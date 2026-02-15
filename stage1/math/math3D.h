@@ -2,7 +2,6 @@
 #include <math.h>
 #include <stdbool.h>
 
-
 //File library file definition
 #ifndef math3D_h
 #define math3D_h

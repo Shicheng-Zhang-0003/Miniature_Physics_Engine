@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <math.h>
-#include "~/Desktop/work/code/major/code/physics_engine/stage1/3D_integration/math3D.h"
+#include "../math/math3D.h"
+#ifndef buffer_h
+#define buffer_h
 
 //Structures required
 typedef struct {

@@ -1,9 +1,8 @@
 #include <stdio.h>
 #include <math.h>
-
-#include "~/Desktop/work/code/major/code/physics_engine/stage1/math/math3D.h"
-#include "~/Desktop/work/code/major/code/physics_engine/stage1/math_phys_buffer/buffer.h"
-#include "~/Desktop/work/code/major/code/physics_engine/stage1/physics/forces/define_forces.h"
+#include "../../math/math3D.h"
+#include "../../math_phys_buffer/buffer.h"
+#include "../forces/define_forces.h"
 
 #ifndef collisions_h
 #define collisions_h
