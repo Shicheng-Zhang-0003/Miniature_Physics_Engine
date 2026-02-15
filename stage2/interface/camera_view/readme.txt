@@ -1,0 +1,1 @@
+DEFAULT NO 3D, 2D force to GTK RENDER
