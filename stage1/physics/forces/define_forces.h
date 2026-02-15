@@ -2,9 +2,8 @@
 #define forces_h
 #include <stdio.h>
 #include <math.h>
-#include "~/Desktop/work/code/major/code/physics_engine/stage1/math_phys_buffer/buffer.h"
-#include "~/Desktop/work/code/major/code/physics_engine/stage1/math/math3D.h"
-
+#include "../../math/math3D.h"
+#include "../../math_phys_buffer/buffer.h"
 //Gravity (Regular and Sloped Parallel Gravity)
 //Local Gravity (Fg = mg)
 void force_applicant_gravity_normal (rigidbody *rb, vector3 gravitational_acceleration, vector3 normal_from_surface) {
