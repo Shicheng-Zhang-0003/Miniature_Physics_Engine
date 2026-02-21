@@ -138,4 +138,15 @@ static inline math3 math3_inverse (math3 m) {
     return res;
 } 
 
+static inline math3 fov_aspr_perspective (float fov, float aspect_rto, float near, float far) {
+    math3 m {{{0}}};
+    float f = 1.0 / tanf (fov / 2.0);
+    m.matrix [0][0] = f / aspect_rto;
+    m.matrix [1][1] = f;
+    m.matrix [2][2] = (far + near) / (near - far);
+    //3 ^ 3 handling of Z - Translations is suboptimal
+    //Counter by simply scaling size
+    return m;
+}
+
 #endif //math3D_h

@@ -1,6 +1,8 @@
-//#include "../..master_header.h" 
-//For when actually integrated with stage 1
+#ifndef timer_h
+#define timer_h
+#include <stdbool.h>
 #include <gtk/gtk.h>
+#include "../../stage1/master_header.h"
 
 //To get a 60 FPS frame game, we will divide 1000 ms / 60 to get a frame render update of every 16 ms
 static gboolean tick_function (gpointer data) {
@@ -15,8 +17,8 @@ static gboolean tick_function (gpointer data) {
     //Integration 
     for (int step2 = 0; step2 < num_objects; step2++) {
         //buffer.h update logic
-        //update_rigidbody (&objects [step2], dt);
-    }//Clear screen using GTK drawing
+        rb_integrate (&objects [step2], dt);
+    } //Clear screen using GTK drawing
     gtk_widget_queue_draw (GTK_WIDGET (objects->user_data_widget)); //Redraw all current objects
     return TRUE; //Continue Timer runtime
 } 

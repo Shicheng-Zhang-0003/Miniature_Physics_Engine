@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <gtk/gtk.h>
-#include "../../stage1/math/math3D.h"
+#include "../../master_header_2.h"
 static inline math3 pov_projection (float fov, float aspect, float nearfield, float farfield) {
     math3 m = {{{0}}};
     float tangent_half_fov = tanf (fov / 2.0);
