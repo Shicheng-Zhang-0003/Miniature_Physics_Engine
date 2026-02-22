@@ -55,9 +55,7 @@ void init_sm_system (mesh *mesh_s, int sections, int stack) {
     //Free Malloced Memory Addrs
     free (indice_list);
     free (vertices);
-} 
-
-void render_sphere (mesh *mesh_s, rigidbody *rb, math3 projection, math3 viewpoint) {
+}  void render_sphere (mesh *mesh_s, rigidbody *rb, math3 projection, math3 viewpoint) {
     //Sphere Preloaded GPU data
     glBindVertexArray (mesh_s->vao);
     //Model Matrix (Scalable by Radius of Sphere, then translate the sphere to apt position)

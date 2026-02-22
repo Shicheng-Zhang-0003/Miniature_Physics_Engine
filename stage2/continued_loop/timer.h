@@ -3,7 +3,6 @@
 #include <stdbool.h>
 #include <gtk/gtk.h>
 #include "../../stage1/master_header.h"
-
 //To get a 60 FPS frame game, we will divide 1000 ms / 60 to get a frame render update of every 16 ms
 static gboolean tick_function (gpointer data) {
     rigidbody *objects = (rigidbody*) data;

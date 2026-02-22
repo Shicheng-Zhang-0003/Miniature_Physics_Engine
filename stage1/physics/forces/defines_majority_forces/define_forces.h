@@ -2,8 +2,8 @@
 #define forces_h
 #include <stdio.h>
 #include <math.h>
-#include "../../math/math3D.h"
-#include "../../math_phys_buffer/buffer.h"
+#include "../../../math/math3D.h"
+#include "../../../math_phys_buffer/buffer.h"
 //Gravity (Regular and Sloped Parallel Gravity)
 //Local Gravity (Fg = mg)
 void force_applicant_gravity_normal (rigidbody *rb, vector3 gravitational_acceleration, vector3 normal_from_surface) {
@@ -17,9 +17,7 @@ void force_applicant_gravity_normal (rigidbody *rb, vector3 gravitational_accele
         vector3 force_normal = vector3_scaling (normal_from_surface, -weight_slope); //Apply Fg in inverse vector
         rb_apply_forces_perfect (rb, force_normal);
     }
-} 
-
-//Universal Law of Gravitation
+} //Universal Law of Gravitation
 //Fg = Gm1m2r ^ -2
 #define big_g 6.67430e-11
 void force_applicant_universal_gravity (rigidbody *a, rigidbody *b) {
@@ -31,9 +29,7 @@ void force_applicant_universal_gravity (rigidbody *a, rigidbody *b) {
     vector3 force_out = vector3_scaling (vector3_normalisation (relation_vector), force_magnitude); //Check magnitude and vectors for applications
     rb_apply_forces_perfect (a, force_out); //Apply to positive vector object (a)
     rb_apply_forces_perfect (n, vector3_scaling (force_out, -1.0)); //Apply to negative vector object (b), equal and opposite direction 
-}
-
-//Friction Definition (3D tangent plane fields)
+} //Friction Definition (3D tangent plane fields)
 void force_applicant_friction (rigidbody *rb, vector3 surface_normal, float mu_static, float mu_kinetic) {
     //Calculate the magnitude of normal forces
     //Ff = uFn
@@ -62,9 +58,7 @@ void force_applicant_friction (rigidbody *rb, vector3 surface_normal, float mu_s
             rb->velocity = vector3_zero ();
         }
     }
-}
-
-//Spring Force, Tension, Hooke Law
+} //Spring Force, Tension, Hooke Law
 void force_applicant_string (rigidbody *rb, vector3 anchor, float resistance_length, float k_constant, float damping) {
     vector3 direction_vector = vector3_subtraction (rb->position, anchor);
     float current_length = vector3_length (direction_vector);
@@ -76,9 +70,7 @@ void force_applicant_string (rigidbody *rb, vector3 anchor, float resistance_len
     //Damping = -c * v (prevents infinite oscillation from release spring compression)
     vector3 force_damping = vector3_scaling (rb->velocity, -damping);
     rb_apply_forces_perfect (rb, vector3_addition (force_spring, force_damping)); //Net of spring and dampening forces
-}
-
-//Vertical Circular Motion
+} //Vertical Circular Motion
 //Vertical circular motion requires Ft to counteract gravity in upper segments
 //This also gives Fc (centripetal) and consequently centrifugal
 void force_applicant_vertical_anchor (rigidbody *rb, vector3 pivot_point, float radius) {
@@ -94,10 +86,7 @@ void force_applicant_vertical_anchor (rigidbody *rb, vector3 pivot_point, float 
     float force_tension_magnitude - force_gravity_along_anchor;
     //Apply Tension towards the vector of the pivot
     rb_apply_forces_perfect (rb, vector3_scale (direction, -force_tension_magnitude));
-}
-
-
-//Monitor the Energy component of the objects related
+} //Monitor the Energy component of the objects related
 typedef struct {float ek, epg, eps, em;} state_energy;
 state_energy force_to_system_energy_amount (rigidbody *rb, vector3 gravitational_acceleration) {
     state_energy es;

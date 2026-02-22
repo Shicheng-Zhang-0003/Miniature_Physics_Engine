@@ -3,7 +3,6 @@
 #include "../math/math3D.h"
 #ifndef buffer_h
 #define buffer_h
-
 //Structures required
 typedef struct {
     //Linear Kinematics
@@ -21,9 +20,7 @@ typedef struct {
     //Dimensions of individual object definition (for collisions and rendering)
     float radius; //Spherical calculation
     bool static_state; //If set to true object is naturally immobile
-} rigidbody;
-
-
+} rigidbody; 
 //Init
 void rigidbody_initialisation_sphere (rigidbody *rb, float radius, float mass, vector3 position_input) {
     //Kinematic
@@ -50,16 +47,12 @@ void rigidbody_initialisation_sphere (rigidbody *rb, float radius, float mass, v
     //Total Force and Torque accumilation
     rb->force_accumilator = vector3_zero ();
     rb->torque_accumilator = vector3_zero ();
-}
-
-//Force application and Torque Dynamics
+} //Force application and Torque Dynamics
 //Apply a force at a centre of mass (perfect collision movement, linear movement only defined)
 void rb_apply_forces_perfect (rigidbody *rb, vector3 force_applied) {
     if (rb->static_state) {return;}
     rb->force_accumilator = vector3_addition (rb->force_accumilator, force); //Force applied to torque and circular momentum
-} 
-
-//Apply force at a point not the centre of mass (which generates rotational motion and torque)
+} //Apply force at a point not the centre of mass (which generates rotational motion and torque)
 //locale_impact = impact point on object identified
 void rb_apply_forces_localised (rigidbody *rb, vector3 force_applied, vector3 locale_impact) {
     if (rb->static_state) {return;}
@@ -68,9 +61,7 @@ void rb_apply_forces_localised (rigidbody *rb, vector3 force_applied, vector3 lo
     vector3 r = vector3_subtraction (locale_impact, rb->position);
     vector3 torque_actual = vector3_cross (r, force_applied);
     rb->torque_accumilator = vector3_addition (rb->torque_accumilator, torque_actual);
-}
-
-//Energy Computation
+} //Energy Computation
 float rb_get_Ek (rigidbody *rb) {
     //EK normal = 0.5mv ^ 2
     float linear_ek = 0.5 * rb->mass * vector3_length_squared (rb->velocity);
@@ -78,9 +69,7 @@ float rb_get_Ek (rigidbody *rb) {
     vector3 angular_momemtum = math3_multiplication_vector3 (math3_inverse (rb->inverse_inertia_system), rb->angular_velocity);
     float rotational_ek = 0.5 * vector3_dot (rb->angular_velocity, angular_momemtum);
     return linear_ek + rotational_ek;
-}
-
-//Integration Segmentation (Movement Compute)
+} //Integration Segmentation (Movement Compute)
 void rb_integrate (rigidbody *rb, float dt) {
     if ((rb->static_state) || (dt <= 0.0)) {return;}
     //Calculate Linear Acceleration (F = ma, a = Fm ^ -1)

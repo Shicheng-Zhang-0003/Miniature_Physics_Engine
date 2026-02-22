@@ -11,9 +11,7 @@ static void on_point_render (GtkGLArea * area, GdkGlContext *context) {
                                                                                                                    mesh transformed for rendering
                                                                                                                    rigidbody->position, rigidbody->orientation does the job here
                                                                                                                 */
-}
-
-void activation (GtkApplication *application, gpointer user_data_main) {
+} void activation (GtkApplication *application, gpointer user_data_main) {
     GtkWidget *window = gtk_application_window_new (app);
     gtk_window_set_title (GTK_WINDOW (window), "Stage 2 Testing Stage");
     gtk_window_set_default_size (GTK_WINDOW (window), 800, 600); //800x600 resolution

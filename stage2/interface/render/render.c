@@ -2,7 +2,6 @@
 #include "../../master_header_2.h"
 #include <epoxy/gl.h>
 #include <epoxy/gl_generated.h>
-
 void render_scene_current (int width, int height) {
     //Setup View angle, Viewport, etc
     glViewport (0, 0, width, height);
@@ -22,3 +21,12 @@ void render_scene_current (int width, int height) {
         glPopMatrix ();
     }
 }
+
+//Incorporate Camera FOV
+// Inside rendering loop
+//float view_matrix [16];
+//camera_get_view_matrix (&my_camera, view_matrix);
+
+// Send it to shadering unit in OpenGL
+//GLuint viewLoc = glGetUniformLocation (shader_program, "view");
+//glUniformMatrix4fv (viewLoc, 1, GL_FALSE, view_matrix);

@@ -3,10 +3,8 @@
 #include "../../math/math3D.h"
 #include "../../math_phys_buffer/buffer.h"
 #include "../forces/define_forces.h"
-
 #ifndef collisions_h
 #define collisions_h
-
 typedef struct {
     rigidbody *a;
     rigidbody *b;
@@ -14,7 +12,6 @@ typedef struct {
     vector3 contact_point; //Position on both objects of contact
     float penetration_contact; //Overlap amount
 } collision_data;
-
 //Detection of actual collision (Sphere to Sphere contact)
 bool collision_dual_sphere (rigidbody *a, rigidbody *b, collision_data *out) {
     vector3 relative_position = vector3_subtraction (b->position, a->position);
@@ -32,9 +29,7 @@ bool collision_dual_sphere (rigidbody *a, rigidbody *b, collision_data *out) {
     //Contact point between the objects is in between the two centre points
     out->contact_point = vector3_addition (a->position, vector3_scaling (out->normal_vector, a->radius));
     return true;
-}
-
-//Resolution (Impulse-Momemtum) (x, y, z directional vectoring for impulse related calculations)
+} //Resolution (Impulse-Momemtum) (x, y, z directional vectoring for impulse related calculations)
 void collision_resolve (collision_data *c) {
     rigidbody *a = c->a, *b = c->b;
     //Calculate the vectors from the centre of mass to the contact point between objects (rad_a, and rad_b)]

@@ -1,13 +1,20 @@
 #include "../../master_header_2.h"
 #include "../../../stage1/master_header.h"
+#include "../../camera/camera.h"
+#include "../../camera/camera.c"
 #include <gtk/gtk.h>
 #include <stdbool.h>
-
 //World Status right now
+extern camera main_camera_fov;
+extern input_status main_inputs;
 rigidbody obj_per_scene [10];
 int object_count = 0;
 static gboolean physics_step_increment (gpointer user_data_stored) {
     float dt = 0.016; // 1 / 60 s increment, 16 ms 
+    if (main_input.w_key) {camera_move_w (&main_camera_fov, dt);}
+    if (main_input.a_key) {camera_move_a (&main_camera_fov, dt);}
+    if (main_input.s_key) {camera_move_s (&main_camera_fov, dt);}
+    if (main_input.d_key) {camera_move_d (&main_camera_fov, dt);}
     for (int step = 0; step < object_count; step++) {
         //Apply forces nominally
         //Gravity

@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <math.h>
 #include <stdbool.h>
-
 //File library file definition
 #ifndef math3D_h
 #define math3D_h
@@ -13,8 +12,6 @@
 #define degrad (math_pi / 180.0)
 #define raddeg (180.0 / math_pi)
 #define epsilon 0.000001
-
-
 //Structures for use as typedefs
 //Vector in 3D for objects in motion
 typedef struct { float x, y, z } vector3;
@@ -22,8 +19,6 @@ typedef struct { float x, y, z } vector3;
 typedef struct { float matrix [3][3] } math3;
 //4D axial rotational matrix motion (w + xi + yj + zk)
 typedef struct { float w, x, y, z } vector4; 
-
-
 //Functions for computing different vector3
 static inline vector3 vector3_new (float x, float y, float z) {return (vector3) {x, y, z};}
 static inline vector3 vector3_zero (float x, float y, float z) {return (vector3) {0.0, 0.0, 0.0};}
@@ -40,10 +35,7 @@ static inline vector3 vector3_normalisation (vector3 vector) {
     float length = vector3_length (vector);
     if (length < epsilon) {return vector3_zero ();}
     return vector3_scaling (vector, 1.0 / length);
-}
-
-
-//Quarternion (4D) Functions
+} //Quarternion (4D) Functions
 //orientation in rotational w-axis w/o gimbal in any axis
 static inline vector4 vector4_identity () {return (vector4) {1.0, 0.0, 0.0, 0.0};}
 static inline vector4 vector4_normalisation (vector4 quart) {
@@ -77,10 +69,7 @@ static inline vector4 vector4_from_axis_with_angle (vector3 axis, float angle_ra
     float side_s = sinf (ang_half);
     vector3 n = vector3_normalisation (axis);
     return (vector4) {cosf (ang_half), n.x * side_s, n.y * side_s, n.z * side_s};
-} 
-
-
-//3 ^ 3 matrix Functions
+} //3 ^ 3 matrix Functions
 static inline math3 math3_identity () {
     math3 m {{{0}}};
     m.m [0][0] = 1.0; m.m [1][1] = 1.0; m.m [2][2] = 1.0;
@@ -136,9 +125,7 @@ static inline math3 math3_inverse (math3 m) {
     res.m [2][1] = (m.m [2][0] * m.m [0][1] - m.m [0][0] * m.m [2][1]) * invDet;
     res.m [2][2] = (m.m [0][0] * m.m [1][1] - m.m [1][0] * m.m [0][1]) * invDet;
     return res;
-} 
-
-static inline math3 fov_aspr_perspective (float fov, float aspect_rto, float near, float far) {
+} static inline math3 fov_aspr_perspective (float fov, float aspect_rto, float near, float far) {
     math3 m {{{0}}};
     float f = 1.0 / tanf (fov / 2.0);
     m.matrix [0][0] = f / aspect_rto;
@@ -147,6 +134,5 @@ static inline math3 fov_aspr_perspective (float fov, float aspect_rto, float nea
     //3 ^ 3 handling of Z - Translations is suboptimal
     //Counter by simply scaling size
     return m;
-}
-
+} 
 #endif //math3D_h
