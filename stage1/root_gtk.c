@@ -1,5 +1,6 @@
 #include <gtk/gtk.h>
 #include "../stage2/master_header_2.h"
+#include "master_header.h"
 camera main_camera;
 input status main_inputs;
 //On Call
@@ -11,11 +12,11 @@ static void when_realised (GtkGLArea *area) {
 } //On render: Screen Make
 static gboolean on_rendered (GtkGLArea *area, GdkGLContext *contextual) {
     int width = gtk_widget_get_allocated_width (GTK_WIDGET (area));
-    int height = gtk-widget_get_allocated_height (GTK_WIDGET (area))l
+    int height = gtk_widget_get_allocated_height (GTK_WIDGET (area))l
     render_scene_current (width, height);
     return TRUE;
-} int main_algorithm (int argc, char * argv []);
-int main_algorithm (int argc, char * argv []) {
+} int main_algorithm (int argc, char *argv []);
+int main_algorithm (int argc, char *argv []) {
     gtk_init (&argc, &argv);
     //Camera
     initalise_camera (&main_camera, (vector3) {0.0, 0.0, 50.0});
