@@ -8,6 +8,6 @@ void applicant_drag_3D (rigidbody *rb, float b, bool quadratic_incorp) { //B = c
     vector3 normalised_opposition = vector3_normalisation (opposite_direction);
     float drag_magnitude;
     if (quadratic_incorp) {drag_magnitude = b * speed * speed;} //High Speed or 3D application, Fd = bv ^ 2
-    else {drag_magnitude = b * speed} //Low speed or Linear Application, Fd = bv
+    else {drag_magnitude = b * speed;} //Low speed or Linear Application, Fd = bv
     rb_apply_forces_perfect(rb, vector3_scaling (normalised_opposition, drag_magnitude)); //Apply Actual drag force to the object with opposition vector and magnitude
 }

@@ -28,7 +28,7 @@ void force_applicant_universal_gravity (rigidbody *a, rigidbody *b) {
     float force_magnitude = (big_g * a->mass * b->mass) / distance_squared; //Fg = Gm1m2r ^ -2
     vector3 force_out = vector3_scaling (vector3_normalisation (relation_vector), force_magnitude); //Check magnitude and vectors for applications
     rb_apply_forces_perfect (a, force_out); //Apply to positive vector object (a)
-    rb_apply_forces_perfect (n, vector3_scaling (force_out, -1.0)); //Apply to negative vector object (b), equal and opposite direction 
+    rb_apply_forces_perfect (b, vector3_scaling (force_out, -1.0)); //Apply to negative vector object (b), equal and opposite direction 
 } //Friction Definition (3D tangent plane fields)
 void force_applicant_friction (rigidbody *rb, vector3 surface_normal, float mu_static, float mu_kinetic) {
     //Calculate the magnitude of normal forces
@@ -48,13 +48,12 @@ void force_applicant_friction (rigidbody *rb, vector3 surface_normal, float mu_s
     } else { 
         //Static Friction: opposition to any form of newly added motion from externalised force
         //Calculated already applied forces
-        vector3 force_tangent_accumulated = vector3_subtraction (rb->force_accumulator, 
-                vector3_scaling (surface_normal, vector3_dot (rb->force_accumulator, surface_normal))); //Accumulated force applied to existing net input for net force output applied on the object
+        vector3 force_tangent_accumulated = vector3_subtraction (rb->force_accumilator, vector3_scaling (surface_normal, vector3_dot (rb->force_accumilator, surface_normal))); //Accumulated force applied to existing net input for net force output applied on the object
         float accumulated_force_magnitude = vector3_length (force_tangent_accumulated);
         if (accumulated_force_magnitude < mu_static * force_normal_magnitude) {
             //Force applied < Force Static Friction --> No movement
             //Neutralise Sliding Force
-            rb_apply_forces_perfect (rb, vector3_scale (force_tangent_accumulated, -1.0));
+            rb_apply_forces_perfect (rb, vector3_scaling (force_tangent_accumulated, -1.0));
             rb->velocity = vector3_zero ();
         }
     }
@@ -66,7 +65,7 @@ void force_applicant_string (rigidbody *rb, vector3 anchor, float resistance_len
     float x_value = current_length - resistance_length;
     vector3 direction = vector3_normalisation (direction_vector);
     //Fs = -kx
-    vector3 force_spring = vector3_scale (direction, -k_constant * x_value);
+    vector3 force_spring = vector3_scaling (direction, -k_constant * x_value);
     //Damping = -c * v (prevents infinite oscillation from release spring compression)
     vector3 force_damping = vector3_scaling (rb->velocity, -damping);
     rb_apply_forces_perfect (rb, vector3_addition (force_spring, force_damping)); //Net of spring and dampening forces
@@ -83,9 +82,9 @@ void force_applicant_vertical_anchor (rigidbody *rb, vector3 pivot_point, float 
     vector3 gravity = {0, -9.81 * rb->mass, 0}; //Gravitational Magnitude
     float force_gravity_along_anchor = vector3_dot (gravity, direction);
     //Tension (Ft): Simultaneously satisfy Fc and counteract Fg
-    float force_tension_magnitude - force_gravity_along_anchor;
+    float force_tension_magnitude = force_centripetal_magnitude + force_gravity_along_anchor;
     //Apply Tension towards the vector of the pivot
-    rb_apply_forces_perfect (rb, vector3_scale (direction, -force_tension_magnitude));
+    rb_apply_forces_perfect (rb, vector3_scaling (direction, -force_tension_magnitude));
 } //Monitor the Energy component of the objects related
 typedef struct {float ek, epg, eps, em;} state_energy;
 state_energy force_to_system_energy_amount (rigidbody *rb, vector3 gravitational_acceleration) {
