@@ -41,9 +41,9 @@ void rigidbody_initialisation_sphere (rigidbody *rb, float radius, float mass, v
     //I = 0.4mr ^ 2
     float iner = (0.4f) * mass * radius * radius; //0.4f, not 0.4, for decimal float point accuracy
     rb->inertia_tensor_local = math3_identity (); 
-    rb->inertia_tensor_local.m [0][0] = iner;
-    rb->inertia_tensor_local.m [1][1] = iner;
-    rb->inertia_tensor_local.m [2][2] = iner;
+    rb->inertia_tensor_local.matrix [0][0] = iner;
+    rb->inertia_tensor_local.matrix [1][1] = iner;
+    rb->inertia_tensor_local.matrix [2][2] = iner;
     //Total Force and Torque accumilation
     rb->force_accumilator = vector3_zero ();
     rb->torque_accumilator = vector3_zero ();
@@ -51,7 +51,7 @@ void rigidbody_initialisation_sphere (rigidbody *rb, float radius, float mass, v
 //Apply a force at a centre of mass (perfect collision movement, linear movement only defined)
 void rb_apply_forces_perfect (rigidbody *rb, vector3 force_applied) {
     if (rb->static_state) {return;}
-    rb->force_accumilator = vector3_addition (rb->force_accumilator, force); //Force applied to torque and circular momentum
+    rb->force_accumilator = vector3_addition (rb->force_accumilator, force_applied); //Force applied to torque and circular momentum
 } //Apply force at a point not the centre of mass (which generates rotational motion and torque)
 //locale_impact = impact point on object identified
 void rb_apply_forces_localised (rigidbody *rb, vector3 force_applied, vector3 locale_impact) {
@@ -67,7 +67,7 @@ float rb_get_Ek (rigidbody *rb) {
     float linear_ek = 0.5 * rb->mass * vector3_length_squared (rb->velocity);
     //EK rotational = 0.5wIw
     vector3 angular_momemtum = math3_multiplication_vector3 (math3_inverse (rb->inverse_inertia_system), rb->angular_velocity);
-    float rotational_ek = 0.5 * vector3_dot (rb->angular_velocity, angular_momemtum);
+    float rotational_ek = 0.5 * vector3_dot (rb->angular_velocity, angular_momentum);
     return linear_ek + rotational_ek;
 } //Integration Segmentation (Movement Compute)
 void rb_integrate (rigidbody *rb, float dt) {
@@ -82,8 +82,8 @@ void rb_integrate (rigidbody *rb, float dt) {
     //P1: Update inverse inertia tensor: inverse_inertia_system = rotational * inverse_inertia_local * transposed value in 4D rotational axis
     math3 rotation = vector4_to_math3 (rb->orientation); //W axis orientation of rotation
     math3 rotation_t = math3_transposition (rotation);
-    math3 inverse_local = math3_invserse (rb->inertia_tensor_local); //Inverse Local Inertia
-    rb->inverse_inertia_system = math3_multiplication (rotation, math3_multiplication (inverse_local, rotationan_t));
+    math3 inverse_local = math3_inverse (rb->inertia_tensor_local); //Inverse Local Inertia
+    rb->inverse_inertia_system = math3_multiplication (rotation, math3_multiplication (inverse_local, rotation_t));
     rb->angular_acceleration = math3_multiplication_vector3 (rb->inverse_inertia_system, rb->torque_accumilator);
     //Update Standard Angular Velocity
     rb->angular_velocity = vector3_addition (rb->angular_velocity, vector3_scaling (rb->angular_acceleration, dt)); //Sum of current angular velocity by delta angular velocity

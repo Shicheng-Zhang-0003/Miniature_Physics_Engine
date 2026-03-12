@@ -14,19 +14,19 @@
 #define epsilon 0.000001
 //Structures for use as typedefs
 //Vector in 3D for objects in motion
-typedef struct { float x, y, z } vector3;
+typedef struct { float x, y, z; } vector3;
 //3 ^ 3 matrix for computing Inertia tensoring
-typedef struct { float matrix [3][3] } math3;
+typedef struct { float matrix [3][3]; } math3;
 //4D axial rotational matrix motion (w + xi + yj + zk)
-typedef struct { float w, x, y, z } vector4; 
+typedef struct { float w, x, y, z; } vector4; 
 //Functions for computing different vector3
 static inline vector3 vector3_new (float x, float y, float z) {return (vector3) {x, y, z};}
-static inline vector3 vector3_zero (float x, float y, float z) {return (vector3) {0.0, 0.0, 0.0};}
+static inline vector3 vector3_zero (void) {return (vector3) {0.0, 0.0, 0.0};}
 static inline vector3 vector3_addition (vector3 a, vector3 b) {return (vector3) {a.x + b.x, a.y + b.y, a.z + b.z};}
 static inline vector3 vector3_subtraction (vector3 a, vector3 b) {return (vector3) {a.x - b.x, a.y - b.y, a.z - b.z};}
 static inline vector3 vector3_scaling (vector3 a, float scale) {return (vector3) {a.x * scale, a.y * scale, a.z * scale};}
 //Dot: work and projection of vectors
-static inline vector3 vector3_dot (vector3 a, vector3 b) {return a.x * b.x + a.y * b.y + a.z * b.z;}
+static inline vector3 vector3_dot (vector3 a, vector3 b) {return (float) (a.x * b.x + a.y * b.y + a.z * b.z);}
 //Cross: Torque conversion and computation
 static inline vector3 vector3_cross (vector3 a, vector3 b) {return (vector3) {(a.y * b.z - a.z * b.y), (a.z * b.x - a.x * b.z), (a.x * b.y - a.y * b.x)};}
 static inline float vector3_length_squared (vector3 vector) {return vector.x * vector.x + vector.y * vector.y + vector.z * vector.z;}
@@ -46,10 +46,10 @@ static inline vector4 vector4_normalisation (vector4 quart) {
 } //Multiplication of two 4D matrices at once (combinatoric rotational motion)
 static inline vector4 vector4_multiplication (vector4 a, vector4 b) {
     return (vector4) {
-        a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z,     
-        a.w * b.w + a.x * b.x + a.y * b.y - a.z * b.z,
-        a.w * b.w - a.x * b.x + a.y * b.y + a.z * b.z,
-        a.w * b.w + a.x * b.x - a.y * b.y + a.z * b.z
+        a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z,    
+        a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
+        a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
+        a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w 
     };
 } //Rotate a 3D vector by a 4D rotational matrix
 //v_a = q * v * q_conjugation
@@ -71,12 +71,12 @@ static inline vector4 vector4_from_axis_with_angle (vector3 axis, float angle_ra
     return (vector4) {cosf (ang_half), n.x * side_s, n.y * side_s, n.z * side_s};
 } //3 ^ 3 matrix Functions
 static inline math3 math3_identity () {
-    math3 m {{{0}}};
-    m.m [0][0] = 1.0; m.m [1][1] = 1.0; m.m [2][2] = 1.0;
+    math3 m = {{{0}}};
+    m.matrix [0][0] = 1.0; m.matrix [1][1] = 1.0; m.matrix [2][2] = 1.0;
     return m;  
 } //Multiply specific matrix by a existing vector
 static inline vector3 math3_multiplication_vector3 (math3 m, vector3 vector) {
-    return (vector3) {m.m [0][0] * vector.x + m.m [0][1] * vector.y + m.m [0][2] * vector.z, m.m [1][0] * vector.x + m.m [1][1] * vector.y + m.m [1][2] * vector.z, m.m [2][0] * vector.x + m.m [2][1] * vector.y + m.m [2][2] * vector.z};
+    return (vector3) {m.matrix [0][0] * vector.x + m.matrix [0][1] * vector.y + m.matrix [0][2] * vector.z, m.matrix [1][0] * vector.x + m.matrix [1][1] * vector.y + m.matrix [1][2] * vector.z, m.matrix [2][0] * vector.x + m.matrix [2][1] * vector.y + m.matrix [2][2] * vector.z};
 } //Convert 4D to rotational matrix (Inertia Tensor rotations)
 //I_total = R * I_local * * R_transposed
 static inline math3 vector4_to_math3 (vector4 quart) {
@@ -87,43 +87,43 @@ static inline math3 vector4_to_math3 (vector4 quart) {
     float y_y = quart.y * y_def, y_z = quart.y * z_def, z_z = quart.z * z_def;
     float w_x = quart.w * x_def, w_y = quart.w * y_def, w_z = quart.w * z_def;
     //Affix to math3 format
-    m.m [0][0] = 1.0 - (y_y + z_z), m.m [0][1] = x_y - w_z, m.m [0][2] = x_z + w_y;
-    m.m [1][0] = x_y + w_z, m.m [1][1] = 1.0 - (x_x + z_z), m.m [1][2] = y_z - w_x;
-    m.m [2][0] = x_z - w_y, m.m [2][1] = y_z + w_x, m.m [2][2] = 1.0 - (x_x + y_y);
+    m.matrix [0][0] = 1.0 - (y_y + z_z), m.matrix [0][1] = x_y - w_z, m.matrix [0][2] = x_z + w_y;
+    m.matrix [1][0] = x_y + w_z, m.matrix [1][1] = 1.0 - (x_x + z_z), m.matrix [1][2] = y_z - w_x;
+    m.matrix [2][0] = x_z - w_y, m.matrix [2][1] = y_z + w_x, m.matrix [2][2] = 1.0 - (x_x + y_y);
     return m;
 } //Matrix Multiplication
-static inline vector3 math3_multiplication (math3 a, math3 b) {
+static inline math3 math3_multiplication (math3 a, math3 b) {
     math3 res = {{{0}}};
-    for (int rot = 0; rot < 3; r++) {
+    for (int rot = 0; rot < 3; rot++) {
         for (int cnt = 0; cnt < 3; cnt++) {
-            res.m [r][c] = (a.m [r][0] * b.m [0][c]) + (a.m [r][1] * b.m [1][c]) + (a.m [r][2] * b.m [2][c]);
+            res.matrix [rot][cnt] = (a.matrix [rot][0] * b.matrix [0][cnt]) + (a.matrix [rot][1] * b.matrix [1][cnt]) + (a.matrix [rot][2] * b.matrix [2][cnt]);
         }
     } return res;
 } static inline math3 math3_transposition (math3 m) {
     math3 res;
     for (int slt1 = 0; slt1 < 3; slt1++) {
-        for (int slt2 = 0; slt2 < 3; slt2++) {res.m [slt1][slt2] = m.m [slt2][slt1];}
+        for (int slt2 = 0; slt2 < 3; slt2++) {res.matrix [slt1][slt2] = m.matrix [slt2][slt1];}
     } return res;
 } //Matrix inversion (3 ^ 3 specific)
 // Angular Constraint Calculation (change_p = J * M ^ -1 * J_transposed) 
 static inline math3 math3_inverse (math3 m) {
-    float det = (m.m [0][0] * (m.m [1][1] * m.m [2][2] - m.m [2][1] * m.m [1][2])) - (m.m [0][1] * (m.m [1][0] * m.m [2][2] - m.m [1][2] * m.m [2][0])) + (m.m [0][2] * (m.m [1][0] * m.m [2][1] - m.m [1][1] * m.m [2][0]));
+    float det = (m.matrix [0][0] * (m.matrix [1][1] * m.matrix [2][2] - m.matrix [2][1] * m.matrix [1][2])) - (m.matrix [0][1] * (m.matrix [1][0] * m.matrix [2][2] - m.matrix [1][2] * m.matrix [2][0])) + (m.matrix [0][2] * (m.matrix [1][0] * m.matrix [2][1] - m.matrix [1][1] * m.matrix [2][0]));
     if (fabsf (det) < epsilon) {return math3_identity ();} //Buffer Check
     float invDet = 1.0 / det;
     math3 res;
     //n ~= {0, 2}
     //[0][n]
-    res.m [0][0] = (m.m [1][1] * m.m [2][2] - m.m [2][1] * m.m [1][2]) * invDet;
-    res.m [0][1] = (m.m [0][2] * m.m [2][1] - m.m [0][1] * m.m [2][2]) * invDet;
-    res.m [0][2] = (m.m [0][1] * m.m [1][2] - m.m [0][2] * m.m [1][1]) * invDet;
+    res.matrix [0][0] = (m.matrix [1][1] * m.matrix [2][2] - m.matrix [2][1] * m.matrix [1][2]) * invDet;
+    res.matrix [0][1] = (m.matrix [0][2] * m.matrix [2][1] - m.matrix [0][1] * m.matrix [2][2]) * invDet;
+    res.matrix [0][2] = (m.matrix [0][1] * m.matrix [1][2] - m.matrix [0][2] * m.matrix [1][1]) * invDet;
     //[1][n]
-    res.m [1][0] = (m.m [1][2] * m.m [2][0] - m.m [1][0] * m.m [2][2]) * invDet;
-    res.m [1][1] = (m.m [0][0] * m.m [2][2] - m.m [0][2] * m.m [2][0]) * invDet;
-    res.m [1][2] = (m.m [1][0] * m.m [0][2] - m.m [0][0] * m.m [1][2]) * invDet;
+    res.matrix [1][0] = (m.matrix [1][2] * m.matrix [2][0] - m.matrix [1][0] * m.matrix [2][2]) * invDet;
+    res.matrix [1][1] = (m.matrix [0][0] * m.matrix [2][2] - m.matrix [0][2] * m.matrix [2][0]) * invDet;
+    res.matrix [1][2] = (m.matrix [1][0] * m.matrix [0][2] - m.matrix [0][0] * m.matrix [1][2]) * invDet;
     //[2][n]
-    res.m [2][0] = (m.m [1][0] * m.m [2][1] - m.m [2][0] * m.m [1][1]) * invDet;
-    res.m [2][1] = (m.m [2][0] * m.m [0][1] - m.m [0][0] * m.m [2][1]) * invDet;
-    res.m [2][2] = (m.m [0][0] * m.m [1][1] - m.m [1][0] * m.m [0][1]) * invDet;
+    res.matrix [2][0] = (m.matrix [1][0] * m.matrix [2][1] - m.matrix [2][0] * m.matrix [1][1]) * invDet;
+    res.matrix [2][1] = (m.matrix [2][0] * m.matrix [0][1] - m.matrix [0][0] * m.matrix [2][1]) * invDet;
+    res.matrix [2][2] = (m.matrix [0][0] * m.matrix [1][1] - m.matrix [1][0] * m.matrix [0][1]) * invDet;
     return res;
 } static inline math3 fov_aspr_perspective (float fov, float aspect_rto, float near, float far) {
     math3 m {{{0}}};
