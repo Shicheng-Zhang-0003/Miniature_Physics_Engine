@@ -5,14 +5,14 @@
 typedef struct {
     vector3 position; //Where Camera is in 3D field
     vector3 front; //Vector that the camera is currently facing
-    vector3 vertical //Which vector defines moving up
+    vector3 vertical; //Which vector defines moving up
     vector3 side; //Axis from Horizontal Planar Entry
     //Euler Angles for rotating motion
     float yaw; //Left, Right
     float pitch; //Up, Down (Degrees)
     //Base Settings
     float speed_movement_camera; //How Fast the Camera POV moves
-    float sensitivity_mouse //How sensitive the mouse is
+    float sensitivity_mouse; //How sensitive the mouse is
 } camera;
 //Init Camera (starting values)
 void initalise_camera (camera *cam, vector3 start_position);

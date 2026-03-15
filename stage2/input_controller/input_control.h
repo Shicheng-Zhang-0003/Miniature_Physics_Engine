@@ -10,6 +10,6 @@ typedef struct {
     double last_x_input, last_y_input;
 } input_status;
 //Initialise input state to zeroing
-void initialise_input (input_state *input);
+void initialise_input (input_status *input);
 
 #endif
