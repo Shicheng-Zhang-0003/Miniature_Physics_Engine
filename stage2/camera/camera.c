@@ -1,6 +1,5 @@
 #include "camera.h"
 #include <math.h>
-
 void camera_update_vector_input (camera *cam) {
     //Front Vector --> Pitch and Yaw
     //Deg to Rad
@@ -15,14 +14,14 @@ void camera_update_vector_input (camera *cam) {
     //Calculate Right Side and Vertical Vectors
     //Cross of Frontal and Up view {0, 1, 0} --> Right Axis
     vector3 world_up_view = {0.0, 1.0, 0.0};
-    cam->side = vector3_normalisation (vector3_cross (cam->side, world_up_view));
+    cam->side = vector3_normalisation (vector3_cross (cam->front, world_up_view));
     //Cross right and front gives the UP axis
     cam->vertical = vector3_normalisation (vector3_cross (cam->side, cam->front));
 } void initalise_camera (camera *cam, vector3 start_position) {
     cam->position = start_position;
     cam->yaw = -90.0; //Straight Forwards (Negative Z Axis)
     cam->pitch = 0.0; //Flat Horizon View
-    cam->speed = 25.0; //25 Units of Movement * s ^ -1
+    cam->speed_movement_camera = 25.0; //25 Units of Movement * s ^ -1
     cam->sensitivity_mouse = 0.1;
     camera_update_vector_input (cam);
 } void camera_view_matrix (camera *cam, float *matrix_out) {
@@ -47,7 +46,7 @@ void camera_update_vector_input (camera *cam) {
     //C3
     matrix_out [12] = -vector3_dot (r_axis, cam->position);
     matrix_out [13] = -vector3_dot (u_axis, cam->position);
-    matrix_out [14] = vector3_dot (f_axis, cam->position);
+    matrix_out [14] = -vector3_dot (f_axis, cam->position);
     matrix_out [15] = 1.0;
 } //Movement
 void camera_move_w (camera *cam, float delta_time) {

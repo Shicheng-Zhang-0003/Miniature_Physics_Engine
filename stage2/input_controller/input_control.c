@@ -20,7 +20,7 @@ void initialise_input (input_status *input) {
     if (event->keyval == GDK_KEY_s) {input->s_key = true;}
     if (event->keyval == GDK_KEY_d) {input->d_key = true;}
     return false;
-} gboolean on_key_released (GtkWidget *widget, GdkEvenetKey *event, gpointer user_data_stored) {
+} gboolean on_key_released (GtkWidget *widget, GdkEventKey *event, gpointer user_data_stored) {
     input_status *input = (input_status *) user_data_stored; 
     //Keystroke Recognition
     if (event->keyval == GDK_KEY_w) {input->w_key = false;}
@@ -28,10 +28,10 @@ void initialise_input (input_status *input) {
     if (event->keyval == GDK_KEY_s) {input->s_key = false;}
     if (event->keyval == GDK_KEY_d) {input->d_key = false;}
     return false;
-} gboolean on_mouse_movements (GtkWidget *widget, GdkEventKey *event, gpointer user_data_stored) {
+} gboolean on_mouse_movements (GtkWidget *widget, GdkEventMotion *event, gpointer user_data_stored) {
     //Pass a array containing both camera and the input status
     //user_data --> global camera view
-    extern camera_t main_camera_fov;
+    extern camera main_camera_fov;
     extern input_status main_inputs;
     if (main_inputs.mouse_1) {
         main_inputs.last_x_input = event->x;
