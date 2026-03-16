@@ -1,10 +1,10 @@
 stage 0: Obsolete (Raylib Dependency Removed)
 stage 1: Main Physics Components
-    Undergoing Stage 2 Linkage
+    Backlog Synaptic Fixes
 stage 2: GTK Start
-    In Prog
+    Linking with Stage 1 and module integration ongoing
 stage 3: Combination
-    Backlog
+    In Progress
 stage 4: Game Mechanics and etc
     In Planning
 stage 5: Push Physics Engine Mechanics into Game Rendering
