@@ -6,7 +6,7 @@ void init_sm_system (mesh *mesh_s, int sections, int stack) {
     //Calculate the number of vertices we require for rendering
     // (stack + 1)(sections + 1) total amount fo vertices required
     int vertice_count = (stack + 1) * (sections + 1);
-    float *vertices = malloc (vertice_count * 3 * sizeof (float));
+    float *vertices = malloc (vertice_count * 6 * sizeof (float));
     //Generate Vertex COordinates for rendering
     int v_idx = 0; //Assembly notation idx bitshifting
     for (int step = 0; step <= stack; step++) {
@@ -16,9 +16,17 @@ void init_sm_system (mesh *mesh_s, int sections, int stack) {
             //Theta goes in radians all around circulat object
             float theta_variable = step2 * 2 * math_pi / sections;
             //Transpose Spherical objects to a cartesian plan (r = 1 as example)
-            vertices [v_idx++] = cosf (phi_variable) * cosf (theta_variable);
-            vertices [v_idx++] = sinf (phi_variable);
-            vertices [v_idx++] = cosf (phi_variable) * sinf (theta_variable);
+            float p_x = cosf (phi_variable) * cosf (theta_variable);
+            float p_y = sinf (phi_variable);
+            float p_z = cosf (phi_variable) * sinf (theta_variable);
+            //Positional Values
+            vertices [v_idx++] = p_x;
+            vertices [v_idx++] = p_x;
+            vertices [v_idx++] = p_x;
+            //Normal Rendering (Unit Sphere, x ^ 2 + y ^ 2 + z ^ 2 = 1)
+            vertices [v_idx++] = p_x;
+            vertices [v_idx++] = p_x;
+            vertices [v_idx++] = p_x;
         }
     } //Generate Indices
     //Quads in each grid is split into dual triangle configurations
@@ -45,30 +53,28 @@ void init_sm_system (mesh *mesh_s, int sections, int stack) {
     glBindVertexArray (mesh_s->vao);
     //Vertice Upload Count
     glBindBuffer (GL_ARRAY_BUFFER, mesh_s->vbo);
-    glBufferData (GL_ARRAY_BUFFER, vertice_count * 3 * sizeof (float), vertices, GL_STATIC_DRAW);
+    glBufferData (GL_ARRAY_BUFFER, vertice_count * 6 * sizeof (float), vertices, GL_STATIC_DRAW);
     //Indice Upload Count
     glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, mesh_s->ebo);
     glBufferData (GL_ELEMENT_ARRAY_BUFFER, mesh_s->index * sizeof (unsigned int), indice_list, GL_STATIC_DRAW);
     //OpenGL attribute set --> affix certain attributes to 3D position statements
-    glVertexAttribPointer (0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof (float), (void*) 0);
+    glVertexAttribPointer (0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof (float), (void*) 0);
+    // Position attribute
+    glVertexAttribPointer (0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof (float), (void*) 0);
+    glEnableVertexAttribArray (0);
+    // Normal attribute
+    glVertexAttribPointer (1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof (float), (void*) (3 * sizeof (float)));
+    glEnableVertexAttribArray (1);
+    //Other attribute set
     glEnableVertexAttribArray (0);
     //Free Malloced Memory Addrs
     free (indice_list);
     free (vertices);
-}  void render_sphere_object (mesh *mesh_s, rigidbody *rb, math3 projection, math3 viewpoint) {
+}  void render_sphere_object (mesh *mesh_s, rigidbody *rb, math4 projection, math4 viewpoint) {
     //Sphere Preloaded GPU data
     glBindVertexArray (mesh_s->vao);
-    //Model Matrix (Scalable by Radius of Sphere, then translate the sphere to apt position)
-    //Math3D functions
-    //Scale by rb->radius (mesh template set to 1)
-    //Translation to rb->position
-    //For now, use fixed function setup to test efficacy and accuracy
-    glPushMatrix ();
-    //Apply Physics Math to Actual Rendered Object
-    glTranslatef (rb->position.x, rb->position.y, rb->position.z);
-    glScalef (rb->radius, rb->radius, rb->radius);
-    //Draw Triangles 
+    //Draw Triangles
     //GL_TRIANGLES for GPU to run indices 3 at a time
     glDrawElements (GL_TRIANGLES, mesh_s->index, GL_UNSIGNED_INT, 0);
-    glPopMatrix ();
+    glBindVertexArray (0);
 }

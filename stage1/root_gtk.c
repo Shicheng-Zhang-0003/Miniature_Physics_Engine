@@ -5,14 +5,15 @@ camera main_camera;
 input status main_inputs;
 //On Call
 static void when_realised (GtkGLArea *area) {
-    gtk_gl_area_make_current (area);
+    gtk_gl_area_get_error (area);
     if (gtl_gl_area_make_current (area) != NULL) {return;}
     //Init OpenGL status
     glEnable (GL_DEPTH_TEST); //Test Depth Signal
+    render_init ();
 } //On render: Screen Make
 static gboolean on_rendered (GtkGLArea *area, GdkGLContext *contextual) {
     int width = gtk_widget_get_allocated_width (GTK_WIDGET (area));
-    int height = gtk_widget_get_allocated_height (GTK_WIDGET (area))l
+    int height = gtk_widget_get_allocated_height (GTK_WIDGET (area));
     render_scene_current (width, height);
     return TRUE;
 } int main_algorithm (int argc, char *argv []);
