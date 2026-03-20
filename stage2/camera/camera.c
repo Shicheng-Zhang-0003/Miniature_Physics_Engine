@@ -24,7 +24,9 @@ void camera_update_vector_input (camera *cam) {
     cam->speed_movement_camera = 25.0; //25 Units of Movement * s ^ -1
     cam->sensitivity_mouse = 0.1;
     camera_update_vector_input (cam);
-} void camera_view_matrix (camera *cam, float *matrix_out) {
+} 
+
+/* void camera_view_matrix (camera *cam, float *matrix_out) {
     //Target is where we will be standing --> In ADDITION to where we are currently looking
     vector3 target = vector3_addition (cam->position, cam->front);
     //Calculate orthogonal axis 
@@ -48,7 +50,7 @@ void camera_update_vector_input (camera *cam) {
     matrix_out [13] = -vector3_dot (u_axis, cam->position);
     matrix_out [14] = -vector3_dot (f_axis, cam->position);
     matrix_out [15] = 1.0;
-} //Movement
+} //Movement */
 void camera_move_w (camera *cam, float delta_time) {
     vector3 velocity_camera = vector3_scaling (cam->front, cam->speed_movement_camera * delta_time);
     cam->position = vector3_addition (cam->position, velocity_camera);

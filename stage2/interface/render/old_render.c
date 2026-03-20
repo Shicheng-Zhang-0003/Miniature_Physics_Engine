@@ -1,8 +1,8 @@
-#include "../../../stage1/master_header.h"
-#include "../../master_header_2.h"
-#include <epoxy/gl.h>
-#include <epoxy/gl_generated.h>
-extern rigidbody obj_per_scene [10];
+//#include "../../../stage1/master_header.h"
+//#include "../../master_header_2.h"
+//#include <epoxy/gl.h>
+//#include <epoxy/gl_generated.h>
+/* extern rigidbody obj_per_scene [10];
 extern int object_count;
 void render_scene_current (int width, int height) {
     //Setup View angle, Viewport, etc
@@ -22,7 +22,7 @@ void render_scene_current (int width, int height) {
         //render_sphere (&mesh_yts, rb, projection, view);
         glPopMatrix ();
     }
-}
+} */
 
 //Incorporate Camera FOV
 // Inside rendering loop

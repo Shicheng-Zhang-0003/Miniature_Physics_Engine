@@ -40,7 +40,7 @@ void collision_resolve (collision_data *c) {
     vector3 velocity_b_at_contact = vector3_addition (b->velocity, vector3_cross (b->angular_velocity, rb)); //Compute change of angular velocity change of the object sphere for object B and combine with already existing velocity
     vector3 relative_velocity = vector3_subtraction (velocity_b_at_contact, velocity_a_at_contact); //Compute Net Velocity of system (both objects)
     //Velocity along the normal line of vector connecting objects to contact point
-    float velocity_relative_dot_normal = vector3_dot (relative_velocity, c->normal);
+    float velocity_relative_dot_normal = vector3_dot (relative_velocity, c->normal_vector);
     //If objects are moving apart/away, no need for implement
     if (velocity_relative_dot_normal > 0) {return;} //variable abbrev vrdn
     //Calculate Impulse on Scalar (delta P)
@@ -49,14 +49,14 @@ void collision_resolve (collision_data *c) {
     //Linear Components
     float inverse_mass_sum = a->inverse_mass + b->inverse_mass;
     //Rotational Components (Inertial resistance to rotational momemtum experiences by getting hit by other object)
-    vector3 ra_cross_normal = vector3_cross (ra, c->normal);
-    vector3 rb_cross_normal = vector3_cross (rb, c->normal);
+    vector3 ra_cross_normal = vector3_cross (ra, c->normal_vector);
+    vector3 rb_cross_normal = vector3_cross (rb, c->normal_vector);
     vector3 angular_mot_a = vector3_cross (math3_multiplication_vector3 (a->inverse_inertia_system, ra_cross_normal), ra_cross_normal);
     vector3 angular_mot_b = vector3_cross (math3_multiplication_vector3 (b->inverse_inertia_system, rb_cross_normal), rb_cross_normal);
-    float rotational_termination = vector3_dot (vector3_addition (angular_mot_a, angular_mot_b), c->normal);
+    float rotational_termination = vector3_dot (vector3_addition (angular_mot_a, angular_mot_b), c->normal_vector);
     float j = ((-1.0 + e) * velocity_relative_dot_normal) / (inverse_mass_sum + rotational_termination);
     //Apply Impulse to objects
-    vector3 impulse_vector = vector3_scaling (c->normal, j);
+    vector3 impulse_vector = vector3_scaling (c->normal_vector, j);
     //Linear Velocity Changes: (delta v = impulse * mass ^ -1)
     a->velocity = vector3_subtraction (a->velocity, vector3_scaling (impulse_vector, a->inverse_mass)); //Add current Velocity to delta v (impulse * mass ^ -1) (Object A)                                                                                                 
     b->velocity = vector3_addition (b->velocity, vector3_scaling (impulse_vector, b->inverse_mass)); //Add current Velocity to delta v (impulse * mass ^ -1) (Object B)
@@ -70,7 +70,7 @@ void collision_resolve (collision_data *c) {
     const float error_percent = 0.2; //20% correction per frame and motion calculated
     const float slop = 0.01; //Allowance for object overlap (penetration, sinking)
     //Correction: Push back each proportion by a certain amount (20%) for each "sink"
-    vector3 correction = vector3_scaling (c->normal, (fmaxf (c->penetration_contact - slop, 0.0)) * (a->inverse_mass + b->inverse_mass) * error_percent);
+    vector3 correction = vector3_scaling (c->normal_vector, (fmaxf (c->penetration_contact - slop, 0.0)) * (a->inverse_mass + b->inverse_mass) * error_percent);
     a->position = vector3_subtraction (a->position, vector3_scaling (correction, a->inverse_mass));    
     b->position = vector3_subtraction (b->position, vector3_scaling (correction, b->inverse_mass));
 }

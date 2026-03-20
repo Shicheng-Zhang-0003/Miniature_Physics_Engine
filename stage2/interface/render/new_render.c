@@ -6,9 +6,12 @@
 #include <epoxy/gl_generated.h>
 #include <sys/types.h>
 //Global Values for shading and meshing 
+extern camera main_camera_fov;
+extern rigidbody obj_per_scene [10];
+extern int object_count;
 static GLuint shaders_program_total = 0;
 static mesh sphere_mesh;
-static int render_init_status;
+static int render_init_status = 0;
 void render_init () {
     if (render_init_status) {return;}
     //Load/Compilation of Shaders
@@ -36,6 +39,7 @@ void render_init () {
     float viewing_array [16];
     math4_to_flat_array (viewpoint, viewing_array);
     glUniformMatrix4fv (glGetUniformLocation (shaders_program_total, "viewframe"), 1, GL_FALSE, viewing_array);
+    glUniform3f (glGetUniformLocation (shaders_program_total, "object_colour"), 0.2, 0.6, 1.0);
     //Light Position
     glUniform3f (glGetUniformLocation (shaders_program_total, "light_position"), 10.0, 20.0, 10.0);
     //Draw Each Object in Question

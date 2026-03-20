@@ -26,7 +26,7 @@ static inline vector3 vector3_addition (vector3 a, vector3 b) {return (vector3) 
 static inline vector3 vector3_subtraction (vector3 a, vector3 b) {return (vector3) {a.x - b.x, a.y - b.y, a.z - b.z};}
 static inline vector3 vector3_scaling (vector3 a, float scale) {return (vector3) {a.x * scale, a.y * scale, a.z * scale};}
 //Dot: work and projection of vectors
-static inline vector3 vector3_dot (vector3 a, vector3 b) {return (float) (a.x * b.x + a.y * b.y + a.z * b.z);}
+static inline float vector3_dot (vector3 a, vector3 b) {return (float) (a.x * b.x + a.y * b.y + a.z * b.z);}
 //Cross: Torque conversion and computation
 static inline vector3 vector3_cross (vector3 a, vector3 b) {return (vector3) {(a.y * b.z - a.z * b.y), (a.z * b.x - a.x * b.z), (a.x * b.y - a.y * b.x)};}
 static inline float vector3_length_squared (vector3 vector) {return vector.x * vector.x + vector.y * vector.y + vector.z * vector.z;}
@@ -126,7 +126,7 @@ static inline math3 math3_inverse (math3 m) {
     res.matrix [2][2] = (m.matrix [0][0] * m.matrix [1][1] - m.matrix [1][0] * m.matrix [0][1]) * invDet;
     return res;
 } static inline math3 fov_aspr_perspective (float fov, float aspect_rto, float near, float far) {
-    math3 m {{{0}}};
+    math3 m = {{{0}}};
     float f = 1.0 / tanf (fov / 2.0);
     m.matrix [0][0] = f / aspect_rto;
     m.matrix [1][1] = f;

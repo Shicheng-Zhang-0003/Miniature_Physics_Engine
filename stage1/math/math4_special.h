@@ -4,13 +4,13 @@
 typedef struct {float matrix [4][4]; } math4;
 //Zero Init
 static inline math4 math4_init () {
-    math4 m {{{0}}};
+    math4 m = {{{0}}};
     return m;
 } //Identity Matrices
 static inline math4 math4_identity () {
     math4 m = {{{0}}};
     m.matrix [0][0] = 1.0; 
-    m.matrix [1][2] = 1.0;
+    m.matrix [1][1] = 1.0;
     m.matrix [2][2] = 1.0;
     m.matrix [3][3] = 1.0;
     return m;
@@ -27,6 +27,7 @@ static inline math4 math4_perspective_fov (float fov, float aspect_rto, float ne
 } //Viewing Perspective
 //Matrix from camera angle vectors (scrap camera_pov.h camera_view_matrix)
 static inline math4 math4_look_view (vector3 position, vector3 frontal, vector3 up) {
+    math4 m = {{{0}}};
     vector3 front = vector3_normalisation (frontal);
     vector3 right = vector3_normalisation (vector3_cross (front, up));
     vector3 upper = vector3_cross (right, front);
@@ -58,7 +59,7 @@ static inline math4 math4_multiplication (math4 a, math4 b) {
     } return res;
 } //Translational Motion Matrix 
 static inline math4 math4_translation (vector3 translate) {
-    math4 m = math3_identity ();
+    math4 m = math4_identity ();
     m.matrix [3][0] = translate.x; 
     m.matrix [3][1] = translate.y;
     m.matrix [3][2] = translate.z;
@@ -72,10 +73,10 @@ static inline math4 math4_scaling (vector3 scalor) {
     return m;
 } static inline math4 vector4_to_math4 (vector4 quart) {
     math4 m = math4_identity ();
-    float x2 = q.x + q.x, y2 = q.y + q.y, z2 = q.z + q.z;
-    float xx = q.x * x2, xy = q.x * y2, xz = q.x * z2;
-    float yy = q.y * y2, yz = q.y * z2, zz = q.z * z2;
-    float wx = q.w * x2, wy = q.w * y2, wz = q.w * z2;
+    float x2 = quart.x + quart.x, y2 = quart.y + quart.y, z2 = quart.z + quart.z;
+    float xx = quart.x * x2, xy = quart.x * y2, xz = quart.x * z2;
+    float yy = quart.y * y2, yz = quart.y * z2, zz = quart.z * z2;
+    float wx = quart.w * x2, wy = quart.w * y2, wz = quart.w * z2;
     m.matrix [0][0] = 1.0 - (yy + zz);
     m.matrix [1][0] = xy - wz;
     m.matrix [2][0] = xz + wy;

@@ -21,17 +21,17 @@ void init_sm_system (mesh *mesh_s, int sections, int stack) {
             float p_z = cosf (phi_variable) * sinf (theta_variable);
             //Positional Values
             vertices [v_idx++] = p_x;
-            vertices [v_idx++] = p_x;
-            vertices [v_idx++] = p_x;
+            vertices [v_idx++] = p_y;
+            vertices [v_idx++] = p_z;
             //Normal Rendering (Unit Sphere, x ^ 2 + y ^ 2 + z ^ 2 = 1)
             vertices [v_idx++] = p_x;
-            vertices [v_idx++] = p_x;
-            vertices [v_idx++] = p_x;
+            vertices [v_idx++] = p_y;
+            vertices [v_idx++] = p_z;
         }
     } //Generate Indices
     //Quads in each grid is split into dual triangle configurations
     mesh_s->index = stack * sections * 6;
-    unsigned int *indice_list = malloc (mesh->index * sizeof (unsigned int));
+    unsigned int *indice_list = malloc (mesh_s->index * sizeof (unsigned int));
     int i_idx = 0;
     for (int step3 = 0; step3 < stack; step3++) {
         int current_row = step3 * (sections + 1);
@@ -59,14 +59,11 @@ void init_sm_system (mesh *mesh_s, int sections, int stack) {
     glBufferData (GL_ELEMENT_ARRAY_BUFFER, mesh_s->index * sizeof (unsigned int), indice_list, GL_STATIC_DRAW);
     //OpenGL attribute set --> affix certain attributes to 3D position statements
     glVertexAttribPointer (0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof (float), (void*) 0);
-    // Position attribute
-    glVertexAttribPointer (0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof (float), (void*) 0);
     glEnableVertexAttribArray (0);
     // Normal attribute
     glVertexAttribPointer (1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof (float), (void*) (3 * sizeof (float)));
     glEnableVertexAttribArray (1);
     //Other attribute set
-    glEnableVertexAttribArray (0);
     //Free Malloced Memory Addrs
     free (indice_list);
     free (vertices);

@@ -67,7 +67,7 @@ float rb_get_Ek (rigidbody *rb) {
     float linear_ek = 0.5 * rb->mass * vector3_length_squared (rb->velocity);
     //EK rotational = 0.5wIw
     vector3 angular_momemtum = math3_multiplication_vector3 (math3_inverse (rb->inverse_inertia_system), rb->angular_velocity);
-    float rotational_ek = 0.5 * vector3_dot (rb->angular_velocity, angular_momentum);
+    float rotational_ek = 0.5 * vector3_dot (rb->angular_velocity, angular_momemtum);
     return linear_ek + rotational_ek;
 } //Integration Segmentation (Movement Compute)
 void rb_integrate (rigidbody *rb, float dt) {

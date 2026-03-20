@@ -1,12 +1,11 @@
 #include <gtk/gtk.h>
 #include "../stage2/master_header_2.h"
 #include "master_header.h"
-camera main_camera;
-input status main_inputs;
+camera main_camera_fov;
+input_status main_inputs;
 //On Call
 static void when_realised (GtkGLArea *area) {
-    gtk_gl_area_get_error (area);
-    if (gtl_gl_area_make_current (area) != NULL) {return;}
+    if (gtk_gl_area_get_error (area) != NULL) {return;}
     //Init OpenGL status
     glEnable (GL_DEPTH_TEST); //Test Depth Signal
     render_init ();
@@ -20,7 +19,7 @@ static gboolean on_rendered (GtkGLArea *area, GdkGLContext *contextual) {
 int main_algorithm (int argc, char *argv []) {
     gtk_init (&argc, &argv);
     //Camera
-    initalise_camera (&main_camera, (vector3) {0.0, 0.0, 50.0});
+    initalise_camera (&main_camera_fov, (vector3) {0.0, 0.0, 50.0});
     initialise_input (&main_inputs);
     //Widgeting
     GtkWidget *window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
@@ -28,8 +27,8 @@ int main_algorithm (int argc, char *argv []) {
     //Keyboard and Mouse Detection
     gtk_widget_add_events (window, GDK_KEY_PRESS_MASK | GDK_KEY_RELEASE_MASK | GDK_POINTER_MOTION_MASK);
     //Signalling
-    g_signal_connect (gl_area, "rendering", G_CALLBACK (on_rendered), NULL);
-    g_signal_connect (gl_area, "realisation", G_CALLBACK (when_realised), NULL);
+    g_signal_connect (gl_area, "render", G_CALLBACK (on_rendered), NULL);
+    g_signal_connect (gl_area, "realise", G_CALLBACK (when_realised), NULL);
     g_signal_connect (window, "key-press-event", G_CALLBACK (on_keypress), &main_inputs);
     g_signal_connect (window, "key-release-event", G_CALLBACK (on_key_released), &main_inputs);
     g_signal_connect (window, "motion-notify-event", G_CALLBACK (on_mouse_movements), NULL);
@@ -41,8 +40,8 @@ int main_algorithm (int argc, char *argv []) {
     gtk_widget_show_all (window);
     gtk_main ();
     return 0;
-} int main () {
-    main_algorithm ();
+} int main (int argc, char *argv []) {
+    main_algorithm (argc, argv);
     return 0;
 }
 

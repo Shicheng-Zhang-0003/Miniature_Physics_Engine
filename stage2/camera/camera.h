@@ -1,6 +1,5 @@
 #ifndef camera_h
 #define camera_h
-#include "../master_header_2.h"
 #include "../../stage1/master_header.h"
 typedef struct {
     vector3 position; //Where Camera is in 3D field
@@ -17,7 +16,7 @@ typedef struct {
 //Init Camera (starting values)
 void initalise_camera (camera *cam, vector3 start_position);
 //4 ^ 4 view matrix --> OpenGL shaders
-void camera_view_matrix (camera *cam, float *matrix_out);
+//void camera_view_matrix (camera *cam, float *matrix_out);
 //Input and Motion Functions
 void camera_update_vector_input (camera *cam);
 void camera_move_w (camera *cam, float delta_time);

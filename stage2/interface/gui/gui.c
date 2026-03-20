@@ -1,20 +1,13 @@
 #include <stdio.h>
 #include <gtk/gtk.h>
 #include <epoxy/gl.h>
-extern rigidbody objects;
+#include "../../master_header_2.h"
+extern rigidbody objects [10];
 extern int number_objects;
 static void on_point_render (GtkGLArea * area, GdkGLContext *context) {
-    //Clear screen to a background that is black or dark in basic colour rendering
-    glClearColor (0.1, 0.1, 0.1, 1.0);
-    glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    //Draw Actual Objects on screen
-    for (int step1 = 0; step1 < number_objects; step1++) {//draw_sphere (objects [step1].position, objects [step1].radius);
-    //render_sphere function (mesh system wiring in render.c header library)
-    } /*
-                                                                                                                   math3D.h functions to perform mathematics computation
-                                                                                                                   mesh transformed for rendering
-                                                                                                                   rigidbody->position, rigidbody->orientation does the job here
-                                                                                                                */
+    int width = gtk_widget_get_allocated_width (GTK_WIDGET (area));
+    int height = gtk_widget_get_allocated_height (GTK_WIDGET (area));
+    render_scene_current (width, height);
 } void activation (GtkApplication *application, gpointer user_data_main) {
     GtkWidget *window = gtk_application_window_new (application);
     gtk_window_set_title (GTK_WINDOW (window), "Stage 2 Testing Stage");
@@ -24,5 +17,6 @@ static void on_point_render (GtkGLArea * area, GdkGLContext *context) {
     g_signal_connect (gl_area_set, "render", G_CALLBACK (on_point_render), NULL);
     gtk_container_add (GTK_CONTAINER (window), gl_area_set);
     //Present Window on System
+    g_signal_connect (window, "destroy", G_CALLBACK (gtk_main_quit), NULL);
     gtk_widget_show_all (window);
 }

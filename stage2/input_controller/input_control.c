@@ -2,6 +2,8 @@
 #include "../camera/camera.h"
 #include <gtk/gtk.h>
 #include <gdk/gdkkeysyms.h>
+extern camera main_camera_fov;
+extern input_status main_inputs;
 void initialise_input (input_status *input) {
     //Keyboard
     input->w_key = false;
@@ -19,7 +21,7 @@ void initialise_input (input_status *input) {
     if (event->keyval == GDK_KEY_a) {input->a_key = true;}
     if (event->keyval == GDK_KEY_s) {input->s_key = true;}
     if (event->keyval == GDK_KEY_d) {input->d_key = true;}
-    return false;
+    return FALSE;
 } gboolean on_key_released (GtkWidget *widget, GdkEventKey *event, gpointer user_data_stored) {
     input_status *input = (input_status *) user_data_stored; 
     //Keystroke Recognition
@@ -27,12 +29,10 @@ void initialise_input (input_status *input) {
     if (event->keyval == GDK_KEY_a) {input->a_key = false;}
     if (event->keyval == GDK_KEY_s) {input->s_key = false;}
     if (event->keyval == GDK_KEY_d) {input->d_key = false;}
-    return false;
+    return FALSE;
 } gboolean on_mouse_movements (GtkWidget *widget, GdkEventMotion *event, gpointer user_data_stored) {
     //Pass a array containing both camera and the input status
     //user_data --> global camera view
-    extern camera main_camera_fov;
-    extern input_status main_inputs;
     if (main_inputs.mouse_1) {
         main_inputs.last_x_input = event->x;
         main_inputs.last_y_input = event->y;

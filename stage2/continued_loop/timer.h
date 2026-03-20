@@ -15,14 +15,19 @@ static gboolean tick_function (gpointer data) {
     //Application of constant forces
     //Gravity
     vector3 gravity = {0, -9.81, 0};
-    for (int step1 = 0; step1 < number_objects; step1++) {force_applicant_gravity_normal (&world->objects [step1], gravity, (vector3) {0, 1, 0});}
+    for (int step1 = 0; step1 < world->number_objects; step1++) {force_applicant_gravity_normal (&world->objects [step1], gravity, (vector3) {0, 1, 0});}
     //Collision Resolve
     //Loop and call upon collusion_dual_sphere function
-    //Integration 
-    for (int step2 = 0; step2 < number_objects; step2++) {
+    for (int step_a = 0; step_a < world->number_objects; step_a++) {
+        for (int step_b = step_a + 1; step_b < world->number_objects; step_b++) {
+            collision_data collision;
+            if (collision_dual_sphere (&world->objects [step_a], &world->objects [step_b], &collision)) {collision_resolve (&collision);}
+    } //Integration 
+    for (int step2 = 0; step2 < world->number_objects; step2++) {
         //buffer.h update logic
         rb_integrate (&world->objects [step2], dt);
     } //Clear screen using GTK drawing
     gtk_widget_queue_draw (world->widget); //Redraw all current objects
-    return TRUE; //Continue Timer runtime
-} 
+    return true; //Continue Timer runtime
+}
+#endif
