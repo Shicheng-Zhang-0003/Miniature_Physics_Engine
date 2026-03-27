@@ -1,5 +1,6 @@
 #include <gtk/gtk.h>
 #include "../stage2/master_header_2.h"
+#include "../stage3/master_header_3.h"
 #include "master_header.h"
 camera main_camera_fov;
 input_status main_inputs;
@@ -38,6 +39,9 @@ int main_algorithm (int argc, char *argv []) {
     g_timeout_add (16, physics_step_increment, gl_area);
     //Show Widget Window
     gtk_widget_show_all (window);
+    frame_timer_init (&main_timer);
+    scene_init_default ();
+    mouse_lock_enable (window);
     gtk_main ();
     return 0;
 } int main (int argc, char *argv []) {
