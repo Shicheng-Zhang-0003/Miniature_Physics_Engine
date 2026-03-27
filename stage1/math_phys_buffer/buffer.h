@@ -20,7 +20,7 @@ typedef struct {
     //Dimensions of individual object definition (for collisions and rendering)
     float radius; //Spherical calculation
     bool static_state; //If set to true object is naturally immobile
-} rigidbody; 
+} rigidbody;
 //Init
 void rigidbody_initialisation_sphere (rigidbody *rb, float radius, float mass, vector3 position_input) {
     //Kinematic
@@ -40,7 +40,7 @@ void rigidbody_initialisation_sphere (rigidbody *rb, float radius, float mass, v
     //Inertial Tensors
     //I = 0.4mr ^ 2
     float iner = (0.4f) * mass * radius * radius; //0.4f, not 0.4, for decimal float point accuracy
-    rb->inertia_tensor_local = math3_identity (); 
+    rb->inertia_tensor_local = math3_identity ();
     rb->inertia_tensor_local.matrix [0][0] = iner;
     rb->inertia_tensor_local.matrix [1][1] = iner;
     rb->inertia_tensor_local.matrix [2][2] = iner;
@@ -92,11 +92,12 @@ void rb_integrate (rigidbody *rb, float dt) {
     vector4 w_quarternion = {0, rb->angular_velocity.x, rb->angular_velocity.y, rb->angular_velocity.z}; //Start with no w axis definition
     vector4 delta_q = vector4_multiplication (w_quarternion, rb->orientation); //Orientation = W-Axis value
     //Set Orientation individually
-    rb->orientation.w += delta_q.w * 0.5 * dt; 
+    rb->orientation.w += delta_q.w * 0.5 * dt;
     rb->orientation.x += delta_q.x * 0.5 * dt;
     rb->orientation.y += delta_q.y * 0.5 * dt;
     rb->orientation.z += delta_q.z * 0.5 * dt;
-    //Clear accumilators of force and torque for next implementation 
+    rb->orientation = vector4_normalisation (rb->orientation);
+    //Clear accumilators of force and torque for next implementation
     rb->force_accumilator = vector3_zero ();
     rb->torque_accumilator = vector3_zero ();
 }

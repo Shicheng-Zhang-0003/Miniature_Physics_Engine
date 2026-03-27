@@ -18,7 +18,7 @@ typedef struct { float x, y, z; } vector3;
 //3 ^ 3 matrix for computing Inertia tensoring
 typedef struct { float matrix [3][3]; } math3;
 //4D axial rotational matrix motion (w + xi + yj + zk)
-typedef struct { float w, x, y, z; } vector4; 
+typedef struct { float w, x, y, z; } vector4;
 //Functions for computing different vector3
 static inline vector3 vector3_new (float x, float y, float z) {return (vector3) {x, y, z};}
 static inline vector3 vector3_zero (void) {return (vector3) {0.0, 0.0, 0.0};}
@@ -46,10 +46,10 @@ static inline vector4 vector4_normalisation (vector4 quart) {
 } //Multiplication of two 4D matrices at once (combinatoric rotational motion)
 static inline vector4 vector4_multiplication (vector4 a, vector4 b) {
     return (vector4) {
-        a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z,    
+        a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z,
         a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
         a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
-        a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w 
+        a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w
     };
 } //Rotate a 3D vector by a 4D rotational matrix
 //v_a = q * v * q_conjugation
@@ -73,7 +73,7 @@ static inline vector4 vector4_from_axis_with_angle (vector3 axis, float angle_ra
 static inline math3 math3_identity () {
     math3 m = {{{0}}};
     m.matrix [0][0] = 1.0; m.matrix [1][1] = 1.0; m.matrix [2][2] = 1.0;
-    return m;  
+    return m;
 } //Multiply specific matrix by a existing vector
 static inline vector3 math3_multiplication_vector3 (math3 m, vector3 vector) {
     return (vector3) {m.matrix [0][0] * vector.x + m.matrix [0][1] * vector.y + m.matrix [0][2] * vector.z, m.matrix [1][0] * vector.x + m.matrix [1][1] * vector.y + m.matrix [1][2] * vector.z, m.matrix [2][0] * vector.x + m.matrix [2][1] * vector.y + m.matrix [2][2] * vector.z};
@@ -105,7 +105,7 @@ static inline math3 math3_multiplication (math3 a, math3 b) {
         for (int slt2 = 0; slt2 < 3; slt2++) {res.matrix [slt1][slt2] = m.matrix [slt2][slt1];}
     } return res;
 } //Matrix inversion (3 ^ 3 specific)
-// Angular Constraint Calculation (change_p = J * M ^ -1 * J_transposed) 
+// Angular Constraint Calculation (change_p = J * M ^ -1 * J_transposed)
 static inline math3 math3_inverse (math3 m) {
     float det = (m.matrix [0][0] * (m.matrix [1][1] * m.matrix [2][2] - m.matrix [2][1] * m.matrix [1][2])) - (m.matrix [0][1] * (m.matrix [1][0] * m.matrix [2][2] - m.matrix [1][2] * m.matrix [2][0])) + (m.matrix [0][2] * (m.matrix [1][0] * m.matrix [2][1] - m.matrix [1][1] * m.matrix [2][0]));
     if (fabsf (det) < epsilon) {return math3_identity ();} //Buffer Check
@@ -134,5 +134,5 @@ static inline math3 math3_inverse (math3 m) {
     //3 ^ 3 handling of Z - Translations is suboptimal
     //Counter by simply scaling size
     return m;
-} 
+}
 #endif //math3D_h

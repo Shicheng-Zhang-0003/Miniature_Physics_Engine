@@ -1,13 +1,16 @@
 #include "../../master_header_2.h"
+#include "../../../stage3/master_header_3.h"
 #include "../../../stage1/master_header.h"
 #include <complex.h>
 #include <gtk/gtk.h>
 #include <stdbool.h>
 //World Status right now
+frame_timer main_timer;
 rigidbody obj_per_scene [10];
 int object_count = 0;
 gboolean physics_step_increment (gpointer user_data_stored) {
-    float dt = 0.016; // 1 / 60 s increment, 16 ms 
+    frame_timer_update (&main_timer);
+    float dt = main_timer.delta_time;
     if (main_inputs.w_key) {camera_move_w (&main_camera_fov, dt);}
     if (main_inputs.a_key) {camera_move_a (&main_camera_fov, dt);}
     if (main_inputs.s_key) {camera_move_s (&main_camera_fov, dt);}
@@ -25,6 +28,7 @@ gboolean physics_step_increment (gpointer user_data_stored) {
         }
     } //Integrate all objects into render
     for (int step4 = 0; step4 < object_count; step4++) {rb_integrate (&obj_per_scene [step4], dt);} //GTK redraw the window
+    for (int step5 = 0; step5 < object_count; step5++) {boundary_apply_floor (&obj_per_scene [step5], 0.0f);}
     gtk_widget_queue_draw (GTK_WIDGET (user_data_stored));
     return TRUE;
 }

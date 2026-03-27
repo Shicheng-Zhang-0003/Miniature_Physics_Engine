@@ -5,6 +5,7 @@
 #include "camera/camera.h"
 #include "input_controller/input_control.h"
 #include "interface/sphere_object/meshing/sphere_meshing.h"
+#include <gtk/gtk.h>
 
 // Global scene, interface/simulate/simulation.c
 extern rigidbody obj_per_scene [10];

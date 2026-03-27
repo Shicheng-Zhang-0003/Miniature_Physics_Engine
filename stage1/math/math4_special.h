@@ -1,7 +1,7 @@
 #ifndef math4_h
 #define math4_h
 #include "math3D.h"
-typedef struct {float matrix [4][4]; } math4;
+typedef struct { float matrix [4][4]; } math4;
 //Zero Init
 static inline math4 math4_init () {
     math4 m = {{{0}}};
@@ -9,7 +9,7 @@ static inline math4 math4_init () {
 } //Identity Matrices
 static inline math4 math4_identity () {
     math4 m = {{{0}}};
-    m.matrix [0][0] = 1.0; 
+    m.matrix [0][0] = 1.0;
     m.matrix [1][1] = 1.0;
     m.matrix [2][2] = 1.0;
     m.matrix [3][3] = 1.0;
@@ -57,10 +57,10 @@ static inline math4 math4_multiplication (math4 a, math4 b) {
                 a.matrix [step1][3] * b.matrix [3][step2];
         }
     } return res;
-} //Translational Motion Matrix 
+} //Translational Motion Matrix
 static inline math4 math4_translation (vector3 translate) {
     math4 m = math4_identity ();
-    m.matrix [3][0] = translate.x; 
+    m.matrix [3][0] = translate.x;
     m.matrix [3][1] = translate.y;
     m.matrix [3][2] = translate.z;
     return m;
@@ -92,6 +92,6 @@ static inline math4 math4_scaling (vector3 scalor) {
 static inline void math4_to_flat_array (math4 m, float *output) {
     for (int step1 = 0; step1 < 4; step1++) {
         for (int step2 = 0; step2 < 4; step2++) {output [step1 * 4 + step2] = m.matrix [step2][step1];}
-    } 
+    }
 }
 #endif
