@@ -13,5 +13,5 @@ typedef struct {
 } mesh;
 //Function Pre-declaration
 void init_sm_system (mesh *mesh_s, int sections, int stack);
-void render_sphere_object (mesh * mesh_s, rigidbody *rb, math4 projections, math4 viewpoint);
+void render_sphere_object (mesh *mesh_s, rigidbody *rb);
 #endif

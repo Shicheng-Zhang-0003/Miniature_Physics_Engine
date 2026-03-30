@@ -22,13 +22,19 @@ void boundary_apply_floor (rigidbody *rb, float floor_y) {
         //Actual Position Calibration (APC)
         rb->position.x = minimum_bounds.x + rb->radius;
         //Restitution Velocity (RSV)
-        if (rb->velocity.x < 0) {rb->velocity.x = -rb->velocity.x * rb->restitution;}
+        if (rb->velocity.x < 0) {
+            rb->velocity.x = -rb->velocity.x * rb->restitution;
+            rb->angular_velocity = vector3_scaling (rb->angular_velocity, 0.98f);
+        }
     } //Maximum Position Bound/Right Wall
     if (rb->position.x + rb->radius > maximum_bounds.x) {
         //APC
         rb->position.x = maximum_bounds.x - rb->radius;
         //RSV
-        if (rb->velocity.x > 0) {rb->velocity.x = -rb->velocity.x * rb->restitution;}
+        if (rb->velocity.x > 0) {
+            rb->velocity.x = -rb->velocity.x * rb->restitution;
+            rb->angular_velocity = vector3_scaling (rb->angular_velocity, 0.98f);
+        }
     }
     // Y axis
     // Minimum Position Bound/Bottom Wall
@@ -36,13 +42,19 @@ void boundary_apply_floor (rigidbody *rb, float floor_y) {
         //APC
         rb->position.y = minimum_bounds.y + rb->radius;
         //RSV
-        if (rb->velocity.y < 0) {rb->velocity.y = -rb->velocity.y * rb->restitution;}
+        if (rb->velocity.y < 0) {
+            rb->velocity.y = -rb->velocity.y * rb->restitution;
+            rb->angular_velocity = vector3_scaling (rb->angular_velocity, 0.98f);
+        }
     } //Maximum Position Bound/Top Wall
     if (rb->position.y + rb->radius > maximum_bounds.y) {
         //APC
         rb->position.y = maximum_bounds.y - rb->radius;
         //RSV
-        if (rb->velocity.y > 0) {rb->velocity.y = -rb->velocity.y * rb->restitution;}
+        if (rb->velocity.y > 0) {
+            rb->velocity.y = -rb->velocity.y * rb->restitution;
+            rb->angular_velocity = vector3_scaling (rb->angular_velocity, 0.98f);
+        }
     }
     // Z axis
     // Minimum Position Bound/Wall Behind
@@ -50,12 +62,18 @@ void boundary_apply_floor (rigidbody *rb, float floor_y) {
         //APC
         rb->position.z = minimum_bounds.z + rb->radius;
         //RSV
-        if (rb->velocity.z < 0) {rb->velocity.z = -rb->velocity.z * rb->restitution;}
+        if (rb->velocity.z < 0) {
+            rb->velocity.z = -rb->velocity.z * rb->restitution;
+            rb->angular_velocity = vector3_scaling (rb->angular_velocity, 0.98f);
+        }
     } //Maximum Position Bound/Wall In Front
     if (rb->position.z + rb->radius > maximum_bounds.z) {
         //APC
         rb->position.z = maximum_bounds.z - rb->radius;
         //RSV
-        if (rb->velocity.z > 0) {rb->velocity.z = -rb->velocity.z * rb->restitution;}
+        if (rb->velocity.z > 0) {
+            rb->velocity.z = -rb->velocity.z * rb->restitution;
+            rb->angular_velocity = vector3_scaling (rb->angular_velocity, 0.98f);
+        }
     }
 }
