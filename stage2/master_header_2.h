@@ -10,8 +10,9 @@
 #include <gtk/gtk.h>
 
 // Global scene, interface/simulate/simulation.c
-extern rigidbody obj_per_scene [10];
+extern rigidbody *obj_per_scene;
 extern int object_count;
+extern int object_capacity;
 
 // Global camera and input, root_gtk.c
 extern camera main_camera_fov;

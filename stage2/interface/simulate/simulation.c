@@ -5,8 +5,9 @@
 #include <stdbool.h>
 //World Status right now
 frame_timer main_timer;
-rigidbody obj_per_scene [10];
+rigidbody *obj_per_scene = NULL;
 int object_count = 0;
+int object_capacity = 0;
 gboolean physics_step_increment (gpointer user_data_stored) {
     frame_timer_update (&main_timer);
     float dt = main_timer.delta_time;

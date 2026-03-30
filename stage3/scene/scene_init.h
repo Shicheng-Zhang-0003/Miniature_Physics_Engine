@@ -2,6 +2,7 @@
 #define scene_init_h
 #include "../../stage1/master_header.h"
 #include "../../stage2/master_header_2.h"
+extern int object_capacity;
 //Add a initial object for referencing (sphere, properties outlined below) (index of object is returned after, -1 if overflow)
 int scene_add_object (float radius, float mass, vector3 position);
 //Init Scene, default object set
