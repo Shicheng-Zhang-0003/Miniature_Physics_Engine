@@ -4,6 +4,7 @@ layout (location = 1) in vec3 aNormal; //Direction the surface faces
 uniform mat4 model; //Move the Ball to rb->position value
 uniform mat4 viewframe; //Camera Facing and location
 uniform mat4 projection; //3D Projection
+uniform mat3 normal_matrix;
 out vec3 normal; //Directional Argument to the fragment shader
 out vec3 fragment_position; //3D positional argument to the fragment shader
 void main () {
@@ -13,5 +14,6 @@ void main () {
     fragment_position = vec3 (model * vec4 (aPos, 1.0));
     //Pass surface directional value forwards
     //Multiply by model matrix to ensure the normal vector rotates with ball movement
-    normal = mat3 (transpose (inverse (model))) * aNormal;
+    //Formerly: normal = mat3 (transpose (inverse (model))) * aNormal;
+    normal = normal_matrix * aNormal;
 }

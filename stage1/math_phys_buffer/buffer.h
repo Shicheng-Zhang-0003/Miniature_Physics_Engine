@@ -20,6 +20,7 @@ typedef struct {
     //Dimensions of individual object definition (for collisions and rendering)
     float radius; //Spherical calculation
     bool static_state; //If set to true object is naturally immobile
+    vector3 colour;
 } rigidbody;
 //Init
 static void rigidbody_initialisation_sphere (rigidbody *rb, float radius, float mass, vector3 position_input) {
@@ -30,6 +31,7 @@ static void rigidbody_initialisation_sphere (rigidbody *rb, float radius, float 
     rb->orientation = vector4_identity ();
     rb->angular_velocity = vector3_zero ();
     rb->angular_acceleration = vector3_zero ();
+    rb->colour = (vector3) {0.2, 0.6, 1.0};
     //Dynamic
     rb->mass = mass;
     if (mass > 0) {rb->inverse_mass = 1.0 / mass;}

@@ -39,7 +39,7 @@ void render_init () {
     float viewing_array [16];
     math4_to_flat_array (viewpoint, viewing_array);
     glUniformMatrix4fv (glGetUniformLocation (shaders_program_total, "viewframe"), 1, GL_FALSE, viewing_array);
-    glUniform3f (glGetUniformLocation (shaders_program_total, "object_colour"), 0.2, 0.6, 1.0);
+    glUniform3f (glGetUniformLocation (shaders_program_total, "camera_position"), main_camera_fov.position.x, main_camera_fov.position.y, main_camera_fov.position.z);
     //Light Position
     glUniform3f (glGetUniformLocation (shaders_program_total, "light_position"), 10.0, 20.0, 10.0);
     //Draw Each Object in Question
@@ -53,8 +53,24 @@ void render_init () {
         float model_array [16];
         math4_to_flat_array (model, model_array);
         //Colour Uniform of the Objects
+        glUniform3f (glGetUniformLocation (shaders_program_total, "object_colour"), rb->colour.x, rb->colour.y, rb->colour.z);
         glUniformMatrix4fv (glGetUniformLocation (shaders_program_total, "model"), 1, GL_FALSE, model_array);
+        math3 model3;
+        for (int row = 0; row < 3; row++) {
+            for (int column = 0; column < 3; column++) {model3.matrix [row][column] = model.matrix [row][column]}
+        } math3 normal_mat = math3_transposition (math3_inverse (model3));
+        float normal_array [9];
+        for (int row2 = 0; row2 < 3; row2++) {
+            for (int column2 = 0; column2 < 3; column2++) {normal_array [row2 * 3 + column2] = normal_mat.matrix [row2][column2]}
+        } glUniformMatrix3fv (glGetUniformLocation (shaders_program_total, "normal_matrix"), 1, GL_FALSE, normal_array);
         //Render Objects
         render_sphere_object (&sphere_mesh, rb, projection, viewpoint);
     }
 }
+
+/*
+ * Add In Future:
+ *
+ * math3 normal_mat = math3_transposition (math3_inverse ( upper-left 3x3 of model ));
+ *
+ * */
