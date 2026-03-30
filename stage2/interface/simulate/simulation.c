@@ -15,7 +15,10 @@ gboolean physics_step_increment (gpointer user_data_stored) {
     if (main_inputs.a_key) {camera_move_a (&main_camera_fov, dt);}
     if (main_inputs.s_key) {camera_move_s (&main_camera_fov, dt);}
     if (main_inputs.d_key) {camera_move_d (&main_camera_fov, dt);}
-    //Apply forces to all objects within the simulation
+    if (main_inputs.space_key) {
+        spawner_launch_sphere (0.5, 1.0, 20.0);
+        main_inputs.space_key = false;
+    } //Apply forces to all objects within the simulation
     for (int step = 0; step < object_count; step++) {
         vector3 gravity = {0, -9.81, 0};
         force_applicant_gravity_normal (&obj_per_scene [step], gravity, (vector3) {0.0, 1.0, 0.0});
