@@ -67,7 +67,7 @@ void init_sm_system (mesh *mesh_s, int sections, int stack) {
     //Free Malloced Memory Addrs
     free (indice_list);
     free (vertices);
-}  void render_sphere_object (mesh *mesh_s, rigidbody *rb, math4 projection, math4 viewpoint) {
+}  void render_sphere_object (mesh *mesh_s, rigidbody *rb) {
     //Sphere Preloaded GPU data
     glBindVertexArray (mesh_s->vao);
     //Draw Triangles
