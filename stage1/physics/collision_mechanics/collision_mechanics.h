@@ -13,7 +13,7 @@ typedef struct {
     float penetration_contact; //Overlap amount
 } collision_data;
 //Detection of actual collision (Sphere to Sphere contact)
-bool collision_dual_sphere (rigidbody *a, rigidbody *b, collision_data *out) {
+static bool collision_dual_sphere (rigidbody *a, rigidbody *b, collision_data *out) {
     vector3 relative_position = vector3_subtraction (b->position, a->position);
     float distance_squared = vector3_length_squared (relative_position);
     float radius_total = a->radius + b->radius;
@@ -21,7 +21,7 @@ bool collision_dual_sphere (rigidbody *a, rigidbody *b, collision_data *out) {
     if (distance_squared >= radius_total * radius_total) {return false;}
     float distance = sqrtf (distance_squared);
     out->a = a;
-    out->b = b; 
+    out->b = b;
     //Normal = Vector from A to B
     if (distance > 0) {out->normal_vector = vector3_scaling (relative_position, 1.0 / distance);}
     else {out->normal_vector = (vector3) {0, 1, 0};}
@@ -30,7 +30,7 @@ bool collision_dual_sphere (rigidbody *a, rigidbody *b, collision_data *out) {
     out->contact_point = vector3_addition (a->position, vector3_scaling (out->normal_vector, a->radius));
     return true;
 } //Resolution (Impulse-Momemtum) (x, y, z directional vectoring for impulse related calculations)
-void collision_resolve (collision_data *c) {
+static void collision_resolve (collision_data *c) {
     rigidbody *a = c->a, *b = c->b;
     //Calculate the vectors from the centre of mass to the contact point between objects (rad_a, and rad_b)]
     vector3 ra = vector3_subtraction (c->contact_point, a->position);
@@ -54,11 +54,11 @@ void collision_resolve (collision_data *c) {
     vector3 angular_mot_a = vector3_cross (math3_multiplication_vector3 (a->inverse_inertia_system, ra_cross_normal), ra_cross_normal);
     vector3 angular_mot_b = vector3_cross (math3_multiplication_vector3 (b->inverse_inertia_system, rb_cross_normal), rb_cross_normal);
     float rotational_termination = vector3_dot (vector3_addition (angular_mot_a, angular_mot_b), c->normal_vector);
-    float j = ((-1.0 + e) * velocity_relative_dot_normal) / (inverse_mass_sum + rotational_termination);
+    float j = (-(1.0 + e) * velocity_relative_dot_normal) / (inverse_mass_sum + rotational_termination);
     //Apply Impulse to objects
     vector3 impulse_vector = vector3_scaling (c->normal_vector, j);
     //Linear Velocity Changes: (delta v = impulse * mass ^ -1)
-    a->velocity = vector3_subtraction (a->velocity, vector3_scaling (impulse_vector, a->inverse_mass)); //Add current Velocity to delta v (impulse * mass ^ -1) (Object A)                                                                                                 
+    a->velocity = vector3_subtraction (a->velocity, vector3_scaling (impulse_vector, a->inverse_mass)); //Add current Velocity to delta v (impulse * mass ^ -1) (Object A)
     b->velocity = vector3_addition (b->velocity, vector3_scaling (impulse_vector, b->inverse_mass)); //Add current Velocity to delta v (impulse * mass ^ -1) (Object B)
     //Changes to angular velocity: (delta angular_v = I ^ -1 * (r * impulse_scalar))
     //I ^ -1: inverse of the moment of inertia (tensor)
@@ -70,8 +70,8 @@ void collision_resolve (collision_data *c) {
     const float error_percent = 0.2; //20% correction per frame and motion calculated
     const float slop = 0.01; //Allowance for object overlap (penetration, sinking)
     //Correction: Push back each proportion by a certain amount (20%) for each "sink"
-    vector3 correction = vector3_scaling (c->normal_vector, (fmaxf (c->penetration_contact - slop, 0.0)) * (a->inverse_mass + b->inverse_mass) * error_percent);
-    a->position = vector3_subtraction (a->position, vector3_scaling (correction, a->inverse_mass));    
-    b->position = vector3_subtraction (b->position, vector3_scaling (correction, b->inverse_mass));
+    vector3 correction = vector3_scaling (c->normal_vector, (fmaxf (c->penetration_contact - slop, 0.0)) / (a->inverse_mass + b->inverse_mass) * error_percent);
+    a->position = vector3_subtraction (a->position, vector3_scaling (correction, a->inverse_mass));
+    b->position = vector3_addition (b->position, vector3_scaling (correction, b->inverse_mass));
 }
 #endif

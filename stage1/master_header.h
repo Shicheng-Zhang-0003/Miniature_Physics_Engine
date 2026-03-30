@@ -8,6 +8,6 @@
 #include "physics/forces/defines_majority_forces/define_forces.h" //Ordinary Physics (Forces and Energy)
 #include "physics/forces/circular/circular_3D.h" //Ext
 #include "physics/forces/drag_3D/drag_3D.h" //Ext
-#include "physics/forces/friction_3D/friction_3D.h" //Ext
+//#include "physics/forces/friction_3D/friction_3D.h" Ext, Obsolete
 #include "physics/forces/spring_3D/spring_3D.h" //Ext
 #endif

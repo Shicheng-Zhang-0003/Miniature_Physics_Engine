@@ -6,7 +6,7 @@
 #include "../../../math_phys_buffer/buffer.h"
 //Gravity (Regular and Sloped Parallel Gravity)
 //Local Gravity (Fg = mg)
-void force_applicant_gravity_normal (rigidbody *rb, vector3 gravitational_acceleration, vector3 normal_from_surface) {
+static void force_applicant_gravity_normal (rigidbody *rb, vector3 gravitational_acceleration, vector3 normal_from_surface) {
     if (rb->static_state) {return;}
     //Fg = mg
     vector3 force_gravity = vector3_scaling (gravitational_acceleration, rb->mass);
@@ -20,7 +20,7 @@ void force_applicant_gravity_normal (rigidbody *rb, vector3 gravitational_accele
 } //Universal Law of Gravitation
 //Fg = Gm1m2r ^ -2
 #define big_g 6.67430e-11
-void force_applicant_universal_gravity (rigidbody *a, rigidbody *b) {
+static void force_applicant_universal_gravity (rigidbody *a, rigidbody *b) {
     vector3 relation_vector = vector3_subtraction (b->position, a->position); //Relative Vector and distance
     float distance_squared = vector3_length_squared (relation_vector); //r ^ 2
     if (distance_squared < epsilon) {return;}
@@ -28,9 +28,9 @@ void force_applicant_universal_gravity (rigidbody *a, rigidbody *b) {
     float force_magnitude = (big_g * a->mass * b->mass) / distance_squared; //Fg = Gm1m2r ^ -2
     vector3 force_out = vector3_scaling (vector3_normalisation (relation_vector), force_magnitude); //Check magnitude and vectors for applications
     rb_apply_forces_perfect (a, force_out); //Apply to positive vector object (a)
-    rb_apply_forces_perfect (b, vector3_scaling (force_out, -1.0)); //Apply to negative vector object (b), equal and opposite direction 
+    rb_apply_forces_perfect (b, vector3_scaling (force_out, -1.0)); //Apply to negative vector object (b), equal and opposite direction
 } //Friction Definition (3D tangent plane fields)
-void force_applicant_friction (rigidbody *rb, vector3 surface_normal, float mu_static, float mu_kinetic) {
+static void force_applicant_friction (rigidbody *rb, vector3 surface_normal, float mu_static, float mu_kinetic) {
     //Calculate the magnitude of normal forces
     //Ff = uFn
     vector3 force_gravity = vector3_scaling ((vector3) {0, -9.81, 0}, rb->mass); //Scale Mass by -9.81 to get mg, Fg
@@ -45,7 +45,7 @@ void force_applicant_friction (rigidbody *rb, vector3 surface_normal, float mu_s
         vector3 kinetic_friction = vector3_scaling (vector3_normalisation (velocity_tangent),
                 -mu_kinetic * force_normal_magnitude);
         rb_apply_forces_perfect (rb, kinetic_friction);
-    } else { 
+    } else {
         //Static Friction: opposition to any form of newly added motion from externalised force
         //Calculated already applied forces
         vector3 force_tangent_accumulated = vector3_subtraction (rb->force_accumilator, vector3_scaling (surface_normal, vector3_dot (rb->force_accumilator, surface_normal))); //Accumulated force applied to existing net input for net force output applied on the object
@@ -58,7 +58,7 @@ void force_applicant_friction (rigidbody *rb, vector3 surface_normal, float mu_s
         }
     }
 } //Spring Force, Tension, Hooke Law
-void force_applicant_string (rigidbody *rb, vector3 anchor, float resistance_length, float k_constant, float damping) {
+static void force_applicant_string (rigidbody *rb, vector3 anchor, float resistance_length, float k_constant, float damping) {
     vector3 direction_vector = vector3_subtraction (rb->position, anchor);
     float current_length = vector3_length (direction_vector);
     if (current_length < epsilon) {return;}
@@ -72,7 +72,7 @@ void force_applicant_string (rigidbody *rb, vector3 anchor, float resistance_len
 } //Vertical Circular Motion
 //Vertical circular motion requires Ft to counteract gravity in upper segments
 //This also gives Fc (centripetal) and consequently centrifugal
-void force_applicant_vertical_anchor (rigidbody *rb, vector3 pivot_point, float radius) {
+static void force_applicant_vertical_anchor (rigidbody *rb, vector3 pivot_point, float radius) {
     vector3 rotational_vector = vector3_subtraction (rb->position, pivot_point);
     vector3 direction = vector3_normalisation (rotational_vector);
     //Centripetal Force Required: Fc = m(vc) ^ 2(r ^ -1)
@@ -87,7 +87,7 @@ void force_applicant_vertical_anchor (rigidbody *rb, vector3 pivot_point, float 
     rb_apply_forces_perfect (rb, vector3_scaling (direction, -force_tension_magnitude));
 } //Monitor the Energy component of the objects related
 typedef struct {float ek, epg, eps, em;} state_energy;
-state_energy force_to_system_energy_amount (rigidbody *rb, vector3 gravitational_acceleration) {
+static state_energy force_to_system_energy_amount (rigidbody *rb, vector3 gravitational_acceleration) {
     state_energy es;
     //Ek --> kinetic
     es.ek = rb_get_Ek (rb);

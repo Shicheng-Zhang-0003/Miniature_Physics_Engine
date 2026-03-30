@@ -17,13 +17,13 @@ void initialise_input (input_status *input) {
 } gboolean on_keypress (GtkWidget *widget, GdkEventKey *event, gpointer user_data_stored) {
     input_status *input = (input_status *) user_data_stored;
     //Keystroke Recognition
-    if (event->keyval == GDK_KEY_w) {input->w_key = true;} 
+    if (event->keyval == GDK_KEY_w) {input->w_key = true;}
     if (event->keyval == GDK_KEY_a) {input->a_key = true;}
     if (event->keyval == GDK_KEY_s) {input->s_key = true;}
     if (event->keyval == GDK_KEY_d) {input->d_key = true;}
     return FALSE;
 } gboolean on_key_released (GtkWidget *widget, GdkEventKey *event, gpointer user_data_stored) {
-    input_status *input = (input_status *) user_data_stored; 
+    input_status *input = (input_status *) user_data_stored;
     //Keystroke Recognition
     if (event->keyval == GDK_KEY_w) {input->w_key = false;}
     if (event->keyval == GDK_KEY_a) {input->a_key = false;}

@@ -22,7 +22,8 @@ static gboolean tick_function (gpointer data) {
         for (int step_b = step_a + 1; step_b < world->number_objects; step_b++) {
             collision_data collision;
             if (collision_dual_sphere (&world->objects [step_a], &world->objects [step_b], &collision)) {collision_resolve (&collision);}
-    } //Integration 
+        }
+    } //Integration
     for (int step2 = 0; step2 < world->number_objects; step2++) {
         //buffer.h update logic
         rb_integrate (&world->objects [step2], dt);

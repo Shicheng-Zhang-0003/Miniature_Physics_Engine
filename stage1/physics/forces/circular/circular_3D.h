@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include "../../../math/math3D.h"
 #include "../../../math_phys_buffer/buffer.h"
-void applicant_centripetal_vector3 (rigidbody *rb, vector3 centrepoint, float strength) {
+static void applicant_centripetal_vector3 (rigidbody *rb, vector3 centrepoint, float strength) {
     //Radius Vector (3D) (r = centre_position - position_current)
     vector3 lock_vector = vector3_subtraction(centrepoint, rb->position);
     float radius = vector3_length (lock_vector);

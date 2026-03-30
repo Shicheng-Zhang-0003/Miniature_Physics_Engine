@@ -1,5 +1,3 @@
-#ifndef shader_loading_h
-#define shader_loading_h
 #include <epoxy/gl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -50,4 +48,3 @@ GLuint compiler_shaders (const char *source, GLenum type) {
     free (fsource);
     return program;
 }
-#endif

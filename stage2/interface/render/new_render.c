@@ -5,7 +5,7 @@
 #include <epoxy/gl.h>
 #include <epoxy/gl_generated.h>
 #include <sys/types.h>
-//Global Values for shading and meshing 
+//Global Values for shading and meshing
 extern camera main_camera_fov;
 extern rigidbody obj_per_scene [10];
 extern int object_count;
@@ -16,13 +16,13 @@ void render_init () {
     if (render_init_status) {return;}
     //Load/Compilation of Shaders
     shaders_program_total = create_shader_program (
-        "stage2/interface/sphere_object/shaders/vertex_shader.glsl", 
+        "stage2/interface/sphere_object/shaders/vertex_shader.glsl",
         "stage2/interface/sphere_object/shaders/fragment_shader.glsl"
     ); //Initialise (32 sec, 32 stack)
     init_sm_system (&sphere_mesh, 32, 32);
-    render_init_status = 1; 
+    render_init_status = 1;
 } void render_scene_current (int width, int height) {
-    render_init (); 
+    render_init ();
     //View Status, Clear SCN
     glViewport (0, 0, width, height);
     glClearColor (0.05, 0.05, 0.1, 1.0);

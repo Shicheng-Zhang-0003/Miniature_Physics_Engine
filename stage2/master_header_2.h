@@ -5,6 +5,8 @@
 #include "camera/camera.h"
 #include "input_controller/input_control.h"
 #include "interface/sphere_object/meshing/sphere_meshing.h"
+#include "interface/render/shader_loading.h"
+#include "continued_loop/timer.h"
 #include <gtk/gtk.h>
 
 // Global scene, interface/simulate/simulation.c
@@ -16,6 +18,7 @@ extern camera main_camera_fov;
 extern input_status main_inputs;
 
 // Rendering, interface/render/render.c
+void render_init (void);
 void render_scene_current (int width, int height);
 
 // Physics interface, interface/simulate/simulation.c

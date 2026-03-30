@@ -29,7 +29,7 @@ int main_algorithm (int argc, char *argv []) {
     gtk_widget_add_events (window, GDK_KEY_PRESS_MASK | GDK_KEY_RELEASE_MASK | GDK_POINTER_MOTION_MASK);
     //Signalling
     g_signal_connect (gl_area, "render", G_CALLBACK (on_rendered), NULL);
-    g_signal_connect (gl_area, "realise", G_CALLBACK (when_realised), NULL);
+    g_signal_connect (gl_area, "realize", G_CALLBACK (when_realised), NULL);
     g_signal_connect (window, "key-press-event", G_CALLBACK (on_keypress), &main_inputs);
     g_signal_connect (window, "key-release-event", G_CALLBACK (on_key_released), &main_inputs);
     g_signal_connect (window, "motion-notify-event", G_CALLBACK (on_mouse_movements), NULL);

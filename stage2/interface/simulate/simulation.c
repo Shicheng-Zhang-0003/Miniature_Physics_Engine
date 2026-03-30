@@ -1,7 +1,6 @@
 #include "../../master_header_2.h"
 #include "../../../stage3/master_header_3.h"
 #include "../../../stage1/master_header.h"
-#include <complex.h>
 #include <gtk/gtk.h>
 #include <stdbool.h>
 //World Status right now

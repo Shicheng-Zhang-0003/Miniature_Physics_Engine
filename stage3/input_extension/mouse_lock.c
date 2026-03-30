@@ -10,7 +10,7 @@ void mouse_lock_enable (GtkWidget *window) {
     GdkDisplay *display = gdk_display_get_default ();
     GdkSeat *seat = gdk_display_get_default_seat (display);
     gdk_seat_ungrab (seat);
-} void mouse_lock_reset_centre (GtkWidget *window) {
+} void mouse_lock_recalibrate (GtkWidget *window) {
     GdkWindow *gdk_win = gtk_widget_get_window (window);
     int width = gtk_widget_get_allocated_width (window);
     int height = gtk_widget_get_allocated_height (window);

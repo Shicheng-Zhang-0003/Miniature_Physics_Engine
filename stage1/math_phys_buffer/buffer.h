@@ -22,7 +22,7 @@ typedef struct {
     bool static_state; //If set to true object is naturally immobile
 } rigidbody;
 //Init
-void rigidbody_initialisation_sphere (rigidbody *rb, float radius, float mass, vector3 position_input) {
+static void rigidbody_initialisation_sphere (rigidbody *rb, float radius, float mass, vector3 position_input) {
     //Kinematic
     rb->position = position_input;
     rb->velocity = vector3_zero ();
@@ -40,7 +40,7 @@ void rigidbody_initialisation_sphere (rigidbody *rb, float radius, float mass, v
     //Inertial Tensors
     //I = 0.4mr ^ 2
     float iner = (0.4f) * mass * radius * radius; //0.4f, not 0.4, for decimal float point accuracy
-    rb->inertia_tensor_local = math3_identity ();
+    rb->inertia_tensor_local = math3 {{{0}}};
     rb->inertia_tensor_local.matrix [0][0] = iner;
     rb->inertia_tensor_local.matrix [1][1] = iner;
     rb->inertia_tensor_local.matrix [2][2] = iner;
@@ -49,12 +49,12 @@ void rigidbody_initialisation_sphere (rigidbody *rb, float radius, float mass, v
     rb->torque_accumilator = vector3_zero ();
 } //Force application and Torque Dynamics
 //Apply a force at a centre of mass (perfect collision movement, linear movement only defined)
-void rb_apply_forces_perfect (rigidbody *rb, vector3 force_applied) {
+static void rb_apply_forces_perfect (rigidbody *rb, vector3 force_applied) {
     if (rb->static_state) {return;}
     rb->force_accumilator = vector3_addition (rb->force_accumilator, force_applied); //Force applied to torque and circular momentum
 } //Apply force at a point not the centre of mass (which generates rotational motion and torque)
 //locale_impact = impact point on object identified
-void rb_apply_forces_localised (rigidbody *rb, vector3 force_applied, vector3 locale_impact) {
+static void rb_apply_forces_localised (rigidbody *rb, vector3 force_applied, vector3 locale_impact) {
     if (rb->static_state) {return;}
     rb_apply_forces_perfect (rb, force_applied);
     //Torque = r * F (r = vector from Centre of Mass to the point of actual contact between objects)
@@ -62,7 +62,7 @@ void rb_apply_forces_localised (rigidbody *rb, vector3 force_applied, vector3 lo
     vector3 torque_actual = vector3_cross (r, force_applied);
     rb->torque_accumilator = vector3_addition (rb->torque_accumilator, torque_actual);
 } //Energy Computation
-float rb_get_Ek (rigidbody *rb) {
+static float rb_get_Ek (rigidbody *rb) {
     //EK normal = 0.5mv ^ 2
     float linear_ek = 0.5 * rb->mass * vector3_length_squared (rb->velocity);
     //EK rotational = 0.5wIw
@@ -70,7 +70,7 @@ float rb_get_Ek (rigidbody *rb) {
     float rotational_ek = 0.5 * vector3_dot (rb->angular_velocity, angular_momemtum);
     return linear_ek + rotational_ek;
 } //Integration Segmentation (Movement Compute)
-void rb_integrate (rigidbody *rb, float dt) {
+static void rb_integrate (rigidbody *rb, float dt) {
     if ((rb->static_state) || (dt <= 0.0)) {return;}
     //Calculate Linear Acceleration (F = ma, a = Fm ^ -1)
     rb->acceleration = vector3_scaling (rb->force_accumilator, rb->inverse_mass); //Multiply Force by inverse of mass
