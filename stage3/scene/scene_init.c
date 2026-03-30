@@ -1,9 +1,16 @@
 #include "scene_init.h"
+#include <stdlib.h>
 //Maximum Object count
-#define max_objects 10
 int scene_add_object (float radius, float mass, vector3 position) {
-    if (object_count >= max_objects) {fprintf (stderr, "Maximum object count reached.\n"); return -1;}
-    rigidbody_initialisation_sphere (&obj_per_scene [object_count], radius, mass, position);
+    if (object_count >= object_capacity) {
+        int new_capacity = 0;
+        if (object_capacity == 0) {new_capacity == 16;}
+        else {new_capacity = object_capacity * 2;}
+        rigidbody *new_array_objects = realloc (obj_per_scene, new_capacity * sizeof (rigidbody));
+        if (!new_array_objects) {fprintf (stderr, "Maximum object count reached.\n"); return -1;}
+        obj_per_scene = new_array_objects;
+        object_capacity = new_capacity;
+    } rigidbody_initialisation_sphere (&obj_per_scene [object_count], radius, mass, position);
     int index = object_count;
     object_count += 1;
     return index;
