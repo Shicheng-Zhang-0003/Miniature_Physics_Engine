@@ -2,8 +2,6 @@
 #include <gtk/gtk.h>
 #include <epoxy/gl.h>
 #include "../../master_header_2.h"
-extern rigidbody objects [10];
-extern int number_objects;
 static void on_point_render (GtkGLArea * area, GdkGLContext *context) {
     int width = gtk_widget_get_allocated_width (GTK_WIDGET (area));
     int height = gtk_widget_get_allocated_height (GTK_WIDGET (area));

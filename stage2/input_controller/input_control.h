@@ -4,7 +4,7 @@
 #include <stdbool.h>
 typedef struct {
     //Keyboard Movement Inputs
-    bool w_key, a_key, s_key, d_key;
+    bool w_key, a_key, s_key, d_key, space_key;
     //Mouse Status Inputs
     bool mouse_1;
     double last_x_input, last_y_input;

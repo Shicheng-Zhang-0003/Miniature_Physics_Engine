@@ -32,7 +32,7 @@ void initialise_input (input_status *input) {
     if (event->keyval == GDK_KEY_a) {input->a_key = false;}
     if (event->keyval == GDK_KEY_s) {input->s_key = false;}
     if (event->keyval == GDK_KEY_d) {input->d_key = false;}
-    if (event->keyval == GDK_KEY_space) {input->space_key = false};
+    if (event->keyval == GDK_KEY_space) {input->space_key = false;}
     return FALSE;
 } gboolean on_mouse_movements (GtkWidget *widget, GdkEventMotion *event, gpointer user_data_stored) {
     //Pass a array containing both camera and the input status

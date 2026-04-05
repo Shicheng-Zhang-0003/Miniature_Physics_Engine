@@ -1,7 +1,7 @@
 #include <epoxy/gl.h>
 #include <stdio.h>
 #include <stdlib.h>
-GLuint compiler_shaders (const char *source, GLenum type) {
+GLuint compiler_shader (const char *source, GLenum type) {
     GLuint shader = glCreateShader (type);
     glShaderSource (shader, 1, &source, NULL);
     glCompileShader (shader);
@@ -28,8 +28,8 @@ GLuint compiler_shaders (const char *source, GLenum type) {
     fread (fsource, 1, fsize, ff); fsource [fsize] = '\0';
     fclose (vf); fclose (ff);
     // Compilation Process
-    GLuint vertex = compiler_shaders (vsource, GL_VERTEX_SHADER);
-    GLuint fragment = compiler_shaders (fsource, GL_FRAGMENT_SHADER);
+    GLuint vertex = compiler_shader (vsource, GL_VERTEX_SHADER);
+    GLuint fragment = compiler_shader (fsource, GL_FRAGMENT_SHADER);
     // Linkage and .o elf
     GLuint program = glCreateProgram ();
     glAttachShader (program, vertex);
