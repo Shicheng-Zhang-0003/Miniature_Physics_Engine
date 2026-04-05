@@ -42,7 +42,7 @@ static void rigidbody_initialisation_sphere (rigidbody *rb, float radius, float 
     //Inertial Tensors
     //I = 0.4mr ^ 2
     float iner = (0.4f) * mass * radius * radius; //0.4f, not 0.4, for decimal float point accuracy
-    rb->inertia_tensor_local = math3 {{{0}}};
+    rb->inertia_tensor_local = (math3) {{{0}}};
     rb->inertia_tensor_local.matrix [0][0] = iner;
     rb->inertia_tensor_local.matrix [1][1] = iner;
     rb->inertia_tensor_local.matrix [2][2] = iner;

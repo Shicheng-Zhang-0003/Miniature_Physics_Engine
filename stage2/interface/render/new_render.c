@@ -7,7 +7,7 @@
 #include <sys/types.h>
 //Global Values for shading and meshing
 extern camera main_camera_fov;
-extern rigidbody obj_per_scene [10];
+extern rigidbody *obj_per_scene;
 extern int object_count;
 static GLuint shaders_program_total = 0;
 static mesh sphere_mesh;
@@ -57,14 +57,14 @@ void render_init () {
         glUniformMatrix4fv (glGetUniformLocation (shaders_program_total, "model"), 1, GL_FALSE, model_array);
         math3 model3;
         for (int row = 0; row < 3; row++) {
-            for (int column = 0; column < 3; column++) {model3.matrix [row][column] = model.matrix [row][column]}
+            for (int column = 0; column < 3; column++) {model3.matrix [row][column] = model.matrix [row][column];}
         } math3 normal_mat = math3_transposition (math3_inverse (model3));
         float normal_array [9];
         for (int row2 = 0; row2 < 3; row2++) {
-            for (int column2 = 0; column2 < 3; column2++) {normal_array [row2 * 3 + column2] = normal_mat.matrix [row2][column2]}
+            for (int column2 = 0; column2 < 3; column2++) {normal_array [row2 * 3 + column2] = normal_mat.matrix [row2][column2];}
         } glUniformMatrix3fv (glGetUniformLocation (shaders_program_total, "normal_matrix"), 1, GL_FALSE, normal_array);
         //Render Objects
-        render_sphere_object (&sphere_mesh, rb, projection, viewpoint);
+        render_sphere_object (&sphere_mesh, rb);
     }
 }
 

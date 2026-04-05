@@ -33,6 +33,6 @@ gboolean physics_step_increment (gpointer user_data_stored) {
     for (int step4 = 0; step4 < object_count; step4++) {rb_integrate (&obj_per_scene [step4], dt);} //GTK redraw the window
     for (int step5 = 0; step5 < object_count; step5++) {boundary_apply_floor (&obj_per_scene [step5], 0.0f);}
     gtk_widget_queue_draw (GTK_WIDGET (user_data_stored));
-    mouse_lock_recalibrate (GTK_WIDGET (user_data_stored));
+    mouse_lock_reset_centre (GTK_WIDGET (user_data_stored));
     return TRUE;
 }
