@@ -11,6 +11,8 @@ void initialise_input (input_status *input) {
     input->a_key = false;
     input->s_key = false;
     input->d_key = false;
+    input->e_key = false;
+    input->f_key = false;
     input->space_key = false;
     //Mouse
     input->mouse_1 = true;
@@ -23,6 +25,8 @@ void initialise_input (input_status *input) {
     if (event->keyval == GDK_KEY_a) {input->a_key = true;}
     if (event->keyval == GDK_KEY_s) {input->s_key = true;}
     if (event->keyval == GDK_KEY_d) {input->d_key = true;}
+    if (event->keyval == GDK_KEY_e) {input->e_key = true;}
+    if (event->keyval == GDK_KEY_f) {input->f_key = true;}
     if (event->keyval == GDK_KEY_space) {input->space_key = true;}
     return FALSE;
 } gboolean on_key_released (GtkWidget *widget, GdkEventKey *event, gpointer user_data_stored) {
@@ -32,6 +36,8 @@ void initialise_input (input_status *input) {
     if (event->keyval == GDK_KEY_a) {input->a_key = false;}
     if (event->keyval == GDK_KEY_s) {input->s_key = false;}
     if (event->keyval == GDK_KEY_d) {input->d_key = false;}
+    if (event->keyval == GDK_KEY_e) {input->e_key = false;}
+    if (event->keyval == GDK_KEY_f) {input->f_key = false;}
     if (event->keyval == GDK_KEY_space) {input->space_key = false;}
     return FALSE;
 } gboolean on_mouse_movements (GtkWidget *widget, GdkEventMotion *event, gpointer user_data_stored) {

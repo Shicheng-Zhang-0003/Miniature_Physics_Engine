@@ -1,6 +1,8 @@
+#include <complex.h>
 #include <gtk/gtk.h>
 #include "../stage2/master_header_2.h"
 #include "../stage3/master_header_3.h"
+#include "../stage4/master_header_4.h"
 #include "master_header.h"
 camera main_camera_fov;
 input_status main_inputs;
@@ -35,6 +37,7 @@ int main_algorithm (int argc, char *argv []) {
     g_signal_connect (window, "motion-notify-event", G_CALLBACK (on_mouse_movements), NULL);
     //Add Window and Objects
     gtk_container_add (GTK_CONTAINER (window), gl_area);
+    overlay_init (window, gl_area);
     //Call Physics Components
     g_timeout_add (16, physics_step_increment, gl_area);
     //Show Widget Window
