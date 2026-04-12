@@ -1,3 +1,5 @@
 gcc main.c -I./stage1 -o physics_engine
 
+//Outdated previously, we require new main folder hierarchy
+
 * -I./stage1 is to recognise root folder hierarchy
