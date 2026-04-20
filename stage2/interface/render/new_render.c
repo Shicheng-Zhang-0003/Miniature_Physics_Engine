@@ -1,5 +1,6 @@
 #include "../../../stage1/master_header.h"
 #include "../../master_header_2.h"
+#include "../../../stage5/rendering/grid.h"
 #include "../../interface/sphere_object/meshing/sphere_meshing.h"
 #include "shader_loading.h"
 #include <epoxy/gl.h>
@@ -12,6 +13,7 @@ extern int object_count;
 static GLuint shaders_program_total = 0;
 static mesh sphere_mesh;
 static int render_init_status = 0;
+static grid_mesh main_grid;
 void render_init () {
     if (render_init_status) {return;}
     //Load/Compilation of Shaders
@@ -19,6 +21,7 @@ void render_init () {
         "stage2/interface/sphere_object/shaders/vertex_shader.glsl",
         "stage2/interface/sphere_object/shaders/fragment_shader.glsl"
     ); //Initialise (32 sec, 32 stack)
+    grid_init (&main_grid, 100, 5);
     init_sm_system (&sphere_mesh, 32, 32);
     render_init_status = 1;
 } void render_scene_current (int width, int height) {
@@ -43,6 +46,7 @@ void render_init () {
     //Light Position
     glUniform3f (glGetUniformLocation (shaders_program_total, "light_position"), 10.0, 20.0, 10.0);
     //Draw Each Object in Question
+    grid_render (&main_grid, shaders_program_total, viewpoint, projection);
     for (int step = 0; step < object_count; step++) {
         rigidbody *rb = &obj_per_scene [step];
         //Model Matrix --> Position + Orientation
