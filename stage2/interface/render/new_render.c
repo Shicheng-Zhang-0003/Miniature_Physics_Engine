@@ -1,6 +1,7 @@
 #include "../../../stage1/master_header.h"
 #include "../../master_header_2.h"
 #include "../../../stage5/rendering/grid.h"
+#include "../../../stage5/rendering/wireframe.h"
 #include "../../interface/sphere_object/meshing/sphere_meshing.h"
 #include "shader_loading.h"
 #include <epoxy/gl.h>
@@ -11,7 +12,7 @@ extern camera main_camera_fov;
 extern rigidbody *obj_per_scene;
 extern int object_count;
 static GLuint shaders_program_total = 0;
-static mesh sphere_mesh;
+mesh sphere_mesh;
 static int render_init_status = 0;
 static grid_mesh main_grid;
 void render_init () {
@@ -69,7 +70,7 @@ void render_init () {
         } glUniformMatrix3fv (glGetUniformLocation (shaders_program_total, "normal_matrix"), 1, GL_FALSE, normal_array);
         //Render Objects
         render_sphere_object (&sphere_mesh, rb);
-    }
+    } wireframe_render_selected_object (shaders_program_total, viewpoint, projection);
 }
 
 /*

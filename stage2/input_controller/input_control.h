@@ -5,6 +5,10 @@
 typedef struct {
     //Keyboard Movement Inputs
     bool w_key, a_key, s_key, d_key, e_key, f_key, space_key;
+    //Load File Inputs
+    bool r_key, l_key; //Save, Load
+    //Join and Disassociate individual objects
+    bool j_key, x_key;
     //Mouse Status Inputs
     bool mouse_1;
     double last_x_input, last_y_input;

@@ -11,6 +11,7 @@ typedef struct {
     //ebo = element buffer object, index store and category
     int index; //Number of points to draw
 } mesh;
+extern mesh sphere_mesh;
 //Function Pre-declaration
 void init_sm_system (mesh *mesh_s, int sections, int stack);
 void render_sphere_object (mesh *mesh_s, rigidbody *rb);

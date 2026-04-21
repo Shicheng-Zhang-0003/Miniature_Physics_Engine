@@ -14,6 +14,12 @@ void initialise_input (input_status *input) {
     input->e_key = false;
     input->f_key = false;
     input->space_key = false;
+    //File
+    input->r_key = false;
+    input->l_key = false;
+    //Object Joining
+    input->j_key = false;
+    input->x_key = false;
     //Mouse
     input->mouse_1 = true;
     input->last_x_input = 400.0; //800 x 600 Video Rendering Centre
@@ -27,6 +33,10 @@ void initialise_input (input_status *input) {
     if (event->keyval == GDK_KEY_d) {input->d_key = true;}
     if (event->keyval == GDK_KEY_e) {input->e_key = true;}
     if (event->keyval == GDK_KEY_f) {input->f_key = true;}
+    if (event->keyval == GDK_KEY_r) {input->r_key = true;}
+    if (event->keyval == GDK_KEY_l) {input->l_key = true;}
+    if (event->keyval == GDK_KEY_j) {input->j_key = true;}
+    if (event->keyval == GDK_KEY_x) {input->x_key = true;}
     if (event->keyval == GDK_KEY_space) {input->space_key = true;}
     return FALSE;
 } gboolean on_key_released (GtkWidget *widget, GdkEventKey *event, gpointer user_data_stored) {
@@ -38,6 +48,10 @@ void initialise_input (input_status *input) {
     if (event->keyval == GDK_KEY_d) {input->d_key = false;}
     if (event->keyval == GDK_KEY_e) {input->e_key = false;}
     if (event->keyval == GDK_KEY_f) {input->f_key = false;}
+    if (event->keyval == GDK_KEY_r) {input->r_key = false;}
+    if (event->keyval == GDK_KEY_l) {input->l_key = false;}
+    if (event->keyval == GDK_KEY_j) {input->j_key = false;}
+    if (event->keyval == GDK_KEY_x) {input->x_key = false;}
     if (event->keyval == GDK_KEY_space) {input->space_key = false;}
     return FALSE;
 } gboolean on_mouse_movements (GtkWidget *widget, GdkEventMotion *event, gpointer user_data_stored) {

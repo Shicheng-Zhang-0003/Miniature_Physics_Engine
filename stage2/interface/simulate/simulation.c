@@ -25,6 +25,12 @@ gboolean physics_step_increment (gpointer user_data_stored) {
     } if (main_inputs.space_key) {
         spawner_launch_sphere (0.5, 1.0, 20.0);
         main_inputs.space_key = false;
+    } if (main_inputs.r_key) {
+        scene_saving ("scene.dat");
+        main_inputs.r_key = false;
+    } if (main_inputs.l_key) {
+        scene_load ("scene.dat");
+        main_inputs.t_key = false;
     } //Apply forces to all objects within the simulation
     for (int step = 0; step < object_count; step++) {
         vector3 gravity = {0, -9.81, 0};
