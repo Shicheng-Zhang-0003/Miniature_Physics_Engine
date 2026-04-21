@@ -2,6 +2,7 @@
 #include "../../../stage3/master_header_3.h"
 #include "../../../stage1/master_header.h"
 #include "../../../stage4/master_header_4.h"
+#include "../../../stage5/master_header_5.h"
 #include <gtk/gtk.h>
 #include <stdbool.h>
 //World Status right now
@@ -31,6 +32,24 @@ gboolean physics_step_increment (gpointer user_data_stored) {
     } if (main_inputs.l_key) {
         scene_load ("scene.dat");
         main_inputs.t_key = false;
+    } if (main_inputs.j_key) {
+        if ((selected_object >= 0) && (last_selected >= 0) && (selected_object != last_selected)) {
+            // Rest length is current distance between the two objects
+            vector3 delta = vector3_subtraction (obj_per_scene [selected_object].position, obj_per_scene [last_selected].position);
+            float spring_rest_length = vector3_length (delta);
+            add_joint (last_selected, selected_object, spring_rest_length, 10.0, 0.5);
+        } last_selected = selected_object;
+        main_inputs.j_key = false;
+    } if (main_inputs.x_key) {
+        if (selected_object >= 0) {
+            joint_remove_for_object (selected_object);
+            // Shift array down to fill gap
+            for (int step = selected_object; step < object_count - 1; step++) {
+                obj_per_scene [step] = obj_per_scene [step + 1];
+            } object_count -= 1;
+            clear_selection ();
+            last_selected = -1;
+        } main_inputs.x_key = false;
     } //Apply forces to all objects within the simulation
     for (int step = 0; step < object_count; step++) {
         vector3 gravity = {0, -9.81, 0};
