@@ -15,9 +15,9 @@ void update_particle (Particle *object, float dt) { //dt = distance travelled
     (object -> acceleration) = Vector2Add ((p -> acceleration), Vector2Scale ((p -> jerk), dt)); //Derive current acceleration from jerk (may not be compatiable or required for specialsied effect)
     (object -> velocity) = Vector2Add ((p -> velocity), Vector2Scale ((p -> acceleration), dt)); //Derive current velocity from acceleration
     (object -> position) = Vector2Add ((p -> position), Vector2Scale ((p -> velocity), dt)); //Derive current position from velocity prior
-    //(object -> acceleration) = (vector2) {0.0f, 0.0f} 
+    //(object -> acceleration) = (vector2) {0.0f, 0.0f}
     //Emergency Backup
-    
+
 
 
     //Segment focusing on collision logic between objects
@@ -29,7 +29,7 @@ void update_particle (Particle *object, float dt) { //dt = distance travelled
     } else if ((object -> position.x) + (object -> radius) > width) { //Right System Wall
         (object -> position.x) = width - (object -> radius);
         (object -> velocity.x) = -(object -> velocity.x) * dampening;
-    } 
+    }
 
     if ((object -> position.y) > (object -> radius)) { //Top System Wall
         (object -> position.y) = (object -> radius);

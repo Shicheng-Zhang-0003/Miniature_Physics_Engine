@@ -47,14 +47,17 @@ gboolean physics_step_increment (gpointer user_data_stored) {
             for (int step = selected_object; step < object_count - 1; step++) {
                 obj_per_scene [step] = obj_per_scene [step + 1];
             } object_count -= 1;
-            clear_selection ();
+            for (int step6 = 0; step6 < max_joint_count; step6++) {
+                if (!joint_pool [step6].active) {continue;}
+                if (joint_pool [step6].index_av > selected_object) {joint_pool [step6].index_av -= 1;}
+                if (joint_pool [step6].index_bv > selected_object) {joint_pool [step6].index_bv -= 1;}
+            } clear_selection ();
             last_selected = -1;
         } main_inputs.x_key = false;
     } //Apply forces to all objects within the simulation
     for (int step = 0; step < object_count; step++) {
         vector3 gravity = {0, -9.81, 0};
         force_applicant_gravity_normal (&obj_per_scene [step], gravity, (vector3) {0.0, 1.0, 0.0});
-        //Add Forces Later on Input and ETC
     } //Resolve collisions between objects
     broadphase_pair pairs [256];
     int pair_counter = broadphase_generate_pairing (pairs, 256);
@@ -64,7 +67,12 @@ gboolean physics_step_increment (gpointer user_data_stored) {
     } for (int step4 = 0; step4 < object_count; step4++) {rb_integrate (&obj_per_scene [step4], dt);} //GTK redraw the window
     for (int step5 = 0; step5 < object_count; step5++) {boundary_apply_floor (&obj_per_scene [step5], 0.0f);}
     gtk_widget_queue_draw (GTK_WIDGET (user_data_stored));
-    mouse_lock_reset_centre (GTK_WIDGET (user_data_stored));
-    overlay_updat ();
+    // Only recalibrate every 10 frames
+    static int counter_recalibration = 0;
+    counter_recalibration += 1;
+    if (counter_recalibration >= 10) {
+        mouse_lock_reset_centre (GTK_WIDGET (user_data_stored));
+        counter_recalibration = 0;
+    } overlay_update ();
     return TRUE;
 }

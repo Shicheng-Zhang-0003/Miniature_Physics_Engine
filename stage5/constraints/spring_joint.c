@@ -55,4 +55,7 @@ int add_joint (int index_av, int index_bv, float spring_length_rest, float k_con
         if (!joint_pool [step].active) {continue;}
         if ((joint_pool [step].index_av == object_index) || (joint_pool [step].index_bv == object_index)) {remove_joint (step);}
     }
+} void joint_init_pool (void) {
+    for (int step = 0; step < max_joint_count; step++) {joint_pool [step].activation = false;}
+    joint_count = 0;
 }

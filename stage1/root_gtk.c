@@ -3,6 +3,7 @@
 #include "../stage2/master_header_2.h"
 #include "../stage3/master_header_3.h"
 #include "../stage4/master_header_4.h"
+#include "../stage5/master_header_5.h"
 #include "master_header.h"
 camera main_camera_fov;
 input_status main_inputs;
@@ -45,6 +46,7 @@ int main_algorithm (int argc, char *argv []) {
     frame_timer_init (&main_timer);
     scene_init_default ();
     mouse_lock_enable (window);
+    joint_init_pool ();
     gtk_main ();
     return 0;
 } int main (int argc, char *argv []) {

@@ -2,6 +2,7 @@
 #include "../../master_header_2.h"
 #include "../../../stage5/rendering/grid.h"
 #include "../../../stage5/rendering/wireframe.h"
+#include "../../../stage5/constraints/spring_joint.h"
 #include "../../interface/sphere_object/meshing/sphere_meshing.h"
 #include "shader_loading.h"
 #include <epoxy/gl.h>
@@ -48,6 +49,7 @@ void render_init () {
     glUniform3f (glGetUniformLocation (shaders_program_total, "light_position"), 10.0, 20.0, 10.0);
     //Draw Each Object in Question
     grid_render (&main_grid, shaders_program_total, viewpoint, projection);
+    apply_force_all_joints ();
     for (int step = 0; step < object_count; step++) {
         rigidbody *rb = &obj_per_scene [step];
         //Model Matrix --> Position + Orientation

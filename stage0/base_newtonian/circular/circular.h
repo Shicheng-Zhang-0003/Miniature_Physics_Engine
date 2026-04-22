@@ -6,7 +6,7 @@
 #include "physics.h"
 
 //Type: Non-Comp: Header File
-//Header File for declaration for Centripetal force declarations 
+//Header File for declaration for Centripetal force declarations
 
 void app_centripetal (Particle *rotating_object, Vector2 centerpoint, float strength) {
     Vector2 lock_centerpoint = Vector2Subtract (centerpoint, (rotating_object -> position)); //Get Radius of rotating system

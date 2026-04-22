@@ -21,4 +21,6 @@ void remove_joint (int joint_index);
 void apply_force_all_joints (void);
 //Remove all joints connected to a particular object
 void remove_joints_from_object (int object_index);
+//Initialise the actual pool of objects to be processed
+void joint_init_pool (void);
 #endif
