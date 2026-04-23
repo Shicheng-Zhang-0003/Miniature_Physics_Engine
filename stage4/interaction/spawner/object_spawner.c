@@ -11,7 +11,7 @@ void spawner_launch_sphere (float radius, float mass, float speed) {
         0.4 + 0.6 * ((float) (idx % 3) / 2.0),
         0.4 + 0.6 * ((float) ((idx + 1) % 3) / 2.0),
         0.4 + 0.6 * ((float) ((idx + 2) % 3) / 2.0)
-    }
+    };
 } void spawner_static_sphere (float radius, float mass, vector3 position) {
     int idx = scene_add_object (radius, mass, position);
     if (idx < 0) {return;} //SAO/SKF

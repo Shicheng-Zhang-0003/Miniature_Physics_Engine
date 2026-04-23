@@ -23,7 +23,7 @@ static void force_applicant_gravity_normal (rigidbody *rb, vector3 gravitational
 static void force_applicant_universal_gravity (rigidbody *a, rigidbody *b) {
     vector3 relation_vector = vector3_subtraction (b->position, a->position); //Relative Vector and distance
     float distance_squared = vector3_length_squared (relation_vector); //r ^ 2
-    if (distance_squared < epsilon) {return;}
+    if (distance_squared < math_epsilon) {return;}
     float distance = sqrtf (distance_squared); //r
     float force_magnitude = (big_g * a->mass * b->mass) / distance_squared; //Fg = Gm1m2r ^ -2
     vector3 force_out = vector3_scaling (vector3_normalisation (relation_vector), force_magnitude); //Check magnitude and vectors for applications
@@ -40,7 +40,7 @@ static void force_applicant_friction (rigidbody *rb, vector3 surface_normal, flo
     float velocity_d_normal = vector3_dot (rb->velocity, surface_normal);
     vector3 velocity_tangent = vector3_subtraction (rb->velocity, vector3_scaling (surface_normal, velocity_d_normal));
     float speed_tangent = vector3_length (velocity_tangent);
-    if (speed_tangent > epsilon) {
+    if (speed_tangent > math_epsilon) {
         //Kinetic Friction: Resists curent sliding motion
         vector3 kinetic_friction = vector3_scaling (vector3_normalisation (velocity_tangent),
                 -mu_kinetic * force_normal_magnitude);
@@ -61,7 +61,7 @@ static void force_applicant_friction (rigidbody *rb, vector3 surface_normal, flo
 static void force_applicant_string (rigidbody *rb, vector3 anchor, float resistance_length, float k_constant, float damping) {
     vector3 direction_vector = vector3_subtraction (rb->position, anchor);
     float current_length = vector3_length (direction_vector);
-    if (current_length < epsilon) {return;}
+    if (current_length < math_epsilon) {return;}
     float x_value = current_length - resistance_length;
     vector3 direction = vector3_normalisation (direction_vector);
     //Fs = -kx

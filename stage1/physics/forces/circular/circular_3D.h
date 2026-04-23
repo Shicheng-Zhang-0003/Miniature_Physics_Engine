@@ -5,7 +5,7 @@ static void applicant_centripetal_vector3 (rigidbody *rb, vector3 centrepoint, f
     //Radius Vector (3D) (r = centre_position - position_current)
     vector3 lock_vector = vector3_subtraction(centrepoint, rb->position);
     float radius = vector3_length (lock_vector);
-    if (radius > epsilon) {
+    if (radius > math_epsilon) {
         //Normalise the vector towards the inwards direction to centrepoint
         vector3 direction = vector3_normalisation (lock_vector);
         //Fc = mv ^ 2 * r ^ -1

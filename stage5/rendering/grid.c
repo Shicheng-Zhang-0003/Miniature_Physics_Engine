@@ -8,12 +8,12 @@ void grid_init (grid_mesh *gm, int half_buffer, int spacing) {
     int total_float_count = steps * 4 * 3; //(* 2 * 2 iteration per axis)
     float *vertices = malloc (total_float_count * sizeof (float));
     int idx = 0;
-    for (int step = -half_buffer; step <= half_buffer; step++) {
+    for (int step = -half_buffer; step <= half_buffer; step += spacing) {
         //Line along the Z axis at X = step;
         vertices [idx++] = (float) step;
         vertices [idx++] = 0.0;
         vertices [idx++] = (float) -half_buffer;
-        vertices [idx++] = (float) i;
+        vertices [idx++] = (float) step;
         vertices [idx++] = 0.0;
         vertices [idx++] = (float) half_buffer;
         //Line along X axis at position of Z = step

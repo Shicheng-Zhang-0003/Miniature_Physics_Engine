@@ -35,7 +35,7 @@ int add_joint (int index_av, int index_bv, float spring_length_rest, float k_con
         //Vector from object a to object b
         vector3 delta_constant = vector3_subtraction (b->position, a->position);
         float current_length = vector3_length (delta_constant);
-        if (current_length < epsilon) {continue;}
+        if (current_length < math_epsilon) {continue;}
         float displacement = current_length - joint->spring_length_rest;
         vector3 direction_travel = vector3_normalisation (delta_constant);
         //Spring force: Fs = -kx (Fs = -k_constant * displacement)
@@ -52,7 +52,7 @@ int add_joint (int index_av, int index_bv, float spring_length_rest, float k_con
     }
 } void remove_joints_from_object (int object_index) {
     for (int step = 0; step < max_joint_count; step++) {
-        if (!joint_pool [step].active) {continue;}
+        if (!joint_pool [step].activation) {continue;}
         if ((joint_pool [step].index_av == object_index) || (joint_pool [step].index_bv == object_index)) {remove_joint (step);}
     }
 } void joint_init_pool (void) {

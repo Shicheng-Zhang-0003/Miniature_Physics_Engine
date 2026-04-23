@@ -14,13 +14,13 @@ SRCS = stage1/root_gtk.c \
        stage3/scene/scene_init.c \
        stage3/timing_belt/frame_timer.c \
        stage3/input_extension/mouse_lock.c \
-       stage4/interaction/object_spawner.c \
-       stage4/interaction/object_selector.c \
+       stage4/interaction/spawner/object_spawner.c \
+       stage4/interaction/selector/object_selector.c \
        stage4/broadphase/broadphase.c \
        stage4/debug_overlay/overlay.c \
        stage5/rendering/grid.c \
        stage5/rendering/wireframe.c \
-       stage5/scene_io/scene_save.c \
+       stage5/scene_io/scene_saving.c \
        stage5/scene_io/scene_load.c \
        stage5/constraints/spring_joint.c
 

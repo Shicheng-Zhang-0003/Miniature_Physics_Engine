@@ -6,7 +6,7 @@ int scene_saving (const char *filepath) {
     //List number of objects first
     fprintf (source, "%d\n", object_count);
     for (int step = 0; step < object_count; step++) {
-        rigidbody *rb = &obj_per_scene [i];
+        rigidbody *rb = &obj_per_scene [step];
         //Each object listed on each line
         //radius, mass, static_status
         //position.x, position.y, position.z

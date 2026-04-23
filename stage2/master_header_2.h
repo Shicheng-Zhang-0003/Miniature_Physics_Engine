@@ -14,7 +14,6 @@ extern int object_capacity;
 // Global camera and input, root_gtk.c
 extern camera main_camera_fov;
 extern input_status main_inputs;
-extern frame_timer main_timer;
 // Rendering, interface/render/render.c
 void render_init (void);
 void render_scene_current (int width, int height);

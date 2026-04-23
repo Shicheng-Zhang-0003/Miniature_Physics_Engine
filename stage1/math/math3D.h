@@ -11,7 +11,7 @@
 //Define Radians and Degree Calculation converter
 #define degrad (math_pi / 180.0)
 #define raddeg (180.0 / math_pi)
-#define epsilon 0.000001
+#define math_epsilon 0.000001
 //Structures for use as typedefs
 //Vector in 3D for objects in motion
 typedef struct { float x, y, z; } vector3;
@@ -33,14 +33,14 @@ static inline float vector3_length_squared (vector3 vector) {return vector.x * v
 static inline float vector3_length (vector3 vector) {return sqrtf (vector3_length_squared (vector));}
 static inline vector3 vector3_normalisation (vector3 vector) {
     float length = vector3_length (vector);
-    if (length < epsilon) {return vector3_zero ();}
+    if (length < math_epsilon) {return vector3_zero ();}
     return vector3_scaling (vector, 1.0 / length);
 } //Quarternion (4D) Functions
 //orientation in rotational w-axis w/o gimbal in any axis
 static inline vector4 vector4_identity () {return (vector4) {1.0, 0.0, 0.0, 0.0};}
 static inline vector4 vector4_normalisation (vector4 quart) {
     float length = sqrtf (quart.w * quart.w + quart.x * quart.x + quart.y * quart.y + quart.z * quart.z);
-    if (length < epsilon) {return vector4_identity ();}
+    if (length < math_epsilon) {return vector4_identity ();}
     float inv_lock = 1.0 / length;
     return (vector4) {quart.w * inv_lock, quart.x * inv_lock, quart.y * inv_lock, quart.z * inv_lock};
 } //Multiplication of two 4D matrices at once (combinatoric rotational motion)
@@ -108,7 +108,7 @@ static inline math3 math3_multiplication (math3 a, math3 b) {
 // Angular Constraint Calculation (change_p = J * M ^ -1 * J_transposed)
 static inline math3 math3_inverse (math3 m) {
     float det = (m.matrix [0][0] * (m.matrix [1][1] * m.matrix [2][2] - m.matrix [2][1] * m.matrix [1][2])) - (m.matrix [0][1] * (m.matrix [1][0] * m.matrix [2][2] - m.matrix [1][2] * m.matrix [2][0])) + (m.matrix [0][2] * (m.matrix [1][0] * m.matrix [2][1] - m.matrix [1][1] * m.matrix [2][0]));
-    if (fabsf (det) < epsilon) {return math3_identity ();} //Buffer Check
+    if (fabsf (det) < math_epsilon) {return math3_identity ();} //Buffer Check
     float invDet = 1.0 / det;
     math3 res;
     //n ~= {0, 2}

@@ -5,8 +5,8 @@ int selector_ray_tracing (void) {
     vector3 ray_direction = vector3_normalisation (main_camera_fov.front);
     float closest_distance = 1e30;
     int closest_index = -1;
-    for (int iteration = 0; iteration < object_count; i++) {
-        rigidbody *rb = &obj_per_scene [i];
+    for (int iteration = 0; iteration < object_count; iteration++) {
+        rigidbody *rb = &obj_per_scene [iteration];
         //Vector from the origin of the ray to centre of the sphere
         vector3 origin_centre = vector3_subtraction (rb->position, origin_ray_view);
         //Project origin_centre onto the direction of the ray to get the closest point on the vector

@@ -6,4 +6,5 @@
 #include "boundary/boundary.h"
 #include "timing_belt/frame_timer.h"
 #include "input_extension/mouse_lock.h"
+extern frame_timer main_timer;
 #endif
