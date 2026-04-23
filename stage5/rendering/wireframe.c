@@ -11,8 +11,8 @@ void wireframe_render_selected_object (GLuint shader_program, math4 view, math4 
     float projection_array [16];
     math4_to_flat_array (view, view_array);
     math4_to_flat_array (projection, projection_array);
-    glUniform4fv (glGetUniformLocation (shader_program, "viewframe"), 1, GL_FALSE, view_array);
-    glUniform4fv (glGetUniformLocation (shader_program, "projection"), 1, GL_FALSE, projection_array);
+    glUniformMatrix4fv (glGetUniformLocation (shader_program, "viewframe"), 1, GL_FALSE, view_array);
+    glUniformMatrix4fv (glGetUniformLocation (shader_program, "projection"), 1, GL_FALSE, projection_array);
     //Scale the mesh frame larger than the actual sphere by a small amount
     float outline_scale = rb->radius * 1.04;
     math4 translation = math4_translation (rb->position);
@@ -22,7 +22,7 @@ void wireframe_render_selected_object (GLuint shader_program, math4 view, math4 
     float model_array [16];
     math4_to_flat_array (model, model_array);
     //A yellow colour stands out from the background
-    glUniform3f (glGetUniformLocation (shader_program, "model"), 1, GL_FALSE, model_array);
+    glUniformMatrix4fv (glGetUniformLocation (shader_program, "model"), 1, GL_FALSE, model_array);
     //Draw in wireframes
     glPolygonMode (GL_FRONT_AND_BACK, GL_LINE);
     glBindVertexArray (sphere_meshing.vao);

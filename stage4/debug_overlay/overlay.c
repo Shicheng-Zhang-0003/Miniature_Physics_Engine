@@ -29,7 +29,7 @@ void overlay_init (GtkWidget *window, GtkWidget *gl_area) {
     } rigidbody *rb = &obj_per_scene [selected_object];
     vector3 gravity = {0.0, -9.81, 0.0};
     state_energy energy = force_to_system_energy_amount (rb, gravity);
-    float speed = vector3_length = (rb->velocity);
+    float speed = vector3_length (rb->velocity);
     snprintf (buffer, sizeof (buffer), "Object %d | Position = (%.1f, %.1f, %.1f) | Speed = %.2f | Ek = %.2f | Epg = %.2f | Em = %.2f", selected_object,
         rb->position.x, rb->position.y, rb->position.z,
         speed,

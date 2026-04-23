@@ -3,7 +3,7 @@
 #include "../../../math_phys_buffer/buffer.h"
 static void applicant_drag_3D (rigidbody *rb, float b, bool quadratic_incorp) { //B = coefficient of drag
     float speed = vector3_length (rb->velocity);
-    if (speed < epsilon) {return;}
+    if (speed < math_epsilon) {return;}
     vector3 opposite_direction = vector3_scaling (rb->velocity, -1.0); //Reverse directional vectoring
     vector3 normalised_opposition = vector3_normalisation (opposite_direction);
     float drag_magnitude;

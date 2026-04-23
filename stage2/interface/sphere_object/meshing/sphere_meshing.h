@@ -1,8 +1,8 @@
 #ifndef sphere_mesh_h
 #define sphere_mesh_h
 #include <epoxy/gl.h>
-#include "../../master_header_2.h"
-#include "../../../stage1/master_header.h"
+#include "stage1/master_header.h"
+#include "stage2/master_header_2.h"
 //GLuint = GPU buffer ID
 typedef struct {
     GLuint vao, vbo, ebo;
