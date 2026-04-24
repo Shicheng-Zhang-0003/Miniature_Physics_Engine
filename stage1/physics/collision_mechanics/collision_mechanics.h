@@ -13,21 +13,27 @@ typedef struct {
     float penetration_contact; //Overlap amount
 } collision_data;
 //Detection of actual collision (Sphere to Sphere contact)
-static bool collision_dual_sphere (rigidbody *a, rigidbody *b, collision_data *out) {
-    vector3 relative_position = vector3_subtraction (b->position, a->position);
-    float distance_squared = vector3_length_squared (relative_position);
-    float radius_total = a->radius + b->radius;
+static bool collision_dual_sphere (rigidbody *rigidbody_object_a, rigidbody *rigidbody_object_b, collision_data *collision_output_data) {
+    vector3 relative_position_vector = vector3_subtraction (rigidbody_object_b->position, rigidbody_object_a->position);
+    float distance_between_centres_squared = vector3_length_squared (relative_position_vector);
+    float total_combined_radius = rigidbody_object_a->radius + rigidbody_object_b->radius;
     //Check Radial discrepancy
-    if (distance_squared >= radius_total * radius_total) {return false;}
-    float distance = sqrtf (distance_squared);
-    out->a = a;
-    out->b = b;
+    if (distance_between_centres_squared >= total_combined_radius * total_combined_radius) {return false;}
+    float distance_between_centres = sqrt (distance_between_centres_squared);
+    collision_output_data->a = rigidbody_object_a;
+    collision_output_data->b = rigidbody_object_b;
     //Normal = Vector from A to B
-    if (distance > 0) {out->normal_vector = vector3_scaling (relative_position, 1.0 / distance);}
-    else {out->normal_vector = (vector3) {0, 1, 0};}
-    out->penetration_contact = radius_total - distance;
-    //Contact point between the objects is in between the two centre points
-    out->contact_point = vector3_addition (a->position, vector3_scaling (out->normal_vector, a->radius));
+    //Safety Check (Div zero)
+    const float minimum_distance_threshold_epsilon = 0.0001;
+    if (distance_between_centres > minimum_distance_threshold_epsilon) {
+        collision_output_data->normal_vector = vector3_scaling (relative_position_vector, 1.0 / distance_between_centres);
+    } else {
+        //Fallback Normal (Overlapping)
+        collision_output_data->normal_vector = (vector3) {0.0, 1.0, 0.0};
+    }
+    collision_output_data->penetration_contact = total_combined_radius - distance_between_centres;
+    //Contact point between objects
+    collision_output_data->contact_point = vector3_addition (rigidbody_object_a->position, vector3_scaling (collision_output_data->normal_vector, rigidbody_object_a->radius));
     return true;
 } //Resolution (Impulse-Momemtum) (x, y, z directional vectoring for impulse related calculations)
 static void collision_resolve (collision_data *c) {

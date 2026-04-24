@@ -1,22 +1,25 @@
 #include "mouse_lock.h"
-void mouse_lock_enable (GtkWidget *window) {
-    GdkWindow *gdk_win = gtk_widget_get_window (window);
-    GdkDisplay *display = gdk_window_get_display (gdk_win);
-    GdkSeat *seat = gdk_display_get_default_seat (display);
-    GdkCursor *blank_cursor = gdk_cursor_new_from_name (display, "none");
-    gdk_seat_grab (seat, gdk_win, GDK_SEAT_CAPABILITY_POINTER, FALSE, blank_cursor, NULL, NULL, NULL);
-    g_object_unref (blank_cursor);
-} void mouse_lock_disable (GtkWidget *window) {
-    GdkDisplay *display = gdk_display_get_default ();
-    GdkSeat *seat = gdk_display_get_default_seat (display);
-    gdk_seat_ungrab (seat);
-} void mouse_lock_reset_centre (GtkWidget *window) {
-    GdkWindow *gdk_win = gtk_widget_get_window (window);
-    int width = gtk_widget_get_allocated_width (window);
-    int height = gtk_widget_get_allocated_height (window);
+void mouse_lock_enable (GtkWidget *parent_window_container) {
+    GdkWindow *gdk_window_instance_handle = gtk_widget_get_window (parent_window_container);
+    if (!gdk_window_instance_handle) {return;}
+    GdkDisplay *gdk_display_default_instance = gdk_window_get_display (gdk_window_instance_handle);
+    GdkSeat *gdk_seat_default_instance = gdk_display_get_default_seat (gdk_display_default_instance);
+    GdkCursor *gdk_blank_cursor_handle = gdk_cursor_new_from_name (gdk_display_default_instance, "none");
+    gdk_seat_grab (gdk_seat_default_instance, gdk_window_instance_handle, GDK_SEAT_CAPABILITY_POINTER, FALSE, gdk_blank_cursor_handle, NULL, NULL, NULL);
+    g_object_unref (gdk_blank_cursor_handle);
+} void mouse_lock_disable (GtkWidget *parent_window_container) {
+    GdkDisplay *gdk_display_default_instance = gdk_display_get_default ();
+    if (!gdk_display_default_instance) {return;}
+    GdkSeat *gdk_seat_default_instance = gdk_display_get_default_seat (gdk_display_default_instance);
+    gdk_seat_ungrab (gdk_seat_default_instance);
+} void mouse_lock_reset_centre (GtkWidget *parent_window_container) {
+    GdkWindow *gdk_window_instance_handle = gtk_widget_get_window (parent_window_container);
+    if (!gdk_window_instance_handle) {return;}
+    int window_allocated_width = gtk_widget_get_allocated_width (parent_window_container);
+    int window_allocated_height = gtk_widget_get_allocated_height (parent_window_container);
     // Warp pointer to window centre
-    GdkDisplay *display = gdk_window_get_display (gdk_win);
-    GdkSeat *seat = gdk_display_get_default_seat (display);
-    GdkDevice *pointer = gdk_seat_get_pointer (seat);
-    gdk_device_warp (pointer, gdk_window_get_screen (gdk_win), width / 2, height / 2);
+    GdkDisplay *gdk_display_default_instance = gdk_window_get_display (gdk_window_instance_handle);
+    GdkSeat *gdk_seat_default_instance = gdk_display_get_default_seat (gdk_display_default_instance);
+    GdkDevice *gdk_pointer_device_instance = gdk_seat_get_pointer (gdk_seat_default_instance);
+    gdk_device_warp (gdk_pointer_device_instance, gdk_window_get_screen (gdk_window_instance_handle), window_allocated_width / 2, window_allocated_height / 2);
 }

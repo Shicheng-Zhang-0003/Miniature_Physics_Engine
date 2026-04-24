@@ -46,6 +46,10 @@ void grid_init (grid_mesh *gm, int half_buffer, int spacing) {
     math4_to_flat_array (model, model_array);
     glUniformMatrix4fv (glGetUniformLocation (shader_program_call, "model"), 1, GL_FALSE, model_array);
     glUniform3f (glGetUniformLocation (shader_program_call, "object_colour"), 0.3, 0.3, 0.3);
+    const float grid_surface_normal_x = 0.0;
+    const float grid_surface_normal_y = 1.0;
+    const float grid_surface_normal_z = 0.0;
+    glVertexAttrib3f (1, grid_surface_normal_x, grid_surface_normal_y, grid_surface_normal_z); // Constant normal pointing up for the grid
     glBindVertexArray (gm->vao);
     glDrawArrays (GL_LINES, 0, gm->line_count);
     glBindVertexArray (0);
