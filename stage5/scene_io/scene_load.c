@@ -2,10 +2,10 @@
 #include "../../stage3/scene/scene_init.h"
 #include <stdio.h>
 int scene_loading (const char *file_src) {
-    if (!source) {fprintf (stderr, "Error LDF01: Loading File Error %s\n", file_src); return 0;}
     FILE *source = fopen (file_src, "r");
+    if (!source) {fprintf (stderr, "Error LDF01: Loading File Error %s\n", file_src); return 0;}
     int count_objects = 0;
-    fscanf (file_src, "%d\n", &count_objects);
+    fscanf (source, "%d\n", &count_objects);
     //Clear the current scene before rendering saved objects
     scene_clear ();
     for (int step = 0; step < count_objects; step++) {

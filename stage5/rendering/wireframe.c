@@ -1,7 +1,7 @@
 #include "wireframe.h"
 #include "../../stage2/interface/sphere_object/meshing/sphere_meshing.h"
 #include <epoxy/gl_generated.h>
-extern mesh sphere_meshing;
+extern mesh sphere_mesh;
 void wireframe_render_selected_object (GLuint shader_program, math4 view, math4 projection) {
     if ((selected_object < 0) || (selected_object >= object_count)) {return;}
     rigidbody *rb = &obj_per_scene [selected_object];
@@ -25,8 +25,8 @@ void wireframe_render_selected_object (GLuint shader_program, math4 view, math4 
     glUniformMatrix4fv (glGetUniformLocation (shader_program, "model"), 1, GL_FALSE, model_array);
     //Draw in wireframes
     glPolygonMode (GL_FRONT_AND_BACK, GL_LINE);
-    glBindVertexArray (sphere_meshing.vao);
-    glDrawElements (GL_TRIANGLES, sphere_meshing.index, GL_UNSIGNED_INT, 0);
+    glBindVertexArray (sphere_mesh.vao);
+    glDrawElements (GL_TRIANGLES, sphere_mesh.index, GL_UNSIGNED_INT, 0);
     glBindVertexArray (0);
     //Restore normal operation later --> line mesh mode to fill mode to prevent something else breaking
     glPolygonMode (GL_FRONT_AND_BACK, GL_FILL);
