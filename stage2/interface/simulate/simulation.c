@@ -11,6 +11,7 @@ rigidbody *obj_per_scene = NULL;
 int object_count = 0;
 int object_capacity = 0;
 gboolean physics_step_increment (gpointer user_data_stored) {
+    static int last_selected = -1;
     frame_timer_update (&main_timer);
     float dt = main_timer.delta_time;
     if (main_inputs.w_key) {camera_move_w (&main_camera_fov, dt);}
@@ -27,11 +28,11 @@ gboolean physics_step_increment (gpointer user_data_stored) {
         spawner_launch_sphere (0.5, 1.0, 20.0);
         main_inputs.space_key = false;
     } if (main_inputs.r_key) {
-        scene_saving ("scene.dat");
+        save_scene ("scene.dat");
         main_inputs.r_key = false;
     } if (main_inputs.l_key) {
-        scene_load ("scene.dat");
-        main_inputs.t_key = false;
+        scene_loading ("scene.dat");
+        main_inputs.l_key = false;
     } if (main_inputs.j_key) {
         if ((selected_object >= 0) && (last_selected >= 0) && (selected_object != last_selected)) {
             // Rest length is current distance between the two objects
@@ -42,22 +43,29 @@ gboolean physics_step_increment (gpointer user_data_stored) {
         main_inputs.j_key = false;
     } if (main_inputs.x_key) {
         if (selected_object >= 0) {
-            joint_remove_for_object (selected_object);
+            remove_joints_from_object (selected_object);
             // Shift array down to fill gap
             for (int step = selected_object; step < object_count - 1; step++) {
                 obj_per_scene [step] = obj_per_scene [step + 1];
             } object_count -= 1;
             for (int step6 = 0; step6 < max_joint_count; step6++) {
-                if (!joint_pool [step6].active) {continue;}
+                if (!joint_pool [step6].activation) {continue;}
                 if (joint_pool [step6].index_av > selected_object) {joint_pool [step6].index_av -= 1;}
                 if (joint_pool [step6].index_bv > selected_object) {joint_pool [step6].index_bv -= 1;}
             } clear_selection ();
             last_selected = -1;
         } main_inputs.x_key = false;
     } //Apply forces to all objects within the simulation
+    apply_force_all_joints ();
     for (int step = 0; step < object_count; step++) {
         vector3 gravity = {0, -9.81, 0};
-        force_applicant_gravity_normal (&obj_per_scene [step], gravity, (vector3) {0.0, 1.0, 0.0});
+        //Only apply normal force if touching or below the floor level (y=0)
+        if (obj_per_scene [step].position.y <= obj_per_scene [step].radius + 0.01) {
+            force_applicant_gravity_normal (&obj_per_scene [step], gravity, (vector3) {0.0, 1.0, 0.0});
+        } else {
+            // Apply only gravity in freefall
+            rb_apply_forces_perfect (&obj_per_scene [step], vector3_scaling (gravity, obj_per_scene [step].mass));
+        }
     } //Resolve collisions between objects
     broadphase_pair pairs [256];
     int pair_counter = broadphase_generate_pairing (pairs, 256);

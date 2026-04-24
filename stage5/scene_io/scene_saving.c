@@ -1,6 +1,6 @@
 #include "scene_saving.h"
 #include <stdio.h>
-int scene_saving (const char *filepath) {
+int save_scene (const char *filepath) {
     FILE *source = fopen (filepath, "w");
     if (!source) {fprintf (stderr, "Error SVF01, could not open %s\n", filepath); return 0;}
     //List number of objects first
