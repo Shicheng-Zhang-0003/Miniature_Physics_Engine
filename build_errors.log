@@ -1,0 +1,590 @@
+
+(engine:411298): Gtk-CRITICAL **: 09:12:44.438: gtk_container_add: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:44.512: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:44.512: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:44.527: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:44.527: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:44.544: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:44.544: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:44.561: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:44.561: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:44.577: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:44.577: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:44.594: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:44.594: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:44.610: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:44.610: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:44.627: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:44.627: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:44.644: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:44.644: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:44.661: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:44.661: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:44.661: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:44.661: gtk_widget_get_window: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:44.678: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:44.678: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:44.695: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:44.695: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:44.711: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:44.711: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:44.728: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:44.728: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:44.744: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:44.744: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:44.761: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:44.761: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:44.778: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:44.778: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:44.795: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:44.795: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:44.811: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:44.811: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:44.828: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:44.828: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:44.828: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:44.828: gtk_widget_get_window: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:44.844: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:44.844: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:44.861: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:44.861: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:44.878: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:44.878: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:44.894: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:44.894: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:44.911: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:44.911: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:44.928: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:44.928: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:44.944: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:44.944: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:44.961: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:44.961: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:44.978: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:44.978: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:44.995: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:44.995: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:44.995: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:44.995: gtk_widget_get_window: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.011: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.011: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.028: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.028: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.045: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.045: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.061: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.061: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.077: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.077: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.094: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.094: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.111: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.111: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.127: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.127: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.144: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.144: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.161: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.161: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.161: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.161: gtk_widget_get_window: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.178: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.178: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.195: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.195: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.212: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.212: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.228: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.228: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.245: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.245: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.261: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.261: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.278: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.278: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.294: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.294: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.311: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.311: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.327: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.327: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.327: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.327: gtk_widget_get_window: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.344: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.344: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.361: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.361: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.378: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.378: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.394: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.394: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.411: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.411: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.428: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.428: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.445: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.445: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.461: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.461: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.478: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.478: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.494: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.494: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.494: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.494: gtk_widget_get_window: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.511: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.511: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.528: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.528: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.544: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.545: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.561: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.561: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.578: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.578: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.595: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.595: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.612: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.612: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.629: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.629: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.645: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.646: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.662: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.662: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.662: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.662: gtk_widget_get_window: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.679: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.679: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.695: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.695: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.712: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.712: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.728: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.728: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.745: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.745: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.761: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.761: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.778: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.778: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.795: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.795: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.812: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.812: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.829: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.829: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.829: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.829: gtk_widget_get_window: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.845: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.845: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.862: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.862: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.879: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.879: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.895: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.895: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.912: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.912: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.929: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.929: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.946: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.946: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.962: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.962: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.979: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.979: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.995: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.995: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:45.995: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:45.995: gtk_widget_get_window: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.011: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.012: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.028: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.029: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.045: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.045: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.062: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.062: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.078: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.078: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.094: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.094: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.111: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.111: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.128: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.128: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.144: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.144: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.161: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.161: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.161: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.161: gtk_widget_get_window: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.178: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.178: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.194: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.194: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.211: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.211: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.228: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.228: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.245: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.245: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.261: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.261: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.278: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.278: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.294: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.294: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.311: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.311: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.328: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.328: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.328: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.328: gtk_widget_get_window: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.344: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.344: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.361: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.361: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.377: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.377: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.394: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.394: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.410: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.410: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.427: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.427: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.444: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.444: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.460: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.461: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.477: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.477: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.494: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.494: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.494: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.494: gtk_widget_get_window: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.512: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.512: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.528: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.528: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.545: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.545: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.561: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.561: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.577: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.577: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.594: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.594: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.611: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.611: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.627: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.627: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.644: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.644: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.660: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.660: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.660: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.660: gtk_widget_get_window: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.677: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.677: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.694: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.694: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.710: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.710: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed
+
+(engine:411298): GLib-GObject-CRITICAL **: 09:12:46.727: invalid unclassed pointer in cast to 'GtkWidget'
+
+(engine:411298): Gtk-CRITICAL **: 09:12:46.727: gtk_widget_queue_draw: assertion 'GTK_IS_WIDGET (widget)' failed

@@ -10,6 +10,7 @@ input_status main_inputs;
 //On Call
 static void when_realised (GtkGLArea *gl_area_widget) {
     if (gtk_gl_area_get_error (gl_area_widget) != NULL) {return;}
+    gtk_gl_area_make_current (gl_area_widget);
     //Init OpenGL Status
     glEnable (GL_DEPTH_TEST); //Test Depth Signal
     render_init ();

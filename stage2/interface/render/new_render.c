@@ -70,14 +70,14 @@ void render_init () {
     for (int step = 0; step < object_count; step++) {
         rigidbody *rb = &obj_per_scene [step];
         //Model Matrix --> Position + Orientation
-        math4 translation = math4_translation (rb->position);
-        math4 rotation = vector4_to_math4 (rb->orientation);
-        math4 scale_render = math4_scaling ((vector3) {rb->radius, rb->radius, rb->radius});
+        math4 translation = math4_translation (rb -> position);
+        math4 rotation = vector4_to_math4 (rb -> orientation);
+        math4 scale_render = math4_scaling ((vector3) {rb -> radius, rb -> radius, rb -> radius});
         math4 model = math4_multiplication (translation, math4_multiplication (rotation, scale_render));
         float model_array [16];
         math4_to_flat_array (model, model_array);
         //Colour Uniform of the Objects
-        glUniform3f (shader_uniform_location_registry.object_colour_location, rb->colour.x, rb->colour.y, rb->colour.z);
+        glUniform3f (shader_uniform_location_registry.object_colour_location, rb -> colour.x, rb -> colour.y, rb -> colour.z);
         glUniformMatrix4fv (shader_uniform_location_registry.model_matrix_location, 1, GL_FALSE, model_array);
         math3 model3;
         for (int row = 0; row < 3; row++) {

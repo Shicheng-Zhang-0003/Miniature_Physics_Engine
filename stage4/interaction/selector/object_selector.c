@@ -8,7 +8,7 @@ int selector_ray_tracing (void) {
     for (int current_object_iterator_index = 0; current_object_iterator_index < object_count; current_object_iterator_index++) {
         rigidbody *rigidbody_object_pointer = &obj_per_scene [current_object_iterator_index];
         //Vector: Ray Origin to Sphere Centre
-        vector3 ray_origin_to_sphere_centre_vector = vector3_subtraction (rigidbody_object_pointer->position, ray_origin_camera_position_vector);
+        vector3 ray_origin_to_sphere_centre_vector = vector3_subtraction (rigidbody_object_pointer -> position, ray_origin_camera_position_vector);
         //Project origin_centre onto ray direction
         float distance_along_ray_direction_projection = vector3_dot (ray_origin_to_sphere_centre_vector, ray_direction_normalised_vector);
         if (distance_along_ray_direction_projection < 0) {continue;} //Behind Camera
@@ -17,7 +17,7 @@ int selector_ray_tracing (void) {
         vector3 perpendicular_offset_vector = vector3_subtraction (ray_origin_to_sphere_centre_vector, closest_point_on_ray_vector);
         float perpendicular_distance_to_ray_squared = vector3_length_squared (perpendicular_offset_vector);
         //Collision Check (Radius)
-        if (perpendicular_distance_to_ray_squared <= (rigidbody_object_pointer->radius * rigidbody_object_pointer->radius)) {
+        if (perpendicular_distance_to_ray_squared <= (rigidbody_object_pointer -> radius * rigidbody_object_pointer -> radius)) {
             if (distance_along_ray_direction_projection < closest_intersection_distance_to_camera) {
                 closest_intersection_distance_to_camera = distance_along_ray_direction_projection;
                 closest_hit_rigidbody_object_index = current_object_iterator_index;

@@ -14,9 +14,9 @@ void wireframe_render_selected_object (GLuint shader_program, math4 view, math4 
     glUniformMatrix4fv (glGetUniformLocation (shader_program, "viewframe"), 1, GL_FALSE, view_array);
     glUniformMatrix4fv (glGetUniformLocation (shader_program, "projection"), 1, GL_FALSE, projection_array);
     //Scale the mesh frame larger than the actual sphere by a small amount
-    float outline_scale = rb->radius * 1.04;
-    math4 translation = math4_translation (rb->position);
-    math4 rotation = vector4_to_math4 (rb->orientation);
+    float outline_scale = rb -> radius * 1.04;
+    math4 translation = math4_translation (rb -> position);
+    math4 rotation = vector4_to_math4 (rb -> orientation);
     math4 scale = math4_scaling ((vector3) {outline_scale, outline_scale, outline_scale});
     math4 model = math4_multiplication (translation, math4_multiplication(rotation, scale));
     float model_array [16];
