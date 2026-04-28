@@ -30,8 +30,8 @@ void init_sm_system (mesh *mesh_s, int sections, int stack) {
         }
     } //Generate Indices
     //Quads in each grid is split into dual triangle configurations
-    mesh_s->index = stack * sections * 6;
-    unsigned int *indice_list = malloc (mesh_s->index * sizeof (unsigned int));
+    mesh_s -> index = stack * sections * 6;
+    unsigned int *indice_list = malloc (mesh_s -> index * sizeof (unsigned int));
     int i_idx = 0;
     for (int step3 = 0; step3 < stack; step3++) {
         int current_row = step3 * (sections + 1);
@@ -47,16 +47,16 @@ void init_sm_system (mesh *mesh_s, int sections, int stack) {
             indice_list [i_idx++] = next_row + 1;
         }
     } //Upload to GPU rendering
-    glGenVertexArrays (1, &mesh_s->vao);
-    glGenBuffers (1, &mesh_s->vbo);
-    glGenBuffers (1, &mesh_s->ebo);
-    glBindVertexArray (mesh_s->vao);
+    glGenVertexArrays (1, &mesh_s -> vao);
+    glGenBuffers (1, &mesh_s -> vbo);
+    glGenBuffers (1, &mesh_s -> ebo);
+    glBindVertexArray (mesh_s -> vao);
     //Vertice Upload Count
-    glBindBuffer (GL_ARRAY_BUFFER, mesh_s->vbo);
+    glBindBuffer (GL_ARRAY_BUFFER, mesh_s -> vbo);
     glBufferData (GL_ARRAY_BUFFER, vertice_count * 6 * sizeof (float), vertices, GL_STATIC_DRAW);
     //Indice Upload Count
-    glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, mesh_s->ebo);
-    glBufferData (GL_ELEMENT_ARRAY_BUFFER, mesh_s->index * sizeof (unsigned int), indice_list, GL_STATIC_DRAW);
+    glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, mesh_s -> ebo);
+    glBufferData (GL_ELEMENT_ARRAY_BUFFER, mesh_s -> index * sizeof (unsigned int), indice_list, GL_STATIC_DRAW);
     //OpenGL attribute set --> affix certain attributes to 3D position statements
     glVertexAttribPointer (0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof (float), (void*) 0);
     glEnableVertexAttribArray (0);
@@ -69,9 +69,9 @@ void init_sm_system (mesh *mesh_s, int sections, int stack) {
     free (vertices);
 }  void render_sphere_object (mesh *mesh_s, rigidbody *rb) {
     //Sphere Preloaded GPU data
-    glBindVertexArray (mesh_s->vao);
+    glBindVertexArray (mesh_s -> vao);
     //Draw Triangles
     //GL_TRIANGLES for GPU to run indices 3 at a time
-    glDrawElements (GL_TRIANGLES, mesh_s->index, GL_UNSIGNED_INT, 0);
+    glDrawElements (GL_TRIANGLES, mesh_s -> index, GL_UNSIGNED_INT, 0);
     glBindVertexArray (0);
 }

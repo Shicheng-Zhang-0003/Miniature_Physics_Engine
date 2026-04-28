@@ -6,8 +6,10 @@ void overlay_init (GtkWidget *main_window_container, GtkWidget *gl_drawing_area_
     //Gtk overlay allows to stack widgets incrementally over top of each other
     GtkWidget *ui_overlay_layout_container = gtk_overlay_new ();
     //Move gl_area value into a overlay container
+    g_object_ref (gl_drawing_area_widget);
     gtk_container_remove (GTK_CONTAINER (main_window_container), gl_drawing_area_widget);
     gtk_container_add (GTK_CONTAINER (ui_overlay_layout_container), gl_drawing_area_widget);
+    g_object_unref (gl_drawing_area_widget);
     gtk_container_add (GTK_CONTAINER (main_window_container), ui_overlay_layout_container);
     //Create labels and anchor to the top left
     debug_overlay_information_label = gtk_label_new ("NORMAL");
@@ -19,7 +21,7 @@ void overlay_init (GtkWidget *main_window_container, GtkWidget *gl_drawing_area_
     GtkCssProvider *debug_label_style_provider = gtk_css_provider_new ();
     gtk_css_provider_load_from_data (debug_label_style_provider, "label {color: white; font-size: 14px;}", -1, NULL);
     gtk_style_context_add_provider (gtk_widget_get_style_context (debug_overlay_information_label), GTK_STYLE_PROVIDER (debug_label_style_provider), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
-    gtk_overlay_add_overlay (GTAL_OVERLAY (ui_overlay_layout_container), debug_overlay_information_label);
+    gtk_overlay_add_overlay (GTK_OVERLAY (ui_overlay_layout_container), debug_overlay_information_label);
 } void overlay_update (void) {
     if (!debug_overlay_information_label) {return;}
     char debug_text_formatting_buffer [256];
@@ -29,9 +31,9 @@ void overlay_init (GtkWidget *main_window_container, GtkWidget *gl_drawing_area_
     } rigidbody *selected_rigidbody_object_pointer = &obj_per_scene [selected_object];
     vector3 constant_gravitational_acceleration_vector = {0.0, -9.81, 0.0};
     state_energy calculated_system_energy_state = force_to_system_energy_amount (selected_rigidbody_object_pointer, constant_gravitational_acceleration_vector);
-    float current_object_speed_magnitude = vector3_length (selected_rigidbody_object_pointer->velocity);
+    float current_object_speed_magnitude = vector3_length (selected_rigidbody_object_pointer -> velocity);
     snprintf (debug_text_formatting_buffer, sizeof (debug_text_formatting_buffer), "Object %d | Position = (%.1f, %.1f, %.1f) | Speed = %.2f | Ek = %.2f | Epg = %.2f | Em = %.2f", selected_object,
-        selected_rigidbody_object_pointer->position.x, selected_rigidbody_object_pointer->position.y, selected_rigidbody_object_pointer->position.z,
+        selected_rigidbody_object_pointer -> position.x, selected_rigidbody_object_pointer -> position.y, selected_rigidbody_object_pointer -> position.z,
         current_object_speed_magnitude,
         calculated_system_energy_state.ek, calculated_system_energy_state.epg, calculated_system_energy_state.em
     ); gtk_label_set_text (GTK_LABEL (debug_overlay_information_label), debug_text_formatting_buffer);

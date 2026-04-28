@@ -23,11 +23,11 @@ void grid_init (grid_mesh *gm, int half_buffer, int spacing) {
         vertices [idx++] = (float) half_buffer;
         vertices [idx++] = 0.0;
         vertices [idx++] = (float) step;
-    } gm->line_count = idx / 3;
-    glGenVertexArrays (1, &gm->vao);
-    glGenBuffers (1, &gm->vbo);
-    glBindVertexArray (gm->vao);
-    glBindBuffer (GL_ARRAY_BUFFER, gm->vbo);
+    } gm -> line_count = idx / 3;
+    glGenVertexArrays (1, &gm -> vao);
+    glGenBuffers (1, &gm -> vbo);
+    glBindVertexArray (gm -> vao);
+    glBindBuffer (GL_ARRAY_BUFFER, gm -> vbo);
     glBufferData (GL_ARRAY_BUFFER, idx * sizeof (float), vertices, GL_STATIC_DRAW);
     glVertexAttribPointer (0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof (float), (void*) 0);
     glEnableVertexAttribArray (0);
@@ -50,7 +50,7 @@ void grid_init (grid_mesh *gm, int half_buffer, int spacing) {
     const float grid_surface_normal_y = 1.0;
     const float grid_surface_normal_z = 0.0;
     glVertexAttrib3f (1, grid_surface_normal_x, grid_surface_normal_y, grid_surface_normal_z); // Constant normal pointing up for the grid
-    glBindVertexArray (gm->vao);
-    glDrawArrays (GL_LINES, 0, gm->line_count);
+    glBindVertexArray (gm -> vao);
+    glDrawArrays (GL_LINES, 0, gm -> line_count);
     glBindVertexArray (0);
 }

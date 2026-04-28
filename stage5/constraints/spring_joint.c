@@ -27,23 +27,23 @@ int add_joint (int rigidbody_object_index_a, int rigidbody_object_index_b, float
         if (!joint_pool [joint_pool_iterator_index].activation) {continue;}
         spring_joint_mechanism *current_spring_joint_pointer = &joint_pool [joint_pool_iterator_index];
         //Validate Indices
-        if ((current_spring_joint_pointer->index_av >= object_count) || (current_spring_joint_pointer->index_bv >= object_count)) {
+        if ((current_spring_joint_pointer -> index_av >= object_count) || (current_spring_joint_pointer -> index_bv >= object_count)) {
             remove_joint (joint_pool_iterator_index);
             continue;
-        } rigidbody *rigidbody_object_a_pointer = &obj_per_scene [current_spring_joint_pointer->index_av];
-        rigidbody *rigidbody_object_b_pointer = &obj_per_scene [current_spring_joint_pointer->index_bv];
+        } rigidbody *rigidbody_object_a_pointer = &obj_per_scene [current_spring_joint_pointer -> index_av];
+        rigidbody *rigidbody_object_b_pointer = &obj_per_scene [current_spring_joint_pointer -> index_bv];
         //Vector: A to B
-        vector3 position_difference_vector = vector3_subtraction (rigidbody_object_b_pointer->position, rigidbody_object_a_pointer->position);
+        vector3 position_difference_vector = vector3_subtraction (rigidbody_object_b_pointer -> position, rigidbody_object_a_pointer -> position);
         float current_distance_between_objects = vector3_length (position_difference_vector);
         if (current_distance_between_objects < math_epsilon) {continue;}
-        float spring_extension_displacement = current_distance_between_objects - current_spring_joint_pointer->spring_length_rest;
+        float spring_extension_displacement = current_distance_between_objects - current_spring_joint_pointer -> spring_length_rest;
         vector3 spring_force_direction_normalised_vector = vector3_normalisation (position_difference_vector);
         //Spring Force (Fs = -kx)
-        vector3 calculated_spring_force_vector = vector3_scaling (spring_force_direction_normalised_vector, current_spring_joint_pointer->k_constant * spring_extension_displacement);
-        vector3 relative_velocity_vector = vector3_subtraction (rigidbody_object_b_pointer->velocity, rigidbody_object_a_pointer->velocity);
+        vector3 calculated_spring_force_vector = vector3_scaling (spring_force_direction_normalised_vector, current_spring_joint_pointer -> k_constant * spring_extension_displacement);
+        vector3 relative_velocity_vector = vector3_subtraction (rigidbody_object_b_pointer -> velocity, rigidbody_object_a_pointer -> velocity);
         float relative_velocity_along_spring_axis = vector3_dot (relative_velocity_vector, spring_force_direction_normalised_vector);
         //Spring Damping (F = -cv)
-        vector3 calculated_spring_damping_force_vector = vector3_scaling (spring_force_direction_normalised_vector, current_spring_joint_pointer->dampening * relative_velocity_along_spring_axis);
+        vector3 calculated_spring_damping_force_vector = vector3_scaling (spring_force_direction_normalised_vector, current_spring_joint_pointer -> dampening * relative_velocity_along_spring_axis);
         //Net Resultant Force
         vector3 net_resultant_spring_force_vector = vector3_addition (calculated_spring_force_vector, calculated_spring_damping_force_vector);
         //Apply Equal and Opposite forces

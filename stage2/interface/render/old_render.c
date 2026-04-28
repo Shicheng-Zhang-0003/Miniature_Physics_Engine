@@ -17,7 +17,7 @@ void render_scene_current (int width, int height) {
         rigidbody *rb = &obj_per_scene [step];
         //Physics position to minimal OpenGL preprocessor
         glPushMatrix ();
-        glTranslatef (rb->position.x, rb->position.y, rb->position.z);
+        glTranslatef (rb -> position.x, rb -> position.y, rb -> position.z);
         //Draw Basic Objects (sphere or whireframe for tests)
         //render_sphere (&mesh_yts, rb, projection, view);
         glPopMatrix ();

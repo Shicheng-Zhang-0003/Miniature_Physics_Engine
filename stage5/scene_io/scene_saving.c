@@ -15,13 +15,13 @@ int save_scene (const char *filepath) {
         //orientation.w, orientation.x, orientation.y, orientation.z
         //colour.x, colour.y, colour.z
         //restitution value
-        fprintf (source, "%.6f %.6f %d\n", rb->radius, rb->mass, (int) rb->static_state);
-        fprintf (source, "%.6f %.6f %.6f\n", rb->position.x, rb->position.y, rb->position.z);
-        fprintf (source, "%.6f %.6f %.6f\n", rb->velocity.x, rb->velocity.y, rb->velocity.z);
-        fprintf (source, "%.6f %.6f %.6f\n", rb->angular_velocity.x, rb->angular_velocity.y, rb->angular_velocity.z);
-        fprintf (source, "%.6f %.6f %.6f %.6f\n", rb->orientation.w, rb->orientation.x, rb->orientation.y, rb->orientation.z);
-        fprintf (source, "%.6f %.6f %.6f\n", rb->colour.x, rb->colour.y, rb->colour.z);
-        fprintf (source, "%.6f\n", rb->restitution);
+        fprintf (source, "%.6f %.6f %d\n", rb -> radius, rb -> mass, (int) rb -> static_state);
+        fprintf (source, "%.6f %.6f %.6f\n", rb -> position.x, rb -> position.y, rb -> position.z);
+        fprintf (source, "%.6f %.6f %.6f\n", rb -> velocity.x, rb -> velocity.y, rb -> velocity.z);
+        fprintf (source, "%.6f %.6f %.6f\n", rb -> angular_velocity.x, rb -> angular_velocity.y, rb -> angular_velocity.z);
+        fprintf (source, "%.6f %.6f %.6f %.6f\n", rb -> orientation.w, rb -> orientation.x, rb -> orientation.y, rb -> orientation.z);
+        fprintf (source, "%.6f %.6f %.6f\n", rb -> colour.x, rb -> colour.y, rb -> colour.z);
+        fprintf (source, "%.6f\n", rb -> restitution);
     } fclose (source);
     return 1;
 }

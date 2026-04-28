@@ -7,8 +7,8 @@ int broadphase_generate_pairing (broadphase_pair *output_collision_pairs_array, 
             rigidbody *rigidbody_object_a_pointer = &obj_per_scene [object_index_a];
             rigidbody *rigidbody_object_b_pointer = &obj_per_scene [object_index_b];
             //Distance Check (Margin + Tolerance)
-            float collision_proximity_margin_with_tolerance = (rigidbody_object_a_pointer->radius + rigidbody_object_b_pointer->radius) * 1.1;
-            vector3 position_delta_vector = vector3_subtraction (rigidbody_object_b_pointer->position, rigidbody_object_a_pointer->position);
+            float collision_proximity_margin_with_tolerance = (rigidbody_object_a_pointer -> radius + rigidbody_object_b_pointer -> radius) * 1.1;
+            vector3 position_delta_vector = vector3_subtraction (rigidbody_object_b_pointer -> position, rigidbody_object_a_pointer -> position);
             float distance_between_centres_squared = vector3_length_squared (position_delta_vector);
             if (distance_between_centres_squared <= (collision_proximity_margin_with_tolerance * collision_proximity_margin_with_tolerance)) {
                 output_collision_pairs_array [collision_pair_counter].a = object_index_a;

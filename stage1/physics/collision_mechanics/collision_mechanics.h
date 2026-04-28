@@ -14,70 +14,70 @@ typedef struct {
 } collision_data;
 //Detection of actual collision (Sphere to Sphere contact)
 static bool collision_dual_sphere (rigidbody *rigidbody_object_a, rigidbody *rigidbody_object_b, collision_data *collision_output_data) {
-    vector3 relative_position_vector = vector3_subtraction (rigidbody_object_b->position, rigidbody_object_a->position);
+    vector3 relative_position_vector = vector3_subtraction (rigidbody_object_b -> position, rigidbody_object_a -> position);
     float distance_between_centres_squared = vector3_length_squared (relative_position_vector);
-    float total_combined_radius = rigidbody_object_a->radius + rigidbody_object_b->radius;
+    float total_combined_radius = rigidbody_object_a -> radius + rigidbody_object_b -> radius;
     //Check Radial discrepancy
     if (distance_between_centres_squared >= total_combined_radius * total_combined_radius) {return false;}
     float distance_between_centres = sqrt (distance_between_centres_squared);
-    collision_output_data->a = rigidbody_object_a;
-    collision_output_data->b = rigidbody_object_b;
+    collision_output_data -> a = rigidbody_object_a;
+    collision_output_data -> b = rigidbody_object_b;
     //Normal = Vector from A to B
     //Safety Check (Div zero)
     const float minimum_distance_threshold_epsilon = 0.0001;
     if (distance_between_centres > minimum_distance_threshold_epsilon) {
-        collision_output_data->normal_vector = vector3_scaling (relative_position_vector, 1.0 / distance_between_centres);
+        collision_output_data -> normal_vector = vector3_scaling (relative_position_vector, 1.0 / distance_between_centres);
     } else {
         //Fallback Normal (Overlapping)
-        collision_output_data->normal_vector = (vector3) {0.0, 1.0, 0.0};
+        collision_output_data -> normal_vector = (vector3) {0.0, 1.0, 0.0};
     }
-    collision_output_data->penetration_contact = total_combined_radius - distance_between_centres;
+    collision_output_data -> penetration_contact = total_combined_radius - distance_between_centres;
     //Contact point between objects
-    collision_output_data->contact_point = vector3_addition (rigidbody_object_a->position, vector3_scaling (collision_output_data->normal_vector, rigidbody_object_a->radius));
+    collision_output_data -> contact_point = vector3_addition (rigidbody_object_a -> position, vector3_scaling (collision_output_data -> normal_vector, rigidbody_object_a -> radius));
     return true;
 } //Resolution (Impulse-Momemtum) (x, y, z directional vectoring for impulse related calculations)
 static void collision_resolve (collision_data *c) {
-    rigidbody *a = c->a, *b = c->b;
+    rigidbody *a = c -> a, *b = c -> b;
     //Calculate the vectors from the centre of mass to the contact point between objects (rad_a, and rad_b)]
-    vector3 ra = vector3_subtraction (c->contact_point, a->position);
-    vector3 rb = vector3_subtraction (c->contact_point, b->position);
+    vector3 ra = vector3_subtraction (c -> contact_point, a -> position);
+    vector3 rb = vector3_subtraction (c -> contact_point, b -> position);
     //Relative Velocity of the system at the point of contact
-    vector3 velocity_a_at_contact = vector3_addition (a->velocity, vector3_cross (a->angular_velocity, ra)); //Compute Same change of velocity stemming from angualr velocity change for object A
-    vector3 velocity_b_at_contact = vector3_addition (b->velocity, vector3_cross (b->angular_velocity, rb)); //Compute change of angular velocity change of the object sphere for object B and combine with already existing velocity
+    vector3 velocity_a_at_contact = vector3_addition (a -> velocity, vector3_cross (a -> angular_velocity, ra)); //Compute Same change of velocity stemming from angualr velocity change for object A
+    vector3 velocity_b_at_contact = vector3_addition (b -> velocity, vector3_cross (b -> angular_velocity, rb)); //Compute change of angular velocity change of the object sphere for object B and combine with already existing velocity
     vector3 relative_velocity = vector3_subtraction (velocity_b_at_contact, velocity_a_at_contact); //Compute Net Velocity of system (both objects)
     //Velocity along the normal line of vector connecting objects to contact point
-    float velocity_relative_dot_normal = vector3_dot (relative_velocity, c->normal_vector);
+    float velocity_relative_dot_normal = vector3_dot (relative_velocity, c -> normal_vector);
     //If objects are moving apart/away, no need for implement
     if (velocity_relative_dot_normal > 0) {return;} //variable abbrev vrdn
     //Calculate Impulse on Scalar (delta P)
     //Delta P = (-1(1 + e) * vrdn) / ( ((mass_a) ^ -1) + ((mass_b) ^ -1) + (n * (((impulse_a) ^ -1 * ra * normal_vector * ra) + ((impulse_b) ^ -1 * rb * normal_vector * rb))))
-    float e = fminf (a->restitution, b-> restitution);
+    float e = fminf (a -> restitution, b -> restitution);
     //Linear Components
-    float inverse_mass_sum = a->inverse_mass + b->inverse_mass;
+    float inverse_mass_sum = a -> inverse_mass + b -> inverse_mass;
     //Rotational Components (Inertial resistance to rotational momemtum experiences by getting hit by other object)
-    vector3 ra_cross_normal = vector3_cross (ra, c->normal_vector);
-    vector3 rb_cross_normal = vector3_cross (rb, c->normal_vector);
-    vector3 angular_mot_a = vector3_cross (math3_multiplication_vector3 (a->inverse_inertia_system, ra_cross_normal), ra_cross_normal);
-    vector3 angular_mot_b = vector3_cross (math3_multiplication_vector3 (b->inverse_inertia_system, rb_cross_normal), rb_cross_normal);
-    float rotational_termination = vector3_dot (vector3_addition (angular_mot_a, angular_mot_b), c->normal_vector);
+    vector3 ra_cross_normal = vector3_cross (ra, c -> normal_vector);
+    vector3 rb_cross_normal = vector3_cross (rb, c -> normal_vector);
+    vector3 angular_mot_a = vector3_cross (math3_multiplication_vector3 (a -> inverse_inertia_system, ra_cross_normal), ra_cross_normal);
+    vector3 angular_mot_b = vector3_cross (math3_multiplication_vector3 (b -> inverse_inertia_system, rb_cross_normal), rb_cross_normal);
+    float rotational_termination = vector3_dot (vector3_addition (angular_mot_a, angular_mot_b), c -> normal_vector);
     float j = (-(1.0 + e) * velocity_relative_dot_normal) / (inverse_mass_sum + rotational_termination);
     //Apply Impulse to objects
-    vector3 impulse_vector = vector3_scaling (c->normal_vector, j);
+    vector3 impulse_vector = vector3_scaling (c -> normal_vector, j);
     //Linear Velocity Changes: (delta v = impulse * mass ^ -1)
-    a->velocity = vector3_subtraction (a->velocity, vector3_scaling (impulse_vector, a->inverse_mass)); //Add current Velocity to delta v (impulse * mass ^ -1) (Object A)
-    b->velocity = vector3_addition (b->velocity, vector3_scaling (impulse_vector, b->inverse_mass)); //Add current Velocity to delta v (impulse * mass ^ -1) (Object B)
+    a -> velocity = vector3_subtraction (a -> velocity, vector3_scaling (impulse_vector, a -> inverse_mass)); //Add current Velocity to delta v (impulse * mass ^ -1) (Object A)
+    b -> velocity = vector3_addition (b -> velocity, vector3_scaling (impulse_vector, b -> inverse_mass)); //Add current Velocity to delta v (impulse * mass ^ -1) (Object B)
     //Changes to angular velocity: (delta angular_v = I ^ -1 * (r * impulse_scalar))
     //I ^ -1: inverse of the moment of inertia (tensor)
     vector3 a_angular_impulse = vector3_cross (ra, vector3_scaling (impulse_vector, -1.0)); //Impulse scalar for object a
     vector3 b_angular_impulse = vector3_cross (rb, impulse_vector); //impulse_scalar for object b
-    a->angular_velocity = vector3_addition (a->angular_velocity, math3_multiplication_vector3 (a->inverse_inertia_system, a_angular_impulse)); //Delta angular_v + current angular_v = final angular_v (Object A)
-    b->angular_velocity = vector3_addition (b->angular_velocity, math3_multiplication_vector3 (b->inverse_inertia_system, b_angular_impulse)); //Delta angular_v + current_angualr_v = final angular_v (Object B)
+    a -> angular_velocity = vector3_addition (a -> angular_velocity, math3_multiplication_vector3 (a -> inverse_inertia_system, a_angular_impulse)); //Delta angular_v + current angular_v = final angular_v (Object A)
+    b -> angular_velocity = vector3_addition (b -> angular_velocity, math3_multiplication_vector3 (b -> inverse_inertia_system, b_angular_impulse)); //Delta angular_v + current_angualr_v = final angular_v (Object B)
     //Correct Position Change Values (FPU error, results in sinking of objects into each other)
     const float error_percent = 0.2; //20% correction per frame and motion calculated
     const float slop = 0.01; //Allowance for object overlap (penetration, sinking)
     //Correction: Push back each proportion by a certain amount (20%) for each "sink"
-    vector3 correction = vector3_scaling (c->normal_vector, (fmaxf (c->penetration_contact - slop, 0.0)) / (a->inverse_mass + b->inverse_mass) * error_percent);
-    a->position = vector3_subtraction (a->position, vector3_scaling (correction, a->inverse_mass));
-    b->position = vector3_addition (b->position, vector3_scaling (correction, b->inverse_mass));
+    vector3 correction = vector3_scaling (c -> normal_vector, (fmaxf (c -> penetration_contact - slop, 0.0)) / (a -> inverse_mass + b -> inverse_mass) * error_percent);
+    a -> position = vector3_subtraction (a -> position, vector3_scaling (correction, a -> inverse_mass));
+    b -> position = vector3_addition (b -> position, vector3_scaling (correction, b -> inverse_mass));
 }
 #endif
