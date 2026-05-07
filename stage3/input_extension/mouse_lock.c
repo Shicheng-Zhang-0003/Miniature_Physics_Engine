@@ -17,9 +17,15 @@ void mouse_lock_enable (GtkWidget *parent_window_container) {
     if (!gdk_window_instance_handle) {return;}
     int window_allocated_width = gtk_widget_get_allocated_width (parent_window_container);
     int window_allocated_height = gtk_widget_get_allocated_height (parent_window_container);
-    // Warp pointer to window centre
+    // Get top-left corner of total screen
+    int screen_origin_x, screen_origin_y;
+    gdk_window_get_origin (gdk_window_instance_handle, &screen_origin_x, &screen_origin_y);
+    // gdk_device_warp (): absolute screen coordinates required
+    // Add a origin on the screen, warp lands at dead center of window.
+    int warp_target_x = screen_origin_x + (window_allocated_width / 2);
+    int warp_target_y = screen_origin_y + (window_allocated_height / 2);
     GdkDisplay *gdk_display_default_instance = gdk_window_get_display (gdk_window_instance_handle);
     GdkSeat *gdk_seat_default_instance = gdk_display_get_default_seat (gdk_display_default_instance);
     GdkDevice *gdk_pointer_device_instance = gdk_seat_get_pointer (gdk_seat_default_instance);
-    gdk_device_warp (gdk_pointer_device_instance, gdk_window_get_screen (gdk_window_instance_handle), window_allocated_width / 2, window_allocated_height / 2);
+    gdk_device_warp (gdk_pointer_device_instance, gdk_window_get_screen (gdk_window_instance_handle), warp_target_x, warp_target_y);
 }
