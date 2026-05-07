@@ -18,7 +18,17 @@ gboolean physics_step_increment (gpointer user_data_stored_pointer) {
     if (main_inputs.a_key) {camera_move_a (&main_camera_fov, current_frame_delta_time);}
     if (main_inputs.s_key) {camera_move_s (&main_camera_fov, current_frame_delta_time);}
     if (main_inputs.d_key) {camera_move_d (&main_camera_fov, current_frame_delta_time);}
-    if (main_inputs.e_key) {
+    //IJKL Viewframe
+    float look_speed = 60.0f; // degrees per second, tune to taste
+    if (main_inputs.cam_up) {main_camera_fov.pitch += look_speed * current_frame_delta_time;}
+    if (main_inputs.cam_down) {main_camera_fov.pitch -= look_speed * current_frame_delta_time;}
+    if (main_inputs.cam_left) {main_camera_fov.yaw -= look_speed * current_frame_delta_time;}
+    if (main_inputs.cam_right) {main_camera_fov.yaw += look_speed * current_frame_delta_time;}
+    if (main_camera_fov.pitch > 89.0f) {main_camera_fov.pitch = 89.0f;}
+    if (main_camera_fov.pitch < -89.0f) {main_camera_fov.pitch = -89.0f;}
+    if ((main_inputs.cam_up) || (main_inputs.cam_down) || (main_inputs.cam_left) || (main_inputs.cam_right)) {
+        camera_update_vector_input (&main_camera_fov);
+    } if (main_inputs.e_key) {
         selector_ray_tracing ();
         main_inputs.e_key = false;
     } if (main_inputs.f_key) {

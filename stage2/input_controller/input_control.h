@@ -9,9 +9,10 @@ typedef struct {
     bool r_key, l_key; //Save, Load
     //Join and Disassociate individual objects
     bool j_key, x_key;
+    //IJKL Mouse Substitute
+    bool cam_up, cam_down, cam_left, cam_right;
     //Mouse Status Inputs
     bool mouse_1;
-    double last_x_input, last_y_input;
 } input_status;
 //Initialise input state to zeroing
 void initialise_input (input_status *input);
