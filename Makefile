@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = $(shell pkg-config --cflags gtk+-3.0 epoxy) -I.
+CFLAGS = $(shell pkg-config --cflags gtk+-3.0 epoxy) -I. -Wall -Wextra
 LIBS = $(shell pkg-config --libs gtk+-3.0 epoxy) -lm
 
 SRCS = stage1/root_gtk.c \

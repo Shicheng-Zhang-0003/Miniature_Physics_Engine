@@ -4,8 +4,8 @@ void mouse_lock_enable (GtkWidget *parent_window_container) {
     if (!gdk_window_instance_handle) {return;}
     GdkDisplay *gdk_display_default_instance = gdk_window_get_display (gdk_window_instance_handle);
     GdkSeat *gdk_seat_default_instance = gdk_display_get_default_seat (gdk_display_default_instance);
-    GdkCursor *gdk_blank_cursor_handle = gdk_cursor_new_from_name (gdk_display_default_instance, "none");
-    gdk_seat_grab (gdk_seat_default_instance, gdk_window_instance_handle, GDK_SEAT_CAPABILITY_POINTER, FALSE, gdk_blank_cursor_handle, NULL, NULL, NULL);
+    GdkCursor *gdk_blank_cursor_handle = gdk_cursor_new_for_display (gdk_display_default_instance, GDK_BLANK_CURSOR);
+    gdk_seat_grab (gdk_seat_default_instance, gdk_window_instance_handle, GDK_SEAT_CAPABILITY_POINTER, TRUE, gdk_blank_cursor_handle, NULL, NULL, NULL);
     g_object_unref (gdk_blank_cursor_handle);
 } void mouse_lock_disable (GtkWidget *parent_window_container) {
     GdkDisplay *gdk_display_default_instance = gdk_display_get_default ();

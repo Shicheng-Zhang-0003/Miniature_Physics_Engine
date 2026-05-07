@@ -77,12 +77,6 @@ gboolean physics_step_increment (gpointer user_data_stored_pointer) {
     for (int physics_integration_iterator_index = 0; physics_integration_iterator_index < object_count; physics_integration_iterator_index++) {rb_integrate (&obj_per_scene [physics_integration_iterator_index], current_frame_delta_time);}
     for (int boundary_check_iterator_index = 0; boundary_check_iterator_index < object_count; boundary_check_iterator_index++) {boundary_apply_floor (&obj_per_scene [boundary_check_iterator_index], 0.0);}
     gtk_widget_queue_draw (GTK_WIDGET (user_data_stored_pointer));
-    // Mouse Recalibration (10 frames)
-    static int frame_counter_for_mouse_recalibration = 0;
-    frame_counter_for_mouse_recalibration += 1;
-    if (frame_counter_for_mouse_recalibration >= 10) {
-        mouse_lock_reset_centre (GTK_WIDGET (user_data_stored_pointer));
-        frame_counter_for_mouse_recalibration = 0;
-    } overlay_update ();
+    overlay_update ();
     return TRUE;
 }

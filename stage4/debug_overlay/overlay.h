@@ -5,7 +5,7 @@
 #include "../../stage2/master_header_2.h"
 #include "../interaction/selector/object_selector.h"
 //Call at init to set up widget for the overlay
-void overlay_init (GtkWidget *window, GtkWidget *gl_area);
+GtkWidget *overlay_init (GtkWidget *gl_area);
 //Call every physics increment to refresh values
 void overlay_update (void);
 #endif
