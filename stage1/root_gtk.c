@@ -20,8 +20,10 @@ static void when_realised (GtkGLArea *gl_area_widget) {
     mouse_lock_enable (parent_window_container);
 } //On render: Screen Make
 static gboolean on_rendered (GtkGLArea *gl_area_widget, GdkGLContext *gl_context_data) {
-    int widget_allocated_width = gtk_widget_get_allocated_width (GTK_WIDGET (gl_area_widget));
-    int widget_allocated_height = gtk_widget_get_allocated_height (GTK_WIDGET (gl_area_widget));
+    (void) gl_context_data;
+    int scale_factor_screen = gtk_widget_get_scale_factor (GTK_WIDGET (gl_area_widget));
+    int widget_allocated_width = gtk_widget_get_allocated_width (GTK_WIDGET (gl_area_widget)) * scale_factor_screen;
+    int widget_allocated_height = gtk_widget_get_allocated_height (GTK_WIDGET (gl_area_widget)) * scale_factor_screen;
     render_scene_current (widget_allocated_width, widget_allocated_height);
     return TRUE;
 } int main_algorithm (int argc, char *argv []);
@@ -42,8 +44,11 @@ int main_algorithm (int argc, char *argv []) {
     g_signal_connect (main_window_container, "key-release-event", G_CALLBACK (on_key_released), &main_inputs);
     g_signal_connect (main_window_container, "motion-notify-event", G_CALLBACK (on_mouse_movements), NULL);
     //Add Objects
-    gtk_container_add (GTK_CONTAINER (main_window_container), gl_drawing_area_widget);
-    overlay_init (main_window_container, gl_drawing_area_widget);
+    GtkWidget *ui_overlay_layout_container = overlay_init (gl_drawing_area_widget);
+    gtk_container_add (GTK_CONTAINER (main_window_container), ui_overlay_layout_container);
+    //Focus and Event Catching
+    gtk_widget_set_can_focus (main_window_container, TRUE);
+    gtk_widget_grab_focus (main_window_container);
     //Physics Step Loop (16ms)
     g_timeout_add (16, physics_step_increment, gl_drawing_area_widget);
     //Show Window

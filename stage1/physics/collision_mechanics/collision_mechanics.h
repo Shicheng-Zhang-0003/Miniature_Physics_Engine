@@ -60,7 +60,9 @@ static void collision_resolve (collision_data *c) {
     vector3 angular_mot_a = vector3_cross (math3_multiplication_vector3 (a -> inverse_inertia_system, ra_cross_normal), ra_cross_normal);
     vector3 angular_mot_b = vector3_cross (math3_multiplication_vector3 (b -> inverse_inertia_system, rb_cross_normal), rb_cross_normal);
     float rotational_termination = vector3_dot (vector3_addition (angular_mot_a, angular_mot_b), c -> normal_vector);
-    float j = (-(1.0 + e) * velocity_relative_dot_normal) / (inverse_mass_sum + rotational_termination);
+    float impulse_denominator = inverse_mass_sum + rotational_termination;
+    if (impulse_denominator <= 0.0) {return;}
+    float j = (-(1.0 + e) * velocity_relative_dot_normal) / impulse_denominator;
     //Apply Impulse to objects
     vector3 impulse_vector = vector3_scaling (c -> normal_vector, j);
     //Linear Velocity Changes: (delta v = impulse * mass ^ -1)
@@ -76,7 +78,8 @@ static void collision_resolve (collision_data *c) {
     const float error_percent = 0.2; //20% correction per frame and motion calculated
     const float slop = 0.01; //Allowance for object overlap (penetration, sinking)
     //Correction: Push back each proportion by a certain amount (20%) for each "sink"
-    vector3 correction = vector3_scaling (c -> normal_vector, (fmaxf (c -> penetration_contact - slop, 0.0)) / (a -> inverse_mass + b -> inverse_mass) * error_percent);
+    if (inverse_mass_sum <= 0.0) {return;}
+    vector3 correction = vector3_scaling (c -> normal_vector, (fmaxf (c -> penetration_contact - slop, 0.0)) / inverse_mass_sum * error_percent);
     a -> position = vector3_subtraction (a -> position, vector3_scaling (correction, a -> inverse_mass));
     b -> position = vector3_addition (b -> position, vector3_scaling (correction, b -> inverse_mass));
 }

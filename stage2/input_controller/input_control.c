@@ -55,24 +55,25 @@ void initialise_input (input_status *input) {
     if (event -> keyval == GDK_KEY_space) {input -> space_key = false;}
     return FALSE;
 } gboolean on_mouse_movements (GtkWidget *widget, GdkEventMotion *event, gpointer user_data_stored) {
-    //Pass a array containing both camera and the input status
-    //user_data --> global camera view
-    if (main_inputs.mouse_1) {
-        main_inputs.last_x_input = event -> x;
-        main_inputs.last_y_input = event -> y;
-        main_inputs.mouse_1 = false;
-    } float x_offsetting = event -> x - main_inputs.last_x_input;
-    float y_offsetting = main_inputs.last_y_input - event -> y; //Y coords top to bot
-    main_inputs.last_x_input = event -> x;
-    main_inputs.last_y_input = event -> y;
-    x_offsetting *= main_camera_fov.sensitivity_mouse;
-    y_offsetting *= main_camera_fov.sensitivity_mouse;
-    main_camera_fov.yaw += x_offsetting;
-    main_camera_fov.pitch += y_offsetting;
-    //Ensure Pitch Stays Relative to current Screen View
-    if (main_camera_fov.pitch > 89.0) {main_camera_fov.pitch = 89.0;}
-    if (main_camera_fov.pitch < -89.0) {main_camera_fov.pitch = -89.0;}
-    //Calculate Front, Right/Side, Up/Vertical Vectors
-    camera_update_vector_input (&main_camera_fov);
-    return FALSE;
+    int window_width = gtk_widget_get_allocated_width (widget);
+    int window_height = gtk_widget_get_allocated_height (widget);
+    float x_centre = window_width / 2.0;
+    float y_centre = window_height / 2.0;
+    float x_offsetting = event -> x - x_centre;
+    float y_offsetting = y_centre - event -> y; //Y coords top to bot
+    // Only update if the mouse has actually moved away from the centre
+    // This prevents spinning when the reset_centre call itself triggers a motion event
+    if ((fabsf (x_offsetting) > 0.0) || (fabsf (y_offsetting) > 0.0)) {
+        x_offsetting *= main_camera_fov.sensitivity_mouse;
+        y_offsetting *= main_camera_fov.sensitivity_mouse;
+        main_camera_fov.yaw += x_offsetting;
+        main_camera_fov.pitch += y_offsetting;
+        //Ensure Pitch Stays Relative to current Screen View
+        if (main_camera_fov.pitch > 89.0) {main_camera_fov.pitch = 89.0;}
+        if (main_camera_fov.pitch < -89.0) {main_camera_fov.pitch = -89.0;}
+        //Calculate Front, Right/Side, Up/Vertical Vectors
+        camera_update_vector_input (&main_camera_fov);
+        // Reset mouse to centre immediately after processing movement to prevent hitting window borders
+        mouse_lock_reset_centre (widget);
+    } return FALSE;
 }

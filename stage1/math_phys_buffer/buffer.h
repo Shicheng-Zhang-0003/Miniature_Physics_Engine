@@ -14,7 +14,7 @@ typedef struct {
     float mass, inverse_mass, restitution;
     //2 = mass ^ -1 for efficient calculation, 3 = bounce
     //Inertial Tensor (Rotational Mass Calculations)
-    math3 inertia_tensor_local, inverse_inertia_system;
+    math3 inertia_tensor_local, inverse_inertia_tensor_local, inverse_inertia_system;
     //Force and Torque accumilation
     vector3 force_accumilator, torque_accumilator;
     //Dimensions of individual object definition (for collisions and rendering)
@@ -48,8 +48,10 @@ static void rigidbody_initialisation_sphere (rigidbody *rb, float radius, float 
     rb -> inertia_tensor_local.matrix [2][2] = inertia_coefficient_sphere;
     //Initialize Inverse Inertia System
     if (mass > 0) {
-        rb -> inverse_inertia_system = math3_inverse (rb -> inertia_tensor_local);
+        rb -> inverse_inertia_tensor_local = math3_inverse (rb -> inertia_tensor_local);
+        rb -> inverse_inertia_system = rb -> inverse_inertia_tensor_local;
     } else {
+        rb -> inverse_inertia_tensor_local = (math3) {{{0}}};
         rb -> inverse_inertia_system = (math3) {{{0}}};
     }
     //Total Force and Torque accumilation
@@ -84,8 +86,7 @@ static void rb_integrate (rigidbody *rb, float dt) {
     //inverse_inertia_system = rotational * inverse_inertia_local * transposed value in 4D rotational axis
     math3 rotation_matrix_current = vector4_to_math3 (rb -> orientation); //W axis orientation of rotation
     math3 rotation_matrix_transposed = math3_transposition (rotation_matrix_current);
-    math3 inertia_tensor_inverse_local = math3_inverse (rb -> inertia_tensor_local); //Inverse Local Inertia
-    rb -> inverse_inertia_system = math3_multiplication (rotation_matrix_current, math3_multiplication (inertia_tensor_inverse_local, rotation_matrix_transposed));
+    rb -> inverse_inertia_system = math3_multiplication (rotation_matrix_current, math3_multiplication (rb -> inverse_inertia_tensor_local, rotation_matrix_transposed));
     //Calculate Linear Acceleration (F = ma, a = Fm ^ -1)
     rb -> acceleration = vector3_scaling (rb -> force_accumilator, rb -> inverse_mass); //Multiply Force by inverse of mass
     //Calculate Instantaneous Velocity

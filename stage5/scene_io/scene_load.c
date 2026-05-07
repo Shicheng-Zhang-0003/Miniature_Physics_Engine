@@ -10,7 +10,7 @@ int scene_loading (const char *file_src) {
     scene_clear ();
     for (int step = 0; step < count_objects; step++) {
         float radius, mass, restitution;
-        int static_state, count = 0;
+        int static_state;
         vector3 position, velocity, angular_velocity, colour;
         vector4 orientation;
         fscanf (source, "%f %f %d\n", &radius, &mass, &static_state);

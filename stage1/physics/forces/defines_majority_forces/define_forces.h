@@ -24,7 +24,6 @@ static void force_applicant_universal_gravity (rigidbody *a, rigidbody *b) {
     vector3 relation_vector = vector3_subtraction (b -> position, a -> position); //Relative Vector and distance
     float distance_squared = vector3_length_squared (relation_vector); //r ^ 2
     if (distance_squared < math_epsilon) {return;}
-    float distance = sqrtf (distance_squared); //r
     float force_magnitude = (big_g * a -> mass * b -> mass) / distance_squared; //Fg = Gm1m2r ^ -2
     vector3 force_out = vector3_scaling (vector3_normalisation (relation_vector), force_magnitude); //Check magnitude and vectors for applications
     rb_apply_forces_perfect (a, force_out); //Apply to positive vector object (a)
