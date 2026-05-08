@@ -53,8 +53,7 @@ static void rigidbody_initialisation_sphere (rigidbody *rb, float radius, float 
     } else {
         rb -> inverse_inertia_tensor_local = (math3) {{{0}}};
         rb -> inverse_inertia_system = (math3) {{{0}}};
-    }
-    //Total Force and Torque accumilation
+    } //Total Force and Torque accumilation
     rb -> force_accumilator = vector3_zero ();
     rb -> torque_accumilator = vector3_zero ();
 } //Force application and Torque Dynamics

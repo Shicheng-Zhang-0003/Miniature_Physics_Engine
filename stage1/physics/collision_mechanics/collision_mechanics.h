@@ -30,8 +30,7 @@ static bool collision_dual_sphere (rigidbody *rigidbody_object_a, rigidbody *rig
     } else {
         //Fallback Normal (Overlapping)
         collision_output_data -> normal_vector = (vector3) {0.0, 1.0, 0.0};
-    }
-    collision_output_data -> penetration_contact = total_combined_radius - distance_between_centres;
+    } collision_output_data -> penetration_contact = total_combined_radius - distance_between_centres;
     //Contact point between objects
     collision_output_data -> contact_point = vector3_addition (rigidbody_object_a -> position, vector3_scaling (collision_output_data -> normal_vector, rigidbody_object_a -> radius));
     return true;
