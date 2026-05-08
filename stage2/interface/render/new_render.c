@@ -27,7 +27,7 @@ mesh sphere_mesh;
 static int render_init_status = 0;
 static grid_mesh main_grid;
 //Render all axes of rotation
-static GLuint axis_shader_program_total = 0;
+/* static GLuint axis_shader_program_total = 0;
 static struct {
     GLint projection_matrix_location;
     GLint view_matrix_location;
@@ -79,7 +79,8 @@ static void axis_renderer_init () {
     draw_axis_segment (rb -> position, y_axis_tip_world_position, 0.0f, 1.0f, 0.0f);
     draw_axis_segment (rb -> position, z_axis_tip_world_position, 0.0f, 0.0f, 1.0f);
     glDisable (GL_PROGRAM_POINT_SIZE);
-} void render_init () {
+} */
+void render_init () {
     if (render_init_status) {return;}
     //Load/Compilation of Shaders
     shaders_program_total = create_shader_program ("stage2/interface/sphere_object/shaders/vertex_shader.glsl", "stage2/interface/sphere_object/shaders/fragment_shader.glsl");
@@ -141,10 +142,11 @@ static void axis_renderer_init () {
         } glUniformMatrix3fv (shader_uniform_location_registry.normal_matrix_location, 1, GL_FALSE, normal_array);
         //Render Objects
         render_sphere_object (&sphere_mesh, rb);
-        // Draw rotation axes for each object
+        /* Draw rotation axes for each object */ /* Makes the game far too laggy
         for (int step_axes = 0; step_axes < object_count; step_axes++) {
             draw_sphere_axes (&obj_per_scene [step_axes], projection_array, viewing_array);
-        } glUseProgram (shaders_program_total);
+        } */
+        glUseProgram (shaders_program_total);
         wireframe_render_selected_object (shaders_program_total, viewpoint, projection);
     } wireframe_render_selected_object (shaders_program_total, viewpoint, projection);
 }
