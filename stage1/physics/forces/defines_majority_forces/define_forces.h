@@ -29,7 +29,34 @@ static void force_applicant_universal_gravity (rigidbody *a, rigidbody *b) {
     rb_apply_forces_perfect (a, force_out); //Apply to positive vector object (a)
     rb_apply_forces_perfect (b, vector3_scaling (force_out, -1.0)); //Apply to negative vector object (b), equal and opposite direction
 } //Friction Definition (3D tangent plane fields)
-static void force_applicant_friction (rigidbody *rb, vector3 surface_normal, float mu_static, float mu_kinetic) {
+static void force_applicant_friction_rolling (rigidbody *rb, vector3 surface_normal, float mu_static, float mu_kinetic) {
+    //Calculate the magnitude of normal forces
+    //Ff = uFn
+    vector3 force_gravity = vector3_scaling ((vector3) {0, -9.81, 0}, rb -> mass); //Scale Mass by -9.81 to get mg, Fg
+    float force_normal_magnitude = fabsf (vector3_dot (force_gravity, surface_normal)); //Magnitude of Force Normal
+    //Contact Vector (r = -radius * normal)
+    vector3 r_contact = vector3_scaling (surface_normal, -rb -> radius);
+    vector3 velocity_at_contact = vector3_addition (rb -> velocity, vector3_cross (rb -> angular_velocity, r_contact));
+    //Tangent velocity at contact point
+    float velocity_d_normal = vector3_dot (velocity_at_contact, surface_normal);
+    vector3 velocity_tangent = vector3_subtraction (velocity_at_contact, vector3_scaling (surface_normal, velocity_d_normal));
+    float speed_tangent = vector3_length (velocity_tangent);
+    if (speed_tangent > math_epsilon) {
+        //Kinetic Friction --> Resists contact sliding
+        vector3 kinetic_friction = vector3_scaling (vector3_normalisation (velocity_tangent), -mu_kinetic * force_normal_magnitude);
+        //Force at Contact Point (Torque Generation)
+        rb_apply_forces_localised (rb, kinetic_friction, vector3_addition (rb -> position, r_contact));
+    } else {
+        //Static Friction --> Neutralise tangent forces
+        vector3 force_tangent_accumulated = vector3_subtraction (rb -> force_accumilator, vector3_scaling (surface_normal, vector3_dot (rb -> force_accumilator, surface_normal)));
+        float accumulated_force_magnitude = vector3_length (force_tangent_accumulated);
+        if (accumulated_force_magnitude < mu_static * force_normal_magnitude) {
+            rb_apply_forces_perfect (rb, vector3_scaling (force_tangent_accumulated, -1.0));
+            //Stop micro-sliding
+            rb -> velocity = vector3_subtraction (rb -> velocity, velocity_tangent);
+        }
+    }
+} static void force_applicant_friction (rigidbody *rb, vector3 surface_normal, float mu_static, float mu_kinetic) {
     //Calculate the magnitude of normal forces
     //Ff = uFn
     vector3 force_gravity = vector3_scaling ((vector3) {0, -9.81, 0}, rb -> mass); //Scale Mass by -9.81 to get mg, Fg

@@ -45,6 +45,12 @@ void grid_init (grid_mesh *gm, int half_buffer, int spacing) {
     float model_array [16];
     math4_to_flat_array (model, model_array);
     glUniformMatrix4fv (glGetUniformLocation (shader_program_call, "model"), 1, GL_FALSE, model_array);
+    //Normal Matrix (Identity for the Static Floor)
+    math3 normal_mat = math3_identity ();
+    float normal_array [9];
+    for (int row = 0; row < 3; row++) {
+        for (int column = 0; column < 3; column++) {normal_array [row * 3 + column] = normal_mat.matrix [row][column];}
+    } glUniformMatrix3fv (glGetUniformLocation (shader_program_call, "normal_matrix"), 1, GL_FALSE, normal_array);
     glUniform3f (glGetUniformLocation (shader_program_call, "object_colour"), 0.3, 0.3, 0.3);
     const float grid_surface_normal_x = 0.0;
     const float grid_surface_normal_y = 1.0;

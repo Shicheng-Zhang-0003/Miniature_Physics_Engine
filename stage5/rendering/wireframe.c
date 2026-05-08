@@ -19,7 +19,7 @@ void wireframe_render_object (GLuint shader_program, math4 view, math4 projectio
     math4 model = math4_multiplication (translation, math4_multiplication(rotation, scale));
     float model_array [16];
     math4_to_flat_array (model, model_array);
-    //Set the object colour to the wireframe colour
+    //Wireframe Object Colour
     glUniform3f (glGetUniformLocation (shader_program, "object_colour"), wire_colour.x, wire_colour.y, wire_colour.z);
     glUniformMatrix4fv (glGetUniformLocation (shader_program, "model"), 1, GL_FALSE, model_array);
     //Draw in wireframes
@@ -27,10 +27,10 @@ void wireframe_render_object (GLuint shader_program, math4 view, math4 projectio
     glBindVertexArray (sphere_mesh.vao);
     glDrawElements (GL_TRIANGLES, sphere_mesh.index, GL_UNSIGNED_INT, 0);
     glBindVertexArray (0);
-    //Restore normal operation later --> line mesh mode to fill mode to prevent something else breaking
+    //Restore normal operation later --> line mesh mode to fill mode
     glPolygonMode (GL_FRONT_AND_BACK, GL_FILL);
 } void wireframe_render_selected_object (GLuint shader_program, math4 view, math4 projection) {
     if ((selected_object < 0) || (selected_object >= object_count)) {return;}
-    //A yellow colour stands out from the background
+    //Yellow outline (Selected Object Visibility)
     wireframe_render_object (shader_program, view, projection, &obj_per_scene [selected_object], (vector3) {1.0, 1.0, 0.0});
 }

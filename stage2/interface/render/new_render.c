@@ -115,8 +115,8 @@ void render_init () {
     math4_to_flat_array (viewpoint, viewing_array);
     glUniformMatrix4fv (shader_uniform_location_registry.view_matrix_location, 1, GL_FALSE, viewing_array);
     glUniform3f (shader_uniform_location_registry.camera_position_location, main_camera_fov.position.x, main_camera_fov.position.y, main_camera_fov.position.z);
-    //Light Position
-    glUniform3f (shader_uniform_location_registry.light_position_location, 10.0, 20.0, 10.0);
+    //Light Position (Stronger overhead lighting)
+    glUniform3f (shader_uniform_location_registry.light_position_location, 20.0, 40.0, 20.0);
     //Draw Each Object in Question
     grid_render (&main_grid, shaders_program_total, viewpoint, projection);
     glUseProgram (shaders_program_total); // Ensure we are back to our main program after grid_render
@@ -142,18 +142,18 @@ void render_init () {
         } glUniformMatrix3fv (shader_uniform_location_registry.normal_matrix_location, 1, GL_FALSE, normal_array);
         //Render Objects
         render_sphere_object (&sphere_mesh, rb);
-        //Draw Latitude and Longitudinal Lines to see rotation
+        //Draw Mesh Latitude and Longitudinal Lines (Rotational Visibility)
         wireframe_render_object (shaders_program_total, viewpoint, projection, rb, (vector3) {0.0, 0.0, 0.0});
-        //Draw a Rotation Marker (a bright dot on the surface) to see if object is sliding or rotating
+        //Rotation Marker (Surface Dot) --> Sliding vs Rotational check
         math4 marker_translation = math4_translation (rb -> position);
         math4 marker_rotation = vector4_to_math4 (rb -> orientation);
-        //Scale the dot very small, and offset it to the surface of the sphere
+        //Scale and Offset Dot (Surface Position)
         math4 marker_offset = math4_translation ((vector3) {0.0, rb -> radius, 0.0});
         math4 marker_scale = math4_scaling ((vector3) {rb -> radius * 0.1, rb -> radius * 0.1, rb -> radius * 0.1});
         math4 marker_model = math4_multiplication (marker_translation, math4_multiplication (marker_rotation, math4_multiplication (marker_offset, marker_scale)));
         float marker_model_array [16];
         math4_to_flat_array (marker_model, marker_model_array);
-        glUniform3f (shader_uniform_location_registry.object_colour_location, 1.0, 1.0, 1.0); //Pure White Dot
+        glUniform3f (shader_uniform_location_registry.object_colour_location, 1.0, 1.0, 1.0); //Dot Colour (White)
         glUniformMatrix4fv (shader_uniform_location_registry.model_matrix_location, 1, GL_FALSE, marker_model_array);
         render_sphere_object (&sphere_mesh, rb);
         /* Draw rotation axes for each object */ /* Makes the game far too laggy

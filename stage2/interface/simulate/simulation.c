@@ -73,6 +73,8 @@ gboolean physics_step_increment (gpointer user_data_stored_pointer) {
         //Normal Force (Floor check y=0)
         if (obj_per_scene [force_application_iterator_index].position.y <= obj_per_scene [force_application_iterator_index].radius + 0.01) {
             force_applicant_gravity_normal (&obj_per_scene [force_application_iterator_index], constant_gravity_acceleration_vector, (vector3) {0.0, 1.0, 0.0});
+            //Apply Floor Friction (Induce Rotation)
+            force_applicant_friction_rolling (&obj_per_scene [force_application_iterator_index], (vector3) {0.0, 1.0, 0.0}, 0.3, 0.2);
         } else {
             // Gravity (Freefall)
             rb_apply_forces_perfect (&obj_per_scene [force_application_iterator_index], vector3_scaling (constant_gravity_acceleration_vector, obj_per_scene [force_application_iterator_index].mass));
