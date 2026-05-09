@@ -18,25 +18,32 @@ gboolean physics_step_increment (gpointer user_data_stored_pointer) {
     if (main_inputs.a_key) {camera_move_a (&main_camera_fov, current_frame_delta_time);}
     if (main_inputs.s_key) {camera_move_s (&main_camera_fov, current_frame_delta_time);}
     if (main_inputs.d_key) {camera_move_d (&main_camera_fov, current_frame_delta_time);}
-    //IJKL Viewframe
-    float look_speed = 60.0f; // degrees per second, tune to taste
-    if (main_inputs.cam_up) {main_camera_fov.pitch += look_speed * current_frame_delta_time;}
-    if (main_inputs.cam_down) {main_camera_fov.pitch -= look_speed * current_frame_delta_time;}
-    if (main_inputs.cam_left) {main_camera_fov.yaw -= look_speed * current_frame_delta_time;}
-    if (main_inputs.cam_right) {main_camera_fov.yaw += look_speed * current_frame_delta_time;}
-    if (main_camera_fov.pitch > 89.0f) {main_camera_fov.pitch = 89.0f;}
+    // Mouse Perspective Steering
+    if (main_inputs.mouse_locked) {
+        float mouse_sensitivity = 0.00075f;
+        main_camera_fov.yaw += main_inputs.mouse_dx * mouse_sensitivity;
+        main_camera_fov.pitch += main_inputs.mouse_dy * mouse_sensitivity;
+        // Reset deltas
+        main_inputs.mouse_dx = 0.0;
+        main_inputs.mouse_dy = 0.0;
+    } if (main_camera_fov.pitch > 89.0f) {main_camera_fov.pitch = 89.0f;}
     if (main_camera_fov.pitch < -89.0f) {main_camera_fov.pitch = -89.0f;}
-    if ((main_inputs.cam_up) || (main_inputs.cam_down) || (main_inputs.cam_left) || (main_inputs.cam_right)) {
-        camera_update_vector_input (&main_camera_fov);
+    camera_update_vector_input (&main_camera_fov);
+    if (main_inputs.esc_key) {
+        if (main_inputs.mouse_locked) {
+            mouse_lock_disable (gtk_widget_get_toplevel (GTK_WIDGET (user_data_stored_pointer)));
+            main_inputs.mouse_locked = false;
+        } main_inputs.esc_key = false;
     } if (main_inputs.e_key) {
         selector_ray_tracing ();
         main_inputs.e_key = false;
     } if (main_inputs.f_key) {
         selector_apply_force_impulse (50.0);
         main_inputs.f_key = false;
-    } if (main_inputs.space_key) {
+    } if (((main_inputs.space_key) || (main_inputs.right_click))) {
         spawner_launch_sphere (0.5, 1.0, 20.0);
         main_inputs.space_key = false;
+        main_inputs.right_click = false;
     } if (main_inputs.r_key) {
         save_scene ("scene.dat");
         main_inputs.r_key = false;
@@ -44,7 +51,7 @@ gboolean physics_step_increment (gpointer user_data_stored_pointer) {
         scene_loading ("scene.dat");
         main_inputs.l_key = false;
     } if (main_inputs.j_key) {
-        if ((selected_object >= 0) && (previously_selected_object_index >= 0) && (selected_object != previously_selected_object_index)) {
+        if (((selected_object >= 0) && (previously_selected_object_index >= 0) && (selected_object != previously_selected_object_index))) {
             // Rest length is current distance between the two objects
             vector3 position_difference_vector = vector3_subtraction (obj_per_scene [selected_object].position, obj_per_scene [previously_selected_object_index].position);
             float spring_resting_length_value = vector3_length (position_difference_vector);
@@ -55,12 +62,12 @@ gboolean physics_step_increment (gpointer user_data_stored_pointer) {
         if (selected_object >= 0) {
             remove_joints_from_object (selected_object);
             // Shift array (fill gap)
-            for (int object_shift_iterator_index = selected_object; object_shift_iterator_index < object_count - 1; object_shift_iterator_index++) {
+            for (int object_shift_iterator_index = selected_object; object_shift_iterator_index < (object_count - 1); object_shift_iterator_index++) {
                 obj_per_scene [object_shift_iterator_index] = obj_per_scene [object_shift_iterator_index + 1];
             } object_count -= 1;
             // Update joint indices
             for (int joint_pool_iterator_index = 0; joint_pool_iterator_index < max_joint_count; joint_pool_iterator_index++) {
-                if (!joint_pool [joint_pool_iterator_index].activation) {continue;}
+                if (! (joint_pool [joint_pool_iterator_index].activation)) {continue;}
                 if (joint_pool [joint_pool_iterator_index].index_av > selected_object) {joint_pool [joint_pool_iterator_index].index_av -= 1;}
                 if (joint_pool [joint_pool_iterator_index].index_bv > selected_object) {joint_pool [joint_pool_iterator_index].index_bv -= 1;}
             } clear_selection ();
@@ -71,7 +78,7 @@ gboolean physics_step_increment (gpointer user_data_stored_pointer) {
     for (int force_application_iterator_index = 0; force_application_iterator_index < object_count; force_application_iterator_index++) {
         vector3 constant_gravity_acceleration_vector = {0, -9.81, 0};
         //Normal Force (Floor check y=0)
-        if (obj_per_scene [force_application_iterator_index].position.y <= obj_per_scene [force_application_iterator_index].radius + 0.01) {
+        if (obj_per_scene [force_application_iterator_index].position.y <= (obj_per_scene [force_application_iterator_index].radius + 0.01)) {
             force_applicant_gravity_normal (&obj_per_scene [force_application_iterator_index], constant_gravity_acceleration_vector, (vector3) {0.0, 1.0, 0.0});
             //Apply Floor Friction (Induce Rotation)
             force_applicant_friction_rolling (&obj_per_scene [force_application_iterator_index], (vector3) {0.0, 1.0, 0.0}, 0.3, 0.2);
