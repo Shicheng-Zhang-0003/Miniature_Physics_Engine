@@ -13,11 +13,15 @@ stage 5: Push Physics Engine Mechanics into Game Rendering
 
 
 Phase 1 is completed:
-    Current Head: 0.9.2-STBL
+    Current Head: 0.9.3-STBL-INTERIM --> Phase 2
     Prev Versions:
+        0.9.3-STBL-INTERIM
         0.9.2-STBL
         0.9.1-5-MSEBUG
         0.9.1-STBL
         0.9.0.2-ROTBUG
         0.9.0.1-STBL
         0.9-PRBFV
+
+Phase 2 is in progress:
+    Current Head: 0.9.3-STBL-INTERIM
