@@ -7,7 +7,7 @@ uniform vec3 object_colour; //color of the object rendered
 uniform vec3 camera_position;
 void main () {
     //Ambient Lighting Amount (Increased for visibility)
-    float ambient_strength = 0.4;
+    float ambient_strength = 0.6;
     vec3 ambient_light = ambient_strength * vec3 (1.0, 1.0, 1.0);
     //Diffuse Lighting (Makes objects seem 3D)
     vec3 normalise = normalize (normal);

@@ -20,7 +20,7 @@ gboolean physics_step_increment (gpointer user_data_stored_pointer) {
     if (main_inputs.d_key) {camera_move_d (&main_camera_fov, current_frame_delta_time);}
     // Mouse Perspective Steering
     if (main_inputs.mouse_locked) {
-        float mouse_sensitivity = 0.00075f;
+        float mouse_sensitivity = 0.0035f;
         main_camera_fov.yaw += main_inputs.mouse_dx * mouse_sensitivity;
         main_camera_fov.pitch += main_inputs.mouse_dy * mouse_sensitivity;
         // Reset deltas

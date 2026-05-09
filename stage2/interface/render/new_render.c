@@ -144,18 +144,6 @@ void render_init () {
         render_sphere_object (&sphere_mesh, rb);
         //Draw Mesh Latitude and Longitudinal Lines (Rotational Visibility)
         wireframe_render_object (shaders_program_total, viewpoint, projection, rb, (vector3) {0.0, 0.0, 0.0});
-        //Rotation Marker (Surface Dot) --> Sliding vs Rotational check
-        math4 marker_translation = math4_translation (rb -> position);
-        math4 marker_rotation = vector4_to_math4 (rb -> orientation);
-        //Scale and Offset Dot (Surface Position)
-        math4 marker_offset = math4_translation ((vector3) {0.0, rb -> radius, 0.0});
-        math4 marker_scale = math4_scaling ((vector3) {rb -> radius * 0.1, rb -> radius * 0.1, rb -> radius * 0.1});
-        math4 marker_model = math4_multiplication (marker_translation, math4_multiplication (marker_rotation, math4_multiplication (marker_offset, marker_scale)));
-        float marker_model_array [16];
-        math4_to_flat_array (marker_model, marker_model_array);
-        glUniform3f (shader_uniform_location_registry.object_colour_location, 1.0, 1.0, 1.0); //Dot Colour (White)
-        glUniformMatrix4fv (shader_uniform_location_registry.model_matrix_location, 1, GL_FALSE, marker_model_array);
-        render_sphere_object (&sphere_mesh, rb);
         /* Draw rotation axes for each object */ /* Makes the game far too laggy
         for (int step_axes = 0; step_axes < object_count; step_axes++) {
             draw_sphere_axes (&obj_per_scene [step_axes], projection_array, viewing_array);
