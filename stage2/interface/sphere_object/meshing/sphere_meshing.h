@@ -10,6 +10,8 @@ typedef struct {
     //vbo = vertex buffer object, coords
     //ebo = element buffer object, index store and category
     int index; //Number of points to draw
+    GLuint wireframe_ebo;
+    int wireframe_index_count;
 } mesh;
 extern mesh sphere_mesh;
 //Function Pre-declaration

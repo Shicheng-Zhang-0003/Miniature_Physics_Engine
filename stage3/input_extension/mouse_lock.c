@@ -2,6 +2,7 @@
 void mouse_lock_enable (GtkWidget *parent_window_container) {
     GdkWindow *gdk_window_instance_handle = gtk_widget_get_window (parent_window_container);
     if (! (gdk_window_instance_handle)) {return;}
+    gdk_window_set_event_compression (gdk_window_instance_handle, FALSE);
     GdkDisplay *gdk_display_default_instance = gdk_window_get_display (gdk_window_instance_handle);
     GdkSeat *gdk_seat_default_instance = gdk_display_get_default_seat (gdk_display_default_instance);
     GdkCursor *gdk_blank_cursor_handle = gdk_cursor_new_for_display (gdk_display_default_instance, GDK_BLANK_CURSOR);

@@ -22,13 +22,12 @@ void wireframe_render_object (GLuint shader_program, math4 view, math4 projectio
     //Wireframe Object Colour
     glUniform3f (glGetUniformLocation (shader_program, "object_colour"), wire_colour.x, wire_colour.y, wire_colour.z);
     glUniformMatrix4fv (glGetUniformLocation (shader_program, "model"), 1, GL_FALSE, model_array);
-    //Draw in wireframes
-    glPolygonMode (GL_FRONT_AND_BACK, GL_LINE);
+    //Draw 3-axis equatorial rings
     glBindVertexArray (sphere_mesh.vao);
-    glDrawElements (GL_TRIANGLES, sphere_mesh.index, GL_UNSIGNED_INT, 0);
+    glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, sphere_mesh.wireframe_ebo);
+    glDrawElements (GL_LINES, sphere_mesh.wireframe_index_count, GL_UNSIGNED_INT, 0);
+    glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, sphere_mesh.ebo);
     glBindVertexArray (0);
-    //Restore normal operation later --> line mesh mode to fill mode
-    glPolygonMode (GL_FRONT_AND_BACK, GL_FILL);
 } void wireframe_render_selected_object (GLuint shader_program, math4 view, math4 projection) {
     if ((selected_object < 0) || (selected_object >= object_count)) {return;}
     //Yellow outline (Selected Object Visibility)
