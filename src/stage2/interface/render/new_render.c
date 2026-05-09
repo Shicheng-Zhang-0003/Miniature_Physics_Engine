@@ -152,10 +152,3 @@ void render_init () {
         wireframe_render_selected_object (shaders_program_total, view_matrix, projection_matrix);
     } wireframe_render_selected_object (shaders_program_total, view_matrix, projection_matrix);
 }
-
-/*
- * Add In Future:
- *
- * math3 normal_mat = math3_transposition (math3_inverse ( upper-left 3x3 of model ));
- *
- * */

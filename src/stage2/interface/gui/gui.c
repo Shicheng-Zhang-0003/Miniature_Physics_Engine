@@ -14,7 +14,7 @@ static void on_point_render (GtkGLArea *gl_area, GdkGLContext *gl_context) {
 } void activation (GtkApplication *application_object, gpointer user_data_pointer) {
     (void) user_data_pointer;
     GtkWidget *main_window = gtk_application_window_new (application_object);
-    gtk_window_set_title (GTK_WINDOW (main_window), "Stage 2 Testing Stage");
+    gtk_window_set_title (GTK_WINDOW (main_window), "Engine");
     gtk_window_set_default_size (GTK_WINDOW (main_window), 800, 600); //800x600 resolution
     //GL Canvas for presenting objects
     GtkWidget *gl_area_widget = gtk_gl_area_new ();

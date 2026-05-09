@@ -15,9 +15,15 @@ void initialise_input (input_status *input_state) {
     input_state -> space_key_pressed = false;
     input_state -> shift_key_pressed = false;
     input_state -> escape_key_pressed = false;
-    //File
-    input_state -> save_key_pressed = false;
-    input_state -> load_key_pressed = false;
+    //Menu
+    input_state -> is_menu_open = false;
+    input_state -> menu_1_pressed = false;
+    input_state -> menu_2_pressed = false;
+    input_state -> menu_3_pressed = false;
+    //Spawn
+    input_state -> spawner_menu_level = 0;
+    input_state -> up_arrow_pressed = false;
+    input_state -> down_arrow_pressed = false;
     //Mouse
     input_state -> is_mouse_locked = false;
     input_state -> is_debug_mode_active = false;
@@ -31,9 +37,21 @@ void initialise_input (input_status *input_state) {
     if (event -> keyval == GDK_KEY_a) {input_state -> a_key_pressed = true;}
     if (event -> keyval == GDK_KEY_s) {input_state -> s_key_pressed = true;}
     if (event -> keyval == GDK_KEY_d) {input_state -> d_key_pressed = true;}
-    if (event -> keyval == GDK_KEY_r) {input_state -> save_key_pressed = true;}
-    if (event -> keyval == GDK_KEY_o) {input_state -> load_key_pressed = true;}  // rebound from L
-    if (event -> keyval == GDK_KEY_space) {input_state -> space_key_pressed = true;}
+    if (event -> keyval == GDK_KEY_9) {input_state -> spawner_menu_level = 0; input_state -> is_menu_open = !(input_state -> is_menu_open);}
+    if (event -> keyval == GDK_KEY_8) {input_state -> is_menu_open = false; if (input_state -> spawner_menu_level > 0) {input_state -> spawner_menu_level = 0;} else {input_state -> spawner_menu_level = 1;}}
+    if (input_state -> is_menu_open) {
+        if (event -> keyval == GDK_KEY_1) {input_state -> menu_1_pressed = true;}
+        if (event -> keyval == GDK_KEY_2) {input_state -> menu_2_pressed = true;}
+        if (event -> keyval == GDK_KEY_3) {input_state -> menu_3_pressed = true;}
+    } if (input_state -> spawner_menu_level == 1) {
+        if (event -> keyval == GDK_KEY_1) {input_state -> spawner_menu_level = 2;}
+    } if (input_state -> spawner_menu_level == 2) {
+        if (event -> keyval == GDK_KEY_1) {input_state -> spawner_menu_level = 3;}
+        if (event -> keyval == GDK_KEY_2) {input_state -> spawner_menu_level = 4;}
+    } if (input_state -> spawner_menu_level >= 3) {
+        if (event -> keyval == GDK_KEY_Up)   {input_state -> up_arrow_pressed = true;}
+        if (event -> keyval == GDK_KEY_Down) {input_state -> down_arrow_pressed = true;}
+    }if (event -> keyval == GDK_KEY_space) {input_state -> space_key_pressed = true;}
     if (event -> keyval == GDK_KEY_Shift_L) {input_state -> shift_key_pressed = true;}
     if (event -> keyval == GDK_KEY_Escape) {input_state -> escape_key_pressed = true;}
     if (event -> keyval == GDK_KEY_0) {input_state -> is_debug_mode_active = !input_state -> is_debug_mode_active;}
@@ -44,8 +62,6 @@ void initialise_input (input_status *input_state) {
     if (event -> keyval == GDK_KEY_a) {input_state -> a_key_pressed = false;}
     if (event -> keyval == GDK_KEY_s) {input_state -> s_key_pressed = false;}
     if (event -> keyval == GDK_KEY_d) {input_state -> d_key_pressed = false;}
-    if (event -> keyval == GDK_KEY_r) {input_state -> save_key_pressed = false;}
-    if (event -> keyval == GDK_KEY_o) {input_state -> load_key_pressed = false;}  // rebound from L
     if (event -> keyval == GDK_KEY_space) {input_state -> space_key_pressed = false;}
     if (event -> keyval == GDK_KEY_Shift_L) {input_state -> shift_key_pressed = false;}
     if (event -> keyval == GDK_KEY_Escape) {input_state -> escape_key_pressed = false;}

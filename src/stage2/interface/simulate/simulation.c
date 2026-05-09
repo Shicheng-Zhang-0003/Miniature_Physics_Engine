@@ -3,14 +3,18 @@
 #include "../../../stage1/master_header.h"
 #include "../../../stage4/master_header_4.h"
 #include "../../../stage5/master_header_5.h"
+#include <complex.h>
 #include <gtk/gtk.h>
 #include <stdbool.h>
+#include <sys/stat.h>
 //World Status right now
 frame_timer main_timer;
 rigidbody *obj_per_scene = NULL;
 int object_count = 0;
 int object_capacity = 0;
 gboolean physics_step_increment (gpointer user_data_pointer) {
+    static int status_dir_checked = 0;
+    if (!status_dir_checked) {mkdir ("status", 0755); status_dir_checked = 1;}
     frame_timer_update (&main_timer);
     float frame_delta_time = main_timer.delta_time;
     if (main_inputs.w_key_pressed) {camera_move_forward (&main_camera_fov, frame_delta_time);}
@@ -50,27 +54,36 @@ gboolean physics_step_increment (gpointer user_data_pointer) {
     if (main_inputs.shift_key_pressed) {
         if (! shift_previously_held) {
             // Initial simple spawn on press
-            spawner_launch_sphere (0.5, 1.0, 20.0);
+            spawner_launch_sphere (spawn_radius, spawn_mass, spawn_speed);
             shift_hold_timer = 0.0;
         } else {
             // Key is being held
             shift_hold_timer += frame_delta_time;
-            if (shift_hold_timer > 2.0) {
-                // "Floor it" - continuous spawning
-                spawner_launch_sphere (0.5, 1.0, 20.0);
+            if (shift_hold_timer > 1.0) {
+                //Continuous spawning
+                spawner_launch_sphere (spawn_radius, spawn_mass, spawn_speed);
             }
         } shift_previously_held = true;
     } else {
         shift_hold_timer = 0.0;
         shift_previously_held = false;
-    }
-
-    if (main_inputs.save_key_pressed) {
-        save_scene ("scene.dat");
-        main_inputs.save_key_pressed = false;
-    } if (main_inputs.load_key_pressed) {
-        scene_loading ("scene.dat");
-        main_inputs.load_key_pressed = false;
+    } if (main_inputs.menu_1_pressed) {
+        save_scene ("status/scene.dat");
+        main_inputs.menu_1_pressed = false;
+        main_inputs.is_menu_open = false;
+    } if (main_inputs.menu_2_pressed) {
+        scene_loading ("status/scene.dat");
+        main_inputs.menu_2_pressed = false;
+        main_inputs.is_menu_open = false;
+    } if (main_inputs.menu_3_pressed) {
+        main_inputs.menu_3_pressed = false;
+        gtk_main_quit ();
+    } if (main_inputs.spawner_menu_level == 3) {
+        if (main_inputs.up_arrow_pressed)   {spawn_mass += 0.5f; main_inputs.up_arrow_pressed = false;}
+        if (main_inputs.down_arrow_pressed) {spawn_mass -= 0.5f; if (spawn_mass < 0.5f) {spawn_mass = 0.5f;} main_inputs.down_arrow_pressed = false;}
+    } if (main_inputs.spawner_menu_level == 4) {
+        if (main_inputs.up_arrow_pressed)   {spawn_radius += 0.1f; main_inputs.up_arrow_pressed = false;}
+        if (main_inputs.down_arrow_pressed) {spawn_radius -= 0.1f; if (spawn_radius < 0.1f) {spawn_radius = 0.1f;} main_inputs.down_arrow_pressed = false;}
     } if (main_inputs.left_mouse_button_clicked) {
         if (selected_object >= 0) {
             remove_joints_from_object (selected_object);

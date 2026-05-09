@@ -1,4 +1,7 @@
 #include "object_spawner.h"
+float spawn_mass = 1.0f;
+float spawn_radius = 0.5f;
+float spawn_speed = 20.0f;
 void spawner_launch_sphere (float spherical_radius, float physical_mass, float launch_speed) {
     //Spawn the object just very slightly in front of the camera (no collision)
     vector3 initial_spawn_position = vector3_addition (main_camera_fov.position, vector3_scaling (main_camera_fov.forward_vector, spherical_radius + 1.0));

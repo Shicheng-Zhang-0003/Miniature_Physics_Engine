@@ -6,7 +6,11 @@ typedef struct {
     //Keyboard Movement Inputs
     bool w_key_pressed, a_key_pressed, s_key_pressed, d_key_pressed, space_key_pressed, shift_key_pressed, escape_key_pressed;
     //File Load Inputs
-    bool save_key_pressed, load_key_pressed; //R key, L (rebound to O)
+    bool is_menu_open;
+    bool menu_1_pressed, menu_2_pressed, menu_3_pressed;
+    //Spawn Object Status
+    int spawner_menu_level;
+    bool up_arrow_pressed, down_arrow_pressed;
     //Mouse Status Inputs
     bool is_mouse_locked, is_debug_mode_active;
     bool left_mouse_button_clicked, right_mouse_button_clicked;

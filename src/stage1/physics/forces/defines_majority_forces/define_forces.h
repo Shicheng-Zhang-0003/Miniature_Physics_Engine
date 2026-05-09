@@ -111,16 +111,22 @@ static void force_applicant_vertical_anchor (rigidbody *rigid_body, vector3 pivo
     //Apply Tension towards the vector of the pivot
     rb_apply_forces_perfect (rigid_body, vector3_scaling (radial_direction, -tension_force_magnitude));
 } //Monitor the Energy component of the objects related
-typedef struct {float kinetic_energy, gravitational_potential_energy, spring_potential_energy, mechanical_energy;} state_energy;
+typedef struct {float linear_kinetic_energy, rotational_kinetic_energy, kinetic_energy, gravitational_potential_energy, spring_potential_energy, mechanical_energy;} state_energy;
 static state_energy force_to_system_energy_amount (rigidbody *rigid_body, vector3 gravitational_acceleration) {
     state_energy energy_state;
-    //Ek --> kinetic
-    energy_state.kinetic_energy = rb_get_kinetic_energy (rigid_body);
+    //Ek linear = 0.5mv^2
+    energy_state.linear_kinetic_energy = 0.5 * rigid_body -> mass * vector3_length_squared (rigid_body -> velocity);
+    //Ek rotational = 0.5wIw
+    vector3 angular_momentum = math3_multiplication_vector3 (math3_inverse (rigid_body -> inverse_inertia_system), rigid_body -> angular_velocity);
+    energy_state.rotational_kinetic_energy = 0.5 * vector3_dot (rigid_body -> angular_velocity, angular_momentum);
+    //Ek --> total kinetic
+    energy_state.kinetic_energy = energy_state.linear_kinetic_energy + energy_state.rotational_kinetic_energy;
     //Epg (Y value in vectoring is height)
     energy_state.gravitational_potential_energy = rigid_body -> mass * fabsf (gravitational_acceleration.y) * rigid_body -> position.y;
     //Eps --> calculated on a per spring basis, not included
+    energy_state.spring_potential_energy = 0.0;
     //Em --> total MEC
-    energy_state.mechanical_energy = energy_state.kinetic_energy + energy_state.gravitational_potential_energy;
+    energy_state.mechanical_energy = energy_state.kinetic_energy + energy_state.gravitational_potential_energy + energy_state.spring_potential_energy;
     return energy_state;
 }
 #endif

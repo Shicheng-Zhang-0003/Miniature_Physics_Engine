@@ -24,12 +24,10 @@ void camera_update_vectors (camera *camera_object) {
     camera_object -> movement_speed = 25.0; //25 Units of Movement * s ^ -1
     camera_object -> mouse_sensitivity = 0.1;
     camera_update_vectors (camera_object);
-} 
-
-/* void camera_view_matrix (camera *camera_object, float *matrix_output) {
+} /* void camera_view_matrix (camera *camera_object, float *matrix_output) {
     //Target is where we will be standing --> In ADDITION to where we are currently looking
     vector3 target_position = vector3_addition (camera_object -> position, camera_object -> forward_vector);
-    //Calculate orthogonal axis 
+    //Calculate orthogonal axis
     vector3 forward_axis = vector3_normalisation (vector3_subtraction (target_position, camera_object -> position));
     vector3 vertical_axis = vector3_normalisation (camera_object -> vertical_vector);
     vector3 right_axis = vector3_normalisation (vector3_cross (forward_axis, vertical_axis));
