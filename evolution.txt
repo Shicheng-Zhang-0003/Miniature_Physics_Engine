@@ -24,6 +24,7 @@ Phase 1 is completed:
         0.9-PRBFV
 
 Phase 2 is in progress:
-    Current Head: 0.9.3-STBL2
+    Current Head: 0.9.3-STBL3
     Prev Versions:
+        0.9.3-STBL2
         0.9.3-STBL-INTERIM
