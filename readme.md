@@ -26,8 +26,23 @@ Engine Mechanics:
         3H: Once a object has been selected, left click to delete the object.
 
 Known Bugs:
-    RTAM-S: Under continuous input, sometimes, the camera viewpoint may be stuck in moving forwards, and pressing S counteracts and stops the movement of the camera.
-        - In this particular case, save the current state of the engine, and restart the executable.
+    PSX = Programming Syntax Bug, OBP = Operational Bug, ECP = External Compatiability Bug, LIC = Library Incompleteness Bug
+
+    PSX = Bugs or issues needing a solution in the present programming.
+    OBP = bugs unpredicted in programming but recognised in operation and requires pinpointing source of error.
+    ECP = Compatiability issues with different operating systems and particular rendering frameworks (EG: X11 vs Wayland, Linux Native).
+    LIC = Given the minimal nature of the engine itself, realism in some cases may be severly impacted when progressing in future to certain applications and feature development.
+
+    PSX-000 (O2CL, O2 CYCLE LOOP): The current rendering of all objects is done using a O (n ^ 2) stacked for loop, which would heavily increase incremental processing time in continued usage.
+        - Change In the future to a O (n) loop at best for looping or dual O (n) separated loops to prevent O (n ^ 2) repetition.
+    PSX-001 (MLCULMT, MALLOC UPPER LIMIT): Objects spawned quickly exceeding a count of 1136 objects will result in the engine feeling slightly slowed down.
+        - Changes in PSX-000 O (n ^ 2) loop may alleviate some of these results.
+    PSX-002 (AXLLAG, AXIAL RENDER LAG): Previously, the program rendered a stational x, y, and z reference axes for each individual object. However, this severly impacted performace and was omitted temporarily with v0.9.0.1-STBL.
+        - Now that rotational motion of spheres has been rectified, this is no longer of immediate concern.
+        - However, in the future, for debug mode, such functionality may return, and resource allocation is of the essence to prevent high stage lag of the system.
+
+    OPB-000 (MTNLCK, or MOTION LOCK): Under continuous input, sometimes, the camera viewpoint may be stuck moving in one direction. In this case, manipulating the object into random, rapid motion counteracts and stops the uncommanded movement of the camera.
+        - In some cases, save the current state of the engine, and restart the executable to solve the issue.
 
 Installation Instructions:
     Refer to the installation folder for instruction details on Linux Platforms.
@@ -37,7 +52,10 @@ Installation Instructions:
     Users may try to install dependencies as is on Intel MacOS, but please note that the only operating system that this has been officially tested on so far is Ubuntu 24.04.4 LTS.
 
 Resource Usage:
-    Nominally consumes approximately 106 Megabytes of RAM at 1136 objects spawned.
+    Nominally consumes approximately 1 Megabyte of extraneous RAM per 1136 objects spawned.
+    Initial Run will result in nominal RAM usage of 105 Megabytes nominally
+    Note: All of this is run under X11 given that mouse locking on Wayland is deficient for the current purpose.
+        - For systems forced to employ Wayland, it would be optimal to install basic X11 drivers to run this engine.
     (Core Ultra 5 125H, Intel Arc Graphics, 32GB total RAM, Ubuntu 24.04.4 LTS)
     (2880 * 1880 Screen, set to 120 Hz refresh rate (although the engine itself has a inbuilt tick rate of 60 FPS))
 
