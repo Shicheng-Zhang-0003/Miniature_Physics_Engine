@@ -33,7 +33,6 @@ Installation Instructions:
 
     Users may try to install dependencies as is on Intel MacOS, but please note that the only operating system that this has been officially tested on so far is Ubuntu 24.04.4 LTS.
 
-
 Resource Usage:
     Nominally consumes approximately 106 Megabytes of RAM at 1136 objects spawned.
     (Core Ultra 5 125H, Intel Arc Graphics, 32GB total RAM, Ubuntu 24.04.4 LTS)
