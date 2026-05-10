@@ -1,3 +1,6 @@
+# readme.md
+
+```
 This is the pre-1.0 release testing edition of the Miniature Physics Engine (MPE, v0.9.3-STBL2).
 
 It is a rigid body physics engine designed around simplicity, ease of use, and efficiency.
@@ -37,3 +40,5 @@ Resource Usage:
     Nominally consumes approximately 106 Megabytes of RAM at 1136 objects spawned.
     (Core Ultra 5 125H, Intel Arc Graphics, 32GB total RAM, Ubuntu 24.04.4 LTS)
     (2880 * 1880 Screen, set to 120 Hz refresh rate (although the engine itself has a inbuilt tick rate of 60 FPS))
+
+```

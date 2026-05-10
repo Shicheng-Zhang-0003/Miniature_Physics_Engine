@@ -1,3 +1,6 @@
+# linux_install_instructions.md
+
+```
 Linux Installation Instructions:
 
 Required Software Stack:
@@ -42,3 +45,5 @@ After dependencies have been installed:
     The only time you should be worried is if you see make: Error at the end of the compilation
     However, my own testing often reveals such issues, so theoretically this should only happen if you didn't install a dependency properly.
 
+
+```
