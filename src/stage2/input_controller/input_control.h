@@ -10,7 +10,9 @@ typedef struct {
     bool menu_1_pressed, menu_2_pressed, menu_3_pressed;
     //Spawn Object Status
     int spawner_menu_level;
-    bool up_arrow_pressed, down_arrow_pressed;
+    int velocity_menu_level;
+    int object_menu_level;
+    bool up_arrow_pressed, down_arrow_pressed, enter_key_pressed, e_key_pressed;
     //Mouse Status Inputs
     bool is_mouse_locked, is_debug_mode_active;
     bool left_mouse_button_clicked, right_mouse_button_clicked;

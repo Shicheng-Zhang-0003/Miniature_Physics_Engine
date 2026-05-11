@@ -11,17 +11,17 @@ void grid_init (grid_mesh *grid_mesh_object, int half_extent, int cell_spacing) 
     for (int step_coordinate = -half_extent; step_coordinate <= half_extent; step_coordinate += cell_spacing) {
         //Line along the Z axis at X = step_coordinate;
         vertex_data [vertex_index++] = (float) step_coordinate;
-        vertex_data [vertex_index++] = 0.0;
+        vertex_data [vertex_index++] = 0.0f;
         vertex_data [vertex_index++] = (float) -half_extent;
         vertex_data [vertex_index++] = (float) step_coordinate;
-        vertex_data [vertex_index++] = 0.0;
+        vertex_data [vertex_index++] = 0.0f;
         vertex_data [vertex_index++] = (float) half_extent;
         //Line along X axis at position of Z = step_coordinate
         vertex_data [vertex_index++] = (float) -half_extent;
-        vertex_data [vertex_index++] = 0.0;
+        vertex_data [vertex_index++] = 0.0f;
         vertex_data [vertex_index++] = (float) step_coordinate;
         vertex_data [vertex_index++] = (float) half_extent;
-        vertex_data [vertex_index++] = 0.0;
+        vertex_data [vertex_index++] = 0.0f;
         vertex_data [vertex_index++] = (float) step_coordinate;
     } grid_mesh_object -> line_vertex_count = vertex_index / 3;
     glGenVertexArrays (1, &grid_mesh_object -> vertex_array_object);
@@ -51,10 +51,10 @@ void grid_init (grid_mesh *grid_mesh_object, int half_extent, int cell_spacing) 
     for (int row_index = 0; row_index < 3; row_index++) {
         for (int column_index = 0; column_index < 3; column_index++) {normal_matrix_flat_array [row_index * 3 + column_index] = identity_normal_matrix.matrix [row_index][column_index];}
     } glUniformMatrix3fv (glGetUniformLocation (shader_program, "normal_matrix"), 1, GL_FALSE, normal_matrix_flat_array);
-    glUniform3f (glGetUniformLocation (shader_program, "object_colour"), 0.3, 0.3, 0.3);
-    const float grid_surface_normal_x = 0.0;
-    const float grid_surface_normal_y = 1.0;
-    const float grid_surface_normal_z = 0.0;
+    glUniform3f (glGetUniformLocation (shader_program, "object_colour"), 0.3f, 0.3f, 0.3f);
+    const float grid_surface_normal_x = 0.0f;
+    const float grid_surface_normal_y = 1.0f;
+    const float grid_surface_normal_z = 0.0f;
     glVertexAttrib3f (1, grid_surface_normal_x, grid_surface_normal_y, grid_surface_normal_z); // Constant normal pointing up for the grid
     glBindVertexArray (grid_mesh_object -> vertex_array_object);
     glDrawArrays (GL_LINES, 0, grid_mesh_object -> line_vertex_count);

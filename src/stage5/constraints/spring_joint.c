@@ -48,7 +48,7 @@ int add_joint (int object_index_a, int object_index_b, float equilibrium_length,
         vector3 net_joint_force = vector3_addition (restoration_force, damping_force);
         //Apply Equal and Opposite forces
         rb_apply_forces_perfect (rigid_body_a, net_joint_force);
-        rb_apply_forces_perfect (rigid_body_b, vector3_scaling (net_joint_force, -1.0));
+        rb_apply_forces_perfect (rigid_body_b, vector3_scaling (net_joint_force, -1.0f));
     }
 } void remove_joints_from_object (int object_index) {
     for (int joint_index = 0; joint_index < maximum_joint_count; joint_index++) {

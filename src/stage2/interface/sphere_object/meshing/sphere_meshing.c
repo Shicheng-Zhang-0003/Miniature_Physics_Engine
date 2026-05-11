@@ -11,7 +11,7 @@ void init_sm_system (mesh *mesh_object, int horizontal_sections, int vertical_st
     //Generate Vertex COordinates for rendering
     int vertex_index = 0; //Assembly notation idx bitshifting
     for (int stack_step = 0; stack_step <= vertical_stacks; stack_step++) {
-        //Phi value goes from .5pi to -.5pi (Max to Min)
+        //Phi value goes from .5fpi to -.5fpi (Max to Min)
         float phi_angle = math_pi / 2 - stack_step * math_pi / vertical_stacks;
         for (int section_step = 0; section_step <= horizontal_sections; section_step++) {
             //Theta goes in radians all around circulat object

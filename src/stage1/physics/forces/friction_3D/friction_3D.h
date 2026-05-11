@@ -10,9 +10,9 @@ static void applicant_friction_3D (rigidbody *rb, vector3 surface_normal, float 
     if (speed_tangent > math_epsilon) {
         //Friction Magnitude --> Ff = uFn
         //Assume Fn to Fg
-        float weight = rb -> mass * 9.81;
+        float weight = rb -> mass * 9.81f;
         float friction_magnitude = mu_kinetic * weight;
-        vector3 friction_vector = vector3_scaling(vector3_normalisation(velocity_tangent), -1.0);
+        vector3 friction_vector = vector3_scaling(vector3_normalisation(velocity_tangent), -1.0f);
         rb_apply_forces_perfect (rb, vector3_scaling (friction_vector, friction_magnitude));
     }
 }

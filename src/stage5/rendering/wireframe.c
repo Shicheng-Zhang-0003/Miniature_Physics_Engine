@@ -12,7 +12,7 @@ void wireframe_render_object (GLuint shader_program, math4 view_matrix, math4 pr
     glUniformMatrix4fv (glGetUniformLocation (shader_program, "viewframe"), 1, GL_FALSE, view_matrix_flat_array);
     glUniformMatrix4fv (glGetUniformLocation (shader_program, "projection"), 1, GL_FALSE, projection_matrix_flat_array);
     //Scale the mesh frame larger than the actual sphere by a small amount
-    float visual_outline_scale = rigid_body -> radius * 1.01;
+    float visual_outline_scale = rigid_body -> radius * 1.01f;
     math4 translation_matrix = math4_translation (rigid_body -> position);
     math4 rotation_matrix = vector4_to_math4 (rigid_body -> orientation);
     math4 scale_matrix = math4_scaling ((vector3) {visual_outline_scale, visual_outline_scale, visual_outline_scale});
@@ -31,5 +31,5 @@ void wireframe_render_object (GLuint shader_program, math4 view_matrix, math4 pr
 } void wireframe_render_selected_object (GLuint shader_program, math4 view_matrix, math4 projection_matrix) {
     if ((selected_object < 0) || (selected_object >= object_count)) {return;}
     //Yellow outline (Selected Object Visibility)
-    wireframe_render_object (shader_program, view_matrix, projection_matrix, &obj_per_scene [selected_object], (vector3) {1.0, 1.0, 0.0});
+    wireframe_render_object (shader_program, view_matrix, projection_matrix, &obj_per_scene [selected_object], (vector3) {1.0f, 1.0f, 0.0f});
 }

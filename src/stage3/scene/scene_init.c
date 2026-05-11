@@ -18,14 +18,14 @@ int scene_add_object (float radius, float mass, vector3 initial_position) {
 } void scene_init_default (void) {
     scene_clear ();
     //Define Object Colours
-    int object_red_index = scene_add_object (1.0, 1.0, (vector3) {0.0, 20.0, 0.0});
-    int object_green_index = scene_add_object (1.0, 1.0, (vector3) {0.5, 15.0, 0.0});
-    int object_blue_index = scene_add_object (1.5, 2.0, (vector3) {0.0, 10.0, 0.0});
-    int object_grey_index = scene_add_object (2.0, 0.0, (vector3) {0.0, 2.0, 0.0});
-    obj_per_scene [object_red_index].colour = (vector3) {1.0, 0.3, 0.3}; // R
-    obj_per_scene [object_green_index].colour = (vector3) {0.3, 1.0, 0.3}; // G
-    obj_per_scene [object_blue_index].colour = (vector3) {0.3, 0.3, 1.0}; // B
-    obj_per_scene [object_grey_index].colour = (vector3) {0.8, 0.8, 0.8}; // GY
+    int object_red_index = scene_add_object (1.0f, 1.0f, (vector3) {0.0f, 20.0f, 0.0f});
+    int object_green_index = scene_add_object (1.0f, 1.0f, (vector3) {0.5f, 15.0f, 0.0f});
+    int object_blue_index = scene_add_object (1.5f, 2.0f, (vector3) {0.0f, 10.0f, 0.0f});
+    int object_grey_index = scene_add_object (2.0f, 0.0f, (vector3) {0.0f, 2.0f, 0.0f});
+    obj_per_scene [object_red_index].colour = (vector3) {1.0f, 0.3f, 0.3f}; // R
+    obj_per_scene [object_green_index].colour = (vector3) {0.3f, 1.0f, 0.3f}; // G
+    obj_per_scene [object_blue_index].colour = (vector3) {0.3f, 0.3f, 1.0f}; // B
+    obj_per_scene [object_grey_index].colour = (vector3) {0.8f, 0.8f, 0.8f}; // GY
 } void scene_clear (void) {
     object_count = 0;
 }

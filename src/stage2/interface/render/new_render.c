@@ -100,12 +100,12 @@ void render_init () {
     render_init ();
     //View Status, Clear SCN
     glViewport (0, 0, widget_width, widget_height);
-    glClearColor (0.05, 0.05, 0.1, 1.0);
+    glClearColor (0.05f, 0.05f, 0.1f, 1.0f);
     glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glUseProgram (shaders_program_total);
     //Projection Matrix, 4D Matrix
     float window_aspect_ratio = (float) (widget_width) / (float) (widget_height);
-    math4 projection_matrix = math4_perspective_fov (degrad * 45.0, window_aspect_ratio, 0.1, 1000.0);
+    math4 projection_matrix = math4_perspective_fov (degrad * 45.0f, window_aspect_ratio, 0.1f, 1000.0f);
     float projection_matrix_flat_array [16];
     math4_to_flat_array (projection_matrix, projection_matrix_flat_array);
     glUniformMatrix4fv (shader_uniform_location_registry.projection_matrix_location, 1, GL_FALSE, projection_matrix_flat_array);
@@ -116,7 +116,7 @@ void render_init () {
     glUniformMatrix4fv (shader_uniform_location_registry.view_matrix_location, 1, GL_FALSE, view_matrix_flat_array);
     glUniform3f (shader_uniform_location_registry.camera_position_location, main_camera_fov.position.x, main_camera_fov.position.y, main_camera_fov.position.z);
     //Light Position (Stronger overhead lighting)
-    glUniform3f (shader_uniform_location_registry.light_position_location, 20.0, 40.0, 20.0);
+    glUniform3f (shader_uniform_location_registry.light_position_location, 20.0f, 40.0f, 20.0f);
     //Draw Each Object in Question
     grid_render (&main_grid, shaders_program_total, view_matrix, projection_matrix);
     glUseProgram (shaders_program_total); // Ensure we are back to our main program after grid_render
@@ -143,7 +143,7 @@ void render_init () {
         //Render Objects
         render_sphere_object (&sphere_mesh, rigid_body);
         //Draw Mesh Latitude and Longitudinal Lines (Rotational Visibility)
-        wireframe_render_object (shaders_program_total, view_matrix, projection_matrix, rigid_body, (vector3) {0.0, 0.0, 0.0});
+        wireframe_render_object (shaders_program_total, view_matrix, projection_matrix, rigid_body, (vector3) {0.0f, 0.0f, 0.0f});
         /* Draw rotation axes for each object */ /* Makes the game far too laggy
         for (int step_axes = 0; step_axes < object_count; step_axes++) {
             draw_sphere_axes (&obj_per_scene [step_axes], projection_matrix_flat_array, view_matrix_flat_array);
