@@ -31,6 +31,7 @@ Phase 2 is in progress:
         0.9.3-STBL-INTERIM
 
 Phase 3 is in progress:
-    Current Head: 0.9.5-Alpha
+    Current Head: 0.9.6-Alpha
     Prev Versions:
+        0.9.5-Alpha
         0.9.4-Alpha

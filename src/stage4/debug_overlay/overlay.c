@@ -8,6 +8,7 @@ static GtkWidget *menu_label = NULL;
 static GtkWidget *spawner_menu_label = NULL;
 static GtkWidget *velocity_menu_label = NULL;
 static GtkWidget *object_menu_label = NULL;
+extern float world_gravity_y;
 GtkWidget *overlay_init (GtkWidget *gl_drawing_area_widget) {
     //Gtk overlay allows to stack widgets incrementally over top of each other
     GtkWidget *ui_overlay_container = gtk_overlay_new ();
@@ -115,7 +116,7 @@ GtkWidget *overlay_init (GtkWidget *gl_drawing_area_widget) {
         gtk_label_set_text (GTK_LABEL (debug_information_label), information_text_buffer);
         return;
     } rigidbody *selected_rigid_body = &obj_per_scene [selected_object];
-    vector3 global_gravity_acceleration = {0.0f, -9.81f, 0.0f};
+    vector3 global_gravity_acceleration = {0.0f, world_gravity_y, 0.0f};
     state_energy calculated_energy = force_to_system_energy_amount (selected_rigid_body, global_gravity_acceleration);
     float selected_object_speed = vector3_length (selected_rigid_body -> velocity);
     if (main_inputs.is_debug_mode_active) {

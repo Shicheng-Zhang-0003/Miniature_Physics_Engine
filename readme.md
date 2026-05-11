@@ -33,19 +33,25 @@ Known Bugs:
     ECP = Compatiability issues with different operating systems and particular rendering frameworks (EG: X11 vs Wayland, Linux Native).
     LIC = Given the minimal nature of the engine itself, realism in some cases may be severly impacted when progressing in future to certain applications and feature development.
 
-    PSX-000 (O2CL, O2 CYCLE LOOP): The current rendering of all objects is done using a O (n ^ 2) stacked for loop, which would heavily increase incremental processing time in continued usage.
+    PSX-000 (SOLVED) (O2CL, O2 CYCLE LOOP): The current rendering of all objects is done using a O (n ^ 2) stacked for loop, which would heavily increase incremental processing time in continued usage.
         - Change In the future to a O (n) loop at best for looping or dual O (n) separated loops to prevent O (n ^ 2) repetition.
-    PSX-001 (MLCULMT, MALLOC UPPER LIMIT): Objects spawned quickly exceeding a count of 1136 objects will result in the engine feeling slightly slowed down.
+    PSX-001 (PARTIAL) (MLCULMT, MALLOC UPPER LIMIT): Objects spawned quickly exceeding a count of 1136 objects will result in the engine feeling slightly slowed down.
         - Changes in PSX-000 O (n ^ 2) loop may alleviate some of these results.
     PSX-002 (AXLLAG, AXIAL RENDER LAG): Previously, the program rendered a stational x, y, and z reference axes for each individual object. However, this severly impacted performace and was omitted temporarily with v0.9.0.1-STBL.
         - Now that rotational motion of spheres has been rectified, this is no longer of immediate concern.
         - However, in the future, for debug mode, such functionality may return, and resource allocation is of the essence to prevent high stage lag of the system.
-    PSX-003 (FPPSCL, FLOATING POINT PRECISION SCALE): In 0.9.5-Alpha, any form of modification to any values is += 0.01, which is far too low if not in debug mode.
+    PSX-003 (SOLVED) (FPPSCL, FLOATING POINT PRECISION SCALE): In 0.9.5-Alpha, any form of modification to any values is += 0.01, which is far too low if not in debug mode.
         - Add a specific option for debug mode to change increment/decrement values.
         - For Game Mode, switch to a nominal +- of 0.2 for all changable constant values.
 
-    OPB-000 (MTNLCK, or MOTION LOCK): Under continuous input, sometimes, the camera viewpoint may be stuck moving in one direction. In this case, manipulating the object into random, rapid motion counteracts and stops the uncommanded movement of the camera.
+    OPB-000 (MTNLCK, MOTION LOCK): Under continuous input, sometimes, the camera viewpoint may be stuck moving in one direction. In this case, manipulating the object into random, rapid motion counteracts and stops the uncommanded movement of the camera.
         - In some cases, save the current state of the engine, and restart the executable to solve the issue.
+
+    ECP-000 (MSEWYLD, MOUSE WAYLAND): Under Wayland, mouse automatically disengages with out of the bounds of the window itself and does not lock properly.
+        - When transitioning from IJKL perspective control, this was a major thing in versions 0.9.1 to 0.9.2.
+        - Right now the thing is currently running on a forced X11 state, which works like a charm.
+        - However, the clarity of the rendering and the quality of objects is absolutely horrid compared to Wayland.
+        - Plus, on some newer Linux systems, they are ditching X11 permanently, so extraneous X11 support drivers may be required.
 
 Installation Instructions:
     Refer to the installation folder for instruction details on Linux Platforms.

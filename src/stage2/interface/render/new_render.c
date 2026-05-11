@@ -149,6 +149,5 @@ void render_init () {
             draw_sphere_axes (&obj_per_scene [step_axes], projection_matrix_flat_array, view_matrix_flat_array);
         } */
         glUseProgram (shaders_program_total);
-        wireframe_render_selected_object (shaders_program_total, view_matrix, projection_matrix);
     } wireframe_render_selected_object (shaders_program_total, view_matrix, projection_matrix);
 }

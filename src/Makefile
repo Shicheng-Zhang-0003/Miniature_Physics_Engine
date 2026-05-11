@@ -22,7 +22,6 @@ SRCS = stage1/root_gtk.c \
        stage5/rendering/wireframe.c \
        stage5/scene_io/scene_saving.c \
        stage5/scene_io/scene_load.c \
-       stage5/constraints/spring_joint.c
 
 engine: $(SRCS)
 	$(CC) $(CFLAGS) $(SRCS) $(LIBS) -o engine

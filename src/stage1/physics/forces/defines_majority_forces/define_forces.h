@@ -29,10 +29,10 @@ static void force_applicant_universal_gravity (rigidbody *rigid_body_a, rigidbod
     rb_apply_forces_perfect (rigid_body_a, gravitational_force); //Apply to positive vector object (a)
     rb_apply_forces_perfect (rigid_body_b, vector3_scaling (gravitational_force, -1.0f)); //Apply to negative vector object (b), equal and opposite direction
 } //Friction Definition (3D tangent plane fields)
-static void force_applicant_friction_rolling (rigidbody *rigid_body, vector3 surface_normal, float static_friction_coefficient, float kinetic_friction_coefficient) {
+static void force_applicant_friction_rolling (rigidbody *rigid_body, vector3 surface_normal, float static_friction_coefficient, float kinetic_friction_coefficient, float gravity_y) {
     //Calculate the magnitude of normal forces
     //Ff = uFn
-    vector3 gravity_force = vector3_scaling ((vector3) {0, -9.81f, 0}, rigid_body -> mass); //Scale Mass by -9.81f to get mg, Fg
+    vector3 gravity_force = vector3_scaling ((vector3) {0, gravity_y, 0}, rigid_body -> mass); //Scale Mass by -9.81f to get mg, Fg
     float normal_force_magnitude = fabsf (vector3_dot (gravity_force, surface_normal)); //Magnitude of Force Normal
     //Contact Vector (r = -radius * normal)
     vector3 relative_contact_vector = vector3_scaling (surface_normal, -rigid_body -> radius);
@@ -56,10 +56,10 @@ static void force_applicant_friction_rolling (rigidbody *rigid_body, vector3 sur
             rigid_body -> velocity = vector3_subtraction (rigid_body -> velocity, tangential_velocity);
         }
     }
-} static void force_applicant_friction (rigidbody *rigid_body, vector3 surface_normal, float static_friction_coefficient, float kinetic_friction_coefficient) {
+} static void force_applicant_friction (rigidbody *rigid_body, vector3 surface_normal, float static_friction_coefficient, float kinetic_friction_coefficient, float gravity_y) {
     //Calculate the magnitude of normal forces
     //Ff = uFn
-    vector3 gravity_force = vector3_scaling ((vector3) {0, -9.81f, 0}, rigid_body -> mass); //Scale Mass by -9.81f to get mg, Fg
+    vector3 gravity_force = vector3_scaling ((vector3) {0, gravity_y, 0}, rigid_body -> mass); //Scale Mass by gravity_y to get mg, Fg
     float normal_force_magnitude = fabsf (vector3_dot (gravity_force, surface_normal)); //Magnitude of Force Normal
     //Find the tangent velocity of the objetc along the surface of support
     //velocity_tangent = velocity - (v * n) * n
@@ -97,14 +97,14 @@ static void force_applicant_string (rigidbody *rigid_body, vector3 anchor_positi
 } //Vertical Circular Motion
 //Vertical circular motion requires Ft to counteract gravity in upper segments
 //This also gives Fc (centripetal) and consequently centrifugal
-static void force_applicant_vertical_anchor (rigidbody *rigid_body, vector3 pivot_point, float radius) {
+static void force_applicant_vertical_anchor (rigidbody *rigid_body, vector3 pivot_point, float radius, float gravity_y) {
     vector3 relative_position_vector = vector3_subtraction (rigid_body -> position, pivot_point);
     vector3 radial_direction = vector3_normalisation (relative_position_vector);
     //Centripetal Force Required: Fc = m(vc) ^ 2(r ^ -1)
     float speed_squared = vector3_length_squared (rigid_body -> velocity);
     float centripetal_force_magnitude = (rigid_body -> mass * speed_squared) / radius;
     //Gravitational component along the anchoring motion (mg * cos (theta_relative_to_anchor_gravity))
-    vector3 gravity_force = {0, -9.81f * rigid_body -> mass, 0}; //Gravitational Magnitude
+    vector3 gravity_force = {0, gravity_y * rigid_body -> mass, 0}; //Gravitational Magnitude
     float gravitational_force_along_radial_axis = vector3_dot (gravity_force, radial_direction);
     //Tension (Ft): Simultaneously satisfy Fc and counteract Fg
     float tension_force_magnitude = centripetal_force_magnitude + gravitational_force_along_radial_axis;

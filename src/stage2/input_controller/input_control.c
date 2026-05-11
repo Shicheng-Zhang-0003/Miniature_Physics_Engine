@@ -76,7 +76,7 @@ void initialise_input (input_status *input_state) {
     } else if ((input_state -> velocity_menu_level == 3) || (input_state -> velocity_menu_level == 4) || input_state -> velocity_menu_level == 11 || input_state -> velocity_menu_level == 21 ||(input_state -> velocity_menu_level == 22) || (input_state -> velocity_menu_level == 23)) {
         if (event -> keyval == GDK_KEY_Up)   {input_state -> up_arrow_pressed = true;}
         if (event -> keyval == GDK_KEY_Down) {input_state -> down_arrow_pressed = true;}
-        if ((event -> keyval == GDK_KEY_Return) || (event -> keyval == GDK_KEY_KP_Enter) {input_state -> enter_key_pressed = true;}
+        if ((event -> keyval == GDK_KEY_Return) || (event -> keyval == GDK_KEY_KP_Enter)) {input_state -> enter_key_pressed = true;}
     } // Selected Object Menu Navigation
     if (input_state -> object_menu_level == 1) {
         if (event -> keyval == GDK_KEY_1) {input_state -> object_menu_level = 2;} // Mass

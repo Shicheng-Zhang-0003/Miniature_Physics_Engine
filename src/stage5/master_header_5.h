@@ -8,5 +8,5 @@
 #include "stage5/rendering/wireframe.h"
 #include "stage5/scene_io/scene_saving.h"
 #include "stage5/scene_io/scene_load.h"
-#include "stage5/constraints/spring_joint.h"
+//#include "stage5/constraints/spring_joint.h"
 #endif

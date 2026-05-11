@@ -55,7 +55,6 @@ int main_algorithm (int argc, char *argv []) {
     //Show Window
     gtk_widget_show_all (main_window);
     frame_timer_init (&main_timer);
-    joint_init_pool ();
     gtk_main ();
     return 0;
 } int main (int argc, char *argv []) {
