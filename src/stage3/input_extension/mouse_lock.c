@@ -1,7 +1,7 @@
 #include "mouse_lock.h"
 void mouse_lock_enable (GtkWidget *window_widget) {
     GdkWindow *gdk_window_handle = gtk_widget_get_window (window_widget);
-    if (! (gdk_window_handle)) {return;}
+    if (!(gdk_window_handle)) {return;}
     gdk_window_set_event_compression (gdk_window_handle, FALSE);
     GdkDisplay *gdk_display_instance = gdk_window_get_display (gdk_window_handle);
     GdkSeat *gdk_seat_instance = gdk_display_get_default_seat (gdk_display_instance);
@@ -12,12 +12,12 @@ void mouse_lock_enable (GtkWidget *window_widget) {
 } void mouse_lock_disable (GtkWidget *window_widget) {
     (void) window_widget;
     GdkDisplay *gdk_display_instance = gdk_display_get_default ();
-    if (! (gdk_display_instance)) {return;}
+    if (!(gdk_display_instance)) {return;}
     GdkSeat *gdk_seat_instance = gdk_display_get_default_seat (gdk_display_instance);
     gdk_seat_ungrab (gdk_seat_instance);
 } void mouse_lock_reset_centre (GtkWidget *window_widget) {
     GdkWindow *gdk_window_handle = gtk_widget_get_window (window_widget);
-    if (! (gdk_window_handle)) {return;}
+    if (!(gdk_window_handle)) {return;}
     int window_width = gtk_widget_get_allocated_width (window_widget);
     int window_height = gtk_widget_get_allocated_height (window_widget);
     // Get top-left corner of total screen

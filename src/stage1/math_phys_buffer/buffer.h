@@ -20,6 +20,7 @@ typedef struct {
     //Dimensions of individual object definition (for collisions and rendering)
     float radius; //Spherical calculation
     bool static_state; //If set to true object is naturally immobile
+    float friction_static, friction_kinetic;
     vector3 colour;
 } rigidbody;
 //Init
@@ -31,17 +32,19 @@ static void rigidbody_initialisation_sphere (rigidbody *rigid_body, float radius
     rigid_body -> orientation = vector4_identity ();
     rigid_body -> angular_velocity = vector3_zero ();
     rigid_body -> angular_acceleration = vector3_zero ();
-    rigid_body -> colour = (vector3) {0.2, 0.6, 1.0};
+    rigid_body -> colour = (vector3) {0.2f, 0.6f, 1.0f};
     //Dynamic
     rigid_body -> mass = mass;
-    if (mass > 0) {rigid_body -> inverse_mass = 1.0 / mass;}
-    else {rigid_body -> inverse_mass = 0.0;}
+    if (mass > 0) {rigid_body -> inverse_mass = 1.0f / mass;}
+    else {rigid_body -> inverse_mass = 0.0f;}
     rigid_body -> radius = radius;
-    rigid_body -> restitution = 0.5; //Default Bounce Energy Return
+    rigid_body -> restitution = 0.5f; //Default Bounce Energy Return
     rigid_body -> static_state = (mass == 0); //Static Objects
+    rigid_body -> friction_static = 0.3f;
+    rigid_body -> friction_kinetic = 0.2f;
     //Inertial Tensors
-    //I = 0.4mr ^ 2
-    float inertia_coefficient_sphere = (0.4) * mass * radius * radius;
+    //I = 0.4fmr ^ 2
+    float inertia_coefficient_sphere = (0.4f) * mass * radius * radius;
     rigid_body -> inertia_tensor_local = (math3) {{{0}}};
     rigid_body -> inertia_tensor_local.matrix [0][0] = inertia_coefficient_sphere;
     rigid_body -> inertia_tensor_local.matrix [1][1] = inertia_coefficient_sphere;
@@ -56,6 +59,20 @@ static void rigidbody_initialisation_sphere (rigidbody *rigid_body, float radius
     } //Total Force and Torque accumilation
     rigid_body -> force_accumilator = vector3_zero ();
     rigid_body -> torque_accumilator = vector3_zero ();
+} // Helper to update inertia tensor after mass/radius change
+static void rigidbody_update_inertia_sphere (rigidbody *rigid_body) {
+    float inertia_coefficient_sphere = (0.4f) * rigid_body -> mass * rigid_body -> radius * rigid_body -> radius;
+    rigid_body -> inertia_tensor_local = (math3) {{{0}}};
+    rigid_body -> inertia_tensor_local.matrix [0][0] = inertia_coefficient_sphere;
+    rigid_body -> inertia_tensor_local.matrix [1][1] = inertia_coefficient_sphere;
+    rigid_body -> inertia_tensor_local.matrix [2][2] = inertia_coefficient_sphere;
+    if (rigid_body -> mass > 0) {
+        rigid_body -> inverse_inertia_tensor_local = math3_inverse (rigid_body -> inertia_tensor_local);
+        rigid_body -> inverse_inertia_system = rigid_body -> inverse_inertia_tensor_local;
+    } else {
+        rigid_body -> inverse_inertia_tensor_local = (math3) {{{0}}};
+        rigid_body -> inverse_inertia_system = (math3) {{{0}}};
+    }
 } //Force application and Torque Dynamics
 //Apply a force at a centre of mass (perfect collision movement, linear movement only defined)
 static void rb_apply_forces_perfect (rigidbody *rigid_body, vector3 force_applied) {
@@ -72,15 +89,15 @@ static void rb_apply_forces_localised (rigidbody *rigid_body, vector3 force_appl
     rigid_body -> torque_accumilator = vector3_addition (rigid_body -> torque_accumilator, torque_generated);
 } //Energy Computation
 static float rb_get_kinetic_energy (rigidbody *rigid_body) {
-    //EK normal = 0.5mv ^ 2
-    float linear_kinetic_energy = 0.5 * rigid_body -> mass * vector3_length_squared (rigid_body -> velocity);
-    //EK rotational = 0.5wIw
+    //EK normal = 0.5fmv ^ 2
+    float linear_kinetic_energy = 0.5f * rigid_body -> mass * vector3_length_squared (rigid_body -> velocity);
+    //EK rotational = 0.5fwIw
     vector3 angular_momemtum = math3_multiplication_vector3 (math3_inverse (rigid_body -> inverse_inertia_system), rigid_body -> angular_velocity);
-    float rotational_kinetic_energy = 0.5 * vector3_dot (rigid_body -> angular_velocity, angular_momemtum);
+    float rotational_kinetic_energy = 0.5f * vector3_dot (rigid_body -> angular_velocity, angular_momemtum);
     return linear_kinetic_energy + rotational_kinetic_energy;
 } //Integration Segmentation (Movement Compute)
-static void rb_integrate (rigidbody *rigid_body, float delta_time) {
-    if ((rigid_body -> static_state) || (delta_time <= 0.0)) {return;}
+static void rb_integrate (rigidbody *rigid_body, float delta_time, float drag_coefficient) {
+    if ((rigid_body -> static_state) || (delta_time <= 0.0f)) {return;}
     //Update inverse inertia tensor based on current orientation before using it
     //inverse_inertia_system = rotational * inverse_inertia_local * transposed value in 4D rotational axis
     math3 rotation_matrix_current = vector4_to_math3 (rigid_body -> orientation); //W axis orientation of rotation
@@ -91,7 +108,7 @@ static void rb_integrate (rigidbody *rigid_body, float delta_time) {
     //Calculate Instantaneous Velocity
     rigid_body -> velocity = vector3_addition (rigid_body -> velocity, vector3_scaling (rigid_body -> acceleration, delta_time)); //Add currenty velocity to delta v
     //Damping (Air Resistance)
-    float linear_velocity_damping_factor = pow (0.99, delta_time);
+    float linear_velocity_damping_factor = pow (drag_coefficient, delta_time);
     rigid_body -> velocity = vector3_scaling (rigid_body -> velocity, linear_velocity_damping_factor);
     //Calculate Position Standard
     rigid_body -> position = vector3_addition (rigid_body -> position, vector3_scaling (rigid_body -> velocity, delta_time)); //Add current position to delta d
@@ -100,17 +117,17 @@ static void rb_integrate (rigidbody *rigid_body, float delta_time) {
     //Update Standard Angular Velocity
     rigid_body -> angular_velocity = vector3_addition (rigid_body -> angular_velocity, vector3_scaling (rigid_body -> angular_acceleration, delta_time)); //Sum of current angular velocity by delta angular velocity
     //Angular Damping
-    float angular_velocity_damping_factor = pow (0.99, delta_time);
+    float angular_velocity_damping_factor = pow (drag_coefficient, delta_time);
     rigid_body -> angular_velocity = vector3_scaling (rigid_body -> angular_velocity, angular_velocity_damping_factor);
     //Update General Orientation (4D)
-    //delta_q = [0, w-axis_values] * q * 0.5 * dt
+    //delta_q = [0, w-axis_values] * q * 0.5f * dt
     vector4 angular_velocity_quaternion = {0, rigid_body -> angular_velocity.x, rigid_body -> angular_velocity.y, rigid_body -> angular_velocity.z}; //Start with no w axis definition
     vector4 orientation_change_delta = vector4_multiplication (angular_velocity_quaternion, rigid_body -> orientation); //Orientation = W-Axis value
     //Set Orientation individually
-    rigid_body -> orientation.w += orientation_change_delta.w * 0.5 * delta_time;
-    rigid_body -> orientation.x += orientation_change_delta.x * 0.5 * delta_time;
-    rigid_body -> orientation.y += orientation_change_delta.y * 0.5 * delta_time;
-    rigid_body -> orientation.z += orientation_change_delta.z * 0.5 * delta_time;
+    rigid_body -> orientation.w += orientation_change_delta.w * 0.5f * delta_time;
+    rigid_body -> orientation.x += orientation_change_delta.x * 0.5f * delta_time;
+    rigid_body -> orientation.y += orientation_change_delta.y * 0.5f * delta_time;
+    rigid_body -> orientation.z += orientation_change_delta.z * 0.5f * delta_time;
     rigid_body -> orientation = vector4_normalisation (rigid_body -> orientation);
     //Clear accumilators of force and torque for next implementation
     rigid_body -> force_accumilator = vector3_zero ();

@@ -40,6 +40,9 @@ Known Bugs:
     PSX-002 (AXLLAG, AXIAL RENDER LAG): Previously, the program rendered a stational x, y, and z reference axes for each individual object. However, this severly impacted performace and was omitted temporarily with v0.9.0.1-STBL.
         - Now that rotational motion of spheres has been rectified, this is no longer of immediate concern.
         - However, in the future, for debug mode, such functionality may return, and resource allocation is of the essence to prevent high stage lag of the system.
+    PSX-003 (FPPSCL, FLOATING POINT PRECISION SCALE): In 0.9.5-Alpha, any form of modification to any values is += 0.01, which is far too low if not in debug mode.
+        - Add a specific option for debug mode to change increment/decrement values.
+        - For Game Mode, switch to a nominal +- of 0.2 for all changable constant values.
 
     OPB-000 (MTNLCK, or MOTION LOCK): Under continuous input, sometimes, the camera viewpoint may be stuck moving in one direction. In this case, manipulating the object into random, rapid motion counteracts and stops the uncommanded movement of the camera.
         - In some cases, save the current state of the engine, and restart the executable to solve the issue.
@@ -53,7 +56,7 @@ Installation Instructions:
 
 Resource Usage:
     Nominally consumes approximately 1 Megabyte of extraneous RAM per 1136 objects spawned.
-    Initial Run will result in nominal RAM usage of 105 Megabytes nominally
+    Initial Run will result in nominal RAM usage of 105 Megabytes nominally, tested with around 1142 objects showed a total RAM consumption of 106 Megabytes.
     Note: All of this is run under X11 given that mouse locking on Wayland is deficient for the current purpose.
         - For systems forced to employ Wayland, it would be optimal to install basic X11 drivers to run this engine.
     (Core Ultra 5 125H, Intel Arc Graphics, 32GB total RAM, Ubuntu 24.04.4 LTS)

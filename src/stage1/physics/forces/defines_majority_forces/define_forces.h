@@ -19,7 +19,7 @@ static void force_applicant_gravity_normal (rigidbody *rigid_body, vector3 gravi
     }
 } //Universal Law of Gravitation
 //Fg = Gm1m2r ^ -2
-#define big_g 6.67430e-11
+#define big_g 6.67430e-11f
 static void force_applicant_universal_gravity (rigidbody *rigid_body_a, rigidbody *rigid_body_b) {
     vector3 relative_position_vector = vector3_subtraction (rigid_body_b -> position, rigid_body_a -> position); //Relative Vector and distance
     float distance_squared = vector3_length_squared (relative_position_vector); //r ^ 2
@@ -27,12 +27,12 @@ static void force_applicant_universal_gravity (rigidbody *rigid_body_a, rigidbod
     float force_magnitude = (big_g * rigid_body_a -> mass * rigid_body_b -> mass) / distance_squared; //Fg = Gm1m2r ^ -2
     vector3 gravitational_force = vector3_scaling (vector3_normalisation (relative_position_vector), force_magnitude); //Check magnitude and vectors for applications
     rb_apply_forces_perfect (rigid_body_a, gravitational_force); //Apply to positive vector object (a)
-    rb_apply_forces_perfect (rigid_body_b, vector3_scaling (gravitational_force, -1.0)); //Apply to negative vector object (b), equal and opposite direction
+    rb_apply_forces_perfect (rigid_body_b, vector3_scaling (gravitational_force, -1.0f)); //Apply to negative vector object (b), equal and opposite direction
 } //Friction Definition (3D tangent plane fields)
 static void force_applicant_friction_rolling (rigidbody *rigid_body, vector3 surface_normal, float static_friction_coefficient, float kinetic_friction_coefficient) {
     //Calculate the magnitude of normal forces
     //Ff = uFn
-    vector3 gravity_force = vector3_scaling ((vector3) {0, -9.81, 0}, rigid_body -> mass); //Scale Mass by -9.81 to get mg, Fg
+    vector3 gravity_force = vector3_scaling ((vector3) {0, -9.81f, 0}, rigid_body -> mass); //Scale Mass by -9.81f to get mg, Fg
     float normal_force_magnitude = fabsf (vector3_dot (gravity_force, surface_normal)); //Magnitude of Force Normal
     //Contact Vector (r = -radius * normal)
     vector3 relative_contact_vector = vector3_scaling (surface_normal, -rigid_body -> radius);
@@ -51,7 +51,7 @@ static void force_applicant_friction_rolling (rigidbody *rigid_body, vector3 sur
         vector3 accumulated_tangential_force = vector3_subtraction (rigid_body -> force_accumilator, vector3_scaling (surface_normal, vector3_dot (rigid_body -> force_accumilator, surface_normal)));
         float accumulated_force_magnitude = vector3_length (accumulated_tangential_force);
         if (accumulated_force_magnitude < static_friction_coefficient * normal_force_magnitude) {
-            rb_apply_forces_perfect (rigid_body, vector3_scaling (accumulated_tangential_force, -1.0));
+            rb_apply_forces_perfect (rigid_body, vector3_scaling (accumulated_tangential_force, -1.0f));
             //Stop micro-sliding
             rigid_body -> velocity = vector3_subtraction (rigid_body -> velocity, tangential_velocity);
         }
@@ -59,7 +59,7 @@ static void force_applicant_friction_rolling (rigidbody *rigid_body, vector3 sur
 } static void force_applicant_friction (rigidbody *rigid_body, vector3 surface_normal, float static_friction_coefficient, float kinetic_friction_coefficient) {
     //Calculate the magnitude of normal forces
     //Ff = uFn
-    vector3 gravity_force = vector3_scaling ((vector3) {0, -9.81, 0}, rigid_body -> mass); //Scale Mass by -9.81 to get mg, Fg
+    vector3 gravity_force = vector3_scaling ((vector3) {0, -9.81f, 0}, rigid_body -> mass); //Scale Mass by -9.81f to get mg, Fg
     float normal_force_magnitude = fabsf (vector3_dot (gravity_force, surface_normal)); //Magnitude of Force Normal
     //Find the tangent velocity of the objetc along the surface of support
     //velocity_tangent = velocity - (v * n) * n
@@ -78,7 +78,7 @@ static void force_applicant_friction_rolling (rigidbody *rigid_body, vector3 sur
         if (accumulated_force_magnitude < static_friction_coefficient * normal_force_magnitude) {
             //Force applied < Force Static Friction --> No movement
             //Neutralise Sliding Force
-            rb_apply_forces_perfect (rigid_body, vector3_scaling (accumulated_tangential_force, -1.0));
+            rb_apply_forces_perfect (rigid_body, vector3_scaling (accumulated_tangential_force, -1.0f));
             rigid_body -> velocity = vector3_zero ();
         }
     }
@@ -104,7 +104,7 @@ static void force_applicant_vertical_anchor (rigidbody *rigid_body, vector3 pivo
     float speed_squared = vector3_length_squared (rigid_body -> velocity);
     float centripetal_force_magnitude = (rigid_body -> mass * speed_squared) / radius;
     //Gravitational component along the anchoring motion (mg * cos (theta_relative_to_anchor_gravity))
-    vector3 gravity_force = {0, -9.81 * rigid_body -> mass, 0}; //Gravitational Magnitude
+    vector3 gravity_force = {0, -9.81f * rigid_body -> mass, 0}; //Gravitational Magnitude
     float gravitational_force_along_radial_axis = vector3_dot (gravity_force, radial_direction);
     //Tension (Ft): Simultaneously satisfy Fc and counteract Fg
     float tension_force_magnitude = centripetal_force_magnitude + gravitational_force_along_radial_axis;
@@ -114,17 +114,17 @@ static void force_applicant_vertical_anchor (rigidbody *rigid_body, vector3 pivo
 typedef struct {float linear_kinetic_energy, rotational_kinetic_energy, kinetic_energy, gravitational_potential_energy, spring_potential_energy, mechanical_energy;} state_energy;
 static state_energy force_to_system_energy_amount (rigidbody *rigid_body, vector3 gravitational_acceleration) {
     state_energy energy_state;
-    //Ek linear = 0.5mv^2
-    energy_state.linear_kinetic_energy = 0.5 * rigid_body -> mass * vector3_length_squared (rigid_body -> velocity);
-    //Ek rotational = 0.5wIw
+    //Ek linear = 0.5fmv^2
+    energy_state.linear_kinetic_energy = 0.5f * rigid_body -> mass * vector3_length_squared (rigid_body -> velocity);
+    //Ek rotational = 0.5fwIw
     vector3 angular_momentum = math3_multiplication_vector3 (math3_inverse (rigid_body -> inverse_inertia_system), rigid_body -> angular_velocity);
-    energy_state.rotational_kinetic_energy = 0.5 * vector3_dot (rigid_body -> angular_velocity, angular_momentum);
+    energy_state.rotational_kinetic_energy = 0.5f * vector3_dot (rigid_body -> angular_velocity, angular_momentum);
     //Ek --> total kinetic
     energy_state.kinetic_energy = energy_state.linear_kinetic_energy + energy_state.rotational_kinetic_energy;
     //Epg (Y value in vectoring is height)
     energy_state.gravitational_potential_energy = rigid_body -> mass * fabsf (gravitational_acceleration.y) * rigid_body -> position.y;
     //Eps --> calculated on a per spring basis, not included
-    energy_state.spring_potential_energy = 0.0;
+    energy_state.spring_potential_energy = 0.0f;
     //Em --> total MEC
     energy_state.mechanical_energy = energy_state.kinetic_energy + energy_state.gravitational_potential_energy + energy_state.spring_potential_energy;
     return energy_state;

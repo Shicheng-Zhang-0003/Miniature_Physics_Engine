@@ -24,12 +24,12 @@ static bool collision_dual_sphere (rigidbody *rigidbody_object_a, rigidbody *rig
     collision_output_data -> object_b = rigidbody_object_b;
     //Normal = Vector from A to B
     //Safety Check (Div zero)
-    const float minimum_distance_threshold_epsilon = 0.0001;
+    const float minimum_distance_threshold_epsilon = 0.0001f;
     if (distance_between_centres > minimum_distance_threshold_epsilon) {
-        collision_output_data -> normal_vector = vector3_scaling (relative_position_vector, 1.0 / distance_between_centres);
+        collision_output_data -> normal_vector = vector3_scaling (relative_position_vector, 1.0f / distance_between_centres);
     } else {
         //Fallback Normal (Overlapping)
-        collision_output_data -> normal_vector = (vector3) {0.0, 1.0, 0.0};
+        collision_output_data -> normal_vector = (vector3) {0.0f, 1.0f, 0.0f};
     } collision_output_data -> penetration_contact = total_combined_radius - distance_between_centres;
     //Contact point between objects
     collision_output_data -> contact_point = vector3_addition (rigidbody_object_a -> position, vector3_scaling (collision_output_data -> normal_vector, rigidbody_object_a -> radius));
@@ -60,8 +60,8 @@ static void collision_resolve (collision_data *collision) {
     vector3 angular_motion_component_b = vector3_cross (math3_multiplication_vector3 (object_b -> inverse_inertia_system, rb_cross_normal), relative_contact_vector_b);
     float rotational_resistance_sum = vector3_dot (vector3_addition (angular_motion_component_a, angular_motion_component_b), collision -> normal_vector);
     float impulse_denominator = inverse_mass_sum + rotational_resistance_sum;
-    if (impulse_denominator <= 0.0) {return;}
-    float impulse_scalar = (-(1.0 + restitution_coefficient) * relative_velocity_dot_normal) / impulse_denominator;
+    if (impulse_denominator <= 0.0f) {return;}
+    float impulse_scalar = (-(1.0f + restitution_coefficient) * relative_velocity_dot_normal) / impulse_denominator;
     //Apply Impulse to objects
     vector3 impulse_vector = vector3_scaling (collision -> normal_vector, impulse_scalar);
     //Linear Velocity Changes: (delta v = impulse * mass ^ -1)
@@ -69,16 +69,16 @@ static void collision_resolve (collision_data *collision) {
     object_b -> velocity = vector3_addition (object_b -> velocity, vector3_scaling (impulse_vector, object_b -> inverse_mass)); //Add current Velocity to delta v (impulse * mass ^ -1) (Object B)
     //Changes to angular velocity: (delta angular_v = I ^ -1 * (r * impulse_scalar))
     //I ^ -1: inverse of the moment of inertia (tensor)
-    vector3 a_angular_impulse = vector3_cross (relative_contact_vector_a, vector3_scaling (impulse_vector, -1.0)); //Impulse scalar for object a
+    vector3 a_angular_impulse = vector3_cross (relative_contact_vector_a, vector3_scaling (impulse_vector, -1.0f)); //Impulse scalar for object a
     vector3 b_angular_impulse = vector3_cross (relative_contact_vector_b, impulse_vector); //impulse_scalar for object b
     object_a -> angular_velocity = vector3_addition (object_a -> angular_velocity, math3_multiplication_vector3 (object_a -> inverse_inertia_system, a_angular_impulse)); //Delta angular_v + current angular_v = final angular_v (Object A)
     object_b -> angular_velocity = vector3_addition (object_b -> angular_velocity, math3_multiplication_vector3 (object_b -> inverse_inertia_system, b_angular_impulse)); //Delta angular_v + current_angualr_v = final angular_v (Object B)
     //Correct Position Change Values (FPU error, results in sinking of objects into each other)
-    const float error_correction_percent = 0.2; //20% correction per frame and motion calculated
-    const float penetration_allowance_slop = 0.01; //Allowance for object overlap (penetration, sinking)
-    //Correction: Push back each proportion by a certain amount (20%) for each "sink"
-    if (inverse_mass_sum <= 0.0) {return;}
-    vector3 position_correction = vector3_scaling (collision -> normal_vector, (fmaxf (collision -> penetration_contact - penetration_allowance_slop, 0.0)) / inverse_mass_sum * error_correction_percent);
+    const float error_correction_percent = 0.2f; //20% correction per frame and motion calculated
+    const float penetration_allowance_slop = 0.01f; //Allowance for object overlap (penetration, sinking)
+    //Correction: Push back proportions by 20% for dropping beneath mesh
+    if (inverse_mass_sum <= 0.0f) {return;}
+    vector3 position_correction = vector3_scaling (collision -> normal_vector, (fmaxf (collision -> penetration_contact - penetration_allowance_slop, 0.0f)) / inverse_mass_sum * error_correction_percent);
     object_a -> position = vector3_subtraction (object_a -> position, vector3_scaling (position_correction, object_a -> inverse_mass));
     object_b -> position = vector3_addition (object_b -> position, vector3_scaling (position_correction, object_b -> inverse_mass));
 }

@@ -9,8 +9,8 @@ void boundary_apply_floor (rigidbody *rigid_body, float floor_y_coordinate) {
         if (rigid_body -> velocity.y < 0) {
             rigid_body -> velocity.y = -rigid_body -> velocity.y * rigid_body -> restitution;
             // Dampen horizontal velocity --> torque generated friction
-            rigid_body -> velocity.x *= 0.98;
-            rigid_body -> velocity.z *= 0.98;
+            rigid_body -> velocity.x *= 0.98f;
+            rigid_body -> velocity.z *= 0.98f;
         } // Dampen angular velocity on collision --> torques
         rigid_body -> angular_velocity = vector3_scaling (rigid_body -> angular_velocity, 0.98f);
     }

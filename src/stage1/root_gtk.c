@@ -29,7 +29,7 @@ int main_algorithm (int argc, char *argv []) {
     g_setenv ("GDK_BACKEND", "x11", FALSE);
     gtk_init (&argc, &argv);
     //Camera Init
-    initalise_camera (&main_camera_fov, (vector3) {0.0, 20.0, 50.0});
+    initalise_camera (&main_camera_fov, (vector3) {0.0f, 20.0f, 50.0f});
     initialise_input (&main_inputs);
     //Widgeting
     GtkWidget *main_window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
@@ -61,13 +61,10 @@ int main_algorithm (int argc, char *argv []) {
 } int main (int argc, char *argv []) {
     main_algorithm (argc, argv);
     return 0;
-}
-
-//How to Pass Camera FOV View to GPU
+} //How to Pass Camera FOV View to GPU
 // Inside render loop
 //float view_matrix [16];
 //camera_get_view_matrix (&my_camera, view_matrix);
-
 // Send it to shader unit
 //GLuint viewLoc = glGetUniformLocation (shader_program, "view");
 //glUniformMatrix4fv (viewLoc, 1, GL_FALSE, view_matrix);

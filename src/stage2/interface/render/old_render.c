@@ -7,11 +7,11 @@ extern int object_count;
 void render_scene_current (int widget_width, int widget_height) {
     //Setup View angle, Viewport, etc
     glViewport (0, 0, widget_width, widget_height);
-    glClearColor (0.05, 0.05, 0.1, 1.0); //Dark Blue Background, Can be changed later
+    glClearColor (0.05f, 0.05f, 0.1f, 1.0f); //Dark Blue Background, Can be changed later
     glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     //Project Setup
     float aspect_ratio = (float) (widget_width) / (float) (widget_height); //9 / 16, 10 / 16, 3 / 4, etc
-    math3 projection_matrix = calculate_perspective (degrad * 45.0, aspect_ratio, 0.1, 1000.0);
+    math3 projection_matrix = calculate_perspective (degrad * 45.0f, aspect_ratio, 0.1f, 1000.0f);
     //Draw every single object in current buffer
     for (int object_index = 0; object_index < object_count; object_index++) {
         rigidbody *rigid_body = &obj_per_scene [object_index];
