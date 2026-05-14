@@ -52,13 +52,23 @@ void initialise_input (input_status *input_state) {
     } // Spawner Menu Navigation
     if (input_state -> spawner_menu_level == 1) {
         if (event -> keyval == GDK_KEY_1) {input_state -> spawner_menu_level = 2;} // Sphere
-    } else if (input_state -> spawner_menu_level == 2) {
+        if (event -> keyval == GDK_KEY_2) {input_state -> spawner_menu_level = 5;} // Cube  (NEW)
+    } else if (input_state -> spawner_menu_level == 2) {  // Sphere submenu
         if (event -> keyval == GDK_KEY_1) {input_state -> spawner_menu_level = 3;} // Mass
         if (event -> keyval == GDK_KEY_2) {input_state -> spawner_menu_level = 4;} // Radius
+    } else if (input_state -> spawner_menu_level == 5) {  // Cube submenu (NEW)
+        if (event -> keyval == GDK_KEY_1) {input_state -> spawner_menu_level = 6;} // Mass
+        if (event -> keyval == GDK_KEY_2) {input_state -> spawner_menu_level = 7;} // Size
     } else if (input_state -> spawner_menu_level == 3 || input_state -> spawner_menu_level == 4) {
+        // Sphere settings
         if (event -> keyval == GDK_KEY_Up)   {input_state -> up_arrow_pressed = true;}
         if (event -> keyval == GDK_KEY_Down) {input_state -> down_arrow_pressed = true;}
-        if (event -> keyval == GDK_KEY_Return || event -> keyval == GDK_KEY_KP_Enter) {input_state -> enter_key_pressed = true;}
+        if ((event -> keyval == GDK_KEY_Return) || (event -> keyval == GDK_KEY_KP_Enter)) {input_state -> enter_key_pressed = true;}
+    } else if (input_state -> spawner_menu_level == 6 || input_state -> spawner_menu_level == 7) {
+        // Cube settings (NEW)
+        if (event -> keyval == GDK_KEY_Up)   {input_state -> up_arrow_pressed = true;}
+        if (event -> keyval == GDK_KEY_Down) {input_state -> down_arrow_pressed = true;}
+        if ((event -> keyval == GDK_KEY_Return) || (event -> keyval == GDK_KEY_KP_Enter)) {input_state -> enter_key_pressed = true;}
     } // Velocity Menu Navigation (Renamed to User Mechanics)
     if (input_state -> velocity_menu_level == 1) {
         if (event -> keyval == GDK_KEY_1) {input_state -> velocity_menu_level = 2;} // Spawning Mechanics

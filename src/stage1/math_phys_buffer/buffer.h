@@ -4,6 +4,7 @@
 #ifndef buffer_h
 #define buffer_h
 //Structures required
+typedef enum { object_sphere, object_cube } object_type;
 typedef struct {
     //Linear Kinematics
     vector3 position, velocity, acceleration;
@@ -22,6 +23,10 @@ typedef struct {
     bool static_state; //If set to true object is naturally immobile
     float friction_static, friction_kinetic;
     vector3 colour;
+    //Type of object
+    object_type type;
+    //Cube Specific Variables
+    vector3 half_extensions;
 } rigidbody;
 //Init
 static void rigidbody_initialisation_sphere (rigidbody *rigid_body, float radius, float mass, vector3 position_input) {
@@ -130,6 +135,43 @@ static void rb_integrate (rigidbody *rigid_body, float delta_time, float drag_co
     rigid_body -> orientation.z += orientation_change_delta.z * 0.5f * delta_time;
     rigid_body -> orientation = vector4_normalisation (rigid_body -> orientation);
     //Clear accumilators of force and torque for next implementation
+    rigid_body -> force_accumilator = vector3_zero ();
+    rigid_body -> torque_accumilator = vector3_zero ();
+} static vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
+// Initialize a cube: Box, OBB
+static void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass) {
+    //Kinematic
+    rigid_body -> position = position_input;
+    rigid_body -> velocity = vector3_zero ();
+    rigid_body -> acceleration = vector3_zero ();
+    rigid_body -> orientation = vector4_identity ();
+    rigid_body -> angular_velocity = vector3_zero ();
+    rigid_body -> angular_acceleration = vector3_zero ();
+    rigid_body -> colour = (vector3) {1.0f, 0.4f, 0.2f};  // Orange-ish for cubes
+    //Dynamic
+    rigid_body -> mass = mass;
+    if (mass > 0) {rigid_body -> inverse_mass = 1.0f / mass;}
+    else {rigid_body -> inverse_mass = 0.0f;}
+    rigid_body -> half_extensions = half_extensions;
+    rigid_body -> restitution = 0.5f;
+    rigid_body -> static_state = (mass == 0);
+    rigid_body -> friction_static = 0.4f;
+    rigid_body -> friction_kinetic = 0.3f;
+    //Inertia Tensor for rectangular box: I = (m/12) * (h² + d², w² + d², w² + h²), nominal extension only for boxes
+    float width = half_extensions.x * 2.0f;  //full width
+    float height = half_extensions.y * 2.0f;  //full height
+    float depth = half_extensions.z * 2.0f;  //full depth
+    rigid_body -> inertia_tensor_local = (math3) {{{0}}};
+    rigid_body -> inertia_tensor_local.matrix[0][0] = (mass / 12.0f) * (height * height + depth * depth);
+    rigid_body -> inertia_tensor_local.matrix[1][1] = (mass / 12.0f) * (width * width + depth * depth);
+    rigid_body -> inertia_tensor_local.matrix[2][2] = (mass / 12.0f) * (width * width + height * height);
+    if (mass > 0) {
+        rigid_body -> inverse_inertia_tensor_local = math3_inverse (rigid_body -> inertia_tensor_local);
+        rigid_body -> inverse_inertia_system = rigid_body -> inverse_inertia_tensor_local;
+    } else {
+        rigid_body -> inverse_inertia_tensor_local = (math3) {{{0}}};
+        rigid_body -> inverse_inertia_system = (math3) {{{0}}};
+    } // Force & Torque accumulators
     rigid_body -> force_accumilator = vector3_zero ();
     rigid_body -> torque_accumilator = vector3_zero ();
 }

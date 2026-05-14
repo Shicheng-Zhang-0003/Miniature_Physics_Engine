@@ -9,7 +9,8 @@ SRCS = stage1/root_gtk.c \
        stage2/interface/render/shader_loading.c \
        stage2/interface/render/new_render.c \
        stage2/interface/sphere_object/meshing/sphere_meshing.c \
-       stage2/interface/gui/gui.c \
+       stage2/interface/sphere_object/meshing/cube_meshing.c \
+	   stage2/interface/gui/gui.c \
        stage3/boundary/boundary.c \
        stage3/scene/scene_init.c \
        stage3/timing_belt/frame_timer.c \

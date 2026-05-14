@@ -4,6 +4,7 @@
 #include "../../../stage5/rendering/wireframe.h"
 #include "../../../stage5/constraints/spring_joint.h"
 #include "../../interface/sphere_object/meshing/sphere_meshing.h"
+#include "../../interface/sphere_object/meshing/cube_meshing.h"
 #include "shader_loading.h"
 #include <complex.h>
 #include <epoxy/gl.h>
@@ -13,6 +14,7 @@
 extern camera main_camera_fov;
 extern rigidbody *obj_per_scene;
 extern int object_count;
+extern mesh cube_mesh;
 static GLuint shaders_program_total = 0;
 static struct {
     GLint projection_matrix_location;
@@ -95,6 +97,7 @@ void render_init () {
     shader_uniform_location_registry.light_position_location = glGetUniformLocation (shaders_program_total, "light_position");
     grid_init (&main_grid, 250, 5);
     init_sm_system (&sphere_mesh, 32, 32);
+    cube_meshing_init ();
     render_init_status = 1;
 } void render_scene_current (int widget_width, int widget_height) {
     render_init ();
@@ -125,7 +128,9 @@ void render_init () {
         //Model Matrix --> Position + Orientation
         math4 translation_matrix = math4_translation (rigid_body -> position);
         math4 rotation_matrix = vector4_to_math4 (rigid_body -> orientation);
-        math4 scale_matrix = math4_scaling ((vector3) {rigid_body -> radius, rigid_body -> radius, rigid_body -> radius});
+        math4 scale_matrix;
+        if (rigid_body -> type == object_sphere) {scale_matrix = math4_scaling ((vector3) {rigid_body -> radius, rigid_body -> radius, rigid_body -> radius});}
+        else {scale_matrix = math4_scaling (rigid_body -> half_extensions);}
         math4 model_matrix = math4_multiplication (translation_matrix, math4_multiplication (rotation_matrix, scale_matrix));
         float model_matrix_flat_array [16];
         math4_to_flat_array (model_matrix, model_matrix_flat_array);
@@ -141,9 +146,13 @@ void render_init () {
             for (int column_index = 0; column_index < 3; column_index++) {normal_matrix_flat_array [row_index * 3 + column_index] = normal_matrix.matrix [row_index][column_index];}
         } glUniformMatrix3fv (shader_uniform_location_registry.normal_matrix_location, 1, GL_FALSE, normal_matrix_flat_array);
         //Render Objects
-        render_sphere_object (&sphere_mesh, rigid_body);
-        //Draw Mesh Latitude and Longitudinal Lines (Rotational Visibility)
-        wireframe_render_object (shaders_program_total, view_matrix, projection_matrix, rigid_body, (vector3) {0.0f, 0.0f, 0.0f});
+                //Render Objects - Choose sphere or cube based on type
+        if (rigid_body -> type == object_sphere) {
+            render_sphere_object (&sphere_mesh, rigid_body);
+            wireframe_render_object (shaders_program_total, view_matrix, projection_matrix, rigid_body, (vector3) {0.0f, 0.0f, 0.0f});
+        } else if (rigid_body -> type == object_cube) {
+            render_cube_object (&cube_mesh, rigid_body);           // We'll add this function next
+        } //Draw Mesh Latitude and Longitudinal Lines (Rotational Visibility)
         /* Draw rotation axes for each object */ /* Makes the game far too laggy
         for (int step_axes = 0; step_axes < object_count; step_axes++) {
             draw_sphere_axes (&obj_per_scene [step_axes], projection_matrix_flat_array, view_matrix_flat_array);
