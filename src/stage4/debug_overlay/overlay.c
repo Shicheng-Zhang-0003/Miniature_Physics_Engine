@@ -69,10 +69,13 @@ GtkWidget *overlay_init (GtkWidget *gl_drawing_area_widget) {
         if (main_inputs.spawner_menu_level == 0) {gtk_widget_hide (spawner_menu_label);}
         else {
             char spawner_text [256];
-            if (main_inputs.spawner_menu_level == 1) {snprintf (spawner_text, sizeof (spawner_text), "-- Spawner Menu --\n1: Sphere\n2: Cube (coming soon)\n3: Rectangular Prism (coming soon)");}
+            if (main_inputs.spawner_menu_level == 1) {snprintf (spawner_text, sizeof (spawner_text), "-- Spawner Menu --\n1: Sphere\n2: Cube");}
             else if (main_inputs.spawner_menu_level == 2) {snprintf (spawner_text, sizeof (spawner_text), "-- Sphere Settings --\n1: Mass\n2: Radius");}
             else if (main_inputs.spawner_menu_level == 3) {snprintf (spawner_text, sizeof (spawner_text), "-- Mass Settings --\nCurrent Mass: %.2f kg\n\nUp/Down: +/- 0.01f\nEnter: Save and Close", spawn_mass);}
             else if (main_inputs.spawner_menu_level == 4) {snprintf (spawner_text, sizeof (spawner_text), "-- Radius Settings --\nCurrent Radius: %.2f m\n\nUp/Down: +/- 0.01f\nEnter: Save and Close", spawn_radius);}
+            else if (main_inputs.spawner_menu_level == 5) {snprintf (spawner_text, sizeof (spawner_text), "-- Cube Settings --\n1: Mass\n2: Size");}
+            else if (main_inputs.spawner_menu_level == 6) {snprintf (spawner_text, sizeof (spawner_text), "-- Cube Mass --\nCurrent Mass: %.2f kg\n\nUp/Down: +/- 0.01f\nEnter: Save and Close", spawn_mass);}
+            else if (main_inputs.spawner_menu_level == 7) {snprintf (spawner_text, sizeof (spawner_text), "-- Cube Size --\nCurrent Size: %.2f m\n\nUp/Down: +/- 0.01f\nEnter: Save and Close", spawn_radius);}
             gtk_label_set_text (GTK_LABEL (spawner_menu_label), spawner_text);
             gtk_widget_show (spawner_menu_label);
         }

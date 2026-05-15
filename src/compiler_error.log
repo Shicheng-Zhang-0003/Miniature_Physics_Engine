@@ -14,9 +14,15 @@ stage1/../stage2/../stage1/physics/forces/circular/circular_3D.h:4:13: warning: 
     4 | static void applicant_centripetal_vector3 (rigidbody *rigid_body, vector3 center_point, float centripetal_strength_modifier) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from stage1/../stage2/../stage1/master_header.h:7:
-stage1/../stage2/../stage1/physics/collision_mechanics/collision_mechanics.h:38:13: warning: ‘collision_resolve’ defined but not used [-Wunused-function]
-   38 | static void collision_resolve (collision_data *collision) {
+stage1/../stage2/../stage1/physics/collision_mechanics/collision_mechanics.h:188:13: warning: ‘collision_resolve’ defined but not used [-Wunused-function]
+  188 | static void collision_resolve (collision_data *collision) {
       |             ^~~~~~~~~~~~~~~~~
+stage1/../stage2/../stage1/physics/collision_mechanics/collision_mechanics.h:117:13: warning: ‘collision_dual_cube’ defined but not used [-Wunused-function]
+  117 | static bool collision_dual_cube (rigidbody *cube_a, rigidbody *cube_b, collision_data *collision_output_data) {
+      |             ^~~~~~~~~~~~~~~~~~~
+stage1/../stage2/../stage1/physics/collision_mechanics/collision_mechanics.h:55:13: warning: ‘collision_sphere_cube’ defined but not used [-Wunused-function]
+   55 | static bool collision_sphere_cube (rigidbody *sphere, rigidbody *cube, collision_data *collision_output_data) {
+      |             ^~~~~~~~~~~~~~~~~~~~~
 stage1/../stage2/../stage1/physics/collision_mechanics/collision_mechanics.h:16:13: warning: ‘collision_dual_sphere’ defined but not used [-Wunused-function]
    16 | static bool collision_dual_sphere (rigidbody *rigidbody_object_a, rigidbody *rigidbody_object_b, collision_data *collision_output_data) {
       |             ^~~~~~~~~~~~~~~~~~~~~
@@ -43,18 +49,21 @@ stage1/../stage2/../stage1/physics/collision_mechanics/../forces/defines_majorit
     9 | static void force_applicant_gravity_normal (rigidbody *rigid_body, vector3 gravitational_acceleration, vector3 surface_normal) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from stage1/../stage2/../stage1/master_header.h:6:
-stage1/../stage2/../stage1/math_phys_buffer/buffer.h:142:13: warning: ‘rigidbody_initialisation_cube’ defined but not used [-Wunused-function]
-  142 | static void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass) {
+stage1/../stage2/../stage1/math_phys_buffer/buffer.h:159:13: warning: ‘rigidbody_initialisation_cube’ defined but not used [-Wunused-function]
+  159 | static void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-stage1/../stage2/../stage1/math_phys_buffer/buffer.h:140:18: warning: ‘make_half_extents’ defined but not used [-Wunused-function]
-  140 | } static vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
+stage1/../stage2/../stage1/math_phys_buffer/buffer.h:157:18: warning: ‘make_half_extents’ defined but not used [-Wunused-function]
+  157 | } static vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
       |                  ^~~~~~~~~~~~~~~~~
-stage1/../stage2/../stage1/math_phys_buffer/buffer.h:104:13: warning: ‘rb_integrate’ defined but not used [-Wunused-function]
-  104 | static void rb_integrate (rigidbody *rigid_body, float delta_time, float drag_coefficient) {
+stage1/../stage2/../stage1/math_phys_buffer/buffer.h:121:13: warning: ‘rb_integrate’ defined but not used [-Wunused-function]
+  121 | static void rb_integrate (rigidbody *rigid_body, float delta_time, float drag_coefficient) {
       |             ^~~~~~~~~~~~
-stage1/../stage2/../stage1/math_phys_buffer/buffer.h:96:14: warning: ‘rb_get_kinetic_energy’ defined but not used [-Wunused-function]
-   96 | static float rb_get_kinetic_energy (rigidbody *rigid_body) {
+stage1/../stage2/../stage1/math_phys_buffer/buffer.h:113:14: warning: ‘rb_get_kinetic_energy’ defined but not used [-Wunused-function]
+  113 | static float rb_get_kinetic_energy (rigidbody *rigid_body) {
       |              ^~~~~~~~~~~~~~~~~~~~~
+stage1/../stage2/../stage1/math_phys_buffer/buffer.h:82:13: warning: ‘rigidbody_update_inertia_cube’ defined but not used [-Wunused-function]
+   82 | static void rigidbody_update_inertia_cube (rigidbody *rigid_body) {
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 stage1/../stage2/../stage1/math_phys_buffer/buffer.h:68:13: warning: ‘rigidbody_update_inertia_sphere’ defined but not used [-Wunused-function]
    68 | static void rigidbody_update_inertia_sphere (rigidbody *rigid_body) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -76,9 +85,15 @@ stage2/camera/../../stage1/physics/forces/circular/circular_3D.h:4:13: warning: 
     4 | static void applicant_centripetal_vector3 (rigidbody *rigid_body, vector3 center_point, float centripetal_strength_modifier) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from stage2/camera/../../stage1/master_header.h:7:
-stage2/camera/../../stage1/physics/collision_mechanics/collision_mechanics.h:38:13: warning: ‘collision_resolve’ defined but not used [-Wunused-function]
-   38 | static void collision_resolve (collision_data *collision) {
+stage2/camera/../../stage1/physics/collision_mechanics/collision_mechanics.h:188:13: warning: ‘collision_resolve’ defined but not used [-Wunused-function]
+  188 | static void collision_resolve (collision_data *collision) {
       |             ^~~~~~~~~~~~~~~~~
+stage2/camera/../../stage1/physics/collision_mechanics/collision_mechanics.h:117:13: warning: ‘collision_dual_cube’ defined but not used [-Wunused-function]
+  117 | static bool collision_dual_cube (rigidbody *cube_a, rigidbody *cube_b, collision_data *collision_output_data) {
+      |             ^~~~~~~~~~~~~~~~~~~
+stage2/camera/../../stage1/physics/collision_mechanics/collision_mechanics.h:55:13: warning: ‘collision_sphere_cube’ defined but not used [-Wunused-function]
+   55 | static bool collision_sphere_cube (rigidbody *sphere, rigidbody *cube, collision_data *collision_output_data) {
+      |             ^~~~~~~~~~~~~~~~~~~~~
 stage2/camera/../../stage1/physics/collision_mechanics/collision_mechanics.h:16:13: warning: ‘collision_dual_sphere’ defined but not used [-Wunused-function]
    16 | static bool collision_dual_sphere (rigidbody *rigidbody_object_a, rigidbody *rigidbody_object_b, collision_data *collision_output_data) {
       |             ^~~~~~~~~~~~~~~~~~~~~
@@ -105,18 +120,21 @@ stage2/camera/../../stage1/physics/collision_mechanics/../forces/defines_majorit
     9 | static void force_applicant_gravity_normal (rigidbody *rigid_body, vector3 gravitational_acceleration, vector3 surface_normal) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from stage2/camera/../../stage1/master_header.h:6:
-stage2/camera/../../stage1/math_phys_buffer/buffer.h:142:13: warning: ‘rigidbody_initialisation_cube’ defined but not used [-Wunused-function]
-  142 | static void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass) {
+stage2/camera/../../stage1/math_phys_buffer/buffer.h:159:13: warning: ‘rigidbody_initialisation_cube’ defined but not used [-Wunused-function]
+  159 | static void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-stage2/camera/../../stage1/math_phys_buffer/buffer.h:140:18: warning: ‘make_half_extents’ defined but not used [-Wunused-function]
-  140 | } static vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
+stage2/camera/../../stage1/math_phys_buffer/buffer.h:157:18: warning: ‘make_half_extents’ defined but not used [-Wunused-function]
+  157 | } static vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
       |                  ^~~~~~~~~~~~~~~~~
-stage2/camera/../../stage1/math_phys_buffer/buffer.h:104:13: warning: ‘rb_integrate’ defined but not used [-Wunused-function]
-  104 | static void rb_integrate (rigidbody *rigid_body, float delta_time, float drag_coefficient) {
+stage2/camera/../../stage1/math_phys_buffer/buffer.h:121:13: warning: ‘rb_integrate’ defined but not used [-Wunused-function]
+  121 | static void rb_integrate (rigidbody *rigid_body, float delta_time, float drag_coefficient) {
       |             ^~~~~~~~~~~~
-stage2/camera/../../stage1/math_phys_buffer/buffer.h:96:14: warning: ‘rb_get_kinetic_energy’ defined but not used [-Wunused-function]
-   96 | static float rb_get_kinetic_energy (rigidbody *rigid_body) {
+stage2/camera/../../stage1/math_phys_buffer/buffer.h:113:14: warning: ‘rb_get_kinetic_energy’ defined but not used [-Wunused-function]
+  113 | static float rb_get_kinetic_energy (rigidbody *rigid_body) {
       |              ^~~~~~~~~~~~~~~~~~~~~
+stage2/camera/../../stage1/math_phys_buffer/buffer.h:82:13: warning: ‘rigidbody_update_inertia_cube’ defined but not used [-Wunused-function]
+   82 | static void rigidbody_update_inertia_cube (rigidbody *rigid_body) {
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 stage2/camera/../../stage1/math_phys_buffer/buffer.h:68:13: warning: ‘rigidbody_update_inertia_sphere’ defined but not used [-Wunused-function]
    68 | static void rigidbody_update_inertia_sphere (rigidbody *rigid_body) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -128,12 +146,12 @@ stage2/input_controller/input_control.c:38:36: warning: unused parameter ‘widg
    38 | } gboolean on_keypress (GtkWidget *widget, GdkEventKey *event, gpointer user_data_stored) {
       |                         ~~~~~~~~~~~^~~~~~
 stage2/input_controller/input_control.c: In function ‘on_key_released’:
-stage2/input_controller/input_control.c:105:40: warning: unused parameter ‘widget’ [-Wunused-parameter]
-  105 | } gboolean on_key_released (GtkWidget *widget, GdkEventKey *event, gpointer user_data_stored) {
+stage2/input_controller/input_control.c:106:40: warning: unused parameter ‘widget’ [-Wunused-parameter]
+  106 | } gboolean on_key_released (GtkWidget *widget, GdkEventKey *event, gpointer user_data_stored) {
       |                             ~~~~~~~~~~~^~~~~~
 stage2/input_controller/input_control.c: In function ‘on_button_release’:
-stage2/input_controller/input_control.c:152:42: warning: unused parameter ‘widget’ [-Wunused-parameter]
-  152 | } gboolean on_button_release (GtkWidget *widget, GdkEventButton *event, gpointer user_data_stored) {
+stage2/input_controller/input_control.c:154:42: warning: unused parameter ‘widget’ [-Wunused-parameter]
+  154 | } gboolean on_button_release (GtkWidget *widget, GdkEventButton *event, gpointer user_data_stored) {
       |                               ~~~~~~~~~~~^~~~~~
 In file included from stage2/input_controller/../camera/../../stage1/master_header.h:12,
                  from stage2/input_controller/../camera/camera.h:3,
@@ -151,9 +169,15 @@ stage2/input_controller/../camera/../../stage1/physics/forces/circular/circular_
     4 | static void applicant_centripetal_vector3 (rigidbody *rigid_body, vector3 center_point, float centripetal_strength_modifier) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from stage2/input_controller/../camera/../../stage1/master_header.h:7:
-stage2/input_controller/../camera/../../stage1/physics/collision_mechanics/collision_mechanics.h:38:13: warning: ‘collision_resolve’ defined but not used [-Wunused-function]
-   38 | static void collision_resolve (collision_data *collision) {
+stage2/input_controller/../camera/../../stage1/physics/collision_mechanics/collision_mechanics.h:188:13: warning: ‘collision_resolve’ defined but not used [-Wunused-function]
+  188 | static void collision_resolve (collision_data *collision) {
       |             ^~~~~~~~~~~~~~~~~
+stage2/input_controller/../camera/../../stage1/physics/collision_mechanics/collision_mechanics.h:117:13: warning: ‘collision_dual_cube’ defined but not used [-Wunused-function]
+  117 | static bool collision_dual_cube (rigidbody *cube_a, rigidbody *cube_b, collision_data *collision_output_data) {
+      |             ^~~~~~~~~~~~~~~~~~~
+stage2/input_controller/../camera/../../stage1/physics/collision_mechanics/collision_mechanics.h:55:13: warning: ‘collision_sphere_cube’ defined but not used [-Wunused-function]
+   55 | static bool collision_sphere_cube (rigidbody *sphere, rigidbody *cube, collision_data *collision_output_data) {
+      |             ^~~~~~~~~~~~~~~~~~~~~
 stage2/input_controller/../camera/../../stage1/physics/collision_mechanics/collision_mechanics.h:16:13: warning: ‘collision_dual_sphere’ defined but not used [-Wunused-function]
    16 | static bool collision_dual_sphere (rigidbody *rigidbody_object_a, rigidbody *rigidbody_object_b, collision_data *collision_output_data) {
       |             ^~~~~~~~~~~~~~~~~~~~~
@@ -180,18 +204,21 @@ stage2/input_controller/../camera/../../stage1/physics/collision_mechanics/../fo
     9 | static void force_applicant_gravity_normal (rigidbody *rigid_body, vector3 gravitational_acceleration, vector3 surface_normal) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from stage2/input_controller/../camera/../../stage1/master_header.h:6:
-stage2/input_controller/../camera/../../stage1/math_phys_buffer/buffer.h:142:13: warning: ‘rigidbody_initialisation_cube’ defined but not used [-Wunused-function]
-  142 | static void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass) {
+stage2/input_controller/../camera/../../stage1/math_phys_buffer/buffer.h:159:13: warning: ‘rigidbody_initialisation_cube’ defined but not used [-Wunused-function]
+  159 | static void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-stage2/input_controller/../camera/../../stage1/math_phys_buffer/buffer.h:140:18: warning: ‘make_half_extents’ defined but not used [-Wunused-function]
-  140 | } static vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
+stage2/input_controller/../camera/../../stage1/math_phys_buffer/buffer.h:157:18: warning: ‘make_half_extents’ defined but not used [-Wunused-function]
+  157 | } static vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
       |                  ^~~~~~~~~~~~~~~~~
-stage2/input_controller/../camera/../../stage1/math_phys_buffer/buffer.h:104:13: warning: ‘rb_integrate’ defined but not used [-Wunused-function]
-  104 | static void rb_integrate (rigidbody *rigid_body, float delta_time, float drag_coefficient) {
+stage2/input_controller/../camera/../../stage1/math_phys_buffer/buffer.h:121:13: warning: ‘rb_integrate’ defined but not used [-Wunused-function]
+  121 | static void rb_integrate (rigidbody *rigid_body, float delta_time, float drag_coefficient) {
       |             ^~~~~~~~~~~~
-stage2/input_controller/../camera/../../stage1/math_phys_buffer/buffer.h:96:14: warning: ‘rb_get_kinetic_energy’ defined but not used [-Wunused-function]
-   96 | static float rb_get_kinetic_energy (rigidbody *rigid_body) {
+stage2/input_controller/../camera/../../stage1/math_phys_buffer/buffer.h:113:14: warning: ‘rb_get_kinetic_energy’ defined but not used [-Wunused-function]
+  113 | static float rb_get_kinetic_energy (rigidbody *rigid_body) {
       |              ^~~~~~~~~~~~~~~~~~~~~
+stage2/input_controller/../camera/../../stage1/math_phys_buffer/buffer.h:82:13: warning: ‘rigidbody_update_inertia_cube’ defined but not used [-Wunused-function]
+   82 | static void rigidbody_update_inertia_cube (rigidbody *rigid_body) {
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 stage2/input_controller/../camera/../../stage1/math_phys_buffer/buffer.h:68:13: warning: ‘rigidbody_update_inertia_sphere’ defined but not used [-Wunused-function]
    68 | static void rigidbody_update_inertia_sphere (rigidbody *rigid_body) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -230,15 +257,18 @@ stage2/interface/simulate/../../../stage1/physics/collision_mechanics/../forces/
    23 | static void force_applicant_universal_gravity (rigidbody *rigid_body_a, rigidbody *rigid_body_b) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from stage2/interface/simulate/../../../stage1/master_header.h:6:
-stage2/interface/simulate/../../../stage1/math_phys_buffer/buffer.h:142:13: warning: ‘rigidbody_initialisation_cube’ defined but not used [-Wunused-function]
-  142 | static void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass) {
+stage2/interface/simulate/../../../stage1/math_phys_buffer/buffer.h:159:13: warning: ‘rigidbody_initialisation_cube’ defined but not used [-Wunused-function]
+  159 | static void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-stage2/interface/simulate/../../../stage1/math_phys_buffer/buffer.h:140:18: warning: ‘make_half_extents’ defined but not used [-Wunused-function]
-  140 | } static vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
+stage2/interface/simulate/../../../stage1/math_phys_buffer/buffer.h:157:18: warning: ‘make_half_extents’ defined but not used [-Wunused-function]
+  157 | } static vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
       |                  ^~~~~~~~~~~~~~~~~
-stage2/interface/simulate/../../../stage1/math_phys_buffer/buffer.h:96:14: warning: ‘rb_get_kinetic_energy’ defined but not used [-Wunused-function]
-   96 | static float rb_get_kinetic_energy (rigidbody *rigid_body) {
+stage2/interface/simulate/../../../stage1/math_phys_buffer/buffer.h:113:14: warning: ‘rb_get_kinetic_energy’ defined but not used [-Wunused-function]
+  113 | static float rb_get_kinetic_energy (rigidbody *rigid_body) {
       |              ^~~~~~~~~~~~~~~~~~~~~
+stage2/interface/simulate/../../../stage1/math_phys_buffer/buffer.h:82:13: warning: ‘rigidbody_update_inertia_cube’ defined but not used [-Wunused-function]
+   82 | static void rigidbody_update_inertia_cube (rigidbody *rigid_body) {
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 stage2/interface/simulate/../../../stage1/math_phys_buffer/buffer.h:32:13: warning: ‘rigidbody_initialisation_sphere’ defined but not used [-Wunused-function]
    32 | static void rigidbody_initialisation_sphere (rigidbody *rigid_body, float radius, float mass, vector3 position_input) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -256,9 +286,15 @@ stage2/interface/render/../../../stage1/physics/forces/circular/circular_3D.h:4:
     4 | static void applicant_centripetal_vector3 (rigidbody *rigid_body, vector3 center_point, float centripetal_strength_modifier) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from stage2/interface/render/../../../stage1/master_header.h:7:
-stage2/interface/render/../../../stage1/physics/collision_mechanics/collision_mechanics.h:38:13: warning: ‘collision_resolve’ defined but not used [-Wunused-function]
-   38 | static void collision_resolve (collision_data *collision) {
+stage2/interface/render/../../../stage1/physics/collision_mechanics/collision_mechanics.h:188:13: warning: ‘collision_resolve’ defined but not used [-Wunused-function]
+  188 | static void collision_resolve (collision_data *collision) {
       |             ^~~~~~~~~~~~~~~~~
+stage2/interface/render/../../../stage1/physics/collision_mechanics/collision_mechanics.h:117:13: warning: ‘collision_dual_cube’ defined but not used [-Wunused-function]
+  117 | static bool collision_dual_cube (rigidbody *cube_a, rigidbody *cube_b, collision_data *collision_output_data) {
+      |             ^~~~~~~~~~~~~~~~~~~
+stage2/interface/render/../../../stage1/physics/collision_mechanics/collision_mechanics.h:55:13: warning: ‘collision_sphere_cube’ defined but not used [-Wunused-function]
+   55 | static bool collision_sphere_cube (rigidbody *sphere, rigidbody *cube, collision_data *collision_output_data) {
+      |             ^~~~~~~~~~~~~~~~~~~~~
 stage2/interface/render/../../../stage1/physics/collision_mechanics/collision_mechanics.h:16:13: warning: ‘collision_dual_sphere’ defined but not used [-Wunused-function]
    16 | static bool collision_dual_sphere (rigidbody *rigidbody_object_a, rigidbody *rigidbody_object_b, collision_data *collision_output_data) {
       |             ^~~~~~~~~~~~~~~~~~~~~
@@ -285,18 +321,21 @@ stage2/interface/render/../../../stage1/physics/collision_mechanics/../forces/de
     9 | static void force_applicant_gravity_normal (rigidbody *rigid_body, vector3 gravitational_acceleration, vector3 surface_normal) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from stage2/interface/render/../../../stage1/master_header.h:6:
-stage2/interface/render/../../../stage1/math_phys_buffer/buffer.h:142:13: warning: ‘rigidbody_initialisation_cube’ defined but not used [-Wunused-function]
-  142 | static void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass) {
+stage2/interface/render/../../../stage1/math_phys_buffer/buffer.h:159:13: warning: ‘rigidbody_initialisation_cube’ defined but not used [-Wunused-function]
+  159 | static void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-stage2/interface/render/../../../stage1/math_phys_buffer/buffer.h:140:18: warning: ‘make_half_extents’ defined but not used [-Wunused-function]
-  140 | } static vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
+stage2/interface/render/../../../stage1/math_phys_buffer/buffer.h:157:18: warning: ‘make_half_extents’ defined but not used [-Wunused-function]
+  157 | } static vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
       |                  ^~~~~~~~~~~~~~~~~
-stage2/interface/render/../../../stage1/math_phys_buffer/buffer.h:104:13: warning: ‘rb_integrate’ defined but not used [-Wunused-function]
-  104 | static void rb_integrate (rigidbody *rigid_body, float delta_time, float drag_coefficient) {
+stage2/interface/render/../../../stage1/math_phys_buffer/buffer.h:121:13: warning: ‘rb_integrate’ defined but not used [-Wunused-function]
+  121 | static void rb_integrate (rigidbody *rigid_body, float delta_time, float drag_coefficient) {
       |             ^~~~~~~~~~~~
-stage2/interface/render/../../../stage1/math_phys_buffer/buffer.h:96:14: warning: ‘rb_get_kinetic_energy’ defined but not used [-Wunused-function]
-   96 | static float rb_get_kinetic_energy (rigidbody *rigid_body) {
+stage2/interface/render/../../../stage1/math_phys_buffer/buffer.h:113:14: warning: ‘rb_get_kinetic_energy’ defined but not used [-Wunused-function]
+  113 | static float rb_get_kinetic_energy (rigidbody *rigid_body) {
       |              ^~~~~~~~~~~~~~~~~~~~~
+stage2/interface/render/../../../stage1/math_phys_buffer/buffer.h:82:13: warning: ‘rigidbody_update_inertia_cube’ defined but not used [-Wunused-function]
+   82 | static void rigidbody_update_inertia_cube (rigidbody *rigid_body) {
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 stage2/interface/render/../../../stage1/math_phys_buffer/buffer.h:68:13: warning: ‘rigidbody_update_inertia_sphere’ defined but not used [-Wunused-function]
    68 | static void rigidbody_update_inertia_sphere (rigidbody *rigid_body) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -318,9 +357,15 @@ In file included from ./stage1/master_header.h:9:
     4 | static void applicant_centripetal_vector3 (rigidbody *rigid_body, vector3 center_point, float centripetal_strength_modifier) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from ./stage1/master_header.h:7:
-./stage1/physics/collision_mechanics/collision_mechanics.h:38:13: warning: ‘collision_resolve’ defined but not used [-Wunused-function]
-   38 | static void collision_resolve (collision_data *collision) {
+./stage1/physics/collision_mechanics/collision_mechanics.h:188:13: warning: ‘collision_resolve’ defined but not used [-Wunused-function]
+  188 | static void collision_resolve (collision_data *collision) {
       |             ^~~~~~~~~~~~~~~~~
+./stage1/physics/collision_mechanics/collision_mechanics.h:117:13: warning: ‘collision_dual_cube’ defined but not used [-Wunused-function]
+  117 | static bool collision_dual_cube (rigidbody *cube_a, rigidbody *cube_b, collision_data *collision_output_data) {
+      |             ^~~~~~~~~~~~~~~~~~~
+./stage1/physics/collision_mechanics/collision_mechanics.h:55:13: warning: ‘collision_sphere_cube’ defined but not used [-Wunused-function]
+   55 | static bool collision_sphere_cube (rigidbody *sphere, rigidbody *cube, collision_data *collision_output_data) {
+      |             ^~~~~~~~~~~~~~~~~~~~~
 ./stage1/physics/collision_mechanics/collision_mechanics.h:16:13: warning: ‘collision_dual_sphere’ defined but not used [-Wunused-function]
    16 | static bool collision_dual_sphere (rigidbody *rigidbody_object_a, rigidbody *rigidbody_object_b, collision_data *collision_output_data) {
       |             ^~~~~~~~~~~~~~~~~~~~~
@@ -347,18 +392,21 @@ In file included from ./stage1/physics/collision_mechanics/collision_mechanics.h
     9 | static void force_applicant_gravity_normal (rigidbody *rigid_body, vector3 gravitational_acceleration, vector3 surface_normal) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from ./stage1/master_header.h:6:
-./stage1/math_phys_buffer/buffer.h:142:13: warning: ‘rigidbody_initialisation_cube’ defined but not used [-Wunused-function]
-  142 | static void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass) {
+./stage1/math_phys_buffer/buffer.h:159:13: warning: ‘rigidbody_initialisation_cube’ defined but not used [-Wunused-function]
+  159 | static void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-./stage1/math_phys_buffer/buffer.h:140:18: warning: ‘make_half_extents’ defined but not used [-Wunused-function]
-  140 | } static vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
+./stage1/math_phys_buffer/buffer.h:157:18: warning: ‘make_half_extents’ defined but not used [-Wunused-function]
+  157 | } static vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
       |                  ^~~~~~~~~~~~~~~~~
-./stage1/math_phys_buffer/buffer.h:104:13: warning: ‘rb_integrate’ defined but not used [-Wunused-function]
-  104 | static void rb_integrate (rigidbody *rigid_body, float delta_time, float drag_coefficient) {
+./stage1/math_phys_buffer/buffer.h:121:13: warning: ‘rb_integrate’ defined but not used [-Wunused-function]
+  121 | static void rb_integrate (rigidbody *rigid_body, float delta_time, float drag_coefficient) {
       |             ^~~~~~~~~~~~
-./stage1/math_phys_buffer/buffer.h:96:14: warning: ‘rb_get_kinetic_energy’ defined but not used [-Wunused-function]
-   96 | static float rb_get_kinetic_energy (rigidbody *rigid_body) {
+./stage1/math_phys_buffer/buffer.h:113:14: warning: ‘rb_get_kinetic_energy’ defined but not used [-Wunused-function]
+  113 | static float rb_get_kinetic_energy (rigidbody *rigid_body) {
       |              ^~~~~~~~~~~~~~~~~~~~~
+./stage1/math_phys_buffer/buffer.h:82:13: warning: ‘rigidbody_update_inertia_cube’ defined but not used [-Wunused-function]
+   82 | static void rigidbody_update_inertia_cube (rigidbody *rigid_body) {
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ./stage1/math_phys_buffer/buffer.h:68:13: warning: ‘rigidbody_update_inertia_sphere’ defined but not used [-Wunused-function]
    68 | static void rigidbody_update_inertia_sphere (rigidbody *rigid_body) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -381,9 +429,15 @@ In file included from ./stage1/master_header.h:9:
     4 | static void applicant_centripetal_vector3 (rigidbody *rigid_body, vector3 center_point, float centripetal_strength_modifier) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from ./stage1/master_header.h:7:
-./stage1/physics/collision_mechanics/collision_mechanics.h:38:13: warning: ‘collision_resolve’ defined but not used [-Wunused-function]
-   38 | static void collision_resolve (collision_data *collision) {
+./stage1/physics/collision_mechanics/collision_mechanics.h:188:13: warning: ‘collision_resolve’ defined but not used [-Wunused-function]
+  188 | static void collision_resolve (collision_data *collision) {
       |             ^~~~~~~~~~~~~~~~~
+./stage1/physics/collision_mechanics/collision_mechanics.h:117:13: warning: ‘collision_dual_cube’ defined but not used [-Wunused-function]
+  117 | static bool collision_dual_cube (rigidbody *cube_a, rigidbody *cube_b, collision_data *collision_output_data) {
+      |             ^~~~~~~~~~~~~~~~~~~
+./stage1/physics/collision_mechanics/collision_mechanics.h:55:13: warning: ‘collision_sphere_cube’ defined but not used [-Wunused-function]
+   55 | static bool collision_sphere_cube (rigidbody *sphere, rigidbody *cube, collision_data *collision_output_data) {
+      |             ^~~~~~~~~~~~~~~~~~~~~
 ./stage1/physics/collision_mechanics/collision_mechanics.h:16:13: warning: ‘collision_dual_sphere’ defined but not used [-Wunused-function]
    16 | static bool collision_dual_sphere (rigidbody *rigidbody_object_a, rigidbody *rigidbody_object_b, collision_data *collision_output_data) {
       |             ^~~~~~~~~~~~~~~~~~~~~
@@ -410,18 +464,21 @@ In file included from ./stage1/physics/collision_mechanics/collision_mechanics.h
     9 | static void force_applicant_gravity_normal (rigidbody *rigid_body, vector3 gravitational_acceleration, vector3 surface_normal) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from ./stage1/master_header.h:6:
-./stage1/math_phys_buffer/buffer.h:142:13: warning: ‘rigidbody_initialisation_cube’ defined but not used [-Wunused-function]
-  142 | static void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass) {
+./stage1/math_phys_buffer/buffer.h:159:13: warning: ‘rigidbody_initialisation_cube’ defined but not used [-Wunused-function]
+  159 | static void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-./stage1/math_phys_buffer/buffer.h:140:18: warning: ‘make_half_extents’ defined but not used [-Wunused-function]
-  140 | } static vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
+./stage1/math_phys_buffer/buffer.h:157:18: warning: ‘make_half_extents’ defined but not used [-Wunused-function]
+  157 | } static vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
       |                  ^~~~~~~~~~~~~~~~~
-./stage1/math_phys_buffer/buffer.h:104:13: warning: ‘rb_integrate’ defined but not used [-Wunused-function]
-  104 | static void rb_integrate (rigidbody *rigid_body, float delta_time, float drag_coefficient) {
+./stage1/math_phys_buffer/buffer.h:121:13: warning: ‘rb_integrate’ defined but not used [-Wunused-function]
+  121 | static void rb_integrate (rigidbody *rigid_body, float delta_time, float drag_coefficient) {
       |             ^~~~~~~~~~~~
-./stage1/math_phys_buffer/buffer.h:96:14: warning: ‘rb_get_kinetic_energy’ defined but not used [-Wunused-function]
-   96 | static float rb_get_kinetic_energy (rigidbody *rigid_body) {
+./stage1/math_phys_buffer/buffer.h:113:14: warning: ‘rb_get_kinetic_energy’ defined but not used [-Wunused-function]
+  113 | static float rb_get_kinetic_energy (rigidbody *rigid_body) {
       |              ^~~~~~~~~~~~~~~~~~~~~
+./stage1/math_phys_buffer/buffer.h:82:13: warning: ‘rigidbody_update_inertia_cube’ defined but not used [-Wunused-function]
+   82 | static void rigidbody_update_inertia_cube (rigidbody *rigid_body) {
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ./stage1/math_phys_buffer/buffer.h:68:13: warning: ‘rigidbody_update_inertia_sphere’ defined but not used [-Wunused-function]
    68 | static void rigidbody_update_inertia_sphere (rigidbody *rigid_body) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -443,9 +500,15 @@ stage2/interface/gui/../../../stage1/physics/forces/circular/circular_3D.h:4:13:
     4 | static void applicant_centripetal_vector3 (rigidbody *rigid_body, vector3 center_point, float centripetal_strength_modifier) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from stage2/interface/gui/../../../stage1/master_header.h:7:
-stage2/interface/gui/../../../stage1/physics/collision_mechanics/collision_mechanics.h:38:13: warning: ‘collision_resolve’ defined but not used [-Wunused-function]
-   38 | static void collision_resolve (collision_data *collision) {
+stage2/interface/gui/../../../stage1/physics/collision_mechanics/collision_mechanics.h:188:13: warning: ‘collision_resolve’ defined but not used [-Wunused-function]
+  188 | static void collision_resolve (collision_data *collision) {
       |             ^~~~~~~~~~~~~~~~~
+stage2/interface/gui/../../../stage1/physics/collision_mechanics/collision_mechanics.h:117:13: warning: ‘collision_dual_cube’ defined but not used [-Wunused-function]
+  117 | static bool collision_dual_cube (rigidbody *cube_a, rigidbody *cube_b, collision_data *collision_output_data) {
+      |             ^~~~~~~~~~~~~~~~~~~
+stage2/interface/gui/../../../stage1/physics/collision_mechanics/collision_mechanics.h:55:13: warning: ‘collision_sphere_cube’ defined but not used [-Wunused-function]
+   55 | static bool collision_sphere_cube (rigidbody *sphere, rigidbody *cube, collision_data *collision_output_data) {
+      |             ^~~~~~~~~~~~~~~~~~~~~
 stage2/interface/gui/../../../stage1/physics/collision_mechanics/collision_mechanics.h:16:13: warning: ‘collision_dual_sphere’ defined but not used [-Wunused-function]
    16 | static bool collision_dual_sphere (rigidbody *rigidbody_object_a, rigidbody *rigidbody_object_b, collision_data *collision_output_data) {
       |             ^~~~~~~~~~~~~~~~~~~~~
@@ -472,18 +535,21 @@ stage2/interface/gui/../../../stage1/physics/collision_mechanics/../forces/defin
     9 | static void force_applicant_gravity_normal (rigidbody *rigid_body, vector3 gravitational_acceleration, vector3 surface_normal) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from stage2/interface/gui/../../../stage1/master_header.h:6:
-stage2/interface/gui/../../../stage1/math_phys_buffer/buffer.h:142:13: warning: ‘rigidbody_initialisation_cube’ defined but not used [-Wunused-function]
-  142 | static void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass) {
+stage2/interface/gui/../../../stage1/math_phys_buffer/buffer.h:159:13: warning: ‘rigidbody_initialisation_cube’ defined but not used [-Wunused-function]
+  159 | static void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-stage2/interface/gui/../../../stage1/math_phys_buffer/buffer.h:140:18: warning: ‘make_half_extents’ defined but not used [-Wunused-function]
-  140 | } static vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
+stage2/interface/gui/../../../stage1/math_phys_buffer/buffer.h:157:18: warning: ‘make_half_extents’ defined but not used [-Wunused-function]
+  157 | } static vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
       |                  ^~~~~~~~~~~~~~~~~
-stage2/interface/gui/../../../stage1/math_phys_buffer/buffer.h:104:13: warning: ‘rb_integrate’ defined but not used [-Wunused-function]
-  104 | static void rb_integrate (rigidbody *rigid_body, float delta_time, float drag_coefficient) {
+stage2/interface/gui/../../../stage1/math_phys_buffer/buffer.h:121:13: warning: ‘rb_integrate’ defined but not used [-Wunused-function]
+  121 | static void rb_integrate (rigidbody *rigid_body, float delta_time, float drag_coefficient) {
       |             ^~~~~~~~~~~~
-stage2/interface/gui/../../../stage1/math_phys_buffer/buffer.h:96:14: warning: ‘rb_get_kinetic_energy’ defined but not used [-Wunused-function]
-   96 | static float rb_get_kinetic_energy (rigidbody *rigid_body) {
+stage2/interface/gui/../../../stage1/math_phys_buffer/buffer.h:113:14: warning: ‘rb_get_kinetic_energy’ defined but not used [-Wunused-function]
+  113 | static float rb_get_kinetic_energy (rigidbody *rigid_body) {
       |              ^~~~~~~~~~~~~~~~~~~~~
+stage2/interface/gui/../../../stage1/math_phys_buffer/buffer.h:82:13: warning: ‘rigidbody_update_inertia_cube’ defined but not used [-Wunused-function]
+   82 | static void rigidbody_update_inertia_cube (rigidbody *rigid_body) {
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 stage2/interface/gui/../../../stage1/math_phys_buffer/buffer.h:68:13: warning: ‘rigidbody_update_inertia_sphere’ defined but not used [-Wunused-function]
    68 | static void rigidbody_update_inertia_sphere (rigidbody *rigid_body) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -505,9 +571,15 @@ stage3/boundary/../../stage1/physics/forces/circular/circular_3D.h:4:13: warning
     4 | static void applicant_centripetal_vector3 (rigidbody *rigid_body, vector3 center_point, float centripetal_strength_modifier) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from stage3/boundary/../../stage1/master_header.h:7:
-stage3/boundary/../../stage1/physics/collision_mechanics/collision_mechanics.h:38:13: warning: ‘collision_resolve’ defined but not used [-Wunused-function]
-   38 | static void collision_resolve (collision_data *collision) {
+stage3/boundary/../../stage1/physics/collision_mechanics/collision_mechanics.h:188:13: warning: ‘collision_resolve’ defined but not used [-Wunused-function]
+  188 | static void collision_resolve (collision_data *collision) {
       |             ^~~~~~~~~~~~~~~~~
+stage3/boundary/../../stage1/physics/collision_mechanics/collision_mechanics.h:117:13: warning: ‘collision_dual_cube’ defined but not used [-Wunused-function]
+  117 | static bool collision_dual_cube (rigidbody *cube_a, rigidbody *cube_b, collision_data *collision_output_data) {
+      |             ^~~~~~~~~~~~~~~~~~~
+stage3/boundary/../../stage1/physics/collision_mechanics/collision_mechanics.h:55:13: warning: ‘collision_sphere_cube’ defined but not used [-Wunused-function]
+   55 | static bool collision_sphere_cube (rigidbody *sphere, rigidbody *cube, collision_data *collision_output_data) {
+      |             ^~~~~~~~~~~~~~~~~~~~~
 stage3/boundary/../../stage1/physics/collision_mechanics/collision_mechanics.h:16:13: warning: ‘collision_dual_sphere’ defined but not used [-Wunused-function]
    16 | static bool collision_dual_sphere (rigidbody *rigidbody_object_a, rigidbody *rigidbody_object_b, collision_data *collision_output_data) {
       |             ^~~~~~~~~~~~~~~~~~~~~
@@ -534,18 +606,21 @@ stage3/boundary/../../stage1/physics/collision_mechanics/../forces/defines_major
     9 | static void force_applicant_gravity_normal (rigidbody *rigid_body, vector3 gravitational_acceleration, vector3 surface_normal) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from stage3/boundary/../../stage1/master_header.h:6:
-stage3/boundary/../../stage1/math_phys_buffer/buffer.h:142:13: warning: ‘rigidbody_initialisation_cube’ defined but not used [-Wunused-function]
-  142 | static void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass) {
+stage3/boundary/../../stage1/math_phys_buffer/buffer.h:159:13: warning: ‘rigidbody_initialisation_cube’ defined but not used [-Wunused-function]
+  159 | static void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-stage3/boundary/../../stage1/math_phys_buffer/buffer.h:140:18: warning: ‘make_half_extents’ defined but not used [-Wunused-function]
-  140 | } static vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
+stage3/boundary/../../stage1/math_phys_buffer/buffer.h:157:18: warning: ‘make_half_extents’ defined but not used [-Wunused-function]
+  157 | } static vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
       |                  ^~~~~~~~~~~~~~~~~
-stage3/boundary/../../stage1/math_phys_buffer/buffer.h:104:13: warning: ‘rb_integrate’ defined but not used [-Wunused-function]
-  104 | static void rb_integrate (rigidbody *rigid_body, float delta_time, float drag_coefficient) {
+stage3/boundary/../../stage1/math_phys_buffer/buffer.h:121:13: warning: ‘rb_integrate’ defined but not used [-Wunused-function]
+  121 | static void rb_integrate (rigidbody *rigid_body, float delta_time, float drag_coefficient) {
       |             ^~~~~~~~~~~~
-stage3/boundary/../../stage1/math_phys_buffer/buffer.h:96:14: warning: ‘rb_get_kinetic_energy’ defined but not used [-Wunused-function]
-   96 | static float rb_get_kinetic_energy (rigidbody *rigid_body) {
+stage3/boundary/../../stage1/math_phys_buffer/buffer.h:113:14: warning: ‘rb_get_kinetic_energy’ defined but not used [-Wunused-function]
+  113 | static float rb_get_kinetic_energy (rigidbody *rigid_body) {
       |              ^~~~~~~~~~~~~~~~~~~~~
+stage3/boundary/../../stage1/math_phys_buffer/buffer.h:82:13: warning: ‘rigidbody_update_inertia_cube’ defined but not used [-Wunused-function]
+   82 | static void rigidbody_update_inertia_cube (rigidbody *rigid_body) {
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 stage3/boundary/../../stage1/math_phys_buffer/buffer.h:68:13: warning: ‘rigidbody_update_inertia_sphere’ defined but not used [-Wunused-function]
    68 | static void rigidbody_update_inertia_sphere (rigidbody *rigid_body) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -567,9 +642,15 @@ stage3/scene/../../stage1/physics/forces/circular/circular_3D.h:4:13: warning: �
     4 | static void applicant_centripetal_vector3 (rigidbody *rigid_body, vector3 center_point, float centripetal_strength_modifier) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from stage3/scene/../../stage1/master_header.h:7:
-stage3/scene/../../stage1/physics/collision_mechanics/collision_mechanics.h:38:13: warning: ‘collision_resolve’ defined but not used [-Wunused-function]
-   38 | static void collision_resolve (collision_data *collision) {
+stage3/scene/../../stage1/physics/collision_mechanics/collision_mechanics.h:188:13: warning: ‘collision_resolve’ defined but not used [-Wunused-function]
+  188 | static void collision_resolve (collision_data *collision) {
       |             ^~~~~~~~~~~~~~~~~
+stage3/scene/../../stage1/physics/collision_mechanics/collision_mechanics.h:117:13: warning: ‘collision_dual_cube’ defined but not used [-Wunused-function]
+  117 | static bool collision_dual_cube (rigidbody *cube_a, rigidbody *cube_b, collision_data *collision_output_data) {
+      |             ^~~~~~~~~~~~~~~~~~~
+stage3/scene/../../stage1/physics/collision_mechanics/collision_mechanics.h:55:13: warning: ‘collision_sphere_cube’ defined but not used [-Wunused-function]
+   55 | static bool collision_sphere_cube (rigidbody *sphere, rigidbody *cube, collision_data *collision_output_data) {
+      |             ^~~~~~~~~~~~~~~~~~~~~
 stage3/scene/../../stage1/physics/collision_mechanics/collision_mechanics.h:16:13: warning: ‘collision_dual_sphere’ defined but not used [-Wunused-function]
    16 | static bool collision_dual_sphere (rigidbody *rigidbody_object_a, rigidbody *rigidbody_object_b, collision_data *collision_output_data) {
       |             ^~~~~~~~~~~~~~~~~~~~~
@@ -596,18 +677,21 @@ stage3/scene/../../stage1/physics/collision_mechanics/../forces/defines_majority
     9 | static void force_applicant_gravity_normal (rigidbody *rigid_body, vector3 gravitational_acceleration, vector3 surface_normal) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from stage3/scene/../../stage1/master_header.h:6:
-stage3/scene/../../stage1/math_phys_buffer/buffer.h:142:13: warning: ‘rigidbody_initialisation_cube’ defined but not used [-Wunused-function]
-  142 | static void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass) {
+stage3/scene/../../stage1/math_phys_buffer/buffer.h:159:13: warning: ‘rigidbody_initialisation_cube’ defined but not used [-Wunused-function]
+  159 | static void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-stage3/scene/../../stage1/math_phys_buffer/buffer.h:140:18: warning: ‘make_half_extents’ defined but not used [-Wunused-function]
-  140 | } static vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
+stage3/scene/../../stage1/math_phys_buffer/buffer.h:157:18: warning: ‘make_half_extents’ defined but not used [-Wunused-function]
+  157 | } static vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
       |                  ^~~~~~~~~~~~~~~~~
-stage3/scene/../../stage1/math_phys_buffer/buffer.h:104:13: warning: ‘rb_integrate’ defined but not used [-Wunused-function]
-  104 | static void rb_integrate (rigidbody *rigid_body, float delta_time, float drag_coefficient) {
+stage3/scene/../../stage1/math_phys_buffer/buffer.h:121:13: warning: ‘rb_integrate’ defined but not used [-Wunused-function]
+  121 | static void rb_integrate (rigidbody *rigid_body, float delta_time, float drag_coefficient) {
       |             ^~~~~~~~~~~~
-stage3/scene/../../stage1/math_phys_buffer/buffer.h:96:14: warning: ‘rb_get_kinetic_energy’ defined but not used [-Wunused-function]
-   96 | static float rb_get_kinetic_energy (rigidbody *rigid_body) {
+stage3/scene/../../stage1/math_phys_buffer/buffer.h:113:14: warning: ‘rb_get_kinetic_energy’ defined but not used [-Wunused-function]
+  113 | static float rb_get_kinetic_energy (rigidbody *rigid_body) {
       |              ^~~~~~~~~~~~~~~~~~~~~
+stage3/scene/../../stage1/math_phys_buffer/buffer.h:82:13: warning: ‘rigidbody_update_inertia_cube’ defined but not used [-Wunused-function]
+   82 | static void rigidbody_update_inertia_cube (rigidbody *rigid_body) {
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 stage3/scene/../../stage1/math_phys_buffer/buffer.h:68:13: warning: ‘rigidbody_update_inertia_sphere’ defined but not used [-Wunused-function]
    68 | static void rigidbody_update_inertia_sphere (rigidbody *rigid_body) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -626,9 +710,15 @@ stage4/interaction/spawner/../../../stage1/physics/forces/circular/circular_3D.h
     4 | static void applicant_centripetal_vector3 (rigidbody *rigid_body, vector3 center_point, float centripetal_strength_modifier) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from stage4/interaction/spawner/../../../stage1/master_header.h:7:
-stage4/interaction/spawner/../../../stage1/physics/collision_mechanics/collision_mechanics.h:38:13: warning: ‘collision_resolve’ defined but not used [-Wunused-function]
-   38 | static void collision_resolve (collision_data *collision) {
+stage4/interaction/spawner/../../../stage1/physics/collision_mechanics/collision_mechanics.h:188:13: warning: ‘collision_resolve’ defined but not used [-Wunused-function]
+  188 | static void collision_resolve (collision_data *collision) {
       |             ^~~~~~~~~~~~~~~~~
+stage4/interaction/spawner/../../../stage1/physics/collision_mechanics/collision_mechanics.h:117:13: warning: ‘collision_dual_cube’ defined but not used [-Wunused-function]
+  117 | static bool collision_dual_cube (rigidbody *cube_a, rigidbody *cube_b, collision_data *collision_output_data) {
+      |             ^~~~~~~~~~~~~~~~~~~
+stage4/interaction/spawner/../../../stage1/physics/collision_mechanics/collision_mechanics.h:55:13: warning: ‘collision_sphere_cube’ defined but not used [-Wunused-function]
+   55 | static bool collision_sphere_cube (rigidbody *sphere, rigidbody *cube, collision_data *collision_output_data) {
+      |             ^~~~~~~~~~~~~~~~~~~~~
 stage4/interaction/spawner/../../../stage1/physics/collision_mechanics/collision_mechanics.h:16:13: warning: ‘collision_dual_sphere’ defined but not used [-Wunused-function]
    16 | static bool collision_dual_sphere (rigidbody *rigidbody_object_a, rigidbody *rigidbody_object_b, collision_data *collision_output_data) {
       |             ^~~~~~~~~~~~~~~~~~~~~
@@ -655,15 +745,18 @@ stage4/interaction/spawner/../../../stage1/physics/collision_mechanics/../forces
     9 | static void force_applicant_gravity_normal (rigidbody *rigid_body, vector3 gravitational_acceleration, vector3 surface_normal) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from stage4/interaction/spawner/../../../stage1/master_header.h:6:
-stage4/interaction/spawner/../../../stage1/math_phys_buffer/buffer.h:140:18: warning: ‘make_half_extents’ defined but not used [-Wunused-function]
-  140 | } static vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
+stage4/interaction/spawner/../../../stage1/math_phys_buffer/buffer.h:157:18: warning: ‘make_half_extents’ defined but not used [-Wunused-function]
+  157 | } static vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
       |                  ^~~~~~~~~~~~~~~~~
-stage4/interaction/spawner/../../../stage1/math_phys_buffer/buffer.h:104:13: warning: ‘rb_integrate’ defined but not used [-Wunused-function]
-  104 | static void rb_integrate (rigidbody *rigid_body, float delta_time, float drag_coefficient) {
+stage4/interaction/spawner/../../../stage1/math_phys_buffer/buffer.h:121:13: warning: ‘rb_integrate’ defined but not used [-Wunused-function]
+  121 | static void rb_integrate (rigidbody *rigid_body, float delta_time, float drag_coefficient) {
       |             ^~~~~~~~~~~~
-stage4/interaction/spawner/../../../stage1/math_phys_buffer/buffer.h:96:14: warning: ‘rb_get_kinetic_energy’ defined but not used [-Wunused-function]
-   96 | static float rb_get_kinetic_energy (rigidbody *rigid_body) {
+stage4/interaction/spawner/../../../stage1/math_phys_buffer/buffer.h:113:14: warning: ‘rb_get_kinetic_energy’ defined but not used [-Wunused-function]
+  113 | static float rb_get_kinetic_energy (rigidbody *rigid_body) {
       |              ^~~~~~~~~~~~~~~~~~~~~
+stage4/interaction/spawner/../../../stage1/math_phys_buffer/buffer.h:82:13: warning: ‘rigidbody_update_inertia_cube’ defined but not used [-Wunused-function]
+   82 | static void rigidbody_update_inertia_cube (rigidbody *rigid_body) {
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 stage4/interaction/spawner/../../../stage1/math_phys_buffer/buffer.h:68:13: warning: ‘rigidbody_update_inertia_sphere’ defined but not used [-Wunused-function]
    68 | static void rigidbody_update_inertia_sphere (rigidbody *rigid_body) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -685,9 +778,15 @@ stage4/interaction/selector/../../../stage1/physics/forces/circular/circular_3D.
     4 | static void applicant_centripetal_vector3 (rigidbody *rigid_body, vector3 center_point, float centripetal_strength_modifier) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from stage4/interaction/selector/../../../stage1/master_header.h:7:
-stage4/interaction/selector/../../../stage1/physics/collision_mechanics/collision_mechanics.h:38:13: warning: ‘collision_resolve’ defined but not used [-Wunused-function]
-   38 | static void collision_resolve (collision_data *collision) {
+stage4/interaction/selector/../../../stage1/physics/collision_mechanics/collision_mechanics.h:188:13: warning: ‘collision_resolve’ defined but not used [-Wunused-function]
+  188 | static void collision_resolve (collision_data *collision) {
       |             ^~~~~~~~~~~~~~~~~
+stage4/interaction/selector/../../../stage1/physics/collision_mechanics/collision_mechanics.h:117:13: warning: ‘collision_dual_cube’ defined but not used [-Wunused-function]
+  117 | static bool collision_dual_cube (rigidbody *cube_a, rigidbody *cube_b, collision_data *collision_output_data) {
+      |             ^~~~~~~~~~~~~~~~~~~
+stage4/interaction/selector/../../../stage1/physics/collision_mechanics/collision_mechanics.h:55:13: warning: ‘collision_sphere_cube’ defined but not used [-Wunused-function]
+   55 | static bool collision_sphere_cube (rigidbody *sphere, rigidbody *cube, collision_data *collision_output_data) {
+      |             ^~~~~~~~~~~~~~~~~~~~~
 stage4/interaction/selector/../../../stage1/physics/collision_mechanics/collision_mechanics.h:16:13: warning: ‘collision_dual_sphere’ defined but not used [-Wunused-function]
    16 | static bool collision_dual_sphere (rigidbody *rigidbody_object_a, rigidbody *rigidbody_object_b, collision_data *collision_output_data) {
       |             ^~~~~~~~~~~~~~~~~~~~~
@@ -714,18 +813,21 @@ stage4/interaction/selector/../../../stage1/physics/collision_mechanics/../force
     9 | static void force_applicant_gravity_normal (rigidbody *rigid_body, vector3 gravitational_acceleration, vector3 surface_normal) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from stage4/interaction/selector/../../../stage1/master_header.h:6:
-stage4/interaction/selector/../../../stage1/math_phys_buffer/buffer.h:142:13: warning: ‘rigidbody_initialisation_cube’ defined but not used [-Wunused-function]
-  142 | static void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass) {
+stage4/interaction/selector/../../../stage1/math_phys_buffer/buffer.h:159:13: warning: ‘rigidbody_initialisation_cube’ defined but not used [-Wunused-function]
+  159 | static void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-stage4/interaction/selector/../../../stage1/math_phys_buffer/buffer.h:140:18: warning: ‘make_half_extents’ defined but not used [-Wunused-function]
-  140 | } static vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
+stage4/interaction/selector/../../../stage1/math_phys_buffer/buffer.h:157:18: warning: ‘make_half_extents’ defined but not used [-Wunused-function]
+  157 | } static vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
       |                  ^~~~~~~~~~~~~~~~~
-stage4/interaction/selector/../../../stage1/math_phys_buffer/buffer.h:104:13: warning: ‘rb_integrate’ defined but not used [-Wunused-function]
-  104 | static void rb_integrate (rigidbody *rigid_body, float delta_time, float drag_coefficient) {
+stage4/interaction/selector/../../../stage1/math_phys_buffer/buffer.h:121:13: warning: ‘rb_integrate’ defined but not used [-Wunused-function]
+  121 | static void rb_integrate (rigidbody *rigid_body, float delta_time, float drag_coefficient) {
       |             ^~~~~~~~~~~~
-stage4/interaction/selector/../../../stage1/math_phys_buffer/buffer.h:96:14: warning: ‘rb_get_kinetic_energy’ defined but not used [-Wunused-function]
-   96 | static float rb_get_kinetic_energy (rigidbody *rigid_body) {
+stage4/interaction/selector/../../../stage1/math_phys_buffer/buffer.h:113:14: warning: ‘rb_get_kinetic_energy’ defined but not used [-Wunused-function]
+  113 | static float rb_get_kinetic_energy (rigidbody *rigid_body) {
       |              ^~~~~~~~~~~~~~~~~~~~~
+stage4/interaction/selector/../../../stage1/math_phys_buffer/buffer.h:82:13: warning: ‘rigidbody_update_inertia_cube’ defined but not used [-Wunused-function]
+   82 | static void rigidbody_update_inertia_cube (rigidbody *rigid_body) {
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 stage4/interaction/selector/../../../stage1/math_phys_buffer/buffer.h:68:13: warning: ‘rigidbody_update_inertia_sphere’ defined but not used [-Wunused-function]
    68 | static void rigidbody_update_inertia_sphere (rigidbody *rigid_body) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -747,9 +849,15 @@ stage4/broadphase/../../stage1/physics/forces/circular/circular_3D.h:4:13: warni
     4 | static void applicant_centripetal_vector3 (rigidbody *rigid_body, vector3 center_point, float centripetal_strength_modifier) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from stage4/broadphase/../../stage1/master_header.h:7:
-stage4/broadphase/../../stage1/physics/collision_mechanics/collision_mechanics.h:38:13: warning: ‘collision_resolve’ defined but not used [-Wunused-function]
-   38 | static void collision_resolve (collision_data *collision) {
+stage4/broadphase/../../stage1/physics/collision_mechanics/collision_mechanics.h:188:13: warning: ‘collision_resolve’ defined but not used [-Wunused-function]
+  188 | static void collision_resolve (collision_data *collision) {
       |             ^~~~~~~~~~~~~~~~~
+stage4/broadphase/../../stage1/physics/collision_mechanics/collision_mechanics.h:117:13: warning: ‘collision_dual_cube’ defined but not used [-Wunused-function]
+  117 | static bool collision_dual_cube (rigidbody *cube_a, rigidbody *cube_b, collision_data *collision_output_data) {
+      |             ^~~~~~~~~~~~~~~~~~~
+stage4/broadphase/../../stage1/physics/collision_mechanics/collision_mechanics.h:55:13: warning: ‘collision_sphere_cube’ defined but not used [-Wunused-function]
+   55 | static bool collision_sphere_cube (rigidbody *sphere, rigidbody *cube, collision_data *collision_output_data) {
+      |             ^~~~~~~~~~~~~~~~~~~~~
 stage4/broadphase/../../stage1/physics/collision_mechanics/collision_mechanics.h:16:13: warning: ‘collision_dual_sphere’ defined but not used [-Wunused-function]
    16 | static bool collision_dual_sphere (rigidbody *rigidbody_object_a, rigidbody *rigidbody_object_b, collision_data *collision_output_data) {
       |             ^~~~~~~~~~~~~~~~~~~~~
@@ -776,18 +884,21 @@ stage4/broadphase/../../stage1/physics/collision_mechanics/../forces/defines_maj
     9 | static void force_applicant_gravity_normal (rigidbody *rigid_body, vector3 gravitational_acceleration, vector3 surface_normal) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from stage4/broadphase/../../stage1/master_header.h:6:
-stage4/broadphase/../../stage1/math_phys_buffer/buffer.h:142:13: warning: ‘rigidbody_initialisation_cube’ defined but not used [-Wunused-function]
-  142 | static void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass) {
+stage4/broadphase/../../stage1/math_phys_buffer/buffer.h:159:13: warning: ‘rigidbody_initialisation_cube’ defined but not used [-Wunused-function]
+  159 | static void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-stage4/broadphase/../../stage1/math_phys_buffer/buffer.h:140:18: warning: ‘make_half_extents’ defined but not used [-Wunused-function]
-  140 | } static vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
+stage4/broadphase/../../stage1/math_phys_buffer/buffer.h:157:18: warning: ‘make_half_extents’ defined but not used [-Wunused-function]
+  157 | } static vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
       |                  ^~~~~~~~~~~~~~~~~
-stage4/broadphase/../../stage1/math_phys_buffer/buffer.h:104:13: warning: ‘rb_integrate’ defined but not used [-Wunused-function]
-  104 | static void rb_integrate (rigidbody *rigid_body, float delta_time, float drag_coefficient) {
+stage4/broadphase/../../stage1/math_phys_buffer/buffer.h:121:13: warning: ‘rb_integrate’ defined but not used [-Wunused-function]
+  121 | static void rb_integrate (rigidbody *rigid_body, float delta_time, float drag_coefficient) {
       |             ^~~~~~~~~~~~
-stage4/broadphase/../../stage1/math_phys_buffer/buffer.h:96:14: warning: ‘rb_get_kinetic_energy’ defined but not used [-Wunused-function]
-   96 | static float rb_get_kinetic_energy (rigidbody *rigid_body) {
+stage4/broadphase/../../stage1/math_phys_buffer/buffer.h:113:14: warning: ‘rb_get_kinetic_energy’ defined but not used [-Wunused-function]
+  113 | static float rb_get_kinetic_energy (rigidbody *rigid_body) {
       |              ^~~~~~~~~~~~~~~~~~~~~
+stage4/broadphase/../../stage1/math_phys_buffer/buffer.h:82:13: warning: ‘rigidbody_update_inertia_cube’ defined but not used [-Wunused-function]
+   82 | static void rigidbody_update_inertia_cube (rigidbody *rigid_body) {
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 stage4/broadphase/../../stage1/math_phys_buffer/buffer.h:68:13: warning: ‘rigidbody_update_inertia_sphere’ defined but not used [-Wunused-function]
    68 | static void rigidbody_update_inertia_sphere (rigidbody *rigid_body) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -809,9 +920,15 @@ stage4/debug_overlay/../../stage1/physics/forces/circular/circular_3D.h:4:13: wa
     4 | static void applicant_centripetal_vector3 (rigidbody *rigid_body, vector3 center_point, float centripetal_strength_modifier) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from stage4/debug_overlay/../../stage1/master_header.h:7:
-stage4/debug_overlay/../../stage1/physics/collision_mechanics/collision_mechanics.h:38:13: warning: ‘collision_resolve’ defined but not used [-Wunused-function]
-   38 | static void collision_resolve (collision_data *collision) {
+stage4/debug_overlay/../../stage1/physics/collision_mechanics/collision_mechanics.h:188:13: warning: ‘collision_resolve’ defined but not used [-Wunused-function]
+  188 | static void collision_resolve (collision_data *collision) {
       |             ^~~~~~~~~~~~~~~~~
+stage4/debug_overlay/../../stage1/physics/collision_mechanics/collision_mechanics.h:117:13: warning: ‘collision_dual_cube’ defined but not used [-Wunused-function]
+  117 | static bool collision_dual_cube (rigidbody *cube_a, rigidbody *cube_b, collision_data *collision_output_data) {
+      |             ^~~~~~~~~~~~~~~~~~~
+stage4/debug_overlay/../../stage1/physics/collision_mechanics/collision_mechanics.h:55:13: warning: ‘collision_sphere_cube’ defined but not used [-Wunused-function]
+   55 | static bool collision_sphere_cube (rigidbody *sphere, rigidbody *cube, collision_data *collision_output_data) {
+      |             ^~~~~~~~~~~~~~~~~~~~~
 stage4/debug_overlay/../../stage1/physics/collision_mechanics/collision_mechanics.h:16:13: warning: ‘collision_dual_sphere’ defined but not used [-Wunused-function]
    16 | static bool collision_dual_sphere (rigidbody *rigidbody_object_a, rigidbody *rigidbody_object_b, collision_data *collision_output_data) {
       |             ^~~~~~~~~~~~~~~~~~~~~
@@ -835,18 +952,21 @@ stage4/debug_overlay/../../stage1/physics/collision_mechanics/../forces/defines_
     9 | static void force_applicant_gravity_normal (rigidbody *rigid_body, vector3 gravitational_acceleration, vector3 surface_normal) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from stage4/debug_overlay/../../stage1/master_header.h:6:
-stage4/debug_overlay/../../stage1/math_phys_buffer/buffer.h:142:13: warning: ‘rigidbody_initialisation_cube’ defined but not used [-Wunused-function]
-  142 | static void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass) {
+stage4/debug_overlay/../../stage1/math_phys_buffer/buffer.h:159:13: warning: ‘rigidbody_initialisation_cube’ defined but not used [-Wunused-function]
+  159 | static void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-stage4/debug_overlay/../../stage1/math_phys_buffer/buffer.h:140:18: warning: ‘make_half_extents’ defined but not used [-Wunused-function]
-  140 | } static vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
+stage4/debug_overlay/../../stage1/math_phys_buffer/buffer.h:157:18: warning: ‘make_half_extents’ defined but not used [-Wunused-function]
+  157 | } static vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
       |                  ^~~~~~~~~~~~~~~~~
-stage4/debug_overlay/../../stage1/math_phys_buffer/buffer.h:104:13: warning: ‘rb_integrate’ defined but not used [-Wunused-function]
-  104 | static void rb_integrate (rigidbody *rigid_body, float delta_time, float drag_coefficient) {
+stage4/debug_overlay/../../stage1/math_phys_buffer/buffer.h:121:13: warning: ‘rb_integrate’ defined but not used [-Wunused-function]
+  121 | static void rb_integrate (rigidbody *rigid_body, float delta_time, float drag_coefficient) {
       |             ^~~~~~~~~~~~
-stage4/debug_overlay/../../stage1/math_phys_buffer/buffer.h:96:14: warning: ‘rb_get_kinetic_energy’ defined but not used [-Wunused-function]
-   96 | static float rb_get_kinetic_energy (rigidbody *rigid_body) {
+stage4/debug_overlay/../../stage1/math_phys_buffer/buffer.h:113:14: warning: ‘rb_get_kinetic_energy’ defined but not used [-Wunused-function]
+  113 | static float rb_get_kinetic_energy (rigidbody *rigid_body) {
       |              ^~~~~~~~~~~~~~~~~~~~~
+stage4/debug_overlay/../../stage1/math_phys_buffer/buffer.h:82:13: warning: ‘rigidbody_update_inertia_cube’ defined but not used [-Wunused-function]
+   82 | static void rigidbody_update_inertia_cube (rigidbody *rigid_body) {
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 stage4/debug_overlay/../../stage1/math_phys_buffer/buffer.h:68:13: warning: ‘rigidbody_update_inertia_sphere’ defined but not used [-Wunused-function]
    68 | static void rigidbody_update_inertia_sphere (rigidbody *rigid_body) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -868,9 +988,15 @@ stage5/rendering/../../stage1/physics/forces/circular/circular_3D.h:4:13: warnin
     4 | static void applicant_centripetal_vector3 (rigidbody *rigid_body, vector3 center_point, float centripetal_strength_modifier) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from stage5/rendering/../../stage1/master_header.h:7:
-stage5/rendering/../../stage1/physics/collision_mechanics/collision_mechanics.h:38:13: warning: ‘collision_resolve’ defined but not used [-Wunused-function]
-   38 | static void collision_resolve (collision_data *collision) {
+stage5/rendering/../../stage1/physics/collision_mechanics/collision_mechanics.h:188:13: warning: ‘collision_resolve’ defined but not used [-Wunused-function]
+  188 | static void collision_resolve (collision_data *collision) {
       |             ^~~~~~~~~~~~~~~~~
+stage5/rendering/../../stage1/physics/collision_mechanics/collision_mechanics.h:117:13: warning: ‘collision_dual_cube’ defined but not used [-Wunused-function]
+  117 | static bool collision_dual_cube (rigidbody *cube_a, rigidbody *cube_b, collision_data *collision_output_data) {
+      |             ^~~~~~~~~~~~~~~~~~~
+stage5/rendering/../../stage1/physics/collision_mechanics/collision_mechanics.h:55:13: warning: ‘collision_sphere_cube’ defined but not used [-Wunused-function]
+   55 | static bool collision_sphere_cube (rigidbody *sphere, rigidbody *cube, collision_data *collision_output_data) {
+      |             ^~~~~~~~~~~~~~~~~~~~~
 stage5/rendering/../../stage1/physics/collision_mechanics/collision_mechanics.h:16:13: warning: ‘collision_dual_sphere’ defined but not used [-Wunused-function]
    16 | static bool collision_dual_sphere (rigidbody *rigidbody_object_a, rigidbody *rigidbody_object_b, collision_data *collision_output_data) {
       |             ^~~~~~~~~~~~~~~~~~~~~
@@ -897,18 +1023,21 @@ stage5/rendering/../../stage1/physics/collision_mechanics/../forces/defines_majo
     9 | static void force_applicant_gravity_normal (rigidbody *rigid_body, vector3 gravitational_acceleration, vector3 surface_normal) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from stage5/rendering/../../stage1/master_header.h:6:
-stage5/rendering/../../stage1/math_phys_buffer/buffer.h:142:13: warning: ‘rigidbody_initialisation_cube’ defined but not used [-Wunused-function]
-  142 | static void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass) {
+stage5/rendering/../../stage1/math_phys_buffer/buffer.h:159:13: warning: ‘rigidbody_initialisation_cube’ defined but not used [-Wunused-function]
+  159 | static void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-stage5/rendering/../../stage1/math_phys_buffer/buffer.h:140:18: warning: ‘make_half_extents’ defined but not used [-Wunused-function]
-  140 | } static vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
+stage5/rendering/../../stage1/math_phys_buffer/buffer.h:157:18: warning: ‘make_half_extents’ defined but not used [-Wunused-function]
+  157 | } static vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
       |                  ^~~~~~~~~~~~~~~~~
-stage5/rendering/../../stage1/math_phys_buffer/buffer.h:104:13: warning: ‘rb_integrate’ defined but not used [-Wunused-function]
-  104 | static void rb_integrate (rigidbody *rigid_body, float delta_time, float drag_coefficient) {
+stage5/rendering/../../stage1/math_phys_buffer/buffer.h:121:13: warning: ‘rb_integrate’ defined but not used [-Wunused-function]
+  121 | static void rb_integrate (rigidbody *rigid_body, float delta_time, float drag_coefficient) {
       |             ^~~~~~~~~~~~
-stage5/rendering/../../stage1/math_phys_buffer/buffer.h:96:14: warning: ‘rb_get_kinetic_energy’ defined but not used [-Wunused-function]
-   96 | static float rb_get_kinetic_energy (rigidbody *rigid_body) {
+stage5/rendering/../../stage1/math_phys_buffer/buffer.h:113:14: warning: ‘rb_get_kinetic_energy’ defined but not used [-Wunused-function]
+  113 | static float rb_get_kinetic_energy (rigidbody *rigid_body) {
       |              ^~~~~~~~~~~~~~~~~~~~~
+stage5/rendering/../../stage1/math_phys_buffer/buffer.h:82:13: warning: ‘rigidbody_update_inertia_cube’ defined but not used [-Wunused-function]
+   82 | static void rigidbody_update_inertia_cube (rigidbody *rigid_body) {
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 stage5/rendering/../../stage1/math_phys_buffer/buffer.h:68:13: warning: ‘rigidbody_update_inertia_sphere’ defined but not used [-Wunused-function]
    68 | static void rigidbody_update_inertia_sphere (rigidbody *rigid_body) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -930,9 +1059,15 @@ In file included from ./stage1/master_header.h:9:
     4 | static void applicant_centripetal_vector3 (rigidbody *rigid_body, vector3 center_point, float centripetal_strength_modifier) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from ./stage1/master_header.h:7:
-./stage1/physics/collision_mechanics/collision_mechanics.h:38:13: warning: ‘collision_resolve’ defined but not used [-Wunused-function]
-   38 | static void collision_resolve (collision_data *collision) {
+./stage1/physics/collision_mechanics/collision_mechanics.h:188:13: warning: ‘collision_resolve’ defined but not used [-Wunused-function]
+  188 | static void collision_resolve (collision_data *collision) {
       |             ^~~~~~~~~~~~~~~~~
+./stage1/physics/collision_mechanics/collision_mechanics.h:117:13: warning: ‘collision_dual_cube’ defined but not used [-Wunused-function]
+  117 | static bool collision_dual_cube (rigidbody *cube_a, rigidbody *cube_b, collision_data *collision_output_data) {
+      |             ^~~~~~~~~~~~~~~~~~~
+./stage1/physics/collision_mechanics/collision_mechanics.h:55:13: warning: ‘collision_sphere_cube’ defined but not used [-Wunused-function]
+   55 | static bool collision_sphere_cube (rigidbody *sphere, rigidbody *cube, collision_data *collision_output_data) {
+      |             ^~~~~~~~~~~~~~~~~~~~~
 ./stage1/physics/collision_mechanics/collision_mechanics.h:16:13: warning: ‘collision_dual_sphere’ defined but not used [-Wunused-function]
    16 | static bool collision_dual_sphere (rigidbody *rigidbody_object_a, rigidbody *rigidbody_object_b, collision_data *collision_output_data) {
       |             ^~~~~~~~~~~~~~~~~~~~~
@@ -959,18 +1094,21 @@ In file included from ./stage1/physics/collision_mechanics/collision_mechanics.h
     9 | static void force_applicant_gravity_normal (rigidbody *rigid_body, vector3 gravitational_acceleration, vector3 surface_normal) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from ./stage1/master_header.h:6:
-./stage1/math_phys_buffer/buffer.h:142:13: warning: ‘rigidbody_initialisation_cube’ defined but not used [-Wunused-function]
-  142 | static void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass) {
+./stage1/math_phys_buffer/buffer.h:159:13: warning: ‘rigidbody_initialisation_cube’ defined but not used [-Wunused-function]
+  159 | static void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-./stage1/math_phys_buffer/buffer.h:140:18: warning: ‘make_half_extents’ defined but not used [-Wunused-function]
-  140 | } static vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
+./stage1/math_phys_buffer/buffer.h:157:18: warning: ‘make_half_extents’ defined but not used [-Wunused-function]
+  157 | } static vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
       |                  ^~~~~~~~~~~~~~~~~
-./stage1/math_phys_buffer/buffer.h:104:13: warning: ‘rb_integrate’ defined but not used [-Wunused-function]
-  104 | static void rb_integrate (rigidbody *rigid_body, float delta_time, float drag_coefficient) {
+./stage1/math_phys_buffer/buffer.h:121:13: warning: ‘rb_integrate’ defined but not used [-Wunused-function]
+  121 | static void rb_integrate (rigidbody *rigid_body, float delta_time, float drag_coefficient) {
       |             ^~~~~~~~~~~~
-./stage1/math_phys_buffer/buffer.h:96:14: warning: ‘rb_get_kinetic_energy’ defined but not used [-Wunused-function]
-   96 | static float rb_get_kinetic_energy (rigidbody *rigid_body) {
+./stage1/math_phys_buffer/buffer.h:113:14: warning: ‘rb_get_kinetic_energy’ defined but not used [-Wunused-function]
+  113 | static float rb_get_kinetic_energy (rigidbody *rigid_body) {
       |              ^~~~~~~~~~~~~~~~~~~~~
+./stage1/math_phys_buffer/buffer.h:82:13: warning: ‘rigidbody_update_inertia_cube’ defined but not used [-Wunused-function]
+   82 | static void rigidbody_update_inertia_cube (rigidbody *rigid_body) {
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ./stage1/math_phys_buffer/buffer.h:68:13: warning: ‘rigidbody_update_inertia_sphere’ defined but not used [-Wunused-function]
    68 | static void rigidbody_update_inertia_sphere (rigidbody *rigid_body) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -992,9 +1130,15 @@ stage5/scene_io/../../stage1/physics/forces/circular/circular_3D.h:4:13: warning
     4 | static void applicant_centripetal_vector3 (rigidbody *rigid_body, vector3 center_point, float centripetal_strength_modifier) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from stage5/scene_io/../../stage1/master_header.h:7:
-stage5/scene_io/../../stage1/physics/collision_mechanics/collision_mechanics.h:38:13: warning: ‘collision_resolve’ defined but not used [-Wunused-function]
-   38 | static void collision_resolve (collision_data *collision) {
+stage5/scene_io/../../stage1/physics/collision_mechanics/collision_mechanics.h:188:13: warning: ‘collision_resolve’ defined but not used [-Wunused-function]
+  188 | static void collision_resolve (collision_data *collision) {
       |             ^~~~~~~~~~~~~~~~~
+stage5/scene_io/../../stage1/physics/collision_mechanics/collision_mechanics.h:117:13: warning: ‘collision_dual_cube’ defined but not used [-Wunused-function]
+  117 | static bool collision_dual_cube (rigidbody *cube_a, rigidbody *cube_b, collision_data *collision_output_data) {
+      |             ^~~~~~~~~~~~~~~~~~~
+stage5/scene_io/../../stage1/physics/collision_mechanics/collision_mechanics.h:55:13: warning: ‘collision_sphere_cube’ defined but not used [-Wunused-function]
+   55 | static bool collision_sphere_cube (rigidbody *sphere, rigidbody *cube, collision_data *collision_output_data) {
+      |             ^~~~~~~~~~~~~~~~~~~~~
 stage5/scene_io/../../stage1/physics/collision_mechanics/collision_mechanics.h:16:13: warning: ‘collision_dual_sphere’ defined but not used [-Wunused-function]
    16 | static bool collision_dual_sphere (rigidbody *rigidbody_object_a, rigidbody *rigidbody_object_b, collision_data *collision_output_data) {
       |             ^~~~~~~~~~~~~~~~~~~~~
@@ -1021,18 +1165,21 @@ stage5/scene_io/../../stage1/physics/collision_mechanics/../forces/defines_major
     9 | static void force_applicant_gravity_normal (rigidbody *rigid_body, vector3 gravitational_acceleration, vector3 surface_normal) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from stage5/scene_io/../../stage1/master_header.h:6:
-stage5/scene_io/../../stage1/math_phys_buffer/buffer.h:142:13: warning: ‘rigidbody_initialisation_cube’ defined but not used [-Wunused-function]
-  142 | static void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass) {
+stage5/scene_io/../../stage1/math_phys_buffer/buffer.h:159:13: warning: ‘rigidbody_initialisation_cube’ defined but not used [-Wunused-function]
+  159 | static void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-stage5/scene_io/../../stage1/math_phys_buffer/buffer.h:140:18: warning: ‘make_half_extents’ defined but not used [-Wunused-function]
-  140 | } static vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
+stage5/scene_io/../../stage1/math_phys_buffer/buffer.h:157:18: warning: ‘make_half_extents’ defined but not used [-Wunused-function]
+  157 | } static vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
       |                  ^~~~~~~~~~~~~~~~~
-stage5/scene_io/../../stage1/math_phys_buffer/buffer.h:104:13: warning: ‘rb_integrate’ defined but not used [-Wunused-function]
-  104 | static void rb_integrate (rigidbody *rigid_body, float delta_time, float drag_coefficient) {
+stage5/scene_io/../../stage1/math_phys_buffer/buffer.h:121:13: warning: ‘rb_integrate’ defined but not used [-Wunused-function]
+  121 | static void rb_integrate (rigidbody *rigid_body, float delta_time, float drag_coefficient) {
       |             ^~~~~~~~~~~~
-stage5/scene_io/../../stage1/math_phys_buffer/buffer.h:96:14: warning: ‘rb_get_kinetic_energy’ defined but not used [-Wunused-function]
-   96 | static float rb_get_kinetic_energy (rigidbody *rigid_body) {
+stage5/scene_io/../../stage1/math_phys_buffer/buffer.h:113:14: warning: ‘rb_get_kinetic_energy’ defined but not used [-Wunused-function]
+  113 | static float rb_get_kinetic_energy (rigidbody *rigid_body) {
       |              ^~~~~~~~~~~~~~~~~~~~~
+stage5/scene_io/../../stage1/math_phys_buffer/buffer.h:82:13: warning: ‘rigidbody_update_inertia_cube’ defined but not used [-Wunused-function]
+   82 | static void rigidbody_update_inertia_cube (rigidbody *rigid_body) {
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 stage5/scene_io/../../stage1/math_phys_buffer/buffer.h:68:13: warning: ‘rigidbody_update_inertia_sphere’ defined but not used [-Wunused-function]
    68 | static void rigidbody_update_inertia_sphere (rigidbody *rigid_body) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1054,9 +1201,15 @@ stage5/scene_io/../../stage1/physics/forces/circular/circular_3D.h:4:13: warning
     4 | static void applicant_centripetal_vector3 (rigidbody *rigid_body, vector3 center_point, float centripetal_strength_modifier) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from stage5/scene_io/../../stage1/master_header.h:7:
-stage5/scene_io/../../stage1/physics/collision_mechanics/collision_mechanics.h:38:13: warning: ‘collision_resolve’ defined but not used [-Wunused-function]
-   38 | static void collision_resolve (collision_data *collision) {
+stage5/scene_io/../../stage1/physics/collision_mechanics/collision_mechanics.h:188:13: warning: ‘collision_resolve’ defined but not used [-Wunused-function]
+  188 | static void collision_resolve (collision_data *collision) {
       |             ^~~~~~~~~~~~~~~~~
+stage5/scene_io/../../stage1/physics/collision_mechanics/collision_mechanics.h:117:13: warning: ‘collision_dual_cube’ defined but not used [-Wunused-function]
+  117 | static bool collision_dual_cube (rigidbody *cube_a, rigidbody *cube_b, collision_data *collision_output_data) {
+      |             ^~~~~~~~~~~~~~~~~~~
+stage5/scene_io/../../stage1/physics/collision_mechanics/collision_mechanics.h:55:13: warning: ‘collision_sphere_cube’ defined but not used [-Wunused-function]
+   55 | static bool collision_sphere_cube (rigidbody *sphere, rigidbody *cube, collision_data *collision_output_data) {
+      |             ^~~~~~~~~~~~~~~~~~~~~
 stage5/scene_io/../../stage1/physics/collision_mechanics/collision_mechanics.h:16:13: warning: ‘collision_dual_sphere’ defined but not used [-Wunused-function]
    16 | static bool collision_dual_sphere (rigidbody *rigidbody_object_a, rigidbody *rigidbody_object_b, collision_data *collision_output_data) {
       |             ^~~~~~~~~~~~~~~~~~~~~
@@ -1083,18 +1236,21 @@ stage5/scene_io/../../stage1/physics/collision_mechanics/../forces/defines_major
     9 | static void force_applicant_gravity_normal (rigidbody *rigid_body, vector3 gravitational_acceleration, vector3 surface_normal) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from stage5/scene_io/../../stage1/master_header.h:6:
-stage5/scene_io/../../stage1/math_phys_buffer/buffer.h:142:13: warning: ‘rigidbody_initialisation_cube’ defined but not used [-Wunused-function]
-  142 | static void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass) {
+stage5/scene_io/../../stage1/math_phys_buffer/buffer.h:159:13: warning: ‘rigidbody_initialisation_cube’ defined but not used [-Wunused-function]
+  159 | static void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-stage5/scene_io/../../stage1/math_phys_buffer/buffer.h:140:18: warning: ‘make_half_extents’ defined but not used [-Wunused-function]
-  140 | } static vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
+stage5/scene_io/../../stage1/math_phys_buffer/buffer.h:157:18: warning: ‘make_half_extents’ defined but not used [-Wunused-function]
+  157 | } static vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
       |                  ^~~~~~~~~~~~~~~~~
-stage5/scene_io/../../stage1/math_phys_buffer/buffer.h:104:13: warning: ‘rb_integrate’ defined but not used [-Wunused-function]
-  104 | static void rb_integrate (rigidbody *rigid_body, float delta_time, float drag_coefficient) {
+stage5/scene_io/../../stage1/math_phys_buffer/buffer.h:121:13: warning: ‘rb_integrate’ defined but not used [-Wunused-function]
+  121 | static void rb_integrate (rigidbody *rigid_body, float delta_time, float drag_coefficient) {
       |             ^~~~~~~~~~~~
-stage5/scene_io/../../stage1/math_phys_buffer/buffer.h:96:14: warning: ‘rb_get_kinetic_energy’ defined but not used [-Wunused-function]
-   96 | static float rb_get_kinetic_energy (rigidbody *rigid_body) {
+stage5/scene_io/../../stage1/math_phys_buffer/buffer.h:113:14: warning: ‘rb_get_kinetic_energy’ defined but not used [-Wunused-function]
+  113 | static float rb_get_kinetic_energy (rigidbody *rigid_body) {
       |              ^~~~~~~~~~~~~~~~~~~~~
+stage5/scene_io/../../stage1/math_phys_buffer/buffer.h:82:13: warning: ‘rigidbody_update_inertia_cube’ defined but not used [-Wunused-function]
+   82 | static void rigidbody_update_inertia_cube (rigidbody *rigid_body) {
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 stage5/scene_io/../../stage1/math_phys_buffer/buffer.h:68:13: warning: ‘rigidbody_update_inertia_sphere’ defined but not used [-Wunused-function]
    68 | static void rigidbody_update_inertia_sphere (rigidbody *rigid_body) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

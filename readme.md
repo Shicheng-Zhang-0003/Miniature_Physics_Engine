@@ -1,7 +1,7 @@
 # readme.md
 
 ```
-This is the pre-1.0 release testing edition of the Miniature Physics Engine (MPE, v0.9.3-STBL2).
+This is the pre-1.0 release testing edition of the Miniature Physics Engine (MPE, v0.9.7-Alpha).
 
 It is a rigid body physics engine designed around simplicity, ease of use, and efficiency.
 
@@ -21,6 +21,7 @@ Engine Mechanics:
         3C: Pressing 0 toggles between Debug Mode and Game Mode, Debug Mode has no borders and more information presented about individual objects.
         3D: Pressing 9 gives the option to save the current state of the object layout, load a previously saved layout, or exit the engine.
         3E: Pressing 8 manipulates how objects are spawned. Prism objects spawning will be added in future versions.
+        3E1: Pressing C for v0.9.7-Alpha spawns a cube, dimensions can be modified.
         3F: Right Click a object to select a object.
         3G: Once a object has been selected, press the space bar to exert a impulse/force.
         3H: Once a object has been selected, left click to delete the object.
@@ -43,6 +44,8 @@ Known Bugs:
     PSX-003 (SOLVED) (FPPSCL, FLOATING POINT PRECISION SCALE): In 0.9.5-Alpha, any form of modification to any values is += 0.01, which is far too low if not in debug mode.
         - Add a specific option for debug mode to change increment/decrement values.
         - For Game Mode, switch to a nominal +- of 0.2 for all changable constant values.
+    PSX-004 (STIPLG, STARTING INPUT LAG): In 0.9.7-Alpha, after just starting the engine itself, spawning objects may require some time to load properly and actually respond.
+        - Fix by finding comflicting spawning logic later, for now, just marvel at the fact that 0.9.7-Alpha was managed to be done on time in the first place.
 
     OPB-000 (MTNLCK, MOTION LOCK): Under continuous input, sometimes, the camera viewpoint may be stuck moving in one direction. In this case, manipulating the object into random, rapid motion counteracts and stops the uncommanded movement of the camera.
         - In some cases, save the current state of the engine, and restart the executable to solve the issue.

@@ -78,6 +78,23 @@ static void rigidbody_update_inertia_sphere (rigidbody *rigid_body) {
         rigid_body -> inverse_inertia_tensor_local = (math3) {{{0}}};
         rigid_body -> inverse_inertia_system = (math3) {{{0}}};
     }
+} // Helper to update inertia tensor after mass/radius change
+static void rigidbody_update_inertia_cube (rigidbody *rigid_body) {
+    float width = rigid_body -> half_extensions.x * 2.0f;
+    float height = rigid_body -> half_extensions.y * 2.0f;
+    float depth = rigid_body -> half_extensions.z * 2.0f;
+    float mass = rigid_body -> mass;
+    rigid_body -> inertia_tensor_local = (math3) {{{0}}};
+    rigid_body -> inertia_tensor_local.matrix[0][0] = (mass / 12.0f) * (height * height + depth * depth);
+    rigid_body -> inertia_tensor_local.matrix[1][1] = (mass / 12.0f) * (width * width + depth * depth);
+    rigid_body -> inertia_tensor_local.matrix[2][2] = (mass / 12.0f) * (width * width + height * height);
+    if (mass > 0) {
+        rigid_body -> inverse_inertia_tensor_local = math3_inverse (rigid_body -> inertia_tensor_local);
+        rigid_body -> inverse_inertia_system = rigid_body -> inverse_inertia_tensor_local;
+    } else {
+        rigid_body -> inverse_inertia_tensor_local = (math3) {{{0}}};
+        rigid_body -> inverse_inertia_system = (math3) {{{0}}};
+    }
 } //Force application and Torque Dynamics
 //Apply a force at a centre of mass (perfect collision movement, linear movement only defined)
 static void rb_apply_forces_perfect (rigidbody *rigid_body, vector3 force_applied) {
@@ -153,6 +170,7 @@ static void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 positi
     if (mass > 0) {rigid_body -> inverse_mass = 1.0f / mass;}
     else {rigid_body -> inverse_mass = 0.0f;}
     rigid_body -> half_extensions = half_extensions;
+    rigid_body -> radius = vector3_length (half_extensions); // Bounding radius for broadphase
     rigid_body -> restitution = 0.5f;
     rigid_body -> static_state = (mass == 0);
     rigid_body -> friction_static = 0.4f;
