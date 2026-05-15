@@ -75,17 +75,23 @@ gboolean physics_step_increment (gpointer user_data_pointer) {
         main_inputs.space_key_pressed = false;
     }
 
-    // Spawn Logic (Shift Press/Hold) - Spheres
+    // Spawn Logic (Shift Press/Hold) - Spheres (Machine Gun)
     static float shift_hold_timer = 0.0f;
+    static float shift_spawn_interval_timer = 0.0f;
     static bool shift_previously_held = false;
     if (main_inputs.shift_key_pressed) {
         if (!shift_previously_held) {
             spawner_launch_sphere (spawn_radius, spawn_mass, spawn_speed);
             shift_hold_timer = 0.0f;
+            shift_spawn_interval_timer = 0.0f;
         } else {
             shift_hold_timer += frame_delta_time;
-            if (shift_hold_timer > 1.0f) {
-                spawner_launch_sphere (spawn_radius, spawn_mass, spawn_speed);
+            if (shift_hold_timer > 0.3f) {
+                shift_spawn_interval_timer += frame_delta_time;
+                if (shift_spawn_interval_timer >= 0.02f) { // Machine gun rate: 50/sec
+                    spawner_launch_sphere (spawn_radius, spawn_mass, spawn_speed);
+                    shift_spawn_interval_timer = 0.0f;
+                }
             }
         }
         shift_previously_held = true;
@@ -94,17 +100,23 @@ gboolean physics_step_increment (gpointer user_data_pointer) {
         shift_previously_held = false;
     }
 
-    // Cube Spawn Logic (C Press/Hold)
+    // Cube Spawn Logic (C Press/Hold) (Machine Gun)
     static float c_hold_timer = 0.0f;
+    static float c_spawn_interval_timer = 0.0f;
     static bool c_previously_held = false;
     if (main_inputs.c_key_pressed) {
         if (!c_previously_held) {
-            spawner_launch_cube (main_camera_fov.position, (vector3) {spawn_radius, spawn_radius, spawn_radius}, spawn_mass);
+            spawner_launch_cube (main_camera_fov.position, (vector3) {spawn_cube_extent, spawn_cube_extent, spawn_cube_extent}, spawn_cube_mass);
             c_hold_timer = 0.0f;
+            c_spawn_interval_timer = 0.0f;
         } else {
             c_hold_timer += frame_delta_time;
-            if (c_hold_timer > 1.0f) {
-                spawner_launch_cube (main_camera_fov.position, (vector3) {spawn_radius, spawn_radius, spawn_radius}, spawn_mass);
+            if (c_hold_timer > 0.3f) {
+                c_spawn_interval_timer += frame_delta_time;
+                if (c_spawn_interval_timer >= 0.02f) { // Machine gun rate: 50/sec
+                    spawner_launch_cube (main_camera_fov.position, (vector3) {spawn_cube_extent, spawn_cube_extent, spawn_cube_extent}, spawn_cube_mass);
+                    c_spawn_interval_timer = 0.0f;
+                }
             }
         }
         c_previously_held = true;
@@ -141,13 +153,13 @@ gboolean physics_step_increment (gpointer user_data_pointer) {
     }
     // Cube Menu Logic
     if (main_inputs.spawner_menu_level == 6) { // Cube Mass
-        if (main_inputs.up_arrow_pressed)   {spawn_mass += adjustment_increment; main_inputs.up_arrow_pressed = false;}
-        if (main_inputs.down_arrow_pressed) {spawn_mass -= adjustment_increment; if (spawn_mass < 0.01f) {spawn_mass = 0.01f;} main_inputs.down_arrow_pressed = false;}
+        if (main_inputs.up_arrow_pressed)   {spawn_cube_mass += adjustment_increment; main_inputs.up_arrow_pressed = false;}
+        if (main_inputs.down_arrow_pressed) {spawn_cube_mass -= adjustment_increment; if (spawn_cube_mass < 0.01f) {spawn_cube_mass = 0.01f;} main_inputs.down_arrow_pressed = false;}
         if (main_inputs.enter_key_pressed)  {main_inputs.spawner_menu_level = 0; main_inputs.enter_key_pressed = false;}
     }
     if (main_inputs.spawner_menu_level == 7) { // Cube Size
-        if (main_inputs.up_arrow_pressed)   {spawn_radius += adjustment_increment; main_inputs.up_arrow_pressed = false;}
-        if (main_inputs.down_arrow_pressed) {spawn_radius -= adjustment_increment; if (spawn_radius < 0.01f) {spawn_radius = 0.01f;} main_inputs.down_arrow_pressed = false;}
+        if (main_inputs.up_arrow_pressed)   {spawn_cube_extent += adjustment_increment; main_inputs.up_arrow_pressed = false;}
+        if (main_inputs.down_arrow_pressed) {spawn_cube_extent -= adjustment_increment; if (spawn_cube_extent < 0.01f) {spawn_cube_extent = 0.01f;} main_inputs.down_arrow_pressed = false;}
         if (main_inputs.enter_key_pressed)  {main_inputs.spawner_menu_level = 0; main_inputs.enter_key_pressed = false;}
     }
 
@@ -195,12 +207,47 @@ gboolean physics_step_increment (gpointer user_data_pointer) {
         }
         rigidbody *target = &obj_per_scene [selected_object];
         if (main_inputs.object_menu_level == 2) {
-            if (main_inputs.up_arrow_pressed)   {target -> mass += adjustment_increment; target -> inverse_mass = 1.0f / target -> mass; rigidbody_update_inertia_sphere (target); main_inputs.up_arrow_pressed = false;}
-            if (main_inputs.down_arrow_pressed) {target -> mass -= adjustment_increment; if (target -> mass < 0.01f) {target -> mass = 0.01f;} target -> inverse_mass = 1.0f / target -> mass; rigidbody_update_inertia_sphere (target); main_inputs.down_arrow_pressed = false;}
+            if (main_inputs.up_arrow_pressed)   {
+                target -> mass += adjustment_increment; 
+                target -> inverse_mass = 1.0f / target -> mass; 
+                if (target -> type == object_sphere) rigidbody_update_inertia_sphere (target);
+                else rigidbody_update_inertia_cube (target);
+                main_inputs.up_arrow_pressed = false;
+            }
+            if (main_inputs.down_arrow_pressed) {
+                target -> mass -= adjustment_increment; 
+                if (target -> mass < 0.01f) {target -> mass = 0.01f;} 
+                target -> inverse_mass = 1.0f / target -> mass; 
+                if (target -> type == object_sphere) rigidbody_update_inertia_sphere (target);
+                else rigidbody_update_inertia_cube (target);
+                main_inputs.down_arrow_pressed = false;
+            }
             if (main_inputs.enter_key_pressed)  {main_inputs.object_menu_level = 0; main_inputs.enter_key_pressed = false;}
         } else if (main_inputs.object_menu_level == 3) {
-            if (main_inputs.up_arrow_pressed)   {target -> radius += adjustment_increment; rigidbody_update_inertia_sphere (target); main_inputs.up_arrow_pressed = false;}
-            if (main_inputs.down_arrow_pressed) {target -> radius -= adjustment_increment; if (target -> radius < 0.01f) {target -> radius = 0.01f;} rigidbody_update_inertia_sphere (target); main_inputs.down_arrow_pressed = false;}
+            if (main_inputs.up_arrow_pressed)   {
+                if (target -> type == object_sphere) {
+                    target -> radius += adjustment_increment; 
+                    rigidbody_update_inertia_sphere (target);
+                } else {
+                    target -> half_extensions = vector3_addition (target -> half_extensions, (vector3){adjustment_increment, adjustment_increment, adjustment_increment});
+                    target -> radius = vector3_length (target -> half_extensions);
+                    rigidbody_update_inertia_cube (target);
+                }
+                main_inputs.up_arrow_pressed = false;
+            }
+            if (main_inputs.down_arrow_pressed) {
+                if (target -> type == object_sphere) {
+                    target -> radius -= adjustment_increment; 
+                    if (target -> radius < 0.01f) {target -> radius = 0.01f;} 
+                    rigidbody_update_inertia_sphere (target);
+                } else {
+                    target -> half_extensions = vector3_subtraction (target -> half_extensions, (vector3){adjustment_increment, adjustment_increment, adjustment_increment});
+                    if (target -> half_extensions.x < 0.01f) target -> half_extensions = (vector3){0.01f, 0.01f, 0.01f};
+                    target -> radius = vector3_length (target -> half_extensions);
+                    rigidbody_update_inertia_cube (target);
+                }
+                main_inputs.down_arrow_pressed = false;
+            }
             if (main_inputs.enter_key_pressed)  {main_inputs.object_menu_level = 0; main_inputs.enter_key_pressed = false;}
         } else if (main_inputs.object_menu_level == 4) {
             if (main_inputs.up_arrow_pressed)   {target -> friction_kinetic += adjustment_increment; target -> friction_static = target -> friction_kinetic + 0.1f; main_inputs.up_arrow_pressed = false;}
@@ -225,113 +272,105 @@ gboolean physics_step_increment (gpointer user_data_pointer) {
         } main_inputs.left_mouse_button_clicked = false;
     }
 
-    // Forces and Physics
-    for (int object_iterator_index = 0; object_iterator_index < object_count; object_iterator_index++) {
-        vector3 constant_gravity_acceleration = {0, world_gravity_y, 0};
-        rigidbody *rb = &obj_per_scene [object_iterator_index];
-        
-        vector3 up_axis = {0, 1, 0};
-        float projection = rb -> radius;
-        if (rb -> type == object_cube) {
-            vector3 axes [3];
-            get_obb_axes (rb, axes);
-            projection = rb -> half_extensions.x * fabsf (vector3_dot (axes [0], up_axis)) +
-                         rb -> half_extensions.y * fabsf (vector3_dot (axes [1], up_axis)) +
-                         rb -> half_extensions.z * fabsf (vector3_dot (axes [2], up_axis));
-        }
+    // --- CORE PHYSICS SUB-STEPPING (12x) ---
+    const int physics_sub_steps = 12;
+    float sub_step_dt = frame_delta_time / (float)physics_sub_steps;
+    
+    // Static buffers for broadphase to avoid reallocation lag
+    static broadphase_pair *persistent_collision_pairs = NULL;
+    static int persistent_pairs_capacity = 0;
 
-        if (rb -> position.y <= (projection + 0.01f)) {
-            if (rb -> type == object_sphere) {
-                force_applicant_gravity_normal (rb, constant_gravity_acceleration, (vector3) {0.0f, 1.0f, 0.0f});
-                force_applicant_friction_rolling (rb, (vector3) {0.0f, 1.0f, 0.0f}, rb -> friction_static, rb -> friction_kinetic, world_gravity_y);
-            } else {
-                // For cubes, find the lowest vertex and apply forces there to generate torque
+    for (int sub_iteration = 0; sub_iteration < physics_sub_steps; sub_iteration++) {
+        // 1. Force Accumulation
+        for (int object_iterator_index = 0; object_iterator_index < object_count; object_iterator_index++) {
+            vector3 constant_gravity_acceleration = {0, world_gravity_y, 0};
+            rigidbody *rb = &obj_per_scene [object_iterator_index];
+            
+            vector3 up_axis = {0, 1, 0};
+            float projection = rb -> radius;
+            if (rb -> type == object_cube) {
                 vector3 axes [3];
                 get_obb_axes (rb, axes);
-                vector3 contact_offset = {0,0,0};
-                for (int i = 0; i < 3; i++) {
-                    float extent = (i == 0) ? rb -> half_extensions.x : (i == 1 ? rb -> half_extensions.y : rb -> half_extensions.z);
-                    vector3 offset = vector3_scaling (axes [i], extent);
-                    if (vector3_dot (offset, (vector3){0, -1, 0}) > 0) {
-                        contact_offset = vector3_addition (contact_offset, offset);
-                    } else {
-                        contact_offset = vector3_subtraction (contact_offset, offset);
-                    }
-                }
-                vector3 lowest_vertex = vector3_addition (rb -> position, contact_offset);
-                
-                // 1. Apply Normal Force at contact point (generates torque to lay flat)
-                vector3 gravity_force = vector3_scaling (constant_gravity_acceleration, rb -> mass);
-                float weight_along_normal = vector3_dot (gravity_force, (vector3){0, 1, 0});
-                if (weight_along_normal < 0) {
-                    vector3 normal_force = vector3_scaling ((vector3){0, 1, 0}, -weight_along_normal);
-                    rb_apply_forces_localised (rb, normal_force, lowest_vertex);
-                    // Also need to apply the base gravity force (usually applied in else, but here we handled normal part)
-                    rb_apply_forces_perfect (rb, gravity_force);
-                }
-                
-                // 2. Apply friction at this contact point
-                vector3 contact_normal = {0, 1, 0};
-                vector3 velocity_at_contact = vector3_addition (rb -> velocity, vector3_cross (rb -> angular_velocity, contact_offset));
-                vector3 tangential_velocity = vector3_subtraction (velocity_at_contact, vector3_scaling (contact_normal, vector3_dot (velocity_at_contact, contact_normal)));
-                float tangential_speed = vector3_length (tangential_velocity);
-                
-                float normal_force_mag = fabsf (rb -> mass * world_gravity_y);
-                if (tangential_speed > 0.001f) {
-                    vector3 friction_force = vector3_scaling (vector3_normalisation (tangential_velocity), -rb -> friction_kinetic * normal_force_mag);
-                    rb_apply_forces_localised (rb, friction_force, lowest_vertex);
-                } else {
-                    vector3 accumulated_tangent = vector3_subtraction (rb -> force_accumilator, vector3_scaling (contact_normal, vector3_dot (rb -> force_accumilator, contact_normal)));
-                    if (vector3_length (accumulated_tangent) < rb -> friction_static * normal_force_mag) {
-                        rb_apply_forces_perfect (rb, vector3_scaling (accumulated_tangent, -1.0f));
-                        rb -> velocity = vector3_subtraction (rb -> velocity, tangential_velocity);
-                    }
-                }
+                projection = rb -> half_extensions.x * fabsf (vector3_dot (axes [0], up_axis)) +
+                             rb -> half_extensions.y * fabsf (vector3_dot (axes [1], up_axis)) +
+                             rb -> half_extensions.z * fabsf (vector3_dot (axes [2], up_axis));
             }
-        } else {
-            rb_apply_forces_perfect (rb, vector3_scaling (constant_gravity_acceleration, rb -> mass));
+
+            if (rb -> position.y <= (projection + 0.01f)) {
+                if (rb -> type == object_sphere) {
+                    force_applicant_gravity_normal (rb, constant_gravity_acceleration, (vector3) {0.0f, 1.0f, 0.0f});
+                    force_applicant_friction_rolling (rb, (vector3) {0.0f, 1.0f, 0.0f}, rb -> friction_static, rb -> friction_kinetic, world_gravity_y);
+                } else {
+                    vector3 axes [3];
+                    get_obb_axes (rb, axes);
+                    vector3 contact_offset = {0,0,0};
+                    for (int i = 0; i < 3; i++) {
+                        float extent = (i == 0) ? rb -> half_extensions.x : (i == 1 ? rb -> half_extensions.y : rb -> half_extensions.z);
+                        vector3 offset = vector3_scaling (axes [i], extent);
+                        if (vector3_dot (offset, (vector3){0, -1, 0}) > 0) contact_offset = vector3_addition (contact_offset, offset);
+                        else contact_offset = vector3_subtraction (contact_offset, offset);
+                    }
+                    vector3 lowest_vertex = vector3_addition (rb -> position, contact_offset);
+                    vector3 gravity_force = vector3_scaling (constant_gravity_acceleration, rb -> mass);
+                    float weight_along_normal = vector3_dot (gravity_force, (vector3){0, 1, 0});
+                    if (weight_along_normal < 0) {
+                        vector3 normal_force = vector3_scaling ((vector3){0, 1, 0}, -weight_along_normal);
+                        rb_apply_forces_localised (rb, normal_force, lowest_vertex);
+                        rb_apply_forces_perfect (rb, gravity_force);
+                    }
+                    // Simple friction
+                    vector3 contact_normal = {0, 1, 0};
+                    vector3 velocity_at_contact = vector3_addition (rb -> velocity, vector3_cross (rb -> angular_velocity, contact_offset));
+                    vector3 tangential_velocity = vector3_subtraction (velocity_at_contact, vector3_scaling (contact_normal, vector3_dot (velocity_at_contact, contact_normal)));
+                    if (vector3_length_squared (tangential_velocity) > 0.0001f) {
+                        vector3 friction_force = vector3_scaling (vector3_normalisation (tangential_velocity), -rb -> friction_kinetic * fabsf (rb -> mass * world_gravity_y));
+                        rb_apply_forces_localised (rb, friction_force, lowest_vertex);
+                    }
+                }
+            } else {
+                rb_apply_forces_perfect (rb, vector3_scaling (constant_gravity_acceleration, rb -> mass));
+            }
+        }
+
+        // 2. Collision Detection & Resolution (Must happen every sub-step for objects to feel each other)
+        int maximum_possible_pairs = (object_count * (object_count - 1)) / 2;
+        if (maximum_possible_pairs < 1) maximum_possible_pairs = 1;
+        if (maximum_possible_pairs > persistent_pairs_capacity) {
+            persistent_pairs_capacity = maximum_possible_pairs + 128;
+            persistent_collision_pairs = realloc (persistent_collision_pairs, persistent_pairs_capacity * sizeof (broadphase_pair));
+        }
+        
+        if (persistent_collision_pairs) {
+            int detected_collision_count = broadphase_generate_pairing (persistent_collision_pairs, persistent_pairs_capacity);
+            for (int collision_index = 0; collision_index < detected_collision_count; collision_index++) {
+                rigidbody *rb_a = &obj_per_scene [persistent_collision_pairs [collision_index].object_index_a];
+                rigidbody *rb_b = &obj_per_scene [persistent_collision_pairs [collision_index].object_index_b];
+                collision_data narrowphase_collision;
+                bool collided = false;
+                if (rb_a -> type == object_sphere && rb_b -> type == object_sphere) collided = collision_dual_sphere (rb_a, rb_b, &narrowphase_collision);
+                else if (rb_a -> type == object_sphere && rb_b -> type == object_cube) collided = collision_sphere_cube (rb_a, rb_b, &narrowphase_collision);
+                else if (rb_a -> type == object_cube && rb_b -> type == object_sphere) {
+                    collided = collision_sphere_cube (rb_b, rb_a, &narrowphase_collision);
+                    narrowphase_collision.normal_vector = vector3_scaling (narrowphase_collision.normal_vector, -1.0f);
+                    narrowphase_collision.object_a = rb_a; narrowphase_collision.object_b = rb_b;
+                }
+                else if (rb_a -> type == object_cube && rb_b -> type == object_cube) collided = collision_dual_cube (rb_a, rb_b, &narrowphase_collision);
+                if (collided) collision_resolve (&narrowphase_collision);
+            }
+        }
+
+        // 3. Integration & Boundary
+        for (int object_iterator_index = 0; object_iterator_index < object_count; object_iterator_index++) {
+            rigidbody *rb = &obj_per_scene [object_iterator_index];
+            rb_integrate (rb, sub_step_dt, world_drag_coefficient);
+            if (!main_inputs.is_debug_mode_active) {
+                boundary_apply_box (rb, (vector3){-250, 0, -250}, (vector3){250, 500, 250});
+            } else {
+                boundary_apply_floor (rb, 0.0f);
+            }
         }
     }
-
-    // Resolve Collisions
-    int maximum_possible_pairs = (object_count * (object_count - 1)) / 2;
-    if (maximum_possible_pairs < 1) {maximum_possible_pairs = 1;}
-    broadphase_pair *broadphase_collision_pairs = malloc (maximum_possible_pairs * sizeof (broadphase_pair));
-    if (broadphase_collision_pairs) {
-        int detected_collision_count = broadphase_generate_pairing (broadphase_collision_pairs, maximum_possible_pairs);
-        for (int collision_index = 0; collision_index < detected_collision_count; collision_index++) {
-            rigidbody *rb_a = &obj_per_scene [broadphase_collision_pairs [collision_index].object_index_a];
-            rigidbody *rb_b = &obj_per_scene [broadphase_collision_pairs [collision_index].object_index_b];
-            collision_data narrowphase_collision;
-            bool collided = false;
-
-            if (rb_a -> type == object_sphere && rb_b -> type == object_sphere) {
-                collided = collision_dual_sphere (rb_a, rb_b, &narrowphase_collision);
-            } else if (rb_a -> type == object_sphere && rb_b -> type == object_cube) {
-                collided = collision_sphere_cube (rb_a, rb_b, &narrowphase_collision);
-            } else if (rb_a -> type == object_cube && rb_b -> type == object_sphere) {
-                collided = collision_sphere_cube (rb_b, rb_a, &narrowphase_collision);
-                narrowphase_collision.normal_vector = vector3_scaling (narrowphase_collision.normal_vector, -1.0f);
-                narrowphase_collision.object_a = rb_a;
-                narrowphase_collision.object_b = rb_b;
-            } else if (rb_a -> type == object_cube && rb_b -> type == object_cube) {
-                collided = collision_dual_cube (rb_a, rb_b, &narrowphase_collision);
-            }
-
-            if (collided) {collision_resolve (&narrowphase_collision);}
-        } free (broadphase_collision_pairs);
-    }
-
-    // Integration and Boundary
-    for (int object_iterator_index = 0; object_iterator_index < object_count; object_iterator_index++) {rb_integrate (&obj_per_scene [object_iterator_index], frame_delta_time, world_drag_coefficient);}
-    
-    if (!main_inputs.is_debug_mode_active) {
-        vector3 boundary_minimum_bounds = {-250.0f, 0.0f, -250.0f};
-        vector3 boundary_maximum_bounds = {250.0f, 500.0f, 250.0f};
-        for (int object_iterator_index = 0; object_iterator_index < object_count; object_iterator_index++) {boundary_apply_box (&obj_per_scene [object_iterator_index], boundary_minimum_bounds, boundary_maximum_bounds);}
-    } else {
-        for (int object_iterator_index = 0; object_iterator_index < object_count; object_iterator_index++) {boundary_apply_floor (&obj_per_scene [object_iterator_index], 0.0f);}
-    } 
+    // --- END SUB-STEPPING ---
 
     gtk_widget_queue_draw (GTK_WIDGET (user_data_pointer));
     overlay_update ();

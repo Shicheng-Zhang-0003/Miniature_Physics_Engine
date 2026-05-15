@@ -5,6 +5,8 @@
 #include "../../../stage3/master_header_3.h"
 extern float spawn_mass;
 extern float spawn_radius;
+extern float spawn_cube_mass;
+extern float spawn_cube_extent;
 extern float spawn_speed;
 extern float friction_static;
 extern float friction_kinetic;
