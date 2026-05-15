@@ -4,7 +4,7 @@
 #include <stdbool.h>
 typedef struct {
     //Keyboard Movement Inputs
-    bool w_key_pressed, a_key_pressed, s_key_pressed, d_key_pressed, space_key_pressed, shift_key_pressed, escape_key_pressed;
+    bool w_key_pressed, a_key_pressed, s_key_pressed, d_key_pressed, space_key_pressed, shift_key_pressed, escape_key_pressed, c_key_pressed;
     //File Load Inputs
     bool is_menu_open;
     bool menu_1_pressed, menu_2_pressed, menu_3_pressed;

@@ -99,6 +99,7 @@ void initialise_input (input_status *input_state) {
         if ((event -> keyval == GDK_KEY_Return) || (event -> keyval == GDK_KEY_KP_Enter)) {input_state -> enter_key_pressed = true;}
     } if (event -> keyval == GDK_KEY_space) {input_state -> space_key_pressed = true;}
     if (event -> keyval == GDK_KEY_Shift_L) {input_state -> shift_key_pressed = true;}
+    if (event -> keyval == GDK_KEY_c || event -> keyval == GDK_KEY_C) {input_state -> c_key_pressed = true;}
     if (event -> keyval == GDK_KEY_Escape) {input_state -> escape_key_pressed = true;}
     if (event -> keyval == GDK_KEY_0) {input_state -> is_debug_mode_active = !input_state -> is_debug_mode_active;}
     return FALSE;
@@ -111,6 +112,7 @@ void initialise_input (input_status *input_state) {
     if (event -> keyval == GDK_KEY_e) {input_state -> e_key_pressed = false;}
     if (event -> keyval == GDK_KEY_space) {input_state -> space_key_pressed = false;}
     if (event -> keyval == GDK_KEY_Shift_L) {input_state -> shift_key_pressed = false;}
+    if (event -> keyval == GDK_KEY_c || event -> keyval == GDK_KEY_C) {input_state -> c_key_pressed = false;}
     if (event -> keyval == GDK_KEY_Escape) {input_state -> escape_key_pressed = false;}
     return FALSE;
 } gboolean on_mouse_movements (GtkWidget *widget, GdkEventMotion *event, gpointer user_data_stored) {
@@ -155,3 +157,4 @@ void initialise_input (input_status *input_state) {
     if (event -> button == 3) {input_state -> right_mouse_button_clicked = false;}
     return FALSE;
 }
+

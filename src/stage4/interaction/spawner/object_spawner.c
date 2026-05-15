@@ -36,5 +36,6 @@ void spawner_launch_sphere (float spherical_radius, float physical_mass, float l
     cube -> velocity = vector3_scaling (main_camera_fov.forward_vector, spawn_speed);
     cube -> friction_static = friction_static;
     cube -> friction_kinetic = friction_kinetic;
+    cube -> colour = (vector3) {0.6f + 0.4f * ((float) (object_count % 3) / 2.0f), 0.4f + 0.6f * ((float) ((object_count + 1) % 3) / 2.0f), 0.2f + 0.8f * ((float) ((object_count + 2) % 3) / 2.0f)};
     object_count += 1;
 }
