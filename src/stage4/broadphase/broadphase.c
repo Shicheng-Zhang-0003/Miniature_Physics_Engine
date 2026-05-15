@@ -8,13 +8,10 @@ int broadphase_generate_pairing (broadphase_pair *collision_pairs_output_array, 
     if (object_count < 2) {return 0;}
     static broadphase_sweep_entry *persistent_sweep_array = NULL;
     static int persistent_sweep_capacity = 0;
-    
     if (object_count > persistent_sweep_capacity) {
         persistent_sweep_capacity = object_count + 64; // Small buffer
         persistent_sweep_array = realloc (persistent_sweep_array, persistent_sweep_capacity * sizeof (broadphase_sweep_entry));
-    }
-    
-    if (!persistent_sweep_array) {return 0;}
+    } if (!persistent_sweep_array) {return 0;}
     for (int object_index = 0; object_index < object_count; object_index++) {
         persistent_sweep_array [object_index].x_minimum = obj_per_scene [object_index].position.x - obj_per_scene [object_index].radius;
         persistent_sweep_array [object_index].object_index = object_index;
@@ -35,9 +32,7 @@ int broadphase_generate_pairing (broadphase_pair *collision_pairs_output_array, 
             if (collision_pair_counter >= maximum_pairs_allowed) {break;}
             int object_index_b = persistent_sweep_array [sweep_index_b].object_index;
             rigidbody *rigid_body_b = &obj_per_scene [object_index_b];
-            
             float combined_radius = (rigid_body_a -> radius + rigid_body_b -> radius) * 1.1f;
-            
             // AABB Check on Y and Z (X already handled by sweep)
             if (fabsf (rigid_body_b -> position.y - rigid_body_a -> position.y) <= combined_radius) {
                 if (fabsf (rigid_body_b -> position.z - rigid_body_a -> position.z) <= combined_radius) {

@@ -34,39 +34,30 @@ static bool collision_dual_sphere (rigidbody *rigidbody_object_a, rigidbody *rig
     //Contact point between objects
     collision_output_data -> contact_point = vector3_addition (rigidbody_object_a -> position, vector3_scaling (collision_output_data -> normal_vector, rigidbody_object_a -> radius));
     return true;
-}
-
-// Helper: Get OBB axes
+} // Helper: Get OBB axes
 static void get_obb_axes (rigidbody *rb, vector3 axes [3]) {
     math3 rot = vector4_to_math3 (rb -> orientation);
     axes [0] = (vector3) {rot.matrix [0][0], rot.matrix [1][0], rot.matrix [2][0]};
     axes [1] = (vector3) {rot.matrix [0][1], rot.matrix [1][1], rot.matrix [2][1]};
     axes [2] = (vector3) {rot.matrix [0][2], rot.matrix [1][2], rot.matrix [2][2]};
-}
-
-// Helper: Project OBB onto axis
+} // Helper: Project OBB onto axis
 static float project_obb (rigidbody *rb, vector3 axis, vector3 axes [3]) {
     return rb -> half_extensions.x * fabsf (vector3_dot (axes [0], axis)) +
            rb -> half_extensions.y * fabsf (vector3_dot (axes [1], axis)) +
            rb -> half_extensions.z * fabsf (vector3_dot (axes [2], axis));
-}
-
-// Detection: Sphere to Cube (OBB)
+} // Detection: Sphere to Cube (OBB)
 static bool collision_sphere_cube (rigidbody *sphere, rigidbody *cube, collision_data *collision_output_data) {
     vector3 axes_cube [3];
     get_obb_axes (cube, axes_cube);
-
     vector3 relative_pos = vector3_subtraction (sphere -> position, cube -> position);
     vector3 closest_point = cube -> position;
     bool inside = true;
     float min_dist = 1000000.0f;
     int nearest_face_axis = 0;
     float nearest_face_sign = 1.0f;
-
     for (int i = 0; i < 3; i++) {
         float dist = vector3_dot (relative_pos, axes_cube [i]);
         float extent = (i == 0) ? cube -> half_extensions.x : (i == 1 ? cube -> half_extensions.y : cube -> half_extensions.z);
-        
         if (dist > extent) {
             dist = extent;
             inside = false;
@@ -79,18 +70,13 @@ static bool collision_sphere_cube (rigidbody *sphere, rigidbody *cube, collision
             float d_neg = extent + dist;
             if (d_pos < min_dist) { min_dist = d_pos; nearest_face_axis = i; nearest_face_sign = 1.0f; }
             if (d_neg < min_dist) { min_dist = d_neg; nearest_face_axis = i; nearest_face_sign = -1.0f; }
-        }
-        closest_point = vector3_addition (closest_point, vector3_scaling (axes_cube [i], dist));
+        } closest_point = vector3_addition (closest_point, vector3_scaling (axes_cube [i], dist));
     }
-
     vector3 diff = vector3_subtraction (sphere -> position, closest_point);
     float distance_sq = vector3_length_squared (diff);
-
     if (!inside && distance_sq > sphere -> radius * sphere -> radius) return false;
-
     collision_output_data -> object_a = sphere;
     collision_output_data -> object_b = cube;
-
     if (inside) {
         // Normal points from sphere center to nearest face (Sphere -> Cube)
         collision_output_data -> normal_vector = vector3_scaling (axes_cube [nearest_face_axis], nearest_face_sign);
@@ -98,93 +84,63 @@ static bool collision_sphere_cube (rigidbody *sphere, rigidbody *cube, collision
         collision_output_data -> contact_point = closest_point; // closest point is on the face
     } else {
         float distance = sqrtf (distance_sq);
-        // Normal must point from Sphere (A) to Cube (B). 
+        // Normal must point from Sphere (A) to Cube (B).
         // diff is (Sphere - closestPoint), which is (A - B_surface).
         // So we need -diff.
         if (distance > 0.0001f) {
             collision_output_data -> normal_vector = vector3_scaling (diff, -1.0f / distance);
         } else {
             collision_output_data -> normal_vector = (vector3) {0.0f, -1.0f, 0.0f};
-        }
-        collision_output_data -> penetration_contact = sphere -> radius - distance;
+        } collision_output_data -> penetration_contact = sphere -> radius - distance;
         collision_output_data -> contact_point = closest_point;
-    }
-
-    return true;
-}
-
-// Detection: Cube to Cube (OBB-OBB) using SAT
+    } return true;
+} // Detection: Cube to Cube (OBB-OBB) using SAT
 static bool collision_dual_cube (rigidbody *cube_a, rigidbody *cube_b, collision_data *collision_output_data) {
     vector3 axes_a [3], axes_b [3];
     get_obb_axes (cube_a, axes_a);
     get_obb_axes (cube_b, axes_b);
-
     vector3 relative_pos = vector3_subtraction (cube_b -> position, cube_a -> position);
-    
     vector3 test_axes [15];
     for (int i = 0; i < 3; i++) test_axes [i] = axes_a [i];
     for (int i = 0; i < 3; i++) test_axes [i + 3] = axes_b [i];
-    
     int axis_idx = 6;
     for (int i = 0; i < 3; i++) {
         for (int j = 0; j < 3; j++) {
             test_axes [axis_idx] = vector3_cross (axes_a [i], axes_b [j]);
-            if (vector3_length_squared (test_axes [axis_idx]) < 0.0001f) {
-                test_axes [axis_idx] = (vector3) {0,0,0}; // Skip degenerate
-            } else {
-                test_axes [axis_idx] = vector3_normalisation (test_axes [axis_idx]);
-            }
+            if (vector3_length_squared (test_axes [axis_idx]) < 0.0001f) {test_axes [axis_idx] = (vector3) {0,0,0};} //Degeneration
+            else {test_axes [axis_idx] = vector3_normalisation (test_axes [axis_idx]);}
             axis_idx++;
         }
-    }
-
-    float min_overlap = 1000000.0f;
+    } float min_overlap = 1000000.0f;
     vector3 best_axis = {0,0,0};
-
     for (int i = 0; i < 15; i++) {
         vector3 axis = test_axes [i];
         if (axis.x == 0 && axis.y == 0 && axis.z == 0) continue;
-
         float projection_a = project_obb (cube_a, axis, axes_a);
         float projection_b = project_obb (cube_b, axis, axes_b);
         float distance = fabsf (vector3_dot (relative_pos, axis));
-
         float overlap = projection_a + projection_b - distance;
         if (overlap < 0) return false;
-
         if (overlap < min_overlap) {
             min_overlap = overlap;
             best_axis = axis;
         }
-    }
-
-    // Ensure normal points from A to B
-    if (vector3_dot (relative_pos, best_axis) < 0) {
-        best_axis = vector3_scaling (best_axis, -1.0f);
-    }
-
+    } // Ensure normal points from A to B
+    if (vector3_dot (relative_pos, best_axis) < 0) {best_axis = vector3_scaling (best_axis, -1.0f);}
     collision_output_data -> object_a = cube_a;
     collision_output_data -> object_b = cube_b;
     collision_output_data -> normal_vector = best_axis;
     collision_output_data -> penetration_contact = min_overlap;
-    
     // Improved contact point: Find vertex of Cube B furthest in direction of -normal
     vector3 contact_point = cube_b -> position;
     for (int i = 0; i < 3; i++) {
         float extent = (i == 0) ? cube_b -> half_extensions.x : (i == 1 ? cube_b -> half_extensions.y : cube_b -> half_extensions.z);
         vector3 offset = vector3_scaling (axes_b [i], extent);
-        if (vector3_dot (offset, best_axis) > 0) {
-            contact_point = vector3_subtraction (contact_point, offset);
-        } else {
-            contact_point = vector3_addition (contact_point, offset);
-        }
-    }
-    collision_output_data -> contact_point = contact_point;
-
+        if (vector3_dot (offset, best_axis) > 0) {contact_point = vector3_subtraction (contact_point, offset);}
+        else {contact_point = vector3_addition (contact_point, offset);}
+    } collision_output_data -> contact_point = contact_point;
     return true;
-}
-
-//Resolution (Impulse-Momemtum) (x, y, z directional vectoring for impulse related calculations)
+} //Resolution (Impulse-Momemtum) (x, y, z directional vectoring for impulse related calculations)
 static void collision_resolve (collision_data *collision) {
     rigidbody *object_a = collision -> object_a, *object_b = collision -> object_b;
     //Calculate the vectors from the centre of mass to the contact point between objects (rad_a, and rad_b)]

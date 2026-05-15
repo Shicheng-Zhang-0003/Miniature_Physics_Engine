@@ -26,6 +26,4 @@ int scene_add_object (float radius, float mass, vector3 initial_position) {
     obj_per_scene [object_green_index].colour = (vector3) {0.3f, 1.0f, 0.3f}; // G
     obj_per_scene [object_blue_index].colour = (vector3) {0.3f, 0.3f, 1.0f}; // B
     obj_per_scene [object_grey_index].colour = (vector3) {0.8f, 0.8f, 0.8f}; // GY
-} void scene_clear (void) {
-    object_count = 0;
-}
+} void scene_clear (void) {object_count = 0;}

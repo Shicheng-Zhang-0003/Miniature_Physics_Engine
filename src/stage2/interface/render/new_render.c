@@ -145,13 +145,10 @@ void render_init () {
         for (int row_index = 0; row_index < 3; row_index++) {
             for (int column_index = 0; column_index < 3; column_index++) {normal_matrix_flat_array [row_index * 3 + column_index] = normal_matrix.matrix [row_index][column_index];}
         } glUniformMatrix3fv (shader_uniform_location_registry.normal_matrix_location, 1, GL_FALSE, normal_matrix_flat_array);
-        //Render Objects
-                //Render Objects - Choose sphere or cube based on type
-        if (rigid_body -> type == object_sphere) {
-            render_sphere_object (&sphere_mesh, rigid_body);
-        } else if (rigid_body -> type == object_cube) {
-            render_cube_object (&cube_mesh, rigid_body);           // We'll add this function next
-        } //Draw Mesh Latitude and Longitudinal Lines (Rotational Visibility)
+        //Render Objects - Choose sphere or cube based on type
+        if (rigid_body -> type == object_sphere) {render_sphere_object (&sphere_mesh, rigid_body);}
+        else if (rigid_body -> type == object_cube) {render_cube_object (&cube_mesh, rigid_body);}
+        //Draw Mesh Latitude and Longitudinal Lines (Rotational Visibility)
         /* Draw rotation axes for each object */ /* Makes the game far too laggy
         for (int step_axes = 0; step_axes < object_count; step_axes++) {
             draw_sphere_axes (&obj_per_scene [step_axes], projection_matrix_flat_array, view_matrix_flat_array);
