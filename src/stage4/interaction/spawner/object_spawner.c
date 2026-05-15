@@ -1,6 +1,8 @@
 #include "object_spawner.h"
 float spawn_mass = 1.0f;
 float spawn_radius = 0.5f;
+float spawn_cube_mass = 2.0f;
+float spawn_cube_extent = 0.5f;
 float spawn_speed = 20.0f;
 float friction_static = 0.3f;
 float friction_kinetic = 0.2f;

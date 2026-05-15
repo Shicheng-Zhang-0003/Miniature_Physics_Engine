@@ -129,18 +129,31 @@ static void rb_integrate (rigidbody *rigid_body, float delta_time, float drag_co
     rigid_body -> acceleration = vector3_scaling (rigid_body -> force_accumilator, rigid_body -> inverse_mass); //Multiply Force by inverse of mass
     //Calculate Instantaneous Velocity
     rigid_body -> velocity = vector3_addition (rigid_body -> velocity, vector3_scaling (rigid_body -> acceleration, delta_time)); //Add currenty velocity to delta v
-    //Damping (Air Resistance)
-    float linear_velocity_damping_factor = pow (drag_coefficient, delta_time);
+    // Damping (Air Resistance) - Increased slightly for stability
+    float linear_velocity_damping_factor = pow (0.98f, delta_time);
     rigid_body -> velocity = vector3_scaling (rigid_body -> velocity, linear_velocity_damping_factor);
+    
+    // Sleep Threshold: Eliminate tiny jitters
+    if (vector3_length_squared (rigid_body -> velocity) < 0.0025f) {
+        rigid_body -> velocity = vector3_zero ();
+    }
+
     //Calculate Position Standard
     rigid_body -> position = vector3_addition (rigid_body -> position, vector3_scaling (rigid_body -> velocity, delta_time)); //Add current position to delta d
+    
     //Update Angular Acceleration Standard
     rigid_body -> angular_acceleration = math3_multiplication_vector3 (rigid_body -> inverse_inertia_system, rigid_body -> torque_accumilator);
+    
     //Update Standard Angular Velocity
     rigid_body -> angular_velocity = vector3_addition (rigid_body -> angular_velocity, vector3_scaling (rigid_body -> angular_acceleration, delta_time)); //Sum of current angular velocity by delta angular velocity
-    //Angular Damping
-    float angular_velocity_damping_factor = pow (drag_coefficient, delta_time);
+    
+    //Angular Damping - High damping helps objects settle
+    float angular_velocity_damping_factor = pow (0.95f, delta_time);
     rigid_body -> angular_velocity = vector3_scaling (rigid_body -> angular_velocity, angular_velocity_damping_factor);
+    
+    if (vector3_length_squared (rigid_body -> angular_velocity) < 0.0025f) {
+        rigid_body -> angular_velocity = vector3_zero ();
+    }
     //Update General Orientation (4D)
     //delta_q = [0, w-axis_values] * q * 0.5f * dt
     vector4 angular_velocity_quaternion = {0, rigid_body -> angular_velocity.x, rigid_body -> angular_velocity.y, rigid_body -> angular_velocity.z}; //Start with no w axis definition

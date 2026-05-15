@@ -224,12 +224,12 @@ static void collision_resolve (collision_data *collision) {
     object_a -> angular_velocity = vector3_addition (object_a -> angular_velocity, math3_multiplication_vector3 (object_a -> inverse_inertia_system, a_angular_impulse)); //Delta angular_v + current angular_v = final angular_v (Object A)
     object_b -> angular_velocity = vector3_addition (object_b -> angular_velocity, math3_multiplication_vector3 (object_b -> inverse_inertia_system, b_angular_impulse)); //Delta angular_v + current_angualr_v = final angular_v (Object B)
     //Correct Position Change Values (FPU error, results in sinking of objects into each other)
-    const float error_correction_percent = 0.2f; //20% correction per frame and motion calculated
-    const float penetration_allowance_slop = 0.01f; //Allowance for object overlap (penetration, sinking)
-    //Correction: Push back proportions by 20% for dropping beneath mesh
+    const float error_correction_percent = 0.15f; // Reduced from 20% to 15% for stability
+    const float penetration_allowance_slop = 0.02f; // Increased allowance to reduce 'kick' jitter
+    //Correction: Push back proportions for dropping beneath mesh
     if (inverse_mass_sum <= 0.0f) {return;}
     float correction_magnitude = fmaxf (collision -> penetration_contact - penetration_allowance_slop, 0.0f);
-    if (correction_magnitude > 0.5f) correction_magnitude = 0.5f; // Safety cap to prevent warping
+    if (correction_magnitude > 2.0f) correction_magnitude = 2.0f; // Increased cap for deeper penetration recovery
     vector3 position_correction = vector3_scaling (collision -> normal_vector, correction_magnitude / inverse_mass_sum * error_correction_percent);
     object_a -> position = vector3_subtraction (object_a -> position, vector3_scaling (position_correction, object_a -> inverse_mass));
     object_b -> position = vector3_addition (object_b -> position, vector3_scaling (position_correction, object_b -> inverse_mass));

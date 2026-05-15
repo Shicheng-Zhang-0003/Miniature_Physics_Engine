@@ -149,7 +149,6 @@ void render_init () {
                 //Render Objects - Choose sphere or cube based on type
         if (rigid_body -> type == object_sphere) {
             render_sphere_object (&sphere_mesh, rigid_body);
-            wireframe_render_object (shaders_program_total, view_matrix, projection_matrix, rigid_body, (vector3) {0.0f, 0.0f, 0.0f});
         } else if (rigid_body -> type == object_cube) {
             render_cube_object (&cube_mesh, rigid_body);           // We'll add this function next
         } //Draw Mesh Latitude and Longitudinal Lines (Rotational Visibility)
