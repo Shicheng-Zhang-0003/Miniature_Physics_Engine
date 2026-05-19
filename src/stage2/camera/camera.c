@@ -1,5 +1,4 @@
 #include "camera.h"
-#include <complex.h>
 #include <math.h>
 void camera_update_vectors (camera *camera_object) {
     //Front Vector --> Pitch and Yaw
@@ -25,19 +24,18 @@ void camera_update_vectors (camera *camera_object) {
     camera_object -> movement_speed = 25.0f; //25 Units of Movement * s ^ -1
     camera_object -> mouse_sensitivity = 0.1f;
     camera_object -> vertical_velocity = 0.0f;
+    camera_object -> horizontal_velocity = (vector3) {0.0f, 0.0f, 0.0f};
     camera_update_vectors (camera_object);
 } //Movement Vectoring
 void camera_move_forward (camera *camera_object, float delta_time) {
-    vector3 camera_velocity = vector3_scaling (camera_object -> forward_vector, camera_object -> movement_speed * delta_time);
-    camera_object -> position = vector3_addition (camera_object -> position, camera_velocity);
+    vector3 flat_forward = vector3_normalisation ((vector3) {camera_object -> forward_vector.x, 0.0f, camera_object -> forward_vector.z});
+    camera_object -> horizontal_velocity = vector3_addition (camera_object -> horizontal_velocity, vector3_scaling (flat_forward, camera_object -> movement_speed * 8.0f * delta_time));
 } void camera_move_backward (camera *camera_object, float delta_time) {
-    vector3 camera_velocity = vector3_scaling (camera_object -> forward_vector, camera_object -> movement_speed * delta_time);
-    camera_object -> position = vector3_subtraction (camera_object -> position, camera_velocity);
+    vector3 flat_forward = vector3_normalisation ((vector3) {camera_object -> forward_vector.x, 0.0f, camera_object -> forward_vector.z});
+    camera_object -> horizontal_velocity = vector3_subtraction (camera_object -> horizontal_velocity, vector3_scaling (flat_forward, camera_object -> movement_speed * 8.0f * delta_time));
 } //Strafe uses the Right/Side Vector
 void camera_move_left (camera *camera_object, float delta_time) {
-    vector3 camera_velocity = vector3_scaling (camera_object -> side_vector, camera_object -> movement_speed * delta_time);
-    camera_object -> position = vector3_subtraction (camera_object -> position, camera_velocity);
+    camera_object -> horizontal_velocity = vector3_subtraction (camera_object -> horizontal_velocity, vector3_scaling (camera_object -> side_vector, camera_object -> movement_speed * 8.0f * delta_time));
 } void camera_move_right (camera *camera_object, float delta_time) {
-    vector3 camera_velocity = vector3_scaling (camera_object -> side_vector, camera_object -> movement_speed * delta_time);
-    camera_object -> position = vector3_addition (camera_object -> position, camera_velocity);
+    camera_object -> horizontal_velocity = vector3_addition (camera_object -> horizontal_velocity, vector3_scaling (camera_object -> side_vector, camera_object -> movement_speed * 8.0f * delta_time));
 }

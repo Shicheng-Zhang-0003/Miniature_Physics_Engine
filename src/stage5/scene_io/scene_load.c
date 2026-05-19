@@ -43,6 +43,7 @@ int scene_loading (const char *file_source_path) {
             object_count += 1;
         } else {loaded_object_index = scene_add_object (object_radius, loaded_physical_mass, object_position);}
         if (loaded_object_index < 0) {fclose (file_source); return 0;}
+        obj_per_scene [loaded_object_index].static_state = (bool) object_static_state;
         obj_per_scene [loaded_object_index].velocity = object_velocity;
         obj_per_scene [loaded_object_index].angular_velocity = object_angular_velocity;
         obj_per_scene [loaded_object_index].orientation = object_orientation;

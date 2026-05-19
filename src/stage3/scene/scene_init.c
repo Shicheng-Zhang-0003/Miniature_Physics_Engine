@@ -1,4 +1,5 @@
 #include "scene_init.h"
+#include "../../stage5/constraints/spring_joint.h"
 #include <stdlib.h>
 #include <stdio.h>
 //Maximum Object count

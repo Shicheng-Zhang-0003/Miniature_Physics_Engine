@@ -12,7 +12,8 @@ typedef struct {
     //Base Settings
     float movement_speed; //How Fast the Camera POV moves
     float mouse_sensitivity; //How sensitive the mouse is
-    float vertical_velocity; // For jumping and gravity
+    float vertical_velocity; //For jumping and gravity
+    vector3 horizontal_velocity; //How fast objects travel, well, horizontally
 } camera;
 //Init Camera (starting values)
 void initialize_camera (camera *camera_object, vector3 starting_position);
