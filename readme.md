@@ -25,6 +25,7 @@ Engine Mechanics:
         3G: Once a object has been selected, press the F key to exert a impulse/force.
         3H: Once a object has been selected, left click to delete the object.
         3I: Space Bar is reserved for jumping in Game Mode.
+        3J: In Versions 0.9.8 and beyond, in Debug Mode, IJKL can be used to steer again is mouse is not present.
 
 Known Bugs:
     PSX = Programming Syntax Bug, OBP = Operational Bug, ECP = External Compatiability Bug, LIC = Library Incompleteness Bug
