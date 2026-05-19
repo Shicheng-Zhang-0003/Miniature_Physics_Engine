@@ -48,7 +48,7 @@ static void force_applicant_friction_rolling (rigidbody *rigid_body, vector3 sur
         rb_apply_forces_localised (rigid_body, kinetic_friction_force, vector3_addition (rigid_body -> position, relative_contact_vector));
     } else {
         //Static Friction --> Neutralise tangent forces
-        vector3 accumulated_tangential_force = vector3_subtraction (rigid_body -> force_accumilator, vector3_scaling (surface_normal, vector3_dot (rigid_body -> force_accumilator, surface_normal)));
+        vector3 accumulated_tangential_force = vector3_subtraction (rigid_body -> force_accumulator, vector3_scaling (surface_normal, vector3_dot (rigid_body -> force_accumulator, surface_normal)));
         float accumulated_force_magnitude = vector3_length (accumulated_tangential_force);
         if (accumulated_force_magnitude < static_friction_coefficient * normal_force_magnitude) {
             rb_apply_forces_perfect (rigid_body, vector3_scaling (accumulated_tangential_force, -1.0f));
@@ -73,7 +73,7 @@ static void force_applicant_friction_rolling (rigidbody *rigid_body, vector3 sur
     } else {
         //Static Friction: opposition to any form of newly added motion from externalised force
         //Calculated already applied forces
-        vector3 accumulated_tangential_force = vector3_subtraction (rigid_body -> force_accumilator, vector3_scaling (surface_normal, vector3_dot (rigid_body -> force_accumilator, surface_normal))); //Accumulated force applied to existing net input for net force output applied on the object
+        vector3 accumulated_tangential_force = vector3_subtraction (rigid_body -> force_accumulator, vector3_scaling (surface_normal, vector3_dot (rigid_body -> force_accumulator, surface_normal))); //Accumulated force applied to existing net input for net force output applied on the object
         float accumulated_force_magnitude = vector3_length (accumulated_tangential_force);
         if (accumulated_force_magnitude < static_friction_coefficient * normal_force_magnitude) {
             //Force applied < Force Static Friction --> No movement

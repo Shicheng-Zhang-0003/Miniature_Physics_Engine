@@ -1,7 +1,7 @@
 # readme.md
 
 ```
-This is the pre-1.0 release testing edition of the Miniature Physics Engine (MPE, v0.9.7-Alpha).
+This is the pre-1.0 release testing edition of the Miniature Physics Engine (MPE, v0.9.8-Alpha).
 
 It is a rigid body physics engine designed around simplicity, ease of use, and efficiency.
 
@@ -20,11 +20,11 @@ Engine Mechanics:
         3B: WASD to move the camera and general viewpoint.
         3C: Pressing 0 toggles between Debug Mode and Game Mode, Debug Mode has no borders and more information presented about individual objects.
         3D: Pressing 9 gives the option to save the current state of the object layout, load a previously saved layout, or exit the engine.
-        3E: Pressing 8 manipulates how objects are spawned. Prism objects spawning will be added in future versions.
-        3E1: Pressing C for v0.9.7-Alpha spawns a cube, dimensions can be modified.
+        3E: Pressing 8 manipulates how objects are spawned.
         3F: Right Click a object to select a object.
-        3G: Once a object has been selected, press the space bar to exert a impulse/force.
+        3G: Once a object has been selected, press the F key to exert a impulse/force.
         3H: Once a object has been selected, left click to delete the object.
+        3I: Space Bar is reserved for jumping in Game Mode.
 
 Known Bugs:
     PSX = Programming Syntax Bug, OBP = Operational Bug, ECP = External Compatiability Bug, LIC = Library Incompleteness Bug
@@ -38,17 +38,17 @@ Known Bugs:
         - Change In the future to a O (n) loop at best for looping or dual O (n) separated loops to prevent O (n ^ 2) repetition.
     PSX-001 (PARTIAL) (MLCULMT, MALLOC UPPER LIMIT): Objects spawned quickly exceeding a count of 1136 objects will result in the engine feeling slightly slowed down.
         - Changes in PSX-000 O (n ^ 2) loop may alleviate some of these results.
-    PSX-002 (AXLLAG, AXIAL RENDER LAG): Previously, the program rendered a stational x, y, and z reference axes for each individual object. However, this severly impacted performace and was omitted temporarily with v0.9.0.1-STBL.
+    PSX-002 (REPLACED, EQUATORIAL LINES AROUND EACH DIMENSION OF THE OBJECT) (AXLLAG, AXIAL RENDER LAG): Previously, the program rendered a stational x, y, and z reference axes for each individual object. However, this severly impacted performace and was omitted temporarily with v0.9.0.1-STBL.
         - Now that rotational motion of spheres has been rectified, this is no longer of immediate concern.
         - However, in the future, for debug mode, such functionality may return, and resource allocation is of the essence to prevent high stage lag of the system.
     PSX-003 (SOLVED) (FPPSCL, FLOATING POINT PRECISION SCALE): In 0.9.5-Alpha, any form of modification to any values is += 0.01, which is far too low if not in debug mode.
         - Add a specific option for debug mode to change increment/decrement values.
         - For Game Mode, switch to a nominal +- of 0.2 for all changable constant values.
-    PSX-004 (STIPLG, STARTING INPUT LAG): In 0.9.7-Alpha, after just starting the engine itself, spawning objects may require some time to load properly and actually respond.
+    PSX-004 (SOLVED) (STIPLG, STARTING INPUT LAG): In 0.9.7-Alpha, after just starting the engine itself, spawning objects may require some time to load properly and actually respond.
         - Fix by finding comflicting spawning logic later, for now, just marvel at the fact that 0.9.7-Alpha was managed to be done on time in the first place.
 
-    OPB-000 (MTNLCK, MOTION LOCK): Under continuous input, sometimes, the camera viewpoint may be stuck moving in one direction. In this case, manipulating the object into random, rapid motion counteracts and stops the uncommanded movement of the camera.
-        - In some cases, save the current state of the engine, and restart the executable to solve the issue.
+    OPB-000 (MTNLCK, MOTION LOCK): Under continuous input, sometimes, the camera viewpoint may be stuck moving in one direction. In this case, pressing the key which the object is currently moving in counteracts and stops the uncommanded movement of the camera.
+        - For example, if you are stuck forwards, simply press W to resolve issue for now.
 
     ECP-000 (MSEWYLD, MOUSE WAYLAND): Under Wayland, mouse automatically disengages with out of the bounds of the window itself and does not lock properly.
         - When transitioning from IJKL perspective control, this was a major thing in versions 0.9.1 to 0.9.2.

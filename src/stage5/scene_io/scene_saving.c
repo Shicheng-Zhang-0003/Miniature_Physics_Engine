@@ -15,7 +15,7 @@ int save_scene (const char *file_destination_path) {
         //orientation.w, orientation.x, orientation.y, orientation.z
         //colour.x, colour.y, colour.z
         //restitution value
-        fprintf (file_destination, "%.6f %.6f %d\n", rigid_body_pointer -> radius, rigid_body_pointer -> mass, (int) rigid_body_pointer -> static_state);
+        fprintf (file_destination, "%.6f %.6f %d %d %.6f %.6f %.6f\n", rigid_body_pointer -> radius, rigid_body_pointer -> mass, (int) rigid_body_pointer -> static_state, (int) rigid_body_pointer -> type, rigid_body_pointer -> half_extensions.x, rigid_body_pointer -> half_extensions.y, rigid_body_pointer -> half_extensions.z);
         fprintf (file_destination, "%.6f %.6f %.6f\n", rigid_body_pointer -> position.x, rigid_body_pointer -> position.y, rigid_body_pointer -> position.z);
         fprintf (file_destination, "%.6f %.6f %.6f\n", rigid_body_pointer -> velocity.x, rigid_body_pointer -> velocity.y, rigid_body_pointer -> velocity.z);
         fprintf (file_destination, "%.6f %.6f %.6f\n", rigid_body_pointer -> angular_velocity.x, rigid_body_pointer -> angular_velocity.y, rigid_body_pointer -> angular_velocity.z);

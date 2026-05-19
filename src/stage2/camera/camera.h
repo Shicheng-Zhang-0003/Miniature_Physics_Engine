@@ -12,9 +12,10 @@ typedef struct {
     //Base Settings
     float movement_speed; //How Fast the Camera POV moves
     float mouse_sensitivity; //How sensitive the mouse is
+    float vertical_velocity; // For jumping and gravity
 } camera;
 //Init Camera (starting values)
-void initalise_camera (camera *camera_object, vector3 starting_position);
+void initialize_camera (camera *camera_object, vector3 starting_position);
 //4 ^ 4 view matrix --> OpenGL shaders
 //void camera_view_matrix (camera *camera_object, float *matrix_output);
 //Input and Motion Functions
