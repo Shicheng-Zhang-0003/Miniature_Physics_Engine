@@ -29,7 +29,7 @@ int main_algorithm (int argc, char *argv []) {
     g_setenv ("GDK_BACKEND", "x11", FALSE);
     gtk_init (&argc, &argv);
     //Camera Init
-    initalise_camera (&main_camera_fov, (vector3) {0.0f, 20.0f, 50.0f});
+    initialize_camera (&main_camera_fov, (vector3) {0.0f, 20.0f, 50.0f});
     initialise_input (&main_inputs);
     //Widgeting
     GtkWidget *main_window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
@@ -45,7 +45,7 @@ int main_algorithm (int argc, char *argv []) {
     g_signal_connect (main_window, "button-press-event", G_CALLBACK (on_button_press), &main_inputs);
     g_signal_connect (main_window, "button-release-event", G_CALLBACK (on_button_release), &main_inputs);
     //Add Objects
-    GtkWidget *ui_overlay_layout = overlay_init (gl_area_widget);
+    GtkWidget *ui_overlay_layout = overlay_initialise (gl_area_widget);
     gtk_container_add (GTK_CONTAINER (main_window), ui_overlay_layout);
     //Focus and Event Catching
     gtk_widget_set_can_focus (main_window, TRUE);

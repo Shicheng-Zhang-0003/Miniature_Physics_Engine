@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = $(shell pkg-config --cflags gtk+-3.0 epoxy) -I. -Wall -Wextra
+CFLAGS = $(shell pkg-config --cflags gtk+-3.0 epoxy) -I. -O3 -march=native -Wall -Wextra
 LIBS = $(shell pkg-config --libs gtk+-3.0 epoxy) -lm
 
 SRCS = stage1/root_gtk.c \
@@ -21,6 +21,7 @@ SRCS = stage1/root_gtk.c \
        stage4/debug_overlay/overlay.c \
        stage5/rendering/grid.c \
        stage5/rendering/wireframe.c \
+       stage5/constraints/spring_joint.c \
        stage5/scene_io/scene_saving.c \
        stage5/scene_io/scene_load.c \
 

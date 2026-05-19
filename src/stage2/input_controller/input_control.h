@@ -4,7 +4,9 @@
 #include <stdbool.h>
 typedef struct {
     //Keyboard Movement Inputs
-    bool w_key_pressed, a_key_pressed, s_key_pressed, d_key_pressed, space_key_pressed, shift_key_pressed, escape_key_pressed, c_key_pressed;
+    bool w_key_pressed, a_key_pressed, s_key_pressed, d_key_pressed, space_key_pressed, shift_key_pressed, escape_key_pressed, f_key_pressed;
+    // Camera Emulation (IJKL)
+    bool i_key_pressed, j_key_pressed, k_key_pressed, l_key_pressed;
     //File Load Inputs
     bool is_menu_open;
     bool menu_1_pressed, menu_2_pressed, menu_3_pressed;
@@ -12,10 +14,11 @@ typedef struct {
     int spawner_menu_level;
     int velocity_menu_level;
     int object_menu_level;
-    bool up_arrow_pressed, down_arrow_pressed, enter_key_pressed, e_key_pressed;
+    int current_spawn_type; // 0: Sphere, 1: Cube
+    bool up_arrow_pressed, down_arrow_pressed, left_arrow_pressed, right_arrow_pressed, enter_key_pressed, e_key_pressed;
     //Mouse Status Inputs
     bool is_mouse_locked, is_debug_mode_active;
-    bool left_mouse_button_clicked, right_mouse_button_clicked;
+    bool left_mouse_button_clicked, right_mouse_button_clicked, middle_mouse_button_clicked;
     float mouse_delta_x, mouse_delta_y;
 } input_status;
 //Initialise input state to zeroing

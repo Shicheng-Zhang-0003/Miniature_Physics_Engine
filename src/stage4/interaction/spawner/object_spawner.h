@@ -10,7 +10,6 @@ extern float spawn_cube_extent;
 extern float spawn_speed;
 extern float friction_static;
 extern float friction_kinetic;
-extern float spawn_cube_side_length;
 //Spawn a sphere at the position of the camera, and fire in a vector exactly equal to the vector of camera view
 void spawner_launch_sphere (float spherical_radius, float physical_mass, float launch_speed);
 //Spawn a static sphere (floating sphere), fixed position

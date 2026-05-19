@@ -5,7 +5,7 @@
 #include <math.h>
 void init_sm_system (mesh *mesh_object, int horizontal_sections, int vertical_stacks) {
     //Calculate the number of vertices we require for rendering
-    // (vertical_stacks + 1)(horizontal_sections + 1) total amount fo vertices required
+    //(vertical_stacks + 1) (horizontal_sections + 1) total amount of vertices required
     int vertex_count = (vertical_stacks + 1) * (horizontal_sections + 1);
     float *vertex_data = malloc (vertex_count * 6 * sizeof (float));
     //Generate Vertex COordinates for rendering
@@ -39,8 +39,7 @@ void init_sm_system (mesh *mesh_object, int horizontal_sections, int vertical_st
     for (int section_index = 0; section_index < horizontal_sections; section_index++) {
         wireframe_indices [wireframe_index++] = middle_stack_index * (horizontal_sections + 1) + section_index;
         wireframe_indices [wireframe_index++] = middle_stack_index * (horizontal_sections + 1) + section_index + 1;
-    }
-    //Vertical 1 (XY plane)
+    } //Vertical 1 (XY plane)
     int theta_0_index = 0;
     int theta_pi_index = horizontal_sections / 2;
     for (int stack_index = 0; stack_index < vertical_stacks; stack_index++) {
@@ -48,8 +47,7 @@ void init_sm_system (mesh *mesh_object, int horizontal_sections, int vertical_st
         wireframe_indices [wireframe_index++] = (stack_index + 1) * (horizontal_sections + 1) + theta_0_index;
         wireframe_indices [wireframe_index++] = stack_index * (horizontal_sections + 1) + theta_pi_index;
         wireframe_indices [wireframe_index++] = (stack_index + 1) * (horizontal_sections + 1) + theta_pi_index;
-    }
-    //Vertical 2 (YZ plane)
+    } //Vertical 2 (YZ plane)
     int theta_pi_half_index = horizontal_sections / 4;
     int theta_three_pi_half_index = 3 * horizontal_sections / 4;
     for (int stack_index = 0; stack_index < vertical_stacks; stack_index++) {
@@ -57,8 +55,7 @@ void init_sm_system (mesh *mesh_object, int horizontal_sections, int vertical_st
         wireframe_indices [wireframe_index++] = (stack_index + 1) * (horizontal_sections + 1) + theta_pi_half_index;
         wireframe_indices [wireframe_index++] = stack_index * (horizontal_sections + 1) + theta_three_pi_half_index;
         wireframe_indices [wireframe_index++] = (stack_index + 1) * (horizontal_sections + 1) + theta_three_pi_half_index;
-    }
-    mesh_object -> wireframe_index_count = wireframe_index;
+    } mesh_object -> wireframe_index_count = wireframe_index;
     //Quads in each grid is split into dual triangle configurations
     mesh_object -> index_count = vertical_stacks * horizontal_sections * 6;
     unsigned int *element_indices = malloc (mesh_object -> index_count * sizeof (unsigned int));
