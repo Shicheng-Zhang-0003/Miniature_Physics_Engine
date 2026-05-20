@@ -4,7 +4,7 @@
 #include "../../../stage5/rendering/wireframe.h"
 #include "../../../stage5/constraints/spring_joint.h"
 #include "../../interface/sphere_object/meshing/sphere_meshing.h"
-#include "../../interface/sphere_object/meshing/cube_meshing.h"
+#include "../../interface/cube_object/meshing/cube_meshing.h"
 #include "shader_loading.h"
 #include <complex.h>
 #include <epoxy/gl.h>

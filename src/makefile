@@ -1,15 +1,15 @@
 CC = gcc
-CFLAGS = $(shell pkg-config --cflags gtk+-3.0 epoxy) -I. -O3 -march=native -Wall -Wextra
-LIBS = $(shell pkg-config --libs gtk+-3.0 epoxy) -lm
+flags = $(shell pkg-config --cflags gtk+-3.0 epoxy) -I. -O3 -march=native -Wall -Wextra
+lib = $(shell pkg-config --libs gtk+-3.0 epoxy) -lm
 
-SRCS = stage1/root_gtk.c \
+source = stage1/root_gtk.c \
        stage2/camera/camera.c \
        stage2/input_controller/input_control.c \
        stage2/interface/simulate/simulation.c \
        stage2/interface/render/shader_loading.c \
        stage2/interface/render/new_render.c \
        stage2/interface/sphere_object/meshing/sphere_meshing.c \
-       stage2/interface/sphere_object/meshing/cube_meshing.c \
+       stage2/interface/cube_object/meshing/cube_meshing.c \
 	   stage2/interface/gui/gui.c \
        stage3/boundary/boundary.c \
        stage3/scene/scene_init.c \
@@ -25,8 +25,8 @@ SRCS = stage1/root_gtk.c \
        stage5/scene_io/scene_saving.c \
        stage5/scene_io/scene_load.c \
 
-engine: $(SRCS)
-	$(CC) $(CFLAGS) $(SRCS) $(LIBS) -o engine
+engine: $(source)
+	$(CC) $(flags) $(source) $(lib) -o engine
 
 clean:
 	rm -f engine

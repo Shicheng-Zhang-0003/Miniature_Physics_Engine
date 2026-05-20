@@ -1,3 +1,4 @@
+#include "stage2/interface/sphere_object/meshing/sphere_meshing.h"
 #include "cube_meshing.h"
 #include <epoxy/gl.h>
 #include <epoxy/gl_generated.h>

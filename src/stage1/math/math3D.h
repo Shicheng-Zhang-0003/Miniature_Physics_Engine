@@ -95,9 +95,7 @@ static inline math3 vector4_to_math3 (vector4 quaternion) {
 static inline math3 math3_multiplication (math3 matrix_a, math3 matrix_b) {
     math3 result_matrix = {{{0}}};
     for (int row_index = 0; row_index < 3; row_index++) {
-        for (int column_index = 0; column_index < 3; column_index++) {
-            result_matrix.matrix [row_index][column_index] = (matrix_a.matrix [row_index][0] * matrix_b.matrix [0][column_index]) + (matrix_a.matrix [row_index][1] * matrix_b.matrix [1][column_index]) + (matrix_a.matrix [row_index][2] * matrix_b.matrix [2][column_index]);
-        }
+        for (int column_index = 0; column_index < 3; column_index++) {result_matrix.matrix [row_index][column_index] = (matrix_a.matrix [row_index][0] * matrix_b.matrix [0][column_index]) + (matrix_a.matrix [row_index][1] * matrix_b.matrix [1][column_index]) + (matrix_a.matrix [row_index][2] * matrix_b.matrix [2][column_index]);}
     } return result_matrix;
 } static inline math3 math3_transposition (math3 matrix) {
     math3 result_matrix;

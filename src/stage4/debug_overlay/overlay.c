@@ -1,7 +1,6 @@
 #include "overlay.h"
 #include "../../stage1/master_header.h"
 #include "../interaction/spawner/object_spawner.h"
-#include <complex.h>
 #include <stdint.h>
 #include <stdio.h>
 static GtkWidget *debug_information_label = NULL;
@@ -19,7 +18,6 @@ extern float world_surface_friction_kinetic;
 extern rigidbody *obj_per_scene;
 extern int object_count;
 extern int selected_object;
-extern float character_weight;
 extern float variable_change_rate;
 extern float jump_height;
 GtkWidget *overlay_initialise (GtkWidget *gl_drawing_area_widget) {
@@ -116,8 +114,10 @@ GtkWidget *overlay_initialise (GtkWidget *gl_drawing_area_widget) {
         else {
             char object_text [512];
             rigidbody *target = &obj_per_scene [selected_object];
-            if (main_inputs.object_menu_level == 1) {snprintf (object_text, sizeof (object_text), "-- Object %d Properties --\n1: Mass\n2: Radius\n3: Friction\n4: Immovable Toggle", selected_object);}
-            else if (main_inputs.object_menu_level == 2) {snprintf (object_text, sizeof (object_text), "-- Mass Adjustment --\nCurrent: %.2f kg\n\nUp/Down: +/- %.2f\nEnter: Save", target -> mass, adjustment_increment);}
+            if (main_inputs.object_menu_level == 1) {
+                if (target -> type == object_sphere) {snprintf (object_text, sizeof (object_text), "-- Object %d (Sphere) --\n1: Mass\n2: Radius\n3: Friction\n4: Immovable Toggle", selected_object);}
+                else {snprintf (object_text, sizeof (object_text), "-- Object %d (Cube) --\n1: Mass\n2: (Radius N/A)\n3: Friction\n4: Immovable Toggle", selected_object);}
+            } else if (main_inputs.object_menu_level == 2) {snprintf (object_text, sizeof (object_text), "-- Mass Adjustment --\nCurrent: %.2f kg\n\nUp/Down: +/- %.2f\nEnter: Save", target -> mass, adjustment_increment);}
             else if (main_inputs.object_menu_level == 3) {snprintf (object_text, sizeof (object_text), "-- Radius Adjustment --\nCurrent: %.2f m\n\nUp/Down: +/- %.2f\nEnter: Save", target -> radius, adjustment_increment);}
             else if (main_inputs.object_menu_level == 4) {snprintf (object_text, sizeof (object_text), "-- Friction Adjustment --\nStatic (u_s): %.2f | Kinetic (u_k): %.2f\n\nUp/Down: +/- %.2f (u_k)\nEnter: Save", target -> friction_static, target -> friction_kinetic, adjustment_increment);}
             else if (main_inputs.object_menu_level == 5) {

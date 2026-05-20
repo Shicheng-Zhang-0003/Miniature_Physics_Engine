@@ -4,6 +4,7 @@
 #include "camera/camera.h"
 #include "input_controller/input_control.h"
 #include "interface/sphere_object/meshing/sphere_meshing.h"
+#include "interface/cube_object/meshing/cube_meshing.h"
 #include "interface/render/shader_loading.h"
 #include "continued_loop/timer.h"
 #include <gtk/gtk.h>

@@ -163,3 +163,27 @@ void initialise_input (input_status *input_state) {
     if (event -> button == 3) {input_state -> right_mouse_button_clicked = false;}
     return FALSE;
 }
+gboolean on_focus_out (GtkWidget *widget, GdkEventFocus *event, gpointer user_data_stored) {
+    (void) widget;
+    (void) event;
+    input_status *input_state = (input_status *) user_data_stored;
+    input_state -> w_key_pressed = false;
+    input_state -> a_key_pressed = false;
+    input_state -> s_key_pressed = false;
+    input_state -> d_key_pressed = false;
+    input_state -> space_key_pressed = false;
+    input_state -> shift_key_pressed = false;
+    input_state -> escape_key_pressed = false;
+    input_state -> f_key_pressed = false;
+    input_state -> i_key_pressed = false;
+    input_state -> j_key_pressed = false;
+    input_state -> k_key_pressed = false;
+    input_state -> l_key_pressed = false;
+    input_state -> up_arrow_pressed = false;
+    input_state -> down_arrow_pressed = false;
+    input_state -> left_arrow_pressed = false;
+    input_state -> right_arrow_pressed = false;
+    input_state -> enter_key_pressed = false;
+    input_state -> e_key_pressed = false;
+    return FALSE;
+}

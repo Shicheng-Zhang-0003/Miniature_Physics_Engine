@@ -33,12 +33,6 @@ static bool collision_dual_sphere (rigidbody *rigidbody_object_a, rigidbody *rig
     //Contact point between objects
     collision_output_data -> contact_point = vector3_addition (rigidbody_object_a -> position, vector3_scaling (collision_output_data -> normal_vector, rigidbody_object_a -> radius));
     return true;
-} // Helper: Get OBB axes
-static void get_obb_axes (rigidbody *rigid_body, vector3 axes [3]) {
-    math3 rotation_matrix = vector4_to_math3 (rigid_body -> orientation);
-    axes [0] = (vector3) {rotation_matrix.matrix [0][0], rotation_matrix.matrix [1][0], rotation_matrix.matrix [2][0]};
-    axes [1] = (vector3) {rotation_matrix.matrix [0][1], rotation_matrix.matrix [1][1], rotation_matrix.matrix [2][1]};
-    axes [2] = (vector3) {rotation_matrix.matrix [0][2], rotation_matrix.matrix [1][2], rotation_matrix.matrix [2][2]};
 } //Project OBB onto axis renders
 static float project_obb (rigidbody *rigid_body, vector3 axis, vector3 axes [3]) {
     return rigid_body -> half_extensions.x * fabsf (vector3_dot (axes [0], axis)) + rigid_body -> half_extensions.y * fabsf (vector3_dot (axes [1], axis)) + rigid_body -> half_extensions.z * fabsf (vector3_dot (axes [2], axis));
