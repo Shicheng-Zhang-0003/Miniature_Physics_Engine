@@ -1,7 +1,7 @@
 # readme.md
 
 ```
-This is the pre-1.0 release testing edition of the Miniature Physics Engine (MPE, v0.9.8-Alpha).
+This is the 1.0 release testing edition of the Miniature Physics Engine (MPE, v1.0-RC).
 
 It is a rigid body physics engine designed around simplicity, ease of use, and efficiency.
 
@@ -10,7 +10,7 @@ The core facets of designing this enigne were:
     2: Unless required for extremely complex tasks such as ray tracing, do not invoke OpenGL or extraneous graphics libraries.
     3: All mathematical compulation components much be programmed from scratch.
 
-As of right now, the engine is still under development, and it is inadvisable to attempt to run using conversion software on Windows.
+It is inadvisable to attempt to run using conversion software on Windows right now.
 
 Engine Mechanics:
     1. Run ./engine to begin running.
