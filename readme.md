@@ -16,14 +16,14 @@ Engine Mechanics:
     1. Run ./engine to begin running.
     2. Clicking with the left mouse button locks mouse input onto the screen. Esc to detach cursor.
     3. Once inside the engine:
-        3A: Shift Key spawns new objects. Hold down for 1.5 seconds to begin spam spawning objects.
+        3A: Shift Key spawns new objects. Hold down to spam spawning objects.
         3B: WASD to move the camera and general viewpoint.
         3C: Pressing 0 toggles between Debug Mode and Game Mode, Debug Mode has no borders and more information presented about individual objects.
         3D: Pressing 9 gives the option to save the current state of the object layout, load a previously saved layout, or exit the engine.
         3E: Pressing 8 manipulates how objects are spawned.
         3F: Right Click a object to select a object.
         3G: Once a object has been selected, press the F key to exert a impulse/force.
-        3H: Once a object has been selected, left click to delete the object.
+        3H: Once a object has been selected, click the scroll wheel to delete the object.
         3I: Space Bar is reserved for jumping in Game Mode.
         3J: In Versions 0.9.8 and beyond, in Debug Mode, IJKL can be used to steer again is mouse is not present.
 
@@ -48,8 +48,10 @@ Known Bugs:
     PSX-004 (SOLVED) (STIPLG, STARTING INPUT LAG): In 0.9.7-Alpha, after just starting the engine itself, spawning objects may require some time to load properly and actually respond.
         - Fix by finding comflicting spawning logic later, for now, just marvel at the fact that 0.9.7-Alpha was managed to be done on time in the first place.
 
-    OPB-000 (MTNLCK, MOTION LOCK): Under continuous input, sometimes, the camera viewpoint may be stuck moving in one direction. In this case, pressing the key which the object is currently moving in counteracts and stops the uncommanded movement of the camera.
-        - For example, if you are stuck forwards, simply press W to resolve issue for now.
+    OPB-000 (PARTIAL) (MTNLCK, MOTION LOCK): Under continuous input, sometimes, the camera viewpoint may be stuck moving in one direction. In this case, pressing the key which the object is currently moving in counteracts and stops the uncommanded movement of the camera.
+        - Fixed by connecting a focus-out-event signal to GtkWindow, resetting all movement and emulation key presses to false when focus is dropped.
+        - However, in 1.0-RC, there is a return of this issue potentially resulting in a reformatted meshing hierarchy.
+        - For stability revert to 0.9.9-Alpha if required.
 
     ECP-000 (MSEWYLD, MOUSE WAYLAND): Under Wayland, mouse automatically disengages with out of the bounds of the window itself and does not lock properly.
         - When transitioning from IJKL perspective control, this was a major thing in versions 0.9.1 to 0.9.2.

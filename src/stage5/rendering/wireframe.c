@@ -1,6 +1,6 @@
 #include "wireframe.h"
 #include "../../stage2/interface/sphere_object/meshing/sphere_meshing.h"
-#include "../../stage2/interface/sphere_object/meshing/cube_meshing.h"
+#include "../../stage2/interface/cube_object/meshing/cube_meshing.h"
 #include <epoxy/gl_generated.h>
 extern mesh sphere_mesh;
 extern mesh cube_mesh;

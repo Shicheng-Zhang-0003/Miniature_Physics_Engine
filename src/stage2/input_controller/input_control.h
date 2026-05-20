@@ -28,4 +28,5 @@ gboolean on_key_released (GtkWidget *widget, GdkEventKey *event, gpointer user_d
 gboolean on_mouse_movements (GtkWidget *widget, GdkEventMotion *event, gpointer user_data_stored);
 gboolean on_button_press (GtkWidget *widget, GdkEventButton *event, gpointer user_data_stored);
 gboolean on_button_release (GtkWidget *widget, GdkEventButton *event, gpointer user_data_stored);
+gboolean on_focus_out (GtkWidget *widget, GdkEventFocus *event, gpointer user_data_stored);
 #endif
