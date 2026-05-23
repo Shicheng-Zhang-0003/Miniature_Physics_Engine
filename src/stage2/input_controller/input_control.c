@@ -44,6 +44,7 @@ void initialise_input (input_status *input_state) {
     input_state -> middle_mouse_button_clicked = false;
     input_state -> mouse_delta_x = 0.0f;
     input_state -> mouse_delta_y = 0.0f;
+    input_state -> suppress_mouse_delta = false;
 } gboolean on_keypress (GtkWidget *widget, GdkEventKey *event, gpointer user_data_stored) {
     input_status *input_state = (input_status *) user_data_stored;
     if (event -> keyval == GDK_KEY_w) {input_state -> w_key_pressed = true;}
@@ -130,13 +131,23 @@ void initialise_input (input_status *input_state) {
         int current_mouse_x = (int) (event -> x);
         int current_mouse_y = (int) (event -> y);
         if (((current_mouse_x == last_warp_x) && (current_mouse_y == last_warp_y))) {return FALSE;}
-        int widget_width = gtk_widget_get_allocated_width (widget);
+        if (input_state -> suppress_mouse_delta) {
+            last_warp_x = current_mouse_x;
+            last_warp_y = current_mouse_y;
+            return FALSE;
+        } int widget_width = gtk_widget_get_allocated_width (widget);
         int widget_height = gtk_widget_get_allocated_height (widget);
         int center_x = (widget_width / 2);
         int center_y = (widget_height / 2);
         int delta_x = (current_mouse_x - center_x);
         int delta_y = (center_y - current_mouse_y);
         if (((delta_x != 0) || (delta_y != 0))) {
+            int half_width = widget_width  / 2;
+            int half_height = widget_height / 2;
+            if (delta_x > half_width) {delta_x = half_width;}
+            if (delta_x < -half_width) {delta_x = -half_width;}
+            if (delta_y > half_height) {delta_y = half_height;}
+            if (delta_y < -half_height) {delta_y = -half_height;}
             input_state -> mouse_delta_x = (float) (delta_x);
             input_state -> mouse_delta_y = (float) (delta_y);
             last_warp_x = center_x;

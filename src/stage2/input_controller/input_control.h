@@ -20,6 +20,7 @@ typedef struct {
     bool is_mouse_locked, is_debug_mode_active;
     bool left_mouse_button_clicked, right_mouse_button_clicked, middle_mouse_button_clicked;
     float mouse_delta_x, mouse_delta_y;
+    bool suppress_mouse_delta;
 } input_status;
 //Initialise input state to zeroing
 void initialise_input (input_status *input_state);

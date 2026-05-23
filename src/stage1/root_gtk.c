@@ -34,6 +34,7 @@ int main_algorithm (int argc, char *argv []) {
     //Widgeting
     GtkWidget *main_window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
     GtkWidget *gl_area_widget = gtk_gl_area_new ();
+    gtk_gl_area_set_has_depth_buffer (GTK_GL_AREA (gl_area_widget), TRUE);
     //Keyboard and Mouse Events
     gtk_widget_add_events (main_window, GDK_KEY_PRESS_MASK | GDK_KEY_RELEASE_MASK | GDK_POINTER_MOTION_MASK | GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK);
     //Signalling
@@ -42,6 +43,7 @@ int main_algorithm (int argc, char *argv []) {
     g_signal_connect (main_window, "key-press-event", G_CALLBACK (on_keypress), &main_inputs);
     g_signal_connect (main_window, "key-release-event", G_CALLBACK (on_key_released), &main_inputs);
     g_signal_connect (main_window, "focus-out-event", G_CALLBACK (on_focus_out), &main_inputs);
+    g_signal_connect (gl_area_widget, "focus-out-event", G_CALLBACK (on_focus_out), &main_inputs);
     g_signal_connect (main_window, "motion-notify-event", G_CALLBACK (on_mouse_movements), NULL);
     g_signal_connect (main_window, "button-press-event", G_CALLBACK (on_button_press), &main_inputs);
     g_signal_connect (main_window, "button-release-event", G_CALLBACK (on_button_release), &main_inputs);
@@ -55,6 +57,7 @@ int main_algorithm (int argc, char *argv []) {
     g_timeout_add (16, physics_step_increment, gl_area_widget);
     //Show Window
     gtk_widget_show_all (main_window);
+    gtk_widget_grab_focus (main_window);
     frame_timer_init (&main_timer);
     gtk_main ();
     return 0;
