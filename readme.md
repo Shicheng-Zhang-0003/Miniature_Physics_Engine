@@ -58,6 +58,11 @@ Known Bugs:
         - Right now the thing is currently running on a forced X11 state, which works like a charm.
         - However, the clarity of the rendering and the quality of objects is absolutely horrid compared to Wayland.
         - Plus, on some newer Linux systems, they are ditching X11 permanently, so extraneous X11 support drivers may be required.
+    ECP-001 (EXTMNTLCK, EXTERNAL MONITOR LOCKING ISSUE): With the X11 mouse grabbing system, after anything is done to the menu, like entering a new value, the mouse grabbing is messed up upon input. There is no method to solve this unless you use the default monitor for your syste: With the X11 mouse grabbing system, after anything is done to the menu, like entering a new value, the mouse grabbing is messed up upon input. There is no method to solve this unless you use the default monitor for your system.
+        - Not the greatest of issues, but it does exist.
+        - Only restricted to multi-monitor systems. For systems with only one monitor, and set to default monitor, this does not exist.
+        - Toggling default monitors for systems will do the trick, but on laptops it is tricky and overall is a hastle to work with.
+        -
 
 Installation Instructions:
     Refer to the installation folder for instruction details on Linux Platforms.
@@ -66,12 +71,16 @@ Installation Instructions:
 
     Users may try to install dependencies as is on Intel MacOS, but please note that the only operating system that this has been officially tested on so far is Ubuntu 24.04.4 LTS.
 
+    For systems upgraded properly, backwards compatiability should be possible for any Ubuntu system after 20.04 LTS.
+
+    Update: A Debian Bookworm (12) VM has been successfully tested with this and ran smoothly, however since I forced qemu screen instead of virt-manager's better handling systems, users should utilise with caution and take care to install all graphics dependencies beforehand (Which is not a lot but still).
+
 Resource Usage:
-    Nominally consumes approximately 1 Megabyte of extraneous RAM per 1136 objects spawned.
-    Initial Run will result in nominal RAM usage of 105 Megabytes nominally, tested with around 1142 objects showed a total RAM consumption of 106 Megabytes.
+    With 1.0-Stable, the maximum amount of objects tested is 3564 Spheres, at a total resource usage of 122 Megabytes of RAM.
+    Upon boot, the engine uses approximately 108 Megabytes of RAM.
     Note: All of this is run under X11 given that mouse locking on Wayland is deficient for the current purpose.
         - For systems forced to employ Wayland, it would be optimal to install basic X11 drivers to run this engine.
-    (Core Ultra 5 125H, Intel Arc Graphics, 32GB total RAM, Ubuntu 24.04.4 LTS)
+    (Core Ultra 5 125H, Intel Arc Graphics, 32GB total RAM, Ubuntu 24.04.4 LTS, Debian 12 (?))
     (2880 * 1880 Screen, set to 120 Hz refresh rate (although the engine itself has a inbuilt tick rate of 60 FPS))
 
 ```

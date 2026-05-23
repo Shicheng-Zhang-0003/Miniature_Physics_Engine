@@ -118,12 +118,12 @@ stage2/camera/../../stage1/math_phys_buffer/buffer.h:39:13: warning: ‘rigidbod
    39 | static void rigidbody_initialisation_sphere (rigidbody *rigid_body, float radius, float mass, vector3 position_input) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 stage2/input_controller/input_control.c: In function ‘on_keypress’:
-stage2/input_controller/input_control.c:47:36: warning: unused parameter ‘widget’ [-Wunused-parameter]
-   47 | } gboolean on_keypress (GtkWidget *widget, GdkEventKey *event, gpointer user_data_stored) {
+stage2/input_controller/input_control.c:48:36: warning: unused parameter ‘widget’ [-Wunused-parameter]
+   48 | } gboolean on_keypress (GtkWidget *widget, GdkEventKey *event, gpointer user_data_stored) {
       |                         ~~~~~~~~~~~^~~~~~
 stage2/input_controller/input_control.c: In function ‘on_key_released’:
-stage2/input_controller/input_control.c:110:40: warning: unused parameter ‘widget’ [-Wunused-parameter]
-  110 | } gboolean on_key_released (GtkWidget *widget, GdkEventKey *event, gpointer user_data_stored) {
+stage2/input_controller/input_control.c:111:40: warning: unused parameter ‘widget’ [-Wunused-parameter]
+  111 | } gboolean on_key_released (GtkWidget *widget, GdkEventKey *event, gpointer user_data_stored) {
       |                             ~~~~~~~~~~~^~~~~~
 In file included from stage2/input_controller/../camera/../../stage1/master_header.h:7,
                  from stage2/input_controller/../camera/camera.h:3,
@@ -186,8 +186,8 @@ stage2/input_controller/../camera/../../stage1/math_phys_buffer/buffer.h:39:13: 
    39 | static void rigidbody_initialisation_sphere (rigidbody *rigid_body, float radius, float mass, vector3 position_input) {
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 stage2/interface/simulate/simulation.c: In function ‘physics_step_increment’:
-stage2/interface/simulate/simulation.c:77:13: warning: unused variable ‘adjustment_increment’ [-Wunused-variable]
-   77 |     } float adjustment_increment = variable_change_rate;
+stage2/interface/simulate/simulation.c:79:13: warning: unused variable ‘adjustment_increment’ [-Wunused-variable]
+   79 |     } float adjustment_increment = variable_change_rate;
       |             ^~~~~~~~~~~~~~~~~~~~
 In file included from stage2/interface/simulate/../../../stage1/physics/collision_mechanics/collision_mechanics.h:5,
                  from stage2/interface/simulate/../../../stage1/master_header.h:7,
