@@ -16,7 +16,7 @@ int object_count = 0;
 int object_capacity = 0;
 //World Physics Globals
 float world_gravity_y = -9.81f;
-float world_drag_coefficient = 0.99f; // Used in pow (drag, delta)
+float world_drag_coefficient = 0.99f; //Used in pow (drag, delta)
 float world_surface_friction_static = 0.2f;
 float world_surface_friction_kinetic = 0.1f;
 float variable_change_rate = 0.2f;
@@ -76,8 +76,7 @@ static void on_entry_insert_text (GtkEditable *editable, const gchar *new_text, 
     } else {
         if (main_inputs.left_arrow_pressed)  {variable_change_rate -= 0.2f; main_inputs.left_arrow_pressed = false;}
         if (main_inputs.right_arrow_pressed) {variable_change_rate += 0.2f; main_inputs.right_arrow_pressed = false;}
-    } float adjustment_increment = variable_change_rate;
-    static int status_dir_checked = 0;
+    } static int status_dir_checked = 0;
     if (!status_dir_checked) {mkdir ("status", 0755); status_dir_checked = 1;}
     frame_timer_update (&main_timer);
     float frame_delta_time = main_timer.delta_time;
@@ -194,22 +193,22 @@ static void on_entry_insert_text (GtkEditable *editable, const gchar *new_text, 
         spawn_mass = open_numerical_input_dialog (parent_window, "Sphere Mass (kg)", spawn_mass);
         mouse_lock_reacquire (gtk_widget_get_toplevel (GTK_WIDGET (parent_window)));
         if (spawn_mass < 0.01f) {spawn_mass = 0.01f;}
-        main_inputs.spawner_menu_level = 2;
+        main_inputs.spawner_menu_level = 0;
     } else if (main_inputs.spawner_menu_level == 4) {
         spawn_radius = open_numerical_input_dialog (parent_window, "Sphere Radius (m)", spawn_radius);
         mouse_lock_reacquire (gtk_widget_get_toplevel (GTK_WIDGET (parent_window)));
         if (spawn_radius < 0.01f) {spawn_radius = 0.01f;}
-        main_inputs.spawner_menu_level = 2;
+        main_inputs.spawner_menu_level = 0;
     } else if (main_inputs.spawner_menu_level == 6) {
         spawn_cube_mass = open_numerical_input_dialog (parent_window, "Cube Mass (kg)", spawn_cube_mass);
         mouse_lock_reacquire (gtk_widget_get_toplevel (GTK_WIDGET (parent_window)));
         if (spawn_cube_mass < 0.01f) {spawn_cube_mass = 0.01f;}
-        main_inputs.spawner_menu_level = 5;
+        main_inputs.spawner_menu_level = 0;
     } else if (main_inputs.spawner_menu_level == 7) {
         spawn_cube_extent = open_numerical_input_dialog (parent_window, "Cube Size (m)", spawn_cube_extent);
         mouse_lock_reacquire (gtk_widget_get_toplevel (GTK_WIDGET (parent_window)));
         if (spawn_cube_extent < 0.01f) {spawn_cube_extent = 0.01f;}
-        main_inputs.spawner_menu_level = 5;
+        main_inputs.spawner_menu_level = 0;
     } if (main_inputs.spawner_menu_level == 8) {
         if ((main_inputs.up_arrow_pressed) || (main_inputs.down_arrow_pressed)) {
             if (main_inputs.current_spawn_type == 0) {main_inputs.current_spawn_type = 1;}
@@ -222,39 +221,39 @@ static void on_entry_insert_text (GtkEditable *editable, const gchar *new_text, 
         spawn_speed = open_numerical_input_dialog (parent_window, "Spawn Speed (m/s)", spawn_speed);
         mouse_lock_reacquire (gtk_widget_get_toplevel (GTK_WIDGET (parent_window)));
         if (spawn_speed < 0.0f) {spawn_speed = 0.0f;}
-        main_inputs.velocity_menu_level = 2;
+        main_inputs.velocity_menu_level = 0;
     } else if (main_inputs.velocity_menu_level == 4) {
         world_surface_friction_kinetic = open_numerical_input_dialog (parent_window, "Spawn Friction (Kinetic)", world_surface_friction_kinetic);
         mouse_lock_reacquire (gtk_widget_get_toplevel (GTK_WIDGET (parent_window)));
         if (world_surface_friction_kinetic < 0.0f) {world_surface_friction_kinetic = 0.0f;}
         world_surface_friction_static = world_surface_friction_kinetic + 0.1f;
-        main_inputs.velocity_menu_level = 2;
+        main_inputs.velocity_menu_level = 0;
     } else if (main_inputs.velocity_menu_level == 11) {
         main_camera_fov.movement_speed = open_numerical_input_dialog (parent_window, "Camera Speed", main_camera_fov.movement_speed);
         mouse_lock_reacquire (gtk_widget_get_toplevel (GTK_WIDGET (parent_window)));
         if (main_camera_fov.movement_speed < 0.01f) {main_camera_fov.movement_speed = 0.01f;}
-        main_inputs.velocity_menu_level = 10;
+        main_inputs.velocity_menu_level = 0;
     } else if (main_inputs.velocity_menu_level == 12) {
         jump_height = open_numerical_input_dialog (parent_window, "Jump Height (m)", jump_height);
         mouse_lock_reacquire (gtk_widget_get_toplevel (GTK_WIDGET (parent_window)));
         if (jump_height < 0.1f) {jump_height = 0.1f;}
-        main_inputs.velocity_menu_level = 10;
+        main_inputs.velocity_menu_level = 0;
     } else if (main_inputs.velocity_menu_level == 21) {
         world_gravity_y = open_numerical_input_dialog (parent_window, "World Gravity (m/s^2)", world_gravity_y);
         mouse_lock_reacquire (gtk_widget_get_toplevel (GTK_WIDGET (parent_window)));
-        main_inputs.velocity_menu_level = 20;
+        main_inputs.velocity_menu_level = 0;
     } else if (main_inputs.velocity_menu_level == 22) {
         world_drag_coefficient = open_numerical_input_dialog (parent_window, "World Drag Coefficient", world_drag_coefficient);
         mouse_lock_reacquire (gtk_widget_get_toplevel (GTK_WIDGET (parent_window)));
         if (world_drag_coefficient > 1.0f) {world_drag_coefficient = 1.0f;}
         if (world_drag_coefficient < 0.1f) {world_drag_coefficient = 0.1f;}
-        main_inputs.velocity_menu_level = 20;
+        main_inputs.velocity_menu_level = 0;
     } else if (main_inputs.velocity_menu_level == 23) {
         world_surface_friction_kinetic = open_numerical_input_dialog (parent_window, "World Surface Friction", world_surface_friction_kinetic);
         mouse_lock_reacquire (gtk_widget_get_toplevel (GTK_WIDGET (parent_window)));
         if (world_surface_friction_kinetic < 0.0f) {world_surface_friction_kinetic = 0.0f;}
         world_surface_friction_static = world_surface_friction_kinetic + 0.1f;
-        main_inputs.velocity_menu_level = 20;
+        main_inputs.velocity_menu_level = 0;
     } // Selected Object Menu Logic
     if (main_inputs.object_menu_level == 2) {
         rigidbody *selected_rigid_body = &obj_per_scene [selected_object];
@@ -264,7 +263,7 @@ static void on_entry_insert_text (GtkEditable *editable, const gchar *new_text, 
         selected_rigid_body -> inverse_mass = 1.0f / selected_rigid_body -> mass;
         if (selected_rigid_body -> type == object_sphere) {rigidbody_update_inertia_sphere (selected_rigid_body);}
         else {rigidbody_update_inertia_cube (selected_rigid_body);}
-        main_inputs.object_menu_level = 1;
+        main_inputs.object_menu_level = 0;
     } else if (main_inputs.object_menu_level == 3) {
         rigidbody *selected_rigid_body = &obj_per_scene [selected_object];
         if (selected_rigid_body -> type == object_sphere) {
@@ -272,14 +271,14 @@ static void on_entry_insert_text (GtkEditable *editable, const gchar *new_text, 
             if (selected_rigid_body -> radius < 0.01f) {selected_rigid_body -> radius = 0.01f;}
             mouse_lock_reacquire (gtk_widget_get_toplevel (GTK_WIDGET (parent_window)));
             rigidbody_update_inertia_sphere (selected_rigid_body);
-        } main_inputs.object_menu_level = 1;
+        } main_inputs.object_menu_level = 0;
     } else if (main_inputs.object_menu_level == 4) {
         rigidbody *selected_rigid_body = &obj_per_scene [selected_object];
         selected_rigid_body -> friction_kinetic = open_numerical_input_dialog (parent_window, "Selected Object Friction", selected_rigid_body -> friction_kinetic);
         mouse_lock_reacquire (gtk_widget_get_toplevel (GTK_WIDGET (parent_window)));
         if (selected_rigid_body -> friction_kinetic < 0.0f) {selected_rigid_body -> friction_kinetic = 0.0f;}
         selected_rigid_body -> friction_static = selected_rigid_body -> friction_kinetic + 0.1f;
-        main_inputs.object_menu_level = 1;
+        main_inputs.object_menu_level = 0;
     } if (main_inputs.object_menu_level == 5) {
         rigidbody *selected_rigid_body = &obj_per_scene [selected_object];
         if ((main_inputs.up_arrow_pressed) || (main_inputs.down_arrow_pressed)) {
@@ -297,15 +296,16 @@ static void on_entry_insert_text (GtkEditable *editable, const gchar *new_text, 
     //Collision Resolution
     static broadphase_pair *persistent_collision_pairs = NULL;
     static int persistent_pairs_capacity = 0;
-    int detected_collision_count = 0;
     int maximum_possible_pairs = (object_count * (object_count - 1)) / 2;
     if (maximum_possible_pairs < 1) maximum_possible_pairs = 1;
     if (maximum_possible_pairs > persistent_pairs_capacity) {
         persistent_pairs_capacity = maximum_possible_pairs + 128;
         persistent_collision_pairs = realloc (persistent_collision_pairs, persistent_pairs_capacity * sizeof (broadphase_pair));
-    } if (persistent_collision_pairs) {detected_collision_count = broadphase_generate_pairing (persistent_collision_pairs, persistent_pairs_capacity);}
+    }
     //Simulation Substep
     for (int sub_iteration = 0; sub_iteration < physics_sub_steps; sub_iteration++) {
+        int detected_collision_count = 0;
+        if (persistent_collision_pairs) {detected_collision_count = broadphase_generate_pairing (persistent_collision_pairs, persistent_pairs_capacity);}
         apply_force_all_joints ();
         for (int object_iterator_index = 0; object_iterator_index < object_count; object_iterator_index++) {
             vector3 constant_gravity_acceleration = {0, world_gravity_y, 0};
