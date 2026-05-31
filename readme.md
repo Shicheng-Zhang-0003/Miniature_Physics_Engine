@@ -1,7 +1,7 @@
 # readme.md
 
 ```
-This is the 1.0 release testing edition of the Miniature Physics Engine (MPE, v1.0-RC).
+This is the Miniature Physics Engine (MPE, v1.1-Stable).
 
 It is a rigid body physics engine designed around simplicity, ease of use, and efficiency.
 
@@ -19,13 +19,16 @@ Engine Mechanics:
         3A: Shift Key spawns new objects. Hold down to spam spawning objects.
         3B: WASD to move the camera and general viewpoint.
         3C: Pressing 0 toggles between Debug Mode and Game Mode, Debug Mode has no borders and more information presented about individual objects.
-        3D: Pressing 9 gives the option to save the current state of the object layout, load a previously saved layout, or exit the engine.
-        3E: Pressing 8 manipulates how objects are spawned.
-        3F: Right Click a object to select a object.
-        3G: Once a object has been selected, press the F key to exert a impulse/force.
-        3H: Once a object has been selected, click the scroll wheel to delete the object.
-        3I: Space Bar is reserved for jumping in Game Mode.
-        3J: In Versions 0.9.8 and beyond, in Debug Mode, IJKL can be used to steer again is mouse is not present.
+        3D: Pressing 9 gives the option to save the current state of the object layout, load a previously saved layout, or exit the engine. Pressing 9 again exits the menu.
+        3E: Pressing 8 manipulates how objects are spawned. Pressing 8 again exits the menu.
+        3F: Pressing 7 manipulates user mechanics and world mechanics. Pressing 7 again exits the menu.
+        3G: Right Click a object to select a object.
+        3H: Once a object has been selected, press E to open the selected object menu.
+        3I: Once a object has been selected, press the F key to exert a impulse/force.
+        3J: Once a object has been selected, click the scroll wheel to delete the object.
+        3K: Space Bar is reserved for jumping in Game Mode.
+        3L: In Versions 0.9.8 and beyond, in Debug Mode, IJKL can be used to steer again is mouse is not present.
+        3M: After a numerical value is changed through a menu, the menu closes automatically and must be opened again to make another change.
 
 Known Bugs:
     PSX = Programming Syntax Bug, OBP = Operational Bug, ECP = External Compatiability Bug, LIC = Library Incompleteness Bug
@@ -47,11 +50,30 @@ Known Bugs:
         - For Game Mode, switch to a nominal +- of 0.2 for all changable constant values.
     PSX-004 (SOLVED) (STIPLG, STARTING INPUT LAG): In 0.9.7-Alpha, after just starting the engine itself, spawning objects may require some time to load properly and actually respond.
         - Fix by finding comflicting spawning logic later, for now, just marvel at the fact that 0.9.7-Alpha was managed to be done on time in the first place.
+    PSX-005 (SOLVED) (HDRFNC, HEADER FUNCTION DUPLICATION): Large rigidbody, force, and collision implementations were previously stored inside header files, creating unnecessary repeated static function generation during compilation.
+        - Rigidbody, force, and collision implementation logic has been moved into C source files while leaving headers responsible for declarations and structures.
+        - This substantially reduces compiler warning output and improves long term maintainability.
+    PSX-006 (SOLVED) (MNURET, MENU RETURN AFTER VALUE CHANGE): After editing a numerical value, menu state previously returned to the prior submenu, requiring extra key presses to clear the interface.
+        - Value changing dialogs now close their active menu after the value is accepted or cancelled.
+        - Main menu keys 7, 8, and 9 remain toggles, so pressing the same menu key again still exits the menu.
 
     OPB-000 (PARTIAL) (MTNLCK, MOTION LOCK): Under continuous input, sometimes, the camera viewpoint may be stuck moving in one direction. In this case, pressing the key which the object is currently moving in counteracts and stops the uncommanded movement of the camera.
         - Fixed by connecting a focus-out-event signal to GtkWindow, resetting all movement and emulation key presses to false when focus is dropped.
         - However, in 1.0-RC, there is a return of this issue potentially resulting in a reformatted meshing hierarchy.
         - For stability revert to 0.9.9-Alpha if required.
+        - Update: The bug was not found to exist so far in terms of 1.1-Stable.
+
+
+    OPB-001 (SOLVED) (PNCRCT, PENETRATION CORRECTION): Collision resolution could skip position correction when overlapping objects were already moving apart.
+        - Collision impulse calculation and positional correction are now separated.
+        - Objects can correct penetration even when an impulse is not required.
+    OPB-002 (SOLVED) (SUBPAIR, SUBSTEP PAIRING): Broadphase collision pairs were generated once per frame before all physics substeps.
+        - Broadphase pairs are now regenerated inside the physics substep loop.
+        - This improves collision detection consistency for moving objects during the frame.
+    OPB-003 (SOLVED) (LDFSAFE, LOAD FILE SAFETY): Loading malformed scene files could partially clear or corrupt the active scene.
+        - Scene loading now validates each expected value before replacing the active scene.
+        - Invalid object types and invalid object counts are rejected.
+        - Static object mass is preserved while keeping inverse mass disabled for static status.
 
     ECP-000 (MSEWYLD, MOUSE WAYLAND): Under Wayland, mouse automatically disengages with out of the bounds of the window itself and does not lock properly.
         - When transitioning from IJKL perspective control, this was a major thing in versions 0.9.1 to 0.9.2.
@@ -62,7 +84,6 @@ Known Bugs:
         - Not the greatest of issues, but it does exist.
         - Only restricted to multi-monitor systems. For systems with only one monitor, and set to default monitor, this does not exist.
         - Toggling default monitors for systems will do the trick, but on laptops it is tricky and overall is a hastle to work with.
-        -
 
 Installation Instructions:
     Refer to the installation folder for instruction details on Linux Platforms.

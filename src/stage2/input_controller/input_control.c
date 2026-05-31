@@ -46,6 +46,7 @@ void initialise_input (input_status *input_state) {
     input_state -> mouse_delta_y = 0.0f;
     input_state -> suppress_mouse_delta = false;
 } gboolean on_keypress (GtkWidget *widget, GdkEventKey *event, gpointer user_data_stored) {
+    (void) widget;
     input_status *input_state = (input_status *) user_data_stored;
     if (event -> keyval == GDK_KEY_w) {input_state -> w_key_pressed = true;}
     if (event -> keyval == GDK_KEY_a) {input_state -> a_key_pressed = true;}
@@ -109,6 +110,7 @@ void initialise_input (input_status *input_state) {
     if (event -> keyval == GDK_KEY_0) {input_state -> is_debug_mode_active = !input_state -> is_debug_mode_active;}
     return FALSE;
 } gboolean on_key_released (GtkWidget *widget, GdkEventKey *event, gpointer user_data_stored) {
+    (void) widget;
     input_status *input_state = (input_status *) user_data_stored;
     if (event -> keyval == GDK_KEY_w) {input_state -> w_key_pressed = false;}
     if (event -> keyval == GDK_KEY_a) {input_state -> a_key_pressed = false;}
@@ -122,36 +124,39 @@ void initialise_input (input_status *input_state) {
     if (event -> keyval == GDK_KEY_space) {input_state -> space_key_pressed = false;}
     return FALSE;
 } gboolean on_mouse_movements (GtkWidget *widget, GdkEventMotion *event, gpointer user_data_stored) {
-    (void) widget;
     (void) user_data_stored;
     input_status *input_state = &main_inputs;
     if (input_state -> is_mouse_locked) {
         static int last_warp_x = -1;
         static int last_warp_y = -1;
-        int current_mouse_x = (int) (event -> x);
-        int current_mouse_y = (int) (event -> y);
-        if (((current_mouse_x == last_warp_x) && (current_mouse_y == last_warp_y))) {return FALSE;}
+        int current_mouse_x = (int) event -> x_root;
+        int current_mouse_y = (int) event -> y_root;
+        if ((current_mouse_x == last_warp_x) && (current_mouse_y == last_warp_y)) {return FALSE;}
         if (input_state -> suppress_mouse_delta) {
             last_warp_x = current_mouse_x;
             last_warp_y = current_mouse_y;
             return FALSE;
-        } int widget_width = gtk_widget_get_allocated_width (widget);
+        } int widget_width  = gtk_widget_get_allocated_width  (widget);
         int widget_height = gtk_widget_get_allocated_height (widget);
-        int center_x = (widget_width / 2);
-        int center_y = (widget_height / 2);
-        int delta_x = (current_mouse_x - center_x);
-        int delta_y = (center_y - current_mouse_y);
-        if (((delta_x != 0) || (delta_y != 0))) {
-            int half_width = widget_width  / 2;
-            int half_height = widget_height / 2;
-            if (delta_x > half_width) {delta_x = half_width;}
-            if (delta_x < -half_width) {delta_x = -half_width;}
-            if (delta_y > half_height) {delta_y = half_height;}
-            if (delta_y < -half_height) {delta_y = -half_height;}
-            input_state -> mouse_delta_x = (float) (delta_x);
-            input_state -> mouse_delta_y = (float) (delta_y);
-            last_warp_x = center_x;
-            last_warp_y = center_y;
+        int center_x = widget_width / 2;
+        int center_y = widget_height / 2;
+        int screen_origin_x, screen_origin_y;
+        gdk_window_get_origin (gtk_widget_get_window (widget), &screen_origin_x, &screen_origin_y);
+        int screen_center_x = screen_origin_x + center_x;
+        int screen_center_y = screen_origin_y + center_y;
+        int delta_x = current_mouse_x - screen_center_x;
+        int delta_y = current_mouse_y - screen_center_y;
+        int half_w = widget_width / 2;
+        int half_h = widget_height / 2;
+        if (delta_x >  half_w) {delta_x =  half_w;}
+        if (delta_x < -half_w) {delta_x = -half_w;}
+        if (delta_y >  half_h) {delta_y =  half_h;}
+        if (delta_y < -half_h) {delta_y = -half_h;}
+        if ((delta_x != 0) || (delta_y != 0)) {
+            input_state -> mouse_delta_x = (float) delta_x;
+            input_state -> mouse_delta_y = -(float) delta_y;
+            last_warp_x = screen_center_x;
+            last_warp_y = screen_center_y;
             mouse_lock_reset_centre (widget);
         }
     } return FALSE;

@@ -24,7 +24,7 @@ void mouse_lock_enable (GtkWidget *window_widget) {
     int window_height = gtk_widget_get_allocated_height (window_widget);
     int screen_origin_x, screen_origin_y;
     gdk_window_get_origin (gdk_window_handle, &screen_origin_x, &screen_origin_y);
-    int warp_target_x = screen_origin_x + (window_width  / 2);
+    int warp_target_x = screen_origin_x + (window_width / 2);
     int warp_target_y = screen_origin_y + (window_height / 2);
     GdkDisplay *gdk_display_instance = gdk_window_get_display (gdk_window_handle);
     GdkSeat *gdk_seat_instance = gdk_display_get_default_seat (gdk_display_instance);
