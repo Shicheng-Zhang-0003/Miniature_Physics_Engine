@@ -3,7 +3,6 @@
 #include "../../../stage1/master_header.h"
 #include "../../../stage4/master_header_4.h"
 #include "../../../stage5/master_header_5.h"
-#include "../../../stage5/constraints/spring_joint.h"
 #include <complex.h>
 #include <gtk/gtk.h>
 #include <stdbool.h>
@@ -14,6 +13,10 @@ frame_timer main_timer;
 rigidbody *obj_per_scene = NULL;
 int object_count = 0;
 int object_capacity = 0;
+//Joint Creation Mode Globals
+static bool joint_creation_mode = false;
+static int joint_selected_objects [2] = {-1, -1};
+static int joint_type_selection = 0; //0: Spring, 1: Revolute, 2: Fixed
 //World Physics Globals
 float world_gravity_y = -9.81f;
 float world_drag_coefficient = 0.99f; //Used in pow (drag, delta)
@@ -307,6 +310,8 @@ static void on_entry_insert_text (GtkEditable *editable, const gchar *new_text, 
         int detected_collision_count = 0;
         if (persistent_collision_pairs) {detected_collision_count = broadphase_generate_pairing (persistent_collision_pairs, persistent_pairs_capacity);}
         apply_force_all_joints ();
+        solve_all_revolute_joints (frame_delta_time / physics_sub_steps);
+        solve_all_fixed_joints (frame_delta_time / physics_sub_steps);
         for (int object_iterator_index = 0; object_iterator_index < object_count; object_iterator_index++) {
             vector3 constant_gravity_acceleration = {0, world_gravity_y, 0};
             rigidbody *rigid_body = &obj_per_scene [object_iterator_index];

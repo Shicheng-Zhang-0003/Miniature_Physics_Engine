@@ -28,6 +28,9 @@ typedef struct {
     //Cube Specific Variables
     vector3 half_extensions;
     vector3 cached_axes [3];
+    //Sleep Optimization
+    bool is_sleeping;
+    float sleep_timer;
 } rigidbody;
 //Helper to update axes from orientation
 void rigidbody_update_axes (rigidbody *rigid_body);

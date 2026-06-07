@@ -54,12 +54,16 @@ int broadphase_generate_pairing (broadphase_pair *collision_pairs_output_array, 
     int collision_pair_counter = 0;
     for (int outer_iterator = 0; outer_iterator < object_count; outer_iterator++) {
         int object_index_a = persistent_sweep_array [outer_iterator].object_index;
+        rigidbody *rigid_body_a = &obj_per_scene [object_index_a];
+        if (rigid_body_a -> is_sleeping) {continue;}
         float x_max_a = aabb_cache [object_index_a].x_max;
         for (int inner_iterator = outer_iterator + 1; inner_iterator < object_count; inner_iterator++) {
+            int object_index_b = persistent_sweep_array [inner_iterator].object_index;
+            rigidbody *rigid_body_b = &obj_per_scene [object_index_b];
+            if ((rigid_body_a -> is_sleeping) && (rigid_body_b -> is_sleeping)) {continue;}
             //If next object starts after current object ends on X
             if (persistent_sweep_array [inner_iterator].x_minimum > x_max_a) {break;}
             if (collision_pair_counter >= maximum_pairs_allowed) {break;}
-            int object_index_b = persistent_sweep_array [inner_iterator].object_index;
             //Check Y and Z separation of objects
             if ((aabb_cache [object_index_b].y_min > aabb_cache [object_index_a].y_max) || (aabb_cache [object_index_b].y_max < aabb_cache [object_index_a].y_min)) {continue;}
             if ((aabb_cache [object_index_b].z_min > aabb_cache [object_index_a].z_max) || (aabb_cache [object_index_b].z_max < aabb_cache [object_index_a].z_min)) {continue;}

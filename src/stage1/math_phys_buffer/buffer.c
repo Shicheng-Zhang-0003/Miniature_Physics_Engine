@@ -43,6 +43,9 @@ void rigidbody_initialisation_sphere (rigidbody *rigid_body, float radius, float
     } //Total Force and Torque accumulation
     rigid_body -> force_accumulator = vector3_zero ();
     rigid_body -> torque_accumulator = vector3_zero ();
+    //Sleep state initialization
+    rigid_body -> is_sleeping = false;
+    rigid_body -> sleep_timer = 0.0f;
 } // Helper to update inertia tensor after mass/radius change
 void rigidbody_update_inertia_sphere (rigidbody *rigid_body) {
     float inertia_coefficient_sphere = (0.4f) * rigid_body -> mass * rigid_body -> radius * rigid_body -> radius;
@@ -175,4 +178,7 @@ void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_inpu
     } // Force & Torque accumulators
     rigid_body -> force_accumulator = vector3_zero ();
     rigid_body -> torque_accumulator = vector3_zero ();
+    //Sleep state initialization
+    rigid_body -> is_sleeping = false;
+    rigid_body -> sleep_timer = 0.0f;
 }
