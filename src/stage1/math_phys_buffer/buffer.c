@@ -23,7 +23,9 @@ void rigidbody_initialisation_sphere (rigidbody *rigid_body, float radius, float
     else {rigid_body -> inverse_mass = 0.0f;}
     rigid_body -> radius = radius;
     rigid_body -> restitution = 0.5f; //Default Bounce Energy Return
-    rigid_body -> static_state = (mass == 0); //Static Objects
+    rigid_body -> static_state = (mass == 0);
+    rigid_body -> is_sleeping = false;
+    rigid_body -> sleep_timer = 0.0f; //Static Objects
     rigid_body -> friction_static = 0.3f;
     rigid_body -> friction_kinetic = 0.2f;
     //Inertial Tensors
@@ -64,9 +66,9 @@ void rigidbody_update_inertia_cube (rigidbody *rigid_body) {
     float depth = rigid_body -> half_extensions.z * 2.0f;
     float mass = rigid_body -> mass;
     rigid_body -> inertia_tensor_local = (math3) {{{0}}};
-    rigid_body -> inertia_tensor_local.matrix[0][0] = (mass / 12.0f) * (height * height + depth * depth);
-    rigid_body -> inertia_tensor_local.matrix[1][1] = (mass / 12.0f) * (width * width + depth * depth);
-    rigid_body -> inertia_tensor_local.matrix[2][2] = (mass / 12.0f) * (width * width + height * height);
+    rigid_body -> inertia_tensor_local.matrix [0][0] = (mass / 12.0f) * (height * height + depth * depth);
+    rigid_body -> inertia_tensor_local.matrix [1][1] = (mass / 12.0f) * (width * width + depth * depth);
+    rigid_body -> inertia_tensor_local.matrix [2][2] = (mass / 12.0f) * (width * width + height * height);
     if (mass > 0) {
         rigid_body -> inverse_inertia_tensor_local = math3_inverse (rigid_body -> inertia_tensor_local);
         rigid_body -> inverse_inertia_system = rigid_body -> inverse_inertia_tensor_local;
@@ -78,11 +80,15 @@ void rigidbody_update_inertia_cube (rigidbody *rigid_body) {
 //Apply a force at a centre of mass (perfect collision movement, linear movement only defined)
 void rb_apply_forces_perfect (rigidbody *rigid_body, vector3 force_applied) {
     if (rigid_body -> static_state) {return;}
+    rigid_body -> is_sleeping = false;
+    rigid_body -> sleep_timer = 0.0f;
     rigid_body -> force_accumulator = vector3_addition (rigid_body -> force_accumulator, force_applied); //Force applied to torque and circular momentum
 } //Apply force at a point not the centre of mass (which generates rotational motion and torque)
 //locale_impact = impact point on object identified
 void rb_apply_forces_localised (rigidbody *rigid_body, vector3 force_applied, vector3 locale_impact) {
     if (rigid_body -> static_state) {return;}
+    rigid_body -> is_sleeping = false;
+    rigid_body -> sleep_timer = 0.0f;
     rb_apply_forces_perfect (rigid_body, force_applied);
     //Torque = r * F (r = vector from Centre of Mass to the point of actual contact between objects)
     vector3 relative_contact_vector = vector3_subtraction (locale_impact, rigid_body -> position);
@@ -99,6 +105,13 @@ float rb_get_kinetic_energy (rigidbody *rigid_body) {
 } //Integration Segmentation (Movement Compute)
 void rb_integrate (rigidbody *rigid_body, float delta_time, float linear_damping, float angular_damping) {
     if ((rigid_body -> static_state) || (delta_time <= 0.0f)) {return;}
+    if (rigid_body -> is_sleeping) {return;}
+    float speed_sq = vector3_length_squared (rigid_body -> velocity);
+    float ang_speed_sq = vector3_length_squared (rigid_body -> angular_velocity);
+    if (speed_sq < 0.0025f && ang_speed_sq < 0.0001f) {
+        rigid_body -> sleep_timer += delta_time;
+        if (rigid_body -> sleep_timer > 1.0f) {rigid_body -> is_sleeping = true;}
+    } else {rigid_body -> sleep_timer = 0.0f;}
     //Update inverse inertia tensor based on current orientation before using it
     //inverse_inertia_system = rotational * inverse_inertia_local * transposed value in 4D rotational axis
     math3 rotation_matrix_current = vector4_to_math3 (rigid_body -> orientation); //W axis orientation of rotation
@@ -156,6 +169,8 @@ void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_inpu
     rigid_body -> radius = vector3_length (half_extensions); // Bounding radius for broadphase
     rigid_body -> restitution = 0.5f;
     rigid_body -> static_state = (mass == 0);
+    rigid_body -> is_sleeping = false;
+    rigid_body -> sleep_timer = 0.0f;
     rigid_body -> friction_static = 0.4f;
     rigid_body -> friction_kinetic = 0.3f;
     //Inertia Tensor for rectangular box: I = (m/12) * (h² + d², w² + d², w² + h²), nominal extension only for boxes
@@ -163,9 +178,9 @@ void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_inpu
     float height = half_extensions.y * 2.0f;  //full height
     float depth = half_extensions.z * 2.0f;  //full depth
     rigid_body -> inertia_tensor_local = (math3) {{{0}}};
-    rigid_body -> inertia_tensor_local.matrix[0][0] = (mass / 12.0f) * (height * height + depth * depth);
-    rigid_body -> inertia_tensor_local.matrix[1][1] = (mass / 12.0f) * (width * width + depth * depth);
-    rigid_body -> inertia_tensor_local.matrix[2][2] = (mass / 12.0f) * (width * width + height * height);
+    rigid_body -> inertia_tensor_local.matrix [0][0] = (mass / 12.0f) * (height * height + depth * depth);
+    rigid_body -> inertia_tensor_local.matrix [1][1] = (mass / 12.0f) * (width * width + depth * depth);
+    rigid_body -> inertia_tensor_local.matrix [2][2] = (mass / 12.0f) * (width * width + height * height);
     if (mass > 0) {
         rigid_body -> inverse_inertia_tensor_local = math3_inverse (rigid_body -> inertia_tensor_local);
         rigid_body -> inverse_inertia_system = rigid_body -> inverse_inertia_tensor_local;
@@ -175,4 +190,9 @@ void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_inpu
     } // Force & Torque accumulators
     rigid_body -> force_accumulator = vector3_zero ();
     rigid_body -> torque_accumulator = vector3_zero ();
+} void rigidbody_wake (rigidbody *rigid_body) {
+    if (rigid_body -> is_sleeping) {
+        rigid_body -> is_sleeping = false;
+        rigid_body -> sleep_timer = 0.0f;
+    }
 }

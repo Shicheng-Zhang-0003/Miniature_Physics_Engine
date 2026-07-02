@@ -26,7 +26,7 @@ static gboolean on_rendered (GtkGLArea *gl_area_widget, GdkGLContext *gl_context
     return TRUE;
 } int main_algorithm (int argc, char *argv []);
 int main_algorithm (int argc, char *argv []) {
-    g_setenv ("GDK_BACKEND", "x11", FALSE);
+    g_setenv ("GDK_BACKEND", "x11", TRUE);
     gtk_init (&argc, &argv);
     //Camera Init
     initialize_camera (&main_camera_fov, (vector3) {0.0f, 20.0f, 50.0f});
