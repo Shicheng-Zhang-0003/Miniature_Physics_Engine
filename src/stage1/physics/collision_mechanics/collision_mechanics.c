@@ -57,7 +57,7 @@ bool collision_sphere_cube (rigidbody *sphere, rigidbody *cube, collision_data *
     collision_output_data -> object_a = sphere;
     collision_output_data -> object_b = cube;
     if (inside) {
-        // Normal points from sphere center to nearest face (Sphere -> Cube)
+        //Normal points from sphere center to nearest face (Sphere -> Cube)
         collision_output_data -> normal_vector = vector3_scaling (axes_cube [nearest_face_axis], nearest_face_sign);
         collision_output_data -> penetration_contact = sphere -> radius + minimum_distance;
         collision_output_data -> contact_point = closest_point; // closest point is on the face
