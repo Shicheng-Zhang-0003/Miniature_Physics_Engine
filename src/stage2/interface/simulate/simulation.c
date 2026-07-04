@@ -288,34 +288,48 @@ static void on_entry_insert_text (GtkEditable *editable, const gchar *new_text, 
             main_inputs.up_arrow_pressed = false;
             main_inputs.down_arrow_pressed = false;
         } if (main_inputs.enter_key_pressed) {main_inputs.object_menu_level = 0; main_inputs.enter_key_pressed = false;}
-    } //Core Physics Substeps, Dampening on Collisions
-    const int physics_sub_steps = 12;
-    float sub_step_dt = frame_delta_time / (float)physics_sub_steps;
-    float linear_damping_factor = powf (world_drag_coefficient, sub_step_dt);
-    float angular_damping_factor = powf (world_drag_coefficient * 0.97f, sub_step_dt);
-    //Collision Resolution
+    } // v1.4 Simulation Contract: Fixed Timestep Accumulator
     static broadphase_pair *persistent_collision_pairs = NULL;
     static int persistent_pairs_capacity = 0;
     int maximum_possible_pairs = (object_count * (object_count - 1)) / 2;
-    if (maximum_possible_pairs < 1) maximum_possible_pairs = 1;
+    if (maximum_possible_pairs < 1) {maximum_possible_pairs = 1;}
     if (maximum_possible_pairs > persistent_pairs_capacity) {
         persistent_pairs_capacity = maximum_possible_pairs + 128;
         persistent_collision_pairs = realloc (persistent_collision_pairs, persistent_pairs_capacity * sizeof (broadphase_pair));
     }
-    //Simulation Substep
-    for (int sub_iteration = 0; sub_iteration < physics_sub_steps; sub_iteration++) {
+
+    static float physics_time_accumulator = 0.0f;
+    const float fixed_physics_dt = 1.0f / 60.0f;
+    const int max_substeps_per_frame = 5; // Spiral of death prevention
+
+    physics_time_accumulator += frame_delta_time;
+    if (physics_time_accumulator > fixed_physics_dt * max_substeps_per_frame) {
+        physics_time_accumulator = fixed_physics_dt * max_substeps_per_frame;
+    }
+
+    float linear_damping_factor = powf (world_drag_coefficient, fixed_physics_dt);
+    float angular_damping_factor = powf (world_drag_coefficient * 0.97f, fixed_physics_dt);
+
+    while (physics_time_accumulator >= fixed_physics_dt) {
         int detected_collision_count = 0;
         if (persistent_collision_pairs) {detected_collision_count = broadphase_generate_pairing (persistent_collision_pairs, persistent_pairs_capacity);}
+
+        static collision_data active_manifold [8192];
+        int manifold_count = 0;
+
         apply_force_all_joints ();
         for (int object_iterator_index = 0; object_iterator_index < object_count; object_iterator_index++) {
             vector3 constant_gravity_acceleration = {0, world_gravity_y, 0};
             rigidbody *rigid_body = &obj_per_scene [object_iterator_index];
+            if (rigid_body -> is_sleeping) {continue;}
+
             vector3 up_axis = {0, 1, 0};
             float projection = rigid_body -> radius;
             if (rigid_body -> type == object_cube) {
                 vector3 *axes = rigid_body -> cached_axes;
                 projection = rigid_body -> half_extensions.x * fabsf (vector3_dot (axes [0], up_axis)) + rigid_body -> half_extensions.y * fabsf (vector3_dot (axes [1], up_axis)) + rigid_body -> half_extensions.z * fabsf (vector3_dot (axes [2], up_axis));
-            } if (rigid_body -> position.y <= (projection + 0.01f)) {
+            }
+            if (rigid_body -> position.y <= (projection + 0.01f)) {
                 if (rigid_body -> type == object_sphere) {
                     force_applicant_gravity_normal (rigid_body, constant_gravity_acceleration, (vector3) {0.0f, 1.0f, 0.0f});
                     force_applicant_friction_rolling (rigid_body, (vector3) {0.0f, 1.0f, 0.0f}, rigid_body -> friction_static, rigid_body -> friction_kinetic, world_gravity_y);
@@ -323,21 +337,20 @@ static void on_entry_insert_text (GtkEditable *editable, const gchar *new_text, 
                     vector3 *axes = rigid_body -> cached_axes;
                     vector3 contact_offset = {0,0,0};
                     for (int axis_index = 0; axis_index < 3; axis_index++) {
-                        float extent;
-                        if (axis_index == 0) {extent = rigid_body -> half_extensions.x;}
-                        else if (axis_index == 1) {extent = rigid_body -> half_extensions.y;}
-                        else {extent = rigid_body -> half_extensions.z;}
+                        float extent = (axis_index == 0) ? rigid_body -> half_extensions.x : (axis_index == 1) ? rigid_body -> half_extensions.y : rigid_body -> half_extensions.z;
                         vector3 offset = vector3_scaling (axes [axis_index], extent);
                         if (vector3_dot (offset, (vector3){0, -1, 0}) > 0) contact_offset = vector3_addition (contact_offset, offset);
                         else contact_offset = vector3_subtraction (contact_offset, offset);
-                    } vector3 lowest_vertex = vector3_addition (rigid_body -> position, contact_offset);
+                    }
+                    vector3 lowest_vertex = vector3_addition (rigid_body -> position, contact_offset);
                     vector3 gravity_force = vector3_scaling (constant_gravity_acceleration, rigid_body -> mass);
                     float weight_along_normal = vector3_dot (gravity_force, (vector3){0, 1, 0});
                     if (weight_along_normal < 0) {
                         vector3 normal_force = vector3_scaling ((vector3){0, 1, 0}, -weight_along_normal);
                         rb_apply_forces_localised (rigid_body, normal_force, lowest_vertex);
                         rb_apply_forces_perfect (rigid_body, gravity_force);
-                    } vector3 contact_normal = {0, 1, 0};
+                    }
+                    vector3 contact_normal = {0, 1, 0};
                     vector3 velocity_at_contact = vector3_addition (rigid_body -> velocity, vector3_cross (rigid_body -> angular_velocity, contact_offset));
                     vector3 tangential_velocity = vector3_subtraction (velocity_at_contact, vector3_scaling (contact_normal, vector3_dot (velocity_at_contact, contact_normal)));
                     if (vector3_length_squared (tangential_velocity) > 0.0001f) {
@@ -345,8 +358,12 @@ static void on_entry_insert_text (GtkEditable *editable, const gchar *new_text, 
                         rb_apply_forces_localised (rigid_body, friction_force, lowest_vertex);
                     }
                 }
-            } else {rb_apply_forces_perfect (rigid_body, vector3_scaling (constant_gravity_acceleration, rigid_body -> mass));}
-        } for (int collision_index = 0; collision_index < detected_collision_count; collision_index++) {
+            } else {
+                rb_apply_forces_perfect (rigid_body, vector3_scaling (constant_gravity_acceleration, rigid_body -> mass));
+            }
+        }
+
+        for (int collision_index = 0; collision_index < detected_collision_count; collision_index++) {
             rigidbody *rigid_body_a = &obj_per_scene [persistent_collision_pairs [collision_index].object_index_a];
             rigidbody *rigid_body_b = &obj_per_scene [persistent_collision_pairs [collision_index].object_index_b];
             collision_data narrowphase_collision;
@@ -358,14 +375,30 @@ static void on_entry_insert_text (GtkEditable *editable, const gchar *new_text, 
                 narrowphase_collision.normal_vector = vector3_scaling (narrowphase_collision.normal_vector, -1.0f);
                 narrowphase_collision.object_a = rigid_body_a; narrowphase_collision.object_b = rigid_body_b;
             } else if (rigid_body_a -> type == object_cube && rigid_body_b -> type == object_cube) collided = collision_dual_cube (rigid_body_a, rigid_body_b, &narrowphase_collision);
-            if (collided) collision_resolve (&narrowphase_collision);
-        } for (int object_iterator_index = 0; object_iterator_index < object_count; object_iterator_index++) {
+
+            if (collided && manifold_count < 8192) {
+                collision_prepare_solver (&narrowphase_collision, &active_manifold [manifold_count]);
+                manifold_count++;
+            }
+        }
+
+        const int solver_iterations = 8;
+        for (int iter = 0; iter < solver_iterations; iter++) {
+            for (int m = 0; m < manifold_count; m++) {
+                collision_resolve_iterative (&active_manifold [m]);
+            }
+        }
+
+        for (int object_iterator_index = 0; object_iterator_index < object_count; object_iterator_index++) {
             rigidbody *rigid_body = &obj_per_scene [object_iterator_index];
-            rb_integrate (rigid_body, sub_step_dt, linear_damping_factor, angular_damping_factor);
+            rb_integrate (rigid_body, fixed_physics_dt, linear_damping_factor, angular_damping_factor);
             if (!main_inputs.is_debug_mode_active) {boundary_apply_box (rigid_body, (vector3){-250, 0, -250}, (vector3){250, 500, 250});}
             else {boundary_apply_floor (rigid_body, 0.0f);}
         }
-    } gtk_widget_queue_draw (GTK_WIDGET (user_data_pointer));
+        physics_time_accumulator -= fixed_physics_dt;
+    }
+
+    gtk_widget_queue_draw (GTK_WIDGET (user_data_pointer));
     overlay_update ();
     return TRUE;
 }
