@@ -40,8 +40,9 @@ Phase 3 is in progress:
         0.9.4-Alpha
 
 Phase 4 is in progress:
-    Current Head:
-    Prev Versions: 1.1-Stable
+    Current Head: 1.2-Alpha
+    Prev Versions:
+        1.1-Stable
         1.0-Stable
         1.0-RC
         0.9.9-Alpha
