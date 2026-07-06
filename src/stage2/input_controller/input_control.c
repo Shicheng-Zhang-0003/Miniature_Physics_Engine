@@ -178,8 +178,7 @@ void initialise_input (input_status *input_state) {
     if (event -> button == 2) {input_state -> middle_mouse_button_clicked = false;}
     if (event -> button == 3) {input_state -> right_mouse_button_clicked = false;}
     return FALSE;
-}
-gboolean on_focus_out (GtkWidget *widget, GdkEventFocus *event, gpointer user_data_stored) {
+} gboolean on_focus_out (GtkWidget *widget, GdkEventFocus *event, gpointer user_data_stored) {
     (void) widget;
     (void) event;
     input_status *input_state = (input_status *) user_data_stored;
