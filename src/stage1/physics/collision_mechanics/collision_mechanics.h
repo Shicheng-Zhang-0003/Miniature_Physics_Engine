@@ -5,7 +5,6 @@
 #include "../forces/defines_majority_forces/define_forces.h"
 #ifndef collisions_h
 #define collisions_h
-
 typedef struct {
     rigidbody *object_a;
     rigidbody *object_b;
@@ -22,7 +21,6 @@ typedef struct {
     vector3 ra;
     vector3 rb;
 } collision_data;
-
 bool collision_dual_sphere (rigidbody *rigidbody_object_a, rigidbody *rigidbody_object_b, collision_data *collision_output_data);
 float project_obb (rigidbody *rigid_body, vector3 axis, vector3 axes [3]);
 bool collision_sphere_cube (rigidbody *sphere, rigidbody *cube, collision_data *collision_output_data);

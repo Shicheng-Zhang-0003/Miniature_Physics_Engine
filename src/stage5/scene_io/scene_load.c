@@ -3,33 +3,26 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
-
 #define MPE_MAGIC 0x4D504533
 #define MPE_VERSION 130
-
 static int read_float (FILE *f, float *v) { return fread (v, sizeof (float), 1, f) == 1; }
 static int read_int (FILE *f, int32_t *v) { return fread (v, sizeof (int32_t), 1, f) == 1; }
 static int read_vec3 (FILE *f, vector3 *v) { return fread (v, sizeof (vector3), 1, f) == 1; }
 static int read_vec4 (FILE *f, vector4 *v) { return fread (v, sizeof (vector4), 1, f) == 1; }
-
 int scene_loading (const char *file_source_path) {
     FILE *f = fopen (file_source_path, "rb");
     if (!f) { fprintf (stderr, "Error LDF01: Could not open %s\n", file_source_path); return 0; }
-
     int32_t magic, version, count;
-    if (!read_int (f, &magic) || magic != MPE_MAGIC) { fprintf (stderr, "Error LDF02: Invalid magic number\n"); fclose (f); return 0; }
-    if (!read_int (f, &version) || version != MPE_VERSION) { fprintf (stderr, "Error LDF03: Version mismatch\n"); fclose (f); return 0; }
-    if (!read_int (f, &count) || count < 0) { fclose (f); return 0; }
-
+    if ((!read_int (f, &magic)) || (magic != MPE_MAGIC)) { fprintf (stderr, "Error LDF02: Invalid magic number\n"); fclose (f); return 0; }
+    if ((!read_int (f, &version)) || (version != MPE_VERSION)) { fprintf (stderr, "Error LDF03: Version mismatch\n"); fclose (f); return 0; }
+    if ((!read_int (f, &count)) || (count < 0)) { fclose (f); return 0; }
     scene_clear ();
     if (count > object_capacity) {
         rigidbody *new_arr = realloc (obj_per_scene, count * sizeof (rigidbody));
         if (!new_arr) { fclose (f); return 0; }
         obj_per_scene = new_arr;
         object_capacity = count;
-    }
-
-    for (int i = 0; i < count; i++) {
+    } for (int i = 0; i < count; i++) {
         rigidbody temp;
         int32_t type_int, static_int;
         if (!read_int (f, &type_int)) break;
@@ -45,15 +38,10 @@ int scene_loading (const char *file_source_path) {
         if (!read_float (f, &temp.friction_static)) break;
         if (!read_float (f, &temp.friction_kinetic)) break;
         if (!read_int (f, &static_int)) break;
-
         temp.type = (object_type) type_int;
         temp.static_state = (static_int != 0);
-
-        if (temp.type == object_cube) {
-            rigidbody_initialisation_cube (&obj_per_scene [i], temp.position, temp.half_extensions, temp.mass);
-        } else {
-            rigidbody_initialisation_sphere (&obj_per_scene [i], temp.radius, temp.mass, temp.position);
-        }
+        if (temp.type == object_cube) {rigidbody_initialisation_cube (&obj_per_scene [i], temp.position, temp.half_extensions, temp.mass);}
+        else {rigidbody_initialisation_sphere (&obj_per_scene [i], temp.radius, temp.mass, temp.position);}
         obj_per_scene [i].velocity = temp.velocity;
         obj_per_scene [i].angular_velocity = temp.angular_velocity;
         obj_per_scene [i].orientation = vector4_normalisation (temp.orientation);
@@ -64,8 +52,7 @@ int scene_loading (const char *file_source_path) {
         obj_per_scene [i].static_state = temp.static_state;
         if (obj_per_scene [i].static_state) { obj_per_scene [i].inverse_mass = 0.0f; }
         rigidbody_update_axes (&obj_per_scene [i]);
-    }
-    object_count = count;
+    } object_count = count;
     fclose (f);
     return 1;
 }

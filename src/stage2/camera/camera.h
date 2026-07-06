@@ -25,5 +25,4 @@ void camera_move_forward (camera *camera_object, float delta_time);
 void camera_move_backward (camera *camera_object, float delta_time);
 void camera_move_left (camera *camera_object, float delta_time);
 void camera_move_right (camera *camera_object, float delta_time);
-
 #endif

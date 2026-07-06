@@ -65,9 +65,7 @@ GtkWidget *overlay_initialise (GtkWidget *gl_drawing_area_widget) {
         if (main_inputs.is_menu_open) {
             gtk_label_set_text (GTK_LABEL (menu_label), "1: Save current state\n2: Load previous state\n3: Exit");
             gtk_widget_show (menu_label);
-        } else {
-            gtk_widget_hide (menu_label);
-        }
+        } else {gtk_widget_hide (menu_label);}
     } if (spawner_menu_label) {
         if (main_inputs.spawner_menu_level == 0) {gtk_widget_hide (spawner_menu_label);}
         else {
