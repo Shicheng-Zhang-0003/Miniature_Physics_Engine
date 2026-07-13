@@ -1,6 +1,6 @@
 # MINIATURE PHYSICS ENGINE (MPE)
 
-## Version 1.3 — "Architectural Convergence"
+## Version 1.4 — "Alpha 2"
 
 ---
 
@@ -17,6 +17,25 @@ The goal of MPE is to prioritize:
 - Cache-efficient data layouts
 - Deterministic physics simulation
 - High-performance real-time scaling
+
+---
+
+## 🚀 Version 1.4 Alpha 2 Highlights
+
+Version 1.4 Alpha 2 introduces:
+- **Warm-Starting Contact Solver**: Persists normal and tangent impulses across frames, initializing sequential iterations with cached forces to reduce micro-jitter and drastically improve stack stability.
+- **Multi-Point Contact Manifolds**: Sutherland-Hodgman face-clipping polygon algorithm for OBB-OBB face contacts, generating up to 4 contact points to enable stable resting positions and support stacking.
+
+---
+
+## 🚀 Version 1.4 Alpha RC1 Highlights
+
+Version 1.4 Alpha RC1 introduces:
+- **Interactive Constraint/Joint System**: Users can now visually link rigid bodies together using interactive spring joints, creating pendulums and chains.
+- **Dynamic Spring Joint Renderer**: Active spring joints are rendered in real time as glowing magenta lines in the OpenGL viewport.
+- **Object Color Painting**: Support for customizing rigid body colors from a built-in color preset sub-menu.
+- **Robust Constraint Deletion**: Shift correction on joint object indices prevents constraints from breaking when rigid bodies are deleted.
+- **Slab-Method OBB Raycast Selection**: Precise slab-method ray-box intersection test for select click accuracy.
 
 ---
 

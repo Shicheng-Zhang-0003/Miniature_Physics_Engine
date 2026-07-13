@@ -1,5 +1,5 @@
 # Miniature Physics Engine — User Guide
-### Version 1.0-RS
+### Version 1.4 Alpha 2
 
 ---
 
@@ -171,8 +171,6 @@ Broadphase collision detection (sweep-and-prune) runs once per frame rather than
 **Wayland:** Mouse locking does not function correctly under native Wayland. The engine must be run under X11. On systems that default to Wayland, install basic X11 drivers (`xorg`, `xserver-xorg`) and launch the engine in an X11 session. Forcing X11 via `GDK_BACKEND=x11 ./engine` may also work depending on your compositor.
 
 **Object count:** Performance degrades gradually above approximately 1136 objects. The physics and broadphase scale linearly with object count; rendering is the primary bottleneck at high numbers.
-
-**Ray selection on cubes:** Right-click selection on cubes uses a bounding sphere approximation. Clicks near the corners of a cube may not register if they fall outside the bounding sphere. Precise OBB ray selection is a planned improvement.
 
 ---
 

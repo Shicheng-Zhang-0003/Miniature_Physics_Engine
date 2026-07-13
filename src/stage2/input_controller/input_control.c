@@ -6,6 +6,7 @@
 #include <stdbool.h>
 extern camera main_camera_fov;
 extern input_status main_inputs;
+extern int selected_object;
 void initialise_input (input_status *input_state) {
     //Keyboard
     input_state -> w_key_pressed = false;
@@ -45,6 +46,7 @@ void initialise_input (input_status *input_state) {
     input_state -> mouse_delta_x = 0.0f;
     input_state -> mouse_delta_y = 0.0f;
     input_state -> suppress_mouse_delta = false;
+    input_state -> marked_joint_object_index = -1;
 } gboolean on_keypress (GtkWidget *widget, GdkEventKey *event, gpointer user_data_stored) {
     (void) widget;
     input_status *input_state = (input_status *) user_data_stored;
@@ -104,6 +106,28 @@ void initialise_input (input_status *input_state) {
         if (event -> keyval == GDK_KEY_2) {input_state -> object_menu_level = 3;}
         if (event -> keyval == GDK_KEY_3) {input_state -> object_menu_level = 4;}
         if (event -> keyval == GDK_KEY_4) {input_state -> object_menu_level = 5;}
+        if (event -> keyval == GDK_KEY_5) {input_state -> object_menu_level = 6;}
+        if (event -> keyval == GDK_KEY_6) {
+            if (input_state -> marked_joint_object_index != -1 && input_state -> marked_joint_object_index != selected_object) {
+                input_state -> object_menu_level = 7;
+            } else {
+                input_state -> object_menu_level = 8;
+            }
+        }
+        if (event -> keyval == GDK_KEY_7) {
+            if (input_state -> marked_joint_object_index != -1 && input_state -> marked_joint_object_index != selected_object) {
+                input_state -> object_menu_level = 8;
+            }
+        }
+    } else if (input_state -> object_menu_level == 8) {
+        if (event -> keyval == GDK_KEY_1) {input_state -> object_menu_level = 81;}
+        if (event -> keyval == GDK_KEY_2) {input_state -> object_menu_level = 82;}
+        if (event -> keyval == GDK_KEY_3) {input_state -> object_menu_level = 83;}
+        if (event -> keyval == GDK_KEY_4) {input_state -> object_menu_level = 84;}
+        if (event -> keyval == GDK_KEY_5) {input_state -> object_menu_level = 85;}
+        if (event -> keyval == GDK_KEY_6) {input_state -> object_menu_level = 86;}
+        if (event -> keyval == GDK_KEY_7) {input_state -> object_menu_level = 87;}
+        if (event -> keyval == GDK_KEY_8) {input_state -> object_menu_level = 88;}
     } if (event -> keyval == GDK_KEY_space) {input_state -> space_key_pressed = true;}
     if (event -> keyval == GDK_KEY_Shift_L) {input_state -> shift_key_pressed = true;}
     if (event -> keyval == GDK_KEY_Escape) {input_state -> escape_key_pressed = true;}

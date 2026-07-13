@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #define MPE_MAGIC 0x4D504533
-#define MPE_VERSION 130
+#define MPE_VERSION 140
 static void write_float (FILE *f, float v) { fwrite (&v, sizeof (float), 1, f); }
 static void write_int (FILE *f, int32_t v) { fwrite (&v, sizeof (int32_t), 1, f); }
 static void write_vec3 (FILE *f, vector3 v) { fwrite (&v, sizeof (vector3), 1, f); }

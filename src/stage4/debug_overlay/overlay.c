@@ -24,7 +24,7 @@ GtkWidget *overlay_initialise (GtkWidget *gl_drawing_area_widget) {
     //Debug Info
     GtkWidget *ui_overlay_container = gtk_overlay_new ();
     gtk_container_add (GTK_CONTAINER (ui_overlay_container), gl_drawing_area_widget);
-    debug_information_label = gtk_label_new ("- Miniature Physics Engine [Stage 5] -");
+    debug_information_label = gtk_label_new ("- Miniature Physics Engine v1.4 Alpha 2 -");
     gtk_widget_set_halign (debug_information_label, GTK_ALIGN_START);
     gtk_widget_set_valign (debug_information_label, GTK_ALIGN_START);
     gtk_overlay_add_overlay (GTK_OVERLAY (ui_overlay_container), debug_information_label);
@@ -113,8 +113,17 @@ GtkWidget *overlay_initialise (GtkWidget *gl_drawing_area_widget) {
             char object_text [512];
             rigidbody *target = &obj_per_scene [selected_object];
             if (main_inputs.object_menu_level == 1) {
-                if (target -> type == object_sphere) {snprintf (object_text, sizeof (object_text), "-- Object %d (Sphere) --\n1: Mass\n2: Radius\n3: Friction\n4: Immovable Toggle", selected_object);}
-                else {snprintf (object_text, sizeof (object_text), "-- Object %d (Cube) --\n1: Mass\n2: (Radius N/A)\n3: Friction\n4: Immovable Toggle", selected_object);}
+                const char *type_name = (target -> type == object_sphere) ? "Sphere" : "Cube";
+                int len = snprintf (object_text, sizeof (object_text),
+                    "-- Object %d (%s) --\n1: Mass\n2: %s\n3: Friction\n4: Immovable Toggle\n5: Mark for Joint\n",
+                    selected_object, type_name, (target -> type == object_sphere) ? "Radius" : "Radius (N/A)");
+                if (main_inputs.marked_joint_object_index != -1 && main_inputs.marked_joint_object_index != selected_object) {
+                    snprintf (object_text + len, sizeof (object_text) - len,
+                        "6: Link Joint (from Obj %d)\n7: Colour Selection", main_inputs.marked_joint_object_index);
+                } else {
+                    snprintf (object_text + len, sizeof (object_text) - len,
+                        "6: Colour Selection");
+                }
             } else if (main_inputs.object_menu_level == 2) {snprintf (object_text, sizeof (object_text), "-- Mass Adjustment --\nCurrent: %.2f kg\n\nUp/Down: +/- %.2f\nEnter: Save", target -> mass, adjustment_increment);}
             else if (main_inputs.object_menu_level == 3) {snprintf (object_text, sizeof (object_text), "-- Radius Adjustment --\nCurrent: %.2f m\n\nUp/Down: +/- %.2f\nEnter: Save", target -> radius, adjustment_increment);}
             else if (main_inputs.object_menu_level == 4) {snprintf (object_text, sizeof (object_text), "-- Friction Adjustment --\nStatic (u_s): %.2f | Kinetic (u_k): %.2f\n\nUp/Down: +/- %.2f (u_k)\nEnter: Save", target -> friction_static, target -> friction_kinetic, adjustment_increment);}
@@ -123,6 +132,9 @@ GtkWidget *overlay_initialise (GtkWidget *gl_drawing_area_widget) {
                 if (target -> static_state) {static_status_text = "YES";}
                 else {static_status_text = "NO";}
                 snprintf (object_text, sizeof (object_text), "-- Immovable Status --\nCurrent: %s\n\nUp/Down: Toggle\nEnter: Save", static_status_text);
+            } else if (main_inputs.object_menu_level == 8) {
+                snprintf (object_text, sizeof (object_text),
+                    "-- Preset Colours --\n1: Red\n2: Green\n3: Blue\n4: Orange\n5: Cyan\n6: Magenta\n7: Yellow\n8: White");
             } gtk_label_set_text (GTK_LABEL (object_menu_label), object_text);
             gtk_widget_show (object_menu_label);
         }

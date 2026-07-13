@@ -21,6 +21,7 @@ typedef struct {
     bool left_mouse_button_clicked, right_mouse_button_clicked, middle_mouse_button_clicked;
     float mouse_delta_x, mouse_delta_y;
     bool suppress_mouse_delta;
+    int marked_joint_object_index; // -1 if none is marked
 } input_status;
 //Initialise input state to zeroing
 void initialise_input (input_status *input_state);

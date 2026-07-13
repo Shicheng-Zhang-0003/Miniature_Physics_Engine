@@ -142,9 +142,10 @@ static void on_entry_insert_text (GtkEditable *editable, const gchar *new_text, 
     } if (main_inputs.middle_mouse_button_clicked) {
         //Scroll wheel click removes object
         if (selected_object >= 0) {
-            //Shift objects down to fill hole
-            remove_joints_from_object (selected_object);
-            for (int object_index = selected_object; object_index < object_count - 1; object_index++) {obj_per_scene [object_index] = obj_per_scene [object_index + 1];}
+            int deleted_idx = selected_object;
+            remove_joints_from_object (deleted_idx);
+            for (int object_index = deleted_idx; object_index < object_count - 1; object_index++) {obj_per_scene [object_index] = obj_per_scene [object_index + 1];}
+            adjust_joints_after_deletion (deleted_idx);
             object_count -= 1;
             selected_object = -1;
         } main_inputs.middle_mouse_button_clicked = false;
@@ -288,6 +289,29 @@ static void on_entry_insert_text (GtkEditable *editable, const gchar *new_text, 
             main_inputs.up_arrow_pressed = false;
             main_inputs.down_arrow_pressed = false;
         } if (main_inputs.enter_key_pressed) {main_inputs.object_menu_level = 0; main_inputs.enter_key_pressed = false;}
+    } else if (main_inputs.object_menu_level == 6) {
+        main_inputs.marked_joint_object_index = selected_object;
+        main_inputs.object_menu_level = 0;
+    } else if (main_inputs.object_menu_level == 7) {
+        if (main_inputs.marked_joint_object_index != -1 && main_inputs.marked_joint_object_index < object_count && main_inputs.marked_joint_object_index != selected_object) {
+            rigidbody *rb_a = &obj_per_scene [main_inputs.marked_joint_object_index];
+            rigidbody *rb_b = &obj_per_scene [selected_object];
+            float dist = vector3_length (vector3_subtraction (rb_b -> position, rb_a -> position));
+            add_joint (main_inputs.marked_joint_object_index, selected_object, dist, 100.0f, 2.0f);
+        }
+        main_inputs.marked_joint_object_index = -1;
+        main_inputs.object_menu_level = 0;
+    } else if (main_inputs.object_menu_level >= 81 && main_inputs.object_menu_level <= 88) {
+        rigidbody *selected_rigid_body = &obj_per_scene [selected_object];
+        if (main_inputs.object_menu_level == 81) { selected_rigid_body -> colour = (vector3){1.0f, 0.0f, 0.0f}; }
+        else if (main_inputs.object_menu_level == 82) { selected_rigid_body -> colour = (vector3){0.0f, 1.0f, 0.0f}; }
+        else if (main_inputs.object_menu_level == 83) { selected_rigid_body -> colour = (vector3){0.0f, 0.0f, 1.0f}; }
+        else if (main_inputs.object_menu_level == 84) { selected_rigid_body -> colour = (vector3){1.0f, 0.4f, 0.2f}; }
+        else if (main_inputs.object_menu_level == 85) { selected_rigid_body -> colour = (vector3){0.0f, 1.0f, 1.0f}; }
+        else if (main_inputs.object_menu_level == 86) { selected_rigid_body -> colour = (vector3){1.0f, 0.0f, 1.0f}; }
+        else if (main_inputs.object_menu_level == 87) { selected_rigid_body -> colour = (vector3){1.0f, 1.0f, 0.0f}; }
+        else if (main_inputs.object_menu_level == 88) { selected_rigid_body -> colour = (vector3){1.0f, 1.0f, 1.0f}; }
+        main_inputs.object_menu_level = 0;
     } // v1.4 Simulation Contract: Fixed Timestep Accumulator
     static broadphase_pair *persistent_collision_pairs = NULL;
     static int persistent_pairs_capacity = 0;
@@ -365,7 +389,8 @@ static void on_entry_insert_text (GtkEditable *editable, const gchar *new_text, 
         } const int solver_iterations = 8;
         for (int iter = 0; iter < solver_iterations; iter++) {
             for (int m = 0; m < manifold_count; m++) {collision_resolve_iterative (&active_manifold [m]);}
-        } for (int object_iterator_index = 0; object_iterator_index < object_count; object_iterator_index++) {
+        } contact_cache_save (active_manifold, manifold_count);
+        for (int object_iterator_index = 0; object_iterator_index < object_count; object_iterator_index++) {
             rigidbody *rigid_body = &obj_per_scene [object_iterator_index];
             rb_integrate (rigid_body, fixed_physics_dt, linear_damping_factor, angular_damping_factor);
             if (!main_inputs.is_debug_mode_active) {boundary_apply_box (rigid_body, (vector3){-250, 0, -250}, (vector3){250, 500, 250});}

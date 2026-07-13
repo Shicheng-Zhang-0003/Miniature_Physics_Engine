@@ -109,5 +109,6 @@ void render_init () {
         glBindVertexArray (cube_mesh.vertex_array_object);
         glDrawElementsInstanced (GL_TRIANGLES, cube_mesh.index_count, GL_UNSIGNED_INT, 0, cube_inst_count);
     } glBindVertexArray (0);
+    spring_joint_render (utility_shader_program, view_matrix, projection_matrix);
     wireframe_render_selected_object (utility_shader_program, view_matrix, projection_matrix);
 }

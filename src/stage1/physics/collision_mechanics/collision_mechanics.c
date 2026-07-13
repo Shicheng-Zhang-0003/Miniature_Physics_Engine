@@ -1,4 +1,19 @@
 #include "collision_mechanics.h"
+#include <stdlib.h>
+
+typedef struct {
+    rigidbody *object_a;
+    rigidbody *object_b;
+    vector3 local_position_a;
+    vector3 local_position_b;
+    float accumulated_normal_impulse;
+    float accumulated_tangent_impulse;
+} cached_contact;
+
+#define MAX_CACHED_CONTACTS 16384
+static cached_contact contact_impulse_cache [MAX_CACHED_CONTACTS];
+static int contact_impulse_cache_count = 0;
+
 bool collision_dual_sphere (rigidbody *rigidbody_object_a, rigidbody *rigidbody_object_b, collision_data *collision_output_data) {
     vector3 relative_position_vector = vector3_subtraction (rigidbody_object_b -> position, rigidbody_object_a -> position);
     float distance_between_centres_squared = vector3_length_squared (relative_position_vector);
@@ -10,10 +25,18 @@ bool collision_dual_sphere (rigidbody *rigidbody_object_a, rigidbody *rigidbody_
     const float minimum_distance_threshold_epsilon = 0.0001f;
     if (distance_between_centres > minimum_distance_threshold_epsilon) {collision_output_data -> normal_vector = vector3_scaling (relative_position_vector, 1.0f / distance_between_centres);}
     else {collision_output_data -> normal_vector = (vector3) {0.0f, 1.0f, 0.0f};}
-    collision_output_data -> penetration_contact = total_combined_radius - distance_between_centres;
-    collision_output_data -> contact_point = vector3_addition (rigidbody_object_a -> position, vector3_scaling (collision_output_data -> normal_vector, rigidbody_object_a -> radius));
+    
+    contact_point_data *cp = &collision_output_data -> contacts [0];
+    cp -> penetration = total_combined_radius - distance_between_centres;
+    cp -> position = vector3_addition (rigidbody_object_a -> position, vector3_scaling (collision_output_data -> normal_vector, rigidbody_object_a -> radius));
+    collision_output_data -> contact_count = 1;
     return true;
-} float project_obb (rigidbody *rigid_body, vector3 axis, vector3 axes [3]) {return rigid_body -> half_extensions.x * fabsf (vector3_dot (axes [0], axis)) + rigid_body -> half_extensions.y * fabsf (vector3_dot (axes [1], axis)) + rigid_body -> half_extensions.z * fabsf (vector3_dot (axes [2], axis));}
+}
+
+float project_obb (rigidbody *rigid_body, vector3 axis, vector3 axes [3]) {
+    return rigid_body -> half_extensions.x * fabsf (vector3_dot (axes [0], axis)) + rigid_body -> half_extensions.y * fabsf (vector3_dot (axes [1], axis)) + rigid_body -> half_extensions.z * fabsf (vector3_dot (axes [2], axis));
+}
+
 bool collision_sphere_cube (rigidbody *sphere, rigidbody *cube, collision_data *collision_output_data) {
     vector3 *axes_cube = cube -> cached_axes;
     vector3 relative_position = vector3_subtraction (sphere -> position, cube -> position);
@@ -36,27 +59,158 @@ bool collision_sphere_cube (rigidbody *sphere, rigidbody *cube, collision_data *
     float distance_sq = vector3_length_squared (difference);
     if (!inside && distance_sq > sphere -> radius * sphere -> radius) return false;
     collision_output_data -> object_a = sphere; collision_output_data -> object_b = cube;
+    
+    contact_point_data *cp = &collision_output_data -> contacts [0];
     if (inside) {
         collision_output_data -> normal_vector = vector3_scaling (axes_cube [nearest_face_axis], nearest_face_sign);
-        collision_output_data -> penetration_contact = sphere -> radius + minimum_distance;
-        collision_output_data -> contact_point = closest_point;
+        cp -> penetration = sphere -> radius + minimum_distance;
+        cp -> position = closest_point;
     } else {
         float distance = sqrtf (distance_sq);
         if (distance > 0.0001f) {collision_output_data -> normal_vector = vector3_scaling (difference, -1.0f / distance);}
         else {collision_output_data -> normal_vector = (vector3) {0.0f, -1.0f, 0.0f};}
-        collision_output_data -> penetration_contact = sphere -> radius - distance;
-        collision_output_data -> contact_point = closest_point;
-    } return true;
-} bool collision_dual_cube (rigidbody *cube_a, rigidbody *cube_b, collision_data *collision_output_data) {
+        cp -> penetration = sphere -> radius - distance;
+        cp -> position = closest_point;
+    }
+    collision_output_data -> contact_count = 1;
+    return true;
+}
+
+static void clip_obb_faces (rigidbody *ref_body, rigidbody *inc_body, vector3 normal, float overlap, collision_data *collision_output_data) {
+    vector3 *ref_axes = ref_body -> cached_axes;
+    vector3 ref_extents = ref_body -> half_extensions;
+    int ref_axis_idx = 0;
+    float max_dot = -1.0f;
+    for (int i = 0; i < 3; i++) {
+        float dot_val = vector3_dot (ref_axes [i], normal);
+        if (fabsf (dot_val) > max_dot) {
+            max_dot = fabsf (dot_val);
+            ref_axis_idx = i;
+        }
+    }
+    vector3 ref_normal = ref_axes [ref_axis_idx];
+    if (vector3_dot (ref_normal, normal) < 0.0f) {
+        ref_normal = vector3_scaling (ref_normal, -1.0f);
+    }
+    int side_axis_idx_1 = (ref_axis_idx + 1) % 3;
+    int side_axis_idx_2 = (ref_axis_idx + 2) % 3;
+    vector3 side_axis_1 = ref_axes [side_axis_idx_1];
+    vector3 side_axis_2 = ref_axes [side_axis_idx_2];
+    float ref_extent_n = (ref_axis_idx == 0) ? ref_extents.x : (ref_axis_idx == 1) ? ref_extents.y : ref_extents.z;
+    float ref_extent_1 = (side_axis_idx_1 == 0) ? ref_extents.x : (side_axis_idx_1 == 1) ? ref_extents.y : ref_extents.z;
+    float ref_extent_2 = (side_axis_idx_2 == 0) ? ref_extents.x : (side_axis_idx_2 == 1) ? ref_extents.y : ref_extents.z;
+    vector3 ref_center = vector3_addition (ref_body -> position, vector3_scaling (ref_normal, ref_extent_n));
+    
+    vector3 *inc_axes = inc_body -> cached_axes;
+    vector3 inc_extents = inc_body -> half_extensions;
+    int inc_axis_idx = 0;
+    float min_dot = 1.0f;
+    for (int i = 0; i < 3; i++) {
+        float dot_val = vector3_dot (inc_axes [i], ref_normal);
+        if (dot_val < min_dot) {
+            min_dot = dot_val;
+            inc_axis_idx = i;
+        }
+    }
+    vector3 inc_normal = inc_axes [inc_axis_idx];
+    float dot_sign = vector3_dot (inc_normal, ref_normal);
+    if (dot_sign > 0.0f) {
+        inc_normal = vector3_scaling (inc_normal, -1.0f);
+    }
+    int inc_u_idx = (inc_axis_idx + 1) % 3;
+    int inc_v_idx = (inc_axis_idx + 2) % 3;
+    vector3 inc_u_axis = inc_axes [inc_u_idx];
+    vector3 inc_v_axis = inc_axes [inc_v_idx];
+    float inc_extent_n = (inc_axis_idx == 0) ? inc_extents.x : (inc_axis_idx == 1) ? inc_extents.y : inc_extents.z;
+    float inc_extent_u = (inc_u_idx == 0) ? inc_extents.x : (inc_u_idx == 1) ? inc_extents.y : inc_extents.z;
+    float inc_extent_v = (inc_v_idx == 0) ? inc_extents.x : (inc_v_idx == 1) ? inc_extents.y : inc_extents.z;
+    vector3 inc_center = vector3_addition (inc_body -> position, vector3_scaling (inc_normal, inc_extent_n));
+    
+    vector3 input_polygon [8];
+    input_polygon [0] = vector3_addition (inc_center, vector3_addition (vector3_scaling (inc_u_axis, inc_extent_u), vector3_scaling (inc_v_axis, inc_extent_v)));
+    input_polygon [1] = vector3_addition (inc_center, vector3_subtraction (vector3_scaling (inc_u_axis, inc_extent_u), vector3_scaling (inc_v_axis, inc_extent_v)));
+    input_polygon [2] = vector3_subtraction (inc_center, vector3_addition (vector3_scaling (inc_u_axis, inc_extent_u), vector3_scaling (inc_v_axis, inc_extent_v)));
+    input_polygon [3] = vector3_subtraction (inc_center, vector3_subtraction (vector3_scaling (inc_u_axis, inc_extent_u), vector3_scaling (inc_v_axis, inc_extent_v)));
+    int input_count = 4;
+    
+    vector3 clip_normals [4];
+    float clip_offsets [4];
+    clip_normals [0] = side_axis_1;
+    clip_offsets [0] = vector3_dot (ref_center, side_axis_1) + ref_extent_1;
+    clip_normals [1] = vector3_scaling (side_axis_1, -1.0f);
+    clip_offsets [1] = -vector3_dot (ref_center, side_axis_1) + ref_extent_1;
+    clip_normals [2] = side_axis_2;
+    clip_offsets [2] = vector3_dot (ref_center, side_axis_2) + ref_extent_2;
+    clip_normals [3] = vector3_scaling (side_axis_2, -1.0f);
+    clip_offsets [3] = -vector3_dot (ref_center, side_axis_2) + ref_extent_2;
+    
+    vector3 output_polygon [8];
+    for (int p = 0; p < 4; p++) {
+        int output_count = 0;
+        if (input_count < 2) {
+            input_count = 0;
+            break;
+        }
+        vector3 v1 = input_polygon [input_count - 1];
+        float d1 = vector3_dot (v1, clip_normals [p]) - clip_offsets [p];
+        for (int i = 0; i < input_count; i++) {
+            vector3 v2 = input_polygon [i];
+            float d2 = vector3_dot (v2, clip_normals [p]) - clip_offsets [p];
+            if (d1 <= 0.0f && d2 <= 0.0f) {
+                output_polygon [output_count++] = v2;
+            } else if (d1 <= 0.0f && d2 > 0.0f) {
+                float t = d1 / (d1 - d2);
+                vector3 v_int = vector3_addition (v1, vector3_scaling (vector3_subtraction (v2, v1), t));
+                output_polygon [output_count++] = v_int;
+            } else if (d1 > 0.0f && d2 <= 0.0f) {
+                float t = d1 / (d1 - d2);
+                vector3 v_int = vector3_addition (v1, vector3_scaling (vector3_subtraction (v2, v1), t));
+                output_polygon [output_count++] = v_int;
+                output_polygon [output_count++] = v2;
+            }
+            v1 = v2;
+            d1 = d2;
+        }
+        input_count = output_count;
+        for (int i = 0; i < input_count; i++) {
+            input_polygon [i] = output_polygon [i];
+        }
+    }
+    float ref_height = vector3_dot (ref_center, ref_normal);
+    int manifold_idx = 0;
+    for (int i = 0; i < input_count; i++) {
+        vector3 v = input_polygon [i];
+        float penetration = ref_height - vector3_dot (v, ref_normal);
+        if (penetration >= -0.01f) {
+            if (manifold_idx < 4) {
+                contact_point_data *cp = &collision_output_data -> contacts [manifold_idx++];
+                cp -> position = v;
+                cp -> penetration = penetration > 0.0f ? penetration : 0.0f;
+            }
+        }
+    }
+    if (manifold_idx == 0) {
+        contact_point_data *cp = &collision_output_data -> contacts [0];
+        cp -> position = inc_center;
+        float penetration = ref_height - vector3_dot (inc_center, ref_normal);
+        cp -> penetration = penetration > 0.0f ? penetration : overlap;
+        manifold_idx = 1;
+    }
+    collision_output_data -> contact_count = manifold_idx;
+}
+
+bool collision_dual_cube (rigidbody *cube_a, rigidbody *cube_b, collision_data *collision_output_data) {
     vector3 *axes_a = cube_a -> cached_axes; vector3 *axes_b = cube_b -> cached_axes;
     vector3 relative_position = vector3_subtraction (cube_b -> position, cube_a -> position);
     float minimum_overlap = 1000000.0f; vector3 best_axis = {0,0,0};
+    int best_axis_index = -1;
+    
     for (int axis_index = 0; axis_index < 6; axis_index++) {
         vector3 axis = (axis_index < 3) ? axes_a [axis_index] : axes_b [axis_index - 3];
         float projection_a = project_obb (cube_a, axis, axes_a); float projection_b = project_obb (cube_b, axis, axes_b);
         float distance = fabsf (vector3_dot (relative_position, axis)); float overlap = projection_a + projection_b - distance;
         if (overlap < 0.0f) {return false;}
-        if (overlap < minimum_overlap) {minimum_overlap = overlap; best_axis = axis;}
+        if (overlap < minimum_overlap) {minimum_overlap = overlap; best_axis = axis; best_axis_index = axis_index;}
     } for (int axis_index_a = 0; axis_index_a < 3; axis_index_a++) {
         for (int axis_index_b = 0; axis_index_b < 3; axis_index_b++) {
             vector3 axis = vector3_cross (axes_a [axis_index_a], axes_b [axis_index_b]);
@@ -66,106 +220,197 @@ bool collision_sphere_cube (rigidbody *sphere, rigidbody *cube, collision_data *
             float projection_a = project_obb (cube_a, axis, axes_a); float projection_b = project_obb (cube_b, axis, axes_b);
             float distance = fabsf (vector3_dot (relative_position, axis)); float overlap = projection_a + projection_b - distance;
             if (overlap < 0.0f) {return false;}
-            if (overlap < minimum_overlap) {minimum_overlap = overlap; best_axis = axis;}
+            if (overlap < minimum_overlap) {minimum_overlap = overlap; best_axis = axis; best_axis_index = 6 + axis_index_a * 3 + axis_index_b;}
         }
     } if (vector3_dot (relative_position, best_axis) < 0) {best_axis = vector3_scaling (best_axis, -1.0f);}
     collision_output_data -> object_a = cube_a; collision_output_data -> object_b = cube_b;
-    collision_output_data -> normal_vector = best_axis; collision_output_data -> penetration_contact = minimum_overlap;
-    vector3 contact_point = cube_b -> position;
-    for (int axis_index = 0; axis_index < 3; axis_index++) {
-        float extent = (axis_index == 0) ? cube_b -> half_extensions.x : (axis_index == 1) ? cube_b -> half_extensions.y : cube_b -> half_extensions.z;
-        vector3 offset = vector3_scaling (axes_b [axis_index], extent);
-        if (vector3_dot (offset, best_axis) > 0) {contact_point = vector3_subtraction (contact_point, offset);}
-        else {contact_point = vector3_addition (contact_point, offset);}
-    } collision_output_data -> contact_point = contact_point;
-    return true;
-} void collision_prepare_solver (collision_data *source, collision_data *m) {
-    *m = *source;
-    m -> accumulated_normal_impulse = 0.0f;
-    m -> accumulated_tangent_impulse = 0.0f;
-    m -> ra = vector3_subtraction (m -> contact_point, m -> object_a -> position);
-    m -> rb = vector3_subtraction (m -> contact_point, m -> object_b -> position);
-    vector3 va = vector3_addition (m -> object_a -> velocity, vector3_cross (m -> object_a -> angular_velocity, m -> ra));
-    vector3 vb = vector3_addition (m -> object_b -> velocity, vector3_cross (m -> object_b -> angular_velocity, m -> rb));
-    vector3 rel_vel = vector3_subtraction (vb, va);
-    float vn_initial = vector3_dot (rel_vel, m -> normal_vector);
-    // FIX: Calculate Restitution Bias ONCE (Erin Catto Box2D method)
-    // Only apply bounce if impact velocity is significant (> 1.0 m/s) to prevent micro-jitter
-    float restitution = fminf (m -> object_a -> restitution, m -> object_b -> restitution);
-    if (vn_initial < -1.0f) {m -> restitution_bias = -restitution * vn_initial;
-    } else {m -> restitution_bias = 0.0f;}
-    vector3 ra_cross_n = vector3_cross (m -> ra, m -> normal_vector);
-    vector3 rb_cross_n = vector3_cross (m -> rb, m -> normal_vector);
-    vector3 ang_a = vector3_cross (math3_multiplication_vector3 (m -> object_a -> inverse_inertia_system, ra_cross_n), m -> ra);
-    vector3 ang_b = vector3_cross (math3_multiplication_vector3 (m -> object_b -> inverse_inertia_system, rb_cross_n), m -> rb);
-    float k_normal = m -> object_a -> inverse_mass + m -> object_b -> inverse_mass + vector3_dot (vector3_addition (ang_a, ang_b), m -> normal_vector);
-    m -> effective_mass_normal = (k_normal > 0.0f) ? (1.0f / k_normal) : 0.0f;
-    // Precompute initial tangent for effective mass (will be recalculated in loop for accuracy)
-    vector3 rel_vel_tangent = vector3_subtraction (rel_vel, vector3_scaling (m -> normal_vector, vn_initial));
-    float tangent_speed = vector3_length (rel_vel_tangent);
-    if (tangent_speed > 0.0001f) {
-        m -> tangent_vector = vector3_scaling (rel_vel_tangent, -1.0f / tangent_speed);
-        vector3 ra_cross_t = vector3_cross (m -> ra, m -> tangent_vector);
-        vector3 rb_cross_t = vector3_cross (m -> rb, m -> tangent_vector);
-        vector3 ang_a_t = vector3_cross (math3_multiplication_vector3 (m -> object_a -> inverse_inertia_system, ra_cross_t), m -> ra);
-        vector3 ang_b_t = vector3_cross (math3_multiplication_vector3 (m -> object_b -> inverse_inertia_system, rb_cross_t), m -> rb);
-        float k_tangent = m -> object_a -> inverse_mass + m -> object_b -> inverse_mass + vector3_dot (vector3_addition (ang_a_t, ang_b_t), m -> tangent_vector);
-        m -> effective_mass_tangent = (k_tangent > 0.0f) ? (1.0f / k_tangent) : 0.0f;
-    } else {
-        m -> tangent_vector = vector3_zero ();
-        m -> effective_mass_tangent = 0.0f;
-    }
-} void collision_resolve_iterative (collision_data *m) {
-    // FIX 1: Recalculate CURRENT relative velocity at contact point inside the loop
-    vector3 va = vector3_addition (m -> object_a -> velocity, vector3_cross (m -> object_a -> angular_velocity, m -> ra));
-    vector3 vb = vector3_addition (m -> object_b -> velocity, vector3_cross (m -> object_b -> angular_velocity, m -> rb));
-    vector3 rel_vel = vector3_subtraction (vb, va);
-    float vn = vector3_dot (rel_vel, m -> normal_vector);
-    // FIX 2: Use the safe restitution bias instead of multiplying (1+e) every iteration
-    float lambda_n = (-vn + m -> restitution_bias) * m -> effective_mass_normal;
-    float old_impulse = m -> accumulated_normal_impulse;
-    m -> accumulated_normal_impulse = fmaxf (old_impulse + lambda_n, 0.0f);
-    lambda_n = m -> accumulated_normal_impulse - old_impulse;
-    if (lambda_n != 0.0f) {
-        vector3 impulse = vector3_scaling (m -> normal_vector, lambda_n);
-        if (!m -> object_a -> static_state) {
-            m -> object_a -> velocity = vector3_subtraction (m -> object_a -> velocity, vector3_scaling (impulse, m -> object_a -> inverse_mass));
-            m -> object_a -> angular_velocity = vector3_subtraction (m -> object_a -> angular_velocity, math3_multiplication_vector3 (m -> object_a -> inverse_inertia_system, vector3_cross (m -> ra, impulse)));
-        } if (!m -> object_b -> static_state) {
-            m -> object_b -> velocity = vector3_addition (m -> object_b -> velocity, vector3_scaling (impulse, m -> object_b -> inverse_mass));
-            m -> object_b -> angular_velocity = vector3_addition (m -> object_b -> angular_velocity, math3_multiplication_vector3 (m -> object_b -> inverse_inertia_system, vector3_cross (m -> rb, impulse)));
+    collision_output_data -> normal_vector = best_axis;
+    
+    if (best_axis_index >= 6) {
+        contact_point_data *cp = &collision_output_data -> contacts [0];
+        vector3 contact_point = cube_b -> position;
+        for (int axis_index = 0; axis_index < 3; axis_index++) {
+            float extent = (axis_index == 0) ? cube_b -> half_extensions.x : (axis_index == 1) ? cube_b -> half_extensions.y : cube_b -> half_extensions.z;
+            vector3 offset = vector3_scaling (axes_b [axis_index], extent);
+            if (vector3_dot (offset, best_axis) > 0) {contact_point = vector3_subtraction (contact_point, offset);}
+            else {contact_point = vector3_addition (contact_point, offset);}
         }
-    } // Friction Impulse
-    va = vector3_addition (m -> object_a -> velocity, vector3_cross (m -> object_a -> angular_velocity, m -> ra));
-    vb = vector3_addition (m -> object_b -> velocity, vector3_cross (m -> object_b -> angular_velocity, m -> rb));
-    rel_vel = vector3_subtraction (vb, va);
-    vector3 tangent = vector3_subtraction (rel_vel, vector3_scaling (m -> normal_vector, vector3_dot (rel_vel, m -> normal_vector)));
-    float tangent_length = vector3_length (tangent);
-    if (tangent_length > 0.0001f) {
-        tangent = vector3_scaling (tangent, -1.0f / tangent_length);
-        float vt = vector3_dot (rel_vel, tangent);
-        // Recompute effective mass for this specific tangent to ensure stability
-        vector3 ra_cross_t = vector3_cross (m -> ra, tangent);
-        vector3 rb_cross_t = vector3_cross (m -> rb, tangent);
-        vector3 ang_a_t = vector3_cross (math3_multiplication_vector3 (m -> object_a -> inverse_inertia_system, ra_cross_t), m -> ra);
-        vector3 ang_b_t = vector3_cross (math3_multiplication_vector3 (m -> object_b -> inverse_inertia_system, rb_cross_t), m -> rb);
-        float k_tangent = m -> object_a -> inverse_mass + m -> object_b -> inverse_mass + vector3_dot (vector3_addition (ang_a_t, ang_b_t), tangent);
-        float eff_mass_t = (k_tangent > 0.0f) ? (1.0f / k_tangent) : 0.0f;
-        float lambda_t = -vt * eff_mass_t;
-        float friction_coeff = fminf (m -> object_a -> friction_kinetic, m -> object_b -> friction_kinetic);
-        float max_friction = m -> accumulated_normal_impulse * friction_coeff;
-        float old_tangent_impulse = m -> accumulated_tangent_impulse;
-        m -> accumulated_tangent_impulse = fmaxf (-max_friction, fminf (old_tangent_impulse + lambda_t, max_friction));
-        lambda_t = m -> accumulated_tangent_impulse - old_tangent_impulse;
-        if (lambda_t != 0.0f) {
-            vector3 friction_impulse = vector3_scaling (tangent, lambda_t);
+        cp -> position = contact_point;
+        cp -> penetration = minimum_overlap;
+        collision_output_data -> contact_count = 1;
+    } else {
+        if (best_axis_index < 3) {
+            clip_obb_faces (cube_a, cube_b, best_axis, minimum_overlap, collision_output_data);
+        } else {
+            clip_obb_faces (cube_b, cube_a, vector3_scaling (best_axis, -1.0f), minimum_overlap, collision_output_data);
+            collision_output_data -> object_a = cube_a;
+            collision_output_data -> object_b = cube_b;
+        }
+    }
+    return true;
+}
+
+void collision_prepare_solver (collision_data *source, collision_data *m) {
+    *m = *source;
+    for (int i = 0; i < m -> contact_count; i++) {
+        contact_point_data *cp = &m -> contacts [i];
+        cp -> ra = vector3_subtraction (cp -> position, m -> object_a -> position);
+        cp -> rb = vector3_subtraction (cp -> position, m -> object_b -> position);
+        cp -> local_position_a = cp -> ra;
+        cp -> local_position_b = cp -> rb;
+        
+        cp -> accumulated_normal_impulse = 0.0f;
+        cp -> accumulated_tangent_impulse = 0.0f;
+        for (int c = 0; c < contact_impulse_cache_count; c++) {
+            cached_contact *cc = &contact_impulse_cache [c];
+            if (cc -> object_a == m -> object_a && cc -> object_b == m -> object_b) {
+                float dist_sq = vector3_length_squared (vector3_subtraction (cc -> local_position_a, cp -> local_position_a));
+                if (dist_sq < 0.04f) {
+                    cp -> accumulated_normal_impulse = cc -> accumulated_normal_impulse;
+                    cp -> accumulated_tangent_impulse = cc -> accumulated_tangent_impulse;
+                    break;
+                }
+            } else if (cc -> object_a == m -> object_b && cc -> object_b == m -> object_a) {
+                float dist_sq = vector3_length_squared (vector3_subtraction (cc -> local_position_a, cp -> local_position_b));
+                if (dist_sq < 0.04f) {
+                    cp -> accumulated_normal_impulse = cc -> accumulated_normal_impulse;
+                    cp -> accumulated_tangent_impulse = cc -> accumulated_tangent_impulse;
+                    break;
+                }
+            }
+        }
+        
+        vector3 va = vector3_addition (m -> object_a -> velocity, vector3_cross (m -> object_a -> angular_velocity, cp -> ra));
+        vector3 vb = vector3_addition (m -> object_b -> velocity, vector3_cross (m -> object_b -> angular_velocity, cp -> rb));
+        vector3 rel_vel = vector3_subtraction (vb, va);
+        float vn_initial = vector3_dot (rel_vel, m -> normal_vector);
+        
+        float restitution = fminf (m -> object_a -> restitution, m -> object_b -> restitution);
+        if (vn_initial < -1.0f) {
+            cp -> restitution_bias = -restitution * vn_initial;
+        } else {
+            cp -> restitution_bias = 0.0f;
+        }
+        
+        vector3 ra_cross_n = vector3_cross (cp -> ra, m -> normal_vector);
+        vector3 rb_cross_n = vector3_cross (cp -> rb, m -> normal_vector);
+        vector3 ang_a = vector3_cross (math3_multiplication_vector3 (m -> object_a -> inverse_inertia_system, ra_cross_n), cp -> ra);
+        vector3 ang_b = vector3_cross (math3_multiplication_vector3 (m -> object_b -> inverse_inertia_system, rb_cross_n), cp -> rb);
+        float k_normal = m -> object_a -> inverse_mass + m -> object_b -> inverse_mass + vector3_dot (vector3_addition (ang_a, ang_b), m -> normal_vector);
+        cp -> effective_mass_normal = (k_normal > 0.0f) ? (1.0f / k_normal) : 0.0f;
+        
+        vector3 rel_vel_tangent = vector3_subtraction (rel_vel, vector3_scaling (m -> normal_vector, vn_initial));
+        float tangent_speed = vector3_length (rel_vel_tangent);
+        if (tangent_speed > 0.0001f) {
+            cp -> tangent_vector = vector3_scaling (rel_vel_tangent, -1.0f / tangent_speed);
+            vector3 ra_cross_t = vector3_cross (cp -> ra, cp -> tangent_vector);
+            vector3 rb_cross_t = vector3_cross (cp -> rb, cp -> tangent_vector);
+            vector3 ang_a_t = vector3_cross (math3_multiplication_vector3 (m -> object_a -> inverse_inertia_system, ra_cross_t), cp -> ra);
+            vector3 ang_b_t = vector3_cross (math3_multiplication_vector3 (m -> object_b -> inverse_inertia_system, rb_cross_t), cp -> rb);
+            float k_tangent = m -> object_a -> inverse_mass + m -> object_b -> inverse_mass + vector3_dot (vector3_addition (ang_a_t, ang_b_t), cp -> tangent_vector);
+            cp -> effective_mass_tangent = (k_tangent > 0.0f) ? (1.0f / k_tangent) : 0.0f;
+        } else {
+            cp -> tangent_vector = vector3_zero ();
+            cp -> effective_mass_tangent = 0.0f;
+        }
+        
+        if (cp -> accumulated_normal_impulse != 0.0f || cp -> accumulated_tangent_impulse != 0.0f) {
+            vector3 impulse = vector3_addition (
+                vector3_scaling (m -> normal_vector, cp -> accumulated_normal_impulse),
+                vector3_scaling (cp -> tangent_vector, cp -> accumulated_tangent_impulse)
+            );
             if (!m -> object_a -> static_state) {
-                m -> object_a -> velocity = vector3_subtraction (m -> object_a -> velocity, vector3_scaling (friction_impulse, m -> object_a -> inverse_mass));
-                m -> object_a -> angular_velocity = vector3_subtraction (m -> object_a -> angular_velocity, math3_multiplication_vector3 (m -> object_a -> inverse_inertia_system, vector3_cross (m -> ra, friction_impulse)));
-            } if (!m -> object_b -> static_state) {
-                m -> object_b -> velocity = vector3_addition (m -> object_b -> velocity, vector3_scaling (friction_impulse, m -> object_b -> inverse_mass));
-                m -> object_b -> angular_velocity = vector3_addition (m -> object_b -> angular_velocity, math3_multiplication_vector3 (m -> object_b -> inverse_inertia_system, vector3_cross (m -> rb, friction_impulse)));
+                m -> object_a -> velocity = vector3_subtraction (m -> object_a -> velocity, vector3_scaling (impulse, m -> object_a -> inverse_mass));
+                m -> object_a -> angular_velocity = vector3_subtraction (m -> object_a -> angular_velocity, math3_multiplication_vector3 (m -> object_a -> inverse_inertia_system, vector3_cross (cp -> ra, impulse)));
+            }
+            if (!m -> object_b -> static_state) {
+                m -> object_b -> velocity = vector3_addition (m -> object_b -> velocity, vector3_scaling (impulse, m -> object_b -> inverse_mass));
+                m -> object_b -> angular_velocity = vector3_addition (m -> object_b -> angular_velocity, math3_multiplication_vector3 (m -> object_b -> inverse_inertia_system, vector3_cross (cp -> rb, impulse)));
             }
         }
     }
-} void collision_resolve (collision_data *collision) {(void) collision;}
+}
+
+void collision_resolve_iterative (collision_data *m) {
+    for (int i = 0; i < m -> contact_count; i++) {
+        contact_point_data *cp = &m -> contacts [i];
+        
+        vector3 va = vector3_addition (m -> object_a -> velocity, vector3_cross (m -> object_a -> angular_velocity, cp -> ra));
+        vector3 vb = vector3_addition (m -> object_b -> velocity, vector3_cross (m -> object_b -> angular_velocity, cp -> rb));
+        vector3 rel_vel = vector3_subtraction (vb, va);
+        float vn = vector3_dot (rel_vel, m -> normal_vector);
+        
+        float lambda_n = (-vn + cp -> restitution_bias) * cp -> effective_mass_normal;
+        float old_impulse = cp -> accumulated_normal_impulse;
+        cp -> accumulated_normal_impulse = fmaxf (old_impulse + lambda_n, 0.0f);
+        lambda_n = cp -> accumulated_normal_impulse - old_impulse;
+        if (lambda_n != 0.0f) {
+            vector3 impulse = vector3_scaling (m -> normal_vector, lambda_n);
+            if (!m -> object_a -> static_state) {
+                m -> object_a -> velocity = vector3_subtraction (m -> object_a -> velocity, vector3_scaling (impulse, m -> object_a -> inverse_mass));
+                m -> object_a -> angular_velocity = vector3_subtraction (m -> object_a -> angular_velocity, math3_multiplication_vector3 (m -> object_a -> inverse_inertia_system, vector3_cross (cp -> ra, impulse)));
+            }
+            if (!m -> object_b -> static_state) {
+                m -> object_b -> velocity = vector3_addition (m -> object_b -> velocity, vector3_scaling (impulse, m -> object_b -> inverse_mass));
+                m -> object_b -> angular_velocity = vector3_addition (m -> object_b -> angular_velocity, math3_multiplication_vector3 (m -> object_b -> inverse_inertia_system, vector3_cross (cp -> rb, impulse)));
+            }
+        }
+        
+        va = vector3_addition (m -> object_a -> velocity, vector3_cross (m -> object_a -> angular_velocity, cp -> ra));
+        vb = vector3_addition (m -> object_b -> velocity, vector3_cross (m -> object_b -> angular_velocity, cp -> rb));
+        rel_vel = vector3_subtraction (vb, va);
+        vector3 tangent = vector3_subtraction (rel_vel, vector3_scaling (m -> normal_vector, vector3_dot (rel_vel, m -> normal_vector)));
+        float tangent_length = vector3_length (tangent);
+        if (tangent_length > 0.0001f) {
+            tangent = vector3_scaling (tangent, -1.0f / tangent_length);
+            float vt = vector3_dot (rel_vel, tangent);
+            
+            vector3 ra_cross_t = vector3_cross (cp -> ra, tangent);
+            vector3 rb_cross_t = vector3_cross (cp -> rb, tangent);
+            vector3 ang_a_t = vector3_cross (math3_multiplication_vector3 (m -> object_a -> inverse_inertia_system, ra_cross_t), cp -> ra);
+            vector3 ang_b_t = vector3_cross (math3_multiplication_vector3 (m -> object_b -> inverse_inertia_system, rb_cross_t), cp -> rb);
+            float k_tangent = m -> object_a -> inverse_mass + m -> object_b -> inverse_mass + vector3_dot (vector3_addition (ang_a_t, ang_b_t), tangent);
+            float eff_mass_t = (k_tangent > 0.0f) ? (1.0f / k_tangent) : 0.0f;
+            
+            float lambda_t = -vt * eff_mass_t;
+            float friction_coeff = fminf (m -> object_a -> friction_kinetic, m -> object_b -> friction_kinetic);
+            float max_friction = cp -> accumulated_normal_impulse * friction_coeff;
+            float old_tangent_impulse = cp -> accumulated_tangent_impulse;
+            cp -> accumulated_tangent_impulse = fmaxf (-max_friction, fminf (old_tangent_impulse + lambda_t, max_friction));
+            lambda_t = cp -> accumulated_tangent_impulse - old_tangent_impulse;
+            if (lambda_t != 0.0f) {
+                vector3 friction_impulse = vector3_scaling (tangent, lambda_t);
+                if (!m -> object_a -> static_state) {
+                    m -> object_a -> velocity = vector3_subtraction (m -> object_a -> velocity, vector3_scaling (friction_impulse, m -> object_a -> inverse_mass));
+                    m -> object_a -> angular_velocity = vector3_subtraction (m -> object_a -> angular_velocity, math3_multiplication_vector3 (m -> object_a -> inverse_inertia_system, vector3_cross (cp -> ra, friction_impulse)));
+                }
+                if (!m -> object_b -> static_state) {
+                    m -> object_b -> velocity = vector3_addition (m -> object_b -> velocity, vector3_scaling (friction_impulse, m -> object_b -> inverse_mass));
+                    m -> object_b -> angular_velocity = vector3_addition (m -> object_b -> angular_velocity, math3_multiplication_vector3 (m -> object_b -> inverse_inertia_system, vector3_cross (cp -> rb, friction_impulse)));
+                }
+            }
+        }
+    }
+}
+
+void contact_cache_save (collision_data *manifolds, int count) {
+    contact_impulse_cache_count = 0;
+    for (int m = 0; m < count; m++) {
+        collision_data *manifold = &manifolds [m];
+        for (int i = 0; i < manifold -> contact_count; i++) {
+            if (contact_impulse_cache_count >= MAX_CACHED_CONTACTS) {return;}
+            contact_point_data *cp = &manifold -> contacts [i];
+            cached_contact *cc = &contact_impulse_cache [contact_impulse_cache_count++];
+            cc -> object_a = manifold -> object_a;
+            cc -> object_b = manifold -> object_b;
+            cc -> local_position_a = cp -> local_position_a;
+            cc -> local_position_b = cp -> local_position_b;
+            cc -> accumulated_normal_impulse = cp -> accumulated_normal_impulse;
+            cc -> accumulated_tangent_impulse = cp -> accumulated_tangent_impulse;
+        }
+    }
+}
+
+void collision_resolve (collision_data *collision) {
+    (void) collision;
+}

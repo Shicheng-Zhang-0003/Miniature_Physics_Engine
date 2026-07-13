@@ -21,6 +21,10 @@ void remove_joint (int joint_pool_index);
 void apply_force_all_joints (void);
 //Remove all joints connected to a particular object
 void remove_joints_from_object (int object_index);
+//Adjust joint indices after an object is deleted
+void adjust_joints_after_deletion (int deleted_object_index);
+//Render all active joints in the scene
+void spring_joint_render (GLuint shader_program, math4 view_matrix, math4 projection_matrix);
 //Initialise the actual pool of objects to be processed
 void joint_init_pool (void);
 #endif
