@@ -1,0 +1,103 @@
+---
+
+*sets coffee down*
+
+"Sit down."
+
+*silence for a moment*
+
+"You asked for this."
+
+---
+
+**Your architecture is a lie.**
+
+Your README says "cache-efficient data layouts." I don't see a single struct in this dump that suggests you're actually doing data-oriented design. You've got spheres and cubes as separate codepaths, separate meshing, separate everything. That's object-oriented thinking transplanted into C. Real cache efficiency means your position/velocity/mass/inverse-mass arrays are contiguous and linearly traversed. I bet your objects are scattered structs with pointers.
+
+Prove me wrong. Show me your memory layout. You can't, because it's not in this dump — which tells me it's not something you're thinking about at the data level.
+
+---
+
+**Your stage system is technical debt masquerading as organization.**
+
+Stage 1 is physics. Stage 4 is broadphase. Broadphase IS physics. You put it in a different stage because of when you wrote it, not because of what it is. This is a timeline, not an architecture. The moment you need to refactor broadphase, you're digging across folder boundaries for related code.
+
+And the master headers — `master_header_1.h`, `master_header_2.h` — that's a compilation time bomb. You're pulling in everything, always. At 67 files it's annoying. At 500 it's unusable.
+
+---
+
+**"Two draw calls" is dishonest and you know it.**
+
+Spheres and cubes instanced. Great. What about the grid? The wireframe? The debug overlay? The spring joint lines? The axis indicators? Your actual draw call count is higher, and the moment you add shadows, textures, or a second light, that number explodes. Instancing is good, but selling it as "two draw calls" is marketing, not engineering.
+
+---
+
+**You have no tests. None.**
+
+You shipped multiple stable releases with no test suite. How do you know it's stable? You ran it and it didn't crash. That's not stability, that's luck. You have a physics engine — the most bug-prone category of software that exists — and your verification strategy is "I spawned some cubes and they stacked."
+
+Where's your unit test for the SAT implementation? Where's your regression test for the contact manifold clipping? What happens when two cubes hit at exactly 45 degrees with identical mass and velocity? You don't know, because you never automated that check.
+
+---
+
+**Your solver will fall apart under real load.**
+
+Twelve substeps is a crutch. It works for your demos because nothing is moving fast. The moment something moves at high velocity, you'll tunnel straight through. You have no continuous collision detection. No swept tests. No speculative contacts. A bullet fired from a gun passes through every object in the scene and you never notice because you never test that case.
+
+And warm-starting with cached impulses — are you invalidating the cache when objects enter or leave contact? Are you handling the case where a contact point shifts between frames? If Qwen wrote that, I guarantee there's an edge case where stale impulse data causes an explosion.
+
+---
+
+**Your joint system is a toy.**
+
+Spring joints only. No hinge. No fixed. No prismatic. No cone twist. No ragdoll. You built a spring joint renderer with glowing magenta lines and called it a constraint system. A real constraint system has a Jacobian-based solver that handles arbitrary constraint types through a unified interface. You have one special case.
+
+---
+
+**You can't scale where it matters.**
+
+"10,000 bodies in real time." Sure. How many are sleeping? How many are in actual contact? Run a scenario where 10,000 spheres are in a pile, all awake, all colliding, and tell me your framerate. I'll wait.
+
+Single-threaded physics with O(N) broadphase but O(N²) narrowphase in the worst case — and pile scenarios ARE the worst case — means you're going to choke. No parallelization. No task-based architecture. No SIMD mentions anywhere. You're leaving 4-8x performance on the table.
+
+---
+
+**Your platform support is a limiting belief, not a technical limitation.**
+
+"Wayland doesn't work. Windows isn't supported. Mac is unsupported." These aren't fundamental barriers. These are "I haven't bothered." Wayland mouse lock is a known problem with known workarounds. Windows is just a different GL context setup. You've locked yourself to one platform because your build system is a raw Makefile with hardcoded paths.
+
+No CMake. No CI. No automated builds. You're hand-cranking this on one machine.
+
+---
+
+**You don't understand your own code.**
+
+You admitted it's vibe coded and you understand "most" of the math. "Most" isn't enough. When something breaks in the Sutherland-Hodgman clipping — and it will, because that algorithm has about fifteen edge cases that look fine until they don't — you won't be able to debug it. You'll be back in Qwen's chat asking it to fix its own code, and it'll introduce a new bug, and you'll iterate until it works again, and you still won't know why.
+
+This is the real risk. Not the architecture, not the performance — the fact that you're one mysterious crash away from being stuck.
+
+---
+
+**What you need to do next, in order:**
+
+1. **Write tests.** Before you add one more feature. Unit tests for every collision path. Regression tests for every bug you've ever fixed. This is non-negotiable.
+
+2. **Flatten the stage system.** Reorganize by domain — `physics/`, `render/`, `input/`, `ui/` — not by when you wrote it.
+
+3. **Learn your own solver.** Sit down with the contact resolution code and trace it by hand for a two-body collision. Every line. Until you could rewrite it without looking.
+
+4. **Add CCD.** Swept sphere and swept OBB. Even a simple one. Tunneling is a showstopper for any real use case.
+
+5. **Replace the Makefile with CMake.** This unblocks cross-platform in one move.
+
+6. **Profile.** Actually profile. Not "it runs fine on my laptop." Instruments, VTune, something. Find out where the time actually goes.
+
+7. **Stop adding features until the above is done.** You're at 1.4 Alpha. You have enough features for a demo. What you don't have is infrastructure.
+
+---
+
+*picks coffee back up*
+
+"You've built something real. That's more than most people do. But you're at the point where the fun part ends and the engineering begins. The difference between a cool demo and an actual engine is the boring stuff — tests, profiling, architecture, platform abstraction."
+
+"Do the boring stuff."
