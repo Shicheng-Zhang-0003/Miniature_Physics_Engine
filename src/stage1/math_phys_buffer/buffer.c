@@ -106,6 +106,19 @@ float rb_get_kinetic_energy (rigidbody *rigid_body) {
 void rb_integrate (rigidbody *rigid_body, float delta_time, float linear_damping, float angular_damping) {
     if ((rigid_body -> static_state) || (delta_time <= 0.0f)) {return;}
     if (rigid_body -> is_sleeping) {return;}
+
+    // Safety Clamp: Prevent infinite energy explosions in deep piles
+    float max_linear_speed = 150.0f;
+    float current_speed_sq = vector3_length_squared (rigid_body -> velocity);
+    if (current_speed_sq > max_linear_speed * max_linear_speed) {
+        rigid_body -> velocity = vector3_scaling (vector3_normalisation (rigid_body -> velocity), max_linear_speed);
+    }
+    float max_angular_speed = 30.0f;
+    float current_ang_speed_sq = vector3_length_squared (rigid_body -> angular_velocity);
+    if (current_ang_speed_sq > max_angular_speed * max_angular_speed) {
+        rigid_body -> angular_velocity = vector3_scaling (vector3_normalisation (rigid_body -> angular_velocity), max_angular_speed);
+    }
+
     float speed_sq = vector3_length_squared (rigid_body -> velocity);
     float ang_speed_sq = vector3_length_squared (rigid_body -> angular_velocity);
     if (speed_sq < 0.0025f && ang_speed_sq < 0.0001f) {

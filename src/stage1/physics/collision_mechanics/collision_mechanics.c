@@ -265,14 +265,14 @@ void collision_prepare_solver (collision_data *source, collision_data *m) {
             cached_contact *cc = &contact_impulse_cache [c];
             if (cc -> object_a == m -> object_a && cc -> object_b == m -> object_b) {
                 float dist_sq = vector3_length_squared (vector3_subtraction (cc -> local_position_a, cp -> local_position_a));
-                if (dist_sq < 0.04f) {
+                if (dist_sq < 0.0025f) { // Tightened from 20cm to 5mm to prevent pile explosions
                     cp -> accumulated_normal_impulse = cc -> accumulated_normal_impulse;
                     cp -> accumulated_tangent_impulse = cc -> accumulated_tangent_impulse;
                     break;
                 }
             } else if (cc -> object_a == m -> object_b && cc -> object_b == m -> object_a) {
                 float dist_sq = vector3_length_squared (vector3_subtraction (cc -> local_position_a, cp -> local_position_b));
-                if (dist_sq < 0.04f) {
+                if (dist_sq < 0.0025f) { // Tightened from 20cm to 5mm to prevent pile explosions
                     cp -> accumulated_normal_impulse = cc -> accumulated_normal_impulse;
                     cp -> accumulated_tangent_impulse = cc -> accumulated_tangent_impulse;
                     break;
@@ -340,7 +340,7 @@ void collision_resolve_iterative (collision_data *m) {
         vector3 rel_vel = vector3_subtraction (vb, va);
         float vn = vector3_dot (rel_vel, m -> normal_vector);
         
-        float lambda_n = (-vn + cp -> restitution_bias) * cp -> effective_mass_normal;
+        float lambda_n = (-vn + cp -> restitution_bias + cp -> separation_bias) * cp -> effective_mass_normal;
         float old_impulse = cp -> accumulated_normal_impulse;
         cp -> accumulated_normal_impulse = fmaxf (old_impulse + lambda_n, 0.0f);
         lambda_n = cp -> accumulated_normal_impulse - old_impulse;
@@ -359,10 +359,16 @@ void collision_resolve_iterative (collision_data *m) {
         va = vector3_addition (m -> object_a -> velocity, vector3_cross (m -> object_a -> angular_velocity, cp -> ra));
         vb = vector3_addition (m -> object_b -> velocity, vector3_cross (m -> object_b -> angular_velocity, cp -> rb));
         rel_vel = vector3_subtraction (vb, va);
-        vector3 tangent = vector3_subtraction (rel_vel, vector3_scaling (m -> normal_vector, vector3_dot (rel_vel, m -> normal_vector)));
-        float tangent_length = vector3_length (tangent);
-        if (tangent_length > 0.0001f) {
-            tangent = vector3_scaling (tangent, -1.0f / tangent_length);
+        vector3 tangent = cp -> tangent_vector;
+        if (vector3_length_squared (tangent) < 0.0001f) {
+            vector3 rel_vel_tangent = vector3_subtraction (rel_vel, vector3_scaling (m -> normal_vector, vector3_dot (rel_vel, m -> normal_vector)));
+            float tangent_length = vector3_length (rel_vel_tangent);
+            if (tangent_length > 0.0001f) {
+                tangent = vector3_scaling (rel_vel_tangent, -1.0f / tangent_length);
+                cp -> tangent_vector = tangent;
+            }
+        }
+        if (vector3_length_squared (tangent) > 0.0001f) {
             float vt = vector3_dot (rel_vel, tangent);
             
             vector3 ra_cross_t = vector3_cross (cp -> ra, tangent);

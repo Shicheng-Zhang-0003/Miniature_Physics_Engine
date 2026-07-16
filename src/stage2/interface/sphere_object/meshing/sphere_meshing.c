@@ -65,7 +65,7 @@ void init_sm_system (mesh *mesh_object, int horizontal_sections, int vertical_st
     // v1.3 Instancing VBO Setup
     glGenBuffers (1, &mesh_object -> instance_vbo);
     glBindBuffer (GL_ARRAY_BUFFER, mesh_object -> instance_vbo);
-    glBufferData (GL_ARRAY_BUFFER, 10000 * 19 * sizeof (float), NULL, GL_DYNAMIC_DRAW);
+    glBufferData (GL_ARRAY_BUFFER, MPE_MAX_BODIES * 19 * sizeof (float), NULL, GL_DYNAMIC_DRAW);
     for (int i = 0; i < 4; i++) {
         glVertexAttribPointer (2 + i, 4, GL_FLOAT, GL_FALSE, 19 * sizeof (float), (void*) (i * 4 * sizeof (float)));
         glEnableVertexAttribArray (2 + i);

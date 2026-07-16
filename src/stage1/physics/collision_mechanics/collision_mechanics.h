@@ -15,7 +15,9 @@ typedef struct {
     float effective_mass_normal;
     float effective_mass_tangent;
     vector3 tangent_vector;
+    vector3 cached_tangent;
     float restitution_bias;
+    float separation_bias;
     vector3 ra;
     vector3 rb;
 } contact_point_data;

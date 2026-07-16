@@ -35,7 +35,7 @@ void cube_meshing_init (void) {
     glBufferData (GL_ELEMENT_ARRAY_BUFFER, sizeof (wireframe_indices), wireframe_indices, GL_STATIC_DRAW);
     glGenBuffers (1, &cube_mesh.instance_vbo);
     glBindBuffer (GL_ARRAY_BUFFER, cube_mesh.instance_vbo);
-    glBufferData (GL_ARRAY_BUFFER, 10000 * 19 * sizeof (float), NULL, GL_DYNAMIC_DRAW);
+    glBufferData (GL_ARRAY_BUFFER, MPE_MAX_BODIES * 19 * sizeof (float), NULL, GL_DYNAMIC_DRAW);
     for (int i = 0; i < 4; i++) {
         glVertexAttribPointer (2 + i, 4, GL_FLOAT, GL_FALSE, 19 * sizeof (float), (void*) (i * 4 * sizeof (float)));
         glEnableVertexAttribArray (2 + i);
