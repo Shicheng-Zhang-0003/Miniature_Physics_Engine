@@ -386,7 +386,7 @@ static void on_entry_insert_text (GtkEditable *editable, const gchar *new_text, 
                 collision_prepare_solver (&narrowphase_collision, &active_manifold [manifold_count]);
                 manifold_count++;
             }
-        } const int solver_iterations = 8;
+        } const int solver_iterations = 16; // Increased to propagate forces through deep stacks
         for (int iter = 0; iter < solver_iterations; iter++) {
             for (int m = 0; m < manifold_count; m++) {collision_resolve_iterative (&active_manifold [m]);}
         } contact_cache_save (active_manifold, manifold_count);

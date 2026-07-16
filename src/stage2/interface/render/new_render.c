@@ -55,8 +55,8 @@ void render_init () {
     grid_init (&main_grid, 250, 5);
     init_sm_system (&sphere_mesh, 32, 32);
     cube_meshing_init ();
-    sphere_instances = malloc (10000 * 19 * sizeof (float));
-    cube_instances = malloc (10000 * 19 * sizeof (float));
+    sphere_instances = malloc (MPE_MAX_BODIES * 19 * sizeof (float));
+    cube_instances = malloc (MPE_MAX_BODIES * 19 * sizeof (float));
     render_init_status = 1;
 } void render_scene_current (int widget_width, int widget_height) {
     render_init ();
@@ -85,7 +85,7 @@ void render_init () {
         int *target_count;
         if (rigid_body -> type == object_sphere) {target_array = sphere_instances; target_count = &sphere_inst_count;}
         else {target_array = cube_instances; target_count = &cube_inst_count;}
-        if ((*target_count) < 10000) {
+        if ((*target_count) < MPE_MAX_BODIES) {
             int idx = (*target_count) * 19;
             math4_to_flat_array (model_matrix, &target_array [idx]);
             target_array [idx + 16] = rigid_body -> colour.x;
