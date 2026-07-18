@@ -261,6 +261,11 @@ void collision_prepare_solver (collision_data *source, collision_data *m) {
         
         cp -> accumulated_normal_impulse = 0.0f;
         cp -> accumulated_tangent_impulse = 0.0f;
+        const float penetration_slop = 0.005f;
+        const float bias_factor = 0.20f;
+        cp -> separation_bias = bias_factor * fmaxf (cp -> penetration - penetration_slop, 0.0f) * 60.0f;
+        if (cp -> separation_bias > 10.0f) {cp -> separation_bias = 10.0f;}
+
         for (int c = 0; c < contact_impulse_cache_count; c++) {
             cached_contact *cc = &contact_impulse_cache [c];
             if (cc -> object_a == m -> object_a && cc -> object_b == m -> object_b) {

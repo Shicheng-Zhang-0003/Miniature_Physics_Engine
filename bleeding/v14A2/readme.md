@@ -1,6 +1,6 @@
 # MINIATURE PHYSICS ENGINE (MPE)
 
-## Version 1.4 — "Alpha 2"
+## Version 1.4 — Alpha RC2
 
 ---
 
@@ -41,7 +41,7 @@ Version 1.4 Alpha RC1 introduces:
 
 ## 🚀 Version 1.3 Highlights
 
-Version 1.3 represents a major architectural convergence, transitioning MPE from a physics sandbox into a scalable simulation engine capable of handling **10,000+ rigid bodies in real time**.
+Version 1.3 established the instanced-rendering and spatial-hash direction used by the current engine.
 
 ---
 
@@ -53,11 +53,11 @@ MPE eliminates per-object draw calls using GPU instancing.
 
 - CPU packs transformation matrices into contiguous buffers
 - GPU handles batch rendering via instanced draw calls
-- Scene is rendered in **two draw calls total**:
+- Dynamic bodies are batched into up to two instanced draws:
   - Spheres
   - Cubes
 
-This removes the traditional O(N) CPU draw-call bottleneck.
+The grid, selected-object outline, and spring-joint overlay use additional draw calls.
 
 ---
 

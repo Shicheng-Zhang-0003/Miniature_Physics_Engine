@@ -3,6 +3,7 @@
 
 #define MPE_MAX_BODIES 16384
 #define MPE_MAX_JOINTS 1024
+#define MPE_MAX_BROADPHASE_PAIRS 65536
 
 //master header file for calling all library files
 #include "math/math3D.h" //Math

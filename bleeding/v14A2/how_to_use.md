@@ -1,5 +1,5 @@
 # Miniature Physics Engine — User Guide
-### Version 1.4 Alpha 2
+### Version 1.4 Alpha RC2
 
 ---
 

@@ -12,7 +12,7 @@ stage 5: Push Physics Engine Mechanics into Game Rendering
     Completed
 
 
-Phase 1 is completed:
+Phase 1 is terminated:
     Current Head: 0.9.3-STBL-INTERIM --> Phase 2
     Prev Versions:
         0.9.3-STBL-INTERIM
@@ -23,14 +23,14 @@ Phase 1 is completed:
         0.9.0.1-STBL
         0.9-PRBFV
 
-Phase 2 is in progress:
+Phase 2 is in terminated:
     Current Head: 0.9.4-Alpha --> Phase 3
     Prev Versions:
         0.9.3-STBL3
         0.9.3-STBL2
         0.9.3-STBL-INTERIM
 
-Phase 3 is in progress:
+Phase 3 is in terminated:
     Current Head: 0.9.8-Alpha --> Phase 4
     Prev Versions:
         0.9.8-Beta
@@ -40,8 +40,12 @@ Phase 3 is in progress:
         0.9.4-Alpha
 
 Phase 4 is in progress:
-    Current Head: 1.2-Alpha
+    Current Head: 1.4-AlphaRC2
     Prev Versions:
+        1.4-AlphaRC1
+        1.35 (Older Naming Scheme)
+        1.3-Stable
+        1.2-Stable
         1.1-Stable
         1.0-Stable
         1.0-RC

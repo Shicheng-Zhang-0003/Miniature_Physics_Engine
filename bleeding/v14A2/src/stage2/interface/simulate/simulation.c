@@ -285,7 +285,8 @@ static void on_entry_insert_text (GtkEditable *editable, const gchar *new_text, 
         if ((main_inputs.up_arrow_pressed) || (main_inputs.down_arrow_pressed)) {
             selected_rigid_body -> static_state = !selected_rigid_body -> static_state;
             if (selected_rigid_body -> static_state) {selected_rigid_body -> inverse_mass = 0.0f; selected_rigid_body -> velocity = vector3_zero (); selected_rigid_body -> angular_velocity = vector3_zero ();}
-            else {if (selected_rigid_body -> mass > 0) {selected_rigid_body -> inverse_mass = 1.0f / selected_rigid_body -> mass;}}
+            else {if (selected_rigid_body -> mass > 0) {selected_rigid_body -> inverse_mass = 1.0f / selected_rigid_body -> mass;}
+                  rigidbody_wake (selected_rigid_body);}
             main_inputs.up_arrow_pressed = false;
             main_inputs.down_arrow_pressed = false;
         } if (main_inputs.enter_key_pressed) {main_inputs.object_menu_level = 0; main_inputs.enter_key_pressed = false;}
@@ -313,14 +314,8 @@ static void on_entry_insert_text (GtkEditable *editable, const gchar *new_text, 
         else if (main_inputs.object_menu_level == 88) { selected_rigid_body -> colour = (vector3){1.0f, 1.0f, 1.0f}; }
         main_inputs.object_menu_level = 0;
     } // v1.4 Simulation Contract: Fixed Timestep Accumulator
-    static broadphase_pair *persistent_collision_pairs = NULL;
-    static int persistent_pairs_capacity = 0;
-    int maximum_possible_pairs = (object_count * (object_count - 1)) / 2;
-    if (maximum_possible_pairs < 1) {maximum_possible_pairs = 1;}
-    if (maximum_possible_pairs > persistent_pairs_capacity) {
-        persistent_pairs_capacity = maximum_possible_pairs + 128;
-        persistent_collision_pairs = realloc (persistent_collision_pairs, persistent_pairs_capacity * sizeof (broadphase_pair));
-    } static float physics_time_accumulator = 0.0f;
+    static broadphase_pair persistent_collision_pairs [MPE_MAX_BROADPHASE_PAIRS];
+    static float physics_time_accumulator = 0.0f;
     const float fixed_physics_dt = 1.0f / 60.0f;
     const int max_substeps_per_frame = 5; // Spiral of death prevention
     physics_time_accumulator += frame_delta_time;
@@ -329,7 +324,7 @@ static void on_entry_insert_text (GtkEditable *editable, const gchar *new_text, 
     float angular_damping_factor = powf (world_drag_coefficient * 0.97f, fixed_physics_dt);
     while (physics_time_accumulator >= fixed_physics_dt) {
         int detected_collision_count = 0;
-        if (persistent_collision_pairs) {detected_collision_count = broadphase_generate_pairing (persistent_collision_pairs, persistent_pairs_capacity);}
+        detected_collision_count = broadphase_generate_pairing (persistent_collision_pairs, MPE_MAX_BROADPHASE_PAIRS);
         static collision_data active_manifold [8192];
         int manifold_count = 0;
         apply_force_all_joints ();
@@ -373,7 +368,7 @@ static void on_entry_insert_text (GtkEditable *editable, const gchar *new_text, 
         } for (int collision_index = 0; collision_index < detected_collision_count; collision_index++) {
             rigidbody *rigid_body_a = &obj_per_scene [persistent_collision_pairs [collision_index].object_index_a];
             rigidbody *rigid_body_b = &obj_per_scene [persistent_collision_pairs [collision_index].object_index_b];
-            collision_data narrowphase_collision;
+            collision_data narrowphase_collision = {0};
             bool collided = false;
             if (rigid_body_a -> type == object_sphere && rigid_body_b -> type == object_sphere) collided = collision_dual_sphere (rigid_body_a, rigid_body_b, &narrowphase_collision);
             else if (rigid_body_a -> type == object_sphere && rigid_body_b -> type == object_cube) collided = collision_sphere_cube (rigid_body_a, rigid_body_b, &narrowphase_collision);
@@ -383,6 +378,8 @@ static void on_entry_insert_text (GtkEditable *editable, const gchar *new_text, 
                 narrowphase_collision.object_a = rigid_body_a; narrowphase_collision.object_b = rigid_body_b;
             } else if (rigid_body_a -> type == object_cube && rigid_body_b -> type == object_cube) collided = collision_dual_cube (rigid_body_a, rigid_body_b, &narrowphase_collision);
             if (collided && manifold_count < 8192) {
+                if (rigid_body_a -> is_sleeping && !rigid_body_b -> static_state) {rigidbody_wake (rigid_body_a);}
+                if (rigid_body_b -> is_sleeping && !rigid_body_a -> static_state) {rigidbody_wake (rigid_body_b);}
                 collision_prepare_solver (&narrowphase_collision, &active_manifold [manifold_count]);
                 manifold_count++;
             }
