@@ -1,0 +1,107 @@
+# readme.md
+
+```
+This is the Miniature Physics Engine (MPE, v1.1-Stable).
+
+It is a rigid body physics engine designed around simplicity, ease of use, and efficiency.
+
+The core facets of designing this enigne were:
+    1: Use the C programming language and the GTK3/4 library as the basis of programming this physics engine.
+    2: Unless required for extremely complex tasks such as ray tracing, do not invoke OpenGL or extraneous graphics libraries.
+    3: All mathematical compulation components much be programmed from scratch.
+
+It is inadvisable to attempt to run using conversion software on Windows right now.
+
+Engine Mechanics:
+    1. Run ./engine to begin running.
+    2. Clicking with the left mouse button locks mouse input onto the screen. Esc to detach cursor.
+    3. Once inside the engine:
+        3A: Shift Key spawns new objects. Hold down to spam spawning objects.
+        3B: WASD to move the camera and general viewpoint.
+        3C: Pressing 0 toggles between Debug Mode and Game Mode, Debug Mode has no borders and more information presented about individual objects.
+        3D: Pressing 9 gives the option to save the current state of the object layout, load a previously saved layout, or exit the engine. Pressing 9 again exits the menu.
+        3E: Pressing 8 manipulates how objects are spawned. Pressing 8 again exits the menu.
+        3F: Pressing 7 manipulates user mechanics and world mechanics. Pressing 7 again exits the menu.
+        3G: Right Click a object to select a object.
+        3H: Once a object has been selected, press E to open the selected object menu.
+        3I: Once a object has been selected, press the F key to exert a impulse/force.
+        3J: Once a object has been selected, click the scroll wheel to delete the object.
+        3K: Space Bar is reserved for jumping in Game Mode.
+        3L: In Versions 0.9.8 and beyond, in Debug Mode, IJKL can be used to steer again is mouse is not present.
+        3M: After a numerical value is changed through a menu, the menu closes automatically and must be opened again to make another change.
+
+Known Bugs:
+    PSX = Programming Syntax Bug, OBP = Operational Bug, ECP = External Compatiability Bug, LIC = Library Incompleteness Bug
+
+    PSX = Bugs or issues needing a solution in the present programming.
+    OBP = bugs unpredicted in programming but recognised in operation and requires pinpointing source of error.
+    ECP = Compatiability issues with different operating systems and particular rendering frameworks (EG: X11 vs Wayland, Linux Native).
+    LIC = Given the minimal nature of the engine itself, realism in some cases may be severly impacted when progressing in future to certain applications and feature development.
+
+    PSX-000 (SOLVED) (O2CL, O2 CYCLE LOOP): The current rendering of all objects is done using a O (n ^ 2) stacked for loop, which would heavily increase incremental processing time in continued usage.
+        - Change In the future to a O (n) loop at best for looping or dual O (n) separated loops to prevent O (n ^ 2) repetition.
+    PSX-001 (PARTIAL) (MLCULMT, MALLOC UPPER LIMIT): Objects spawned quickly exceeding a count of 1136 objects will result in the engine feeling slightly slowed down.
+        - Changes in PSX-000 O (n ^ 2) loop may alleviate some of these results.
+    PSX-002 (REPLACED, EQUATORIAL LINES AROUND EACH DIMENSION OF THE OBJECT) (AXLLAG, AXIAL RENDER LAG): Previously, the program rendered a stational x, y, and z reference axes for each individual object. However, this severly impacted performace and was omitted temporarily with v0.9.0.1-STBL.
+        - Now that rotational motion of spheres has been rectified, this is no longer of immediate concern.
+        - However, in the future, for debug mode, such functionality may return, and resource allocation is of the essence to prevent high stage lag of the system.
+    PSX-003 (SOLVED) (FPPSCL, FLOATING POINT PRECISION SCALE): In 0.9.5-Alpha, any form of modification to any values is += 0.01, which is far too low if not in debug mode.
+        - Add a specific option for debug mode to change increment/decrement values.
+        - For Game Mode, switch to a nominal +- of 0.2 for all changable constant values.
+    PSX-004 (SOLVED) (STIPLG, STARTING INPUT LAG): In 0.9.7-Alpha, after just starting the engine itself, spawning objects may require some time to load properly and actually respond.
+        - Fix by finding comflicting spawning logic later, for now, just marvel at the fact that 0.9.7-Alpha was managed to be done on time in the first place.
+    PSX-005 (SOLVED) (HDRFNC, HEADER FUNCTION DUPLICATION): Large rigidbody, force, and collision implementations were previously stored inside header files, creating unnecessary repeated static function generation during compilation.
+        - Rigidbody, force, and collision implementation logic has been moved into C source files while leaving headers responsible for declarations and structures.
+        - This substantially reduces compiler warning output and improves long term maintainability.
+    PSX-006 (SOLVED) (MNURET, MENU RETURN AFTER VALUE CHANGE): After editing a numerical value, menu state previously returned to the prior submenu, requiring extra key presses to clear the interface.
+        - Value changing dialogs now close their active menu after the value is accepted or cancelled.
+        - Main menu keys 7, 8, and 9 remain toggles, so pressing the same menu key again still exits the menu.
+
+    OPB-000 (PARTIAL) (MTNLCK, MOTION LOCK): Under continuous input, sometimes, the camera viewpoint may be stuck moving in one direction. In this case, pressing the key which the object is currently moving in counteracts and stops the uncommanded movement of the camera.
+        - Fixed by connecting a focus-out-event signal to GtkWindow, resetting all movement and emulation key presses to false when focus is dropped.
+        - However, in 1.0-RC, there is a return of this issue potentially resulting in a reformatted meshing hierarchy.
+        - For stability revert to 0.9.9-Alpha if required.
+        - Update: The bug was not found to exist so far in terms of 1.1-Stable.
+
+
+    OPB-001 (SOLVED) (PNCRCT, PENETRATION CORRECTION): Collision resolution could skip position correction when overlapping objects were already moving apart.
+        - Collision impulse calculation and positional correction are now separated.
+        - Objects can correct penetration even when an impulse is not required.
+    OPB-002 (SOLVED) (SUBPAIR, SUBSTEP PAIRING): Broadphase collision pairs were generated once per frame before all physics substeps.
+        - Broadphase pairs are now regenerated inside the physics substep loop.
+        - This improves collision detection consistency for moving objects during the frame.
+    OPB-003 (SOLVED) (LDFSAFE, LOAD FILE SAFETY): Loading malformed scene files could partially clear or corrupt the active scene.
+        - Scene loading now validates each expected value before replacing the active scene.
+        - Invalid object types and invalid object counts are rejected.
+        - Static object mass is preserved while keeping inverse mass disabled for static status.
+
+    ECP-000 (MSEWYLD, MOUSE WAYLAND): Under Wayland, mouse automatically disengages with out of the bounds of the window itself and does not lock properly.
+        - When transitioning from IJKL perspective control, this was a major thing in versions 0.9.1 to 0.9.2.
+        - Right now the thing is currently running on a forced X11 state, which works like a charm.
+        - However, the clarity of the rendering and the quality of objects is absolutely horrid compared to Wayland.
+        - Plus, on some newer Linux systems, they are ditching X11 permanently, so extraneous X11 support drivers may be required.
+    ECP-001 (EXTMNTLCK, EXTERNAL MONITOR LOCKING ISSUE): With the X11 mouse grabbing system, after anything is done to the menu, like entering a new value, the mouse grabbing is messed up upon input. There is no method to solve this unless you use the default monitor for your syste: With the X11 mouse grabbing system, after anything is done to the menu, like entering a new value, the mouse grabbing is messed up upon input. There is no method to solve this unless you use the default monitor for your system.
+        - Not the greatest of issues, but it does exist.
+        - Only restricted to multi-monitor systems. For systems with only one monitor, and set to default monitor, this does not exist.
+        - Toggling default monitors for systems will do the trick, but on laptops it is tricky and overall is a hastle to work with.
+
+Installation Instructions:
+    Refer to the installation folder for instruction details on Linux Platforms.
+
+    Installation and conversion methods for MacOS (M-Series) and Microsoft Windows will be added in the future.
+
+    Users may try to install dependencies as is on Intel MacOS, but please note that the only operating system that this has been officially tested on so far is Ubuntu 24.04.4 LTS.
+
+    For systems upgraded properly, backwards compatiability should be possible for any Ubuntu system after 20.04 LTS.
+
+    Update: A Debian Bookworm (12) VM has been successfully tested with this and ran smoothly, however since I forced qemu screen instead of virt-manager's better handling systems, users should utilise with caution and take care to install all graphics dependencies beforehand (Which is not a lot but still).
+
+Resource Usage:
+    With 1.0-Stable, the maximum amount of objects tested is 3564 Spheres, at a total resource usage of 122 Megabytes of RAM.
+    Upon boot, the engine uses approximately 108 Megabytes of RAM.
+    Note: All of this is run under X11 given that mouse locking on Wayland is deficient for the current purpose.
+        - For systems forced to employ Wayland, it would be optimal to install basic X11 drivers to run this engine.
+    (Core Ultra 5 125H, Intel Arc Graphics, 32GB total RAM, Ubuntu 24.04.4 LTS, Debian 12 (?))
+    (2880 * 1880 Screen, set to 120 Hz refresh rate (although the engine itself has a inbuilt tick rate of 60 FPS))
+
+```
