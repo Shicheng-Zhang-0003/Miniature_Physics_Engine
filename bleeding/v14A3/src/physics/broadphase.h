@@ -1,0 +1,11 @@
+#ifndef broadphase_h
+#define broadphase_h
+#include "../core/math3D.h"
+#include "../core/buffer.h"
+
+typedef struct {
+    int object_index_a, object_index_b;
+} broadphase_pair;
+
+int broadphase_generate_pairing (broadphase_pair *collision_pairs_output_array, int maximum_pairs_allowed);
+#endif
