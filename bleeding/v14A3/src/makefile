@@ -1,0 +1,33 @@
+CC = gcc
+CFLAGS = $(shell pkg-config --cflags gtk+-3.0 epoxy) -I. -O3 -march=native -Wall -Wextra
+LIBS = $(shell pkg-config --libs gtk+-3.0 epoxy) -lm
+SOURCES = root_gtk.c \
+	  simulation.c \
+	  core/buffer.c \
+	  core/frame_timer.c \
+	  physics/define_forces.c \
+	  physics/collision_mechanics.c \
+	  physics/broadphase.c \
+	  physics/spring_joint.c \
+	  physics/physics_world.c \
+	  render/shader_loading.c \
+	  render/new_render.c \
+	  render/sphere_meshing.c \
+	  render/cube_meshing.c \
+	  render/grid.c \
+	  render/wireframe.c \
+	  scene/boundary.c \
+	  scene/scene_init.c \
+	  scene/scene_saving.c \
+	  scene/scene_load.c \
+	  ui_input/camera.c \
+	  ui_input/input_control.c \
+	  ui_input/gui.c \
+	  ui_input/mouse_lock.c \
+	  ui_input/object_spawner.c \
+	  ui_input/object_selector.c \
+	  ui_input/overlay.c
+engine: $(SOURCES)
+	$(CC) $(CFLAGS) $(SOURCES) $(LIBS) -o engine
+clean:
+	rm -f engine
