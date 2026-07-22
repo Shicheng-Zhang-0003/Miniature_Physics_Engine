@@ -1,3 +1,4 @@
+#include "../mpe_engine.h"
 #include <epoxy/gl.h>
 #include <stdio.h>
 #include <stdlib.h>

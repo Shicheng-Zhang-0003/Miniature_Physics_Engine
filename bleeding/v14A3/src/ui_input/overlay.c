@@ -1,6 +1,6 @@
+#include "../mpe_engine.h"
 #include "overlay.h"
-#include "../../stage1/master_header.h"
-#include "../interaction/spawner/object_spawner.h"
+#include "object_spawner.h"
 #include <stdint.h>
 #include <stdio.h>
 static GtkWidget *debug_information_label = NULL;

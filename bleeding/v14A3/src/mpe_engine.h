@@ -1,6 +1,9 @@
 #ifndef mpe_engine_h
 #define mpe_engine_h
 
+#include <gtk/gtk.h>
+#include <epoxy/gl.h>
+
 #define MPE_MAX_BODIES 16384
 #define MPE_MAX_JOINTS 1024
 #define MPE_MAX_BROADPHASE_PAIRS 65536
@@ -8,7 +11,6 @@
 #include "core/math3D.h"
 #include "core/math4_special.h"
 #include "core/buffer.h"
-#include "core/timer.h"
 #include "core/frame_timer.h"
 
 #include "physics/collision_mechanics.h"
@@ -35,5 +37,55 @@
 #include "ui_input/object_spawner.h"
 #include "ui_input/object_selector.h"
 #include "ui_input/overlay.h"
+
+/* ------------------------------------------------------------------ */
+/* Global scene state                                                 */
+/* ------------------------------------------------------------------ */
+
+extern rigidbody *obj_per_scene;
+extern int object_count;
+extern int object_capacity;
+
+/* ------------------------------------------------------------------ */
+/* Global application input and camera state                         */
+/* ------------------------------------------------------------------ */
+
+extern camera main_camera_fov;
+extern input_status main_inputs;
+
+/* ------------------------------------------------------------------ */
+/* Global editor, world, and timing state                            */
+/* ------------------------------------------------------------------ */
+
+extern int selected_object;
+
+extern float world_gravity_y;
+extern float world_drag_coefficient;
+extern float world_surface_friction_static;
+extern float world_surface_friction_kinetic;
+
+extern float variable_change_rate;
+extern float jump_height;
+
+extern frame_timer main_timer;
+
+/* ------------------------------------------------------------------ */
+/* Top-level render entry points                                      */
+/* ------------------------------------------------------------------ */
+
+void render_init (void);
+void render_scene_current (int widget_width, int widget_height);
+
+/* ------------------------------------------------------------------ */
+/* Top-level physics tick entry point                                 */
+/* ------------------------------------------------------------------ */
+
+gboolean physics_step_increment (gpointer user_data_pointer);
+
+/* ------------------------------------------------------------------ */
+/* Optional GTK application activation entry point                    */
+/* ------------------------------------------------------------------ */
+
+void activation (GtkApplication *application_object, gpointer user_data_pointer);
 
 #endif // mpe_engine_h

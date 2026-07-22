@@ -1,3 +1,4 @@
+#include "../mpe_engine.h"
 #include "broadphase.h"
 #include <stdlib.h>
 #include <math.h>
@@ -18,7 +19,22 @@ static int hash_coordinate (int x, int y, int z) {
     node_pool [node_count].next_entry = hash_table [hash];
     hash_table [hash] = node_count;
     node_count++;
-} int broadphase_generate_pairing (broadphase_pair *collision_pairs_output_array, int maximum_pairs_allowed) {
+
+}
+
+static inline float broadphase_bounding_radius (rigidbody *rb) {
+    if (rb -> type == object_sphere) {
+        return rb -> radius;
+    }
+
+    return sqrtf (
+        rb -> half_extensions.x * rb -> half_extensions.x +
+        rb -> half_extensions.y * rb -> half_extensions.y +
+        rb -> half_extensions.z * rb -> half_extensions.z
+    );
+}
+
+int broadphase_generate_pairing (broadphase_pair *collision_pairs_output_array, int maximum_pairs_allowed) {
     if (object_count < 2) {return 0;}
     for (int i = 0; i < HASH_TABLE_SIZE; i++) {hash_table [i] = -1;}
     node_count = 0;
@@ -67,12 +83,8 @@ static int hash_coordinate (int x, int y, int z) {
                         last_checked_gen [pair_index] = current_gen;
                         rigidbody *rb_a = &obj_per_scene [min_obj];
                         rigidbody *rb_b = &obj_per_scene [max_obj];
-                        static inline float get_bounding_radius (rigidbody *rb) {
-                            if (rb -> type == object_sphere) {return rb -> radius;}
-                            return sqrtf (rb -> half_extensions.x * rb -> half_extensions.x + rb -> half_extensions.y * rb -> half_extensions.y + rb -> half_extensions.z * rb -> half_extensions.z);
-                        }
                         float dist_sq = vector3_length_squared (vector3_subtraction (rb_a -> position, rb_b -> position));
-                        float rad_sum = get_bounding_radius (rb_a) + get_bounding_radius (rb_b);
+                        float rad_sum = broadphase_bounding_radius (rb_a) + broadphase_bounding_radius (rb_b);
                         if (dist_sq <= rad_sum * rad_sum) {
                             if (collision_pair_counter < maximum_pairs_allowed) {
                                 collision_pairs_output_array [collision_pair_counter].object_index_a = min_obj;

@@ -1,3 +1,4 @@
+#include "../mpe_engine.h"
 #include "input_control.h"
 #include "camera.h"
 #include "mouse_lock.h"

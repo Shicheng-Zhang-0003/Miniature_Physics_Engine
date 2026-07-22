@@ -1,3 +1,4 @@
+#include "../mpe_engine.h"
 #include "object_selector.h"
 #include <math.h>
 int selected_object = -1;

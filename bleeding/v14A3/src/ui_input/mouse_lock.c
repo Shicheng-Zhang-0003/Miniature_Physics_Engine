@@ -1,3 +1,4 @@
+#include "../mpe_engine.h"
 #include "mouse_lock.h"
 #include "input_control.h"
 extern input_status main_inputs;

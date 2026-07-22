@@ -1,7 +1,7 @@
+#include "../mpe_engine.h"
 #include <stdio.h>
 #include <gtk/gtk.h>
 #include <epoxy/gl.h>
-#include "../mpe_engine.h"
 static void on_point_render (GtkGLArea *gl_area, GdkGLContext *gl_context) {
     (void) gl_context;
     int widget_width = gtk_widget_get_allocated_width (GTK_WIDGET (gl_area));

@@ -1,3 +1,4 @@
+#include "../mpe_engine.h"
 #include "physics_world.h"
 
 physics_world main_physics_world;

@@ -1,3 +1,4 @@
+#include "../mpe_engine.h"
 #include "scene_saving.h"
 #include <stdio.h>
 #include <stdint.h>

@@ -1,3 +1,4 @@
+#include "../mpe_engine.h"
 #include "sphere_meshing.h"
 #include <complex.h>
 #include <epoxy/gl_generated.h>

@@ -1,3 +1,4 @@
+#include "../mpe_engine.h"
 #include "object_spawner.h"
 float spawn_mass = 1.0f;
 float spawn_radius = 0.5f;

@@ -1,3 +1,4 @@
+#include "../mpe_engine.h"
 #include "spring_joint.h"
 #include <stdio.h>
 #include <stdlib.h>

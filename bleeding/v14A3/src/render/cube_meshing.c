@@ -1,3 +1,4 @@
+#include "../mpe_engine.h"
 #include "cube_meshing.h"
 #include <epoxy/gl.h>
 #include <epoxy/gl_generated.h>

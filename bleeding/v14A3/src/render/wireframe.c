@@ -1,3 +1,4 @@
+#include "../mpe_engine.h"
 #include "wireframe.h"
 #include "sphere_meshing.h"
 #include "cube_meshing.h"

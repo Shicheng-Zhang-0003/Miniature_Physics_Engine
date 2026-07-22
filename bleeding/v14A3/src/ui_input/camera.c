@@ -1,3 +1,4 @@
+#include "../mpe_engine.h"
 #include "camera.h"
 #include <math.h>
 void camera_update_vectors (camera *camera_object) {

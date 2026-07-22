@@ -1,5 +1,6 @@
+#include "../mpe_engine.h"
 #include "scene_init.h"
-#include "../../stage5/constraints/spring_joint.h"
+#include "../physics/spring_joint.h"
 #include <stdlib.h>
 #include <stdio.h>
 

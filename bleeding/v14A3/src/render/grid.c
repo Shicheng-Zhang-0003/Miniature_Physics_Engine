@@ -1,3 +1,4 @@
+#include "../mpe_engine.h"
 #include "grid.h"
 #include <epoxy/gl_generated.h>
 #include <stdlib.h>

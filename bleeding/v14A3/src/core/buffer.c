@@ -1,3 +1,4 @@
+#include "../mpe_engine.h"
 #include "buffer.h"
 // Helper to update axes from orientation
 void rigidbody_update_axes (rigidbody *rigid_body) {

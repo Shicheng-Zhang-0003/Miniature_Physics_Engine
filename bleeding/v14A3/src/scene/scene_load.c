@@ -1,5 +1,6 @@
+#include "../mpe_engine.h"
 #include "scene_load.h"
-#include "../../stage3/scene/scene_init.h"
+#include "scene_init.h"
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
