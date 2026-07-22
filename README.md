@@ -1,6 +1,6 @@
 # MINIATURE PHYSICS ENGINE (MPE)
 
-## Version 1.4 — Alpha RC2
+## Version 1.4 Alpha RC3
 
 ---
 
@@ -17,6 +17,17 @@ The goal of MPE is to prioritize:
 - Cache-efficient data layouts
 - Deterministic physics simulation
 - High-performance real-time scaling
+
+---
+
+## 🚀 Version 1.4 Alpha RC3 Highlights
+
+Version 1.4 Alpha RC3 introduces:
+- **Domain-Driven Architecture Restructuring**: Reorganized the codebase from monolithic `stage1..stage5` folders into clean `core`, `physics`, `render`, `scene`, and `ui_input` domain modules.
+- **Broadphase Bounding Sphere Radius Bug Fix**: Resolved broadphase pairing filtering bug for OBB cubes by computing exact bounding sphere radii, eliminating false-negative collision skips for cube-cube and sphere-cube pairs.
+- **Sutherland-Hodgman Polygon Buffer Safety**: Expanded polygon clipping output buffers to prevent stack memory corruption during complex multi-axis OBB face intersections.
+- **Physics World Encapsulation (`PhysicsWorld`)**: Introduced formal structural encapsulation (`physics_world`) grouping gravity, solver iterations, contact manifolds, and broadphase pair buffers into a unified state container.
+- **Fixed-Timestep Physics Accumulator**: Locked internal simulation ticks ($60\text{Hz}$ / $120\text{Hz}$) with substep capping to ensure frame-rate-independent physics stability.
 
 ---
 
