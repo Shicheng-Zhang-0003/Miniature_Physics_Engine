@@ -24,7 +24,7 @@ GtkWidget *overlay_initialise (GtkWidget *gl_drawing_area_widget) {
     //Debug Info
     GtkWidget *ui_overlay_container = gtk_overlay_new ();
     gtk_container_add (GTK_CONTAINER (ui_overlay_container), gl_drawing_area_widget);
-    debug_information_label = gtk_label_new ("- Miniature Physics Engine v1.4 Alpha 2 -");
+    debug_information_label = gtk_label_new ("- Miniature Physics Engine v1.4 Alpha 3 -");
     gtk_widget_set_halign (debug_information_label, GTK_ALIGN_START);
     gtk_widget_set_valign (debug_information_label, GTK_ALIGN_START);
     gtk_overlay_add_overlay (GTK_OVERLAY (ui_overlay_container), debug_information_label);
@@ -148,8 +148,8 @@ GtkWidget *overlay_initialise (GtkWidget *gl_drawing_area_widget) {
         if (main_inputs.current_spawn_type == 0) {spawn_type_text = "sphere";}
         else {spawn_type_text = "cube";}
         snprintf (information_text_buffer, sizeof (information_text_buffer),
-                 "[%s] | No object selected | Shift: spawn %s | R-Click: select | 0: Toggle Mode | L/R Arr: change rate (%.2f)",
-                 game_mode_text, spawn_type_text, variable_change_rate);
+                 "[%s] | No object selected | Shift: spawn %s | R-Click: select | 0: Toggle Mode",
+                 game_mode_text, spawn_type_text);
         gtk_label_set_text (GTK_LABEL (debug_information_label), information_text_buffer);
         return;
     } rigidbody *selected_rigid_body = &obj_per_scene [selected_object];

@@ -1,6 +1,6 @@
 # MINIATURE PHYSICS ENGINE (MPE)
 
-## Version 1.4 — Alpha 3
+## Version 1.4 Alpha RC3
 
 ---
 
@@ -20,9 +20,9 @@ The goal of MPE is to prioritize:
 
 ---
 
-## 🚀 Version 1.4 Alpha 3 Highlights
+## 🚀 Version 1.4 Alpha RC3 Highlights
 
-Version 1.4 Alpha 3 introduces:
+Version 1.4 Alpha RC3 introduces:
 - **Domain-Driven Architecture Restructuring**: Reorganized the codebase from monolithic `stage1..stage5` folders into clean `core`, `physics`, `render`, `scene`, and `ui_input` domain modules.
 - **Broadphase Bounding Sphere Radius Bug Fix**: Resolved broadphase pairing filtering bug for OBB cubes by computing exact bounding sphere radii, eliminating false-negative collision skips for cube-cube and sphere-cube pairs.
 - **Sutherland-Hodgman Polygon Buffer Safety**: Expanded polygon clipping output buffers to prevent stack memory corruption during complex multi-axis OBB face intersections.

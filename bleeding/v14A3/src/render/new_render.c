@@ -32,8 +32,8 @@ static float *sphere_instances = NULL;
 static float *cube_instances = NULL;
 void render_init () {
     if (render_init_status) {return;}
-    instanced_shader_program = create_shader_program ("stage2/interface/sphere_object/shaders/vertex_shader.glsl", "stage2/interface/sphere_object/shaders/fragment_shader.glsl");
-    utility_shader_program = create_shader_program ("stage2/interface/render/shaders/utility_vertex.glsl", "stage2/interface/render/shaders/utility_fragment.glsl");
+    instanced_shader_program = create_shader_program ("render/shaders/vertex_shader.glsl", "render/shaders/fragment_shader.glsl");
+    utility_shader_program = create_shader_program ("render/shaders/utility_vertex.glsl", "render/shaders/utility_fragment.glsl");
     instanced_uniforms.projection_matrix_location = glGetUniformLocation (instanced_shader_program, "projection");
     instanced_uniforms.view_matrix_location = glGetUniformLocation (instanced_shader_program, "viewframe");
     instanced_uniforms.camera_position_location = glGetUniformLocation (instanced_shader_program, "camera_position");

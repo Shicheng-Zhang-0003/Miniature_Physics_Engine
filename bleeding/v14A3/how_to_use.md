@@ -1,5 +1,5 @@
 # Miniature Physics Engine — User Guide
-### Version 1.4 Alpha RC2
+### Version 1.4 Alpha RC3
 
 ---
 
@@ -138,9 +138,9 @@ All values are in SI units (metres, kilograms, seconds).
 | Static friction | 0.3 | 0.4 |
 | World gravity | −9.81 m/s² | — |
 | Air drag coefficient | 0.99 | — |
-| Physics substeps | 12 per frame | — |
+| Physics timestep | 60 Hz fixed | — |
 
-The engine runs at 60 FPS with 12 substeps per frame, giving stable collision resolution for stacked objects and rolling behaviour. Spheres use rolling friction with torque generation at the contact point. Cubes use localised force application at the lowest vertex to generate rotational torque on floor contact.
+The engine uses a fixed 60 Hz physics timestep with an accumulator, allowing up to 5 physics ticks per rendered frame to prevent spiral-of-death. Each physics tick uses 16 solver iterations, giving stable collision resolution for stacked objects and rolling behaviour. Spheres use rolling friction with torque generation at the contact point. Cubes use localised force application at the lowest vertex to generate rotational torque on floor contact.
 
 Objects with velocity below 0.05 m/s and angular velocity below 0.01 rad/s are put to sleep automatically to prevent floating-point jitter.
 
