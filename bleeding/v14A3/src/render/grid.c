@@ -34,25 +34,52 @@ void grid_init (grid_mesh *grid_mesh_object, int half_extent, int cell_spacing) 
     glEnableVertexAttribArray (0);
     glBindVertexArray (0);
     free (vertex_data);
-} void grid_render (grid_mesh *grid_mesh_object, GLuint shader_program, math4 view_matrix, math4 projection_matrix) {
+} /* A3_PATCH_27_UNIFORM_CACHE */
+/* A3_PATCH_32_PORTABLE_GRID_RESTORE */
+static GLuint a3_grid_cached_program = 0;
+static GLint a3_grid_uniform_viewframe = -1;
+static GLint a3_grid_uniform_projection = -1;
+static GLint a3_grid_uniform_model = -1;
+static GLint a3_grid_uniform_normal_matrix = -1;
+static GLint a3_grid_uniform_object_colour = -1;
+static GLint a3_grid_uniform_camera_position = -1;
+static GLint a3_grid_uniform_light_position = -1;
+
+static void a3_grid_cache_uniforms (GLuint shader_program) {
+    if (shader_program == a3_grid_cached_program) {return;}
+
+    a3_grid_cached_program = shader_program;
+    a3_grid_uniform_viewframe = glGetUniformLocation (shader_program, "viewframe");
+    a3_grid_uniform_projection = glGetUniformLocation (shader_program, "projection");
+    a3_grid_uniform_model = glGetUniformLocation (shader_program, "model");
+    a3_grid_uniform_normal_matrix = glGetUniformLocation (shader_program, "normal_matrix");
+    a3_grid_uniform_object_colour = glGetUniformLocation (shader_program, "object_colour");
+    a3_grid_uniform_camera_position = glGetUniformLocation (shader_program, "camera_position");
+    a3_grid_uniform_light_position = glGetUniformLocation (shader_program, "light_position");
+}
+
+void grid_render (grid_mesh *grid_mesh_object, GLuint shader_program, math4 view_matrix, math4 projection_matrix) {
     glUseProgram (shader_program);
+    a3_grid_cache_uniforms (shader_program);
     float view_matrix_flat_array [16], projection_matrix_flat_array [16];
     math4_to_flat_array (view_matrix, view_matrix_flat_array);
     math4_to_flat_array (projection_matrix, projection_matrix_flat_array);
-    glUniformMatrix4fv (glGetUniformLocation (shader_program, "viewframe"), 1, GL_FALSE, view_matrix_flat_array);
-    glUniformMatrix4fv (glGetUniformLocation (shader_program, "projection"), 1, GL_FALSE, projection_matrix_flat_array);
+    glUniformMatrix4fv (a3_grid_uniform_viewframe, 1, GL_FALSE, view_matrix_flat_array);
+    glUniformMatrix4fv (a3_grid_uniform_projection, 1, GL_FALSE, projection_matrix_flat_array);
     //Identity Model Matrix (sits at the (0, 0, 0, 0w))
     math4 model_matrix = math4_identity ();
     float model_matrix_flat_array [16];
     math4_to_flat_array (model_matrix, model_matrix_flat_array);
-    glUniformMatrix4fv (glGetUniformLocation (shader_program, "model"), 1, GL_FALSE, model_matrix_flat_array);
+    glUniformMatrix4fv (a3_grid_uniform_model, 1, GL_FALSE, model_matrix_flat_array);
     //Normal Matrix (Identity for the Static Floor)
     math3 identity_normal_matrix = math3_identity ();
     float normal_matrix_flat_array [9];
     for (int row_index = 0; row_index < 3; row_index++) {
         for (int column_index = 0; column_index < 3; column_index++) {normal_matrix_flat_array [row_index * 3 + column_index] = identity_normal_matrix.matrix [row_index][column_index];}
-    } glUniformMatrix3fv (glGetUniformLocation (shader_program, "normal_matrix"), 1, GL_FALSE, normal_matrix_flat_array);
-    glUniform3f (glGetUniformLocation (shader_program, "object_colour"), 0.3f, 0.3f, 0.3f);
+    } glUniformMatrix3fv (a3_grid_uniform_normal_matrix, 1, GL_FALSE, normal_matrix_flat_array);
+    glUniform3f (a3_grid_uniform_object_colour, 0.3f, 0.3f, 0.3f);
+    glUniform3f (a3_grid_uniform_camera_position, main_camera_fov.position.x, main_camera_fov.position.y, main_camera_fov.position.z);
+    glUniform3f (a3_grid_uniform_light_position, 20.0f, 40.0f, 20.0f);
     const float grid_surface_normal_x = 0.0f;
     const float grid_surface_normal_y = 1.0f;
     const float grid_surface_normal_z = 0.0f;

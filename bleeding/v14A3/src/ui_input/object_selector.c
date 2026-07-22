@@ -2,6 +2,7 @@
 #include "object_selector.h"
 #include <math.h>
 int selected_object = -1;
+uint32_t selected_object_id = 0;
 // Exact OBB Raycast using the Slab Method
 static bool ray_obb_intersection (vector3 ray_origin, vector3 ray_dir, rigidbody *obb, float *t_hit) {
     float tmin = -1e30f;
@@ -24,7 +25,38 @@ static bool ray_obb_intersection (vector3 ray_origin, vector3 ray_dir, rigidbody
         } else if ((-e > extents [i]) || (-e < -extents [i])) {return false;}
     } *t_hit = tmin > 0 ? tmin : tmax;
     return *t_hit > 0;
-} int selector_ray_tracing (void) {
+} void select_object_by_index (int object_index) {
+    /* A3_PATCH_08_SELECTION_ID */
+    if ((object_index < 0) || (object_index >= object_count)) {
+        clear_selection ();
+        return;
+    }
+
+    selected_object = object_index;
+    selected_object_id = obj_per_scene [object_index].object_id;
+}
+
+void selection_validate (void) {
+    if (selected_object_id == 0) {
+        clear_selection ();
+        return;
+    }
+
+    int object_index = scene_find_object_index_by_id (selected_object_id);
+
+    if (object_index < 0) {
+        clear_selection ();
+        return;
+    }
+
+    selected_object = object_index;
+}
+
+uint32_t selection_get_id (void) {
+    return selected_object_id;
+}
+
+int selector_ray_tracing (void) {
     vector3 ray_origin_position = main_camera_fov.position;
     vector3 ray_direction_vector = vector3_normalisation (main_camera_fov.forward_vector);
     float closest_hit_distance = 1e30f;
@@ -51,10 +83,12 @@ static bool ray_obb_intersection (vector3 ray_origin, vector3 ray_dir, rigidbody
                 closest_object_index = object_index;
             }
         }
-    } selected_object = closest_object_index;
+    } select_object_by_index (closest_object_index);
     return closest_object_index;
 } void clear_selection (void) {selected_object = -1;}
 void selector_apply_force_impulse (float impulse_magnitude) {
+    /* A3_PATCH_08_SELECTION_ID_IMPULSE */
+    selection_validate ();
     if ((selected_object < 0) || (selected_object >= object_count)) {return;}
     rigidbody *selected_rigid_body = &obj_per_scene [selected_object];
     vector3 applied_impulse_vector = vector3_scaling (main_camera_fov.forward_vector, impulse_magnitude);

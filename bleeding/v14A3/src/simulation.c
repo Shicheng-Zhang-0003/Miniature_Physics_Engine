@@ -16,6 +16,12 @@ float world_surface_friction_static = 0.2f;
 float world_surface_friction_kinetic = 0.1f;
 float variable_change_rate = 0.2f;
 float jump_height = 1.0f;
+
+/* A3_PATCH_36_DEBUG_COUNTERS */
+int debug_last_object_count = 0;
+int debug_last_broadphase_pair_count = 0;
+int debug_last_manifold_count = 0;
+float debug_last_frame_time = 0.0f;
 static void on_entry_insert_text (GtkEditable *editable, const gchar *new_text, gint new_text_length, gint *position, gpointer user_data) {
     (void) position;
     (void) user_data;
@@ -28,9 +34,13 @@ static void on_entry_insert_text (GtkEditable *editable, const gchar *new_text, 
     }
 } float open_numerical_input_dialog (GtkWidget *parent, const char *title, float current_value) {
     main_inputs.suppress_mouse_delta = true;
+    GtkWidget *dialog_parent_widget = NULL; /* A3_PATCH_25_DIALOG_SAFETY */
+    if ((parent) && (GTK_IS_WIDGET (parent))) {
+        dialog_parent_widget = gtk_widget_get_toplevel (GTK_WIDGET (parent));
+    }
     GtkWidget *dialog = gtk_dialog_new_with_buttons (
         title,
-        GTK_WINDOW (parent),
+        GTK_WINDOW (dialog_parent_widget),
         GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
         "_Cancel", GTK_RESPONSE_CANCEL,
         "_OK", GTK_RESPONSE_OK,
@@ -61,8 +71,33 @@ static void on_entry_insert_text (GtkEditable *editable, const gchar *new_text, 
         float parsed = strtof (text, &endptr);
         if ((endptr != text) && (*endptr == '\0')) {result_value = parsed;}
     } gtk_widget_destroy (dialog);
+    main_inputs.suppress_mouse_delta = false; /* A3_PATCH_25_DIALOG_SAFETY */
     return result_value;
-} gboolean physics_step_increment (gpointer user_data_pointer) {
+} 
+
+void editor_reset (void) {
+    /* A3_PATCH_03_EDITOR_RESET */
+    clear_selection ();
+
+    main_inputs.is_menu_open = false;
+    main_inputs.spawner_menu_level = 0;
+    main_inputs.velocity_menu_level = 0;
+    main_inputs.object_menu_level = 0;
+    main_inputs.marked_joint_object_index = -1;
+
+    main_inputs.menu_1_pressed = false;
+    main_inputs.menu_2_pressed = false;
+    main_inputs.menu_3_pressed = false;
+
+    main_inputs.up_arrow_pressed = false;
+    main_inputs.down_arrow_pressed = false;
+    main_inputs.left_arrow_pressed = false;
+    main_inputs.right_arrow_pressed = false;
+    main_inputs.enter_key_pressed = false;
+    main_inputs.e_key_pressed = false;
+}
+
+gboolean physics_step_increment (gpointer user_data_pointer) {
     GtkWidget *parent_window = NULL;
     if (user_data_pointer) {parent_window = gtk_widget_get_toplevel (GTK_WIDGET (user_data_pointer));}
     if (main_inputs.is_debug_mode_active) {
@@ -75,6 +110,7 @@ static void on_entry_insert_text (GtkEditable *editable, const gchar *new_text, 
     if (!status_dir_checked) {mkdir ("status", 0755); status_dir_checked = 1;}
     frame_timer_update (&main_timer);
     float frame_delta_time = main_timer.delta_time;
+    debug_last_frame_time = frame_delta_time;
     //Camera Movements
     if (!main_inputs.is_debug_mode_active) {
         if (main_inputs.w_key_pressed) {camera_move_forward (&main_camera_fov, frame_delta_time);}
@@ -135,16 +171,10 @@ static void on_entry_insert_text (GtkEditable *editable, const gchar *new_text, 
         selector_ray_tracing ();
         main_inputs.right_mouse_button_clicked = false;
     } if (main_inputs.middle_mouse_button_clicked) {
-        //Scroll wheel click removes object
-        if (selected_object >= 0) {
-            int deleted_idx = selected_object;
-            remove_joints_from_object (deleted_idx);
-            for (int object_index = deleted_idx; object_index < object_count - 1; object_index++) {obj_per_scene [object_index] = obj_per_scene [object_index + 1];}
-            adjust_joints_after_deletion (deleted_idx);
-            object_count -= 1;
-            selected_object = -1;
-        } main_inputs.middle_mouse_button_clicked = false;
-    } if (main_inputs.e_key_pressed) {
+/* A3_PATCH_04_SAFE_DELETION */
+if (selected_object >= 0) {scene_remove_object_by_index (selected_object);}
+main_inputs.middle_mouse_button_clicked = false;
+} if (main_inputs.e_key_pressed) {
         if (selected_object >= 0) {
             if (main_inputs.object_menu_level > 0) {main_inputs.object_menu_level = 0;}
             else {main_inputs.object_menu_level = 1;}
@@ -182,133 +212,10 @@ static void on_entry_insert_text (GtkEditable *editable, const gchar *new_text, 
         shift_previously_held = false;
     } //Scene Saving, 9 Key bindings
     if (main_inputs.menu_1_pressed) {save_scene ("status/scene.dat"); main_inputs.menu_1_pressed = false; main_inputs.is_menu_open = false;}
-    if (main_inputs.menu_2_pressed) {scene_loading ("status/scene.dat"); main_inputs.menu_2_pressed = false; main_inputs.is_menu_open = false;}
+    if (main_inputs.menu_2_pressed) {scene_loading ("status/scene.dat"); editor_reset (); main_inputs.menu_2_pressed = false; main_inputs.is_menu_open = false;}
     if (main_inputs.menu_3_pressed) {main_inputs.menu_3_pressed = false; gtk_main_quit ();}
-    // Spawner Menu Logic
-    if (main_inputs.spawner_menu_level == 3) {
-        spawn_mass = open_numerical_input_dialog (parent_window, "Sphere Mass (kg)", spawn_mass);
-        mouse_lock_reacquire (gtk_widget_get_toplevel (GTK_WIDGET (parent_window)));
-        if (spawn_mass < 0.01f) {spawn_mass = 0.01f;}
-        main_inputs.spawner_menu_level = 0;
-    } else if (main_inputs.spawner_menu_level == 4) {
-        spawn_radius = open_numerical_input_dialog (parent_window, "Sphere Radius (m)", spawn_radius);
-        mouse_lock_reacquire (gtk_widget_get_toplevel (GTK_WIDGET (parent_window)));
-        if (spawn_radius < 0.01f) {spawn_radius = 0.01f;}
-        main_inputs.spawner_menu_level = 0;
-    } else if (main_inputs.spawner_menu_level == 6) {
-        spawn_cube_mass = open_numerical_input_dialog (parent_window, "Cube Mass (kg)", spawn_cube_mass);
-        mouse_lock_reacquire (gtk_widget_get_toplevel (GTK_WIDGET (parent_window)));
-        if (spawn_cube_mass < 0.01f) {spawn_cube_mass = 0.01f;}
-        main_inputs.spawner_menu_level = 0;
-    } else if (main_inputs.spawner_menu_level == 7) {
-        spawn_cube_extent = open_numerical_input_dialog (parent_window, "Cube Size (m)", spawn_cube_extent);
-        mouse_lock_reacquire (gtk_widget_get_toplevel (GTK_WIDGET (parent_window)));
-        if (spawn_cube_extent < 0.01f) {spawn_cube_extent = 0.01f;}
-        main_inputs.spawner_menu_level = 0;
-    } if (main_inputs.spawner_menu_level == 8) {
-        if ((main_inputs.up_arrow_pressed) || (main_inputs.down_arrow_pressed)) {
-            if (main_inputs.current_spawn_type == 0) {main_inputs.current_spawn_type = 1;}
-            else {main_inputs.current_spawn_type = 0;}
-            main_inputs.up_arrow_pressed = false;
-            main_inputs.down_arrow_pressed = false;
-        } if (main_inputs.enter_key_pressed) {main_inputs.spawner_menu_level = 0; main_inputs.enter_key_pressed = false;}
-    } // User Mechanics Menu Logic
-    if (main_inputs.velocity_menu_level == 3) {
-        spawn_speed = open_numerical_input_dialog (parent_window, "Spawn Speed (m/s)", spawn_speed);
-        mouse_lock_reacquire (gtk_widget_get_toplevel (GTK_WIDGET (parent_window)));
-        if (spawn_speed < 0.0f) {spawn_speed = 0.0f;}
-        main_inputs.velocity_menu_level = 0;
-    } else if (main_inputs.velocity_menu_level == 4) {
-        world_surface_friction_kinetic = open_numerical_input_dialog (parent_window, "Spawn Friction (Kinetic)", world_surface_friction_kinetic);
-        mouse_lock_reacquire (gtk_widget_get_toplevel (GTK_WIDGET (parent_window)));
-        if (world_surface_friction_kinetic < 0.0f) {world_surface_friction_kinetic = 0.0f;}
-        world_surface_friction_static = world_surface_friction_kinetic + 0.1f;
-        main_inputs.velocity_menu_level = 0;
-    } else if (main_inputs.velocity_menu_level == 11) {
-        main_camera_fov.movement_speed = open_numerical_input_dialog (parent_window, "Camera Speed", main_camera_fov.movement_speed);
-        mouse_lock_reacquire (gtk_widget_get_toplevel (GTK_WIDGET (parent_window)));
-        if (main_camera_fov.movement_speed < 0.01f) {main_camera_fov.movement_speed = 0.01f;}
-        main_inputs.velocity_menu_level = 0;
-    } else if (main_inputs.velocity_menu_level == 12) {
-        jump_height = open_numerical_input_dialog (parent_window, "Jump Height (m)", jump_height);
-        mouse_lock_reacquire (gtk_widget_get_toplevel (GTK_WIDGET (parent_window)));
-        if (jump_height < 0.1f) {jump_height = 0.1f;}
-        main_inputs.velocity_menu_level = 0;
-    } else if (main_inputs.velocity_menu_level == 21) {
-        world_gravity_y = open_numerical_input_dialog (parent_window, "World Gravity (m/s^2)", world_gravity_y);
-        mouse_lock_reacquire (gtk_widget_get_toplevel (GTK_WIDGET (parent_window)));
-        main_inputs.velocity_menu_level = 0;
-    } else if (main_inputs.velocity_menu_level == 22) {
-        world_drag_coefficient = open_numerical_input_dialog (parent_window, "World Drag Coefficient", world_drag_coefficient);
-        mouse_lock_reacquire (gtk_widget_get_toplevel (GTK_WIDGET (parent_window)));
-        if (world_drag_coefficient > 1.0f) {world_drag_coefficient = 1.0f;}
-        if (world_drag_coefficient < 0.1f) {world_drag_coefficient = 0.1f;}
-        main_inputs.velocity_menu_level = 0;
-    } else if (main_inputs.velocity_menu_level == 23) {
-        world_surface_friction_kinetic = open_numerical_input_dialog (parent_window, "World Surface Friction", world_surface_friction_kinetic);
-        mouse_lock_reacquire (gtk_widget_get_toplevel (GTK_WIDGET (parent_window)));
-        if (world_surface_friction_kinetic < 0.0f) {world_surface_friction_kinetic = 0.0f;}
-        world_surface_friction_static = world_surface_friction_kinetic + 0.1f;
-        main_inputs.velocity_menu_level = 0;
-    } // Selected Object Menu Logic
-    if (main_inputs.object_menu_level == 2) {
-        rigidbody *selected_rigid_body = &obj_per_scene [selected_object];
-        selected_rigid_body -> mass = open_numerical_input_dialog (parent_window, "Selected Object Mass", selected_rigid_body -> mass);
-        mouse_lock_reacquire (gtk_widget_get_toplevel (GTK_WIDGET (parent_window)));
-        if (selected_rigid_body -> mass < 0.01f) {selected_rigid_body -> mass = 0.01f;}
-        selected_rigid_body -> inverse_mass = 1.0f / selected_rigid_body -> mass;
-        if (selected_rigid_body -> type == object_sphere) {rigidbody_update_inertia_sphere (selected_rigid_body);}
-        else {rigidbody_update_inertia_cube (selected_rigid_body);}
-        main_inputs.object_menu_level = 0;
-    } else if (main_inputs.object_menu_level == 3) {
-        rigidbody *selected_rigid_body = &obj_per_scene [selected_object];
-        if (selected_rigid_body -> type == object_sphere) {
-            selected_rigid_body -> radius = open_numerical_input_dialog (parent_window, "Selected Object Radius", selected_rigid_body -> radius);
-            if (selected_rigid_body -> radius < 0.01f) {selected_rigid_body -> radius = 0.01f;}
-            mouse_lock_reacquire (gtk_widget_get_toplevel (GTK_WIDGET (parent_window)));
-            rigidbody_update_inertia_sphere (selected_rigid_body);
-        } main_inputs.object_menu_level = 0;
-    } else if (main_inputs.object_menu_level == 4) {
-        rigidbody *selected_rigid_body = &obj_per_scene [selected_object];
-        selected_rigid_body -> friction_kinetic = open_numerical_input_dialog (parent_window, "Selected Object Friction", selected_rigid_body -> friction_kinetic);
-        mouse_lock_reacquire (gtk_widget_get_toplevel (GTK_WIDGET (parent_window)));
-        if (selected_rigid_body -> friction_kinetic < 0.0f) {selected_rigid_body -> friction_kinetic = 0.0f;}
-        selected_rigid_body -> friction_static = selected_rigid_body -> friction_kinetic + 0.1f;
-        main_inputs.object_menu_level = 0;
-    } if (main_inputs.object_menu_level == 5) {
-        rigidbody *selected_rigid_body = &obj_per_scene [selected_object];
-        if ((main_inputs.up_arrow_pressed) || (main_inputs.down_arrow_pressed)) {
-            selected_rigid_body -> static_state = !selected_rigid_body -> static_state;
-            if (selected_rigid_body -> static_state) {selected_rigid_body -> inverse_mass = 0.0f; selected_rigid_body -> velocity = vector3_zero (); selected_rigid_body -> angular_velocity = vector3_zero ();}
-            else {if (selected_rigid_body -> mass > 0) {selected_rigid_body -> inverse_mass = 1.0f / selected_rigid_body -> mass;}
-                  rigidbody_wake (selected_rigid_body);}
-            main_inputs.up_arrow_pressed = false;
-            main_inputs.down_arrow_pressed = false;
-        } if (main_inputs.enter_key_pressed) {main_inputs.object_menu_level = 0; main_inputs.enter_key_pressed = false;}
-    } else if (main_inputs.object_menu_level == 6) {
-        main_inputs.marked_joint_object_index = selected_object;
-        main_inputs.object_menu_level = 0;
-    } else if (main_inputs.object_menu_level == 7) {
-        if (main_inputs.marked_joint_object_index != -1 && main_inputs.marked_joint_object_index < object_count && main_inputs.marked_joint_object_index != selected_object) {
-            rigidbody *rb_a = &obj_per_scene [main_inputs.marked_joint_object_index];
-            rigidbody *rb_b = &obj_per_scene [selected_object];
-            float dist = vector3_length (vector3_subtraction (rb_b -> position, rb_a -> position));
-            add_joint (main_inputs.marked_joint_object_index, selected_object, dist, 100.0f, 2.0f);
-        }
-        main_inputs.marked_joint_object_index = -1;
-        main_inputs.object_menu_level = 0;
-    } else if (main_inputs.object_menu_level >= 81 && main_inputs.object_menu_level <= 88) {
-        rigidbody *selected_rigid_body = &obj_per_scene [selected_object];
-        if (main_inputs.object_menu_level == 81) { selected_rigid_body -> colour = (vector3){1.0f, 0.0f, 0.0f}; }
-        else if (main_inputs.object_menu_level == 82) { selected_rigid_body -> colour = (vector3){0.0f, 1.0f, 0.0f}; }
-        else if (main_inputs.object_menu_level == 83) { selected_rigid_body -> colour = (vector3){0.0f, 0.0f, 1.0f}; }
-        else if (main_inputs.object_menu_level == 84) { selected_rigid_body -> colour = (vector3){1.0f, 0.4f, 0.2f}; }
-        else if (main_inputs.object_menu_level == 85) { selected_rigid_body -> colour = (vector3){0.0f, 1.0f, 1.0f}; }
-        else if (main_inputs.object_menu_level == 86) { selected_rigid_body -> colour = (vector3){1.0f, 0.0f, 1.0f}; }
-        else if (main_inputs.object_menu_level == 87) { selected_rigid_body -> colour = (vector3){1.0f, 1.0f, 0.0f}; }
-        else if (main_inputs.object_menu_level == 88) { selected_rigid_body -> colour = (vector3){1.0f, 1.0f, 1.0f}; }
-        main_inputs.object_menu_level = 0;
-    } // v1.4 Simulation Contract: Fixed Timestep Accumulator
+    editor_update_menus (parent_window);
+// v1.4 Simulation Contract: Fixed Timestep Accumulator
     static broadphase_pair persistent_collision_pairs [MPE_MAX_BROADPHASE_PAIRS];
     static float physics_time_accumulator = 0.0f;
     const float fixed_physics_dt = 1.0f / 60.0f;
@@ -320,46 +227,17 @@ static void on_entry_insert_text (GtkEditable *editable, const gchar *new_text, 
     while (physics_time_accumulator >= fixed_physics_dt) {
         int detected_collision_count = 0;
         detected_collision_count = broadphase_generate_pairing (persistent_collision_pairs, MPE_MAX_BROADPHASE_PAIRS);
+    debug_last_broadphase_pair_count = detected_collision_count;
         static collision_data active_manifold [8192];
         int manifold_count = 0;
+    contact_cache_stats_reset ();
         apply_force_all_joints ();
         for (int object_iterator_index = 0; object_iterator_index < object_count; object_iterator_index++) {
             vector3 constant_gravity_acceleration = {0, world_gravity_y, 0};
             rigidbody *rigid_body = &obj_per_scene [object_iterator_index];
             if (rigid_body -> is_sleeping) {continue;}
-            vector3 up_axis = {0, 1, 0};
-            float projection = rigid_body -> radius;
-            if (rigid_body -> type == object_cube) {
-                vector3 *axes = rigid_body -> cached_axes;
-                projection = rigid_body -> half_extensions.x * fabsf (vector3_dot (axes [0], up_axis)) + rigid_body -> half_extensions.y * fabsf (vector3_dot (axes [1], up_axis)) + rigid_body -> half_extensions.z * fabsf (vector3_dot (axes [2], up_axis));
-            } if (rigid_body -> position.y <= (projection + 0.01f)) {
-                if (rigid_body -> type == object_sphere) {
-                    force_applicant_gravity_normal (rigid_body, constant_gravity_acceleration, (vector3) {0.0f, 1.0f, 0.0f});
-                    force_applicant_friction_rolling (rigid_body, (vector3) {0.0f, 1.0f, 0.0f}, rigid_body -> friction_static, rigid_body -> friction_kinetic, world_gravity_y);
-                } else {
-                    vector3 *axes = rigid_body -> cached_axes;
-                    vector3 contact_offset = {0,0,0};
-                    for (int axis_index = 0; axis_index < 3; axis_index++) {
-                        float extent = (axis_index == 0) ? rigid_body -> half_extensions.x : (axis_index == 1) ? rigid_body -> half_extensions.y : rigid_body -> half_extensions.z;
-                        vector3 offset = vector3_scaling (axes [axis_index], extent);
-                        if (vector3_dot (offset, (vector3){0, -1, 0}) > 0) contact_offset = vector3_addition (contact_offset, offset);
-                        else contact_offset = vector3_subtraction (contact_offset, offset);
-                    } vector3 lowest_vertex = vector3_addition (rigid_body -> position, contact_offset);
-                    vector3 gravity_force = vector3_scaling (constant_gravity_acceleration, rigid_body -> mass);
-                    float weight_along_normal = vector3_dot (gravity_force, (vector3){0, 1, 0});
-                    if (weight_along_normal < 0) {
-                        vector3 normal_force = vector3_scaling ((vector3){0, 1, 0}, -weight_along_normal);
-                        rb_apply_forces_localised (rigid_body, normal_force, lowest_vertex);
-                        rb_apply_forces_perfect (rigid_body, gravity_force);
-                    } vector3 contact_normal = {0, 1, 0};
-                    vector3 velocity_at_contact = vector3_addition (rigid_body -> velocity, vector3_cross (rigid_body -> angular_velocity, contact_offset));
-                    vector3 tangential_velocity = vector3_subtraction (velocity_at_contact, vector3_scaling (contact_normal, vector3_dot (velocity_at_contact, contact_normal)));
-                    if (vector3_length_squared (tangential_velocity) > 0.0001f) {
-                        vector3 friction_force = vector3_scaling (vector3_normalisation (tangential_velocity), -rigid_body -> friction_kinetic * fabsf (rigid_body -> mass * world_gravity_y));
-                        rb_apply_forces_localised (rigid_body, friction_force, lowest_vertex);
-                    }
-                }
-            } else {rb_apply_forces_perfect (rigid_body, vector3_scaling (constant_gravity_acceleration, rigid_body -> mass));}
+            /* A3_PATCH_17_REMOVE_FLOOR_HACK */
+rb_apply_forces_perfect (rigid_body, vector3_scaling (constant_gravity_acceleration, rigid_body -> mass));
         } for (int collision_index = 0; collision_index < detected_collision_count; collision_index++) {
             rigidbody *rigid_body_a = &obj_per_scene [persistent_collision_pairs [collision_index].object_index_a];
             rigidbody *rigid_body_b = &obj_per_scene [persistent_collision_pairs [collision_index].object_index_b];
@@ -378,7 +256,23 @@ static void on_entry_insert_text (GtkEditable *editable, const gchar *new_text, 
                 collision_prepare_solver (&narrowphase_collision, &active_manifold [manifold_count]);
                 manifold_count++;
             }
-        } const int solver_iterations = 16; // Increased to propagate forces through deep stacks
+        } /* A3_PATCH_16_FLOOR_MANIFOLD */
+ for (int floor_object_index = 0; floor_object_index < object_count; floor_object_index++) {
+     rigidbody *floor_rigid_body = &obj_per_scene [floor_object_index];
+     if ((floor_rigid_body -> static_state) || (floor_rigid_body -> is_sleeping)) {continue;}
+ 
+     collision_data floor_collision = {0};
+ 
+     if (collision_static_plane_body (floor_rigid_body, 0.0f, &floor_collision)) {
+         if (manifold_count < 8192) {
+             collision_prepare_solver (&floor_collision, &active_manifold [manifold_count]);
+             manifold_count++;
+         }
+     }
+ }
+ 
+    debug_last_manifold_count = manifold_count;
+ const int solver_iterations = 16; // Increased to propagate forces through deep stacks
         for (int iter = 0; iter < solver_iterations; iter++) {
             for (int m = 0; m < manifold_count; m++) {collision_resolve_iterative (&active_manifold [m]);}
         } contact_cache_save (active_manifold, manifold_count);
@@ -389,6 +283,7 @@ static void on_entry_insert_text (GtkEditable *editable, const gchar *new_text, 
             else {boundary_apply_floor (rigid_body, 0.0f);}
         } physics_time_accumulator -= fixed_physics_dt;
     } gtk_widget_queue_draw (GTK_WIDGET (user_data_pointer));
-    overlay_update ();
+    debug_last_object_count = object_count;
+overlay_update ();
     return TRUE;
 }

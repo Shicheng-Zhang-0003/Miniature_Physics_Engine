@@ -18,12 +18,16 @@ int scene_loading (const char *file_source_path) {
     if ((!read_int (f, &version)) || (version != MPE_VERSION && version != 130)) { fprintf (stderr, "Error LDF03: Version mismatch\n"); fclose (f); return 0; }
     if ((!read_int (f, &count)) || (count < 0)) { fclose (f); return 0; }
     scene_clear ();
-    if (count > object_capacity) {
-        rigidbody *new_arr = realloc (obj_per_scene, count * sizeof (rigidbody));
-        if (!new_arr) { fclose (f); return 0; }
-        obj_per_scene = new_arr;
-        object_capacity = count;
-    } for (int i = 0; i < count; i++) {
+    contact_cache_clear (); /* A3_PATCH_22_SCENE_LOAD_RESET */
+    /* A3_PATCH_23_POOL_CONSISTENCY */
+if (count > MPE_MAX_BODIES) {count = MPE_MAX_BODIES;}
+
+if (!scene_ensure_pool_capacity (count)) {
+    fclose (f);
+    return 0;
+}
+
+if (count > object_capacity) {count = object_capacity;} for (int i = 0; i < count; i++) {
         rigidbody temp;
         int32_t type_int, static_int;
         if (!read_int (f, &type_int)) break;
@@ -53,6 +57,9 @@ int scene_loading (const char *file_source_path) {
         obj_per_scene [i].static_state = temp.static_state;
         if (obj_per_scene [i].static_state) { obj_per_scene [i].inverse_mass = 0.0f; }
         rigidbody_update_axes (&obj_per_scene [i]);
+        /* A3_PATCH_06_STABLE_IDS_LOAD */
+        obj_per_scene [i].object_id = scene_allocate_object_id ();
+        obj_per_scene [i].object_generation = 1;
     } object_count = count;
     fclose (f);
     return 1;

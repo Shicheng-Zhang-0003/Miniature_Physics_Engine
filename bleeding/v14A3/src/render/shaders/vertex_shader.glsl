@@ -14,6 +14,18 @@ void main () {
     gl_Position = projection * viewframe * model * vec4 (aPos, 1.0f);
     fragment_position = vec3 (model * vec4 (aPos, 1.0f));
     local_position = aPos;
-    normal = mat3 (transpose (inverse (model))) * aNormal;
+    /* A3_PATCH_29_SHADER_NORMALS */
+mat3 a3_rotation_scale = mat3 (model);
+vec3 a3_scale = vec3 (
+    max (length (a3_rotation_scale [0]), 0.0001),
+    max (length (a3_rotation_scale [1]), 0.0001),
+    max (length (a3_rotation_scale [2]), 0.0001)
+);
+mat3 a3_rotation = mat3 (
+    a3_rotation_scale [0] / a3_scale.x,
+    a3_rotation_scale [1] / a3_scale.y,
+    a3_rotation_scale [2] / a3_scale.z
+);
+normal = normalize (a3_rotation * (aNormal / a3_scale));
     out_color = instance_color;
 }

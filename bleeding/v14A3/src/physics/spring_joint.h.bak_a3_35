@@ -1,0 +1,35 @@
+#ifndef spring_joint_h
+#define spring_joint_h
+#include "../core/math3D.h"
+#include "../core/math4_special.h"
+#include "../core/buffer.h"
+
+/* A3_PATCH_34_UNIFY_JOINT_CONSTANTS */
+#ifndef MPE_MAX_JOINTS
+#define MPE_MAX_JOINTS 1024
+#endif
+#include <stdint.h>
+#include <epoxy/gl.h>
+
+typedef struct {
+    uint32_t object_id_a, object_id_b; /* A3_PATCH_09_JOINT_IDS */
+    float equilibrium_length;
+    float spring_constant;
+    float damping_coefficient;
+    bool is_active;
+} spring_joint;
+
+extern spring_joint joint_pool [MPE_MAX_JOINTS];
+extern int current_joint_count;
+
+int add_joint (int object_index_a, int object_index_b, float equilibrium_length, float spring_constant, float damping_coefficient);
+void remove_joint (int joint_pool_index);
+void apply_force_all_joints (void);
+void remove_joints_from_object (int object_index);
+void adjust_joints_after_deletion (int deleted_object_index);
+void spring_joint_render (GLuint shader_program, math4 view_matrix, math4 projection_matrix);
+void joint_init_pool (void);
+
+int add_joint_by_ids (uint32_t object_id_a, uint32_t object_id_b, float equilibrium_length, float spring_constant, float damping_coefficient);
+void remove_joints_from_object_id (uint32_t object_id);
+#endif

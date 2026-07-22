@@ -47,4 +47,4 @@ void cube_meshing_init (void) {
     glBindVertexArray (0);
     cube_mesh.index_count = 36;
     cube_mesh.wireframe_index_count = 24;
-} void render_cube_object (mesh *mesh_object, rigidbody *rigid_body) {(void) rigid_body; (void) mesh_object;}
+} 

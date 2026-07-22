@@ -1,7 +1,7 @@
 #ifndef object_spawner_h
 #define object_spawner_h
 #include "../core/math3D.h"
-#include "../core/buffer.h"
+#include "../core/rigidbody.h"
 
 extern float spawn_mass;
 extern float spawn_radius;

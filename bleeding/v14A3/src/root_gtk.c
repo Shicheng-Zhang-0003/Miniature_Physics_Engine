@@ -29,6 +29,7 @@ int main_algorithm (int argc, char *argv []) {
     initialise_input (&main_inputs);
     //Widgeting
     GtkWidget *main_window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
+    g_signal_connect (main_window, "destroy", G_CALLBACK (gtk_main_quit), NULL);
     GtkWidget *gl_area_widget = gtk_gl_area_new ();
     gtk_gl_area_set_has_depth_buffer (GTK_GL_AREA (gl_area_widget), TRUE);
     //Keyboard and Mouse Events

@@ -18,12 +18,50 @@ void scene_allocate_pool (void) {
     }
 }
 
+static uint32_t next_object_id = 1;
+
+uint32_t scene_allocate_object_id (void) {
+    /* A3_PATCH_06_STABLE_IDS */
+    return next_object_id++;
+}
+
+void scene_assign_new_identity (int object_index) {
+    if ((object_index < 0) || (object_index >= object_count)) {return;}
+    obj_per_scene [object_index].object_id = scene_allocate_object_id ();
+    obj_per_scene [object_index].object_generation = 1;
+}
+
+int scene_ensure_pool_capacity (int required_capacity) {
+    /* A3_PATCH_23_POOL_CONSISTENCY */
+    if (required_capacity <= 0) {return 1;}
+
+    if (required_capacity > MPE_MAX_BODIES) {required_capacity = MPE_MAX_BODIES;}
+
+    if (pool_is_initialized && (required_capacity <= object_capacity)) {return 1;}
+
+    int new_capacity = MPE_MAX_BODIES;
+
+    rigidbody *new_array = (rigidbody *) realloc (obj_per_scene, (size_t) new_capacity * sizeof (rigidbody));
+
+    if (!new_array) {
+        fprintf (stderr, "Error POOL23: Failed to resize physics heap.\n");
+        return 0;
+    }
+
+    obj_per_scene = new_array;
+    object_capacity = new_capacity;
+    pool_is_initialized = true;
+
+    return 1;
+}
+
 int scene_add_object (float radius, float mass, vector3 initial_position) {
     scene_allocate_pool ();
     if (object_count >= MPE_MAX_BODIES) { fprintf (stderr, "Error POOL01: Maximum object capacity reached.\n"); return -1; }
     rigidbody_initialisation_sphere (&obj_per_scene [object_count], radius, mass, initial_position);
     int current_object_index = object_count;
     object_count += 1;
+    scene_assign_new_identity (current_object_index);
     return current_object_index;
 }
 
@@ -33,6 +71,7 @@ int scene_add_cube (vector3 position, vector3 half_extensions, float mass) {
     rigidbody_initialisation_cube (&obj_per_scene [object_count], position, half_extensions, mass);
     int current_object_index = object_count;
     object_count += 1;
+    scene_assign_new_identity (current_object_index);
     return current_object_index;
 }
 
@@ -40,6 +79,92 @@ void scene_init_default (void) {
     scene_clear ();
     int object_grey_index = scene_add_object (2.0f, 0.0f, (vector3) {0.0f, 2.0f, 0.0f});
     obj_per_scene [object_grey_index].colour = (vector3) {0.8f, 0.8f, 0.8f};
+}
+
+void scene_remove_object_by_index (int object_index) {
+    /* A3_PATCH_04_SAFE_DELETION */
+    if ((object_index < 0) || (object_index >= object_count)) {return;}
+
+    uint32_t previous_selected_id = selected_object_id; /* A3_PATCH_08_SELECTION_ID */
+    remove_joints_from_object (object_index);
+    contact_cache_clear ();
+
+    for (int i = object_index; i < object_count - 1; i++) {
+        obj_per_scene [i] = obj_per_scene [i + 1];
+    }
+
+    adjust_joints_after_deletion (object_index);
+    object_count -= 1;
+
+    /* A3_PATCH_08_SELECTION_ID */
+    if (previous_selected_id == 0) {
+        clear_selection ();
+    } else {
+        int refreshed_selection_index = scene_find_object_index_by_id (previous_selected_id);
+
+        if (refreshed_selection_index < 0) {
+            clear_selection ();
+            main_inputs.object_menu_level = 0;
+        } else {
+            selected_object = refreshed_selection_index;
+            selected_object_id = previous_selected_id;
+        }
+    }
+
+    if (main_inputs.marked_joint_object_index == object_index) {
+        main_inputs.marked_joint_object_index = -1;
+    } else if (main_inputs.marked_joint_object_index > object_index) {
+        main_inputs.marked_joint_object_index -= 1;
+    }
+
+    if ((selected_object < 0) || (selected_object >= object_count)) {
+        main_inputs.object_menu_level = 0;
+    }
+}
+
+int scene_find_object_index_by_id (uint32_t object_id) {
+    /* A3_PATCH_07_ID_LOOKUP */
+    if (object_id == 0) {return -1;}
+
+    for (int i = 0; i < object_count; i++) {
+        if (obj_per_scene [i].object_id == object_id) {return i;}
+    }
+
+    return -1;
+}
+
+bool scene_object_id_exists (uint32_t object_id) {
+    return scene_find_object_index_by_id (object_id) >= 0;
+}
+
+rigidbody *scene_resolve_object_by_id (uint32_t object_id) {
+    int object_index = scene_find_object_index_by_id (object_id);
+    if (object_index < 0) {return NULL;}
+    return &obj_per_scene [object_index];
+}
+
+uint32_t scene_get_object_id_at_index (int object_index) {
+    if ((object_index < 0) || (object_index >= object_count)) {return 0;}
+    return obj_per_scene [object_index].object_id;
+}
+
+void scene_spawn_stability_stack (void) {
+    /* A3_PATCH_37_STABILITY_SCENES */
+    for (int i = 0; i < 10; i++) {
+        float stack_height = 1.0f + (float) i * 1.05f;
+
+        int spawned_object_index = scene_add_cube (
+            (vector3) {0.0f, stack_height, 0.0f},
+            (vector3) {0.5f, 0.5f, 0.5f},
+            1.0f
+        );
+
+        if (spawned_object_index >= 0) {
+            obj_per_scene [spawned_object_index].colour = (vector3) {0.8f, 0.8f, 0.2f};
+            obj_per_scene [spawned_object_index].velocity = vector3_zero ();
+            obj_per_scene [spawned_object_index].angular_velocity = vector3_zero ();
+        }
+    }
 }
 
 void scene_clear (void) {

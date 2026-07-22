@@ -77,4 +77,4 @@ void init_sm_system (mesh *mesh_object, int horizontal_sections, int vertical_st
     glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, mesh_object -> element_buffer_object);
     glBindVertexArray (0);
     free (wireframe_indices); free (element_indices); free (vertex_data);
-} void render_sphere_object (mesh *mesh_object, rigidbody *rigid_body) {(void) rigid_body; (void) mesh_object;}
+} 

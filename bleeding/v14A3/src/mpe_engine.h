@@ -10,15 +10,13 @@
 
 #include "core/math3D.h"
 #include "core/math4_special.h"
-#include "core/buffer.h"
+#include "core/rigidbody.h"
 #include "core/frame_timer.h"
 
 #include "physics/collision_mechanics.h"
 #include "physics/define_forces.h"
 #include "physics/broadphase.h"
 #include "physics/spring_joint.h"
-#include "physics/constraint_interface.h"
-#include "physics/physics_world.h"
 
 #include "render/shader_loading.h"
 #include "render/sphere_meshing.h"
@@ -38,6 +36,7 @@
 #include "ui_input/object_selector.h"
 #include "ui_input/overlay.h"
 
+#include "ui_input/editor.h"
 /* ------------------------------------------------------------------ */
 /* Global scene state                                                 */
 /* ------------------------------------------------------------------ */
@@ -86,6 +85,14 @@ gboolean physics_step_increment (gpointer user_data_pointer);
 /* Optional GTK application activation entry point                    */
 /* ------------------------------------------------------------------ */
 
-void activation (GtkApplication *application_object, gpointer user_data_pointer);
 
+
+/* A3_PATCH_24_MENU_STATE_MACHINE */
+float open_numerical_input_dialog (GtkWidget *parent, const char *title, float current_value);
+
+/* A3_PATCH_36_DEBUG_COUNTERS */
+extern int debug_last_object_count;
+extern int debug_last_broadphase_pair_count;
+extern int debug_last_manifold_count;
+extern float debug_last_frame_time;
 #endif // mpe_engine_h

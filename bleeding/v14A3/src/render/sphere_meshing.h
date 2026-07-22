@@ -3,7 +3,7 @@
 #include <epoxy/gl.h>
 #include "../core/math3D.h"
 #include "../core/math4_special.h"
-#include "../core/buffer.h"
+#include "../core/rigidbody.h"
 
 typedef struct {
     GLuint vertex_array_object;
@@ -18,5 +18,4 @@ typedef struct {
 
 extern mesh sphere_mesh;
 void init_sm_system (mesh *mesh_object, int horizontal_sections, int vertical_stacks);
-void render_sphere_object (mesh *mesh_object, rigidbody *rigid_body);
 #endif

@@ -1,10 +1,11 @@
 #include "../mpe_engine.h"
 #include "collision_mechanics.h"
+#include <stdint.h>
 #include <stdlib.h>
 
 typedef struct {
-    rigidbody *object_a;
-    rigidbody *object_b;
+    uint32_t object_id_a; /* A3_PATCH_10_CONTACT_CACHE_IDS */
+    uint32_t object_id_b;
     vector3 local_position_a;
     vector3 local_position_b;
     float accumulated_normal_impulse;
@@ -200,6 +201,13 @@ static void clip_obb_faces (rigidbody *ref_body, rigidbody *inc_body, vector3 no
     collision_output_data -> contact_count = manifold_idx;
 }
 
+static inline float a3_cube_extent_axis (rigidbody *cube, int axis_index) {
+    /* A3_PATCH_21_CUBE_EDGE_CONTACTS */
+    if (axis_index == 0) {return cube -> half_extensions.x;}
+    if (axis_index == 1) {return cube -> half_extensions.y;}
+    return cube -> half_extensions.z;
+}
+
 bool collision_dual_cube (rigidbody *cube_a, rigidbody *cube_b, collision_data *collision_output_data) {
     vector3 *axes_a = cube_a -> cached_axes; vector3 *axes_b = cube_b -> cached_axes;
     vector3 relative_position = vector3_subtraction (cube_b -> position, cube_a -> position);
@@ -228,18 +236,130 @@ bool collision_dual_cube (rigidbody *cube_a, rigidbody *cube_b, collision_data *
     collision_output_data -> normal_vector = best_axis;
     
     if (best_axis_index >= 6) {
-        contact_point_data *cp = &collision_output_data -> contacts [0];
-        vector3 contact_point = cube_b -> position;
-        for (int axis_index = 0; axis_index < 3; axis_index++) {
-            float extent = (axis_index == 0) ? cube_b -> half_extensions.x : (axis_index == 1) ? cube_b -> half_extensions.y : cube_b -> half_extensions.z;
-            vector3 offset = vector3_scaling (axes_b [axis_index], extent);
-            if (vector3_dot (offset, best_axis) > 0) {contact_point = vector3_subtraction (contact_point, offset);}
-            else {contact_point = vector3_addition (contact_point, offset);}
+    /* A3_PATCH_21_CUBE_EDGE_CONTACTS */
+    int edge_axis_a = (best_axis_index - 6) / 3;
+    int edge_axis_b = (best_axis_index - 6) % 3;
+
+    vector3 edge_dir_a = axes_a [edge_axis_a];
+    vector3 edge_dir_b = axes_b [edge_axis_b];
+
+    float edge_extent_a = a3_cube_extent_axis (cube_a, edge_axis_a);
+    float edge_extent_b = a3_cube_extent_axis (cube_b, edge_axis_b);
+
+    vector3 anchor_a = cube_a -> position;
+
+    for (int axis_index = 0; axis_index < 3; axis_index++) {
+        if (axis_index == edge_axis_a) {continue;}
+
+        float extent = a3_cube_extent_axis (cube_a, axis_index);
+        vector3 axis = axes_a [axis_index];
+
+        if (vector3_dot (axis, best_axis) > 0.0f) {
+            anchor_a = vector3_addition (anchor_a, vector3_scaling (axis, extent));
+        } else {
+            anchor_a = vector3_subtraction (anchor_a, vector3_scaling (axis, extent));
         }
-        cp -> position = contact_point;
-        cp -> penetration = minimum_overlap;
-        collision_output_data -> contact_count = 1;
-    } else {
+    }
+
+    vector3 anchor_b = cube_b -> position;
+
+    for (int axis_index = 0; axis_index < 3; axis_index++) {
+        if (axis_index == edge_axis_b) {continue;}
+
+        float extent = a3_cube_extent_axis (cube_b, axis_index);
+        vector3 axis = axes_b [axis_index];
+
+        if (vector3_dot (axis, best_axis) > 0.0f) {
+            anchor_b = vector3_subtraction (anchor_b, vector3_scaling (axis, extent));
+        } else {
+            anchor_b = vector3_addition (anchor_b, vector3_scaling (axis, extent));
+        }
+    }
+
+    vector3 anchor_delta = vector3_subtraction (anchor_a, anchor_b);
+
+    float aa = vector3_dot (edge_dir_a, edge_dir_a);
+    float bb = vector3_dot (edge_dir_a, edge_dir_b);
+    float cc = vector3_dot (edge_dir_b, edge_dir_b);
+    float d = vector3_dot (edge_dir_a, anchor_delta);
+    float e = vector3_dot (edge_dir_b, anchor_delta);
+
+    float denominator = aa * cc - bb * bb;
+
+    float t_a = 0.0f;
+    float t_b = 0.0f;
+
+    if (fabsf (denominator) > 0.000001f) {
+        t_a = (bb * e - cc * d) / denominator;
+        t_b = (aa * e - bb * d) / denominator;
+    }
+
+    if (t_a > edge_extent_a) {t_a = edge_extent_a;}
+    if (t_a < -edge_extent_a) {t_a = -edge_extent_a;}
+    if (t_b > edge_extent_b) {t_b = edge_extent_b;}
+    if (t_b < -edge_extent_b) {t_b = -edge_extent_b;}
+
+    if (cc > 0.000001f) {
+        t_b = (e + bb * t_a) / cc;
+        if (t_b > edge_extent_b) {t_b = edge_extent_b;}
+        if (t_b < -edge_extent_b) {t_b = -edge_extent_b;}
+    }
+
+    if (aa > 0.000001f) {
+        t_a = (bb * t_b - d) / aa;
+        if (t_a > edge_extent_a) {t_a = edge_extent_a;}
+        if (t_a < -edge_extent_a) {t_a = -edge_extent_a;}
+    }
+
+    vector3 closest_a = vector3_addition (anchor_a, vector3_scaling (edge_dir_a, t_a));
+    vector3 closest_b = vector3_addition (anchor_b, vector3_scaling (edge_dir_b, t_b));
+    vector3 contact_point = vector3_scaling (vector3_addition (closest_a, closest_b), 0.5f);
+
+    collision_output_data -> contact_count = 0;
+
+    contact_point_data *cp = &collision_output_data -> contacts [0];
+    cp -> position = contact_point;
+    cp -> penetration = minimum_overlap;
+    collision_output_data -> contact_count = 1;
+
+    float parallel_alignment = fabsf (bb);
+    float contact_spread = fminf (edge_extent_a, edge_extent_b) * 0.5f;
+
+    if ((parallel_alignment > 0.95f) && (contact_spread > 0.05f)) {
+        float t_offsets [2];
+        t_offsets [0] = t_a - contact_spread;
+        t_offsets [1] = t_a + contact_spread;
+
+        for (int offset_index = 0; offset_index < 2; offset_index++) {
+            if (collision_output_data -> contact_count >= 4) {break;}
+
+            float sample_t_a = t_offsets [offset_index];
+
+            if (sample_t_a > edge_extent_a) {sample_t_a = edge_extent_a;}
+            if (sample_t_a < -edge_extent_a) {sample_t_a = -edge_extent_a;}
+
+            float sample_t_b = t_b;
+
+            if (cc > 0.000001f) {
+                sample_t_b = (e + bb * sample_t_a) / cc;
+                if (sample_t_b > edge_extent_b) {sample_t_b = edge_extent_b;}
+                if (sample_t_b < -edge_extent_b) {sample_t_b = -edge_extent_b;}
+            }
+
+            vector3 sample_closest_a = vector3_addition (anchor_a, vector3_scaling (edge_dir_a, sample_t_a));
+            vector3 sample_closest_b = vector3_addition (anchor_b, vector3_scaling (edge_dir_b, sample_t_b));
+            vector3 sample_contact_point = vector3_scaling (vector3_addition (sample_closest_a, sample_closest_b), 0.5f);
+
+            if (vector3_length_squared (vector3_subtraction (sample_contact_point, contact_point)) > 0.0001f) {
+                contact_point_data *extra_cp = &collision_output_data -> contacts [collision_output_data -> contact_count];
+                extra_cp -> position = sample_contact_point;
+                extra_cp -> penetration = minimum_overlap;
+                collision_output_data -> contact_count++;
+            }
+        }
+    }
+}
+else {
         if (best_axis_index < 3) {
             clip_obb_faces (cube_a, cube_b, best_axis, minimum_overlap, collision_output_data);
         } else {
@@ -251,40 +371,213 @@ bool collision_dual_cube (rigidbody *cube_a, rigidbody *cube_b, collision_data *
     return true;
 }
 
+static rigidbody *collision_static_plane_body_proxy (float plane_y) {
+    static rigidbody static_plane_body;
+    static int static_plane_initialized = 0;
+
+    if (!static_plane_initialized) {
+        rigidbody_initialisation_sphere (&static_plane_body, 1.0f, 0.0f, (vector3) {0.0f, plane_y, 0.0f});
+        static_plane_body.static_state = true;
+        static_plane_body.inverse_mass = 0.0f;
+        static_plane_body.inverse_inertia_tensor_local = (math3) {{{0}}};
+        static_plane_body.inverse_inertia_system = (math3) {{{0}}};
+        static_plane_body.restitution = 0.0f;
+        static_plane_body.object_id = 0xFFFFFFFFu; /* A3_PATCH_16_FLOOR_MANIFOLD */
+        static_plane_body.object_generation = 1;
+        static_plane_initialized = 1;
+    }
+
+    static_plane_body.position.y = plane_y;
+    static_plane_body.friction_static = world_surface_friction_static;
+    static_plane_body.friction_kinetic = world_surface_friction_kinetic;
+
+    return &static_plane_body;
+}
+
+bool collision_static_plane_sphere (rigidbody *sphere, float plane_y, collision_data *collision_output_data) {
+    if (sphere -> type != object_sphere) {return false;}
+
+    float lowest_y = sphere -> position.y - sphere -> radius;
+    float penetration = plane_y - lowest_y;
+
+    if (penetration <= 0.0f) {return false;}
+
+    rigidbody *plane_body = collision_static_plane_body_proxy (plane_y);
+
+    collision_output_data -> object_a = sphere;
+    collision_output_data -> object_b = plane_body;
+    collision_output_data -> normal_vector = (vector3) {0.0f, -1.0f, 0.0f};
+    collision_output_data -> contact_count = 1;
+
+    contact_point_data *cp = &collision_output_data -> contacts [0];
+    cp -> position = (vector3) {sphere -> position.x, lowest_y, sphere -> position.z};
+    cp -> penetration = penetration;
+
+    return true;
+}
+
+bool collision_static_plane_cube (rigidbody *cube, float plane_y, collision_data *collision_output_data) {
+    if (cube -> type != object_cube) {return false;}
+
+    vector3 *axes = cube -> cached_axes;
+    vector3 extents = cube -> half_extensions;
+
+    vector3 candidate_positions [8];
+    float candidate_penetrations [8];
+    int candidate_count = 0;
+
+    for (int sx = 0; sx < 2; sx++) {
+        float sign_x = sx ? 1.0f : -1.0f;
+
+        for (int sy = 0; sy < 2; sy++) {
+            float sign_y = sy ? 1.0f : -1.0f;
+
+            for (int sz = 0; sz < 2; sz++) {
+                float sign_z = sz ? 1.0f : -1.0f;
+
+                vector3 corner = cube -> position;
+                corner = vector3_addition (corner, vector3_scaling (axes [0], sign_x * extents.x));
+                corner = vector3_addition (corner, vector3_scaling (axes [1], sign_y * extents.y));
+                corner = vector3_addition (corner, vector3_scaling (axes [2], sign_z * extents.z));
+
+                float penetration = plane_y - corner.y;
+
+                if (penetration > -0.005f) {
+                    candidate_positions [candidate_count] = corner;
+                    candidate_penetrations [candidate_count] = (penetration > 0.0f) ? penetration : 0.0f;
+                    candidate_count++;
+                }
+            }
+        }
+    }
+
+    if (candidate_count == 0) {return false;}
+
+    rigidbody *plane_body = collision_static_plane_body_proxy (plane_y);
+
+    collision_output_data -> object_a = cube;
+    collision_output_data -> object_b = plane_body;
+    collision_output_data -> normal_vector = (vector3) {0.0f, -1.0f, 0.0f};
+    collision_output_data -> contact_count = 0;
+
+    int max_contacts = (candidate_count < 4) ? candidate_count : 4;
+
+    for (int i = 0; i < max_contacts; i++) {
+        int best = i;
+
+        for (int j = i + 1; j < candidate_count; j++) {
+            if (candidate_penetrations [j] > candidate_penetrations [best]) {best = j;}
+        }
+
+        if (best != i) {
+            vector3 temp_position = candidate_positions [i];
+            candidate_positions [i] = candidate_positions [best];
+            candidate_positions [best] = temp_position;
+
+            float temp_penetration = candidate_penetrations [i];
+            candidate_penetrations [i] = candidate_penetrations [best];
+            candidate_penetrations [best] = temp_penetration;
+        }
+
+        contact_point_data *cp = &collision_output_data -> contacts [i];
+        cp -> position = candidate_positions [i];
+        cp -> penetration = candidate_penetrations [i];
+        collision_output_data -> contact_count++;
+    }
+
+    return true;
+}
+
+bool collision_static_plane_body (rigidbody *body, float plane_y, collision_data *collision_output_data) {
+    /* A3_PATCH_16_FLOOR_MANIFOLD */
+    if (body -> type == object_sphere) {return collision_static_plane_sphere (body, plane_y, collision_output_data);}
+    if (body -> type == object_cube) {return collision_static_plane_cube (body, plane_y, collision_output_data);}
+    return false;
+}
+
+static inline vector4 collision_inverse_orientation (vector4 orientation) {
+    /* A3_PATCH_19_BODY_LOCAL_WARM_START */
+    return (vector4) {orientation.w, -orientation.x, -orientation.y, -orientation.z};
+}
+
+static inline vector3 collision_world_offset_to_body_local (rigidbody *body, vector3 world_offset) {
+    return vector4_rotate_to_vector3 (collision_inverse_orientation (body -> orientation), world_offset);
+}
+
+static inline vector3 collision_body_local_to_world_offset (rigidbody *body, vector3 local_offset) {
+    return vector4_rotate_to_vector3 (body -> orientation, local_offset);
+}
+
+/* A3_PATCH_36_DEBUG_COUNTERS */
+static int contact_cache_hit_count = 0;
+static int contact_cache_miss_count = 0;
+
+void contact_cache_stats_reset (void) {
+    contact_cache_hit_count = 0;
+    contact_cache_miss_count = 0;
+}
+
+int contact_cache_get_hits (void) {
+    return contact_cache_hit_count;
+}
+
+int contact_cache_get_misses (void) {
+    return contact_cache_miss_count;
+}
+
 void collision_prepare_solver (collision_data *source, collision_data *m) {
     *m = *source;
+    static int a3_patch_19_cache_reset_done = 0; /* A3_PATCH_19_CACHE_RESET */
+    if (!a3_patch_19_cache_reset_done) {
+        contact_impulse_cache_count = 0;
+        a3_patch_19_cache_reset_done = 1;
+    }
+
     for (int i = 0; i < m -> contact_count; i++) {
         contact_point_data *cp = &m -> contacts [i];
         cp -> ra = vector3_subtraction (cp -> position, m -> object_a -> position);
         cp -> rb = vector3_subtraction (cp -> position, m -> object_b -> position);
-        cp -> local_position_a = cp -> ra;
-        cp -> local_position_b = cp -> rb;
+        cp -> local_position_a = collision_world_offset_to_body_local (m -> object_a, cp -> ra); /* A3_PATCH_19_BODY_LOCAL_WARM_START */
+        cp -> local_position_b = collision_world_offset_to_body_local (m -> object_b, cp -> rb);
         
         cp -> accumulated_normal_impulse = 0.0f;
         cp -> accumulated_tangent_impulse = 0.0f;
-        const float penetration_slop = 0.005f;
-        const float bias_factor = 0.20f;
+        const float penetration_slop = 0.010f; /* A3_PATCH_20_SOLVER_TUNING */
+        const float bias_factor = 0.10f;
         cp -> separation_bias = bias_factor * fmaxf (cp -> penetration - penetration_slop, 0.0f) * 60.0f;
-        if (cp -> separation_bias > 10.0f) {cp -> separation_bias = 10.0f;}
+        if (cp -> separation_bias > 5.0f) {cp -> separation_bias = 5.0f;}
 
-        for (int c = 0; c < contact_impulse_cache_count; c++) {
-            cached_contact *cc = &contact_impulse_cache [c];
-            if (cc -> object_a == m -> object_a && cc -> object_b == m -> object_b) {
-                float dist_sq = vector3_length_squared (vector3_subtraction (cc -> local_position_a, cp -> local_position_a));
-                if (dist_sq < 0.0025f) { // Tightened from 20cm to 5mm to prevent pile explosions
-                    cp -> accumulated_normal_impulse = cc -> accumulated_normal_impulse;
-                    cp -> accumulated_tangent_impulse = cc -> accumulated_tangent_impulse;
-                    break;
-                }
-            } else if (cc -> object_a == m -> object_b && cc -> object_b == m -> object_a) {
-                float dist_sq = vector3_length_squared (vector3_subtraction (cc -> local_position_a, cp -> local_position_b));
-                if (dist_sq < 0.0025f) { // Tightened from 20cm to 5mm to prevent pile explosions
-                    cp -> accumulated_normal_impulse = cc -> accumulated_normal_impulse;
-                    cp -> accumulated_tangent_impulse = cc -> accumulated_tangent_impulse;
-                    break;
-                }
-            }
+        uint32_t cache_id_a = (m -> object_a) ? m -> object_a -> object_id : 0;
+uint32_t cache_id_b = (m -> object_b) ? m -> object_b -> object_id : 0;
+int cache_match_found = 0;
+
+for (int c = 0; c < contact_impulse_cache_count; c++) {
+    cached_contact *cc = &contact_impulse_cache [c];
+
+    /* A3_PATCH_10_CONTACT_CACHE_IDS */
+    if ((cache_id_a != 0) && (cache_id_b != 0) && (cc -> object_id_a == cache_id_a) && (cc -> object_id_b == cache_id_b)) {
+        float dist_sq = vector3_length_squared (vector3_subtraction (cc -> local_position_a, cp -> local_position_a));
+
+        if (dist_sq < 0.0025f) {
+            cp -> accumulated_normal_impulse = cc -> accumulated_normal_impulse;
+            cp -> accumulated_tangent_impulse = cc -> accumulated_tangent_impulse;
+            cache_match_found = 1;
+            break;
         }
+    } else if ((cache_id_a != 0) && (cache_id_b != 0) && (cc -> object_id_a == cache_id_b) && (cc -> object_id_b == cache_id_a)) {
+        float dist_sq = vector3_length_squared (vector3_subtraction (cc -> local_position_a, cp -> local_position_b));
+
+        if (dist_sq < 0.0025f) {
+            cp -> accumulated_normal_impulse = cc -> accumulated_normal_impulse;
+            cp -> accumulated_tangent_impulse = cc -> accumulated_tangent_impulse;
+            cache_match_found = 1;
+            break;
+        }
+    }
+}
+
+if (cache_match_found) {contact_cache_hit_count++;}
+else {contact_cache_miss_count++;}
         
         vector3 va = vector3_addition (m -> object_a -> velocity, vector3_cross (m -> object_a -> angular_velocity, cp -> ra));
         vector3 vb = vector3_addition (m -> object_b -> velocity, vector3_cross (m -> object_b -> angular_velocity, cp -> rb));
@@ -292,8 +585,9 @@ void collision_prepare_solver (collision_data *source, collision_data *m) {
         float vn_initial = vector3_dot (rel_vel, m -> normal_vector);
         
         float restitution = fminf (m -> object_a -> restitution, m -> object_b -> restitution);
-        if (vn_initial < -1.0f) {
+        if (vn_initial < -1.5f) { /* A3_PATCH_20_RESTITUTION_TUNING */
             cp -> restitution_bias = -restitution * vn_initial;
+            if (cp -> restitution_bias > 4.0f) {cp -> restitution_bias = 4.0f;}
         } else {
             cp -> restitution_bias = 0.0f;
         }
@@ -413,8 +707,9 @@ void contact_cache_save (collision_data *manifolds, int count) {
             if (contact_impulse_cache_count >= MAX_CACHED_CONTACTS) {return;}
             contact_point_data *cp = &manifold -> contacts [i];
             cached_contact *cc = &contact_impulse_cache [contact_impulse_cache_count++];
-            cc -> object_a = manifold -> object_a;
-            cc -> object_b = manifold -> object_b;
+        /* A3_PATCH_10_CONTACT_CACHE_IDS */
+        cc -> object_id_a = (manifold -> object_a) ? manifold -> object_a -> object_id : 0;
+        cc -> object_id_b = (manifold -> object_b) ? manifold -> object_b -> object_id : 0;
             cc -> local_position_a = cp -> local_position_a;
             cc -> local_position_b = cp -> local_position_b;
             cc -> accumulated_normal_impulse = cp -> accumulated_normal_impulse;
@@ -423,6 +718,8 @@ void contact_cache_save (collision_data *manifolds, int count) {
     }
 }
 
-void collision_resolve (collision_data *collision) {
-    (void) collision;
+void contact_cache_clear (void) {
+    /* A3_PATCH_04_CONTACT_CACHE_CLEAR */
+    contact_impulse_cache_count = 0;
 }
+

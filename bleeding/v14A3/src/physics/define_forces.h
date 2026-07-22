@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <math.h>
 #include "../core/math3D.h"
-#include "../core/buffer.h"
+#include "../core/rigidbody.h"
 //Universal Law of Gravitation
 #define big_g 6.67430e-11f
 typedef struct {float linear_kinetic_energy, rotational_kinetic_energy, kinetic_energy, gravitational_potential_energy, spring_potential_energy, mechanical_energy;} state_energy;

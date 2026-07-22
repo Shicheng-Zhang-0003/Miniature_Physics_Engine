@@ -1,6 +1,9 @@
 #include "../mpe_engine.h"
 #include "boundary.h"
 #include <math.h>
+
+/* A3_PATCH_18_BOUNDARY_FLOOR_EMERGENCY */
+#define A3_BOUNDARY_FLOOR_EMERGENCY_SLOP 0.25f
 // Helper: Get lowest point of OBB along an axis
 static float get_obb_min_along_axis (rigidbody *rigid_body, vector3 axis) {
     if (rigid_body -> type == object_sphere) return vector3_dot (rigid_body -> position, axis) - rigid_body -> radius;
@@ -24,7 +27,7 @@ static float get_obb_max_along_axis (rigidbody *rigid_body, vector3 axis) {
 } void boundary_apply_floor (rigidbody *rigid_body, float floor_y_level) {
     if (rigid_body -> static_state) {return;}
     float min_y = get_obb_min_along_axis (rigid_body, (vector3) {0, 1, 0});
-    if (min_y < floor_y_level) {
+    if (min_y < (floor_y_level - A3_BOUNDARY_FLOOR_EMERGENCY_SLOP)) { /* A3_PATCH_18_BOUNDARY_FLOOR_EMERGENCY */
         rigid_body -> position.y += (floor_y_level - min_y);
         if (rigid_body -> velocity.y < 0) {
             rigid_body -> velocity.y = -rigid_body -> velocity.y * rigid_body -> restitution;
@@ -51,7 +54,7 @@ static float get_obb_max_along_axis (rigidbody *rigid_body, vector3 axis) {
         }
     } // Y axis
     float min_y = get_obb_min_along_axis (rigid_body, (vector3) {0, 1, 0});
-    if (min_y < min_bounds.y) {
+    if (min_y < (min_bounds.y - A3_BOUNDARY_FLOOR_EMERGENCY_SLOP)) { /* A3_PATCH_18_BOUNDARY_FLOOR_EMERGENCY */
         rigid_body -> position.y += (min_bounds.y - min_y);
         if (rigid_body -> velocity.y < 0) {
             rigid_body -> velocity.y = -rigid_body -> velocity.y * rigid_body -> restitution;

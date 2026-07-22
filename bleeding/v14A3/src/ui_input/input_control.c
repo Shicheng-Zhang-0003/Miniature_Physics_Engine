@@ -38,6 +38,7 @@ void initialise_input (input_status *input_state) {
     input_state -> right_arrow_pressed = false;
     input_state -> enter_key_pressed = false;
     input_state -> e_key_pressed = false;
+input_state -> stability_test_pressed = false;
     //Mouse
     input_state -> is_mouse_locked = false;
     input_state -> is_debug_mode_active = false;
@@ -57,6 +58,7 @@ void initialise_input (input_status *input_state) {
     if (event -> keyval == GDK_KEY_d) {input_state -> d_key_pressed = true;}
     if (event -> keyval == GDK_KEY_e) {input_state -> e_key_pressed = true;}
     if (event -> keyval == GDK_KEY_f) {input_state -> f_key_pressed = true;}
+if (event -> keyval == GDK_KEY_F5) {input_state -> stability_test_pressed = true;}
     if (event -> keyval == GDK_KEY_i) {input_state -> i_key_pressed = true;}
     if (event -> keyval == GDK_KEY_j) {input_state -> j_key_pressed = true;}
     if (event -> keyval == GDK_KEY_k) {input_state -> k_key_pressed = true;}
@@ -225,5 +227,20 @@ void initialise_input (input_status *input_state) {
     input_state -> right_arrow_pressed = false;
     input_state -> enter_key_pressed = false;
     input_state -> e_key_pressed = false;
+input_state -> stability_test_pressed = false;
+    /* A3_PATCH_02_FOCUS_LOSS */
+    input_state -> mouse_delta_x = 0.0f;
+    input_state -> mouse_delta_y = 0.0f;
+    input_state -> left_mouse_button_clicked = false;
+    input_state -> right_mouse_button_clicked = false;
+    input_state -> middle_mouse_button_clicked = false;
+    input_state -> suppress_mouse_delta = false;
+
+    if (input_state -> is_mouse_locked) {
+        GtkWidget *a3_toplevel_widget = gtk_widget_get_toplevel (widget);
+        mouse_lock_disable (a3_toplevel_widget);
+        input_state -> is_mouse_locked = false;
+    }
+
     return FALSE;
 }
