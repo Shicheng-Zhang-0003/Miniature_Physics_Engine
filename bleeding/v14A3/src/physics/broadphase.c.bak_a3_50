@@ -5,7 +5,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 #define GRID_CELL_SIZE 5.0f
-#define A3_MAX_CELL_SPAN_PER_AXIS 8 /* A3_PATCH_50_BROADPHASE_LARGE_OBJECT_SAFETY */
 #define HASH_TABLE_SIZE 8192
 #define MAX_OBJECTS 16384
 typedef struct { int object_index; int next_entry; } hash_node;
@@ -172,22 +171,6 @@ int broadphase_generate_pairing (broadphase_pair *collision_pairs_output_array, 
         int max_y = (int) floorf ((rb -> position.y + extent_y) / GRID_CELL_SIZE);
         int min_z = (int) floorf ((rb -> position.z - extent_z) / GRID_CELL_SIZE);
         int max_z = (int) floorf ((rb -> position.z + extent_z) / GRID_CELL_SIZE);
-        /* A3_PATCH_50_BROADPHASE_LARGE_OBJECT_SAFETY */
-        if ((max_x - min_x) > A3_MAX_CELL_SPAN_PER_AXIS) {
-            int center_x = (int) floorf (rb -> position.x / GRID_CELL_SIZE);
-            min_x = center_x - (A3_MAX_CELL_SPAN_PER_AXIS / 2);
-            max_x = min_x + A3_MAX_CELL_SPAN_PER_AXIS;
-        }
-        if ((max_y - min_y) > A3_MAX_CELL_SPAN_PER_AXIS) {
-            int center_y = (int) floorf (rb -> position.y / GRID_CELL_SIZE);
-            min_y = center_y - (A3_MAX_CELL_SPAN_PER_AXIS / 2);
-            max_y = min_y + A3_MAX_CELL_SPAN_PER_AXIS;
-        }
-        if ((max_z - min_z) > A3_MAX_CELL_SPAN_PER_AXIS) {
-            int center_z = (int) floorf (rb -> position.z / GRID_CELL_SIZE);
-            min_z = center_z - (A3_MAX_CELL_SPAN_PER_AXIS / 2);
-            max_z = min_z + A3_MAX_CELL_SPAN_PER_AXIS;
-        }
         for (int x = min_x; x <= max_x; x++) {
             for (int y = min_y; y <= max_y; y++) {
                 for (int z = min_z; z <= max_z; z++) { insert_into_hash (i, x, y, z); }

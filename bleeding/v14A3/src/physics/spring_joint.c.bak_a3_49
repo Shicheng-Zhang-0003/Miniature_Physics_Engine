@@ -4,9 +4,6 @@
 #include <stdlib.h>
 #include <epoxy/gl.h>
 
-/* A3_PATCH_49_JOINT_FORCE_LIMIT */
-#define A3_MAX_JOINT_ACCELERATION 200.0f
-
 spring_joint joint_pool [MPE_MAX_JOINTS];
 int current_joint_count = 0;
 int add_joint_by_ids (uint32_t object_id_a, uint32_t object_id_b, float equilibrium_length, float spring_constant, float damping_coefficient) {
@@ -81,16 +78,6 @@ void remove_joint (int joint_pool_index) {
         vector3 damping_force = vector3_scaling (spring_axis_direction, current_spring_joint -> damping_coefficient * velocity_along_spring_axis);
         vector3 net_joint_force = vector3_addition (restoration_force, damping_force);
 
-        /* A3_PATCH_49_JOINT_FORCE_LIMIT */
-        float a3_inverse_mass_sum = rigid_body_a -> inverse_mass + rigid_body_b -> inverse_mass;
-        if (a3_inverse_mass_sum > 0.0f) {
-            float a3_reduced_mass = 1.0f / a3_inverse_mass_sum;
-            float a3_max_joint_force = a3_reduced_mass * A3_MAX_JOINT_ACCELERATION;
-            float a3_force_length = vector3_length (net_joint_force);
-            if ((a3_force_length > a3_max_joint_force) && (a3_force_length > math_epsilon)) {
-                net_joint_force = vector3_scaling (net_joint_force, a3_max_joint_force / a3_force_length);
-            }
-        }
         rb_apply_forces_perfect (rigid_body_a, net_joint_force);
         rb_apply_forces_perfect (rigid_body_b, vector3_scaling (net_joint_force, -1.0f));
     }

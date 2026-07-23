@@ -101,32 +101,6 @@ void editor_reset (void) {
     main_inputs.e_key_pressed = false;
 }
 
-static void validation_report_print (void) {
-    /* A3_PATCH_51_FIX_VALIDATION_PRINT */
-    printf ("[A3] Validation report %s\n", A3_VERSION_STRING);
-    printf ("[A3] objects=%d capacity=%d joints=%d selected=%d\n",
-            object_count, object_capacity, current_joint_count, selected_object);
-    printf ("[A3] debug last: obj=%d pairs=%d manifolds=%d frame_time=%f\n",
-            debug_last_object_count,
-            debug_last_broadphase_pair_count,
-            debug_last_manifold_count,
-            debug_last_frame_time);
-    printf ("[A3] broadphase overflow: nodes=%d pairs=%d\n",
-            broadphase_get_node_overflow_count (),
-            broadphase_get_pair_overflow_count ());
-    printf ("[A3] contact cache: hits=%d misses=%d\n",
-            contact_cache_get_hits (),
-            contact_cache_get_misses ());
-    printf ("[A3] menus: open=%d spawner=%d velocity=%d object=%d marked_joint=%d\n",
-            main_inputs.is_menu_open,
-            main_inputs.spawner_menu_level,
-            main_inputs.velocity_menu_level,
-            main_inputs.object_menu_level,
-            main_inputs.marked_joint_object_index);
-    fflush (stdout);
-}
-
-
 gboolean physics_step_increment (gpointer user_data_pointer) {
     GtkWidget *parent_window = NULL;
     if (user_data_pointer) {parent_window = gtk_widget_get_toplevel (GTK_WIDGET (user_data_pointer));}
@@ -231,11 +205,6 @@ if (main_inputs.spawn_stress_pressed) {
     scene_spawn_stress_test ();
     main_inputs.spawn_stress_pressed = false;
 }
-if (main_inputs.validation_report_pressed) {
-    validation_report_print ();
-    main_inputs.validation_report_pressed = false;
-}
-
 
 
 

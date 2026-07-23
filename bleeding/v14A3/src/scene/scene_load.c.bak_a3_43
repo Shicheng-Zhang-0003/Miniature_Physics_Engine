@@ -56,12 +56,8 @@ for (int i = 0; i < count; i++) {
         obj_per_scene [i].friction_static = temp.friction_static;
         obj_per_scene [i].friction_kinetic = temp.friction_kinetic;
         obj_per_scene [i].static_state = temp.static_state;
-        /* A3_PATCH_43_NAN_STATIC_HARDENING */
-if (obj_per_scene [i].static_state) {rigidbody_set_static (&obj_per_scene [i], true);}
-else {rigidbody_set_static (&obj_per_scene [i], false);}
-rigidbody_sanitize (&obj_per_scene [i]);
+        if (obj_per_scene [i].static_state) { obj_per_scene [i].inverse_mass = 0.0f; }
         rigidbody_update_axes (&obj_per_scene [i]);
-rigidbody_sanitize (&obj_per_scene [i]); /* A3_PATCH_47_NAN_SANITIZATION */
         /* A3_PATCH_06_STABLE_IDS_LOAD */
         obj_per_scene [i].object_id = scene_allocate_object_id ();
         obj_per_scene [i].object_generation = 1;

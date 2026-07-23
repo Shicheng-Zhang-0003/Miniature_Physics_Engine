@@ -1,147 +1,6 @@
 #include "../mpe_engine.h"
 #include "rigidbody.h"
 // Helper to update axes from orientation
-/* A3_PATCH_47_NAN_SANITIZATION */
-static bool a3_vector3_is_finite (vector3 v) {
-    return isfinite (v.x) && isfinite (v.y) && isfinite (v.z);
-}
-
-static bool a3_vector4_is_finite (vector4 v) {
-    return isfinite (v.w) && isfinite (v.x) && isfinite (v.y) && isfinite (v.z);
-}
-
-static bool a3_math3_is_finite (math3 m) {
-    for (int row_index = 0; row_index < 3; row_index++) {
-        for (int column_index = 0; column_index < 3; column_index++) {
-            if (!isfinite (m.matrix [row_index][column_index])) {return false;}
-        }
-    }
-    return true;
-}
-
-static bool a3_math3_is_zero (math3 m) {
-    for (int row_index = 0; row_index < 3; row_index++) {
-        for (int column_index = 0; column_index < 3; column_index++) {
-            if (m.matrix [row_index][column_index] != 0.0f) {return false;}
-        }
-    }
-    return true;
-}
-
-void rigidbody_sanitize (rigidbody *rigid_body) {
-    bool needs_inertia_recalc = false;
-    math3 zero_matrix = {{{0.0f}}};
-
-    if (!a3_vector3_is_finite (rigid_body -> position)) {
-        rigid_body -> position = (vector3) {0.0f, 5.0f, 0.0f};
-        rigid_body -> velocity = vector3_zero ();
-        rigid_body -> angular_velocity = vector3_zero ();
-        rigid_body -> orientation = vector4_identity ();
-        rigid_body -> is_sleeping = false;
-        rigid_body -> sleep_timer = 0.0f;
-        needs_inertia_recalc = true;
-    }
-
-    if (!a3_vector3_is_finite (rigid_body -> velocity)) {
-        rigid_body -> velocity = vector3_zero ();
-    }
-
-    if (!a3_vector3_is_finite (rigid_body -> angular_velocity)) {
-        rigid_body -> angular_velocity = vector3_zero ();
-    }
-
-    if (!a3_vector4_is_finite (rigid_body -> orientation)) {
-        rigid_body -> orientation = vector4_identity ();
-        needs_inertia_recalc = true;
-    } else {
-        float orientation_length_squared =
-            rigid_body -> orientation.w * rigid_body -> orientation.w +
-            rigid_body -> orientation.x * rigid_body -> orientation.x +
-            rigid_body -> orientation.y * rigid_body -> orientation.y +
-            rigid_body -> orientation.z * rigid_body -> orientation.z;
-
-        if (!isfinite (orientation_length_squared) || (orientation_length_squared < 0.25f) || (orientation_length_squared > 4.0f)) {
-            if (orientation_length_squared > 0.000001f) {
-                rigid_body -> orientation = vector4_normalisation (rigid_body -> orientation);
-            } else {
-                rigid_body -> orientation = vector4_identity ();
-            }
-            needs_inertia_recalc = true;
-        }
-    }
-
-    if (!isfinite (rigid_body -> mass) || (rigid_body -> mass < 0.0f)) {
-        rigid_body -> mass = rigid_body -> static_state ? 0.0f : 1.0f;
-        needs_inertia_recalc = true;
-    }
-
-    if (rigid_body -> type == object_sphere) {
-        if (!isfinite (rigid_body -> radius) || (rigid_body -> radius <= 0.0f)) {
-            rigid_body -> radius = 0.01f;
-            needs_inertia_recalc = true;
-        }
-    } else {
-        if (!isfinite (rigid_body -> half_extensions.x) || (rigid_body -> half_extensions.x <= 0.0f)) {
-            rigid_body -> half_extensions.x = 0.01f;
-            needs_inertia_recalc = true;
-        }
-        if (!isfinite (rigid_body -> half_extensions.y) || (rigid_body -> half_extensions.y <= 0.0f)) {
-            rigid_body -> half_extensions.y = 0.01f;
-            needs_inertia_recalc = true;
-        }
-        if (!isfinite (rigid_body -> half_extensions.z) || (rigid_body -> half_extensions.z <= 0.0f)) {
-            rigid_body -> half_extensions.z = 0.01f;
-            needs_inertia_recalc = true;
-        }
-    }
-
-    if (!isfinite (rigid_body -> friction_static) || (rigid_body -> friction_static < 0.0f)) {
-        rigid_body -> friction_static = 0.3f;
-    }
-
-    if (!isfinite (rigid_body -> friction_kinetic) || (rigid_body -> friction_kinetic < 0.0f)) {
-        rigid_body -> friction_kinetic = 0.2f;
-    }
-
-    if (!isfinite (rigid_body -> restitution) || (rigid_body -> restitution < 0.0f)) {
-        rigid_body -> restitution = 0.0f;
-    }
-
-    if (rigid_body -> restitution > 1.0f) {
-        rigid_body -> restitution = 1.0f;
-    }
-
-    if (rigid_body -> static_state) {
-        rigid_body -> inverse_mass = 0.0f;
-        rigid_body -> inverse_inertia_tensor_local = zero_matrix;
-        rigid_body -> inverse_inertia_system = zero_matrix;
-        rigid_body -> velocity = vector3_zero ();
-        rigid_body -> angular_velocity = vector3_zero ();
-        rigid_body -> is_sleeping = false;
-        rigid_body -> sleep_timer = 0.0f;
-    } else {
-        if ((rigid_body -> mass <= 0.0f) || (!isfinite (rigid_body -> mass))) {
-            rigid_body -> mass = 1.0f;
-            needs_inertia_recalc = true;
-        }
-
-        rigid_body -> inverse_mass = 1.0f / rigid_body -> mass;
-
-        if (needs_inertia_recalc ||
-            (!a3_math3_is_finite (rigid_body -> inverse_inertia_tensor_local)) ||
-            (!a3_math3_is_finite (rigid_body -> inverse_inertia_system)) ||
-            (a3_math3_is_zero (rigid_body -> inverse_inertia_system))) {
-            if (rigid_body -> type == object_sphere) {
-                rigidbody_update_inertia_sphere (rigid_body);
-            } else {
-                rigidbody_update_inertia_cube (rigid_body);
-            }
-        }
-    }
-
-    rigidbody_update_axes (rigid_body);
-}
-
 void rigidbody_update_axes (rigidbody *rigid_body) {
     math3 rotation_matrix = vector4_to_math3 (rigid_body -> orientation);
     rigid_body -> cached_axes [0] = (vector3) {rotation_matrix.matrix [0][0], rotation_matrix.matrix [1][0], rotation_matrix.matrix [2][0]};
@@ -303,88 +162,7 @@ void rb_integrate (rigidbody *rigid_body, float delta_time, float linear_damping
     rigid_body -> force_accumulator = vector3_zero ();
     rigid_body -> torque_accumulator = vector3_zero ();
     rigidbody_update_axes (rigid_body);
-} void rb_integrate_velocity (rigidbody *rigid_body, float delta_time, float linear_damping, float angular_damping) {
-    /* A3_PATCH_44_SEMI_IMPLICIT */
-    if ((rigid_body -> static_state) || (delta_time <= 0.0f)) {return;}
-    if (rigid_body -> is_sleeping) {return;}
-
-    math3 rotation_matrix_current = vector4_to_math3 (rigid_body -> orientation);
-    math3 rotation_matrix_transposed = math3_transposition (rotation_matrix_current);
-    rigid_body -> inverse_inertia_system = math3_multiplication (
-        rotation_matrix_current,
-        math3_multiplication (rigid_body -> inverse_inertia_tensor_local, rotation_matrix_transposed)
-    );
-
-    rigid_body -> acceleration = vector3_scaling (rigid_body -> force_accumulator, rigid_body -> inverse_mass);
-    rigid_body -> velocity = vector3_addition (rigid_body -> velocity, vector3_scaling (rigid_body -> acceleration, delta_time));
-    rigid_body -> velocity = vector3_scaling (rigid_body -> velocity, linear_damping);
-
-    if (vector3_length_squared (rigid_body -> velocity) < 0.00005f) {
-        rigid_body -> velocity = vector3_zero ();
-    }
-
-    rigid_body -> angular_acceleration = math3_multiplication_vector3 (rigid_body -> inverse_inertia_system, rigid_body -> torque_accumulator);
-    rigid_body -> angular_velocity = vector3_addition (rigid_body -> angular_velocity, vector3_scaling (rigid_body -> angular_acceleration, delta_time));
-    rigid_body -> angular_velocity = vector3_scaling (rigid_body -> angular_velocity, angular_damping);
-
-    if (vector3_length_squared (rigid_body -> angular_velocity) < 0.0001f) {
-        rigid_body -> angular_velocity = vector3_zero ();
-    }
-
-    float max_linear_speed = 150.0f;
-    float current_speed_sq = vector3_length_squared (rigid_body -> velocity);
-
-    if (current_speed_sq > max_linear_speed * max_linear_speed) {
-        rigid_body -> velocity = vector3_scaling (vector3_normalisation (rigid_body -> velocity), max_linear_speed);
-    }
-
-    float max_angular_speed = 30.0f;
-    float current_angular_speed_sq = vector3_length_squared (rigid_body -> angular_velocity);
-
-    if (current_angular_speed_sq > max_angular_speed * max_angular_speed) {
-        rigid_body -> angular_velocity = vector3_scaling (vector3_normalisation (rigid_body -> angular_velocity), max_angular_speed);
-    }
-
-    rigid_body -> force_accumulator = vector3_zero ();
-    rigid_body -> torque_accumulator = vector3_zero ();
-}
-
-void rb_integrate_position (rigidbody *rigid_body, float delta_time) {
-    /* A3_PATCH_44_SEMI_IMPLICIT */
-    if ((rigid_body -> static_state) || (delta_time <= 0.0f)) {return;}
-    if (rigid_body -> is_sleeping) {return;}
-
-    rigid_body -> position = vector3_addition (rigid_body -> position, vector3_scaling (rigid_body -> velocity, delta_time));
-
-    vector4 angular_velocity_quaternion = {
-        0.0f,
-        rigid_body -> angular_velocity.x,
-        rigid_body -> angular_velocity.y,
-        rigid_body -> angular_velocity.z
-    };
-
-    vector4 orientation_change_delta = vector4_multiplication (angular_velocity_quaternion, rigid_body -> orientation);
-
-    rigid_body -> orientation.w += orientation_change_delta.w * 0.5f * delta_time;
-    rigid_body -> orientation.x += orientation_change_delta.x * 0.5f * delta_time;
-    rigid_body -> orientation.y += orientation_change_delta.y * 0.5f * delta_time;
-    rigid_body -> orientation.z += orientation_change_delta.z * 0.5f * delta_time;
-
-    rigid_body -> orientation = vector4_normalisation (rigid_body -> orientation);
-    rigidbody_update_axes (rigid_body);
-
-    float speed_sq = vector3_length_squared (rigid_body -> velocity);
-    float angular_speed_sq = vector3_length_squared (rigid_body -> angular_velocity);
-
-    if ((speed_sq < 0.0025f) && (angular_speed_sq < 0.0001f)) {
-        rigid_body -> sleep_timer += delta_time;
-        if (rigid_body -> sleep_timer > 1.0f) {rigid_body -> is_sleeping = true;}
-    } else {
-        rigid_body -> sleep_timer = 0.0f;
-    }
-}
-
-vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
+} vector3 make_half_extents (float width, float height, float depth) {return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};}
 // Initialize a cube: Box, OBB
 void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass) {
     //Kinematic
@@ -434,9 +212,128 @@ void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_inpu
 }
 
 /* A3_PATCH_43_NAN_STATIC_HARDENING */
+static bool a3_vector3_is_finite (vector3 v) {
+    return isfinite (v.x) && isfinite (v.y) && isfinite (v.z);
+}
 
+static bool a3_vector4_is_finite (vector4 v) {
+    return isfinite (v.w) && isfinite (v.x) && isfinite (v.y) && isfinite (v.z);
+}
 
+static bool a3_math3_is_finite (math3 m) {
+    for (int row_index = 0; row_index < 3; row_index++) {
+        for (int column_index = 0; column_index < 3; column_index++) {
+            if (!isfinite (m.matrix [row_index][column_index])) {return false;}
+        }
+    }
+    return true;
+}
 
+void rigidbody_sanitize (rigidbody *rigid_body) {
+    math3 zero_matrix = {{{0.0f}}};
+
+    if (!a3_vector3_is_finite (rigid_body -> position)) {
+        rigid_body -> position = (vector3) {0.0f, 5.0f, 0.0f};
+        rigid_body -> velocity = vector3_zero ();
+        rigid_body -> angular_velocity = vector3_zero ();
+        rigid_body -> orientation = vector4_identity ();
+        rigid_body -> is_sleeping = false;
+        rigid_body -> sleep_timer = 0.0f;
+    }
+
+    if (!a3_vector3_is_finite (rigid_body -> velocity)) {
+        rigid_body -> velocity = vector3_zero ();
+    }
+
+    if (!a3_vector3_is_finite (rigid_body -> angular_velocity)) {
+        rigid_body -> angular_velocity = vector3_zero ();
+    }
+
+    if (!a3_vector4_is_finite (rigid_body -> orientation)) {
+        rigid_body -> orientation = vector4_identity ();
+    } else {
+        float orientation_length_squared =
+            rigid_body -> orientation.w * rigid_body -> orientation.w +
+            rigid_body -> orientation.x * rigid_body -> orientation.x +
+            rigid_body -> orientation.y * rigid_body -> orientation.y +
+            rigid_body -> orientation.z * rigid_body -> orientation.z;
+
+        if ((orientation_length_squared < 0.25f) || (orientation_length_squared > 4.0f)) {
+            rigid_body -> orientation = vector4_normalisation (rigid_body -> orientation);
+        }
+    }
+
+    if (!isfinite (rigid_body -> mass) || (rigid_body -> mass < 0.0f)) {
+        rigid_body -> mass = rigid_body -> static_state ? 0.0f : 1.0f;
+    }
+
+    if (rigid_body -> type == object_sphere) {
+        if (!isfinite (rigid_body -> radius) || (rigid_body -> radius <= 0.0f)) {
+            rigid_body -> radius = 0.01f;
+        }
+    } else {
+        if (!isfinite (rigid_body -> half_extensions.x) || (rigid_body -> half_extensions.x <= 0.0f)) {
+            rigid_body -> half_extensions.x = 0.01f;
+        }
+        if (!isfinite (rigid_body -> half_extensions.y) || (rigid_body -> half_extensions.y <= 0.0f)) {
+            rigid_body -> half_extensions.y = 0.01f;
+        }
+        if (!isfinite (rigid_body -> half_extensions.z) || (rigid_body -> half_extensions.z <= 0.0f)) {
+            rigid_body -> half_extensions.z = 0.01f;
+        }
+    }
+
+    if (!isfinite (rigid_body -> friction_static) || (rigid_body -> friction_static < 0.0f)) {
+        rigid_body -> friction_static = 0.3f;
+    }
+
+    if (!isfinite (rigid_body -> friction_kinetic) || (rigid_body -> friction_kinetic < 0.0f)) {
+        rigid_body -> friction_kinetic = 0.2f;
+    }
+
+    if (!isfinite (rigid_body -> restitution) || (rigid_body -> restitution < 0.0f)) {
+        rigid_body -> restitution = 0.0f;
+    }
+
+    if (rigid_body -> restitution > 1.0f) {
+        rigid_body -> restitution = 1.0f;
+    }
+
+    if (rigid_body -> static_state) {
+        rigid_body -> inverse_mass = 0.0f;
+        rigid_body -> inverse_inertia_tensor_local = zero_matrix;
+        rigid_body -> inverse_inertia_system = zero_matrix;
+        rigid_body -> velocity = vector3_zero ();
+        rigid_body -> angular_velocity = vector3_zero ();
+        rigid_body -> is_sleeping = false;
+        rigid_body -> sleep_timer = 0.0f;
+    } else {
+        if ((rigid_body -> mass <= 0.0f) || (!isfinite (rigid_body -> mass))) {
+            rigid_body -> mass = 1.0f;
+        }
+
+        if (rigid_body -> mass < 0.0001f) {
+            rigid_body -> mass = 0.0001f;
+        }
+
+        rigid_body -> inverse_mass = 1.0f / rigid_body -> mass;
+
+        if (!isfinite (rigid_body -> inverse_mass)) {
+            rigid_body -> inverse_mass = 0.0f;
+        }
+
+        if ((!a3_math3_is_finite (rigid_body -> inverse_inertia_tensor_local)) ||
+            (!a3_math3_is_finite (rigid_body -> inverse_inertia_system))) {
+            if (rigid_body -> type == object_sphere) {
+                rigidbody_update_inertia_sphere (rigid_body);
+            } else {
+                rigidbody_update_inertia_cube (rigid_body);
+            }
+        }
+    }
+
+    rigidbody_update_axes (rigid_body);
+}
 
 void rigidbody_set_static (rigidbody *rigid_body, bool make_static) {
     math3 zero_matrix = {{{0.0f}}};

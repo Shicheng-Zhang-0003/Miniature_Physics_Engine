@@ -61,7 +61,6 @@ if (obj_per_scene [i].static_state) {rigidbody_set_static (&obj_per_scene [i], t
 else {rigidbody_set_static (&obj_per_scene [i], false);}
 rigidbody_sanitize (&obj_per_scene [i]);
         rigidbody_update_axes (&obj_per_scene [i]);
-rigidbody_sanitize (&obj_per_scene [i]); /* A3_PATCH_47_NAN_SANITIZATION */
         /* A3_PATCH_06_STABLE_IDS_LOAD */
         obj_per_scene [i].object_id = scene_allocate_object_id ();
         obj_per_scene [i].object_generation = 1;

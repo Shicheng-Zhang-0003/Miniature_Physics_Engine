@@ -3,18 +3,6 @@
 #include "mpe_engine.h"
 camera main_camera_fov;
 input_status main_inputs;
-/* A3_PATCH_42_CRITICAL_LIFECYCLE */
-static guint physics_timeout_id = 0;
-
-static void on_main_window_destroy (GtkWidget *widget, gpointer user_data) {
-    (void) widget;
-    (void) user_data;
-    if (physics_timeout_id) {
-        g_source_remove (physics_timeout_id);
-        physics_timeout_id = 0;
-    }
-    gtk_main_quit ();
-}
 //On Call
 static void when_realised (GtkGLArea *gl_area_widget) {
     if (gtk_gl_area_get_error (gl_area_widget) != NULL) {return;}
@@ -30,8 +18,6 @@ static gboolean on_rendered (GtkGLArea *gl_area_widget, GdkGLContext *gl_context
     int screen_scale_factor = gtk_widget_get_scale_factor (GTK_WIDGET (gl_area_widget));
     int widget_width = gtk_widget_get_allocated_width (GTK_WIDGET (gl_area_widget)) * screen_scale_factor;
     int widget_height = gtk_widget_get_allocated_height (GTK_WIDGET (gl_area_widget)) * screen_scale_factor;
-/* A3_PATCH_42_CRITICAL_LIFECYCLE */
-if ((widget_width <= 0) || (widget_height <= 0)) {return TRUE;}
     render_scene_current (widget_width, widget_height);
     return TRUE;
 } int main_algorithm (int argc, char *argv []);
@@ -44,7 +30,7 @@ printf ("MPE %s\n", A3_VERSION_STRING); /* A3_PATCH_41_FINAL_VALIDATION */
     initialise_input (&main_inputs);
     //Widgeting
     GtkWidget *main_window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
-    g_signal_connect (main_window, "destroy", G_CALLBACK (on_main_window_destroy), NULL);
+    g_signal_connect (main_window, "destroy", G_CALLBACK (gtk_main_quit), NULL);
     GtkWidget *gl_area_widget = gtk_gl_area_new ();
     gtk_gl_area_set_has_depth_buffer (GTK_GL_AREA (gl_area_widget), TRUE);
     //Keyboard and Mouse Events
@@ -66,7 +52,7 @@ printf ("MPE %s\n", A3_VERSION_STRING); /* A3_PATCH_41_FINAL_VALIDATION */
     gtk_widget_set_can_focus (main_window, TRUE);
     gtk_widget_grab_focus (main_window);
     //Physics Step Loop (16ms)
-    physics_timeout_id = g_timeout_add (16, physics_step_increment, gl_area_widget);
+    g_timeout_add (16, physics_step_increment, gl_area_widget);
     //Show Window
     gtk_widget_show_all (main_window);
     gtk_widget_grab_focus (main_window);
