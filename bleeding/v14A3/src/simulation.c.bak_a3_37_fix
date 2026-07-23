@@ -182,27 +182,7 @@ main_inputs.middle_mouse_button_clicked = false;
     } if (main_inputs.f_key_pressed) {
         if (selected_object >= 0) {selector_apply_force_impulse (250.0f);} //Increased as cube friction is far higher
         main_inputs.f_key_pressed = false;
-    }
-if (main_inputs.stability_test_pressed) {
-    scene_spawn_stability_stack ();
-    main_inputs.stability_test_pressed = false;
-}
-if (main_inputs.sleep_wake_test_pressed) {
-    scene_spawn_sleep_wake_test ();
-    main_inputs.sleep_wake_test_pressed = false;
-}
-if (main_inputs.editor_torture_pressed) {
-    scene_editor_torture_test ();
-    main_inputs.editor_torture_pressed = false;
-}
-if (main_inputs.spawn_stress_pressed) {
-    scene_spawn_stress_test ();
-    main_inputs.spawn_stress_pressed = false;
-}
-
-
-
- //Holding down shift, spawn gun
+    } //Holding down shift, spawn gun
     static float shift_hold_timer = 0.0f;
     static float shift_spawn_interval_timer = 0.0f;
     static bool shift_previously_held = false;

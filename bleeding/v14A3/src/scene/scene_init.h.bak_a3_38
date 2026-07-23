@@ -22,10 +22,4 @@ uint32_t scene_get_object_id_at_index (int object_index);
 int scene_ensure_pool_capacity (int required_capacity);
 
 void scene_spawn_stability_stack (void);
-
-void scene_spawn_sleep_wake_test (void);
-
-void scene_editor_torture_test (void);
-
-void scene_spawn_stress_test (void);
 #endif

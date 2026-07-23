@@ -19,7 +19,6 @@ typedef struct {
 bool stability_test_pressed;
 bool sleep_wake_test_pressed;
 bool editor_torture_pressed;
-bool spawn_stress_pressed;
     //Mouse Status Inputs
     bool is_mouse_locked, is_debug_mode_active;
     bool left_mouse_button_clicked, right_mouse_button_clicked, middle_mouse_button_clicked;

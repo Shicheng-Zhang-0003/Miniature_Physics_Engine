@@ -150,12 +150,11 @@ uint32_t scene_get_object_id_at_index (int object_index) {
 
 void scene_spawn_stability_stack (void) {
     /* A3_PATCH_37_STABILITY_SCENES */
-    /* A3_TEST_FIX_1 */
     for (int i = 0; i < 10; i++) {
-        float stack_y = 0.5f + (float) i * 0.99f;
+        float stack_height = 1.0f + (float) i * 1.05f;
 
         int spawned_object_index = scene_add_cube (
-            (vector3) {20.0f, stack_y, 0.0f},
+            (vector3) {0.0f, stack_height, 0.0f},
             (vector3) {0.5f, 0.5f, 0.5f},
             1.0f
         );
@@ -164,19 +163,14 @@ void scene_spawn_stability_stack (void) {
             obj_per_scene [spawned_object_index].colour = (vector3) {0.8f, 0.8f, 0.2f};
             obj_per_scene [spawned_object_index].velocity = vector3_zero ();
             obj_per_scene [spawned_object_index].angular_velocity = vector3_zero ();
-            obj_per_scene [spawned_object_index].restitution = 0.0f;
-            obj_per_scene [spawned_object_index].friction_static = 0.8f;
-            obj_per_scene [spawned_object_index].friction_kinetic = 0.7f;
         }
     }
 }
 
-
 void scene_spawn_sleep_wake_test (void) {
     /* A3_PATCH_38_SLEEP_WAKE_TEST */
-    /* A3_TEST_FIX_1 */
     int target_object_index = scene_add_cube (
-        (vector3) {20.0f, 0.5f, 10.0f},
+        (vector3) {0.0f, 0.5f, 0.0f},
         (vector3) {0.5f, 0.5f, 0.5f},
         2.0f
     );
@@ -187,135 +181,18 @@ void scene_spawn_sleep_wake_test (void) {
         obj_per_scene [target_object_index].angular_velocity = vector3_zero ();
         obj_per_scene [target_object_index].is_sleeping = true;
         obj_per_scene [target_object_index].sleep_timer = 1.0f;
-        obj_per_scene [target_object_index].restitution = 0.0f;
-        obj_per_scene [target_object_index].friction_static = 0.8f;
-        obj_per_scene [target_object_index].friction_kinetic = 0.7f;
     }
 
     int projectile_object_index = scene_add_object (
         0.35f,
         3.0f,
-        (vector3) {20.0f, 0.5f, 16.0f}
+        (vector3) {0.0f, 0.5f, 6.0f}
     );
 
     if (projectile_object_index >= 0) {
         obj_per_scene [projectile_object_index].colour = (vector3) {1.0f, 0.2f, 0.2f};
         obj_per_scene [projectile_object_index].velocity = (vector3) {0.0f, 0.0f, -18.0f};
         obj_per_scene [projectile_object_index].angular_velocity = vector3_zero ();
-        obj_per_scene [projectile_object_index].restitution = 0.0f;
-    }
-}
-
-
-void scene_editor_torture_test (void) {
-    /* A3_PATCH_39_EDITOR_TORTURE */
-    /* A3_TEST_FIX_1 */
-    printf ("[A3] Editor torture test: spawning jointed objects at x=-20\n");
-
-    int object_a_index = scene_add_object (0.35f, 1.0f, (vector3) {-20.0f, 2.0f, 0.0f});
-    int object_b_index = scene_add_cube ((vector3) {-17.0f, 2.0f, 0.0f}, (vector3) {0.4f, 0.4f, 0.4f}, 1.5f);
-    int object_c_index = scene_add_object (0.35f, 1.0f, (vector3) {-14.0f, 2.0f, 0.0f});
-
-    if ((object_a_index < 0) || (object_b_index < 0) || (object_c_index < 0)) {
-        printf ("[A3] Editor torture test failed: could not spawn test objects.\n");
-        return;
-    }
-
-    obj_per_scene [object_a_index].restitution = 0.0f;
-    obj_per_scene [object_b_index].restitution = 0.0f;
-    obj_per_scene [object_c_index].restitution = 0.0f;
-
-    selected_object = object_b_index;
-    main_inputs.object_menu_level = 1;
-    main_inputs.marked_joint_object_index = object_a_index;
-
-    float first_joint_length = vector3_length (
-        vector3_subtraction (
-            obj_per_scene [object_b_index].position,
-            obj_per_scene [object_a_index].position
-        )
-    );
-
-    add_joint (object_a_index, object_b_index, first_joint_length, 100.0f, 2.0f);
-    scene_remove_object_by_index (object_b_index);
-
-    int shifted_object_c_index = object_c_index;
-    if (shifted_object_c_index > object_b_index) {shifted_object_c_index--;}
-
-    selected_object = object_a_index;
-    main_inputs.object_menu_level = 1;
-    main_inputs.marked_joint_object_index = shifted_object_c_index;
-
-    if ((shifted_object_c_index >= 0) && (shifted_object_c_index < object_count)) {
-        float second_joint_length = vector3_length (
-            vector3_subtraction (
-                obj_per_scene [shifted_object_c_index].position,
-                obj_per_scene [object_a_index].position
-            )
-        );
-
-        add_joint (object_a_index, shifted_object_c_index, second_joint_length, 100.0f, 2.0f);
-        scene_remove_object_by_index (shifted_object_c_index);
-    }
-
-    if ((object_a_index >= 0) && (object_a_index < object_count)) {
-        obj_per_scene [object_a_index].colour = (vector3) {0.2f, 1.0f, 0.2f};
-    }
-
-    clear_selection ();
-    main_inputs.object_menu_level = 0;
-    main_inputs.marked_joint_object_index = -1;
-    main_inputs.is_menu_open = false;
-    main_inputs.spawner_menu_level = 0;
-    main_inputs.velocity_menu_level = 0;
-
-    printf ("[A3] Editor torture test complete: deleted jointed selected/marked objects; green survivor left at x=-20.\n");
-}
-
-
-void scene_spawn_stress_test (void) {
-    /* A3_PATCH_40_SPAWN_STRESS */
-    broadphase_reset_overflow_counts ();
-
-    int objects_to_spawn = 300;
-
-    if (object_count + objects_to_spawn > MPE_MAX_BODIES) {
-        objects_to_spawn = MPE_MAX_BODIES - object_count;
-    }
-
-    if (objects_to_spawn <= 0) {return;}
-
-    int grid_width = 10;
-    int grid_depth = 10;
-
-    for (int i = 0; i < objects_to_spawn; i++) {
-        int grid_x = i % grid_width;
-        int grid_z = (i / grid_width) % grid_depth;
-        int layer = i / (grid_width * grid_depth);
-
-        float x = -9.0f + (float) grid_x * 2.0f;
-        float z = -9.0f + (float) grid_z * 2.0f;
-        float y = 5.0f + (float) layer * 2.5f;
-
-        float jitter = (float) (i % 7) * 0.05f - 0.15f;
-
-        int spawned_object_index = -1;
-
-        if ((i % 2) == 0) {
-            spawned_object_index = scene_add_object (0.35f, 1.0f, (vector3) {x, y, z});
-        } else {
-            spawned_object_index = scene_add_cube ((vector3) {x, y, z}, (vector3) {0.4f, 0.4f, 0.4f}, 1.5f);
-        }
-
-        if (spawned_object_index >= 0) {
-            obj_per_scene [spawned_object_index].velocity = (vector3) {jitter, -1.0f, -jitter};
-            obj_per_scene [spawned_object_index].angular_velocity = vector3_zero ();
-            obj_per_scene [spawned_object_index].colour = (vector3) {
-                0.3f + 0.7f * ((float) ((spawned_object_index + 0) % 3) / 2.0f),
-                0.3f + 0.7f * ((float) ((spawned_object_index + 1) % 3) / 2.0f),
-                0.3f + 0.7f * ((float) ((spawned_object_index + 2) % 3) / 2.0f)
-            };
-        }
     }
 }
 

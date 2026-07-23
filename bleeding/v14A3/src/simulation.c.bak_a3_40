@@ -195,11 +195,6 @@ if (main_inputs.editor_torture_pressed) {
     scene_editor_torture_test ();
     main_inputs.editor_torture_pressed = false;
 }
-if (main_inputs.spawn_stress_pressed) {
-    scene_spawn_stress_test ();
-    main_inputs.spawn_stress_pressed = false;
-}
-
 
 
  //Holding down shift, spawn gun

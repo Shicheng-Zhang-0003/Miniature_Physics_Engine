@@ -24,7 +24,6 @@ static gboolean on_rendered (GtkGLArea *gl_area_widget, GdkGLContext *gl_context
 int main_algorithm (int argc, char *argv []) {
     g_setenv ("GDK_BACKEND", "x11", TRUE);
     gtk_init (&argc, &argv);
-printf ("MPE %s\n", A3_VERSION_STRING); /* A3_PATCH_41_FINAL_VALIDATION */
     //Camera Init
     initialize_camera (&main_camera_fov, (vector3) {0.0f, 20.0f, 50.0f});
     initialise_input (&main_inputs);

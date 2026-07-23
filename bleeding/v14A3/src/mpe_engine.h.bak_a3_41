@@ -95,7 +95,4 @@ extern int debug_last_object_count;
 extern int debug_last_broadphase_pair_count;
 extern int debug_last_manifold_count;
 extern float debug_last_frame_time;
-
-/* A3_PATCH_41_FINAL_VALIDATION */
-#define A3_VERSION_STRING "v14A3.41"
 #endif // mpe_engine_h

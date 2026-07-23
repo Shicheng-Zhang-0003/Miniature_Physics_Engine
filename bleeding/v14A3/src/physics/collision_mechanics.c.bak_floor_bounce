@@ -381,7 +381,7 @@ static rigidbody *collision_static_plane_body_proxy (float plane_y) {
         static_plane_body.inverse_mass = 0.0f;
         static_plane_body.inverse_inertia_tensor_local = (math3) {{{0}}};
         static_plane_body.inverse_inertia_system = (math3) {{{0}}};
-        static_plane_body.restitution = 1.0f; /* A3_HOTFIX_FLOOR_BOUNCE */
+        static_plane_body.restitution = 0.0f;
         static_plane_body.object_id = 0xFFFFFFFFu; /* A3_PATCH_16_FLOOR_MANIFOLD */
         static_plane_body.object_generation = 1;
         static_plane_initialized = 1;

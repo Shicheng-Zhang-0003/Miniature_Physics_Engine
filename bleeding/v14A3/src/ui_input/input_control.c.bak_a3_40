@@ -41,7 +41,6 @@ void initialise_input (input_status *input_state) {
 input_state -> stability_test_pressed = false;
 input_state -> sleep_wake_test_pressed = false;
 input_state -> editor_torture_pressed = false;
-input_state -> spawn_stress_pressed = false;
     //Mouse
     input_state -> is_mouse_locked = false;
     input_state -> is_debug_mode_active = false;
@@ -64,7 +63,6 @@ input_state -> spawn_stress_pressed = false;
 if (event -> keyval == GDK_KEY_F5) {input_state -> stability_test_pressed = true;}
 if (event -> keyval == GDK_KEY_F6) {input_state -> sleep_wake_test_pressed = true;}
 if (event -> keyval == GDK_KEY_F7) {input_state -> editor_torture_pressed = true;}
-if (event -> keyval == GDK_KEY_F8) {input_state -> spawn_stress_pressed = true;}
     if (event -> keyval == GDK_KEY_i) {input_state -> i_key_pressed = true;}
     if (event -> keyval == GDK_KEY_j) {input_state -> j_key_pressed = true;}
     if (event -> keyval == GDK_KEY_k) {input_state -> k_key_pressed = true;}
@@ -236,7 +234,6 @@ if (event -> keyval == GDK_KEY_F8) {input_state -> spawn_stress_pressed = true;}
 input_state -> stability_test_pressed = false;
 input_state -> sleep_wake_test_pressed = false;
 input_state -> editor_torture_pressed = false;
-input_state -> spawn_stress_pressed = false;
     /* A3_PATCH_02_FOCUS_LOSS */
     input_state -> mouse_delta_x = 0.0f;
     input_state -> mouse_delta_y = 0.0f;
