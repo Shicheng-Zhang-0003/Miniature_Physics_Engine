@@ -101,32 +101,6 @@ void editor_reset (void) {
     main_inputs.e_key_pressed = false;
 }
 
-static void validation_report_print (void) {
-    /* A3_PATCH_51_FIX_VALIDATION_PRINT */
-    printf ("[A3] Validation report %s\n", A3_VERSION_STRING);
-    printf ("[A3] objects=%d capacity=%d joints=%d selected=%d\n",
-            object_count, object_capacity, current_joint_count, selected_object);
-    printf ("[A3] debug last: obj=%d pairs=%d manifolds=%d frame_time=%f\n",
-            debug_last_object_count,
-            debug_last_broadphase_pair_count,
-            debug_last_manifold_count,
-            debug_last_frame_time);
-    printf ("[A3] broadphase overflow: nodes=%d pairs=%d\n",
-            broadphase_get_node_overflow_count (),
-            broadphase_get_pair_overflow_count ());
-    printf ("[A3] contact cache: hits=%d misses=%d\n",
-            contact_cache_get_hits (),
-            contact_cache_get_misses ());
-    printf ("[A3] menus: open=%d spawner=%d velocity=%d object=%d marked_joint=%d\n",
-            main_inputs.is_menu_open,
-            main_inputs.spawner_menu_level,
-            main_inputs.velocity_menu_level,
-            main_inputs.object_menu_level,
-            main_inputs.marked_joint_object_index);
-    fflush (stdout);
-}
-
-
 gboolean physics_step_increment (gpointer user_data_pointer) {
     GtkWidget *parent_window = NULL;
     if (user_data_pointer) {parent_window = gtk_widget_get_toplevel (GTK_WIDGET (user_data_pointer));}
@@ -231,11 +205,6 @@ if (main_inputs.spawn_stress_pressed) {
     scene_spawn_stress_test ();
     main_inputs.spawn_stress_pressed = false;
 }
-if (main_inputs.validation_report_pressed) {
-    validation_report_print ();
-    main_inputs.validation_report_pressed = false;
-}
-
 
 
 
@@ -282,10 +251,6 @@ if (main_inputs.validation_report_pressed) {
     float linear_damping_factor = powf (world_drag_coefficient, fixed_physics_dt);
     float angular_damping_factor = powf (world_drag_coefficient * 0.97f, fixed_physics_dt);
     while (physics_time_accumulator >= fixed_physics_dt) {
-/* A3_PATCH_47_NAN_SANITIZATION */
-for (int sanitize_index = 0; sanitize_index < object_count; sanitize_index++) {
-    rigidbody_sanitize (&obj_per_scene [sanitize_index]);
-}
         /* A3_PATCH_43_PRE_BROADPHASE_SANITIZE */
         for (int sanitize_index = 0; sanitize_index < object_count; sanitize_index++) {
             rigidbody_sanitize (&obj_per_scene [sanitize_index]);
@@ -303,14 +268,7 @@ for (int sanitize_index = 0; sanitize_index < object_count; sanitize_index++) {
             if (rigid_body -> is_sleeping) {continue;}
             /* A3_PATCH_17_REMOVE_FLOOR_HACK */
 rb_apply_forces_perfect (rigid_body, vector3_scaling (constant_gravity_acceleration, rigid_body -> mass));
-        }
-
-/* A3_PATCH_44_SEMI_IMPLICIT */
-for (int velocity_integration_index = 0; velocity_integration_index < object_count; velocity_integration_index++) {
-    rb_integrate_velocity (&obj_per_scene [velocity_integration_index], fixed_physics_dt, linear_damping_factor, angular_damping_factor);
-}
-
-for (int collision_index = 0; collision_index < detected_collision_count; collision_index++) {
+        } for (int collision_index = 0; collision_index < detected_collision_count; collision_index++) {
             rigidbody *rigid_body_a = &obj_per_scene [persistent_collision_pairs [collision_index].object_index_a];
             rigidbody *rigid_body_b = &obj_per_scene [persistent_collision_pairs [collision_index].object_index_b];
             collision_data narrowphase_collision = {0};
@@ -350,7 +308,7 @@ for (int collision_index = 0; collision_index < detected_collision_count; collis
         } contact_cache_save (active_manifold, manifold_count);
         for (int object_iterator_index = 0; object_iterator_index < object_count; object_iterator_index++) {
             rigidbody *rigid_body = &obj_per_scene [object_iterator_index];
-            rb_integrate_position (rigid_body, fixed_physics_dt); /* A3_PATCH_44_SEMI_IMPLICIT */
+            rb_integrate (rigid_body, fixed_physics_dt, linear_damping_factor, angular_damping_factor);
             /* A3_PATCH_43_POST_INTEGRATE_SANITIZE */
             rigidbody_sanitize (rigid_body);
             if (!main_inputs.is_debug_mode_active) {boundary_apply_box (rigid_body, (vector3){-250, 0, -250}, (vector3){250, 500, 250});}

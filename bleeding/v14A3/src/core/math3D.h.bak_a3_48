@@ -106,11 +106,7 @@ static inline math3 math3_multiplication (math3 matrix_a, math3 matrix_b) {
 // Angular Constraint Calculation (change_p = J * M ^ -1 * J_transposed)
 static inline math3 math3_inverse (math3 matrix) {
     float determinant = (matrix.matrix [0][0] * (matrix.matrix [1][1] * matrix.matrix [2][2] - matrix.matrix [2][1] * matrix.matrix [1][2])) - (matrix.matrix [0][1] * (matrix.matrix [1][0] * matrix.matrix [2][2] - matrix.matrix [1][2] * matrix.matrix [2][0])) + (matrix.matrix [0][2] * (matrix.matrix [1][0] * matrix.matrix [2][1] - matrix.matrix [1][1] * matrix.matrix [2][0]));
-    if ((!isfinite (determinant)) || (fabsf (determinant) < math_epsilon)) {
-        /* A3_PATCH_48_SAFE_INERTIA_INVERSE */
-        math3 singular_matrix = {{{0.0f}}};
-        return singular_matrix;
-    }
+    if (fabsf (determinant) < math_epsilon) {return math3_identity ();} //Buffer Check
     float inverse_determinant = 1.0f / determinant;
     math3 result_matrix;
     //n ~= {0, 2}

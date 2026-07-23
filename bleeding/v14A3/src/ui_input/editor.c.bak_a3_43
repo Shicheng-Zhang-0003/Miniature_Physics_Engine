@@ -134,7 +134,15 @@ void editor_update_menus (GtkWidget *parent_window) {
         rigidbody *selected_rigid_body = editor_selected_object_or_null ();
         if (!selected_rigid_body) {main_inputs.object_menu_level = 0; return;}
         if ((main_inputs.up_arrow_pressed) || (main_inputs.down_arrow_pressed)) {
-            rigidbody_set_static (selected_rigid_body, !selected_rigid_body -> static_state);
+            selected_rigid_body -> static_state = !selected_rigid_body -> static_state;
+            if (selected_rigid_body -> static_state) {
+                selected_rigid_body -> inverse_mass = 0.0f;
+                selected_rigid_body -> velocity = vector3_zero ();
+                selected_rigid_body -> angular_velocity = vector3_zero ();
+            } else {
+                if (selected_rigid_body -> mass > 0) {selected_rigid_body -> inverse_mass = 1.0f / selected_rigid_body -> mass;}
+                rigidbody_wake (selected_rigid_body);
+            }
             main_inputs.up_arrow_pressed = false;
             main_inputs.down_arrow_pressed = false;
         }

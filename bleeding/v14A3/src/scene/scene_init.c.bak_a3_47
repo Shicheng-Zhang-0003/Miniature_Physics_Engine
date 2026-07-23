@@ -62,7 +62,6 @@ int scene_add_object (float radius, float mass, vector3 initial_position) {
     int current_object_index = object_count;
     object_count += 1;
     scene_assign_new_identity (current_object_index);
-rigidbody_sanitize (&obj_per_scene [current_object_index]); /* A3_PATCH_47_NAN_SANITIZATION */
     return current_object_index;
 }
 
@@ -73,7 +72,6 @@ int scene_add_cube (vector3 position, vector3 half_extensions, float mass) {
     int current_object_index = object_count;
     object_count += 1;
     scene_assign_new_identity (current_object_index);
-rigidbody_sanitize (&obj_per_scene [current_object_index]); /* A3_PATCH_47_NAN_SANITIZATION */
     return current_object_index;
 }
 

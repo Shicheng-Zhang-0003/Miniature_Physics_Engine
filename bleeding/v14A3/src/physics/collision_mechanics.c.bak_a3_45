@@ -679,12 +679,7 @@ void collision_resolve_iterative (collision_data *m) {
             float eff_mass_t = (k_tangent > 0.0f) ? (1.0f / k_tangent) : 0.0f;
             
             float lambda_t = -vt * eff_mass_t;
-            float tangential_speed = fabsf (vt);
-            const float static_friction_threshold = 0.02f; /* A3_PATCH_45_STATIC_FRICTION */
-            float static_friction_coeff = fminf (m -> object_a -> friction_static, m -> object_b -> friction_static);
-            float kinetic_friction_coeff = fminf (m -> object_a -> friction_kinetic, m -> object_b -> friction_kinetic);
-            if (static_friction_coeff < kinetic_friction_coeff) {static_friction_coeff = kinetic_friction_coeff;}
-            float friction_coeff = (tangential_speed < static_friction_threshold) ? static_friction_coeff : kinetic_friction_coeff;
+            float friction_coeff = fminf (m -> object_a -> friction_kinetic, m -> object_b -> friction_kinetic);
             float max_friction = cp -> accumulated_normal_impulse * friction_coeff;
             float old_tangent_impulse = cp -> accumulated_tangent_impulse;
             cp -> accumulated_tangent_impulse = fmaxf (-max_friction, fminf (old_tangent_impulse + lambda_t, max_friction));
