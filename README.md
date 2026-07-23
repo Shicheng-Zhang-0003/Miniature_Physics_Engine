@@ -18,6 +18,8 @@ The goal of MPE is to prioritize:
 - Deterministic physics simulation
 - High-performance real-time scaling
 
+Note: Github will read 77% Makefile due to the number of compiled .o and .d files uploaded.
+
 ---
 
 ## 🚀 Version 1.4 Alpha RC3 Highlights
