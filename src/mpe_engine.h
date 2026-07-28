@@ -98,4 +98,10 @@ extern float debug_last_frame_time;
 
 /* A3_PATCH_41_FINAL_VALIDATION */
 #define A3_VERSION_STRING "v14A3.51" /* A3_PATCH_51_FINAL_VALIDATION */
+
+/* MPE_RELEASE_FREEZE_BEGIN */
+#define A3_RELEASE_FREEZE 1
+#define A3_RELEASE_FREEZE_NOTE "v14A3 RC freeze: fixes/validation/cleanup only until v14S"
+/* MPE_RELEASE_FREEZE_END */
+
 #endif // mpe_engine_h
