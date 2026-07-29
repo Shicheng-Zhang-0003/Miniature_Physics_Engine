@@ -1,5 +1,30 @@
 # MPE v14A3.41 Validation Checklist
 
+
+<!-- MPE_RELEASE_GATES_SECTION_BEGIN -->
+## v14S Release Gates
+
+The stable release is controlled by [`RELEASE_GATES.md`](RELEASE_GATES.md).
+
+Minimum mandatory gates:
+
+- [ ] Release freeze policy is active.
+- [ ] Build passes.
+- [ ] Startup prints the correct version.
+- [ ] Shader/render failures are visible.
+- [ ] Input and focus-loss behaviour is stable.
+- [ ] Editor deletion/joint torture tests pass.
+- [ ] Physics stacks settle without explosion.
+- [ ] Sleeping stacks remain sleeping.
+- [ ] Overflow counters are visible where applicable.
+- [ ] F5-F9 validation tests pass.
+- [ ] Documentation matches code.
+- [ ] Repository artifacts are cleaned.
+- [ ] Sanitizer validation passes.
+
+Do not tag `v14S` until all mandatory P0 gates pass.
+<!-- MPE_RELEASE_GATES_SECTION_END -->
+
 This checklist validates the full 1-41 A3 patch sequence.
 
 ## Built-in Test Keys

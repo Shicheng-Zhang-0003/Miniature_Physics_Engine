@@ -55,6 +55,92 @@ int scene_ensure_pool_capacity (int required_capacity) {
     return 1;
 }
 
+/* MPE_TASK_20B_SPAWN_SEPARATION_BEGIN */
+static bool a3_spawn_collision_dispatch (rigidbody *rigid_body_a, rigidbody *rigid_body_b, collision_data *collision_output) {
+if ((rigid_body_a -> type == object_sphere) && (rigid_body_b -> type == object_sphere)) {
+return collision_dual_sphere (rigid_body_a, rigid_body_b, collision_output);
+}
+if ((rigid_body_a -> type == object_sphere) && (rigid_body_b -> type == object_cube)) {
+return collision_sphere_cube (rigid_body_a, rigid_body_b, collision_output);
+}
+if ((rigid_body_a -> type == object_cube) && (rigid_body_b -> type == object_sphere)) {
+bool collided = collision_sphere_cube (rigid_body_b, rigid_body_a, collision_output);
+if (collided) {
+collision_output -> normal_vector = vector3_scaling (collision_output -> normal_vector, -1.0f);
+collision_output -> object_a = rigid_body_a;
+collision_output -> object_b = rigid_body_b;
+}
+return collided;
+}
+if ((rigid_body_a -> type == object_cube) && (rigid_body_b -> type == object_cube)) {
+return collision_dual_cube (rigid_body_a, rigid_body_b, collision_output);
+}
+return false;
+}
+
+static void scene_resolve_spawn_overlap (int new_object_index) {
+if ((new_object_index < 0) || (new_object_index >= object_count)) {return;}
+
+rigidbody *new_body = &obj_per_scene [new_object_index];
+if (new_body -> static_state) {return;}
+
+const int max_attempts = 24;
+const float overlap_threshold = 0.02f;
+
+for (int attempt = 0; attempt < max_attempts; attempt++) {
+bool overlap_found = false;
+
+for (int other_index = 0; other_index < object_count; other_index++) {
+if (other_index == new_object_index) {continue;}
+
+rigidbody *other_body = &obj_per_scene [other_index];
+collision_data overlap_collision = {0};
+
+if (!a3_spawn_collision_dispatch (new_body, other_body, &overlap_collision)) {continue;}
+
+float max_depth = 0.0f;
+
+for (int contact_index = 0; contact_index < overlap_collision.contact_count; contact_index++) {
+float depth = overlap_collision.contacts [contact_index].penetration;
+if (depth > max_depth) {max_depth = depth;}
+}
+
+if (max_depth <= overlap_threshold) {continue;}
+
+overlap_found = true;
+
+float normal_length_squared = vector3_length_squared (overlap_collision.normal_vector);
+vector3 separation_normal;
+
+if ((!isfinite (normal_length_squared)) || (normal_length_squared < 0.000001f)) {
+separation_normal = (vector3) {0.0f, 1.0f, 0.0f};
+} else {
+separation_normal = vector3_scaling (overlap_collision.normal_vector, 1.0f / sqrtf (normal_length_squared));
+}
+
+float move_distance = (max_depth - overlap_threshold) + 0.005f;
+if (move_distance > 1.0f) {move_distance = 1.0f;}
+
+if (overlap_collision.object_a == new_body) {
+new_body -> position = vector3_subtraction (
+new_body -> position,
+vector3_scaling (separation_normal, move_distance)
+);
+} else {
+new_body -> position = vector3_addition (
+new_body -> position,
+vector3_scaling (separation_normal, move_distance)
+);
+}
+
+rigidbody_wake (new_body);
+}
+
+if (!overlap_found) {break;}
+}
+}
+/* MPE_TASK_20B_SPAWN_SEPARATION_END */
+
 int scene_add_object (float radius, float mass, vector3 initial_position) {
     scene_allocate_pool ();
     if (object_count >= MPE_MAX_BODIES) { fprintf (stderr, "Error POOL01: Maximum object capacity reached.\n"); return -1; }
@@ -63,6 +149,7 @@ int scene_add_object (float radius, float mass, vector3 initial_position) {
     object_count += 1;
     scene_assign_new_identity (current_object_index);
 rigidbody_sanitize (&obj_per_scene [current_object_index]); /* A3_PATCH_47_NAN_SANITIZATION */
+scene_resolve_spawn_overlap (current_object_index); /* MPE_TASK_20B_SPAWN_RESOLVE_CALL */
     return current_object_index;
 }
 
@@ -74,6 +161,7 @@ int scene_add_cube (vector3 position, vector3 half_extensions, float mass) {
     object_count += 1;
     scene_assign_new_identity (current_object_index);
 rigidbody_sanitize (&obj_per_scene [current_object_index]); /* A3_PATCH_47_NAN_SANITIZATION */
+scene_resolve_spawn_overlap (current_object_index); /* MPE_TASK_20B_SPAWN_RESOLVE_CALL */
     return current_object_index;
 }
 
@@ -320,6 +408,111 @@ void scene_spawn_stress_test (void) {
         }
     }
 }
+
+/* MPE_TASK_13_LONG_RUN_SCENE_BEGIN */
+void scene_spawn_long_run_validation (void) {
+/* MPE_TASK_13_LONG_RUN_VALIDATION_SCENE */
+scene_clear ();
+clear_selection ();
+main_inputs.object_menu_level = 0;
+main_inputs.marked_joint_object_index = -1;
+main_inputs.is_menu_open = false;
+main_inputs.spawner_menu_level = 0;
+main_inputs.velocity_menu_level = 0;
+
+/* Stability stack: 10 cubes at x=20. */
+for (int i = 0; i < 10; i++) {
+float stack_y = 0.5f + (float) i * 0.99f;
+int spawned_object_index = scene_add_cube (
+(vector3) {20.0f, stack_y, 0.0f},
+(vector3) {0.5f, 0.5f, 0.5f},
+1.0f
+);
+if (spawned_object_index >= 0) {
+obj_per_scene [spawned_object_index].colour = (vector3) {0.8f, 0.8f, 0.2f};
+obj_per_scene [spawned_object_index].velocity = vector3_zero ();
+obj_per_scene [spawned_object_index].angular_velocity = vector3_zero ();
+obj_per_scene [spawned_object_index].restitution = 0.0f;
+obj_per_scene [spawned_object_index].friction_static = 0.8f;
+obj_per_scene [spawned_object_index].friction_kinetic = 0.7f;
+}
+}
+
+/* Pile base: 3x3 cubes at x=-20. */
+for (int gx = 0; gx < 3; gx++) {
+for (int gz = 0; gz < 3; gz++) {
+float x = -20.0f + ((float) gx - 1.0f) * 1.1f;
+float z = ((float) gz - 1.0f) * 1.1f;
+int spawned_object_index = scene_add_cube (
+(vector3) {x, 0.5f, z},
+(vector3) {0.5f, 0.5f, 0.5f},
+1.0f
+);
+if (spawned_object_index >= 0) {
+obj_per_scene [spawned_object_index].colour = (vector3) {0.9f, 0.5f, 0.2f};
+obj_per_scene [spawned_object_index].velocity = vector3_zero ();
+obj_per_scene [spawned_object_index].angular_velocity = vector3_zero ();
+obj_per_scene [spawned_object_index].restitution = 0.0f;
+obj_per_scene [spawned_object_index].friction_static = 0.8f;
+obj_per_scene [spawned_object_index].friction_kinetic = 0.7f;
+}
+}
+}
+
+/* Pile middle: 2x2 cubes. */
+for (int gx = 0; gx < 2; gx++) {
+for (int gz = 0; gz < 2; gz++) {
+float x = -20.0f + ((float) gx - 0.5f) * 1.1f;
+float z = ((float) gz - 0.5f) * 1.1f;
+int spawned_object_index = scene_add_cube (
+(vector3) {x, 1.49f, z},
+(vector3) {0.5f, 0.5f, 0.5f},
+1.0f
+);
+if (spawned_object_index >= 0) {
+obj_per_scene [spawned_object_index].colour = (vector3) {0.2f, 0.7f, 0.9f};
+obj_per_scene [spawned_object_index].velocity = vector3_zero ();
+obj_per_scene [spawned_object_index].angular_velocity = vector3_zero ();
+obj_per_scene [spawned_object_index].restitution = 0.0f;
+obj_per_scene [spawned_object_index].friction_static = 0.8f;
+obj_per_scene [spawned_object_index].friction_kinetic = 0.7f;
+}
+}
+}
+
+/* Pile top: one cube. */
+int top_cube_index = scene_add_cube (
+(vector3) {-20.0f, 2.48f, 0.0f},
+(vector3) {0.5f, 0.5f, 0.5f},
+1.0f
+);
+if (top_cube_index >= 0) {
+obj_per_scene [top_cube_index].colour = (vector3) {0.9f, 0.9f, 0.9f};
+obj_per_scene [top_cube_index].velocity = vector3_zero ();
+obj_per_scene [top_cube_index].angular_velocity = vector3_zero ();
+obj_per_scene [top_cube_index].restitution = 0.0f;
+obj_per_scene [top_cube_index].friction_static = 0.8f;
+obj_per_scene [top_cube_index].friction_kinetic = 0.7f;
+}
+
+/* A few resting spheres. */
+for (int i = 0; i < 3; i++) {
+int spawned_object_index = scene_add_object (
+0.35f,
+1.0f,
+(vector3) {-30.0f + (float) i * 3.0f, 0.35f, 8.0f}
+);
+if (spawned_object_index >= 0) {
+obj_per_scene [spawned_object_index].colour = (vector3) {0.3f, 0.9f, 0.3f};
+obj_per_scene [spawned_object_index].velocity = vector3_zero ();
+obj_per_scene [spawned_object_index].angular_velocity = vector3_zero ();
+obj_per_scene [spawned_object_index].restitution = 0.0f;
+obj_per_scene [spawned_object_index].friction_static = 0.8f;
+obj_per_scene [spawned_object_index].friction_kinetic = 0.7f;
+}
+}
+}
+/* MPE_TASK_13_LONG_RUN_SCENE_END */
 
 void scene_clear (void) {
     object_count = 0;

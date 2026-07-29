@@ -645,7 +645,7 @@ build/render/new_render.o: render/new_render.c render/../mpe_engine.h \
  render/../ui_input/../core/math3D.h \
  render/../ui_input/../core/math4_special.h \
  render/../ui_input/object_selector.h render/../ui_input/overlay.h \
- render/../ui_input/editor.h
+ render/../ui_input/editor.h render/../ui_input/debug_terminal.h
 render/../mpe_engine.h:
 /usr/include/gtk-3.0/gtk/gtk.h:
 /usr/include/gtk-3.0/gdk/gdk.h:
@@ -1361,3 +1361,4 @@ render/../ui_input/../core/math4_special.h:
 render/../ui_input/object_selector.h:
 render/../ui_input/overlay.h:
 render/../ui_input/editor.h:
+render/../ui_input/debug_terminal.h:

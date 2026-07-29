@@ -5,6 +5,16 @@
 typedef struct {
     //Keyboard Movement Inputs
     bool w_key_pressed, a_key_pressed, s_key_pressed, d_key_pressed, space_key_pressed, shift_key_pressed, escape_key_pressed, f_key_pressed;
+/* MPE_TASK_22_ENTER_SPAWN_FIELD_BEGIN */
+bool enter_spawn_held;
+/* MPE_TASK_22_ENTER_SPAWN_FIELD_END */
+/* MPE_TASK_21_KEYBOARD_ONLY_FIELDS_BEGIN */
+bool r_key_pressed;
+bool delete_key_pressed;
+bool m_key_pressed;
+bool t_key_pressed;
+bool c_key_pressed;
+/* MPE_TASK_21_KEYBOARD_ONLY_FIELDS_END */
     // Camera Emulation (IJKL)
     bool i_key_pressed, j_key_pressed, k_key_pressed, l_key_pressed;
     //File Load Inputs
@@ -21,6 +31,12 @@ bool sleep_wake_test_pressed;
 bool editor_torture_pressed;
 bool spawn_stress_pressed;
 bool validation_report_pressed;
+/* MPE_TASK_18_TERMINAL_INPUT_FIELD_BEGIN */
+bool debug_terminal_pressed;
+/* MPE_TASK_18_TERMINAL_INPUT_FIELD_END */
+/* MPE_TASK_13_LONG_RUN_INPUT_BEGIN */
+bool long_run_validation_pressed;
+/* MPE_TASK_13_LONG_RUN_INPUT_END */
     //Mouse Status Inputs
     bool is_mouse_locked, is_debug_mode_active;
     bool left_mouse_button_clicked, right_mouse_button_clicked, middle_mouse_button_clicked;

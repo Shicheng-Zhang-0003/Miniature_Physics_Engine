@@ -1,0 +1,719 @@
+#include "../mpe_engine.h"
+#include "debug_terminal.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdarg.h>
+#include <math.h>
+#include <gdk/gdkkeysyms.h>
+
+/* MPE_TASK_18_DEBUG_TERMINAL */
+
+static GtkWidget *terminal_window = NULL;
+static GtkWidget *terminal_output_view = NULL;
+static GtkTextBuffer *terminal_output_buffer = NULL;
+static GtkWidget *terminal_entry = NULL;
+
+#define TERM_HISTORY_SIZE 32
+#define TERM_HISTORY_LENGTH 255
+static char term_history [TERM_HISTORY_SIZE][TERM_HISTORY_LENGTH + 1];
+static int term_history_count = 0;
+static int term_history_cursor = -1;
+
+/* ------------------------------------------------------------------ */
+/* Output helpers                                                      */
+/* ------------------------------------------------------------------ */
+
+static void term_scroll_to_bottom (void) {
+GtkTextIter end_iter;
+gtk_text_buffer_get_end_iter (terminal_output_buffer, &end_iter);
+gtk_text_view_scroll_to_iter (GTK_TEXT_VIEW (terminal_output_view), &end_iter, 0.0, FALSE, 0.0, 0.0);
+}
+
+static void term_append_with_tag (const char *tag_name, const char *text) {
+if (!terminal_output_buffer) {return;}
+GtkTextIter end_iter;
+gtk_text_buffer_get_end_iter (terminal_output_buffer, &end_iter);
+if (tag_name) {
+gtk_text_buffer_insert_with_tags_by_name (terminal_output_buffer, &end_iter, text, -1, tag_name, NULL);
+} else {
+gtk_text_buffer_insert (terminal_output_buffer, &end_iter, text, -1);
+}
+term_scroll_to_bottom ();
+}
+
+static void term_out (const char *text) {term_append_with_tag (NULL, text);}
+static void term_ok (const char *text) {term_append_with_tag ("term_ok", text);}
+static void term_err (const char *text) {term_append_with_tag ("term_err", text);}
+static void term_echo (const char *text) {term_append_with_tag ("term_echo", text);}
+static void term_dim (const char *text) {term_append_with_tag ("term_dim", text);}
+
+static void term_printf (const char *tag_name, const char *format, ...) {
+char line_buffer [1024];
+va_list argument_list;
+va_start (argument_list, format);
+vsnprintf (line_buffer, sizeof (line_buffer), format, argument_list);
+va_end (argument_list);
+term_append_with_tag (tag_name, line_buffer);
+}
+
+/* ------------------------------------------------------------------ */
+/* Argument helpers                                                    */
+/* ------------------------------------------------------------------ */
+
+static bool term_parse_float (const char *token, float *output_value) {
+char *endptr = NULL;
+float parsed_value = strtof (token, &endptr);
+if ((endptr == token) || (*endptr != '\0') || (!isfinite (parsed_value))) {return false;}
+*output_value = parsed_value;
+return true;
+}
+
+static int term_resolve_object (const char *token) {
+if (!token) {return -1;}
+if (strcmp (token, "sel") == 0) {
+if ((selected_object < 0) || (selected_object >= object_count)) {
+term_err ("mpe: no object selected (right-click in viewport, or use sel <index>)\n");
+return -1;
+}
+return selected_object;
+}
+char *endptr = NULL;
+long parsed_index = strtol (token, &endptr, 10);
+if ((endptr == token) || (*endptr != '\0')) {
+term_err ("mpe: invalid object reference (use an index or sel)\n");
+return -1;
+}
+if ((parsed_index < 0) || (parsed_index >= object_count)) {
+term_printf ("term_err", "mpe: object index %ld out of range (0-%d)\n", parsed_index, object_count - 1);
+return -1;
+}
+return (int) parsed_index;
+}
+
+/* ------------------------------------------------------------------ */
+/* Command handlers                                                    */
+/* ------------------------------------------------------------------ */
+
+static void cmd_help (int argc, char **argv);
+static void cmd_clear (int argc, char **argv);
+static void cmd_ls (int argc, char **argv);
+static void cmd_ll (int argc, char **argv);
+static void cmd_cat (int argc, char **argv);
+static void cmd_pwd (int argc, char **argv);
+static void cmd_free (int argc, char **argv);
+static void cmd_sel (int argc, char **argv);
+static void cmd_touch (int argc, char **argv);
+static void cmd_cp (int argc, char **argv);
+static void cmd_rm (int argc, char **argv);
+static void cmd_mv (int argc, char **argv);
+static void cmd_ln (int argc, char **argv);
+static void cmd_chmod (int argc, char **argv);
+static void cmd_sleep (int argc, char **argv);
+static void cmd_wake (int argc, char **argv);
+
+typedef struct {
+const char *name;
+bool mutates;
+void (*handler) (int argc, char **argv);
+const char *usage;
+const char *description;
+} terminal_command;
+
+static const terminal_command terminal_commands [] = {
+{"help",  false, cmd_help,  "help",                          "show this help"},
+{"clear", false, cmd_clear, "clear",                         "clear terminal screen"},
+{"ls",    false, cmd_ls,    "ls",                            "list objects"},
+{"ll",    false, cmd_ll,    "ll",                            "list objects (detailed)"},
+{"cat",   false, cmd_cat,   "cat <i|sel>",                   "show everything about one object"},
+{"pwd",   false, cmd_pwd,   "pwd",                           "print camera and world state"},
+{"free",  false, cmd_free,  "free",                          "print scene resource usage"},
+{"sel",   false, cmd_sel,   "sel [i]",                       "show or set selected object"},
+{"touch", true,  cmd_touch, "touch [sphere|cube] [x y z] [mass] [size]", "create object"},
+{"cp",    true,  cmd_cp,    "cp <i|sel> [dx dy dz]",         "duplicate object"},
+{"rm",    true,  cmd_rm,    "rm <i|sel|all>",                "delete object(s)"},
+{"mv",    true,  cmd_mv,    "mv <i|sel> <dx dy dz> | mv <i|sel> to <x y z>", "impulse or teleport"},
+{"ln",    true,  cmd_ln,    "ln [a b [k d]] | ln -d a b",    "list, create, or remove spring joints"},
+{"chmod", true,  cmd_chmod, "chmod <i|sel> static|dynamic",  "change object static state"},
+{"sleep", true,  cmd_sleep, "sleep <i|sel>",                 "force object to sleep"},
+{"wake",  true,  cmd_wake,  "wake <i|sel>",                  "force object awake"},
+};
+
+#define TERMINAL_COMMAND_COUNT (sizeof (terminal_commands) / sizeof (terminal_commands [0]))
+
+static void cmd_help (int argc, char **argv) {
+(void) argc; (void) argv;
+term_dim ("read-only commands work in any mode; [debug] commands need debug mode.\n");
+for (size_t command_index = 0; command_index < TERMINAL_COMMAND_COUNT; command_index++) {
+term_printf (NULL, "  %-7s %-46s %s%s\n",
+terminal_commands [command_index].name,
+terminal_commands [command_index].usage,
+terminal_commands [command_index].description,
+terminal_commands [command_index].mutates ? " [debug]" : "");
+}
+}
+
+static void cmd_clear (int argc, char **argv) {
+(void) argc; (void) argv;
+if (terminal_output_buffer) {gtk_text_buffer_set_text (terminal_output_buffer, "", -1);}
+}
+
+static const char *term_type_name (rigidbody *rigid_body) {
+return (rigid_body -> type == object_sphere) ? "sph" : "cube";
+}
+
+static void cmd_ls (int argc, char **argv) {
+(void) argc; (void) argv;
+if (object_count == 0) {term_dim ("(empty scene)\n"); return;}
+term_printf (NULL, "%-4s %-6s %-5s %-7s %-6s %s\n", "IDX", "ID", "TYPE", "STATE", "SLEEP", "POSITION");
+for (int object_index = 0; object_index < object_count; object_index++) {
+rigidbody *rigid_body = &obj_per_scene [object_index];
+term_printf (NULL, "%-4d %-6u %-5s %-7s %-6s (%.2f, %.2f, %.2f)\n",
+object_index,
+rigid_body -> object_id,
+term_type_name (rigid_body),
+rigid_body -> static_state ? "static" : "dyn",
+rigid_body -> is_sleeping ? "zzz" : "awake",
+rigid_body -> position.x, rigid_body -> position.y, rigid_body -> position.z);
+}
+term_printf ("term_dim", "-- %d object(s)\n", object_count);
+}
+
+static void cmd_ll (int argc, char **argv) {
+(void) argc; (void) argv;
+if (object_count == 0) {term_dim ("(empty scene)\n"); return;}
+for (int object_index = 0; object_index < object_count; object_index++) {
+rigidbody *rigid_body = &obj_per_scene [object_index];
+float size_x = (rigid_body -> type == object_sphere) ? rigid_body -> radius : rigid_body -> half_extensions.x;
+float size_y = (rigid_body -> type == object_sphere) ? rigid_body -> radius : rigid_body -> half_extensions.y;
+float size_z = (rigid_body -> type == object_sphere) ? rigid_body -> radius : rigid_body -> half_extensions.z;
+term_printf (NULL, "%-4d id=%u %s %s %s m=%.2f rest=%.2f fric=%.2f/%.2f\n",
+object_index,
+rigid_body -> object_id,
+term_type_name (rigid_body),
+rigid_body -> static_state ? "static" : "dyn",
+rigid_body -> is_sleeping ? "zzz" : "awake",
+rigid_body -> mass,
+rigid_body -> restitution,
+rigid_body -> friction_static,
+rigid_body -> friction_kinetic);
+term_printf (NULL, "     pos=(%.2f, %.2f, %.2f) vel=(%.2f, %.2f, %.2f) |v|=%.3f size=(%.2f, %.2f, %.2f)\n",
+rigid_body -> position.x, rigid_body -> position.y, rigid_body -> position.z,
+rigid_body -> velocity.x, rigid_body -> velocity.y, rigid_body -> velocity.z,
+vector3_length (rigid_body -> velocity),
+size_x, size_y, size_z);
+}
+term_printf ("term_dim", "-- %d object(s)\n", object_count);
+}
+
+static void cmd_cat (int argc, char **argv) {
+if (argc < 2) {term_err ("usage: cat <i|sel>\n"); return;}
+int object_index = term_resolve_object (argv [1]);
+if (object_index < 0) {return;}
+rigidbody *rigid_body = &obj_per_scene [object_index];
+term_printf ("term_echo", "object [%d] id=%u generation=%u\n", object_index, rigid_body -> object_id, rigid_body -> object_generation);
+term_printf (NULL, "  type        %s\n", (rigid_body -> type == object_sphere) ? "sphere" : "cube");
+term_printf (NULL, "  state       %s%s\n",
+rigid_body -> static_state ? "static" : "dynamic",
+rigid_body -> is_sleeping ? ", sleeping" : "");
+term_printf (NULL, "  mass        %.3f (inverse %.4f)\n", rigid_body -> mass, rigid_body -> inverse_mass);
+if (rigid_body -> type == object_sphere) {
+term_printf (NULL, "  radius      %.3f\n", rigid_body -> radius);
+} else {
+term_printf (NULL, "  half ext    (%.3f, %.3f, %.3f)\n",
+rigid_body -> half_extensions.x, rigid_body -> half_extensions.y, rigid_body -> half_extensions.z);
+}
+term_printf (NULL, "  position    (%.4f, %.4f, %.4f)\n", rigid_body -> position.x, rigid_body -> position.y, rigid_body -> position.z);
+term_printf (NULL, "  velocity    (%.4f, %.4f, %.4f) |v|=%.4f\n",
+rigid_body -> velocity.x, rigid_body -> velocity.y, rigid_body -> velocity.z,
+vector3_length (rigid_body -> velocity));
+term_printf (NULL, "  angular v   (%.4f, %.4f, %.4f)\n",
+rigid_body -> angular_velocity.x, rigid_body -> angular_velocity.y, rigid_body -> angular_velocity.z);
+term_printf (NULL, "  orientation (%.4f, %.4f, %.4f, %.4f)\n",
+rigid_body -> orientation.w, rigid_body -> orientation.x,
+rigid_body -> orientation.y, rigid_body -> orientation.z);
+term_printf (NULL, "  restitution %.3f   friction s/k %.3f/%.3f\n",
+rigid_body -> restitution, rigid_body -> friction_static, rigid_body -> friction_kinetic);
+term_printf (NULL, "  colour      (%.2f, %.2f, %.2f)\n", rigid_body -> colour.x, rigid_body -> colour.y, rigid_body -> colour.z);
+term_printf (NULL, "  sleep timer %.2f\n", rigid_body -> sleep_timer);
+int attached_joint_count = 0;
+for (int joint_index = 0; joint_index < MPE_MAX_JOINTS; joint_index++) {
+if (!joint_pool [joint_index].is_active) {continue;}
+if ((joint_pool [joint_index].object_id_a == rigid_body -> object_id) ||
+(joint_pool [joint_index].object_id_b == rigid_body -> object_id)) {attached_joint_count++;}
+}
+term_printf (NULL, "  joints      %d\n", attached_joint_count);
+}
+
+static void cmd_pwd (int argc, char **argv) {
+(void) argc; (void) argv;
+term_printf (NULL, "camera   (%.2f, %.2f, %.2f) yaw=%.1f pitch=%.1f\n",
+main_camera_fov.position.x, main_camera_fov.position.y, main_camera_fov.position.z,
+main_camera_fov.yaw, main_camera_fov.pitch);
+term_printf (NULL, "mode     %s\n", main_inputs.is_debug_mode_active ? "debug" : "game");
+term_printf (NULL, "gravity  %.2f   drag %.3f   floor friction s/k %.2f/%.2f\n",
+world_gravity_y, world_drag_coefficient,
+world_surface_friction_static, world_surface_friction_kinetic);
+}
+
+static void cmd_free (int argc, char **argv) {
+(void) argc; (void) argv;
+int sleeping_count = 0;
+for (int object_index = 0; object_index < object_count; object_index++) {
+if (obj_per_scene [object_index].is_sleeping) {sleeping_count++;}
+}
+term_printf (NULL, "objects   %d / %d\n", object_count, object_capacity);
+term_printf (NULL, "joints    %d / %d\n", current_joint_count, MPE_MAX_JOINTS);
+term_printf (NULL, "sleeping  %d   awake %d\n", sleeping_count, object_count - sleeping_count);
+term_printf (NULL, "last tick pairs=%d manifolds=%d frame=%.4fs cache h/m=%d/%d\n",
+debug_last_broadphase_pair_count,
+debug_last_manifold_count,
+debug_last_frame_time,
+contact_cache_get_hits (),
+contact_cache_get_misses ());
+}
+
+static void cmd_sel (int argc, char **argv) {
+if (argc < 2) {
+if ((selected_object >= 0) && (selected_object < object_count)) {
+term_printf (NULL, "selected [%d] id=%u\n", selected_object, obj_per_scene [selected_object].object_id);
+} else {term_dim ("nothing selected\n");}
+return;
+}
+int object_index = term_resolve_object (argv [1]);
+if (object_index < 0) {return;}
+select_object_by_index (object_index);
+term_printf ("term_ok", "selected [%d]\n", object_index);
+}
+
+static void cmd_touch (int argc, char **argv) {
+object_type spawn_type = object_sphere;
+int argument_index = 1;
+if (argument_index < argc) {
+if (strcmp (argv [argument_index], "sphere") == 0) {spawn_type = object_sphere; argument_index++;}
+else if (strcmp (argv [argument_index], "cube") == 0) {spawn_type = object_cube; argument_index++;}
+}
+float parsed_values [5] = {0.0f, 5.0f, 0.0f, 1.0f, 0.5f};
+int value_count = 0;
+for (; (argument_index < argc) && (value_count < 5); argument_index++) {
+if (!term_parse_float (argv [argument_index], &parsed_values [value_count])) {
+term_printf ("term_err", "mpe: invalid number '%s'\n", argv [argument_index]);
+return;
+}
+value_count++;
+}
+vector3 spawn_position = {parsed_values [0], parsed_values [1], parsed_values [2]};
+float spawn_mass = parsed_values [3];
+float spawn_size = parsed_values [4];
+int created_index = -1;
+if (spawn_type == object_sphere) {
+created_index = scene_add_object (spawn_size, spawn_mass, spawn_position);
+} else {
+created_index = scene_add_cube (spawn_position, (vector3) {spawn_size, spawn_size, spawn_size}, spawn_mass);
+}
+if (created_index < 0) {term_err ("mpe: spawn failed (scene full?)\n"); return;}
+term_printf ("term_ok", "created %s [%d] at (%.2f, %.2f, %.2f) m=%.2f size=%.2f\n",
+(spawn_type == object_sphere) ? "sphere" : "cube",
+created_index,
+spawn_position.x, spawn_position.y, spawn_position.z,
+spawn_mass, spawn_size);
+}
+
+static void cmd_cp (int argc, char **argv) {
+if (argc < 2) {term_err ("usage: cp <i|sel> [dx dy dz]\n"); return;}
+int source_index = term_resolve_object (argv [1]);
+if (source_index < 0) {return;}
+vector3 copy_offset = {1.0f, 0.0f, 0.0f};
+if (argc >= 5) {
+float offset_values [3];
+for (int offset_index = 0; offset_index < 3; offset_index++) {
+if (!term_parse_float (argv [2 + offset_index], &offset_values [offset_index])) {
+term_printf ("term_err", "mpe: invalid number '%s'\n", argv [2 + offset_index]);
+return;
+}
+}
+copy_offset = (vector3) {offset_values [0], offset_values [1], offset_values [2]};
+}
+rigidbody snapshot = obj_per_scene [source_index];
+vector3 copy_position = vector3_addition (snapshot.position, copy_offset);
+int created_index = -1;
+if (snapshot.type == object_sphere) {
+created_index = scene_add_object (snapshot.radius, snapshot.mass, copy_position);
+} else {
+created_index = scene_add_cube (copy_position, snapshot.half_extensions, snapshot.mass);
+}
+if (created_index < 0) {term_err ("mpe: copy failed (scene full?)\n"); return;}
+rigidbody *created_body = &obj_per_scene [created_index];
+created_body -> colour = snapshot.colour;
+created_body -> restitution = snapshot.restitution;
+created_body -> friction_static = snapshot.friction_static;
+created_body -> friction_kinetic = snapshot.friction_kinetic;
+created_body -> velocity = snapshot.velocity;
+created_body -> angular_velocity = snapshot.angular_velocity;
+if (snapshot.static_state) {rigidbody_set_static (created_body, true);}
+term_printf ("term_ok", "copied [%d] -> [%d] at (%.2f, %.2f, %.2f)\n",
+source_index, created_index,
+copy_position.x, copy_position.y, copy_position.z);
+}
+
+static void cmd_rm (int argc, char **argv) {
+if (argc < 2) {term_err ("usage: rm <i|sel|all>\n"); return;}
+if (strcmp (argv [1], "all") == 0) {
+int removed_count = object_count;
+scene_clear ();
+clear_selection ();
+contact_cache_clear ();
+main_inputs.object_menu_level = 0;
+main_inputs.marked_joint_object_index = -1;
+term_printf ("term_ok", "removed %d object(s), joints cleared\n", removed_count);
+return;
+}
+int object_index = term_resolve_object (argv [1]);
+if (object_index < 0) {return;}
+scene_remove_object_by_index (object_index);
+term_printf ("term_ok", "removed object [%d]\n", object_index);
+}
+
+static void cmd_mv (int argc, char **argv) {
+if (argc < 3) {term_err ("usage: mv <i|sel> <dx dy dz> | mv <i|sel> to <x y z>\n"); return;}
+int object_index = term_resolve_object (argv [1]);
+if (object_index < 0) {return;}
+rigidbody *rigid_body = &obj_per_scene [object_index];
+if (strcmp (argv [2], "to") == 0) {
+if (argc < 6) {term_err ("usage: mv <i|sel> to <x> <y> <z>\n"); return;}
+float target_values [3];
+for (int value_index = 0; value_index < 3; value_index++) {
+if (!term_parse_float (argv [3 + value_index], &target_values [value_index])) {
+term_printf ("term_err", "mpe: invalid number '%s'\n", argv [3 + value_index]);
+return;
+}
+}
+rigid_body -> position = (vector3) {target_values [0], target_values [1], target_values [2]};
+rigidbody_wake (rigid_body);
+term_printf ("term_ok", "[%d] teleported to (%.2f, %.2f, %.2f)\n",
+object_index, target_values [0], target_values [1], target_values [2]);
+return;
+}
+if (argc < 5) {term_err ("usage: mv <i|sel> <dx> <dy> <dz>\n"); return;}
+float impulse_values [3];
+for (int value_index = 0; value_index < 3; value_index++) {
+if (!term_parse_float (argv [2 + value_index], &impulse_values [value_index])) {
+term_printf ("term_err", "mpe: invalid number '%s'\n", argv [2 + value_index]);
+return;
+}
+}
+rigid_body -> velocity = vector3_addition (rigid_body -> velocity,
+(vector3) {impulse_values [0], impulse_values [1], impulse_values [2]});
+rigidbody_wake (rigid_body);
+term_printf ("term_ok", "[%d] impulse applied, velocity now (%.2f, %.2f, %.2f)\n",
+object_index,
+rigid_body -> velocity.x, rigid_body -> velocity.y, rigid_body -> velocity.z);
+}
+
+static void cmd_ln (int argc, char **argv) {
+if (argc == 1) {
+int listed_count = 0;
+for (int joint_index = 0; joint_index < MPE_MAX_JOINTS; joint_index++) {
+if (!joint_pool [joint_index].is_active) {continue;}
+int index_a = scene_find_object_index_by_id (joint_pool [joint_index].object_id_a);
+int index_b = scene_find_object_index_by_id (joint_pool [joint_index].object_id_b);
+term_printf (NULL, "joint %-3d [%d] <-> [%d] len=%.2f k=%.1f d=%.1f\n",
+joint_index, index_a, index_b,
+joint_pool [joint_index].equilibrium_length,
+joint_pool [joint_index].spring_constant,
+joint_pool [joint_index].damping_coefficient);
+listed_count++;
+}
+if (listed_count == 0) {term_dim ("(no joints)\n");}
+return;
+}
+if ((argc >= 4) && (strcmp (argv [1], "-d") == 0)) {
+int index_a = term_resolve_object (argv [2]);
+if (index_a < 0) {return;}
+int index_b = term_resolve_object (argv [3]);
+if (index_b < 0) {return;}
+uint32_t object_id_a = scene_get_object_id_at_index (index_a);
+uint32_t object_id_b = scene_get_object_id_at_index (index_b);
+for (int joint_index = 0; joint_index < MPE_MAX_JOINTS; joint_index++) {
+if (!joint_pool [joint_index].is_active) {continue;}
+bool forward_match = (joint_pool [joint_index].object_id_a == object_id_a) &&
+(joint_pool [joint_index].object_id_b == object_id_b);
+bool reverse_match = (joint_pool [joint_index].object_id_a == object_id_b) &&
+(joint_pool [joint_index].object_id_b == object_id_a);
+if (forward_match || reverse_match) {
+remove_joint (joint_index);
+term_printf ("term_ok", "removed joint %d ([%d] <-> [%d])\n", joint_index, index_a, index_b);
+return;
+}
+}
+term_err ("mpe: no joint between those objects\n");
+return;
+}
+if (argc < 3) {term_err ("usage: ln [a b [k d]] | ln -d a b\n"); return;}
+int index_a = term_resolve_object (argv [1]);
+if (index_a < 0) {return;}
+int index_b = term_resolve_object (argv [2]);
+if (index_b < 0) {return;}
+if (index_a == index_b) {term_err ("mpe: cannot link an object to itself\n"); return;}
+float spring_constant = 100.0f;
+float damping_coefficient = 2.0f;
+if ((argc >= 4) && (!term_parse_float (argv [3], &spring_constant))) {
+term_printf ("term_err", "mpe: invalid number '%s'\n", argv [3]);
+return;
+}
+if ((argc >= 5) && (!term_parse_float (argv [4], &damping_coefficient))) {
+term_printf ("term_err", "mpe: invalid number '%s'\n", argv [4]);
+return;
+}
+float rest_length = vector3_length (vector3_subtraction (
+obj_per_scene [index_b].position, obj_per_scene [index_a].position));
+int joint_index = add_joint (index_a, index_b, rest_length, spring_constant, damping_coefficient);
+if (joint_index < 0) {term_err ("mpe: joint failed (pool full?)\n"); return;}
+term_printf ("term_ok", "linked [%d] <-> [%d] (joint %d, rest length %.2f, k=%.1f, d=%.1f)\n",
+index_a, index_b, joint_index, rest_length, spring_constant, damping_coefficient);
+}
+
+static void cmd_chmod (int argc, char **argv) {
+if (argc < 3) {term_err ("usage: chmod <i|sel> static|dynamic\n"); return;}
+int object_index = term_resolve_object (argv [1]);
+if (object_index < 0) {return;}
+rigidbody *rigid_body = &obj_per_scene [object_index];
+if ((strcmp (argv [2], "static") == 0) || (strcmp (argv [2], "immovable") == 0)) {
+rigidbody_set_static (rigid_body, true);
+term_printf ("term_ok", "[%d] is now static (immovable)\n", object_index);
+} else if ((strcmp (argv [2], "dynamic") == 0) || (strcmp (argv [2], "movable") == 0)) {
+rigidbody_set_static (rigid_body, false);
+term_printf ("term_ok", "[%d] is now dynamic\n", object_index);
+} else {
+term_err ("mpe: mode must be static or dynamic\n");
+}
+}
+
+static void cmd_sleep (int argc, char **argv) {
+if (argc < 2) {term_err ("usage: sleep <i|sel>\n"); return;}
+int object_index = term_resolve_object (argv [1]);
+if (object_index < 0) {return;}
+rigidbody *rigid_body = &obj_per_scene [object_index];
+if (rigid_body -> static_state) {term_err ("mpe: static objects do not sleep\n"); return;}
+rigid_body -> velocity = vector3_zero ();
+rigid_body -> angular_velocity = vector3_zero ();
+rigid_body -> is_sleeping = true;
+rigid_body -> sleep_timer = 2.0f;
+term_printf ("term_ok", "[%d] forced to sleep\n", object_index);
+}
+
+static void cmd_wake (int argc, char **argv) {
+if (argc < 2) {term_err ("usage: wake <i|sel>\n"); return;}
+int object_index = term_resolve_object (argv [1]);
+if (object_index < 0) {return;}
+rigidbody_wake (&obj_per_scene [object_index]);
+term_printf ("term_ok", "[%d] forced awake\n", object_index);
+}
+
+/* ------------------------------------------------------------------ */
+/* Command execution                                                   */
+/* ------------------------------------------------------------------ */
+
+static void term_execute (char *command_line) {
+while (*command_line == ' ') {command_line++;}
+if (*command_line == '\0') {return;}
+term_echo ("mpe> ");
+term_out (command_line);
+term_out ("\n");
+
+char *tokens [16];
+int token_count = 0;
+char *token = strtok (command_line, " ");
+while ((token) && (token_count < 16)) {
+tokens [token_count++] = token;
+token = strtok (NULL, " ");
+}
+if (token_count == 0) {return;}
+
+const terminal_command *found_command = NULL;
+for (size_t command_index = 0; command_index < TERMINAL_COMMAND_COUNT; command_index++) {
+if (strcmp (tokens [0], terminal_commands [command_index].name) == 0) {
+found_command = &terminal_commands [command_index];
+break;
+}
+}
+if (!found_command) {
+term_printf ("term_err", "mpe: command not found: %s (try help)\n", tokens [0]);
+return;
+}
+if ((found_command -> mutates) && (!main_inputs.is_debug_mode_active)) {
+term_printf ("term_err", "mpe: '%s' is locked in game mode — press 0 in the viewport to return to debug mode\n",
+found_command -> name);
+return;
+}
+found_command -> handler (token_count, tokens);
+}
+
+/* ------------------------------------------------------------------ */
+/* History and signals                                                 */
+/* ------------------------------------------------------------------ */
+
+static void term_history_push (const char *command_text) {
+if (command_text [0] == '\0') {return;}
+if ((term_history_count > 0) && (strcmp (term_history [0], command_text) == 0)) {return;}
+if (term_history_count < TERM_HISTORY_SIZE) {term_history_count++;}
+for (int history_index = term_history_count - 1; history_index > 0; history_index--) {
+strncpy (term_history [history_index], term_history [history_index - 1], TERM_HISTORY_LENGTH);
+term_history [history_index][TERM_HISTORY_LENGTH] = '\0';
+}
+strncpy (term_history [0], command_text, TERM_HISTORY_LENGTH);
+term_history [0][TERM_HISTORY_LENGTH] = '\0';
+}
+
+static void on_terminal_entry_activate (GtkEntry *entry) {
+const gchar *entry_text = gtk_entry_get_text (entry);
+char command_copy [TERM_HISTORY_LENGTH + 1];
+strncpy (command_copy, entry_text, TERM_HISTORY_LENGTH);
+command_copy [TERM_HISTORY_LENGTH] = '\0';
+term_history_push (command_copy);
+term_history_cursor = -1;
+term_execute (command_copy);
+gtk_entry_set_text (entry, "");
+}
+
+static gboolean on_terminal_entry_keypress (GtkWidget *widget, GdkEventKey *event) {
+if (event -> keyval == GDK_KEY_Up) {
+if (term_history_count > 0) {
+if (term_history_cursor < term_history_count - 1) {term_history_cursor++;}
+gtk_entry_set_text (GTK_ENTRY (widget), term_history [term_history_cursor]);
+gtk_editable_set_position (GTK_EDITABLE (widget), -1);
+}
+return TRUE;
+}
+if (event -> keyval == GDK_KEY_Down) {
+if (term_history_cursor > 0) {
+term_history_cursor--;
+gtk_entry_set_text (GTK_ENTRY (widget), term_history [term_history_cursor]);
+} else {
+term_history_cursor = -1;
+gtk_entry_set_text (GTK_ENTRY (widget), "");
+}
+gtk_editable_set_position (GTK_EDITABLE (widget), -1);
+return TRUE;
+}
+return FALSE;
+}
+
+static gboolean on_terminal_window_keypress (GtkWidget *widget, GdkEventKey *event) {
+if (event -> keyval == GDK_KEY_Escape) {
+gtk_widget_destroy (widget);
+return TRUE;
+}
+return FALSE;
+}
+
+static void on_terminal_window_destroy (GtkWidget *widget) {
+(void) widget;
+terminal_window = NULL;
+terminal_output_view = NULL;
+terminal_output_buffer = NULL;
+terminal_entry = NULL;
+term_history_cursor = -1;
+}
+
+/* ------------------------------------------------------------------ */
+/* Public interface                                                    */
+/* ------------------------------------------------------------------ */
+
+bool debug_terminal_is_open (void) {
+return terminal_window != NULL;
+}
+
+void debug_terminal_sync_mode (void) {
+if (!terminal_window) {return;}
+if (main_inputs.is_debug_mode_active) {
+gtk_window_set_title (GTK_WINDOW (terminal_window), "MPE Debug Terminal - debug mode");
+term_ok ("[terminal unlocked] debug mode active — all commands available\n");
+} else {
+gtk_window_set_title (GTK_WINDOW (terminal_window), "MPE Debug Terminal - LOCKED (game mode)");
+term_err ("[terminal locked] game mode — read-only commands only (press 0 in the viewport to unlock)\n");
+}
+}
+
+void debug_terminal_open (GtkWidget *parent_window) {
+if (!main_inputs.is_debug_mode_active) {return;}
+if (terminal_window) {
+gtk_window_present (GTK_WINDOW (terminal_window));
+return;
+}
+
+terminal_window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
+gtk_widget_set_name (terminal_window, "mpe-debug-terminal");
+gtk_window_set_default_size (GTK_WINDOW (terminal_window), 780, 540);
+if ((parent_window) && (GTK_IS_WIDGET (parent_window))) {
+gtk_window_set_transient_for (GTK_WINDOW (terminal_window), GTK_WINDOW (parent_window));
+}
+g_signal_connect (terminal_window, "destroy", G_CALLBACK (on_terminal_window_destroy), NULL);
+g_signal_connect (terminal_window, "key-press-event", G_CALLBACK (on_terminal_window_keypress), NULL);
+
+static bool terminal_css_installed = false;
+if (!terminal_css_installed) {
+GtkCssProvider *css_provider = gtk_css_provider_new ();
+gtk_css_provider_load_from_data (css_provider,
+"#mpe-debug-terminal { background: #0d1420; }\n"
+"#mpe-debug-terminal textview { background: #0d1420; color: #c9d6e3; font-family: monospace; font-size: 13px; }\n"
+"#mpe-debug-terminal textview text { background: #0d1420; }\n"
+"#mpe-debug-terminal entry { background: #131c2b; color: #ffcf87; caret-color: #ffcf87; font-family: monospace; font-size: 13px; border: none; padding: 6px 8px; }\n"
+"#mpe-debug-terminal label { color: #ffcf87; font-family: monospace; font-weight: bold; }\n",
+-1, NULL);
+gtk_style_context_add_provider_for_screen (gdk_screen_get_default (),
+GTK_STYLE_PROVIDER (css_provider),
+GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+g_object_unref (css_provider);
+terminal_css_installed = true;
+}
+
+GtkWidget *root_box = gtk_box_new (GTK_ORIENTATION_VERTICAL, 0);
+gtk_container_add (GTK_CONTAINER (terminal_window), root_box);
+
+GtkWidget *scrolled_window = gtk_scrolled_window_new (NULL, NULL);
+gtk_box_pack_start (GTK_BOX (root_box), scrolled_window, TRUE, TRUE, 0);
+
+terminal_output_view = gtk_text_view_new ();
+gtk_text_view_set_editable (GTK_TEXT_VIEW (terminal_output_view), FALSE);
+gtk_text_view_set_cursor_visible (GTK_TEXT_VIEW (terminal_output_view), FALSE);
+gtk_text_view_set_wrap_mode (GTK_TEXT_VIEW (terminal_output_view), GTK_WRAP_WORD_CHAR);
+gtk_text_view_set_left_margin (GTK_TEXT_VIEW (terminal_output_view), 10);
+gtk_text_view_set_right_margin (GTK_TEXT_VIEW (terminal_output_view), 10);
+gtk_text_view_set_top_margin (GTK_TEXT_VIEW (terminal_output_view), 10);
+terminal_output_buffer = gtk_text_view_get_buffer (GTK_TEXT_VIEW (terminal_output_view));
+gtk_text_buffer_create_tag (terminal_output_buffer, "term_echo",
+"foreground", "#ffcf87", "weight", PANGO_WEIGHT_BOLD, NULL);
+gtk_text_buffer_create_tag (terminal_output_buffer, "term_ok",
+"foreground", "#8be28b", NULL);
+gtk_text_buffer_create_tag (terminal_output_buffer, "term_err",
+"foreground", "#ff7b72", NULL);
+gtk_text_buffer_create_tag (terminal_output_buffer, "term_dim",
+"foreground", "#5f7387", NULL);
+gtk_container_add (GTK_CONTAINER (scrolled_window), terminal_output_view);
+
+GtkWidget *input_box = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 6);
+gtk_box_pack_start (GTK_BOX (root_box), input_box, FALSE, FALSE, 0);
+
+GtkWidget *prompt_label = gtk_label_new ("mpe>");
+gtk_box_pack_start (GTK_BOX (input_box), prompt_label, FALSE, FALSE, 10);
+
+terminal_entry = gtk_entry_new ();
+gtk_entry_set_placeholder_text (GTK_ENTRY (terminal_entry), "type help and press Enter");
+gtk_box_pack_start (GTK_BOX (input_box), terminal_entry, TRUE, TRUE, 10);
+g_signal_connect (terminal_entry, "activate", G_CALLBACK (on_terminal_entry_activate), NULL);
+g_signal_connect (terminal_entry, "key-press-event", G_CALLBACK (on_terminal_entry_keypress), NULL);
+
+/* Release mouse lock so the terminal is actually usable. */
+if (main_inputs.is_mouse_locked) {
+if ((parent_window) && (GTK_IS_WIDGET (parent_window))) {mouse_lock_disable (parent_window);}
+main_inputs.is_mouse_locked = false;
+}
+
+gtk_widget_show_all (terminal_window);
+debug_terminal_sync_mode ();
+
+term_printf ("term_echo", "MPE Debug Terminal %s\n", A3_VERSION_STRING);
+term_out ("Unix-style scene shell. Commands apply live to the running simulation.\n");
+term_dim ("type 'help' for commands — Up/Down for history — Esc to close.\n");
+}

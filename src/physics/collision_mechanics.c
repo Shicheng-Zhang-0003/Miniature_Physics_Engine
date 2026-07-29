@@ -10,6 +10,10 @@ typedef struct {
     vector3 local_position_b;
     float accumulated_normal_impulse;
     float accumulated_tangent_impulse;
+/* MPE_TASK_05_CACHE_STAMP_BEGIN */
+uint32_t property_stamp_a;
+uint32_t property_stamp_b;
+/* MPE_TASK_05_CACHE_STAMP_END */
 } cached_contact;
 
 #define MAX_CACHED_CONTACTS 16384
@@ -105,20 +109,26 @@ static void clip_obb_faces (rigidbody *ref_body, rigidbody *inc_body, vector3 no
     
     vector3 *inc_axes = inc_body -> cached_axes;
     vector3 inc_extents = inc_body -> half_extensions;
-    int inc_axis_idx = 0;
-    float min_dot = 1.0f;
-    for (int i = 0; i < 3; i++) {
-        float dot_val = vector3_dot (inc_axes [i], ref_normal);
-        if (dot_val < min_dot) {
-            min_dot = dot_val;
-            inc_axis_idx = i;
-        }
-    }
-    vector3 inc_normal = inc_axes [inc_axis_idx];
-    float dot_sign = vector3_dot (inc_normal, ref_normal);
-    if (dot_sign > 0.0f) {
-        inc_normal = vector3_scaling (inc_normal, -1.0f);
-    }
+    /* MPE_F5_FACE_CLIP_INCIDENT_FIX_BEGIN */
+int inc_axis_idx = 0;
+float max_abs_dot = -1.0f;
+
+for (int i = 0; i < 3; i++) {
+float dot_val = fabsf (vector3_dot (inc_axes [i], ref_normal));
+if (dot_val > max_abs_dot) {
+max_abs_dot = dot_val;
+inc_axis_idx = i;
+}
+}
+
+if (max_abs_dot < 0.000001f) {inc_axis_idx = 0;}
+
+vector3 inc_normal = inc_axes [inc_axis_idx];
+
+if (vector3_dot (inc_normal, ref_normal) > 0.0f) {
+inc_normal = vector3_scaling (inc_normal, -1.0f);
+}
+/* MPE_F5_FACE_CLIP_INCIDENT_FIX_END */
     int inc_u_idx = (inc_axis_idx + 1) % 3;
     int inc_v_idx = (inc_axis_idx + 2) % 3;
     vector3 inc_u_axis = inc_axes [inc_u_idx];
@@ -207,6 +217,60 @@ static inline float a3_cube_extent_axis (rigidbody *cube, int axis_index) {
     if (axis_index == 1) {return cube -> half_extensions.y;}
     return cube -> half_extensions.z;
 }
+
+/* MPE_TASK_04_CUBE_NORMAL_CONSISTENCY_BEGIN */
+static void a3_task04_enforce_cube_normal_consistency (collision_data *collision_output_data, rigidbody *cube_a, rigidbody *cube_b) {
+    if ((!collision_output_data) || (!cube_a) || (!cube_b)) {return;}
+
+    collision_output_data -> object_a = cube_a;
+    collision_output_data -> object_b = cube_b;
+
+    if (collision_output_data -> contact_count < 0) {
+        collision_output_data -> contact_count = 0;
+    }
+
+    if (collision_output_data -> contact_count > 4) {
+        collision_output_data -> contact_count = 4;
+    }
+
+    vector3 normal = collision_output_data -> normal_vector;
+    float normal_length_squared = vector3_length_squared (normal);
+
+    if ((!isfinite (normal_length_squared)) || (normal_length_squared < 0.000001f)) {
+        normal = (vector3) {0.0f, 1.0f, 0.0f};
+    } else {
+        normal = vector3_scaling (normal, 1.0f / sqrtf (normal_length_squared));
+    }
+
+    vector3 a_to_b = vector3_subtraction (cube_b -> position, cube_a -> position);
+    float a_to_b_length_squared = vector3_length_squared (a_to_b);
+
+    if (a_to_b_length_squared > 0.000001f) {
+        /*
+         * Convention:
+         * collision normal points from object_a toward object_b.
+         */
+        if (vector3_dot (a_to_b, normal) < 0.0f) {
+            normal = vector3_scaling (normal, -1.0f);
+        }
+    } else {
+        /*
+         * Near-coincident centres:
+         * choose a deterministic orientation by forcing the first
+         * significant component to be positive.
+         */
+        if (fabsf (normal.x) > 0.000001f) {
+            if (normal.x < 0.0f) {normal = vector3_scaling (normal, -1.0f);}
+        } else if (fabsf (normal.y) > 0.000001f) {
+            if (normal.y < 0.0f) {normal = vector3_scaling (normal, -1.0f);}
+        } else {
+            if (normal.z < 0.0f) {normal = vector3_scaling (normal, -1.0f);}
+        }
+    }
+
+    collision_output_data -> normal_vector = normal;
+}
+/* MPE_TASK_04_CUBE_NORMAL_CONSISTENCY_END */
 
 bool collision_dual_cube (rigidbody *cube_a, rigidbody *cube_b, collision_data *collision_output_data) {
     vector3 *axes_a = cube_a -> cached_axes; vector3 *axes_b = cube_b -> cached_axes;
@@ -368,9 +432,11 @@ else {
             collision_output_data -> object_b = cube_b;
         }
     }
-    return true;
+    /* MPE_TASK_04_CUBE_NORMAL_CALL_BEGIN */
+a3_task04_enforce_cube_normal_consistency (collision_output_data, cube_a, cube_b);
+/* MPE_TASK_04_CUBE_NORMAL_CALL_END */
+return true;
 }
-
 static rigidbody *collision_static_plane_body_proxy (float plane_y) {
     static rigidbody static_plane_body;
     static int static_plane_initialized = 0;
@@ -525,6 +591,53 @@ int contact_cache_get_misses (void) {
     return contact_cache_miss_count;
 }
 
+/* MPE_TASK_05_CACHE_VALIDATE_BEGIN */
+static uint32_t a3_task05_mix_u32 (uint32_t hash_value, uint32_t input_value) {
+    hash_value ^= input_value + 0x9e3779b9u + (hash_value << 6) + (hash_value >> 2);
+    return hash_value;
+}
+
+static uint32_t a3_task05_float_bits (float value) {
+    union {
+        float float_value;
+        uint32_t integer_value;
+    } converter;
+
+    converter.float_value = value;
+    return converter.integer_value;
+}
+
+static uint32_t a3_task05_body_property_stamp (const rigidbody *rigid_body) {
+    if (!rigid_body) {return 0;}
+
+    uint32_t stamp = 2166136261u;
+
+    stamp = a3_task05_mix_u32 (stamp, (uint32_t) rigid_body -> type);
+    stamp = a3_task05_mix_u32 (stamp, rigid_body -> static_state ? 1u : 0u);
+
+    stamp = a3_task05_mix_u32 (stamp, a3_task05_float_bits (rigid_body -> mass));
+    stamp = a3_task05_mix_u32 (stamp, a3_task05_float_bits (rigid_body -> inverse_mass));
+    stamp = a3_task05_mix_u32 (stamp, a3_task05_float_bits (rigid_body -> radius));
+
+    stamp = a3_task05_mix_u32 (stamp, a3_task05_float_bits (rigid_body -> half_extensions.x));
+    stamp = a3_task05_mix_u32 (stamp, a3_task05_float_bits (rigid_body -> half_extensions.y));
+    stamp = a3_task05_mix_u32 (stamp, a3_task05_float_bits (rigid_body -> half_extensions.z));
+
+    return stamp;
+}
+
+static bool a3_task05_cached_impulses_are_usable (float normal_impulse, float tangent_impulse) {
+    if ((!isfinite (normal_impulse)) || (!isfinite (tangent_impulse))) {return false;}
+
+    if (normal_impulse < 0.0f) {return false;}
+
+    if (fabsf (normal_impulse) > 1000000.0f) {return false;}
+    if (fabsf (tangent_impulse) > 1000000.0f) {return false;}
+
+    return true;
+}
+/* MPE_TASK_05_CACHE_VALIDATE_END */
+
 void collision_prepare_solver (collision_data *source, collision_data *m) {
     *m = *source;
     static int a3_patch_19_cache_reset_done = 0; /* A3_PATCH_19_CACHE_RESET */
@@ -547,35 +660,74 @@ void collision_prepare_solver (collision_data *source, collision_data *m) {
         cp -> separation_bias = bias_factor * fmaxf (cp -> penetration - penetration_slop, 0.0f) * 60.0f;
         if (cp -> separation_bias > 5.0f) {cp -> separation_bias = 5.0f;}
 
-        uint32_t cache_id_a = (m -> object_a) ? m -> object_a -> object_id : 0;
+        /* MPE_TASK_05_CACHE_MATCH_BEGIN */
+uint32_t cache_id_a = (m -> object_a) ? m -> object_a -> object_id : 0;
 uint32_t cache_id_b = (m -> object_b) ? m -> object_b -> object_id : 0;
+
+uint32_t cache_stamp_a = a3_task05_body_property_stamp (m -> object_a);
+uint32_t cache_stamp_b = a3_task05_body_property_stamp (m -> object_b);
+
 int cache_match_found = 0;
 
 for (int c = 0; c < contact_impulse_cache_count; c++) {
     cached_contact *cc = &contact_impulse_cache [c];
 
     /* A3_PATCH_10_CONTACT_CACHE_IDS */
-    if ((cache_id_a != 0) && (cache_id_b != 0) && (cc -> object_id_a == cache_id_a) && (cc -> object_id_b == cache_id_b)) {
-        float dist_sq = vector3_length_squared (vector3_subtraction (cc -> local_position_a, cp -> local_position_a));
+    if ((cache_id_a != 0) && (cache_id_b != 0) &&
+        (cc -> object_id_a == cache_id_a) &&
+        (cc -> object_id_b == cache_id_b) &&
+        (cc -> property_stamp_a == cache_stamp_a) &&
+        (cc -> property_stamp_b == cache_stamp_b)) {
 
-        if (dist_sq < 0.0025f) {
-            cp -> accumulated_normal_impulse = cc -> accumulated_normal_impulse;
+        float dist_sq = vector3_length_squared (
+            vector3_subtraction (cc -> local_position_a, cp -> local_position_a)
+        );
+
+        if ((dist_sq < 0.0025f) &&
+            (a3_task05_cached_impulses_are_usable (cc -> accumulated_normal_impulse, cc -> accumulated_tangent_impulse))) {
+
+            cp -> accumulated_normal_impulse = fmaxf (cc -> accumulated_normal_impulse, 0.0f);
             cp -> accumulated_tangent_impulse = cc -> accumulated_tangent_impulse;
             cache_match_found = 1;
             break;
         }
-    } else if ((cache_id_a != 0) && (cache_id_b != 0) && (cc -> object_id_a == cache_id_b) && (cc -> object_id_b == cache_id_a)) {
-        float dist_sq = vector3_length_squared (vector3_subtraction (cc -> local_position_a, cp -> local_position_b));
+    } else if ((cache_id_a != 0) && (cache_id_b != 0) &&
+               (cc -> object_id_a == cache_id_b) &&
+               (cc -> object_id_b == cache_id_a) &&
+               (cc -> property_stamp_a == cache_stamp_b) &&
+               (cc -> property_stamp_b == cache_stamp_a)) {
 
-        if (dist_sq < 0.0025f) {
-            cp -> accumulated_normal_impulse = cc -> accumulated_normal_impulse;
-            cp -> accumulated_tangent_impulse = cc -> accumulated_tangent_impulse;
+        float dist_sq_ab = vector3_length_squared (
+            vector3_subtraction (cc -> local_position_a, cp -> local_position_b)
+        );
+
+        float dist_sq_ba = vector3_length_squared (
+            vector3_subtraction (cc -> local_position_b, cp -> local_position_a)
+        );
+
+        float dist_sq = fminf (dist_sq_ab, dist_sq_ba);
+
+        if ((dist_sq < 0.0025f) &&
+            (a3_task05_cached_impulses_are_usable (cc -> accumulated_normal_impulse, cc -> accumulated_tangent_impulse))) {
+
+            /*
+             * Swapped body order:
+             *
+             * Normal impulse magnitude remains positive because the current
+             * manifold normal should already point from current object_a
+             * toward current object_b.
+             *
+             * Tangent impulse direction is reversed because the relative
+             * velocity order is reversed.
+             */
+            cp -> accumulated_normal_impulse = fmaxf (cc -> accumulated_normal_impulse, 0.0f);
+            cp -> accumulated_tangent_impulse = -cc -> accumulated_tangent_impulse;
             cache_match_found = 1;
             break;
         }
     }
 }
-
+/* MPE_TASK_05_CACHE_MATCH_END */
 if (cache_match_found) {contact_cache_hit_count++;}
 else {contact_cache_miss_count++;}
         
@@ -715,6 +867,10 @@ void contact_cache_save (collision_data *manifolds, int count) {
         /* A3_PATCH_10_CONTACT_CACHE_IDS */
         cc -> object_id_a = (manifold -> object_a) ? manifold -> object_a -> object_id : 0;
         cc -> object_id_b = (manifold -> object_b) ? manifold -> object_b -> object_id : 0;
+/* MPE_TASK_05_CACHE_SAVE_STAMP_BEGIN */
+cc -> property_stamp_a = a3_task05_body_property_stamp (manifold -> object_a);
+cc -> property_stamp_b = a3_task05_body_property_stamp (manifold -> object_b);
+/* MPE_TASK_05_CACHE_SAVE_STAMP_END */
             cc -> local_position_a = cp -> local_position_a;
             cc -> local_position_b = cp -> local_position_b;
             cc -> accumulated_normal_impulse = cp -> accumulated_normal_impulse;

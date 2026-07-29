@@ -648,7 +648,8 @@ build/ui_input/camera.o: ui_input/camera.c ui_input/../mpe_engine.h \
  ui_input/../ui_input/../core/math3D.h \
  ui_input/../ui_input/../core/math4_special.h \
  ui_input/../ui_input/object_selector.h ui_input/../ui_input/overlay.h \
- ui_input/../ui_input/editor.h ui_input/camera.h
+ ui_input/../ui_input/editor.h ui_input/../ui_input/debug_terminal.h \
+ ui_input/camera.h
 ui_input/../mpe_engine.h:
 /usr/include/gtk-3.0/gtk/gtk.h:
 /usr/include/gtk-3.0/gdk/gdk.h:
@@ -1364,4 +1365,5 @@ ui_input/../ui_input/../core/math4_special.h:
 ui_input/../ui_input/object_selector.h:
 ui_input/../ui_input/overlay.h:
 ui_input/../ui_input/editor.h:
+ui_input/../ui_input/debug_terminal.h:
 ui_input/camera.h:
