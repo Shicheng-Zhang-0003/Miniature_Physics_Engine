@@ -139,14 +139,27 @@ void rigidbody_sanitize (rigidbody *rigid_body) {
         }
     }
 
-    rigidbody_update_axes (rigid_body);
+    /* MPE_TASK_15_SANITIZE_AXIS_CACHE_BEGIN */
+if ((!a3_vector3_is_finite (rigid_body -> cached_axes [0])) ||
+(!a3_vector3_is_finite (rigid_body -> cached_axes [1])) ||
+(!a3_vector3_is_finite (rigid_body -> cached_axes [2])) ||
+(!a3_vector4_is_finite (rigid_body -> cached_axes_orientation)) ||
+(fabsf (rigid_body -> cached_axes_orientation.w - rigid_body -> orientation.w) > 0.000001f) ||
+(fabsf (rigid_body -> cached_axes_orientation.x - rigid_body -> orientation.x) > 0.000001f) ||
+(fabsf (rigid_body -> cached_axes_orientation.y - rigid_body -> orientation.y) > 0.000001f) ||
+(fabsf (rigid_body -> cached_axes_orientation.z - rigid_body -> orientation.z) > 0.000001f)) {
+rigidbody_update_axes (rigid_body);
 }
-
+/* MPE_TASK_15_SANITIZE_AXIS_CACHE_END */
+}
 void rigidbody_update_axes (rigidbody *rigid_body) {
     math3 rotation_matrix = vector4_to_math3 (rigid_body -> orientation);
     rigid_body -> cached_axes [0] = (vector3) {rotation_matrix.matrix [0][0], rotation_matrix.matrix [1][0], rotation_matrix.matrix [2][0]};
     rigid_body -> cached_axes [1] = (vector3) {rotation_matrix.matrix [0][1], rotation_matrix.matrix [1][1], rotation_matrix.matrix [2][1]};
     rigid_body -> cached_axes [2] = (vector3) {rotation_matrix.matrix [0][2], rotation_matrix.matrix [1][2], rotation_matrix.matrix [2][2]};
+/* MPE_TASK_15_AXIS_STAMP_BEGIN */
+rigid_body -> cached_axes_orientation = rigid_body -> orientation;
+/* MPE_TASK_15_AXIS_STAMP_END */
 } //Init
 void rigidbody_initialisation_sphere (rigidbody *rigid_body, float radius, float mass, vector3 position_input) {
     //Kinematic
@@ -222,16 +235,24 @@ void rigidbody_update_inertia_cube (rigidbody *rigid_body) {
 //Apply a force at a centre of mass (perfect collision movement, linear movement only defined)
 void rb_apply_forces_perfect (rigidbody *rigid_body, vector3 force_applied) {
     if (rigid_body -> static_state) {return;}
-    rigid_body -> is_sleeping = false;
-    rigid_body -> sleep_timer = 0.0f;
-    rigid_body -> force_accumulator = vector3_addition (rigid_body -> force_accumulator, force_applied); //Force applied to torque and circular momentum
+/* MPE_TASK_13_2_FORCE_SLEEP_FIX_BEGIN */
+if ((rigid_body -> is_sleeping) && (vector3_length_squared (force_applied) > 0.000001f)) {
+rigid_body -> is_sleeping = false;
+rigid_body -> sleep_timer = 0.0f;
+}
+/* MPE_TASK_13_2_FORCE_SLEEP_FIX_END */
+rigid_body -> force_accumulator = vector3_addition (rigid_body -> force_accumulator, force_applied); //Force applied to torque and circular momentum
 } //Apply force at a point not the centre of mass (which generates rotational motion and torque)
 //locale_impact = impact point on object identified
 void rb_apply_forces_localised (rigidbody *rigid_body, vector3 force_applied, vector3 locale_impact) {
     if (rigid_body -> static_state) {return;}
-    rigid_body -> is_sleeping = false;
-    rigid_body -> sleep_timer = 0.0f;
-    rb_apply_forces_perfect (rigid_body, force_applied);
+/* MPE_TASK_13_2_LOCALIZED_SLEEP_FIX_BEGIN */
+if ((rigid_body -> is_sleeping) && (vector3_length_squared (force_applied) > 0.000001f)) {
+rigid_body -> is_sleeping = false;
+rigid_body -> sleep_timer = 0.0f;
+}
+/* MPE_TASK_13_2_LOCALIZED_SLEEP_FIX_END */
+rb_apply_forces_perfect (rigid_body, force_applied);
     //Torque = r * F (r = vector from Centre of Mass to the point of actual contact between objects)
     vector3 relative_contact_vector = vector3_subtraction (locale_impact, rigid_body -> position);
     vector3 torque_generated = vector3_cross (relative_contact_vector, force_applied);
@@ -442,6 +463,10 @@ void rigidbody_set_static (rigidbody *rigid_body, bool make_static) {
     math3 zero_matrix = {{{0.0f}}};
 
     rigid_body -> static_state = make_static;
+/* MPE_TASK_07_ACCUMULATOR_CLEAR_BEGIN */
+rigid_body -> force_accumulator = vector3_zero ();
+rigid_body -> torque_accumulator = vector3_zero ();
+/* MPE_TASK_07_ACCUMULATOR_CLEAR_END */
 
     if (make_static) {
         rigid_body -> inverse_mass = 0.0f;

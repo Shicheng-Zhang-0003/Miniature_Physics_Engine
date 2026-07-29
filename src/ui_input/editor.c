@@ -109,7 +109,12 @@ void editor_update_menus (GtkWidget *parent_window) {
         selected_rigid_body -> inverse_mass = 1.0f / selected_rigid_body -> mass;
         if (selected_rigid_body -> type == object_sphere) {rigidbody_update_inertia_sphere (selected_rigid_body);}
         else {rigidbody_update_inertia_cube (selected_rigid_body);}
-        main_inputs.object_menu_level = 0;
+        /* MPE_TASK_06_CACHE_CLEAR_MASS */
+contact_cache_clear ();
+/* MPE_TASK_19_EDITOR_EDIT_WAKE_MASS_BEGIN */
+rigidbody_wake (selected_rigid_body);
+/* MPE_TASK_19_EDITOR_EDIT_WAKE_MASS_END */
+main_inputs.object_menu_level = 0;
     } else if (main_inputs.object_menu_level == 3) {
         rigidbody *selected_rigid_body = editor_selected_object_or_null ();
         if (!selected_rigid_body) {main_inputs.object_menu_level = 0; return;}
@@ -119,7 +124,12 @@ void editor_update_menus (GtkWidget *parent_window) {
             editor_reacquire_mouse (parent_window);
             rigidbody_update_inertia_sphere (selected_rigid_body);
         }
-        main_inputs.object_menu_level = 0;
+        /* MPE_TASK_06_CACHE_CLEAR_RADIUS */
+contact_cache_clear ();
+/* MPE_TASK_19_EDITOR_EDIT_WAKE_RADIUS_BEGIN */
+rigidbody_wake (selected_rigid_body);
+/* MPE_TASK_19_EDITOR_EDIT_WAKE_RADIUS_END */
+main_inputs.object_menu_level = 0;
     } else if (main_inputs.object_menu_level == 4) {
         rigidbody *selected_rigid_body = editor_selected_object_or_null ();
         if (!selected_rigid_body) {main_inputs.object_menu_level = 0; return;}
@@ -127,7 +137,12 @@ void editor_update_menus (GtkWidget *parent_window) {
         editor_reacquire_mouse (parent_window);
         if (selected_rigid_body -> friction_kinetic < 0.0f) {selected_rigid_body -> friction_kinetic = 0.0f;}
         selected_rigid_body -> friction_static = selected_rigid_body -> friction_kinetic + 0.1f;
-        main_inputs.object_menu_level = 0;
+        /* MPE_TASK_06_CACHE_CLEAR_FRICTION */
+contact_cache_clear ();
+/* MPE_TASK_19_EDITOR_EDIT_WAKE_FRICTION_BEGIN */
+rigidbody_wake (selected_rigid_body);
+/* MPE_TASK_19_EDITOR_EDIT_WAKE_FRICTION_END */
+main_inputs.object_menu_level = 0;
     }
 
     if (main_inputs.object_menu_level == 5) {
@@ -135,7 +150,9 @@ void editor_update_menus (GtkWidget *parent_window) {
         if (!selected_rigid_body) {main_inputs.object_menu_level = 0; return;}
         if ((main_inputs.up_arrow_pressed) || (main_inputs.down_arrow_pressed)) {
             rigidbody_set_static (selected_rigid_body, !selected_rigid_body -> static_state);
-            main_inputs.up_arrow_pressed = false;
+            /* MPE_TASK_06_CACHE_CLEAR_STATIC */
+contact_cache_clear ();
+main_inputs.up_arrow_pressed = false;
             main_inputs.down_arrow_pressed = false;
         }
 

@@ -37,6 +37,9 @@
 #include "ui_input/overlay.h"
 
 #include "ui_input/editor.h"
+/* MPE_TASK_18_TERMINAL_INCLUDE_BEGIN */
+#include "ui_input/debug_terminal.h"
+/* MPE_TASK_18_TERMINAL_INCLUDE_END */
 /* ------------------------------------------------------------------ */
 /* Global scene state                                                 */
 /* ------------------------------------------------------------------ */
@@ -95,6 +98,17 @@ extern int debug_last_object_count;
 extern int debug_last_broadphase_pair_count;
 extern int debug_last_manifold_count;
 extern float debug_last_frame_time;
+/* MPE_TASK_13_LONG_RUN_EXTERN_BEGIN */
+extern int long_run_validation_active;
+extern int long_run_validation_ticks_remaining;
+extern int long_run_validation_total_ticks;
+/* MPE_TASK_13_LONG_RUN_EXTERN_END */
+/* MPE_TASK_12_SLEEPING_COUNT_EXTERN_BEGIN */
+extern int debug_last_sleeping_object_count;
+/* MPE_TASK_12_SLEEPING_COUNT_EXTERN_END */
+/* MPE_TASK_09_MANIFOLD_OVERFLOW_EXTERN_BEGIN */
+extern int debug_last_manifold_overflow_count;
+/* MPE_TASK_09_MANIFOLD_OVERFLOW_EXTERN_END */
 
 /* A3_PATCH_41_FINAL_VALIDATION */
 #define A3_VERSION_STRING "v14A3.51" /* A3_PATCH_51_FINAL_VALIDATION */

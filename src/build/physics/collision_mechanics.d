@@ -648,9 +648,9 @@ build/physics/collision_mechanics.o: physics/collision_mechanics.c \
  physics/../ui_input/../core/math3D.h \
  physics/../ui_input/../core/math4_special.h \
  physics/../ui_input/object_selector.h physics/../ui_input/overlay.h \
- physics/../ui_input/editor.h physics/collision_mechanics.h \
- physics/../core/math3D.h physics/../core/rigidbody.h \
- physics/define_forces.h
+ physics/../ui_input/editor.h physics/../ui_input/debug_terminal.h \
+ physics/collision_mechanics.h physics/../core/math3D.h \
+ physics/../core/rigidbody.h physics/define_forces.h
 physics/../mpe_engine.h:
 /usr/include/gtk-3.0/gtk/gtk.h:
 /usr/include/gtk-3.0/gdk/gdk.h:
@@ -1366,6 +1366,7 @@ physics/../ui_input/../core/math4_special.h:
 physics/../ui_input/object_selector.h:
 physics/../ui_input/overlay.h:
 physics/../ui_input/editor.h:
+physics/../ui_input/debug_terminal.h:
 physics/collision_mechanics.h:
 physics/../core/math3D.h:
 physics/../core/rigidbody.h:

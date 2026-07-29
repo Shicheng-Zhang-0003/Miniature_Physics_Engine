@@ -5,6 +5,11 @@
 > **Release freeze notice:** This tree is in `v14A3` RC freeze. Until `v14S`, only correctness, stability, validation, documentation, and repository hygiene changes are accepted. No new features.
 <!-- MPE_RELEASE_FREEZE_NOTICE_END -->
 
+
+<!-- MPE_RELEASE_GATES_NOTICE_BEGIN -->
+> **v14S release gates:** The stable release is controlled by [`RELEASE_GATES.md`](RELEASE_GATES.md). All mandatory P0 gates must pass before tagging `v14S`.
+<!-- MPE_RELEASE_GATES_NOTICE_END -->
+
 ## Version 1.4 Alpha RC3
 
 ---
