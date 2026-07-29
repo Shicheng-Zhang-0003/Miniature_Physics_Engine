@@ -648,7 +648,8 @@ build/physics/spring_joint.o: physics/spring_joint.c \
  physics/../ui_input/../core/math3D.h \
  physics/../ui_input/../core/math4_special.h \
  physics/../ui_input/object_selector.h physics/../ui_input/overlay.h \
- physics/../ui_input/editor.h physics/spring_joint.h
+ physics/../ui_input/editor.h physics/../ui_input/debug_terminal.h \
+ physics/spring_joint.h
 physics/../mpe_engine.h:
 /usr/include/gtk-3.0/gtk/gtk.h:
 /usr/include/gtk-3.0/gdk/gdk.h:
@@ -1364,4 +1365,5 @@ physics/../ui_input/../core/math4_special.h:
 physics/../ui_input/object_selector.h:
 physics/../ui_input/overlay.h:
 physics/../ui_input/editor.h:
+physics/../ui_input/debug_terminal.h:
 physics/spring_joint.h:

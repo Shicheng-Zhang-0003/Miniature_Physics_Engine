@@ -643,7 +643,8 @@ build/scene/scene_saving.o: scene/scene_saving.c scene/../mpe_engine.h \
  scene/../ui_input/../core/rigidbody.h scene/../ui_input/../core/math3D.h \
  scene/../ui_input/../core/math4_special.h \
  scene/../ui_input/object_selector.h scene/../ui_input/overlay.h \
- scene/../ui_input/editor.h scene/scene_saving.h
+ scene/../ui_input/editor.h scene/../ui_input/debug_terminal.h \
+ scene/scene_saving.h
 scene/../mpe_engine.h:
 /usr/include/gtk-3.0/gtk/gtk.h:
 /usr/include/gtk-3.0/gdk/gdk.h:
@@ -1359,4 +1360,5 @@ scene/../ui_input/../core/math4_special.h:
 scene/../ui_input/object_selector.h:
 scene/../ui_input/overlay.h:
 scene/../ui_input/editor.h:
+scene/../ui_input/debug_terminal.h:
 scene/scene_saving.h:

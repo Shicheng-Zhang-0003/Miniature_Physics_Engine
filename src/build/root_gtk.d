@@ -636,7 +636,8 @@ build/root_gtk.o: root_gtk.c /usr/include/gtk-3.0/gtk/gtk.h \
  ui_input/../core/math3D.h ui_input/mouse_lock.h \
  ui_input/object_spawner.h ui_input/../core/rigidbody.h \
  ui_input/../core/math3D.h ui_input/../core/math4_special.h \
- ui_input/object_selector.h ui_input/overlay.h ui_input/editor.h
+ ui_input/object_selector.h ui_input/overlay.h ui_input/editor.h \
+ ui_input/debug_terminal.h
 /usr/include/gtk-3.0/gtk/gtk.h:
 /usr/include/gtk-3.0/gdk/gdk.h:
 /usr/include/gtk-3.0/gdk/gdkconfig.h:
@@ -1352,3 +1353,4 @@ ui_input/../core/math4_special.h:
 ui_input/object_selector.h:
 ui_input/overlay.h:
 ui_input/editor.h:
+ui_input/debug_terminal.h:

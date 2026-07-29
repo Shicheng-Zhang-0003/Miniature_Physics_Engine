@@ -642,7 +642,8 @@ build/core/frame_timer.o: core/frame_timer.c core/../mpe_engine.h \
  core/../ui_input/../core/rigidbody.h core/../ui_input/../core/math3D.h \
  core/../ui_input/../core/math4_special.h \
  core/../ui_input/object_selector.h core/../ui_input/overlay.h \
- core/../ui_input/editor.h core/frame_timer.h
+ core/../ui_input/editor.h core/../ui_input/debug_terminal.h \
+ core/frame_timer.h
 core/../mpe_engine.h:
 /usr/include/gtk-3.0/gtk/gtk.h:
 /usr/include/gtk-3.0/gdk/gdk.h:
@@ -1358,4 +1359,5 @@ core/../ui_input/../core/math4_special.h:
 core/../ui_input/object_selector.h:
 core/../ui_input/overlay.h:
 core/../ui_input/editor.h:
+core/../ui_input/debug_terminal.h:
 core/frame_timer.h:

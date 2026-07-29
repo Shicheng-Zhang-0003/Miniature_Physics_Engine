@@ -27,6 +27,35 @@ static void overlay_append_overflow_text (char *buffer, size_t buffer_size) {
     /* A3_PATCH_14_OVERFLOW_VISIBILITY */
     int node_overflow_count = broadphase_get_node_overflow_count ();
     int pair_overflow_count = broadphase_get_pair_overflow_count ();
+/* MPE_TASK_11_OVERLAY_LARGE_CLAMP_BEGIN */
+int large_clamp_count = broadphase_get_large_object_clamp_count ();
+if (large_clamp_count > 0) {
+size_t large_clamp_current_length = strlen (buffer);
+if (large_clamp_current_length < buffer_size) {
+snprintf (buffer + large_clamp_current_length, buffer_size - large_clamp_current_length,
+" | BP large clamps:%d", large_clamp_count);
+}
+}
+/* MPE_TASK_11_OVERLAY_LARGE_CLAMP_END */
+/* MPE_TASK_10_OVERLAY_DEDUPE_BEGIN */
+int dedupe_overflow_count = broadphase_get_pair_dedupe_overflow_count ();
+if (dedupe_overflow_count > 0) {
+size_t dedupe_current_length = strlen (buffer);
+if (dedupe_current_length < buffer_size) {
+snprintf (buffer + dedupe_current_length, buffer_size - dedupe_current_length,
+" | BP dedupe overflow:%d", dedupe_overflow_count);
+}
+}
+/* MPE_TASK_10_OVERLAY_DEDUPE_END */
+/* MPE_TASK_09_OVERLAY_MANIFOLD_OVERFLOW_BEGIN */
+if (debug_last_manifold_overflow_count > 0) {
+size_t manifold_current_length = strlen (buffer);
+if (manifold_current_length < buffer_size) {
+snprintf (buffer + manifold_current_length, buffer_size - manifold_current_length,
+" | Manifold overflow:%d", debug_last_manifold_overflow_count);
+}
+}
+/* MPE_TASK_09_OVERLAY_MANIFOLD_OVERFLOW_END */
 
     if ((node_overflow_count > 0) || (pair_overflow_count > 0)) {
         size_t current_length = strlen (buffer);
@@ -93,6 +122,22 @@ GtkWidget *overlay_initialise (GtkWidget *gl_drawing_area_widget) {
                   debug_last_manifold_count,
                   contact_cache_get_hits (),
                   contact_cache_get_misses ());
+/* MPE_TASK_13_OVERLAY_LONG_RUN_BEGIN */
+if (long_run_validation_active) {
+size_t long_run_current_length = strlen (buffer);
+if (long_run_current_length < buffer_size) {
+snprintf (buffer + long_run_current_length, buffer_size - long_run_current_length,
+" | LR:%ds", long_run_validation_ticks_remaining / 60);
+}
+}
+/* MPE_TASK_13_OVERLAY_LONG_RUN_END */
+/* MPE_TASK_12_OVERLAY_SLEEP_BEGIN */
+size_t sleep_current_length = strlen (buffer);
+if (sleep_current_length < buffer_size) {
+snprintf (buffer + sleep_current_length, buffer_size - sleep_current_length,
+" | Sleep:%d", debug_last_sleeping_object_count);
+}
+/* MPE_TASK_12_OVERLAY_SLEEP_END */
     }
 }
 

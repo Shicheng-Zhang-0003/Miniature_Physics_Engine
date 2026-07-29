@@ -24,6 +24,12 @@ int debug_last_object_count = 0;
 int debug_last_broadphase_pair_count = 0;
 int debug_last_manifold_count = 0;
 float debug_last_frame_time = 0.0f;
+/* MPE_TASK_12_SLEEPING_COUNT_GLOBAL_BEGIN */
+int debug_last_sleeping_object_count = 0;
+/* MPE_TASK_12_SLEEPING_COUNT_GLOBAL_END */
+/* MPE_TASK_09_MANIFOLD_OVERFLOW_COUNTER_BEGIN */
+int debug_last_manifold_overflow_count = 0;
+/* MPE_TASK_09_MANIFOLD_OVERFLOW_COUNTER_END */
 static void on_entry_insert_text (GtkEditable *editable, const gchar *new_text, gint new_text_length, gint *position, gpointer user_data) {
     (void) position;
     (void) user_data;
@@ -76,7 +82,10 @@ editor_dialog_active = true;
     } gtk_widget_destroy (dialog);
     main_inputs.suppress_mouse_delta = false; /* A3_PATCH_25_DIALOG_SAFETY */
 editor_dialog_active = false;
-    return result_value;
+/* MPE_TASK_22_ENTER_SPAWN_DIALOG_CLEAR_BEGIN */
+main_inputs.enter_spawn_held = false;
+/* MPE_TASK_22_ENTER_SPAWN_DIALOG_CLEAR_END */
+return result_value;
 } 
 
 void editor_reset (void) {
@@ -106,6 +115,9 @@ static void validation_report_print (void) {
     printf ("[A3] Validation report %s\n", A3_VERSION_STRING);
     printf ("[A3] objects=%d capacity=%d joints=%d selected=%d\n",
             object_count, object_capacity, current_joint_count, selected_object);
+/* MPE_TASK_12_VALIDATION_PRINT_BEGIN */
+printf ("[A3] sleeping objects: last_frame=%d\n", debug_last_sleeping_object_count);
+/* MPE_TASK_12_VALIDATION_PRINT_END */
     printf ("[A3] debug last: obj=%d pairs=%d manifolds=%d frame_time=%f\n",
             debug_last_object_count,
             debug_last_broadphase_pair_count,
@@ -114,6 +126,18 @@ static void validation_report_print (void) {
     printf ("[A3] broadphase overflow: nodes=%d pairs=%d\n",
             broadphase_get_node_overflow_count (),
             broadphase_get_pair_overflow_count ());
+/* MPE_TASK_17_VALIDATION_PRINT_BEGIN */
+printf ("[A3] broadphase cell size: %.2f\n", broadphase_get_current_cell_size ());
+/* MPE_TASK_17_VALIDATION_PRINT_END */
+/* MPE_TASK_11_VALIDATION_PRINT_BEGIN */
+printf ("[A3] broadphase large object clamps: last_run=%d\n", broadphase_get_large_object_clamp_count ());
+/* MPE_TASK_11_VALIDATION_PRINT_END */
+/* MPE_TASK_10_VALIDATION_PRINT_BEGIN */
+printf ("[A3] pair dedupe overflow: last_run=%d\n", broadphase_get_pair_dedupe_overflow_count ());
+/* MPE_TASK_10_VALIDATION_PRINT_END */
+/* MPE_TASK_09_VALIDATION_PRINT_BEGIN */
+printf ("[A3] manifold overflow: last_frame=%d\n", debug_last_manifold_overflow_count);
+/* MPE_TASK_09_VALIDATION_PRINT_END */
     printf ("[A3] contact cache: hits=%d misses=%d\n",
             contact_cache_get_hits (),
             contact_cache_get_misses ());
@@ -127,11 +151,347 @@ static void validation_report_print (void) {
 }
 
 
+/* MPE_TASK_13_LONG_RUN_HELPERS_BEGIN */
+#define A3_LONG_RUN_VALIDATION_TICKS 3600
+
+int long_run_validation_active = 0;
+int long_run_validation_ticks_remaining = 0;
+int long_run_validation_total_ticks = 0;
+
+static float long_run_validation_last_max_linear_speed = 0.0f;
+static float long_run_validation_last_max_angular_speed = 0.0f;
+static float long_run_validation_max_linear_speed = 0.0f;
+static float long_run_validation_max_angular_speed = 0.0f;
+static int long_run_validation_nan_count = 0;
+static int long_run_validation_fallen_count = 0;
+static int long_run_validation_max_manifold_overflow = 0;
+static int long_run_validation_final_sleeping_count = 0;
+static int long_run_validation_final_awake_count = 0;
+
+static int a3_task13_body_is_invalid (rigidbody *rigid_body) {
+if ((!isfinite (rigid_body -> position.x)) ||
+(!isfinite (rigid_body -> position.y)) ||
+(!isfinite (rigid_body -> position.z))) {return 1;}
+
+if ((!isfinite (rigid_body -> velocity.x)) ||
+(!isfinite (rigid_body -> velocity.y)) ||
+(!isfinite (rigid_body -> velocity.z))) {return 1;}
+
+if ((!isfinite (rigid_body -> angular_velocity.x)) ||
+(!isfinite (rigid_body -> angular_velocity.y)) ||
+(!isfinite (rigid_body -> angular_velocity.z))) {return 1;}
+
+if ((!isfinite (rigid_body -> orientation.w)) ||
+(!isfinite (rigid_body -> orientation.x)) ||
+(!isfinite (rigid_body -> orientation.y)) ||
+(!isfinite (rigid_body -> orientation.z))) {return 1;}
+
+return 0;
+}
+
+static void long_run_validation_report (void) {
+int pass =
+(object_count > 0) &&
+(long_run_validation_nan_count == 0) &&
+(long_run_validation_fallen_count == 0) &&
+(long_run_validation_last_max_linear_speed < 0.25f) &&
+(long_run_validation_last_max_angular_speed < 0.5f);
+
+printf ("[A3] Long-run validation report %s\n", A3_VERSION_STRING);
+printf ("[A3] duration_ticks=%d objects=%d sleeping=%d awake=%d\n",
+long_run_validation_total_ticks,
+object_count,
+long_run_validation_final_sleeping_count,
+long_run_validation_final_awake_count);
+printf ("[A3] final max speed: linear=%.6f angular=%.6f\n",
+long_run_validation_last_max_linear_speed,
+long_run_validation_last_max_angular_speed);
+printf ("[A3] run max speed: linear=%.6f angular=%.6f\n",
+long_run_validation_max_linear_speed,
+long_run_validation_max_angular_speed);
+printf ("[A3] nan_ticks=%d fallen_ticks=%d max_manifold_overflow=%d\n",
+long_run_validation_nan_count,
+long_run_validation_fallen_count,
+long_run_validation_max_manifold_overflow);
+printf ("[A3] broadphase overflow: nodes=%d pairs=%d dedupe=%d large_clamps=%d\n",
+broadphase_get_node_overflow_count (),
+broadphase_get_pair_overflow_count (),
+broadphase_get_pair_dedupe_overflow_count (),
+broadphase_get_large_object_clamp_count ());
+printf ("[A3] result: %s\n", pass ? "PASS" : "FAIL");
+fflush (stdout);
+}
+
+static void long_run_validation_evaluate (void) {
+float current_max_linear_speed = 0.0f;
+float current_max_angular_speed = 0.0f;
+int current_sleeping_count = 0;
+int current_awake_count = 0;
+int current_fallen_count = 0;
+int current_nan_count = 0;
+
+for (int object_index = 0; object_index < object_count; object_index++) {
+rigidbody *rigid_body = &obj_per_scene [object_index];
+
+if (a3_task13_body_is_invalid (rigid_body)) {
+current_nan_count++;
+continue;
+}
+
+if (rigid_body -> position.y < -1.0f) {
+current_fallen_count++;
+}
+
+if (rigid_body -> is_sleeping) {
+current_sleeping_count++;
+} else if (!rigid_body -> static_state) {
+current_awake_count++;
+}
+
+float linear_speed = vector3_length (rigid_body -> velocity);
+float angular_speed = vector3_length (rigid_body -> angular_velocity);
+
+if (linear_speed > current_max_linear_speed) {
+current_max_linear_speed = linear_speed;
+}
+
+if (angular_speed > current_max_angular_speed) {
+current_max_angular_speed = angular_speed;
+}
+}
+
+long_run_validation_last_max_linear_speed = current_max_linear_speed;
+long_run_validation_last_max_angular_speed = current_max_angular_speed;
+
+if (current_max_linear_speed > long_run_validation_max_linear_speed) {
+long_run_validation_max_linear_speed = current_max_linear_speed;
+}
+
+if (current_max_angular_speed > long_run_validation_max_angular_speed) {
+long_run_validation_max_angular_speed = current_max_angular_speed;
+}
+
+long_run_validation_final_sleeping_count = current_sleeping_count;
+long_run_validation_final_awake_count = current_awake_count;
+
+long_run_validation_nan_count += current_nan_count;
+long_run_validation_fallen_count += current_fallen_count;
+
+if (debug_last_manifold_overflow_count > long_run_validation_max_manifold_overflow) {
+long_run_validation_max_manifold_overflow = debug_last_manifold_overflow_count;
+}
+}
+
+static void long_run_validation_tick_update (void) {
+if (!long_run_validation_active) {return;}
+
+long_run_validation_evaluate ();
+
+if (long_run_validation_ticks_remaining > 0) {
+long_run_validation_ticks_remaining--;
+}
+
+if (long_run_validation_ticks_remaining <= 0) {
+long_run_validation_report ();
+long_run_validation_active = 0;
+}
+}
+
+static void long_run_validation_start (int duration_ticks) {
+if (duration_ticks <= 0) {duration_ticks = 1;}
+
+long_run_validation_active = 1;
+long_run_validation_ticks_remaining = duration_ticks;
+long_run_validation_total_ticks = duration_ticks;
+
+long_run_validation_last_max_linear_speed = 0.0f;
+long_run_validation_last_max_angular_speed = 0.0f;
+long_run_validation_max_linear_speed = 0.0f;
+long_run_validation_max_angular_speed = 0.0f;
+long_run_validation_nan_count = 0;
+long_run_validation_fallen_count = 0;
+long_run_validation_max_manifold_overflow = 0;
+long_run_validation_final_sleeping_count = 0;
+long_run_validation_final_awake_count = 0;
+
+broadphase_reset_overflow_counts ();
+contact_cache_clear ();
+
+printf ("[A3] Long-run validation started: %d ticks (%.1f seconds)\n",
+duration_ticks,
+(float) duration_ticks / 60.0f);
+fflush (stdout);
+}
+/* MPE_TASK_13_LONG_RUN_HELPERS_END */
+
+/* MPE_TASK_20A_DEPENETRATION_HELPERS_BEGIN */
+static bool a3_depenetration_dispatch (rigidbody *rigid_body_a, rigidbody *rigid_body_b, collision_data *collision_output) {
+if ((rigid_body_a -> type == object_sphere) && (rigid_body_b -> type == object_sphere)) {
+return collision_dual_sphere (rigid_body_a, rigid_body_b, collision_output);
+}
+if ((rigid_body_a -> type == object_sphere) && (rigid_body_b -> type == object_cube)) {
+return collision_sphere_cube (rigid_body_a, rigid_body_b, collision_output);
+}
+if ((rigid_body_a -> type == object_cube) && (rigid_body_b -> type == object_sphere)) {
+bool collided = collision_sphere_cube (rigid_body_b, rigid_body_a, collision_output);
+if (collided) {
+collision_output -> normal_vector = vector3_scaling (collision_output -> normal_vector, -1.0f);
+collision_output -> object_a = rigid_body_a;
+collision_output -> object_b = rigid_body_b;
+}
+return collided;
+}
+if ((rigid_body_a -> type == object_cube) && (rigid_body_b -> type == object_cube)) {
+return collision_dual_cube (rigid_body_a, rigid_body_b, collision_output);
+}
+return false;
+}
+
+static void a3_positional_depenetrate_manifold (collision_data *manifold) {
+if ((!manifold) || (manifold -> contact_count <= 0)) {return;}
+
+rigidbody *body_a = manifold -> object_a;
+rigidbody *body_b = manifold -> object_b;
+
+if ((!body_a) || (!body_b)) {return;}
+
+float normal_length_squared = vector3_length_squared (manifold -> normal_vector);
+if ((!isfinite (normal_length_squared)) || (normal_length_squared < 0.000001f)) {return;}
+
+float max_depth = 0.0f;
+float depth_sum = 0.0f;
+int depth_count = 0;
+
+const float penetration_slop = 0.005f;
+
+for (int contact_index = 0; contact_index < manifold -> contact_count; contact_index++) {
+float depth = manifold -> contacts [contact_index].penetration;
+if (depth > max_depth) {max_depth = depth;}
+if (depth > penetration_slop) {
+depth_sum += depth;
+depth_count++;
+}
+}
+
+if (max_depth <= 0.0005f) {return;}
+
+bool a_sleeping = (body_a -> is_sleeping) && (!body_a -> static_state);
+bool b_sleeping = (body_b -> is_sleeping) && (!body_b -> static_state);
+
+/* Wake sleeping bodies only when the overlap is meaningful. */
+if ((a_sleeping) && (b_sleeping) && (max_depth > 0.02f)) {
+rigidbody_wake (body_a);
+rigidbody_wake (body_b);
+a_sleeping = false;
+b_sleeping = false;
+}
+
+if ((a_sleeping) && (body_b -> static_state) && (max_depth > 0.02f)) {
+rigidbody_wake (body_a);
+a_sleeping = false;
+}
+
+if ((b_sleeping) && (body_a -> static_state) && (max_depth > 0.02f)) {
+rigidbody_wake (body_b);
+b_sleeping = false;
+}
+
+float inverse_mass_a = (body_a -> static_state || a_sleeping) ? 0.0f : body_a -> inverse_mass;
+float inverse_mass_b = (body_b -> static_state || b_sleeping) ? 0.0f : body_b -> inverse_mass;
+float inverse_mass_sum = inverse_mass_a + inverse_mass_b;
+
+if (inverse_mass_sum <= 0.0f) {return;}
+
+if (depth_count == 0) {
+depth_sum = max_depth;
+depth_count = 1;
+}
+
+float average_depth = depth_sum / (float) depth_count;
+float correction_magnitude = (average_depth - penetration_slop) * 0.35f / inverse_mass_sum;
+
+if (correction_magnitude <= 0.0f) {return;}
+if (correction_magnitude > 0.2f) {correction_magnitude = 0.2f;}
+
+vector3 correction_vector = vector3_scaling (manifold -> normal_vector, correction_magnitude);
+
+if (inverse_mass_a > 0.0f) {
+body_a -> position = vector3_subtraction (
+body_a -> position,
+vector3_scaling (correction_vector, inverse_mass_a)
+);
+if (correction_magnitude > 0.01f) {rigidbody_wake (body_a);}
+}
+
+if (inverse_mass_b > 0.0f) {
+body_b -> position = vector3_addition (
+body_b -> position,
+vector3_scaling (correction_vector, inverse_mass_b)
+);
+if (correction_magnitude > 0.01f) {rigidbody_wake (body_b);}
+}
+}
+
+static void a3_positional_depenetration_pass (broadphase_pair *pair_buffer, int *pair_count_pointer, bool rebuild_broadphase) {
+if ((object_count < 2) || (!pair_buffer) || (!pair_count_pointer)) {return;}
+
+int pair_count = *pair_count_pointer;
+
+if (rebuild_broadphase) {
+pair_count = broadphase_generate_pairing (pair_buffer, MPE_MAX_BROADPHASE_PAIRS);
+*pair_count_pointer = pair_count;
+}
+
+int depenetration_iterations = rebuild_broadphase ? 3 : 1;
+
+for (int dep_iteration = 0; dep_iteration < depenetration_iterations; dep_iteration++) {
+for (int pair_index = 0; pair_index < pair_count; pair_index++) {
+int index_a = pair_buffer [pair_index].object_index_a;
+int index_b = pair_buffer [pair_index].object_index_b;
+
+if ((index_a < 0) || (index_a >= object_count)) {continue;}
+if ((index_b < 0) || (index_b >= object_count)) {continue;}
+
+rigidbody *body_a = &obj_per_scene [index_a];
+rigidbody *body_b = &obj_per_scene [index_b];
+
+collision_data depenetration_collision = {0};
+
+if (a3_depenetration_dispatch (body_a, body_b, &depenetration_collision)) {
+a3_positional_depenetrate_manifold (&depenetration_collision);
+}
+}
+
+for (int object_index = 0; object_index < object_count; object_index++) {
+rigidbody *rigid_body = &obj_per_scene [object_index];
+if (rigid_body -> static_state) {continue;}
+
+collision_data floor_collision = {0};
+
+if (collision_static_plane_body (rigid_body, 0.0f, &floor_collision)) {
+a3_positional_depenetrate_manifold (&floor_collision);
+}
+}
+}
+}
+/* MPE_TASK_20A_DEPENETRATION_HELPERS_END */
+
 gboolean physics_step_increment (gpointer user_data_pointer) {
     GtkWidget *parent_window = NULL;
     if (user_data_pointer) {parent_window = gtk_widget_get_toplevel (GTK_WIDGET (user_data_pointer));}
 /* A3_PATCH_42_CRITICAL_LIFECYCLE */
 if (editor_dialog_active) {return TRUE;}
+/* MPE_TASK_18_MODE_WATCH_BEGIN */
+static bool a3_previous_debug_mode_state = false;
+static bool a3_debug_mode_watch_ready = false;
+if (!a3_debug_mode_watch_ready) {
+a3_debug_mode_watch_ready = true;
+a3_previous_debug_mode_state = main_inputs.is_debug_mode_active;
+} else if (main_inputs.is_debug_mode_active != a3_previous_debug_mode_state) {
+a3_previous_debug_mode_state = main_inputs.is_debug_mode_active;
+debug_terminal_sync_mode ();
+}
+/* MPE_TASK_18_MODE_WATCH_END */
     if (main_inputs.is_debug_mode_active) {
         if (main_inputs.left_arrow_pressed)  {variable_change_rate -= 0.01f; main_inputs.left_arrow_pressed = false;}
         if (main_inputs.right_arrow_pressed) {variable_change_rate += 0.01f; main_inputs.right_arrow_pressed = false;}
@@ -164,6 +524,9 @@ if (editor_dialog_active) {return TRUE;}
         if (main_inputs.a_key_pressed) {main_camera_fov.position = vector3_subtraction (main_camera_fov.position, vector3_scaling (main_camera_fov.side_vector, debug_speed));}
         if (main_inputs.d_key_pressed) {main_camera_fov.position = vector3_addition (main_camera_fov.position, vector3_scaling (main_camera_fov.side_vector, debug_speed));}
         if (main_inputs.space_key_pressed) {main_camera_fov.position.y += debug_speed;}
+/* MPE_TASK_22_SHIFT_DOWN_BEGIN */
+if (main_inputs.shift_key_pressed) {main_camera_fov.position.y -= debug_speed;}
+/* MPE_TASK_22_SHIFT_DOWN_END */
         float ijkl_speed = 35.0f * frame_delta_time;
         if (main_inputs.i_key_pressed) {main_camera_fov.pitch += ijkl_speed;}
         if (main_inputs.k_key_pressed) {main_camera_fov.pitch -= ijkl_speed;}
@@ -215,6 +578,35 @@ main_inputs.middle_mouse_button_clicked = false;
         if (selected_object >= 0) {selector_apply_force_impulse (250.0f);} //Increased as cube friction is far higher
         main_inputs.f_key_pressed = false;
     }
+/* MPE_TASK_21_KEYBOARD_ONLY_ACTIONS_BEGIN */
+if (main_inputs.r_key_pressed) {
+if (main_inputs.is_debug_mode_active) {selector_ray_tracing ();}
+main_inputs.r_key_pressed = false;
+}
+
+if (main_inputs.delete_key_pressed) {
+if ((main_inputs.is_debug_mode_active) && (selected_object >= 0) && (selected_object < object_count)) {
+scene_remove_object_by_index (selected_object);
+}
+main_inputs.delete_key_pressed = false;
+}
+
+if (main_inputs.m_key_pressed) {
+if ((main_inputs.is_debug_mode_active) && (!main_inputs.is_mouse_locked) && (parent_window)) {
+mouse_lock_enable (parent_window);
+main_inputs.is_mouse_locked = true;
+}
+main_inputs.m_key_pressed = false;
+}
+
+if (main_inputs.t_key_pressed) {
+if (main_inputs.is_debug_mode_active) {
+if (debug_terminal_is_open ()) {debug_terminal_focus_entry ();}
+else {debug_terminal_open (parent_window);}
+}
+main_inputs.t_key_pressed = false;
+}
+/* MPE_TASK_21_KEYBOARD_ONLY_ACTIONS_END */
 if (main_inputs.stability_test_pressed) {
     scene_spawn_stability_stack ();
     main_inputs.stability_test_pressed = false;
@@ -235,6 +627,19 @@ if (main_inputs.validation_report_pressed) {
     validation_report_print ();
     main_inputs.validation_report_pressed = false;
 }
+/* MPE_TASK_18_TERMINAL_OPEN_BEGIN */
+if (main_inputs.debug_terminal_pressed) {
+if (main_inputs.is_debug_mode_active) {debug_terminal_open (parent_window);}
+main_inputs.debug_terminal_pressed = false;
+}
+/* MPE_TASK_18_TERMINAL_OPEN_END */
+/* MPE_TASK_13_LONG_RUN_START_CALL_BEGIN */
+if (main_inputs.long_run_validation_pressed) {
+scene_spawn_long_run_validation ();
+long_run_validation_start (A3_LONG_RUN_VALIDATION_TICKS);
+main_inputs.long_run_validation_pressed = false;
+}
+/* MPE_TASK_13_LONG_RUN_START_CALL_END */
 
 
 
@@ -243,8 +648,15 @@ if (main_inputs.validation_report_pressed) {
     static float shift_hold_timer = 0.0f;
     static float shift_spawn_interval_timer = 0.0f;
     static bool shift_previously_held = false;
-    if (main_inputs.shift_key_pressed) {
-        if (!shift_previously_held) {
+    /* MPE_TASK_22_ENTER_SPAWN_CONDITION_BEGIN */
+if ((main_inputs.enter_spawn_held) &&
+(!editor_dialog_active) &&
+(!main_inputs.is_menu_open) &&
+(main_inputs.spawner_menu_level == 0) &&
+(main_inputs.velocity_menu_level == 0) &&
+(main_inputs.object_menu_level == 0)) {
+/* MPE_TASK_22_ENTER_SPAWN_CONDITION_END */
+if (!shift_previously_held) {
             if (main_inputs.current_spawn_type == 0) {spawner_launch_sphere (spawn_radius, spawn_mass, spawn_speed);}
             else {
                 vector3 cube_spawn_position = vector3_addition (main_camera_fov.position, vector3_scaling (main_camera_fov.forward_vector, spawn_cube_extent + 1.0f));
@@ -281,15 +693,16 @@ if (main_inputs.validation_report_pressed) {
     if (physics_time_accumulator > fixed_physics_dt * max_substeps_per_frame) {physics_time_accumulator = fixed_physics_dt * max_substeps_per_frame;}
     float linear_damping_factor = powf (world_drag_coefficient, fixed_physics_dt);
     float angular_damping_factor = powf (world_drag_coefficient * 0.97f, fixed_physics_dt);
-    while (physics_time_accumulator >= fixed_physics_dt) {
+    /* MPE_TASK_09_MANIFOLD_OVERFLOW_FRAME_RESET_BEGIN */
+debug_last_manifold_overflow_count = 0;
+/* MPE_TASK_09_MANIFOLD_OVERFLOW_FRAME_RESET_END */
+while (physics_time_accumulator >= fixed_physics_dt) {
+/* MPE_TASK_14_SANITIZE_ONCE_BEGIN */
 /* A3_PATCH_47_NAN_SANITIZATION */
 for (int sanitize_index = 0; sanitize_index < object_count; sanitize_index++) {
-    rigidbody_sanitize (&obj_per_scene [sanitize_index]);
+rigidbody_sanitize (&obj_per_scene [sanitize_index]);
 }
-        /* A3_PATCH_43_PRE_BROADPHASE_SANITIZE */
-        for (int sanitize_index = 0; sanitize_index < object_count; sanitize_index++) {
-            rigidbody_sanitize (&obj_per_scene [sanitize_index]);
-        }
+/* MPE_TASK_14_SANITIZE_ONCE_END */
         int detected_collision_count = 0;
         detected_collision_count = broadphase_generate_pairing (persistent_collision_pairs, MPE_MAX_BROADPHASE_PAIRS);
     debug_last_broadphase_pair_count = detected_collision_count;
@@ -313,7 +726,10 @@ for (int velocity_integration_index = 0; velocity_integration_index < object_cou
 for (int collision_index = 0; collision_index < detected_collision_count; collision_index++) {
             rigidbody *rigid_body_a = &obj_per_scene [persistent_collision_pairs [collision_index].object_index_a];
             rigidbody *rigid_body_b = &obj_per_scene [persistent_collision_pairs [collision_index].object_index_b];
-            collision_data narrowphase_collision = {0};
+            /* MPE_TASK_13_SLEEP_PAIR_SKIP_BEGIN */
+if ((rigid_body_a -> is_sleeping) && (rigid_body_b -> is_sleeping)) {continue;}
+/* MPE_TASK_13_SLEEP_PAIR_SKIP_END */
+collision_data narrowphase_collision = {0};
             bool collided = false;
             if (rigid_body_a -> type == object_sphere && rigid_body_b -> type == object_sphere) collided = collision_dual_sphere (rigid_body_a, rigid_body_b, &narrowphase_collision);
             else if (rigid_body_a -> type == object_sphere && rigid_body_b -> type == object_cube) collided = collision_sphere_cube (rigid_body_a, rigid_body_b, &narrowphase_collision);
@@ -322,13 +738,44 @@ for (int collision_index = 0; collision_index < detected_collision_count; collis
                 narrowphase_collision.normal_vector = vector3_scaling (narrowphase_collision.normal_vector, -1.0f);
                 narrowphase_collision.object_a = rigid_body_a; narrowphase_collision.object_b = rigid_body_b;
             } else if (rigid_body_a -> type == object_cube && rigid_body_b -> type == object_cube) collided = collision_dual_cube (rigid_body_a, rigid_body_b, &narrowphase_collision);
-            if (collided && manifold_count < 8192) {
-                if (rigid_body_a -> is_sleeping && !rigid_body_b -> static_state) {rigidbody_wake (rigid_body_a);}
-                if (rigid_body_b -> is_sleeping && !rigid_body_a -> static_state) {rigidbody_wake (rigid_body_b);}
+            /* MPE_TASK_09_OBJECT_MANIFOLD_CONDITION_BEGIN */
+if (collided) {
+if (manifold_count < 8192) {
+/* MPE_TASK_09_OBJECT_MANIFOLD_CONDITION_END */
+                /* MPE_TASK_13_SLEEP_WAKE_FIX_BEGIN */
+bool a3_a_was_sleeping = rigid_body_a -> is_sleeping;
+bool a3_b_was_sleeping = rigid_body_b -> is_sleeping;
+
+if (a3_a_was_sleeping && a3_b_was_sleeping) {continue;}
+
+float a3_wake_linear_threshold_sq = 0.01f; /* 0.1 m/s */
+float a3_wake_angular_threshold_sq = 0.0025f; /* 0.05 rad/s */
+
+bool a3_a_is_active =
+(!a3_a_was_sleeping) &&
+((vector3_length_squared (rigid_body_a -> velocity) > a3_wake_linear_threshold_sq) ||
+(vector3_length_squared (rigid_body_a -> angular_velocity) > a3_wake_angular_threshold_sq));
+
+bool a3_b_is_active =
+(!a3_b_was_sleeping) &&
+((vector3_length_squared (rigid_body_b -> velocity) > a3_wake_linear_threshold_sq) ||
+(vector3_length_squared (rigid_body_b -> angular_velocity) > a3_wake_angular_threshold_sq));
+
+if (a3_a_was_sleeping && (!rigid_body_b -> static_state) && a3_b_is_active) {
+rigidbody_wake (rigid_body_a);
+}
+
+if (a3_b_was_sleeping && (!rigid_body_a -> static_state) && a3_a_is_active) {
+rigidbody_wake (rigid_body_b);
+}
+/* MPE_TASK_13_SLEEP_WAKE_FIX_END */
                 collision_prepare_solver (&narrowphase_collision, &active_manifold [manifold_count]);
                 manifold_count++;
             }
-        } /* A3_PATCH_16_FLOOR_MANIFOLD */
+        /* MPE_TASK_09_OBJECT_MANIFOLD_OVERFLOW_BEGIN */
+} else {debug_last_manifold_overflow_count++;}
+/* MPE_TASK_09_OBJECT_MANIFOLD_OVERFLOW_END */
+} /* A3_PATCH_16_FLOOR_MANIFOLD */
  for (int floor_object_index = 0; floor_object_index < object_count; floor_object_index++) {
      rigidbody *floor_rigid_body = &obj_per_scene [floor_object_index];
      if ((floor_rigid_body -> static_state) || (floor_rigid_body -> is_sleeping)) {continue;}
@@ -336,28 +783,89 @@ for (int collision_index = 0; collision_index < detected_collision_count; collis
      collision_data floor_collision = {0};
  
      if (collision_static_plane_body (floor_rigid_body, 0.0f, &floor_collision)) {
-         if (manifold_count < 8192) {
-             collision_prepare_solver (&floor_collision, &active_manifold [manifold_count]);
-             manifold_count++;
-         }
+         /* MPE_TASK_09_FLOOR_MANIFOLD_OVERFLOW_BEGIN */
+if (manifold_count < 8192) {
+collision_prepare_solver (&floor_collision, &active_manifold [manifold_count]);
+manifold_count++;
+} else {
+debug_last_manifold_overflow_count++;
+}
+/* MPE_TASK_09_FLOOR_MANIFOLD_OVERFLOW_END */
      }
  }
  
     debug_last_manifold_count = manifold_count;
- const int solver_iterations = 16; // Increased to propagate forces through deep stacks
+ /* MPE_TASK_13_SLEEP_STATICIZE_BEGIN */
+math3 a3_sleep_zero_matrix = {{{0.0f}}};
+for (int sleep_staticize_index = 0; sleep_staticize_index < object_count; sleep_staticize_index++) {
+rigidbody *sleep_staticize_body = &obj_per_scene [sleep_staticize_index];
+if ((sleep_staticize_body -> is_sleeping) && (!sleep_staticize_body -> static_state)) {
+sleep_staticize_body -> velocity = vector3_zero ();
+sleep_staticize_body -> angular_velocity = vector3_zero ();
+sleep_staticize_body -> force_accumulator = vector3_zero ();
+sleep_staticize_body -> torque_accumulator = vector3_zero ();
+sleep_staticize_body -> inverse_mass = 0.0f;
+sleep_staticize_body -> inverse_inertia_system = a3_sleep_zero_matrix;
+}
+}
+/* MPE_TASK_13_SLEEP_STATICIZE_END */
+const int solver_iterations = 16; // Increased to propagate forces through deep stacks
         for (int iter = 0; iter < solver_iterations; iter++) {
             for (int m = 0; m < manifold_count; m++) {collision_resolve_iterative (&active_manifold [m]);}
         } contact_cache_save (active_manifold, manifold_count);
-        for (int object_iterator_index = 0; object_iterator_index < object_count; object_iterator_index++) {
+        /* MPE_TASK_13_SLEEP_RESTORE_BEGIN */
+for (int sleep_restore_index = 0; sleep_restore_index < object_count; sleep_restore_index++) {
+rigidbody *sleep_restore_body = &obj_per_scene [sleep_restore_index];
+if ((sleep_restore_body -> is_sleeping) && (!sleep_restore_body -> static_state)) {
+if ((sleep_restore_body -> mass > 0.0f) && (isfinite (sleep_restore_body -> mass))) {
+sleep_restore_body -> inverse_mass = 1.0f / sleep_restore_body -> mass;
+} else {
+sleep_restore_body -> inverse_mass = 0.0f;
+}
+math3 sleep_rotation_matrix = vector4_to_math3 (sleep_restore_body -> orientation);
+math3 sleep_rotation_transpose = math3_transposition (sleep_rotation_matrix);
+sleep_restore_body -> inverse_inertia_system = math3_multiplication (
+sleep_rotation_matrix,
+math3_multiplication (sleep_restore_body -> inverse_inertia_tensor_local, sleep_rotation_transpose)
+);
+sleep_restore_body -> velocity = vector3_zero ();
+sleep_restore_body -> angular_velocity = vector3_zero ();
+}
+}
+/* MPE_TASK_13_SLEEP_RESTORE_END */
+/* MPE_TASK_20A_BOUNDARY_MOVED_DECL_BEGIN */
+bool a3_boundary_moved_any = false;
+/* MPE_TASK_20A_BOUNDARY_MOVED_DECL_END */
+for (int object_iterator_index = 0; object_iterator_index < object_count; object_iterator_index++) {
             rigidbody *rigid_body = &obj_per_scene [object_iterator_index];
             rb_integrate_position (rigid_body, fixed_physics_dt); /* A3_PATCH_44_SEMI_IMPLICIT */
             /* A3_PATCH_43_POST_INTEGRATE_SANITIZE */
             rigidbody_sanitize (rigid_body);
-            if (!main_inputs.is_debug_mode_active) {boundary_apply_box (rigid_body, (vector3){-250, 0, -250}, (vector3){250, 500, 250});}
-            else {boundary_apply_floor (rigid_body, 0.0f);}
-        } physics_time_accumulator -= fixed_physics_dt;
+            /* MPE_TASK_20A_BOUNDARY_TRACK_BEGIN */
+vector3 a3_pre_boundary_position = rigid_body -> position;
+if (!main_inputs.is_debug_mode_active) {boundary_apply_box (rigid_body, (vector3){-250, 0, -250}, (vector3){250, 500, 250});}
+else {boundary_apply_floor (rigid_body, 0.0f);}
+if (vector3_length_squared (vector3_subtraction (rigid_body -> position, a3_pre_boundary_position)) > 0.000001f) {
+a3_boundary_moved_any = true;
+}
+/* MPE_TASK_20A_BOUNDARY_TRACK_END */
+        }
+/* MPE_TASK_20A_POST_BOUNDARY_DEPENETRATION_BEGIN */
+a3_positional_depenetration_pass (persistent_collision_pairs, &detected_collision_count, a3_boundary_moved_any);
+/* MPE_TASK_20A_POST_BOUNDARY_DEPENETRATION_END */
+physics_time_accumulator -= fixed_physics_dt;
     } gtk_widget_queue_draw (GTK_WIDGET (user_data_pointer));
-    debug_last_object_count = object_count;
+    /* MPE_TASK_12_SLEEPING_COUNT_BEGIN */
+int a3_sleeping_object_count = 0;
+for (int sleep_count_index = 0; sleep_count_index < object_count; sleep_count_index++) {
+if (obj_per_scene [sleep_count_index].is_sleeping) {a3_sleeping_object_count++;}
+}
+debug_last_sleeping_object_count = a3_sleeping_object_count;
+/* MPE_TASK_12_SLEEPING_COUNT_END */
+debug_last_object_count = object_count;
+/* MPE_TASK_13_LONG_RUN_TICK_CALL_BEGIN */
+long_run_validation_tick_update ();
+/* MPE_TASK_13_LONG_RUN_TICK_CALL_END */
 overlay_update ();
     return TRUE;
 }
