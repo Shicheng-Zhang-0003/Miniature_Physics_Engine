@@ -1,2 +1,47 @@
-*.d
+# ============ Build output ============
+# Object files + gcc auto-dependency files (-MMD -MP).
+# The .d files are Make-syntax; committing them is why GitHub
+# reports the repo as mostly Makefile.
 *.o
+*.d
+*.obj
+*.a
+*.so
+
+# The compiled binary
+engine
+engine.exe
+
+# Out-of-source build dir created by src/makefile (BUILD_DIR := build)
+build/
+
+# ============ Backup / scratch files ============
+# Manual per-task backups — use git history instead
+*.bak
+*.bak_*
+*.orig
+*.rej
+*~
+# Editor swap files
+*.swp
+*.swo
+.*.swp
+
+# ============ Editors / IDEs ============
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+compile_commands.json
+.cache/
+
+# ============ OS cruft ============
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ============ Runtime state (engine writes this at startup) ============
+status/
+
+# ============ Misc ============
+*.log
