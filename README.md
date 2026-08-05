@@ -1,5 +1,3 @@
-
-```markdown
 # MINIATURE PHYSICS ENGINE (MPE)
 
 <!-- MPE_RELEASE_FREEZE_NOTICE_BEGIN -->
@@ -69,6 +67,7 @@ Version 1.3 established the instanced-rendering and spatial-hash direction used 
 ## 🎨 Rendering System
 
 ### Hardware Instanced Rendering
+
 MPE eliminates per-object draw calls using GPU instancing.
 - CPU packs transformation matrices into contiguous buffers
 - GPU handles batch rendering via instanced draw calls
@@ -83,6 +82,7 @@ The grid, selected-object outline, and spring-joint overlay use additional draw 
 ## ⚙️ Physics Optimization
 
 ### Spatial Hash Grid Broadphase
+
 The previous Sweep-and-Prune system has been replaced with a **3D spatial hash grid**.
 
 Key properties:
@@ -103,6 +103,7 @@ Key properties:
 ---
 
 ### Collision Resolution
+
 Impulse-based solver supporting:
 - Static and kinetic friction
 - Rolling friction via torque at contact points
@@ -111,6 +112,7 @@ Impulse-based solver supporting:
 ---
 
 ### Integration
+
 - Semi-implicit Euler integration (linear motion)
 - Quaternion-based angular integration (no gimbal lock)
 
@@ -171,7 +173,7 @@ sudo apt install build-essential pkg-config libgtk-3-dev libepoxy-dev
 ```
 
 For other distributions (Fedora, Arch, SUSE, Alpine, Gentoo, Nix), see
-[`install/linux/linux_install_instructions.md`](install/linux/linux_install_instructions.md).
+[install/linux/linux_install_instructions.md](install/linux/linux_install_instructions.md).
 
 ### Build and run
 
@@ -186,4 +188,3 @@ make
 
 <img width="4424" height="1824" alt="Screenshot from 2026-07-18 17-18-52" src="https://github.com/user-attachments/assets/5d1d044d-3926-469e-ab27-9f3719452324" />
 <img width="4558" height="1908" alt="Screenshot from 2026-07-18 17-20-09" src="https://github.com/user-attachments/assets/acebe348-707e-485e-835c-08cd1b1dc0fa" />
-```
