@@ -2,6 +2,8 @@
 
 This tree is in **v14A3 RC freeze**.
 
+# 12/08/26 Update: v14S stabilised. This document is now in a legacy state.
+
 The purpose of this stage is to stabilise the engine for the upcoming `v14S`
 stable release.
 

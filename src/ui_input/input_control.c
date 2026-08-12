@@ -27,7 +27,6 @@ input_state -> r_key_pressed = false;
 input_state -> delete_key_pressed = false;
 input_state -> m_key_pressed = false;
 input_state -> t_key_pressed = false;
-input_state -> c_key_pressed = false;
 /* MPE_TASK_21_KEYBOARD_ONLY_INIT_END */
 //Menu
     input_state -> is_menu_open = false;
@@ -83,7 +82,6 @@ if ((event -> keyval == GDK_KEY_r) || (event -> keyval == GDK_KEY_R)) {input_sta
 if (event -> keyval == GDK_KEY_Delete) {input_state -> delete_key_pressed = true;}
 if ((event -> keyval == GDK_KEY_m) || (event -> keyval == GDK_KEY_M)) {input_state -> m_key_pressed = true;}
 if ((event -> keyval == GDK_KEY_t) || (event -> keyval == GDK_KEY_T)) {input_state -> t_key_pressed = true;}
-if ((event -> keyval == GDK_KEY_c) || (event -> keyval == GDK_KEY_C)) {input_state -> c_key_pressed = true;}
 /* MPE_TASK_21_KEYBOARD_ONLY_KEYPRESS_END */
 if (event -> keyval == GDK_KEY_F5) {input_state -> stability_test_pressed = true;}
 if (event -> keyval == GDK_KEY_F6) {input_state -> sleep_wake_test_pressed = true;}
@@ -201,7 +199,6 @@ if ((event -> keyval == GDK_KEY_r) || (event -> keyval == GDK_KEY_R)) {input_sta
 if (event -> keyval == GDK_KEY_Delete) {input_state -> delete_key_pressed = false;}
 if ((event -> keyval == GDK_KEY_m) || (event -> keyval == GDK_KEY_M)) {input_state -> m_key_pressed = false;}
 if ((event -> keyval == GDK_KEY_t) || (event -> keyval == GDK_KEY_T)) {input_state -> t_key_pressed = false;}
-if ((event -> keyval == GDK_KEY_c) || (event -> keyval == GDK_KEY_C)) {input_state -> c_key_pressed = false;}
 /* MPE_TASK_21_KEYBOARD_ONLY_KEYRELEASE_END */
     if (event -> keyval == GDK_KEY_i) {input_state -> i_key_pressed = false;}
     if (event -> keyval == GDK_KEY_j) {input_state -> j_key_pressed = false;}
@@ -291,7 +288,6 @@ input_state -> r_key_pressed = false;
 input_state -> delete_key_pressed = false;
 input_state -> m_key_pressed = false;
 input_state -> t_key_pressed = false;
-input_state -> c_key_pressed = false;
 /* MPE_TASK_21_KEYBOARD_ONLY_FOCUS_END */
 input_state -> up_arrow_pressed = false;
     input_state -> down_arrow_pressed = false;
