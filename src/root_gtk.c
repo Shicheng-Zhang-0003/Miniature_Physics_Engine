@@ -1,4 +1,3 @@
-#include <complex.h>
 #include <gtk/gtk.h>
 #include "mpe_engine.h"
 camera main_camera_fov;

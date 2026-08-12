@@ -1,5 +1,4 @@
 #include "../mpe_engine.h"
-#include <complex.h>
 #include <epoxy/gl.h>
 #include <epoxy/gl_generated.h>
 #include <sys/types.h>
@@ -34,6 +33,11 @@ void render_init () {
     if (render_init_status) {return;}
     instanced_shader_program = create_shader_program ("render/shaders/vertex_shader.glsl", "render/shaders/fragment_shader.glsl");
     utility_shader_program = create_shader_program ("render/shaders/utility_vertex.glsl", "render/shaders/utility_fragment.glsl");
+    if ((instanced_shader_program == 0) || (utility_shader_program == 0)) {
+    fprintf (stderr, "RENDER INIT FAILED: shader program creation failed (instanced=%u, utility=%u)\n", instanced_shader_program, utility_shader_program);
+    render_init_status = -1;
+    return;
+    }
     instanced_uniforms.projection_matrix_location = glGetUniformLocation (instanced_shader_program, "projection");
     instanced_uniforms.view_matrix_location = glGetUniformLocation (instanced_shader_program, "viewframe");
     instanced_uniforms.camera_position_location = glGetUniformLocation (instanced_shader_program, "camera_position");
@@ -53,6 +57,12 @@ void render_init () {
     render_init_status = 1;
 } void render_scene_current (int widget_width, int widget_height) {
     render_init ();
+    if (render_init_status < 0) {
+    glViewport (0, 0, widget_width, widget_height);
+    glClearColor (0.5f, 0.0f, 0.0f, 1.0f);
+    glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    return;
+    }
     glViewport (0, 0, widget_width, widget_height);
     glClearColor (0.05f, 0.05f, 0.1f, 1.0f);
     glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

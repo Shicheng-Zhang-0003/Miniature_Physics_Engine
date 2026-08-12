@@ -1,5 +1,4 @@
 #include "mpe_engine.h"
-#include <complex.h>
 #include <gtk/gtk.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -706,7 +705,7 @@ rigidbody_sanitize (&obj_per_scene [sanitize_index]);
         int detected_collision_count = 0;
         detected_collision_count = broadphase_generate_pairing (persistent_collision_pairs, MPE_MAX_BROADPHASE_PAIRS);
     debug_last_broadphase_pair_count = detected_collision_count;
-        static collision_data active_manifold [8192];
+        static collision_data active_manifold [A3_MAX_MANIFOLDS];
         int manifold_count = 0;
     contact_cache_stats_reset ();
         apply_force_all_joints ();
@@ -740,7 +739,7 @@ collision_data narrowphase_collision = {0};
             } else if (rigid_body_a -> type == object_cube && rigid_body_b -> type == object_cube) collided = collision_dual_cube (rigid_body_a, rigid_body_b, &narrowphase_collision);
             /* MPE_TASK_09_OBJECT_MANIFOLD_CONDITION_BEGIN */
 if (collided) {
-if (manifold_count < 8192) {
+if (manifold_count < A3_MAX_MANIFOLDS) {
 /* MPE_TASK_09_OBJECT_MANIFOLD_CONDITION_END */
                 /* MPE_TASK_13_SLEEP_WAKE_FIX_BEGIN */
 bool a3_a_was_sleeping = rigid_body_a -> is_sleeping;
@@ -784,7 +783,7 @@ rigidbody_wake (rigid_body_b);
  
      if (collision_static_plane_body (floor_rigid_body, 0.0f, &floor_collision)) {
          /* MPE_TASK_09_FLOOR_MANIFOLD_OVERFLOW_BEGIN */
-if (manifold_count < 8192) {
+if (manifold_count < A3_MAX_MANIFOLDS) {
 collision_prepare_solver (&floor_collision, &active_manifold [manifold_count]);
 manifold_count++;
 } else {

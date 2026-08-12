@@ -7,6 +7,7 @@
 #define MPE_MAX_BODIES 16384
 #define MPE_MAX_JOINTS 1024
 #define MPE_MAX_BROADPHASE_PAIRS 65536
+#define A3_MAX_MANIFOLDS 8192
 
 #include "core/math3D.h"
 #include "core/math4_special.h"
@@ -111,11 +112,11 @@ extern int debug_last_manifold_overflow_count;
 /* MPE_TASK_09_MANIFOLD_OVERFLOW_EXTERN_END */
 
 /* A3_PATCH_41_FINAL_VALIDATION */
-#define A3_VERSION_STRING "v14A3.51" /* A3_PATCH_51_FINAL_VALIDATION */
+#define A3_VERSION_STRING "v14S" /* v14S stable release */
 
 /* MPE_RELEASE_FREEZE_BEGIN */
-#define A3_RELEASE_FREEZE 1
-#define A3_RELEASE_FREEZE_NOTE "v14A3 RC freeze: fixes/validation/cleanup only until v14S"
+#define A3_RELEASE_FREEZE 0
+#define A3_RELEASE_FREEZE_NOTE "v14S stable release tagged: A3-to-S freeze complete"
 /* MPE_RELEASE_FREEZE_END */
 
 #endif // mpe_engine_h

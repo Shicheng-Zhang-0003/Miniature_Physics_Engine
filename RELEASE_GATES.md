@@ -1,5 +1,7 @@
 # MPE v14S Release Gates
 
+# Legacy Backlog --> v14S stabilised. v14t15 cycle commencing soon.
+
 This document defines the exit criteria for promoting `v14A3` to `v14S`.
 
 `v14S` is the stable release form of `v14A3`.
@@ -45,106 +47,106 @@ They should be recorded as post-stable work items.
 
 ### 1. Release Freeze
 
-- [ ] The `v14A3` release freeze policy is present and acknowledged.
-- [ ] No new features are being added.
-- [ ] Only correctness, stability, validation, documentation, and hygiene changes are accepted.
+- [x] The `v14A3` release freeze policy is present and acknowledged.
+- [x] No new features are being added.
+- [x] Only correctness, stability, validation, documentation, and hygiene changes are accepted.
 
 ### 2. Build
 
-- [ ] `make clean` succeeds.
-- [ ] `make` succeeds.
-- [ ] The engine binary is produced.
-- [ ] There are no new compiler errors.
-- [ ] Compiler warnings are reviewed and understood.
+- [x] `make clean` succeeds.
+- [x] `make` succeeds.
+- [x] The engine binary is produced.
+- [x] There are no new compiler errors.
+- [x] Compiler warnings are reviewed and understood.
 
 ### 3. Startup
 
-- [ ] Engine starts using the documented workflow.
-- [ ] Startup prints the correct version string.
-- [ ] Shaders load successfully.
-- [ ] The main window opens.
-- [ ] The grid renders.
-- [ ] The overlay renders.
-- [ ] There is no uncontrolled GL error spam.
+- [x] Engine starts using the documented workflow.
+- [x] Startup prints the correct version string.
+- [x] Shaders load successfully.
+- [x] The main window opens.
+- [x] The grid renders.
+- [x] The overlay renders.
+- [x] There is no uncontrolled GL error spam.
 
 ### 4. Shader / Render Failure Visibility
 
-- [ ] Shader compilation failure is reported clearly.
-- [ ] Shader link failure is reported clearly.
-- [ ] Missing shader files are reported clearly.
-- [ ] The engine does not silently continue in a broken render state.
+- [x] Shader compilation failure is reported clearly.
+- [x] Shader link failure is reported clearly.
+- [x] Missing shader files are reported clearly.
+- [x] The engine does not silently continue in a broken render state.
 
 ### 5. Input and Lifecycle
 
-- [ ] Closing the window quits the program.
-- [ ] Mouse lock can be acquired.
-- [ ] Mouse lock can be released.
-- [ ] Focus loss clears stuck keyboard state.
-- [ ] Focus loss clears stuck mouse state.
-- [ ] Dialogs do not leave editor state stuck.
+- [x] Closing the window quits the program.
+- [x] Mouse lock can be acquired.
+- [x] Mouse lock can be released.
+- [x] Focus loss clears stuck keyboard state.
+- [x] Focus loss clears stuck mouse state.
+- [x] Dialogs do not leave editor state stuck.
 
 ### 6. Editor Stability
 
-- [ ] Selecting an object does not crash.
-- [ ] Deleting the selected object does not crash.
-- [ ] Deleting a jointed object does not crash.
-- [ ] Deleting a marked joint object does not crash.
-- [ ] Opening menus with an invalid selection does not crash.
-- [ ] Save/load with menus open does not crash.
+- [x] Selecting an object does not crash.
+- [x] Deleting the selected object does not crash.
+- [x] Deleting a jointed object does not crash.
+- [x] Deleting a marked joint object does not crash.
+- [x] Opening menus with an invalid selection does not crash.
+- [x] Save/load with menus open does not crash.
 
 ### 7. Physics Stability
 
-- [ ] Objects rest on the floor without explosive jitter.
-- [ ] Cubes stack with reasonable stability.
-- [ ] Spheres and cubes collide correctly.
-- [ ] Restitution produces bounce.
-- [ ] Friction affects sliding.
-- [ ] Sleeping objects wake when hit.
-- [ ] Sleeping stacks remain sleeping once settled.
-- [ ] No NaNs appear after normal use.
-- [ ] No NaNs appear after stress testing.
+- [x] Objects rest on the floor without explosive jitter.
+- [x] Cubes stack with reasonable stability.
+- [x] Spheres and cubes collide correctly.
+- [x] Restitution produces bounce.
+- [x] Friction affects sliding.
+- [x] Sleeping objects wake when hit.
+- [x] Sleeping stacks remain sleeping once settled.
+- [x] No NaNs appear after normal use.
+- [x] No NaNs appear after stress testing.
 
 ### 8. Broadphase / Solver Visibility
 
-- [ ] Broadphase node overflow is visible.
-- [ ] Broadphase pair overflow is visible.
-- [ ] Manifold overflow is visible.
-- [ ] Pair-dedupe exhaustion is visible or safely handled.
-- [ ] Debug counters are visible in overlay and/or validation report.
+- [x] Broadphase node overflow is visible.
+- [x] Broadphase pair overflow is visible.
+- [x] Manifold overflow is visible.
+- [x] Pair-dedupe exhaustion is visible or safely handled.
+- [x] Debug counters are visible in overlay and/or validation report.
 
 ### 9. Validation Tests
 
-- [ ] F5 stability stack passes.
-- [ ] F6 sleep/wake test passes.
-- [ ] F7 editor torture test passes.
-- [ ] F8 spawn stress test passes.
-- [ ] F9 validation report prints useful state.
-- [ ] The engine can idle for several minutes without explosion.
+- [x] F5 stability stack passes.
+- [x] F6 sleep/wake test passes.
+- [x] F7 editor torture test passes.
+- [x] F8 spawn stress test passes.
+- [x] F9 validation report prints useful state.
+- [x] The engine can idle for several minutes without explosion.
 
 ### 10. Documentation
 
-- [ ] README matches the code.
-- [ ] User guide matches the code.
-- [ ] Validation checklist matches the current version.
-- [ ] Broadphase description matches the implementation.
-- [ ] Physics timestep description matches the implementation.
-- [ ] Known limitations are documented.
+- [x] README matches the code.
+- [x] User guide matches the code.
+- [x] Validation checklist matches the current version.
+- [x] Broadphase description matches the implementation.
+- [x] Physics timestep description matches the implementation.
+- [x] Known limitations are documented.
 
 ### 11. Repository Hygiene
 
-- [ ] Build artifacts are not tracked.
-- [ ] Object files are not tracked.
-- [ ] Dependency files are not tracked.
-- [ ] Backup shader files are removed or isolated.
-- [ ] Duplicate documentation is reduced or clarified.
-- [ ] A `.gitignore` exists.
+- [x] Build artifacts are not tracked.
+- [x] Object files are not tracked.
+- [x] Dependency files are not tracked.
+- [x] Backup shader files are removed or isolated.
+- [x] Duplicate documentation is reduced or clarified.
+- [x] A `.gitignore` exists.
 
 ### 12. Sanitizer / Debug Validation
 
-- [ ] A debug build with AddressSanitizer is available or manually used.
-- [ ] A debug build with UndefinedBehaviorSanitizer is available or manually used.
-- [ ] Normal validation passes under sanitizer builds.
-- [ ] No severe sanitizer errors are present.
+- [x] A debug build with AddressSanitizer is available or manually used.
+- [x] A debug build with UndefinedBehaviorSanitizer is available or manually used.
+- [x] Normal validation passes under sanitizer builds.
+- [x] No severe sanitizer errors are present.
 
 ---
 
@@ -152,24 +154,24 @@ They should be recorded as post-stable work items.
 
 ### Scene Save / Load
 
-- [ ] Saving a scene works.
-- [ ] Loading a scene works.
-- [ ] Loading resets editor/menu/selection state.
-- [ ] Save/load failure is reported.
-- [ ] Scene format limitations are documented.
+- [x] Saving a scene works.
+- [x] Loading a scene works.
+- [x] Loading resets editor/menu/selection state.
+- [x] Save/load failure is reported.
+- [x] Scene format limitations are documented.
 
 ### Performance Sanity
 
-- [ ] CPU usage drops when the scene is sleeping.
-- [ ] Overlay updates do not dominate frame time.
-- [ ] Redundant sanitization passes are reduced.
-- [ ] Stress scenes remain usable.
+- [x] CPU usage drops when the scene is sleeping.
+- [x] Overlay updates do not dominate frame time.
+- [x] Redundant sanitization passes are reduced.
+- [x] Stress scenes remain usable.
 
 ### User Feedback
 
-- [ ] Object capacity exhaustion is visible to the user.
-- [ ] Save/load failure is visible to the user.
-- [ ] Shader failure is visible to the user.
+- [x] Object capacity exhaustion is visible to the user.
+- [x] Save/load failure is visible to the user.
+- [x] Shader failure is visible to the user.
 
 ---
 

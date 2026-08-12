@@ -42,7 +42,6 @@ After dependencies have been installed:
         - This makes a new compilation of the source code run using your system's specifications.
         - Especially now that I have added -O3 into compilation flags.
         - Usually nothing, but for older systems gcc optimisations may be in consideration
-    If you see a bunch of warnings from gcc, do not worry.
     The only time you should be worried is if you see make: Error at the end of the compilation
     However, my own testing often reveals such issues, so theoretically this should only happen if you didn't install a dependency properly.
 
