@@ -1,3 +1,4 @@
+
 ```markdown
 # 🧊 MINIATURE PHYSICS ENGINE (MPE)
 
@@ -42,6 +43,7 @@ MPE is built around four priorities:
 ## 🎨 Rendering System
 
 ### Hardware-Instanced Rendering
+
 MPE eliminates per-object draw calls using **GPU instancing**:
 
 - The CPU packs model matrices + colors into contiguous buffers.
@@ -49,6 +51,7 @@ MPE eliminates per-object draw calls using **GPU instancing**:
 - The grid, selection outline, and spring-joint overlay share a utility shader with cached uniform locations.
 
 ### Shading
+
 - Custom **GLSL Phong** lighting (ambient + diffuse + specular).
 - **Equatorial axis rings** painted on every object (red/green/blue) so rotation is visible at a glance.
 
@@ -57,9 +60,11 @@ MPE eliminates per-object draw calls using **GPU instancing**:
 ## ⚙️ Physics Engine
 
 ### Broadphase — Spatial Hash Grid
+
 Objects are mapped into hashed grid buckets; collision checks are limited to local neighborhoods for **average O(N)** scaling. Cell size adapts to object radii. A sleep system removes inactive bodies from the solver.
 
 ### Narrowphase
+
 | Pair | Method |
 |---|---|
 | Sphere–Sphere | Analytical distance test |
@@ -67,11 +72,13 @@ Objects are mapped into hashed grid buckets; collision checks are limited to loc
 | OBB–OBB | Separating Axis Theorem (15 axes) + Sutherland–Hodgman face clipping |
 
 ### Solver
+
 - **Impulse-based sequential solver**, 16 iterations, with **warm starting**.
 - Static + kinetic friction, rolling friction, Baumgarte penetration correction.
 - Positional depenetration pass for pile stability.
 
 ### Integration
+
 - **Semi-implicit (symplectic) Euler** for linear motion.
 - **Quaternion-based angular integration** (no gimbal lock).
 - **Fixed 60 Hz timestep** with an accumulator and 5-substep cap (spiral-of-death prevention).
@@ -98,6 +105,7 @@ A fully custom, dependency-free math library: 3D vectors, 4×4 matrices, quatern
 ## 🎮 Controls
 
 ### Movement & Camera
+
 | Action | Input |
 |---|---|
 | Move | `W A S D` |
@@ -110,12 +118,14 @@ A fully custom, dependency-free math library: 3D vectors, 4×4 matrices, quatern
 | Toggle Game / Debug mode | `0` |
 
 ### Spawning
+
 | Action | Input |
 |---|---|
-| Spawn object | Hold `Shift` **or** hold `Enter` |
+| Spawn object | Hold `Enter` |
 | Spawner settings | `8` |
 
 ### Selection & Editing
+
 | Action | Input |
 |---|---|
 | Select object | Right-click (raycast) **or** `R` (Debug) |
@@ -126,6 +136,7 @@ A fully custom, dependency-free math library: 3D vectors, 4×4 matrices, quatern
 | Save / Load scene | `9` |
 
 ### Debug Terminal & Validation
+
 | Action | Input |
 |---|---|
 | Open debug terminal | `T` or `1` (Debug) |
@@ -187,13 +198,16 @@ MPE ships with built-in stability tests:
 ## 🛠️ Build Instructions
 
 ### Dependencies (Ubuntu / Debian)
+
 ```bash
 sudo apt update
 sudo apt install build-essential pkg-config libgtk-3-dev libepoxy-dev
 ```
-For other distributions (Fedora, Arch, SUSE, Alpine, Gentoo, Nix), see [`install/linux/linux_install_instructions.md`](install/linux/linux_install_instructions.md).
+
+For other distributions (Fedora, Arch, SUSE, Alpine, Gentoo, Nix), see [install/linux/linux_install_instructions.md](install/linux/linux_install_instructions.md).
 
 ### Build and run
+
 ```bash
 cd src
 make clean
@@ -228,4 +242,3 @@ See `evolution.txt` for the full lineage back to stage 0.
 
 <img width="4424" height="1824" alt="Screenshot from 2026-07-18 17-18-52" src="https://github.com/user-attachments/assets/5d1d044d-3926-469e-ab27-9f3719452324" />
 <img width="4558" height="1908" alt="Screenshot from 2026-07-18 17-20-09" src="https://github.com/user-attachments/assets/acebe348-707e-485e-835c-08cd1b1dc0fa" />
-```
