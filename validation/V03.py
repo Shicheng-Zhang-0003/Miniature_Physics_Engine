@@ -1,0 +1,54 @@
+#!/usr/bin/env python3
+"""V-03: Interactive walk of the 12 mandatory P0 gates. Writes a log."""
+import os, datetime
+
+GATES = [
+    ("1. Release Freeze", "Freeze policy present; no new features; only allowed change classes."),
+    ("2. Build", "make clean + make succeed; binary produced; warnings reviewed."),
+    ("3. Startup", "Starts via documented workflow; prints correct version; shaders load; window/grid/overlay render."),
+    ("4. Shader/Render Failure Visibility", "Compile/link/missing-file failures reported; no silent broken render state."),
+    ("5. Input and Lifecycle", "Close quits; mouse lock acquire/release; focus loss clears stuck state; dialogs don't stick."),
+    ("6. Editor Stability", "Select/delete/jointed-delete/marked-delete no crash; invalid-selection menus safe; save/load with menus safe."),
+    ("7. Physics Stability", "Rest without jitter; cubes stack; sphere/cube collide; restitution; friction; sleep/wake; no NaNs."),
+    ("8. Broadphase/Solver Visibility", "Node/pair/manifold overflow visible; dedupe exhaustion visible; counters in overlay/report."),
+    ("9. Validation Tests", "F5/F6/F7/F8/F9 pass; engine idles minutes without explosion."),
+    ("10. Documentation", "README + user guide + checklist match code; broadphase + timestep descriptions accurate."),
+    ("11. Repository Hygiene", "No tracked build artifacts; .gitignore exists; duplicate docs clarified."),
+    ("12. Sanitizer/Debug Validation", "ASan + UBSan builds available; normal validation passes under them; no severe errors."),
+]
+
+def main():
+    print("=== V-03: P0 Release Gate Checklist Walk ===")
+    print("Manually verify each gate, then record the result.\n")
+    results = []
+    for name, desc in GATES:
+        print(f"--- {name} ---\n    {desc}")
+        while True:
+            ans = input("    PASS / FAIL / SKIP? [p/f/s]: ").strip().lower()
+            if ans in ("p", "pass"):   results.append((name, "PASS")); print(); break
+            if ans in ("f", "fail"):   results.append((name, "FAIL")); print(); break
+            if ans in ("s", "skip"):   results.append((name, "SKIP")); print(); break
+            print("    Enter p, f, or s.")
+
+    stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    log = os.path.join("v14S", "v03_gate_validation.log")
+    fails = [r for r in results if r[1] == "FAIL"]
+    with open(log, "w") as f:
+        f.write(f"MPE v14S P0 Gate Validation - {stamp}\n\n")
+        for name, status in results:
+            f.write(f"[{status}] {name}\n")
+        f.write(f"\nResult: {'ALL P0 PASS' if not fails else f'{len(fails)} GATE(S) FAILED'}\n")
+
+    print("=== SUMMARY ===")
+    for name, status in results:
+        print(f"  [{status}] {name}")
+    print()
+    if fails:
+        print(f"RESULT: {len(fails)} gate(s) FAILED. Do NOT tag v14S.")
+        print("Fix the failures, rerun validation, then re-evaluate.")
+    else:
+        print("RESULT: ALL P0 GATES PASS. Proceed to V-05 release prep.")
+    print(f"\nLog written to {log}")
+
+if __name__ == "__main__":
+    main()

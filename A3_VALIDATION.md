@@ -1,4 +1,5 @@
-# MPE v14A3.41 Validation Checklist
+# MPE v14A3.51 Validation Checklist
+> This checklist is subordinate to [`RELEASE_GATES.md`](RELEASE_GATES.md), which is the authoritative gate list for `v14S`.
 
 
 <!-- MPE_RELEASE_GATES_SECTION_BEGIN -->
@@ -25,7 +26,7 @@ Minimum mandatory gates:
 Do not tag `v14S` until all mandatory P0 gates pass.
 <!-- MPE_RELEASE_GATES_SECTION_END -->
 
-This checklist validates the full 1-41 A3 patch sequence.
+This checklist validates the full 1-51 A3 patch sequence.
 
 ## Built-in Test Keys
 
@@ -78,7 +79,7 @@ This checklist validates the full 1-41 A3 patch sequence.
 
 - [ ] make -C src clean succeeds.
 - [ ] make -C src succeeds.
-- [ ] Startup prints: MPE v14A3.41
+- [ ] Startup prints: MPE v14A3.51
 
 ## Final Pass
 

@@ -13,7 +13,6 @@ bool r_key_pressed;
 bool delete_key_pressed;
 bool m_key_pressed;
 bool t_key_pressed;
-bool c_key_pressed;
 /* MPE_TASK_21_KEYBOARD_ONLY_FIELDS_END */
     // Camera Emulation (IJKL)
     bool i_key_pressed, j_key_pressed, k_key_pressed, l_key_pressed;
