@@ -1,52 +1,42 @@
-# MPE v14A3 Release Freeze Policy
+# MPE v15R1 Release Policy
 
-This tree is in **v14A3 RC freeze**.
+This tree is in **v15R1 development**.
 
-# 12/08/26 Update: v14S stabilised. This document is now in a legacy state.
+## Cycle Goal
 
-The purpose of this stage is to stabilise the engine for the upcoming `v14S`
-stable release.
+The v15 series introduces the centralised configuration system.
+This release candidate covers:
 
-## Freeze Rule
+1. `src/config/` folder with LOCKED constants manifest and tunable registry.
+2. Engine code migration to read from the config store.
+3. Permanent storage of tunables to `status/engine.cfg`.
+4. In-engine menu toggle (key `6`) for live parameter editing.
+5. Terminal `env`/`export` rewire to the registry.
 
-Until `v14S` is tagged, the following rule applies:
+## Change Classes Accepted
 
-> No new features are to be added to this branch.
+During v15R1 development:
 
-Only the following change classes are accepted:
-
-1. Correctness fixes.
-2. Crash fixes.
-3. Stability fixes.
-4. Validation and testing improvements.
-5. Documentation corrections.
-6. Build and repository hygiene.
-7. Small performance fixes only where they remove obvious waste or instability.
+1. Configuration system implementation (Tasks 24–41).
+2. Correctness fixes required by the config migration.
+3. Build and repository hygiene.
+4. Documentation updates to match new architecture.
+5. Validation improvements for the new system.
 
 ## Explicitly Deferred
 
-The following are deferred until after `v14S`:
-
-- New physics features.
-- New rendering features.
-- New editor systems.
-- New constraint types.
-- Large architectural refactors.
-- Full global-state removal.
+- Full global-state removal beyond config extraction.
 - Multithreading.
 - Continuous collision detection.
 - Generic constraint framework.
 - Scene format version 2.
+- Wayland mouse-lock support.
 
 ## Release Goal
 
-The goal of `v14S` is not to make the engine perfect.
-
-The goal is to make the current engine:
-
-- build cleanly,
-- run predictably,
-- fail visibly,
-- pass validation,
-- and be release-worthy as the stable form of `v14A3`.
-
+`v15R1` may be tagged when:
+- all MPE_TASK_24 through MPE_TASK_41 are complete,
+- all P0 gates pass,
+- the config system round-trips (save → restart → load),
+- the menu and terminal both edit live parameters,
+- and physics behaviour at defaults is identical to v14S.

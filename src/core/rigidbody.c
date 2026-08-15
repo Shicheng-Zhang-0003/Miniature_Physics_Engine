@@ -177,7 +177,7 @@ void rigidbody_initialisation_sphere (rigidbody *rigid_body, float radius, float
     if (mass > 0) {rigid_body -> inverse_mass = 1.0f / mass;}
     else {rigid_body -> inverse_mass = 0.0f;}
     rigid_body -> radius = radius;
-    rigid_body -> restitution = 0.5f; //Default Bounce Energy Return
+    rigid_body -> restitution = g_cfg.body_defaults.sphere_restitution; /* MPE_TASK_32 */
     rigid_body -> static_state = (mass == 0);
     rigid_body -> is_sleeping = false;
     rigid_body -> sleep_timer = 0.0f; //Static Objects
@@ -271,12 +271,12 @@ void rb_integrate (rigidbody *rigid_body, float delta_time, float linear_damping
     if (rigid_body -> is_sleeping) {return;}
 
     // Safety Clamp: Prevent infinite energy explosions in deep piles
-    float max_linear_speed = 150.0f;
+    float max_linear_speed = g_cfg.timestep.max_linear_speed; /* MPE_TASK_30 */
     float current_speed_sq = vector3_length_squared (rigid_body -> velocity);
     if (current_speed_sq > max_linear_speed * max_linear_speed) {
         rigid_body -> velocity = vector3_scaling (vector3_normalisation (rigid_body -> velocity), max_linear_speed);
     }
-    float max_angular_speed = 30.0f;
+    float max_angular_speed = g_cfg.timestep.max_angular_speed; /* MPE_TASK_30 */
     float current_ang_speed_sq = vector3_length_squared (rigid_body -> angular_velocity);
     if (current_ang_speed_sq > max_angular_speed * max_angular_speed) {
         rigid_body -> angular_velocity = vector3_scaling (vector3_normalisation (rigid_body -> angular_velocity), max_angular_speed);
@@ -284,9 +284,9 @@ void rb_integrate (rigidbody *rigid_body, float delta_time, float linear_damping
 
     float speed_sq = vector3_length_squared (rigid_body -> velocity);
     float ang_speed_sq = vector3_length_squared (rigid_body -> angular_velocity);
-    if (speed_sq < 0.0025f && ang_speed_sq < 0.0001f) {
+    if (speed_sq < g_cfg.sleep.linear_thresh_sq && ang_speed_sq < g_cfg.sleep.angular_thresh_sq) {
         rigid_body -> sleep_timer += delta_time;
-        if (rigid_body -> sleep_timer > 1.0f) {rigid_body -> is_sleeping = true;}
+        if (rigid_body -> sleep_timer > g_cfg.sleep.timer_duration) {rigid_body -> is_sleeping = true;}
     } else {rigid_body -> sleep_timer = 0.0f;}
     //Update inverse inertia tensor based on current orientation before using it
     //inverse_inertia_system = rotational * inverse_inertia_local * transposed value in 4D rotational axis
@@ -352,14 +352,14 @@ void rb_integrate (rigidbody *rigid_body, float delta_time, float linear_damping
         rigid_body -> angular_velocity = vector3_zero ();
     }
 
-    float max_linear_speed = 150.0f;
+    float max_linear_speed = g_cfg.timestep.max_linear_speed; /* MPE_TASK_30 */
     float current_speed_sq = vector3_length_squared (rigid_body -> velocity);
 
     if (current_speed_sq > max_linear_speed * max_linear_speed) {
         rigid_body -> velocity = vector3_scaling (vector3_normalisation (rigid_body -> velocity), max_linear_speed);
     }
 
-    float max_angular_speed = 30.0f;
+    float max_angular_speed = g_cfg.timestep.max_angular_speed; /* MPE_TASK_30 */
     float current_angular_speed_sq = vector3_length_squared (rigid_body -> angular_velocity);
 
     if (current_angular_speed_sq > max_angular_speed * max_angular_speed) {
@@ -397,9 +397,9 @@ void rb_integrate_position (rigidbody *rigid_body, float delta_time) {
     float speed_sq = vector3_length_squared (rigid_body -> velocity);
     float angular_speed_sq = vector3_length_squared (rigid_body -> angular_velocity);
 
-    if ((speed_sq < 0.0025f) && (angular_speed_sq < 0.0001f)) {
+    if ((speed_sq < g_cfg.sleep.linear_thresh_sq) && (angular_speed_sq < g_cfg.sleep.angular_thresh_sq)) {
         rigid_body -> sleep_timer += delta_time;
-        if (rigid_body -> sleep_timer > 1.0f) {rigid_body -> is_sleeping = true;}
+        if (rigid_body -> sleep_timer > g_cfg.sleep.timer_duration) {rigid_body -> is_sleeping = true;}
     } else {
         rigid_body -> sleep_timer = 0.0f;
     }
@@ -424,7 +424,7 @@ void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_inpu
     else {rigid_body -> inverse_mass = 0.0f;}
     rigid_body -> half_extensions = half_extensions;
     rigid_body -> radius = vector3_length (half_extensions); // Bounding radius for broadphase
-    rigid_body -> restitution = 0.5f;
+    rigid_body -> restitution = g_cfg.body_defaults.cube_restitution; /* MPE_TASK_32 */
     rigid_body -> static_state = (mass == 0);
     rigid_body -> is_sleeping = false;
     rigid_body -> sleep_timer = 0.0f;

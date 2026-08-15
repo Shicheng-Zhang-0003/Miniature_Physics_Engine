@@ -19,6 +19,7 @@ bool t_key_pressed;
     //File Load Inputs
     bool is_menu_open;
     bool menu_1_pressed, menu_2_pressed, menu_3_pressed;
+bool menu_4_pressed, menu_5_pressed, menu_6_pressed; /* MPE_TASK_35 */
     //Spawn Object Status
     int spawner_menu_level;
     int velocity_menu_level;
@@ -36,6 +37,9 @@ bool debug_terminal_pressed;
 /* MPE_TASK_13_LONG_RUN_INPUT_BEGIN */
 bool long_run_validation_pressed;
 /* MPE_TASK_13_LONG_RUN_INPUT_END */
+/* MPE_TASK_39_CONFIG_TORTURE_INPUT_BEGIN */
+bool config_torture_pressed;
+/* MPE_TASK_39_CONFIG_TORTURE_INPUT_END */
     //Mouse Status Inputs
     bool is_mouse_locked, is_debug_mode_active;
     bool left_mouse_button_clicked, right_mouse_button_clicked, middle_mouse_button_clicked;

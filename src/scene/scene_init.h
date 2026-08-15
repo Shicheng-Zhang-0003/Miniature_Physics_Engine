@@ -31,4 +31,7 @@ void scene_spawn_stress_test (void);
 /* MPE_TASK_13_LONG_RUN_SCENE_DECL_BEGIN */
 void scene_spawn_long_run_validation (void);
 /* MPE_TASK_13_LONG_RUN_SCENE_DECL_END */
+/* MPE_TASK_39_CONFIG_TORTURE_DECL_BEGIN */
+void scene_spawn_config_torture_test (void);
+/* MPE_TASK_39_CONFIG_TORTURE_DECL_END */
 #endif

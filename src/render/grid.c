@@ -44,6 +44,9 @@ static GLint a3_grid_uniform_normal_matrix = -1;
 static GLint a3_grid_uniform_object_colour = -1;
 static GLint a3_grid_uniform_camera_position = -1;
 static GLint a3_grid_uniform_light_position = -1;
+static GLint a3_grid_uniform_ambient = -1;
+static GLint a3_grid_uniform_specular_coeff = -1;
+static GLint a3_grid_uniform_specular_exp = -1;
 
 static void a3_grid_cache_uniforms (GLuint shader_program) {
     if (shader_program == a3_grid_cached_program) {return;}
@@ -56,6 +59,9 @@ static void a3_grid_cache_uniforms (GLuint shader_program) {
     a3_grid_uniform_object_colour = glGetUniformLocation (shader_program, "object_colour");
     a3_grid_uniform_camera_position = glGetUniformLocation (shader_program, "camera_position");
     a3_grid_uniform_light_position = glGetUniformLocation (shader_program, "light_position");
+    a3_grid_uniform_ambient = glGetUniformLocation (shader_program, "u_ambient_strength");
+    a3_grid_uniform_specular_coeff = glGetUniformLocation (shader_program, "u_specular_coeff");
+    a3_grid_uniform_specular_exp = glGetUniformLocation (shader_program, "u_specular_exponent");
 }
 
 void grid_render (grid_mesh *grid_mesh_object, GLuint shader_program, math4 view_matrix, math4 projection_matrix) {
@@ -79,7 +85,10 @@ void grid_render (grid_mesh *grid_mesh_object, GLuint shader_program, math4 view
     } glUniformMatrix3fv (a3_grid_uniform_normal_matrix, 1, GL_FALSE, normal_matrix_flat_array);
     glUniform3f (a3_grid_uniform_object_colour, 0.3f, 0.3f, 0.3f);
     glUniform3f (a3_grid_uniform_camera_position, main_camera_fov.position.x, main_camera_fov.position.y, main_camera_fov.position.z);
-    glUniform3f (a3_grid_uniform_light_position, 20.0f, 40.0f, 20.0f);
+    glUniform3f (a3_grid_uniform_light_position, g_cfg.render.light_x, g_cfg.render.light_y, g_cfg.render.light_z);
+    glUniform1f (a3_grid_uniform_ambient, g_cfg.render.ambient_strength);
+    glUniform1f (a3_grid_uniform_specular_coeff, g_cfg.render.specular_coeff);
+    glUniform1f (a3_grid_uniform_specular_exp, g_cfg.render.specular_exponent);
     const float grid_surface_normal_x = 0.0f;
     const float grid_surface_normal_y = 1.0f;
     const float grid_surface_normal_z = 0.0f;
