@@ -4,10 +4,9 @@
 #include <gtk/gtk.h>
 #include <epoxy/gl.h>
 
-#define MPE_MAX_BODIES 16384
-#define MPE_MAX_JOINTS 1024
-#define MPE_MAX_BROADPHASE_PAIRS 65536
-#define A3_MAX_MANIFOLDS 8192
+/* MPE_TASK_25_CONSTANTS_INCLUDE */
+#include "config/mpe_constants.h"
+#include "config/mpe_config.h"
 
 #include "core/math3D.h"
 #include "core/math4_special.h"
@@ -40,6 +39,7 @@
 #include "ui_input/editor.h"
 /* MPE_TASK_18_TERMINAL_INCLUDE_BEGIN */
 #include "ui_input/debug_terminal.h"
+#include "ui_input/config_menu.h"
 /* MPE_TASK_18_TERMINAL_INCLUDE_END */
 /* ------------------------------------------------------------------ */
 /* Global scene state                                                 */
@@ -62,13 +62,7 @@ extern input_status main_inputs;
 
 extern int selected_object;
 
-extern float world_gravity_y;
-extern float world_drag_coefficient;
-extern float world_surface_friction_static;
-extern float world_surface_friction_kinetic;
 
-extern float variable_change_rate;
-extern float jump_height;
 
 extern frame_timer main_timer;
 
@@ -112,11 +106,11 @@ extern int debug_last_manifold_overflow_count;
 /* MPE_TASK_09_MANIFOLD_OVERFLOW_EXTERN_END */
 
 /* A3_PATCH_41_FINAL_VALIDATION */
-#define A3_VERSION_STRING "v14S" /* v14S stable release */
+#define A3_VERSION_STRING "v15R1" /* v15R1 release candidate */
 
 /* MPE_RELEASE_FREEZE_BEGIN */
 #define A3_RELEASE_FREEZE 0
-#define A3_RELEASE_FREEZE_NOTE "v14S stable release tagged: A3-to-S freeze complete"
+#define A3_RELEASE_FREEZE_NOTE "v15R1 development cycle active"
 /* MPE_RELEASE_FREEZE_END */
 
 #endif // mpe_engine_h

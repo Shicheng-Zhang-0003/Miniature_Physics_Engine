@@ -3,6 +3,7 @@
 #include "../physics/spring_joint.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include <time.h> /* MPE_TASK_39 srand() */
 
 static bool pool_is_initialized = false;
 
@@ -84,8 +85,8 @@ if ((new_object_index < 0) || (new_object_index >= object_count)) {return;}
 rigidbody *new_body = &obj_per_scene [new_object_index];
 if (new_body -> static_state) {return;}
 
-const int max_attempts = 24;
-const float overlap_threshold = 0.02f;
+const int max_attempts = g_cfg.spawner.overlap_max_attempts; /* MPE_TASK_32 */
+const float overlap_threshold = g_cfg.spawner.overlap_thresh; /* MPE_TASK_32 */
 
 for (int attempt = 0; attempt < max_attempts; attempt++) {
 bool overlap_found = false;
@@ -326,7 +327,7 @@ void scene_editor_torture_test (void) {
         )
     );
 
-    add_joint (object_a_index, object_b_index, first_joint_length, 100.0f, 2.0f);
+    add_joint (object_a_index, object_b_index, first_joint_length, g_cfg.joints.default_spring_k, g_cfg.joints.default_damping); /* MPE_TASK_31 */
     scene_remove_object_by_index (object_b_index);
 
     int shifted_object_c_index = object_c_index;
@@ -344,7 +345,7 @@ void scene_editor_torture_test (void) {
             )
         );
 
-        add_joint (object_a_index, shifted_object_c_index, second_joint_length, 100.0f, 2.0f);
+        add_joint (object_a_index, shifted_object_c_index, second_joint_length, g_cfg.joints.default_spring_k, g_cfg.joints.default_damping); /* MPE_TASK_31 */
         scene_remove_object_by_index (shifted_object_c_index);
     }
 
@@ -513,6 +514,31 @@ obj_per_scene [spawned_object_index].friction_kinetic = 0.7f;
 }
 }
 /* MPE_TASK_13_LONG_RUN_SCENE_END */
+
+/* MPE_TASK_39_CONFIG_TORTURE_SCENE_BEGIN */
+void scene_spawn_config_torture_test (void) {
+    /* Randomize all tunables to extreme but bounded values */
+    srand ((unsigned int) time (NULL) ^ 0xDEADBEEFu);
+    for (size_t cfg_i = 0; cfg_i < g_registry_count; cfg_i++) {
+        const mpe_param *p = &g_registry [cfg_i];
+        if (p -> type == P_FLOAT) {
+            float range = (float) (p -> max - p -> min);
+            float random_value = (float) p -> min + ((float) rand () / (float) RAND_MAX) * range;
+            *(float *) p -> storage = random_value;
+        } else if (p -> type == P_INT) {
+            int range = (int) (p -> max - p -> min);
+            int random_value = (int) p -> min + (rand () % ((range > 0) ? range : 1));
+            *(int *) p -> storage = random_value;
+        } else if (p -> type == P_BOOL) {
+            *(bool *) p -> storage = (rand () % 2) != 0;
+        }
+    }
+    /* Spawn the standard long-run validation scene */
+    scene_spawn_long_run_validation ();
+    printf ("[A3] Config torture: tunables randomized to extreme values\n");
+    fflush (stdout);
+}
+/* MPE_TASK_39_CONFIG_TORTURE_SCENE_END */
 
 void scene_clear (void) {
     object_count = 0;

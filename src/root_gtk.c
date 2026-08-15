@@ -37,6 +37,14 @@ if ((widget_width <= 0) || (widget_height <= 0)) {return TRUE;}
 int main_algorithm (int argc, char *argv []) {
     g_setenv ("GDK_BACKEND", "x11", TRUE);
     gtk_init (&argc, &argv);
+    mpe_config_init (); /* MPE_TASK_29_CONFIG_INIT */
+    /* MPE_TASK_34_CONFIG_LOAD_BEGIN */
+    if (mpe_config_load ("status/engine.cfg")) {
+        printf ("[config] loaded status/engine.cfg\n");
+    } else {
+        printf ("[config] defaults active (no saved config)\n");
+    }
+    /* MPE_TASK_34_CONFIG_LOAD_END */
 printf ("MPE %s\n", A3_VERSION_STRING); /* A3_PATCH_41_FINAL_VALIDATION */
     //Camera Init
     initialize_camera (&main_camera_fov, (vector3) {0.0f, 20.0f, 50.0f});
@@ -71,6 +79,10 @@ printf ("MPE %s\n", A3_VERSION_STRING); /* A3_PATCH_41_FINAL_VALIDATION */
     gtk_widget_grab_focus (main_window);
     frame_timer_init (&main_timer);
     gtk_main ();
+    /* MPE_TASK_34_CONFIG_SAVE_BEGIN */
+    mpe_config_save ("status/engine.cfg");
+    printf ("[config] saved status/engine.cfg\n");
+    /* MPE_TASK_34_CONFIG_SAVE_END */
     return 0;
 } int main (int argc, char *argv []) {
     main_algorithm (argc, argv);

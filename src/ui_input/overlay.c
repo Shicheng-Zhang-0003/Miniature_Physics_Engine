@@ -10,17 +10,12 @@ static GtkWidget *menu_label = NULL;
 static GtkWidget *spawner_menu_label = NULL;
 static GtkWidget *velocity_menu_label = NULL;
 static GtkWidget *object_menu_label = NULL;
+static GtkWidget *config_menu_label = NULL; /* MPE_TASK_35 */
 extern input_status main_inputs;
 extern camera main_camera_fov;
-extern float world_gravity_y;
-extern float world_drag_coefficient;
-extern float world_surface_friction_static;
-extern float world_surface_friction_kinetic;
 extern rigidbody *obj_per_scene;
 extern int object_count;
 extern int selected_object;
-extern float variable_change_rate;
-extern float jump_height;
 
 
 static void overlay_append_overflow_text (char *buffer, size_t buffer_size) {
@@ -75,7 +70,7 @@ GtkWidget *overlay_initialise (GtkWidget *gl_drawing_area_widget) {
     //Debug Info
     GtkWidget *ui_overlay_container = gtk_overlay_new ();
     gtk_container_add (GTK_CONTAINER (ui_overlay_container), gl_drawing_area_widget);
-    debug_information_label = gtk_label_new ("- Miniature Physics Engine v1.4 Alpha 3 -");
+    debug_information_label = gtk_label_new ("- Miniature Physics Engine v15R1 -");
     gtk_widget_set_halign (debug_information_label, GTK_ALIGN_START);
     gtk_widget_set_valign (debug_information_label, GTK_ALIGN_START);
     gtk_overlay_add_overlay (GTK_OVERLAY (ui_overlay_container), debug_information_label);
@@ -109,6 +104,14 @@ GtkWidget *overlay_initialise (GtkWidget *gl_drawing_area_widget) {
     gtk_widget_set_valign (object_menu_label, GTK_ALIGN_CENTER);
     gtk_overlay_add_overlay (GTK_OVERLAY (ui_overlay_container), object_menu_label);
     gtk_widget_hide (object_menu_label);
+
+    /* MPE_TASK_35_CONFIG_MENU_LABEL_BEGIN */
+    config_menu_label = gtk_label_new ("");
+    gtk_widget_set_halign (config_menu_label, GTK_ALIGN_CENTER);
+    gtk_widget_set_valign (config_menu_label, GTK_ALIGN_CENTER);
+    gtk_overlay_add_overlay (GTK_OVERLAY (ui_overlay_container), config_menu_label);
+    gtk_widget_hide (config_menu_label);
+    /* MPE_TASK_35_CONFIG_MENU_LABEL_END */
     return ui_overlay_container;
 } static void overlay_append_stats_text (char *buffer, size_t buffer_size) {
     /* A3_PATCH_36_DEBUG_COUNTERS */
@@ -142,10 +145,10 @@ snprintf (buffer + sleep_current_length, buffer_size - sleep_current_length,
 }
 
 void overlay_update (void) {
-    float adjustment_increment = variable_change_rate;
+    float adjustment_increment = g_cfg.ui.change_rate_game;
     if (menu_label) {
         if (main_inputs.is_menu_open) {
-            gtk_label_set_text (GTK_LABEL (menu_label), "1: Save current state\n2: Load previous state\n3: Exit");
+            { char menu_text_buffer [512]; snprintf (menu_text_buffer, sizeof (menu_text_buffer), "-- Scene Menu --\nObjects: %d | Joints: %d\n\n1: Save Scene\n2: Load Scene\n3: Clear Scene\n4: Save Config\n5: Reset Config\n6: Exit", object_count, current_joint_count); gtk_label_set_text (GTK_LABEL (menu_label), menu_text_buffer); }
             gtk_widget_show (menu_label);
         } else {gtk_widget_hide (menu_label);}
     } if (spawner_menu_label) {
@@ -158,11 +161,11 @@ void overlay_update (void) {
                 else {spawn_type_text = "Cube";}
                 snprintf (spawner_text, sizeof (spawner_text), "-- Spawner Menu --\n1: Sphere\n2: Cube\n3: Current Type: %s", spawn_type_text);
             } else if (main_inputs.spawner_menu_level == 2) {snprintf (spawner_text, sizeof (spawner_text), "-- Sphere Settings --\n1: Mass\n2: Radius");}
-            else if (main_inputs.spawner_menu_level == 3) {snprintf (spawner_text, sizeof (spawner_text), "-- Mass Settings --\nCurrent Mass: %.2f kg\n\nValue dialog active (step %.2f)", spawn_mass, adjustment_increment);}
-            else if (main_inputs.spawner_menu_level == 4) {snprintf (spawner_text, sizeof (spawner_text), "-- Radius Settings --\nCurrent Radius: %.2f m\n\nValue dialog active (step %.2f)", spawn_radius, adjustment_increment);}
+            else if (main_inputs.spawner_menu_level == 3) {snprintf (spawner_text, sizeof (spawner_text), "-- Mass Settings --\nCurrent Mass: %.2f kg\n\nValue dialog active (step %.2f)", g_cfg.spawner.mass, adjustment_increment);}
+            else if (main_inputs.spawner_menu_level == 4) {snprintf (spawner_text, sizeof (spawner_text), "-- Radius Settings --\nCurrent Radius: %.2f m\n\nValue dialog active (step %.2f)", g_cfg.spawner.radius, adjustment_increment);}
             else if (main_inputs.spawner_menu_level == 5) {snprintf (spawner_text, sizeof (spawner_text), "-- Cube Settings --\n1: Mass\n2: Size");}
-            else if (main_inputs.spawner_menu_level == 6) {snprintf (spawner_text, sizeof (spawner_text), "-- Cube Mass --\nCurrent Mass: %.2f kg\n\nValue dialog active (step %.2f)", spawn_cube_mass, adjustment_increment);}
-            else if (main_inputs.spawner_menu_level == 7) {snprintf (spawner_text, sizeof (spawner_text), "-- Cube Size --\nCurrent Size: %.2f m\n\nValue dialog active (step %.2f)", spawn_cube_extent, adjustment_increment);}
+            else if (main_inputs.spawner_menu_level == 6) {snprintf (spawner_text, sizeof (spawner_text), "-- Cube Mass --\nCurrent Mass: %.2f kg\n\nValue dialog active (step %.2f)", g_cfg.spawner.cube_mass, adjustment_increment);}
+            else if (main_inputs.spawner_menu_level == 7) {snprintf (spawner_text, sizeof (spawner_text), "-- Cube Size --\nCurrent Size: %.2f m\n\nValue dialog active (step %.2f)", g_cfg.spawner.cube_extent, adjustment_increment);}
             else if (main_inputs.spawner_menu_level == 8) {
                 const char *spawn_type_text;
                 if (main_inputs.current_spawn_type == 0) {spawn_type_text = "Sphere";}
@@ -177,15 +180,15 @@ void overlay_update (void) {
             char velocity_text [512];
             if (main_inputs.velocity_menu_level == 1) {snprintf (velocity_text, sizeof (velocity_text), "-- User Mechanics --\n1: Spawning\n2: Viewpoint\n3: World Modification");}
             else if (main_inputs.velocity_menu_level == 2) {snprintf (velocity_text, sizeof (velocity_text), "-- Spawning Mechanics --\n1: Launch Velocity\n2: Object Friction");}
-            else if (main_inputs.velocity_menu_level == 3) {snprintf (velocity_text, sizeof (velocity_text), "-- Launch Velocity --\nCurrent: %.2f m/s\n\nValue dialog active (step %.2f)", spawn_speed, adjustment_increment);}
-            else if (main_inputs.velocity_menu_level == 4) {snprintf (velocity_text, sizeof (velocity_text), "-- Object Friction --\nStatic (u_s): %.2f | Kinetic (u_k): %.2f\n\nValue dialog active (step %.2f)", friction_static, friction_kinetic, adjustment_increment);}
+            else if (main_inputs.velocity_menu_level == 3) {snprintf (velocity_text, sizeof (velocity_text), "-- Launch Velocity --\nCurrent: %.2f m/s\n\nValue dialog active (step %.2f)", g_cfg.spawner.speed, adjustment_increment);}
+            else if (main_inputs.velocity_menu_level == 4) {snprintf (velocity_text, sizeof (velocity_text), "-- Object Friction --\nStatic (u_s): %.2f | Kinetic (u_k): %.2f\n\nValue dialog active (step %.2f)", g_cfg.spawner.friction_s, g_cfg.spawner.friction_k, adjustment_increment);}
             else if (main_inputs.velocity_menu_level == 10) {snprintf (velocity_text, sizeof (velocity_text), "-- Viewpoint Settings --\n1: Movement Speed\n2: Character Jump Height");}
             else if (main_inputs.velocity_menu_level == 11) {snprintf (velocity_text, sizeof (velocity_text), "-- Movement Speed --\nCurrent: %.2f m/s\n\nValue dialog active (step %.2f)", main_camera_fov.movement_speed, adjustment_increment);}
-            else if (main_inputs.velocity_menu_level == 12) {snprintf (velocity_text, sizeof (velocity_text), "-- Jump Height --\nCurrent: %.2f m\n\nValue dialog active (step %.2f)", jump_height, adjustment_increment);}
+            else if (main_inputs.velocity_menu_level == 12) {snprintf (velocity_text, sizeof (velocity_text), "-- Jump Height --\nCurrent: %.2f m\n\nValue dialog active (step %.2f)", g_cfg.camera.jump_height, adjustment_increment);}
             else if (main_inputs.velocity_menu_level == 20) {snprintf (velocity_text, sizeof (velocity_text), "-- World Modification --\n1: Gravity\n2: Air Resistance\n3: Surface Friction");}
-            else if (main_inputs.velocity_menu_level == 21) {snprintf (velocity_text, sizeof (velocity_text), "-- World Gravity --\nCurrent: %.2f m/s^2\n\nValue dialog active (step %.2f)", world_gravity_y, adjustment_increment);}
-            else if (main_inputs.velocity_menu_level == 22) {snprintf (velocity_text, sizeof (velocity_text), "-- Air Resistance (Drag) --\nCurrent Coeff: %.2f\n\nValue dialog active (step %.2f)", world_drag_coefficient, adjustment_increment * 0.01f);}
-            else if (main_inputs.velocity_menu_level == 23) {snprintf (velocity_text, sizeof (velocity_text), "-- Surface Friction (Floor) --\nStatic (u_s): %.2f | Kinetic (u_k): %.2f\n\nValue dialog active (step %.2f)", world_surface_friction_static, world_surface_friction_kinetic, adjustment_increment);}
+            else if (main_inputs.velocity_menu_level == 21) {snprintf (velocity_text, sizeof (velocity_text), "-- World Gravity --\nCurrent: %.2f m/s^2\n\nValue dialog active (step %.2f)", g_cfg.world.gravity, adjustment_increment);}
+            else if (main_inputs.velocity_menu_level == 22) {snprintf (velocity_text, sizeof (velocity_text), "-- Air Resistance (Drag) --\nCurrent Coeff: %.2f\n\nValue dialog active (step %.2f)", g_cfg.world.drag, adjustment_increment * 0.01f);}
+            else if (main_inputs.velocity_menu_level == 23) {snprintf (velocity_text, sizeof (velocity_text), "-- Surface Friction (Floor) --\nStatic (u_s): %.2f | Kinetic (u_k): %.2f\n\nValue dialog active (step %.2f)", g_cfg.world.floor_friction_s, g_cfg.world.floor_friction_k, adjustment_increment);}
             gtk_label_set_text (GTK_LABEL (velocity_menu_label), velocity_text);
             gtk_widget_show (velocity_menu_label);
         }
@@ -194,6 +197,7 @@ void overlay_update (void) {
         if ((main_inputs.object_menu_level == 0) || (selected_object < 0) || (selected_object >= object_count)) {
             if (!overlay_has_valid_selection ()) {main_inputs.object_menu_level = 0;}
             gtk_widget_hide (object_menu_label);
+
         }
         else {
             char object_text [512];
@@ -224,6 +228,16 @@ void overlay_update (void) {
             } gtk_label_set_text (GTK_LABEL (object_menu_label), object_text);
             gtk_widget_show (object_menu_label);
         }
+    /* MPE_TASK_35_CONFIG_MENU_RENDER_BEGIN */
+    if (config_menu_label) {
+        if (config_menu_is_open ()) {
+            char config_text [2048];
+            config_menu_render (config_text, sizeof (config_text));
+            gtk_label_set_text (GTK_LABEL (config_menu_label), config_text);
+            gtk_widget_show (config_menu_label);
+        } else {gtk_widget_hide (config_menu_label);}
+    }
+    /* MPE_TASK_35_CONFIG_MENU_RENDER_END */
     } if (!debug_information_label) {return;}
     char information_text_buffer [1024];
     char game_mode_text [32];

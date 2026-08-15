@@ -4,8 +4,6 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
-#define MPE_MAGIC 0x4D504533
-#define MPE_VERSION 140
 static int read_float (FILE *f, float *v) { return fread (v, sizeof (float), 1, f) == 1; }
 static int read_int (FILE *f, int32_t *v) { return fread (v, sizeof (int32_t), 1, f) == 1; }
 static int read_vec3 (FILE *f, vector3 *v) { return fread (v, sizeof (vector3), 1, f) == 1; }

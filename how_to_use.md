@@ -1,6 +1,6 @@
 ```markdown
 # Miniature Physics Engine — User Guide
-### Version 1.4 Stable (v14S)
+### Version 15 Release Candidate 1 (v15R1)
 
 ---
 
@@ -138,6 +138,141 @@ Common commands:
 Type `help` for the full command list or `man <command>` for usage. `Ctrl+L` clears the screen. `Escape` closes the terminal.
 
 ---
+
+---
+
+## Configuration System (Key 6)
+
+Press `6` to open the **Configuration Menu**. This provides live access to all 57 tunable engine parameters.
+
+The menu is organised into 13 categories:
+
+| Category | Parameters |
+|---|---|
+| World | Gravity, drag, floor friction |
+| Timestep | Solver iterations, max substeps, speed clamps |
+| Sleep | Sleep/wake thresholds, timer |
+| Solver | Penetration slop, bias, restitution, friction |
+| Depenetration | Correction factor, max correction, slop |
+| Broadphase | Cell size, multiplier, max span |
+| Joints | Max acceleration, spring k, damping |
+| Boundary | Floor slop values |
+| Spawner | Mass, radius, speed, friction |
+| Body Defaults | Restitution, friction per type |
+| Camera | Speed, sensitivity, jump height |
+| Render | Light position, ambient, specular |
+| UI | Change rates, spawn timing |
+
+Navigation:
+- Select a category number to view its parameters
+- Select a parameter number to edit it via dialog
+- `0` goes back / more categories
+- `6` closes the menu
+- Parameters marked `[D]` require Debug Mode to edit
+
+Config is saved to `status/engine.cfg` on exit and loaded on startup.
+
+### Terminal Config Commands
+
+In the debug terminal:
+- `env` — list all parameters grouped by category
+- `export KEY=value` — set a parameter (e.g., `export world.gravity=-2.0`)
+- `config save` — save config to file
+- `config load` — reload config from file
+- `config reset` — reset all parameters to defaults
+
+### F11 Config Torture Test
+
+Press `F11` to randomise all 57 tunables to extreme bounded values and run
+a 60-second long-run validation. This stress-tests the engine under
+adversarial parameter combinations. After the test, use key 6 → Reset
+Defaults or terminal `config reset` to restore normal behaviour.
+
+---
+
+## Configuration System (Key 6)
+
+Press `6` to open the **Configuration Menu**. This provides live access to all 57 tunable engine parameters.
+
+The menu is organised into 13 categories:
+
+| Category | Parameters |
+|---|---|
+| World | Gravity, drag, floor friction |
+| Timestep | Solver iterations, max substeps, speed clamps |
+| Sleep | Sleep/wake thresholds, timer |
+| Solver | Penetration slop, bias, restitution, friction |
+| Depenetration | Correction factor, max correction, slop |
+| Broadphase | Cell size, multiplier, max span |
+| Joints | Max acceleration, spring k, damping |
+| Boundary | Floor slop values |
+| Spawner | Mass, radius, speed, friction |
+| Body Defaults | Restitution, friction per type |
+| Camera | Speed, sensitivity, jump height |
+| Render | Light position, ambient, specular |
+| UI | Change rates, spawn timing |
+
+### Navigation
+- Select a category number to view its parameters
+- Select a parameter number to edit it via dialog
+- `0` goes back / more categories
+- `6` closes the menu
+- Parameters marked `[D]` require Debug Mode to edit
+
+### Terminal Commands
+- `env` — list all parameters grouped by category
+- `export KEY=value` — set a parameter (e.g., `export world.gravity=-2.0`)
+- `config save` — save config to file
+- `config load` — reload config from file
+- `config reset` — reset all parameters to defaults
+
+### Persistence
+- Config is saved to `status/engine.cfg` on exit
+- Config is loaded on startup (missing file = defaults)
+- Corrupt or missing config does not crash the engine
+
+---
+
+## Configuration System (Key 6)
+
+Press `6` to open the **Configuration Menu**. This provides live access to all 57 tunable engine parameters.
+
+The menu is organised into 13 categories:
+
+| Category | Parameters |
+|---|---|
+| World | Gravity, drag, floor friction |
+| Timestep | Solver iterations, max substeps, speed clamps |
+| Sleep | Sleep/wake thresholds, timer |
+| Solver | Penetration slop, bias, restitution, friction |
+| Depenetration | Correction factor, max correction, slop |
+| Broadphase | Cell size, multiplier, max span |
+| Joints | Max acceleration, spring k, damping |
+| Boundary | Floor slop values |
+| Spawner | Mass, radius, speed, friction |
+| Body Defaults | Restitution, friction per type |
+| Camera | Speed, sensitivity, jump height |
+| Render | Light position, ambient, specular |
+| UI | Change rates, spawn timing |
+
+### Navigation
+- Select a category number to view its parameters
+- Select a parameter number to edit it via dialog
+- `0` goes back / more categories
+- `6` closes the menu
+- Parameters marked `[D]` require Debug Mode to edit
+
+### Terminal Commands
+- `env` — list all parameters grouped by category
+- `export KEY=value` — set a parameter (e.g., `export world.gravity=-2.0`)
+- `config save` — save config to file
+- `config load` — reload config from file
+- `config reset` — reset all parameters to defaults
+
+### Persistence
+- Config is saved to `status/engine.cfg` on exit
+- Config is loaded on startup (missing file = defaults)
+- Corrupt or missing config does not crash the engine
 
 ## Validation Tests
 

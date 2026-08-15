@@ -31,10 +31,10 @@ def main():
             print("    Enter p, f, or s.")
 
     stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    log = os.path.join("v14S", "v03_gate_validation.log")
+    log = os.path.join("v15R1", "v03_gate_validation.log")
     fails = [r for r in results if r[1] == "FAIL"]
     with open(log, "w") as f:
-        f.write(f"MPE v14S P0 Gate Validation - {stamp}\n\n")
+        f.write(f"MPE v15R1 P0 Gate Validation - {stamp}\n\n")
         for name, status in results:
             f.write(f"[{status}] {name}\n")
         f.write(f"\nResult: {'ALL P0 PASS' if not fails else f'{len(fails)} GATE(S) FAILED'}\n")
@@ -44,7 +44,7 @@ def main():
         print(f"  [{status}] {name}")
     print()
     if fails:
-        print(f"RESULT: {len(fails)} gate(s) FAILED. Do NOT tag v14S.")
+        print(f"RESULT: {len(fails)} gate(s) FAILED. Do NOT tag v15R1.")
         print("Fix the failures, rerun validation, then re-evaluate.")
     else:
         print("RESULT: ALL P0 GATES PASS. Proceed to V-05 release prep.")

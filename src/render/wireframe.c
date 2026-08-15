@@ -26,6 +26,9 @@ static void a3_wire_cache_uniforms (GLuint shader_program) {
 static GLint a3_wire_uniform_normal_matrix = -1;
 static GLint a3_wire_uniform_camera_position = -1;
 static GLint a3_wire_uniform_light_position = -1;
+static GLint a3_wire_uniform_ambient = -1;
+static GLint a3_wire_uniform_specular_coeff = -1;
+static GLint a3_wire_uniform_specular_exp = -1;
 
 static void a3_wire_cache_missing_uniforms (GLuint shader_program) {
     static GLuint a3_wire_missing_cached_program = 0;
@@ -36,6 +39,9 @@ static void a3_wire_cache_missing_uniforms (GLuint shader_program) {
     a3_wire_uniform_normal_matrix = glGetUniformLocation (shader_program, "normal_matrix");
     a3_wire_uniform_camera_position = glGetUniformLocation (shader_program, "camera_position");
     a3_wire_uniform_light_position = glGetUniformLocation (shader_program, "light_position");
+    a3_wire_uniform_ambient = glGetUniformLocation (shader_program, "u_ambient_strength");
+    a3_wire_uniform_specular_coeff = glGetUniformLocation (shader_program, "u_specular_coeff");
+    a3_wire_uniform_specular_exp = glGetUniformLocation (shader_program, "u_specular_exponent");
 }
 
 void wireframe_render_object (GLuint shader_program, math4 view_matrix, math4 projection_matrix, rigidbody *rigid_body, vector3 wireframe_colour) {
@@ -77,7 +83,10 @@ void wireframe_render_object (GLuint shader_program, math4 view_matrix, math4 pr
 
     glUniformMatrix3fv (a3_wire_uniform_normal_matrix, 1, GL_FALSE, a3_wire_normal_matrix_flat);
     glUniform3f (a3_wire_uniform_camera_position, main_camera_fov.position.x, main_camera_fov.position.y, main_camera_fov.position.z);
-    glUniform3f (a3_wire_uniform_light_position, 20.0f, 40.0f, 20.0f);
+    glUniform3f (a3_wire_uniform_light_position, g_cfg.render.light_x, g_cfg.render.light_y, g_cfg.render.light_z);
+    glUniform1f (a3_wire_uniform_ambient, g_cfg.render.ambient_strength);
+    glUniform1f (a3_wire_uniform_specular_coeff, g_cfg.render.specular_coeff);
+    glUniform1f (a3_wire_uniform_specular_exp, g_cfg.render.specular_exponent);
     if (rigid_body -> type == object_sphere) {
         glBindVertexArray (sphere_mesh.vertex_array_object);
         glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, sphere_mesh.wireframe_element_buffer_object);

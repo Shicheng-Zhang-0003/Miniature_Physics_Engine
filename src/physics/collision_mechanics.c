@@ -16,7 +16,6 @@ uint32_t property_stamp_b;
 /* MPE_TASK_05_CACHE_STAMP_END */
 } cached_contact;
 
-#define MAX_CACHED_CONTACTS 16384
 static cached_contact contact_impulse_cache [MAX_CACHED_CONTACTS];
 static int contact_impulse_cache_count = 0;
 
@@ -454,8 +453,8 @@ static rigidbody *collision_static_plane_body_proxy (float plane_y) {
     }
 
     static_plane_body.position.y = plane_y;
-    static_plane_body.friction_static = world_surface_friction_static;
-    static_plane_body.friction_kinetic = world_surface_friction_kinetic;
+    static_plane_body.friction_static = g_cfg.world.floor_friction_s;
+    static_plane_body.friction_kinetic = g_cfg.world.floor_friction_k;
 
     return &static_plane_body;
 }
@@ -655,10 +654,10 @@ void collision_prepare_solver (collision_data *source, collision_data *m) {
         
         cp -> accumulated_normal_impulse = 0.0f;
         cp -> accumulated_tangent_impulse = 0.0f;
-        const float penetration_slop = 0.010f; /* A3_PATCH_20_SOLVER_TUNING */
-        const float bias_factor = 0.10f;
+        const float penetration_slop = g_cfg.solver.penetration_slop; /* MPE_TASK_30 */
+        const float bias_factor = g_cfg.solver.bias_factor; /* MPE_TASK_30 */
         cp -> separation_bias = bias_factor * fmaxf (cp -> penetration - penetration_slop, 0.0f) * 60.0f;
-        if (cp -> separation_bias > 5.0f) {cp -> separation_bias = 5.0f;}
+        if (cp -> separation_bias > g_cfg.solver.max_separation_bias) {cp -> separation_bias = 5.0f;}
 
         /* MPE_TASK_05_CACHE_MATCH_BEGIN */
 uint32_t cache_id_a = (m -> object_a) ? m -> object_a -> object_id : 0;
@@ -683,7 +682,7 @@ for (int c = 0; c < contact_impulse_cache_count; c++) {
             vector3_subtraction (cc -> local_position_a, cp -> local_position_a)
         );
 
-        if ((dist_sq < 0.0025f) &&
+        if ((dist_sq < g_cfg.solver.warm_start_match_dist_sq) &&
             (a3_task05_cached_impulses_are_usable (cc -> accumulated_normal_impulse, cc -> accumulated_tangent_impulse))) {
 
             cp -> accumulated_normal_impulse = fmaxf (cc -> accumulated_normal_impulse, 0.0f);
@@ -707,7 +706,7 @@ for (int c = 0; c < contact_impulse_cache_count; c++) {
 
         float dist_sq = fminf (dist_sq_ab, dist_sq_ba);
 
-        if ((dist_sq < 0.0025f) &&
+        if ((dist_sq < g_cfg.solver.warm_start_match_dist_sq) &&
             (a3_task05_cached_impulses_are_usable (cc -> accumulated_normal_impulse, cc -> accumulated_tangent_impulse))) {
 
             /*
@@ -737,9 +736,9 @@ else {contact_cache_miss_count++;}
         float vn_initial = vector3_dot (rel_vel, m -> normal_vector);
         
         float restitution = fminf (m -> object_a -> restitution, m -> object_b -> restitution);
-        if (vn_initial < -1.5f) { /* A3_PATCH_20_RESTITUTION_TUNING */
+        if (vn_initial < g_cfg.solver.restitution_velocity_thresh) { /* A3_PATCH_20_RESTITUTION_TUNING */
             cp -> restitution_bias = -restitution * vn_initial;
-            if (cp -> restitution_bias > 4.0f) {cp -> restitution_bias = 4.0f;}
+            if (cp -> restitution_bias > g_cfg.solver.max_restitution_bias) {cp -> restitution_bias = 4.0f;}
         } else {
             cp -> restitution_bias = 0.0f;
         }
@@ -832,7 +831,7 @@ void collision_resolve_iterative (collision_data *m) {
             
             float lambda_t = -vt * eff_mass_t;
             float tangential_speed = fabsf (vt);
-            const float static_friction_threshold = 0.02f; /* A3_PATCH_45_STATIC_FRICTION */
+            const float static_friction_threshold = g_cfg.solver.static_friction_thresh; /* MPE_TASK_30 */
             float static_friction_coeff = fminf (m -> object_a -> friction_static, m -> object_b -> friction_static);
             float kinetic_friction_coeff = fminf (m -> object_a -> friction_kinetic, m -> object_b -> friction_kinetic);
             if (static_friction_coeff < kinetic_friction_coeff) {static_friction_coeff = kinetic_friction_coeff;}

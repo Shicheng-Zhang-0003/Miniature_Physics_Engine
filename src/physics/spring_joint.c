@@ -5,7 +5,6 @@
 #include <epoxy/gl.h>
 
 /* A3_PATCH_49_JOINT_FORCE_LIMIT */
-#define A3_MAX_JOINT_ACCELERATION 200.0f
 
 spring_joint joint_pool [MPE_MAX_JOINTS];
 int current_joint_count = 0;
@@ -85,7 +84,7 @@ void remove_joint (int joint_pool_index) {
         float a3_inverse_mass_sum = rigid_body_a -> inverse_mass + rigid_body_b -> inverse_mass;
         if (a3_inverse_mass_sum > 0.0f) {
             float a3_reduced_mass = 1.0f / a3_inverse_mass_sum;
-            float a3_max_joint_force = a3_reduced_mass * A3_MAX_JOINT_ACCELERATION;
+            float a3_max_joint_force = a3_reduced_mass * g_cfg.joints.max_acceleration;
             float a3_force_length = vector3_length (net_joint_force);
             if ((a3_force_length > a3_max_joint_force) && (a3_force_length > math_epsilon)) {
                 net_joint_force = vector3_scaling (net_joint_force, a3_max_joint_force / a3_force_length);
@@ -150,6 +149,9 @@ static void a3_spring_cache_uniforms (GLuint shader_program) {
 /* A3_PATCH_30_MISSING_UNIFORMS */
 static GLint a3_spring_uniform_camera_position = -1;
 static GLint a3_spring_uniform_light_position = -1;
+static GLint a3_spring_uniform_ambient = -1;
+static GLint a3_spring_uniform_specular_coeff = -1;
+static GLint a3_spring_uniform_specular_exp = -1;
 
 static void a3_spring_cache_missing_uniforms (GLuint shader_program) {
     static GLuint a3_spring_missing_cached_program = 0;
@@ -159,6 +161,9 @@ static void a3_spring_cache_missing_uniforms (GLuint shader_program) {
     a3_spring_missing_cached_program = shader_program;
     a3_spring_uniform_camera_position = glGetUniformLocation (shader_program, "camera_position");
     a3_spring_uniform_light_position = glGetUniformLocation (shader_program, "light_position");
+    a3_spring_uniform_ambient = glGetUniformLocation (shader_program, "u_ambient_strength");
+    a3_spring_uniform_specular_coeff = glGetUniformLocation (shader_program, "u_specular_coeff");
+    a3_spring_uniform_specular_exp = glGetUniformLocation (shader_program, "u_specular_exponent");
 }
 
 void spring_joint_render (GLuint shader_program, math4 view_matrix, math4 projection_matrix) {
@@ -240,7 +245,10 @@ void spring_joint_render (GLuint shader_program, math4 view_matrix, math4 projec
     glUniform3f (a3_spring_uniform_object_colour, 1.0f, 0.0f, 1.0f);
     /* A3_PATCH_30_MISSING_UNIFORMS */
     glUniform3f (a3_spring_uniform_camera_position, main_camera_fov.position.x, main_camera_fov.position.y, main_camera_fov.position.z);
-    glUniform3f (a3_spring_uniform_light_position, 20.0f, 40.0f, 20.0f);
+    glUniform3f (a3_spring_uniform_light_position, g_cfg.render.light_x, g_cfg.render.light_y, g_cfg.render.light_z);
+    glUniform1f (a3_spring_uniform_ambient, g_cfg.render.ambient_strength);
+    glUniform1f (a3_spring_uniform_specular_coeff, g_cfg.render.specular_coeff);
+    glUniform1f (a3_spring_uniform_specular_exp, g_cfg.render.specular_exponent);
     glVertexAttrib3f (1, 0.0f, 1.0f, 0.0f);
 
     glBindVertexArray (joint_vao);

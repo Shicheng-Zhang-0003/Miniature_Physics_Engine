@@ -14,6 +14,9 @@ static struct {
     GLint view_matrix_location;
     GLint camera_position_location;
     GLint light_position_location;
+    GLint ambient_strength_location;
+    GLint specular_coeff_location;
+    GLint specular_exponent_location;
 } instanced_uniforms;
 static struct {
     GLint projection_matrix_location;
@@ -23,6 +26,9 @@ static struct {
     GLint object_colour_location;
     GLint camera_position_location;
     GLint light_position_location;
+    GLint ambient_strength_location;
+    GLint specular_coeff_location;
+    GLint specular_exponent_location;
 } utility_uniforms;
 mesh sphere_mesh;
 static int render_init_status = 0;
@@ -42,6 +48,9 @@ void render_init () {
     instanced_uniforms.view_matrix_location = glGetUniformLocation (instanced_shader_program, "viewframe");
     instanced_uniforms.camera_position_location = glGetUniformLocation (instanced_shader_program, "camera_position");
     instanced_uniforms.light_position_location = glGetUniformLocation (instanced_shader_program, "light_position");
+    instanced_uniforms.ambient_strength_location = glGetUniformLocation (instanced_shader_program, "u_ambient_strength");
+    instanced_uniforms.specular_coeff_location = glGetUniformLocation (instanced_shader_program, "u_specular_coeff");
+    instanced_uniforms.specular_exponent_location = glGetUniformLocation (instanced_shader_program, "u_specular_exponent");
     utility_uniforms.projection_matrix_location = glGetUniformLocation (utility_shader_program, "projection");
     utility_uniforms.view_matrix_location = glGetUniformLocation (utility_shader_program, "viewframe");
     utility_uniforms.model_matrix_location = glGetUniformLocation (utility_shader_program, "model");
@@ -100,7 +109,10 @@ void render_init () {
     glUniformMatrix4fv (instanced_uniforms.projection_matrix_location, 1, GL_FALSE, projection_matrix_flat_array);
     glUniformMatrix4fv (instanced_uniforms.view_matrix_location, 1, GL_FALSE, view_matrix_flat_array);
     glUniform3f (instanced_uniforms.camera_position_location, main_camera_fov.position.x, main_camera_fov.position.y, main_camera_fov.position.z);
-    glUniform3f (instanced_uniforms.light_position_location, 20.0f, 40.0f, 20.0f);
+    glUniform3f (instanced_uniforms.light_position_location, g_cfg.render.light_x, g_cfg.render.light_y, g_cfg.render.light_z);
+    glUniform1f (instanced_uniforms.ambient_strength_location, g_cfg.render.ambient_strength);
+    glUniform1f (instanced_uniforms.specular_coeff_location, g_cfg.render.specular_coeff);
+    glUniform1f (instanced_uniforms.specular_exponent_location, g_cfg.render.specular_exponent);
     if (sphere_inst_count > 0) {
         glBindBuffer (GL_ARRAY_BUFFER, sphere_mesh.instance_vbo);
         glBufferSubData (GL_ARRAY_BUFFER, 0, sphere_inst_count * 19 * sizeof (float), sphere_instances);

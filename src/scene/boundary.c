@@ -4,8 +4,6 @@
 
 /* A3_PATCH_18_BOUNDARY_FLOOR_EMERGENCY */
 /* MPE_TASK_08_FLOOR_EMERGENCY_TUNING_BEGIN */
-#define A3_BOUNDARY_FLOOR_EMERGENCY_SLOP 0.05f
-#define A3_BOUNDARY_FLOOR_VELOCITY_SLOP 0.10f
 /* MPE_TASK_08_FLOOR_EMERGENCY_TUNING_END */
 // Helper: Get lowest point of OBB along an axis
 static float get_obb_min_along_axis (rigidbody *rigid_body, vector3 axis) {
@@ -32,14 +30,14 @@ return vector3_dot (rigid_body -> position, axis) + projection;
 } void boundary_apply_floor (rigidbody *rigid_body, float floor_y_level) {
     if (rigid_body -> static_state) {return;}
     float min_y = get_obb_min_along_axis (rigid_body, (vector3) {0, 1, 0});
-    if (min_y < (floor_y_level - A3_BOUNDARY_FLOOR_EMERGENCY_SLOP)) {
+    if (min_y < (floor_y_level - g_cfg.boundary.floor_emergency_slop)) {
 /* MPE_TASK_08_FLOOR_APPLY_BEGIN */
 float a3_floor_penetration = floor_y_level - min_y;
 
 rigid_body -> position.y += a3_floor_penetration;
 
 if (rigid_body -> velocity.y < 0.0f) {
-if (a3_floor_penetration > A3_BOUNDARY_FLOOR_VELOCITY_SLOP) {
+if (a3_floor_penetration > g_cfg.boundary.floor_velocity_slop) {
 rigidbody_wake (rigid_body);
 rigid_body -> velocity.y = -rigid_body -> velocity.y * rigid_body -> restitution;
 rigid_body -> velocity.x *= 0.98f;
@@ -48,7 +46,7 @@ rigid_body -> angular_velocity = vector3_scaling (rigid_body -> angular_velocity
 } else {
 rigid_body -> velocity.y = 0.0f;
 }
-} else if (a3_floor_penetration > A3_BOUNDARY_FLOOR_VELOCITY_SLOP) {
+} else if (a3_floor_penetration > g_cfg.boundary.floor_velocity_slop) {
 rigidbody_wake (rigid_body);
 rigid_body -> angular_velocity = vector3_scaling (rigid_body -> angular_velocity, 0.98f);
 }
@@ -75,21 +73,21 @@ rigidbody_wake (rigid_body); /* A3_PATCH_46_BOUNDARY_WAKE */
         }
     } // Y axis
     float min_y = get_obb_min_along_axis (rigid_body, (vector3) {0, 1, 0});
-    if (min_y < (min_bounds.y - A3_BOUNDARY_FLOOR_EMERGENCY_SLOP)) {
+    if (min_y < (min_bounds.y - g_cfg.boundary.floor_emergency_slop)) {
 /* MPE_TASK_08_BOX_FLOOR_APPLY_BEGIN */
 float a3_floor_penetration = min_bounds.y - min_y;
 
 rigid_body -> position.y += a3_floor_penetration;
 
 if (rigid_body -> velocity.y < 0.0f) {
-if (a3_floor_penetration > A3_BOUNDARY_FLOOR_VELOCITY_SLOP) {
+if (a3_floor_penetration > g_cfg.boundary.floor_velocity_slop) {
 rigidbody_wake (rigid_body);
 rigid_body -> velocity.y = -rigid_body -> velocity.y * rigid_body -> restitution;
 rigid_body -> angular_velocity = vector3_scaling (rigid_body -> angular_velocity, 0.98f);
 } else {
 rigid_body -> velocity.y = 0.0f;
 }
-} else if (a3_floor_penetration > A3_BOUNDARY_FLOOR_VELOCITY_SLOP) {
+} else if (a3_floor_penetration > g_cfg.boundary.floor_velocity_slop) {
 rigidbody_wake (rigid_body);
 }
 /* MPE_TASK_08_BOX_FLOOR_APPLY_END */

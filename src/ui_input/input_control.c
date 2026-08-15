@@ -33,6 +33,12 @@ input_state -> t_key_pressed = false;
     input_state -> menu_1_pressed = false;
     input_state -> menu_2_pressed = false;
     input_state -> menu_3_pressed = false;
+    input_state -> menu_4_pressed = false;
+    input_state -> menu_5_pressed = false;
+    input_state -> menu_6_pressed = false; /* MPE_TASK_35_FOCUS */
+    input_state -> menu_4_pressed = false;
+    input_state -> menu_5_pressed = false;
+    input_state -> menu_6_pressed = false; /* MPE_TASK_35 */
     //Spawn
     input_state -> spawner_menu_level = 0;
     input_state -> velocity_menu_level = 0;
@@ -52,6 +58,9 @@ input_state -> validation_report_pressed = false;
     /* MPE_TASK_13_LONG_RUN_INIT_BEGIN */
 input_state -> long_run_validation_pressed = false;
 /* MPE_TASK_13_LONG_RUN_INIT_END */
+/* MPE_TASK_39_CONFIG_TORTURE_INIT_BEGIN */
+input_state -> config_torture_pressed = false;
+/* MPE_TASK_39_CONFIG_TORTURE_INIT_END */
 /* MPE_TASK_18_TERMINAL_INPUT_INIT_BEGIN */
 input_state -> debug_terminal_pressed = false;
 /* MPE_TASK_18_TERMINAL_INPUT_INIT_END */
@@ -91,15 +100,27 @@ if (event -> keyval == GDK_KEY_F9) {input_state -> validation_report_pressed = t
 /* MPE_TASK_13_LONG_RUN_KEY_BEGIN */
 if (event -> keyval == GDK_KEY_F10) {input_state -> long_run_validation_pressed = true;}
 /* MPE_TASK_13_LONG_RUN_KEY_END */
+/* MPE_TASK_39_CONFIG_TORTURE_KEY_BEGIN */
+if (event -> keyval == GDK_KEY_F11) {input_state -> config_torture_pressed = true;}
+/* MPE_TASK_39_CONFIG_TORTURE_KEY_END */
     if (event -> keyval == GDK_KEY_i) {input_state -> i_key_pressed = true;}
     if (event -> keyval == GDK_KEY_j) {input_state -> j_key_pressed = true;}
     if (event -> keyval == GDK_KEY_k) {input_state -> k_key_pressed = true;}
     if (event -> keyval == GDK_KEY_l) {input_state -> l_key_pressed = true;}
-    if (event -> keyval == GDK_KEY_9) {input_state -> spawner_menu_level = 0; input_state -> velocity_menu_level = 0; input_state -> object_menu_level = 0; input_state -> is_menu_open = !(input_state -> is_menu_open);}
-    if (event -> keyval == GDK_KEY_8) {input_state -> is_menu_open = false; input_state -> velocity_menu_level = 0; input_state -> object_menu_level = 0; if (input_state -> spawner_menu_level > 0) {input_state -> spawner_menu_level = 0;} else {input_state -> spawner_menu_level = 1;}}
-    if (event -> keyval == GDK_KEY_7) {input_state -> is_menu_open = false; input_state -> spawner_menu_level = 0; input_state -> object_menu_level = 0; if (input_state -> velocity_menu_level > 0) {input_state -> velocity_menu_level = 0;} else {input_state -> velocity_menu_level = 1;}}
+    if ((event -> keyval == GDK_KEY_9) && (!config_menu_is_open ())) {input_state -> spawner_menu_level = 0; input_state -> velocity_menu_level = 0; input_state -> object_menu_level = 0; input_state -> is_menu_open = !(input_state -> is_menu_open);}
+    if ((event -> keyval == GDK_KEY_8) && (!config_menu_is_open ())) {input_state -> is_menu_open = false; input_state -> velocity_menu_level = 0; input_state -> object_menu_level = 0; if (input_state -> spawner_menu_level > 0) {input_state -> spawner_menu_level = 0;} else {input_state -> spawner_menu_level = 1;}}
+    if ((event -> keyval == GDK_KEY_7) && (!config_menu_is_open ())) {input_state -> is_menu_open = false; input_state -> spawner_menu_level = 0; input_state -> object_menu_level = 0; if (input_state -> velocity_menu_level > 0) {input_state -> velocity_menu_level = 0;} else {input_state -> velocity_menu_level = 1;}}
+/* MPE_TASK_35_CONFIG_MENU_KEY_BEGIN */
+if ((event -> keyval == GDK_KEY_6) && (!input_state -> is_menu_open)) {
+input_state -> spawner_menu_level = 0;
+input_state -> velocity_menu_level = 0;
+input_state -> object_menu_level = 0;
+if (config_menu_is_open ()) {config_menu_close ();}
+else {config_menu_level_force_open ();}
+}
+/* MPE_TASK_35_CONFIG_MENU_KEY_END */
     /* MPE_TASK_18_TERMINAL_KEY_BEGIN */
-if ((event -> keyval == GDK_KEY_1) &&
+if ((event -> keyval == GDK_KEY_1) && (!config_menu_is_open ()) && (!config_menu_is_open ()) &&
 (input_state -> is_debug_mode_active) &&
 (!input_state -> is_menu_open) &&
 (input_state -> spawner_menu_level == 0) &&
@@ -112,7 +133,23 @@ if (input_state -> is_menu_open) {
         if (event -> keyval == GDK_KEY_1) {input_state -> menu_1_pressed = true;}
         if (event -> keyval == GDK_KEY_2) {input_state -> menu_2_pressed = true;}
         if (event -> keyval == GDK_KEY_3) {input_state -> menu_3_pressed = true;}
+        if (event -> keyval == GDK_KEY_4) {input_state -> menu_4_pressed = true;}
+        if (event -> keyval == GDK_KEY_5) {input_state -> menu_5_pressed = true;}
+        if (event -> keyval == GDK_KEY_6) {input_state -> menu_6_pressed = true;} /* MPE_TASK_35 */
     } // Menu Navigation
+    /* MPE_TASK_35_CONFIG_MENU_NAV_BEGIN */
+    if (config_menu_is_open ()) {
+        if (event -> keyval == GDK_KEY_0) {config_menu_key_press (0);}
+        if (event -> keyval == GDK_KEY_1) {config_menu_key_press (1);}
+        if (event -> keyval == GDK_KEY_2) {config_menu_key_press (2);}
+        if (event -> keyval == GDK_KEY_3) {config_menu_key_press (3);}
+        if (event -> keyval == GDK_KEY_4) {config_menu_key_press (4);}
+        if (event -> keyval == GDK_KEY_5) {config_menu_key_press (5);}
+        if (event -> keyval == GDK_KEY_7) {config_menu_key_press (7);}
+        if (event -> keyval == GDK_KEY_8) {config_menu_key_press (8);}
+        if (event -> keyval == GDK_KEY_9) {config_menu_key_press (9);}
+    }
+    /* MPE_TASK_35_CONFIG_MENU_NAV_END */
     if ((input_state -> spawner_menu_level > 0) || (input_state -> velocity_menu_level > 0) || (input_state -> object_menu_level > 0)) {
         if (event -> keyval == GDK_KEY_Up) {input_state -> up_arrow_pressed = true;}
         if (event -> keyval == GDK_KEY_Down) {input_state -> down_arrow_pressed = true;}
@@ -159,7 +196,7 @@ if (input_state -> is_menu_open) {
                 input_state -> object_menu_level = 8;
             }
         }
-        if (event -> keyval == GDK_KEY_7) {
+        if ((event -> keyval == GDK_KEY_7) && (!config_menu_is_open ())) {
             if (input_state -> marked_joint_object_index != -1 && input_state -> marked_joint_object_index != selected_object) {
                 input_state -> object_menu_level = 8;
             }
@@ -171,8 +208,8 @@ if (input_state -> is_menu_open) {
         if (event -> keyval == GDK_KEY_4) {input_state -> object_menu_level = 84;}
         if (event -> keyval == GDK_KEY_5) {input_state -> object_menu_level = 85;}
         if (event -> keyval == GDK_KEY_6) {input_state -> object_menu_level = 86;}
-        if (event -> keyval == GDK_KEY_7) {input_state -> object_menu_level = 87;}
-        if (event -> keyval == GDK_KEY_8) {input_state -> object_menu_level = 88;}
+        if ((event -> keyval == GDK_KEY_7) && (!config_menu_is_open ())) {input_state -> object_menu_level = 87;}
+        if ((event -> keyval == GDK_KEY_8) && (!config_menu_is_open ())) {input_state -> object_menu_level = 88;}
     } /* MPE_TASK_22_ENTER_SPAWN_KEYPRESS_BEGIN */
 if (((event -> keyval == GDK_KEY_Return) || (event -> keyval == GDK_KEY_KP_Enter)) &&
 (!input_state -> is_menu_open) &&
@@ -185,7 +222,7 @@ input_state -> enter_spawn_held = true;
 if (event -> keyval == GDK_KEY_space) {input_state -> space_key_pressed = true;}
     if (event -> keyval == GDK_KEY_Shift_L) {input_state -> shift_key_pressed = true;}
     if (event -> keyval == GDK_KEY_Escape) {input_state -> escape_key_pressed = true;}
-    if (event -> keyval == GDK_KEY_0) {input_state -> is_debug_mode_active = !input_state -> is_debug_mode_active;}
+    if ((event -> keyval == GDK_KEY_0) && (!config_menu_is_open ())) {input_state -> is_debug_mode_active = !input_state -> is_debug_mode_active;}
     return FALSE;
 } gboolean on_key_released (GtkWidget *widget, GdkEventKey *event, gpointer user_data_stored) {
     (void) widget;
@@ -303,6 +340,9 @@ input_state -> validation_report_pressed = false;
     /* MPE_TASK_13_LONG_RUN_FOCUS_BEGIN */
 input_state -> long_run_validation_pressed = false;
 /* MPE_TASK_13_LONG_RUN_FOCUS_END */
+/* MPE_TASK_39_CONFIG_TORTURE_FOCUS_BEGIN */
+input_state -> config_torture_pressed = false;
+/* MPE_TASK_39_CONFIG_TORTURE_FOCUS_END */
 /* MPE_TASK_18_TERMINAL_FOCUS_BEGIN */
 input_state -> debug_terminal_pressed = false;
 /* MPE_TASK_18_TERMINAL_FOCUS_END */
