@@ -144,8 +144,6 @@ A fully custom, dependency-free math library: 3D vectors, 4×4 matrices, quatern
 | Spawn stress test (300 objects) | `F8` |
 | Validation report | `F9` |
 | Long-run validation (60 s) | `F10` |
-| **Config torture test** | **`F11`** |
-| **Config torture test** | **`F11`** |
 | **Config torture test** | **F11** |
 
 ---
