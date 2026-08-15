@@ -22,8 +22,8 @@ void camera_update_vectors (camera *camera_object) {
     camera_object -> position = starting_position;
     camera_object -> yaw = -90.0f; //Straight Forwards (Negative Z Axis)
     camera_object -> pitch = 0.0f; //Flat Horizon View
-    camera_object -> movement_speed = 25.0f; //25 Units of Movement * s ^ -1
-    camera_object -> mouse_sensitivity = 0.1f;
+    camera_object -> movement_speed = g_cfg.camera.move_speed; /* MPE_TASK_32 */ //25 Units of Movement * s ^ -1
+    camera_object -> mouse_sensitivity = g_cfg.camera.mouse_sensitivity; /* MPE_TASK_32 */
     camera_object -> vertical_velocity = 0.0f;
     camera_object -> horizontal_velocity = (vector3) {0.0f, 0.0f, 0.0f};
     camera_update_vectors (camera_object);

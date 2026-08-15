@@ -24,24 +24,24 @@ void editor_update_menus (GtkWidget *parent_window) {
 
     // Spawner Menu Logic
     if (main_inputs.spawner_menu_level == 3) {
-        spawn_mass = open_numerical_input_dialog (parent_window, "Sphere Mass (kg)", spawn_mass);
+        g_cfg.spawner.mass = open_numerical_input_dialog (parent_window, "Sphere Mass (kg)", g_cfg.spawner.mass);
         editor_reacquire_mouse (parent_window);
-        if (spawn_mass < 0.01f) {spawn_mass = 0.01f;}
+        if (g_cfg.spawner.mass < 0.01f) {g_cfg.spawner.mass = 0.01f;}
         main_inputs.spawner_menu_level = 0;
     } else if (main_inputs.spawner_menu_level == 4) {
-        spawn_radius = open_numerical_input_dialog (parent_window, "Sphere Radius (m)", spawn_radius);
+        g_cfg.spawner.radius = open_numerical_input_dialog (parent_window, "Sphere Radius (m)", g_cfg.spawner.radius);
         editor_reacquire_mouse (parent_window);
-        if (spawn_radius < 0.01f) {spawn_radius = 0.01f;}
+        if (g_cfg.spawner.radius < 0.01f) {g_cfg.spawner.radius = 0.01f;}
         main_inputs.spawner_menu_level = 0;
     } else if (main_inputs.spawner_menu_level == 6) {
-        spawn_cube_mass = open_numerical_input_dialog (parent_window, "Cube Mass (kg)", spawn_cube_mass);
+        g_cfg.spawner.cube_mass = open_numerical_input_dialog (parent_window, "Cube Mass (kg)", g_cfg.spawner.cube_mass);
         editor_reacquire_mouse (parent_window);
-        if (spawn_cube_mass < 0.01f) {spawn_cube_mass = 0.01f;}
+        if (g_cfg.spawner.cube_mass < 0.01f) {g_cfg.spawner.cube_mass = 0.01f;}
         main_inputs.spawner_menu_level = 0;
     } else if (main_inputs.spawner_menu_level == 7) {
-        spawn_cube_extent = open_numerical_input_dialog (parent_window, "Cube Size (m)", spawn_cube_extent);
+        g_cfg.spawner.cube_extent = open_numerical_input_dialog (parent_window, "Cube Size (m)", g_cfg.spawner.cube_extent);
         editor_reacquire_mouse (parent_window);
-        if (spawn_cube_extent < 0.01f) {spawn_cube_extent = 0.01f;}
+        if (g_cfg.spawner.cube_extent < 0.01f) {g_cfg.spawner.cube_extent = 0.01f;}
         main_inputs.spawner_menu_level = 0;
     }
 
@@ -61,15 +61,15 @@ void editor_update_menus (GtkWidget *parent_window) {
 
     // User Mechanics Menu Logic
     if (main_inputs.velocity_menu_level == 3) {
-        spawn_speed = open_numerical_input_dialog (parent_window, "Spawn Speed (m/s)", spawn_speed);
+        g_cfg.spawner.speed = open_numerical_input_dialog (parent_window, "Spawn Speed (m/s)", g_cfg.spawner.speed);
         editor_reacquire_mouse (parent_window);
-        if (spawn_speed < 0.0f) {spawn_speed = 0.0f;}
+        if (g_cfg.spawner.speed < 0.0f) {g_cfg.spawner.speed = 0.0f;}
         main_inputs.velocity_menu_level = 0;
     } else if (main_inputs.velocity_menu_level == 4) {
-        world_surface_friction_kinetic = open_numerical_input_dialog (parent_window, "Spawn Friction (Kinetic)", world_surface_friction_kinetic);
+        g_cfg.world.floor_friction_k = open_numerical_input_dialog (parent_window, "Spawn Friction (Kinetic)", g_cfg.world.floor_friction_k);
         editor_reacquire_mouse (parent_window);
-        if (world_surface_friction_kinetic < 0.0f) {world_surface_friction_kinetic = 0.0f;}
-        world_surface_friction_static = world_surface_friction_kinetic + 0.1f;
+        if (g_cfg.world.floor_friction_k < 0.0f) {g_cfg.world.floor_friction_k = 0.0f;}
+        g_cfg.world.floor_friction_s = g_cfg.world.floor_friction_k + 0.1f;
         main_inputs.velocity_menu_level = 0;
     } else if (main_inputs.velocity_menu_level == 11) {
         main_camera_fov.movement_speed = open_numerical_input_dialog (parent_window, "Camera Speed", main_camera_fov.movement_speed);
@@ -77,25 +77,25 @@ void editor_update_menus (GtkWidget *parent_window) {
         if (main_camera_fov.movement_speed < 0.01f) {main_camera_fov.movement_speed = 0.01f;}
         main_inputs.velocity_menu_level = 0;
     } else if (main_inputs.velocity_menu_level == 12) {
-        jump_height = open_numerical_input_dialog (parent_window, "Jump Height (m)", jump_height);
+        g_cfg.camera.jump_height = open_numerical_input_dialog (parent_window, "Jump Height (m)", g_cfg.camera.jump_height);
         editor_reacquire_mouse (parent_window);
-        if (jump_height < 0.1f) {jump_height = 0.1f;}
+        if (g_cfg.camera.jump_height < 0.1f) {g_cfg.camera.jump_height = 0.1f;}
         main_inputs.velocity_menu_level = 0;
     } else if (main_inputs.velocity_menu_level == 21) {
-        world_gravity_y = open_numerical_input_dialog (parent_window, "World Gravity (m/s^2)", world_gravity_y);
+        g_cfg.world.gravity = open_numerical_input_dialog (parent_window, "World Gravity (m/s^2)", g_cfg.world.gravity);
         editor_reacquire_mouse (parent_window);
         main_inputs.velocity_menu_level = 0;
     } else if (main_inputs.velocity_menu_level == 22) {
-        world_drag_coefficient = open_numerical_input_dialog (parent_window, "World Drag Coefficient", world_drag_coefficient);
+        g_cfg.world.drag = open_numerical_input_dialog (parent_window, "World Drag Coefficient", g_cfg.world.drag);
         editor_reacquire_mouse (parent_window);
-        if (world_drag_coefficient > 1.0f) {world_drag_coefficient = 1.0f;}
-        if (world_drag_coefficient < 0.1f) {world_drag_coefficient = 0.1f;}
+        if (g_cfg.world.drag > 1.0f) {g_cfg.world.drag = 1.0f;}
+        if (g_cfg.world.drag < 0.1f) {g_cfg.world.drag = 0.1f;}
         main_inputs.velocity_menu_level = 0;
     } else if (main_inputs.velocity_menu_level == 23) {
-        world_surface_friction_kinetic = open_numerical_input_dialog (parent_window, "World Surface Friction", world_surface_friction_kinetic);
+        g_cfg.world.floor_friction_k = open_numerical_input_dialog (parent_window, "World Surface Friction", g_cfg.world.floor_friction_k);
         editor_reacquire_mouse (parent_window);
-        if (world_surface_friction_kinetic < 0.0f) {world_surface_friction_kinetic = 0.0f;}
-        world_surface_friction_static = world_surface_friction_kinetic + 0.1f;
+        if (g_cfg.world.floor_friction_k < 0.0f) {g_cfg.world.floor_friction_k = 0.0f;}
+        g_cfg.world.floor_friction_s = g_cfg.world.floor_friction_k + 0.1f;
         main_inputs.velocity_menu_level = 0;
     }
 
@@ -168,7 +168,7 @@ main_inputs.up_arrow_pressed = false;
             rigidbody *rb_a = &obj_per_scene [main_inputs.marked_joint_object_index];
             rigidbody *rb_b = &obj_per_scene [selected_object];
             float dist = vector3_length (vector3_subtraction (rb_b -> position, rb_a -> position));
-            add_joint (main_inputs.marked_joint_object_index, selected_object, dist, 100.0f, 2.0f);
+            add_joint (main_inputs.marked_joint_object_index, selected_object, dist, g_cfg.joints.default_spring_k, g_cfg.joints.default_damping); /* MPE_TASK_31 */
         }
         main_inputs.marked_joint_object_index = -1;
         main_inputs.object_menu_level = 0;

@@ -6,16 +6,9 @@
 #include <stdbool.h>
 
 /* MPE_TASK_17_ADAPTIVE_CELL_SIZE_BEGIN */
-#define A3_DEFAULT_GRID_CELL_SIZE 5.0f
-#define A3_BROADPHASE_MIN_CELL_SIZE 1.0f
-#define A3_BROADPHASE_MAX_CELL_SIZE 50.0f
-#define A3_BROADPHASE_CELL_SIZE_MULTIPLIER 4.0f
-static float broadphase_current_cell_size = A3_DEFAULT_GRID_CELL_SIZE;
+static float broadphase_current_cell_size = 5.0f; /* MPE_TASK_31 bootstrap; runtime reads g_cfg */
 #define GRID_CELL_SIZE broadphase_current_cell_size
 /* MPE_TASK_17_ADAPTIVE_CELL_SIZE_END */
-#define A3_MAX_CELL_SPAN_PER_AXIS 8 /* A3_PATCH_50_BROADPHASE_LARGE_OBJECT_SAFETY */
-#define HASH_TABLE_SIZE 8192
-#define MAX_OBJECTS 16384
 
 typedef struct { int object_index; int next_entry; } hash_node;
 
@@ -129,8 +122,6 @@ rb -> half_extensions.z * rb -> half_extensions.z
 );
 }
 
-#define A3_PAIR_HASH_TABLE_SIZE (1 << 18)
-#define A3_PAIR_HASH_MASK (A3_PAIR_HASH_TABLE_SIZE - 1)
 
 static uint64_t a3_pair_hash_keys [A3_PAIR_HASH_TABLE_SIZE];
 static uint32_t a3_pair_hash_generations [A3_PAIR_HASH_TABLE_SIZE];
@@ -189,7 +180,7 @@ return true;
 /* MPE_TASK_17_CELL_SIZE_FUNCTION_BEGIN */
 static void broadphase_update_cell_size (void) {
 if (object_count <= 0) {
-broadphase_current_cell_size = A3_DEFAULT_GRID_CELL_SIZE;
+broadphase_current_cell_size = g_cfg.broadphase.cell_size_default;
 return;
 }
 
@@ -208,19 +199,19 @@ float average_radius = radius_sum / (float) object_count;
 if ((!isfinite (average_radius)) || (average_radius <= 0.0f)) {average_radius = 0.5f;}
 if ((!isfinite (max_radius)) || (max_radius <= 0.0f)) {max_radius = 0.5f;}
 
-float desired_cell_size = A3_BROADPHASE_CELL_SIZE_MULTIPLIER * average_radius;
-float minimum_required_cell_size = (2.0f * max_radius) / (float) A3_MAX_CELL_SPAN_PER_AXIS;
+float desired_cell_size = g_cfg.broadphase.cell_size_multiplier * average_radius;
+float minimum_required_cell_size = (2.0f * max_radius) / (float) g_cfg.broadphase.max_cell_span_per_axis;
 
 if (desired_cell_size < minimum_required_cell_size) {
 desired_cell_size = minimum_required_cell_size;
 }
 
-if (desired_cell_size < A3_BROADPHASE_MIN_CELL_SIZE) {
-desired_cell_size = A3_BROADPHASE_MIN_CELL_SIZE;
+if (desired_cell_size < g_cfg.broadphase.cell_size_min) {
+desired_cell_size = g_cfg.broadphase.cell_size_min;
 }
 
-if (desired_cell_size > A3_BROADPHASE_MAX_CELL_SIZE) {
-desired_cell_size = A3_BROADPHASE_MAX_CELL_SIZE;
+if (desired_cell_size > g_cfg.broadphase.cell_size_max) {
+desired_cell_size = g_cfg.broadphase.cell_size_max;
 }
 
 broadphase_current_cell_size = desired_cell_size;
@@ -230,7 +221,7 @@ broadphase_current_cell_size = desired_cell_size;
 int broadphase_generate_pairing (broadphase_pair *collision_pairs_output_array, int maximum_pairs_allowed) {
 /* MPE_TASK_17_CELL_SIZE_CALL_BEGIN */
 if (object_count < 2) {
-broadphase_current_cell_size = A3_DEFAULT_GRID_CELL_SIZE;
+broadphase_current_cell_size = g_cfg.broadphase.cell_size_default;
 return 0;
 }
 
@@ -261,24 +252,24 @@ int max_z = (int) floorf ((rb -> position.z + extent_z) / GRID_CELL_SIZE);
 bool a3_large_object_clamped = false;
 
 /* A3_PATCH_50_BROADPHASE_LARGE_OBJECT_SAFETY */
-if ((max_x - min_x) > A3_MAX_CELL_SPAN_PER_AXIS) {
+if ((max_x - min_x) > g_cfg.broadphase.max_cell_span_per_axis) {
 int center_x = (int) floorf (rb -> position.x / GRID_CELL_SIZE);
-min_x = center_x - (A3_MAX_CELL_SPAN_PER_AXIS / 2);
-max_x = min_x + A3_MAX_CELL_SPAN_PER_AXIS;
+min_x = center_x - (g_cfg.broadphase.max_cell_span_per_axis / 2);
+max_x = min_x + g_cfg.broadphase.max_cell_span_per_axis;
 a3_large_object_clamped = true;
 }
 
-if ((max_y - min_y) > A3_MAX_CELL_SPAN_PER_AXIS) {
+if ((max_y - min_y) > g_cfg.broadphase.max_cell_span_per_axis) {
 int center_y = (int) floorf (rb -> position.y / GRID_CELL_SIZE);
-min_y = center_y - (A3_MAX_CELL_SPAN_PER_AXIS / 2);
-max_y = min_y + A3_MAX_CELL_SPAN_PER_AXIS;
+min_y = center_y - (g_cfg.broadphase.max_cell_span_per_axis / 2);
+max_y = min_y + g_cfg.broadphase.max_cell_span_per_axis;
 a3_large_object_clamped = true;
 }
 
-if ((max_z - min_z) > A3_MAX_CELL_SPAN_PER_AXIS) {
+if ((max_z - min_z) > g_cfg.broadphase.max_cell_span_per_axis) {
 int center_z = (int) floorf (rb -> position.z / GRID_CELL_SIZE);
-min_z = center_z - (A3_MAX_CELL_SPAN_PER_AXIS / 2);
-max_z = min_z + A3_MAX_CELL_SPAN_PER_AXIS;
+min_z = center_z - (g_cfg.broadphase.max_cell_span_per_axis / 2);
+max_z = min_z + g_cfg.broadphase.max_cell_span_per_axis;
 a3_large_object_clamped = true;
 }
 
