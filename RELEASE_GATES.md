@@ -28,140 +28,140 @@ They should be recorded as post-stable work items.
 ## Mandatory P0 Release Gates
 
 ### 1. Release Freeze
-- [ ] The `v15R1` release policy is present and acknowledged.
-- [ ] No new features beyond the config system are being added.
-- [ ] Only correctness, stability, validation, documentation, and hygiene changes are accepted.
+- [X] The `v15R1` release policy is present and acknowledged.
+- [X] No new features beyond the config system are being added.
+- [X] Only correctness, stability, validation, documentation, and hygiene changes are accepted.
 
 ### 2. Build
-- [ ] `make clean` succeeds.
-- [ ] `make` succeeds.
-- [ ] The engine binary is produced.
-- [ ] There are no new compiler errors.
-- [ ] Compiler warnings are reviewed and understood.
+- [X] `make clean` succeeds.
+- [X] `make` succeeds.
+- [X] The engine binary is produced.
+- [X] There are no new compiler errors.
+- [X] Compiler warnings are reviewed and understood.
 
 ### 3. Startup
-- [ ] Engine starts using the documented workflow.
-- [ ] Startup prints the correct version string (`MPE v15R1`).
-- [ ] Config system initialises (prints `[config] loaded` or `[config] defaults active`).
-- [ ] Shaders load successfully.
-- [ ] The main window opens.
-- [ ] The grid renders.
-- [ ] The overlay renders.
+- [X] Engine starts using the documented workflow.
+- [X] Startup prints the correct version string (`MPE v15R1`).
+- [X] Config system initialises (prints `[config] loaded` or `[config] defaults active`).
+- [X] Shaders load successfully.
+- [X] The main window opens.
+- [X] The grid renders.
+- [X] The overlay renders.
 
 ### 4. Shader / Render Failure Visibility
-- [ ] Shader compilation failure is reported clearly.
-- [ ] Shader link failure is reported clearly.
-- [ ] Missing shader files are reported clearly.
-- [ ] The engine does not silently continue in a broken render state.
+- [X] Shader compilation failure is reported clearly.
+- [X] Shader link failure is reported clearly.
+- [X] Missing shader files are reported clearly.
+- [X] The engine does not silently continue in a broken render state.
 
 ### 5. Input and Lifecycle
-- [ ] Closing the window quits the program.
-- [ ] Config is saved on clean exit.
-- [ ] Mouse lock can be acquired.
-- [ ] Mouse lock can be released.
-- [ ] Focus loss clears stuck keyboard state.
-- [ ] Focus loss clears stuck mouse state.
-- [ ] Dialogs do not leave editor state stuck.
-- [ ] Config menu (key 6) opens and closes correctly.
-- [ ] Config menu keys 0-9 work inside the menu.
-- [ ] Config menu does not interfere with other menus (7/8/9).
+- [X] Closing the window quits the program.
+- [X] Config is saved on clean exit.
+- [X] Mouse lock can be acquired.
+- [X] Mouse lock can be released.
+- [X] Focus loss clears stuck keyboard state.
+- [X] Focus loss clears stuck mouse state.
+- [X] Dialogs do not leave editor state stuck.
+- [X] Config menu (key 6) opens and closes correctly.
+- [X] Config menu keys 0-9 work inside the menu.
+- [X] Config menu does not interfere with other menus (7/8/9).
 
 ### 6. Editor Stability
-- [ ] Selecting an object does not crash.
-- [ ] Deleting the selected object does not crash.
-- [ ] Deleting a jointed object does not crash.
-- [ ] Deleting a marked joint object does not crash.
-- [ ] Opening menus with an invalid selection does not crash.
-- [ ] Save/load with menus open does not crash.
+- [X] Selecting an object does not crash.
+- [X] Deleting the selected object does not crash.
+- [X] Deleting a jointed object does not crash.
+- [X] Deleting a marked joint object does not crash.
+- [X] Opening menus with an invalid selection does not crash.
+- [X] Save/load with menus open does not crash.
 
 ### 7. Physics Stability
-- [ ] Objects rest on the floor without explosive jitter.
-- [ ] Cubes stack with reasonable stability.
-- [ ] Spheres and cubes collide correctly.
-- [ ] Restitution produces bounce.
-- [ ] Friction affects sliding.
-- [ ] Sleeping objects wake when hit.
-- [ ] Sleeping stacks remain sleeping once settled.
-- [ ] No NaNs appear after normal use.
-- [ ] No NaNs appear after stress testing.
-- [ ] Physics behaviour at default config is identical to v14S.
+- [X] Objects rest on the floor without explosive jitter.
+- [X] Cubes stack with reasonable stability.
+- [X] Spheres and cubes collide correctly.
+- [X] Restitution produces bounce.
+- [X] Friction affects sliding.
+- [X] Sleeping objects wake when hit.
+- [X] Sleeping stacks remain sleeping once settled.
+- [X] No NaNs appear after normal use.
+- [X] No NaNs appear after stress testing.
+- [X] Physics behaviour at default config is identical to v14S.
 
 ### 8. Broadphase / Solver Visibility
-- [ ] Broadphase node overflow is visible.
-- [ ] Broadphase pair overflow is visible.
-- [ ] Manifold overflow is visible.
-- [ ] Pair-dedupe exhaustion is visible or safely handled.
-- [ ] Debug counters are visible in overlay and/or validation report.
+- [X] Broadphase node overflow is visible.
+- [X] Broadphase pair overflow is visible.
+- [X] Manifold overflow is visible.
+- [X] Pair-dedupe exhaustion is visible or safely handled.
+- [X] Debug counters are visible in overlay and/or validation report.
 
 ### 9. Validation Tests
-- [ ] F5 stability stack passes.
-- [ ] F6 sleep/wake test passes.
-- [ ] F7 editor torture test passes.
-- [ ] F8 spawn stress test passes.
-- [ ] F9 validation report prints useful state including config dump.
-- [ ] F10 long-run validation passes.
-- [ ] F11 config torture test runs without crash.
-- [ ] The engine can idle for several minutes without explosion.
+- [X] F5 stability stack passes.
+- [X] F6 sleep/wake test passes.
+- [X] F7 editor torture test passes.
+- [X] F8 spawn stress test passes.
+- [X] F9 validation report prints useful state including config dump.
+- [X] F10 long-run validation passes.
+- [X] F11 config torture test runs without crash.
+- [X] The engine can idle for several minutes without explosion.
 
 ### 10. Configuration System
-- [ ] Config menu (key 6) opens and navigates correctly.
-- [ ] All 57 tunable parameters are editable via the menu.
-- [ ] Debug-only parameters are refused in Game Mode.
-- [ ] Config saves to `status/engine.cfg` on exit.
-- [ ] Config loads on startup and overrides defaults.
-- [ ] Corrupt or missing config file does not crash the engine.
-- [ ] Terminal `env` lists all parameters grouped by category.
-- [ ] Terminal `export KEY=value` works for any registered key.
-- [ ] Terminal `config save|load|reset` works correctly.
-- [ ] Extreme values are clamped to registered bounds.
-- [ ] F11 torture test randomises without NaN or crash.
-- [ ] Config reset restores v14S-identical behaviour.
+- [X] Config menu (key 6) opens and navigates correctly.
+- [X] All 57 tunable parameters are editable via the menu.
+- [X] Debug-only parameters are refused in Game Mode.
+- [X] Config saves to `status/engine.cfg` on exit.
+- [X] Config loads on startup and overrides defaults.
+- [X] Corrupt or missing config file does not crash the engine.
+- [X] Terminal `env` lists all parameters grouped by category.
+- [X] Terminal `export KEY=value` works for any registered key.
+- [X] Terminal `config save|load|reset` works correctly.
+- [X] Extreme values are clamped to registered bounds.
+- [X] F11 torture test randomises without NaN or crash.
+- [X] Config reset restores v14S-identical behaviour.
 
 ### 11. Documentation
-- [ ] README matches the code.
-- [ ] User guide matches the code.
-- [ ] Validation checklist matches the current version.
-- [ ] Broadphase description matches the implementation.
-- [ ] Physics timestep description matches the implementation.
-- [ ] Config system is documented.
-- [ ] Known limitations are documented.
+- [X] README matches the code.
+- [X] User guide matches the code.
+- [X] Validation checklist matches the current version.
+- [X] Broadphase description matches the implementation.
+- [X] Physics timestep description matches the implementation.
+- [X] Config system is documented.
+- [X] Known limitations are documented.
 
 ### 12. Repository Hygiene
-- [ ] Build artifacts are not tracked.
-- [ ] Object files are not tracked.
-- [ ] Dependency files are not tracked.
-- [ ] Backup shader files are removed or isolated.
-- [ ] Duplicate documentation is reduced or clarified.
-- [ ] A `.gitignore` exists.
+- [X] Build artifacts are not tracked.
+- [X] Object files are not tracked.
+- [X] Dependency files are not tracked.
+- [X] Backup shader files are removed or isolated.
+- [X] Duplicate documentation is reduced or clarified.
+- [X] A `.gitignore` exists.
 
 ### 13. Sanitizer / Debug Validation
-- [ ] A debug build with AddressSanitizer is available or manually used.
-- [ ] A debug build with UndefinedBehaviorSanitizer is available or manually used.
-- [ ] Normal validation passes under sanitizer builds.
-- [ ] No severe sanitizer errors are present.
+- [X] A debug build with AddressSanitizer is available or manually used.
+- [X] A debug build with UndefinedBehaviorSanitizer is available or manually used.
+- [X] Normal validation passes under sanitizer builds.
+- [X] No severe sanitizer errors are present.
 
 ---
 
 ## Recommended P1 Release Gates
 
 ### Scene Save / Load
-- [ ] Saving a scene works.
-- [ ] Loading a scene works.
-- [ ] Loading resets editor/menu/selection state.
-- [ ] Save/load failure is reported.
-- [ ] Scene format limitations are documented.
+- [X] Saving a scene works.
+- [X] Loading a scene works.
+- [X] Loading resets editor/menu/selection state.
+- [X] Save/load failure is reported.
+- [X] Scene format limitations are documented.
 
 ### Performance Sanity
-- [ ] CPU usage drops when the scene is sleeping.
-- [ ] Overlay updates do not dominate frame time.
-- [ ] Redundant sanitization passes are reduced.
-- [ ] Stress scenes remain usable.
+- [X] CPU usage drops when the scene is sleeping.
+- [X] Overlay updates do not dominate frame time.
+- [X] Redundant sanitization passes are reduced.
+- [X] Stress scenes remain usable.
 
 ### User Feedback
-- [ ] Object capacity exhaustion is visible to the user.
-- [ ] Save/load failure is visible to the user.
-- [ ] Shader failure is visible to the user.
-- [ ] Config load failure is visible to the user.
+- [X] Object capacity exhaustion is visible to the user.
+- [X] Save/load failure is visible to the user.
+- [X] Shader failure is visible to the user.
+- [X] Config load failure is visible to the user.
 
 ---
 
