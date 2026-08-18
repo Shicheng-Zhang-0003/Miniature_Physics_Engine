@@ -13,19 +13,19 @@
 
 const char *mpe_config_category_name(param_category cat) {
     switch (cat) {
-        case CAT_WORLD:         return "world";
-        case CAT_TIMESTEP:      return "timestep";
-        case CAT_SLEEP:         return "sleep";
-        case CAT_SOLVER:        return "solver";
-        case CAT_DEPENETRATION: return "depenetration";
-        case CAT_BROADPHASE:    return "broadphase";
-        case CAT_JOINTS:        return "joints";
-        case CAT_BOUNDARY:      return "boundary";
-        case CAT_SPAWNER:       return "spawner";
-        case CAT_BODY_DEFAULTS: return "body_defaults";
-        case CAT_CAMERA:        return "camera";
-        case CAT_RENDER:        return "render";
-        case CAT_UI:            return "ui";
+        case cat_world:         return "world";
+        case cat_timestep:      return "timestep";
+        case cat_sleep:         return "sleep";
+        case cat_solver:        return "solver";
+        case cat_depenetration: return "depenetration";
+        case cat_broadphase:    return "broadphase";
+        case cat_joints:        return "joints";
+        case cat_boundary:      return "boundary";
+        case cat_spawner:       return "spawner";
+        case cat_body_defaults: return "body_defaults";
+        case cat_camera:        return "camera";
+        case cat_render:        return "render";
+        case cat_ui:            return "ui";
         default:                return "unknown";
     }
 }
@@ -33,9 +33,9 @@ const char *mpe_config_category_name(param_category cat) {
 static double param_read_double(const mpe_param *param) {
     if ((!param) || (!param->storage)) {return 0.0;}
     switch (param->type) {
-        case P_FLOAT: return (double)(*(float *)param->storage);
-        case P_INT:   return (double)(*(int *)param->storage);
-        case P_BOOL:  return (*(bool *)param->storage) ? 1.0 : 0.0;
+        case p_float: return (double)(*(float *)param->storage);
+        case p_int:   return (double)(*(int *)param->storage);
+        case p_bool:  return (*(bool *)param->storage) ? 1.0 : 0.0;
         default:      return 0.0;
     }
 }
@@ -46,9 +46,9 @@ static bool param_write_double(const mpe_param *param, double value) {
     if (value < param->min) {value = param->min; clamped = true;}
     if (value > param->max) {value = param->max; clamped = true;}
     switch (param->type) {
-        case P_FLOAT: *(float *)param->storage = (float)value; break;
-        case P_INT:   *(int *)param->storage = (int)value; break;
-        case P_BOOL:  *(bool *)param->storage = (value != 0.0); break;
+        case p_float: *(float *)param->storage = (float)value; break;
+        case p_int:   *(int *)param->storage = (int)value; break;
+        case p_bool:  *(bool *)param->storage = (value != 0.0); break;
         default: break;
     }
     return clamped;
@@ -158,7 +158,7 @@ bool mpe_config_save(const char *path) {
     strftime(stamp, sizeof(stamp), "%Y-%m-%d %H:%M:%S", local_time);
     fprintf(file, "# MPE Engine Configuration\n");
     fprintf(file, "# saved:   %s\n\n", stamp);
-    for (int cat = 0; cat <= CAT_UI; cat++) {
+    for (int cat = 0; cat <= cat_ui; cat++) {
         bool wrote_header = false;
         for (size_t i = 0; i < g_registry_count; i++) {
             if ((int)g_registry[i].category != cat) {continue;}
@@ -168,7 +168,7 @@ bool mpe_config_save(const char *path) {
             }
             const char *dot = strchr(g_registry[i].key, '.');
             const char *field = dot ? (dot + 1) : g_registry[i].key;
-            if (g_registry[i].type == P_FLOAT) {
+            if (g_registry[i].type == p_float) {
                 fprintf(file, "%s = %.6f\n", field, param_read_double(&g_registry[i]));
             } else {
                 fprintf(file, "%s = %d\n", field, (int)param_read_double(&g_registry[i]));

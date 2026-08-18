@@ -12,13 +12,13 @@ int scene_loading (const char *file_source_path) {
     FILE *f = fopen (file_source_path, "rb");
     if (!f) { fprintf (stderr, "Error LDF01: Could not open %s\n", file_source_path); return 0; }
     int32_t magic, version, count;
-    if ((!read_int (f, &magic)) || (magic != MPE_MAGIC)) { fprintf (stderr, "Error LDF02: Invalid magic number\n"); fclose (f); return 0; }
-    if ((!read_int (f, &version)) || (version != MPE_VERSION && version != 130)) { fprintf (stderr, "Error LDF03: Version mismatch\n"); fclose (f); return 0; }
+    if ((!read_int (f, &magic)) || (magic != mpe_magic)) { fprintf (stderr, "Error LDF02: Invalid magic number\n"); fclose (f); return 0; }
+    if ((!read_int (f, &version)) || (version != mpe_version && version != 130)) { fprintf (stderr, "Error LDF03: Version mismatch\n"); fclose (f); return 0; }
     if ((!read_int (f, &count)) || (count < 0)) { fclose (f); return 0; }
     scene_clear ();
     contact_cache_clear (); /* A3_PATCH_22_SCENE_LOAD_RESET */
     /* A3_PATCH_23_POOL_CONSISTENCY */
-if (count > MPE_MAX_BODIES) {count = MPE_MAX_BODIES;}
+if (count > mpe_max_bodies) {count = mpe_max_bodies;}
 
 if (!scene_ensure_pool_capacity (count)) {
     fclose (f);

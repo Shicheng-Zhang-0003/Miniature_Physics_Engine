@@ -46,7 +46,7 @@ event_log_init (); /* MPE_TASK_V15R2_EVENT_LOG_INIT */
         printf ("[config] defaults active (no saved config)\n");
     }
     /* MPE_TASK_34_CONFIG_LOAD_END */
-printf ("MPE %s\n", A3_VERSION_STRING); /* A3_PATCH_41_FINAL_VALIDATION */
+printf ("MPE %s\n", a3_version_string); /* A3_PATCH_41_FINAL_VALIDATION */
     //Camera Init
     initialize_camera (&main_camera_fov, (vector3) {0.0f, 20.0f, 50.0f});
     initialise_input (&main_inputs);

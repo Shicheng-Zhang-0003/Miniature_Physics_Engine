@@ -15,10 +15,10 @@ static GtkTextBuffer *terminal_output_buffer = NULL;
 static GtkWidget *terminal_entry = NULL;
 static GtkWidget *terminal_prompt_label = NULL;
 static char term_cwd [256] = "/";
-static char term_history [TERM_HISTORY_SIZE][TERM_HISTORY_LENGTH + 1];
+static char term_history [term_history_size][term_history_length + 1];
 static int term_history_count = 0;
 static int term_history_cursor = -1;
-static uint32_t term_id_buffer [MPE_MAX_BODIES];
+static uint32_t term_id_buffer [mpe_max_bodies];
 /* ------------------------------------------------------------------ */
 /* Output helpers                                                      */
 /* ------------------------------------------------------------------ */
@@ -60,11 +60,11 @@ term_capturing = false;
 }
 /* MPE_TASK_V15R2_OUTPUT_CAPTURE_END */
 /* MPE_TASK_V15R2_PHASE7_ALIAS_STORAGE_BEGIN */
-#define TERM_ALIAS_MAX 32
-#define TERM_ALIAS_NAME_LEN 64
-#define TERM_ALIAS_VALUE_LEN 256
-static char term_alias_names [TERM_ALIAS_MAX][TERM_ALIAS_NAME_LEN];
-static char term_alias_values [TERM_ALIAS_MAX][TERM_ALIAS_VALUE_LEN];
+#define term_alias_max 32
+#define term_alias_name_len 64
+#define term_alias_value_len 256
+static char term_alias_names [term_alias_max][term_alias_name_len];
+static char term_alias_values [term_alias_max][term_alias_value_len];
 static int term_alias_count = 0;
 static bool term_sudo_active = false;
 /* MPE_TASK_V15R2_PHASE7_ALIAS_STORAGE_END */
@@ -117,13 +117,13 @@ gtk_label_set_text (GTK_LABEL (terminal_prompt_label), prompt_buffer);
 static void term_history_push (const char *command_text) {
 if (command_text [0] == '\0') {return;}
 if ((term_history_count > 0) && (strcmp (term_history [0], command_text) == 0)) {return;}
-if (term_history_count < TERM_HISTORY_SIZE) {term_history_count++;}
+if (term_history_count < term_history_size) {term_history_count++;}
 for (int history_index = term_history_count - 1; history_index > 0; history_index--) {
-strncpy (term_history [history_index], term_history [history_index - 1], TERM_HISTORY_LENGTH);
-term_history [history_index][TERM_HISTORY_LENGTH] = '\0';
+strncpy (term_history [history_index], term_history [history_index - 1], term_history_length);
+term_history [history_index][term_history_length] = '\0';
 }
-strncpy (term_history [0], command_text, TERM_HISTORY_LENGTH);
-term_history [0][TERM_HISTORY_LENGTH] = '\0';
+strncpy (term_history [0], command_text, term_history_length);
+term_history [0][term_history_length] = '\0';
 }
 /* ------------------------------------------------------------------ */
 /* String/path helpers                                                 */
@@ -167,20 +167,20 @@ const char *component = term_last_path_component (token);
 char *endptr = NULL;
 long parsed_index = strtol (component, &endptr, 10);
 if ((endptr == component) || (*endptr != '\0')) {return -1;}
-if ((parsed_index < 0) || (parsed_index >= MPE_MAX_JOINTS)) {return -1;}
+if ((parsed_index < 0) || (parsed_index >= mpe_max_joints)) {return -1;}
 if (!joint_pool [parsed_index].is_active) {return -1;}
 return (int) parsed_index;
 }
 typedef enum {
-TERM_TARGET_OBJECT,
-TERM_TARGET_JOINT
+term_target_object,
+term_target_joint
 } term_target_kind;
 static term_target_kind term_classify_token (const char *token) {
-if (!token) {return TERM_TARGET_OBJECT;}
-if (strstr (token, "joint")) {return TERM_TARGET_JOINT;}
-if (strstr (token, "obj")) {return TERM_TARGET_OBJECT;}
-if (strstr (term_cwd, "joint")) {return TERM_TARGET_JOINT;}
-return TERM_TARGET_OBJECT;
+if (!token) {return term_target_object;}
+if (strstr (token, "joint")) {return term_target_joint;}
+if (strstr (token, "obj")) {return term_target_object;}
+if (strstr (term_cwd, "joint")) {return term_target_joint;}
+return term_target_object;
 }
 static int term_require_object (const char *token) {
 int object_index = term_object_from_token (token);
@@ -470,7 +470,7 @@ else {term_printf (NULL, "%d\n", object_index);}
 }
 static void term_list_joints (bool long_format) {
 int listed_count = 0;
-for (int joint_index = 0; joint_index < MPE_MAX_JOINTS; joint_index++) {
+for (int joint_index = 0; joint_index < mpe_max_joints; joint_index++) {
 if (!joint_pool [joint_index].is_active) {continue;}
 if (long_format) {term_print_joint_long (joint_index);}
 else {term_printf (NULL, "%d\n", joint_index);}
@@ -531,7 +531,7 @@ term_printf (NULL, "  damping:    %.4f\n", joint -> damping_coefficient);
 }
 static void term_print_world (void) {
 term_printf ("term_echo", "/world\n");
-term_printf (NULL, "  version:            %s\n", A3_VERSION_STRING);
+term_printf (NULL, "  version:            %s\n", a3_version_string);
 term_printf (NULL, "  mode:               %s\n", main_inputs.is_debug_mode_active ? "debug" : "game");
 term_printf (NULL, "  gravity:            %.4f\n", g_cfg.world.gravity);
 term_printf (NULL, "  drag:               %.4f\n", g_cfg.world.drag);
@@ -754,7 +754,7 @@ const char *target = argv [argument_index];
 if (strstr (target, "world")) {term_print_world ();}
 else if (strstr (target, "camera")) {term_print_camera ();}
 else if (strstr (target, "spawner")) {term_print_spawner ();}
-else if (term_classify_token (target) == TERM_TARGET_JOINT) {
+else if (term_classify_token (target) == term_target_joint) {
 int joint_index = term_joint_from_token (target);
 if (joint_index >= 0) {term_print_joint_cat (joint_index);}
 else {term_printf ("term_err", "mpe: %s: No such joint\n", target);}
@@ -801,9 +801,9 @@ const char *target = argv [argument_index];
 bool all_targets = term_is_all_token (target);
 term_target_kind kind = term_classify_token (target);
 if (all_targets) {
-if (kind == TERM_TARGET_JOINT) {
+if (kind == term_target_joint) {
 int removed_count = 0;
-for (int joint_index = 0; joint_index < MPE_MAX_JOINTS; joint_index++) {
+for (int joint_index = 0; joint_index < mpe_max_joints; joint_index++) {
 if (joint_pool [joint_index].is_active) {remove_joint (joint_index); removed_count++;}
 }
 term_printf ("term_ok", "removed %d joint(s)\n", removed_count);
@@ -821,7 +821,7 @@ term_ok ("removed all objects\n");
 }
 continue;
 }
-if (kind == TERM_TARGET_JOINT) {
+if (kind == term_target_joint) {
 int joint_index = term_joint_from_token (target);
 if (joint_index >= 0) {
 remove_joint (joint_index);
@@ -832,7 +832,7 @@ term_printf ("term_err", "mpe: %s: No such joint\n", target);
 } else {
 int object_index = term_object_from_token (target);
 if (object_index >= 0) {
-if (delete_count < MPE_MAX_BODIES) {
+if (delete_count < mpe_max_bodies) {
 term_id_buffer [delete_count++] = obj_per_scene [object_index].object_id;
 }
 } else {
@@ -908,7 +908,7 @@ term_err ("usage: unlink <path>\n");
 return;
 }
 const char *target = argv [1];
-if (term_classify_token (target) == TERM_TARGET_JOINT) {
+if (term_classify_token (target) == term_target_joint) {
 int joint_index = term_require_joint (target);
 if (joint_index >= 0) {
 remove_joint (joint_index);
@@ -957,23 +957,23 @@ if (argc < 2) {
 term_err ("usage: kill [-STOP|-CONT|-9|-TERM] <object...>\n");
 return;
 }
-enum {KILL_TERM, KILL_STOP, KILL_CONT};
-int kill_action = KILL_TERM;
+enum {kill_term, kill_stop, kill_cont};
+int kill_action = kill_term;
 int argument_index = 1;
 if ((argc > 1) && ((argv [1][0] == '-') || (g_str_has_prefix (argv [1], "SIG")))) {
 const char *signal_text = argv [1];
 if (signal_text [0] == '-') {signal_text++;}
 if (g_str_has_prefix (signal_text, "SIG")) {signal_text += 3;}
-if (term_str_eq (signal_text, "STOP") || term_str_eq (signal_text, "19")) {kill_action = KILL_STOP;}
-else if (term_str_eq (signal_text, "CONT") || term_str_eq (signal_text, "18")) {kill_action = KILL_CONT;}
-else {kill_action = KILL_TERM;}
+if (term_str_eq (signal_text, "STOP") || term_str_eq (signal_text, "19")) {kill_action = kill_stop;}
+else if (term_str_eq (signal_text, "CONT") || term_str_eq (signal_text, "18")) {kill_action = kill_cont;}
+else {kill_action = kill_term;}
 argument_index = 2;
 }
 int delete_count = 0;
 for (; argument_index < argc; argument_index++) {
 const char *target = argv [argument_index];
 if (term_is_all_token (target)) {
-if (kill_action == KILL_STOP) {
+if (kill_action == kill_stop) {
 for (int object_index = 0; object_index < object_count; object_index++) {
 obj_per_scene [object_index].velocity = vector3_zero ();
 obj_per_scene [object_index].angular_velocity = vector3_zero ();
@@ -981,7 +981,7 @@ obj_per_scene [object_index].is_sleeping = true;
 obj_per_scene [object_index].sleep_timer = 2.0f;
 }
 term_ok ("stopped all objects\n");
-} else if (kill_action == KILL_CONT) {
+} else if (kill_action == kill_cont) {
 for (int object_index = 0; object_index < object_count; object_index++) {
 rigidbody_wake (&obj_per_scene [object_index]);
 }
@@ -1006,17 +1006,17 @@ term_printf ("term_err", "mpe: %s: No such object\n", target);
 continue;
 }
 rigidbody *rigid_body = &obj_per_scene [object_index];
-if (kill_action == KILL_STOP) {
+if (kill_action == kill_stop) {
 rigid_body -> velocity = vector3_zero ();
 rigid_body -> angular_velocity = vector3_zero ();
 rigid_body -> is_sleeping = true;
 rigid_body -> sleep_timer = 2.0f;
 term_printf ("term_ok", "stopped /obj/%d\n", object_index);
-} else if (kill_action == KILL_CONT) {
+} else if (kill_action == kill_cont) {
 rigidbody_wake (rigid_body);
 term_printf ("term_ok", "continued /obj/%d\n", object_index);
 } else {
-if (delete_count < MPE_MAX_BODIES) {
+if (delete_count < mpe_max_bodies) {
 term_id_buffer [delete_count++] = rigid_body -> object_id;
 }
 }
@@ -1117,8 +1117,8 @@ rigid_body -> position.x, rigid_body -> position.y, rigid_body -> position.z);
 }
 static void cmd_df (int argc, char **argv) {
 (void) argc; (void) argv;
-int object_capacity_value = (object_capacity > 0) ? object_capacity : MPE_MAX_BODIES;
-int joint_capacity_value = MPE_MAX_JOINTS;
+int object_capacity_value = (object_capacity > 0) ? object_capacity : mpe_max_bodies;
+int joint_capacity_value = mpe_max_joints;
 int object_percent = (object_capacity_value > 0) ? (object_count * 100 / object_capacity_value) : 0;
 int joint_percent = (joint_capacity_value > 0) ? (current_joint_count * 100 / joint_capacity_value) : 0;
 term_printf (NULL, "Filesystem     Size   Used  Avail Use%% Mounted on\n");
@@ -1134,7 +1134,7 @@ return;
 }
 for (int argument_index = 1; argument_index < argc; argument_index++) {
 const char *target = argv [argument_index];
-if (term_classify_token (target) == TERM_TARGET_JOINT) {
+if (term_classify_token (target) == term_target_joint) {
 int joint_index = term_joint_from_token (target);
 if (joint_index >= 0) {
 spring_joint *joint = &joint_pool [joint_index];
@@ -1168,17 +1168,17 @@ else if (term_str_eq (argv [i], "-o")) {print_os = true;}
 else if (argv [i][0] == '-') {print_all = true;}
 }
 if (print_all) {
-term_printf (NULL, "MPE %s mpe-engine x86_64 POSIX-like/GTK3/OpenGL3.3 MPE\n", A3_VERSION_STRING);
+term_printf (NULL, "MPE %s mpe-engine x86_64 POSIX-like/GTK3/OpenGL3.3 MPE\n", a3_version_string);
 } else if (print_sys) {
 term_out ("MPE\n");
 } else if (print_rel) {
-term_printf (NULL, "%s\n", A3_VERSION_STRING);
+term_printf (NULL, "%s\n", a3_version_string);
 } else if (print_mach) {
 term_out ("x86_64\n");
 } else if (print_os) {
 term_out ("POSIX-like/GTK3/OpenGL3.3\n");
 } else {
-term_printf (NULL, "MPE %s\n", A3_VERSION_STRING);
+term_printf (NULL, "MPE %s\n", a3_version_string);
 }
 }
 static void cmd_whoami (int argc, char **argv) {
@@ -1210,9 +1210,9 @@ if ((int) g_registry [i].category != current_category) {
 current_category = (int) g_registry [i].category;
 term_printf ("term_echo", "[%s]\n", mpe_config_category_name ((param_category) current_category));
 }
-if (g_registry [i].type == P_INT) {
+if (g_registry [i].type == p_int) {
 term_printf (NULL, "  %s = %d\n", g_registry [i].key, *(int *) g_registry [i].storage);
-} else if (g_registry [i].type == P_BOOL) {
+} else if (g_registry [i].type == p_bool) {
 term_printf (NULL, "  %s = %s\n", g_registry [i].key, (*(bool *) g_registry [i].storage) ? "true" : "false");
 } else {
 term_printf (NULL, "  %s = %.4f\n", g_registry [i].key, *(float *) g_registry [i].storage);
@@ -1247,9 +1247,9 @@ term_printf ("term_ok", "CAMERA_SPEED=%.4f\n", variable_value);
 const mpe_param *param = mpe_config_find (variable_name);
 if (param) {
 bool clamped = !mpe_config_set_float (variable_name, variable_value);
-if (param -> type == P_INT) {
+if (param -> type == p_int) {
 term_printf ("term_ok", "%s = %d%s\n", variable_name, *(int *) param -> storage, clamped ? " (clamped)" : "");
-} else if (param -> type == P_BOOL) {
+} else if (param -> type == p_bool) {
 term_printf ("term_ok", "%s = %s%s\n", variable_name, (*(bool *) param -> storage) ? "true" : "false", clamped ? " (clamped)" : "");
 } else {
 term_printf ("term_ok", "%s = %.4f%s\n", variable_name, *(float *) param -> storage, clamped ? " (clamped)" : "");
@@ -1305,7 +1305,7 @@ static void cmd_poweroff (int argc, char **argv) {
 (void) argc; (void) argv;
 mpe_config_save ("status/engine.cfg");
 term_ok ("System halted.\n");
-event_log_push (LOG_INFO, "Engine shutdown via terminal poweroff");
+event_log_push (log_info, "Engine shutdown via terminal poweroff");
 gtk_main_quit ();
 }
 static void cmd_shutdown (int argc, char **argv) {cmd_poweroff (argc, argv);}
@@ -1317,7 +1317,7 @@ contact_cache_clear ();
 editor_reset ();
 scene_init_default ();
 term_ok ("System rebooted.\n");
-event_log_push (LOG_INFO, "Scene rebooted via terminal");
+event_log_push (log_info, "Scene rebooted via terminal");
 }
 static void cmd_halt (int argc, char **argv) {
 (void) argc; (void) argv;
@@ -1366,18 +1366,18 @@ object_count, current_joint_count, debug_last_sleeping_object_count);
 }
 static void cmd_free (int argc, char **argv) {
 (void) argc; (void) argv;
-int obj_cap = (object_capacity > 0) ? object_capacity : MPE_MAX_BODIES;
+int obj_cap = (object_capacity > 0) ? object_capacity : mpe_max_bodies;
 term_printf (NULL, "             total      used      free  use%%\n");
 term_printf (NULL, "objects:    %6d   %6d   %6d   %3d%%\n",
 obj_cap, object_count, obj_cap - object_count,
 (obj_cap > 0) ? (object_count * 100 / obj_cap) : 0);
 term_printf (NULL, "joints:     %6d   %6d   %6d   %3d%%\n",
-MPE_MAX_JOINTS, current_joint_count, MPE_MAX_JOINTS - current_joint_count,
-(MPE_MAX_JOINTS > 0) ? (current_joint_count * 100 / MPE_MAX_JOINTS) : 0);
+mpe_max_joints, current_joint_count, mpe_max_joints - current_joint_count,
+(mpe_max_joints > 0) ? (current_joint_count * 100 / mpe_max_joints) : 0);
 term_printf (NULL, "bp pairs:   %6d   %6d\n",
-MPE_MAX_BROADPHASE_PAIRS, debug_last_broadphase_pair_count);
+mpe_max_broadphase_pairs, debug_last_broadphase_pair_count);
 term_printf (NULL, "manifolds:  %6d   %6d\n",
-A3_MAX_MANIFOLDS, debug_last_manifold_count);
+a3_max_manifolds, debug_last_manifold_count);
 term_printf (NULL, "cache:      hits=%d misses=%d\n",
 contact_cache_get_hits (), contact_cache_get_misses ());
 }
@@ -1486,7 +1486,7 @@ return;
 }
 rigidbody *rb = &obj_per_scene [object_index];
 int joint_count_for_obj = 0;
-for (int ji = 0; ji < MPE_MAX_JOINTS; ji++) {
+for (int ji = 0; ji < mpe_max_joints; ji++) {
 if (!joint_pool [ji].is_active) {continue;}
 int ia = scene_find_object_index_by_id (joint_pool [ji].object_id_a);
 int ib = scene_find_object_index_by_id (joint_pool [ji].object_id_b);
@@ -1579,7 +1579,7 @@ for (int i = 1; i < argc; i++) {
 if (argv [i][0] == '-') {continue;}
 if (strstr (argv [i], "joint")) {
 int active_joints = 0;
-for (int ji = 0; ji < MPE_MAX_JOINTS; ji++) {
+for (int ji = 0; ji < mpe_max_joints; ji++) {
 if (joint_pool [ji].is_active) {active_joints++;}
 }
 term_printf (NULL, "%d /joint\n", active_joints);
@@ -1610,7 +1610,7 @@ term_printf (NULL, "/spawner: object factory, type=%s\n",
 (main_inputs.current_spawn_type == 0) ? "sphere" : "cube");
 return;
 }
-if (term_classify_token (target) == TERM_TARGET_JOINT) {
+if (term_classify_token (target) == term_target_joint) {
 int joint_index = term_joint_from_token (target);
 if (joint_index >= 0) {
 spring_joint *j = &joint_pool [joint_index];
@@ -1798,7 +1798,7 @@ term_list_joints (true);
 return;
 }
 if (object_count == 0) {term_dim ("(no objects)\n"); return;}
-static int sort_indices [MPE_MAX_BODIES];
+static int sort_indices [mpe_max_bodies];
 for (int i = 0; i < object_count; i++) {sort_indices [i] = i;}
 qsort (sort_indices, (size_t) object_count, sizeof (int), a3_sort_compare);
 term_printf (NULL, "%-10s %4s %8s %-4s %-6s %s\n", "MODE", "PID", "MASS", "TYPE", "STATE", "INFO");
@@ -2168,7 +2168,7 @@ if (scene_loading (scene_path)) {
 editor_reset ();
 contact_cache_clear ();
 term_printf ("term_ok", "mounted %s: %d objects loaded\n", scene_path, object_count);
-event_log_push (LOG_INFO, "Scene mounted via terminal: %s", scene_path);
+event_log_push (log_info, "Scene mounted via terminal: %s", scene_path);
 } else {
 term_printf ("term_err", "mpe: mount: %s: failed to load\n", scene_path);
 }
@@ -2186,7 +2186,7 @@ clear_selection ();
 contact_cache_clear ();
 editor_reset ();
 term_ok ("umount: scene cleared\n");
-event_log_push (LOG_INFO, "Scene unmounted via terminal");
+event_log_push (log_info, "Scene unmounted via terminal");
 }
 static void cmd_mkfs (int argc, char **argv) {
 (void) argc; (void) argv;
@@ -2195,7 +2195,7 @@ clear_selection ();
 contact_cache_clear ();
 editor_reset ();
 term_printf ("term_ok", "Scene formatted. 0 objects, 0 joints.\n");
-event_log_push (LOG_INFO, "Scene formatted via terminal (mkfs)");
+event_log_push (log_info, "Scene formatted via terminal (mkfs)");
 }
 static void cmd_fsck (int argc, char **argv) {
 bool auto_fix = false;
@@ -2249,8 +2249,8 @@ term_printf ("term_ok", "  /obj/%d: sanitized\n", object_index);
 }
 }
 }
-term_printf ("term_echo", "fsck: checking %d joint slots...\n", MPE_MAX_JOINTS);
-for (int joint_index = 0; joint_index < MPE_MAX_JOINTS; joint_index++) {
+term_printf ("term_echo", "fsck: checking %d joint slots...\n", mpe_max_joints);
+for (int joint_index = 0; joint_index < mpe_max_joints; joint_index++) {
 if (!joint_pool [joint_index].is_active) {continue;}
 spring_joint *j = &joint_pool [joint_index];
 int index_a = scene_find_object_index_by_id (j -> object_id_a);
@@ -2284,7 +2284,7 @@ object_count, current_joint_count, warning_count);
 term_printf ("term_err", "fsck: FAIL — %d error(s), %d warning(s)%s\n",
 error_count, warning_count, auto_fix ? " (auto-fixed)" : " (run fsck -y to fix)");
 }
-event_log_push (error_count == 0 ? LOG_INFO : LOG_WARN,
+event_log_push (error_count == 0 ? log_info : log_warn,
 "fsck: %d errors, %d warnings%s", error_count, warning_count, auto_fix ? " (fixed)" : "");
 }
 /* MPE_TASK_V15R2_PHASE5_IMPL_END */
@@ -2297,7 +2297,7 @@ if (term_str_eq (argv [i], "-a")) {show_all = true;}
 term_printf ("term_echo", "Active Joints (spring connections)\n");
 term_printf (NULL, "Proto  Local        Foreign      State         K        D      Len\n");
 int listed = 0;
-for (int ji = 0; ji < MPE_MAX_JOINTS; ji++) {
+for (int ji = 0; ji < mpe_max_joints; ji++) {
 if ((!joint_pool [ji].is_active) && (!show_all)) {continue;}
 int ia = scene_find_object_index_by_id (joint_pool [ji].object_id_a);
 int ib = scene_find_object_index_by_id (joint_pool [ji].object_id_b);
@@ -2387,21 +2387,21 @@ const char *alias_value = equals_pos + 1;
 bool updated = false;
 for (int i = 0; i < term_alias_count; i++) {
 if (term_str_eq (alias_name, term_alias_names [i])) {
-strncpy (term_alias_values [i], alias_value, TERM_ALIAS_VALUE_LEN - 1);
-term_alias_values [i][TERM_ALIAS_VALUE_LEN - 1] = '\0';
+strncpy (term_alias_values [i], alias_value, term_alias_value_len - 1);
+term_alias_values [i][term_alias_value_len - 1] = '\0';
 updated = true;
 break;
 }
 }
 if (!updated) {
-if (term_alias_count >= TERM_ALIAS_MAX) {
+if (term_alias_count >= term_alias_max) {
 term_err ("mpe: alias: alias table full\n");
 continue;
 }
-strncpy (term_alias_names [term_alias_count], alias_name, TERM_ALIAS_NAME_LEN - 1);
-term_alias_names [term_alias_count][TERM_ALIAS_NAME_LEN - 1] = '\0';
-strncpy (term_alias_values [term_alias_count], alias_value, TERM_ALIAS_VALUE_LEN - 1);
-term_alias_values [term_alias_count][TERM_ALIAS_VALUE_LEN - 1] = '\0';
+strncpy (term_alias_names [term_alias_count], alias_name, term_alias_name_len - 1);
+term_alias_names [term_alias_count][term_alias_name_len - 1] = '\0';
+strncpy (term_alias_values [term_alias_count], alias_value, term_alias_value_len - 1);
+term_alias_values [term_alias_count][term_alias_value_len - 1] = '\0';
 term_alias_count++;
 }
 term_printf ("term_ok", "alias %s='%s'\n", alias_name, alias_value);
@@ -2414,8 +2414,8 @@ bool found = false;
 for (int i = 0; i < term_alias_count; i++) {
 if (term_str_eq (argv [argument_index], term_alias_names [i])) {
 for (int j = i; j < term_alias_count - 1; j++) {
-strncpy (term_alias_names [j], term_alias_names [j + 1], TERM_ALIAS_NAME_LEN);
-strncpy (term_alias_values [j], term_alias_values [j + 1], TERM_ALIAS_VALUE_LEN);
+strncpy (term_alias_names [j], term_alias_names [j + 1], term_alias_name_len);
+strncpy (term_alias_values [j], term_alias_values [j + 1], term_alias_value_len);
 }
 term_alias_count--;
 found = true;
@@ -2603,8 +2603,8 @@ if ((filter_level >= 0) && ((int) level < filter_level)) {continue;}
 struct tm *local_time = localtime (&timestamp);
 char time_buffer [32];
 strftime (time_buffer, sizeof (time_buffer), "%H:%M:%S", local_time);
-const char *level_text = (level == LOG_INFO) ? "INFO" : (level == LOG_WARN) ? "WARN" : "ERR ";
-const char *tag_name = (level == LOG_ERROR) ? "term_err" : (level == LOG_WARN) ? "term_echo" : NULL;
+const char *level_text = (level == log_info) ? "INFO" : (level == log_warn) ? "WARN" : "ERR ";
+const char *tag_name = (level == log_error) ? "term_err" : (level == log_warn) ? "term_echo" : NULL;
 term_printf (tag_name, "[%s] %s: %s\n", time_buffer, level_text, message);
 printed++;
 }
@@ -2622,6 +2622,7 @@ static const mv_editable_file mv_known_files [] = {
 {"status/engine.cfg",          "Main engine configuration (57 tunables)"},
 {"status/engine.cfg.backup",   "F10/F11 validation config backup"},
 {"status/engine.cfg.bak",      "MicroVim auto-backup (last :w)"},
+{"status/scene.dat",           "Scene save file (binary)"},
 {"../readme.md",               "Project README"},
 {"../evolution.txt",           "Version lineage (stage 0 → v15R2)"},
 {"../how_to_use.md",           "User guide / controls reference"},
@@ -2634,6 +2635,22 @@ static const mv_editable_file mv_known_files [] = {
 {"../validation/V02.sh",       "Clean build + warning review"},
 {"../validation/V03.py",       "P0 gate interactive walk"},
 {"../validation/V04.sh",       "F10 long-run validation guide"},
+{"../src/makefile",            "Build system makefile"},
+{"../src/compile",             "Compile script"},
+{"../src/config/mpe_constants.h", "Compile-time constants manifest"},
+{"../src/config/mpe_config.h", "Config API header"},
+{"../src/config/mpe_config_schema.c", "Config parameter registry"},
+{"../src/config/mpe_config.c", "Config implementation"},
+{"../src/ui_input/microvim.h", "MicroVim header"},
+{"../src/ui_input/microvim.c", "MicroVim implementation"},
+{"../src/ui_input/debug_terminal.h", "Terminal header"},
+{"../src/ui_input/debug_terminal.c", "Terminal implementation"},
+{"../src/render/shaders/vertex_shader.glsl", "Vertex shader"},
+{"../src/render/shaders/fragment_shader.glsl", "Fragment shader"},
+{"../src/render/shaders/utility_vertex.glsl", "Utility vertex shader"},
+{"../src/render/shaders/utility_fragment.glsl", "Utility fragment shader"},
+{"../src/render/shaders/axis_vertex.glsl", "Axis vertex shader"},
+{"../src/render/shaders/axis_fragment.glsl", "Axis fragment shader"},
 {NULL, NULL}
 };
 static const char *mv_allowed_extensions [] = {
@@ -2673,12 +2690,15 @@ static void cmd_vi (int argc, char **argv) {
 /* Handle --list / -l flag */
 if ((argc > 1) && (term_str_eq (argv [1], "--list") || term_str_eq (argv [1], "-l"))) {
 term_printf ("term_echo", "MicroVim editable files:\n");
+term_out ("\n");
 for (int i = 0; mv_known_files [i].path; i++) {
-term_printf (NULL, "  %-32s %s\n", mv_known_files [i].path, mv_known_files [i].description);
+term_printf (NULL, "  %-40s %s\n", mv_known_files [i].path, mv_known_files [i].description);
 }
-term_dim ("\nAlso allowed: any file with extensions: .cfg .ini .conf .txt .md .glsl .sh .py .h .c\n");
+term_out ("\n");
+term_dim ("Also allowed: any file with extensions: .cfg .ini .conf .txt .md .glsl .sh .py .h .c\n");
 term_dim ("Blocked: .dat .o .so .a .bin .exe and other binary formats\n");
-term_dim ("Usage: vi <path>  |  vi --list\n");
+term_out ("\n");
+term_dim ("Usage: vi <path>  |  vi --list  |  vi --help\n");
 return;
 }
 /* Handle --help / -h flag */
@@ -2723,10 +2743,10 @@ while (*command_line == ' ') {command_line++;}
 if (*command_line == '\0') {return;}
 /* MPE_TASK_V15R2_PHASE7_ALIAS_EXPANSION_BEGIN */
 {
-char first_word [TERM_ALIAS_NAME_LEN];
+char first_word [term_alias_name_len];
 int word_index = 0;
 const char *scan = command_line;
-while ((*scan) && (*scan != ' ') && (word_index < TERM_ALIAS_NAME_LEN - 1)) {
+while ((*scan) && (*scan != ' ') && (word_index < term_alias_name_len - 1)) {
 first_word [word_index++] = *scan++;
 }
 first_word [word_index] = '\0';
@@ -2787,9 +2807,9 @@ g_strfreev (argument_vector);
 /* ------------------------------------------------------------------ */
 static void on_terminal_entry_activate (GtkEntry *entry) {
 const gchar *entry_text = gtk_entry_get_text (entry);
-char command_copy [TERM_HISTORY_LENGTH + 1];
-strncpy (command_copy, entry_text, TERM_HISTORY_LENGTH);
-command_copy [TERM_HISTORY_LENGTH] = '\0';
+char command_copy [term_history_length + 1];
+strncpy (command_copy, entry_text, term_history_length);
+command_copy [term_history_length] = '\0';
 term_history_push (command_copy);
 term_history_cursor = -1;
 term_execute (command_copy);
@@ -2826,7 +2846,7 @@ return FALSE;
 static gboolean on_terminal_window_keypress (GtkWidget *widget, GdkEventKey *event) {
 /* MPE_TASK_V15R2_MICROVIM_KEY_ROUTING_BEGIN */
 if (microvim_is_active ()) {
-if ((event -> keyval == GDK_KEY_Escape) && (microvim_get_mode () == MV_NORMAL)) {
+if ((event -> keyval == GDK_KEY_Escape) && (microvim_get_mode () == mv_normal)) {
 /* Double-escape in normal mode exits editor */
 static gint64 last_escape_time = 0;
 gint64 now = g_get_monotonic_time ();
@@ -2847,6 +2867,7 @@ if (microvim_is_active ()) {
 if (terminal_output_buffer) {microvim_render (terminal_output_buffer);}
 } else {
 /* MicroVim closed itself via :q, :wq, :q!, or :x */
+if (terminal_output_buffer) {gtk_text_buffer_set_text (terminal_output_buffer, "", -1);}
 if (terminal_entry) {gtk_widget_show (terminal_entry);}
 if (terminal_prompt_label) {gtk_widget_show (terminal_prompt_label);}
 term_ok ("MicroVim exited.\n");
@@ -2959,7 +2980,7 @@ main_inputs.is_mouse_locked = false;
 gtk_widget_show_all (terminal_window);
 term_update_prompt ();
 debug_terminal_sync_mode ();
-term_printf ("term_echo", "MPE POSIX Debug Terminal %s\n", A3_VERSION_STRING);
+term_printf ("term_echo", "MPE POSIX Debug Terminal %s\n", a3_version_string);
 term_out ("Virtual root: /obj /joint /world /camera /spawner\n");
 term_dim ("Type 'help' or 'man <command>'. Ctrl+L clears. Esc closes.\n");
 }

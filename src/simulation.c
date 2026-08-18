@@ -127,7 +127,7 @@ void editor_reset (void) {
 
 static void validation_report_print (void) {
     /* A3_PATCH_51_FIX_VALIDATION_PRINT */
-    printf ("[A3] Validation report %s\n", A3_VERSION_STRING);
+    printf ("[A3] Validation report %s\n", a3_version_string);
     printf ("[A3] objects=%d capacity=%d joints=%d selected=%d\n",
             object_count, object_capacity, current_joint_count, selected_object);
 /* MPE_TASK_12_VALIDATION_PRINT_BEGIN */
@@ -166,9 +166,9 @@ printf ("[A3] manifold overflow: last_frame=%d\n", debug_last_manifold_overflow_
     printf ("[A3] config file: %s\n", (access ("status/engine.cfg", F_OK) == 0) ? "present" : "absent");
     printf ("[A3] config params: %zu registered\n", g_registry_count);
     for (size_t cfg_i = 0; cfg_i < g_registry_count; cfg_i++) {
-        if (g_registry [cfg_i].type == P_INT) {
+        if (g_registry [cfg_i].type == p_int) {
             printf ("[A3]   %s = %d\n", g_registry [cfg_i].key, *(int *) g_registry [cfg_i].storage);
-        } else if (g_registry [cfg_i].type == P_BOOL) {
+        } else if (g_registry [cfg_i].type == p_bool) {
             printf ("[A3]   %s = %s\n", g_registry [cfg_i].key, (*(bool *) g_registry [cfg_i].storage) ? "true" : "false");
         } else {
             printf ("[A3]   %s = %.4f\n", g_registry [cfg_i].key, *(float *) g_registry [cfg_i].storage);
@@ -226,7 +226,7 @@ int pass =
 (long_run_validation_last_max_linear_speed < 0.25f) &&
 (long_run_validation_last_max_angular_speed < 0.5f);
 
-printf ("[A3] Long-run validation report %s\n", A3_VERSION_STRING);
+printf ("[A3] Long-run validation report %s\n", a3_version_string);
 printf ("[A3] duration_ticks=%d objects=%d sleeping=%d awake=%d\n",
 long_run_validation_total_ticks,
 object_count,
@@ -258,9 +258,9 @@ printf ("[A3] result: %s\n", pass ? "PASS" : "FAIL");
     printf ("[A3] config file: %s\n", (access ("status/engine.cfg", F_OK) == 0) ? "present" : "absent");
     printf ("[A3] config params: %zu registered\n", g_registry_count);
     for (size_t cfg_i = 0; cfg_i < g_registry_count; cfg_i++) {
-        if (g_registry [cfg_i].type == P_INT) {
+        if (g_registry [cfg_i].type == p_int) {
             printf ("[A3]   %s = %d\n", g_registry [cfg_i].key, *(int *) g_registry [cfg_i].storage);
-        } else if (g_registry [cfg_i].type == P_BOOL) {
+        } else if (g_registry [cfg_i].type == p_bool) {
             printf ("[A3]   %s = %s\n", g_registry [cfg_i].key, (*(bool *) g_registry [cfg_i].storage) ? "true" : "false");
         } else {
             printf ("[A3]   %s = %.4f\n", g_registry [cfg_i].key, *(float *) g_registry [cfg_i].storage);
@@ -372,9 +372,9 @@ duration_ticks,
     printf ("[A3] config file: %s\n", (access ("status/engine.cfg", F_OK) == 0) ? "present" : "absent");
     printf ("[A3] config params: %zu registered\n", g_registry_count);
     for (size_t cfg_i = 0; cfg_i < g_registry_count; cfg_i++) {
-        if (g_registry [cfg_i].type == P_INT) {
+        if (g_registry [cfg_i].type == p_int) {
             printf ("[A3]   %s = %d\n", g_registry [cfg_i].key, *(int *) g_registry [cfg_i].storage);
-        } else if (g_registry [cfg_i].type == P_BOOL) {
+        } else if (g_registry [cfg_i].type == p_bool) {
             printf ("[A3]   %s = %s\n", g_registry [cfg_i].key, (*(bool *) g_registry [cfg_i].storage) ? "true" : "false");
         } else {
             printf ("[A3]   %s = %.4f\n", g_registry [cfg_i].key, *(float *) g_registry [cfg_i].storage);
@@ -499,7 +499,7 @@ if ((object_count < 2) || (!pair_buffer) || (!pair_count_pointer)) {return;}
 int pair_count = *pair_count_pointer;
 
 if (rebuild_broadphase) {
-pair_count = broadphase_generate_pairing (pair_buffer, MPE_MAX_BROADPHASE_PAIRS);
+pair_count = broadphase_generate_pairing (pair_buffer, mpe_max_broadphase_pairs);
 *pair_count_pointer = pair_count;
 }
 
@@ -712,7 +712,7 @@ main_inputs.debug_terminal_pressed = false;
 /* MPE_TASK_13_LONG_RUN_START_CALL_BEGIN */
 if (main_inputs.long_run_validation_pressed) {
 scene_spawn_long_run_validation ();
-long_run_validation_start (A3_LONG_RUN_VALIDATION_TICKS);
+long_run_validation_start (a3_long_run_validation_ticks);
         long_run_validation_restore_config = 1; /* MPE_TASK_39_FIX */
 main_inputs.long_run_validation_pressed = false;
 }
@@ -722,7 +722,7 @@ if (main_inputs.config_torture_pressed) {
         /* MPE_TASK_39_FIX_SAVE_CONFIG */
         mpe_config_save ("status/engine.cfg.backup");
     scene_spawn_config_torture_test ();
-    long_run_validation_start (A3_LONG_RUN_VALIDATION_TICKS);
+    long_run_validation_start (a3_long_run_validation_ticks);
         long_run_validation_restore_config = 1; /* MPE_TASK_39_FIX */
     main_inputs.config_torture_pressed = false;
 }
@@ -776,7 +776,7 @@ if (!shift_previously_held) {
     editor_update_menus (parent_window);
     config_menu_update (parent_window); /* MPE_TASK_35 */
 // v1.4 Simulation Contract: Fixed Timestep Accumulator
-    static broadphase_pair persistent_collision_pairs [MPE_MAX_BROADPHASE_PAIRS];
+    static broadphase_pair persistent_collision_pairs [mpe_max_broadphase_pairs];
     static float physics_time_accumulator = 0.0f;
     const float fixed_physics_dt = 1.0f / 60.0f;
     const int max_substeps_per_frame = 5; // Spiral of death prevention
@@ -795,9 +795,9 @@ rigidbody_sanitize (&obj_per_scene [sanitize_index]);
 }
 /* MPE_TASK_14_SANITIZE_ONCE_END */
         int detected_collision_count = 0;
-        detected_collision_count = broadphase_generate_pairing (persistent_collision_pairs, MPE_MAX_BROADPHASE_PAIRS);
+        detected_collision_count = broadphase_generate_pairing (persistent_collision_pairs, mpe_max_broadphase_pairs);
     debug_last_broadphase_pair_count = detected_collision_count;
-        static collision_data active_manifold [A3_MAX_MANIFOLDS];
+        static collision_data active_manifold [a3_max_manifolds];
         int manifold_count = 0;
     contact_cache_stats_reset ();
         apply_force_all_joints ();
@@ -831,7 +831,7 @@ collision_data narrowphase_collision = {0};
             } else if (rigid_body_a -> type == object_cube && rigid_body_b -> type == object_cube) collided = collision_dual_cube (rigid_body_a, rigid_body_b, &narrowphase_collision);
             /* MPE_TASK_09_OBJECT_MANIFOLD_CONDITION_BEGIN */
 if (collided) {
-if (manifold_count < A3_MAX_MANIFOLDS) {
+if (manifold_count < a3_max_manifolds) {
 /* MPE_TASK_09_OBJECT_MANIFOLD_CONDITION_END */
                 /* MPE_TASK_13_SLEEP_WAKE_FIX_BEGIN */
 bool a3_a_was_sleeping = rigid_body_a -> is_sleeping;
@@ -875,7 +875,7 @@ rigidbody_wake (rigid_body_b);
  
      if (collision_static_plane_body (floor_rigid_body, 0.0f, &floor_collision)) {
          /* MPE_TASK_09_FLOOR_MANIFOLD_OVERFLOW_BEGIN */
-if (manifold_count < A3_MAX_MANIFOLDS) {
+if (manifold_count < a3_max_manifolds) {
 collision_prepare_solver (&floor_collision, &active_manifold [manifold_count]);
 manifold_count++;
 } else {

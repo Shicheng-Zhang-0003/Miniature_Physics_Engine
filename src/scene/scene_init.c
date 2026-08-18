@@ -9,12 +9,12 @@ static bool pool_is_initialized = false;
 
 void scene_allocate_pool (void) {
     if (!pool_is_initialized) {
-        obj_per_scene = (rigidbody *) malloc (MPE_MAX_BODIES * sizeof (rigidbody));
+        obj_per_scene = (rigidbody *) malloc (mpe_max_bodies * sizeof (rigidbody));
         if (!obj_per_scene) {
             fprintf (stderr, "Error POOL00: Failed to allocate physics heap.\n");
             exit (1);
         }
-        object_capacity = MPE_MAX_BODIES;
+        object_capacity = mpe_max_bodies;
         pool_is_initialized = true;
     }
 }
@@ -36,11 +36,11 @@ int scene_ensure_pool_capacity (int required_capacity) {
     /* A3_PATCH_23_POOL_CONSISTENCY */
     if (required_capacity <= 0) {return 1;}
 
-    if (required_capacity > MPE_MAX_BODIES) {required_capacity = MPE_MAX_BODIES;}
+    if (required_capacity > mpe_max_bodies) {required_capacity = mpe_max_bodies;}
 
     if (pool_is_initialized && (required_capacity <= object_capacity)) {return 1;}
 
-    int new_capacity = MPE_MAX_BODIES;
+    int new_capacity = mpe_max_bodies;
 
     rigidbody *new_array = (rigidbody *) realloc (obj_per_scene, (size_t) new_capacity * sizeof (rigidbody));
 
@@ -144,7 +144,7 @@ if (!overlap_found) {break;}
 
 int scene_add_object (float radius, float mass, vector3 initial_position) {
     scene_allocate_pool ();
-    if (object_count >= MPE_MAX_BODIES) { fprintf (stderr, "Error POOL01: Maximum object capacity reached.\n"); return -1; }
+    if (object_count >= mpe_max_bodies) { fprintf (stderr, "Error POOL01: Maximum object capacity reached.\n"); return -1; }
     rigidbody_initialisation_sphere (&obj_per_scene [object_count], radius, mass, initial_position);
     int current_object_index = object_count;
     object_count += 1;
@@ -156,7 +156,7 @@ scene_resolve_spawn_overlap (current_object_index); /* MPE_TASK_20B_SPAWN_RESOLV
 
 int scene_add_cube (vector3 position, vector3 half_extensions, float mass) {
     scene_allocate_pool ();
-    if (object_count >= MPE_MAX_BODIES) { fprintf (stderr, "Error POOL01: Maximum object capacity reached.\n"); return -1; }
+    if (object_count >= mpe_max_bodies) { fprintf (stderr, "Error POOL01: Maximum object capacity reached.\n"); return -1; }
     rigidbody_initialisation_cube (&obj_per_scene [object_count], position, half_extensions, mass);
     int current_object_index = object_count;
     object_count += 1;
@@ -370,8 +370,8 @@ void scene_spawn_stress_test (void) {
 
     int objects_to_spawn = 300;
 
-    if (object_count + objects_to_spawn > MPE_MAX_BODIES) {
-        objects_to_spawn = MPE_MAX_BODIES - object_count;
+    if (object_count + objects_to_spawn > mpe_max_bodies) {
+        objects_to_spawn = mpe_max_bodies - object_count;
     }
 
     if (objects_to_spawn <= 0) {return;}
@@ -521,15 +521,15 @@ void scene_spawn_config_torture_test (void) {
     srand ((unsigned int) time (NULL) ^ 0xDEADBEEFu);
     for (size_t cfg_i = 0; cfg_i < g_registry_count; cfg_i++) {
         const mpe_param *p = &g_registry [cfg_i];
-        if (p -> type == P_FLOAT) {
+        if (p -> type == p_float) {
             float range = (float) (p -> max - p -> min);
             float random_value = (float) p -> min + ((float) rand () / (float) RAND_MAX) * range;
             *(float *) p -> storage = random_value;
-        } else if (p -> type == P_INT) {
+        } else if (p -> type == p_int) {
             int range = (int) (p -> max - p -> min);
             int random_value = (int) p -> min + (rand () % ((range > 0) ? range : 1));
             *(int *) p -> storage = random_value;
-        } else if (p -> type == P_BOOL) {
+        } else if (p -> type == p_bool) {
             *(bool *) p -> storage = (rand () % 2) != 0;
         }
     }

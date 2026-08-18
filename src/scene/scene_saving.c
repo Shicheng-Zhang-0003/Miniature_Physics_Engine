@@ -9,8 +9,8 @@ static void write_vec4 (FILE *f, vector4 v) { fwrite (&v, sizeof (vector4), 1, f
 int save_scene (const char *file_destination_path) {
     FILE *f = fopen (file_destination_path, "wb");
     if (!f) { fprintf (stderr, "Error SVF01: Could not open %s\n", file_destination_path); return 0; }
-    write_int (f, MPE_MAGIC);
-    write_int (f, MPE_VERSION);
+    write_int (f, mpe_magic);
+    write_int (f, mpe_version);
     write_int (f, object_count);
     for (int i = 0; i < object_count; i++) {
         rigidbody *rb = &obj_per_scene [i];

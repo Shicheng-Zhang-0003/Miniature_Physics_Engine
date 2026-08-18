@@ -31,23 +31,23 @@ void config_menu_key_press (int key_number) {
     if (key_number == 6) {config_menu_close (); return;}
     if (config_menu_level == 1) {
         /* Page 1: 1-5 + 7-9 select categories, 0 = more. (6 = close) */
-        if (key_number == 1) {config_menu_active_category = CAT_WORLD; config_menu_level = 10 + CAT_WORLD;}
-        else if (key_number == 2) {config_menu_active_category = CAT_TIMESTEP; config_menu_level = 10 + CAT_TIMESTEP;}
-        else if (key_number == 3) {config_menu_active_category = CAT_SLEEP; config_menu_level = 10 + CAT_SLEEP;}
-        else if (key_number == 4) {config_menu_active_category = CAT_SOLVER; config_menu_level = 10 + CAT_SOLVER;}
-        else if (key_number == 5) {config_menu_active_category = CAT_DEPENETRATION; config_menu_level = 10 + CAT_DEPENETRATION;}
-        else if (key_number == 7) {config_menu_active_category = CAT_BROADPHASE; config_menu_level = 10 + CAT_BROADPHASE;}
-        else if (key_number == 8) {config_menu_active_category = CAT_JOINTS; config_menu_level = 10 + CAT_JOINTS;}
-        else if (key_number == 9) {config_menu_active_category = CAT_BOUNDARY; config_menu_level = 10 + CAT_BOUNDARY;}
+        if (key_number == 1) {config_menu_active_category = cat_world; config_menu_level = 10 + cat_world;}
+        else if (key_number == 2) {config_menu_active_category = cat_timestep; config_menu_level = 10 + cat_timestep;}
+        else if (key_number == 3) {config_menu_active_category = cat_sleep; config_menu_level = 10 + cat_sleep;}
+        else if (key_number == 4) {config_menu_active_category = cat_solver; config_menu_level = 10 + cat_solver;}
+        else if (key_number == 5) {config_menu_active_category = cat_depenetration; config_menu_level = 10 + cat_depenetration;}
+        else if (key_number == 7) {config_menu_active_category = cat_broadphase; config_menu_level = 10 + cat_broadphase;}
+        else if (key_number == 8) {config_menu_active_category = cat_joints; config_menu_level = 10 + cat_joints;}
+        else if (key_number == 9) {config_menu_active_category = cat_boundary; config_menu_level = 10 + cat_boundary;}
         else if (key_number == 0) {config_menu_level = 2;}
         config_menu_selected_param = -1;
     } else if (config_menu_level == 2) {
         /* Page 2: 1-5 categories, 7 save, 8 reset, 9 back, 0 close. (6 = close) */
-        if (key_number == 1) {config_menu_active_category = CAT_SPAWNER; config_menu_level = 10 + CAT_SPAWNER;}
-        else if (key_number == 2) {config_menu_active_category = CAT_BODY_DEFAULTS; config_menu_level = 10 + CAT_BODY_DEFAULTS;}
-        else if (key_number == 3) {config_menu_active_category = CAT_CAMERA; config_menu_level = 10 + CAT_CAMERA;}
-        else if (key_number == 4) {config_menu_active_category = CAT_RENDER; config_menu_level = 10 + CAT_RENDER;}
-        else if (key_number == 5) {config_menu_active_category = CAT_UI; config_menu_level = 10 + CAT_UI;}
+        if (key_number == 1) {config_menu_active_category = cat_spawner; config_menu_level = 10 + cat_spawner;}
+        else if (key_number == 2) {config_menu_active_category = cat_body_defaults; config_menu_level = 10 + cat_body_defaults;}
+        else if (key_number == 3) {config_menu_active_category = cat_camera; config_menu_level = 10 + cat_camera;}
+        else if (key_number == 4) {config_menu_active_category = cat_render; config_menu_level = 10 + cat_render;}
+        else if (key_number == 5) {config_menu_active_category = cat_ui; config_menu_level = 10 + cat_ui;}
         else if (key_number == 7) {mpe_config_save ("status/engine.cfg");}
         else if (key_number == 8) {mpe_config_reset_defaults (); contact_cache_clear ();}
         else if (key_number == 9) {config_menu_level = 1;}
@@ -60,7 +60,7 @@ void config_menu_key_press (int key_number) {
         if ((key_number >= 1) && ((size_t) key_number <= param_count)) {
             config_menu_selected_param = key_number - 1;
         } else if (key_number == 0) {
-            config_menu_level = (category <= CAT_BOUNDARY) ? 1 : 2;
+            config_menu_level = (category <= cat_boundary) ? 1 : 2;
             config_menu_active_category = -1;
             config_menu_selected_param = -1;
         }
@@ -83,16 +83,16 @@ void config_menu_update (GtkWidget *parent_window) {
         return;
     }
     float current_value = 0.0f;
-    if (param -> type == P_FLOAT) {current_value = *(float *) param -> storage;}
-    else if (param -> type == P_INT) {current_value = (float) (*(int *) param -> storage);}
-    else if (param -> type == P_BOOL) {current_value = (*(bool *) param -> storage) ? 1.0f : 0.0f;}
+    if (param -> type == p_float) {current_value = *(float *) param -> storage;}
+    else if (param -> type == p_int) {current_value = (float) (*(int *) param -> storage);}
+    else if (param -> type == p_bool) {current_value = (*(bool *) param -> storage) ? 1.0f : 0.0f;}
     float new_value = open_numerical_input_dialog (parent_window, param -> display, current_value);
     if (new_value < (float) param -> min) {new_value = (float) param -> min;}
     if (new_value > (float) param -> max) {new_value = (float) param -> max;}
-    if (param -> type == P_FLOAT) {*(float *) param -> storage = new_value;}
-    else if (param -> type == P_INT) {*(int *) param -> storage = (int) new_value;}
-    else if (param -> type == P_BOOL) {*(bool *) param -> storage = (new_value != 0.0f);}
-    if ((category == CAT_SOLVER) || (category == CAT_TIMESTEP) || (category == CAT_DEPENETRATION)) {
+    if (param -> type == p_float) {*(float *) param -> storage = new_value;}
+    else if (param -> type == p_int) {*(int *) param -> storage = (int) new_value;}
+    else if (param -> type == p_bool) {*(bool *) param -> storage = (new_value != 0.0f);}
+    if ((category == cat_solver) || (category == cat_timestep) || (category == cat_depenetration)) {
         contact_cache_clear ();
     }
     config_menu_selected_param = -1;
@@ -113,14 +113,14 @@ void config_menu_render (char *buffer, size_t buffer_size) {
             "9: Boundary (%zu)\n"
             "0: More...\n"
             "6: Close",
-            mpe_config_count_by_category (CAT_WORLD),
-            mpe_config_count_by_category (CAT_TIMESTEP),
-            mpe_config_count_by_category (CAT_SLEEP),
-            mpe_config_count_by_category (CAT_SOLVER),
-            mpe_config_count_by_category (CAT_DEPENETRATION),
-            mpe_config_count_by_category (CAT_BROADPHASE),
-            mpe_config_count_by_category (CAT_JOINTS),
-            mpe_config_count_by_category (CAT_BOUNDARY));
+            mpe_config_count_by_category (cat_world),
+            mpe_config_count_by_category (cat_timestep),
+            mpe_config_count_by_category (cat_sleep),
+            mpe_config_count_by_category (cat_solver),
+            mpe_config_count_by_category (cat_depenetration),
+            mpe_config_count_by_category (cat_broadphase),
+            mpe_config_count_by_category (cat_joints),
+            mpe_config_count_by_category (cat_boundary));
     } else if (config_menu_level == 2) {
         snprintf (buffer, buffer_size,
             "-- Config Menu (Page 2) --\n"
@@ -134,11 +134,11 @@ void config_menu_render (char *buffer, size_t buffer_size) {
             "9: Back\n"
             "0: Back\n"
             "6: Close",
-            mpe_config_count_by_category (CAT_SPAWNER),
-            mpe_config_count_by_category (CAT_BODY_DEFAULTS),
-            mpe_config_count_by_category (CAT_CAMERA),
-            mpe_config_count_by_category (CAT_RENDER),
-            mpe_config_count_by_category (CAT_UI));
+            mpe_config_count_by_category (cat_spawner),
+            mpe_config_count_by_category (cat_body_defaults),
+            mpe_config_count_by_category (cat_camera),
+            mpe_config_count_by_category (cat_render),
+            mpe_config_count_by_category (cat_ui));
     } else if (config_menu_level >= 10) {
         int category = config_menu_level - 10;
         static const mpe_param *category_params [64];
@@ -149,11 +149,11 @@ void config_menu_render (char *buffer, size_t buffer_size) {
         for (size_t i = 0; (i < param_count) && (offset < buffer_size - 64); i++) {
             const mpe_param *p = category_params [i];
             float val = 0.0f;
-            if (p -> type == P_FLOAT) {val = *(float *) p -> storage;}
-            else if (p -> type == P_INT) {val = (float) (*(int *) p -> storage);}
-            else if (p -> type == P_BOOL) {val = (*(bool *) p -> storage) ? 1.0f : 0.0f;}
+            if (p -> type == p_float) {val = *(float *) p -> storage;}
+            else if (p -> type == p_int) {val = (float) (*(int *) p -> storage);}
+            else if (p -> type == p_bool) {val = (*(bool *) p -> storage) ? 1.0f : 0.0f;}
             const char *debug_tag = (p -> debug_only) ? " [D]" : "";
-            if (p -> type == P_INT) {
+            if (p -> type == p_int) {
                 offset += snprintf (buffer + offset, buffer_size - offset,
                     "%zu: %s = %d%s\n", i + 1, p -> display, (int) val, debug_tag);
             } else {
