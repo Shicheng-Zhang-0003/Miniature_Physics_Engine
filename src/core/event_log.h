@@ -4,10 +4,10 @@
 
 #include <time.h>
 
-#define EVENT_LOG_CAPACITY 256
-#define EVENT_MSG_LENGTH 256
+#define event_log_capacity 256
+#define event_msg_length 256
 
-typedef enum { LOG_INFO, LOG_WARN, LOG_ERROR } log_level;
+typedef enum { log_info, log_warn, log_error } log_level;
 
 void event_log_init(void);
 void event_log_push(log_level level, const char *format, ...);

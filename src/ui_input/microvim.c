@@ -7,9 +7,9 @@
 #include <ctype.h>
 #include <gdk/gdkkeysyms.h>
 
-#define MV_VIEW_HEIGHT 40
-#define MV_UNDO_DEPTH 64
-#define MV_MAX_LINE_LEN 4096
+#define mv_view_height 40
+#define mv_undo_depth 64
+#define mv_max_line_len 4096
 
 /* ------------------------------------------------------------------ */
 /* State                                                                */
@@ -43,7 +43,7 @@ int scroll_offset;
 bool active;
 bool quit_requested;
 bool file_exists; /* MPE_TASK_V15R2_FILE_EXISTS_FLAG */
-mv_snapshot undo_stack [MV_UNDO_DEPTH];
+mv_snapshot undo_stack [mv_undo_depth];
 int undo_top;
 int redo_top;
 } mv;
@@ -106,14 +106,14 @@ if (mv.cursor_col < 0) {mv.cursor_col = 0;}
 /* Undo                                                                 */
 /* ------------------------------------------------------------------ */
 static void mv_undo_push (void) {
-if (mv.undo_top >= MV_UNDO_DEPTH) {
-for (int i = 0; i < MV_UNDO_DEPTH - 1; i++) {
+if (mv.undo_top >= mv_undo_depth) {
+for (int i = 0; i < mv_undo_depth - 1; i++) {
 mv_snapshot *s = &mv.undo_stack [i];
 for (int j = 0; j < s -> line_count; j++) {free (s -> lines [j]);}
 free (s -> lines);
 mv.undo_stack [i] = mv.undo_stack [i + 1];
 }
-mv.undo_top = MV_UNDO_DEPTH - 1;
+mv.undo_top = mv_undo_depth - 1;
 }
 mv_snapshot *snap = &mv.undo_stack [mv.undo_top];
 snap -> lines = (char **) malloc ((size_t) mv.line_count * sizeof (char *));
@@ -164,7 +164,7 @@ mv_insert_line (0, "");
 mv.line_count = 1;
 return false;
 }
-char line_buf [MV_MAX_LINE_LEN];
+char line_buf [mv_max_line_len];
 while (fgets (line_buf, sizeof (line_buf), f)) {
 size_t len = strlen (line_buf);
 while ((len > 0) && ((line_buf [len - 1] == '\n') || (line_buf [len - 1] == '\r'))) {
@@ -460,20 +460,20 @@ if (strstr (mv.filename, "engine.cfg")) {
 mpe_config_load ("status/engine.cfg");
 contact_cache_clear ();
 }
-mv.mode = MV_NORMAL;
+mv.mode = mv_normal;
 } else if (cmd [0] == 'q' && cmd [1] == '!') {
 mv.quit_requested = true;
 } else if (cmd [0] == 'q' && cmd [1] == '\0') {
 if (mv.modified) {
 /* MPE_TASK_V15R2_QUIT_MODIFIED_ERROR_BEGIN */
-mv.mode = MV_NORMAL;
+mv.mode = mv_normal;
 mv.command_len = 0;
 mv.command_buf [0] = '\0';
 /* Render an error message in the status area by temporarily
 setting a flag that microvim_render will pick up */
 mv.command_len = snprintf (mv.command_buf, sizeof (mv.command_buf),
 "E37: No write since last change (use :q! or :wq)");
-mv.mode = MV_COMMAND; /* Show error in command line area */
+mv.mode = mv_command; /* Show error in command line area */
 return;
 /* MPE_TASK_V15R2_QUIT_MODIFIED_ERROR_END */
 }
@@ -490,13 +490,13 @@ mv.modified = false;
 mv.undo_top = 0;
 mv.redo_top = 0;
 }
-mv.mode = MV_NORMAL;
+mv.mode = mv_normal;
 } else if (strncmp (cmd, "set number", 10) == 0 || strncmp (cmd, "set nu", 6) == 0) {
 mv.show_line_numbers = true;
-mv.mode = MV_NORMAL;
+mv.mode = mv_normal;
 } else if (strncmp (cmd, "set nonumber", 12) == 0 || strncmp (cmd, "set nonu", 8) == 0) {
 mv.show_line_numbers = false;
-mv.mode = MV_NORMAL;
+mv.mode = mv_normal;
 } else if (cmd [0] == 's' && cmd [1] == '/') {
 /* Substitute on current line: s/old/new/ or s/old/new/g */
 char *p1 = cmd + 2;
@@ -540,16 +540,16 @@ if (match) {pos = (int) (match - lower_line);}
 g_free (lower_line);
 g_free (lower_old);
 }
-mv.mode = MV_NORMAL;
+mv.mode = mv_normal;
 } else if (isdigit ((unsigned char) cmd [0])) {
 int target_line = atoi (cmd) - 1;
 if (target_line < 0) {target_line = 0;}
 if (target_line >= mv.line_count) {target_line = mv.line_count - 1;}
 mv.cursor_row = target_line;
 mv.cursor_col = 0;
-mv.mode = MV_NORMAL;
+mv.mode = mv_normal;
 } else {
-mv.mode = MV_NORMAL;
+mv.mode = mv_normal;
 }
 mv.command_len = 0;
 mv.command_buf [0] = '\0';
@@ -563,10 +563,10 @@ unsigned int key = event -> keyval;
 bool ctrl = (event -> state & GDK_CONTROL_MASK) != 0;
 
 if (ctrl) {
-if (key == GDK_KEY_f) {mv.cursor_row += MV_VIEW_HEIGHT; mv_clamp_cursor (); return;}
-if (key == GDK_KEY_b) {mv.cursor_row -= MV_VIEW_HEIGHT; mv_clamp_cursor (); return;}
-if (key == GDK_KEY_d) {mv.cursor_row += MV_VIEW_HEIGHT / 2; mv_clamp_cursor (); return;}
-if (key == GDK_KEY_u) {mv.cursor_row -= MV_VIEW_HEIGHT / 2; mv_clamp_cursor (); return;}
+if (key == GDK_KEY_f) {mv.cursor_row += mv_view_height; mv_clamp_cursor (); return;}
+if (key == GDK_KEY_b) {mv.cursor_row -= mv_view_height; mv_clamp_cursor (); return;}
+if (key == GDK_KEY_d) {mv.cursor_row += mv_view_height / 2; mv_clamp_cursor (); return;}
+if (key == GDK_KEY_u) {mv.cursor_row -= mv_view_height / 2; mv_clamp_cursor (); return;}
 if (key == GDK_KEY_r) {mv_redo_perform (); return;}
 return;
 }
@@ -575,7 +575,7 @@ if (mv.pending_op) {
 char op = mv.pending_op;
 mv.pending_op = 0;
 if (key == GDK_KEY_d && op == 'd') {mv_delete_line_op (); return;}
-if (key == GDK_KEY_c && op == 'c') {mv_delete_line_op (); mv.mode = MV_INSERT; return;}
+if (key == GDK_KEY_c && op == 'c') {mv_delete_line_op (); mv.mode = mv_insert; return;}
 if (key == GDK_KEY_y && op == 'y') {mv_yank_line (); return;}
 if (key == GDK_KEY_w) {
 if (op == 'd') {mv_delete_to_end (); return;}
@@ -583,11 +583,11 @@ if (op == 'y') {mv_yank_line (); return;}
 }
 if (key == GDK_KEY_0 || key == GDK_KEY_Home) {
 if (op == 'd') {mv_delete_to_start (); return;}
-if (op == 'c') {mv_delete_to_start (); mv.mode = MV_INSERT; return;}
+if (op == 'c') {mv_delete_to_start (); mv.mode = mv_insert; return;}
 }
 if (key == GDK_KEY_dollar || key == GDK_KEY_End) {
 if (op == 'd') {mv_delete_to_end (); return;}
-if (op == 'c') {mv_delete_to_end (); mv.mode = MV_INSERT; return;}
+if (op == 'c') {mv_delete_to_end (); mv.mode = mv_insert; return;}
 }
 if (key == GDK_KEY_G) {
 if (op == 'd') {
@@ -595,6 +595,11 @@ mv_undo_push ();
 while (mv.line_count > mv.cursor_row + 1) {mv_delete_line (mv.line_count - 1);}
 mv.modified = true;
 }
+return;
+}
+if (key == GDK_KEY_g && op == 'g') {
+mv.cursor_row = 0;
+mv.cursor_col = 0;
 return;
 }
 return;
@@ -624,12 +629,12 @@ while (mv.cursor_row < mv.line_count - 1 && mv_line_len (mv.cursor_row) > 0) {mv
 mv.cursor_col = 0;
 break;
 }
-case GDK_KEY_i: mv.mode = MV_INSERT; break;
-case GDK_KEY_I: mv.cursor_col = 0; mv.mode = MV_INSERT; break;
-case GDK_KEY_a: mv.cursor_col++; mv_clamp_cursor (); mv.mode = MV_INSERT; break;
-case GDK_KEY_A: mv.cursor_col = mv_line_len (mv.cursor_row); mv.mode = MV_INSERT; break;
-case GDK_KEY_o: mv_undo_push (); mv_insert_line (mv.cursor_row + 1, ""); mv.cursor_row++; mv.cursor_col = 0; mv.mode = MV_INSERT; mv.modified = true; break;
-case GDK_KEY_O: mv_undo_push (); mv_insert_line (mv.cursor_row, ""); mv.cursor_col = 0; mv.mode = MV_INSERT; mv.modified = true; break;
+case GDK_KEY_i: mv.mode = mv_insert; break;
+case GDK_KEY_I: mv.cursor_col = 0; mv.mode = mv_insert; break;
+case GDK_KEY_a: mv.cursor_col++; mv_clamp_cursor (); mv.mode = mv_insert; break;
+case GDK_KEY_A: mv.cursor_col = mv_line_len (mv.cursor_row); mv.mode = mv_insert; break;
+case GDK_KEY_o: mv_undo_push (); mv_insert_line (mv.cursor_row + 1, ""); mv.cursor_row++; mv.cursor_col = 0; mv.mode = mv_insert; mv.modified = true; break;
+case GDK_KEY_O: mv_undo_push (); mv_insert_line (mv.cursor_row, ""); mv.cursor_col = 0; mv.mode = mv_insert; mv.modified = true; break;
 case GDK_KEY_x: mv_delete_char_under_cursor (); break;
 case GDK_KEY_X: mv_delete_char_before_cursor (); break;
 case GDK_KEY_d: mv.pending_op = 'd'; break;
@@ -640,8 +645,8 @@ case GDK_KEY_P: mv_paste (false); break;
 case GDK_KEY_u: mv_undo_perform (); break;
 case GDK_KEY_J: mv_join_lines (); break;
 case GDK_KEY_D: mv_delete_to_end (); break;
-case GDK_KEY_C: mv_delete_to_end (); mv.mode = MV_INSERT; break;
-case GDK_KEY_S: mv_delete_line_op (); mv.mode = MV_INSERT; break;
+case GDK_KEY_C: mv_delete_to_end (); mv.mode = mv_insert; break;
+case GDK_KEY_S: mv_delete_line_op (); mv.mode = mv_insert; break;
 case GDK_KEY_asciitilde: {
 int row = mv.cursor_row;
 int col = mv.cursor_col;
@@ -656,8 +661,8 @@ mv_clamp_cursor ();
 }
 break;
 }
-case GDK_KEY_slash: mv.mode = MV_SEARCH; mv.search_forward = true; mv.search_len = 0; mv.search_buf [0] = '\0'; break;
-case GDK_KEY_question: mv.mode = MV_SEARCH; mv.search_forward = false; mv.search_len = 0; mv.search_buf [0] = '\0'; break;
+case GDK_KEY_slash: mv.mode = mv_search; mv.search_forward = true; mv.search_len = 0; mv.search_buf [0] = '\0'; break;
+case GDK_KEY_question: mv.mode = mv_search; mv.search_forward = false; mv.search_len = 0; mv.search_buf [0] = '\0'; break;
 case GDK_KEY_n: mv_search_execute (mv.search_forward); break;
 case GDK_KEY_N: mv_search_execute (!mv.search_forward); break;
 case GDK_KEY_asterisk: {
@@ -680,7 +685,7 @@ mv_search_execute (true);
 }
 break;
 }
-case GDK_KEY_colon: mv.mode = MV_COMMAND; mv.command_len = 0; mv.command_buf [0] = '\0'; break;
+case GDK_KEY_colon: mv.mode = mv_command; mv.command_len = 0; mv.command_buf [0] = '\0'; break;
 case GDK_KEY_Escape: break;
 default: break;
 }
@@ -689,7 +694,7 @@ default: break;
 static void mv_handle_insert_key (GdkEventKey *event) {
 unsigned int key = event -> keyval;
 if (key == GDK_KEY_Escape) {
-mv.mode = MV_NORMAL;
+mv.mode = mv_normal;
 if (mv.cursor_col > 0) {mv.cursor_col--;}
 return;
 }
@@ -730,7 +735,7 @@ mv_insert_char ((char) key);
 static void mv_handle_command_key (GdkEventKey *event) {
 unsigned int key = event -> keyval;
 if (key == GDK_KEY_Escape) {
-mv.mode = MV_NORMAL;
+mv.mode = mv_normal;
 mv.command_len = 0;
 mv.command_buf [0] = '\0';
 return;
@@ -752,7 +757,7 @@ mv.command_buf [mv.command_len] = '\0';
 static void mv_handle_search_key (GdkEventKey *event) {
 unsigned int key = event -> keyval;
 if (key == GDK_KEY_Escape) {
-mv.mode = MV_NORMAL;
+mv.mode = mv_normal;
 return;
 }
 if (key == GDK_KEY_BackSpace) {
@@ -761,7 +766,7 @@ return;
 }
 if (key == GDK_KEY_Return || key == GDK_KEY_KP_Enter) {
 mv_search_execute (mv.search_forward);
-mv.mode = MV_NORMAL;
+mv.mode = mv_normal;
 return;
 }
 if (key >= 32 && key < 127 && mv.search_len < 254) {
@@ -794,15 +799,15 @@ gtk_text_buffer_set_text (buffer, "", -1);
 
 /* Adjust scroll */
 if (mv.cursor_row < mv.scroll_offset) {mv.scroll_offset = mv.cursor_row;}
-if (mv.cursor_row >= mv.scroll_offset + MV_VIEW_HEIGHT - 2) {
-mv.scroll_offset = mv.cursor_row - MV_VIEW_HEIGHT + 3;
+if (mv.cursor_row >= mv.scroll_offset + mv_view_height - 2) {
+mv.scroll_offset = mv.cursor_row - mv_view_height + 3;
 }
 if (mv.scroll_offset < 0) {mv.scroll_offset = 0;}
 
 GtkTextIter end_iter;
-char line_buf [MV_MAX_LINE_LEN + 64];
+char line_buf [mv_max_line_len + 64];
 
-for (int view_line = 0; view_line < MV_VIEW_HEIGHT - 2; view_line++) {
+for (int view_line = 0; view_line < mv_view_height - 2; view_line++) {
 int row = mv.scroll_offset + view_line;
 if (row < mv.line_count) {
 if (mv.show_line_numbers) {
@@ -844,13 +849,13 @@ gtk_text_buffer_insert (buffer, &end_iter, "\n", -1);
 /* Status bar */
 char status_buf [1024];
 const char *mode_text = "";
-if (mv.mode == MV_INSERT) {mode_text = "-- INSERT -- ";}
-else if (mv.mode == MV_COMMAND) {mode_text = ":";}
-else if (mv.mode == MV_SEARCH) {mode_text = mv.search_forward ? "/" : "?";}
+if (mv.mode == mv_insert) {mode_text = "-- INSERT -- ";}
+else if (mv.mode == mv_command) {mode_text = ":";}
+else if (mv.mode == mv_search) {mode_text = mv.search_forward ? "/" : "?";}
 
-if (mv.mode == MV_COMMAND) {
+if (mv.mode == mv_command) {
 snprintf (status_buf, sizeof (status_buf), ":%s", mv.command_buf);
-} else if (mv.mode == MV_SEARCH) {
+} else if (mv.mode == mv_search) {
 snprintf (status_buf, sizeof (status_buf), "%s%s", mv.search_forward ? "/" : "?", mv.search_buf);
 } else {
 int pct = (mv.line_count > 1) ? ((mv.cursor_row + 1) * 100 / mv.line_count) : 100;
@@ -872,13 +877,13 @@ pct);
 }
 gtk_text_buffer_get_end_iter (buffer, &end_iter);
 gtk_text_buffer_insert_with_tags_by_name (buffer, &end_iter, status_buf, -1,
-(mv.mode == MV_INSERT) ? "mv_insert_label" : "mv_status", NULL);
+(mv.mode == mv_insert) ? "mv_insert_label" : "mv_status", NULL);
 
 /* Place cursor */
 GtkTextIter cursor_iter;
 int target_line = mv.cursor_row - mv.scroll_offset;
 if (target_line < 0) {target_line = 0;}
-if (target_line >= MV_VIEW_HEIGHT - 2) {target_line = MV_VIEW_HEIGHT - 3;}
+if (target_line >= mv_view_height - 2) {target_line = mv_view_height - 3;}
 int col_offset = mv.cursor_col + (mv.show_line_numbers ? 5 : 0);
 gtk_text_buffer_get_iter_at_line_offset (buffer, &cursor_iter, target_line, col_offset);
 gtk_text_buffer_place_cursor (buffer, &cursor_iter);
@@ -904,7 +909,7 @@ mv.filename [sizeof (mv.filename) - 1] = '\0';
 mv.file_exists = mv_load_file (filename); /* MPE_TASK_V15R2_FILE_EXISTS_STORE */
 mv.cursor_row = 0;
 mv.cursor_col = 0;
-mv.mode = MV_NORMAL;
+mv.mode = mv_normal;
 mv.modified = false;
 mv.active = true;
 mv.quit_requested = false;
@@ -928,7 +933,7 @@ void microvim_close (void) {
 mv_clear_lines ();
 if (mv.lines) {free (mv.lines); mv.lines = NULL;}
 if (mv.yank_text) {free (mv.yank_text); mv.yank_text = NULL;}
-for (int i = 0; i < MV_UNDO_DEPTH; i++) {
+for (int i = 0; i < mv_undo_depth; i++) {
 mv_snapshot *s = &mv.undo_stack [i];
 if (s -> lines) {
 for (int j = 0; j < s -> line_count; j++) {free (s -> lines [j]);}
@@ -943,10 +948,10 @@ mv.quit_requested = false;
 void microvim_handle_key (GdkEventKey *event) {
 if (!mv.active) {return;}
 switch (mv.mode) {
-case MV_NORMAL: mv_handle_normal_key (event); break;
-case MV_INSERT: mv_handle_insert_key (event); break;
-case MV_COMMAND: mv_handle_command_key (event); break;
-case MV_SEARCH: mv_handle_search_key (event); break;
+case mv_normal: mv_handle_normal_key (event); break;
+case mv_insert: mv_handle_insert_key (event); break;
+case mv_command: mv_handle_command_key (event); break;
+case mv_search: mv_handle_search_key (event); break;
 }
 if (mv.quit_requested) {
 microvim_close ();

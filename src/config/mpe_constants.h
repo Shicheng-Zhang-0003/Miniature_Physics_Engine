@@ -17,40 +17,40 @@
 /* ------------------------------------------------------------------
  * CAPACITY — object and joint pool limits
  * ------------------------------------------------------------------ */
-#define MPE_MAX_BODIES            16384
-#define MPE_MAX_JOINTS            1024
-#define MPE_MAX_BROADPHASE_PAIRS  65536
-#define A3_MAX_MANIFOLDS          8192
+#define mpe_max_bodies            16384
+#define mpe_max_joints            1024
+#define mpe_max_broadphase_pairs  65536
+#define a3_max_manifolds          8192
 
 /* ------------------------------------------------------------------
  * BROADPHASE — spatial hash grid structure
  * ------------------------------------------------------------------ */
-#define HASH_TABLE_SIZE           8192
-#define MAX_OBJECTS               MPE_MAX_BODIES  /* alias for clarity in broadphase.c */
-#define A3_PAIR_HASH_TABLE_SIZE   (1 << 18)
-#define A3_PAIR_HASH_MASK         (A3_PAIR_HASH_TABLE_SIZE - 1)
+#define hash_table_size           8192
+#define max_objects               mpe_max_bodies  /* alias for clarity in broadphase.c */
+#define a3_pair_hash_table_size   (1 << 18)
+#define a3_pair_hash_mask         (a3_pair_hash_table_size - 1)
 
 /* ------------------------------------------------------------------
  * CONTACT CACHE — warm-starting impulse cache
  * ------------------------------------------------------------------ */
-#define MAX_CACHED_CONTACTS       16384
+#define max_cached_contacts       16384
 
 /* ------------------------------------------------------------------
  * DEBUG TERMINAL — history buffer dimensions
  * ------------------------------------------------------------------ */
-#define TERM_HISTORY_SIZE         64
-#define TERM_HISTORY_LENGTH       511
+#define term_history_size         64
+#define term_history_length       511
 
 /* ------------------------------------------------------------------
  * SCENE I/O — binary format identification
  * ------------------------------------------------------------------ */
-#define MPE_MAGIC                 0x4D504533  /* "MPE3" */
-#define MPE_VERSION               140
+#define mpe_magic                 0x4D504533  /* "MPE3" */
+#define mpe_version               140
 
 /* ------------------------------------------------------------------
  * VALIDATION — built-in test durations
  * ------------------------------------------------------------------ */
-#define A3_LONG_RUN_VALIDATION_TICKS 3600  /* 60 seconds at 60 Hz */
+#define a3_long_run_validation_ticks 3600  /* 60 seconds at 60 Hz */
 
 #endif /* mpe_constants_h */
 /* MPE_TASK_25_CONSTANTS_MANIFEST_END */
