@@ -31,9 +31,12 @@ typedef struct {
 /* MPE_TASK_15_AXIS_CACHE_FIELD_BEGIN */
 vector4 cached_axes_orientation;
 /* MPE_TASK_15_AXIS_CACHE_FIELD_END */
-    //v1.2 Sleeping Bodies
-    bool is_sleeping;
-    float sleep_timer;
+//v1.2 Sleeping Bodies
+bool is_sleeping;
+float sleep_timer;
+/* MPE_TASK_V15R2_NICE_VALUE_BEGIN */
+int nice_value;  /* -20 to +19, default 0. Positive = extra damping. */
+/* MPE_TASK_V15R2_NICE_VALUE_END */
     /* A3_PATCH_06_STABLE_IDS */
     uint32_t object_id;
     uint32_t object_generation;

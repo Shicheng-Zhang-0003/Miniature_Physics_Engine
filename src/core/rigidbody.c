@@ -179,9 +179,10 @@ void rigidbody_initialisation_sphere (rigidbody *rigid_body, float radius, float
     rigid_body -> radius = radius;
     rigid_body -> restitution = g_cfg.body_defaults.sphere_restitution; /* MPE_TASK_32 */
     rigid_body -> static_state = (mass == 0);
-    rigid_body -> is_sleeping = false;
-    rigid_body -> sleep_timer = 0.0f; //Static Objects
-    rigid_body -> friction_static = 0.3f;
+rigid_body -> is_sleeping = false;
+rigid_body -> sleep_timer = 0.0f; //Static Objects
+rigid_body -> nice_value = 0; /* MPE_TASK_V15R2_NICE_INIT */
+rigid_body -> friction_static = 0.3f;
     rigid_body -> friction_kinetic = 0.2f;
     //Inertial Tensors
     //I = 0.4fmr ^ 2
@@ -339,6 +340,13 @@ void rb_integrate (rigidbody *rigid_body, float delta_time, float linear_damping
     rigid_body -> acceleration = vector3_scaling (rigid_body -> force_accumulator, rigid_body -> inverse_mass);
     rigid_body -> velocity = vector3_addition (rigid_body -> velocity, vector3_scaling (rigid_body -> acceleration, delta_time));
     rigid_body -> velocity = vector3_scaling (rigid_body -> velocity, linear_damping);
+/* MPE_TASK_V15R2_NICE_DAMPING_BEGIN */
+if (rigid_body -> nice_value > 0) {
+float nice_factor = 1.0f - 0.002f * (float) rigid_body -> nice_value;
+if (nice_factor < 0.9f) { nice_factor = 0.9f; }
+rigid_body -> velocity = vector3_scaling (rigid_body -> velocity, nice_factor);
+}
+/* MPE_TASK_V15R2_NICE_DAMPING_END */
 
     if (vector3_length_squared (rigid_body -> velocity) < 0.00005f) {
         rigid_body -> velocity = vector3_zero ();
@@ -426,9 +434,10 @@ void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_inpu
     rigid_body -> radius = vector3_length (half_extensions); // Bounding radius for broadphase
     rigid_body -> restitution = g_cfg.body_defaults.cube_restitution; /* MPE_TASK_32 */
     rigid_body -> static_state = (mass == 0);
-    rigid_body -> is_sleeping = false;
-    rigid_body -> sleep_timer = 0.0f;
-    rigid_body -> friction_static = 0.4f;
+rigid_body -> is_sleeping = false;
+rigid_body -> sleep_timer = 0.0f;
+rigid_body -> nice_value = 0; /* MPE_TASK_V15R2_NICE_INIT */
+rigid_body -> friction_static = 0.4f;
     rigid_body -> friction_kinetic = 0.3f;
     //Inertia Tensor for rectangular box: I = (m/12) * (h² + d², w² + d², w² + h²), nominal extension only for boxes
     float width = half_extensions.x * 2.0f;  //full width

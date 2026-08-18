@@ -38,6 +38,7 @@ int main_algorithm (int argc, char *argv []) {
     g_setenv ("GDK_BACKEND", "x11", TRUE);
     gtk_init (&argc, &argv);
     mpe_config_init (); /* MPE_TASK_29_CONFIG_INIT */
+event_log_init (); /* MPE_TASK_V15R2_EVENT_LOG_INIT */
     /* MPE_TASK_34_CONFIG_LOAD_BEGIN */
     if (mpe_config_load ("status/engine.cfg")) {
         printf ("[config] loaded status/engine.cfg\n");
