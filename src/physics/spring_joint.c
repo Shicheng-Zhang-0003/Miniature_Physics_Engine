@@ -6,13 +6,13 @@
 
 /* A3_PATCH_49_JOINT_FORCE_LIMIT */
 
-spring_joint joint_pool [MPE_MAX_JOINTS];
+spring_joint joint_pool [mpe_max_joints];
 int current_joint_count = 0;
 int add_joint_by_ids (uint32_t object_id_a, uint32_t object_id_b, float equilibrium_length, float spring_constant, float damping_coefficient) {
     /* A3_PATCH_09_JOINT_IDS */
     if ((object_id_a == 0) || (object_id_b == 0) || (object_id_a == object_id_b)) {return -1;}
 
-    for (int joint_index = 0; joint_index < MPE_MAX_JOINTS; joint_index++) {
+    for (int joint_index = 0; joint_index < mpe_max_joints; joint_index++) {
         if (!joint_pool [joint_index].is_active) {
             joint_pool [joint_index].object_id_a = object_id_a;
             joint_pool [joint_index].object_id_b = object_id_b;
@@ -42,13 +42,13 @@ int add_joint (int object_index_a, int object_index_b, float equilibrium_length,
 }
 
 void remove_joint (int joint_pool_index) {
-    if ((joint_pool_index < 0) || (joint_pool_index >= MPE_MAX_JOINTS)) {return;}
+    if ((joint_pool_index < 0) || (joint_pool_index >= mpe_max_joints)) {return;}
     if (!joint_pool [joint_pool_index].is_active) {return;}
     joint_pool [joint_pool_index].is_active = false;
     current_joint_count -= 1;
 } void apply_force_all_joints (void) {
     /* A3_PATCH_09_JOINT_IDS */
-    for (int joint_index = 0; joint_index < MPE_MAX_JOINTS; joint_index++) {
+    for (int joint_index = 0; joint_index < mpe_max_joints; joint_index++) {
         if (!joint_pool [joint_index].is_active) {continue;}
 
         spring_joint *current_spring_joint = &joint_pool [joint_index];
@@ -99,7 +99,7 @@ void remove_joints_from_object_id (uint32_t object_id) {
     /* A3_PATCH_09_JOINT_IDS */
     if (object_id == 0) {return;}
 
-    for (int joint_index = 0; joint_index < MPE_MAX_JOINTS; joint_index++) {
+    for (int joint_index = 0; joint_index < mpe_max_joints; joint_index++) {
         if (!joint_pool [joint_index].is_active) {continue;}
 
         if ((joint_pool [joint_index].object_id_a == object_id) || (joint_pool [joint_index].object_id_b == object_id)) {
@@ -120,7 +120,7 @@ void adjust_joints_after_deletion (int deleted_object_index) {
 }
 
 void joint_init_pool (void) {
-    for (int joint_index = 0; joint_index < MPE_MAX_JOINTS; joint_index++) {joint_pool [joint_index].is_active = false;}
+    for (int joint_index = 0; joint_index < mpe_max_joints; joint_index++) {joint_pool [joint_index].is_active = false;}
     current_joint_count = 0;
 }
 
@@ -170,7 +170,7 @@ void spring_joint_render (GLuint shader_program, math4 view_matrix, math4 projec
     /* A3_PATCH_09_JOINT_IDS */
     int active_count = 0;
 
-    for (int i = 0; i < MPE_MAX_JOINTS; i++) {
+    for (int i = 0; i < mpe_max_joints; i++) {
         if (!joint_pool [i].is_active) {continue;}
 
         rigidbody *rb_a = scene_resolve_object_by_id (joint_pool [i].object_id_a);
@@ -180,13 +180,13 @@ void spring_joint_render (GLuint shader_program, math4 view_matrix, math4 projec
     }
 
     if (active_count == 0) {return;}
-    if (active_count > MPE_MAX_JOINTS) {active_count = MPE_MAX_JOINTS;} /* A3_PATCH_28_PERSISTENT_JOINT_BUFFER */
+    if (active_count > mpe_max_joints) {active_count = mpe_max_joints;} /* A3_PATCH_28_PERSISTENT_JOINT_BUFFER */
 
-    static float vertices [MPE_MAX_JOINTS * 2 * 3]; /* A3_PATCH_28_PERSISTENT_JOINT_BUFFER */
+    static float vertices [mpe_max_joints * 2 * 3]; /* A3_PATCH_28_PERSISTENT_JOINT_BUFFER */
 
     int v_idx = 0;
 
-    for (int i = 0; i < MPE_MAX_JOINTS; i++) {
+    for (int i = 0; i < mpe_max_joints; i++) {
         if (!joint_pool [i].is_active) {continue;}
 
         rigidbody *rb_a = scene_resolve_object_by_id (joint_pool [i].object_id_a);
@@ -207,7 +207,7 @@ void spring_joint_render (GLuint shader_program, math4 view_matrix, math4 projec
         glGenBuffers (1, &joint_vbo);
         glBindVertexArray (joint_vao);
         glBindBuffer (GL_ARRAY_BUFFER, joint_vbo);
-        glBufferData (GL_ARRAY_BUFFER, MPE_MAX_JOINTS * 2 * 3 * sizeof (float), NULL, GL_DYNAMIC_DRAW);
+        glBufferData (GL_ARRAY_BUFFER, mpe_max_joints * 2 * 3 * sizeof (float), NULL, GL_DYNAMIC_DRAW);
         glVertexAttribPointer (0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof (float), (void*) 0);
         glEnableVertexAttribArray (0);
         glBindVertexArray (0);

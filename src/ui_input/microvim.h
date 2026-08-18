@@ -5,7 +5,7 @@
 #include <gtk/gtk.h>
 #include <stdbool.h>
 
-typedef enum { MV_NORMAL, MV_INSERT, MV_COMMAND, MV_SEARCH } mv_mode;
+typedef enum { mv_normal, mv_insert, mv_command, mv_search } mv_mode;
 
 void microvim_open (const char *filename);
 void microvim_close (void);

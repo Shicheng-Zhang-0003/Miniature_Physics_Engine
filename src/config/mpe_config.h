@@ -21,25 +21,25 @@
  * Parameter metadata enums
  * ------------------------------------------------------------------ */
 typedef enum {
-    P_FLOAT,
-    P_INT,
-    P_BOOL
+    p_float,
+    p_int,
+    p_bool
 } param_type;
 
 typedef enum {
-    CAT_WORLD,
-    CAT_TIMESTEP,
-    CAT_SLEEP,
-    CAT_SOLVER,
-    CAT_DEPENETRATION,
-    CAT_BROADPHASE,
-    CAT_JOINTS,
-    CAT_BOUNDARY,
-    CAT_SPAWNER,
-    CAT_BODY_DEFAULTS,
-    CAT_CAMERA,
-    CAT_RENDER,
-    CAT_UI
+    cat_world,
+    cat_timestep,
+    cat_sleep,
+    cat_solver,
+    cat_depenetration,
+    cat_broadphase,
+    cat_joints,
+    cat_boundary,
+    cat_spawner,
+    cat_body_defaults,
+    cat_camera,
+    cat_render,
+    cat_ui
 } param_category;
 
 /* ------------------------------------------------------------------

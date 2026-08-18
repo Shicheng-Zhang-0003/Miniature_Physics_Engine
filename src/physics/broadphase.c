@@ -15,7 +15,7 @@ typedef struct { int object_index; int next_entry; } hash_node;
 static hash_node *node_pool = NULL; /* A3_PATCH_15_DYNAMIC_NODE_POOL */
 static int node_pool_capacity = 0;
 static int node_count = 0;
-static int hash_table [HASH_TABLE_SIZE];
+static int hash_table [hash_table_size];
 
 /* A3_PATCH_14_OVERFLOW_VISIBILITY */
 static int broadphase_node_overflow_count = 0;
@@ -71,13 +71,13 @@ static int hash_coordinate (int x, int y, int z) {
 unsigned int h = ((unsigned int) x) * 73856093u;
 h ^= ((unsigned int) y) * 19349663u;
 h ^= ((unsigned int) z) * 83492791u;
-return (int) (h % HASH_TABLE_SIZE);
+return (int) (h % hash_table_size);
 }
 
 static bool broadphase_ensure_node_capacity (void) {
 /* A3_PATCH_15_DYNAMIC_NODE_POOL */
 if (node_pool == NULL) {
-node_pool_capacity = MAX_OBJECTS * 8;
+node_pool_capacity = max_objects * 8;
 node_pool = (hash_node *) malloc ((size_t) node_pool_capacity * sizeof (hash_node));
 if (node_pool == NULL) {
 node_pool_capacity = 0;
@@ -87,7 +87,7 @@ return false;
 return true;
 }
 if (node_count < node_pool_capacity) {return true;}
-int new_capacity = (node_pool_capacity > 0) ? (node_pool_capacity * 2) : (MAX_OBJECTS * 8);
+int new_capacity = (node_pool_capacity > 0) ? (node_pool_capacity * 2) : (max_objects * 8);
 if (new_capacity < node_pool_capacity) {
 broadphase_node_overflow_count++;
 return false;
@@ -123,8 +123,8 @@ rb -> half_extensions.z * rb -> half_extensions.z
 }
 
 
-static uint64_t a3_pair_hash_keys [A3_PAIR_HASH_TABLE_SIZE];
-static uint32_t a3_pair_hash_generations [A3_PAIR_HASH_TABLE_SIZE];
+static uint64_t a3_pair_hash_keys [a3_pair_hash_table_size];
+static uint32_t a3_pair_hash_generations [a3_pair_hash_table_size];
 static uint32_t a3_pair_hash_generation = 0;
 
 static inline uint64_t a3_broadphase_pair_key (int object_a, int object_b) {
@@ -138,14 +138,14 @@ mixed_key *= 0xff51afd7ed558ccdULL;
 mixed_key ^= mixed_key >> 33;
 mixed_key *= 0xc4ceb9fe1a85ec53ULL;
 mixed_key ^= mixed_key >> 33;
-return (uint32_t) (mixed_key & A3_PAIR_HASH_MASK);
+return (uint32_t) (mixed_key & a3_pair_hash_mask);
 }
 
 static void broadphase_pair_dedupe_begin (void) {
 /* A3_PATCH_12_PAIR_HASH */
 a3_pair_hash_generation++;
 if (a3_pair_hash_generation == 0) {
-for (int i = 0; i < A3_PAIR_HASH_TABLE_SIZE; i++) {
+for (int i = 0; i < a3_pair_hash_table_size; i++) {
 a3_pair_hash_generations [i] = 0;
 }
 a3_pair_hash_generation = 1;
@@ -155,8 +155,8 @@ a3_pair_hash_generation = 1;
 static bool pair_already_checked (int min_obj, int max_obj) {
 uint64_t key = a3_broadphase_pair_key (min_obj, max_obj);
 uint32_t index = a3_broadphase_pair_hash (key);
-for (uint32_t probe = 0; probe < A3_PAIR_HASH_TABLE_SIZE; probe++) {
-uint32_t slot = (index + probe) & A3_PAIR_HASH_MASK;
+for (uint32_t probe = 0; probe < a3_pair_hash_table_size; probe++) {
+uint32_t slot = (index + probe) & a3_pair_hash_mask;
 if (a3_pair_hash_generations [slot] != a3_pair_hash_generation) {
 a3_pair_hash_keys [slot] = key;
 a3_pair_hash_generations [slot] = a3_pair_hash_generation;
@@ -227,7 +227,7 @@ return 0;
 
 broadphase_update_cell_size ();
 /* MPE_TASK_17_CELL_SIZE_CALL_END */
-for (int i = 0; i < HASH_TABLE_SIZE; i++) {hash_table [i] = -1;}
+for (int i = 0; i < hash_table_size; i++) {hash_table [i] = -1;}
 node_count = 0;
 /* A3_PATCH_12_PAIR_HASH */
 broadphase_pair_dedupe_begin ();
@@ -280,7 +280,7 @@ for (int y = min_y; y <= max_y; y++) {
 for (int z = min_z; z <= max_z; z++) { insert_into_hash (i, x, y, z); }
 }
 }
-} for (int i = 0; i < HASH_TABLE_SIZE; i++) {
+} for (int i = 0; i < hash_table_size; i++) {
 int node_idx = hash_table [i];
 while (node_idx != -1) {
 int obj_a = node_pool [node_idx].object_index;

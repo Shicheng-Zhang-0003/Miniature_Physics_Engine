@@ -5,8 +5,8 @@
 #include "../core/rigidbody.h"
 
 /* A3_PATCH_34_UNIFY_JOINT_CONSTANTS */
-#ifndef MPE_MAX_JOINTS
-#define MPE_MAX_JOINTS 1024
+#ifndef mpe_max_joints
+#define mpe_max_joints 1024
 #endif
 #include <stdint.h>
 #include <epoxy/gl.h>
@@ -19,7 +19,7 @@ typedef struct {
     bool is_active;
 } spring_joint;
 
-extern spring_joint joint_pool [MPE_MAX_JOINTS];
+extern spring_joint joint_pool [mpe_max_joints];
 extern int current_joint_count;
 
 int add_joint (int object_index_a, int object_index_b, float equilibrium_length, float spring_constant, float damping_coefficient);

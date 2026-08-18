@@ -16,7 +16,7 @@ uint32_t property_stamp_b;
 /* MPE_TASK_05_CACHE_STAMP_END */
 } cached_contact;
 
-static cached_contact contact_impulse_cache [MAX_CACHED_CONTACTS];
+static cached_contact contact_impulse_cache [max_cached_contacts];
 static int contact_impulse_cache_count = 0;
 
 bool collision_dual_sphere (rigidbody *rigidbody_object_a, rigidbody *rigidbody_object_b, collision_data *collision_output_data) {
@@ -860,7 +860,7 @@ void contact_cache_save (collision_data *manifolds, int count) {
     for (int m = 0; m < count; m++) {
         collision_data *manifold = &manifolds [m];
         for (int i = 0; i < manifold -> contact_count; i++) {
-            if (contact_impulse_cache_count >= MAX_CACHED_CONTACTS) {return;}
+            if (contact_impulse_cache_count >= max_cached_contacts) {return;}
             contact_point_data *cp = &manifold -> contacts [i];
             cached_contact *cc = &contact_impulse_cache [contact_impulse_cache_count++];
         /* A3_PATCH_10_CONTACT_CACHE_IDS */
