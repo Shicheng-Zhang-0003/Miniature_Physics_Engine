@@ -12,6 +12,7 @@
 #include "core/math4_special.h"
 #include "core/rigidbody.h"
 #include "core/frame_timer.h"
+#include "core/event_log.h" /* MPE_TASK_V15R2 */
 
 #include "physics/collision_mechanics.h"
 #include "physics/define_forces.h"
@@ -40,6 +41,7 @@
 /* MPE_TASK_18_TERMINAL_INCLUDE_BEGIN */
 #include "ui_input/debug_terminal.h"
 #include "ui_input/config_menu.h"
+#include "ui_input/microvim.h" /* MPE_TASK_V15R2 */
 /* MPE_TASK_18_TERMINAL_INCLUDE_END */
 /* ------------------------------------------------------------------ */
 /* Global scene state                                                 */
@@ -87,6 +89,7 @@ gboolean physics_step_increment (gpointer user_data_pointer);
 
 /* A3_PATCH_24_MENU_STATE_MACHINE */
 float open_numerical_input_dialog (GtkWidget *parent, const char *title, float current_value);
+void editor_reset (void); /* MPE_TASK_V15R2_FIX */
 
 /* A3_PATCH_36_DEBUG_COUNTERS */
 extern int debug_last_object_count;
@@ -104,6 +107,11 @@ extern int debug_last_sleeping_object_count;
 /* MPE_TASK_09_MANIFOLD_OVERFLOW_EXTERN_BEGIN */
 extern int debug_last_manifold_overflow_count;
 /* MPE_TASK_09_MANIFOLD_OVERFLOW_EXTERN_END */
+/* MPE_TASK_V15R2_PHYSICS_HALT_EXTERN_BEGIN */
+void physics_halt_set(bool halted);
+void physics_halt_for_ticks(int ticks);
+bool physics_is_halted(void);
+/* MPE_TASK_V15R2_PHYSICS_HALT_EXTERN_END */
 
 /* A3_PATCH_41_FINAL_VALIDATION */
 #define A3_VERSION_STRING "v15R1" /* v15R1 release candidate */
