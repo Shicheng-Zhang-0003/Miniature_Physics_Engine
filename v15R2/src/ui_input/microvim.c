@@ -913,7 +913,6 @@ mv.mode = mv_normal;
 mv.modified = false;
 mv.active = true;
 mv.quit_requested = false;
-mv.file_exists = false; /* MPE_TASK_V15R2_INIT_FILE_EXISTS */
 mv.show_line_numbers = true;
 mv.scroll_offset = 0;
 mv.undo_top = 0;
