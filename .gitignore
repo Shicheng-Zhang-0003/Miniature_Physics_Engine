@@ -1,28 +1,30 @@
-# ============ Build output ============
-# Object files + gcc auto-dependency files (-MMD -MP).
-# The .d files are Make-syntax; committing them is why GitHub
-# reports the repo as mostly Makefile.
+# ============================================================
+# MPE root .gitignore
+# Repo root contains: v15R2/  fixes/  run_all.sh  verify.sh
+# ============================================================
+
+# ============ Build output (matches anywhere in tree) ============
 *.o
 *.d
 *.obj
 *.a
 *.so
-
-# The compiled binary
+*.exe
 engine
-engine.exe
-
-# Out-of-source build dir created by src/makefile (BUILD_DIR := build)
 build/
 
+# ============ Fix-script backups ============
+# Every fix script creates .pre_NNN backups before mutating
+*.pre_*
+
 # ============ Backup / scratch files ============
-# Manual per-task backups — use git history instead
 *.bak
 *.bak_*
 *.orig
 *.rej
 *~
-# Editor swap files
+
+# ============ Editor swap files ============
 *.swp
 *.swo
 .*.swp
@@ -40,8 +42,14 @@ compile_commands.json
 Thumbs.db
 desktop.ini
 
-# ============ Runtime state (engine writes this at startup) ============
+# ============ Runtime state (engine writes at startup) ============
+# status/ dirs contain engine.cfg, scene.dat — regenerated
 status/
 
-# ============ Misc ============
+# ============ Logs ============
+# fix_log.txt IS tracked (execution history). Only stray logs ignored.
 *.log
+
+# ============ Sanitizer / temp build artifacts ============
+/tmp/
+*.san
