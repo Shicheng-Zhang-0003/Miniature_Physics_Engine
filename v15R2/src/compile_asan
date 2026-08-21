@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# AddressSanitizer + UndefinedBehaviorSanitizer build
+set -euo pipefail
+cd "$(dirname "$0")"
+
+make clean
+
+SAN_CFLAGS="$(pkg-config --cflags gtk+-3.0 epoxy) -I. -O1 -g -Wall -Wextra \
+  -fsanitize=address -fsanitize=undefined -fno-omit-frame-pointer"
+
+SAN_LIBS="$(pkg-config --libs gtk+-3.0 epoxy) -lm \
+  -fsanitize=address -fsanitize=undefined"
+
+make -j"$(nproc)" CFLAGS="$SAN_CFLAGS" LIBS="$SAN_LIBS"
+
+echo ""
+echo "=== ASan+UBSan build complete ==="
+echo "Run: ./engine"
+echo "Sanitizer reports print to stderr on first violation."

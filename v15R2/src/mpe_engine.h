@@ -114,7 +114,7 @@ bool physics_is_halted(void);
 /* MPE_TASK_V15R2_PHYSICS_HALT_EXTERN_END */
 
 /* A3_PATCH_41_FINAL_VALIDATION */
-#define a3_version_string "v15R1" /* v15R1 release candidate */
+#define a3_version_string "v15R2" /* v15R1 release candidate */
 
 /* MPE_RELEASE_FREEZE_BEGIN */
 #define a3_release_freeze 0
