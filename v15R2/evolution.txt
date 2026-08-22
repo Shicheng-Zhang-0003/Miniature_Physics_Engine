@@ -53,8 +53,9 @@ Phase 4 is in progress:
         1.0-RC
         0.9.9-Alpha
         0.9.8-Alpha
-Phase 5 is in progress:
-Current Head: v15R1
+Phase 5 is terminated:
+Current Head: v15R2
 Prev Versions:
 v14S
 v14A3
+v15R1

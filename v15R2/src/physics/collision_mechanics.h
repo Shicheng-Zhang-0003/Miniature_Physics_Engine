@@ -43,7 +43,6 @@ bool collision_static_plane_sphere (rigidbody *sphere, float plane_y, collision_
 bool collision_static_plane_cube (rigidbody *cube, float plane_y, collision_data *collision_output_data);
 bool collision_static_plane_body (rigidbody *body, float plane_y, collision_data *collision_output_data);
 
-/* A3_PATCH_36_DEBUG_COUNTERS */
 void contact_cache_stats_reset (void);
 int contact_cache_get_hits (void);
 int contact_cache_get_misses (void);

@@ -3,3 +3,120 @@
 [SKIP] Bug pattern not found — already fixed or file changed
 [SKIP] No literal '...' found — already fixed
 [SKIP] Version string already updated or changed
+
+=== MPE v15R2 Fix Run: 2026-08-21 08:56:56 ===
+[SKIP] Bug pattern not found — already fixed or file changed
+[SKIP] No literal '...' found — already fixed
+[SKIP] Version string already updated or changed
+[SKIP] Freeze note already updated or changed
+[SKIP] Duplicate condition not found — already fixed
+[SKIP] Duplicate init block not found — already fixed
+[SKIP] shift_* variables not found — already renamed
+[SKIP] No v15R1 references found — already fixed
+[SKIP] No v15R1 references found — already fixed
+[SKIP] No v15R1 references found — already fixed
+
+=== MPE v15R2 Fix Run: 2026-08-21 08:57:29 ===
+[SKIP] Bug pattern not found — already fixed or file changed
+[SKIP] No literal '...' found — already fixed
+[SKIP] Version string already updated or changed
+[SKIP] Freeze note already updated or changed
+[SKIP] Duplicate condition not found — already fixed
+[SKIP] Duplicate init block not found — already fixed
+[SKIP] shift_* variables not found — already renamed
+[SKIP] No v15R1 references found — already fixed
+[SKIP] No v15R1 references found — already fixed
+[SKIP] No v15R1 references found — already fixed
+
+=== MPE v15R2 Fix Run: 2026-08-21 09:22:54 ===
+[SKIP] Bug pattern not found — already fixed or file changed
+[SKIP] No literal '...' found — already fixed
+[SKIP] Version string already updated or changed
+[SKIP] Freeze note already updated or changed
+[SKIP] Duplicate condition not found — already fixed
+[SKIP] Duplicate init block not found — already fixed
+[SKIP] shift_* variables not found — already renamed
+[SKIP] No v15R1 references found — already fixed
+[SKIP] No v15R1 references found — already fixed
+[SKIP] No v15R1 references found — already fixed
+[SKIP] Comment already updated or removed
+[SKIP] Only 1 occurrence(s) found — already fixed
+[SKIP] No v15R1 references found in readme.md
+[SKIP] No v15R1 references found
+[SKIP] No v15R1 references found
+[SKIP] evolution.txt already updated
+[SKIP] GitHub URL not found — already fixed
+[SKIP] ./compile reference not found — already fixed
+[SKIP] compile script already has error checking
+[SKIP] v15R2/src/core/frame_timer.c already removed
+[SKIP] File already ends with }
+[SKIP] Dead camera code not found — already removed
+[PASS] 023: SAVE-010 fixed — removed 0 backup file(s) from status/
+
+=== MPE v15R2 Fix Run: 2026-08-21 10:46:57 ===
+[SKIP] Bug pattern not found — already fixed or file changed
+[SKIP] No literal '...' found — already fixed
+[SKIP] Version string already updated or changed
+[SKIP] Freeze note already updated or changed
+[SKIP] Duplicate condition not found — already fixed
+[SKIP] Duplicate init block not found — already fixed
+[SKIP] shift_* variables not found — already renamed
+[SKIP] No v15R1 references found — already fixed
+[SKIP] No v15R1 references found — already fixed
+[SKIP] No v15R1 references found — already fixed
+[SKIP] Comment already updated or removed
+[SKIP] Only 1 occurrence(s) found — already fixed
+[SKIP] No v15R1 references found in readme.md
+[SKIP] No v15R1 references found
+[SKIP] No v15R1 references found
+[SKIP] evolution.txt already updated
+[SKIP] GitHub URL not found — already fixed
+[SKIP] ./compile reference not found — already fixed
+[SKIP] compile script already has error checking
+[SKIP] v15R2/src/core/frame_timer.c already removed
+[SKIP] File already ends with }
+[SKIP] Dead camera code not found — already removed
+[PASS] 023: SAVE-010 fixed — removed 0 backup file(s) from status/
+[SKIP] uptime pattern not found — already fixed
+[PASS] 030a: capture cleanup correctly placed in on_terminal_window_destroy only
+[FAIL] term_capture_reset not added to destroy handler
+[SKIP] rigidbody_wake already present after sanitize
+[PASS] 036: PHYS-010 fixed — restitution threshold help clarified
+[SKIP] render_init_status already replaced
+[PASS] 038a: render_init() removed from per-frame path, kept in when_realised
+[FAIL] render_init() removed from all locations — when_realised needs it
+[SKIP] Line-length guard already present
+[SKIP] Line-length guard already present
+
+=== MPE v15R2 Fix Run: 2026-08-21 10:48:57 ===
+[SKIP] Bug pattern not found — already fixed or file changed
+[SKIP] No literal '...' found — already fixed
+[SKIP] Version string already updated or changed
+[SKIP] Freeze note already updated or changed
+[SKIP] Duplicate condition not found — already fixed
+[SKIP] Duplicate init block not found — already fixed
+[SKIP] shift_* variables not found — already renamed
+[SKIP] No v15R1 references found — already fixed
+[SKIP] No v15R1 references found — already fixed
+[SKIP] No v15R1 references found — already fixed
+[SKIP] Comment already updated or removed
+[SKIP] Only 1 occurrence(s) found — already fixed
+[SKIP] No v15R1 references found in readme.md
+[SKIP] No v15R1 references found
+[SKIP] No v15R1 references found
+[SKIP] evolution.txt already updated
+[SKIP] GitHub URL not found — already fixed
+[SKIP] ./compile reference not found — already fixed
+[SKIP] compile script already has error checking
+[SKIP] v15R2/src/core/frame_timer.c already removed
+[SKIP] File already ends with }
+[SKIP] Dead camera code not found — already removed
+[PASS] 023: SAVE-010 fixed — removed 0 backup file(s) from status/
+[SKIP] uptime pattern not found — already fixed
+[PASS] 030a: capture cleanup correctly placed in on_terminal_window_destroy only
+[SKIP] rigidbody_wake already present after sanitize
+[PASS] 036: PHYS-010 fixed — restitution threshold help clarified
+[SKIP] render_init_status already replaced
+[PASS] 038a: render_init() removed from per-frame path, kept in when_realised
+[SKIP] Line-length guard already present
+[SKIP] Line-length guard already present

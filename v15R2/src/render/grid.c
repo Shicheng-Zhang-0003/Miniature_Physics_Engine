@@ -35,7 +35,6 @@ void grid_init (grid_mesh *grid_mesh_object, int half_extent, int cell_spacing) 
     glBindVertexArray (0);
     free (vertex_data);
 } /* A3_PATCH_27_UNIFORM_CACHE */
-/* A3_PATCH_32_PORTABLE_GRID_RESTORE */
 static GLuint a3_grid_cached_program = 0;
 static GLint a3_grid_uniform_viewframe = -1;
 static GLint a3_grid_uniform_projection = -1;

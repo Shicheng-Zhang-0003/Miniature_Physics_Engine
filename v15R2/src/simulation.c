@@ -10,7 +10,6 @@ rigidbody *obj_per_scene = NULL;
 int object_count = 0;
 int object_capacity = 0;
 //World Physics Globals
-/* A3_PATCH_42_CRITICAL_LIFECYCLE */
 static bool editor_dialog_active = false;
 /* MPE_TASK_V15R2_PHYSICS_HALT_BEGIN */
 static int physics_halt_ticks_remaining = 0;
@@ -33,7 +32,6 @@ return physics_halted;
 /* MPE_TASK_V15R2_PHYSICS_HALT_END */
 
 
-/* A3_PATCH_36_DEBUG_COUNTERS */
 int debug_last_object_count = 0;
 int debug_last_broadphase_pair_count = 0;
 int debug_last_manifold_count = 0;
@@ -103,7 +101,6 @@ return result_value;
 } 
 
 void editor_reset (void) {
-    /* A3_PATCH_03_EDITOR_RESET */
     clear_selection ();
 
     main_inputs.is_menu_open = false;
@@ -126,7 +123,6 @@ void editor_reset (void) {
 }
 
 static void validation_report_print (void) {
-    /* A3_PATCH_51_FIX_VALIDATION_PRINT */
     printf ("[A3] Validation report %s\n", a3_version_string);
     printf ("[A3] objects=%d capacity=%d joints=%d selected=%d\n",
             object_count, object_capacity, current_joint_count, selected_object);
@@ -540,7 +536,6 @@ a3_positional_depenetrate_manifold (&floor_collision);
 gboolean physics_step_increment (gpointer user_data_pointer) {
     GtkWidget *parent_window = NULL;
     if (user_data_pointer) {parent_window = gtk_widget_get_toplevel (GTK_WIDGET (user_data_pointer));}
-/* A3_PATCH_42_CRITICAL_LIFECYCLE */
 if (editor_dialog_active) {return TRUE;}
 /* MPE_TASK_V15R2_PHYSICS_HALT_CHECK_BEGIN */
 if (physics_halt_ticks_remaining > 0) {
@@ -641,7 +636,6 @@ if (main_inputs.shift_key_pressed) {main_camera_fov.position.y -= debug_speed;}
         selector_ray_tracing ();
         main_inputs.right_mouse_button_clicked = false;
     } if (main_inputs.middle_mouse_button_clicked) {
-/* A3_PATCH_04_SAFE_DELETION */
 if (selected_object >= 0) {scene_remove_object_by_index (selected_object);}
 main_inputs.middle_mouse_button_clicked = false;
 } if (main_inputs.e_key_pressed) {
@@ -732,9 +726,9 @@ if (main_inputs.config_torture_pressed) {
 
 
  //Holding down shift, spawn gun
-    static float shift_hold_timer = 0.0f;
-    static float shift_spawn_interval_timer = 0.0f;
-    static bool shift_previously_held = false;
+    static float enter_hold_timer = 0.0f;
+    static float enter_spawn_interval_timer = 0.0f;
+    static bool enter_previously_held = false;
     /* MPE_TASK_22_ENTER_SPAWN_CONDITION_BEGIN */
 if ((main_inputs.enter_spawn_held) &&
 (!editor_dialog_active) &&
@@ -743,29 +737,29 @@ if ((main_inputs.enter_spawn_held) &&
 (main_inputs.velocity_menu_level == 0) &&
 (main_inputs.object_menu_level == 0)) {
 /* MPE_TASK_22_ENTER_SPAWN_CONDITION_END */
-if (!shift_previously_held) {
+if (!enter_previously_held) {
             if (main_inputs.current_spawn_type == 0) {spawner_launch_sphere (g_cfg.spawner.radius, g_cfg.spawner.mass, g_cfg.spawner.speed);}
             else {
                 vector3 cube_spawn_position = vector3_addition (main_camera_fov.position, vector3_scaling (main_camera_fov.forward_vector, g_cfg.spawner.cube_extent + 1.0f));
                 spawner_launch_cube (cube_spawn_position, (vector3) {g_cfg.spawner.cube_extent, g_cfg.spawner.cube_extent, g_cfg.spawner.cube_extent}, g_cfg.spawner.cube_mass);
-            } shift_hold_timer = 0.0f;
-            shift_spawn_interval_timer = 0.0f;
+            } enter_hold_timer = 0.0f;
+            enter_spawn_interval_timer = 0.0f;
         } else {
-            shift_hold_timer += frame_delta_time;
-            if (shift_hold_timer > 0.3f) {
-                shift_spawn_interval_timer += frame_delta_time;
-                if (shift_spawn_interval_timer >= 0.02f) {
+            enter_hold_timer += frame_delta_time;
+            if (enter_hold_timer > 0.3f) {
+                enter_spawn_interval_timer += frame_delta_time;
+                if (enter_spawn_interval_timer >= 0.02f) {
                     if (main_inputs.current_spawn_type == 0) {spawner_launch_sphere (g_cfg.spawner.radius, g_cfg.spawner.mass, g_cfg.spawner.speed);}
                     else {
                         vector3 cube_spawn_position = vector3_addition (main_camera_fov.position, vector3_scaling (main_camera_fov.forward_vector, g_cfg.spawner.cube_extent + 1.0f));
                         spawner_launch_cube (cube_spawn_position, (vector3) {g_cfg.spawner.cube_extent, g_cfg.spawner.cube_extent, g_cfg.spawner.cube_extent}, g_cfg.spawner.cube_mass);
-                    } shift_spawn_interval_timer = 0.0f;
+                    } enter_spawn_interval_timer = 0.0f;
                 }
             }
-        } shift_previously_held = true;
+        } enter_previously_held = true;
     } else {
-        shift_hold_timer = 0.0f;
-        shift_previously_held = false;
+        enter_hold_timer = 0.0f;
+        enter_previously_held = false;
     } //Scene Saving, 9 Key bindings
     if (main_inputs.menu_1_pressed) {save_scene ("status/scene.dat"); main_inputs.menu_1_pressed = false; main_inputs.is_menu_open = false;} /* MPE_TASK_35_SAVE */
     if (main_inputs.menu_2_pressed) {scene_loading ("status/scene.dat"); editor_reset (); main_inputs.menu_2_pressed = false; main_inputs.is_menu_open = false;} /* MPE_TASK_35_LOAD */
@@ -789,7 +783,6 @@ debug_last_manifold_overflow_count = 0;
 /* MPE_TASK_09_MANIFOLD_OVERFLOW_FRAME_RESET_END */
 while (physics_time_accumulator >= fixed_physics_dt) {
 /* MPE_TASK_14_SANITIZE_ONCE_BEGIN */
-/* A3_PATCH_47_NAN_SANITIZATION */
 for (int sanitize_index = 0; sanitize_index < object_count; sanitize_index++) {
 rigidbody_sanitize (&obj_per_scene [sanitize_index]);
 }
@@ -805,11 +798,9 @@ rigidbody_sanitize (&obj_per_scene [sanitize_index]);
             vector3 constant_gravity_acceleration = {0, g_cfg.world.gravity, 0};
             rigidbody *rigid_body = &obj_per_scene [object_iterator_index];
             if (rigid_body -> is_sleeping) {continue;}
-            /* A3_PATCH_17_REMOVE_FLOOR_HACK */
 rb_apply_forces_perfect (rigid_body, vector3_scaling (constant_gravity_acceleration, rigid_body -> mass));
         }
 
-/* A3_PATCH_44_SEMI_IMPLICIT */
 for (int velocity_integration_index = 0; velocity_integration_index < object_count; velocity_integration_index++) {
     rb_integrate_velocity (&obj_per_scene [velocity_integration_index], fixed_physics_dt, linear_damping_factor, angular_damping_factor);
 }
@@ -930,7 +921,6 @@ bool a3_boundary_moved_any = false;
 for (int object_iterator_index = 0; object_iterator_index < object_count; object_iterator_index++) {
             rigidbody *rigid_body = &obj_per_scene [object_iterator_index];
             rb_integrate_position (rigid_body, fixed_physics_dt); /* A3_PATCH_44_SEMI_IMPLICIT */
-            /* A3_PATCH_43_POST_INTEGRATE_SANITIZE */
             rigidbody_sanitize (rigid_body);
             /* MPE_TASK_20A_BOUNDARY_TRACK_BEGIN */
 vector3 a3_pre_boundary_position = rigid_body -> position;

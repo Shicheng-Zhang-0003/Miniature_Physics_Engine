@@ -22,7 +22,6 @@ void scene_allocate_pool (void) {
 static uint32_t next_object_id = 1;
 
 uint32_t scene_allocate_object_id (void) {
-    /* A3_PATCH_06_STABLE_IDS */
     return next_object_id++;
 }
 
@@ -33,7 +32,6 @@ void scene_assign_new_identity (int object_index) {
 }
 
 int scene_ensure_pool_capacity (int required_capacity) {
-    /* A3_PATCH_23_POOL_CONSISTENCY */
     if (required_capacity <= 0) {return 1;}
 
     if (required_capacity > mpe_max_bodies) {required_capacity = mpe_max_bodies;}
@@ -173,7 +171,6 @@ void scene_init_default (void) {
 }
 
 void scene_remove_object_by_index (int object_index) {
-    /* A3_PATCH_04_SAFE_DELETION */
     if ((object_index < 0) || (object_index >= object_count)) {return;}
 
     uint32_t previous_selected_id = selected_object_id; /* A3_PATCH_08_SELECTION_ID */
@@ -184,10 +181,8 @@ void scene_remove_object_by_index (int object_index) {
         obj_per_scene [i] = obj_per_scene [i + 1];
     }
 
-    adjust_joints_after_deletion (object_index);
     object_count -= 1;
 
-    /* A3_PATCH_08_SELECTION_ID */
     if (previous_selected_id == 0) {
         clear_selection ();
     } else {
@@ -214,7 +209,6 @@ void scene_remove_object_by_index (int object_index) {
 }
 
 int scene_find_object_index_by_id (uint32_t object_id) {
-    /* A3_PATCH_07_ID_LOOKUP */
     if (object_id == 0) {return -1;}
 
     for (int i = 0; i < object_count; i++) {
@@ -240,8 +234,6 @@ uint32_t scene_get_object_id_at_index (int object_index) {
 }
 
 void scene_spawn_stability_stack (void) {
-    /* A3_PATCH_37_STABILITY_SCENES */
-    /* A3_TEST_FIX_1 */
     for (int i = 0; i < 10; i++) {
         float stack_y = 0.5f + (float) i * 0.99f;
 
@@ -264,8 +256,6 @@ void scene_spawn_stability_stack (void) {
 
 
 void scene_spawn_sleep_wake_test (void) {
-    /* A3_PATCH_38_SLEEP_WAKE_TEST */
-    /* A3_TEST_FIX_1 */
     int target_object_index = scene_add_cube (
         (vector3) {20.0f, 0.5f, 10.0f},
         (vector3) {0.5f, 0.5f, 0.5f},
@@ -299,8 +289,6 @@ void scene_spawn_sleep_wake_test (void) {
 
 
 void scene_editor_torture_test (void) {
-    /* A3_PATCH_39_EDITOR_TORTURE */
-    /* A3_TEST_FIX_1 */
     printf ("[A3] Editor torture test: spawning jointed objects at x=-20\n");
 
     int object_a_index = scene_add_object (0.35f, 1.0f, (vector3) {-20.0f, 2.0f, 0.0f});
@@ -365,7 +353,6 @@ void scene_editor_torture_test (void) {
 
 
 void scene_spawn_stress_test (void) {
-    /* A3_PATCH_40_SPAWN_STRESS */
     broadphase_reset_overflow_counts ();
 
     int objects_to_spawn = 300;

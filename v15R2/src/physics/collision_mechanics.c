@@ -211,7 +211,6 @@ inc_normal = vector3_scaling (inc_normal, -1.0f);
 }
 
 static inline float a3_cube_extent_axis (rigidbody *cube, int axis_index) {
-    /* A3_PATCH_21_CUBE_EDGE_CONTACTS */
     if (axis_index == 0) {return cube -> half_extensions.x;}
     if (axis_index == 1) {return cube -> half_extensions.y;}
     return cube -> half_extensions.z;
@@ -299,7 +298,6 @@ bool collision_dual_cube (rigidbody *cube_a, rigidbody *cube_b, collision_data *
     collision_output_data -> normal_vector = best_axis;
     
     if (best_axis_index >= 6) {
-    /* A3_PATCH_21_CUBE_EDGE_CONTACTS */
     int edge_axis_a = (best_axis_index - 6) / 3;
     int edge_axis_b = (best_axis_index - 6) % 3;
 
@@ -554,14 +552,12 @@ bool collision_static_plane_cube (rigidbody *cube, float plane_y, collision_data
 }
 
 bool collision_static_plane_body (rigidbody *body, float plane_y, collision_data *collision_output_data) {
-    /* A3_PATCH_16_FLOOR_MANIFOLD */
     if (body -> type == object_sphere) {return collision_static_plane_sphere (body, plane_y, collision_output_data);}
     if (body -> type == object_cube) {return collision_static_plane_cube (body, plane_y, collision_output_data);}
     return false;
 }
 
 static inline vector4 collision_inverse_orientation (vector4 orientation) {
-    /* A3_PATCH_19_BODY_LOCAL_WARM_START */
     return (vector4) {orientation.w, -orientation.x, -orientation.y, -orientation.z};
 }
 
@@ -573,7 +569,6 @@ static inline vector3 collision_body_local_to_world_offset (rigidbody *body, vec
     return vector4_rotate_to_vector3 (body -> orientation, local_offset);
 }
 
-/* A3_PATCH_36_DEBUG_COUNTERS */
 static int contact_cache_hit_count = 0;
 static int contact_cache_miss_count = 0;
 
@@ -671,7 +666,6 @@ int cache_match_found = 0;
 for (int c = 0; c < contact_impulse_cache_count; c++) {
     cached_contact *cc = &contact_impulse_cache [c];
 
-    /* A3_PATCH_10_CONTACT_CACHE_IDS */
     if ((cache_id_a != 0) && (cache_id_b != 0) &&
         (cc -> object_id_a == cache_id_a) &&
         (cc -> object_id_b == cache_id_b) &&
@@ -863,7 +857,6 @@ void contact_cache_save (collision_data *manifolds, int count) {
             if (contact_impulse_cache_count >= max_cached_contacts) {return;}
             contact_point_data *cp = &manifold -> contacts [i];
             cached_contact *cc = &contact_impulse_cache [contact_impulse_cache_count++];
-        /* A3_PATCH_10_CONTACT_CACHE_IDS */
         cc -> object_id_a = (manifold -> object_a) ? manifold -> object_a -> object_id : 0;
         cc -> object_id_b = (manifold -> object_b) ? manifold -> object_b -> object_id : 0;
 /* MPE_TASK_05_CACHE_SAVE_STAMP_BEGIN */
@@ -879,7 +872,6 @@ cc -> property_stamp_b = a3_task05_body_property_stamp (manifold -> object_b);
 }
 
 void contact_cache_clear (void) {
-    /* A3_PATCH_04_CONTACT_CACHE_CLEAR */
     contact_impulse_cache_count = 0;
 }
 

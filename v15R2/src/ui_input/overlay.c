@@ -19,7 +19,6 @@ extern int selected_object;
 
 
 static void overlay_append_overflow_text (char *buffer, size_t buffer_size) {
-    /* A3_PATCH_14_OVERFLOW_VISIBILITY */
     int node_overflow_count = broadphase_get_node_overflow_count ();
     int pair_overflow_count = broadphase_get_pair_overflow_count ();
 /* MPE_TASK_11_OVERLAY_LARGE_CLAMP_BEGIN */
@@ -63,14 +62,13 @@ snprintf (buffer + manifold_current_length, buffer_size - manifold_current_lengt
     }
 }
 static bool overlay_has_valid_selection (void) {
-    /* A3_PATCH_05_OVERLAY_VALIDATION */
     return (selected_object >= 0) && (selected_object < object_count);
 }
 GtkWidget *overlay_initialise (GtkWidget *gl_drawing_area_widget) {
     //Debug Info
     GtkWidget *ui_overlay_container = gtk_overlay_new ();
     gtk_container_add (GTK_CONTAINER (ui_overlay_container), gl_drawing_area_widget);
-    debug_information_label = gtk_label_new ("- Miniature Physics Engine v15R1 -");
+    debug_information_label = gtk_label_new ("- Miniature Physics Engine v15R2 -");
     gtk_widget_set_halign (debug_information_label, GTK_ALIGN_START);
     gtk_widget_set_valign (debug_information_label, GTK_ALIGN_START);
     gtk_overlay_add_overlay (GTK_OVERLAY (ui_overlay_container), debug_information_label);
@@ -114,7 +112,6 @@ GtkWidget *overlay_initialise (GtkWidget *gl_drawing_area_widget) {
     /* MPE_TASK_35_CONFIG_MENU_LABEL_END */
     return ui_overlay_container;
 } static void overlay_append_stats_text (char *buffer, size_t buffer_size) {
-    /* A3_PATCH_36_DEBUG_COUNTERS */
     size_t current_length = strlen (buffer);
 
     if (current_length < buffer_size) {
@@ -193,7 +190,6 @@ void overlay_update (void) {
             gtk_widget_show (velocity_menu_label);
         }
     } if (object_menu_label) {
-        /* A3_PATCH_03_OVERLAY_GUARD */
         if ((main_inputs.object_menu_level == 0) || (selected_object < 0) || (selected_object >= object_count)) {
             if (!overlay_has_valid_selection ()) {main_inputs.object_menu_level = 0;}
             gtk_widget_hide (object_menu_label);

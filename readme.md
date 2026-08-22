@@ -1,10 +1,10 @@
 # 🧊 MINIATURE PHYSICS ENGINE (MPE)
 
 <!-- MPE_RELEASE_FREEZE_NOTICE_BEGIN -->
-> **Stable release:** `v15R1` is the first release candidate of v15, introducing the centralised configuration system. The `v14A3` release-candidate freeze is complete — all mandatory P0 gates passed before tagging.
+> **Stable release:** `v15R2` is the first release candidate of v15, introducing the centralised configuration system. The `v14A3` release-candidate freeze is complete — all mandatory P0 gates passed before tagging.
 <!-- MPE_RELEASE_FREEZE_NOTICE_END -->
 <!-- MPE_RELEASE_GATES_NOTICE_BEGIN -->
-> **Release quality:** `v15R1` was promoted under the criteria in [`RELEASE_GATES.md`](RELEASE_GATES.md). See [`RELEASE_NOTES_v15R1.md`](RELEASE_NOTES_v15R1.md) for the full change list.
+> **Release quality:** `v15R2` was promoted under the criteria in [`RELEASE_GATES.md`](RELEASE_GATES.md). See [`RELEASE_NOTES_v15R2.md`](RELEASE_NOTES_v15R2.md) for the full change list.
 <!-- MPE_RELEASE_GATES_NOTICE_END -->
 
 **License:** GPL-3.0 · **Language:** C · **UI:** GTK3 · **Renderer:** OpenGL 3.3 Core
@@ -24,9 +24,9 @@ MPE is built around four priorities:
 
 ---
 
-## ✨ What's New in v15R1
+## ✨ What's New in v15R2
 
-`v15R1` completes the release-candidate freeze with a full pass of correctness, stability, validation, documentation, and hygiene fixes. Highlights carried into stable:
+`v15R2` completes the release-candidate freeze with a full pass of correctness, stability, validation, documentation, and hygiene fixes. Highlights carried into stable:
 
 - **Domain-driven architecture** — clean `core`, `physics`, `render`, `scene`, `ui_input` modules.
 - **Warm-starting contact solver** with multi-point Sutherland–Hodgman manifolds for stable stacking.
@@ -219,7 +219,7 @@ make
 ## ⚠️ Known Limitations
 
 - **Wayland:** Mouse locking does not work under native Wayland. Run under X11, or try `GDK_BACKEND=x11 ./engine`.
-- **Scene format:** Save/load preserves bodies but **not** spring joints, object IDs, or sleep state. Scene format v2 is planned post-v15R1.
+- **Scene format:** Save/load preserves bodies but **not** spring joints, object IDs, or sleep state. Scene format v2 is planned post-v15R2.
 - **Object count:** Performance degrades gradually above ~1136 objects; rendering is the primary bottleneck at high counts.
 - **Global state:** The engine still uses file-scope globals; full encapsulation is deferred to v15.
 
@@ -227,7 +227,7 @@ make
 
 ## 📜 Version History
 
-- **v15R1 (stable)** — first release candidate of v15, introducing the centralised configuration system. *(this release)*
+- **v15R2 (stable)** — first release candidate of v15, introducing the centralised configuration system. *(this release)*
 - **v1.4 Alpha RC3** — domain-driven restructure, spatial-hash broadphase, physics-world encapsulation.
 - **v1.4 Alpha 2** — warm-starting solver, multi-point contact manifolds.
 - **v1.4 Alpha RC1** — spring joints, joint renderer, color painting, OBB raycast selection.

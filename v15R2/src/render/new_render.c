@@ -31,17 +31,18 @@ static struct {
     GLint specular_exponent_location;
 } utility_uniforms;
 mesh sphere_mesh;
-static int render_init_status = 0;
+typedef enum { RENDER_UNINITIALIZED = 0, RENDER_OK = 1, RENDER_FAILED = -1 } render_status;
+static render_status render_init_status = RENDER_UNINITIALIZED;
 static grid_mesh main_grid;
 static float *sphere_instances = NULL;
 static float *cube_instances = NULL;
 void render_init () {
-    if (render_init_status) {return;}
+    if (render_init_status != RENDER_UNINITIALIZED) {return;}
     instanced_shader_program = create_shader_program ("render/shaders/vertex_shader.glsl", "render/shaders/fragment_shader.glsl");
     utility_shader_program = create_shader_program ("render/shaders/utility_vertex.glsl", "render/shaders/utility_fragment.glsl");
     if ((instanced_shader_program == 0) || (utility_shader_program == 0)) {
     fprintf (stderr, "RENDER INIT FAILED: shader program creation failed (instanced=%u, utility=%u)\n", instanced_shader_program, utility_shader_program);
-    render_init_status = -1;
+    render_init_status = RENDER_FAILED;
     return;
     }
     instanced_uniforms.projection_matrix_location = glGetUniformLocation (instanced_shader_program, "projection");
@@ -63,10 +64,9 @@ void render_init () {
     cube_meshing_init ();
     sphere_instances = malloc (mpe_max_bodies * 19 * sizeof (float));
     cube_instances = malloc (mpe_max_bodies * 19 * sizeof (float));
-    render_init_status = 1;
+    render_init_status = RENDER_OK;
 } void render_scene_current (int widget_width, int widget_height) {
-    render_init ();
-    if (render_init_status < 0) {
+    if (render_init_status == RENDER_FAILED) {
     glViewport (0, 0, widget_width, widget_height);
     glClearColor (0.5f, 0.0f, 0.0f, 1.0f);
     glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

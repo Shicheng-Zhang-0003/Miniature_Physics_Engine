@@ -1,8 +1,8 @@
-# MPE v15R1 Release Gates
+# MPE v15R2 Release Gates
 
-This document defines the exit criteria for tagging `v15R1`.
+This document defines the exit criteria for tagging `v15R2`.
 
-`v15R1` is the first release candidate of the v15 series, introducing
+`v15R2` is the first release candidate of the v15 series, introducing
 the centralised configuration system.
 
 ---
@@ -11,7 +11,7 @@ the centralised configuration system.
 
 ### P0 Gates
 P0 gates are mandatory.
-If any P0 gate fails, `v15R1` must not be tagged.
+If any P0 gate fails, `v15R2` must not be tagged.
 
 ### P1 Gates
 P1 gates are strongly recommended.
@@ -20,7 +20,7 @@ A P1 gate may be deferred only if:
 2. it does not undermine overall stability.
 
 ### P2 / P3 Gates
-P2 and P3 gates are optional for `v15R1`.
+P2 and P3 gates are optional for `v15R2`.
 They should be recorded as post-stable work items.
 
 ---
@@ -28,7 +28,7 @@ They should be recorded as post-stable work items.
 ## Mandatory P0 Release Gates
 
 ### 1. Release Freeze
-- [X] The `v15R1` release policy is present and acknowledged.
+- [X] The `v15R2` release policy is present and acknowledged.
 - [X] No new features beyond the config system are being added.
 - [X] Only correctness, stability, validation, documentation, and hygiene changes are accepted.
 
@@ -41,7 +41,7 @@ They should be recorded as post-stable work items.
 
 ### 3. Startup
 - [X] Engine starts using the documented workflow.
-- [X] Startup prints the correct version string (`MPE v15R1`).
+- [X] Startup prints the correct version string (`MPE v15R2`).
 - [X] Config system initialises (prints `[config] loaded` or `[config] defaults active`).
 - [X] Shaders load successfully.
 - [X] The main window opens.
@@ -167,7 +167,7 @@ They should be recorded as post-stable work items.
 
 ## Deferred / Post-Stable Work
 
-The following are not required for `v15R1`:
+The following are not required for `v15R2`:
 - full global-state removal beyond config extraction,
 - full `PhysicsWorld` encapsulation,
 - multithreading,
@@ -179,13 +179,13 @@ The following are not required for `v15R1`:
 - Wayland mouse-lock support,
 - per-object config persistence in scene files.
 
-These belong after `v15R1`.
+These belong after `v15R2`.
 
 ---
 
 ## Release Decision
 
-`v15R1` may be tagged only when:
+`v15R2` may be tagged only when:
 1. all P0 gates pass,
 2. all accepted P1 gates pass or are documented as known limitations,
 3. the validation checklist has been run,
@@ -195,4 +195,4 @@ These belong after `v15R1`.
 If any mandatory gate fails, the correct action is:
 - fix the gate failure,
 - rerun validation,
-- and only then re-evaluate `v15R1`.
+- and only then re-evaluate `v15R2`.

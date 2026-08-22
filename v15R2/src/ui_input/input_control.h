@@ -48,7 +48,7 @@ bool config_torture_pressed;
     int marked_joint_object_index; // -1 if none is marked
 } input_status;
 //Initialise input state to zeroing
-void initialise_input (input_status *input_state);
+void initialize_input (input_status *input_state);
 gboolean on_keypress (GtkWidget *widget, GdkEventKey *event, gpointer user_data_stored);
 gboolean on_key_released (GtkWidget *widget, GdkEventKey *event, gpointer user_data_stored);
 gboolean on_mouse_movements (GtkWidget *widget, GdkEventMotion *event, gpointer user_data_stored);

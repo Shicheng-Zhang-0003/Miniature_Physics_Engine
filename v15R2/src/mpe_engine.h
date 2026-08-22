@@ -87,11 +87,9 @@ gboolean physics_step_increment (gpointer user_data_pointer);
 
 
 
-/* A3_PATCH_24_MENU_STATE_MACHINE */
 float open_numerical_input_dialog (GtkWidget *parent, const char *title, float current_value);
 void editor_reset (void); /* MPE_TASK_V15R2_FIX */
 
-/* A3_PATCH_36_DEBUG_COUNTERS */
 extern int debug_last_object_count;
 extern int debug_last_broadphase_pair_count;
 extern int debug_last_manifold_count;
@@ -113,12 +111,11 @@ void physics_halt_for_ticks(int ticks);
 bool physics_is_halted(void);
 /* MPE_TASK_V15R2_PHYSICS_HALT_EXTERN_END */
 
-/* A3_PATCH_41_FINAL_VALIDATION */
-#define a3_version_string "v15R2" /* v15R1 release candidate */
+#define a3_version_string "v15R2" /* v15R2 release candidate */
 
 /* MPE_RELEASE_FREEZE_BEGIN */
 #define a3_release_freeze 0
-#define a3_release_freeze_note "v15R1 development cycle active"
+#define a3_release_freeze_note "v15R2 development cycle active"
 /* MPE_RELEASE_FREEZE_END */
 
 #endif // mpe_engine_h

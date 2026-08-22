@@ -17,7 +17,6 @@ static int node_pool_capacity = 0;
 static int node_count = 0;
 static int hash_table [hash_table_size];
 
-/* A3_PATCH_14_OVERFLOW_VISIBILITY */
 static int broadphase_node_overflow_count = 0;
 static int broadphase_pair_overflow_count = 0;
 
@@ -67,7 +66,6 @@ return broadphase_current_cell_size;
 /* MPE_TASK_17_CELL_SIZE_GETTER_END */
 
 static int hash_coordinate (int x, int y, int z) {
-/* A3_PATCH_13_HASH_SAFETY */
 unsigned int h = ((unsigned int) x) * 73856093u;
 h ^= ((unsigned int) y) * 19349663u;
 h ^= ((unsigned int) z) * 83492791u;
@@ -75,7 +73,6 @@ return (int) (h % hash_table_size);
 }
 
 static bool broadphase_ensure_node_capacity (void) {
-/* A3_PATCH_15_DYNAMIC_NODE_POOL */
 if (node_pool == NULL) {
 node_pool_capacity = max_objects * 8;
 node_pool = (hash_node *) malloc ((size_t) node_pool_capacity * sizeof (hash_node));
@@ -142,7 +139,6 @@ return (uint32_t) (mixed_key & a3_pair_hash_mask);
 }
 
 static void broadphase_pair_dedupe_begin (void) {
-/* A3_PATCH_12_PAIR_HASH */
 a3_pair_hash_generation++;
 if (a3_pair_hash_generation == 0) {
 for (int i = 0; i < a3_pair_hash_table_size; i++) {
@@ -229,12 +225,10 @@ broadphase_update_cell_size ();
 /* MPE_TASK_17_CELL_SIZE_CALL_END */
 for (int i = 0; i < hash_table_size; i++) {hash_table [i] = -1;}
 node_count = 0;
-/* A3_PATCH_12_PAIR_HASH */
 broadphase_pair_dedupe_begin ();
 int collision_pair_counter = 0;
 for (int i = 0; i < object_count; i++) {
 rigidbody *rb = &obj_per_scene [i];
-/* A3_PATCH_11_SLEEPING_BROADPHASE */
 float extent_x, extent_y, extent_z;
 if (rb -> type == object_sphere) {extent_x = extent_y = extent_z = rb -> radius;}
 else {
@@ -251,7 +245,6 @@ int max_z = (int) floorf ((rb -> position.z + extent_z) / GRID_CELL_SIZE);
 /* MPE_TASK_11_LARGE_OBJECT_CLAMP_BEGIN */
 bool a3_large_object_clamped = false;
 
-/* A3_PATCH_50_BROADPHASE_LARGE_OBJECT_SAFETY */
 if ((max_x - min_x) > g_cfg.broadphase.max_cell_span_per_axis) {
 int center_x = (int) floorf (rb -> position.x / GRID_CELL_SIZE);
 min_x = center_x - (g_cfg.broadphase.max_cell_span_per_axis / 2);

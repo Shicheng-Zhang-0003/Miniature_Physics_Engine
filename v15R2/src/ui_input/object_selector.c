@@ -26,7 +26,6 @@ static bool ray_obb_intersection (vector3 ray_origin, vector3 ray_dir, rigidbody
     } *t_hit = tmin > 0 ? tmin : tmax;
     return *t_hit > 0;
 } void select_object_by_index (int object_index) {
-    /* A3_PATCH_08_SELECTION_ID */
     if ((object_index < 0) || (object_index >= object_count)) {
         clear_selection ();
         return;
@@ -87,7 +86,6 @@ int selector_ray_tracing (void) {
     return closest_object_index;
 } void clear_selection (void) {selected_object = -1;}
 void selector_apply_force_impulse (float impulse_magnitude) {
-    /* A3_PATCH_08_SELECTION_ID_IMPULSE */
     selection_validate ();
     if ((selected_object < 0) || (selected_object >= object_count)) {return;}
     rigidbody *selected_rigid_body = &obj_per_scene [selected_object];

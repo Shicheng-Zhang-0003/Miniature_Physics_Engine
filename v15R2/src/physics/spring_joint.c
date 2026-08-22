@@ -4,12 +4,10 @@
 #include <stdlib.h>
 #include <epoxy/gl.h>
 
-/* A3_PATCH_49_JOINT_FORCE_LIMIT */
 
 spring_joint joint_pool [mpe_max_joints];
 int current_joint_count = 0;
 int add_joint_by_ids (uint32_t object_id_a, uint32_t object_id_b, float equilibrium_length, float spring_constant, float damping_coefficient) {
-    /* A3_PATCH_09_JOINT_IDS */
     if ((object_id_a == 0) || (object_id_b == 0) || (object_id_a == object_id_b)) {return -1;}
 
     for (int joint_index = 0; joint_index < mpe_max_joints; joint_index++) {
@@ -47,7 +45,6 @@ void remove_joint (int joint_pool_index) {
     joint_pool [joint_pool_index].is_active = false;
     current_joint_count -= 1;
 } void apply_force_all_joints (void) {
-    /* A3_PATCH_09_JOINT_IDS */
     for (int joint_index = 0; joint_index < mpe_max_joints; joint_index++) {
         if (!joint_pool [joint_index].is_active) {continue;}
 
@@ -80,7 +77,6 @@ void remove_joint (int joint_pool_index) {
         vector3 damping_force = vector3_scaling (spring_axis_direction, current_spring_joint -> damping_coefficient * velocity_along_spring_axis);
         vector3 net_joint_force = vector3_addition (restoration_force, damping_force);
 
-        /* A3_PATCH_49_JOINT_FORCE_LIMIT */
         float a3_inverse_mass_sum = rigid_body_a -> inverse_mass + rigid_body_b -> inverse_mass;
         if (a3_inverse_mass_sum > 0.0f) {
             float a3_reduced_mass = 1.0f / a3_inverse_mass_sum;
@@ -96,7 +92,6 @@ void remove_joint (int joint_pool_index) {
 }
 
 void remove_joints_from_object_id (uint32_t object_id) {
-    /* A3_PATCH_09_JOINT_IDS */
     if (object_id == 0) {return;}
 
     for (int joint_index = 0; joint_index < mpe_max_joints; joint_index++) {
@@ -113,12 +108,6 @@ void remove_joints_from_object (int object_index) {
     remove_joints_from_object_id (obj_per_scene [object_index].object_id);
 }
 
-void adjust_joints_after_deletion (int deleted_object_index) {
-    /* A3_PATCH_09_JOINT_IDS */
-    (void) deleted_object_index;
-    /* Joints now use stable object IDs, so index repair is unnecessary. */
-}
-
 void joint_init_pool (void) {
     for (int joint_index = 0; joint_index < mpe_max_joints; joint_index++) {joint_pool [joint_index].is_active = false;}
     current_joint_count = 0;
@@ -127,7 +116,6 @@ void joint_init_pool (void) {
 static GLuint joint_vao = 0;
 static GLuint joint_vbo = 0;
 
-/* A3_PATCH_27_UNIFORM_CACHE */
 static GLuint a3_spring_cached_program = 0;
 static GLint a3_spring_uniform_viewframe = -1;
 static GLint a3_spring_uniform_projection = -1;
@@ -146,7 +134,6 @@ static void a3_spring_cache_uniforms (GLuint shader_program) {
     a3_spring_uniform_object_colour = glGetUniformLocation (shader_program, "object_colour");
 }
 
-/* A3_PATCH_30_MISSING_UNIFORMS */
 static GLint a3_spring_uniform_camera_position = -1;
 static GLint a3_spring_uniform_light_position = -1;
 static GLint a3_spring_uniform_ambient = -1;
@@ -167,7 +154,6 @@ static void a3_spring_cache_missing_uniforms (GLuint shader_program) {
 }
 
 void spring_joint_render (GLuint shader_program, math4 view_matrix, math4 projection_matrix) {
-    /* A3_PATCH_09_JOINT_IDS */
     int active_count = 0;
 
     for (int i = 0; i < mpe_max_joints; i++) {
@@ -243,7 +229,6 @@ void spring_joint_render (GLuint shader_program, math4 view_matrix, math4 projec
 
     glUniformMatrix3fv (a3_spring_uniform_normal_matrix, 1, GL_FALSE, normal_matrix_flat_array);
     glUniform3f (a3_spring_uniform_object_colour, 1.0f, 0.0f, 1.0f);
-    /* A3_PATCH_30_MISSING_UNIFORMS */
     glUniform3f (a3_spring_uniform_camera_position, main_camera_fov.position.x, main_camera_fov.position.y, main_camera_fov.position.z);
     glUniform3f (a3_spring_uniform_light_position, g_cfg.render.light_x, g_cfg.render.light_y, g_cfg.render.light_z);
     glUniform1f (a3_spring_uniform_ambient, g_cfg.render.ambient_strength);
