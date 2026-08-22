@@ -1,10 +1,10 @@
 # 🧊 MINIATURE PHYSICS ENGINE (MPE)
 
 <!-- MPE_RELEASE_FREEZE_NOTICE_BEGIN -->
-> **Stable release:** `v15R2` is the first release candidate of v15, introducing the centralised configuration system. The `v14A3` release-candidate freeze is complete — all mandatory P0 gates passed before tagging.
+> **Current development tree:** `v15R2` continues the v15 configuration-system work. It is not a tagged stable release; use the release gates before promotion.
 <!-- MPE_RELEASE_FREEZE_NOTICE_END -->
 <!-- MPE_RELEASE_GATES_NOTICE_BEGIN -->
-> **Release quality:** `v15R2` was promoted under the criteria in [`RELEASE_GATES.md`](RELEASE_GATES.md). See [`RELEASE_NOTES_v15R2.md`](RELEASE_NOTES_v15R2.md) for the full change list.
+> **Release quality:** the current criteria are in [`v15R2/RELEASE_GATES.md`](v15R2/RELEASE_GATES.md). The most recent release notes in this tree are [`v15R2/release_notes_v15R1.md`](v15R2/release_notes_v15R1.md).
 <!-- MPE_RELEASE_GATES_NOTICE_END -->
 
 **License:** GPL-3.0 · **Language:** C · **UI:** GTK3 · **Renderer:** OpenGL 3.3 Core
@@ -26,14 +26,14 @@ MPE is built around four priorities:
 
 ## ✨ What's New in v15R2
 
-`v15R2` completes the release-candidate freeze with a full pass of correctness, stability, validation, documentation, and hygiene fixes. Highlights carried into stable:
+`v15R2` is the active development cycle for the centralised configuration system. Highlights currently present in the tree:
 
 - **Domain-driven architecture** — clean `core`, `physics`, `render`, `scene`, `ui_input` modules.
 - **Warm-starting contact solver** with multi-point Sutherland–Hodgman manifolds for stable stacking.
 - **3D spatial-hash grid broadphase** with adaptive cell sizing.
 - **Interactive spring-joint system** with live magenta rendering.
 - **POSIX-style debug terminal** — drive the whole simulation from a shell.
-- **Built-in validation suite** (F5–F10), including a 60-second long-run stability test.
+- **Built-in validation suite** (F5–F11), including a 60-second long-run stability test and config torture test.
 - **Shader/render failure visibility** — the engine no longer continues silently in a broken render state.
 
 ---
@@ -227,7 +227,7 @@ make
 
 ## 📜 Version History
 
-- **v15R2 (stable)** — first release candidate of v15, introducing the centralised configuration system. *(this release)*
+- **v15R2 (development)** — ongoing v15 configuration-system work. *(current tree)*
 - **v1.4 Alpha RC3** — domain-driven restructure, spatial-hash broadphase, physics-world encapsulation.
 - **v1.4 Alpha 2** — warm-starting solver, multi-point contact manifolds.
 - **v1.4 Alpha RC1** — spring joints, joint renderer, color painting, OBB raycast selection.

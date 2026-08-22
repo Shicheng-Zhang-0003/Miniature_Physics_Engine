@@ -1,6 +1,6 @@
 ```markdown
 # Miniature Physics Engine — User Guide
-### Version 15 Release Candidate 1 (v15R1)
+### v15R2 Development Guide
 
 ---
 
@@ -143,7 +143,7 @@ Type `help` for the full command list or `man <command>` for usage. `Ctrl+L` cle
 
 ## Configuration System (Key 6)
 
-Press `6` to open the **Configuration Menu**. This provides live access to all 57 tunable engine parameters.
+Press `6` to open the **Configuration Menu**. This provides live access to all 69 tunable engine parameters.
 
 The menu is organised into 13 categories:
 
@@ -183,7 +183,7 @@ In the debug terminal:
 
 ### F11 Config Torture Test
 
-Press `F11` to randomise all 57 tunables to extreme bounded values and run
+Press `F11` to randomise all 69 tunables to extreme bounded values and run
 a 60-second long-run validation. This stress-tests the engine under
 adversarial parameter combinations. After the test, use key 6 → Reset
 Defaults or terminal `config reset` to restore normal behaviour.
@@ -242,7 +242,7 @@ Press `9` to open the scene menu:
 
 Scenes are saved to `status/scene.dat`. Saving overwrites any existing file. Loading clears the current scene and replaces it entirely. Both spheres and cubes are saved and restored correctly, including position, velocity, orientation, colour, mass, friction, restitution, and static state.
 
-**Known limitations:** Spring joints are **not** saved and will be lost on save/load. Object IDs are reassigned on load, so any external references (selection, terminal, joints) to specific IDs will not survive. Sleeping state is not persisted — all objects load awake. These limitations will be addressed in scene format version 2 (post-v14S).
+**Known limitations:** Spring joints are **not** saved and will be lost on save/load. Object IDs are reassigned on load, so any external references (selection, terminal, joints) to specific IDs will not survive. Sleeping state is not persisted — all objects load awake. These limitations are deferred to scene format version 2.
 
 ---
 
@@ -293,7 +293,7 @@ Broadphase collision detection uses a 3D spatial hash grid and runs once per phy
 
 **Object count:** Performance degrades gradually above approximately 1136 objects. The physics and broadphase scale linearly with object count; rendering is the primary bottleneck at high numbers.
 
-**Scene format:** Save/load preserves bodies but not spring joints, object IDs, or sleep state. Scene format v2 is planned post-v14S.
+**Scene format:** Save/load preserves bodies but not spring joints, object IDs, or sleep state. Scene format v2 is deferred work.
 
 ---
 
@@ -319,129 +319,5 @@ Run:
 ```
 
 The engine has been tested on Ubuntu 24.04.4 LTS. Intel MacOS users may attempt to install the same dependencies via Homebrew, but this is unsupported. Windows is not supported.
-```
 
----
-
-## A3_VALIDATION.md — full rewrite for v14S
-
-```markdown
-# MPE v14S Validation Checklist
-
-> This checklist was used to validate the `v14S` stable release.
-> It is subordinate to [`RELEASE_GATES.md`](RELEASE_GATES.md), which is the authoritative gate list.
-
-<!-- MPE_RELEASE_GATES_SECTION_BEGIN -->
-## v14S Release Gates
-
-The stable release is controlled by [`RELEASE_GATES.md`](RELEASE_GATES.md).
-
-Minimum mandatory gates:
-
-- [x] Release freeze policy is active.
-- [x] Build passes.
-- [x] Startup prints the correct version.
-- [x] Shader/render failures are visible.
-- [x] Input and focus-loss behaviour is stable.
-- [x] Editor deletion/joint torture tests pass.
-- [x] Physics stacks settle without explosion.
-- [x] Sleeping stacks remain sleeping.
-- [x] Overflow counters are visible where applicable.
-- [x] F5–F10 validation tests pass.
-- [x] Documentation matches code.
-- [x] Repository artifacts are cleaned.
-- [x] Sanitizer validation passes.
-
-All mandatory P0 gates passed before tagging `v14S`.
-<!-- MPE_RELEASE_GATES_SECTION_END -->
-
-This checklist validates the full 1–51 A3 patch sequence plus the S-01 through S-11 stable-release fixes.
-
-## Built-in Test Keys
-
-| Key | Test |
-|---|---|
-| F5 | Spawn 10-cube stability stack |
-| F6 | Spawn sleeping cube + moving projectile |
-| F7 | Editor torture test: select, joint, delete, reset |
-| F8 | Spawn stress test: up to 300 mixed objects |
-| F9 | Print validation report to console |
-| F10 | Long-run validation: 3600 ticks (60 seconds) of idle stability |
-
-## Core Lifecycle
-
-- [x] Closing the window quits the program.
-- [x] Losing window focus clears stuck input.
-- [x] Mouse lock state does not remain stuck after focus loss.
-
-## Editor State
-
-- [x] Deleting selected object does not crash.
-- [x] Deleting jointed object does not crash.
-- [x] Deleting marked joint object does not crash.
-- [x] Loading a scene resets selection/menu/cache state.
-- [x] Object menu closes when selection becomes invalid.
-
-## Physics
-
-- [x] Objects rest on floor without explosive jitter.
-- [x] Cubes stack with reasonable stability.
-- [x] Spheres and cubes collide correctly.
-- [x] Objects with restitution bounce on floor.
-- [x] Surface friction affects sliding.
-- [x] Sleeping objects wake when hit.
-- [x] Joints remain valid after deletion.
-
-## Broadphase
-
-- [x] Sleeping objects are still discoverable.
-- [x] High object counts do not allocate quadratic dedupe memory.
-- [x] Broadphase overflow counters are visible if overflow occurs.
-- [x] Node pool grows instead of silently dropping objects.
-
-## Rendering
-
-- [x] Ground grid is visible.
-- [x] Wireframe selection renders.
-- [x] Joint lines render.
-- [x] No per-frame uniform query spam in grid/wireframe/joint paths.
-- [x] Shader/render failure does not silently continue (S-01).
-
-## Build
-
-- [x] make -C src clean succeeds.
-- [x] make -C src succeeds.
-- [x] Startup prints: MPE v14S
-
-## Sanitizer Validation
-
-- [x] AddressSanitizer build compiles and runs.
-- [x] UndefinedBehaviorSanitizer build compiles and runs.
-- [x] Normal validation passes under sanitizer builds.
-- [x] No severe sanitizer errors.
-
-## Final Pass
-
-Run:
-
-```
-make -C src clean
-make -C src
-./src/engine
-```
-
-Then manually test:
-
-1. Press F5 — stack settles.
-2. Press F6 — sleeping cube wakes on impact.
-3. Press F7 — editor torture does not crash.
-4. Press F8 — spawn stress remains observable and does not silently fail.
-5. Press F9 — validation report prints useful state.
-6. Press F10 — long-run validation completes and prints PASS.
-7. Save/load scene with menus open — no crash.
-8. Delete selected/jointed objects — no crash.
-9. Set friction to 0 and restitution above 0 — objects slide and bounce.
-10. Open debug terminal (T) — commands execute correctly.
-
-All checks passed. `v14S` tagged.
-```
+For release validation, follow [RELEASE_GATES.md](RELEASE_GATES.md) and the scripts in `validation/`.

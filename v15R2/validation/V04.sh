@@ -30,5 +30,5 @@ PASS criteria (all must hold):
   - final max linear speed  < 0.25
   - final max angular speed < 0.5
 
-Record the result for V-03 (Gate 9) and V-05.
+Record the result for V-03 (Gate 9) and the release checklist.
 EOF

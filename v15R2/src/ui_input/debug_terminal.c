@@ -2413,10 +2413,13 @@ for (int argument_index = 1; argument_index < argc; argument_index++) {
 bool found = false;
 for (int i = 0; i < term_alias_count; i++) {
 if (term_str_eq (argv [argument_index], term_alias_names [i])) {
-for (int j = i; j < term_alias_count - 1; j++) {
-strncpy (term_alias_names [j], term_alias_names [j + 1], term_alias_name_len);
-strncpy (term_alias_values [j], term_alias_values [j + 1], term_alias_value_len);
+int entries_to_move = term_alias_count - i - 1;
+if (entries_to_move > 0) {
+memmove (term_alias_names [i], term_alias_names [i + 1], (size_t) entries_to_move * sizeof term_alias_names [0]);
+memmove (term_alias_values [i], term_alias_values [i + 1], (size_t) entries_to_move * sizeof term_alias_values [0]);
 }
+term_alias_names [term_alias_count - 1][0] = '\0';
+term_alias_values [term_alias_count - 1][0] = '\0';
 term_alias_count--;
 found = true;
 term_printf ("term_ok", "unalias %s\n", argv [argument_index]);
@@ -2620,7 +2623,7 @@ const char *path;
 const char *description;
 } mv_editable_file;
 static const mv_editable_file mv_known_files [] = {
-{"status/engine.cfg",          "Main engine configuration (57 tunables)"},
+{"status/engine.cfg",          "Main engine configuration (69 tunables)"},
 {"status/engine.cfg.backup",   "F10/F11 validation config backup"},
 {"status/engine.cfg.bak",      "MicroVim auto-backup (last :w)"},
 {"status/scene.dat",           "Scene save file (binary)"},
