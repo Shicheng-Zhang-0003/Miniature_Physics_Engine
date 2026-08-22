@@ -127,13 +127,4 @@ static inline math3 math3_inverse (math3 matrix) {
     result_matrix.matrix [2][2] = (matrix.matrix [0][0] * matrix.matrix [1][1] - matrix.matrix [1][0] * matrix.matrix [0][1]) * inverse_determinant;
     return result_matrix;
 }
-    math3 perspective_matrix = {{{0}}};
-    float focal_length = 1.0f / tanf (field_of_view / 2.0f);
-    perspective_matrix.matrix [0][0] = focal_length / aspect_ratio;
-    perspective_matrix.matrix [1][1] = focal_length;
-    perspective_matrix.matrix [2][2] = (far_plane + near_plane) / (near_plane - far_plane);
-    //3 ^ 3 handling of Z - Translations is suboptimal
-    //Counter by simply scaling size
-    return perspective_matrix;
-}
 #endif //math3D_h
