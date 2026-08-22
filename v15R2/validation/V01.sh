@@ -2,7 +2,7 @@
 # V-01: Build with AddressSanitizer + UndefinedBehaviorSanitizer.
 # The F5/F6/F7/F8/F10 torture run itself needs the GUI (manual).
 set -uo pipefail
-SRC="v15R1/src"
+SRC="v15R2/src"
 [[ -d "$SRC" ]] || { echo "ERROR: $SRC not found." >&2; exit 1; }
 
 echo "=== V-01: Sanitizer build (ASan + UBSan) ==="

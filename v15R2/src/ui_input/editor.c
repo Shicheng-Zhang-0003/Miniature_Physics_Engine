@@ -7,13 +7,11 @@ static void editor_reacquire_mouse (GtkWidget *parent_window) {
 }
 
 static rigidbody *editor_selected_object_or_null (void) {
-    /* A3_PATCH_25_DIALOG_SAFETY */
     if ((selected_object < 0) || (selected_object >= object_count)) {return NULL;}
     return &obj_per_scene [selected_object];
 }
 
 void editor_update_menus (GtkWidget *parent_window) {
-    /* A3_PATCH_24_MENU_STATE_MACHINE */
     if ((selected_object < 0) || (selected_object >= object_count)) {
         if (main_inputs.object_menu_level > 0) {main_inputs.object_menu_level = 0;}
     }

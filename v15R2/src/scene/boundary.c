@@ -2,7 +2,6 @@
 #include "boundary.h"
 #include <math.h>
 
-/* A3_PATCH_18_BOUNDARY_FLOOR_EMERGENCY */
 /* MPE_TASK_08_FLOOR_EMERGENCY_TUNING_BEGIN */
 /* MPE_TASK_08_FLOOR_EMERGENCY_TUNING_END */
 // Helper: Get lowest point of OBB along an axis

@@ -4,7 +4,6 @@
 #include "../core/math4_special.h"
 #include "../core/rigidbody.h"
 
-/* A3_PATCH_34_UNIFY_JOINT_CONSTANTS */
 #ifndef mpe_max_joints
 #define mpe_max_joints 1024
 #endif
@@ -26,7 +25,6 @@ int add_joint (int object_index_a, int object_index_b, float equilibrium_length,
 void remove_joint (int joint_pool_index);
 void apply_force_all_joints (void);
 void remove_joints_from_object (int object_index);
-void adjust_joints_after_deletion (int deleted_object_index);
 void spring_joint_render (GLuint shader_program, math4 view_matrix, math4 projection_matrix);
 void joint_init_pool (void);
 

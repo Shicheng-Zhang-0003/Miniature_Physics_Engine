@@ -1,6 +1,6 @@
-# MPE v15R1 Release Policy
+# MPE v15R2 Release Policy
 
-This tree is in **v15R1 development**.
+This tree is in **v15R2 development**.
 
 ## Cycle Goal
 
@@ -15,7 +15,7 @@ This release candidate covers:
 
 ## Change Classes Accepted
 
-During v15R1 development:
+During v15R2 development:
 
 1. Configuration system implementation (Tasks 24–41).
 2. Correctness fixes required by the config migration.
@@ -34,7 +34,7 @@ During v15R1 development:
 
 ## Release Goal
 
-`v15R1` may be tagged when:
+`v15R2` may be tagged when:
 - all MPE_TASK_24 through MPE_TASK_41 are complete,
 - all P0 gates pass,
 - the config system round-trips (save → restart → load),

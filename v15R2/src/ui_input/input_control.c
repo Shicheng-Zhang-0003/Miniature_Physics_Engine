@@ -8,7 +8,7 @@
 extern camera main_camera_fov;
 extern input_status main_inputs;
 extern int selected_object;
-void initialise_input (input_status *input_state) {
+void initialize_input (input_status *input_state) {
     //Keyboard
     input_state -> w_key_pressed = false;
     input_state -> a_key_pressed = false;
@@ -36,9 +36,6 @@ input_state -> t_key_pressed = false;
     input_state -> menu_4_pressed = false;
     input_state -> menu_5_pressed = false;
     input_state -> menu_6_pressed = false; /* MPE_TASK_35_FOCUS */
-    input_state -> menu_4_pressed = false;
-    input_state -> menu_5_pressed = false;
-    input_state -> menu_6_pressed = false; /* MPE_TASK_35 */
     //Spawn
     input_state -> spawner_menu_level = 0;
     input_state -> velocity_menu_level = 0;
@@ -120,7 +117,7 @@ else {config_menu_level_force_open ();}
 }
 /* MPE_TASK_35_CONFIG_MENU_KEY_END */
     /* MPE_TASK_18_TERMINAL_KEY_BEGIN */
-if ((event -> keyval == GDK_KEY_1) && (!config_menu_is_open ()) && (!config_menu_is_open ()) &&
+if ((event -> keyval == GDK_KEY_1) && (!config_menu_is_open ()) &&
 (input_state -> is_debug_mode_active) &&
 (!input_state -> is_menu_open) &&
 (input_state -> spawner_menu_level == 0) &&
@@ -349,7 +346,6 @@ input_state -> debug_terminal_pressed = false;
 /* MPE_TASK_22_ENTER_SPAWN_FOCUS_BEGIN */
 input_state -> enter_spawn_held = false;
 /* MPE_TASK_22_ENTER_SPAWN_FOCUS_END */
-/* A3_PATCH_02_FOCUS_LOSS */
     input_state -> mouse_delta_x = 0.0f;
     input_state -> mouse_delta_y = 0.0f;
     input_state -> left_mouse_button_clicked = false;

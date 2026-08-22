@@ -5,7 +5,6 @@
 #include <epoxy/gl_generated.h>
 extern mesh sphere_mesh;
 extern mesh cube_mesh;
-/* A3_PATCH_27_UNIFORM_CACHE */
 static GLuint a3_wire_cached_program = 0;
 static GLint a3_wire_uniform_viewframe = -1;
 static GLint a3_wire_uniform_projection = -1;
@@ -22,7 +21,6 @@ static void a3_wire_cache_uniforms (GLuint shader_program) {
     a3_wire_uniform_object_colour = glGetUniformLocation (shader_program, "object_colour");
 }
 
-/* A3_PATCH_30_MISSING_UNIFORMS */
 static GLint a3_wire_uniform_normal_matrix = -1;
 static GLint a3_wire_uniform_camera_position = -1;
 static GLint a3_wire_uniform_light_position = -1;
@@ -71,7 +69,6 @@ void wireframe_render_object (GLuint shader_program, math4 view_matrix, math4 pr
     math4_to_flat_array (model_matrix, model_matrix_flat_array);
     glUniform3f (a3_wire_uniform_object_colour, wireframe_colour.x, wireframe_colour.y, wireframe_colour.z);
     glUniformMatrix4fv (a3_wire_uniform_model, 1, GL_FALSE, model_matrix_flat_array);
-    /* A3_PATCH_30_MISSING_UNIFORMS */
     math3 a3_wire_normal_matrix = math3_identity ();
     float a3_wire_normal_matrix_flat [9];
 
