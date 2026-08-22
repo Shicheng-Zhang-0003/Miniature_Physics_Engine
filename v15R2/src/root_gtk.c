@@ -2,7 +2,6 @@
 #include "mpe_engine.h"
 camera main_camera_fov;
 input_status main_inputs;
-/* A3_PATCH_42_CRITICAL_LIFECYCLE */
 static guint physics_timeout_id = 0;
 
 static void on_main_window_destroy (GtkWidget *widget, gpointer user_data) {
@@ -29,7 +28,6 @@ static gboolean on_rendered (GtkGLArea *gl_area_widget, GdkGLContext *gl_context
     int screen_scale_factor = gtk_widget_get_scale_factor (GTK_WIDGET (gl_area_widget));
     int widget_width = gtk_widget_get_allocated_width (GTK_WIDGET (gl_area_widget)) * screen_scale_factor;
     int widget_height = gtk_widget_get_allocated_height (GTK_WIDGET (gl_area_widget)) * screen_scale_factor;
-/* A3_PATCH_42_CRITICAL_LIFECYCLE */
 if ((widget_width <= 0) || (widget_height <= 0)) {return TRUE;}
     render_scene_current (widget_width, widget_height);
     return TRUE;
@@ -49,7 +47,7 @@ event_log_init (); /* MPE_TASK_V15R2_EVENT_LOG_INIT */
 printf ("MPE %s\n", a3_version_string); /* A3_PATCH_41_FINAL_VALIDATION */
     //Camera Init
     initialize_camera (&main_camera_fov, (vector3) {0.0f, 20.0f, 50.0f});
-    initialise_input (&main_inputs);
+    initialize_input (&main_inputs);
     //Widgeting
     GtkWidget *main_window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
     g_signal_connect (main_window, "destroy", G_CALLBACK (on_main_window_destroy), NULL);
@@ -88,10 +86,4 @@ printf ("MPE %s\n", a3_version_string); /* A3_PATCH_41_FINAL_VALIDATION */
 } int main (int argc, char *argv []) {
     main_algorithm (argc, argv);
     return 0;
-} //How to Pass Camera FOV View to GPU
-// Inside render loop
-//float view_matrix [16];
-//camera_get_view_matrix (&my_camera, view_matrix);
-// Send it to shader unit
-//GLuint viewLoc = glGetUniformLocation (shader_program, "view");
-//glUniformMatrix4fv (viewLoc, 1, GL_FALSE, view_matrix);
+}

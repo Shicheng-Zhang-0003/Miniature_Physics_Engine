@@ -105,7 +105,7 @@ static mpe_param s_registry[] = {
      p_float, cat_solver, &g_cfg.solver.max_separation_bias,
      5.0, 0.5, 50.0, true},
 
-    {"solver.restitution_velocity_thresh", "Restitution Velocity Threshold", "Approach speed below which bounce is suppressed (m/s)",
+    {"solver.restitution_velocity_thresh", "Restitution Velocity Threshold", "Approach speed below which bounce is suppressed (negative = approaching, m/s)",
      p_float, cat_solver, &g_cfg.solver.restitution_velocity_thresh,
      -1.5, -10.0, 0.0, true},
 

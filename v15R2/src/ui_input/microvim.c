@@ -404,6 +404,7 @@ static void mv_insert_char (char c) {
 int row = mv.cursor_row;
 int col = mv.cursor_col;
 int len = mv_line_len (row);
+    if (len >= mv_max_line_len - 1) {return;} /* FIX_039: prevent overflow */
 char *line = mv.lines [row];
 char *new_line = (char *) malloc ((size_t)(len + 2));
 memcpy (new_line, line, (size_t) col);

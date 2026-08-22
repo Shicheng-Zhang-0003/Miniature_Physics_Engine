@@ -17,7 +17,6 @@ int scene_loading (const char *file_source_path) {
     if ((!read_int (f, &count)) || (count < 0)) { fclose (f); return 0; }
     scene_clear ();
     contact_cache_clear (); /* A3_PATCH_22_SCENE_LOAD_RESET */
-    /* A3_PATCH_23_POOL_CONSISTENCY */
 if (count > mpe_max_bodies) {count = mpe_max_bodies;}
 
 if (!scene_ensure_pool_capacity (count)) {
@@ -54,13 +53,11 @@ for (int i = 0; i < count; i++) {
         obj_per_scene [i].friction_static = temp.friction_static;
         obj_per_scene [i].friction_kinetic = temp.friction_kinetic;
         obj_per_scene [i].static_state = temp.static_state;
-        /* A3_PATCH_43_NAN_STATIC_HARDENING */
 if (obj_per_scene [i].static_state) {rigidbody_set_static (&obj_per_scene [i], true);}
 else {rigidbody_set_static (&obj_per_scene [i], false);}
 rigidbody_sanitize (&obj_per_scene [i]);
         rigidbody_update_axes (&obj_per_scene [i]);
 rigidbody_sanitize (&obj_per_scene [i]); /* A3_PATCH_47_NAN_SANITIZATION */
-        /* A3_PATCH_06_STABLE_IDS_LOAD */
         obj_per_scene [i].object_id = scene_allocate_object_id ();
         obj_per_scene [i].object_generation = 1;
     loaded_count++;

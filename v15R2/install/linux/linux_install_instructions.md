@@ -36,9 +36,9 @@ To Check if dependency libraries are actually detected:
     To check dependency resolution
 
 After dependencies have been installed:
-    git clone https://github.com/shicheng-zhang/physics-engine.git --> This gets the actual source code.
+    git clone <repository-url> --> This gets the actual source code.
     Go to the src/ folder --> where all of the main code is actually stored.
-    Run ./compile
+    Run make
         - This makes a new compilation of the source code run using your system's specifications.
         - Especially now that I have added -O3 into compilation flags.
         - Usually nothing, but for older systems gcc optimisations may be in consideration

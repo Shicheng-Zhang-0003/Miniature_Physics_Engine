@@ -66,6 +66,7 @@ term_capturing = false;
 static char term_alias_names [term_alias_max][term_alias_name_len];
 static char term_alias_values [term_alias_max][term_alias_value_len];
 static int term_alias_count = 0;
+static gint64 term_engine_start_time = 0; /* FIX_029 */
 static bool term_sudo_active = false;
 /* MPE_TASK_V15R2_PHASE7_ALIAS_STORAGE_END */
 
@@ -1353,10 +1354,8 @@ cfg_ok ? "ok" : "FAILED", scene_ok ? "ok" : "FAILED");
 }
 static void cmd_uptime (int argc, char **argv) {
 (void) argc; (void) argv;
-static gint64 a3_term_start_time = 0;
-if (a3_term_start_time == 0) {a3_term_start_time = g_get_monotonic_time ();}
 gint64 now = g_get_monotonic_time ();
-double elapsed = (double) (now - a3_term_start_time) / 1000000.0;
+double elapsed = (double) (now - term_engine_start_time) / 1000000.0;
 int hours = (int) (elapsed / 3600.0);
 int minutes = (int) (fmod (elapsed, 3600.0) / 60.0);
 int seconds = (int) fmod (elapsed, 60.0);
@@ -2245,6 +2244,7 @@ if (has_error) {
 error_count++;
 if (auto_fix) {
 rigidbody_sanitize (rb);
+                            rigidbody_wake (rb); /* FIX_032 */
 term_printf ("term_ok", "  /obj/%d: sanitized\n", object_index);
 }
 }
@@ -2563,6 +2563,7 @@ static void cmd_su (int argc, char **argv) {
 (void) argc; (void) argv;
 main_inputs.is_debug_mode_active = !main_inputs.is_debug_mode_active;
 debug_terminal_sync_mode ();
+    if (term_engine_start_time == 0) { term_engine_start_time = g_get_monotonic_time (); } /* FIX_029 */
 if (main_inputs.is_debug_mode_active) {
 term_ok ("Switched to debug mode.\n");
 } else {
@@ -2891,6 +2892,7 @@ terminal_output_buffer = NULL;
 terminal_entry = NULL;
 terminal_prompt_label = NULL;
 term_history_cursor = -1;
+    term_capture_reset (); /* FIX_030: free capture buffer on close */
 }
 /* ------------------------------------------------------------------ */
 /* Public interface                                                    */
@@ -2980,6 +2982,7 @@ main_inputs.is_mouse_locked = false;
 gtk_widget_show_all (terminal_window);
 term_update_prompt ();
 debug_terminal_sync_mode ();
+    if (term_engine_start_time == 0) { term_engine_start_time = g_get_monotonic_time (); } /* FIX_029 */
 term_printf ("term_echo", "MPE POSIX Debug Terminal %s\n", a3_version_string);
 term_out ("Virtual root: /obj /joint /world /camera /spawner\n");
 term_dim ("Type 'help' or 'man <command>'. Ctrl+L clears. Esc closes.\n");
