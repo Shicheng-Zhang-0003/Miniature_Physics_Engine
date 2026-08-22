@@ -24,7 +24,7 @@ fi
 echo ""
 echo "=== MANUAL STEP: torture test under sanitizers ==="
 echo "  cd $SRC && ./engine"
-echo "  Press F5, F6, F7, F8, F10 and exercise normal use."
+echo "  Press F5, F6, F7, F8, F10, and F11, then exercise normal use."
 echo "  ASan/UBSan reports print to stderr the moment they fire."
 echo "Pass criterion: no severe sanitizer errors."
 echo "NOTE: this leaves a sanitizer binary; rerun V-02 to rebuild normal."

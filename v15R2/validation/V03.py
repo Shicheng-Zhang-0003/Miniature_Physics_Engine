@@ -12,9 +12,10 @@ GATES = [
     ("7. Physics Stability", "Rest without jitter; cubes stack; sphere/cube collide; restitution; friction; sleep/wake; no NaNs."),
     ("8. Broadphase/Solver Visibility", "Node/pair/manifold overflow visible; dedupe exhaustion visible; counters in overlay/report."),
     ("9. Validation Tests", "F5/F6/F7/F8/F9 pass; engine idles minutes without explosion."),
-    ("10. Documentation", "README + user guide + checklist match code; broadphase + timestep descriptions accurate."),
-    ("11. Repository Hygiene", "No tracked build artifacts; .gitignore exists; duplicate docs clarified."),
-    ("12. Sanitizer/Debug Validation", "ASan + UBSan builds available; normal validation passes under them; no severe errors."),
+    ("10. Configuration System", "Menu and terminal edit live parameters; save/load/reset round-trip; bounds and debug-only controls work."),
+    ("11. Documentation", "README + user guide + checklist match code; broadphase + timestep descriptions accurate."),
+    ("12. Repository Hygiene", "No tracked build artifacts; .gitignore exists; duplicate docs clarified."),
+    ("13. Sanitizer/Debug Validation", "ASan + UBSan builds available; normal validation passes under them; no severe errors."),
 ]
 
 def main():
@@ -31,10 +32,10 @@ def main():
             print("    Enter p, f, or s.")
 
     stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    log = os.path.join("v15R1", "v03_gate_validation.log")
+    log = os.path.join("v15R2", "v03_gate_validation.log")
     fails = [r for r in results if r[1] == "FAIL"]
     with open(log, "w") as f:
-        f.write(f"MPE v15R1 P0 Gate Validation - {stamp}\n\n")
+        f.write(f"MPE v15R2 P0 Gate Validation - {stamp}\n\n")
         for name, status in results:
             f.write(f"[{status}] {name}\n")
         f.write(f"\nResult: {'ALL P0 PASS' if not fails else f'{len(fails)} GATE(S) FAILED'}\n")
@@ -44,10 +45,10 @@ def main():
         print(f"  [{status}] {name}")
     print()
     if fails:
-        print(f"RESULT: {len(fails)} gate(s) FAILED. Do NOT tag v15R1.")
+        print(f"RESULT: {len(fails)} gate(s) FAILED. Do NOT tag v15R2.")
         print("Fix the failures, rerun validation, then re-evaluate.")
     else:
-        print("RESULT: ALL P0 GATES PASS. Proceed to V-05 release prep.")
+        print("RESULT: ALL P0 GATES PASS. Release preparation may proceed.")
     print(f"\nLog written to {log}")
 
 if __name__ == "__main__":
