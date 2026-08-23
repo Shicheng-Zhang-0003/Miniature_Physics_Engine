@@ -12,6 +12,7 @@
 #include "core/math4_special.h"
 #include "core/rigidbody.h"
 #include "core/frame_timer.h"
+#include "core/physics_world.h"
 #include "core/event_log.h" /* MPE_TASK_V15R2 */
 
 #include "physics/collision_mechanics.h"

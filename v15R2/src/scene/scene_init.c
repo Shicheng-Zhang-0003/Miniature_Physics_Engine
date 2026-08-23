@@ -520,6 +520,15 @@ void scene_spawn_config_torture_test (void) {
             *(bool *) p -> storage = (rand () % 2) != 0;
         }
     }
+    if (g_cfg.world.gravity > -1.0f) {
+        g_cfg.world.gravity = -1.0f - ((float) rand () / (float) RAND_MAX) * 20.0f;
+    }
+    if (g_cfg.solver.penetration_slop > 0.02f) { g_cfg.solver.penetration_slop = 0.010f; }
+    if (g_cfg.depenetration.penetration_slop > 0.02f) { g_cfg.depenetration.penetration_slop = 0.005f; }
+    if (g_cfg.solver.bias_factor < 0.05f) { g_cfg.solver.bias_factor = 0.10f; }
+    if (g_cfg.depenetration.correction_factor < 0.1f) { g_cfg.depenetration.correction_factor = 0.35f; }
+    if (g_cfg.sleep.linear_thresh_sq > 0.01f) { g_cfg.sleep.linear_thresh_sq = 0.0025f; }
+    if (g_cfg.sleep.angular_thresh_sq > 0.01f) { g_cfg.sleep.angular_thresh_sq = 0.0001f; }
     /* Spawn the standard long-run validation scene */
     scene_spawn_long_run_validation ();
     printf ("[A3] Config torture: tunables randomized to extreme values\n");

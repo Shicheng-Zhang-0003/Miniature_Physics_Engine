@@ -1,7 +1,6 @@
 #include "../mpe_engine.h"
 #include "rigidbody.h"
 // Helper to update axes from orientation
-/* A3_PATCH_47_NAN_SANITIZATION */
 static bool a3_vector3_is_finite (vector3 v) {
     return isfinite (v.x) && isfinite (v.y) && isfinite (v.z);
 }
@@ -267,66 +266,7 @@ float rb_get_kinetic_energy (rigidbody *rigid_body) {
     float rotational_kinetic_energy = 0.5f * vector3_dot (rigid_body -> angular_velocity, angular_momemtum);
     return linear_kinetic_energy + rotational_kinetic_energy;
 } //Integration Segmentation (Movement Compute)
-void rb_integrate (rigidbody *rigid_body, float delta_time, float linear_damping, float angular_damping) {
-    if ((rigid_body -> static_state) || (delta_time <= 0.0f)) {return;}
-    if (rigid_body -> is_sleeping) {return;}
-
-    // Safety Clamp: Prevent infinite energy explosions in deep piles
-    float max_linear_speed = g_cfg.timestep.max_linear_speed; /* MPE_TASK_30 */
-    float current_speed_sq = vector3_length_squared (rigid_body -> velocity);
-    if (current_speed_sq > max_linear_speed * max_linear_speed) {
-        rigid_body -> velocity = vector3_scaling (vector3_normalisation (rigid_body -> velocity), max_linear_speed);
-    }
-    float max_angular_speed = g_cfg.timestep.max_angular_speed; /* MPE_TASK_30 */
-    float current_ang_speed_sq = vector3_length_squared (rigid_body -> angular_velocity);
-    if (current_ang_speed_sq > max_angular_speed * max_angular_speed) {
-        rigid_body -> angular_velocity = vector3_scaling (vector3_normalisation (rigid_body -> angular_velocity), max_angular_speed);
-    }
-
-    float speed_sq = vector3_length_squared (rigid_body -> velocity);
-    float ang_speed_sq = vector3_length_squared (rigid_body -> angular_velocity);
-    if (speed_sq < g_cfg.sleep.linear_thresh_sq && ang_speed_sq < g_cfg.sleep.angular_thresh_sq) {
-        rigid_body -> sleep_timer += delta_time;
-        if (rigid_body -> sleep_timer > g_cfg.sleep.timer_duration) {rigid_body -> is_sleeping = true;}
-    } else {rigid_body -> sleep_timer = 0.0f;}
-    //Update inverse inertia tensor based on current orientation before using it
-    //inverse_inertia_system = rotational * inverse_inertia_local * transposed value in 4D rotational axis
-    math3 rotation_matrix_current = vector4_to_math3 (rigid_body -> orientation); //W axis orientation of rotation
-    math3 rotation_matrix_transposed = math3_transposition (rotation_matrix_current);
-    rigid_body -> inverse_inertia_system = math3_multiplication (rotation_matrix_current, math3_multiplication (rigid_body -> inverse_inertia_tensor_local, rotation_matrix_transposed));
-    //Calculate Linear Acceleration (F = ma, a = Fm ^ -1)
-    rigid_body -> acceleration = vector3_scaling (rigid_body -> force_accumulator, rigid_body -> inverse_mass); //Multiply Force by inverse of mass
-    //Calculate Instantaneous Velocity
-    rigid_body -> velocity = vector3_addition (rigid_body -> velocity, vector3_scaling (rigid_body -> acceleration, delta_time)); //Add currenty velocity to delta v
-    //Air resistance increased slightly for stability
-    rigid_body -> velocity = vector3_scaling (rigid_body -> velocity, linear_damping);
-    // Sleep Threshold, eliminates tiny jitters
-    if (vector3_length_squared (rigid_body -> velocity) < 0.00005f) {rigid_body -> velocity = vector3_zero ();}
-    //Calculate Position Standard
-    rigid_body -> position = vector3_addition (rigid_body -> position, vector3_scaling (rigid_body -> velocity, delta_time)); //Add current position to delta d
-    //Update Angular Acceleration Standard
-    rigid_body -> angular_acceleration = math3_multiplication_vector3 (rigid_body -> inverse_inertia_system, rigid_body -> torque_accumulator);
-    //Update Standard Angular Velocity
-    rigid_body -> angular_velocity = vector3_addition (rigid_body -> angular_velocity, vector3_scaling (rigid_body -> angular_acceleration, delta_time)); //Sum of current angular velocity by delta angular velocity
-    //Angular Damping - High damping helps objects settle
-    rigid_body -> angular_velocity = vector3_scaling (rigid_body -> angular_velocity, angular_damping);
-    if (vector3_length_squared (rigid_body -> angular_velocity) < 0.0001f) {rigid_body -> angular_velocity = vector3_zero ();}
-    //Update General Orientation (4D)
-    //delta_q = [0, w-axis_values] * q * 0.5f * dt
-    vector4 angular_velocity_quaternion = {0, rigid_body -> angular_velocity.x, rigid_body -> angular_velocity.y, rigid_body -> angular_velocity.z}; //Start with no w axis definition
-    vector4 orientation_change_delta = vector4_multiplication (angular_velocity_quaternion, rigid_body -> orientation); //Orientation = W-Axis value
-    //Set Orientation individually
-    rigid_body -> orientation.w += orientation_change_delta.w * 0.5f * delta_time;
-    rigid_body -> orientation.x += orientation_change_delta.x * 0.5f * delta_time;
-    rigid_body -> orientation.y += orientation_change_delta.y * 0.5f * delta_time;
-    rigid_body -> orientation.z += orientation_change_delta.z * 0.5f * delta_time;
-    rigid_body -> orientation = vector4_normalisation (rigid_body -> orientation);
-    //Clear accumulators of force and torque for next implementation
-    rigid_body -> force_accumulator = vector3_zero ();
-    rigid_body -> torque_accumulator = vector3_zero ();
-    rigidbody_update_axes (rigid_body);
-} void rb_integrate_velocity (rigidbody *rigid_body, float delta_time, float linear_damping, float angular_damping) {
-    /* A3_PATCH_44_SEMI_IMPLICIT */
+void rb_integrate_velocity (rigidbody *rigid_body, float delta_time, float linear_damping, float angular_damping) {
     if ((rigid_body -> static_state) || (delta_time <= 0.0f)) {return;}
     if (rigid_body -> is_sleeping) {return;}
 
@@ -379,7 +319,6 @@ rigid_body -> velocity = vector3_scaling (rigid_body -> velocity, nice_factor);
 }
 
 void rb_integrate_position (rigidbody *rigid_body, float delta_time) {
-    /* A3_PATCH_44_SEMI_IMPLICIT */
     if ((rigid_body -> static_state) || (delta_time <= 0.0f)) {return;}
     if (rigid_body -> is_sleeping) {return;}
 
@@ -463,7 +402,6 @@ rigid_body -> friction_static = 0.4f;
     }
 }
 
-/* A3_PATCH_43_NAN_STATIC_HARDENING */
 
 
 

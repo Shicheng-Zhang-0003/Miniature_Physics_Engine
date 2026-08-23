@@ -20,7 +20,7 @@ if [[ ! -f "$TARGET_C" ]]; then
 fi
 
 # Check if the function still exists
-if ! grep -q 'void rb_integrate (rigidbody \*rigid_body, float delta_time' "$TARGET_C"; then
+if ! grep -q '^void rb_integrate (' "$TARGET_C"; then
     echo "[SKIP] rb_integrate already removed"
     exit 0
 fi
