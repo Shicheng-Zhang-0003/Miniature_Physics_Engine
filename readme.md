@@ -4,7 +4,7 @@
 > **Current development tree:** `v15R2` continues the v15 configuration-system work. It is not a tagged stable release; use the release gates before promotion.
 <!-- MPE_RELEASE_FREEZE_NOTICE_END -->
 <!-- MPE_RELEASE_GATES_NOTICE_BEGIN -->
-> **Release quality:** the current criteria are in [`v15R2/RELEASE_GATES.md`](v15R2/RELEASE_GATES.md). The most recent release notes in this tree are [`v15R2/release_notes_v15R1.md`](v15R2/release_notes_v15R1.md).
+> **Release quality:** the current criteria are in [`v15R2/RELEASE_GATES.md`](v15R2/RELEASE_GATES.md). The current candidate notes are in [`v15R2/release_notes_v15R2.md`](v15R2/release_notes_v15R2.md); [`v15R2/release_notes_v15R1.md`](v15R2/release_notes_v15R1.md) documents the prior RC.
 <!-- MPE_RELEASE_GATES_NOTICE_END -->
 
 **License:** GPL-3.0 · **Language:** C · **UI:** GTK3 · **Renderer:** OpenGL 3.3 Core
