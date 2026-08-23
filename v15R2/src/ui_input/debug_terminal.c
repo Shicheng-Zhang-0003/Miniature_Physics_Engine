@@ -2632,6 +2632,7 @@ static const mv_editable_file mv_known_files [] = {
 {"../how_to_use.md",           "User guide / controls reference"},
 {"../RELEASE_POLICY.md",       "Release cycle rules"},
 {"../RELEASE_GATES.md",        "P0/P1/P2 gate checklist"},
+{"../release_notes_v15R2.md",  "v15R2 release candidate notes"},
 {"../release_notes_v15R1.md",  "v15R1 release notes"},
 {"../LICENSE",                 "GPL-3.0 license text"},
 {"../.gitignore",              "Git ignore rules"},
