@@ -37,7 +37,6 @@ float sleep_timer;
 /* MPE_TASK_V15R2_NICE_VALUE_BEGIN */
 int nice_value;  /* -20 to +19, default 0. Positive = extra damping. */
 /* MPE_TASK_V15R2_NICE_VALUE_END */
-    /* A3_PATCH_06_STABLE_IDS */
     uint32_t object_id;
     uint32_t object_generation;
 } rigidbody;
@@ -48,16 +47,13 @@ void rigidbody_update_inertia_cube (rigidbody *rigid_body);
 void rb_apply_forces_perfect (rigidbody *rigid_body, vector3 force_applied);
 void rb_apply_forces_localised (rigidbody *rigid_body, vector3 force_applied, vector3 locale_impact);
 float rb_get_kinetic_energy (rigidbody *rigid_body);
-void rb_integrate (rigidbody *rigid_body, float delta_time, float linear_damping, float angular_damping);
 vector3 make_half_extents (float width, float height, float depth);
 void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass);
 void rigidbody_wake (rigidbody *rigid_body);
 
-/* A3_PATCH_43_NAN_STATIC_HARDENING */
 void rigidbody_sanitize (rigidbody *rigid_body);
 void rigidbody_set_static (rigidbody *rigid_body, bool make_static);
 
-/* A3_PATCH_44_SEMI_IMPLICIT */
 void rb_integrate_velocity (rigidbody *rigid_body, float delta_time, float linear_damping, float angular_damping);
 void rb_integrate_position (rigidbody *rigid_body, float delta_time);
 #endif

@@ -34,7 +34,7 @@ static mpe_param s_registry[] = {
      * ============================================================ */
     {"world.gravity", "World Gravity", "Gravitational acceleration (m/s^2, negative = down)",
      p_float, cat_world, &g_cfg.world.gravity,
-     -9.81, -50.0, 50.0, false},
+     -9.81, -50.0, 0.0, false},
 
     {"world.drag", "Air Drag Coefficient", "Per-tick velocity retention (0.1 = heavy drag, 1.0 = none)",
      p_float, cat_world, &g_cfg.world.drag,
@@ -72,11 +72,11 @@ static mpe_param s_registry[] = {
      * ============================================================ */
     {"sleep.linear_thresh_sq", "Sleep Linear Threshold^2", "Speed^2 below which sleep timer accumulates",
      p_float, cat_sleep, &g_cfg.sleep.linear_thresh_sq,
-     0.0025, 0.0, 1.0, true},
+     0.0025, 0.0, 0.05, true},
 
     {"sleep.angular_thresh_sq", "Sleep Angular Threshold^2", "Angular speed^2 below which sleep timer accumulates",
      p_float, cat_sleep, &g_cfg.sleep.angular_thresh_sq,
-     0.0001, 0.0, 1.0, true},
+     0.0001, 0.0, 0.05, true},
 
     {"sleep.timer_duration", "Sleep Timer (s)", "Seconds below threshold before a body sleeps",
      p_float, cat_sleep, &g_cfg.sleep.timer_duration,
@@ -95,7 +95,7 @@ static mpe_param s_registry[] = {
      * ============================================================ */
     {"solver.penetration_slop", "Penetration Slop", "Allowed overlap before bias correction (m)",
      p_float, cat_solver, &g_cfg.solver.penetration_slop,
-     0.010, 0.0, 0.5, true},
+     0.010, 0.0, 0.05, true},
 
     {"solver.bias_factor", "Bias Factor", "Baumgarte positional correction aggressiveness",
      p_float, cat_solver, &g_cfg.solver.bias_factor,
@@ -134,11 +134,11 @@ static mpe_param s_registry[] = {
 
     {"depenetration.penetration_slop", "Depenetration Slop", "Overlap tolerance for depenetration pass (m)",
      p_float, cat_depenetration, &g_cfg.depenetration.penetration_slop,
-     0.005, 0.0, 0.5, true},
+     0.005, 0.0, 0.05, true},
 
     {"depenetration.wake_depth_thresh", "Wake Depth Threshold", "Overlap depth that wakes sleeping pairs (m)",
      p_float, cat_depenetration, &g_cfg.depenetration.wake_depth_thresh,
-     0.02, 0.0, 1.0, true},
+     0.02, 0.0, 0.1, true},
 
     {"depenetration.rebuild_iterations", "Rebuild Iterations", "Depenetration iterations after boundary rebuild",
      p_int, cat_depenetration, &g_cfg.depenetration.rebuild_iterations,
