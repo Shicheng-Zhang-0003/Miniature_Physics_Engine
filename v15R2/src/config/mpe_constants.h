@@ -33,7 +33,7 @@
 /* ------------------------------------------------------------------
  * CONTACT CACHE — warm-starting impulse cache
  * ------------------------------------------------------------------ */
-#define max_cached_contacts       16384
+#define max_cached_contacts       65536
 
 /* ------------------------------------------------------------------
  * DEBUG TERMINAL — history buffer dimensions

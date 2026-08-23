@@ -59,6 +59,15 @@ broadphase_large_object_clamp_count = 0;
 /* MPE_TASK_11_LARGE_OBJECT_CLAMP_RESET_END */
 }
 
+void broadphase_cleanup (void) {
+    if (node_pool) {
+        free (node_pool);
+        node_pool = NULL;
+        node_pool_capacity = 0;
+        node_count = 0;
+    }
+}
+
 /* MPE_TASK_17_CELL_SIZE_GETTER_BEGIN */
 float broadphase_get_current_cell_size (void) {
 return broadphase_current_cell_size;

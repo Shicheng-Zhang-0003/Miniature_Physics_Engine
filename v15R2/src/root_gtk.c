@@ -11,6 +11,8 @@ static void on_main_window_destroy (GtkWidget *widget, gpointer user_data) {
         g_source_remove (physics_timeout_id);
         physics_timeout_id = 0;
     }
+    render_cleanup ();
+    broadphase_cleanup ();
     gtk_main_quit ();
 }
 //On Call

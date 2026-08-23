@@ -73,6 +73,8 @@ extern frame_timer main_timer;
 /* ------------------------------------------------------------------ */
 
 void render_init (void);
+void render_cleanup (void);
+void broadphase_cleanup (void);
 void render_scene_current (int widget_width, int widget_height);
 
 /* ------------------------------------------------------------------ */

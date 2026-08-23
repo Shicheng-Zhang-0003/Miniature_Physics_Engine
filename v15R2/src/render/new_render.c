@@ -65,7 +65,13 @@ void render_init () {
     sphere_instances = malloc (mpe_max_bodies * 19 * sizeof (float));
     cube_instances = malloc (mpe_max_bodies * 19 * sizeof (float));
     render_init_status = RENDER_OK;
-} void render_scene_current (int widget_width, int widget_height) {
+}
+void render_cleanup (void) {
+    if (sphere_instances) { free (sphere_instances); sphere_instances = NULL; }
+    if (cube_instances) { free (cube_instances); cube_instances = NULL; }
+    render_init_status = RENDER_UNINITIALIZED;
+}
+void render_scene_current (int widget_width, int widget_height) {
     if (render_init_status == RENDER_FAILED) {
     glViewport (0, 0, widget_width, widget_height);
     glClearColor (0.5f, 0.0f, 0.0f, 1.0f);

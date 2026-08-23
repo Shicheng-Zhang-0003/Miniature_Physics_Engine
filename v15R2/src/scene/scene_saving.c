@@ -1,5 +1,6 @@
 #include "../mpe_engine.h"
 #include "scene_saving.h"
+#include "../physics/spring_joint.h"
 #include <stdio.h>
 #include <stdint.h>
 static void write_float (FILE *f, float v) { fwrite (&v, sizeof (float), 1, f); }
@@ -27,6 +28,21 @@ int save_scene (const char *file_destination_path) {
         write_float (f, rb -> friction_static);
         write_float (f, rb -> friction_kinetic);
         write_int (f, rb -> static_state ? 1 : 0);
-    } fclose (f);
+    }
+    int active_joints = 0;
+    for (int j = 0; j < current_joint_count; j++) {
+        if (joint_pool [j].is_active) { active_joints++; }
+    }
+    write_int (f, active_joints);
+    for (int j = 0; j < current_joint_count; j++) {
+        if (joint_pool [j].is_active) {
+            write_int (f, (int32_t) joint_pool [j].object_id_a);
+            write_int (f, (int32_t) joint_pool [j].object_id_b);
+            write_float (f, joint_pool [j].equilibrium_length);
+            write_float (f, joint_pool [j].spring_constant);
+            write_float (f, joint_pool [j].damping_coefficient);
+        }
+    }
+    fclose (f);
     return 1;
 }
