@@ -1,6 +1,7 @@
 #include "../mpe_engine.h"
 #include "scene_load.h"
 #include "scene_init.h"
+#include "../physics/spring_joint.h"
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -17,6 +18,7 @@ int scene_loading (const char *file_source_path) {
     if ((!read_int (f, &count)) || (count < 0)) { fclose (f); return 0; }
     scene_clear ();
     contact_cache_clear (); /* A3_PATCH_22_SCENE_LOAD_RESET */
+    joint_init_pool ();
 if (count > mpe_max_bodies) {count = mpe_max_bodies;}
 
 if (!scene_ensure_pool_capacity (count)) {
@@ -62,6 +64,19 @@ rigidbody_sanitize (&obj_per_scene [i]); /* A3_PATCH_47_NAN_SANITIZATION */
         obj_per_scene [i].object_generation = 1;
     loaded_count++;
 } object_count = loaded_count; /* A3_PATCH_42_CRITICAL_LIFECYCLE */
+    int32_t active_joints = 0;
+    if (read_int (f, &active_joints) && (active_joints > 0)) {
+        for (int j = 0; j < active_joints; j++) {
+            int32_t id_a, id_b;
+            float eq, k, c;
+            if (!read_int (f, &id_a)) break;
+            if (!read_int (f, &id_b)) break;
+            if (!read_float (f, &eq)) break;
+            if (!read_float (f, &k)) break;
+            if (!read_float (f, &c)) break;
+            add_joint_by_ids ((uint32_t) id_a, (uint32_t) id_b, eq, k, c);
+        }
+    }
     fclose (f);
     return 1;
 }

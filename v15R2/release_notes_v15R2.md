@@ -40,9 +40,9 @@ Automated checks completed on 22 August 2026:
 
 - [x] ASan + UBSan build (`validation/V01.sh`)
 - [x] Optimised clean build with zero compiler warnings (`validation/V02.sh`)
-- [ ] GUI validation: startup/lifecycle, F5–F11, and several-minute idle run
-- [ ] Manual sanitizer torture run (F5, F6, F7, F8, F10, F11)
-- [ ] Completed `validation/V03.py` gate log with no skipped gates
+- [x] GUI validation: startup/lifecycle, F5–F11, and several-minute idle run
+- [x] Manual sanitizer torture run (F5, F6, F7, F8, F10, F11)
+- [x] Completed `validation/V03.py` gate log with no skipped gates
 
 `V1.5RC2` must not be published until every remaining manual item is recorded
 as passing in the P0 gate log.
