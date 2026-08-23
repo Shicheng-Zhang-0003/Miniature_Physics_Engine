@@ -18,6 +18,7 @@ int broadphase_get_large_object_clamp_count (void);
 int broadphase_get_pair_dedupe_overflow_count (void);
 /* MPE_TASK_10_PAIR_DEDUPE_HEADER_END */
 void broadphase_reset_overflow_counts (void);
+void broadphase_cleanup (void);
 /* MPE_TASK_17_CELL_SIZE_HEADER_BEGIN */
 float broadphase_get_current_cell_size (void);
 /* MPE_TASK_17_CELL_SIZE_HEADER_END */
