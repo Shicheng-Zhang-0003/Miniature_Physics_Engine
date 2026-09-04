@@ -12,6 +12,7 @@
 *.exe
 engine
 build/
+.fixes_generation_1/
 
 # ============ Fix-script backups ============
 # Every fix script creates .pre_NNN backups before mutating

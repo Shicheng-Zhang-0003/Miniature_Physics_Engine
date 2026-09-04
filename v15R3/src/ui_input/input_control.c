@@ -259,6 +259,8 @@ if ((event -> keyval == GDK_KEY_t) || (event -> keyval == GDK_KEY_T)) {input_sta
     if (event -> keyval == GDK_KEY_v) {input_state -> v_key_pressed = false;}
     if (event -> keyval == GDK_KEY_b) {input_state -> b_key_pressed = false;}
     if (event -> keyval == GDK_KEY_n) {input_state -> n_key_pressed = false;} /* MFS_124_FIX */
+    if (event -> keyval == GDK_KEY_space) {input_state -> space_key_pressed = false;} /* MFS_154 */
+    if (event -> keyval == GDK_KEY_Shift_L) {input_state -> shift_key_pressed = false;} /* MFS_154 */
 /* MPE_TASK_22_ENTER_SPAWN_KEYRELEASE_BEGIN */
 if ((event -> keyval == GDK_KEY_Return) || (event -> keyval == GDK_KEY_KP_Enter)) {
 input_state -> enter_spawn_held = false;
