@@ -13,9 +13,9 @@
 #   from the IK and apply it directly in drivetrain_update.
 #
 # Phase:   phase2_robotics
-# Files:   v15R2/src/robotics/robot.h (add mecanum fields)
-#          v15R2/src/robotics/drivetrain.c (fix syntax + set forces)
-#          v15R2/src/robotics/robot.c (init new fields)
+# Files:   v15R3/src/robotics/robot.h (add mecanum fields)
+#          v15R3/src/robotics/drivetrain.c (fix syntax + set forces)
+#          v15R3/src/robotics/robot.c (init new fields)
 # Depends: 075, 076
 # Risk:    medium (three targeted edits)
 # ============================================================
@@ -23,9 +23,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-ROBOT_H="v15R2/src/robotics/robot.h"
-DRIVETRAIN_C="v15R2/src/robotics/drivetrain.c"
-ROBOT_C="v15R2/src/robotics/robot.c"
+ROBOT_H="v15R3/src/robotics/robot.h"
+DRIVETRAIN_C="v15R3/src/robotics/drivetrain.c"
+ROBOT_C="v15R3/src/robotics/robot.c"
 
 for f in "$ROBOT_H" "$DRIVETRAIN_C" "$ROBOT_C"; do
     [[ -f "$f" ]] || { echo "[SKIP] $f not found"; exit 0; }
@@ -171,7 +171,7 @@ fi
 # ============================================================
 # STEP 4: Rebuild and run the mecanum test
 # ============================================================
-cd v15R2/src
+cd v15R3/src
 if make test_mecanum_drive > /tmp/mecanum_test_082.log 2>&1; then
     tail -6 /tmp/mecanum_test_082.log
     echo "[PASS] 082: mecanum syntax fixed + chassis forces applied; test passes"

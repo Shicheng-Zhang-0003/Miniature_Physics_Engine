@@ -6,8 +6,8 @@
 #   Axle convention: local X axis (matches robot.c axle_axis_x = 1.0)
 #
 # Phase:   phase3_sensors (cylinder keystone)
-# Files:   v15R2/src/core/rigidbody.h
-#          v15R2/src/core/physics_world.h
+# Files:   v15R3/src/core/rigidbody.h
+#          v15R3/src/core/physics_world.h
 # Depends: 082 (indentation)
 # Risk:    low (additive header changes)
 # ============================================================
@@ -15,8 +15,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-RB_H="v15R2/src/core/rigidbody.h"
-PW_H="v15R2/src/core/physics_world.h"
+RB_H="v15R3/src/core/rigidbody.h"
+PW_H="v15R3/src/core/physics_world.h"
 
 for f in "$RB_H" "$PW_H"; do
     [[ -f "$f" ]] || { echo "[SKIP] $f not found"; exit 0; }

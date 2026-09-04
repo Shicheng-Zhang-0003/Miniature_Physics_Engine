@@ -3,14 +3,14 @@
 # FIX 074 — FTC Phase 2: tank drivetrain
 #   Maps left/right power (-1..1) to wheel motor commands.
 # Phase:   phase2_robotics
-# Files:   v15R2/src/robotics/drivetrain.h, drivetrain.c (new)
+# Files:   v15R3/src/robotics/drivetrain.h, drivetrain.c (new)
 # Depends: 073
 # Risk:    low (new files only)
 # ============================================================
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
-DIR="v15R2/src/robotics"
+DIR="v15R3/src/robotics"
 H="$DIR/drivetrain.h"
 C="$DIR/drivetrain.c"
 grep -q 'MPE_FTC_074' "$C" 2>/dev/null && { echo "[SKIP] drivetrain already present"; exit 0; }

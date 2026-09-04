@@ -7,14 +7,14 @@
 #   mecanum strafe is achieved by applying forces directly to the
 #   chassis based on the IK, not through wheel friction.
 # Phase:   phase2_robotics
-# Files:   v15R2/src/robotics/drivetrain.c (replace mecanum stub)
+# Files:   v15R3/src/robotics/drivetrain.c (replace mecanum stub)
 # Depends: 074, 076
 # Risk:    medium (rewrites drivetrain_mecanum function)
 # ============================================================
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
-TARGET="v15R2/src/robotics/drivetrain.c"
+TARGET="v15R3/src/robotics/drivetrain.c"
 [[ -f "$TARGET" ]] || { echo "[SKIP] drivetrain.c not found"; exit 0; }
 grep -q 'MPE_FTC_075' "$TARGET" && { echo "[SKIP] mecanum already implemented"; exit 0; }
 cp "$TARGET" "${TARGET}.pre_075"

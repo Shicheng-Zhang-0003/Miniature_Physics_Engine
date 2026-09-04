@@ -2,7 +2,7 @@
 # ============================================================
 # FIX 018 — DOC-007: change ./compile to make in install docs
 # Phase:   phase0_trivial
-# Files:   v15R2/install/linux/linux_install_instructions.md
+# Files:   v15R3/install/linux/linux_install_instructions.md
 # Depends: 017
 # Risk:    low
 # ============================================================
@@ -11,7 +11,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-TARGET="v15R2/install/linux/linux_install_instructions.md"
+TARGET="v15R3/install/linux/linux_install_instructions.md"
 
 if [[ ! -f "$TARGET" ]]; then
     echo "[SKIP] $TARGET not found"

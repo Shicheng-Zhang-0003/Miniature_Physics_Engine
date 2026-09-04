@@ -20,8 +20,8 @@
 #            converting spin into translation.
 #
 # Phase:   phase3_sensors
-# Files:   v15R2/src/tests/driven_wheel_test.c
-#          v15R2/src/makefile
+# Files:   v15R3/src/tests/driven_wheel_test.c
+#          v15R3/src/makefile
 # Depends: 093
 # Risk:    low, test-only
 # ============================================================
@@ -30,7 +30,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-SRC="v15R2/src"
+SRC="v15R3/src"
 TEST="$SRC/tests/driven_wheel_test.c"
 MAKEFILE="$SRC/makefile"
 

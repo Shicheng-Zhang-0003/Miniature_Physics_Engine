@@ -4,7 +4,7 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
 python3 -c "
-path = 'v15R2/src/ui_input/simulation_input_dispatch.c'
+path = 'v15R3/src/ui_input/simulation_input_dispatch.c'
 with open(path, 'r') as f: content = f.read()
 
 # Remove 't' terminal block

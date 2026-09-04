@@ -7,7 +7,7 @@
 #   BEFORE judging the cylinder.
 #
 # Phase:   phase3_sensors (cylinder keystone)
-# Files:   v15R2/src/tests/cylinder_drop_test.c (rewrite)
+# Files:   v15R3/src/tests/cylinder_drop_test.c (rewrite)
 # Depends: 092
 # Risk:    low (test-only rewrite)
 # ============================================================
@@ -15,7 +15,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-SRC="v15R2/src"
+SRC="v15R3/src"
 TEST="$SRC/tests/cylinder_drop_test.c"
 
 [[ -f "$TEST" ]] || { echo "[SKIP] $TEST not found (run 092 first)"; exit 0; }

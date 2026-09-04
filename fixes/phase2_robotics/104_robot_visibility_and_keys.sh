@@ -11,18 +11,18 @@
 #   Fix: Remove T terminal code; T is now robot-forward only.
 #
 # Phase:   phase2_robotics
-# Files:   v15R2/src/robotics/gui_robot_registry.h
-#          v15R2/src/robotics/gui_robot_registry.c
-#          v15R2/src/ui_input/simulation_input_dispatch.c
+# Files:   v15R3/src/robotics/gui_robot_registry.h
+#          v15R3/src/robotics/gui_robot_registry.c
+#          v15R3/src/ui_input/simulation_input_dispatch.c
 # Risk:    medium
 # ============================================================
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-REG_H="v15R2/src/robotics/gui_robot_registry.h"
-REG_C="v15R2/src/robotics/gui_robot_registry.c"
-DISPATCH="v15R2/src/ui_input/simulation_input_dispatch.c"
+REG_H="v15R3/src/robotics/gui_robot_registry.h"
+REG_C="v15R3/src/robotics/gui_robot_registry.c"
+DISPATCH="v15R3/src/ui_input/simulation_input_dispatch.c"
 
 # Backup
 cp "$REG_H" "${REG_H}.pre_104"

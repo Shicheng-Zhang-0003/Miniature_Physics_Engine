@@ -17,8 +17,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-BATTERY_C="v15R2/src/robotics/battery.c"
-DISPATCH="v15R2/src/ui_input/simulation_input_dispatch.c"
+BATTERY_C="v15R3/src/robotics/battery.c"
+DISPATCH="v15R3/src/ui_input/simulation_input_dispatch.c"
 
 cp "$BATTERY_C" "${BATTERY_C}.pre_112"
 cp "$DISPATCH" "${DISPATCH}.pre_112"

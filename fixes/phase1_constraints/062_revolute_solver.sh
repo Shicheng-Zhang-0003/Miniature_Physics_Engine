@@ -7,17 +7,17 @@
 #   a torque-accumulator motor. Limits are deferred (need persistent
 #   relative-angle state).
 # Phase:   phase1_constraints
-# Files:   v15R2/src/physics/revolute_joint.h, revolute_joint.c (new)
+# Files:   v15R3/src/physics/revolute_joint.h, revolute_joint.c (new)
 # Depends: 060, 061
 # Risk:    low (new files only)
 # ============================================================
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
-H="v15R2/src/physics/revolute_joint.h"
-C="v15R2/src/physics/revolute_joint.c"
+H="v15R3/src/physics/revolute_joint.h"
+C="v15R3/src/physics/revolute_joint.c"
 grep -q 'MPE_FTC_062' "$C" 2>/dev/null && { echo "[SKIP] revolute solver already present"; exit 0; }
-[[ -f "v15R2/src/physics/constraint.h" ]] || { echo "[SKIP] constraint.h missing (run 060)"; exit 0; }
+[[ -f "v15R3/src/physics/constraint.h" ]] || { echo "[SKIP] constraint.h missing (run 060)"; exit 0; }
 
 cat > "$H" <<'EOF'
 /* MPE_FTC_062 */

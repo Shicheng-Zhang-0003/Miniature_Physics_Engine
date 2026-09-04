@@ -6,14 +6,14 @@
 #   NOTE: wiring into scene_saving.c/scene_load.c is a follow-up
 #   compile-gated step (intentionally NOT blind sed).
 # Phase:   phase0_foundation
-# Files:   v15R2/src/scene/scene_id_remap.h, scene_id_remap.c
+# Files:   v15R3/src/scene/scene_id_remap.h, scene_id_remap.c
 # Depends: none
 # Risk:    low (new files only)
 # ============================================================
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
-DIR="v15R2/src/scene"
+DIR="v15R3/src/scene"
 H="$DIR/scene_id_remap.h"; C="$DIR/scene_id_remap.c"
 [[ -d "$DIR" ]] || { echo "[SKIP] $DIR not found"; exit 0; }
 if [[ -f "$H" ]] && grep -q 'MPE_FTC_054' "$H"; then

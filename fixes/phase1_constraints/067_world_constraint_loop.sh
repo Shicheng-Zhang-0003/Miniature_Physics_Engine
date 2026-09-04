@@ -5,14 +5,14 @@
 #   accumulator), constraint_solve_all() after the contact solver and
 #   before position integration. Adds the constraint.h include.
 # Phase:   phase1_constraints
-# Files:   v15R2/src/core/physics_world.c
+# Files:   v15R3/src/core/physics_world.c
 # Depends: 059c, 063
 # Risk:    medium (three targeted inserts; compile-gated)
 # ============================================================
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
-TARGET="v15R2/src/core/physics_world.c"
+TARGET="v15R3/src/core/physics_world.c"
 [[ -f "$TARGET" ]] || { echo "[SKIP] physics_world.c not found"; exit 0; }
 grep -q 'MPE_FTC_067' "$TARGET" && { echo "[SKIP] constraints already wired"; exit 0; }
 grep -q 'contact_cache_save (world_manifolds, manifold_count);' "$TARGET" || { echo "[SKIP] solver anchor not found"; exit 0; }

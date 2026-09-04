@@ -8,14 +8,14 @@
 #   Deferred (documented in-file): sleep staticize, depenetration,
 #   joints (Phase 1), per-world contact cache.
 # Phase:   phase0_foundation
-# Files:   v15R2/src/core/physics_world.c
+# Files:   v15R3/src/core/physics_world.c
 # Depends: 055, 056, 059
 # Risk:    low (whole-file overwrite of a file this fleet owns)
 # ============================================================
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
-TARGET="v15R2/src/core/physics_world.c"
+TARGET="v15R3/src/core/physics_world.c"
 [[ -f "$TARGET" ]] || { echo "[SKIP] physics_world.c not found (are 055/056 applied?)"; exit 0; }
 grep -q 'MPE_FTC_059C' "$TARGET" && { echo "[SKIP] full pipeline already present"; exit 0; }
 cp "$TARGET" "${TARGET}.pre_059c"

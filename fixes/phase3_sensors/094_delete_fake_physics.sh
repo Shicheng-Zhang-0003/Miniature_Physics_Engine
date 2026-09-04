@@ -13,9 +13,9 @@
 #        on REAL cylinder-floor friction.
 #
 # Phase:   phase3_sensors (cylinder keystone)
-# Files:   v15R2/src/robotics/robot.c
-#          v15R2/src/robotics/drivetrain.c
-#          v15R2/src/makefile
+# Files:   v15R3/src/robotics/robot.c
+#          v15R3/src/robotics/drivetrain.c
+#          v15R3/src/makefile
 # Depends: 093h (grounded propulsion proven)
 # Risk:    medium (removes code paths, verifies with tests)
 # ============================================================
@@ -23,9 +23,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-ROBOT_C="v15R2/src/robotics/robot.c"
-DRIVETRAIN_C="v15R2/src/robotics/drivetrain.c"
-MAKEFILE="v15R2/src/makefile"
+ROBOT_C="v15R3/src/robotics/robot.c"
+DRIVETRAIN_C="v15R3/src/robotics/drivetrain.c"
+MAKEFILE="v15R3/src/makefile"
 
 for f in "$ROBOT_C" "$DRIVETRAIN_C" "$MAKEFILE"; do
     [[ -f "$f" ]] || { echo "[SKIP] $f not found"; exit 0; }
@@ -64,7 +64,7 @@ fi
 # ============================================================
 # STEP 4: Build and run teleop test (verifies cylinder robot drives)
 # ============================================================
-cd v15R2/src
+cd v15R3/src
 
 echo "--- Building teleop test ---"
 if ! make test_teleop_drive > /tmp/teleop_094.log 2>&1; then

@@ -13,11 +13,11 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 TARGET=".gitignore"
 [[ -f "$TARGET" ]] || { echo "[SKIP] $TARGET not found"; exit 0; }
-grep -q '!v15R2/v03_gate_validation.log' "$TARGET" && { echo "[SKIP] Exception already present"; exit 0; }
+grep -q '!v15R3/v03_gate_validation.log' "$TARGET" && { echo "[SKIP] Exception already present"; exit 0; }
 grep -q '^\*\.log$' "$TARGET" || { echo "[SKIP] *.log rule not found"; exit 0; }
 
 cp "$TARGET" "${TARGET}.pre_053"
-sed -i 's|^\*\.log$|!v15R2/v03_gate_validation.log\n*.log|' "$TARGET"
+sed -i 's|^\*\.log$|!v15R3/v03_gate_validation.log\n*.log|' "$TARGET"
 
-grep -q '!v15R2/v03_gate_validation.log' "$TARGET" || { echo "[FAIL] exception not added"; exit 1; }
+grep -q '!v15R3/v03_gate_validation.log' "$TARGET" || { echo "[FAIL] exception not added"; exit 1; }
 echo "[PASS] 053: v03_gate_validation.log is now tracked"

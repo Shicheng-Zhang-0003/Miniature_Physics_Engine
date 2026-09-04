@@ -11,7 +11,7 @@
 #   Normal matches the sphere-floor convention: (0,-1,0).
 #
 # Phase:   phase3_sensors (cylinder keystone)
-# Files:   v15R2/src/physics/collision_mechanics.c
+# Files:   v15R3/src/physics/collision_mechanics.c
 # Depends: 091, 092a
 # Risk:    medium (new narrowphase + dispatcher edit)
 # ============================================================
@@ -19,7 +19,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-CM_C="v15R2/src/physics/collision_mechanics.c"
+CM_C="v15R3/src/physics/collision_mechanics.c"
 
 [[ -f "$CM_C" ]] || { echo "[SKIP] $CM_C not found"; exit 0; }
 grep -q 'collision_static_plane_body' "$CM_C" || { echo "[FAIL] dispatcher collision_static_plane_body not found"; exit 1; }
@@ -103,7 +103,7 @@ CYL_EOF
 grep -q 'collision_static_plane_cylinder' "$CM_C" || { echo "[FAIL] cylinder function not added"; exit 1; }
 grep -q 'object_cylinder) {return collision_static_plane_cylinder' "$CM_C" || { echo "[FAIL] dispatcher not wired"; exit 1; }
 
-cd v15R2/src
+cd v15R3/src
 if make test_cylinder_drop > /tmp/cyl_093.log 2>&1; then
     grep -E '\[info\]|\[PASS\]' /tmp/cyl_093.log || true
     echo "[PASS] 093: cylinder now rests on the floor — wheels touch ground"

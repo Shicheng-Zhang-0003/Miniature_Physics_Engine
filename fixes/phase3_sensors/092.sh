@@ -2,8 +2,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-RB_H="v15R2/src/core/rigidbody.h"
-PW_H="v15R2/src/core/physics_world.h"
+RB_H="v15R3/src/core/rigidbody.h"
+PW_H="v15R3/src/core/physics_world.h"
 
 for f in "$RB_H" "$PW_H"; do
     [[ -f "$f" ]] || { echo "[SKIP] $f not found"; exit 0; }
@@ -36,7 +36,7 @@ if grep -q 'MPE_FTC_090 \*//' "$PW_H"; then
 fi
 
 # Verify build
-cd v15R2/src
+cd v15R3/src
 if make > /tmp/build_092.log 2>&1; then
     echo "[PASS] 092: cylinder headers fixed, build passes"
 else

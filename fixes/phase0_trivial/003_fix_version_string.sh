@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # ============================================================
-# FIX 003 — BUG-003: version string says v15R1, should be v15R2
+# FIX 003 — BUG-003: version string says v15R2, should be v15R3
 # Phase:   phase0_trivial
-# Files:   v15R2/src/mpe_engine.h
+# Files:   v15R3/src/mpe_engine.h
 # Depends: none
 # Risk:    low
 # ============================================================
@@ -11,7 +11,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-TARGET="v15R2/src/mpe_engine.h"
+TARGET="v15R3/src/mpe_engine.h"
 
 # --- Preflight ---
 if [[ ! -f "$TARGET" ]]; then
@@ -19,7 +19,7 @@ if [[ ! -f "$TARGET" ]]; then
     exit 0
 fi
 
-if ! grep -q '#define a3_version_string "v15R1"' "$TARGET"; then
+if ! grep -q '#define a3_version_string "v15R2"' "$TARGET"; then
     echo "[SKIP] Version string already updated or changed"
     exit 0
 fi
@@ -28,17 +28,17 @@ fi
 cp "$TARGET" "${TARGET}.pre_003"
 
 # --- Fix ---
-sed -i 's/#define a3_version_string "v15R1"/#define a3_version_string "v15R2"/' "$TARGET"
+sed -i 's/#define a3_version_string "v15R2"/#define a3_version_string "v15R3"/' "$TARGET"
 
 # --- Postflight ---
-if grep -q '#define a3_version_string "v15R1"' "$TARGET"; then
-    echo "[FAIL] Version string still says v15R1"
+if grep -q '#define a3_version_string "v15R2"' "$TARGET"; then
+    echo "[FAIL] Version string still says v15R2"
     exit 1
 fi
 
-if ! grep -q '#define a3_version_string "v15R2"' "$TARGET"; then
-    echo "[FAIL] Version string not set to v15R2"
+if ! grep -q '#define a3_version_string "v15R3"' "$TARGET"; then
+    echo "[FAIL] Version string not set to v15R3"
     exit 1
 fi
 
-echo "[PASS] 003: BUG-003 fixed — version string now reads v15R2"
+echo "[PASS] 003: BUG-003 fixed — version string now reads v15R3"

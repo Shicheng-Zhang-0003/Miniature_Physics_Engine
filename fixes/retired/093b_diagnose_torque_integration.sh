@@ -15,9 +15,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-RB_C="v15R2/src/core/rigidbody.c"
-RB_H="v15R2/src/core/rigidbody.h"
-PW_C="v15R2/src/core/physics_world.c"
+RB_C="v15R3/src/core/rigidbody.c"
+RB_H="v15R3/src/core/rigidbody.h"
+PW_C="v15R3/src/core/physics_world.c"
 
 echo "============================================================"
 echo "[1] rb_integrate_velocity — full body (rigidbody.c)"

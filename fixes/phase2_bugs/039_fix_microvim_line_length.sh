@@ -2,7 +2,7 @@
 # ============================================================
 # FIX 039 — TERM-010: add line-length guard in MicroVim insert
 # Phase:   phase2_bugs
-# Files:   v15R2/src/ui_input/microvim.c
+# Files:   v15R3/src/ui_input/microvim.c
 # Depends: none
 # Risk:    low
 # ============================================================
@@ -11,7 +11,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-TARGET="v15R2/src/ui_input/microvim.c"
+TARGET="v15R3/src/ui_input/microvim.c"
 
 if [[ ! -f "$TARGET" ]]; then
     echo "[SKIP] $TARGET not found"

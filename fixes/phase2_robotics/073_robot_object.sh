@@ -5,20 +5,20 @@
 #   with motor-driven axles. Uses physics_world from Phase 0
 #   and constraint framework from Phase 1.
 # Phase:   phase2_robotics
-# Files:   v15R2/src/robotics/robot.h, robot.c (new)
+# Files:   v15R3/src/robotics/robot.h, robot.c (new)
 # Depends: 070, 071, 072, 063 (constraint dispatch)
 # Risk:    low (new files only)
 # ============================================================
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
-DIR="v15R2/src/robotics"
+DIR="v15R3/src/robotics"
 H="$DIR/robot.h"
 C="$DIR/robot.c"
 grep -q 'MPE_FTC_073' "$C" 2>/dev/null && { echo "[SKIP] robot object already present"; exit 0; }
 [[ -f "$DIR/motor.h" ]] || { echo "[SKIP] motor.h missing (run 070 first)"; exit 0; }
 [[ -f "$DIR/battery.h" ]] || { echo "[SKIP] battery.h missing (run 072 first)"; exit 0; }
-[[ -f "v15R2/src/physics/constraint.h" ]] || { echo "[SKIP] constraint.h missing (run 060 first)"; exit 0; }
+[[ -f "v15R3/src/physics/constraint.h" ]] || { echo "[SKIP] constraint.h missing (run 060 first)"; exit 0; }
 
 cat > "$H" <<'EOF'
 /* MPE_FTC_073: FTC robot object */

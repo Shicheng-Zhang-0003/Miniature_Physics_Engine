@@ -11,7 +11,7 @@
 #   explicitly and uses portable [ \t] character classes.
 #
 # Phase:   phase3_sensors (cylinder keystone)
-# Files:   v15R2/src/core/rigidbody.c
+# Files:   v15R3/src/core/rigidbody.c
 # Depends: 091
 # Risk:    low (additive branch)
 # ============================================================
@@ -19,7 +19,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-RB_C="v15R2/src/core/rigidbody.c"
+RB_C="v15R3/src/core/rigidbody.c"
 [[ -f "$RB_C" ]] || { echo "[SKIP] $RB_C not found"; exit 0; }
 grep -q 'MPE_FTC_093d' "$RB_C" && { echo "[SKIP] 093d already applied"; exit 0; }
 
@@ -59,7 +59,7 @@ if ! grep -q 'MPE_FTC_093d' "$RB_C"; then
     exit 1
 fi
 
-cd v15R2/src
+cd v15R3/src
 if make > /tmp/build_093d.log 2>&1; then
     echo "[PASS] 093d: cylinder branch added to inertia dispatch"
 else

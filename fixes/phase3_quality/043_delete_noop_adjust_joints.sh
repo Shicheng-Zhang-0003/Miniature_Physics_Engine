@@ -2,8 +2,8 @@
 # ============================================================
 # FIX 043 — ARCH-014: delete no-op adjust_joints_after_deletion
 # Phase:   phase3_quality
-# Files:   v15R2/src/physics/spring_joint.c, spring_joint.h,
-#          v15R2/src/scene/scene_init.c
+# Files:   v15R3/src/physics/spring_joint.c, spring_joint.h,
+#          v15R3/src/scene/scene_init.c
 # Depends: none
 # Risk:    low
 # ============================================================
@@ -12,9 +12,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-TARGET_C="v15R2/src/physics/spring_joint.c"
-TARGET_H="v15R2/src/physics/spring_joint.h"
-CALLER="v15R2/src/scene/scene_init.c"
+TARGET_C="v15R3/src/physics/spring_joint.c"
+TARGET_H="v15R3/src/physics/spring_joint.h"
+CALLER="v15R3/src/scene/scene_init.c"
 
 if [[ ! -f "$TARGET_C" ]]; then
     echo "[SKIP] $TARGET_C not found"

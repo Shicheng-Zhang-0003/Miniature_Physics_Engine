@@ -4,7 +4,7 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
 python3 -c "
-h_path = 'v15R2/src/robotics/gui_robot_registry.h'
+h_path = 'v15R3/src/robotics/gui_robot_registry.h'
 with open(h_path, 'r') as f: h_content = f.read()
 proxy_struct = '''
 typedef struct {
@@ -18,7 +18,7 @@ if 'gui_robot_proxies' not in h_content:
     h_content = h_content.replace('#define MFS_MAX_GUI_ROBOTS 4', '#define MFS_MAX_GUI_ROBOTS 4\n' + proxy_struct)
 with open(h_path, 'w') as f: f.write(h_content)
 
-c_path = 'v15R2/src/robotics/gui_robot_registry.c'
+c_path = 'v15R3/src/robotics/gui_robot_registry.c'
 with open(c_path, 'r') as f: c_content = f.read()
 includes = '''#include <string.h>
 #include \"../scene/scene_init.h\"

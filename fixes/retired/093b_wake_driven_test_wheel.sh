@@ -8,7 +8,7 @@
 #   the wheel each step when applying drive torque.
 #
 # Phase:   phase3_sensors (cylinder keystone)
-# Files:   v15R2/src/tests/driven_wheel_test.c
+# Files:   v15R3/src/tests/driven_wheel_test.c
 # Depends: 093a
 # Risk:    trivial
 # ============================================================
@@ -16,7 +16,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-TEST="v15R2/src/tests/driven_wheel_test.c"
+TEST="v15R3/src/tests/driven_wheel_test.c"
 [[ -f "$TEST" ]] || { echo "[SKIP] $TEST not found"; exit 0; }
 grep -q 'MPE_FTC_093b' "$TEST" && { echo "[SKIP] 093b already applied"; exit 0; }
 grep -q 'torque_accumulator.x += drive_torque;' "$TEST" \
@@ -28,7 +28,7 @@ sed -i 's|world.bodies\[wheel\].torque_accumulator.x += drive_torque;|world.bodi
 
 grep -q 'MPE_FTC_093b' "$TEST" || { echo "[FAIL] wake call not added"; exit 1; }
 
-cd v15R2/src
+cd v15R3/src
 if ! make test_driven_wheel > /tmp/driven_wheel_093b.log 2>&1; then
     if ! grep -q '\[info\] wheel dz' /tmp/driven_wheel_093b.log; then
         tail -15 /tmp/driven_wheel_093b.log

@@ -2,7 +2,7 @@
 # ============================================================
 # FIX 007 — BUG-009: shift_* variables should be enter_*
 # Phase:   phase0_trivial
-# Files:   v15R2/src/simulation.c
+# Files:   v15R3/src/simulation.c
 # Depends: none
 # Risk:    low
 # ============================================================
@@ -11,7 +11,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-TARGET="v15R2/src/simulation.c"
+TARGET="v15R3/src/simulation.c"
 
 # --- Preflight ---
 if [[ ! -f "$TARGET" ]]; then

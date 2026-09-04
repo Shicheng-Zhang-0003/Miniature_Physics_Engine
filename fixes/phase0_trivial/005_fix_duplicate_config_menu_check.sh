@@ -2,7 +2,7 @@
 # ============================================================
 # FIX 005 — BUG-007: duplicate config_menu_is_open() check
 # Phase:   phase0_trivial
-# Files:   v15R2/src/ui_input/input_control.c
+# Files:   v15R3/src/ui_input/input_control.c
 # Depends: none
 # Risk:    low
 # ============================================================
@@ -11,7 +11,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-TARGET="v15R2/src/ui_input/input_control.c"
+TARGET="v15R3/src/ui_input/input_control.c"
 
 # --- Preflight ---
 if [[ ! -f "$TARGET" ]]; then
