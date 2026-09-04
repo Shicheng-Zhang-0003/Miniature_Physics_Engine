@@ -13,8 +13,8 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
-DT="v15R2/src/robotics/drivetrain.c"
-MATH="v15R2/src/core/math3D.h"
+DT="v15R3/src/robotics/drivetrain.c"
+MATH="v15R3/src/core/math3D.h"
 
 echo "=== Inspecting math3D.h ==="
 grep -iE 'cross|normalisation|rotate_to_vector3' "$MATH" | head -10
@@ -31,7 +31,7 @@ python3 - "$DT" << 'PYEOF'
 import re, sys
 
 path = sys.argv[1]
-with open('v15R2/src/core/math3D.h', 'r') as f:
+with open('v15R3/src/core/math3D.h', 'r') as f:
     math3d = f.read()
 
 # Dynamically find the exact function names
@@ -82,5 +82,5 @@ PYEOF
 
 echo ""
 echo "=== Rebuilding ==="
-cd v15R2/src
+cd v15R3/src
 ./compile 2>&1 | tail -15

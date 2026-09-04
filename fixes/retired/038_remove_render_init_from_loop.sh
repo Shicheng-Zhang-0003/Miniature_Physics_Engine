@@ -2,7 +2,7 @@
 # ============================================================
 # FIX 038 — REND-010: remove render_init() call from render loop
 # Phase:   phase2_bugs
-# Files:   v15R2/src/render/new_render.c
+# Files:   v15R3/src/render/new_render.c
 # Depends: 037
 # Risk:    low
 # ============================================================
@@ -11,7 +11,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-TARGET="v15R2/src/render/new_render.c"
+TARGET="v15R3/src/render/new_render.c"
 
 if [[ ! -f "$TARGET" ]]; then
     echo "[SKIP] $TARGET not found"

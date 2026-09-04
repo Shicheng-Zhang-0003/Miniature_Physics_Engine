@@ -15,10 +15,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-H="v15R2/src/ui_input/input_control.h"
-C="v15R2/src/ui_input/input_control.c"
-D="v15R2/src/ui_input/simulation_input_dispatch.c"
-T="v15R2/src/ui_input/debug_terminal.c"
+H="v15R3/src/ui_input/input_control.h"
+C="v15R3/src/ui_input/input_control.c"
+D="v15R3/src/ui_input/simulation_input_dispatch.c"
+T="v15R3/src/ui_input/debug_terminal.c"
 
 # Backup
 cp "$H" "${H}.pre_106"

@@ -4,14 +4,14 @@
 #   separation_bias clamped to magic 5.0f, restitution_bias to 4.0f,
 #   instead of their registered config values.
 # Phase:   phase0_foundation
-# Files:   v15R2/src/physics/collision_mechanics.c
+# Files:   v15R3/src/physics/collision_mechanics.c
 # Depends: none
 # Risk:    low (two unique single-line replacements)
 # ============================================================
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
-TARGET="v15R2/src/physics/collision_mechanics.c"
+TARGET="v15R3/src/physics/collision_mechanics.c"
 [[ -f "$TARGET" ]] || { echo "[SKIP] $TARGET not found"; exit 0; }
 
 if grep -q 'cp -> separation_bias = g_cfg.solver.max_separation_bias;' "$TARGET"; then

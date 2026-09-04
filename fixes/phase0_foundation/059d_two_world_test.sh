@@ -6,15 +6,15 @@
 #   leakage between worlds. This is the behavioural gate that the
 #   retired 050 file-existence check pretended to be.
 # Phase:   phase0_foundation
-# Files:   v15R2/src/tests/two_world_test.c (new)
-#          v15R2/src/makefile (new target)
+# Files:   v15R3/src/tests/two_world_test.c (new)
+#          v15R3/src/makefile (new target)
 # Depends: 055, 056, 059, 059c
 # Risk:    low (additive file + appended make target)
 # ============================================================
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
-SRC="v15R2/src"
+SRC="v15R3/src"
 TEST="$SRC/tests/two_world_test.c"
 MAKEFILE="$SRC/makefile"
 grep -q 'MPE_FTC_059C' "$SRC/core/physics_world.c" 2>/dev/null || { echo "[SKIP] 059c not applied yet"; exit 0; }

@@ -12,10 +12,10 @@
 #     4. overlay.c: Add battery/RPM HUD for active robots
 #
 # Phase:   phase2_robotics
-# Files:   v15R2/src/robotics/robot.c
-#          v15R2/src/simulation.c
-#          v15R2/src/ui_input/debug_terminal.c
-#          v15R2/src/ui_input/overlay.c
+# Files:   v15R3/src/robotics/robot.c
+#          v15R3/src/simulation.c
+#          v15R3/src/ui_input/debug_terminal.c
+#          v15R3/src/ui_input/overlay.c
 # Depends: 094a (fake physics removed, makefile repaired)
 # Risk:    medium (touches simulation.c god-file, but additive only)
 # ============================================================
@@ -23,10 +23,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-ROBOT_C="v15R2/src/robotics/robot.c"
-SIM_C="v15R2/src/simulation.c"
-TERM_C="v15R2/src/ui_input/debug_terminal.c"
-OVERLAY_C="v15R2/src/ui_input/overlay.c"
+ROBOT_C="v15R3/src/robotics/robot.c"
+SIM_C="v15R3/src/simulation.c"
+TERM_C="v15R3/src/ui_input/debug_terminal.c"
+OVERLAY_C="v15R3/src/ui_input/overlay.c"
 
 for f in "$ROBOT_C" "$SIM_C" "$TERM_C" "$OVERLAY_C"; do
     [[ -f "$f" ]] || { echo "[SKIP] $f not found"; exit 0; }
@@ -111,18 +111,18 @@ sed -i '/if (editor_dialog_active) {/,/return TRUE;/ {
 
 # 2d. Add Q key tracking to input_control.h and input_control.c
 #     Q is not currently tracked — add it alongside E
-if ! grep -q 'q_key_pressed' "v15R2/src/ui_input/input_control.h"; then
-    sed -i '/bool e_key_pressed;/a\    bool q_key_pressed; /* MPE_FTC_100_GUI_BRIDGE */' "v15R2/src/ui_input/input_control.h"
+if ! grep -q 'q_key_pressed' "v15R3/src/ui_input/input_control.h"; then
+    sed -i '/bool e_key_pressed;/a\    bool q_key_pressed; /* MPE_FTC_100_GUI_BRIDGE */' "v15R3/src/ui_input/input_control.h"
 fi
-if ! grep -q 'q_key_pressed' "v15R2/src/ui_input/input_control.c"; then
+if ! grep -q 'q_key_pressed' "v15R3/src/ui_input/input_control.c"; then
     # Init
-    sed -i '/input_state->e_key_pressed = false;/a\    input_state->q_key_pressed = false; /* MPE_FTC_100_GUI_BRIDGE */' "v15R2/src/ui_input/input_control.c"
+    sed -i '/input_state->e_key_pressed = false;/a\    input_state->q_key_pressed = false; /* MPE_FTC_100_GUI_BRIDGE */' "v15R3/src/ui_input/input_control.c"
     # Key press
-    sed -i '/if (event->keyval == GDK_KEY_e) {/i\    if ((event->keyval == GDK_KEY_q) || (event->keyval == GDK_KEY_Q)) { input_state->q_key_pressed = true; } /* MPE_FTC_100 */' "v15R2/src/ui_input/input_control.c"
+    sed -i '/if (event->keyval == GDK_KEY_e) {/i\    if ((event->keyval == GDK_KEY_q) || (event->keyval == GDK_KEY_Q)) { input_state->q_key_pressed = true; } /* MPE_FTC_100 */' "v15R3/src/ui_input/input_control.c"
     # Key release
-    sed -i '/if (event->keyval == GDK_KEY_Shift_L) {/i\    if ((event->keyval == GDK_KEY_q) || (event->keyval == GDK_KEY_Q)) { input_state->q_key_pressed = false; } /* MPE_FTC_100 */' "v15R2/src/ui_input/input_control.c"
+    sed -i '/if (event->keyval == GDK_KEY_Shift_L) {/i\    if ((event->keyval == GDK_KEY_q) || (event->keyval == GDK_KEY_Q)) { input_state->q_key_pressed = false; } /* MPE_FTC_100 */' "v15R3/src/ui_input/input_control.c"
     # Focus out
-    sed -i '/input_state->e_key_pressed = false;.*FOCUS/a\    input_state->q_key_pressed = false; /* MPE_FTC_100 FOCUS */' "v15R2/src/ui_input/input_control.c"
+    sed -i '/input_state->e_key_pressed = false;.*FOCUS/a\    input_state->q_key_pressed = false; /* MPE_FTC_100 FOCUS */' "v15R3/src/ui_input/input_control.c"
 fi
 
 echo "  [2/5] simulation.c + input_control: robot registry + KB drive + Q key"
@@ -213,7 +213,7 @@ echo "  [4/5] overlay.c: robot battery/RPM HUD added"
 # STEP 5: Build verification
 # ============================================================
 echo "  [5/5] Building..."
-cd v15R2/src
+cd v15R3/src
 if make clean > /dev/null 2>&1 && make > /tmp/build_100.log 2>&1; then
     # Check the warning is gone
     if grep -q 'implicit declaration.*wheel_traction_apply' /tmp/build_100.log; then

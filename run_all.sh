@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# run_all.sh MUST live at the PROJECT ROOT (same dir as v15R2/ and fixes/).
+# run_all.sh MUST live at the PROJECT ROOT (same dir as v15R3/ and fixes/).
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT"
 
-if [[ ! -d "v15R2/src" ]]; then
-  echo "[FATAL] Cannot find v15R2/src under: $ROOT"
-  echo "        run_all.sh must sit at the project root, next to v15R2/ and fixes/."
+if [[ ! -d "v15R3/src" ]]; then
+  echo "[FATAL] Cannot find v15R3/src under: $ROOT"
+  echo "        run_all.sh must sit at the project root, next to v15R3/ and fixes/."
   echo "        Current directory contents:"
   ls -1
   exit 1
@@ -32,7 +32,7 @@ run_script() {
 build_check() {
   local phase_name="$1"
   printf "  [build] %-44s" "$phase_name"
-  if (cd "$ROOT/v15R2/src" && make >/dev/null 2>>"$ROOT/$LOG"); then
+  if (cd "$ROOT/v15R3/src" && make >/dev/null 2>>"$ROOT/$LOG"); then
     echo "OK"
   else
     echo "FAIL (see $LOG)"; BUILD_FAILS=$((BUILD_FAILS + 1))

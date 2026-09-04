@@ -14,8 +14,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-M3D="v15R2/src/core/math3D.h"
-SRC="v15R2/src"
+M3D="v15R3/src/core/math3D.h"
+SRC="v15R3/src"
 
 echo "============================================================"
 echo "[1] math3_inverse source (from math3D.h)"

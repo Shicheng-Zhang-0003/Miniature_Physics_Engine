@@ -5,14 +5,14 @@
 #   Raise to 0.5 m over 3 s so a non-driving robot fails, then
 #   rebuild and run the test for an immediate verdict.
 # Phase:   phase0_foundation (drivetrain bring-up)
-# Files:   v15R2/src/tests/teleop_drive_test.c
+# Files:   v15R3/src/tests/teleop_drive_test.c
 # Depends: 077, 078
 # Risk:    low
 # ============================================================
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
-TARGET="v15R2/src/tests/teleop_drive_test.c"
+TARGET="v15R3/src/tests/teleop_drive_test.c"
 [[ -f "$TARGET" ]] || { echo "[SKIP] $TARGET not found"; exit 0; }
 grep -q 'MPE_FTC_079' "$TARGET" && { echo "[SKIP] 079 already applied"; exit 0; }
 grep -q 'total_displacement < 0.05f' "$TARGET" \
@@ -24,7 +24,7 @@ sed -i 's|total_displacement < 0.05f|total_displacement < 0.5f /* MPE_FTC_079: r
 grep -q 'MPE_FTC_079' "$TARGET" || { echo "[FAIL] threshold not updated"; exit 1; }
 
 # Rebuild + run for an immediate verdict (recompiles robot.c from 078 too)
-cd v15R2/src
+cd v15R3/src
 if make test_teleop_drive > /tmp/teleop_drive.log 2>&1; then
   tail -6 /tmp/teleop_drive.log
   echo "[PASS] 079: teleop test now requires real driving, and it drives"

@@ -11,7 +11,7 @@
 #   and allows small inertia tensors to invert correctly.
 #
 # Phase:   phase3_sensors (cylinder keystone)
-# Files:   v15R2/src/core/math3D.h
+# Files:   v15R3/src/core/math3D.h
 # Depends: 093f
 # Risk:    medium (modifies core math, but isolated to one check)
 # ============================================================
@@ -19,7 +19,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-M3D="v15R2/src/core/math3D.h"
+M3D="v15R3/src/core/math3D.h"
 [[ -f "$M3D" ]] || { echo "[SKIP] $M3D not found"; exit 0; }
 grep -q 'MPE_FTC_093g' "$M3D" && { echo "[SKIP] 093g already applied"; exit 0; }
 
@@ -35,7 +35,7 @@ if ! grep -q 'MPE_FTC_093g' "$M3D"; then
 fi
 
 # Build check
-cd v15R2/src
+cd v15R3/src
 if make > /tmp/build_093g.log 2>&1; then
     echo "[PASS] 093g: math3_inverse epsilon reduced to 1e-12f"
 else

@@ -10,8 +10,8 @@
 #        and needs a fix in math3D.c.
 #
 # Phase:   phase3_sensors (cylinder keystone)
-# Files:   v15R2/src/tests/math3_inverse_test.c (new)
-#          v15R2/src/makefile (new target)
+# Files:   v15R3/src/tests/math3_inverse_test.c (new)
+#          v15R3/src/makefile (new target)
 # Depends: 093d
 # Risk:    low (additive test)
 # ============================================================
@@ -19,7 +19,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-SRC="v15R2/src"
+SRC="v15R3/src"
 TEST="$SRC/tests/math3_inverse_test.c"
 MAKEFILE="$SRC/makefile"
 

@@ -8,17 +8,17 @@
 #   seam that lets physics_world_step() drive collision for any
 #   body array — including independent worlds.
 # Phase:   phase0_foundation
-# Files:   v15R2/src/physics/broadphase.c, broadphase.h
-#          v15R2/src/simulation.c (2 call sites)
+# Files:   v15R3/src/physics/broadphase.c, broadphase.h
+#          v15R3/src/simulation.c (2 call sites)
 # Depends: none
 # Risk:    medium (rename guarded by exact occurrence counts)
 # ============================================================
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
-BP="v15R2/src/physics/broadphase.c"
-BH="v15R2/src/physics/broadphase.h"
-SIM="v15R2/src/simulation.c"
+BP="v15R3/src/physics/broadphase.c"
+BH="v15R3/src/physics/broadphase.h"
+SIM="v15R3/src/simulation.c"
 for f in "$BP" "$BH" "$SIM"; do
   [[ -f "$f" ]] || { echo "[SKIP] $f not found"; exit 0; }
 done

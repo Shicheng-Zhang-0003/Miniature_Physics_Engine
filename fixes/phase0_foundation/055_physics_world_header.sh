@@ -3,14 +3,14 @@
 # FIX 055 — ARCH-001 (real): physics_world header, pure sim state
 #   Replaces the dead scaffold. No camera/input/UI coupling.
 # Phase:   phase0_foundation
-# Files:   v15R2/src/core/physics_world.h
+# Files:   v15R3/src/core/physics_world.h
 # Depends: none
 # Risk:    low (whole-file overwrite; nothing reads old fields)
 # ============================================================
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
-TARGET="v15R2/src/core/physics_world.h"
+TARGET="v15R3/src/core/physics_world.h"
 grep -q 'MPE_FTC_055' "$TARGET" 2>/dev/null && { echo "[SKIP] real header already present"; exit 0; }
 [[ -f "$TARGET" ]] && cp "$TARGET" "${TARGET}.pre_055"
 

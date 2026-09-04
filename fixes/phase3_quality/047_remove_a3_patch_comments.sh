@@ -2,7 +2,7 @@
 # ============================================================
 # FIX 047 — QUAL-001a: remove A3_PATCH comment markers
 # Phase:   phase3_quality
-# Files:   all .c and .h files under v15R2/src/
+# Files:   all .c and .h files under v15R3/src/
 # Depends: 041-046
 # Risk:    low
 # Note:    Only removes standalone comment lines like
@@ -14,7 +14,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-SRC_DIR="v15R2/src"
+SRC_DIR="v15R3/src"
 CHANGED=0
 
 # Only remove standalone A3_PATCH/A3_TEST/A3_HOTFIX comment lines

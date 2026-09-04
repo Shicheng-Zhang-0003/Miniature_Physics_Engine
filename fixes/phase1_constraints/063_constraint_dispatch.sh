@@ -5,17 +5,17 @@
 #   constraints to revolute_solve(). constraint_apply_motors() drives
 #   enabled motors once per tick. Adds a motor setter for robotics code.
 # Phase:   phase1_constraints
-# Files:   v15R2/src/physics/constraint.h, constraint.c (rewrite)
+# Files:   v15R3/src/physics/constraint.h, constraint.c (rewrite)
 # Depends: 060, 061, 062
 # Risk:    low (rewrites files this fleet created)
 # ============================================================
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
-H="v15R2/src/physics/constraint.h"
-C="v15R2/src/physics/constraint.c"
+H="v15R3/src/physics/constraint.h"
+C="v15R3/src/physics/constraint.c"
 grep -q 'MPE_FTC_063' "$C" 2>/dev/null && { echo "[SKIP] dispatch already present"; exit 0; }
-[[ -f "v15R2/src/physics/revolute_joint.h" ]] || { echo "[SKIP] revolute_joint.h missing (run 062)"; exit 0; }
+[[ -f "v15R3/src/physics/revolute_joint.h" ]] || { echo "[SKIP] revolute_joint.h missing (run 062)"; exit 0; }
 [[ -f "$H" ]] && cp "$H" "${H}.pre_063"
 [[ -f "$C" ]] && cp "$C" "${C}.pre_063"
 

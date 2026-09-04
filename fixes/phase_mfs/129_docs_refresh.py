@@ -25,7 +25,7 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 ROOT = SCRIPT_DIR.parent.parent
-SRC = ROOT / "v15R2" / "src"
+SRC = ROOT / "v15R3" / "src"
 TOOLS = ROOT / "tools"
 
 sys.path.insert(0, str(TOOLS))
@@ -57,7 +57,7 @@ def step_readme():
     content = """\
 # MPE FTC Simulator — README
 > Status: **Milestone 2 (Physics Keystone) complete. Milestone 3 in progress.**
-> Original project: Miniature Physics Engine v15R2
+> Original project: Miniature Physics Engine v15R3
 > Current direction: FTC robotics simulator with real physics, headless testing,
 > and future FTC-style hardware abstraction.
 
@@ -66,7 +66,7 @@ def step_readme():
 ## 1. What This Project Is
 
 This repository is an FTC-oriented robotics simulator built on top of the
-Miniature Physics Engine (v15R2). The long-term goal is to provide an FTC
+Miniature Physics Engine (v15R3). The long-term goal is to provide an FTC
 simulation environment comparable in spirit to what WPILib simulation provides
 for FRC:
 
@@ -98,7 +98,7 @@ All 8 headless tests **PASS**:
 ## 3. Repository Layout
 
 ```text
-v15R2/src/
+v15R3/src/
   core/
     physics_world.c/.h          Multi-world physics state + full pipeline
     rigidbody.c/.h              Body data, integration, cylinder support
@@ -170,7 +170,7 @@ fixes/
 ## 4. Build
 
 ```bash
-cd v15R2/src
+cd v15R3/src
 make clean && make
 ```
 
@@ -386,7 +386,7 @@ def step_scope():
     content = read_file(path)
 
     header = """\
-# v15R2 — Complete Defect & Debt Audit
+# v15R3 — Complete Defect & Debt Audit
 
 > **STATUS UPDATE (post-Milestone-2):**
 > This audit was taken before the FTC physics-first pivot. Approximately 30+
@@ -408,7 +408,7 @@ def step_scope():
 
 """
     content = content.replace(
-        "# v15R2 — Complete Defect & Debt Audit\n",
+        "# v15R3 — Complete Defect & Debt Audit\n",
         header,
         1
     )
@@ -420,7 +420,7 @@ def step_scope():
 # ============================================================
 def step_how_to_use():
     log("Step 4: Patching how_to_use.md")
-    path = ROOT / "v15R2" / "how_to_use.md"
+    path = ROOT / "v15R3" / "how_to_use.md"
     content = read_file(path)
 
     robot_section = """
@@ -479,13 +479,13 @@ The engine supports three object types:
 # ============================================================
 def step_evolution():
     log("Step 5: Updating evolution.txt")
-    path = ROOT / "v15R2" / "evolution.txt"
+    path = ROOT / "v15R3" / "evolution.txt"
     content = """\
 MPE Evolution Lineage
 =====================
 
 V0.9-Buffer:  Direct Translation Layer from V1.5RC2 of MPE
-V1.5RC2:      v15R2 — Configuration System (69 tunables, registry, menu)
+V1.5RC2:      v15R3 — Configuration System (69 tunables, registry, menu)
 MFS:          MPE FTC Simulator — Physics-first pivot
               Milestone 1: Foundation & Robotics Core ✅
               Milestone 2: Physics Keystone (cylinders, anisotropic friction) ✅
@@ -522,7 +522,7 @@ def step_phase_a_audit():
 # ============================================================
 def step_release_gates():
     log("Step 7: Patching RELEASE_GATES.md")
-    path = ROOT / "v15R2" / "RELEASE_GATES.md"
+    path = ROOT / "v15R3" / "RELEASE_GATES.md"
     content = read_file(path)
 
     ftc_section = """
@@ -555,7 +555,7 @@ def step_release_gates():
 # ============================================================
 def step_release_policy():
     log("Step 8: Patching RELEASE_POLICY.md")
-    path = ROOT / "v15R2" / "RELEASE_POLICY.md"
+    path = ROOT / "v15R3" / "RELEASE_POLICY.md"
     content = read_file(path)
 
     content = content.replace(

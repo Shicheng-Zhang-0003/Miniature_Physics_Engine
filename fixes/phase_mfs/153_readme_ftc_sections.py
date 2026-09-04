@@ -109,7 +109,7 @@ MPE and MFS are currently a single tree. The plan is to separate them cleanly.
 
 | Milestone | State |
 |-----------|-------|
-| **v15R2** | Config system + MFS merged *(current)* |
+| **v15R3** | Config system + MFS merged *(current)* |
 | **v15S** | Stabilisation — final **merged** release |
 | **v16R1** | Begin splitting MFS out of the MPE mainframe |
 | **v16+** | MPE kernel + module ecosystem |

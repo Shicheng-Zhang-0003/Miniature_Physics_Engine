@@ -2,7 +2,7 @@
 # ============================================================
 # FIX 029 — BUG-005: uptime measures from first call, not engine start
 # Phase:   phase2_bugs
-# Files:   v15R2/src/ui_input/debug_terminal.c
+# Files:   v15R3/src/ui_input/debug_terminal.c
 # Depends: none
 # Risk:    low
 # ============================================================
@@ -11,7 +11,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-TARGET="v15R2/src/ui_input/debug_terminal.c"
+TARGET="v15R3/src/ui_input/debug_terminal.c"
 
 if [[ ! -f "$TARGET" ]]; then
     echo "[SKIP] $TARGET not found"

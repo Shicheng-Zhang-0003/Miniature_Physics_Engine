@@ -2,7 +2,7 @@
 # ============================================================
 # FIX 037 — REND-009: replace render_init_status magic numbers
 # Phase:   phase2_bugs
-# Files:   v15R2/src/render/new_render.c
+# Files:   v15R3/src/render/new_render.c
 # Depends: none
 # Risk:    low
 # ============================================================
@@ -11,7 +11,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-TARGET="v15R2/src/render/new_render.c"
+TARGET="v15R3/src/render/new_render.c"
 
 if [[ ! -f "$TARGET" ]]; then
     echo "[SKIP] $TARGET not found"

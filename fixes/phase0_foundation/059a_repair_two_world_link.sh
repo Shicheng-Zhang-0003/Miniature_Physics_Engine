@@ -11,14 +11,14 @@
 # Numbered 059a so it runs before 059d in run_all.sh.
 #
 # Phase:   phase0_foundation
-# Files:   v15R2/src/makefile
+# Files:   v15R3/src/makefile
 # Depends: 059d (target exists), 063 + 067 (constraint sources present)
 # Risk:    low (one targeted makefile line edit)
 # ============================================================
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
-MAKEFILE="v15R2/src/makefile"
+MAKEFILE="v15R3/src/makefile"
 
 [[ -f "$MAKEFILE" ]] || { echo "[SKIP] $MAKEFILE not found"; exit 0; }
 

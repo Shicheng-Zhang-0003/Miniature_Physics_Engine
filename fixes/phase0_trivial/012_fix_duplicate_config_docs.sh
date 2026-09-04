@@ -2,7 +2,7 @@
 # ============================================================
 # FIX 012 — DOC-001: delete duplicate config sections in how_to_use.md
 # Phase:   phase0_trivial
-# Files:   v15R2/how_to_use.md
+# Files:   v15R3/how_to_use.md
 # Depends: none
 # Risk:    low
 # ============================================================
@@ -11,7 +11,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-TARGET="v15R2/how_to_use.md"
+TARGET="v15R3/how_to_use.md"
 
 if [[ ! -f "$TARGET" ]]; then
     echo "[SKIP] $TARGET not found"

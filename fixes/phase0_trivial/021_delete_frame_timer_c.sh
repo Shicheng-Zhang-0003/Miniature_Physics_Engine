@@ -2,7 +2,7 @@
 # ============================================================
 # FIX 021 — ARCH-016: delete empty frame_timer.c
 # Phase:   phase0_trivial
-# Files:   v15R2/src/core/frame_timer.c
+# Files:   v15R3/src/core/frame_timer.c
 # Depends: none
 # Risk:    low
 # ============================================================
@@ -11,7 +11,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-TARGET="v15R2/src/core/frame_timer.c"
+TARGET="v15R3/src/core/frame_timer.c"
 
 if [[ ! -f "$TARGET" ]]; then
     echo "[SKIP] $TARGET already removed"

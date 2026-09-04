@@ -2,7 +2,7 @@
 # ============================================================
 # FIX 023 — SAVE-010: remove status/ backup files from disk
 # Phase:   phase0_trivial
-# Files:   v15R2/src/status/
+# Files:   v15R3/src/status/
 # Depends: none (gitignore fix already ran)
 # Risk:    low
 # ============================================================
@@ -11,7 +11,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-STATUS_DIR="v15R2/src/status"
+STATUS_DIR="v15R3/src/status"
 REMOVED=0
 
 if [[ ! -d "$STATUS_DIR" ]]; then

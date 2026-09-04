@@ -5,14 +5,14 @@
 #   whitespace mismatch. Uses extended regex to match any leading
 #   whitespace, so it works regardless of tabs/spaces/indent depth.
 # Phase:   phase0_foundation
-# Files:   v15R2/src/physics/broadphase.c
+# Files:   v15R3/src/physics/broadphase.c
 # Depends: 059
 # Risk:    low (single targeted replacement, idempotent)
 # ============================================================
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
-TARGET="v15R2/src/physics/broadphase.c"
+TARGET="v15R3/src/physics/broadphase.c"
 
 [[ -f "$TARGET" ]] || { echo "[SKIP] $TARGET not found"; exit 0; }
 

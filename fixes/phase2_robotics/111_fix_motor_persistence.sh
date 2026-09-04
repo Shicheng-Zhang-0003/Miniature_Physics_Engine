@@ -21,7 +21,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-DISPATCH="v15R2/src/ui_input/simulation_input_dispatch.c"
+DISPATCH="v15R3/src/ui_input/simulation_input_dispatch.c"
 
 cp "$DISPATCH" "${DISPATCH}.pre_111"
 

@@ -3,7 +3,7 @@
 # FIX 039a — Insert line-length guard into mv_insert_char
 #             using awk for reliable multi-line context matching
 # Phase:   phase2_bugs
-# Files:   v15R2/src/ui_input/microvim.c
+# Files:   v15R3/src/ui_input/microvim.c
 # Depends: 039
 # Risk:    low
 # ============================================================
@@ -12,7 +12,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-TARGET="v15R2/src/ui_input/microvim.c"
+TARGET="v15R3/src/ui_input/microvim.c"
 
 if [[ ! -f "$TARGET" ]]; then
     echo "[SKIP] $TARGET not found"

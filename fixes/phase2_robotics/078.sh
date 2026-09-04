@@ -6,16 +6,16 @@
 #   "double free or corruption (out)". Also adds defensive bounds
 #   guards to the contact/manifold write paths.
 # Phase:   phase1_constraints / phase2_robotics
-# Files:   v15R2/src/core/physics_world.c (guards)
-#          v15R2/src/makefile (asan teleop target)
+# Files:   v15R3/src/core/physics_world.c (guards)
+#          v15R3/src/makefile (asan teleop target)
 # Depends: 077
 # Risk:    low (additive guards + new make target)
 # ============================================================
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
-PW="v15R2/src/core/physics_world.c"
-MAKEFILE="v15R2/src/makefile"
+PW="v15R3/src/core/physics_world.c"
+MAKEFILE="v15R3/src/makefile"
 [[ -f "$PW" ]] || { echo "[SKIP] physics_world.c not found"; exit 0; }
 grep -q 'MPE_FTC_078' "$PW" && { echo "[SKIP] 078 already applied"; exit 0; }
 cp "$PW" "${PW}.pre_078"
@@ -40,4 +40,4 @@ fi
 grep -q 'MPE_FTC_078' "$PW" || { echo "[FAIL] guard not applied"; exit 1; }
 grep -q 'test_teleop_drive_asan' "$MAKEFILE" || { echo "[FAIL] asan target not added"; exit 1; }
 echo "[PASS] 078: teleop diagnostic guards + ASan target added"
-echo "  -> run: cd v15R2/src && make test_teleop_drive_asan"
+echo "  -> run: cd v15R3/src && make test_teleop_drive_asan"

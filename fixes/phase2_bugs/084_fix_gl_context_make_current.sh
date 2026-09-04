@@ -9,7 +9,7 @@
 #   before render_init() in the when_realised callback.
 #
 # Phase:   phase2_bugs
-# Files:   v15R2/src/root_gtk.c
+# Files:   v15R3/src/root_gtk.c
 # Depends: 038b
 # Risk:    low
 # ============================================================
@@ -17,7 +17,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-TARGET="v15R2/src/root_gtk.c"
+TARGET="v15R3/src/root_gtk.c"
 [[ -f "$TARGET" ]] || { echo "[SKIP] $TARGET not found"; exit 0; }
 
 # Check if already fixed
@@ -46,7 +46,7 @@ if ! grep -q 'gtk_gl_area_make_current' "$TARGET"; then
 fi
 
 # Verify build
-cd v15R2/src
+cd v15R3/src
 if make > /tmp/build_084.log 2>&1; then
     echo "[PASS] 084: GL context fix applied, build verified"
 else

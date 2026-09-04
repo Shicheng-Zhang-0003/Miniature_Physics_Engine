@@ -17,7 +17,7 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 ROOT = SCRIPT_DIR.parent.parent
-SRC = ROOT / "v15R2" / "src"
+SRC = ROOT / "v15R3" / "src"
 
 print("=" * 60)
 print("MFS 128a: Verify build with MFS_DEBUG_STRAFE")
@@ -51,7 +51,7 @@ if result.returncode != 0:
 print("[PASS] Build successful with MFS_DEBUG_STRAFE!")
 print()
 print("You can now build and run the engine with strafe diagnostics:")
-print("  cd v15R2/src")
+print("  cd v15R3/src")
 print("  make CFLAGS=\"$(pkg-config --cflags gtk+-3.0 epoxy) -I. -O3 -Wall -Wextra -MMD -MP -DMFS_DEBUG_STRAFE\"")
 print("  ./engine")
 print()

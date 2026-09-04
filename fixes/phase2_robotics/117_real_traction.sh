@@ -12,7 +12,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
-DT="v15R2/src/robotics/drivetrain.c"
+DT="v15R3/src/robotics/drivetrain.c"
 
 if grep -q 'MPE_DRIVETRAIN_REAL' "$DT"; then
     echo "[SKIP] fix 117 already applied"
@@ -151,7 +151,7 @@ PYEOF
 
 echo ""
 echo "--- build ---"
-cd v15R2/src
+cd v15R3/src
 ./compile 2>&1 | tail -10
 echo ""
 echo "--- headless tests ---"

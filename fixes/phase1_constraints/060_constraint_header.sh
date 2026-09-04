@@ -4,14 +4,14 @@
 #   Declares constraint types + base struct. FTC needs hard
 #   constraints (revolute/fixed/prismatic), not just spring joints.
 # Phase:   phase1_constraints
-# Files:   v15R2/src/physics/constraint.h
+# Files:   v15R3/src/physics/constraint.h
 # Depends: none
 # Risk:    low (new file only)
 # ============================================================
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
-TARGET="v15R2/src/physics/constraint.h"
+TARGET="v15R3/src/physics/constraint.h"
 grep -q 'MPE_FTC_060' "$TARGET" 2>/dev/null && { echo "[SKIP] constraint.h already present"; exit 0; }
 
 cat > "$TARGET" <<'EOF'

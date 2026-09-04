@@ -18,8 +18,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-MOTOR_C="v15R2/src/robotics/motor.c"
-DISPATCH="v15R2/src/ui_input/simulation_input_dispatch.c"
+MOTOR_C="v15R3/src/robotics/motor.c"
+DISPATCH="v15R3/src/ui_input/simulation_input_dispatch.c"
 
 cp "$MOTOR_C"  "${MOTOR_C}.pre_113"
 cp "$DISPATCH" "${DISPATCH}.pre_113"

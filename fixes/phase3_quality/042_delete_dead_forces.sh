@@ -2,7 +2,7 @@
 # ============================================================
 # FIX 042 — ARCH-013: delete unused define_forces functions
 # Phase:   phase3_quality
-# Files:   v15R2/src/physics/define_forces.c, define_forces.h
+# Files:   v15R3/src/physics/define_forces.c, define_forces.h
 # Depends: none
 # Risk:    low
 # ============================================================
@@ -11,8 +11,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-TARGET_C="v15R2/src/physics/define_forces.c"
-TARGET_H="v15R2/src/physics/define_forces.h"
+TARGET_C="v15R3/src/physics/define_forces.c"
+TARGET_H="v15R3/src/physics/define_forces.h"
 
 if [[ ! -f "$TARGET_C" ]]; then
     echo "[SKIP] $TARGET_C not found"

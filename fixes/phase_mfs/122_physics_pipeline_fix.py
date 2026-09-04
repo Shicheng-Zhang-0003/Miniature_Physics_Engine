@@ -25,7 +25,7 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 ROOT = SCRIPT_DIR.parent.parent  # project root (mfs/)
-SRC = ROOT / "v15R2" / "src"
+SRC = ROOT / "v15R3" / "src"
 TOOLS = ROOT / "tools"
 
 sys.path.insert(0, str(TOOLS))

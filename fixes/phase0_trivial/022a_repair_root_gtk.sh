@@ -2,7 +2,7 @@
 # ============================================================
 # FIX 022a — Repair: script 022 deleted the closing } of main()
 # Phase:   phase0_trivial
-# Files:   v15R2/src/root_gtk.c
+# Files:   v15R3/src/root_gtk.c
 # Depends: 022
 # Risk:    low
 # ============================================================
@@ -11,7 +11,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-TARGET="v15R2/src/root_gtk.c"
+TARGET="v15R3/src/root_gtk.c"
 
 if [[ ! -f "$TARGET" ]]; then
     echo "[SKIP] $TARGET not found"

@@ -2,7 +2,7 @@
 # ============================================================
 # FIX 041 — ARCH-012: delete dead rb_integrate()
 # Phase:   phase3_quality
-# Files:   v15R2/src/core/rigidbody.c, v15R2/src/core/rigidbody.h
+# Files:   v15R3/src/core/rigidbody.c, v15R3/src/core/rigidbody.h
 # Depends: none
 # Risk:    low
 # ============================================================
@@ -11,8 +11,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-TARGET_C="v15R2/src/core/rigidbody.c"
-TARGET_H="v15R2/src/core/rigidbody.h"
+TARGET_C="v15R3/src/core/rigidbody.c"
+TARGET_H="v15R3/src/core/rigidbody.h"
 
 if [[ ! -f "$TARGET_C" ]]; then
     echo "[SKIP] $TARGET_C not found"
