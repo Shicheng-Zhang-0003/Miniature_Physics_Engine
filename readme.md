@@ -7,6 +7,8 @@
 > **Release quality:** the current criteria are in [`v15R2/RELEASE_GATES.md`](v15R2/RELEASE_GATES.md). The current candidate notes are in [`v15R2/release_notes_v15R2.md`](v15R2/release_notes_v15R2.md); [`v15R2/release_notes_v15R2.md`](v15R2/release_notes_v15R2.md) documents the prior RC.
 <!-- MPE_RELEASE_GATES_NOTICE_END -->
 
+# Note: This codebase is the latest snapshot of the MPE FTC Simulator, or MFS. Stability changes were made in MFS that were determined to be beneficial to the original MPE engine standalone. Future v16 Series development will focus on modularisation to convert MFS into a plug and install kernel module add-on to the original MPE system.
+
 **License:** GPL-3.0 · **Language:** C · **UI:** GTK3 · **Renderer:** OpenGL 3.3 Core
 
 ---
