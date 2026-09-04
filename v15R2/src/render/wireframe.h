@@ -5,6 +5,7 @@
 #include "../core/math4_special.h"
 #include "../core/rigidbody.h"
 
-void wireframe_render_selected_object (GLuint shader_program, math4 view_matrix, math4 projection_matrix);
-void wireframe_render_object (GLuint shader_program, math4 view_matrix, math4 projection_matrix, rigidbody *rigid_body, vector3 wireframe_colour);
+void wireframe_render_selected_object(GLuint shader_program, math4 view_matrix, math4 projection_matrix);
+void wireframe_render_object(GLuint shader_program, math4 view_matrix, math4 projection_matrix, rigidbody *rigid_body,
+                             vector3 wireframe_colour);
 #endif

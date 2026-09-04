@@ -4,7 +4,7 @@
 #include <stdbool.h>
 typedef struct {
     //Keyboard Movement Inputs
-    bool w_key_pressed, a_key_pressed, s_key_pressed, d_key_pressed, space_key_pressed, shift_key_pressed, escape_key_pressed, f_key_pressed;
+    bool w_key_pressed, a_key_pressed, s_key_pressed, d_key_pressed, space_key_pressed, shift_key_pressed, escape_key_pressed, f_key_pressed, q_key_pressed, g_key_pressed, h_key_pressed, v_key_pressed, b_key_pressed, n_key_pressed, c_key_pressed; /* MFS_GUI_BRIDGE */
 /* MPE_TASK_22_ENTER_SPAWN_FIELD_BEGIN */
 bool enter_spawn_held;
 /* MPE_TASK_22_ENTER_SPAWN_FIELD_END */

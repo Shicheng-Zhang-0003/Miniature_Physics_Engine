@@ -13,51 +13,90 @@
 
 const char *mpe_config_category_name(param_category cat) {
     switch (cat) {
-        case cat_world:         return "world";
-        case cat_timestep:      return "timestep";
-        case cat_sleep:         return "sleep";
-        case cat_solver:        return "solver";
-        case cat_depenetration: return "depenetration";
-        case cat_broadphase:    return "broadphase";
-        case cat_joints:        return "joints";
-        case cat_boundary:      return "boundary";
-        case cat_spawner:       return "spawner";
-        case cat_body_defaults: return "body_defaults";
-        case cat_camera:        return "camera";
-        case cat_render:        return "render";
-        case cat_ui:            return "ui";
-        default:                return "unknown";
+    case cat_world:
+        return "world";
+    case cat_timestep:
+        return "timestep";
+    case cat_sleep:
+        return "sleep";
+    case cat_solver:
+        return "solver";
+    case cat_depenetration:
+        return "depenetration";
+    case cat_broadphase:
+        return "broadphase";
+    case cat_joints:
+        return "joints";
+    case cat_boundary:
+        return "boundary";
+    case cat_spawner:
+        return "spawner";
+    case cat_body_defaults:
+        return "body_defaults";
+    case cat_camera:
+        return "camera";
+    case cat_render:
+        return "render";
+    case cat_ui:
+        return "ui";
+    default:
+        return "unknown";
     }
 }
 
 static double param_read_double(const mpe_param *param) {
-    if ((!param) || (!param->storage)) {return 0.0;}
+    if ((!param) || (!param->storage)) {
+        return 0.0;
+    }
     switch (param->type) {
-        case p_float: return (double)(*(float *)param->storage);
-        case p_int:   return (double)(*(int *)param->storage);
-        case p_bool:  return (*(bool *)param->storage) ? 1.0 : 0.0;
-        default:      return 0.0;
+    case p_float:
+        return (double) (*(float *) param->storage);
+    case p_int:
+        return (double) (*(int *) param->storage);
+    case p_bool:
+        return (*(bool *) param->storage) ? 1.0 : 0.0;
+    default:
+        return 0.0;
     }
 }
 
 static bool param_write_double(const mpe_param *param, double value) {
-    if ((!param) || (!param->storage)) {return false;}
+    if ((!param) || (!param->storage)) {
+        return false;
+    }
     bool clamped = false;
-    if (value < param->min) {value = param->min; clamped = true;}
-    if (value > param->max) {value = param->max; clamped = true;}
+    if (value < param->min) {
+        value = param->min;
+        clamped = true;
+    }
+    if (value > param->max) {
+        value = param->max;
+        clamped = true;
+    }
     switch (param->type) {
-        case p_float: *(float *)param->storage = (float)value; break;
-        case p_int:   *(int *)param->storage = (int)value; break;
-        case p_bool:  *(bool *)param->storage = (value != 0.0); break;
-        default: break;
+    case p_float:
+        *(float *) param->storage = (float) value;
+        break;
+    case p_int:
+        *(int *) param->storage = (int) value;
+        break;
+    case p_bool:
+        *(bool *) param->storage = (value != 0.0);
+        break;
+    default:
+        break;
     }
     return clamped;
 }
 
 const mpe_param *mpe_config_find(const char *key) {
-    if (!key) {return NULL;}
+    if (!key) {
+        return NULL;
+    }
     for (size_t i = 0; i < g_registry_count; i++) {
-        if (strcmp(g_registry[i].key, key) == 0) {return &g_registry[i];}
+        if (strcmp(g_registry[i].key, key) == 0) {
+            return &g_registry[i];
+        }
     }
     return NULL;
 }
@@ -75,42 +114,54 @@ void mpe_config_reset_defaults(void) {
 
 bool mpe_config_get_float(const char *key, float *out) {
     const mpe_param *param = mpe_config_find(key);
-    if ((!param) || (!out)) {return false;}
-    *out = (float)param_read_double(param);
+    if ((!param) || (!out)) {
+        return false;
+    }
+    *out = (float) param_read_double(param);
     return true;
 }
 
 bool mpe_config_get_int(const char *key, int *out) {
     const mpe_param *param = mpe_config_find(key);
-    if ((!param) || (!out)) {return false;}
-    *out = (int)param_read_double(param);
+    if ((!param) || (!out)) {
+        return false;
+    }
+    *out = (int) param_read_double(param);
     return true;
 }
 
 bool mpe_config_get_bool(const char *key, bool *out) {
     const mpe_param *param = mpe_config_find(key);
-    if ((!param) || (!out)) {return false;}
+    if ((!param) || (!out)) {
+        return false;
+    }
     *out = (param_read_double(param) != 0.0);
     return true;
 }
 
 bool mpe_config_set_float(const char *key, float value) {
     const mpe_param *param = mpe_config_find(key);
-    if (!param) {return false;}
-    bool clamped = param_write_double(param, (double)value);
+    if (!param) {
+        return false;
+    }
+    bool clamped = param_write_double(param, (double) value);
     return !clamped;
 }
 
 bool mpe_config_set_int(const char *key, int value) {
     const mpe_param *param = mpe_config_find(key);
-    if (!param) {return false;}
-    bool clamped = param_write_double(param, (double)value);
+    if (!param) {
+        return false;
+    }
+    bool clamped = param_write_double(param, (double) value);
     return !clamped;
 }
 
 bool mpe_config_set_bool(const char *key, bool value) {
     const mpe_param *param = mpe_config_find(key);
-    if (!param) {return false;}
+    if (!param) {
+        return false;
+    }
     param_write_double(param, value ? 1.0 : 0.0);
     return true;
 }
@@ -118,7 +169,9 @@ bool mpe_config_set_bool(const char *key, bool value) {
 size_t mpe_config_count_by_category(param_category cat) {
     size_t count = 0;
     for (size_t i = 0; i < g_registry_count; i++) {
-        if (g_registry[i].category == cat) {count++;}
+        if (g_registry[i].category == cat) {
+            count++;
+        }
     }
     return count;
 }
@@ -126,7 +179,9 @@ size_t mpe_config_count_by_category(param_category cat) {
 /* Fill a caller-provided buffer with params of a category.
  * Matches header: size_t get_by_category(cat, out_params, max_params). */
 size_t mpe_config_get_by_category(param_category cat, const mpe_param **out_params, size_t max_params) {
-    if ((!out_params) || (max_params == 0)) {return 0;}
+    if ((!out_params) || (max_params == 0)) {
+        return 0;
+    }
     size_t filled = 0;
     for (size_t i = 0; (i < g_registry_count) && (filled < max_params); i++) {
         if (g_registry[i].category == cat) {
@@ -148,10 +203,14 @@ static void ensure_parent_dir(const char *path) {
 }
 
 bool mpe_config_save(const char *path) {
-    if (!path) {return false;}
+    if (!path) {
+        return false;
+    }
     ensure_parent_dir(path);
     FILE *file = fopen(path, "w");
-    if (!file) {return false;}
+    if (!file) {
+        return false;
+    }
     time_t now = time(NULL);
     struct tm *local_time = localtime(&now);
     char stamp[64];
@@ -161,9 +220,11 @@ bool mpe_config_save(const char *path) {
     for (int cat = 0; cat <= cat_ui; cat++) {
         bool wrote_header = false;
         for (size_t i = 0; i < g_registry_count; i++) {
-            if ((int)g_registry[i].category != cat) {continue;}
+            if ((int) g_registry[i].category != cat) {
+                continue;
+            }
             if (!wrote_header) {
-                fprintf(file, "[%s]\n", mpe_config_category_name((param_category)cat));
+                fprintf(file, "[%s]\n", mpe_config_category_name((param_category) cat));
                 wrote_header = true;
             }
             const char *dot = strchr(g_registry[i].key, '.');
@@ -171,17 +232,21 @@ bool mpe_config_save(const char *path) {
             if (g_registry[i].type == p_float) {
                 fprintf(file, "%s = %.6f\n", field, param_read_double(&g_registry[i]));
             } else {
-                fprintf(file, "%s = %d\n", field, (int)param_read_double(&g_registry[i]));
+                fprintf(file, "%s = %d\n", field, (int) param_read_double(&g_registry[i]));
             }
         }
-        if (wrote_header) {fprintf(file, "\n");}
+        if (wrote_header) {
+            fprintf(file, "\n");
+        }
     }
     fclose(file);
     return true;
 }
 
 static char *term_trim(char *str) {
-    while ((*str == ' ') || (*str == '\t')) {str++;}
+    while ((*str == ' ') || (*str == '\t')) {
+        str++;
+    }
     char *end = str + strlen(str) - 1;
     while ((end > str) && ((*end == ' ') || (*end == '\t') || (*end == '\n') || (*end == '\r'))) {
         *end = '\0';
@@ -191,14 +256,20 @@ static char *term_trim(char *str) {
 }
 
 bool mpe_config_load(const char *path) {
-    if (!path) {return false;}
+    if (!path) {
+        return false;
+    }
     FILE *file = fopen(path, "r");
-    if (!file) {return false;}
+    if (!file) {
+        return false;
+    }
     char line[512];
     char section[64] = "";
     while (fgets(line, sizeof(line), file)) {
         char *cursor = term_trim(line);
-        if ((*cursor == '\0') || (*cursor == '#')) {continue;}
+        if ((*cursor == '\0') || (*cursor == '#')) {
+            continue;
+        }
         if (*cursor == '[') {
             char *close = strchr(cursor, ']');
             if (close) {
@@ -209,7 +280,9 @@ bool mpe_config_load(const char *path) {
             continue;
         }
         char *equals = strchr(cursor, '=');
-        if (!equals) {continue;}
+        if (!equals) {
+            continue;
+        }
         *equals = '\0';
         char *key_part = term_trim(cursor);
         char *value_part = term_trim(equals + 1);
@@ -220,10 +293,14 @@ bool mpe_config_load(const char *path) {
             snprintf(full_key, sizeof(full_key), "%s", key_part);
         }
         const mpe_param *param = mpe_config_find(full_key);
-        if (!param) {continue;}
+        if (!param) {
+            continue;
+        }
         char *endptr = NULL;
         double parsed = strtod(value_part, &endptr);
-        if ((endptr == value_part) || (!isfinite(parsed))) {continue;}
+        if ((endptr == value_part) || (!isfinite(parsed))) {
+            continue;
+        }
         param_write_double(param, parsed);
     }
     fclose(file);

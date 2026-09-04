@@ -20,11 +20,7 @@
 /* ------------------------------------------------------------------
  * Parameter metadata enums
  * ------------------------------------------------------------------ */
-typedef enum {
-    p_float,
-    p_int,
-    p_bool
-} param_type;
+typedef enum { p_float, p_int, p_bool } param_type;
 
 typedef enum {
     cat_world,
@@ -51,6 +47,7 @@ typedef struct {
         float drag;
         float floor_friction_s;
         float floor_friction_k;
+    float rolling_resistance_coeff; /* MFS_132 */
     } world;
 
     struct {
@@ -157,16 +154,16 @@ typedef struct {
  * Parameter registry entry — describes one tunable
  * ------------------------------------------------------------------ */
 typedef struct {
-    const char     *key;          /* "solver.iterations" — file/terminal key */
-    const char     *display;      /* "Solver Iterations" — menu label       */
-    const char     *help;         /* tooltip / man text                     */
-    param_type      type;
-    param_category  category;
-    void           *storage;      /* pointer into g_cfg                     */
-    double          def;          /* default value                          */
-    double          min;          /* clamp lower bound                      */
-    double          max;          /* clamp upper bound                      */
-    bool            debug_only;   /* requires debug mode to mutate          */
+    const char *key; /* "solver.iterations" — file/terminal key */
+    const char *display; /* "Solver Iterations" — menu label       */
+    const char *help; /* tooltip / man text                     */
+    param_type type;
+    param_category category;
+    void *storage; /* pointer into g_cfg                     */
+    double def; /* default value                          */
+    double min; /* clamp lower bound                      */
+    double max; /* clamp upper bound                      */
+    bool debug_only; /* requires debug mode to mutate          */
 } mpe_param;
 
 /* ------------------------------------------------------------------
