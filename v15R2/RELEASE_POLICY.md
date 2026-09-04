@@ -22,6 +22,10 @@ During v15R2 development:
 3. Build and repository hygiene.
 4. Documentation updates to match new architecture.
 5. Validation improvements for the new system.
+6. FTC robotics: robot creation, drivetrain, motor, battery, sensors.
+7. Cylinder physics: narrowphase, inertia, anisotropic friction.
+8. Constraint framework: revolute joints, axis correction.
+9. Headless test infrastructure and CI tooling.
 
 ## Explicitly Deferred
 

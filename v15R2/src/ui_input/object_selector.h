@@ -5,13 +5,13 @@
 #include <stdint.h>
 
 extern int selected_object;
-int selector_ray_tracing (void);
-void clear_selection (void);
-void selector_apply_force_impulse (float impulse_magnitude);
+int selector_ray_tracing(void);
+void clear_selection(void);
+void selector_apply_force_impulse(float impulse_magnitude);
 
 extern uint32_t selected_object_id;
 
-void select_object_by_index (int object_index);
-void selection_validate (void);
-uint32_t selection_get_id (void);
+void select_object_by_index(int object_index);
+void selection_validate(void);
+uint32_t selection_get_id(void);
 #endif

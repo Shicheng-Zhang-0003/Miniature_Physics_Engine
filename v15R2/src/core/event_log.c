@@ -38,15 +38,21 @@ int event_log_get_count(void) {
 }
 
 const char *event_log_get_message(int index, log_level *level, time_t *timestamp) {
-    if ((index < 0) || (index >= event_log_count)) { return NULL; }
+    if ((index < 0) || (index >= event_log_count)) {
+        return NULL;
+    }
     int actual_index;
     if (event_log_count < event_log_capacity) {
         actual_index = index;
     } else {
         actual_index = (event_log_head + index) % event_log_capacity;
     }
-    if (level) { *level = event_log_ring[actual_index].level; }
-    if (timestamp) { *timestamp = event_log_ring[actual_index].timestamp; }
+    if (level) {
+        *level = event_log_ring[actual_index].level;
+    }
+    if (timestamp) {
+        *timestamp = event_log_ring[actual_index].timestamp;
+    }
     return event_log_ring[actual_index].message;
 }
 

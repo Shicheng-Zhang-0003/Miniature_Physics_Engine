@@ -18,6 +18,12 @@ void initialize_input (input_status *input_state) {
     input_state -> shift_key_pressed = false;
     input_state -> escape_key_pressed = false;
     input_state -> f_key_pressed = false;
+    input_state -> g_key_pressed = false;
+    input_state -> h_key_pressed = false;
+    input_state -> c_key_pressed = false;
+    input_state -> v_key_pressed = false;
+    input_state -> b_key_pressed = false;
+    input_state -> n_key_pressed = false;
     input_state -> i_key_pressed = false;
     input_state -> j_key_pressed = false;
     input_state -> k_key_pressed = false;
@@ -82,7 +88,14 @@ input_state -> enter_spawn_held = false;
     if (event -> keyval == GDK_KEY_s) {input_state -> s_key_pressed = true;}
     if (event -> keyval == GDK_KEY_d) {input_state -> d_key_pressed = true;}
     if (event -> keyval == GDK_KEY_e) {input_state -> e_key_pressed = true;}
+    if ((event -> keyval == GDK_KEY_q) || (event -> keyval == GDK_KEY_Q)) {input_state -> q_key_pressed = true;} /* MFS_GUI_BRIDGE_Q_KEY */
     if (event -> keyval == GDK_KEY_f) {input_state -> f_key_pressed = true;}
+    if (event -> keyval == GDK_KEY_g) {input_state -> g_key_pressed = true;}
+    if (event -> keyval == GDK_KEY_h) {input_state -> h_key_pressed = true;}
+    if (event -> keyval == GDK_KEY_c) {input_state -> c_key_pressed = true;}
+    if (event -> keyval == GDK_KEY_v) {input_state -> v_key_pressed = true;}
+    if (event -> keyval == GDK_KEY_b) {input_state -> b_key_pressed = true;}
+    if (event -> keyval == GDK_KEY_n) {input_state -> n_key_pressed = true;}
 /* MPE_TASK_21_KEYBOARD_ONLY_KEYPRESS_BEGIN */
 if ((event -> keyval == GDK_KEY_r) || (event -> keyval == GDK_KEY_R)) {input_state -> r_key_pressed = true;}
 if (event -> keyval == GDK_KEY_Delete) {input_state -> delete_key_pressed = true;}
@@ -108,7 +121,7 @@ if (event -> keyval == GDK_KEY_F11) {input_state -> config_torture_pressed = tru
     if ((event -> keyval == GDK_KEY_8) && (!config_menu_is_open ())) {input_state -> is_menu_open = false; input_state -> velocity_menu_level = 0; input_state -> object_menu_level = 0; if (input_state -> spawner_menu_level > 0) {input_state -> spawner_menu_level = 0;} else {input_state -> spawner_menu_level = 1;}}
     if ((event -> keyval == GDK_KEY_7) && (!config_menu_is_open ())) {input_state -> is_menu_open = false; input_state -> spawner_menu_level = 0; input_state -> object_menu_level = 0; if (input_state -> velocity_menu_level > 0) {input_state -> velocity_menu_level = 0;} else {input_state -> velocity_menu_level = 1;}}
 /* MPE_TASK_35_CONFIG_MENU_KEY_BEGIN */
-if ((event -> keyval == GDK_KEY_6) && (!input_state -> is_menu_open)) {
+if ((event -> keyval == GDK_KEY_6) && (!input_state -> is_menu_open) && (input_state -> object_menu_level == 0)) {
 input_state -> spawner_menu_level = 0;
 input_state -> velocity_menu_level = 0;
 input_state -> object_menu_level = 0;
@@ -238,8 +251,14 @@ if ((event -> keyval == GDK_KEY_t) || (event -> keyval == GDK_KEY_T)) {input_sta
     if (event -> keyval == GDK_KEY_j) {input_state -> j_key_pressed = false;}
     if (event -> keyval == GDK_KEY_k) {input_state -> k_key_pressed = false;}
     if (event -> keyval == GDK_KEY_l) {input_state -> l_key_pressed = false;}
-    if (event -> keyval == GDK_KEY_Shift_L) {input_state -> shift_key_pressed = false;}
-    if (event -> keyval == GDK_KEY_space) {input_state -> space_key_pressed = false;}
+    if ((event -> keyval == GDK_KEY_q) || (event -> keyval == GDK_KEY_Q)) {input_state -> q_key_pressed = false;} /* MFS_GUI_BRIDGE_Q_KEY */
+    if (event -> keyval == GDK_KEY_g) {input_state -> g_key_pressed = false;} /* MFS_GUI_BRIDGE */
+    if (event -> keyval == GDK_KEY_g) {input_state -> g_key_pressed = false;}
+    if (event -> keyval == GDK_KEY_h) {input_state -> h_key_pressed = false;}
+    if (event -> keyval == GDK_KEY_c) {input_state -> c_key_pressed = false;}
+    if (event -> keyval == GDK_KEY_v) {input_state -> v_key_pressed = false;}
+    if (event -> keyval == GDK_KEY_b) {input_state -> b_key_pressed = false;}
+    if (event -> keyval == GDK_KEY_n) {input_state -> n_key_pressed = false;} /* MFS_124_FIX */
 /* MPE_TASK_22_ENTER_SPAWN_KEYRELEASE_BEGIN */
 if ((event -> keyval == GDK_KEY_Return) || (event -> keyval == GDK_KEY_KP_Enter)) {
 input_state -> enter_spawn_held = false;
@@ -313,6 +332,12 @@ input_state -> enter_spawn_held = false;
     input_state -> shift_key_pressed = false;
     input_state -> escape_key_pressed = false;
     input_state -> f_key_pressed = false;
+    input_state -> g_key_pressed = false;
+    input_state -> h_key_pressed = false;
+    input_state -> c_key_pressed = false;
+    input_state -> v_key_pressed = false;
+    input_state -> b_key_pressed = false;
+    input_state -> n_key_pressed = false;
     input_state -> i_key_pressed = false;
     input_state -> j_key_pressed = false;
     input_state -> k_key_pressed = false;
@@ -329,6 +354,7 @@ input_state -> up_arrow_pressed = false;
     input_state -> right_arrow_pressed = false;
     input_state -> enter_key_pressed = false;
     input_state -> e_key_pressed = false;
+    input_state -> q_key_pressed = false; /* MFS_GUI_BRIDGE_Q_KEY_FOCUS */
 input_state -> stability_test_pressed = false;
 input_state -> sleep_wake_test_pressed = false;
 input_state -> editor_torture_pressed = false;
@@ -346,6 +372,7 @@ input_state -> debug_terminal_pressed = false;
 /* MPE_TASK_22_ENTER_SPAWN_FOCUS_BEGIN */
 input_state -> enter_spawn_held = false;
 /* MPE_TASK_22_ENTER_SPAWN_FOCUS_END */
+/* A3_PATCH_02_FOCUS_LOSS */
     input_state -> mouse_delta_x = 0.0f;
     input_state -> mouse_delta_y = 0.0f;
     input_state -> left_mouse_button_clicked = false;

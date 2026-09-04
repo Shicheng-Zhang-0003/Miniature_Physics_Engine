@@ -65,33 +65,30 @@ extern input_status main_inputs;
 
 extern int selected_object;
 
-
-
 extern frame_timer main_timer;
 
 /* ------------------------------------------------------------------ */
 /* Top-level render entry points                                      */
 /* ------------------------------------------------------------------ */
 
-void render_init (void);
-void render_cleanup (void);
-void broadphase_cleanup (void);
-void render_scene_current (int widget_width, int widget_height);
+void render_init(void);
+void render_cleanup(void);
+void broadphase_cleanup(void);
+void render_scene_current(int widget_width, int widget_height);
 
 /* ------------------------------------------------------------------ */
 /* Top-level physics tick entry point                                 */
 /* ------------------------------------------------------------------ */
 
-gboolean physics_step_increment (gpointer user_data_pointer);
+gboolean physics_step_increment(gpointer user_data_pointer);
 
 /* ------------------------------------------------------------------ */
 /* Optional GTK application activation entry point                    */
 /* ------------------------------------------------------------------ */
 
-
-
-float open_numerical_input_dialog (GtkWidget *parent, const char *title, float current_value);
-void editor_reset (void); /* MPE_TASK_V15R2_FIX */
+float open_numerical_input_dialog(GtkWidget *parent, const char *title, float current_value);
+void editor_reset(void); /* MPE_TASK_V15R2_FIX */
+bool editor_dialog_is_active(void); /* MFS_PHASE_A */
 
 extern int debug_last_object_count;
 extern int debug_last_broadphase_pair_count;
@@ -112,6 +109,7 @@ extern int debug_last_manifold_overflow_count;
 void physics_halt_set(bool halted);
 void physics_halt_for_ticks(int ticks);
 bool physics_is_halted(void);
+bool physics_halt_tick_update(void); /* MFS_PHASE_A */
 /* MPE_TASK_V15R2_PHYSICS_HALT_EXTERN_END */
 
 #define a3_version_string "v15R2" /* v15R2 release candidate */

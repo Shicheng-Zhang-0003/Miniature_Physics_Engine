@@ -3,6 +3,7 @@
 #include "../core/math3D.h"
 #include "../core/rigidbody.h"
 #include "define_forces.h"
+struct physics_world; /* MFS_131: forward decl for per-world cache */
 #ifndef collisions_h
 #define collisions_h
 typedef struct {
@@ -26,24 +27,24 @@ typedef struct {
     rigidbody *object_a;
     rigidbody *object_b;
     vector3 normal_vector;
-    contact_point_data contacts [4];
+    contact_point_data contacts[4];
     int contact_count;
 } collision_data;
-bool collision_dual_sphere (rigidbody *rigidbody_object_a, rigidbody *rigidbody_object_b, collision_data *collision_output_data);
-float project_obb (rigidbody *rigid_body, vector3 axis, vector3 axes [3]);
-bool collision_sphere_cube (rigidbody *sphere, rigidbody *cube, collision_data *collision_output_data);
-bool collision_dual_cube (rigidbody *cube_a, rigidbody *cube_b, collision_data *collision_output_data);
-void collision_prepare_solver (collision_data *source, collision_data *manifold_entry);
-void collision_resolve_iterative (collision_data *manifold_entry);
-void contact_cache_save (collision_data *manifolds, int count);
-void contact_cache_clear (void);
+bool collision_dual_sphere(rigidbody *rigidbody_object_a, rigidbody *rigidbody_object_b,
+                           collision_data *collision_output_data);
+float project_obb(rigidbody *rigid_body, vector3 axis, vector3 axes[3]);
+bool collision_sphere_cube(rigidbody *sphere, rigidbody *cube, collision_data *collision_output_data);
+bool collision_dual_cube(rigidbody *cube_a, rigidbody *cube_b, collision_data *collision_output_data);
+void collision_prepare_solver(collision_data *source, collision_data *manifold_entry);
+void collision_resolve_iterative(collision_data *manifold_entry);
+void contact_cache_save(struct physics_world *world, collision_data *manifolds, int count); /* MFS_131 */
+void contact_cache_clear(struct physics_world *world); /* MFS_131 */
 
+bool collision_static_plane_sphere(rigidbody *sphere, float plane_y, collision_data *collision_output_data);
+bool collision_static_plane_cube(rigidbody *cube, float plane_y, collision_data *collision_output_data);
+bool collision_static_plane_body(rigidbody *body, float plane_y, collision_data *collision_output_data);
 
-bool collision_static_plane_sphere (rigidbody *sphere, float plane_y, collision_data *collision_output_data);
-bool collision_static_plane_cube (rigidbody *cube, float plane_y, collision_data *collision_output_data);
-bool collision_static_plane_body (rigidbody *body, float plane_y, collision_data *collision_output_data);
-
-void contact_cache_stats_reset (void);
-int contact_cache_get_hits (void);
-int contact_cache_get_misses (void);
+void contact_cache_stats_reset(void);
+int contact_cache_get_hits(void);
+int contact_cache_get_misses(void);
 #endif

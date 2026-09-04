@@ -2,38 +2,39 @@
 #include "grid.h"
 #include <epoxy/gl_generated.h>
 #include <stdlib.h>
-void grid_init (grid_mesh *grid_mesh_object, int half_extent, int cell_spacing) {
+void grid_init(grid_mesh *grid_mesh_object, int half_extent, int cell_spacing) {
     //Count the lines: one iteration per X axis, one along Z axis
     int grid_line_steps = (half_extent * 2) / cell_spacing + 1;
     //Each line (2 vertices, 3 floats)
     int vertex_float_count = grid_line_steps * 4 * 3; //(* 2 * 2 iteration per axis)
-    float *vertex_data = malloc (vertex_float_count * sizeof (float));
+    float *vertex_data = malloc(vertex_float_count * sizeof(float));
     int vertex_index = 0;
     for (int step_coordinate = -half_extent; step_coordinate <= half_extent; step_coordinate += cell_spacing) {
         //Line along the Z axis at X = step_coordinate;
-        vertex_data [vertex_index++] = (float) step_coordinate;
-        vertex_data [vertex_index++] = 0.0f;
-        vertex_data [vertex_index++] = (float) -half_extent;
-        vertex_data [vertex_index++] = (float) step_coordinate;
-        vertex_data [vertex_index++] = 0.0f;
-        vertex_data [vertex_index++] = (float) half_extent;
+        vertex_data[vertex_index++] = (float) step_coordinate;
+        vertex_data[vertex_index++] = 0.0f;
+        vertex_data[vertex_index++] = (float) -half_extent;
+        vertex_data[vertex_index++] = (float) step_coordinate;
+        vertex_data[vertex_index++] = 0.0f;
+        vertex_data[vertex_index++] = (float) half_extent;
         //Line along X axis at position of Z = step_coordinate
-        vertex_data [vertex_index++] = (float) -half_extent;
-        vertex_data [vertex_index++] = 0.0f;
-        vertex_data [vertex_index++] = (float) step_coordinate;
-        vertex_data [vertex_index++] = (float) half_extent;
-        vertex_data [vertex_index++] = 0.0f;
-        vertex_data [vertex_index++] = (float) step_coordinate;
-    } grid_mesh_object -> line_vertex_count = vertex_index / 3;
-    glGenVertexArrays (1, &grid_mesh_object -> vertex_array_object);
-    glGenBuffers (1, &grid_mesh_object -> vertex_buffer_object);
-    glBindVertexArray (grid_mesh_object -> vertex_array_object);
-    glBindBuffer (GL_ARRAY_BUFFER, grid_mesh_object -> vertex_buffer_object);
-    glBufferData (GL_ARRAY_BUFFER, vertex_index * sizeof (float), vertex_data, GL_STATIC_DRAW);
-    glVertexAttribPointer (0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof (float), (void*) 0);
-    glEnableVertexAttribArray (0);
-    glBindVertexArray (0);
-    free (vertex_data);
+        vertex_data[vertex_index++] = (float) -half_extent;
+        vertex_data[vertex_index++] = 0.0f;
+        vertex_data[vertex_index++] = (float) step_coordinate;
+        vertex_data[vertex_index++] = (float) half_extent;
+        vertex_data[vertex_index++] = 0.0f;
+        vertex_data[vertex_index++] = (float) step_coordinate;
+    }
+    grid_mesh_object->line_vertex_count = vertex_index / 3;
+    glGenVertexArrays(1, &grid_mesh_object->vertex_array_object);
+    glGenBuffers(1, &grid_mesh_object->vertex_buffer_object);
+    glBindVertexArray(grid_mesh_object->vertex_array_object);
+    glBindBuffer(GL_ARRAY_BUFFER, grid_mesh_object->vertex_buffer_object);
+    glBufferData(GL_ARRAY_BUFFER, vertex_index * sizeof(float), vertex_data, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *) 0);
+    glEnableVertexAttribArray(0);
+    glBindVertexArray(0);
+    free(vertex_data);
 } /* A3_PATCH_27_UNIFORM_CACHE */
 static GLuint a3_grid_cached_program = 0;
 static GLint a3_grid_uniform_viewframe = -1;
@@ -47,52 +48,60 @@ static GLint a3_grid_uniform_ambient = -1;
 static GLint a3_grid_uniform_specular_coeff = -1;
 static GLint a3_grid_uniform_specular_exp = -1;
 
-static void a3_grid_cache_uniforms (GLuint shader_program) {
-    if (shader_program == a3_grid_cached_program) {return;}
+static void a3_grid_cache_uniforms(GLuint shader_program) {
+    if (shader_program == a3_grid_cached_program) {
+        return;
+    }
 
     a3_grid_cached_program = shader_program;
-    a3_grid_uniform_viewframe = glGetUniformLocation (shader_program, "viewframe");
-    a3_grid_uniform_projection = glGetUniformLocation (shader_program, "projection");
-    a3_grid_uniform_model = glGetUniformLocation (shader_program, "model");
-    a3_grid_uniform_normal_matrix = glGetUniformLocation (shader_program, "normal_matrix");
-    a3_grid_uniform_object_colour = glGetUniformLocation (shader_program, "object_colour");
-    a3_grid_uniform_camera_position = glGetUniformLocation (shader_program, "camera_position");
-    a3_grid_uniform_light_position = glGetUniformLocation (shader_program, "light_position");
-    a3_grid_uniform_ambient = glGetUniformLocation (shader_program, "u_ambient_strength");
-    a3_grid_uniform_specular_coeff = glGetUniformLocation (shader_program, "u_specular_coeff");
-    a3_grid_uniform_specular_exp = glGetUniformLocation (shader_program, "u_specular_exponent");
+    a3_grid_uniform_viewframe = glGetUniformLocation(shader_program, "viewframe");
+    a3_grid_uniform_projection = glGetUniformLocation(shader_program, "projection");
+    a3_grid_uniform_model = glGetUniformLocation(shader_program, "model");
+    a3_grid_uniform_normal_matrix = glGetUniformLocation(shader_program, "normal_matrix");
+    a3_grid_uniform_object_colour = glGetUniformLocation(shader_program, "object_colour");
+    a3_grid_uniform_camera_position = glGetUniformLocation(shader_program, "camera_position");
+    a3_grid_uniform_light_position = glGetUniformLocation(shader_program, "light_position");
+    a3_grid_uniform_ambient = glGetUniformLocation(shader_program, "u_ambient_strength");
+    a3_grid_uniform_specular_coeff = glGetUniformLocation(shader_program, "u_specular_coeff");
+    a3_grid_uniform_specular_exp = glGetUniformLocation(shader_program, "u_specular_exponent");
 }
 
-void grid_render (grid_mesh *grid_mesh_object, GLuint shader_program, math4 view_matrix, math4 projection_matrix) {
-    glUseProgram (shader_program);
-    a3_grid_cache_uniforms (shader_program);
-    float view_matrix_flat_array [16], projection_matrix_flat_array [16];
-    math4_to_flat_array (view_matrix, view_matrix_flat_array);
-    math4_to_flat_array (projection_matrix, projection_matrix_flat_array);
-    glUniformMatrix4fv (a3_grid_uniform_viewframe, 1, GL_FALSE, view_matrix_flat_array);
-    glUniformMatrix4fv (a3_grid_uniform_projection, 1, GL_FALSE, projection_matrix_flat_array);
+void grid_render(grid_mesh *grid_mesh_object, GLuint shader_program, math4 view_matrix, math4 projection_matrix) {
+    glUseProgram(shader_program);
+    a3_grid_cache_uniforms(shader_program);
+    float view_matrix_flat_array[16], projection_matrix_flat_array[16];
+    math4_to_flat_array(view_matrix, view_matrix_flat_array);
+    math4_to_flat_array(projection_matrix, projection_matrix_flat_array);
+    glUniformMatrix4fv(a3_grid_uniform_viewframe, 1, GL_FALSE, view_matrix_flat_array);
+    glUniformMatrix4fv(a3_grid_uniform_projection, 1, GL_FALSE, projection_matrix_flat_array);
     //Identity Model Matrix (sits at the (0, 0, 0, 0w))
-    math4 model_matrix = math4_identity ();
-    float model_matrix_flat_array [16];
-    math4_to_flat_array (model_matrix, model_matrix_flat_array);
-    glUniformMatrix4fv (a3_grid_uniform_model, 1, GL_FALSE, model_matrix_flat_array);
+    math4 model_matrix = math4_identity();
+    float model_matrix_flat_array[16];
+    math4_to_flat_array(model_matrix, model_matrix_flat_array);
+    glUniformMatrix4fv(a3_grid_uniform_model, 1, GL_FALSE, model_matrix_flat_array);
     //Normal Matrix (Identity for the Static Floor)
-    math3 identity_normal_matrix = math3_identity ();
-    float normal_matrix_flat_array [9];
+    math3 identity_normal_matrix = math3_identity();
+    float normal_matrix_flat_array[9];
     for (int row_index = 0; row_index < 3; row_index++) {
-        for (int column_index = 0; column_index < 3; column_index++) {normal_matrix_flat_array [row_index * 3 + column_index] = identity_normal_matrix.matrix [row_index][column_index];}
-    } glUniformMatrix3fv (a3_grid_uniform_normal_matrix, 1, GL_FALSE, normal_matrix_flat_array);
-    glUniform3f (a3_grid_uniform_object_colour, 0.3f, 0.3f, 0.3f);
-    glUniform3f (a3_grid_uniform_camera_position, main_camera_fov.position.x, main_camera_fov.position.y, main_camera_fov.position.z);
-    glUniform3f (a3_grid_uniform_light_position, g_cfg.render.light_x, g_cfg.render.light_y, g_cfg.render.light_z);
-    glUniform1f (a3_grid_uniform_ambient, g_cfg.render.ambient_strength);
-    glUniform1f (a3_grid_uniform_specular_coeff, g_cfg.render.specular_coeff);
-    glUniform1f (a3_grid_uniform_specular_exp, g_cfg.render.specular_exponent);
+        for (int column_index = 0; column_index < 3; column_index++) {
+            normal_matrix_flat_array[row_index * 3 + column_index] =
+                identity_normal_matrix.matrix[row_index][column_index];
+        }
+    }
+    glUniformMatrix3fv(a3_grid_uniform_normal_matrix, 1, GL_FALSE, normal_matrix_flat_array);
+    glUniform3f(a3_grid_uniform_object_colour, 0.3f, 0.3f, 0.3f);
+    glUniform3f(a3_grid_uniform_camera_position, main_camera_fov.position.x, main_camera_fov.position.y,
+                main_camera_fov.position.z);
+    glUniform3f(a3_grid_uniform_light_position, g_cfg.render.light_x, g_cfg.render.light_y, g_cfg.render.light_z);
+    glUniform1f(a3_grid_uniform_ambient, g_cfg.render.ambient_strength);
+    glUniform1f(a3_grid_uniform_specular_coeff, g_cfg.render.specular_coeff);
+    glUniform1f(a3_grid_uniform_specular_exp, g_cfg.render.specular_exponent);
     const float grid_surface_normal_x = 0.0f;
     const float grid_surface_normal_y = 1.0f;
     const float grid_surface_normal_z = 0.0f;
-    glVertexAttrib3f (1, grid_surface_normal_x, grid_surface_normal_y, grid_surface_normal_z); // Constant normal pointing up for the grid
-    glBindVertexArray (grid_mesh_object -> vertex_array_object);
-    glDrawArrays (GL_LINES, 0, grid_mesh_object -> line_vertex_count);
-    glBindVertexArray (0);
+    glVertexAttrib3f(1, grid_surface_normal_x, grid_surface_normal_y,
+                     grid_surface_normal_z); // Constant normal pointing up for the grid
+    glBindVertexArray(grid_mesh_object->vertex_array_object);
+    glDrawArrays(GL_LINES, 0, grid_mesh_object->line_vertex_count);
+    glBindVertexArray(0);
 }

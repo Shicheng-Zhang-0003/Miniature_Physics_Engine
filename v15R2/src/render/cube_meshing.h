@@ -3,5 +3,5 @@
 #include "sphere_meshing.h"
 
 extern mesh cube_mesh;
-void cube_meshing_init (void);
+void cube_meshing_init(void);
 #endif

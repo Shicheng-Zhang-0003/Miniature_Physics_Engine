@@ -105,7 +105,7 @@ They should be recorded as post-stable work items.
 
 ### 10. Configuration System
 - [X] Config menu (key 6) opens and navigates correctly.
-- [X] All 57 tunable parameters are editable via the menu.
+- [X] All 69 tunable parameters are editable via the menu.
 - [X] Debug-only parameters are refused in Game Mode.
 - [X] Config saves to `status/engine.cfg` on exit.
 - [X] Config loads on startup and overrides defaults.
@@ -180,6 +180,26 @@ The following are not required for `v15R2`:
 - per-object config persistence in scene files.
 
 These belong after `v15R2`.
+
+---
+
+
+### 14. FTC Robotics (MFS)
+- [X] `ftc_robot_create` spawns chassis + 4 cylinder wheels with revolute joints
+- [X] Mecanum strafe works via real anisotropic roller friction (no chassis cheat)
+- [X] Tank drive works via motor torque → wheel traction
+- [X] Motor model: BackEMF, gear ratio, Kt/Kv correct
+- [X] Battery voltage sag under multi-motor load
+- [X] All 8 headless tests pass (`python3 tools/test_runner.py`)
+- [X] Robot visible in GUI via proxy sync
+- [X] Robot drivable via G/V/B/N/C/H keys
+- [X] Fixed-timestep accumulator (60Hz deterministic)
+- [X] Revolute axis drift corrected (Baumgarte)
+- [ ] Scene save/load preserves robot assemblies
+- [ ] Prismatic joints (arms/slides)
+- [ ] Sensors (encoders, IMU, distance)
+- [ ] FTC HAL (HardwareMap, OpMode)
+
 
 ---
 

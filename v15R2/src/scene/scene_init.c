@@ -7,12 +7,12 @@
 
 static bool pool_is_initialized = false;
 
-void scene_allocate_pool (void) {
+void scene_allocate_pool(void) {
     if (!pool_is_initialized) {
-        obj_per_scene = (rigidbody *) malloc (mpe_max_bodies * sizeof (rigidbody));
+        obj_per_scene = (rigidbody *) malloc(mpe_max_bodies * sizeof(rigidbody));
         if (!obj_per_scene) {
-            fprintf (stderr, "Error POOL00: Failed to allocate physics heap.\n");
-            exit (1);
+            fprintf(stderr, "Error POOL00: Failed to allocate physics heap.\n");
+            exit(1);
         }
         object_capacity = mpe_max_bodies;
         pool_is_initialized = true;
@@ -21,29 +21,37 @@ void scene_allocate_pool (void) {
 
 static uint32_t next_object_id = 1;
 
-uint32_t scene_allocate_object_id (void) {
+uint32_t scene_allocate_object_id(void) {
     return next_object_id++;
 }
 
-void scene_assign_new_identity (int object_index) {
-    if ((object_index < 0) || (object_index >= object_count)) {return;}
-    obj_per_scene [object_index].object_id = scene_allocate_object_id ();
-    obj_per_scene [object_index].object_generation = 1;
+void scene_assign_new_identity(int object_index) {
+    if ((object_index < 0) || (object_index >= object_count)) {
+        return;
+    }
+    obj_per_scene[object_index].object_id = scene_allocate_object_id();
+    obj_per_scene[object_index].object_generation = 1;
 }
 
-int scene_ensure_pool_capacity (int required_capacity) {
-    if (required_capacity <= 0) {return 1;}
+int scene_ensure_pool_capacity(int required_capacity) {
+    if (required_capacity <= 0) {
+        return 1;
+    }
 
-    if (required_capacity > mpe_max_bodies) {required_capacity = mpe_max_bodies;}
+    if (required_capacity > mpe_max_bodies) {
+        required_capacity = mpe_max_bodies;
+    }
 
-    if (pool_is_initialized && (required_capacity <= object_capacity)) {return 1;}
+    if (pool_is_initialized && (required_capacity <= object_capacity)) {
+        return 1;
+    }
 
     int new_capacity = mpe_max_bodies;
 
-    rigidbody *new_array = (rigidbody *) realloc (obj_per_scene, (size_t) new_capacity * sizeof (rigidbody));
+    rigidbody *new_array = (rigidbody *) realloc(obj_per_scene, (size_t) new_capacity * sizeof(rigidbody));
 
     if (!new_array) {
-        fprintf (stderr, "Error POOL23: Failed to resize physics heap.\n");
+        fprintf(stderr, "Error POOL23: Failed to resize physics heap.\n");
         return 0;
     }
 
@@ -55,141 +63,163 @@ int scene_ensure_pool_capacity (int required_capacity) {
 }
 
 /* MPE_TASK_20B_SPAWN_SEPARATION_BEGIN */
-static bool a3_spawn_collision_dispatch (rigidbody *rigid_body_a, rigidbody *rigid_body_b, collision_data *collision_output) {
-if ((rigid_body_a -> type == object_sphere) && (rigid_body_b -> type == object_sphere)) {
-return collision_dual_sphere (rigid_body_a, rigid_body_b, collision_output);
-}
-if ((rigid_body_a -> type == object_sphere) && (rigid_body_b -> type == object_cube)) {
-return collision_sphere_cube (rigid_body_a, rigid_body_b, collision_output);
-}
-if ((rigid_body_a -> type == object_cube) && (rigid_body_b -> type == object_sphere)) {
-bool collided = collision_sphere_cube (rigid_body_b, rigid_body_a, collision_output);
-if (collided) {
-collision_output -> normal_vector = vector3_scaling (collision_output -> normal_vector, -1.0f);
-collision_output -> object_a = rigid_body_a;
-collision_output -> object_b = rigid_body_b;
-}
-return collided;
-}
-if ((rigid_body_a -> type == object_cube) && (rigid_body_b -> type == object_cube)) {
-return collision_dual_cube (rigid_body_a, rigid_body_b, collision_output);
-}
-return false;
-}
-
-static void scene_resolve_spawn_overlap (int new_object_index) {
-if ((new_object_index < 0) || (new_object_index >= object_count)) {return;}
-
-rigidbody *new_body = &obj_per_scene [new_object_index];
-if (new_body -> static_state) {return;}
-
-const int max_attempts = g_cfg.spawner.overlap_max_attempts; /* MPE_TASK_32 */
-const float overlap_threshold = g_cfg.spawner.overlap_thresh; /* MPE_TASK_32 */
-
-for (int attempt = 0; attempt < max_attempts; attempt++) {
-bool overlap_found = false;
-
-for (int other_index = 0; other_index < object_count; other_index++) {
-if (other_index == new_object_index) {continue;}
-
-rigidbody *other_body = &obj_per_scene [other_index];
-collision_data overlap_collision = {0};
-
-if (!a3_spawn_collision_dispatch (new_body, other_body, &overlap_collision)) {continue;}
-
-float max_depth = 0.0f;
-
-for (int contact_index = 0; contact_index < overlap_collision.contact_count; contact_index++) {
-float depth = overlap_collision.contacts [contact_index].penetration;
-if (depth > max_depth) {max_depth = depth;}
+static bool a3_spawn_collision_dispatch(rigidbody *rigid_body_a, rigidbody *rigid_body_b,
+                                        collision_data *collision_output) {
+    if ((rigid_body_a->type == object_sphere) && (rigid_body_b->type == object_sphere)) {
+        return collision_dual_sphere(rigid_body_a, rigid_body_b, collision_output);
+    }
+    if ((rigid_body_a->type == object_sphere) && (rigid_body_b->type == object_cube)) {
+        return collision_sphere_cube(rigid_body_a, rigid_body_b, collision_output);
+    }
+    if ((rigid_body_a->type == object_cube) && (rigid_body_b->type == object_sphere)) {
+        bool collided = collision_sphere_cube(rigid_body_b, rigid_body_a, collision_output);
+        if (collided) {
+            collision_output->normal_vector = vector3_scaling(collision_output->normal_vector, -1.0f);
+            collision_output->object_a = rigid_body_a;
+            collision_output->object_b = rigid_body_b;
+        }
+        return collided;
+    }
+    if ((rigid_body_a->type == object_cube) && (rigid_body_b->type == object_cube)) {
+        return collision_dual_cube(rigid_body_a, rigid_body_b, collision_output);
+    }
+    return false;
 }
 
-if (max_depth <= overlap_threshold) {continue;}
+static void scene_resolve_spawn_overlap(int new_object_index) {
+    if ((new_object_index < 0) || (new_object_index >= object_count)) {
+        return;
+    }
 
-overlap_found = true;
+    rigidbody *new_body = &obj_per_scene[new_object_index];
+    if (new_body->static_state) {
+        return;
+    }
 
-float normal_length_squared = vector3_length_squared (overlap_collision.normal_vector);
-vector3 separation_normal;
+    const int max_attempts = g_cfg.spawner.overlap_max_attempts; /* MPE_TASK_32 */
+    const float overlap_threshold = g_cfg.spawner.overlap_thresh; /* MPE_TASK_32 */
 
-if ((!isfinite (normal_length_squared)) || (normal_length_squared < 0.000001f)) {
-separation_normal = (vector3) {0.0f, 1.0f, 0.0f};
-} else {
-separation_normal = vector3_scaling (overlap_collision.normal_vector, 1.0f / sqrtf (normal_length_squared));
-}
+    for (int attempt = 0; attempt < max_attempts; attempt++) {
+        bool overlap_found = false;
 
-float move_distance = (max_depth - overlap_threshold) + 0.005f;
-if (move_distance > 1.0f) {move_distance = 1.0f;}
+        for (int other_index = 0; other_index < object_count; other_index++) {
+            if (other_index == new_object_index) {
+                continue;
+            }
 
-if (overlap_collision.object_a == new_body) {
-new_body -> position = vector3_subtraction (
-new_body -> position,
-vector3_scaling (separation_normal, move_distance)
-);
-} else {
-new_body -> position = vector3_addition (
-new_body -> position,
-vector3_scaling (separation_normal, move_distance)
-);
-}
+            rigidbody *other_body = &obj_per_scene[other_index];
+            collision_data overlap_collision = {0};
 
-rigidbody_wake (new_body);
-}
+            if (!a3_spawn_collision_dispatch(new_body, other_body, &overlap_collision)) {
+                continue;
+            }
 
-if (!overlap_found) {break;}
-}
+            float max_depth = 0.0f;
+
+            for (int contact_index = 0; contact_index < overlap_collision.contact_count; contact_index++) {
+                float depth = overlap_collision.contacts[contact_index].penetration;
+                if (depth > max_depth) {
+                    max_depth = depth;
+                }
+            }
+
+            if (max_depth <= overlap_threshold) {
+                continue;
+            }
+
+            overlap_found = true;
+
+            float normal_length_squared = vector3_length_squared(overlap_collision.normal_vector);
+            vector3 separation_normal;
+
+            if ((!isfinite(normal_length_squared)) || (normal_length_squared < 0.000001f)) {
+                separation_normal = (vector3){0.0f, 1.0f, 0.0f};
+            } else {
+                separation_normal =
+                    vector3_scaling(overlap_collision.normal_vector, 1.0f / sqrtf(normal_length_squared));
+            }
+
+            float move_distance = (max_depth - overlap_threshold) + 0.005f;
+            if (move_distance > 1.0f) {
+                move_distance = 1.0f;
+            }
+
+            if (overlap_collision.object_a == new_body) {
+                new_body->position =
+                    vector3_subtraction(new_body->position, vector3_scaling(separation_normal, move_distance));
+            } else {
+                new_body->position =
+                    vector3_addition(new_body->position, vector3_scaling(separation_normal, move_distance));
+            }
+
+            rigidbody_wake(new_body);
+        }
+
+        if (!overlap_found) {
+            break;
+        }
+    }
 }
 /* MPE_TASK_20B_SPAWN_SEPARATION_END */
 
-int scene_add_object (float radius, float mass, vector3 initial_position) {
-    scene_allocate_pool ();
-    if (object_count >= mpe_max_bodies) { fprintf (stderr, "Error POOL01: Maximum object capacity reached.\n"); return -1; }
-    rigidbody_initialisation_sphere (&obj_per_scene [object_count], radius, mass, initial_position);
+int scene_add_object(float radius, float mass, vector3 initial_position) {
+    scene_allocate_pool();
+    if (object_count >= mpe_max_bodies) {
+        fprintf(stderr, "Error POOL01: Maximum object capacity reached.\n");
+        return -1;
+    }
+    rigidbody_initialisation_sphere(&obj_per_scene[object_count], radius, mass, initial_position);
     int current_object_index = object_count;
     object_count += 1;
-    scene_assign_new_identity (current_object_index);
-rigidbody_sanitize (&obj_per_scene [current_object_index]); /* A3_PATCH_47_NAN_SANITIZATION */
-scene_resolve_spawn_overlap (current_object_index); /* MPE_TASK_20B_SPAWN_RESOLVE_CALL */
+    scene_assign_new_identity(current_object_index);
+    rigidbody_sanitize(&obj_per_scene[current_object_index]); /* A3_PATCH_47_NAN_SANITIZATION */
+    scene_resolve_spawn_overlap(current_object_index); /* MPE_TASK_20B_SPAWN_RESOLVE_CALL */
     return current_object_index;
 }
 
-int scene_add_cube (vector3 position, vector3 half_extensions, float mass) {
-    scene_allocate_pool ();
-    if (object_count >= mpe_max_bodies) { fprintf (stderr, "Error POOL01: Maximum object capacity reached.\n"); return -1; }
-    rigidbody_initialisation_cube (&obj_per_scene [object_count], position, half_extensions, mass);
+int scene_add_cube(vector3 position, vector3 half_extensions, float mass) {
+    scene_allocate_pool();
+    if (object_count >= mpe_max_bodies) {
+        fprintf(stderr, "Error POOL01: Maximum object capacity reached.\n");
+        return -1;
+    }
+    rigidbody_initialisation_cube(&obj_per_scene[object_count], position, half_extensions, mass);
     int current_object_index = object_count;
     object_count += 1;
-    scene_assign_new_identity (current_object_index);
-rigidbody_sanitize (&obj_per_scene [current_object_index]); /* A3_PATCH_47_NAN_SANITIZATION */
-scene_resolve_spawn_overlap (current_object_index); /* MPE_TASK_20B_SPAWN_RESOLVE_CALL */
+    scene_assign_new_identity(current_object_index);
+    rigidbody_sanitize(&obj_per_scene[current_object_index]); /* A3_PATCH_47_NAN_SANITIZATION */
+    scene_resolve_spawn_overlap(current_object_index); /* MPE_TASK_20B_SPAWN_RESOLVE_CALL */
     return current_object_index;
 }
 
-void scene_init_default (void) {
-    scene_clear ();
-    int object_grey_index = scene_add_object (2.0f, 0.0f, (vector3) {0.0f, 2.0f, 0.0f});
-    obj_per_scene [object_grey_index].colour = (vector3) {0.8f, 0.8f, 0.8f};
+void scene_init_default(void) {
+    scene_clear();
+    int object_grey_index = scene_add_object(2.0f, 0.0f, (vector3){0.0f, 2.0f, 0.0f});
+    obj_per_scene[object_grey_index].colour = (vector3){0.8f, 0.8f, 0.8f};
 }
 
-void scene_remove_object_by_index (int object_index) {
-    if ((object_index < 0) || (object_index >= object_count)) {return;}
+void scene_remove_object_by_index(int object_index) {
+    if ((object_index < 0) || (object_index >= object_count)) {
+        return;
+    }
 
     uint32_t previous_selected_id = selected_object_id; /* A3_PATCH_08_SELECTION_ID */
-    remove_joints_from_object (object_index);
-    contact_cache_clear ();
+    remove_joints_from_object(object_index);
+    contact_cache_clear(NULL);
 
     for (int i = object_index; i < object_count - 1; i++) {
-        obj_per_scene [i] = obj_per_scene [i + 1];
+        obj_per_scene[i] = obj_per_scene[i + 1];
     }
 
     object_count -= 1;
 
     if (previous_selected_id == 0) {
-        clear_selection ();
+        clear_selection();
     } else {
-        int refreshed_selection_index = scene_find_object_index_by_id (previous_selected_id);
+        int refreshed_selection_index = scene_find_object_index_by_id(previous_selected_id);
 
         if (refreshed_selection_index < 0) {
-            clear_selection ();
+            clear_selection();
             main_inputs.object_menu_level = 0;
         } else {
             selected_object = refreshed_selection_index;
@@ -208,152 +238,142 @@ void scene_remove_object_by_index (int object_index) {
     }
 }
 
-int scene_find_object_index_by_id (uint32_t object_id) {
-    if (object_id == 0) {return -1;}
+int scene_find_object_index_by_id(uint32_t object_id) {
+    if (object_id == 0) {
+        return -1;
+    }
 
     for (int i = 0; i < object_count; i++) {
-        if (obj_per_scene [i].object_id == object_id) {return i;}
+        if (obj_per_scene[i].object_id == object_id) {
+            return i;
+        }
     }
 
     return -1;
 }
 
-bool scene_object_id_exists (uint32_t object_id) {
-    return scene_find_object_index_by_id (object_id) >= 0;
+bool scene_object_id_exists(uint32_t object_id) {
+    return scene_find_object_index_by_id(object_id) >= 0;
 }
 
-rigidbody *scene_resolve_object_by_id (uint32_t object_id) {
-    int object_index = scene_find_object_index_by_id (object_id);
-    if (object_index < 0) {return NULL;}
-    return &obj_per_scene [object_index];
+rigidbody *scene_resolve_object_by_id(uint32_t object_id) {
+    int object_index = scene_find_object_index_by_id(object_id);
+    if (object_index < 0) {
+        return NULL;
+    }
+    return &obj_per_scene[object_index];
 }
 
-uint32_t scene_get_object_id_at_index (int object_index) {
-    if ((object_index < 0) || (object_index >= object_count)) {return 0;}
-    return obj_per_scene [object_index].object_id;
+uint32_t scene_get_object_id_at_index(int object_index) {
+    if ((object_index < 0) || (object_index >= object_count)) {
+        return 0;
+    }
+    return obj_per_scene[object_index].object_id;
 }
 
-void scene_spawn_stability_stack (void) {
+void scene_spawn_stability_stack(void) {
     for (int i = 0; i < 10; i++) {
         float stack_y = 0.5f + (float) i * 0.99f;
 
-        int spawned_object_index = scene_add_cube (
-            (vector3) {20.0f, stack_y, 0.0f},
-            (vector3) {0.5f, 0.5f, 0.5f},
-            1.0f
-        );
+        int spawned_object_index = scene_add_cube((vector3){20.0f, stack_y, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
 
         if (spawned_object_index >= 0) {
-            obj_per_scene [spawned_object_index].colour = (vector3) {0.8f, 0.8f, 0.2f};
-            obj_per_scene [spawned_object_index].velocity = vector3_zero ();
-            obj_per_scene [spawned_object_index].angular_velocity = vector3_zero ();
-            obj_per_scene [spawned_object_index].restitution = 0.0f;
-            obj_per_scene [spawned_object_index].friction_static = 0.8f;
-            obj_per_scene [spawned_object_index].friction_kinetic = 0.7f;
+            obj_per_scene[spawned_object_index].colour = (vector3){0.8f, 0.8f, 0.2f};
+            obj_per_scene[spawned_object_index].velocity = vector3_zero();
+            obj_per_scene[spawned_object_index].angular_velocity = vector3_zero();
+            obj_per_scene[spawned_object_index].restitution = 0.0f;
+            obj_per_scene[spawned_object_index].friction_static = 0.8f;
+            obj_per_scene[spawned_object_index].friction_kinetic = 0.7f;
         }
     }
 }
 
-
-void scene_spawn_sleep_wake_test (void) {
-    int target_object_index = scene_add_cube (
-        (vector3) {20.0f, 0.5f, 10.0f},
-        (vector3) {0.5f, 0.5f, 0.5f},
-        2.0f
-    );
+void scene_spawn_sleep_wake_test(void) {
+    int target_object_index = scene_add_cube((vector3){20.0f, 0.5f, 10.0f}, (vector3){0.5f, 0.5f, 0.5f}, 2.0f);
 
     if (target_object_index >= 0) {
-        obj_per_scene [target_object_index].colour = (vector3) {0.2f, 0.8f, 0.8f};
-        obj_per_scene [target_object_index].velocity = vector3_zero ();
-        obj_per_scene [target_object_index].angular_velocity = vector3_zero ();
-        obj_per_scene [target_object_index].is_sleeping = true;
-        obj_per_scene [target_object_index].sleep_timer = 1.0f;
-        obj_per_scene [target_object_index].restitution = 0.0f;
-        obj_per_scene [target_object_index].friction_static = 0.8f;
-        obj_per_scene [target_object_index].friction_kinetic = 0.7f;
+        obj_per_scene[target_object_index].colour = (vector3){0.2f, 0.8f, 0.8f};
+        obj_per_scene[target_object_index].velocity = vector3_zero();
+        obj_per_scene[target_object_index].angular_velocity = vector3_zero();
+        obj_per_scene[target_object_index].is_sleeping = true;
+        obj_per_scene[target_object_index].sleep_timer = 1.0f;
+        obj_per_scene[target_object_index].restitution = 0.0f;
+        obj_per_scene[target_object_index].friction_static = 0.8f;
+        obj_per_scene[target_object_index].friction_kinetic = 0.7f;
     }
 
-    int projectile_object_index = scene_add_object (
-        0.35f,
-        3.0f,
-        (vector3) {20.0f, 0.5f, 16.0f}
-    );
+    int projectile_object_index = scene_add_object(0.35f, 3.0f, (vector3){20.0f, 0.5f, 16.0f});
 
     if (projectile_object_index >= 0) {
-        obj_per_scene [projectile_object_index].colour = (vector3) {1.0f, 0.2f, 0.2f};
-        obj_per_scene [projectile_object_index].velocity = (vector3) {0.0f, 0.0f, -18.0f};
-        obj_per_scene [projectile_object_index].angular_velocity = vector3_zero ();
-        obj_per_scene [projectile_object_index].restitution = 0.0f;
+        obj_per_scene[projectile_object_index].colour = (vector3){1.0f, 0.2f, 0.2f};
+        obj_per_scene[projectile_object_index].velocity = (vector3){0.0f, 0.0f, -18.0f};
+        obj_per_scene[projectile_object_index].angular_velocity = vector3_zero();
+        obj_per_scene[projectile_object_index].restitution = 0.0f;
     }
 }
 
+void scene_editor_torture_test(void) {
+    printf("[A3] Editor torture test: spawning jointed objects at x=-20\n");
 
-void scene_editor_torture_test (void) {
-    printf ("[A3] Editor torture test: spawning jointed objects at x=-20\n");
-
-    int object_a_index = scene_add_object (0.35f, 1.0f, (vector3) {-20.0f, 2.0f, 0.0f});
-    int object_b_index = scene_add_cube ((vector3) {-17.0f, 2.0f, 0.0f}, (vector3) {0.4f, 0.4f, 0.4f}, 1.5f);
-    int object_c_index = scene_add_object (0.35f, 1.0f, (vector3) {-14.0f, 2.0f, 0.0f});
+    int object_a_index = scene_add_object(0.35f, 1.0f, (vector3){-20.0f, 2.0f, 0.0f});
+    int object_b_index = scene_add_cube((vector3){-17.0f, 2.0f, 0.0f}, (vector3){0.4f, 0.4f, 0.4f}, 1.5f);
+    int object_c_index = scene_add_object(0.35f, 1.0f, (vector3){-14.0f, 2.0f, 0.0f});
 
     if ((object_a_index < 0) || (object_b_index < 0) || (object_c_index < 0)) {
-        printf ("[A3] Editor torture test failed: could not spawn test objects.\n");
+        printf("[A3] Editor torture test failed: could not spawn test objects.\n");
         return;
     }
 
-    obj_per_scene [object_a_index].restitution = 0.0f;
-    obj_per_scene [object_b_index].restitution = 0.0f;
-    obj_per_scene [object_c_index].restitution = 0.0f;
+    obj_per_scene[object_a_index].restitution = 0.0f;
+    obj_per_scene[object_b_index].restitution = 0.0f;
+    obj_per_scene[object_c_index].restitution = 0.0f;
 
     selected_object = object_b_index;
     main_inputs.object_menu_level = 1;
     main_inputs.marked_joint_object_index = object_a_index;
 
-    float first_joint_length = vector3_length (
-        vector3_subtraction (
-            obj_per_scene [object_b_index].position,
-            obj_per_scene [object_a_index].position
-        )
-    );
+    float first_joint_length = vector3_length(
+        vector3_subtraction(obj_per_scene[object_b_index].position, obj_per_scene[object_a_index].position));
 
-    add_joint (object_a_index, object_b_index, first_joint_length, g_cfg.joints.default_spring_k, g_cfg.joints.default_damping); /* MPE_TASK_31 */
-    scene_remove_object_by_index (object_b_index);
+    add_joint(object_a_index, object_b_index, first_joint_length, g_cfg.joints.default_spring_k,
+              g_cfg.joints.default_damping); /* MPE_TASK_31 */
+    scene_remove_object_by_index(object_b_index);
 
     int shifted_object_c_index = object_c_index;
-    if (shifted_object_c_index > object_b_index) {shifted_object_c_index--;}
+    if (shifted_object_c_index > object_b_index) {
+        shifted_object_c_index--;
+    }
 
     selected_object = object_a_index;
     main_inputs.object_menu_level = 1;
     main_inputs.marked_joint_object_index = shifted_object_c_index;
 
     if ((shifted_object_c_index >= 0) && (shifted_object_c_index < object_count)) {
-        float second_joint_length = vector3_length (
-            vector3_subtraction (
-                obj_per_scene [shifted_object_c_index].position,
-                obj_per_scene [object_a_index].position
-            )
-        );
+        float second_joint_length = vector3_length(vector3_subtraction(obj_per_scene[shifted_object_c_index].position,
+                                                                       obj_per_scene[object_a_index].position));
 
-        add_joint (object_a_index, shifted_object_c_index, second_joint_length, g_cfg.joints.default_spring_k, g_cfg.joints.default_damping); /* MPE_TASK_31 */
-        scene_remove_object_by_index (shifted_object_c_index);
+        add_joint(object_a_index, shifted_object_c_index, second_joint_length, g_cfg.joints.default_spring_k,
+                  g_cfg.joints.default_damping); /* MPE_TASK_31 */
+        scene_remove_object_by_index(shifted_object_c_index);
     }
 
     if ((object_a_index >= 0) && (object_a_index < object_count)) {
-        obj_per_scene [object_a_index].colour = (vector3) {0.2f, 1.0f, 0.2f};
+        obj_per_scene[object_a_index].colour = (vector3){0.2f, 1.0f, 0.2f};
     }
 
-    clear_selection ();
+    clear_selection();
     main_inputs.object_menu_level = 0;
     main_inputs.marked_joint_object_index = -1;
     main_inputs.is_menu_open = false;
     main_inputs.spawner_menu_level = 0;
     main_inputs.velocity_menu_level = 0;
 
-    printf ("[A3] Editor torture test complete: deleted jointed selected/marked objects; green survivor left at x=-20.\n");
+    printf(
+        "[A3] Editor torture test complete: deleted jointed selected/marked objects; green survivor left at x=-20.\n");
 }
 
-
-void scene_spawn_stress_test (void) {
-    broadphase_reset_overflow_counts ();
+void scene_spawn_stress_test(void) {
+    broadphase_reset_overflow_counts();
 
     int objects_to_spawn = 300;
 
@@ -361,7 +381,9 @@ void scene_spawn_stress_test (void) {
         objects_to_spawn = mpe_max_bodies - object_count;
     }
 
-    if (objects_to_spawn <= 0) {return;}
+    if (objects_to_spawn <= 0) {
+        return;
+    }
 
     int grid_width = 10;
     int grid_depth = 10;
@@ -380,163 +402,154 @@ void scene_spawn_stress_test (void) {
         int spawned_object_index = -1;
 
         if ((i % 2) == 0) {
-            spawned_object_index = scene_add_object (0.35f, 1.0f, (vector3) {x, y, z});
+            spawned_object_index = scene_add_object(0.35f, 1.0f, (vector3){x, y, z});
         } else {
-            spawned_object_index = scene_add_cube ((vector3) {x, y, z}, (vector3) {0.4f, 0.4f, 0.4f}, 1.5f);
+            spawned_object_index = scene_add_cube((vector3){x, y, z}, (vector3){0.4f, 0.4f, 0.4f}, 1.5f);
         }
 
         if (spawned_object_index >= 0) {
-            obj_per_scene [spawned_object_index].velocity = (vector3) {jitter, -1.0f, -jitter};
-            obj_per_scene [spawned_object_index].angular_velocity = vector3_zero ();
-            obj_per_scene [spawned_object_index].colour = (vector3) {
-                0.3f + 0.7f * ((float) ((spawned_object_index + 0) % 3) / 2.0f),
-                0.3f + 0.7f * ((float) ((spawned_object_index + 1) % 3) / 2.0f),
-                0.3f + 0.7f * ((float) ((spawned_object_index + 2) % 3) / 2.0f)
-            };
+            obj_per_scene[spawned_object_index].velocity = (vector3){jitter, -1.0f, -jitter};
+            obj_per_scene[spawned_object_index].angular_velocity = vector3_zero();
+            obj_per_scene[spawned_object_index].colour =
+                (vector3){0.3f + 0.7f * ((float) ((spawned_object_index + 0) % 3) / 2.0f),
+                          0.3f + 0.7f * ((float) ((spawned_object_index + 1) % 3) / 2.0f),
+                          0.3f + 0.7f * ((float) ((spawned_object_index + 2) % 3) / 2.0f)};
         }
     }
 }
 
 /* MPE_TASK_13_LONG_RUN_SCENE_BEGIN */
-void scene_spawn_long_run_validation (void) {
-/* MPE_TASK_13_LONG_RUN_VALIDATION_SCENE */
-scene_clear ();
-clear_selection ();
-main_inputs.object_menu_level = 0;
-main_inputs.marked_joint_object_index = -1;
-main_inputs.is_menu_open = false;
-main_inputs.spawner_menu_level = 0;
-main_inputs.velocity_menu_level = 0;
+void scene_spawn_long_run_validation(void) {
+    /* MPE_TASK_13_LONG_RUN_VALIDATION_SCENE */
+    scene_clear();
+    clear_selection();
+    main_inputs.object_menu_level = 0;
+    main_inputs.marked_joint_object_index = -1;
+    main_inputs.is_menu_open = false;
+    main_inputs.spawner_menu_level = 0;
+    main_inputs.velocity_menu_level = 0;
 
-/* Stability stack: 10 cubes at x=20. */
-for (int i = 0; i < 10; i++) {
-float stack_y = 0.5f + (float) i * 0.99f;
-int spawned_object_index = scene_add_cube (
-(vector3) {20.0f, stack_y, 0.0f},
-(vector3) {0.5f, 0.5f, 0.5f},
-1.0f
-);
-if (spawned_object_index >= 0) {
-obj_per_scene [spawned_object_index].colour = (vector3) {0.8f, 0.8f, 0.2f};
-obj_per_scene [spawned_object_index].velocity = vector3_zero ();
-obj_per_scene [spawned_object_index].angular_velocity = vector3_zero ();
-obj_per_scene [spawned_object_index].restitution = 0.0f;
-obj_per_scene [spawned_object_index].friction_static = 0.8f;
-obj_per_scene [spawned_object_index].friction_kinetic = 0.7f;
-}
-}
+    /* Stability stack: 10 cubes at x=20. */
+    for (int i = 0; i < 10; i++) {
+        float stack_y = 0.5f + (float) i * 0.99f;
+        int spawned_object_index = scene_add_cube((vector3){20.0f, stack_y, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
+        if (spawned_object_index >= 0) {
+            obj_per_scene[spawned_object_index].colour = (vector3){0.8f, 0.8f, 0.2f};
+            obj_per_scene[spawned_object_index].velocity = vector3_zero();
+            obj_per_scene[spawned_object_index].angular_velocity = vector3_zero();
+            obj_per_scene[spawned_object_index].restitution = 0.0f;
+            obj_per_scene[spawned_object_index].friction_static = 0.8f;
+            obj_per_scene[spawned_object_index].friction_kinetic = 0.7f;
+        }
+    }
 
-/* Pile base: 3x3 cubes at x=-20. */
-for (int gx = 0; gx < 3; gx++) {
-for (int gz = 0; gz < 3; gz++) {
-float x = -20.0f + ((float) gx - 1.0f) * 1.1f;
-float z = ((float) gz - 1.0f) * 1.1f;
-int spawned_object_index = scene_add_cube (
-(vector3) {x, 0.5f, z},
-(vector3) {0.5f, 0.5f, 0.5f},
-1.0f
-);
-if (spawned_object_index >= 0) {
-obj_per_scene [spawned_object_index].colour = (vector3) {0.9f, 0.5f, 0.2f};
-obj_per_scene [spawned_object_index].velocity = vector3_zero ();
-obj_per_scene [spawned_object_index].angular_velocity = vector3_zero ();
-obj_per_scene [spawned_object_index].restitution = 0.0f;
-obj_per_scene [spawned_object_index].friction_static = 0.8f;
-obj_per_scene [spawned_object_index].friction_kinetic = 0.7f;
-}
-}
-}
+    /* Pile base: 3x3 cubes at x=-20. */
+    for (int gx = 0; gx < 3; gx++) {
+        for (int gz = 0; gz < 3; gz++) {
+            float x = -20.0f + ((float) gx - 1.0f) * 1.1f;
+            float z = ((float) gz - 1.0f) * 1.1f;
+            int spawned_object_index = scene_add_cube((vector3){x, 0.5f, z}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
+            if (spawned_object_index >= 0) {
+                obj_per_scene[spawned_object_index].colour = (vector3){0.9f, 0.5f, 0.2f};
+                obj_per_scene[spawned_object_index].velocity = vector3_zero();
+                obj_per_scene[spawned_object_index].angular_velocity = vector3_zero();
+                obj_per_scene[spawned_object_index].restitution = 0.0f;
+                obj_per_scene[spawned_object_index].friction_static = 0.8f;
+                obj_per_scene[spawned_object_index].friction_kinetic = 0.7f;
+            }
+        }
+    }
 
-/* Pile middle: 2x2 cubes. */
-for (int gx = 0; gx < 2; gx++) {
-for (int gz = 0; gz < 2; gz++) {
-float x = -20.0f + ((float) gx - 0.5f) * 1.1f;
-float z = ((float) gz - 0.5f) * 1.1f;
-int spawned_object_index = scene_add_cube (
-(vector3) {x, 1.49f, z},
-(vector3) {0.5f, 0.5f, 0.5f},
-1.0f
-);
-if (spawned_object_index >= 0) {
-obj_per_scene [spawned_object_index].colour = (vector3) {0.2f, 0.7f, 0.9f};
-obj_per_scene [spawned_object_index].velocity = vector3_zero ();
-obj_per_scene [spawned_object_index].angular_velocity = vector3_zero ();
-obj_per_scene [spawned_object_index].restitution = 0.0f;
-obj_per_scene [spawned_object_index].friction_static = 0.8f;
-obj_per_scene [spawned_object_index].friction_kinetic = 0.7f;
-}
-}
-}
+    /* Pile middle: 2x2 cubes. */
+    for (int gx = 0; gx < 2; gx++) {
+        for (int gz = 0; gz < 2; gz++) {
+            float x = -20.0f + ((float) gx - 0.5f) * 1.1f;
+            float z = ((float) gz - 0.5f) * 1.1f;
+            int spawned_object_index = scene_add_cube((vector3){x, 1.49f, z}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
+            if (spawned_object_index >= 0) {
+                obj_per_scene[spawned_object_index].colour = (vector3){0.2f, 0.7f, 0.9f};
+                obj_per_scene[spawned_object_index].velocity = vector3_zero();
+                obj_per_scene[spawned_object_index].angular_velocity = vector3_zero();
+                obj_per_scene[spawned_object_index].restitution = 0.0f;
+                obj_per_scene[spawned_object_index].friction_static = 0.8f;
+                obj_per_scene[spawned_object_index].friction_kinetic = 0.7f;
+            }
+        }
+    }
 
-/* Pile top: one cube. */
-int top_cube_index = scene_add_cube (
-(vector3) {-20.0f, 2.48f, 0.0f},
-(vector3) {0.5f, 0.5f, 0.5f},
-1.0f
-);
-if (top_cube_index >= 0) {
-obj_per_scene [top_cube_index].colour = (vector3) {0.9f, 0.9f, 0.9f};
-obj_per_scene [top_cube_index].velocity = vector3_zero ();
-obj_per_scene [top_cube_index].angular_velocity = vector3_zero ();
-obj_per_scene [top_cube_index].restitution = 0.0f;
-obj_per_scene [top_cube_index].friction_static = 0.8f;
-obj_per_scene [top_cube_index].friction_kinetic = 0.7f;
-}
+    /* Pile top: one cube. */
+    int top_cube_index = scene_add_cube((vector3){-20.0f, 2.48f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
+    if (top_cube_index >= 0) {
+        obj_per_scene[top_cube_index].colour = (vector3){0.9f, 0.9f, 0.9f};
+        obj_per_scene[top_cube_index].velocity = vector3_zero();
+        obj_per_scene[top_cube_index].angular_velocity = vector3_zero();
+        obj_per_scene[top_cube_index].restitution = 0.0f;
+        obj_per_scene[top_cube_index].friction_static = 0.8f;
+        obj_per_scene[top_cube_index].friction_kinetic = 0.7f;
+    }
 
-/* A few resting spheres. */
-for (int i = 0; i < 3; i++) {
-int spawned_object_index = scene_add_object (
-0.35f,
-1.0f,
-(vector3) {-30.0f + (float) i * 3.0f, 0.35f, 8.0f}
-);
-if (spawned_object_index >= 0) {
-obj_per_scene [spawned_object_index].colour = (vector3) {0.3f, 0.9f, 0.3f};
-obj_per_scene [spawned_object_index].velocity = vector3_zero ();
-obj_per_scene [spawned_object_index].angular_velocity = vector3_zero ();
-obj_per_scene [spawned_object_index].restitution = 0.0f;
-obj_per_scene [spawned_object_index].friction_static = 0.8f;
-obj_per_scene [spawned_object_index].friction_kinetic = 0.7f;
-}
-}
+    /* A few resting spheres. */
+    for (int i = 0; i < 3; i++) {
+        int spawned_object_index = scene_add_object(0.35f, 1.0f, (vector3){-30.0f + (float) i * 3.0f, 0.35f, 8.0f});
+        if (spawned_object_index >= 0) {
+            obj_per_scene[spawned_object_index].colour = (vector3){0.3f, 0.9f, 0.3f};
+            obj_per_scene[spawned_object_index].velocity = vector3_zero();
+            obj_per_scene[spawned_object_index].angular_velocity = vector3_zero();
+            obj_per_scene[spawned_object_index].restitution = 0.0f;
+            obj_per_scene[spawned_object_index].friction_static = 0.8f;
+            obj_per_scene[spawned_object_index].friction_kinetic = 0.7f;
+        }
+    }
 }
 /* MPE_TASK_13_LONG_RUN_SCENE_END */
 
 /* MPE_TASK_39_CONFIG_TORTURE_SCENE_BEGIN */
-void scene_spawn_config_torture_test (void) {
+void scene_spawn_config_torture_test(void) {
     /* Randomize all tunables to extreme but bounded values */
-    srand ((unsigned int) time (NULL) ^ 0xDEADBEEFu);
+    srand((unsigned int) time(NULL) ^ 0xDEADBEEFu);
     for (size_t cfg_i = 0; cfg_i < g_registry_count; cfg_i++) {
-        const mpe_param *p = &g_registry [cfg_i];
-        if (p -> type == p_float) {
-            float range = (float) (p -> max - p -> min);
-            float random_value = (float) p -> min + ((float) rand () / (float) RAND_MAX) * range;
-            *(float *) p -> storage = random_value;
-        } else if (p -> type == p_int) {
-            int range = (int) (p -> max - p -> min);
-            int random_value = (int) p -> min + (rand () % ((range > 0) ? range : 1));
-            *(int *) p -> storage = random_value;
-        } else if (p -> type == p_bool) {
-            *(bool *) p -> storage = (rand () % 2) != 0;
+        const mpe_param *p = &g_registry[cfg_i];
+        if (p->type == p_float) {
+            float range = (float) (p->max - p->min);
+            float random_value = (float) p->min + ((float) rand() / (float) RAND_MAX) * range;
+            *(float *) p->storage = random_value;
+        } else if (p->type == p_int) {
+            int range = (int) (p->max - p->min);
+            int random_value = (int) p->min + (rand() % ((range > 0) ? range : 1));
+            *(int *) p->storage = random_value;
+        } else if (p->type == p_bool) {
+            *(bool *) p->storage = (rand() % 2) != 0;
         }
     }
     if (g_cfg.world.gravity > -1.0f) {
-        g_cfg.world.gravity = -1.0f - ((float) rand () / (float) RAND_MAX) * 20.0f;
+        g_cfg.world.gravity = -1.0f - ((float) rand() / (float) RAND_MAX) * 20.0f;
     }
-    if (g_cfg.solver.penetration_slop > 0.02f) { g_cfg.solver.penetration_slop = 0.010f; }
-    if (g_cfg.depenetration.penetration_slop > 0.02f) { g_cfg.depenetration.penetration_slop = 0.005f; }
-    if (g_cfg.solver.bias_factor < 0.05f) { g_cfg.solver.bias_factor = 0.10f; }
-    if (g_cfg.depenetration.correction_factor < 0.1f) { g_cfg.depenetration.correction_factor = 0.35f; }
-    if (g_cfg.sleep.linear_thresh_sq > 0.01f) { g_cfg.sleep.linear_thresh_sq = 0.0025f; }
-    if (g_cfg.sleep.angular_thresh_sq > 0.01f) { g_cfg.sleep.angular_thresh_sq = 0.0001f; }
+    if (g_cfg.solver.penetration_slop > 0.02f) {
+        g_cfg.solver.penetration_slop = 0.010f;
+    }
+    if (g_cfg.depenetration.penetration_slop > 0.02f) {
+        g_cfg.depenetration.penetration_slop = 0.005f;
+    }
+    if (g_cfg.solver.bias_factor < 0.05f) {
+        g_cfg.solver.bias_factor = 0.10f;
+    }
+    if (g_cfg.depenetration.correction_factor < 0.1f) {
+        g_cfg.depenetration.correction_factor = 0.35f;
+    }
+    if (g_cfg.sleep.linear_thresh_sq > 0.01f) {
+        g_cfg.sleep.linear_thresh_sq = 0.0025f;
+    }
+    if (g_cfg.sleep.angular_thresh_sq > 0.01f) {
+        g_cfg.sleep.angular_thresh_sq = 0.0001f;
+    }
     /* Spawn the standard long-run validation scene */
-    scene_spawn_long_run_validation ();
-    printf ("[A3] Config torture: tunables randomized to extreme values\n");
-    fflush (stdout);
+    scene_spawn_long_run_validation();
+    printf("[A3] Config torture: tunables randomized to extreme values\n");
+    fflush(stdout);
 }
 /* MPE_TASK_39_CONFIG_TORTURE_SCENE_END */
 
-void scene_clear (void) {
+void scene_clear(void) {
     object_count = 0;
-    joint_init_pool ();
+    joint_init_pool();
 }
