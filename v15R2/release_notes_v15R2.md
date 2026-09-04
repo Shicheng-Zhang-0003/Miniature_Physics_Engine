@@ -16,7 +16,7 @@ applied, and the release gates and validation tooling have been refreshed for
 the current version.
 
 The centralised configuration system introduced in `v15R1` remains the
-headline feature: 57 live tunables, persistent `status/engine.cfg` storage,
+headline feature: 69 live tunables, persistent `status/engine.cfg` storage,
 an in-engine configuration menu, and terminal `env`, `export`, and `config`
 commands.
 

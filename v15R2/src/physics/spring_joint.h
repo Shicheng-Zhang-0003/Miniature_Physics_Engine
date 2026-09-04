@@ -18,16 +18,18 @@ typedef struct {
     bool is_active;
 } spring_joint;
 
-extern spring_joint joint_pool [mpe_max_joints];
+extern spring_joint joint_pool[mpe_max_joints];
 extern int current_joint_count;
 
-int add_joint (int object_index_a, int object_index_b, float equilibrium_length, float spring_constant, float damping_coefficient);
-void remove_joint (int joint_pool_index);
-void apply_force_all_joints (void);
-void remove_joints_from_object (int object_index);
-void spring_joint_render (GLuint shader_program, math4 view_matrix, math4 projection_matrix);
-void joint_init_pool (void);
+int add_joint(int object_index_a, int object_index_b, float equilibrium_length, float spring_constant,
+              float damping_coefficient);
+void remove_joint(int joint_pool_index);
+void apply_force_all_joints(void);
+void remove_joints_from_object(int object_index);
+void spring_joint_render(GLuint shader_program, math4 view_matrix, math4 projection_matrix);
+void joint_init_pool(void);
 
-int add_joint_by_ids (uint32_t object_id_a, uint32_t object_id_b, float equilibrium_length, float spring_constant, float damping_coefficient);
-void remove_joints_from_object_id (uint32_t object_id);
+int add_joint_by_ids(uint32_t object_id_a, uint32_t object_id_b, float equilibrium_length, float spring_constant,
+                     float damping_coefficient);
+void remove_joints_from_object_id(uint32_t object_id);
 #endif

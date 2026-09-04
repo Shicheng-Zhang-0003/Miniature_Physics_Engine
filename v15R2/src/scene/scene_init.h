@@ -4,34 +4,33 @@
 #include "../core/rigidbody.h"
 
 extern int object_capacity;
-int scene_add_object (float radius, float mass, vector3 initial_position);
-int scene_add_cube (vector3 position, vector3 half_extensions, float mass);
-void scene_init_default (void);
-void scene_clear (void);
-void scene_remove_object_by_index (int object_index);
+int scene_add_object(float radius, float mass, vector3 initial_position);
+int scene_add_cube(vector3 position, vector3 half_extensions, float mass);
+void scene_init_default(void);
+void scene_clear(void);
+void scene_remove_object_by_index(int object_index);
 
+uint32_t scene_allocate_object_id(void);
+void scene_assign_new_identity(int object_index);
 
-uint32_t scene_allocate_object_id (void);
-void scene_assign_new_identity (int object_index);
+int scene_find_object_index_by_id(uint32_t object_id);
+bool scene_object_id_exists(uint32_t object_id);
+rigidbody *scene_resolve_object_by_id(uint32_t object_id);
+uint32_t scene_get_object_id_at_index(int object_index);
 
-int scene_find_object_index_by_id (uint32_t object_id);
-bool scene_object_id_exists (uint32_t object_id);
-rigidbody *scene_resolve_object_by_id (uint32_t object_id);
-uint32_t scene_get_object_id_at_index (int object_index);
+int scene_ensure_pool_capacity(int required_capacity);
 
-int scene_ensure_pool_capacity (int required_capacity);
+void scene_spawn_stability_stack(void);
 
-void scene_spawn_stability_stack (void);
+void scene_spawn_sleep_wake_test(void);
 
-void scene_spawn_sleep_wake_test (void);
+void scene_editor_torture_test(void);
 
-void scene_editor_torture_test (void);
-
-void scene_spawn_stress_test (void);
+void scene_spawn_stress_test(void);
 /* MPE_TASK_13_LONG_RUN_SCENE_DECL_BEGIN */
-void scene_spawn_long_run_validation (void);
+void scene_spawn_long_run_validation(void);
 /* MPE_TASK_13_LONG_RUN_SCENE_DECL_END */
 /* MPE_TASK_39_CONFIG_TORTURE_DECL_BEGIN */
-void scene_spawn_config_torture_test (void);
+void scene_spawn_config_torture_test(void);
 /* MPE_TASK_39_CONFIG_TORTURE_DECL_END */
 #endif

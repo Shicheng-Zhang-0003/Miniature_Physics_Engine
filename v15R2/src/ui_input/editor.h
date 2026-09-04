@@ -3,6 +3,6 @@
 
 #include <gtk/gtk.h>
 
-void editor_update_menus (GtkWidget *parent_window);
+void editor_update_menus(GtkWidget *parent_window);
 
 #endif

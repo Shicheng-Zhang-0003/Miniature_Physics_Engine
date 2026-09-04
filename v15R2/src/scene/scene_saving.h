@@ -3,5 +3,5 @@
 #include "../core/math3D.h"
 #include "../core/rigidbody.h"
 
-int save_scene (const char *file_destination_path);
+int save_scene(const char *file_destination_path);
 #endif

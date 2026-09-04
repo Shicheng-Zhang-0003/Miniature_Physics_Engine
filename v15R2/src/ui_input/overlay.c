@@ -1,4 +1,5 @@
 #include "../mpe_engine.h"
+#include "../robotics/gui_robot_registry.h" /* MFS_GUI_BRIDGE */
 #include "overlay.h"
 #include "object_spawner.h"
 #include <stdint.h>
@@ -17,258 +18,370 @@ extern rigidbody *obj_per_scene;
 extern int object_count;
 extern int selected_object;
 
-
-static void overlay_append_overflow_text (char *buffer, size_t buffer_size) {
-    int node_overflow_count = broadphase_get_node_overflow_count ();
-    int pair_overflow_count = broadphase_get_pair_overflow_count ();
-/* MPE_TASK_11_OVERLAY_LARGE_CLAMP_BEGIN */
-int large_clamp_count = broadphase_get_large_object_clamp_count ();
-if (large_clamp_count > 0) {
-size_t large_clamp_current_length = strlen (buffer);
-if (large_clamp_current_length < buffer_size) {
-snprintf (buffer + large_clamp_current_length, buffer_size - large_clamp_current_length,
-" | BP large clamps:%d", large_clamp_count);
-}
-}
-/* MPE_TASK_11_OVERLAY_LARGE_CLAMP_END */
-/* MPE_TASK_10_OVERLAY_DEDUPE_BEGIN */
-int dedupe_overflow_count = broadphase_get_pair_dedupe_overflow_count ();
-if (dedupe_overflow_count > 0) {
-size_t dedupe_current_length = strlen (buffer);
-if (dedupe_current_length < buffer_size) {
-snprintf (buffer + dedupe_current_length, buffer_size - dedupe_current_length,
-" | BP dedupe overflow:%d", dedupe_overflow_count);
-}
-}
-/* MPE_TASK_10_OVERLAY_DEDUPE_END */
-/* MPE_TASK_09_OVERLAY_MANIFOLD_OVERFLOW_BEGIN */
-if (debug_last_manifold_overflow_count > 0) {
-size_t manifold_current_length = strlen (buffer);
-if (manifold_current_length < buffer_size) {
-snprintf (buffer + manifold_current_length, buffer_size - manifold_current_length,
-" | Manifold overflow:%d", debug_last_manifold_overflow_count);
-}
-}
-/* MPE_TASK_09_OVERLAY_MANIFOLD_OVERFLOW_END */
+static void overlay_append_overflow_text(char *buffer, size_t buffer_size) {
+    int node_overflow_count = broadphase_get_node_overflow_count();
+    int pair_overflow_count = broadphase_get_pair_overflow_count();
+    /* MPE_TASK_11_OVERLAY_LARGE_CLAMP_BEGIN */
+    int large_clamp_count = broadphase_get_large_object_clamp_count();
+    if (large_clamp_count > 0) {
+        size_t large_clamp_current_length = strlen(buffer);
+        if (large_clamp_current_length < buffer_size) {
+            snprintf(buffer + large_clamp_current_length, buffer_size - large_clamp_current_length,
+                     " | BP large clamps:%d", large_clamp_count);
+        }
+    }
+    /* MPE_TASK_11_OVERLAY_LARGE_CLAMP_END */
+    /* MPE_TASK_10_OVERLAY_DEDUPE_BEGIN */
+    int dedupe_overflow_count = broadphase_get_pair_dedupe_overflow_count();
+    if (dedupe_overflow_count > 0) {
+        size_t dedupe_current_length = strlen(buffer);
+        if (dedupe_current_length < buffer_size) {
+            snprintf(buffer + dedupe_current_length, buffer_size - dedupe_current_length, " | BP dedupe overflow:%d",
+                     dedupe_overflow_count);
+        }
+    }
+    /* MPE_TASK_10_OVERLAY_DEDUPE_END */
+    /* MPE_TASK_09_OVERLAY_MANIFOLD_OVERFLOW_BEGIN */
+    if (debug_last_manifold_overflow_count > 0) {
+        size_t manifold_current_length = strlen(buffer);
+        if (manifold_current_length < buffer_size) {
+            snprintf(buffer + manifold_current_length, buffer_size - manifold_current_length, " | Manifold overflow:%d",
+                     debug_last_manifold_overflow_count);
+        }
+    }
+    /* MPE_TASK_09_OVERLAY_MANIFOLD_OVERFLOW_END */
 
     if ((node_overflow_count > 0) || (pair_overflow_count > 0)) {
-        size_t current_length = strlen (buffer);
+        size_t current_length = strlen(buffer);
 
         if (current_length < buffer_size) {
-            snprintf (buffer + current_length, buffer_size - current_length,
-                      " | BP overflow N:%d P:%d",
-                      node_overflow_count, pair_overflow_count);
+            snprintf(buffer + current_length, buffer_size - current_length, " | BP overflow N:%d P:%d",
+                     node_overflow_count, pair_overflow_count);
         }
     }
 }
-static bool overlay_has_valid_selection (void) {
+static bool overlay_has_valid_selection(void) {
     return (selected_object >= 0) && (selected_object < object_count);
 }
-GtkWidget *overlay_initialise (GtkWidget *gl_drawing_area_widget) {
+GtkWidget *overlay_initialise(GtkWidget *gl_drawing_area_widget) {
     //Debug Info
-    GtkWidget *ui_overlay_container = gtk_overlay_new ();
-    gtk_container_add (GTK_CONTAINER (ui_overlay_container), gl_drawing_area_widget);
-    debug_information_label = gtk_label_new ("- Miniature Physics Engine v15R2 -");
-    gtk_widget_set_halign (debug_information_label, GTK_ALIGN_START);
-    gtk_widget_set_valign (debug_information_label, GTK_ALIGN_START);
-    gtk_overlay_add_overlay (GTK_OVERLAY (ui_overlay_container), debug_information_label);
+    GtkWidget *ui_overlay_container = gtk_overlay_new();
+    gtk_container_add(GTK_CONTAINER(ui_overlay_container), gl_drawing_area_widget);
+    debug_information_label = gtk_label_new("- Miniature Physics Engine v15R2 -");
+    gtk_widget_set_halign(debug_information_label, GTK_ALIGN_START);
+    gtk_widget_set_valign(debug_information_label, GTK_ALIGN_START);
+    gtk_overlay_add_overlay(GTK_OVERLAY(ui_overlay_container), debug_information_label);
     //Crosshair
-    crosshair_label = gtk_label_new ("+");
-    gtk_widget_set_halign (crosshair_label, GTK_ALIGN_CENTER);
-    gtk_widget_set_valign (crosshair_label, GTK_ALIGN_CENTER);
-    gtk_overlay_add_overlay (GTK_OVERLAY (ui_overlay_container), crosshair_label);
-    gtk_widget_show (crosshair_label);
+    crosshair_label = gtk_label_new("+");
+    gtk_widget_set_halign(crosshair_label, GTK_ALIGN_CENTER);
+    gtk_widget_set_valign(crosshair_label, GTK_ALIGN_CENTER);
+    gtk_overlay_add_overlay(GTK_OVERLAY(ui_overlay_container), crosshair_label);
+    gtk_widget_show(crosshair_label);
     //Combined menu
-    menu_label = gtk_label_new ("");
-    gtk_widget_set_halign (menu_label, GTK_ALIGN_CENTER);
-    gtk_widget_set_valign (menu_label, GTK_ALIGN_CENTER);
-    gtk_overlay_add_overlay (GTK_OVERLAY (ui_overlay_container), menu_label);
-    gtk_widget_hide (menu_label);
+    menu_label = gtk_label_new("");
+    gtk_widget_set_halign(menu_label, GTK_ALIGN_CENTER);
+    gtk_widget_set_valign(menu_label, GTK_ALIGN_CENTER);
+    gtk_overlay_add_overlay(GTK_OVERLAY(ui_overlay_container), menu_label);
+    gtk_widget_hide(menu_label);
     //Totoal spawner characteristics menu
-    spawner_menu_label = gtk_label_new ("");
-    gtk_widget_set_halign (spawner_menu_label, GTK_ALIGN_CENTER);
-    gtk_widget_set_valign (spawner_menu_label, GTK_ALIGN_CENTER);
-    gtk_overlay_add_overlay (GTK_OVERLAY (ui_overlay_container), spawner_menu_label);
-    gtk_widget_hide (spawner_menu_label);
+    spawner_menu_label = gtk_label_new("");
+    gtk_widget_set_halign(spawner_menu_label, GTK_ALIGN_CENTER);
+    gtk_widget_set_valign(spawner_menu_label, GTK_ALIGN_CENTER);
+    gtk_overlay_add_overlay(GTK_OVERLAY(ui_overlay_container), spawner_menu_label);
+    gtk_widget_hide(spawner_menu_label);
     //Spawn Velocity Change
-    velocity_menu_label = gtk_label_new ("");
-    gtk_widget_set_halign (velocity_menu_label, GTK_ALIGN_CENTER);
-    gtk_widget_set_valign (velocity_menu_label, GTK_ALIGN_CENTER);
-    gtk_overlay_add_overlay (GTK_OVERLAY (ui_overlay_container), velocity_menu_label);
-    gtk_widget_hide (velocity_menu_label);
+    velocity_menu_label = gtk_label_new("");
+    gtk_widget_set_halign(velocity_menu_label, GTK_ALIGN_CENTER);
+    gtk_widget_set_valign(velocity_menu_label, GTK_ALIGN_CENTER);
+    gtk_overlay_add_overlay(GTK_OVERLAY(ui_overlay_container), velocity_menu_label);
+    gtk_widget_hide(velocity_menu_label);
     //Object Individual Menu
-    object_menu_label = gtk_label_new ("");
-    gtk_widget_set_halign (object_menu_label, GTK_ALIGN_CENTER);
-    gtk_widget_set_valign (object_menu_label, GTK_ALIGN_CENTER);
-    gtk_overlay_add_overlay (GTK_OVERLAY (ui_overlay_container), object_menu_label);
-    gtk_widget_hide (object_menu_label);
+    object_menu_label = gtk_label_new("");
+    gtk_widget_set_halign(object_menu_label, GTK_ALIGN_CENTER);
+    gtk_widget_set_valign(object_menu_label, GTK_ALIGN_CENTER);
+    gtk_overlay_add_overlay(GTK_OVERLAY(ui_overlay_container), object_menu_label);
+    gtk_widget_hide(object_menu_label);
 
     /* MPE_TASK_35_CONFIG_MENU_LABEL_BEGIN */
-    config_menu_label = gtk_label_new ("");
-    gtk_widget_set_halign (config_menu_label, GTK_ALIGN_CENTER);
-    gtk_widget_set_valign (config_menu_label, GTK_ALIGN_CENTER);
-    gtk_overlay_add_overlay (GTK_OVERLAY (ui_overlay_container), config_menu_label);
-    gtk_widget_hide (config_menu_label);
+    config_menu_label = gtk_label_new("");
+    gtk_widget_set_halign(config_menu_label, GTK_ALIGN_CENTER);
+    gtk_widget_set_valign(config_menu_label, GTK_ALIGN_CENTER);
+    gtk_overlay_add_overlay(GTK_OVERLAY(ui_overlay_container), config_menu_label);
+    gtk_widget_hide(config_menu_label);
     /* MPE_TASK_35_CONFIG_MENU_LABEL_END */
     return ui_overlay_container;
-} static void overlay_append_stats_text (char *buffer, size_t buffer_size) {
-    size_t current_length = strlen (buffer);
+}
+static void overlay_append_stats_text(char *buffer, size_t buffer_size) {
+    size_t current_length = strlen(buffer);
 
     if (current_length < buffer_size) {
-        snprintf (buffer + current_length, buffer_size - current_length,
-                  " | Obj:%d Pairs:%d Manifolds:%d Cache H:%d M:%d",
-                  debug_last_object_count,
-                  debug_last_broadphase_pair_count,
-                  debug_last_manifold_count,
-                  contact_cache_get_hits (),
-                  contact_cache_get_misses ());
-/* MPE_TASK_13_OVERLAY_LONG_RUN_BEGIN */
-if (long_run_validation_active) {
-size_t long_run_current_length = strlen (buffer);
-if (long_run_current_length < buffer_size) {
-snprintf (buffer + long_run_current_length, buffer_size - long_run_current_length,
-" | LR:%ds", long_run_validation_ticks_remaining / 60);
-}
-}
-/* MPE_TASK_13_OVERLAY_LONG_RUN_END */
-/* MPE_TASK_12_OVERLAY_SLEEP_BEGIN */
-size_t sleep_current_length = strlen (buffer);
-if (sleep_current_length < buffer_size) {
-snprintf (buffer + sleep_current_length, buffer_size - sleep_current_length,
-" | Sleep:%d", debug_last_sleeping_object_count);
-}
-/* MPE_TASK_12_OVERLAY_SLEEP_END */
+        snprintf(buffer + current_length, buffer_size - current_length,
+                 " | Obj:%d Pairs:%d Manifolds:%d Cache H:%d M:%d", debug_last_object_count,
+                 debug_last_broadphase_pair_count, debug_last_manifold_count, contact_cache_get_hits(),
+                 contact_cache_get_misses());
+        /* MPE_TASK_13_OVERLAY_LONG_RUN_BEGIN */
+        if (long_run_validation_active) {
+            size_t long_run_current_length = strlen(buffer);
+            if (long_run_current_length < buffer_size) {
+                snprintf(buffer + long_run_current_length, buffer_size - long_run_current_length, " | LR:%ds",
+                         long_run_validation_ticks_remaining / 60);
+            }
+        }
+        /* MPE_TASK_13_OVERLAY_LONG_RUN_END */
+        /* MPE_TASK_12_OVERLAY_SLEEP_BEGIN */
+        size_t sleep_current_length = strlen(buffer);
+        if (sleep_current_length < buffer_size) {
+            snprintf(buffer + sleep_current_length, buffer_size - sleep_current_length, " | Sleep:%d",
+                     debug_last_sleeping_object_count);
+        }
+        /* MPE_TASK_12_OVERLAY_SLEEP_END */
     }
 }
 
-void overlay_update (void) {
+void overlay_update(void) {
     float adjustment_increment = g_cfg.ui.change_rate_game;
     if (menu_label) {
         if (main_inputs.is_menu_open) {
-            { char menu_text_buffer [512]; snprintf (menu_text_buffer, sizeof (menu_text_buffer), "-- Scene Menu --\nObjects: %d | Joints: %d\n\n1: Save Scene\n2: Load Scene\n3: Clear Scene\n4: Save Config\n5: Reset Config\n6: Exit", object_count, current_joint_count); gtk_label_set_text (GTK_LABEL (menu_label), menu_text_buffer); }
-            gtk_widget_show (menu_label);
-        } else {gtk_widget_hide (menu_label);}
-    } if (spawner_menu_label) {
-        if (main_inputs.spawner_menu_level == 0) {gtk_widget_hide (spawner_menu_label);}
-        else {
-            char spawner_text [512];
+            {
+                char menu_text_buffer[512];
+                snprintf(menu_text_buffer, sizeof(menu_text_buffer),
+                         "-- Scene Menu --\nObjects: %d | Joints: %d\n\n1: Save Scene\n2: Load Scene\n3: Clear "
+                         "Scene\n4: Save Config\n5: Reset Config\n6: Exit",
+                         object_count, current_joint_count);
+                gtk_label_set_text(GTK_LABEL(menu_label), menu_text_buffer);
+            }
+            gtk_widget_show(menu_label);
+        } else {
+            gtk_widget_hide(menu_label);
+        }
+    }
+    if (spawner_menu_label) {
+        if (main_inputs.spawner_menu_level == 0) {
+            gtk_widget_hide(spawner_menu_label);
+        } else {
+            char spawner_text[512];
             if (main_inputs.spawner_menu_level == 1) {
                 const char *spawn_type_text;
-                if (main_inputs.current_spawn_type == 0) {spawn_type_text = "Sphere";}
-                else {spawn_type_text = "Cube";}
-                snprintf (spawner_text, sizeof (spawner_text), "-- Spawner Menu --\n1: Sphere\n2: Cube\n3: Current Type: %s", spawn_type_text);
-            } else if (main_inputs.spawner_menu_level == 2) {snprintf (spawner_text, sizeof (spawner_text), "-- Sphere Settings --\n1: Mass\n2: Radius");}
-            else if (main_inputs.spawner_menu_level == 3) {snprintf (spawner_text, sizeof (spawner_text), "-- Mass Settings --\nCurrent Mass: %.2f kg\n\nValue dialog active (step %.2f)", g_cfg.spawner.mass, adjustment_increment);}
-            else if (main_inputs.spawner_menu_level == 4) {snprintf (spawner_text, sizeof (spawner_text), "-- Radius Settings --\nCurrent Radius: %.2f m\n\nValue dialog active (step %.2f)", g_cfg.spawner.radius, adjustment_increment);}
-            else if (main_inputs.spawner_menu_level == 5) {snprintf (spawner_text, sizeof (spawner_text), "-- Cube Settings --\n1: Mass\n2: Size");}
-            else if (main_inputs.spawner_menu_level == 6) {snprintf (spawner_text, sizeof (spawner_text), "-- Cube Mass --\nCurrent Mass: %.2f kg\n\nValue dialog active (step %.2f)", g_cfg.spawner.cube_mass, adjustment_increment);}
-            else if (main_inputs.spawner_menu_level == 7) {snprintf (spawner_text, sizeof (spawner_text), "-- Cube Size --\nCurrent Size: %.2f m\n\nValue dialog active (step %.2f)", g_cfg.spawner.cube_extent, adjustment_increment);}
-            else if (main_inputs.spawner_menu_level == 8) {
-                const char *spawn_type_text;
-                if (main_inputs.current_spawn_type == 0) {spawn_type_text = "Sphere";}
-                else {spawn_type_text = "Cube";}
-                snprintf (spawner_text, sizeof (spawner_text), "-- Toggle Spawn Type --\nCurrent: %s\n\nUp/Down: Toggle\nEnter: Save and Close", spawn_type_text);
-            } gtk_label_set_text (GTK_LABEL (spawner_menu_label), spawner_text);
-            gtk_widget_show (spawner_menu_label);
-        }
-    } if (velocity_menu_label) {
-        if (main_inputs.velocity_menu_level == 0) {gtk_widget_hide (velocity_menu_label);}
-        else {
-            char velocity_text [512];
-            if (main_inputs.velocity_menu_level == 1) {snprintf (velocity_text, sizeof (velocity_text), "-- User Mechanics --\n1: Spawning\n2: Viewpoint\n3: World Modification");}
-            else if (main_inputs.velocity_menu_level == 2) {snprintf (velocity_text, sizeof (velocity_text), "-- Spawning Mechanics --\n1: Launch Velocity\n2: Object Friction");}
-            else if (main_inputs.velocity_menu_level == 3) {snprintf (velocity_text, sizeof (velocity_text), "-- Launch Velocity --\nCurrent: %.2f m/s\n\nValue dialog active (step %.2f)", g_cfg.spawner.speed, adjustment_increment);}
-            else if (main_inputs.velocity_menu_level == 4) {snprintf (velocity_text, sizeof (velocity_text), "-- Object Friction --\nStatic (u_s): %.2f | Kinetic (u_k): %.2f\n\nValue dialog active (step %.2f)", g_cfg.spawner.friction_s, g_cfg.spawner.friction_k, adjustment_increment);}
-            else if (main_inputs.velocity_menu_level == 10) {snprintf (velocity_text, sizeof (velocity_text), "-- Viewpoint Settings --\n1: Movement Speed\n2: Character Jump Height");}
-            else if (main_inputs.velocity_menu_level == 11) {snprintf (velocity_text, sizeof (velocity_text), "-- Movement Speed --\nCurrent: %.2f m/s\n\nValue dialog active (step %.2f)", main_camera_fov.movement_speed, adjustment_increment);}
-            else if (main_inputs.velocity_menu_level == 12) {snprintf (velocity_text, sizeof (velocity_text), "-- Jump Height --\nCurrent: %.2f m\n\nValue dialog active (step %.2f)", g_cfg.camera.jump_height, adjustment_increment);}
-            else if (main_inputs.velocity_menu_level == 20) {snprintf (velocity_text, sizeof (velocity_text), "-- World Modification --\n1: Gravity\n2: Air Resistance\n3: Surface Friction");}
-            else if (main_inputs.velocity_menu_level == 21) {snprintf (velocity_text, sizeof (velocity_text), "-- World Gravity --\nCurrent: %.2f m/s^2\n\nValue dialog active (step %.2f)", g_cfg.world.gravity, adjustment_increment);}
-            else if (main_inputs.velocity_menu_level == 22) {snprintf (velocity_text, sizeof (velocity_text), "-- Air Resistance (Drag) --\nCurrent Coeff: %.2f\n\nValue dialog active (step %.2f)", g_cfg.world.drag, adjustment_increment * 0.01f);}
-            else if (main_inputs.velocity_menu_level == 23) {snprintf (velocity_text, sizeof (velocity_text), "-- Surface Friction (Floor) --\nStatic (u_s): %.2f | Kinetic (u_k): %.2f\n\nValue dialog active (step %.2f)", g_cfg.world.floor_friction_s, g_cfg.world.floor_friction_k, adjustment_increment);}
-            gtk_label_set_text (GTK_LABEL (velocity_menu_label), velocity_text);
-            gtk_widget_show (velocity_menu_label);
-        }
-    } if (object_menu_label) {
-        if ((main_inputs.object_menu_level == 0) || (selected_object < 0) || (selected_object >= object_count)) {
-            if (!overlay_has_valid_selection ()) {main_inputs.object_menu_level = 0;}
-            gtk_widget_hide (object_menu_label);
-
-        }
-        else {
-            char object_text [512];
-            rigidbody *target = &obj_per_scene [selected_object];
-            if (main_inputs.object_menu_level == 1) {
-                const char *type_name = (target -> type == object_sphere) ? "Sphere" : "Cube";
-                int len = snprintf (object_text, sizeof (object_text),
-                    "-- Object %d (%s) --\n1: Mass\n2: %s\n3: Friction\n4: Immovable Toggle\n5: Mark for Joint\n",
-                    selected_object, type_name, (target -> type == object_sphere) ? "Radius" : "Radius (N/A)");
-                if (main_inputs.marked_joint_object_index != -1 && main_inputs.marked_joint_object_index != selected_object) {
-                    snprintf (object_text + len, sizeof (object_text) - len,
-                        "6: Link Joint (from Obj %d)\n7: Colour Selection", main_inputs.marked_joint_object_index);
+                if (main_inputs.current_spawn_type == 0) {
+                    spawn_type_text = "Sphere";
                 } else {
-                    snprintf (object_text + len, sizeof (object_text) - len,
-                        "6: Colour Selection");
+                    spawn_type_text = "Cube";
                 }
-            } else if (main_inputs.object_menu_level == 2) {snprintf (object_text, sizeof (object_text), "-- Mass Adjustment --\nCurrent: %.2f kg\n\nValue dialog active (step %.2f)", target -> mass, adjustment_increment);}
-            else if (main_inputs.object_menu_level == 3) {snprintf (object_text, sizeof (object_text), "-- Radius Adjustment --\nCurrent: %.2f m\n\nValue dialog active (step %.2f)", target -> radius, adjustment_increment);}
-            else if (main_inputs.object_menu_level == 4) {snprintf (object_text, sizeof (object_text), "-- Friction Adjustment --\nStatic (u_s): %.2f | Kinetic (u_k): %.2f\n\nValue dialog active (step %.2f)", target -> friction_static, target -> friction_kinetic, adjustment_increment);}
-            else if (main_inputs.object_menu_level == 5) {
-                const char *static_status_text;
-                if (target -> static_state) {static_status_text = "YES";}
-                else {static_status_text = "NO";}
-                snprintf (object_text, sizeof (object_text), "-- Immovable Status --\nCurrent: %s\n\nUp/Down: Toggle\nEnter: Save", static_status_text);
-            } else if (main_inputs.object_menu_level == 8) {
-                snprintf (object_text, sizeof (object_text),
-                    "-- Preset Colours --\n1: Red\n2: Green\n3: Blue\n4: Orange\n5: Cyan\n6: Magenta\n7: Yellow\n8: White");
-            } gtk_label_set_text (GTK_LABEL (object_menu_label), object_text);
-            gtk_widget_show (object_menu_label);
+                snprintf(spawner_text, sizeof(spawner_text),
+                         "-- Spawner Menu --\n1: Sphere\n2: Cube\n3: Current Type: %s", spawn_type_text);
+            } else if (main_inputs.spawner_menu_level == 2) {
+                snprintf(spawner_text, sizeof(spawner_text), "-- Sphere Settings --\n1: Mass\n2: Radius");
+            } else if (main_inputs.spawner_menu_level == 3) {
+                snprintf(spawner_text, sizeof(spawner_text),
+                         "-- Mass Settings --\nCurrent Mass: %.2f kg\n\nValue dialog active (step %.2f)",
+                         g_cfg.spawner.mass, adjustment_increment);
+            } else if (main_inputs.spawner_menu_level == 4) {
+                snprintf(spawner_text, sizeof(spawner_text),
+                         "-- Radius Settings --\nCurrent Radius: %.2f m\n\nValue dialog active (step %.2f)",
+                         g_cfg.spawner.radius, adjustment_increment);
+            } else if (main_inputs.spawner_menu_level == 5) {
+                snprintf(spawner_text, sizeof(spawner_text), "-- Cube Settings --\n1: Mass\n2: Size");
+            } else if (main_inputs.spawner_menu_level == 6) {
+                snprintf(spawner_text, sizeof(spawner_text),
+                         "-- Cube Mass --\nCurrent Mass: %.2f kg\n\nValue dialog active (step %.2f)",
+                         g_cfg.spawner.cube_mass, adjustment_increment);
+            } else if (main_inputs.spawner_menu_level == 7) {
+                snprintf(spawner_text, sizeof(spawner_text),
+                         "-- Cube Size --\nCurrent Size: %.2f m\n\nValue dialog active (step %.2f)",
+                         g_cfg.spawner.cube_extent, adjustment_increment);
+            } else if (main_inputs.spawner_menu_level == 8) {
+                const char *spawn_type_text;
+                if (main_inputs.current_spawn_type == 0) {
+                    spawn_type_text = "Sphere";
+                } else {
+                    spawn_type_text = "Cube";
+                }
+                snprintf(spawner_text, sizeof(spawner_text),
+                         "-- Toggle Spawn Type --\nCurrent: %s\n\nUp/Down: Toggle\nEnter: Save and Close",
+                         spawn_type_text);
+            }
+            gtk_label_set_text(GTK_LABEL(spawner_menu_label), spawner_text);
+            gtk_widget_show(spawner_menu_label);
         }
-    /* MPE_TASK_35_CONFIG_MENU_RENDER_BEGIN */
-    if (config_menu_label) {
-        if (config_menu_is_open ()) {
-            char config_text [2048];
-            config_menu_render (config_text, sizeof (config_text));
-            gtk_label_set_text (GTK_LABEL (config_menu_label), config_text);
-            gtk_widget_show (config_menu_label);
-        } else {gtk_widget_hide (config_menu_label);}
     }
-    /* MPE_TASK_35_CONFIG_MENU_RENDER_END */
-    } if (!debug_information_label) {return;}
-    char information_text_buffer [1024];
-    char game_mode_text [32];
-    if (main_inputs.is_debug_mode_active) {snprintf (game_mode_text, sizeof (game_mode_text), "DEBUG MODE");}
-    else {snprintf (game_mode_text, sizeof (game_mode_text), "GAME MODE");}
+    if (velocity_menu_label) {
+        if (main_inputs.velocity_menu_level == 0) {
+            gtk_widget_hide(velocity_menu_label);
+        } else {
+            char velocity_text[512];
+            if (main_inputs.velocity_menu_level == 1) {
+                snprintf(velocity_text, sizeof(velocity_text),
+                         "-- User Mechanics --\n1: Spawning\n2: Viewpoint\n3: World Modification");
+            } else if (main_inputs.velocity_menu_level == 2) {
+                snprintf(velocity_text, sizeof(velocity_text),
+                         "-- Spawning Mechanics --\n1: Launch Velocity\n2: Object Friction");
+            } else if (main_inputs.velocity_menu_level == 3) {
+                snprintf(velocity_text, sizeof(velocity_text),
+                         "-- Launch Velocity --\nCurrent: %.2f m/s\n\nValue dialog active (step %.2f)",
+                         g_cfg.spawner.speed, adjustment_increment);
+            } else if (main_inputs.velocity_menu_level == 4) {
+                snprintf(velocity_text, sizeof(velocity_text),
+                         "-- Object Friction --\nStatic (u_s): %.2f | Kinetic (u_k): %.2f\n\nValue dialog active (step "
+                         "%.2f)",
+                         g_cfg.spawner.friction_s, g_cfg.spawner.friction_k, adjustment_increment);
+            } else if (main_inputs.velocity_menu_level == 10) {
+                snprintf(velocity_text, sizeof(velocity_text),
+                         "-- Viewpoint Settings --\n1: Movement Speed\n2: Character Jump Height");
+            } else if (main_inputs.velocity_menu_level == 11) {
+                snprintf(velocity_text, sizeof(velocity_text),
+                         "-- Movement Speed --\nCurrent: %.2f m/s\n\nValue dialog active (step %.2f)",
+                         main_camera_fov.movement_speed, adjustment_increment);
+            } else if (main_inputs.velocity_menu_level == 12) {
+                snprintf(velocity_text, sizeof(velocity_text),
+                         "-- Jump Height --\nCurrent: %.2f m\n\nValue dialog active (step %.2f)",
+                         g_cfg.camera.jump_height, adjustment_increment);
+            } else if (main_inputs.velocity_menu_level == 20) {
+                snprintf(velocity_text, sizeof(velocity_text),
+                         "-- World Modification --\n1: Gravity\n2: Air Resistance\n3: Surface Friction");
+            } else if (main_inputs.velocity_menu_level == 21) {
+                snprintf(velocity_text, sizeof(velocity_text),
+                         "-- World Gravity --\nCurrent: %.2f m/s^2\n\nValue dialog active (step %.2f)",
+                         g_cfg.world.gravity, adjustment_increment);
+            } else if (main_inputs.velocity_menu_level == 22) {
+                snprintf(velocity_text, sizeof(velocity_text),
+                         "-- Air Resistance (Drag) --\nCurrent Coeff: %.2f\n\nValue dialog active (step %.2f)",
+                         g_cfg.world.drag, adjustment_increment * 0.01f);
+            } else if (main_inputs.velocity_menu_level == 23) {
+                snprintf(velocity_text, sizeof(velocity_text),
+                         "-- Surface Friction (Floor) --\nStatic (u_s): %.2f | Kinetic (u_k): %.2f\n\nValue dialog "
+                         "active (step %.2f)",
+                         g_cfg.world.floor_friction_s, g_cfg.world.floor_friction_k, adjustment_increment);
+            }
+            gtk_label_set_text(GTK_LABEL(velocity_menu_label), velocity_text);
+            gtk_widget_show(velocity_menu_label);
+        }
+    }
+    if (object_menu_label) {
+        if ((main_inputs.object_menu_level == 0) || (selected_object < 0) || (selected_object >= object_count)) {
+            if (!overlay_has_valid_selection()) {
+                main_inputs.object_menu_level = 0;
+            }
+            gtk_widget_hide(object_menu_label);
+
+        } else {
+            char object_text[512];
+            rigidbody *target = &obj_per_scene[selected_object];
+            if (main_inputs.object_menu_level == 1) {
+                const char *type_name = (target->type == object_sphere) ? "Sphere" : "Cube";
+                int len = snprintf(
+                    object_text, sizeof(object_text),
+                    "-- Object %d (%s) --\n1: Mass\n2: %s\n3: Friction\n4: Immovable Toggle\n5: Mark for Joint\n",
+                    selected_object, type_name, (target->type == object_sphere) ? "Radius" : "Radius (N/A)");
+                if (main_inputs.marked_joint_object_index != -1 &&
+                    main_inputs.marked_joint_object_index != selected_object) {
+                    snprintf(object_text + len, sizeof(object_text) - len,
+                             "6: Link Joint (from Obj %d)\n7: Colour Selection", main_inputs.marked_joint_object_index);
+                } else {
+                    snprintf(object_text + len, sizeof(object_text) - len, "6: Colour Selection");
+                }
+            } else if (main_inputs.object_menu_level == 2) {
+                snprintf(object_text, sizeof(object_text),
+                         "-- Mass Adjustment --\nCurrent: %.2f kg\n\nValue dialog active (step %.2f)", target->mass,
+                         adjustment_increment);
+            } else if (main_inputs.object_menu_level == 3) {
+                snprintf(object_text, sizeof(object_text),
+                         "-- Radius Adjustment --\nCurrent: %.2f m\n\nValue dialog active (step %.2f)", target->radius,
+                         adjustment_increment);
+            } else if (main_inputs.object_menu_level == 4) {
+                snprintf(object_text, sizeof(object_text),
+                         "-- Friction Adjustment --\nStatic (u_s): %.2f | Kinetic (u_k): %.2f\n\nValue dialog active "
+                         "(step %.2f)",
+                         target->friction_static, target->friction_kinetic, adjustment_increment);
+            } else if (main_inputs.object_menu_level == 5) {
+                const char *static_status_text;
+                if (target->static_state) {
+                    static_status_text = "YES";
+                } else {
+                    static_status_text = "NO";
+                }
+                snprintf(object_text, sizeof(object_text),
+                         "-- Immovable Status --\nCurrent: %s\n\nUp/Down: Toggle\nEnter: Save", static_status_text);
+            } else if (main_inputs.object_menu_level == 8) {
+                snprintf(object_text, sizeof(object_text),
+                         "-- Preset Colours --\n1: Red\n2: Green\n3: Blue\n4: Orange\n5: Cyan\n6: Magenta\n7: "
+                         "Yellow\n8: White");
+            }
+            gtk_label_set_text(GTK_LABEL(object_menu_label), object_text);
+            gtk_widget_show(object_menu_label);
+        }
+        /* MPE_TASK_35_CONFIG_MENU_RENDER_BEGIN */
+        if (config_menu_label) {
+            if (config_menu_is_open()) {
+                char config_text[2048];
+                config_menu_render(config_text, sizeof(config_text));
+                gtk_label_set_text(GTK_LABEL(config_menu_label), config_text);
+                gtk_widget_show(config_menu_label);
+            } else {
+                gtk_widget_hide(config_menu_label);
+            }
+        }
+        /* MPE_TASK_35_CONFIG_MENU_RENDER_END */
+    }
+    if (!debug_information_label) {
+        return;
+    }
+    char information_text_buffer[1024];
+    char game_mode_text[32];
+    if (main_inputs.is_debug_mode_active) {
+        snprintf(game_mode_text, sizeof(game_mode_text), "DEBUG MODE");
+    } else {
+        snprintf(game_mode_text, sizeof(game_mode_text), "GAME MODE");
+    }
     if ((selected_object < 0) || (selected_object >= object_count)) {
         const char *spawn_type_text;
-        if (main_inputs.current_spawn_type == 0) {spawn_type_text = "sphere";}
-        else {spawn_type_text = "cube";}
-        snprintf (information_text_buffer, sizeof (information_text_buffer),
-                 "[%s] | No object selected | Shift: spawn %s | R-Click: select | 0: Toggle Mode",
-                 game_mode_text, spawn_type_text);
-        overlay_append_stats_text (information_text_buffer, sizeof (information_text_buffer));
-    overlay_append_overflow_text (information_text_buffer, sizeof (information_text_buffer));
-gtk_label_set_text (GTK_LABEL (debug_information_label), information_text_buffer);
-        return;
-    } rigidbody *selected_rigid_body = &obj_per_scene [selected_object];
-    float selected_object_speed = vector3_length (selected_rigid_body -> velocity);
-    const char *object_type_text;
-    if (selected_rigid_body -> type == object_sphere) {object_type_text = "Sphere";}
-    else {object_type_text = "Cube";}
-    const char *static_status_text;
-    if (selected_rigid_body -> static_state) {static_status_text = "(Static)";}
-    else {static_status_text = "(Dynamic)";}
-    snprintf (information_text_buffer, sizeof (information_text_buffer),
-            "[%s] | %s [%d] %s | Pos: (%.1f, %.1f, %.1f) | Speed: %.2f | E: Menu | F: Impulse | M-Click: remove",
-            game_mode_text,
-            object_type_text,
-            selected_object,
-            static_status_text,
-            selected_rigid_body -> position.x, selected_rigid_body -> position.y, selected_rigid_body -> position.z,
-            selected_object_speed
-        );
-    overlay_append_stats_text (information_text_buffer, sizeof (information_text_buffer));
-    overlay_append_overflow_text (information_text_buffer, sizeof (information_text_buffer));
-gtk_label_set_text (GTK_LABEL (debug_information_label), information_text_buffer);
-}
+        if (main_inputs.current_spawn_type == 0) {
+            spawn_type_text = "sphere";
+        } else {
+            spawn_type_text = "cube";
+        }
+        snprintf(information_text_buffer, sizeof(information_text_buffer),
+                 "[%s] | No object selected | Shift: spawn %s | R-Click: select | 0: Toggle Mode", game_mode_text,
+                 spawn_type_text);
+        overlay_append_stats_text(information_text_buffer, sizeof(information_text_buffer));
+        overlay_append_overflow_text(information_text_buffer, sizeof(information_text_buffer));
+    /* MFS_GUI_BRIDGE_OVERLAY: Robot HUD */
+    if (gui_robot_get_count() > 0) {
+        size_t hud_offset = strlen(information_text_buffer);
+        for (int ri = 0; (ri < gui_robot_get_count()) && (hud_offset < sizeof(information_text_buffer) - 128); ri++) {
+            ftc_robot *rb = gui_robot_get(ri);
+            if (!rb) continue;
+            float batt_v = battery_get_voltage(&rb->battery, 0.0f);
+            int rpm_avg = (int)((rb->wheel_motors[0].rpm + rb->wheel_motors[1].rpm +
+                                 rb->wheel_motors[2].rpm + rb->wheel_motors[3].rpm) / 4.0f);
+            snprintf(information_text_buffer + hud_offset, sizeof(information_text_buffer) - hud_offset,
+                     " | R%d: %.1fV %dRPM", ri, batt_v, rpm_avg);
+            hud_offset = strlen(information_text_buffer);
+        }
+    }
+    /* MFS_GUI_BRIDGE_OVERLAY_END */
 
+        gtk_label_set_text(GTK_LABEL(debug_information_label), information_text_buffer);
+        return;
+    }
+    rigidbody *selected_rigid_body = &obj_per_scene[selected_object];
+    float selected_object_speed = vector3_length(selected_rigid_body->velocity);
+    const char *object_type_text;
+    if (selected_rigid_body->type == object_sphere) {
+        object_type_text = "Sphere";
+    } else {
+        object_type_text = "Cube";
+    }
+    const char *static_status_text;
+    if (selected_rigid_body->static_state) {
+        static_status_text = "(Static)";
+    } else {
+        static_status_text = "(Dynamic)";
+    }
+    snprintf(information_text_buffer, sizeof(information_text_buffer),
+             "[%s] | %s [%d] %s | Pos: (%.1f, %.1f, %.1f) | Speed: %.2f | E: Menu | F: Impulse | M-Click: remove",
+             game_mode_text, object_type_text, selected_object, static_status_text, selected_rigid_body->position.x,
+             selected_rigid_body->position.y, selected_rigid_body->position.z, selected_object_speed);
+    overlay_append_stats_text(information_text_buffer, sizeof(information_text_buffer));
+    overlay_append_overflow_text(information_text_buffer, sizeof(information_text_buffer));
+    gtk_label_set_text(GTK_LABEL(debug_information_label), information_text_buffer);
+}

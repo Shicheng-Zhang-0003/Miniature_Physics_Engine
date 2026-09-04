@@ -297,6 +297,49 @@ Broadphase collision detection uses a 3D spatial hash grid and runs once per phy
 
 ---
 
+
+---
+
+## FTC Robot (MFS)
+
+### Spawning a Robot
+Open the debug terminal (`T` in debug mode) and type:
+```
+touch robot
+```
+This spawns a 4-wheel mecanum robot at position (5, rest_height, 5) with
+goBILDA 5203 30:1 motors. An orange nose sphere shows the heading (+Z local).
+
+### Driving the Robot
+| Key | Action |
+|---|---|
+| `G` | Drive forward |
+| `B` | Drive backward |
+| `V` | Strafe right |
+| `N` | Strafe left |
+| `C` | Rotate left (CCW) |
+| `H` | Rotate right (CW) |
+
+Keys are held-state: press and hold to drive, release to stop.
+The robot HUD in the top-left overlay shows battery voltage and average RPM.
+
+### Physics Model
+- **Wheels:** Cylinders (radius 0.05m, half-width 0.02m) with revolute joints
+- **Friction:** Anisotropic roller friction for mecanum (±45° rollers)
+- **Motors:** BackEMF, Kt/Kv, gear ratio, thermal accumulation
+- **Battery:** 12.8V nominal, 0.015Ω internal resistance, 30Ah capacity
+- **Traction:** Torque → ground force clamped by friction (no chassis cheat)
+- **Timestep:** Fixed 60Hz accumulator (deterministic)
+
+### Object Types
+The engine supports three object types:
+- **Sphere** — spawned via `touch new.sph` or spawner menu
+- **Cube** — spawned via `touch new.cube` or spawner menu
+- **Cylinder** — used for robot wheels (axle along local X)
+
+
+---
+
 ## Installation (Ubuntu 24.04 LTS)
 
 Install dependencies:

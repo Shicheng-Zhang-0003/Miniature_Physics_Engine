@@ -17,5 +17,5 @@ typedef struct {
 } mesh;
 
 extern mesh sphere_mesh;
-void init_sm_system (mesh *mesh_object, int horizontal_sections, int vertical_stacks);
+void init_sm_system(mesh *mesh_object, int horizontal_sections, int vertical_stacks);
 #endif

@@ -1,5 +1,24 @@
 # v15R2 — Complete Defect & Debt Audit
 
+> **STATUS UPDATE (post-Milestone-2):**
+> This audit was taken before the FTC physics-first pivot. Approximately 30+
+> items listed below have since been resolved. Key resolutions:
+>
+> - **ARCH-002** (simulation.c 44KB god file): RESOLVED — split to ~130 lines
+> - **ARCH-009** (monolithic physics_step_increment): RESOLVED — extracted
+> - **ARCH-012–017** (dead code): ALL RESOLVED — removed
+> - **BUG-001–012**: ALL RESOLVED
+> - **PHYS-003** (only spring joints): RESOLVED — revolute joints implemented
+> - **REND-010** (render_init every frame): RESOLVED
+> - **TERM-010** (MicroVim line length): RESOLVED
+> - **QUAL-002** (spelling): RESOLVED
+> - **DOC-001–008**: MOSTLY RESOLVED
+>
+> Still open: PHYS-001 (islanding), PHYS-002 (CCD), PHYS-004 (rolling friction),
+> PERF-001 (SIMD), PERF-003 (frustum culling), ARCH-001 (partial), ARCH-003
+> (debug_terminal 146KB), ARCH-006 (scene format), SAVE-001–008.
+
+
 Every issue found across all 88 files, organized by section. Severity scale: **Critical** (breaks correctness), **High** (blocks future work), **Medium** (code quality / maintainability), **Low** (polish / cosmetic).
 
 ---
