@@ -4,14 +4,14 @@
 #   Creates a robot, applies full strafe for 180 ticks (3 seconds),
 #   asserts the robot moved sideways (x-axis displacement).
 # Phase:   phase2_robotics
-# Files:   v15R2/src/tests/mecanum_drive_test.c (new), makefile target
+# Files:   v15R3/src/tests/mecanum_drive_test.c (new), makefile target
 # Depends: 075, 076
 # Risk:    low (new test file + make target)
 # ============================================================
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
-SRC="v15R2/src"
+SRC="v15R3/src"
 TEST="$SRC/tests/mecanum_drive_test.c"
 MAKEFILE="$SRC/makefile"
 grep -q 'MPE_FTC_080' "$TEST" 2>/dev/null && { echo "[SKIP] mecanum test already present"; exit 0; }

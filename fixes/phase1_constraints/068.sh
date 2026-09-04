@@ -5,14 +5,14 @@
 #   Asserts the anchor holds (rod length stays constant) and the bob
 #   swings under gravity. This is the behavioural gate for 062/063/067.
 # Phase:   phase1_constraints
-# Files:   v15R2/src/tests/revolute_test.c (new), makefile (target)
+# Files:   v15R3/src/tests/revolute_test.c (new), makefile (target)
 # Depends: 062, 063, 067
 # Risk:    low (additive file + appended make target)
 # ============================================================
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
-SRC="v15R2/src"
+SRC="v15R3/src"
 TEST="$SRC/tests/revolute_test.c"
 MAKEFILE="$SRC/makefile"
 grep -q 'MPE_FTC_067' "$SRC/core/physics_world.c" 2>/dev/null || { echo "[SKIP] 067 not applied yet"; exit 0; }

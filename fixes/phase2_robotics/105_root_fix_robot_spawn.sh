@@ -13,8 +13,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-REG_C="v15R2/src/robotics/gui_robot_registry.c"
-DISPATCH="v15R2/src/ui_input/simulation_input_dispatch.c"
+REG_C="v15R3/src/robotics/gui_robot_registry.c"
+DISPATCH="v15R3/src/ui_input/simulation_input_dispatch.c"
 
 # Backup
 cp "$REG_C" "${REG_C}.pre_105"

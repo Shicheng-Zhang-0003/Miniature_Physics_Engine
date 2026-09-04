@@ -4,14 +4,14 @@
 #   The rigidbody struct member is `half_extensions`, not `half_extents`.
 #   Then rebuild and run the mecanum drive test to verify.
 # Phase:   phase2_robotics
-# Files:   v15R2/src/robotics/wheel_traction.c
+# Files:   v15R3/src/robotics/wheel_traction.c
 # Depends: 076
 # Risk:    trivial
 # ============================================================
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
-TARGET="v15R2/src/robotics/wheel_traction.c"
+TARGET="v15R3/src/robotics/wheel_traction.c"
 [[ -f "$TARGET" ]] || { echo "[SKIP] wheel_traction.c not found"; exit 0; }
 
 # Already fixed?
@@ -31,7 +31,7 @@ if grep -q 'half_extents' "$TARGET"; then
 fi
 
 # Rebuild and run the mecanum test
-cd v15R2/src
+cd v15R3/src
 if make test_mecanum_drive > /tmp/mecanum_test.log 2>&1; then
   tail -6 /tmp/mecanum_test.log
   echo "[PASS] 081: wheel_traction typo fixed; mecanum test passes"

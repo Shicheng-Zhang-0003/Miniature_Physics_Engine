@@ -7,7 +7,7 @@
 #   This is the final proof needed to rebuild the robot on real physics.
 #
 # Phase:   phase3_sensors (cylinder keystone)
-# Files:   v15R2/src/tests/driven_wheel_test.c (rewrite)
+# Files:   v15R3/src/tests/driven_wheel_test.c (rewrite)
 # Depends: 093g
 # Risk:    low (test-only)
 # ============================================================
@@ -15,7 +15,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-SRC="v15R2/src"
+SRC="v15R3/src"
 TEST="$SRC/tests/driven_wheel_test.c"
 
 [[ -d "$SRC/tests" ]] || { echo "[SKIP] $SRC/tests not found"; exit 0; }

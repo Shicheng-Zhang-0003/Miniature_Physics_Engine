@@ -15,27 +15,27 @@ cd "$ROOT"
 TARGET="readme.md"
 
 if [[ ! -f "$TARGET" ]]; then
-    # Fallback: check if it's still inside v15R2/
-    if [[ -f "v15R2/readme.md" ]]; then
-        TARGET="v15R2/readme.md"
+    # Fallback: check if it's still inside v15R3/
+    if [[ -f "v15R3/readme.md" ]]; then
+        TARGET="v15R3/readme.md"
     else
-        echo "[SKIP] readme.md not found at root or v15R2/"
+        echo "[SKIP] readme.md not found at root or v15R3/"
         exit 0
     fi
 fi
 
-if ! grep -q 'v15R1' "$TARGET"; then
-    echo "[SKIP] No v15R1 references found in $TARGET"
+if ! grep -q 'v15R2' "$TARGET"; then
+    echo "[SKIP] No v15R2 references found in $TARGET"
     exit 0
 fi
 
 cp "$TARGET" "${TARGET}.pre_013"
 
-sed -i 's/v15R1/v15R2/g' "$TARGET"
+sed -i 's/v15R2/v15R3/g' "$TARGET"
 
-if grep -q 'v15R1' "$TARGET"; then
-    echo "[FAIL] v15R1 still present in $TARGET"
+if grep -q 'v15R2' "$TARGET"; then
+    echo "[FAIL] v15R2 still present in $TARGET"
     exit 1
 fi
 
-echo "[PASS] 013: DOC-002 fixed — $TARGET now references v15R2"
+echo "[PASS] 013: DOC-002 fixed — $TARGET now references v15R3"

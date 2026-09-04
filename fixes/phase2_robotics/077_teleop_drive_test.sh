@@ -7,14 +7,14 @@
 #     - No NaN in any body state
 #     - Robot didn't flip (chassis y stayed reasonable)
 # Phase:   phase2_robotics
-# Files:   v15R2/src/tests/teleop_drive_test.c (new), makefile target
+# Files:   v15R3/src/tests/teleop_drive_test.c (new), makefile target
 # Depends: 070-074, 067 (constraint loop in physics_world_step)
 # Risk:    low (new test file + make target)
 # ============================================================
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
-SRC="v15R2/src"
+SRC="v15R3/src"
 TEST="$SRC/tests/teleop_drive_test.c"
 MAKEFILE="$SRC/makefile"
 grep -q 'MPE_FTC_077' "$TEST" 2>/dev/null && { echo "[SKIP] teleop drive test already present"; exit 0; }

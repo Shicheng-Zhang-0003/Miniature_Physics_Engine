@@ -3,7 +3,7 @@
 # FIX 041a — Repair: restore rigidbody.c/h from backup,
 #             then delete ONLY rb_integrate (not velocity/position)
 # Phase:   phase3_quality
-# Files:   v15R2/src/core/rigidbody.c, v15R2/src/core/rigidbody.h
+# Files:   v15R3/src/core/rigidbody.c, v15R3/src/core/rigidbody.h
 # Depends: 041 (failed)
 # Risk:    low
 # ============================================================
@@ -12,8 +12,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-TARGET_C="v15R2/src/core/rigidbody.c"
-TARGET_H="v15R2/src/core/rigidbody.h"
+TARGET_C="v15R3/src/core/rigidbody.c"
+TARGET_H="v15R3/src/core/rigidbody.h"
 BACKUP_C="${TARGET_C}.pre_041"
 BACKUP_H="${TARGET_H}.pre_041"
 

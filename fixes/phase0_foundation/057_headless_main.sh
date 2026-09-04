@@ -4,14 +4,14 @@
 #   Wrapped in MPE_HEADLESS so the default build is unaffected.
 #   Avoids mpe_engine.h -> no GTK dependency.
 # Phase:   phase0_foundation
-# Files:   v15R2/src/headless_main.c
+# Files:   v15R3/src/headless_main.c
 # Depends: 055, 056
 # Risk:    low (new file only)
 # ============================================================
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
-TARGET="v15R2/src/headless_main.c"
+TARGET="v15R3/src/headless_main.c"
 grep -q 'MPE_FTC_057' "$TARGET" 2>/dev/null && { echo "[SKIP] headless_main already present"; exit 0; }
 
 cat > "$TARGET" <<'EOF'

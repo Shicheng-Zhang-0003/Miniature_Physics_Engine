@@ -2,7 +2,7 @@
 # ============================================================
 # FIX 019 — BUILD-005: add error checking to src/compile
 # Phase:   phase0_trivial
-# Files:   v15R2/src/compile
+# Files:   v15R3/src/compile
 # Depends: none
 # Risk:    low
 # ============================================================
@@ -11,7 +11,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-TARGET="v15R2/src/compile"
+TARGET="v15R3/src/compile"
 
 if [[ ! -f "$TARGET" ]]; then
     echo "[SKIP] $TARGET not found"

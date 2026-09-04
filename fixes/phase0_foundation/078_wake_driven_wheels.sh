@@ -6,14 +6,14 @@
 #   returns early and motor torque in torque_accumulator is never applied.
 #   Fix: wake each driven wheel when motor torque is applied.
 # Phase:   phase0_foundation (drivetrain bring-up)
-# Files:   v15R2/src/robotics/robot.c
+# Files:   v15R3/src/robotics/robot.c
 # Depends: 073
 # Risk:    low
 # ============================================================
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
-TARGET="v15R2/src/robotics/robot.c"
+TARGET="v15R3/src/robotics/robot.c"
 [[ -f "$TARGET" ]] || { echo "[SKIP] $TARGET not found"; exit 0; }
 grep -q 'MPE_FTC_078' "$TARGET" && { echo "[SKIP] 078 already applied"; exit 0; }
 grep -q 'wheel->torque_accumulator.z += axle.z \* torque;' "$TARGET" \

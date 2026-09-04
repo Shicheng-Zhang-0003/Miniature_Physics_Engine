@@ -3,14 +3,14 @@
 # FIX 072 — FTC Phase 2: battery model with voltage sag
 #   V_terminal = V_nominal * charge - R_internal * I_total
 # Phase:   phase2_robotics
-# Files:   v15R2/src/robotics/battery.h, battery.c (new)
+# Files:   v15R3/src/robotics/battery.h, battery.c (new)
 # Depends: none
 # Risk:    low (new files only)
 # ============================================================
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
-DIR="v15R2/src/robotics"
+DIR="v15R3/src/robotics"
 H="$DIR/battery.h"
 C="$DIR/battery.c"
 grep -q 'MPE_FTC_072' "$C" 2>/dev/null && { echo "[SKIP] battery model already present"; exit 0; }

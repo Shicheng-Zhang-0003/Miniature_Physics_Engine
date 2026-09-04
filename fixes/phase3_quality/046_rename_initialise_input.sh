@@ -2,8 +2,8 @@
 # ============================================================
 # FIX 046 — QUAL-002: standardise initialise_input spelling
 # Phase:   phase3_quality
-# Files:   v15R2/src/ui_input/input_control.c, input_control.h,
-#          v15R2/src/root_gtk.c
+# Files:   v15R3/src/ui_input/input_control.c, input_control.h,
+#          v15R3/src/root_gtk.c
 # Depends: none
 # Risk:    low
 # ============================================================
@@ -12,9 +12,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-TARGET_H="v15R2/src/ui_input/input_control.h"
-TARGET_C="v15R2/src/ui_input/input_control.c"
-CALLER="v15R2/src/root_gtk.c"
+TARGET_H="v15R3/src/ui_input/input_control.h"
+TARGET_C="v15R3/src/ui_input/input_control.c"
+CALLER="v15R3/src/root_gtk.c"
 
 if [[ ! -f "$TARGET_H" ]]; then
     echo "[SKIP] $TARGET_H not found"

@@ -4,14 +4,14 @@
 #   Pool, add, remove implemented. constraint_solve_all is the
 #   declared solver seam, filled in alongside islanding (Phase 1).
 # Phase:   phase1_constraints
-# Files:   v15R2/src/physics/constraint.c
+# Files:   v15R3/src/physics/constraint.c
 # Depends: 060
 # Risk:    low (new file only)
 # ============================================================
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
-TARGET="v15R2/src/physics/constraint.c"
+TARGET="v15R3/src/physics/constraint.c"
 grep -q 'MPE_FTC_061' "$TARGET" 2>/dev/null && { echo "[SKIP] constraint.c already present"; exit 0; }
 
 cat > "$TARGET" <<'EOF'

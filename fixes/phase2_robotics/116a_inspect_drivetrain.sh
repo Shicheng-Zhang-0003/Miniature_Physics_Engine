@@ -7,8 +7,8 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
-RB="v15R2/src/robotics/robot.c"
-DT="v15R2/src/robotics/drivetrain.c"
+RB="v15R3/src/robotics/robot.c"
+DT="v15R3/src/robotics/drivetrain.c"
 
 echo "================ 116a: DRIVETRAIN INSPECTION ================"
 echo ""
@@ -35,15 +35,15 @@ echo "--- [7] drivetrain_update body (first 20 lines) ---"
 awk '/^void drivetrain_update/{f=1} f{print NR": "$0; if(++c>20) exit}' "$DT"
 echo ""
 echo "--- [8] math3D functions available ---"
-M="v15R2/src/core/math3D.h"
+M="v15R3/src/core/math3D.h"
 for fn in vector3_cross_product vector3_normalisation vector3_scaling vector3_dot vector3_addition vector3_subtraction; do
     if grep -q "$fn" "$M"; then echo "  [OK]   $fn"; else echo "  [MISS] $fn"; fi
 done
 echo ""
 echo "--- [9] force/torque accumulator fields (rigidbody.h) ---"
-grep -nE 'force_accumulator|torque_accumulator' v15R2/src/core/rigidbody.h | head -4
+grep -nE 'force_accumulator|torque_accumulator' v15R3/src/core/rigidbody.h | head -4
 echo ""
 echo "--- [10] gravity constant available? ---"
-grep -rn 'world.gravity' v15R2/src/config/mpe_config_schema.c | head -2
+grep -rn 'world.gravity' v15R3/src/config/mpe_config_schema.c | head -2
 echo ""
 echo "================ INSPECTION DONE ================"

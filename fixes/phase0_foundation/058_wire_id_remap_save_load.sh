@@ -6,9 +6,9 @@
 #   through it. Without this, saved joints reference IDs that no
 #   longer exist and are silently deleted on the first tick.
 # Phase:   phase0_foundation
-# Files:   v15R2/src/config/mpe_constants.h
-#          v15R2/src/scene/scene_saving.c
-#          v15R2/src/scene/scene_load.c
+# Files:   v15R3/src/config/mpe_constants.h
+#          v15R3/src/scene/scene_saving.c
+#          v15R3/src/scene/scene_load.c
 # Depends: 054
 # Risk:    medium (format change; 9 targeted edits, unique anchors,
 #          requires the compile gate)
@@ -16,10 +16,10 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
-CONST="v15R2/src/config/mpe_constants.h"
-SAVE="v15R2/src/scene/scene_saving.c"
-LOAD="v15R2/src/scene/scene_load.c"
-REMAP_H="v15R2/src/scene/scene_id_remap.h"
+CONST="v15R3/src/config/mpe_constants.h"
+SAVE="v15R3/src/scene/scene_saving.c"
+LOAD="v15R3/src/scene/scene_load.c"
+REMAP_H="v15R3/src/scene/scene_id_remap.h"
 for f in "$CONST" "$SAVE" "$LOAD" "$REMAP_H"; do
   [[ -f "$f" ]] || { echo "[SKIP] $f not found (is 054 applied?)"; exit 0; }
 done

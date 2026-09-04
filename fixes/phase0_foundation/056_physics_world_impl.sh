@@ -3,14 +3,14 @@
 # FIX 056 — ARCH-001 (real): physics_world implementation
 #   Owning struct + working free-body step. Replaces dead scaffold.
 # Phase:   phase0_foundation
-# Files:   v15R2/src/core/physics_world.c
+# Files:   v15R3/src/core/physics_world.c
 # Depends: 055
 # Risk:    low (whole-file overwrite)
 # ============================================================
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
-TARGET="v15R2/src/core/physics_world.c"
+TARGET="v15R3/src/core/physics_world.c"
 grep -q 'MPE_FTC_056' "$TARGET" 2>/dev/null && { echo "[SKIP] real impl already present"; exit 0; }
 [[ -f "$TARGET" ]] && cp "$TARGET" "${TARGET}.pre_056"
 

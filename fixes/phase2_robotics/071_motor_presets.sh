@@ -5,14 +5,14 @@
 #   Values are physically reasonable; verify against actual
 #   spec sheets for competition accuracy.
 # Phase:   phase2_robotics
-# Files:   v15R2/src/robotics/motor_presets.h, motor_presets.c (new)
+# Files:   v15R3/src/robotics/motor_presets.h, motor_presets.c (new)
 # Depends: 070
 # Risk:    low (new files only)
 # ============================================================
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
-DIR="v15R2/src/robotics"
+DIR="v15R3/src/robotics"
 H="$DIR/motor_presets.h"
 C="$DIR/motor_presets.c"
 grep -q 'MPE_FTC_071' "$C" 2>/dev/null && { echo "[SKIP] motor presets already present"; exit 0; }

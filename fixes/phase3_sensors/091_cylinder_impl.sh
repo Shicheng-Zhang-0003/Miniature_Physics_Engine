@@ -11,9 +11,9 @@
 #   Broadphase bounding radius: sqrt(r^2 + half_length^2)
 #
 # Phase:   phase3_sensors (cylinder keystone)
-# Files:   v15R2/src/core/rigidbody.c
-#          v15R2/src/core/physics_world.c
-#          v15R2/src/physics/broadphase.c
+# Files:   v15R3/src/core/rigidbody.c
+#          v15R3/src/core/physics_world.c
+#          v15R3/src/physics/broadphase.c
 # Depends: 090
 # Risk:    medium (multiple file edits, additive logic)
 # ============================================================
@@ -21,10 +21,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-RB_C="v15R2/src/core/rigidbody.c"
-PW_C="v15R2/src/core/physics_world.c"
-BP_C="v15R2/src/physics/broadphase.c"
-RB_H="v15R2/src/core/rigidbody.h"
+RB_C="v15R3/src/core/rigidbody.c"
+PW_C="v15R3/src/core/physics_world.c"
+BP_C="v15R3/src/physics/broadphase.c"
+RB_H="v15R3/src/core/rigidbody.h"
 
 for f in "$RB_C" "$PW_C" "$BP_C"; do
     [[ -f "$f" ]] || { echo "[SKIP] $f not found"; exit 0; }
@@ -221,7 +221,7 @@ grep -q 'physics_world_add_cylinder' "$PW_C" || { echo "[FAIL] add_cylinder not 
 grep -q 'object_cylinder' "$BP_C" || { echo "[FAIL] cylinder not in broadphase.c"; exit 1; }
 
 # Build check
-cd v15R2/src
+cd v15R3/src
 if make > /tmp/build_091.log 2>&1; then
     echo "  Build: PASS"
 else

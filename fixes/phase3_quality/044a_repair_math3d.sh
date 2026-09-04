@@ -3,7 +3,7 @@
 # FIX 044a — Repair: delete fov_aspr_perspective from math3D.h
 #             (previous script failed because line starts with "} static")
 # Phase:   phase3_quality
-# Files:   v15R2/src/core/math3D.h
+# Files:   v15R3/src/core/math3D.h
 # Depends: 044 (failed)
 # Risk:    low
 # ============================================================
@@ -12,7 +12,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-TARGET="v15R2/src/core/math3D.h"
+TARGET="v15R3/src/core/math3D.h"
 
 if [[ ! -f "$TARGET" ]]; then
     echo "[SKIP] $TARGET not found"

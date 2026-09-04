@@ -10,7 +10,7 @@
 #   wheel_traction.c TOKEN (keep the rest of the line intact).
 #
 # Phase:   phase3_sensors (cylinder keystone)
-# Files:   v15R2/src/makefile
+# Files:   v15R3/src/makefile
 # Depends: 094
 # Risk:    low (restore + targeted token removal)
 # ============================================================
@@ -18,7 +18,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-MAKEFILE="v15R2/src/makefile"
+MAKEFILE="v15R3/src/makefile"
 BACKUP="${MAKEFILE}.pre_094"
 
 [[ -f "$MAKEFILE" ]] || { echo "[SKIP] makefile not found"; exit 0; }
@@ -41,7 +41,7 @@ if grep -q 'wheel_traction' "$MAKEFILE"; then
     exit 1
 fi
 
-cd v15R2/src
+cd v15R3/src
 
 # 4. Verify the makefile parses cleanly (dry-run)
 if ! make -n test_teleop_drive > /tmp/makeparse_094a.log 2>&1; then

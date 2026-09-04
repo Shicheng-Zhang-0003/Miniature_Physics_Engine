@@ -7,15 +7,15 @@
 #   The raycast uses the existing ray_sphere/ray_obb intersection code
 #   from the selector module.
 # Phase:   phase2_robotics
-# Files:   v15R2/src/robotics/wheel_traction.h, wheel_traction.c (new)
-#          v15R2/src/robotics/robot.c (wire traction into update)
+# Files:   v15R3/src/robotics/wheel_traction.h, wheel_traction.c (new)
+#          v15R3/src/robotics/robot.c (wire traction into update)
 # Depends: 073, 078 (drivetrain must work)
 # Risk:    medium (new files + targeted insert into robot.c)
 # ============================================================
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
-DIR="v15R2/src/robotics"
+DIR="v15R3/src/robotics"
 H="$DIR/wheel_traction.h"
 C="$DIR/wheel_traction.c"
 ROBOT_C="$DIR/robot.c"

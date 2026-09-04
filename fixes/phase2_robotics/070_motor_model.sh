@@ -8,14 +8,14 @@
 #     Output  = Torque * gear_ratio
 #   With stall-current clamping and thermal accumulation.
 # Phase:   phase2_robotics
-# Files:   v15R2/src/robotics/motor.h, motor.c (new)
+# Files:   v15R3/src/robotics/motor.h, motor.c (new)
 # Depends: none (physics_world from Phase 0)
 # Risk:    low (new files only)
 # ============================================================
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
-DIR="v15R2/src/robotics"
+DIR="v15R3/src/robotics"
 H="$DIR/motor.h"
 C="$DIR/motor.c"
 grep -q 'MPE_FTC_070' "$C" 2>/dev/null && { echo "[SKIP] motor model already present"; exit 0; }

@@ -16,10 +16,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-SIM_C="v15R2/src/simulation.c"
-DISPATCH="v15R2/src/ui_input/simulation_input_dispatch.c"
-INPUT_H="v15R2/src/ui_input/input_control.h"
-INPUT_C="v15R2/src/ui_input/input_control.c"
+SIM_C="v15R3/src/simulation.c"
+DISPATCH="v15R3/src/ui_input/simulation_input_dispatch.c"
+INPUT_H="v15R3/src/ui_input/input_control.h"
+INPUT_C="v15R3/src/ui_input/input_control.c"
 
 cp "$SIM_C"    "${SIM_C}.pre_108"
 cp "$DISPATCH" "${DISPATCH}.pre_108"

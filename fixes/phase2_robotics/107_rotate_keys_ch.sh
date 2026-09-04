@@ -9,9 +9,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-H="v15R2/src/ui_input/input_control.h"
-C="v15R2/src/ui_input/input_control.c"
-D="v15R2/src/ui_input/simulation_input_dispatch.c"
+H="v15R3/src/ui_input/input_control.h"
+C="v15R3/src/ui_input/input_control.c"
+D="v15R3/src/ui_input/simulation_input_dispatch.c"
 
 # ============================================================
 # PART 1: Add c_key_pressed to input_control.h

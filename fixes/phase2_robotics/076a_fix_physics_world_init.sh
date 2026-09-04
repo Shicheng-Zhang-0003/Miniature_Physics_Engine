@@ -10,14 +10,14 @@
 # bodies == NULL so the malloc always runs.
 #
 # Phase:   phase2_robotics
-# Files:   v15R2/src/core/physics_world.c
+# Files:   v15R3/src/core/physics_world.c
 # Depends: 059c
 # Risk:    low (defensive init hardening)
 # ============================================================
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
-TARGET="v15R2/src/core/physics_world.c"
+TARGET="v15R3/src/core/physics_world.c"
 [[ -f "$TARGET" ]] || { echo "[SKIP] $TARGET not found"; exit 0; }
 grep -q 'MPE_FTC_076a' "$TARGET" && { echo "[SKIP] already applied"; exit 0; }
 cp "$TARGET" "${TARGET}.pre_076a"
@@ -46,7 +46,7 @@ grep -q '#include <string.h>' "$TARGET" \
   || { echo "[FAIL] string.h not included"; exit 1; }
 
 # Verify by rebuilding + running the teleop test if its make target exists
-cd v15R2/src
+cd v15R3/src
 if grep -q '^test_teleop_drive:' makefile 2>/dev/null; then
   if make test_teleop_drive > /tmp/teleop_test.log 2>&1; then
     tail -6 /tmp/teleop_test.log

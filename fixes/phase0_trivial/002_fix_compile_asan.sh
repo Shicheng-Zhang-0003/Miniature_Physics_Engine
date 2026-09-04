@@ -2,7 +2,7 @@
 # ============================================================
 # FIX 002 — BUG-002: compile_asan script is broken
 # Phase:   phase0_trivial
-# Files:   v15R2/src/compile_asan
+# Files:   v15R3/src/compile_asan
 # Depends: none
 # Risk:    low
 # ============================================================
@@ -11,7 +11,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-TARGET="v15R2/src/compile_asan"
+TARGET="v15R3/src/compile_asan"
 
 # --- Preflight ---
 if [[ ! -f "$TARGET" ]]; then

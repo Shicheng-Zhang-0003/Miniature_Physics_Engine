@@ -3,14 +3,14 @@
 # FIX 082 — CODE QUALITY: Normalize indentation across codebase
 #
 #   Uses clang-format with the project .clang-format config to
-#   normalize indentation in all .c and .h files under v15R2/src/.
+#   normalize indentation in all .c and .h files under v15R3/src/.
 #   Creates .pre_082 backups before modifying each file.
 #
 #   Falls back to a manual sed-based approach if clang-format
 #   is not installed.
 #
 # Phase:   phase6_quality
-# Files:   v15R2/src/**/*.c, v15R2/src/**/*.h
+# Files:   v15R3/src/**/*.c, v15R3/src/**/*.h
 # Depends: none
 # Risk:    low (formatting only, no logic changes)
 # ============================================================
@@ -19,7 +19,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-SRC_DIR="v15R2/src"
+SRC_DIR="v15R3/src"
 CLANG_FORMAT_CONFIG="$ROOT/.clang-format"
 
 # --- Preflight ---
