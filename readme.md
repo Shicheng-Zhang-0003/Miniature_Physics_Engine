@@ -243,3 +243,94 @@ See `evolution.txt` for the full lineage back to stage 0.
 
 <img width="4424" height="1824" alt="Screenshot from 2026-07-18 17-18-52" src="https://github.com/user-attachments/assets/5d1d044d-3926-469e-ab27-9f3719452324" />
 <img width="4558" height="1908" alt="Screenshot from 2026-07-18 17-20-09" src="https://github.com/user-attachments/assets/acebe348-707e-485e-835c-08cd1b1dc0fa" />
+
+<!-- MFS_FTC_SECTIONS_BEGIN -->
+
+---
+
+## 🤖 MFS — FTC Robotics Simulator
+
+This tree also carries **MFS** (MPE FTC Simulator), a robotics simulation
+layer currently merged into the engine. MFS turns MPE into an FTC-oriented
+robot simulator: a mecanum drivetrain with physically-truthful wheel contact,
+DC motor electrical models, battery voltage sag, and dead-reckoning odometry.
+
+> MFS exists to make autonomous tuning realistic. Motor commands become torque,
+> torque spins cylinder wheels, wheels grip the floor through anisotropic
+> roller friction, and sensors read back from simulated state. Nothing is
+> faked at the contact layer.
+
+### Capabilities
+- **Cylinder wheel bodies** with correct axle inertia (`I = ½·m·r²`)
+- **Mecanum drivetrain** via real anisotropic roller friction (±45° rollers) — no chassis-force cheats
+- **Tank drivetrain** via motor torque → wheel traction
+- **DC motor model** — BackEMF, gear ratio, Kt/Kv, stall/free-speed limits
+- **Battery model** — voltage sag under multi-motor load
+- **Odometry** — wheel encoders + IMU-style heading for dead reckoning
+- **Revolute joints** — wheels hinged to the chassis with axis correction
+- **Idle hold** — gearbox-style lock so a parked robot stays parked
+
+### Robot controls
+| Key | Action |
+|-----|--------|
+| `G` | Drive forward |
+| `B` | Drive backward |
+| `V` | Strafe right |
+| `N` | Strafe left |
+| `C` | Rotate left (CCW) |
+| `H` | Rotate right (CW) |
+
+Spawn the robot from the debug terminal with `touch robot`.
+
+### Headless test suite
+MFS ships a headless regression suite (no GTK/OpenGL required):
+
+| Test | Proves |
+|------|--------|
+| `two_world` | Independent `physics_world` instances |
+| `revolute` | Hinge joints hold anchor and allow swing |
+| `teleop_drive` | Tank drive moves the robot |
+| `mecanum_drive` | Strafe via real roller friction |
+| `cylinder_drop` | Cylinder settles on the floor |
+| `driven_wheel` | Torque → friction → translation |
+| `math3_inverse` | Matrix inverse at small inertia tensors |
+| `ftc_integration` | Drive / turn / strafe sequence |
+| `physics_truth` | 24 physical-law assertions |
+
+Run with `python3 tools/test_runner.py`.
+
+### Physics truth gate
+`physics_truth` asserts the laws the simulator depends on: free-fall gravity,
+cylinder inertia, restitution, rolling kinematics (`v = ω·r`), rolling
+resistance, motor free-speed and stall torque, BackEMF braking, static and
+kinetic friction thresholds, numerical stability, energy conservation, and
+revolute anchor holding. This suite is the gate that keeps MFS honest.
+
+---
+
+## 🧩 Roadmap — v16 Modularisation
+
+MPE and MFS are currently a single tree. The plan is to separate them cleanly.
+
+| Milestone | State |
+|-----------|-------|
+| **v15R2** | Config system + MFS merged *(current)* |
+| **v15S** | Stabilisation — final **merged** release |
+| **v16R1** | Begin splitting MFS out of the MPE mainframe |
+| **v16+** | MPE kernel + module ecosystem |
+
+Beginning at **v16R1** (after **v15S**):
+
+- **MPE returns to being a standalone physics-engine kernel**, but gains a
+  **kernel-module plugin state system** — a defined host into which modules
+  register their state and hooks.
+- **MFS becomes the first module ecosystem** built on that plugin system,
+  rather than code fused into the engine.
+- Within MFS, the plan is a hierarchy of **modules and submodules** — the
+  drivetrain, motor, battery, sensor, and odometry layers already present are
+  the natural candidates — each loadable against the bare MPE kernel.
+
+**Goal:** run MPE on its own with no robotics present, and drop MFS (or any
+future ecosystem) in as a plugin.
+
+<!-- MFS_FTC_SECTIONS_END -->
