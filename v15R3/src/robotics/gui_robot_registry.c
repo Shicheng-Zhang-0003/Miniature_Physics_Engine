@@ -157,7 +157,12 @@ if ((mfs_gui_robot_count <= 0) || (!mfs_gui_robot_world)) {
 return;
 }
 for (int i = 0; i < mfs_gui_robot_count; i++) {
+/* MFS_164_DRIVE_DISPATCH: dispatch based on drivetrain type */
+if (mfs_gui_robots[i].drivetrain_type == FTC_DRIVETRAIN_TANK) {
+drivetrain_tank(&mfs_gui_robots[i], forward - rotate, forward + rotate);
+} else {
 drivetrain_mecanum(&mfs_gui_robots[i], forward, strafe, rotate);
+}
 }
 }
 

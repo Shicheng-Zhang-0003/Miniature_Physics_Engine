@@ -113,6 +113,7 @@ void rigidbody_sanitize(rigidbody *rigid_body) {
 
     if (!isfinite(rigid_body->friction_kinetic) || (rigid_body->friction_kinetic < 0.0f)) {
         rigid_body->friction_kinetic = 0.2f;
+rigid_body->driven_this_tick = false; /* MFS_169 */
     }
 
     if (!isfinite(rigid_body->restitution) || (rigid_body->restitution < 0.0f)) {
@@ -286,8 +287,14 @@ float rb_get_kinetic_energy(rigidbody *rigid_body) {
     //EK normal = 0.5fmv ^ 2
     float linear_kinetic_energy = 0.5f * rigid_body->mass * vector3_length_squared(rigid_body->velocity);
     //EK rotational = 0.5fwIw
-    vector3 angular_momemtum =
-        math3_multiplication_vector3(math3_inverse(rigid_body->inverse_inertia_system), rigid_body->angular_velocity);
+    /* MFS_166_INERTIA_FIX: use inertia_tensor_local rotated to world space
+* instead of inverting the already-inverted inverse_inertia_system */
+math3 a3_ke_rotation = vector4_to_math3(rigid_body->orientation);
+math3 a3_ke_rotation_t = math3_transposition(a3_ke_rotation);
+math3 a3_ke_world_inertia = math3_multiplication(a3_ke_rotation,
+math3_multiplication(rigid_body->inertia_tensor_local, a3_ke_rotation_t));
+vector3 angular_momemtum =
+math3_multiplication_vector3(a3_ke_world_inertia, rigid_body->angular_velocity);
     float rotational_kinetic_energy = 0.5f * vector3_dot(rigid_body->angular_velocity, angular_momemtum);
     return linear_kinetic_energy + rotational_kinetic_energy;
 } //Integration Segmentation (Movement Compute)
@@ -419,6 +426,7 @@ void rigidbody_initialisation_cube(rigidbody *rigid_body, vector3 position_input
     rigid_body->nice_value = 0; /* MPE_TASK_V15R2_NICE_INIT */
     rigid_body->friction_static = 0.4f;
     rigid_body->friction_kinetic = 0.3f;
+rigid_body->driven_this_tick = false; /* MFS_169 */
     //Inertia Tensor for rectangular box: I = (m/12) * (h² + d², w² + d², w² + h²), nominal extension only for boxes
     float width = half_extensions.x * 2.0f; //full width
     float height = half_extensions.y * 2.0f; //full height
@@ -527,13 +535,14 @@ void rigidbody_initialisation_cylinder(rigidbody *rigid_body, float radius, floa
     }
     rigid_body->radius = radius;
     rigid_body->cylinder_half_length = half_length;
-    rigid_body->restitution = g_cfg.body_defaults.sphere_restitution;
+    rigid_body->restitution = g_cfg.body_defaults.cylinder_restitution; /* MFS_165_CYL_RESTITUTION */
     rigid_body->static_state = (mass == 0);
     rigid_body->is_sleeping = false;
     rigid_body->sleep_timer = 0.0f;
     rigid_body->nice_value = 0;
     rigid_body->friction_static = 0.4f;
     rigid_body->friction_kinetic = 0.3f;
+rigid_body->driven_this_tick = false; /* MFS_169 */
     
     rigidbody_update_inertia_cylinder(rigid_body);
     

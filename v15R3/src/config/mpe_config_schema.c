@@ -219,6 +219,8 @@ static mpe_param s_registry[] = {
 
     {"body_defaults.cube_fric_k", "Cube Kinetic Friction", "Default kinetic friction for new cubes", p_float,
      cat_body_defaults, &g_cfg.body_defaults.cube_fric_k, 0.3, 0.0, 5.0, false},
+{"body_defaults.cylinder_restitution", "Cylinder Restitution", "Default bounce for new cylinders (wheels)", p_float,
+cat_body_defaults, &g_cfg.body_defaults.cylinder_restitution, 0.3, 0.0, 1.0, false},
 
     /* ============================================================
      * cat_camera

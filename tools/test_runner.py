@@ -29,6 +29,11 @@ KNOWN_TESTS = [
     "math3_inverse",
     "ftc_integration",
     "physics_truth",
+    "tank_turn",
+    "odometry_accuracy",
+    "cylinder_sphere",
+    "cylinder_cube",
+    "cylinder_cylinder",
 ]
 
 # Tests that encode desired future behavior but are currently expected

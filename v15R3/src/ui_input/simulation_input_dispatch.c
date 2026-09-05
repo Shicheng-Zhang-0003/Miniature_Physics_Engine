@@ -7,7 +7,10 @@
 #include "../robotics/gui_robot_registry.h"
 void simulation_input_dispatch(GtkWidget *parent_window) {
     /* MFS_157_GAMEPAD_POLL: drain gamepad events once per frame */
-    gamepad_poll(gamepad_get_primary());
+    /* MFS_161_GAMEPAD_GUARD: only poll when a robot exists to save syscalls */
+    if (gui_robot_get_count() > 0) {
+        gamepad_poll(gamepad_get_primary());
+    }
     /* Mouse, Escape, E, F key bindings */
     if (main_inputs.escape_key_pressed) {
         if (main_inputs.is_mouse_locked) {

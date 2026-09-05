@@ -1,4 +1,24 @@
-/* MFS_INCREMENT_SPLIT_2: Fixed-timestep physics loop.
+#!/usr/bin/env python3
+"""
+MFS 173d: Complete rewrite of simulation_physics_loop.c
+========================================================
+The 173 script corrupted this file by moving code outside the function body.
+This script rewrites the entire file with correct structure, including the
+cylinder collision dispatch cases.
+"""
+import sys, subprocess
+from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+ROOT = SCRIPT_DIR.parent
+SRC = ROOT / "v15R3" / "src"
+TOOLS = ROOT / "tools"
+sys.path.insert(0, str(TOOLS))
+DRY_RUN = "--dry-run" in sys.argv
+
+def log(msg): print(f"  [173d] {msg}")
+
+CORRECT_FILE = r'''/* MFS_INCREMENT_SPLIT_2: Fixed-timestep physics loop.
 * Extracted from physics_step_increment in simulation.c.
 * Owns: the accumulator, broadphase, narrowphase, solver, integration,
 *        sleep staticize/restore, boundary, depenetration.
@@ -184,3 +204,47 @@ void simulation_physics_tick(float frame_delta_time) {
         physics_time_accumulator -= fixed_physics_dt;
     }
 }
+'''
+
+def main():
+    print("=" * 60)
+    print("MFS 173d: Rewrite simulation_physics_loop.c")
+    print("=" * 60)
+    if DRY_RUN: print("  ** DRY RUN **\n")
+
+    target = SRC / "core" / "simulation_physics_loop.c"
+    if not target.exists():
+        log("[FAIL] File not found")
+        return 1
+
+    if not DRY_RUN:
+        target.write_text(CORRECT_FILE)
+    log("[OK] File rewritten with correct structure + cylinder dispatch")
+
+    if not DRY_RUN:
+        log("Building...")
+        r = subprocess.run(
+            [sys.executable, str(TOOLS / "build_check.py"), "--quick"],
+            cwd=str(ROOT), capture_output=True, text=True, timeout=180)
+        print(r.stdout[-3000:] if r.stdout else "")
+        if r.returncode != 0:
+            print(r.stderr[-2000:] if r.stderr else "")
+            log("[FAIL] Build still broken")
+            return 1
+        log("[PASS] Build clean")
+
+        log("Running tests...")
+        r = subprocess.run(
+            [sys.executable, str(TOOLS / "test_runner.py")],
+            cwd=str(ROOT), capture_output=True, text=True, timeout=300)
+        print(r.stdout[-2500:] if r.stdout else "")
+        if r.returncode != 0:
+            log("[WARN] Some tests failed")
+        else:
+            log("[PASS] All tests pass")
+
+    print("=" * 60)
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main())

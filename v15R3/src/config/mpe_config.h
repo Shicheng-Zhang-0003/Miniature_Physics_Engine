@@ -73,6 +73,7 @@ typedef struct {
         float max_restitution_bias;
         float static_friction_thresh;
         float warm_start_match_dist_sq;
+        float wheel_lock_omega_thresh; /* MFS_166 */
     } solver;
 
     struct {
@@ -123,6 +124,7 @@ typedef struct {
         float cube_restitution;
         float cube_fric_s;
         float cube_fric_k;
+        float cylinder_restitution; /* MFS_165 */
     } body_defaults;
 
     struct {

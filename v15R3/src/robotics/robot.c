@@ -24,17 +24,14 @@ float ftc_robot_rest_height(void) {
 
 int ftc_robot_create_with_drive(physics_world *world, ftc_robot *robot, float x, float y, float z,
                                 motor_preset_id preset, ftc_drivetrain_type drivetrain_type) {
-    /* MFS_151_ZERO */
-    robot->odom_x = robot->odom_z = robot->odom_theta = 0.0f;
-    for (int mfs_i = 0; mfs_i < 4; mfs_i++) robot->wheel_radians[mfs_i] = 0.0f;
-
-    if ((!world) || (!robot)) {
-        return 1;
-    }
-    memset(robot, 0, sizeof(ftc_robot));
+/* MFS_161_NULL_FIX: null-check FIRST, before any dereference */
+if ((!world) || (!robot)) {
+return 1;
+}
+memset(robot, 0, sizeof(ftc_robot));
+/* memset zeroes odom_x/z/theta and wheel_radians — no separate init needed */
     robot->motor_preset = preset;
     robot->drivetrain_type = drivetrain_type;
-    robot->mecanum_active = false; /* MPE_FTC_082 */
     robot->axle_axis_x = 1.0f; /* axles point along X (left-right) */
     robot->axle_axis_y = 0.0f;
     robot->axle_axis_z = 0.0f;

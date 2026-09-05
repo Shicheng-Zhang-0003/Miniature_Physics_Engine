@@ -11,6 +11,7 @@
 *.so
 *.exe
 engine
+test_*
 build/
 .fixes_generation_1/
 
@@ -50,6 +51,7 @@ status/
 # ============ Logs ============
 # fix_log.txt IS tracked (execution history). Only stray logs ignored.
 !v15R2/v03_gate_validation.log
+!v15R3/v03_gate_validation.log
 *.log
 
 # ============ Sanitizer / temp build artifacts ============
