@@ -43,6 +43,7 @@
 #include "ui_input/debug_terminal.h"
 #include "ui_input/config_menu.h"
 #include "ui_input/microvim.h" /* MPE_TASK_V15R2 */
+#include "ui_input/gamepad.h" /* MFS_156 */
 /* MPE_TASK_18_TERMINAL_INCLUDE_END */
 /* ------------------------------------------------------------------ */
 /* Global scene state                                                 */
