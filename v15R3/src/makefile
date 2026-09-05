@@ -168,3 +168,43 @@ config/mpe_config.c config/mpe_config_schema.c
 test_odometry_diag: $(ODOM_DIAG_SOURCES)
 	$(CC) $(CFLAGS) -DMFS_ODOM_DIAG $(ODOM_DIAG_SOURCES) -lm -o test_odometry_diag
 	./test_odometry_diag
+
+# MFS_167: tank drive differential turning test
+TANK_TURN_TEST_SOURCES := tests/tank_turn_test.c core/physics_world.c core/rigidbody.c \
+physics/collision_mechanics.c physics/broadphase.c physics/constraint.c physics/revolute_joint.c \
+robotics/motor.c robotics/motor_presets.c robotics/battery.c robotics/robot.c robotics/drivetrain.c \
+config/mpe_config.c config/mpe_config_schema.c
+test_tank_turn: $(TANK_TURN_TEST_SOURCES)
+	$(CC) $(CFLAGS) -DMFS_TANK_TURN_TEST $(TANK_TURN_TEST_SOURCES) -lm -o test_tank_turn
+	./test_tank_turn
+
+# MFS_167: odometry accuracy test
+ODOMETRY_ACC_TEST_SOURCES := tests/odometry_accuracy_test.c core/physics_world.c core/rigidbody.c \
+physics/collision_mechanics.c physics/broadphase.c physics/constraint.c physics/revolute_joint.c \
+robotics/motor.c robotics/motor_presets.c robotics/battery.c robotics/robot.c robotics/drivetrain.c \
+config/mpe_config.c config/mpe_config_schema.c
+test_odometry_accuracy: $(ODOMETRY_ACC_TEST_SOURCES)
+	$(CC) $(CFLAGS) -DMFS_ODOMETRY_ACCURACY_TEST $(ODOMETRY_ACC_TEST_SOURCES) -lm -o test_odometry_accuracy
+	./test_odometry_accuracy
+
+# MFS_174: cylinder collision tests
+CYL_SPH_SOURCES := tests/cylinder_sphere_test.c core/physics_world.c core/rigidbody.c \
+physics/collision_mechanics.c physics/broadphase.c physics/constraint.c physics/revolute_joint.c \
+config/mpe_config.c config/mpe_config_schema.c
+test_cylinder_sphere: $(CYL_SPH_SOURCES)
+	$(CC) $(CFLAGS) -DMFS_CYL_SPH_TEST $(CYL_SPH_SOURCES) -lm -o test_cylinder_sphere
+	./test_cylinder_sphere
+
+CYL_CUBE_SOURCES := tests/cylinder_cube_test.c core/physics_world.c core/rigidbody.c \
+physics/collision_mechanics.c physics/broadphase.c physics/constraint.c physics/revolute_joint.c \
+config/mpe_config.c config/mpe_config_schema.c
+test_cylinder_cube: $(CYL_CUBE_SOURCES)
+	$(CC) $(CFLAGS) -DMFS_CYL_CUBE_TEST $(CYL_CUBE_SOURCES) -lm -o test_cylinder_cube
+	./test_cylinder_cube
+
+CYL_CYL_SOURCES := tests/cylinder_cylinder_test.c core/physics_world.c core/rigidbody.c \
+physics/collision_mechanics.c physics/broadphase.c physics/constraint.c physics/revolute_joint.c \
+config/mpe_config.c config/mpe_config_schema.c
+test_cylinder_cylinder: $(CYL_CYL_SOURCES)
+	$(CC) $(CFLAGS) -DMFS_CYL_CYL_TEST $(CYL_CYL_SOURCES) -lm -o test_cylinder_cylinder
+	./test_cylinder_cylinder

@@ -40,7 +40,8 @@ typedef struct {
     /* MPE_TASK_V15R2_NICE_VALUE_END */
     /* MFS_MECANUM_FRICTION: anisotropic roller friction support */
     bool is_mecanum;          /* true = mecanum wheel with angled rollers */
-    float roller_angle_rad;   /* roller angle from axle (X axis), typically ±45° */
+    float roller_angle_rad;
+bool driven_this_tick;  /* MFS_169: set when motor torque applied this tick */   /* roller angle from axle (X axis), typically ±45° */
     uint32_t object_id;
     uint32_t object_generation;
 } rigidbody;

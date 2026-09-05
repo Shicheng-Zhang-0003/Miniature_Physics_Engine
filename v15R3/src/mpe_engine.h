@@ -113,11 +113,11 @@ bool physics_is_halted(void);
 bool physics_halt_tick_update(void); /* MFS_PHASE_A */
 /* MPE_TASK_V15R2_PHYSICS_HALT_EXTERN_END */
 
-#define a3_version_string "v15R2" /* v15R2 release candidate */
+#define a3_version_string "v15R3" /* v15R3 development */
 
 /* MPE_RELEASE_FREEZE_BEGIN */
 #define a3_release_freeze 0
-#define a3_release_freeze_note "v15R2 development cycle active"
+#define a3_release_freeze_note "v15R3 development cycle active"
 /* MPE_RELEASE_FREEZE_END */
 
 #endif // mpe_engine_h

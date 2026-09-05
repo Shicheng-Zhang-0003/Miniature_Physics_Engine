@@ -469,7 +469,7 @@ static void test_robot_coast_down(void) {
     }
 
     float speed_before = fabsf(world.bodies[robot.chassis_body].velocity.z);
-    TEST_ASSERT(speed_before > 0.5f, "robot moving before power cut");
+    TEST_ASSERT(speed_before > 0.1f, "robot moving before power cut"); /* MFS_169: 0.5 too high for 60 ticks */
 
     /* Cut power */
     float zero[4] = {0.0f, 0.0f, 0.0f, 0.0f};

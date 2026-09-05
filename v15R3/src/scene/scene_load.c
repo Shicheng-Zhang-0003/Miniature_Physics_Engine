@@ -114,7 +114,7 @@ contact_cache_clear(physics_world_get_primary()); /* MFS_131 */
         }
         rigidbody_sanitize(&obj_per_scene[i]);
         rigidbody_update_axes(&obj_per_scene[i]);
-        rigidbody_sanitize(&obj_per_scene[i]); /* A3_PATCH_47_NAN_SANITIZATION */
+/* MFS_166_DEDUP: second sanitize removed */
         obj_per_scene[i].object_id = scene_allocate_object_id();
         if ((version >= 150) && (saved_object_id > 0)) {
             scene_id_remap_add((uint32_t) saved_object_id, obj_per_scene[i].object_id);

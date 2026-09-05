@@ -19,7 +19,9 @@ from pathlib import Path
 import re
 
 ROOT = Path(__file__).resolve().parent.parent
-SRC = ROOT / "v15R2" / "src"
+SRC = ROOT / "v15R3" / "src"
+if not SRC.exists():
+    SRC = ROOT / "v15R2" / "src"
 
 
 def line_count(path: Path) -> int:
@@ -52,10 +54,11 @@ def main():
     print()
 
     if not SRC.exists():
-        print("FATAL: v15R2/src not found")
+        print(f"FATAL: {SRC} not found")
         raise SystemExit(1)
 
-    c_h_files = find_files(["v15R2/src/**/*.c", "v15R2/src/**/*.h"])
+    rel_src = SRC.relative_to(ROOT)
+    c_h_files = find_files([f"{rel_src}/**/*.c", f"{rel_src}/**/*.h"])
     c_files = [p for p in c_h_files if p.suffix == ".c"]
     h_files = [p for p in c_h_files if p.suffix == ".h"]
 

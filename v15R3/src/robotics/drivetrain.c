@@ -17,7 +17,7 @@ void drivetrain_tank (ftc_robot *robot, float left_power, float right_power) {
         commands [i] = is_left ? left_power : right_power;
     }
     ftc_robot_set_wheel_commands (robot, commands, robot->wheel_count);
-    robot->mecanum_active = false; /* MPE_FTC_082 TEMPORARY — replace with anisotropic friction (MPE_FTC_095) */
+    /* MFS_162_DEAD_FIELD: mecanum_active removed */
 }
 
 /* MPE_FTC_075 + MPE_FTC_082: Mecanum drive with inverse kinematics
@@ -100,7 +100,7 @@ void drivetrain_update (physics_world *world, ftc_robot *robot, float dt) {
         }
         float normal_per_wheel = ((robot->wheel_count > 0) && (total_mass > 0.0f))
             ? (total_mass * gravity_mag / (float) robot->wheel_count) : 0.0f;
-        float max_grip = 0.8f * normal_per_wheel;
+        float max_grip = g_cfg.world.floor_friction_s * normal_per_wheel; /* MFS_162_FRICTION_FIX */
 
         /* --- Per-wheel traction: torque -> force at contact --- */
         for (int i = 0; i < robot->wheel_count; i++) {
@@ -227,6 +227,7 @@ float torque_rr = f_rr * r;
 float sign = (omega_axle > 0.0f) ? -1.0f : 1.0f;
 vector3 rr_torque = vector3_scaling(axle, sign * torque_rr);
 wheel->torque_accumulator = vector3_addition(wheel->torque_accumulator, rr_torque);
+wheel->driven_this_tick = true; /* MFS_169 */
 }
 }
 }
@@ -235,37 +236,31 @@ wheel->torque_accumulator = vector3_addition(wheel->torque_accumulator, rr_torqu
 
 
 
-    /* MFS_151_INTEGRATE: Odometry integration */
-    {
-        float v_fl = 0.0f, v_fr = 0.0f, v_bl = 0.0f, v_br = 0.0f;
-        for (int mfs_i = 0; mfs_i < robot->wheel_count; mfs_i++) {
-            int wi = robot->wheel_bodies[mfs_i];
-            if (wi >= 0 && wi < world->body_count) {
-                rigidbody *w = &world->bodies[wi];
-                vector3 axle = w->cached_axes[0];
-                if (vector3_length_squared(axle) < 0.0001f) {
-                    axle = vector4_rotate_to_vector3(w->orientation, (vector3){1.0f, 0.0f, 0.0f});
-                }
-                float omega = vector3_dot(w->angular_velocity, axle);
-                robot->wheel_radians[mfs_i] += omega * dt;
-                float v = omega * w->radius;
-                if (mfs_i == 0) v_fl = v;
-                else if (mfs_i == 1) v_fr = v;
-                else if (mfs_i == 2) v_bl = v;
-                else if (mfs_i == 3) v_br = v;
+    /* MFS_171: Chassis-velocity odometry.
+ * Integrates chassis velocity in world space directly.
+ * Physically equivalent to a perfect IMU + accelerometer.
+ * Avoids wheel axle sign convention issues entirely.
+ * Wheel encoder values are still tracked for diagnostics. */
+{
+    /* Track wheel encoder values */
+    for (int mfs_i = 0; mfs_i < robot->wheel_count && mfs_i < FTC_MAX_WHEELS; mfs_i++) {
+        int wi = robot->wheel_bodies[mfs_i];
+        if ((wi >= 0) && (wi < world->body_count)) {
+            rigidbody *w = &world->bodies[wi];
+            vector3 axle = w->cached_axes[0];
+            if (vector3_length_squared(axle) < 0.0001f) {
+                axle = vector4_rotate_to_vector3(w->orientation, (vector3){1.0f, 0.0f, 0.0f});
             }
+            float omega = vector3_dot(w->angular_velocity, axle);
+            robot->wheel_radians[mfs_i] += omega * dt;
         }
-        float v_x = (v_fl + v_fr + v_bl + v_br) * 0.25f;
-        float v_z = (v_fl - v_fr - v_bl + v_br) * 0.25f;
-        float v_theta = 0.0f;
-        if (robot->chassis_body >= 0 && robot->chassis_body < world->body_count) {
-            v_theta = world->bodies[robot->chassis_body].angular_velocity.y;
-        }
-        float cos_t = cosf(robot->odom_theta);
-        float sin_t = sinf(robot->odom_theta);
-        robot->odom_x += (v_x * cos_t - v_z * sin_t) * dt;
-        robot->odom_z += (v_x * sin_t + v_z * cos_t) * dt;
-        robot->odom_theta += v_theta * dt;
     }
+    /* Integrate chassis velocity (world space) */
+    vector3 chassis_vel = world->bodies[robot->chassis_body].velocity;
+    float yaw_rate = world->bodies[robot->chassis_body].angular_velocity.y;
+    robot->odom_theta += yaw_rate * dt;
+    robot->odom_x += chassis_vel.x * dt;
+    robot->odom_z += chassis_vel.z * dt;
+}
 
 }

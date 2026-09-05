@@ -227,8 +227,13 @@ void editor_update_menus(GtkWidget *parent_window) {
             rigidbody *rb_a = &obj_per_scene[main_inputs.marked_joint_object_index];
             rigidbody *rb_b = &obj_per_scene[selected_object];
             float dist = vector3_length(vector3_subtraction(rb_b->position, rb_a->position));
-            add_joint(main_inputs.marked_joint_object_index, selected_object, dist, g_cfg.joints.default_spring_k,
-                      g_cfg.joints.default_damping); /* MPE_TASK_31 */
+            if (add_joint(main_inputs.marked_joint_object_index, selected_object, dist, g_cfg.joints.default_spring_k,
+
+            g_cfg.joints.default_damping) < 0) { /* MFS_166_JOINT_CHECK */
+
+            printf("[editor] warning: could not create joint (pool full?)\n");
+
+            } /* MPE_TASK_31 */
         }
         main_inputs.marked_joint_object_index = -1;
         main_inputs.object_menu_level = 0;
