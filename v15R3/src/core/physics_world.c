@@ -150,6 +150,26 @@ void physics_world_step(physics_world *world, float dt) {
             }
         } else if ((body_a->type == object_cube) && (body_b->type == object_cube)) {
             collided = collision_dual_cube(body_a, body_b, &narrowphase_collision);
+        } else if ((body_a->type == object_cylinder) && (body_b->type == object_sphere)) { /* MFS_173C_REPAIRED */
+            collided = collision_cylinder_sphere(body_a, body_b, &narrowphase_collision);
+        } else if ((body_a->type == object_sphere) && (body_b->type == object_cylinder)) {
+            collided = collision_cylinder_sphere(body_b, body_a, &narrowphase_collision);
+            if (collided) {
+                narrowphase_collision.normal_vector = vector3_scaling(narrowphase_collision.normal_vector, -1.0f);
+                narrowphase_collision.object_a = body_a;
+                narrowphase_collision.object_b = body_b;
+            }
+        } else if ((body_a->type == object_cylinder) && (body_b->type == object_cube)) {
+            collided = collision_cylinder_cube(body_a, body_b, &narrowphase_collision);
+        } else if ((body_a->type == object_cube) && (body_b->type == object_cylinder)) {
+            collided = collision_cylinder_cube(body_b, body_a, &narrowphase_collision);
+            if (collided) {
+                narrowphase_collision.normal_vector = vector3_scaling(narrowphase_collision.normal_vector, -1.0f);
+                narrowphase_collision.object_a = body_a;
+                narrowphase_collision.object_b = body_b;
+            }
+        } else if ((body_a->type == object_cylinder) && (body_b->type == object_cylinder)) {
+            collided = collision_cylinder_cylinder(body_a, body_b, &narrowphase_collision);
         }
         if ((collided) && (manifold_count >= 0) && (manifold_count < a3_max_manifolds)) { /* MPE_FTC_078 */
             collision_prepare_solver(&narrowphase_collision, &world_manifolds[manifold_count]);
@@ -201,13 +221,13 @@ void physics_world_step(physics_world *world, float dt) {
      * can't spin freely because the gearbox resists back-driving. */
     for (int i = 0; i < world->body_count; i++) {
         rigidbody *rb = &world->bodies[i];
-        if (rb->is_mecanum) {
+        if (rb->is_mecanum && !rb->driven_this_tick) { /* MFS_169 */
             vector3 axle = rb->cached_axes[0];
             if (vector3_length_squared(axle) < 0.0001f) {
                 axle = vector4_rotate_to_vector3(rb->orientation, (vector3){1.0f, 0.0f, 0.0f});
             }
             float axle_omega = vector3_dot(rb->angular_velocity, axle);
-            if (fabsf(axle_omega) < 0.5f) {
+            if (fabsf(axle_omega) < g_cfg.solver.wheel_lock_omega_thresh) { /* MFS_166_WHEEL_LOCK_CFG */
                 rb->angular_velocity = vector3_subtraction(
                     rb->angular_velocity,
                     vector3_scaling(axle, axle_omega));
@@ -215,7 +235,12 @@ void physics_world_step(physics_world *world, float dt) {
         }
     }
 
-    contact_cache_save(world, world_manifolds, manifold_count); /* MFS_131 */
+    contact_cache_save(world, world_manifolds, manifold_count);
+
+/* MFS_169: clear driven flag at end of step */
+for (int i = 0; i < world->body_count; i++) {
+world->bodies[i].driven_this_tick = false;
+} /* MFS_131 */
 
     for (int i = 0; i < world->body_count; i++) {
         rb_integrate_position(&world->bodies[i], dt);

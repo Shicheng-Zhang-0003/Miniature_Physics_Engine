@@ -260,6 +260,9 @@ int broadphase_generate_pairing(rigidbody *bodies, int body_count, broadphase_pa
         float extent_x, extent_y, extent_z;
         if (rb->type == object_sphere) {
             extent_x = extent_y = extent_z = rb->radius;
+        } else if (rb->type == object_cylinder) {
+            float r = broadphase_bounding_radius(rb);
+            extent_x = extent_y = extent_z = r;
         } else {
             vector3 *axes = rb->cached_axes;
             extent_x = fabsf(axes[0].x) * rb->half_extensions.x + fabsf(axes[1].x) * rb->half_extensions.y +

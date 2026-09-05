@@ -32,11 +32,11 @@ typedef struct {
     /* MPE_FTC_082: mecanum chassis-force fields */
     vector3 mecanum_chassis_force;
     float mecanum_chassis_torque;
-    bool mecanum_active;
+    /* MFS_162_DEAD_FIELD: mecanum_active removed */
     ftc_drivetrain_type drivetrain_type; /* MFS_DRIVETRAIN_TYPE */
 
     /* MFS_151_ODOMETRY: Wheel encoders and pose estimation */
-    float wheel_radians[4];
+    float wheel_radians[FTC_MAX_WHEELS]; /* MFS_163_BOUNDS_FIX: was [4], OOB if wheel_count > 4 */
     float odom_x, odom_z, odom_theta;
 } ftc_robot;
 

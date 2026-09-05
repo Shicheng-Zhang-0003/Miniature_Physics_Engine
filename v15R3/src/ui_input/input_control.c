@@ -18,6 +18,7 @@ void initialize_input (input_status *input_state) {
     input_state -> shift_key_pressed = false;
     input_state -> escape_key_pressed = false;
     input_state -> f_key_pressed = false;
+    input_state -> q_key_pressed = false; /* MFS_161_QKEY_FIX */
     /* MFS_159_GVBNCH_REMOVED: g_key_pressed */
     /* MFS_159_GVBNCH_REMOVED: h_key_pressed */
     /* MFS_159_GVBNCH_REMOVED: c_key_pressed */

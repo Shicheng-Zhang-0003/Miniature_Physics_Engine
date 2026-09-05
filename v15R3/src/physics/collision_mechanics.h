@@ -47,4 +47,12 @@ bool collision_static_plane_body(rigidbody *body, float plane_y, collision_data 
 void contact_cache_stats_reset(void);
 int contact_cache_get_hits(void);
 int contact_cache_get_misses(void);
+/* MFS_172: cylinder-vs-object narrowphase */
+bool collision_cylinder_sphere(rigidbody *cyl, rigidbody *sph,
+                               collision_data *out);
+bool collision_cylinder_cube(rigidbody *cyl, rigidbody *cube,
+                             collision_data *out);
+bool collision_cylinder_cylinder(rigidbody *cyl_a, rigidbody *cyl_b,
+                                 collision_data *out);
+
 #endif
