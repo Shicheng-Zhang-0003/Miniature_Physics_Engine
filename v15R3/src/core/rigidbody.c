@@ -83,6 +83,15 @@ void rigidbody_sanitize(rigidbody *rigid_body) {
             rigid_body->radius = 0.01f;
             needs_inertia_recalc = true;
         }
+    } else if (rigid_body->type == object_cylinder) { /* R3-001 */
+        if (!isfinite(rigid_body->radius) || (rigid_body->radius <= 0.0f)) {
+            rigid_body->radius = 0.01f;
+            needs_inertia_recalc = true;
+        }
+        if (!isfinite(rigid_body->cylinder_half_length) || (rigid_body->cylinder_half_length <= 0.0f)) {
+            rigid_body->cylinder_half_length = 0.01f;
+            needs_inertia_recalc = true;
+        }
     } else {
         if (!isfinite(rigid_body->half_extensions.x) || (rigid_body->half_extensions.x <= 0.0f)) {
             rigid_body->half_extensions.x = 0.01f;
@@ -466,8 +475,7 @@ void rigidbody_set_static(rigidbody *rigid_body, bool make_static) {
         if (rigid_body->type == object_sphere) {
             rigidbody_update_inertia_sphere(rigid_body);
     } else if (rigid_body->type == object_cylinder) { /* MPE_FTC_091 */
-        rigidbody_update_inertia_cylinder(rigid_body);
-        rigidbody_update_inertia_cylinder(rigid_body);
+        rigidbody_update_inertia_cylinder(rigid_body); /* R3-001 dedupe */
     } else {
             rigidbody_update_inertia_cube(rigid_body);
         }

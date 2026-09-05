@@ -13,6 +13,8 @@ static void on_main_window_destroy(GtkWidget *widget, gpointer user_data) {
     }
     render_cleanup();
     broadphase_cleanup();
+    /* MFS_156_GAMEPAD_CLOSE */
+    gamepad_close(gamepad_get_primary());
     gtk_main_quit();
 }
 //On Call
@@ -43,6 +45,9 @@ int main_algorithm(int argc, char *argv[]) {
     g_setenv("GDK_BACKEND", "x11", TRUE);
     gtk_init(&argc, &argv);
     mpe_config_init(); /* MPE_TASK_29_CONFIG_INIT */
+    /* MFS_156_GAMEPAD_INIT: open the gamepad device */
+    gamepad_init(gamepad_get_primary(), NULL);
+    gamepad_get_primary()->invert_left_y = true; /* stick up = forward */
     event_log_init(); /* MPE_TASK_V15R2_EVENT_LOG_INIT */
     /* MPE_TASK_34_CONFIG_LOAD_BEGIN */
     if (mpe_config_load("status/engine.cfg")) {

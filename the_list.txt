@@ -1,0 +1,144 @@
+I've done a deep, line-by-line dig through the entire dump. Here's every issue I found, ordered by severity:
+
+---
+
+## Critical / Crash-Level
+
+### 1. NULL dereference in `ftc_robot_create_with_drive` (robot.c)
+The `MFS_151_ZERO` block dereferences `robot` **before** the null-check:
+```c
+robot->odom_x = robot->odom_z = robot->odom_theta = 0.0f;  // ← deref
+for (int mfs_i = 0; mfs_i < 4; mfs_i++) robot->wheel_radians[mfs_i] = 0.0f;
+if ((!world) || (!robot)) { return 1; }  // ← check comes AFTER
+memset(robot, 0, sizeof(ftc_robot));     // ← memset makes the above redundant anyway
+```
+If `robot` is NULL, this crashes. The null-check must come first. The MFS_151_ZERO block is also fully redundant since `memset` zeroes the same fields.
+
+---
+
+## High / Behavioural Bugs
+
+### 2. Duplicate `g_key_pressed` clear in `on_key_released` (input_control.c)
+Two identical lines, one from `MFS_GUI_BRIDGE` and one from fix 124:
+```c
+if (event -> keyval == GDK_KEY_g) {input_state -> g_key_pressed = false;} /* MFS_GUI_BRIDGE */
+if (event -> keyval == GDK_KEY_g) {input_state -> g_key_pressed = false;}
+```
+Harmless at runtime but it means the key-release path does redundant work and signals a merge conflict that wasn't cleaned up.
+
+### 3. `q_key_pressed` missing from `initialize_input` (input_control.c)
+The field exists in the struct and is wired in `on_keypress`/`on_key_released`/`on_focus_out`, but `initialize_input` never sets it to `false`. Since `main_inputs` is a global it starts zero, but any future re-init path would leave it in a stale state.
+
+### 4. Hardcoded `0.8f` friction in traction code (drivetrain.c)
+```c
+float max_grip = 0.8f * normal_per_wheel;
+```
+This ignores `g_cfg.world.floor_friction_s`. Fix 121 noted it couldn't find the config field, but the field **does** exist in `mpe_config.h` (`floor_friction_s`). This means changing floor friction via the config menu or terminal has **no effect** on robot traction.
+
+### 5. `wheel_radians[4]` vs `FTC_MAX_WHEELS = 8` (robot.h / drivetrain.c)
+The odometry array is hardcoded to 4:
+```c
+float wheel_radians[4];   // robot.h
+```
+But the odometry loop iterates up to `robot->wheel_count`:
+```c
+for (int mfs_i = 0; mfs_i < robot->wheel_count; mfs_i++) {
+    robot->wheel_radians[mfs_i] += omega * dt;   // OOB if wheel_count > 4
+```
+Currently safe because `ftc_robot_create` always makes 4 wheels, but any future 6- or 8-wheel robot would write out of bounds.
+
+### 6. No cylinder-vs-object narrowphase (physics_world.c / simulation_physics_loop.c)
+The narrowphase dispatch handles sphere-sphere, sphere-cube, cube-sphere, cube-cube — but **no cylinder cases at all**. Cylinders (robot wheels) only collide with the floor via `collision_static_plane_cylinder`. Two cylinders, or a cylinder and a sphere/cube, pass straight through each other. This is noted as "deferred" in fix 093 but it means a robot can drive through walls, ramps, and game elements.
+
+---
+
+## Medium / Logic Bugs
+
+### 7. `gui_robot_apply_drive` always calls `drivetrain_mecanum` (gui_robot_registry.c)
+```c
+void gui_robot_apply_drive(float forward, float strafe, float rotate) {
+    ...
+    drivetrain_mecanum(&mfs_gui_robots[i], forward, strafe, rotate);
+}
+```
+It ignores `robot->drivetrain_type`. If a robot were created with `FTC_DRIVETRAIN_TANK`, keyboard input would still go through the mecanum IK path, producing wrong wheel commands. Currently masked because `gui_robot_spawn` only creates mecanum robots.
+
+### 8. Rolling resistance block outside `#if MPE_DRIVETRAIN_REAL` (drivetrain.c)
+The `#endif /* MPE_DRIVETRAIN_REAL */` closes **before** the rolling resistance block:
+```c
+#endif /* MPE_DRIVETRAIN_REAL */
+
+/* MFS_132_ROLLING_RESISTANCE: ... */
+{
+    float c_rr = g_cfg.world.rolling_resistance_coeff;
+    ...
+```
+If someone sets `MPE_DRIVETRAIN_REAL` to 0 to revert to the old cheat model, rolling resistance still runs. This is probably intentional (rolling resistance is independent of the traction model) but the placement is misleading and the block re-declares `total_mass` / `chassis_ok` that were already computed inside the `#if` scope.
+
+### 9. `drivetrain_mecanum` never sets `robot->mecanum_active` (drivetrain.c)
+Fix 082 added `mecanum_active = true` in `drivetrain_mecanum` and `drivetrain_update` checked it to apply chassis forces. Fix 094/117 removed the chassis-force application but left `mecanum_active = false` in `drivetrain_tank` and **removed** the `= true` in `drivetrain_mecanum`. The field is now dead — never set to true, never read. `drivetrain_tank` still writes `false` to it for no reason.
+
+### 10. Cylinder init uses sphere restitution default (rigidbody.c)
+```c
+rigid_body->restitution = g_cfg.body_defaults.sphere_restitution;
+```
+Cylinders (wheels) inherit the sphere bounce default. There's no `cylinder_restitution` in `body_defaults`. Wheels should probably have their own (lower) restitution.
+
+---
+
+## Low / Quality / Latent Issues
+
+### 11. `rigidbody_sanitize` called twice in `scene_load.c`
+```c
+rigidbody_sanitize(&obj_per_scene[i]);
+rigidbody_update_axes(&obj_per_scene[i]);
+rigidbody_sanitize(&obj_per_scene[i]); /* A3_PATCH_47_NAN_SANITIZATION */
+```
+The second call is redundant — `rigidbody_update_axes` doesn't invalidate anything that sanitize would fix.
+
+### 12. `add_joint` return value unchecked in `editor.c` (object menu level 7)
+```c
+add_joint(main_inputs.marked_joint_object_index, selected_object, dist, ...);
+```
+If the joint pool is full, this silently fails and the user gets no feedback.
+
+### 13. `rb_get_kinetic_energy` computes inverse-of-inverse (rigidbody.c)
+```c
+math3_inverse(rigid_body->inverse_inertia_system)
+```
+This inverts the already-inverted inertia tensor. The result is just `inertia_tensor_local` rotated into world space. Wasteful but not wrong.
+
+### 14. Odometry strafe sign convention unverified against physics
+The odometry formula:
+```c
+float v_z = (v_fl - v_fr - v_bl + v_br) * 0.25f;
+```
+combined with the strafe negation in `drivetrain_mecanum` (`strafe = -strafe`) produces a sign convention that needs to be verified against the actual contact solver output. If the signs don't match, odometry will report strafe in the wrong direction. No headless test currently validates this.
+
+### 15. `MFS_150_WHEEL_LOCK` threshold is hardcoded
+```c
+if (fabsf(axle_omega) < 0.5f) {
+```
+The 0.5 rad/s lock threshold is not tunable. If the idle spin diagnostic (fix 148) showed different values, this threshold would need manual code changes.
+
+### 16. `gamepad_poll` called even when no robot exists (simulation_input_dispatch.c)
+```c
+gamepad_poll(gamepad_get_primary());
+```
+This runs every frame regardless of whether a robot is spawned. Harmless but wastes a `read()` syscall per frame.
+
+### 17. `drivetrain_update` velocity cap of 3.0 m/s is very aggressive
+The hard velocity cap inside `drivetrain_update` runs every physics tick and directly overwrites `chassis->velocity`. This bypasses the impulse solver and can interfere with collision responses (e.g., if another object pushes the robot). A 5203-30 motor at 12.8V can theoretically push a light chassis well past 3 m/s.
+
+### 18. No headless test for tank drive
+`test_teleop_drive` uses `drivetrain_tank`, but there's no test that verifies tank drive produces **differential** turning (left wheel forward, right wheel backward → rotation in place). The test only checks forward displacement.
+
+### 19. No headless test for odometry accuracy
+Fix 151 added `odometry_diag.c` which prints values but doesn't **assert** anything. There's no `TEST_ASSERT` comparing odometry output against ground-truth physics positions.
+
+### 20. `scene_load.c` doesn't restore `nice_value`
+`SAVE-004` in the audit notes that `nice_value` isn't saved. The save format writes 14 fields per body but `nice_value` isn't one of them. Any per-object damping set via `nice` is lost on save/load.
+
+---
+
+That's 20 distinct issues. What did I miss?
