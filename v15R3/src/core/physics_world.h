@@ -41,5 +41,13 @@ int physics_world_add_cylinder(physics_world *world, float radius, float half_le
 void physics_world_clear(physics_world *world);
 void physics_world_step(physics_world *world, float dt);
 physics_world *physics_world_get_primary(void);
-
+/* R3-07: Add four static wall bodies around the playable area.
+ * half_width and half_depth define the playable half-extents.
+ * wall_height and wall_thickness define the wall geometry.
+ * Returns 0 on success, -1 on failure. */
+int physics_world_add_boundary_walls(physics_world *world,
+                                     float half_width,
+                                     float half_depth,
+                                     float wall_height,
+                                     float wall_thickness);
 #endif
