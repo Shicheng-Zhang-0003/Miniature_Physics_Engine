@@ -1334,68 +1334,135 @@ bool collision_cylinder_sphere(rigidbody *cyl, rigidbody *sph,
  * Sample N points along the axle, find the one closest to the OBB
  * surface, then do a sphere-OBB test at that point with the
  * cylinder radius. 5 samples is enough for short axles (wheels). */
+
+/* LIST4 NEW-02 / NEW-03:
+ * Correct cylinder-vs-cube contact normal and sample resolution.
+ *
+ * Convention:
+ *   object_a = cylinder
+ *   object_b = cube
+ *   normal must point from cylinder toward cube.
+ *
+ * The old version used:
+ *   cyl->position - best_on_obb
+ * which pointed from the cube surface toward the cylinder center.
+ * That inverted the solver response for floor/wall contacts.
+ *
+ * The corrected version uses:
+ *   best_on_obb - best_pt
+ * where best_pt is the closest sampled point on the cylinder axle.
+ */
 bool collision_cylinder_cube(rigidbody *cyl, rigidbody *cube,
                              collision_data *out) {
     if ((cyl->type != object_cylinder) || (cube->type != object_cube)) {
         return false;
     }
-    vector3 axis = cyl->cached_axes[0];
+
     float r = cyl->radius;
     float h = cyl->cylinder_half_length;
 
+    if ((r <= 0.0f) || (h <= 0.0f) || (!isfinite(r)) || (!isfinite(h))) {
+        return false;
+    }
+
+    vector3 axis = cyl->cached_axes[0];
+    float axis_len_sq = vector3_length_squared(axis);
+
+    if (axis_len_sq < 1e-8f) {
+        axis = (vector3){1.0f, 0.0f, 0.0f};
+        axis_len_sq = 1.0f;
+    }
+
+    axis = vector3_scaling(axis, 1.0f / sqrtf(axis_len_sq));
+
     vector3 e1 = vector3_subtraction(cyl->position, vector3_scaling(axis, h));
     vector3 e2 = vector3_addition(cyl->position, vector3_scaling(axis, h));
+    vector3 seg = vector3_subtraction(e2, e1);
 
-    const int SAMPLES = 5;
+    /*
+     * Nine samples gives better coverage than the original five without
+     * becoming expensive. For FTC wheel-sized cylinders this is enough.
+     */
+    const int SAMPLES = 9;
+
     float best_dist = 1e30f;
     vector3 best_on_obb = cube->position;
+    vector3 best_pt = cyl->position;
 
     for (int s = 0; s <= SAMPLES; s++) {
-        float t = (float)s / (float)SAMPLES;
-        vector3 pt = vector3_addition(e1,
-            vector3_scaling(vector3_subtraction(e2, e1), t));
+        float t = (float) s / (float) SAMPLES;
+        vector3 pt = vector3_addition(e1, vector3_scaling(seg, t));
 
-        /* project into OBB local space */
         vector3 rel = vector3_subtraction(pt, cube->position);
         vector3 *axes = cube->cached_axes;
-        vector3 local = {
+
+        vector3 local = (vector3){
             vector3_dot(rel, axes[0]),
             vector3_dot(rel, axes[1]),
             vector3_dot(rel, axes[2])
         };
-        vector3 clamped = {
+
+        vector3 clamped = (vector3){
             fmaxf(-cube->half_extensions.x, fminf(cube->half_extensions.x, local.x)),
             fmaxf(-cube->half_extensions.y, fminf(cube->half_extensions.y, local.y)),
             fmaxf(-cube->half_extensions.z, fminf(cube->half_extensions.z, local.z))
         };
+
         vector3 on_obb = cube->position;
         on_obb = vector3_addition(on_obb, vector3_scaling(axes[0], clamped.x));
         on_obb = vector3_addition(on_obb, vector3_scaling(axes[1], clamped.y));
         on_obb = vector3_addition(on_obb, vector3_scaling(axes[2], clamped.z));
 
         float d = vector3_length(vector3_subtraction(pt, on_obb));
+
         if (d < best_dist) {
             best_dist = d;
             best_on_obb = on_obb;
+            best_pt = pt;
         }
     }
 
-    if (best_dist >= r) return false;
+    if (best_dist >= r) {
+        return false;
+    }
 
     out->object_a = cyl;
     out->object_b = cube;
     out->contact_count = 1;
 
-    if (best_dist > 0.0001f) {
-        out->normal_vector = vector3_scaling(
-            vector3_subtraction(cyl->position, best_on_obb),
-            1.0f / vector3_length(vector3_subtraction(cyl->position, best_on_obb)));
+    /*
+     * Correct normal direction:
+     * from the cylinder axle sample point toward the closest point on the cube.
+     */
+    vector3 toward_obb = vector3_subtraction(best_on_obb, best_pt);
+    float toward_len = vector3_length(toward_obb);
+
+    if (toward_len > 0.0001f) {
+        out->normal_vector = vector3_scaling(toward_obb, 1.0f / toward_len);
     } else {
-        out->normal_vector = (vector3){0.0f, 1.0f, 0.0f};
+        /*
+         * Degenerate case: sampled axle point is inside the cube.
+         * Use cube center as a fallback escape direction.
+         */
+        vector3 fallback = vector3_subtraction(cube->position, best_pt);
+        float fallback_len = vector3_length(fallback);
+
+        if (fallback_len > 0.0001f) {
+            out->normal_vector = vector3_scaling(fallback, 1.0f / fallback_len);
+        } else {
+            out->normal_vector = (vector3){0.0f, -1.0f, 0.0f};
+        }
     }
+
     contact_point_data *cp = &out->contacts[0];
     cp->penetration = r - best_dist;
+
+    if (cp->penetration < 0.0f) {
+        cp->penetration = 0.0f;
+    }
+
     cp->position = best_on_obb;
+
     return true;
 }
 
