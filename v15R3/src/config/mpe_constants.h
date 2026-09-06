@@ -45,7 +45,7 @@
  * SCENE I/O — binary format identification
  * ------------------------------------------------------------------ */
 #define mpe_magic 0x4D504533 /* "MPE3" */
-#define mpe_version 150
+#define mpe_version 151 /* R3-04: bumped to add cylinder_half_length to body format */
 
 /* ------------------------------------------------------------------
  * VALIDATION — built-in test durations
