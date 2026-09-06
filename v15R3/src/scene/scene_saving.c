@@ -1,6 +1,7 @@
 #include "../mpe_engine.h"
 #include "scene_saving.h"
 #include "../physics/spring_joint.h"
+#include <complex.h>
 #include <stdio.h>
 #include <stdint.h>
 static void write_float(FILE *f, float v) {
@@ -16,9 +17,15 @@ static void write_vec4(FILE *f, vector4 v) {
     fwrite(&v, sizeof(vector4), 1, f);
 }
 int save_scene(const char *file_destination_path) {
-    FILE *f = fopen(file_destination_path, "wb");
+    /* R3-03: Atomic write. Write to a temporary file first, then
+     * atomically rename over the target. A crash mid-write leaves
+     * the original file intact. */
+    char tmp_path[512];
+    snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", file_destination_path);
+
+    FILE *f = fopen(tmp_path, "wb");
     if (!f) {
-        fprintf(stderr, "Error SVF01: Could not open %s\n", file_destination_path);
+        fprintf(stderr, "Error SVF01: Could not open %s\n", tmp_path);
         return 0;
     }
     write_int(f, mpe_magic);
@@ -58,5 +65,12 @@ int save_scene(const char *file_destination_path) {
         }
     }
     fclose(f);
+    /* R3-03: Atomic rename over the target */
+    if (rename(tmp_path, file_destination_path) != 0) {
+        fprintf(stderr, "Error SVF02: Could not rename %s to %s\n",
+                tmp_path, file_destination_path);
+        remove(tmp_path);
+        return 0;
+    }
     return 1;
 }

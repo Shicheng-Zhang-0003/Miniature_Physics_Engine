@@ -201,16 +201,20 @@ static void ensure_parent_dir(const char *path) {
         mkdir(copy, 0755);
     }
 }
-
 bool mpe_config_save(const char *path) {
     if (!path) {
         return false;
     }
+
     ensure_parent_dir(path);
-    FILE *file = fopen(path, "w");
-    if (!file) {
-        return false;
-    }
+
+    /* R3-03: Atomic write. Write to a temporary file first, then
+     * atomically rename over the target. */
+    char tmp_path[512];
+    snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", path);
+
+    FILE *file = fopen(tmp_path, "w");
+    if (!file) {return false;}
     time_t now = time(NULL);
     struct tm *local_time = localtime(&now);
     char stamp[64];
@@ -240,7 +244,11 @@ bool mpe_config_save(const char *path) {
         }
     }
     fclose(file);
-    return true;
+    /* R3-03: Atomic rename over the target */
+    if (rename(tmp_path, path) != 0) {
+        remove(tmp_path);
+        return false;
+    } return true;
 }
 
 static char *term_trim(char *str) {
