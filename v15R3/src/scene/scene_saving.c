@@ -36,6 +36,9 @@ int save_scene(const char *file_destination_path) {
         write_int(f, (int32_t) rb->type);
         write_float(f, rb->mass);
         write_float(f, rb->radius);
+        /* R3-04: Write cylinder_half_length for all bodies.
+         * For non-cylinder bodies this is zero and is ignored on load. */
+        write_float(f, rb->cylinder_half_length);
         write_vec3(f, rb->half_extensions);
         write_vec3(f, rb->position);
         write_vec3(f, rb->velocity);
