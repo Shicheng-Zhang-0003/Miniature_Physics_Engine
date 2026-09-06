@@ -11,6 +11,8 @@
 
 ## Messed up on the latest series of commits. This is a blank slate refactor and restart of modularisation and FTC physics differentiation.
 
+## V1.5St, or v15ST, i the temporary backup revertation version to resume work on FTC physics truth and MPE kernel separation components should a corruption disaster such as 4bee7f26 occurs again.
+
 **License:** GPL-3.0 · **Language:** C · **UI:** GTK3 · **Renderer:** OpenGL 3.3 Core
 
 ---
