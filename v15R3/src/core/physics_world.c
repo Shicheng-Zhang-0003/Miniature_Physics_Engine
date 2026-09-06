@@ -282,3 +282,69 @@ world->bodies[i].driven_this_tick = false;
 physics_world *physics_world_get_primary(void) {
     return &g_physics_world;
 }
+
+/* R3-07: Containment walls.
+ *
+ * Adds four static cube bodies around the playable area.
+ * The walls are placed just outside the half-extents so the
+ * playable interior is exactly half_width x half_depth.
+ *
+ * Wall layout (top view):
+ *
+ *        north wall
+ *   +-----------------+
+ *   |                 |
+ * w |    playable     | e
+ * e |     area        | a
+ * s |                 | s
+ * t |                 | t
+ *   +-----------------+
+ *        south wall
+ */
+int physics_world_add_boundary_walls(physics_world *world,
+                                     float half_width,
+                                     float half_depth,
+                                     float wall_height,
+                                     float wall_thickness)
+{
+    if (!world) {
+        return -1;
+    }
+    if ((half_width <= 0.0f) || (half_depth <= 0.0f) ||
+        (wall_height <= 0.0f) || (wall_thickness <= 0.0f)) {
+        return -1;
+    }
+
+    float hy = wall_height * 0.5f;
+    float ht = wall_thickness * 0.5f;
+
+    /* North wall: +Z side */
+    int north = physics_world_add_cube(world,
+        (vector3){0.0f, hy, half_depth + ht},
+        (vector3){half_width + wall_thickness, hy, ht},
+        0.0f);
+
+    /* South wall: -Z side */
+    int south = physics_world_add_cube(world,
+        (vector3){0.0f, hy, -(half_depth + ht)},
+        (vector3){half_width + wall_thickness, hy, ht},
+        0.0f);
+
+    /* East wall: +X side */
+    int east = physics_world_add_cube(world,
+        (vector3){half_width + ht, hy, 0.0f},
+        (vector3){ht, hy, half_depth + wall_thickness},
+        0.0f);
+
+    /* West wall: -X side */
+    int west = physics_world_add_cube(world,
+        (vector3){-(half_width + ht), hy, 0.0f},
+        (vector3){ht, hy, half_depth + wall_thickness},
+        0.0f);
+
+    if ((north < 0) || (south < 0) || (east < 0) || (west < 0)) {
+        return -1;
+    }
+
+    return 0;
+}
