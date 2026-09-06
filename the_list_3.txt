@@ -1,0 +1,156 @@
+Here's **the_list_3** — the MPE-kernel brick-robustness items that **v2 does not cover**. I went back through the actual source (both pipelines, the loader/saver, config, broadphase, physics_world, rigidbody) and pulled only things that can corrupt state, lose data, silently degrade correctness, or lock the engine into an unrecoverable state. Where v2 is *adjacent* (floor proxy, scene format), I've flagged the acute defect v2's fix doesn't explicitly close.
+
+---
+
+# the_list_3 — MPE Kernel Brick-Robustness (net-new vs v2)
+
+**Severity:** 🔴 Critical · 🟠 High · 🟡 Medium · ⚪ Low
+
+---
+
+## Theme 1 — Determinism (entirely absent from v2)
+
+### R3-01 🟠 No determinism contract, and no test proves it
+**Problem:** The whole reason MPE exists (and the whole reason MFS will sit on it) is *reproducible* physics. Yet there is no item in v2, no test, and no guarantee that "same scene + same config → identical state after N ticks." The sequential-impulse solver is Gauss–Seidel, so results depend on **manifold ordering**, which depends on broadphase emission order. That happens to be deterministic today, but it is **unverified and fragile** to: interleaved/multi-world stepping, any future parallelization, the two pipelines ordering contacts differently, and the unseeded `srand(time(NULL))` in the torture path.
+**Why it bricks:** Once MFS autonomous tuning relies on repeatable runs, a single silent ordering change makes runs irreproducible and *impossible to debug* — the worst kind of brick, because nothing looks broken.
+**Fix:**
+1. Add a `determinism_test`: build a fixed mixed scene, run 3000 ticks, hash all positions/velocities/orientations, run it again, require a bitwise-identical hash.
+2. Pin manifold ordering explicitly (sort pairs by `(id_a, id_b)` before the solver) so it can't drift with the hash layout.
+3. Seed or remove all `srand(time(...))` from anything that touches physics.
+4. Make this a release gate.
+**Files:** new `tests/determinism_test.c`; `collision_mechanics.c`; `physics_world.c`; `scene_init.c`.
+**Verification:** test passes twice with identical hashes; hash unchanged across `-O0`/`-O3`.
+
+---
+
+## Theme 2 — Persistence must never brick the save or the scene
+
+### R3-02 🔴 `scene_loading` destroys the current scene before it knows the file is readable
+**Problem:** `scene_loading` validates only the header, then calls `scene_clear()`, *then* reads bodies in a loop that `break`s on any read failure, and finally commits `object_count = loaded_count`. A scene file with a **valid header but truncated/corrupt body data** wipes the live scene and leaves a partial one. The original is gone.
+**Why it bricks:** One bad/truncated `scene.dat` = total loss of the current scene, silently.
+**Fix:** Read/parse into a **staging buffer first**; only call `scene_clear()` and commit after the *entire* file parses cleanly. On any failure, leave the live scene untouched and report the error.
+**Files:** `scene/scene_load.c`.
+**Verification:** truncate a saved `scene.dat` mid-body, load it → current scene unchanged + error reported.
+
+### R3-03 🟠 No atomic writes for `scene.dat` or `engine.cfg`
+**Problem:** Both `save_scene` and `mpe_config_save` do `fopen(path, "w"/"wb")`, which truncates immediately. A crash, power loss, or full disk mid-write leaves a **corrupted file** that the next boot reads.
+**Why it bricks:** Interrupted save = permanently corrupt save/config.
+**Fix:** Write to `path.tmp`, `fflush`+`fclose`, then `rename()` over the target (POSIX rename is atomic).
+**Files:** `scene/scene_saving.c`, `config/mpe_config.c`.
+**Verification:** kill the process mid-save → original file intact.
+
+### R3-04 🟠 Cylinders are silently corrupted to spheres on save/load
+**Problem:** `save_scene` writes `type`/`radius` but **not `cylinder_half_length`**, and `scene_loading` has only two branches — `object_cube` or "else sphere". There is **no cylinder branch**, so a saved cylinder is re-initialised as a sphere and its type is overwritten.
+**Why it bricks:** Any scene containing cylinders (now a first-class type, `MPE_FTC_090`) is *silently* wrong after a save/load round-trip. No error, just wrong geometry/inertia.
+**Fix:** Save `cylinder_half_length`; add a `rigidbody_initialisation_cylinder` branch to the loader keyed on `type`.
+**Files:** `scene/scene_saving.c`, `scene/scene_load.c`.
+**Verification:** save a scene with a cylinder, load it, assert `type==object_cylinder` and `cylinder_half_length` preserved.
+
+### R3-05 ⚪ Corrupt/rejected config lines vanish without a trace
+**Problem:** `mpe_config_load` `continue`s past any line it can't parse or that's non-finite, with no counter or log. A partially-corrupt `engine.cfg` loads "successfully" while silently dropping values.
+**Why it bricks:** You can't tell your config was half-ignored; behaviour changes with no diagnostic.
+**Fix:** Count and report rejected lines (`printf`/event log), and treat "some lines rejected" as a soft warning.
+**Files:** `config/mpe_config.c`.
+
+---
+
+## Theme 3 — Unrecoverable / silently-degrading physics states
+
+### R3-06 🟠 `physics_world` sleeping bodies can never be woken by contact
+**Problem:** In `physics_world_step`, two sleeping bodies are skipped, but there is **no wake-on-contact logic** (the legacy path has it; this one doesn't). Worse, `rb_integrate_position` returns early for sleeping bodies, so their sleep decision code never runs — a sleeping body's `sleep_timer` never updates and it **cannot wake on its own**. Meanwhile the solver still applies impulses to it (it keeps real mass), changing its velocity while its position stays frozen.
+**Why it bricks:** A body that sleeps can only be revived by an external `rigidbody_wake()` call. Anything that lands on it silently fails to wake it → stuck, inconsistent bodies with velocity but no motion.
+**Fix:** In `physics_world_step`, when an awake+active body contacts a sleeping one, call `rigidbody_wake()` on the sleeper (mirror the legacy path's `a3_a_was_sleeping` logic).
+**Files:** `core/physics_world.c`.
+**Verification:** sleeping cube + moving projectile in a physics_world → projectile impact wakes the cube within 1 tick.
+
+### R3-07 🟠 `physics_world` has no containment — bodies escape to infinity and NaN
+**Problem:** `physics_world_step` has a floor (`collision_static_plane_body`) but **no walls and no ceiling**. A body launched laterally leaves forever. As coordinates grow, float precision collapses and the solver eventually produces NaN.
+**Why it bricks:** Any robot or object that drives/slides off the edge is unrecoverable and will degrade to NaN.
+**Fix:** Give the world static wall bodies (or a clamp) consistent with whatever the legacy path uses, so nothing can reach unbounded coordinates.
+**Files:** `core/physics_world.c`.
+**Verification:** launch a sphere sideways at high speed → it stays bounded, no NaN over 3000 ticks.
+
+### R3-08 🟡 `physics_world_step` uses file-global scratch buffers — it is not truly multi-world
+**Problem:** `world_pairs[]` and `world_manifolds[]` (and the broadphase's `hash_table`/`node_pool`) are **file-static globals**, yet the API is advertised as multi-world (`physics_world.h`, the `two_world` test). Two worlds stepped in the same frame clobber each other's scratch. The `two_world` test only passes because it steps the worlds *sequentially*.
+**Why it bricks:** The multi-world contract is false; interleaved worlds corrupt each other mid-step.
+**Fix:** Move pair/manifold scratch into the `physics_world` struct (per-world), or document and enforce strictly-sequential stepping.
+**Files:** `core/physics_world.c`, `physics/broadphase.c`.
+
+### R3-09 🟡 Broadphase overflow silently removes objects from collision
+**Problem:** When the node pool is exhausted, `insert_into_hash` returns early and the object is simply **not inserted**. When the pair-dedupe table saturates, `pair_already_checked` returns `true` and **suppresses** new pairs. Both paths only bump a counter.
+**Why it bricks:** Under load, objects *silently stop colliding*. The physics lies with no hard failure — exactly the "looks fine, is wrong" brick.
+**Fix:** Treat overflow as a first-class fault: surface it loudly (overlay + event log), and choose a defined degradation (e.g. keep the most recent pairs) rather than silently dropping contacts.
+**Files:** `physics/broadphase.c`.
+
+### R3-10 🟡 The floor proxy poisons the warm-start contact cache
+**Problem:** Until the proxy is killed (v2 1.4), every floor contact uses the single `static` proxy with `object_id = 0xFFFFFFFF` and hardcoded `restitution = 1.0`. So **all** floor contacts in the warm-start cache share the sentinel id, and per-body floor bounce/warm-start is keyed against a fake body. The sentinel is also a real id collision waiting to happen if `next_object_id` ever wraps (see R3-12).
+**Why it bricks:** Floor warm-starting and bounce are not per-body-correct today, and a sentinel id sits in the cache namespace.
+**Fix:** Killing the proxy (v2 1.4) resolves this; until then, don't warm-start floor contacts against the sentinel id.
+**Files:** `physics/collision_mechanics.c`.
+
+---
+
+## Theme 4 — Kernel purity (MFS is fused into the kernel)
+
+### R3-11 🟠 The MPE kernel is contaminated with MFS-specific state and behaviour
+**Problem:** v2 scoped MFS robotics *out* but let "generic features introduced for MFS" *in*. Several things that got fused are **not generic** — they are MFS welded into the kernel:
+- `rigidbody` carries `is_mecanum`, `roller_angle_rad`, `driven_this_tick` (`rigidbody.h`).
+- `physics_world_step` runs a mecanum **wheel-lock** loop and clears `driven_this_tick`, and reads the robotics-only `solver.wheel_lock_omega_thresh`.
+- `collision_prepare_solver` branches on `is_mecanum` for the friction tangent.
+- `mpe_engine.h` includes `ui_input/gamepad.h`; `root_gtk.c` calls `gamepad_init/close` — **kernel startup depends on an MFS input device**.
+- `mpe_config_schema.c` registers `solver.wheel_lock_omega_thresh` (robotics-only).
+
+**Why it bricks:** A standalone MPE that can't run without gamepad/mecanum fields isn't a kernel — it's a coupled blob. This coupling is what will break the v16 module split and makes every "kernel" change risk robotics side-effects.
+**Fix:** Excise robotics-specific state from `rigidbody`/`physics_world_step`/config into a robotics layer that *opts in* (e.g. a per-body user-data pointer + a post-step hook). Remove the gamepad dependency from `mpe_engine.h`/startup.
+**Files:** `core/rigidbody.h/.c`, `core/physics_world.c`, `config/mpe_config_schema.c`, `mpe_engine.h`, `root_gtk.c`.
+**Verification:** MPE builds and runs with zero robotics/gamepad references in `core/`.
+
+---
+
+## Theme 5 — Identity & lifecycle integrity
+
+### R3-12 🟡 `next_object_id` can wrap/collide; generation is dead
+**Problem:** `scene_allocate_object_id()` increments a `static uint32` with **no uniqueness check** and no persistence. `object_generation` exists but is always set to 1 and never used. Over very long sessions or many save/load cycles, an id can repeat, which would corrupt contact-cache matching and id-based joint resolution.
+**Why it bricks:** A silent id collision makes the cache/joints operate on the wrong body — misattribution with no crash.
+**Fix:** On allocation, skip ids already present; actually use/increment `object_generation` in the cache key; or move to a collision-free id scheme.
+**Files:** `scene/scene_init.c`, `physics/collision_mechanics.c`.
+
+### R3-13 ⚪ No teardown for the primary physics_world or GPU resources on exit
+**Problem:** `on_main_window_destroy` calls `render_cleanup`/`broadphase_cleanup`/`gamepad_close` but never `physics_world_cleanup` on the primary world, and mesh VBOs/VAOs aren't released.
+**Why it bricks:** For long-run stability and clean restart/reload cycles this leaks; more importantly there's no defined "reset the whole engine" path.
+**Fix:** Add a single `mpe_shutdown()` that tears down physics worlds, meshes, and caches; call it from the destroy handler.
+**Files:** `root_gtk.c`, `render/*.c`, `core/physics_world.c`.
+
+---
+
+## Theme 6 — Hidden physics constants (extending v2's theme)
+
+### R3-14 ⚪ Baumgarte separation bias hardcodes `* 60.0f`
+**Problem:** `collision_prepare_solver` computes `separation_bias = bias_factor * max(pen - slop, 0) * 60.0f`, assuming a 60 Hz step instead of scaling by `1/dt`. Same class as the `0.97` drag (v2 2.7) but a different, unlisted constant.
+**Why it bricks:** If the timestep ever changes, penetration correction silently changes strength.
+**Fix:** Pass `dt` and use `/ dt`.
+**Files:** `physics/collision_mechanics.c`.
+
+---
+
+## Theme 7 — The engine can overwrite its own project files
+
+### R3-15 ⚪ `tee` and microvim can clobber arbitrary project files from inside the engine
+**Problem:** `cmd_tee` writes to any path, and microvim can edit+save the **makefile, source files, and shaders** while the engine runs. The engine can therefore brick its own build/source from within.
+**Why it bricks:** One mistyped `:w` on the wrong file corrupts the codebase without leaving the app.
+**Fix:** Restrict terminal/microvim writes to a sandboxed set (config/scene), or require an explicit confirm for anything under `src/`/`makefile`.
+**Files:** `ui_input/debug_terminal.c`, `ui_input/microvim.c`.
+
+---
+
+## Priority order for brick-robustness
+
+1. **R3-02** (scene load destroys scene) — 🔴 data loss, do first.
+2. **R3-06, R3-07** (sleep never wakes, no containment) — 🟠 core physics can lock up or NaN.
+3. **R3-01** (determinism) — 🟠 lock it in *before* MFS builds on it.
+4. **R3-03, R3-04** (atomic writes, cylinder corruption) — 🟠 persistence integrity.
+5. **R3-11** (kernel purity) — 🟠 required for a standalone, module-ready MPE.
+6. **R3-08, R3-09, R3-10** — 🟡 robustness under load / multi-world honesty.
+7. **R3-12, R3-13, R3-14, R3-05, R3-15** — 🟡/⚪ hardening.
+
+The through-line v2 missed: **v2 is mostly about making the physics *right*; this list is about making the engine *unbreakable* — it can't lose your scene, can't corrupt your save, can't silently stop colliding, can't wedge a body asleep, can't run to infinity, and can't be coupled to robotics while claiming to be a standalone kernel.** Get R3-02, R3-06, R3-07, and R3-01 green and MPE is genuinely safe to hand back to MFS.
