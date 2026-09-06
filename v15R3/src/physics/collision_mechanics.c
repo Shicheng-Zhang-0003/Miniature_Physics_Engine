@@ -892,7 +892,17 @@ void collision_prepare_solver(collision_data *source, collision_data *m) {
         } else if (m->object_b && m->object_b->is_mecanum) {
             mecanum_wheel = m->object_b;
         }
-
+        if (mecanum_wheel && mecanum_wheel->type == object_cylinder) {
+        /* NEW-08: Only apply mecanum tangent for floor contacts.
+     * If the contact normal is not approximately vertical, this is
+     * not a floor contact and the mecanum tangent must not be applied.
+     * A mecanum wheel touching a wall or another object must use the
+     * standard tangent computation, not the roller-based override. */
+            float newton_verticality = fabsf(vector3_dot(m->normal_vector, (vector3){0.0f, 1.0f, 0.0f}));
+            if (newton_verticality < 0.9f) {
+                mecanum_wheel = NULL; /* Not a floor contact — skip mecanum tangent */
+            }
+        }
         if (mecanum_wheel && mecanum_wheel->type == object_cylinder) {
             /* Compute roller's free-slide direction in world space.
              * Roller angle is measured from the axle (local X axis).
@@ -909,10 +919,16 @@ void collision_prepare_solver(collision_data *source, collision_data *m) {
              * The roller direction in the contact plane is perpendicular to the grip direction. */
 
             /* Floor normal is (0, 1, 0) or (0, -1, 0) depending on convention */
-            vector3 floor_normal = m->normal_vector;
-            if (vector3_length_squared(floor_normal) < 0.0001f) {
-                floor_normal = (vector3){0.0f, 1.0f, 0.0f};
+            /* LIST4 NEW-08 + strafe-sign fix: only apply mecanum tangent for
+            * actual floor contacts (contact normal approximately vertical).
+            * Always use the UPWARD floor normal for the grip computation,
+            * regardless of the contact normal direction. */
+            vector3 floor_normal = {0.0f, 1.0f, 0.0f};
+            float verticality = fabsf(vector3_dot(m->normal_vector, floor_normal));
+            if (verticality < 0.9f) {
+                mecanum_wheel = NULL;   /* not a floor contact, skip mecanum tangent */
             }
+
 
             /* Project axle onto floor plane */
             vector3 axle_proj = vector3_subtraction(
