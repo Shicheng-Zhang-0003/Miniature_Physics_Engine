@@ -11,9 +11,7 @@
 
 ## Messed up on the latest series of commits. This is a blank slate refactor and restart of modularisation and FTC physics differentiation.
 
-## V1.5St, or v15ST, i the temporary backup revertation version to resume work on FTC physics truth and MPE kernel separation components should a corruption disaster such as 4bee7f26 occurs again.
-
-## Broken State: The 105645 Commit is completely broken with the robot itself twitching and vibrating at least on the wheel side. Use V1.5ST if you require immediate usage.
+## 2nd time around, is 3rd time a charm?
 
 **License:** GPL-3.0 · **Language:** C · **UI:** GTK3 · **Renderer:** OpenGL 3.3 Core
 

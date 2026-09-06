@@ -14,7 +14,6 @@
 #include "../physics/constraint.h" /* MPE_FTC_067 */
 #include "../config/mpe_config.h"
 #include "../config/mpe_constants.h"
-#include "../physics/depenetration_world.h" /* MPE_PHASE1_DEPENETRATION_WORLD */
 #include <stdlib.h>
 #include <math.h>
 #include <string.h> /* MPE_FTC_076a */
@@ -106,30 +105,6 @@ void physics_world_clear(physics_world *world) {
     world->world_contact_cache_count = 0; /* MFS_131A */
 }
 
-/* MPE_WAKE_ON_CONTACT_HELPER: wake sleeping bodies struck by active bodies.
-* Standalone extraction from the legacy simulation_physics_loop.c narrowphase.
-* Required because physics_world_step does NOT staticize sleeping bodies, so a
-* sleeping body in a contact manifold must be woken or it receives solver
-* impulses it never integrates. */
-static void physics_world_wake_on_contact(rigidbody *body_a, rigidbody *body_b) {
-    bool a_was_sleeping = body_a->is_sleeping;
-    bool b_was_sleeping = body_b->is_sleeping;
-    float wake_linear_sq = g_cfg.sleep.wake_linear_thresh_sq;
-    float wake_angular_sq = g_cfg.sleep.wake_angular_thresh_sq;
-    bool a_is_active = (!a_was_sleeping) &&
-        ((vector3_length_squared(body_a->velocity) > wake_linear_sq) ||
-         (vector3_length_squared(body_a->angular_velocity) > wake_angular_sq));
-    bool b_is_active = (!b_was_sleeping) &&
-        ((vector3_length_squared(body_b->velocity) > wake_linear_sq) ||
-         (vector3_length_squared(body_b->angular_velocity) > wake_angular_sq));
-    if (a_was_sleeping && (!body_b->static_state) && b_is_active) {
-        rigidbody_wake(body_a);
-    }
-    if (b_was_sleeping && (!body_a->static_state) && a_is_active) {
-        rigidbody_wake(body_b);
-    }
-}
-
 void physics_world_step(physics_world *world, float dt) {
     if ((!world) || (!world->bodies) || (dt <= 0.0f) || (world->body_count <= 0)) {
         return;
@@ -197,7 +172,6 @@ void physics_world_step(physics_world *world, float dt) {
             collided = collision_cylinder_cylinder(body_a, body_b, &narrowphase_collision);
         }
         if ((collided) && (manifold_count >= 0) && (manifold_count < a3_max_manifolds)) { /* MPE_FTC_078 */
-            physics_world_wake_on_contact(body_a, body_b); /* MPE_WAKE_ON_CONTACT_CALL */
             collision_prepare_solver(&narrowphase_collision, &world_manifolds[manifold_count]);
             manifold_count++;
         }
@@ -272,8 +246,6 @@ world->bodies[i].driven_this_tick = false;
         rb_integrate_position(&world->bodies[i], dt);
         rigidbody_sanitize(&world->bodies[i]);
     }
-    /* MPE_PHASE1_DEPENETRATION_CALL */
-    physics_world_depenetration_pass(world, world_pairs, pair_count);
 }
 
 physics_world *physics_world_get_primary(void) {

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # V-04: F10 long-run validation (3600 ticks / 60s). GUI interaction required.
 set -uo pipefail
-SRC="v15R3/src"
+SRC="v15R2/src"
 [[ -d "$SRC" ]] || { echo "ERROR: $SRC not found." >&2; exit 1; }
 
 echo "=== V-04: F10 Long-Run Validation ==="
