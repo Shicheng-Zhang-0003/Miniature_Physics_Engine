@@ -170,10 +170,41 @@ void physics_world_step(physics_world *world, float dt) {
             }
         } else if ((body_a->type == object_cylinder) && (body_b->type == object_cylinder)) {
             collided = collision_cylinder_cylinder(body_a, body_b, &narrowphase_collision);
-        }
-        if ((collided) && (manifold_count >= 0) && (manifold_count < a3_max_manifolds)) { /* MPE_FTC_078 */
-            collision_prepare_solver(&narrowphase_collision, &world_manifolds[manifold_count]);
-            manifold_count++;
+        } if ((collided) && (manifold_count < a3_max_manifolds)) {
+            /* LIST4 R3-06: wake-on-contact for the physics_world path.
+             *
+             * The legacy path already had this. The encapsulated path did not,
+             * which allowed sleeping bodies to remain frozen while active bodies
+             * collided with them and silently injected velocity.
+             */
+            bool a_was_sleeping = body_a->is_sleeping;
+            bool b_was_sleeping = body_b->is_sleeping;
+
+            if ((a_was_sleeping) && (b_was_sleeping)) {
+                /* Both sleeping: nothing to wake. */
+            } else {
+                float wake_linear_threshold_sq = g_cfg.sleep.wake_linear_thresh_sq;
+                float wake_angular_threshold_sq = g_cfg.sleep.wake_angular_thresh_sq;
+
+                bool a_is_active = (!a_was_sleeping) &&
+                    ((vector3_length_squared(body_a->velocity) > wake_linear_threshold_sq) ||
+                     (vector3_length_squared(body_a->angular_velocity) > wake_angular_threshold_sq));
+
+                bool b_is_active = (!b_was_sleeping) &&
+                    ((vector3_length_squared(body_b->velocity) > wake_linear_threshold_sq) ||
+                     (vector3_length_squared(body_b->angular_velocity) > wake_angular_threshold_sq));
+
+                if ((a_was_sleeping) && (!body_b->static_state) && (b_is_active)) {
+                    rigidbody_wake(body_a);
+                }
+
+                if ((b_was_sleeping) && (!body_a->static_state) && (a_is_active)) {
+                    rigidbody_wake(body_b);
+                }
+
+                collision_prepare_solver(&narrowphase_collision, &world_manifolds[manifold_count]);
+                manifold_count++;
+            }
         }
     }
 
