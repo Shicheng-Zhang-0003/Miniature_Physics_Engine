@@ -32,7 +32,7 @@ def main():
             print("    Enter p, f, or s.")
 
     stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    log = os.path.join("v15R3", "v03_gate_validation.log")
+    log = os.path.join("v15R2", "v03_gate_validation.log")
     failures = [r for r in results if r[1] in ("FAIL", "SKIP")]
     with open(log, "w") as f:
         f.write(f"MPE v15R2 P0 Gate Validation - {stamp}\n\n")
