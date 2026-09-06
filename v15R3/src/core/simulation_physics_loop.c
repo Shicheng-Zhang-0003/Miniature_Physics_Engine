@@ -19,7 +19,7 @@ void simulation_physics_tick(float frame_delta_time) {
         physics_time_accumulator = fixed_physics_dt * max_substeps_per_frame;
     }
     float linear_damping_factor = powf(g_cfg.world.drag, fixed_physics_dt);
-    float angular_damping_factor = powf(g_cfg.world.drag * 0.97f, fixed_physics_dt);
+    float angular_damping_factor = powf(g_cfg.world.drag, fixed_physics_dt);
     debug_last_manifold_overflow_count = 0;
     while (physics_time_accumulator >= fixed_physics_dt) {
         /* Sanitize all bodies */
