@@ -1,0 +1,950 @@
+# MPE Kernel Bug Eradication Master Plan
+
+This plan covers every defect in the MPE internal kernel: physics, architecture, scene management, rendering, UI, terminal, config, build system, and testing. MFS robotics (drivetrain, motor, battery, odometry, robot creation) is excluded. Generic features that were *introduced* for MFS but belong to the engine (cylinders, constraints, physics_world) are included.
+
+---
+
+## Phase 0 — Test Infrastructure
+
+You cannot fix what you cannot measure. The kernel currently has **zero unit tests** for its math, collision, solver, integration, or config functions. Every subsequent phase depends on this one.
+
+### 0.1 — Kernel Unit Test Harness
+
+**Problem:** TEST-002. No tests exist for `math3_inverse`, `vector4_normalisation`, `collision_dual_sphere`, `collision_sphere_cube`, `collision_dual_cube`, `collision_prepare_solver`, `collision_resolve_iterative`, `rb_integrate_velocity`, `rb_integrate_position`, `rigidbody_sanitize`, `mpe_config_init`, `broadphase_generate_pairing`, or any other kernel function.
+
+**Fix:** Create `tests/unit/` directory with a minimal test framework:
+
+```c
+// tests/unit/test_framework.h
+#define TEST(name) static void test_##name(void)
+#define ASSERT_TRUE(cond) ...
+#define ASSERT_FLOAT_EQ(a, b, eps) ...
+#define RUN_TEST(name) ...
+```
+
+**Files to create:**
+- `tests/unit/math_test.c` — vector ops, quaternion ops, matrix ops, `math3_inverse`
+- `tests/unit/collision_test.c` — sphere-sphere, sphere-cube, cube-cube, cylinder cases
+- `tests/unit/solver_test.c` — `collision_prepare_solver`, `collision_resolve_iterative`
+- `tests/unit/integration_test.c` — `rb_integrate_velocity`, `rb_integrate_position`
+- `tests/unit/config_test.c` — init, get, set, clamp, save/load round-trip
+- `tests/unit/broadphase_test.c` — pair generation, deduplication, overflow
+
+**Makefile addition:** `make unit_tests` target that builds and runs all unit tests headlessly.
+
+**Verification:** `make unit_tests` passes with zero failures.
+
+### 0.2 — Kernel Integration Test
+
+**Problem:** TEST-001. All validation (F5–F11) requires GTK and manual keypresses.
+
+**Fix:** Create `tests/kernel_stability_test.c`:
+- Spawns the same scenes as F5 (stack), F6 (sleep/wake), F8 (stress)
+- Runs them headlessly via `physics_world_step`
+- Asserts no NaN, no objects below floor, sleeping bodies stay sleeping
+- Replaces the need for GUI-driven F5/F6/F8 in CI
+
+**Verification:** `make test_kernel_stability` passes headlessly.
+
+### 0.3 — Fix Existing Validation Scripts
+
+**Problem:** TEST-005. `V01.sh`, `V02.sh`, `V04.sh` reference `v15R1/src` but the directory is `v15R3/src`.
+
+**Fix:** Update all three scripts to use `v15R3/src`.
+
+**Verification:** `bash validation/V01.sh` runs without "directory not found" errors.
+
+---
+
+## Phase 1 — Architecture: Kill the Global State
+
+This is the root disease. Every other fix is fragile while globals exist.
+
+### 1.1 — Consolidate Scene State into a Single Struct
+
+**Problem:** ARCH-001. `obj_per_scene`, `object_count`, `object_capacity`, `selected_object`, `main_inputs`, `main_camera_fov`, `main_timer` are all file-scope globals in `simulation.c` / `mpe_engine.h`.
+
+**Fix:**
+1. Create `typedef struct { rigidbody *bodies; int count; int capacity; } scene_state;`
+2. Create `typedef struct { scene_state scene; input_status inputs; camera cam; frame_timer timer; int selected_object; } engine_state;`
+3. Replace all `extern` declarations in `mpe_engine.h` with a single `extern engine_state g_engine;`
+4. Update all consumers to use `g_engine.scene.bodies` instead of `obj_per_scene`, etc.
+
+**Files affected:** `simulation.c`, `mpe_engine.h`, `simulation_physics_loop.c`, `simulation_camera.c`, `simulation_input_dispatch.c`, `simulation_menu_dispatch.c`, `overlay.c`, `editor.c`, `object_selector.c`, `object_spawner.c`, `debug_terminal.c`, `scene_init.c`, `scene_saving.c`, `scene_load.c`, `boundary.c`, `new_render.c`, `wireframe.c`, `spring_joint.c`
+
+**Verification:** Build passes. All existing headless tests pass. `grep -r "obj_per_scene" src/` returns zero hits outside the struct definition.
+
+### 1.2 — Eliminate the Legacy Physics Pipeline
+
+**Problem:** Two physics pipelines exist: `simulation_physics_loop.c` (legacy global path) and `physics_world.c` (encapsulated path). They differ in sleep handling, boundary handling, joint handling, and contact cache.
+
+**Fix:**
+1. Migrate the GUI scene into a `physics_world` instance
+2. Delete `simulation_physics_loop.c` entirely
+3. The GUI renderer reads body positions from the `physics_world`
+4. The floor becomes body index 0 in the world (a large static cube), eliminating the floor proxy
+5. Boundary walls become real static bodies in the world (or are removed in debug mode)
+
+**Files to delete:** `core/simulation_physics_loop.c`, `core/simulation_physics_loop.h`
+
+**Files to modify:** `simulation.c` (call `physics_world_step` instead of `simulation_physics_tick`), `scene_init.c` (populate the physics_world), `boundary.c` (delete or convert to wall bodies)
+
+**Verification:** F5 stack test passes via headless `physics_world_step`. No objects fall through the floor. Sleep/wake works correctly.
+
+### 1.3 — Kill the Sleep Staticize Hack
+
+**Problem:** ARCH-007. In `simulation_physics_loop.c`, sleeping bodies get `inverse_mass = 0` and zeroed inertia before the solver, then restored after. Any code reading a body between those passes sees corrupted properties.
+
+**Fix:** This is eliminated automatically by Phase 1.2. The `physics_world_step` path already handles sleep correctly by skipping sleeping bodies in force/integration and treating them as static in the solver without mutating their properties.
+
+**Verification:** Unit test: create a sleeping body, read its `inverse_mass` during solver iteration, assert it equals `1/mass` (not 0).
+
+### 1.4 — Kill the Floor Proxy
+
+**Problem:** ARCH-011. `collision_static_plane_body_proxy()` returns a pointer to a `static rigidbody` with `object_id = 0xFFFFFFFF` and hardcoded `restitution = 1.0f`. Not thread-safe. Not a real body.
+
+**Fix:** Eliminated by Phase 1.2. The floor becomes a real static body in the physics_world. The `collision_static_plane_body`, `collision_static_plane_sphere`, `collision_static_plane_cube`, `collision_static_plane_cylinder` functions are replaced by normal body-body collision against the floor body.
+
+**Files to modify:** `collision_mechanics.c` (delete floor proxy functions), `physics_world.c` (floor is body 0)
+
+**Verification:** No reference to `collision_static_plane_body_proxy` remains. Floor collision produces correct restitution (uses the floor body's actual restitution value, not hardcoded 1.0).
+
+### 1.5 — Kill the Boundary Teleporter
+
+**Problem:** `boundary_apply_box` / `boundary_apply_floor` teleport objects and flip velocity. No real wall exists. Energy discontinuities. Confuses the depenetration pass.
+
+**Fix:**
+- In game mode: create 5 static wall bodies (floor + 4 walls) in the physics_world
+- In debug mode: no boundary (objects can fly away)
+- Delete `boundary.c` and `boundary.h`
+
+**Files to delete:** `scene/boundary.c`, `scene/boundary.h`
+
+**Verification:** Objects bounce off visible walls. No teleportation. Energy is conserved through wall bounces.
+
+### 1.6 — Reduce `mpe_engine.h` Include Bloat
+
+**Problem:** ARCH-005. `mpe_engine.h` includes 25+ headers. Every file that includes it pulls in the entire engine.
+
+**Fix:** Split into minimal headers:
+- `mpe_types.h` — forward declarations, typedefs
+- `mpe_scene.h` — scene state access
+- `mpe_input.h` — input state
+- Each `.c` file includes only what it needs
+
+**Verification:** `make` passes. Compile time decreases (measure with `time make`).
+
+---
+
+## Phase 2 — Physics Correctness
+
+### 2.1 — Fix the Friction Model (Single-Direction Tangent)
+
+**Problem:** `collision_resolve_iterative` solves friction along a single tangent vector. Real friction is a 2D cone. If the relative velocity direction changes during solver iterations, the friction direction is stale.
+
+**Fix:** Implement two-tangent friction:
+1. Compute `tangent1` and `tangent2` (perpendicular to each other and to the normal)
+2. Solve friction impulses along both tangents
+3. Clamp the combined friction impulse to the friction cone: `sqrt(λt1² + λt2²) ≤ μ * λn`
+
+**File:** `collision_mechanics.c`, `collision_resolve_iterative()`
+
+**Verification:** Unit test: a cube on an inclined plane should slide in the correct direction. A sphere rolling diagonally should decelerate correctly.
+
+### 2.2 — Fix Tangent Effective Mass Not Recomputed
+
+**Problem:** In `collision_resolve_iterative`, if the tangent vector was zero at prep time and is computed during iteration, `effective_mass_tangent` is NOT recomputed. The friction impulse uses the new tangent direction with the old effective mass.
+
+**Fix:** After computing a new tangent vector in the solver iteration, recompute `effective_mass_tangent`:
+
+```c
+if (vector3_length_squared(tangent) < 0.0001f) {
+    // compute new tangent...
+    cp->tangent_vector = tangent;
+    // RECOMPUTE effective mass:
+    vector3 ra_cross_t = vector3_cross(cp->ra, tangent);
+    vector3 rb_cross_t = vector3_cross(cp->rb, tangent);
+    // ... compute k_tangent and eff_mass_t ...
+}
+```
+
+**File:** `collision_mechanics.c`, `collision_resolve_iterative()`
+
+**Verification:** Unit test: two cubes sliding against each other at an angle should decelerate at the correct rate.
+
+### 2.3 — Fix Warm-Start Tangent Mismatch
+
+**Problem:** `collision_prepare_solver` applies the cached tangent impulse in the current frame's tangent direction, but the cached impulse was accumulated in the previous frame's tangent direction.
+
+**Fix:** Store the tangent direction in the contact cache. On warm-start, project the cached impulse onto the new tangent direction:
+
+```c
+float projected_tangent_impulse = cc->accumulated_tangent_impulse *
+    vector3_dot(cc->cached_tangent_direction, cp->tangent_vector);
+```
+
+**File:** `collision_mechanics.c`, `contact_cache_save()`, `collision_prepare_solver()`
+
+**Verification:** Unit test: a sphere rolling on a flat surface maintains consistent velocity across frames (no energy injection from warm-start mismatch).
+
+### 2.4 — Fix Restitution Bias Computed Once
+
+**Problem:** Restitution bias is computed from the initial relative velocity at contact prep time. During solver iterations, other contacts change the velocity. The bias doesn't update.
+
+**Fix:** This is a known limitation of sequential impulse solvers. The fix is to recompute `vn_initial` at the start of each solver iteration for the restitution term. Alternatively, use a velocity threshold approach where restitution is only applied if the pre-solve approach velocity exceeds the threshold (which is already partially done). Document this as a known limitation and add a unit test that verifies multi-contact restitution doesn't produce energy gain.
+
+**Verification:** Unit test: two spheres dropped simultaneously onto a floor should not bounce higher than `e² * h`.
+
+### 2.5 — Fix Quaternion Integration (First-Order)
+
+**Problem:** `rb_integrate_position` uses first-order Euler for quaternion integration. For high angular velocities, orientation lags behind true rotation.
+
+**Fix:** Use exponential map (second-order):
+```c
+float angle = vector3_length(angular_velocity) * dt;
+if (angle > 1e-6f) {
+    vector3 axis = vector3_scaling(angular_velocity, 1.0f / (angle / dt));
+    vector4 dq = vector4_from_axis_with_angle(axis, angle);
+    rigid_body->orientation = vector4_normalisation(vector4_multiplication(dq, rigid_body->orientation));
+}
+```
+
+**File:** `rigidbody.c`, `rb_integrate_position()`
+
+**Verification:** Unit test: a body spinning at 30 rad/s for 1 second should have orientation matching the analytical solution within 0.1%.
+
+### 2.6 — Fix Sleep Decision Inside Position Integration
+
+**Problem:** A body can go to sleep in the middle of a physics step, after its position has been integrated but before other bodies have been processed. Wake-up only happens during narrowphase dispatch.
+
+**Fix:** Move sleep/wake decisions to a dedicated pass after all integration is complete:
+1. After all positions are integrated, iterate all bodies
+2. Update sleep timers
+3. Put bodies to sleep / wake them based on thresholds
+4. Wake bodies that are in contact with awake bodies
+
+**File:** `physics_world.c` (in the unified pipeline from Phase 1.2)
+
+**Verification:** Unit test: a sleeping body adjacent to a moving body wakes up within 1 tick.
+
+### 2.7 — Fix Angular Drag Hidden Multiplier
+
+**Problem:** `angular_damping_factor = powf(g_cfg.world.drag * 0.97f, fixed_physics_dt)` — the `0.97f` is not in config. The config says one thing, the engine does another.
+
+**Fix:** Remove the `0.97f` multiplier. Use `powf(g_cfg.world.drag, dt)` for both linear and angular damping. If different angular damping is desired, add a separate `world.angular_drag` config parameter.
+
+**File:** `simulation_physics_loop.c` (or `physics_world.c` after Phase 1.2)
+
+**Verification:** Config test: set `world.drag = 1.0`, verify zero damping on both linear and angular velocity.
+
+### 2.8 — Fix Nice Damping (Multiplicative Hack)
+
+**Problem:** `nice_value` applies a per-tick velocity multiplier. Not a force. Doesn't respect mass. Doesn't produce a reaction force.
+
+**Fix:** Convert to a drag force:
+```c
+if (rigid_body->nice_value > 0) {
+    float drag_coeff = 0.002f * (float)rigid_body->nice_value;
+    vector3 drag_force = vector3_scaling(rigid_body->velocity, -drag_coeff * rigid_body->mass);
+    rb_apply_forces_perfect(rigid_body, drag_force);
+}
+```
+
+**File:** `rigidbody.c`, `rb_integrate_velocity()`
+
+**Verification:** Unit test: a body with `nice_value = 19` decelerates at the same rate regardless of mass (force scales with mass, so acceleration is mass-independent).
+
+### 2.9 — Make Velocity Zeroing Thresholds Configurable
+
+**Problem:** `0.00005f` for linear and `0.0001f` for angular velocity zeroing are hardcoded.
+
+**Fix:** Add `solver.linear_sleep_thresh` and `solver.angular_sleep_thresh` to the config registry. Use them in `rb_integrate_velocity`.
+
+**File:** `rigidbody.c`, `mpe_config_schema.c`
+
+**Verification:** Config test: set thresholds to 0, verify no velocity zeroing occurs.
+
+### 2.10 — Fix Sphere-Cube Inside Case
+
+**Problem:** When the sphere center is inside the cube, the code picks the nearest face and pushes the sphere out along that face's normal. For a sphere near an edge or corner, this is wrong.
+
+**Fix:** For the inside case, compute the penetration depth along all 3 axes and use the axis with minimum penetration (same as the outside case but with sign correction):
+
+```c
+if (inside) {
+    // Find the axis with minimum penetration
+    float min_pen = minimum_distance; // already computed
+    // Push out along the nearest face normal
+    // This is actually correct for the inside case
+}
+```
+
+Actually, the current implementation IS correct for the inside case (nearest face escape). The issue is the penetration depth overestimation near edges. Add a note documenting this as a known limitation and add a unit test that verifies the inside case doesn't produce explosive forces.
+
+**Verification:** Unit test: sphere spawned inside a cube is pushed out without velocity exceeding 10 m/s.
+
+### 2.11 — Fix SAT Edge-Edge Parameter Clamping
+
+**Problem:** In `collision_dual_cube`, the edge-edge case computes closest points between two edge segments. The parameter clamping logic recomputes `t_b` after clamping `t_a`, but doesn't re-clamp `t_a` after recomputing `t_b`.
+
+**Fix:** After recomputing `t_b`, re-clamp `t_a`:
+```c
+if (cc > 0.000001f) {
+    t_b = (e + bb * t_a) / cc;
+    // clamp t_b...
+    // RE-CLAMP t_a:
+    if (aa > 0.000001f) {
+        t_a = (bb * t_b - d) / aa;
+        // clamp t_a again...
+    }
+}
+```
+
+Actually, looking at the code, it DOES re-clamp `t_a` after recomputing `t_b`. The issue is that it doesn't re-clamp `t_b` after the second `t_a` re-clamp. Add one more iteration of the alternating projection.
+
+**File:** `collision_mechanics.c`, `collision_dual_cube()`
+
+**Verification:** Unit test: two cubes in edge-edge contact at near-parallel angles produce stable contact points.
+
+### 2.12 — Implement Rolling Friction (PHYS-004)
+
+**Problem:** Only sliding friction exists. Spheres don't generate rolling resistance torque. A sphere on a flat surface rolls forever.
+
+**Fix:** Add rolling friction as a torque opposing angular velocity at the contact point:
+```c
+// In collision_resolve_iterative, after friction:
+float rolling_coeff = fminf(a->rolling_friction, b->rolling_friction);
+if (rolling_coeff > 0.0f) {
+    vector3 angular_vel_rel = vector3_subtraction(b->angular_velocity, a->angular_velocity);
+    float rolling_torque_mag = rolling_coeff * cp->accumulated_normal_impulse;
+    // Apply opposing torque about the contact normal
+}
+```
+
+Add `rolling_friction` field to `rigidbody` struct. Add config parameter `body_defaults.rolling_friction`.
+
+**Files:** `rigidbody.h`, `rigidbody.c`, `collision_mechanics.c`, `mpe_config_schema.c`
+
+**Verification:** Unit test: a sphere rolling on a flat surface decelerates and stops within 10 seconds.
+
+### 2.13 — Implement CCD (PHYS-002)
+
+**Problem:** Fast objects (spawner speed up to 500 m/s) can tunnel through thin geometry.
+
+**Fix:** Implement swept-sphere CCD as a first pass:
+1. Before narrowphase, check if any body's velocity * dt exceeds its bounding radius
+2. If so, perform a raycast along the velocity vector
+3. If the raycast hits, clamp the position to the contact point
+
+This is a simplified CCD. Full CCD (TOI computation) is deferred to v16.
+
+**File:** `physics_world.c` (in the unified pipeline)
+
+**Verification:** Unit test: a sphere at 100 m/s does not pass through a 0.1m-thick wall.
+
+### 2.14 — Implement Solver Islanding (PHYS-001)
+
+**Problem:** All manifolds solved in one global loop. Unrelated contacts interfere. Blocks parallel solving.
+
+**Fix:** After broadphase, build contact graphs. Identify connected components (islands). Solve each island independently. Sleeping bodies that are not connected to any awake body are skipped entirely.
+
+**File:** `physics_world.c`
+
+**Verification:** Unit test: two separate stacks of cubes (far apart) produce identical results when solved together vs. solved in separate worlds.
+
+---
+
+## Phase 3 — Scene & Persistence
+
+### 3.1 — Fix Scene Format (ARCH-006, SAVE-001 through SAVE-008)
+
+**Problem:** Raw binary struct dump. No joints saved. No stable IDs. No sleep state. No nice_value. No versioning flexibility. No endianness handling. No integrity check. fwrite return values unchecked.
+
+**Fix:** Design scene format v2:
+
+```
+Header:
+  magic (4 bytes): "MPE4"
+  version (4 bytes): 200
+  checksum (4 bytes): CRC32 of body+joint data
+  body_count (4 bytes)
+  joint_count (4 bytes)
+
+Per body:
+  type (4 bytes)
+  mass (4 bytes)
+  radius (4 bytes)
+  half_extensions (12 bytes)
+  cylinder_half_length (4 bytes)
+  position (12 bytes)
+  velocity (12 bytes)
+  angular_velocity (12 bytes)
+  orientation (16 bytes)
+  colour (12 bytes)
+  restitution (4 bytes)
+  friction_static (4 bytes)
+  friction_kinetic (4 bytes)
+  static_state (4 bytes)
+  object_id (4 bytes)
+  object_generation (4 bytes)
+  is_sleeping (4 bytes)
+  sleep_timer (4 bytes)
+  nice_value (4 bytes)
+
+Per joint:
+  type (4 bytes)
+  id_a (4 bytes)
+  id_b (4 bytes)
+  equilibrium_length (4 bytes)
+  spring_constant (4 bytes)
+  damping_coefficient (4 bytes)
+```
+
+All writes use explicit little-endian encoding. All reads validate the checksum.
+
+**Files:** `scene_saving.c`, `scene_load.c`
+
+**Verification:** Save/load round-trip test: save a scene with joints, sleeping bodies, and nice_value. Load it. Assert all values match.
+
+### 3.2 — Preserve Object IDs on Load (SAVE-002)
+
+**Problem:** `scene_load.c` calls `scene_allocate_object_id()` for every loaded body. External references break.
+
+**Fix:** Use the saved `object_id` directly. Only allocate a new ID if there's a collision with an existing ID.
+
+**Verification:** Unit test: save a scene, load it, assert all object IDs are identical.
+
+### 3.3 — Save Joints (SAVE-001)
+
+**Problem:** All spring joints lost on save/load.
+
+**Fix:** Included in scene format v2 (Phase 3.1).
+
+**Verification:** Save a scene with joints. Load it. Assert joints exist with correct parameters.
+
+### 3.4 — Save Sleep State (SAVE-003)
+
+**Problem:** All bodies load awake.
+
+**Fix:** Included in scene format v2 (Phase 3.1).
+
+**Verification:** Save a scene with sleeping bodies. Load it. Assert sleeping bodies are still sleeping.
+
+### 3.5 — Save nice_value (SAVE-004)
+
+**Problem:** Per-object damping lost on save/load.
+
+**Fix:** Included in scene format v2 (Phase 3.1).
+
+**Verification:** Save a scene with nice_value set. Load it. Assert nice_value is preserved.
+
+### 3.6 — Fix Spring Joint Index-Based Resolution
+
+**Problem:** `spring_joint.c` uses `scene_find_object_index_by_id` to resolve joints every tick. Linear scan. If an object is deleted, the joint is removed via `remove_joints_from_object_id`, but the `add_joint` function still takes indices.
+
+**Fix:** Change `add_joint` to take IDs directly (it already has `add_joint_by_ids`). Deprecate the index-based `add_joint`. Update `editor.c` to use `add_joint_by_ids`.
+
+**Verification:** Unit test: create a joint, delete one of the objects, assert the joint is removed.
+
+---
+
+## Phase 4 — Memory & Performance
+
+### 4.1 — Add Arena Allocator for Physics (QUAL-011)
+
+**Problem:** All allocations use raw `malloc`/`realloc`/`free`. The broadphase node pool uses `realloc` to grow. For a 60 Hz physics sim, this causes heap fragmentation.
+
+**Fix:** Create a simple frame allocator:
+```c
+typedef struct { char *buffer; size_t capacity; size_t offset; } arena_t;
+void *arena_alloc(arena_t *a, size_t size);
+void arena_reset(arena_t *a);
+```
+
+Use it for:
+- Broadphase pair buffer (reset each tick)
+- Manifold buffer (reset each tick)
+- Contact cache (reset each tick)
+
+**Verification:** Run the engine for 10 minutes. Verify no memory growth via `/proc/self/status` VmRSS.
+
+### 4.2 — Fix Broadphase Node Pool (PERF-006)
+
+**Problem:** `node_pool` in `broadphase.c` uses `malloc`/`realloc`.
+
+**Fix:** Pre-allocate a fixed-size pool at init time:
+```c
+static hash_node node_pool[mpe_max_bodies * 8];
+```
+
+Remove the `realloc` growth logic. If the pool is exhausted, count the overflow and skip (already done).
+
+**Verification:** No `malloc`/`realloc` calls in broadphase during runtime. Verify with `valgrind --tool=massif`.
+
+### 4.3 — Fix Contact Cache Linear Search (PERF-007)
+
+**Problem:** `collision_prepare_solver` does a linear scan of `contact_impulse_cache` (up to 65536 entries) for each contact point.
+
+**Fix:** Replace with a hash map keyed on `(object_id_a, object_id_b)`:
+```c
+typedef struct { uint64_t key; cached_contact value; } cache_entry;
+// Use open addressing with linear probing
+```
+
+**File:** `collision_mechanics.c`
+
+**Verification:** Performance test: 1000 bodies, measure time in `collision_prepare_solver`. Should decrease by >50%.
+
+### 4.4 — Fix Double Sanitize (PERF-011)
+
+**Problem:** `rigidbody_sanitize` is called twice per body per tick in the legacy path.
+
+**Fix:** Eliminated by Phase 1.2 (legacy path deleted). In the unified pipeline, sanitize once at the start of the tick.
+
+**Verification:** `grep -c "rigidbody_sanitize" physics_world.c` returns 1.
+
+### 4.5 — Fix Cell Size Recomputed Every Tick (PERF-005)
+
+**Problem:** `broadphase_update_cell_size()` iterates all objects every physics tick.
+
+**Fix:** Recompute cell size only when the object set changes (add/remove) or every N ticks (e.g., every 60 ticks):
+```c
+static int ticks_since_cell_update = 0;
+if (ticks_since_cell_update >= 60 || objects_changed) {
+    broadphase_update_cell_size(...);
+    ticks_since_cell_update = 0;
+}
+ticks_since_cell_update++;
+```
+
+**Verification:** Performance test: measure broadphase time with 1000 static bodies. Should be constant regardless of tick count.
+
+### 4.6 — Fix O(n²) Overlay String Building (PERF-010)
+
+**Problem:** `overlay_append_overflow_text` and `overlay_append_stats_text` use `strlen` + `snprintf` to append — rescans the buffer each time.
+
+**Fix:** Track the current write offset:
+```c
+size_t offset = strlen(buffer);
+snprintf(buffer + offset, buffer_size - offset, ...);
+```
+
+Actually, the code already does this. The issue is that `overlay_update()` calls `strlen(information_text_buffer)` multiple times. Cache the offset.
+
+**Verification:** Performance test: measure overlay update time with 1000 objects. Should be < 0.1ms.
+
+### 4.7 — Fix O(n) Raycast (PERF-012)
+
+**Problem:** `selector_ray_tracing` iterates all objects.
+
+**Fix:** Use the broadphase spatial hash to find candidate objects along the ray. Only test ray-OBB/ray-sphere against candidates.
+
+**Verification:** Performance test: measure raycast time with 1000 objects. Should be < 0.01ms.
+
+### 4.8 — Fix O(n) Spawn Overlap (PERF-013)
+
+**Problem:** `scene_resolve_spawn_overlap` iterates all objects for each new spawn.
+
+**Fix:** Use the broadphase to find nearby objects. Only test overlap against neighbors.
+
+**Verification:** Performance test: spawn 100 objects in a crowded scene. Total time should be O(n log n), not O(n²).
+
+### 4.9 — Fix Conditional Broadphase Rebuild (PERF-015)
+
+**Problem:** If boundary moved any object, `a3_positional_depenetration_pass` rebuilds the entire broadphase.
+
+**Fix:** Eliminated by Phase 1.5 (boundary teleporter deleted). In the unified pipeline, depenetration uses the existing broadphase pairs.
+
+### 4.10 — Enable -march=native (PERF-002)
+
+**Problem:** `ENABLE_NATIVE ?= 0` in makefile.
+
+**Fix:** Change to `ENABLE_NATIVE ?= 1`. Add a fallback for non-x86 platforms.
+
+**Verification:** `make` produces a binary with AVX2 instructions (verify with `objdump -d | grep ymm`).
+
+### 4.11 — Add Frustum Culling (PERF-003, REND-001)
+
+**Problem:** Every object gets a model matrix computed and uploaded every frame regardless of visibility.
+
+**Fix:** In `render_scene_current`, compute the camera frustum planes. Skip objects whose bounding sphere is outside the frustum.
+
+**Verification:** Performance test: render 1000 objects with camera facing away. Instance count should be ~0.
+
+### 4.12 — Add Dirty-Checking on Instance Packing (PERF-004, REND-002)
+
+**Problem:** The instance buffer packing loop recomputes all model matrices every frame.
+
+**Fix:** Add a `dirty` flag to each body. Set it when position/orientation changes. Only recompute the model matrix for dirty bodies. Cache the model matrix in the body struct.
+
+**Verification:** Performance test: 1000 sleeping objects. Only the camera should cause matrix recomputation.
+
+---
+
+## Phase 5 — UI / Input / Terminal
+
+### 5.1 — Fix Duplicate g_key_pressed (Bug 2)
+
+**Problem:** Two identical lines in `on_key_released`.
+
+**Status:** FIXED by MFS_161_DUP_FIX. Verify the fix is present.
+
+### 5.2 — Fix q_key_pressed Init (Bug 3)
+
+**Problem:** `q_key_pressed` not initialized in `initialize_input`.
+
+**Status:** FIXED by MFS_161_QKEY_FIX. Verify the fix is present.
+
+### 5.3 — Fix add_joint Return Check (Bug 12)
+
+**Problem:** `add_joint` return value unchecked in `editor.c`.
+
+**Status:** FIXED by MFS_166_JOINT_CHECK. Verify the fix is present.
+
+### 5.4 — Fix rb_get_kinetic_energy (Bug 13)
+
+**Problem:** Computes inverse-of-inverse.
+
+**Status:** FIXED by MFS_166_INERTIA_FIX. Verify the fix is present.
+
+### 5.5 — Fix MicroVim O(n²) File Loading (PERF-008)
+
+**Problem:** `mv_load_file` calls `mv_insert_line` for each line, which shifts all existing lines.
+
+**Fix:** Load all lines into a temporary array, then assign to `mv.lines` in one pass:
+```c
+char **temp_lines = malloc(line_count * sizeof(char*));
+// read all lines into temp_lines
+mv.lines = temp_lines;
+mv.line_count = line_count;
+mv.line_capacity = line_count;
+```
+
+**Verification:** Load a 1000-line file. Time should be < 1ms.
+
+### 5.6 — Fix MicroVim O(n) Undo (PERF-009)
+
+**Problem:** Every `mv_undo_push` deep-copies all lines.
+
+**Fix:** Use a copy-on-write approach: store only the changed line and its index, not the entire document. Or increase the undo depth limit and accept the memory cost (simpler).
+
+For simplicity, keep the current approach but limit the document size that triggers deep copies:
+```c
+if (mv.line_count > 500) {
+    // Only store the changed line, not the full document
+}
+```
+
+**Verification:** Edit a 1000-line file 10 times. Memory usage should not grow by more than 10 * (changed line size).
+
+### 5.7 — Fix Terminal Uptime (BUG-005)
+
+**Problem:** `cmd_uptime` uses a static `a3_term_start_time` initialized on first `uptime` invocation, not at engine boot.
+
+**Status:** FIXED (the code now initializes `term_engine_start_time` in `debug_terminal_open`). Verify.
+
+### 5.8 — Fix Terminal Capture Memory Leak (BUG-006)
+
+**Problem:** `term_capture_end()` sets `term_capturing = false` but never frees `term_capture_buffer`.
+
+**Status:** FIXED by FIX_030 (`term_capture_reset()` called in `on_terminal_window_destroy`). Verify.
+
+### 5.9 — Fix Terminal Sudo Flag Persistence (BUG-011)
+
+**Problem:** `cmd_sudo` sets `term_sudo_active = true`, calls `term_execute`, sets false. But if the executed command is `time <mutating cmd>`, the recursive `term_execute` inherits `sudo_active = true`.
+
+**Fix:** Save and restore the flag:
+```c
+bool saved_sudo = term_sudo_active;
+term_sudo_active = true;
+term_execute(sub_command);
+term_sudo_active = saved_sudo;
+```
+
+**Verification:** Run `sudo time rm 5` in game mode. The `rm` should succeed. Then run `rm 6` without sudo. It should fail.
+
+### 5.10 — Fix Terminal fsck Wake (BUG-012)
+
+**Problem:** `cmd_fsck -y` calls `rigidbody_sanitize()` on error bodies but doesn't call `rigidbody_wake()` afterward.
+
+**Status:** FIXED by FIX_032. Verify.
+
+### 5.11 — Replace Magic Integer Menu State Machine (ARCH-008)
+
+**Problem:** `spawner_menu_level == 3`, `velocity_menu_level == 21`, `object_menu_level == 85` — scattered across files. No named states, no FSM.
+
+**Fix:** Define enums:
+```c
+typedef enum { MENU_CLOSED, MENU_ROOT, MENU_SPHERE, MENU_SPHERE_MASS, ... } spawner_menu_state;
+typedef enum { OBJ_MENU_CLOSED, OBJ_MENU_ROOT, OBJ_MENU_MASS, ... } object_menu_state;
+```
+
+Replace all magic integers with enum values.
+
+**Files:** `input_control.h`, `input_control.c`, `editor.c`, `overlay.c`, `simulation_input_dispatch.c`
+
+**Verification:** Build passes. All menu navigation works identically.
+
+### 5.12 — Fix GTK Deprecation Warnings (QUAL-019)
+
+**Problem:** `gtk_dialog_run`, `gtk_container_add`, `gtk_box_pack_start`, `gtk_widget_show_all` are deprecated in GTK4.
+
+**Fix:** For GTK3 compatibility, suppress the warnings with pragmas:
+```c
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS
+// deprecated calls
+G_GNUC_END_IGNORE_DEPRECATIONS
+```
+
+For future GTK4 migration, replace with non-deprecated equivalents. Deferred to v16.
+
+**Verification:** `make` produces zero deprecation warnings.
+
+---
+
+## Phase 6 — Rendering
+
+### 6.1 — Fix Hardcoded Render Values (REND-004, REND-005, REND-006)
+
+**Problem:** Grid color `(0.3, 0.3, 0.3)`, wireframe color `(1.0, 1.0, 0.0)`, wireframe scale `1.01f` are hardcoded.
+
+**Fix:** Add to config:
+- `render.grid_color_r/g/b`
+- `render.wireframe_color_r/g/b`
+- `render.wireframe_scale`
+
+**Files:** `grid.c`, `wireframe.c`, `mpe_config_schema.c`
+
+### 6.2 — Unify Wireframe Uniform Caches (REND-007)
+
+**Problem:** Two separate uniform caches (`a3_wire_cached_program` and `a3_wire_missing_cached_program`).
+
+**Fix:** Merge into a single cache function that queries all uniforms at once.
+
+**File:** `wireframe.c`
+
+### 6.3 — Add Shader Hot-Reload (REND-008)
+
+**Problem:** Shader changes require engine restart.
+
+**Fix:** Add a `shader_reload()` function that recompiles all shaders. Call it from the terminal command `shader reload`.
+
+**File:** `shader_loading.c`, `debug_terminal.c`
+
+### 6.4 — Fix Render Init Magic Number (REND-009)
+
+**Problem:** `render_init_status` uses -1/0/1 instead of an enum.
+
+**Fix:** Already has a typedef enum `render_status`. Verify it's used consistently.
+
+### 6.5 — Fix Grid Always Rendered (REND-003)
+
+**Problem:** Grid draws even when camera looks away.
+
+**Fix:** Check if the grid plane intersects the frustum before drawing.
+
+**File:** `grid.c`
+
+---
+
+## Phase 7 — Build & Platform
+
+### 7.1 — Fix Makefile Source Discovery (BUILD-001)
+
+**Problem:** `SOURCES := $(shell find . -name '*.c')` is slow and fragile.
+
+**Fix:** Explicitly list sources:
+```makefile
+CORE_SOURCES := core/rigidbody.c core/physics_world.c ...
+PHYSICS_SOURCES := physics/collision_mechanics.c physics/broadphase.c ...
+SOURCES := $(CORE_SOURCES) $(PHYSICS_SOURCES) ...
+```
+
+**Verification:** `make` works. Adding a `.c` file that shouldn't be compiled doesn't break the build.
+
+### 7.2 — Add Debug/Release Targets (BUILD-002)
+
+**Problem:** Only one build configuration.
+
+**Fix:**
+```makefile
+debug: CFLAGS += -O0 -g -DDEBUG
+debug: engine
+
+release: CFLAGS += -O3 -DNDEBUG
+release: engine
+```
+
+### 7.3 — Add Install Target (BUILD-003)
+
+**Fix:**
+```makefile
+install: engine
+    install -m 755 engine /usr/local/bin/mpe-engine
+```
+
+### 7.4 — Fix compile Script Error Checking (BUILD-005)
+
+**Problem:** `make clean; make -j$(nproc);` doesn't check if make succeeded.
+
+**Fix:** Already has `set -e`. Verify.
+
+### 7.5 — Remove Tracked status/ Files (BUILD-006)
+
+**Problem:** `engine.cfg`, `engine.cfg.bak`, `engine.cfg.backup` are in the repo despite `.gitignore` saying `status/`.
+
+**Fix:** `git rm --cached status/engine.cfg status/engine.cfg.bak status/engine.cfg.backup`
+
+---
+
+## Phase 8 — Code Quality & Cleanup
+
+### 8.1 — Unify Naming (QUAL-001)
+
+**Problem:** Three naming generations: `a3_`, `MPE_TASK_XX_`, `MPE_TASK_V15R2_`, `MFS_`.
+
+**Fix:** Establish a naming convention:
+- Functions: `mpe_<module>_<action>` (e.g., `mpe_collision_prepare_solver`)
+- Types: `mpe_<name>_t` (e.g., `mpe_rigidbody_t`)
+- Constants: `MPE_<NAME>` (e.g., `MPE_MAX_BODIES`)
+- Macros: `MPE_<NAME>` (e.g., `MPE_PI`)
+
+Apply incrementally. Don't do a big-bang rename.
+
+### 8.2 — Add Unified Error Reporting (QUAL-006)
+
+**Problem:** Some functions return int, some bool, some -1. Errors go to `stderr` via `fprintf`.
+
+**Fix:** Use the existing `event_log_push` for all errors. Return a consistent error code:
+```c
+typedef enum { MPE_OK = 0, MPE_ERR_INVALID = -1, MPE_ERR_FULL = -2, MPE_ERR_IO = -3 } mpe_error;
+```
+
+### 8.3 — Fix Fixed Buffers (QUAL-015)
+
+**Problem:** `overlay.c` uses `char [512]` and `char [1024]`. Could overflow with many objects.
+
+**Fix:** Increase to 4096 or use dynamic allocation.
+
+### 8.4 — Fix Config Menu Fixed Array (QUAL-020)
+
+**Problem:** `config_menu.c` uses `static const mpe_param *category_params[64]`.
+
+**Fix:** Use `g_registry_count` as the array size, or allocate dynamically.
+
+### 8.5 — Split God Files (ARCH-003, ARCH-004)
+
+**Problem:** `debug_terminal.c` is 146KB. `collision_mechanics.c` is 59KB.
+
+**Fix:**
+- `debug_terminal.c` → split by command phase into `terminal_core.c`, `terminal_commands_fs.c`, `terminal_commands_net.c`, etc.
+- `collision_mechanics.c` → split into `narrowphase.c`, `solver.c`, `contact_cache.c`
+
+**Verification:** No file exceeds 2000 lines.
+
+### 8.6 — Fix Config Registry Compile-Time Coupling (ARCH-010)
+
+**Problem:** `mpe_config_schema.c` uses `&g_cfg.world.gravity` directly in the static array. Any struct layout change silently breaks the registry.
+
+**Fix:** Use an init function that resolves pointers at runtime:
+```c
+void mpe_config_schema_init(void) {
+    registry[0].storage = &g_cfg.world.gravity;
+    // ...
+}
+```
+
+### 8.7 — Fix Wayland Mouse Lock (PLAT-001, PLAT-002)
+
+**Problem:** Mouse lock doesn't work under Wayland. Engine forces X11.
+
+**Fix:** For GTK3, use `gdk_seat_grab` which works on both X11 and Wayland. Remove the `g_setenv("GDK_BACKEND", "x11", TRUE)` call.
+
+**Verification:** Run under Wayland. Mouse lock works.
+
+### 8.8 — Fix Terminal Alias Table Cap (QUAL-018)
+
+**Problem:** `term_alias_max` is 32. No dynamic growth.
+
+**Fix:** Increase to 128 or use dynamic allocation.
+
+### 8.9 — Fix MicroVim File Whitelist (QUAL-017)
+
+**Problem:** `mv_known_files[]` lists 32 files with relative paths from `src/`. Breaks if working directory changes.
+
+**Fix:** Use paths relative to the executable's directory. Determine the executable's directory at startup via `/proc/self/exe`.
+
+---
+
+## Phase 9 — Dependency Graph & Execution Order
+
+```
+Phase 0 (Tests) ─────────────────────────────────────────────────────┐
+    │                                                                 │
+    ▼                                                                 │
+Phase 1 (Architecture) ──────────────────────────────────────────────┤
+    │  1.1 Global state                                               │
+    │  1.2 Kill legacy pipeline                                       │
+    │  1.3 Kill sleep staticize (auto by 1.2)                         │
+    │  1.4 Kill floor proxy (auto by 1.2)                             │
+    │  1.5 Kill boundary teleporter (auto by 1.2)                     │
+    │  1.6 Reduce include bloat                                       │
+    ▼                                                                 │
+Phase 2 (Physics) ───────────────────────────────────────────────────┤
+    │  2.1-2.14 (can be parallelized after 1.2)                       │
+    ▼                                                                 │
+Phase 3 (Scene) ─────────────────────────────────────────────────────┤
+    │  3.1-3.6                                                        │
+    ▼                                                                 │
+Phase 4 (Performance) ───────────────────────────────────────────────┤
+    │  4.1-4.12 (can be parallelized)                                 │
+    ▼                                                                 │
+Phase 5 (UI/Terminal) ───────────────────────────────────────────────┤
+    │  5.1-5.12 (mostly independent)                                  │
+    ▼                                                                 │
+Phase 6 (Rendering) ─────────────────────────────────────────────────┤
+    │  6.1-6.5                                                        │
+    ▼                                                                 │
+Phase 7 (Build) ─────────────────────────────────────────────────────┤
+    │  7.1-7.5                                                        │
+    ▼                                                                 │
+Phase 8 (Cleanup) ───────────────────────────────────────────────────┘
+    8.1-8.9
+```
+
+**Critical path:** Phase 0 → Phase 1 → Phase 2 → Phase 3
+
+**Parallelizable after Phase 1:** Phases 4, 5, 6, 7, 8 can all proceed independently.
+
+---
+
+## Total Bug Count
+
+| Category | Count |
+|---|---|
+| Architecture | 6 |
+| Physics correctness | 14 |
+| Scene/persistence | 6 |
+| Memory/performance | 12 |
+| UI/input/terminal | 12 |
+| Rendering | 5 |
+| Build/platform | 7 |
+| Code quality | 9 |
+| **Total** | **71** |
+
+---
+
+## Success Criteria
+
+The kernel is "bug-free" when:
+
+1. `make unit_tests` passes with zero failures
+2. `make test_kernel_stability` passes headlessly
+3. `grep -r "obj_per_scene" src/` returns zero hits outside the struct definition
+4. No `simulation_physics_loop.c` exists
+5. No `collision_static_plane_body_proxy` exists
+6. No `boundary_apply_box` exists
+7. Scene save/load round-trip preserves all state (joints, IDs, sleep, nice_value)
+8. No `malloc`/`realloc` calls during physics tick (all pre-allocated)
+9. `make` produces zero warnings with `-Wall -Wextra -Werror`
+10. F5–F11 all pass under ASan+UBSan with zero reports
