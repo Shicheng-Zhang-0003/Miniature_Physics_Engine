@@ -208,3 +208,12 @@ config/mpe_config.c config/mpe_config_schema.c
 test_cylinder_cylinder: $(CYL_CYL_SOURCES)
 	$(CC) $(CFLAGS) -DMFS_CYL_CYL_TEST $(CYL_CYL_SOURCES) -lm -o test_cylinder_cylinder
 	./test_cylinder_cylinder
+
+# LIST4 NEW-01: tipped cylinder floor regression test
+LIST4_CYLINDER_FLOOR_SOURCES := tests/list4_cylinder_floor_test.c core/physics_world.c core/rigidbody.c \
+    physics/collision_mechanics.c physics/broadphase.c physics/constraint.c physics/revolute_joint.c \
+    config/mpe_config.c config/mpe_config_schema.c
+
+test_list4_cylinder_floor: $(LIST4_CYLINDER_FLOOR_SOURCES)
+	$(CC) $(CFLAGS) -DLIST4_CYLINDER_FLOOR_TEST $(LIST4_CYLINDER_FLOOR_SOURCES) -lm -o test_list4_cylinder_floor
+	./test_list4_cylinder_floor
