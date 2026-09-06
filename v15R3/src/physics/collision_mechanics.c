@@ -882,38 +882,38 @@ void collision_prepare_solver(collision_data *source, collision_data *m) {
 
         vector3 rel_vel_tangent = vector3_subtraction(rel_vel, vector3_scaling(m->normal_vector, vn_initial));
         float tangent_speed = vector3_length(rel_vel_tangent);
-        
+
         /* MFS_MECANUM_FRICTION: for mecanum wheels, use roller-based tangent direction */
         bool mecanum_tangent_set = false;
         rigidbody *mecanum_wheel = NULL;
-        
+
         if (m->object_a && m->object_a->is_mecanum) {
             mecanum_wheel = m->object_a;
         } else if (m->object_b && m->object_b->is_mecanum) {
             mecanum_wheel = m->object_b;
         }
-        
+
         if (mecanum_wheel && mecanum_wheel->type == object_cylinder) {
             /* Compute roller's free-slide direction in world space.
              * Roller angle is measured from the axle (local X axis).
              * For a wheel resting on the floor (y=0 plane), the roller direction
              * projected onto the floor plane determines the free-slide direction.
              * Friction grips perpendicular to that direction. */
-            
+
             /* Get wheel's local axes in world space */
             vector3 axle_world = mecanum_wheel->cached_axes[0]; /* local X = axle */
-            
+
             /* Compute roller direction: rotate axle by roller_angle around the wheel's local Y axis
              * (which points along the wheel's radius at the contact point).
              * For simplicity, assume the wheel is upright (axle horizontal).
              * The roller direction in the contact plane is perpendicular to the grip direction. */
-            
+
             /* Floor normal is (0, 1, 0) or (0, -1, 0) depending on convention */
             vector3 floor_normal = m->normal_vector;
             if (vector3_length_squared(floor_normal) < 0.0001f) {
                 floor_normal = (vector3){0.0f, 1.0f, 0.0f};
             }
-            
+
             /* Project axle onto floor plane */
             vector3 axle_proj = vector3_subtraction(
                 axle_world,
@@ -922,7 +922,7 @@ void collision_prepare_solver(collision_data *source, collision_data *m) {
             float axle_proj_len = vector3_length(axle_proj);
             if (axle_proj_len > 0.0001f) {
                 axle_proj = vector3_scaling(axle_proj, 1.0f / axle_proj_len);
-                
+
                 /* Roller direction is at roller_angle from axle, in the wheel's tangent plane.
                  * For a mecanum wheel on the floor, the roller's free direction is:
                  * cos(angle) * axle_proj + sin(angle) * (floor_normal × axle_proj)
@@ -934,7 +934,7 @@ void collision_prepare_solver(collision_data *source, collision_data *m) {
                     vector3_scaling(axle_proj, cos_a),
                     vector3_scaling(perp, sin_a)
                 );
-                
+
                 /* Grip direction is perpendicular to roller_free, still in the floor plane */
                 vector3 grip_dir = vector3_cross(floor_normal, roller_free);
 
@@ -960,7 +960,7 @@ void collision_prepare_solver(collision_data *source, collision_data *m) {
 
 
         }
-        
+
         if (mecanum_tangent_set || tangent_speed > 0.0001f) {
             if (!mecanum_tangent_set) {
                 cp->tangent_vector = vector3_scaling(rel_vel_tangent, -1.0f / tangent_speed);
@@ -1143,36 +1143,140 @@ void contact_cache_clear(struct physics_world *world) {
  * like a sphere of radius r; an endpoint below the plane yields a contact.
  * Two contacts (one per axle end) give a stable resting wheel.
  * Normal matches the sphere-floor convention: (0,-1,0). */
+/* LIST4 NEW-01: robust cylinder/static-plane contact.
+ *
+ * The old version only tested the two axle endpoints as if they were
+ * sphere centres. That misses the true lowest point when the cylinder
+ * is tipped, and can allow a cylinder to fall through the floor.
+ *
+ * This version computes the actual lowest support point of the cylinder
+ * against a horizontal plane. For near-horizontal axles it generates two
+ * contacts at the axle ends for stacking/resting stability. For tilted or
+ * vertical axles it generates the correct single support contact.
+ */
 bool collision_static_plane_cylinder(rigidbody *cyl, float plane_y, collision_data *collision_output_data) {
-    if (cyl->type != object_cylinder) {return false;}
-    vector3 axis = cyl->cached_axes[0]; /* axle = local X in world space */
+    if (cyl->type != object_cylinder) {
+        return false;
+    }
+
     float r = cyl->radius;
     float h = cyl->cylinder_half_length;
-    vector3 axle_offset = vector3_scaling(axis, h);
-    vector3 e1 = vector3_subtraction(cyl->position, axle_offset);
-    vector3 e2 = vector3_addition(cyl->position, axle_offset);
+
+    if ((r <= 0.0f) || (h <= 0.0f) || (!isfinite(r)) || (!isfinite(h))) {
+        return false;
+    }
+
+    vector3 axis = cyl->cached_axes[0];
+    float axis_len_sq = vector3_length_squared(axis);
+
+    if (axis_len_sq < 1e-8f) {
+        axis = (vector3){1.0f, 0.0f, 0.0f};
+        axis_len_sq = 1.0f;
+    }
+
+    axis = vector3_scaling(axis, 1.0f / sqrtf(axis_len_sq));
+
+    float ay = axis.y;
+    if (ay > 1.0f) {
+        ay = 1.0f;
+    }
+    if (ay < -1.0f) {
+        ay = -1.0f;
+    }
+
+    /*
+     * For a cylinder against a horizontal plane:
+     *
+     * vertical half-extent =
+     *     r * sqrt(1 - axis.y^2)
+     *   + h * fabs(axis.y)
+     *
+     * The first term is the barrel contribution.
+     * The second term is the end-cap/axle contribution.
+     */
+    float horizontal = sqrtf(fmaxf(0.0f, 1.0f - ay * ay));
+
+    /*
+     * Radial offset to the lowest barrel point.
+     * The plane normal is up, so the downward direction is (0,-1,0).
+     * Remove the component parallel to the axle.
+     */
+    vector3 down = {0.0f, -1.0f, 0.0f};
+    float down_along_axis = vector3_dot(down, axis);
+    vector3 radial = vector3_subtraction(down, vector3_scaling(axis, down_along_axis));
+    float radial_len = vector3_length(radial);
+
+    if (radial_len > 1e-6f) {
+        radial = vector3_scaling(radial, r / radial_len);
+    } else {
+        radial = vector3_zero();
+    }
+
     rigidbody *plane_body = collision_static_plane_body_proxy(plane_y);
+
     collision_output_data->object_a = cyl;
     collision_output_data->object_b = plane_body;
     collision_output_data->normal_vector = (vector3){0.0f, -1.0f, 0.0f};
     collision_output_data->contact_count = 0;
-    float pen1 = plane_y - (e1.y - r);
-    if ((pen1 > 0.0f) && (collision_output_data->contact_count < 2)) {
-        contact_point_data *cp = &collision_output_data->contacts[collision_output_data->contact_count];
-        cp->position = (vector3){e1.x, e1.y - r, e1.z};
-        cp->penetration = pen1;
-        collision_output_data->contact_count++;
+
+    /*
+     * Near-horizontal axle:
+     * generate two contacts at the axle ends for stability.
+     * This is the normal FTC wheel case.
+     */
+    if (fabsf(ay) < 0.35f) {
+        float axle_offsets[2] = {-h, h};
+
+        for (int i = 0; i < 2; i++) {
+            vector3 end_center =
+                vector3_addition(cyl->position, vector3_scaling(axis, axle_offsets[i]));
+
+            vector3 contact_point = vector3_addition(end_center, radial);
+            float local_penetration = plane_y - contact_point.y;
+
+            if ((local_penetration > 0.0f) && (collision_output_data->contact_count < 2)) {
+                contact_point_data *cp =
+                    &collision_output_data->contacts[collision_output_data->contact_count];
+                cp->position = contact_point;
+                cp->penetration = local_penetration;
+                collision_output_data->contact_count++;
+            }
+        }
     }
-    float pen2 = plane_y - (e2.y - r);
-    if ((pen2 > 0.0f) && (collision_output_data->contact_count < 2)) {
-        contact_point_data *cp = &collision_output_data->contacts[collision_output_data->contact_count];
-        cp->position = (vector3){e2.x, e2.y - r, e2.z};
-        cp->penetration = pen2;
-        collision_output_data->contact_count++;
+
+    /*
+     * Tilted or vertical axle:
+     * generate the single true support contact.
+     */
+    if (collision_output_data->contact_count == 0) {
+        float axle_offset = (ay >= 0.0f) ? -h : h;
+
+        vector3 contact_point = vector3_addition(
+            vector3_addition(cyl->position, vector3_scaling(axis, axle_offset)),
+            radial);
+
+        float local_penetration = plane_y - contact_point.y;
+
+        /*
+         * Fallback safety:
+         * if numerical error makes the direct contact miss, use the
+         * analytical lowest height.
+         */
+        if (local_penetration <= 0.0f) {
+            float lowest_offset = (r * horizontal) + (h * fabsf(ay));
+            local_penetration = plane_y - (cyl->position.y - lowest_offset);
+        }
+
+        if (local_penetration > 0.0f) {
+            contact_point_data *cp = &collision_output_data->contacts[0];
+            cp->position = contact_point;
+            cp->penetration = local_penetration;
+            collision_output_data->contact_count = 1;
+        }
     }
+
     return collision_output_data->contact_count > 0;
 }
-
 /* ================================================================
  * MFS_172: Cylinder-vs-object narrowphase
  * ================================================================ */
