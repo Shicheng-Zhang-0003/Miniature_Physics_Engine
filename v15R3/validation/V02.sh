@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # V-02: make clean + make; verify binary; summarize compiler warnings.
 set -uo pipefail
-SRC="v15R2/src"
+SRC="v15R3/src"
 [[ -d "$SRC" ]] || { echo "ERROR: $SRC not found." >&2; exit 1; }
 
 echo "=== V-02: Clean build + warning review ==="
