@@ -1,0 +1,348 @@
+# Full Mathematical & Physics Deep Audit — Issues NOT Covered by the Three Lists
+
+I went line-by-line through every physics, math, collision, solver, joint, motor, and drivetrain function in the codebase. Below are **15 distinct defects** that none of your three lists catch.
+
+---
+
+## CRITICAL — Will Produce Wrong Physics
+
+### NEW-01: Cylinder floor collision only checks axle endpoints — a tipped wheel falls through the ground
+
+**File:** `collision_mechanics.c`, `collision_static_plane_cylinder()`
+
+```c
+vector3 e1 = vector3_subtraction(cyl->position, axle_offset);
+vector3 e2 = vector3_addition(cyl->position, axle_offset);
+float pen1 = plane_y - (e1.y - r);
+float pen2 = plane_y - (e2.y - r);
+```
+
+This only tests the **two axle endpoints** against the floor. It never tests the **barrel surface**. If a cylinder's axle is horizontal (the wheel has tipped over), both axle endpoints are at the same height as the center, and neither penetrates the floor. The barrel is resting on the ground but the function returns `false`. The cylinder falls through.
+
+**Proof:** A cylinder with axle along X, center at y=0.05, radius 0.05. e1.y = e2.y = 0.05. pen = 0.0 - (0.05 - 0.05) = 0.0. No contact detected. The cylinder accelerates downward under gravity and is gone.
+
+**Fix:** Add a barrel-surface test. Project the cylinder center onto the floor plane. If `center.y - r < plane_y`, generate a contact at the projected point with normal (0,1,0). This handles the lying-on-side case.
+
+---
+
+### NEW-02: Cylinder-cube collision normal points from OBB surface to cylinder CENTER, not to the closest axle point
+
+**File:** `collision_mechanics.c`, `collision_cylinder_cube()`
+
+```c
+out->normal_vector = vector3_scaling(
+    vector3_subtraction(cyl->position, best_on_obb),
+    1.0f / vector3_length(vector3_subtraction(cyl->position, best_on_obb)));
+```
+
+The normal is computed from the closest OBB surface point to the **cylinder center**. But the contact happens at the closest point on the **axle segment**, which can be offset from the center by up to `cylinder_half_length` along the axle. The normal direction is wrong by up to `atan(half_length / distance)` radians. For a wheel (r=0.05, h=0.02) this is small. For longer cylinders it produces visibly wrong bounce directions.
+
+**Fix:** Compute the normal from `best_on_obb` to the closest axle sample point `pt`, not to `cyl->position`.
+
+---
+
+### NEW-03: Cylinder-cube collision uses 5 axle samples — contacts between samples are missed
+
+**File:** `collision_mechanics.c`, `collision_cylinder_cube()`
+
+```c
+const int SAMPLES = 5;
+```
+
+Five samples along the axle means four gaps. A cube edge that falls between two samples produces no contact. For a wheel this is marginal. For any cylinder longer than ~0.1m it is a tunneling hazard. The function also does not test the circular end caps of the cylinder, only the axle line.
+
+---
+
+### NEW-04: Odometry integrates world-space velocity without rotating into the robot frame
+
+**File:** `drivetrain.c`, the MFS_171 block
+
+```c
+robot->odom_x += chassis_vel.x * dt;
+robot->odom_z += chassis_vel.z * dt;
+```
+
+This integrates **world-space** velocity components directly. Real odometry integrates **body-frame** velocity rotated by the current heading. When the robot turns 90°, the world X velocity becomes the robot's forward velocity, but the code still accumulates it into `odom_x`. The heading `odom_theta` is tracked but never used to rotate the velocity before integration.
+
+**Correct formula:**
+```c
+float cos_t = cosf(robot->odom_theta);
+float sin_t = sinf(robot->odom_theta);
+float v_fwd = chassis_vel.x * cos_t + chassis_vel.z * sin_t;
+float v_str = -chassis_vel.x * sin_t + chassis_vel.z * cos_t;
+robot->odom_x += v_fwd * dt;
+robot->odom_z += v_str * dt;
+```
+
+Without this, the odometry diverges from physics every time the robot turns. For a training simulator this teaches the grade 9s wrong intuition.
+
+---
+
+### NEW-05: Artificial lateral damping in drivetrain is a physics lie that masks a solver deficiency
+
+**File:** `drivetrain.c`
+
+```c
+/* MFS_132_DAMPING_TRUTH: PHYSICS LIE — artificial lateral damping */
+chassis->force_accumulator = vector3_subtraction(
+    chassis->force_accumulator,
+    vector3_scaling(lat, m * 1.0f));
+```
+
+The code literally labels itself a lie. It applies a velocity-proportional force opposing all horizontal chassis motion, every tick, regardless of what the wheels are doing. This means:
+- The robot cannot coast (the damping kills velocity even when it should roll freely)
+- Collision impulses on the chassis are immediately damped away
+- The damping coefficient (1.0 × mass) has no physical derivation
+
+The root cause is that the contact solver does not produce enough lateral friction through the wheels to prevent sliding. The correct fix is to increase the friction coefficient or add anisotropic friction at the wheel contacts, not to apply a chassis-level cheat force.
+
+---
+
+## HIGH — Produces Measurable Error
+
+### NEW-06: Revolute joint solver applies point-to-point and axis constraints sequentially without iteration
+
+**File:** `revolute_joint.c`, `revolute_solve()`
+
+The function solves the 3-DOF point constraint, then solves the 2-DOF axis constraint, in a single pass. The axis correction changes angular velocities, which violates the point constraint. The point constraint was already solved and is not revisited. Over many ticks, the anchor drifts.
+
+The Baumgarte bias on the point constraint partially compensates, but the axis correction has its own Baumgarte term that fights the point correction. The two corrections oscillate against each other.
+
+**Fix:** Either iterate the two constraints 2-3 times per tick, or combine them into a single 5×5 effective mass matrix and solve simultaneously.
+
+---
+
+### NEW-07: Revolute axis drift correction is applied to BOTH bodies including the reference chassis
+
+**File:** `revolute_joint.c`, the MFS_REVOLUTE_AXIS_DRIFT_FIX block
+
+```c
+if (!body_a->static_state) {
+    body_a->angular_velocity = vector3_subtraction(
+        body_a->angular_velocity,
+        math3_multiplication_vector3(body_a->inverse_inertia_system, axis_impulse));
+}
+```
+
+The chassis (body_a) receives an angular impulse to correct axis drift. But the chassis is the reference body — its orientation defines the vehicle heading. Correcting the chassis orientation to match the wheel axis means the **entire robot rotates** to accommodate wheel tilt. This produces the erratic heading drift that the fix was trying to prevent.
+
+**Fix:** Only apply the axis correction to body_b (the wheel). The chassis should be treated as the kinematic reference.
+
+---
+
+### NEW-08: Mecanum friction tangent assumes the contact normal is the floor normal
+
+**File:** `collision_mechanics.c`, `collision_prepare_solver()`, the mecanum tangent block
+
+```c
+vector3 floor_normal = m->normal_vector;
+// ...
+vector3 perp = vector3_cross(floor_normal, axle_proj);
+vector3 grip_dir = vector3_cross(floor_normal, roller_free);
+```
+
+The code uses the **contact normal** as if it were the floor normal. If the mecanum wheel contacts a wall, a game element, or another robot, the contact normal is not (0,1,0). The roller free direction and grip direction are computed relative to a surface that isn't the floor. The resulting friction tangent is wrong.
+
+**Fix:** Only apply the mecanum tangent override when the contact normal is approximately vertical (dot with (0,1,0) > 0.9). For non-floor contacts, fall through to the standard tangent computation.
+
+---
+
+### NEW-09: Mecanum friction tangent assumes the wheel is upright
+
+The roller direction computation projects the axle onto the contact plane:
+
+```c
+vector3 axle_proj = vector3_subtraction(
+    axle_world,
+    vector3_scaling(floor_normal, vector3_dot(axle_world, floor_normal)));
+```
+
+If the wheel tilts (which the revolute joint allows), the axle is no longer horizontal. The projection still works mathematically, but the roller angle is defined relative to the **upright** axle. A tilted wheel has a different effective roller angle. The code does not account for this.
+
+---
+
+### NEW-10: Spring joint damping uses pre-force velocity — one step behind
+
+**File:** `spring_joint.c`, `apply_force_all_joints()`
+
+```c
+vector3 relative_velocity = vector3_subtraction(rigid_body_b->velocity, rigid_body_a->velocity);
+float velocity_along_spring_axis = vector3_dot(relative_velocity, spring_axis_direction);
+vector3 damping_force = vector3_scaling(spring_axis_direction,
+    current_spring_joint->damping_coefficient * velocity_along_spring_axis);
+```
+
+The damping force is computed from the velocity **before** the spring force is applied. For a stiff spring (k=100), the spring force changes the velocity significantly within one tick. The damping force is computed from the old velocity, so it either over-damps or under-damps. For very stiff springs this causes oscillation.
+
+**Fix:** Apply the spring force first, then compute damping from the updated velocity. Or use implicit damping: `F_damp = -c * (v + F_spring * dt / m)`.
+
+---
+
+### NEW-11: Spring joint force clamping is applied to the NET force, not to spring and damping independently
+
+**File:** `spring_joint.c`
+
+```c
+vector3 net_joint_force = vector3_addition(restoration_force, damping_force);
+// ...
+if (a3_force_length > a3_max_joint_force) {
+    net_joint_force = vector3_scaling(net_joint_force, a3_max_joint_force / a3_force_length);
+}
+```
+
+If the spring force is at the clamp limit and the damping force opposes it, the net force is below the limit and the damping reduces the effective spring force. If they align, the net exceeds the limit and both are scaled down. The spring and damping should be clamped independently.
+
+---
+
+## MEDIUM — Subtle Accuracy Issues
+
+### NEW-12: Contact cache local-position matching fails for rotating bodies
+
+**File:** `collision_mechanics.c`, `collision_prepare_solver()`
+
+```c
+cp->local_position_a = collision_world_offset_to_body_local(m->object_a, cp->ra);
+```
+
+The cache stores contact positions in body-local space. Between frames, if the body rotates, the same world-space contact point maps to a different local position. The cache match distance check (`dist_sq < warm_start_match_dist_sq`) fails, and warm-start is lost. For spinning cylinders (wheels), this means warm-start fails every frame, causing jitter.
+
+**Fix:** Store the world-space contact position and the body's orientation at cache time. On match, rotate the cached local position by the orientation delta before comparing.
+
+---
+
+### NEW-13: Idle hold Coulomb friction constant has no physical derivation
+
+**File:** `drivetrain.c`
+
+```c
+float mfs_coulomb = 2.0f;
+```
+
+This 2.0 N constant is supposed to represent gearbox back-drive friction. Real back-drive friction depends on gear ratio, gear efficiency, and motor cogging torque. For a 5203-30 motor, the back-drive friction is approximately `stall_torque / gear_ratio × (1 - efficiency)` ≈ 2.55/30 × 0.15 ≈ 0.013 N·m at the motor shaft, which is 0.013 × 30 = 0.38 N·m at the wheel, or about 0.38/0.05 = 7.6 N of force per wheel. The hardcoded 2.0 N is in the right ballpark but is not derived from the motor model. It should be computed from the motor preset.
+
+---
+
+### NEW-14: The inertia tensor is rotated to world space one tick behind during collision solving
+
+**File:** `rigidbody.c`, `rb_integrate_velocity()`
+
+The inertia tensor is rotated to world space at the start of velocity integration:
+
+```c
+math3 rotation_matrix_current = vector4_to_math3(rigid_body->orientation);
+rigid_body->inverse_inertia_system = math3_multiplication(rotation_matrix_current, ...);
+```
+
+This uses the orientation from the **previous** tick. The solver then uses this inertia to compute collision impulses. The orientation is not updated until `rb_integrate_position()`, which runs after the solver. So the inertia tensor used during collision solving is always one tick stale.
+
+For slow rotations this is negligible. For fast-spinning bodies (wheels at 200+ rad/s), the inertia tensor direction lags by `ω × dt` radians per tick, which at 60 Hz and 200 rad/s is 3.3° per tick. This produces a small but systematic error in the collision response.
+
+---
+
+### NEW-15: The motor model does not separately model gear efficiency
+
+**File:** `motor.c`, `motor_update()`
+
+```c
+m->torque = m->kt * m->current * m->efficiency;
+m->output_torque = m->torque * m->gear_ratio;
+```
+
+The efficiency is applied at the motor shaft. But gear trains have their own efficiency loss, which compounds with gear ratio. A 30:1 gearbox with 85% motor efficiency and 90% gear efficiency should produce:
+
+`output_torque = kt × I × 0.85 × 30 × 0.90`
+
+The code produces:
+
+`output_torque = kt × I × 0.85 × 30`
+
+The gear efficiency (0.90) is missing. For a 71:1 gearbox this error compounds further.
+
+---
+
+## Summary Table
+
+| ID | Severity | File | Issue |
+|---|---|---|---|
+| NEW-01 | **CRITICAL** | collision_mechanics.c | Cylinder floor collision misses barrel surface — tipped wheel falls through |
+| NEW-02 | **CRITICAL** | collision_mechanics.c | Cylinder-cube normal points to center, not closest axle point |
+| NEW-03 | HIGH | collision_mechanics.c | Cylinder-cube uses 5 samples — contacts between samples missed |
+| NEW-04 | HIGH | drivetrain.c | Odometry integrates world velocity without heading rotation |
+| NEW-05 | HIGH | drivetrain.c | Artificial lateral damping labeled "PHYSICS LIE" |
+| NEW-06 | HIGH | revolute_joint.c | Point and axis constraints solved sequentially, no iteration |
+| NEW-07 | HIGH | revolute_joint.c | Axis drift correction applied to chassis (reference body) |
+| NEW-08 | HIGH | collision_mechanics.c | Mecanum tangent assumes floor contact |
+| NEW-09 | MEDIUM | collision_mechanics.c | Mecanum tangent assumes upright wheel |
+| NEW-10 | MEDIUM | spring_joint.c | Damping uses pre-force velocity |
+| NEW-11 | MEDIUM | spring_joint.c | Force clamp on net, not independent |
+| NEW-12 | MEDIUM | collision_mechanics.c | Cache local-position matching fails for rotating bodies |
+| NEW-13 | MEDIUM | drivetrain.c | Coulomb constant not derived from motor model |
+| NEW-14 | LOW | rigidbody.c | Inertia tensor one tick stale during solving |
+| NEW-15 | LOW | motor.c | Gear efficiency not modeled separately |
+
+---
+
+# The Plan: Eliminate Legacy, Build the Engine
+
+Given that your teacher needs this working for grade 9 training, here is the execution order that eliminates the legacy path while building the new engine in layers that are testable at every step.
+
+## Phase 0: Stop the bleeding (1 week)
+
+Fix NEW-01 immediately. A tipped wheel falling through the floor will destroy the training experience. Fix NEW-04 (odometry heading rotation) because the grade 9s will be reading odometry values. Fix NEW-05 by removing the artificial damping and increasing wheel friction instead.
+
+## Phase 1: Kill the legacy pipeline (2 weeks)
+
+The legacy path (`simulation_physics_loop.c`) and the encapsulated path (`physics_world.c`) must become one. The steps:
+
+1. Add wake-on-contact to `physics_world_step()` (mirror the legacy logic, fixes R3-06)
+2. Add static wall bodies to `physics_world` (fixes R3-07)
+3. Move the GUI scene into a `physics_world` instance
+4. Delete `simulation_physics_loop.c`, `boundary.c`, the floor proxy
+5. The renderer reads body positions from the `physics_world`
+
+This eliminates the sleep staticize hack, the floor proxy, the boundary teleporter, and the dual-maintenance problem in one stroke. Every fix after this only needs to be made once.
+
+## Phase 2: Kill global state (2 weeks)
+
+Replace `obj_per_scene`, `object_count`, `main_inputs`, `main_camera_fov`, `selected_object`, `main_timer` with a single `engine_state` struct. Pass it by pointer. This is the prerequisite for unit testing, multi-world, and the v16 module split.
+
+## Phase 3: Fix the physics (3 weeks)
+
+Work through the combined list: the 71 items from the_list_2, the 15 items from the_list_3, and the 15 items above. Priority order:
+
+1. Two-tangent friction cone (the_list_2 item 2.1)
+2. Cylinder floor barrel contact (NEW-01)
+3. Cylinder-cube normal fix (NEW-02)
+4. Odometry heading rotation (NEW-04)
+5. Remove artificial damping (NEW-05)
+6. Revolute joint simultaneous solve (NEW-06, NEW-07)
+7. Mecanum tangent floor check (NEW-08)
+8. Contact cache orientation-aware matching (NEW-12)
+9. Determinism test (the_list_3 R3-01)
+
+## Phase 4: Modularize (2 weeks)
+
+Split the god files:
+- `collision_mechanics.c` → `narrowphase_sphere.c`, `narrowphase_cube.c`, `narrowphase_cylinder.c`, `solver.c`, `contact_cache.c`
+- `debug_terminal.c` → `terminal_core.c`, `terminal_commands_fs.c`, `terminal_commands_net.c`, `terminal_commands_edit.c`
+- `rigidbody.c` → `rigidbody_init.c`, `rigidbody_integrate.c`, `rigidbody_inertia.c`
+
+Create the module interface:
+```c
+typedef struct mpe_module {
+    const char *name;
+    void (*init)(mpe_engine_state *engine);
+    void (*step)(mpe_engine_state *engine, float dt);
+    void (*shutdown)(mpe_engine_state *engine);
+} mpe_module;
+```
+
+The robotics layer registers as a module. The engine core knows nothing about mecanum wheels, motors, or FTC fields.
+
+## Phase 5: Testing and validation (ongoing)
+
+Every fix gets a headless test. The physics truth suite grows. The determinism test becomes a release gate. The grade 9s get a simulator that tells the truth.
+
+---
+
+The total timeline is roughly 10 weeks of focused work. The critical path is Phase 1 (kill legacy) because every physics fix after that only needs to be made once instead of twice. Start there.
