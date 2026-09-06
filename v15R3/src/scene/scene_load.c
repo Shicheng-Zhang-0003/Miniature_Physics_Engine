@@ -102,8 +102,15 @@ int scene_loading(const char *file_source_path)
         int32_t type_int, static_int, saved_object_id = 0;
 
         if (!read_int(f, &type_int))               break;
-        if (!read_float(f, &temp.mass))            break;
-        if (!read_float(f, &temp.radius))          break;
+                if (!read_float(f, &temp.radius))          break;
+        /* R3-04: Read cylinder_half_length. Present in version >= 151.
+         * For older versions, default to radius/2. */
+        if (version >= 151) {
+            if (!read_float(f, &temp.cylinder_half_length)) break;
+        } else {
+            temp.cylinder_half_length = temp.radius * 0.5f;
+        }
+        if (!read_vec3(f, &temp.half_extensions))  break;
         if (!read_vec3(f, &temp.half_extensions))  break;
         if (!read_vec3(f, &temp.position))         break;
         if (!read_vec3(f, &temp.velocity))         break;
@@ -127,6 +134,11 @@ int scene_loading(const char *file_source_path)
         if (temp.type == object_cube) {
             rigidbody_initialisation_cube(&staged_bodies[i],
                 temp.position, temp.half_extensions, temp.mass);
+        } else if (temp.type == object_cylinder) {
+            /* R3-04: Cylinder branch. Previously cylinders were silently
+             * re-initialised as spheres, corrupting their geometry. */
+            rigidbody_initialisation_cylinder(&staged_bodies[i],
+                temp.radius, temp.cylinder_half_length, temp.mass, temp.position);
         } else {
             rigidbody_initialisation_sphere(&staged_bodies[i],
                 temp.radius, temp.mass, temp.position);
