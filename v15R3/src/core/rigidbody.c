@@ -330,8 +330,63 @@ void rb_integrate_velocity(rigidbody *rigid_body, float delta_time, float linear
         rigid_body->velocity = vector3_zero();
     }
 
-    rigid_body->angular_acceleration =
-        math3_multiplication_vector3(rigid_body->inverse_inertia_system, rigid_body->torque_accumulator);
+    rigid_body->angular_acceleration = math3_multiplication_vector3(rigid_body->inverse_inertia_system, rigid_body->torque_accumulator);
+
+    /* LIST4 NEW-16: Gyroscopic torque.
+ *
+ * Without this, torque-free bodies conserve world-space angular velocity
+ * instead of angular momentum. That suppresses gyroscopic precession and
+ * allows rotational kinetic energy to drift for tumbling non-spherical bodies.
+ *
+ * Euler's equation requires:
+ *
+ *   tau_gyro = -omega x (I_world * omega)
+ *
+ * We compute it in local space because inertia_tensor_local is constant
+ * and usually diagonal for primitive shapes.
+ */
+    {
+        math3 list4_gyro_rotation = vector4_to_math3(rigid_body->orientation);
+        math3 list4_gyro_rotation_t = math3_transposition(list4_gyro_rotation);
+
+        vector3 list4_gyro_omega_local =
+        math3_multiplication_vector3(list4_gyro_rotation_t, rigid_body->angular_velocity);
+
+        vector3 list4_gyro_angular_momentum_local =
+        math3_multiplication_vector3(rigid_body->inertia_tensor_local, list4_gyro_omega_local);
+
+        vector3 list4_gyro_torque_local =
+        vector3_cross(list4_gyro_omega_local, list4_gyro_angular_momentum_local);
+
+        list4_gyro_torque_local = vector3_scaling(list4_gyro_torque_local, -1.0f);
+
+        vector3 list4_gyro_torque_world =
+        math3_multiplication_vector3(list4_gyro_rotation, list4_gyro_torque_local);
+
+        vector3 list4_gyro_alpha =
+        math3_multiplication_vector3(rigid_body->inverse_inertia_system, list4_gyro_torque_world);
+
+        /*
+     * Conservative stability clamp.
+     *
+     * Explicit gyroscopic torque can become aggressive for very fast,
+     * highly asymmetric bodies. This cap prevents the correction from
+     * destabilising the existing solver while still producing correct
+     * precession behaviour at normal simulation speeds.
+     */
+        float list4_gyro_alpha_sq = vector3_length_squared(list4_gyro_alpha);
+        float list4_gyro_alpha_limit = 2000.0f; /* rad/s^2 */
+
+        if (list4_gyro_alpha_sq > list4_gyro_alpha_limit * list4_gyro_alpha_limit) {
+            list4_gyro_alpha = vector3_scaling(
+                vector3_normalisation(list4_gyro_alpha),
+                list4_gyro_alpha_limit);
+        }
+
+        rigid_body->angular_acceleration =
+            vector3_addition(rigid_body->angular_acceleration, list4_gyro_alpha);
+    }
+
     rigid_body->angular_velocity =
         vector3_addition(rigid_body->angular_velocity, vector3_scaling(rigid_body->angular_acceleration, delta_time));
     rigid_body->angular_velocity = vector3_scaling(rigid_body->angular_velocity, angular_damping);
@@ -500,13 +555,13 @@ void rigidbody_update_inertia_cylinder(rigidbody *rigid_body) {
     float h = rigid_body->cylinder_half_length;
     float mass = rigid_body->mass;
     float L = 2.0f * h;
-    
+
     rigid_body->inertia_tensor_local = (math3){{{0}}};
     /* Axle is along X axis */
     rigid_body->inertia_tensor_local.matrix[0][0] = 0.5f * mass * r * r;
     rigid_body->inertia_tensor_local.matrix[1][1] = (mass / 12.0f) * (3.0f * r * r + L * L);
     rigid_body->inertia_tensor_local.matrix[2][2] = (mass / 12.0f) * (3.0f * r * r + L * L);
-    
+
     if (mass > 0) {
         rigid_body->inverse_inertia_tensor_local = math3_inverse(rigid_body->inertia_tensor_local);
         rigid_body->inverse_inertia_system = rigid_body->inverse_inertia_tensor_local;
@@ -526,7 +581,7 @@ void rigidbody_initialisation_cylinder(rigidbody *rigid_body, float radius, floa
     rigid_body->colour = (vector3){0.6f, 0.6f, 0.6f}; /* Grey for cylinders */
     rigid_body->type = object_cylinder;
     rigidbody_update_axes(rigid_body);
-    
+
     rigid_body->mass = mass;
     if (mass > 0) {
         rigid_body->inverse_mass = 1.0f / mass;
@@ -543,9 +598,9 @@ void rigidbody_initialisation_cylinder(rigidbody *rigid_body, float radius, floa
     rigid_body->friction_static = 0.4f;
     rigid_body->friction_kinetic = 0.3f;
 rigid_body->driven_this_tick = false; /* MFS_169 */
-    
+
     rigidbody_update_inertia_cylinder(rigid_body);
-    
+
     rigid_body->force_accumulator = vector3_zero();
     rigid_body->torque_accumulator = vector3_zero();
 }
