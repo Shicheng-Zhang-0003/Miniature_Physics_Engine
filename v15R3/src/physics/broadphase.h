@@ -8,7 +8,10 @@ typedef struct {
 } broadphase_pair;
 
 int broadphase_generate_pairing(rigidbody *bodies, int body_count, broadphase_pair *collision_pairs_output_array,
-                                int maximum_pairs_allowed); /* MPE_FTC_059 */
+                                int maximum_pairs_allowed, float dt); /* MPE_FTC_059 */
+/* Conservative bounding-sphere radius (rotation-invariant). Shared with the
+ * renderer's frustum culling so both use one definition. */
+float broadphase_bounding_radius(rigidbody *rb);
 
 int broadphase_get_node_overflow_count(void);
 int broadphase_get_pair_overflow_count(void);

@@ -1,9 +1,9 @@
-# MPE v15R2 Release Gates
+# MPE v15R3 Release Gates
 
-This document defines the exit criteria for tagging `v15R2`.
+This document defines the exit criteria for tagging `v15R3`.
 
-`v15R2` is the first release candidate of the v15 series, introducing
-the centralised configuration system.
+`v15R3` is the MPE-only development tree of the v15 series, continuing
+the centralised configuration system (prior RCs: v15R1, v15R3).
 
 ---
 
@@ -11,7 +11,7 @@ the centralised configuration system.
 
 ### P0 Gates
 P0 gates are mandatory.
-If any P0 gate fails, `v15R2` must not be tagged.
+If any P0 gate fails, `v15R3` must not be tagged.
 
 ### P1 Gates
 P1 gates are strongly recommended.
@@ -20,7 +20,7 @@ A P1 gate may be deferred only if:
 2. it does not undermine overall stability.
 
 ### P2 / P3 Gates
-P2 and P3 gates are optional for `v15R2`.
+P2 and P3 gates are optional for `v15R3`.
 They should be recorded as post-stable work items.
 
 ---
@@ -28,7 +28,7 @@ They should be recorded as post-stable work items.
 ## Mandatory P0 Release Gates
 
 ### 1. Release Freeze
-- [X] The `v15R2` release policy is present and acknowledged.
+- [X] The `v15R3` release policy is present and acknowledged.
 - [X] No new features beyond the config system are being added.
 - [X] Only correctness, stability, validation, documentation, and hygiene changes are accepted.
 
@@ -41,7 +41,7 @@ They should be recorded as post-stable work items.
 
 ### 3. Startup
 - [X] Engine starts using the documented workflow.
-- [X] Startup prints the correct version string (`MPE v15R2`).
+- [X] Startup prints the correct version string (`MPE v15R3`).
 - [X] Config system initialises (prints `[config] loaded` or `[config] defaults active`).
 - [X] Shaders load successfully.
 - [X] The main window opens.
@@ -105,7 +105,7 @@ They should be recorded as post-stable work items.
 
 ### 10. Configuration System
 - [X] Config menu (key 6) opens and navigates correctly.
-- [X] All 69 tunable parameters are editable via the menu.
+- [X] All 76 tunable parameters are editable via the menu.
 - [X] Debug-only parameters are refused in Game Mode.
 - [X] Config saves to `status/engine.cfg` on exit.
 - [X] Config loads on startup and overrides defaults.
@@ -167,7 +167,7 @@ They should be recorded as post-stable work items.
 
 ## Deferred / Post-Stable Work
 
-The following are not required for `v15R2`:
+The following are not required for `v15R3`:
 - full global-state removal beyond config extraction,
 - full `PhysicsWorld` encapsulation,
 - multithreading,
@@ -179,33 +179,25 @@ The following are not required for `v15R2`:
 - Wayland mouse-lock support,
 - per-object config persistence in scene files.
 
-These belong after `v15R2`.
+These belong after `v15R3`.
 
 ---
 
 
-### 14. FTC Robotics (MFS)
-- [X] `ftc_robot_create` spawns chassis + 4 cylinder wheels with revolute joints
-- [X] Mecanum strafe works via real anisotropic roller friction (no chassis cheat)
-- [X] Tank drive works via motor torque → wheel traction
-- [X] Motor model: BackEMF, gear ratio, Kt/Kv correct
-- [X] Battery voltage sag under multi-motor load
-- [X] All 8 headless tests pass (`python3 tools/test_runner.py`)
-- [X] Robot visible in GUI via proxy sync
-- [X] Robot drivable via G/V/B/N/C/H keys
+### 14. Joints and constraints
+- [X] Revolute joints hold anchors and allow swing (`revolute` test)
+- [X] Revolute axis drift corrected (positional Baumgarte, once per tick after the loop)
+- [X] Spring joints with live rendering
 - [X] Fixed-timestep accumulator (60Hz deterministic)
-- [X] Revolute axis drift corrected (Baumgarte)
-- [ ] Scene save/load preserves robot assemblies
+- [X] Scene save/load preserves joint assemblies (v200: springs + revolutes, `scene_roundtrip` test)
 - [ ] Prismatic joints (arms/slides)
-- [ ] Sensors (encoders, IMU, distance)
-- [ ] FTC HAL (HardwareMap, OpMode)
 
 
 ---
 
 ## Release Decision
 
-`v15R2` may be tagged only when:
+`v15R3` may be tagged only when:
 1. all P0 gates pass,
 2. all accepted P1 gates pass or are documented as known limitations,
 3. the validation checklist has been run,
@@ -215,4 +207,4 @@ These belong after `v15R2`.
 If any mandatory gate fails, the correct action is:
 - fix the gate failure,
 - rerun validation,
-- and only then re-evaluate `v15R2`.
+- and only then re-evaluate `v15R3`.

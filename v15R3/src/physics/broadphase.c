@@ -124,7 +124,7 @@ static void insert_into_hash(int object_index, int x, int y, int z) {
     node_count++;
 }
 
-static inline float broadphase_bounding_radius(rigidbody *rb) {
+float broadphase_bounding_radius(rigidbody *rb) {
     if (rb->type == object_sphere) {
         return rb->radius;
     }
@@ -179,16 +179,12 @@ static bool pair_already_checked(int min_obj, int max_obj) {
             return true;
         }
     }
-    /* MPE_TASK_10_PAIR_DEDUPE_FALLBACK_BEGIN */
-    /*
- * Pair dedupe table exhausted.
- *
- * Returning true suppresses further duplicate pair emission when the
- * dedupe table is saturated. This may drop some new pairs in extreme
- * scenes, but prevents duplicate-pair explosion and performance collapse.
- */
+    /* FIX-AUDIT: table exhausted. Old code returned true ("already seen")
+     * which silently DROPPED new pairs (missed collisions). Return false so
+     * the pair is emitted (risk duplicate narrowphase work, never a miss).
+     * Overflow is still counted for validation visibility. */
     broadphase_pair_dedupe_overflow_count++;
-    return true;
+    return false;
     /* MPE_TASK_10_PAIR_DEDUPE_FALLBACK_END */
 }
 
@@ -240,7 +236,10 @@ static void broadphase_update_cell_size(rigidbody *bodies, int body_count) { /* 
 /* MPE_TASK_17_CELL_SIZE_FUNCTION_END */
 
 int broadphase_generate_pairing(rigidbody *bodies, int body_count, broadphase_pair *collision_pairs_output_array,
-                                int maximum_pairs_allowed) { /* MPE_FTC_059 */
+                                int maximum_pairs_allowed, float dt) { /* MPE_FTC_059 */
+    if (dt <= 0.0f) {
+        dt = 1.0f / 60.0f;
+    }
     /* MPE_TASK_17_CELL_SIZE_CALL_BEGIN */
     if (body_count < 2) {
         broadphase_current_cell_size = g_cfg.broadphase.cell_size_default;
@@ -272,33 +271,35 @@ int broadphase_generate_pairing(rigidbody *bodies, int body_count, broadphase_pa
             extent_z = fabsf(axes[0].z) * rb->half_extensions.x + fabsf(axes[1].z) * rb->half_extensions.y +
                        fabsf(axes[2].z) * rb->half_extensions.z;
         }
+        /* Swept AABB: expand by this tick's linear motion so a fast body
+         * pairs with everything along its path (CCD needs the pair to
+         * exist). Sleeping/static bodies don't move: no expansion. */
+        if ((!rb->static_state) && (!rb->is_sleeping)) {
+            extent_x += fabsf(rb->velocity.x) * dt;
+            extent_y += fabsf(rb->velocity.y) * dt;
+            extent_z += fabsf(rb->velocity.z) * dt;
+        }
         int min_x = (int) floorf((rb->position.x - extent_x) / GRID_CELL_SIZE);
         int max_x = (int) floorf((rb->position.x + extent_x) / GRID_CELL_SIZE);
         int min_y = (int) floorf((rb->position.y - extent_y) / GRID_CELL_SIZE);
         int max_y = (int) floorf((rb->position.y + extent_y) / GRID_CELL_SIZE);
         int min_z = (int) floorf((rb->position.z - extent_z) / GRID_CELL_SIZE);
         int max_z = (int) floorf((rb->position.z + extent_z) / GRID_CELL_SIZE);
-        /* MPE_TASK_11_LARGE_OBJECT_CLAMP_BEGIN */
+        /* FIX-AUDIT: old code SHRANK the occupied interval to max_span,
+         * so cells the body truly covers were never inserted -> missed
+         * pairs (false negatives). Broadphase must never miss. Keep the
+         * full span (correct); count the event for perf visibility. */
         bool a3_large_object_clamped = false;
 
         if ((max_x - min_x) > g_cfg.broadphase.max_cell_span_per_axis) {
-            int center_x = (int) floorf(rb->position.x / GRID_CELL_SIZE);
-            min_x = center_x - (g_cfg.broadphase.max_cell_span_per_axis / 2);
-            max_x = min_x + g_cfg.broadphase.max_cell_span_per_axis;
             a3_large_object_clamped = true;
         }
 
         if ((max_y - min_y) > g_cfg.broadphase.max_cell_span_per_axis) {
-            int center_y = (int) floorf(rb->position.y / GRID_CELL_SIZE);
-            min_y = center_y - (g_cfg.broadphase.max_cell_span_per_axis / 2);
-            max_y = min_y + g_cfg.broadphase.max_cell_span_per_axis;
             a3_large_object_clamped = true;
         }
 
         if ((max_z - min_z) > g_cfg.broadphase.max_cell_span_per_axis) {
-            int center_z = (int) floorf(rb->position.z / GRID_CELL_SIZE);
-            min_z = center_z - (g_cfg.broadphase.max_cell_span_per_axis / 2);
-            max_z = min_z + g_cfg.broadphase.max_cell_span_per_axis;
             a3_large_object_clamped = true;
         }
 

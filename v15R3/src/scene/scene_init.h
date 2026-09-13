@@ -12,6 +12,9 @@ void scene_remove_object_by_index(int object_index);
 
 uint32_t scene_allocate_object_id(void);
 void scene_assign_new_identity(int object_index);
+/* Advance the allocator past a loaded stable ID (v200 scenes preserve IDs;
+ * future allocations must not collide with them). */
+void scene_note_loaded_id(uint32_t object_id);
 
 int scene_find_object_index_by_id(uint32_t object_id);
 bool scene_object_id_exists(uint32_t object_id);

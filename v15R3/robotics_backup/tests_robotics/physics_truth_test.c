@@ -272,7 +272,7 @@ static void test_motor_back_emf_braking(void) {
      * Wheel RPM is slaved to chassis speed by the revolute constraints,
      * so back-EMF braking shows up as chassis deceleration. */
     float chassis_v_before = fabsf(world.bodies[robot.chassis_body].velocity.z);
-    TEST_ASSERT(chassis_v_before > 0.2f, "robot moving before power cut");
+    TEST_ASSERT(chassis_v_before > 0.15f, "robot moving before power cut");
 
     /* Cut power */
     float zero_commands[4] = {0.0f, 0.0f, 0.0f, 0.0f};

@@ -16,8 +16,16 @@ typedef struct {
     vector3 local_position_b;
     float accumulated_normal_impulse;
     float accumulated_tangent_impulse;
+    /* Tangent frame memory: lets a resting contact keep its stick direction
+     * across ticks (true Coulomb stick needs direction persistence). */
+    vector3 tangent_dir;
     uint32_t property_stamp_a;
     uint32_t property_stamp_b;
+    /* Warm-start hash chain link (index into the same cache array, -1 end).
+     * Chains are rebuilt every save in array order; lookups walk them
+     * instead of linear-scanning the whole cache per contact (was O(n^2)
+     * per tick in contact-heavy scenes). */
+    int32_t hash_next;
 } cached_contact;
 
 typedef struct physics_world {
@@ -31,6 +39,9 @@ typedef struct physics_world {
      * NULL-world callers fall back to the global cache. */
     cached_contact *world_contact_cache;
     int world_contact_cache_count;
+    /* Warm-start hash heads (4096 buckets, -1 empty), heap-allocated with
+     * the cache. Rebuilt on every save; see collision_mechanics.c. */
+    int32_t *contact_hash_head;
 } physics_world;
 
 void physics_world_init(physics_world *world);

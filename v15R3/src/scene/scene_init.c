@@ -22,7 +22,20 @@ void scene_allocate_pool(void) {
 static uint32_t next_object_id = 1;
 
 uint32_t scene_allocate_object_id(void) {
+    if (next_object_id == 0) {
+        next_object_id = 1;
+    }
     return next_object_id++;
+}
+
+void scene_note_loaded_id(uint32_t object_id) {
+    /* 0 is never a valid body id; UINT32_MAX cannot advance further. */
+    if ((object_id == 0) || (object_id == 0xFFFFFFFFu)) {
+        return;
+    }
+    if (object_id >= next_object_id) {
+        next_object_id = object_id + 1;
+    }
 }
 
 void scene_assign_new_identity(int object_index) {

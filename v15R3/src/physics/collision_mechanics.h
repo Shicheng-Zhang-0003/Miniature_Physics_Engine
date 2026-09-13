@@ -1,11 +1,12 @@
+#ifndef collisions_h
+#define collisions_h
+
 #include <stdio.h>
 #include <math.h>
 #include "../core/math3D.h"
 #include "../core/rigidbody.h"
 #include "define_forces.h"
 struct physics_world; /* MFS_131: forward decl for per-world cache */
-#ifndef collisions_h
-#define collisions_h
 typedef struct {
     vector3 position;
     float penetration;
@@ -16,9 +17,27 @@ typedef struct {
     float effective_mass_normal;
     float effective_mass_tangent;
     vector3 tangent_vector;
+    /* Second Coulomb tangent (disc model): tangent2 = n x tangent1.
+     * Solved jointly with a combined |Ft| <= mu*Fn clamp. */
+    vector3 tangent2;
+    float accumulated_tangent2_impulse;
+    float effective_mass_tangent2;
     vector3 cached_tangent;
-    float restitution_bias;
-    float separation_bias;
+    /* Poisson restitution state: Newtonian velocity bias is wrong for
+     * multi-contact (it pays bounce per iteration). Instead the compression
+     * phase accumulates unbiased impulse; the restitution pass then pays
+     * e * (this tick's compression impulse) once. impact_velocity gates the
+     * pass to fresh impacts; base_normal_impulse excludes warm start. */
+    float impact_velocity;
+    float base_normal_impulse;
+    /* Warm-start provenance: set when this contact adopted cached impulses.
+     * The solver damps warm contacts (oscillation control) and runs cold
+     * contacts at full step (fast transient kill). See resolve. */
+    bool warmed;
+    /* NOTE: there is deliberately NO velocity-level Baumgarte bias field.
+     * Penetration is corrected positionally only (split impulse +
+     * depenetration pass). A velocity bias would inject approach velocity
+     * that the friction clamp and Poisson pass then treat as real impact. */
     vector3 ra;
     vector3 rb;
 } contact_point_data;
@@ -35,8 +54,39 @@ bool collision_dual_sphere(rigidbody *rigidbody_object_a, rigidbody *rigidbody_o
 float project_obb(rigidbody *rigid_body, vector3 axis, vector3 axes[3]);
 bool collision_sphere_cube(rigidbody *sphere, rigidbody *cube, collision_data *collision_output_data);
 bool collision_dual_cube(rigidbody *cube_a, rigidbody *cube_b, collision_data *collision_output_data);
-void collision_prepare_solver(collision_data *source, collision_data *manifold_entry);
-void collision_resolve_iterative(collision_data *manifold_entry);
+void collision_prepare_solver(struct physics_world *world, collision_data *source, collision_data *manifold_entry,
+                              float dt);
+/* Returns the largest impulse magnitude applied this visit (for convergence tests). */
+float collision_resolve_iterative(collision_data *manifold_entry, float dt, bool friction_only, int start_index);
+/* Support-first manifold order: indices sorted by lowest contact height
+ * (floor contacts first, then ascending pairs), ties broken by manifold
+ * index for a deterministic total order. Sequential impulse propagates
+ * support ~one contact level per sweep in arbitrary order; support-first
+ * order carries floor support to the top of a stack in a single sweep, so
+ * deep stacks converge in far fewer iterations. Order affects only the
+ * sweep sequence (same equations); twin runs agree bit-for-bit. */
+void collision_manifold_solve_order(collision_data *manifolds, int manifold_count, int *order_out);
+/* Split impulse (Catto): positional penetration correction applied AFTER
+ * the velocity iterations, directly to positions, mass-weighted. Carries
+ * no velocity change, so it cannot inflate contact impulses or friction. */
+/* Split impulse (Catto): positional penetration correction applied AFTER
+ * the velocity iterations, directly to positions, mass-weighted. Carries
+ * no velocity change, so it cannot inflate contact impulses or friction. */
+void collision_apply_split_impulse(collision_data *manifolds, int manifold_count, float dt);
+/* Rolling + spin resistance, once per tick after the velocity solve. */
+void collision_apply_rolling_resistance(collision_data *manifolds, int manifold_count, float dt);
+/* Poisson restitution: after compression converges, each fresh impact gets
+ * e * (this tick's compression impulse) once, then a short relaxation lets
+ * friction respond. Correct for multi-contact; Newtonian bias over-pays. */
+void collision_apply_poisson_restitution(collision_data *manifolds, int manifold_count);
+/* CCD swept clamp: for bodies whose per-tick displacement exceeds their
+ * contact thickness, analytic time-of-impact against the floor plane,
+ * spheres, and static boxes. Clamps the body to the TOI configuration and
+ * keeps velocity, so discrete narrowphase then sees penetration≈0 with the
+ * true approach velocity (restitution/friction respond correctly).
+ * Linear sweep only (angular motion ignored over the tick); dynamic-box
+ * obstacles are paired by the swept broadphase but not TOI-clamped. */
+int collision_ccd_sweep_clamp(rigidbody *bodies, int body_count, float dt);
 void contact_cache_save(struct physics_world *world, collision_data *manifolds, int count); /* MFS_131 */
 void contact_cache_clear(struct physics_world *world); /* MFS_131 */
 
@@ -47,7 +97,10 @@ bool collision_static_plane_body(rigidbody *body, float plane_y, collision_data 
 void contact_cache_stats_reset(void);
 int contact_cache_get_hits(void);
 int contact_cache_get_misses(void);
-/* MFS_172: cylinder-vs-object narrowphase */
+/* Cylinder-vs-object narrowphase. Axle-segment + radius (capsule) model:
+ * flat end-caps are treated as hemispherical. Documented approximation:
+ * end-cap contacts on flat faces deviate from true cylinder geometry by
+ * up to the corner cut. Barrel contacts are exact. */
 bool collision_cylinder_sphere(rigidbody *cyl, rigidbody *sph,
                                collision_data *out);
 bool collision_cylinder_cube(rigidbody *cyl, rigidbody *cube,

@@ -102,20 +102,90 @@ void render_scene_current(int widget_width, int widget_height) {
     float view_matrix_flat_array[16];
     math4_to_flat_array(view_matrix, view_matrix_flat_array);
     grid_render(&main_grid, utility_shader_program, view_matrix, projection_matrix);
+    /* Frustum culling: extract the six inward-facing planes from the
+     * column-major view-projection matrix (Gribb/Hartmann) and skip
+     * packing/uploading/drawing fully-outside bodies. Bounding spheres
+     * come from broadphase_bounding_radius (rotation-invariant, never
+     * wrongly excludes). Zero persistent memory: planes live on stack. */
+    math4 view_projection = math4_multiplication(projection_matrix, view_matrix);
+    vector4 frustum_planes[6];
+    {
+        float row0[4] = {view_projection.matrix[0][0], view_projection.matrix[1][0], view_projection.matrix[2][0],
+                         view_projection.matrix[3][0]};
+        float row1[4] = {view_projection.matrix[0][1], view_projection.matrix[1][1], view_projection.matrix[2][1],
+                         view_projection.matrix[3][1]};
+        float row2[4] = {view_projection.matrix[0][2], view_projection.matrix[1][2], view_projection.matrix[2][2],
+                         view_projection.matrix[3][2]};
+        float row3[4] = {view_projection.matrix[0][3], view_projection.matrix[1][3], view_projection.matrix[2][3],
+                         view_projection.matrix[3][3]};
+        float combos[6][4];
+        for (int k = 0; k < 4; k++) {
+            combos[0][k] = row3[k] + row0[k];
+            combos[1][k] = row3[k] - row0[k];
+            combos[2][k] = row3[k] + row1[k];
+            combos[3][k] = row3[k] - row1[k];
+            combos[4][k] = row3[k] + row2[k];
+            combos[5][k] = row3[k] - row2[k];
+        }
+        for (int p = 0; p < 6; p++) {
+            float len =
+                sqrtf(combos[p][0] * combos[p][0] + combos[p][1] * combos[p][1] + combos[p][2] * combos[p][2]);
+            if (len < 0.000001f) {
+                len = 1.0f;
+            }
+            /* vector4 packs {w,x,y,z}: store (d,a,b,c) so .x/.y/.z/.w
+             * read as the (a,b,c,d) plane coefficients below. */
+            frustum_planes[p] =
+                (vector4){combos[p][3] / len, combos[p][0] / len, combos[p][1] / len, combos[p][2] / len};
+        }
+    }
     int sphere_inst_count = 0;
     int cube_inst_count = 0;
     for (int object_index = 0; object_index < object_count; object_index++) {
         rigidbody *rigid_body = &obj_per_scene[object_index];
-        math4 translation_matrix = math4_translation(rigid_body->position);
-        math4 rotation_matrix = vector4_to_math4(rigid_body->orientation);
-        math4 scale_matrix;
-        if (rigid_body->type == object_sphere) {
-            scale_matrix = math4_scaling((vector3){rigid_body->radius, rigid_body->radius, rigid_body->radius});
-        } else {
-            scale_matrix = math4_scaling(rigid_body->half_extensions);
+        /* Sphere-vs-frustum: outside if signed distance < -radius on any plane. */
+        {
+            float bound = broadphase_bounding_radius(rigid_body);
+            bool culled = false;
+            for (int p = 0; p < 6; p++) {
+                float dist = frustum_planes[p].x * rigid_body->position.x +
+                             frustum_planes[p].y * rigid_body->position.y +
+                             frustum_planes[p].z * rigid_body->position.z + frustum_planes[p].w;
+                if (dist < -bound) {
+                    culled = true;
+                    break;
+                }
+            }
+            if (culled) {
+                continue;
+            }
         }
-        math4 model_matrix =
-            math4_multiplication(translation_matrix, math4_multiplication(rotation_matrix, scale_matrix));
+        /* Direct T*R*S composition (~20 flops) instead of two full 4x4
+         * multiplies (~128): M[c][r] = R[c][r]*s[c], M[c][3] = 0,
+         * M[3][r] = t[r], M[3][3] = 1. Render-only path (no physics
+         * impact); also why hand-SIMD stops here — the solver's
+         * bit-determinism discipline (-ffp-contract=off, fixed op order)
+         * outranks single-digit-% CPU gains. See ENABLE_NATIVE for the
+         * opt-in auto-vectorized build. */
+        math4 rotation_matrix = vector4_to_math4(rigid_body->orientation);
+        vector3 model_scale;
+        if (rigid_body->type == object_sphere) {
+            model_scale = (vector3){rigid_body->radius, rigid_body->radius, rigid_body->radius};
+        } else {
+            model_scale = rigid_body->half_extensions;
+        }
+        float scale_comp[3] = {model_scale.x, model_scale.y, model_scale.z};
+        math4 model_matrix = {{{0}}};
+        for (int mc = 0; mc < 3; mc++) {
+            for (int mr = 0; mr < 3; mr++) {
+                model_matrix.matrix[mc][mr] = rotation_matrix.matrix[mc][mr] * scale_comp[mc];
+            }
+            model_matrix.matrix[mc][3] = 0.0f;
+            model_matrix.matrix[3][mc] = (mc == 0) ? rigid_body->position.x
+                                        : (mc == 1) ? rigid_body->position.y
+                                                    : rigid_body->position.z;
+        }
+        model_matrix.matrix[3][3] = 1.0f;
         float *target_array;
         int *target_count;
         if (rigid_body->type == object_sphere) {

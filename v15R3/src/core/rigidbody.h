@@ -1,11 +1,12 @@
+#ifndef rigidbody_h
+#define rigidbody_h
+
 #include <stdio.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include "math3D.h"
 #include "math4_special.h"
-#ifndef rigidbody_h
-#define rigidbody_h
 typedef enum { object_sphere, object_cube, object_cylinder } object_type; /* MPE_FTC_090 */
 typedef struct {
     //Linear Kinematics
@@ -35,13 +36,13 @@ typedef struct {
     //v1.2 Sleeping Bodies
     bool is_sleeping;
     float sleep_timer;
+    /* Kinematic bodies: infinite mass like static, but move with a
+     * user-prescribed velocity (conveyors, platforms). Forces never alter
+     * them; contacts treat them as immovable with velocity. */
+    bool kinematic;
     /* MPE_TASK_V15R2_NICE_VALUE_BEGIN */
     int nice_value; /* -20 to +19, default 0. Positive = extra damping. */
     /* MPE_TASK_V15R2_NICE_VALUE_END */
-    /* MFS_MECANUM_FRICTION: anisotropic roller friction support */
-    bool is_mecanum;          /* true = mecanum wheel with angled rollers */
-    float roller_angle_rad;
-bool driven_this_tick;  /* MFS_169: set when motor torque applied this tick */   /* roller angle from axle (X axis), typically ±45° */
     uint32_t object_id;
     uint32_t object_generation;
 } rigidbody;
@@ -60,8 +61,8 @@ void rigidbody_wake(rigidbody *rigid_body);
 
 void rigidbody_sanitize(rigidbody *rigid_body);
 void rigidbody_set_static(rigidbody *rigid_body, bool make_static);
+void rigidbody_set_kinematic(rigidbody *rigid_body, bool make_kinematic);
 
 void rb_integrate_velocity(rigidbody *rigid_body, float delta_time, float linear_damping, float angular_damping);
 void rb_integrate_position(rigidbody *rigid_body, float delta_time);
-void rigidbody_set_mecanum(rigidbody *rb, bool enable, float roller_angle_rad);
 #endif

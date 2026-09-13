@@ -1,17 +1,13 @@
 # 🧊 MINIATURE PHYSICS ENGINE (MPE)
 
+> **MPE-only:** the engine builds and all headless tests pass with MPE core only: `cd v15R3/src && make && python3 ../../tools/test_runner.py`.
+
 <!-- MPE_RELEASE_FREEZE_NOTICE_BEGIN -->
-> **Current development tree:** `v15R2` continues the v15 configuration-system work. It is not a tagged stable release; use the release gates before promotion.
+> **Current development tree:** `v15R3` continues the v15 configuration-system work. It is not a tagged stable release; use the release gates before promotion.
 <!-- MPE_RELEASE_FREEZE_NOTICE_END -->
 <!-- MPE_RELEASE_GATES_NOTICE_BEGIN -->
-> **Release quality:** the current criteria are in [`v15R2/RELEASE_GATES.md`](v15R2/RELEASE_GATES.md). The current candidate notes are in [`v15R2/release_notes_v15R2.md`](v15R2/release_notes_v15R2.md); [`v15R2/release_notes_v15R2.md`](v15R2/release_notes_v15R2.md) documents the prior RC.
+> **Release quality:** the current criteria are in [`v15R3/RELEASE_GATES.md`](v15R3/RELEASE_GATES.md). The current candidate notes are in [`v15R3/release_notes_v15R2.md`](v15R3/release_notes_v15R2.md); [`v15R3/release_notes_v15R1.md`](v15R3/release_notes_v15R1.md) documents the prior RC.
 <!-- MPE_RELEASE_GATES_NOTICE_END -->
-
-# Note: This codebase is the latest snapshot of the MPE FTC Simulator, or MFS. Stability changes were made in MFS that were determined to be beneficial to the original MPE engine standalone. Future v16 Series development will focus on modularisation to convert MFS into a plug and install kernel module add-on to the original MPE system.
-
-## Messed up on the latest series of commits. This is a blank slate refactor and restart of modularisation and FTC physics differentiation.
-
-## 2nd time around, is 3rd time a charm?
 
 **License:** GPL-3.0 · **Language:** C · **UI:** GTK3 · **Renderer:** OpenGL 3.3 Core
 
@@ -30,9 +26,9 @@ MPE is built around four priorities:
 
 ---
 
-## ✨ What's New in v15R2
+## ✨ What's New in v15R3
 
-`v15R2` is the active development cycle for the centralised configuration system. Highlights currently present in the tree:
+`v15R3` is the active development cycle for the centralised configuration system (MPE-only run; MFS robotics is parked in `v15R3/robotics_backup/` — see that folder's `README_PARKED.md`). Highlights currently present in the tree:
 
 - **Domain-driven architecture** — clean `core`, `physics`, `render`, `scene`, `ui_input` modules.
 - **Warm-starting contact solver** with multi-point Sutherland–Hodgman manifolds for stable stacking.
@@ -214,7 +210,7 @@ For other distributions (Fedora, Arch, SUSE, Alpine, Gentoo, Nix), see [install/
 ### Build and run
 
 ```bash
-cd src
+cd v15R3/src
 make clean
 make
 ./engine
@@ -225,15 +221,16 @@ make
 ## ⚠️ Known Limitations
 
 - **Wayland:** Mouse locking does not work under native Wayland. Run under X11, or try `GDK_BACKEND=x11 ./engine`.
-- **Scene format:** Save/load preserves bodies but **not** spring joints, object IDs, or sleep state. Scene format v2 is planned post-v15R2.
+- **Scene format:** v200 saves bodies (with stable IDs, sleep state, damping) plus spring and revolute joints, with a CRC32 integrity footer. Files ≤v153 still load via the legacy reader.
 - **Object count:** Performance degrades gradually above ~1136 objects; rendering is the primary bottleneck at high counts.
-- **Global state:** The engine still uses file-scope globals; full encapsulation is deferred to v15.
+- **Global state:** The GTK GUI path still uses file-scope globals (`obj_per_scene`, camera, input); canonical simulation state is `physics_world`. Full GUI migration is deferred to v16.
 
 ---
 
 ## 📜 Version History
 
-- **v15R2 (development)** — ongoing v15 configuration-system work. *(current tree)*
+- **v15R3 (development)** — ongoing v15 configuration-system work, MPE-only. *(current tree)*
+- **v15R2** — config-system hardening + MFS robotics (prior RC, see `release_notes_v15R2.md`).
 - **v1.4 Alpha RC3** — domain-driven restructure, spatial-hash broadphase, physics-world encapsulation.
 - **v1.4 Alpha 2** — warm-starting solver, multi-point contact manifolds.
 - **v1.4 Alpha RC1** — spring joints, joint renderer, color painting, OBB raycast selection.
@@ -248,93 +245,33 @@ See `evolution.txt` for the full lineage back to stage 0.
 <img width="4424" height="1824" alt="Screenshot from 2026-07-18 17-18-52" src="https://github.com/user-attachments/assets/5d1d044d-3926-469e-ab27-9f3719452324" />
 <img width="4558" height="1908" alt="Screenshot from 2026-07-18 17-20-09" src="https://github.com/user-attachments/assets/acebe348-707e-485e-835c-08cd1b1dc0fa" />
 
-<!-- MFS_FTC_SECTIONS_BEGIN -->
-
 ---
 
-## 🤖 MFS — FTC Robotics Simulator
+## 🧪 Headless test suite
 
-This tree also carries **MFS** (MPE FTC Simulator), a robotics simulation
-layer currently merged into the engine. MFS turns MPE into an FTC-oriented
-robot simulator: a mecanum drivetrain with physically-truthful wheel contact,
-DC motor electrical models, battery voltage sag, and dead-reckoning odometry.
-
-> MFS exists to make autonomous tuning realistic. Motor commands become torque,
-> torque spins cylinder wheels, wheels grip the floor through anisotropic
-> roller friction, and sensors read back from simulated state. Nothing is
-> faked at the contact layer.
-
-### Capabilities
-- **Cylinder wheel bodies** with correct axle inertia (`I = ½·m·r²`)
-- **Mecanum drivetrain** via real anisotropic roller friction (±45° rollers) — no chassis-force cheats
-- **Tank drivetrain** via motor torque → wheel traction
-- **DC motor model** — BackEMF, gear ratio, Kt/Kv, stall/free-speed limits
-- **Battery model** — voltage sag under multi-motor load
-- **Odometry** — wheel encoders + IMU-style heading for dead reckoning
-- **Revolute joints** — wheels hinged to the chassis with axis correction
-- **Idle hold** — gearbox-style lock so a parked robot stays parked
-
-### Robot controls
-| Key | Action |
-|-----|--------|
-| `G` | Drive forward |
-| `B` | Drive backward |
-| `V` | Strafe right |
-| `N` | Strafe left |
-| `C` | Rotate left (CCW) |
-| `H` | Rotate right (CW) |
-
-Spawn the robot from the debug terminal with `touch robot`.
-
-### Headless test suite
-MFS ships a headless regression suite (no GTK/OpenGL required):
+MPE ships a headless regression suite (no GTK/OpenGL required):
 
 | Test | Proves |
 |------|--------|
 | `two_world` | Independent `physics_world` instances |
 | `revolute` | Hinge joints hold anchor and allow swing |
-| `teleop_drive` | Tank drive moves the robot |
-| `mecanum_drive` | Strafe via real roller friction |
 | `cylinder_drop` | Cylinder settles on the floor |
 | `driven_wheel` | Torque → friction → translation |
 | `math3_inverse` | Matrix inverse at small inertia tensors |
-| `ftc_integration` | Drive / turn / strafe sequence |
-| `physics_truth` | 24 physical-law assertions |
+| `floor_collision_diag` | Floor contact diagnostics |
+| `cylinder_sphere/cube/cylinder` | Cylinder narrowphase pairs |
+| `list4_cylinder_floor` | Tipped-cylinder floor regression |
+| `scene_roundtrip` | Save/load v153 format round-trip |
+| `static_hold` | Coulomb stick holds / yields past friction angle |
+| `rolling_decay` | Contact-patch rolling resistance decay |
+| `ccd_sweep` | Swept TOI: no tunneling at 144 m/s |
+| `kinematic` | Velocity-driven platforms carry bodies |
 
 Run with `python3 tools/test_runner.py`.
 
-### Physics truth gate
-`physics_truth` asserts the laws the simulator depends on: free-fall gravity,
-cylinder inertia, restitution, rolling kinematics (`v = ω·r`), rolling
-resistance, motor free-speed and stall torque, BackEMF braking, static and
-kinetic friction thresholds, numerical stability, energy conservation, and
-revolute anchor holding. This suite is the gate that keeps MFS honest.
+### Determinism and precision
+- Fixed 1/60 s timestep, fixed solver iteration order, exact IEEE `+ - * / sqrt`.
+- Per-tick transcendentals (damping retention, rotation rotors) use fixed-coefficient polynomials (`v15R3/src/core/det_math.h`), bit-identical on all IEEE-754 targets; the build disables FP contraction (`-ffp-contract=off`).
+- Proven by `determinism`: twin worlds agree bitwise over 600 ticks.
+- float32 world: the playable volume is bounded (±250 m), where float resolution (~0.03 mm at the corners) sits 300× below contact slop. No origin rebasing required inside the boundary box.
 
----
-
-## 🧩 Roadmap — v16 Modularisation
-
-MPE and MFS are currently a single tree. The plan is to separate them cleanly.
-
-| Milestone | State |
-|-----------|-------|
-| **v15R2** | Config system + MFS merged *(current)* |
-| **v15S** | Stabilisation — final **merged** release |
-| **v16R1** | Begin splitting MFS out of the MPE mainframe |
-| **v16+** | MPE kernel + module ecosystem |
-
-Beginning at **v16R1** (after **v15S**):
-
-- **MPE returns to being a standalone physics-engine kernel**, but gains a
-  **kernel-module plugin state system** — a defined host into which modules
-  register their state and hooks.
-- **MFS becomes the first module ecosystem** built on that plugin system,
-  rather than code fused into the engine.
-- Within MFS, the plan is a hierarchy of **modules and submodules** — the
-  drivetrain, motor, battery, sensor, and odometry layers already present are
-  the natural candidates — each loadable against the bare MPE kernel.
-
-**Goal:** run MPE on its own with no robotics present, and drop MFS (or any
-future ecosystem) in as a plugin.
-
-<!-- MFS_FTC_SECTIONS_END -->

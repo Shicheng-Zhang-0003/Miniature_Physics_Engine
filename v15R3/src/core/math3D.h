@@ -166,7 +166,21 @@ static inline math3 math3_inverse(math3 matrix) {
         (matrix.matrix[0][1] *
          (matrix.matrix[1][0] * matrix.matrix[2][2] - matrix.matrix[1][2] * matrix.matrix[2][0])) +
         (matrix.matrix[0][2] * (matrix.matrix[1][0] * matrix.matrix[2][1] - matrix.matrix[1][1] * matrix.matrix[2][0]));
-    if ((!isfinite(determinant)) || (fabsf(determinant) < 1e-12f) /* MPE_FTC_093g: smaller epsilon for small inertia tensors */) {
+    /* FIX-AUDIT: absolute 1e-12 treated small-but-valid inertia (r=1cm
+     * sphere det~6e-14) as singular -> zero inverse -> locked rotation.
+     * Use scale-relative test against ||M||_F^3 = frob_sq^1.5. */
+    float frob_sq = 0.0f;
+    for (int _r = 0; _r < 3; _r++)
+        for (int _c = 0; _c < 3; _c++)
+            frob_sq += matrix.matrix[_r][_c] * matrix.matrix[_r][_c];
+    /* Scale-invariant singularity test: |det| / ||M||_F^3 < 1e-12.
+     * For M = s*M0: det ~ s^3, ||M||_F^3 ~ s^3, ratio is constant. */
+    float frob_norm_cubed = frob_sq * sqrtf(fmaxf(frob_sq, 1e-24f));
+    float eps = 1e-12f * frob_norm_cubed;
+    if (frob_sq <= 0.0f) {
+        eps = 1e-24f;
+    }
+    if ((!isfinite(determinant)) || (fabsf(determinant) < eps)) {
         math3 singular_matrix = {{{0.0f}}};
         return singular_matrix;
     }

@@ -3,9 +3,10 @@ MPE Evolution Lineage
 
 V0.9-Buffer:  Direct Translation Layer from V1.5RC2 of MPE
 V1.5RC2:      v15R2 — Configuration System (69 tunables, registry, menu)
-MFS:          MPE FTC Simulator — Physics-first pivot
+MFS:          MPE FTC Simulator — Physics-first pivot (parked in robotics_backup/
+              during the MPE-only run)
               Milestone 1: Foundation & Robotics Core ✅
               Milestone 2: Physics Keystone (cylinders, anisotropic friction) ✅
               Milestone 3: Solver Hardening (in progress)
 
-Current Head: MFS (post-Milestone-2)
+Current Head: v15R3 (MPE-only development tree)

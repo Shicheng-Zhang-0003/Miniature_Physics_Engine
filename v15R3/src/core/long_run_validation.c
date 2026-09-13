@@ -50,9 +50,13 @@ static int a3_task13_body_is_invalid(rigidbody *rigid_body) {
 }
 
 static void long_run_validation_report(void) {
+    /* FIX-AUDIT: old gate used final-tick speed only, so spike-then-settle
+     * passed. Gate on final AND run-max (looser bound for transients). */
     int pass = (object_count > 0) && (long_run_validation_nan_count == 0) && (long_run_validation_fallen_count == 0) &&
                (long_run_validation_last_max_linear_speed < 0.25f) &&
-               (long_run_validation_last_max_angular_speed < 0.5f);
+               (long_run_validation_last_max_angular_speed < 0.5f) &&
+               (long_run_validation_max_linear_speed < 2.0f) &&
+               (long_run_validation_max_angular_speed < 4.0f);
 
     printf("[A3] Long-run validation report %s\n", a3_version_string);
     printf("[A3] duration_ticks=%d objects=%d sleeping=%d awake=%d\n", long_run_validation_total_ticks, object_count,

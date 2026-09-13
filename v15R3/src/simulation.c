@@ -1,5 +1,4 @@
 #include "mpe_engine.h"
-#include "robotics/gui_robot_registry.h" /* MFS_GUI_BRIDGE */
 #include "core/validation_report.h"
 #include "physics/depenetration.h"
 #include "core/simulation_camera.h"
@@ -12,6 +11,7 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <unistd.h> /* MPE_TASK_39 access() */
+
 //World Status right now
 frame_timer main_timer;
 rigidbody *obj_per_scene = NULL;
@@ -91,13 +91,6 @@ gboolean physics_step_increment(gpointer user_data_pointer) {
     /* THE PHYSICS LOOP */
     simulation_physics_tick(frame_delta_time);
 
-    /* MFS_GUI_BRIDGE_TICK: Robot physics tick only.
-       Drive input is handled in simulation_input_dispatch.c (G/V/B/N/C/H). */
-    if (gui_robot_get_count() > 0) {
-        gui_robot_tick(frame_delta_time);
-    }
-    /* MFS_GUI_BRIDGE_TICK_END */
-
     /* Post-physics bookkeeping */
     gtk_widget_queue_draw(GTK_WIDGET(user_data_pointer));
     int a3_sleeping_object_count = 0;
@@ -110,3 +103,5 @@ gboolean physics_step_increment(gpointer user_data_pointer) {
     overlay_update();
     return TRUE;
 }
+
+/* a3_positional_depenetration_pass now lives in physics/depenetration.c. */
