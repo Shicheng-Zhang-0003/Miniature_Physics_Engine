@@ -1,6 +1,6 @@
 /* MPE kinematic truth test: a velocity-driven platform ignores gravity and
  * carries a resting body with it through contact. */
-#ifdef MPE_KINEMATIC_TEST
+#ifdef mpe_kinematic_test
 #include <stdio.h>
 #include <math.h>
 #include "core/physics_world.h"
@@ -58,4 +58,4 @@ int main(void) {
     physics_world_cleanup(&world);
     return fail;
 }
-#endif /* MPE_KINEMATIC_TEST */
+#endif /* mpe_kinematic_test */

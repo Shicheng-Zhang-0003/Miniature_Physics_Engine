@@ -22,7 +22,7 @@ int constraint_add_revolute (struct physics_world *world, uint32_t id_a, uint32_
     if (vector3_length_squared(axis_a) < 1e-12f) { return -1; }
     for (int i = 0; i < mpe_max_joints; i++) {
         if (!world->revolute_constraints [i].is_active) {
-            world->revolute_constraints [i].type = CONSTRAINT_REVOLUTE;
+            world->revolute_constraints [i].type = constraint_revolute;
             world->revolute_constraints [i].body_id_a = id_a;
             world->revolute_constraints [i].body_id_b = id_b;
             world->revolute_constraints [i].p.revolute.anchor_a = anchor_a;
@@ -59,7 +59,7 @@ void constraint_set_revolute_motor (struct physics_world *world, int index, bool
     if (!world) { return; }
     if ((index < 0) || (index >= mpe_max_joints)) { return; }
     if (!world->revolute_constraints [index].is_active) { return; }
-    if (world->revolute_constraints [index].type != CONSTRAINT_REVOLUTE) { return; }
+    if (world->revolute_constraints [index].type != constraint_revolute) { return; }
     world->revolute_constraints [index].p.revolute.motor_enabled = enabled;
     world->revolute_constraints [index].p.revolute.motor_target_speed = target_speed;
     world->revolute_constraints [index].p.revolute.motor_max_torque = max_torque;
@@ -69,7 +69,7 @@ void constraint_set_revolute_axes (struct physics_world *world, int index, vecto
     if (!world) { return; }
     if ((index < 0) || (index >= mpe_max_joints)) { return; }
     if (!world->revolute_constraints [index].is_active) { return; }
-    if (world->revolute_constraints [index].type != CONSTRAINT_REVOLUTE) { return; }
+    if (world->revolute_constraints [index].type != constraint_revolute) { return; }
     if (vector3_length_squared (axis_a) < 1e-12f) { return; }
     world->revolute_constraints [index].p.revolute.axis_a = vector3_normalisation (axis_a);
     /* Zero axis_b means "same as axis_a" (legacy callers). */
@@ -83,7 +83,7 @@ void constraint_set_revolute_limits (struct physics_world *world, int index, boo
     if (!world) { return; }
     if ((index < 0) || (index >= mpe_max_joints)) { return; }
     if (!world->revolute_constraints [index].is_active) { return; }
-    if (world->revolute_constraints [index].type != CONSTRAINT_REVOLUTE) { return; }
+    if (world->revolute_constraints [index].type != constraint_revolute) { return; }
     if ((!isfinite (limit_min_rad)) || (!isfinite (limit_max_rad))) { return; }
     world->revolute_constraints [index].p.revolute.limits_enabled = enabled;
     world->revolute_constraints [index].p.revolute.limit_min_rad =
@@ -127,18 +127,18 @@ static void constraint_dispatch (struct physics_world *world, float dt, bool mot
          * written straight to the accumulator (no force-wake trip), so a
          * sleeping robot would otherwise never hear its own drive. */
         if (motors_pass) {
-            if ((c->type == CONSTRAINT_REVOLUTE) && (c->p.revolute.motor_enabled)) {
+            if ((c->type == constraint_revolute) && (c->p.revolute.motor_enabled)) {
                 rigidbody_wake (body_a);
                 rigidbody_wake (body_b);
             }
         } else {
             if ((!islands_body_awake (world, body_a)) && (!islands_body_awake (world, body_b))) { continue; }
         }
-        if (c->type == CONSTRAINT_REVOLUTE) {
+        if (c->type == constraint_revolute) {
             if (motors_pass) { revolute_apply_motor (&c->p.revolute, body_a, body_b, dt); }
             else { revolute_solve (&c->p.revolute, body_a, body_b, dt); }
         }
-        /* CONSTRAINT_FIXED / CONSTRAINT_PRISMATIC dispatched in 064 / 065 */
+        /* constraint_fixed / constraint_prismatic dispatched in 064 / 065 */
     }
 }
 
@@ -166,7 +166,7 @@ void constraint_correct_axis_drift_all (struct physics_world *world, float dt) {
     int body_count = world->body_count;
     for (int i = 0; i < mpe_max_joints; i++) {
         if (!world->revolute_constraints [i].is_active) { continue; }
-        if (world->revolute_constraints [i].type != CONSTRAINT_REVOLUTE) { continue; }
+        if (world->revolute_constraints [i].type != constraint_revolute) { continue; }
         constraint *c = &world->revolute_constraints [i];
         rigidbody *body_a = find_body_by_id (bodies, body_count, c->body_id_a);
         rigidbody *body_b = find_body_by_id (bodies, body_count, c->body_id_b);

@@ -12,9 +12,9 @@
  * first-hit, O(chain) instead of O(cache). Heads live in
  * physics_world.contact_hash_head (heap, per world). The old file-scope
  * global cache is retired; a NULL cache degrades to all-miss. */
-#define CONTACT_HASH_BITS 12
-#define CONTACT_HASH_SIZE (1 << CONTACT_HASH_BITS)
-#define CONTACT_HASH_MASK (CONTACT_HASH_SIZE - 1)
+#define contact_hash_bits 12
+#define contact_hash_size (1 << contact_hash_bits)
+#define contact_hash_mask (contact_hash_size - 1)
 
 static inline uint32_t contact_pair_key(uint32_t id_a, uint32_t id_b) {
     uint32_t lo = (id_a < id_b) ? id_a : id_b;
@@ -26,7 +26,7 @@ static inline uint32_t contact_pair_key(uint32_t id_a, uint32_t id_b) {
     key ^= key >> 27;
     key *= 0x94d049bb133111ebULL;
     key ^= key >> 31;
-    return (uint32_t) (key & CONTACT_HASH_MASK);
+    return (uint32_t) (key & contact_hash_mask);
 }
 
 bool collision_dual_sphere(rigidbody *rigidbody_object_a, rigidbody *rigidbody_object_b,
@@ -1565,7 +1565,7 @@ void contact_cache_save(struct physics_world *world, collision_data *manifolds, 
      * scan used: identical first-hit. Zero-id entries never match any
      * predicate and stay unchained. */
     if (hash_head) {
-        for (int h = 0; h < CONTACT_HASH_SIZE; h++) {
+        for (int h = 0; h < contact_hash_size; h++) {
             hash_head[h] = -1;
         }
         for (int c = *cache_count - 1; c >= 0; c--) {
@@ -2080,7 +2080,7 @@ bool collision_cylinder_cube(rigidbody *cyl, rigidbody *cube,
      * Nine samples gives better coverage than the original five without
      * becoming expensive. For FTC wheel-sized cylinders this is enough.
      */
-    const int SAMPLES = 9;
+    const int samples = 9;
 
     /* Collect every penetrating sample: a cylinder lying on a face needs
      * several contacts along the axle for stable support (single-point
@@ -2090,8 +2090,8 @@ bool collision_cylinder_cube(rigidbody *cyl, rigidbody *cube,
     float samp_d[10];
     int samp_count = 0;
 
-    for (int s = 0; s <= SAMPLES; s++) {
-        float t = (float) s / (float) SAMPLES;
+    for (int s = 0; s <= samples; s++) {
+        float t = (float) s / (float) samples;
         vector3 pt = vector3_addition(e1, vector3_scaling(seg, t));
 
         vector3 rel = vector3_subtraction(pt, cube->position);

@@ -8,7 +8,7 @@
 #include "config/mpe_constants.h"
 #include "config/mpe_config.h"
 
-#include "core/math3D.h"
+#include "core/math3d.h"
 #include "core/math4_special.h"
 #include "core/rigidbody.h"
 #include "core/frame_timer.h"

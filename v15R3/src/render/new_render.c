@@ -29,13 +29,13 @@ static struct {
     GLint specular_exponent_location;
 } utility_uniforms;
 mesh sphere_mesh;
-typedef enum { RENDER_UNINITIALIZED = 0, RENDER_OK = 1, RENDER_FAILED = -1 } render_status;
-static render_status render_init_status = RENDER_UNINITIALIZED;
+typedef enum { render_uninitialized = 0, render_ok = 1, render_failed = -1 } render_status;
+static render_status render_init_status = render_uninitialized;
 static grid_mesh main_grid;
 static float *sphere_instances = NULL;
 static float *cube_instances = NULL;
 void render_init() {
-    if (render_init_status != RENDER_UNINITIALIZED) {
+    if (render_init_status != render_uninitialized) {
         return;
     }
     instanced_shader_program =
@@ -45,7 +45,7 @@ void render_init() {
     if ((instanced_shader_program == 0) || (utility_shader_program == 0)) {
         fprintf(stderr, "RENDER INIT FAILED: shader program creation failed (instanced=%u, utility=%u)\n",
                 instanced_shader_program, utility_shader_program);
-        render_init_status = RENDER_FAILED;
+        render_init_status = render_failed;
         return;
     }
     instanced_uniforms.projection_matrix_location = glGetUniformLocation(instanced_shader_program, "projection");
@@ -68,7 +68,7 @@ void render_init() {
     cube_meshing_init();
     sphere_instances = malloc(mpe_max_bodies * 19 * sizeof(float));
     cube_instances = malloc(mpe_max_bodies * 19 * sizeof(float));
-    render_init_status = RENDER_OK;
+    render_init_status = render_ok;
 }
 void render_cleanup(void) {
     if (sphere_instances) {
@@ -79,10 +79,10 @@ void render_cleanup(void) {
         free(cube_instances);
         cube_instances = NULL;
     }
-    render_init_status = RENDER_UNINITIALIZED;
+    render_init_status = render_uninitialized;
 }
 void render_scene_current(int widget_width, int widget_height) {
-    if (render_init_status == RENDER_FAILED) {
+    if (render_init_status == render_failed) {
         glViewport(0, 0, widget_width, widget_height);
         glClearColor(0.5f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

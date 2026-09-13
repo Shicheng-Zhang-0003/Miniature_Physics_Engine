@@ -1,6 +1,6 @@
 /* MPE rolling-decay truth test: with air drag disabled, contact-patch
  * rolling resistance must still decay a rolling ball (no perpetual roll). */
-#ifdef MPE_ROLLING_DECAY_TEST
+#ifdef mpe_rolling_decay_test
 #include <stdio.h>
 #include <math.h>
 #include "core/physics_world.h"
@@ -46,4 +46,4 @@ int main(void) {
     physics_world_cleanup(&world);
     return fail;
 }
-#endif /* MPE_ROLLING_DECAY_TEST */
+#endif /* mpe_rolling_decay_test */

@@ -1,6 +1,6 @@
 #ifndef object_spawner_h
 #define object_spawner_h
-#include "../core/math3D.h"
+#include "../core/math3d.h"
 #include "../core/rigidbody.h"
 
 void spawner_launch_sphere(float spherical_radius, float physical_mass, float launch_speed);

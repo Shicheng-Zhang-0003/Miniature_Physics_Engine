@@ -1,7 +1,7 @@
 /* MFS_174: Cylinder vs cylinder collision test.
 * Two cylinders approach each other. They must not pass
 * through each other. */
-#ifdef MFS_CYL_CYL_TEST
+#ifdef mfs_cyl_cyl_test
 #include <stdio.h>
 #include <math.h>
 #include "core/physics_world.h"
@@ -56,4 +56,4 @@ int main(void) {
     physics_world_cleanup(&world);
     return 0;
 }
-#endif /* MFS_CYL_CYL_TEST */
+#endif /* mfs_cyl_cyl_test */

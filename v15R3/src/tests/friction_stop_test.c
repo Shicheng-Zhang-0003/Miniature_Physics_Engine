@@ -1,6 +1,6 @@
 /* Friction-stop truth: a sliding block must stop after exactly v^2/(2*mu*g)
  * (work-energy: kinetic energy dissipated by Coulomb friction). */
-#ifdef MPE_FRICTION_STOP_TEST
+#ifdef mpe_friction_stop_test
 #include <stdio.h>
 #include <math.h>
 #include "core/physics_world.h"
@@ -53,4 +53,4 @@ int main(void) {
     physics_world_cleanup(&world);
     return fail;
 }
-#endif /* MPE_FRICTION_STOP_TEST */
+#endif /* mpe_friction_stop_test */

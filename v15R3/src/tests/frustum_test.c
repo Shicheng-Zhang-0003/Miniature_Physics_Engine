@@ -2,10 +2,10 @@
  * agree with clip-space projection. A point inside clip space must never
  * be culled (no false exclusion); a point far outside must be culled.
  * Pure math4 — no GL required. Built via `make build_frustum`. */
-#ifdef MPE_FRUSTUM_TEST
+#ifdef mpe_frustum_test
 #include <stdio.h>
 #include <math.h>
-#include "core/math3D.h"
+#include "core/math3d.h"
 #include "core/math4_special.h"
 
 static vector4 math4_mul_vec4(math4 m, vector4 v) {
@@ -121,4 +121,4 @@ int main(void) {
     }
     return fail;
 }
-#endif /* MPE_FRUSTUM_TEST */
+#endif /* mpe_frustum_test */

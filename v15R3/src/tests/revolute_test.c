@@ -1,5 +1,5 @@
 /* MPE_FTC_068: revolute pendulum test. Built via `make test_revolute`. */
-#ifdef MPE_REVOLUTE_TEST
+#ifdef mpe_revolute_test
 #include <stdio.h>
 #include <math.h>
 #include "core/physics_world.h"
@@ -67,4 +67,4 @@ int main(void) {
     physics_world_cleanup(&world);
     return fail;
 }
-#endif /* MPE_REVOLUTE_TEST */
+#endif /* mpe_revolute_test */

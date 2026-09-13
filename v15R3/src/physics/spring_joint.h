@@ -1,6 +1,6 @@
 #ifndef spring_joint_h
 #define spring_joint_h
-#include "../core/math3D.h"
+#include "../core/math3d.h"
 #include "../core/math4_special.h"
 #include "../core/rigidbody.h"
 #include "../core/physics_world.h"
