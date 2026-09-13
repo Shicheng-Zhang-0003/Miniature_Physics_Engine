@@ -12,7 +12,7 @@ static void on_main_window_destroy(GtkWidget *widget, gpointer user_data) {
         physics_timeout_id = 0;
     }
     render_cleanup();
-    broadphase_cleanup();
+    physics_world_cleanup(physics_world_get_primary());
     gtk_main_quit();
 }
 //On Call
@@ -52,6 +52,9 @@ int main_algorithm(int argc, char *argv[]) {
     }
     /* MPE_TASK_34_CONFIG_LOAD_END */
     printf("MPE %s\n", a3_version_string); /* A3_PATCH_41_FINAL_VALIDATION */
+    /* Primary simulation world owns all sim state (bodies, joints,
+     * caches, scratch). Scene code assumes it initialized. */
+    physics_world_init(physics_world_get_primary());
     //Camera Init
     initialize_camera(&main_camera_fov, (vector3){0.0f, 20.0f, 50.0f});
     initialize_input(&main_inputs);

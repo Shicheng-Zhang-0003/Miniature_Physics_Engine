@@ -195,8 +195,8 @@ void cmd_rm(int argc, char **argv) {
             if (kind == term_target_joint) {
                 int removed_count = 0;
                 for (int joint_index = 0; joint_index < mpe_max_joints; joint_index++) {
-                    if (joint_pool[joint_index].is_active) {
-                        remove_joint(joint_index);
+                    if ((physics_world_get_primary()->spring_joints)[joint_index].is_active) {
+                        remove_joint(physics_world_get_primary(), joint_index);
                         removed_count++;
                     }
                 }
@@ -204,7 +204,7 @@ void cmd_rm(int argc, char **argv) {
             } else {
                 scene_clear();
                 clear_selection();
-                contact_cache_clear(NULL);
+                contact_cache_clear(physics_world_get_primary());
                 main_inputs.object_menu_level = 0;
                 main_inputs.marked_joint_object_index = -1;
                 main_inputs.is_menu_open = false;
@@ -218,7 +218,7 @@ void cmd_rm(int argc, char **argv) {
         if (kind == term_target_joint) {
             int joint_index = term_joint_from_token(target);
             if (joint_index >= 0) {
-                remove_joint(joint_index);
+                remove_joint(physics_world_get_primary(), joint_index);
                 term_printf("term_ok", "removed /joint/%d\n", joint_index);
             } else {
                 term_printf("term_err", "mpe: %s: No such joint\n", target);
@@ -227,7 +227,7 @@ void cmd_rm(int argc, char **argv) {
             int object_index = term_object_from_token(target);
             if (object_index >= 0) {
                 if (delete_count < mpe_max_bodies) {
-                    term_id_buffer[delete_count++] = obj_per_scene[object_index].object_id;
+                    term_id_buffer[delete_count++] = (physics_world_get_primary()->bodies)[object_index].object_id;
                 }
             } else {
                 term_printf("term_err", "mpe: %s: No such object\n", target);
@@ -253,7 +253,7 @@ void cmd_mv(int argc, char **argv) {
     if (object_index < 0) {
         return;
     }
-    rigidbody *rigid_body = &obj_per_scene[object_index];
+    rigidbody *rigid_body = &(physics_world_get_primary()->bodies)[object_index];
     float x = 0.0f, y = 0.0f, z = 0.0f;
     int movement_kind = term_parse_movement_destination(argv[2], &x, &y, &z);
     if (movement_kind == 1) {
@@ -292,10 +292,10 @@ void cmd_ln(int argc, char **argv) {
         return;
     }
     float rest_length =
-        vector3_length(vector3_subtraction(obj_per_scene[index_b].position, obj_per_scene[index_a].position));
+        vector3_length(vector3_subtraction((physics_world_get_primary()->bodies)[index_b].position, (physics_world_get_primary()->bodies)[index_a].position));
     float spring_constant = soft_joint ? g_cfg.joints.soft_spring_k : g_cfg.joints.default_spring_k;
     float damping_coefficient = soft_joint ? g_cfg.joints.soft_damping : g_cfg.joints.default_damping;
-    int joint_index = add_joint(index_a, index_b, rest_length, spring_constant, damping_coefficient);
+    int joint_index = add_joint(physics_world_get_primary(), index_a, index_b, rest_length, spring_constant, damping_coefficient);
     if (joint_index < 0) {
         term_err("mpe: ln: cannot create joint\n");
         return;
@@ -311,7 +311,7 @@ void cmd_unlink(int argc, char **argv) {
     if (term_classify_token(target) == term_target_joint) {
         int joint_index = term_require_joint(target);
         if (joint_index >= 0) {
-            remove_joint(joint_index);
+            remove_joint(physics_world_get_primary(), joint_index);
             term_printf("term_ok", "removed /joint/%d\n", joint_index);
         }
     } else {
@@ -386,22 +386,22 @@ void cmd_kill(int argc, char **argv) {
         const char *target = argv[argument_index];
         if (term_is_all_token(target)) {
             if (kill_action == kill_stop) {
-                for (int object_index = 0; object_index < object_count; object_index++) {
-                    obj_per_scene[object_index].velocity = vector3_zero();
-                    obj_per_scene[object_index].angular_velocity = vector3_zero();
-                    obj_per_scene[object_index].is_sleeping = true;
-                    obj_per_scene[object_index].sleep_timer = 2.0f;
+                for (int object_index = 0; object_index < (physics_world_get_primary()->body_count); object_index++) {
+                    (physics_world_get_primary()->bodies)[object_index].velocity = vector3_zero();
+                    (physics_world_get_primary()->bodies)[object_index].angular_velocity = vector3_zero();
+                    (physics_world_get_primary()->bodies)[object_index].is_sleeping = true;
+                    (physics_world_get_primary()->bodies)[object_index].sleep_timer = 2.0f;
                 }
                 term_ok("stopped all objects\n");
             } else if (kill_action == kill_cont) {
-                for (int object_index = 0; object_index < object_count; object_index++) {
-                    rigidbody_wake(&obj_per_scene[object_index]);
+                for (int object_index = 0; object_index < (physics_world_get_primary()->body_count); object_index++) {
+                    rigidbody_wake(&(physics_world_get_primary()->bodies)[object_index]);
                 }
                 term_ok("continued all objects\n");
             } else {
                 scene_clear();
                 clear_selection();
-                contact_cache_clear(NULL);
+                contact_cache_clear(physics_world_get_primary());
                 main_inputs.object_menu_level = 0;
                 main_inputs.marked_joint_object_index = -1;
                 main_inputs.is_menu_open = false;
@@ -417,7 +417,7 @@ void cmd_kill(int argc, char **argv) {
             term_printf("term_err", "mpe: %s: No such object\n", target);
             continue;
         }
-        rigidbody *rigid_body = &obj_per_scene[object_index];
+        rigidbody *rigid_body = &(physics_world_get_primary()->bodies)[object_index];
         if (kill_action == kill_stop) {
             rigid_body->velocity = vector3_zero();
             rigid_body->angular_velocity = vector3_zero();

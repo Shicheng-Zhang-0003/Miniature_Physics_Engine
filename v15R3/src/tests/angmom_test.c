@@ -21,7 +21,7 @@ int main(void) {
     g_cfg.world.angular_damping_scale = 1.0f;
     physics_world world;
     physics_world_init(&world);
-    constraint_pool_init();
+    constraint_pool_init(&world);
 
     /* Distinct half extents => fully populated inertia tensor. */
     int b = physics_world_add_cube(&world, (vector3){0.0f, 50.0f, 0.0f}, (vector3){0.3f, 0.5f, 0.7f}, 2.0f);

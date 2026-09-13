@@ -104,10 +104,10 @@ void wireframe_render_object(GLuint shader_program, math4 view_matrix, math4 pro
     glBindVertexArray(0);
 }
 void wireframe_render_selected_object(GLuint shader_program, math4 view_matrix, math4 projection_matrix) {
-    if ((selected_object < 0) || (selected_object >= object_count)) {
+    if ((selected_object < 0) || (selected_object >= (physics_world_get_primary()->body_count))) {
         return;
     }
     //Yellow outline (Selected Object Visibility)
-    wireframe_render_object(shader_program, view_matrix, projection_matrix, &obj_per_scene[selected_object],
+    wireframe_render_object(shader_program, view_matrix, projection_matrix, &(physics_world_get_primary()->bodies)[selected_object],
                             (vector3){1.0f, 1.0f, 0.0f});
 }

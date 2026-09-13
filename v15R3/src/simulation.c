@@ -14,10 +14,10 @@
 
 //World Status right now
 frame_timer main_timer;
-rigidbody *obj_per_scene = NULL;
-int object_count = 0;
-int object_capacity = 0;
-//World Physics Globals
+/* RETIRED: obj_per_scene/object_count/object_capacity lived here.
+ * Body storage is owned by the primary physics_world now; see
+ * core/physics_world.h. This TU keeps app/diag state (timer, debug
+ * counters) plus the GTK frame dispatch below. */
 
 int debug_last_object_count = 0;
 int debug_last_broadphase_pair_count = 0;
@@ -94,11 +94,11 @@ gboolean physics_step_increment(gpointer user_data_pointer) {
     /* Post-physics bookkeeping */
     gtk_widget_queue_draw(GTK_WIDGET(user_data_pointer));
     int a3_sleeping_object_count = 0;
-    for (int sleep_count_index = 0; sleep_count_index < object_count; sleep_count_index++) {
-        if (obj_per_scene[sleep_count_index].is_sleeping) { a3_sleeping_object_count++; }
+    for (int sleep_count_index = 0; sleep_count_index < (physics_world_get_primary()->body_count); sleep_count_index++) {
+        if ((physics_world_get_primary()->bodies)[sleep_count_index].is_sleeping) { a3_sleeping_object_count++; }
     }
     debug_last_sleeping_object_count = a3_sleeping_object_count;
-    debug_last_object_count = object_count;
+    debug_last_object_count = (physics_world_get_primary()->body_count);
     long_run_validation_tick_update();
     overlay_update();
     return TRUE;

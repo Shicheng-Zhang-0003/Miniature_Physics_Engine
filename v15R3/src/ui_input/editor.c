@@ -9,20 +9,20 @@ static void editor_reacquire_mouse(GtkWidget *parent_window) {
 }
 
 static rigidbody *editor_selected_object_or_null(void) {
-    if ((selected_object < 0) || (selected_object >= object_count)) {
+    if ((selected_object < 0) || (selected_object >= (physics_world_get_primary()->body_count))) {
         return NULL;
     }
-    return &obj_per_scene[selected_object];
+    return &(physics_world_get_primary()->bodies)[selected_object];
 }
 
 void editor_update_menus(GtkWidget *parent_window) {
-    if ((selected_object < 0) || (selected_object >= object_count)) {
+    if ((selected_object < 0) || (selected_object >= (physics_world_get_primary()->body_count))) {
         if (main_inputs.object_menu_level > 0) {
             main_inputs.object_menu_level = 0;
         }
     }
 
-    if ((main_inputs.marked_joint_object_index < 0) || (main_inputs.marked_joint_object_index >= object_count)) {
+    if ((main_inputs.marked_joint_object_index < 0) || (main_inputs.marked_joint_object_index >= (physics_world_get_primary()->body_count))) {
         main_inputs.marked_joint_object_index = -1;
     }
 
@@ -153,7 +153,7 @@ void editor_update_menus(GtkWidget *parent_window) {
             rigidbody_update_inertia_cube(selected_rigid_body);
         }
         /* MPE_TASK_06_CACHE_CLEAR_MASS */
-        contact_cache_clear(NULL);
+        contact_cache_clear(physics_world_get_primary());
         /* MPE_TASK_19_EDITOR_EDIT_WAKE_MASS_BEGIN */
         rigidbody_wake(selected_rigid_body);
         /* MPE_TASK_19_EDITOR_EDIT_WAKE_MASS_END */
@@ -174,7 +174,7 @@ void editor_update_menus(GtkWidget *parent_window) {
             rigidbody_update_inertia_sphere(selected_rigid_body);
         }
         /* MPE_TASK_06_CACHE_CLEAR_RADIUS */
-        contact_cache_clear(NULL);
+        contact_cache_clear(physics_world_get_primary());
         /* MPE_TASK_19_EDITOR_EDIT_WAKE_RADIUS_BEGIN */
         rigidbody_wake(selected_rigid_body);
         /* MPE_TASK_19_EDITOR_EDIT_WAKE_RADIUS_END */
@@ -193,7 +193,7 @@ void editor_update_menus(GtkWidget *parent_window) {
         }
         selected_rigid_body->friction_static = selected_rigid_body->friction_kinetic + 0.1f;
         /* MPE_TASK_06_CACHE_CLEAR_FRICTION */
-        contact_cache_clear(NULL);
+        contact_cache_clear(physics_world_get_primary());
         /* MPE_TASK_19_EDITOR_EDIT_WAKE_FRICTION_BEGIN */
         rigidbody_wake(selected_rigid_body);
         /* MPE_TASK_19_EDITOR_EDIT_WAKE_FRICTION_END */
@@ -209,7 +209,7 @@ void editor_update_menus(GtkWidget *parent_window) {
         if ((main_inputs.up_arrow_pressed) || (main_inputs.down_arrow_pressed)) {
             rigidbody_set_static(selected_rigid_body, !selected_rigid_body->static_state);
             /* MPE_TASK_06_CACHE_CLEAR_STATIC */
-            contact_cache_clear(NULL);
+            contact_cache_clear(physics_world_get_primary());
             main_inputs.up_arrow_pressed = false;
             main_inputs.down_arrow_pressed = false;
         }
@@ -222,12 +222,12 @@ void editor_update_menus(GtkWidget *parent_window) {
         main_inputs.marked_joint_object_index = selected_object;
         main_inputs.object_menu_level = 0;
     } else if (main_inputs.object_menu_level == 7) {
-        if (main_inputs.marked_joint_object_index != -1 && main_inputs.marked_joint_object_index < object_count &&
+        if (main_inputs.marked_joint_object_index != -1 && main_inputs.marked_joint_object_index < (physics_world_get_primary()->body_count) &&
             main_inputs.marked_joint_object_index != selected_object) {
-            rigidbody *rb_a = &obj_per_scene[main_inputs.marked_joint_object_index];
-            rigidbody *rb_b = &obj_per_scene[selected_object];
+            rigidbody *rb_a = &(physics_world_get_primary()->bodies)[main_inputs.marked_joint_object_index];
+            rigidbody *rb_b = &(physics_world_get_primary()->bodies)[selected_object];
             float dist = vector3_length(vector3_subtraction(rb_b->position, rb_a->position));
-            if (add_joint(main_inputs.marked_joint_object_index, selected_object, dist, g_cfg.joints.default_spring_k,
+            if (add_joint(physics_world_get_primary(), main_inputs.marked_joint_object_index, selected_object, dist, g_cfg.joints.default_spring_k,
 
             g_cfg.joints.default_damping) < 0) { /* MFS_166_JOINT_CHECK */
 

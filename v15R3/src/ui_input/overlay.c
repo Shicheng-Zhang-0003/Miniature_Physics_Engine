@@ -13,15 +13,13 @@ static GtkWidget *object_menu_label = NULL;
 static GtkWidget *config_menu_label = NULL; /* MPE_TASK_35 */
 extern input_status main_inputs;
 extern camera main_camera_fov;
-extern rigidbody *obj_per_scene;
-extern int object_count;
 extern int selected_object;
 
 static void overlay_append_overflow_text(char *buffer, size_t buffer_size) {
-    int node_overflow_count = broadphase_get_node_overflow_count();
-    int pair_overflow_count = broadphase_get_pair_overflow_count();
+    int node_overflow_count = broadphase_get_node_overflow_count(physics_world_get_primary());
+    int pair_overflow_count = broadphase_get_pair_overflow_count(physics_world_get_primary());
     /* MPE_TASK_11_OVERLAY_LARGE_CLAMP_BEGIN */
-    int large_clamp_count = broadphase_get_large_object_clamp_count();
+    int large_clamp_count = broadphase_get_large_object_clamp_count(physics_world_get_primary());
     if (large_clamp_count > 0) {
         size_t large_clamp_current_length = strlen(buffer);
         if (large_clamp_current_length < buffer_size) {
@@ -31,7 +29,7 @@ static void overlay_append_overflow_text(char *buffer, size_t buffer_size) {
     }
     /* MPE_TASK_11_OVERLAY_LARGE_CLAMP_END */
     /* MPE_TASK_10_OVERLAY_DEDUPE_BEGIN */
-    int dedupe_overflow_count = broadphase_get_pair_dedupe_overflow_count();
+    int dedupe_overflow_count = broadphase_get_pair_dedupe_overflow_count(physics_world_get_primary());
     if (dedupe_overflow_count > 0) {
         size_t dedupe_current_length = strlen(buffer);
         if (dedupe_current_length < buffer_size) {
@@ -60,7 +58,7 @@ static void overlay_append_overflow_text(char *buffer, size_t buffer_size) {
     }
 }
 static bool overlay_has_valid_selection(void) {
-    return (selected_object >= 0) && (selected_object < object_count);
+    return (selected_object >= 0) && (selected_object < (physics_world_get_primary()->body_count));
 }
 GtkWidget *overlay_initialise(GtkWidget *gl_drawing_area_widget) {
     //Debug Info
@@ -116,8 +114,8 @@ static void overlay_append_stats_text(char *buffer, size_t buffer_size) {
     if (current_length < buffer_size) {
         snprintf(buffer + current_length, buffer_size - current_length,
                  " | Obj:%d Pairs:%d Manifolds:%d Cache H:%d M:%d", debug_last_object_count,
-                 debug_last_broadphase_pair_count, debug_last_manifold_count, contact_cache_get_hits(),
-                 contact_cache_get_misses());
+                 debug_last_broadphase_pair_count, debug_last_manifold_count, contact_cache_get_hits(physics_world_get_primary()),
+                 contact_cache_get_misses(physics_world_get_primary()));
         /* MPE_TASK_13_OVERLAY_LONG_RUN_BEGIN */
         if (long_run_validation_active) {
             size_t long_run_current_length = strlen(buffer);
@@ -146,7 +144,7 @@ void overlay_update(void) {
                 snprintf(menu_text_buffer, sizeof(menu_text_buffer),
                          "-- Scene Menu --\nObjects: %d | Joints: %d\n\n1: Save Scene\n2: Load Scene\n3: Clear "
                          "Scene\n4: Save Config\n5: Reset Config\n6: Exit",
-                         object_count, current_joint_count);
+                         (physics_world_get_primary()->body_count), (physics_world_get_primary()->spring_joint_count));
                 gtk_label_set_text(GTK_LABEL(menu_label), menu_text_buffer);
             }
             gtk_widget_show(menu_label);
@@ -256,7 +254,7 @@ void overlay_update(void) {
         }
     }
     if (object_menu_label) {
-        if ((main_inputs.object_menu_level == 0) || (selected_object < 0) || (selected_object >= object_count)) {
+        if ((main_inputs.object_menu_level == 0) || (selected_object < 0) || (selected_object >= (physics_world_get_primary()->body_count))) {
             if (!overlay_has_valid_selection()) {
                 main_inputs.object_menu_level = 0;
             }
@@ -264,7 +262,7 @@ void overlay_update(void) {
 
         } else {
             char object_text[512];
-            rigidbody *target = &obj_per_scene[selected_object];
+            rigidbody *target = &(physics_world_get_primary()->bodies)[selected_object];
             if (main_inputs.object_menu_level == 1) {
                 const char *type_name = (target->type == object_sphere) ? "Sphere" : "Cube";
                 int len = snprintf(
@@ -331,7 +329,7 @@ void overlay_update(void) {
     } else {
         snprintf(game_mode_text, sizeof(game_mode_text), "GAME MODE");
     }
-    if ((selected_object < 0) || (selected_object >= object_count)) {
+    if ((selected_object < 0) || (selected_object >= (physics_world_get_primary()->body_count))) {
         const char *spawn_type_text;
         if (main_inputs.current_spawn_type == 0) {
             spawn_type_text = "sphere";
@@ -347,7 +345,7 @@ void overlay_update(void) {
         gtk_label_set_text(GTK_LABEL(debug_information_label), information_text_buffer);
         return;
     }
-    rigidbody *selected_rigid_body = &obj_per_scene[selected_object];
+    rigidbody *selected_rigid_body = &(physics_world_get_primary()->bodies)[selected_object];
     float selected_object_speed = vector3_length(selected_rigid_body->velocity);
     const char *object_type_text;
     if (selected_rigid_body->type == object_sphere) {

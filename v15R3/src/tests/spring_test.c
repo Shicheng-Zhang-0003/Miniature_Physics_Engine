@@ -31,8 +31,8 @@ int main(void) {
     g_cfg.world.gravity = 0.0f; /* space lab: pure 1-D oscillation */
     physics_world world;
     physics_world_init(&world);
-    constraint_pool_init();
-    joint_init_pool();
+    constraint_pool_init(&world);
+    joint_init_pool(&world);
 
     /* Static anchor + unit mass, k=20, c=0, L0=2, amplitude 0.5 along x.
      * T = 2*pi*sqrt(1/20) = 1.40496 s. High in the air: no contacts. */
@@ -41,7 +41,7 @@ int main(void) {
     int mass = physics_world_add_sphere(&world, 0.2f, 1.0f, (vector3){2.5f, 50.0f, 0.0f});
     uint32_t ida = world.bodies[anchor].object_id;
     uint32_t idm = world.bodies[mass].object_id;
-    if (add_joint_by_ids(ida, idm, 2.0f, k, 0.0f) < 0) {
+    if (add_joint_by_ids(&world, ida, idm, 2.0f, k, 0.0f) < 0) {
         printf("[FAIL] joint creation\n");
         physics_world_cleanup(&world);
         return 1;

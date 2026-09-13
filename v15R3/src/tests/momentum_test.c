@@ -11,7 +11,7 @@ int main(void) {
     mpe_config_init();
     physics_world world;
     physics_world_init(&world);
-    constraint_pool_init();
+    constraint_pool_init(&world);
 
     /* High above the floor: no gravity-torque/contact interference. */
     int a = physics_world_add_sphere(&world, 0.5f, 1.0f, (vector3){-3.0f, 20.0f, 0.0f});

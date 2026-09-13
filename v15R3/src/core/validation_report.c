@@ -8,28 +8,28 @@
 
 void validation_report_print(void) {
     printf("[A3] Validation report %s\n", a3_version_string);
-    printf("[A3] objects=%d capacity=%d joints=%d selected=%d\n", object_count, object_capacity, current_joint_count,
+    printf("[A3] objects=%d capacity=%d joints=%d selected=%d\n", (physics_world_get_primary()->body_count), (physics_world_get_primary()->body_capacity), (physics_world_get_primary()->spring_joint_count),
            selected_object);
     /* MPE_TASK_12_VALIDATION_PRINT_BEGIN */
     printf("[A3] sleeping objects: last_frame=%d\n", debug_last_sleeping_object_count);
     /* MPE_TASK_12_VALIDATION_PRINT_END */
     printf("[A3] debug last: obj=%d pairs=%d manifolds=%d frame_time=%f\n", debug_last_object_count,
            debug_last_broadphase_pair_count, debug_last_manifold_count, debug_last_frame_time);
-    printf("[A3] broadphase overflow: nodes=%d pairs=%d\n", broadphase_get_node_overflow_count(),
-           broadphase_get_pair_overflow_count());
+    printf("[A3] broadphase overflow: nodes=%d pairs=%d\n", broadphase_get_node_overflow_count(physics_world_get_primary()),
+           broadphase_get_pair_overflow_count(physics_world_get_primary()));
     /* MPE_TASK_17_VALIDATION_PRINT_BEGIN */
-    printf("[A3] broadphase cell size: %.2f\n", broadphase_get_current_cell_size());
+    printf("[A3] broadphase cell size: %.2f\n", broadphase_get_current_cell_size(physics_world_get_primary()));
     /* MPE_TASK_17_VALIDATION_PRINT_END */
     /* MPE_TASK_11_VALIDATION_PRINT_BEGIN */
-    printf("[A3] broadphase large object clamps: last_run=%d\n", broadphase_get_large_object_clamp_count());
+    printf("[A3] broadphase large object clamps: last_run=%d\n", broadphase_get_large_object_clamp_count(physics_world_get_primary()));
     /* MPE_TASK_11_VALIDATION_PRINT_END */
     /* MPE_TASK_10_VALIDATION_PRINT_BEGIN */
-    printf("[A3] pair dedupe overflow: last_run=%d\n", broadphase_get_pair_dedupe_overflow_count());
+    printf("[A3] pair dedupe overflow: last_run=%d\n", broadphase_get_pair_dedupe_overflow_count(physics_world_get_primary()));
     /* MPE_TASK_10_VALIDATION_PRINT_END */
     /* MPE_TASK_09_VALIDATION_PRINT_BEGIN */
     printf("[A3] manifold overflow: last_frame=%d\n", debug_last_manifold_overflow_count);
     /* MPE_TASK_09_VALIDATION_PRINT_END */
-    printf("[A3] contact cache: hits=%d misses=%d\n", contact_cache_get_hits(), contact_cache_get_misses());
+    printf("[A3] contact cache: hits=%d misses=%d\n", contact_cache_get_hits(physics_world_get_primary()), contact_cache_get_misses(physics_world_get_primary()));
     printf("[A3] menus: open=%d spawner=%d velocity=%d object=%d marked_joint=%d\n", main_inputs.is_menu_open,
            main_inputs.spawner_menu_level, main_inputs.velocity_menu_level, main_inputs.object_menu_level,
            main_inputs.marked_joint_object_index);

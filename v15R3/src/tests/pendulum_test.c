@@ -12,7 +12,7 @@ int main(void) {
     mpe_config_init();
     physics_world world;
     physics_world_init(&world);
-    constraint_pool_init();
+    constraint_pool_init(&world);
 
     /* Static pivot at (0,6,0). Rod 0.2 x 2.0 x 0.2, COM 1 m below anchor.
      * PHYSICS TRUTH: the hinge pin sits at the pivot's BOTTOM face
@@ -30,7 +30,7 @@ int main(void) {
     uint32_t pivot_id = world.bodies[pivot].object_id;
     uint32_t rod_id = world.bodies[rod].object_id;
     /* Hinge about z, pin 0.1 m below the pivot's bottom face; rod anchor at its top face. */
-    if (constraint_add_revolute(pivot_id, rod_id, (vector3){0.0f, -0.3f, 0.0f}, (vector3){0.0f, 1.0f, 0.0f},
+    if (constraint_add_revolute(&world, pivot_id, rod_id, (vector3){0.0f, -0.3f, 0.0f}, (vector3){0.0f, 1.0f, 0.0f},
                                 (vector3){0.0f, 0.0f, 1.0f}) < 0) {
         printf("[FAIL] joint creation\n");
         physics_world_cleanup(&world);

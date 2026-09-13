@@ -3,36 +3,27 @@
 #include "../core/math3D.h"
 #include "../core/math4_special.h"
 #include "../core/rigidbody.h"
+#include "../core/physics_world.h"
+#include "spring_joint_types.h"
 
-#ifndef mpe_max_joints
-#define mpe_max_joints 1024
-#endif
 #include <stdint.h>
 #include <epoxy/gl.h>
 
-typedef struct {
-    uint32_t object_id_a, object_id_b; /* A3_PATCH_09_JOINT_IDS */
-    float equilibrium_length;
-    float spring_constant;
-    float damping_coefficient;
-    bool is_active;
-} spring_joint;
-
-extern spring_joint joint_pool[mpe_max_joints];
-extern int current_joint_count;
-
-int add_joint(int object_index_a, int object_index_b, float equilibrium_length, float spring_constant,
-              float damping_coefficient);
-void remove_joint(int joint_pool_index);
-void apply_force_all_joints(void);
-/* FIX-AUDIT: world-aware spring pass so the encapsulated physics_world path
- * (which has no access to obj_per_scene) still integrates springs. */
-void apply_spring_forces_world(rigidbody *bodies, int body_count);
-void remove_joints_from_object(int object_index);
+/* Spring pool lives in physics_world (per-world state). The functions below
+ * take the owning world explicitly; legacy single-world callers pass the
+ * primary world. No file-scope pool remains. */
+void joint_init_pool(physics_world *world);
+int spring_joint_count(const physics_world *world);
+int add_joint_by_ids(physics_world *world, uint32_t object_id_a, uint32_t object_id_b, float equilibrium_length,
+                     float spring_constant, float damping_coefficient);
+int add_joint(physics_world *world, int object_index_a, int object_index_b, float equilibrium_length,
+              float spring_constant, float damping_coefficient);
+void remove_joint(physics_world *world, int joint_pool_index);
+void remove_joints_from_object(physics_world *world, int object_index);
+void remove_joints_from_object_id(physics_world *world, uint32_t object_id);
+void apply_force_all_joints(physics_world *world);
+/* World-aware spring pass over an explicit body array (headless + world
+ * step path). Reads the pool of the given world. */
+void apply_spring_forces_world(physics_world *world, rigidbody *bodies, int body_count);
 void spring_joint_render(GLuint shader_program, math4 view_matrix, math4 projection_matrix);
-void joint_init_pool(void);
-
-int add_joint_by_ids(uint32_t object_id_a, uint32_t object_id_b, float equilibrium_length, float spring_constant,
-                     float damping_coefficient);
-void remove_joints_from_object_id(uint32_t object_id);
 #endif

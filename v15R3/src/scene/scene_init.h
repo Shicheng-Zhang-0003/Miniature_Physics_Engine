@@ -3,7 +3,8 @@
 #include "../core/math3D.h"
 #include "../core/rigidbody.h"
 
-extern int object_capacity;
+/* Body storage lives in the primary physics_world (body_capacity member);
+ * no file-scope pool remains. */
 int scene_add_object(float radius, float mass, vector3 initial_position);
 int scene_add_cube(vector3 position, vector3 half_extensions, float mass);
 void scene_init_default(void);

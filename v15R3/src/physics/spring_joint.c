@@ -1,26 +1,59 @@
 #include "../mpe_engine.h"
 #include "spring_joint.h"
+#include "../core/physics_world.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <epoxy/gl.h>
 
-spring_joint joint_pool[mpe_max_joints];
-int current_joint_count = 0;
-int add_joint_by_ids(uint32_t object_id_a, uint32_t object_id_b, float equilibrium_length, float spring_constant,
-                     float damping_coefficient) {
+/* Per-world spring pool. No file-scope pool remains. */
+
+static rigidbody *spring_find_body(rigidbody *bodies, int body_count, uint32_t object_id) {
+    if ((!bodies) || (object_id == 0)) {
+        return NULL;
+    }
+    for (int i = 0; i < body_count; i++) {
+        if (bodies[i].object_id == object_id) {
+            return &bodies[i];
+        }
+    }
+    return NULL;
+}
+
+void joint_init_pool(physics_world *world) {
+    if (!world) {
+        return;
+    }
+    for (int joint_index = 0; joint_index < mpe_max_joints; joint_index++) {
+        world->spring_joints[joint_index].is_active = false;
+    }
+    world->spring_joint_count = 0;
+}
+
+int spring_joint_count(const physics_world *world) {
+    if (!world) {
+        return 0;
+    }
+    return world->spring_joint_count;
+}
+
+int add_joint_by_ids(physics_world *world, uint32_t object_id_a, uint32_t object_id_b, float equilibrium_length,
+                     float spring_constant, float damping_coefficient) {
+    if (!world) {
+        return -1;
+    }
     if ((object_id_a == 0) || (object_id_b == 0) || (object_id_a == object_id_b)) {
         return -1;
     }
 
     for (int joint_index = 0; joint_index < mpe_max_joints; joint_index++) {
-        if (!joint_pool[joint_index].is_active) {
-            joint_pool[joint_index].object_id_a = object_id_a;
-            joint_pool[joint_index].object_id_b = object_id_b;
-            joint_pool[joint_index].equilibrium_length = equilibrium_length;
-            joint_pool[joint_index].spring_constant = spring_constant;
-            joint_pool[joint_index].damping_coefficient = damping_coefficient;
-            joint_pool[joint_index].is_active = true;
-            current_joint_count += 1;
+        if (!world->spring_joints[joint_index].is_active) {
+            world->spring_joints[joint_index].object_id_a = object_id_a;
+            world->spring_joints[joint_index].object_id_b = object_id_b;
+            world->spring_joints[joint_index].equilibrium_length = equilibrium_length;
+            world->spring_joints[joint_index].spring_constant = spring_constant;
+            world->spring_joints[joint_index].damping_coefficient = damping_coefficient;
+            world->spring_joints[joint_index].is_active = true;
+            world->spring_joint_count += 1;
             return joint_index;
         }
     }
@@ -29,48 +62,55 @@ int add_joint_by_ids(uint32_t object_id_a, uint32_t object_id_b, float equilibri
     return -1;
 }
 
-int add_joint(int object_index_a, int object_index_b, float equilibrium_length, float spring_constant,
-              float damping_coefficient) {
-    if ((object_index_a < 0) || (object_index_a >= object_count) || (object_index_b < 0) ||
-        (object_index_b >= object_count)) {
+int add_joint(physics_world *world, int object_index_a, int object_index_b, float equilibrium_length,
+              float spring_constant, float damping_coefficient) {
+    if (!world) {
+        return -1;
+    }
+    if ((object_index_a < 0) || (object_index_a >= world->body_count) || (object_index_b < 0) ||
+        (object_index_b >= world->body_count)) {
         fprintf(stderr, "Error SJA002: Invalid joint object index\n");
         return -1;
     }
 
-    uint32_t object_id_a = obj_per_scene[object_index_a].object_id;
-    uint32_t object_id_b = obj_per_scene[object_index_b].object_id;
+    uint32_t object_id_a = world->bodies[object_index_a].object_id;
+    uint32_t object_id_b = world->bodies[object_index_b].object_id;
 
-    return add_joint_by_ids(object_id_a, object_id_b, equilibrium_length, spring_constant, damping_coefficient);
+    return add_joint_by_ids(world, object_id_a, object_id_b, equilibrium_length, spring_constant,
+                            damping_coefficient);
 }
 
-void remove_joint(int joint_pool_index) {
+void remove_joint(physics_world *world, int joint_pool_index) {
+    if (!world) {
+        return;
+    }
     if ((joint_pool_index < 0) || (joint_pool_index >= mpe_max_joints)) {
         return;
     }
-    if (!joint_pool[joint_pool_index].is_active) {
+    if (!world->spring_joints[joint_pool_index].is_active) {
         return;
     }
-    joint_pool[joint_pool_index].is_active = false;
-    current_joint_count -= 1;
+    world->spring_joints[joint_pool_index].is_active = false;
+    world->spring_joint_count -= 1;
 }
-void apply_force_all_joints(void) {
+
+/* Shared Hooke+damping+limit core over an explicit body array. Both step
+ * paths funnel through here (legacy passes the primary world's bodies). */
+static void spring_apply_core(physics_world *world, rigidbody *bodies, int body_count) {
     for (int joint_index = 0; joint_index < mpe_max_joints; joint_index++) {
-        if (!joint_pool[joint_index].is_active) {
+        if (!world->spring_joints[joint_index].is_active) {
             continue;
         }
 
-        spring_joint *current_spring_joint = &joint_pool[joint_index];
+        spring_joint *current_spring_joint = &world->spring_joints[joint_index];
 
-        int object_index_a = scene_find_object_index_by_id(current_spring_joint->object_id_a);
-        int object_index_b = scene_find_object_index_by_id(current_spring_joint->object_id_b);
+        rigidbody *rigid_body_a = spring_find_body(bodies, body_count, current_spring_joint->object_id_a);
+        rigidbody *rigid_body_b = spring_find_body(bodies, body_count, current_spring_joint->object_id_b);
 
-        if ((object_index_a < 0) || (object_index_b < 0)) {
-            remove_joint(joint_index);
+        if ((!rigid_body_a) || (!rigid_body_b)) {
+            remove_joint(world, joint_index);
             continue;
         }
-
-        rigidbody *rigid_body_a = &obj_per_scene[object_index_a];
-        rigidbody *rigid_body_b = &obj_per_scene[object_index_b];
 
         vector3 displacement_vector = vector3_subtraction(rigid_body_b->position, rigid_body_a->position);
         float current_separation_distance = vector3_length(displacement_vector);
@@ -115,90 +155,45 @@ void apply_force_all_joints(void) {
     }
 }
 
-/* FIX-AUDIT: world-aware spring pass for the encapsulated path.
- * Same Hooke+damping+limit math as above, but IDs resolve against the
- * passed world instead of global obj_per_scene. Center-to-center only
- * (no torque) — matches legacy behavior; anchor offsets are future work. */
-void apply_spring_forces_world(rigidbody *bodies, int body_count) {
-    if ((!bodies) || (body_count <= 0)) {
+/* Legacy entry point: applies the owning world's pool to its own bodies. */
+void apply_force_all_joints(physics_world *world) {
+    if ((!world) || (!world->bodies) || (world->body_count <= 0)) {
         return;
     }
-    for (int joint_index = 0; joint_index < mpe_max_joints; joint_index++) {
-        if (!joint_pool[joint_index].is_active) {
-            continue;
-        }
-        spring_joint *sj = &joint_pool[joint_index];
-        rigidbody *a = NULL;
-        rigidbody *b = NULL;
-        for (int i = 0; i < body_count; i++) {
-            if (bodies[i].object_id == sj->object_id_a) {
-                a = &bodies[i];
-            }
-            if (bodies[i].object_id == sj->object_id_b) {
-                b = &bodies[i];
-            }
-            if (a && b) {
-                break;
-            }
-        }
-        if ((!a) || (!b)) {
-            continue;
-        }
-        vector3 disp = vector3_subtraction(b->position, a->position);
-        float sep = vector3_length(disp);
-        vector3 axis;
-        if (sep < math_epsilon) {
-            axis = (vector3){1.0f, 0.0f, 0.0f};
-            sep = 0.0f;
-        } else {
-            axis = vector3_scaling(disp, 1.0f / sep);
-        }
-        float ext = sep - sj->equilibrium_length;
-        vector3 f_rest = vector3_scaling(axis, sj->spring_constant * ext);
-        vector3 rel = vector3_subtraction(b->velocity, a->velocity);
-        vector3 f_damp = vector3_scaling(axis, sj->damping_coefficient * vector3_dot(rel, axis));
-        vector3 f = vector3_addition(f_rest, f_damp);
-        float inv_sum = a->inverse_mass + b->inverse_mass;
-        if (inv_sum > 0.0f) {
-            float fmax = (1.0f / inv_sum) * g_cfg.joints.max_acceleration;
-            float fl = vector3_length(f);
-            if ((fl > fmax) && (fl > math_epsilon)) {
-                f = vector3_scaling(f, fmax / fl);
-            }
-        }
-        rb_apply_forces_perfect(a, f);
-        rb_apply_forces_perfect(b, vector3_scaling(f, -1.0f));
-    }
+    spring_apply_core(world, world->bodies, world->body_count);
 }
 
-void remove_joints_from_object_id(uint32_t object_id) {
-    if (object_id == 0) {
+/* World-aware spring pass over an explicit body array (headless + world
+ * step path). Pool comes from the given world. */
+void apply_spring_forces_world(physics_world *world, rigidbody *bodies, int body_count) {
+    if ((!world) || (!bodies) || (body_count <= 0)) {
+        return;
+    }
+    spring_apply_core(world, bodies, body_count);
+}
+
+void remove_joints_from_object_id(physics_world *world, uint32_t object_id) {
+    if ((!world) || (object_id == 0)) {
         return;
     }
 
     for (int joint_index = 0; joint_index < mpe_max_joints; joint_index++) {
-        if (!joint_pool[joint_index].is_active) {
+        if (!world->spring_joints[joint_index].is_active) {
             continue;
         }
 
-        if ((joint_pool[joint_index].object_id_a == object_id) || (joint_pool[joint_index].object_id_b == object_id)) {
-            remove_joint(joint_index);
+        if ((world->spring_joints[joint_index].object_id_a == object_id) ||
+            (world->spring_joints[joint_index].object_id_b == object_id)) {
+            remove_joint(world, joint_index);
         }
     }
 }
 
-void remove_joints_from_object(int object_index) {
-    if ((object_index < 0) || (object_index >= object_count)) {
+void remove_joints_from_object(physics_world *world, int object_index) {
+    if ((!world) || (object_index < 0) || (object_index >= world->body_count)) {
         return;
     }
-    remove_joints_from_object_id(obj_per_scene[object_index].object_id);
-}
-
-void joint_init_pool(void) {
-    for (int joint_index = 0; joint_index < mpe_max_joints; joint_index++) {
-        joint_pool[joint_index].is_active = false;
-    }
-    current_joint_count = 0;
+    remove_joints_from_object_id(world, world->bodies[object_index].object_id);
 }
 
 static GLuint joint_vao = 0;
@@ -246,15 +241,20 @@ static void a3_spring_cache_missing_uniforms(GLuint shader_program) {
 }
 
 void spring_joint_render(GLuint shader_program, math4 view_matrix, math4 projection_matrix) {
+    /* Single-viewport renderer: draws the primary world's joints. */
+    physics_world *world = physics_world_get_primary();
+    if (!world) {
+        return;
+    }
     int active_count = 0;
 
     for (int i = 0; i < mpe_max_joints; i++) {
-        if (!joint_pool[i].is_active) {
+        if (!world->spring_joints[i].is_active) {
             continue;
         }
 
-        rigidbody *rb_a = scene_resolve_object_by_id(joint_pool[i].object_id_a);
-        rigidbody *rb_b = scene_resolve_object_by_id(joint_pool[i].object_id_b);
+        rigidbody *rb_a = scene_resolve_object_by_id(world->spring_joints[i].object_id_a);
+        rigidbody *rb_b = scene_resolve_object_by_id(world->spring_joints[i].object_id_b);
 
         if ((rb_a) && (rb_b)) {
             active_count++;
@@ -273,12 +273,12 @@ void spring_joint_render(GLuint shader_program, math4 view_matrix, math4 project
     int v_idx = 0;
 
     for (int i = 0; i < mpe_max_joints; i++) {
-        if (!joint_pool[i].is_active) {
+        if (!world->spring_joints[i].is_active) {
             continue;
         }
 
-        rigidbody *rb_a = scene_resolve_object_by_id(joint_pool[i].object_id_a);
-        rigidbody *rb_b = scene_resolve_object_by_id(joint_pool[i].object_id_b);
+        rigidbody *rb_a = scene_resolve_object_by_id(world->spring_joints[i].object_id_a);
+        rigidbody *rb_b = scene_resolve_object_by_id(world->spring_joints[i].object_id_b);
 
         if ((rb_a) && (rb_b)) {
             vertices[v_idx++] = rb_a->position.x;

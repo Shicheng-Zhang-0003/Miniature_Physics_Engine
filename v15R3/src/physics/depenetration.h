@@ -11,11 +11,13 @@
 bool a3_depenetration_dispatch(rigidbody *rigid_body_a, rigidbody *rigid_body_b,
                                collision_data *collision_output);
 void a3_positional_depenetrate_manifold(collision_data *manifold);
-/* Legacy-path entry point, moved here from simulation.c so headless
- * harnesses can link the legacy step without the GTK application TU.
- * Takes the body array explicitly (no globals) so this TU stays
- * link-clean for world-only binaries. */
-void a3_positional_depenetration_pass(rigidbody *bodies, int body_count, broadphase_pair *pair_buffer,
+/* Positional depenetration over one world's pairs (single implementation
+ * for both step paths; the former world-static duplicate is deleted).
+ * Moved here from simulation.c so headless harnesses can link the legacy
+ * step without the GTK application TU. Takes the owning world explicitly
+ * so this TU stays link-clean for world-only binaries. */
+struct physics_world;
+void a3_positional_depenetration_pass(struct physics_world *world, broadphase_pair *pair_buffer,
                                       int *pair_count_pointer, bool rebuild_broadphase);
 
 #endif
