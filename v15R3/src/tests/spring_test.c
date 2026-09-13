@@ -1,6 +1,6 @@
 /* Spring truth: undamped mass-spring period must match 2*pi*sqrt(m/k), and
  * total mechanical energy must not drift (symplectic bounded oscillation). */
-#ifdef MPE_SPRING_TEST
+#ifdef mpe_spring_test
 #include <stdio.h>
 #include <math.h>
 #include "../ui_input/camera.h"
@@ -51,8 +51,8 @@ int main(void) {
     float prev_x = world.bodies[mass].position.x - 2.0f; /* extension */
     int crossings = 0;
     int first_cross = -1, last_cross = -1;
-    float E0 = 0.5f * k * 0.25f;
-    float Emax_dev = 0.0f;
+    float e0 = 0.5f * k * 0.25f;
+    float emax_dev = 0.0f;
     for (int t = 0; t < 600; t++) {
         physics_world_step(&world, dt);
         rigidbody *mb = &world.bodies[mass];
@@ -70,28 +70,28 @@ int main(void) {
             last_cross = t;
         }
         prev_x = x;
-        float E = 0.5f * k * x * x + 0.5f * 1.0f * vector3_length_squared(mb->velocity);
-        float dev = fabsf(E - E0) / E0;
-        if (dev > Emax_dev) {
-            Emax_dev = dev;
+        float e = 0.5f * k * x * x + 0.5f * 1.0f * vector3_length_squared(mb->velocity);
+        float dev = fabsf(e - e0) / e0;
+        if (dev > emax_dev) {
+            emax_dev = dev;
         }
     }
     int fail = 0;
     /* Half-periods between first and last crossing. */
-    float measured_T = 0.0f;
+    float measured_t = 0.0f;
     if (crossings >= 4) {
-        measured_T = 2.0f * (float)(last_cross - first_cross) * dt / (float)(crossings - 1);
+        measured_t = 2.0f * (float)(last_cross - first_cross) * dt / (float)(crossings - 1);
     }
-    float analytic_T = 2.0f * 3.14159265f * sqrtf(1.0f / k);
-    printf("[info] period: measured=%.4f analytic=%.4f crossings=%d\n", measured_T, analytic_T, crossings);
-    if (fabsf(measured_T - analytic_T) / analytic_T > 0.05f) {
+    float analytic_t = 2.0f * 3.14159265f * sqrtf(1.0f / k);
+    printf("[info] period: measured=%.4f analytic=%.4f crossings=%d\n", measured_t, analytic_t, crossings);
+    if (fabsf(measured_t - analytic_t) / analytic_t > 0.05f) {
         printf("[FAIL] spring period off\n");
         fail = 1;
     } else {
         printf("[PASS] spring period matches 2*pi*sqrt(m/k)\n");
     }
-    printf("[info] max energy deviation: %.3f\n", Emax_dev);
-    if (Emax_dev > 0.10f) {
+    printf("[info] max energy deviation: %.3f\n", emax_dev);
+    if (emax_dev > 0.10f) {
         printf("[FAIL] spring energy drifts\n");
         fail = 1;
     } else {
@@ -100,4 +100,4 @@ int main(void) {
     physics_world_cleanup(&world);
     return fail;
 }
-#endif /* MPE_SPRING_TEST */
+#endif /* mpe_spring_test */

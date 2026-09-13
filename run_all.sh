@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # MPE-only verification run: clean build of the engine + full headless suite.
-# (The old per-phase fix-script runner was retired; fixes/*.py are history.
+# (The old per-phase fix scripts and regex helpers are removed, not retired.
 #  Robotics/MFS is parked in v15R3/robotics_backup during the MPE-only run.)
 set -euo pipefail
 

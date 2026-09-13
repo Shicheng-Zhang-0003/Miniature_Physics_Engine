@@ -2,8 +2,8 @@
 #include <math.h>
 #include <stdbool.h>
 //File library file definition
-#ifndef math3D_h
-#define math3D_h
+#ifndef math3d_h
+#define math3d_h
 //Pi definition
 #ifndef math_pi
 #define math_pi 3.14159265358979323846f
@@ -210,4 +210,4 @@ static inline math3 math3_inverse(math3 matrix) {
         (matrix.matrix[0][0] * matrix.matrix[1][1] - matrix.matrix[1][0] * matrix.matrix[0][1]) * inverse_determinant;
     return result_matrix;
 }
-#endif //math3D_h
+#endif //math3d_h

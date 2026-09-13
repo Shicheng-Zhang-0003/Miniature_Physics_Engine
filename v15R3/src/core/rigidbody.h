@@ -5,7 +5,7 @@
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include "math3D.h"
+#include "math3d.h"
 #include "math4_special.h"
 typedef enum { object_sphere, object_cube, object_cylinder } object_type; /* MPE_FTC_090 */
 typedef struct {

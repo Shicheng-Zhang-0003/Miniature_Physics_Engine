@@ -1,6 +1,6 @@
 /* Bounce-series truth: successive apexes must decay geometrically as e^2
  * (Poisson restitution per impact). e=0.6 from 3.5 m: apexes ~1.76, ~0.95. */
-#ifdef MPE_BOUNCE_SERIES_TEST
+#ifdef mpe_bounce_series_test
 #include <stdio.h>
 #include <math.h>
 #include "core/physics_world.h"
@@ -56,4 +56,4 @@ int main(void) {
     physics_world_cleanup(&world);
     return fail;
 }
-#endif /* MPE_BOUNCE_SERIES_TEST */
+#endif /* mpe_bounce_series_test */

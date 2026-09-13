@@ -1,6 +1,6 @@
 /* Momentum truth: head-on elastic collision of equal masses must exchange
  * velocities exactly (conservation of linear momentum + e=1). */
-#ifdef MPE_MOMENTUM_TEST
+#ifdef mpe_momentum_test
 #include <stdio.h>
 #include <math.h>
 #include "core/physics_world.h"
@@ -64,4 +64,4 @@ int main(void) {
     physics_world_cleanup(&world);
     return fail;
 }
-#endif /* MPE_MOMENTUM_TEST */
+#endif /* mpe_momentum_test */

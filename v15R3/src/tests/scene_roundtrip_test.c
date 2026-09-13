@@ -4,7 +4,7 @@
  * joints with motor params, and CRC32 tamper rejection across save ->
  * clear -> load. Spring pool ops are stubbed (spring_joint.c is GL-tainted
  * and not linked headless); they operate on the primary world's pool. */
-#ifdef MPE_SCENE_ROUNDTRIP_TEST
+#ifdef mpe_scene_roundtrip_test
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -84,11 +84,11 @@ int add_joint_by_ids(physics_world *world, uint32_t id_a, uint32_t id_b, float e
 }
 
 static int failures = 0;
-#define CHECK(cond, label) do { \
+#define check(cond, label) do { \
     if (cond) { printf("  [PASS] %s\n", label); } \
     else { printf("  [FAIL] %s\n", label); failures++; } \
 } while (0)
-#define CHECKF(a, b, eps, label) CHECK(fabsf((a) - (b)) <= (eps), label)
+#define checkf(a, b, eps, label) check(fabsf((a) - (b)) <= (eps), label)
 
 int main(void) {
     mpe_config_init();
@@ -113,62 +113,62 @@ int main(void) {
     world->body_count = 2;
     joint_init_pool(world);
     constraint_pool_init(world);
-    CHECK(add_joint_by_ids(world, 1, 2, 1.5f, 20.0f, 1.0f) >= 0, "joint created pre-save");
+    check(add_joint_by_ids(world, 1, 2, 1.5f, 20.0f, 1.0f) >= 0, "joint created pre-save");
     int rev_idx = constraint_add_revolute(world, 1, 2, (vector3){0.0f, -0.3f, 0.0f}, (vector3){0.0f, 1.0f, 0.0f},
                                           (vector3){0.0f, 0.0f, 1.0f});
-    CHECK(rev_idx >= 0, "revolute created pre-save");
+    check(rev_idx >= 0, "revolute created pre-save");
     constraint_set_revolute_motor(world, rev_idx, true, 2.5f, 10.0f);
 
     const char *path = "/tmp/mpe_scene_roundtrip.dat";
-    CHECK(save_scene(path) == 1, "save_scene succeeds");
-    CHECK(world->spring_joint_count == 1, "one joint saved");
+    check(save_scene(path) == 1, "save_scene succeeds");
+    check(world->spring_joint_count == 1, "one joint saved");
 
     scene_clear();
     world->next_object_id = 100; /* v200 preserves IDs: allocator drift must NOT leak into loaded IDs */
-    CHECK(scene_loading(path) == 1, "scene_loading succeeds");
-    CHECK(world->body_count == 2, "two bodies loaded");
-    CHECK(world->bodies[0].object_id == 1, "v200 stable ID preserved (body 0)");
-    CHECK(world->bodies[1].object_id == 2, "v200 stable ID preserved (body 1)");
-    CHECK(scene_allocate_object_id() >= 3, "allocator advanced past loaded IDs");
+    check(scene_loading(path) == 1, "scene_loading succeeds");
+    check(world->body_count == 2, "two bodies loaded");
+    check(world->bodies[0].object_id == 1, "v200 stable ID preserved (body 0)");
+    check(world->bodies[1].object_id == 2, "v200 stable ID preserved (body 1)");
+    check(scene_allocate_object_id() >= 3, "allocator advanced past loaded IDs");
 
     rigidbody *s = &world->bodies[0];
-    CHECK(s->type == object_sphere, "body 0 type round-trips");
-    CHECKF(s->mass, 2.0f, 1e-5f, "body 0 mass round-trips");
-    CHECKF(s->radius, 0.5f, 1e-5f, "body 0 radius round-trips");
-    CHECKF(s->position.x, 1.0f, 1e-5f, "body 0 position round-trips");
-    CHECKF(s->velocity.y, -0.5f, 1e-5f, "body 0 velocity round-trips");
-    CHECKF(s->colour.z, 0.3f, 1e-5f, "body 0 colour round-trips");
-    CHECKF(s->restitution, 0.4f, 1e-5f, "body 0 restitution round-trips");
-    CHECK(s->nice_value == 7, "body 0 nice_value persists");
-    CHECK(!s->is_sleeping, "body 0 awake");
+    check(s->type == object_sphere, "body 0 type round-trips");
+    checkf(s->mass, 2.0f, 1e-5f, "body 0 mass round-trips");
+    checkf(s->radius, 0.5f, 1e-5f, "body 0 radius round-trips");
+    checkf(s->position.x, 1.0f, 1e-5f, "body 0 position round-trips");
+    checkf(s->velocity.y, -0.5f, 1e-5f, "body 0 velocity round-trips");
+    checkf(s->colour.z, 0.3f, 1e-5f, "body 0 colour round-trips");
+    checkf(s->restitution, 0.4f, 1e-5f, "body 0 restitution round-trips");
+    check(s->nice_value == 7, "body 0 nice_value persists");
+    check(!s->is_sleeping, "body 0 awake");
 
     rigidbody *c = &world->bodies[1];
-    CHECK(c->type == object_cube, "body 1 type round-trips");
-    CHECKF(c->mass, 1.0f, 1e-5f, "body 1 mass round-trips");
-    CHECK(c->is_sleeping, "body 1 sleep state persists");
+    check(c->type == object_cube, "body 1 type round-trips");
+    checkf(c->mass, 1.0f, 1e-5f, "body 1 mass round-trips");
+    check(c->is_sleeping, "body 1 sleep state persists");
 
-    CHECK(world->spring_joint_count == 1, "one joint restored");
+    check(world->spring_joint_count == 1, "one joint restored");
     if (world->spring_joint_count == 1) {
         uint32_t ja = world->spring_joints[0].object_id_a;
         uint32_t jb = world->spring_joints[0].object_id_b;
         uint32_t i0 = world->bodies[0].object_id;
         uint32_t i1 = world->bodies[1].object_id;
-        CHECK(((ja == i0) && (jb == i1)) || ((ja == i1) && (jb == i0)),
+        check(((ja == i0) && (jb == i1)) || ((ja == i1) && (jb == i0)),
               "joint endpoints remapped to loaded bodies");
-        CHECKF(world->spring_joints[0].spring_constant, 20.0f, 1e-5f, "joint params round-trip");
+        checkf(world->spring_joints[0].spring_constant, 20.0f, 1e-5f, "joint params round-trip");
     }
 
-    CHECK(constraint_get_count(world) == 1, "one revolute restored");
+    check(constraint_get_count(world) == 1, "one revolute restored");
     if (constraint_get_count(world) == 1) {
         const constraint *rc = constraint_pool_at(world, 0);
-        CHECK((rc != NULL) && (rc->type == CONSTRAINT_REVOLUTE), "restored joint is revolute");
+        check((rc != NULL) && (rc->type == constraint_revolute), "restored joint is revolute");
         if (rc) {
-            CHECK(((rc->body_id_a == 1) && (rc->body_id_b == 2)) ||
+            check(((rc->body_id_a == 1) && (rc->body_id_b == 2)) ||
                   ((rc->body_id_a == 2) && (rc->body_id_b == 1)),
                   "revolute endpoints reference preserved IDs");
-            CHECK(rc->p.revolute.motor_enabled, "revolute motor flag round-trips");
-            CHECKF(rc->p.revolute.motor_target_speed, 2.5f, 1e-5f, "revolute motor target round-trips");
-            CHECKF(rc->p.revolute.motor_max_torque, 10.0f, 1e-5f, "revolute motor torque round-trips");
+            check(rc->p.revolute.motor_enabled, "revolute motor flag round-trips");
+            checkf(rc->p.revolute.motor_target_speed, 2.5f, 1e-5f, "revolute motor target round-trips");
+            checkf(rc->p.revolute.motor_max_torque, 10.0f, 1e-5f, "revolute motor torque round-trips");
         }
     }
 
@@ -182,7 +182,7 @@ int main(void) {
         unsigned char *bytes = (unsigned char *) malloc((size_t) fsize);
         size_t got = fread(bytes, 1, (size_t) fsize, rf);
         fclose(rf);
-        CHECK(got == (size_t) fsize, "scene file readable for tamper test");
+        check(got == (size_t) fsize, "scene file readable for tamper test");
         const char *tamper_path = "/tmp/mpe_scene_tampered.dat";
         bytes[20] ^= 0xFFu; /* inside body 0's mass: data corrupt, footer intact */
         FILE *wf = fopen(tamper_path, "wb");
@@ -190,9 +190,9 @@ int main(void) {
         fclose(wf);
         free(bytes);
         int count_before = world->body_count;
-        CHECK(scene_loading(tamper_path) == 0, "tampered scene rejected");
-        CHECK(world->body_count == count_before, "live scene untouched by failed load");
-        CHECK(world->bodies[0].object_id == 1, "live IDs untouched by failed load");
+        check(scene_loading(tamper_path) == 0, "tampered scene rejected");
+        check(world->body_count == count_before, "live scene untouched by failed load");
+        check(world->bodies[0].object_id == 1, "live IDs untouched by failed load");
         remove(tamper_path);
     }
 
@@ -202,4 +202,4 @@ int main(void) {
     else printf("[FAIL] scene round-trip: %d checks failed\n", failures);
     return failures ? 1 : 0;
 }
-#endif /* MPE_SCENE_ROUNDTRIP_TEST */
+#endif /* mpe_scene_roundtrip_test */

@@ -1,6 +1,6 @@
 /* Stack-stability truth: a 6-cube tower must stand 10 s with bounded drift
  * and level top (sequential-impulse convergence + unbiased friction). */
-#ifdef MPE_STACK_TEST
+#ifdef mpe_stack_test
 #include <stdio.h>
 #include <math.h>
 #include "core/physics_world.h"
@@ -51,4 +51,4 @@ int main(void) {
     physics_world_cleanup(&world);
     return fail;
 }
-#endif /* MPE_STACK_TEST */
+#endif /* mpe_stack_test */

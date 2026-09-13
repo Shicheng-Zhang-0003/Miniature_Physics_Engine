@@ -1,6 +1,6 @@
 /* MPE static-hold truth test: Coulomb stick must hold below the friction
  * angle and yield above it (no creep, no mid-slope freeze). */
-#ifdef MPE_STATIC_HOLD_TEST
+#ifdef mpe_static_hold_test
 #include <stdio.h>
 #include <math.h>
 #include "core/physics_world.h"
@@ -80,4 +80,4 @@ int main(void) {
     }
     return fail;
 }
-#endif /* MPE_STATIC_HOLD_TEST */
+#endif /* mpe_static_hold_test */

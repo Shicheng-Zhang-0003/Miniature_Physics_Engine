@@ -651,13 +651,13 @@ void rigidbody_update_inertia_cylinder(rigidbody *rigid_body) {
     float r = rigid_body->radius;
     float h = rigid_body->cylinder_half_length;
     float mass = rigid_body->mass;
-    float L = 2.0f * h;
+    float l = 2.0f * h;
 
     rigid_body->inertia_tensor_local = (math3){{{0}}};
     /* Axle is along X axis */
     rigid_body->inertia_tensor_local.matrix[0][0] = 0.5f * mass * r * r;
-    rigid_body->inertia_tensor_local.matrix[1][1] = (mass / 12.0f) * (3.0f * r * r + L * L);
-    rigid_body->inertia_tensor_local.matrix[2][2] = (mass / 12.0f) * (3.0f * r * r + L * L);
+    rigid_body->inertia_tensor_local.matrix[1][1] = (mass / 12.0f) * (3.0f * r * r + l * l);
+    rigid_body->inertia_tensor_local.matrix[2][2] = (mass / 12.0f) * (3.0f * r * r + l * l);
 
     if (mass > 0) {
         rigid_body->inverse_inertia_tensor_local = math3_inverse(rigid_body->inertia_tensor_local);

@@ -1,7 +1,7 @@
 #ifndef sphere_mesh_h
 #define sphere_mesh_h
 #include <epoxy/gl.h>
-#include "../core/math3D.h"
+#include "../core/math3d.h"
 #include "../core/math4_special.h"
 #include "../core/rigidbody.h"
 

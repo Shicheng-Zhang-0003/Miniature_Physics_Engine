@@ -1,6 +1,6 @@
 #ifndef math4_h
 #define math4_h
-#include "math3D.h"
+#include "math3d.h"
 typedef struct {
     float matrix[4][4];
 } math4;

@@ -3,7 +3,7 @@
  * field). Same binary + same platform: guaranteed by construction (fixed
  * iteration order, exact IEEE ops, deterministic transcendentals, fused
  * contraction disabled). Cross-platform: guaranteed while IEEE-754 holds. */
-#ifdef MPE_DETERMINISM_TEST
+#ifdef mpe_determinism_test
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -81,4 +81,4 @@ int main(void) {
     physics_world_cleanup(&w2);
     return fail;
 }
-#endif /* MPE_DETERMINISM_TEST */
+#endif /* mpe_determinism_test */

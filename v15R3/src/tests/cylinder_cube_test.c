@@ -1,7 +1,7 @@
 /* MFS_174: Cylinder vs cube wall collision test.
 * A cylinder rolls toward a static cube wall. It must not
 * pass through the wall. */
-#ifdef MFS_CYL_CUBE_TEST
+#ifdef mfs_cyl_cube_test
 #include <stdio.h>
 #include <math.h>
 #include "core/physics_world.h"
@@ -52,4 +52,4 @@ int main(void) {
     physics_world_cleanup(&world);
     return 0;
 }
-#endif /* MFS_CYL_CUBE_TEST */
+#endif /* mfs_cyl_cube_test */
