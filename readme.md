@@ -222,7 +222,6 @@ make
 
 - **Wayland:** Mouse locking does not work under native Wayland. Run under X11, or try `GDK_BACKEND=x11 ./engine`.
 - **Scene format:** v200 saves bodies (with stable IDs, sleep state, damping) plus spring and revolute joints, with a CRC32 integrity footer. Files ≤v153 still load via the legacy reader.
-- **Object count:** Performance degrades gradually above ~1136 objects; rendering is the primary bottleneck at high counts.
 - **Global state:** All simulation state (bodies, IDs, joints, constraints, caches, solver scratch) is owned by `physics_world`; the file-scope sim globals are retired. App/UI state (camera, input, selection, terminal, diagnostics) remains global by design.
 
 ---
