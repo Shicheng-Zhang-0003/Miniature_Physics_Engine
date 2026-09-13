@@ -291,8 +291,6 @@ Broadphase collision detection uses a 3D spatial hash grid and runs once per phy
 
 **Wayland:** Mouse locking does not function correctly under native Wayland. The engine must be run under X11. On systems that default to Wayland, install basic X11 drivers (`xorg`, `xserver-xorg`) and launch the engine in an X11 session. Forcing X11 via `GDK_BACKEND=x11 ./engine` may also work depending on your compositor.
 
-**Object count:** Performance degrades gradually above approximately 1136 objects. The physics and broadphase scale linearly with object count; rendering is the primary bottleneck at high numbers.
-
 **Scene format:** Save/load preserves bodies but not spring joints, object IDs, or sleep state. Scene format v2 is deferred work.
 
 ---
