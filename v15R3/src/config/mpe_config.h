@@ -48,6 +48,7 @@ typedef struct {
         float floor_friction_s;
         float floor_friction_k;
     float rolling_resistance_coeff; /* MFS_132 */
+        float angular_damping_scale; /* FIX-AUDIT: was hardcoded 0.97 */
     } world;
 
     struct {
@@ -73,7 +74,6 @@ typedef struct {
         float max_restitution_bias;
         float static_friction_thresh;
         float warm_start_match_dist_sq;
-        float wheel_lock_omega_thresh; /* MFS_166 */
     } solver;
 
     struct {
@@ -98,11 +98,16 @@ typedef struct {
         float default_damping;
         float soft_spring_k;
         float soft_damping;
+        float revolute_beta; /* FIX-AUDIT */
+        float revolute_max_bias; /* FIX-AUDIT */
+        float revolute_motor_gain; /* FIX-AUDIT */
     } joints;
 
     struct {
         float floor_emergency_slop;
-        float floor_velocity_slop;
+        /* AUDIT: floor_velocity_slop removed — it was registered but never
+         * read by any code path (bounce-vs-rest is velocity-gated in the
+         * Poisson pass, not depth-gated). */
     } boundary;
 
     struct {
@@ -125,6 +130,8 @@ typedef struct {
         float cube_fric_s;
         float cube_fric_k;
         float cylinder_restitution; /* MFS_165 */
+        float cylinder_fric_s; /* FIX-AUDIT */
+        float cylinder_fric_k; /* FIX-AUDIT */
     } body_defaults;
 
     struct {

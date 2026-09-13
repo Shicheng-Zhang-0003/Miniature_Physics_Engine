@@ -1,5 +1,4 @@
 #include "../mpe_engine.h"
-#include "../robotics/gui_robot_registry.h" /* MFS_GUI_BRIDGE */
 #include "overlay.h"
 #include "object_spawner.h"
 #include <stdint.h>
@@ -344,21 +343,6 @@ void overlay_update(void) {
                  spawn_type_text);
         overlay_append_stats_text(information_text_buffer, sizeof(information_text_buffer));
         overlay_append_overflow_text(information_text_buffer, sizeof(information_text_buffer));
-    /* MFS_GUI_BRIDGE_OVERLAY: Robot HUD */
-    if (gui_robot_get_count() > 0) {
-        size_t hud_offset = strlen(information_text_buffer);
-        for (int ri = 0; (ri < gui_robot_get_count()) && (hud_offset < sizeof(information_text_buffer) - 128); ri++) {
-            ftc_robot *rb = gui_robot_get(ri);
-            if (!rb) continue;
-            float batt_v = battery_get_voltage(&rb->battery, 0.0f);
-            int rpm_avg = (int)((rb->wheel_motors[0].rpm + rb->wheel_motors[1].rpm +
-                                 rb->wheel_motors[2].rpm + rb->wheel_motors[3].rpm) / 4.0f);
-            snprintf(information_text_buffer + hud_offset, sizeof(information_text_buffer) - hud_offset,
-                     " | R%d: %.1fV %dRPM", ri, batt_v, rpm_avg);
-            hud_offset = strlen(information_text_buffer);
-        }
-    }
-    /* MFS_GUI_BRIDGE_OVERLAY_END */
 
         gtk_label_set_text(GTK_LABEL(debug_information_label), information_text_buffer);
         return;

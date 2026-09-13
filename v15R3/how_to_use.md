@@ -1,6 +1,6 @@
 ```markdown
 # Miniature Physics Engine — User Guide
-### v15R2 Development Guide
+### v15R3 Development Guide
 
 ---
 
@@ -143,7 +143,7 @@ Type `help` for the full command list or `man <command>` for usage. `Ctrl+L` cle
 
 ## Configuration System (Key 6)
 
-Press `6` to open the **Configuration Menu**. This provides live access to all 69 tunable engine parameters.
+Press `6` to open the **Configuration Menu**. This provides live access to all 76 tunable engine parameters.
 
 The menu is organised into 13 categories:
 
@@ -183,7 +183,7 @@ In the debug terminal:
 
 ### F11 Config Torture Test
 
-Press `F11` to randomise all 69 tunables to extreme bounded values and run
+Press `F11` to randomise all 76 tunables to extreme bounded values and run
 a 60-second long-run validation. This stress-tests the engine under
 adversarial parameter combinations. After the test, use key 6 → Reset
 Defaults or terminal `config reset` to restore normal behaviour.
@@ -297,45 +297,12 @@ Broadphase collision detection uses a 3D spatial hash grid and runs once per phy
 
 ---
 
-
----
-
-## FTC Robot (MFS)
-
-### Spawning a Robot
-Open the debug terminal (`T` in debug mode) and type:
-```
-touch robot
-```
-This spawns a 4-wheel mecanum robot at position (5, rest_height, 5) with
-goBILDA 5203 30:1 motors. An orange nose sphere shows the heading (+Z local).
-
-### Driving the Robot
-| Key | Action |
-|---|---|
-| `G` | Drive forward |
-| `B` | Drive backward |
-| `V` | Strafe right |
-| `N` | Strafe left |
-| `C` | Rotate left (CCW) |
-| `H` | Rotate right (CW) |
-
-Keys are held-state: press and hold to drive, release to stop.
-The robot HUD in the top-left overlay shows battery voltage and average RPM.
-
-### Physics Model
-- **Wheels:** Cylinders (radius 0.05m, half-width 0.02m) with revolute joints
-- **Friction:** Anisotropic roller friction for mecanum (±45° rollers)
-- **Motors:** BackEMF, Kt/Kv, gear ratio, thermal accumulation
-- **Battery:** 12.8V nominal, 0.015Ω internal resistance, 30Ah capacity
-- **Traction:** Torque → ground force clamped by friction (no chassis cheat)
-- **Timestep:** Fixed 60Hz accumulator (deterministic)
-
-### Object Types
+## Object Types
 The engine supports three object types:
 - **Sphere** — spawned via `touch new.sph` or spawner menu
 - **Cube** — spawned via `touch new.cube` or spawner menu
-- **Cylinder** — used for robot wheels (axle along local X)
+- **Cylinder** — axle along local X, correct `I = ½·m·r²` inertia
+
 
 
 ---

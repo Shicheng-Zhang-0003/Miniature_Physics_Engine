@@ -75,12 +75,17 @@ void apply_force_all_joints(void) {
         vector3 displacement_vector = vector3_subtraction(rigid_body_b->position, rigid_body_a->position);
         float current_separation_distance = vector3_length(displacement_vector);
 
+        /* FIX-AUDIT: coincident bodies with L0>0 need maximal repulsion,
+         * not skip. Pick an arbitrary axis. */
+        vector3 spring_axis_direction;
         if (current_separation_distance < math_epsilon) {
-            continue;
+            spring_axis_direction = (vector3){1.0f, 0.0f, 0.0f};
+            current_separation_distance = 0.0f;
+        } else {
+            spring_axis_direction = vector3_scaling(displacement_vector, 1.0f / current_separation_distance);
         }
 
         float spring_extension = current_separation_distance - current_spring_joint->equilibrium_length;
-        vector3 spring_axis_direction = vector3_normalisation(displacement_vector);
 
         vector3 restoration_force =
             vector3_scaling(spring_axis_direction, current_spring_joint->spring_constant * spring_extension);
@@ -94,6 +99,10 @@ void apply_force_all_joints(void) {
 
         float a3_inverse_mass_sum = rigid_body_a->inverse_mass + rigid_body_b->inverse_mass;
         if (a3_inverse_mass_sum > 0.0f) {
+            /* FIX-AUDIT: explicit-Euler springs go unstable for
+             * w*dt = sqrt(k/m)*dt > 2 (e.g. k=5000,m=0.01 -> 11.8).
+             * The Fmax limiter below keeps it bounded but silently breaks
+             * Hooke's law; that tradeoff is retained and documented. */
             float a3_reduced_mass = 1.0f / a3_inverse_mass_sum;
             float a3_max_joint_force = a3_reduced_mass * g_cfg.joints.max_acceleration;
             float a3_force_length = vector3_length(net_joint_force);
@@ -103,6 +112,62 @@ void apply_force_all_joints(void) {
         }
         rb_apply_forces_perfect(rigid_body_a, net_joint_force);
         rb_apply_forces_perfect(rigid_body_b, vector3_scaling(net_joint_force, -1.0f));
+    }
+}
+
+/* FIX-AUDIT: world-aware spring pass for the encapsulated path.
+ * Same Hooke+damping+limit math as above, but IDs resolve against the
+ * passed world instead of global obj_per_scene. Center-to-center only
+ * (no torque) — matches legacy behavior; anchor offsets are future work. */
+void apply_spring_forces_world(rigidbody *bodies, int body_count) {
+    if ((!bodies) || (body_count <= 0)) {
+        return;
+    }
+    for (int joint_index = 0; joint_index < mpe_max_joints; joint_index++) {
+        if (!joint_pool[joint_index].is_active) {
+            continue;
+        }
+        spring_joint *sj = &joint_pool[joint_index];
+        rigidbody *a = NULL;
+        rigidbody *b = NULL;
+        for (int i = 0; i < body_count; i++) {
+            if (bodies[i].object_id == sj->object_id_a) {
+                a = &bodies[i];
+            }
+            if (bodies[i].object_id == sj->object_id_b) {
+                b = &bodies[i];
+            }
+            if (a && b) {
+                break;
+            }
+        }
+        if ((!a) || (!b)) {
+            continue;
+        }
+        vector3 disp = vector3_subtraction(b->position, a->position);
+        float sep = vector3_length(disp);
+        vector3 axis;
+        if (sep < math_epsilon) {
+            axis = (vector3){1.0f, 0.0f, 0.0f};
+            sep = 0.0f;
+        } else {
+            axis = vector3_scaling(disp, 1.0f / sep);
+        }
+        float ext = sep - sj->equilibrium_length;
+        vector3 f_rest = vector3_scaling(axis, sj->spring_constant * ext);
+        vector3 rel = vector3_subtraction(b->velocity, a->velocity);
+        vector3 f_damp = vector3_scaling(axis, sj->damping_coefficient * vector3_dot(rel, axis));
+        vector3 f = vector3_addition(f_rest, f_damp);
+        float inv_sum = a->inverse_mass + b->inverse_mass;
+        if (inv_sum > 0.0f) {
+            float fmax = (1.0f / inv_sum) * g_cfg.joints.max_acceleration;
+            float fl = vector3_length(f);
+            if ((fl > fmax) && (fl > math_epsilon)) {
+                f = vector3_scaling(f, fmax / fl);
+            }
+        }
+        rb_apply_forces_perfect(a, f);
+        rb_apply_forces_perfect(b, vector3_scaling(f, -1.0f));
     }
 }
 

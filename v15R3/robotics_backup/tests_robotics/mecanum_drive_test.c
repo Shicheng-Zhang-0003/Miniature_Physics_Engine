@@ -56,8 +56,10 @@ int main(void) {
         printf("[info] start=(%.3f,%.3f,%.3f) end=(%.3f,%.3f,%.3f)\n", start_x, start_y, start_z, end_x, end_y, end_z);
         printf("[info] displacement x=%.4f  z=%.4f\n", dx, dz);
 
-        /* Robot should have moved sideways (x-axis) */
-        float lateral_displacement = fabsf(dx);
+        /* Robot should have moved sideways (+X for strafe=1). Signed check:
+         * FIX-AUDIT: old fabs() passed for -X too, leaving the strafe-sign
+         * fix untested. */
+        float lateral_displacement = dx;
         if (lateral_displacement < 0.3f) {
             printf("[FAIL] robot did not strafe far enough in +X (dx=%.4f, expected >0.3)\n", dx);
             fail = 1;

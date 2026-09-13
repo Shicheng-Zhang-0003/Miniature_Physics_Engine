@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """
-MPE Test Runner
-================
+MPE Test Runner (MPE-only run)
+===============================
 Discovers, builds, and runs all headless tests. Generates a summary report.
+
+Robotics (MFS) tests are parked with the code in v15R3/robotics_backup.
 
 Usage:
     python tools/test_runner.py              # Run all tests
@@ -22,28 +24,37 @@ SRC_DIR = Path(__file__).resolve().parent.parent / "v15R3" / "src"
 KNOWN_TESTS = [
     "two_world",
     "revolute",
-    "teleop_drive",
-    "mecanum_drive",
     "cylinder_drop",
     "driven_wheel",
     "math3_inverse",
-    "ftc_integration",
-    "physics_truth",
-    "tank_turn",
-    "odometry_accuracy",
+    "floor_collision_diag",
     "cylinder_sphere",
     "cylinder_cube",
     "cylinder_cylinder",
+    "list4_cylinder_floor",
+    "scene_roundtrip",
+    "static_hold",
+    "rolling_decay",
+    "ccd_sweep",
+    "kinematic",
+    "determinism",
+    "momentum",
+    "angmom",
+    "spring",
+    "projectile",
+    "incline_accel",
+    "pendulum",
+    "bounce_series",
+    "friction_stop",
+    "stack",
+    "frustum",
 ]
 
 # Tests that encode desired future behavior but are currently expected
-# to fail because the corresponding physics model is not implemented yet.
-#
-# mecanum_drive currently requires real lateral/roller traction. The old
-# fake chassis-force patch made this pass but was physically dishonest.
-# It should remain XFAIL until anisotropic mecanum wheel friction exists.
+# to fail because the corresponding model is not implemented yet.
+# MPE-only run: empty. (The old mecanum_drive XFAIL moved to
+# v15R3/robotics_backup with the rest of MFS.)
 EXPECTED_FAILURES = {
-    # mecanum_drive now passes via real anisotropic roller friction (MFS_MECANUM_REAL).
 }
 
 
@@ -94,7 +105,10 @@ class TestResult:
 
 
 def build_test(name: str) -> tuple:
-    target = f"test_{name}"
+    # Build-only target: `test_<name>` also runs the test, which would
+    # conflate test failures with build failures. `build_<name>` only
+    # compiles; run_test() executes the binary separately.
+    target = f"build_{name}"
     try:
         proc = subprocess.run(
             ["make", "-j4", target],

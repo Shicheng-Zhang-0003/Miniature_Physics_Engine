@@ -13,10 +13,11 @@ physics_world *mfs_gui_robot_world = NULL;
 gui_robot_proxy mfs_gui_proxies[MFS_MAX_GUI_ROBOTS];
 
 /* MFS_125: Nose offset in chassis-local space.
-* Chassis half-extent Z = 0.225m, so 0.28m puts the nose just in front. */
+ * FIX-AUDIT: front wheels are at -Z (robot.c), so the nose must be -Z too.
+ * Was +0.28 (rear), contradicting wheel labels and drive direction. */
 #define MFS_NOSE_OFFSET_X 0.0f
 #define MFS_NOSE_OFFSET_Y 0.0f
-#define MFS_NOSE_OFFSET_Z 0.28f
+#define MFS_NOSE_OFFSET_Z -0.28f
 #define MFS_NOSE_RADIUS    0.03f
 
 int gui_robot_spawn(float x, float y, float z, motor_preset_id preset) {

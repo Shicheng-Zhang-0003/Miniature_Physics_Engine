@@ -15,11 +15,10 @@ void motor_from_spec(motor *m, float stall_torque_nm, float free_speed_rpm, floa
     m->efficiency = (efficiency > 0.0f && efficiency <= 1.0f) ? efficiency : 0.85f;
 
     /* Kt = motor-shaft stall torque / stall_current.
-     * MFS_MOTOR_FIX: preset stall_torque_nm is the OUTPUT-shaft stall torque (after
-     * the gearbox), so divide by the gear ratio to get the motor-shaft value before
-     * deriving Kt. motor_update then multiplies torque by gear_ratio to produce the
-     * output torque. (Previously the ratio was applied twice -> ~30x too much torque.) */
-    float motor_stall_torque = stall_torque_nm / m->gear_ratio;
+     * FIX-AUDIT: preset stall is OUTPUT-shaft (post-gearbox, includes loss)
+     * but output applied eff again -> stall*eff (15-20% low). Derive the
+     * ideal motor-shaft torque as stall/(gear*eff) so output == spec. */
+    float motor_stall_torque = stall_torque_nm / (m->gear_ratio * m->efficiency);
     m->kt = (stall_current_a > 0.0f) ? (motor_stall_torque / stall_current_a) : 0.0f;
 
     /* R = V_nominal / stall_current */
@@ -62,14 +61,18 @@ void motor_update(motor *m, float wheel_angular_vel, float dt, float battery_vol
     }
     m->current = raw_current;
 
-    /* Torque = Kt * I * efficiency */
-    m->torque = m->kt * m->current * m->efficiency;
+    /* Torque = Kt * I (motor-shaft ideal); efficiency applied once at the
+     * gearbox output below. NOTE: Kt and Kv are fit independently to the
+     * output-shaft stall/free-speed spec endpoints; their ratio absorbs
+     * gearbox friction + no-load current, so motor-shaft Kt==Ke is not
+     * enforced. See audit: CoreHex gear=1.0 mislabels output as shaft. */
+    m->torque = m->kt * m->current;
 
-    /* Output torque at wheel (after gearing) */
-    m->output_torque = m->torque * m->gear_ratio; /* MFS_122: restore gearing */
+    /* Output torque at wheel (after gearing, minus gearbox loss) */
+    m->output_torque = m->torque * m->gear_ratio * m->efficiency; /* MFS_122: restore gearing */
 
-    /* Speed tracking */
-    m->rpm = fabsf(wheel_angular_vel) / MOTOR_RPM_TO_RAD_S;
+    /* Speed tracking (signed: reverse reads negative). */
+    m->rpm = wheel_angular_vel / MOTOR_RPM_TO_RAD_S;
 
     /* Simplified thermal: heat from I^2*R, cooling to ambient */
     float heat_generated = m->current * m->current * m->resistance * dt;
