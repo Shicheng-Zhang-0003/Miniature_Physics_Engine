@@ -1,6 +1,6 @@
 /* Projectile truth: ballistic apex height/time and horizontal range must
  * match closed-form kinematics (constant-gravity, drag disabled). */
-#ifdef MPE_PROJECTILE_TEST
+#ifdef mpe_projectile_test
 #include <stdio.h>
 #include <math.h>
 #include "core/physics_world.h"
@@ -66,4 +66,4 @@ int main(void) {
     physics_world_cleanup(&world);
     return fail;
 }
-#endif /* MPE_PROJECTILE_TEST */
+#endif /* mpe_projectile_test */

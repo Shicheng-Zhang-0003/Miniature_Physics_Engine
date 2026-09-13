@@ -1,5 +1,5 @@
 /* MPE_FTC_057: headless entry. Build with -DMPE_HEADLESS via `make headless`. */
-#ifdef MPE_HEADLESS
+#ifdef mpe_headless
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -29,4 +29,4 @@ int main(int argc, char *argv[]) {
     physics_world_cleanup(&world);
     return (invalid == 0) ? 0 : 1;
 }
-#endif /* MPE_HEADLESS */
+#endif /* mpe_headless */

@@ -8,7 +8,7 @@
  *   1. If the control SPHERE does not fall, gravity/integration is broken.
  *   2. If the sphere rests but the CYLINDER falls through, cylinder
  *      contact is missing (the real keystone gap -> 093). */
-#ifdef MPE_CYLINDER_DROP_TEST
+#ifdef mpe_cylinder_drop_test
 
 #include <stdio.h>
 #include <math.h>
@@ -88,4 +88,4 @@ int main(void) {
     return 0;
 }
 
-#endif /* MPE_CYLINDER_DROP_TEST */
+#endif /* mpe_cylinder_drop_test */

@@ -94,14 +94,14 @@ int save_scene(const char *file_destination_path) {
     int active_revolutes = 0;
     for (int j = 0; j < constraint_pool_capacity(); j++) {
         const constraint *c = constraint_pool_at(physics_world_get_primary(), j);
-        if ((c) && (c->type == CONSTRAINT_REVOLUTE)) {
+        if ((c) && (c->type == constraint_revolute)) {
             active_revolutes++;
         }
     }
     ok = ok && scene_w32(f, &crc, (uint32_t) active_revolutes);
     for (int j = 0; ok && (j < constraint_pool_capacity()); j++) {
         const constraint *c = constraint_pool_at(physics_world_get_primary(), j);
-        if ((!c) || (c->type != CONSTRAINT_REVOLUTE)) {
+        if ((!c) || (c->type != constraint_revolute)) {
             continue;
         }
         ok = ok && scene_w32(f, &crc, (uint32_t) c->type);

@@ -1,6 +1,6 @@
 /* Incline-acceleration truth: frictionless slide must accelerate at exactly
  * g*sin(theta) down the slope. */
-#ifdef MPE_INCLINE_ACCEL_TEST
+#ifdef mpe_incline_accel_test
 #include <stdio.h>
 #include <math.h>
 #include "core/physics_world.h"
@@ -64,4 +64,4 @@ int main(void) {
     physics_world_cleanup(&world);
     return fail;
 }
-#endif /* MPE_INCLINE_ACCEL_TEST */
+#endif /* mpe_incline_accel_test */

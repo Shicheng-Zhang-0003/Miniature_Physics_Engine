@@ -1,6 +1,6 @@
 #ifndef scene_init_h
 #define scene_init_h
-#include "../core/math3D.h"
+#include "../core/math3d.h"
 #include "../core/rigidbody.h"
 
 /* Body storage lives in the primary physics_world (body_capacity member);

@@ -2,7 +2,7 @@
  * Test A: invert a known diagonal matrix, check the result.
  * Test B: re-run the air-wheel probe to see if fixing sanitize
  *         alone resolved the zero-inverse problem. */
-#ifdef MPE_MATH3_INVERSE_TEST
+#ifdef mpe_math3_inverse_test
 
 #include <math.h>
 #include <stdio.h>
@@ -10,7 +10,7 @@
 #include "config/mpe_config.h"
 #include "core/physics_world.h"
 #include "core/rigidbody.h"
-#include "core/math3D.h"
+#include "core/math3d.h"
 
 int main(void) {
     mpe_config_init();
@@ -83,4 +83,4 @@ int main(void) {
     }
 }
 
-#endif /* MPE_MATH3_INVERSE_TEST */
+#endif /* mpe_math3_inverse_test */

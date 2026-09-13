@@ -94,25 +94,25 @@ void revolute_solve(revolute_params *p, rigidbody *body_a, rigidbody *body_b, fl
     }
 
     float inv_mass_sum = inv_mass_a + inv_mass_b;
-    math3 K = {{{0.0f}}};
+    math3 k = {{{0.0f}}};
     for (int i = 0; i < 3; i++) {
-        K.matrix[i][i] = inv_mass_sum;
+        k.matrix[i][i] = inv_mass_sum;
     }
     math3 skew_a = skew_symmetric(r_a);
     math3 skew_b = skew_symmetric(r_b);
-    /* K = inv_mass_sum*I - skew(r_a)*Ia^-1*skew(r_a) - skew(r_b)*Ib^-1*skew(r_b)
-     * (the subtracted terms are positive semi-definite, so K stays SPD) */
+    /* k = inv_mass_sum*I - skew(r_a)*Ia^-1*skew(r_a) - skew(r_b)*Ib^-1*skew(r_b)
+     * (the subtracted terms are positive semi-definite, so k stays SPD) */
     math3 term_a = math3_multiplication(skew_a, math3_multiplication(body_a->inverse_inertia_system, skew_a));
     math3 term_b = math3_multiplication(skew_b, math3_multiplication(body_b->inverse_inertia_system, skew_b));
     for (int i = 0; i < 3; i++) {
         for (int j = 0; j < 3; j++) {
-            K.matrix[i][j] -= term_a.matrix[i][j];
-            K.matrix[i][j] -= term_b.matrix[i][j];
+            k.matrix[i][j] -= term_a.matrix[i][j];
+            k.matrix[i][j] -= term_b.matrix[i][j];
         }
     }
-    math3 K_inv = math3_inverse(K);
+    math3 k_inv = math3_inverse(k);
     vector3 rhs = vector3_scaling(vector3_addition(relative_velocity, bias), -1.0f);
-    vector3 impulse = math3_multiplication_vector3(K_inv, rhs);
+    vector3 impulse = math3_multiplication_vector3(k_inv, rhs);
 
     body_a->velocity = vector3_subtraction(body_a->velocity, vector3_scaling(impulse, inv_mass_a));
     body_b->velocity = vector3_addition(body_b->velocity, vector3_scaling(impulse, inv_mass_b));

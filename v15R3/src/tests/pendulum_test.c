@@ -1,7 +1,7 @@
 /* Pendulum truth: a compound pendulum must swing at
  * T = 2*pi*sqrt(I_pivot / (m*g*d)). Exercises revolute constraints +
  * gravity torque together. */
-#ifdef MPE_PENDULUM_TEST
+#ifdef mpe_pendulum_test
 #include <stdio.h>
 #include <math.h>
 #include "core/physics_world.h"
@@ -37,9 +37,9 @@ int main(void) {
         return 1;
     }
 
-    /* I about pivot: box-inertia + parallel axis, d = 1. */
-    float I = (1.0f / 12.0f) * (4.0f + 0.04f) + 1.0f;
-    float T_exact = 2.0f * 3.14159265f * sqrtf(I / 9.81f);
+    /* i about pivot: box-inertia + parallel axis, d = 1. */
+    float i = (1.0f / 12.0f) * (4.0f + 0.04f) + 1.0f;
+    float t_exact = 2.0f * 3.14159265f * sqrtf(i / 9.81f);
     const float dt = 1.0f / 60.0f;
     float prev_x = world.bodies[rod].position.x;
     int crossings = 0, first = -1, last = -1;
@@ -61,12 +61,12 @@ int main(void) {
         prev_x = x;
     }
     int fail = 0;
-    float T_meas = 0.0f;
+    float t_meas = 0.0f;
     if (crossings >= 4) {
-        T_meas = 2.0f * (float)(last - first) * dt / (float)(crossings - 1);
+        t_meas = 2.0f * (float)(last - first) * dt / (float)(crossings - 1);
     }
-    printf("[info] period: measured=%.4f analytic=%.4f crossings=%d\n", T_meas, T_exact, crossings);
-    if (fabsf(T_meas - T_exact) / T_exact > 0.08f) {
+    printf("[info] period: measured=%.4f analytic=%.4f crossings=%d\n", t_meas, t_exact, crossings);
+    if (fabsf(t_meas - t_exact) / t_exact > 0.08f) {
         printf("[FAIL] pendulum period off\n");
         fail = 1;
     } else {
@@ -75,4 +75,4 @@ int main(void) {
     physics_world_cleanup(&world);
     return fail;
 }
-#endif /* MPE_PENDULUM_TEST */
+#endif /* mpe_pendulum_test */

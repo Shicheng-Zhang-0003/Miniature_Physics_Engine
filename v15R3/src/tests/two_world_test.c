@@ -1,5 +1,5 @@
 /* MPE_FTC_059D: two-world independence test. Built via `make test_two_world`. */
-#ifdef MPE_TWO_WORLD_TEST
+#ifdef mpe_two_world_test
 #include <stdio.h>
 #include <math.h>
 #include "core/physics_world.h"
@@ -45,4 +45,4 @@ int main(void) {
     physics_world_cleanup(&world_b);
     return fail;
 }
-#endif /* MPE_TWO_WORLD_TEST */
+#endif /* mpe_two_world_test */

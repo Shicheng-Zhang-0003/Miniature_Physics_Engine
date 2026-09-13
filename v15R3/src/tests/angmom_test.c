@@ -1,18 +1,18 @@
 /* Angular momentum truth: a torque-free tumbling asymmetric body must keep
  * its world-frame angular momentum vector exactly constant. This exercises
  * the inertia-tensor rotation and the gyroscopic term simultaneously. */
-#ifdef MPE_ANGMOM_TEST
+#ifdef mpe_angmom_test
 #include <stdio.h>
 #include <math.h>
 #include "core/physics_world.h"
 #include "physics/constraint.h"
 #include "config/mpe_config.h"
 
-static vector3 body_L(rigidbody *rb) {
-    math3 R = vector4_to_math3(rb->orientation);
-    math3 Rt = math3_transposition(R);
-    math3 Iw = math3_multiplication(R, math3_multiplication(rb->inertia_tensor_local, Rt));
-    return math3_multiplication_vector3(Iw, rb->angular_velocity);
+static vector3 body_l(rigidbody *rb) {
+    math3 r = vector4_to_math3(rb->orientation);
+    math3 rt = math3_transposition(r);
+    math3 iw = math3_multiplication(r, math3_multiplication(rb->inertia_tensor_local, rt));
+    return math3_multiplication_vector3(iw, rb->angular_velocity);
 }
 
 int main(void) {
@@ -28,14 +28,14 @@ int main(void) {
     world.bodies[b].angular_velocity = (vector3){1.0f, 3.0f, 2.0f};
     rigidbody_wake(&world.bodies[b]);
 
-    vector3 L0 = body_L(&world.bodies[b]);
-    float L0n = vector3_length(L0);
+    vector3 l0 = body_l(&world.bodies[b]);
+    float l0n = vector3_length(l0);
     const float dt = 1.0f / 60.0f;
     float max_err = 0.0f;
     for (int t = 0; t < 120; t++) {
         physics_world_step(&world, dt);
-        vector3 L = body_L(&world.bodies[b]);
-        float err = vector3_length(vector3_subtraction(L, L0)) / L0n;
+        vector3 l = body_l(&world.bodies[b]);
+        float err = vector3_length(vector3_subtraction(l, l0)) / l0n;
         if (err > max_err) {
             max_err = err;
         }
@@ -56,4 +56,4 @@ int main(void) {
     physics_world_cleanup(&world);
     return fail;
 }
-#endif /* MPE_ANGMOM_TEST */
+#endif /* mpe_angmom_test */

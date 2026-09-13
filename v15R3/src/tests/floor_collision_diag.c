@@ -1,11 +1,11 @@
 
-#ifdef MPE_FLOOR_DIAG
+#ifdef mpe_floor_diag
 #include <stdio.h>
 #include <math.h>
 #include "core/physics_world.h"
 #include "config/mpe_config.h"
 
-static const float DT = 1.0f / 60.0f;
+static const float time_step = 1.0f / 60.0f;
 
 int main(void) {
     mpe_config_init();
@@ -44,7 +44,7 @@ int main(void) {
     printf("\n");
 
     for (int i = 0; i < 60; i++) { /* MFS_139_EXTEND: run longer to reach floor */
-        physics_world_step(&world, DT);
+        physics_world_step(&world, time_step);
         printf("step=%2d y=%.6f vy=%.6f\n",
                i + 1, world.bodies[cyl_idx].position.y,
                world.bodies[cyl_idx].velocity.y);

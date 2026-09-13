@@ -1,5 +1,5 @@
 /* MPE_FTC_093h: Grounded driven wheel propulsion proof. */
-#ifdef MPE_DRIVEN_WHEEL_TEST
+#ifdef mpe_driven_wheel_test
 
 #include <math.h>
 #include <stdio.h>
@@ -64,4 +64,4 @@ int main(void) {
     return 0;
 }
 
-#endif /* MPE_DRIVEN_WHEEL_TEST */
+#endif /* mpe_driven_wheel_test */

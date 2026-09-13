@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 #include <math.h>
-#include "../core/math3D.h"
+#include "../core/math3d.h"
 #include "../core/rigidbody.h"
 #include "define_forces.h"
 struct physics_world; /* MFS_131: forward decl for per-world cache */

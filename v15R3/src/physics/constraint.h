@@ -10,11 +10,11 @@
 struct physics_world;
 
 typedef enum {
-    CONSTRAINT_SPRING,
-    CONSTRAINT_REVOLUTE,
-    CONSTRAINT_FIXED,
-    CONSTRAINT_PRISMATIC,
-    CONSTRAINT_DISTANCE
+    constraint_spring,
+    constraint_revolute,
+    constraint_fixed,
+    constraint_prismatic,
+    constraint_distance
 } constraint_type;
 
 typedef struct {

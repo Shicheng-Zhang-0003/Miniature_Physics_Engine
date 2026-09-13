@@ -4,7 +4,7 @@
  * collision could miss the true lowest point of a tipped cylinder.
  * The cylinder must not fall through the floor or become NaN.
  */
-#ifdef LIST4_CYLINDER_FLOOR_TEST
+#ifdef list4_cylinder_floor_test
 
 #include <stdio.h>
 #include <math.h>
@@ -77,4 +77,4 @@ int main(void) {
     return 0;
 }
 
-#endif /* LIST4_CYLINDER_FLOOR_TEST */
+#endif /* list4_cylinder_floor_test */

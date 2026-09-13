@@ -1,7 +1,7 @@
 #ifndef grid_h
 #define grid_h
 #include <epoxy/gl.h>
-#include "../core/math3D.h"
+#include "../core/math3d.h"
 #include "../core/math4_special.h"
 
 typedef struct {

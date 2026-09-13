@@ -267,7 +267,7 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
         }
         r.motor_enabled = motor_u;
         r.limits_enabled = limits_u;
-        if ((r.type != (uint32_t) CONSTRAINT_REVOLUTE) || (r.id_a == 0) || (r.id_a == r.id_b) ||
+        if ((r.type != (uint32_t) constraint_revolute) || (r.id_a == 0) || (r.id_a == r.id_b) ||
             (!scene_id_in_staged(staged_ids, staged_body_count, r.id_a)) ||
             (!scene_id_in_staged(staged_ids, staged_body_count, r.id_b)) ||
             (!isfinite(r.motor_target)) || (!isfinite(r.motor_max_torque)) || (r.motor_max_torque < 0.0f) ||

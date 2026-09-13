@@ -1,5 +1,5 @@
 /* MPE CCD truth test: fast bodies must impact, never tunnel. */
-#ifdef MPE_CCD_SWEEP_TEST
+#ifdef mpe_ccd_sweep_test
 #include <stdio.h>
 #include <math.h>
 #include "core/physics_world.h"
@@ -66,4 +66,4 @@ int main(void) {
     }
     return fail;
 }
-#endif /* MPE_CCD_SWEEP_TEST */
+#endif /* mpe_ccd_sweep_test */
