@@ -22,11 +22,11 @@ int main(void) {
     float rod_length = vector3_length(vector3_subtraction(pivot_point, world.bodies[bob_index].position));
     vector3 start_position = world.bodies[bob_index].position;
 
-    constraint_pool_init();
+    constraint_pool_init(&world);
     vector3 anchor_a = {0.0f, 0.0f, 0.0f}; /* pivot centre -> world (0,10,0) */
     vector3 anchor_b = {-1.0f, 2.0f, 0.0f}; /* bob-local -> world (0,10,0)   */
     vector3 axis = {0.0f, 0.0f, 1.0f}; /* swing in the x-y plane        */
-    int joint_index = constraint_add_revolute(pivot_id, bob_id, anchor_a, anchor_b, axis);
+    int joint_index = constraint_add_revolute(&world, pivot_id, bob_id, anchor_a, anchor_b, axis);
     if (joint_index < 0) {
         printf("[FAIL] could not add revolute joint\n");
         return 1;

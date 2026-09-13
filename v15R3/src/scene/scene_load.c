@@ -41,7 +41,7 @@ typedef struct {
     float c;
 } staged_joint;
 
-/* Staged v200 revolute data (mirrors constraint_pool entries). */
+/* Staged v200 revolute data (mirrors (physics_world_get_primary()->revolute_constraints) entries). */
 typedef struct {
     uint32_t type;
     uint32_t id_a;
@@ -97,8 +97,8 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
     if (!scene_ensure_pool_capacity(count)) {
         return 0;
     }
-    if (count > object_capacity) {
-        count = object_capacity;
+    if (count > (physics_world_get_primary()->body_capacity)) {
+        count = (physics_world_get_primary()->body_capacity);
     }
 
     rigidbody *staged_bodies = (rigidbody *) malloc((size_t) count * sizeof(rigidbody));
@@ -301,28 +301,27 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
 
     /* --- Commit: clear scene AND joint pools, install staged data --- */
     scene_clear();
-    constraint_pool_init();
+    constraint_pool_init(physics_world_get_primary());
     scene_id_remap_reset();
-    contact_cache_clear(NULL);
     contact_cache_clear(physics_world_get_primary());
-    joint_init_pool();
+    joint_init_pool(physics_world_get_primary());
 
-    object_count = staged_body_count;
+    (physics_world_get_primary()->body_count) = staged_body_count;
     for (int i = 0; i < staged_body_count; i++) {
-        obj_per_scene[i] = staged_bodies[i];
-        scene_note_loaded_id(obj_per_scene[i].object_id);
+        (physics_world_get_primary()->bodies)[i] = staged_bodies[i];
+        scene_note_loaded_id((physics_world_get_primary()->bodies)[i].object_id);
     }
     for (int j = 0; j < staged_spring_count; j++) {
-        add_joint_by_ids(staged_springs[j].id_a, staged_springs[j].id_b, staged_springs[j].eq, staged_springs[j].k,
+        add_joint_by_ids(physics_world_get_primary(), staged_springs[j].id_a, staged_springs[j].id_b, staged_springs[j].eq, staged_springs[j].k,
                          staged_springs[j].c);
     }
     for (int j = 0; j < staged_rev_count; j++) {
         staged_revolute *r = &staged_revs[j];
-        int index = constraint_add_revolute(r->id_a, r->id_b, r->anchor_a, r->anchor_b, r->axis_a);
+        int index = constraint_add_revolute(physics_world_get_primary(), r->id_a, r->id_b, r->anchor_a, r->anchor_b, r->axis_a);
         if (index >= 0) {
-            constraint_set_revolute_axes(index, r->axis_a, r->axis_b);
-            constraint_set_revolute_motor(index, r->motor_enabled != 0, r->motor_target, r->motor_max_torque);
-            constraint_set_revolute_limits(index, r->limits_enabled != 0, r->limit_min, r->limit_max);
+            constraint_set_revolute_axes(physics_world_get_primary(), index, r->axis_a, r->axis_b);
+            constraint_set_revolute_motor(physics_world_get_primary(), index, r->motor_enabled != 0, r->motor_target, r->motor_max_torque);
+            constraint_set_revolute_limits(physics_world_get_primary(), index, r->limits_enabled != 0, r->limit_min, r->limit_max);
         }
     }
 
@@ -393,8 +392,8 @@ int scene_loading(const char *file_source_path)
         return 0;
     }
 
-    if (count > object_capacity) {
-        count = object_capacity;
+    if (count > (physics_world_get_primary()->body_capacity)) {
+        count = (physics_world_get_primary()->body_capacity);
     }
 
     /* --- Allocate staging buffers --- */
@@ -567,32 +566,31 @@ int scene_loading(const char *file_source_path)
     /* FIX-AUDIT: stale revolute joints survived every load (only the
      * spring pool was reset), constraining dead IDs. v1 files carry no
      * revolute data, so clearing is strictly more correct there too. */
-    constraint_pool_init();
+    constraint_pool_init(physics_world_get_primary());
     scene_id_remap_reset();
-    contact_cache_clear(NULL);
     contact_cache_clear(physics_world_get_primary());
-    joint_init_pool();
+    joint_init_pool(physics_world_get_primary());
 
-    object_count = staged_body_count;
+    (physics_world_get_primary()->body_count) = staged_body_count;
 
     for (int i = 0; i < staged_body_count; i++) {
-        obj_per_scene[i] = staged_bodies[i];
+        (physics_world_get_primary()->bodies)[i] = staged_bodies[i];
 
         /* Recover the saved object ID from staging (v150+). */
         int32_t saved_id = staged_ids[i];
 
-        obj_per_scene[i].object_id = scene_allocate_object_id();
+        (physics_world_get_primary()->bodies)[i].object_id = scene_allocate_object_id();
 
         if ((version >= 150) && (saved_id > 0)) {
-            scene_id_remap_add((uint32_t)saved_id, obj_per_scene[i].object_id);
+            scene_id_remap_add((uint32_t)saved_id, (physics_world_get_primary()->bodies)[i].object_id);
         }
 
-        obj_per_scene[i].object_generation = 1;
+        (physics_world_get_primary()->bodies)[i].object_generation = 1;
     }
 
     /* Install staged joints */
     for (int j = 0; j < staged_joint_count; j++) {
-        add_joint_by_ids(
+        add_joint_by_ids(physics_world_get_primary(), 
             scene_id_remap_resolve(staged_joints[j].id_a),
             scene_id_remap_resolve(staged_joints[j].id_b),
             staged_joints[j].eq,

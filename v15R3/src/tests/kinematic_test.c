@@ -11,7 +11,7 @@ int main(void) {
     mpe_config_init();
     physics_world world;
     physics_world_init(&world);
-    constraint_pool_init();
+    constraint_pool_init(&world);
 
     /* Platform: box bottom at y=0, driven +x at 2 m/s, immune to gravity. */
     int p = physics_world_add_cube(&world, (vector3){0, 0.5f, 0}, (vector3){2.0f, 0.5f, 2.0f}, 5.0f);

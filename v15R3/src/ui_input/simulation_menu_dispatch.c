@@ -19,7 +19,7 @@ void simulation_menu_dispatch(GtkWidget *parent_window) {
     if (main_inputs.menu_3_pressed) {
         scene_clear();
         clear_selection();
-        contact_cache_clear(NULL);
+        contact_cache_clear(physics_world_get_primary());
         editor_reset();
         main_inputs.menu_3_pressed = false;
         main_inputs.is_menu_open = false;
@@ -31,7 +31,7 @@ void simulation_menu_dispatch(GtkWidget *parent_window) {
     }
     if (main_inputs.menu_5_pressed) {
         mpe_config_reset_defaults();
-        contact_cache_clear(NULL);
+        contact_cache_clear(physics_world_get_primary());
         main_inputs.menu_5_pressed = false;
         main_inputs.is_menu_open = false;
     }

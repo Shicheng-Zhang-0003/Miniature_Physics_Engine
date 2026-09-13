@@ -48,7 +48,7 @@ void simulation_input_dispatch(GtkWidget *parent_window) {
         main_inputs.r_key_pressed = false;
     }
     if (main_inputs.delete_key_pressed) {
-        if ((main_inputs.is_debug_mode_active) && (selected_object >= 0) && (selected_object < object_count)) {
+        if ((main_inputs.is_debug_mode_active) && (selected_object >= 0) && (selected_object < (physics_world_get_primary()->body_count))) {
             scene_remove_object_by_index(selected_object);
         }
         main_inputs.delete_key_pressed = false;

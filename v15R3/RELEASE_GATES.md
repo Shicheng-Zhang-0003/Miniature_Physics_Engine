@@ -168,16 +168,17 @@ They should be recorded as post-stable work items.
 ## Deferred / Post-Stable Work
 
 The following are not required for `v15R3`:
-- full global-state removal beyond config extraction,
-- full `PhysicsWorld` encapsulation,
 - multithreading,
-- continuous collision detection,
-- generic constraint framework,
-- solver islanding,
-- scene format version 2,
+- generic constraint framework (only revolute hinges exist),
 - complete UI state-machine rewrite,
 - Wayland mouse-lock support,
 - per-object config persistence in scene files.
+
+Completed since this list was written (no longer deferred): full
+global-state removal (sim state is per-world), `PhysicsWorld`
+encapsulation, continuous collision detection (swept TOI clamp), solver
+islanding (union-find sleep islands), scene format v2 (stable IDs,
+joints, CRC32).
 
 These belong after `v15R3`.
 

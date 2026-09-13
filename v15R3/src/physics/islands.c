@@ -2,41 +2,38 @@
  * See islands.h for the contract. */
 #include "islands.h"
 #include "constraint.h"
+#include "../core/physics_world.h"
 #include "../config/mpe_constants.h"
 #include <stddef.h>
 #include <stdint.h>
 
-static int island_parent[mpe_max_bodies];
-static int island_label[mpe_max_bodies];
-static unsigned char island_awake[16384];
-static rigidbody *island_base = NULL;
-static int island_body_count = 0;
-static int island_total = 0;
+/* Union-find scratch lives in the world (heap members); the module keeps
+ * no state of its own. Queries take the world explicitly. */
 
-static int island_find(int x) {
+static int island_find(struct physics_world *world, int x) {
     int root = x;
-    while (island_parent[root] != root) {
-        root = island_parent[root];
+    while (world->island_parent[root] != root) {
+        root = world->island_parent[root];
     }
-    while (island_parent[x] != root) {
-        int next = island_parent[x];
-        island_parent[x] = root;
+    while (world->island_parent[x] != root) {
+        int next = world->island_parent[x];
+        world->island_parent[x] = root;
         x = next;
     }
     return root;
 }
 
-static void island_union(int a, int b) {
-    int ra = island_find(a);
-    int rb = island_find(b);
+static void island_union(struct physics_world *world, int a, int b) {
+    int ra = island_find(world, a);
+    int rb = island_find(world, b);
     if (ra == rb) {
         return;
     }
     /* Union by smaller root: deterministic, no rank state. */
     if (ra < rb) {
-        island_parent[rb] = ra;
+        world->island_parent[rb] = ra;
     } else {
-        island_parent[ra] = rb;
+        world->island_parent[ra] = rb;
     }
 }
 
@@ -51,20 +48,30 @@ static int island_index_of(rigidbody *bodies, rigidbody *body, int body_count) {
     return (int) offset;
 }
 
-void islands_build(rigidbody *bodies, int body_count, broadphase_pair *pairs, int pair_count) {
-    island_base = bodies;
-    island_body_count = 0;
-    island_total = 0;
+static bool islands_ready(const struct physics_world *world) {
+    return (world) && (world->bodies) && (world->island_parent) && (world->island_label) &&
+           (world->island_awake_flags);
+}
+
+void islands_build(struct physics_world *world, broadphase_pair *pairs, int pair_count) {
+    if (!islands_ready(world)) {
+        return;
+    }
+    rigidbody *bodies = world->bodies;
+    int body_count = world->body_count;
+    world->island_base = bodies;
+    world->island_body_count = 0;
+    world->island_total = 0;
     if ((!bodies) || (body_count <= 0)) {
         return;
     }
     if (body_count > mpe_max_bodies) {
         body_count = mpe_max_bodies;
     }
-    island_body_count = body_count;
+    world->island_body_count = body_count;
     for (int i = 0; i < body_count; i++) {
-        island_parent[i] = i;
-        island_label[i] = -1;
+        world->island_parent[i] = i;
+        world->island_label[i] = -1;
     }
     if ((pairs) && (pair_count > 0)) {
         for (int p = 0; p < pair_count; p++) {
@@ -73,14 +80,14 @@ void islands_build(rigidbody *bodies, int body_count, broadphase_pair *pairs, in
             if ((a < 0) || (a >= body_count) || (b < 0) || (b >= body_count) || (a == b)) {
                 continue;
             }
-            island_union(a, b);
+            island_union(world, a, b);
         }
     }
     /* Revolute joints join islands (wheels must solve with their chassis). */
     {
         uint32_t ids_a[mpe_max_joints];
         uint32_t ids_b[mpe_max_joints];
-        int joints = constraint_get_active_ids(ids_a, ids_b, mpe_max_joints);
+        int joints = constraint_get_active_ids(world, ids_a, ids_b, mpe_max_joints);
         for (int j = 0; j < joints; j++) {
             int ia = -1, ib = -1;
             for (int i = 0; i < body_count; i++) {
@@ -95,44 +102,50 @@ void islands_build(rigidbody *bodies, int body_count, broadphase_pair *pairs, in
                 }
             }
             if ((ia >= 0) && (ib >= 0) && (ia != ib)) {
-                island_union(ia, ib);
+                island_union(world, ia, ib);
             }
         }
     }
     /* Labels in first-seen order; awake if any dynamic member is awake. */
     for (int i = 0; i < body_count; i++) {
-        int root = island_find(i);
-        if (island_label[root] < 0) {
-            island_label[root] = island_total;
-            island_awake[island_total] = 0;
-            island_total++;
+        int root = island_find(world, i);
+        if (world->island_label[root] < 0) {
+            world->island_label[root] = world->island_total;
+            world->island_awake_flags[world->island_total] = 0;
+            world->island_total++;
         }
-        island_label[i] = island_label[root];
+        world->island_label[i] = world->island_label[root];
         if ((!bodies[i].static_state) && (!bodies[i].is_sleeping)) {
-            island_awake[island_label[i]] = 1;
+            world->island_awake_flags[world->island_label[i]] = 1;
         }
     }
 }
 
-int islands_count(void) {
-    return island_total;
+int islands_count(const struct physics_world *world) {
+    if (!world) {
+        return 0;
+    }
+    return world->island_total;
 }
 
-int islands_body_island(rigidbody *bodies, rigidbody *body) {
-    if ((!bodies) || (bodies != island_base) || (island_body_count <= 0)) {
+int islands_body_island(struct physics_world *world, rigidbody *body) {
+    if (!islands_ready(world)) {
         return -1;
     }
-    int idx = island_index_of(bodies, body, island_body_count);
+    if (world->bodies != world->island_base) {
+        return -1;
+    }
+    int idx = island_index_of(world->bodies, body, world->island_body_count);
     if (idx < 0) {
         return -1;
     }
-    return island_label[idx];
+    return world->island_label[idx];
 }
 
-bool islands_body_awake(rigidbody *bodies, rigidbody *body) {
-    int island = islands_body_island(bodies, body);
+bool islands_body_awake(struct physics_world *world, rigidbody *body) {
+    int island = islands_body_island(world, body);
     if (island < 0) {
         return true;
     }
-    return island_awake[island] != 0;
+    return world->island_awake_flags[island] != 0;
 }

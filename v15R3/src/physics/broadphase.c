@@ -1,79 +1,79 @@
 #include "../mpe_engine.h"
 #include "broadphase.h"
+#include "../core/physics_world.h"
 #include <stdlib.h>
 #include <math.h>
 #include <stdint.h>
 #include <stdbool.h>
 
-/* MPE_TASK_17_ADAPTIVE_CELL_SIZE_BEGIN */
-static float broadphase_current_cell_size = 5.0f; /* MPE_TASK_31 bootstrap; runtime reads g_cfg */
-#define GRID_CELL_SIZE broadphase_current_cell_size
-/* MPE_TASK_17_ADAPTIVE_CELL_SIZE_END */
+/* All mutable state lives in the per-world workspace (broadphase_workspace,
+ * owned by physics_world). No file-scope state remains; worlds never share
+ * broadphase data. Static helpers below take the workspace explicitly. */
 
-typedef struct {
-    int object_index;
-    int next_entry;
-} hash_node;
-
-static hash_node *node_pool = NULL; /* A3_PATCH_15_DYNAMIC_NODE_POOL */
-static int node_pool_capacity = 0;
-static int node_count = 0;
-static int hash_table[hash_table_size];
-
-static int broadphase_node_overflow_count = 0;
-static int broadphase_pair_overflow_count = 0;
-
-/* MPE_TASK_10_PAIR_DEDUPE_COUNTER_BEGIN */
-static int broadphase_pair_dedupe_overflow_count = 0;
-/* MPE_TASK_10_PAIR_DEDUPE_COUNTER_END */
-
-/* MPE_TASK_11_LARGE_OBJECT_CLAMP_COUNTER_BEGIN */
-static int broadphase_large_object_clamp_count = 0;
-/* MPE_TASK_11_LARGE_OBJECT_CLAMP_COUNTER_END */
-
-int broadphase_get_node_overflow_count(void) {
-    return broadphase_node_overflow_count;
+int broadphase_get_node_overflow_count(const struct physics_world *world) {
+    if ((!world) || (!world->broadphase)) {
+        return 0;
+    }
+    return world->broadphase->node_overflow_count;
 }
 
-int broadphase_get_pair_overflow_count(void) {
-    return broadphase_pair_overflow_count;
+int broadphase_get_pair_overflow_count(const struct physics_world *world) {
+    if ((!world) || (!world->broadphase)) {
+        return 0;
+    }
+    return world->broadphase->pair_overflow_count;
 }
 
 /* MPE_TASK_10_PAIR_DEDUPE_GETTER_BEGIN */
-int broadphase_get_pair_dedupe_overflow_count(void) {
-    return broadphase_pair_dedupe_overflow_count;
+int broadphase_get_pair_dedupe_overflow_count(const struct physics_world *world) {
+    if ((!world) || (!world->broadphase)) {
+        return 0;
+    }
+    return world->broadphase->pair_dedupe_overflow_count;
 }
 /* MPE_TASK_10_PAIR_DEDUPE_GETTER_END */
 
 /* MPE_TASK_11_LARGE_OBJECT_CLAMP_GETTER_BEGIN */
-int broadphase_get_large_object_clamp_count(void) {
-    return broadphase_large_object_clamp_count;
+int broadphase_get_large_object_clamp_count(const struct physics_world *world) {
+    if ((!world) || (!world->broadphase)) {
+        return 0;
+    }
+    return world->broadphase->large_object_clamp_count;
 }
 /* MPE_TASK_11_LARGE_OBJECT_CLAMP_GETTER_END */
 
-void broadphase_reset_overflow_counts(void) {
-    broadphase_node_overflow_count = 0;
-    broadphase_pair_overflow_count = 0;
+void broadphase_reset_overflow_counts(struct physics_world *world) {
+    if ((!world) || (!world->broadphase)) {
+        return;
+    }
+    world->broadphase->node_overflow_count = 0;
+    world->broadphase->pair_overflow_count = 0;
     /* MPE_TASK_10_PAIR_DEDUPE_RESET_BEGIN */
-    broadphase_pair_dedupe_overflow_count = 0;
+    world->broadphase->pair_dedupe_overflow_count = 0;
     /* MPE_TASK_10_PAIR_DEDUPE_RESET_END */
     /* MPE_TASK_11_LARGE_OBJECT_CLAMP_RESET_BEGIN */
-    broadphase_large_object_clamp_count = 0;
+    world->broadphase->large_object_clamp_count = 0;
     /* MPE_TASK_11_LARGE_OBJECT_CLAMP_RESET_END */
 }
 
-void broadphase_cleanup(void) {
-    if (node_pool) {
-        free(node_pool);
-        node_pool = NULL;
-        node_pool_capacity = 0;
-        node_count = 0;
+void broadphase_cleanup(struct physics_world *world) {
+    if ((!world) || (!world->broadphase)) {
+        return;
+    }
+    if (world->broadphase->node_pool) {
+        free(world->broadphase->node_pool);
+        world->broadphase->node_pool = NULL;
+        world->broadphase->node_pool_capacity = 0;
+        world->broadphase->node_count = 0;
     }
 }
 
 /* MPE_TASK_17_CELL_SIZE_GETTER_BEGIN */
-float broadphase_get_current_cell_size(void) {
-    return broadphase_current_cell_size;
+float broadphase_get_current_cell_size(const struct physics_world *world) {
+    if ((!world) || (!world->broadphase)) {
+        return 5.0f;
+    }
+    return world->broadphase->current_cell_size;
 }
 /* MPE_TASK_17_CELL_SIZE_GETTER_END */
 
@@ -84,47 +84,53 @@ static int hash_coordinate(int x, int y, int z) {
     return (int) (h % hash_table_size);
 }
 
-static bool broadphase_ensure_node_capacity(void) {
-    if (node_pool == NULL) {
-        node_pool_capacity = max_objects * 8;
-        node_pool = (hash_node *) malloc((size_t) node_pool_capacity * sizeof(hash_node));
-        if (node_pool == NULL) {
-            node_pool_capacity = 0;
-            broadphase_node_overflow_count++;
+static bool broadphase_ensure_node_capacity(broadphase_workspace *ws) {
+    if (!ws) {
+        return false;
+    }
+    if (ws->node_pool == NULL) {
+        ws->node_pool_capacity = max_objects * 8;
+        ws->node_pool = (hash_node *) malloc((size_t) ws->node_pool_capacity * sizeof(hash_node));
+        if (ws->node_pool == NULL) {
+            ws->node_pool_capacity = 0;
+            ws->node_overflow_count++;
             return false;
         }
         return true;
     }
-    if (node_count < node_pool_capacity) {
+    if (ws->node_count < ws->node_pool_capacity) {
         return true;
     }
-    int new_capacity = (node_pool_capacity > 0) ? (node_pool_capacity * 2) : (max_objects * 8);
-    if (new_capacity < node_pool_capacity) {
-        broadphase_node_overflow_count++;
+    int new_capacity = (ws->node_pool_capacity > 0) ? (ws->node_pool_capacity * 2) : (max_objects * 8);
+    if (new_capacity < ws->node_pool_capacity) {
+        ws->node_overflow_count++;
         return false;
     }
-    hash_node *new_pool = (hash_node *) realloc(node_pool, (size_t) new_capacity * sizeof(hash_node));
+    hash_node *new_pool = (hash_node *) realloc(ws->node_pool, (size_t) new_capacity * sizeof(hash_node));
     if (new_pool == NULL) {
-        broadphase_node_overflow_count++;
+        ws->node_overflow_count++;
         return false;
     }
-    node_pool = new_pool;
-    node_pool_capacity = new_capacity;
+    ws->node_pool = new_pool;
+    ws->node_pool_capacity = new_capacity;
     return true;
 }
 
-static void insert_into_hash(int object_index, int x, int y, int z) {
-    if (!broadphase_ensure_node_capacity()) {
+static void insert_into_hash(broadphase_workspace *ws, int object_index, int x, int y, int z) {
+    if (!broadphase_ensure_node_capacity(ws)) {
         return;
     }
     int hash = hash_coordinate(x, y, z);
-    node_pool[node_count].object_index = object_index;
-    node_pool[node_count].next_entry = hash_table[hash];
-    hash_table[hash] = node_count;
-    node_count++;
+    ws->node_pool[ws->node_count].object_index = object_index;
+    ws->node_pool[ws->node_count].next_entry = ws->hash_table[hash];
+    ws->hash_table[hash] = ws->node_count;
+    ws->node_count++;
 }
 
 float broadphase_bounding_radius(rigidbody *rb) {
+    if (!rb) {
+        return 0.0f;
+    }
     if (rb->type == object_sphere) {
         return rb->radius;
     }
@@ -136,10 +142,6 @@ float broadphase_bounding_radius(rigidbody *rb) {
                  rb->half_extensions.y * rb->half_extensions.y +
                  rb->half_extensions.z * rb->half_extensions.z);
 }
-
-static uint64_t a3_pair_hash_keys[a3_pair_hash_table_size];
-static uint32_t a3_pair_hash_generations[a3_pair_hash_table_size];
-static uint32_t a3_pair_hash_generation = 0;
 
 static inline uint64_t a3_broadphase_pair_key(int object_a, int object_b) {
     return ((uint64_t) (uint32_t) object_a << 32) | (uint64_t) (uint32_t) object_b;
@@ -155,27 +157,30 @@ static inline uint32_t a3_broadphase_pair_hash(uint64_t key) {
     return (uint32_t) (mixed_key & a3_pair_hash_mask);
 }
 
-static void broadphase_pair_dedupe_begin(void) {
-    a3_pair_hash_generation++;
-    if (a3_pair_hash_generation == 0) {
+static void broadphase_pair_dedupe_begin(broadphase_workspace *ws) {
+    if (!ws) {
+        return;
+    }
+    ws->pair_hash_generation++;
+    if (ws->pair_hash_generation == 0) {
         for (int i = 0; i < a3_pair_hash_table_size; i++) {
-            a3_pair_hash_generations[i] = 0;
+            ws->pair_hash_generations[i] = 0;
         }
-        a3_pair_hash_generation = 1;
+        ws->pair_hash_generation = 1;
     }
 }
 
-static bool pair_already_checked(int min_obj, int max_obj) {
+static bool pair_already_checked(broadphase_workspace *ws, int min_obj, int max_obj) {
     uint64_t key = a3_broadphase_pair_key(min_obj, max_obj);
     uint32_t index = a3_broadphase_pair_hash(key);
     for (uint32_t probe = 0; probe < a3_pair_hash_table_size; probe++) {
         uint32_t slot = (index + probe) & a3_pair_hash_mask;
-        if (a3_pair_hash_generations[slot] != a3_pair_hash_generation) {
-            a3_pair_hash_keys[slot] = key;
-            a3_pair_hash_generations[slot] = a3_pair_hash_generation;
+        if (ws->pair_hash_generations[slot] != ws->pair_hash_generation) {
+            ws->pair_hash_keys[slot] = key;
+            ws->pair_hash_generations[slot] = ws->pair_hash_generation;
             return false;
         }
-        if (a3_pair_hash_keys[slot] == key) {
+        if (ws->pair_hash_keys[slot] == key) {
             return true;
         }
     }
@@ -183,15 +188,20 @@ static bool pair_already_checked(int min_obj, int max_obj) {
      * which silently DROPPED new pairs (missed collisions). Return false so
      * the pair is emitted (risk duplicate narrowphase work, never a miss).
      * Overflow is still counted for validation visibility. */
-    broadphase_pair_dedupe_overflow_count++;
+    ws->pair_dedupe_overflow_count++;
     return false;
     /* MPE_TASK_10_PAIR_DEDUPE_FALLBACK_END */
 }
 
 /* MPE_TASK_17_CELL_SIZE_FUNCTION_BEGIN */
-static void broadphase_update_cell_size(rigidbody *bodies, int body_count) { /* MPE_FTC_059 */
+static void broadphase_update_cell_size(struct physics_world *world, rigidbody *bodies,
+                                        int body_count) { /* MPE_FTC_059 */
+    broadphase_workspace *ws = world ? world->broadphase : NULL;
+    if (!ws) {
+        return;
+    }
     if (body_count <= 0) {
-        broadphase_current_cell_size = g_cfg.broadphase.cell_size_default;
+        ws->current_cell_size = g_cfg.broadphase.cell_size_default;
         return;
     }
 
@@ -231,28 +241,35 @@ static void broadphase_update_cell_size(rigidbody *bodies, int body_count) { /* 
         desired_cell_size = g_cfg.broadphase.cell_size_max;
     }
 
-    broadphase_current_cell_size = desired_cell_size;
+    ws->current_cell_size = desired_cell_size;
 }
 /* MPE_TASK_17_CELL_SIZE_FUNCTION_END */
 
-int broadphase_generate_pairing(rigidbody *bodies, int body_count, broadphase_pair *collision_pairs_output_array,
+int broadphase_generate_pairing(struct physics_world *world, broadphase_pair *collision_pairs_output_array,
                                 int maximum_pairs_allowed, float dt) { /* MPE_FTC_059 */
+    if ((!world) || (!world->bodies) || (!world->broadphase) || (!collision_pairs_output_array) ||
+        (maximum_pairs_allowed <= 0)) {
+        return 0;
+    }
+    rigidbody *bodies = world->bodies;
+    int body_count = world->body_count;
+    broadphase_workspace *ws = world->broadphase;
     if (dt <= 0.0f) {
         dt = 1.0f / 60.0f;
     }
     /* MPE_TASK_17_CELL_SIZE_CALL_BEGIN */
     if (body_count < 2) {
-        broadphase_current_cell_size = g_cfg.broadphase.cell_size_default;
+        ws->current_cell_size = g_cfg.broadphase.cell_size_default;
         return 0;
     }
 
-    broadphase_update_cell_size(bodies, body_count); /* MPE_FTC_059e */
+    broadphase_update_cell_size(world, bodies, body_count); /* MPE_FTC_059e */
     /* MPE_TASK_17_CELL_SIZE_CALL_END */
     for (int i = 0; i < hash_table_size; i++) {
-        hash_table[i] = -1;
+        ws->hash_table[i] = -1;
     }
-    node_count = 0;
-    broadphase_pair_dedupe_begin();
+    ws->node_count = 0;
+    broadphase_pair_dedupe_begin(ws);
     int collision_pair_counter = 0;
     for (int i = 0; i < body_count; i++) {
         rigidbody *rb = &bodies[i];
@@ -279,12 +296,13 @@ int broadphase_generate_pairing(rigidbody *bodies, int body_count, broadphase_pa
             extent_y += fabsf(rb->velocity.y) * dt;
             extent_z += fabsf(rb->velocity.z) * dt;
         }
-        int min_x = (int) floorf((rb->position.x - extent_x) / GRID_CELL_SIZE);
-        int max_x = (int) floorf((rb->position.x + extent_x) / GRID_CELL_SIZE);
-        int min_y = (int) floorf((rb->position.y - extent_y) / GRID_CELL_SIZE);
-        int max_y = (int) floorf((rb->position.y + extent_y) / GRID_CELL_SIZE);
-        int min_z = (int) floorf((rb->position.z - extent_z) / GRID_CELL_SIZE);
-        int max_z = (int) floorf((rb->position.z + extent_z) / GRID_CELL_SIZE);
+        float cell_size = ws->current_cell_size;
+        int min_x = (int) floorf((rb->position.x - extent_x) / cell_size);
+        int max_x = (int) floorf((rb->position.x + extent_x) / cell_size);
+        int min_y = (int) floorf((rb->position.y - extent_y) / cell_size);
+        int max_y = (int) floorf((rb->position.y + extent_y) / cell_size);
+        int min_z = (int) floorf((rb->position.z - extent_z) / cell_size);
+        int max_z = (int) floorf((rb->position.z + extent_z) / cell_size);
         /* FIX-AUDIT: old code SHRANK the occupied interval to max_span,
          * so cells the body truly covers were never inserted -> missed
          * pairs (false negatives). Broadphase must never miss. Keep the
@@ -304,28 +322,28 @@ int broadphase_generate_pairing(rigidbody *bodies, int body_count, broadphase_pa
         }
 
         if (a3_large_object_clamped) {
-            broadphase_large_object_clamp_count++;
+            ws->large_object_clamp_count++;
         }
         /* MPE_TASK_11_LARGE_OBJECT_CLAMP_END */
         for (int x = min_x; x <= max_x; x++) {
             for (int y = min_y; y <= max_y; y++) {
                 for (int z = min_z; z <= max_z; z++) {
-                    insert_into_hash(i, x, y, z);
+                    insert_into_hash(ws, i, x, y, z);
                 }
             }
         }
     }
     for (int i = 0; i < hash_table_size; i++) {
-        int node_idx = hash_table[i];
+        int node_idx = ws->hash_table[i];
         while (node_idx != -1) {
-            int obj_a = node_pool[node_idx].object_index;
-            int next_node_idx = node_pool[node_idx].next_entry;
+            int obj_a = ws->node_pool[node_idx].object_index;
+            int next_node_idx = ws->node_pool[node_idx].next_entry;
             while (next_node_idx != -1) {
-                int obj_b = node_pool[next_node_idx].object_index;
+                int obj_b = ws->node_pool[next_node_idx].object_index;
                 if (obj_a != obj_b) {
                     int min_obj = obj_a < obj_b ? obj_a : obj_b;
                     int max_obj = obj_a > obj_b ? obj_a : obj_b;
-                    if (!pair_already_checked(min_obj, max_obj)) {
+                    if (!pair_already_checked(ws, min_obj, max_obj)) {
                         rigidbody *rb_a = &bodies[min_obj];
                         rigidbody *rb_b = &bodies[max_obj];
                         float dist_sq = vector3_length_squared(vector3_subtraction(rb_a->position, rb_b->position));
@@ -336,14 +354,14 @@ int broadphase_generate_pairing(rigidbody *bodies, int body_count, broadphase_pa
                                 collision_pairs_output_array[collision_pair_counter].object_index_b = max_obj;
                                 collision_pair_counter++;
                             } else {
-                                broadphase_pair_overflow_count++;
+                                ws->pair_overflow_count++;
                             }
                         }
                     }
                 }
-                next_node_idx = node_pool[next_node_idx].next_entry;
+                next_node_idx = ws->node_pool[next_node_idx].next_entry;
             }
-            node_idx = node_pool[node_idx].next_entry;
+            node_idx = ws->node_pool[node_idx].next_entry;
         }
     }
     return collision_pair_counter;

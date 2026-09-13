@@ -191,7 +191,7 @@ int term_object_from_token(const char *token) {
         return -1;
     }
     if (term_str_eq(token, "sel") || term_str_eq(term_last_path_component(token), "sel")) {
-        if ((selected_object >= 0) && (selected_object < object_count)) {
+        if ((selected_object >= 0) && (selected_object < (physics_world_get_primary()->body_count))) {
             return selected_object;
         }
         return -1;
@@ -202,7 +202,7 @@ int term_object_from_token(const char *token) {
     if ((endptr == component) || (*endptr != '\0')) {
         return -1;
     }
-    if ((parsed_index < 0) || (parsed_index >= object_count)) {
+    if ((parsed_index < 0) || (parsed_index >= (physics_world_get_primary()->body_count))) {
         return -1;
     }
     return (int) parsed_index;
@@ -220,7 +220,7 @@ int term_joint_from_token(const char *token) {
     if ((parsed_index < 0) || (parsed_index >= mpe_max_joints)) {
         return -1;
     }
-    if (!joint_pool[parsed_index].is_active) {
+    if (!(physics_world_get_primary()->spring_joints)[parsed_index].is_active) {
         return -1;
     }
     return (int) parsed_index;

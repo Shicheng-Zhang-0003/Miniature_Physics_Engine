@@ -52,14 +52,14 @@ static int a3_task13_body_is_invalid(rigidbody *rigid_body) {
 static void long_run_validation_report(void) {
     /* FIX-AUDIT: old gate used final-tick speed only, so spike-then-settle
      * passed. Gate on final AND run-max (looser bound for transients). */
-    int pass = (object_count > 0) && (long_run_validation_nan_count == 0) && (long_run_validation_fallen_count == 0) &&
+    int pass = ((physics_world_get_primary()->body_count) > 0) && (long_run_validation_nan_count == 0) && (long_run_validation_fallen_count == 0) &&
                (long_run_validation_last_max_linear_speed < 0.25f) &&
                (long_run_validation_last_max_angular_speed < 0.5f) &&
                (long_run_validation_max_linear_speed < 2.0f) &&
                (long_run_validation_max_angular_speed < 4.0f);
 
     printf("[A3] Long-run validation report %s\n", a3_version_string);
-    printf("[A3] duration_ticks=%d objects=%d sleeping=%d awake=%d\n", long_run_validation_total_ticks, object_count,
+    printf("[A3] duration_ticks=%d objects=%d sleeping=%d awake=%d\n", long_run_validation_total_ticks, (physics_world_get_primary()->body_count),
            long_run_validation_final_sleeping_count, long_run_validation_final_awake_count);
     printf("[A3] final max speed: linear=%.6f angular=%.6f\n", long_run_validation_last_max_linear_speed,
            long_run_validation_last_max_angular_speed);
@@ -68,8 +68,8 @@ static void long_run_validation_report(void) {
     printf("[A3] nan_ticks=%d fallen_ticks=%d max_manifold_overflow=%d\n", long_run_validation_nan_count,
            long_run_validation_fallen_count, long_run_validation_max_manifold_overflow);
     printf("[A3] broadphase overflow: nodes=%d pairs=%d dedupe=%d large_clamps=%d\n",
-           broadphase_get_node_overflow_count(), broadphase_get_pair_overflow_count(),
-           broadphase_get_pair_dedupe_overflow_count(), broadphase_get_large_object_clamp_count());
+           broadphase_get_node_overflow_count(physics_world_get_primary()), broadphase_get_pair_overflow_count(physics_world_get_primary()),
+           broadphase_get_pair_dedupe_overflow_count(physics_world_get_primary()), broadphase_get_large_object_clamp_count(physics_world_get_primary()));
     printf("[A3] result: %s\n", pass ? "PASS" : "FAIL");
     /* MPE_TASK_39_FIX_RESTORE_CONFIG */
     if (long_run_validation_restore_config) {
@@ -101,8 +101,8 @@ static void long_run_validation_evaluate(void) {
     int current_fallen_count = 0;
     int current_nan_count = 0;
 
-    for (int object_index = 0; object_index < object_count; object_index++) {
-        rigidbody *rigid_body = &obj_per_scene[object_index];
+    for (int object_index = 0; object_index < (physics_world_get_primary()->body_count); object_index++) {
+        rigidbody *rigid_body = &(physics_world_get_primary()->bodies)[object_index];
 
         if (a3_task13_body_is_invalid(rigid_body)) {
             current_nan_count++;
@@ -189,8 +189,8 @@ void long_run_validation_start(int duration_ticks) {
     long_run_validation_final_sleeping_count = 0;
     long_run_validation_final_awake_count = 0;
 
-    broadphase_reset_overflow_counts();
-    contact_cache_clear(NULL);
+    broadphase_reset_overflow_counts(physics_world_get_primary());
+    contact_cache_clear(physics_world_get_primary());
 
     printf("[A3] Long-run validation started: %d ticks (%.1f seconds)\n", duration_ticks,
            (float) duration_ticks / 60.0f);

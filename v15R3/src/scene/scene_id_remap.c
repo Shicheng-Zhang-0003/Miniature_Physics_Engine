@@ -1,4 +1,7 @@
-/* MPE_FTC_054 */
+/* MPE_FTC_054: load-time ID remap table.
+ * Deliberately file-static: pure transient scratch, strictly single-flight
+ * (scene loads never overlap or nest), reset at every load commit. It holds
+ * no simulation state across calls, so it stays out of physics_world. */
 #include "scene_id_remap.h"
 #include "../config/mpe_constants.h"
 typedef struct {

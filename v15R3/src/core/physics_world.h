@@ -4,6 +4,10 @@
 
 #include "rigidbody.h"
 #include "../config/mpe_constants.h" /* MFS_131 */
+#include "../physics/spring_joint_types.h"
+#include "../physics/constraint.h"
+#include "../physics/broadphase.h"
+#include "../physics/collision_mechanics.h"
 #include <stdint.h>
 
 /* MFS_131A: warm-start contact cache entry. Moved here from
@@ -42,6 +46,35 @@ typedef struct physics_world {
     /* Warm-start hash heads (4096 buckets, -1 empty), heap-allocated with
      * the cache. Rebuilt on every save; see collision_mechanics.c. */
     int32_t *contact_hash_head;
+    /* Joint pools (per-world state; migrated from file-scope globals).
+     * Spring joints (Hooke point-to-point) and generic constraints
+     * (revolute hinges today). Counts track active entries. */
+    spring_joint spring_joints[mpe_max_joints];
+    int spring_joint_count;
+    constraint revolute_constraints[mpe_max_joints];
+    int revolute_constraint_count;
+    /* Solver scratch (per-world heap; migrated from file-scope statics so
+     * worlds never share mutable solver state).
+     * pair_buffer/manifolds: broadphase pairs + narrowphase manifolds for
+     * the current tick. awake/order: per-manifold island flags + sweep
+     * order. sort_keys: manifold height keys. pair_skipped: sleep-wake
+     * revisit marks. island_*: union-find labels + wake flags. */
+    broadphase_workspace *broadphase;
+    broadphase_pair *pair_buffer;
+    collision_data *manifolds;
+    unsigned char *manifold_awake;
+    int *manifold_order;
+    float *manifold_sort_keys;
+    unsigned char *pair_skipped;
+    int *island_parent;
+    int *island_label;
+    unsigned char *island_awake_flags;
+    rigidbody *island_base;
+    int island_body_count;
+    int island_total;
+    /* Contact-cache diagnostics (per-world; was global). */
+    int contact_cache_hits;
+    int contact_cache_misses;
 } physics_world;
 
 void physics_world_init(physics_world *world);

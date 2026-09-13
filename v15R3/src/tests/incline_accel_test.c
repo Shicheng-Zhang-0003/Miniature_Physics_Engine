@@ -11,7 +11,7 @@ int main(void) {
     mpe_config_init();
     physics_world world;
     physics_world_init(&world);
-    constraint_pool_init();
+    constraint_pool_init(&world);
 
     float ang = -30.0f * 3.14159265f / 180.0f;
     vector3 n = {-sinf(ang), cosf(ang), 0.0f};

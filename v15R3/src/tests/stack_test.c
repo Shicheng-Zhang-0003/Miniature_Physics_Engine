@@ -11,7 +11,7 @@ int main(void) {
     mpe_config_init();
     physics_world world;
     physics_world_init(&world);
-    constraint_pool_init();
+    constraint_pool_init(&world);
 
     const float h = 0.4f;
     for (int i = 0; i < 6; i++) {

@@ -85,7 +85,7 @@ void config_menu_key_press(int key_number) {
             mpe_config_save("status/engine.cfg");
         } else if (key_number == 8) {
             mpe_config_reset_defaults();
-            contact_cache_clear(NULL);
+            contact_cache_clear(physics_world_get_primary());
         } else if (key_number == 9) {
             config_menu_level = 1;
         } else if (key_number == 0) {
@@ -148,7 +148,7 @@ void config_menu_update(GtkWidget *parent_window) {
         *(bool *) param->storage = (new_value != 0.0f);
     }
     if ((category == cat_solver) || (category == cat_timestep) || (category == cat_depenetration)) {
-        contact_cache_clear(NULL);
+        contact_cache_clear(physics_world_get_primary());
     }
     config_menu_selected_param = -1;
 }

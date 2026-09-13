@@ -11,7 +11,7 @@ int main(void) {
     mpe_config_init();
     physics_world world;
     physics_world_init(&world);
-    constraint_pool_init();
+    constraint_pool_init(&world);
 
     int s = physics_world_add_sphere(&world, 0.5f, 1.0f, (vector3){0.0f, 4.0f, 0.0f});
     world.bodies[s].restitution = 0.6f;

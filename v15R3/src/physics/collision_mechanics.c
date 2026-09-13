@@ -5,21 +5,16 @@
 #include <stdlib.h>
 
 
-static cached_contact contact_impulse_cache[max_cached_contacts];
-static int contact_impulse_cache_count = 0;
-
 /* Warm-start hash: 4096 buckets over canonical (min_id, max_id) pairs.
  * Chains live in cached_contact.hash_next and are rebuilt on every save
  * in array order (reverse-prepend), so a lookup walk visits candidates in
- * exactly the array order the old linear scan used: identical first-hit,
- * O(chain) instead of O(cache). Heads for per-world caches live in
- * physics_world.contact_hash_head (heap); the global cache uses the static
- * array below. A NULL heads pointer (malloc failure) falls back to the
- * legacy linear scan in collision_prepare_solver. */
+ * exactly the array order the old legacy linear scan used: identical
+ * first-hit, O(chain) instead of O(cache). Heads live in
+ * physics_world.contact_hash_head (heap, per world). The old file-scope
+ * global cache is retired; a NULL cache degrades to all-miss. */
 #define CONTACT_HASH_BITS 12
 #define CONTACT_HASH_SIZE (1 << CONTACT_HASH_BITS)
 #define CONTACT_HASH_MASK (CONTACT_HASH_SIZE - 1)
-static int32_t contact_hash_head_global[CONTACT_HASH_SIZE];
 
 static inline uint32_t contact_pair_key(uint32_t id_a, uint32_t id_b) {
     uint32_t lo = (id_a < id_b) ? id_a : id_b;
@@ -775,20 +770,26 @@ static inline vector3 collision_body_local_to_world_offset(rigidbody *body, vect
     return vector4_rotate_to_vector3(body->orientation, local_offset);
 }
 
-static int contact_cache_hit_count = 0;
-static int contact_cache_miss_count = 0;
-
-void contact_cache_stats_reset(void) {
-    contact_cache_hit_count = 0;
-    contact_cache_miss_count = 0;
+void contact_cache_stats_reset(struct physics_world *world) {
+    if (!world) {
+        return;
+    }
+    world->contact_cache_hits = 0;
+    world->contact_cache_misses = 0;
 }
 
-int contact_cache_get_hits(void) {
-    return contact_cache_hit_count;
+int contact_cache_get_hits(const struct physics_world *world) {
+    if (!world) {
+        return 0;
+    }
+    return world->contact_cache_hits;
 }
 
-int contact_cache_get_misses(void) {
-    return contact_cache_miss_count;
+int contact_cache_get_misses(const struct physics_world *world) {
+    if (!world) {
+        return 0;
+    }
+    return world->contact_cache_misses;
 }
 
 /* MPE_TASK_05_CACHE_VALIDATE_BEGIN */
@@ -903,16 +904,13 @@ void collision_prepare_solver(struct physics_world *world, collision_data *sourc
     if (dt <= 0.0f) {
         dt = 1.0f / 60.0f;
     }
-    /* FIX-AUDIT: select per-world cache when available; legacy NULL falls
-     * back to global. Old code always read global while save(world) wrote
-     * per-world -> warm start dead in world path. */
-    cached_contact *cache_array = contact_impulse_cache;
-    int cache_count = contact_impulse_cache_count;
-    int32_t *hash_head = contact_hash_head_global;
-    if (world && world->world_contact_cache) {
-        cache_array = world->world_contact_cache;
-        cache_count = world->world_contact_cache_count;
-        hash_head = world->contact_hash_head;
+    /* Per-world cache; a missing cache degrades to all-miss (cold solve).
+     * No global fallback remains. */
+    cached_contact *cache_array = (world) ? world->world_contact_cache : NULL;
+    int cache_count = (world) ? world->world_contact_cache_count : 0;
+    int32_t *hash_head = (world) ? world->contact_hash_head : NULL;
+    if (!cache_array) {
+        cache_count = 0;
     }
 
     for (int i = 0; i < m->contact_count; i++) {
@@ -995,10 +993,12 @@ void collision_prepare_solver(struct physics_world *world, collision_data *sourc
             }
         }
         /* MPE_TASK_05_CACHE_MATCH_END */
-        if (cache_match_found) {
-            contact_cache_hit_count++;
-        } else {
-            contact_cache_miss_count++;
+        if (world) {
+            if (cache_match_found) {
+                world->contact_cache_hits++;
+            } else {
+                world->contact_cache_misses++;
+            }
         }
 
         vector3 va = vector3_addition(m->object_a->velocity, vector3_cross(m->object_a->angular_velocity, cp->ra));
@@ -1138,13 +1138,15 @@ void collision_prepare_solver(struct physics_world *world, collision_data *sourc
     }
 }
 
-static float manifold_sort_keys[a3_max_manifolds];
+/* Sort context for the comparator below: single-flight transient (set
+ * immediately before qsort, never carried across calls). */
+static const float *manifold_sort_keys_active = NULL;
 
 static int manifold_sort_compare(const void *pa, const void *pb) {
     int ia = *(const int *) pa;
     int ib = *(const int *) pb;
-    float ka = manifold_sort_keys[ia];
-    float kb = manifold_sort_keys[ib];
+    float ka = manifold_sort_keys_active[ia];
+    float kb = manifold_sort_keys_active[ib];
     if (ka < kb) {
         return -1;
     }
@@ -1162,8 +1164,9 @@ static int manifold_sort_compare(const void *pa, const void *pb) {
     return 0;
 }
 
-void collision_manifold_solve_order(collision_data *manifolds, int manifold_count, int *order_out) {
-    if ((!manifolds) || (!order_out) || (manifold_count <= 0)) {
+void collision_manifold_solve_order(struct physics_world *world, collision_data *manifolds, int manifold_count,
+                                      int *order_out) {
+    if ((!world) || (!world->manifold_sort_keys) || (!manifolds) || (!order_out) || (manifold_count <= 0)) {
         return;
     }
     if (manifold_count > a3_max_manifolds) {
@@ -1177,10 +1180,12 @@ void collision_manifold_solve_order(collision_data *manifolds, int manifold_coun
                 lowest = y;
             }
         }
-        manifold_sort_keys[m] = lowest;
+        world->manifold_sort_keys[m] = lowest;
         order_out[m] = m;
     }
+    manifold_sort_keys_active = world->manifold_sort_keys;
     qsort(order_out, (size_t) manifold_count, sizeof(int), manifold_sort_compare);
+    manifold_sort_keys_active = NULL;
 }
 
 float collision_resolve_iterative(collision_data *m, float dt, bool friction_only, int start_index) {
@@ -1521,22 +1526,14 @@ void collision_apply_rolling_resistance(collision_data *manifolds, int manifold_
 }
 
 void contact_cache_save(struct physics_world *world, collision_data *manifolds, int count) {
-    /* MFS_131A: per-world warm-start cache.
-     * world == NULL (legacy GUI path via simulation_physics_loop) falls back
-     * to the global cache. Canonical callers pass a real world
-     * (physics_world_step). */
-    int *cache_count;
-    cached_contact *cache_array;
-    int32_t *hash_head;
-    if ((world) && (world->world_contact_cache)) {
-        cache_count = &world->world_contact_cache_count;
-        cache_array = world->world_contact_cache;
-        hash_head = world->contact_hash_head;
-    } else {
-        cache_count = &contact_impulse_cache_count;
-        cache_array = contact_impulse_cache;
-        hash_head = contact_hash_head_global;
+    /* Per-world warm-start cache (no global fallback remains). A missing
+     * cache degrades to no warm start for the next tick. */
+    if ((!world) || (!world->world_contact_cache)) {
+        return;
     }
+    int *cache_count = &world->world_contact_cache_count;
+    cached_contact *cache_array = world->world_contact_cache;
+    int32_t *hash_head = world->contact_hash_head;
     *cache_count = 0;
     for (int m = 0; m < count; m++) {
         collision_data *manifold = &manifolds[m];
@@ -1662,12 +1659,10 @@ void collision_apply_split_impulse(collision_data *manifolds, int manifold_count
 }
 
 void contact_cache_clear(struct physics_world *world) {
-    /* NULL world = legacy GUI-path global cache (see contact_cache_save). */
-    if ((world) && (world->world_contact_cache)) {
-        world->world_contact_cache_count = 0;
-    } else {
-        contact_impulse_cache_count = 0;
+    if (!world) {
+        return;
     }
+    world->world_contact_cache_count = 0;
 }
 
 /* CCD swept clamp (see header). Position pre-clamp only: narrowphase +

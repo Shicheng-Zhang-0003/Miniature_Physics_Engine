@@ -4,8 +4,6 @@
 #include <sys/types.h>
 #include <stdlib.h>
 extern camera main_camera_fov;
-extern rigidbody *obj_per_scene;
-extern int object_count;
 extern mesh cube_mesh;
 static GLuint instanced_shader_program = 0;
 static GLuint utility_shader_program = 0;
@@ -141,8 +139,8 @@ void render_scene_current(int widget_width, int widget_height) {
     }
     int sphere_inst_count = 0;
     int cube_inst_count = 0;
-    for (int object_index = 0; object_index < object_count; object_index++) {
-        rigidbody *rigid_body = &obj_per_scene[object_index];
+    for (int object_index = 0; object_index < (physics_world_get_primary()->body_count); object_index++) {
+        rigidbody *rigid_body = &(physics_world_get_primary()->bodies)[object_index];
         /* Sphere-vs-frustum: outside if signed distance < -radius on any plane. */
         {
             float bound = broadphase_bounding_radius(rigid_body);
