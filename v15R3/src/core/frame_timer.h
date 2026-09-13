@@ -20,7 +20,8 @@ static inline void frame_timer_update(frame_timer *timer_object) {
         elapsed_seconds = timer_object->maximum_delta_time;
     }
     if (elapsed_seconds <= 0.0f) {
-        elapsed_seconds = 0.016f;
+        /* FIX-AUDIT: clock repeat/pause must freeze, not inject 16ms motion. */
+        elapsed_seconds = 0.0f;
     }
     timer_object->delta_time = elapsed_seconds;
 }

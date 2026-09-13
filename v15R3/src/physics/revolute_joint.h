@@ -4,6 +4,8 @@
 #include "constraint.h"
 /* Iterative positional/axis solve (call once per tick). */
 void revolute_solve(revolute_params *p, rigidbody *body_a, rigidbody *body_b, float dt);
+/* Positional axis drift correction (call once per tick, AFTER solver loop). */
+void revolute_correct_axis_drift(revolute_params *p, rigidbody *body_a, rigidbody *body_b, float dt);
 /* Motor: adds drive torque to the torque accumulator (call once per tick). */
 void revolute_apply_motor(revolute_params *p, rigidbody *body_a, rigidbody *body_b, float dt);
 #endif

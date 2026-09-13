@@ -1,6 +1,6 @@
-# MPE v15R2 Release Policy
+# MPE v15R3 Release Policy
 
-This tree is in **v15R2 development**.
+This tree is in **v15R3 development**.
 
 ## Cycle Goal
 
@@ -15,15 +15,14 @@ This release candidate covers:
 
 ## Change Classes Accepted
 
-During v15R2 development:
+During v15R3 development:
 
 1. Configuration system implementation (Tasks 24–41).
 2. Correctness fixes required by the config migration.
 3. Build and repository hygiene.
 4. Documentation updates to match new architecture.
 5. Validation improvements for the new system.
-6. FTC robotics: robot creation, drivetrain, motor, battery, sensors.
-7. Cylinder physics: narrowphase, inertia, anisotropic friction.
+6. Cylinder physics: narrowphase, inertia, floor contact.
 8. Constraint framework: revolute joints, axis correction.
 9. Headless test infrastructure and CI tooling.
 
@@ -38,7 +37,7 @@ During v15R2 development:
 
 ## Release Goal
 
-`v15R2` may be tagged when:
+`v15R3` may be tagged when:
 - all MPE_TASK_24 through MPE_TASK_41 are complete,
 - all P0 gates pass,
 - the config system round-trips (save → restart → load),

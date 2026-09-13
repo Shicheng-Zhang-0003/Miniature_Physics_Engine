@@ -43,10 +43,14 @@
 #include "ui_input/debug_terminal.h"
 #include "ui_input/config_menu.h"
 #include "ui_input/microvim.h" /* MPE_TASK_V15R2 */
-#include "ui_input/gamepad.h" /* MFS_156 */
 /* MPE_TASK_18_TERMINAL_INCLUDE_END */
 /* ------------------------------------------------------------------ */
-/* Global scene state                                                 */
+/* Global scene state (LEGACY GUI path)                               */
+/* Canonical simulation state is `physics_world` (core/physics_world.h) */
+/* — all headless tests step a `physics_world` directly. This global  */
+/*  exists only so the GTK GUI / render / editor / scene-save path    */
+/*  keeps working until it is migrated onto a world. New code must use */
+/*  physics_world_*, not these globals.                               */
 /* ------------------------------------------------------------------ */
 
 extern rigidbody *obj_per_scene;
@@ -82,6 +86,10 @@ void render_scene_current(int widget_width, int widget_height);
 /* ------------------------------------------------------------------ */
 
 gboolean physics_step_increment(gpointer user_data_pointer);
+/* Legacy-path depenetration pass (defined in physics/depenetration.c; takes
+ * the body array explicitly). Kept declared here for GUI callers. */
+void a3_positional_depenetration_pass(rigidbody *bodies, int body_count, broadphase_pair *pair_buffer,
+                                      int *pair_count_pointer, bool rebuild_broadphase);
 
 /* ------------------------------------------------------------------ */
 /* Optional GTK application activation entry point                    */

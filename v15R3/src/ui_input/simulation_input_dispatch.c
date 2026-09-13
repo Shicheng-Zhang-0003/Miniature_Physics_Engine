@@ -4,13 +4,7 @@
 #include "../mpe_engine.h"
 #include "../core/validation_report.h"    /* MFS_INCREMENT_SPLIT: validation_report_print */
 #include "../core/long_run_validation.h"
-#include "../robotics/gui_robot_registry.h"
 void simulation_input_dispatch(GtkWidget *parent_window) {
-    /* MFS_157_GAMEPAD_POLL: drain gamepad events once per frame */
-    /* MFS_161_GAMEPAD_GUARD: only poll when a robot exists to save syscalls */
-    if (gui_robot_get_count() > 0) {
-        gamepad_poll(gamepad_get_primary());
-    }
     /* Mouse, Escape, E, F key bindings */
     if (main_inputs.escape_key_pressed) {
         if (main_inputs.is_mouse_locked) {
@@ -66,7 +60,6 @@ void simulation_input_dispatch(GtkWidget *parent_window) {
         }
         main_inputs.m_key_pressed = false;
     }
-    /* T key is now exclusively for robot forward drive */
     /* Test key bindings (F5-F11) */
     if (main_inputs.stability_test_pressed) {
         scene_spawn_stability_stack();
@@ -106,27 +99,6 @@ void simulation_input_dispatch(GtkWidget *parent_window) {
         long_run_validation_start(a3_long_run_validation_ticks);
         long_run_validation_restore_config = 1;
         main_inputs.config_torture_pressed = false;
-    }
-
-    /* MFS_159_GAMEPAD_ONLY: F310 gamepad is the sole drive input.
- * Left stick Y = forward/back, Left stick X = strafe,
- * Right stick X = rotate. GVBNCH keyboard drive removed. */
-    if (gui_robot_get_count() > 0) {
-        float drive_forward = 0.0f, drive_strafe = 0.0f, drive_rotate = 0.0f;
-        gamepad_state *mfs_pad = gamepad_get_primary();
-        if (gamepad_is_connected(mfs_pad)) {
-            drive_forward = gamepad_get_axis(mfs_pad, gamepad_axis_left_y);
-            drive_strafe  = -gamepad_get_axis(mfs_pad, gamepad_axis_left_x); /* MFS_160_STRAFE_NEG */
-            drive_rotate  = gamepad_get_axis(mfs_pad, gamepad_axis_right_x);
-            /* clamp to [-1, 1] */
-            if (drive_forward >  1.0f) drive_forward =  1.0f;
-            if (drive_forward < -1.0f) drive_forward = -1.0f;
-            if (drive_strafe  >  1.0f) drive_strafe  =  1.0f;
-            if (drive_strafe  < -1.0f) drive_strafe  = -1.0f;
-            if (drive_rotate  >  1.0f) drive_rotate  =  1.0f;
-            if (drive_rotate  < -1.0f) drive_rotate  = -1.0f;
-        }
-        gui_robot_apply_drive(drive_forward, drive_strafe, drive_rotate);
     }
 
 /* Spawn gun (Enter hold) */

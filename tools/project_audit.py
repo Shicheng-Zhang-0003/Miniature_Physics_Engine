@@ -137,8 +137,8 @@ def main():
 
     print("Recommended next architectural target")
     print("-" * 72)
-    print("1. Keep mecanum_drive as XFAIL until anisotropic friction is implemented.")
-    print("2. Quarantine old bash fix scripts; do not run them as mutation tools.")
+    print("1. MFS is parked: robotics + gamepad + robotics tests live in v15R3/robotics_backup.")
+    print("2. Keep the MPE-only headless suite green via tools/test_runner.py.")
     print("3. Split simulation.c in small extractions:")
     print("   a. validation/reporting helpers")
     print("   b. GUI/editor input dispatch")

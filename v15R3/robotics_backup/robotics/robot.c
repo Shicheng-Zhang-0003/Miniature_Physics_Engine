@@ -108,13 +108,34 @@ void ftc_robot_update(physics_world *world, ftc_robot *robot, float dt) {
         return;
     }
 
-    /* Sum currents for battery sag */
-    float total_current = 0.0f;
+    /* A commanded robot is awake by definition. Wake the chassis when any
+     * wheel is commanded: motor vibration and driver intent keep a real
+     * robot active, and the velocity integrator drains forces for sleeping
+     * bodies, so a sleeping chassis would swallow traction forever after
+     * an idle settle. Wheels are woken below per-wheel. */
+    int any_command = 0;
     for (int i = 0; i < robot->wheel_count; i++) {
-        total_current += fabsf(robot->wheel_motors[i].current);
+        if (fabsf(robot->wheel_motors[i].command) > 0.01f) { any_command = 1; break; }
     }
-    float terminal_voltage = battery_get_voltage(&robot->battery, total_current);
-    battery_drain(&robot->battery, total_current, dt);
+    if (any_command && robot->chassis_body >= 0 && robot->chassis_body < world->body_count) {
+        rigidbody_wake(&world->bodies[robot->chassis_body]);
+    }
+
+    /* Sum currents for battery sag.
+     * FIX-AUDIT: old fabs() sum doubled sag in turn-in-place (opposing
+     * currents cancel on a real pack) and made regen always drain. Use
+     * signed sum for sag; drain only net positive (regen credited with
+     * 50% efficiency, SoC clamped in battery_drain path). */
+    float total_current_signed = 0.0f;
+    for (int i = 0; i < robot->wheel_count; i++) {
+        total_current_signed += robot->wheel_motors[i].current;
+    }
+    float terminal_voltage = battery_get_voltage(&robot->battery, total_current_signed);
+    float drain_current = (total_current_signed > 0.0f) ? total_current_signed : 0.5f * total_current_signed;
+    if (drain_current < 0.0f && robot->battery.charge_fraction >= 1.0f) {
+        drain_current = 0.0f;
+    }
+    battery_drain(&robot->battery, drain_current, dt);
 
     /* Update each wheel motor */
     for (int i = 0; i < robot->wheel_count; i++) {
@@ -153,6 +174,11 @@ void ftc_robot_update(physics_world *world, ftc_robot *robot, float dt) {
         wheel->torque_accumulator = vector3_addition(
             wheel->torque_accumulator,
             vector3_scaling(axle, torque));
+        /* FIX-AUDIT: mark wheel driven (gated on command) so wheel-lock
+         * doesn't freeze driven wheels, but still locks truly idle ones. */
+        if (fabsf(robot->wheel_motors[i].command) > 0.01f) {
+            wheel->driven_this_tick = true;
+        }
         rigidbody_wake(wheel); /* MPE_FTC_078: keep driven wheels awake so motor torque is applied */
     }
 }

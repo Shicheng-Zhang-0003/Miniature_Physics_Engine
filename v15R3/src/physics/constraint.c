@@ -1,6 +1,7 @@
 /* MPE_FTC_063 */
 #include "constraint.h"
 #include "revolute_joint.h"
+#include "islands.h"
 #include "../config/mpe_constants.h"
 
 static constraint constraint_pool [mpe_max_joints];
@@ -13,6 +14,9 @@ void constraint_pool_init (void) {
 
 int constraint_add_revolute (uint32_t id_a, uint32_t id_b, vector3 anchor_a, vector3 anchor_b, vector3 axis_a) {
     if ((id_a == 0) || (id_b == 0) || (id_a == id_b)) { return -1; }
+    /* FIX-AUDIT: zero hinge axis used to silently become a ball-joint lock
+     * (normalise(0)=0 -> perpendicular = full relative spin killed). Reject. */
+    if (vector3_length_squared(axis_a) < 1e-12f) { return -1; }
     for (int i = 0; i < mpe_max_joints; i++) {
         if (!constraint_pool [i].is_active) {
             constraint_pool [i].type = CONSTRAINT_REVOLUTE;
@@ -21,6 +25,7 @@ int constraint_add_revolute (uint32_t id_a, uint32_t id_b, vector3 anchor_a, vec
             constraint_pool [i].p.revolute.anchor_a = anchor_a;
             constraint_pool [i].p.revolute.anchor_b = anchor_b;
             constraint_pool [i].p.revolute.axis_a = vector3_normalisation (axis_a);
+            constraint_pool [i].p.revolute.axis_b = vector3_normalisation (axis_a);
             constraint_pool [i].p.revolute.motor_enabled = false;
             constraint_pool [i].p.revolute.limits_enabled = false;
             constraint_pool [i].p.revolute.motor_target_speed = 0.0f;
@@ -51,6 +56,36 @@ void constraint_set_revolute_motor (int index, bool enabled, float target_speed,
     constraint_pool [index].p.revolute.motor_max_torque = max_torque;
 }
 
+void constraint_set_revolute_axes (int index, vector3 axis_a, vector3 axis_b) {
+    if ((index < 0) || (index >= mpe_max_joints)) { return; }
+    if (!constraint_pool [index].is_active) { return; }
+    if (constraint_pool [index].type != CONSTRAINT_REVOLUTE) { return; }
+    if (vector3_length_squared (axis_a) < 1e-12f) { return; }
+    constraint_pool [index].p.revolute.axis_a = vector3_normalisation (axis_a);
+    /* Zero axis_b means "same as axis_a" (legacy callers). */
+    constraint_pool [index].p.revolute.axis_b = (vector3_length_squared (axis_b) > 1e-12f)
+        ? vector3_normalisation (axis_b)
+        : constraint_pool [index].p.revolute.axis_a;
+}
+
+void constraint_set_revolute_limits (int index, bool enabled, float limit_min_rad, float limit_max_rad) {
+    if ((index < 0) || (index >= mpe_max_joints)) { return; }
+    if (!constraint_pool [index].is_active) { return; }
+    if (constraint_pool [index].type != CONSTRAINT_REVOLUTE) { return; }
+    if ((!isfinite (limit_min_rad)) || (!isfinite (limit_max_rad))) { return; }
+    constraint_pool [index].p.revolute.limits_enabled = enabled;
+    constraint_pool [index].p.revolute.limit_min_rad = (limit_min_rad < limit_max_rad) ? limit_min_rad : limit_max_rad;
+    constraint_pool [index].p.revolute.limit_max_rad = (limit_min_rad < limit_max_rad) ? limit_max_rad : limit_min_rad;
+}
+
+int constraint_pool_capacity (void) { return mpe_max_joints; }
+
+const constraint *constraint_pool_at (int index) {
+    if ((index < 0) || (index >= mpe_max_joints)) { return NULL; }
+    if (!constraint_pool [index].is_active) { return NULL; }
+    return &constraint_pool [index];
+}
+
 static rigidbody *find_body_by_id (rigidbody *bodies, int body_count, uint32_t id) {
     if (!bodies) { return NULL; }
     for (int i = 0; i < body_count; i++) {
@@ -60,13 +95,26 @@ static rigidbody *find_body_by_id (rigidbody *bodies, int body_count, uint32_t i
 }
 
 static void constraint_dispatch (rigidbody *bodies, int body_count, float dt, bool motors_pass) {
-    if ((!bodies) || (body_count <= 0)) { return; }
+    if ((!bodies) || (body_count <= 0) || (constraint_count <= 0)) { return; }
     for (int i = 0; i < mpe_max_joints; i++) {
         if (!constraint_pool [i].is_active) { continue; }
         constraint *c = &constraint_pool [i];
         rigidbody *body_a = find_body_by_id (bodies, body_count, c->body_id_a);
         rigidbody *body_b = find_body_by_id (bodies, body_count, c->body_id_b);
         if ((!body_a) || (!body_b)) { continue; }
+        /* Island skip (solve pass only): a fully-sleeping island's joint
+         * solve is a no-op. Motors always apply (pre-integration drive),
+         * and an ENABLED motor keeps its bodies awake: motor torque is
+         * written straight to the accumulator (no force-wake trip), so a
+         * sleeping robot would otherwise never hear its own drive. */
+        if (motors_pass) {
+            if ((c->type == CONSTRAINT_REVOLUTE) && (c->p.revolute.motor_enabled)) {
+                rigidbody_wake (body_a);
+                rigidbody_wake (body_b);
+            }
+        } else {
+            if ((!islands_body_awake (bodies, body_a)) && (!islands_body_awake (bodies, body_b))) { continue; }
+        }
         if (c->type == CONSTRAINT_REVOLUTE) {
             if (motors_pass) { revolute_apply_motor (&c->p.revolute, body_a, body_b, dt); }
             else { revolute_solve (&c->p.revolute, body_a, body_b, dt); }
@@ -78,6 +126,32 @@ static void constraint_dispatch (rigidbody *bodies, int body_count, float dt, bo
 void constraint_solve_all (rigidbody *bodies, int body_count, float dt) {
     if (dt <= 0.0f) { return; }
     constraint_dispatch (bodies, body_count, dt, false);
+}
+
+int constraint_get_active_ids (uint32_t *ids_a, uint32_t *ids_b, int capacity) {
+    if ((!ids_a) || (!ids_b) || (capacity <= 0)) { return 0; }
+    int count = 0;
+    for (int i = 0; (i < mpe_max_joints) && (count < capacity); i++) {
+        if (!constraint_pool [i].is_active) { continue; }
+        ids_a[count] = constraint_pool [i].body_id_a;
+        ids_b[count] = constraint_pool [i].body_id_b;
+        count++;
+    }
+    return count;
+}
+
+void constraint_correct_axis_drift_all (rigidbody *bodies, int body_count, float dt) {
+    if ((!bodies) || (body_count <= 0) || (dt <= 0.0f) || (constraint_count <= 0)) { return; }
+    for (int i = 0; i < mpe_max_joints; i++) {
+        if (!constraint_pool [i].is_active) { continue; }
+        if (constraint_pool [i].type != CONSTRAINT_REVOLUTE) { continue; }
+        constraint *c = &constraint_pool [i];
+        rigidbody *body_a = find_body_by_id (bodies, body_count, c->body_id_a);
+        rigidbody *body_b = find_body_by_id (bodies, body_count, c->body_id_b);
+        if ((!body_a) || (!body_b)) { continue; }
+        if ((!islands_body_awake (bodies, body_a)) && (!islands_body_awake (bodies, body_b))) { continue; }
+        revolute_correct_axis_drift (&c->p.revolute, body_a, body_b, dt);
+    }
 }
 
 void constraint_apply_motors (rigidbody *bodies, int body_count, float dt) {

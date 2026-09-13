@@ -1,21 +1,37 @@
 #include "../mpe_engine.h"
 #include "scene_saving.h"
+#include "scene_crc.h"
 #include "../physics/spring_joint.h"
-#include <complex.h>
+#include "../physics/constraint.h"
 #include <stdio.h>
 #include <stdint.h>
-static void write_float(FILE *f, float v) {
-    fwrite(&v, sizeof(float), 1, f);
+
+/* Scene format v200: explicit little-endian fields + sectioned joints +
+ * CRC32 footer. Layout (all integers/floats LE):
+ *   u32 magic ("MPE3"), u32 version (200), u32 body_count,
+ *   bodies[]: u32 type, f32 mass, radius, half_length,
+ *     half_extents xyz, position xyz, velocity xyz, angular_velocity xyz,
+ *     orientation wxyz, colour xyz, restitution, fric_s, fric_k,
+ *     u32 static, u32 object_id, i32 nice_value, u32 sleeping, u32 kinematic,
+ *     u32 generation,
+ *   u32 spring_count, springs[]: u32 id_a, id_b, f32 eq, k, c,
+ *   u32 revolute_count, revolutes[]: u32 type, id_a, id_b,
+ *     anchor_a xyz, anchor_b xyz, axis_a xyz, axis_b xyz,
+ *     u32 motor_enabled, f32 target, max_torque,
+ *     u32 limits_enabled, f32 limit_min, limit_max,
+ *   u32 crc32 (IEEE, over every preceding byte).
+ * Older versions (<=153) keep their native-order legacy reader in
+ * scene_load.c; the saver only ever writes v200. */
+
+static int save_vec3(FILE *f, uint32_t *crc, vector3 v) {
+    return scene_wfloat(f, crc, v.x) && scene_wfloat(f, crc, v.y) && scene_wfloat(f, crc, v.z);
 }
-static void write_int(FILE *f, int32_t v) {
-    fwrite(&v, sizeof(int32_t), 1, f);
+
+static int save_quat(FILE *f, uint32_t *crc, vector4 q) {
+    return scene_wfloat(f, crc, q.w) && scene_wfloat(f, crc, q.x) && scene_wfloat(f, crc, q.y) &&
+           scene_wfloat(f, crc, q.z);
 }
-static void write_vec3(FILE *f, vector3 v) {
-    fwrite(&v, sizeof(vector3), 1, f);
-}
-static void write_vec4(FILE *f, vector4 v) {
-    fwrite(&v, sizeof(vector4), 1, f);
-}
+
 int save_scene(const char *file_destination_path) {
     /* R3-03: Atomic write. Write to a temporary file first, then
      * atomically rename over the target. A crash mid-write leaves
@@ -28,44 +44,95 @@ int save_scene(const char *file_destination_path) {
         fprintf(stderr, "Error SVF01: Could not open %s\n", tmp_path);
         return 0;
     }
-    write_int(f, mpe_magic);
-    write_int(f, mpe_version);
-    write_int(f, object_count);
-    for (int i = 0; i < object_count; i++) {
+    uint32_t crc = 0xFFFFFFFFu;
+    int ok = 1;
+    ok = ok && scene_w32(f, &crc, (uint32_t) mpe_magic);
+    ok = ok && scene_w32(f, &crc, (uint32_t) mpe_version);
+    ok = ok && scene_w32(f, &crc, (uint32_t) object_count);
+    for (int i = 0; ok && (i < object_count); i++) {
         rigidbody *rb = &obj_per_scene[i];
-        write_int(f, (int32_t) rb->type);
-        write_float(f, rb->mass);
-        write_float(f, rb->radius);
-        /* R3-04: Write cylinder_half_length for all bodies.
-         * For non-cylinder bodies this is zero and is ignored on load. */
-        write_float(f, rb->cylinder_half_length);
-        write_vec3(f, rb->half_extensions);
-        write_vec3(f, rb->position);
-        write_vec3(f, rb->velocity);
-        write_vec3(f, rb->angular_velocity);
-        write_vec4(f, rb->orientation);
-        write_vec3(f, rb->colour);
-        write_float(f, rb->restitution);
-        write_float(f, rb->friction_static);
-        write_float(f, rb->friction_kinetic);
-        write_int(f, rb->static_state ? 1 : 0);
-        write_int(f, (int32_t) rb->object_id); /* MPE_FTC_058 */
+        ok = ok && scene_w32(f, &crc, (uint32_t) rb->type);
+        ok = ok && scene_wfloat(f, &crc, rb->mass);
+        ok = ok && scene_wfloat(f, &crc, rb->radius);
+        ok = ok && scene_wfloat(f, &crc, rb->cylinder_half_length);
+        ok = ok && save_vec3(f, &crc, rb->half_extensions);
+        ok = ok && save_vec3(f, &crc, rb->position);
+        ok = ok && save_vec3(f, &crc, rb->velocity);
+        ok = ok && save_vec3(f, &crc, rb->angular_velocity);
+        ok = ok && save_quat(f, &crc, rb->orientation);
+        ok = ok && save_vec3(f, &crc, rb->colour);
+        ok = ok && scene_wfloat(f, &crc, rb->restitution);
+        ok = ok && scene_wfloat(f, &crc, rb->friction_static);
+        ok = ok && scene_wfloat(f, &crc, rb->friction_kinetic);
+        ok = ok && scene_w32(f, &crc, rb->static_state ? 1u : 0u);
+        ok = ok && scene_w32(f, &crc, rb->object_id); /* MPE_FTC_058 */
+        ok = ok && scene_w32(f, &crc, (uint32_t) rb->nice_value);
+        ok = ok && scene_w32(f, &crc, rb->is_sleeping ? 1u : 0u);
+        ok = ok && scene_w32(f, &crc, rb->kinematic ? 1u : 0u);
+        ok = ok && scene_w32(f, &crc, rb->object_generation);
     }
-    int active_joints = 0;
-    for (int j = 0; j < current_joint_count; j++) {
+    /* FIX-AUDIT: scan the FULL pool, not 0..current_joint_count. Removal
+     * leaves holes (active joints above a removed index), which the old
+     * bound silently dropped from saves. */
+    int active_springs = 0;
+    for (int j = 0; j < mpe_max_joints; j++) {
         if (joint_pool[j].is_active) {
-            active_joints++;
+            active_springs++;
         }
     }
-    write_int(f, active_joints);
-    for (int j = 0; j < current_joint_count; j++) {
-        if (joint_pool[j].is_active) {
-            write_int(f, (int32_t) joint_pool[j].object_id_a);
-            write_int(f, (int32_t) joint_pool[j].object_id_b);
-            write_float(f, joint_pool[j].equilibrium_length);
-            write_float(f, joint_pool[j].spring_constant);
-            write_float(f, joint_pool[j].damping_coefficient);
+    ok = ok && scene_w32(f, &crc, (uint32_t) active_springs);
+    for (int j = 0; ok && (j < mpe_max_joints); j++) {
+        if (!joint_pool[j].is_active) {
+            continue;
         }
+        ok = ok && scene_w32(f, &crc, joint_pool[j].object_id_a);
+        ok = ok && scene_w32(f, &crc, joint_pool[j].object_id_b);
+        ok = ok && scene_wfloat(f, &crc, joint_pool[j].equilibrium_length);
+        ok = ok && scene_wfloat(f, &crc, joint_pool[j].spring_constant);
+        ok = ok && scene_wfloat(f, &crc, joint_pool[j].damping_coefficient);
+    }
+    int active_revolutes = 0;
+    for (int j = 0; j < constraint_pool_capacity(); j++) {
+        const constraint *c = constraint_pool_at(j);
+        if ((c) && (c->type == CONSTRAINT_REVOLUTE)) {
+            active_revolutes++;
+        }
+    }
+    ok = ok && scene_w32(f, &crc, (uint32_t) active_revolutes);
+    for (int j = 0; ok && (j < constraint_pool_capacity()); j++) {
+        const constraint *c = constraint_pool_at(j);
+        if ((!c) || (c->type != CONSTRAINT_REVOLUTE)) {
+            continue;
+        }
+        ok = ok && scene_w32(f, &crc, (uint32_t) c->type);
+        ok = ok && scene_w32(f, &crc, c->body_id_a);
+        ok = ok && scene_w32(f, &crc, c->body_id_b);
+        ok = ok && save_vec3(f, &crc, c->p.revolute.anchor_a);
+        ok = ok && save_vec3(f, &crc, c->p.revolute.anchor_b);
+        ok = ok && save_vec3(f, &crc, c->p.revolute.axis_a);
+        ok = ok && save_vec3(f, &crc, c->p.revolute.axis_b);
+        ok = ok && scene_w32(f, &crc, c->p.revolute.motor_enabled ? 1u : 0u);
+        ok = ok && scene_wfloat(f, &crc, c->p.revolute.motor_target_speed);
+        ok = ok && scene_wfloat(f, &crc, c->p.revolute.motor_max_torque);
+        ok = ok && scene_w32(f, &crc, c->p.revolute.limits_enabled ? 1u : 0u);
+        ok = ok && scene_wfloat(f, &crc, c->p.revolute.limit_min_rad);
+        ok = ok && scene_wfloat(f, &crc, c->p.revolute.limit_max_rad);
+    }
+    /* Footer CRC over every preceding byte (finalize + raw LE append). */
+    uint32_t final_crc = crc ^ 0xFFFFFFFFu;
+    if (ok) {
+        unsigned char footer[4] = {(unsigned char) (final_crc & 0xFFu),
+                                   (unsigned char) ((final_crc >> 8) & 0xFFu),
+                                   (unsigned char) ((final_crc >> 16) & 0xFFu),
+                                   (unsigned char) ((final_crc >> 24) & 0xFFu)};
+        ok = (fwrite(footer, 1, 4, f) == 4);
+    }
+    /* Fail the save if any buffered write errored. */
+    if ((!ok) || ferror(f)) {
+        fprintf(stderr, "Error SVF03: Write failure on %s\n", tmp_path);
+        fclose(f);
+        remove(tmp_path);
+        return 0;
     }
     fclose(f);
     /* R3-03: Atomic rename over the target */

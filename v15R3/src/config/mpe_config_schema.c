@@ -35,7 +35,7 @@ static mpe_param s_registry[] = {
     {"world.gravity", "World Gravity", "Gravitational acceleration (m/s^2, negative = down)", p_float, cat_world,
      &g_cfg.world.gravity, -9.81, -50.0, 0.0, false},
 
-    {"world.drag", "Air Drag Coefficient", "Per-tick velocity retention (0.1 = heavy drag, 1.0 = none)", p_float,
+    {"world.drag", "Air Drag Coefficient", "Per-second velocity retention base (0.1 = heavy drag, 1.0 = none); applied as powf(drag,dt)", p_float,
      cat_world, &g_cfg.world.drag, 0.99, 0.1, 1.0, false},
 
     {"world.floor_friction_s", "Floor Friction (Static)", "Static friction coefficient for floor contacts", p_float,
@@ -45,21 +45,25 @@ static mpe_param s_registry[] = {
      cat_world, &g_cfg.world.floor_friction_k, 0.1, 0.0, 5.0, false},
      {"world.rolling_resistance_coeff", "Rolling Resistance Coeff", "Rolling resistance coefficient for wheels on floor (0 = free roll)", p_float,
      cat_world, &g_cfg.world.rolling_resistance_coeff, 0.02f, 0.0, 5.0, false},
+    {"world.angular_damping_scale", "Angular Damping Scale", "Extra angular damping multiplier (was hardcoded 0.97)", p_float,
+     cat_world, &g_cfg.world.angular_damping_scale, 0.97f, 0.5, 1.0, true},
 
     /* ============================================================
      * cat_timestep
      * ============================================================ */
-    {"timestep.solver_iterations", "Solver Iterations",
-     "Sequential impulse solver passes per tick (higher = stiffer stacks)", p_int, cat_timestep,
-     &g_cfg.timestep.solver_iterations, 16.0, 1.0, 64.0, false},
+{"timestep.solver_iterations", "Solver Iterations",
+      "Sequential-impulse passes per tick (higher = stiffer stacks, costlier)", p_int, cat_timestep,
+      &g_cfg.timestep.solver_iterations, 64.0, 1.0, 128.0, false},
 
     {"timestep.max_substeps", "Max Substeps", "Physics substeps per frame cap (spiral-of-death prevention)", p_int,
      cat_timestep, &g_cfg.timestep.max_substeps, 5.0, 1.0, 20.0, true},
 
-    {"timestep.max_linear_speed", "Max Linear Speed", "Velocity safety clamp (m/s)", p_float, cat_timestep,
+    {"timestep.max_linear_speed", "Max Linear Speed", "Stability safety clamp (m/s): anything faster is scaled back, CCD still resolves the impact",
+     p_float, cat_timestep,
      &g_cfg.timestep.max_linear_speed, 150.0, 10.0, 10000.0, true},
 
-    {"timestep.max_angular_speed", "Max Angular Speed", "Angular velocity safety clamp (rad/s)", p_float, cat_timestep,
+    {"timestep.max_angular_speed", "Max Angular Speed", "Stability safety clamp (rad/s): faster spin is scaled back",
+     p_float, cat_timestep,
      &g_cfg.timestep.max_angular_speed, 30.0, 5.0, 500.0, true},
 
     /* ============================================================
@@ -71,8 +75,8 @@ static mpe_param s_registry[] = {
     {"sleep.angular_thresh_sq", "Sleep Angular Threshold^2", "Angular speed^2 below which sleep timer accumulates",
      p_float, cat_sleep, &g_cfg.sleep.angular_thresh_sq, 0.0001, 0.0, 0.05, true},
 
-    {"sleep.timer_duration", "Sleep Timer (s)", "Seconds below threshold before a body sleeps", p_float, cat_sleep,
-     &g_cfg.sleep.timer_duration, 1.0, 0.1, 10.0, true},
+{"sleep.timer_duration", "Sleep Timer (s)", "Seconds below threshold before a body sleeps", p_float, cat_sleep,
+      &g_cfg.sleep.timer_duration, 1.0, 0.1, 10.0, true},
 
     {"sleep.wake_linear_thresh_sq", "Wake Linear Threshold^2", "Speed^2 required to wake a sleeping body", p_float,
      cat_sleep, &g_cfg.sleep.wake_linear_thresh_sq, 0.01, 0.0, 10.0, true},
@@ -96,8 +100,8 @@ static mpe_param s_registry[] = {
      "Approach speed below which bounce is suppressed (negative = approaching, m/s)", p_float, cat_solver,
      &g_cfg.solver.restitution_velocity_thresh, -1.5, -10.0, 0.0, true},
 
-    {"solver.max_restitution_bias", "Max Restitution Bias", "Upper cap on restitution bounce velocity", p_float,
-     cat_solver, &g_cfg.solver.max_restitution_bias, 4.0, 0.5, 50.0, true},
+{"solver.max_restitution_bias", "Max Restitution Bias", "Upper cap on restitution bounce velocity", p_float,
+      cat_solver, &g_cfg.solver.max_restitution_bias, 20.0, 0.5, 50.0, true},
 
     {"solver.static_friction_thresh", "Static Friction Speed Thresh",
      "Sliding speed below which static friction applies", p_float, cat_solver, &g_cfg.solver.static_friction_thresh,
@@ -109,11 +113,11 @@ static mpe_param s_registry[] = {
     /* ============================================================
      * cat_depenetration
      * ============================================================ */
-    {"depenetration.correction_factor", "Correction Factor", "Fraction of penetration corrected per pass", p_float,
-     cat_depenetration, &g_cfg.depenetration.correction_factor, 0.35, 0.0, 1.0, true},
+{"depenetration.correction_factor", "Correction Factor", "Fraction of penetration corrected per pass", p_float,
+      cat_depenetration, &g_cfg.depenetration.correction_factor, 0.35, 0.0, 1.0, true},
 
-    {"depenetration.max_correction", "Max Correction", "Per-pass positional correction cap (m)", p_float,
-     cat_depenetration, &g_cfg.depenetration.max_correction, 0.2, 0.01, 2.0, true},
+{"depenetration.max_correction", "Max Correction", "Per-pass positional correction cap (m)", p_float,
+      cat_depenetration, &g_cfg.depenetration.max_correction, 0.2, 0.01, 2.0, true},
 
     {"depenetration.penetration_slop", "Depenetration Slop", "Overlap tolerance for depenetration pass (m)", p_float,
      cat_depenetration, &g_cfg.depenetration.penetration_slop, 0.005, 0.0, 0.05, true},
@@ -160,14 +164,20 @@ static mpe_param s_registry[] = {
     {"joints.soft_damping", "Soft Damping", "Damping coefficient for soft joints", p_float, cat_joints,
      &g_cfg.joints.soft_damping, 1.0, 0.0, 100.0, false},
 
+    {"joints.revolute_beta", "Revolute Beta", "Baumgarte beta for revolute point-to-point", p_float, cat_joints,
+     &g_cfg.joints.revolute_beta, 0.3, 0.0, 1.0, true},
+
+    {"joints.revolute_max_bias", "Revolute Max Bias", "Cap on revolute anchor bias speed (m/s); bounds per-tick energy injection on large gaps", p_float,
+      cat_joints, &g_cfg.joints.revolute_max_bias, 5.0, 0.5, 500.0, true},
+
+    {"joints.revolute_motor_gain", "Revolute Motor Gain", "Proportional gain for revolute motor torque", p_float,
+     cat_joints, &g_cfg.joints.revolute_motor_gain, 8.0, 0.0, 100.0, true},
+
     /* ============================================================
      * cat_boundary
      * ============================================================ */
     {"boundary.floor_emergency_slop", "Floor Emergency Slop", "Tolerance below floor before emergency clamp (m)",
-     p_float, cat_boundary, &g_cfg.boundary.floor_emergency_slop, 0.05, 0.0, 1.0, true},
-
-    {"boundary.floor_velocity_slop", "Floor Velocity Slop", "Penetration depth triggering bounce vs rest", p_float,
-     cat_boundary, &g_cfg.boundary.floor_velocity_slop, 0.10, 0.0, 1.0, true},
+      p_float, cat_boundary, &g_cfg.boundary.floor_emergency_slop, 0.05, 0.0, 1.0, true},
 
     /* ============================================================
      * cat_spawner
@@ -184,8 +194,9 @@ static mpe_param s_registry[] = {
     {"spawner.cube_extent", "Cube Half-Extent", "Default half-extent for spawned cubes (m)", p_float, cat_spawner,
      &g_cfg.spawner.cube_extent, 0.5, 0.01, 50.0, false},
 
-    {"spawner.speed", "Launch Speed", "Default launch velocity for spawned objects (m/s)", p_float, cat_spawner,
-     &g_cfg.spawner.speed, 20.0, 0.0, 500.0, false},
+    {"spawner.speed", "Launch Speed", "Launch velocity for spawned objects (m/s). Capped by timestep.max_linear_speed (safety clamp).",
+     p_float, cat_spawner,
+     &g_cfg.spawner.speed, 20.0, 0.0, 150.0, false},
 
     {"spawner.friction_s", "Spawn Friction (Static)", "Static friction applied to new objects", p_float, cat_spawner,
      &g_cfg.spawner.friction_s, 0.3, 0.0, 5.0, false},
@@ -221,6 +232,10 @@ static mpe_param s_registry[] = {
      cat_body_defaults, &g_cfg.body_defaults.cube_fric_k, 0.3, 0.0, 5.0, false},
 {"body_defaults.cylinder_restitution", "Cylinder Restitution", "Default bounce for new cylinders (wheels)", p_float,
 cat_body_defaults, &g_cfg.body_defaults.cylinder_restitution, 0.3, 0.0, 1.0, false},
+    {"body_defaults.cylinder_fric_s", "Cylinder Static Friction", "Default static friction for new cylinders", p_float,
+     cat_body_defaults, &g_cfg.body_defaults.cylinder_fric_s, 0.4, 0.0, 5.0, false},
+    {"body_defaults.cylinder_fric_k", "Cylinder Kinetic Friction", "Default kinetic friction for new cylinders", p_float,
+     cat_body_defaults, &g_cfg.body_defaults.cylinder_fric_k, 0.3, 0.0, 5.0, false},
 
     /* ============================================================
      * cat_camera

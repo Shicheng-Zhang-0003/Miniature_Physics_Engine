@@ -25,6 +25,9 @@ int add_joint(int object_index_a, int object_index_b, float equilibrium_length, 
               float damping_coefficient);
 void remove_joint(int joint_pool_index);
 void apply_force_all_joints(void);
+/* FIX-AUDIT: world-aware spring pass so the encapsulated physics_world path
+ * (which has no access to obj_per_scene) still integrates springs. */
+void apply_spring_forces_world(rigidbody *bodies, int body_count);
 void remove_joints_from_object(int object_index);
 void spring_joint_render(GLuint shader_program, math4 view_matrix, math4 projection_matrix);
 void joint_init_pool(void);

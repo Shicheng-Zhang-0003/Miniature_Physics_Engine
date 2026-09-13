@@ -102,16 +102,17 @@ int main(void) {
     float strafe_dx = end_x - start_x;
     printf("[info] strafe: physics dx=%.4f odometry dx=%.4f\n", strafe_dx, robot.odom_x);
 
-    if (fabsf(strafe_dx) > 0.02f && fabsf(robot.odom_x) > 0.02f) {
-        /* Check sign agreement */
-        if ((strafe_dx > 0 && robot.odom_x < 0) || (strafe_dx < 0 && robot.odom_x > 0)) {
-            printf("[FAIL] odometry strafe sign disagrees with physics\n");
-            return 1;
-        }
-        printf("[PASS] odometry strafe sign matches physics\n");
-    } else {
-        printf("[info] strafe too small to verify sign (dx=%.4f)\n", strafe_dx);
+    /* FIX-AUDIT: old minima gate silently skipped when strafe was small.
+     * Strafe must actually move (>0.1m) and encoder odom must agree in sign. */
+    if (fabsf(strafe_dx) < 0.1f) {
+        printf("[FAIL] strafe too small to verify (dx=%.4f)\n", strafe_dx);
+        return 1;
     }
+    if ((strafe_dx > 0 && robot.odom_x < 0) || (strafe_dx < 0 && robot.odom_x > 0)) {
+        printf("[FAIL] odometry strafe sign disagrees with physics\n");
+        return 1;
+    }
+    printf("[PASS] odometry strafe sign matches physics\n");
 
     printf("[PASS] odometry accuracy test complete\n");
     physics_world_cleanup(&world);
