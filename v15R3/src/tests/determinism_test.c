@@ -13,7 +13,7 @@
 
 static void build_scene(physics_world *world) {
     physics_world_init(world);
-    constraint_pool_init();
+    constraint_pool_init(world);
     int a = physics_world_add_sphere(world, 0.5f, 2.0f, (vector3){-1.0f, 3.0f, 0.5f});
     world->bodies[a].velocity = (vector3){1.5f, -0.5f, 0.25f};
     world->bodies[a].angular_velocity = (vector3){3.0f, -1.0f, 2.0f};

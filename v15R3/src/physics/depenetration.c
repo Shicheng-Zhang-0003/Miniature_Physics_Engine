@@ -59,17 +59,19 @@ bool a3_depenetration_dispatch(rigidbody *rigid_body_a, rigidbody *rigid_body_b,
     return false;
 }
 
-/* Legacy-path entry point, moved here from simulation.c (arrays explicit). */
-void a3_positional_depenetration_pass(rigidbody *bodies, int body_count, broadphase_pair *pair_buffer,
+/* Single depenetration implementation (see header). */
+void a3_positional_depenetration_pass(struct physics_world *world, broadphase_pair *pair_buffer,
                                       int *pair_count_pointer, bool rebuild_broadphase) {
-    if ((!bodies) || (body_count < 2) || (!pair_buffer) || (!pair_count_pointer)) {
+    if ((!world) || (!world->bodies) || (world->body_count < 2) || (!pair_buffer) || (!pair_count_pointer)) {
         return;
     }
+    rigidbody *bodies = world->bodies;
+    int body_count = world->body_count;
 
     int pair_count = *pair_count_pointer;
 
     if (rebuild_broadphase) {
-        pair_count = broadphase_generate_pairing(bodies, body_count, pair_buffer, mpe_max_broadphase_pairs,
+        pair_count = broadphase_generate_pairing(world, pair_buffer, mpe_max_broadphase_pairs,
                                                  1.0f / 60.0f);
         *pair_count_pointer = pair_count;
     }

@@ -48,9 +48,9 @@ int save_scene(const char *file_destination_path) {
     int ok = 1;
     ok = ok && scene_w32(f, &crc, (uint32_t) mpe_magic);
     ok = ok && scene_w32(f, &crc, (uint32_t) mpe_version);
-    ok = ok && scene_w32(f, &crc, (uint32_t) object_count);
-    for (int i = 0; ok && (i < object_count); i++) {
-        rigidbody *rb = &obj_per_scene[i];
+    ok = ok && scene_w32(f, &crc, (uint32_t) (physics_world_get_primary()->body_count));
+    for (int i = 0; ok && (i < (physics_world_get_primary()->body_count)); i++) {
+        rigidbody *rb = &(physics_world_get_primary()->bodies)[i];
         ok = ok && scene_w32(f, &crc, (uint32_t) rb->type);
         ok = ok && scene_wfloat(f, &crc, rb->mass);
         ok = ok && scene_wfloat(f, &crc, rb->radius);
@@ -71,36 +71,36 @@ int save_scene(const char *file_destination_path) {
         ok = ok && scene_w32(f, &crc, rb->kinematic ? 1u : 0u);
         ok = ok && scene_w32(f, &crc, rb->object_generation);
     }
-    /* FIX-AUDIT: scan the FULL pool, not 0..current_joint_count. Removal
+    /* FIX-AUDIT: scan the FULL pool, not 0..(physics_world_get_primary()->spring_joint_count). Removal
      * leaves holes (active joints above a removed index), which the old
      * bound silently dropped from saves. */
     int active_springs = 0;
     for (int j = 0; j < mpe_max_joints; j++) {
-        if (joint_pool[j].is_active) {
+        if ((physics_world_get_primary()->spring_joints)[j].is_active) {
             active_springs++;
         }
     }
     ok = ok && scene_w32(f, &crc, (uint32_t) active_springs);
     for (int j = 0; ok && (j < mpe_max_joints); j++) {
-        if (!joint_pool[j].is_active) {
+        if (!(physics_world_get_primary()->spring_joints)[j].is_active) {
             continue;
         }
-        ok = ok && scene_w32(f, &crc, joint_pool[j].object_id_a);
-        ok = ok && scene_w32(f, &crc, joint_pool[j].object_id_b);
-        ok = ok && scene_wfloat(f, &crc, joint_pool[j].equilibrium_length);
-        ok = ok && scene_wfloat(f, &crc, joint_pool[j].spring_constant);
-        ok = ok && scene_wfloat(f, &crc, joint_pool[j].damping_coefficient);
+        ok = ok && scene_w32(f, &crc, (physics_world_get_primary()->spring_joints)[j].object_id_a);
+        ok = ok && scene_w32(f, &crc, (physics_world_get_primary()->spring_joints)[j].object_id_b);
+        ok = ok && scene_wfloat(f, &crc, (physics_world_get_primary()->spring_joints)[j].equilibrium_length);
+        ok = ok && scene_wfloat(f, &crc, (physics_world_get_primary()->spring_joints)[j].spring_constant);
+        ok = ok && scene_wfloat(f, &crc, (physics_world_get_primary()->spring_joints)[j].damping_coefficient);
     }
     int active_revolutes = 0;
     for (int j = 0; j < constraint_pool_capacity(); j++) {
-        const constraint *c = constraint_pool_at(j);
+        const constraint *c = constraint_pool_at(physics_world_get_primary(), j);
         if ((c) && (c->type == CONSTRAINT_REVOLUTE)) {
             active_revolutes++;
         }
     }
     ok = ok && scene_w32(f, &crc, (uint32_t) active_revolutes);
     for (int j = 0; ok && (j < constraint_pool_capacity()); j++) {
-        const constraint *c = constraint_pool_at(j);
+        const constraint *c = constraint_pool_at(physics_world_get_primary(), j);
         if ((!c) || (c->type != CONSTRAINT_REVOLUTE)) {
             continue;
         }

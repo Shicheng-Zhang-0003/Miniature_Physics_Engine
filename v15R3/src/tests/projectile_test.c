@@ -13,7 +13,7 @@ int main(void) {
     g_cfg.world.angular_damping_scale = 1.0f;
     physics_world world;
     physics_world_init(&world);
-    constraint_pool_init();
+    constraint_pool_init(&world);
 
     const float vx = 8.0f, vy = 12.0f, g = 9.81f;
     int s = physics_world_add_sphere(&world, 0.2f, 1.0f, (vector3){0.0f, 1.0f, 0.0f});

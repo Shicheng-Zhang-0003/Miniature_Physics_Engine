@@ -45,20 +45,14 @@
 #include "ui_input/microvim.h" /* MPE_TASK_V15R2 */
 /* MPE_TASK_18_TERMINAL_INCLUDE_END */
 /* ------------------------------------------------------------------ */
-/* Global scene state (LEGACY GUI path)                               */
-/* Canonical simulation state is `physics_world` (core/physics_world.h) */
-/* — all headless tests step a `physics_world` directly. This global  */
-/*  exists only so the GTK GUI / render / editor / scene-save path    */
-/*  keeps working until it is migrated onto a world. New code must use */
-/*  physics_world_*, not these globals.                               */
+/* Simulation state lives in physics_world (core/physics_world.h):    */
+/* bodies, IDs, joint/constraint pools, warm-start caches, solver     */
+/* scratch. The file-scope globals below are gone for good; GUI code  */
+/* reaches simulation state via physics_world_get_primary().          */
 /* ------------------------------------------------------------------ */
 
-extern rigidbody *obj_per_scene;
-extern int object_count;
-extern int object_capacity;
-
 /* ------------------------------------------------------------------ */
-/* Global application input and camera state                         */
+/* Global application input and camera state (retained: app, not sim) */
 /* ------------------------------------------------------------------ */
 
 extern camera main_camera_fov;
@@ -78,7 +72,6 @@ extern frame_timer main_timer;
 
 void render_init(void);
 void render_cleanup(void);
-void broadphase_cleanup(void);
 void render_scene_current(int widget_width, int widget_height);
 
 /* ------------------------------------------------------------------ */
@@ -86,9 +79,10 @@ void render_scene_current(int widget_width, int widget_height);
 /* ------------------------------------------------------------------ */
 
 gboolean physics_step_increment(gpointer user_data_pointer);
-/* Legacy-path depenetration pass (defined in physics/depenetration.c; takes
- * the body array explicitly). Kept declared here for GUI callers. */
-void a3_positional_depenetration_pass(rigidbody *bodies, int body_count, broadphase_pair *pair_buffer,
+/* Depenetration pass (defined in physics/depenetration.c; takes the owning
+ * world). Kept declared here for GUI callers. */
+struct physics_world;
+void a3_positional_depenetration_pass(struct physics_world *world, broadphase_pair *pair_buffer,
                                       int *pair_count_pointer, bool rebuild_broadphase);
 
 /* ------------------------------------------------------------------ */

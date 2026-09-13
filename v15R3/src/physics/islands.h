@@ -21,12 +21,13 @@
 #include "broadphase.h"
 #include <stdbool.h>
 
-void islands_build(rigidbody *bodies, int body_count, broadphase_pair *pairs, int pair_count);
-int islands_count(void);
+struct physics_world;
+void islands_build(struct physics_world *world, broadphase_pair *pairs, int pair_count);
+int islands_count(const struct physics_world *world);
 /* Island id of a member body, or -1 for foreign pointers. */
-int islands_body_island(rigidbody *bodies, rigidbody *body);
+int islands_body_island(struct physics_world *world, rigidbody *body);
 /* False only when the body's island exists and every dynamic member sleeps.
  * Foreign pointers (floor proxy, stale) report true: never skip those. */
-bool islands_body_awake(rigidbody *bodies, rigidbody *body);
+bool islands_body_awake(struct physics_world *world, rigidbody *body);
 
 #endif /* islands_h */

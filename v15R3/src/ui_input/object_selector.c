@@ -37,13 +37,13 @@ static bool ray_obb_intersection(vector3 ray_origin, vector3 ray_dir, rigidbody 
     return *t_hit > 0;
 }
 void select_object_by_index(int object_index) {
-    if ((object_index < 0) || (object_index >= object_count)) {
+    if ((object_index < 0) || (object_index >= (physics_world_get_primary()->body_count))) {
         clear_selection();
         return;
     }
 
     selected_object = object_index;
-    selected_object_id = obj_per_scene[object_index].object_id;
+    selected_object_id = (physics_world_get_primary()->bodies)[object_index].object_id;
 }
 
 void selection_validate(void) {
@@ -71,8 +71,8 @@ int selector_ray_tracing(void) {
     vector3 ray_direction_vector = vector3_normalisation(main_camera_fov.forward_vector);
     float closest_hit_distance = 1e30f;
     int closest_object_index = -1;
-    for (int object_index = 0; object_index < object_count; object_index++) {
-        rigidbody *rigid_body_pointer = &obj_per_scene[object_index];
+    for (int object_index = 0; object_index < (physics_world_get_primary()->body_count); object_index++) {
+        rigidbody *rigid_body_pointer = &(physics_world_get_primary()->bodies)[object_index];
         float t_hit = 0.0f;
         bool hit = false;
         if (rigid_body_pointer->type == object_sphere) {
@@ -107,10 +107,10 @@ void clear_selection(void) {
 }
 void selector_apply_force_impulse(float impulse_magnitude) {
     selection_validate();
-    if ((selected_object < 0) || (selected_object >= object_count)) {
+    if ((selected_object < 0) || (selected_object >= (physics_world_get_primary()->body_count))) {
         return;
     }
-    rigidbody *selected_rigid_body = &obj_per_scene[selected_object];
+    rigidbody *selected_rigid_body = &(physics_world_get_primary()->bodies)[selected_object];
     vector3 applied_impulse_vector = vector3_scaling(main_camera_fov.forward_vector, impulse_magnitude);
     rb_apply_forces_perfect(selected_rigid_body, applied_impulse_vector);
 }

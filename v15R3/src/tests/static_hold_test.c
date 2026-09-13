@@ -10,7 +10,7 @@
 static float slope_drift(float slope_deg, float mus, float muk, int *asleep_out) {
     physics_world world;
     physics_world_init(&world);
-    constraint_pool_init();
+    constraint_pool_init(&world);
     float ang = slope_deg * 3.14159265f / 180.0f;
     vector3 n = {-sinf(ang), cosf(ang), 0.0f};
     vector3 surf = {0.0f, 4.0f, 0.0f};

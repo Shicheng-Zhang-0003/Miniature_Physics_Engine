@@ -64,8 +64,10 @@ float collision_resolve_iterative(collision_data *manifold_entry, float dt, bool
  * support ~one contact level per sweep in arbitrary order; support-first
  * order carries floor support to the top of a stack in a single sweep, so
  * deep stacks converge in far fewer iterations. Order affects only the
- * sweep sequence (same equations); twin runs agree bit-for-bit. */
-void collision_manifold_solve_order(collision_data *manifolds, int manifold_count, int *order_out);
+ * sweep sequence (same equations); twin runs agree bit-for-bit. Keys live
+ * in the world's scratch. */
+void collision_manifold_solve_order(struct physics_world *world, collision_data *manifolds, int manifold_count,
+                                    int *order_out);
 /* Split impulse (Catto): positional penetration correction applied AFTER
  * the velocity iterations, directly to positions, mass-weighted. Carries
  * no velocity change, so it cannot inflate contact impulses or friction. */
@@ -94,9 +96,9 @@ bool collision_static_plane_sphere(rigidbody *sphere, float plane_y, collision_d
 bool collision_static_plane_cube(rigidbody *cube, float plane_y, collision_data *collision_output_data);
 bool collision_static_plane_body(rigidbody *body, float plane_y, collision_data *collision_output_data);
 
-void contact_cache_stats_reset(void);
-int contact_cache_get_hits(void);
-int contact_cache_get_misses(void);
+void contact_cache_stats_reset(struct physics_world *world);
+int contact_cache_get_hits(const struct physics_world *world);
+int contact_cache_get_misses(const struct physics_world *world);
 /* Cylinder-vs-object narrowphase. Axle-segment + radius (capsule) model:
  * flat end-caps are treated as hemispherical. Documented approximation:
  * end-cap contacts on flat faces deviate from true cylinder geometry by

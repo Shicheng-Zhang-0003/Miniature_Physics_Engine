@@ -63,8 +63,8 @@ void cmd_sed(int argc, char **argv) {
         const char *target = argv[argument_index];
         bool all_targets = term_is_all_token(target);
         if (all_targets) {
-            for (int object_index = 0; object_index < object_count; object_index++) {
-                rigidbody *rb = &obj_per_scene[object_index];
+            for (int object_index = 0; object_index < (physics_world_get_primary()->body_count); object_index++) {
+                rigidbody *rb = &(physics_world_get_primary()->bodies)[object_index];
                 if (term_str_eq(field_name, "mass")) {
                     if (!is_numeric) {
                         continue;
@@ -117,7 +117,7 @@ void cmd_sed(int argc, char **argv) {
                 }
                 modified_count++;
             }
-            contact_cache_clear(NULL);
+            contact_cache_clear(physics_world_get_primary());
             continue;
         }
         int object_index = term_object_from_token(target);
@@ -125,7 +125,7 @@ void cmd_sed(int argc, char **argv) {
             term_printf("term_err", "mpe: sed: %s: No such object\n", target);
             continue;
         }
-        rigidbody *rb = &obj_per_scene[object_index];
+        rigidbody *rb = &(physics_world_get_primary()->bodies)[object_index];
         if (term_str_eq(field_name, "mass")) {
             if (!is_numeric) {
                 term_err("mpe: sed: mass requires numeric value\n");
@@ -190,7 +190,7 @@ void cmd_sed(int argc, char **argv) {
             continue;
         }
         modified_count++;
-        contact_cache_clear(NULL);
+        contact_cache_clear(physics_world_get_primary());
         term_printf("term_ok", "/obj/%d: %s=%s\n", object_index, field_name, value_str);
     }
     if (all_targets_matched_any(argc, argv)) {
@@ -220,8 +220,8 @@ void cmd_nice(int argc, char **argv) {
         if (object_index < 0) {
             continue;
         }
-        obj_per_scene[object_index].nice_value = priority;
-        rigidbody_wake(&obj_per_scene[object_index]);
+        (physics_world_get_primary()->bodies)[object_index].nice_value = priority;
+        rigidbody_wake(&(physics_world_get_primary()->bodies)[object_index]);
         term_printf("term_ok", "/obj/%d nice=%d\n", object_index, priority);
     }
 }
@@ -252,7 +252,7 @@ void cmd_ping(int argc, char **argv) {
     if (object_index < 0) {
         return;
     }
-    rigidbody *rb = &obj_per_scene[object_index];
+    rigidbody *rb = &(physics_world_get_primary()->bodies)[object_index];
     if (rb->static_state) {
         term_printf("term_dim", "PING /obj/%d: no response (static)\n", object_index);
         return;
@@ -278,8 +278,8 @@ void cmd_mount(int argc, char **argv) {
     const char *scene_path = argv[1];
     if (scene_loading(scene_path)) {
         editor_reset();
-        contact_cache_clear(NULL);
-        term_printf("term_ok", "mounted %s: %d objects loaded\n", scene_path, object_count);
+        contact_cache_clear(physics_world_get_primary());
+        term_printf("term_ok", "mounted %s: %d objects loaded\n", scene_path, (physics_world_get_primary()->body_count));
         event_log_push(log_info, "Scene mounted via terminal: %s", scene_path);
     } else {
         term_printf("term_err", "mpe: mount: %s: failed to load\n", scene_path);
@@ -296,7 +296,7 @@ void cmd_umount(int argc, char **argv) {
     }
     scene_clear();
     clear_selection();
-    contact_cache_clear(NULL);
+    contact_cache_clear(physics_world_get_primary());
     editor_reset();
     term_ok("umount: scene cleared\n");
     event_log_push(log_info, "Scene unmounted via terminal");
@@ -306,7 +306,7 @@ void cmd_mkfs(int argc, char **argv) {
     (void) argv;
     scene_clear();
     clear_selection();
-    contact_cache_clear(NULL);
+    contact_cache_clear(physics_world_get_primary());
     editor_reset();
     term_printf("term_ok", "Scene formatted. 0 objects, 0 joints.\n");
     event_log_push(log_info, "Scene formatted via terminal (mkfs)");
@@ -320,9 +320,9 @@ void cmd_fsck(int argc, char **argv) {
     }
     int error_count = 0;
     int warning_count = 0;
-    term_printf("term_echo", "fsck: checking %d objects...\n", object_count);
-    for (int object_index = 0; object_index < object_count; object_index++) {
-        rigidbody *rb = &obj_per_scene[object_index];
+    term_printf("term_echo", "fsck: checking %d objects...\n", (physics_world_get_primary()->body_count));
+    for (int object_index = 0; object_index < (physics_world_get_primary()->body_count); object_index++) {
+        rigidbody *rb = &(physics_world_get_primary()->bodies)[object_index];
         bool has_error = false;
         if ((!isfinite(rb->position.x)) || (!isfinite(rb->position.y)) || (!isfinite(rb->position.z))) {
             term_printf("term_err", "  /obj/%d: position NaN/Inf\n", object_index);
@@ -369,17 +369,17 @@ void cmd_fsck(int argc, char **argv) {
     }
     term_printf("term_echo", "fsck: checking %d joint slots...\n", mpe_max_joints);
     for (int joint_index = 0; joint_index < mpe_max_joints; joint_index++) {
-        if (!joint_pool[joint_index].is_active) {
+        if (!(physics_world_get_primary()->spring_joints)[joint_index].is_active) {
             continue;
         }
-        spring_joint *j = &joint_pool[joint_index];
+        spring_joint *j = &(physics_world_get_primary()->spring_joints)[joint_index];
         int index_a = scene_find_object_index_by_id(j->object_id_a);
         int index_b = scene_find_object_index_by_id(j->object_id_b);
         if (index_a < 0) {
             term_printf("term_err", "  /joint/%d: object_a (id=%u) not found\n", joint_index, j->object_id_a);
             error_count++;
             if (auto_fix) {
-                remove_joint(joint_index);
+                remove_joint(physics_world_get_primary(), joint_index);
                 term_printf("term_ok", "  /joint/%d: removed\n", joint_index);
             }
             continue;
@@ -388,7 +388,7 @@ void cmd_fsck(int argc, char **argv) {
             term_printf("term_err", "  /joint/%d: object_b (id=%u) not found\n", joint_index, j->object_id_b);
             error_count++;
             if (auto_fix) {
-                remove_joint(joint_index);
+                remove_joint(physics_world_get_primary(), joint_index);
                 term_printf("term_ok", "  /joint/%d: removed\n", joint_index);
             }
             continue;
@@ -403,11 +403,11 @@ void cmd_fsck(int argc, char **argv) {
         }
     }
     if (auto_fix) {
-        contact_cache_clear(NULL);
+        contact_cache_clear(physics_world_get_primary());
     }
     if (error_count == 0) {
-        term_printf("term_ok", "fsck: PASS — %d objects, %d joints, %d warning(s), 0 errors\n", object_count,
-                    current_joint_count, warning_count);
+        term_printf("term_ok", "fsck: PASS — %d objects, %d joints, %d warning(s), 0 errors\n", (physics_world_get_primary()->body_count),
+                    (physics_world_get_primary()->spring_joint_count), warning_count);
     } else {
         term_printf("term_err", "fsck: FAIL — %d error(s), %d warning(s)%s\n", error_count, warning_count,
                     auto_fix ? " (auto-fixed)" : " (run fsck -y to fix)");
@@ -428,15 +428,15 @@ void cmd_netstat(int argc, char **argv) {
     term_printf(NULL, "Proto  Local        Foreign      State         K        D      Len\n");
     int listed = 0;
     for (int ji = 0; ji < mpe_max_joints; ji++) {
-        if ((!joint_pool[ji].is_active) && (!show_all)) {
+        if ((!(physics_world_get_primary()->spring_joints)[ji].is_active) && (!show_all)) {
             continue;
         }
-        int ia = scene_find_object_index_by_id(joint_pool[ji].object_id_a);
-        int ib = scene_find_object_index_by_id(joint_pool[ji].object_id_b);
-        const char *state_text = joint_pool[ji].is_active ? "ESTABLISHED" : "CLOSED";
+        int ia = scene_find_object_index_by_id((physics_world_get_primary()->spring_joints)[ji].object_id_a);
+        int ib = scene_find_object_index_by_id((physics_world_get_primary()->spring_joints)[ji].object_id_b);
+        const char *state_text = (physics_world_get_primary()->spring_joints)[ji].is_active ? "ESTABLISHED" : "CLOSED";
         term_printf(NULL, "spring /obj/%-6d /obj/%-6d %-12s %7.1f %7.1f %7.2f\n", ia, ib, state_text,
-                    joint_pool[ji].spring_constant, joint_pool[ji].damping_coefficient,
-                    joint_pool[ji].equilibrium_length);
+                    (physics_world_get_primary()->spring_joints)[ji].spring_constant, (physics_world_get_primary()->spring_joints)[ji].damping_coefficient,
+                    (physics_world_get_primary()->spring_joints)[ji].equilibrium_length);
         listed++;
     }
     if (listed == 0) {
@@ -467,7 +467,7 @@ void cmd_ifconfig(int argc, char **argv) {
     term_printf(NULL, "    spawn=%s  selected=%d  marked_joint=%d\n",
                 (main_inputs.current_spawn_type == 0) ? "sphere" : "cube", selected_object,
                 main_inputs.marked_joint_object_index);
-    term_printf(NULL, "    objects=%d  joints=%d  sleeping=%d\n", object_count, current_joint_count,
+    term_printf(NULL, "    objects=%d  joints=%d  sleeping=%d\n", (physics_world_get_primary()->body_count), (physics_world_get_primary()->spring_joint_count),
                 debug_last_sleeping_object_count);
 }
 void cmd_lsmod(int argc, char **argv) {
@@ -594,7 +594,7 @@ void cmd_lsof(int argc, char **argv) {
     term_printf(NULL, "%-11s %-8s %s\n", "terminal", "win", debug_terminal_is_open() ? "open" : "closed");
     term_printf(NULL, "%-11s %-8s %s\n", "mouse", "lock", main_inputs.is_mouse_locked ? "grabbed" : "released");
     term_printf(NULL, "%-11s %-8s %s\n", "mode", "state", main_inputs.is_debug_mode_active ? "debug" : "game");
-    if ((selected_object >= 0) && (selected_object < object_count)) {
+    if ((selected_object >= 0) && (selected_object < (physics_world_get_primary()->body_count))) {
         term_printf(NULL, "%-11s %-8s /obj/%d\n", "selection", "obj", selected_object);
     } else {
         term_printf(NULL, "%-11s %-8s %s\n", "selection", "obj", "(none)");
