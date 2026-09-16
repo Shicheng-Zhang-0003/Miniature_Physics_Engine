@@ -465,7 +465,7 @@ void cmd_ifconfig(int argc, char **argv) {
     term_out("\n");
     term_printf("term_echo", "input0:  flags=<%s>\n", main_inputs.is_mouse_locked ? "GRABBED" : "RELEASED");
     term_printf(NULL, "    spawn=%s  selected=%d  marked_joint=%d\n",
-                (main_inputs.current_spawn_type == 0) ? "sphere" : "cube", selected_object,
+                term_spawn_type_name(), selected_object,
                 main_inputs.marked_joint_object_index);
     term_printf(NULL, "    objects=%d  joints=%d  sleeping=%d\n", (physics_world_get_primary()->body_count), (physics_world_get_primary()->spring_joint_count),
                 debug_last_sleeping_object_count);
@@ -657,6 +657,24 @@ void cmd_tee(int argc, char **argv) {
         return;
     }
     const char *output_filename = argv[1];
+    /* Jail: only allow writes inside status/ or /tmp/mpe-*. Absolute paths
+     * elsewhere or ".." traversal could overwrite engine sources/shaders. */
+    bool allowed = false;
+    if (strncmp(output_filename, "status/", 7) == 0) {
+        allowed = true;
+    } else if (strncmp(output_filename, "/tmp/mpe-", 9) == 0) {
+        allowed = true;
+    } else if (strchr(output_filename, '/') == NULL) {
+        /* Bare filename -> sandbox into status/. */
+        allowed = true;
+    }
+    if (strstr(output_filename, "..") != NULL) {
+        allowed = false;
+    }
+    if (!allowed) {
+        term_err("mpe: tee: path jailed (use status/<file> or /tmp/mpe-<file>)\n");
+        return;
+    }
     char sub_command[2048];
     sub_command[0] = '\0';
     size_t offset = 0;
@@ -676,13 +694,19 @@ void cmd_tee(int argc, char **argv) {
     term_capture_end();
     char *captured = term_capture_get();
     if (captured && captured[0] != '\0') {
-        FILE *output_file = fopen(output_filename, "w");
+        char resolved[512];
+        if (strchr(output_filename, '/') == NULL) {
+            snprintf(resolved, sizeof(resolved), "status/%s", output_filename);
+        } else {
+            snprintf(resolved, sizeof(resolved), "%s", output_filename);
+        }
+        FILE *output_file = fopen(resolved, "w");
         if (output_file) {
             fputs(captured, output_file);
             fclose(output_file);
-            term_printf("term_ok", "tee: wrote %zu bytes to %s\n", strlen(captured), output_filename);
+            term_printf("term_ok", "tee: wrote %zu bytes to %s\n", strlen(captured), resolved);
         } else {
-            term_printf("term_err", "mpe: tee: %s: cannot open for writing\n", output_filename);
+            term_printf("term_err", "mpe: tee: %s: cannot open for writing\n", resolved);
         }
     }
     term_capture_reset();
@@ -833,23 +857,26 @@ typedef struct {
     const char *path;
     const char *description;
 } mv_editable_file;
-static const mv_editable_file mv_known_files[] = {{"status/engine.cfg", "Main engine configuration (69 tunables)"},
+static const mv_editable_file mv_known_files[] = {{"status/engine.cfg", "Main engine configuration (78 tunables)"},
                                                   {"status/engine.cfg.backup", "F10/F11 validation config backup"},
                                                   {"status/engine.cfg.bak", "MicroVim auto-backup (last :w)"},
                                                   {"status/scene.dat", "Scene save file (binary)"},
-                                                  {"readme.md", "Project README"},
-                                                  {"evolution.txt", "Version lineage (stage 0 -> v15R2)"},
-                                                  {"how_to_use.md", "User guide / controls reference"},
-                                                  {"RELEASE_POLICY.md", "Release cycle rules"},
-                                                  {"RELEASE_GATES.md", "P0/P1/P2 gate checklist"},
-                                                  {"release_notes_v15R2.md", "v15R2 release candidate notes"},
-                                                  {"release_notes_v15R1.md", "v15R1 release notes"},
-                                                  {"LICENSE", "GPL-3.0 license text"},
-                                                  {".gitignore", "Git ignore rules"},
-                                                  {"validation/V01.sh", "Sanitizer build script"},
-                                                  {"validation/V02.sh", "Clean build + warning review"},
-                                                  {"validation/V03.py", "P0 gate interactive walk"},
-                                                  {"validation/V04.sh", "F10 long-run validation guide"},
+                                                  /* Project files below resolve relative to the engine working
+                                                   * directory (v15R3/src): ../ enters v15R3/, ../../ the repo
+                                                   * root. Listed wrongly as bare names before (they opened as
+                                                   * [New] buffers and would save strays into src/). */
+                                                  {"../../readme.md", "Project README"},
+                                                  {"../evolution.txt", "Version lineage (stages to v15R3 dev)"},
+                                                  {"../how_to_use.md", "User guide / controls reference"},
+                                                  {"../RELEASE_POLICY.md", "Release cycle rules"},
+                                                  {"../RELEASE_GATES.md", "P0/P1/P2 gate checklist"},
+                                                  {"../../scope.md", "Defect & debt audit"},
+                                                  {"../../LICENSE", "GPL-3.0 license text"},
+                                                  {"../../.gitignore", "Git ignore rules"},
+                                                  {"../validation/V01.sh", "Sanitizer build script"},
+                                                  {"../validation/V02.sh", "Clean build + warning review"},
+                                                  {"../validation/V03.py", "P0 gate interactive walk"},
+                                                  {"../validation/V04.sh", "F10 long-run validation guide"},
                                                   {"makefile", "Build system makefile"},
                                                   {"compile", "Compile script"},
                                                   {"config/mpe_constants.h", "Compile-time constants manifest"},

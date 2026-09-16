@@ -77,11 +77,12 @@ void editor_reset(void) {
     main_inputs.menu_1_pressed = false;
     main_inputs.menu_2_pressed = false;
     main_inputs.menu_3_pressed = false;
+    main_inputs.menu_4_pressed = false;
+    main_inputs.menu_5_pressed = false;
+    main_inputs.menu_6_pressed = false;
 
     main_inputs.up_arrow_pressed = false;
     main_inputs.down_arrow_pressed = false;
-    main_inputs.left_arrow_pressed = false;
-    main_inputs.right_arrow_pressed = false;
     main_inputs.enter_key_pressed = false;
     main_inputs.e_key_pressed = false;
     config_menu_close(); /* MPE_TASK_35 */

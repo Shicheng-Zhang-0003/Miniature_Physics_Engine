@@ -36,6 +36,61 @@ static bool ray_obb_intersection(vector3 ray_origin, vector3 ray_dir, rigidbody 
     *t_hit = tmin > 0 ? tmin : tmax;
     return *t_hit > 0;
 }
+/* Exact solid-cylinder raycast (axle = local X, flat caps). Side quadric in
+ * cylinder-local space plus two cap discs; nearest positive t wins. */
+static bool ray_cylinder_intersection(vector3 ray_origin, vector3 ray_dir, rigidbody *cyl, float *t_hit) {
+    vector3 ax = cyl->cached_axes[0];
+    float ax_len_sq = vector3_length_squared(ax);
+    if (ax_len_sq < 1e-8f) {
+        return false;
+    }
+    ax = vector3_scaling(ax, 1.0f / sqrtf(ax_len_sq));
+    float r = cyl->radius;
+    float h = cyl->cylinder_half_length;
+    vector3 oc = vector3_subtraction(ray_origin, cyl->position);
+    float dx = vector3_dot(ray_dir, ax);
+    float ox = vector3_dot(oc, ax);
+    vector3 rd_perp = vector3_subtraction(ray_dir, vector3_scaling(ax, dx));
+    vector3 oc_perp = vector3_subtraction(oc, vector3_scaling(ax, ox));
+    float best_t = 1e30f;
+    bool hit = false;
+    /* Barrel side: |oc_perp + t*rd_perp|^2 = r^2 with |ox + t*dx| <= h. */
+    float a = vector3_length_squared(rd_perp);
+    if (a > 1e-12f) {
+        float b = 2.0f * vector3_dot(oc_perp, rd_perp);
+        float c = vector3_length_squared(oc_perp) - r * r;
+        float disc = b * b - 4.0f * a * c;
+        if (disc >= 0.0f) {
+            float sq = sqrtf(disc);
+            float t_candidates[2] = {(-b - sq) / (2.0f * a), (-b + sq) / (2.0f * a)};
+            for (int k = 0; k < 2; k++) {
+                float t = t_candidates[k];
+                if (t > 0.0f && t < best_t && fabsf(ox + t * dx) <= h) {
+                    best_t = t;
+                    hit = true;
+                }
+            }
+        }
+    }
+    /* Flat caps: planes x = +/-h, radial check. */
+    if (fabsf(dx) > 1e-9f) {
+        for (int s = -1; s <= 1; s += 2) {
+            float t = (s * h - ox) / dx;
+            if (t > 0.0f && t < best_t) {
+                vector3 p = vector3_addition(oc, vector3_scaling(ray_dir, t));
+                vector3 radial = vector3_subtraction(p, vector3_scaling(ax, s * h));
+                if (vector3_length_squared(radial) <= r * r) {
+                    best_t = t;
+                    hit = true;
+                }
+            }
+        }
+    }
+    if (hit) {
+        *t_hit = best_t;
+    }
+    return hit;
+}
 void select_object_by_index(int object_index) {
     if ((object_index < 0) || (object_index >= (physics_world_get_primary()->body_count))) {
         clear_selection();
@@ -89,6 +144,8 @@ int selector_ray_tracing(void) {
                 hit = true;
                 t_hit = projection_length_along_ray;
             }
+        } else if (rigid_body_pointer->type == object_cylinder) {
+            hit = ray_cylinder_intersection(ray_origin_position, ray_direction_vector, rigid_body_pointer, &t_hit);
         } else {
             hit = ray_obb_intersection(ray_origin_position, ray_direction_vector, rigid_body_pointer, &t_hit);
         }
@@ -104,6 +161,7 @@ int selector_ray_tracing(void) {
 }
 void clear_selection(void) {
     selected_object = -1;
+    selected_object_id = 0;
 }
 void selector_apply_force_impulse(float impulse_magnitude) {
     selection_validate();

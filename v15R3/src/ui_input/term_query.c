@@ -37,7 +37,7 @@ void cmd_stat(int argc, char **argv) {
     if (strstr(target, "spawner")) {
         term_printf("term_echo", "  File: /spawner\n");
         term_printf(NULL, "  Type: %s  Mass: %.4f  Radius: %.4f\n",
-                    (main_inputs.current_spawn_type == 0) ? "sphere" : "cube", g_cfg.spawner.mass,
+                    term_spawn_type_name(), g_cfg.spawner.mass,
                     g_cfg.spawner.radius);
         term_printf(NULL, "  Speed: %.4f  Friction: s=%.3f k=%.3f\n", g_cfg.spawner.speed, g_cfg.spawner.friction_s,
                     g_cfg.spawner.friction_k);
@@ -203,7 +203,7 @@ void cmd_file(int argc, char **argv) {
     }
     if (strstr(target, "spawner")) {
         term_printf(NULL, "/spawner: object factory, type=%s\n",
-                    (main_inputs.current_spawn_type == 0) ? "sphere" : "cube");
+                    term_spawn_type_name());
         return;
     }
     if (term_classify_token(target) == term_target_joint) {

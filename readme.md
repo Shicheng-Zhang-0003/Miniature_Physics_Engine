@@ -37,6 +37,7 @@ MPE is built around four priorities:
 - **POSIX-style debug terminal** — drive the whole simulation from a shell.
 - **Built-in validation suite** (F5–F11), including a 60-second long-run stability test and config torture test.
 - **Shader/render failure visibility** — the engine no longer continues silently in a broken render state.
+- **Physics-truth pass** — Verlet-exact free flight, post-integration Poisson gate, CCD remainder integration, strict warm-start, true cylinder SDF geometry, no velocity clamps or restitution caps; game-only damping (`nice_value`, angular scale) labeled and defaulted off/vacuum.
 
 ---
 
@@ -73,7 +74,7 @@ Objects are mapped into hashed grid buckets; collision checks are limited to loc
 
 ### Solver
 
-- **Impulse-based sequential solver**, 16 iterations, with **warm starting**.
+- **Impulse-based sequential solver**, 64 iterations by default (configurable 1–128), with **warm starting**.
 - Static + kinetic friction, rolling friction, Baumgarte penetration correction.
 - Positional depenetration pass for pile stability.
 
@@ -114,7 +115,6 @@ A fully custom, dependency-free math library: 3D vectors, 4×4 matrices, quatern
 | Fly down (Debug) | `Shift` |
 | Steer camera mouse-free (Debug) | `I J K L` |
 | Release mouse | `Escape` |
-| Re-lock mouse (Debug) | `M` |
 | Toggle Game / Debug mode | `0` |
 
 ### Spawning
@@ -131,7 +131,7 @@ A fully custom, dependency-free math library: 3D vectors, 4×4 matrices, quatern
 | Select object | Right-click (raycast) **or** `R` (Debug) |
 | Open object menu | `E` |
 | Apply impulse | `F` |
-| Delete object | Middle-click **or** `Delete` (Debug) |
+| Delete object | Middle-click |
 | World settings | `7` |
 | Save / Load scene | `9` |
 
@@ -139,7 +139,7 @@ A fully custom, dependency-free math library: 3D vectors, 4×4 matrices, quatern
 
 | Action | Input |
 |---|---|
-| Open debug terminal | `T` or `1` (Debug) |
+| Open debug terminal | `1` (Debug) |
 | Stability stack test | `F5` |
 | Sleep / wake test | `F6` |
 | Editor torture test | `F7` |
@@ -152,7 +152,7 @@ A fully custom, dependency-free math library: 3D vectors, 4×4 matrices, quatern
 
 ## 🐚 Debug Terminal
 
-In Debug Mode, press `T` (or `1`) to open a **POSIX-style shell** over the physics world. The simulation is exposed as a virtual filesystem:
+In Debug Mode, press `1` to open a **POSIX-style shell** over the physics world. The simulation is exposed as a virtual filesystem:
 
 | Path | Contents |
 |---|---|
@@ -191,8 +191,9 @@ MPE ships with built-in stability tests:
 | `F8` | Spawn stress: up to 300 mixed objects |
 | `F9` | Print validation report |
 | `F10` | Long-run validation: 3600 ticks (60 s) of idle stability |
+| `F11` | Config torture: 78 tunables randomised to extremes, then 3600 ticks |
 
-`F10` monitors for NaN values, fallen objects, and residual motion, printing `PASS`/`FAIL` at the end.
+`F10` monitors for NaN values, fallen objects, and residual motion, printing `PASS`/`FAIL` at the end. `F11` is a robustness verdict — `PASS` means no NaN and nothing fell through the world (speeds reported, never gated; under extremes, perpetual fall/creep can be the true outcome). Each F11 press uses the next printed seed. Torture pins solver resolution (gravity −17…−1, ≥96 iterations — proven envelope for the 10:1 validation column) while material/world extremes stay fully random.
 
 ---
 

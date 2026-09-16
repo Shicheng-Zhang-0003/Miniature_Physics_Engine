@@ -84,7 +84,7 @@ They should be recorded as post-stable work items.
 - [X] Sleeping stacks remain sleeping once settled.
 - [X] No NaNs appear after normal use.
 - [X] No NaNs appear after stress testing.
-- [X] Physics behaviour at default config is identical to v14S.
+- [X] Physics behaviour at default config is identical to v14S, except intentional truth fixes: angular damping defaults to vacuum (1.0; v14S hardcoded 0.97 rotary damping) and velocity/restitution clamps are removed.
 
 ### 8. Broadphase / Solver Visibility
 - [X] Broadphase node overflow is visible.
@@ -101,11 +101,13 @@ They should be recorded as post-stable work items.
 - [X] F9 validation report prints useful state including config dump.
 - [X] F10 long-run validation passes.
 - [X] F11 config torture test runs without crash.
+- [X] F11 verdict is robustness-only (no NaN, nothing fallen); speeds reported, never gated.
+- [X] F11 pins solver resolution (gravity −17…−1, ≥96 iterations — proven envelope for the 10:1 column); material/world extremes stay fully random.
 - [X] The engine can idle for several minutes without explosion.
 
 ### 10. Configuration System
 - [X] Config menu (key 6) opens and navigates correctly.
-- [X] All 76 tunable parameters are editable via the menu.
+- [X] All 78 tunable parameters are editable via the menu.
 - [X] Debug-only parameters are refused in Game Mode.
 - [X] Config saves to `status/engine.cfg` on exit.
 - [X] Config loads on startup and overrides defaults.
@@ -115,7 +117,7 @@ They should be recorded as post-stable work items.
 - [X] Terminal `config save|load|reset` works correctly.
 - [X] Extreme values are clamped to registered bounds.
 - [X] F11 torture test randomises without NaN or crash.
-- [X] Config reset restores v14S-identical behaviour.
+- [X] Config reset restores v14S-identical behaviour (same truth-fix exceptions as above).
 
 ### 11. Documentation
 - [X] README matches the code.

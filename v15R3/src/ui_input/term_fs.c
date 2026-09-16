@@ -150,12 +150,14 @@ void cmd_touch(int argc, char **argv) {
             continue;
         }
     if ((argc > 1) && (strstr(argv[1], "robot"))) {
-        term_err("mpe: touch: unknown type 'robot' (types: sph, cube)\n");
+        term_err("mpe: touch: unknown type 'robot' (types: sph, cube, cyl)\n");
         return;
     }
 
         object_type spawn_type = object_sphere;
-        if (strstr(argv[argument_index], "cube")) {
+        if (strstr(argv[argument_index], "cyl")) {
+            spawn_type = object_cylinder;
+        } else if (strstr(argv[argument_index], "cube")) {
             spawn_type = object_cube;
         }
         int created_index = term_create_object(spawn_type);

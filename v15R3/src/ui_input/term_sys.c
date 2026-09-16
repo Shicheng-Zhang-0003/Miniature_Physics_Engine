@@ -404,7 +404,7 @@ void cmd_w(int argc, char **argv) {
     term_printf(NULL, "  yaw=%.2f  pitch=%.2f  speed=%.2f m/s\n", main_camera_fov.yaw, main_camera_fov.pitch,
                 main_camera_fov.movement_speed);
     term_printf(NULL, "  mode=%s  spawn=%s  sel=%d\n", main_inputs.is_debug_mode_active ? "DEBUG" : "GAME",
-                (main_inputs.current_spawn_type == 0) ? "sphere" : "cube", selected_object);
+                term_spawn_type_name(), selected_object);
 }
 void cmd_hostname(int argc, char **argv) {
     if ((argc > 1) && (term_str_eq(argv[1], "-f"))) {

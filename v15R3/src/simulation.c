@@ -60,14 +60,8 @@ gboolean physics_step_increment(gpointer user_data_pointer) {
         debug_terminal_sync_mode();
     }
 
-    /* Change rate adjustment */
-    if (main_inputs.is_debug_mode_active) {
-        if (main_inputs.left_arrow_pressed) { g_cfg.ui.change_rate_debug -= 0.01f; main_inputs.left_arrow_pressed = false; }
-        if (main_inputs.right_arrow_pressed) { g_cfg.ui.change_rate_debug += 0.01f; main_inputs.right_arrow_pressed = false; }
-    } else {
-        if (main_inputs.left_arrow_pressed) { g_cfg.ui.change_rate_game -= 0.2f; main_inputs.left_arrow_pressed = false; }
-        if (main_inputs.right_arrow_pressed) { g_cfg.ui.change_rate_game += 0.2f; main_inputs.right_arrow_pressed = false; }
-    }
+    /* Change-rate keys (Left/Right) REMOVED: pre-dialog relics. Rates are
+     * config values now (ui.change_rate_game/debug via menu 6/terminal). */
 
     /* Status dir + frame timer */
     static int status_dir_checked = 0;

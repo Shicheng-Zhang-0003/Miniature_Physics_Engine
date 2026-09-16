@@ -7,6 +7,8 @@
  * no file-scope pool remains. */
 int scene_add_object(float radius, float mass, vector3 initial_position);
 int scene_add_cube(vector3 position, vector3 half_extensions, float mass);
+/* Cylinder spawns (axle along local X). Same identity/sanitize/overlap path. */
+int scene_add_cylinder(float radius, float half_length, float mass, vector3 initial_position);
 void scene_init_default(void);
 void scene_clear(void);
 void scene_remove_object_by_index(int object_index);

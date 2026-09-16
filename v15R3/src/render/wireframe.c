@@ -2,9 +2,10 @@
 #include "wireframe.h"
 #include "sphere_meshing.h"
 #include "cube_meshing.h"
-#include <epoxy/gl_generated.h>
+#include "cylinder_meshing.h"
 extern mesh sphere_mesh;
 extern mesh cube_mesh;
+extern mesh cylinder_mesh;
 static GLuint a3_wire_cached_program = 0;
 static GLint a3_wire_uniform_viewframe = -1;
 static GLint a3_wire_uniform_projection = -1;
@@ -63,6 +64,10 @@ void wireframe_render_object(GLuint shader_program, math4 view_matrix, math4 pro
     if (rigid_body->type == object_sphere) {
         float s = rigid_body->radius * 1.01f;
         scale_matrix = math4_scaling((vector3){s, s, s});
+    } else if (rigid_body->type == object_cylinder) {
+        /* Unit cylinder mesh: axle X half-length 1, radius 1. */
+        scale_matrix = math4_scaling((vector3){rigid_body->cylinder_half_length * 1.01f,
+                                               rigid_body->radius * 1.01f, rigid_body->radius * 1.01f});
     } else {
         scale_matrix =
             math4_scaling((vector3){rigid_body->half_extensions.x * 1.01f, rigid_body->half_extensions.y * 1.01f,
@@ -95,6 +100,11 @@ void wireframe_render_object(GLuint shader_program, math4 view_matrix, math4 pro
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, sphere_mesh.wireframe_element_buffer_object);
         glDrawElements(GL_LINES, sphere_mesh.wireframe_index_count, GL_UNSIGNED_INT, 0);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, sphere_mesh.element_buffer_object);
+    } else if (rigid_body->type == object_cylinder) {
+        glBindVertexArray(cylinder_mesh.vertex_array_object);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cylinder_mesh.wireframe_element_buffer_object);
+        glDrawElements(GL_LINES, cylinder_mesh.wireframe_index_count, GL_UNSIGNED_INT, 0);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cylinder_mesh.element_buffer_object);
     } else {
         glBindVertexArray(cube_mesh.vertex_array_object);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cube_mesh.wireframe_element_buffer_object);

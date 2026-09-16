@@ -34,7 +34,13 @@ bool collision_dual_sphere(rigidbody *rigidbody_object_a, rigidbody *rigidbody_o
     vector3 relative_position_vector = vector3_subtraction(rigidbody_object_b->position, rigidbody_object_a->position);
     float distance_between_centres_squared = vector3_length_squared(relative_position_vector);
     float total_combined_radius = rigidbody_object_a->radius + rigidbody_object_b->radius;
-    if (distance_between_centres_squared >= total_combined_radius * total_combined_radius) {
+    /* TRUTH P0-4: slop-band persistence parity with cube/cylinder/floor.
+     * Resting spheres at exact contact (dist == r1+r2) must report a
+     * zero-depth contact for friction; strict < flickers support at 30Hz.
+     * Admit pen >= -slop, clamp negatives to 0 (no bounce, friction only). */
+    float slop = g_cfg.solver.penetration_slop;
+    float outer = total_combined_radius + slop;
+    if (distance_between_centres_squared >= outer * outer) {
         return false;
     }
     float distance_between_centres = sqrtf(distance_between_centres_squared);
@@ -49,7 +55,8 @@ bool collision_dual_sphere(rigidbody *rigidbody_object_a, rigidbody *rigidbody_o
     }
 
     contact_point_data *cp = &collision_output_data->contacts[0];
-    cp->penetration = total_combined_radius - distance_between_centres;
+    float raw_pen = total_combined_radius - distance_between_centres;
+    cp->penetration = (raw_pen > 0.0f) ? raw_pen : 0.0f;
     cp->position = vector3_addition(rigidbody_object_a->position,
                                     vector3_scaling(collision_output_data->normal_vector, rigidbody_object_a->radius));
     collision_output_data->contact_count = 1;
@@ -419,18 +426,17 @@ bool collision_dual_cube(rigidbody *cube_a, rigidbody *cube_b, collision_data *c
             }
         }
     }
-    /* Face-axis hysteresis: the raw 15-axis minimum is knife-edge
-     * discontinuous — infinitesimal tilt flips face↔edge, collapsing a
-     * 4-point face manifold into a single corner contact whose torque kicks
-     * the tilt further (measured: flip at t=60, full topple by t=300 at 16
-     * iterations). The face axis is always a valid separating axis, so take
-     * the edge axis only when it wins decisively (>=10% shallower).
-     * Genuine edge contacts (corner landings, crossed boxes) clear this bar
-     * by a wide margin; resting-face jitter never does. */
+    /* TRUTH: raw 15-axis minimum, no hysteresis. An earlier 0.9x face-bias
+     * suppressed true edge contacts within a 10% band (wrong points/normal/
+     * torque for tilted boxes) to hide solver jitter. Real boxes DO change
+     * manifold discontinuously on tilt; the solver (slop persistence +
+     * warm-start + 64 iterations) must handle it, not geometry lies.
+     * Hysteresis deleted; genuine face contacts still win raw whenever
+     * shallower (the common resting case). */
     float minimum_overlap = 0.0f;
     vector3 best_axis = {0, 0, 0};
     int best_axis_index = -1;
-    if ((edge_best_axis_index >= 0) && (edge_minimum_overlap < face_minimum_overlap * 0.9f)) {
+    if ((edge_best_axis_index >= 0) && (edge_minimum_overlap < face_minimum_overlap)) {
         minimum_overlap = edge_minimum_overlap;
         best_axis = edge_best_axis;
         best_axis_index = edge_best_axis_index;
@@ -614,9 +620,12 @@ bool collision_dual_cube(rigidbody *cube_a, rigidbody *cube_b, collision_data *c
     /* MPE_TASK_04_CUBE_NORMAL_CALL_END */
     return true;
 }
-static rigidbody *collision_static_plane_body_proxy(float plane_y) {
-    static rigidbody static_plane_body;
-    static int static_plane_initialized = 0;
+rigidbody *collision_static_plane_body_proxy(float plane_y) {
+    /* Thread-local so concurrent worlds/threads never share mutable state.
+     * restitution=1.0 is intentionally neutral: effective bounce is
+     * min(body_restitution, 1.0) == body_restitution. */
+    static _Thread_local rigidbody static_plane_body;
+    static _Thread_local int static_plane_initialized = 0;
 
     if (!static_plane_initialized) {
         rigidbody_initialisation_sphere(&static_plane_body, 1.0f, 0.0f, (vector3){0.0f, plane_y, 0.0f});
@@ -826,6 +835,15 @@ static uint32_t a3_task05_body_property_stamp(const rigidbody *rigid_body) {
     stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(rigid_body->half_extensions.y));
     stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(rigid_body->half_extensions.z));
 
+    /* Orientation quantized to 1e-3: rotation invalidates local-space cache
+     * matching. Without this, a body that rotates significantly between
+     * frames can false-positive match a stale contact (PHYS-007). Quantizing
+     * keeps resting contacts stable while forcing a miss on real rotation. */
+    stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(roundf(rigid_body->orientation.w * 1000.0f) / 1000.0f));
+    stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(roundf(rigid_body->orientation.x * 1000.0f) / 1000.0f));
+    stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(roundf(rigid_body->orientation.y * 1000.0f) / 1000.0f));
+    stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(roundf(rigid_body->orientation.z * 1000.0f) / 1000.0f));
+
     return stamp;
 }
 
@@ -862,9 +880,15 @@ static int contact_cache_match_role(const cached_contact *cc, uint32_t id_a, uin
     float match_dist_sq = g_cfg.solver.warm_start_match_dist_sq;
     if ((cc->object_id_a == id_a) && (cc->object_id_b == id_b) && (cc->property_stamp_a == stamp_a) &&
         (cc->property_stamp_b == stamp_b)) {
+        /* TRUTH: strict both-side matching. Old side-A-only aliased two B
+         * bodies sharing an A anchor within 5cm (wrong impulse injection).
+         * Both material points must coincide; resting contacts satisfy this
+         * exactly (body-local storage survives rigid translation). */
         float dist_a_sq = vector3_length_squared(vector3_subtraction(cc->local_position_a, local_a));
-        if ((dist_a_sq < match_dist_sq) && (a3_task05_cached_impulses_are_usable(cc->accumulated_normal_impulse,
-                                                                                cc->accumulated_tangent_impulse))) {
+        float dist_b_sq = vector3_length_squared(vector3_subtraction(cc->local_position_b, local_b));
+        if ((dist_a_sq < match_dist_sq) && (dist_b_sq < match_dist_sq) &&
+            (a3_task05_cached_impulses_are_usable(cc->accumulated_normal_impulse,
+                                                 cc->accumulated_tangent_impulse))) {
             return 1;
         }
         return 0;
@@ -938,12 +962,9 @@ void collision_prepare_solver(struct physics_world *world, collision_data *sourc
 
         int cache_match_found = 0;
 
-        /* Warm-start matching (baseline side-A-only): side-B and property
-         * stamps are intentionally loose here. Bisect showed strict
-         * both-side matching + stamps destabilize resting wheel contacts
-         * (fewer hits = colder solver = idle spin-up and bounce). Aliasing
-         * on shared A-anchors is a known accepted tradeoff, documented for
-         * future 2-tangent + consistent-rotation warm-start work. */
+        /* Warm-start matching: strict both-side material-point coincidence
+         * (see contact_cache_match_role). A hit adopts cached impulses at
+         * full step — no damped SOR, no provenance flags. */
         if ((hash_head) && (cache_id_a != 0) && (cache_id_b != 0)) {
             /* Hash walk: visits the pair's entries in save order, i.e. the
              * same first-hit the legacy linear scan below would find. */
@@ -957,7 +978,6 @@ void collision_prepare_solver(struct physics_world *world, collision_data *sourc
                 if (role == 1) {
                     cp->accumulated_normal_impulse = fmaxf(cc->accumulated_normal_impulse, 0.0f);
                     cp->accumulated_tangent_impulse = cc->accumulated_tangent_impulse;
-                    cp->warmed = true;
                     cache_match_found = 1;
                     break;
                 } else if (role == 2) {
@@ -966,7 +986,6 @@ void collision_prepare_solver(struct physics_world *world, collision_data *sourc
                      * the relative-velocity order. */
                     cp->accumulated_normal_impulse = fmaxf(cc->accumulated_normal_impulse, 0.0f);
                     cp->accumulated_tangent_impulse = -cc->accumulated_tangent_impulse;
-                    cp->warmed = true;
                     cache_match_found = 1;
                     break;
                 }
@@ -980,13 +999,11 @@ void collision_prepare_solver(struct physics_world *world, collision_data *sourc
                 if (role == 1) {
                     cp->accumulated_normal_impulse = fmaxf(cc->accumulated_normal_impulse, 0.0f);
                     cp->accumulated_tangent_impulse = cc->accumulated_tangent_impulse;
-                    cp->warmed = true;
                     cache_match_found = 1;
                     break;
                 } else if (role == 2) {
                     cp->accumulated_normal_impulse = fmaxf(cc->accumulated_normal_impulse, 0.0f);
                     cp->accumulated_tangent_impulse = -cc->accumulated_tangent_impulse;
-                    cp->warmed = true;
                     cache_match_found = 1;
                     break;
                 }
@@ -1011,11 +1028,11 @@ void collision_prepare_solver(struct physics_world *world, collision_data *sourc
 
         vector3 ra_cross_n = vector3_cross(cp->ra, m->normal_vector);
         vector3 rb_cross_n = vector3_cross(cp->rb, m->normal_vector);
-        vector3 ang_a =
-            vector3_cross(math3_multiplication_vector3(m->object_a->inverse_inertia_system, ra_cross_n), cp->ra);
-        vector3 ang_b =
-            vector3_cross(math3_multiplication_vector3(m->object_b->inverse_inertia_system, rb_cross_n), cp->rb);
-        float k_normal = m->object_a->inverse_mass + m->object_b->inverse_mass +
+        vector3 ang_a = vector3_cross(
+            math3_multiplication_vector3(rigidbody_effective_inv_inertia(m->object_a), ra_cross_n), cp->ra);
+        vector3 ang_b = vector3_cross(
+            math3_multiplication_vector3(rigidbody_effective_inv_inertia(m->object_b), rb_cross_n), cp->rb);
+        float k_normal = rigidbody_effective_inv_mass(m->object_a) + rigidbody_effective_inv_mass(m->object_b) +
                          vector3_dot(vector3_addition(ang_a, ang_b), m->normal_vector);
         cp->effective_mass_normal = (k_normal > 0.0f) ? (1.0f / k_normal) : 0.0f;
 
@@ -1083,20 +1100,20 @@ void collision_prepare_solver(struct physics_world *world, collision_data *sourc
             vector3 ra_cross_t = vector3_cross(cp->ra, cp->tangent_vector);
             vector3 rb_cross_t = vector3_cross(cp->rb, cp->tangent_vector);
             vector3 ang_a_t =
-                vector3_cross(math3_multiplication_vector3(m->object_a->inverse_inertia_system, ra_cross_t), cp->ra);
+                vector3_cross(math3_multiplication_vector3(rigidbody_effective_inv_inertia(m->object_a), ra_cross_t), cp->ra);
             vector3 ang_b_t =
-                vector3_cross(math3_multiplication_vector3(m->object_b->inverse_inertia_system, rb_cross_t), cp->rb);
-            float k_tangent = m->object_a->inverse_mass + m->object_b->inverse_mass +
+                vector3_cross(math3_multiplication_vector3(rigidbody_effective_inv_inertia(m->object_b), rb_cross_t), cp->rb);
+            float k_tangent = rigidbody_effective_inv_mass(m->object_a) + rigidbody_effective_inv_mass(m->object_b) +
                               vector3_dot(vector3_addition(ang_a_t, ang_b_t), cp->tangent_vector);
             cp->effective_mass_tangent = (k_tangent > 0.0f) ? (1.0f / k_tangent) : 0.0f;
             if (vector3_length_squared(cp->tangent2) > 0.0001f) {
                 vector3 ra_cross_t2 = vector3_cross(cp->ra, cp->tangent2);
                 vector3 rb_cross_t2 = vector3_cross(cp->rb, cp->tangent2);
                 vector3 ang_a_t2 = vector3_cross(
-                    math3_multiplication_vector3(m->object_a->inverse_inertia_system, ra_cross_t2), cp->ra);
+                    math3_multiplication_vector3(rigidbody_effective_inv_inertia(m->object_a), ra_cross_t2), cp->ra);
                 vector3 ang_b_t2 = vector3_cross(
-                    math3_multiplication_vector3(m->object_b->inverse_inertia_system, rb_cross_t2), cp->rb);
-                float k_tangent2 = m->object_a->inverse_mass + m->object_b->inverse_mass +
+                    math3_multiplication_vector3(rigidbody_effective_inv_inertia(m->object_b), rb_cross_t2), cp->rb);
+                float k_tangent2 = rigidbody_effective_inv_mass(m->object_a) + rigidbody_effective_inv_mass(m->object_b) +
                                    vector3_dot(vector3_addition(ang_a_t2, ang_b_t2), cp->tangent2);
                 cp->effective_mass_tangent2 = (k_tangent2 > 0.0f) ? (1.0f / k_tangent2) : 0.0f;
             } else {
@@ -1119,17 +1136,17 @@ void collision_prepare_solver(struct physics_world *world, collision_data *sourc
                                  vector3_scaling(cp->tangent2, cp->accumulated_tangent2_impulse)));
             if (!m->object_a->static_state) {
                 m->object_a->velocity =
-                    vector3_subtraction(m->object_a->velocity, vector3_scaling(impulse, m->object_a->inverse_mass));
+                    vector3_subtraction(m->object_a->velocity, vector3_scaling(impulse, rigidbody_effective_inv_mass(m->object_a)));
                 m->object_a->angular_velocity = vector3_subtraction(
                     m->object_a->angular_velocity,
-                    math3_multiplication_vector3(m->object_a->inverse_inertia_system, vector3_cross(cp->ra, impulse)));
+                    math3_multiplication_vector3(rigidbody_effective_inv_inertia(m->object_a), vector3_cross(cp->ra, impulse)));
             }
             if (!m->object_b->static_state) {
                 m->object_b->velocity =
-                    vector3_addition(m->object_b->velocity, vector3_scaling(impulse, m->object_b->inverse_mass));
+                    vector3_addition(m->object_b->velocity, vector3_scaling(impulse, rigidbody_effective_inv_mass(m->object_b)));
                 m->object_b->angular_velocity = vector3_addition(
                     m->object_b->angular_velocity,
-                    math3_multiplication_vector3(m->object_b->inverse_inertia_system, vector3_cross(cp->rb, impulse)));
+                    math3_multiplication_vector3(rigidbody_effective_inv_inertia(m->object_b), vector3_cross(cp->rb, impulse)));
             }
         }
         /* Poisson base: compression impulse entering the iterations (warm
@@ -1217,14 +1234,11 @@ float collision_resolve_iterative(collision_data *m, float dt, bool friction_onl
             float old_impulse = cp->accumulated_normal_impulse;
             cp->accumulated_normal_impulse = fmaxf(old_impulse + lambda_n, 0.0f);
             lambda_n = cp->accumulated_normal_impulse - old_impulse;
-            /* Provenance-gated SOR: warm (persistent, steady-state)
-             * contacts take damped steps (coupled ping-pong control);
-             * cold contacts (fresh impacts, migrating slide, transients)
-             * take full steps (fast kill). Fixed points unchanged (zero
-             * step stays zero); twin runs agree bit-for-bit. */
-            if (cp->warmed) {
-                lambda_n *= 0.5f;
-            }
+            /* TRUTH: full step always. Old provenance-gated SOR (warm *=0.5)
+             * halved steady-state corrections to mask cache aliasing
+             * ping-pong; with strict both-side matching (above) the alias
+             * source is gone, so dampening true warm starts only slows
+             * convergence 2x. Fixed points unchanged either way. */
             cp->accumulated_normal_impulse = old_impulse + lambda_n;
             if (lambda_n != 0.0f) {
                 float applied_n = fabsf(lambda_n);
@@ -1234,18 +1248,18 @@ float collision_resolve_iterative(collision_data *m, float dt, bool friction_onl
                 vector3 impulse = vector3_scaling(m->normal_vector, lambda_n);
                 if (!m->object_a->static_state) {
                     m->object_a->velocity = vector3_subtraction(
-                        m->object_a->velocity, vector3_scaling(impulse, m->object_a->inverse_mass));
+                        m->object_a->velocity, vector3_scaling(impulse, rigidbody_effective_inv_mass(m->object_a)));
                     m->object_a->angular_velocity = vector3_subtraction(
                         m->object_a->angular_velocity,
-                        math3_multiplication_vector3(m->object_a->inverse_inertia_system,
+                        math3_multiplication_vector3(rigidbody_effective_inv_inertia(m->object_a),
                                                      vector3_cross(cp->ra, impulse)));
                 }
                 if (!m->object_b->static_state) {
                     m->object_b->velocity = vector3_addition(
-                        m->object_b->velocity, vector3_scaling(impulse, m->object_b->inverse_mass));
+                        m->object_b->velocity, vector3_scaling(impulse, rigidbody_effective_inv_mass(m->object_b)));
                     m->object_b->angular_velocity = vector3_addition(
                         m->object_b->angular_velocity,
-                        math3_multiplication_vector3(m->object_b->inverse_inertia_system,
+                        math3_multiplication_vector3(rigidbody_effective_inv_inertia(m->object_b),
                                                      vector3_cross(cp->rb, impulse)));
                 }
             }
@@ -1286,13 +1300,13 @@ float collision_resolve_iterative(collision_data *m, float dt, bool friction_onl
             if (eff1 <= 0.0f) {
                 vector3 ra_c = vector3_cross(cp->ra, tangent);
                 vector3 rb_c = vector3_cross(cp->rb, tangent);
-                float k = m->object_a->inverse_mass + m->object_b->inverse_mass +
+                float k = rigidbody_effective_inv_mass(m->object_a) + rigidbody_effective_inv_mass(m->object_b) +
                           vector3_dot(vector3_addition(
                                           vector3_cross(math3_multiplication_vector3(
-                                                            m->object_a->inverse_inertia_system, ra_c),
+                                                            rigidbody_effective_inv_inertia(m->object_a), ra_c),
                                                         cp->ra),
                                           vector3_cross(math3_multiplication_vector3(
-                                                            m->object_b->inverse_inertia_system, rb_c),
+                                                            rigidbody_effective_inv_inertia(m->object_b), rb_c),
                                                         cp->rb)),
                                       tangent);
                 eff1 = (k > 0.0f) ? (1.0f / k) : 0.0f;
@@ -1301,13 +1315,13 @@ float collision_resolve_iterative(collision_data *m, float dt, bool friction_onl
             if (has_t2 && (eff2 <= 0.0f)) {
                 vector3 ra_c2 = vector3_cross(cp->ra, tangent2);
                 vector3 rb_c2 = vector3_cross(cp->rb, tangent2);
-                float k2 = m->object_a->inverse_mass + m->object_b->inverse_mass +
+                float k2 = rigidbody_effective_inv_mass(m->object_a) + rigidbody_effective_inv_mass(m->object_b) +
                            vector3_dot(vector3_addition(
                                            vector3_cross(math3_multiplication_vector3(
-                                                             m->object_a->inverse_inertia_system, ra_c2),
+                                                             rigidbody_effective_inv_inertia(m->object_a), ra_c2),
                                                          cp->ra),
                                            vector3_cross(math3_multiplication_vector3(
-                                                             m->object_b->inverse_inertia_system, rb_c2),
+                                                             rigidbody_effective_inv_inertia(m->object_b), rb_c2),
                                                          cp->rb)),
                                        tangent2);
                 eff2 = (k2 > 0.0f) ? (1.0f / k2) : 0.0f;
@@ -1341,13 +1355,9 @@ float collision_resolve_iterative(collision_data *m, float dt, bool friction_onl
                 new_acc1 = 0.0f;
                 new_acc2 = 0.0f;
             }
-            /* Provenance-gated SOR (see normal solve above). */
+            /* TRUTH: full friction step (see normal solve: SOR deleted). */
             float step1 = new_acc1 - cp->accumulated_tangent_impulse;
             float step2 = new_acc2 - cp->accumulated_tangent2_impulse;
-            if (cp->warmed) {
-                step1 *= 0.5f;
-                step2 *= 0.5f;
-            }
             cp->accumulated_tangent_impulse += step1;
             cp->accumulated_tangent2_impulse += step2;
             vector3 friction_delta = vector3_addition(vector3_scaling(tangent, step1),
@@ -1361,18 +1371,18 @@ float collision_resolve_iterative(collision_data *m, float dt, bool friction_onl
             if (vector3_length_squared(friction_delta) > 0.0f) {
                 if (!m->object_a->static_state) {
                     m->object_a->velocity = vector3_subtraction(
-                        m->object_a->velocity, vector3_scaling(friction_delta, m->object_a->inverse_mass));
+                        m->object_a->velocity, vector3_scaling(friction_delta, rigidbody_effective_inv_mass(m->object_a)));
                     m->object_a->angular_velocity =
                         vector3_subtraction(m->object_a->angular_velocity,
-                                            math3_multiplication_vector3(m->object_a->inverse_inertia_system,
+                                            math3_multiplication_vector3(rigidbody_effective_inv_inertia(m->object_a),
                                                                          vector3_cross(cp->ra, friction_delta)));
                 }
                 if (!m->object_b->static_state) {
                     m->object_b->velocity = vector3_addition(
-                        m->object_b->velocity, vector3_scaling(friction_delta, m->object_b->inverse_mass));
+                        m->object_b->velocity, vector3_scaling(friction_delta, rigidbody_effective_inv_mass(m->object_b)));
                     m->object_b->angular_velocity =
                         vector3_addition(m->object_b->angular_velocity,
-                                         math3_multiplication_vector3(m->object_b->inverse_inertia_system,
+                                         math3_multiplication_vector3(rigidbody_effective_inv_inertia(m->object_b),
                                                                       vector3_cross(cp->rb, friction_delta)));
                 }
             }
@@ -1389,6 +1399,25 @@ float collision_resolve_iterative(collision_data *m, float dt, bool friction_onl
  * friction sees the post-bounce velocities. Gated to fresh impacts by the
  * recorded pre-solve approach speed: resting contacts (and sustained
  * pushes below threshold) get exactly zero. */
+void collision_refresh_impact_velocities(collision_data *manifolds, int manifold_count) {
+    if ((!manifolds) || (manifold_count <= 0)) {
+        return;
+    }
+    for (int m = 0; m < manifold_count; m++) {
+        collision_data *man = &manifolds[m];
+        if ((!man->object_a) || (!man->object_b)) {
+            continue;
+        }
+        for (int i = 0; i < man->contact_count; i++) {
+            contact_point_data *cp = &man->contacts[i];
+            vector3 va = vector3_addition(man->object_a->velocity,
+                                          vector3_cross(man->object_a->angular_velocity, cp->ra));
+            vector3 vb = vector3_addition(man->object_b->velocity,
+                                          vector3_cross(man->object_b->angular_velocity, cp->rb));
+            cp->impact_velocity = vector3_dot(vector3_subtraction(vb, va), man->normal_vector);
+        }
+    }
+}
 void collision_apply_poisson_restitution(collision_data *manifolds, int manifold_count) {
     if ((!manifolds) || (manifold_count <= 0)) {
         return;
@@ -1422,9 +1451,16 @@ void collision_apply_poisson_restitution(collision_data *manifolds, int manifold
             if (lambda_r > newton_bound) {
                 lambda_r = newton_bound;
             }
-            float cap = g_cfg.solver.max_restitution_bias * cp->effective_mass_normal;
-            if (lambda_r > cap) {
-                lambda_r = cap;
+            /* TRUTH P0-9: NO artificial restitution cap. The Newton bound
+             * above IS the physical bound (e reverses recorded approach).
+             * Capping at max_restitution_bias*m_eff (default 20 m/s) deadens
+             * fast bounce 7x (144 m/s e=1 pays 20). Param retained for
+             * emergency NaN guard at 1e6 scale (never binds physically). */
+            {
+                float emergency_cap = 1.0e6f * cp->effective_mass_normal;
+                if (lambda_r > emergency_cap) {
+                    lambda_r = emergency_cap;
+                }
             }
             if (lambda_r <= 0.0f) {
                 continue;
@@ -1433,18 +1469,18 @@ void collision_apply_poisson_restitution(collision_data *manifolds, int manifold
             vector3 impulse = vector3_scaling(man->normal_vector, lambda_r);
             if (!man->object_a->static_state) {
                 man->object_a->velocity = vector3_subtraction(
-                    man->object_a->velocity, vector3_scaling(impulse, man->object_a->inverse_mass));
+                    man->object_a->velocity, vector3_scaling(impulse, rigidbody_effective_inv_mass(man->object_a)));
                 man->object_a->angular_velocity = vector3_subtraction(
                     man->object_a->angular_velocity,
-                    math3_multiplication_vector3(man->object_a->inverse_inertia_system,
+                    math3_multiplication_vector3(rigidbody_effective_inv_inertia(man->object_a),
                                                  vector3_cross(cp->ra, impulse)));
             }
             if (!man->object_b->static_state) {
                 man->object_b->velocity = vector3_addition(
-                    man->object_b->velocity, vector3_scaling(impulse, man->object_b->inverse_mass));
+                    man->object_b->velocity, vector3_scaling(impulse, rigidbody_effective_inv_mass(man->object_b)));
                 man->object_b->angular_velocity = vector3_addition(
                     man->object_b->angular_velocity,
-                    math3_multiplication_vector3(man->object_b->inverse_inertia_system,
+                    math3_multiplication_vector3(rigidbody_effective_inv_inertia(man->object_b),
                                                  vector3_cross(cp->rb, impulse)));
             }
         }
@@ -1459,8 +1495,9 @@ void collision_apply_poisson_restitution(collision_data *manifolds, int manifold
  * iterations (per-iteration application would multiply the torque by the
  * iteration count). Independent of the tangent frame: pure rolling has no
  * slip direction, but resistance torque is still physical.
- * Note: applied per body, so a body-body contact dissipates on both sides
- * (shared patch, 2x rate); floor contacts are exact. */
+ * TRUTH: shared patch split 1/2 per side for body-body (old code dissipated
+ * 2x: floor exact, body-body double). Spin lever from Hertz a=sqrt(R*delta)
+ * using contact penetration (no 0.15 magic). */
 void collision_apply_rolling_resistance(collision_data *manifolds, int manifold_count, float dt) {
     if ((!manifolds) || (manifold_count <= 0) || (dt <= 0.0f)) {
         return;
@@ -1471,6 +1508,14 @@ void collision_apply_rolling_resistance(collision_data *manifolds, int manifold_
     }
     for (int m = 0; m < manifold_count; m++) {
         collision_data *man = &manifolds[m];
+        /* Shared patch: halve per side when BOTH bodies are dynamic (each
+         * side dissipates half the patch loss; floor/static bodies take the
+         * full single-sided rate). */
+        bool b_dynamic =
+            (man->object_b) && (!man->object_b->static_state) && (!man->object_b->is_sleeping);
+        bool a_dynamic =
+            (man->object_a) && (!man->object_a->static_state) && (!man->object_a->is_sleeping);
+        float share = (a_dynamic && b_dynamic) ? 0.5f : 1.0f;
         for (int i = 0; i < man->contact_count; i++) {
             contact_point_data *cp = &man->contacts[i];
             if (cp->accumulated_normal_impulse <= 0.0f) {
@@ -1494,25 +1539,32 @@ void collision_apply_rolling_resistance(collision_data *manifolds, int manifold_
                     if ((roll_speed > 0.0001f) && (lever > 0.0001f)) {
                         vector3 roll_axis = vector3_scaling(roll_w, 1.0f / roll_speed);
                         float inertia_axis = 1.0f / fmaxf(vector3_dot(
-                            roll_axis, math3_multiplication_vector3(bd->inverse_inertia_system, roll_axis)),
+                            roll_axis, math3_multiplication_vector3(rigidbody_effective_inv_inertia(bd), roll_axis)),
                             1e-9f);
-                        float dw = rolling_mu * normal_force * lever * dt / inertia_axis;
+                        float dw = share * rolling_mu * normal_force * lever * dt / inertia_axis;
                         if (dw > roll_speed) {
                             dw = roll_speed;
                         }
                         bd->angular_velocity = vector3_subtraction(
                             bd->angular_velocity, vector3_scaling(roll_axis, dw));
                     }
-                    /* Spin part: oppose twist about the contact normal with a
-                     * patch-scale lever (contact patch << body size). */
+                    /* Spin part: Hertz patch a=sqrt(R*delta), clamped to
+                     * 0.3R (patch << body). R from lever |r| (contact radius
+                     * for spheres, approx for boxes). No magic 0.15. */
                     float spin_speed = vector3_length(spin_n);
-                    float patch = 0.15f * sqrtf(vector3_length_squared(rlev[bi]));
+                    float pen = (cp->penetration > 0.0f) ? cp->penetration : 0.0f;
+                    float r_eff = sqrtf(vector3_length_squared(rlev[bi]));
+                    float patch = sqrtf(fmaxf(r_eff * pen, 0.0f));
+                    float patch_cap = 0.3f * r_eff;
+                    if (patch > patch_cap) {
+                        patch = patch_cap;
+                    }
                     if ((spin_speed > 0.0001f) && (patch > 0.00001f)) {
                         vector3 spin_axis = vector3_scaling(spin_n, 1.0f / spin_speed);
                         float inertia_spin = 1.0f / fmaxf(vector3_dot(
-                            spin_axis, math3_multiplication_vector3(bd->inverse_inertia_system, spin_axis)),
+                            spin_axis, math3_multiplication_vector3(rigidbody_effective_inv_inertia(bd), spin_axis)),
                             1e-9f);
-                        float dw_spin = rolling_mu * normal_force * patch * dt / inertia_spin;
+                        float dw_spin = share * rolling_mu * normal_force * patch * dt / inertia_spin;
                         if (dw_spin > spin_speed) {
                             dw_spin = spin_speed;
                         }
@@ -1599,16 +1651,10 @@ void collision_apply_split_impulse(collision_data *manifolds, int manifold_count
         if ((!body_a) || (!body_b)) {
             continue;
         }
-        float inv_a = body_a->static_state ? 0.0f : body_a->inverse_mass;
-        float inv_b = body_b->static_state ? 0.0f : body_b->inverse_mass;
+        float inv_a = rigidbody_effective_inv_mass(body_a);
+        float inv_b = rigidbody_effective_inv_mass(body_b);
         /* Sleeping bodies hold infinite mass (undisturbed rest) unless the
          * correction is significant, in which case wake first. */
-        if ((!body_a->static_state) && (body_a->is_sleeping)) {
-            inv_a = 0.0f;
-        }
-        if ((!body_b->static_state) && (body_b->is_sleeping)) {
-            inv_b = 0.0f;
-        }
         float inv_sum = inv_a + inv_b;
         if (inv_sum <= 0.0f) {
             /* Both sides locked: check whether the overlap is significant
@@ -1699,9 +1745,14 @@ static float ccd_min_thickness(const rigidbody *body) {
     return fminf(body->half_extensions.x, fminf(body->half_extensions.y, body->half_extensions.z));
 }
 
-int collision_ccd_sweep_clamp(rigidbody *bodies, int body_count, float dt) {
+int collision_ccd_sweep_clamp_full(rigidbody *bodies, int body_count, float dt, float *time_remaining_out) {
     if ((!bodies) || (body_count <= 0) || (dt <= 0.0f)) {
         return 0;
+    }
+    if (time_remaining_out) {
+        for (int k = 0; k < body_count; k++) {
+            time_remaining_out[k] = dt;
+        }
     }
     int clamped = 0;
     for (int i = 0; i < body_count; i++) {
@@ -1709,15 +1760,23 @@ int collision_ccd_sweep_clamp(rigidbody *bodies, int body_count, float dt) {
         if ((mover->static_state) || (mover->is_sleeping)) {
             continue;
         }
-        float speed = vector3_length(mover->velocity);
-        if (speed <= 0.0001f) {
+        /* TRUTH P1-19: angular sweep bound. Tip speed |w x r| <= |w|*R sweeps
+         * a disc; linear-only bound tunnels for fast spinners. */
+        float lin_speed = vector3_length(mover->velocity);
+        float ang_speed = vector3_length(mover->angular_velocity);
+        float bound_r = broadphase_bounding_radius(mover);
+        if ((!isfinite(bound_r)) || (bound_r < 0.0f)) {
+            bound_r = 0.0f;
+        }
+        float sweep_speed = lin_speed + ang_speed * bound_r;
+        if (sweep_speed <= 0.0001f) {
             continue;
         }
         float thickness = ccd_min_thickness(mover);
         if ((thickness <= 0.0f) || (!isfinite(thickness))) {
             continue;
         }
-        float displacement = speed * dt;
+        float displacement = sweep_speed * dt;
         /* Plane sweep is O(1) per body: run it whenever the tick motion
          * exceeds slop, so impacts never fall in the gap between slop-band
          * sampling and the safety nets (which would delete the bounce).
@@ -1741,22 +1800,26 @@ int collision_ccd_sweep_clamp(rigidbody *bodies, int body_count, float dt) {
             }
         }
 
-        /* 2. Spheres (dynamic or static) and static boxes: only when the
-         * tick motion exceeds body thickness (cost control). */
+        /* 2. Volumes: spheres, boxes (static AND dynamic via relative
+         * velocity in obstacle frame), cylinders (conservative bounding
+         * spheres). TRUTH: dynamic boxes/cylinders must sweep too; ignoring
+         * them tunnels box-box at 5-30 m/s (below old thickness gate). */
         if (do_volumes) {
         for (int j = 0; j < body_count; j++) {
             if (j == i) {
                 continue;
             }
             rigidbody *other = &bodies[j];
+            vector3 other_v =
+                ((other->static_state) || (other->is_sleeping)) ? vector3_zero() : other->velocity;
             if (other->type == object_sphere) {
                 vector3 dp = vector3_subtraction(other->position, mover->position);
-                vector3 other_v = other->is_sleeping ? vector3_zero() : other->velocity;
                 vector3 dv = vector3_subtraction(other_v, mover->velocity);
-                float rr = mover->radius + other->radius;
-                if (mover->type != object_sphere) {
-                    rr = ccd_min_thickness(mover) + other->radius;
-                }
+                /* TRUTH: non-sphere movers use bounding radius (conservative,
+                 * never misses). Old min_thickness underestimated boxes. */
+                float rr = (mover->type == object_sphere)
+                    ? (mover->radius + other->radius)
+                    : (broadphase_bounding_radius(mover) + other->radius);
                 float a = vector3_dot(dv, dv);
                 float c = vector3_dot(dp, dp) - rr * rr;
                 if ((c <= 0.0f) || (a <= 1e-12f)) {
@@ -1772,16 +1835,40 @@ int collision_ccd_sweep_clamp(rigidbody *bodies, int body_count, float dt) {
                     best_toi = toi;
                     hit = true;
                 }
-            } else if ((other->type == object_cube) && (other->static_state)) {
-                /* Swept sphere-vs-static-OBB via slab test in box space. */
-                float sr = (mover->type == object_sphere) ? mover->radius : ccd_min_thickness(mover);
+            } else if (other->type == object_cylinder) {
+                /* Conservative bounding-sphere sweep for cylinder obstacles
+                 * (exact segment sweep is P1 future; bounding never misses). */
+                vector3 dp = vector3_subtraction(other->position, mover->position);
+                vector3 dv = vector3_subtraction(other_v, mover->velocity);
+                float rr = broadphase_bounding_radius(mover) + broadphase_bounding_radius(other);
+                float a = vector3_dot(dv, dv);
+                float c = vector3_dot(dp, dp) - rr * rr;
+                if ((c <= 0.0f) || (a <= 1e-12f)) {
+                    continue;
+                }
+                float b = 2.0f * vector3_dot(dp, dv);
+                float disc = b * b - 4.0f * a * c;
+                if (disc < 0.0f) {
+                    continue;
+                }
+                float toi = (-b - sqrtf(disc)) / (2.0f * a);
+                if ((toi > 0.0f) && (toi < best_toi) && (toi <= dt)) {
+                    best_toi = toi;
+                    hit = true;
+                }
+            } else if (other->type == object_cube) {
+                /* Swept sphere-vs-OBB via slab test in box space, with
+                 * RELATIVE velocity so dynamic boxes sweep correctly. */
+                float sr = (mover->type == object_sphere) ? mover->radius
+                                                          : broadphase_bounding_radius(mover);
                 vector3 rel = vector3_subtraction(mover->position, other->position);
+                vector3 rel_v = vector3_subtraction(mover->velocity, other_v);
                 vector3 ax0 = other->cached_axes[0];
                 vector3 ax1 = other->cached_axes[1];
                 vector3 ax2 = other->cached_axes[2];
                 float pl[3] = {vector3_dot(rel, ax0), vector3_dot(rel, ax1), vector3_dot(rel, ax2)};
-                float vl[3] = {vector3_dot(mover->velocity, ax0), vector3_dot(mover->velocity, ax1),
-                               vector3_dot(mover->velocity, ax2)};
+                float vl[3] = {vector3_dot(rel_v, ax0), vector3_dot(rel_v, ax1),
+                               vector3_dot(rel_v, ax2)};
                 float ex[3] = {other->half_extensions.x + sr, other->half_extensions.y + sr,
                                other->half_extensions.z + sr};
                 float tmin = 0.0f, tmax = dt;
@@ -1828,9 +1915,17 @@ int collision_ccd_sweep_clamp(rigidbody *bodies, int body_count, float dt) {
             rigidbody_wake(mover);
             rigidbody_update_axes(mover);
             clamped++;
+            if (time_remaining_out) {
+                float rem = dt - best_toi;
+                time_remaining_out[i] = (rem > 0.0f) ? rem : 0.0f;
+            }
         }
     }
     return clamped;
+}
+
+int collision_ccd_sweep_clamp(rigidbody *bodies, int body_count, float dt) {
+    return collision_ccd_sweep_clamp_full(bodies, body_count, dt, NULL);
 }
 /* Cylinder vs static floor plane.
  * Models the cylinder as axle segment + radius. Each axle endpoint acts
@@ -1848,420 +1943,6 @@ int collision_ccd_sweep_clamp(rigidbody *bodies, int body_count, float dt) {
  * contacts at the axle ends for stacking/resting stability. For tilted or
  * vertical axles it generates the correct single support contact.
  */
-bool collision_static_plane_cylinder(rigidbody *cyl, float plane_y, collision_data *collision_output_data) {
-    if (cyl->type != object_cylinder) {
-        return false;
-    }
-
-    float r = cyl->radius;
-    float h = cyl->cylinder_half_length;
-
-    if ((r <= 0.0f) || (h <= 0.0f) || (!isfinite(r)) || (!isfinite(h))) {
-        return false;
-    }
-
-    vector3 axis = cyl->cached_axes[0];
-    float axis_len_sq = vector3_length_squared(axis);
-
-    if (axis_len_sq < 1e-8f) {
-        axis = (vector3){1.0f, 0.0f, 0.0f};
-        axis_len_sq = 1.0f;
-    }
-
-    axis = vector3_scaling(axis, 1.0f / sqrtf(axis_len_sq));
-
-    float ay = axis.y;
-    if (ay > 1.0f) {
-        ay = 1.0f;
-    }
-    if (ay < -1.0f) {
-        ay = -1.0f;
-    }
-
-    /*
-     * For a cylinder against a horizontal plane:
-     *
-     * vertical half-extent =
-     *     r * sqrt(1 - axis.y^2)
-     *   + h * fabs(axis.y)
-     *
-     * The first term is the barrel contribution.
-     * The second term is the end-cap/axle contribution.
-     */
-    float horizontal = sqrtf(fmaxf(0.0f, 1.0f - ay * ay));
-
-    /*
-     * Radial offset to the lowest barrel point.
-     * The plane normal is up, so the downward direction is (0,-1,0).
-     * Remove the component parallel to the axle.
-     */
-    vector3 down = {0.0f, -1.0f, 0.0f};
-    float down_along_axis = vector3_dot(down, axis);
-    vector3 radial = vector3_subtraction(down, vector3_scaling(axis, down_along_axis));
-    float radial_len = vector3_length(radial);
-
-    if (radial_len > 1e-6f) {
-        radial = vector3_scaling(radial, r / radial_len);
-    } else {
-        radial = vector3_zero();
-    }
-
-    rigidbody *plane_body = collision_static_plane_body_proxy(plane_y);
-
-    collision_output_data->object_a = cyl;
-    collision_output_data->object_b = plane_body;
-    collision_output_data->normal_vector = (vector3){0.0f, -1.0f, 0.0f};
-    collision_output_data->contact_count = 0;
-
-    /*
-     * Near-horizontal axle:
-     * generate two contacts at the axle ends for stability.
-     * This is the normal FTC wheel case.
-     * Slop-gated (see clip_obb_faces): wheels rolling within slop keep
-     * persistent friction contacts instead of flickering support.
-     */
-    if (fabsf(ay) < 0.35f) {
-        float axle_offsets[2] = {-h, h};
-        float wheel_slop = g_cfg.solver.penetration_slop;
-
-        for (int i = 0; i < 2; i++) {
-            vector3 end_center =
-                vector3_addition(cyl->position, vector3_scaling(axis, axle_offsets[i]));
-
-            vector3 contact_point = vector3_addition(end_center, radial);
-            float local_penetration = plane_y - contact_point.y;
-
-            if ((local_penetration > -wheel_slop) && (collision_output_data->contact_count < 2)) {
-                contact_point_data *cp =
-                    &collision_output_data->contacts[collision_output_data->contact_count];
-                cp->position = contact_point;
-                cp->penetration = (local_penetration > 0.0f) ? local_penetration : 0.0f;
-                collision_output_data->contact_count++;
-            }
-        }
-    }
-
-    /*
-     * Tilted or vertical axle:
-     * generate the single true support contact.
-     */
-    if (collision_output_data->contact_count == 0) {
-        float axle_offset = (ay >= 0.0f) ? -h : h;
-
-        vector3 contact_point = vector3_addition(
-            vector3_addition(cyl->position, vector3_scaling(axis, axle_offset)),
-            radial);
-
-        float local_penetration = plane_y - contact_point.y;
-
-        /*
-         * Fallback safety:
-         * if numerical error makes the direct contact miss, use the
-         * analytical lowest height. Slop-gated like the main path.
-         */
-        if (local_penetration <= -g_cfg.solver.penetration_slop) {
-            float lowest_offset = (r * horizontal) + (h * fabsf(ay));
-            local_penetration = plane_y - (cyl->position.y - lowest_offset);
-        }
-
-        if (local_penetration > -g_cfg.solver.penetration_slop) {
-            contact_point_data *cp = &collision_output_data->contacts[0];
-            cp->position = contact_point;
-            cp->penetration = (local_penetration > 0.0f) ? local_penetration : 0.0f;
-            collision_output_data->contact_count = 1;
-        }
-    }
-
-    return collision_output_data->contact_count > 0;
-}
-/* ================================================================
- * MFS_172: Cylinder-vs-object narrowphase
- * ================================================================ */
-
-/* Cylinder vs Sphere.
- * The cylinder is modelled as its axle segment [E1,E2] with radius r_c.
- * Find the closest point on the segment to the sphere centre, then
- * do a sphere-sphere test at that point. */
-bool collision_cylinder_sphere(rigidbody *cyl, rigidbody *sph,
-                               collision_data *out) {
-    if ((cyl->type != object_cylinder) || (sph->type != object_sphere)) {
-        return false;
-    }
-    vector3 axis = cyl->cached_axes[0];
-    float r_c = cyl->radius;
-    float h   = cyl->cylinder_half_length;
-    float r_s = sph->radius;
-
-    vector3 e1 = vector3_subtraction(cyl->position, vector3_scaling(axis, h));
-    vector3 e2 = vector3_addition(cyl->position, vector3_scaling(axis, h));
-
-    /* closest point on segment [e1,e2] to sphere centre */
-    vector3 seg = vector3_subtraction(e2, e1);
-    float seg_len_sq = vector3_length_squared(seg);
-    float t = 0.0f;
-    if (seg_len_sq > 0.000001f) {
-        t = vector3_dot(vector3_subtraction(sph->position, e1), seg) / seg_len_sq;
-        if (t < 0.0f) t = 0.0f;
-        if (t > 1.0f) t = 1.0f;
-    }
-    vector3 closest = vector3_addition(e1, vector3_scaling(seg, t));
-
-    float dist = vector3_length(vector3_subtraction(sph->position, closest));
-    float min_dist = r_c + r_s;
-    if (dist >= min_dist) return false;
-
-    out->object_a = cyl;
-    out->object_b = sph;
-    out->contact_count = 1;
-
-    if (dist > 0.0001f) {
-        out->normal_vector = vector3_scaling(
-            vector3_subtraction(sph->position, closest), 1.0f / dist);
-    } else {
-        out->normal_vector = (vector3){0.0f, 1.0f, 0.0f};
-    }
-    contact_point_data *cp = &out->contacts[0];
-    cp->penetration = min_dist - dist;
-    cp->position = vector3_addition(closest,
-        vector3_scaling(out->normal_vector, r_c));
-    return true;
-}
-
-/* Cylinder vs Cube (OBB).
- * Sample N points along the axle, find the one closest to the OBB
- * surface, then do a sphere-OBB test at that point with the
- * cylinder radius. 5 samples is enough for short axles (wheels). */
-
-/* LIST4 NEW-02 / NEW-03:
- * Correct cylinder-vs-cube contact normal and sample resolution.
- *
- * Convention:
- *   object_a = cylinder
- *   object_b = cube
- *   normal must point from cylinder toward cube.
- *
- * The old version used:
- *   cyl->position - best_on_obb
- * which pointed from the cube surface toward the cylinder center.
- * That inverted the solver response for floor/wall contacts.
- *
- * The corrected version uses:
- *   best_on_obb - best_pt
- * where best_pt is the closest sampled point on the cylinder axle.
- */
-bool collision_cylinder_cube(rigidbody *cyl, rigidbody *cube,
-                             collision_data *out) {
-    if ((cyl->type != object_cylinder) || (cube->type != object_cube)) {
-        return false;
-    }
-
-    float r = cyl->radius;
-    float h = cyl->cylinder_half_length;
-
-    if ((r <= 0.0f) || (h <= 0.0f) || (!isfinite(r)) || (!isfinite(h))) {
-        return false;
-    }
-
-    vector3 axis = cyl->cached_axes[0];
-    float axis_len_sq = vector3_length_squared(axis);
-
-    if (axis_len_sq < 1e-8f) {
-        axis = (vector3){1.0f, 0.0f, 0.0f};
-        axis_len_sq = 1.0f;
-    }
-
-    axis = vector3_scaling(axis, 1.0f / sqrtf(axis_len_sq));
-
-    vector3 e1 = vector3_subtraction(cyl->position, vector3_scaling(axis, h));
-    vector3 e2 = vector3_addition(cyl->position, vector3_scaling(axis, h));
-    vector3 seg = vector3_subtraction(e2, e1);
-
-    /*
-     * Nine samples gives better coverage than the original five without
-     * becoming expensive. For FTC wheel-sized cylinders this is enough.
-     */
-    const int samples = 9;
-
-    /* Collect every penetrating sample: a cylinder lying on a face needs
-     * several contacts along the axle for stable support (single-point
-     * contact rocks). Keep the 4 deepest, slop-gated like other paths. */
-    vector3 samp_pt[10];
-    vector3 samp_obb[10];
-    float samp_d[10];
-    int samp_count = 0;
-
-    for (int s = 0; s <= samples; s++) {
-        float t = (float) s / (float) samples;
-        vector3 pt = vector3_addition(e1, vector3_scaling(seg, t));
-
-        vector3 rel = vector3_subtraction(pt, cube->position);
-        vector3 *axes = cube->cached_axes;
-
-        vector3 local = (vector3){
-            vector3_dot(rel, axes[0]),
-            vector3_dot(rel, axes[1]),
-            vector3_dot(rel, axes[2])
-        };
-
-        vector3 clamped = (vector3){
-            fmaxf(-cube->half_extensions.x, fminf(cube->half_extensions.x, local.x)),
-            fmaxf(-cube->half_extensions.y, fminf(cube->half_extensions.y, local.y)),
-            fmaxf(-cube->half_extensions.z, fminf(cube->half_extensions.z, local.z))
-        };
-
-        vector3 on_obb = cube->position;
-        on_obb = vector3_addition(on_obb, vector3_scaling(axes[0], clamped.x));
-        on_obb = vector3_addition(on_obb, vector3_scaling(axes[1], clamped.y));
-        on_obb = vector3_addition(on_obb, vector3_scaling(axes[2], clamped.z));
-
-        float d = vector3_length(vector3_subtraction(pt, on_obb));
-
-        if ((d < r + g_cfg.solver.penetration_slop) && (samp_count < 10)) {
-            samp_pt[samp_count] = pt;
-            samp_obb[samp_count] = on_obb;
-            samp_d[samp_count] = d;
-            samp_count++;
-        }
-    }
-
-    if (samp_count == 0) {
-        return false;
-    }
-
-    out->object_a = cyl;
-    out->object_b = cube;
-    out->contact_count = 0;
-
-    /* Deepest-first selection into the 4-slot manifold. */
-    for (int k = 0; (k < samp_count) && (out->contact_count < 4); k++) {
-        int deepest_idx = -1;
-        float deepest_d = 1e30f;
-        for (int s = 0; s < samp_count; s++) {
-            if (samp_d[s] < deepest_d) {
-                bool used = false;
-                for (int u = 0; u < out->contact_count; u++) {
-                    if (out->contacts[u].position.x == samp_obb[s].x &&
-                        out->contacts[u].position.y == samp_obb[s].y &&
-                        out->contacts[u].position.z == samp_obb[s].z) {
-                        used = true;
-                        break;
-                    }
-                }
-                if (!used) {
-                    deepest_d = samp_d[s];
-                    deepest_idx = s;
-                }
-            }
-        }
-        if (deepest_idx < 0) {
-            break;
-        }
-        /* Normal: axle sample toward the cube surface (A->B). Degenerate
-         * (sample inside the cube): escape toward the cube center, which
-         * pushes A outward under the A->B sign convention. */
-        vector3 toward_obb = vector3_subtraction(samp_obb[deepest_idx], samp_pt[deepest_idx]);
-        float toward_len = vector3_length(toward_obb);
-        vector3 nrm;
-        if (toward_len > 0.0001f) {
-            nrm = vector3_scaling(toward_obb, 1.0f / toward_len);
-        } else {
-            vector3 fallback = vector3_subtraction(cube->position, samp_pt[deepest_idx]);
-            float fallback_len = vector3_length(fallback);
-            if (fallback_len > 0.0001f) {
-                nrm = vector3_scaling(fallback, 1.0f / fallback_len);
-            } else {
-                nrm = (vector3){0.0f, -1.0f, 0.0f};
-            }
-        }
-        if (out->contact_count == 0) {
-            out->normal_vector = nrm;
-        }
-        contact_point_data *cp = &out->contacts[out->contact_count];
-        float pen = r - samp_d[deepest_idx];
-        cp->penetration = (pen > 0.0f) ? pen : 0.0f;
-        cp->position = samp_obb[deepest_idx];
-        out->contact_count++;
-    }
-
-    if (out->contact_count == 0) {
-        return false;
-    }
-
-    return true;
-}
-
-/* Cylinder vs Cylinder.
- * Segment-segment closest points, then sphere-sphere at those
- * points with respective radii. */
-bool collision_cylinder_cylinder(rigidbody *cyl_a, rigidbody *cyl_b,
-                                 collision_data *out) {
-    if ((cyl_a->type != object_cylinder) || (cyl_b->type != object_cylinder)) {
-        return false;
-    }
-    vector3 ax = cyl_a->cached_axes[0];
-    vector3 bx = cyl_b->cached_axes[0];
-    float ha = cyl_a->cylinder_half_length;
-    float hb = cyl_b->cylinder_half_length;
-
-    vector3 a1 = vector3_subtraction(cyl_a->position, vector3_scaling(ax, ha));
-    vector3 a2 = vector3_addition(cyl_a->position, vector3_scaling(ax, ha));
-    vector3 b1 = vector3_subtraction(cyl_b->position, vector3_scaling(bx, hb));
-    vector3 b2 = vector3_addition(cyl_b->position, vector3_scaling(bx, hb));
-
-    /* segment-segment closest points (Ericson, Real-Time Collision Detection) */
-    vector3 d1 = vector3_subtraction(a2, a1);
-    vector3 d2 = vector3_subtraction(b2, b1);
-    vector3 r  = vector3_subtraction(a1, b1);
-    float a = vector3_dot(d1, d1);
-    float e = vector3_dot(d2, d2);
-    float f = vector3_dot(d2, r);
-    float s, t;
-
-    if ((a <= 0.000001f) && (e <= 0.000001f)) {
-        s = t = 0.0f;
-    } else if (a <= 0.000001f) {
-        s = 0.0f;
-        t = f / e;
-        if (t < 0.0f) t = 0.0f;
-        if (t > 1.0f) t = 1.0f;
-    } else {
-        float c = vector3_dot(d1, r);
-        if (e <= 0.000001f) {
-            t = 0.0f;
-            s = -c / a;
-            if (s < 0.0f) s = 0.0f;
-            if (s > 1.0f) s = 1.0f;
-        } else {
-            float b = vector3_dot(d1, d2);
-            float denom = a * e - b * b;
-            s = (denom > 0.000001f) ? (b * f - c * e) / denom : 0.0f;
-            if (s < 0.0f) s = 0.0f;
-            if (s > 1.0f) s = 1.0f;
-            t = (b * s + f) / e;
-            if (t < 0.0f) { t = 0.0f; s = -c / a; }
-            if (t > 1.0f) { t = 1.0f; s = (b - c) / a; }
-            if (s < 0.0f) s = 0.0f;
-            if (s > 1.0f) s = 1.0f;
-        }
-    }
-
-    vector3 pa = vector3_addition(a1, vector3_scaling(d1, s));
-    vector3 pb = vector3_addition(b1, vector3_scaling(d2, t));
-    float dist = vector3_length(vector3_subtraction(pa, pb));
-    float min_dist = cyl_a->radius + cyl_b->radius;
-    if (dist >= min_dist) return false;
-
-    out->object_a = cyl_a;
-    out->object_b = cyl_b;
-    out->contact_count = 1;
-    if (dist > 0.0001f) {
-        out->normal_vector = vector3_scaling(
-            vector3_subtraction(pb, pa), 1.0f / dist);
-    } else {
-        out->normal_vector = (vector3){0.0f, 1.0f, 0.0f};
-    }
-    contact_point_data *cp = &out->contacts[0];
-    cp->penetration = min_dist - dist;
-    cp->position = vector3_scaling(vector3_addition(pa, pb), 0.5f);
-    return true;
-}
+/* Cylinder narrowphase lives in collision_cylinder.c (extracted to shrink this file).
+ * Declarations in physics/collision_cylinder.h, shared proxy below. */
+#include "collision_cylinder.h"

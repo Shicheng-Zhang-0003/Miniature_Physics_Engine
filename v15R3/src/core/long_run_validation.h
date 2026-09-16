@@ -7,6 +7,7 @@ extern int long_run_validation_active;
 extern int long_run_validation_ticks_remaining;
 extern int long_run_validation_total_ticks;
 extern int long_run_validation_restore_config; /* MPE_TASK_39_FIX */
+extern int long_run_validation_is_torture; /* TRUTH: F11 mode, corruption gates only */
 
 void long_run_validation_start(int duration_ticks);
 void long_run_validation_tick_update(void);

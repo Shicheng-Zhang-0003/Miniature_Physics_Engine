@@ -52,7 +52,7 @@ clean:
 # failing test is never misreported as a build failure); test_<name> builds
 # and runs (human use).
 MPE_TEST_CORE := core/physics_world.c core/rigidbody.c \
-	physics/collision_mechanics.c physics/broadphase.c physics/constraint.c physics/revolute_joint.c physics/depenetration.c physics/islands.c \
+	physics/collision_mechanics.c physics/collision_cylinder.c physics/broadphase.c physics/constraint.c physics/revolute_joint.c physics/depenetration.c physics/islands.c \
 	config/mpe_config.c config/mpe_config_schema.c scene/boundary.c
 
 build_two_world: tests/two_world_test.c $(MPE_TEST_CORE)

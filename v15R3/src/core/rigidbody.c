@@ -441,20 +441,14 @@ void rb_integrate_velocity(rigidbody *rigid_body, float delta_time, float linear
 
     /* AUDIT: no angular snap either (see above). */
 
-    float max_linear_speed = g_cfg.timestep.max_linear_speed; /* MPE_TASK_30 */
-    float current_speed_sq = vector3_length_squared(rigid_body->velocity);
-
-    if (current_speed_sq > max_linear_speed * max_linear_speed) {
-        rigid_body->velocity = vector3_scaling(vector3_normalisation(rigid_body->velocity), max_linear_speed);
-    }
-
-    float max_angular_speed = g_cfg.timestep.max_angular_speed; /* MPE_TASK_30 */
-    float current_angular_speed_sq = vector3_length_squared(rigid_body->angular_velocity);
-
-    if (current_angular_speed_sq > max_angular_speed * max_angular_speed) {
-        rigid_body->angular_velocity =
-            vector3_scaling(vector3_normalisation(rigid_body->angular_velocity), max_angular_speed);
-    }
+    /* TRUTH P0-8: NO velocity guillotine. Real physics has no speed limit;
+     * truncating |v| destroys momentum/energy (impact momentum becomes
+     * post-clamp, wrong by clamp ratio). Stability for fast bodies is CCD's
+     * job (analytic TOI, no cap) + substeps, never truncation.
+     * max_linear/angular_speed params retained as INFORM guards (see
+     * validation_report overflow counters); they never scale velocities. */
+    (void) g_cfg.timestep.max_linear_speed;
+    (void) g_cfg.timestep.max_angular_speed;
 
     rigid_body->force_accumulator = vector3_zero();
     rigid_body->torque_accumulator = vector3_zero();
@@ -468,7 +462,18 @@ void rb_integrate_position(rigidbody *rigid_body, float delta_time) {
         return;
     }
 
-    rigid_body->position = vector3_addition(rigid_body->position, vector3_scaling(rigid_body->velocity, delta_time));
+    /* Symplectic Euler drift: x += v_new*dt (v_new already holds this tick's
+     * forces). Exact + energy-bounded for oscillators; constant-force
+     * (gravity) exactness is applied by CALLERS for contact-free bodies
+     * only (see physics_world_step: +1/2*g*dt^2). Done at call sites because
+     * only the step knows contact state: applying -1/2*a*dt^2 with the
+     * pre-solve applied-force acceleration to CONSTRAINED bodies pumps them
+     * (contact impulses cancel gravity post-solve; stale-a correction lifts
+     * resting contacts 1.36mm/tick out of slop, killing friction 3x and
+     * toppling stacks) and mixing explicit velocity with Verlet position
+     * breaks symplecticity for springs (418% energy spiral). */
+    rigid_body->position =
+        vector3_addition(rigid_body->position, vector3_scaling(rigid_body->velocity, delta_time));
 
     /* Exact exponential-map rotation: q' = normalize(dq(w,|w|dt) * q).
      * First-order Euler (q += 0.5*dt*w*q) accumulates orientation phase
@@ -503,19 +508,25 @@ void rb_integrate_position(rigidbody *rigid_body, float delta_time) {
 
     if (rigid_body->kinematic) {
         rigid_body->sleep_timer = 0.0f;
-    } else if ((speed_sq < g_cfg.sleep.linear_thresh_sq) && (angular_speed_sq < g_cfg.sleep.angular_thresh_sq)) {
-        rigid_body->sleep_timer += delta_time;
-        if (rigid_body->sleep_timer > g_cfg.sleep.timer_duration) {
-            rigid_body->is_sleeping = true;
+    } else if ((!g_cfg.sleep.enable) || ((speed_sq < g_cfg.sleep.linear_thresh_sq) && (angular_speed_sq < g_cfg.sleep.angular_thresh_sq))) {
+        /* TRUTH: sleep.enable=0 never sleeps (validation mode). Note the
+         * inverted structure: disabled OR below-threshold accumulates, but
+         * the transition below honors the switch (never sets is_sleeping
+         * when disabled). Sleep itself remains NON-PHYSICAL when enabled. */
+        if (!g_cfg.sleep.enable) {
+            rigid_body->sleep_timer = 0.0f;
+        } else {
+            rigid_body->sleep_timer += delta_time;
+            if (rigid_body->sleep_timer > g_cfg.sleep.timer_duration) {
+                rigid_body->is_sleeping = true;
+            }
         }
     } else {
         rigid_body->sleep_timer = 0.0f;
     }
 }
 
-vector3 make_half_extents(float width, float height, float depth) {
-    return (vector3){width * 0.5f, height * 0.5f, depth * 0.5f};
-}
+/* make_half_extents REMOVED (trivial helper, zero callers). */
 // Initialize a cube: Box, OBB
 void rigidbody_initialisation_cube(rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass) {
     //Kinematic

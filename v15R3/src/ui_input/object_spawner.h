@@ -7,4 +7,6 @@ void spawner_launch_sphere(float spherical_radius, float physical_mass, float la
 void spawner_static_sphere(float spherical_radius, float physical_mass, vector3 static_position);
 void spawner_launch_cube(vector3 position, vector3 half_extensions, float physical_mass);
 void spawner_static_cube(vector3 position, vector3 half_extensions, float physical_mass);
+void spawner_launch_cylinder(float radius, float half_length, float physical_mass, float launch_speed);
+void spawner_static_cylinder(float radius, float half_length, float physical_mass, vector3 static_position);
 #endif

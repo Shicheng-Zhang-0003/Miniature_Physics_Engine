@@ -33,6 +33,11 @@ typedef struct {
     int pair_overflow_count;
     int pair_dedupe_overflow_count;
     int large_object_clamp_count;
+    /* Cell-size cache: recomputing avg radius every tick is O(n) per tick
+     * (PERF-005). Cache and only recompute when the population changes
+     * significantly or every 60 ticks. */
+    int cached_body_count;
+    int ticks_since_cell_recompute;
 } broadphase_workspace;
 
 int broadphase_generate_pairing(struct physics_world *world, broadphase_pair *collision_pairs_output_array,

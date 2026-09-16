@@ -64,6 +64,10 @@ typedef struct {
         float timer_duration;
         float wake_linear_thresh_sq;
         float wake_angular_thresh_sq;
+        /* TRUTH: master switch. Sleep is a NON-PHYSICAL optimization (freezes
+         * micro-creep/pendulum/rolling tails, zeroes energy). 1=game (sleep),
+         * 0=truth validation (never sleeps; solver alone must settle). */
+        int enable;
     } sleep;
 
     struct {
@@ -71,7 +75,7 @@ typedef struct {
         float bias_factor;
         float max_separation_bias;
         float restitution_velocity_thresh;
-        float max_restitution_bias;
+        /* max_restitution_bias REMOVED (dead knob; Newton bound is physical). */
         float static_friction_thresh;
         float warm_start_match_dist_sq;
     } solver;
@@ -79,7 +83,7 @@ typedef struct {
     struct {
         float correction_factor;
         float max_correction;
-        float penetration_slop;
+        /* penetration_slop REMOVED (single-slop unification: solver slop rules). */
         float wake_depth_thresh;
         int rebuild_iterations;
     } depenetration;
@@ -115,6 +119,9 @@ typedef struct {
         float radius;
         float cube_mass;
         float cube_extent;
+        float cyl_mass;
+        float cyl_radius;
+        float cyl_half_length;
         float speed;
         float friction_s;
         float friction_k;

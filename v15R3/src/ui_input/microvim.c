@@ -81,7 +81,13 @@ static void mv_set_line(int index, const char *text) {
     if (mv.lines[index]) {
         free(mv.lines[index]);
     }
-    mv.lines[index] = g_strdup(text);
+    /* Enforce max line length (TERM-010): truncate instead of overflowing. */
+    if (text && strlen(text) >= (size_t) mv_max_line_len) {
+        char *tmp = g_strndup(text, mv_max_line_len - 1);
+        mv.lines[index] = tmp ? tmp : g_strdup("");
+    } else {
+        mv.lines[index] = g_strdup(text ? text : "");
+    }
 }
 
 static void mv_insert_line(int index, const char *text) {
@@ -89,7 +95,12 @@ static void mv_insert_line(int index, const char *text) {
     for (int i = mv.line_count; i > index; i--) {
         mv.lines[i] = mv.lines[i - 1];
     }
-    mv.lines[index] = g_strdup(text);
+    if (text && strlen(text) >= (size_t) mv_max_line_len) {
+        char *tmp = g_strndup(text, mv_max_line_len - 1);
+        mv.lines[index] = tmp ? tmp : g_strdup("");
+    } else {
+        mv.lines[index] = g_strdup(text ? text : "");
+    }
     mv.line_count++;
 }
 
@@ -335,37 +346,76 @@ static void mv_word_end(void) {
 /* Search                                                               */
 /* ------------------------------------------------------------------ */
 static void mv_search_execute(bool forward) {
-    if (mv.search_len == 0) {
+    if (mv.search_len == 0 || mv.line_count <= 0) {
         return;
     }
+    /* Lower pattern once instead of per-line per-attempt (old code allocated
+     * two strings per line scanned). */
+    char *pattern_lower = g_ascii_strdown(mv.search_buf, -1);
+    if (!pattern_lower) {
+        return;
+    }
+    size_t pat_len = strlen(pattern_lower);
     int start_row = mv.cursor_row;
     for (int attempt = 0; attempt < mv.line_count * 2; attempt++) {
         int row = (forward ? (start_row + attempt) : (start_row - attempt + mv.line_count * 2)) % mv.line_count;
         const char *line = mv.lines[row];
-        char *found = g_ascii_strdown(line, -1);
-        char *pattern_lower = g_ascii_strdown(mv.search_buf, -1);
-        char *match = strstr(found, pattern_lower);
-        if (match) {
-            int match_col = (int) (match - found);
-            if ((row == start_row) && forward && (match_col <= mv.cursor_col)) {
-                g_free(found);
-                g_free(pattern_lower);
-                continue;
-            }
-            if ((row == start_row) && !forward && (match_col >= mv.cursor_col)) {
-                g_free(found);
-                g_free(pattern_lower);
-                continue;
-            }
-            mv.cursor_row = row;
-            mv.cursor_col = match_col;
-            g_free(found);
-            g_free(pattern_lower);
-            return;
+        if (!line) {
+            continue;
         }
-        g_free(found);
-        g_free(pattern_lower);
+        /* Case-insensitive substring search without per-line allocation. */
+        const char *match = NULL;
+        size_t line_len = strlen(line);
+        if (pat_len <= line_len) {
+            for (size_t i = 0; i + pat_len <= line_len; i++) {
+                bool eq = true;
+                for (size_t k = 0; k < pat_len; k++) {
+                    if (g_ascii_tolower(line[i + k]) != pattern_lower[k]) {
+                        eq = false;
+                        break;
+                    }
+                }
+                if (eq) {
+                    match = line + i;
+                    /* For forward/backward skip semantics we need the first
+                     * valid match per row; for simplicity take the first and
+                     * apply cursor gating below. A second scan finds later
+                     * matches on the start row if the first is behind cursor. */
+                    int col0 = (int) (match - line);
+                    if ((row == start_row) && forward && (col0 <= mv.cursor_col)) {
+                        /* Look for a later match on the same row. */
+                        const char *later = NULL;
+                        for (size_t j = (size_t)(mv.cursor_col + 1); j + pat_len <= line_len; j++) {
+                            bool eq2 = true;
+                            for (size_t k = 0; k < pat_len; k++) {
+                                if (g_ascii_tolower(line[j + k]) != pattern_lower[k]) {
+                                    eq2 = false;
+                                    break;
+                                }
+                            }
+                            if (eq2) {
+                                later = line + j;
+                                break;
+                            }
+                        }
+                        if (later) {
+                            match = later;
+                        } else {
+                            continue;
+                        }
+                    }
+                    if ((row == start_row) && !forward && ((int) (match - line) >= mv.cursor_col)) {
+                        continue;
+                    }
+                    mv.cursor_row = row;
+                    mv.cursor_col = (int) (match - line);
+                    g_free(pattern_lower);
+                    return;
+                }
+            }
+        }
     }
+    g_free(pattern_lower);
 }
 
 /* ------------------------------------------------------------------ */

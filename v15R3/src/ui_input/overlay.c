@@ -64,7 +64,13 @@ GtkWidget *overlay_initialise(GtkWidget *gl_drawing_area_widget) {
     //Debug Info
     GtkWidget *ui_overlay_container = gtk_overlay_new();
     gtk_container_add(GTK_CONTAINER(ui_overlay_container), gl_drawing_area_widget);
-    debug_information_label = gtk_label_new("- Miniature Physics Engine v15R2 -");
+    debug_information_label = gtk_label_new("");
+    /* Versioned at runtime: never hardcode the tree version in display text. */
+    {
+        char version_header[64];
+        snprintf(version_header, sizeof(version_header), "- Miniature Physics Engine %s -", a3_version_string);
+        gtk_label_set_text(GTK_LABEL(debug_information_label), version_header);
+    }
     gtk_widget_set_halign(debug_information_label, GTK_ALIGN_START);
     gtk_widget_set_valign(debug_information_label, GTK_ALIGN_START);
     gtk_overlay_add_overlay(GTK_OVERLAY(ui_overlay_container), debug_information_label);
@@ -161,11 +167,13 @@ void overlay_update(void) {
                 const char *spawn_type_text;
                 if (main_inputs.current_spawn_type == 0) {
                     spawn_type_text = "Sphere";
-                } else {
+                } else if (main_inputs.current_spawn_type == 1) {
                     spawn_type_text = "Cube";
+                } else {
+                    spawn_type_text = "Cylinder";
                 }
                 snprintf(spawner_text, sizeof(spawner_text),
-                         "-- Spawner Menu --\n1: Sphere\n2: Cube\n3: Current Type: %s", spawn_type_text);
+                         "-- Spawner Menu --\n1: Sphere\n2: Cube\n3: Current Type: %s\n4: Cylinder", spawn_type_text);
             } else if (main_inputs.spawner_menu_level == 2) {
                 snprintf(spawner_text, sizeof(spawner_text), "-- Sphere Settings --\n1: Mass\n2: Radius");
             } else if (main_inputs.spawner_menu_level == 3) {
@@ -190,12 +198,28 @@ void overlay_update(void) {
                 const char *spawn_type_text;
                 if (main_inputs.current_spawn_type == 0) {
                     spawn_type_text = "Sphere";
-                } else {
+                } else if (main_inputs.current_spawn_type == 1) {
                     spawn_type_text = "Cube";
+                } else {
+                    spawn_type_text = "Cylinder";
                 }
                 snprintf(spawner_text, sizeof(spawner_text),
-                         "-- Toggle Spawn Type --\nCurrent: %s\n\nUp/Down: Toggle\nEnter: Save and Close",
+                         "-- Toggle Spawn Type --\nCurrent: %s\n\nUp/Down: Cycle\nEnter: Save and Close",
                          spawn_type_text);
+            } else if (main_inputs.spawner_menu_level == 9) {
+                snprintf(spawner_text, sizeof(spawner_text), "-- Cylinder Settings --\n1: Mass\n2: Radius\n3: Half-Length");
+            } else if (main_inputs.spawner_menu_level == 10) {
+                snprintf(spawner_text, sizeof(spawner_text),
+                         "-- Cylinder Mass --\nCurrent Mass: %.2f kg\n\nValue dialog active (step %.2f)",
+                         g_cfg.spawner.cyl_mass, adjustment_increment);
+            } else if (main_inputs.spawner_menu_level == 11) {
+                snprintf(spawner_text, sizeof(spawner_text),
+                         "-- Cylinder Radius --\nCurrent Radius: %.2f m\n\nValue dialog active (step %.2f)",
+                         g_cfg.spawner.cyl_radius, adjustment_increment);
+            } else if (main_inputs.spawner_menu_level == 12) {
+                snprintf(spawner_text, sizeof(spawner_text),
+                         "-- Cylinder Half-Length --\nCurrent: %.2f m\n\nValue dialog active (step %.2f)",
+                         g_cfg.spawner.cyl_half_length, adjustment_increment);
             }
             gtk_label_set_text(GTK_LABEL(spawner_menu_label), spawner_text);
             gtk_widget_show(spawner_menu_label);
@@ -234,7 +258,8 @@ void overlay_update(void) {
                          g_cfg.camera.jump_height, adjustment_increment);
             } else if (main_inputs.velocity_menu_level == 20) {
                 snprintf(velocity_text, sizeof(velocity_text),
-                         "-- World Modification --\n1: Gravity\n2: Air Resistance\n3: Surface Friction");
+                         "-- World Modification --\n1: Gravity\n2: Air Resistance\n3: Surface Friction\n4: Rolling "
+                         "Resistance\n5: Solver Iterations");
             } else if (main_inputs.velocity_menu_level == 21) {
                 snprintf(velocity_text, sizeof(velocity_text),
                          "-- World Gravity --\nCurrent: %.2f m/s^2\n\nValue dialog active (step %.2f)",
@@ -248,6 +273,14 @@ void overlay_update(void) {
                          "-- Surface Friction (Floor) --\nStatic (u_s): %.2f | Kinetic (u_k): %.2f\n\nValue dialog "
                          "active (step %.2f)",
                          g_cfg.world.floor_friction_s, g_cfg.world.floor_friction_k, adjustment_increment);
+            } else if (main_inputs.velocity_menu_level == 24) {
+                snprintf(velocity_text, sizeof(velocity_text),
+                         "-- Rolling Resistance --\nCurrent Coeff: %.3f\n\nValue dialog active (step %.2f)",
+                         g_cfg.world.rolling_resistance_coeff, adjustment_increment);
+            } else if (main_inputs.velocity_menu_level == 25) {
+                snprintf(velocity_text, sizeof(velocity_text),
+                         "-- Solver Iterations --\nCurrent: %d passes/tick\n\nValue dialog active (step %.2f)",
+                         g_cfg.timestep.solver_iterations, adjustment_increment);
             }
             gtk_label_set_text(GTK_LABEL(velocity_menu_label), velocity_text);
             gtk_widget_show(velocity_menu_label);
@@ -264,11 +297,16 @@ void overlay_update(void) {
             char object_text[512];
             rigidbody *target = &(physics_world_get_primary()->bodies)[selected_object];
             if (main_inputs.object_menu_level == 1) {
-                const char *type_name = (target->type == object_sphere) ? "Sphere" : "Cube";
+                /* Three body types (cylinders are not cubes; their radius is live). */
+                const char *type_name = (target->type == object_sphere)    ? "Sphere"
+                                        : (target->type == object_cylinder) ? "Cylinder"
+                                                                           : "Cube";
+                const char *radius_label =
+                    (target->type == object_cube) ? "Radius (N/A)" : "Radius";
                 int len = snprintf(
                     object_text, sizeof(object_text),
                     "-- Object %d (%s) --\n1: Mass\n2: %s\n3: Friction\n4: Immovable Toggle\n5: Mark for Joint\n",
-                    selected_object, type_name, (target->type == object_sphere) ? "Radius" : "Radius (N/A)");
+                    selected_object, type_name, radius_label);
                 if (main_inputs.marked_joint_object_index != -1 &&
                     main_inputs.marked_joint_object_index != selected_object) {
                     snprintf(object_text + len, sizeof(object_text) - len,
@@ -333,11 +371,13 @@ void overlay_update(void) {
         const char *spawn_type_text;
         if (main_inputs.current_spawn_type == 0) {
             spawn_type_text = "sphere";
-        } else {
+        } else if (main_inputs.current_spawn_type == 1) {
             spawn_type_text = "cube";
+        } else {
+            spawn_type_text = "cylinder";
         }
         snprintf(information_text_buffer, sizeof(information_text_buffer),
-                 "[%s] | No object selected | Shift: spawn %s | R-Click: select | 0: Toggle Mode", game_mode_text,
+                 "[%s] | No object selected | Enter: spawn %s | R-Click: select | 0: Toggle Mode", game_mode_text,
                  spawn_type_text);
         overlay_append_stats_text(information_text_buffer, sizeof(information_text_buffer));
         overlay_append_overflow_text(information_text_buffer, sizeof(information_text_buffer));
@@ -347,12 +387,10 @@ void overlay_update(void) {
     }
     rigidbody *selected_rigid_body = &(physics_world_get_primary()->bodies)[selected_object];
     float selected_object_speed = vector3_length(selected_rigid_body->velocity);
-    const char *object_type_text;
-    if (selected_rigid_body->type == object_sphere) {
-        object_type_text = "Sphere";
-    } else {
-        object_type_text = "Cube";
-    }
+    /* Three body types: never collapse cylinder into cube in display text. */
+    const char *object_type_text = (selected_rigid_body->type == object_sphere)    ? "Sphere"
+                                   : (selected_rigid_body->type == object_cylinder) ? "Cylinder"
+                                                                                   : "Cube";
     const char *static_status_text;
     if (selected_rigid_body->static_state) {
         static_status_text = "(Static)";

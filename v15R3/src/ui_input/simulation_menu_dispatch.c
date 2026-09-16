@@ -4,14 +4,26 @@
 #include "../mpe_engine.h"
 
 void simulation_menu_dispatch(GtkWidget *parent_window) {
-    /* Scene menu: 9 key bindings */
+    /* Scene menu: 9 key bindings. All failures are reported via event_log
+     * (visible in terminal dmesg) and stdout so save/load never fails
+     * silently (QUAL-009). */
     if (main_inputs.menu_1_pressed) {
-        save_scene("status/scene.dat");
+        if (save_scene("status/scene.dat")) {
+            event_log_push(0, "scene saved to status/scene.dat");
+        } else {
+            event_log_push(2, "scene save FAILED (see stderr SVF*)");
+            fprintf(stderr, "[menu] scene save failed\n");
+        }
         main_inputs.menu_1_pressed = false;
         main_inputs.is_menu_open = false;
     }
     if (main_inputs.menu_2_pressed) {
-        scene_loading("status/scene.dat");
+        if (scene_loading("status/scene.dat")) {
+            event_log_push(0, "scene loaded from status/scene.dat");
+        } else {
+            event_log_push(2, "scene load FAILED (see stderr LDF*)");
+            fprintf(stderr, "[menu] scene load failed\n");
+        }
         editor_reset();
         main_inputs.menu_2_pressed = false;
         main_inputs.is_menu_open = false;
@@ -25,7 +37,12 @@ void simulation_menu_dispatch(GtkWidget *parent_window) {
         main_inputs.is_menu_open = false;
     }
     if (main_inputs.menu_4_pressed) {
-        mpe_config_save("status/engine.cfg");
+        if (mpe_config_save("status/engine.cfg")) {
+            event_log_push(0, "config saved to status/engine.cfg");
+        } else {
+            event_log_push(2, "config save FAILED");
+            fprintf(stderr, "[menu] config save failed\n");
+        }
         main_inputs.menu_4_pressed = false;
         main_inputs.is_menu_open = false;
     }

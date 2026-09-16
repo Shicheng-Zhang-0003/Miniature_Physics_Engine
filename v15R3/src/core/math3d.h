@@ -25,6 +25,10 @@ typedef struct {
 typedef struct {
     float w, x, y, z;
 } vector4;
+/* Canonical aliases: quaternions are vector4 storage, but deserve a distinct
+ * name for readability. mat3 is the descriptive alias for math3. */
+typedef vector4 quaternion;
+typedef math3 mat3;
 //Functions for computing different vector3
 static inline vector3 vector3_new(float x_coordinate, float y_coordinate, float z_coordinate) {
     return (vector3){x_coordinate, y_coordinate, z_coordinate};
