@@ -75,6 +75,16 @@ typedef struct physics_world {
     /* Contact-cache diagnostics (per-world; was global). */
     int contact_cache_hits;
     int contact_cache_misses;
+    /* TRUTH P0-3: per-body CCD remainder (dt - toi). Allocated mpe_max_bodies
+     * floats. CCD pre-clamp consumes toi; post-solve integration must advance
+     * only the remainder, else displacement double-counts (toi + dt). */
+    float *ccd_time_remaining;
+    /* TRUTH P0-1: per-body contact flag for gravity-exactness gating.
+     * Verlet +1/2*g*dt^2 applies ONLY to contact-free bodies (free flight =
+     * exact parabola); constrained bodies stay pure symplectic Euler (their
+     * acceleration is canceled by contact impulses post-solve; correcting
+     * with pre-solve gravity pumps them out of slop). Reset each tick. */
+    unsigned char *has_contact;
 } physics_world;
 
 void physics_world_init(physics_world *world);

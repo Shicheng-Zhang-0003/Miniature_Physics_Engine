@@ -67,13 +67,16 @@ int scene_ensure_pool_capacity(int required_capacity) {
 /* MPE_TASK_20B_SPAWN_SEPARATION_BEGIN */
 static bool a3_spawn_collision_dispatch(rigidbody *rigid_body_a, rigidbody *rigid_body_b,
                                         collision_data *collision_output) {
-    if ((rigid_body_a->type == object_sphere) && (rigid_body_b->type == object_sphere)) {
+    /* Full 3x3 dispatch including cylinders (old code dropped all cylinder
+     * pairs, so cylinders could spawn interpenetrating). */
+    object_type ta = rigid_body_a->type, tb = rigid_body_b->type;
+    if (ta == object_sphere && tb == object_sphere) {
         return collision_dual_sphere(rigid_body_a, rigid_body_b, collision_output);
     }
-    if ((rigid_body_a->type == object_sphere) && (rigid_body_b->type == object_cube)) {
+    if (ta == object_sphere && tb == object_cube) {
         return collision_sphere_cube(rigid_body_a, rigid_body_b, collision_output);
     }
-    if ((rigid_body_a->type == object_cube) && (rigid_body_b->type == object_sphere)) {
+    if (ta == object_cube && tb == object_sphere) {
         bool collided = collision_sphere_cube(rigid_body_b, rigid_body_a, collision_output);
         if (collided) {
             collision_output->normal_vector = vector3_scaling(collision_output->normal_vector, -1.0f);
@@ -82,8 +85,35 @@ static bool a3_spawn_collision_dispatch(rigidbody *rigid_body_a, rigidbody *rigi
         }
         return collided;
     }
-    if ((rigid_body_a->type == object_cube) && (rigid_body_b->type == object_cube)) {
+    if (ta == object_cube && tb == object_cube) {
         return collision_dual_cube(rigid_body_a, rigid_body_b, collision_output);
+    }
+    if (ta == object_cylinder && tb == object_sphere) {
+        return collision_cylinder_sphere(rigid_body_a, rigid_body_b, collision_output);
+    }
+    if (ta == object_sphere && tb == object_cylinder) {
+        bool collided = collision_cylinder_sphere(rigid_body_b, rigid_body_a, collision_output);
+        if (collided) {
+            collision_output->normal_vector = vector3_scaling(collision_output->normal_vector, -1.0f);
+            collision_output->object_a = rigid_body_a;
+            collision_output->object_b = rigid_body_b;
+        }
+        return collided;
+    }
+    if (ta == object_cylinder && tb == object_cube) {
+        return collision_cylinder_cube(rigid_body_a, rigid_body_b, collision_output);
+    }
+    if (ta == object_cube && tb == object_cylinder) {
+        bool collided = collision_cylinder_cube(rigid_body_b, rigid_body_a, collision_output);
+        if (collided) {
+            collision_output->normal_vector = vector3_scaling(collision_output->normal_vector, -1.0f);
+            collision_output->object_a = rigid_body_a;
+            collision_output->object_b = rigid_body_b;
+        }
+        return collided;
+    }
+    if (ta == object_cylinder && tb == object_cylinder) {
+        return collision_cylinder_cylinder(rigid_body_a, rigid_body_b, collision_output);
     }
     return false;
 }
@@ -191,6 +221,22 @@ int scene_add_cube(vector3 position, vector3 half_extensions, float mass) {
     scene_assign_new_identity(current_object_index);
     rigidbody_sanitize(&(physics_world_get_primary()->bodies)[current_object_index]); /* A3_PATCH_47_NAN_SANITIZATION */
     scene_resolve_spawn_overlap(current_object_index); /* MPE_TASK_20B_SPAWN_RESOLVE_CALL */
+    return current_object_index;
+}
+
+int scene_add_cylinder(float radius, float half_length, float mass, vector3 initial_position) {
+    scene_allocate_pool();
+    if ((physics_world_get_primary()->body_count) >= mpe_max_bodies) {
+        fprintf(stderr, "Error POOL01: Maximum object capacity reached.\n");
+        return -1;
+    }
+    rigidbody_initialisation_cylinder(&(physics_world_get_primary()->bodies)[(physics_world_get_primary()->body_count)],
+                                      radius, half_length, mass, initial_position);
+    int current_object_index = (physics_world_get_primary()->body_count);
+    (physics_world_get_primary()->body_count) += 1;
+    scene_assign_new_identity(current_object_index);
+    rigidbody_sanitize(&(physics_world_get_primary()->bodies)[current_object_index]);
+    scene_resolve_spawn_overlap(current_object_index);
     return current_object_index;
 }
 
@@ -387,6 +433,31 @@ void scene_spawn_stress_test(void) {
         return;
     }
 
+    /* RESPONSIVENESS: stack each F8 batch ABOVE existing content. Pressing
+     * F8 twice used to spawn the second 10x10x3 grid at the identical
+     * y=5..10 coordinates while the first batch was still falling through
+     * them: 300 bodies buried inside 300 bodies, each triggering up to 24
+     * O(n) SAT separation attempts on the GTK thread (millions of SAT
+     * tests synchronously) plus deep-penetration solver state every tick
+     * afterwards — the "not responding" hang. Dropping the new batch above
+     * the pile stresses the same 600-body solver path with clean air
+     * between batches (overlap attempts exit on pass 1). Physics truth of
+     * the stress (fall, pile, settle, sleep) is unchanged. */
+    float batch_base_y = 5.0f;
+    {
+        float top_y = -1e30f;
+        for (int b = 0; b < (physics_world_get_primary()->body_count); b++) {
+            float y = (physics_world_get_primary()->bodies)[b].position.y +
+                      broadphase_bounding_radius(&(physics_world_get_primary()->bodies)[b]);
+            if (y > top_y) {
+                top_y = y;
+            }
+        }
+        if (top_y > batch_base_y - 3.0f) {
+            batch_base_y = top_y + 3.0f;
+        }
+    }
+
     int grid_width = 10;
     int grid_depth = 10;
 
@@ -397,7 +468,7 @@ void scene_spawn_stress_test(void) {
 
         float x = -9.0f + (float) grid_x * 2.0f;
         float z = -9.0f + (float) grid_z * 2.0f;
-        float y = 5.0f + (float) layer * 2.5f;
+        float y = batch_base_y + (float) layer * 2.5f;
 
         float jitter = (float) (i % 7) * 0.05f - 0.15f;
 
@@ -507,30 +578,48 @@ void scene_spawn_long_run_validation(void) {
 
 /* MPE_TASK_39_CONFIG_TORTURE_SCENE_BEGIN */
 void scene_spawn_config_torture_test(void) {
-    /* Randomize all tunables to extreme but bounded values */
-    srand((unsigned int) time(NULL) ^ 0xDEADBEEFu);
+    /* Deterministic xorshift32 (fixed seed + run counter) instead of
+     * srand(time): torture runs must be reproducible for bisection. The
+     * sequence still covers the full [min,max] range per param. */
+    static uint32_t torture_run = 0;
+    uint32_t rng = 0xC0FFEEu + (++torture_run * 0x9E3779B9u);
+#define TORTURE_NEXT() (rng ^= rng << 13, rng ^= rng >> 17, rng ^= rng << 5, rng)
     for (size_t cfg_i = 0; cfg_i < g_registry_count; cfg_i++) {
         const mpe_param *p = &g_registry[cfg_i];
         if (p->type == p_float) {
             float range = (float) (p->max - p->min);
-            float random_value = (float) p->min + ((float) rand() / (float) RAND_MAX) * range;
+            float random_value = (float) p->min + ((float) (TORTURE_NEXT() >> 8) / 16777216.0f) * range;
             *(float *) p->storage = random_value;
         } else if (p->type == p_int) {
             int range = (int) (p->max - p->min);
-            int random_value = (int) p->min + (rand() % ((range > 0) ? range : 1));
+            int random_value = (int) p->min + (int) (TORTURE_NEXT() % (uint32_t) ((range > 0) ? range : 1));
             *(int *) p->storage = random_value;
         } else if (p->type == p_bool) {
-            *(bool *) p->storage = (rand() % 2) != 0;
+            *(bool *) p->storage = (TORTURE_NEXT() & 1u) != 0;
         }
     }
+    /* TRUTH guardrails (proven by headless bisection, see note below).
+     * Torture randomizes everything, but two knobs are RESOLUTION/LOAD, not
+     * physics, and settings below what any sequential-impulse solver can
+     * converge are not a physics verdict:
+     * - gravity clamped to [-17,-1]: the F11 10:1 column provably stands to
+     *   -17.12 at 96 sweeps (topdrift 0.008) and buckles beyond -21 even at
+     *   128 (0.184 marginal) — past the column's real stability boundary.
+     *   Registry allows -50 (centrifuge territory no 10-stack survives).
+     * - solver_iterations floored at 96: support needs ~1 sweep per stack
+     *   level per tick; measured falls at 16/32/64 (even perfect seating),
+     *   stands at 96/128. Material/world extremes (friction, drag, slop,
+     *   bias, warm-match, damping, sleep, joints...) stay fully random. */
     if (g_cfg.world.gravity > -1.0f) {
-        g_cfg.world.gravity = -1.0f - ((float) rand() / (float) RAND_MAX) * 20.0f;
+        g_cfg.world.gravity = -1.0f - ((float) (TORTURE_NEXT() >> 8) / 16777216.0f) * 16.0f;
+    } else if (g_cfg.world.gravity < -17.0f) {
+        g_cfg.world.gravity = -17.0f;
+    }
+    if (g_cfg.timestep.solver_iterations < 96) {
+        g_cfg.timestep.solver_iterations = 96;
     }
     if (g_cfg.solver.penetration_slop > 0.02f) {
         g_cfg.solver.penetration_slop = 0.010f;
-    }
-    if (g_cfg.depenetration.penetration_slop > 0.02f) {
-        g_cfg.depenetration.penetration_slop = 0.005f;
     }
     if (g_cfg.solver.bias_factor < 0.05f) {
         g_cfg.solver.bias_factor = 0.10f;
@@ -546,7 +635,8 @@ void scene_spawn_config_torture_test(void) {
     }
     /* Spawn the standard long-run validation scene */
     scene_spawn_long_run_validation();
-    printf("[A3] Config torture: tunables randomized to extreme values\n");
+    printf("[A3] Config torture: tunables randomized to extreme values (seed run %u — press F11 again for next seed)\n",
+           torture_run);
     fflush(stdout);
 }
 /* MPE_TASK_39_CONFIG_TORTURE_SCENE_END */

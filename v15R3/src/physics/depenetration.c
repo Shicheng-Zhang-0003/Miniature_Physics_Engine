@@ -59,7 +59,14 @@ bool a3_depenetration_dispatch(rigidbody *rigid_body_a, rigidbody *rigid_body_b,
     return false;
 }
 
-/* Single depenetration implementation (see header). */
+/* Single depenetration implementation (see header).
+ * TRUTH note: sequential with split impulse, NOT double-correction of the
+ * same penetration. Split impulse corrects pre-integration penetration at
+ * solve time; bodies then MOVE (Verlet remainder integration), creating NEW
+ * overlaps; this pass corrects those post-move residuals + boundary shoves.
+ * Slop-gated (solver slop, single) + 0.5mm early-out: routine sub-mm
+ * residuals pass through untouched. Deep pathology (spawn overlap) resolves
+ * over ticks bounded by max_correction (teleport bounded, counted). */
 void a3_positional_depenetration_pass(struct physics_world *world, broadphase_pair *pair_buffer,
                                       int *pair_count_pointer, bool rebuild_broadphase) {
     if ((!world) || (!world->bodies) || (world->body_count < 2) || (!pair_buffer) || (!pair_count_pointer)) {
@@ -136,7 +143,10 @@ void a3_positional_depenetrate_manifold(collision_data *manifold) {
     float depth_sum = 0.0f;
     int depth_count = 0;
 
-    const float penetration_slop = g_cfg.depenetration.penetration_slop; /* MPE_TASK_30 */
+    /* TRUTH P0-12: single slop. Solver slop is the sole overlap tolerance;
+     * a second depenetration slop (5mm vs solver 10mm) makes the passes
+     * fight (limit-cycle jitter). Depenetration honors solver slop. */
+    const float penetration_slop = g_cfg.solver.penetration_slop;
 
     for (int contact_index = 0; contact_index < manifold->contact_count; contact_index++) {
         float depth = manifold->contacts[contact_index].penetration;

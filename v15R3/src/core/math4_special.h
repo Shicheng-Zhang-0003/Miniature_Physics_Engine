@@ -20,7 +20,20 @@ static inline math4 math4_identity() {
 static inline math4 math4_look_view(vector3 camera_position, vector3 camera_front, vector3 camera_up) {
     math4 result_matrix = math4_identity();
     vector3 forward_vector = vector3_normalisation(camera_front);
-    vector3 side_vector = vector3_normalisation(vector3_cross(forward_vector, camera_up));
+    /* Degenerate-guard: forward invalid or parallel to up would produce NaN
+     * side vector. Fall back to -Z forward and Y up. */
+    if (vector3_length_squared(forward_vector) < 1e-12f) {
+        forward_vector = (vector3){0.0f, 0.0f, -1.0f};
+    }
+    vector3 side_raw = vector3_cross(forward_vector, camera_up);
+    if (vector3_length_squared(side_raw) < 1e-12f) {
+        /* camera_up parallel to forward (e.g. looking straight up): pick
+         * an orthogonal reference so the basis stays valid. */
+        vector3 alt_up = (fabsf(forward_vector.y) < 0.99f) ? (vector3){0.0f, 1.0f, 0.0f}
+                                                           : (vector3){1.0f, 0.0f, 0.0f};
+        side_raw = vector3_cross(forward_vector, alt_up);
+    }
+    vector3 side_vector = vector3_normalisation(side_raw);
     vector3 up_vector = vector3_cross(side_vector, forward_vector);
     result_matrix.matrix[0][0] = side_vector.x;
     result_matrix.matrix[1][0] = side_vector.y;
@@ -38,6 +51,19 @@ static inline math4 math4_look_view(vector3 camera_position, vector3 camera_fron
 } //Perspective Projection Matrices
 static inline math4 math4_perspective_fov(float field_of_view, float aspect_ratio, float near_plane, float far_plane) {
     math4 result_matrix = {{{0}}};
+    /* Clamp degenerate inputs so a bad config can never produce NaN/Inf. */
+    if (!(field_of_view > 0.01f && field_of_view < 3.14f)) {
+        field_of_view = 45.0f * 3.14159265358979323846f / 180.0f;
+    }
+    if (!(aspect_ratio > 1e-6f && aspect_ratio < 1e6f)) {
+        aspect_ratio = 16.0f / 9.0f;
+    }
+    if (!(near_plane > 1e-6f)) {
+        near_plane = 0.1f;
+    }
+    if (!(far_plane > near_plane + 1e-4f)) {
+        far_plane = near_plane + 1000.0f;
+    }
     float focal_length = 1.0f / tanf(field_of_view / 2.0f);
     result_matrix.matrix[0][0] = focal_length / aspect_ratio;
     result_matrix.matrix[1][1] = focal_length;

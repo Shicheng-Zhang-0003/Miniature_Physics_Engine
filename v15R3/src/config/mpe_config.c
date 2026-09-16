@@ -106,6 +106,18 @@ void mpe_config_init(void) {
     for (size_t i = 0; i < g_registry_count; i++) {
         param_write_double(&g_registry[i], g_registry[i].def);
     }
+    /* Validate registry storage pointers lie inside g_cfg. A struct layout
+     * change that silently breaks the registry now fails loudly at startup
+     * instead of corrupting unrelated memory. */
+    const char *base = (const char *) &g_cfg;
+    const char *end = base + sizeof(g_cfg);
+    for (size_t i = 0; i < g_registry_count; i++) {
+        const char *p = (const char *) g_registry[i].storage;
+        if (!p || p < base || p >= end) {
+            fprintf(stderr, "[config] registry entry '%s' has invalid storage pointer\n",
+                    g_registry[i].key ? g_registry[i].key : "(null)");
+        }
+    }
 }
 
 void mpe_config_reset_defaults(void) {
@@ -195,6 +207,14 @@ static void ensure_parent_dir(const char *path) {
     char copy[512];
     strncpy(copy, path, sizeof(copy) - 1);
     copy[sizeof(copy) - 1] = '\0';
+    /* mkdir -p: create every ancestor component, not just the leaf. */
+    for (char *p = copy + 1; *p; p++) {
+        if (*p == '/') {
+            *p = '\0';
+            mkdir(copy, 0755);
+            *p = '/';
+        }
+    }
     char *last_slash = strrchr(copy, '/');
     if ((last_slash) && (last_slash != copy)) {
         *last_slash = '\0';
@@ -211,14 +231,21 @@ bool mpe_config_save(const char *path) {
     /* R3-03: Atomic write. Write to a temporary file first, then
      * atomically rename over the target. */
     char tmp_path[512];
-    snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", path);
+    int tmp_len = snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", path);
+    if (tmp_len < 0 || (size_t) tmp_len >= sizeof(tmp_path)) {
+        return false;
+    }
 
     FILE *file = fopen(tmp_path, "w");
     if (!file) {return false;}
     time_t now = time(NULL);
     struct tm *local_time = localtime(&now);
     char stamp[64];
-    strftime(stamp, sizeof(stamp), "%Y-%m-%d %H:%M:%S", local_time);
+    if (local_time) {
+        strftime(stamp, sizeof(stamp), "%Y-%m-%d %H:%M:%S", local_time);
+    } else {
+        snprintf(stamp, sizeof(stamp), "unknown-time");
+    }
     fprintf(file, "# MPE Engine Configuration\n");
     fprintf(file, "# saved:   %s\n\n", stamp);
     for (int cat = 0; cat <= cat_ui; cat++) {
@@ -252,10 +279,17 @@ bool mpe_config_save(const char *path) {
 }
 
 static char *term_trim(char *str) {
+    if (!str) {
+        return str;
+    }
     while ((*str == ' ') || (*str == '\t')) {
         str++;
     }
-    char *end = str + strlen(str) - 1;
+    size_t len = strlen(str);
+    if (len == 0) {
+        return str;
+    }
+    char *end = str + len - 1;
     while ((end > str) && ((*end == ' ') || (*end == '\t') || (*end == '\n') || (*end == '\r'))) {
         *end = '\0';
         end--;

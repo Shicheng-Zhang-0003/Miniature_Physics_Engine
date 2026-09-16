@@ -37,7 +37,6 @@ The current mode is shown in the top-left status bar.
 | Space | Jump | Fly up |
 | Shift | — | Fly down |
 | I J K L | — | Steer camera (mouse-free) |
-| M | — | Re-lock mouse cursor |
 | Escape | Release mouse | Release mouse |
 
 In Game Mode, releasing WASD does not stop instantly — horizontal momentum bleeds off over a short distance, giving natural arc through the air when jumping while moving.
@@ -48,7 +47,7 @@ In Game Mode, releasing WASD does not stop instantly — horizontal momentum ble
 
 **Enter** spawns an object in front of the camera. Hold Enter for 0.3 seconds to begin rapid-fire spawning.
 
-The active spawn type (sphere or cube) is shown in the status bar. To configure spawning, press `8`:
+The active spawn type (sphere, cube, or cylinder) is shown in the status bar. To configure spawning, press `8`:
 
 ```
 8 → Spawner Menu
@@ -58,7 +57,11 @@ The active spawn type (sphere or cube) is shown in the status bar. To configure 
   2 → Cube settings
     1 → Mass
     2 → Size (half-extent)
-  3 → Toggle spawn type (sphere / cube)
+  3 → Toggle spawn type (sphere / cube / cylinder, Up/Down cycle, Enter confirms)
+  4 → Cylinder settings
+    1 → Mass
+    2 → Radius
+    3 → Half-length (axle, local X)
 ```
 
 Each leaf option opens a text input dialog where you type the value directly and press OK.
@@ -78,7 +81,6 @@ Once selected:
 | `E` | Open / close the object property menu |
 | `F` | Apply an impulse force (launches the object) |
 | Middle mouse click | Delete the object |
-| `Delete` | Remove the selected object (Debug Mode only) |
 
 The object property menu:
 
@@ -99,7 +101,7 @@ Mass, radius, and friction open a text input dialog. Immovable objects have zero
 
 ## Debug Terminal
 
-In Debug Mode, press `T` or `1` to open the **POSIX-style debug terminal**. In Game Mode the terminal is read-only; mutating commands require Debug Mode.
+In Debug Mode, press `1` to open the **POSIX-style debug terminal**. In Game Mode the terminal is read-only; mutating commands require Debug Mode.
 
 The terminal presents the physics world as a virtual filesystem:
 
@@ -119,6 +121,7 @@ Common commands:
 | `cat /obj/3` | Inspect object 3 |
 | `touch new.sph` | Spawn a sphere |
 | `touch new.cube` | Spawn a cube |
+| `touch new.cyl` | Spawn a cylinder |
 | `rm 3` | Delete object 3 |
 | `rm -rf /obj/all` | Delete all objects |
 | `mv 3 /pos/0/10/0` | Teleport object 3 |
@@ -143,7 +146,7 @@ Type `help` for the full command list or `man <command>` for usage. `Ctrl+L` cle
 
 ## Configuration System (Key 6)
 
-Press `6` to open the **Configuration Menu**. This provides live access to all 76 tunable engine parameters.
+Press `6` to open the **Configuration Menu**. This provides live access to all 78 tunable engine parameters.
 
 The menu is organised into 13 categories:
 
@@ -183,10 +186,25 @@ In the debug terminal:
 
 ### F11 Config Torture Test
 
-Press `F11` to randomise all 76 tunables to extreme bounded values and run
+Press `F11` to randomise all 78 tunables to extreme bounded values and run
 a 60-second long-run validation. This stress-tests the engine under
-adversarial parameter combinations. After the test, use key 6 → Reset
-Defaults or terminal `config reset` to restore normal behaviour.
+adversarial parameter combinations (each press uses the next seed, printed
+for bisection). F11 is a robustness verdict: PASS means no NaN and nothing
+fell through the world — speeds are reported, never gated (under extremes,
+perpetual fall/creep can be the TRUE outcome). Solver resolution is pinned
+during torture (gravity −17…−1, ≥96 iterations — the proven envelope for the
+10:1 validation column; material/world extremes stay fully random). F10 at
+defaults keeps the full settle verdict (final < 0.25 m/s, run-max < 2.0 m/s
+past the 2 s opening transient). After the test, use
+key 6 → Reset Defaults or terminal `config reset` to restore normal behaviour.
+
+### Truth-validation switches
+
+- `sleep.enable = 0` (terminal `export sleep.enable=0`, debug-only) disables
+  the sleep optimizer so the solver alone must settle the scene.
+- `nice_value` is a per-object settle tool, not physics: keep 0 for truth.
+- `world.drag` is linear-viscous retention (`c = −ln(drag)`), not quadratic
+  aero; `1.0` is vacuum truth.
 
 ---
 
@@ -199,9 +217,10 @@ The engine includes built-in test keys for stability validation:
 | F5 | Spawn a 10-cube stability stack |
 | F6 | Spawn sleeping cube + moving projectile (sleep/wake test) |
 | F7 | Editor torture test: select, joint, delete, reset |
-| F8 | Spawn stress test: up to 300 mixed objects |
+| F8 | Spawn stress test: up to 300 mixed objects (repeatable: each batch stacks above the last) |
 | F9 | Print validation report to console |
 | F10 | Long-run validation: 3600 ticks (60 seconds) of idle stability |
+| F11 | Config torture (robustness verdict — see above) |
 
 F10 spawns a predefined scene (stack + pile + spheres) and monitors for NaN values, fallen objects, and residual motion over 60 seconds, printing `PASS` or `FAIL` to the console at completion.
 
@@ -219,13 +238,15 @@ Press `7` to open the world and viewpoint settings:
   2 → Viewpoint
     1 → Movement speed
     2 → Jump height (metres)
-  3 → World
+  3 → World (shortcuts into the same values as menu 6)
     1 → Gravity (m/s², negative = downward)
     2 → Air resistance coefficient (0.1–1.0; lower = more drag)
     3 → Surface friction (floor kinetic friction)
+    4 → Rolling resistance coefficient
+    5 → Solver iterations per tick (1–128)
 ```
 
-**Change rate** controls how much arrow keys adjust values in toggle-style menus (Immovable, spawn type). Left/Right arrow keys change it. In Debug Mode the step is ±0.01; in Game Mode it is ±0.2. The current rate is shown in the status bar.
+Toggle-style menus (Immovable, spawn type) use `Up`/`Down` to flip and `Enter` to confirm. Change-rate values (`ui.change_rate_*`) remain editable via menu 6 or the terminal.
 
 ---
 
@@ -240,9 +261,9 @@ Press `9` to open the scene menu:
   3 → Exit engine
 ```
 
-Scenes are saved to `status/scene.dat`. Saving overwrites any existing file. Loading clears the current scene and replaces it entirely. Both spheres and cubes are saved and restored correctly, including position, velocity, orientation, colour, mass, friction, restitution, and static state.
+Scenes are saved to `status/scene.dat` (v200: LE fields, stable IDs, CRC32 footer, atomic tmp→rename). Saving overwrites any existing file. Loading clears the current scene and replaces it entirely. Bodies (sphere/cube/cylinder incl. position, velocity, orientation, colour, mass, friction, restitution, static/kinematic/sleep/nice_value/stable ID+generation) plus spring joints and revolute joints (anchors, axes, motors, limits) are saved and restored. Files ≤v153 load via the legacy reader (IDs remapped, cylinders become spheres pre-R3-04).
 
-**Known limitations:** Spring joints are **not** saved and will be lost on save/load. Object IDs are reassigned on load, so any external references (selection, terminal, joints) to specific IDs will not survive. Sleeping state is not persisted — all objects load awake. These limitations are deferred to scene format version 2.
+**Known limitations:** Prismatic joints are not yet implemented so nothing to save. Per-object config (beyond nice_value) is not persisted. Big-endian hosts are untested (format is LE by design).
 
 ---
 
@@ -261,7 +282,7 @@ All values are in SI units (metres, kilograms, seconds).
 | Air drag coefficient | 0.99 | — |
 | Physics timestep | 60 Hz fixed | — |
 
-The engine uses a fixed 60 Hz physics timestep with an accumulator, allowing up to 5 physics ticks per rendered frame to prevent spiral-of-death. Each physics tick uses 16 solver iterations, giving stable collision resolution for stacked objects and rolling behaviour. Spheres use rolling friction with torque generation at the contact point. Cubes use localised force application at the lowest vertex to generate rotational torque on floor contact.
+The engine uses a fixed 60 Hz physics timestep with an accumulator, allowing up to 5 physics ticks per rendered frame to prevent spiral-of-death. Each physics tick runs 64 sequential-impulse solver iterations by default (timestep.solver_iterations, 1–128), giving stable collision resolution for stacked objects and rolling behaviour. Rolling resistance applies contact-patch torque (Hertz patch, shared-patch split for body-body); static/kinetic Coulomb friction uses a two-tangent disc clamp.
 
 Objects with velocity below 0.05 m/s and angular velocity below 0.01 rad/s are put to sleep automatically to prevent floating-point jitter.
 
@@ -291,15 +312,15 @@ Broadphase collision detection uses a 3D spatial hash grid and runs once per phy
 
 **Wayland:** Mouse locking does not function correctly under native Wayland. The engine must be run under X11. On systems that default to Wayland, install basic X11 drivers (`xorg`, `xserver-xorg`) and launch the engine in an X11 session. Forcing X11 via `GDK_BACKEND=x11 ./engine` may also work depending on your compositor.
 
-**Scene format:** Save/load preserves bodies but not spring joints, object IDs, or sleep state. Scene format v2 is deferred work.
+**Scene format:** v200 saves bodies (stable IDs, sleep, damping) plus spring, revolute, fixed and distance joints, with CRC32 footer and atomic write. Files ≤v153 load via the legacy reader. Truth labels: `world.drag` is linear-viscous (not quadratic aero); `nice_value`/`angular_damping_scale` are NON-PHYSICAL settle tools (0/1.0 = truth); `sleep.enable=0` runs sleepless truth validation; boundary walls are a plastic safety net, not material contact.
 
 ---
 
 ## Object Types
 The engine supports three object types:
-- **Sphere** — spawned via `touch new.sph` or spawner menu
-- **Cube** — spawned via `touch new.cube` or spawner menu
-- **Cylinder** — axle along local X, correct `I = ½·m·r²` inertia
+- **Sphere** — spawned via `touch new.sph`, spawner menu, or `Enter`
+- **Cube** — spawned via `touch new.cube`, spawner menu, or `Enter`
+- **Cylinder** — spawned via `touch new.cyl`, spawner menu, or `Enter`; axle along local X, correct `I = ½·m·r²` inertia, exact flat-cap contacts, dedicated instanced mesh
 
 
 

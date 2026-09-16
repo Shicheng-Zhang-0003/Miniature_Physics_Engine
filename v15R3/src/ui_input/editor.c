@@ -56,15 +56,40 @@ void editor_update_menus(GtkWidget *parent_window) {
             g_cfg.spawner.cube_extent = 0.01f;
         }
         main_inputs.spawner_menu_level = 0;
+    } else if (main_inputs.spawner_menu_level == 10) {
+        g_cfg.spawner.cyl_mass =
+            open_numerical_input_dialog(parent_window, "Cylinder Mass (kg)", g_cfg.spawner.cyl_mass);
+        editor_reacquire_mouse(parent_window);
+        if (g_cfg.spawner.cyl_mass < 0.01f) {
+            g_cfg.spawner.cyl_mass = 0.01f;
+        }
+        main_inputs.spawner_menu_level = 0;
+    } else if (main_inputs.spawner_menu_level == 11) {
+        g_cfg.spawner.cyl_radius =
+            open_numerical_input_dialog(parent_window, "Cylinder Radius (m)", g_cfg.spawner.cyl_radius);
+        editor_reacquire_mouse(parent_window);
+        if (g_cfg.spawner.cyl_radius < 0.01f) {
+            g_cfg.spawner.cyl_radius = 0.01f;
+        }
+        main_inputs.spawner_menu_level = 0;
+    } else if (main_inputs.spawner_menu_level == 12) {
+        g_cfg.spawner.cyl_half_length =
+            open_numerical_input_dialog(parent_window, "Cylinder Half-Length (m)", g_cfg.spawner.cyl_half_length);
+        editor_reacquire_mouse(parent_window);
+        if (g_cfg.spawner.cyl_half_length < 0.01f) {
+            g_cfg.spawner.cyl_half_length = 0.01f;
+        }
+        main_inputs.spawner_menu_level = 0;
     }
 
     if (main_inputs.spawner_menu_level == 8) {
-        if ((main_inputs.up_arrow_pressed) || (main_inputs.down_arrow_pressed)) {
-            if (main_inputs.current_spawn_type == 0) {
-                main_inputs.current_spawn_type = 1;
-            } else {
-                main_inputs.current_spawn_type = 0;
-            }
+        /* Three-way spawn-type cycle (was a two-way toggle). */
+        if (main_inputs.up_arrow_pressed) {
+            main_inputs.current_spawn_type = (main_inputs.current_spawn_type + 1) % 3;
+            main_inputs.up_arrow_pressed = false;
+            main_inputs.down_arrow_pressed = false;
+        } else if (main_inputs.down_arrow_pressed) {
+            main_inputs.current_spawn_type = (main_inputs.current_spawn_type + 2) % 3;
             main_inputs.up_arrow_pressed = false;
             main_inputs.down_arrow_pressed = false;
         }
@@ -84,13 +109,25 @@ void editor_update_menus(GtkWidget *parent_window) {
         }
         main_inputs.velocity_menu_level = 0;
     } else if (main_inputs.velocity_menu_level == 4) {
-        g_cfg.world.floor_friction_k =
-            open_numerical_input_dialog(parent_window, "Spawn Friction (Kinetic)", g_cfg.world.floor_friction_k);
+        /* TRUTH: this menu is labeled (overlay + user guide) "spawn/object
+         * friction applied to newly spawned objects", and spawner_launch
+         * reads g_cfg.spawner.friction_*. It used to write WORLD floor
+         * friction instead (duplicating level 23 under a false label while
+         * the display showed the untouched spawner values). Now writes what
+         * it says. World floor friction lives at level 23. */
+        g_cfg.spawner.friction_k =
+            open_numerical_input_dialog(parent_window, "Spawn Friction (Kinetic)", g_cfg.spawner.friction_k);
         editor_reacquire_mouse(parent_window);
-        if (g_cfg.world.floor_friction_k < 0.0f) {
-            g_cfg.world.floor_friction_k = 0.0f;
+        if (g_cfg.spawner.friction_k < 0.0f) {
+            g_cfg.spawner.friction_k = 0.0f;
         }
-        g_cfg.world.floor_friction_s = g_cfg.world.floor_friction_k + 0.1f;
+        if (g_cfg.spawner.friction_k > 5.0f) {
+            g_cfg.spawner.friction_k = 5.0f;
+        }
+        g_cfg.spawner.friction_s = g_cfg.spawner.friction_k + 0.1f;
+        if (g_cfg.spawner.friction_s > 5.0f) {
+            g_cfg.spawner.friction_s = 5.0f;
+        }
         main_inputs.velocity_menu_level = 0;
     } else if (main_inputs.velocity_menu_level == 11) {
         main_camera_fov.movement_speed =
@@ -131,6 +168,31 @@ void editor_update_menus(GtkWidget *parent_window) {
         }
         g_cfg.world.floor_friction_s = g_cfg.world.floor_friction_k + 0.1f;
         main_inputs.velocity_menu_level = 0;
+    } else if (main_inputs.velocity_menu_level == 24) {
+        /* Imported from menu 6: world rolling resistance (registry 0..5). */
+        g_cfg.world.rolling_resistance_coeff = open_numerical_input_dialog(
+            parent_window, "Rolling Resistance Coeff", g_cfg.world.rolling_resistance_coeff);
+        editor_reacquire_mouse(parent_window);
+        if (g_cfg.world.rolling_resistance_coeff < 0.0f) {
+            g_cfg.world.rolling_resistance_coeff = 0.0f;
+        }
+        if (g_cfg.world.rolling_resistance_coeff > 5.0f) {
+            g_cfg.world.rolling_resistance_coeff = 5.0f;
+        }
+        main_inputs.velocity_menu_level = 0;
+    } else if (main_inputs.velocity_menu_level == 25) {
+        /* Imported from menu 6: solver iterations (registry int 1..128). */
+        float iters = open_numerical_input_dialog(parent_window, "Solver Iterations",
+                                                  (float) g_cfg.timestep.solver_iterations);
+        editor_reacquire_mouse(parent_window);
+        if (iters < 1.0f) {
+            iters = 1.0f;
+        }
+        if (iters > 128.0f) {
+            iters = 128.0f;
+        }
+        g_cfg.timestep.solver_iterations = (int) iters;
+        main_inputs.velocity_menu_level = 0;
     }
 
     // Selected Object Menu Logic
@@ -149,6 +211,9 @@ void editor_update_menus(GtkWidget *parent_window) {
         selected_rigid_body->inverse_mass = 1.0f / selected_rigid_body->mass;
         if (selected_rigid_body->type == object_sphere) {
             rigidbody_update_inertia_sphere(selected_rigid_body);
+        } else if (selected_rigid_body->type == object_cylinder) {
+            /* Cylinders got cube inertia here before (wrong dynamics post-edit). */
+            rigidbody_update_inertia_cylinder(selected_rigid_body);
         } else {
             rigidbody_update_inertia_cube(selected_rigid_body);
         }
@@ -172,6 +237,16 @@ void editor_update_menus(GtkWidget *parent_window) {
             }
             editor_reacquire_mouse(parent_window);
             rigidbody_update_inertia_sphere(selected_rigid_body);
+        } else if (selected_rigid_body->type == object_cylinder) {
+            /* Cylinder radius is live (see overlay label): same dialog path,
+             * cylinder inertia (sanitize re-syncs bounding half-extents). */
+            selected_rigid_body->radius =
+                open_numerical_input_dialog(parent_window, "Selected Object Radius", selected_rigid_body->radius);
+            if (selected_rigid_body->radius < 0.01f) {
+                selected_rigid_body->radius = 0.01f;
+            }
+            editor_reacquire_mouse(parent_window);
+            rigidbody_update_inertia_cylinder(selected_rigid_body);
         }
         /* MPE_TASK_06_CACHE_CLEAR_RADIUS */
         contact_cache_clear(physics_world_get_primary());

@@ -29,11 +29,13 @@ static struct {
     GLint specular_exponent_location;
 } utility_uniforms;
 mesh sphere_mesh;
+mesh cylinder_mesh;
 typedef enum { render_uninitialized = 0, render_ok = 1, render_failed = -1 } render_status;
 static render_status render_init_status = render_uninitialized;
 static grid_mesh main_grid;
 static float *sphere_instances = NULL;
 static float *cube_instances = NULL;
+static float *cylinder_instances = NULL;
 void render_init() {
     if (render_init_status != render_uninitialized) {
         return;
@@ -66,8 +68,10 @@ void render_init() {
     grid_init(&main_grid, 250, 5);
     init_sm_system(&sphere_mesh, 32, 32);
     cube_meshing_init();
+    init_cylinder_system(&cylinder_mesh, 24);
     sphere_instances = malloc(mpe_max_bodies * 19 * sizeof(float));
     cube_instances = malloc(mpe_max_bodies * 19 * sizeof(float));
+    cylinder_instances = malloc(mpe_max_bodies * 19 * sizeof(float));
     render_init_status = render_ok;
 }
 void render_cleanup(void) {
@@ -78,6 +82,10 @@ void render_cleanup(void) {
     if (cube_instances) {
         free(cube_instances);
         cube_instances = NULL;
+    }
+    if (cylinder_instances) {
+        free(cylinder_instances);
+        cylinder_instances = NULL;
     }
     render_init_status = render_uninitialized;
 }
@@ -139,6 +147,7 @@ void render_scene_current(int widget_width, int widget_height) {
     }
     int sphere_inst_count = 0;
     int cube_inst_count = 0;
+    int cylinder_inst_count = 0;
     for (int object_index = 0; object_index < (physics_world_get_primary()->body_count); object_index++) {
         rigidbody *rigid_body = &(physics_world_get_primary()->bodies)[object_index];
         /* Sphere-vs-frustum: outside if signed distance < -radius on any plane. */
@@ -169,6 +178,11 @@ void render_scene_current(int widget_width, int widget_height) {
         vector3 model_scale;
         if (rigid_body->type == object_sphere) {
             model_scale = (vector3){rigid_body->radius, rigid_body->radius, rigid_body->radius};
+        } else if (rigid_body->type == object_cylinder) {
+            /* Unit mesh: axle X half-length 1, radius 1 (see
+             * cylinder_meshing.h): scale columns to (h, r, r). */
+            model_scale =
+                (vector3){rigid_body->cylinder_half_length, rigid_body->radius, rigid_body->radius};
         } else {
             model_scale = rigid_body->half_extensions;
         }
@@ -189,6 +203,9 @@ void render_scene_current(int widget_width, int widget_height) {
         if (rigid_body->type == object_sphere) {
             target_array = sphere_instances;
             target_count = &sphere_inst_count;
+        } else if (rigid_body->type == object_cylinder) {
+            target_array = cylinder_instances;
+            target_count = &cylinder_inst_count;
         } else {
             target_array = cube_instances;
             target_count = &cube_inst_count;
@@ -223,6 +240,12 @@ void render_scene_current(int widget_width, int widget_height) {
         glBufferSubData(GL_ARRAY_BUFFER, 0, cube_inst_count * 19 * sizeof(float), cube_instances);
         glBindVertexArray(cube_mesh.vertex_array_object);
         glDrawElementsInstanced(GL_TRIANGLES, cube_mesh.index_count, GL_UNSIGNED_INT, 0, cube_inst_count);
+    }
+    if (cylinder_inst_count > 0) {
+        glBindBuffer(GL_ARRAY_BUFFER, cylinder_mesh.instance_vbo);
+        glBufferSubData(GL_ARRAY_BUFFER, 0, cylinder_inst_count * 19 * sizeof(float), cylinder_instances);
+        glBindVertexArray(cylinder_mesh.vertex_array_object);
+        glDrawElementsInstanced(GL_TRIANGLES, cylinder_mesh.index_count, GL_UNSIGNED_INT, 0, cylinder_inst_count);
     }
     glBindVertexArray(0);
     spring_joint_render(utility_shader_program, view_matrix, projection_matrix);

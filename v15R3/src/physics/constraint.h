@@ -31,12 +31,25 @@ typedef struct {
 } revolute_params;
 
 typedef struct {
+    vector3 anchor_a;
+    vector3 anchor_b;
+} fixed_params;
+
+typedef struct {
+    vector3 anchor_a;
+    vector3 anchor_b;
+    float rest_length;
+} distance_params;
+
+typedef struct {
     constraint_type type;
     uint32_t body_id_a;
     uint32_t body_id_b;
     bool is_active;
     union {
         revolute_params revolute;
+        fixed_params fixed;
+        distance_params distance;
     } p;
 } constraint;
 
@@ -44,6 +57,10 @@ struct physics_world;
 void constraint_pool_init (struct physics_world *world);
 int  constraint_add_revolute (struct physics_world *world, uint32_t id_a, uint32_t id_b, vector3 anchor_a,
                               vector3 anchor_b, vector3 axis_a);
+int constraint_add_fixed(struct physics_world *world, uint32_t id_a, uint32_t id_b, vector3 anchor_a,
+                         vector3 anchor_b);
+int constraint_add_distance(struct physics_world *world, uint32_t id_a, uint32_t id_b, vector3 anchor_a,
+                            vector3 anchor_b, float rest_length);
 void constraint_remove (struct physics_world *world, int index);
 int  constraint_get_count (const struct physics_world *world);
 void constraint_set_revolute_motor (struct physics_world *world, int index, bool enabled, float target_speed,

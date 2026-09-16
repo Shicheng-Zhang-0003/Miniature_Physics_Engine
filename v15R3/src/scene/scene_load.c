@@ -499,8 +499,10 @@ int scene_loading(const char *file_source_path)
             rigidbody_set_static(&staged_bodies[i], false);
         }
 
-        rigidbody_sanitize(&staged_bodies[i]);
-        rigidbody_update_axes(&staged_bodies[i]);
+        /* Single sanitization point: set_static already refreshed inertia
+         * and axes; sanitize once after sleep/kinematic assignment below.
+         * (Old code sanitized here AND after update_axes AND inside
+         * set_kinematic — triple work per body on every load.) */
 
         /* nice_value and sleep state persist (v152+); older files load
          * awake with default damping. Saved IDs go to staged_ids. */
@@ -513,6 +515,11 @@ int scene_loading(const char *file_source_path)
             staged_bodies[i].sleep_timer = 0.0f;
             staged_bodies[i].velocity = vector3_zero();
             staged_bodies[i].angular_velocity = vector3_zero();
+        }
+        /* Single sanitize covers the whole legacy path (set_kinematic already
+         * sanitizes, but non-kinematic bodies need it here). */
+        if (saved_kinematic == 0) {
+            rigidbody_sanitize(&staged_bodies[i]);
         }
         staged_ids[i] = saved_object_id;
 

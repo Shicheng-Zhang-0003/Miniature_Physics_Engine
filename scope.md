@@ -17,6 +17,23 @@
 > Still open: PHYS-001 (islanding), PHYS-002 (CCD), PHYS-004 (rolling friction),
 > PERF-001 (SIMD), PERF-003 (frustum culling), ARCH-001 (partial), ARCH-003
 > (debug_terminal 146KB), ARCH-006 (scene format), SAVE-001–008.
+>
+> STATUS UPDATE 2 (post physics-truth pass, 26/26 headless green):
+> Resolved since the above: PHYS-001 (union-find sleep islands), PHYS-002
+> (swept TOI + remainder integration, dynamic volumes), PHYS-004 (Hertz-patch
+> rolling + spin resistance), PERF-003 (Gribb/Hartmann frustum culling),
+> ARCH-003 (terminal split into term_fs/obj/query/sys/admin), ARCH-006 +
+> SAVE-001–008 (scene v200: stable IDs, joints, CRC32, atomic staged load).
+> Still genuinely open: PERF-001 (SIMD), multithreading, prismatic joints,
+> rope inequality, revolute angle-limit tracking, Wayland mouse-lock,
+> quadratic aero drag.
+>
+> STATUS UPDATE 3 (dead-knob scrapping + wire-ins):
+> Scrapped (zero physics purpose, verified zero readers): `warmed` flag,
+> `cached_tangent`, `mpe_face_hysteresis`, `solver.max_restitution_bias`
+> (registry+struct), `depenetration.penetration_slop` (registry+struct),
+> `make_half_extents`. Wired in (real physics, was dead):
+> `rb_get_kinetic_energy` + `islands_count` → F9 energy/island readout.
 
 
 Every issue found across all 88 files, organized by section. Severity scale: **Critical** (breaks correctness), **High** (blocks future work), **Medium** (code quality / maintainability), **Low** (polish / cosmetic).

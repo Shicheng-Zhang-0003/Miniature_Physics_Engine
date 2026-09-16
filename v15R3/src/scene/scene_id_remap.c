@@ -13,13 +13,14 @@ static int remap_count = 0;
 void scene_id_remap_reset(void) {
     remap_count = 0;
 }
-void scene_id_remap_add(uint32_t old_id, uint32_t new_id) {
+bool scene_id_remap_add(uint32_t old_id, uint32_t new_id) {
     if (remap_count >= mpe_max_bodies) {
-        return;
+        return false;
     }
     remap_table[remap_count].old_id = old_id;
     remap_table[remap_count].new_id = new_id;
     remap_count++;
+    return true;
 }
 uint32_t scene_id_remap_resolve(uint32_t old_id) {
     for (int i = 0; i < remap_count; i++) {
@@ -28,4 +29,7 @@ uint32_t scene_id_remap_resolve(uint32_t old_id) {
         }
     }
     return old_id;
+}
+int scene_id_remap_count(void) {
+    return remap_count;
 }

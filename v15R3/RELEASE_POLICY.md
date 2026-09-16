@@ -28,12 +28,28 @@ During v15R3 development:
 
 ## Explicitly Deferred
 
-- Full global-state removal beyond config extraction.
-- Multithreading.
-- Continuous collision detection.
-- Generic constraint framework.
-- Scene format version 2.
+- Multithreading (islands currently skip-only, solve stays single-threaded).
+- Prismatic joints; rope inequality; revolute angle-limit tracking.
+- Complete UI state-machine rewrite (magic-level dispatch split, not yet FSM).
 - Wayland mouse-lock support.
+- Per-object config persistence beyond nice_value.
+- Quadratic aero drag (current drag is linear-viscous retention).
+
+## Landed Since the Original List (no longer deferred)
+
+- Full sim-state global removal (physics_world owns bodies/IDs/joints/caches).
+- Continuous collision detection (swept TOI + remainder integration).
+- Solver islanding (union-find sleep islands).
+- Scene format v200 (stable IDs, joints, CRC32, atomic staged load).
+- Poisson restitution, split impulse, rolling resistance, gyroscopic torque.
+- Physics-truth pass: Verlet-exact free flight, post-integration Poisson gate,
+  strict warm-start, true cylinder SDF, hysteresis deleted, speed-clamp and
+  restitution-cap deleted. Intentional behavior change vs v14S: default
+  angular_damping_scale is now 1.0 (truth vacuum; v14S hardcoded 0.97 rotary
+  damping) and sleep can be disabled via sleep.enable for truth validation.
+- F11 torture guardrails: gravity −17…−1, solver_iterations ≥96 (proven
+  envelope for the 10:1 validation column; convergence proof in
+  `src/scene/scene_init.c`). F11 verdict is robustness-only by spec.
 
 ## Release Goal
 
@@ -42,4 +58,5 @@ During v15R3 development:
 - all P0 gates pass,
 - the config system round-trips (save → restart → load),
 - the menu and terminal both edit live parameters,
-- and physics behaviour at defaults is identical to v14S.
+  - and physics behaviour at defaults is identical to v14S except the
+  documented truth-fix exceptions (vacuum angular damping, removed clamps).

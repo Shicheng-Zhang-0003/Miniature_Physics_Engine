@@ -12,7 +12,7 @@
 #include "../config/mpe_constants.h"
 
 /* alias table dimensions (storage lives in debug_terminal.c) */
-#define term_alias_max 32
+#define term_alias_max 64
 #define term_alias_name_len 64
 #define term_alias_value_len 256
 
@@ -70,6 +70,7 @@ void term_execute(char *command_line);
 
 /* object/joint model layer (defined in term_obj.c) */
 const char *term_object_type_name(rigidbody *rigid_body);
+const char *term_spawn_type_name(void);
 const char *term_object_state_name(rigidbody *rigid_body);
 const char *term_object_mode(rigidbody *rigid_body);
 void term_print_object_long(int object_index);
