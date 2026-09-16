@@ -20,6 +20,8 @@
  * that omit physics/spring_joint.c (GL dependency) still link; the GUI
  * engine links it and gets real spring forces. Pool comes from the world. */
 void apply_spring_forces_world(physics_world *world, rigidbody *bodies, int body_count) __attribute__((weak));
+void apply_spring_forces_world_dt(physics_world *world, rigidbody *bodies, int body_count, float dt)
+    __attribute__((weak));
 #include "../config/mpe_config.h"
 #include "../config/mpe_constants.h"
 #include <stdlib.h>
@@ -35,6 +37,7 @@ void physics_world_init(physics_world *world) {
     if (!world) {
         return;
     }
+    det_pin_fp_state();
     memset(world, 0, sizeof(physics_world)); /* MPE_FTC_076a */
     if (!world->bodies) {
         world->bodies = (rigidbody *) malloc((size_t) mpe_max_bodies * sizeof(rigidbody));
@@ -139,7 +142,13 @@ int physics_world_add_sphere(physics_world *world, float radius, float mass, vec
     }
     rigidbody *rb = &world->bodies[world->body_count];
     rigidbody_initialisation_sphere(rb, radius, mass, position);
+    if (world->next_object_id == 0 || world->next_object_id == 0xFFFFFFFFu) {
+        world->next_object_id = 1;
+    }
     rb->object_id = world->next_object_id++;
+    if (world->next_object_id == 0 || world->next_object_id == 0xFFFFFFFFu) {
+        world->next_object_id = 1;
+    }
     rb->object_generation = 1;
     rigidbody_sanitize(rb);
     return world->body_count++;
@@ -151,7 +160,13 @@ int physics_world_add_cube(physics_world *world, vector3 position, vector3 half_
     }
     rigidbody *rb = &world->bodies[world->body_count];
     rigidbody_initialisation_cube(rb, position, half_extensions, mass);
+    if (world->next_object_id == 0 || world->next_object_id == 0xFFFFFFFFu) {
+        world->next_object_id = 1;
+    }
     rb->object_id = world->next_object_id++;
+    if (world->next_object_id == 0 || world->next_object_id == 0xFFFFFFFFu) {
+        world->next_object_id = 1;
+    }
     rb->object_generation = 1;
     rigidbody_sanitize(rb);
     return world->body_count++;
@@ -165,7 +180,13 @@ int physics_world_add_cylinder(physics_world *world, float radius, float half_le
     }
     rigidbody *rb = &world->bodies[world->body_count];
     rigidbody_initialisation_cylinder(rb, radius, half_length, mass, position);
+    if (world->next_object_id == 0 || world->next_object_id == 0xFFFFFFFFu) {
+        world->next_object_id = 1;
+    }
     rb->object_id = world->next_object_id++;
+    if (world->next_object_id == 0 || world->next_object_id == 0xFFFFFFFFu) {
+        world->next_object_id = 1;
+    }
     rb->object_generation = 1;
     rigidbody_sanitize(rb);
     return world->body_count++;
@@ -177,6 +198,16 @@ void physics_world_clear(physics_world *world) {
     }
     world->body_count = 0;
     world->world_contact_cache_count = 0; /* MFS_131A */
+    world->manifold_overflow_count = 0;
+    world->contact_cache_hits = 0;
+    world->contact_cache_misses = 0;
+    /* TRUTH: next_object_id monotonic wraps at 4G to 0, colliding with
+     * cache sentinel id==0 (no match) + floor 0xFFFFFFFF. Skip 0/0xFFFFFFFF
+     * on wrap. clear() does NOT reset IDs (stable across clears would alias
+     * old cache entries); instead ensure wrap skips sentinels. */
+    if (world->next_object_id == 0 || world->next_object_id == 0xFFFFFFFFu) {
+        world->next_object_id = 1;
+    }
 }
 
 /* One broadphase pair through narrowphase + wake-on-contact + solver
@@ -227,35 +258,52 @@ static void physics_world_process_pair(physics_world *world, int index_a, int in
             }
         } else if ((body_a->type == object_cylinder) && (body_b->type == object_cylinder)) {
             collided = collision_cylinder_cylinder(body_a, body_b, &narrowphase_collision);
-        }         if ((collided) && ((*manifold_count_ptr) < a3_max_manifolds)) {
-            /* LIST4 R3-06: wake-on-contact for the physics_world path.
-             *
-             * The legacy path already had this. The encapsulated path did not,
-             * which allowed sleeping bodies to remain frozen while active bodies
-             * collided with them and silently injected velocity.
-             */
+        }         if (collided) {
+            if ((*manifold_count_ptr) >= a3_max_manifolds) {
+                world->manifold_overflow_count++;
+                return;
+            }
+            /* TRUTH: three-gate wake (any fires).
+             * 1. NEW EDGE (pair novelty via the contact cache): either id
+             *    pair has no entry from a prior tick. First touch wakes at
+             *    ANY speed — this closes the slow-pusher ghost (creeping
+             *    stack partner, 0.05 m/s kinematic platform) that pure
+             *    velocity gates miss, and unlike per-body flags it is not
+             *    blinded by floor contacts every rester holds. Persistent
+             *    resting pairs have entries, so settled stacks proceed to
+             *    sleep instead of being kept awake forever (which pumped
+             *    the F10 10-stack to 13 m/s via never-sleeping micro-motion).
+             * 2. FAST OTHER: original velocity gate (backstop for fast bodies
+             *    that already held contacts, e.g. debris sliding along a
+             *    stack before striking a sleeper).
+             * 3. DEEP: overlap beyond wake_depth_thresh, even vs statics. */
             bool a_was_sleeping = body_a->is_sleeping;
             bool b_was_sleeping = body_b->is_sleeping;
 
             if ((a_was_sleeping) && (b_was_sleeping)) {
-                /* Both sleeping: nothing to wake. */
+                /* Both sleeping: nothing to wake (depth backstop below still
+                 * applies via the revisit/split/depen paths). */
             } else {
-                float wake_linear_threshold_sq = g_cfg.sleep.wake_linear_thresh_sq;
-                float wake_angular_threshold_sq = g_cfg.sleep.wake_angular_thresh_sq;
-
-                bool a_is_active = (!a_was_sleeping) &&
-                    ((vector3_length_squared(body_a->velocity) > wake_linear_threshold_sq) ||
-                     (vector3_length_squared(body_a->angular_velocity) > wake_angular_threshold_sq));
-
-                bool b_is_active = (!b_was_sleeping) &&
-                    ((vector3_length_squared(body_b->velocity) > wake_linear_threshold_sq) ||
-                     (vector3_length_squared(body_b->angular_velocity) > wake_angular_threshold_sq));
-
-                if ((a_was_sleeping) && (!body_b->static_state) && (b_is_active)) {
+                bool new_edge = !contact_cache_has_pair(world, body_a->object_id, body_b->object_id);
+                if ((a_was_sleeping) && (!body_b->static_state) && new_edge) {
                     rigidbody_wake(body_a);
                 }
+                if ((b_was_sleeping) && (!body_a->static_state) && new_edge) {
+                    rigidbody_wake(body_b);
+                }
 
-                if ((b_was_sleeping) && (!body_a->static_state) && (a_is_active)) {
+                float wake_lin_sq = g_cfg.sleep.wake_linear_thresh_sq;
+                float wake_ang_sq = g_cfg.sleep.wake_angular_thresh_sq;
+                bool a_fast = (!a_was_sleeping) &&
+                              ((vector3_length_squared(body_a->velocity) > wake_lin_sq) ||
+                               (vector3_length_squared(body_a->angular_velocity) > wake_ang_sq));
+                bool b_fast = (!b_was_sleeping) &&
+                              ((vector3_length_squared(body_b->velocity) > wake_lin_sq) ||
+                               (vector3_length_squared(body_b->angular_velocity) > wake_ang_sq));
+                if ((a_was_sleeping) && (!body_b->static_state) && b_fast) {
+                    rigidbody_wake(body_a);
+                }
+                if ((b_was_sleeping) && (!body_a->static_state) && a_fast) {
                     rigidbody_wake(body_b);
                 }
 
@@ -297,13 +345,23 @@ static void physics_world_process_pair(physics_world *world, int index_a, int in
 }
 
 void physics_world_step(physics_world *world, float dt) {
-    if ((!world) || (!world->bodies) || (dt <= 0.0f) || (world->body_count <= 0)) {
+    if ((!world) || (!world->bodies) || (!(dt > 0.0f)) || (!isfinite(dt)) || (world->body_count <= 0)) {
         return;
+    }
+    if (dt > 0.1f) {
+        dt = 0.1f;
     }
 
     for (int i = 0; i < world->body_count; i++) {
         rigidbody_sanitize(&world->bodies[i]);
     }
+    /* TRUTH: snapshot config once per tick. Menu/terminal mutating g_cfg
+     * mid-tick (between substeps) would otherwise change behavior halfway
+     * through the frame. Hot path uses these locals, never g_cfg directly. */
+    const float step_gravity = g_cfg.world.gravity;
+    const float step_drag = g_cfg.world.drag;
+    const float step_ang_scale = g_cfg.world.angular_damping_scale;
+    const int step_iterations = g_cfg.timestep.solver_iterations;
     /* TRUTH P0-1: reset contact flags (set below on every manifold). */
     if (world->has_contact) {
         for (int i = 0; i < world->body_count; i++) {
@@ -329,9 +387,10 @@ void physics_world_step(physics_world *world, float dt) {
     int broadphase_pair_count = pair_count; /* saved for depenetration pass */
 
     /* Low-memory contract: degraded (pairless) tick instead of a crash when
-     * scratch failed to allocate. */
+     * scratch failed to allocate. TRUTH: sort_keys missing left order_out
+     * uninitialized -> OOB solve. Check it too. */
     if ((!world->pair_buffer) || (!world->manifolds) || (!world->manifold_awake) || (!world->manifold_order) ||
-        (!world->pair_skipped) || (!world->broadphase)) {
+        (!world->manifold_sort_keys) || (!world->pair_skipped) || (!world->broadphase)) {
         return;
     }
     int manifold_count = 0;
@@ -392,11 +451,29 @@ void physics_world_step(physics_world *world, float dt) {
 
     for (int i = 0; i < world->body_count; i++) {
         rigidbody *rb = &world->bodies[i];
-        if ((rb->static_state) || (rb->is_sleeping)) {
+        if (rb->static_state) {
             continue;
         }
+        /* TRUTH: sleeping floor contact must still build a manifold (with
+         * eff_inv=0 it solves as no-op) so has_contact is set and deep
+         * sink wakes. Old skip left shallow sleepers intersecting floor
+         * forever with has_contact=0 (false free-flight). */
+        bool was_sleeping = rb->is_sleeping;
         collision_data floor_collision = {0};
-        if ((collision_static_plane_body(rb, 0.0f, &floor_collision)) && (manifold_count < a3_max_manifolds)) {
+        if (collision_static_plane_body(rb, 0.0f, &floor_collision)) {
+            if (manifold_count >= a3_max_manifolds) {
+                world->manifold_overflow_count++;
+                continue;
+            }
+            float deepest = 0.0f;
+            for (int fi = 0; fi < floor_collision.contact_count; fi++) {
+                if (floor_collision.contacts[fi].penetration > deepest) {
+                    deepest = floor_collision.contacts[fi].penetration;
+                }
+            }
+            if (was_sleeping && deepest > g_cfg.depenetration.wake_depth_thresh) {
+                rigidbody_wake(rb);
+            }
             collision_prepare_solver(world, &floor_collision, &world->manifolds[manifold_count], dt);
             manifold_count++;
             if (world->has_contact) {
@@ -417,7 +494,7 @@ void physics_world_step(physics_world *world, float dt) {
     }
     collision_manifold_solve_order(world, world->manifolds, manifold_count, world->manifold_order);
 
-    vector3 gravity = {0.0f, g_cfg.world.gravity, 0.0f};
+    vector3 gravity = {0.0f, step_gravity, 0.0f};
     for (int i = 0; i < world->body_count; i++) {
         rigidbody *rb = &world->bodies[i];
         if ((rb->static_state) || (rb->is_sleeping) || (rb->kinematic)) {
@@ -427,14 +504,16 @@ void physics_world_step(physics_world *world, float dt) {
     }
 
     /* Deterministic retention factors (never libm pow: see det_math.h). */
-    float linear_damping = (float) det_pow_retention((double) g_cfg.world.drag, (double) dt);
+    float linear_damping = (float) det_pow_retention((double) step_drag, (double) dt);
     /* FIX-AUDIT: angular scale was hardcoded 0.97 (damped even at drag=1).
      * Now a real config param. */
     float angular_damping =
-        (float) det_pow_retention((double) (g_cfg.world.drag * g_cfg.world.angular_damping_scale), (double) dt);
+        (float) det_pow_retention((double) (step_drag * step_ang_scale), (double) dt);
     /* FIX-AUDIT: springs were never applied on the encapsulated path.
      * Apply world-aware spring forces before integration (weak-linked). */
-    if (apply_spring_forces_world) {
+    if (apply_spring_forces_world_dt) {
+        apply_spring_forces_world_dt(world, world->bodies, world->body_count, dt);
+    } else if (apply_spring_forces_world) {
         apply_spring_forces_world(world, world->bodies, world->body_count);
     }
     constraint_apply_motors(world, dt); /* MPE_FTC_067 */
@@ -461,7 +540,15 @@ void physics_world_step(physics_world *world, float dt) {
      * current velocities before any iteration touches accumulators. */
     collision_refresh_impact_velocities(world->manifolds, manifold_count);
 
-    int solver_iterations = g_cfg.timestep.solver_iterations;
+    int solver_iterations = step_iterations;
+    if (solver_iterations < 1) {
+        solver_iterations = 1;
+    }
+    if (solver_iterations > 128) {
+        solver_iterations = 128;
+    }
+    /* TRUTH: joint angle/slide integration once per tick (not per iteration). */
+    constraint_pre_step_all(world, dt);
     for (int iter = 0; iter < solver_iterations; iter++) {
         for (int o = 0; o < manifold_count; o++) {
             int m = world->manifold_order[o];
@@ -486,7 +573,10 @@ void physics_world_step(physics_world *world, float dt) {
     constraint_correct_axis_drift_all(world, dt);
     /* Poisson restitution: one e-over-compression payment per fresh impact,
      * then short relaxation so friction sees post-bounce velocities. */
+    /* TRUTH: joints must see post-bounce velocities too. Poisson without a
+     * joint relaxation leaves hinges/welds broken for a tick. */
     collision_apply_poisson_restitution(world->manifolds, manifold_count);
+    constraint_solve_all(world, dt);
     for (int relax_iter = 0; relax_iter < 2; relax_iter++) {
         for (int o = 0; o < manifold_count; o++) {
             int m = world->manifold_order[o];
@@ -500,6 +590,26 @@ void physics_world_step(physics_world *world, float dt) {
      * The velocity solve above is compression-only, so contact impulses
      * (and the Coulomb clamp) stay honest. */
     collision_apply_split_impulse(world->manifolds, manifold_count, dt);
+    /* TRUTH: split can wake sleepers (deep overlap) that were skipped as
+     * both-asleep with no manifold. They would integrate with has_contact=0
+     * (false free-flight). Re-process newly-awake skipped pairs now so they
+     * get a manifold + has_contact before integration. */
+    for (int p = 0; p < pair_count; p++) {
+        if (!world->pair_skipped[p]) {
+            continue;
+        }
+        int ia = world->pair_buffer[p].object_index_a;
+        int ib = world->pair_buffer[p].object_index_b;
+        if (ia < 0 || ia >= world->body_count || ib < 0 || ib >= world->body_count) {
+            world->pair_skipped[p] = 0;
+            continue;
+        }
+        if (world->bodies[ia].is_sleeping && world->bodies[ib].is_sleeping) {
+            continue;
+        }
+        physics_world_process_pair(world, ia, ib, dt, &manifold_count);
+        world->pair_skipped[p] = 0;
+    }
     /* Rolling resistance once per tick (uses solved normal impulses). */
     collision_apply_rolling_resistance(world->manifolds, manifold_count, dt);
 
@@ -519,7 +629,7 @@ void physics_world_step(physics_world *world, float dt) {
      * contact-free bodies ONLY (x += v*rem - 1/2*g*rem^2 is the exact
      * constant-force flow, hence exact parabolas; constrained bodies stay
      * symplectic Euler since contact impulses cancel gravity post-solve). */
-    float grav_half = -0.5f * g_cfg.world.gravity;
+    float grav_half = -0.5f * step_gravity;
     for (int i = 0; i < world->body_count; i++) {
         float step_dt = dt;
         if ((world->ccd_time_remaining) && (world->ccd_time_remaining[i] < step_dt) &&
@@ -547,7 +657,8 @@ void physics_world_step(physics_world *world, float dt) {
     }
 
     /* Positional depenetration pass (like legacy path). */
-    a3_positional_depenetration_pass(world, world->pair_buffer, &broadphase_pair_count, a3_boundary_moved_any);
+    a3_positional_depenetration_pass_dt(world, world->pair_buffer, &broadphase_pair_count, a3_boundary_moved_any,
+                                        dt);
     /* AUDIT: the warm-start cache is deliberately NOT cleared here. Cached
      * contact points are stored in BODY-LOCAL space, which rigid
      * translation (the only thing depenetration/boundary do) preserves

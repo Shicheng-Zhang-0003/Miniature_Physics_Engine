@@ -97,7 +97,7 @@ static mpe_param s_registry[] = {
      &g_cfg.solver.bias_factor, 0.10, 0.0, 1.0, true},
 
     {"solver.max_separation_bias", "Max Separation Bias", "Upper cap on positional bias velocity (m/s)", p_float,
-     cat_solver, &g_cfg.solver.max_separation_bias, 5.0, 0.5, 50.0, true},
+     cat_solver, &g_cfg.solver.max_separation_bias, 5.0, 0.5, 10.0, true},
 
     {"solver.restitution_velocity_thresh", "Restitution Velocity Threshold",
      "Approach speed below which bounce is suppressed (negative = approaching, m/s)", p_float, cat_solver,
@@ -113,7 +113,7 @@ static mpe_param s_registry[] = {
      0.02, 0.0, 1.0, true},
 
     {"solver.warm_start_match_dist_sq", "Warm-Start Match Dist^2", "Max distance^2 for cached contact matching",
-     p_float, cat_solver, &g_cfg.solver.warm_start_match_dist_sq, 0.0025, 0.0, 1.0, true},
+     p_float, cat_solver, &g_cfg.solver.warm_start_match_dist_sq, 0.0025, 0.0, 0.01, true},
 
     /* ============================================================
      * cat_depenetration
@@ -122,7 +122,7 @@ static mpe_param s_registry[] = {
       cat_depenetration, &g_cfg.depenetration.correction_factor, 0.35, 0.0, 1.0, true},
 
     {"depenetration.max_correction", "Max Correction", "Per-pass positional correction cap (m)", p_float,
-      cat_depenetration, &g_cfg.depenetration.max_correction, 0.2, 0.01, 2.0, true},
+      cat_depenetration, &g_cfg.depenetration.max_correction, 0.2, 0.01, 0.5, true},
     /* TRUTH: depenetration.penetration_slop REMOVED from the registry — dead
      * since the single-slop unification (depenetration honors
      * solver.penetration_slop). The struct field remains for save-file
@@ -175,10 +175,10 @@ static mpe_param s_registry[] = {
      &g_cfg.joints.revolute_beta, 0.3, 0.0, 1.0, true},
 
     {"joints.revolute_max_bias", "Revolute Max Bias", "Cap on revolute anchor bias speed (m/s); bounds per-tick energy injection on large gaps", p_float,
-      cat_joints, &g_cfg.joints.revolute_max_bias, 5.0, 0.5, 500.0, true},
+      cat_joints, &g_cfg.joints.revolute_max_bias, 5.0, 0.5, 20.0, true},
 
     {"joints.revolute_motor_gain", "Revolute Motor Gain", "Proportional gain for revolute motor torque", p_float,
-     cat_joints, &g_cfg.joints.revolute_motor_gain, 8.0, 0.0, 100.0, true},
+     cat_joints, &g_cfg.joints.revolute_motor_gain, 8.0, 0.0, 50.0, true},
 
     /* ============================================================
      * cat_boundary

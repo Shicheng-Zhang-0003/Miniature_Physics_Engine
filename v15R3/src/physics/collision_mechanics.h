@@ -107,6 +107,9 @@ bool collision_static_plane_body(rigidbody *body, float plane_y, collision_data 
 void contact_cache_stats_reset(struct physics_world *world);
 int contact_cache_get_hits(const struct physics_world *world);
 int contact_cache_get_misses(const struct physics_world *world);
+/* Pair-novelty probe: true if this id pair has any entry saved from a prior
+ * tick (either order). Drives wake-on-first-touch (see implementation). */
+bool contact_cache_has_pair(struct physics_world *world, uint32_t id_a, uint32_t id_b);
 /* Cylinder-vs-object narrowphase. TRUE solid-cylinder geometry:
  * flat end-caps (SDF), rim circle, inside SDF branch; segment-OBB convex
  * exact for cube; coaxial face-gap + parallel 2-point for cyl-cyl.

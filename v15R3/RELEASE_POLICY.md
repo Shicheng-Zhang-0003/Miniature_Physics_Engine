@@ -1,12 +1,12 @@
 # MPE v15R3 Release Policy
 
-This tree is in **v15R3 development**.
+This tree is tagged **v15R3 release** (`a3_release_freeze = 1`).
+Accepted changes from here on: correctness, stability, validation,
+documentation, and hygiene only — no new features.
 
-## Cycle Goal
+## What v15 Delivered
 
-The v15 series introduces the centralised configuration system.
-This release candidate covers:
-
+The v15 series introduced the centralised configuration system:
 1. `src/config/` folder with LOCKED constants manifest and tunable registry.
 2. Engine code migration to read from the config store.
 3. Permanent storage of tunables to `status/engine.cfg`.
@@ -15,25 +15,25 @@ This release candidate covers:
 
 ## Change Classes Accepted
 
-During v15R3 development:
+Under the v15R3 freeze:
 
-1. Configuration system implementation (Tasks 24–41).
-2. Correctness fixes required by the config migration.
+1. Correctness fixes with headless proof (new or extended tests).
+2. Stability fixes required by validation (F5–F11, 29-test suite).
 3. Build and repository hygiene.
-4. Documentation updates to match new architecture.
-5. Validation improvements for the new system.
-6. Cylinder physics: narrowphase, inertia, floor contact.
-8. Constraint framework: revolute joints, axis correction.
-9. Headless test infrastructure and CI tooling.
+4. Documentation updates to match the architecture.
+5. Validation improvements (tests, TUI snapshot scenes, gates).
 
-## Explicitly Deferred
+## Explicitly Deferred (post-release)
 
 - Multithreading (islands currently skip-only, solve stays single-threaded).
-- Prismatic joints; rope inequality; revolute angle-limit tracking.
+- In-engine creation UI and scene persistence for fixed/distance/prismatic/
+  rope (solver supports all five constraint types + springs; v200 persists
+  springs + revolutes).
 - Complete UI state-machine rewrite (magic-level dispatch split, not yet FSM).
 - Wayland mouse-lock support.
 - Per-object config persistence beyond nice_value.
 - Quadratic aero drag (current drag is linear-viscous retention).
+- SIMD math (scalar core; ~1136-object perf wall stands).
 
 ## Landed Since the Original List (no longer deferred)
 
@@ -50,12 +50,23 @@ During v15R3 development:
 - F11 torture guardrails: gravity −17…−1, solver_iterations ≥96 (proven
   envelope for the 10:1 validation column; convergence proof in
   `src/scene/scene_init.c`). F11 verdict is robustness-only by spec.
+- Sleep truth: three-gate wake (first-touch pair novelty via the contact
+  cache, fast-other velocity gate, deep overlap) — resting stacks settle
+  and sleep; slow pushers and kinematic platforms wake sleepers at any
+  speed. Fixes the release-cycle F10 10-stack 13 m/s runaway.
+- Terminal debugger + snapshot suite (`mpe-tui`, `src/tui/`): live ncurses
+  inspector plus deterministic pipeable state dumps; `make tui-smoke`.
+- Adversarial headless tests: `f10_long_run` (settle gates incl. run-max),
+  `sleep_contact_wake` (first-touch wake + no-churn control), `f11_torture`
+  (fixed-seed config extremes, corruption gates). Suite total: 29/29 green.
+- Driven-wheel truth: test moved into the resolvable spin regime with
+  load-bearing gates (grounded height, rolling coupling, spin cap).
 
-## Release Goal
+## Release Goal (met)
 
-`v15R3` may be tagged when:
+`v15R3` is tagged:
 - all MPE_TASK_24 through MPE_TASK_41 are complete,
-- all P0 gates pass,
+- all P0 gates pass (see `RELEASE_GATES.md` release verdict),
 - the config system round-trips (save → restart → load),
 - the menu and terminal both edit live parameters,
   - and physics behaviour at defaults is identical to v14S except the

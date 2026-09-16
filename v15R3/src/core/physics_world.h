@@ -20,6 +20,9 @@ typedef struct {
     vector3 local_position_b;
     float accumulated_normal_impulse;
     float accumulated_tangent_impulse;
+    /* NOTE: the second Coulomb-disc tangent is deliberately NOT cached (see
+     * prepare): t2 = n×t1 is frame-derived each tick and re-converges in
+     * the relaxation sweeps. */
     /* Tangent frame memory: lets a resting contact keep its stick direction
      * across ticks (true Coulomb stick needs direction persistence). */
     vector3 tangent_dir;
@@ -75,6 +78,10 @@ typedef struct physics_world {
     /* Contact-cache diagnostics (per-world; was global). */
     int contact_cache_hits;
     int contact_cache_misses;
+    /* TRUTH: manifold overflow (pairs dropped when manifolds full) must be
+     * visible, not silent. Legacy path counted via debug counter; world path
+     * dropped silently and gave false free-flight gravity. */
+    int manifold_overflow_count;
     /* TRUTH P0-3: per-body CCD remainder (dt - toi). Allocated mpe_max_bodies
      * floats. CCD pre-clamp consumes toi; post-solve integration must advance
      * only the remainder, else displacement double-counts (toi + dt). */
@@ -83,7 +90,10 @@ typedef struct physics_world {
      * Verlet +1/2*g*dt^2 applies ONLY to contact-free bodies (free flight =
      * exact parabola); constrained bodies stay pure symplectic Euler (their
      * acceleration is canceled by contact impulses post-solve; correcting
-     * with pre-solve gravity pumps them out of slop). Reset each tick. */
+     * with pre-solve gravity pumps them out of slop). Reset each tick.
+     * (Wake-on-first-touch novelty intentionally does NOT use a per-body
+     * prev array — floor contacts blind it. It probes the warm-start cache
+     * per id-pair instead; see contact_cache_has_pair.) */
     unsigned char *has_contact;
 } physics_world;
 

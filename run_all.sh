@@ -31,3 +31,13 @@ else
   echo "RESULT: FAIL (see $LOG)"
   exit 1
 fi
+
+echo "--- terminal debugger suite ---"
+if (cd v15R3/src && make tui-smoke 2>&1 | tee -a "$ROOT/$LOG" | grep -q "tui-smoke: all scenes dump finite state"); then
+  echo "TUI: OK"
+else
+  echo "TUI: FAIL (see $LOG)"
+  exit 1
+fi
+
+echo "--- release ritual complete: run ./v15R3/src/engine for the F5-F11 in-engine matrix ---"

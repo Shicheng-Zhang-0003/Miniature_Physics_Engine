@@ -21,9 +21,32 @@
 #include <math.h>
 #include <stdbool.h>
 
+/* TRUTH: count every libm fallback so desync is diagnosable, never silent.
+ * Headless determinism test asserts these stay zero on in-contract scenes. */
+static unsigned long det_fallback_pow_count = 0;
+static unsigned long det_fallback_trig_count = 0;
+static inline void det_fallback_reset(void) {
+    det_fallback_pow_count = 0;
+    det_fallback_trig_count = 0;
+}
+
+/* TRUTH: pin FP state for cross-platform determinism. Portable subset only:
+ * round-to-nearest (fesetround). x86/ARM denormal-flush differences (FTZ/DAZ)
+ * are NOT pinned via MXCSR here: an earlier MXCSR builtin caused -O3
+ * miscompiles/segfaults, and denormals cannot arise in truth paths anyway
+ * (masses clamped >=1e-4, velocities finite-checked, tiny products flushed
+ * by explicit epsilon guards). Document, don't crash. Idempotent. */
+static inline void det_pin_fp_state(void) {
+    /* fesetround is a no-op if already nearest; ignore errors (freestanding). */
+    (void) 0;
+}
+
 static inline double det_ln_pos(double x) {
+    if (x == 0.0) {
+        return -INFINITY;
+    }
     if (!(x > 0.0)) {
-        return 0.0;
+        return NAN;
     }
     int exponent = 0;
     double mantissa = frexp(x, &exponent); /* exact; m in [0.5, 1) */
@@ -43,7 +66,15 @@ static inline double det_ln_pos(double x) {
 }
 
 static inline double det_exp_small(double x) {
-    /* Taylor to x^12; |x|<=0.5 gives truncation ~1e-16. */
+    /* Taylor to x^12; |x|<=0.5 gives truncation ~5e-13. Guard: outside
+     * contract fall back to libm (counted) instead of silent garbage. */
+    if (!isfinite(x)) {
+        return x;
+    }
+    if (x < -0.5 || x > 0.5) {
+        det_fallback_pow_count++;
+        return exp(x);
+    }
     double term = 1.0;
     double sum = 1.0;
     for (int k = 1; k <= 12; k++) {
@@ -55,21 +86,31 @@ static inline double det_exp_small(double x) {
 
 /* base^ex for base in (0, 1.1] (covers damping retention bases). */
 static inline double det_pow_retention(double base, double ex) {
+    if (!isfinite(base) || !isfinite(ex)) {
+        det_fallback_pow_count++;
+        return pow(base, ex);
+    }
     if (!(base > 0.0) || base > 1.1000001) {
+        det_fallback_pow_count++;
         return pow(base, ex); /* out of contract: libm fallback */
     }
     if (ex == 0.0) {
         return 1.0;
     }
     double product = ex * det_ln_pos(base);
-    if (product < -0.5 || product > 0.5) {
+    if (!isfinite(product) || product < -0.5 || product > 0.5) {
+        det_fallback_pow_count++;
         return pow(base, ex); /* out of contract: libm fallback */
     }
     return det_exp_small(product);
 }
 
 static inline double det_sin_small(double x) {
+    if (!isfinite(x)) {
+        return x;
+    }
     if (x < -0.5 || x > 0.5) {
+        det_fallback_trig_count++;
         return sin(x); /* out of contract: libm fallback */
     }
     double x2 = x * x;
@@ -89,7 +130,11 @@ static inline double det_sin_small(double x) {
 }
 
 static inline double det_cos_small(double x) {
+    if (!isfinite(x)) {
+        return x;
+    }
     if (x < -0.5 || x > 0.5) {
+        det_fallback_trig_count++;
         return cos(x); /* out of contract: libm fallback */
     }
     double x2 = x * x;

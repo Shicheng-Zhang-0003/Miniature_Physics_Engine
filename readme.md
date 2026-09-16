@@ -3,10 +3,12 @@
 > **MPE-only:** the engine builds and all headless tests pass with MPE core only: `cd v15R3/src && make && python3 ../../tools/test_runner.py`.
 
 <!-- MPE_RELEASE_FREEZE_NOTICE_BEGIN -->
-> **Current development tree:** `v15R3` continues the v15 configuration-system work. It is not a tagged stable release; use the release gates before promotion.
+> **Release:** `v15R3` is tagged. The tree is frozen except for correctness,
+> stability, validation, documentation, and hygiene changes.
 <!-- MPE_RELEASE_FREEZE_NOTICE_END -->
 <!-- MPE_RELEASE_GATES_NOTICE_BEGIN -->
-> **Release quality:** the current criteria are in [`v15R3/RELEASE_GATES.md`](v15R3/RELEASE_GATES.md). The current candidate notes are in [`v15R3/release_notes_v15R2.md`](v15R3/release_notes_v15R2.md); [`v15R3/release_notes_v15R1.md`](v15R3/release_notes_v15R1.md) documents the prior RC.
+> **Release quality:** all P0 gates pass — see [`v15R3/RELEASE_GATES.md`](v15R3/RELEASE_GATES.md).
+> Release notes: [`v15R3/release_notes_v15R3.md`](v15R3/release_notes_v15R3.md).
 <!-- MPE_RELEASE_GATES_NOTICE_END -->
 
 **License:** GPL-3.0 · **Language:** C · **UI:** GTK3 · **Renderer:** OpenGL 3.3 Core
@@ -28,16 +30,19 @@ MPE is built around four priorities:
 
 ## ✨ What's New in v15R3
 
-`v15R3` is the active development cycle for the centralised configuration system (MPE-only run; MFS robotics is parked in `v15R3/robotics_backup/` — see that folder's `README_PARKED.md`). Highlights currently present in the tree:
+`v15R3` is the v15 configuration-system release (MPE-only run; MFS robotics is parked in `v15R3/robotics_backup/` — see that folder's `README_PARKED.md`). Highlights:
 
 - **Domain-driven architecture** — clean `core`, `physics`, `render`, `scene`, `ui_input` modules.
 - **Warm-starting contact solver** with multi-point Sutherland–Hodgman manifolds for stable stacking.
+- **Full constraint framework** — revolute, fixed, prismatic, distance, and rope constraints plus spring joints (springs + revolutes persist in scene v200; all types live in the headless suite and the TUI demo).
 - **3D spatial-hash grid broadphase** with adaptive cell sizing.
 - **Interactive spring-joint system** with live magenta rendering.
 - **POSIX-style debug terminal** — drive the whole simulation from a shell.
 - **Built-in validation suite** (F5–F11), including a 60-second long-run stability test and config torture test.
 - **Shader/render failure visibility** — the engine no longer continues silently in a broken render state.
 - **Physics-truth pass** — Verlet-exact free flight, post-integration Poisson gate, CCD remainder integration, strict warm-start, true cylinder SDF geometry, no velocity clamps or restitution caps; game-only damping (`nice_value`, angular scale) labeled and defaulted off/vacuum.
+- **Sleep truth** — three-gate wake (first-touch pair novelty, fast-other, deep overlap): slow pushers wake sleepers at any speed, resting stacks proceed to sleep and stay settled (F10 root cause, fixed).
+- **Terminal debugger + output suite** — `mpe-tui`: live ncurses inspector (bodies, joints, constraints, math, scene graph) plus pipeable `--snapshot`/`--stream` state dumps; see [below](#-terminal-debugger--output-suite-mpe-tui).
 
 ---
 
@@ -89,6 +94,29 @@ Objects are mapped into hashed grid buckets; collision checks are limited to loc
 ## 🧮 Mathematics Core
 
 A fully custom, dependency-free math library: 3D vectors, 4×4 matrices, quaternions, and inertia tensors — designed for tightly packed, cache-friendly structs.
+
+---
+
+## 🔍 Terminal debugger & output suite (`mpe-tui`)
+
+A terminal-only companion to the GTK engine — a live inspector and a
+scriptable state-dump suite in one binary (needs only ncurses):
+
+```bash
+cd v15R3/src
+make mpe-tui
+./mpe-tui                         # live ncurses inspector (needs a TTY)
+./mpe-tui --snapshot 600          # one full state dump (pipeable, diffable)
+./mpe-tui --stream 600 --every 60 # dumps over time
+./mpe-tui --snapshot 10 --scene tower|pendulum|springlab|f10|demo
+```
+
+Live screens: overview table, per-object characteristics + mathematics
+(quaternion, euler, inertia tensors, momentum, energy), joint/constraint
+detail with live endpoint geometry, pairwise scene graph, help. Snapshot
+sections (`[engine]`, `[body i]`, `[springs]`, `[constraints]`, `[pairs]`,
+`[islands]`, `[stats]`, `[result]`) are fixed-format and deterministic —
+`make tui-smoke` checks every scene dumps finite state.
 
 ---
 
@@ -204,6 +232,8 @@ MPE ships with built-in stability tests:
 ```bash
 sudo apt update
 sudo apt install build-essential pkg-config libgtk-3-dev libepoxy-dev
+# Optional, for the mpe-tui terminal debugger:
+sudo apt install libncurses-dev
 ```
 
 For other distributions (Fedora, Arch, SUSE, Alpine, Gentoo, Nix), see [install/linux/linux_install_instructions.md](install/linux/linux_install_instructions.md).
@@ -229,14 +259,14 @@ make
 
 ## 📜 Version History
 
-- **v15R3 (development)** — ongoing v15 configuration-system work, MPE-only. *(current tree)*
-- **v15R2** — config-system hardening + MFS robotics (prior RC, see `release_notes_v15R2.md`).
+- **v15R3 (release)** — configuration system, physics-truth pass, full constraint framework, TUI debugger + snapshot suite, 29/29 headless green. *(this tree)*
+- **v15R2** — config-system hardening + MFS robotics (prior RC, parked in `robotics_backup/`).
 - **v1.4 Alpha RC3** — domain-driven restructure, spatial-hash broadphase, physics-world encapsulation.
 - **v1.4 Alpha 2** — warm-starting solver, multi-point contact manifolds.
 - **v1.4 Alpha RC1** — spring joints, joint renderer, color painting, OBB raycast selection.
 - **v1.3** — established instanced rendering and spatial-hash direction.
 
-See `evolution.txt` for the full lineage back to stage 0.
+See `evolution.txt` for the full lineage back to stage 0. Release notes: [`v15R3/release_notes_v15R3.md`](v15R3/release_notes_v15R3.md).
 
 ---
 
@@ -249,23 +279,36 @@ See `evolution.txt` for the full lineage back to stage 0.
 
 ## 🧪 Headless test suite
 
-MPE ships a headless regression suite (no GTK/OpenGL required):
+MPE ships a headless regression suite (no GTK/OpenGL required) — **29/29 green**:
 
 | Test | Proves |
 |------|--------|
 | `two_world` | Independent `physics_world` instances |
 | `revolute` | Hinge joints hold anchor and allow swing |
 | `cylinder_drop` | Cylinder settles on the floor |
-| `driven_wheel` | Torque → friction → translation |
+| `driven_wheel` | Torque → friction → translation (grounded, coupled) |
 | `math3_inverse` | Matrix inverse at small inertia tensors |
 | `floor_collision_diag` | Floor contact diagnostics |
 | `cylinder_sphere/cube/cylinder` | Cylinder narrowphase pairs |
 | `list4_cylinder_floor` | Tipped-cylinder floor regression |
-| `scene_roundtrip` | Save/load v153 format round-trip |
+| `scene_roundtrip` | Save/load v200 round-trip (springs + revolutes) |
 | `static_hold` | Coulomb stick holds / yields past friction angle |
 | `rolling_decay` | Contact-patch rolling resistance decay |
 | `ccd_sweep` | Swept TOI: no tunneling at 144 m/s |
 | `kinematic` | Velocity-driven platforms carry bodies |
+| `determinism` | Twin worlds agree bitwise over 600 ticks |
+| `momentum` / `angmom` | Linear / angular momentum conservation |
+| `spring` | Hooke period + bounded energy |
+| `projectile` | Verlet-exact free-flight parabola |
+| `incline_accel` | Slope acceleration matches `g·sinθ` |
+| `pendulum` | Revolute pendulum period |
+| `bounce_series` | Poisson restitution series |
+| `friction_stop` | Coulomb stopping distance `v²/(2μg)` |
+| `stack` | 6-cube tower stands |
+| `f10_long_run` | F10 settle gates on the validation scene |
+| `sleep_contact_wake` | Slow pushers wake sleepers; resting contact doesn't churn |
+| `f11_torture` | Deterministic config extremes without corruption |
+| `frustum` | Frustum culling math |
 
 Run with `python3 tools/test_runner.py`.
 

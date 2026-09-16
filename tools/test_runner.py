@@ -47,6 +47,9 @@ KNOWN_TESTS = [
     "bounce_series",
     "friction_stop",
     "stack",
+    "f10_long_run",
+    "sleep_contact_wake",
+    "f11_torture",
     "frustum",
 ]
 

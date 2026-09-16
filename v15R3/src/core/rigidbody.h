@@ -95,6 +95,10 @@ static inline bool rigidbody_is_awake_for_solver(const rigidbody *rb) {
     if (rb->static_state) {
         return false;
     }
+    /* TRUTH: kinematic has eff_inv==0 (infinite mass) but still moves with
+     * prescribed velocity. It is "awake" for island purposes (floor stacks
+     * on moving platforms must stay awake) while solver treats it as
+     * immovable via effective_* helpers. Sleeping is the only solver-skip. */
     return !rb->is_sleeping;
 }
 

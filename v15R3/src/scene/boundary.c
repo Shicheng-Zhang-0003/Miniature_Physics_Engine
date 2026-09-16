@@ -48,7 +48,10 @@ static float get_obb_max_along_axis(rigidbody *rigid_body, vector3 axis) {
  * bodies inside the playable volume and kills only the inward (escaping)
  * velocity component. Deep escape still wakes the body so it rejoins. */
 void boundary_apply_floor(rigidbody *rigid_body, float floor_y_level) {
-    if (rigid_body->static_state) {
+    if (!rigid_body) {
+        return;
+    }
+    if (rigid_body->static_state || rigid_body->kinematic) {
         return;
     }
     float min_y = get_obb_min_along_axis(rigid_body, (vector3){0, 1, 0});
@@ -61,7 +64,10 @@ void boundary_apply_floor(rigidbody *rigid_body, float floor_y_level) {
     }
 }
 void boundary_apply_box(rigidbody *rigid_body, vector3 min_bounds, vector3 max_bounds) {
-    if (rigid_body->static_state) {
+    if (!rigid_body) {
+        return;
+    }
+    if (rigid_body->static_state || rigid_body->kinematic) {
         return;
     }
     // X axis

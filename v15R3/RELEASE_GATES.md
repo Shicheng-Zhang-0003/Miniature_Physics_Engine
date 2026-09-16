@@ -2,8 +2,8 @@
 
 This document defines the exit criteria for tagging `v15R3`.
 
-`v15R3` is the MPE-only development tree of the v15 series, continuing
-the centralised configuration system (prior RCs: v15R1, v15R3).
+`v15R3` is the MPE-only release of the v15 series, carrying the
+centralised configuration system (prior RCs: v15R1, v15R2).
 
 ---
 
@@ -99,10 +99,12 @@ They should be recorded as post-stable work items.
 - [X] F7 editor torture test passes.
 - [X] F8 spawn stress test passes.
 - [X] F9 validation report prints useful state including config dump.
-- [X] F10 long-run validation passes.
+- [X] F10 long-run validation passes (three-gate wake: first-touch novelty + fast-other + deep).
 - [X] F11 config torture test runs without crash.
 - [X] F11 verdict is robustness-only (no NaN, nothing fallen); speeds reported, never gated.
 - [X] F11 pins solver resolution (gravity −17…−1, ≥96 iterations — proven envelope for the 10:1 column); material/world extremes stay fully random.
+- [X] Headless suite 29/29 green (`python3 tools/test_runner.py`), including `f10_long_run`, `sleep_contact_wake`, `f11_torture`.
+- [X] `mpe-tui` snapshot suite green for all scenes (`make tui-smoke`).
 - [X] The engine can idle for several minutes without explosion.
 
 ### 10. Configuration System
@@ -171,7 +173,9 @@ They should be recorded as post-stable work items.
 
 The following are not required for `v15R3`:
 - multithreading,
-- generic constraint framework (only revolute hinges exist),
+- in-engine creation UI and scene persistence for fixed/distance/prismatic/rope
+  (solver supports all five constraint types + springs; menus persist
+  springs + revolutes),
 - complete UI state-machine rewrite,
 - Wayland mouse-lock support,
 - per-object config persistence in scene files.
@@ -190,10 +194,12 @@ These belong after `v15R3`.
 ### 14. Joints and constraints
 - [X] Revolute joints hold anchors and allow swing (`revolute` test)
 - [X] Revolute axis drift corrected (positional Baumgarte, once per tick after the loop)
+- [X] Revolute angle limits tracked once per tick with velocity-level enforcement
+- [X] Fixed / prismatic / distance / rope constraints solved (2-D perpendicular lock, measured limits, pull-only rope)
 - [X] Spring joints with live rendering
+- [X] Joint pre-step runs once per tick (angle/slide tracking never integrates per-iteration)
 - [X] Fixed-timestep accumulator (60Hz deterministic)
 - [X] Scene save/load preserves joint assemblies (v200: springs + revolutes, `scene_roundtrip` test)
-- [ ] Prismatic joints (arms/slides)
 
 
 ---
@@ -211,3 +217,14 @@ If any mandatory gate fails, the correct action is:
 - fix the gate failure,
 - rerun validation,
 - and only then re-evaluate `v15R3`.
+
+### Release verdict (v15R3, tagged)
+
+All P0 gates pass: clean build with zero new errors, 29/29 headless green,
+`tui-smoke` green, F10 settle verdict green (headless 3600-tick equivalent
+plus committed `f10_long_run`), F11 robustness green in-engine and headless
+(`f11_torture`). P1 known limitations are documented in
+[`release_notes_v15R3.md`](release_notes_v15R3.md) and
+[`how_to_use.md`](how_to_use.md) (Wayland mouse-lock, joint creation UI +
+persistence scope, SIMD/multithreading). Tree frozen (`a3_release_freeze = 1`):
+correctness, stability, validation, documentation, and hygiene changes only.
