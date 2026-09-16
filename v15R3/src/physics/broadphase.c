@@ -202,8 +202,22 @@ static void broadphase_update_cell_size(struct physics_world *world, rigidbody *
     }
     if (body_count <= 0) {
         ws->current_cell_size = g_cfg.broadphase.cell_size_default;
+        ws->cached_body_count = body_count;
+        ws->ticks_since_cell_recompute = 0;
         return;
     }
+
+    /* Cache: skip O(n) rescan if population is stable and we recomputed
+     * recently. Recompute when count drifts >10% or every 60 ticks. */
+    ws->ticks_since_cell_recompute++;
+    int count_delta = body_count > ws->cached_body_count ? body_count - ws->cached_body_count
+                                                         : ws->cached_body_count - body_count;
+    bool count_stable = (ws->cached_body_count > 0) && (count_delta * 10 < ws->cached_body_count);
+    if (count_stable && ws->ticks_since_cell_recompute < 60 && ws->current_cell_size > 0.0f) {
+        return;
+    }
+    ws->cached_body_count = body_count;
+    ws->ticks_since_cell_recompute = 0;
 
     float radius_sum = 0.0f;
     float max_radius = 0.0f;
@@ -290,11 +304,18 @@ int broadphase_generate_pairing(struct physics_world *world, broadphase_pair *co
         }
         /* Swept AABB: expand by this tick's linear motion so a fast body
          * pairs with everything along its path (CCD needs the pair to
-         * exist). Sleeping/static bodies don't move: no expansion. */
+         * exist). Sleeping/static bodies don't move: no expansion.
+         * TRUTH P1-19: add angular sweep |w|*R*dt (tip-speed bound). A fast
+         * spinner sweeps a disc of radius R; linear-only expansion tunnels
+         * rotationally. Conservative: expands all axes uniformly. */
         if ((!rb->static_state) && (!rb->is_sleeping)) {
-            extent_x += fabsf(rb->velocity.x) * dt;
-            extent_y += fabsf(rb->velocity.y) * dt;
-            extent_z += fabsf(rb->velocity.z) * dt;
+            float ang_sweep = vector3_length(rb->angular_velocity) * broadphase_bounding_radius(rb) * dt;
+            if ((!isfinite(ang_sweep)) || (ang_sweep < 0.0f)) {
+                ang_sweep = 0.0f;
+            }
+            extent_x += fabsf(rb->velocity.x) * dt + ang_sweep;
+            extent_y += fabsf(rb->velocity.y) * dt + ang_sweep;
+            extent_z += fabsf(rb->velocity.z) * dt + ang_sweep;
         }
         float cell_size = ws->current_cell_size;
         int min_x = (int) floorf((rb->position.x - extent_x) / cell_size);

@@ -22,10 +22,10 @@ cd "$ROOT"
 # 2. Version string
 echo ""
 echo "--- Version check ---"
-if grep -rq 'v15R2' v15R3/src/mpe_engine.h; then
-    echo "[WARN] mpe_engine.h still references v15R2"
+if grep -q 'v15R3' v15R3/src/mpe_engine.h; then
+    echo "[PASS] mpe_engine.h references v15R3"
 else
-    echo "[PASS] No v15R2 in mpe_engine.h"
+    echo "[WARN] mpe_engine.h missing v15R3 (stale version string)"
 fi
 
 # 3. File sizes (god file check)

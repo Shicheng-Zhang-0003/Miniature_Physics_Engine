@@ -35,7 +35,7 @@ static mpe_param s_registry[] = {
     {"world.gravity", "World Gravity", "Gravitational acceleration (m/s^2, negative = down)", p_float, cat_world,
      &g_cfg.world.gravity, -9.81, -50.0, 0.0, false},
 
-    {"world.drag", "Air Drag Coefficient", "Per-second velocity retention base (0.1 = heavy drag, 1.0 = none); applied as powf(drag,dt)", p_float,
+    {"world.drag", "Air Drag Coefficient", "VISCOUS retention base (truth: linear viscous c=-ln(drag), NOT quadratic aero; area/mass-independent; 1.0=truth vacuum, off)", p_float,
      cat_world, &g_cfg.world.drag, 0.99, 0.1, 1.0, false},
 
     {"world.floor_friction_s", "Floor Friction (Static)", "Static friction coefficient for floor contacts", p_float,
@@ -45,8 +45,8 @@ static mpe_param s_registry[] = {
      cat_world, &g_cfg.world.floor_friction_k, 0.1, 0.0, 5.0, false},
      {"world.rolling_resistance_coeff", "Rolling Resistance Coeff", "Rolling resistance coefficient for wheels on floor (0 = free roll)", p_float,
      cat_world, &g_cfg.world.rolling_resistance_coeff, 0.02f, 0.0, 5.0, false},
-    {"world.angular_damping_scale", "Angular Damping Scale", "Extra angular damping multiplier (was hardcoded 0.97)", p_float,
-     cat_world, &g_cfg.world.angular_damping_scale, 0.97f, 0.5, 1.0, true},
+    {"world.angular_damping_scale", "Angular Damping Scale", "NON-PHYSICAL game damping (1.0=truth, off). Extra rotary retention with no fluid basis; air damps translation, barely rotation.", p_float,
+     cat_world, &g_cfg.world.angular_damping_scale, 1.0f, 0.5, 1.0, true},
 
     /* ============================================================
      * cat_timestep
@@ -84,6 +84,9 @@ static mpe_param s_registry[] = {
     {"sleep.wake_angular_thresh_sq", "Wake Angular Threshold^2", "Angular speed^2 required to wake a sleeping body",
      p_float, cat_sleep, &g_cfg.sleep.wake_angular_thresh_sq, 0.0025, 0.0, 10.0, true},
 
+    {"sleep.enable", "Sleep Enable", "Master switch: 1=sleep optimization (game), 0=never sleep (physics truth validation)", p_int,
+     cat_sleep, &g_cfg.sleep.enable, 1.0, 0.0, 1.0, true},
+
     /* ============================================================
      * cat_solver
      * ============================================================ */
@@ -100,8 +103,10 @@ static mpe_param s_registry[] = {
      "Approach speed below which bounce is suppressed (negative = approaching, m/s)", p_float, cat_solver,
      &g_cfg.solver.restitution_velocity_thresh, -1.5, -10.0, 0.0, true},
 
-{"solver.max_restitution_bias", "Max Restitution Bias", "Upper cap on restitution bounce velocity", p_float,
-      cat_solver, &g_cfg.solver.max_restitution_bias, 20.0, 0.5, 50.0, true},
+    /* TRUTH: solver.max_restitution_bias REMOVED — dead knob (registered and
+     * F11-randomized, but the Poisson pass never read it; the Newton bound
+     * e*(-vn)*m_eff IS the physical bound, plus a 1e6 emergency guard).
+     * A cap that cannot act is a lie in the menu. */
 
     {"solver.static_friction_thresh", "Static Friction Speed Thresh",
      "Sliding speed below which static friction applies", p_float, cat_solver, &g_cfg.solver.static_friction_thresh,
@@ -113,14 +118,16 @@ static mpe_param s_registry[] = {
     /* ============================================================
      * cat_depenetration
      * ============================================================ */
-{"depenetration.correction_factor", "Correction Factor", "Fraction of penetration corrected per pass", p_float,
+    {"depenetration.correction_factor", "Correction Factor", "Fraction of penetration corrected per pass", p_float,
       cat_depenetration, &g_cfg.depenetration.correction_factor, 0.35, 0.0, 1.0, true},
 
-{"depenetration.max_correction", "Max Correction", "Per-pass positional correction cap (m)", p_float,
+    {"depenetration.max_correction", "Max Correction", "Per-pass positional correction cap (m)", p_float,
       cat_depenetration, &g_cfg.depenetration.max_correction, 0.2, 0.01, 2.0, true},
-
-    {"depenetration.penetration_slop", "Depenetration Slop", "Overlap tolerance for depenetration pass (m)", p_float,
-     cat_depenetration, &g_cfg.depenetration.penetration_slop, 0.005, 0.0, 0.05, true},
+    /* TRUTH: depenetration.penetration_slop REMOVED from the registry — dead
+     * since the single-slop unification (depenetration honors
+     * solver.penetration_slop). The struct field remains for save-file
+     * forward-compat but nothing reads it. Registry count unchanged (this
+     * removal balances the sleep.enable addition at 77). */
 
     {"depenetration.wake_depth_thresh", "Wake Depth Threshold", "Overlap depth that wakes sleeping pairs (m)", p_float,
      cat_depenetration, &g_cfg.depenetration.wake_depth_thresh, 0.02, 0.0, 0.1, true},
@@ -194,7 +201,16 @@ static mpe_param s_registry[] = {
     {"spawner.cube_extent", "Cube Half-Extent", "Default half-extent for spawned cubes (m)", p_float, cat_spawner,
      &g_cfg.spawner.cube_extent, 0.5, 0.01, 50.0, false},
 
-    {"spawner.speed", "Launch Speed", "Launch velocity for spawned objects (m/s). Capped by timestep.max_linear_speed (safety clamp).",
+    {"spawner.cyl_mass", "Cylinder Mass", "Default mass for spawned cylinders (kg)", p_float, cat_spawner,
+     &g_cfg.spawner.cyl_mass, 1.5, 0.01, 10000.0, false},
+
+    {"spawner.cyl_radius", "Cylinder Radius", "Default radius for spawned cylinders (m)", p_float, cat_spawner,
+     &g_cfg.spawner.cyl_radius, 0.4, 0.01, 50.0, false},
+
+    {"spawner.cyl_half_length", "Cylinder Half-Length", "Default axle half-length for spawned cylinders (m)",
+     p_float, cat_spawner, &g_cfg.spawner.cyl_half_length, 0.4, 0.01, 50.0, false},
+
+    {"spawner.speed", "Launch Speed", "Launch velocity for spawned objects (m/s, uncapped — CCD owns fast bodies)",
      p_float, cat_spawner,
      &g_cfg.spawner.speed, 20.0, 0.0, 150.0, false},
 

@@ -21,10 +21,14 @@ void event_log_init(void) {
 }
 
 void event_log_push(log_level level, const char *format, ...) {
+    if (!format) {
+        return;
+    }
     va_list args;
     va_start(args, format);
     vsnprintf(event_log_ring[event_log_head].message, event_msg_length, format, args);
     va_end(args);
+    event_log_ring[event_log_head].message[event_msg_length - 1] = '\0';
     event_log_ring[event_log_head].timestamp = time(NULL);
     event_log_ring[event_log_head].level = level;
     event_log_head = (event_log_head + 1) % event_log_capacity;

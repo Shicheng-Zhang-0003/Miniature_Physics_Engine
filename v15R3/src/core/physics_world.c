@@ -89,6 +89,12 @@ void physics_world_init(physics_world *world) {
     if (!world->island_awake_flags) {
         world->island_awake_flags = (unsigned char *) malloc((size_t) mpe_max_bodies * sizeof(unsigned char));
     }
+    if (!world->ccd_time_remaining) {
+        world->ccd_time_remaining = (float *) malloc((size_t) mpe_max_bodies * sizeof(float));
+    }
+    if (!world->has_contact) {
+        world->has_contact = (unsigned char *) malloc((size_t) mpe_max_bodies * sizeof(unsigned char));
+    }
     world->body_count = 0;
     if (world->next_object_id == 0) {
         world->next_object_id = 1;
@@ -120,6 +126,8 @@ void physics_world_cleanup(physics_world *world) {
     physics_world_free_ptr((void **) &world->island_parent);
     physics_world_free_ptr((void **) &world->island_label);
     physics_world_free_ptr((void **) &world->island_awake_flags);
+    physics_world_free_ptr((void **) &world->ccd_time_remaining);
+    physics_world_free_ptr((void **) &world->has_contact);
     world->world_contact_cache_count = 0;
     world->body_count = 0;
     world->body_capacity = 0;
@@ -275,6 +283,15 @@ static void physics_world_process_pair(physics_world *world, int index_a, int in
 
                 collision_prepare_solver(world, &narrowphase_collision, &world->manifolds[(*manifold_count_ptr)], dt);
                 (*manifold_count_ptr)++;
+                /* TRUTH P0-1: contact flag for gravity-exactness gating. */
+                if (world->has_contact) {
+                    if ((index_a >= 0) && (index_a < world->body_count)) {
+                        world->has_contact[index_a] = 1;
+                    }
+                    if ((index_b >= 0) && (index_b < world->body_count)) {
+                        world->has_contact[index_b] = 1;
+                    }
+                }
             }
         }
 }
@@ -287,10 +304,22 @@ void physics_world_step(physics_world *world, float dt) {
     for (int i = 0; i < world->body_count; i++) {
         rigidbody_sanitize(&world->bodies[i]);
     }
+    /* TRUTH P0-1: reset contact flags (set below on every manifold). */
+    if (world->has_contact) {
+        for (int i = 0; i < world->body_count; i++) {
+            world->has_contact[i] = 0;
+        }
+    }
 
     /* CCD: clamp fast bodies to their time-of-impact pose before pairing,
-     * so discrete narrowphase cannot tunnel past thin geometry. */
-    collision_ccd_sweep_clamp(world->bodies, world->body_count, dt);
+     * so discrete narrowphase cannot tunnel past thin geometry.
+     * TRUTH P0-3: remainder (dt-toi) recorded per body; post-solve
+     * integration advances only the remainder (see below). */
+    if (world->ccd_time_remaining) {
+        collision_ccd_sweep_clamp_full(world->bodies, world->body_count, dt, world->ccd_time_remaining);
+    } else {
+        collision_ccd_sweep_clamp(world->bodies, world->body_count, dt);
+    }
 
     int pair_count = 0;
     if (world->body_count >= 2) {
@@ -370,6 +399,9 @@ void physics_world_step(physics_world *world, float dt) {
         if ((collision_static_plane_body(rb, 0.0f, &floor_collision)) && (manifold_count < a3_max_manifolds)) {
             collision_prepare_solver(world, &floor_collision, &world->manifolds[manifold_count], dt);
             manifold_count++;
+            if (world->has_contact) {
+                world->has_contact[i] = 1;
+            }
         }
     }
 
@@ -410,20 +442,24 @@ void physics_world_step(physics_world *world, float dt) {
         rb_integrate_velocity(&world->bodies[i], dt, linear_damping, angular_damping);
     }
 
-    /* Sleep staticize: sleeping bodies get infinite mass for solver stability.
-     * Real mass/inertia restored after solver (see sleep restore below). */
-    math3 a3_sleep_zero_matrix = {{{0.0f}}};
-    for (int sleep_staticize_index = 0; sleep_staticize_index < world->body_count; sleep_staticize_index++) {
-        rigidbody *sleep_staticize_body = &world->bodies[sleep_staticize_index];
-        if ((sleep_staticize_body->is_sleeping) && (!sleep_staticize_body->static_state)) {
-            sleep_staticize_body->velocity = vector3_zero();
-            sleep_staticize_body->angular_velocity = vector3_zero();
-            sleep_staticize_body->force_accumulator = vector3_zero();
-            sleep_staticize_body->torque_accumulator = vector3_zero();
-            sleep_staticize_body->inverse_mass = 0.0f;
-            sleep_staticize_body->inverse_inertia_system = a3_sleep_zero_matrix;
+    /* Sleeping bodies keep real mass/inertia (no staticize mutation).
+     * The solver treats them as infinite mass via rigidbody_effective_*
+     * helpers, so observable state is never corrupted mid-tick and the
+     * path is thread-safe. Zero stale velocities/accumulators only. */
+    for (int sleep_index = 0; sleep_index < world->body_count; sleep_index++) {
+        rigidbody *sleep_body = &world->bodies[sleep_index];
+        if ((sleep_body->is_sleeping) && (!sleep_body->static_state)) {
+            sleep_body->velocity = vector3_zero();
+            sleep_body->angular_velocity = vector3_zero();
+            sleep_body->force_accumulator = vector3_zero();
+            sleep_body->torque_accumulator = vector3_zero();
         }
     }
+
+    /* TRUTH P0-2: Poisson gate must see post-force-integration approach
+     * speed (prepare ran pre-gravity, stale by g*dt). Refresh vn from
+     * current velocities before any iteration touches accumulators. */
+    collision_refresh_impact_velocities(world->manifolds, manifold_count);
 
     int solver_iterations = g_cfg.timestep.solver_iterations;
     for (int iter = 0; iter < solver_iterations; iter++) {
@@ -467,20 +503,11 @@ void physics_world_step(physics_world *world, float dt) {
     /* Rolling resistance once per tick (uses solved normal impulses). */
     collision_apply_rolling_resistance(world->manifolds, manifold_count, dt);
 
-    /* Sleep restore: restore real mass/inertia for sleeping bodies. */
+    /* Sleeping bodies already hold real mass (no staticize was applied),
+     * so no restore is needed. Keep velocities pinned at zero. */
     for (int sleep_restore_index = 0; sleep_restore_index < world->body_count; sleep_restore_index++) {
         rigidbody *sleep_restore_body = &world->bodies[sleep_restore_index];
         if ((sleep_restore_body->is_sleeping) && (!sleep_restore_body->static_state)) {
-            if ((sleep_restore_body->mass > 0.0f) && (isfinite(sleep_restore_body->mass))) {
-                sleep_restore_body->inverse_mass = 1.0f / sleep_restore_body->mass;
-            } else {
-                sleep_restore_body->inverse_mass = 0.0f;
-            }
-            math3 sleep_rotation_matrix = vector4_to_math3(sleep_restore_body->orientation);
-            math3 sleep_rotation_transpose = math3_transposition(sleep_rotation_matrix);
-            sleep_restore_body->inverse_inertia_system = math3_multiplication(
-                sleep_rotation_matrix,
-                math3_multiplication(sleep_restore_body->inverse_inertia_tensor_local, sleep_rotation_transpose));
             sleep_restore_body->velocity = vector3_zero();
             sleep_restore_body->angular_velocity = vector3_zero();
         }
@@ -488,8 +515,23 @@ void physics_world_step(physics_world *world, float dt) {
 
     contact_cache_save(world, world->manifolds, manifold_count);
 
+    /* TRUTH P0-1+P0-3: integrate CCD remainder; gravity-exactness for
+     * contact-free bodies ONLY (x += v*rem - 1/2*g*rem^2 is the exact
+     * constant-force flow, hence exact parabolas; constrained bodies stay
+     * symplectic Euler since contact impulses cancel gravity post-solve). */
+    float grav_half = -0.5f * g_cfg.world.gravity;
     for (int i = 0; i < world->body_count; i++) {
-        rb_integrate_position(&world->bodies[i], dt);
+        float step_dt = dt;
+        if ((world->ccd_time_remaining) && (world->ccd_time_remaining[i] < step_dt) &&
+            (world->ccd_time_remaining[i] > 0.0f)) {
+            step_dt = world->ccd_time_remaining[i];
+        }
+        rb_integrate_position(&world->bodies[i], step_dt);
+        rigidbody *ib = &world->bodies[i];
+        bool free_flight = (world->has_contact) ? (world->has_contact[i] == 0) : true;
+        if (free_flight && (!ib->static_state) && (!ib->is_sleeping) && (!ib->kinematic) && (step_dt > 0.0f)) {
+            ib->position.y += grav_half * step_dt * step_dt;
+        }
         rigidbody_sanitize(&world->bodies[i]);
     }
 

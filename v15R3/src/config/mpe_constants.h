@@ -53,5 +53,25 @@
  * ------------------------------------------------------------------ */
 #define a3_long_run_validation_ticks 3600 /* 60 seconds at 60 Hz */
 
+/* ------------------------------------------------------------------
+ * PHYSICS NUMERICS — centralized epsilon / threshold constants.
+ * Previously scattered as raw literals (0.98f, 1.01f, 0.0001f, ...).
+ * ------------------------------------------------------------------ */
+#define mpe_eps_contact 1e-4f
+#define mpe_eps_normal 1e-6f
+#define mpe_eps_parallel 1e-4f
+#define mpe_eps_singular 1e-12f
+/* mpe_face_hysteresis REMOVED (dead since face-hysteresis deletion; the
+ * 15-axis minimum is reported raw). */
+#define mpe_wireframe_scale 1.01f
+#define mpe_sleep_wake_depth 0.02f
+#define mpe_depen_early_out 5e-4f
+#define mpe_wake_corr_thresh 0.01f
+#define mpe_boundary_epsilon_sq 1e-6f
+#define mpe_ray_tmin_neg -1e30f
+#define mpe_ray_tmax_pos 1e30f
+#define mpe_spawn_nudge 0.005f
+#define mpe_spawn_max_move 1.0f
+
 #endif /* mpe_constants_h */
 /* MPE_TASK_25_CONSTANTS_MANIFEST_END */

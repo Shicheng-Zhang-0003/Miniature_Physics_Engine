@@ -21,6 +21,17 @@ const char *term_object_type_name(rigidbody *rigid_body) {
     }
     return "cube";
 }
+/* Single source of truth for the spawn-gun type label (sphere/cube/cylinder).
+ * All terminal + overlay-adjacent displays must use this, never inline. */
+const char *term_spawn_type_name(void) {
+    if (main_inputs.current_spawn_type == 0) {
+        return "sphere";
+    }
+    if (main_inputs.current_spawn_type == 1) {
+        return "cube";
+    }
+    return "cylinder";
+}
 const char *term_object_state_name(rigidbody *rigid_body) {
     if (rigid_body->static_state) {
         return "static";
@@ -152,11 +163,14 @@ void term_print_camera(void) {
 }
 void term_print_spawner(void) {
     term_printf("term_echo", "/spawner\n");
-    term_printf(NULL, "  type:        %s\n", (main_inputs.current_spawn_type == 0) ? "sphere" : "cube");
+    term_printf(NULL, "  type:        %s\n", term_spawn_type_name());
     term_printf(NULL, "  mass:        %.4f\n", g_cfg.spawner.mass);
     term_printf(NULL, "  radius:      %.4f\n", g_cfg.spawner.radius);
     term_printf(NULL, "  cube_mass:   %.4f\n", g_cfg.spawner.cube_mass);
     term_printf(NULL, "  cube_extent: %.4f\n", g_cfg.spawner.cube_extent);
+    term_printf(NULL, "  cyl_mass:    %.4f\n", g_cfg.spawner.cyl_mass);
+    term_printf(NULL, "  cyl_radius:  %.4f\n", g_cfg.spawner.cyl_radius);
+    term_printf(NULL, "  cyl_half:    %.4f\n", g_cfg.spawner.cyl_half_length);
     term_printf(NULL, "  speed:       %.4f\n", g_cfg.spawner.speed);
     term_printf(NULL, "  friction_s:  %.4f\n", g_cfg.spawner.friction_s);
     term_printf(NULL, "  friction_k:  %.4f\n", g_cfg.spawner.friction_k);
@@ -170,6 +184,13 @@ int term_create_object(object_type spawn_type) {
         vector3 spawn_position = vector3_addition(
             main_camera_fov.position, vector3_scaling(main_camera_fov.forward_vector, g_cfg.spawner.radius + 1.0f));
         created_index = scene_add_object(g_cfg.spawner.radius, g_cfg.spawner.mass, spawn_position);
+    } else if (spawn_type == object_cylinder) {
+        float bound = sqrtf(g_cfg.spawner.cyl_radius * g_cfg.spawner.cyl_radius +
+                            g_cfg.spawner.cyl_half_length * g_cfg.spawner.cyl_half_length);
+        vector3 spawn_position = vector3_addition(main_camera_fov.position,
+                                                  vector3_scaling(main_camera_fov.forward_vector, bound + 1.0f));
+        created_index = scene_add_cylinder(g_cfg.spawner.cyl_radius, g_cfg.spawner.cyl_half_length,
+                                           g_cfg.spawner.cyl_mass, spawn_position);
     } else {
         vector3 spawn_position =
             vector3_addition(main_camera_fov.position,
@@ -200,6 +221,11 @@ int term_duplicate_object(int source_index) {
     int created_index = -1;
     if (snapshot.type == object_sphere) {
         created_index = scene_add_object(snapshot.radius, snapshot.mass, copy_position);
+    } else if (snapshot.type == object_cylinder) {
+        /* Cylinders duplicate as cylinders (old code fell through to cube,
+         * spawning the wrong shape with axle dims as box extents). */
+        created_index =
+            scene_add_cylinder(snapshot.radius, snapshot.cylinder_half_length, snapshot.mass, copy_position);
     } else {
         created_index = scene_add_cube(copy_position, snapshot.half_extensions, snapshot.mass);
     }

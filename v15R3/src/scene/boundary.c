@@ -5,25 +5,38 @@
 /* MPE_TASK_08_FLOOR_EMERGENCY_TUNING_BEGIN */
 /* MPE_TASK_08_FLOOR_EMERGENCY_TUNING_END */
 // Helper: Get lowest point of OBB along an axis
-static float get_obb_min_along_axis(rigidbody *rigid_body, vector3 axis) {
-    if (rigid_body->type == object_sphere)
-        return vector3_dot(rigid_body->position, axis) - rigid_body->radius;
-    /* MPE_TASK_16_BOUNDARY_CACHED_AXES_MIN_BEGIN */
+/* TRUTH: exact support function per shape. The OBB formula
+ * S(d) = SUM he_i*|axis_i.d| is exact for boxes (corners) but OVERESTIMATES
+ * cylinders by up to r*(|a|+|b|-sqrt(a^2+b^2)) (peaks when the axle is
+ * diagonal to d): the phantom depth tripped the floor clamp on ROLLING
+ * wheels (+8.8cm teleport into the air, then Poisson bounce off the slam —
+ * the "erratic cylinder" instability). Cylinders use their exact support
+ * S_cyl(d) = r*|d-(d.ax)ax| + h*|d.ax| (same form as the CCD support). */
+static float body_support_along_axis(rigidbody *rigid_body, vector3 axis) {
+    if (rigid_body->type == object_sphere) {
+        return rigid_body->radius;
+    }
+    if (rigid_body->type == object_cylinder) {
+        vector3 axle = rigid_body->cached_axes[0];
+        float along = vector3_dot(axle, axis);
+        vector3 radial_vec = vector3_subtraction(axis, vector3_scaling(axle, along));
+        return rigid_body->radius * vector3_length(radial_vec) +
+               rigid_body->cylinder_half_length * fabsf(along);
+    }
     vector3 *axes = rigid_body->cached_axes;
-    float projection = rigid_body->half_extensions.x * fabsf(vector3_dot(axes[0], axis)) +
-                       rigid_body->half_extensions.y * fabsf(vector3_dot(axes[1], axis)) +
-                       rigid_body->half_extensions.z * fabsf(vector3_dot(axes[2], axis));
+    return rigid_body->half_extensions.x * fabsf(vector3_dot(axes[0], axis)) +
+           rigid_body->half_extensions.y * fabsf(vector3_dot(axes[1], axis)) +
+           rigid_body->half_extensions.z * fabsf(vector3_dot(axes[2], axis));
+}
+static float get_obb_min_along_axis(rigidbody *rigid_body, vector3 axis) {
+    /* MPE_TASK_16_BOUNDARY_CACHED_AXES_MIN_BEGIN */
+    float projection = body_support_along_axis(rigid_body, axis);
     /* MPE_TASK_16_BOUNDARY_CACHED_AXES_MIN_END */
     return vector3_dot(rigid_body->position, axis) - projection;
 } // Helper: Get highest point of OBB along an axis
 static float get_obb_max_along_axis(rigidbody *rigid_body, vector3 axis) {
-    if (rigid_body->type == object_sphere)
-        return vector3_dot(rigid_body->position, axis) + rigid_body->radius;
     /* MPE_TASK_16_BOUNDARY_CACHED_AXES_MAX_BEGIN */
-    vector3 *axes = rigid_body->cached_axes;
-    float projection = rigid_body->half_extensions.x * fabsf(vector3_dot(axes[0], axis)) +
-                       rigid_body->half_extensions.y * fabsf(vector3_dot(axes[1], axis)) +
-                       rigid_body->half_extensions.z * fabsf(vector3_dot(axes[2], axis));
+    float projection = body_support_along_axis(rigid_body, axis);
     /* MPE_TASK_16_BOUNDARY_CACHED_AXES_MAX_END */
     return vector3_dot(rigid_body->position, axis) + projection;
 }

@@ -5,7 +5,6 @@
 #include <math.h>
 #include "../core/math3d.h"
 #include "../core/rigidbody.h"
-#include "define_forces.h"
 struct physics_world; /* MFS_131: forward decl for per-world cache */
 typedef struct {
     vector3 position;
@@ -22,7 +21,8 @@ typedef struct {
     vector3 tangent2;
     float accumulated_tangent2_impulse;
     float effective_mass_tangent2;
-    vector3 cached_tangent;
+    /* cached_tangent REMOVED (dead field, never read; tangent_vector +
+     * tangent2 are the live Coulomb-disc frame). */
     /* Poisson restitution state: Newtonian velocity bias is wrong for
      * multi-contact (it pays bounce per iteration). Instead the compression
      * phase accumulates unbiased impulse; the restitution pass then pays
@@ -30,10 +30,8 @@ typedef struct {
      * pass to fresh impacts; base_normal_impulse excludes warm start. */
     float impact_velocity;
     float base_normal_impulse;
-    /* Warm-start provenance: set when this contact adopted cached impulses.
-     * The solver damps warm contacts (oscillation control) and runs cold
-     * contacts at full step (fast transient kill). See resolve. */
-    bool warmed;
+    /* warmed REMOVED (dead provenance flag; SOR damping deleted with the
+     * strict warm-start match — all contacts solve full steps). */
     /* NOTE: there is deliberately NO velocity-level Baumgarte bias field.
      * Penetration is corrected positionally only (split impulse +
      * depenetration pass). A velocity bias would inject approach velocity
@@ -81,14 +79,24 @@ void collision_apply_rolling_resistance(collision_data *manifolds, int manifold_
  * e * (this tick's compression impulse) once, then a short relaxation lets
  * friction respond. Correct for multi-contact; Newtonian bias over-pays. */
 void collision_apply_poisson_restitution(collision_data *manifolds, int manifold_count);
+/* TRUTH P0-2: refresh Poisson gate to post-force-integration velocities.
+ * Prepare() runs before gravity/springs/motors are integrated, so the
+ * recorded impact_velocity is stale by g*dt + spring/motor deltas.
+ * Call after rb_integrate_velocity, before iterations: recomputes
+ * vn = (vb+wb×rb − va−wa×ra)·n from current velocities (ra/rb/n unchanged,
+ * positions not yet moved). Exact pre-solve approach speed. */
+void collision_refresh_impact_velocities(collision_data *manifolds, int manifold_count);
 /* CCD swept clamp: for bodies whose per-tick displacement exceeds their
  * contact thickness, analytic time-of-impact against the floor plane,
  * spheres, and static boxes. Clamps the body to the TOI configuration and
  * keeps velocity, so discrete narrowphase then sees penetration≈0 with the
  * true approach velocity (restitution/friction respond correctly).
- * Linear sweep only (angular motion ignored over the tick); dynamic-box
- * obstacles are paired by the swept broadphase but not TOI-clamped. */
+ * TRUTH P0-3: fills time_remaining_out[i] = dt - toi (dt if unclamped).
+ * Post-solve integration MUST advance only the remainder, else toi+dt
+ * double-counts. Linear sweep only (angular motion ignored over the tick);
+ * dynamic-box obstacles are paired by the swept broadphase but not TOI-clamped. */
 int collision_ccd_sweep_clamp(rigidbody *bodies, int body_count, float dt);
+int collision_ccd_sweep_clamp_full(rigidbody *bodies, int body_count, float dt, float *time_remaining_out);
 void contact_cache_save(struct physics_world *world, collision_data *manifolds, int count); /* MFS_131 */
 void contact_cache_clear(struct physics_world *world); /* MFS_131 */
 
@@ -99,10 +107,10 @@ bool collision_static_plane_body(rigidbody *body, float plane_y, collision_data 
 void contact_cache_stats_reset(struct physics_world *world);
 int contact_cache_get_hits(const struct physics_world *world);
 int contact_cache_get_misses(const struct physics_world *world);
-/* Cylinder-vs-object narrowphase. Axle-segment + radius (capsule) model:
- * flat end-caps are treated as hemispherical. Documented approximation:
- * end-cap contacts on flat faces deviate from true cylinder geometry by
- * up to the corner cut. Barrel contacts are exact. */
+/* Cylinder-vs-object narrowphase. TRUE solid-cylinder geometry:
+ * flat end-caps (SDF), rim circle, inside SDF branch; segment-OBB convex
+ * exact for cube; coaxial face-gap + parallel 2-point for cyl-cyl.
+ * Barrel contacts exact; see collision_cylinder.c. */
 bool collision_cylinder_sphere(rigidbody *cyl, rigidbody *sph,
                                collision_data *out);
 bool collision_cylinder_cube(rigidbody *cyl, rigidbody *cube,

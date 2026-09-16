@@ -3,6 +3,7 @@
 * the config registry, and menu state to stdout (triggered by F9).
 */
 #include "../mpe_engine.h"
+#include "../physics/islands.h"
 #include <stdio.h>
 #include <unistd.h>
 
@@ -30,6 +31,43 @@ void validation_report_print(void) {
     printf("[A3] manifold overflow: last_frame=%d\n", debug_last_manifold_overflow_count);
     /* MPE_TASK_09_VALIDATION_PRINT_END */
     printf("[A3] contact cache: hits=%d misses=%d\n", contact_cache_get_hits(physics_world_get_primary()), contact_cache_get_misses(physics_world_get_primary()));
+    /* TRUTH instrumentation (wired-in, was dead code):
+     * total mechanical energy E = sum(KE) + sum(m*g*h) over dynamic bodies.
+     * Static bodies carry no energy (infinite mass, zeroed velocity).
+     * Track across F9 presses: drift means solver/positional passes are
+     * creating or destroying energy (split impulse and sleeping aside,
+     * both energy-neutral by construction). */
+    {
+        physics_world *w = physics_world_get_primary();
+        double total_ke = 0.0, total_pe = 0.0;
+        for (int i = 0; i < w->body_count; i++) {
+            rigidbody *rb = &w->bodies[i];
+            if (rb->static_state) {
+                continue;
+            }
+            total_ke += (double) rb_get_kinetic_energy(rb);
+            if (isfinite(rb->mass) && isfinite(rb->position.y)) {
+                total_pe += (double) rb->mass * (double) g_cfg.world.gravity * (double) rb->position.y;
+            }
+        }
+        printf("[A3] energy: KE=%.4f PE=%.4f total=%.4f J (dynamic bodies)\n", total_ke, total_pe,
+               total_ke + total_pe);
+    }
+    /* Solver islands (wired-in, was a dead accessor): connected components
+     * of the contact graph; fully-sleeping islands skip the solve exactly.
+     * awake=0 everywhere with motion present means the island builder is
+     * over-merging or under-waking — check wake logic, not the solver. */
+    {
+        physics_world *w = physics_world_get_primary();
+        int asleep_islands = 0;
+        for (int i = 0; i < w->island_total; i++) {
+            if (w->island_awake_flags[i] == 0) {
+                asleep_islands++;
+            }
+        }
+        printf("[A3] islands: total=%d asleep=%d awake=%d (islands_count query live)\n", islands_count(w),
+               asleep_islands, w->island_total - asleep_islands);
+    }
     printf("[A3] menus: open=%d spawner=%d velocity=%d object=%d marked_joint=%d\n", main_inputs.is_menu_open,
            main_inputs.spawner_menu_level, main_inputs.velocity_menu_level, main_inputs.object_menu_level,
            main_inputs.marked_joint_object_index);

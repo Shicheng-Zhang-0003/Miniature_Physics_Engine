@@ -18,22 +18,13 @@ void initialize_input (input_status *input_state) {
     input_state -> shift_key_pressed = false;
     input_state -> escape_key_pressed = false;
     input_state -> f_key_pressed = false;
-    input_state -> q_key_pressed = false; /* MFS_161_QKEY_FIX */
-    /* MFS_159_GVBNCH_REMOVED: g_key_pressed */
-    /* MFS_159_GVBNCH_REMOVED: h_key_pressed */
-    /* MFS_159_GVBNCH_REMOVED: c_key_pressed */
-    /* MFS_159_GVBNCH_REMOVED: v_key_pressed */
-    /* MFS_159_GVBNCH_REMOVED: b_key_pressed */
-    /* MFS_159_GVBNCH_REMOVED: n_key_pressed */
+    /* q/m/delete/t keybinds REMOVED (dead or deleted; see header). */
     input_state -> i_key_pressed = false;
     input_state -> j_key_pressed = false;
     input_state -> k_key_pressed = false;
     input_state -> l_key_pressed = false;
-    /* MPE_TASK_21_KEYBOARD_ONLY_INIT_BEGIN */
+    /* MPE_TASK_21_KEYBOARD_ONLY_INIT_BEGIN (r only) */
 input_state -> r_key_pressed = false;
-input_state -> delete_key_pressed = false;
-input_state -> m_key_pressed = false;
-input_state -> t_key_pressed = false;
 /* MPE_TASK_21_KEYBOARD_ONLY_INIT_END */
 //Menu
     input_state -> is_menu_open = false;
@@ -50,8 +41,6 @@ input_state -> t_key_pressed = false;
     input_state -> current_spawn_type = 0; // 0: Sphere, 1: Cube
     input_state -> up_arrow_pressed = false;
     input_state -> down_arrow_pressed = false;
-    input_state -> left_arrow_pressed = false;
-    input_state -> right_arrow_pressed = false;
     input_state -> enter_key_pressed = false;
     input_state -> e_key_pressed = false;
 input_state -> stability_test_pressed = false;
@@ -74,7 +63,6 @@ input_state -> enter_spawn_held = false;
 //Mouse
     input_state -> is_mouse_locked = false;
     input_state -> is_debug_mode_active = false;
-    input_state -> left_mouse_button_clicked = false;
     input_state -> right_mouse_button_clicked = false;
     input_state -> middle_mouse_button_clicked = false;
     input_state -> mouse_delta_x = 0.0f;
@@ -89,19 +77,10 @@ input_state -> enter_spawn_held = false;
     if (event -> keyval == GDK_KEY_s) {input_state -> s_key_pressed = true;}
     if (event -> keyval == GDK_KEY_d) {input_state -> d_key_pressed = true;}
     if (event -> keyval == GDK_KEY_e) {input_state -> e_key_pressed = true;}
-    if ((event -> keyval == GDK_KEY_q) || (event -> keyval == GDK_KEY_Q)) {input_state -> q_key_pressed = true;} /* MFS_GUI_BRIDGE_Q_KEY */
     if (event -> keyval == GDK_KEY_f) {input_state -> f_key_pressed = true;}
-    /* MFS_159_GVBNCH_REMOVED: g_key_pressed */
-    /* MFS_159_GVBNCH_REMOVED: h_key_pressed */
-    /* MFS_159_GVBNCH_REMOVED: c_key_pressed */
-    /* MFS_159_GVBNCH_REMOVED: v_key_pressed */
-    /* MFS_159_GVBNCH_REMOVED: b_key_pressed */
-    /* MFS_159_GVBNCH_REMOVED: n_key_pressed */
-/* MPE_TASK_21_KEYBOARD_ONLY_KEYPRESS_BEGIN */
+/* q/m/delete/t/left/right REMOVED (dead or deleted keybinds; see header). */
+/* MPE_TASK_21_KEYBOARD_ONLY_KEYPRESS_BEGIN (r only) */
 if ((event -> keyval == GDK_KEY_r) || (event -> keyval == GDK_KEY_R)) {input_state -> r_key_pressed = true;}
-if (event -> keyval == GDK_KEY_Delete) {input_state -> delete_key_pressed = true;}
-if ((event -> keyval == GDK_KEY_m) || (event -> keyval == GDK_KEY_M)) {input_state -> m_key_pressed = true;}
-if ((event -> keyval == GDK_KEY_t) || (event -> keyval == GDK_KEY_T)) {input_state -> t_key_pressed = true;}
 /* MPE_TASK_21_KEYBOARD_ONLY_KEYPRESS_END */
 if (event -> keyval == GDK_KEY_F5) {input_state -> stability_test_pressed = true;}
 if (event -> keyval == GDK_KEY_F6) {input_state -> sleep_wake_test_pressed = true;}
@@ -164,20 +143,24 @@ if (input_state -> is_menu_open) {
     if ((input_state -> spawner_menu_level > 0) || (input_state -> velocity_menu_level > 0) || (input_state -> object_menu_level > 0)) {
         if (event -> keyval == GDK_KEY_Up) {input_state -> up_arrow_pressed = true;}
         if (event -> keyval == GDK_KEY_Down) {input_state -> down_arrow_pressed = true;}
-        if (event -> keyval == GDK_KEY_Left) {input_state -> left_arrow_pressed = true;}
-        if (event -> keyval == GDK_KEY_Right) {input_state -> right_arrow_pressed = true;}
+        /* Left/Right REMOVED (pre-dialog change-rate relics). */
         if ((event -> keyval == GDK_KEY_Return) || (event -> keyval == GDK_KEY_KP_Enter)) {input_state -> enter_key_pressed = true;}
     } // Spawner Menu Logic
     if (input_state -> spawner_menu_level == 1) {
         if (event -> keyval == GDK_KEY_1) {input_state -> spawner_menu_level = 2;}
         if (event -> keyval == GDK_KEY_2) {input_state -> spawner_menu_level = 5;}
         if (event -> keyval == GDK_KEY_3) {input_state -> spawner_menu_level = 8;}
+        if (event -> keyval == GDK_KEY_4) {input_state -> spawner_menu_level = 9;}
     } else if (input_state -> spawner_menu_level == 2) {
         if (event -> keyval == GDK_KEY_1) {input_state -> spawner_menu_level = 3;}
         if (event -> keyval == GDK_KEY_2) {input_state -> spawner_menu_level = 4;}
     } else if (input_state -> spawner_menu_level == 5) {
         if (event -> keyval == GDK_KEY_1) {input_state -> spawner_menu_level = 6;}
         if (event -> keyval == GDK_KEY_2) {input_state -> spawner_menu_level = 7;}
+    } else if (input_state -> spawner_menu_level == 9) {
+        if (event -> keyval == GDK_KEY_1) {input_state -> spawner_menu_level = 10;}
+        if (event -> keyval == GDK_KEY_2) {input_state -> spawner_menu_level = 11;}
+        if (event -> keyval == GDK_KEY_3) {input_state -> spawner_menu_level = 12;}
     } // Velocity Menu Logic
     if (input_state -> velocity_menu_level == 1) {
         if (event -> keyval == GDK_KEY_1) {input_state -> velocity_menu_level = 2;}
@@ -190,6 +173,10 @@ if (input_state -> is_menu_open) {
         if (event -> keyval == GDK_KEY_1) {input_state -> velocity_menu_level = 21;}
         if (event -> keyval == GDK_KEY_2) {input_state -> velocity_menu_level = 22;}
         if (event -> keyval == GDK_KEY_3) {input_state -> velocity_menu_level = 23;}
+        /* World-physics shortcuts imported from menu 6 (game-mode-safe,
+         * non-debug-only params only; debug-only physics stays in 6). */
+        if (event -> keyval == GDK_KEY_4) {input_state -> velocity_menu_level = 24;}
+        if (event -> keyval == GDK_KEY_5) {input_state -> velocity_menu_level = 25;}
     } else if (input_state -> velocity_menu_level == 10) {
         if (event -> keyval == GDK_KEY_1) {input_state -> velocity_menu_level = 11;}
         if (event -> keyval == GDK_KEY_2) {input_state -> velocity_menu_level = 12;}
@@ -242,24 +229,14 @@ if (event -> keyval == GDK_KEY_space) {input_state -> space_key_pressed = true;}
     if (event -> keyval == GDK_KEY_a) {input_state -> a_key_pressed = false;}
     if (event -> keyval == GDK_KEY_s) {input_state -> s_key_pressed = false;}
     if (event -> keyval == GDK_KEY_d) {input_state -> d_key_pressed = false;}
-/* MPE_TASK_21_KEYBOARD_ONLY_KEYRELEASE_BEGIN */
+/* MPE_TASK_21_KEYBOARD_ONLY_KEYRELEASE_BEGIN (r only) */
 if ((event -> keyval == GDK_KEY_r) || (event -> keyval == GDK_KEY_R)) {input_state -> r_key_pressed = false;}
-if (event -> keyval == GDK_KEY_Delete) {input_state -> delete_key_pressed = false;}
-if ((event -> keyval == GDK_KEY_m) || (event -> keyval == GDK_KEY_M)) {input_state -> m_key_pressed = false;}
-if ((event -> keyval == GDK_KEY_t) || (event -> keyval == GDK_KEY_T)) {input_state -> t_key_pressed = false;}
 /* MPE_TASK_21_KEYBOARD_ONLY_KEYRELEASE_END */
     if (event -> keyval == GDK_KEY_i) {input_state -> i_key_pressed = false;}
     if (event -> keyval == GDK_KEY_j) {input_state -> j_key_pressed = false;}
     if (event -> keyval == GDK_KEY_k) {input_state -> k_key_pressed = false;}
     if (event -> keyval == GDK_KEY_l) {input_state -> l_key_pressed = false;}
-    if ((event -> keyval == GDK_KEY_q) || (event -> keyval == GDK_KEY_Q)) {input_state -> q_key_pressed = false;} /* MFS_GUI_BRIDGE_Q_KEY */
-    /* MFS_159_GVBNCH_REMOVED: g_key_pressed */
-    /* MFS_159_GVBNCH_REMOVED: g_key_pressed */
-    /* MFS_159_GVBNCH_REMOVED: h_key_pressed */
-    /* MFS_159_GVBNCH_REMOVED: c_key_pressed */
-    /* MFS_159_GVBNCH_REMOVED: v_key_pressed */
-    /* MFS_159_GVBNCH_REMOVED: b_key_pressed */
-    /* MFS_159_GVBNCH_REMOVED: n_key_pressed */ /* MFS_124_FIX */
+/* q/m/delete/t REMOVED (dead or deleted keybinds). */
     if (event -> keyval == GDK_KEY_space) {input_state -> space_key_pressed = false;} /* MFS_154 */
     if (event -> keyval == GDK_KEY_Shift_L) {input_state -> shift_key_pressed = false;} /* MFS_154 */
 /* MPE_TASK_22_ENTER_SPAWN_KEYRELEASE_BEGIN */
@@ -307,7 +284,7 @@ input_state -> enter_spawn_held = false;
     } return FALSE;
 } gboolean on_button_press (GtkWidget *widget, GdkEventButton *event, gpointer user_data_stored) {
     input_status *input_state = (input_status *) user_data_stored;
-    if (event -> button == 1) {input_state -> left_mouse_button_clicked = true;}
+    /* Left click only locks the mouse (no selection action attached). */
     if (event -> button == 2) {input_state -> middle_mouse_button_clicked = true;}
     if (event -> button == 3) {input_state -> right_mouse_button_clicked = true;}
     if (!(input_state -> is_mouse_locked)) {
@@ -319,7 +296,6 @@ input_state -> enter_spawn_held = false;
 } gboolean on_button_release (GtkWidget *widget, GdkEventButton *event, gpointer user_data_stored) {
     (void) widget;
     input_status *input_state = (input_status *) user_data_stored;
-    if (event -> button == 1) {input_state -> left_mouse_button_clicked = false;}
     if (event -> button == 2) {input_state -> middle_mouse_button_clicked = false;}
     if (event -> button == 3) {input_state -> right_mouse_button_clicked = false;}
     return FALSE;
@@ -335,29 +311,18 @@ input_state -> enter_spawn_held = false;
     input_state -> shift_key_pressed = false;
     input_state -> escape_key_pressed = false;
     input_state -> f_key_pressed = false;
-    /* MFS_159_GVBNCH_REMOVED: g_key_pressed */
-    /* MFS_159_GVBNCH_REMOVED: h_key_pressed */
-    /* MFS_159_GVBNCH_REMOVED: c_key_pressed */
-    /* MFS_159_GVBNCH_REMOVED: v_key_pressed */
-    /* MFS_159_GVBNCH_REMOVED: b_key_pressed */
-    /* MFS_159_GVBNCH_REMOVED: n_key_pressed */
+/* q/m/delete/t + g/h/c/v/b/n REMOVED (dead or deleted keybinds). */
     input_state -> i_key_pressed = false;
     input_state -> j_key_pressed = false;
     input_state -> k_key_pressed = false;
     input_state -> l_key_pressed = false;
-    /* MPE_TASK_21_KEYBOARD_ONLY_FOCUS_BEGIN */
+    /* MPE_TASK_21_KEYBOARD_ONLY_FOCUS_BEGIN (r only) */
 input_state -> r_key_pressed = false;
-input_state -> delete_key_pressed = false;
-input_state -> m_key_pressed = false;
-input_state -> t_key_pressed = false;
 /* MPE_TASK_21_KEYBOARD_ONLY_FOCUS_END */
 input_state -> up_arrow_pressed = false;
     input_state -> down_arrow_pressed = false;
-    input_state -> left_arrow_pressed = false;
-    input_state -> right_arrow_pressed = false;
     input_state -> enter_key_pressed = false;
     input_state -> e_key_pressed = false;
-    input_state -> q_key_pressed = false; /* MFS_GUI_BRIDGE_Q_KEY_FOCUS */
 input_state -> stability_test_pressed = false;
 input_state -> sleep_wake_test_pressed = false;
 input_state -> editor_torture_pressed = false;
@@ -378,7 +343,6 @@ input_state -> enter_spawn_held = false;
 /* A3_PATCH_02_FOCUS_LOSS */
     input_state -> mouse_delta_x = 0.0f;
     input_state -> mouse_delta_y = 0.0f;
-    input_state -> left_mouse_button_clicked = false;
     input_state -> right_mouse_button_clicked = false;
     input_state -> middle_mouse_button_clicked = false;
     input_state -> suppress_mouse_delta = false;

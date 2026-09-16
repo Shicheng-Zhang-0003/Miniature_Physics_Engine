@@ -296,7 +296,7 @@ const terminal_command terminal_commands[] = {
     {"ls", false, cmd_ls, "ls [-l] [path]", "list objects/joints"},
     {"ll", false, cmd_ll, "ll [path]", "long listing"},
     {"cat", false, cmd_cat, "cat <path...>", "inspect object/joint/world/camera/spawner"},
-    {"touch", true, cmd_touch, "touch [new.sph|new.cube...]", "create object"},
+    {"touch", true, cmd_touch, "touch [new.sph|new.cube|new.cyl...]", "create object"},
     {"cp", true, cmd_cp, "cp <object> [dest]", "duplicate object"},
     {"rm", true, cmd_rm, "rm [-rf] <path...>", "remove object/joint/all"},
     {"mv", true, cmd_mv, "mv <object> /pos/x/y/z|/vel/x/y/z", "move or impulse object"},

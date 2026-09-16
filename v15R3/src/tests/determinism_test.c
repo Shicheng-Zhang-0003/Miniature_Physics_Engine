@@ -22,7 +22,9 @@ static void build_scene(physics_world *world) {
     world->bodies[b].velocity = (vector3){-0.75f, 0.0f, 0.5f};
     world->bodies[b].angular_velocity = (vector3){0.0f, 2.0f, -1.5f};
     world->bodies[b].restitution = 0.3f;
-    world->bodies[b].nice_value = 3;
+    /* TRUTH: nice=0 (no numerical damping). Old nice=3 baked game damping
+     * into the determinism proof; determinism must hold for pure physics. */
+    world->bodies[b].nice_value = 0;
     int c = physics_world_add_cylinder(world, 0.3f, 0.4f, 1.5f, (vector3){0.0f, 2.0f, 1.0f});
     world->bodies[c].velocity = (vector3){0.2f, -1.0f, -0.3f};
     world->bodies[c].angular_velocity = (vector3){-2.0f, 0.5f, 1.0f};

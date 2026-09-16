@@ -127,8 +127,33 @@ static void spring_apply_core(physics_world *world, rigidbody *bodies, int body_
 
         float spring_extension = current_separation_distance - current_spring_joint->equilibrium_length;
 
+        /* TRUTH: Courant stability guard (loud, not silent). Explicit Euler
+         * is stable iff w*dt=sqrt(k/m_red)*dt<2. Above that the TRUE Hooke
+         * force would explode; softening k to the stable limit preserves
+         * bounded energy and reports the deviation (stderr, rate-limited).
+         * Default truth paths (k=20,m=1: w*dt=0.07) never bind. */
+        float k_eff = current_spring_joint->spring_constant;
+        float a3_inverse_mass_sum = rigid_body_a->inverse_mass + rigid_body_b->inverse_mass;
+        if (a3_inverse_mass_sum > 1e-12f) {
+            float m_red = 1.0f / a3_inverse_mass_sum;
+            /* Stable limit with 0.75 safety: k < m*(1.5/dt)^2. dt from
+             * fixed step (1/60); uses worst-case tick. */
+            float k_stable = m_red * 8100.0f; /* m*(90)^2, 90=1.5*60 */
+            if ((k_eff > k_stable) && (k_stable > 0.0f)) {
+                static int spring_warn_count = 0;
+                if (spring_warn_count < 8) {
+                    fprintf(stderr,
+                            "[spring] TRUTH guard: joint %d k=%.1f > stable %.1f "
+                            "(m_red=%.4f): softened, Hooke deviates. Use stiffer substeps or lighter k.\n",
+                            joint_index, k_eff, k_stable, m_red);
+                    spring_warn_count++;
+                }
+                k_eff = k_stable;
+            }
+        }
+
         vector3 restoration_force =
-            vector3_scaling(spring_axis_direction, current_spring_joint->spring_constant * spring_extension);
+            vector3_scaling(spring_axis_direction, k_eff * spring_extension);
 
         vector3 relative_velocity = vector3_subtraction(rigid_body_b->velocity, rigid_body_a->velocity);
         float velocity_along_spring_axis = vector3_dot(relative_velocity, spring_axis_direction);
@@ -137,12 +162,12 @@ static void spring_apply_core(physics_world *world, rigidbody *bodies, int body_
                                                 current_spring_joint->damping_coefficient * velocity_along_spring_axis);
         vector3 net_joint_force = vector3_addition(restoration_force, damping_force);
 
-        float a3_inverse_mass_sum = rigid_body_a->inverse_mass + rigid_body_b->inverse_mass;
         if (a3_inverse_mass_sum > 0.0f) {
-            /* FIX-AUDIT: explicit-Euler springs go unstable for
-             * w*dt = sqrt(k/m)*dt > 2 (e.g. k=5000,m=0.01 -> 11.8).
-             * The Fmax limiter below keeps it bounded but silently breaks
-             * Hooke's law; that tradeoff is retained and documented. */
+            /* Actuator saturation (documented NON-Hookean): caps force to
+             * m_red*max_acceleration (default 200 m/s^2). Truth paths never
+             * bind (spring test: 10N << 200N cap). Extreme user k/x saturate
+             * loudly-bounded instead of NaN. For pure Hooke set
+             * joints.max_acceleration to its 10000 max. */
             float a3_reduced_mass = 1.0f / a3_inverse_mass_sum;
             float a3_max_joint_force = a3_reduced_mass * g_cfg.joints.max_acceleration;
             float a3_force_length = vector3_length(net_joint_force);

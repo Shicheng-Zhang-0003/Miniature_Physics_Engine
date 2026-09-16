@@ -4,15 +4,18 @@
 #include <stdbool.h>
 typedef struct {
     //Keyboard Movement Inputs
-    bool w_key_pressed, a_key_pressed, s_key_pressed, d_key_pressed, space_key_pressed, shift_key_pressed, escape_key_pressed, f_key_pressed, q_key_pressed; /* MFS_159_GVBNCH_REMOVED */
+    bool w_key_pressed, a_key_pressed, s_key_pressed, d_key_pressed, space_key_pressed, shift_key_pressed, escape_key_pressed, f_key_pressed;
+    /* q_key_pressed REMOVED (dead MFS bridge flag, zero consumers).
+     * m_key_pressed REMOVED (keybind deleted).
+     * delete_key_pressed REMOVED (keybind deleted).
+     * t_key_pressed REMOVED (dead flag, zero consumers; terminal opens via 1).
+     * left_mouse_button_clicked REMOVED (dead flag; click only locks mouse).
+     * left/right_arrow REMOVED (pre-dialog change-rate relics). */
 /* MPE_TASK_22_ENTER_SPAWN_FIELD_BEGIN */
 bool enter_spawn_held;
 /* MPE_TASK_22_ENTER_SPAWN_FIELD_END */
-/* MPE_TASK_21_KEYBOARD_ONLY_FIELDS_BEGIN */
+/* MPE_TASK_21_KEYBOARD_ONLY_FIELDS_BEGIN (r only; m/t/delete removed) */
 bool r_key_pressed;
-bool delete_key_pressed;
-bool m_key_pressed;
-bool t_key_pressed;
 /* MPE_TASK_21_KEYBOARD_ONLY_FIELDS_END */
     // Camera Emulation (IJKL)
     bool i_key_pressed, j_key_pressed, k_key_pressed, l_key_pressed;
@@ -24,8 +27,8 @@ bool menu_4_pressed, menu_5_pressed, menu_6_pressed; /* MPE_TASK_35 */
     int spawner_menu_level;
     int velocity_menu_level;
     int object_menu_level;
-    int current_spawn_type; // 0: Sphere, 1: Cube
-    bool up_arrow_pressed, down_arrow_pressed, left_arrow_pressed, right_arrow_pressed, enter_key_pressed, e_key_pressed;
+    int current_spawn_type; // 0: Sphere, 1: Cube, 2: Cylinder
+    bool up_arrow_pressed, down_arrow_pressed, enter_key_pressed, e_key_pressed;
 bool stability_test_pressed;
 bool sleep_wake_test_pressed;
 bool editor_torture_pressed;
@@ -42,7 +45,7 @@ bool config_torture_pressed;
 /* MPE_TASK_39_CONFIG_TORTURE_INPUT_END */
     //Mouse Status Inputs
     bool is_mouse_locked, is_debug_mode_active;
-    bool left_mouse_button_clicked, right_mouse_button_clicked, middle_mouse_button_clicked;
+    bool right_mouse_button_clicked, middle_mouse_button_clicked;
     float mouse_delta_x, mouse_delta_y;
     bool suppress_mouse_delta;
     int marked_joint_object_index; // -1 if none is marked
