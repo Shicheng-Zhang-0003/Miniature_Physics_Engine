@@ -23,7 +23,11 @@ int main(void) {
     if (w < 0) { printf("[FAIL] could not create wheel\n"); return 1; }
 
     const float dt = 1.0f / 60.0f;
-    const float drive_torque = 0.15f; /* N·m about the axle (X) */
+    /* TRUTH: torque sized for the resolvable regime. 0.15 N·m spins this
+     * 0.5 kg wheel past π rad/tick, where discrete contact is undefined
+     * (baseline "passed" at y=488 lunacy). 0.080 spins to ~58 rad/s
+     * (~1 rad/tick), where the rim-quad contact resolves honestly. */
+    const float drive_torque = 0.080f; /* N·m about the axle (X) */
 
     /* Let it settle for 1 second before applying drive torque */
     for (int t = 0; t < 60; t++) {
@@ -46,19 +50,46 @@ int main(void) {
 
     printf("[info] grounded wheel: dz=%.4f vz=%.4f wx=%.4f y=%.4f\n", dz, vz, wx, y);
 
-    if (fabsf(wx) < 1.0f) {
-        printf("[FAIL] wheel did not spin under torque (wx=%.4f)\n", wx);
+    if (!isfinite(dz) || !isfinite(vz) || !isfinite(wx) || !isfinite(y)) {
+        printf("[FAIL] non-finite wheel state\n");
         return 1;
     }
 
-    if (fabsf(dz) < 0.10f) {
+    if (fabsf(wx) < 5.0f) {
+        printf("[FAIL] wheel did not spin up under torque (wx=%.4f)\n", wx);
+        return 1;
+    }
+
+    if (fabsf(wx) > 120.0f) {
+        printf("[FAIL] wheel spun past the resolvable regime (wx=%.4f > 120 ~ 2 rad/tick)\n", wx);
+        return 1;
+    }
+
+    /* Grounded: the wheel radius is 0.05; liftoff lunacy reached y=147+. */
+    if (fabsf(y - 0.05f) > 0.05f) {
+        printf("[FAIL] wheel left the ground (y=%.4f, expected ~0.05)\n", y);
+        return 1;
+    }
+
+    if (fabsf(dz) < 1.0f) {
         printf("[GAP] wheel spun but did not translate (dz=%.4f) — contact friction not gripping\n", dz);
         return 1;
     }
 
-    /* Kinematic check: rolling without slipping means vz ≈ wx * r */
+    /* Rolling coupling: propulsion direction must match spin, and slip must
+     * stay physical — vz tracks wx*r (pure roll) within slip tolerance.
+     * Superluminal vz >> wx*r (baseline: 87 vs 20.8) means lunacy. */
     float expected_vz = wx * 0.05f;
     printf("[info] kinematic check: expected vz (w*r) = %.4f, actual vz = %.4f\n", expected_vz, vz);
+    if ((vz * wx) < 0.0f) {
+        printf("[FAIL] translation opposes spin (vz=%.4f, wx=%.4f) — wrong propulsion direction\n", vz, wx);
+        return 1;
+    }
+    float coupling = fabsf(vz) / (fabsf(expected_vz) + 1e-6f);
+    if (coupling < 0.20f || coupling > 1.15f) {
+        printf("[FAIL] unphysical slip (vz/wr=%.3f, need 0.20..1.15)\n", coupling);
+        return 1;
+    }
 
     printf("[PASS] grounded wheel rolled %.4f m via real floor friction\n", dz);
     return 0;

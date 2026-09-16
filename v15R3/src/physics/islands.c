@@ -41,11 +41,29 @@ static int island_index_of(rigidbody *bodies, rigidbody *body, int body_count) {
     if ((!bodies) || (!body) || (body_count <= 0)) {
         return -1;
     }
-    ptrdiff_t offset = body - bodies;
-    if ((offset < 0) || (offset >= body_count)) {
+    /* TRUTH: pointer subtraction across unrelated objects (floor proxy in TLS
+     * vs bodies on heap) is UB; -O3 VRP/aliasing miscompiles it into garbage
+     * indices and segfaults (cylinder_drop). Compare byte addresses first,
+     * subtract only when provably in-range. */
+    uintptr_t base = (uintptr_t) (const void *) bodies;
+    uintptr_t addr = (uintptr_t) (const void *) body;
+    uintptr_t stride = (uintptr_t) sizeof(rigidbody);
+    if (addr < base) {
         return -1;
     }
-    return (int) offset;
+    uintptr_t diff = addr - base;
+    if (diff % stride != 0) {
+        return -1;
+    }
+    uintptr_t idx = diff / stride;
+    if (idx >= (uintptr_t) body_count) {
+        return -1;
+    }
+    /* Paranoia: verify round-trip (catches padding/aliasing surprises). */
+    if ((void *) &bodies[idx] != (void *) body) {
+        return -1;
+    }
+    return (int) idx;
 }
 
 static bool islands_ready(const struct physics_world *world) {
@@ -80,10 +98,20 @@ void islands_build(struct physics_world *world, broadphase_pair *pairs, int pair
             if ((a < 0) || (a >= body_count) || (b < 0) || (b >= body_count) || (a == b)) {
                 continue;
             }
+            /* TRUTH: don't merge via both-sleeping pairs (solver skips them).
+             * Old code unioned every broadphase pair incl. bounding-sphere
+             * false positives, keeping giant false islands awake. */
+            bool a_sleep = bodies[a].is_sleeping;
+            bool b_sleep = bodies[b].is_sleeping;
+            if (a_sleep && b_sleep) {
+                continue;
+            }
             island_union(world, a, b);
         }
     }
-    /* Revolute joints join islands (wheels must solve with their chassis). */
+    /* Joints join islands. TRUTH: O(J*B) linear scan per tick stalled with
+     * many joints/bodies. Use pointer-offset fast path (bodies from same
+     * world are contiguous) with id fallback, no nested scan. */
     {
         uint32_t ids_a[mpe_max_joints];
         uint32_t ids_b[mpe_max_joints];

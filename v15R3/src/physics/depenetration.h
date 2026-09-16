@@ -19,5 +19,7 @@ void a3_positional_depenetrate_manifold(collision_data *manifold);
 struct physics_world;
 void a3_positional_depenetration_pass(struct physics_world *world, broadphase_pair *pair_buffer,
                                       int *pair_count_pointer, bool rebuild_broadphase);
+void a3_positional_depenetration_pass_dt(struct physics_world *world, broadphase_pair *pair_buffer,
+                                         int *pair_count_pointer, bool rebuild_broadphase, float dt);
 
 #endif

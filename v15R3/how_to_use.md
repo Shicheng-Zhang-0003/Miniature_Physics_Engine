@@ -1,6 +1,5 @@
-```markdown
 # Miniature Physics Engine — User Guide
-### v15R3 Development Guide
+### v15R3 Release Guide
 
 ---
 
@@ -142,6 +141,29 @@ Type `help` for the full command list or `man <command>` for usage. `Ctrl+L` cle
 
 ---
 
+## Terminal Debugger (`mpe-tui`)
+
+A terminal-only companion binary: a live inspector and a scriptable
+state-dump suite (needs only ncurses; no GTK/OpenGL):
+
+```bash
+cd src
+make mpe-tui
+./mpe-tui                         # live ncurses inspector (needs a TTY)
+./mpe-tui --snapshot 600          # one full state dump (pipeable, diffable)
+./mpe-tui --stream 600 --every 60 # dumps every 60 ticks
+./mpe-tui --snapshot 10 --scene tower|pendulum|springlab|f10|demo
+```
+
+Live screens (`1`–`5`, `Tab` cycles): body overview, per-object
+characteristics + mathematics (quaternion, euler, inertia tensors, momentum,
+energy), joint/constraint detail with live endpoint geometry, pairwise scene
+graph, help. Keys: `j/k` select, `Space` pause, `s` single-step, `+/-`
+time scale, `/` filter, `q` quit. Snapshot sections (`[engine]`, `[body i]`,
+`[springs]`, `[constraints]`, `[pairs]`, `[islands]`, `[stats]`,
+`[result]`) are fixed-format and deterministic. `make tui-smoke` checks
+every scene dumps finite state.
+
 ---
 
 ## Configuration System (Key 6)
@@ -263,7 +285,9 @@ Press `9` to open the scene menu:
 
 Scenes are saved to `status/scene.dat` (v200: LE fields, stable IDs, CRC32 footer, atomic tmp→rename). Saving overwrites any existing file. Loading clears the current scene and replaces it entirely. Bodies (sphere/cube/cylinder incl. position, velocity, orientation, colour, mass, friction, restitution, static/kinematic/sleep/nice_value/stable ID+generation) plus spring joints and revolute joints (anchors, axes, motors, limits) are saved and restored. Files ≤v153 load via the legacy reader (IDs remapped, cylinders become spheres pre-R3-04).
 
-**Known limitations:** Prismatic joints are not yet implemented so nothing to save. Per-object config (beyond nice_value) is not persisted. Big-endian hosts are untested (format is LE by design).
+**Joint truth:** the solver supports spring, revolute, fixed, prismatic, distance, and rope constraints (see them live in `mpe-tui --scene demo`). The in-engine menus create spring joints; scene v200 persists springs + revolutes only. Fixed/distance/prismatic/rope currently have no creation UI and do not persist — solver-side only.
+
+**Known limitations:** Per-object config (beyond nice_value) is not persisted. Big-endian hosts are untested (format is LE by design).
 
 ---
 
@@ -312,7 +336,7 @@ Broadphase collision detection uses a 3D spatial hash grid and runs once per phy
 
 **Wayland:** Mouse locking does not function correctly under native Wayland. The engine must be run under X11. On systems that default to Wayland, install basic X11 drivers (`xorg`, `xserver-xorg`) and launch the engine in an X11 session. Forcing X11 via `GDK_BACKEND=x11 ./engine` may also work depending on your compositor.
 
-**Scene format:** v200 saves bodies (stable IDs, sleep, damping) plus spring, revolute, fixed and distance joints, with CRC32 footer and atomic write. Files ≤v153 load via the legacy reader. Truth labels: `world.drag` is linear-viscous (not quadratic aero); `nice_value`/`angular_damping_scale` are NON-PHYSICAL settle tools (0/1.0 = truth); `sleep.enable=0` runs sleepless truth validation; boundary walls are a plastic safety net, not material contact.
+**Scene format:** v200 saves bodies (stable IDs, sleep, damping) plus spring and revolute joints, with CRC32 footer and atomic write. Fixed/distance/prismatic/rope constraints solve correctly but have no creation UI and do not persist yet. Files ≤v153 load via the legacy reader. Truth labels: `world.drag` is linear-viscous (not quadratic aero); `nice_value`/`angular_damping_scale` are NON-PHYSICAL settle tools (0/1.0 = truth); `sleep.enable=0` runs sleepless truth validation; boundary walls are a plastic safety net, not material contact.
 
 ---
 

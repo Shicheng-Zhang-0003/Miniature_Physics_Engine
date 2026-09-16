@@ -96,7 +96,10 @@ void remove_joint(physics_world *world, int joint_pool_index) {
 
 /* Shared Hooke+damping+limit core over an explicit body array. Both step
  * paths funnel through here (legacy passes the primary world's bodies). */
-static void spring_apply_core(physics_world *world, rigidbody *bodies, int body_count) {
+static void spring_apply_core_dt(physics_world *world, rigidbody *bodies, int body_count, float dt) {
+    if (!(dt > 0.0f) || !isfinite(dt)) {
+        dt = 1.0f / 60.0f;
+    }
     for (int joint_index = 0; joint_index < mpe_max_joints; joint_index++) {
         if (!world->spring_joints[joint_index].is_active) {
             continue;
@@ -131,24 +134,43 @@ static void spring_apply_core(physics_world *world, rigidbody *bodies, int body_
          * is stable iff w*dt=sqrt(k/m_red)*dt<2. Above that the TRUE Hooke
          * force would explode; softening k to the stable limit preserves
          * bounded energy and reports the deviation (stderr, rate-limited).
-         * Default truth paths (k=20,m=1: w*dt=0.07) never bind. */
+         * TRUTH: use effective masses (sleeping/static infinite) and actual
+         * dt (not hardcoded 60Hz), plus damping guard c*dt/m<2. */
         float k_eff = current_spring_joint->spring_constant;
-        float a3_inverse_mass_sum = rigid_body_a->inverse_mass + rigid_body_b->inverse_mass;
+        if (!isfinite(k_eff) || k_eff < 0.0f) {
+            k_eff = 0.0f;
+        }
+        float a3_inverse_mass_sum =
+            rigidbody_effective_inv_mass(rigid_body_a) + rigidbody_effective_inv_mass(rigid_body_b);
         if (a3_inverse_mass_sum > 1e-12f) {
             float m_red = 1.0f / a3_inverse_mass_sum;
-            /* Stable limit with 0.75 safety: k < m*(1.5/dt)^2. dt from
-             * fixed step (1/60); uses worst-case tick. */
-            float k_stable = m_red * 8100.0f; /* m*(90)^2, 90=1.5*60 */
-            if ((k_eff > k_stable) && (k_stable > 0.0f)) {
+            float omega_dt_limit = 1.5f;
+            float k_stable = m_red * (omega_dt_limit / dt) * (omega_dt_limit / dt);
+            if ((k_eff > k_stable) && (k_stable > 0.0f) && isfinite(k_stable)) {
                 static int spring_warn_count = 0;
                 if (spring_warn_count < 8) {
                     fprintf(stderr,
                             "[spring] TRUTH guard: joint %d k=%.1f > stable %.1f "
-                            "(m_red=%.4f): softened, Hooke deviates. Use stiffer substeps or lighter k.\n",
-                            joint_index, k_eff, k_stable, m_red);
+                            "(m_red=%.4f, dt=%.4f): softened, Hooke deviates. Use stiffer substeps or lighter k.\n",
+                            joint_index, k_eff, k_stable, m_red, dt);
                     spring_warn_count++;
                 }
                 k_eff = k_stable;
+            }
+            /* Damping stability: explicit c*dt/m_red < 2. */
+            float c = current_spring_joint->damping_coefficient;
+            if (!isfinite(c) || c < 0.0f) {
+                c = 0.0f;
+            }
+            float c_stable = 1.5f * m_red / dt;
+            if ((c > c_stable) && isfinite(c_stable) && c_stable > 0.0f) {
+                static int damp_warn_count = 0;
+                if (damp_warn_count < 8) {
+                    fprintf(stderr, "[spring] TRUTH guard: joint %d c=%.1f > stable %.1f: softened.\n",
+                            joint_index, c, c_stable);
+                    damp_warn_count++;
+                }
+                current_spring_joint->damping_coefficient = c_stable;
             }
         }
 
@@ -185,7 +207,14 @@ void apply_force_all_joints(physics_world *world) {
     if ((!world) || (!world->bodies) || (world->body_count <= 0)) {
         return;
     }
-    spring_apply_core(world, world->bodies, world->body_count);
+    spring_apply_core_dt(world, world->bodies, world->body_count, 1.0f / 60.0f);
+}
+
+void apply_force_all_joints_dt(physics_world *world, float dt) {
+    if ((!world) || (!world->bodies) || (world->body_count <= 0)) {
+        return;
+    }
+    spring_apply_core_dt(world, world->bodies, world->body_count, dt);
 }
 
 /* World-aware spring pass over an explicit body array (headless + world
@@ -194,7 +223,14 @@ void apply_spring_forces_world(physics_world *world, rigidbody *bodies, int body
     if ((!world) || (!bodies) || (body_count <= 0)) {
         return;
     }
-    spring_apply_core(world, bodies, body_count);
+    spring_apply_core_dt(world, bodies, body_count, 1.0f / 60.0f);
+}
+
+void apply_spring_forces_world_dt(physics_world *world, rigidbody *bodies, int body_count, float dt) {
+    if ((!world) || (!bodies) || (body_count <= 0)) {
+        return;
+    }
+    spring_apply_core_dt(world, bodies, body_count, dt);
 }
 
 void remove_joints_from_object_id(physics_world *world, uint32_t object_id) {
