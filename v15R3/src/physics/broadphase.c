@@ -88,8 +88,16 @@ static bool broadphase_ensure_node_capacity(broadphase_workspace *ws) {
     if (!ws) {
         return false;
     }
+    /* TRUTH: unbounded doubling lets one huge wall (250m/cell 1m) allocate
+     * millions of nodes -> stall/OOM then false negatives. Cap at 1M nodes
+     * (~12MB) and fail open with telemetry instead of OOM-killing. */
+    const int kMaxNodes = 1 << 20;
     if (ws->node_pool == NULL) {
-        ws->node_pool_capacity = max_objects * 8;
+        int want = max_objects * 8;
+        if (want > kMaxNodes) {
+            want = kMaxNodes;
+        }
+        ws->node_pool_capacity = want;
         ws->node_pool = (hash_node *) malloc((size_t) ws->node_pool_capacity * sizeof(hash_node));
         if (ws->node_pool == NULL) {
             ws->node_pool_capacity = 0;
@@ -101,8 +109,15 @@ static bool broadphase_ensure_node_capacity(broadphase_workspace *ws) {
     if (ws->node_count < ws->node_pool_capacity) {
         return true;
     }
+    if (ws->node_pool_capacity >= kMaxNodes) {
+        ws->node_overflow_count++;
+        return false;
+    }
     int new_capacity = (ws->node_pool_capacity > 0) ? (ws->node_pool_capacity * 2) : (max_objects * 8);
-    if (new_capacity < ws->node_pool_capacity) {
+    if (new_capacity > kMaxNodes) {
+        new_capacity = kMaxNodes;
+    }
+    if (new_capacity <= ws->node_pool_capacity) {
         ws->node_overflow_count++;
         return false;
     }
@@ -208,13 +223,32 @@ static void broadphase_update_cell_size(struct physics_world *world, rigidbody *
     }
 
     /* Cache: skip O(n) rescan if population is stable and we recomputed
-     * recently. Recompute when count drifts >10% or every 60 ticks. */
+     * recently. Recompute when count drifts >10% or every 60 ticks.
+     * TRUTH: count alone hides same-count size swaps (spheres -> huge walls).
+     * Also track average radius; drift >25% forces recompute. */
     ws->ticks_since_cell_recompute++;
     int count_delta = body_count > ws->cached_body_count ? body_count - ws->cached_body_count
-                                                         : ws->cached_body_count - body_count;
+                                                          : ws->cached_body_count - body_count;
     bool count_stable = (ws->cached_body_count > 0) && (count_delta * 10 < ws->cached_body_count);
     if (count_stable && ws->ticks_since_cell_recompute < 60 && ws->current_cell_size > 0.0f) {
-        return;
+        /* Cheap size-distribution probe: sample up to 16 bodies for avg radius drift. */
+        float probe_sum = 0.0f;
+        int probe_n = body_count < 16 ? body_count : 16;
+        for (int pi = 0; pi < probe_n; pi++) {
+            float pr = broadphase_bounding_radius(&bodies[(pi * body_count) / probe_n]);
+            if (isfinite(pr) && pr > 0.0f) {
+                probe_sum += pr;
+            }
+        }
+        float probe_avg = probe_n > 0 ? probe_sum / (float) probe_n : 0.0f;
+        float cached_avg = ws->current_cell_size / g_cfg.broadphase.cell_size_multiplier;
+        if (cached_avg <= 0.0f) {
+            cached_avg = 0.5f;
+        }
+        float drift = fabsf(probe_avg - cached_avg) / cached_avg;
+        if (isfinite(drift) && drift < 0.25f) {
+            return;
+        }
     }
     ws->cached_body_count = body_count;
     ws->ticks_since_cell_recompute = 0;
@@ -268,12 +302,14 @@ int broadphase_generate_pairing(struct physics_world *world, broadphase_pair *co
     rigidbody *bodies = world->bodies;
     int body_count = world->body_count;
     broadphase_workspace *ws = world->broadphase;
-    if (dt <= 0.0f) {
+    if (!(dt > 0.0f) || !isfinite(dt)) {
         dt = 1.0f / 60.0f;
     }
     /* MPE_TASK_17_CELL_SIZE_CALL_BEGIN */
     if (body_count < 2) {
         ws->current_cell_size = g_cfg.broadphase.cell_size_default;
+        ws->cached_body_count = body_count;
+        ws->ticks_since_cell_recompute = 0;
         return 0;
     }
 
@@ -367,9 +403,35 @@ int broadphase_generate_pairing(struct physics_world *world, broadphase_pair *co
                     if (!pair_already_checked(ws, min_obj, max_obj)) {
                         rigidbody *rb_a = &bodies[min_obj];
                         rigidbody *rb_b = &bodies[max_obj];
-                        float dist_sq = vector3_length_squared(vector3_subtraction(rb_a->position, rb_b->position));
+                        /* TRUTH: swept-insert then unswept cull tunnels fast bodies.
+                         * Cells prove swept-AABB overlap; cull must be swept too.
+                         * Expand by relative displacement over dt (linear + tip). */
+                        vector3 dp = vector3_subtraction(rb_a->position, rb_b->position);
+                        float dist_sq = vector3_length_squared(dp);
                         float rad_sum = broadphase_bounding_radius(rb_a) + broadphase_bounding_radius(rb_b);
-                        if (dist_sq <= rad_sum * rad_sum) {
+                        float sweep = 0.0f;
+                        if ((!rb_a->static_state && !rb_a->is_sleeping) ||
+                            (!rb_b->static_state && !rb_b->is_sleeping)) {
+                            vector3 dv = vector3_subtraction(rb_a->velocity, rb_b->velocity);
+                            float vrel = vector3_length(dv);
+                            float wa = vector3_length(rb_a->angular_velocity) * broadphase_bounding_radius(rb_a);
+                            float wb = vector3_length(rb_b->angular_velocity) * broadphase_bounding_radius(rb_b);
+                            if (!isfinite(vrel)) {
+                                vrel = 0.0f;
+                            }
+                            if (!isfinite(wa)) {
+                                wa = 0.0f;
+                            }
+                            if (!isfinite(wb)) {
+                                wb = 0.0f;
+                            }
+                            sweep = (vrel + wa + wb) * dt;
+                        }
+                        float swept_sum = rad_sum + sweep;
+                        if (!isfinite(swept_sum) || swept_sum < 0.0f) {
+                            swept_sum = rad_sum;
+                        }
+                        if (dist_sq <= swept_sum * swept_sum) {
                             if (collision_pair_counter < maximum_pairs_allowed) {
                                 collision_pairs_output_array[collision_pair_counter].object_index_a = min_obj;
                                 collision_pairs_output_array[collision_pair_counter].object_index_b = max_obj;

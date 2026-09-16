@@ -56,14 +56,29 @@ static inline vector3 vector3_cross(vector3 vector_a, vector3 vector_b) {
                      (vector_a.x * vector_b.y - vector_a.y * vector_b.x)};
 }
 static inline float vector3_length_squared(vector3 vector) {
-    return vector.x * vector.x + vector.y * vector.y + vector.z * vector.z;
+    if (!isfinite(vector.x) || !isfinite(vector.y) || !isfinite(vector.z)) {
+        return INFINITY;
+    }
+    double dx = (double) vector.x, dy = (double) vector.y, dz = (double) vector.z;
+    double s = dx * dx + dy * dy + dz * dz;
+    if (s > 3.402823466e38) {
+        return INFINITY;
+    }
+    return (float) s;
 }
 static inline float vector3_length(vector3 vector) {
-    return sqrtf(vector3_length_squared(vector));
+    float s2 = vector3_length_squared(vector);
+    if (!isfinite(s2)) {
+        return INFINITY;
+    }
+    return sqrtf(s2);
 }
 static inline vector3 vector3_normalisation(vector3 vector) {
+    if (!isfinite(vector.x) || !isfinite(vector.y) || !isfinite(vector.z)) {
+        return vector3_zero();
+    }
     float length = vector3_length(vector);
-    if (length < math_epsilon) {
+    if ((!isfinite(length)) || (length < math_epsilon)) {
         return vector3_zero();
     }
     return vector3_scaling(vector, 1.0f / length);
@@ -73,9 +88,13 @@ static inline vector4 vector4_identity() {
     return (vector4){1.0f, 0.0f, 0.0f, 0.0f};
 }
 static inline vector4 vector4_normalisation(vector4 quaternion) {
+    if (!isfinite(quaternion.w) || !isfinite(quaternion.x) || !isfinite(quaternion.y) ||
+        !isfinite(quaternion.z)) {
+        return vector4_identity();
+    }
     float length = sqrtf(quaternion.w * quaternion.w + quaternion.x * quaternion.x + quaternion.y * quaternion.y +
                          quaternion.z * quaternion.z);
-    if (length < math_epsilon) {
+    if ((!isfinite(length)) || (length < math_epsilon)) {
         return vector4_identity();
     }
     float inverse_length = 1.0f / length;
@@ -104,10 +123,28 @@ static inline vector3 vector4_rotate_to_vector3(vector4 quaternion, vector3 vect
     vector3 w_axis_scaled = vector3_scaling(temp_cross, quaternion.w);
     return vector3_addition(vector, vector3_addition(w_axis_scaled, cross_result));
 } //Rotation from the Axis with angular orientation
+/* TRUTH: degenerate axis can never define a rotation. Old code returned
+ * {cos(h),0,0,0} with |q|!=1 for angle!=0, scaling R by |q|^2. */
 static inline vector4 vector4_from_axis_with_angle(vector3 rotation_axis, float angle_radians) {
+    if (!isfinite(angle_radians)) {
+        return vector4_identity();
+    }
+    float axis_len_sq = rotation_axis.x * rotation_axis.x + rotation_axis.y * rotation_axis.y +
+                        rotation_axis.z * rotation_axis.z;
+    if ((!isfinite(axis_len_sq)) || (axis_len_sq < math_epsilon * math_epsilon)) {
+        return vector4_identity();
+    }
     float half_angle = angle_radians * 0.5f;
+    if (!isfinite(half_angle)) {
+        return vector4_identity();
+    }
     float sine_half_angle = sinf(half_angle);
     vector3 normalized_axis = vector3_normalisation(rotation_axis);
+    float nlen_sq = normalized_axis.x * normalized_axis.x + normalized_axis.y * normalized_axis.y +
+                    normalized_axis.z * normalized_axis.z;
+    if ((!isfinite(nlen_sq)) || (nlen_sq < 0.5f)) {
+        return vector4_identity();
+    }
     return (vector4){cosf(half_angle), normalized_axis.x * sine_half_angle, normalized_axis.y * sine_half_angle,
                      normalized_axis.z * sine_half_angle};
 } //3 ^ 3 matrix Functions
@@ -124,7 +161,21 @@ static inline vector3 math3_multiplication_vector3(math3 matrix, vector3 vector)
                      matrix.matrix[2][0] * vector.x + matrix.matrix[2][1] * vector.y + matrix.matrix[2][2] * vector.z};
 } //Convert 4D to rotational matrix (Inertia Tensor rotations)
 //I_total = R * I_local * * R_transposed
+/* TRUTH: callers must pass unit quats. Sanitize normalizes drift >1e-6, but
+ * tick-internal drift still scales R by |q|^2. Normalize here (cheap, exact)
+ * so a non-unit quat can never inject energy. Row-major. */
 static inline math3 vector4_to_math3(vector4 quaternion) {
+    float n2 = quaternion.w * quaternion.w + quaternion.x * quaternion.x + quaternion.y * quaternion.y +
+               quaternion.z * quaternion.z;
+    if (isfinite(n2) && (fabsf(n2 - 1.0f) > 1e-12f) && (n2 > 1e-24f)) {
+        float inv = 1.0f / sqrtf(n2);
+        quaternion.w *= inv;
+        quaternion.x *= inv;
+        quaternion.y *= inv;
+        quaternion.z *= inv;
+    } else if (!isfinite(n2) || (n2 <= 1e-24f)) {
+        quaternion = vector4_identity();
+    }
     math3 result_matrix;
     //Defining actual plug in values
     float x_double = quaternion.x + quaternion.x, y_double = quaternion.y + quaternion.y,
@@ -164,19 +215,29 @@ static inline math3 math3_transposition(math3 matrix) {
 } //Matrix inversion (3 ^ 3 specific)
 // Angular Constraint Calculation (change_p = J * M ^ -1 * J_transposed)
 static inline math3 math3_inverse(math3 matrix) {
-    float determinant =
-        (matrix.matrix[0][0] *
-         (matrix.matrix[1][1] * matrix.matrix[2][2] - matrix.matrix[2][1] * matrix.matrix[1][2])) -
-        (matrix.matrix[0][1] *
-         (matrix.matrix[1][0] * matrix.matrix[2][2] - matrix.matrix[1][2] * matrix.matrix[2][0])) +
-        (matrix.matrix[0][2] * (matrix.matrix[1][0] * matrix.matrix[2][1] - matrix.matrix[1][1] * matrix.matrix[2][0]));
-    /* FIX-AUDIT: absolute 1e-12 treated small-but-valid inertia (r=1cm
-     * sphere det~6e-14) as singular -> zero inverse -> locked rotation.
-     * Use scale-relative test against ||M||_F^3 = frob_sq^1.5. */
-    float frob_sq = 0.0f;
+    /* TRUTH: accumulate in double to avoid frob overflow (1e20^2 -> Inf). */
+    double frob_sq_d = 0.0;
     for (int _r = 0; _r < 3; _r++)
-        for (int _c = 0; _c < 3; _c++)
-            frob_sq += matrix.matrix[_r][_c] * matrix.matrix[_r][_c];
+        for (int _c = 0; _c < 3; _c++) {
+            double v = (double) matrix.matrix[_r][_c];
+            if (!isfinite(v)) {
+                math3 nan_out = {{{0.0f}}};
+                return nan_out;
+            }
+            frob_sq_d += v * v;
+        }
+    float frob_sq = (frob_sq_d > 3.402823466e38) ? INFINITY : (float) frob_sq_d;
+    double det_d = (double) matrix.matrix[0][0] *
+                       ((double) matrix.matrix[1][1] * matrix.matrix[2][2] -
+                        (double) matrix.matrix[2][1] * matrix.matrix[1][2]) -
+                   (double) matrix.matrix[0][1] *
+                       ((double) matrix.matrix[1][0] * matrix.matrix[2][2] -
+                        (double) matrix.matrix[1][2] * matrix.matrix[2][0]) +
+                   (double) matrix.matrix[0][2] *
+                       ((double) matrix.matrix[1][0] * matrix.matrix[2][1] -
+                        (double) matrix.matrix[1][1] * matrix.matrix[2][0]);
+    float determinant = (det_d > 3.402823466e38 || det_d < -3.402823466e38) ? ((det_d > 0) ? INFINITY : -INFINITY)
+                                                                           : (float) det_d;
     /* Scale-invariant singularity test: |det| / ||M||_F^3 < 1e-12.
      * For M = s*M0: det ~ s^3, ||M||_F^3 ~ s^3, ratio is constant. */
     float frob_norm_cubed = frob_sq * sqrtf(fmaxf(frob_sq, 1e-24f));
@@ -185,6 +246,23 @@ static inline math3 math3_inverse(math3 matrix) {
         eps = 1e-24f;
     }
     if ((!isfinite(determinant)) || (fabsf(determinant) < eps)) {
+        /* TRUTH: adjugate of a singular matrix is zero everywhere, which
+         * locks ALL rotation even when only one axis is degenerate
+         * (needle cylinder Ixx=0, Iyy=Izz=a). If the matrix is (near-)
+         * diagonal, invert per-axis: 0 -> 0 (that axis locked), others
+         * exact. Otherwise true singularity -> zero. */
+        float off = fabsf(matrix.matrix[0][1]) + fabsf(matrix.matrix[0][2]) + fabsf(matrix.matrix[1][0]) +
+                    fabsf(matrix.matrix[1][2]) + fabsf(matrix.matrix[2][0]) + fabsf(matrix.matrix[2][1]);
+        float diag_scale = fabsf(matrix.matrix[0][0]) + fabsf(matrix.matrix[1][1]) + fabsf(matrix.matrix[2][2]);
+        if ((diag_scale > 0.0f) && isfinite(diag_scale) && (off <= 1e-6f * diag_scale)) {
+            math3 d = {{{0.0f}}};
+            d.matrix[0][0] = (fabsf(matrix.matrix[0][0]) > 1e-24f) ? (1.0f / matrix.matrix[0][0]) : 0.0f;
+            d.matrix[1][1] = (fabsf(matrix.matrix[1][1]) > 1e-24f) ? (1.0f / matrix.matrix[1][1]) : 0.0f;
+            d.matrix[2][2] = (fabsf(matrix.matrix[2][2]) > 1e-24f) ? (1.0f / matrix.matrix[2][2]) : 0.0f;
+            if (isfinite(d.matrix[0][0]) && isfinite(d.matrix[1][1]) && isfinite(d.matrix[2][2])) {
+                return d;
+            }
+        }
         math3 singular_matrix = {{{0.0f}}};
         return singular_matrix;
     }

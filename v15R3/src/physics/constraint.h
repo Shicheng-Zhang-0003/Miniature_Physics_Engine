@@ -14,7 +14,8 @@ typedef enum {
     constraint_revolute,
     constraint_fixed,
     constraint_prismatic,
-    constraint_distance
+    constraint_distance,
+    constraint_rope
 } constraint_type;
 
 typedef struct {
@@ -28,7 +29,30 @@ typedef struct {
     float limit_max_rad;
     bool motor_enabled;
     bool limits_enabled;
+    /* Persistent angle tracking for limit enforcement (revolute limits). */
+    float accumulated_angle;
+    bool angle_initialized;
+    vector3 reference_axis_a;
+    vector3 reference_axis_b;
 } revolute_params;
+
+typedef struct {
+    vector3 anchor_a;
+    vector3 anchor_b;
+    vector3 axis_a;           /* Slide axis in body A's local space */
+    vector3 axis_b;           /* Slide axis in body B's local space (zero = same as axis_a) */
+    float limit_min;          /* Minimum translation along axis (meters) */
+    float limit_max;          /* Maximum translation along axis (meters) */
+    bool limits_enabled;
+    bool motor_enabled;
+    float motor_target_speed; /* Target linear speed along axis (m/s) */
+    float motor_max_force;    /* Maximum motor force (N) */
+    /* Persistent position tracking for limit enforcement. */
+    float accumulated_position;
+    bool position_initialized;
+    vector3 reference_axis_a;
+    vector3 reference_axis_b;
+} prismatic_params;
 
 typedef struct {
     vector3 anchor_a;
@@ -42,6 +66,12 @@ typedef struct {
 } distance_params;
 
 typedef struct {
+    vector3 anchor_a;
+    vector3 anchor_b;
+    float rest_length;        /* Maximum distance (rope length) */
+} rope_params;                /* Inequality distance constraint: pulls only, no push */
+
+typedef struct {
     constraint_type type;
     uint32_t body_id_a;
     uint32_t body_id_b;
@@ -50,6 +80,8 @@ typedef struct {
         revolute_params revolute;
         fixed_params fixed;
         distance_params distance;
+        prismatic_params prismatic;
+        rope_params rope;
     } p;
 } constraint;
 
@@ -71,10 +103,22 @@ void constraint_set_revolute_motor (struct physics_world *world, int index, bool
 void constraint_set_revolute_axes (struct physics_world *world, int index, vector3 axis_a, vector3 axis_b);
 void constraint_set_revolute_limits (struct physics_world *world, int index, bool enabled, float limit_min_rad,
                                      float limit_max_rad);
+/* Prismatic joint (slider) API */
+int constraint_add_prismatic (struct physics_world *world, uint32_t id_a, uint32_t id_b, vector3 anchor_a,
+                              vector3 anchor_b, vector3 axis_a);
+void constraint_set_prismatic_axes (struct physics_world *world, int index, vector3 axis_a, vector3 axis_b);
+void constraint_set_prismatic_limits (struct physics_world *world, int index, bool enabled, float limit_min, float limit_max);
+void constraint_set_prismatic_motor (struct physics_world *world, int index, bool enabled, float target_speed, float max_force);
+/* Rope constraint (inequality distance, pull-only) API */
+int constraint_add_rope (struct physics_world *world, uint32_t id_a, uint32_t id_b, vector3 anchor_a,
+                         vector3 anchor_b, float max_length);
 int constraint_pool_capacity (void);
 const constraint *constraint_pool_at (const struct physics_world *world, int index);
 /* Solve joints — call once per solver iteration inside solver loop. */
 void constraint_solve_all (struct physics_world *world, float dt);
+/* TRUTH: once-per-tick joint pre-step (angle/slide integration + index cache).
+ * Must be called once before the iteration loop; solve() must not integrate. */
+void constraint_pre_step_all (struct physics_world *world, float dt);
 /* Active joint endpoint ids (for island building). Returns count. */
 int constraint_get_active_ids (const struct physics_world *world, uint32_t *ids_a, uint32_t *ids_b, int capacity);
 /* Motor drive — call once per tick before velocity integration. */

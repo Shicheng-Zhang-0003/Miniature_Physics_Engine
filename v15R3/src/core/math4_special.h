@@ -34,7 +34,20 @@ static inline math4 math4_look_view(vector3 camera_position, vector3 camera_fron
         side_raw = vector3_cross(forward_vector, alt_up);
     }
     vector3 side_vector = vector3_normalisation(side_raw);
+    /* TRUTH: second degeneracy must be re-checked. If still degenerate
+     * (NaN input), side is zero -> zero rows silently. Fall back to identity
+     * basis instead. */
+    if (vector3_length_squared(side_vector) < 1e-12f) {
+        side_vector = (vector3){1.0f, 0.0f, 0.0f};
+        forward_vector = (vector3){0.0f, 0.0f, -1.0f};
+    }
     vector3 up_vector = vector3_cross(side_vector, forward_vector);
+    float up_len_sq = vector3_length_squared(up_vector);
+    if ((!isfinite(up_len_sq)) || (up_len_sq < 1e-12f)) {
+        up_vector = (vector3){0.0f, 1.0f, 0.0f};
+    } else {
+        up_vector = vector3_scaling(up_vector, 1.0f / sqrtf(up_len_sq));
+    }
     result_matrix.matrix[0][0] = side_vector.x;
     result_matrix.matrix[1][0] = side_vector.y;
     result_matrix.matrix[2][0] = side_vector.z;
@@ -99,7 +112,10 @@ static inline math4 math4_multiplication(math4 matrix_a, math4 matrix_b) {
     }
     return result_matrix;
 } //Quaternion to Matrix Interface
+/* TRUTH: column-major storage (math3 is row-major). Normalize input like
+ * vector4_to_math3 so non-unit quats never scale the render matrix. */
 static inline math4 vector4_to_math4(vector4 quaternion) {
+    quaternion = vector4_normalisation(quaternion);
     math4 result_matrix = math4_identity();
     float x_double = quaternion.x + quaternion.x, y_double = quaternion.y + quaternion.y,
           z_double = quaternion.z + quaternion.z;
@@ -117,7 +133,11 @@ static inline math4 vector4_to_math4(vector4 quaternion) {
     result_matrix.matrix[2][2] = 1.0f - (x_x + y_y);
     return result_matrix;
 } //GPU flat array interface
+/* TRUTH: NULL/short buffer was heap overflow. Require non-NULL; caller owns 16 floats. */
 static inline void math4_to_flat_array(math4 matrix, float *output_array) {
+    if (!output_array) {
+        return;
+    }
     for (int column_index = 0; column_index < 4; column_index++) {
         for (int row_index = 0; row_index < 4; row_index++) {
             output_array[column_index * 4 + row_index] = matrix.matrix[column_index][row_index];

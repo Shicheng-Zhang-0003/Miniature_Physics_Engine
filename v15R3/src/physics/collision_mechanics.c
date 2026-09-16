@@ -1,6 +1,7 @@
 #include "../mpe_engine.h"
 #include "collision_mechanics.h"
 #include "../core/physics_world.h" /* MFS_131 */
+#include "../core/det_math.h"
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -106,8 +107,14 @@ bool collision_sphere_cube(rigidbody *sphere, rigidbody *cube, collision_data *c
     }
     vector3 difference = vector3_subtraction(sphere->position, closest_point);
     float distance_sq = vector3_length_squared(difference);
-    if (!inside && distance_sq > sphere->radius * sphere->radius)
+    /* TRUTH: slop parity. Outside branch must admit [-slop,0) as zero-depth
+     * like every other path (dual_sphere, clip, floor, cyl). Old strict
+     * radius test flickered resting contact. */
+    float slop_sc = g_cfg.solver.penetration_slop;
+    float outer_sc = sphere->radius + slop_sc;
+    if (!inside && distance_sq > outer_sc * outer_sc) {
         return false;
+    }
     collision_output_data->object_a = sphere;
     collision_output_data->object_b = cube;
 
@@ -141,7 +148,9 @@ bool collision_sphere_cube(rigidbody *sphere, rigidbody *cube, collision_data *c
         } else {
             collision_output_data->normal_vector = (vector3){0.0f, -1.0f, 0.0f};
         }
-        cp->penetration = sphere->radius - distance;
+        float raw_pen_sc = sphere->radius - distance;
+        /* TRUTH: clamp slop-band negatives to zero (friction-only). */
+        cp->penetration = (raw_pen_sc > 0.0f) ? raw_pen_sc : 0.0f;
         cp->position = closest_point;
     }
     collision_output_data->contact_count = 1;
@@ -618,6 +627,12 @@ bool collision_dual_cube(rigidbody *cube_a, rigidbody *cube_b, collision_data *c
     /* MPE_TASK_04_CUBE_NORMAL_CALL_BEGIN */
     a3_task04_enforce_cube_normal_consistency(collision_output_data, cube_a, cube_b);
     /* MPE_TASK_04_CUBE_NORMAL_CALL_END */
+    /* TRUTH: clip can return 0 (SAT/clip disagreement at grazing angles).
+     * Old code returned true with 0 contacts -> phantom manifold consumed a
+     * slot, set has_contact=1 (killing exact gravity), solver no-op. */
+    if (collision_output_data->contact_count <= 0) {
+        return false;
+    }
     return true;
 }
 rigidbody *collision_static_plane_body_proxy(float plane_y) {
@@ -801,6 +816,39 @@ int contact_cache_get_misses(const struct physics_world *world) {
     return world->contact_cache_misses;
 }
 
+/* TRUTH: pair-novelty probe for wake-on-first-touch. A sleeping body must
+ * wake when a NEW contact edge forms at ANY relative speed (slow kinematic
+ * pushers defeat velocity gates; per-body "had contact" flags are blinded
+ * by floor contacts every rester holds). The warm-start cache IS the
+ * contact memory: every solved manifold is saved each tick, so a pair with
+ * no entry has never touched (or its entries were evicted — wake is then
+ * the safe direction). Pair-level on purpose: rotation drift changes local
+ * points but not pair novelty. Linear scan, early-out; only called for
+ * pairs with a sleeping side (rare). NULL cache => true (fail-open awake).
+ * NOTE: probe strictly prior ticks — contact_cache_save runs at step end,
+ * after all process_pair calls. */
+bool contact_cache_has_pair(struct physics_world *world, uint32_t id_a, uint32_t id_b) {
+    if (!world || id_a == 0 || id_b == 0) {
+        return true;
+    }
+    cached_contact *cache = world->world_contact_cache;
+    int count = world->world_contact_cache_count;
+    if (!cache || count <= 0) {
+        return false;
+    }
+    if (count > max_cached_contacts) {
+        count = max_cached_contacts;
+    }
+    for (int i = 0; i < count; i++) {
+        uint32_t ca = cache[i].object_id_a;
+        uint32_t cb = cache[i].object_id_b;
+        if (((ca == id_a) && (cb == id_b)) || ((ca == id_b) && (cb == id_a))) {
+            return true;
+        }
+    }
+    return false;
+}
+
 /* MPE_TASK_05_CACHE_VALIDATE_BEGIN */
 static uint32_t a3_task05_mix_u32(uint32_t hash_value, uint32_t input_value) {
     hash_value ^= input_value + 0x9e3779b9u + (hash_value << 6) + (hash_value >> 2);
@@ -834,6 +882,15 @@ static uint32_t a3_task05_body_property_stamp(const rigidbody *rigid_body) {
     stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(rigid_body->half_extensions.x));
     stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(rigid_body->half_extensions.y));
     stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(rigid_body->half_extensions.z));
+
+    /* TRUTH: friction/restitution/kinematic affect the solved impulse.
+     * Old stamp omitted them: editing friction or toggling kinematic hit a
+     * stale acc_n*new_mu (wrong friction cone for a tick). Include. */
+    stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(rigid_body->friction_static));
+    stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(rigid_body->friction_kinetic));
+    stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(rigid_body->restitution));
+    stamp = a3_task05_mix_u32(stamp, rigid_body->kinematic ? 2u : 0u);
+    stamp = a3_task05_mix_u32(stamp, rigid_body->is_sleeping ? 4u : 0u);
 
     /* Orientation quantized to 1e-3: rotation invalidates local-space cache
      * matching. Without this, a body that rotates significantly between
@@ -887,8 +944,7 @@ static int contact_cache_match_role(const cached_contact *cc, uint32_t id_a, uin
         float dist_a_sq = vector3_length_squared(vector3_subtraction(cc->local_position_a, local_a));
         float dist_b_sq = vector3_length_squared(vector3_subtraction(cc->local_position_b, local_b));
         if ((dist_a_sq < match_dist_sq) && (dist_b_sq < match_dist_sq) &&
-            (a3_task05_cached_impulses_are_usable(cc->accumulated_normal_impulse,
-                                                 cc->accumulated_tangent_impulse))) {
+            (a3_task05_cached_impulses_are_usable(cc->accumulated_normal_impulse, cc->accumulated_tangent_impulse))) {
             return 1;
         }
         return 0;
@@ -947,6 +1003,7 @@ void collision_prepare_solver(struct physics_world *world, collision_data *sourc
 
         cp->accumulated_normal_impulse = 0.0f;
         cp->accumulated_tangent_impulse = 0.0f;
+        cp->accumulated_tangent2_impulse = 0.0f;
         /* AUDIT: no velocity-level Baumgarte bias is computed here on
          * purpose (see header). g_cfg.solver.bias_factor drives the
          * positional split-impulse correction instead, where bias velocity
@@ -964,7 +1021,12 @@ void collision_prepare_solver(struct physics_world *world, collision_data *sourc
 
         /* Warm-start matching: strict both-side material-point coincidence
          * (see contact_cache_match_role). A hit adopts cached impulses at
-         * full step — no damped SOR, no provenance flags. */
+         * full step — no damped SOR, no provenance flags. NOTE (truth):
+         * only the normal + PRIMARY tangent are restored. The second disc
+         * tangent is deliberately never cached: t2_new = n×t1_new can point
+         * anywhere relative to a cached t2_old when frames rotate, and
+         * restoring it injected sideways energy; cold t2 re-converges in
+         * the relaxation sweeps. Normal is frame-independent: always warm. */
         if ((hash_head) && (cache_id_a != 0) && (cache_id_b != 0)) {
             /* Hash walk: visits the pair's entries in save order, i.e. the
              * same first-hit the legacy linear scan below would find. */
@@ -1127,6 +1189,15 @@ void collision_prepare_solver(struct physics_world *world, collision_data *sourc
             cp->effective_mass_tangent2 = 0.0f;
             cp->accumulated_tangent2_impulse = 0.0f;
         }
+        /* NOTE (truth, measured): the primary tangent keeps its cached
+         * magnitude even on fresh slip (original static-hold behavior). An
+         * experiment zeroing it here fixed a 127 rad/s wheel singularity but
+         * regressed the 6-cube stack (drift 0.27m vs 0.003m), so it was
+         * reverted: extreme-spin contacts are handled by keeping the wheel
+         * test in the resolvable regime (see driven_wheel_test), not by
+         * weakening everyday friction. The second disc tangent is never
+         * cached (cold every tick): t2_new = n×t1_new can point anywhere
+         * relative to a cached t2_old when frames rotate. */
 
         if (cp->accumulated_normal_impulse != 0.0f || cp->accumulated_tangent_impulse != 0.0f ||
             cp->accumulated_tangent2_impulse != 0.0f) {
@@ -1155,30 +1226,50 @@ void collision_prepare_solver(struct physics_world *world, collision_data *sourc
     }
 }
 
-/* Sort context for the comparator below: single-flight transient (set
- * immediately before qsort, never carried across calls). */
-static const float *manifold_sort_keys_active = NULL;
-
-static int manifold_sort_compare(const void *pa, const void *pb) {
-    int ia = *(const int *) pa;
-    int ib = *(const int *) pb;
-    float ka = manifold_sort_keys_active[ia];
-    float kb = manifold_sort_keys_active[ib];
-    if (ka < kb) {
-        return -1;
+/* Sort context: TRUTH deterministic stable mergesort, no qsort globals.
+ * Old static manifold_sort_keys_active was racy/reentrant across threads.
+ * Bottom-up mergesort on (key,index) is total-order deterministic,
+ * thread-safe, and stable. Manifolds <=8192: O(n log n) with scratch. */
+static void collision_manifold_merge_sort(const float *keys, int *order, int *scratch, int n) {
+    for (int i = 0; i < n; i++) {
+        order[i] = i;
     }
-    if (ka > kb) {
-        return 1;
+    int *src = order;
+    int *dst = scratch;
+    for (int width = 1; width < n; width *= 2) {
+        for (int lo = 0; lo < n; lo += 2 * width) {
+            int mid = lo + width < n ? lo + width : n;
+            int hi = lo + 2 * width < n ? lo + 2 * width : n;
+            int a = lo, b = mid, o = lo;
+            while (a < mid && b < hi) {
+                float ka = keys[src[a]];
+                float kb = keys[src[b]];
+                bool take_a;
+                if (ka < kb) {
+                    take_a = true;
+                } else if (ka > kb) {
+                    take_a = false;
+                } else {
+                    take_a = src[a] < src[b];
+                }
+                dst[o++] = take_a ? src[a++] : src[b++];
+            }
+            while (a < mid) {
+                dst[o++] = src[a++];
+            }
+            while (b < hi) {
+                dst[o++] = src[b++];
+            }
+        }
+        int *tmp = src;
+        src = dst;
+        dst = tmp;
     }
-    /* Total order by original index: deterministic regardless of qsort
-     * internals, identical for twin runs. */
-    if (ia < ib) {
-        return -1;
+    if (src != order) {
+        for (int i = 0; i < n; i++) {
+            order[i] = src[i];
+        }
     }
-    if (ia > ib) {
-        return 1;
-    }
-    return 0;
 }
 
 void collision_manifold_solve_order(struct physics_world *world, collision_data *manifolds, int manifold_count,
@@ -1200,9 +1291,32 @@ void collision_manifold_solve_order(struct physics_world *world, collision_data 
         world->manifold_sort_keys[m] = lowest;
         order_out[m] = m;
     }
-    manifold_sort_keys_active = world->manifold_sort_keys;
-    qsort(order_out, (size_t) manifold_count, sizeof(int), manifold_sort_compare);
-    manifold_sort_keys_active = NULL;
+    /* TRUTH: mergesort with thread-local scratch (no malloc, no globals).
+     * Deterministic total order, race-free. */
+    {
+        static _Thread_local int merge_scratch[8192];
+        if (manifold_count <= 8192) {
+            collision_manifold_merge_sort(world->manifold_sort_keys, order_out, merge_scratch, manifold_count);
+            return;
+        }
+    }
+    /* Tiny fallback: insertion sort (deterministic, no globals). */
+    for (int i = 1; i < manifold_count; i++) {
+        int key_idx = order_out[i];
+        float key_val = world->manifold_sort_keys[key_idx];
+        int j = i - 1;
+        while (j >= 0) {
+            int cur_idx = order_out[j];
+            float cur_val = world->manifold_sort_keys[cur_idx];
+            bool shift = (cur_val > key_val) || (cur_val == key_val && cur_idx > key_idx);
+            if (!shift) {
+                break;
+            }
+            order_out[j + 1] = order_out[j];
+            j--;
+        }
+        order_out[j + 1] = key_idx;
+    }
 }
 
 float collision_resolve_iterative(collision_data *m, float dt, bool friction_only, int start_index) {
@@ -1527,44 +1641,71 @@ void collision_apply_rolling_resistance(collision_data *manifolds, int manifold_
                 vector3 rlev[2] = {cp->ra, cp->rb};
                 for (int bi = 0; bi < 2; bi++) {
                     rigidbody *bd = bodies[bi];
-                    if ((bd->static_state) || (bd->is_sleeping)) {
+                    if ((!bd) || (bd->static_state) || (bd->is_sleeping) || (bd->kinematic)) {
                         continue;
                     }
-                    /* Rolling part: oppose tangential-plane spin. */
+                    /* TRUTH: roll lever = |r| (contact radius, =R for spheres:
+                     * M=mu*N*R, standard Coulomb rolling resistance). Spin
+                     * lever = Hertz patch a=sqrt(R*pen_eff), capped 0.3R.
+                     * An earlier revision used patch for roll too, which
+                     * under-damped 28x (R=0.5,pen=0.5mm: R/patch~32) and
+                     * failed rolling_decay (15.8m vs 4-14m). Roll and spin
+                     * are different physics: roll resists translation via
+                     * R, spin resists yaw via patch. Slop zero-depth gets
+                     * pen_eff=0.5mm floor so resting spin still decays. */
+                    float pen_raw = (cp->penetration > 0.0f) ? cp->penetration : 0.0f;
+                    float pen_eff = (pen_raw > 0.0005f) ? pen_raw : 0.0005f;
+                    float r_eff = sqrtf(vector3_length_squared(rlev[bi]));
+                    if ((!isfinite(r_eff)) || (r_eff < 1e-6f)) {
+                        continue;
+                    }
+                    float patch = sqrtf(fmaxf(r_eff * pen_eff, 0.0f));
+                    float patch_cap = 0.3f * r_eff;
+                    if (patch > patch_cap) {
+                        patch = patch_cap;
+                    }
+                    /* Rolling part: oppose tangential-plane spin, lever=|r|
+                     * (contact radius: M=mu*N*R, standard Coulomb rolling
+                     * resistance). Applies to all shapes; boxes in face
+                     * contact get tipping damping that settles stacks
+                     * (verified: F10 10-stack calm, 6-cube holds). Spin
+                     * below uses the Hertz patch. */
                     vector3 spin_n = vector3_scaling(man->normal_vector,
                                                      vector3_dot(bd->angular_velocity, man->normal_vector));
                     vector3 roll_w = vector3_subtraction(bd->angular_velocity, spin_n);
                     float roll_speed = vector3_length(roll_w);
-                    float lever = sqrtf(vector3_length_squared(rlev[bi]));
-                    if ((roll_speed > 0.0001f) && (lever > 0.0001f)) {
+                    if (roll_speed > 0.0001f) {
                         vector3 roll_axis = vector3_scaling(roll_w, 1.0f / roll_speed);
                         float inertia_axis = 1.0f / fmaxf(vector3_dot(
                             roll_axis, math3_multiplication_vector3(rigidbody_effective_inv_inertia(bd), roll_axis)),
                             1e-9f);
-                        float dw = share * rolling_mu * normal_force * lever * dt / inertia_axis;
+                        if (!isfinite(inertia_axis) || inertia_axis <= 0.0f) {
+                            continue;
+                        }
+                        float dw = share * rolling_mu * normal_force * r_eff * dt / inertia_axis;
+                        if (!isfinite(dw) || dw < 0.0f) {
+                            continue;
+                        }
                         if (dw > roll_speed) {
                             dw = roll_speed;
                         }
                         bd->angular_velocity = vector3_subtraction(
                             bd->angular_velocity, vector3_scaling(roll_axis, dw));
                     }
-                    /* Spin part: Hertz patch a=sqrt(R*delta), clamped to
-                     * 0.3R (patch << body). R from lever |r| (contact radius
-                     * for spheres, approx for boxes). No magic 0.15. */
+                    /* Spin part: same patch. */
                     float spin_speed = vector3_length(spin_n);
-                    float pen = (cp->penetration > 0.0f) ? cp->penetration : 0.0f;
-                    float r_eff = sqrtf(vector3_length_squared(rlev[bi]));
-                    float patch = sqrtf(fmaxf(r_eff * pen, 0.0f));
-                    float patch_cap = 0.3f * r_eff;
-                    if (patch > patch_cap) {
-                        patch = patch_cap;
-                    }
-                    if ((spin_speed > 0.0001f) && (patch > 0.00001f)) {
+                    if (spin_speed > 0.0001f) {
                         vector3 spin_axis = vector3_scaling(spin_n, 1.0f / spin_speed);
                         float inertia_spin = 1.0f / fmaxf(vector3_dot(
                             spin_axis, math3_multiplication_vector3(rigidbody_effective_inv_inertia(bd), spin_axis)),
                             1e-9f);
+                        if (!isfinite(inertia_spin) || inertia_spin <= 0.0f) {
+                            continue;
+                        }
                         float dw_spin = share * rolling_mu * normal_force * patch * dt / inertia_spin;
+                        if (!isfinite(dw_spin) || dw_spin < 0.0f) {
+                            continue;
+                        }
                         if (dw_spin > spin_speed) {
                             dw_spin = spin_speed;
                         }
@@ -1638,12 +1779,33 @@ void contact_cache_save(struct physics_world *world, collision_data *manifolds, 
  * Runs after the velocity iterations. Unlike Baumgarte bias velocity, this
  * adds no energy to the momentum solve and cannot inflate friction. */
 void collision_apply_split_impulse(collision_data *manifolds, int manifold_count, float dt) {
-    if ((!manifolds) || (manifold_count <= 0) || (dt <= 0.0f)) {
+    if ((!manifolds) || (manifold_count <= 0) || (!(dt > 0.0f))) {
         return;
     }
-    const float slop = g_cfg.solver.penetration_slop;
-    const float beta = g_cfg.solver.bias_factor;
-    const float max_corr = g_cfg.solver.max_separation_bias * dt;
+    float slop = g_cfg.solver.penetration_slop;
+    float beta = g_cfg.solver.bias_factor;
+    float max_bias_vel = g_cfg.solver.max_separation_bias;
+    /* TRUTH: runtime clamps survive old config files with huge caps.
+     * slop 0..5cm, beta 0..1, bias vel <=10 m/s. */
+    if (!isfinite(slop) || slop < 0.0f) {
+        slop = 0.01f;
+    }
+    if (slop > 0.05f) {
+        slop = 0.05f;
+    }
+    if (!isfinite(beta) || beta < 0.0f) {
+        beta = 0.0f;
+    }
+    if (beta > 1.0f) {
+        beta = 1.0f;
+    }
+    if (!isfinite(max_bias_vel) || max_bias_vel < 0.0f) {
+        max_bias_vel = 5.0f;
+    }
+    if (max_bias_vel > 10.0f) {
+        max_bias_vel = 10.0f;
+    }
+    const float max_corr = max_bias_vel * dt;
     for (int m = 0; m < manifold_count; m++) {
         collision_data *man = &manifolds[m];
         rigidbody *body_a = man->object_a;
@@ -1689,13 +1851,16 @@ void collision_apply_split_impulse(collision_data *manifolds, int manifold_count
             continue;
         }
         vector3 shift = vector3_scaling(man->normal_vector, corr / inv_sum);
-        if (!body_a->static_state) {
+        /* TRUTH: kinematic has stored inv!=0 but effective 0. Old
+         * !static_state moved kinematics, corrupting prescribed motion.
+         * Gate on effective inv (zero for kinematic/sleeping/static). */
+        if (inv_a > 0.0f) {
             body_a->position = vector3_subtraction(body_a->position, vector3_scaling(shift, inv_a));
             if (corr > 0.01f) {
                 rigidbody_wake(body_a);
             }
         }
-        if (!body_b->static_state) {
+        if (inv_b > 0.0f) {
             body_b->position = vector3_addition(body_b->position, vector3_scaling(shift, inv_b));
             if (corr > 0.01f) {
                 rigidbody_wake(body_b);
@@ -1746,15 +1911,44 @@ static float ccd_min_thickness(const rigidbody *body) {
 }
 
 int collision_ccd_sweep_clamp_full(rigidbody *bodies, int body_count, float dt, float *time_remaining_out) {
-    if ((!bodies) || (body_count <= 0) || (dt <= 0.0f)) {
+    if ((!bodies) || (body_count <= 0) || (!(dt > 0.0f)) || !isfinite(dt)) {
         return 0;
     }
+    /* TRUTH: low-memory NULL path must NOT pre-move. Old code did
+     * pos+=v*toi with no remainder recorded, then caller integrated full dt
+     * => toi+dt double-count overshoot. Degraded mode: discrete only. */
+    bool record_remainder = (time_remaining_out != NULL);
     if (time_remaining_out) {
         for (int k = 0; k < body_count; k++) {
             time_remaining_out[k] = dt;
         }
     }
-    int clamped = 0;
+    /* TRUTH: symmetric two-phase clamp. Old sequential per-body move vs
+     * already-moved positions let B tunnel through A (A clamps to contact
+     * vs B_old, moves; B sees c<=0 vs A_new, skips, then integrates full dt
+     * through A). Phase 1 computes all TOIs vs OLD positions; phase 2 moves
+     * all simultaneously. Order-independent. */
+    float *best_tois = NULL;
+    unsigned char *hit_flags = NULL;
+    bool use_heap = body_count > 64;
+    float stack_tois[64];
+    unsigned char stack_hits[64];
+    if (use_heap) {
+        best_tois = (float *) malloc((size_t) body_count * sizeof(float));
+        hit_flags = (unsigned char *) malloc((size_t) body_count * sizeof(unsigned char));
+        if (!best_tois || !hit_flags) {
+            free(best_tois);
+            free(hit_flags);
+            return 0;
+        }
+    } else {
+        best_tois = stack_tois;
+        hit_flags = stack_hits;
+    }
+    for (int i = 0; i < body_count; i++) {
+        best_tois[i] = dt;
+        hit_flags[i] = 0;
+    }
     for (int i = 0; i < body_count; i++) {
         rigidbody *mover = &bodies[i];
         if ((mover->static_state) || (mover->is_sleeping)) {
@@ -1780,15 +1974,27 @@ int collision_ccd_sweep_clamp_full(rigidbody *bodies, int body_count, float dt, 
         /* Plane sweep is O(1) per body: run it whenever the tick motion
          * exceeds slop, so impacts never fall in the gap between slop-band
          * sampling and the safety nets (which would delete the bounce).
-         * The O(n^2) sphere/box sweep stays gated on body thickness. */
-        bool do_volumes = displacement > thickness;
+         * TRUTH: volume gate must consider obstacle thinness, not mover
+         * alone. Large mover (1m) moving 0.5m would skip volumes and tunnel
+         * a thin 0.1m wall. Gate on min(mover, 0.2m) so fast large bodies
+         * still sweep. */
+        bool do_volumes = displacement > fminf(thickness, 0.2f);
         if ((displacement <= g_cfg.solver.penetration_slop) && (!do_volumes)) {
             continue; /* discrete sampling suffices */
         }
         float best_toi = dt;
         bool hit = false;
 
-        /* 1. Floor plane y = 0. */
+        /* 1. Floor plane y = 0. Center-velocity TOI only — deliberately.
+         * TRUTH correction of an overreach: an earlier revision used the
+         * lowest-point velocity (vy - |w|R) so a "diving corner" would clamp.
+         * That fired every tick for pure spinners in stable contact (a wheel
+         * at 127 rad/s reports vy_low = -6.8 m/s while its center is
+         * stationary), teleporting/rotating rolling contact into bounce
+         * growth (driven_wheel levitated to y=2.9). Rotation alone cannot
+         * translate the center through the plane — corners dipping below it
+         * are bounded oscillation the discrete solver re-seats each tick.
+         * CCD is for TRANSLATION tunneling; spin is the solver's job. */
         if (mover->velocity.y < -0.0001f) {
             float lowest = mover->position.y - ccd_support_depth(mover);
             if (lowest > 0.0f) {
@@ -1836,25 +2042,122 @@ int collision_ccd_sweep_clamp_full(rigidbody *bodies, int body_count, float dt, 
                     hit = true;
                 }
             } else if (other->type == object_cylinder) {
-                /* Conservative bounding-sphere sweep for cylinder obstacles
-                 * (exact segment sweep is P1 future; bounding never misses). */
-                vector3 dp = vector3_subtraction(other->position, mover->position);
-                vector3 dv = vector3_subtraction(other_v, mover->velocity);
-                float rr = broadphase_bounding_radius(mover) + broadphase_bounding_radius(other);
-                float a = vector3_dot(dv, dv);
-                float c = vector3_dot(dp, dp) - rr * rr;
-                if ((c <= 0.0f) || (a <= 1e-12f)) {
-                    continue;
-                }
-                float b = 2.0f * vector3_dot(dp, dv);
-                float disc = b * b - 4.0f * a * c;
-                if (disc < 0.0f) {
-                    continue;
-                }
-                float toi = (-b - sqrtf(disc)) / (2.0f * a);
-                if ((toi > 0.0f) && (toi < best_toi) && (toi <= dt)) {
-                    best_toi = toi;
-                    hit = true;
+                /* Exact segment-vs-sphere sweep for cylinder obstacles.
+                 * Cylinder = segment (axle) + radius. Sweep the mover's bounding
+                 * sphere against the cylinder's swept capsule.
+                 *
+                 * For a moving sphere (or sphere-bounded body) vs static cylinder:
+                 *   - The cylinder's axle endpoints sweep spheres of radius r
+                 *   - The barrel sweeps a capsule along the relative velocity
+                 *   - We solve for the earliest TOI by checking segment-sphere
+                 *     and capsule-sphere sweep.
+                 *
+                 * For a moving cylinder vs static cylinder: both segments sweep.
+                 * Full segment-segment sweep is complex; fall back to bounding
+                 * sphere for cylinder-vs-cylinder (conservative, never misses).
+                 */
+                if (mover->type == object_sphere) {
+                    /* Sphere vs cylinder: exact segment-sphere sweep. */
+                    vector3 ax = other->cached_axes[0];
+                    float ax_len = vector3_length(ax);
+                    if (ax_len < 1e-6f) {
+                        ax = (vector3){1.0f, 0.0f, 0.0f};
+                    } else {
+                        ax = vector3_scaling(ax, 1.0f / ax_len);
+                    }
+                    float h = other->cylinder_half_length;
+                    float r_cyl = other->radius;
+                    float r_sph = mover->radius;
+                    float rr = r_cyl + r_sph;
+
+                    /* Cylinder endpoints in world space. */
+                    vector3 ep1 = vector3_addition(other->position, vector3_scaling(ax, -h));
+                    vector3 ep2 = vector3_addition(other->position, vector3_scaling(ax, h));
+
+                    /* Relative motion. */
+                    vector3 dp1 = vector3_subtraction(ep1, mover->position);
+                    vector3 dp2 = vector3_subtraction(ep2, mover->position);
+                    vector3 dv = vector3_subtraction(other_v, mover->velocity);
+
+                    /* Sweep against both endpoint spheres. */
+                    float best_cyl_toi = dt;
+                    for (int ep = 0; ep < 2; ep++) {
+                        vector3 dp = (ep == 0) ? dp1 : dp2;
+                        float a = vector3_dot(dv, dv);
+                        float c = vector3_dot(dp, dp) - rr * rr;
+                        if ((c <= 0.0f) || (a <= 1e-12f)) continue;
+                        float b = 2.0f * vector3_dot(dp, dv);
+                        float disc = b * b - 4.0f * a * c;
+                        if (disc < 0.0f) continue;
+                        float toi = (-b - sqrtf(disc)) / (2.0f * a);
+                        if ((toi > 0.0f) && (toi < best_cyl_toi) && (toi <= dt)) {
+                            best_cyl_toi = toi;
+                        }
+                    }
+
+                    /* Sweep against barrel (capsule segment).
+                     * Project relative velocity onto plane perpendicular to axle. */
+                    float dv_ax = vector3_dot(dv, ax);
+                    vector3 dv_perp = vector3_subtraction(dv, vector3_scaling(ax, dv_ax));
+                    float dv_perp_len_sq = vector3_length_squared(dv_perp);
+                    if (dv_perp_len_sq > 1e-12f) {
+                        /* Relative motion has perpendicular component - capsule sweep.
+                         * The capsule is the segment extruded along dv_perp.
+                         * Find closest approach of sphere to swept capsule. */
+                        vector3 dp_mid = vector3_subtraction(other->position, mover->position);
+                        float dp_ax = vector3_dot(dp_mid, ax);
+                        vector3 dp_perp = vector3_subtraction(dp_mid, vector3_scaling(ax, dp_ax));
+                        float dp_perp_len_sq = vector3_length_squared(dp_perp);
+                        (void)sqrtf(dv_perp_len_sq); /* dv_perp_len used in debug builds */
+
+                        /* Quadratic for perpendicular distance == rr.
+                         * |dp_perp + t*dv_perp|^2 = rr^2 */
+                        float a = dv_perp_len_sq;
+                        float b = 2.0f * vector3_dot(dp_perp, dv_perp);
+                        float c = dp_perp_len_sq - rr * rr;
+                        if (a > 1e-12f) {
+                            float disc = b * b - 4.0f * a * c;
+                            if (disc >= 0.0f) {
+                                float toi = (-b - sqrtf(disc)) / (2.0f * a);
+                                if ((toi > 0.0f) && (toi < best_cyl_toi) && (toi <= dt)) {
+                                    /* Check if contact point is within segment bounds at TOI. */
+                                    vector3 rel_pos = vector3_addition(dp_mid, vector3_scaling(dv, toi));
+                                    float rel_ax = vector3_dot(rel_pos, ax);
+                                    if (fabsf(rel_ax) <= h + rr) {
+                                        best_cyl_toi = toi;
+                                    }
+                                }
+                            }
+                        }
+                        (void)dv_perp_len_sq; /* silence unused in some configs */
+                    }
+
+                    if ((best_cyl_toi > 0.0f) && (best_cyl_toi < best_toi)) {
+                        best_toi = best_cyl_toi;
+                        hit = true;
+                    }
+                } else {
+                    /* Non-sphere mover vs cylinder: conservative bounding sphere sweep.
+                     * (Exact segment-segment sweep for cylinder-vs-cylinder is complex;
+                     * bounding sphere is conservative and never misses.) */
+                    vector3 dp = vector3_subtraction(other->position, mover->position);
+                    vector3 dv = vector3_subtraction(other_v, mover->velocity);
+                    float rr = broadphase_bounding_radius(mover) + broadphase_bounding_radius(other);
+                    float a = vector3_dot(dv, dv);
+                    float c = vector3_dot(dp, dp) - rr * rr;
+                    if ((c <= 0.0f) || (a <= 1e-12f)) {
+                        continue;
+                    }
+                    float b = 2.0f * vector3_dot(dp, dv);
+                    float disc = b * b - 4.0f * a * c;
+                    if (disc < 0.0f) {
+                        continue;
+                    }
+                    float toi = (-b - sqrtf(disc)) / (2.0f * a);
+                    if ((toi > 0.0f) && (toi < best_toi) && (toi <= dt)) {
+                        best_toi = toi;
+                        hit = true;
+                    }
                 }
             } else if (other->type == object_cube) {
                 /* Swept sphere-vs-OBB via slab test in box space, with
@@ -1910,16 +2213,65 @@ int collision_ccd_sweep_clamp_full(rigidbody *bodies, int body_count, float dt, 
         }
         } /* do_volumes */
 
-        if (hit) {
-            mover->position = vector3_addition(mover->position, vector3_scaling(mover->velocity, best_toi));
+        /* Phase 1: record only (no move yet — symmetric two-phase). */
+        if (hit && best_toi < dt && best_toi > 0.0f) {
+            best_tois[i] = best_toi;
+            hit_flags[i] = 1;
+        }
+    }
+    /* Phase 2: apply all clamps simultaneously vs OLD positions.
+     * TRUTH: rotate orientation by w*toi too (old code lost toi rotation:
+     * total became w*rem not w*dt). Linear pre-move + angular pre-rotate,
+     * remainder integration completes both. */
+    int clamped = 0;
+    if (record_remainder) {
+        for (int i = 0; i < body_count; i++) {
+            if (!hit_flags[i]) {
+                continue;
+            }
+            rigidbody *mover = &bodies[i];
+            if ((mover->static_state) || (mover->is_sleeping)) {
+                continue;
+            }
+            float toi = best_tois[i];
+            if (!(toi > 0.0f) || !(toi < dt)) {
+                continue;
+            }
+            mover->position = vector3_addition(mover->position, vector3_scaling(mover->velocity, toi));
+            float spin = vector3_length(mover->angular_velocity);
+            if (spin > 1e-6f && isfinite(spin)) {
+                double half = 0.5 * (double) spin * (double) toi;
+                vector4 rotor;
+                if (half > -0.5 && half < 0.5) {
+                    double s = det_sin_small(half);
+                    double c = det_cos_small(half);
+                    double inv = 1.0 / (double) spin;
+                    rotor = (vector4){(float) c, (float) (mover->angular_velocity.x * inv * s),
+                                     (float) (mover->angular_velocity.y * inv * s),
+                                     (float) (mover->angular_velocity.z * inv * s)};
+                } else {
+                    rotor = vector4_from_axis_with_angle(
+                        vector3_scaling(mover->angular_velocity, 1.0f / spin), spin * toi);
+                }
+                mover->orientation = vector4_normalisation(vector4_multiplication(rotor, mover->orientation));
+            }
             rigidbody_wake(mover);
             rigidbody_update_axes(mover);
             clamped++;
-            if (time_remaining_out) {
-                float rem = dt - best_toi;
-                time_remaining_out[i] = (rem > 0.0f) ? rem : 0.0f;
+            float rem = dt - toi;
+            time_remaining_out[i] = (rem > 0.0f) ? rem : 0.0f;
+        }
+    } else {
+        /* Degraded NULL mode: no pre-move (would double-count). Count only. */
+        for (int i = 0; i < body_count; i++) {
+            if (hit_flags[i]) {
+                clamped++;
             }
         }
+    }
+    if (use_heap) {
+        free(best_tois);
+        free(hit_flags);
     }
     return clamped;
 }

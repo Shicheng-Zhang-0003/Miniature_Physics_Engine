@@ -34,6 +34,25 @@
 > (registry+struct), `depenetration.penetration_slop` (registry+struct),
 > `make_half_extents`. Wired in (real physics, was dead):
 > `rb_get_kinetic_energy` + `islands_count` → F9 energy/island readout.
+>
+> STATUS UPDATE 4 (v15R3 RELEASE):
+> This tree is tagged v15R3 (`a3_release_freeze = 1`). Landed since update 3:
+> terminal debugger + snapshot suite (`mpe-tui`: live ncurses inspector over
+> bodies/joints/constraints/math/scene-graph, plus pipeable `--snapshot` /
+> `--stream` dumps; `make tui-smoke`), sleep truth (three-gate wake:
+> first-touch pair novelty via the contact cache + fast-other + deep — fixes
+> the F10 10-stack 13 m/s runaway while keeping slow-pusher wakes at any
+> speed), CCD corrections (symmetric two-phase clamp, translation-gated floor
+> TOI, no double-count remainder), friction policy settled (primary-tangent
+> warm restore, second disc tangent always cold), driven_wheel moved into the
+> resolvable regime (0.080 N·m) with load-bearing gates (grounded, coupling,
+> spin cap), full constraint framework in the suite (revolute/fixed/prismatic/
+> distance/rope + springs; v200 persists springs + revolutes), and three
+> adversarial tests (`f10_long_run`, `sleep_contact_wake`, `f11_torture`).
+> Headless suite: 29/29 green. See `v15R3/release_notes_v15R3.md`.
+> Still genuinely open: PERF-001 (SIMD), multithreading, in-engine creation
+> UI + persistence for fixed/distance/prismatic/rope, Wayland mouse-lock,
+> quadratic aero drag.
 
 
 Every issue found across all 88 files, organized by section. Severity scale: **Critical** (breaks correctness), **High** (blocks future work), **Medium** (code quality / maintainability), **Low** (polish / cosmetic).

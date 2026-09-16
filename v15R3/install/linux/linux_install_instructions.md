@@ -15,20 +15,21 @@ Installation Instructions (Prerequisite Packages):
     Ubuntu/Debian/Debian Derivatives (apt):
         sudo apt update --> update system
         sudo apt install build-essential pkg-config libgtk-3-dev libepoxy-dev
+        sudo apt install libncurses-dev --> only needed for the mpe-tui terminal debugger
     Fedora (dnf, yum?):
         sudo dnf update
-        sudo dnf install @development-tools pkgconf-pkg-config gtk3-devel libepoxy-devel
+        sudo dnf install @development-tools pkgconf-pkg-config gtk3-devel libepoxy-devel ncurses-devel --> ncurses for mpe-tui
     Arch/Manjaro/Arch Derivatives (pacman):
         sudo pacman -Syu
-        sudo pacman -S base-devel pkgconf gtk3 libepoxy
+        sudo pacman -S base-devel pkgconf gtk3 libepoxy ncurses --> ncurses for mpe-tui
     SUSE Derivatives (zypper):
-        sudo zypper install -t pattern devel_basis pkg-config gtk3-devel libepoxy-devel
+        sudo zypper install -t pattern devel_basis pkg-config gtk3-devel libepoxy-devel ncurses-devel --> ncurses for mpe-tui
     Alpine (apk):
-        sudo apk add build-base pkgconf gtk+3.0-dev libepoxy-dev
+        sudo apk add build-base pkgconf gtk+3.0-dev libepoxy-dev ncurses-dev --> ncurses for mpe-tui
     Gentoo (portage):
-        sudo emerge --ask sys-devel/base-system dev-util/pkgconf x11-libs/gtk+:3 media-libs/libepoxy
+        sudo emerge --ask sys-devel/base-system dev-util/pkgconf x11-libs/gtk+:3 media-libs/libepoxy sys-libs/ncurses --> ncurses for mpe-tui
     Nix (source compilation):
-        nix-shell -p gcc pkg-config gtk3 libepoxy
+        nix-shell -p gcc pkg-config gtk3 libepoxy ncurses --> ncurses for mpe-tui
 
 To Check if dependency libraries are actually detected:
     On most Linux system, if you have pkg-config installed, run:

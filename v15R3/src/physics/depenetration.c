@@ -69,8 +69,16 @@ bool a3_depenetration_dispatch(rigidbody *rigid_body_a, rigidbody *rigid_body_b,
  * over ticks bounded by max_correction (teleport bounded, counted). */
 void a3_positional_depenetration_pass(struct physics_world *world, broadphase_pair *pair_buffer,
                                       int *pair_count_pointer, bool rebuild_broadphase) {
+    a3_positional_depenetration_pass_dt(world, pair_buffer, pair_count_pointer, rebuild_broadphase, 1.0f / 60.0f);
+}
+
+void a3_positional_depenetration_pass_dt(struct physics_world *world, broadphase_pair *pair_buffer,
+                                         int *pair_count_pointer, bool rebuild_broadphase, float dt) {
     if ((!world) || (!world->bodies) || (world->body_count < 2) || (!pair_buffer) || (!pair_count_pointer)) {
         return;
+    }
+    if (!(dt > 0.0f) || !isfinite(dt)) {
+        dt = 1.0f / 60.0f;
     }
     rigidbody *bodies = world->bodies;
     int body_count = world->body_count;
@@ -78,8 +86,7 @@ void a3_positional_depenetration_pass(struct physics_world *world, broadphase_pa
     int pair_count = *pair_count_pointer;
 
     if (rebuild_broadphase) {
-        pair_count = broadphase_generate_pairing(world, pair_buffer, mpe_max_broadphase_pairs,
-                                                 1.0f / 60.0f);
+        pair_count = broadphase_generate_pairing(world, pair_buffer, mpe_max_broadphase_pairs, dt);
         *pair_count_pointer = pair_count;
     }
 
@@ -109,7 +116,7 @@ void a3_positional_depenetration_pass(struct physics_world *world, broadphase_pa
 
         for (int object_index = 0; object_index < body_count; object_index++) {
             rigidbody *rigid_body = &bodies[object_index];
-            if (rigid_body->static_state) {
+            if (rigid_body->static_state || rigid_body->kinematic) {
                 continue;
             }
 
@@ -184,8 +191,18 @@ void a3_positional_depenetrate_manifold(collision_data *manifold) {
         b_sleeping = false;
     }
 
-    float inverse_mass_a = (body_a->static_state || a_sleeping) ? 0.0f : body_a->inverse_mass;
-    float inverse_mass_b = (body_b->static_state || b_sleeping) ? 0.0f : body_b->inverse_mass;
+    float inverse_mass_a = rigidbody_effective_inv_mass(body_a);
+    float inverse_mass_b = rigidbody_effective_inv_mass(body_b);
+    /* TRUTH: sleeping bodies with deep overlap already woken above, so
+     * effective (zero for still-sleeping) is correct. Kinematic must use
+     * effective (zero), never raw stored inv (nonzero) — old code moved
+     * kinematics. */
+    if (a_sleeping) {
+        inverse_mass_a = 0.0f;
+    }
+    if (b_sleeping) {
+        inverse_mass_b = 0.0f;
+    }
     float inverse_mass_sum = inverse_mass_a + inverse_mass_b;
 
     if (inverse_mass_sum <= 0.0f) {

@@ -410,9 +410,81 @@ bool collision_cylinder_cube(rigidbody *cyl, rigidbody *cube,
     out->normal_vector = n0;
     {
         contact_point_data *cp = &out->contacts[out->contact_count++];
-        float pen = r - d_star;
+        float pen;
+        if (toward_len > 0.0001f) {
+            pen = r - d_star;
+        } else {
+            /* TRUTH: axle point inside box. d_star==0, but true capsule
+             * depth is r + face_clearance (distance to nearest face), not r.
+             * Old r-only underestimated by up to half the box. */
+            vector3 rel0b = vector3_subtraction(pt_star, cube->position);
+            vector3 *axes0b = cube->cached_axes;
+            float l0xb = vector3_dot(rel0b, axes0b[0]);
+            float l0yb = vector3_dot(rel0b, axes0b[1]);
+            float l0zb = vector3_dot(rel0b, axes0b[2]);
+            float pxb = cube->half_extensions.x - fabsf(l0xb);
+            float pyb = cube->half_extensions.y - fabsf(l0yb);
+            float pzb = cube->half_extensions.z - fabsf(l0zb);
+            float clearance = pxb;
+            if (pyb < clearance) {
+                clearance = pyb;
+            }
+            if (pzb < clearance) {
+                clearance = pzb;
+            }
+            if (!isfinite(clearance) || clearance < 0.0f) {
+                clearance = 0.0f;
+            }
+            pen = r + clearance;
+        }
         cp->penetration = (pen > 0.0f) ? pen : 0.0f;
-        cp->position = obb_star;
+        /* TRUTH: interior contact position must be on the box surface
+         * (face point), not the interior axle point, or lever arms are wrong.
+         * obb_star==pt_star interior; push to face along n0. */
+        if (toward_len <= 0.0001f) {
+            vector3 rel0c = vector3_subtraction(pt_star, cube->position);
+            vector3 *axes0c = cube->cached_axes;
+            float l0xc = vector3_dot(rel0c, axes0c[0]);
+            float l0yc = vector3_dot(rel0c, axes0c[1]);
+            float l0zc = vector3_dot(rel0c, axes0c[2]);
+            float pxc = cube->half_extensions.x - fabsf(l0xc);
+            float pyc = cube->half_extensions.y - fabsf(l0yc);
+            float pzc = cube->half_extensions.z - fabsf(l0zc);
+            float best = pxc;
+            int bi = 0;
+            if (pyc < best) {
+                best = pyc;
+                bi = 1;
+            }
+            if (pzc < best) {
+                best = pzc;
+                bi = 2;
+            }
+            float sgn = 0.0f;
+            float loc = 0.0f;
+            float ext = 0.0f;
+            if (bi == 0) {
+                sgn = (l0xc >= 0.0f) ? 1.0f : -1.0f;
+                loc = l0xc;
+                ext = cube->half_extensions.x;
+            } else if (bi == 1) {
+                sgn = (l0yc >= 0.0f) ? 1.0f : -1.0f;
+                loc = l0yc;
+                ext = cube->half_extensions.y;
+            } else {
+                sgn = (l0zc >= 0.0f) ? 1.0f : -1.0f;
+                loc = l0zc;
+                ext = cube->half_extensions.z;
+            }
+            float push = ext - sgn * loc;
+            if (isfinite(push)) {
+                cp->position = vector3_addition(obb_star, vector3_scaling(n0, push));
+            } else {
+                cp->position = obb_star;
+            }
+        } else {
+            cp->position = obb_star;
+        }
     }
 
     /* Line support: cylinder lying on a face contacts along an interval,
@@ -589,7 +661,19 @@ bool collision_cylinder_cube(rigidbody *cyl, rigidbody *cube,
  * faces use axial gap; parallel sides emit 2 points at overlap ends. */
 bool collision_cylinder_cylinder(rigidbody *cyl_a, rigidbody *cyl_b,
                                  collision_data *out) {
+    if ((!cyl_a) || (!cyl_b) || (!out)) {
+        return false;
+    }
     if ((cyl_a->type != object_cylinder) || (cyl_b->type != object_cylinder)) {
+        return false;
+    }
+    /* TRUTH: NaN/0 geometry must reject, like all other cyl entries. */
+    if (!isfinite(cyl_a->radius) || !isfinite(cyl_a->cylinder_half_length) || !isfinite(cyl_b->radius) ||
+        !isfinite(cyl_b->cylinder_half_length)) {
+        return false;
+    }
+    if (cyl_a->radius <= 0.0f || cyl_a->cylinder_half_length <= 0.0f || cyl_b->radius <= 0.0f ||
+        cyl_b->cylinder_half_length <= 0.0f) {
         return false;
     }
     vector3 ax = cyl_a->cached_axes[0];
@@ -610,13 +694,15 @@ bool collision_cylinder_cylinder(rigidbody *cyl_a, rigidbody *cyl_b,
     float hb = cyl_b->cylinder_half_length;
     float slop = g_cfg.solver.penetration_slop;
 
-    /* Coaxial / near-coaxial face-face: axial gap truth (not r_a+r_b).
-     * TRUTH gate: faces meet with gap≈0 (CCD clamps fast face impacts to
-     * TOI, so penetration at solve is shallow). Deep axial overlap
-     * (gap<<-slop: rods side-by-side, centers axially aligned) is SIDE
-     * contact with LATERAL normal — misreporting axial normal lets side
-     * approaches pass through (measured: z-approach discs with axial
-     * normal). Face branch iff gap in [-2*slop, +slop). */
+    /* Coaxial / near-coaxial face-face vs barrel-side disambiguation.
+     * TRUTH: pick the SHALLOWER penetration (first touch), not just any gap.
+     * Face gap = axial_gap (faces interpenetrating axially). Side gap =
+     * lateral - (r_a+r_b) (barrels overlapping laterally). Shallow wins:
+     * - Axial approach (lateral~0, gap -0.05): face -0.05 vs side -0.10 ->
+     *   face wins (old narrow gate missed deep face, side gave (0,1,0)).
+     * - Side approach (gap -0.04 const, lateral 0.08): face -0.04 vs side
+     *   -0.02 -> side wins (a wide gate claiming face here pushes X while
+     *   bodies pass through in Z). */
     float axis_dot = fabsf(vector3_dot(ax, bx));
     if (axis_dot > 0.95f) {
         vector3 delta = vector3_subtraction(cyl_b->position, cyl_a->position);
@@ -624,8 +710,9 @@ bool collision_cylinder_cylinder(rigidbody *cyl_a, rigidbody *cyl_b,
         vector3 lateral_vec = vector3_subtraction(delta, vector3_scaling(ax, axial));
         float lateral = vector3_length(lateral_vec);
         float axial_gap = fabsf(axial) - (ha + hb);
-        if ((axial_gap >= -2.0f * slop) && (axial_gap < slop) &&
-            (lateral < cyl_a->radius + cyl_b->radius + slop)) {
+        float side_gap = lateral - (cyl_a->radius + cyl_b->radius);
+        bool face_candidate = (axial_gap < slop) && (lateral < cyl_a->radius + cyl_b->radius + slop);
+        if (face_candidate && (axial_gap >= -2.0f * slop || axial_gap > side_gap)) {
             /* Faces overlap laterally and meet axially: flat-cap contact. */
             float s = (axial >= 0.0f) ? 1.0f : -1.0f;
             vector3 nrm = vector3_scaling(ax, s); /* A -> B */
@@ -726,30 +813,58 @@ bool collision_cylinder_cylinder(rigidbody *cyl_a, rigidbody *cyl_b,
     float raw_pen = min_dist - dist;
     cp->penetration = (raw_pen > 0.0f) ? raw_pen : 0.0f;
     cp->position = vector3_scaling(vector3_addition(pa, pb), 0.5f);
-    /* TRUTH P1-6: parallel barrels share a LINE, not a point. Emit a second
-     * contact offset along the overlap direction so stacked logs do not rock
-     * on a single point. Only when axes near-parallel and overlap is long. */
+    contact_point_data saved_single = out->contacts[0];
+    /* TRUTH P1-6: parallel barrels share a LINE, not a point. Emit two
+     * contacts at the overlap interval ends (both clamped onto segments,
+     * symmetric ±), so stacked logs do not rock on a single point. */
     if (axis_dot > 0.95f) {
         float overlap = fminf(ha, hb);
         if (overlap > 0.05f) {
-            vector3 shared = (axis_dot > 0.0f) ? ax : vector3_scaling(ax, -1.0f);
-            vector3 off = vector3_scaling(shared, overlap * 0.5f);
-            vector3 pa2 = vector3_addition(pa, off);
-            vector3 pb2 = vector3_addition(pb, off);
-            /* Clamp back onto segments. */
-            vector3 a1p = a1, b1p = b1;
-            (void) a1p;
-            (void) b1p;
-            float sep2 = vector3_length(vector3_subtraction(pa2, pb2));
-            if ((sep2 < min_dist + slop) &&
-                (vector3_length_squared(vector3_subtraction(pa2, pa)) > 0.0025f)) {
-                contact_point_data *cp2 = &out->contacts[1];
-                float pen2 = min_dist - sep2;
-                cp2->penetration = (pen2 > 0.0f) ? pen2 : 0.0f;
-                cp2->position = vector3_scaling(vector3_addition(pa2, pb2), 0.5f);
-                out->contact_count = 2;
+            vector3 shared = (vector3_dot(ax, bx) >= 0.0f) ? ax : vector3_scaling(ax, -1.0f);
+            /* Overlap interval along A: project B's interval onto A. */
+            float s_c = vector3_dot(vector3_subtraction(cyl_b->position, cyl_a->position), shared);
+            float lo = fmaxf(-ha, s_c - hb);
+            float hi = fminf(ha, s_c + hb);
+            if (hi > lo + 0.05f) {
+                /* Two endpoints, inset by 25% to stay on the barrel. */
+                float t0 = lo + (hi - lo) * 0.25f;
+                float t1 = lo + (hi - lo) * 0.75f;
+                vector3 pa0 = vector3_addition(cyl_a->position, vector3_scaling(shared, t0));
+                vector3 pa1 = vector3_addition(cyl_a->position, vector3_scaling(shared, t1));
+                /* Closest points on B's axle for each. */
+                for (int k = 0; k < 2; k++) {
+                    vector3 pak = (k == 0) ? pa0 : pa1;
+                    float tb = vector3_dot(vector3_subtraction(pak, cyl_b->position), bx);
+                    if (tb < -hb) {
+                        tb = -hb;
+                    }
+                    if (tb > hb) {
+                        tb = hb;
+                    }
+                    vector3 pbk = vector3_addition(cyl_b->position, vector3_scaling(bx, tb));
+                    float sepk = vector3_length(vector3_subtraction(pak, pbk));
+                    if ((sepk >= min_dist + slop) || out->contact_count >= 4) {
+                        continue;
+                    }
+                    /* Replace single midpoint with two interval ends. */
+                    if (k == 0) {
+                        out->contact_count = 0;
+                    }
+                    contact_point_data *cpk = &out->contacts[out->contact_count++];
+                    float penk = min_dist - sepk;
+                    cpk->penetration = (penk > 0.0f) ? penk : 0.0f;
+                    cpk->position = vector3_scaling(vector3_addition(pak, pbk), 0.5f);
+                }
+                if (out->contact_count <= 0) {
+                    /* Interval ends missed (curved ends): restore single. */
+                    out->contacts[0] = saved_single;
+                    out->contact_count = 1;
+                }
             }
         }
+    }
+    if (out->contact_count <= 0) {
+        return false;
     }
     return true;
 }

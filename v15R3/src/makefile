@@ -34,6 +34,7 @@ install: engine
 help:
 	@echo "targets: engine (default) | debug | release | install | clean"
 	@echo "         test_<name> (build+run) | build_<name> (build only)"
+	@echo "         mpe-tui (terminal debugger + snapshot suite) | tui-smoke"
 	@echo "         flow: python3 ../../tools/test_runner.py"
 
 $(BUILD_DIR)/%.o: %.c
@@ -41,9 +42,29 @@ $(BUILD_DIR)/%.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf build build-debug build-release engine test_*
+	rm -rf build build-debug build-release engine test_* mpe-tui
 
-.PHONY: clean debug release install help
+# ---- MPE terminal debugger + snapshot suite (TUI) ----
+# Terminal-only executable: live ncurses inspector (overview / object+math /
+# joints / graph / help) plus pipeable --snapshot/--stream dumps that serve
+# as the scriptable debugging output suite. Links the headless-tested core
+# plus springs; never calls GTK/GL at runtime (spring GL render is linked
+# for its physics symbols but never invoked — output is terminal only).
+TUI_SRCS := tui/tui_main.c tui/tui_debugger.c tui/tui_dump.c
+TUI_CORE = $(MPE_TEST_CORE) $(SPRING_TEST_SRCS)
+TUI_LIBS := -lm $(shell pkg-config --libs ncurses) $(shell pkg-config --libs epoxy)
+build_tui: $(TUI_SRCS) $(TUI_CORE)
+	$(CC) $(CFLAGS) -Dmpe_tui_main $(TUI_SRCS) $(TUI_CORE) $(TUI_LIBS) -o mpe-tui
+mpe-tui: build_tui
+tui-smoke: build_tui
+	./mpe-tui --snapshot 60 --scene demo > /dev/null
+	./mpe-tui --stream 120 --every 60 --scene demo > /dev/null
+	./mpe-tui --snapshot 10 --scene tower > /dev/null
+	./mpe-tui --snapshot 10 --scene pendulum > /dev/null
+	./mpe-tui --snapshot 10 --scene springlab > /dev/null
+	@echo "[PASS] tui-smoke: all scenes dump finite state"
+
+.PHONY: clean debug release install help mpe-tui build_tui tui-smoke
 
 -include $(DEPS)
 
@@ -182,6 +203,20 @@ build_stack: tests/stack_test.c $(MPE_TEST_CORE)
 test_stack: build_stack
 	./test_stack
 
+build_f10_long_run: tests/f10_long_run_test.c $(MPE_TEST_CORE)
+	$(CC) $(CFLAGS) -Dmpe_f10_long_run_test tests/f10_long_run_test.c $(MPE_TEST_CORE) -lm -o test_f10_long_run
+test_f10_long_run: build_f10_long_run
+	./test_f10_long_run
+
+build_sleep_contact_wake: tests/sleep_contact_wake_test.c $(MPE_TEST_CORE)
+	$(CC) $(CFLAGS) -Dmpe_sleep_contact_wake_test tests/sleep_contact_wake_test.c $(MPE_TEST_CORE) -lm -o test_sleep_contact_wake
+test_sleep_contact_wake: build_sleep_contact_wake
+	./test_sleep_contact_wake
+
+build_f11_torture: tests/f11_torture_test.c $(MPE_TEST_CORE)
+	$(CC) $(CFLAGS) -Dmpe_f11_torture_test tests/f11_torture_test.c $(MPE_TEST_CORE) -lm -o test_f11_torture
+test_f11_torture: build_f11_torture
+	./test_f11_torture
 # Pure math4 (header-only): no MPE_TEST_CORE needed, no GL needed.
 build_frustum: tests/frustum_test.c
 	$(CC) $(CFLAGS) -Dmpe_frustum_test tests/frustum_test.c -lm -o test_frustum
@@ -200,4 +235,6 @@ test_frustum: build_frustum
 	build_projectile test_projectile build_incline_accel test_incline_accel \
 	build_pendulum test_pendulum build_bounce_series test_bounce_series \
 	build_friction_stop test_friction_stop build_stack test_stack \
+	build_f10_long_run test_f10_long_run build_sleep_contact_wake test_sleep_contact_wake \
+	build_f11_torture test_f11_torture \
 	build_frustum test_frustum
