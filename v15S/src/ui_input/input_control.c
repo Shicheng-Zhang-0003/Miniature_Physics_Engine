@@ -7,6 +7,8 @@
 #include "camera.h"
 #include "mouse_lock.h"
 #include <gdk/gdkkeysyms.h>
+#include <gdk/x11/gdkx.h>
+#include <X11/Xlib.h>
 extern camera main_camera_fov;
 extern int selected_object;
 void initialize_input(input_status *s) {if(!s)return; s->w_key_pressed=false; s->a_key_pressed=false; s->s_key_pressed=false; s->d_key_pressed=false; s->space_key_pressed=false; s->shift_key_pressed=false; s->escape_key_pressed=false; s->f_key_pressed=false; s->r_key_pressed=false; s->i_key_pressed=false; s->j_key_pressed=false; s->k_key_pressed=false; s->l_key_pressed=false; s->is_menu_open=false; s->menu_1_pressed=false; s->menu_2_pressed=false; s->menu_3_pressed=false; s->menu_4_pressed=false; s->menu_5_pressed=false; s->menu_6_pressed=false; s->spawner_menu_level=0; s->velocity_menu_level=0; s->object_menu_level=0; s->current_spawn_type=0; s->up_arrow_pressed=false; s->down_arrow_pressed=false; s->enter_key_pressed=false; s->e_key_pressed=false; s->stability_test_pressed=false; s->sleep_wake_test_pressed=false; s->editor_torture_pressed=false; s->spawn_stress_pressed=false; s->validation_report_pressed=false; s->debug_terminal_pressed=false; s->long_run_validation_pressed=false; s->config_torture_pressed=false; s->is_mouse_locked=false; s->is_debug_mode_active=false; s->right_mouse_button_clicked=false; s->middle_mouse_button_clicked=false; s->mouse_delta_x=0; s->mouse_delta_y=0; s->suppress_mouse_delta=false; s->marked_joint_object_index=-1; s->enter_spawn_held=false; }
@@ -79,15 +81,15 @@ gboolean on_mouse_movements(GtkEventControllerMotion *ctrl, double x, double y, 
     input_status *st=(input_status*)ud;
     if(!st) st=&main_inputs;
     if(!st->is_mouse_locked) return FALSE;
-    // Use toplevel size for clamping, not widget (controller has no size)
-    // For now use fixed 800x600 heuristic or get from widget via gtk_event_controller_get_widget
     GtkWidget *w = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(ctrl));
     int ww = w ? gtk_widget_get_width(w) : 800;
     int wh = w ? gtk_widget_get_height(w) : 600;
     if(ww<=0||wh<=0) {ww=800; wh=600;}
+    /* Always reset last_x/last_y to the centre so deltas are
+     * computed relative to the centre point, and warp the
+     * cursor there immediately so it can never leave the
+     * widget window. This is the standard FPS-camera pattern. */
     static double last_x=-1,last_y=-1;
-    if(last_x<0) {last_x=x; last_y=y; return FALSE;}
-    if(st->suppress_mouse_delta) {last_x=x; last_y=y; return FALSE;}
     double dx = x - last_x;
     double dy = y - last_y;
     if (dx > ww/2) dx = ww/2;
@@ -97,8 +99,10 @@ gboolean on_mouse_movements(GtkEventControllerMotion *ctrl, double x, double y, 
     if(dx!=0||dy!=0) {
         st->mouse_delta_x = (float)dx;
         st->mouse_delta_y = -(float)dy;
-        last_x = x; last_y = y;
     }
+    last_x = ww / 2.0;
+    last_y = wh / 2.0;
+    mouse_lock_reset_centre(w);
     return FALSE;
 }
 gboolean on_button_press(GtkGestureClick *gest, int n_press, double x, double y, gpointer user_data_stored) {
@@ -112,9 +116,11 @@ gboolean on_button_press(GtkGestureClick *gest, int n_press, double x, double y,
         st->mouse_delta_x=0; st->mouse_delta_y=0;
         st->is_mouse_locked=true;
         mouse_lock_enable(g_gl_area ? g_gl_area : gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(gest)));
+        mouse_lock_reset_centre(g_gl_area ? g_gl_area : gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(gest)));
     } else if(!st->is_mouse_locked) {
         st->is_mouse_locked=true;
         mouse_lock_enable(g_gl_area ? g_gl_area : gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(gest)));
+        mouse_lock_reset_centre(g_gl_area ? g_gl_area : gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(gest)));
     }
     return FALSE;
 }
