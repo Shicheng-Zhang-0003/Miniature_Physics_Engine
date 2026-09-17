@@ -32,20 +32,28 @@ static GdkCursor *mpe_blank_cursor_new(void) {
     return gdk_cursor_new_from_name("none", NULL);
 }
 
-void mouse_lock_enable(GtkWidget *window_widget) {
-    if (!window_widget) return;
-    if (!GTK_IS_WIDGET(window_widget)) return;
-    GdkSurface *surface = mpe_surface_for_widget(window_widget);
+void mouse_lock_enable(GtkWidget *widget) {
+    if (!widget) return;
+    if (!GTK_IS_WIDGET(widget)) return;
+
+    /* Set cursor on the widget itself */
     GdkCursor *blank = mpe_blank_cursor_new();
     if (blank) {
-        gtk_widget_set_cursor(window_widget, blank);
-        if (surface) {
-            gdk_surface_set_cursor(surface, blank);
-        }
+        gtk_widget_set_cursor(widget, blank);
         g_object_unref(blank);
     } else {
-        gtk_widget_set_cursor_from_name(window_widget, "none");
-        if (surface) {
+        gtk_widget_set_cursor_from_name(widget, "none");
+    }
+
+    /* Get the top-level surface for the cursor to actually hide
+     * on X11/Wayland. The GL area's surface may be a child surface. */
+    GdkSurface *surface = mpe_surface_for_widget(widget);
+    if (surface) {
+        GdkCursor *blank2 = mpe_blank_cursor_new();
+        if (blank2) {
+            gdk_surface_set_cursor(surface, blank2);
+            g_object_unref(blank2);
+        } else {
             GdkCursor *fallback = gdk_cursor_new_from_name("none", NULL);
             if (fallback) {
                 gdk_surface_set_cursor(surface, fallback);
@@ -63,33 +71,15 @@ void mouse_lock_enable(GtkWidget *window_widget) {
      * correct best-effort Wayland-safe equivalent. */
 }
 
-void mouse_lock_disable(GtkWidget *window_widget) {
-    GdkSurface *surface = NULL;
-    GdkDisplay *display = NULL;
+void mouse_lock_disable(GtkWidget *widget) {
+    if (!widget || !GTK_IS_WIDGET(widget)) return;
 
-    if (window_widget && GTK_IS_WIDGET(window_widget)) {
-        /* Clear widget cursor — restores default. */
-        gtk_widget_set_cursor(window_widget, NULL);
-        surface = mpe_surface_for_widget(window_widget);
-    }
+    /* Clear cursor on the widget */
+    gtk_widget_set_cursor(widget, NULL);
 
+    GdkSurface *surface = mpe_surface_for_widget(widget);
     if (surface) {
         gdk_surface_set_cursor(surface, NULL);
-        display = gdk_surface_get_display(surface);
-    } else {
-        display = gdk_display_get_default();
-        /* If we were given a non-widget window_widget that is now NULL,
-         * try to clear the default toplevel surface cursor as fallback. */
-        if (display) {
-            /* No widget to clear, but touching the seat keeps parity with
-             * the GTK3 path which called seat ungrab unconditionally. */
-        }
-    }
-
-    if (display) {
-        GdkSeat *seat = gdk_display_get_default_seat(display);
-        (void)seat;
-        /* GTK4 removed seat ungrab — no ungrab to perform. */
     }
 }
 
