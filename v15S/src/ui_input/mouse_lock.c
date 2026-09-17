@@ -16,12 +16,15 @@
 
 extern input_status main_inputs;
 
-/* Resolve the GdkSurface for any widget (via its GtkNative toplevel).
- * May return NULL if the widget is not yet realized — callers must handle it. */
+/* Resolve the GdkSurface for any widget via its top-level
+ * GtkNative. Traverses up the widget hierarchy to get the
+ * top-level surface, not a child surface. */
 static GdkSurface *mpe_surface_for_widget(GtkWidget *widget) {
     if (!widget) return NULL;
     if (!GTK_IS_WIDGET(widget)) return NULL;
-    GtkNative *native = gtk_widget_get_native(widget);
+    GtkWidget *toplevel = gtk_widget_get_ancestor(widget, GTK_TYPE_WINDOW);
+    if (!toplevel) toplevel = widget;
+    GtkNative *native = gtk_widget_get_native(toplevel);
     if (!native) return NULL;
     return gtk_native_get_surface(native);
 }
