@@ -111,10 +111,10 @@ gboolean on_button_press(GtkGestureClick *gest, int n_press, double x, double y,
     if(btn==1 && !st->is_mouse_locked) {
         st->mouse_delta_x=0; st->mouse_delta_y=0;
         st->is_mouse_locked=true;
-        mouse_lock_enable(gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(gest)));
+        mouse_lock_enable(g_gl_area ? g_gl_area : gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(gest)));
     } else if(!st->is_mouse_locked) {
         st->is_mouse_locked=true;
-        mouse_lock_enable(gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(gest)));
+        mouse_lock_enable(g_gl_area ? g_gl_area : gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(gest)));
     }
     return FALSE;
 }
@@ -138,7 +138,7 @@ gboolean on_focus_out(GtkEventControllerFocus *ctrl, gpointer user_data_stored) 
     st->long_run_validation_pressed=false; st->config_torture_pressed=false; st->debug_terminal_pressed=false; st->enter_spawn_held=false;
     st->mouse_delta_x=0; st->mouse_delta_y=0; st->right_mouse_button_clicked=false; st->middle_mouse_button_clicked=false; st->suppress_mouse_delta=false;
     if(st->is_mouse_locked) {
-        mouse_lock_disable(gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(ctrl)));
+        mouse_lock_disable(g_gl_area ? g_gl_area : gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(ctrl)));
         st->is_mouse_locked=false;
     }
     return FALSE;
