@@ -433,7 +433,7 @@ input_state -> enter_spawn_held = false;
     if (!(input_state -> is_mouse_locked)) {
         input_state -> mouse_delta_x = 0.0f;
         input_state -> mouse_delta_y = 0.0f;
-        mouse_lock_enable (gtk_widget_get_toplevel (widget));
+        mouse_lock_enable (gtk_widget_get_ancestor(widget, GTK_TYPE_WINDOW));
         input_state -> is_mouse_locked = true;
     } return FALSE;
 } gboolean on_button_release (GtkWidget *widget, GdkEventButton *event, gpointer user_data_stored) {
@@ -491,7 +491,7 @@ input_state -> enter_spawn_held = false;
     input_state -> suppress_mouse_delta = false;
 
     if (input_state -> is_mouse_locked) {
-        GtkWidget *a3_toplevel_widget = gtk_widget_get_toplevel (widget);
+        GtkWidget *a3_toplevel_widget = gtk_widget_get_ancestor(widget, GTK_TYPE_WINDOW);
         mouse_lock_disable (a3_toplevel_widget);
         input_state -> is_mouse_locked = false;
     }
