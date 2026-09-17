@@ -3,6 +3,7 @@
 camera main_camera_fov;
 input_status main_inputs;
 static guint physics_timeout_id = 0;
+GtkWidget *g_gl_area = NULL;
 
 #ifdef MPE_GTK4
 /* ====================== GTK4 PATH ====================== */
@@ -75,6 +76,7 @@ static void app_activate(GApplication *app, gpointer user_data) {
     g_signal_connect(main_window, "destroy", G_CALLBACK(on_main_window_destroy_gtk4), NULL);
 
     GtkWidget *gl_area_widget = gtk_gl_area_new();
+    g_gl_area = gl_area_widget;
     gtk_gl_area_set_has_depth_buffer(GTK_GL_AREA(gl_area_widget), TRUE);
     gtk_gl_area_set_allowed_apis(GTK_GL_AREA(gl_area_widget), GDK_GL_API_GL);
     g_signal_connect(gl_area_widget, "render", G_CALLBACK(on_rendered), NULL);
@@ -86,19 +88,22 @@ static void app_activate(GApplication *app, gpointer user_data) {
     g_signal_connect(key_ctrl, "key-released", G_CALLBACK(on_key_released), &main_inputs);
     gtk_widget_add_controller(main_window, key_ctrl);
 
+    /* Mouse motion controller on the GL area for proper cursor tracking */
     GtkEventController *motion_ctrl = gtk_event_controller_motion_new();
     g_signal_connect(motion_ctrl, "motion", G_CALLBACK(on_mouse_movements), &main_inputs);
-    gtk_widget_add_controller(main_window, motion_ctrl);
+    gtk_widget_add_controller(gl_area_widget, motion_ctrl);
 
+    /* Click gesture on the GL area for mouse lock */
     GtkGesture *click = gtk_gesture_click_new();
     gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(click), 0);
     g_signal_connect(click, "pressed", G_CALLBACK(on_button_press), &main_inputs);
     g_signal_connect(click, "released", G_CALLBACK(on_button_release), &main_inputs);
-    gtk_widget_add_controller(main_window, GTK_EVENT_CONTROLLER(click));
+    gtk_widget_add_controller(gl_area_widget, GTK_EVENT_CONTROLLER(click));
 
+    /* Focus controller on the GL area */
     GtkEventController *focus_ctrl = gtk_event_controller_focus_new();
     g_signal_connect(focus_ctrl, "leave", G_CALLBACK(on_focus_out), &main_inputs);
-    gtk_widget_add_controller(main_window, focus_ctrl);
+    gtk_widget_add_controller(gl_area_widget, focus_ctrl);
 
     GtkWidget *ui_overlay_layout = overlay_initialise(gl_area_widget);
     gtk_window_set_child(GTK_WINDOW(main_window), ui_overlay_layout);

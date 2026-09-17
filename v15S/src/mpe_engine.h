@@ -57,6 +57,7 @@
 
 extern camera main_camera_fov;
 extern input_status main_inputs;
+extern GtkWidget *g_gl_area;
 
 /* ------------------------------------------------------------------ */
 /* Global editor, world, and timing state                            */
