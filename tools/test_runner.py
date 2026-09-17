@@ -19,7 +19,11 @@ from pathlib import Path
 from typing import Optional
 
 
-SRC_DIR = Path(__file__).resolve().parent.parent / "v15R3" / "src"
+# v15R3 is the frozen GTK3 truth engine; v15S is the active GTK4 port.
+# Prefer the active tree if present, else fall back to v15R3.
+_src_v15s = Path(__file__).resolve().parent.parent / "v15S" / "src"
+_src_v15r3 = Path(__file__).resolve().parent.parent / "v15R3" / "src"
+SRC_DIR = _src_v15s if _src_v15s.exists() else _src_v15r3
 
 KNOWN_TESTS = [
     "two_world",
