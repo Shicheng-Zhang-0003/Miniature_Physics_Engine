@@ -117,7 +117,6 @@ static void app_activate(GApplication *app, gpointer user_data) {
 
 /* Keep old main_algorithm for source compat but route through GApplication. */
 int main_algorithm(int argc, char *argv[]) {
-    g_setenv("GDK_BACKEND", "x11", TRUE);
     mpe_app = gtk_application_new("org.mpe.engine", G_APPLICATION_DEFAULT_FLAGS);
     g_signal_connect(mpe_app, "activate", G_CALLBACK(app_activate), NULL);
     int status = g_application_run(G_APPLICATION(mpe_app), argc, argv);
