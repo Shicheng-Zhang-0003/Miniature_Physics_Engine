@@ -1,0 +1,25 @@
+MPE Evolution Lineage
+=====================
+
+V0.9-Buffer:  Direct Translation Layer from V1.5RC2 of MPE
+V1.5RC2:      v15R2 — Configuration System (69 tunables, registry, menu)
+MFS:          MPE FTC Simulator — Physics-first pivot (parked in robotics_backup/
+              during the MPE-only run)
+              Milestone 1: Foundation & Robotics Core ✅
+              Milestone 2: Physics Keystone (cylinders, anisotropic friction) ✅
+              Milestone 3: Solver Hardening (in progress)
+
+Current Head: v15R3 (MPE-only release, tagged; tree frozen to
+              correctness/stability/validation/docs/hygiene)
+Truth Pass:   Verlet-exact free flight, strict warm-start, true cylinder SDF,
+              CCD remainder, no clamps/caps/hysteresis, F11 torture guardrails
+              (gravity -17..-1, iters >=96, robustness verdict). 29/29 green.
+Sleep Truth:  three-gate wake (first-touch pair novelty + fast-other + deep);
+              F10 10-stack settles to all-asleep, KE=0 at 60 s.
+TUI Suite:    mpe-tui live ncurses inspector + deterministic --snapshot /
+              --stream dumps (demo/tower/pendulum/springlab/f10 scenes).
+Adversarial:  f10_long_run (settle incl. run-max), sleep_contact_wake
+              (slow-pusher first-touch + no-churn control), f11_torture
+              (fixed-seed config extremes, corruption gates).
+Spawning:     cylinders spawnable (Enter type 3, menu 8 settings, touch
+              new.cyl): exact SDF contacts, ray selection, instanced mesh.
