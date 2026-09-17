@@ -63,6 +63,7 @@ $(BUILD_DIR)/%.o: %.c
 
 clean:
 	rm -rf build build-debug build-release engine test_* mpe-tui
+	rm -rf status/engine.cfg status/engine.cfg.backup
 
 # ---- MPE terminal debugger + snapshot suite (TUI) ----
 # Terminal-only executable: live ncurses inspector (overview / object+math /
