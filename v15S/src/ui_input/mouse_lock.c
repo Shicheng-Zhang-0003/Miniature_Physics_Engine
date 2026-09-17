@@ -35,36 +35,9 @@ static GdkCursor *mpe_blank_cursor_new(void) {
 void mouse_lock_enable(GtkWidget *window_widget) {
     if (!window_widget) return;
     if (!GTK_IS_WIDGET(window_widget)) return;
-
     GdkSurface *surface = mpe_surface_for_widget(window_widget);
-
-    /* Wayland-safe seat query — GTK4 removed the seat grab API. Keep GdkSeat/
-     * GdkDevice access to document capability, but do not grab. Confinement
-     * on Wayland requires zwp_pointer_constraints_v1 via compositor/portal,
-     * which GDK does not wrap (no pointer-constraint API on GdkToplevel). */
-    GdkDisplay *display = NULL;
-    if (surface) {
-        display = gdk_surface_get_display(surface);
-    } else {
-        display = gdk_display_get_default();
-    }
-    if (display) {
-        GdkSeat *seat = gdk_display_get_default_seat(display);
-        if (seat) {
-            GdkDevice *pointer = gdk_seat_get_pointer(seat);
-            (void)pointer;
-            (void)gdk_seat_get_capabilities(seat);
-        }
-    }
-
-    /* Window event compression was removed in GTK4. Motion compression is
-     * controlled by GtkEventControllerMotion; no surface call needed. */
-
     GdkCursor *blank = mpe_blank_cursor_new();
     if (blank) {
-        /* Preferred GTK4 API: per-widget cursor (Wayland-safe, compositor-
-         * mediated). Also set on the underlying GdkSurface for immediate effect
-         * if the widget is realized. gtk_widget_set_cursor refs the cursor. */
         gtk_widget_set_cursor(window_widget, blank);
         if (surface) {
             gdk_surface_set_cursor(surface, blank);
