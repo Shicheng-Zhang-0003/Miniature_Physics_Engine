@@ -124,13 +124,7 @@ gboolean on_button_release(GtkGestureClick *gest, int n_press, double x, double 
     guint btn = gtk_gesture_single_get_current_button(GTK_GESTURE_SINGLE(gest));
     (void)n_press; (void)x; (void)y;
     if(btn==2) st->middle_mouse_button_clicked=false;
-    if(btn==3) {
-        st->right_mouse_button_clicked=false;
-        if(st->is_mouse_locked) {
-            mouse_lock_disable(g_gl_area ? g_gl_area : gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(gest)));
-            st->is_mouse_locked=false;
-        }
-    }
+    if(btn==3) st->right_mouse_button_clicked=false;
     return FALSE;
 }
 gboolean on_focus_out(GtkEventControllerFocus *ctrl, gpointer user_data_stored) {
