@@ -8,16 +8,18 @@ NATIVE_FLAG := $(if $(filter 1,$(ENABLE_NATIVE)),-march=native,)
 # history and `v15S` is the GTK4 truthful port.
 GTK_PKG ?= gtk4
 ifeq ($(GTK_PKG),gtk4)
-  GTK_CFLAGS := $(shell pkg-config --cflags gtk4 epoxy)
-  GTK_LIBS   := $(shell pkg-config --libs gtk4 epoxy)
-  GTK_DEFINES := -DMPE_GTK4=1
+   GTK_CFLAGS := $(shell pkg-config --cflags gtk4 epoxy)
+   GTK_LIBS   := $(shell pkg-config --libs gtk4 epoxy)
+   GTK_DEFINES := -DMPE_GTK4=1
+   X11_LIBS    := -lX11
 else
-  GTK_CFLAGS := $(shell pkg-config --cflags gtk+-3.0 epoxy)
-  GTK_LIBS   := $(shell pkg-config --libs gtk+-3.0 epoxy)
-  GTK_DEFINES := -DMPE_GTK3=1
+   GTK_CFLAGS := $(shell pkg-config --cflags gtk+-3.0 epoxy)
+   GTK_LIBS   := $(shell pkg-config --libs gtk+-3.0 epoxy)
+   GTK_DEFINES := -DMPE_GTK3=1
+   X11_LIBS    :=
 endif
 BASE_CFLAGS = $(GTK_CFLAGS) -I. $(NATIVE_FLAG) $(GTK_DEFINES) -Wall -Wextra -MMD -MP -ffp-contract=off
-BASE_LIBS = $(GTK_LIBS) -lm
+BASE_LIBS = $(GTK_LIBS) $(X11_LIBS) -lm
 # Command-line CFLAGS/LIBS (e.g. compile_asan) override these defaults.
 CFLAGS ?= $(BASE_CFLAGS) -O3
 LIBS ?= $(BASE_LIBS)

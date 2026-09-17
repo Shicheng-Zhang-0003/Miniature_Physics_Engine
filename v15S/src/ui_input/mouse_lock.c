@@ -13,6 +13,8 @@
 #include "input_state.h"
 #include <gtk/gtk.h>
 #include <gdk/gdk.h>
+#include <gdk/x11/gdkx.h>
+#include <X11/Xlib.h>
 
 extern input_status main_inputs;
 
@@ -49,7 +51,7 @@ void mouse_lock_enable(GtkWidget *widget) {
     }
 
     /* Get the top-level surface for the cursor to actually hide
-     * on X11/Wayland. The GL area's surface may be a child surface. */
+      * on X11/Wayland. The GL area's surface may be a child surface. */
     GdkSurface *surface = mpe_surface_for_widget(widget);
     if (surface) {
         GdkCursor *blank2 = mpe_blank_cursor_new();
@@ -65,13 +67,12 @@ void mouse_lock_enable(GtkWidget *widget) {
         }
     }
 
-    /* Pointer constraints: GTK4/GDK has no public API for
-     * zwp_pointer_constraints_v1 / zwp_locked_pointer_v1. On X11 the hidden
-     * cursor plus relative deltas (via GtkEventControllerMotion) approximates
-     * the old confined grab. On Wayland, true lock requires the compositor or
-     * xdg-desktop-portal RemoteDesktop/GlobalShortcuts — not exposed through
-     * GDK. Pending portal support, hidden cursor + delta integration is the
-     * correct best-effort Wayland-safe equivalent. */
+    /* Pointer confinement on X11: hidden cursor + XWarpPointer
+     * keeps the pointer centered after each motion step (see
+     * on_mouse_movements). GDK4 removed gdk_seat_grab, so we
+     * use the warp-and-recentre pattern instead of a grab.
+     * On Wayland, the cursor is hidden but unconstrained —
+     * the compositor controls pointer position. */
 }
 
 void mouse_lock_disable(GtkWidget *widget) {
@@ -87,36 +88,31 @@ void mouse_lock_disable(GtkWidget *widget) {
 }
 
 void mouse_lock_reset_centre(GtkWidget *window_widget) {
-    /* Wayland forbids pointer warping; device warp was removed in GTK4.
-     * This function is a deliberate no-op for Wayland safety.
-     *
-     * GTK3 warped to (origin + width/2, height/2) and re-grabbed to keep the
-     * pointer centred for delta = x_root - screen_centre. GTK4's
-     * GtkEventControllerMotion delivers absolute surface coords; deltas are
-     * computed as (x - last_x) without recentring, so no warp is needed.
-     * Multi-monitor warp-drop handling is also obsolete without a grab.
-     *
-     * Keep surface/seat touches for API parity and to preserve expected
-     * GdkSurface/GdkSeat symbol usage inside the GTK4 branch. */
+    /* Warp the pointer back to the centre of the widget.
+     * GDK4 removed gdk_device_warp and gdk_surface_get_position,
+     * so on X11 we use XWarpPointer directly with the surface
+     * dimensions. On Wayland this is a no-op (the compositor
+     * controls pointer position and warping is not permitted). */
     if (!window_widget) return;
     if (!GTK_IS_WIDGET(window_widget)) return;
 
     GdkSurface *surface = mpe_surface_for_widget(window_widget);
-    if (surface) {
-        (void)gdk_surface_get_width(surface);
-        (void)gdk_surface_get_height(surface);
-        GdkDisplay *display = gdk_surface_get_display(surface);
-        if (display) {
-            GdkSeat *seat = gdk_display_get_default_seat(display);
-            if (seat) {
-                GdkDevice *pointer = gdk_seat_get_pointer(seat);
-                (void)pointer;
-            }
-        }
-    } else {
-        /* Not yet realized — nothing to centre; delta logic in
-         * input_control.c handles initial last_x/last_y seeding. */
-    }
+    if (!surface) return;
+
+    GdkDisplay *display = gdk_surface_get_display(surface);
+    if (!display) return;
+
+    Display *xdisplay = gdk_x11_display_get_xdisplay(display);
+    if (!xdisplay) return;
+
+    int ww = gdk_surface_get_width(surface);
+    int wh = gdk_surface_get_height(surface);
+    if (ww <= 0 || wh <= 0) return;
+
+    Window root_win = DefaultRootWindow(xdisplay);
+    XWarpPointer(xdisplay, None, root_win, 0, 0, 0, 0,
+                 ww / 2, wh / 2);
+    XFlush(xdisplay);
 }
 
 void mouse_lock_reacquire(GtkWidget *window_widget) {
