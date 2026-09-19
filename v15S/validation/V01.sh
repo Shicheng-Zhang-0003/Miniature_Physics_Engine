@@ -2,16 +2,16 @@
 # V-01: Build with AddressSanitizer + UndefinedBehaviorSanitizer.
 # The F5/F6/F7/F8/F10 torture run itself needs the GUI (manual).
 set -euo pipefail
-SRC="v15R3/src"
+SRC="v15S/src"
 [[ -d "$SRC" ]] || { echo "ERROR: $SRC not found." >&2; exit 1; }
 
 echo "=== V-01: Sanitizer build (ASan + UBSan) ==="
 cd "$SRC"
 make clean > /dev/null 2>&1 || true
 
-SAN_CFLAGS="$(pkg-config --cflags gtk+-3.0 epoxy) -I. -O1 -g -Wall -Wextra \
+SAN_CFLAGS="$(pkg-config --cflags gtk4 epoxy) -I. -O1 -g -Wall -Wextra \
  -fsanitize=address -fsanitize=undefined -fno-omit-frame-pointer"
-SAN_LIBS="$(pkg-config --libs gtk+-3.0 epoxy) -lm \
+SAN_LIBS="$(pkg-config --libs gtk4 epoxy) -lm \
  -fsanitize=address -fsanitize=undefined"
 
 if make CFLAGS="$SAN_CFLAGS" LIBS="$SAN_LIBS" 2>&1 | tee /tmp/v01_build.log; then

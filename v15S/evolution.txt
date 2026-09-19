@@ -22,4 +22,16 @@ Adversarial:  f10_long_run (settle incl. run-max), sleep_contact_wake
               (slow-pusher first-touch + no-churn control), f11_torture
               (fixed-seed config extremes, corruption gates).
 Spawning:     cylinders spawnable (Enter type 3, menu 8 settings, touch
-              new.cyl): exact SDF contacts, ray selection, instanced mesh.
+               new.cyl): exact SDF contacts, ray selection, instanced mesh.
+
+v15S Head:    GTK4 port (Wayland-safe input, gestures, overlay, dialogs).
+Modularity:   MPI hot-plug ABI (shapes, broadphase, solver stages, tick
+               modules); registry-first dispatch everywhere; per-world
+               config authoritative in all hot paths; `mod` terminal
+               command; TUI --broadphase/--solver flags; capsule example.
+Data Layout:  growable bodies/contacts (ceilings kept), O(1) pair probes
+               + id cache, islands O(J+B), small-first node pool,
+               process-wide det counters. 30/30 green (29 + module).
+Globals:      kernel holds zero sim state; primary owned by
+               core/mpe_primary.c (app layer); registry process-global
+               by design; UI/diagnostics stay app-global by design.
