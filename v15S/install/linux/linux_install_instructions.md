@@ -4,7 +4,7 @@
 Linux Installation Instructions:
 
 Required Software Stack:
-        GTK3/4: libgtk-3-dev, libgtk-4-dev.
+        GTK4: libgtk-4-dev. (GTK3 was the v15R3 stack.)
         Epoxy for OpenGL: libepoxy-dev
         GNU C Math Library: libm, part of libc6-dev
         GNU Compiler Collection: gcc, v12+ recommended
@@ -14,26 +14,26 @@ Required Software Stack:
 Installation Instructions (Prerequisite Packages):
     Ubuntu/Debian/Debian Derivatives (apt):
         sudo apt update --> update system
-        sudo apt install build-essential pkg-config libgtk-3-dev libepoxy-dev
+        sudo apt install build-essential pkg-config libgtk-4-dev libepoxy-dev
         sudo apt install libncurses-dev --> only needed for the mpe-tui terminal debugger
     Fedora (dnf, yum?):
         sudo dnf update
-        sudo dnf install @development-tools pkgconf-pkg-config gtk3-devel libepoxy-devel ncurses-devel --> ncurses for mpe-tui
+        sudo dnf install @development-tools pkgconf-pkg-config gtk4-devel libepoxy-devel ncurses-devel --> ncurses for mpe-tui
     Arch/Manjaro/Arch Derivatives (pacman):
         sudo pacman -Syu
-        sudo pacman -S base-devel pkgconf gtk3 libepoxy ncurses --> ncurses for mpe-tui
+        sudo pacman -S base-devel pkgconf gtk4 libepoxy ncurses --> ncurses for mpe-tui
     SUSE Derivatives (zypper):
-        sudo zypper install -t pattern devel_basis pkg-config gtk3-devel libepoxy-devel ncurses-devel --> ncurses for mpe-tui
+        sudo zypper install -t pattern devel_basis pkg-config gtk4-devel libepoxy-devel ncurses-devel --> ncurses for mpe-tui
     Alpine (apk):
-        sudo apk add build-base pkgconf gtk+3.0-dev libepoxy-dev ncurses-dev --> ncurses for mpe-tui
+        sudo apk add build-base pkgconf gtk4.0-dev libepoxy-dev ncurses-dev --> ncurses for mpe-tui
     Gentoo (portage):
-        sudo emerge --ask sys-devel/base-system dev-util/pkgconf x11-libs/gtk+:3 media-libs/libepoxy sys-libs/ncurses --> ncurses for mpe-tui
+        sudo emerge --ask sys-devel/base-system dev-util/pkgconf gui-libs/gtk:4 media-libs/libepoxy sys-libs/ncurses --> ncurses for mpe-tui
     Nix (source compilation):
-        nix-shell -p gcc pkg-config gtk3 libepoxy ncurses --> ncurses for mpe-tui
+        nix-shell -p gcc pkg-config gtk4 libepoxy ncurses --> ncurses for mpe-tui
 
 To Check if dependency libraries are actually detected:
     On most Linux system, if you have pkg-config installed, run:
-        $ pkg-config --cflags --libs gtk+-3.0 epoxy
+        $ pkg-config --cflags --libs gtk4 epoxy
     To check dependency resolution
 
 After dependencies have been installed:
