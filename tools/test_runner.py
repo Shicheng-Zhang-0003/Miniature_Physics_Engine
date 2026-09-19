@@ -4,7 +4,7 @@ MPE Test Runner (MPE-only run)
 ===============================
 Discovers, builds, and runs all headless tests. Generates a summary report.
 
-Robotics (MFS) tests are parked with the code in v15R3/robotics_backup.
+Robotics (MFS) tests are parked with the code in v15S/robotics_backup.
 
 Usage:
     python tools/test_runner.py              # Run all tests
@@ -55,12 +55,13 @@ KNOWN_TESTS = [
     "sleep_contact_wake",
     "f11_torture",
     "frustum",
+    "module",
 ]
 
 # Tests that encode desired future behavior but are currently expected
 # to fail because the corresponding model is not implemented yet.
 # MPE-only run: empty. (The old mecanum_drive XFAIL moved to
-# v15R3/robotics_backup with the rest of MFS.)
+# v15S/robotics_backup with the rest of MFS.)
 EXPECTED_FAILURES = {
 }
 

@@ -429,12 +429,14 @@ static int tui_engine_lines(physics_world *world, unsigned long long tick, char 
                  vector3_length(mom));
     }
     if (n < cap) {
-        snprintf(out[n++], 128, "grav=%+.2f drag=%.4f angScale=%.3f iters=%d dt=1/60", g_cfg.world.gravity,
-                 g_cfg.world.drag, g_cfg.world.angular_damping_scale, g_cfg.timestep.solver_iterations);
+        const mpe_config_t *dc = mpe_world_cfg(world);
+        snprintf(out[n++], 128, "grav=%+.2f drag=%.4f angScale=%.3f iters=%d dt=1/60", dc->world.gravity,
+                 dc->world.drag, dc->world.angular_damping_scale, dc->timestep.solver_iterations);
     }
     if (n < cap) {
-        snprintf(out[n++], 128, "slop=%.3f beta=%.2f maxBias=%.1f islands=%d/%d", g_cfg.solver.penetration_slop,
-                 g_cfg.solver.bias_factor, g_cfg.solver.max_separation_bias, islands_count(world),
+        const mpe_config_t *dc = mpe_world_cfg(world);
+        snprintf(out[n++], 128, "slop=%.3f beta=%.2f maxBias=%.1f islands=%d/%d", dc->solver.penetration_slop,
+                 dc->solver.bias_factor, dc->solver.max_separation_bias, islands_count(world),
                  world ? world->island_total : 0);
     }
     if (n < cap) {
@@ -482,8 +484,9 @@ void tui_render_sidebar(tui_debugger_t *dbg) {
         }
         mvwprintw(dbg->sidebar_win, row++, 0, "springs=%d constr=%d", springs,
                   dbg->world ? dbg->world->revolute_constraint_count : 0);
-        mvwprintw(dbg->sidebar_win, row++, 0, "sleepEn=%d slop=%.3f", g_cfg.sleep.enable,
-                  g_cfg.solver.penetration_slop);
+        const mpe_config_t *dc = mpe_world_cfg(dbg->world);
+        mvwprintw(dbg->sidebar_win, row++, 0, "sleepEn=%d slop=%.3f", dc->sleep.enable,
+                  dc->solver.penetration_slop);
     }
     wrefresh(dbg->sidebar_win);
 }

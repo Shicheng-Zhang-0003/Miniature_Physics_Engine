@@ -26,6 +26,8 @@ static const char *dump_type(object_type t) {
             return "cube";
         case object_cylinder:
             return "cylinder";
+        case object_custom:
+            return "custom";
         default:
             return "unknown";
     }
@@ -114,24 +116,33 @@ int tui_dump_snapshot(FILE *out, physics_world *world, unsigned long tick, float
             awake++;
         }
     }
-    fprintf(out, "[engine] gravity=%+.4f drag=%.5f angScale=%.4f iters=%d substeps=%d\n", g_cfg.world.gravity,
-            g_cfg.world.drag, g_cfg.world.angular_damping_scale, g_cfg.timestep.solver_iterations,
-            g_cfg.timestep.max_substeps);
+    /* Per-world truth params (a scene-local config may differ from g_cfg). */
+    const mpe_config_t *C = mpe_world_cfg(world);
+    int ncustom = 0;
+    for (int ci = 0; ci < world->body_count; ci++) {
+        if (world->bodies[ci].type == object_custom) {
+            ncustom++;
+        }
+    }
+    fprintf(out, "[engine] gravity=%+.4f drag=%.5f angScale=%.4f iters=%d substeps=%d\n",
+            C->world.gravity, C->world.drag, C->world.angular_damping_scale, C->timestep.solver_iterations,
+            C->timestep.max_substeps);
     fprintf(out, "[engine] slop=%.4f beta=%.3f maxBias=%.2f restThresh=%+.2f warmMatchSq=%.5f\n",
-            g_cfg.solver.penetration_slop, g_cfg.solver.bias_factor, g_cfg.solver.max_separation_bias,
-            g_cfg.solver.restitution_velocity_thresh, g_cfg.solver.warm_start_match_dist_sq);
+            C->solver.penetration_slop, C->solver.bias_factor, C->solver.max_separation_bias,
+            C->solver.restitution_velocity_thresh, C->solver.warm_start_match_dist_sq);
     fprintf(out, "[engine] sleepEn=%d linThSq=%.5f angThSq=%.6f timer=%.2f wakeLinSq=%.4f wakeAngSq=%.5f\n",
-            g_cfg.sleep.enable, g_cfg.sleep.linear_thresh_sq, g_cfg.sleep.angular_thresh_sq,
-            g_cfg.sleep.timer_duration, g_cfg.sleep.wake_linear_thresh_sq, g_cfg.sleep.wake_angular_thresh_sq);
+            C->sleep.enable, C->sleep.linear_thresh_sq, C->sleep.angular_thresh_sq, C->sleep.timer_duration,
+            C->sleep.wake_linear_thresh_sq, C->sleep.wake_angular_thresh_sq);
     fprintf(out, "[engine] depenFactor=%.2f depenMax=%.3f wakeDepth=%.3f rebuildIters=%d rollMu=%.4f\n",
-            g_cfg.depenetration.correction_factor, g_cfg.depenetration.max_correction,
-            g_cfg.depenetration.wake_depth_thresh, g_cfg.depenetration.rebuild_iterations,
-            g_cfg.world.rolling_resistance_coeff);
+            C->depenetration.correction_factor, C->depenetration.max_correction,
+            C->depenetration.wake_depth_thresh, C->depenetration.rebuild_iterations,
+            C->world.rolling_resistance_coeff);
     fprintf(out, "[engine] jointBeta=%.2f jointMaxBias=%.2f motorGain=%.2f maxAccel=%.1f floorSlop=%.3f\n",
-            g_cfg.joints.revolute_beta, g_cfg.joints.revolute_max_bias, g_cfg.joints.revolute_motor_gain,
-            g_cfg.joints.max_acceleration, g_cfg.boundary.floor_emergency_slop);
-    fprintf(out, "[world] awake=%d sleeping=%d static=%d kinematic=%d KE=%.6f P=(%+.4f,%+.4f,%+.4f)|P|=%.5f\n",
-            awake, sleeping, statics, kinematics, ke, mom.x, mom.y, mom.z, vector3_length(mom));
+            C->joints.revolute_beta, C->joints.revolute_max_bias, C->joints.revolute_motor_gain,
+            C->joints.max_acceleration, C->boundary.floor_emergency_slop);
+    fprintf(out, "[world] awake=%d sleeping=%d static=%d kinematic=%d custom=%d tickMods=%d bodies=%d/%d KE=%.6f P=(%+.4f,%+.4f,%+.4f)|P|=%.5f\n",
+            awake, sleeping, statics, kinematics, ncustom, world->tick_module_count, world->body_count,
+            world->body_capacity, ke, mom.x, mom.y, mom.z, vector3_length(mom));
 
     /* ---- bodies: characteristics + mathematics ---- */
     for (int i = 0; i < world->body_count; i++) {
@@ -336,8 +347,9 @@ int tui_dump_snapshot(FILE *out, physics_world *world, unsigned long tick, float
     }
 
     /* ---- solver / broadphase diagnostics ---- */
-    fprintf(out, "[stats] cacheHit=%d cacheMiss=%d manifoldOvfl=%d cell=%.4f\n", contact_cache_get_hits(world),
-            contact_cache_get_misses(world), world->manifold_overflow_count,
+    fprintf(out, "[stats] cacheHit=%d cacheMiss=%d cacheCount=%d/%d manifoldOvfl=%d cell=%.4f\n",
+            contact_cache_get_hits(world), contact_cache_get_misses(world), world->world_contact_cache_count,
+            world->world_contact_cache_capacity, world->manifold_overflow_count,
             broadphase_get_current_cell_size(world));
     fprintf(out, "[stats] bpNodes=%d/%d pairOvfl=%d dedupOvfl=%d bigClamp=%d\n",
             world->broadphase ? world->broadphase->node_count : -1,
