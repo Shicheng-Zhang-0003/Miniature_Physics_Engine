@@ -54,6 +54,11 @@ GtkWidget *overlay_initialise(GtkWidget *gl_drawing_area_widget) {
     gtk_widget_set_vexpand(gl_drawing_area_widget, TRUE);
     gtk_overlay_set_child(GTK_OVERLAY(ui_overlay_container), gl_drawing_area_widget);
     debug_information_label = gtk_label_new("");
+    /* Overlay labels must never intercept clicks — the GL-area
+     * GtkGestureClick owns button events. In GTK4 an overlay child
+     * with can-target=TRUE eats the press before it reaches the
+     * GL area (selection/mouse-lock silently stops working). */
+    gtk_widget_set_can_target(debug_information_label, FALSE);
     {
         char version_header[64];
         snprintf(version_header, sizeof(version_header), "- Miniature Physics Engine %s -", a3_version_string);
@@ -63,26 +68,32 @@ GtkWidget *overlay_initialise(GtkWidget *gl_drawing_area_widget) {
     gtk_widget_set_valign(debug_information_label, GTK_ALIGN_START);
     gtk_overlay_add_overlay(GTK_OVERLAY(ui_overlay_container), debug_information_label);
     crosshair_label = gtk_label_new("+");
+    gtk_widget_set_can_target(crosshair_label, FALSE);
     gtk_widget_set_halign(crosshair_label, GTK_ALIGN_CENTER);
     gtk_widget_set_valign(crosshair_label, GTK_ALIGN_CENTER);
     gtk_overlay_add_overlay(GTK_OVERLAY(ui_overlay_container), crosshair_label);
     menu_label = gtk_label_new("");
+    gtk_widget_set_can_target(menu_label, FALSE);
     gtk_widget_set_halign(menu_label, GTK_ALIGN_CENTER);
     gtk_widget_set_valign(menu_label, GTK_ALIGN_CENTER);
     gtk_overlay_add_overlay(GTK_OVERLAY(ui_overlay_container), menu_label);
     spawner_menu_label = gtk_label_new("");
+    gtk_widget_set_can_target(spawner_menu_label, FALSE);
     gtk_widget_set_halign(spawner_menu_label, GTK_ALIGN_CENTER);
     gtk_widget_set_valign(spawner_menu_label, GTK_ALIGN_CENTER);
     gtk_overlay_add_overlay(GTK_OVERLAY(ui_overlay_container), spawner_menu_label);
     velocity_menu_label = gtk_label_new("");
+    gtk_widget_set_can_target(velocity_menu_label, FALSE);
     gtk_widget_set_halign(velocity_menu_label, GTK_ALIGN_CENTER);
     gtk_widget_set_valign(velocity_menu_label, GTK_ALIGN_CENTER);
     gtk_overlay_add_overlay(GTK_OVERLAY(ui_overlay_container), velocity_menu_label);
     object_menu_label = gtk_label_new("");
+    gtk_widget_set_can_target(object_menu_label, FALSE);
     gtk_widget_set_halign(object_menu_label, GTK_ALIGN_CENTER);
     gtk_widget_set_valign(object_menu_label, GTK_ALIGN_CENTER);
     gtk_overlay_add_overlay(GTK_OVERLAY(ui_overlay_container), object_menu_label);
     config_menu_label = gtk_label_new("");
+    gtk_widget_set_can_target(config_menu_label, FALSE);
     gtk_widget_set_halign(config_menu_label, GTK_ALIGN_CENTER);
     gtk_widget_set_valign(config_menu_label, GTK_ALIGN_CENTER);
     gtk_overlay_add_overlay(GTK_OVERLAY(ui_overlay_container), config_menu_label);

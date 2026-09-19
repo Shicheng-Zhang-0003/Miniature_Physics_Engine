@@ -13,8 +13,10 @@
 #include "input_state.h"
 #include <gtk/gtk.h>
 #include <gdk/gdk.h>
+#ifdef GDK_WINDOWING_X11
 #include <gdk/x11/gdkx.h>
 #include <X11/Xlib.h>
+#endif
 
 extern input_status main_inputs;
 
@@ -92,7 +94,9 @@ void mouse_lock_reset_centre(GtkWidget *window_widget) {
      * GDK4 removed gdk_device_warp and gdk_surface_get_position,
      * so on X11 we use XWarpPointer directly with the surface
      * dimensions. On Wayland this is a no-op (the compositor
-     * controls pointer position and warping is not permitted). */
+     * controls pointer position and warping is not permitted).
+     * CRITICAL: never call gdk_x11_* on a Wayland display — it
+     * segfaults (unchecked cast). Guard at runtime. */
     if (!window_widget) return;
     if (!GTK_IS_WIDGET(window_widget)) return;
 
@@ -101,6 +105,10 @@ void mouse_lock_reset_centre(GtkWidget *window_widget) {
 
     GdkDisplay *display = gdk_surface_get_display(surface);
     if (!display) return;
+
+#ifdef GDK_WINDOWING_X11
+    if (!GDK_IS_X11_DISPLAY(display)) return;
+    if (!GDK_IS_X11_SURFACE(surface)) return;
 
     Display *xdisplay = gdk_x11_display_get_xdisplay(display);
     if (!xdisplay) return;
@@ -113,6 +121,11 @@ void mouse_lock_reset_centre(GtkWidget *window_widget) {
     XWarpPointer(xdisplay, None, root_win, 0, 0, 0, 0,
                  ww / 2, wh / 2);
     XFlush(xdisplay);
+#else
+    (void)display;
+    (void)surface;
+    return;
+#endif
 }
 
 void mouse_lock_reacquire(GtkWidget *window_widget) {
