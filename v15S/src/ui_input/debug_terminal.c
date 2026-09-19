@@ -416,6 +416,7 @@ const terminal_command terminal_commands[] = {
     {"vim", true, cmd_vi, "vim [filename]", "open microvim editor"},
     {"microvim", true, cmd_vi, "microvim [filename]", "open microvim editor"},
     /* MPE_TASK_V15R2_PHASE8_TABLE_END */
+    {"mod", true, cmd_mod, "mod ls|load|unload|attach|detach|use-*", "hot plug physics modules"},
 };
 const size_t terminal_command_count = sizeof(terminal_commands) / sizeof(terminal_commands[0]);
 
@@ -1162,6 +1163,7 @@ const terminal_command terminal_commands[] = {
     {"vim", true, cmd_vi, "vim [filename]", "open microvim editor"},
     {"microvim", true, cmd_vi, "microvim [filename]", "open microvim editor"},
     /* MPE_TASK_V15R2_PHASE8_TABLE_END */
+    {"mod", true, cmd_mod, "mod ls|load|unload|attach|detach|use-*", "hot plug physics modules"},
 };
 const size_t terminal_command_count = sizeof(terminal_commands) / sizeof(terminal_commands[0]);
 
