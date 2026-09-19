@@ -79,58 +79,11 @@ int scene_ensure_pool_capacity(int required_capacity) {
     return 1;
 }
 
-/* MPE_TASK_20B_SPAWN_SEPARATION_BEGIN */
+/* Spawn-overlap probe: routed through the shape registry so custom
+ * shapes separate correctly too (replaces the 3x3 inline chain). */
 static bool a3_spawn_collision_dispatch(rigidbody *rigid_body_a, rigidbody *rigid_body_b,
                                         collision_data *collision_output) {
-    /* Full 3x3 dispatch including cylinders (old code dropped all cylinder
-     * pairs, so cylinders could spawn interpenetrating). */
-    object_type ta = rigid_body_a->type, tb = rigid_body_b->type;
-    if (ta == object_sphere && tb == object_sphere) {
-        return collision_dual_sphere(rigid_body_a, rigid_body_b, collision_output);
-    }
-    if (ta == object_sphere && tb == object_cube) {
-        return collision_sphere_cube(rigid_body_a, rigid_body_b, collision_output);
-    }
-    if (ta == object_cube && tb == object_sphere) {
-        bool collided = collision_sphere_cube(rigid_body_b, rigid_body_a, collision_output);
-        if (collided) {
-            collision_output->normal_vector = vector3_scaling(collision_output->normal_vector, -1.0f);
-            collision_output->object_a = rigid_body_a;
-            collision_output->object_b = rigid_body_b;
-        }
-        return collided;
-    }
-    if (ta == object_cube && tb == object_cube) {
-        return collision_dual_cube(rigid_body_a, rigid_body_b, collision_output);
-    }
-    if (ta == object_cylinder && tb == object_sphere) {
-        return collision_cylinder_sphere(rigid_body_a, rigid_body_b, collision_output);
-    }
-    if (ta == object_sphere && tb == object_cylinder) {
-        bool collided = collision_cylinder_sphere(rigid_body_b, rigid_body_a, collision_output);
-        if (collided) {
-            collision_output->normal_vector = vector3_scaling(collision_output->normal_vector, -1.0f);
-            collision_output->object_a = rigid_body_a;
-            collision_output->object_b = rigid_body_b;
-        }
-        return collided;
-    }
-    if (ta == object_cylinder && tb == object_cube) {
-        return collision_cylinder_cube(rigid_body_a, rigid_body_b, collision_output);
-    }
-    if (ta == object_cube && tb == object_cylinder) {
-        bool collided = collision_cylinder_cube(rigid_body_b, rigid_body_a, collision_output);
-        if (collided) {
-            collision_output->normal_vector = vector3_scaling(collision_output->normal_vector, -1.0f);
-            collision_output->object_a = rigid_body_a;
-            collision_output->object_b = rigid_body_b;
-        }
-        return collided;
-    }
-    if (ta == object_cylinder && tb == object_cylinder) {
-        return collision_cylinder_cylinder(rigid_body_a, rigid_body_b, collision_output);
-    }
-    return false;
+    return mpe_shape_dispatch(physics_world_get_primary(), rigid_body_a, rigid_body_b, collision_output);
 }
 
 static void scene_resolve_spawn_overlap(int new_object_index) {
@@ -275,6 +228,7 @@ void scene_remove_object_by_index(int object_index) {
     }
 
     (physics_world_get_primary()->body_count) -= 1;
+    physics_world_bump_revision(physics_world_get_primary());
 
     if (previous_selected_id == 0) {
         clear_selection();
@@ -658,5 +612,6 @@ void scene_spawn_config_torture_test(void) {
 
 void scene_clear(void) {
     (physics_world_get_primary()->body_count) = 0;
+    physics_world_bump_revision(physics_world_get_primary());
     joint_init_pool(physics_world_get_primary());
 }

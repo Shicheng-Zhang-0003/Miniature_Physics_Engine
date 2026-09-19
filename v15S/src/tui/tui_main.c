@@ -18,6 +18,7 @@
 
 #include "../ui_input/camera.h"
 #include "core/physics_world.h"
+#include "core/mpe_registry.h"
 #include "physics/constraint.h"
 #include "physics/spring_joint.h"
 #include "config/mpe_config.h"
@@ -44,7 +45,9 @@ static void print_help(const char *prog) {
     printf("  --snapshot [N]       run N ticks (default 600) then dump full state\n");
     printf("  --stream N           dump state every --every ticks while running N ticks\n");
     printf("  --every K            stream interval (default 60)\n");
-    printf("  --scene NAME         demo|tower|pendulum|springlab|f10 (default demo)\n");
+    printf("  --scene NAME         demo|tower|pendulum|springlab|f10|stress|ccd (default demo)\n");
+    printf("  --broadphase NAME    hash (default) or registered foreign backend\n");
+    printf("  --solver NAME        seq-impulse (default) or registered foreign backend\n");
     printf("  --ticks N            ticks to run in live mode before auto-exit (0 = run forever)\n");
     printf("  --help               this text\n");
     printf("\nLive keys: 1..5 screens, Tab cycle, j/k select, Space pause, s step,\n");
@@ -136,9 +139,63 @@ static void scene_f10_only(physics_world *world) {
     }
 }
 
-static void scene_springlab_only(physics_world *world) {    g_cfg.world.gravity = 0.0f;
-    g_cfg.world.drag = 1.0f;
-    g_cfg.world.angular_damping_scale = 1.0f;
+/* Spawn-stress scene: 300 mixed bodies in a grid + one of every joint
+ * type + a kinematic conveyor + a fast CCD ball. Deterministic. */
+static void scene_stress_only(physics_world *world) {
+    constraint_pool_init(world);
+    joint_init_pool(world);
+    for (int i = 0; i < 100; i++) {
+        float x = (float) (i % 10) * 1.2f - 5.0f;
+        float z = (float) ((i / 10) % 10) * 1.2f - 5.0f;
+        float y = 2.0f + (float) (i / 100);
+        physics_world_add_sphere(world, 0.35f, 1.0f, (vector3){x, y, z});
+        physics_world_add_cube(world, (vector3){x + 0.5f, y + 2.0f, z}, (vector3){0.35f, 0.35f, 0.35f},
+                               1.0f);
+        physics_world_add_cylinder(world, 0.3f, 0.4f, 1.0f, (vector3){x, y + 4.0f, z + 0.5f});
+    }
+    int anchor = physics_world_add_cube(world, (vector3){0.0f, 50.0f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f},
+                                        0.0f);
+    int smass = physics_world_add_sphere(world, 0.2f, 1.0f, (vector3){2.5f, 50.0f, 0.0f});
+    add_joint_by_ids(world, world->bodies[anchor].object_id, world->bodies[smass].object_id, 2.0f, 20.0f,
+                     0.0f);
+    int pivot = physics_world_add_cube(world, (vector3){8.0f, 10.0f, 0.0f}, (vector3){0.2f, 0.2f, 0.2f},
+                                       1.0f);
+    rigidbody_set_static(&world->bodies[pivot], true);
+    int bob = physics_world_add_sphere(world, 0.3f, 2.0f, (vector3){9.0f, 8.0f, 0.0f});
+    constraint_add_revolute(world, world->bodies[pivot].object_id, world->bodies[bob].object_id,
+                            (vector3){0.0f, 0.0f, 0.0f}, (vector3){-1.0f, 2.0f, 0.0f},
+                            (vector3){0.0f, 0.0f, 1.0f});
+    int plat = physics_world_add_cube(world, (vector3){0.0f, 0.25f, -8.0f}, (vector3){1.0f, 0.25f, 1.0f},
+                                      1.0f);
+    rigidbody_set_kinematic(&world->bodies[plat], true);
+    world->bodies[plat].velocity = (vector3){1.5f, 0.0f, 0.0f};
+    physics_world_add_cube(world, (vector3){0.0f, 0.75f, -8.0f}, (vector3){0.25f, 0.25f, 0.25f}, 1.0f);
+    int fast = physics_world_add_sphere(world, 0.5f, 1.0f, (vector3){-30.0f, 5.0f, 8.0f});
+    world->bodies[fast].velocity = (vector3){144.0f, 0.0f, 0.0f};
+    world->bodies[fast].restitution = 0.0f;
+    rigidbody_wake(&world->bodies[fast]);
+}
+
+/* CCD battery: thin static wall + three restitution-0 balls at
+ * 60/144/300 m/s in separate z lanes. */
+static void scene_ccd_only(physics_world *world) {
+    physics_world_add_cube(world, (vector3){0.0f, 5.0f, 0.0f}, (vector3){0.05f, 5.0f, 8.0f}, 0.0f);
+    float speeds[3] = {60.0f, 144.0f, 300.0f};
+    for (int k = 0; k < 3; k++) {
+        int s = physics_world_add_sphere(world, 0.5f, 1.0f, (vector3){-5.7f, 5.0f, -5.0f + 5.0f * k});
+        world->bodies[s].velocity = (vector3){speeds[k], 0.0f, 0.0f};
+        world->bodies[s].restitution = 0.0f;
+        rigidbody_wake(&world->bodies[s]);
+    }
+}
+
+static void scene_springlab_only(physics_world *world) {
+    /* Per-scene config: zero-g vacuum WITHOUT touching the global g_cfg,
+     * so other scenes/runs in this process are unaffected. */
+    mpe_config_t *sc = mpe_world_cfg_mut(world);
+    sc->world.gravity = 0.0f;
+    sc->world.drag = 1.0f;
+    sc->world.angular_damping_scale = 1.0f;
     constraint_pool_init(world);
     joint_init_pool(world);
     int anchor = physics_world_add_cube(world, (vector3){0.0f, 50.0f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 0.0f);
@@ -233,7 +290,15 @@ static int build_scene(physics_world *world, const char *name) {
         scene_f10_only(world);
         return 0;
     }
-    fprintf(stderr, "mpe-tui: unknown scene '%s' (demo|tower|pendulum|springlab|f10)\n", name);
+    if (strcmp(name, "stress") == 0) {
+        scene_stress_only(world);
+        return 0;
+    }
+    if (strcmp(name, "ccd") == 0) {
+        scene_ccd_only(world);
+        return 0;
+    }
+    fprintf(stderr, "mpe-tui: unknown scene '%s' (demo|tower|pendulum|springlab|f10|stress|ccd)\n", name);
     return -1;
 }
 
@@ -248,6 +313,8 @@ static double now_seconds(void) {
 int main(int argc, char *argv[]) {
     const float dt = 1.0f / 60.0f;
     const char *scene = "demo";
+    const char *want_broadphase = NULL;
+    const char *want_solver = NULL;
     long ticks = 600;
     long every = 60;
     long live_ticks = 0;
@@ -272,6 +339,10 @@ int main(int argc, char *argv[]) {
             every = atol(argv[++i]);
         } else if (strcmp(argv[i], "--scene") == 0 && i + 1 < argc) {
             scene = argv[++i];
+        } else if (strcmp(argv[i], "--broadphase") == 0 && i + 1 < argc) {
+            want_broadphase = argv[++i];
+        } else if (strcmp(argv[i], "--solver") == 0 && i + 1 < argc) {
+            want_solver = argv[++i];
         } else if (strcmp(argv[i], "--ticks") == 0 && i + 1 < argc) {
             live_ticks = atol(argv[++i]);
         } else {
@@ -296,6 +367,30 @@ int main(int argc, char *argv[]) {
     if (want_snapshot || want_stream) {
         physics_world world;
         physics_world_init(&world);
+        /* Per-run config copy: scenes may tune physics (springlab vacuum)
+         * without leaking into the global registry or other runs. */
+        static mpe_config_t tui_scene_cfg;
+        tui_scene_cfg = g_cfg;
+        physics_world_set_config(&world, &tui_scene_cfg);
+        mpe_register_builtins();
+        if (want_broadphase) {
+            const mpe_broadphase_if_t *b = mpe_find_broadphase(want_broadphase);
+            if (!b) {
+                fprintf(stderr, "mpe-tui: unknown broadphase '%s'\n", want_broadphase);
+                physics_world_cleanup(&world);
+                return 2;
+            }
+            physics_world_set_broadphase(&world, b);
+        }
+        if (want_solver) {
+            const mpe_solver_if_t *s = mpe_find_solver(want_solver);
+            if (!s) {
+                fprintf(stderr, "mpe-tui: unknown solver '%s'\n", want_solver);
+                physics_world_cleanup(&world);
+                return 2;
+            }
+            physics_world_set_solver(&world, s);
+        }
         if (build_scene(&world, scene) != 0) {
             physics_world_cleanup(&world);
             return 2;
@@ -331,6 +426,9 @@ int main(int argc, char *argv[]) {
     }
     physics_world world;
     physics_world_init(&world);
+    static mpe_config_t tui_live_cfg;
+    tui_live_cfg = g_cfg;
+    physics_world_set_config(&world, &tui_live_cfg);
     if (build_scene(&world, scene) != 0) {
         physics_world_cleanup(&world);
         return 2;
