@@ -64,8 +64,11 @@ void rigidbody_sanitize(rigidbody *rigid_body) {
     }
     /* TRUTH: corrupt type enum (uninit garbage) must not silently become cube. */
     if (rigid_body->type != object_sphere && rigid_body->type != object_cube &&
-        rigid_body->type != object_cylinder) {
+        rigid_body->type != object_cylinder && rigid_body->type != object_custom) {
         rigid_body->type = object_cube;
+    }
+    if (rigid_body->type == object_custom && rigid_body->custom_shape < 100) {
+        rigid_body->custom_shape = 100;
     }
     bool needs_inertia_recalc = false;
     math3 zero_matrix = {{{0.0f}}};
