@@ -44,7 +44,9 @@ static float ccd_min_thickness(const rigidbody *body) {
     return fminf(body->half_extensions.x, fminf(body->half_extensions.y, body->half_extensions.z));
 }
 
-int collision_ccd_sweep_clamp_full(rigidbody *bodies, int body_count, float dt, float *time_remaining_out) {
+int collision_ccd_sweep_clamp_full(rigidbody *bodies, int body_count, float dt, float *time_remaining_out,
+                                   const mpe_config_t *cfg) {
+    const mpe_config_t *C = cfg ? cfg : &g_cfg;
     if ((!bodies) || (body_count <= 0) || (!(dt > 0.0f)) || !isfinite(dt)) {
         return 0;
     }
@@ -113,7 +115,7 @@ int collision_ccd_sweep_clamp_full(rigidbody *bodies, int body_count, float dt, 
          * a thin 0.1m wall. Gate on min(mover, 0.2m) so fast large bodies
          * still sweep. */
         bool do_volumes = displacement > fminf(thickness, 0.2f);
-        if ((displacement <= g_cfg.solver.penetration_slop) && (!do_volumes)) {
+        if ((displacement <= C->solver.penetration_slop) && (!do_volumes)) {
             continue; /* discrete sampling suffices */
         }
         float best_toi = dt;
@@ -411,5 +413,16 @@ int collision_ccd_sweep_clamp_full(rigidbody *bodies, int body_count, float dt, 
 }
 
 int collision_ccd_sweep_clamp(rigidbody *bodies, int body_count, float dt) {
-    return collision_ccd_sweep_clamp_full(bodies, body_count, dt, NULL);
+    return collision_ccd_sweep_clamp_full(bodies, body_count, dt, NULL, NULL);
+}
+
+int collision_ccd_sweep_clamp_world(struct physics_world *world, float dt) {
+    if (!world || !world->bodies || world->body_count <= 0) {
+        return 0;
+    }
+    const mpe_config_t *C = world->cfg ? world->cfg : &g_cfg;
+    if (world->ccd_time_remaining) {
+        return collision_ccd_sweep_clamp_full(world->bodies, world->body_count, dt, world->ccd_time_remaining, C);
+    }
+    return collision_ccd_sweep_clamp_full(world->bodies, world->body_count, dt, NULL, C);
 }

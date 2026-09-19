@@ -7,7 +7,9 @@
 #include <math.h>
 #include <stdint.h>
 
-bool collision_static_plane_cylinder(rigidbody *cyl, float plane_y, collision_data *collision_output_data) {
+bool collision_static_plane_cylinder(rigidbody *cyl, float plane_y, collision_data *collision_output_data,
+                                     const mpe_config_t *cfg) {
+    const mpe_config_t *C = cfg ? cfg : &g_cfg;
     if (cyl->type != object_cylinder) {
         return false;
     }
@@ -65,7 +67,7 @@ bool collision_static_plane_cylinder(rigidbody *cyl, float plane_y, collision_da
         radial = vector3_zero();
     }
 
-    rigidbody *plane_body = collision_static_plane_body_proxy(plane_y);
+    rigidbody *plane_body = collision_static_plane_body_proxy(plane_y, cfg);
 
     collision_output_data->object_a = cyl;
     collision_output_data->object_b = plane_body;
@@ -81,7 +83,7 @@ bool collision_static_plane_cylinder(rigidbody *cyl, float plane_y, collision_da
      */
     if (fabsf(ay) < 0.35f) {
         float axle_offsets[2] = {-h, h};
-        float wheel_slop = g_cfg.solver.penetration_slop;
+        float wheel_slop = C->solver.penetration_slop;
 
         for (int i = 0; i < 2; i++) {
             vector3 end_center =
@@ -131,7 +133,7 @@ bool collision_static_plane_cylinder(rigidbody *cyl, float plane_y, collision_da
         } else {
             what = vector3_normalisation(what);
         }
-        float rim_slop = g_cfg.solver.penetration_slop;
+        float rim_slop = C->solver.penetration_slop;
         const float leg_angles[4] = {0.0f, 1.5707963f, 3.1415927f, 4.7123890f};
         for (int leg = 0; leg < 4; leg++) {
             float c = cosf(leg_angles[leg]);
@@ -174,7 +176,8 @@ bool collision_static_plane_cylinder(rigidbody *cyl, float plane_y, collision_da
  * |yz|<=r. Closest surface point classified barrel/cap/rim/inside;
  * gap = |p_s - closest| - r_s, slop-gated like other paths. */
 bool collision_cylinder_sphere(rigidbody *cyl, rigidbody *sph,
-                               collision_data *out) {
+                               collision_data *out, const mpe_config_t *cfg) {
+    const mpe_config_t *C = cfg ? cfg : &g_cfg;
     if ((cyl->type != object_cylinder) || (sph->type != object_sphere)) {
         return false;
     }
@@ -229,7 +232,7 @@ bool collision_cylinder_sphere(rigidbody *cyl, rigidbody *sph,
         center_dist = 0.0f; /* center inside: gap = -min_clear below */
         float min_clear = (axial_clear < radial_clear) ? axial_clear : radial_clear;
         float gap = -min_clear - r_s;
-        float slop = g_cfg.solver.penetration_slop;
+        float slop = C->solver.penetration_slop;
         if (gap <= -slop) {
             /* Deep: still a contact (discrete owns it). */
         }
@@ -263,7 +266,7 @@ bool collision_cylinder_sphere(rigidbody *cyl, rigidbody *sph,
     vector3 diff = vector3_subtraction(sph->position, closest);
     center_dist = vector3_length(diff);
     float gap2 = center_dist - r_s;
-    float slop2 = g_cfg.solver.penetration_slop;
+    float slop2 = C->solver.penetration_slop;
     if (gap2 >= slop2) {
         return false;
     }
@@ -326,7 +329,8 @@ static float cylcube_seg_obb_dist2(rigidbody *cube, vector3 e1, vector3 seg, flo
 }
 
 bool collision_cylinder_cube(rigidbody *cyl, rigidbody *cube,
-                             collision_data *out) {
+                             collision_data *out, const mpe_config_t *cfg) {
+    const mpe_config_t *C = cfg ? cfg : &g_cfg;
     if ((cyl->type != object_cylinder) || (cube->type != object_cube)) {
         return false;
     }
@@ -372,7 +376,7 @@ bool collision_cylinder_cube(rigidbody *cyl, rigidbody *cube,
     vector3 obb_star;
     float d2_star = cylcube_seg_obb_dist2(cube, e1, seg, t_star, &obb_star);
     float d_star = sqrtf(d2_star);
-    float slop = g_cfg.solver.penetration_slop;
+    float slop = C->solver.penetration_slop;
     if (d_star >= r + slop) {
         return false;
     }
@@ -660,7 +664,8 @@ bool collision_cylinder_cube(rigidbody *cyl, rigidbody *cube,
  * parallel logs (rocks). Barrel-side uses segment closest (exact); coaxial
  * faces use axial gap; parallel sides emit 2 points at overlap ends. */
 bool collision_cylinder_cylinder(rigidbody *cyl_a, rigidbody *cyl_b,
-                                 collision_data *out) {
+                                 collision_data *out, const mpe_config_t *cfg) {
+    const mpe_config_t *C = cfg ? cfg : &g_cfg;
     if ((!cyl_a) || (!cyl_b) || (!out)) {
         return false;
     }
@@ -692,7 +697,7 @@ bool collision_cylinder_cylinder(rigidbody *cyl_a, rigidbody *cyl_b,
     }
     float ha = cyl_a->cylinder_half_length;
     float hb = cyl_b->cylinder_half_length;
-    float slop = g_cfg.solver.penetration_slop;
+    float slop = C->solver.penetration_slop;
 
     /* Coaxial / near-coaxial face-face vs barrel-side disambiguation.
      * TRUTH: pick the SHALLOWER penetration (first touch), not just any gap.

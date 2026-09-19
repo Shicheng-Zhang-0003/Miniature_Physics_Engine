@@ -5,6 +5,12 @@
 #include <math.h>
 #include "../core/math3d.h"
 #include "../core/rigidbody.h"
+#include "../config/mpe_config.h"
+/* Per-world config convention: narrowphase/solver/CCD functions take
+ * `const mpe_config_t *cfg` with NULL meaning "global g_cfg". Step paths
+ * pass their world's snapshot (mpe_world_cfg); direct unit callers pass
+ * NULL. This keeps foreign per-world configs authoritative without
+ * breaking the direct-call test surface. */
 struct physics_world; /* MFS_131: forward decl for per-world cache */
 typedef struct {
     vector3 position;
@@ -48,14 +54,17 @@ typedef struct {
     int contact_count;
 } collision_data;
 bool collision_dual_sphere(rigidbody *rigidbody_object_a, rigidbody *rigidbody_object_b,
-                           collision_data *collision_output_data);
+                           collision_data *collision_output_data, const mpe_config_t *cfg);
 float project_obb(rigidbody *rigid_body, vector3 axis, vector3 axes[3]);
-bool collision_sphere_cube(rigidbody *sphere, rigidbody *cube, collision_data *collision_output_data);
-bool collision_dual_cube(rigidbody *cube_a, rigidbody *cube_b, collision_data *collision_output_data);
+bool collision_sphere_cube(rigidbody *sphere, rigidbody *cube, collision_data *collision_output_data,
+                           const mpe_config_t *cfg);
+bool collision_dual_cube(rigidbody *cube_a, rigidbody *cube_b, collision_data *collision_output_data,
+                         const mpe_config_t *cfg);
 void collision_prepare_solver(struct physics_world *world, collision_data *source, collision_data *manifold_entry,
                               float dt);
 /* Returns the largest impulse magnitude applied this visit (for convergence tests). */
-float collision_resolve_iterative(collision_data *manifold_entry, float dt, bool friction_only, int start_index);
+float collision_resolve_iterative(collision_data *manifold_entry, float dt, bool friction_only, int start_index,
+                                  const mpe_config_t *cfg);
 /* Support-first manifold order: indices sorted by lowest contact height
  * (floor contacts first, then ascending pairs), ties broken by manifold
  * index for a deterministic total order. Sequential impulse propagates
@@ -72,13 +81,15 @@ void collision_manifold_solve_order(struct physics_world *world, collision_data 
 /* Split impulse (Catto): positional penetration correction applied AFTER
  * the velocity iterations, directly to positions, mass-weighted. Carries
  * no velocity change, so it cannot inflate contact impulses or friction. */
-void collision_apply_split_impulse(collision_data *manifolds, int manifold_count, float dt);
+void collision_apply_split_impulse(collision_data *manifolds, int manifold_count, float dt,
+                                   const mpe_config_t *cfg);
 /* Rolling + spin resistance, once per tick after the velocity solve. */
-void collision_apply_rolling_resistance(collision_data *manifolds, int manifold_count, float dt);
+void collision_apply_rolling_resistance(collision_data *manifolds, int manifold_count, float dt,
+                                        const mpe_config_t *cfg);
 /* Poisson restitution: after compression converges, each fresh impact gets
  * e * (this tick's compression impulse) once, then a short relaxation lets
  * friction respond. Correct for multi-contact; Newtonian bias over-pays. */
-void collision_apply_poisson_restitution(collision_data *manifolds, int manifold_count);
+void collision_apply_poisson_restitution(collision_data *manifolds, int manifold_count, const mpe_config_t *cfg);
 /* TRUTH P0-2: refresh Poisson gate to post-force-integration velocities.
  * Prepare() runs before gravity/springs/motors are integrated, so the
  * recorded impact_velocity is stale by g*dt + spring/motor deltas.
@@ -96,13 +107,20 @@ void collision_refresh_impact_velocities(collision_data *manifolds, int manifold
  * double-counts. Linear sweep only (angular motion ignored over the tick);
  * dynamic-box obstacles are paired by the swept broadphase but not TOI-clamped. */
 int collision_ccd_sweep_clamp(rigidbody *bodies, int body_count, float dt);
-int collision_ccd_sweep_clamp_full(rigidbody *bodies, int body_count, float dt, float *time_remaining_out);
+int collision_ccd_sweep_clamp_full(rigidbody *bodies, int body_count, float dt, float *time_remaining_out,
+                                   const mpe_config_t *cfg);
+/* World-aware CCD entry: forwards the world's config snapshot. */
+struct physics_world;
+int collision_ccd_sweep_clamp_world(struct physics_world *world, float dt);
 void contact_cache_save(struct physics_world *world, collision_data *manifolds, int count); /* MFS_131 */
 void contact_cache_clear(struct physics_world *world); /* MFS_131 */
 
-bool collision_static_plane_sphere(rigidbody *sphere, float plane_y, collision_data *collision_output_data);
-bool collision_static_plane_cube(rigidbody *cube, float plane_y, collision_data *collision_output_data);
-bool collision_static_plane_body(rigidbody *body, float plane_y, collision_data *collision_output_data);
+bool collision_static_plane_sphere(rigidbody *sphere, float plane_y, collision_data *collision_output_data,
+                                   const mpe_config_t *cfg);
+bool collision_static_plane_cube(rigidbody *cube, float plane_y, collision_data *collision_output_data,
+                                 const mpe_config_t *cfg);
+bool collision_static_plane_body(rigidbody *body, float plane_y, collision_data *collision_output_data,
+                                 const mpe_config_t *cfg);
 
 void contact_cache_stats_reset(struct physics_world *world);
 int contact_cache_get_hits(const struct physics_world *world);
@@ -115,10 +133,10 @@ bool contact_cache_has_pair(struct physics_world *world, uint32_t id_a, uint32_t
  * exact for cube; coaxial face-gap + parallel 2-point for cyl-cyl.
  * Barrel contacts exact; see collision_cylinder.c. */
 bool collision_cylinder_sphere(rigidbody *cyl, rigidbody *sph,
-                               collision_data *out);
+                               collision_data *out, const mpe_config_t *cfg);
 bool collision_cylinder_cube(rigidbody *cyl, rigidbody *cube,
-                             collision_data *out);
+                             collision_data *out, const mpe_config_t *cfg);
 bool collision_cylinder_cylinder(rigidbody *cyl_a, rigidbody *cyl_b,
-                                 collision_data *out);
+                                 collision_data *out, const mpe_config_t *cfg);
 
 #endif

@@ -109,26 +109,16 @@ void islands_build(struct physics_world *world, broadphase_pair *pairs, int pair
             island_union(world, a, b);
         }
     }
-    /* Joints join islands. TRUTH: O(J*B) linear scan per tick stalled with
-     * many joints/bodies. Use pointer-offset fast path (bodies from same
-     * world are contiguous) with id fallback, no nested scan. */
+    /* Joints join islands. O(J) via the world's id->index cache
+     * (verified + linear fallback inside); the old O(J*B) nested scan
+     * stalled joint-heavy scenes. */
     {
         uint32_t ids_a[mpe_max_joints];
         uint32_t ids_b[mpe_max_joints];
         int joints = constraint_get_active_ids(world, ids_a, ids_b, mpe_max_joints);
         for (int j = 0; j < joints; j++) {
-            int ia = -1, ib = -1;
-            for (int i = 0; i < body_count; i++) {
-                if (bodies[i].object_id == ids_a[j]) {
-                    ia = i;
-                }
-                if (bodies[i].object_id == ids_b[j]) {
-                    ib = i;
-                }
-                if ((ia >= 0) && (ib >= 0)) {
-                    break;
-                }
-            }
+            int ia = physics_world_index_by_id(world, ids_a[j]);
+            int ib = physics_world_index_by_id(world, ids_b[j]);
             if ((ia >= 0) && (ib >= 0) && (ia != ib)) {
                 island_union(world, ia, ib);
             }
