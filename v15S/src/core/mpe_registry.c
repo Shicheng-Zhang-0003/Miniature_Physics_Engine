@@ -1,5 +1,6 @@
 #include "mpe_registry.h"
 #include "../core/rigidbody.h"
+#include "../core/physics_world.h"
 #include "../physics/broadphase.h"
 #include "../physics/collision_mechanics.h"
 #include <string.h>
@@ -101,27 +102,57 @@ const mpe_module_desc_t *mpe_find_module(const char *name) {
     return 0;
 }
 
-/* Built-in pair handlers forward to existing narrowphase fns.
- * Registered lazily on first use (idempotent) so headless tests
- * that never call registry still work via direct fallback. */
+/* Built-in pair handlers forward the world's config snapshot. */
+static const mpe_config_t *wrap_cfg(mpe_world_t *w) {
+    return (w && w->cfg) ? w->cfg : &g_cfg;
+}
 static bool wrap_ss(rigidbody *a, rigidbody *b, void *out, mpe_world_t *w) {
-    (void)w; return collision_dual_sphere(a, b, (collision_data *)out);
+    return collision_dual_sphere(a, b, (collision_data *)out, wrap_cfg(w));
 }
 static bool wrap_sc(rigidbody *a, rigidbody *b, void *out, mpe_world_t *w) {
-    (void)w; return collision_sphere_cube(a, b, (collision_data *)out);
+    return collision_sphere_cube(a, b, (collision_data *)out, wrap_cfg(w));
 }
 static bool wrap_cc(rigidbody *a, rigidbody *b, void *out, mpe_world_t *w) {
-    (void)w; return collision_dual_cube(a, b, (collision_data *)out);
+    return collision_dual_cube(a, b, (collision_data *)out, wrap_cfg(w));
 }
 static bool wrap_cyl_s(rigidbody *a, rigidbody *b, void *out, mpe_world_t *w) {
-    (void)w; return collision_cylinder_sphere(a, b, (collision_data *)out);
+    return collision_cylinder_sphere(a, b, (collision_data *)out, wrap_cfg(w));
 }
 static bool wrap_cyl_c(rigidbody *a, rigidbody *b, void *out, mpe_world_t *w) {
-    (void)w; return collision_cylinder_cube(a, b, (collision_data *)out);
+    return collision_cylinder_cube(a, b, (collision_data *)out, wrap_cfg(w));
 }
 static bool wrap_cyl_cyl(rigidbody *a, rigidbody *b, void *out, mpe_world_t *w) {
-    (void)w; return collision_cylinder_cylinder(a, b, (collision_data *)out);
+    return collision_cylinder_cylinder(a, b, (collision_data *)out, wrap_cfg(w));
 }
+
+/* Builtin stage backends: exact current behaviour, registered under
+ * canonical names so `mod use-broadphase hash` / `mod use-solver
+ * seq-impulse` round-trips to the defaults. */
+static int builtin_broadphase_generate(mpe_world_t *world, broadphase_pair *pairs_out, int max_pairs,
+                                       float dt, void *mod_state) {
+    (void) mod_state;
+    return broadphase_generate_pairing(world, pairs_out, max_pairs, dt);
+}
+static float builtin_solver_resolve(mpe_world_t *world, void *manifold, float dt, bool friction_only, int iter,
+                                    void *mod_state) {
+    (void) mod_state;
+    return collision_resolve_iterative((collision_data *)manifold, dt, friction_only, iter, wrap_cfg(world));
+}
+static void builtin_solver_poisson(mpe_world_t *world, void *manifolds, int n, void *mod_state) {
+    (void) mod_state;
+    collision_apply_poisson_restitution((collision_data *)manifolds, n, wrap_cfg(world));
+}
+static void builtin_solver_rolling(mpe_world_t *world, void *manifolds, int n, float dt, void *mod_state) {
+    (void) mod_state;
+    collision_apply_rolling_resistance((collision_data *)manifolds, n, dt, wrap_cfg(world));
+}
+static void builtin_solver_split(mpe_world_t *world, void *manifolds, int n, float dt, void *mod_state) {
+    (void) mod_state;
+    collision_apply_split_impulse((collision_data *)manifolds, n, dt, wrap_cfg(world));
+}
+static const mpe_broadphase_if_t s_builtin_broadphase = {builtin_broadphase_generate};
+static const mpe_solver_if_t s_builtin_solver = {builtin_solver_resolve, builtin_solver_poisson,
+                                                 builtin_solver_rolling, builtin_solver_split};
 
 static int s_builtins_done = 0;
 void mpe_register_builtins(void) {
@@ -134,4 +165,6 @@ void mpe_register_builtins(void) {
     mpe_register_pair_handler(2, 0, -1, -1, wrap_cyl_s, "cyl-sphere");
     mpe_register_pair_handler(2, 1, -1, -1, wrap_cyl_c, "cyl-cube");
     mpe_register_pair_handler(2, 2, -1, -1, wrap_cyl_cyl, "cyl-cyl");
+    mpe_register_broadphase("hash", &s_builtin_broadphase);
+    mpe_register_solver("seq-impulse", &s_builtin_solver);
 }

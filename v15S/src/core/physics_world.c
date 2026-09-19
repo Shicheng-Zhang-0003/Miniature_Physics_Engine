@@ -17,23 +17,30 @@
 #include "../physics/depenetration.h"
 #include "../scene/boundary.h"
 #include "det_math.h" /* bit-identical damping factors on all IEEE targets */
-/* FIX-AUDIT: world spring pass is weakly linked so headless test binaries
- * that omit physics/spring_joint.c (GL dependency) still link; the GUI
- * engine links it and gets real spring forces. Pool comes from the world. */
-void apply_spring_forces_world(physics_world *world, rigidbody *bodies, int body_count) __attribute__((weak));
-void apply_spring_forces_world_dt(physics_world *world, rigidbody *bodies, int body_count, float dt)
-    __attribute__((weak));
+/* Canonical spring pass is weakly linked so spring-less headless test
+ * binaries (which omit physics/spring_joint.c for its GL dependency)
+ * still link; the GUI engine and TUI link it and get real forces. */
+void mpe_springs_apply(physics_world *world, float dt) __attribute__((weak));
 #include "../config/mpe_config.h"
 #include "../config/mpe_constants.h"
 #include <stdlib.h>
 #include <math.h>
 #include <string.h> /* MPE_FTC_076a */
 
-static physics_world g_physics_world = {.bodies = NULL, .body_count = 0, .body_capacity = 0, .next_object_id = 1};
+/* NOTE: no file-scope simulation state in this TU. The application
+ * primary lives in core/mpe_primary.c; all stepping takes explicit
+ * worlds (see physics_world_get_primary contract in the header). */
 
 /* Helper: malloc-or-NULL (leaves member NULL on failure; users degrade
  * gracefully — add fns reject NULL bodies, pairing returns 0, solves skip).
  * Worlds that fail init are safely unusable, never crash-prone. */
+static void physics_world_free_ptr(void **slot) {
+    if (slot && *slot) {
+        free(*slot);
+        *slot = NULL;
+    }
+}
+
 void physics_world_init(physics_world *world) {
     if (!world) {
         return;
@@ -44,13 +51,16 @@ void physics_world_init(physics_world *world) {
      * rebind via physics_world_set_config() for isolation. */
     world->cfg = &g_cfg;
     mpe_register_builtins();
+    /* Growable pools: start small, double on demand (see growers below).
+     * body_capacity tracks the live allocation (not the ceiling). */
     if (!world->bodies) {
-        world->bodies = (rigidbody *) malloc((size_t) mpe_max_bodies * sizeof(rigidbody));
-        world->body_capacity = mpe_max_bodies;
+        world->bodies = (rigidbody *) malloc((size_t) mpe_initial_bodies * sizeof(rigidbody));
+        world->body_capacity = world->bodies ? mpe_initial_bodies : 0;
     }
     if (!world->world_contact_cache) {
         world->world_contact_cache =
-            (cached_contact *) malloc((size_t) max_cached_contacts * sizeof(cached_contact)); /* MFS_131A */
+            (cached_contact *) malloc((size_t) mpe_initial_contacts * sizeof(cached_contact)); /* MFS_131A */
+        world->world_contact_cache_capacity = world->world_contact_cache ? mpe_initial_contacts : 0;
     }
     /* Warm-start hash heads: heap, not stack (worlds are often stack-local;
      * an inline 16 KB array risks overflow next to big frames). */
@@ -103,16 +113,23 @@ void physics_world_init(physics_world *world) {
     if (!world->has_contact) {
         world->has_contact = (unsigned char *) malloc((size_t) mpe_max_bodies * sizeof(unsigned char));
     }
+    /* id->index cache (heap; worlds are frequently stack-local). */
+    if (!world->id_cache_keys) {
+        world->id_cache_size = mpe_id_cache_size;
+        world->id_cache_keys = (uint32_t *) calloc((size_t) world->id_cache_size, sizeof(uint32_t));
+        world->id_cache_vals = (int *) malloc((size_t) world->id_cache_size * sizeof(int));
+        world->id_cache_valid = (unsigned char *) calloc((size_t) world->id_cache_size, sizeof(unsigned char));
+        if (!world->id_cache_keys || !world->id_cache_vals || !world->id_cache_valid) {
+            physics_world_free_ptr((void **) &world->id_cache_keys);
+            physics_world_free_ptr((void **) &world->id_cache_vals);
+            physics_world_free_ptr((void **) &world->id_cache_valid);
+            world->id_cache_size = 0;
+        }
+        world->id_cache_revision = 0;
+    }
     world->body_count = 0;
     if (world->next_object_id == 0) {
         world->next_object_id = 1;
-    }
-}
-
-static void physics_world_free_ptr(void **slot) {
-    if (slot && *slot) {
-        free(*slot);
-        *slot = NULL;
     }
 }
 
@@ -136,6 +153,10 @@ void physics_world_cleanup(physics_world *world) {
     physics_world_free_ptr((void **) &world->island_awake_flags);
     physics_world_free_ptr((void **) &world->ccd_time_remaining);
     physics_world_free_ptr((void **) &world->has_contact);
+    physics_world_free_ptr((void **) &world->id_cache_keys);
+    physics_world_free_ptr((void **) &world->id_cache_vals);
+    physics_world_free_ptr((void **) &world->id_cache_valid);
+    world->id_cache_size = 0;
     world->world_contact_cache_count = 0;
     world->body_count = 0;
     world->body_capacity = 0;
@@ -147,9 +168,127 @@ void physics_world_set_config(physics_world *world, mpe_config_t *cfg) {
     world->cfg = cfg ? cfg : &g_cfg;
 }
 
+/* Pool growers: ×2 up to the compile-time ceilings. Manifold pointers
+ * into bodies[] are rebuilt every tick, and caches store ids (never
+ * pointers), so relocation during add_* (outside any step) is safe. */
+static int physics_world_grow_bodies(physics_world *world) {
+    if (!world || !world->bodies) {
+        return -1;
+    }
+    if (world->body_capacity >= mpe_max_bodies) {
+        return -1;
+    }
+    int want = world->body_capacity > 0 ? world->body_capacity * 2 : mpe_initial_bodies;
+    if (want > mpe_max_bodies) {
+        want = mpe_max_bodies;
+    }
+    rigidbody *grown = (rigidbody *) realloc(world->bodies, (size_t) want * sizeof(rigidbody));
+    if (!grown) {
+        return -1;
+    }
+    world->bodies = grown;
+    world->body_capacity = want;
+    return 0;
+}
+
+int physics_world_grow_contact_cache(physics_world *world) {
+    if (!world || !world->world_contact_cache) {
+        return -1;
+    }
+    if (world->world_contact_cache_capacity >= max_cached_contacts) {
+        return -1;
+    }
+    int want = world->world_contact_cache_capacity > 0 ? world->world_contact_cache_capacity * 2
+                                                       : mpe_initial_contacts;
+    if (want > max_cached_contacts) {
+        want = max_cached_contacts;
+    }
+    cached_contact *grown =
+        (cached_contact *) realloc(world->world_contact_cache, (size_t) want * sizeof(cached_contact));
+    if (!grown) {
+        return -1;
+    }
+    world->world_contact_cache = grown;
+    world->world_contact_cache_capacity = want;
+    return 0;
+}
+
 mpe_config_t *physics_world_get_config(physics_world *world) {
     if (!world || !world->cfg) return &g_cfg;
     return world->cfg;
+}
+
+void physics_world_bump_revision(physics_world *world) {
+    if (!world) return;
+    world->body_revision++;
+}
+
+static void physics_world_id_cache_rebuild(physics_world *world) {
+    for (int i = 0; i < world->id_cache_size; i++) {
+        world->id_cache_valid[i] = 0;
+    }
+    if (!world->bodies || world->body_count <= 0) {
+        world->id_cache_revision = world->body_revision;
+        return;
+    }
+    uint32_t mask = (uint32_t) (world->id_cache_size - 1);
+    for (int i = 0; i < world->body_count; i++) {
+        uint32_t id = world->bodies[i].object_id;
+        if (id == 0 || id == 0xFFFFFFFFu) {
+            continue;
+        }
+        uint32_t h = (id * 2654435761u) & mask;
+        for (int probe = 0; probe < 32; probe++) {
+            uint32_t s = (h + (uint32_t) probe) & mask;
+            if (!world->id_cache_valid[s]) {
+                world->id_cache_keys[s] = id;
+                world->id_cache_vals[s] = i;
+                world->id_cache_valid[s] = 1;
+                break;
+            }
+        }
+    }
+    world->id_cache_revision = world->body_revision;
+}
+
+int physics_world_index_by_id(physics_world *world, uint32_t id) {
+    if (!world || !world->bodies || world->body_count <= 0 || id == 0) {
+        return -1;
+    }
+    if (world->id_cache_size > 0 && world->id_cache_keys && world->id_cache_vals && world->id_cache_valid) {
+        if (world->id_cache_revision != world->body_revision) {
+            physics_world_id_cache_rebuild(world);
+        }
+        uint32_t mask = (uint32_t) (world->id_cache_size - 1);
+        uint32_t h = (id * 2654435761u) & mask;
+        for (int probe = 0; probe < 32; probe++) {
+            uint32_t s = (h + (uint32_t) probe) & mask;
+            if (!world->id_cache_valid[s]) {
+                break;
+            }
+            if (world->id_cache_keys[s] == id) {
+                int idx = world->id_cache_vals[s];
+                if (idx >= 0 && idx < world->body_count && world->bodies[idx].object_id == id) {
+                    return idx;
+                }
+                break;
+            }
+        }
+    }
+    for (int i = 0; i < world->body_count; i++) {
+        if (world->bodies[i].object_id == id) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+rigidbody *physics_world_body_by_id(physics_world *world, uint32_t id) {
+    int idx = physics_world_index_by_id(world, id);
+    if (idx < 0) {
+        return NULL;
+    }
+    return &world->bodies[idx];
 }
 
 void physics_world_set_broadphase(physics_world *world, const mpe_broadphase_if_t *iface) {
@@ -221,7 +360,10 @@ bool mpe_shape_dispatch(physics_world *world, rigidbody *a, rigidbody *b, collis
 }
 
 int physics_world_add_sphere(physics_world *world, float radius, float mass, vector3 position) {
-    if ((!world) || (!world->bodies) || (world->body_count >= world->body_capacity)) {
+    if ((!world) || (!world->bodies)) {
+        return -1;
+    }
+    if (world->body_count >= world->body_capacity && physics_world_grow_bodies(world) != 0) {
         return -1;
     }
     rigidbody *rb = &world->bodies[world->body_count];
@@ -235,11 +377,15 @@ int physics_world_add_sphere(physics_world *world, float radius, float mass, vec
     }
     rb->object_generation = 1;
     rigidbody_sanitize(rb);
+    physics_world_bump_revision(world);
     return world->body_count++;
 }
 
 int physics_world_add_cube(physics_world *world, vector3 position, vector3 half_extensions, float mass) {
-    if ((!world) || (!world->bodies) || (world->body_count >= world->body_capacity)) {
+    if ((!world) || (!world->bodies)) {
+        return -1;
+    }
+    if (world->body_count >= world->body_capacity && physics_world_grow_bodies(world) != 0) {
         return -1;
     }
     rigidbody *rb = &world->bodies[world->body_count];
@@ -253,13 +399,17 @@ int physics_world_add_cube(physics_world *world, vector3 position, vector3 half_
     }
     rb->object_generation = 1;
     rigidbody_sanitize(rb);
+    physics_world_bump_revision(world);
     return world->body_count++;
 }
 
 /* MPE_FTC_091 */
 int physics_world_add_cylinder(physics_world *world, float radius, float half_length, float mass,
                              vector3 position) {
-    if ((!world) || (!world->bodies) || (world->body_count >= world->body_capacity)) {
+    if ((!world) || (!world->bodies)) {
+        return -1;
+    }
+    if (world->body_count >= world->body_capacity && physics_world_grow_bodies(world) != 0) {
         return -1;
     }
     rigidbody *rb = &world->bodies[world->body_count];
@@ -273,11 +423,13 @@ int physics_world_add_cylinder(physics_world *world, float radius, float half_le
     }
     rb->object_generation = 1;
     rigidbody_sanitize(rb);
+    physics_world_bump_revision(world);
     return world->body_count++;
 }
 
 int physics_world_add_custom(physics_world *world, int custom_shape, vector3 position, float mass, float radius) {
-    if ((!world) || (!world->bodies) || (world->body_count >= world->body_capacity)) return -1;
+    if ((!world) || (!world->bodies)) return -1;
+    if (world->body_count >= world->body_capacity && physics_world_grow_bodies(world) != 0) return -1;
     if (custom_shape < 100) custom_shape = 100;
     rigidbody *rb = &world->bodies[world->body_count];
     /* Backing is a sphere (bounding volume + inertia sane until the
@@ -292,6 +444,7 @@ int physics_world_add_custom(physics_world *world, int custom_shape, vector3 pos
     rigidbody_sanitize(rb);
     rb->type = object_custom; /* sanitize must not reset foreign type */
     rb->custom_shape = custom_shape;
+    physics_world_bump_revision(world);
     return world->body_count++;
 }
 
@@ -304,6 +457,7 @@ void physics_world_clear(physics_world *world) {
     world->manifold_overflow_count = 0;
     world->contact_cache_hits = 0;
     world->contact_cache_misses = 0;
+    physics_world_bump_revision(world);
     /* TRUTH: next_object_id monotonic wraps at 4G to 0, colliding with
      * cache sentinel id==0 (no match) + floor 0xFFFFFFFF. Skip 0/0xFFFFFFFF
      * on wrap. clear() does NOT reset IDs (stable across clears would alias
@@ -315,9 +469,11 @@ void physics_world_clear(physics_world *world) {
 
 /* One broadphase pair through narrowphase + wake-on-contact + solver
  * prep. Shared by the main pair loop and the sleep-wake revisit pass
- * below (extracted verbatim from the former single loop). */
-static void physics_world_process_pair(physics_world *world, int index_a, int index_b, float dt,
-                                       int *manifold_count_ptr) {
+ * below (extracted verbatim from the former single loop). Non-static:
+ * the legacy GUI tick reuses it so both step paths share one wake +
+ * dispatch implementation (registry-routed, per-world config). */
+void physics_world_process_pair(physics_world *world, int index_a, int index_b, float dt,
+                                int *manifold_count_ptr) {
     if ((index_a < 0) || (index_a >= world->body_count)) {
         return;
     }
@@ -416,8 +572,41 @@ static void physics_world_process_pair(physics_world *world, int index_a, int in
         }
 }
 
-void physics_world_step(physics_world *world, float dt) {
-    if ((!world) || (!world->bodies) || (!(dt > 0.0f)) || (!isfinite(dt)) || (world->body_count <= 0)) {
+/* Solver stage dispatch: foreign solver_if hooks override per stage,
+ * builtins run on the tick's config snapshot. Keeps the iteration loop
+ * readable while making every stage hot-swappable. */
+static float mpe_step_resolve(physics_world *world, collision_data *m, float dt, bool friction_only, int iter,
+                              const mpe_config_t *cfg) {
+    if (world->solver_if && world->solver_if->resolve) {
+        return world->solver_if->resolve(world, m, dt, friction_only, iter, NULL);
+    }
+    return collision_resolve_iterative(m, dt, friction_only, iter, cfg);
+}
+static void mpe_step_poisson(physics_world *world, collision_data *manifolds, int n, const mpe_config_t *cfg) {
+    if (world->solver_if && world->solver_if->poisson) {
+        world->solver_if->poisson(world, manifolds, n, NULL);
+        return;
+    }
+    collision_apply_poisson_restitution(manifolds, n, cfg);
+}
+static void mpe_step_rolling(physics_world *world, collision_data *manifolds, int n, float dt,
+                             const mpe_config_t *cfg) {
+    if (world->solver_if && world->solver_if->rolling) {
+        world->solver_if->rolling(world, manifolds, n, dt, NULL);
+        return;
+    }
+    collision_apply_rolling_resistance(manifolds, n, dt, cfg);
+}
+static void mpe_step_split(physics_world *world, collision_data *manifolds, int n, float dt,
+                           const mpe_config_t *cfg) {
+    if (world->solver_if && world->solver_if->split) {
+        world->solver_if->split(world, manifolds, n, dt, NULL);
+        return;
+    }
+    collision_apply_split_impulse(manifolds, n, dt, cfg);
+}
+
+void physics_world_step(physics_world *world, float dt) {    if ((!world) || (!world->bodies) || (!(dt > 0.0f)) || (!isfinite(dt)) || (world->body_count <= 0)) {
         return;
     }
     if (dt > 0.1f) {
@@ -447,11 +636,7 @@ void physics_world_step(physics_world *world, float dt) {
      * so discrete narrowphase cannot tunnel past thin geometry.
      * TRUTH P0-3: remainder (dt-toi) recorded per body; post-solve
      * integration advances only the remainder (see below). */
-    if (world->ccd_time_remaining) {
-        collision_ccd_sweep_clamp_full(world->bodies, world->body_count, dt, world->ccd_time_remaining);
-    } else {
-        collision_ccd_sweep_clamp(world->bodies, world->body_count, dt);
-    }
+    collision_ccd_sweep_clamp_world(world, dt);
 
     int pair_count = 0;
     if (world->body_count >= 2) {
@@ -537,7 +722,7 @@ void physics_world_step(physics_world *world, float dt) {
          * forever with has_contact=0 (false free-flight). */
         bool was_sleeping = rb->is_sleeping;
         collision_data floor_collision = {0};
-        if (collision_static_plane_body(rb, 0.0f, &floor_collision)) {
+        if (collision_static_plane_body(rb, 0.0f, &floor_collision, step_cfg)) {
             if (manifold_count >= a3_max_manifolds) {
                 world->manifold_overflow_count++;
                 continue;
@@ -586,12 +771,9 @@ void physics_world_step(physics_world *world, float dt) {
      * Now a real config param. */
     float angular_damping =
         (float) det_pow_retention((double) (step_drag * step_ang_scale), (double) dt);
-    /* FIX-AUDIT: springs were never applied on the encapsulated path.
-     * Apply world-aware spring forces before integration (weak-linked). */
-    if (apply_spring_forces_world_dt) {
-        apply_spring_forces_world_dt(world, world->bodies, world->body_count, dt);
-    } else if (apply_spring_forces_world) {
-        apply_spring_forces_world(world, world->bodies, world->body_count);
+    /* Springs before integration (weak-linked canonical entry). */
+    if (mpe_springs_apply) {
+        mpe_springs_apply(world, dt);
     }
     constraint_apply_motors(world, dt); /* MPE_FTC_067 */
     /* Phase-2: foreign forcefield / motor modules (pre-integration). */
@@ -643,8 +825,8 @@ void physics_world_step(physics_world *world, float dt) {
              * A second immediate visit converges the local distribution
              * before propagating, buying back the margin deep stacks
              * need at low global iteration counts. Deterministic. */
-            collision_resolve_iterative(&world->manifolds[m], dt, false, iter);
-            collision_resolve_iterative(&world->manifolds[m], dt, false, iter + 1);
+            mpe_step_resolve(world, &world->manifolds[m], dt, false, iter, step_cfg);
+            mpe_step_resolve(world, &world->manifolds[m], dt, false, iter + 1, step_cfg);
         }
         /* MFS_SOLVER_FIX: solve joints inside the iteration loop so friction
          * impulses properly transfer through revolute constraints to the chassis */
@@ -657,7 +839,7 @@ void physics_world_step(physics_world *world, float dt) {
      * then short relaxation so friction sees post-bounce velocities. */
     /* TRUTH: joints must see post-bounce velocities too. Poisson without a
      * joint relaxation leaves hinges/welds broken for a tick. */
-    collision_apply_poisson_restitution(world->manifolds, manifold_count);
+    mpe_step_poisson(world, world->manifolds, manifold_count, step_cfg);
     constraint_solve_all(world, dt);
     for (int relax_iter = 0; relax_iter < 2; relax_iter++) {
         for (int o = 0; o < manifold_count; o++) {
@@ -665,13 +847,13 @@ void physics_world_step(physics_world *world, float dt) {
             if (!world->manifold_awake[m]) {
                 continue;
             }
-            collision_resolve_iterative(&world->manifolds[m], dt, true, relax_iter);
+            mpe_step_resolve(world, &world->manifolds[m], dt, true, relax_iter, step_cfg);
         }
     }
     /* Split impulse: positional depenetration with zero velocity change.
      * The velocity solve above is compression-only, so contact impulses
      * (and the Coulomb clamp) stay honest. */
-    collision_apply_split_impulse(world->manifolds, manifold_count, dt);
+    mpe_step_split(world, world->manifolds, manifold_count, dt, step_cfg);
     /* TRUTH: split can wake sleepers (deep overlap) that were skipped as
      * both-asleep with no manifold. They would integrate with has_contact=0
      * (false free-flight). Re-process newly-awake skipped pairs now so they
@@ -693,7 +875,7 @@ void physics_world_step(physics_world *world, float dt) {
         world->pair_skipped[p] = 0;
     }
     /* Rolling resistance once per tick (uses solved normal impulses). */
-    collision_apply_rolling_resistance(world->manifolds, manifold_count, dt);
+    mpe_step_rolling(world, world->manifolds, manifold_count, dt, step_cfg);
 
     /* Sleeping bodies already hold real mass (no staticize was applied),
      * so no restore is needed. Keep velocities pinned at zero. */
@@ -757,10 +939,6 @@ void physics_world_step(physics_world *world, float dt) {
      * Rotation-driven contact migration still misses naturally via the
      * match distance, which is the correct invalidation path. Scene loads
      * (pool invalidation) keep their explicit clears. */
-}
-
-physics_world *physics_world_get_primary(void) {
-    return &g_physics_world;
 }
 
 /* R3-07: Containment walls.

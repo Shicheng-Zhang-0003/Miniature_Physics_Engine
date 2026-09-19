@@ -85,6 +85,10 @@ tui-smoke: build_tui
 	./mpe-tui --snapshot 10 --scene tower > /dev/null
 	./mpe-tui --snapshot 10 --scene pendulum > /dev/null
 	./mpe-tui --snapshot 10 --scene springlab > /dev/null
+	./mpe-tui --snapshot 600 --scene f10 > /dev/null
+	./mpe-tui --snapshot 600 --scene stress > /dev/null
+	./mpe-tui --snapshot 60 --scene ccd > /dev/null
+	./mpe-tui --snapshot 60 --scene demo --solver seq-impulse --broadphase hash > /dev/null
 	@echo "[PASS] tui-smoke: all scenes dump finite state"
 
 .PHONY: clean debug release install help mpe-tui build_tui tui-smoke
@@ -96,7 +100,7 @@ tui-smoke: build_tui
 # failing test is never misreported as a build failure); test_<name> builds
 # and runs (human use).
 # TRUE god file split: collision_mechanics.c (2305 lines) → 4 focused TUs
-MPE_TEST_CORE := core/physics_world.c core/rigidbody.c core/mpe_registry.c core/mpe_loader.c \
+MPE_TEST_CORE := core/physics_world.c core/rigidbody.c core/mpe_registry.c core/mpe_loader.c core/det_math.c core/mpe_primary.c \
 	physics/collision_narrowphase.c physics/collision_cache.c physics/collision_solver.c physics/collision_ccd.c physics/collision_cylinder.c physics/broadphase.c physics/constraint.c physics/revolute_joint.c physics/depenetration.c physics/islands.c \
 	config/mpe_config.c config/mpe_config_schema.c scene/boundary.c
 MPE_TEST_LIBS := -lm -ldl
