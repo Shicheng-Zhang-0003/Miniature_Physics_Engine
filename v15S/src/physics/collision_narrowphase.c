@@ -12,7 +12,8 @@
 #include <math.h>
 
 bool collision_dual_sphere(rigidbody *rigidbody_object_a, rigidbody *rigidbody_object_b,
-                           collision_data *collision_output_data) {
+                           collision_data *collision_output_data, const mpe_config_t *cfg) {
+    const mpe_config_t *C = cfg ? cfg : &g_cfg;
     vector3 relative_position_vector = vector3_subtraction(rigidbody_object_b->position, rigidbody_object_a->position);
     float distance_between_centres_squared = vector3_length_squared(relative_position_vector);
     float total_combined_radius = rigidbody_object_a->radius + rigidbody_object_b->radius;
@@ -20,7 +21,7 @@ bool collision_dual_sphere(rigidbody *rigidbody_object_a, rigidbody *rigidbody_o
      * Resting spheres at exact contact (dist == r1+r2) must report a
      * zero-depth contact for friction; strict < flickers support at 30Hz.
      * Admit pen >= -slop, clamp negatives to 0 (no bounce, friction only). */
-    float slop = g_cfg.solver.penetration_slop;
+    float slop = C->solver.penetration_slop;
     float outer = total_combined_radius + slop;
     if (distance_between_centres_squared >= outer * outer) {
         return false;
@@ -51,7 +52,9 @@ float project_obb(rigidbody *rigid_body, vector3 axis, vector3 axes[3]) {
            rigid_body->half_extensions.z * fabsf(vector3_dot(axes[2], axis));
 }
 
-bool collision_sphere_cube(rigidbody *sphere, rigidbody *cube, collision_data *collision_output_data) {
+bool collision_sphere_cube(rigidbody *sphere, rigidbody *cube, collision_data *collision_output_data,
+                           const mpe_config_t *cfg) {
+    const mpe_config_t *C = cfg ? cfg : &g_cfg;
     vector3 *axes_cube = cube->cached_axes;
     vector3 relative_position = vector3_subtraction(sphere->position, cube->position);
     vector3 closest_point = cube->position;
@@ -91,7 +94,7 @@ bool collision_sphere_cube(rigidbody *sphere, rigidbody *cube, collision_data *c
     /* TRUTH: slop parity. Outside branch must admit [-slop,0) as zero-depth
      * like every other path (dual_sphere, clip, floor, cyl). Old strict
      * radius test flickered resting contact. */
-    float slop_sc = g_cfg.solver.penetration_slop;
+    float slop_sc = C->solver.penetration_slop;
     float outer_sc = sphere->radius + slop_sc;
     if (!inside && distance_sq > outer_sc * outer_sc) {
         return false;
@@ -139,7 +142,8 @@ bool collision_sphere_cube(rigidbody *sphere, rigidbody *cube, collision_data *c
 }
 
 static void clip_obb_faces(rigidbody *ref_body, rigidbody *inc_body, vector3 normal, float overlap,
-                           collision_data *collision_output_data) {
+                           collision_data *collision_output_data, const mpe_config_t *cfg) {
+    const mpe_config_t *C = cfg ? cfg : &g_cfg;
     (void) overlap; /* slop-gated admission below; no phantom fallback uses this */
     vector3 *ref_axes = ref_body->cached_axes;
     vector3 ref_extents = ref_body->half_extensions;
@@ -272,7 +276,7 @@ static void clip_obb_faces(rigidbody *ref_body, rigidbody *inc_body, vector3 nor
      * (bias subtracts slop) and no restitution (velocity-gated), so they
      * cannot bounce at a distance. Strict >0 flickers rolling/wheel
      * support and starves friction. */
-    float clip_slop = g_cfg.solver.penetration_slop;
+    float clip_slop = C->solver.penetration_slop;
     for (int i = 0; i < input_count; i++) {
         vector3 v = input_polygon[i];
         float penetration = ref_height - vector3_dot(v, ref_normal);
@@ -366,7 +370,8 @@ static void a3_task04_enforce_cube_normal_consistency(collision_data *collision_
     collision_output_data->normal_vector = normal;
 }
 
-bool collision_dual_cube(rigidbody *cube_a, rigidbody *cube_b, collision_data *collision_output_data) {
+bool collision_dual_cube(rigidbody *cube_a, rigidbody *cube_b, collision_data *collision_output_data,
+                         const mpe_config_t *cfg) {
     vector3 *axes_a = cube_a->cached_axes;
     vector3 *axes_b = cube_b->cached_axes;
     vector3 relative_position = vector3_subtraction(cube_b->position, cube_a->position);
@@ -596,9 +601,10 @@ bool collision_dual_cube(rigidbody *cube_a, rigidbody *cube_b, collision_data *c
         }
     } else {
         if (best_axis_index < 3) {
-            clip_obb_faces(cube_a, cube_b, best_axis, minimum_overlap, collision_output_data);
+            clip_obb_faces(cube_a, cube_b, best_axis, minimum_overlap, collision_output_data, cfg);
         } else {
-            clip_obb_faces(cube_b, cube_a, vector3_scaling(best_axis, -1.0f), minimum_overlap, collision_output_data);
+            clip_obb_faces(cube_b, cube_a, vector3_scaling(best_axis, -1.0f), minimum_overlap, collision_output_data,
+                           cfg);
             collision_output_data->object_a = cube_a;
             collision_output_data->object_b = cube_b;
         }
@@ -615,7 +621,7 @@ bool collision_dual_cube(rigidbody *cube_a, rigidbody *cube_b, collision_data *c
     return true;
 }
 
-rigidbody *collision_static_plane_body_proxy(float plane_y) {
+rigidbody *collision_static_plane_body_proxy(float plane_y, const mpe_config_t *cfg) {
     /* Thread-local so concurrent worlds/threads never share mutable state.
      * restitution=1.0 is intentionally neutral: effective bounce is
      * min(body_restitution, 1.0) == body_restitution. */
@@ -635,13 +641,16 @@ rigidbody *collision_static_plane_body_proxy(float plane_y) {
     }
 
     static_plane_body.position.y = plane_y;
-    static_plane_body.friction_static = g_cfg.world.floor_friction_s;
-    static_plane_body.friction_kinetic = g_cfg.world.floor_friction_k;
+    const mpe_config_t *C = cfg ? cfg : &g_cfg;
+    static_plane_body.friction_static = C->world.floor_friction_s;
+    static_plane_body.friction_kinetic = C->world.floor_friction_k;
 
     return &static_plane_body;
 }
 
-bool collision_static_plane_sphere(rigidbody *sphere, float plane_y, collision_data *collision_output_data) {
+bool collision_static_plane_sphere(rigidbody *sphere, float plane_y, collision_data *collision_output_data,
+                                   const mpe_config_t *cfg) {
+    const mpe_config_t *C = cfg ? cfg : &g_cfg;
     if (sphere->type != object_sphere) {
         return false;
     }
@@ -651,11 +660,11 @@ bool collision_static_plane_sphere(rigidbody *sphere, float plane_y, collision_d
 
     /* Slop-gated like cube/cylinder paths: resting contact persists as
      * zero-depth (friction without bounce) instead of flickering. */
-    if (penetration <= -g_cfg.solver.penetration_slop) {
+    if (penetration <= -C->solver.penetration_slop) {
         return false;
     }
 
-    rigidbody *plane_body = collision_static_plane_body_proxy(plane_y);
+    rigidbody *plane_body = collision_static_plane_body_proxy(plane_y, cfg);
 
     collision_output_data->object_a = sphere;
     collision_output_data->object_b = plane_body;
@@ -669,7 +678,9 @@ bool collision_static_plane_sphere(rigidbody *sphere, float plane_y, collision_d
     return true;
 }
 
-bool collision_static_plane_cube(rigidbody *cube, float plane_y, collision_data *collision_output_data) {
+bool collision_static_plane_cube(rigidbody *cube, float plane_y, collision_data *collision_output_data,
+                                 const mpe_config_t *cfg) {
+    const mpe_config_t *C = cfg ? cfg : &g_cfg;
     if (cube->type != object_cube) {
         return false;
     }
@@ -699,7 +710,7 @@ bool collision_static_plane_cube(rigidbody *cube, float plane_y, collision_data 
 
                 /* Slop-gated (see clip_obb_faces): admit within slop as
                  * zero-depth for persistent friction, no bounce. */
-                if (penetration > -g_cfg.solver.penetration_slop) {
+                if (penetration > -C->solver.penetration_slop) {
                     candidate_positions[candidate_count] = corner;
                     candidate_penetrations[candidate_count] = (penetration > 0.0f) ? penetration : 0.0f;
                     candidate_count++;
@@ -712,7 +723,7 @@ bool collision_static_plane_cube(rigidbody *cube, float plane_y, collision_data 
         return false;
     }
 
-    rigidbody *plane_body = collision_static_plane_body_proxy(plane_y);
+    rigidbody *plane_body = collision_static_plane_body_proxy(plane_y, cfg);
 
     collision_output_data->object_a = cube;
     collision_output_data->object_b = plane_body;
@@ -749,13 +760,14 @@ bool collision_static_plane_cube(rigidbody *cube, float plane_y, collision_data 
     return true;
 }
 
-bool collision_static_plane_body(rigidbody *body, float plane_y, collision_data *collision_output_data) {
-    if (body->type == object_cylinder) {return collision_static_plane_cylinder(body, plane_y, collision_output_data);}
+bool collision_static_plane_body(rigidbody *body, float plane_y, collision_data *collision_output_data,
+                                 const mpe_config_t *cfg) {
+    if (body->type == object_cylinder) {return collision_static_plane_cylinder(body, plane_y, collision_output_data, cfg);}
     if (body->type == object_sphere) {
-        return collision_static_plane_sphere(body, plane_y, collision_output_data);
+        return collision_static_plane_sphere(body, plane_y, collision_output_data, cfg);
     }
     if (body->type == object_cube) {
-        return collision_static_plane_cube(body, plane_y, collision_output_data);
+        return collision_static_plane_cube(body, plane_y, collision_output_data, cfg);
     }
     return false;
 }

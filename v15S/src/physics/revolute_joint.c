@@ -48,7 +48,8 @@ static math3 math3_addition(math3 a, math3 b) {
     return r;
 }
 
-void revolute_solve(revolute_params *p, rigidbody *body_a, rigidbody *body_b, float dt) {
+void revolute_solve(revolute_params *p, rigidbody *body_a, rigidbody *body_b, float dt, const mpe_config_t *cfg) {
+    const mpe_config_t *C = cfg ? cfg : &g_cfg;
     if ((!p) || (!body_a) || (!body_b) || (dt <= 0.0f)) {
         return;
     }
@@ -78,7 +79,7 @@ void revolute_solve(revolute_params *p, rigidbody *body_a, rigidbody *body_b, fl
     vector3 relative_velocity = vector3_subtraction(vel_b_at_anchor, vel_a_at_anchor);
 
     /* Live tunable (was hardcoded 0.3): positional correction stiffness. */
-    const float baumgarte_beta = g_cfg.joints.revolute_beta;
+    const float baumgarte_beta = C->joints.revolute_beta;
     /* Clamp the bias SPEED (Catto's stabilized Baumgarte): an uncapped
      * beta/dt turns a large anchor gap into a multi-m/s velocity demand in
      * one tick. Against a contact face the joint then re-injects approach
@@ -87,7 +88,7 @@ void revolute_solve(revolute_params *p, rigidbody *body_a, rigidbody *body_b, fl
      * friction cone (measured 7x: acc_n 43 from a 6 m/s impact). The cap
      * bounds per-tick energy injection; steady-state mm errors never bind. */
     float bias_speed = baumgarte_beta * vector3_length(position_error) / dt;
-    float max_bias_speed = g_cfg.joints.revolute_max_bias;
+    float max_bias_speed = C->joints.revolute_max_bias;
     vector3 bias;
     if ((bias_speed > max_bias_speed) && (bias_speed > 0.0f)) {
         bias = vector3_scaling(position_error, (baumgarte_beta / dt) * (max_bias_speed / bias_speed));
@@ -215,7 +216,8 @@ void revolute_solve(revolute_params *p, rigidbody *body_a, rigidbody *body_b, fl
 }
 
 /* TRUTH: once-per-tick angle integration (called before the solver loop). */
-void revolute_pre_step(revolute_params *p, rigidbody *body_a, rigidbody *body_b, float dt) {
+void revolute_pre_step(revolute_params *p, rigidbody *body_a, rigidbody *body_b, float dt, const mpe_config_t *cfg) {
+    (void) cfg;
     if ((!p) || (!body_a) || (!body_b) || (!(dt > 0.0f))) {
         return;
     }
@@ -241,7 +243,8 @@ void revolute_pre_step(revolute_params *p, rigidbody *body_a, rigidbody *body_b,
 }
 
 /* Prismatic: single-axis slide with optional limits and motor. */
-void prismatic_solve(prismatic_params *p, rigidbody *body_a, rigidbody *body_b, float dt) {
+void prismatic_solve(prismatic_params *p, rigidbody *body_a, rigidbody *body_b, float dt, const mpe_config_t *cfg) {
+    const mpe_config_t *C = cfg ? cfg : &g_cfg;
     if ((!p) || (!body_a) || (!body_b) || (dt <= 0.0f)) {
         return;
     }
@@ -298,8 +301,8 @@ void prismatic_solve(prismatic_params *p, rigidbody *body_a, rigidbody *body_b, 
                 float rel_d = vector3_dot(rel_vel, dir);
                 /* Positional bias: keep anchors coincident off-axis. */
                 float err_d = vector3_dot(delta, dir);
-                float bias_d = g_cfg.joints.revolute_beta * err_d / dt;
-                float max_b = g_cfg.joints.revolute_max_bias;
+                float bias_d = C->joints.revolute_beta * err_d / dt;
+                float max_b = C->joints.revolute_max_bias;
                 if (bias_d > max_b) {
                     bias_d = max_b;
                 } else if (bias_d < -max_b) {
@@ -369,7 +372,8 @@ void prismatic_solve(prismatic_params *p, rigidbody *body_a, rigidbody *body_b, 
 }
 
 /* TRUTH: once-per-tick slide tracking (called before the solver loop). */
-void prismatic_pre_step(prismatic_params *p, rigidbody *body_a, rigidbody *body_b, float dt) {
+void prismatic_pre_step(prismatic_params *p, rigidbody *body_a, rigidbody *body_b, float dt, const mpe_config_t *cfg) {
+    (void) cfg;
     if ((!p) || (!body_a) || (!body_b) || (!(dt > 0.0f))) {
         return;
     }
@@ -403,7 +407,8 @@ void prismatic_pre_step(prismatic_params *p, rigidbody *body_a, rigidbody *body_
 }
 
 /* Rope: inequality distance constraint (pulls only, no push). */
-void rope_solve(rope_params *p, rigidbody *body_a, rigidbody *body_b, float dt) {
+void rope_solve(rope_params *p, rigidbody *body_a, rigidbody *body_b, float dt, const mpe_config_t *cfg) {
+    const mpe_config_t *C = cfg ? cfg : &g_cfg;
     if ((!p) || (!body_a) || (!body_b) || (dt <= 0.0f)) return;
     if (!isfinite(p->rest_length) || p->rest_length < 0.0f) return;
     if (body_a->is_sleeping) rigidbody_wake(body_a);
@@ -430,8 +435,8 @@ void rope_solve(rope_params *p, rigidbody *body_a, rigidbody *body_b, float dt) 
     vector3 vel_b = vector3_addition(body_b->velocity, vector3_cross(body_b->angular_velocity, r_b));
     float rel_n = vector3_dot(vector3_subtraction(vel_b, vel_a), n);
 
-    float bias = g_cfg.joints.revolute_beta * err / dt;
-    float max_b = g_cfg.joints.revolute_max_bias;
+    float bias = C->joints.revolute_beta * err / dt;
+    float max_b = C->joints.revolute_max_bias;
     if (bias > max_b) bias = max_b;
     else if (bias < -max_b) bias = -max_b;
 
@@ -463,7 +468,8 @@ void rope_solve(rope_params *p, rigidbody *body_a, rigidbody *body_b, float dt) 
 }
 
 /* Prismatic motor: adds drive force to the force accumulator (call once per tick). */
-void prismatic_apply_motor(prismatic_params *p, rigidbody *body_a, rigidbody *body_b, float dt) {
+void prismatic_apply_motor(prismatic_params *p, rigidbody *body_a, rigidbody *body_b, float dt, const mpe_config_t *cfg) {
+    const mpe_config_t *C = cfg ? cfg : &g_cfg;
     if ((!p) || (!p->motor_enabled) || (!body_a) || (!body_b) || (!(dt > 0.0f))) {
         return;
     }
@@ -495,7 +501,7 @@ void prismatic_apply_motor(prismatic_params *p, rigidbody *body_a, rigidbody *bo
         vector4_rotate_to_vector3(body_b->orientation, p->anchor_b)));
     float current_speed = vector3_dot(vector3_subtraction(vel_b, vel_a), axis_world);
     float speed_error = p->motor_target_speed - current_speed;
-    float motor_gain = g_cfg.joints.revolute_motor_gain;
+    float motor_gain = C->joints.revolute_motor_gain;
     float desired_force = speed_error * motor_gain;
     if (desired_force > p->motor_max_force) {
         desired_force = p->motor_max_force;
@@ -511,7 +517,8 @@ void prismatic_apply_motor(prismatic_params *p, rigidbody *body_a, rigidbody *bo
 /* Fixed weld: point-to-point (same K-matrix as revolute) plus full angular
  * lock (kill all relative spin, not just off-axis). Deterministic, no bias
  * beyond the shared Baumgarte cap. */
-void fixed_solve(fixed_params *p, rigidbody *body_a, rigidbody *body_b, float dt) {
+void fixed_solve(fixed_params *p, rigidbody *body_a, rigidbody *body_b, float dt, const mpe_config_t *cfg) {
+    const mpe_config_t *C = cfg ? cfg : &g_cfg;
     if ((!p) || (!body_a) || (!body_b) || (dt <= 0.0f)) {
         return;
     }
@@ -534,10 +541,10 @@ void fixed_solve(fixed_params *p, rigidbody *body_a, rigidbody *body_b, float dt
     vector3 vel_a = vector3_addition(body_a->velocity, vector3_cross(body_a->angular_velocity, r_a));
     vector3 vel_b = vector3_addition(body_b->velocity, vector3_cross(body_b->angular_velocity, r_b));
     vector3 rel = vector3_subtraction(vel_b, vel_a);
-    const float beta = g_cfg.joints.revolute_beta;
+    const float beta = C->joints.revolute_beta;
     float err_len = vector3_length(err);
     vector3 bias = (err_len > 1e-9f)
-        ? vector3_scaling(err, fminf(beta / dt, g_cfg.joints.revolute_max_bias / fmaxf(err_len, 1e-9f)))
+        ? vector3_scaling(err, fminf(beta / dt, C->joints.revolute_max_bias / fmaxf(err_len, 1e-9f)))
         : vector3_zero();
     math3 skew_a = skew_symmetric(r_a);
     math3 skew_b = skew_symmetric(r_b);
@@ -576,7 +583,8 @@ void fixed_solve(fixed_params *p, rigidbody *body_a, rigidbody *body_b, float dt
         body_b->angular_velocity, math3_multiplication_vector3(rigidbody_effective_inv_inertia(body_b), ang_imp));
 }
 
-void revolute_apply_motor(revolute_params *p, rigidbody *body_a, rigidbody *body_b, float dt) {
+void revolute_apply_motor(revolute_params *p, rigidbody *body_a, rigidbody *body_b, float dt, const mpe_config_t *cfg) {
+    const mpe_config_t *C = cfg ? cfg : &g_cfg;
     (void) dt;
     if ((!p) || (!p->motor_enabled) || (!body_a) || (!body_b)) {
         return;
@@ -617,7 +625,7 @@ void revolute_apply_motor(revolute_params *p, rigidbody *body_a, rigidbody *body
     if (!isfinite(speed_error)) {
         return;
     }
-    float motor_gain = g_cfg.joints.revolute_motor_gain;
+    float motor_gain = C->joints.revolute_motor_gain;
     if (!isfinite(motor_gain) || motor_gain < 0.0f) {
         motor_gain = 8.0f;
     }
@@ -660,7 +668,8 @@ void revolute_apply_motor(revolute_params *p, rigidbody *body_a, rigidbody *body
 
 /* Distance: 1D constraint along the anchor axis. Preserves free rotation and
  * tangential motion; only the separation error is corrected. */
-void distance_solve(distance_params *p, rigidbody *body_a, rigidbody *body_b, float dt) {
+void distance_solve(distance_params *p, rigidbody *body_a, rigidbody *body_b, float dt, const mpe_config_t *cfg) {
+    const mpe_config_t *C = cfg ? cfg : &g_cfg;
     if ((!p) || (!body_a) || (!body_b) || (dt <= 0.0f)) {
         return;
     }
@@ -689,8 +698,8 @@ void distance_solve(distance_params *p, rigidbody *body_a, rigidbody *body_b, fl
     vector3 vel_a = vector3_addition(body_a->velocity, vector3_cross(body_a->angular_velocity, r_a));
     vector3 vel_b = vector3_addition(body_b->velocity, vector3_cross(body_b->angular_velocity, r_b));
     float rel_n = vector3_dot(vector3_subtraction(vel_b, vel_a), n);
-    float bias = g_cfg.joints.revolute_beta * err / dt;
-    float max_b = g_cfg.joints.revolute_max_bias;
+    float bias = C->joints.revolute_beta * err / dt;
+    float max_b = C->joints.revolute_max_bias;
     if (bias > max_b) {
         bias = max_b;
     } else if (bias < -max_b) {
@@ -722,7 +731,8 @@ void distance_solve(distance_params *p, rigidbody *body_a, rigidbody *body_b, fl
  * integrate (weld flexes over seconds). This Baumgarte drives the relative
  * quaternion error q_err = q_a^-1 * q_b toward identity with angular impulse,
  * proportional to the rotation vector (axis*sin(half-angle) scaled). */
-void fixed_correct_angular_drift(fixed_params *p, rigidbody *body_a, rigidbody *body_b, float dt) {
+void fixed_correct_angular_drift(fixed_params *p, rigidbody *body_a, rigidbody *body_b, float dt, const mpe_config_t *cfg) {
+    (void) cfg;
     (void) p;
     if ((!body_a) || (!body_b) || (dt <= 0.0f)) {
         return;
@@ -769,7 +779,8 @@ void fixed_correct_angular_drift(fixed_params *p, rigidbody *body_a, rigidbody *
  * so per-iteration application multiplies the correction by the iteration
  * count (64x at defaults): a spurious torsional spring that pumps energy
  * and destroys hinge truth (e.g. 9x-too-fast pendulum). */
-void revolute_correct_axis_drift(revolute_params *p, rigidbody *body_a, rigidbody *body_b, float dt) {
+void revolute_correct_axis_drift(revolute_params *p, rigidbody *body_a, rigidbody *body_b, float dt, const mpe_config_t *cfg) {
+    (void) cfg;
     if ((!p) || (!body_a) || (!body_b) || (dt <= 0.0f)) {
         return;
     }

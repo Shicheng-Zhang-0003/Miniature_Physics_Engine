@@ -12,58 +12,12 @@
 #include <stdbool.h>
 #include <math.h>
 
+/* Narrowphase dispatch relic removed: all pair routing goes through the
+ * shape registry (mpe_shape_dispatch), so foreign shapes get positional
+ * correction too. This symbol remains as a NULL-world wrapper. */
 bool a3_depenetration_dispatch(rigidbody *rigid_body_a, rigidbody *rigid_body_b,
                                       collision_data *collision_output) {
-    if ((rigid_body_a->type == object_sphere) && (rigid_body_b->type == object_sphere)) {
-        return collision_dual_sphere(rigid_body_a, rigid_body_b, collision_output);
-    }
-    if ((rigid_body_a->type == object_sphere) && (rigid_body_b->type == object_cube)) {
-        return collision_sphere_cube(rigid_body_a, rigid_body_b, collision_output);
-    }
-    if ((rigid_body_a->type == object_cube) && (rigid_body_b->type == object_sphere)) {
-        bool collided = collision_sphere_cube(rigid_body_b, rigid_body_a, collision_output);
-        if (collided) {
-            collision_output->normal_vector = vector3_scaling(collision_output->normal_vector, -1.0f);
-            collision_output->object_a = rigid_body_a;
-            collision_output->object_b = rigid_body_b;
-        }
-        return collided;
-    }
-    if ((rigid_body_a->type == object_cube) && (rigid_body_b->type == object_cube)) {
-        return collision_dual_cube(rigid_body_a, rigid_body_b, collision_output);
-    }
-    /* FIX-AUDIT: cylinders were excluded -> no positional pass, only
-     * velocity Baumgarte. Add all cylinder branches (normal flip on swap
-     * mirrors the sphere/cube swap above). Bisect verified these branches
-     * do not affect the wheel-rig settle (floor is a plane path). */
-    if ((rigid_body_a->type == object_cylinder) && (rigid_body_b->type == object_sphere)) {
-        return collision_cylinder_sphere(rigid_body_a, rigid_body_b, collision_output);
-    }
-    if ((rigid_body_a->type == object_sphere) && (rigid_body_b->type == object_cylinder)) {
-        bool collided = collision_cylinder_sphere(rigid_body_b, rigid_body_a, collision_output);
-        if (collided) {
-            collision_output->normal_vector = vector3_scaling(collision_output->normal_vector, -1.0f);
-            collision_output->object_a = rigid_body_a;
-            collision_output->object_b = rigid_body_b;
-        }
-        return collided;
-    }
-    if ((rigid_body_a->type == object_cylinder) && (rigid_body_b->type == object_cube)) {
-        return collision_cylinder_cube(rigid_body_a, rigid_body_b, collision_output);
-    }
-    if ((rigid_body_a->type == object_cube) && (rigid_body_b->type == object_cylinder)) {
-        bool collided = collision_cylinder_cube(rigid_body_b, rigid_body_a, collision_output);
-        if (collided) {
-            collision_output->normal_vector = vector3_scaling(collision_output->normal_vector, -1.0f);
-            collision_output->object_a = rigid_body_a;
-            collision_output->object_b = rigid_body_b;
-        }
-        return collided;
-    }
-    if ((rigid_body_a->type == object_cylinder) && (rigid_body_b->type == object_cylinder)) {
-        return collision_cylinder_cylinder(rigid_body_a, rigid_body_b, collision_output);
-    }
-    return false;
+    return mpe_shape_dispatch(NULL, rigid_body_a, rigid_body_b, collision_output);
 }
 
 /* Single depenetration implementation (see header).
@@ -97,7 +51,9 @@ void a3_positional_depenetration_pass_dt(struct physics_world *world, broadphase
         *pair_count_pointer = pair_count;
     }
 
-    int depenetration_iterations = rebuild_broadphase ? g_cfg.depenetration.rebuild_iterations : 1; /* MPE_TASK_30 */
+    int depenetration_iterations = rebuild_broadphase
+        ? mpe_world_cfg(world)->depenetration.rebuild_iterations
+        : 1; /* MPE_TASK_30 */
 
     for (int dep_iteration = 0; dep_iteration < depenetration_iterations; dep_iteration++) {
         for (int pair_index = 0; pair_index < pair_count; pair_index++) {
@@ -116,8 +72,8 @@ void a3_positional_depenetration_pass_dt(struct physics_world *world, broadphase
 
             collision_data depenetration_collision = {0};
 
-            if (a3_depenetration_dispatch(body_a, body_b, &depenetration_collision)) {
-                a3_positional_depenetrate_manifold(&depenetration_collision);
+            if (mpe_shape_dispatch(world, body_a, body_b, &depenetration_collision)) {
+                a3_positional_depenetrate_manifold_w(world, &depenetration_collision);
             }
         }
 
@@ -129,14 +85,19 @@ void a3_positional_depenetration_pass_dt(struct physics_world *world, broadphase
 
             collision_data floor_collision = {0};
 
-            if (collision_static_plane_body(rigid_body, 0.0f, &floor_collision)) {
-                a3_positional_depenetrate_manifold(&floor_collision);
+            if (collision_static_plane_body(rigid_body, 0.0f, &floor_collision, mpe_world_cfg(world))) {
+                a3_positional_depenetrate_manifold_w(world, &floor_collision);
             }
         }
     }
 }
 
 void a3_positional_depenetrate_manifold(collision_data *manifold) {
+    a3_positional_depenetrate_manifold_w(NULL, manifold);
+}
+
+void a3_positional_depenetrate_manifold_w(struct physics_world *world, collision_data *manifold) {
+    const mpe_config_t *C = (world && world->cfg) ? world->cfg : &g_cfg;
     if ((!manifold) || (manifold->contact_count <= 0)) {
         return;
     }
@@ -160,7 +121,7 @@ void a3_positional_depenetrate_manifold(collision_data *manifold) {
     /* TRUTH P0-12: single slop. Solver slop is the sole overlap tolerance;
      * a second depenetration slop (5mm vs solver 10mm) makes the passes
      * fight (limit-cycle jitter). Depenetration honors solver slop. */
-    const float penetration_slop = g_cfg.solver.penetration_slop;
+    const float penetration_slop = C->solver.penetration_slop;
 
     for (int contact_index = 0; contact_index < manifold->contact_count; contact_index++) {
         float depth = manifold->contacts[contact_index].penetration;
@@ -181,19 +142,19 @@ void a3_positional_depenetrate_manifold(collision_data *manifold) {
     bool b_sleeping = (body_b->is_sleeping) && (!body_b->static_state);
 
     /* Wake sleeping bodies only when the overlap is meaningful. */
-    if ((a_sleeping) && (b_sleeping) && (max_depth > g_cfg.depenetration.wake_depth_thresh)) {
+    if ((a_sleeping) && (b_sleeping) && (max_depth > C->depenetration.wake_depth_thresh)) {
         rigidbody_wake(body_a);
         rigidbody_wake(body_b);
         a_sleeping = false;
         b_sleeping = false;
     }
 
-    if ((a_sleeping) && (body_b->static_state) && (max_depth > g_cfg.depenetration.wake_depth_thresh)) {
+    if ((a_sleeping) && (body_b->static_state) && (max_depth > C->depenetration.wake_depth_thresh)) {
         rigidbody_wake(body_a);
         a_sleeping = false;
     }
 
-    if ((b_sleeping) && (body_a->static_state) && (max_depth > g_cfg.depenetration.wake_depth_thresh)) {
+    if ((b_sleeping) && (body_a->static_state) && (max_depth > C->depenetration.wake_depth_thresh)) {
         rigidbody_wake(body_b);
         b_sleeping = false;
     }
@@ -225,13 +186,13 @@ void a3_positional_depenetrate_manifold(collision_data *manifold) {
      * corner per pass. Average under-corrects by (max-avg)*factor, causing
      * leaning stacks. */
     float correction_magnitude =
-        (max_depth - penetration_slop) * g_cfg.depenetration.correction_factor / inverse_mass_sum; /* MPE_TASK_30 */
+        (max_depth - penetration_slop) * C->depenetration.correction_factor / inverse_mass_sum; /* MPE_TASK_30 */
 
     if (correction_magnitude <= 0.0f) {
         return;
     }
-    if (correction_magnitude > g_cfg.depenetration.max_correction) {
-        correction_magnitude = g_cfg.depenetration.max_correction;
+    if (correction_magnitude > C->depenetration.max_correction) {
+        correction_magnitude = C->depenetration.max_correction;
     }
 
     vector3 correction_vector = vector3_scaling(manifold->normal_vector, correction_magnitude);

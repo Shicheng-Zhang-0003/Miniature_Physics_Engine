@@ -27,5 +27,7 @@ void apply_force_all_joints_dt(physics_world *world, float dt);
  * step path). Reads the pool of the given world. */
 void apply_spring_forces_world(physics_world *world, rigidbody *bodies, int body_count);
 void apply_spring_forces_world_dt(physics_world *world, rigidbody *bodies, int body_count, float dt);
+/* Canonical per-tick spring entry (see spring_joint_types.h). */
+void mpe_springs_apply(physics_world *world, float dt);
 void spring_joint_render(GLuint shader_program, math4 view_matrix, math4 projection_matrix);
 #endif
