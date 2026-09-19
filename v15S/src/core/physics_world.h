@@ -4,6 +4,8 @@
 
 #include "rigidbody.h"
 #include "../config/mpe_constants.h" /* MFS_131 */
+#include "../config/mpe_config.h"
+#include "mpe_module.h"
 #include "../physics/spring_joint_types.h"
 #include "../physics/constraint.h"
 #include "../physics/broadphase.h"
@@ -40,6 +42,12 @@ typedef struct physics_world {
     int body_count;
     int body_capacity;
     uint32_t next_object_id;
+    /* Phase-1 modularisation: per-world config. Defaults to &g_cfg
+     * (global singleton, back-compat). Call physics_world_set_config()
+     * to bind a foreign/isolated mpe_config_t. Hot path must read
+     * via mpe_world_cfg(world), never g_cfg directly, so two worlds
+     * can hold different gravity/iters/slop. */
+    mpe_config_t *cfg;
     /* MFS_131A: per-world warm-start cache. Heap-allocated in
      * physics_world_init (an inline array would be ~3 MB and would
      * overflow the stack of tests that declare worlds locally).
@@ -95,16 +103,48 @@ typedef struct physics_world {
      * prev array — floor contacts blind it. It probes the warm-start cache
      * per id-pair instead; see contact_cache_has_pair.) */
     unsigned char *has_contact;
+    /* Phase-2 modular slots. NULL = built-in default.
+     * broadphase_if/solver_if override the corresponding stage;
+     * tick_modules[] are generic pre/post-step hooks (forcefields,
+     * motors, loggers). States parallel tick_modules[]. */
+    const mpe_broadphase_if_t *broadphase_if;
+    const mpe_solver_if_t *solver_if;
+    const mpe_module_desc_t *tick_modules[16];
+    void *tick_module_state[16];
+    int tick_module_count;
 } physics_world;
 
 void physics_world_init(physics_world *world);
 void physics_world_cleanup(physics_world *world);
+/* Phase-1: bind per-world config (NULL rebinds global g_cfg).
+ * Must be called after physics_world_init; safe any time (takes
+ * effect next tick; step snapshots cfg at tick start). */
+void physics_world_set_config(physics_world *world, mpe_config_t *cfg);
+mpe_config_t *physics_world_get_config(physics_world *world);
+/* Hot-path accessor: per-world cfg if bound, else global.
+ * Never NULL after mpe_config_init() has run once. */
+static inline const mpe_config_t *mpe_world_cfg(const physics_world *world) {
+    if (world && world->cfg) return world->cfg;
+    return &g_cfg;
+}
+static inline mpe_config_t *mpe_world_cfg_mut(physics_world *world) {
+    if (world && world->cfg) return world->cfg;
+    return &g_cfg;
+}
 int physics_world_add_sphere(physics_world *world, float radius, float mass, vector3 position);
 int physics_world_add_cube(physics_world *world, vector3 position, vector3 half_extensions, float mass);
 int physics_world_add_cylinder(physics_world *world, float radius, float half_length, float mass, vector3 position); /* MPE_FTC_090 */
+int physics_world_add_custom(physics_world *world, int custom_shape, vector3 position, float mass, float radius);
 void physics_world_clear(physics_world *world);
 void physics_world_step(physics_world *world, float dt);
 physics_world *physics_world_get_primary(void);
+/* Phase-2: modular attach/dispatch. */
+int physics_world_attach_module(physics_world *world, const mpe_module_desc_t *desc);
+int physics_world_detach_module(physics_world *world, const char *name);
+void physics_world_set_broadphase(physics_world *world, const mpe_broadphase_if_t *iface);
+void physics_world_set_solver(physics_world *world, const mpe_solver_if_t *iface);
+/* Shape dispatch: registry-first, built-in fallback. Returns true on contact. */
+bool mpe_shape_dispatch(physics_world *world, rigidbody *a, rigidbody *b, collision_data *out);
 /* R3-07: Add four static wall bodies around the playable area.
  * half_width and half_depth define the playable half-extents.
  * wall_height and wall_thickness define the wall geometry.

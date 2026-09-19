@@ -9,6 +9,7 @@
  * A per-world cache is tracked as future work.
  */
 #include "physics_world.h"
+#include "mpe_registry.h"
 #include "../physics/collision_mechanics.h"
 #include "../physics/broadphase.h"
 #include "../physics/constraint.h" /* MPE_FTC_067 */
@@ -39,6 +40,10 @@ void physics_world_init(physics_world *world) {
     }
     det_pin_fp_state();
     memset(world, 0, sizeof(physics_world)); /* MPE_FTC_076a */
+    /* Phase-1: default-bind global config (back-compat). Caller may
+     * rebind via physics_world_set_config() for isolation. */
+    world->cfg = &g_cfg;
+    mpe_register_builtins();
     if (!world->bodies) {
         world->bodies = (rigidbody *) malloc((size_t) mpe_max_bodies * sizeof(rigidbody));
         world->body_capacity = mpe_max_bodies;
@@ -134,6 +139,85 @@ void physics_world_cleanup(physics_world *world) {
     world->world_contact_cache_count = 0;
     world->body_count = 0;
     world->body_capacity = 0;
+    world->cfg = &g_cfg;
+}
+
+void physics_world_set_config(physics_world *world, mpe_config_t *cfg) {
+    if (!world) return;
+    world->cfg = cfg ? cfg : &g_cfg;
+}
+
+mpe_config_t *physics_world_get_config(physics_world *world) {
+    if (!world || !world->cfg) return &g_cfg;
+    return world->cfg;
+}
+
+void physics_world_set_broadphase(physics_world *world, const mpe_broadphase_if_t *iface) {
+    if (!world) return;
+    world->broadphase_if = iface;
+}
+
+void physics_world_set_solver(physics_world *world, const mpe_solver_if_t *iface) {
+    if (!world) return;
+    world->solver_if = iface;
+}
+
+int physics_world_attach_module(physics_world *world, const mpe_module_desc_t *desc) {
+    if (!world || !desc || desc->abi != MPE_MODULE_ABI) return -1;
+    for (int i = 0; i < world->tick_module_count; i++)
+        if (world->tick_modules[i] == desc) return i;
+    if (world->tick_module_count >= 16) return -1;
+    void *st = NULL;
+    if (desc->attach && desc->attach(world, &st) != 0) return -1;
+    world->tick_modules[world->tick_module_count] = desc;
+    world->tick_module_state[world->tick_module_count] = st;
+    return world->tick_module_count++;
+}
+
+int physics_world_detach_module(physics_world *world, const char *name) {
+    if (!world || !name) return -1;
+    for (int i = 0; i < world->tick_module_count; i++) {
+        if (world->tick_modules[i] && world->tick_modules[i]->name &&
+            strcmp(world->tick_modules[i]->name, name) == 0) {
+            if (world->tick_modules[i]->detach)
+                world->tick_modules[i]->detach(world, world->tick_module_state[i]);
+            for (int j = i; j + 1 < world->tick_module_count; j++) {
+                world->tick_modules[j] = world->tick_modules[j + 1];
+                world->tick_module_state[j] = world->tick_module_state[j + 1];
+            }
+            world->tick_module_count--;
+            world->tick_modules[world->tick_module_count] = NULL;
+            world->tick_module_state[world->tick_module_count] = NULL;
+            return 0;
+        }
+    }
+    return -1;
+}
+
+/* Registry-first shape dispatch with built-in fallback.
+ * Handles swapped (cube,sphere)/(cyl,sphere)/(cyl,cube) by trying the
+ * registered orientation first, then the swapped orientation with a
+ * normal flip — mirroring the legacy inline chains. Custom shapes
+ * go through the registry only (no built-in fallback). */
+bool mpe_shape_dispatch(physics_world *world, rigidbody *a, rigidbody *b, collision_data *out) {
+    if (!a || !b || !out) return false;
+    mpe_register_builtins();
+    int ca = (a->type == object_custom) ? a->custom_shape : -1;
+    int cb = (b->type == object_custom) ? b->custom_shape : -1;
+    mpe_collide_fn fn = mpe_find_pair_handler((int)a->type, (int)b->type, ca, cb);
+    if (fn) return fn(a, b, out, world);
+    /* try swapped orientation (registry may hold canonical order only) */
+    fn = mpe_find_pair_handler((int)b->type, (int)a->type, cb, ca);
+    if (fn) {
+        collision_data tmp = {0};
+        if (!fn(b, a, &tmp, world)) return false;
+        *out = tmp;
+        out->normal_vector = vector3_scaling(tmp.normal_vector, -1.0f);
+        out->object_a = a;
+        out->object_b = b;
+        return true;
+    }
+    return false;
 }
 
 int physics_world_add_sphere(physics_world *world, float radius, float mass, vector3 position) {
@@ -192,6 +276,25 @@ int physics_world_add_cylinder(physics_world *world, float radius, float half_le
     return world->body_count++;
 }
 
+int physics_world_add_custom(physics_world *world, int custom_shape, vector3 position, float mass, float radius) {
+    if ((!world) || (!world->bodies) || (world->body_count >= world->body_capacity)) return -1;
+    if (custom_shape < 100) custom_shape = 100;
+    rigidbody *rb = &world->bodies[world->body_count];
+    /* Backing is a sphere (bounding volume + inertia sane until the
+     * plugin overrides); type marks it foreign for dispatch. */
+    rigidbody_initialisation_sphere(rb, radius > 0.0f ? radius : 0.5f, mass, position);
+    rb->type = object_custom;
+    rb->custom_shape = custom_shape;
+    if (world->next_object_id == 0 || world->next_object_id == 0xFFFFFFFFu) world->next_object_id = 1;
+    rb->object_id = world->next_object_id++;
+    if (world->next_object_id == 0 || world->next_object_id == 0xFFFFFFFFu) world->next_object_id = 1;
+    rb->object_generation = 1;
+    rigidbody_sanitize(rb);
+    rb->type = object_custom; /* sanitize must not reset foreign type */
+    rb->custom_shape = custom_shape;
+    return world->body_count++;
+}
+
 void physics_world_clear(physics_world *world) {
     if (!world) {
         return;
@@ -224,41 +327,10 @@ static void physics_world_process_pair(physics_world *world, int index_a, int in
     rigidbody *body_a = &world->bodies[index_a];
     rigidbody *body_b = &world->bodies[index_b];
         collision_data narrowphase_collision = {0};
-        bool collided = false;
-        if ((body_a->type == object_sphere) && (body_b->type == object_sphere)) {
-            collided = collision_dual_sphere(body_a, body_b, &narrowphase_collision);
-        } else if ((body_a->type == object_sphere) && (body_b->type == object_cube)) {
-            collided = collision_sphere_cube(body_a, body_b, &narrowphase_collision);
-        } else if ((body_a->type == object_cube) && (body_b->type == object_sphere)) {
-            collided = collision_sphere_cube(body_b, body_a, &narrowphase_collision);
-            if (collided) {
-                narrowphase_collision.normal_vector = vector3_scaling(narrowphase_collision.normal_vector, -1.0f);
-                narrowphase_collision.object_a = body_a;
-                narrowphase_collision.object_b = body_b;
-            }
-        } else if ((body_a->type == object_cube) && (body_b->type == object_cube)) {
-            collided = collision_dual_cube(body_a, body_b, &narrowphase_collision);
-        } else if ((body_a->type == object_cylinder) && (body_b->type == object_sphere)) { /* MFS_173C_REPAIRED */
-            collided = collision_cylinder_sphere(body_a, body_b, &narrowphase_collision);
-        } else if ((body_a->type == object_sphere) && (body_b->type == object_cylinder)) {
-            collided = collision_cylinder_sphere(body_b, body_a, &narrowphase_collision);
-            if (collided) {
-                narrowphase_collision.normal_vector = vector3_scaling(narrowphase_collision.normal_vector, -1.0f);
-                narrowphase_collision.object_a = body_a;
-                narrowphase_collision.object_b = body_b;
-            }
-        } else if ((body_a->type == object_cylinder) && (body_b->type == object_cube)) {
-            collided = collision_cylinder_cube(body_a, body_b, &narrowphase_collision);
-        } else if ((body_a->type == object_cube) && (body_b->type == object_cylinder)) {
-            collided = collision_cylinder_cube(body_b, body_a, &narrowphase_collision);
-            if (collided) {
-                narrowphase_collision.normal_vector = vector3_scaling(narrowphase_collision.normal_vector, -1.0f);
-                narrowphase_collision.object_a = body_a;
-                narrowphase_collision.object_b = body_b;
-            }
-        } else if ((body_a->type == object_cylinder) && (body_b->type == object_cylinder)) {
-            collided = collision_cylinder_cylinder(body_a, body_b, &narrowphase_collision);
-        }         if (collided) {
+        /* Phase-2: registry-first dispatch (foreign shapes plug in here),
+         * built-in table fallback preserves exact legacy behaviour. */
+        bool collided = mpe_shape_dispatch(world, body_a, body_b, &narrowphase_collision);
+        if (collided) {
             if ((*manifold_count_ptr) >= a3_max_manifolds) {
                 world->manifold_overflow_count++;
                 return;
@@ -292,8 +364,8 @@ static void physics_world_process_pair(physics_world *world, int index_a, int in
                     rigidbody_wake(body_b);
                 }
 
-                float wake_lin_sq = g_cfg.sleep.wake_linear_thresh_sq;
-                float wake_ang_sq = g_cfg.sleep.wake_angular_thresh_sq;
+                float wake_lin_sq = mpe_world_cfg(world)->sleep.wake_linear_thresh_sq;
+                float wake_ang_sq = mpe_world_cfg(world)->sleep.wake_angular_thresh_sq;
                 bool a_fast = (!a_was_sleeping) &&
                               ((vector3_length_squared(body_a->velocity) > wake_lin_sq) ||
                                (vector3_length_squared(body_a->angular_velocity) > wake_ang_sq));
@@ -319,7 +391,7 @@ static void physics_world_process_pair(physics_world *world, int index_a, int in
                             deepest = narrowphase_collision.contacts[wi].penetration;
                         }
                     }
-                    if (deepest > g_cfg.depenetration.wake_depth_thresh) {
+                    if (deepest > mpe_world_cfg(world)->depenetration.wake_depth_thresh) {
                         if (a_was_sleeping) {
                             rigidbody_wake(body_a);
                         }
@@ -357,11 +429,13 @@ void physics_world_step(physics_world *world, float dt) {
     }
     /* TRUTH: snapshot config once per tick. Menu/terminal mutating g_cfg
      * mid-tick (between substeps) would otherwise change behavior halfway
-     * through the frame. Hot path uses these locals, never g_cfg directly. */
-    const float step_gravity = g_cfg.world.gravity;
-    const float step_drag = g_cfg.world.drag;
-    const float step_ang_scale = g_cfg.world.angular_damping_scale;
-    const int step_iterations = g_cfg.timestep.solver_iterations;
+     * through the frame. Hot path uses these locals, never g_cfg directly.
+     * Phase-1: snapshot from per-world cfg (defaults to global). */
+    const mpe_config_t *step_cfg = mpe_world_cfg(world);
+    const float step_gravity = step_cfg->world.gravity;
+    const float step_drag = step_cfg->world.drag;
+    const float step_ang_scale = step_cfg->world.angular_damping_scale;
+    const int step_iterations = step_cfg->timestep.solver_iterations;
     /* TRUTH P0-1: reset contact flags (set below on every manifold). */
     if (world->has_contact) {
         for (int i = 0; i < world->body_count; i++) {
@@ -381,8 +455,11 @@ void physics_world_step(physics_world *world, float dt) {
 
     int pair_count = 0;
     if (world->body_count >= 2) {
-        pair_count =
-            broadphase_generate_pairing(world, world->pair_buffer, mpe_max_broadphase_pairs, dt);
+        if (world->broadphase_if && world->broadphase_if->generate)
+            pair_count = world->broadphase_if->generate(world, world->pair_buffer,
+                                                        mpe_max_broadphase_pairs, dt, NULL);
+        else
+            pair_count = broadphase_generate_pairing(world, world->pair_buffer, mpe_max_broadphase_pairs, dt);
     }
     int broadphase_pair_count = pair_count; /* saved for depenetration pass */
 
@@ -471,7 +548,7 @@ void physics_world_step(physics_world *world, float dt) {
                     deepest = floor_collision.contacts[fi].penetration;
                 }
             }
-            if (was_sleeping && deepest > g_cfg.depenetration.wake_depth_thresh) {
+            if (was_sleeping && deepest > step_cfg->depenetration.wake_depth_thresh) {
                 rigidbody_wake(rb);
             }
             collision_prepare_solver(world, &floor_collision, &world->manifolds[manifold_count], dt);
@@ -517,6 +594,11 @@ void physics_world_step(physics_world *world, float dt) {
         apply_spring_forces_world(world, world->bodies, world->body_count);
     }
     constraint_apply_motors(world, dt); /* MPE_FTC_067 */
+    /* Phase-2: foreign forcefield / motor modules (pre-integration). */
+    for (int mi = 0; mi < world->tick_module_count; mi++) {
+        if (world->tick_modules[mi] && world->tick_modules[mi]->pre_step)
+            world->tick_modules[mi]->pre_step(world, dt, world->tick_module_state[mi]);
+    }
     for (int i = 0; i < world->body_count; i++) {
         rb_integrate_velocity(&world->bodies[i], dt, linear_damping, angular_damping);
     }
@@ -659,6 +741,11 @@ void physics_world_step(physics_world *world, float dt) {
     /* Positional depenetration pass (like legacy path). */
     a3_positional_depenetration_pass_dt(world, world->pair_buffer, &broadphase_pair_count, a3_boundary_moved_any,
                                         dt);
+    /* Phase-2: foreign post-step modules (loggers, correctors). */
+    for (int mi = 0; mi < world->tick_module_count; mi++) {
+        if (world->tick_modules[mi] && world->tick_modules[mi]->post_step)
+            world->tick_modules[mi]->post_step(world, dt, world->tick_module_state[mi]);
+    }
     /* AUDIT: the warm-start cache is deliberately NOT cleared here. Cached
      * contact points are stored in BODY-LOCAL space, which rigid
      * translation (the only thing depenetration/boundary do) preserves
