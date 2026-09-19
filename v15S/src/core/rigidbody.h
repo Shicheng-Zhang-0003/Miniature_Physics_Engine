@@ -7,9 +7,8 @@
 #include <stdint.h>
 #include "math3d.h"
 #include "math4_special.h"
-typedef enum { object_sphere, object_cube, object_cylinder } object_type; /* MPE_FTC_090 */
-/* Uppercase aliases for C convention; keep lowercase for backward compat. */
-enum { OBJECT_SPHERE = object_sphere, OBJECT_CUBE = object_cube, OBJECT_CYLINDER = object_cylinder };
+typedef enum { object_sphere, object_cube, object_cylinder, object_custom } object_type; /* MPE_FTC_090 + modular custom */
+enum { OBJECT_SPHERE = object_sphere, OBJECT_CUBE = object_cube, OBJECT_CYLINDER = object_cylinder, OBJECT_CUSTOM = object_custom };
 typedef struct {
     //Linear Kinematics
     vector3 position, velocity, acceleration;
@@ -52,6 +51,11 @@ typedef struct {
     /* MPE_TASK_V15R2_NICE_VALUE_END */
     uint32_t object_id;
     uint32_t object_generation;
+    /* Modular custom shape: valid only when type==object_custom.
+     * Foreign plugins claim an id (>=100) via mpe_register_pair_handler;
+     * core treats the body as a bounding-sphere for broadphase/CCD
+     * until the plugin overrides those stages. */
+    int custom_shape;
 } rigidbody;
 void rigidbody_update_axes(rigidbody *rigid_body);
 void rigidbody_initialisation_sphere(rigidbody *rigid_body, float radius, float mass, vector3 position_input);

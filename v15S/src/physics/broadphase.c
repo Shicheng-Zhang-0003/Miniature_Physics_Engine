@@ -156,6 +156,10 @@ float broadphase_bounding_radius(rigidbody *rb) {
         return sqrtf(rb->radius * rb->radius +
                      rb->cylinder_half_length * rb->cylinder_half_length);
     }
+    if (rb->type == object_custom) {
+        /* Foreign shape: conservative sphere until plugin overrides. */
+        return rb->radius > 0.0f ? rb->radius : 0.5f;
+    }
     return sqrtf(rb->half_extensions.x * rb->half_extensions.x +
                  rb->half_extensions.y * rb->half_extensions.y +
                  rb->half_extensions.z * rb->half_extensions.z);
@@ -329,7 +333,7 @@ int broadphase_generate_pairing(struct physics_world *world, broadphase_pair *co
         float extent_x, extent_y, extent_z;
         if (rb->type == object_sphere) {
             extent_x = extent_y = extent_z = rb->radius;
-        } else if (rb->type == object_cylinder) {
+        } else if (rb->type == object_cylinder || rb->type == object_custom) {
             float r = broadphase_bounding_radius(rb);
             extent_x = extent_y = extent_z = r;
         } else {
