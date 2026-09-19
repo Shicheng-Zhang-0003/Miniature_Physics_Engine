@@ -315,6 +315,7 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
         (physics_world_get_primary()->bodies)[i] = staged_bodies[i];
         scene_note_loaded_id((physics_world_get_primary()->bodies)[i].object_id);
     }
+    physics_world_bump_revision(physics_world_get_primary());
     for (int j = 0; j < staged_spring_count; j++) {
         add_joint_by_ids(physics_world_get_primary(), staged_springs[j].id_a, staged_springs[j].id_b, staged_springs[j].eq, staged_springs[j].k,
                          staged_springs[j].c);

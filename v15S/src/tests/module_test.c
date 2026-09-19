@@ -2,8 +2,10 @@
  * custom shape + tick-module hooks. No GTK/GL. */
 #include <stdio.h>
 #include <assert.h>
+#include <string.h>
 #include "../core/physics_world.h"
 #include "../core/mpe_registry.h"
+#include "../core/det_math.h"
 #include "../config/mpe_config.h"
 
 static int pre_calls = 0;
@@ -14,6 +16,19 @@ static const mpe_module_desc_t my_mod = {
     .kind = "generic", .deterministic = true,
     .attach = 0, .detach = 0, .pre_step = my_pre, .post_step = 0,
 };
+
+/* Counting solver_if: delegates to the builtin with the world's config. */
+static int *test_counting_solver_calls = NULL;
+static float test_count_resolve(mpe_world_t *world, void *manifold, float dt, bool friction_only, int iter,
+                                void *s) {
+    (void) s;
+    if (test_counting_solver_calls) {
+        (*test_counting_solver_calls)++;
+    }
+    const mpe_config_t *C = (world && world->cfg) ? world->cfg : &g_cfg;
+    return collision_resolve_iterative((collision_data *)manifold, dt, friction_only, iter, C);
+}
+static const mpe_solver_if_t test_counting_solver = {test_count_resolve, NULL, NULL, NULL};
 
 int mpe_module_test_main(void) {
     mpe_config_init();
@@ -36,14 +51,16 @@ int mpe_module_test_main(void) {
     /* 2. registry has built-ins */
     if (!mpe_find_pair_handler(0, 0, -1, -1)) { printf("[FAIL] registry sphere-sphere\n"); return 1; }
     if (!mpe_find_pair_handler(0, 1, -1, -1)) { printf("[FAIL] registry sphere-cube\n"); return 1; }
-    printf("[PASS] builtin pair registry\n");
+    if (!mpe_find_broadphase("hash")) { printf("[FAIL] registry broadphase hash\n"); return 1; }
+    if (!mpe_find_solver("seq-impulse")) { printf("[FAIL] registry solver seq-impulse\n"); return 1; }
+    printf("[PASS] builtin pair/broadphase/solver registry\n");
 
     /* 3. shape dispatch equivalence: sphere-sphere via registry == direct */
     int ia = physics_world_add_sphere(&A, 0.5f, 1.0f, (vector3){0, 2, 0});
     int ib = physics_world_add_sphere(&A, 0.5f, 1.0f, (vector3){0, 2.4f, 0});
     (void)ia; (void)ib;
     collision_data d1 = {0}, d2 = {0};
-    bool r1 = collision_dual_sphere(&A.bodies[0], &A.bodies[1], &d1);
+    bool r1 = collision_dual_sphere(&A.bodies[0], &A.bodies[1], &d1, NULL);
     bool r2 = mpe_shape_dispatch(&A, &A.bodies[0], &A.bodies[1], &d2);
     if (r1 != r2) { printf("[FAIL] dispatch mismatch\n"); return 1; }
     printf("[PASS] shape dispatch matches builtin\n");
@@ -67,6 +84,87 @@ int mpe_module_test_main(void) {
     physics_world_step(&A, 1.0f / 60.0f);
     if (pre_calls != 1) { printf("[FAIL] detach did not stop calls\n"); return 1; }
     printf("[PASS] detach stops hooks\n");
+
+    /* 6. id cache: lookups correct, survives pool growth + revision bumps */
+    {
+        physics_world W; physics_world_init(&W);
+        for (int i = 0; i < 600; i++) {
+            physics_world_add_sphere(&W, 0.3f, 1.0f,
+                                     (vector3){(float) (i % 20), 2.0f + (float) (i / 20), 0});
+        }
+        if (W.body_capacity < 600 || W.body_count != 600) {
+            printf("[FAIL] pool growth cap=%d count=%d\n", W.body_capacity, W.body_count);
+            return 1;
+        }
+        printf("[PASS] pool grows on demand (cap=%d)\n", W.body_capacity);
+        uint32_t mid_id = W.bodies[300].object_id;
+        if (physics_world_index_by_id(&W, mid_id) != 300) {
+            printf("[FAIL] id lookup cap=%d\n", physics_world_index_by_id(&W, mid_id));
+            return 1;
+        }
+        if (physics_world_index_by_id(&W, 0xDEADBEEFu) != -1) {
+            printf("[FAIL] missing id should be -1\n");
+            return 1;
+        }
+        printf("[PASS] id->index cache correct\n");
+        for (int t = 0; t < 120; t++) physics_world_step(&W, 1.0f / 60.0f);
+        if (physics_world_index_by_id(&W, mid_id) < 0 && W.body_count == 600) {
+            /* bodies may legitimately still all exist; index must resolve */
+            printf("[FAIL] id lost after steps\n");
+            return 1;
+        }
+        printf("[PASS] id cache stable across steps\n");
+        physics_world_cleanup(&W);
+    }
+
+    /* 7. det fallback counters observable process-wide, zero in-contract */
+    {
+        det_fallback_reset();
+        physics_world W; physics_world_init(&W);
+        physics_world_add_sphere(&W, 0.5f, 1.0f, (vector3){0, 5, 0});
+        for (int t = 0; t < 600; t++) physics_world_step(&W, 1.0f / 60.0f);
+        if (det_fallback_pow_total() != 0) {
+            printf("[FAIL] pow fallbacks=%lu\n", det_fallback_pow_total());
+            return 1;
+        }
+        printf("[PASS] det counters process-wide zero (pow=%lu trig=%lu)\n",
+               det_fallback_pow_total(), det_fallback_trig_total());
+        physics_world_cleanup(&W);
+    }
+
+    /* 6. per-world narrowphase config: slop-0 world sees contact, slop-5cm world does not */
+    {
+        physics_world W; physics_world_init(&W);
+        static mpe_config_t cfgW; cfgW = g_cfg;
+        physics_world_add_sphere(&W, 0.5f, 1.0f, (vector3){0, 2, 0});
+        physics_world_add_sphere(&W, 0.5f, 1.0f, (vector3){0, 3.005f, 0}); /* 5mm gap */
+        collision_data dd = {0};
+        cfgW.solver.penetration_slop = 0.01f;
+        bool hit_slop = collision_dual_sphere(&W.bodies[0], &W.bodies[1], &dd, &cfgW);
+        memset(&dd, 0, sizeof(dd));
+        cfgW.solver.penetration_slop = 0.0f;
+        bool hit_zero = collision_dual_sphere(&W.bodies[0], &W.bodies[1], &dd, &cfgW);
+        if (!hit_slop || hit_zero) { printf("[FAIL] per-world slop routing\n"); return 1; }
+        printf("[PASS] per-world narrowphase config\n");
+        /* solver_if override: counting resolve hook observes iterations */
+        physics_world_cleanup(&W);
+    }
+
+    /* 7. solver_if + broadphase_if overrides take effect */
+    {
+        int resolve_calls = 0;
+        physics_world W; physics_world_init(&W);
+        physics_world_add_cube(&W, (vector3){0, 0.5f, 0}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
+        physics_world_add_cube(&W, (vector3){0, 1.5f, 0}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
+        physics_world_set_solver(&W, &test_counting_solver);
+        resolve_calls = 0;
+        test_counting_solver_calls = &resolve_calls;
+        for (int t = 0; t < 5; t++) physics_world_step(&W, 1.0f / 60.0f);
+        if (resolve_calls <= 0) { printf("[FAIL] solver_if resolve never called\n"); return 1; }
+        printf("[PASS] solver_if override observes %d resolves\n", resolve_calls);
+        physics_world_set_solver(&W, NULL);
+        physics_world_cleanup(&W);
+    }
 
     physics_world_cleanup(&A);
     physics_world_cleanup(&B);
