@@ -1,5 +1,5 @@
 # Miniature Physics Engine — User Guide
-### v15R3 Release Guide
+### v15S Guide (GTK4 + modular kernel)
 
 ---
 
@@ -136,6 +136,10 @@ Common commands:
 | `top` | Show fastest-moving objects |
 | `df` | Show capacity usage |
 | `export GRAVITY=-2.0` | Change world gravity |
+| `mod ls` | List loaded physics modules |
+| `mod load ./plugins/mpe_capsule.so` | Hot-plug a foreign shape |
+| `mod attach capsule-shape` | Attach a module to the world |
+| `mod use-solver seq-impulse` | Swap the solver backend |
 
 Type `help` for the full command list or `man <command>` for usage. `Ctrl+L` clears the screen. `Escape` closes the terminal.
 
@@ -152,8 +156,15 @@ make mpe-tui
 ./mpe-tui                         # live ncurses inspector (needs a TTY)
 ./mpe-tui --snapshot 600          # one full state dump (pipeable, diffable)
 ./mpe-tui --stream 600 --every 60 # dumps every 60 ticks
-./mpe-tui --snapshot 10 --scene tower|pendulum|springlab|f10|demo
+./mpe-tui --snapshot 10 --scene tower|pendulum|springlab|f10|demo|stress|ccd
+./mpe-tui --snapshot 60 --scene demo --solver seq-impulse --broadphase hash
 ```
+
+Scenes: `demo` (everything), `tower`, `pendulum`, `springlab` (zero-g
+vacuum, scene-local config), `f10` (validation replica), `stress`
+(300 mixed bodies + every joint type + CCD ball), `ccd` (60/144/300 m/s
+wall battery). Each scene runs on its own config copy, so vacuum and
+torture settings never leak between runs.
 
 Live screens (`1`–`5`, `Tab` cycles): body overview, per-object
 characteristics + mathematics (quaternion, euler, inertia tensors, momentum,
@@ -161,7 +172,8 @@ energy), joint/constraint detail with live endpoint geometry, pairwise scene
 graph, help. Keys: `j/k` select, `Space` pause, `s` single-step, `+/-`
 time scale, `/` filter, `q` quit. Snapshot sections (`[engine]`, `[body i]`,
 `[springs]`, `[constraints]`, `[pairs]`, `[islands]`, `[stats]`,
-`[result]`) are fixed-format and deterministic. `make tui-smoke` checks
+`[result]`) are fixed-format and deterministic, and report pool usage
+(`bodies=n/cap`, `cacheCount=n/cap`). `make tui-smoke` checks
 every scene dumps finite state.
 
 ---
@@ -227,6 +239,26 @@ key 6 → Reset Defaults or terminal `config reset` to restore normal behaviour.
 - `nice_value` is a per-object settle tool, not physics: keep 0 for truth.
 - `world.drag` is linear-viscous retention (`c = −ln(drag)`), not quadratic
   aero; `1.0` is vacuum truth.
+
+---
+
+## Module System (Hot-Plug Physics)
+
+Every pipeline stage is swappable at runtime through the Module
+Interface (`src/core/mpe_module.h`, ABI v1):
+
+- **Shapes** — custom bodies (`object_custom`, id ≥ 100) dispatch via the
+  pair registry. Example: `plugins/mpe_capsule.c`.
+- **Backends** — `hash` broadphase and `seq-impulse` solver are the
+  builtins; foreign ones register under their own names.
+- **Tick modules** — `pre_step`/`post_step` hooks (force fields, motors,
+  loggers) attach per world.
+
+In the debug terminal: `mod ls`, `mod load <file.so>`,
+`mod unload <name>`, `mod attach|detach <name>`,
+`mod use-broadphase|use-solver <name|builtin>`. In TUI:
+`--broadphase NAME --solver NAME`. Each world carries its own config,
+so two worlds can run different physics side by side.
 
 ---
 
@@ -334,7 +366,9 @@ Broadphase collision detection uses a 3D spatial hash grid and runs once per phy
 
 ## Known Limitations
 
-**Wayland:** Mouse locking does not function correctly under native Wayland. The engine must be run under X11. On systems that default to Wayland, install basic X11 drivers (`xorg`, `xserver-xorg`) and launch the engine in an X11 session. Forcing X11 via `GDK_BACKEND=x11 ./engine` may also work depending on your compositor.
+**Wayland:** supported. The GTK4 port uses Wayland-safe input (no X11
+pointer warping); the mouse locks via cursor capture and works under both
+Wayland and X11 sessions.
 
 **Scene format:** v200 saves bodies (stable IDs, sleep, damping) plus spring and revolute joints, with CRC32 footer and atomic write. Fixed/distance/prismatic/rope constraints solve correctly but have no creation UI and do not persist yet. Files ≤v153 load via the legacy reader. Truth labels: `world.drag` is linear-viscous (not quadratic aero); `nice_value`/`angular_damping_scale` are NON-PHYSICAL settle tools (0/1.0 = truth); `sleep.enable=0` runs sleepless truth validation; boundary walls are a plastic safety net, not material contact.
 
@@ -355,7 +389,7 @@ The engine supports three object types:
 Install dependencies:
 
 ```bash
-sudo apt install gcc make libgtk-3-dev libepoxy-dev
+sudo apt install gcc make libgtk-4-dev libepoxy-dev
 ```
 
 Build:

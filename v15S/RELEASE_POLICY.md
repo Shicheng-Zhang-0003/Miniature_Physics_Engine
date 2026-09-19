@@ -1,8 +1,15 @@
-# MPE v15R3 Release Policy
+# MPE Release Policy (v15R3 record + v15S head)
 
 This tree is tagged **v15R3 release** (`a3_release_freeze = 1`).
 Accepted changes from here on: correctness, stability, validation,
 documentation, and hygiene only — no new features.
+
+`v15S` is the active evolution head on top of `v15R3`: GTK4 port, module
+system (MPI hot-plug), per-world config, data-structure upgrades
+(growable pools, O(1) caches), kernel global-state removal, and the TUI
+stress suite. It keeps the v15R3 physics-truth contract (defaults
+bit-identical unless noted) and extends the suite to 30/30
+(29 physics + `module`).
 
 ## What v15 Delivered
 
@@ -30,7 +37,6 @@ Under the v15R3 freeze:
   rope (solver supports all five constraint types + springs; v200 persists
   springs + revolutes).
 - Complete UI state-machine rewrite (magic-level dispatch split, not yet FSM).
-- Wayland mouse-lock support.
 - Per-object config persistence beyond nice_value.
 - Quadratic aero drag (current drag is linear-viscous retention).
 - SIMD math (scalar core; ~1136-object perf wall stands).
@@ -58,7 +64,8 @@ Under the v15R3 freeze:
   inspector plus deterministic pipeable state dumps; `make tui-smoke`.
 - Adversarial headless tests: `f10_long_run` (settle gates incl. run-max),
   `sleep_contact_wake` (first-touch wake + no-churn control), `f11_torture`
-  (fixed-seed config extremes, corruption gates). Suite total: 29/29 green.
+  (fixed-seed config extremes, corruption gates). Suite total: 29/29 green
+  (30/30 on the v15S head with `module`).
 - Driven-wheel truth: test moved into the resolvable spin regime with
   load-bearing gates (grounded height, rolling coupling, spin cap).
 

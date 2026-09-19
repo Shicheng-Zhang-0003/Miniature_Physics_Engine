@@ -1,6 +1,9 @@
-# MPE v15R3 Release Gates
+# MPE Release Gates (v15R3 record + v15S addendum)
 
-This document defines the exit criteria for tagging `v15R3`.
+This document defines the exit criteria for tagging `v15R3`, plus the
+v15S addendum gates covering the GTK4 port, module system, and
+data-structure upgrades. The v15R3 record below is historical; v15S
+must additionally pass §15.
 
 `v15R3` is the MPE-only release of the v15 series, carrying the
 centralised configuration system (prior RCs: v15R1, v15R2).
@@ -103,8 +106,8 @@ They should be recorded as post-stable work items.
 - [X] F11 config torture test runs without crash.
 - [X] F11 verdict is robustness-only (no NaN, nothing fallen); speeds reported, never gated.
 - [X] F11 pins solver resolution (gravity −17…−1, ≥96 iterations — proven envelope for the 10:1 column); material/world extremes stay fully random.
-- [X] Headless suite 29/29 green (`python3 tools/test_runner.py`), including `f10_long_run`, `sleep_contact_wake`, `f11_torture`.
-- [X] `mpe-tui` snapshot suite green for all scenes (`make tui-smoke`).
+- [X] Headless suite 30/30 green (`python3 tools/test_runner.py` — 29 physics + `module`), including `f10_long_run`, `sleep_contact_wake`, `f11_torture`.
+- [X] `mpe-tui` snapshot suite green for all scenes (`make tui-smoke`: demo/tower/pendulum/springlab/f10/stress/ccd).
 - [X] The engine can idle for several minutes without explosion.
 
 ### 10. Configuration System
@@ -177,7 +180,6 @@ The following are not required for `v15R3`:
   (solver supports all five constraint types + springs; menus persist
   springs + revolutes),
 - complete UI state-machine rewrite,
-- Wayland mouse-lock support,
 - per-object config persistence in scene files.
 
 Completed since this list was written (no longer deferred): full
@@ -200,6 +202,19 @@ These belong after `v15R3`.
 - [X] Joint pre-step runs once per tick (angle/slide tracking never integrates per-iteration)
 - [X] Fixed-timestep accumulator (60Hz deterministic)
 - [X] Scene save/load preserves joint assemblies (v200: springs + revolutes, `scene_roundtrip` test)
+
+---
+
+## v15S Addendum Gates (§15)
+
+### 15. Modularity, data structures, GTK4
+- [X] Engine builds and runs on GTK4; mouse lock works on Wayland and X11.
+- [X] No simulation globals in the kernel: every step takes an explicit `physics_world`; the single GUI primary is app-owned (`core/mpe_primary.c`); registry is process-global by design (documented).
+- [X] Module system: shapes/broadphase/solver/tick-modules register, override, and hot-load (`.so` ABI-checked); `mod` terminal command and TUI `--broadphase/--solver` flags work; `module` headless test green.
+- [X] Per-world config authoritative in every hot path (narrowphase/solver/CCD/joints/depenetration/broadphase); NULL-call convention keeps direct unit callers working.
+- [X] O(1) contact-pair probes and id→index lookups (verified + linear fallback); islands joint pass O(J+B); growable body/contact pools with ceilings; small-first broadphase nodes; process-wide determinism counters asserted zero in-contract.
+- [X] Single narrowphase dispatch (registry-first) shared by world step, legacy GUI tick, depenetration pass, and spawn resolver; single canonical spring entry for both step paths.
+- [X] TUI stress green: `stress`/`ccd` scenes, 3600-tick f10 settle (maxV 0.0), byte-identical reruns, per-scene configs, pool visibility in dumps.
 
 
 ---
@@ -224,7 +239,7 @@ All P0 gates pass: clean build with zero new errors, 29/29 headless green,
 `tui-smoke` green, F10 settle verdict green (headless 3600-tick equivalent
 plus committed `f10_long_run`), F11 robustness green in-engine and headless
 (`f11_torture`). P1 known limitations are documented in
-[`release_notes_v15R3.md`](release_notes_v15R3.md) and
-[`how_to_use.md`](how_to_use.md) (Wayland mouse-lock, joint creation UI +
+[`release_notes_v15R3.md`](../release_notes_v15R3.md) and
+[`how_to_use.md`](how_to_use.md) (joint creation UI +
 persistence scope, SIMD/multithreading). Tree frozen (`a3_release_freeze = 1`):
 correctness, stability, validation, documentation, and hygiene changes only.
