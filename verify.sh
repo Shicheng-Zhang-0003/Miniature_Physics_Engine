@@ -9,7 +9,7 @@ echo ""
 
 # 1. Build
 echo "--- Build check ---"
-cd v15R3/src
+cd v15S/src
 make clean > /dev/null 2>&1 || true
 if make 2>&1 | tail -5; then
     echo "[PASS] Build succeeded"
