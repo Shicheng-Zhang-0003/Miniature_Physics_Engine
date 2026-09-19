@@ -62,7 +62,7 @@ void validation_report_print(void) {
             }
             total_ke += (double) rb_get_kinetic_energy(rb);
             if (isfinite(rb->mass) && isfinite(rb->position.y)) {
-                total_pe += (double) rb->mass * (double) g_cfg.world.gravity * (double) rb->position.y;
+                total_pe += (double) rb->mass * (double) mpe_world_cfg(w)->world.gravity * (double) rb->position.y;
             }
         }
         printf("[A3] energy: KE=%.4f PE=%.4f total=%.4f J (dynamic bodies)\n", total_ke, total_pe,

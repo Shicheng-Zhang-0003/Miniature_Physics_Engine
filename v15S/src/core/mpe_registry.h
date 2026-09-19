@@ -4,7 +4,10 @@
  * Built-ins self-register at startup (mpe_register_builtins).
  * .so plugins register via mpe_loader (calls same functions).
  * Pair dispatch: (type_a, type_b) with object_custom support.
- */
+ *
+ * NOTE: the registry tables are intentionally process-global (a type /
+ * plugin repository, not simulation state). All mutable SIMULATION state
+ * lives in physics_world instances; worlds never share solver data. */
 #include "mpe_module.h"
 #include <stddef.h>
 struct rigidbody;

@@ -12,6 +12,7 @@
 #include <stdint.h>
 #include "../core/math3d.h"
 #include "../core/rigidbody.h"
+#include "../physics/broadphase.h"
 
 #define MPE_MODULE_ABI 1
 
@@ -35,15 +36,23 @@ typedef struct {
 typedef bool (*mpe_collide_fn)(rigidbody *a, rigidbody *b,
                                void *manifold_out, mpe_world_t *world);
 
-/* Broadphase interface */
+/* Broadphase interface: typed pair buffer, world for config/scratch.
+ * Return value: pair count (0 = degraded tick). NULL entry = builtin. */
 typedef struct {
-    int (*generate)(mpe_world_t *world, void *pairs_out, int max_pairs, float dt, void *mod_state);
+    int (*generate)(mpe_world_t *world, broadphase_pair *pairs_out, int max_pairs, float dt,
+                    void *mod_state);
 } mpe_broadphase_if_t;
 
-/* Solver interface (subset; full solve stays in collision_solver.c for now) */
+/* Solver stage interface: every hook optional (NULL = builtin).
+ * Hooks receive the owning world (per-world config + scratch) and the
+ * module state pointer from attach. Builtin semantics: sequential
+ * impulses, Poisson restitution, Catto split, rolling resistance. */
 typedef struct {
-    void (*prepare)(mpe_world_t *world, void *manifolds, int n, float dt, void *mod_state);
-    float (*iterate)(mpe_world_t *world, void *manifold, float dt, bool friction_only, void *mod_state);
+    float (*resolve)(mpe_world_t *world, void *manifold, float dt, bool friction_only, int iter,
+                     void *mod_state);
+    void (*poisson)(mpe_world_t *world, void *manifolds, int n, void *mod_state);
+    void (*rolling)(mpe_world_t *world, void *manifolds, int n, float dt, void *mod_state);
+    void (*split)(mpe_world_t *world, void *manifolds, int n, float dt, void *mod_state);
 } mpe_solver_if_t;
 
 #endif
