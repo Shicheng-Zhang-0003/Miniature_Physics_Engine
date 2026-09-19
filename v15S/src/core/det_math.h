@@ -22,13 +22,14 @@
 #include <stdbool.h>
 
 /* TRUTH: count every libm fallback so desync is diagnosable, never silent.
- * Headless determinism test asserts these stay zero on in-contract scenes. */
-static unsigned long det_fallback_pow_count = 0;
-static unsigned long det_fallback_trig_count = 0;
-static inline void det_fallback_reset(void) {
-    det_fallback_pow_count = 0;
-    det_fallback_trig_count = 0;
-}
+ * Single process-wide definition (core/det_math.c); the old per-TU
+ * statics gave every translation unit its own counters, so a test
+ * asserting zero only observed its own TU. */
+extern unsigned long det_fallback_pow_count;
+extern unsigned long det_fallback_trig_count;
+void det_fallback_reset(void);
+static inline unsigned long det_fallback_pow_total(void) { return det_fallback_pow_count; }
+static inline unsigned long det_fallback_trig_total(void) { return det_fallback_trig_count; }
 
 /* TRUTH: pin FP state for cross-platform determinism. Portable subset only:
  * round-to-nearest (fesetround). x86/ARM denormal-flush differences (FTZ/DAZ)

@@ -54,6 +54,11 @@ typedef struct physics_world {
      * NULL-world callers fall back to the global cache. */
     cached_contact *world_contact_cache;
     int world_contact_cache_count;
+    /* Growable pools: bodies start small and double to the compile-time
+     * ceilings (mpe_max_bodies / max_cached_contacts), so an empty world
+     * costs kilobytes instead of megabytes. Caps are ceilings, not
+     * preallocations; overflow still degrades gracefully, never crashes. */
+    int world_contact_cache_capacity;
     /* Warm-start hash heads (4096 buckets, -1 empty), heap-allocated with
      * the cache. Rebuilt on every save; see collision_mechanics.c. */
     int32_t *contact_hash_head;
@@ -112,6 +117,17 @@ typedef struct physics_world {
     const mpe_module_desc_t *tick_modules[16];
     void *tick_module_state[16];
     int tick_module_count;
+    /* id->index cache (replaces the old file-static global in
+     * constraint.c, which was shared across worlds and threads).
+     * Rebuilt lazily when body_revision moves; every lookup verifies
+     * against the live array and falls back to linear scan, so a
+     * missed bump costs speed, never correctness. */
+    uint32_t *id_cache_keys;
+    int *id_cache_vals;
+    unsigned char *id_cache_valid;
+    int id_cache_size;
+    uint64_t body_revision;
+    uint64_t id_cache_revision;
 } physics_world;
 
 void physics_world_init(physics_world *world);
@@ -137,12 +153,29 @@ int physics_world_add_cylinder(physics_world *world, float radius, float half_le
 int physics_world_add_custom(physics_world *world, int custom_shape, vector3 position, float mass, float radius);
 void physics_world_clear(physics_world *world);
 void physics_world_step(physics_world *world, float dt);
+/* Shared pair pipeline (narrowphase dispatch + 3-gate wake + solver prep).
+ * Used by both step paths so GUI and headless ticks stay identical. */
+void physics_world_process_pair(physics_world *world, int index_a, int index_b, float dt,
+                                int *manifold_count_ptr);
+/* Application-owned primary world (defined in core/mpe_primary.c).
+ * The kernel holds no simulation globals; this accessor exists for the
+ * scene/UI/render layers of a single-world GUI process. Headless and
+ * foreign code should own explicit physics_world instances instead. */
 physics_world *physics_world_get_primary(void);
 /* Phase-2: modular attach/dispatch. */
 int physics_world_attach_module(physics_world *world, const mpe_module_desc_t *desc);
 int physics_world_detach_module(physics_world *world, const char *name);
 void physics_world_set_broadphase(physics_world *world, const mpe_broadphase_if_t *iface);
 void physics_world_set_solver(physics_world *world, const mpe_solver_if_t *iface);
+/* Pool growth (×2 to ceiling). Used by add_* paths and cache save. */
+int physics_world_grow_contact_cache(physics_world *world);
+/* Mutation stamp: bumped by every world-owned body-array mutation
+ * (add/clear) and by scene-level mutators (remove/load/clear). */
+void physics_world_bump_revision(physics_world *world);
+/* O(1) id->index via the world cache (linear fallback, always correct).
+ * Returns -1 for id 0 / missing. */
+int physics_world_index_by_id(physics_world *world, uint32_t id);
+rigidbody *physics_world_body_by_id(physics_world *world, uint32_t id);
 /* Shape dispatch: registry-first, built-in fallback. Returns true on contact. */
 bool mpe_shape_dispatch(physics_world *world, rigidbody *a, rigidbody *b, collision_data *out);
 /* R3-07: Add four static wall bodies around the playable area.
