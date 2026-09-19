@@ -7,7 +7,9 @@
  *
  * This header is the SINGLE SOURCE OF TRUTH for every compile-time
  * constant that defines memory layout, array sizes, and structural
- * limits. These are LOCKED: they cannot change at runtime.
+ * limits. CAPACITY entries are CEILINGS: pools start at their
+ * *_INITIAL size and double on demand (see physics_world growers),
+ * so an empty world costs kilobytes while the layout guarantees hold.
  *
  * Behavioural/tunable constants (cell sizes, slops, thresholds)
  * remain in their domain files until v15R1 Task 29-33 migrates
@@ -15,9 +17,10 @@
  * ================================================================== */
 
 /* ------------------------------------------------------------------
- * CAPACITY — object and joint pool limits
+ * CAPACITY — object and joint pool limits (ceilings + initial sizes)
  * ------------------------------------------------------------------ */
 #define mpe_max_bodies 16384
+#define mpe_initial_bodies 512
 #define mpe_max_joints 1024
 #define mpe_max_broadphase_pairs 65536
 #define a3_max_manifolds 8192
@@ -31,9 +34,11 @@
 #define a3_pair_hash_mask (a3_pair_hash_table_size - 1)
 
 /* ------------------------------------------------------------------
- * CONTACT CACHE — warm-starting impulse cache
+ * CONTACT CACHE — warm-starting impulse cache (ceiling + initial)
  * ------------------------------------------------------------------ */
 #define max_cached_contacts 65536
+#define mpe_initial_contacts 4096
+#define mpe_id_cache_size 2048
 
 /* ------------------------------------------------------------------
  * DEBUG TERMINAL — history buffer dimensions

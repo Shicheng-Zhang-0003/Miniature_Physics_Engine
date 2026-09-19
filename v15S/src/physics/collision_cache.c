@@ -77,8 +77,24 @@ bool contact_cache_has_pair(struct physics_world *world, uint32_t id_a, uint32_t
     if (!cache || count <= 0) {
         return false;
     }
-    if (count > max_cached_contacts) {
-        count = max_cached_contacts;
+    /* O(chain) hash walk over the chains rebuilt by contact_cache_save
+     * (same entries, same order semantics as the old O(n) scan; boolean
+     * result identical). Degrades to linear only if heads are missing. */
+    int32_t *heads = world->contact_hash_head;
+    if (heads) {
+        uint32_t slot = contact_pair_key(id_a, id_b);
+        for (int32_t s = heads[slot], guard = 0; s >= 0 && s < count && guard <= count;
+             s = cache[s].hash_next, guard++) {
+            uint32_t ca = cache[s].object_id_a;
+            uint32_t cb = cache[s].object_id_b;
+            if (((ca == id_a) && (cb == id_b)) || ((ca == id_b) && (cb == id_a))) {
+                return true;
+            }
+        }
+        return false;
+    }
+    if (count > world->world_contact_cache_capacity) {
+        count = world->world_contact_cache_capacity;
     }
     for (int i = 0; i < count; i++) {
         uint32_t ca = cache[i].object_id_a;
@@ -157,8 +173,11 @@ void contact_cache_save(struct physics_world *world, collision_data *manifolds, 
     for (int m = 0; m < count; m++) {
         collision_data *manifold = &manifolds[m];
         for (int i = 0; i < manifold->contact_count; i++) {
-            if (*cache_count >= max_cached_contacts) {
-                break;
+            if (*cache_count >= world->world_contact_cache_capacity) {
+                if (physics_world_grow_contact_cache(world) != 0) {
+                    break;
+                }
+                cache_array = world->world_contact_cache;
             }
             contact_point_data *cp = &manifold->contacts[i];
             cached_contact *cc = &cache_array[(*cache_count)++];
@@ -175,7 +194,7 @@ void contact_cache_save(struct physics_world *world, collision_data *manifolds, 
             /* Remember the stick frame for resting contacts next tick. */
             cc->tangent_dir = cp->tangent_vector;
         }
-        if (*cache_count >= max_cached_contacts) {
+        if (*cache_count >= world->world_contact_cache_capacity) {
             break;
         }
     }

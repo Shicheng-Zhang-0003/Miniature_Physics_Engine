@@ -93,10 +93,13 @@ static bool broadphase_ensure_node_capacity(broadphase_workspace *ws) {
     }
     /* TRUTH: unbounded doubling lets one huge wall (250m/cell 1m) allocate
      * millions of nodes -> stall/OOM then false negatives. Cap at 1M nodes
-     * (~12MB) and fail open with telemetry instead of OOM-killing. */
+     * (~12MB) and fail open with telemetry instead of OOM-killing.
+     * Pools start small (4096) and double: a 2-body world costs 32KB,
+     * not the 1MB the old max_objects*8 initial grab took. */
     const int kMaxNodes = 1 << 20;
+    const int kInitialNodes = 4096;
     if (ws->node_pool == NULL) {
-        int want = max_objects * 8;
+        int want = kInitialNodes;
         if (want > kMaxNodes) {
             want = kMaxNodes;
         }
@@ -116,7 +119,7 @@ static bool broadphase_ensure_node_capacity(broadphase_workspace *ws) {
         ws->node_overflow_count++;
         return false;
     }
-    int new_capacity = (ws->node_pool_capacity > 0) ? (ws->node_pool_capacity * 2) : (max_objects * 8);
+    int new_capacity = (ws->node_pool_capacity > 0) ? (ws->node_pool_capacity * 2) : kInitialNodes;
     if (new_capacity > kMaxNodes) {
         new_capacity = kMaxNodes;
     }
@@ -222,8 +225,9 @@ static void broadphase_update_cell_size(struct physics_world *world, rigidbody *
     if (!ws) {
         return;
     }
+    const mpe_config_t *C = mpe_world_cfg(world);
     if (body_count <= 0) {
-        ws->current_cell_size = g_cfg.broadphase.cell_size_default;
+        ws->current_cell_size = C->broadphase.cell_size_default;
         ws->cached_body_count = body_count;
         ws->ticks_since_cell_recompute = 0;
         return;
@@ -248,7 +252,7 @@ static void broadphase_update_cell_size(struct physics_world *world, rigidbody *
             }
         }
         float probe_avg = probe_n > 0 ? probe_sum / (float) probe_n : 0.0f;
-        float cached_avg = ws->current_cell_size / g_cfg.broadphase.cell_size_multiplier;
+        float cached_avg = ws->current_cell_size / C->broadphase.cell_size_multiplier;
         if (cached_avg <= 0.0f) {
             cached_avg = 0.5f;
         }
@@ -281,19 +285,19 @@ static void broadphase_update_cell_size(struct physics_world *world, rigidbody *
         max_radius = 0.5f;
     }
 
-    float desired_cell_size = g_cfg.broadphase.cell_size_multiplier * average_radius;
-    float minimum_required_cell_size = (2.0f * max_radius) / (float) g_cfg.broadphase.max_cell_span_per_axis;
+    float desired_cell_size = C->broadphase.cell_size_multiplier * average_radius;
+    float minimum_required_cell_size = (2.0f * max_radius) / (float) C->broadphase.max_cell_span_per_axis;
 
     if (desired_cell_size < minimum_required_cell_size) {
         desired_cell_size = minimum_required_cell_size;
     }
 
-    if (desired_cell_size < g_cfg.broadphase.cell_size_min) {
-        desired_cell_size = g_cfg.broadphase.cell_size_min;
+    if (desired_cell_size < C->broadphase.cell_size_min) {
+        desired_cell_size = C->broadphase.cell_size_min;
     }
 
-    if (desired_cell_size > g_cfg.broadphase.cell_size_max) {
-        desired_cell_size = g_cfg.broadphase.cell_size_max;
+    if (desired_cell_size > C->broadphase.cell_size_max) {
+        desired_cell_size = C->broadphase.cell_size_max;
     }
 
     ws->current_cell_size = desired_cell_size;
@@ -314,7 +318,7 @@ int broadphase_generate_pairing(struct physics_world *world, broadphase_pair *co
     }
     /* MPE_TASK_17_CELL_SIZE_CALL_BEGIN */
     if (body_count < 2) {
-        ws->current_cell_size = g_cfg.broadphase.cell_size_default;
+        ws->current_cell_size = mpe_world_cfg(world)->broadphase.cell_size_default;
         ws->cached_body_count = body_count;
         ws->ticks_since_cell_recompute = 0;
         return 0;
@@ -372,16 +376,17 @@ int broadphase_generate_pairing(struct physics_world *world, broadphase_pair *co
          * pairs (false negatives). Broadphase must never miss. Keep the
          * full span (correct); count the event for perf visibility. */
         bool a3_large_object_clamped = false;
+        const int max_span = mpe_world_cfg(world)->broadphase.max_cell_span_per_axis;
 
-        if ((max_x - min_x) > g_cfg.broadphase.max_cell_span_per_axis) {
+        if ((max_x - min_x) > max_span) {
             a3_large_object_clamped = true;
         }
 
-        if ((max_y - min_y) > g_cfg.broadphase.max_cell_span_per_axis) {
+        if ((max_y - min_y) > max_span) {
             a3_large_object_clamped = true;
         }
 
-        if ((max_z - min_z) > g_cfg.broadphase.max_cell_span_per_axis) {
+        if ((max_z - min_z) > max_span) {
             a3_large_object_clamped = true;
         }
 

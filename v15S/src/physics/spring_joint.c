@@ -203,7 +203,7 @@ static void spring_apply_core_dt(physics_world *world, rigidbody *bodies, int bo
              * loudly-bounded instead of NaN. For pure Hooke set
              * joints.max_acceleration to its 10000 max. */
             float a3_reduced_mass = 1.0f / a3_inverse_mass_sum;
-            float a3_max_joint_force = a3_reduced_mass * g_cfg.joints.max_acceleration;
+            float a3_max_joint_force = a3_reduced_mass * mpe_world_cfg(world)->joints.max_acceleration;
             float a3_force_length = vector3_length(net_joint_force);
             if ((a3_force_length > a3_max_joint_force) && (a3_force_length > math_epsilon)) {
                 net_joint_force = vector3_scaling(net_joint_force, a3_max_joint_force / a3_force_length);
@@ -214,19 +214,21 @@ static void spring_apply_core_dt(physics_world *world, rigidbody *bodies, int bo
     }
 }
 
-/* Legacy entry point: applies the owning world's pool to its own bodies. */
-void apply_force_all_joints(physics_world *world) {
-    if ((!world) || (!world->bodies) || (world->body_count <= 0)) {
-        return;
-    }
-    spring_apply_core_dt(world, world->bodies, world->body_count, 1.0f / 60.0f);
-}
-
-void apply_force_all_joints_dt(physics_world *world, float dt) {
+/* Canonical per-tick spring entry: both step paths call exactly this. */
+void mpe_springs_apply(physics_world *world, float dt) {
     if ((!world) || (!world->bodies) || (world->body_count <= 0)) {
         return;
     }
     spring_apply_core_dt(world, world->bodies, world->body_count, dt);
+}
+
+/* Legacy entry points: thin wrappers over the canonical pass. */
+void apply_force_all_joints(physics_world *world) {
+    mpe_springs_apply(world, 1.0f / 60.0f);
+}
+
+void apply_force_all_joints_dt(physics_world *world, float dt) {
+    mpe_springs_apply(world, dt);
 }
 
 /* World-aware spring pass over an explicit body array (headless + world

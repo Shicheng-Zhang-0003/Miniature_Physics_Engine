@@ -117,11 +117,10 @@ static bool a3_task05_cached_impulses_are_usable(float normal_impulse, float tan
 }
 
 static int contact_cache_match_role(const cached_contact *cc, uint32_t id_a, uint32_t id_b, uint32_t stamp_a,
-                                    uint32_t stamp_b, vector3 local_a, vector3 local_b) {
+                                    uint32_t stamp_b, vector3 local_a, vector3 local_b, float match_dist_sq) {
     if ((!cc) || (id_a == 0) || (id_b == 0)) {
         return 0;
     }
-    float match_dist_sq = g_cfg.solver.warm_start_match_dist_sq;
     if ((cc->object_id_a == id_a) && (cc->object_id_b == id_b) && (cc->property_stamp_a == stamp_a) &&
         (cc->property_stamp_b == stamp_b)) {
         /* TRUTH: strict both-side matching. Old side-A-only aliased two B
@@ -149,7 +148,7 @@ static int contact_cache_match_role(const cached_contact *cc, uint32_t id_a, uin
 }
 
 static bool contact_cache_adoptable(const cached_contact *cc, uint32_t id_a, uint32_t id_b, uint32_t stamp_a,
-                                    uint32_t stamp_b, vector3 local_a) {
+                                    uint32_t stamp_b, vector3 local_a, float match_dist_sq) {
     if ((!cc) || (id_a == 0) || (id_b == 0)) {
         return false;
     }
@@ -158,7 +157,7 @@ static bool contact_cache_adoptable(const cached_contact *cc, uint32_t id_a, uin
         return false;
     }
     float dist_a_sq = vector3_length_squared(vector3_subtraction(cc->local_position_a, local_a));
-    if (dist_a_sq >= g_cfg.solver.warm_start_match_dist_sq) {
+    if (dist_a_sq >= match_dist_sq) {
         return false;
     }
     return vector3_length_squared(cc->tangent_dir) > 0.0001f;
@@ -204,6 +203,9 @@ void collision_prepare_solver(struct physics_world *world, collision_data *sourc
         uint32_t cache_stamp_b = a3_task05_body_property_stamp(m->object_b);
 
         int cache_match_found = 0;
+        /* Per-world warm-start match distance (was global). */
+        const mpe_config_t *prep_cfg = world ? mpe_world_cfg(world) : &g_cfg;
+        float prep_match_sq = prep_cfg->solver.warm_start_match_dist_sq;
 
         /* Warm-start matching: strict both-side material-point coincidence
          * (see contact_cache_match_role). A hit adopts cached impulses at
@@ -222,7 +224,7 @@ void collision_prepare_solver(struct physics_world *world, collision_data *sourc
                  slot = cache_array[slot].hash_next, guard++) {
                 cached_contact *cc = &cache_array[slot];
                 int role = contact_cache_match_role(cc, cache_id_a, cache_id_b, cache_stamp_a, cache_stamp_b,
-                                                    cp->local_position_a, cp->local_position_b);
+                                                    cp->local_position_a, cp->local_position_b, prep_match_sq);
                 if (role == 1) {
                     cp->accumulated_normal_impulse = fmaxf(cc->accumulated_normal_impulse, 0.0f);
                     cp->accumulated_tangent_impulse = cc->accumulated_tangent_impulse;
@@ -243,7 +245,7 @@ void collision_prepare_solver(struct physics_world *world, collision_data *sourc
             for (int c = 0; c < cache_count; c++) {
                 cached_contact *cc = &cache_array[c];
                 int role = contact_cache_match_role(cc, cache_id_a, cache_id_b, cache_stamp_a, cache_stamp_b,
-                                                    cp->local_position_a, cp->local_position_b);
+                                                    cp->local_position_a, cp->local_position_b, prep_match_sq);
                 if (role == 1) {
                     cp->accumulated_normal_impulse = fmaxf(cc->accumulated_normal_impulse, 0.0f);
                     cp->accumulated_tangent_impulse = cc->accumulated_tangent_impulse;
@@ -303,7 +305,7 @@ void collision_prepare_solver(struct physics_world *world, collision_data *sourc
                      slot = cache_array[slot].hash_next, guard++) {
                     cached_contact *cc = &cache_array[slot];
                     if (contact_cache_adoptable(cc, cache_id_a, cache_id_b, cache_stamp_a, cache_stamp_b,
-                                                cp->local_position_a)) {
+                                                cp->local_position_a, prep_match_sq)) {
                         adopted_tangent = cc->tangent_dir;
                         break;
                     }
@@ -312,7 +314,7 @@ void collision_prepare_solver(struct physics_world *world, collision_data *sourc
                 for (int c = 0; c < cache_count; c++) {
                     cached_contact *cc = &cache_array[c];
                     if (contact_cache_adoptable(cc, cache_id_a, cache_id_b, cache_stamp_a, cache_stamp_b,
-                                                cp->local_position_a)) {
+                                                cp->local_position_a, prep_match_sq)) {
                         adopted_tangent = cc->tangent_dir;
                         break;
                     }
@@ -501,7 +503,9 @@ void collision_manifold_solve_order(struct physics_world *world, collision_data 
     }
 }
 
-float collision_resolve_iterative(collision_data *m, float dt, bool friction_only, int start_index) {
+float collision_resolve_iterative(collision_data *m, float dt, bool friction_only, int start_index,
+                                  const mpe_config_t *cfg) {
+    const mpe_config_t *C = cfg ? cfg : &g_cfg;
     if (dt <= 0.0f) {
         dt = 1.0f / 60.0f;
     }
@@ -627,7 +631,7 @@ float collision_resolve_iterative(collision_data *m, float dt, bool friction_onl
             /* Stick/slip select on combined slip speed. With a persistent
              * frame and an honest normal impulse, stick (full slip kill
              * inside the cone) genuinely holds; sliding clamps to mu_k. */
-            const float static_friction_threshold = g_cfg.solver.static_friction_thresh; /* MPE_TASK_30 */
+            const float static_friction_threshold = C->solver.static_friction_thresh; /* MPE_TASK_30 */
             float static_friction_coeff = fminf(m->object_a->friction_static, m->object_b->friction_static);
             float kinetic_friction_coeff = fminf(m->object_a->friction_kinetic, m->object_b->friction_kinetic);
             if (static_friction_coeff < kinetic_friction_coeff) {
@@ -708,7 +712,9 @@ void collision_refresh_impact_velocities(collision_data *manifolds, int manifold
     }
 }
 
-void collision_apply_poisson_restitution(collision_data *manifolds, int manifold_count) {
+void collision_apply_poisson_restitution(collision_data *manifolds, int manifold_count,
+                                         const mpe_config_t *cfg) {
+    const mpe_config_t *C = cfg ? cfg : &g_cfg;
     if ((!manifolds) || (manifold_count <= 0)) {
         return;
     }
@@ -720,7 +726,7 @@ void collision_apply_poisson_restitution(collision_data *manifolds, int manifold
             if (e <= 0.0f) {
                 continue;
             }
-            if (cp->impact_velocity >= g_cfg.solver.restitution_velocity_thresh) {
+            if (cp->impact_velocity >= C->solver.restitution_velocity_thresh) {
                 continue;
             }
             float compression = cp->accumulated_normal_impulse - cp->base_normal_impulse;
@@ -777,11 +783,13 @@ void collision_apply_poisson_restitution(collision_data *manifolds, int manifold
     }
 }
 
-void collision_apply_rolling_resistance(collision_data *manifolds, int manifold_count, float dt) {
+void collision_apply_rolling_resistance(collision_data *manifolds, int manifold_count, float dt,
+                                        const mpe_config_t *cfg) {
+    const mpe_config_t *C = cfg ? cfg : &g_cfg;
     if ((!manifolds) || (manifold_count <= 0) || (dt <= 0.0f)) {
         return;
     }
-    float rolling_mu = g_cfg.world.rolling_resistance_coeff;
+    float rolling_mu = C->world.rolling_resistance_coeff;
     if (rolling_mu <= 0.0f) {
         return;
     }
@@ -883,13 +891,15 @@ void collision_apply_rolling_resistance(collision_data *manifolds, int manifold_
     }
 }
 
-void collision_apply_split_impulse(collision_data *manifolds, int manifold_count, float dt) {
+void collision_apply_split_impulse(collision_data *manifolds, int manifold_count, float dt,
+                                   const mpe_config_t *cfg) {
+    const mpe_config_t *C = cfg ? cfg : &g_cfg;
     if ((!manifolds) || (manifold_count <= 0) || (!(dt > 0.0f))) {
         return;
     }
-    float slop = g_cfg.solver.penetration_slop;
-    float beta = g_cfg.solver.bias_factor;
-    float max_bias_vel = g_cfg.solver.max_separation_bias;
+    float slop = C->solver.penetration_slop;
+    float beta = C->solver.bias_factor;
+    float max_bias_vel = C->solver.max_separation_bias;
     /* TRUTH: runtime clamps survive old config files with huge caps.
      * slop 0..5cm, beta 0..1, bias vel <=10 m/s. */
     if (!isfinite(slop) || slop < 0.0f) {
@@ -932,7 +942,7 @@ void collision_apply_split_impulse(collision_data *manifolds, int manifold_count
                     deepest_check = man->contacts[i].penetration;
                 }
             }
-            if (deepest_check > g_cfg.depenetration.wake_depth_thresh) {
+            if (deepest_check > C->depenetration.wake_depth_thresh) {
                 if (!body_a->static_state) {
                     rigidbody_wake(body_a);
                 }
