@@ -9,8 +9,8 @@
 #include "core/physics_world.h"
 #include "physics/constraint.h"
 #include "config/mpe_config.h"
-#include "robotics/robot.h"
-#include "robotics/drivetrain.h"
+#include "robotics_backup/robotics/robot.h"
+#include "robotics_backup/robotics/drivetrain.h"
 
 static int tests_run = 0;
 static int tests_passed = 0;
@@ -24,6 +24,19 @@ static int tests_failed = 0;
 
 static const float DT = 1.0f / 60.0f;
 
+/* MFS_PORT_V15S: robot subtests run 128 solver iterations (40:1
+ * chassis/wheel stacked mass ratio; default 64 cannot converge it).
+ * Pure-truth subtests keep the default envelope. Save/restore keeps
+ * each subtest hermetic regardless of call order. */
+static int ftc_saved_iterations = 64;
+#define FTC_ITERS_BEGIN() do { \
+    ftc_saved_iterations = g_cfg.timestep.solver_iterations; \
+    g_cfg.timestep.solver_iterations = 128; \
+} while (0)
+#define FTC_ITERS_END() do { \
+    g_cfg.timestep.solver_iterations = ftc_saved_iterations; \
+} while (0)
+
 /* ------------------------------------------------------------------
 * Test 1: Free fall gravity — sphere falls at g = 9.81 m/s^2
 * ------------------------------------------------------------------ */
@@ -31,7 +44,7 @@ static void test_free_fall_gravity(void) {
     printf("--- Test 1: Free Fall Gravity ---\n");
     physics_world world;
     physics_world_init(&world);
-    constraint_pool_init(); /* MFS_139_ISOLATION: clear stale constraints */
+    constraint_pool_init(&world); /* MFS_139_ISOLATION: clear stale constraints */
 
     float h = 10.0f;
     int idx = physics_world_add_sphere(&world, 0.5f, 1.0f, (vector3){0.0f, h, 0.0f});
@@ -60,7 +73,7 @@ static void test_cylinder_inertia(void) {
     printf("--- Test 2: Cylinder Inertia (I = 0.5*m*r^2) ---\n");
     physics_world world;
     physics_world_init(&world);
-    constraint_pool_init(); /* MFS_139_ISOLATION: clear stale constraints */
+    constraint_pool_init(&world); /* MFS_139_ISOLATION: clear stale constraints */
 
     float m = 0.5f, r = 0.05f, half_len = 0.02f;
     int idx = physics_world_add_cylinder(&world, r, half_len, m,
@@ -88,7 +101,7 @@ static void test_restitution_bounce(void) {
     printf("--- Test 3: Restitution Bounce (h_bounce ≈ e^2*h) ---\n");
     physics_world world;
     physics_world_init(&world);
-    constraint_pool_init(); /* MFS_139_ISOLATION: clear stale constraints */
+    constraint_pool_init(&world); /* MFS_139_ISOLATION: clear stale constraints */
 
     float h = 5.0f;
     float e = 0.5f;
@@ -109,10 +122,10 @@ static void test_restitution_bounce(void) {
         }
     }
 
-    float expected_bounce_h = e * e * h;
+    float expected_bounce_h = e * e * (h - 0.5f) + 0.5f; /* MFS_PORT_V15S: center falls (h-r), rebounds e^2 of that, plus r. The old e^2*h forgot the radius (1.25 vs true ~1.63); the engine was right. */
     float bounce_error = fabsf(max_height_after_bounce - expected_bounce_h) / expected_bounce_h;
     TEST_ASSERT(bounced, "sphere bounces after impact");
-    TEST_ASSERT(bounce_error < 0.3f, "bounce height ≈ e^2 * h");
+    TEST_ASSERT(bounce_error < 0.3f, "bounce height ≈ e^2*(h-r)+r");
 
     physics_world_cleanup(&world);
 }
@@ -124,7 +137,7 @@ static void test_rolling_kinematics(void) {
     printf("--- Test 4: Rolling Kinematics (v ≈ omega*r) ---\n");
     physics_world world;
     physics_world_init(&world);
-    constraint_pool_init(); /* MFS_139_ISOLATION: clear stale constraints */
+    constraint_pool_init(&world); /* MFS_139_ISOLATION: clear stale constraints */
 
     /* Add a static floor */
     int floor_idx = physics_world_add_cube(&world,
@@ -159,11 +172,11 @@ static void test_rolling_resistance_stopping(void) {
     printf("--- Test 5: Rolling Resistance (robot coasts to stop) ---\n");
     physics_world world;
     physics_world_init(&world);
-    constraint_pool_init(); /* MFS_139_ISOLATION: clear stale constraints */
-    constraint_pool_init();
+    constraint_pool_init(&world); /* MFS_139_ISOLATION: clear stale constraints */
+    constraint_pool_init(&world);
 
     ftc_robot robot;
-    int rc = ftc_robot_create(&world, &robot, 0.0f, ftc_robot_rest_height(), 0.0f, MOTOR_GB_5203_30);
+    int rc = ftc_robot_create(&world, &robot, 0.0f, ftc_robot_rest_height(), 0.0f, MOTOR_GB_5203_26_9);
     TEST_ASSERT(rc == 0, "robot created successfully");
     if (rc != 0) return;
 
@@ -200,11 +213,20 @@ static void test_motor_free_speed(void) {
     printf("--- Test 6: Motor Free Speed (RPM → spec) ---\n");
     physics_world world;
     physics_world_init(&world);
-    constraint_pool_init(); /* MFS_139_ISOLATION: clear stale constraints */
-    constraint_pool_init();
+    constraint_pool_init(&world); /* MFS_139_ISOLATION: clear stale constraints */
+    constraint_pool_init(&world);
 
     ftc_robot robot;
-    ftc_robot_create(&world, &robot, 0.0f, ftc_robot_rest_height(), 0.0f, MOTOR_GB_5203_30);
+    ftc_robot_create(&world, &robot, 0.0f, ftc_robot_rest_height(), 0.0f, MOTOR_GB_5203_26_9);
+
+    /* MFS_PORT_V15S: settle first (zero commands). Driving from the spawn
+     * transient leaves wheels un-spun while traction drags the chassis;
+     * planted contacts must establish before speed is meaningful. */
+    for (int i = 0; i < 120; i++) {
+        drivetrain_tank(&robot, 0.0f, 0.0f);
+        drivetrain_update(&world, &robot, DT);
+        physics_world_step(&world, DT);
+    }
 
     /* Drive at full power for 3 seconds */
     for (int i = 0; i < 180; i++) {
@@ -213,11 +235,11 @@ static void test_motor_free_speed(void) {
         physics_world_step(&world, DT);
     }
 
-    /* 5203-30 spec: 220 RPM output */
-    float spec_rpm = 220.0f;
+    /* 5203-2402-0027 spec: 223 RPM output */
+    float spec_rpm = 223.0f;
     float actual_rpm = robot.wheel_motors[0].rpm;
     float rpm_error = fabsf(actual_rpm - spec_rpm) / spec_rpm;
-    TEST_ASSERT(rpm_error < 0.3f, "motor RPM approaches spec free speed (220 RPM)");
+    TEST_ASSERT(rpm_error < 0.3f, "motor RPM approaches spec free speed (223 RPM)");
 
     physics_world_cleanup(&world);
 }
@@ -229,21 +251,21 @@ static void test_motor_stall_torque(void) {
     printf("--- Test 7: Motor Stall Torque ---\n");
     physics_world world;
     physics_world_init(&world);
-    constraint_pool_init(); /* MFS_139_ISOLATION: clear stale constraints */
-    constraint_pool_init();
+    constraint_pool_init(&world); /* MFS_139_ISOLATION: clear stale constraints */
+    constraint_pool_init(&world);
 
     ftc_robot robot;
-    ftc_robot_create(&world, &robot, 0.0f, ftc_robot_rest_height(), 0.0f, MOTOR_GB_5203_30);
+    ftc_robot_create(&world, &robot, 0.0f, ftc_robot_rest_height(), 0.0f, MOTOR_GB_5203_26_9);
 
     /* Apply full power with wheel locked (apply opposing force) */
     drivetrain_tank(&robot, 1.0f, 1.0f);
     drivetrain_update(&world, &robot, DT);
 
-    /* 5203-30 spec: 2.55 N·m output stall torque */
-    float spec_stall_torque = 2.55f;
+    /* 5203-2402-0027 spec: 38.0 kg.cm = 3.727 N-m output stall torque */
+    float spec_stall_torque = 3.73f;
     float actual_torque = robot.wheel_motors[0].output_torque;
     float torque_error = fabsf(actual_torque - spec_stall_torque) / spec_stall_torque;
-    TEST_ASSERT(torque_error < 0.3f, "motor output torque ≈ spec stall torque (2.55 N·m)");
+    TEST_ASSERT(torque_error < 0.3f, "motor output torque ≈ spec stall torque (3.73 N·m)");
 
     physics_world_cleanup(&world);
 }
@@ -255,11 +277,11 @@ static void test_motor_back_emf_braking(void) {
     printf("--- Test 8: Motor Back-EMF Braking ---\n");
     physics_world world;
     physics_world_init(&world);
-    constraint_pool_init(); /* MFS_139_ISOLATION: clear stale constraints */
-    constraint_pool_init();
+    constraint_pool_init(&world); /* MFS_139_ISOLATION: clear stale constraints */
+    constraint_pool_init(&world);
 
     ftc_robot robot;
-    ftc_robot_create(&world, &robot, 0.0f, ftc_robot_rest_height(), 0.0f, MOTOR_GB_5203_30);
+    ftc_robot_create(&world, &robot, 0.0f, ftc_robot_rest_height(), 0.0f, MOTOR_GB_5203_26_9);
 
     /* Spin up the wheels */
     for (int i = 0; i < 60; i++) {
@@ -301,7 +323,7 @@ static void test_static_friction_threshold(void) {
     printf("--- Test 9: Static Friction Threshold ---\n");
     physics_world world;
     physics_world_init(&world);
-    constraint_pool_init(); /* MFS_139_ISOLATION: clear stale constraints */
+    constraint_pool_init(&world); /* MFS_139_ISOLATION: clear stale constraints */
 
     /* Static floor, top surface at y = 0 */
     physics_world_add_cube(&world,
@@ -358,7 +380,7 @@ static void test_kinetic_friction_deceleration(void) {
     printf("--- Test 10: Kinetic Friction Deceleration ---\n");
     physics_world world;
     physics_world_init(&world);
-    constraint_pool_init(); /* MFS_139_ISOLATION: clear stale constraints */
+    constraint_pool_init(&world); /* MFS_139_ISOLATION: clear stale constraints */
 
     /* Static floor, top surface at y = 0 */
     physics_world_add_cube(&world,
@@ -404,8 +426,8 @@ static void test_numerical_stability_no_nan(void) {
     printf("--- Test 11: Numerical Stability (no NaN over 3000 ticks) ---\n");
     physics_world world;
     physics_world_init(&world);
-    constraint_pool_init(); /* MFS_139_ISOLATION: clear stale constraints */
-    constraint_pool_init();
+    constraint_pool_init(&world); /* MFS_139_ISOLATION: clear stale constraints */
+    constraint_pool_init(&world);
 
     /* Add mixed objects */
     physics_world_add_cube(&world,
@@ -417,7 +439,7 @@ static void test_numerical_stability_no_nan(void) {
         (vector3){0.3f, 0.3f, 0.3f}, 1.5f);
 
     ftc_robot robot;
-    ftc_robot_create(&world, &robot, 2.0f, ftc_robot_rest_height(), 0.0f, MOTOR_GB_5203_30);
+    ftc_robot_create(&world, &robot, 2.0f, ftc_robot_rest_height(), 0.0f, MOTOR_GB_5203_26_9);
 
     /* Drive and coast for 3000 ticks */
     bool has_nan = false;
@@ -455,11 +477,11 @@ static void test_robot_coast_down(void) {
     printf("--- Test 12: Robot Coast-Down After Power Cut ---\n");
     physics_world world;
     physics_world_init(&world);
-    constraint_pool_init(); /* MFS_139_ISOLATION: clear stale constraints */
-    constraint_pool_init();
+    constraint_pool_init(&world); /* MFS_139_ISOLATION: clear stale constraints */
+    constraint_pool_init(&world);
 
     ftc_robot robot;
-    ftc_robot_create(&world, &robot, 0.0f, ftc_robot_rest_height(), 0.0f, MOTOR_GB_5203_30);
+    ftc_robot_create(&world, &robot, 0.0f, ftc_robot_rest_height(), 0.0f, MOTOR_GB_5203_26_9);
 
     /* Drive forward for 1 second */
     for (int i = 0; i < 60; i++) {
@@ -494,7 +516,7 @@ static void test_energy_conservation_free_fall(void) {
     printf("--- Test 13: Energy Conservation (free fall) ---\n");
     physics_world world;
     physics_world_init(&world);
-    constraint_pool_init(); /* MFS_139_ISOLATION: clear stale constraints */
+    constraint_pool_init(&world); /* MFS_139_ISOLATION: clear stale constraints */
 
     float h = 10.0f;
     float m = 1.0f;
@@ -524,7 +546,7 @@ static void test_cylinder_floor_rest(void) {
     printf("--- Test 14: Cylinder Rests on Floor ---\n");
     physics_world world;
     physics_world_init(&world);
-    constraint_pool_init(); /* MFS_139_ISOLATION: clear stale constraints */
+    constraint_pool_init(&world); /* MFS_139_ISOLATION: clear stale constraints */
 
     /* Static floor, top surface at y = 0 */
     physics_world_add_cube(&world,
@@ -570,8 +592,8 @@ static void test_revolute_anchor_holds(void) {
     printf("--- Test 15: Revolute Anchor Holds Under Gravity ---\n");
     physics_world world;
     physics_world_init(&world);
-    constraint_pool_init(); /* MFS_139_ISOLATION: clear stale constraints */
-    constraint_pool_init();
+    constraint_pool_init(&world); /* MFS_139_ISOLATION: clear stale constraints */
+    constraint_pool_init(&world);
 
     /* Add a static pivot */
     int pivot_idx = physics_world_add_cube(&world,
@@ -589,7 +611,7 @@ static void test_revolute_anchor_holds(void) {
     vector3 anchor_a = {0.0f, 0.0f, 0.0f};
     vector3 anchor_b = {-1.0f, 2.0f, 0.0f};
     vector3 axis = {0.0f, 0.0f, 1.0f};
-    int joint_idx = constraint_add_revolute(pivot_id, bob_id, anchor_a, anchor_b, axis);
+    int joint_idx = constraint_add_revolute(&world, pivot_id, bob_id, anchor_a, anchor_b, axis);
     TEST_ASSERT(joint_idx >= 0, "revolute joint created");
 
     float rod_length = vector3_length(vector3_subtraction(
@@ -621,14 +643,18 @@ int main(void) {
     test_cylinder_inertia();
     test_restitution_bounce();
     test_rolling_kinematics();
+    FTC_ITERS_BEGIN(); /* robot subtests 5-8: 128 iterations */
     test_rolling_resistance_stopping();
     test_motor_free_speed();
     test_motor_stall_torque();
     test_motor_back_emf_braking();
+    FTC_ITERS_END();
     test_static_friction_threshold();
     test_kinetic_friction_deceleration();
+    FTC_ITERS_BEGIN(); /* robot subtests 11-12: 128 iterations */
     test_numerical_stability_no_nan();
     test_robot_coast_down();
+    FTC_ITERS_END();
     test_energy_conservation_free_fall();
     test_cylinder_floor_rest();
     test_revolute_anchor_holds();

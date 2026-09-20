@@ -7,7 +7,7 @@
 
 #include "robot.h"
 #include "drivetrain.h"
-#include "../core/physics_world.h"
+#include "core/physics_world.h"
 
 #define MFS_MAX_GUI_ROBOTS 4
 

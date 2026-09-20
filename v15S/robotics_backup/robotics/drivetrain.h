@@ -2,7 +2,7 @@
 #ifndef drivetrain_h
 #define drivetrain_h
 #include "robot.h"
-#include "../core/physics_world.h"
+#include "core/physics_world.h"
 
 /* Tank drive: independent left/right power */
 void drivetrain_tank(ftc_robot *robot, float left_power, float right_power);

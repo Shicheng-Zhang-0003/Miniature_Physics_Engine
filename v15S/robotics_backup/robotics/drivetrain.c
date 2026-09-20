@@ -1,8 +1,8 @@
 /* MPE_FTC_074: Drivetrain implementation */
 /* MPE_FTC_082 TEMPORARY — replace with anisotropic friction (MPE_FTC_095): Fixed syntax error (stray '}') + real mecanum chassis forces */
 #include "drivetrain.h"
-#include "../core/math3D.h"
-#include "../config/mpe_config.h"
+#include "core/math3d.h"
+#include "config/mpe_config.h"
 
 void drivetrain_tank (ftc_robot *robot, float left_power, float right_power) {
     if (!robot) {return;}
@@ -70,6 +70,7 @@ void drivetrain_mecanum (ftc_robot *robot, float forward, float strafe, float ro
 
 void drivetrain_update (physics_world *world, ftc_robot *robot, float dt) {
     if ((!world) || (!robot) || (dt <= 0.0f)) {return;}
+    const mpe_config_t *drive_cfg = mpe_world_cfg(world);
     ftc_robot_update (world, robot, dt);
 
 /* MPE_DRIVETRAIN_REAL — FIX 117 (Path A / partial 095 keystone):
@@ -82,7 +83,7 @@ void drivetrain_update (physics_world *world, ftc_robot *robot, float dt) {
     {
         vector3 world_up = {0.0f, 1.0f, 0.0f};
         float gravity_mag = 9.81f;
-        if (g_cfg.world.gravity < 0.0f) { gravity_mag = -g_cfg.world.gravity; }
+        if (drive_cfg->world.gravity < 0.0f) { gravity_mag = -drive_cfg->world.gravity; }
 
         /* Total robot mass -> per-wheel normal load */
         float total_mass = 0.0f;
@@ -103,7 +104,7 @@ void drivetrain_update (physics_world *world, ftc_robot *robot, float dt) {
          * drive force itself at mu_k understates rolling grip and stalls
          * the robot. Sliding is handled by the contact solver's
          * static/kinetic selection. */
-        float grip_mu = g_cfg.world.floor_friction_s;
+        float grip_mu = drive_cfg->world.floor_friction_s;
         float max_grip = grip_mu * normal_per_wheel; /* MFS_162_FRICTION_FIX */
 
         /* --- Per-wheel traction: torque -> force at contact --- */
@@ -134,9 +135,36 @@ void drivetrain_update (physics_world *world, ftc_robot *robot, float dt) {
             wheel->force_accumulator = vector3_addition(
                 wheel->force_accumulator,
                 vector3_scaling(rolling_dir, traction));
-            /* FIX-AUDIT: traction counts as driving for wheel-lock. */
-            if (fabsf(robot->wheel_motors[i].command) > 0.01f) {
-                wheel->driven_this_tick = true;
+            /* MFS_PORT_V15S: driven_this_tick gate belonged to the parked
+             * core wheel-lock loop; wheels are woken in ftc_robot_update. */
+        }
+
+        /* --- Mecanum strafe: reduced-order roller force (FTC-side) ---
+         * MFS_PORT_V15S: lateral motion has no contact force path anymore
+         * (the parked core roller-tangent model is gone, and isotropic
+         * cylinder friction cannot produce roller thrust). Model it where
+         * it belongs without engine changes: the roller geometry converts
+         * wheel torque into chassis-lateral force, budgeted inside the
+         * friction circle (half the total grip; forward traction uses the
+         * rest). Rotate still works through real wheel differentials
+         * (see tank_turn_test), so only strafe is modeled here. */
+        if (robot->drivetrain_type == FTC_DRIVETRAIN_MECANUM && chassis_ok) {
+            float c0 = robot->wheel_motors[0].command;
+            float c1 = robot->wheel_motors[1].command;
+            float c2 = (robot->wheel_count > 2) ? robot->wheel_motors[2].command : 0.0f;
+            float c3 = (robot->wheel_count > 3) ? robot->wheel_motors[3].command : 0.0f;
+            float strafe = (c0 - c1 - c2 + c3) * 0.25f; /* inverse IK mapping */
+            if (fabsf(strafe) > 0.01f) {
+                rigidbody *chassis = &world->bodies[robot->chassis_body];
+                vector3 lat = vector4_rotate_to_vector3(chassis->orientation, (vector3){1.0f, 0.0f, 0.0f});
+                lat.y = 0.0f;
+                float lat_len_sq = vector3_length_squared(lat);
+                if (lat_len_sq > 1e-6f) {
+                    lat = vector3_scaling(lat, 1.0f / sqrtf(lat_len_sq));
+                    float f_lat = strafe * max_grip * (float) robot->wheel_count * 0.5f;
+                    chassis->force_accumulator = vector3_addition(
+                        chassis->force_accumulator, vector3_scaling(lat, f_lat));
+                }
             }
         }
 
@@ -215,7 +243,7 @@ void drivetrain_update (physics_world *world, ftc_robot *robot, float dt) {
 * wheels in contact with the floor. Simulates realistic coast-down.
 * Only applies when motor command is near-zero (free-rolling). */
 {
-float c_rr = g_cfg.world.rolling_resistance_coeff; /* MFS_141: real config param, default 0.02 */
+float c_rr = drive_cfg->world.rolling_resistance_coeff; /* MFS_141: real config param, default 0.02 */
 if ((c_rr > 0.0f) && (robot->wheel_count > 0)) {
 float total_mass = 0.0f;
 int chassis_ok = ((robot->chassis_body >= 0) &&
@@ -228,7 +256,7 @@ total_mass += world->bodies[wi].mass;
 }
 }
 float g_mag = 9.81f;
-if (g_cfg.world.gravity < 0.0f) { g_mag = -g_cfg.world.gravity; }
+if (drive_cfg->world.gravity < 0.0f) { g_mag = -drive_cfg->world.gravity; }
 float n_per_wheel = (total_mass * g_mag) / (float) robot->wheel_count;
 for (int i = 0; i < robot->wheel_count; i++) {
 int wi = robot->wheel_bodies[i];
@@ -248,7 +276,7 @@ float torque_rr = f_rr * r;
 float sign = (omega_axle > 0.0f) ? -1.0f : 1.0f;
 vector3 rr_torque = vector3_scaling(axle, sign * torque_rr);
 wheel->torque_accumulator = vector3_addition(wheel->torque_accumulator, rr_torque);
-wheel->driven_this_tick = true; /* MFS_169 */
+/* MFS_PORT_V15S: see above — no driven_this_tick in the current core. */
 }
 }
 }
