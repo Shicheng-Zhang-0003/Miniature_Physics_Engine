@@ -2,8 +2,8 @@
 * FIX 105: Initialize physics_world before creating bodies.
 * FIX 125: Orange nose sphere at front of chassis for heading indication. */
 #include "gui_robot_registry.h"
-#include "../mpe_engine.h"
-#include "../scene/scene_init.h"
+#include "mpe_engine.h"
+#include "scene/scene_init.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -52,11 +52,15 @@ proxy->wheel_proxies[i] = -1;
 int chassis_body = robot->chassis_body;
 if ((chassis_body >= 0) && (chassis_body < mfs_gui_robot_world->body_count)) {
 rigidbody *src = &mfs_gui_robot_world->bodies[chassis_body];
-int proxy_idx = scene_add_cube(src->position, src->half_extensions, 0.0f);
+/* MFS_PORT_V15S: visual proxies are static bodies in the same world
+ * (the retired obj_per_scene/object_count globals are gone). The engine
+ * renders world bodies directly; proxies preserve the legacy
+ * duplicate-body render path for GUI code that reads them. */
+int proxy_idx = physics_world_add_cube(mfs_gui_robot_world, src->position, src->half_extensions, 0.0f);
 if (proxy_idx >= 0) {
-obj_per_scene[proxy_idx].colour = (vector3){0.2f, 0.6f, 0.9f};
-obj_per_scene[proxy_idx].static_state = true;
-obj_per_scene[proxy_idx].inverse_mass = 0.0f;
+mfs_gui_robot_world->bodies[proxy_idx].colour = (vector3){0.2f, 0.6f, 0.9f};
+mfs_gui_robot_world->bodies[proxy_idx].static_state = true;
+mfs_gui_robot_world->bodies[proxy_idx].inverse_mass = 0.0f;
 proxy->chassis_proxy = proxy_idx;
 }
 /* MFS_125: Create heading indicator (orange nose) at front of chassis */
@@ -64,11 +68,11 @@ proxy->chassis_proxy = proxy_idx;
 vector3 nose_local = {MFS_NOSE_OFFSET_X, MFS_NOSE_OFFSET_Y, MFS_NOSE_OFFSET_Z};
 vector3 nose_world = vector3_addition(src->position,
 vector4_rotate_to_vector3(src->orientation, nose_local));
-int nose_idx = scene_add_object(MFS_NOSE_RADIUS, 0.0f, nose_world);
+int nose_idx = physics_world_add_sphere(mfs_gui_robot_world, MFS_NOSE_RADIUS, 0.0f, nose_world);
 if (nose_idx >= 0) {
-obj_per_scene[nose_idx].colour = (vector3){1.0f, 0.5f, 0.0f}; /* orange */
-obj_per_scene[nose_idx].static_state = true;
-obj_per_scene[nose_idx].inverse_mass = 0.0f;
+mfs_gui_robot_world->bodies[nose_idx].colour = (vector3){1.0f, 0.5f, 0.0f}; /* orange */
+mfs_gui_robot_world->bodies[nose_idx].static_state = true;
+mfs_gui_robot_world->bodies[nose_idx].inverse_mass = 0.0f;
 proxy->nose_proxy = nose_idx;
 }
 }
@@ -78,11 +82,11 @@ for (int i = 0; i < robot->wheel_count; i++) {
 int wheel_body = robot->wheel_bodies[i];
 if ((wheel_body >= 0) && (wheel_body < mfs_gui_robot_world->body_count)) {
 rigidbody *src = &mfs_gui_robot_world->bodies[wheel_body];
-int proxy_idx = scene_add_object(src->radius, 0.0f, src->position);
+int proxy_idx = physics_world_add_sphere(mfs_gui_robot_world, src->radius, 0.0f, src->position);
 if (proxy_idx >= 0) {
-obj_per_scene[proxy_idx].colour = (vector3){0.15f, 0.15f, 0.15f};
-obj_per_scene[proxy_idx].static_state = true;
-obj_per_scene[proxy_idx].inverse_mass = 0.0f;
+mfs_gui_robot_world->bodies[proxy_idx].colour = (vector3){0.15f, 0.15f, 0.15f};
+mfs_gui_robot_world->bodies[proxy_idx].static_state = true;
+mfs_gui_robot_world->bodies[proxy_idx].inverse_mass = 0.0f;
 proxy->wheel_proxies[i] = proxy_idx;
 }
 }
@@ -115,11 +119,11 @@ for (int i = 0; i < mfs_gui_robot_count; i++) {
 ftc_robot *robot = &mfs_gui_robots[i];
 gui_robot_proxy *proxy = &mfs_gui_proxies[i];
 /* Sync chassis */
-if ((proxy->chassis_proxy >= 0) && (proxy->chassis_proxy < object_count)) {
+if ((proxy->chassis_proxy >= 0) && (proxy->chassis_proxy < mfs_gui_robot_world->body_count)) {
 int chassis_body = robot->chassis_body;
 if ((chassis_body >= 0) && (chassis_body < mfs_gui_robot_world->body_count)) {
 rigidbody *src = &mfs_gui_robot_world->bodies[chassis_body];
-rigidbody *dst = &obj_per_scene[proxy->chassis_proxy];
+rigidbody *dst = &mfs_gui_robot_world->bodies[proxy->chassis_proxy];
 dst->position = src->position;
 dst->orientation = src->orientation;
 rigidbody_update_axes(dst);
@@ -128,11 +132,11 @@ rigidbody_update_axes(dst);
 /* Sync wheels */
 for (int w = 0; w < robot->wheel_count; w++) {
 int proxy_idx = proxy->wheel_proxies[w];
-if ((proxy_idx >= 0) && (proxy_idx < object_count)) {
+if ((proxy_idx >= 0) && (proxy_idx < mfs_gui_robot_world->body_count)) {
 int wheel_body = robot->wheel_bodies[w];
 if ((wheel_body >= 0) && (wheel_body < mfs_gui_robot_world->body_count)) {
 rigidbody *src = &mfs_gui_robot_world->bodies[wheel_body];
-rigidbody *dst = &obj_per_scene[proxy_idx];
+rigidbody *dst = &mfs_gui_robot_world->bodies[proxy_idx];
 dst->position = src->position;
 dst->orientation = src->orientation;
 rigidbody_update_axes(dst);
@@ -140,14 +144,14 @@ rigidbody_update_axes(dst);
 }
 }
 /* MFS_125: Sync heading indicator (nose) */
-if ((proxy->nose_proxy >= 0) && (proxy->nose_proxy < object_count)) {
+if ((proxy->nose_proxy >= 0) && (proxy->nose_proxy < mfs_gui_robot_world->body_count)) {
 int chassis_body = robot->chassis_body;
 if ((chassis_body >= 0) && (chassis_body < mfs_gui_robot_world->body_count)) {
 rigidbody *chassis = &mfs_gui_robot_world->bodies[chassis_body];
 vector3 nose_local = {MFS_NOSE_OFFSET_X, MFS_NOSE_OFFSET_Y, MFS_NOSE_OFFSET_Z};
 vector3 nose_world = vector3_addition(chassis->position,
 vector4_rotate_to_vector3(chassis->orientation, nose_local));
-obj_per_scene[proxy->nose_proxy].position = nose_world;
+mfs_gui_robot_world->bodies[proxy->nose_proxy].position = nose_world;
 }
 }
 }

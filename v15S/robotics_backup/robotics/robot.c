@@ -1,7 +1,7 @@
 /* MPE_FTC_073: FTC robot object implementation */
 /* MPE_FTC_094_CLEANUP: wheel_traction removed — real cylinder friction */
 #include "robot.h"
-#include "../physics/constraint.h"
+#include "physics/constraint.h"
 #include <math.h>
 #include <string.h>
 
@@ -15,7 +15,8 @@
 #define WHEEL_HALF_WIDTH 0.02f /* 40mm wide wheels */
 #define WHEEL_OFFSET_X 0.24f /* slightly outside chassis */
 #define WHEEL_OFFSET_Z 0.20f
-#define WHEEL_Y_OFFSET (-CHASSIS_HALF_Y - WHEEL_RADIUS + 0.01f)
+#define WHEEL_Y_OFFSET (-CHASSIS_HALF_Y - WHEEL_RADIUS - 0.005f) /* MFS_PORT_V15S: 5mm ground clearance. The old +0.01f tucked wheel tops 10mm INSIDE the chassis box, so the contact solver fought the joint-held pose every tick (sinking, chatter, pitch-unload). Joints hold anchors, not volumes — interpenetrating rest poses are solver poison. */
+#define WHEEL_PRELOAD 0.002f /* MFS_PORT_V15S: joint anchors sit 2mm BELOW exact touch so P2P preloads wheels into persistent floor contact. Inside slop (10mm): no positional fight, but the manifold never grazes out to a hover-skid (which starves odometry). Real suspensions run droop/preload the same way. */
 
 /* MPE_FTC_095: chassis-centre height where the wheels just touch floor y=0 */
 float ftc_robot_rest_height(void) {
@@ -28,8 +29,12 @@ int ftc_robot_create_with_drive(physics_world *world, ftc_robot *robot, float x,
 if ((!world) || (!robot)) {
 return 1;
 }
-memset(robot, 0, sizeof(ftc_robot));
+    memset(robot, 0, sizeof(ftc_robot));
 /* memset zeroes odom_x/z/theta and wheel_radians — no separate init needed */
+    /* Traction scales start open (1.0); memset leaves 0.0 = fully cut. */
+    for (int i = 0; i < FTC_MAX_WHEELS; i++) {
+        robot->wheel_traction_scale[i] = 1.0f;
+    }
     robot->motor_preset = preset;
     robot->drivetrain_type = drivetrain_type;
     robot->axle_axis_x = 1.0f; /* axles point along X (left-right) */
@@ -66,30 +71,35 @@ memset(robot, 0, sizeof(ftc_robot));
 
         uint32_t wheel_id = world->bodies[robot->wheel_bodies[i]].object_id;
 
-        /* Revolute joint: chassis (body_a) to wheel (body_b), axle along X */
-        vector3 anchor_on_chassis = {wheel_positions[i][0] - x, WHEEL_Y_OFFSET, wheel_positions[i][2] - z};
+        /* Revolute joint: chassis (body_a) to wheel (body_b), axle along X.
+         * Anchor sits WHEEL_PRELOAD below exact touch (see above). */
+        vector3 anchor_on_chassis = {wheel_positions[i][0] - x, WHEEL_Y_OFFSET - WHEEL_PRELOAD,
+                                     wheel_positions[i][2] - z};
         vector3 anchor_on_wheel = {0.0f, 0.0f, 0.0f}; /* wheel centre */
         vector3 axle_axis = {robot->axle_axis_x, robot->axle_axis_y, robot->axle_axis_z};
 
         robot->wheel_joints[i] =
-            constraint_add_revolute(chassis_id, wheel_id, anchor_on_chassis, anchor_on_wheel, axle_axis);
+            constraint_add_revolute(world, chassis_id, wheel_id, anchor_on_chassis, anchor_on_wheel,
+                                    axle_axis);
         if (robot->wheel_joints[i] < 0) {
             return 1;
         }
 
-        /* MFS_MECANUM_REAL: Mark wheel as mecanum with roller angle.
-         * Standard layout: front-left +45°, front-right -45°, back-left -45°, back-right +45° */
+        /* MFS_PORT_V15S: roller geometry is robot-local state now (the
+         * parked rigidbody is_mecanum/roller_angle_rad fields are gone
+         * from the core). Standard layout: FL +45°, FR -45°, BL -45°,
+         * BR +45°. Tank robots get 0/false (plain cylinders). */
         float roller_angle = 0.0f;
-        if (i == 0) roller_angle = 0.785398f;       /* front-left: +45° */
-        if (i == 1) roller_angle = -0.785398f;      /* front-right: -45° */
-        if (i == 2) roller_angle = -0.785398f;      /* back-left: -45° */
-        if (i == 3) roller_angle = 0.785398f;       /* back-right: +45° */
-        
+        bool is_mecanum = false;
         if (robot->drivetrain_type == FTC_DRIVETRAIN_MECANUM) {
-                rigidbody_set_mecanum(&world->bodies[robot->wheel_bodies[i]], true, roller_angle);
-            } else {
-                rigidbody_set_mecanum(&world->bodies[robot->wheel_bodies[i]], false, 0.0f);
-            }
+            is_mecanum = true;
+            if (i == 0) roller_angle = 0.785398f;       /* front-left: +45° */
+            else if (i == 1) roller_angle = -0.785398f; /* front-right: -45° */
+            else if (i == 2) roller_angle = -0.785398f; /* back-left: -45° */
+            else if (i == 3) roller_angle = 0.785398f;  /* back-right: +45° */
+        }
+        robot->wheel_roller_angle[i] = roller_angle;
+        robot->wheel_is_mecanum[i] = is_mecanum;
 
         /* Set up motor for this wheel */
         motor_preset_apply(&robot->wheel_motors[i], preset);
@@ -152,10 +162,62 @@ void ftc_robot_update(physics_world *world, ftc_robot *robot, float dt) {
         }
         float wheel_speed = vector3_dot(wheel->angular_velocity, axle);
 
+        /* MFS_TRACTION_CONTROL: compare against the rolling speed the
+         * chassis motion demands at this wheel (rigid-body velocity at
+         * the wheel center, projected on the rolling direction). A wheel
+         * spinning far from demand is slipping: cut its torque so kinetic
+         * friction re-captures it instead of sliding forever. Scales
+         * recover toward open when slip clears (hysteresis via margin). */
+        if (robot->chassis_body >= 0 && robot->chassis_body < world->body_count &&
+            wheel->radius > 0.001f) {
+            rigidbody *chassis = &world->bodies[robot->chassis_body];
+            vector3 r_ch_wh = vector3_subtraction(wheel->position, chassis->position);
+            vector3 v_contact = vector3_addition(
+                chassis->velocity, vector3_cross(chassis->angular_velocity, r_ch_wh));
+            vector3 roll_dir = vector3_cross(axle, (vector3){0.0f, 1.0f, 0.0f});
+            float w_expected = 0.0f;
+            if (vector3_length_squared(roll_dir) > 1e-6f) {
+                roll_dir = vector3_scaling(roll_dir, 1.0f / sqrtf(vector3_length_squared(roll_dir)));
+                w_expected = vector3_dot(v_contact, roll_dir) / wheel->radius;
+            }
+            float slip = wheel_speed - w_expected;
+            /* Cut ONLY overspeed (wheel outrunning travel = burnout).
+             * Under-speed (skid/drag) keeps full torque so the wheel
+             * spins UP to rolling speed; cutting there deadlocks the
+             * wheel at zero while traction drags the chassis. */
+            float dir = 0.0f;
+            if (w_expected > 1e-3f) {
+                dir = 1.0f;
+            } else if (w_expected < -1e-3f) {
+                dir = -1.0f;
+            }
+            float *scale = &robot->wheel_traction_scale[i];
+            float over = slip * dir;
+            if (dir != 0.0f && over > 4.0f) {
+                *scale = 0.15f;
+            } else if (*scale < 1.0f && over < 2.0f) {
+                *scale += 0.2f;
+                if (*scale > 1.0f) {
+                    *scale = 1.0f;
+                }
+            }
+        }
+
         /* Update motor electrical state */
         motor_update(&robot->wheel_motors[i], wheel_speed, dt, terminal_voltage);
 
-        /* Apply motor torque along the actual physical axle in world space */
+        /* Traction cut applies to delivered torque (both the axle drive
+         * below and the traction loop in drivetrain_update read
+         * output_torque). Electrical readings (current/rpm) stay
+         * unscaled: they report the commanded state. */
+        robot->wheel_motors[i].output_torque *= robot->wheel_traction_scale[i];
+
+        /* Apply motor torque along the actual physical axle in world space.
+         * MFS_PORT_V15S: NO one-tick no-overshoot clamp here (tried: it
+         * caps torque below the static-grip cone, so wheels skid instead
+         * of rolling while traction drags the chassis — odometry reads
+         * ~zero). Chatter is handled by traction control (slip-gated cut
+         * above), which preserves full stall torque for breakaway. */
         float torque = robot->wheel_motors[i].output_torque;
         /* MFS_145_IDLE_BRAKE: back-EMF braking is a damper — it brings a coasting
          * wheel to rest and can never reverse it (no back-EMF once stopped).
@@ -174,11 +236,9 @@ void ftc_robot_update(physics_world *world, ftc_robot *robot, float dt) {
         wheel->torque_accumulator = vector3_addition(
             wheel->torque_accumulator,
             vector3_scaling(axle, torque));
-        /* FIX-AUDIT: mark wheel driven (gated on command) so wheel-lock
-         * doesn't freeze driven wheels, but still locks truly idle ones. */
-        if (fabsf(robot->wheel_motors[i].command) > 0.01f) {
-            wheel->driven_this_tick = true;
-        }
+        /* MFS_PORT_V15S: the parked core wheel-lock loop (and its
+         * driven_this_tick gate) is gone; driven wheels are kept awake
+         * directly below instead. */
         rigidbody_wake(wheel); /* MPE_FTC_078: keep driven wheels awake so motor torque is applied */
     }
 }

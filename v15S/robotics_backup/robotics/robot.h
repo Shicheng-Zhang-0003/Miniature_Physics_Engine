@@ -5,7 +5,7 @@
 #include "motor.h"
 #include "motor_presets.h"
 #include "battery.h"
-#include "../core/physics_world.h"
+#include "core/physics_world.h"
 
 #define FTC_MAX_WHEELS 8
 
@@ -38,6 +38,16 @@ typedef struct {
     /* MFS_151_ODOMETRY: Wheel encoders and pose estimation */
     float wheel_radians[FTC_MAX_WHEELS]; /* MFS_163_BOUNDS_FIX: was [4], OOB if wheel_count > 4 */
     float odom_x, odom_z, odom_theta;
+    /* MFS_TRACTION_CONTROL: per-wheel torque scale (1 = full). Cut when
+     * slip is detected so a spun-up wheel re-grips instead of sliding
+     * forever (kinetic friction alone can never re-capture a wheel whose
+     * stall torque exceeds the kinetic cone). */
+    float wheel_traction_scale[FTC_MAX_WHEELS];
+    /* MFS_PORT_V15S: roller geometry used to live on the rigidbody
+     * (is_mecanum / roller_angle_rad, removed with the parked solver
+     * hooks). It now lives here, owned by the robot that defines it. */
+    float wheel_roller_angle[FTC_MAX_WHEELS]; /* radians, +45/-45 layout */
+    bool wheel_is_mecanum[FTC_MAX_WHEELS];
 } ftc_robot;
 
 /* Create a 4-wheel robot at the given position. Returns 0 on success. */

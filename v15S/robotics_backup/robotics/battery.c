@@ -7,9 +7,11 @@ void battery_init(battery *b) {
     }
     b->nominal_voltage = 12.8f;
     b->internal_resistance = 0.015f; /* FIX 112: realistic LiPo internal resistance */
-    /* FIX-AUDIT: 30Ah was 5-10x a real FTC pack (REV slim 3Ah, goBILDA 6Ah).
-     * 5Ah gives realistic brown-out over a match. */
-    b->capacity_ah = 5.0f;
+    /* VERIFIED: both standard FTC packs are 10-cell 12 V NiMH 3000 mAh
+     * with 20 A fuses (REV-31-1302 slim, 567 g; goBILDA 3100-0012-0020).
+     * 3.0 Ah exactly — the old 5.0 Ah compromise is retired. Nominal
+     * 12.8 V is a fresh-pack assumption (spec nominal is 12.0 V). */
+    b->capacity_ah = 3.0f;
     b->charge_fraction = 1.0f;
 }
 
