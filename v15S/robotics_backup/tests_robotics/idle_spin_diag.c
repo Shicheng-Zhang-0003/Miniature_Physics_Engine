@@ -5,18 +5,21 @@
 #include "core/physics_world.h"
 #include "physics/constraint.h"
 #include "config/mpe_config.h"
-#include "robotics/robot.h"
-#include "robotics/drivetrain.h"
+#include "robotics_backup/robotics/robot.h"
+#include "robotics_backup/robotics/drivetrain.h"
 
 static const float DT = 1.0f / 60.0f;
 
 int main(void) {
     mpe_config_init();
+    /* MFS_PORT_V15S: robot worlds need 128 iterations (40:1 chassis/wheel
+     * mass ratio; see teleop_drive_test.c). */
+    g_cfg.timestep.solver_iterations = 128;
     printf("\n=== IDLE WHEEL-SPIN DIAGNOSTIC ===\n");
 
     physics_world world;
     physics_world_init(&world);
-    constraint_pool_init();
+    constraint_pool_init(&world);
 
     /* floor at y=0 */
     physics_world_add_cube(&world,
@@ -24,7 +27,7 @@ int main(void) {
         (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
 
     ftc_robot robot;
-    int rc = ftc_robot_create(&world, &robot, 0.0f, ftc_robot_rest_height(), 0.0f, MOTOR_GB_5203_30);
+    int rc = ftc_robot_create(&world, &robot, 0.0f, ftc_robot_rest_height(), 0.0f, MOTOR_GB_5203_26_9);
     if (rc != 0) { printf("[FAIL] robot create\n"); return 1; }
 
     /* Ensure zero commands */

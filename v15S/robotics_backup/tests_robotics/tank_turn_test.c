@@ -7,18 +7,21 @@
 #include "core/physics_world.h"
 #include "physics/constraint.h"
 #include "config/mpe_config.h"
-#include "robotics/robot.h"
-#include "robotics/drivetrain.h"
+#include "robotics_backup/robotics/robot.h"
+#include "robotics_backup/robotics/drivetrain.h"
 
 int main(void) {
     mpe_config_init();
+    /* MFS_PORT_V15S: robot worlds need 128 iterations (40:1 chassis/wheel
+     * mass ratio; see teleop_drive_test.c). */
+    g_cfg.timestep.solver_iterations = 128;
     physics_world world;
     physics_world_init(&world);
-    constraint_pool_init();
+    constraint_pool_init(&world);
 
     ftc_robot robot;
     int rc = ftc_robot_create_with_drive(&world, &robot, 0.0f, ftc_robot_rest_height(), 0.0f,
-                                         MOTOR_GB_5203_30, FTC_DRIVETRAIN_TANK);
+                                         MOTOR_GB_5203_26_9, FTC_DRIVETRAIN_TANK);
     if (rc != 0) { printf("[FAIL] could not create robot\n"); return 1; }
 
     float start_x, start_y, start_z;
