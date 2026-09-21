@@ -109,24 +109,68 @@ module: module/mpe_module.o module/mpe_registry.o module/mpe_loader.o
 ecosystem: ecosystem/mpe_ecosystem.o
 	$(CC) $(CFLAGS) -shared ecosystem/mpe_ecosystem.o -lm -ldl -o ecosystem.so
 
-# ---- MFS Ecosystem (distinct folder: ecosystem/mfs/) ----
-MFS_ECOSYSTEM_SRCS = ecosystem/mfs/mfs_ecosystem.c ecosystem/mfs/mfs_module_1.c ecosystem/mfs/mfs_internal.c
+# ---- MFS overarching ecosystem (v15S/src/ecosystem/mfs/: modules,
+# submodules, tests, docs under the "mfs-simulator" umbrella) ----
+MFS_ECOSYSTEM_SRCS = ecosystem/mfs/mfs_ecosystem.c ecosystem/mfs/mfs_internal.c \
+	ecosystem/mfs/modules/module_1/mfs_module_1.c \
+	ecosystem/mfs/modules/module_1/submodules/gamepad/gamepad.c \
+	ecosystem/mfs/modules/ftc/ftc_module.c ecosystem/mfs/modules/ftc/ftc_fleet.c \
+	ecosystem/mfs/modules/ftc/gui_robot_registry.c \
+	ecosystem/mfs/modules/ftc/submodules/robot.c ecosystem/mfs/modules/ftc/submodules/drivetrain.c \
+	ecosystem/mfs/modules/ftc/submodules/motor.c ecosystem/mfs/modules/ftc/submodules/motor_presets.c \
+	ecosystem/mfs/modules/ftc/submodules/battery.c
 MFS_ECOSYSTEM_OBJS = $(patsubst %.c,$(BUILD_DIR)/%.o,$(MFS_ECOSYSTEM_SRCS))
 
-# Direct -fPIC rules (must appear before the generic pattern rule).
-# MFS needs the robotics_backup include root (location-independent
-# "robotics/...", "gamepad/..." includes; see ecosystem/mfs/README_MFS.md).
+# Direct -fPIC rules (explicit targets take precedence over the generic
+# pattern rule). MFS-internal includes are MFS-root-relative
+# ("modules/..."), hence -Iecosystem/mfs; engine headers via -I. as usual.
 $(BUILD_DIR)/ecosystem/mfs/mfs_ecosystem.o: ecosystem/mfs/mfs_ecosystem.c
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -fPIC -I../robotics_backup -c $< -o $@
-
-$(BUILD_DIR)/ecosystem/mfs/mfs_module_1.o: ecosystem/mfs/mfs_module_1.c
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -fPIC -I../robotics_backup -c $< -o $@
+	$(CC) $(CFLAGS) -fPIC -Iecosystem/mfs -c $< -o $@
 
 $(BUILD_DIR)/ecosystem/mfs/mfs_internal.o: ecosystem/mfs/mfs_internal.c
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -fPIC -I../robotics_backup -c $< -o $@
+	$(CC) $(CFLAGS) -fPIC -Iecosystem/mfs -c $< -o $@
+
+$(BUILD_DIR)/ecosystem/mfs/modules/module_1/mfs_module_1.o: ecosystem/mfs/modules/module_1/mfs_module_1.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -fPIC -Iecosystem/mfs -c $< -o $@
+
+$(BUILD_DIR)/ecosystem/mfs/modules/module_1/submodules/gamepad/gamepad.o: ecosystem/mfs/modules/module_1/submodules/gamepad/gamepad.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -fPIC -Iecosystem/mfs -c $< -o $@
+
+$(BUILD_DIR)/ecosystem/mfs/modules/ftc/ftc_module.o: ecosystem/mfs/modules/ftc/ftc_module.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -fPIC -Iecosystem/mfs -c $< -o $@
+
+$(BUILD_DIR)/ecosystem/mfs/modules/ftc/ftc_fleet.o: ecosystem/mfs/modules/ftc/ftc_fleet.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -fPIC -Iecosystem/mfs -c $< -o $@
+
+$(BUILD_DIR)/ecosystem/mfs/modules/ftc/gui_robot_registry.o: ecosystem/mfs/modules/ftc/gui_robot_registry.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -fPIC -Iecosystem/mfs $(shell pkg-config --cflags gtk4 epoxy 2>/dev/null) -c $< -o $@
+
+$(BUILD_DIR)/ecosystem/mfs/modules/ftc/submodules/robot.o: ecosystem/mfs/modules/ftc/submodules/robot.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -fPIC -Iecosystem/mfs -c $< -o $@
+
+$(BUILD_DIR)/ecosystem/mfs/modules/ftc/submodules/drivetrain.o: ecosystem/mfs/modules/ftc/submodules/drivetrain.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -fPIC -Iecosystem/mfs -c $< -o $@
+
+$(BUILD_DIR)/ecosystem/mfs/modules/ftc/submodules/motor.o: ecosystem/mfs/modules/ftc/submodules/motor.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -fPIC -Iecosystem/mfs -c $< -o $@
+
+$(BUILD_DIR)/ecosystem/mfs/modules/ftc/submodules/motor_presets.o: ecosystem/mfs/modules/ftc/submodules/motor_presets.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -fPIC -Iecosystem/mfs -c $< -o $@
+
+$(BUILD_DIR)/ecosystem/mfs/modules/ftc/submodules/battery.o: ecosystem/mfs/modules/ftc/submodules/battery.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -fPIC -Iecosystem/mfs -c $< -o $@
 
 mfs_ecosystem.so: $(MFS_ECOSYSTEM_OBJS)
 	$(CC) $(CFLAGS) -fPIC -shared $(MFS_ECOSYSTEM_OBJS) -lm -ldl -o mfs_ecosystem.so
