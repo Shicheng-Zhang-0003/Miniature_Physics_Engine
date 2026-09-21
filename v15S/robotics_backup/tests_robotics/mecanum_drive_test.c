@@ -67,7 +67,7 @@ int main(void) {
             printf("[FAIL] robot did not strafe far enough in +X (dx=%.4f, expected >0.3)\n", dx);
             fail = 1;
         } else {
-            printf("[PASS] robot strafed in +X under real mecanum roller friction (dx=%.4f)\n", dx);
+            printf("[PASS] robot strafed in +X under chassis-force strafe model (dx=%.4f)\n", dx);
         }
     }
 

@@ -4,7 +4,7 @@
 
 typedef struct {
     float nominal_voltage; /* V (12.8 fresh) */
-    float internal_resistance; /* ohms (~0.05 for FTC battery) */
+    float internal_resistance; /* ohms (0.015 LiPo; see battery.c FIX 112) */
     float capacity_ah; /* amp-hours */
     float charge_fraction; /* 0..1 */
 } battery;

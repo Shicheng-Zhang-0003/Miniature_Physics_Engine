@@ -2,7 +2,7 @@
 #include "motor.h"
 #include <math.h>
 
-#define MOTOR_RPM_TO_RAD_S 0.10472f /* 2*pi/60 */
+#define MOTOR_RPM_TO_RAD_S 0.104719755f /* 2*pi/60 */
 
 void motor_from_spec(motor *m, float stall_torque_nm, float free_speed_rpm, float stall_current_a,
                      float nominal_voltage, float gear_ratio, float efficiency) {
