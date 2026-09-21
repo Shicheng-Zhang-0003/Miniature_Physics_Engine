@@ -56,10 +56,31 @@ void render_init() {
     if (render_init_status != render_uninitialized) {
         return;
     }
-    instanced_shader_program =
-        create_shader_program("render/shaders/vertex_shader.glsl", "render/shaders/fragment_shader.glsl");
-    utility_shader_program =
-        create_shader_program("render/shaders/utility_vertex.glsl", "render/shaders/utility_fragment.glsl");
+    const char *shader_dir = getenv("MPE_SHADER_DIR");
+    char vs_path[512], fs_path[512], uvs_path[512], ufs_path[512];
+    if (shader_dir && shader_dir[0]) {
+        snprintf(vs_path, sizeof(vs_path), "%s/vertex_shader.glsl", shader_dir);
+        snprintf(fs_path, sizeof(fs_path), "%s/fragment_shader.glsl", shader_dir);
+        snprintf(uvs_path, sizeof(uvs_path), "%s/utility_vertex.glsl", shader_dir);
+        snprintf(ufs_path, sizeof(ufs_path), "%s/utility_fragment.glsl", shader_dir);
+    } else {
+        snprintf(vs_path, sizeof(vs_path), "render/shaders/vertex_shader.glsl");
+        snprintf(fs_path, sizeof(fs_path), "render/shaders/fragment_shader.glsl");
+        snprintf(uvs_path, sizeof(uvs_path), "render/shaders/utility_vertex.glsl");
+        snprintf(ufs_path, sizeof(ufs_path), "render/shaders/utility_fragment.glsl");
+    }
+    /* Installed fallback: <prefix>/share/mpe/shaders (see make install). */
+    instanced_shader_program = create_shader_program(vs_path, fs_path);
+    if (instanced_shader_program == 0) {
+        char alt_vs[512], alt_fs[512];
+        const char *home = getenv("HOME");
+        if (home) {
+            snprintf(alt_vs, sizeof(alt_vs), "%s/.local/share/mpe/shaders/vertex_shader.glsl", home);
+            snprintf(alt_fs, sizeof(alt_fs), "%s/.local/share/mpe/shaders/fragment_shader.glsl", home);
+            instanced_shader_program = create_shader_program(alt_vs, alt_fs);
+        }
+    }
+    utility_shader_program = create_shader_program(uvs_path, ufs_path);
     if ((instanced_shader_program == 0) || (utility_shader_program == 0)) {
         fprintf(stderr, "RENDER INIT FAILED: shader program creation failed (instanced=%u, utility=%u)\n",
                 instanced_shader_program, utility_shader_program);
@@ -88,6 +109,14 @@ void render_init() {
     sphere_instances = malloc(mpe_max_bodies * 19 * sizeof(float));
     cube_instances = malloc(mpe_max_bodies * 19 * sizeof(float));
     cylinder_instances = malloc(mpe_max_bodies * 19 * sizeof(float));
+    if (!sphere_instances || !cube_instances || !cylinder_instances) {
+        fprintf(stderr, "RENDER INIT FAILED: instance buffer OOM\n");
+        free(sphere_instances); sphere_instances = NULL;
+        free(cube_instances); cube_instances = NULL;
+        free(cylinder_instances); cylinder_instances = NULL;
+        render_init_status = render_failed;
+        return;
+    }
     render_init_status = render_ok;
 }
 void render_cleanup(void) {
@@ -106,6 +135,9 @@ void render_cleanup(void) {
     render_init_status = render_uninitialized;
 }
 void render_scene_current(int widget_width, int widget_height) {
+    if (widget_width <= 0 || widget_height <= 0) {
+        return;
+    }
     if (render_init_status == render_failed) {
         glViewport(0, 0, widget_width, widget_height);
         glClearColor(0.5f, 0.0f, 0.0f, 1.0f);

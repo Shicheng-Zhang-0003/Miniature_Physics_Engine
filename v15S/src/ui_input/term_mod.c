@@ -91,3 +91,48 @@ void cmd_mod(int argc, char **argv) {
     }
     term_err("mpe: mod: unknown subcommand\n");
 }
+
+/* modinfo command — show detailed info about a module */
+void cmd_modinfo(int argc, char **argv) {
+    if (argc < 2) {
+        term_err("mpe: modinfo: usage: modinfo <module-name>\n");
+        return;
+    }
+    const mpe_module_desc_t *d = mpe_find_module(argv[1]);
+    if (!d) {
+        term_err("mpe: modinfo: module not found\n");
+        return;
+    }
+    char buf[512];
+    snprintf(buf, sizeof(buf), "name:        %s\n", d->name);
+    term_out(buf);
+    snprintf(buf, sizeof(buf), "version:     %s\n", d->version ? d->version : "?");
+    term_out(buf);
+    snprintf(buf, sizeof(buf), "kind:        %s\n", d->kind ? d->kind : "generic");
+    term_out(buf);
+    snprintf(buf, sizeof(buf), "deterministic: %s\n", d->deterministic ? "yes" : "no");
+    term_out(buf);
+    snprintf(buf, sizeof(buf), "abi:         %u\n", d->abi);
+    term_out(buf);
+    /* module-specific fields */
+    if (d->kind && term_str_eq(d->kind, "shape")) {
+        term_out("type:        shape (pair handler)\n");
+    } else if (d->kind && term_str_eq(d->kind, "broadphase")) {
+        term_out("type:        broadphase backend\n");
+    } else if (d->kind && term_str_eq(d->kind, "solver")) {
+        term_out("type:        solver backend\n");
+    } else if (d->kind && term_str_eq(d->kind, "generic")) {
+        if (d->pre_step) term_out("hooks:       pre_step\n");
+        if (d->post_step) term_out("hooks:       post_step\n");
+    }
+    /* check if loaded */
+    for (int i = 0; i < mpe_loader_count(); i++) {
+        if (term_str_eq(mpe_loader_path_at(i), d->name)) {
+            snprintf(buf, sizeof(buf), "loaded:      yes (%s)\n", mpe_loader_path_at(i));
+            term_out(buf);
+            return;
+        }
+    }
+    snprintf(buf, sizeof(buf), "loaded:      no\n");
+    term_out(buf);
+}
