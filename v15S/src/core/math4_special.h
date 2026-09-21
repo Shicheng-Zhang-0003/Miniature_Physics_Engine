@@ -1,5 +1,8 @@
 #ifndef math4_h
 #define math4_h
+/* STORAGE CONVENTION (read before indexing): math4 is COLUMN-major,
+ * m[col][row]; translation lives in m[3][0..2]. math3 (math3d.h) is
+ * ROW-major. Do not mix indexing across the two types. */
 #include "math3d.h"
 typedef struct {
     float matrix[4][4];
@@ -65,7 +68,7 @@ static inline math4 math4_look_view(vector3 camera_position, vector3 camera_fron
 static inline math4 math4_perspective_fov(float field_of_view, float aspect_ratio, float near_plane, float far_plane) {
     math4 result_matrix = {{{0}}};
     /* Clamp degenerate inputs so a bad config can never produce NaN/Inf. */
-    if (!(field_of_view > 0.01f && field_of_view < 3.14f)) {
+    if (!(field_of_view > 0.01f && field_of_view < 3.14159265f)) {
         field_of_view = 45.0f * 3.14159265358979323846f / 180.0f;
     }
     if (!(aspect_ratio > 1e-6f && aspect_ratio < 1e6f)) {
@@ -115,7 +118,21 @@ static inline math4 math4_multiplication(math4 matrix_a, math4 matrix_b) {
 /* TRUTH: column-major storage (math3 is row-major). Normalize input like
  * vector4_to_math3 so non-unit quats never scale the render matrix. */
 static inline math4 vector4_to_math4(vector4 quaternion) {
-    quaternion = vector4_normalisation(quaternion);
+    /* Same degenerate rule as vector4_to_math3 (|q|>1e-6 normalize, else
+     * identity) so physics and render never disagree on quats.
+     * Double accumulation matches vector4_to_math3 after its fix. */
+    double n2_d = (double) quaternion.w * (double) quaternion.w + (double) quaternion.x * (double) quaternion.x +
+                  (double) quaternion.y * (double) quaternion.y + (double) quaternion.z * (double) quaternion.z;
+    float n2 = (n2_d > (double) FLT_MAX) ? INFINITY : (float) n2_d;
+    if (isfinite(n2) && (n2 > 1e-12f)) {
+        float inv = 1.0f / sqrtf(n2);
+        quaternion.w *= inv;
+        quaternion.x *= inv;
+        quaternion.y *= inv;
+        quaternion.z *= inv;
+    } else {
+        quaternion = vector4_identity();
+    }
     math4 result_matrix = math4_identity();
     float x_double = quaternion.x + quaternion.x, y_double = quaternion.y + quaternion.y,
           z_double = quaternion.z + quaternion.z;

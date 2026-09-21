@@ -11,40 +11,51 @@
  * compiler may not fuse multiply-adds differently per target).
  *
  * Error bounds (double internally, float at the boundary):
- *   det_ln_pos:   |err| < 1e-12 for x in [0.1, 10]
- *   det_exp_small:|err| < 1e-13 for |x| <= 0.5
- *   det_sin_small / det_cos_small: |err| < 1e-12 for |x| <= 0.5
- *   (cos truncation x^12/12! at 0.5 is ~5e-13, so 1e-13 was overstated).
+ *   det_ln_pos:    |err| < 1e-12 for x in [0.1, 10]
+ *   det_exp_small: |err| < 1e-13 for |x| <= 0.5
+ *   det_pow_retention: |err| < 1e-11 for base in (0,1.1], |ex*ln(base)| <= 0.5
+ *     (<1e-13 in damping use where |product| < 0.04: ln error ~5e-13 is
+ *     attenuated by small |ex|)
+ *   det_sin/det_cos: |err| < 1e-15 for |x| <= pi/4 and all rotor use
+ *     (|w|*dt/2 << 1 in practice); <5e-13 for |x| < 1e4 (single-double
+ *     reduction: pi/2 rounded 6.1e-17 times k~6366; no Payne-Hanek, so
+ *     |x| >> 1e8 loses integer resolution — out of contract there)
+ *   det_sin_small/det_cos_small: |err| < 1e-15 for |x| <= pi/4
  * Callers must respect the documented input ranges; out-of-range input
  * falls back to libm (accurate, but no longer bit-deterministic).
  */
 #include <math.h>
 #include <stdbool.h>
+#include <assert.h>
 
 /* TRUTH: count every libm fallback so desync is diagnosable, never silent.
  * Single process-wide definition (core/det_math.c); the old per-TU
  * statics gave every translation unit its own counters, so a test
- * asserting zero only observed its own TU. */
+ * asserting zero only observed its own TU. Counters stay active in release:
+ * NDEBUG must never silence desync telemetry. */
 extern unsigned long det_fallback_pow_count;
 extern unsigned long det_fallback_trig_count;
 void det_fallback_reset(void);
 static inline unsigned long det_fallback_pow_total(void) { return det_fallback_pow_count; }
 static inline unsigned long det_fallback_trig_total(void) { return det_fallback_trig_count; }
 
-/* TRUTH: pin FP state for cross-platform determinism. Portable subset only:
- * round-to-nearest (fesetround). x86/ARM denormal-flush differences (FTZ/DAZ)
- * are NOT pinned via MXCSR here: an earlier MXCSR builtin caused -O3
- * miscompiles/segfaults, and denormals cannot arise in truth paths anyway
- * (masses clamped >=1e-4, velocities finite-checked, tiny products flushed
- * by explicit epsilon guards). Document, don't crash. Idempotent. */
-static inline void det_pin_fp_state(void) {
-    /* fesetround is a no-op if already nearest; ignore errors (freestanding). */
-    (void) 0;
-}
+/* TRUTH: pin FP state for cross-platform determinism. Portable subset:
+ * round-to-nearest (fesetround). x86/ARM denormal-flush differences (FTZ/DAZ/FZ/DZ)
+ * pinned via MXCSR/FPCR. Idempotent. */
+void det_pin_fp_state(void);
 
+extern void det_mark_fallback_pow(void);
+extern void det_mark_fallback_trig(void);
+extern void det_assert_no_fallback_pow(void);
+extern void det_assert_no_fallback_trig(void);
+
+/* Natural logarithm for x > 0. |err| < 1e-12 on [0.1, 10]. */
 static inline double det_ln_pos(double x) {
     if (x == 0.0) {
         return -INFINITY;
+    }
+    if (isinf(x) && x > 0.0) {
+        return INFINITY; /* ln(+INF) = +INF, not NaN */
     }
     if (!(x > 0.0)) {
         return NAN;
@@ -66,14 +77,16 @@ static inline double det_ln_pos(double x) {
     return sum + (double)exponent * ln2;
 }
 
+/* Exponential for |x| <= 0.5. |err| < 1e-13. */
 static inline double det_exp_small(double x) {
-    /* Taylor to x^12; |x|<=0.5 gives truncation ~5e-13. Guard: outside
-     * contract fall back to libm (counted) instead of silent garbage. */
     if (!isfinite(x)) {
-        return x;
+        /* TRUTH: exp(-INF)=0, exp(+INF)=+INF, exp(NaN)=NaN. Returning x
+         * gave exp(-INF)=-INF (wrong). libm here is exact for these. */
+        det_mark_fallback_pow();
+        return exp(x);
     }
     if (x < -0.5 || x > 0.5) {
-        det_fallback_pow_count++;
+        det_mark_fallback_pow();
         return exp(x);
     }
     double term = 1.0;
@@ -88,11 +101,11 @@ static inline double det_exp_small(double x) {
 /* base^ex for base in (0, 1.1] (covers damping retention bases). */
 static inline double det_pow_retention(double base, double ex) {
     if (!isfinite(base) || !isfinite(ex)) {
-        det_fallback_pow_count++;
+        det_mark_fallback_pow();
         return pow(base, ex);
     }
     if (!(base > 0.0) || base > 1.1000001) {
-        det_fallback_pow_count++;
+        det_mark_fallback_pow();
         return pow(base, ex); /* out of contract: libm fallback */
     }
     if (ex == 0.0) {
@@ -100,58 +113,140 @@ static inline double det_pow_retention(double base, double ex) {
     }
     double product = ex * det_ln_pos(base);
     if (!isfinite(product) || product < -0.5 || product > 0.5) {
-        det_fallback_pow_count++;
+        det_mark_fallback_pow();
         return pow(base, ex); /* out of contract: libm fallback */
     }
     return det_exp_small(product);
 }
 
+/* Taylor series for sin/cos on [-pi/4, pi/4] (|x| <= 0.7854).
+ * Error bounds: |err| < 1e-15 for |x| <= pi/4. */
 static inline double det_sin_small(double x) {
     if (!isfinite(x)) {
-        return x;
+        /* TRUTH: sin(non-finite) is NaN (libm). Returning x propagated INF
+         * into rotors (later normalized to identity, hiding poison). */
+        det_mark_fallback_trig();
+        return NAN;
     }
-    if (x < -0.5 || x > 0.5) {
-        det_fallback_trig_count++;
+    const double pi_quarter = 0.78539816339744830961566084581987572104929234984378;
+    if (x < -pi_quarter || x > pi_quarter) {
+        det_mark_fallback_trig();
         return sin(x); /* out of contract: libm fallback */
     }
     double x2 = x * x;
     double term = x;
     double sum = x;
-    term *= -x2 / (2.0 * 3.0);
-    sum += term;
-    term *= -x2 / (4.0 * 5.0);
-    sum += term;
-    term *= -x2 / (6.0 * 7.0);
-    sum += term;
-    term *= -x2 / (8.0 * 9.0);
-    sum += term;
-    term *= -x2 / (10.0 * 11.0);
-    sum += term;
+    /* Terms up to x^17: 18 terms total for 1e-15 accuracy at pi/4 */
+    term *= -x2 / (2.0 * 3.0);  sum += term;  /* x^3/3! */
+    term *= -x2 / (4.0 * 5.0);  sum += term;  /* x^5/5! */
+    term *= -x2 / (6.0 * 7.0);  sum += term;  /* x^7/7! */
+    term *= -x2 / (8.0 * 9.0);  sum += term;  /* x^9/9! */
+    term *= -x2 / (10.0 * 11.0); sum += term; /* x^11/11! */
+    term *= -x2 / (12.0 * 13.0); sum += term; /* x^13/13! */
+    term *= -x2 / (14.0 * 15.0); sum += term; /* x^15/15! */
+    term *= -x2 / (16.0 * 17.0); sum += term; /* x^17/17! */
     return sum;
 }
 
 static inline double det_cos_small(double x) {
     if (!isfinite(x)) {
-        return x;
+        /* TRUTH: cos(non-finite) is NaN (libm). See det_sin_small. */
+        det_mark_fallback_trig();
+        return NAN;
     }
-    if (x < -0.5 || x > 0.5) {
-        det_fallback_trig_count++;
+    const double pi_quarter = 0.78539816339744830961566084581987572104929234984378;
+    if (x < -pi_quarter || x > pi_quarter) {
+        det_mark_fallback_trig();
         return cos(x); /* out of contract: libm fallback */
     }
     double x2 = x * x;
     double term = 1.0;
     double sum = 1.0;
-    term *= -x2 / (1.0 * 2.0);
-    sum += term;
-    term *= -x2 / (3.0 * 4.0);
-    sum += term;
-    term *= -x2 / (5.0 * 6.0);
-    sum += term;
-    term *= -x2 / (7.0 * 8.0);
-    sum += term;
-    term *= -x2 / (9.0 * 10.0);
-    sum += term;
+    /* Terms up to x^16: 17 terms total for 1e-15 accuracy at pi/4 */
+    term *= -x2 / (1.0 * 2.0);  sum += term;  /* x^2/2! */
+    term *= -x2 / (3.0 * 4.0);  sum += term;  /* x^4/4! */
+    term *= -x2 / (5.0 * 6.0);  sum += term;  /* x^6/6! */
+    term *= -x2 / (7.0 * 8.0);  sum += term;  /* x^8/8! */
+    term *= -x2 / (9.0 * 10.0); sum += term;  /* x^10/10! */
+    term *= -x2 / (11.0 * 12.0); sum += term; /* x^12/12! */
+    term *= -x2 / (13.0 * 14.0); sum += term; /* x^14/14! */
+    term *= -x2 / (15.0 * 16.0); sum += term; /* x^16/16! */
     return sum;
+}
+
+/* Argument reduction for sin/cos: reduce x to [-pi/4, pi/4] using
+ * exact rational approximations of pi. Returns reduced x and quadrant. */
+static inline double det_reduce_pi4(double x, int *quadrant) {
+    const double pi_half = 1.57079632679489661923132169163975144209858469968755;
+    const double pi_quarter = 0.78539816339744830961566084581987572104929234984378;
+    const double two_over_pi = 0.63661977236758134307553505349005744813783858296183;
+    
+    if (!isfinite(x)) {
+        *quadrant = 0;
+        return x;
+    }
+    /* k = round(x * 2/pi). long long: long overflows past ~1e19 (UB) and
+     * k&3 on negative long is implementation-defined pre-C23. Contract:
+     * |x| < 1e15 (integer-exact doubles); beyond that the caller is out of
+     * contract (physics rotors never approach it). */
+    double k_d = x * two_over_pi;
+    if (!(k_d > -1e15) || !(k_d < 1e15)) {
+        *quadrant = 0;
+        det_mark_fallback_trig();
+        return x; /* out of contract: caller falls back */
+    }
+    long long k = (long long) (k_d >= 0.0 ? k_d + 0.5 : k_d - 0.5);
+    *quadrant = (int) ((k % 4 + 4) % 4); /* defined for negatives */
+    double x_red = x - (double) k * pi_half;
+    /* Correct for rounding error in k */
+    if (x_red > pi_quarter) {
+        x_red -= pi_half;
+        *quadrant = (*quadrant + 2) & 3;
+    } else if (x_red < -pi_quarter) {
+        x_red += pi_half;
+        *quadrant = (*quadrant + 2) & 3;
+    }
+    return x_red;
+}
+
+/* Full-range sin/cos via argument reduction. Bounds per header contract
+ * (|x|<=pi/4 exact; <5e-13 below 1e4; out of contract beyond 1e15).
+ * PHYSICS-TRUTH: non-finite input is NaN (libm/IEEE) and marks the trig
+ * fallback counter, matching det_sin_small/det_cos_small. */
+static inline double det_sin(double x) {
+    if (!isfinite(x)) {
+        det_mark_fallback_trig();
+        return NAN;
+    }
+    int quadrant = 0;
+    double xr = det_reduce_pi4(x, &quadrant);
+    double s = det_sin_small(xr);
+    double c = det_cos_small(xr);
+    switch (quadrant) {
+        case 0: return s;      /* sin(x) */
+        case 1: return c;      /* sin(x + pi/2) = cos(x) */
+        case 2: return -s;     /* sin(x + pi) = -sin(x) */
+        case 3: return -c;     /* sin(x + 3pi/2) = -cos(x) */
+    }
+    return s; /* unreachable */
+}
+
+static inline double det_cos(double x) {
+    if (!isfinite(x)) {
+        det_mark_fallback_trig();
+        return NAN;
+    }
+    int quadrant = 0;
+    double xr = det_reduce_pi4(x, &quadrant);
+    double s = det_sin_small(xr);
+    double c = det_cos_small(xr);
+    switch (quadrant) {
+        case 0: return c;      /* cos(x) */
+        case 1: return -s;     /* cos(x + pi/2) = -sin(x) */
+        case 2: return -c;     /* cos(x + pi) = -cos(x) */
+        case 3: return s;      /* cos(x + 3pi/2) = sin(x) */
+    }
+    return c; /* unreachable */
 }
 
 #endif /* det_math_h */
