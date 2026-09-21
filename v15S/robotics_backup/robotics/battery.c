@@ -28,7 +28,10 @@ float battery_get_voltage(const battery *b, float total_current_draw) {
     if (soc > 1.0f) {
         soc = 1.0f;
     }
-    float open_circuit = b->nominal_voltage - 0.8f * (1.0f - soc) * (1.0f - soc);
+    /* PHYSICS-FIX: NiMH 10-cell swing is ~4 V fresh->cutoff (14 V fresh,
+     * 12 V nominal, ~10 V cutoff), not 0.8 V. The old 0.8 V shoulder kept
+     * a dead pack at 12.0 V OCV, hiding brownout in long runs. */
+    float open_circuit = b->nominal_voltage - 4.0f * (1.0f - soc) * (1.0f - soc);
     float sag = b->internal_resistance * total_current_draw;
     float terminal = open_circuit - sag;
     if (terminal < 0.0f) {

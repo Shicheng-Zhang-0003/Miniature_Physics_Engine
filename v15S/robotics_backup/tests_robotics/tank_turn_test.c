@@ -50,10 +50,15 @@ int main(void) {
     float end_x, end_y, end_z;
     ftc_robot_get_position(&world, &robot, &end_x, &end_y, &end_z);
 
-    /* Robot should have rotated but not translated much */
+    /* Robot should have rotated but not translated much.
+     * PHYSICS-FIX: yaw from the quaternion, not fabs(orientation.y).
+     * q.y alone is sin(yaw/2)*cos(pitch/2)*... — valid only at small
+     * angles. Yaw about +Y: atan2(2*(w*y+x*z), 1-2*(y*y+x*x)). */
     float displacement = sqrtf((end_x - start_x) * (end_x - start_x) +
                                (end_z - start_z) * (end_z - start_z));
-    float heading_change = fabsf(world.bodies[robot.chassis_body].orientation.y);
+    quaternion q = world.bodies[robot.chassis_body].orientation;
+    float heading_change = fabsf(atan2f(2.0f * (q.w * q.y + q.x * q.z),
+                                        1.0f - 2.0f * (q.y * q.y + q.x * q.x)));
 
     printf("[info] displacement=%.4f heading_change=%.4f\n", displacement, heading_change);
 
