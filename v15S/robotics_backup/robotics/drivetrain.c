@@ -108,6 +108,14 @@ void drivetrain_update (physics_world *world, ftc_robot *robot, float dt) {
         float max_grip = grip_mu * normal_per_wheel; /* MFS_162_FRICTION_FIX */
 
         /* --- Per-wheel traction: torque -> force at contact --- */
+        /* PHYSICS-FIX: budget on the NET traction vector, not the scalar
+         * sum. The friction circle bounds |F_long + F_lat| per patch; in
+         * pure strafe the wheel (fore-aft) forces cancel vectorially
+         * (net ~0) while each wheel saturates, so a scalar-sum budget
+         * leaves zero remaining and kills strafe entirely (dx 0.10 vs
+         * 0.3 gate). Net budgeting keeps pure strafe whole and scales
+         * strafe only when net drive actually consumes the circle. */
+        vector3 traction_net = vector3_zero();
         for (int i = 0; i < robot->wheel_count; i++) {
             int wi = robot->wheel_bodies[i];
             if ((wi < 0) || (wi >= world->body_count)) { continue; }
@@ -132,9 +140,10 @@ void drivetrain_update (physics_world *world, ftc_robot *robot, float dt) {
             float traction = robot->wheel_motors[i].output_torque / r;
             if (traction > max_grip)  { traction = max_grip; }
             if (traction < -max_grip) { traction = -max_grip; }
+            vector3 tvec = vector3_scaling(rolling_dir, traction);
+            traction_net = vector3_addition(traction_net, tvec);
             wheel->force_accumulator = vector3_addition(
-                wheel->force_accumulator,
-                vector3_scaling(rolling_dir, traction));
+                wheel->force_accumulator, tvec);
             /* MFS_PORT_V15S: driven_this_tick gate belonged to the parked
              * core wheel-lock loop; wheels are woken in ftc_robot_update. */
         }
@@ -144,10 +153,15 @@ void drivetrain_update (physics_world *world, ftc_robot *robot, float dt) {
          * (the parked core roller-tangent model is gone, and isotropic
          * cylinder friction cannot produce roller thrust). Model it where
          * it belongs without engine changes: the roller geometry converts
-         * wheel torque into chassis-lateral force, budgeted inside the
-         * friction circle (half the total grip; forward traction uses the
-         * rest). Rotate still works through real wheel differentials
-         * (see tank_turn_test), so only strafe is modeled here. */
+         * wheel torque into chassis-lateral force.
+         * PHYSICS-FIX: budgeted inside the friction circle. The old code
+         * added strafe*max_grip*n*0.5 on top of fully-clamped wheel
+         * traction (combined ~6*max_grip vs circle 4*max_grip), inventing
+         * grip. Strafe is capped so |F_long_net + F_lat| <= n*max_grip
+         * (net-vector circle: pure strafe keeps full force since fore-aft
+         * cancels; combined drive scales strafe). Rotate still works
+         * through real wheel differentials (see tank_turn_test), so only
+         * strafe is modeled here. */
         if (robot->drivetrain_type == FTC_DRIVETRAIN_MECANUM && chassis_ok) {
             float c0 = robot->wheel_motors[0].command;
             float c1 = robot->wheel_motors[1].command;
@@ -162,6 +176,16 @@ void drivetrain_update (physics_world *world, ftc_robot *robot, float dt) {
                 if (lat_len_sq > 1e-6f) {
                     lat = vector3_scaling(lat, 1.0f / sqrtf(lat_len_sq));
                     float f_lat = strafe * max_grip * (float) robot->wheel_count * 0.5f;
+                    float total_grip = max_grip * (float) robot->wheel_count;
+                    /* Net-vector circle: |F_long_net + F_lat| <= total. */
+                    float long_used = sqrtf(vector3_length_squared(traction_net));
+                    float remaining = total_grip - long_used;
+                    if (remaining < 0.0f) {
+                        remaining = 0.0f;
+                    }
+                    if (fabsf(f_lat) > remaining) {
+                        f_lat = (f_lat > 0.0f) ? remaining : -remaining;
+                    }
                     chassis->force_accumulator = vector3_addition(
                         chassis->force_accumulator, vector3_scaling(lat, f_lat));
                 }
@@ -324,7 +348,9 @@ wheel->torque_accumulator = vector3_addition(wheel->torque_accumulator, rr_torqu
         v_fwd = ((wfl + wfr + wbl + wbr) * 0.25f) * r;
         /* IK identity mapping: combo FL-FR-BL+BR = 4*strafe. */
         v_lat = ((wfl - wfr - wbl + wbr) * 0.25f) * r;
-        float track = 0.48f; /* 2 * WHEEL_OFFSET_X = 2 * 0.24, differential drive moment arm */
+        /* PHYSICS-FIX: mecanum yaw arm is Lx+Lz (0.24+0.20=0.44), not the
+         * differential track 2*Lx=0.48. The old 0.48 understated yaw ~9%. */
+        float track = 0.44f; /* WHEEL_OFFSET_X + WHEEL_OFFSET_Z: mecanum moment arm */
         yaw_rate = (((-wfl + wfr - wbl + wbr) * 0.25f) * r) / track;
     } else if (robot->wheel_count >= 2) {
         float wl = 0.0f;
@@ -341,6 +367,7 @@ wheel->torque_accumulator = vector3_addition(wheel->torque_accumulator, rr_torqu
         wl = (nl > 0) ? (wl / (float) nl) : 0.0f;
         wr = (nr > 0) ? (wr / (float) nr) : 0.0f;
         v_fwd = ((wl + wr) * 0.5f) * r;
+        /* Differential (tank) yaw arm is the track 2*Lx = 0.48. */
         yaw_rate = ((wr - wl) * r) / 0.48f;
     }
     robot->odom_theta += yaw_rate * dt;

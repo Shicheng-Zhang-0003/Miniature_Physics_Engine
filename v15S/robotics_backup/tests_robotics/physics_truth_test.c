@@ -257,9 +257,29 @@ static void test_motor_stall_torque(void) {
     ftc_robot robot;
     ftc_robot_create(&world, &robot, 0.0f, ftc_robot_rest_height(), 0.0f, MOTOR_GB_5203_26_9);
 
-    /* Apply full power with wheel locked (apply opposing force) */
+    /* PHYSICS-FIX: locked-rotor stall over 10 ticks, not a single update.
+     * A single update at zero speed returns spec torque by construction
+     * (Kt derived from stall) — vacuous. Re-zero wheel spin each tick to
+     * simulate a stalled gearbox, step the world, and verify torque AND
+     * current stay near spec under battery sag. */
     drivetrain_tank(&robot, 1.0f, 1.0f);
-    drivetrain_update(&world, &robot, DT);
+    for (int t = 0; t < 10; t++) {
+        for (int w = 0; w < robot.wheel_count; w++) {
+            int wi = robot.wheel_bodies[w];
+            if (wi >= 0 && wi < world.body_count) {
+                rigidbody *wheel = &world.bodies[wi];
+                vector3 axle = wheel->cached_axes[0];
+                if (vector3_length_squared(axle) < 0.0001f) {
+                    axle = vector4_rotate_to_vector3(wheel->orientation, (vector3){1.0f, 0.0f, 0.0f});
+                }
+                float spin = vector3_dot(wheel->angular_velocity, axle);
+                wheel->angular_velocity =
+                    vector3_subtraction(wheel->angular_velocity, vector3_scaling(axle, spin));
+            }
+        }
+        drivetrain_update(&world, &robot, DT);
+        physics_world_step(&world, DT);
+    }
 
     /* 5203-2402-0027 spec: 38.0 kg.cm = 3.727 N-m output stall torque */
     float spec_stall_torque = 3.73f;
@@ -576,7 +596,10 @@ static void test_cylinder_floor_rest(void) {
     float y_error = fabsf(y - expected_y);
     printf("    [DIAG] final y=%.6f expected=%.6f error=%.6f (floor top=0.0)\n",
            y, expected_y, y_error);
-    TEST_ASSERT(y_error < 0.15f,
+    /* PHYSICS-FIX: 0.15 m was 3x the cylinder radius and 15x slop — a
+     * sunk-through-floor false pass. 0.03 m (3x slop) is the honest rest
+     * band for a 5 cm wheel on a 10 mm slop contact. */
+    TEST_ASSERT(y_error < 0.03f,
                 "cylinder rests on floor (center ≈ r above floor top)");
 
     float vy = world.bodies[idx].velocity.y;
