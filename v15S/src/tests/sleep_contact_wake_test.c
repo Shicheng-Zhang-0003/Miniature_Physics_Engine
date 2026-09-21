@@ -70,8 +70,12 @@ int main(void) {
         }
     }
 
-    printf("[info] touch_tick=%d wake_tick=%d control_wake_tick=%d sleeper_x=%.4f pusher_x=%.4f\n", touch_tick,
-           wake_tick, control_wake_tick, world.bodies[sleeper].position.x, world.bodies[pusher].position.x);
+    /* No tunneling: never deeply interpenetrated (slop riding is by design:
+     * slop-band normal impulses carry the sleeper just outside touch). */
+    float end_gap = (world.bodies[sleeper].position.x - 0.5f) - (world.bodies[pusher].position.x + 0.5f);
+    printf("[info] touch=%d wake=%d control_wake=%d sleeper_x=%.4f pusher_x=%.4f control_y=%.4f end_gap=%.4f\n", touch_tick,
+           wake_tick, control_wake_tick, world.bodies[sleeper].position.x, world.bodies[pusher].position.x,
+           world.bodies[control].position.y, end_gap);
     if (touch_tick < 0) {
         printf("[FAIL] pusher never reached the sleeper\n");
         fail = 1;
@@ -91,10 +95,24 @@ int main(void) {
     } else {
         printf("[PASS] lone sleeper undisturbed by resting contact\n");
     }
+    /* TRUTH: control must also be WHERE it slept (position, not just flag):
+     * a sleeper that fell through the floor asleep still passes the flag
+     * check. And the woken sleeper must have been PUSHED (momentum
+     * transfer), not just flagged awake. */
+    {
+        float control_y = world.bodies[control].position.y;
+        if (control_y < 0.4f || control_y > 0.6f) {
+            printf("[FAIL] control sleeper displaced (y=%.4f, expect ~0.5)\n", control_y);
+            fail = 1;
+        }
+        if (wake_tick >= 0 && world.bodies[sleeper].position.x < 2.1f) {
+            printf("[FAIL] sleeper woken but never pushed (x=%.4f)\n", world.bodies[sleeper].position.x);
+            fail = 1;
+        }
+    }
     /* No tunneling: never deeply interpenetrated (slop riding is by design:
      * slop-band normal impulses carry the sleeper just outside touch). */
-    float end_gap = (world.bodies[sleeper].position.x - 0.5f) - (world.bodies[pusher].position.x + 0.5f);
-    if (end_gap < -g_cfg.solver.penetration_slop - 0.05f) {
+    if (end_gap < -0.02f) {
         printf("[FAIL] pusher tunneled into the sleeper (gap=%.4f)\n", end_gap);
         fail = 1;
     }

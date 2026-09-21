@@ -47,9 +47,14 @@ int main(void) {
     printf("[info] c1 z=%.4f  c2 z=%.4f  gap=%.4f\n", z1, z2, gap);
 
     /* They started 0.6 apart. After colliding, c1 should still
-    * be behind c2 (gap > 0). If gap < -0.1 they passed through. */
-    if (gap < -0.1f) {
+     * be behind c2 (gap > 0). TRUTH: two-sided — gap<-0.05 is pass-through,
+     * gap>1.0 is fly-apart-without-touching (solver never engaged). */
+    if (gap < -0.05f) {
         printf("[FAIL] cylinders passed through each other\n");
+        return 1;
+    }
+    if (gap > 1.0f) {
+        printf("[FAIL] cylinders never interacted (gap=%.4f)\n", gap);
         return 1;
     }
     printf("[PASS] cylinder-cylinder collision works\n");

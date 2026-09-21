@@ -28,6 +28,8 @@ int main(void) {
     int box = physics_world_add_cube(&world, p0, (vector3){h, h, h}, 1.0f);
     world.bodies[box].friction_static = 0.0f;
     world.bodies[box].friction_kinetic = 0.0f;
+    world.bodies[box].restitution = 0.0f; /* normal bounce jitter projects onto d */
+    g_cfg.sleep.enable = 0; /* measure motion, not sleep freeze */
     rb->friction_static = 0.0f;
     rb->friction_kinetic = 0.0f;
 
@@ -59,8 +61,19 @@ int main(void) {
     } else {
         printf("[PASS] frictionless slide accelerates at g*sin(theta)\n");
     }
-    (void) p_a;
-    (void) p_b;
+    /* TRUTH: velocity-only passes while x+=v*dt position is wrong. Assert
+     * the displacement matches v_a*1+0.5*a*1^2 along the slope. */
+    {
+        vector3 dpb = vector3_subtraction(p_b, p_a);
+        float s_meas = vector3_dot(dpb, d);
+        float s_exact = v_a * 1.0f + 0.5f * a_exact * 1.0f;
+        if (fabsf(s_meas - s_exact) / fabsf(s_exact) > 0.03f) {
+            printf("[FAIL] incline displacement off (%.4f vs %.4f)\n", s_meas, s_exact);
+            fail = 1;
+        } else {
+            printf("[PASS] incline displacement matches kinematics\n");
+        }
+    }
     physics_world_cleanup(&world);
     return fail;
 }

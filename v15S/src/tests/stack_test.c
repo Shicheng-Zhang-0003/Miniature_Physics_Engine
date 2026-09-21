@@ -31,8 +31,8 @@ int main(void) {
     int fail = 0;
     float top_drift = sqrtf(world.bodies[5].position.x * world.bodies[5].position.x +
                             world.bodies[5].position.z * world.bodies[5].position.z);
-    printf("[info] top drift=%.4f (limit 0.15)\n", top_drift);
-    if (top_drift > 0.15f) {
+    printf("[info] top drift=%.4f (limit 0.05)\n", top_drift);
+    if (top_drift > 0.05f) {
         printf("[FAIL] tower leans/falls\n");
         fail = 1;
     } else {
@@ -40,8 +40,16 @@ int main(void) {
     }
     for (int i = 0; i < 6; i++) {
         float y_e = h + (float)i * 2.0f * h;
-        if (fabsf(world.bodies[i].position.y - y_e) > 0.12f) {
+        if (fabsf(world.bodies[i].position.y - y_e) > 0.03f) {
             printf("[FAIL] level %d sank/floated (y=%.4f)\n", i, world.bodies[i].position.y);
+            fail = 1;
+        }
+        /* TRUTH: settled tower must be still, not vibrating. Velocity gates
+         * catch solver jitter the position band hides. */
+        float lv = vector3_length(world.bodies[i].velocity);
+        float av = vector3_length(world.bodies[i].angular_velocity);
+        if (lv > 0.05f || av > 0.05f) {
+            printf("[FAIL] level %d still moving (v=%.4f w=%.4f)\n", i, lv, av);
             fail = 1;
         }
     }

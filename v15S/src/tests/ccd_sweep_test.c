@@ -25,9 +25,19 @@ int main(void) {
             physics_world_step(&world, dt);
         }
         float x = world.bodies[s].position.x;
+        float vx = world.bodies[s].velocity.x;
         printf("[info] wall case: final_x=%.3f (face contact at -0.55)\n", x);
+        /* TRUTH: two-sided. A frozen body at -5.7 or a 0.09m penetration
+         * both passed the old one-sided gate. Demand stopped AT the face
+         * with spent velocity. */
         if (x > -0.45f) {
             printf("[FAIL] sphere tunneled the thin wall\n");
+            fail = 1;
+        } else if (x < -0.75f) {
+            printf("[FAIL] sphere never reached/stopped at the wall (x=%.3f)\n", x);
+            fail = 1;
+        } else if (fabsf(vx) > 5.0f) {
+            printf("[FAIL] sphere still flying after wall impact (vx=%.3f)\n", vx);
             fail = 1;
         } else {
             printf("[PASS] 144 m/s sphere stopped at thin wall\n");
@@ -52,8 +62,15 @@ int main(void) {
             }
         }
         printf("[info] floor case: min_center_y=%.4f rest_y=%.3f\n", min_y, world.bodies[s].position.y);
-        if (min_y < -0.55f) {
-            printf("[FAIL] sphere tunneled the floor\n");
+        /* TRUTH: two-sided. Old min_y<-0.55 allowed 1.04m penetration
+         * (center -0.54, fully through) to pass. Demand no deep tunnel
+         * AND settled rest at radius height. */
+        float rest_y = world.bodies[s].position.y;
+        if (min_y < 0.40f) {
+            printf("[FAIL] sphere tunneled the floor (min_y=%.4f)\n", min_y);
+            fail = 1;
+        } else if (rest_y < 0.45f || rest_y > 0.55f) {
+            printf("[FAIL] sphere did not settle at rest height (rest_y=%.4f)\n", rest_y);
             fail = 1;
         } else {
             printf("[PASS] 60 m/s sphere lands on floor\n");

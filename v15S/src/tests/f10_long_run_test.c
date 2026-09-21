@@ -74,7 +74,7 @@ int main(void) {
                 nan_ticks++;
                 continue;
             }
-            if (rb->position.y < -1.0f) {
+            if (rb->position.y < -0.2f) {
                 fallen_ticks++;
             }
             float l = vector3_length(rb->velocity);
@@ -107,8 +107,12 @@ int main(void) {
 
     printf("[info] final lin=%.5f ang=%.5f runmax lin=%.5f ang=%.5f transient lin=%.5f ang=%.5f nan=%ld fallen=%ld\n",
            fin_lin, fin_ang, run_max_lin, run_max_ang, trans_lin, trans_ang, nan_ticks, fallen_ticks);
+    /* TRUTH: runmax 2.0/4.0 admitted a 1.9 m/s ejection as calm (the
+     * documented 13 m/s pump was only just caught). Settle means still:
+     * runmax gates at creep scale. Fallen at y<-0.2 (boundary teleports
+     * anything past 0, so -1.0 masked escapes). */
     int pass = world.body_count > 0 && nan_ticks == 0 && fallen_ticks == 0 && fin_lin < 0.25f && fin_ang < 0.5f &&
-               run_max_lin < 2.0f && run_max_ang < 4.0f;
+               run_max_lin < 0.5f && run_max_ang < 1.0f;
     if (pass) {
         printf("[PASS] long-run 10-stack+pile settles and stays calm\n");
     } else {

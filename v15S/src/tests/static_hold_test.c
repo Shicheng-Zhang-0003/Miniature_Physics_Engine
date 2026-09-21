@@ -62,10 +62,15 @@ int main(void) {
         printf("[PASS] static hold: box stands on 20deg slope at mu_s=0.9\n");
     }
 
-    /* 10 deg, mu 0.1 (friction angle 5.7 deg): must slide freely, stay awake. */
+    /* 10 deg, mu 0.1 (friction angle 5.7 deg): must slide freely, stay awake.
+     * TRUTH: analytic slide is ~21 m (a=g(sin10-mu*cos10)); the old >2.0 m
+     * gate passed 90%-overdamped friction. Demand substantial travel.
+     * Far-from-threshold pairs only: a mu~=tan(theta) borderline case would
+     * probe 2x cone error but sits on the stick/slip discontinuity (verdict
+     * flips on fp noise); deferred until characterized. */
     float slide_drift = slope_drift(-10.0f, 0.1f, 0.08f, &asleep);
     printf("[info] slide case: drift=%.4f m awake=%d\n", slide_drift, !asleep);
-    if (slide_drift < 2.0f) {
+    if (slide_drift < 8.0f) {
         printf("[FAIL] slide: box barely moved (%.4f m) past the friction angle\n", slide_drift);
         fail = 1;
     } else if (asleep) {

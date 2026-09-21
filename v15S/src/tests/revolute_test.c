@@ -54,10 +54,13 @@ int main(void) {
         float moved = vector3_length(vector3_subtraction(bob->position, start_position));
         printf("[info] rod=%.4f max_drift=%.4f moved=%.4f bob=(%.3f,%.3f,%.3f)\n", rod_length, max_drift, moved,
                bob->position.x, bob->position.y, bob->position.z);
-        if (max_drift > 0.15f) {
+        if (max_drift > 0.02f) {
             printf("[FAIL] anchor drift %.4f too large — revolute not holding\n", max_drift);
             fail = 1;
         } else if (moved < 0.05f) {
+            /* TRUTH: moved proves swing initiation; full period dynamics
+             * are proven by pendulum_test (same hinge mechanism,
+             * period-gated). */
             printf("[FAIL] bob did not move — gravity or joint not acting\n");
             fail = 1;
         } else {

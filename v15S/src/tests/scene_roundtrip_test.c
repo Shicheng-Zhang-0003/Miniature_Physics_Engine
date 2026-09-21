@@ -129,7 +129,10 @@ int main(void) {
     check(world->body_count == 2, "two bodies loaded");
     check(world->bodies[0].object_id == 1, "v200 stable ID preserved (body 0)");
     check(world->bodies[1].object_id == 2, "v200 stable ID preserved (body 1)");
-    check(scene_allocate_object_id() >= 3, "allocator advanced past loaded IDs");
+    /* TRUTH: allocator was pinned at 100 pre-load; loaded IDs are 1,2.
+     * allocate() must return exactly 100 (drift to 3 would alias live IDs;
+     * drift anywhere else leaks). */
+    check(scene_allocate_object_id() == 100, "allocator preserved at 100 past loaded IDs");
 
     rigidbody *s = &world->bodies[0];
     check(s->type == object_sphere, "body 0 type round-trips");
@@ -141,6 +144,14 @@ int main(void) {
     checkf(s->restitution, 0.4f, 1e-5f, "body 0 restitution round-trips");
     check(s->nice_value == 7, "body 0 nice_value persists");
     check(!s->is_sleeping, "body 0 awake");
+    /* TRUTH: partial-field coverage passed while orientation/angvel/
+     * friction/generation silently dropped. Compare the full struct state
+     * that v200 claims to persist. */
+    checkf(s->orientation.w, 1.0f, 1e-5f, "body 0 orientation round-trips");
+    checkf(s->orientation.x, 0.0f, 1e-5f, "body 0 orientation round-trips");
+    checkf(s->angular_velocity.x, 0.0f, 1e-5f, "body 0 angular velocity round-trips");
+    checkf(s->friction_static, g_cfg.body_defaults.sphere_fric_s, 1e-5f, "body 0 friction round-trips");
+    check(s->object_generation == 1, "body 0 generation round-trips");
 
     rigidbody *c = &world->bodies[1];
     check(c->type == object_cube, "body 1 type round-trips");
@@ -184,7 +195,9 @@ int main(void) {
         fclose(rf);
         check(got == (size_t) fsize, "scene file readable for tamper test");
         const char *tamper_path = "/tmp/mpe_scene_tampered.dat";
-        bytes[20] ^= 0xFFu; /* inside body 0's mass: data corrupt, footer intact */
+        /* TRUTH: byte 20 = body 0 radius field (header 12 + type 4 +
+         * mass 4 = 20). Corrupts payload, footer intact -> must reject. */
+        bytes[20] ^= 0xFFu;
         FILE *wf = fopen(tamper_path, "wb");
         fwrite(bytes, 1, (size_t) fsize, wf);
         fclose(wf);

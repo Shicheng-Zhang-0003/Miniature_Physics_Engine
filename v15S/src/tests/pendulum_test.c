@@ -66,7 +66,10 @@ int main(void) {
         t_meas = 2.0f * (float)(last - first) * dt / (float)(crossings - 1);
     }
     printf("[info] period: measured=%.4f analytic=%.4f crossings=%d\n", t_meas, t_exact, crossings);
-    if (fabsf(t_meas - t_exact) / t_exact > 0.08f) {
+    /* TRUTH: 8% is 10x the nonlinear correction (0.8%) and hides joint
+     * compliance, contact fight, damping and g error. Band at 3% with a
+     * crossings floor (need sustained oscillation, not a transient). */
+    if (crossings < 6 || fabsf(t_meas - t_exact) / t_exact > 0.03f) {
         printf("[FAIL] pendulum period off\n");
         fail = 1;
     } else {

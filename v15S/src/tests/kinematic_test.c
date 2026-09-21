@@ -35,25 +35,35 @@ int main(void) {
     float plat_y = world.bodies[p].position.y;
     float plat_x = world.bodies[p].position.x;
     float crate_x = world.bodies[c].position.x;
-    printf("[info] platform x=%.3f y=%.4f | crate x=%.3f\n", plat_x, plat_y, crate_x);
+    float crate_y = world.bodies[c].position.y;
+    printf("[info] platform x=%.3f y=%.4f | crate x=%.3f y=%.4f\n", plat_x, plat_y, crate_x, crate_y);
     int fail = 0;
-    if (fabsf(plat_y - 0.5f) > 0.05f) {
+    if (fabsf(plat_y - 0.5f) > 0.01f) {
         printf("[FAIL] kinematic platform fell under gravity (y=%.4f)\n", plat_y);
         fail = 1;
     } else {
         printf("[PASS] kinematic platform ignores gravity\n");
     }
-    if (plat_x < 3.0f) {
-        printf("[FAIL] platform did not advance (x=%.3f)\n", plat_x);
+    if (plat_x < 3.8f || plat_x > 4.2f) {
+        printf("[FAIL] platform did not advance at drive velocity (x=%.3f, expect 4.0)\n", plat_x);
         fail = 1;
     } else {
         printf("[PASS] kinematic platform advances at drive velocity\n");
     }
-    if (crate_x < 1.0f) {
-        printf("[FAIL] crate not carried (x=%.3f)\n", crate_x);
+    /* TRUTH: two-sided carry proof. Old crate_x<1.0 allowed 75% slip. The
+     * measured slip is 0.67 (carried, with rolling lag); <1.0 keeps meaning
+     * (0.5 would red a working carry). crate_y>0.8 proves it rode ON TOP
+     * (1.25): fallen through the platform to the floor (0.25) still drags
+     * 1m and used to pass. */
+    if (fabsf(crate_x - plat_x) > 1.0f) {
+        printf("[FAIL] crate not carried (crate_x=%.3f plat_x=%.3f)\n", crate_x, plat_x);
         fail = 1;
     } else {
         printf("[PASS] contact carries the crate (x=%.3f)\n", crate_x);
+    }
+    if (crate_y < 0.8f) {
+        printf("[FAIL] crate fell through the platform (y=%.4f)\n", crate_y);
+        fail = 1;
     }
     physics_world_cleanup(&world);
     return fail;

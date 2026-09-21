@@ -42,8 +42,11 @@ int main(void) {
             *(float *) g_registry[i].storage =
                 (float) g_registry[i].min + ((float) (t_next() >> 8) / 16777216.0f) * range;
         } else if (g_registry[i].type == p_int) {
+            /* TRUTH: %(range+1), not %range: %1==0 always, so binary params
+             * (range 1, e.g. sleep.enable) were NEVER tortured. */
             int range = (int) (g_registry[i].max - g_registry[i].min);
-            *(int *) g_registry[i].storage = (int) g_registry[i].min + (int) (t_next() % (uint32_t) (range > 0 ? range : 1));
+            *(int *) g_registry[i].storage =
+                (int) g_registry[i].min + (int) (t_next() % (uint32_t) (range >= 0 ? range + 1 : 1));
         } else if (g_registry[i].type == p_bool) {
             *(bool *) g_registry[i].storage = (t_next() & 1u) != 0;
         }
@@ -109,8 +112,18 @@ int main(void) {
         float mx_lin = 0.0f, mx_ang = 0.0f;
         for (int i = 0; i < world.body_count; i++) {
             rigidbody *rb = &world.bodies[i];
+            /* TRUTH: corruption means ANY non-finite state, including
+             * angular velocity (the old check missed spinning NaNs). */
             if (!isfinite(rb->position.x) || !isfinite(rb->position.y) || !isfinite(rb->position.z) ||
-                !isfinite(rb->velocity.x) || !isfinite(rb->velocity.y) || !isfinite(rb->velocity.z)) {
+                !isfinite(rb->velocity.x) || !isfinite(rb->velocity.y) || !isfinite(rb->velocity.z) ||
+                !isfinite(rb->angular_velocity.x) || !isfinite(rb->angular_velocity.y) ||
+                !isfinite(rb->angular_velocity.z)) {
+                nan_ticks++;
+                continue;
+            }
+            if (fabsf(rb->velocity.x) > 1e6f || fabsf(rb->velocity.y) > 1e6f || fabsf(rb->velocity.z) > 1e6f ||
+                fabsf(rb->angular_velocity.x) > 1e6f || fabsf(rb->angular_velocity.y) > 1e6f ||
+                fabsf(rb->angular_velocity.z) > 1e6f) {
                 nan_ticks++;
                 continue;
             }
@@ -131,6 +144,10 @@ int main(void) {
     }
     printf("[info] torture end speeds (reported, never gated): lin=%.3f ang=%.3f nan=%ld fallen=%ld\n", end_lin,
            end_ang, nan_ticks, fallen_ticks);
+    /* TRUTH: crash-only verdict. Under extreme configs perpetual fall/creep
+     * is the TRUE outcome (settling is impossible in principle), so speeds
+     * are reported, never gated. PASS = no corruption (finite state, world
+     * intact), not stability. Do not cite as a stability proof. */
     int pass = world.body_count > 0 && nan_ticks == 0 && fallen_ticks == 0;
     if (pass) {
         printf("[PASS] torture survived extremes without corruption\n");

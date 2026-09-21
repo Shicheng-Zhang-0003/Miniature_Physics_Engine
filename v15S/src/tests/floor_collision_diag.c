@@ -51,7 +51,34 @@ int main(void) {
     }
 
     printf("\n=== DIAG COMPLETE ===\n");
-    physics_world_cleanup(&world);
-    return 0;
+    /* TRUTH: a diagnostic that cannot fail is decoration. Gate the physical
+     * invariants: finite state, no tunneling (y>=-slop), settled rest
+     * (y in [0.02,0.08] for r=0.05, |vy| small). */
+    {
+        float fy = world.bodies[cyl_idx].position.y;
+        float fvy = world.bodies[cyl_idx].velocity.y;
+        int fail = 0;
+        if (!isfinite(fy) || !isfinite(fvy)) {
+            printf("[FAIL] non-finite floor state\n");
+            fail = 1;
+        }
+        if (fy < -0.05f) {
+            printf("[FAIL] cylinder tunneled through floor (y=%.4f)\n", fy);
+            fail = 1;
+        }
+        if (fy < 0.02f || fy > 0.08f) {
+            printf("[FAIL] cylinder did not settle at rest height (y=%.4f, expect ~0.05)\n", fy);
+            fail = 1;
+        }
+        if (fabsf(fvy) > 0.5f) {
+            printf("[FAIL] cylinder still moving fast after 60 ticks (vy=%.4f)\n", fvy);
+            fail = 1;
+        }
+        if (!fail) {
+            printf("[PASS] floor contact holds and settles\n");
+        }
+        physics_world_cleanup(&world);
+        return fail;
+    }
 }
 #endif
