@@ -1,36 +1,23 @@
-# MFS — distinct folder inside the MPE kernel module-ecosystem handling tree
+# MFS overarching module ecosystem ("mfs-simulator")
 #
-# Location: v15S/src/ecosystem/mfs/
-# Parent:   v15S/src/ecosystem/  (kernel MEI: mpe_ecosystem.h/.c + registry)
+# Location: v15S/src/ecosystem/mfs/  (under the kernel MEI tree)
+# Full map: see README_MFS.md
 #
-# Contents (canonical, single source — no forks):
-#   mfs_module_1.c / .h / _test.c  — MPI "generic" tick module "mfs-simulator"
-#   mfs_ecosystem.c                 — MEI wrapper bundling Module 1 internally
-#   mfs_internal.c / .h             — private static registry for that bundling
+# Include convention (location-independent, do not use ../ crosses):
+#   engine headers -> "core/...", "physics/...", "config/..."  (-I$(MPE_SRC))
+#   MFS-internal   -> "modules/...", e.g. "modules/ftc/submodules/robot.h" (-I.)
 #
-# Retired (do NOT resurrect):
-#   v15S/mfs_ecosystem/modules/mfs_module_1.* (535-line older fork coupled to
-#   mfs_internal via a dlopen constructor that self-DoSed attach; physics
-#   identical to the canonical 703-line fork kept here).
-#
-# Dependencies (NOT moved — stay where they are):
-#   v15S/src/{core,physics,config,scene}/  via -I$(MPE_SRC)  (engine kernel)
-#   v15S/robotics_backup/robotics/, gamepad/ via -I$(RB)     (FTC robot library)
-# Includes in this folder are location-independent on purpose:
-#   engine  -> "core/...", "physics/...", "config/..."
-#   robots  -> "robotics/...", "gamepad/..."
-#   local   -> "mfs_*.h" (same dir)
-# Do not reintroduce ../-relative crosses; they break on every move.
-#
-# Physics-truth note: deterministic=false (libm M_PI/fabsf + live gamepad;
-# route trig through core/det_math.h before claiming true).
+# Physics-truth note: deterministic=false on both bundled modules (libm
+# trig in odometry/rotors plus live gamepad polling in module_1; route
+# through core/det_math.h before claiming true).
 
 MPE_SRC = ../..
-RB = ../../../robotics_backup
+MFS = .
 
-CFLAGS = -I$(MPE_SRC) -I$(RB) -O3 -Wall -Wextra -ffp-contract=off -fPIC -fno-inline -fno-lto -fno-inline-functions-called-once -fvisibility=default \
+CFLAGS = -I$(MPE_SRC) -I$(MFS) -O3 -Wall -Wextra -ffp-contract=off -fPIC -fno-inline -fno-lto -fno-inline-functions-called-once -fvisibility=default \
          -DMPE_MODULE_ABI=1 -DMPE_ECOSYSTEM_ABI=1 -DMPE_GTK4=1
 
+# ---- engine kernel objects (resolved against the -rdynamic host for .so builds) ----
 MPE_CORE_SRCS = $(MPE_SRC)/core/physics_world.c $(MPE_SRC)/core/rigidbody.c \
            $(MPE_SRC)/core/mpe_registry.c $(MPE_SRC)/core/mpe_loader.c \
            $(MPE_SRC)/core/det_math.c $(MPE_SRC)/core/mpe_primary.c \
@@ -42,34 +29,42 @@ MPE_CORE_SRCS = $(MPE_SRC)/core/physics_world.c $(MPE_SRC)/core/rigidbody.c \
            $(MPE_SRC)/config/mpe_config.c $(MPE_SRC)/config/mpe_config_schema.c \
            $(MPE_SRC)/scene/boundary.c
 
-RB_CORE_SRCS = $(RB)/robotics/robot.c $(RB)/robotics/drivetrain.c \
-           $(RB)/robotics/motor.c $(RB)/robotics/motor_presets.c \
-           $(RB)/robotics/battery.c \
-           $(RB)/gamepad/gamepad.c
+# ---- MFS modules + submodules ----
+MOD1_SRCS = modules/module_1/mfs_module_1.c
+MOD1_SUB_SRCS = modules/module_1/submodules/gamepad/gamepad.c
+FTC_SRCS = modules/ftc/ftc_module.c modules/ftc/ftc_fleet.c modules/ftc/gui_robot_registry.c
+FTC_SUB_SRCS = modules/ftc/submodules/robot.c modules/ftc/submodules/drivetrain.c \
+           modules/ftc/submodules/motor.c modules/ftc/submodules/motor_presets.c \
+           modules/ftc/submodules/battery.c
+ECO_SRCS = mfs_ecosystem.c mfs_internal.c
 
-MFS_SRCS = mfs_module_1.c mfs_ecosystem.c mfs_internal.c ../mpe_ecosystem.c
-MFS_OBJS = $(MFS_SRCS:.c=.o)
-ALL_SRCS = $(MPE_CORE_SRCS) $(RB_CORE_SRCS) $(MFS_SRCS)
+ALL_SRCS = $(MPE_CORE_SRCS) $(MOD1_SRCS) $(MOD1_SUB_SRCS) $(FTC_SRCS) $(FTC_SUB_SRCS) $(ECO_SRCS)
 ALL_OBJS = $(ALL_SRCS:.c=.o)
 
-all: mfs_module_1.so mfs_ecosystem.so
+# Thin module .so (FTC stack only; engine symbols resolve against the host,
+# same pattern as build_tests.sh mpe_ftc.so; avoids version skew).
+FTC_MOD_SRCS = $(FTC_SRCS) $(FTC_SUB_SRCS)
+FTC_MOD_OBJS = $(FTC_MOD_SRCS:.c=.o)
 
-# Fat link (engine + robot stacks statically inside), matching the original
-# MFS makefiles. Long-term the thin pattern (mpe_ftc.so: only module objs,
-# resolve against the -rdynamic host) avoids version skew; not switched yet.
+all: mfs_module_1.so mfs_ecosystem.so mpe_ftc.so
+
 mfs_module_1.so: $(ALL_OBJS)
 	$(CC) $(CFLAGS) -shared $(ALL_OBJS) -lm -ldl -o mfs_module_1.so
 
 mfs_ecosystem.so: $(ALL_OBJS)
 	$(CC) $(CFLAGS) -shared $(ALL_OBJS) -lm -ldl -o mfs_ecosystem.so
 
+mpe_ftc.so: $(FTC_MOD_OBJS)
+	$(CC) $(CFLAGS) -shared $(FTC_MOD_OBJS) -lm -ldl -o plugins/mpe_ftc.so
+
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 test: $(ALL_OBJS)
-	$(CC) $(CFLAGS) -DMFS_MODULE_1_TEST mfs_module_1_test.c $(ALL_OBJS) \
+	$(CC) $(CFLAGS) -DMFS_MODULE_1_TEST modules/module_1/mfs_module_1_test.c $(ALL_OBJS) \
 	    -lm -ldl -o test_mfs_module_1
 	./test_mfs_module_1
 
 clean:
-	rm -f $(MFS_OBJS) mfs_module_1.so mfs_ecosystem.so test_mfs_module_1
+	rm -f mfs_module_1.so mfs_ecosystem.so plugins/mpe_ftc.so test_mfs_module_1
+	rm -f $(MOD1_SRCS:.c=.o) $(MOD1_SUB_SRCS:.c=.o) $(FTC_SRCS:.c=.o) $(FTC_SUB_SRCS:.c=.o) $(ECO_SRCS:.c=.o)

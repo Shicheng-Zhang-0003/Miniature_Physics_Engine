@@ -1,18 +1,21 @@
-/* MFS Ecosystem — BioBuzz Robotics/Field Simulation
- * 
- * Provides a complete robotics/field simulation ecosystem that bundles
- * the MFS Module 1 as an internal module. This ecosystem manages the
- * internal module lifecycle and provides the ecosystem descriptor.
- * 
+/* MFS Ecosystem — "mfs-simulator" overarching descriptor.
+ *
+ * The single home for everything MFS-wise: it bundles every module the
+ * MFS tree ships as internal modules sharing one per-world state slot.
+ * Modules live in modules/<name>/, their support libs in
+ * modules/<name>/submodules/ (see README_MFS.md for the map).
+ *
  * Architecture:
  * - MFS Ecosystem (this file) manages internal modules
- * - MFS Module 1 (mfs_module_1.c) implements the actual simulation logic
+ * - modules/module_1 (mfs_module_1.c) implements the BioBuzz simulation
+ * - modules/ftc (ftc_module.c) implements the ftc-fleet tick module,
+ *   built on its submodules/ robot stack
  * - Internal module system (mfs_internal.c) manages module lifecycle
  */
 
 #include "../mpe_ecosystem.h"
 #include "mfs_internal.h"
-#include "mfs_module_1.h"
+#include "modules/module_1/mfs_module_1.h"
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
@@ -39,15 +42,28 @@ static int mfs_ecosystem_attach(struct mpe_world *world, void **eco_state) {
     /* Initialize internal module registry */
     mfs_internal_registry_init();
     
-    /* Register internal modules */
+    /* Register internal modules (every module the MFS tree ships). */
     extern const mpe_module_desc_t mfs_module_1_desc;
     if (mfs_internal_module_register(&mfs_module_1_desc) < 0) {
         free(state);
         return -1;
     }
-    
+    /* NOTE: ftc_module.c exports the loader-reserved symbol
+     * mpe_module_desc (dlsym'd by `mod load` for mpe_ftc.so); it IS the
+     * ftc-fleet descriptor, so the static bundle references it directly
+     * instead of duplicating the struct. */
+    extern const mpe_module_desc_t mpe_module_desc;
+    if (mfs_internal_module_register(&mpe_module_desc) < 0) {
+        free(state);
+        return -1;
+    }
+
     /* Attach internal modules */
     if (mfs_internal_module_attach("mfs-simulator", (struct mpe_world*)world) < 0) {
+        free(state);
+        return -1;
+    }
+    if (mfs_internal_module_attach("ftc-fleet", (struct mpe_world*)world) < 0) {
         free(state);
         return -1;
     }
@@ -118,7 +134,7 @@ __attribute__((used)) const mpe_ecosystem_desc_t mpe_ecosystem_desc = {
     .name = "mfs-simulator",
     .version = "1.0",
     .author = "MFS Team",
-    .description = "BioBuzz robotics/field simulation ecosystem with bundled MFS Module 1",
+    .description = "MFS overarching ecosystem: bundles modules/module_1 (BioBuzz sim) and modules/ftc (ftc-fleet) with their submodules",
     /* PHYSICS-TRUTH: bundles a non-deterministic module (see above). */
     .deterministic = false,
     .attach = mfs_ecosystem_attach,
