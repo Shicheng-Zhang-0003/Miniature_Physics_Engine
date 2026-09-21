@@ -35,6 +35,13 @@ GLuint create_shader_program(const char *vertex_shader_path, const char *fragmen
     fseek(fragment_shader_file, 0, SEEK_END);
     long fragment_file_size = ftell(fragment_shader_file);
     rewind(fragment_shader_file);
+    if (vertex_file_size <= 0 || vertex_file_size > (1 << 20) ||
+        fragment_file_size <= 0 || fragment_file_size > (1 << 20)) {
+        fclose(vertex_shader_file);
+        fclose(fragment_shader_file);
+        fprintf(stderr, "Shader file size invalid\n");
+        return 0;
+    }
     char *vertex_shader_source = malloc(vertex_file_size + 1);
     char *fragment_shader_source = malloc(fragment_file_size + 1);
     if ((!vertex_shader_source) || (!fragment_shader_source)) {
@@ -49,10 +56,20 @@ GLuint create_shader_program(const char *vertex_shader_path, const char *fragmen
     }
     if (fread(vertex_shader_source, 1, vertex_file_size, vertex_shader_file) != (size_t) vertex_file_size) {
         fprintf(stderr, "Error reading vertex shader\n");
+        free(vertex_shader_source);
+        free(fragment_shader_source);
+        fclose(vertex_shader_file);
+        fclose(fragment_shader_file);
+        return 0;
     }
     vertex_shader_source[vertex_file_size] = '\0';
     if (fread(fragment_shader_source, 1, fragment_file_size, fragment_shader_file) != (size_t) fragment_file_size) {
         fprintf(stderr, "Error reading fragment shader\n");
+        free(vertex_shader_source);
+        free(fragment_shader_source);
+        fclose(vertex_shader_file);
+        fclose(fragment_shader_file);
+        return 0;
     }
     fragment_shader_source[fragment_file_size] = '\0';
     fclose(vertex_shader_file);

@@ -398,6 +398,7 @@ const terminal_command terminal_commands[] = {
     {"netstat", false, cmd_netstat, "netstat [-a] [-t]", "joint network topology"},
     {"ifconfig", false, cmd_ifconfig, "ifconfig", "camera/render/input state"},
     {"lsmod", false, cmd_lsmod, "lsmod", "loaded engine modules"},
+    {"modinfo", false, cmd_modinfo, "modinfo <module>", "module details"},
     /* MPE_TASK_V15R2_PHASE6_TABLE_END */
     /* MPE_TASK_V15R2_PHASE7_TABLE_BEGIN */
     {"alias", true, cmd_alias, "alias [name=value]", "define/list command aliases"},
@@ -1145,6 +1146,7 @@ const terminal_command terminal_commands[] = {
     {"netstat", false, cmd_netstat, "netstat [-a] [-t]", "joint network topology"},
     {"ifconfig", false, cmd_ifconfig, "ifconfig", "camera/render/input state"},
     {"lsmod", false, cmd_lsmod, "lsmod", "loaded engine modules"},
+    {"modinfo", false, cmd_modinfo, "modinfo <module>", "module details"},
     /* MPE_TASK_V15R2_PHASE6_TABLE_END */
     /* MPE_TASK_V15R2_PHASE7_TABLE_BEGIN */
     {"alias", true, cmd_alias, "alias [name=value]", "define/list command aliases"},

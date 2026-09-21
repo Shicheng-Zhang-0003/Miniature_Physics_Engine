@@ -175,5 +175,6 @@ void cmd_su(int argc, char **argv);
 void cmd_dmesg(int argc, char **argv);
 void cmd_vi(int argc, char **argv);
 void cmd_mod(int argc, char **argv);
+void cmd_modinfo(int argc, char **argv);
 
 #endif /* term_priv_h */

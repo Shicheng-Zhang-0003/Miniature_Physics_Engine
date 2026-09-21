@@ -18,8 +18,12 @@ else
    GTK_DEFINES := -DMPE_GTK3=1
    X11_LIBS    :=
 endif
-BASE_CFLAGS = $(GTK_CFLAGS) -I. $(NATIVE_FLAG) $(GTK_DEFINES) -Wall -Wextra -MMD -MP -ffp-contract=off
+BASE_CFLAGS = -g $(GTK_CFLAGS) -I. $(NATIVE_FLAG) $(GTK_DEFINES) -Wall -Wextra -MMD -MP -ffp-contract=off
 BASE_LIBS = $(GTK_LIBS) $(X11_LIBS) -lm -ldl -rdynamic
+# Determinism flags are hard-appended after $(CFLAGS) on every compile/link
+# so environment CFLAGS can never silently drop -ffp-contract=off (bitwise
+# twins depend on it). NATIVE builds emit a portability warning (see below).
+DETERMINISM_FLAGS = -ffp-contract=off -fno-fast-math
 # Command-line CFLAGS/LIBS (e.g. compile_asan) override these defaults.
 CFLAGS ?= $(BASE_CFLAGS) -O3
 LIBS ?= $(BASE_LIBS)
@@ -49,15 +53,42 @@ release:
 	$(MAKE) BUILD_DIR=build-release CFLAGS="$(BASE_CFLAGS) -O3 -DNDEBUG" engine
 
 PREFIX ?= $(HOME)/.local
-install: engine
+install: engine mpe-tui
 	install -d $(DESTDIR)$(PREFIX)/bin
 	install -m 0755 engine $(DESTDIR)$(PREFIX)/bin/mpe-engine
+	install -m 0755 mpe-tui $(DESTDIR)$(PREFIX)/bin/mpe-tui
+	install -d $(DESTDIR)$(PREFIX)/share/mpe/shaders
+	install -m 0644 render/shaders/*.glsl $(DESTDIR)$(PREFIX)/share/mpe/shaders/ || true
+	install -d $(DESTDIR)$(PREFIX)/share/mpe/status
+	@echo "NOTE: run from v15S/src or set MPE_SHADER_DIR=$(PREFIX)/share/mpe/shaders"
+
+installcheck:
+	@echo "--- installcheck: headless suite must pass ---"
+	python3 ../../tools/test_runner.py 2>&1 | tail -5
+
+check-deps:
+	@pkg-config --exists gtk4 epoxy ncurses x11 || (echo "missing deps: need gtk4 epoxy ncurses x11"; exit 1)
+	@echo "deps OK"
+
+check-flags:
+	@if [ "$(ENABLE_NATIVE)" = "1" ]; then echo "WARNING: NATIVE BUILD - NOT BITWISE PORTABLE"; fi
+	@echo "$(CFLAGS)" | grep -q "ffp-contract=off" || (echo "FAIL: -ffp-contract=off missing from CFLAGS"; exit 1)
+	@echo "flags OK"
 
 help:
 	@echo "targets: engine (default) | debug | release | install | clean"
 	@echo "         test_<name> (build+run) | build_<name> (build only)"
 	@echo "         mpe-tui (terminal debugger + snapshot suite) | tui-smoke"
+	@echo "         ecosystem | mfs_ecosystem | modinfo"
 	@echo "         flow: python3 ../../tools/test_runner.py"
+
+# MFS lives in its distinct folder: ecosystem/mfs/ (see ecosystem/mfs/README_MFS.md).
+# Objects build via the MFS_ECOSYSTEM_OBJS recursive rule below (with -fPIC);
+# the generic $(BUILD_DIR)/%.o rule must not claim them (no duplicate recipes).
+
+$(BUILD_DIR)/%.o: %.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/%.o: %.c
 	@mkdir -p $(dir $@)
@@ -65,7 +96,40 @@ $(BUILD_DIR)/%.o: %.c
 
 clean:
 	rm -rf build build-debug build-release engine test_* mpe-tui
+	@echo "NOTE: user data status/engine.cfg preserved (use distclean to remove)"
+
+distclean: clean
 	rm -rf status/engine.cfg status/engine.cfg.backup
+
+# ---- Module system ----
+module: module/mpe_module.o module/mpe_registry.o module/mpe_loader.o
+	$(CC) $(CFLAGS) -shared module/mpe_module.o module/mpe_registry.o module/mpe_loader.o -lm -ldl -o module.so
+
+# ---- Ecosystem system ----
+ecosystem: ecosystem/mpe_ecosystem.o
+	$(CC) $(CFLAGS) -shared ecosystem/mpe_ecosystem.o -lm -ldl -o ecosystem.so
+
+# ---- MFS Ecosystem (distinct folder: ecosystem/mfs/) ----
+MFS_ECOSYSTEM_SRCS = ecosystem/mfs/mfs_ecosystem.c ecosystem/mfs/mfs_module_1.c ecosystem/mfs/mfs_internal.c
+MFS_ECOSYSTEM_OBJS = $(patsubst %.c,$(BUILD_DIR)/%.o,$(MFS_ECOSYSTEM_SRCS))
+
+# Direct -fPIC rules (must appear before the generic pattern rule).
+# MFS needs the robotics_backup include root (location-independent
+# "robotics/...", "gamepad/..." includes; see ecosystem/mfs/README_MFS.md).
+$(BUILD_DIR)/ecosystem/mfs/mfs_ecosystem.o: ecosystem/mfs/mfs_ecosystem.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -fPIC -I../robotics_backup -c $< -o $@
+
+$(BUILD_DIR)/ecosystem/mfs/mfs_module_1.o: ecosystem/mfs/mfs_module_1.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -fPIC -I../robotics_backup -c $< -o $@
+
+$(BUILD_DIR)/ecosystem/mfs/mfs_internal.o: ecosystem/mfs/mfs_internal.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -fPIC -I../robotics_backup -c $< -o $@
+
+mfs_ecosystem.so: $(MFS_ECOSYSTEM_OBJS)
+	$(CC) $(CFLAGS) -fPIC -shared $(MFS_ECOSYSTEM_OBJS) -lm -ldl -o mfs_ecosystem.so
 
 # ---- MPE terminal debugger + snapshot suite (TUI) ----
 # Terminal-only executable: live ncurses inspector (overview / object+math /
@@ -280,4 +344,91 @@ plugins: plugins/mpe_capsule.so
 	build_friction_stop test_friction_stop build_stack test_stack \
 	build_f10_long_run test_f10_long_run build_sleep_contact_wake test_sleep_contact_wake \
 	build_f11_torture test_f11_torture \
-	build_frustum test_frustum
+	build_frustum test_frustum \
+	build_paranoia_freeflight_exact test_paranoia_freeflight_exact \
+	build_paranoia_depenetration_sleep test_paranoia_depenetration_sleep \
+	build_paranoia_contact_solver test_paranoia_contact_solver \
+	build_paranoia_constraints test_paranoia_constraints \
+	build_paranoia_broadphase test_paranoia_broadphase \
+	build_paranoia_energy_momentum test_paranoia_energy_momentum \
+	build_paranoia_ccd test_paranoia_ccd \
+	build_paranoia_cylinder_collision test_paranoia_cylinder_collision \
+	build_paranoia_determinism test_paranoia_determinism \
+	build_paranoia_scene_persistence test_paranoia_scene_persistence \
+	build_paranoia_spring_joints test_paranoia_spring_joints \
+	build_paranoia_integration_edges test_paranoia_integration_edges \
+	build_paranoia_fp_edges test_paranoia_fp_edges \
+	build_paranoia_config test_paranoia_config
+
+# ---- Paranoia tests (extreme edge cases, mathematical truth verification) ----
+PARANOIA_TEST_CORE := $(MPE_TEST_CORE)
+
+build_paranoia_freeflight_exact: tests/paranoia_freeflight_exact.c $(PARANOIA_TEST_CORE)
+	$(CC) $(CFLAGS) -Dmpe_paranoia_freeflight_exact tests/paranoia_freeflight_exact.c $(PARANOIA_TEST_CORE) $(MPE_TEST_LIBS) -o test_paranoia_freeflight_exact
+test_paranoia_freeflight_exact: build_paranoia_freeflight_exact
+	./test_paranoia_freeflight_exact
+
+build_paranoia_depenetration_sleep: tests/paranoia_depenetration_sleep.c $(PARANOIA_TEST_CORE)
+	$(CC) $(CFLAGS) -Dmpe_paranoia_depenetration_sleep tests/paranoia_depenetration_sleep.c $(PARANOIA_TEST_CORE) $(MPE_TEST_LIBS) -o test_paranoia_depenetration_sleep
+test_paranoia_depenetration_sleep: build_paranoia_depenetration_sleep
+	./test_paranoia_depenetration_sleep
+
+build_paranoia_contact_solver: tests/paranoia_contact_solver.c $(PARANOIA_TEST_CORE)
+	$(CC) $(CFLAGS) -Dmpe_paranoia_contact_solver tests/paranoia_contact_solver.c $(PARANOIA_TEST_CORE) $(MPE_TEST_LIBS) -o test_paranoia_contact_solver
+test_paranoia_contact_solver: build_paranoia_contact_solver
+	./test_paranoia_contact_solver
+
+build_paranoia_constraints: tests/paranoia_constraints.c $(PARANOIA_TEST_CORE)
+	$(CC) $(CFLAGS) -Dmpe_paranoia_constraints tests/paranoia_constraints.c $(PARANOIA_TEST_CORE) $(MPE_TEST_LIBS) -o test_paranoia_constraints
+test_paranoia_constraints: build_paranoia_constraints
+	./test_paranoia_constraints
+
+build_paranoia_broadphase: tests/paranoia_broadphase.c $(PARANOIA_TEST_CORE)
+	$(CC) $(CFLAGS) -Dmpe_paranoia_broadphase tests/paranoia_broadphase.c $(PARANOIA_TEST_CORE) $(MPE_TEST_LIBS) -o test_paranoia_broadphase
+test_paranoia_broadphase: build_paranoia_broadphase
+	./test_paranoia_broadphase
+
+build_paranoia_energy_momentum: tests/paranoia_energy_momentum.c $(PARANOIA_TEST_CORE)
+	$(CC) $(CFLAGS) -Dmpe_paranoia_energy_momentum tests/paranoia_energy_momentum.c $(PARANOIA_TEST_CORE) $(MPE_TEST_LIBS) -o test_paranoia_energy_momentum
+test_paranoia_energy_momentum: build_paranoia_energy_momentum
+	./test_paranoia_energy_momentum
+
+build_paranoia_ccd: tests/paranoia_ccd.c $(PARANOIA_TEST_CORE)
+	$(CC) $(CFLAGS) -Dmpe_paranoia_ccd tests/paranoia_ccd.c $(PARANOIA_TEST_CORE) $(MPE_TEST_LIBS) -o test_paranoia_ccd
+test_paranoia_ccd: build_paranoia_ccd
+	./test_paranoia_ccd
+
+build_paranoia_cylinder_collision: tests/paranoia_cylinder_collision.c $(PARANOIA_TEST_CORE)
+	$(CC) $(CFLAGS) -Dmpe_paranoia_cylinder_collision tests/paranoia_cylinder_collision.c $(PARANOIA_TEST_CORE) $(MPE_TEST_LIBS) -o test_paranoia_cylinder_collision
+test_paranoia_cylinder_collision: build_paranoia_cylinder_collision
+	./test_paranoia_cylinder_collision
+
+build_paranoia_determinism: tests/paranoia_determinism.c $(PARANOIA_TEST_CORE)
+	$(CC) $(CFLAGS) -Dmpe_paranoia_determinism tests/paranoia_determinism.c $(PARANOIA_TEST_CORE) $(MPE_TEST_LIBS) -o test_paranoia_determinism
+test_paranoia_determinism: build_paranoia_determinism
+	./test_paranoia_determinism
+
+build_paranoia_scene_persistence: tests/paranoia_scene_persistence.c $(PARANOIA_TEST_CORE) scene/scene_load.c scene/scene_saving.c scene/scene_id_remap.c scene/scene_crc.c
+	$(CC) $(CFLAGS) -Dmpe_paranoia_scene_persistence tests/paranoia_scene_persistence.c $(PARANOIA_TEST_CORE) scene/scene_load.c scene/scene_saving.c scene/scene_id_remap.c scene/scene_crc.c $(MPE_TEST_LIBS) -o test_paranoia_scene_persistence
+test_paranoia_scene_persistence: build_paranoia_scene_persistence
+	./test_paranoia_scene_persistence
+
+build_paranoia_spring_joints: tests/paranoia_spring_joints.c $(PARANOIA_TEST_CORE) physics/spring_joint.c
+	$(CC) $(CFLAGS) -Dmpe_paranoia_spring_joints tests/paranoia_spring_joints.c $(PARANOIA_TEST_CORE) physics/spring_joint.c $(MPE_TEST_LIBS) $(shell pkg-config --libs epoxy) -o test_paranoia_spring_joints
+test_paranoia_spring_joints: build_paranoia_spring_joints
+	./test_paranoia_spring_joints
+
+build_paranoia_integration_edges: tests/paranoia_integration_edges.c $(PARANOIA_TEST_CORE)
+	$(CC) $(CFLAGS) -Dmpe_paranoia_integration_edges tests/paranoia_integration_edges.c $(PARANOIA_TEST_CORE) $(MPE_TEST_LIBS) -o test_paranoia_integration_edges
+test_paranoia_integration_edges: build_paranoia_integration_edges
+	./test_paranoia_integration_edges
+
+build_paranoia_fp_edges: tests/paranoia_fp_edges.c $(PARANOIA_TEST_CORE)
+	$(CC) $(CFLAGS) -Dmpe_paranoia_fp_edges tests/paranoia_fp_edges.c $(PARANOIA_TEST_CORE) $(MPE_TEST_LIBS) -o test_paranoia_fp_edges
+test_paranoia_fp_edges: build_paranoia_fp_edges
+	./test_paranoia_fp_edges
+
+build_paranoia_config: tests/paranoia_config.c $(PARANOIA_TEST_CORE)
+	$(CC) $(CFLAGS) -Dmpe_paranoia_config tests/paranoia_config.c $(PARANOIA_TEST_CORE) $(MPE_TEST_LIBS) -o test_paranoia_config
+test_paranoia_config: build_paranoia_config
+	./test_paranoia_config

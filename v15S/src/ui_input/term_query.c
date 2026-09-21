@@ -398,6 +398,7 @@ int a3_sort_compare(const void *pa, const void *pb) {
         break;
     }
     int result = (va < vb) ? -1 : ((va > vb) ? 1 : 0);
+    if (result == 0) result = (ia < ib) ? -1 : ((ia > ib) ? 1 : 0);
     return a3_sort_reverse ? -result : result;
 }
 void cmd_sort(int argc, char **argv) {
@@ -1046,6 +1047,7 @@ int a3_sort_compare(const void *pa, const void *pb) {
         break;
     }
     int result = (va < vb) ? -1 : ((va > vb) ? 1 : 0);
+    if (result == 0) result = (ia < ib) ? -1 : ((ia > ib) ? 1 : 0);
     return a3_sort_reverse ? -result : result;
 }
 void cmd_sort(int argc, char **argv) {
