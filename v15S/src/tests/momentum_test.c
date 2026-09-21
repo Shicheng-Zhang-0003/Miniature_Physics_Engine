@@ -9,6 +9,11 @@
 
 int main(void) {
     mpe_config_init();
+    /* TRUTH: gravity-free collision (y=20 fall couples floor/boundary/CCD
+     * into a momentum measurement; the old 4s fall dropped 78m). Zero-g
+     * isolates exchange physics. */
+    g_cfg.world.gravity = 0.0f;
+    g_cfg.sleep.enable = 0;
     physics_world world;
     physics_world_init(&world);
     constraint_pool_init(&world);
@@ -42,24 +47,45 @@ int main(void) {
     float vb = world.bodies[b].velocity.x;
     float p1 = va + vb;
     printf("[info] post-hit va=%.4f vb=%.4f (expect 0 / 3)\n", va, vb);
+    /* TRUTH: 10% bands proved e=0.9 as e=1 (2.85 passes as 3). Bands at
+     * projectile-grade 5% + KE conservation (elastic exchange preserves
+     * va^2+vb^2=9) + transverse silence (no spurious y/z). */
     int fail = 0;
-    if (fabsf(va) > 0.3f) {
+    if (fabsf(va) > 0.05f) {
         printf("[FAIL] striker did not stop (va=%.4f)\n", va);
         fail = 1;
     } else {
         printf("[PASS] striker stops dead\n");
     }
-    if (fabsf(vb - 3.0f) > 0.3f) {
+    if (fabsf(vb - 3.0f) > 0.05f) {
         printf("[FAIL] target did not inherit velocity (vb=%.4f)\n", vb);
         fail = 1;
     } else {
         printf("[PASS] target inherits velocity\n");
     }
-    if (fabsf(p1 - p0) > 0.3f) {
+    if (fabsf(p1 - p0) > 0.05f) {
         printf("[FAIL] momentum not conserved (%.4f vs %.4f)\n", p1, p0);
         fail = 1;
     } else {
         printf("[PASS] total momentum conserved\n");
+    }
+    {
+        float ke1 = va * va + vb * vb;
+        if (fabsf(ke1 - 9.0f) > 0.3f) {
+            printf("[FAIL] kinetic energy not conserved (%.4f vs 9.0)\n", ke1);
+            fail = 1;
+        }
+        float tmax = 0.0f;
+        for (int i = 0; i < world.body_count; i++) {
+            float ty = fabsf(world.bodies[i].velocity.y);
+            float tz = fabsf(world.bodies[i].velocity.z);
+            if (ty > tmax) tmax = ty;
+            if (tz > tmax) tmax = tz;
+        }
+        if (tmax > 0.05f) {
+            printf("[FAIL] spurious transverse motion (%.4f)\n", tmax);
+            fail = 1;
+        }
     }
     physics_world_cleanup(&world);
     return fail;

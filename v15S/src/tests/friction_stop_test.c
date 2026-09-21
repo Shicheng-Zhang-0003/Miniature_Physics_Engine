@@ -9,6 +9,13 @@
 
 int main(void) {
     mpe_config_init();
+    /* The infinite solver floor is coplanar with the slab (both y=0) and
+     * shares support: its friction must equal the declared test surface
+     * (mu=0.3) or min-combine drags the effective coefficient toward the
+     * floor default (0.2/0.1) and the block slides ~3x far. Same class of
+     * setup-material fix as the bounce test's floor restitution. */
+    g_cfg.world.floor_friction_s = 0.3f;
+    g_cfg.world.floor_friction_k = 0.3f;
     physics_world world;
     physics_world_init(&world);
     constraint_pool_init(&world);

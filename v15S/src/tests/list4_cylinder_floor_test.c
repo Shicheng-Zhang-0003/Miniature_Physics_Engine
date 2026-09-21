@@ -62,11 +62,25 @@ int main(void) {
     }
 
     float final_y = world.bodies[cyl].position.y;
+    float final_vy = world.bodies[cyl].velocity.y;
 
-    printf("[info] tipped cylinder final y=%.4f\n", final_y);
+    printf("[info] tipped cylinder final y=%.4f vy=%.4f (rest 0.02)\n", final_y, final_vy);
 
+    /* TRUTH: two-sided. Tipped 90° about Z the axle is vertical: rest
+     * height = half-length 0.02. Old gate only caught y<-0.05 (0.07
+     * penetration passes) and never an explosion (y=10 passes). */
     if (final_y < -0.05f) {
         printf("[FAIL] tipped cylinder fell through the floor\n");
+        physics_world_cleanup(&world);
+        return 1;
+    }
+    if (final_y < 0.005f || final_y > 0.06f) {
+        printf("[FAIL] tipped cylinder not at rest height (y=%.4f)\n", final_y);
+        physics_world_cleanup(&world);
+        return 1;
+    }
+    if (fabsf(final_vy) > 0.1f) {
+        printf("[FAIL] tipped cylinder still moving (vy=%.4f)\n", final_vy);
         physics_world_cleanup(&world);
         return 1;
     }

@@ -42,10 +42,18 @@ int main(void) {
     if (fail) return 1;
 
     float cyl_z = world.bodies[cyl].position.z;
-    printf("[info] cylinder final z=%.4f (wall at z=0.5)\n", cyl_z);
+    float cyl_vz = world.bodies[cyl].velocity.z;
+    printf("[info] cylinder final z=%.4f vz=%.4f (wall face at z=0.4)\n", cyl_z, cyl_vz);
 
-    if (cyl_z > 0.8f) {
+    /* TRUTH: two-sided. Wall face at z=0.4 (center 0.5 - half 0.1);
+     * cylinder surface must not cross it, and must be spent (bounced back
+     * or stopped), not flying. Old z>0.8 allowed 0.45m penetration. */
+    if (cyl_z > 0.40f) {
         printf("[FAIL] cylinder passed through wall\n");
+        return 1;
+    }
+    if (fabsf(cyl_vz) > 1.0f) {
+        printf("[FAIL] cylinder still flying after wall interaction (vz=%.4f)\n", cyl_vz);
         return 1;
     }
     printf("[PASS] cylinder-cube collision works\n");

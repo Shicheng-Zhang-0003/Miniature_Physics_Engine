@@ -84,14 +84,17 @@ int main(void) {
     }
     float analytic_t = 2.0f * 3.14159265f * sqrtf(1.0f / k);
     printf("[info] period: measured=%.4f analytic=%.4f crossings=%d\n", measured_t, analytic_t, crossings);
-    if (fabsf(measured_t - analytic_t) / analytic_t > 0.05f) {
+    /* TRUTH: 5% is 35x the expected w*dt error (~0.14%); a 10%-off k passes.
+     * Band at 2% + drift monotonicity (damped-c leak losing 9% passes max
+     * checks but not drift). */
+    if (crossings < 4 || fabsf(measured_t - analytic_t) / analytic_t > 0.02f) {
         printf("[FAIL] spring period off\n");
         fail = 1;
     } else {
         printf("[PASS] spring period matches 2*pi*sqrt(m/k)\n");
     }
     printf("[info] max energy deviation: %.3f\n", emax_dev);
-    if (emax_dev > 0.10f) {
+    if (emax_dev > 0.05f) {
         printf("[FAIL] spring energy drifts\n");
         fail = 1;
     } else {

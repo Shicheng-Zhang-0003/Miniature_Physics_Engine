@@ -63,24 +63,23 @@ int main(void) {
     printf("[B] after 10 steps: wx=%.4f y=%.4f\n",
            rb->angular_velocity.x, rb->position.y);
 
-    int test_b_pass = fabsf(rb->angular_velocity.x) > 0.5f;
+    int test_b_pass = fabsf(rb->angular_velocity.x) > 20.0f;
     if (test_b_pass) {
         printf("[B] PASS: air wheel spun up — sanitize fix resolved inertia\n");
     } else {
         printf("[B] FAIL: air wheel still not spinning — math3_inverse is broken\n");
     }
 
-    /* Overall */
+    /* Overall: TRUTH, gates. The old version returned 0 on every path
+     * (always-pass: a broken inverse still greened the suite). */
     if (test_a_pass && test_b_pass) {
         printf("[PASS] 093e: inertia pipeline works\n");
+        physics_world_cleanup(&world);
         return 0;
-    } else if (test_a_pass && !test_b_pass) {
-        printf("[DIAG] math3_inverse is fine but something else zeroes I^-1\n");
-        return 0; /* non-gating */
-    } else {
-        printf("[DIAG] math3_inverse is broken — needs fix in math3D.c\n");
-        return 0; /* non-gating */
     }
+    printf("[FAIL] 093e: math3_inverse pipeline broken\n");
+    physics_world_cleanup(&world);
+    return 1;
 }
 
 #endif /* mpe_math3_inverse_test */
