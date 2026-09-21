@@ -21,7 +21,7 @@
 #ifndef ftc_fleet_h
 #define ftc_fleet_h
 
-#include "robot.h"
+#include "submodules/robot.h"
 
 struct physics_world;
 
