@@ -44,12 +44,14 @@ int main(void) {
     if (fail) return 1;
 
     /* Sphere started at z=0.5 moving toward cylinder at z=0.
-    * After 2 seconds it should have been deflected or stopped,
-    * NOT passed through to z < -0.2 */
+     * After 2 seconds it should have been deflected or stopped.
+     * TRUTH: touch happens at z≈0.13 (0.05 half-len + 0.08 radius);
+     * z<-0.05 means 0.2m+ travel THROUGH the cylinder. (Cylinder mass 0.0
+     * is intentional: mass==0 builds a static body per init policy.) */
     float sph_z = world.bodies[sph].position.z;
     printf("[info] sphere final z=%.4f (started at 0.5)\n", sph_z);
 
-    if (sph_z < -0.2f) {
+    if (sph_z < -0.05f) {
         printf("[FAIL] sphere passed through cylinder\n");
         return 1;
     }

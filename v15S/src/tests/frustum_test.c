@@ -111,8 +111,14 @@ int main(void) {
             printf("[FAIL] pose %d: %d visible points culled\n", pose, false_out);
             fail = 1;
         }
-        if ((culled > 0) && (far_kept == culled)) {
-            printf("[FAIL] pose %d: culling never fires\n", pose);
+        /* TRUTH: far_kept==culled only fails if culling NEVER fires once in
+         * 20k (99.9% kept passes). Demand real culling power + coverage. */
+        if (inside_clip <= 0) {
+            printf("[FAIL] pose %d: no inside points sampled\n", pose);
+            fail = 1;
+        }
+        if ((culled > 0) && ((float) far_kept / (float) culled > 0.2f)) {
+            printf("[FAIL] pose %d: culling too weak (kept %d/%d far)\n", pose, far_kept, culled);
             fail = 1;
         }
     }

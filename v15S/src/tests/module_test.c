@@ -17,6 +17,19 @@ static const mpe_module_desc_t my_mod = {
     .attach = 0, .detach = 0, .pre_step = my_pre, .post_step = 0,
 };
 
+/* Custom-routing probe: sentinel normal proves registry->custom dispatch. */
+static bool probe_custom_hit = false;
+static bool probe_custom_fn(rigidbody *a, rigidbody *b, void *out, mpe_world_t *w) {
+    (void)b; (void)w;
+    collision_data *cd = (collision_data *)out;
+    cd->object_a = a;
+    cd->object_b = a;
+    cd->normal_vector = (vector3){0.0f, 0.0f, 1.0f};
+    cd->contact_count = 0;
+    probe_custom_hit = true;
+    return true;
+}
+
 /* Counting solver_if: delegates to the builtin with the world's config. */
 static int *test_counting_solver_calls = NULL;
 static float test_count_resolve(mpe_world_t *world, void *manifold, float dt, bool friction_only, int iter,
@@ -63,6 +76,16 @@ int mpe_module_test_main(void) {
     bool r1 = collision_dual_sphere(&A.bodies[0], &A.bodies[1], &d1, NULL);
     bool r2 = mpe_shape_dispatch(&A, &A.bodies[0], &A.bodies[1], &d2);
     if (r1 != r2) { printf("[FAIL] dispatch mismatch\n"); return 1; }
+    /* TRUTH: bool-only compare passes while normals/penetration diverge
+     * (swapped-frame bug hid here). Compare the manifold content. */
+    if (r1 && r2) {
+        float dn = vector3_length(vector3_subtraction(d1.normal_vector, d2.normal_vector));
+        float dp = fabsf(d1.contacts[0].penetration - d2.contacts[0].penetration);
+        if (dn > 1e-5f || dp > 1e-5f || d1.contact_count != d2.contact_count) {
+            printf("[FAIL] dispatch manifold differs (dn=%.6f dp=%.6f)\n", dn, dp);
+            return 1;
+        }
+    }
     printf("[PASS] shape dispatch matches builtin\n");
 
     /* 4. custom shape add + dispatch (bounding-sphere fallback) */
@@ -73,6 +96,18 @@ int mpe_module_test_main(void) {
     rigidbody_sanitize(&A.bodies[ic]);
     if (A.bodies[ic].type != object_custom) { printf("[FAIL] sanitize reset custom\n"); return 1; }
     printf("[PASS] custom shape survives sanitize\n");
+    /* TRUTH: custom dispatch was never exercised (fallback unproven).
+     * Register a stub for (custom:100 vs sphere) and prove routing. */
+    mpe_register_pair_handler(3, 0, 100, -1, probe_custom_fn, "test-custom-probe");
+    {
+        collision_data dc = {0};
+        probe_custom_hit = false;
+        bool rc = mpe_shape_dispatch(&A, &A.bodies[ic], &A.bodies[0], &dc);
+        if (!rc || !probe_custom_hit) { printf("[FAIL] custom dispatch not routed\n"); return 1; }
+        if (dc.normal_vector.z < 0.99f) { printf("[FAIL] custom sentinel normal lost\n"); return 1; }
+    }
+    mpe_unregister_pair_handler(probe_custom_fn);
+    printf("[PASS] custom shape dispatches through registry\n");
 
     /* 5. tick-module hook fires once per step */
     physics_world_attach_module(&A, &my_mod);
@@ -123,8 +158,8 @@ int mpe_module_test_main(void) {
         physics_world W; physics_world_init(&W);
         physics_world_add_sphere(&W, 0.5f, 1.0f, (vector3){0, 5, 0});
         for (int t = 0; t < 600; t++) physics_world_step(&W, 1.0f / 60.0f);
-        if (det_fallback_pow_total() != 0) {
-            printf("[FAIL] pow fallbacks=%lu\n", det_fallback_pow_total());
+        if (det_fallback_pow_total() != 0 || det_fallback_trig_total() != 0) {
+            printf("[FAIL] det fallbacks pow=%lu trig=%lu\n", det_fallback_pow_total(), det_fallback_trig_total());
             return 1;
         }
         printf("[PASS] det counters process-wide zero (pow=%lu trig=%lu)\n",
@@ -132,7 +167,7 @@ int mpe_module_test_main(void) {
         physics_world_cleanup(&W);
     }
 
-    /* 6. per-world narrowphase config: slop-0 world sees contact, slop-5cm world does not */
+    /* 8. per-world narrowphase config: slop-0 world sees contact, slop-5cm world does not */
     {
         physics_world W; physics_world_init(&W);
         static mpe_config_t cfgW; cfgW = g_cfg;

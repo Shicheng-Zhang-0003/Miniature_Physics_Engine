@@ -73,14 +73,22 @@ int main(void) {
         printf("[GAP] control sphere did not fall (y=%.4f) — gravity or integration broken\n", sph_y);
         return 1;
     }
+    if (sph_y < -0.05f) {
+        printf("[FAIL] control sphere tunneled the floor (y=%.4f)\n", sph_y);
+        return 1;
+    }
+    if (sph_y < 0.03f || sph_y > 0.07f) {
+        printf("[FAIL] control sphere did not settle at rest height (y=%.4f, expect ~0.05)\n", sph_y);
+        return 1;
+    }
 
     /* 2. Cylinder: did it fall through the floor? */
-    if (cyl_y < -5.0f) {
+    if (cyl_y < -0.05f) {
         printf("[GAP] cylinder fell through the floor (y=%.4f) — cylinder contact missing\n", cyl_y);
         return 1;
     }
-    if (cyl_y > 0.20f) {
-        printf("[FAIL] cylinder did not settle (y=%.4f)\n", cyl_y);
+    if (cyl_y < 0.03f || cyl_y > 0.07f) {
+        printf("[FAIL] cylinder did not settle at rest height (y=%.4f, expect ~0.05)\n", cyl_y);
         return 1;
     }
 

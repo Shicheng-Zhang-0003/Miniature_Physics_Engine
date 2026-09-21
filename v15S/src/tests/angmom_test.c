@@ -46,6 +46,11 @@ int main(void) {
         }
     }
     printf("[info] max |L-L0|/|L0| over 2 s tumble: %.5f\n", max_err);
+    /* TRUTH: 3% over 120 ticks (2 s) with measured 2.5% drift from explicit
+     * gyro Euler (first-order, O(w^3*dt^2) energy error on tumblers).
+     * Tightening to 1%/600 ticks was measured to RED (drift accumulates);
+     * that needs implicit-midpoint gyro integration first (future work),
+     * not a band-aid band. */
     int fail = 0;
     if (max_err > 0.03f) {
         printf("[FAIL] angular momentum drifts (%.4f)\n", max_err);
