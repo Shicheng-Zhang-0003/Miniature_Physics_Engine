@@ -58,6 +58,27 @@ KNOWN_TESTS = [
     "module",
 ]
 
+# Edge-case paranoia suite (makefile paranoia_*, strongest coverage).
+# Gated with --include-paranoia or by exact name; run_all.sh gates them.
+PARANOIA_TESTS = [
+    "paranoia_broadphase",
+    "paranoia_ccd",
+    "paranoia_config",
+    "paranoia_constraints",
+    "paranoia_contact_solver",
+    "paranoia_cylinder_collision",
+    "paranoia_depenetration_sleep",
+    "paranoia_determinism",
+    "paranoia_energy_momentum",
+    "paranoia_fp_edges",
+    "paranoia_freeflight_exact",
+    "paranoia_integration_edges",
+    "paranoia_scene_persistence",
+    "paranoia_spring_joints",
+]
+
+DIAG_MATH_TESTS = {"floor_collision_diag", "frustum", "math3_inverse"}
+
 # Tests that encode desired future behavior but are currently expected
 # to fail because the corresponding model is not implemented yet.
 # MPE-only run: empty. (The old mecanum_drive XFAIL moved to
@@ -225,9 +246,13 @@ if __name__ == "__main__":
     if "--help" in args or "-h" in args:
         print(__doc__)
         sys.exit(0)
+    all_tests = list(KNOWN_TESTS)
+    if "--include-paranoia" in args:
+        all_tests += PARANOIA_TESTS
+        args = [a for a in args if a != "--include-paranoia"]
     if "--list" in args:
         print("Available tests:")
-        for t in KNOWN_TESTS:
+        for t in all_tests:
             print(f"  {t}")
         sys.exit(0)
     if not SRC_DIR.exists():
@@ -235,10 +260,25 @@ if __name__ == "__main__":
         sys.exit(1)
 
     test_filter = args[0] if args else None
+    include_paranoia = False
+    # Paranoia reachable by exact name without the flag; full paranoia sweep
+    # only with --include-paranoia (they need extra link units; default 30 stay green).
+    if test_filter in PARANOIA_TESTS:
+        KNOWN_TESTS.extend([test_filter])
+    elif test_filter is None and "--include-paranoia" in args:
+        include_paranoia = True
+        KNOWN_TESTS.extend([t for t in PARANOIA_TESTS if t not in KNOWN_TESTS])
+    # Exact-name match first (avoids substring running the wrong test).
     print(f"MPE Test Runner — src: {SRC_DIR}")
     print("=" * 60)
     results = run_all(test_filter)
     print_report(results)
+    # Split physics vs diag/math honesty: diag entries never inflate physics green.
+    phys = [r for r in results if r.name not in DIAG_MATH_TESTS]
+    diag = [r for r in results if r.name in DIAG_MATH_TESTS]
+    if diag:
+        print(f"\nPhysics: {sum(1 for r in phys if r.passed)}/{len(phys)} green | "
+              f"Diag/math: {sum(1 for r in diag if r.passed)}/{len(diag)} (informational)")
     blocking_failed = sum(1 for r in results if r.blocking_failure)
     unexpected_passed = sum(1 for r in results if r.unexpected_pass)
 
