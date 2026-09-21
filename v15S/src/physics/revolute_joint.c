@@ -48,18 +48,59 @@ static math3 math3_addition(math3 a, math3 b) {
     return r;
 }
 
+/* 6×6 matrix operations for coupled hinge solve + motor. */
+static void mat6_zero(float m[6][6]) {
+    for (int i = 0; i < 6; i++) for (int j = 0; j < 6; j++) m[i][j] = 0.0f;
+}
+static void mat6_vec_mul(float out[6], float m[6][6], float v[6]) {
+    for (int i = 0; i < 6; i++) {
+        out[i] = 0.0f;
+        for (int j = 0; j < 6; j++) out[i] += m[i][j] * v[j];
+    }
+}
+static int mat6_invert(float m[6][6], float out[6][6]) {
+    /* Gauss-Jordan elimination with partial pivoting. */
+    float aug[6][12];
+    for (int i = 0; i < 6; i++) {
+        for (int j = 0; j < 6; j++) aug[i][j] = m[i][j];
+        for (int j = 0; j < 6; j++) aug[i][6+j] = (i==j) ? 1.0f : 0.0f;
+    }
+    for (int col = 0; col < 6; col++) {
+        int pivot = col;
+        float max_val = fabsf(aug[col][col]);
+        for (int row = col+1; row < 6; row++) {
+            if (fabsf(aug[row][col]) > max_val) {
+                max_val = fabsf(aug[row][col]);
+                pivot = row;
+            }
+        }
+        if (max_val < 1e-12f) return 0; /* singular */
+        if (pivot != col) {
+            for (int j = 0; j < 12; j++) {
+                float tmp = aug[col][j]; aug[col][j] = aug[pivot][j]; aug[pivot][j] = tmp;
+            }
+        }
+        float piv_val = aug[col][col];
+        for (int j = 0; j < 12; j++) aug[col][j] /= piv_val;
+        for (int row = 0; row < 6; row++) {
+            if (row == col) continue;
+            float factor = aug[row][col];
+            for (int j = 0; j < 12; j++) aug[row][j] -= factor * aug[col][j];
+        }
+    }
+    for (int i = 0; i < 6; i++) for (int j = 0; j < 6; j++) out[i][j] = aug[i][6+j];
+    return 1;
+}
+
 void revolute_solve(revolute_params *p, rigidbody *body_a, rigidbody *body_b, float dt, const mpe_config_t *cfg) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
     if ((!p) || (!body_a) || (!body_b) || (dt <= 0.0f)) {
         return;
     }
     /* Jointed bodies stay awake so the constraint always acts. */
-    if (body_a->is_sleeping) {
-        rigidbody_wake(body_a);
-    }
-    if (body_b->is_sleeping) {
-        rigidbody_wake(body_b);
-    }
+    if (body_a->is_sleeping) rigidbody_wake(body_a);
+    if (body_b->is_sleeping) rigidbody_wake(body_b);
+    
     float inv_mass_a = rigidbody_effective_inv_mass(body_a);
     float inv_mass_b = rigidbody_effective_inv_mass(body_b);
     if ((inv_mass_a <= 0.0f) && (inv_mass_b <= 0.0f)) {
@@ -69,7 +110,7 @@ void revolute_solve(revolute_params *p, rigidbody *body_a, rigidbody *body_b, fl
     vector3 r_a = vector4_rotate_to_vector3(body_a->orientation, p->anchor_a);
     vector3 r_b = vector4_rotate_to_vector3(body_b->orientation, p->anchor_b);
 
-    /* ---- point-to-point ---- */
+    /* Anchor positions and velocities. */
     vector3 anchor_a_world = vector3_addition(body_a->position, r_a);
     vector3 anchor_b_world = vector3_addition(body_b->position, r_b);
     vector3 position_error = vector3_subtraction(anchor_b_world, anchor_a_world);
@@ -78,136 +119,284 @@ void revolute_solve(revolute_params *p, rigidbody *body_a, rigidbody *body_b, fl
     vector3 vel_b_at_anchor = vector3_addition(body_b->velocity, vector3_cross(body_b->angular_velocity, r_b));
     vector3 relative_velocity = vector3_subtraction(vel_b_at_anchor, vel_a_at_anchor);
 
-    /* Live tunable (was hardcoded 0.3): positional correction stiffness. */
+    /* Hinge axis in world space (from body A). */
+    vector3 axis_world = vector4_rotate_to_vector3(body_a->orientation, vector3_normalisation(p->axis_a));
+    float axis_len_sq = vector3_length_squared(axis_world);
+    if (axis_len_sq < 1e-12f) return;
+    axis_world = vector3_scaling(axis_world, 1.0f / sqrtf(axis_len_sq));
+
+    /* Build orthonormal basis (u, v) perpendicular to axis for axis alignment constraints.
+     * u = normalize(axis × ref), v = axis × u. */
+    vector3 ref = (fabsf(axis_world.y) < 0.99f) ? (vector3){0.0f, 1.0f, 0.0f} : (vector3){1.0f, 0.0f, 0.0f};
+    vector3 u = vector3_cross(axis_world, ref);
+    float u_len = sqrtf(vector3_length_squared(u));
+    if (u_len < 1e-6f) {
+        ref = (vector3){1.0f, 0.0f, 0.0f};
+        u = vector3_cross(axis_world, ref);
+        u_len = sqrtf(vector3_length_squared(u));
+    }
+    u = vector3_scaling(u, 1.0f / u_len);
+    vector3 v = vector3_cross(axis_world, u); /* already unit length */
+
+    /* Baumgarte bias for position error (point-to-point only; axis alignment is velocity-only).
+     * TRUTH: velocity-level P2P bias solved INSIDE the iteration loop is
+     * correct here (bias includes live rel_vel and converges; it is NOT the
+     * once-per-tick axis-drift term, which must never enter the loop or its
+     * position error pumps 64x). Do not move either across the boundary. */
     const float baumgarte_beta = C->joints.revolute_beta;
-    /* Clamp the bias SPEED (Catto's stabilized Baumgarte): an uncapped
-     * beta/dt turns a large anchor gap into a multi-m/s velocity demand in
-     * one tick. Against a contact face the joint then re-injects approach
-     * every iteration while the contact re-stops it — accumulated normal
-     * impulse grows without bound, inflating Poisson restitution and the
-     * friction cone (measured 7x: acc_n 43 from a 6 m/s impact). The cap
-     * bounds per-tick energy injection; steady-state mm errors never bind. */
     float bias_speed = baumgarte_beta * vector3_length(position_error) / dt;
     float max_bias_speed = C->joints.revolute_max_bias;
-    vector3 bias;
-    if ((bias_speed > max_bias_speed) && (bias_speed > 0.0f)) {
-        bias = vector3_scaling(position_error, (baumgarte_beta / dt) * (max_bias_speed / bias_speed));
-    } else {
-        bias = vector3_scaling(position_error, baumgarte_beta / dt);
-    }
+    vector3 bias_p2p = (bias_speed > max_bias_speed && bias_speed > 0.0f)
+        ? vector3_scaling(position_error, (baumgarte_beta / dt) * (max_bias_speed / bias_speed))
+        : vector3_scaling(position_error, baumgarte_beta / dt);
 
+    /* Effective mass/inertia. */
     float inv_mass_sum = inv_mass_a + inv_mass_b;
-    math3 k = {{{0.0f}}};
-    for (int i = 0; i < 3; i++) {
-        k.matrix[i][i] = inv_mass_sum;
-    }
+    math3 I_inv_a = rigidbody_effective_inv_inertia(body_a);
+    math3 I_inv_b = rigidbody_effective_inv_inertia(body_b);
     math3 skew_a = skew_symmetric(r_a);
     math3 skew_b = skew_symmetric(r_b);
-    /* k = inv_mass_sum*I - skew(r_a)*Ia^-1*skew(r_a) - skew(r_b)*Ib^-1*skew(r_b)
-     * (the subtracted terms are positive semi-definite, so k stays SPD) */
-    math3 term_a = math3_multiplication(skew_a, math3_multiplication(rigidbody_effective_inv_inertia(body_a), skew_a));
-    math3 term_b = math3_multiplication(skew_b, math3_multiplication(rigidbody_effective_inv_inertia(body_b), skew_b));
+
+    /* Build 6×6 K-matrix (effective mass matrix for the 5 constraints + motor).
+     * Rows 0-2: point-to-point (x, y, z)
+     * Rows 3-4: axis alignment (u, v components of relative angular velocity)
+     * Row 5: motor (relative angular velocity along hinge axis) */
+    float K[6][6];
+    mat6_zero(K);
+
+    /* Point-to-point block (3×3): K_p2p = inv_mass_sum*I - skew_a*Ia^-1*skew_a - skew_b*Ib^-1*skew_b */
+    math3 term_a = math3_multiplication(skew_a, math3_multiplication(I_inv_a, skew_a));
+    math3 term_b = math3_multiplication(skew_b, math3_multiplication(I_inv_b, skew_b));
     for (int i = 0; i < 3; i++) {
         for (int j = 0; j < 3; j++) {
-            k.matrix[i][j] -= term_a.matrix[i][j];
-            k.matrix[i][j] -= term_b.matrix[i][j];
+            K[i][j] = (i==j ? inv_mass_sum : 0.0f) - term_a.matrix[i][j] - term_b.matrix[i][j];
         }
     }
-    math3 k_inv = math3_inverse(k);
-    vector3 rhs = vector3_scaling(vector3_addition(relative_velocity, bias), -1.0f);
-    vector3 impulse = math3_multiplication_vector3(k_inv, rhs);
 
-    body_a->velocity = vector3_subtraction(body_a->velocity, vector3_scaling(impulse, inv_mass_a));
-    body_b->velocity = vector3_addition(body_b->velocity, vector3_scaling(impulse, inv_mass_b));
-    body_a->angular_velocity =
-        vector3_subtraction(body_a->angular_velocity,
-                            math3_multiplication_vector3(rigidbody_effective_inv_inertia(body_a),
-                                                         vector3_cross(r_a, impulse)));
-    body_b->angular_velocity =
-        vector3_addition(body_b->angular_velocity,
-                         math3_multiplication_vector3(rigidbody_effective_inv_inertia(body_b),
-                                                      vector3_cross(r_b, impulse)));
+    /* Cross-coupling block (3×2): K_p2p_axis = J_p2p * M^-1 * J_axis^T
+     * J_p2p = [I, -I, -skew(r_a), skew(r_b)]
+     * J_axis_u = [0, 0, -u, u]
+     * J_axis_v = [0, 0, -v, v] */
+    for (int i = 0; i < 3; i++) {
+        vector3 skew_a_row_i;
+        if (i == 0) skew_a_row_i = (vector3){0, -r_a.z, r_a.y};
+        else if (i == 1) skew_a_row_i = (vector3){r_a.z, 0, -r_a.x};
+        else skew_a_row_i = (vector3){-r_a.y, r_a.x, 0};
+        
+        vector3 skew_b_row_i;
+        if (i == 0) skew_b_row_i = (vector3){0, -r_b.z, r_b.y};
+        else if (i == 1) skew_b_row_i = (vector3){r_b.z, 0, -r_b.x};
+        else skew_b_row_i = (vector3){-r_b.y, r_b.x, 0};
+        
+        vector3 Ia_skew_a = math3_multiplication_vector3(I_inv_a, skew_a_row_i);
+        vector3 Ib_skew_b = math3_multiplication_vector3(I_inv_b, skew_b_row_i);
+        
+        K[i][3] = -vector3_dot(Ia_skew_a, u) + vector3_dot(Ib_skew_b, u);
+        K[i][4] = -vector3_dot(Ia_skew_a, v) + vector3_dot(Ib_skew_b, v);
+        K[3][i] = K[i][3]; /* symmetric */
+        K[4][i] = K[i][4];
+    }
+    
+    /* Axis-Axis block (2×2): K_axis = J_axis * M^-1 * J_axis^T */
+    math3 I_sum = math3_addition(I_inv_a, I_inv_b);
+    K[3][3] = vector3_dot(u, math3_multiplication_vector3(I_sum, u));
+    K[4][4] = vector3_dot(v, math3_multiplication_vector3(I_sum, v));
+    K[3][4] = vector3_dot(u, math3_multiplication_vector3(I_sum, v));
+    K[4][3] = K[3][4];
+    
+    /* Motor row/column (row 5): K_motor = axis · (Ia^-1 + Ib^-1) · axis */
+    float axis_mass_inv = vector3_dot(axis_world, math3_multiplication_vector3(I_sum, axis_world));
+    K[5][5] = (axis_mass_inv > 1e-12f) ? axis_mass_inv : 1e-12f;
+    
+    /* Motor coupling with axis alignment rows (3,4): K[5][3] = axis · I_sum · u, etc.
+     * Free hinge when disabled: decouple row/col 5 and force lambda[5]=0
+     * (enforcing along_axis=0 would weld the hinge into a rotational lock). */
+    if (p->motor_enabled) {
+        K[5][3] = vector3_dot(axis_world, math3_multiplication_vector3(I_sum, u));
+        K[3][5] = K[5][3];
+        K[5][4] = vector3_dot(axis_world, math3_multiplication_vector3(I_sum, v));
+        K[4][5] = K[5][4];
+    } else {
+        K[5][3] = 0.0f; K[3][5] = 0.0f;
+        K[5][4] = 0.0f; K[4][5] = 0.0f;
+    }
+    /* Motor coupling with P2P rows (0,1,2): zero (motor is pure angular, no linear coupling). */
+    for (int i = 0; i < 3; i++) {
+        K[i][5] = 0.0f;
+        K[5][i] = 0.0f;
+    }
 
-    /* ---- axis alignment: kill relative angular velocity off the hinge ---- */
-    vector3 axis_world = vector4_rotate_to_vector3(body_a->orientation, vector3_normalisation(p->axis_a));
-    vector3 relative_angular = vector3_subtraction(body_b->angular_velocity, body_a->angular_velocity);
-    float along_axis = vector3_dot(relative_angular, axis_world);
-    vector3 perpendicular_angular = vector3_subtraction(relative_angular, vector3_scaling(axis_world, along_axis));
+    /* Add regularization for numerical stability (tiny diagonal). */
+    for (int i = 0; i < 6; i++) K[i][i] += 1e-10f;
 
-    math3 angular_mass = math3_addition(rigidbody_effective_inv_inertia(body_a),
-                                        rigidbody_effective_inv_inertia(body_b));
-    math3 angular_mass_inv = math3_inverse(angular_mass);
-    vector3 angular_impulse =
-        vector3_scaling(math3_multiplication_vector3(angular_mass_inv, perpendicular_angular), -1.0f);
+    /* RHS = -(J*v + bias). Bias only on P2P (first 3 rows). */
+    float rhs[6];
+    /* P2P rows: -(relative_velocity + bias_p2p) */
+    vector3 rhs_p2p = vector3_scaling(vector3_addition(relative_velocity, bias_p2p), -1.0f);
+    rhs[0] = rhs_p2p.x;
+    rhs[1] = rhs_p2p.y;
+    rhs[2] = rhs_p2p.z;
+    /* Axis rows: -perpendicular_angular_velocity (no bias for axis alignment). */
+    vector3 rel_ang = vector3_subtraction(body_b->angular_velocity, body_a->angular_velocity);
+    rhs[3] = -vector3_dot(rel_ang, u);
+    rhs[4] = -vector3_dot(rel_ang, v);
+    /* Motor row: -(along_axis_velocity - motor_target_speed), or 0 when
+     * disabled (free spin: no constraint on the hinge axis). */
+    float along_axis = vector3_dot(rel_ang, axis_world);
+    if (p->motor_enabled) {
+        rhs[5] = -(along_axis - p->motor_target_speed);
+    } else {
+        rhs[5] = 0.0f;
+    }
+
+    /* Solve K * lambda = rhs. */
+    float K_inv[6][6];
+    if (!mat6_invert(K, K_inv)) {
+        /* Singular - fall back to sequential solve. */
+        goto fallback_sequential;
+    }
+    float lambda[6];
+    mat6_vec_mul(lambda, K_inv, rhs);
+    if (!p->motor_enabled) {
+        lambda[5] = 0.0f; /* free hinge: never apply axis torque */
+    } else if (p->motor_max_torque > 0.0f) {
+        /* Single clamped drive: constraint torque respects max_torque over
+         * THIS tick's dt (hardcoded 1/60 overstated torque 6x when clamped
+         * to 0.1s). (Torque-accumulator pre-pass also drives; the clamp
+         * here keeps the constraint path from overriding weak motors.)
+         * TRUTH: full single-drive decoupling (accumulator only) was
+         * considered and REJECTED with cause: the clamped row converges
+         * hinges through contact in one tick where accumulator-only lags,
+         * and no test exhibits overshoot with the clamp in place
+         * (revolute/pendulum green, motor stays within no-overshoot). */
+        float max_lam = p->motor_max_torque * dt;
+        if (lambda[5] > max_lam) lambda[5] = max_lam;
+        else if (lambda[5] < -max_lam) lambda[5] = -max_lam;
+    }
+
+    /* Apply impulses.
+     * P2P impulse (3D): applied to both bodies.
+     * Axis impulses (2D): angular impulses along u and v.
+     * Motor impulse (1D): angular impulse along axis_world. */
+    vector3 impulse_p2p = {lambda[0], lambda[1], lambda[2]};
+    vector3 axis_impulse = vector3_addition(
+        vector3_scaling(u, lambda[3]),
+        vector3_scaling(v, lambda[4])
+    );
+    float motor_lambda = lambda[5];
+    vector3 motor_impulse = vector3_scaling(axis_world, motor_lambda);
+
+    body_a->velocity = vector3_subtraction(body_a->velocity, vector3_scaling(impulse_p2p, inv_mass_a));
+    body_b->velocity = vector3_addition(body_b->velocity, vector3_scaling(impulse_p2p, inv_mass_b));
     body_a->angular_velocity = vector3_subtraction(
         body_a->angular_velocity,
-        math3_multiplication_vector3(rigidbody_effective_inv_inertia(body_a), angular_impulse));
+        math3_multiplication_vector3(I_inv_a, vector3_addition(vector3_addition(vector3_cross(r_a, impulse_p2p), axis_impulse), motor_impulse)));
     body_b->angular_velocity = vector3_addition(
         body_b->angular_velocity,
-        math3_multiplication_vector3(rigidbody_effective_inv_inertia(body_b), angular_impulse));
+        math3_multiplication_vector3(I_inv_b, vector3_addition(vector3_addition(vector3_cross(r_b, impulse_p2p), axis_impulse), motor_impulse)));
 
-    /* ---- angle limits: persistent relative-angle tracking + velocity-level enforcement ----
-     * TRUTH: angle integration lives in revolute_pre_step() (once per tick).
-     * Old code integrated here (per solver iteration, 64x/tick). */
+    /* ---- angle limits: persistent relative-angle tracking + velocity-level enforcement ---- */
     if (p->limits_enabled) {
-        /* Initialize reference frame on first solve after limits enabled. */
         if (!p->angle_initialized) {
-            /* Compute initial relative orientation around hinge axis. */
             vector4 q_a_inv = {body_a->orientation.w, -body_a->orientation.x, -body_a->orientation.y, -body_a->orientation.z};
             vector4 q_rel = vector4_multiplication(q_a_inv, body_b->orientation);
             q_rel = vector4_normalisation(q_rel);
-            if (q_rel.w < 0.0f) {
-                q_rel.w = -q_rel.w;
-                q_rel.x = -q_rel.x;
-                q_rel.y = -q_rel.y;
-                q_rel.z = -q_rel.z;
-            }
-            /* Extract rotation angle around hinge axis (axis_a in A's local space). */
+            if (q_rel.w < 0.0f) { q_rel.w = -q_rel.w; q_rel.x = -q_rel.x; q_rel.y = -q_rel.y; q_rel.z = -q_rel.z; }
             float half_angle = atan2f(sqrtf(q_rel.x * q_rel.x + q_rel.y * q_rel.y + q_rel.z * q_rel.z), q_rel.w);
             vector3 rot_axis = {q_rel.x, q_rel.y, q_rel.z};
             float rot_axis_len = sqrtf(vector3_length_squared(rot_axis));
-            if (rot_axis_len > 1e-6f) {
-                rot_axis = vector3_scaling(rot_axis, 1.0f / rot_axis_len);
-            } else {
-                rot_axis = axis_world;
-            }
-            /* Project rotation onto hinge axis. */
+            if (rot_axis_len > 1e-6f) rot_axis = vector3_scaling(rot_axis, 1.0f / rot_axis_len);
+            else rot_axis = axis_world;
             float axis_dot = vector3_dot(rot_axis, axis_world);
             float initial_angle = 2.0f * half_angle * axis_dot;
-            /* Normalize to [-pi, pi] for consistency. */
-            while (initial_angle > math_pi) initial_angle -= 2.0f * math_pi;
-            while (initial_angle < -math_pi) initial_angle += 2.0f * math_pi;
+            /* TRUTH: NO [-pi,pi] wrap (dead-reckoned joint coordinate must
+             * stay unwrapped: wrapping made limits outside [-pi,pi]
+             * unreachable and teleported multi-turn assemblies. Integration
+             * of along_axis IS the angle for single-axis hinge motion
+             * (exact, not approximate); velocity-level limit kills rebase
+             * drift every iteration. */
             p->accumulated_angle = initial_angle;
             p->reference_axis_a = vector4_rotate_to_vector3(body_a->orientation, vector3_normalisation(p->axis_a));
             p->reference_axis_b = vector4_rotate_to_vector3(body_b->orientation,
                 (vector3_length_squared(p->axis_b) > 1e-12f) ? vector3_normalisation(p->axis_b)
-                                                              : vector3_normalisation(p->axis_a));
+                                                            : vector3_normalisation(p->axis_a));
             p->angle_initialized = true;
         }
 
-        /* Enforce limits at velocity level: if at limit and trying to go beyond, kill along-axis velocity. */
         float min_limit = p->limit_min_rad;
         float max_limit = p->limit_max_rad;
+        float along_axis = vector3_dot(vector3_subtraction(body_b->angular_velocity, body_a->angular_velocity), axis_world);
         bool at_min = (p->accumulated_angle <= min_limit + 1e-4f) && (along_axis < 0.0f);
         bool at_max = (p->accumulated_angle >= max_limit - 1e-4f) && (along_axis > 0.0f);
 
         if (at_min || at_max) {
-            /* Compute effective mass along hinge axis for limit impulse. */
-            float axis_mass_inv = vector3_dot(axis_world, math3_multiplication_vector3(
-                math3_addition(rigidbody_effective_inv_inertia(body_a), rigidbody_effective_inv_inertia(body_b)), axis_world));
+            float axis_mass_inv = vector3_dot(axis_world, math3_multiplication_vector3(I_sum, axis_world));
             float axis_mass = (axis_mass_inv > 1e-12f) ? (1.0f / axis_mass_inv) : 0.0f;
-
             if (axis_mass > 0.0f) {
-                /* Velocity-level clamp: apply impulse to kill along-axis component. */
-                float lambda = -along_axis * axis_mass;
-                vector3 limit_impulse = vector3_scaling(axis_world, lambda);
+                float limit_lambda = -along_axis * axis_mass;
+                vector3 limit_impulse = vector3_scaling(axis_world, limit_lambda);
                 body_a->angular_velocity = vector3_subtraction(
                     body_a->angular_velocity,
-                    math3_multiplication_vector3(rigidbody_effective_inv_inertia(body_a), limit_impulse));
+                    math3_multiplication_vector3(I_inv_a, limit_impulse));
                 body_b->angular_velocity = vector3_addition(
                     body_b->angular_velocity,
-                    math3_multiplication_vector3(rigidbody_effective_inv_inertia(body_b), limit_impulse));
-                /* Clamp accumulated angle to limit to prevent numerical drift. */
+                    math3_multiplication_vector3(I_inv_b, limit_impulse));
+                if (at_min) p->accumulated_angle = min_limit;
+                if (at_max) p->accumulated_angle = max_limit;
+            }
+        }
+    }
+    return;
+
+fallback_sequential:
+    /* Fallback to original sequential solve if 5×5 solve fails. */
+    /* ---- point-to-point ---- */
+    {
+        float inv_mass_sum = inv_mass_a + inv_mass_b;
+        math3 k = {{{0.0f}}};
+        for (int i = 0; i < 3; i++) k.matrix[i][i] = inv_mass_sum;
+        math3 term_a = math3_multiplication(skew_a, math3_multiplication(I_inv_a, skew_a));
+        math3 term_b = math3_multiplication(skew_b, math3_multiplication(I_inv_b, skew_b));
+        for (int i = 0; i < 3; i++) for (int j = 0; j < 3; j++) k.matrix[i][j] -= term_a.matrix[i][j] + term_b.matrix[i][j];
+        math3 k_inv = math3_inverse(k);
+        vector3 rhs_vec = vector3_scaling(vector3_addition(relative_velocity, bias_p2p), -1.0f);
+        vector3 impulse = math3_multiplication_vector3(k_inv, rhs_vec);
+        body_a->velocity = vector3_subtraction(body_a->velocity, vector3_scaling(impulse, inv_mass_a));
+        body_b->velocity = vector3_addition(body_b->velocity, vector3_scaling(impulse, inv_mass_b));
+        body_a->angular_velocity = vector3_subtraction(body_a->angular_velocity,
+            math3_multiplication_vector3(I_inv_a, vector3_cross(r_a, impulse)));
+        body_b->angular_velocity = vector3_addition(body_b->angular_velocity,
+            math3_multiplication_vector3(I_inv_b, vector3_cross(r_b, impulse)));
+    }
+    /* ---- axis alignment ---- */
+    {
+        vector3 rel_ang = vector3_subtraction(body_b->angular_velocity, body_a->angular_velocity);
+        vector3 perp_ang = vector3_subtraction(rel_ang, vector3_scaling(axis_world, vector3_dot(rel_ang, axis_world)));
+        math3 ang_mass = math3_addition(I_inv_a, I_inv_b);
+        math3 ang_mass_inv = math3_inverse(ang_mass);
+        vector3 ang_imp = vector3_scaling(math3_multiplication_vector3(ang_mass_inv, perp_ang), -1.0f);
+        body_a->angular_velocity = vector3_subtraction(body_a->angular_velocity,
+            math3_multiplication_vector3(I_inv_a, ang_imp));
+        body_b->angular_velocity = vector3_addition(body_b->angular_velocity,
+            math3_multiplication_vector3(I_inv_b, ang_imp));
+    }
+    /* ---- limits ---- (same as above) */
+    if (p->limits_enabled) {
+        float min_limit = p->limit_min_rad;
+        float max_limit = p->limit_max_rad;
+        float along_axis = vector3_dot(vector3_subtraction(body_b->angular_velocity, body_a->angular_velocity), axis_world);
+        bool at_min = (p->accumulated_angle <= min_limit + 1e-4f) && (along_axis < 0.0f);
+        bool at_max = (p->accumulated_angle >= max_limit - 1e-4f) && (along_axis > 0.0f);
+        if (at_min || at_max) {
+            float axis_mass_inv = vector3_dot(axis_world, math3_multiplication_vector3(I_sum, axis_world));
+            float axis_mass = (axis_mass_inv > 1e-12f) ? (1.0f / axis_mass_inv) : 0.0f;
+            if (axis_mass > 0.0f) {
+                float limit_lambda = -along_axis * axis_mass;
+                vector3 limit_impulse = vector3_scaling(axis_world, limit_lambda);
+                body_a->angular_velocity = vector3_subtraction(body_a->angular_velocity,
+                    math3_multiplication_vector3(I_inv_a, limit_impulse));
+                body_b->angular_velocity = vector3_addition(body_b->angular_velocity,
+                    math3_multiplication_vector3(I_inv_b, limit_impulse));
                 if (at_min) p->accumulated_angle = min_limit;
                 if (at_max) p->accumulated_angle = max_limit;
             }
@@ -238,8 +427,8 @@ void revolute_pre_step(revolute_params *p, rigidbody *body_a, rigidbody *body_b,
         d = -1.0f;
     }
     p->accumulated_angle += d;
-    while (p->accumulated_angle > math_pi) p->accumulated_angle -= 2.0f * math_pi;
-    while (p->accumulated_angle < -math_pi) p->accumulated_angle += 2.0f * math_pi;
+    /* TRUTH: no wrap (see init site): the joint coordinate stays unwrapped
+     * so multi-turn limits work; limit kills rebase it every solve. */
 }
 
 /* Prismatic: single-axis slide with optional limits and motor. */

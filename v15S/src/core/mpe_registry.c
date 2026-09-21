@@ -4,16 +4,18 @@
 #include "../physics/broadphase.h"
 #include "../physics/collision_mechanics.h"
 #include <string.h>
+#include <stdlib.h>
 
 static mpe_pair_entry_t s_pairs[MPE_MAX_PAIR_HANDLERS];
 static int s_pair_count = 0;
 
-static struct { const char *name; mpe_broadphase_if_t iface; } s_broad[8];
+static struct { char name[64]; mpe_broadphase_if_t iface; } s_broad[8];
 static int s_broad_count = 0;
-static struct { const char *name; mpe_solver_if_t iface; } s_solvers[8];
+static struct { char name[64]; mpe_solver_if_t iface; } s_solvers[8];
 static int s_solver_count = 0;
 
 static mpe_module_desc_t s_modules[MPE_MAX_MODULES];
+static char s_module_names[MPE_MAX_MODULES][64];
 static int s_module_count = 0;
 
 int mpe_register_pair_handler(int ta, int tb, int ca, int cb, mpe_collide_fn fn, const char *name) {
@@ -28,6 +30,18 @@ int mpe_register_pair_handler(int ta, int tb, int ca, int cb, mpe_collide_fn fn,
     if (s_pair_count >= MPE_MAX_PAIR_HANDLERS) return -1;
     s_pairs[s_pair_count] = (mpe_pair_entry_t){ta, tb, ca, cb, fn, name};
     return s_pair_count++;
+}
+
+int mpe_unregister_pair_handler(mpe_collide_fn fn) {
+    if (!fn) return -1;
+    int removed = 0;
+    for (int i = 0; i < s_pair_count;) {
+        if (s_pairs[i].fn == fn) {
+            for (int j = i; j + 1 < s_pair_count; j++) s_pairs[j] = s_pairs[j + 1];
+            s_pair_count--; removed++;
+        } else i++;
+    }
+    return removed ? 0 : -1;
 }
 
 static int match_score(const mpe_pair_entry_t *e, int ta, int tb, int ca, int cb) {
@@ -53,18 +67,38 @@ void mpe_register_broadphase(const char *name, const mpe_broadphase_if_t *iface)
     if (!name || !iface || s_broad_count >= 8) return;
     for (int i = 0; i < s_broad_count; i++)
         if (strcmp(s_broad[i].name, name) == 0) { s_broad[i].iface = *iface; return; }
-    s_broad[s_broad_count].name = name;
+    snprintf(s_broad[s_broad_count].name, sizeof(s_broad[s_broad_count].name), "%s", name);
     s_broad[s_broad_count].iface = *iface;
     s_broad_count++;
+}
+
+void mpe_unregister_broadphase(const char *name) {
+    if (!name) return;
+    for (int i = 0; i < s_broad_count;) {
+        if (strcmp(s_broad[i].name, name) == 0) {
+            for (int j = i; j + 1 < s_broad_count; j++) s_broad[j] = s_broad[j + 1];
+            s_broad_count--;
+        } else i++;
+    }
 }
 
 void mpe_register_solver(const char *name, const mpe_solver_if_t *iface) {
     if (!name || !iface || s_solver_count >= 8) return;
     for (int i = 0; i < s_solver_count; i++)
         if (strcmp(s_solvers[i].name, name) == 0) { s_solvers[i].iface = *iface; return; }
-    s_solvers[s_solver_count].name = name;
+    snprintf(s_solvers[s_solver_count].name, sizeof(s_solvers[s_solver_count].name), "%s", name);
     s_solvers[s_solver_count].iface = *iface;
     s_solver_count++;
+}
+
+void mpe_unregister_solver(const char *name) {
+    if (!name) return;
+    for (int i = 0; i < s_solver_count;) {
+        if (strcmp(s_solvers[i].name, name) == 0) {
+            for (int j = i; j + 1 < s_solver_count; j++) s_solvers[j] = s_solvers[j + 1];
+            s_solver_count--;
+        } else i++;
+    }
 }
 
 const mpe_broadphase_if_t *mpe_find_broadphase(const char *name) {
@@ -84,10 +118,30 @@ const mpe_solver_if_t *mpe_find_solver(const char *name) {
 int mpe_register_module(const mpe_module_desc_t *desc) {
     if (!desc || desc->abi != MPE_MODULE_ABI || !desc->name) return -1;
     for (int i = 0; i < s_module_count; i++)
-        if (strcmp(s_modules[i].name, desc->name) == 0) { s_modules[i] = *desc; return i; }
+        if (strcmp(s_module_names[i], desc->name) == 0) {
+            s_modules[i] = *desc; s_modules[i].name = s_module_names[i]; return i;
+        }
     if (s_module_count >= MPE_MAX_MODULES) return -1;
     s_modules[s_module_count] = *desc;
+    snprintf(s_module_names[s_module_count], sizeof(s_module_names[s_module_count]), "%s", desc->name);
+    s_modules[s_module_count].name = s_module_names[s_module_count];
     return s_module_count++;
+}
+
+int mpe_unregister_module(const char *name) {
+    if (!name) return -1;
+    for (int i = 0; i < s_module_count; i++) {
+        if (strcmp(s_module_names[i], name) == 0) {
+            for (int j = i; j + 1 < s_module_count; j++) {
+                s_modules[j] = s_modules[j + 1];
+                snprintf(s_module_names[j], sizeof(s_module_names[j]), "%s", s_module_names[j + 1]);
+                s_modules[j].name = s_module_names[j];
+            }
+            s_module_count--;
+            return 0;
+        }
+    }
+    return -1;
 }
 
 int mpe_module_count(void) { return s_module_count; }

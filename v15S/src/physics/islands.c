@@ -41,29 +41,15 @@ static int island_index_of(rigidbody *bodies, rigidbody *body, int body_count) {
     if ((!bodies) || (!body) || (body_count <= 0)) {
         return -1;
     }
-    /* TRUTH: pointer subtraction across unrelated objects (floor proxy in TLS
-     * vs bodies on heap) is UB; -O3 VRP/aliasing miscompiles it into garbage
-     * indices and segfaults (cylinder_drop). Compare byte addresses first,
-     * subtract only when provably in-range. */
-    uintptr_t base = (uintptr_t) (const void *) bodies;
-    uintptr_t addr = (uintptr_t) (const void *) body;
-    uintptr_t stride = (uintptr_t) sizeof(rigidbody);
-    if (addr < base) {
+    int idx = body->body_index;
+    if (idx < 0 || idx >= body_count) {
         return -1;
     }
-    uintptr_t diff = addr - base;
-    if (diff % stride != 0) {
+    /* Paranoia: verify round-trip (catches stale indices). */
+    if (&bodies[idx] != body) {
         return -1;
     }
-    uintptr_t idx = diff / stride;
-    if (idx >= (uintptr_t) body_count) {
-        return -1;
-    }
-    /* Paranoia: verify round-trip (catches padding/aliasing surprises). */
-    if ((void *) &bodies[idx] != (void *) body) {
-        return -1;
-    }
-    return (int) idx;
+    return idx;
 }
 
 static bool islands_ready(const struct physics_world *world) {
@@ -111,7 +97,10 @@ void islands_build(struct physics_world *world, broadphase_pair *pairs, int pair
     }
     /* Joints join islands. O(J) via the world's id->index cache
      * (verified + linear fallback inside); the old O(J*B) nested scan
-     * stalled joint-heavy scenes. */
+     * stalled joint-heavy scenes. Covers every constraint type in the
+     * shared pool (revolute/fixed/distance/prismatic/rope) plus springs:
+     * a spring-connected sleeping pair must share an island or the sleep
+     * gate and the spring force disagree for a tick. */
     {
         uint32_t ids_a[mpe_max_joints];
         uint32_t ids_b[mpe_max_joints];
@@ -119,6 +108,16 @@ void islands_build(struct physics_world *world, broadphase_pair *pairs, int pair
         for (int j = 0; j < joints; j++) {
             int ia = physics_world_index_by_id(world, ids_a[j]);
             int ib = physics_world_index_by_id(world, ids_b[j]);
+            if ((ia >= 0) && (ib >= 0) && (ia != ib)) {
+                island_union(world, ia, ib);
+            }
+        }
+        for (int j = 0; j < mpe_max_joints; j++) {
+            if (!world->spring_joints[j].is_active) {
+                continue;
+            }
+            int ia = physics_world_index_by_id(world, world->spring_joints[j].object_id_a);
+            int ib = physics_world_index_by_id(world, world->spring_joints[j].object_id_b);
             if ((ia >= 0) && (ib >= 0) && (ia != ib)) {
                 island_union(world, ia, ib);
             }
@@ -162,7 +161,7 @@ int islands_body_island(struct physics_world *world, rigidbody *body) {
 
 bool islands_body_awake(struct physics_world *world, rigidbody *body) {
     int island = islands_body_island(world, body);
-    if (island < 0) {
+    if (island < 0 || island >= world->island_total) {
         return true;
     }
     return world->island_awake_flags[island] != 0;

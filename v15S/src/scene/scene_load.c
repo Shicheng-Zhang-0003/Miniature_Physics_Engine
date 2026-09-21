@@ -62,6 +62,52 @@ typedef struct {
     float limit_max;
 } staged_revolute;
 
+/* Staged fixed constraint data. */
+typedef struct {
+    uint32_t type;
+    uint32_t id_a;
+    uint32_t id_b;
+    vector3 anchor_a;
+    vector3 anchor_b;
+} staged_fixed;
+
+/* Staged distance constraint data. */
+typedef struct {
+    uint32_t type;
+    uint32_t id_a;
+    uint32_t id_b;
+    vector3 anchor_a;
+    vector3 anchor_b;
+    float rest_length;
+} staged_distance;
+
+/* Staged prismatic constraint data. */
+typedef struct {
+    uint32_t type;
+    uint32_t id_a;
+    uint32_t id_b;
+    vector3 anchor_a;
+    vector3 anchor_b;
+    vector3 axis_a;
+    vector3 axis_b;
+    uint32_t motor_enabled;
+    float motor_target_speed;
+    float motor_max_force;
+    uint32_t limits_enabled;
+    float limit_min;
+    float limit_max;
+} staged_prismatic;
+
+/* Staged rope constraint data. */
+typedef struct {
+    uint32_t type;
+    uint32_t id_a;
+    uint32_t id_b;
+    vector3 anchor_a;
+    vector3 anchor_b;
+    float rest_length;
+} staged_rope;
+
 static int scene_load_vec3(FILE *f, uint32_t *crc, vector3 *v) {
     return scene_rfloat(f, crc, &v->x) && scene_rfloat(f, crc, &v->y) && scene_rfloat(f, crc, &v->z);
 }
@@ -94,10 +140,14 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
     if (!scene_r32(f, &crc, &body_count_u)) {
         return 0;
     }
-    if ((body_count_u == 0) || (body_count_u > (uint32_t) mpe_max_bodies)) {
+    if ((body_count_u > (uint32_t) mpe_max_bodies)) {
         return 0;
     }
     int count = (int) body_count_u;
+    if (count == 0) {
+        /* Empty scene round-trips: valid header + zero bodies + joints + CRC. */
+        /* Fall through to section parsing with zero bodies. */
+    }
     if (!scene_ensure_pool_capacity(count)) {
         return 0;
     }
@@ -148,8 +198,11 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
         if (!body_ok) {
             break;
         }
-        /* Structural validation (CRC gates corruption; this gates logic). */
-        if ((type_u > (uint32_t) object_cylinder) || (id_u == 0) || (!isfinite(mass)) || (mass < 0.0f)) {
+        /* Structural validation (CRC gates corruption; this gates logic).
+         * object_custom persists as bare type tag (no plugin blob yet):
+         * accept and init as sphere placeholder so one custom body never
+         * vetoes the whole file. Full blob persistence is future work. */
+        if ((type_u > (uint32_t) object_custom) || (id_u == 0) || (!isfinite(mass)) || (mass < 0.0f)) {
             body_ok = 0;
             break;
         }
@@ -234,11 +287,156 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
         staged_spring_count++;
     }
 
-    /* Revolutes (same validation discipline). */
+    /* Fixed constraints (v200+). */
+    uint32_t fixed_count_u = 0;
+    staged_fixed *staged_fixeds = NULL;
+    int staged_fixed_count = 0;
+    int fixed_ok = springs_ok;
+    if (fixed_ok) {
+        fixed_ok = fixed_ok && scene_r32(f, &crc, &fixed_count_u);
+    }
+    if (fixed_ok && (fixed_count_u > 0) && (fixed_count_u <= (uint32_t) mpe_max_joints)) {
+        staged_fixeds = (staged_fixed *) malloc((size_t) fixed_count_u * sizeof(staged_fixed));
+        if (!staged_fixeds) {
+            fixed_ok = 0;
+        }
+    } else if (fixed_ok && (fixed_count_u > (uint32_t) mpe_max_joints)) {
+        fixed_ok = 0;
+    }
+    for (uint32_t j = 0; fixed_ok && (j < fixed_count_u); j++) {
+        staged_fixed fc;
+        fixed_ok = fixed_ok && scene_r32(f, &crc, &fc.type);
+        fixed_ok = fixed_ok && scene_r32(f, &crc, &fc.id_a);
+        fixed_ok = fixed_ok && scene_r32(f, &crc, &fc.id_b);
+        fixed_ok = fixed_ok && scene_load_vec3(f, &crc, &fc.anchor_a);
+        fixed_ok = fixed_ok && scene_load_vec3(f, &crc, &fc.anchor_b);
+        if (!fixed_ok) break;
+        if ((fc.type != (uint32_t) constraint_fixed) || (fc.id_a == 0) || (fc.id_a == fc.id_b) ||
+            (!scene_id_in_staged(staged_ids, staged_body_count, fc.id_a)) ||
+            (!scene_id_in_staged(staged_ids, staged_body_count, fc.id_b))) {
+            continue;
+        }
+        staged_fixeds[staged_fixed_count++] = fc;
+    }
+
+    /* Distance constraints (v200+). */
+    uint32_t dist_count_u = 0;
+    staged_distance *staged_dists = NULL;
+    int staged_dist_count = 0;
+    int dist_ok = fixed_ok;
+    if (dist_ok) {
+        dist_ok = dist_ok && scene_r32(f, &crc, &dist_count_u);
+    }
+    if (dist_ok && (dist_count_u > 0) && (dist_count_u <= (uint32_t) mpe_max_joints)) {
+        staged_dists = (staged_distance *) malloc((size_t) dist_count_u * sizeof(staged_distance));
+        if (!staged_dists) {
+            dist_ok = 0;
+        }
+    } else if (dist_ok && (dist_count_u > (uint32_t) mpe_max_joints)) {
+        dist_ok = 0;
+    }
+    for (uint32_t j = 0; dist_ok && (j < dist_count_u); j++) {
+        staged_distance dc;
+        dist_ok = dist_ok && scene_r32(f, &crc, &dc.type);
+        dist_ok = dist_ok && scene_r32(f, &crc, &dc.id_a);
+        dist_ok = dist_ok && scene_r32(f, &crc, &dc.id_b);
+        dist_ok = dist_ok && scene_load_vec3(f, &crc, &dc.anchor_a);
+        dist_ok = dist_ok && scene_load_vec3(f, &crc, &dc.anchor_b);
+        dist_ok = dist_ok && scene_rfloat(f, &crc, &dc.rest_length);
+        if (!dist_ok) break;
+        if ((dc.type != (uint32_t) constraint_distance) || (dc.id_a == 0) || (dc.id_a == dc.id_b) ||
+            (!scene_id_in_staged(staged_ids, staged_body_count, dc.id_a)) ||
+            (!scene_id_in_staged(staged_ids, staged_body_count, dc.id_b)) ||
+            (!isfinite(dc.rest_length)) || (dc.rest_length < 0.0f)) {
+            continue;
+        }
+        staged_dists[staged_dist_count++] = dc;
+    }
+
+    /* Prismatic constraints (v200+). */
+    uint32_t prism_count_u = 0;
+    staged_prismatic *staged_prisms = NULL;
+    int staged_prism_count = 0;
+    int prism_ok = dist_ok;
+    if (prism_ok) {
+        prism_ok = prism_ok && scene_r32(f, &crc, &prism_count_u);
+    }
+    if (prism_ok && (prism_count_u > 0) && (prism_count_u <= (uint32_t) mpe_max_joints)) {
+        staged_prisms = (staged_prismatic *) malloc((size_t) prism_count_u * sizeof(staged_prismatic));
+        if (!staged_prisms) {
+            prism_ok = 0;
+        }
+    } else if (prism_ok && (prism_count_u > (uint32_t) mpe_max_joints)) {
+        prism_ok = 0;
+    }
+    for (uint32_t j = 0; prism_ok && (j < prism_count_u); j++) {
+        staged_prismatic pc;
+        uint32_t motor_u = 0, limits_u = 0;
+        prism_ok = prism_ok && scene_r32(f, &crc, &pc.type);
+        prism_ok = prism_ok && scene_r32(f, &crc, &pc.id_a);
+        prism_ok = prism_ok && scene_r32(f, &crc, &pc.id_b);
+        prism_ok = prism_ok && scene_load_vec3(f, &crc, &pc.anchor_a);
+        prism_ok = prism_ok && scene_load_vec3(f, &crc, &pc.anchor_b);
+        prism_ok = prism_ok && scene_load_vec3(f, &crc, &pc.axis_a);
+        prism_ok = prism_ok && scene_load_vec3(f, &crc, &pc.axis_b);
+        prism_ok = prism_ok && scene_r32(f, &crc, &motor_u);
+        prism_ok = prism_ok && scene_rfloat(f, &crc, &pc.motor_target_speed);
+        prism_ok = prism_ok && scene_rfloat(f, &crc, &pc.motor_max_force);
+        prism_ok = prism_ok && scene_r32(f, &crc, &limits_u);
+        prism_ok = prism_ok && scene_rfloat(f, &crc, &pc.limit_min);
+        prism_ok = prism_ok && scene_rfloat(f, &crc, &pc.limit_max);
+        if (!prism_ok) break;
+        pc.motor_enabled = motor_u;
+        pc.limits_enabled = limits_u;
+        if ((pc.type != (uint32_t) constraint_prismatic) || (pc.id_a == 0) || (pc.id_a == pc.id_b) ||
+            (!scene_id_in_staged(staged_ids, staged_body_count, pc.id_a)) ||
+            (!scene_id_in_staged(staged_ids, staged_body_count, pc.id_b)) ||
+            (!isfinite(pc.motor_target_speed)) || (!isfinite(pc.motor_max_force)) || (pc.motor_max_force < 0.0f) ||
+            (!isfinite(pc.limit_min)) || (!isfinite(pc.limit_max))) {
+            continue;
+        }
+        staged_prisms[staged_prism_count++] = pc;
+    }
+
+    /* Rope constraints (v200+). */
+    uint32_t rope_count_u = 0;
+    staged_rope *staged_ropes = NULL;
+    int staged_rope_count = 0;
+    int rope_ok = prism_ok;
+    if (rope_ok) {
+        rope_ok = rope_ok && scene_r32(f, &crc, &rope_count_u);
+    }
+    if (rope_ok && (rope_count_u > 0) && (rope_count_u <= (uint32_t) mpe_max_joints)) {
+        staged_ropes = (staged_rope *) malloc((size_t) rope_count_u * sizeof(staged_rope));
+        if (!staged_ropes) {
+            rope_ok = 0;
+        }
+    } else if (rope_ok && (rope_count_u > (uint32_t) mpe_max_joints)) {
+        rope_ok = 0;
+    }
+    for (uint32_t j = 0; rope_ok && (j < rope_count_u); j++) {
+        staged_rope rc;
+        rope_ok = rope_ok && scene_r32(f, &crc, &rc.type);
+        rope_ok = rope_ok && scene_r32(f, &crc, &rc.id_a);
+        rope_ok = rope_ok && scene_r32(f, &crc, &rc.id_b);
+        rope_ok = rope_ok && scene_load_vec3(f, &crc, &rc.anchor_a);
+        rope_ok = rope_ok && scene_load_vec3(f, &crc, &rc.anchor_b);
+        rope_ok = rope_ok && scene_rfloat(f, &crc, &rc.rest_length);
+        if (!rope_ok) break;
+        if ((rc.type != (uint32_t) constraint_rope) || (rc.id_a == 0) || (rc.id_a == rc.id_b) ||
+            (!scene_id_in_staged(staged_ids, staged_body_count, rc.id_a)) ||
+            (!scene_id_in_staged(staged_ids, staged_body_count, rc.id_b)) ||
+            (!isfinite(rc.rest_length)) || (rc.rest_length < 0.0f)) {
+            continue;
+        }
+        staged_ropes[staged_rope_count++] = rc;
+    }
+
+    /* Revolute constraints (v200+, kept for backward compatibility). */
     uint32_t rev_count_u = 0;
     staged_revolute *staged_revs = NULL;
     int staged_rev_count = 0;
-    int revs_ok = springs_ok;
+    int revs_ok = rope_ok;
     if (revs_ok) {
         revs_ok = revs_ok && scene_r32(f, &crc, &rev_count_u);
     }
@@ -292,14 +490,16 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
                           (((uint32_t) footer[2]) << 16) | (((uint32_t) footer[3]) << 24);
         crc_ok = (stored == (crc ^ 0xFFFFFFFFu));
     }
-    if ((!crc_ok) || (staged_body_count == 0)) {
-        if (!crc_ok) {
-            fprintf(stderr, "Error LDF04: CRC mismatch (corrupt scene file)\n");
-        }
+    if (!crc_ok) {
+        fprintf(stderr, "Error LDF04: CRC mismatch (corrupt scene file)\n");
         free(staged_bodies);
         free(staged_ids);
         free(staged_springs);
         free(staged_revs);
+        free(staged_fixeds);
+        free(staged_dists);
+        free(staged_prisms);
+        free(staged_ropes);
         return 0;
     }
 
@@ -313,6 +513,10 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
     (physics_world_get_primary()->body_count) = staged_body_count;
     for (int i = 0; i < staged_body_count; i++) {
         (physics_world_get_primary()->bodies)[i] = staged_bodies[i];
+        (physics_world_get_primary()->bodies)[i].body_index = i;
+        (physics_world_get_primary()->bodies)[i].custom_shape = -1;
+        (physics_world_get_primary()->bodies)[i].max_relative_speed_sq = 0.0f;
+        rigidbody_update_axes(&(physics_world_get_primary()->bodies)[i]);
         scene_note_loaded_id((physics_world_get_primary()->bodies)[i].object_id);
     }
     physics_world_bump_revision(physics_world_get_primary());
@@ -330,10 +534,55 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
         }
     }
 
+    /* Install fixed constraints. */
+    for (int j = 0; j < staged_fixed_count; j++) {
+        staged_fixed *fc = &staged_fixeds[j];
+        constraint_add_fixed(physics_world_get_primary(),
+            scene_id_remap_resolve(fc->id_a),
+            scene_id_remap_resolve(fc->id_b),
+            fc->anchor_a, fc->anchor_b);
+    }
+
+    /* Install distance constraints. */
+    for (int j = 0; j < staged_dist_count; j++) {
+        staged_distance *dc = &staged_dists[j];
+        constraint_add_distance(physics_world_get_primary(),
+            scene_id_remap_resolve(dc->id_a),
+            scene_id_remap_resolve(dc->id_b),
+            dc->anchor_a, dc->anchor_b, dc->rest_length);
+    }
+
+    /* Install prismatic constraints. */
+    for (int j = 0; j < staged_prism_count; j++) {
+        staged_prismatic *pc = &staged_prisms[j];
+        int index = constraint_add_prismatic(physics_world_get_primary(),
+            scene_id_remap_resolve(pc->id_a),
+            scene_id_remap_resolve(pc->id_b),
+            pc->anchor_a, pc->anchor_b, pc->axis_a);
+        if (index >= 0) {
+            constraint_set_prismatic_axes(physics_world_get_primary(), index, pc->axis_a, pc->axis_b);
+            constraint_set_prismatic_motor(physics_world_get_primary(), index, pc->motor_enabled != 0, pc->motor_target_speed, pc->motor_max_force);
+            constraint_set_prismatic_limits(physics_world_get_primary(), index, pc->limits_enabled != 0, pc->limit_min, pc->limit_max);
+        }
+    }
+
+    /* Install rope constraints. */
+    for (int j = 0; j < staged_rope_count; j++) {
+        staged_rope *rc = &staged_ropes[j];
+        constraint_add_rope(physics_world_get_primary(),
+            scene_id_remap_resolve(rc->id_a),
+            scene_id_remap_resolve(rc->id_b),
+            rc->anchor_a, rc->anchor_b, rc->rest_length);
+    }
+
     free(staged_bodies);
     free(staged_ids);
     free(staged_springs);
     free(staged_revs);
+    free(staged_fixeds);
+    free(staged_dists);
+    free(staged_prisms);
+    free(staged_ropes);
     return 1;
 }
 

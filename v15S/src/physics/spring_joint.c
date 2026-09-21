@@ -152,6 +152,12 @@ static void spring_apply_core_dt(physics_world *world, rigidbody *bodies, int bo
         if (!isfinite(k_eff) || k_eff < 0.0f) {
             k_eff = 0.0f;
         }
+        /* TRUTH: c_eff is function-scope: the softened damping must survive
+         * past the stability block to the force computation below. */
+        float c_eff = current_spring_joint->damping_coefficient;
+        if (!isfinite(c_eff) || c_eff < 0.0f) {
+            c_eff = 0.0f;
+        }
         float a3_inverse_mass_sum =
             rigidbody_effective_inv_mass(rigid_body_a) + rigidbody_effective_inv_mass(rigid_body_b);
         if (a3_inverse_mass_sum > 1e-12f) {
@@ -170,11 +176,11 @@ static void spring_apply_core_dt(physics_world *world, rigidbody *bodies, int bo
                 k_eff = k_stable;
             }
             /* Damping stability: explicit c*dt/m_red < 2. */
-            float c = current_spring_joint->damping_coefficient;
-            if (!isfinite(c) || c < 0.0f) {
-                c = 0.0f;
-            }
+            float c = c_eff;
             float c_stable = 1.5f * m_red / dt;
+            /* TRUTH: soften via LOCAL c_eff, never by writing back into the
+             * user's damping_coefficient (old code permanently mutated c:
+             * the joint silently kept the softened value forever). */
             if ((c > c_stable) && isfinite(c_stable) && c_stable > 0.0f) {
                 static int damp_warn_count = 0;
                 if (damp_warn_count < 8) {
@@ -182,7 +188,7 @@ static void spring_apply_core_dt(physics_world *world, rigidbody *bodies, int bo
                             joint_index, c, c_stable);
                     damp_warn_count++;
                 }
-                current_spring_joint->damping_coefficient = c_stable;
+                c_eff = c_stable;
             }
         }
 
@@ -193,7 +199,7 @@ static void spring_apply_core_dt(physics_world *world, rigidbody *bodies, int bo
         float velocity_along_spring_axis = vector3_dot(relative_velocity, spring_axis_direction);
 
         vector3 damping_force = vector3_scaling(spring_axis_direction,
-                                                current_spring_joint->damping_coefficient * velocity_along_spring_axis);
+                                                c_eff * velocity_along_spring_axis);
         vector3 net_joint_force = vector3_addition(restoration_force, damping_force);
 
         if (a3_inverse_mass_sum > 0.0f) {

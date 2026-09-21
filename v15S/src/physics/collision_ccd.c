@@ -11,6 +11,7 @@
 #include <math.h>
 #include "collision_cylinder.h"
 #include "broadphase.h"
+#include <float.h>
 
 static float ccd_support_depth(const rigidbody *body) {
     /* Lowest-point offset below the center along world -Y. */
@@ -45,7 +46,8 @@ static float ccd_min_thickness(const rigidbody *body) {
 }
 
 int collision_ccd_sweep_clamp_full(rigidbody *bodies, int body_count, float dt, float *time_remaining_out,
-                                   const mpe_config_t *cfg) {
+                                   const mpe_config_t *cfg, float *best_tois_out,
+                                   unsigned char *hit_flags_out) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
     if ((!bodies) || (body_count <= 0) || (!(dt > 0.0f)) || !isfinite(dt)) {
         return 0;
@@ -66,10 +68,15 @@ int collision_ccd_sweep_clamp_full(rigidbody *bodies, int body_count, float dt, 
      * all simultaneously. Order-independent. */
     float *best_tois = NULL;
     unsigned char *hit_flags = NULL;
-    bool use_heap = body_count > 64;
+    bool use_heap = false;
+    bool use_caller_scratch = (best_tois_out != NULL) && (hit_flags_out != NULL);
     float stack_tois[64];
     unsigned char stack_hits[64];
-    if (use_heap) {
+    if (use_caller_scratch) {
+        best_tois = best_tois_out;
+        hit_flags = hit_flags_out;
+    } else if (body_count > 64) {
+        use_heap = true;
         best_tois = (float *) malloc((size_t) body_count * sizeof(float));
         hit_flags = (unsigned char *) malloc((size_t) body_count * sizeof(unsigned char));
         if (!best_tois || !hit_flags) {
@@ -121,31 +128,77 @@ int collision_ccd_sweep_clamp_full(rigidbody *bodies, int body_count, float dt, 
         float best_toi = dt;
         bool hit = false;
 
-        /* 1. Floor plane y = 0. Center-velocity TOI only — deliberately.
-         * TRUTH correction of an overreach: an earlier revision used the
-         * lowest-point velocity (vy - |w|R) so a "diving corner" would clamp.
-         * That fired every tick for pure spinners in stable contact (a wheel
-         * at 127 rad/s reports vy_low = -6.8 m/s while its center is
-         * stationary), teleporting/rotating rolling contact into bounce
-         * growth (driven_wheel levitated to y=2.9). Rotation alone cannot
-         * translate the center through the plane — corners dipping below it
-         * are bounded oscillation the discrete solver re-seats each tick.
-         * CCD is for TRANSLATION tunneling; spin is the solver's job. */
-        if (mover->velocity.y < -0.0001f) {
-            float lowest = mover->position.y - ccd_support_depth(mover);
-            if (lowest > 0.0f) {
-                float toi = lowest / -mover->velocity.y;
+                /* 1. Floor plane y = 0. Exact quadratic CCD under constant gravity.
+         * Equation: 0.5*g*t^2 + v0*t + y0 = 0, with v0 the CENTER vertical
+         * velocity and y0 the lowest-point height (center minus support).
+         * Translational-only by design (see below): spin never triggers. */
+        /* Lowest point offset from center (support depth preserves the
+         * contact geometry for boxes/cylinders; the TOI itself is
+         * translational — see below). */
+        float r_lowest_y = ccd_support_depth(mover);
+        float lowest = mover->position.y - r_lowest_y;
+
+        /* Floor TOI uses the CENTER (translational) velocity, never the
+         * lowest-point velocity v_center + omega x r. Rotation alone cannot
+         * translate the center through the plane: a pure spinner reports a
+         * diving lowest point (wheel at 127 rad/s: vy_low = -6.8 m/s while
+         * stationary) and would clamp every tick — teleporting/rotating
+         * rolling contact into levitation and spin pump (driven_wheel
+         * disease). Dipping corners are bounded oscillation the discrete
+         * solver re-seats; CCD owns translation tunneling only. */
+        float v0 = mover->velocity.y;
+        /* Exact quadratic CCD for floor plane under constant gravity.
+         * Equation: 0.5*g*t^2 + v0*t + y0 = 0
+         * where g = gravity (negative), y0 = lowest-point height above plane.
+         * TRUTH: solve UNCONDITIONALLY (no v0 sign gate). Gravity curves
+         * trajectories: a rising body (v0>0) still impacts within the tick
+         * when y0 is small (v0=0.01,y0=1e-4,g=-9.81 -> toi=0.0056<dt); the
+         * old v0<-eps gate tunneled those. Only toi in (0,dt) clamps, and
+         * sleeping movers are skipped above, so resting sleepers never churn.
+         * Micro-hop artifacts stay sub-tick scale. */
+        {
+            float gravity = C->world.gravity;  /* negative */
+            float y0 = lowest;
+            if (gravity == 0.0f) {
+                /* Linear case (no gravity): y0 + v0*t = 0 */
+                float toi = y0 / -v0;
                 if ((toi > 0.0f) && (toi < best_toi)) {
                     best_toi = toi;
                     hit = true;
+                }
+            } else {
+                /* Quadratic: 0.5*g*t^2 + v0*t + y0 = 0.
+                 * Fires under real gravity (the tunneling case CCD exists for).
+                 * TRUTH: parabola ignores viscous drag (exact only for
+                 * drag=1; drag<1 errs O(c*dt^2), ~1e-6m at 0.99/60Hz,
+                 * second-order — one Newton step on the analytic residual
+                 * would make it exact if ever needed). */
+                float a = 0.5f * gravity;
+                float b = v0;
+                float c = y0;
+                float disc = b * b - 4.0f * a * c;
+                if (disc >= 0.0f) {
+                    float sqrt_disc = sqrtf(disc);
+                    float denom = 2.0f * a;
+                    if (fabsf(denom) > 1e-12f) {
+                        float t1 = (-b - sqrt_disc) / denom;
+                        float t2 = (-b + sqrt_disc) / denom;
+                        float toi = FLT_MAX;
+                        if (t1 > 0.0f) toi = t1;
+                        if (t2 > 0.0f && t2 < toi) toi = t2;
+                        if (toi > 0.0f && toi < best_toi) {
+                            best_toi = toi;
+                            hit = true;
+                        }
+                    }
                 }
             }
         }
 
         /* 2. Volumes: spheres, boxes (static AND dynamic via relative
          * velocity in obstacle frame), cylinders (conservative bounding
-         * spheres). TRUTH: dynamic boxes/cylinders must sweep too; ignoring
-         * them tunnels box-box at 5-30 m/s (below old thickness gate). */
+         * spheres). Independent of floor state: fast horizontal motion at or
+         * below support depth must still sweep volumes. */
         if (do_volumes) {
         for (int j = 0; j < body_count; j++) {
             if (j == i) {
@@ -256,10 +309,16 @@ int collision_ccd_sweep_clamp_full(rigidbody *bodies, int body_count, float dt, 
                             if (disc >= 0.0f) {
                                 float toi = (-b - sqrtf(disc)) / (2.0f * a);
                                 if ((toi > 0.0f) && (toi < best_cyl_toi) && (toi <= dt)) {
-                                    /* Check if contact point is within segment bounds at TOI. */
+                                    /* Check if contact point is within segment bounds at TOI.
+                                     * TRUTH: strict |axial|<=h (barrel only). The old
+                                     * h+rr double-covered the caps (already swept
+                                     * exactly as endpoint spheres above) and reported
+                                     * barrel hits rr beyond the segment end, where the
+                                     * true distance sqrt(rr^2+(axial-h)^2)>rr:
+                                     * early (wrong-side) clamps. */
                                     vector3 rel_pos = vector3_addition(dp_mid, vector3_scaling(dv, toi));
                                     float rel_ax = vector3_dot(rel_pos, ax);
-                                    if (fabsf(rel_ax) <= h + rr) {
+                                    if (fabsf(rel_ax) <= h) {
                                         best_cyl_toi = toi;
                                     }
                                 }
@@ -356,11 +415,25 @@ int collision_ccd_sweep_clamp_full(rigidbody *bodies, int body_count, float dt, 
         }
     }
     /* Phase 2: apply all clamps simultaneously vs OLD positions.
-     * TRUTH: rotate orientation by w*toi too (old code lost toi rotation:
-     * total became w*rem not w*dt). Linear pre-move + angular pre-rotate,
-     * remainder integration completes both. */
+     * TRUTH: analytic pre-move + chained v(toi), not linear pre-move.
+     * Linear pre-move (pos+=v*toi) plus remainder analytic-from-v_pre
+     * violates the semigroup: total = v0*dt+0.5*g*rem^2 instead of
+     * v0*dt+0.5*g*dt^2 (pos err 0.5*g*(toi^2+2*toi*rem), vel err g*toi;
+     * dt=1/60,toi=dt/2: 1mm + 0.08m/s per tick). Instead advance the exact
+     * gravity+drag flow to toi AND chain v_toi into velocity, so the
+     * remainder analytic (from v_toi, via the tick_v0 snapshot taken after
+     * CCD) composes to exactly analytic(dt) from v_pre. Rotation already
+     * composes (w*toi + w*rem); this makes translation match. Volume TOIs
+     * (derived linearly) overshoot by <=0.5*g*toi^2 < slop: absorbed. */
     int clamped = 0;
     if (record_remainder) {
+        const mpe_config_t *CC = C;
+        float drag_c = CC->world.drag;
+        float grav_c = CC->world.gravity;
+        if (!isfinite(drag_c) || drag_c <= 0.0f) drag_c = 1.0f;
+        if (drag_c > 1.0f) drag_c = 1.0f;
+        if (!isfinite(grav_c)) grav_c = 0.0f;
+        double cdr = (drag_c >= 1.0f - 1e-6f) ? 0.0 : -det_ln_pos((double) drag_c);
         for (int i = 0; i < body_count; i++) {
             if (!hit_flags[i]) {
                 continue;
@@ -373,22 +446,50 @@ int collision_ccd_sweep_clamp_full(rigidbody *bodies, int body_count, float dt, 
             if (!(toi > 0.0f) || !(toi < dt)) {
                 continue;
             }
-            mover->position = vector3_addition(mover->position, vector3_scaling(mover->velocity, toi));
+            /* Exact flow to toi from v_pre (velocity untouched since tick
+             * start: CCD runs before force integration). */
+            vector3 v_pre = mover->velocity;
+            if (!isfinite(v_pre.x) || !isfinite(v_pre.y) || !isfinite(v_pre.z)) {
+                continue;
+            }
+            double e_toi, a_pos, g_pos, v_toi_k;
+            if (cdr == 0.0) {
+                double t = (double) toi;
+                e_toi = 1.0;
+                a_pos = t;
+                g_pos = 0.5 * t * t;
+                v_toi_k = t;
+            } else {
+                double cdt = cdr * (double) toi;
+                double e;
+                if (cdt < 1e-4) {
+                    e = 1.0 - cdt + 0.5 * cdt * cdt - cdt * cdt * cdt / 6.0;
+                } else {
+                    e = det_exp_small(-cdt);
+                }
+                e_toi = e;
+                a_pos = (1.0 - e) / cdr;
+                g_pos = (double) toi / cdr - (1.0 - e) / (cdr * cdr);
+                v_toi_k = (1.0 - e) / cdr;
+            }
+            vector3 grav_vec = {0.0f, grav_c, 0.0f};
+            mover->position = vector3_addition(
+                mover->position,
+                vector3_addition(vector3_scaling(v_pre, (float) a_pos), vector3_scaling(grav_vec, (float) g_pos)));
+            mover->velocity = vector3_addition(vector3_scaling(v_pre, (float) e_toi),
+                                               vector3_scaling(grav_vec, (float) v_toi_k));
             float spin = vector3_length(mover->angular_velocity);
             if (spin > 1e-6f && isfinite(spin)) {
+                /* TRUTH: full-range det sin/cos (bit-identical), never libm
+                 * from_axis_with_angle in the tick path (|w|*toi routinely
+                 * exceeds 0.5 for fast spinners, e.g. 60 rad/s). */
                 double half = 0.5 * (double) spin * (double) toi;
-                vector4 rotor;
-                if (half > -0.5 && half < 0.5) {
-                    double s = det_sin_small(half);
-                    double c = det_cos_small(half);
-                    double inv = 1.0 / (double) spin;
-                    rotor = (vector4){(float) c, (float) (mover->angular_velocity.x * inv * s),
-                                     (float) (mover->angular_velocity.y * inv * s),
-                                     (float) (mover->angular_velocity.z * inv * s)};
-                } else {
-                    rotor = vector4_from_axis_with_angle(
-                        vector3_scaling(mover->angular_velocity, 1.0f / spin), spin * toi);
-                }
+                double s = det_sin(half);
+                double c = det_cos(half);
+                double inv = 1.0 / (double) spin;
+                vector4 rotor = {(float) c, (float) (mover->angular_velocity.x * inv * s),
+                                 (float) (mover->angular_velocity.y * inv * s),
+                                 (float) (mover->angular_velocity.z * inv * s)};
                 mover->orientation = vector4_normalisation(vector4_multiplication(rotor, mover->orientation));
             }
             rigidbody_wake(mover);
@@ -413,7 +514,7 @@ int collision_ccd_sweep_clamp_full(rigidbody *bodies, int body_count, float dt, 
 }
 
 int collision_ccd_sweep_clamp(rigidbody *bodies, int body_count, float dt) {
-    return collision_ccd_sweep_clamp_full(bodies, body_count, dt, NULL, NULL);
+    return collision_ccd_sweep_clamp_full(bodies, body_count, dt, NULL, NULL, NULL, NULL);
 }
 
 int collision_ccd_sweep_clamp_world(struct physics_world *world, float dt) {
@@ -422,7 +523,7 @@ int collision_ccd_sweep_clamp_world(struct physics_world *world, float dt) {
     }
     const mpe_config_t *C = world->cfg ? world->cfg : &g_cfg;
     if (world->ccd_time_remaining) {
-        return collision_ccd_sweep_clamp_full(world->bodies, world->body_count, dt, world->ccd_time_remaining, C);
+        return collision_ccd_sweep_clamp_full(world->bodies, world->body_count, dt, world->ccd_time_remaining, C, world->ccd_best_tois, world->ccd_hit_flags);
     }
-    return collision_ccd_sweep_clamp_full(world->bodies, world->body_count, dt, NULL, C);
+    return collision_ccd_sweep_clamp_full(world->bodies, world->body_count, dt, NULL, C, NULL, NULL);
 }

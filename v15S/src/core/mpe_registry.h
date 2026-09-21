@@ -33,11 +33,15 @@ mpe_collide_fn mpe_find_pair_handler(int type_a, int type_b, int custom_a, int c
  * Global defaults live here. */
 void mpe_register_broadphase(const char *name, const mpe_broadphase_if_t *iface);
 void mpe_register_solver(const char *name, const mpe_solver_if_t *iface);
+void mpe_unregister_broadphase(const char *name);
+void mpe_unregister_solver(const char *name);
+int mpe_unregister_pair_handler(mpe_collide_fn fn);
 const mpe_broadphase_if_t *mpe_find_broadphase(const char *name);
 const mpe_solver_if_t *mpe_find_solver(const char *name);
 
 /* generic tick modules */
 int mpe_register_module(const mpe_module_desc_t *desc);
+int mpe_unregister_module(const char *name);
 int mpe_module_count(void);
 const mpe_module_desc_t *mpe_module_at(int i);
 const mpe_module_desc_t *mpe_find_module(const char *name);
