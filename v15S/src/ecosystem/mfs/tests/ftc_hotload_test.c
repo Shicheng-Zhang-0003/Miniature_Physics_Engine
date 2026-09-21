@@ -9,7 +9,7 @@
  *     chassis pose + odometry across the static and dynamic copies.
  *  4. detach/re-attach lifecycle on the dynamic world.
  *
- * Build/run: robotics_backup/build_tests.sh (sets FTC_SO); or
+ * Build/run: ecosystem/mfs/build_tests.sh (sets FTC_SO); or
  *   gcc ... -DMPE_FTC_HOTLOAD_TEST ... -ldl && FTC_SO=path ./a.out
  */
 #ifdef MPE_FTC_HOTLOAD_TEST
@@ -23,9 +23,9 @@
 #include "config/mpe_config.h"
 #include "core/mpe_registry.h"
 #include "core/mpe_loader.h"
-#include "robotics_backup/robotics/robot.h"
-#include "robotics_backup/robotics/drivetrain.h"
-#include "robotics_backup/robotics/ftc_fleet.h"
+#include "modules/ftc/submodules/robot.h"
+#include "modules/ftc/submodules/drivetrain.h"
+#include "modules/ftc/ftc_fleet.h"
 
 extern const mpe_module_desc_t mpe_module_desc; /* static copy (ftc_module.c) */
 
@@ -69,7 +69,7 @@ static void print_bits(const char *tag, float a, float b) {
 int main(int argc, char **argv) {
     const char *so = getenv("FTC_SO");
     if (!so && argc > 1) so = argv[1];
-    if (!so) so = "../robotics_backup/plugins/mpe_ftc.so";
+    if (!so) so = "plugins/mpe_ftc.so";
 
     /* ---- 1. dynamic import through the kernel loader ---- */
     char err[512] = {0};
