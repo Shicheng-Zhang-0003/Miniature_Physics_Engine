@@ -1,6 +1,6 @@
 /* MPE_FTC_071: FTC motor presets — verified against manufacturer spec sheets (2025-09).
  *
- * EVERY entry below is traceable to a published sheet (see FTC_SPECS.md for SKUs/URLs).
+ * EVERY entry below is traceable to a published sheet (see ecosystem/mfs/docs/FTC_SPECS.md for SKUs/URLs).
  * Conventions:
  * - stall_torque: OUTPUT-SHAFT stall, N·m, at nominal 12 VDC.
  * - free_speed:   OUTPUT-SHAFT no-load RPM at 12 VDC.

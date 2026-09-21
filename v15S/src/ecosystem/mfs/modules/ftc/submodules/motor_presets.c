@@ -1,6 +1,6 @@
 /* MPE_FTC_071: FTC motor presets — verified spec-sheet values.
  *
- * SOURCES (full table + URLs in robotics_backup/FTC_SPECS.md):
+ * SOURCES (full table + URLs in ecosystem/mfs/docs/FTC_SPECS.md):
  * - goBILDA 5203 series pages (RS-555 base, steel planetary, 12 VDC,
  *   0.25 A no-load, 9.2 A stall). kg.cm -> N-m at 0.0980665.
  * - AndyMark NeveRest Classic 40/60 + Orbital pages (am-3104 base:
