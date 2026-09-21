@@ -14,10 +14,10 @@
 #include "physics/collision_mechanics.h"
 #include "physics/broadphase.h"
 #include "physics/constraint.h"
-#include "robotics/robot.h"
-#include "robotics/drivetrain.h"
-#include "robotics/motor.h"
-#include "robotics/battery.h"
+#include "modules/ftc/submodules/robot.h"
+#include "modules/ftc/submodules/drivetrain.h"
+#include "modules/ftc/submodules/motor.h"
+#include "modules/ftc/submodules/battery.h"
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
