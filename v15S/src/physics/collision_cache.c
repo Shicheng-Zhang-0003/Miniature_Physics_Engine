@@ -69,8 +69,10 @@ int contact_cache_get_misses(const struct physics_world *world) {
 }
 
 bool contact_cache_has_pair(struct physics_world *world, uint32_t id_a, uint32_t id_b) {
+    /* TRUTH: zero ids mean "unknown", not "seen". Returning true suppressed
+     * first-touch wake for id-0 bodies (they never woke sleepers). */
     if (!world || id_a == 0 || id_b == 0) {
-        return true;
+        return false;
     }
     cached_contact *cache = world->world_contact_cache;
     int count = world->world_contact_cache_count;
@@ -141,10 +143,14 @@ static uint32_t a3_task05_body_property_stamp(const rigidbody *rigid_body) {
 
     /* TRUTH: friction/restitution/kinematic affect the solved impulse.
      * Old stamp omitted them: editing friction or toggling kinematic hit a
-     * stale acc_n*new_mu (wrong friction cone for a tick). Include. */
+     * stale acc_n*new_mu (wrong friction cone for a tick). Include.
+     * TRUTH: cylinder_half_length and custom_shape likewise change lever
+     * arms and dispatch: editing h hit stale acc with the wrong geometry. */
     stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(rigid_body->friction_static));
     stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(rigid_body->friction_kinetic));
     stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(rigid_body->restitution));
+    stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(rigid_body->cylinder_half_length));
+    stamp = a3_task05_mix_u32(stamp, (uint32_t) rigid_body->custom_shape);
     stamp = a3_task05_mix_u32(stamp, rigid_body->kinematic ? 2u : 0u);
     stamp = a3_task05_mix_u32(stamp, rigid_body->is_sleeping ? 4u : 0u);
 
@@ -191,6 +197,8 @@ void contact_cache_save(struct physics_world *world, collision_data *manifolds, 
             cc->local_position_b = cp->local_position_b;
             cc->accumulated_normal_impulse = cp->accumulated_normal_impulse;
             cc->accumulated_tangent_impulse = cp->accumulated_tangent_impulse;
+            /* (compression fields intentionally unsaved: reserved/ABI, the
+             * solver derives compression as normal-minus-base). */
             /* Remember the stick frame for resting contacts next tick. */
             cc->tangent_dir = cp->tangent_vector;
         }

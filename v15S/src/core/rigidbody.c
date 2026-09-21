@@ -7,7 +7,111 @@
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
-// Helper to update axes from orientation
+
+/* Exact free-flight integration under constant gravity + linear viscous drag.
+ * The config 'drag' is a VELOCITY RETENTION FACTOR per second (0 to 1).
+ * Continuous ODE: dv/dt = -c*v + g, where c = -ln(drag) [1/s], g = gravity vector.
+ * Exact solution:
+ *   v(t) = v0 * e^(-c*t) + (g/c) * (1 - e^(-c*t))
+ *   x(t) = x0 + v0 * (1 - e^(-c*t))/c + g * (t/c - (1 - e^(-c*t))/c^2)
+ * For c -> 0 (drag -> 1), Taylor expansion recovers Verlet.
+ * This is EXACT for linear viscous drag (Stokes regime), bit-deterministic via det_math.
+ * OVERWRITES rb->velocity with exact v(dt) for consistency. */
+static inline void rb_integrate_position_exact_free_flight(rigidbody *rb, float dt, const mpe_config_t *cfg) {
+    if (!rb || rb->static_state || rb->is_sleeping || rb->kinematic || !(dt > 0.0f)) return;
+    if (!isfinite(dt)) return;
+
+    float drag_retention = cfg->world.drag;
+    float gravity = cfg->world.gravity;
+    /* TRUTH: contract is drag in (0,1] (retention per second). Clamp
+     * violations instead of producing NaN: drag>1 (anti-damping) and
+     * drag<=0/NaN have no physical meaning here. */
+    if (!isfinite(drag_retention) || drag_retention <= 0.0f) drag_retention = 1.0f;
+    if (drag_retention > 1.0f) drag_retention = 1.0f;
+    if (!isfinite(gravity)) gravity = 0.0f;
+    vector3 g = {0.0f, gravity, 0.0f};
+    /* v0 MUST be the start-of-tick (pre-force) velocity. Callers snapshot
+     * v_pre before rb_integrate_velocity and restore it before calling this
+     * analytic path (see physics_world_step tick_v0). Treating post-force
+     * velocity as v(0) double-applies gravity/damping. */
+    vector3 v0 = rb->velocity;
+    if (!isfinite(v0.x) || !isfinite(v0.y) || !isfinite(v0.z)) v0 = vector3_zero();
+    
+    if (drag_retention >= 1.0f - 1e-6f) {
+        /* c ≈ 0: exact Verlet (drag == 1, conservative).
+         * x = x0 + v0*dt + 0.5*g*dt^2, v = v0 + g*dt. */
+        vector3 g_half_dt2 = vector3_scaling(g, 0.5f * dt * dt);
+        rb->position = vector3_addition(rb->position, vector3_scaling(v0, dt));
+        rb->position = vector3_addition(rb->position, g_half_dt2);
+        /* Exact velocity for c=0: v(dt) = v0 + g*dt */
+        rb->velocity = vector3_addition(v0, vector3_scaling(g, dt));
+        return;
+    }
+    
+    /* c > 0: exact analytic integration of linear viscous drag + gravity.
+     * Deterministic: det_ln_pos, never libm log (bit-identity across targets). */
+    double c = -det_ln_pos((double)drag_retention);  /* drag coefficient [1/s] */
+    double dt_d = (double)dt;
+    double c_dt = c * dt_d;
+    double term1_pos, term2_pos, term1_vel, term2_vel;
+    double e_ct, one_minus_e_ct;
+
+    if (c_dt < 1e-4) {
+        /* TRUTH: stable small-argument SERIES (no inv_c cancellation:
+         * dt/c-(1-e)/c^2 loses ~all digits for c~1e-6 in any precision).
+         * x(t) = x0 + v0*(t-c t^2/2+c^2 t^3/6) + g*(t^2/2-c t^3/6). */
+        double cdt = c_dt;
+        e_ct = 1.0 - cdt + 0.5 * cdt * cdt - cdt * cdt * cdt / 6.0;
+        one_minus_e_ct = cdt - 0.5 * cdt * cdt + cdt * cdt * cdt / 6.0;
+        term1_pos = dt_d - 0.5 * c * dt_d * dt_d + c * c * dt_d * dt_d * dt_d / 6.0;
+        term2_pos = 0.5 * dt_d * dt_d - c * dt_d * dt_d * dt_d / 6.0;
+        term1_vel = e_ct;
+        term2_vel = term1_pos; /* (1-e)/c == series above */
+    } else {
+        /* Full exact solution. Deterministic only for c*dt<=0.5
+         * (drag>=0.1, dt<=0.21s); larger steps fall back to libm (counted).
+         * Cap dt or substep for determinism. */
+        double inv_c = 1.0 / c;
+        e_ct = det_exp_small(-c_dt);  /* deterministic exp */
+        one_minus_e_ct = 1.0 - e_ct;
+        term1_pos = one_minus_e_ct * inv_c;
+        term2_pos = dt_d * inv_c - one_minus_e_ct * inv_c * inv_c;
+        term1_vel = e_ct;
+        term2_vel = one_minus_e_ct * inv_c;
+    }
+    
+    vector3 v_term = vector3_scaling(v0, (float)term1_pos);
+    vector3 g_term = vector3_scaling(g, (float)term2_pos);
+    /* TRUTH: double internally, float at the boundary by struct design
+     * (position/velocity are float). Casts lose ~1e-7 rel; far bodies
+     * (|x|>250) additionally suffer float-ulp error (~3e-5m at 500m).
+     * Deterministic (same bits), but imprecise far-field: use double
+     * storage if far-field accuracy is ever required. */
+    rb->position = vector3_addition(rb->position, vector3_addition(v_term, g_term));
+    
+    /* Exact velocity: v(dt) = v0 * e^(-c*dt) + (g/c) * (1 - e^(-c*dt)) */
+    vector3 v_exact = vector3_addition(
+        vector3_scaling(v0, (float)term1_vel),
+        vector3_scaling(g, (float)term2_vel)
+    );
+    rb->velocity = v_exact;
+}
+
+/* Symplectic Euler position integration for constrained bodies (original, stable).
+ * Velocity has already been updated by rb_integrate_velocity with forces + gravity.
+ * Position: x += v_new * dt.
+ * This matches the original stable behavior. */
+static inline void rb_integrate_position_constrained(rigidbody *rb, float dt) {
+    if (!rb || rb->static_state || rb->is_sleeping || rb->kinematic || !(dt > 0.0f)) return;
+    rb->position = vector3_addition(rb->position, vector3_scaling(rb->velocity, dt));
+}
+
+/* rb_integrate_position_free_flight_original REMOVED (dead: zero callers;
+ * its contract (x+=v_post*dt, caller fixes gravity) invited double-counts).
+ * Use rb_integrate_position (constrained, safe) or
+ * rb_integrate_position_exact (explicit v_pre + free flag). */
+
+/* Helper to update axes from orientation */
 static bool a3_vector3_is_finite(vector3 v) {
     return isfinite(v.x) && isfinite(v.y) && isfinite(v.z);
 }
@@ -375,12 +479,17 @@ void rigidbody_initialisation_sphere(rigidbody *rigid_body, float radius, float 
     rigid_body->sleep_timer = 0.0f; //Static Objects
     rigid_body->nice_value = 0; /* MPE_TASK_V15R2_NICE_INIT */
     rigid_body->kinematic = false;
+    /* DATA-INVARIANT: fresh bodies are generation 1 (matches the add_*
+     * paths and the static plane). Direct-init callers that assign
+     * object_id by hand (e.g. scene_roundtrip) otherwise persist
+     * generation 0 while the v200 contract expects 1. */
+    rigid_body->object_generation = 1;
     /* FIX-AUDIT: use config body defaults (were hardcoded, registry dead). */
     rigid_body->friction_static = g_cfg.body_defaults.sphere_fric_s;
     rigid_body->friction_kinetic = g_cfg.body_defaults.sphere_fric_k;
     //Inertial Tensors
-    //I = 0.4fmr ^ 2
-    float inertia_coefficient_sphere = (0.4f) * mass * radius * radius;
+    //I = (2/5)*m*r^2 solid sphere (correctly-rounded 2.0f/5.0f, not 0.4f literal).
+    float inertia_coefficient_sphere = (2.0f / 5.0f) * mass * radius * radius;
     rigid_body->inertia_tensor_local = (math3){{{0}}};
     rigid_body->inertia_tensor_local.matrix[0][0] = inertia_coefficient_sphere;
     rigid_body->inertia_tensor_local.matrix[1][1] = inertia_coefficient_sphere;
@@ -400,7 +509,8 @@ void rigidbody_update_inertia_sphere(rigidbody *rigid_body) {
     if (!rigid_body) {
         return;
     }
-    float inertia_coefficient_sphere = (0.4f) * rigid_body->mass * rigid_body->radius * rigid_body->radius;
+    float inertia_coefficient_sphere =
+        (2.0f / 5.0f) * rigid_body->mass * rigid_body->radius * rigid_body->radius;
     rigid_body->inertia_tensor_local = (math3){{{0}}};
     rigid_body->inertia_tensor_local.matrix[0][0] = inertia_coefficient_sphere;
     rigid_body->inertia_tensor_local.matrix[1][1] = inertia_coefficient_sphere;
@@ -572,6 +682,12 @@ void rb_integrate_velocity(rigidbody *rigid_body, float delta_time, float linear
         rigid_body->velocity = vector3_zero();
     }
     rigid_body->velocity = vector3_scaling(rigid_body->velocity, linear_damping);
+    /* TRUTH: this is symplectic Euler with post-scale damping
+     * (v0+a*dt)*ret, first-order with O(c*dt^2) error vs the analytic
+     * v0*ret+a*(1-ret)/c for drag<1. Exact only for drag=1. Free-flight
+     * bodies discard this path (tick_v0 + analytic); constrained bodies
+     * (resting stacks) keep the O(dt^2) bias. The has_contact flip
+     * discontinuity is likewise O(dt^2). Documented, not hidden. */
 /* FIX-AUDIT: nice damping was per-tick (frame-rate dependent). Make it
       * per-second-anchored: factor semantics preserved at 60Hz via
       * det_pow_retention(base, dt*60) (bit-deterministic, see det_math.h).
@@ -665,6 +781,15 @@ void rb_integrate_velocity(rigidbody *rigid_body, float delta_time, float linear
 }
 
 void rb_integrate_position(rigidbody *rigid_body, float delta_time) {
+    /* TRUTH: SAFE default = constrained symplectic Euler (x += v_live*dt).
+     * The old default (exact free-flight on live velocity) double-applied
+     * gravity/damping for any caller that already ran rb_integrate_velocity.
+     * Exact free-flight needs v_pre: restore tick_v0 first, then call
+     * rb_integrate_position_exact(..., free_flight=true) explicitly. */
+    rb_integrate_position_exact(rigid_body, delta_time, &g_cfg, false);
+}
+
+void rb_integrate_position_exact(rigidbody *rigid_body, float delta_time, const mpe_config_t *cfg, bool free_flight) {
     if (!rigid_body) {
         return;
     }
@@ -675,63 +800,79 @@ void rb_integrate_position(rigidbody *rigid_body, float delta_time) {
         return;
     }
 
-    /* Symplectic Euler drift: x += v_new*dt (v_new already holds this tick's
-     * forces). Exact + energy-bounded for oscillators; constant-force
-     * (gravity) exactness is applied by CALLERS for contact-free bodies
-     * only (see physics_world_step: +1/2*g*dt^2). Done at call sites because
-     * only the step knows contact state: applying -1/2*a*dt^2 with the
-     * pre-solve applied-force acceleration to CONSTRAINED bodies pumps them
-     * (contact impulses cancel gravity post-solve; stale-a correction lifts
-     * resting contacts 1.36mm/tick out of slop, killing friction 3x and
-     * toppling stacks) and mixing explicit velocity with Verlet position
-     * breaks symplecticity for springs (418% energy spiral). */
-    rigid_body->position =
-        vector3_addition(rigid_body->position, vector3_scaling(rigid_body->velocity, delta_time));
+    if (rigid_body->kinematic) {
+        /* Kinematic: prescribed velocity, no forces. Position: x += v*dt.
+         * Never accrues sleep (prescribed motion contradicts rest); reset
+         * the timer here, not via sanitize, so direct struct writes
+         * bypassing sanitize cannot strand a stale timer. */
+        rigid_body->sleep_timer = 0.0f;
+        rigid_body->position = vector3_addition(rigid_body->position, vector3_scaling(rigid_body->velocity, delta_time));
+        rigidbody_update_axes(rigid_body);
+        return;
+    }
+
+    if (free_flight) {
+        rb_integrate_position_exact_free_flight(rigid_body, delta_time, cfg);
+    } else {
+        rb_integrate_position_constrained(rigid_body, delta_time);
+    }
 
     /* Exact exponential-map rotation: q' = normalize(dq(w,|w|dt) * q).
      * First-order Euler (q += 0.5*dt*w*q) accumulates orientation phase
      * error for fast spinners; the closed-form rotor is exact for constant
      * w over the tick and unconditionally stable. Frame order (world-frame
-     * left multiplication) matches the previous scheme. */
-    float spin_rate = vector3_length(rigid_body->angular_velocity);
-    if (spin_rate > 0.000001f) {
-        /* Deterministic rotor: fixed-coefficient trig (see det_math.h).
-         * Falls back to libm only for absurd rate*dt products. */
+     * left multiplication) matches the previous scheme.
+     * TRUTH: no spin-rate gate (a 1e-6 threshold drops micro-rotation and
+     * loses ~1e-3 rad per megatick); exact down to zero. Non-finite spin
+     * (poisoned w) normalizes orientation instead of building an INF rotor
+     * that teleports attitude. */
+    float spin_sq = vector3_length_squared(rigid_body->angular_velocity);
+    if (!isfinite(spin_sq) || !(spin_sq > 0.0f)) {
+        rigid_body->orientation = vector4_normalisation(rigid_body->orientation);
+    } else {
+        float spin_rate = sqrtf(spin_sq);
+        /* Deterministic rotor: full-range sin/cos with argument reduction.
+         * Exact for constant w over the tick, unconditionally stable. */
         double half_angle = 0.5 * (double) spin_rate * (double) delta_time;
         vector4 spin_rotor;
-        if (half_angle > -0.5 && half_angle < 0.5) {
-            double s = det_sin_small(half_angle);
-            double c = det_cos_small(half_angle);
-            double inv = 1.0 / (double) spin_rate;
-            spin_rotor = (vector4){(float) c, (float) (rigid_body->angular_velocity.x * inv * s),
-                                  (float) (rigid_body->angular_velocity.y * inv * s),
-                                  (float) (rigid_body->angular_velocity.z * inv * s)};
-        } else {
-            spin_rotor = vector4_from_axis_with_angle(
-                vector3_scaling(rigid_body->angular_velocity, 1.0f / spin_rate), spin_rate * delta_time);
-        }
+        double s = det_sin(half_angle);
+        double c = det_cos(half_angle);
+        double inv = 1.0 / (double) spin_rate;
+        spin_rotor = (vector4){(float) c, (float) (rigid_body->angular_velocity.x * inv * s),
+                              (float) (rigid_body->angular_velocity.y * inv * s),
+                              (float) (rigid_body->angular_velocity.z * inv * s)};
         rigid_body->orientation = vector4_normalisation(vector4_multiplication(spin_rotor, rigid_body->orientation));
-    } else {
-        rigid_body->orientation = vector4_normalisation(rigid_body->orientation);
     }
     rigidbody_update_axes(rigid_body);
 
     float speed_sq = vector3_length_squared(rigid_body->velocity);
     float angular_speed_sq = vector3_length_squared(rigid_body->angular_velocity);
+    /* Sleep entry requires BOTH absolute rest and relative rest at contacts.
+     * Absolute speed below threshold AND contact-relative speed below
+     * threshold: jittery contacts reset the timer instead of raising the
+     * threshold (fmax inversion would make fast contacts sleep *easier*).
+     * Moving platforms keep riders awake via relative motion. */
+    bool linear_calm = (speed_sq < cfg->sleep.linear_thresh_sq);
+    bool angular_calm = (angular_speed_sq < cfg->sleep.angular_thresh_sq);
+    bool relative_calm = (rigid_body->max_relative_speed_sq < cfg->sleep.linear_thresh_sq);
 
-    if (rigid_body->kinematic) {
-        rigid_body->sleep_timer = 0.0f;
-    } else if ((!g_cfg.sleep.enable) || ((speed_sq < g_cfg.sleep.linear_thresh_sq) && (angular_speed_sq < g_cfg.sleep.angular_thresh_sq))) {
-        /* TRUTH: sleep.enable=0 never sleeps (validation mode). Note the
-         * inverted structure: disabled OR below-threshold accumulates, but
-         * the transition below honors the switch (never sets is_sleeping
-         * when disabled). Sleep itself remains NON-PHYSICAL when enabled. */
-        if (!g_cfg.sleep.enable) {
+    /* Kinematic bodies early-returned above; this branch is dead without it.
+     * Kept as defense-in-depth is wrong here (dead code rots): removed.
+     * Kinematic never sleeps by construction (prescribed velocity). */
+    if ((!cfg->sleep.enable) || (linear_calm && angular_calm && relative_calm)) {
+        if (!cfg->sleep.enable) {
             rigid_body->sleep_timer = 0.0f;
         } else {
             rigid_body->sleep_timer += delta_time;
-            if (rigid_body->sleep_timer > g_cfg.sleep.timer_duration) {
+            if (rigid_body->sleep_timer > cfg->sleep.timer_duration) {
+                /* TRUTH: freeze atomically. Leaving threshold velocity in a
+                 * sleeper leaks motion to direct callers without the world's
+                 * pinning pass (world pins anyway; belt and suspenders). */
                 rigid_body->is_sleeping = true;
+                rigid_body->velocity = vector3_zero();
+                rigid_body->angular_velocity = vector3_zero();
+                rigid_body->force_accumulator = vector3_zero();
+                rigid_body->torque_accumulator = vector3_zero();
             }
         }
     } else {
@@ -801,6 +942,8 @@ void rigidbody_initialisation_cube(rigidbody *rigid_body, vector3 position_input
     rigid_body->sleep_timer = 0.0f;
     rigid_body->nice_value = 0; /* MPE_TASK_V15R2_NICE_INIT */
     rigid_body->kinematic = false;
+    /* DATA-INVARIANT: fresh bodies are generation 1 (see sphere init). */
+    rigid_body->object_generation = 1;
     /* FIX-AUDIT: use config body defaults (were hardcoded). */
     rigid_body->friction_static = g_cfg.body_defaults.cube_fric_s;
     rigid_body->friction_kinetic = g_cfg.body_defaults.cube_fric_k;
@@ -1018,6 +1161,8 @@ void rigidbody_initialisation_cylinder(rigidbody *rigid_body, float radius, floa
     rigid_body->sleep_timer = 0.0f;
     rigid_body->nice_value = 0;
     rigid_body->kinematic = false;
+    /* DATA-INVARIANT: fresh bodies are generation 1 (see sphere init). */
+    rigid_body->object_generation = 1;
     /* FIX-AUDIT: use config cylinder defaults (new registry entries). */
     rigid_body->friction_static = g_cfg.body_defaults.cylinder_fric_s;
     rigid_body->friction_kinetic = g_cfg.body_defaults.cylinder_fric_k;

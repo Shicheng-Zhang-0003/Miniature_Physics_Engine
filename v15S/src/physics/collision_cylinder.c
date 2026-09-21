@@ -1,5 +1,6 @@
 /* Cylinder narrowphase (extracted from collision_mechanics.c to shrink the 2.2k-line god file).
- * Axle-segment + radius capsule model: barrel exact, flat caps hemispherical.
+ * EXACT solid-cylinder SDF (flat caps, rim circle, inside): the old
+ * axle-segment + radius capsule model (hemispherical caps) is retired.
  */
 #include "collision_cylinder.h"
 #include "../core/physics_world.h"
@@ -7,7 +8,7 @@
 #include <math.h>
 #include <stdint.h>
 
-bool collision_static_plane_cylinder(rigidbody *cyl, float plane_y, collision_data *collision_output_data,
+bool collision_static_plane_cylinder(rigidbody *plane_body, rigidbody *cyl, float plane_y, collision_data *collision_output_data,
                                      const mpe_config_t *cfg) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
     if (cyl->type != object_cylinder) {
@@ -67,7 +68,7 @@ bool collision_static_plane_cylinder(rigidbody *cyl, float plane_y, collision_da
         radial = vector3_zero();
     }
 
-    rigidbody *plane_body = collision_static_plane_body_proxy(plane_y, cfg);
+    // proxy removed
 
     collision_output_data->object_a = cyl;
     collision_output_data->object_b = plane_body;
@@ -78,12 +79,27 @@ bool collision_static_plane_cylinder(rigidbody *cyl, float plane_y, collision_da
      * Near-horizontal axle:
      * generate two contacts at the axle ends for stability.
      * This is the normal FTC wheel case.
-     * Slop-gated (see clip_obb_faces): wheels rolling within slop keep
-     * persistent friction contacts instead of flickering support.
+     * JOINTLY GATED (no flickering pivot): each end is admitted within
+     * slop independently, but if exactly one end touches while the axle is
+     * near-horizontal, the other end is patch-adjacent (at most
+     * 2*h*sin(20°]) above the plane) and is admitted with depth 0 rather
+     * than dropping to a single pivot. A 1-point pivot under a rolling
+     * wheel is a stability bifurcation: symmetric 2-point support
+     * self-levels (differential normal righting torque), while a pivot
+     * amplifies tilt (offset normal + friction torques feed precession),
+     * and fp noise at the slop boundary picks the branch — measured:
+     * 2→1 flip at a 1.4mm/0.03° scale, then wobble pump to tumbling and
+     * pole-vault launch (16 J in, 10 kJ out). The partner point carries
+     * ~zero normal (depth 0, vn≈0) and cone-limited friction, so no
+     * phantom support: it only restores symmetric torque authority and
+     * manifold continuity ("wheels rolling within slop keep persistent
+     * friction contacts instead of flickering support").
      */
     if (fabsf(ay) < 0.35f) {
         float axle_offsets[2] = {-h, h};
         float wheel_slop = C->solver.penetration_slop;
+        float end_pen[2] = {0.0f, 0.0f};
+        bool end_in[2] = {false, false};
 
         for (int i = 0; i < 2; i++) {
             vector3 end_center =
@@ -92,11 +108,32 @@ bool collision_static_plane_cylinder(rigidbody *cyl, float plane_y, collision_da
             vector3 contact_point = vector3_addition(end_center, radial);
             float local_penetration = plane_y - contact_point.y;
 
-            if ((local_penetration > -wheel_slop) && (collision_output_data->contact_count < 2)) {
+            if (local_penetration > -wheel_slop) {
+                end_in[i] = true;
+                end_pen[i] = (local_penetration > 0.0f) ? local_penetration : 0.0f;
+            }
+        }
+        /* Joint rule: one firm end keeps the patch; admit the partner. */
+        if ((end_in[0] != end_in[1]) && ((end_in[0] && end_pen[0] > 0.0f) || (end_in[1] && end_pen[1] > 0.0f))) {
+            int out = end_in[0] ? 1 : 0;
+            vector3 end_center = vector3_addition(cyl->position, vector3_scaling(axis, axle_offsets[out]));
+            vector3 contact_point = vector3_addition(end_center, radial);
+            float local_penetration = plane_y - contact_point.y;
+            if (local_penetration > -2.0f * wheel_slop) {
+                end_in[out] = true;
+                end_pen[out] = 0.0f;
+            }
+        }
+
+        for (int i = 0; i < 2; i++) {
+            if (end_in[i] && (collision_output_data->contact_count < 2)) {
+                vector3 end_center =
+                    vector3_addition(cyl->position, vector3_scaling(axis, axle_offsets[i]));
+                vector3 contact_point = vector3_addition(end_center, radial);
                 contact_point_data *cp =
                     &collision_output_data->contacts[collision_output_data->contact_count];
                 cp->position = contact_point;
-                cp->penetration = (local_penetration > 0.0f) ? local_penetration : 0.0f;
+                cp->penetration = end_pen[i];
                 collision_output_data->contact_count++;
             }
         }
@@ -134,10 +171,12 @@ bool collision_static_plane_cylinder(rigidbody *cyl, float plane_y, collision_da
             what = vector3_normalisation(what);
         }
         float rim_slop = C->solver.penetration_slop;
-        const float leg_angles[4] = {0.0f, 1.5707963f, 3.1415927f, 4.7123890f};
         for (int leg = 0; leg < 4; leg++) {
-            float c = cosf(leg_angles[leg]);
-            float s = sinf(leg_angles[leg]);
+            /* TRUTH: exact quadrant constants, never libm cosf/sinf in the
+             * tick path (libm transcendentals are not bit-identical across
+             * targets; det_math contract). Angles are 0/90/180/270. */
+            float c = (leg == 0) ? 1.0f : ((leg == 2) ? -1.0f : 0.0f);
+            float s = (leg == 1) ? 1.0f : ((leg == 3) ? -1.0f : 0.0f);
             vector3 rim_point = vector3_addition(
                 cap_center, vector3_scaling(vector3_addition(vector3_scaling(nhat, c), vector3_scaling(what, s)),
                                             r));
@@ -275,6 +314,12 @@ bool collision_cylinder_sphere(rigidbody *cyl, rigidbody *sph,
     out->contact_count = 1;
     if (center_dist > 0.0001f) {
         out->normal_vector = vector3_scaling(diff, 1.0f / center_dist);
+    } else if (fabsf(x) > h) {
+        /* TRUTH: degenerate coincident centers on the flat-cap disc interior
+         * (|x|>h, radial<=r): the true normal is +/-axle, NOT the in-plane
+         * radial direction (which pushes resting cap-center spheres
+         * sideways). Radial fallback only for the barrel band. */
+        out->normal_vector = vector3_scaling(axis, (x >= 0.0f) ? 1.0f : -1.0f);
     } else {
         out->normal_vector = radial_dir;
     }
@@ -586,15 +631,18 @@ bool collision_cylinder_cube(rigidbody *cyl, rigidbody *cube,
                 vector3_subtraction(ref, vector3_scaling(axis, vector3_dot(ref, axis))));
             vector3 v = vector3_normalisation(vector3_cross(axis, u));
             vector3 *baxes = cube->cached_axes;
-            const float rim_angles[3] = {0.0f, 2.0943951f, 4.1887902f};
             for (int leg = 0; leg < 3; leg++) {
                 if (out->contact_count >= 4) {
                     break;
                 }
+                /* TRUTH: exact 0/120/240 constants (cos120=-1/2,
+                 * sin120=+sqrt(3)/2), never libm in the tick path. */
+                float rc = (leg == 0) ? 1.0f : -0.5f;
+                float rs = (leg == 0) ? 0.0f : ((leg == 1) ? 0.8660254037844386f : -0.8660254037844386f);
                 vector3 rim = vector3_addition(
                     cap_center,
-                    vector3_scaling(vector3_addition(vector3_scaling(u, cosf(rim_angles[leg])),
-                                                    vector3_scaling(v, sinf(rim_angles[leg]))),
+                    vector3_scaling(vector3_addition(vector3_scaling(u, rc),
+                                                    vector3_scaling(v, rs)),
                                     r));
                 vector3 rrel = vector3_subtraction(rim, cube->position);
                 float lx = vector3_dot(rrel, baxes[0]);

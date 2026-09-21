@@ -22,6 +22,7 @@ typedef struct {
     vector3 local_position_b;
     float accumulated_normal_impulse;
     float accumulated_tangent_impulse;
+    float accumulated_compression_impulse;
     /* NOTE: the second Coulomb-disc tangent is deliberately NOT cached (see
      * prepare): t2 = n×t1 is frame-derived each tick and re-converges in
      * the relaxation sweeps. */
@@ -95,10 +96,15 @@ typedef struct physics_world {
      * visible, not silent. Legacy path counted via debug counter; world path
      * dropped silently and gave false free-flight gravity. */
     int manifold_overflow_count;
+    /* Manifold capacity (growable like bodies and contacts). */
+    int manifold_capacity;
     /* TRUTH P0-3: per-body CCD remainder (dt - toi). Allocated mpe_max_bodies
      * floats. CCD pre-clamp consumes toi; post-solve integration must advance
      * only the remainder, else displacement double-counts (toi + dt). */
     float *ccd_time_remaining;
+    /* CCD scratch arrays for swept clamp (pre-allocated, no malloc in hot path). */
+    float *ccd_best_tois;
+    unsigned char *ccd_hit_flags;
     /* TRUTH P0-1: per-body contact flag for gravity-exactness gating.
      * Verlet +1/2*g*dt^2 applies ONLY to contact-free bodies (free flight =
      * exact parabola); constrained bodies stay pure symplectic Euler (their
@@ -108,6 +114,16 @@ typedef struct physics_world {
      * prev array — floor contacts blind it. It probes the warm-start cache
      * per id-pair instead; see contact_cache_has_pair.) */
     unsigned char *has_contact;
+    /* Start-of-tick linear velocity snapshot for exact free-flight.
+     * rb_integrate_velocity runs before position integration, so the live
+     * velocity is post-force (v_pre+g*dt). The analytic free-flight solution
+     * must start from v_pre; this scratch holds it (capacity tracks bodies). */
+    vector3 *tick_v0;
+    int tick_v0_capacity;
+    /* Static plane (floor at y=0) body - persistent to avoid stack pointer issues.
+     * Disabled by default; enable only for scenarios that need an infinite floor at y=0. */
+    rigidbody static_plane_body;
+    bool static_plane_enabled;
     /* Phase-2 modular slots. NULL = built-in default.
      * broadphase_if/solver_if override the corresponding stage;
      * tick_modules[] are generic pre/post-step hooks (forcefields,
@@ -168,7 +184,9 @@ int physics_world_detach_module(physics_world *world, const char *name);
 void physics_world_set_broadphase(physics_world *world, const mpe_broadphase_if_t *iface);
 void physics_world_set_solver(physics_world *world, const mpe_solver_if_t *iface);
 /* Pool growth (×2 to ceiling). Used by add_* paths and cache save. */
+int physics_world_grow_bodies(physics_world *world);
 int physics_world_grow_contact_cache(physics_world *world);
+int physics_world_grow_manifolds(physics_world *world);
 /* Mutation stamp: bumped by every world-owned body-array mutation
  * (add/clear) and by scene-level mutators (remove/load/clear). */
 void physics_world_bump_revision(physics_world *world);

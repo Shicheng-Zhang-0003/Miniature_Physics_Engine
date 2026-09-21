@@ -45,7 +45,7 @@ static mpe_param s_registry[] = {
      cat_world, &g_cfg.world.floor_friction_k, 0.1, 0.0, 5.0, false},
      {"world.rolling_resistance_coeff", "Rolling Resistance Coeff", "Rolling resistance coefficient for wheels on floor (0 = free roll)", p_float,
      cat_world, &g_cfg.world.rolling_resistance_coeff, 0.02f, 0.0, 5.0, false},
-    {"world.angular_damping_scale", "Angular Damping Scale", "NON-PHYSICAL game damping (1.0=truth, off). Extra rotary retention with no fluid basis; air damps translation, barely rotation.", p_float,
+    {"world.angular_damping_scale", "Angular Damping Scale", "NON-PHYSICAL game damping (1.0=truth, off: retention exactly 1.0 even when drag<1 damps translation; air damps translation, barely rotation). Extra rotary retention with no fluid basis.", p_float,
      cat_world, &g_cfg.world.angular_damping_scale, 1.0f, 0.5, 1.0, true},
 
     /* ============================================================
@@ -58,25 +58,25 @@ static mpe_param s_registry[] = {
     {"timestep.max_substeps", "Max Substeps", "Physics substeps per frame cap (spiral-of-death prevention)", p_int,
      cat_timestep, &g_cfg.timestep.max_substeps, 5.0, 1.0, 20.0, true},
 
-    {"timestep.max_linear_speed", "Max Linear Speed", "Stability safety clamp (m/s): anything faster is scaled back, CCD still resolves the impact",
+    {"timestep.max_linear_speed", "Max Linear Speed", "Inform-only overspeed guard (m/s): velocities are never scaled back (no guillotine); CCD owns fast bodies and resolves the impact",
      p_float, cat_timestep,
      &g_cfg.timestep.max_linear_speed, 150.0, 10.0, 10000.0, true},
 
-    {"timestep.max_angular_speed", "Max Angular Speed", "Stability safety clamp (rad/s): faster spin is scaled back",
+    {"timestep.max_angular_speed", "Max Angular Speed", "Inform-only overspeed guard (rad/s): spin is never scaled back; rotors are exact and unconditionally stable",
      p_float, cat_timestep,
      &g_cfg.timestep.max_angular_speed, 30.0, 5.0, 500.0, true},
 
     /* ============================================================
      * cat_sleep
      * ============================================================ */
-    {"sleep.linear_thresh_sq", "Sleep Linear Threshold^2", "Speed^2 below which sleep timer accumulates", p_float,
-     cat_sleep, &g_cfg.sleep.linear_thresh_sq, 0.0025, 0.0, 0.05, true},
+    {"sleep.linear_thresh_sq", "Sleep Linear Threshold^2", "Speed^2 below which sleep timer accumulates (0.01^2: Box2D 0.01 m/s; old 0.0025 froze visibly-drifting 0.05 m/s bodies, zeroing real creep energy)", p_float,
+     cat_sleep, &g_cfg.sleep.linear_thresh_sq, 0.0001, 0.0, 0.05, true},
 
-    {"sleep.angular_thresh_sq", "Sleep Angular Threshold^2", "Angular speed^2 below which sleep timer accumulates",
-     p_float, cat_sleep, &g_cfg.sleep.angular_thresh_sq, 0.0001, 0.0, 0.05, true},
+    {"sleep.angular_thresh_sq", "Sleep Angular Threshold^2", "Angular speed^2 below which sleep timer accumulates (0.035^2: Box2D 2deg/s; old 0.0001 kept 1deg/s spinners awake 12x too strictly)",
+     p_float, cat_sleep, &g_cfg.sleep.angular_thresh_sq, 0.0012, 0.0, 0.05, true},
 
-{"sleep.timer_duration", "Sleep Timer (s)", "Seconds below threshold before a body sleeps", p_float, cat_sleep,
-      &g_cfg.sleep.timer_duration, 1.0, 0.1, 10.0, true},
+{"sleep.timer_duration", "Sleep Timer (s)", "Seconds below threshold before a body sleeps (Box2D 0.5s; 1.0s let micro-motion pump stacks twice as long)", p_float, cat_sleep,
+      &g_cfg.sleep.timer_duration, 0.5, 0.1, 10.0, true},
 
     {"sleep.wake_linear_thresh_sq", "Wake Linear Threshold^2", "Speed^2 required to wake a sleeping body", p_float,
      cat_sleep, &g_cfg.sleep.wake_linear_thresh_sq, 0.01, 0.0, 10.0, true},
@@ -100,8 +100,9 @@ static mpe_param s_registry[] = {
      cat_solver, &g_cfg.solver.max_separation_bias, 5.0, 0.5, 10.0, true},
 
     {"solver.restitution_velocity_thresh", "Restitution Velocity Threshold",
-     "Approach speed below which bounce is suppressed (negative = approaching, m/s)", p_float, cat_solver,
-     &g_cfg.solver.restitution_velocity_thresh, -1.5, -10.0, 0.0, true},
+     "Approach speed below which bounce is suppressed (negative = approaching, m/s; Box2D cuts at 1.0: sub-1 m/s impacts are inelastic)",
+     p_float, cat_solver,
+     &g_cfg.solver.restitution_velocity_thresh, -1.0, -10.0, 0.0, true},
 
     /* TRUTH: solver.max_restitution_bias REMOVED — dead knob (registered and
      * F11-randomized, but the Poisson pass never read it; the Newton bound
@@ -112,8 +113,8 @@ static mpe_param s_registry[] = {
      "Sliding speed below which static friction applies", p_float, cat_solver, &g_cfg.solver.static_friction_thresh,
      0.02, 0.0, 1.0, true},
 
-    {"solver.warm_start_match_dist_sq", "Warm-Start Match Dist^2", "Max distance^2 for cached contact matching",
-     p_float, cat_solver, &g_cfg.solver.warm_start_match_dist_sq, 0.0025, 0.0, 0.01, true},
+    {"solver.warm_start_match_dist_sq", "Warm-Start Match Dist^2", "Max distance^2 for cached contact matching (1cm: violent-contact adoption must be near-steady; 5cm admitted tumbling geometry as steady state)",
+     p_float, cat_solver, &g_cfg.solver.warm_start_match_dist_sq, 0.0001, 0.0, 0.01, true},
 
     /* ============================================================
      * cat_depenetration
@@ -121,15 +122,15 @@ static mpe_param s_registry[] = {
     {"depenetration.correction_factor", "Correction Factor", "Fraction of penetration corrected per pass", p_float,
      cat_depenetration, &g_cfg.depenetration.correction_factor, 0.35, 0.0, 1.0, true},
 
-    {"depenetration.max_correction", "Max Correction", "Per-pass positional correction cap (m)", p_float,
-     cat_depenetration, &g_cfg.depenetration.max_correction, 0.2, 0.01, 0.5, true},
+    {"depenetration.max_correction", "Max Correction", "Per-pass positional correction cap (m): 0.2m/teleport per pass was a tunneling-scale jump; 0.02m resolves deep overlap over ticks via split+passes without teleporting (CCD/boundary own tunneling)", p_float,
+     cat_depenetration, &g_cfg.depenetration.max_correction, 0.02, 0.005, 0.1, true},
     /* TRUTH: depenetration.penetration_slop REMOVED from the registry — dead
      * since the single-slop unification (depenetration honors
      * solver.penetration_slop). The struct field remains for save-file
      * forward-compat but nothing reads it. Registry count unchanged (this
      * removal balances the sleep.enable addition at 77). */
 
-    {"depenetration.wake_depth_thresh", "Wake Depth Threshold", "Overlap depth that wakes sleeping pairs (m)", p_float,
+    {"depenetration.wake_depth_thresh", "Wake Depth Threshold", "Overlap depth that wakes sleeping pairs (m). TRUTH: kept at 0.02, NOT unified with split wake 0.01: measured 0.01 re-admits the F10 runaway (runmax 13.07 m/s ejection, sleep churn on resting residual) while 0.02 holds runmax 0.00. Resting stacks carry ~0.01 residual; the wake gate must clear it.", p_float,
      cat_depenetration, &g_cfg.depenetration.wake_depth_thresh, 0.02, 0.0, 0.1, true},
 
     {"depenetration.rebuild_iterations", "Rebuild Iterations", "Depenetration iterations after boundary rebuild", p_int,

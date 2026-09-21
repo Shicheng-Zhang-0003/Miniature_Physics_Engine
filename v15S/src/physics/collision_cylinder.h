@@ -9,10 +9,10 @@
 #include "../core/rigidbody.h"
 #include "collision_mechanics.h"
 
-/* Shared floor proxy (defined in collision_narrowphase.c, thread-local). */
-rigidbody *collision_static_plane_body_proxy(float plane_y, const mpe_config_t *cfg);
+/* Static plane proxy: caller provides storage, function fills it. */
+void collision_static_plane_body_proxy_fill(rigidbody *out, float plane_y, const mpe_config_t *cfg);
 
-bool collision_static_plane_cylinder(rigidbody *cyl, float plane_y, collision_data *out,
+bool collision_static_plane_cylinder(rigidbody *plane_body, rigidbody *cyl, float plane_y, collision_data *out,
                                      const mpe_config_t *cfg);
 bool collision_cylinder_sphere(rigidbody *cyl, rigidbody *sph, collision_data *out,
                                const mpe_config_t *cfg);

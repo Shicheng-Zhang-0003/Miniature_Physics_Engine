@@ -85,7 +85,7 @@ void a3_positional_depenetration_pass_dt(struct physics_world *world, broadphase
 
             collision_data floor_collision = {0};
 
-            if (collision_static_plane_body(rigid_body, 0.0f, &floor_collision, mpe_world_cfg(world))) {
+            if (collision_static_plane_body(&world->static_plane_body, rigid_body, 0.0f, &floor_collision, mpe_world_cfg(world))) {
                 a3_positional_depenetrate_manifold_w(world, &floor_collision);
             }
         }
@@ -159,6 +159,20 @@ void a3_positional_depenetrate_manifold_w(struct physics_world *world, collision
         b_sleeping = false;
     }
 
+    /* TRUTH: a DYNAMIC body boring into a sleeper must wake it (deep
+     * overlap), or depenetration shoves the dynamic aside while the sleeper
+     * sleeps through growing penetration = ghost tunneling. Static and
+     * both-sleeping cases above; these cover the asymmetric ones. */
+    if ((a_sleeping) && (!b_sleeping) && (max_depth > C->depenetration.wake_depth_thresh)) {
+        rigidbody_wake(body_a);
+        a_sleeping = false;
+    }
+
+    if ((b_sleeping) && (!a_sleeping) && (max_depth > C->depenetration.wake_depth_thresh)) {
+        rigidbody_wake(body_b);
+        b_sleeping = false;
+    }
+
     float inverse_mass_a = rigidbody_effective_inv_mass(body_a);
     float inverse_mass_b = rigidbody_effective_inv_mass(body_b);
     /* TRUTH: sleeping bodies with deep overlap already woken above, so
@@ -173,6 +187,15 @@ void a3_positional_depenetrate_manifold_w(struct physics_world *world, collision
     }
     float inverse_mass_sum = inverse_mass_a + inverse_mass_b;
 
+    /* TRUTH: if either body is sleeping and we didn't wake it (overlap
+     * below threshold), the sleeping body must not be moved by
+     * depenetration. Skip correction entirely to preserve sleep state. */
+    if ((a_sleeping || b_sleeping) && 
+        !((a_sleeping && b_sleeping && max_depth > C->depenetration.wake_depth_thresh) ||
+          (a_sleeping && body_b->static_state && max_depth > C->depenetration.wake_depth_thresh) ||
+          (b_sleeping && body_a->static_state && max_depth > C->depenetration.wake_depth_thresh))) {
+        return;
+    }
     if (inverse_mass_sum <= 0.0f) {
         return;
     }

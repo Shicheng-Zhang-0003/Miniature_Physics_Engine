@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include "math3d.h"
 #include "math4_special.h"
+#include "../config/mpe_config.h"
 typedef enum { object_sphere, object_cube, object_cylinder, object_custom } object_type; /* MPE_FTC_090 + modular custom */
 enum { OBJECT_SPHERE = object_sphere, OBJECT_CUBE = object_cube, OBJECT_CYLINDER = object_cylinder, OBJECT_CUSTOM = object_custom };
 typedef struct {
@@ -56,6 +57,12 @@ typedef struct {
      * core treats the body as a bounding-sphere for broadphase/CCD
      * until the plugin overrides those stages. */
     int custom_shape;
+    /* Index in physics_world->bodies array (set on add, updated on remove).
+     * Eliminates pointer arithmetic for O(1) body lookup in island building. */
+    int body_index;
+    /* Maximum relative velocity squared at contacts (for sleep check).
+     * Updated during contact processing; used for relative-velocity sleep gating. */
+    float max_relative_speed_sq;
 } rigidbody;
 void rigidbody_update_axes(rigidbody *rigid_body);
 void rigidbody_initialisation_sphere(rigidbody *rigid_body, float radius, float mass, vector3 position_input);
@@ -76,6 +83,8 @@ void rigidbody_set_kinematic(rigidbody *rigid_body, bool make_kinematic);
 
 void rb_integrate_velocity(rigidbody *rigid_body, float delta_time, float linear_damping, float angular_damping);
 void rb_integrate_position(rigidbody *rigid_body, float delta_time);
+void rb_integrate_position_exact(rigidbody *rigid_body, float delta_time, const mpe_config_t *cfg, bool free_flight);
+/* rb_integrate_position_free_flight_original REMOVED (was dead, invited double-counts). */
 
 /* Effective-mass helpers: sleeping/static/kinematic bodies behave as infinite
  * mass WITHOUT mutating stored inverse_mass/inertia. Use these in the solver,
