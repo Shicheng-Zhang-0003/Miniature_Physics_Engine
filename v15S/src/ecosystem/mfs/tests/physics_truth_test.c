@@ -9,8 +9,8 @@
 #include "core/physics_world.h"
 #include "physics/constraint.h"
 #include "config/mpe_config.h"
-#include "robotics_backup/robotics/robot.h"
-#include "robotics_backup/robotics/drivetrain.h"
+#include "modules/ftc/submodules/robot.h"
+#include "modules/ftc/submodules/drivetrain.h"
 
 static int tests_run = 0;
 static int tests_passed = 0;

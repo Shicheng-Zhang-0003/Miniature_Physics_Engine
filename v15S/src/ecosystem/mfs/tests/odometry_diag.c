@@ -5,8 +5,8 @@
 #include "core/physics_world.h"
 #include "physics/constraint.h"
 #include "config/mpe_config.h"
-#include "robotics_backup/robotics/robot.h"
-#include "robotics_backup/robotics/drivetrain.h"
+#include "modules/ftc/submodules/robot.h"
+#include "modules/ftc/submodules/drivetrain.h"
 
 static const float DT = 1.0f / 60.0f;
 
