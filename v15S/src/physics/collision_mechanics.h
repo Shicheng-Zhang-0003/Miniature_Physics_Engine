@@ -32,10 +32,18 @@ typedef struct {
     /* Poisson restitution state: Newtonian velocity bias is wrong for
      * multi-contact (it pays bounce per iteration). Instead the compression
      * phase accumulates unbiased impulse; the restitution pass then pays
-     * e * (this tick's compression impulse) once. impact_velocity gates the
-     * pass to fresh impacts; base_normal_impulse excludes warm start. */
+     * e * (this tick's compression impulse) once, where
+     * compression_this_tick = accumulated_normal_impulse - base_normal_impulse.
+     * impact_velocity gates the pass to fresh impacts. TRUTH: base INCLUDES
+     * the adopted warm-start impulse (excluding it would re-pay last tick's
+     * bounce every tick). */
     float impact_velocity;
     float base_normal_impulse;
+    /* RESERVED (ABI): compression fields predate the normal-minus-base
+     * formulation and are intentionally unwritten/unread. Kept so plugin
+     * struct layouts don't shift. Do not use. */
+    float base_compression_impulse;
+    float accumulated_compression_impulse;
     /* warmed REMOVED (dead provenance flag; SOR damping deleted with the
      * strict warm-start match — all contacts solve full steps). */
     /* NOTE: there is deliberately NO velocity-level Baumgarte bias field.
@@ -108,19 +116,19 @@ void collision_refresh_impact_velocities(collision_data *manifolds, int manifold
  * dynamic-box obstacles are paired by the swept broadphase but not TOI-clamped. */
 int collision_ccd_sweep_clamp(rigidbody *bodies, int body_count, float dt);
 int collision_ccd_sweep_clamp_full(rigidbody *bodies, int body_count, float dt, float *time_remaining_out,
-                                   const mpe_config_t *cfg);
+                                    const mpe_config_t *cfg, float *best_tois_out, unsigned char *hit_flags_out);
 /* World-aware CCD entry: forwards the world's config snapshot. */
 struct physics_world;
 int collision_ccd_sweep_clamp_world(struct physics_world *world, float dt);
 void contact_cache_save(struct physics_world *world, collision_data *manifolds, int count); /* MFS_131 */
 void contact_cache_clear(struct physics_world *world); /* MFS_131 */
 
-bool collision_static_plane_sphere(rigidbody *sphere, float plane_y, collision_data *collision_output_data,
+bool collision_static_plane_sphere(rigidbody *plane_body, rigidbody *sphere, float plane_y, collision_data *collision_output_data,
                                    const mpe_config_t *cfg);
-bool collision_static_plane_cube(rigidbody *cube, float plane_y, collision_data *collision_output_data,
+bool collision_static_plane_cube(rigidbody *plane_body, rigidbody *cube, float plane_y, collision_data *collision_output_data,
                                  const mpe_config_t *cfg);
-bool collision_static_plane_body(rigidbody *body, float plane_y, collision_data *collision_output_data,
-                                 const mpe_config_t *cfg);
+bool collision_static_plane_body(rigidbody *plane_body, rigidbody *body, float plane_y,
+                                  collision_data *collision_output_data, const mpe_config_t *cfg);
 
 void contact_cache_stats_reset(struct physics_world *world);
 int contact_cache_get_hits(const struct physics_world *world);

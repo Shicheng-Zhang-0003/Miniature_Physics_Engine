@@ -152,20 +152,44 @@ float broadphase_bounding_radius(rigidbody *rb) {
     if (!rb) {
         return 0.0f;
     }
+    /* TRUTH: never return non-finite/negative (callers square/compare it;
+     * NaN comparisons are false = dropped pair = false negative). Corrupt
+     * input degrades to a conservative span. */
+    float out = 0.5f;
     if (rb->type == object_sphere) {
-        return rb->radius;
+        out = rb->radius;
+    } else if (rb->type == object_cylinder) { /* MPE_FTC_091 */
+        if (isfinite(rb->radius) && isfinite(rb->cylinder_half_length)) {
+            out = sqrtf(rb->radius * rb->radius + rb->cylinder_half_length * rb->cylinder_half_length);
+        }
+    } else if (rb->type == object_custom) {
+        /* Foreign shape: radius, but never smaller than the box the plugin
+         * may actually occupy (old code ignored half_extensions and tunneled
+         * large customs). */
+        out = (isfinite(rb->radius) && rb->radius > 0.0f) ? rb->radius : 0.5f;
+        if (isfinite(rb->half_extensions.x) && isfinite(rb->half_extensions.y) &&
+            isfinite(rb->half_extensions.z)) {
+            float b = sqrtf(rb->half_extensions.x * rb->half_extensions.x +
+                            rb->half_extensions.y * rb->half_extensions.y +
+                            rb->half_extensions.z * rb->half_extensions.z);
+            if (isfinite(b) && b > out) {
+                out = b;
+            }
+        }
+    } else {
+        if (isfinite(rb->half_extensions.x) && isfinite(rb->half_extensions.y) &&
+            isfinite(rb->half_extensions.z)) {
+            out = sqrtf(rb->half_extensions.x * rb->half_extensions.x +
+                        rb->half_extensions.y * rb->half_extensions.y +
+                        rb->half_extensions.z * rb->half_extensions.z);
+        }
     }
-    if (rb->type == object_cylinder) { /* MPE_FTC_091 */
-        return sqrtf(rb->radius * rb->radius +
-                     rb->cylinder_half_length * rb->cylinder_half_length);
+    if (!isfinite(out) || out <= 0.0f) {
+        out = 0.5f;
+    } else if (out > 500.0f) {
+        out = 500.0f;
     }
-    if (rb->type == object_custom) {
-        /* Foreign shape: conservative sphere until plugin overrides. */
-        return rb->radius > 0.0f ? rb->radius : 0.5f;
-    }
-    return sqrtf(rb->half_extensions.x * rb->half_extensions.x +
-                 rb->half_extensions.y * rb->half_extensions.y +
-                 rb->half_extensions.z * rb->half_extensions.z);
+    return out;
 }
 
 static inline uint64_t a3_broadphase_pair_key(int object_a, int object_b) {
@@ -330,6 +354,7 @@ int broadphase_generate_pairing(struct physics_world *world, broadphase_pair *co
         ws->hash_table[i] = -1;
     }
     ws->node_count = 0;
+    int overflow_before = ws->node_overflow_count;
     broadphase_pair_dedupe_begin(ws);
     int collision_pair_counter = 0;
     for (int i = 0; i < body_count; i++) {
@@ -349,22 +374,60 @@ int broadphase_generate_pairing(struct physics_world *world, broadphase_pair *co
             extent_z = fabsf(axes[0].z) * rb->half_extensions.x + fabsf(axes[1].z) * rb->half_extensions.y +
                        fabsf(axes[2].z) * rb->half_extensions.z;
         }
+        if (!isfinite(extent_x) || extent_x < 0.0f) {
+            extent_x = 1.0f;
+        } else if (extent_x > 500.0f) {
+            extent_x = 500.0f;
+        }
+        if (!isfinite(extent_y) || extent_y < 0.0f) {
+            extent_y = 1.0f;
+        } else if (extent_y > 500.0f) {
+            extent_y = 500.0f;
+        }
+        if (!isfinite(extent_z) || extent_z < 0.0f) {
+            extent_z = 1.0f;
+        } else if (extent_z > 500.0f) {
+            extent_z = 500.0f;
+        }
         /* Swept AABB: expand by this tick's linear motion so a fast body
          * pairs with everything along its path (CCD needs the pair to
          * exist). Sleeping/static bodies don't move: no expansion.
          * TRUTH P1-19: add angular sweep |w|*R*dt (tip-speed bound). A fast
          * spinner sweeps a disc of radius R; linear-only expansion tunnels
-         * rotationally. Conservative: expands all axes uniformly. */
+         * rotationally. Conservative: expands all axes uniformly.
+         * TRUTH: corrupt dimensions (NaN radius/extents) degrade to a
+         * conservative span, never NaN arithmetic ((int)NaN is UB, NaN
+         * spans silently drop the body = false negative).
+         * TRUTH: clamp per-tick motion (Box2D maxTranslation 2.0m). Unbounded
+         * |v|*dt (150 m/s, Inf, NaN) explodes cell spans (floorf(Inf) is UB,
+         * millions of inserts exhaust the pool). NaN/negative collapse to 0. */
         if ((!rb->static_state) && (!rb->is_sleeping)) {
             float ang_sweep = vector3_length(rb->angular_velocity) * broadphase_bounding_radius(rb) * dt;
             if ((!isfinite(ang_sweep)) || (ang_sweep < 0.0f)) {
                 ang_sweep = 0.0f;
             }
-            extent_x += fabsf(rb->velocity.x) * dt + ang_sweep;
-            extent_y += fabsf(rb->velocity.y) * dt + ang_sweep;
-            extent_z += fabsf(rb->velocity.z) * dt + ang_sweep;
+            if (ang_sweep > 2.0f) {
+                ang_sweep = 2.0f;
+            }
+            float dx = fabsf(rb->velocity.x) * dt;
+            float dy = fabsf(rb->velocity.y) * dt;
+            float dz = fabsf(rb->velocity.z) * dt;
+            if (!isfinite(dx) || dx < 0.0f) dx = 0.0f; else if (dx > 2.0f) dx = 2.0f;
+            if (!isfinite(dy) || dy < 0.0f) dy = 0.0f; else if (dy > 2.0f) dy = 2.0f;
+            if (!isfinite(dz) || dz < 0.0f) dz = 0.0f; else if (dz > 2.0f) dz = 2.0f;
+            extent_x += dx + ang_sweep;
+            extent_y += dy + ang_sweep;
+            extent_z += dz + ang_sweep;
         }
+        /* TRUTH: guard cell_size (bad config 0/NaN -> X/0=Inf, (int)Inf is
+         * UB, loop hangs/OOMs). Fall back to default, then 1.0. */
         float cell_size = ws->current_cell_size;
+        if (!(cell_size > 1e-6f) || !isfinite(cell_size)) {
+            cell_size = mpe_world_cfg(world)->broadphase.cell_size_default;
+        }
+        if (!(cell_size > 1e-6f) || !isfinite(cell_size)) {
+            cell_size = 1.0f;
+        }
         int min_x = (int) floorf((rb->position.x - extent_x) / cell_size);
         int max_x = (int) floorf((rb->position.x + extent_x) / cell_size);
         int min_y = (int) floorf((rb->position.y - extent_y) / cell_size);
@@ -417,7 +480,17 @@ int broadphase_generate_pairing(struct physics_world *world, broadphase_pair *co
                         rigidbody *rb_b = &bodies[max_obj];
                         /* TRUTH: swept-insert then unswept cull tunnels fast bodies.
                          * Cells prove swept-AABB overlap; cull must be swept too.
-                         * Expand by relative displacement over dt (linear + tip). */
+                         * Expand by relative displacement over dt (linear + tip),
+                         * clamped like inserts (Box2D-style 2m/4m budgets), PLUS
+                         * the solver slop band: resting pairs at dist =
+                         * rad_sum + slop are admitted downstream (pen >= -slop)
+                         * and must not be culled here (missed friction).
+                         * TRUTH: non-finite inputs emit fail-closed (a corrupt
+                         * body pairs with its cell neighborhood, never drops).
+                         * Pair-buffer exhaustion counts telemetry; the 64K cap
+                         * exceeds any validated scene (overflow asserts zero in
+                         * stress/F8). If it ever fires, the run is degraded:
+                         * see overflow counters, do not trust the tick. */
                         vector3 dp = vector3_subtraction(rb_a->position, rb_b->position);
                         float dist_sq = vector3_length_squared(dp);
                         float rad_sum = broadphase_bounding_radius(rb_a) + broadphase_bounding_radius(rb_b);
@@ -438,12 +511,24 @@ int broadphase_generate_pairing(struct physics_world *world, broadphase_pair *co
                                 wb = 0.0f;
                             }
                             sweep = (vrel + wa + wb) * dt;
+                            if (!isfinite(sweep) || sweep < 0.0f) {
+                                sweep = 0.0f;
+                            } else if (sweep > 4.0f) {
+                                sweep = 4.0f;
+                            }
                         }
-                        float swept_sum = rad_sum + sweep;
-                        if (!isfinite(swept_sum) || swept_sum < 0.0f) {
-                            swept_sum = rad_sum;
+                        float slop_bp = mpe_world_cfg(world)->solver.penetration_slop;
+                        if (!isfinite(slop_bp) || slop_bp < 0.0f) {
+                            slop_bp = 0.0f;
                         }
-                        if (dist_sq <= swept_sum * swept_sum) {
+                        float swept_sum = rad_sum + slop_bp + sweep;
+                        bool cull_hit = false;
+                        if (!isfinite(dist_sq) || !isfinite(swept_sum)) {
+                            cull_hit = true; /* fail-closed on corrupt input */
+                        } else if (dist_sq <= swept_sum * swept_sum) {
+                            cull_hit = true;
+                        }
+                        if (cull_hit) {
                             if (collision_pair_counter < maximum_pairs_allowed) {
                                 collision_pairs_output_array[collision_pair_counter].object_index_a = min_obj;
                                 collision_pairs_output_array[collision_pair_counter].object_index_b = max_obj;
@@ -457,6 +542,47 @@ int broadphase_generate_pairing(struct physics_world *world, broadphase_pair *co
                 next_node_idx = ws->node_pool[next_node_idx].next_entry;
             }
             node_idx = ws->node_pool[node_idx].next_entry;
+        }
+    }
+    /* Fail-closed: node-pool exhaustion drops cell inserts (false negatives).
+     * If any insert failed this tick, supplement with brute-force swept
+     * pairing over all i<j not already emitted. O(n^2) only on overflow
+     * ticks; guarantees the broadphase never misses. */
+    if (ws->node_overflow_count != overflow_before) {
+        for (int ai = 0; ai < body_count && collision_pair_counter < maximum_pairs_allowed; ai++) {
+            for (int bi = ai + 1; bi < body_count && collision_pair_counter < maximum_pairs_allowed; bi++) {
+                if (pair_already_checked(ws, ai, bi)) continue;
+                rigidbody *rb_a = &bodies[ai];
+                rigidbody *rb_b = &bodies[bi];
+                vector3 dp = vector3_subtraction(rb_a->position, rb_b->position);
+                float dist_sq = vector3_length_squared(dp);
+                float rad_sum = broadphase_bounding_radius(rb_a) + broadphase_bounding_radius(rb_b);
+                float sweep = 0.0f;
+                if ((!rb_a->static_state && !rb_a->is_sleeping) ||
+                    (!rb_b->static_state && !rb_b->is_sleeping)) {
+                    vector3 dv = vector3_subtraction(rb_a->velocity, rb_b->velocity);
+                    float vrel = vector3_length(dv);
+                    float wa = vector3_length(rb_a->angular_velocity) * broadphase_bounding_radius(rb_a);
+                    float wb = vector3_length(rb_b->angular_velocity) * broadphase_bounding_radius(rb_b);
+                    if (!isfinite(vrel)) vrel = 0.0f;
+                    if (!isfinite(wa)) wa = 0.0f;
+                    if (!isfinite(wb)) wb = 0.0f;
+                    sweep = (vrel + wa + wb) * dt;
+                    if (!isfinite(sweep) || sweep < 0.0f) sweep = 0.0f;
+                    else if (sweep > 4.0f) sweep = 4.0f;
+                }
+                float slop_fb = mpe_world_cfg(world)->solver.penetration_slop;
+                if (!isfinite(slop_fb) || slop_fb < 0.0f) slop_fb = 0.0f;
+                float swept_sum = rad_sum + slop_fb + sweep;
+                bool fb_hit = false;
+                if (!isfinite(dist_sq) || !isfinite(swept_sum)) fb_hit = true;
+                else if (dist_sq <= swept_sum * swept_sum) fb_hit = true;
+                if (fb_hit) {
+                    collision_pairs_output_array[collision_pair_counter].object_index_a = ai;
+                    collision_pairs_output_array[collision_pair_counter].object_index_b = bi;
+                    collision_pair_counter++;
+                }
+            }
         }
     }
     return collision_pair_counter;

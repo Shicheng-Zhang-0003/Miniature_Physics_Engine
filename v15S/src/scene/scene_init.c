@@ -65,16 +65,21 @@ void scene_assign_new_identity(int object_index) {
 }
 
 int scene_ensure_pool_capacity(int required_capacity) {
-    /* Primary world preallocates the full body pool at init; capacity is
-     * always mpe_max_bodies once allocated. */
+    /* Growable pools: grow on demand to the compile-time ceiling. */
     if (required_capacity <= 0) {
         return 1;
     }
     scene_ensure_primary();
     physics_world *world = physics_world_get_primary();
-    if ((!world->bodies) || (world->body_capacity < required_capacity)) {
+    if (!world->bodies) {
         fprintf(stderr, "Error POOL23: Physics heap unavailable.\n");
         return 0;
+    }
+    while (world->body_capacity < required_capacity) {
+        if (world->body_capacity >= mpe_max_bodies || physics_world_grow_bodies(world) != 0) {
+            fprintf(stderr, "Error POOL23: Physics heap unavailable.\n");
+            return 0;
+        }
     }
     return 1;
 }
@@ -164,9 +169,16 @@ static void scene_resolve_spawn_overlap(int new_object_index) {
 
 int scene_add_object(float radius, float mass, vector3 initial_position) {
     scene_allocate_pool();
-    if ((physics_world_get_primary()->body_count) >= mpe_max_bodies) {
+    physics_world *world = physics_world_get_primary();
+    if (world->body_count >= mpe_max_bodies) {
         fprintf(stderr, "Error POOL01: Maximum object capacity reached.\n");
         return -1;
+    }
+    if (world->body_count >= world->body_capacity) {
+        if (physics_world_grow_bodies(world) != 0) {
+            fprintf(stderr, "Error POOL01: Body pool growth failed.\n");
+            return -1;
+        }
     }
     rigidbody_initialisation_sphere(&(physics_world_get_primary()->bodies)[(physics_world_get_primary()->body_count)], radius, mass, initial_position);
     int current_object_index = (physics_world_get_primary()->body_count);
@@ -179,9 +191,16 @@ int scene_add_object(float radius, float mass, vector3 initial_position) {
 
 int scene_add_cube(vector3 position, vector3 half_extensions, float mass) {
     scene_allocate_pool();
-    if ((physics_world_get_primary()->body_count) >= mpe_max_bodies) {
+    physics_world *cworld = physics_world_get_primary();
+    if (cworld->body_count >= mpe_max_bodies) {
         fprintf(stderr, "Error POOL01: Maximum object capacity reached.\n");
         return -1;
+    }
+    if (cworld->body_count >= cworld->body_capacity) {
+        if (physics_world_grow_bodies(cworld) != 0) {
+            fprintf(stderr, "Error POOL01: Body pool growth failed.\n");
+            return -1;
+        }
     }
     rigidbody_initialisation_cube(&(physics_world_get_primary()->bodies)[(physics_world_get_primary()->body_count)], position, half_extensions, mass);
     int current_object_index = (physics_world_get_primary()->body_count);
@@ -194,9 +213,16 @@ int scene_add_cube(vector3 position, vector3 half_extensions, float mass) {
 
 int scene_add_cylinder(float radius, float half_length, float mass, vector3 initial_position) {
     scene_allocate_pool();
-    if ((physics_world_get_primary()->body_count) >= mpe_max_bodies) {
+    physics_world *yworld = physics_world_get_primary();
+    if (yworld->body_count >= mpe_max_bodies) {
         fprintf(stderr, "Error POOL01: Maximum object capacity reached.\n");
         return -1;
+    }
+    if (yworld->body_count >= yworld->body_capacity) {
+        if (physics_world_grow_bodies(yworld) != 0) {
+            fprintf(stderr, "Error POOL01: Body pool growth failed.\n");
+            return -1;
+        }
     }
     rigidbody_initialisation_cylinder(&(physics_world_get_primary()->bodies)[(physics_world_get_primary()->body_count)],
                                       radius, half_length, mass, initial_position);
@@ -225,6 +251,7 @@ void scene_remove_object_by_index(int object_index) {
 
     for (int i = object_index; i < (physics_world_get_primary()->body_count) - 1; i++) {
         (physics_world_get_primary()->bodies)[i] = (physics_world_get_primary()->bodies)[i + 1];
+        (physics_world_get_primary()->bodies)[i].body_index = i;
     }
 
     (physics_world_get_primary()->body_count) -= 1;

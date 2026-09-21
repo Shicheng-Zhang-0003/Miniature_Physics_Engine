@@ -25,6 +25,7 @@
 #include "frame_timer.h"
 #include <math.h>
 #include <stdbool.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -80,8 +81,12 @@ void simulation_physics_tick(float frame_delta_time) {
     }
     float linear_damping_factor =
         (float) det_pow_retention((double) leg_cfg->world.drag, (double) fixed_physics_dt);
-    float angular_damping_factor = (float) det_pow_retention(
-        (double) (leg_cfg->world.drag * leg_cfg->world.angular_damping_scale), (double) fixed_physics_dt);
+    /* TRUTH: scale=1.0 means no extra rotary damping (matches canonical). */
+    float angular_damping_factor = (leg_cfg->world.angular_damping_scale >= 1.0f)
+                                       ? 1.0f
+                                       : (float) det_pow_retention(
+                                             (double) (leg_cfg->world.drag * leg_cfg->world.angular_damping_scale),
+                                             (double) fixed_physics_dt);
     debug_last_manifold_overflow_count = 0;
     /* All simulation state lives in the primary world; this tick only
      * borrows it (scratch included). Worlds that failed init degrade
@@ -99,6 +104,12 @@ void simulation_physics_tick(float frame_delta_time) {
         /* Sanitize all bodies */
         for (int sanitize_index = 0; sanitize_index < world->body_count; sanitize_index++) {
             rigidbody_sanitize(&world->bodies[sanitize_index]);
+        }
+        /* TRUTH: reset per-tick relative-speed scratch for sleep gating
+         * (mirrors physics_world_step; prepare writes the max). Without
+         * reset the legacy path accumulates stale maxima forever. */
+        for (int rel_index = 0; rel_index < world->body_count; rel_index++) {
+            world->bodies[rel_index].max_relative_speed_sq = 0.0f;
         }
         /* CCD: clamp fast bodies to TOI pose (see physics_world.c).
          * TRUTH P0-3: remainder recorded for post-solve integration. */
@@ -186,7 +197,7 @@ void simulation_physics_tick(float frame_delta_time) {
             }
             bool was_sleeping = floor_rigid_body->is_sleeping;
             collision_data floor_collision = {0};
-            if (collision_static_plane_body(floor_rigid_body, 0.0f, &floor_collision,
+            if (collision_static_plane_body(&world->static_plane_body, floor_rigid_body, 0.0f, &floor_collision,
                                             mpe_world_cfg(world))) {
                 if (manifold_count < a3_max_manifolds) {
                     float deepest = 0.0f;
@@ -241,6 +252,11 @@ void simulation_physics_tick(float frame_delta_time) {
         for (int mi = 0; mi < world->tick_module_count; mi++) {
             if (world->tick_modules[mi] && world->tick_modules[mi]->pre_step) {
                 world->tick_modules[mi]->pre_step(world, fixed_physics_dt, world->tick_module_state[mi]);
+            }
+        }
+        if (world->tick_v0 && world->tick_v0_capacity >= mpe_max_bodies) {
+            for (int si = 0; si < world->body_count; si++) {
+                world->tick_v0[si] = world->bodies[si].velocity;
             }
         }
         for (int vi = 0; vi < world->body_count; vi++) {
@@ -359,10 +375,52 @@ void simulation_physics_tick(float frame_delta_time) {
                 sleep_restore_body->angular_velocity = vector3_zero();
             }
         }
-        /* Integrate position + boundary + depenetration
-         * TRUTH P0-1+P0-3: CCD remainder + gravity-exact free flight. */
+        /* Integrate position + boundary + depenetration.
+         * Exact free-flight lives in rb_integrate_position_exact (analytic
+         * from v_pre, includes 0.5*g*dt^2). rb_integrate_position is the
+         * SAFE default (constrained symplectic on live velocity); free
+         * flight must call exact explicitly after restoring v_pre. No
+         * manual half-leg anywhere: it would double-count gravity. */
         bool a3_boundary_moved_any = false;
-        float grav_half_leg = -0.5f * mpe_world_cfg(world)->world.gravity;
+        const mpe_config_t *leg_pos_cfg = mpe_world_cfg(world);
+        /* PHYSICS-FIX: legacy path now shares the canonical joint gate.
+         * Jointed contact-free bodies are constrained (joint impulses own
+         * their velocity); analytic free-flight from v_pre would discard
+         * the joint solve. Bitmap precomputed once O(J+B). */
+        static _Thread_local unsigned char leg_joint[mpe_max_bodies];
+        {
+            int n = world->body_count;
+            if (n > mpe_max_bodies) {
+                n = mpe_max_bodies;
+            }
+            memset(leg_joint, 0, (size_t) n);
+            for (int ji = 0; ji < mpe_max_joints; ji++) {
+                if (!world->revolute_constraints[ji].is_active) {
+                    continue;
+                }
+                int ia = physics_world_index_by_id(world, world->revolute_constraints[ji].body_id_a);
+                int ib = physics_world_index_by_id(world, world->revolute_constraints[ji].body_id_b);
+                if (ia >= 0 && ia < n) {
+                    leg_joint[ia] = 1;
+                }
+                if (ib >= 0 && ib < n) {
+                    leg_joint[ib] = 1;
+                }
+            }
+            for (int ji = 0; ji < mpe_max_joints; ji++) {
+                if (!world->spring_joints[ji].is_active) {
+                    continue;
+                }
+                int ia = physics_world_index_by_id(world, world->spring_joints[ji].object_id_a);
+                int ib = physics_world_index_by_id(world, world->spring_joints[ji].object_id_b);
+                if (ia >= 0 && ia < n) {
+                    leg_joint[ia] = 1;
+                }
+                if (ib >= 0 && ib < n) {
+                    leg_joint[ib] = 1;
+                }
+            }
+        }
         for (int object_iterator_index = 0; object_iterator_index < world->body_count; object_iterator_index++) {
             rigidbody *rigid_body = &world->bodies[object_iterator_index];
             float step_dt = fixed_physics_dt;
@@ -370,18 +428,27 @@ void simulation_physics_tick(float frame_delta_time) {
                 (world->ccd_time_remaining[object_iterator_index] > 0.0f)) {
                 step_dt = world->ccd_time_remaining[object_iterator_index];
             }
-            rb_integrate_position(rigid_body, step_dt);
-            bool free_flight = (world->has_contact) ? (world->has_contact[object_iterator_index] == 0) : true;
-            if (free_flight && (!rigid_body->static_state) && (!rigid_body->is_sleeping) &&
-                (!rigid_body->kinematic) && (step_dt > 0.0f)) {
-                rigid_body->position.y += grav_half_leg * step_dt * step_dt;
+            /* Contact-free AND joint-free bodies take analytic free-flight
+             * from v_pre; constrained bodies keep post-solve velocity
+             * (solver/joints own them). Per-world cfg (was &g_cfg global):
+             * multi-world gravity/drag diverge from canonical otherwise. */
+            bool leg_contact_free =
+                (world->has_contact) ? (world->has_contact[object_iterator_index] == 0) : true;
+            bool leg_joint_free = (object_iterator_index < mpe_max_bodies)
+                ? (leg_joint[object_iterator_index] == 0)
+                : false;
+            bool leg_free = leg_contact_free && leg_joint_free;
+            if (leg_free && world->tick_v0 && world->tick_v0_capacity >= mpe_max_bodies) {
+                rigid_body->velocity = world->tick_v0[object_iterator_index];
             }
+            rb_integrate_position_exact(rigid_body, step_dt, leg_pos_cfg, leg_free);
             rigidbody_sanitize(rigid_body);
             /* TRUTH: unified safety net with world path (box always). Old
              * debug floor-only let bodies escape sideways in debug, diverging
              * from headless. Solver owns normal contact; boundary is plastic. */
             vector3 a3_pre_boundary_position = rigid_body->position;
-            boundary_apply_box(rigid_body, (vector3){-250, 0, -250}, (vector3){250, 500, 250});
+            boundary_apply_box_cfg(rigid_body, (vector3){-250, 0, -250}, (vector3){250, 500, 250},
+                                   mpe_world_cfg(world));
             if (vector3_length_squared(vector3_subtraction(rigid_body->position, a3_pre_boundary_position)) > 0.000001f) {
                 a3_boundary_moved_any = true;
             }

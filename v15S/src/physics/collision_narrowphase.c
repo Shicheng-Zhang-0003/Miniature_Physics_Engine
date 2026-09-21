@@ -14,8 +14,19 @@
 bool collision_dual_sphere(rigidbody *rigidbody_object_a, rigidbody *rigidbody_object_b,
                            collision_data *collision_output_data, const mpe_config_t *cfg) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
+    /* TRUTH: degenerate spheres (NaN/radius<=0) must return false, never a
+     * phantom zero-depth contact with an arbitrary +Y normal. */
+    if (!isfinite(rigidbody_object_a->radius) || !isfinite(rigidbody_object_b->radius)) {
+        return false;
+    }
+    if (rigidbody_object_a->radius <= 0.0f || rigidbody_object_b->radius <= 0.0f) {
+        return false;
+    }
     vector3 relative_position_vector = vector3_subtraction(rigidbody_object_b->position, rigidbody_object_a->position);
     float distance_between_centres_squared = vector3_length_squared(relative_position_vector);
+    if (!isfinite(distance_between_centres_squared)) {
+        return false;
+    }
     float total_combined_radius = rigidbody_object_a->radius + rigidbody_object_b->radius;
     /* TRUTH P0-4: slop-band persistence parity with cube/cylinder/floor.
      * Resting spheres at exact contact (dist == r1+r2) must report a
@@ -55,7 +66,22 @@ float project_obb(rigidbody *rigid_body, vector3 axis, vector3 axes[3]) {
 bool collision_sphere_cube(rigidbody *sphere, rigidbody *cube, collision_data *collision_output_data,
                            const mpe_config_t *cfg) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
+    /* TRUTH: degenerate inputs must return false, never phantom contacts.
+     * Zero-radius spheres and NaN cube geometry previously emitted
+     * slop-band contacts with NaN closest points. */
+    if (!isfinite(sphere->radius) || sphere->radius <= 0.0f) {
+        return false;
+    }
+    if (!isfinite(cube->half_extensions.x) || !isfinite(cube->half_extensions.y) ||
+        !isfinite(cube->half_extensions.z)) {
+        return false;
+    }
     vector3 *axes_cube = cube->cached_axes;
+    for (int ai = 0; ai < 3; ai++) {
+        if (!isfinite(axes_cube[ai].x) || !isfinite(axes_cube[ai].y) || !isfinite(axes_cube[ai].z)) {
+            return false;
+        }
+    }
     vector3 relative_position = vector3_subtraction(sphere->position, cube->position);
     vector3 closest_point = cube->position;
     bool inside = true;
@@ -372,6 +398,14 @@ static void a3_task04_enforce_cube_normal_consistency(collision_data *collision_
 
 bool collision_dual_cube(rigidbody *cube_a, rigidbody *cube_b, collision_data *collision_output_data,
                          const mpe_config_t *cfg) {
+    /* TRUTH: slop-band parity with sphere/cylinder/floor paths. Strict
+     * overlap<0 rejection drops resting pairs sitting at gap<=slop
+     * (friction flicker, sleep churn). Admit pen>=-slop everywhere. */
+    const mpe_config_t *C = cfg ? cfg : &g_cfg;
+    float slop_sat = C->solver.penetration_slop;
+    if (!isfinite(slop_sat) || slop_sat < 0.0f) {
+        slop_sat = 0.0f;
+    }
     vector3 *axes_a = cube_a->cached_axes;
     vector3 *axes_b = cube_b->cached_axes;
     vector3 relative_position = vector3_subtraction(cube_b->position, cube_a->position);
@@ -389,7 +423,7 @@ bool collision_dual_cube(rigidbody *cube_a, rigidbody *cube_b, collision_data *c
         float projection_b = project_obb(cube_b, axis, axes_b);
         float distance = fabsf(vector3_dot(relative_position, axis));
         float overlap = projection_a + projection_b - distance;
-        if (overlap < 0.0f) {
+        if (overlap < -slop_sat) {
             return false;
         }
         if (overlap < face_minimum_overlap) {
@@ -409,7 +443,7 @@ bool collision_dual_cube(rigidbody *cube_a, rigidbody *cube_b, collision_data *c
             float projection_b = project_obb(cube_b, axis, axes_b);
             float distance = fabsf(vector3_dot(relative_position, axis));
             float overlap = projection_a + projection_b - distance;
-            if (overlap < 0.0f) {
+            if (overlap < -slop_sat) {
                 return false;
             }
             if (overlap < edge_minimum_overlap) {
@@ -548,7 +582,10 @@ bool collision_dual_cube(rigidbody *cube_a, rigidbody *cube_b, collision_data *c
 
         contact_point_data *cp = &collision_output_data->contacts[0];
         cp->position = contact_point;
-        cp->penetration = minimum_overlap;
+        /* TRUTH: slop-band admission (SAT above) can yield minimum_overlap
+         * in [-slop,0): clamp to zero-depth (friction persistence only),
+         * never hand the solver a negative penetration. */
+        cp->penetration = (minimum_overlap > 0.0f) ? minimum_overlap : 0.0f;
         collision_output_data->contact_count = 1;
 
         float parallel_alignment = fabsf(bb);
@@ -594,7 +631,7 @@ bool collision_dual_cube(rigidbody *cube_a, rigidbody *cube_b, collision_data *c
                     contact_point_data *extra_cp =
                         &collision_output_data->contacts[collision_output_data->contact_count];
                     extra_cp->position = sample_contact_point;
-                    extra_cp->penetration = minimum_overlap;
+                    extra_cp->penetration = (minimum_overlap > 0.0f) ? minimum_overlap : 0.0f;
                     collision_output_data->contact_count++;
                 }
             }
@@ -621,35 +658,27 @@ bool collision_dual_cube(rigidbody *cube_a, rigidbody *cube_b, collision_data *c
     return true;
 }
 
-rigidbody *collision_static_plane_body_proxy(float plane_y, const mpe_config_t *cfg) {
-    /* Thread-local so concurrent worlds/threads never share mutable state.
+/* Fill a caller-provided static plane proxy body.
+     * No thread-local state - caller owns the storage.
      * restitution=1.0 is intentionally neutral: effective bounce is
      * min(body_restitution, 1.0) == body_restitution. */
-    static _Thread_local rigidbody static_plane_body;
-    static _Thread_local int static_plane_initialized = 0;
-
-    if (!static_plane_initialized) {
-        rigidbody_initialisation_sphere(&static_plane_body, 1.0f, 0.0f, (vector3){0.0f, plane_y, 0.0f});
-        static_plane_body.static_state = true;
-        static_plane_body.inverse_mass = 0.0f;
-        static_plane_body.inverse_inertia_tensor_local = (math3){{{0}}};
-        static_plane_body.inverse_inertia_system = (math3){{{0}}};
-        static_plane_body.restitution = 1.0f; /* A3_HOTFIX_FLOOR_BOUNCE */
-        static_plane_body.object_id = 0xFFFFFFFFu; /* A3_PATCH_16_FLOOR_MANIFOLD */
-        static_plane_body.object_generation = 1;
-        static_plane_initialized = 1;
-    }
-
-    static_plane_body.position.y = plane_y;
+    void collision_static_plane_body_proxy_fill(rigidbody *out, float plane_y, const mpe_config_t *cfg) {
+    rigidbody_initialisation_sphere(out, 1.0f, 0.0f, (vector3){0.0f, plane_y, 0.0f});
+    out->static_state = true;
+    out->inverse_mass = 0.0f;
+    out->inverse_inertia_tensor_local = (math3){{{0}}};
+    out->inverse_inertia_system = (math3){{{0}}};
+    out->restitution = 1.0f; /* A3_HOTFIX_FLOOR_BOUNCE */
+    out->object_id = 0xFFFFFFFFu; /* A3_PATCH_16_FLOOR_MANIFOLD */
+    out->object_generation = 1;
+    out->body_index = -1; /* Not in world's body array */
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
-    static_plane_body.friction_static = C->world.floor_friction_s;
-    static_plane_body.friction_kinetic = C->world.floor_friction_k;
-
-    return &static_plane_body;
+    out->friction_static = C->world.floor_friction_s;
+    out->friction_kinetic = C->world.floor_friction_k;
 }
 
-bool collision_static_plane_sphere(rigidbody *sphere, float plane_y, collision_data *collision_output_data,
-                                   const mpe_config_t *cfg) {
+bool collision_static_plane_sphere(rigidbody *plane_body, rigidbody *sphere, float plane_y,
+                                    collision_data *collision_output_data, const mpe_config_t *cfg) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
     if (sphere->type != object_sphere) {
         return false;
@@ -664,8 +693,6 @@ bool collision_static_plane_sphere(rigidbody *sphere, float plane_y, collision_d
         return false;
     }
 
-    rigidbody *plane_body = collision_static_plane_body_proxy(plane_y, cfg);
-
     collision_output_data->object_a = sphere;
     collision_output_data->object_b = plane_body;
     collision_output_data->normal_vector = (vector3){0.0f, -1.0f, 0.0f};
@@ -678,7 +705,7 @@ bool collision_static_plane_sphere(rigidbody *sphere, float plane_y, collision_d
     return true;
 }
 
-bool collision_static_plane_cube(rigidbody *cube, float plane_y, collision_data *collision_output_data,
+bool collision_static_plane_cube(rigidbody *plane_body, rigidbody *cube, float plane_y, collision_data *collision_output_data,
                                  const mpe_config_t *cfg) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
     if (cube->type != object_cube) {
@@ -723,7 +750,7 @@ bool collision_static_plane_cube(rigidbody *cube, float plane_y, collision_data 
         return false;
     }
 
-    rigidbody *plane_body = collision_static_plane_body_proxy(plane_y, cfg);
+    // collision_static_plane_body_proxy_fill removed
 
     collision_output_data->object_a = cube;
     collision_output_data->object_b = plane_body;
@@ -760,14 +787,18 @@ bool collision_static_plane_cube(rigidbody *cube, float plane_y, collision_data 
     return true;
 }
 
-bool collision_static_plane_body(rigidbody *body, float plane_y, collision_data *collision_output_data,
-                                 const mpe_config_t *cfg) {
-    if (body->type == object_cylinder) {return collision_static_plane_cylinder(body, plane_y, collision_output_data, cfg);}
+bool collision_static_plane_body(rigidbody *plane_body, rigidbody *body, float plane_y,
+                                 collision_data *collision_output_data, const mpe_config_t *cfg) {
+    collision_output_data->object_a = body;
+    collision_output_data->object_b = plane_body;
+    collision_output_data->normal_vector = (vector3){0.0f, -1.0f, 0.0f};
+    collision_output_data->contact_count = 0;
+    if (body->type == object_cylinder) {return collision_static_plane_cylinder(plane_body, body, plane_y, collision_output_data, cfg);}
     if (body->type == object_sphere) {
-        return collision_static_plane_sphere(body, plane_y, collision_output_data, cfg);
+        return collision_static_plane_sphere(plane_body, body, plane_y, collision_output_data, cfg);
     }
     if (body->type == object_cube) {
-        return collision_static_plane_cube(body, plane_y, collision_output_data, cfg);
+        return collision_static_plane_cube(plane_body, body, plane_y, collision_output_data, cfg);
     }
     return false;
 }
