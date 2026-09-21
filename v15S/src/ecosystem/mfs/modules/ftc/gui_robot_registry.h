@@ -5,8 +5,8 @@
 #ifndef gui_robot_registry_h
 #define gui_robot_registry_h
 
-#include "robot.h"
-#include "drivetrain.h"
+#include "submodules/robot.h"
+#include "submodules/drivetrain.h"
 #include "core/physics_world.h"
 
 #define MFS_MAX_GUI_ROBOTS 4

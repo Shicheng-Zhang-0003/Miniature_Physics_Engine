@@ -1,6 +1,6 @@
 /* FTC robot fleet implementation. */
 #include "ftc_fleet.h"
-#include "drivetrain.h"
+#include "submodules/drivetrain.h"
 #include <stdlib.h>
 #include <string.h>
 
