@@ -6,16 +6,19 @@
 #include "../core/rigidbody.h"
 #include "../config/mpe_config.h"
 #include "../config/mpe_constants.h"
-#include "../scene/scene_init.h"
-#include "../ui_input/camera.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 #include <stdbool.h>
+
+#ifndef MPE_HEADLESS
+#include "../scene/scene_init.h"
+#include "../ui_input/camera.h"
 #include <epoxy/gl.h>
 
 extern camera main_camera_fov;
 rigidbody *scene_resolve_object_by_id(uint32_t id);
+#endif
 
 /* Per-world spring pool. No file-scope pool remains. */
 
@@ -277,6 +280,8 @@ void remove_joints_from_object(physics_world *world, int object_index) {
     remove_joints_from_object_id(world, world->bodies[object_index].object_id);
 }
 
+#ifndef MPE_HEADLESS
+
 static GLuint joint_vao = 0;
 static GLuint joint_vbo = 0;
 
@@ -425,3 +430,5 @@ void spring_joint_render(GLuint shader_program, math4 view_matrix, math4 project
     glDrawArrays(GL_LINES, 0, active_count * 2);
     glBindVertexArray(0);
 }
+
+#endif /* MPE_HEADLESS */

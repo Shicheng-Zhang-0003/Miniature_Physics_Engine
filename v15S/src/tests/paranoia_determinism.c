@@ -6,6 +6,18 @@
 #include "physics/constraint.h"
 #include "config/mpe_config.h"
 
+static int bodies_bitwise_equal(const rigidbody *a, const rigidbody *b) {
+    if (a->position.x != b->position.x || a->position.y != b->position.y || a->position.z != b->position.z) return 0;
+    if (a->velocity.x != b->velocity.x || a->velocity.y != b->velocity.y || a->velocity.z != b->velocity.z) return 0;
+    if (a->acceleration.x != b->acceleration.x || a->acceleration.y != b->acceleration.y || a->acceleration.z != b->acceleration.z) return 0;
+    if (a->orientation.w != b->orientation.w || a->orientation.x != b->orientation.x || a->orientation.y != b->orientation.y || a->orientation.z != b->orientation.z) return 0;
+    if (a->angular_velocity.x != b->angular_velocity.x || a->angular_velocity.y != b->angular_velocity.y || a->angular_velocity.z != b->angular_velocity.z) return 0;
+    if (a->angular_acceleration.x != b->angular_acceleration.x || a->angular_acceleration.y != b->angular_acceleration.y || a->angular_acceleration.z != b->angular_acceleration.z) return 0;
+    if (a->force_accumulator.x != b->force_accumulator.x || a->force_accumulator.y != b->force_accumulator.y || a->force_accumulator.z != b->force_accumulator.z) return 0;
+    if (a->torque_accumulator.x != b->torque_accumulator.x || a->torque_accumulator.y != b->torque_accumulator.y || a->torque_accumulator.z != b->torque_accumulator.z) return 0;
+    return 1;
+}
+
 int main(void) {
     mpe_config_init();
     int fail = 0;
@@ -51,13 +63,7 @@ int main(void) {
         int mismatch = 0;
         if (w1.body_count != w2.body_count) { mismatch = 1; }
         for (int i = 0; i < w1.body_count && !mismatch; i++) {
-            rigidbody *a = &w1.bodies[i];
-            rigidbody *b = &w2.bodies[i];
-            float *fa = &a->position.x;
-            float *fb = &b->position.x;
-            for (int k = 0; k < 3 + 3 + 4 + 3 + 3 + 3 + 3; k++) { /* pos, vel, quat, angvel, acc, angacc, force, torque */
-                if (fa[k] != fb[k]) { mismatch = 1; break; }
-            }
+            if (!bodies_bitwise_equal(&w1.bodies[i], &w2.bodies[i])) { mismatch = 1; break; }
         }
 
         if (mismatch) { printf("[FAIL] twin worlds diverged\n"); fail = 1; }
@@ -66,7 +72,7 @@ int main(void) {
         physics_world_cleanup(&w2);
     }
 
-    /* Test 2: Deterministic across scene save/load */
+    /* Test 2: Deterministic across re-initialization (same initial conditions, same ticks) */
     {
         physics_world world;
         physics_world_init(&world);
@@ -83,9 +89,6 @@ int main(void) {
         const float dt = 1.0f / 60.0f;
         for (int t = 0; t < 300; t++) physics_world_step(&world, dt);
 
-        /* Save state */
-        physics_world *w = &world;
-        /* Can't easily test save/load without scene API, so test re-initialization */
         /* Recreate world with exact same initial conditions */
         physics_world world2;
         physics_world_init(&world2);
@@ -96,13 +99,15 @@ int main(void) {
         world2.bodies[b].restitution = 0.5f;
         rigidbody_wake(&world2.bodies[b]);
 
-        for (int t = 0; t < 300; t++) {
-            physics_world_step(&world, dt);
-            physics_world_step(&world2, dt);
-        }
+        for (int t = 0; t < 300; t++) physics_world_step(&world2, dt);
 
-        float pos_diff = fabsf(world.bodies[0].position.x - world2.bodies[0].position.x);
-        float vel_diff = fabsf(world.bodies[0].velocity.x - world2.bodies[0].velocity.x);
+        /* Both worlds now have 300 ticks. Compare final state. */
+        float pos_diff = fabsf(world.bodies[0].position.x - world2.bodies[0].position.x) +
+                         fabsf(world.bodies[0].position.y - world2.bodies[0].position.y) +
+                         fabsf(world.bodies[0].position.z - world2.bodies[0].position.z);
+        float vel_diff = fabsf(world.bodies[0].velocity.x - world2.bodies[0].velocity.x) +
+                         fabsf(world.bodies[0].velocity.y - world2.bodies[0].velocity.y) +
+                         fabsf(world.bodies[0].velocity.z - world2.bodies[0].velocity.z);
 
         printf("[INFO] determinism_reinit pos_diff=%.6f vel_diff=%.6f\n", pos_diff, vel_diff);
         if (pos_diff > 0.0f || vel_diff > 0.0f) { printf("[FAIL] re-init not deterministic\n"); fail = 1; }
@@ -112,23 +117,27 @@ int main(void) {
         physics_world_cleanup(&world2);
     }
 
-    /* Test 3: Deterministic with different thread counts (simulated) */
+    /* Test 3: Deterministic across 10 independent runs (compare to reference run) */
     {
-        physics_world world;
-        physics_world_init(&world);
-        constraint_pool_init(&world);
+        physics_world world_ref;
+        physics_world_init(&world_ref);
+        constraint_pool_init(&world_ref);
 
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 1.0f;
 
-        int a = physics_world_add_cube(&world, (vector3){0.0f, 2.0f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
-        world.bodies[a].velocity = (vector3){2.0f, -1.0f, 0.5f};
-        world.bodies[a].angular_velocity = (vector3){1.0f, 2.0f, -1.0f};
-        world.bodies[a].restitution = 0.3f;
+        int a = physics_world_add_cube(&world_ref, (vector3){0.0f, 2.0f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
+        world_ref.bodies[a].velocity = (vector3){2.0f, -1.0f, 0.5f};
+        world_ref.bodies[a].angular_velocity = (vector3){1.0f, 2.0f, -1.0f};
+        world_ref.bodies[a].restitution = 0.3f;
 
         const float dt = 1.0f / 60.0f;
-        vector3 pos_ref = world.bodies[0].position;
+        /* Run reference world to get final position */
+        for (int t = 0; t < 600; t++) physics_world_step(&world_ref, dt);
+        vector3 pos_ref = world_ref.bodies[0].position;
+        vector3 vel_ref = world_ref.bodies[0].velocity;
 
+        int sub_fail = 0;
         for (int run = 0; run < 10; run++) {
             physics_world world2;
             physics_world_init(&world2);
@@ -141,15 +150,22 @@ int main(void) {
 
             for (int t = 0; t < 600; t++) physics_world_step(&world2, dt);
 
-            float diff = fabsf(world2.bodies[0].position.x - pos_ref.x) +
-                        fabsf(world2.bodies[0].position.y - pos_ref.y) +
-                        fabsf(world2.bodies[0].position.z - pos_ref.z);
-            if (diff > 0.0f) { printf("[FAIL] run %d diverged\n", run); fail = 1; }
+            float pos_diff = fabsf(world2.bodies[0].position.x - pos_ref.x) +
+                             fabsf(world2.bodies[0].position.y - pos_ref.y) +
+                             fabsf(world2.bodies[0].position.z - pos_ref.z);
+            float vel_diff = fabsf(world2.bodies[0].velocity.x - vel_ref.x) +
+                             fabsf(world2.bodies[0].velocity.y - vel_ref.y) +
+                             fabsf(world2.bodies[0].velocity.z - vel_ref.z);
+            if (pos_diff > 0.0f || vel_diff > 0.0f) { 
+                printf("[FAIL] run %d diverged (pos_diff=%.6f vel_diff=%.6f)\n", run, pos_diff, vel_diff); 
+                sub_fail = 1; 
+            }
 
             physics_world_cleanup(&world2);
         }
-        printf("[PASS] 10 independent runs bitwise identical\n");
-        physics_world_cleanup(&world);
+        if (sub_fail) { fail = 1; }
+        else { printf("[PASS] 10 independent runs bitwise identical to reference\n"); }
+        physics_world_cleanup(&world_ref);
     }
 
     /* Test 4: Floating point determinism - no NaN/Inf propagation */
@@ -162,8 +178,8 @@ int main(void) {
         g_cfg.world.drag = 1.0f;
 
         /* Create scenario that could produce NaN */
-        int a = physics_world_add_sphere(&world, 0.0f, 1.0f, (vector3){0.0f, 0.0f, 0.0f}); /* zero radius - should be sanitized */
-        int b = physics_world_add_cube(&world, (vector3){0.0f, 0.0f, 0.0f}, (vector3){0.0f, 0.0f, 0.0f}, 1.0f); /* zero size - sanitized */
+        physics_world_add_sphere(&world, 0.0f, 1.0f, (vector3){0.0f, 0.0f, 0.0f}); /* zero radius - should be sanitized */
+        physics_world_add_cube(&world, (vector3){0.0f, 0.0f, 0.0f}, (vector3){0.0f, 0.0f, 0.0f}, 1.0f); /* zero size - sanitized */
 
         const float dt = 1.0f / 60.0f;
         int nan_count = 0;

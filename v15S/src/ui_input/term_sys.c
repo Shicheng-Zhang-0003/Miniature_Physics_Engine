@@ -248,7 +248,15 @@ void cmd_export(int argc, char **argv) {
         } else {
             const mpe_param *param = mpe_config_find(variable_name);
             if (param) {
-                bool clamped = !mpe_config_set_float(variable_name, variable_value);
+                bool accepted;
+                if (param->type == p_int) {
+                    accepted = mpe_config_set_int(variable_name, (int) lroundf(variable_value));
+                } else if (param->type == p_bool) {
+                    accepted = mpe_config_set_bool(variable_name, variable_value != 0.0f);
+                } else {
+                    accepted = mpe_config_set_float(variable_name, variable_value);
+                }
+                bool clamped = !accepted;
                 if (param->type == p_int) {
                     term_printf("term_ok", "%s = %d%s\n", variable_name, *(int *) param->storage,
                                 clamped ? " (clamped)" : "");
@@ -724,7 +732,15 @@ void cmd_export(int argc, char **argv) {
         } else {
             const mpe_param *param = mpe_config_find(variable_name);
             if (param) {
-                bool clamped = !mpe_config_set_float(variable_name, variable_value);
+                bool accepted;
+                if (param->type == p_int) {
+                    accepted = mpe_config_set_int(variable_name, (int) lroundf(variable_value));
+                } else if (param->type == p_bool) {
+                    accepted = mpe_config_set_bool(variable_name, variable_value != 0.0f);
+                } else {
+                    accepted = mpe_config_set_float(variable_name, variable_value);
+                }
+                bool clamped = !accepted;
                 if (param->type == p_int) {
                     term_printf("term_ok", "%s = %d%s\n", variable_name, *(int *) param->storage,
                                 clamped ? " (clamped)" : "");

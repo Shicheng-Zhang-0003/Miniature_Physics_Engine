@@ -14,26 +14,33 @@ int main(void) {
     /* Test 1: Config bounds clamping - all params */
     {
         mpe_config_init();
-        int clamped = 0;
-
-        /* Test gravity bounds */
-        clamped += mpe_config_set_float("world.gravity", 100.0f);  /* should clamp to max */
-        clamped += mpe_config_set_float("world.gravity", -100.0f); /* should clamp to min */
-
-        /* Test drag bounds */
-        clamped += mpe_config_set_float("world.drag", 2.0f);
-        clamped += mpe_config_set_float("world.drag", 0.0f);
-
-        /* Test solver iterations */
-        clamped += mpe_config_set_int("timestep.solver_iterations", 200);
-        clamped += mpe_config_set_int("timestep.solver_iterations", 0);
-
-        /* Test slop */
-        clamped += mpe_config_set_float("solver.penetration_slop", 1.0f);
-        clamped += mpe_config_set_float("solver.penetration_slop", -0.1f);
-
-        printf("[INFO] config_clamping clamped=%d (expected >0)\n", clamped);
-        if (clamped == 0) { printf("[FAIL] config bounds not enforced\n"); fail = 1; }
+        /* Setters return false when they clamp; verify both that contract and
+         * the stored extrema, rather than treating false as a failed write. */
+        int rejected_or_clamped = 0;
+        rejected_or_clamped += !mpe_config_set_float("world.gravity", 100.0f);
+        rejected_or_clamped += !mpe_config_set_float("world.gravity", -100.0f);
+        rejected_or_clamped += !mpe_config_set_float("world.drag", 2.0f);
+        rejected_or_clamped += !mpe_config_set_float("world.drag", 0.0f);
+        rejected_or_clamped += !mpe_config_set_int("timestep.solver_iterations", 200);
+        rejected_or_clamped += !mpe_config_set_int("timestep.solver_iterations", 0);
+        rejected_or_clamped += !mpe_config_set_float("solver.penetration_slop", 1.0f);
+        rejected_or_clamped += !mpe_config_set_float("solver.penetration_slop", -0.1f);
+        float gravity = 0.0f, drag = 0.0f, slop = 0.0f; int iters = 0;
+        mpe_config_get_float("world.gravity", &gravity);
+        mpe_config_get_float("world.drag", &drag);
+        mpe_config_get_int("timestep.solver_iterations", &iters);
+        mpe_config_get_float("solver.penetration_slop", &slop);
+        const mpe_param *gravity_p = mpe_config_find("world.gravity");
+        const mpe_param *drag_p = mpe_config_find("world.drag");
+        const mpe_param *iters_p = mpe_config_find("timestep.solver_iterations");
+        const mpe_param *slop_p = mpe_config_find("solver.penetration_slop");
+        int bounded = gravity_p && drag_p && iters_p && slop_p &&
+                      gravity >= gravity_p->min && gravity <= gravity_p->max &&
+                      drag >= drag_p->min && drag <= drag_p->max &&
+                      iters >= (int)iters_p->min && iters <= (int)iters_p->max &&
+                      slop >= slop_p->min && slop <= slop_p->max;
+        printf("[INFO] config_clamping rejected_or_clamped=%d bounded=%d\n", rejected_or_clamped, bounded);
+        if (rejected_or_clamped != 8 || !bounded) { printf("[FAIL] config bounds not enforced\n"); fail = 1; }
         else { printf("[PASS] config bounds clamping works\n"); }
     }
 
@@ -46,12 +53,12 @@ int main(void) {
         mpe_config_set_float("solver.penetration_slop", 0.02f);
 
         char path[256] = "/tmp/paranoia_config.cfg";
-        int save_result = mpe_config_save(path);
-        if (save_result != 0) { printf("[FAIL] config save failed\n"); fail = 1; }
+        bool save_result = mpe_config_save(path);
+        if (!save_result) { printf("[FAIL] config save failed\n"); fail = 1; }
 
         mpe_config_reset_defaults();
-        int load_result = mpe_config_load(path);
-        if (load_result != 0) { printf("[FAIL] config load failed\n"); fail = 1; }
+        bool load_result = mpe_config_load(path);
+        if (!load_result) { printf("[FAIL] config load failed\n"); fail = 1; }
 
         float g, d; int iters; float slop;
         mpe_config_get_float("world.gravity", &g);
@@ -71,7 +78,8 @@ int main(void) {
     {
         mpe_config_init();
         mpe_config_set_float("solver.penetration_slop", 0.02f);
-        int clamped = mpe_config_set_float("sleep.enable", 0); /* debug only */
+        bool rejected_type = !mpe_config_set_float("sleep.enable", 0); /* bool, not float */
+        if (!rejected_type) { printf("[FAIL] setter accepted wrong type\n"); fail = 1; }
 
         /* In actual game mode this would be enforced by UI layer */
         printf("[INFO] debug_only_params test (manual verification)\n");

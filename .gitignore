@@ -14,6 +14,7 @@ engine
 test_*
 build/
 .fixes_generation_1/
+reference_materials/
 
 # ============ Fix-script backups ============
 # Every fix script creates .pre_NNN backups before mutating
