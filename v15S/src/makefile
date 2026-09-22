@@ -406,6 +406,7 @@ plugins: plugins/mpe_capsule.so
 
 # ---- Paranoia tests (extreme edge cases, mathematical truth verification) ----
 PARANOIA_TEST_CORE := $(MPE_TEST_CORE)
+PARANOIA_CFLAGS := $(CFLAGS) -DMPE_HEADLESS
 
 build_paranoia_freeflight_exact: tests/paranoia_freeflight_exact.c $(PARANOIA_TEST_CORE)
 	$(CC) $(CFLAGS) -Dmpe_paranoia_freeflight_exact tests/paranoia_freeflight_exact.c $(PARANOIA_TEST_CORE) $(MPE_TEST_LIBS) -o test_paranoia_freeflight_exact
@@ -428,51 +429,51 @@ test_paranoia_constraints: build_paranoia_constraints
 	./test_paranoia_constraints
 
 build_paranoia_broadphase: tests/paranoia_broadphase.c $(PARANOIA_TEST_CORE)
-	$(CC) $(CFLAGS) -Dmpe_paranoia_broadphase tests/paranoia_broadphase.c $(PARANOIA_TEST_CORE) $(MPE_TEST_LIBS) -o test_paranoia_broadphase
+	$(CC) $(PARANOIA_CFLAGS) -Dmpe_paranoia_broadphase tests/paranoia_broadphase.c $(PARANOIA_TEST_CORE) $(MPE_TEST_LIBS) -o test_paranoia_broadphase
 test_paranoia_broadphase: build_paranoia_broadphase
 	./test_paranoia_broadphase
 
 build_paranoia_energy_momentum: tests/paranoia_energy_momentum.c $(PARANOIA_TEST_CORE)
-	$(CC) $(CFLAGS) -Dmpe_paranoia_energy_momentum tests/paranoia_energy_momentum.c $(PARANOIA_TEST_CORE) $(MPE_TEST_LIBS) -o test_paranoia_energy_momentum
+	$(CC) $(PARANOIA_CFLAGS) -Dmpe_paranoia_energy_momentum tests/paranoia_energy_momentum.c $(PARANOIA_TEST_CORE) $(SPRING_TEST_SRCS) $(MPE_TEST_LIBS) $(shell pkg-config --libs epoxy) -o test_paranoia_energy_momentum
 test_paranoia_energy_momentum: build_paranoia_energy_momentum
 	./test_paranoia_energy_momentum
 
 build_paranoia_ccd: tests/paranoia_ccd.c $(PARANOIA_TEST_CORE)
-	$(CC) $(CFLAGS) -Dmpe_paranoia_ccd tests/paranoia_ccd.c $(PARANOIA_TEST_CORE) $(MPE_TEST_LIBS) -o test_paranoia_ccd
+	$(CC) $(PARANOIA_CFLAGS) -Dmpe_paranoia_ccd tests/paranoia_ccd.c $(PARANOIA_TEST_CORE) $(MPE_TEST_LIBS) -o test_paranoia_ccd
 test_paranoia_ccd: build_paranoia_ccd
 	./test_paranoia_ccd
 
 build_paranoia_cylinder_collision: tests/paranoia_cylinder_collision.c $(PARANOIA_TEST_CORE)
-	$(CC) $(CFLAGS) -Dmpe_paranoia_cylinder_collision tests/paranoia_cylinder_collision.c $(PARANOIA_TEST_CORE) $(MPE_TEST_LIBS) -o test_paranoia_cylinder_collision
+	$(CC) $(PARANOIA_CFLAGS) -Dmpe_paranoia_cylinder_collision tests/paranoia_cylinder_collision.c $(PARANOIA_TEST_CORE) $(MPE_TEST_LIBS) -o test_paranoia_cylinder_collision
 test_paranoia_cylinder_collision: build_paranoia_cylinder_collision
 	./test_paranoia_cylinder_collision
 
 build_paranoia_determinism: tests/paranoia_determinism.c $(PARANOIA_TEST_CORE)
-	$(CC) $(CFLAGS) -Dmpe_paranoia_determinism tests/paranoia_determinism.c $(PARANOIA_TEST_CORE) $(MPE_TEST_LIBS) -o test_paranoia_determinism
+	$(CC) $(PARANOIA_CFLAGS) -Dmpe_paranoia_determinism tests/paranoia_determinism.c $(PARANOIA_TEST_CORE) $(MPE_TEST_LIBS) -o test_paranoia_determinism
 test_paranoia_determinism: build_paranoia_determinism
 	./test_paranoia_determinism
 
 build_paranoia_scene_persistence: tests/paranoia_scene_persistence.c $(PARANOIA_TEST_CORE) scene/scene_load.c scene/scene_saving.c scene/scene_id_remap.c scene/scene_crc.c
-	$(CC) $(CFLAGS) -Dmpe_paranoia_scene_persistence tests/paranoia_scene_persistence.c $(PARANOIA_TEST_CORE) scene/scene_load.c scene/scene_saving.c scene/scene_id_remap.c scene/scene_crc.c $(MPE_TEST_LIBS) -o test_paranoia_scene_persistence
+	$(CC) $(PARANOIA_CFLAGS) -Dmpe_paranoia_scene_persistence tests/paranoia_scene_persistence.c $(PARANOIA_TEST_CORE) scene/scene_load.c scene/scene_saving.c scene/scene_id_remap.c scene/scene_crc.c $(MPE_TEST_LIBS) -o test_paranoia_scene_persistence
 test_paranoia_scene_persistence: build_paranoia_scene_persistence
 	./test_paranoia_scene_persistence
 
 build_paranoia_spring_joints: tests/paranoia_spring_joints.c $(PARANOIA_TEST_CORE) physics/spring_joint.c
-	$(CC) $(CFLAGS) -Dmpe_paranoia_spring_joints tests/paranoia_spring_joints.c $(PARANOIA_TEST_CORE) physics/spring_joint.c $(MPE_TEST_LIBS) $(shell pkg-config --libs epoxy) -o test_paranoia_spring_joints
+	$(CC) $(PARANOIA_CFLAGS) -Dmpe_paranoia_spring_joints tests/paranoia_spring_joints.c $(PARANOIA_TEST_CORE) physics/spring_joint.c $(MPE_TEST_LIBS) $(shell pkg-config --libs epoxy) -o test_paranoia_spring_joints
 test_paranoia_spring_joints: build_paranoia_spring_joints
 	./test_paranoia_spring_joints
 
 build_paranoia_integration_edges: tests/paranoia_integration_edges.c $(PARANOIA_TEST_CORE)
-	$(CC) $(CFLAGS) -Dmpe_paranoia_integration_edges tests/paranoia_integration_edges.c $(PARANOIA_TEST_CORE) $(MPE_TEST_LIBS) -o test_paranoia_integration_edges
+	$(CC) $(PARANOIA_CFLAGS) -Dmpe_paranoia_integration_edges tests/paranoia_integration_edges.c $(PARANOIA_TEST_CORE) $(MPE_TEST_LIBS) -o test_paranoia_integration_edges
 test_paranoia_integration_edges: build_paranoia_integration_edges
 	./test_paranoia_integration_edges
 
 build_paranoia_fp_edges: tests/paranoia_fp_edges.c $(PARANOIA_TEST_CORE)
-	$(CC) $(CFLAGS) -Dmpe_paranoia_fp_edges tests/paranoia_fp_edges.c $(PARANOIA_TEST_CORE) $(MPE_TEST_LIBS) -o test_paranoia_fp_edges
+	$(CC) $(PARANOIA_CFLAGS) -Dmpe_paranoia_fp_edges tests/paranoia_fp_edges.c $(PARANOIA_TEST_CORE) $(MPE_TEST_LIBS) -o test_paranoia_fp_edges
 test_paranoia_fp_edges: build_paranoia_fp_edges
 	./test_paranoia_fp_edges
 
 build_paranoia_config: tests/paranoia_config.c $(PARANOIA_TEST_CORE)
-	$(CC) $(CFLAGS) -Dmpe_paranoia_config tests/paranoia_config.c $(PARANOIA_TEST_CORE) $(MPE_TEST_LIBS) -o test_paranoia_config
+	$(CC) $(PARANOIA_CFLAGS) -Dmpe_paranoia_config tests/paranoia_config.c $(PARANOIA_TEST_CORE) $(MPE_TEST_LIBS) -o test_paranoia_config
 test_paranoia_config: build_paranoia_config
 	./test_paranoia_config

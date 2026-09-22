@@ -204,13 +204,14 @@ void mpe_config_init(void);
 /* Reset all tunables to their defaults. */
 void mpe_config_reset_defaults(void);
 
-/* Generic getters — look up by key string. Return false if not found. */
+/* Typed getters — return false for a missing key, NULL output, or type mismatch. */
 bool mpe_config_get_float(const char *key, float *out);
 bool mpe_config_get_int(const char *key, int *out);
 bool mpe_config_get_bool(const char *key, bool *out);
 
-/* Generic setters — look up by key, clamp to [min,max], write to g_cfg.
- * Returns false if key not found or value was clamped. */
+/* Typed setters — look up by key, clamp to [min,max], write to g_cfg.
+ * Returns false for a missing key, type mismatch, non-finite float, or a
+ * value that required clamping. */
 bool mpe_config_set_float(const char *key, float value);
 bool mpe_config_set_int(const char *key, int value);
 bool mpe_config_set_bool(const char *key, bool value);
