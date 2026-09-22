@@ -10,6 +10,7 @@
  */
 #include "physics_world.h"
 #include "mpe_registry.h"
+#include "mpe_loader.h"
 #include "../physics/collision_mechanics.h"
 #include "../physics/broadphase.h"
 #include "../physics/constraint.h" /* MPE_FTC_067 */
@@ -178,6 +179,7 @@ void physics_world_cleanup(physics_world *world) {
         if (world->tick_modules[i] && world->tick_modules[i]->detach) {
             world->tick_modules[i]->detach(world, world->tick_module_state[i]);
         }
+        mpe_loader_release_module(world->tick_modules[i]);
         world->tick_modules[i] = NULL;
         world->tick_module_state[i] = NULL;
     }
@@ -394,6 +396,7 @@ int physics_world_attach_module(physics_world *world, const mpe_module_desc_t *d
     if (desc->attach && desc->attach(world, &st) != 0) return -1;
     world->tick_modules[world->tick_module_count] = desc;
     world->tick_module_state[world->tick_module_count] = st;
+    mpe_loader_retain_module(desc);
     return world->tick_module_count++;
 }
 
@@ -404,6 +407,7 @@ int physics_world_detach_module(physics_world *world, const char *name) {
             strcmp(world->tick_modules[i]->name, name) == 0) {
             if (world->tick_modules[i]->detach)
                 world->tick_modules[i]->detach(world, world->tick_module_state[i]);
+            mpe_loader_release_module(world->tick_modules[i]);
             for (int j = i; j + 1 < world->tick_module_count; j++) {
                 world->tick_modules[j] = world->tick_modules[j + 1];
                 world->tick_module_state[j] = world->tick_module_state[j + 1];
@@ -825,15 +829,11 @@ void physics_world_step(physics_world *world, float dt) {    if ((!world) || (!w
         if (rb->static_state) {
             continue;
         }
-        /* TRUTH: the infinite solver floor at y=0 is UNCONDITIONAL. It is a
-         * real material contact (friction + restitution via the plane body
-         * with restitution-neutral proxy), not the plastic boundary clamp.
-         * Gating it behind a flag silently replaced solver friction with the
-         * boundary safety net (no friction, no bounce, no manifolds, no
-         * rolling resistance) and broke every floor-resting scene that did
-         * not opt in (wheel propulsion, stacks, F10). The boundary box stays
-         * as the perfectly-plastic backstop at the same height. */
-        {
+        /* TRUTH: the infinite solver floor at y=0 is gated by static_plane_enabled.
+         * When disabled, the boundary box provides a perfectly-plastic backstop
+         * at y=0 with no friction or restitution. When enabled (default for GUI),
+         * the floor is a real material contact with friction + restitution. */
+        if (world->static_plane_enabled) {
             /* Sync plane friction from the live per-world config every tick.
              * The persistent body would otherwise keep its initialisation
              * defaults (sphere 0.3/0.2), silently ignoring world.floor_*

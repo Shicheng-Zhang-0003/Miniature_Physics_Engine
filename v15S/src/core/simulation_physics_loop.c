@@ -190,33 +190,35 @@ void simulation_physics_tick(float frame_delta_time) {
         }
         /* Floor collision (sleeping included: sets has_contact + deep-wake,
          * solves as no-op via eff_inv=0; see physics_world.c). */
-        for (int floor_object_index = 0; floor_object_index < world->body_count; floor_object_index++) {
-            rigidbody *floor_rigid_body = &world->bodies[floor_object_index];
-            if (floor_rigid_body->static_state) {
-                continue;
-            }
-            bool was_sleeping = floor_rigid_body->is_sleeping;
-            collision_data floor_collision = {0};
-            if (collision_static_plane_body(&world->static_plane_body, floor_rigid_body, 0.0f, &floor_collision,
-                                            mpe_world_cfg(world))) {
-                if (manifold_count < a3_max_manifolds) {
-                    float deepest = 0.0f;
-                    for (int fi = 0; fi < floor_collision.contact_count; fi++) {
-                        if (floor_collision.contacts[fi].penetration > deepest) {
-                            deepest = floor_collision.contacts[fi].penetration;
+        if (world->static_plane_enabled) {
+            for (int floor_object_index = 0; floor_object_index < world->body_count; floor_object_index++) {
+                rigidbody *floor_rigid_body = &world->bodies[floor_object_index];
+                if (floor_rigid_body->static_state) {
+                    continue;
+                }
+                bool was_sleeping = floor_rigid_body->is_sleeping;
+                collision_data floor_collision = {0};
+                if (collision_static_plane_body(&world->static_plane_body, floor_rigid_body, 0.0f, &floor_collision,
+                                                mpe_world_cfg(world))) {
+                    if (manifold_count < a3_max_manifolds) {
+                        float deepest = 0.0f;
+                        for (int fi = 0; fi < floor_collision.contact_count; fi++) {
+                            if (floor_collision.contacts[fi].penetration > deepest) {
+                                deepest = floor_collision.contacts[fi].penetration;
+                            }
                         }
+                        if (was_sleeping && deepest > mpe_world_cfg(world)->depenetration.wake_depth_thresh) {
+                            rigidbody_wake(floor_rigid_body);
+                        }
+                        collision_prepare_solver(world, &floor_collision, &world->manifolds[manifold_count],
+                                                 fixed_physics_dt);
+                        manifold_count++;
+                        if (world->has_contact) {
+                            world->has_contact[floor_object_index] = 1;
+                        }
+                    } else {
+                        world->manifold_overflow_count++;
                     }
-                    if (was_sleeping && deepest > mpe_world_cfg(world)->depenetration.wake_depth_thresh) {
-                        rigidbody_wake(floor_rigid_body);
-                    }
-                    collision_prepare_solver(world, &floor_collision, &world->manifolds[manifold_count],
-                                             fixed_physics_dt);
-                    manifold_count++;
-                    if (world->has_contact) {
-                        world->has_contact[floor_object_index] = 1;
-                    }
-                } else {
-                    world->manifold_overflow_count++;
                 }
             }
         }

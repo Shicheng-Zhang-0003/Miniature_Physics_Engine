@@ -126,7 +126,7 @@ void mpe_config_reset_defaults(void) {
 
 bool mpe_config_get_float(const char *key, float *out) {
     const mpe_param *param = mpe_config_find(key);
-    if ((!param) || (!out)) {
+    if ((!param) || (!out) || param->type != p_float) {
         return false;
     }
     *out = (float) param_read_double(param);
@@ -135,7 +135,7 @@ bool mpe_config_get_float(const char *key, float *out) {
 
 bool mpe_config_get_int(const char *key, int *out) {
     const mpe_param *param = mpe_config_find(key);
-    if ((!param) || (!out)) {
+    if ((!param) || (!out) || param->type != p_int) {
         return false;
     }
     *out = (int) param_read_double(param);
@@ -144,7 +144,7 @@ bool mpe_config_get_int(const char *key, int *out) {
 
 bool mpe_config_get_bool(const char *key, bool *out) {
     const mpe_param *param = mpe_config_find(key);
-    if ((!param) || (!out)) {
+    if ((!param) || (!out) || param->type != p_bool) {
         return false;
     }
     *out = (param_read_double(param) != 0.0);
@@ -153,7 +153,7 @@ bool mpe_config_get_bool(const char *key, bool *out) {
 
 bool mpe_config_set_float(const char *key, float value) {
     const mpe_param *param = mpe_config_find(key);
-    if (!param) {
+    if (!param || param->type != p_float || !isfinite(value)) {
         return false;
     }
     bool clamped = param_write_double(param, (double) value);
@@ -162,7 +162,7 @@ bool mpe_config_set_float(const char *key, float value) {
 
 bool mpe_config_set_int(const char *key, int value) {
     const mpe_param *param = mpe_config_find(key);
-    if (!param) {
+    if (!param || param->type != p_int) {
         return false;
     }
     bool clamped = param_write_double(param, (double) value);
@@ -171,7 +171,7 @@ bool mpe_config_set_int(const char *key, int value) {
 
 bool mpe_config_set_bool(const char *key, bool value) {
     const mpe_param *param = mpe_config_find(key);
-    if (!param) {
+    if (!param || param->type != p_bool) {
         return false;
     }
     param_write_double(param, value ? 1.0 : 0.0);

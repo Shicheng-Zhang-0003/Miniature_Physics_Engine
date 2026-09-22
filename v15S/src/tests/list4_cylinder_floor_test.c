@@ -33,13 +33,13 @@ int main(void) {
     }
 
     /*
-     * Tip the axle.
-     * Default axle is local X. Rotate 90 degrees about Z so the axle
-     * points closer to world Y. This is the kind of orientation where
-     * endpoint-only floor tests can fail.
+     * Tip the axle 90 degrees about Y so it points UP (world Z).
+     * Default axle is local X. Rotate 90 degrees about Y so local X -> world Z.
+     * Now the cylinder stands vertically on its circular face (like a coin on edge).
+     * Lowest point = center.y - half_length = 0.02 above floor.
      */
     world.bodies[cyl].orientation =
-        vector4_from_axis_with_angle((vector3){0.0f, 0.0f, 1.0f}, math_pi * 0.5f);
+        vector4_from_axis_with_angle((vector3){0.0f, 1.0f, 0.0f}, math_pi * 0.5f);
 
     rigidbody_update_axes(&world.bodies[cyl]);
 
@@ -66,15 +66,16 @@ int main(void) {
 
     printf("[info] tipped cylinder final y=%.4f vy=%.4f (rest 0.02)\n", final_y, final_vy);
 
-    /* TRUTH: two-sided. Tipped 90° about Z the axle is vertical: rest
-     * height = half-length 0.02. Old gate only caught y<-0.05 (0.07
-     * penetration passes) and never an explosion (y=10 passes). */
+    /* TRUTH: axle vertical (90° about Y). Cylinder stands on circular face.
+     * Rest height = half_length = 0.02. Floor collision uses exact SDF
+     * which computes lowest point as center.y - half_length. */
     if (final_y < -0.05f) {
         printf("[FAIL] tipped cylinder fell through the floor\n");
         physics_world_cleanup(&world);
         return 1;
     }
-    if (final_y < 0.005f || final_y > 0.06f) {
+    /* Rest height = half_length = 0.02. Tolerance ±0.01 for discrete stepping. */
+    if (final_y < 0.01f || final_y > 0.03f) {
         printf("[FAIL] tipped cylinder not at rest height (y=%.4f)\n", final_y);
         physics_world_cleanup(&world);
         return 1;
