@@ -156,7 +156,10 @@ bool collision_sphere_cube(rigidbody *sphere, rigidbody *cube, collision_data *c
         if (distance > 0.0001f) {
             collision_output_data->normal_vector = vector3_scaling(difference, -1.0f / distance);
         } else {
-            collision_output_data->normal_vector = (vector3){0.0f, -1.0f, 0.0f};
+            /* Degenerate: center within 0.1mm of surface. True normal is
+             * the nearest face normal (A->B = -outward), not -Y. */
+            vector3 outward = vector3_scaling(axes_cube[nearest_face_axis], nearest_face_sign);
+            collision_output_data->normal_vector = vector3_scaling(outward, -1.0f);
         }
         float raw_pen_sc = sphere->radius - distance;
         /* TRUTH: clamp slop-band negatives to zero (friction-only). */

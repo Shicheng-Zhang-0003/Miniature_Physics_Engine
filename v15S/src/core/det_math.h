@@ -98,7 +98,10 @@ static inline double det_exp_small(double x) {
     return sum;
 }
 
-/* base^ex for base in (0, 1.1] (covers damping retention bases). */
+/* base^ex for base in (0, 1.1] (covers damping retention bases).
+ * TRUTH: never desyncs via libm in-tick. If |product|>0.5, chunk into
+ * n pieces each within [-0.5,0.5] and multiply exact powers: r=exp(p/n),
+ * result=r^n via exact mults. Only non-finite/out-of-range bases use libm. */
 static inline double det_pow_retention(double base, double ex) {
     if (!isfinite(base) || !isfinite(ex)) {
         det_mark_fallback_pow();
@@ -112,9 +115,29 @@ static inline double det_pow_retention(double base, double ex) {
         return 1.0;
     }
     double product = ex * det_ln_pos(base);
-    if (!isfinite(product) || product < -0.5 || product > 0.5) {
+    if (!isfinite(product)) {
         det_mark_fallback_pow();
-        return pow(base, ex); /* out of contract: libm fallback */
+        return pow(base, ex);
+    }
+    if (product < -0.5 || product > 0.5) {
+        /* Chunk to stay in det_exp_small contract without libm. */
+        double ap = (product < 0.0) ? -product : product;
+        long n = (long)(ap / 0.5) + 1L;
+        if (n < 1L) {
+            n = 1L;
+        }
+        if (n > 64L) {
+            /* Absurd exponent (e.g. dt corruption): libm + count. */
+            det_mark_fallback_pow();
+            return pow(base, ex);
+        }
+        double sub = product / (double)n;
+        double r = det_exp_small(sub);
+        double out = 1.0;
+        for (long k = 0; k < n; k++) {
+            out *= r;
+        }
+        return out;
     }
     return det_exp_small(product);
 }
@@ -192,19 +215,21 @@ static inline double det_reduce_pi4(double x, int *quadrant) {
     double k_d = x * two_over_pi;
     if (!(k_d > -1e15) || !(k_d < 1e15)) {
         *quadrant = 0;
-        det_mark_fallback_trig();
+        /* No mark here: caller det_sin/cos small-path marks once, so the
+         * fallback is counted exactly once per call. */
         return x; /* out of contract: caller falls back */
     }
     long long k = (long long) (k_d >= 0.0 ? k_d + 0.5 : k_d - 0.5);
     *quadrant = (int) ((k % 4 + 4) % 4); /* defined for negatives */
     double x_red = x - (double) k * pi_half;
-    /* Correct for rounding error in k */
+    /* Correct for rounding error in k: shifting by one quadrant (+/-pi/2),
+     * not two. +2 was a 180-degree correction for a 90-degree error. */
     if (x_red > pi_quarter) {
         x_red -= pi_half;
-        *quadrant = (*quadrant + 2) & 3;
+        *quadrant = (*quadrant + 1) & 3;
     } else if (x_red < -pi_quarter) {
         x_red += pi_half;
-        *quadrant = (*quadrant + 2) & 3;
+        *quadrant = (*quadrant + 3) & 3;
     }
     return x_red;
 }
@@ -220,15 +245,14 @@ static inline double det_sin(double x) {
     }
     int quadrant = 0;
     double xr = det_reduce_pi4(x, &quadrant);
-    double s = det_sin_small(xr);
-    double c = det_cos_small(xr);
+    /* Compute only the needed branch so an out-of-contract xr marks once. */
     switch (quadrant) {
-        case 0: return s;      /* sin(x) */
-        case 1: return c;      /* sin(x + pi/2) = cos(x) */
-        case 2: return -s;     /* sin(x + pi) = -sin(x) */
-        case 3: return -c;     /* sin(x + 3pi/2) = -cos(x) */
+        case 0: return det_sin_small(xr);      /* sin(x) */
+        case 1: return det_cos_small(xr);      /* sin(x + pi/2) = cos(x) */
+        case 2: return -det_sin_small(xr);     /* sin(x + pi) = -sin(x) */
+        case 3: return -det_cos_small(xr);     /* sin(x + 3pi/2) = -cos(x) */
     }
-    return s; /* unreachable */
+    return det_sin_small(xr); /* unreachable */
 }
 
 static inline double det_cos(double x) {
@@ -238,15 +262,13 @@ static inline double det_cos(double x) {
     }
     int quadrant = 0;
     double xr = det_reduce_pi4(x, &quadrant);
-    double s = det_sin_small(xr);
-    double c = det_cos_small(xr);
     switch (quadrant) {
-        case 0: return c;      /* cos(x) */
-        case 1: return -s;     /* cos(x + pi/2) = -sin(x) */
-        case 2: return -c;     /* cos(x + pi) = -cos(x) */
-        case 3: return s;      /* cos(x + 3pi/2) = sin(x) */
+        case 0: return det_cos_small(xr);      /* cos(x) */
+        case 1: return -det_sin_small(xr);     /* cos(x + pi/2) = -sin(x) */
+        case 2: return -det_cos_small(xr);     /* cos(x + pi) = -cos(x) */
+        case 3: return det_sin_small(xr);      /* cos(x + 3pi/2) = sin(x) */
     }
-    return c; /* unreachable */
+    return det_cos_small(xr); /* unreachable */
 }
 
 #endif /* det_math_h */

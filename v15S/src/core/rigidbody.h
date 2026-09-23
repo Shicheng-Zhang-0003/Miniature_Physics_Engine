@@ -63,6 +63,11 @@ typedef struct {
     /* Maximum relative velocity squared at contacts (for sleep check).
      * Updated during contact processing; used for relative-velocity sleep gating. */
     float max_relative_speed_sq;
+    /* Render-only / proxy bodies: excluded from broadphase pairing,
+     * narrowphase dispatch, floor contact and CCD (render + dumps still
+     * see them). Append-only ABI extension: old plugins ignore it.
+     * Default false; set by visual-proxy layers (gui_robot_registry). */
+    bool no_collide;
 } rigidbody;
 void rigidbody_update_axes(rigidbody *rigid_body);
 void rigidbody_initialisation_sphere(rigidbody *rigid_body, float radius, float mass, vector3 position_input);

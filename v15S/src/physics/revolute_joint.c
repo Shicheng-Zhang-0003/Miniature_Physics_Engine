@@ -48,47 +48,79 @@ static math3 math3_addition(math3 a, math3 b) {
     return r;
 }
 
-/* 6×6 matrix operations for coupled hinge solve + motor. */
-static void mat6_zero(float m[6][6]) {
-    for (int i = 0; i < 6; i++) for (int j = 0; j < 6; j++) m[i][j] = 0.0f;
+/* 6x6 matrix operations for coupled hinge solve + motor.
+ * TRUTH: K spans invM (~1e-6..1e4) plus Iinv*r^2 (up to ~1e15 for tiny
+ * masses with long anchors). float (23-bit, ~1e7) cannot hold cond(K)>1e10:
+ * pivot test is meaningless and lambda is garbage. Solve in double with
+ * row/column equilibration (D=sqrt(diag), Ks=D^-1 K D^-1). */
+static void mat6_zero(double m[6][6]) {
+    for (int i = 0; i < 6; i++) for (int j = 0; j < 6; j++) m[i][j] = 0.0;
 }
-static void mat6_vec_mul(float out[6], float m[6][6], float v[6]) {
+static void mat6_vec_mul_d(double out[6], double m[6][6], double v[6]) {
     for (int i = 0; i < 6; i++) {
-        out[i] = 0.0f;
+        out[i] = 0.0;
         for (int j = 0; j < 6; j++) out[i] += m[i][j] * v[j];
     }
 }
-static int mat6_invert(float m[6][6], float out[6][6]) {
-    /* Gauss-Jordan elimination with partial pivoting. */
-    float aug[6][12];
+static int mat6_invert(double m[6][6], double out[6][6]) {
+    /* Equilibrate, then Gauss-Jordan with partial pivoting in double. */
+    double d[6];
     for (int i = 0; i < 6; i++) {
-        for (int j = 0; j < 6; j++) aug[i][j] = m[i][j];
-        for (int j = 0; j < 6; j++) aug[i][6+j] = (i==j) ? 1.0f : 0.0f;
+        double dg = m[i][i];
+        if (!(dg > 0.0)) {
+            dg = 0.0;
+            for (int j = 0; j < 6; j++) {
+                double v = m[i][j];
+                if (isfinite(v)) {
+                    dg += v * v;
+                }
+            }
+            dg = (dg > 0.0) ? sqrt(dg) : 1.0;
+            d[i] = dg;
+        } else {
+            d[i] = sqrt(dg);
+        }
+        if (!(d[i] > 1e-18) || !isfinite(d[i])) {
+            d[i] = 1.0;
+        }
+    }
+    double aug[6][12];
+    for (int i = 0; i < 6; i++) {
+        for (int j = 0; j < 6; j++) {
+            double s = d[i] * d[j];
+            aug[i][j] = (s > 0.0) ? m[i][j] / s : m[i][j];
+        }
+        for (int j = 0; j < 6; j++) aug[i][6+j] = (i==j) ? 1.0 : 0.0;
     }
     for (int col = 0; col < 6; col++) {
         int pivot = col;
-        float max_val = fabsf(aug[col][col]);
+        double max_val = fabs(aug[col][col]);
         for (int row = col+1; row < 6; row++) {
-            if (fabsf(aug[row][col]) > max_val) {
-                max_val = fabsf(aug[row][col]);
+            if (fabs(aug[row][col]) > max_val) {
+                max_val = fabs(aug[row][col]);
                 pivot = row;
             }
         }
-        if (max_val < 1e-12f) return 0; /* singular */
+        if (!(max_val > 1e-18) || !isfinite(max_val)) return 0; /* singular */
         if (pivot != col) {
             for (int j = 0; j < 12; j++) {
-                float tmp = aug[col][j]; aug[col][j] = aug[pivot][j]; aug[pivot][j] = tmp;
+                double tmp = aug[col][j]; aug[col][j] = aug[pivot][j]; aug[pivot][j] = tmp;
             }
         }
-        float piv_val = aug[col][col];
+        double piv_val = aug[col][col];
         for (int j = 0; j < 12; j++) aug[col][j] /= piv_val;
         for (int row = 0; row < 6; row++) {
             if (row == col) continue;
-            float factor = aug[row][col];
+            double factor = aug[row][col];
             for (int j = 0; j < 12; j++) aug[row][j] -= factor * aug[col][j];
         }
     }
-    for (int i = 0; i < 6; i++) for (int j = 0; j < 6; j++) out[i][j] = aug[i][6+j];
+    for (int i = 0; i < 6; i++) {
+        for (int j = 0; j < 6; j++) {
+            double s = d[i] * d[j];
+            out[i][j] = aug[i][6+j] / s;
+        }
+    }
     return 1;
 }
 
@@ -161,7 +193,7 @@ void revolute_solve(revolute_params *p, rigidbody *body_a, rigidbody *body_b, fl
      * Rows 0-2: point-to-point (x, y, z)
      * Rows 3-4: axis alignment (u, v components of relative angular velocity)
      * Row 5: motor (relative angular velocity along hinge axis) */
-    float K[6][6];
+    double K[6][6];
     mat6_zero(K);
 
     /* Point-to-point block (3×3): K_p2p = inv_mass_sum*I - skew_a*Ia^-1*skew_a - skew_b*Ib^-1*skew_b */
@@ -227,10 +259,10 @@ void revolute_solve(revolute_params *p, rigidbody *body_a, rigidbody *body_b, fl
     }
 
     /* Add regularization for numerical stability (tiny diagonal). */
-    for (int i = 0; i < 6; i++) K[i][i] += 1e-10f;
+    for (int i = 0; i < 6; i++) K[i][i] += 1e-10;
 
     /* RHS = -(J*v + bias). Bias only on P2P (first 3 rows). */
-    float rhs[6];
+    double rhs[6];
     /* P2P rows: -(relative_velocity + bias_p2p) */
     vector3 rhs_p2p = vector3_scaling(vector3_addition(relative_velocity, bias_p2p), -1.0f);
     rhs[0] = rhs_p2p.x;
@@ -249,14 +281,14 @@ void revolute_solve(revolute_params *p, rigidbody *body_a, rigidbody *body_b, fl
         rhs[5] = 0.0f;
     }
 
-    /* Solve K * lambda = rhs. */
-    float K_inv[6][6];
+    /* Solve K * lambda = rhs (double). */
+    double K_inv[6][6];
     if (!mat6_invert(K, K_inv)) {
         /* Singular - fall back to sequential solve. */
         goto fallback_sequential;
     }
-    float lambda[6];
-    mat6_vec_mul(lambda, K_inv, rhs);
+    double lambda[6];
+    mat6_vec_mul_d(lambda, K_inv, rhs);
     if (!p->motor_enabled) {
         lambda[5] = 0.0f; /* free hinge: never apply axis torque */
     } else if (p->motor_max_torque > 0.0f) {
@@ -278,12 +310,12 @@ void revolute_solve(revolute_params *p, rigidbody *body_a, rigidbody *body_b, fl
      * P2P impulse (3D): applied to both bodies.
      * Axis impulses (2D): angular impulses along u and v.
      * Motor impulse (1D): angular impulse along axis_world. */
-    vector3 impulse_p2p = {lambda[0], lambda[1], lambda[2]};
+    vector3 impulse_p2p = {(float)lambda[0], (float)lambda[1], (float)lambda[2]};
     vector3 axis_impulse = vector3_addition(
-        vector3_scaling(u, lambda[3]),
-        vector3_scaling(v, lambda[4])
+        vector3_scaling(u, (float)lambda[3]),
+        vector3_scaling(v, (float)lambda[4])
     );
-    float motor_lambda = lambda[5];
+    float motor_lambda = (float)lambda[5];
     vector3 motor_impulse = vector3_scaling(axis_world, motor_lambda);
 
     body_a->velocity = vector3_subtraction(body_a->velocity, vector3_scaling(impulse_p2p, inv_mass_a));

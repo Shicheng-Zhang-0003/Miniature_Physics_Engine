@@ -94,7 +94,7 @@ int collision_ccd_sweep_clamp_full(rigidbody *bodies, int body_count, float dt, 
     }
     for (int i = 0; i < body_count; i++) {
         rigidbody *mover = &bodies[i];
-        if ((mover->static_state) || (mover->is_sleeping)) {
+        if ((mover->static_state) || (mover->is_sleeping) || (mover->no_collide)) {
             continue;
         }
         /* TRUTH P1-19: angular sweep bound. Tip speed |w x r| <= |w|*R sweeps
@@ -159,12 +159,18 @@ int collision_ccd_sweep_clamp_full(rigidbody *bodies, int body_count, float dt, 
         {
             float gravity = C->world.gravity;  /* negative */
             float y0 = lowest;
-            if (gravity == 0.0f) {
-                /* Linear case (no gravity): y0 + v0*t = 0 */
-                float toi = y0 / -v0;
-                if ((toi > 0.0f) && (toi < best_toi)) {
-                    best_toi = toi;
-                    hit = true;
+            /* Linear fallback whenever |a| is degenerate: |g|<2e-9 gives
+             * a<1e-9, where float disc rounds sqrt(b^2-4ac)->|b| and the
+             * quadratic root collapses to 0 instead of y0/-v0. */
+            float a_lin = 0.5f * gravity;
+            if (fabsf(a_lin) < 1e-9f) {
+                /* Linear case (no/near-zero gravity): y0 + v0*t = 0 */
+                if (fabsf(v0) > 1e-9f) {
+                    float toi = y0 / -v0;
+                    if ((toi > 0.0f) && (toi < best_toi)) {
+                        best_toi = toi;
+                        hit = true;
+                    }
                 }
             } else {
                 /* Quadratic: 0.5*g*t^2 + v0*t + y0 = 0.
@@ -172,22 +178,23 @@ int collision_ccd_sweep_clamp_full(rigidbody *bodies, int body_count, float dt, 
                  * TRUTH: parabola ignores viscous drag (exact only for
                  * drag=1; drag<1 errs O(c*dt^2), ~1e-6m at 0.99/60Hz,
                  * second-order — one Newton step on the analytic residual
-                 * would make it exact if ever needed). */
-                float a = 0.5f * gravity;
-                float b = v0;
-                float c = y0;
-                float disc = b * b - 4.0f * a * c;
-                if (disc >= 0.0f) {
-                    float sqrt_disc = sqrtf(disc);
-                    float denom = 2.0f * a;
-                    if (fabsf(denom) > 1e-12f) {
-                        float t1 = (-b - sqrt_disc) / denom;
-                        float t2 = (-b + sqrt_disc) / denom;
-                        float toi = FLT_MAX;
-                        if (t1 > 0.0f) toi = t1;
-                        if (t2 > 0.0f && t2 < toi) toi = t2;
-                        if (toi > 0.0f && toi < best_toi) {
-                            best_toi = toi;
+                 * would make it exact if ever needed).
+                 * Computed in double to avoid float cancellation. */
+                double a = 0.5 * (double)gravity;
+                double b = (double)v0;
+                double c = (double)y0;
+                double disc = b * b - 4.0 * a * c;
+                if (disc >= 0.0) {
+                    double sqrt_disc = sqrt(disc);
+                    double denom = 2.0 * a;
+                    if (fabs(denom) > 1e-18) {
+                        double t1 = (-b - sqrt_disc) / denom;
+                        double t2 = (-b + sqrt_disc) / denom;
+                        double toi = 1e30;
+                        if (t1 > 0.0) toi = t1;
+                        if (t2 > 0.0 && t2 < toi) toi = t2;
+                        if (toi > 0.0 && toi < (double)best_toi) {
+                            best_toi = (float)toi;
                             hit = true;
                         }
                     }
@@ -205,6 +212,9 @@ int collision_ccd_sweep_clamp_full(rigidbody *bodies, int body_count, float dt, 
                 continue;
             }
             rigidbody *other = &bodies[j];
+            if (other->no_collide) {
+                continue; /* render-only proxies: never obstacles */
+            }
             vector3 other_v =
                 ((other->static_state) || (other->is_sleeping)) ? vector3_zero() : other->velocity;
             if (other->type == object_sphere) {
