@@ -7,18 +7,13 @@
 #include "config/mpe_config.h"
 #include "modules/ftc/submodules/robot.h"
 #include "modules/ftc/submodules/drivetrain.h"
+#include "ecosystem/mfs/tests/mfs_test_common.h"
 
 int main(void) {
-    mpe_config_init();
-    /* MFS_PORT_V15S: 8 kg chassis on 0.2 kg wheels is a 40:1 stacked mass
-     * ratio; the default 64-iteration envelope cannot converge it (crooked
-     * settle, stalled drive). Robot worlds run 128 iterations. */
-    g_cfg.timestep.solver_iterations = 128;
     physics_world world;
-    physics_world_init(&world);
-    constraint_pool_init(&world);
+    mfs_test_world(&world); /* 128 iters + tile floor (see header) */
 
-    /* Create robot at origin, using goBILDA 30:1 motors */
+    /* Create robot at origin, using goBILDA 5203 26.9:1 motors (223 RPM) */
     ftc_robot robot;
     int rc = ftc_robot_create(&world, &robot, 0.0f, ftc_robot_rest_height(), 0.0f, MOTOR_GB_5203_26_9);
     if (rc != 0) {
@@ -71,11 +66,20 @@ int main(void) {
 
         /* Robot should have moved in some direction (z or x) */
         float total_displacement = sqrtf(dz * dz + (end_x - start_x) * (end_x - start_x));
+        /* Straight-line drive must hold heading: yaw from quaternion
+         * (solver pair-order asymmetry used to spin full-power straights). */
+        quaternion q = world.bodies[robot.chassis_body].orientation;
+        float heading = fabsf(atan2f(2.0f * (q.w * q.y + q.x * q.z),
+                                     1.0f - 2.0f * (q.y * q.y + q.x * q.x)));
+        printf("[info] heading drift=%.4f rad\n", heading);
         if (total_displacement < 0.5f /* MPE_FTC_079: require real driving, not just falling */) {
             printf("[FAIL] robot did not move (displacement=%.4f)\n", total_displacement);
             fail = 1;
         } else if (fabsf(dy) > 1.0f) {
             printf("[FAIL] robot flipped or fell (dy=%.4f)\n", dy);
+            fail = 1;
+        } else if (heading > 0.3f) {
+            printf("[FAIL] straight drive yawed (%.4f rad)\n", heading);
             fail = 1;
         } else {
             printf("[PASS] robot drove under motor power (displacement=%.4f, dy=%.4f)\n", total_displacement, dy);

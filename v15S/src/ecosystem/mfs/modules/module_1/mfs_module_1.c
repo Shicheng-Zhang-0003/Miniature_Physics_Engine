@@ -47,6 +47,11 @@ __attribute__((used)) const mpe_module_desc_t mfs_module_1_desc = {
     .post_step = mfs_module_1_post_step,
 };
 
+/* NOTE: no mpe_module_desc alias here on purpose. Both this TU and
+ * ftc_module.c used to DEFINE it, breaking every link that combined
+ * them (multiple-definition). The MFS-internal export is
+ * mfs_module_1_desc above; MPI loading uses the ftc-fleet module. */
+
 /* ================================================================
  * Module Lifecycle
  * ================================================================ */
@@ -62,6 +67,11 @@ __attribute__((used)) int mfs_module_1_attach(mpe_world_t *world, void **mod_sta
     state->shooter_target_rpm = MFS_SHOOTER_TARGET_RPM;
     state->intake_speed_rpm = MFS_INTAKE_ROLLER_SPEED_RPM;
     state->gamepad_control_enabled = true;
+
+    /* Joint pools: the robot/intake/shooter are joint assemblies.
+     * Without this, constraint_add_revolute fails and robot creation
+     * silently aborts (the module test never ran — see Makefile D1). */
+    constraint_pool_init(world);
     
     /* Initialize gamepad (singleton) */
     if (gamepad_init(&state->gamepad, NULL)) {
@@ -121,7 +131,7 @@ __attribute__((used)) void mfs_module_1_gamepad_step(mfs_module_1_state *state, 
     float left_x = gamepad_get_axis(pad, gamepad_axis_left_x);
     float left_y = gamepad_get_axis(pad, gamepad_axis_left_y);
     float right_x = gamepad_get_axis(pad, gamepad_axis_right_x);
-    float right_y = gamepad_get_axis(pad, gamepad_axis_right_y);
+    /* (right_y unread: no pitch mapping exists) */
     float lt = gamepad_get_axis(pad, gamepad_axis_left_trigger);
     float rt = gamepad_get_axis(pad, gamepad_axis_right_trigger);
     
@@ -138,13 +148,10 @@ __attribute__((used)) void mfs_module_1_gamepad_step(mfs_module_1_state *state, 
     /* Edge detection for toggles */
     bool start_pressed = btn_start && !state->prev_button_start;
     bool a_pressed = btn_a && !state->prev_button_a;
-    bool b_pressed = btn_b && !state->prev_button_b;
     bool x_pressed = btn_x && !state->prev_button_x;
     bool y_pressed = btn_y && !state->prev_button_y;
-    bool lb_pressed = btn_lb && !state->prev_button_lb;
-    bool rb_pressed = btn_rb && !state->prev_button_rb;
-    bool lt_pressed = (lt > 0.5f) && !state->prev_left_trigger;
-    bool rt_pressed = (rt > 0.5f) && !state->prev_right_trigger;
+    /* (removed unused edge vars b/lb/rb/lt/rt_pressed: B is level-read,
+     * LB+RB combine in the e-stop below, triggers are level-read) */
     
     /* Update previous button states */
     state->prev_button_start = btn_start;
@@ -157,11 +164,13 @@ __attribute__((used)) void mfs_module_1_gamepad_step(mfs_module_1_state *state, 
     state->prev_left_trigger = (lt > 0.5f);
     state->prev_right_trigger = (rt > 0.5f);
     
-    /* Toggle gamepad control with Start button */
+    /* Toggle gamepad control with Start button. Processed BEFORE the
+     * enabled check: otherwise a disabled pad can never re-enable
+     * (latch-dead — the toggle lived behind its own gate). */
     if (start_pressed) {
         state->gamepad_control_enabled = !state->gamepad_control_enabled;
     }
-    
+
     if (!state->gamepad_control_enabled) return;
     
     /* Drive mapping (mecanum):
@@ -173,17 +182,17 @@ __attribute__((used)) void mfs_module_1_gamepad_step(mfs_module_1_state *state, 
     state->drive_strafe = left_x;     /* strafe right = +X */
     state->drive_rotate = right_x;    /* rotate right = +X */
     
-    /* Intake toggle (A button) */
+    /* Intake: A toggles the mode, B momentarily reverses while held and
+     * releases back to the mode power. (The old chain double-toggled on
+     * A and latched reverse forever after any B-hold: the release path
+     * was unreachable.) */
     if (a_pressed) {
         state->intake_active = !state->intake_active;
     }
-    
-    /* Intake reverse with B button (hold) */
     if (btn_b) {
-        state->intake_active = true;
-        state->intake_power = -1.0f;  /* reverse */
-    } else if (a_pressed || !btn_b) {
-        state->intake_power = 1.0f;
+        state->intake_power = -1.0f;  /* momentary reverse */
+    } else {
+        state->intake_power = state->intake_active ? 1.0f : 0.0f;
     }
     
     /* Shooter spin-up (X button toggle) */
@@ -259,8 +268,11 @@ __attribute__((used)) void mfs_module_1_pre_step(mpe_world_t *world, float dt, v
     /* Ball physics (spin, drag, Magnus) */
     mfs_module_1_ball_physics_step(state, dt);
     
-    /* Update FTC robot motors (applies torque to wheel bodies) */
-    ftc_robot_update(world, &state->robot, dt);
+    /* Full drivetrain update (motor torque + traction + odometry +
+     * damping). Calling ftc_robot_update directly skipped all of that:
+     * no traction forces, no odometry, no chassis damping. mpe_world_t
+     * IS physics_world (see core/mpe_module.h). */
+    drivetrain_update((physics_world *)world, &state->robot, dt);
 }
 
 __attribute__((used)) void mfs_module_1_post_step(mpe_world_t *world, float dt, void *mod_state) {
@@ -411,10 +423,12 @@ __attribute__((used)) void mfs_module_1_shooter_create(mfs_module_1_state *state
     rigidbody *chassis = mfs_get_chassis(state);
     if (!chassis) return;
     
-    /* Flywheel positioned at top-rear of chassis, angled up */
+    /* Flywheel on a pylon clear of the chassis: at 0.8*H the tilted disc
+     * grazed the chassis top inside the 10 mm slop band and slop friction
+     * + joint fight killed spin by tick 3. 1.0*H clears slop with margin. */
     vector3 robot_pos = chassis->position;
     vector3 flywheel_pos = vector3_addition(robot_pos,
-        (vector3){0.0f, MFS_ROBOT_CHASSIS_HEIGHT*0.8f, -MFS_ROBOT_CHASSIS_LENGTH*0.5f - 0.05f});
+        (vector3){0.0f, MFS_ROBOT_CHASSIS_HEIGHT*1.0f, -MFS_ROBOT_CHASSIS_LENGTH*0.5f - 0.05f});
     
     int flywheel_idx = physics_world_add_cylinder(world,
         MFS_SHOOTER_FLYWHEEL_RADIUS,
@@ -433,7 +447,7 @@ __attribute__((used)) void mfs_module_1_shooter_create(mfs_module_1_state *state
         int joint_idx = constraint_add_revolute(world,
             chassis->object_id,
             flywheel->object_id,
-            (vector3){0.0f, MFS_ROBOT_CHASSIS_HEIGHT*0.8f, -MFS_ROBOT_CHASSIS_LENGTH*0.5f - 0.05f},
+            (vector3){0.0f, MFS_ROBOT_CHASSIS_HEIGHT*1.0f, -MFS_ROBOT_CHASSIS_LENGTH*0.5f - 0.05f},
             (vector3){0.0f, 0.0f, 0.0f},
             (vector3){0.0f, 1.0f, 0.0f});  /* spin axis = Y (horizontal) */
         if (joint_idx >= 0) {
@@ -540,8 +554,12 @@ __attribute__((used)) void mfs_module_1_intake_step(mfs_module_1_state *state, f
     float torque = omega_error * 0.2f;  /* Proportional gain */
     if (torque > 0.5f) torque = 0.5f;
     if (torque < -0.5f) torque = -0.5f;
-    
-    roller->torque_accumulator.x += torque;
+
+    /* Torque about the roller's world axle (cached_axes[0]), not raw X:
+     * the roller yaws with the chassis. */
+    roller->torque_accumulator =
+        vector3_addition(roller->torque_accumulator,
+                         vector3_scaling(roller->cached_axes[0], torque));
     
     /* Ball pickup detection: check contacts between intake and balls */
     if (state->intake_active) {
@@ -562,11 +580,13 @@ __attribute__((used)) void mfs_module_1_intake_step(mfs_module_1_state *state, f
                 vector3 intake_force = vector3_scaling(to_roller, 2.0f);  /* 2N intake force */
                 rb_apply_forces_perfect(ball, intake_force);
                 
-                /* Also apply roller surface velocity to ball (compliant contact) */
-                vector3 roller_surf_vel = vector3_cross(roller->angular_velocity, 
+                /* Entrain the ball toward roller surface velocity: explicit
+                 * rate 0.3/s times dt (dimensionless per-tick fraction).
+                 * Compliant-contact stand-in, not a contact force. */
+                vector3 roller_surf_vel = vector3_cross(roller->angular_velocity,
                     vector3_scaling(vector3_subtraction(ball->position, roller->position), 1.0f));
-                ball->velocity = vector3_addition(ball->velocity, 
-                    vector3_scaling(roller_surf_vel, 0.3f * dt));  /* 30% velocity transfer */
+                ball->velocity = vector3_addition(ball->velocity,
+                    vector3_scaling(roller_surf_vel, 0.3f * dt));
             }
         }
     }
@@ -584,20 +604,33 @@ __attribute__((used)) void mfs_module_1_shooter_step(mfs_module_1_state *state, 
     if (flywheel_idx < 0) return;
     
     rigidbody *flywheel = &world->bodies[flywheel_idx];
-    float current_omega_y = flywheel->angular_velocity.y;
+    /* Spin axis: the joint axis (0,1,0) tilted 35° about the chassis X at
+     * creation. Reading/writing raw .y spun the wrong axis once tilted
+     * (18% torque loss + rpm misread). Track the chassis frame so yaw
+     * keeps the axis honest. */
+    float tilt = MFS_SHOOTER_LAUNCH_ANGLE_DEG * (float)M_PI / 180.0f;
+    vector3 sax = {0.0f, cosf(tilt), sinf(tilt)};
+    {
+        rigidbody *chassis = mfs_get_chassis(state);
+        if (chassis) {
+            sax = vector4_rotate_to_vector3(chassis->orientation, sax);
+        }
+    }
+    float current_omega_y = vector3_dot(flywheel->angular_velocity, sax);
     state->shooter_rpm = fabsf(current_omega_y) * 30.0f / M_PI;
-    
+
     /* Spin-up logic */
     if (state->shooter_spinup_cmd && !state->shooter_ready) {
         state->shooter_spinning_up = true;
         state->shooter_spinup_timer += dt;
-        
+
         /* Apply spin-up torque */
         float target_omega = state->shooter_target_rpm * M_PI / 30.0f;
         float omega_error = target_omega - current_omega_y;
         float torque = omega_error * 0.05f;  /* Flywheel motor torque constant */
         if (torque > 0.3f) torque = 0.3f;
-        flywheel->torque_accumulator.y += torque;
+        flywheel->torque_accumulator =
+            vector3_addition(flywheel->torque_accumulator, vector3_scaling(sax, torque));
         
         if (state->shooter_rpm >= state->shooter_target_rpm * 0.95f) {
             state->shooter_ready = true;
@@ -633,7 +666,7 @@ __attribute__((used)) void mfs_module_1_shooter_step(mfs_module_1_state *state, 
                         MFS_BIOBUZZ_BALL_MASS * surf_speed * 0.8f);  /* 80% transfer */
                     rb_apply_forces_localised(ball, impulse, ball->position);
                     
-                    state->balls_scored++;  /* Count as shot (scoring checked separately) */
+                    state->balls_fired++;  /* fired, not scored: no goal detection exists */
                     state->shooter_fire_cmd = false;  /* Consume fire command */
                 }
                 break;  /* Only shoot one ball per fire command */
@@ -650,21 +683,11 @@ __attribute__((used)) void mfs_module_1_robot_drive_step(mfs_module_1_state *sta
     (void)dt;
     if (!state->robot_created) return;
     
-    /* Set wheel commands from drive inputs */
-    float commands[4] = {
-        state->drive_forward + state->drive_strafe + state->drive_rotate,  /* FL */
-        state->drive_forward - state->drive_strafe - state->drive_rotate,  /* FR */
-        state->drive_forward - state->drive_strafe + state->drive_rotate,  /* RL */
-        state->drive_forward + state->drive_strafe - state->drive_rotate   /* RR */
-    };
-    
-    /* Clamp to [-1, 1] */
-    for (int i = 0; i < 4; i++) {
-        if (commands[i] > 1.0f) commands[i] = 1.0f;
-        if (commands[i] < -1.0f) commands[i] = -1.0f;
-    }
-    
-    ftc_robot_set_wheel_commands(&state->robot, commands, 4);
+    /* Canonical mecanum mixer (normalized, FTC rotate convention).
+     * The hand mixer here was rotate-inverted vs drivetrain_mecanum and
+     * clamped per-wheel without normalization, distorting combined
+     * inputs. Single source of truth now. */
+    drivetrain_mecanum(&state->robot, state->drive_forward, state->drive_strafe, state->drive_rotate);
 }
 
 /* ================================================================
@@ -691,11 +714,11 @@ __attribute__((used)) void mfs_module_1_set_shooter(mfs_module_1_state *state, b
 }
 
 __attribute__((used)) void mfs_module_1_get_stats(const mfs_module_1_state *state,
-                            int *balls_collected, int *balls_scored,
+                            int *balls_collected, int *balls_fired,
                             float *shooter_rpm, bool *shooter_ready) {
     if (!state) return;
     if (balls_collected) *balls_collected = state->balls_collected;
-    if (balls_scored) *balls_scored = state->balls_scored;
+    if (balls_fired) *balls_fired = state->balls_fired;
     if (shooter_rpm) *shooter_rpm = state->shooter_rpm;
     if (shooter_ready) *shooter_ready = state->shooter_ready;
 }

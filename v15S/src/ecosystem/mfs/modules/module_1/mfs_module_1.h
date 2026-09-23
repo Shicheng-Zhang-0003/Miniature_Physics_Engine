@@ -114,7 +114,7 @@ typedef struct mfs_module_1_state {
     bool shooter_ready;
     
     /* Game state */
-    int balls_scored;
+    int balls_fired;
     int balls_collected;
     float match_time;
     
@@ -153,7 +153,7 @@ void mfs_module_1_set_drive_commands(mfs_module_1_state *state,
 void mfs_module_1_set_intake(mfs_module_1_state *state, bool active);
 void mfs_module_1_set_shooter(mfs_module_1_state *state, bool spinup, bool fire);
 void mfs_module_1_get_stats(const mfs_module_1_state *state,
-                            int *balls_collected, int *balls_scored,
+                            int *balls_collected, int *balls_fired,
                             float *shooter_rpm, bool *shooter_ready);
 
 /* Internal helpers (used by pre_step) */

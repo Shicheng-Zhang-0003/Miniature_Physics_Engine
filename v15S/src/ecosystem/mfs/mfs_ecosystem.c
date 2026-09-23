@@ -13,12 +13,13 @@
  * - Internal module system (mfs_internal.c) manages module lifecycle
  */
 
-#include "../mpe_ecosystem.h"
+#include "ecosystem/mpe_ecosystem.h"
 #include "mfs_internal.h"
 #include "modules/module_1/mfs_module_1.h"
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 /* ================================================================
  * Ecosystem State
@@ -33,18 +34,23 @@ typedef struct {
  * Ecosystem Lifecycle
  * ================================================================ */
 
-static int mfs_ecosystem_attach(struct mpe_world *world, void **eco_state) {
+static int mfs_ecosystem_attach(mpe_world_t *world, void **eco_state) {
     if (!world || !eco_state) return -1;
-    
+
     mfs_ecosystem_state_t *state = calloc(1, sizeof(mfs_ecosystem_state_t));
     if (!state) return -1;
-    
-    /* Initialize internal module registry */
-    mfs_internal_registry_init();
-    
-    /* Register internal modules (every module the MFS tree ships). */
+
+    /* Initialize internal module registry once only */
+    static int s_registry_initialized = 0;
+    if (!s_registry_initialized) {
+        mfs_internal_registry_init();
+        s_registry_initialized = 1;
+    }
+    /* Ensure-registered (idempotent): repeat attaches to other worlds
+     * must not fail on duplicate registration. */
     extern const mpe_module_desc_t mfs_module_1_desc;
-    if (mfs_internal_module_register(&mfs_module_1_desc) < 0) {
+    if (!mfs_internal_module_registered(MFS_MODULE_1_NAME) &&
+        mfs_internal_module_register(&mfs_module_1_desc) < 0) {
         free(state);
         return -1;
     }
@@ -53,17 +59,18 @@ static int mfs_ecosystem_attach(struct mpe_world *world, void **eco_state) {
      * ftc-fleet descriptor, so the static bundle references it directly
      * instead of duplicating the struct. */
     extern const mpe_module_desc_t mpe_module_desc;
-    if (mfs_internal_module_register(&mpe_module_desc) < 0) {
+    if (!mfs_internal_module_registered("ftc-fleet") &&
+        mfs_internal_module_register(&mpe_module_desc) < 0) {
         free(state);
         return -1;
     }
 
     /* Attach internal modules */
-    if (mfs_internal_module_attach("mfs-simulator", (struct mpe_world*)world) < 0) {
+    if (mfs_internal_module_attach("mfs-simulator", (mpe_world_t*)world) < 0) {
         free(state);
         return -1;
     }
-    if (mfs_internal_module_attach("ftc-fleet", (struct mpe_world*)world) < 0) {
+    if (mfs_internal_module_attach("ftc-fleet", (mpe_world_t*)world) < 0) {
         free(state);
         return -1;
     }
@@ -75,14 +82,14 @@ static int mfs_ecosystem_attach(struct mpe_world *world, void **eco_state) {
     return 0;
 }
 
-static void mfs_ecosystem_detach(struct mpe_world *world, void *eco_state) {
+static void mfs_ecosystem_detach(mpe_world_t *world, void *eco_state) {
     (void)world;
     if (!eco_state) return;
     
     mfs_ecosystem_state_t *state = (mfs_ecosystem_state_t *)eco_state;
     
     /* Detach all internal modules */
-    mfs_internal_modules_detach_all((struct mpe_world*)world);
+    mfs_internal_modules_detach_all((mpe_world_t*)world);
     
     free(state);
 }
@@ -91,15 +98,15 @@ static void mfs_ecosystem_detach(struct mpe_world *world, void *eco_state) {
  * Ecosystem Step Hooks
  * ================================================================ */
 
-static void mfs_ecosystem_pre_step(struct mpe_world *world, float dt, void *eco_state) {
+static void mfs_ecosystem_pre_step(mpe_world_t *world, float dt, void *eco_state) {
     (void)eco_state;
     /* Run pre_step for all attached internal modules */
-    mfs_internal_modules_pre_step((struct mpe_world*)world, dt);
+    mfs_internal_modules_pre_step((mpe_world_t*)world, dt);
 }
 
-static void mfs_ecosystem_post_step(struct mpe_world *world, float dt, void *eco_state) {
+static void mfs_ecosystem_post_step(mpe_world_t *world, float dt, void *eco_state) {
     (void)eco_state;
-    mfs_internal_modules_post_step((struct mpe_world*)world, dt);
+    mfs_internal_modules_post_step((mpe_world_t*)world, dt);
 }
 
 /* ================================================================
@@ -108,20 +115,31 @@ static void mfs_ecosystem_post_step(struct mpe_world *world, float dt, void *eco
 
 static int mfs_ecosystem_config_get(void *eco_state, const char *key, char *out, int maxlen) {
     (void)eco_state;
+    if (!key || !out || maxlen <= 0) return -1;
     if (strcmp(key, "shooter_rpm") == 0) {
-        /* Would need to get state from module */
-        return -1;
+        mfs_module_1_state *ms =
+            (mfs_module_1_state *)mfs_internal_module_state(MFS_MODULE_1_NAME);
+        if (!ms) return -1;
+        snprintf(out, (size_t)maxlen, "%.1f", (double)ms->shooter_rpm);
+        return 0;
     }
-    return -1;
+    return -1; /* unsupported key (honest: no silent default) */
 }
 
 static int mfs_ecosystem_config_set(void *eco_state, const char *key, const char *value) {
     (void)eco_state;
+    if (!key || !value) return -1;
+    /* No settable keys exist yet (shooter target goes through the
+     * module_1 gamepad/shooter API, not the bundle). -1 = unsupported. */
+    (void)key;
+    (void)value;
     return -1;
 }
 
 static int mfs_ecosystem_command(void *eco_state, int argc, char **argv) {
-    (void)eco_state; (void)argc; (void)argv;
+    (void)eco_state;
+    if (argc < 0 || !argv) return -1;
+    /* No bundle commands exist yet. -1 = unsupported. */
     return -1;
 }
 

@@ -68,6 +68,12 @@ return 1;
         if (robot->wheel_bodies[i] < 0) {
             return 1;
         }
+        /* Grippy rubber on tile (was engine defaults ~0.3/0.2: glassy).
+         * Contact mu = min(wheel, floor); the drivetrain budgets against
+         * these same wheel materials (see drivetrain_update). */
+        world->bodies[robot->wheel_bodies[i]].friction_static = 0.9f;
+        world->bodies[robot->wheel_bodies[i]].friction_kinetic = 0.7f;
+        world->bodies[robot->wheel_bodies[i]].restitution = 0.0f;
 
         uint32_t wheel_id = world->bodies[robot->wheel_bodies[i]].object_id;
 
@@ -130,6 +136,22 @@ void ftc_robot_update(physics_world *world, ftc_robot *robot, float dt) {
     if (any_command && robot->chassis_body >= 0 && robot->chassis_body < world->body_count) {
         rigidbody_wake(&world->bodies[robot->chassis_body]);
     }
+    /* A sleeping chassis with real velocity is inconsistent state: the
+     * velocity integrator drains forces for sleepers, so motion freezes
+     * mid-drift (measured T8 hold failure). Truly settled bodies sit
+     * below the sleep thresholds; anything above wakes. */
+    if (robot->chassis_body >= 0 && robot->chassis_body < world->body_count) {
+        rigidbody *chb = &world->bodies[robot->chassis_body];
+        if (chb->is_sleeping) {
+            const mpe_config_t *sleep_cfg = mpe_world_cfg(world);
+            float lv2 = vector3_length_squared(chb->velocity);
+            float av2 = vector3_length_squared(chb->angular_velocity);
+            if (lv2 > sleep_cfg->sleep.linear_thresh_sq ||
+                av2 > sleep_cfg->sleep.angular_thresh_sq) {
+                rigidbody_wake(chb);
+            }
+        }
+    }
 
     /* Sum currents for battery sag.
      * FIX-AUDIT: old fabs() sum doubled sag in turn-in-place (opposing
@@ -140,6 +162,14 @@ void ftc_robot_update(physics_world *world, ftc_robot *robot, float dt) {
     for (int i = 0; i < robot->wheel_count; i++) {
         total_current_signed += robot->wheel_motors[i].current;
     }
+    /* Pack fuse sees the absolute bus load (stall sums, regen doesn't
+     * cool the fuse). */
+    float fuse_load = 0.0f;
+    for (int i = 0; i < robot->wheel_count; i++) {
+        float c = robot->wheel_motors[i].current;
+        fuse_load += (c > 0.0f) ? c : -c;
+    }
+    battery_fuse_step(&robot->battery, fuse_load, dt);
     float terminal_voltage = battery_get_voltage(&robot->battery, total_current_signed);
     float drain_current = (total_current_signed > 0.0f) ? total_current_signed : 0.5f * total_current_signed;
     if (drain_current < 0.0f && robot->battery.charge_fraction >= 1.0f) {
@@ -161,6 +191,25 @@ void ftc_robot_update(physics_world *world, ftc_robot *robot, float dt) {
             axle = vector4_rotate_to_vector3(wheel->orientation, (vector3){1.0f, 0.0f, 0.0f});
         }
         float wheel_speed = vector3_dot(wheel->angular_velocity, axle);
+        /* Disturbance observer: external load = measured net torque effect
+         * minus last tick's explicit motor torque. At lock this converges
+         * to -stall (full stall held); free, to 0. Clamped; NaN-safe. */
+        float axle_I = 0.5f * wheel->mass * wheel->radius * wheel->radius;
+        if (robot->wheel_motors[i].wprev_valid && axle_I > 0.0f && dt > 0.0f &&
+            isfinite(wheel_speed)) {
+            float tau_l = axle_I * (wheel_speed - robot->wheel_motors[i].w_prev) / dt -
+                          robot->wheel_motors[i].tau_exp_prev;
+            if (!isfinite(tau_l)) {
+                tau_l = 0.0f;
+            } else if (tau_l > 100.0f) {
+                tau_l = 100.0f;
+            } else if (tau_l < -100.0f) {
+                tau_l = -100.0f;
+            }
+            robot->wheel_motors[i].load_torque = tau_l;
+        }
+        robot->wheel_motors[i].w_prev = isfinite(wheel_speed) ? wheel_speed : 0.0f;
+        robot->wheel_motors[i].wprev_valid = 1;
 
         /* MFS_TRACTION_CONTROL: compare against the rolling speed the
          * chassis motion demands at this wheel (rigid-body velocity at
@@ -168,8 +217,12 @@ void ftc_robot_update(physics_world *world, ftc_robot *robot, float dt) {
          * spinning far from demand is slipping: cut its torque so kinetic
          * friction re-captures it instead of sliding forever. Scales
          * recover toward open when slip clears (hysteresis via margin). */
+        /* No contact → no slip: airborne wheels (free-spin rigs, jumps)
+         * must not trip the traction cut. Same 0.05 clearance the
+         * traction loop uses. */
+        float wheel_bottom = wheel->position.y - wheel->radius;
         if (robot->chassis_body >= 0 && robot->chassis_body < world->body_count &&
-            wheel->radius > 0.001f) {
+            wheel->radius > 0.001f && wheel_bottom <= 0.05f) {
             rigidbody *chassis = &world->bodies[robot->chassis_body];
             vector3 r_ch_wh = vector3_subtraction(wheel->position, chassis->position);
             vector3 v_contact = vector3_addition(
@@ -203,8 +256,10 @@ void ftc_robot_update(physics_world *world, ftc_robot *robot, float dt) {
             }
         }
 
-        /* Update motor electrical state */
-        motor_update(&robot->wheel_motors[i], wheel_speed, dt, terminal_voltage);
+        /* Update motor electrical state (implicit-in-speed: stable for
+         * light wheels; same stall/free endpoints as explicit). */
+        float axle_inertia = 0.5f * wheel->mass * wheel->radius * wheel->radius;
+        motor_update_load(&robot->wheel_motors[i], wheel_speed, dt, terminal_voltage, axle_inertia);
 
         /* Traction cut applies to delivered torque (both the axle drive
          * below and the traction loop in drivetrain_update read
@@ -213,12 +268,25 @@ void ftc_robot_update(physics_world *world, ftc_robot *robot, float dt) {
         robot->wheel_motors[i].output_torque *= robot->wheel_traction_scale[i];
 
         /* Apply motor torque along the actual physical axle in world space.
-         * MFS_PORT_V15S: NO one-tick no-overshoot clamp here (tried: it
-         * caps torque below the static-grip cone, so wheels skid instead
-         * of rolling while traction drags the chassis — odometry reads
-         * ~zero). Chatter is handled by traction control (slip-gated cut
-         * above), which preserves full stall torque for breakaway. */
+         * Free-speed governor: a motor cannot push its wheel past free
+         * speed under its own power (measured pathology: +248 rad/s in
+         * ONE tick at 10.6x free speed). Below free speed torque is
+         * untouched, preserving full stall for breakaway grip; only the
+         * overshoot past 1.1x free speed is clipped to land on the bound.
+         * (An old no-overshoot-everywhere clamp is NOT used: it capped
+         * torque below the static-grip cone and stalled breakaway.) */
         float torque = robot->wheel_motors[i].output_torque;
+        {
+            float wfree = fabsf(robot->wheel_motors[i].free_speed_rad_s) * 1.1f;
+            float iaxle = 0.5f * wheel->mass * wheel->radius * wheel->radius;
+            if (iaxle > 0.0f && wfree > 0.0f && dt > 0.0f) {
+                float wpred = wheel_speed + torque * dt / iaxle;
+                if (fabsf(wpred) > wfree && (wpred * torque) > 0.0f) {
+                    torque = ((wpred > 0.0f) ? wfree : -wfree) - wheel_speed;
+                    torque *= iaxle / dt;
+                }
+            }
+        }
         /* MFS_145_IDLE_BRAKE: back-EMF braking is a damper — it brings a coasting
          * wheel to rest and can never reverse it (no back-EMF once stopped).
          * At idle, clamp the braking torque to the amount that stops the wheel

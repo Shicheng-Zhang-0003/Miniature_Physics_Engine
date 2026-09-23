@@ -26,6 +26,7 @@
 #include "modules/ftc/submodules/robot.h"
 #include "modules/ftc/submodules/drivetrain.h"
 #include "modules/ftc/ftc_fleet.h"
+#include "ecosystem/mfs/tests/mfs_test_common.h"
 
 extern const mpe_module_desc_t mpe_module_desc; /* static copy (ftc_module.c) */
 
@@ -48,10 +49,7 @@ static int finite_world(physics_world *w) {
 }
 
 static void setup_world(physics_world *w) {
-    mpe_config_init();
-    g_cfg.timestep.solver_iterations = 128;
-    physics_world_init(w);
-    constraint_pool_init(w);
+    mfs_test_world(w); /* 128 iters + tile floor (see header) */
 }
 
 /* dlsym'd dynamic API surface (full import: descriptor + fleet + drive) */
