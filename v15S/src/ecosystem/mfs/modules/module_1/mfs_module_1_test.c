@@ -93,8 +93,19 @@ int main(void) {
             mfs_module_1_set_shooter(state, true, false);
         }
         
-        /* Fire at tick 80 */
-        if (t == 80) {
+        /* Stage a ball at the flywheel rim on the SAME tick as the fire
+         * command (staging a tick early leaves it behind: the robot has
+         * driven 1.3 m by tick 80). Balls spawn across the field; none
+         * is ever near the wheel otherwise, so without staging the
+         * discharge path is dead code in this test. */
+        if (t == 80 && state->ball_count > 0) {
+            int fw = physics_world_index_by_id(&world, state->shooter_flywheel_body);
+            int b0 = physics_world_index_by_id(&world, state->ball_body_ids[0]);
+            if (fw >= 0 && b0 >= 0) {
+                world.bodies[b0].position = vector3_addition(
+                    world.bodies[fw].position, (vector3){0.05f, 0.0f, 0.0f});
+                world.bodies[b0].velocity = vector3_zero();
+            }
             mfs_module_1_set_shooter(state, true, true);
         }
     }
@@ -106,20 +117,28 @@ int main(void) {
         return 1;
     }
     
-    float dist = sqrtf(chassis->position.x * chassis->position.x + 
+    float dist = sqrtf(chassis->position.x * chassis->position.x +
                        chassis->position.z * chassis->position.z);
-    if (dist < 0.1f) {
+    /* Calibrated gates (measured: 1.36 m drive, 3969/4000 rpm): drive must
+     * cover real ground and the flywheel must near its target, not merely
+     * twitch (old 0.1 m / 1000 rpm admitted both). */
+    if (dist < 0.5f) {
         printf("[FAIL] Robot didn't move (dist=%.3f)\n", dist);
         return 1;
     }
     printf("[OK] Robot moved %.3f meters\n", dist);
-    
+
     /* Verify shooter spun up */
-    if (state->shooter_rpm < 1000.0f) {
+    if (state->shooter_rpm < 3000.0f) {
         printf("[FAIL] Shooter didn't spin up (rpm=%.1f)\n", state->shooter_rpm);
         return 1;
     }
     printf("[OK] Shooter RPM: %.1f\n", state->shooter_rpm);
+    if (state->balls_fired < 1) {
+        printf("[FAIL] Fire command never discharged a ball\n");
+        return 1;
+    }
+    printf("[OK] Balls fired: %d\n", state->balls_fired);
     
     /* Verify balls still exist */
     int valid_balls = 0;

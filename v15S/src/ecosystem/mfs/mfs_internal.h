@@ -32,6 +32,9 @@ void mfs_internal_registry_init(void);
 /* Register an internal module (compiled directly into ecosystem) */
 int mfs_internal_module_register(const mpe_module_desc_t *desc);
 
+/* 1 if name is registered, else 0 (idempotent ensure-register). */
+int mfs_internal_module_registered(const char *name);
+
 /* Attach an internal module by name */
 int mfs_internal_module_attach(const char *name, physics_world *world);
 

@@ -41,7 +41,8 @@ nominal used in presets is consistent with published data.
 
 5202 series (6 mm D-shaft) mirrors these ratios on the same RS-555/9.2 A
 platform (e.g. 5202-2402-0019: 19.2:1, 312 RPM, 24.3 kg.cm) — same
-physics as the 5203 equivalents, so no duplicate presets. 5303 Saturn
+physics as the 5203 equivalents, with 11 duplicate presets present in
+motor_presets.h (MOTOR_GB_5202_*). 5303 Saturn
 series is 24 V and NOT FTC-legal — excluded.
 
 ## AndyMark NeveRest (am-3104 base)
@@ -55,13 +56,13 @@ versions are FTC-legal per AndyMark.)
 |---|---|---|---|---|---|
 | `MOTOR_NR_CLASSIC_40` | 40:1 | 160 pub | 2.4715 (350 oz-in pub) | 11.5 | published |
 | `MOTOR_NR_CLASSIC_60` | 60:1 | 105 pub | 3.707 (2.734 ft-lb pub) | 11.5 | published |
-| `MOTOR_NR_ORBITAL_20` | 19.2:1 | ~344 pub | 1.1904 (ideal-derived) | 11.5 | mixed |
+| `MOTOR_NR_ORBITAL_19_2` | 19.2:1 | ~344 pub | 1.1904 (ideal-derived) | 11.5 | mixed |
 
 Classic stalls match base×ratio almost exactly (0.062×40 = 2.48 ≈
 2.472), i.e. AndyMark publishes ideal numbers. Orbital free speeds run
 ~10% above 6000/ratio (6600-class base behavior); published ~344 used.
-Orbital 3.7 (~1784 RPM) and 50.9 (~130 RPM) exist but have no presets —
-same base, add on demand.
+Orbital 3.7 (~1784 RPM) and 50.9 (~130 RPM) presets exist
+(`MOTOR_NR_ORBITAL_3_7`, `MOTOR_NR_ORBITAL_50_9`).
 
 ## REV Robotics
 

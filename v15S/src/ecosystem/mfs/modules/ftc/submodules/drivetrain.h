@@ -7,7 +7,7 @@
 /* Tank drive: independent left/right power */
 void drivetrain_tank(ftc_robot *robot, float left_power, float right_power);
 
-/* Mecanum drive: forward/strafe/rotate (stub for Phase 3) */
+/* Mecanum drive: forward/strafe/rotate (IK + roller-thrust strafe model) */
 void drivetrain_mecanum(ftc_robot *robot, float forward, float strafe, float rotate);
 
 /* One drivetrain update tick: sets motor commands, then updates motors. */

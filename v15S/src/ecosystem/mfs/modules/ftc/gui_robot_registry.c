@@ -61,6 +61,9 @@ if (proxy_idx >= 0) {
 mfs_gui_robot_world->bodies[proxy_idx].colour = (vector3){0.2f, 0.6f, 0.9f};
 mfs_gui_robot_world->bodies[proxy_idx].static_state = true;
 mfs_gui_robot_world->bodies[proxy_idx].inverse_mass = 0.0f;
+/* Proxies overlap the real bodies by design: exclude from ALL contact
+ * (broadphase/dispatch/floor/CCD) or the solver fights the robot. */
+mfs_gui_robot_world->bodies[proxy_idx].no_collide = true;
 proxy->chassis_proxy = proxy_idx;
 }
 /* MFS_125: Create heading indicator (orange nose) at front of chassis */
@@ -73,6 +76,7 @@ if (nose_idx >= 0) {
 mfs_gui_robot_world->bodies[nose_idx].colour = (vector3){1.0f, 0.5f, 0.0f}; /* orange */
 mfs_gui_robot_world->bodies[nose_idx].static_state = true;
 mfs_gui_robot_world->bodies[nose_idx].inverse_mass = 0.0f;
+mfs_gui_robot_world->bodies[nose_idx].no_collide = true;
 proxy->nose_proxy = nose_idx;
 }
 }
@@ -87,6 +91,7 @@ if (proxy_idx >= 0) {
 mfs_gui_robot_world->bodies[proxy_idx].colour = (vector3){0.15f, 0.15f, 0.15f};
 mfs_gui_robot_world->bodies[proxy_idx].static_state = true;
 mfs_gui_robot_world->bodies[proxy_idx].inverse_mass = 0.0f;
+mfs_gui_robot_world->bodies[proxy_idx].no_collide = true;
 proxy->wheel_proxies[i] = proxy_idx;
 }
 }
@@ -95,6 +100,10 @@ mfs_gui_robot_count++;
 return idx;
 }
 
+/* gui_robot_tick OWNS stepping mfs_gui_robot_world (fixed 60 Hz
+ * accumulator). Do NOT step that world from the engine loop as well:
+ * double-stepping integrates forces twice per tick. Use this tick OR
+ * the engine loop, never both, for any bound world. */
 void gui_robot_tick(float dt) {
 if ((mfs_gui_robot_count <= 0) || (!mfs_gui_robot_world)) {
 return;
@@ -169,6 +178,24 @@ drivetrain_tank(&mfs_gui_robots[i], forward - rotate, forward + rotate);
 drivetrain_mecanum(&mfs_gui_robots[i], forward, strafe, rotate);
 }
 }
+}
+
+/* Release a registry slot. Bodies persist until scene_clear (no
+ * mid-array removal exists); proxies are already non-colliding so the
+ * leftovers are render-only. */
+void gui_robot_despawn(int index) {
+if ((index < 0) || (index >= mfs_gui_robot_count)) {
+return;
+}
+for (int i = index; i + 1 < mfs_gui_robot_count; i++) {
+mfs_gui_robots[i] = mfs_gui_robots[i + 1];
+mfs_gui_proxies[i] = mfs_gui_proxies[i + 1];
+}
+mfs_gui_robot_count--;
+}
+
+void gui_robot_clear(void) {
+mfs_gui_robot_count = 0;
 }
 
 int gui_robot_get_count(void) {

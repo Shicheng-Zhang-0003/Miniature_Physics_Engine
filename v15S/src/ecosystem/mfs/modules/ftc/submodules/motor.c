@@ -34,8 +34,13 @@ void motor_from_spec(motor *m, float stall_torque_nm, float free_speed_rpm, floa
     m->back_emf = 0.0f;
     m->torque = 0.0f;
     m->output_torque = 0.0f;
+    m->torque_explicit = 0.0f;
     m->rpm = 0.0f;
     m->temperature = 25.0f;
+    m->load_torque = 0.0f;
+    m->w_prev = 0.0f;
+    m->tau_exp_prev = 0.0f;
+    m->wprev_valid = 0;
 }
 
 void motor_update(motor *m, float wheel_angular_vel, float dt, float battery_voltage) {
@@ -51,8 +56,12 @@ void motor_update(motor *m, float wheel_angular_vel, float dt, float battery_vol
     /* Applied voltage from command */
     float applied_voltage = battery_voltage * m->command;
 
+    /* Copper thermal derating: winding resistance rises with the modeled
+     * temperature (was write-only telemetry). Small at FTC currents. */
+    float r_eff = m->resistance * (1.0f + 0.00393f * (m->temperature - 25.0f));
+    if (!(r_eff > 0.0f) || !isfinite(r_eff)) r_eff = m->resistance;
     /* Current = (V - BackEMF) / R, clamped to stall */
-    float raw_current = (applied_voltage - m->back_emf) / m->resistance;
+    float raw_current = (applied_voltage - m->back_emf) / r_eff;
     if (raw_current > m->stall_current) {
         raw_current = m->stall_current;
     }
@@ -70,11 +79,64 @@ void motor_update(motor *m, float wheel_angular_vel, float dt, float battery_vol
 
     /* Output torque at wheel (after gearing, minus gearbox loss) */
     m->output_torque = m->torque * m->gear_ratio * m->efficiency; /* MFS_122: restore gearing */
+    m->torque_explicit = m->output_torque; /* explicit path: applied == instantaneous */
 
     /* Speed tracking (signed: reverse reads negative). */
     m->rpm = wheel_angular_vel / MOTOR_RPM_TO_RAD_S;
+}
 
-    /* Simplified thermal: heat from I^2*R, cooling to ambient */
+void motor_update_load(motor *m, float wheel_angular_vel, float dt, float battery_voltage,
+                       float axle_inertia) {
+    if ((!m) || (dt <= 0.0f)) {
+        return;
+    }
+    if (!(axle_inertia > 0.0f) || !isfinite(axle_inertia)) {
+        motor_update(m, wheel_angular_vel, dt, battery_voltage);
+        return;
+    }
+    /* Implicit Euler on the electrical dynamics with disturbance
+     * observer for external load (joints/contacts):
+     *   tau = A*(V - B*w_end),  w_end = w + (tau + tau_L)*dt/I
+     * => w_end = (w + (A*V + tau_L)*dt/I) / (1 + A*B*dt/I)
+     * with A = Kt*gear*eff/R, B = kv*gear. tau_L is last tick's measured
+     * discrepancy (I*(w_now - w_pred)/dt). Without it the solve assumes
+     * no load and starves locked wheels ~10x (turn/strafe die while free
+     * spin converges). Stall/free endpoints identical to explicit. */
+    float applied_voltage = battery_voltage * m->command;
+    float A = m->kt * m->gear_ratio * m->efficiency / m->resistance;
+    float B = m->kv * m->gear_ratio;
+    if (!(m->resistance > 0.0f) || !isfinite(A) || !isfinite(B)) {
+        motor_update(m, wheel_angular_vel, dt, battery_voltage);
+        return;
+    }
+    float tau_L = (m->wprev_valid && isfinite(m->load_torque)) ? m->load_torque : 0.0f;
+    float w_end = (wheel_angular_vel + (A * applied_voltage + tau_L) * dt / axle_inertia) /
+                  (1.0f + A * B * dt / axle_inertia);
+    if (!isfinite(w_end)) {
+        motor_update(m, wheel_angular_vel, dt, battery_voltage);
+        return;
+    }
+    m->back_emf = m->kv * (w_end * m->gear_ratio);
+    float raw_current = (applied_voltage - m->back_emf) / m->resistance;
+    if (raw_current > m->stall_current) {
+        raw_current = m->stall_current;
+    }
+    if (raw_current < -m->stall_current) {
+        raw_current = -m->stall_current;
+    }
+    m->current = raw_current;
+    m->torque = m->kt * m->current;
+    m->output_torque = m->torque * m->gear_ratio * m->efficiency;
+    /* Explicit instantaneous twin (see header): correct locked-rotor
+     * force sizing at the measured speed. */
+    {
+        float exp_i = (applied_voltage - m->kv * (wheel_angular_vel * m->gear_ratio)) / m->resistance;
+        if (exp_i > m->stall_current) exp_i = m->stall_current;
+        else if (exp_i < -m->stall_current) exp_i = -m->stall_current;
+        m->torque_explicit = m->kt * exp_i * m->gear_ratio * m->efficiency;
+        m->tau_exp_prev = m->torque_explicit;
+    }
+    m->rpm = w_end / MOTOR_RPM_TO_RAD_S;
     float heat_generated = m->current * m->current * m->resistance * dt;
     float cooling = (m->temperature - 25.0f) * 0.01f * dt;
     m->temperature += heat_generated * 0.1f - cooling;

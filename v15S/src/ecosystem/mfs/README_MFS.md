@@ -8,8 +8,9 @@ history preserved via `git mv`.)
 ```
 v15S/src/ecosystem/mfs/                  # MFS root ("mfs-simulator")
   README_MFS.md                          # this file
-  Makefile                               # unified standalone build
-  build_tests.sh                         # FTC/robotics test build + run
+  Makefile                               # unified standalone build (thin .so, build/ objs)
+  mfs_sources.mk                         # canonical engine+FTC file lists (mirrored in build_tests.sh)
+  build_tests.sh                         # FTC/robotics test build + run (8 gated + 5 info)
   mfs_ecosystem.c                        # overarching descriptor: registers
                                          #   modules/module_1 + modules/ftc
   mfs_internal.c/.h                      # internal static module registry
@@ -29,9 +30,12 @@ v15S/src/ecosystem/mfs/                  # MFS root ("mfs-simulator")
         motor.c/.h                       # DC electrical model
         motor_presets.c/.h               # 57-preset FTC catalog (see docs/)
         battery.c/.h                     # sag + drain model
-  tests/                                 # teleop, mecanum, tank, odometry
-                                         # (+diags), ftc integration/debug,
-                                         # physics truth (+diag), hotload
+  tests/                                 # teleop, mecanum, tank, odometry,
+                                         # ftc integration, physics truth,
+                                         # hotload, module_1 test,
+                                         # mfs_test_common.h (shared setup:
+                                         #   128 iters + tile floor),
+                                         # (+5 ungated diags)
   docs/
     FTC_SPECS.md                         # motor spec-sheet sources + URLs
   plugins/                               # build output only (gitignored):
@@ -64,6 +68,9 @@ Location-independent; never use `../` crosses (they break on every move):
 Design rules modules follow (and future modules should too):
 
 - **One descriptor per `.so`**; the loader `dlsym`s exactly that symbol.
+  Ecosystem bundles are the exception: `mfs_ecosystem.so` links its inner
+  modules' objects, so it exports both symbols and the loader takes
+  `mpe_ecosystem_desc` first by documented precedence.
 - **Per-world state only**: fleets/states allocate in `attach`, free in
   `detach`. Detach never deletes world bodies.
 - **Tick position**: `pre_step` lands motor torques/traction in the
@@ -81,7 +88,7 @@ Design rules modules follow (and future modules should too):
 From `v15S/src`:
 
 ```
-ecosystem/mfs/build_tests.sh            # full FTC suite (13 tests + diags)
+ecosystem/mfs/build_tests.sh            # full FTC suite (8 gated tests + 5 info diags + build checks)
 ecosystem/mfs/build_tests.sh --build-only
 ```
 
@@ -129,25 +136,39 @@ physics_world_detach_module(world, "ftc-fleet");
 - Traction control (`wheel_traction_scale`): cuts torque only on
   overspeed (burnout); under-speed keeps full torque so wheels spin up
   to rolling speed instead of skidding.
-- Mecanum strafe is a reduced-order roller force on the chassis budgeted
-  in the net-vector friction circle; rotate works through real wheel
-  differentials. Anisotropic roller friction in the solver remains the
-  principled long-term model.
+- Mecanum strafe is a torque-derived roller force on the chassis
+  (`sin45·Στ/r` from instantaneous motor torques), capped at 1.1× the
+  static cone as a documented breakaway margin: the isotropic contact
+  model cannot roll sideways, so the stand-in must exceed static where
+  real rollers would roll. `odom_slip` flags every fused tick; encoder
+  math itself is exact. Anisotropic roller friction in the solver remains
+  the principled long-term model.
+- Motor model: implicit-in-speed solve with disturbance observer
+  (stall *and* free speed both exact), free-speed governor backstop,
+  copper thermal derating, 20 A PTC fuse with brownout recovery.
+- Traction budgets against wheel materials (not the global floor
+  default); wheels ship grippy rubber (0.9/0.7). Idle hold is gated
+  below 0.25 m/s as documented; chassis wakes on super-threshold motion
+  so sleep never swallows drift.
 - `physics_truth_test` bounce expectation accounts for ball radius
-  (`e^2*(h-r)+r`). Motor free-speed test settles before driving.
-- `gui_robot_registry` proxies are same-world static bodies.
+  (`e^2*(h-r)+r`). Motor free-speed test spins airborne wheels in
+  vacuum. T14 gates position + no-runaway (steady pure roll on slop
+  contacts is an engine rolling-model edge, out of MFS scope).
+- `gui_robot_registry` proxies are same-world static bodies flagged
+  `no_collide` (render-only: skipped by broadphase/dispatch/floor/CCD),
+  with `gui_robot_despawn/clear` lifecycle and a no-double-step contract
+  on `gui_robot_tick`.
 
 ## Known observations (not FTC bugs)
 
 - Static settle shows a systematic left-high roll (~15 mm) that follows
   world X under 90° rotation: solver pair-order lock-in, not assembly
   geometry. Harmless to all gates.
-- Unbounded raw torque can pump a light wheel past ~2000 rad/s, where
-  swept broadphase spans explode. The FTC torque paths (back-EMF plus
-  traction control) bound wheels near free speed, so robot code cannot
-  reach that regime. A span cap belongs in the broadphase when the
-  engine is next touched.
-- Odometry over-reads distance ~4x under chronic wheel slip (floor μ 0.2
-  in the test worlds vs tile-like grip): the encoder FK math is correct,
-  the wheels physically spin. Coherent fix is tile friction in the robot
-  test setups plus threshold recalibration — not a model change.
+- Wheel spin is bounded two ways: the free-speed governor (hard backstop
+  at 1.1× free speed) and the implicit motor solve (no discrete-time
+  overshoot). Unbounded torque can no longer pump wheels to span-busting
+  speeds through the FTC paths.
+- Odometry tracks physics within ~5% on tile floors (was 45% error with
+  sign flip on the frictionless backstop). Lateral encoder blindness is
+  structural (roller thrust bypasses wheels): `odom_slip` flags fused
+  ticks instead of hiding them.
