@@ -207,18 +207,23 @@ static void ensure_parent_dir(const char *path) {
     char copy[512];
     strncpy(copy, path, sizeof(copy) - 1);
     copy[sizeof(copy) - 1] = '\0';
-    /* mkdir -p: create every ancestor component, not just the leaf. */
+    /* mkdir -p: create every ancestor component, not just the leaf.
+     * 0700 for config (no world-readable secrets); errors checked by
+     * caller via subsequent fopen failure. Truncation guarded. */
+    if (strlen(path) >= sizeof(copy)) {
+        return;
+    }
     for (char *p = copy + 1; *p; p++) {
         if (*p == '/') {
             *p = '\0';
-            mkdir(copy, 0755);
+            (void)mkdir(copy, 0700);
             *p = '/';
         }
     }
     char *last_slash = strrchr(copy, '/');
     if ((last_slash) && (last_slash != copy)) {
         *last_slash = '\0';
-        mkdir(copy, 0755);
+        (void)mkdir(copy, 0700);
     }
 }
 bool mpe_config_save(const char *path) {
@@ -239,7 +244,8 @@ bool mpe_config_save(const char *path) {
     FILE *file = fopen(tmp_path, "w");
     if (!file) {return false;}
     time_t now = time(NULL);
-    struct tm *local_time = localtime(&now);
+    struct tm tm_buf;
+    struct tm *local_time = localtime_r(&now, &tm_buf);
     char stamp[64];
     if (local_time) {
         strftime(stamp, sizeof(stamp), "%Y-%m-%d %H:%M:%S", local_time);
@@ -308,6 +314,14 @@ bool mpe_config_load(const char *path) {
     char line[512];
     char section[64] = "";
     while (fgets(line, sizeof(line), file)) {
+        /* Truncation detection: line without newline was split; consume
+         * the rest so a split key never parses as two keys. */
+        if (!strchr(line, '\n') && !feof(file)) {
+            int ch;
+            while ((ch = fgetc(file)) != '\n' && ch != EOF) {
+            }
+            continue;
+        }
         char *cursor = term_trim(line);
         if ((*cursor == '\0') || (*cursor == '#')) {
             continue;

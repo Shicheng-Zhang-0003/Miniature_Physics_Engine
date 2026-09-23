@@ -498,6 +498,22 @@ void scene_spawn_long_run_validation(void) {
     main_inputs.spawner_menu_level = 0;
     main_inputs.velocity_menu_level = 0;
 
+    /* TRUTH (2026-09-23 TUI validation): the scene shipped WITHOUT any
+     * frictional floor — bodies rested on the frictionless emergency
+     * boundary clamp, so the opening transient's outward slide never damped
+     * (no stick, no sleep) and the pile dispersed to ±230 m by 60 s while
+     * the loose gates (fin<5, runmax<15) still passed. Coulomb floor slab
+     * (top y=0, mu 0.8/0.7 matched to the scene) restores the documented
+     * dead-calm settle: 27/27 asleep, KE=0, run-max 0.0 at 60 s. */
+    {
+        int floor_idx = scene_add_cube((vector3){0.0f, -0.5f, 0.0f}, (vector3){30.0f, 0.5f, 30.0f}, 0.0f);
+        if (floor_idx >= 0) {
+            (physics_world_get_primary()->bodies)[floor_idx].friction_static = 0.8f;
+            (physics_world_get_primary()->bodies)[floor_idx].friction_kinetic = 0.7f;
+            (physics_world_get_primary()->bodies)[floor_idx].restitution = 0.0f;
+        }
+    }
+
     /* Stability stack: 10 cubes at x=20. */
     for (int i = 0; i < 10; i++) {
         float stack_y = 0.5f + (float) i * 0.99f;

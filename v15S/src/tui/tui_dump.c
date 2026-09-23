@@ -34,6 +34,9 @@ static const char *dump_type(object_type t) {
 }
 
 static const char *dump_state(const rigidbody *rb) {
+    if (!rb) {
+        return "invalid";
+    }
     if (rb->static_state) {
         return "static";
     }
@@ -67,6 +70,11 @@ static int dump_index_by_id(physics_world *world, uint32_t id) {
     if (!world || id == 0) {
         return -1;
     }
+    /* Reuse the world id->index cache (O(1)) instead of linear scan. */
+    int hit = physics_world_index_by_id(world, id);
+    if (hit >= 0) {
+        return hit;
+    }
     for (int i = 0; i < world->body_count; i++) {
         if (world->bodies[i].object_id == id) {
             return i;
@@ -80,7 +88,7 @@ static vector3 dump_anchor_world(const rigidbody *rb, vector3 local) {
 }
 
 int tui_dump_snapshot(FILE *out, physics_world *world, unsigned long tick, float dt) {
-    if (!out || !world) {
+    if (!out || !world || !world->bodies) {
         return 1;
     }
     int bad = 0;

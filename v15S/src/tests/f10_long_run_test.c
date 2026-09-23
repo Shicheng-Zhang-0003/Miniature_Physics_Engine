@@ -38,6 +38,20 @@ int main(void) {
     physics_world_init(&world);
     constraint_pool_init(&world);
 
+    /* Coulomb floor (top y=0, mu matched). Floorless, the pile rests on the
+     * frictionless boundary clamp and disperses (0/27 asleep, KE=30 at
+     * 60 s) while loose gates still pass — the same setup-bug family as
+     * stack/driven_wheel/list4. With floor: 27/27 asleep, KE=0, runmax 0. */
+    {
+        int f = physics_world_add_cube(&world, (vector3){0.0f, -0.5f, 0.0f},
+                                       (vector3){30.0f, 0.5f, 30.0f}, 0.0f);
+        if (f >= 0) {
+            world.bodies[f].friction_static = 0.8f;
+            world.bodies[f].friction_kinetic = 0.7f;
+            world.bodies[f].restitution = 0.0f;
+        }
+    }
+
     for (int i = 0; i < 10; i++) {
         f10_add_cube(&world, (vector3){20.0f, 0.5f + (float) i * 0.99f, 0.0f});
     }
@@ -79,7 +93,7 @@ int main(void) {
                 nan_ticks++;
                 continue;
             }
-            if (rb->position.y < -0.2f) {
+            if (!rb->static_state && rb->position.y < -0.2f) {
                 fallen_ticks++;
             }
             float l = vector3_length(rb->velocity);
@@ -112,14 +126,27 @@ int main(void) {
 
     printf("[info] final lin=%.5f ang=%.5f runmax lin=%.5f ang=%.5f transient lin=%.5f ang=%.5f nan=%ld fallen=%ld\n",
            fin_lin, fin_ang, run_max_lin, run_max_ang, trans_lin, trans_ang, nan_ticks, fallen_ticks);
-    /* TRUTH: Three-gate wake eliminated the 13 m/s pump (fixed in v15).
-     * Sequential impulse solver + discrete time stepping: residual micro-motion
-     * in 10-high stack with overlaps produces run-max ~10-15 m/s over 25s.
-     * This is a known solver limitation for adversarial tall stacks.
-     * Tolerances reflect actual engine behavior. */
+    /* TRUTH (2026-09-23 TUI validation): the old "run-max ~10-15 is a solver
+     * limitation" comment rationalized a missing floor, not solver truth.
+     * Floorless, the pile slides on the frictionless clamp and disperses
+     * (runmax 10.7) while these loose gates pass. With the Coulomb floor
+     * the scene settles dead calm: 27/27 asleep, KE=0, run-max 0.0.
+     * Gates now match the in-engine V04 verdict (fin<0.25/0.5, runmax<2.0)
+     * plus a sleep fraction. */
+    int asleep = 0, dynamic_n = 0;
+    for (int i = 0; i < world.body_count; i++) {
+        if (!world.bodies[i].static_state) {
+            dynamic_n++;
+            if (world.bodies[i].is_sleeping) {
+                asleep++;
+            }
+        }
+    }
+    printf("[info] asleep=%d/%d\n", asleep, dynamic_n);
     int pass = world.body_count > 0 && nan_ticks == 0 && fallen_ticks == 0 &&
-               fin_lin < 5.0f && fin_ang < 5.0f &&
-               run_max_lin < 15.0f && run_max_ang < 15.0f;
+               fin_lin < 0.25f && fin_ang < 0.5f &&
+               run_max_lin < 2.0f && run_max_ang < 2.0f &&
+               asleep == dynamic_n && dynamic_n > 0;
     if (pass) {
         printf("[PASS] long-run 10-stack+pile settles and stays calm\n");
     } else {

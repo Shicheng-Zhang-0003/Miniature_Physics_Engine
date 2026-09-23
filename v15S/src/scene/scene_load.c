@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 static int read_float(FILE *f, float *v) {
     return fread(v, sizeof(float), 1, f) == 1;
 }
@@ -151,12 +152,16 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
     if (!scene_ensure_pool_capacity(count)) {
         return 0;
     }
+    /* count is now guaranteed <= body_capacity after ensure_pool_capacity. */
     if (count > (physics_world_get_primary()->body_capacity)) {
-        count = (physics_world_get_primary()->body_capacity);
+        return 0;
     }
 
-    rigidbody *staged_bodies = (rigidbody *) malloc((size_t) count * sizeof(rigidbody));
-    int32_t *staged_ids = (int32_t *) malloc((size_t) count * sizeof(int32_t));
+    /* Allocate at least 1 element even for count==0 (malloc(0) may
+     * return NULL on some platforms, which would abort the load). */
+    int alloc_count = count > 0 ? count : 1;
+    rigidbody *staged_bodies = (rigidbody *) malloc((size_t) alloc_count * sizeof(rigidbody));
+    int32_t *staged_ids = (int32_t *) malloc((size_t) alloc_count * sizeof(int32_t));
     if ((!staged_bodies) || (!staged_ids)) {
         free(staged_bodies);
         free(staged_ids);
@@ -171,6 +176,7 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
     for (int i = 0; (i < count) && body_ok; i++) {
         uint32_t type_u = 0, static_u = 0, id_u = 0, nice_u = 0, sleep_u = 0, kin_u = 0, gen_u = 0;
         float mass = 0.0f, radius = 0.0f, half_len = 0.0f;
+        float sleep_timer_f = 0.0f;
         vector3 half_ext = {0.0f, 0.0f, 0.0f};
         vector3 pos = {0.0f, 0.0f, 0.0f}, vel = {0.0f, 0.0f, 0.0f}, ang = {0.0f, 0.0f, 0.0f};
         vector4 orient = {1.0f, 0.0f, 0.0f, 0.0f};
@@ -193,6 +199,7 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
         body_ok = body_ok && scene_r32(f, &crc, &id_u);
         body_ok = body_ok && scene_r32(f, &crc, &nice_u);
         body_ok = body_ok && scene_r32(f, &crc, &sleep_u);
+        body_ok = body_ok && scene_rfloat(f, &crc, &sleep_timer_f);
         body_ok = body_ok && scene_r32(f, &crc, &kin_u);
         body_ok = body_ok && scene_r32(f, &crc, &gen_u);
         if (!body_ok) {
@@ -206,11 +213,60 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
             body_ok = 0;
             break;
         }
+        /* Full float validation: NaN/Inf pos/vel/ang/orient/colour/material
+         * must veto the file, never poison the live world. Zero-quat vetoed
+         * (normalisation would yield identity, hiding corruption). */
+        {
+            float vals[] = {pos.x, pos.y, pos.z, vel.x, vel.y, vel.z,
+                            ang.x, ang.y, ang.z, orient.w, orient.x, orient.y, orient.z,
+                            colour.x, colour.y, colour.z, rest, fs, fk, sleep_timer_f,
+                            radius, half_len, half_ext.x, half_ext.y, half_ext.z};
+            bool all_fin = true;
+            for (size_t vi = 0; vi < sizeof(vals) / sizeof(vals[0]); vi++) {
+                if (!isfinite(vals[vi])) {
+                    all_fin = false;
+                    break;
+                }
+            }
+            double q2 = (double)orient.w * orient.w + (double)orient.x * orient.x +
+                        (double)orient.y * orient.y + (double)orient.z * orient.z;
+            if (!all_fin || !(q2 > 1e-12) || fabsf(pos.x) > 1e6f || fabsf(pos.y) > 1e6f ||
+                fabsf(pos.z) > 1e6f) {
+                body_ok = 0;
+                break;
+            }
+        }
+        /* Duplicate-ID veto: staged file with cloned IDs would alias the
+         * id_cache and mis-wire joints. */
+        for (int di = 0; di < i; di++) {
+            if (staged_ids[di] == (int32_t)id_u) {
+                body_ok = 0;
+                break;
+            }
+        }
+        if (!body_ok) {
+            break;
+        }
         object_type type = (object_type) type_u;
         if (type == object_cube) {
             rigidbody_initialisation_cube(&staged_bodies[i], pos, half_ext, mass);
         } else if (type == object_cylinder) {
             rigidbody_initialisation_cylinder(&staged_bodies[i], radius, half_len, mass, pos);
+        } else if (type == object_custom) {
+            /* v200 has no custom blob: restore as custom id 100 (capsule)
+             * with persisted radius so dispatch still finds the handler
+             * instead of degrading to sphere. */
+            memset(&staged_bodies[i], 0, sizeof(staged_bodies[i]));
+            staged_bodies[i].type = object_custom;
+            staged_bodies[i].custom_shape = 100;
+            staged_bodies[i].radius = (isfinite(radius) && radius > 0.0f) ? radius : 0.5f;
+            staged_bodies[i].mass = mass;
+            staged_bodies[i].inverse_mass = (mass > 0.0f) ? 1.0f / mass : 0.0f;
+            staged_bodies[i].position = pos;
+            staged_bodies[i].orientation = vector4_identity();
+            staged_bodies[i].half_extensions = (vector3){staged_bodies[i].radius,
+                                                         staged_bodies[i].radius,
+                                                         staged_bodies[i].radius};
         } else {
             rigidbody_initialisation_sphere(&staged_bodies[i], radius, mass, pos);
         }
@@ -234,7 +290,7 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
         }
         if ((sleep_u != 0) && (!staged_bodies[i].static_state) && (!staged_bodies[i].kinematic)) {
             staged_bodies[i].is_sleeping = true;
-            staged_bodies[i].sleep_timer = 0.0f;
+            staged_bodies[i].sleep_timer = sleep_timer_f;
             staged_bodies[i].velocity = vector3_zero();
             staged_bodies[i].angular_velocity = vector3_zero();
         }
@@ -512,9 +568,20 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
 
     (physics_world_get_primary()->body_count) = staged_body_count;
     for (int i = 0; i < staged_body_count; i++) {
+        int staged_cs = staged_bodies[i].custom_shape;
         (physics_world_get_primary()->bodies)[i] = staged_bodies[i];
         (physics_world_get_primary()->bodies)[i].body_index = i;
-        (physics_world_get_primary()->bodies)[i].custom_shape = -1;
+        /* Preserve foreign custom identity (staged); non-custom bodies
+         * keep custom_shape=-1. Clobbering customs to -1 broke dispatch
+         * (100/-1 mismatch rejects the capsule handler). */
+        if ((physics_world_get_primary()->bodies)[i].type == object_custom) {
+            if (staged_cs < 100) {
+                staged_cs = 100;
+            }
+            (physics_world_get_primary()->bodies)[i].custom_shape = staged_cs;
+        } else {
+            (physics_world_get_primary()->bodies)[i].custom_shape = -1;
+        }
         (physics_world_get_primary()->bodies)[i].max_relative_speed_sq = 0.0f;
         rigidbody_update_axes(&(physics_world_get_primary()->bodies)[i]);
         scene_note_loaded_id((physics_world_get_primary()->bodies)[i].object_id);
@@ -635,6 +702,15 @@ int scene_loading(const char *file_source_path)
     if ((!read_int(f, &count)) || (count < 0)) {
         fclose(f);
         return 0;
+    }
+
+    if (count == 0) {
+        /* Empty legacy scene is valid: clear and succeed (v200 already
+         * handles count==0; legacy malloc(0) could return NULL and
+         * misreport OOM). */
+        scene_clear();
+        fclose(f);
+        return 1;
     }
 
     if (count > mpe_max_bodies) {
@@ -814,8 +890,10 @@ int scene_loading(const char *file_source_path)
     fclose(f);
 
     /* --- Validate staged data before committing --- */
-    if (staged_body_count == 0) {
-        /* Nothing to commit. Do not clear the scene. */
+    if (staged_body_count == 0 || staged_body_count < count) {
+        /* Nothing to commit or partial read (truncated file). Do not
+         * clear the live scene — a partial load must leave the scene
+         * untouched. */
         free(staged_bodies);
         if (staged_ids) free(staged_ids);
         if (staged_joints) free(staged_joints);

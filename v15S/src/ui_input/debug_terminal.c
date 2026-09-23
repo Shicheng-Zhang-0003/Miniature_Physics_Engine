@@ -42,15 +42,18 @@ static size_t term_capture_capacity = 0;
 static bool term_capturing = false;
 
 void term_capture_begin(void) {
-    term_capturing = true;
     term_capture_length = 0;
     if (!term_capture_buffer) {
         term_capture_capacity = 8192;
         term_capture_buffer = malloc(term_capture_capacity);
+        if (!term_capture_buffer) {
+            term_capture_capacity = 0;
+            term_capturing = false;
+            return;
+        }
     }
-    if (term_capture_buffer) {
-        term_capture_buffer[0] = '\0';
-    }
+    term_capturing = true;
+    term_capture_buffer[0] = '\0';
 }
 
 void term_capture_end(void) {
@@ -82,18 +85,32 @@ gint64 term_engine_start_time = 0; /* FIX_029 */
 
 static void term_append_with_tag(const char *tag_name, const char *text) {
     /* MPE_TASK_V15R2_OUTPUT_CAPTURE_INTERCEPT */
+    if (!text) {
+        return;
+    }
     if (term_capturing) {
         size_t text_len = strlen(text);
+        /* 1MB cap: capture is for tests, never unbounded. */
+        if (text_len > (1u << 20)) {
+            text_len = (1u << 20);
+        }
         while (term_capture_length + text_len + 1 > term_capture_capacity) {
-            term_capture_capacity *= 2;
-            term_capture_buffer = realloc(term_capture_buffer, term_capture_capacity);
-            if (!term_capture_buffer) {
+            size_t next = term_capture_capacity ? term_capture_capacity * 2 : 8192;
+            if (next > (1u << 20) + 1024) {
                 term_capturing = false;
                 return;
             }
+            char *nb = realloc(term_capture_buffer, next);
+            if (!nb) {
+                term_capturing = false;
+                return;
+            }
+            term_capture_buffer = nb;
+            term_capture_capacity = next;
         }
-        memcpy(term_capture_buffer + term_capture_length, text, text_len + 1);
+        memcpy(term_capture_buffer + term_capture_length, text, text_len);
         term_capture_length += text_len;
+        term_capture_buffer[term_capture_length] = '\0';
         return;
     }
     if (!terminal_output_buffer) {
@@ -446,7 +463,8 @@ void term_execute(char *command_line) {
         for (int alias_index = 0; alias_index < term_alias_count; alias_index++) {
             if (g_ascii_strcasecmp(first_word, term_alias_names[alias_index]) == 0) {
                 static char expanded_command[2048];
-                snprintf(expanded_command, sizeof(expanded_command), "%s%s", term_alias_values[alias_index], scan);
+                int ew = snprintf(expanded_command, sizeof(expanded_command), "%s%s", term_alias_values[alias_index], scan);
+                if (ew < 0 || (size_t)ew >= sizeof(expanded_command)) { term_err("mpe: alias expansion too long, refused\n"); break; }
                 command_line = expanded_command;
                 break;
             }
@@ -819,15 +837,18 @@ static size_t term_capture_capacity = 0;
 static bool term_capturing = false;
 
 void term_capture_begin(void) {
-    term_capturing = true;
     term_capture_length = 0;
     if (!term_capture_buffer) {
         term_capture_capacity = 8192;
         term_capture_buffer = malloc(term_capture_capacity);
+        if (!term_capture_buffer) {
+            term_capture_capacity = 0;
+            term_capturing = false;
+            return;
+        }
     }
-    if (term_capture_buffer) {
-        term_capture_buffer[0] = '\0';
-    }
+    term_capturing = true;
+    term_capture_buffer[0] = '\0';
 }
 
 void term_capture_end(void) {
@@ -859,18 +880,32 @@ gint64 term_engine_start_time = 0; /* FIX_029 */
 
 static void term_append_with_tag(const char *tag_name, const char *text) {
     /* MPE_TASK_V15R2_OUTPUT_CAPTURE_INTERCEPT */
+    if (!text) {
+        return;
+    }
     if (term_capturing) {
         size_t text_len = strlen(text);
+        /* 1MB cap: capture is for tests, never unbounded. */
+        if (text_len > (1u << 20)) {
+            text_len = (1u << 20);
+        }
         while (term_capture_length + text_len + 1 > term_capture_capacity) {
-            term_capture_capacity *= 2;
-            term_capture_buffer = realloc(term_capture_buffer, term_capture_capacity);
-            if (!term_capture_buffer) {
+            size_t next = term_capture_capacity ? term_capture_capacity * 2 : 8192;
+            if (next > (1u << 20) + 1024) {
                 term_capturing = false;
                 return;
             }
+            char *nb = realloc(term_capture_buffer, next);
+            if (!nb) {
+                term_capturing = false;
+                return;
+            }
+            term_capture_buffer = nb;
+            term_capture_capacity = next;
         }
-        memcpy(term_capture_buffer + term_capture_length, text, text_len + 1);
+        memcpy(term_capture_buffer + term_capture_length, text, text_len);
         term_capture_length += text_len;
+        term_capture_buffer[term_capture_length] = '\0';
         return;
     }
     if (!terminal_output_buffer) {
@@ -1194,7 +1229,8 @@ void term_execute(char *command_line) {
         for (int alias_index = 0; alias_index < term_alias_count; alias_index++) {
             if (g_ascii_strcasecmp(first_word, term_alias_names[alias_index]) == 0) {
                 static char expanded_command[2048];
-                snprintf(expanded_command, sizeof(expanded_command), "%s%s", term_alias_values[alias_index], scan);
+                int ew = snprintf(expanded_command, sizeof(expanded_command), "%s%s", term_alias_values[alias_index], scan);
+                if (ew < 0 || (size_t)ew >= sizeof(expanded_command)) { term_err("mpe: alias expansion too long, refused\n"); break; }
                 command_line = expanded_command;
                 break;
             }
