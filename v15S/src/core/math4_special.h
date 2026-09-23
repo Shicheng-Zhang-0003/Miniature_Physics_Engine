@@ -44,10 +44,20 @@ static inline math4 math4_look_view(vector3 camera_position, vector3 camera_fron
         side_vector = (vector3){1.0f, 0.0f, 0.0f};
         forward_vector = (vector3){0.0f, 0.0f, -1.0f};
     }
+    /* Re-orthogonalize: up = normalize(cross(side, forward)). If that
+     * degenerates (NaN input), fall back to a vector orthogonal to side. */
     vector3 up_vector = vector3_cross(side_vector, forward_vector);
     float up_len_sq = vector3_length_squared(up_vector);
     if ((!isfinite(up_len_sq)) || (up_len_sq < 1e-12f)) {
-        up_vector = (vector3){0.0f, 1.0f, 0.0f};
+        vector3 ref = (fabsf(side_vector.y) < 0.99f) ? (vector3){0.0f, 1.0f, 0.0f}
+                                                     : (vector3){1.0f, 0.0f, 0.0f};
+        up_vector = vector3_cross(ref, side_vector);
+        float rl2 = vector3_length_squared(up_vector);
+        if ((!isfinite(rl2)) || (rl2 < 1e-12f)) {
+            up_vector = (vector3){0.0f, 1.0f, 0.0f};
+        } else {
+            up_vector = vector3_scaling(up_vector, 1.0f / sqrtf(rl2));
+        }
     } else {
         up_vector = vector3_scaling(up_vector, 1.0f / sqrtf(up_len_sq));
     }
@@ -122,10 +132,10 @@ static inline math4 vector4_to_math4(vector4 quaternion) {
      * identity) so physics and render never disagree on quats.
      * Double accumulation matches vector4_to_math3 after its fix. */
     double n2_d = (double) quaternion.w * (double) quaternion.w + (double) quaternion.x * (double) quaternion.x +
-                  (double) quaternion.y * (double) quaternion.y + (double) quaternion.z * (double) quaternion.z;
-    float n2 = (n2_d > (double) FLT_MAX) ? INFINITY : (float) n2_d;
-    if (isfinite(n2) && (n2 > 1e-12f)) {
-        float inv = 1.0f / sqrtf(n2);
+                   (double) quaternion.y * (double) quaternion.y + (double) quaternion.z * (double) quaternion.z;
+    if (isfinite(n2_d) && (n2_d > 1e-12)) {
+        double inv_d = 1.0 / sqrt(n2_d);
+        float inv = (float)inv_d;
         quaternion.w *= inv;
         quaternion.x *= inv;
         quaternion.y *= inv;

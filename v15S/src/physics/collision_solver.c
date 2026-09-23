@@ -834,7 +834,11 @@ void collision_apply_poisson_restitution(collision_data *manifolds, int manifold
             if (e <= 0.0f) {
                 continue;
             }
-            if (cp->impact_velocity >= C->solver.restitution_velocity_thresh) {
+            /* Threshold is a speed (approach magnitude). Enforce negative
+             * sign so a misconfigured +1.0 cannot make resting contacts
+             * bounce: gate is impact_vn >= -|thresh] skip. */
+            float rest_th = -fabsf(C->solver.restitution_velocity_thresh);
+            if (cp->impact_velocity >= rest_th) {
                 continue;
             }
             float compression = cp->accumulated_normal_impulse - cp->base_normal_impulse;
