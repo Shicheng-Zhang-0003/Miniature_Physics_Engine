@@ -171,6 +171,23 @@ int mpe_ecosystem_detach(mpe_world_t *world, const char *eco_name) {
     return rc;
 }
 
+/* Per-world state lookup for terminal-driven commands (eco command/
+ * config forward to these states on the primary world). */
+void *mpe_ecosystem_state(mpe_world_t *world, const char *eco_name) {
+    if (!world || !eco_name) return NULL;
+    pthread_mutex_lock(&s_eco_lock);
+    void *out = NULL;
+    for (int i = 0; i < 8; i++) {
+        if (s_attached[i].desc && s_attached[i].world == (const void *)world &&
+            strcmp(s_attached[i].desc->name, eco_name) == 0) {
+            out = s_attached[i].state;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&s_eco_lock);
+    return out;
+}
+
 /* Detach everywhere (unload path): hooks run while the .so is mapped. */
 void mpe_ecosystem_detach_everywhere(const char *eco_name) {
     if (!eco_name) return;

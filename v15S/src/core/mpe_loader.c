@@ -381,6 +381,33 @@ const char *mpe_loader_name_at(int i) {
     return s_h[i].desc->name;
 }
 
+/* Resolve a symbol from a loaded handle (by path, module name, or
+ * ecosystem name) without taking a new reference. Powers terminal
+ * commands (ftc/eco) that drive plugin APIs the engine never links.
+ * Returns NULL when unknown (caller reports, never crashes). */
+void *mpe_loader_symbol(const char *path_or_name, const char *sym) {
+    if (!path_or_name || !sym || !*sym) return NULL;
+    char resolved[PATH_MAX];
+    const char *identity = path_or_name;
+    int by_path = (strchr(path_or_name, '/') != NULL);
+    if (by_path) {
+        if (!plugin_path_is_confined(path_or_name, resolved)) return NULL;
+        identity = resolved;
+    }
+    for (int i = 0; i < s_n; i++) {
+        const char *n = s_h[i].is_ecosystem
+                            ? ((s_h[i].eco && s_h[i].eco->name) ? s_h[i].eco->name : "")
+                            : ((s_h[i].desc && s_h[i].desc->name) ? s_h[i].desc->name : "");
+        if (strcmp(s_h[i].path, identity) != 0 && strcmp(n, identity) != 0) continue;
+        /* Resolve against the stored open handle (never loads). */
+        dlerror();
+        void *p = dlsym(s_h[i].h, sym);
+        if (dlerror() != NULL) return NULL;
+        return p;
+    }
+    return NULL;
+}
+
 /* Retain/release resolve the OWNING handle (origin-aware): attach may
  * store a registry copy or a static original, and a static same-named
  * desc must never pin the .so. Pointer comparison alone could never
