@@ -37,14 +37,18 @@ To Check if dependency libraries are actually detected:
     To check dependency resolution
 
 After dependencies have been installed:
-    git clone <repository-url> --> This gets the actual source code.
-    Go to the src/ folder --> where all of the main code is actually stored.
+    git clone <repository-url> --> Replace with the actual repository URL.
+    Go to the v15S/src/ folder --> where all of the main code is actually stored.
     Run make
-        - This makes a new compilation of the source code run using your system's specifications.
-        - Especially now that I have added -O3 into compilation flags.
-        - Usually nothing, but for older systems gcc optimisations may be in consideration
-    The only time you should be worried is if you see make: Error at the end of the compilation
-    However, my own testing often reveals such issues, so theoretically this should only happen if you didn't install a dependency properly.
+        - This compiles the engine with -O3 (override with CFLAGS=... on older systems).
+        - Only worry if you see make: Error at the end of the compilation,
+          which usually means a dependency is missing.
+    Headless regression suite (no display needed):
+        make build_suite && ./test_mpe_suite --all
+        (expects 31/31 green: 28 physics + 3 diag-informational)
+    Robotics suite:
+        ecosystem/mfs/build_tests.sh
+        (expects 8 gated green + 5 informational diags)
 
 
 ```

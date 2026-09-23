@@ -1,11 +1,11 @@
 # MPE v15R3 — Release Notes
 
-**Status:** tagged release. Tree frozen (`a3_release_freeze = 1`):
+**Status:** tagged release (v15R3 tag in git history, frozen there with `a3_release_freeze = 1`; v15S head has `freeze = 0`):
 correctness, stability, validation, documentation, and hygiene changes only.
 
 **What it is:** the v15 configuration-system release of the Miniature
 Physics Engine — a hand-written 3D rigid-body engine in C (GTK3 + OpenGL
-3.3), MPE-only run (MFS robotics parked in `robotics_backup/`).
+3.3), MPE-only run (MFS robotics parked (now consolidated in `v15S/src/ecosystem/mfs/`)).
 
 ---
 
@@ -107,7 +107,7 @@ documented truth exceptions (vacuum angular damping, removed clamps).
 - Windows/macOS: unsupported.
 - No SIMD; single-threaded solve; ~1136-object practical wall.
 - Linear-only CCD sweep; rotation-heavy sub-tick motion is the solver's job.
-- Joint UI/persistence scope per §4. Big-endian hosts untested (LE format).
+- Joint UI/persistence scope per §4. Big-endian hosts unsupported: little-endian only, big-endian fails at compile time (scene_saving.c #error).
 - GTK4 port planned separately (render path verified portable; mouse-look
   needs an input redesign — no action in this release).
 

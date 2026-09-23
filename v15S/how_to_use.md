@@ -151,7 +151,7 @@ A terminal-only companion binary: a live inspector and a scriptable
 state-dump suite (needs only ncurses; no GTK/OpenGL):
 
 ```bash
-cd src
+cd v15S/src
 make mpe-tui
 ./mpe-tui                         # live ncurses inspector (needs a TTY)
 ./mpe-tui --snapshot 600          # one full state dump (pipeable, diffable)
@@ -260,6 +260,23 @@ In the debug terminal: `mod ls`, `mod load <file.so>`,
 `--broadphase NAME --solver NAME`. Each world carries its own config,
 so two worlds can run different physics side by side.
 
+Lifetime rules (all enforced, all tested by `loader_lifecycle`):
+- Paths are jailed to `plugins/<name>.so` (modules) or
+  `ecosystem/mfs/<name>.so` (ecosystem bundles), relative to the
+  process working directory (normally `v15S/src`).
+- `mod unload` refuses with "busy" while any live world still references
+  the code (attached tick module, active stage backend). Detach/reset
+  first, then retry. Unload otherwise detaches every live world,
+  resets aliasing stage slots to builtin, and purges leftover pair
+  handlers pre-`dlclose`.
+- Builtins (`hash`, `seq-impulse`, the six collision pairs) refuse
+  silent takeover; foreign stages register under their own names.
+- Pair handlers must self-unregister in a destructor (see
+  `plugins/mpe_capsule.c`); tick hook tables are snapshotted, so hooks
+  may attach/detach mid-tick.
+- Ecosystem bundles export `mpe_ecosystem_desc` (loader precedence over
+  any inner `mpe_module_desc`): `mod load ecosystem/mfs/mfs_ecosystem.so`.
+
 ---
 
 ## Validation Tests
@@ -276,7 +293,7 @@ The engine includes built-in test keys for stability validation:
 | F10 | Long-run validation: 3600 ticks (60 seconds) of idle stability |
 | F11 | Config torture (robustness verdict — see above) |
 
-F10 spawns a predefined scene (stack + pile + spheres) and monitors for NaN values, fallen objects, and residual motion over 60 seconds, printing `PASS` or `FAIL` to the console at completion.
+F10 spawns a predefined scene (Coulomb floor slab + stack + pile + spheres) and monitors for NaN values, fallen objects, and residual motion over 60 seconds, printing `PASS` or `FAIL` to the console at completion. The floor is load-bearing: without frictional contact the pile disperses instead of settling (measured 0/27 asleep, KE=30 at 60 s); with it the scene settles dead calm (27/27 asleep, KE=0, run-max 0.0). Verdict thresholds: final speeds < 0.25/0.5, post-transient run-max < 2.0.
 
 ---
 
@@ -315,11 +332,11 @@ Press `9` to open the scene menu:
   3 → Exit engine
 ```
 
-Scenes are saved to `status/scene.dat` (v200: LE fields, stable IDs, CRC32 footer, atomic tmp→rename). Saving overwrites any existing file. Loading clears the current scene and replaces it entirely. Bodies (sphere/cube/cylinder incl. position, velocity, orientation, colour, mass, friction, restitution, static/kinematic/sleep/nice_value/stable ID+generation) plus spring joints and revolute joints (anchors, axes, motors, limits) are saved and restored. Files ≤v153 load via the legacy reader (IDs remapped, cylinders become spheres pre-R3-04).
+Scenes are saved to `status/scene.dat` (v200: LE fields, stable IDs, CRC32 footer, atomic tmp→rename). Saving overwrites any existing file. Loading clears the current scene and replaces it entirely. Bodies (sphere/cube/cylinder incl. position, velocity, orientation, colour, mass, friction, restitution, static/kinematic/sleep/nice_value/stable ID+generation) plus spring joints and revolute/fixed/distance/prismatic/rope joints (anchors, axes, motors, limits) are saved and restored. Files v130/v140/v150/v151/v152/v153 load via the legacy reader (IDs remapped, cylinders become spheres pre-R3-04).
 
-**Joint truth:** the solver supports spring, revolute, fixed, prismatic, distance, and rope constraints (see them live in `mpe-tui --scene demo`). The in-engine menus create spring joints; scene v200 persists springs + revolutes only. Fixed/distance/prismatic/rope currently have no creation UI and do not persist — solver-side only.
+**Joint truth:** the solver supports spring, revolute, fixed, prismatic, distance, and rope constraints (see them live in `mpe-tui --scene demo`). The in-engine menus create spring joints; scene v200 persists springs + revolute/fixed/distance/prismatic/rope. Fixed/distance/prismatic/rope currently have no in-engine creation UI — solver + persistence + TUI-demo only.
 
-**Known limitations:** Per-object config (beyond nice_value) is not persisted. Big-endian hosts are untested (format is LE by design).
+**Known limitations:** Per-object config (beyond nice_value) is not persisted. Big-endian hosts unsupported: little-endian only; big-endian fails at compile time (scene_saving.c #error).
 
 ---
 
@@ -370,15 +387,16 @@ Broadphase collision detection uses a 3D spatial hash grid and runs once per phy
 pointer warping); the mouse locks via cursor capture and works under both
 Wayland and X11 sessions.
 
-**Scene format:** v200 saves bodies (stable IDs, sleep, damping) plus spring and revolute joints, with CRC32 footer and atomic write. Fixed/distance/prismatic/rope constraints solve correctly but have no creation UI and do not persist yet. Files ≤v153 load via the legacy reader. Truth labels: `world.drag` is linear-viscous (not quadratic aero); `nice_value`/`angular_damping_scale` are NON-PHYSICAL settle tools (0/1.0 = truth); `sleep.enable=0` runs sleepless truth validation; boundary walls are a plastic safety net, not material contact.
+**Scene format:** v200 saves bodies (stable IDs, sleep, damping) plus spring and revolute/fixed/distance/prismatic/rope joints, with CRC32 footer and atomic write. Fixed/distance/prismatic/rope have no in-engine creation UI yet (solver + persistence + TUI only). Files v130/v140/v150/v151/v152/v153 load via the legacy reader. Truth labels: `world.drag` is linear-viscous (not quadratic aero); `nice_value`/`angular_damping_scale` are NON-PHYSICAL settle tools (0/1.0 = truth); `sleep.enable=0` runs sleepless truth validation; boundary walls are a plastic safety net, not material contact.
 
 ---
 
 ## Object Types
-The engine supports three object types:
+The engine supports four object types:
 - **Sphere** — spawned via `touch new.sph`, spawner menu, or `Enter`
 - **Cube** — spawned via `touch new.cube`, spawner menu, or `Enter`
 - **Cylinder** — spawned via `touch new.cyl`, spawner menu, or `Enter`; axle along local X, correct `I = ½·m·r²` inertia, exact flat-cap contacts, dedicated instanced mesh
+- **Custom** (`object_custom`, id ≥ 100) — foreign shapes via hot-plugged pair handlers. Example: capsule (`plugins/mpe_capsule.c`): segment + radius with the bounding invariant `radius = √(h²+rc²)` (the engine owns `radius` as the bounding radius for broadphase; `sanitize` preserves it). Custom bodies render as cubes.
 
 
 
@@ -395,7 +413,7 @@ sudo apt install gcc make libgtk-4-dev libepoxy-dev
 Build:
 
 ```bash
-cd src
+cd v15S/src
 make
 ```
 
@@ -403,6 +421,13 @@ Run:
 
 ```bash
 ./engine
+```
+
+Headless suites (no display needed):
+
+```bash
+make build_suite && ./test_mpe_suite --all   # engine: 31/31 green
+ecosystem/mfs/build_tests.sh                 # robotics: 8 gated + 5 info
 ```
 
 The engine has been tested on Ubuntu 24.04.4 LTS. Intel MacOS users may attempt to install the same dependencies via Homebrew, but this is unsupported. Windows is not supported.

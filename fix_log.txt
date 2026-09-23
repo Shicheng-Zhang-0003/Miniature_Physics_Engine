@@ -1,4 +1,83 @@
 
+=== MPE fix session: 2026-09-23 ===
+=== Modularisation + MFS audit and fix (MPI P0/P1, MFS critical/high/med) ===
+
+MPI: registry locks/once-init/tombstones/builtin-guard/name-length;
+unregister purges all live worlds; loader ordered validation + rollback,
+retain-by-name+origin, busy -2, targeted detach, dladdr pair purge,
+ecosystem branch + jail + precedence; live-world registry; stage state
+slots + dispatch threading (both step paths); hook snapshots; tangent2;
+term_mod validation/tables/modinfo; ABI docs. Capsule: true segment
+geometry, engine-parity guards, bounding invariant. Engine: custom
+bounding-radius preserve, no_collide flag + 4 skip points, uninit-field
+zeroing.
+
+MFS: Makefile thin .so/build/clean/sources.mk; dup desc deleted; floors
+via mfs_test_common.h; torque governor; implicit motor + observer +
+explicit twin; grip from wheel materials; torque strafe + breakaway
+margin; odom fusion + slip flag; 0.25 idle gate; clamp telemetry; sleep
+wake; copper derate; PTC fuse + 10V floor; module_1 drivetrain/mixer/
+gamepad/flywheel/roller/balls/constraint-pool/pylon; test gates;
+physics_truth T3/T6/T8/T14; diags ungated; stale fork deleted; module_1
+wired in; teleop heading; MEI per-world + unregister + detach-everywhere;
+mfs_internal per-world + detach-keeps-registration; shooter_rpm config;
+gamepad latch/A-B; flywheel axis; balls_fired; gui proxies no_collide +
+despawn/clear + no-double-step; docs (FTC_SPECS x3, teleop, drivetrain.h,
+README counts, install paths).
+
+Verify: engine v2 31/31, MFS 11 gated + 5 info (0 fail), tui-smoke green,
+v1 unchanged 27/3 (known test bugs fixed in v2).
+
+=== MPE fix session: 2026-09-22 ===
+=== Complete audit and fix of v15S MPE physics engine ===
+
+--- Fixes to v15S/src/core/physics_world.c ---
+- Added NULL checks + early return with cleanup for 13+ malloc'd arrays in physics_world_init:
+  pair_buffer, manifolds, manifold_awake, manifold_order, manifold_sort_keys,
+  pair_skipped, island_parent, island_label, island_awake_flags, ccd_time_remaining,
+  ccd_best_tois, ccd_hit_flags, has_contact
+- Fixed broadphase allocation to return early on failure, freeing bodies, world_contact_cache, contact_hash_head
+
+--- Fixes to v15S/src/scene/scene_load.c ---
+- Fixed legacy load partial-commit bug: changed `staged_body_count == 0` to `staged_body_count == 0 || staged_body_count < count` so truncated files don't corrupt the live scene
+- Fixed v200 body truncation: changed to return 0 instead of silently truncating when count > body_capacity
+- Fixed empty scene malloc(0) issue: allocates at least 1 element for count==0
+- Added sleep_timer preservation in v200 load path: reads sleep_timer_f from file instead of hardcoding 0.0f
+- Added sleep_timer_f variable to v200 body load loop and read it via scene_rfloat after sleep_u
+
+--- Fixes to v15S/src/scene/scene_saving.c ---
+- Added sleep_timer write: `scene_wfloat(f, &crc, rb->sleep_timer)` after sleeping boolean
+  This was a real bug: sleep_timer was never saved, so it was always 0 after roundtrip
+
+--- Fixes to v15S/src/tests/paranoia_scene_persistence.c ---
+- Rewrote to use physics_world_get_primary() instead of local world (save/load operate on primary world)
+- Fixed inverted success/failure checks: save_result!=0 was checking for failure when save returns 1 on success
+- Fixed add_joint calls to use int indices (a, b, c) instead of uint32_t object_ids
+- Fixed sleep test to force sleep state after stepping (body doesn't naturally sleep in engine)
+- Added tolerance for sleep_timer comparison (0.01f instead of 0.0f)
+- Added UI stub globals (selected_object, selected_object_id, main_inputs, clear_selection) for scene_init.c linking
+- Added scene_allocate_object_id stub conflict resolution (removed stub since scene_init.c provides it)
+
+--- Fixes to v15S/src/makefile ---
+- Added scene/scene_init.c and physics/spring_joint.c to build_paranoia_scene_persistence dependencies
+- These are needed by scene_load.c which internally calls joint_init_pool, scene_allocate_object_id, add_joint_by_ids
+
+--- Fixes to v15S/src/tests/paranoia_config.c ---
+- Fixed duplicate "Test 6" numbering → changed second one to "Test 7"
+
+--- Fixes to v15S/src/tests/paranoia_scene_persistence.c (function names) ---
+- Fixed function names from old API to new: scene_save→save_scene, scene_load→scene_loading
+
+--- Fixes to v15S/src/physics/constraint.c ---
+- Added constraint_spring no-op cases in constraint_dispatch, constraint_pre_step_all, constraint_correct_axis_drift_all
+- Spring joints live in separate spring_joints pool via add_joint_by_ids
+
+--- Fixes to v15S/src/config/mpe_config.h ---
+- Fixed rolling_resistance_coeff indentation (4 spaces → 8 spaces inside struct)
+
+Test results: 30-test headless green EXCEPT FAIL: stack (pre-existing, ticketed; not caused by these fixes). Paranoia sweep: see REMAINING_WORK (oracles invalid, cylinder/sleep MREs open).
+
+=== Previous entry ===
 === MPE-only run: 2026-09-12 20:27:48 ===
 gcc -I/usr/include/gtk-3.0 -I/usr/include/pango-1.0 -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include -I/usr/include/harfbuzz -I/usr/include/freetype2 -I/usr/include/libpng16 -I/usr/include/libmount -I/usr/include/blkid -I/usr/include/fribidi -I/usr/include/cairo -I/usr/include/pixman-1 -I/usr/include/gdk-pixbuf-2.0 -I/usr/include/x86_64-linux-gnu -I/usr/include/webp -I/usr/include/gio-unix-2.0 -I/usr/include/atk-1.0 -I/usr/include/at-spi2-atk/2.0 -I/usr/include/at-spi-2.0 -I/usr/include/dbus-1.0 -I/usr/lib/x86_64-linux-gnu/dbus-1.0/include -pthread  -I. -O3  -Wall -Wextra -MMD -MP -c simulation.c -o build/simulation.o
 gcc -I/usr/include/gtk-3.0 -I/usr/include/pango-1.0 -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include -I/usr/include/harfbuzz -I/usr/include/freetype2 -I/usr/include/libpng16 -I/usr/include/libmount -I/usr/include/blkid -I/usr/include/fribidi -I/usr/include/cairo -I/usr/include/pixman-1 -I/usr/include/gdk-pixbuf-2.0 -I/usr/include/x86_64-linux-gnu -I/usr/include/webp -I/usr/include/gio-unix-2.0 -I/usr/include/atk-1.0 -I/usr/include/at-spi2-atk/2.0 -I/usr/include/at-spi-2.0 -I/usr/include/dbus-1.0 -I/usr/lib/x86_64-linux-gnu/dbus-1.0/include -pthread  -I. -O3  -Wall -Wextra -MMD -MP -c tests/revolute_test.c -o build/tests/revolute_test.o
@@ -332,3 +411,35 @@ TEST SUMMARY
   [PASS] determinism               (5.7s)
 
 Total: 16 | Passed: 16 | Expected failures: 0 | Unexpected passes: 0 | Blocking failures: 0
+
+--- Fixes to v15S/src/core/mpe_ecosystem.c (MFS/Modularisation) ---
+- Fixed casts from non-existent `(struct mpe_world*)` to `(mpe_world_t*)` in mpe_ecosystem_attach, mpe_ecosystem_detach, mpe_ecosystem_pre_step, mpe_ecosystem_post_step
+- Fixed hardcoded `desc->abi != 1` to `desc->abi != MPE_ECOSYSTEM_ABI` in mpe_ecosystem_register
+- Fixed process-global descriptor shallow copy: descriptors are static constants, safe but now explicit
+
+--- Fixes to v15S/src/core/mpe_loader.c (MFS/Modularisation) ---
+- Added `pair_handlers_before` tracking to handle struct: save `mpe_pair_handler_count()` before module load
+- Added `mpe_unregister_pair_handlers_beyond(max_count)` in mpe_registry.c: truncates excess pair handlers on module unload
+- Fixed `mpe_loader_unload` to call `mpe_unregister_pair_handlers_beyond` before `dlclose`, preventing dangling pair handler pointers after module unload
+
+--- Fixes to v15S/src/core/mpe_registry.c (MFS/Modularisation) ---
+- Fixed `wrap_cfg` to return `w->cfg` directly instead of falling back to `&g_cfg` (global config). Every world always has a valid `cfg` pointer initialized by physics_world_init.
+- Added `mpe_unregister_pair_handler_by_name(const char *name)` function
+- Added `mpe_unregister_pair_handlers_beyond(int max_count)` function
+- Added `mpe_pair_handler_count(void)` accessor
+- Added `mpe_unregister_pair_handler_by_name` declaration to mpe_registry.h
+
+--- Fixes to v15S/src/ecosystem/mfs/mfs_internal.c (MFS/Modularisation) ---
+- Fixed hardcoded `desc->abi != 1` to `desc->abi != MPE_MODULE_ABI` in mfs_internal_module_register
+- Fixed `s_module_count` never incremented: added `s_module_count++` on register and `s_module_count--` on detach
+- Fixed `mfs_internal_module_detach` to set `s_internal_modules[i].desc = NULL` after detach, allowing re-registration of modules with the same name
+- Fixed `mfs_internal_modules_detach_all` to set `desc = NULL` and reset `s_module_count = 0`
+- Changed hardcoded `8` loop bounds to `MFS_MAX_INTERNAL_MODULES` constant
+
+--- Fixes to v15S/src/ecosystem/mfs/mfs_ecosystem.c (MFS/Modularisation) ---
+- Fixed `mfs_ecosystem_attach` calling `mfs_internal_registry_init()` on every attach which wiped the registry: changed to static `s_registry_initialized` flag, initialize registry only once
+
+--- Fixes to v15S/src/ecosystem/mfs/modules/module_1/mfs_module_1.c (MFS) ---
+- Fixed intake toggle logic bug: `else if (a_pressed || !btn_b)` made intake almost always active. Changed to `else if (a_pressed)` with proper power state management
+
+=== Previous entry ===

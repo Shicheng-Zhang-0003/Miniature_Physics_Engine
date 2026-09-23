@@ -29,6 +29,8 @@ PASS criteria (all must hold):
   - fallen_ticks = 0
   - final max linear speed  < 0.25
   - final max angular speed < 0.5
+  - run-max past 2s < 2.0 m/s (the transient gate that caught the F10
+    13.06 m/s ejection at tick 909; final-only gating passes it)
 
 Record the result for V-03 (Gate 9) and the release checklist.
 EOF

@@ -8,7 +8,7 @@
 
 ## 📋 Overview
 
-MPE is a custom-built **3D rigid-body physics engine and real-time rendering pipeline**, written entirely in **C**. It runs on a **zero-dependency core** — the only external requirements are **GTK4** (windowing/UI) and **OpenGL** (render backend).
+MPE is a custom-built **3D rigid-body physics engine and real-time rendering pipeline**, written entirely in **C**. It runs on a **zero-dependency core** — engine needs **GTK4** (windowing/UI) + **OpenGL via libepoxy** + **X11**; `mpe-tui` additionally needs **ncurses**. Headless tests need only libc+libm+libdl.
 
 MPE is built around four priorities:
 
@@ -36,7 +36,7 @@ Inherited from `v15R3`:
 
 - **Domain-driven architecture** — clean `core`, `physics`, `render`, `scene`, `ui_input` modules.
 - **Warm-starting contact solver** with multi-point Sutherland–Hodgman manifolds for stable stacking.
-- **Full constraint framework** — revolute, fixed, prismatic, distance, and rope constraints plus spring joints (springs + revolutes persist in scene v200; all types live in the headless suite and the TUI demo).
+- **Full constraint framework** — revolute, fixed, prismatic, distance, and rope constraints plus spring joints (scene v200 persists springs + all five constraint types; all types live in the headless suite and the TUI demo).
 - **3D spatial-hash grid broadphase** with adaptive cell sizing.
 - **Interactive spring-joint system** with live magenta rendering.
 - **POSIX-style debug terminal** — drive the whole simulation from a shell (now with a `mod` command for hot-plugging physics).
@@ -114,9 +114,10 @@ physics_world_set_solver(world, mpe_find_solver("seq-impulse"));
 physics_world_attach_module(world, desc);   // pre_step / post_step hooks
 ```
 
-- Shapes: `object_custom` bodies (id ≥ 100) dispatch through the registry; see `plugins/mpe_capsule.c`.
-- Backends: `mpe_register_broadphase` / `mpe_register_solver`; builtins `hash` + `seq-impulse`.
-- Loading: `mpe_loader_load("./plugins/mpe_capsule.so")` (ABI-checked `dlopen`), or live in the debug terminal: `mod load|unload|attach|detach|use-broadphase|use-solver|ls`, or in TUI: `--solver NAME --broadphase NAME`.
+- Shapes: `object_custom` bodies (id ≥ 100) dispatch through the registry; see `plugins/mpe_capsule.c` (true segment capsule; bounding invariant `R = √(h²+rc²)`).
+- Backends: `mpe_register_broadphase` / `mpe_register_solver`; builtins `hash` + `seq-impulse` (takeover refused; per-stage `mod_state` threaded through both step paths).
+- Loading: `mpe_loader_load("plugins/mpe_capsule.so")` (ABI-checked `dlopen`, CWD-jailed), or live in the debug terminal: `mod load|unload|attach|detach|use-broadphase|use-solver|ls`, or in TUI: `--solver NAME --broadphase NAME`. Ecosystem bundles (`mpe_ecosystem_desc`) load from `ecosystem/mfs/*.so`.
+- Lifetime rules: unload refuses `-2` (busy) while any live world references the code — detach/reset first, then retry. Unregister detaches every live world pre-`dlclose`; pair handlers self-unregister via destructor with a `dladdr` purge backstop. Tick hook tables are snapshotted, so hooks may attach/detach mid-tick.
 - Modules never touch globals: per-world config via `mpe_world_cfg(world)`, per-module per-world state via `attach`.
 
 ---
@@ -283,17 +284,17 @@ make
 
 ## ⚠️ Known Limitations
 
-- **Scene format:** v200 saves bodies (with stable IDs, sleep state, damping) plus spring and revolute joints, with a CRC32 integrity footer. Files ≤v153 still load via the legacy reader.
+- **Scene format:** v200 saves bodies (with stable IDs, sleep state, damping) plus springs + revolute/fixed/distance/prismatic/rope joints, with a CRC32 integrity footer. Files v130/v140/v150/v151/v152/v153 load via the legacy reader.
 - **Global state:** the kernel holds no simulation state — every step takes an explicit `physics_world` (growable pools, per-world caches/scratch/config). The single GUI process owns its primary world via `core/mpe_primary.c` (app layer, like UE's `GWorld`); the type/plugin registry is process-global by design. App/UI state (camera, input, selection, terminal, diagnostics) remains global by design.
-- **Joint UI/persistence scope:** solver supports spring/revolute/fixed/prismatic/distance/rope; menus create springs (+revolutes in TUI scenes); v200 persists springs + revolutes.
+- **Joint UI/persistence scope:** solver supports spring/revolute/fixed/prismatic/distance/rope; menus create springs (+revolutes in TUI scenes); v200 persists springs + revolute/fixed/distance/prismatic/rope.
 
 ---
 
 ## 📜 Version History
 
-- **v15S (current head)** — GTK4 port, module system (MPI hot-plug), per-world config, data-structure upgrades (growable pools, O(1) caches), kernel global-state removal, TUI stress suite (`stress`/`ccd` scenes, backend flags), 30/30 headless green (29 + `module`).
+- **v15S (current head)** — GTK4 port, module system (MPI hot-plug), per-world config, data-structure upgrades (growable pools, O(1) caches), kernel global-state removal, TUI stress suite (`stress`/`ccd` scenes, backend flags), 31/31 headless green (28 physics + 3 diag-informational).
 - **v15R3 (release)** — configuration system, physics-truth pass, full constraint framework, TUI debugger + snapshot suite, 29/29 headless green. Release notes: [`release_notes_v15R3.md`](release_notes_v15R3.md).
-- **v15R2** — config-system hardening + MFS robotics (prior RC, parked in `v15S/robotics_backup/`).
+- **v15R2** — config-system hardening + MFS robotics (prior RC, parked (now consolidated in `v15S/src/ecosystem/mfs/`)).
 - **v1.4 Alpha RC3** — domain-driven restructure, spatial-hash broadphase, physics-world encapsulation.
 - **v1.4 Alpha 2** — warm-starting solver, multi-point contact manifolds.
 - **v1.4 Alpha RC1** — spring joints, joint renderer, color painting, OBB raycast selection.
@@ -312,7 +313,20 @@ See [`v15S/evolution.txt`](v15S/evolution.txt) for the full lineage back to stag
 
 ## 🧪 Headless test suite
 
-MPE ships a headless regression suite (no GTK/OpenGL required) — **30/30 green** (29 physics + `module`):
+MPE ships a headless regression suite (no GTK/OpenGL required) — **31/31 green** via Suite v2
+(single C binary `v15S/src/test_mpe_suite`, 28 physics + 3 diag-informational):
+
+```bash
+cd v15S/src && make build_suite && ./test_mpe_suite --all   # canonical
+python3 ../../tools/test_runner.py --suite                   # same via runner
+```
+
+Suite v2 runs all tests in one process with shared audited builders (exact-name
+dispatch, saved/restored config, real Coulomb floors everywhere). It fixed three
+v1 setup bugs (stack/driven_wheel/list4 never enabled floor friction; list4 also
+rotated about the wrong axis) and caught an engine uninit-field bug
+(`cylinder_half_length` garbage on spheres broke cross-test determinism).
+Legacy v1 (30 binaries) is kept for transition (`test_runner.py` without `--suite`).
 
 | Test | Proves |
 |------|--------|
@@ -324,7 +338,7 @@ MPE ships a headless regression suite (no GTK/OpenGL required) — **30/30 green
 | `floor_collision_diag` | Floor contact diagnostics |
 | `cylinder_sphere/cube/cylinder` | Cylinder narrowphase pairs |
 | `list4_cylinder_floor` | Tipped-cylinder floor regression |
-| `scene_roundtrip` | Save/load v200 round-trip (springs + revolutes) |
+| `scene_roundtrip` | Save/load v200 round-trip (springs + all constraint types) |
 | `static_hold` | Coulomb stick holds / yields past friction angle |
 | `rolling_decay` | Contact-patch rolling resistance decay |
 | `ccd_sweep` | Swept TOI: no tunneling at 144 m/s |
@@ -343,11 +357,17 @@ MPE ships a headless regression suite (no GTK/OpenGL required) — **30/30 green
 | `f11_torture` | Deterministic config extremes without corruption |
 | `frustum` | Frustum culling math |
 | `module` | Per-world config, registry dispatch, custom shapes, solver hooks, id cache, pool growth, det counters |
+| `loader_lifecycle` | Plugin load/busy-unload/purge, builtin-hijack refusal, stage reset, `mod_state` threading |
 
-Run with `python3 tools/test_runner.py`.
+Run with `python3 tools/test_runner.py --suite` (canonical) or `./test_mpe_suite --all` from `v15S/src`.
+
+### MFS robotics (`v15S/src/ecosystem/mfs/`)
+- **FTC stack**: motor presets (spec-sheet derived), back-EMF electrical model with implicit-in-speed solve + disturbance observer (stall *and* free speed exact), traction budgeting against wheel materials, torque-derived mecanum strafe with `odom_slip` flag, tile-friction test floors.
+- **Suite**: `build_tests.sh` — 8 gated tests + 5 informational diags, all green (was 13 pass / 3 fail + broken `make`).
+- **Modules**: `ftc-fleet` tick module (hot-pluggable, bitwise-identical static vs `.so`), `mfs_module_1` game module, `mfs-simulator` ecosystem bundle (loadable via `mod load ecosystem/mfs/mfs_ecosystem.so`).
 
 ### Determinism and precision
 - Fixed 1/60 s timestep, fixed solver iteration order, exact IEEE `+ - * / sqrt`.
-- Per-tick transcendentals (damping retention, rotation rotors) use fixed-coefficient polynomials (`v15S/src/core/det_math.h`), bit-identical on all IEEE-754 targets; the build disables FP contraction (`-ffp-contract=off`). Fallback counters are process-wide (`det_fallback_*_total()`, asserted zero in-contract).
+- Per-tick transcendentals (damping retention, rotation rotors) use fixed-coefficient polynomials (`v15S/src/core/det_math.h`), bit-identical on all IEEE-754 targets at `ENABLE_NATIVE=0`; `ENABLE_NATIVE=1` (-march=native) breaks bitwise portability. The build disables FP contraction (`-ffp-contract=off`). Fallback counters are process-wide (`det_fallback_*_total()`, asserted zero in-contract).
 - Proven by `determinism`: twin worlds agree bitwise over 600 ticks.
 - float32 world: the playable volume is bounded (±250 m), where float resolution (~0.03 mm at the corners) sits 300× below contact slop. No origin rebasing required inside the boundary box.
