@@ -292,7 +292,7 @@ make
 
 ## 📜 Version History
 
-- **v15S (current head)** — GTK4 port, module system (MPI hot-plug), per-world config, data-structure upgrades (growable pools, O(1) caches), kernel global-state removal, TUI stress suite (`stress`/`ccd` scenes, backend flags), 31/31 headless green (28 physics + 3 diag-informational).
+- **v15S (current head)** — GTK4 port, module system (MPI hot-plug), per-world config, data-structure upgrades (growable pools, O(1) caches), kernel global-state removal, TUI stress suite (`stress`/`ccd` scenes, backend flags), 32/32 headless green (29 physics + 3 diag-informational).
 - **v15R3 (release)** — configuration system, physics-truth pass, full constraint framework, TUI debugger + snapshot suite, 29/29 headless green. Release notes: [`release_notes_v15R3.md`](release_notes_v15R3.md).
 - **v15R2** — config-system hardening + MFS robotics (prior RC, parked (now consolidated in `v15S/src/ecosystem/mfs/`)).
 - **v1.4 Alpha RC3** — domain-driven restructure, spatial-hash broadphase, physics-world encapsulation.
@@ -313,8 +313,8 @@ See [`v15S/evolution.txt`](v15S/evolution.txt) for the full lineage back to stag
 
 ## 🧪 Headless test suite
 
-MPE ships a headless regression suite (no GTK/OpenGL required) — **31/31 green** via Suite v2
-(single C binary `v15S/src/test_mpe_suite`, 28 physics + 3 diag-informational):
+MPE ships a headless regression suite (no GTK/OpenGL required) — **32/32 green** via Suite v2
+(single C binary `v15S/src/test_mpe_suite`, 29 physics + 3 diag-informational):
 
 ```bash
 cd v15S/src && make build_suite && ./test_mpe_suite --all   # canonical
@@ -358,6 +358,7 @@ Legacy v1 (30 binaries) is kept for transition (`test_runner.py` without `--suit
 | `frustum` | Frustum culling math |
 | `module` | Per-world config, registry dispatch, custom shapes, solver hooks, id cache, pool growth, det counters |
 | `loader_lifecycle` | Plugin load/busy-unload/purge, builtin-hijack refusal, stage reset, `mod_state` threading |
+| `ftc_ecosystem` | Bundle load → attach → spawn/drive/telemetry → detach/unload end-to-end |
 
 Run with `python3 tools/test_runner.py --suite` (canonical) or `./test_mpe_suite --all` from `v15S/src`.
 

@@ -26,7 +26,7 @@ fi
 
 echo "--- headless tests (Suite v2, canonical) ---"
 if python3 tools/test_runner.py --suite 2>&1 | tee -a "$LOG" | grep -q "Blocking failures: 0"; then
-  echo "RESULT: ALL PASS (31/31 v2)"
+  echo "RESULT: ALL PASS (32/32 v2)"
 else
   echo "RESULT: FAIL (see $LOG)"
   exit 1

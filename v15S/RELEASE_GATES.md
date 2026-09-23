@@ -106,7 +106,7 @@ They should be recorded as post-stable work items.
 - [X] F11 config torture test runs without crash.
 - [X] F11 verdict is robustness-only (no NaN, nothing fallen); speeds reported, never gated.
 - [X] F11 pins solver resolution (gravity −17…−1, ≥96 iterations — proven envelope for the 10:1 column); material/world extremes stay fully random.
-- [X] Headless suite 31/31 green (Suite v2 `test_mpe_suite --all` — 28 physics + 3 diag-informational), including `f10_long_run`, `sleep_contact_wake`, `f11_torture`, `loader_lifecycle`.
+- [X] Headless suite 32/32 green (Suite v2 `test_mpe_suite --all` — 29 physics + 3 diag-informational), including `f10_long_run`, `sleep_contact_wake`, `f11_torture`, `loader_lifecycle`, `ftc_ecosystem`.
 - [X] `mpe-tui` snapshot suite green for all scenes (`make tui-smoke`: demo/tower/pendulum/springlab/f10/stress/ccd).
 - [X] The engine can idle for several minutes without explosion.
 
@@ -235,7 +235,7 @@ If any mandatory gate fails, the correct action is:
 
 ### Release verdict (v15R3, tagged)
 
-All P0 gates pass: clean build with zero new errors, 31/31 headless green (28 physics + 3 diag),
+All P0 gates pass: clean build with zero new errors, 32/32 headless green (29 physics + 3 diag),
 `tui-smoke` green, F10 settle verdict green (headless 3600-tick equivalent
 plus committed `f10_long_run`), F11 robustness green in-engine and headless
 (`f11_torture`). P1 known limitations are documented in
