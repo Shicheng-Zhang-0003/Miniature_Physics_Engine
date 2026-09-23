@@ -11,6 +11,8 @@
 *.so
 *.exe
 engine
+mpe-tui
+mpe-tui.d
 test_*
 build/
 .fixes_generation_1/

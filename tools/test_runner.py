@@ -4,12 +4,16 @@ MPE Test Runner (MPE-only run)
 ===============================
 Discovers, builds, and runs all headless tests. Generates a summary report.
 
-Robotics (MFS) tests live with the code in v15S/src/ecosystem/mfs/tests.
+Canonical path is Suite v2 (single C binary, exact dispatch):
+    python tools/test_runner.py --suite      # build + run test_mpe_suite --all
+    python tools/test_runner.py --suite stack  # one v2 test by exact name
 
-Usage:
-    python tools/test_runner.py              # Run all tests
+Legacy path (30 separate binaries, kept for transition):
+    python tools/test_runner.py              # Run all v1 tests
     python tools/test_runner.py --list       # List available tests
-    python tools/test_runner.py driven_wheel # Run specific test
+    python tools/test_runner.py driven_wheel # Run specific v1 test
+
+Robotics (MFS) tests live with the code in v15S/src/ecosystem/mfs/tests.
 """
 
 import subprocess
@@ -187,7 +191,11 @@ def run_test(name: str, timeout: int = 60) -> TestResult:
 def run_all(test_filter: Optional[str] = None) -> list:
     tests = KNOWN_TESTS
     if test_filter:
-        tests = [t for t in tests if test_filter.lower() in t.lower()]
+        # Exact-name match first (avoids `stack`/`ccd` over-matching).
+        if test_filter in KNOWN_TESTS:
+            tests = [test_filter]
+        else:
+            tests = [t for t in tests if test_filter.lower() in t.lower()]
         if not tests:
             print(f"No tests matching '{test_filter}'")
             return []
@@ -241,15 +249,40 @@ def print_report(results: list):
                         print(r.stderr[-500:])
 
 
+def run_suite(suite_args: list) -> int:
+    """Canonical Suite v2 path: `make build_suite` then `./test_mpe_suite`."""
+    print(f"MPE Suite v2 — src: {SRC_DIR}")
+    print("=" * 60)
+    build = subprocess.run(["make", "build_suite"], cwd=str(SRC_DIR),
+                           capture_output=True, text=True, timeout=300)
+    if build.returncode != 0:
+        print("SUITE BUILD FAILED:")
+        print((build.stdout + "\n" + build.stderr)[-2000:])
+        return 1
+    binary = SRC_DIR / "test_mpe_suite"
+    proc = subprocess.run([str(binary)] + suite_args, cwd=str(SRC_DIR),
+                          capture_output=True, text=True, timeout=600)
+    print(proc.stdout[-6000:] if len(proc.stdout) > 6000 else proc.stdout)
+    if proc.stderr:
+        print(proc.stderr[-2000:])
+    return proc.returncode
+
+
 if __name__ == "__main__":
-    args = sys.argv[1:]
-    if "--help" in args or "-h" in args:
+    raw_args = sys.argv[1:]
+    if "--help" in raw_args or "-h" in raw_args:
         print(__doc__)
         sys.exit(0)
+    if "--suite" in raw_args:
+        suite_args = [a for a in raw_args if a != "--suite"]
+        if not suite_args:
+            suite_args = ["--all"]
+        sys.exit(run_suite(suite_args))
+    want_paranoia = "--include-paranoia" in raw_args
+    args = [a for a in raw_args if a != "--include-paranoia"]
     all_tests = list(KNOWN_TESTS)
-    if "--include-paranoia" in args:
-        all_tests += PARANOIA_TESTS
-        args = [a for a in args if a != "--include-paranoia"]
+    if want_paranoia:
+        all_tests += [t for t in PARANOIA_TESTS if t not in all_tests]
     if "--list" in args:
         print("Available tests:")
         for t in all_tests:
@@ -260,16 +293,17 @@ if __name__ == "__main__":
         sys.exit(1)
 
     test_filter = args[0] if args else None
-    include_paranoia = False
     # Paranoia reachable by exact name without the flag; full paranoia sweep
     # only with --include-paranoia (they need extra link units; default 30 stay green).
     if test_filter in PARANOIA_TESTS:
         KNOWN_TESTS.extend([test_filter])
-    elif test_filter is None and "--include-paranoia" in args:
-        include_paranoia = True
+    elif test_filter is None and want_paranoia:
         KNOWN_TESTS.extend([t for t in PARANOIA_TESTS if t not in KNOWN_TESTS])
     # Exact-name match first (avoids substring running the wrong test).
-    print(f"MPE Test Runner — src: {SRC_DIR}")
+    if test_filter is not None and test_filter in KNOWN_TESTS:
+        print(f"MPE Test Runner — src: {SRC_DIR} (exact: {test_filter})")
+    else:
+        print(f"MPE Test Runner — src: {SRC_DIR}")
     print("=" * 60)
     results = run_all(test_filter)
     print_report(results)
