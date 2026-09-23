@@ -6,7 +6,17 @@
  *  - modules never touch g_cfg / g_physics_world / bodies[] directly;
  *    use mpe_world_* accessors + per-world cfg (mpe_world_cfg).
  *  - per-module per-world state via void* (attach stores, detach frees).
- *  - deterministic modules must use det_math.h, never bare sin/cos/pow.
+ *  - deterministic modules must use det_math.h, never bare sin/cos/pow
+ *    (sqrtf/isfinite are IEEE-exact and allowed).
+ *  - pair handlers self-unregister in a destructor (see
+ *    plugins/mpe_capsule.c); the loader purges leftovers by code address.
+ *  - ABI VERSIONING: abi must equal MPE_MODULE_ABI (1). The ABI
+ *    transitively includes rigidbody/broadphase_pair/collision_data
+ *    layouts, which are passed by pointer and NOT frozen: any engine
+ *    change to those structs requires bumping MPE_MODULE_ABI and
+ *    rebuilding all plugins. Registry find results are unowned interior
+ *    pointers — copy what you keep, never store them across unload.
+ *    Unregistering a module/stage detaches it from every live world first.
  */
 #include <stdbool.h>
 #include <stdint.h>
