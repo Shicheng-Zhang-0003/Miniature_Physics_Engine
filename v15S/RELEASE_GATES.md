@@ -44,7 +44,7 @@ They should be recorded as post-stable work items.
 
 ### 3. Startup
 - [X] Engine starts using the documented workflow.
-- [X] Startup prints the correct version string (`MPE v15R3`).
+- [X] Startup prints the correct version string (`MPE v15S-dev (GTK4)` from `a3_version_string`; window title derives from it).
 - [X] Config system initialises (prints `[config] loaded` or `[config] defaults active`).
 - [X] Shaders load successfully.
 - [X] The main window opens.
@@ -106,7 +106,7 @@ They should be recorded as post-stable work items.
 - [X] F11 config torture test runs without crash.
 - [X] F11 verdict is robustness-only (no NaN, nothing fallen); speeds reported, never gated.
 - [X] F11 pins solver resolution (gravity −17…−1, ≥96 iterations — proven envelope for the 10:1 column); material/world extremes stay fully random.
-- [X] Headless suite 30/30 green (`python3 tools/test_runner.py` — 29 physics + `module`), including `f10_long_run`, `sleep_contact_wake`, `f11_torture`.
+- [X] Headless suite 31/31 green (Suite v2 `test_mpe_suite --all` — 28 physics + 3 diag-informational), including `f10_long_run`, `sleep_contact_wake`, `f11_torture`, `loader_lifecycle`.
 - [X] `mpe-tui` snapshot suite green for all scenes (`make tui-smoke`: demo/tower/pendulum/springlab/f10/stress/ccd).
 - [X] The engine can idle for several minutes without explosion.
 
@@ -178,7 +178,7 @@ The following are not required for `v15R3`:
 - multithreading,
 - in-engine creation UI and scene persistence for fixed/distance/prismatic/rope
   (solver supports all five constraint types + springs; menus persist
-  springs + revolutes),
+  springs + all five constraint types),
 - complete UI state-machine rewrite,
 - per-object config persistence in scene files.
 
@@ -201,16 +201,16 @@ These belong after `v15R3`.
 - [X] Spring joints with live rendering
 - [X] Joint pre-step runs once per tick (angle/slide tracking never integrates per-iteration)
 - [X] Fixed-timestep accumulator (60Hz deterministic)
-- [X] Scene save/load preserves joint assemblies (v200: springs + revolutes, `scene_roundtrip` test)
+- [X] Scene save/load preserves joint assemblies (v200: springs + all five constraint types, `scene_roundtrip` test)
 
 ---
 
 ## v15S Addendum Gates (§15)
 
 ### 15. Modularity, data structures, GTK4
-- [X] Engine builds and runs on GTK4; mouse lock works on Wayland and X11.
+- [X] Engine builds and runs on GTK4; mouse lock works on X11 (verified). Wayland path is Wayland-safe by design (no X11-only lock) but P1-unverified until a Weston/Sway matrix is logged.
 - [X] No simulation globals in the kernel: every step takes an explicit `physics_world`; the single GUI primary is app-owned (`core/mpe_primary.c`); registry is process-global by design (documented).
-- [X] Module system: shapes/broadphase/solver/tick-modules register, override, and hot-load (`.so` ABI-checked); `mod` terminal command and TUI `--broadphase/--solver` flags work; `module` headless test green.
+- [X] Module system: shapes/broadphase/solver/tick-modules register and hot-load (`.so` ABI-checked, CWD-jailed); unload refuses busy (`-2`) and purges all live worlds pre-`dlclose`; builtins refuse silent takeover; per-stage `mod_state` threaded; `mod` terminal command and TUI `--broadphase/--solver` flags work; `module` + `loader_lifecycle` headless tests green (lifecycle proven against the real capsule `.so`: load/busy/detach/unload/purge/reload).
 - [X] Per-world config authoritative in every hot path (narrowphase/solver/CCD/joints/depenetration/broadphase); NULL-call convention keeps direct unit callers working.
 - [X] O(1) contact-pair probes and id→index lookups (verified + linear fallback); islands joint pass O(J+B); growable body/contact pools with ceilings; small-first broadphase nodes; process-wide determinism counters asserted zero in-contract.
 - [X] Single narrowphase dispatch (registry-first) shared by world step, legacy GUI tick, depenetration pass, and spawn resolver; single canonical spring entry for both step paths.
@@ -235,7 +235,7 @@ If any mandatory gate fails, the correct action is:
 
 ### Release verdict (v15R3, tagged)
 
-All P0 gates pass: clean build with zero new errors, 29/29 headless green,
+All P0 gates pass: clean build with zero new errors, 31/31 headless green (28 physics + 3 diag),
 `tui-smoke` green, F10 settle verdict green (headless 3600-tick equivalent
 plus committed `f10_long_run`), F11 robustness green in-engine and headless
 (`f11_torture`). P1 known limitations are documented in
