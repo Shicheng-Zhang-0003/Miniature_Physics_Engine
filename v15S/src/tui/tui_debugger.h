@@ -3,8 +3,10 @@
 
 #include "../core/physics_world.h"
 #include "../core/rigidbody.h"
-#include <ncurses.h>
 #include <stdio.h>
+/* Forward-declare ncurses WINDOW so non-curses consumers (tui_dump,
+ * snapshot tests) don't inherit <ncurses.h>. */
+typedef struct _win_st WINDOW;
 
 typedef enum {
     TUI_MODE_OVERVIEW,

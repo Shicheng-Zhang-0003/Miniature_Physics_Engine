@@ -5,7 +5,9 @@
 #ifndef term_priv_h
 #define term_priv_h
 
+#define _POSIX_C_SOURCE 200809L
 #include <gtk/gtk.h>
+#include <strings.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include "../core/rigidbody.h"

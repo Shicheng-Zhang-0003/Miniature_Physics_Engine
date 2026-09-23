@@ -9,6 +9,7 @@
  * Exit code is 0 on finite state, 1 when any body goes non-finite.
  */
 #include <math.h>
+#include <ncurses.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -90,6 +91,19 @@ static void scene_pendulum_only(physics_world *world) {
 static void scene_f10_only(physics_world *world) {
     constraint_pool_init(world);
     joint_init_pool(world);
+    /* Coulomb floor (top y=0, mu matched to the scene). Without it the pile
+     * rests on the frictionless boundary clamp and disperses instead of
+     * settling (measured 2026-09-23: 0/27 asleep, KE=30, spread 235 m at
+     * 60 s). With it: 27/27 asleep, KE=0, run-max 0.0. */
+    {
+        int f = physics_world_add_cube(world, (vector3){0.0f, -0.5f, 0.0f},
+                                       (vector3){30.0f, 0.5f, 30.0f}, 0.0f);
+        if (f >= 0) {
+            world->bodies[f].friction_static = 0.8f;
+            world->bodies[f].friction_kinetic = 0.7f;
+            world->bodies[f].restitution = 0.0f;
+        }
+    }
     for (int i = 0; i < 10; i++) {
         int idx = physics_world_add_cube(world, (vector3){20.0f, 0.5f + (float) i * 0.99f, 0.0f},
                                          (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
@@ -369,7 +383,7 @@ int main(int argc, char *argv[]) {
         physics_world_init(&world);
         /* Per-run config copy: scenes may tune physics (springlab vacuum)
          * without leaking into the global registry or other runs. */
-        static mpe_config_t tui_scene_cfg;
+        mpe_config_t tui_scene_cfg;
         tui_scene_cfg = g_cfg;
         physics_world_set_config(&world, &tui_scene_cfg);
         mpe_register_builtins();
@@ -426,7 +440,7 @@ int main(int argc, char *argv[]) {
     }
     physics_world world;
     physics_world_init(&world);
-    static mpe_config_t tui_live_cfg;
+    mpe_config_t tui_live_cfg;
     tui_live_cfg = g_cfg;
     physics_world_set_config(&world, &tui_live_cfg);
     if (build_scene(&world, scene) != 0) {
