@@ -11,7 +11,7 @@ GATES = [
     ("6. Editor Stability", "Select/delete/jointed-delete/marked-delete no crash; invalid-selection menus safe; save/load with menus safe."),
     ("7. Physics Stability", "Rest without jitter; cubes stack; sphere/cube collide; restitution; friction; sleep/wake; no NaNs."),
     ("8. Broadphase/Solver Visibility", "Node/pair/manifold overflow visible; dedupe exhaustion visible; counters in overlay/report."),
-    ("9. Validation Tests", "F5/F6/F7/F8/F9/F10/F11 pass; 31/31 headless green; tui-smoke green; engine idles minutes without explosion."),
+    ("9. Validation Tests", "F5/F6/F7/F8/F9/F10/F11 pass; 32/32 headless green; tui-smoke green; engine idles minutes without explosion."),
     ("10. Configuration System", "Menu and terminal edit live parameters; save/load/reset round-trip; bounds and debug-only controls work."),
     ("11. Documentation", "README + user guide + checklist match code; broadphase + timestep descriptions accurate."),
     ("12. Repository Hygiene", "No tracked build artifacts; .gitignore exists; duplicate docs clarified."),

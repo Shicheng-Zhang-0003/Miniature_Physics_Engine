@@ -45,7 +45,7 @@ After dependencies have been installed:
           which usually means a dependency is missing.
     Headless regression suite (no display needed):
         make build_suite && ./test_mpe_suite --all
-        (expects 31/31 green: 28 physics + 3 diag-informational)
+        (expects 32/32 green: 29 physics + 3 diag-informational)
     Robotics suite:
         ecosystem/mfs/build_tests.sh
         (expects 8 gated green + 5 informational diags)

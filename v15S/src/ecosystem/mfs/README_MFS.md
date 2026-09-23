@@ -102,13 +102,30 @@ Standalone (out-of-tree, engine untouched): `make -C ecosystem/mfs`
 (`mfs_module_1.so`, `mfs_ecosystem.so`, `mpe_ftc.so` into `plugins/`),
 `make -C ecosystem/mfs test`, or from `v15S/src`: `make mfs_ecosystem.so`.
 
-Inside the engine terminal (no rebuild needed):
+Inside the engine terminal (no rebuild needed — full drive session):
+
+```
+mod load ecosystem/mfs/mfs_ecosystem.so   # load the bundle
+eco attach mfs-simulator                  # attach it to the primary world
+ftc spawn                                 # mecanum robot at the origin
+ftc drive 0 tank 1 1                      # full forward (persists)
+ftc telemetry 0                           # pose, odometry, battery, wheels
+ftc drive 0 stop
+```
+
+Lower level (single module instead of the bundle):
 
 ```
 mod load plugins/mpe_ftc.so
 mod ls                      # -> ftc-fleet-1.0 [generic]
 mod attach ftc-fleet        # per-world fleet allocated on primary
 ```
+
+`spawn` adds a tile floor automatically when the world has none
+(robots need frictional contact). `eco command mfs-simulator
+<spawn|drive|list|telemetry|help> [...]` drives the same surface the
+`ftc` commands use; `eco config mfs-simulator get shooter_rpm` reads
+bundle config.
 
 Spawning/commanding from host C (same headers, static or dlsym'd):
 

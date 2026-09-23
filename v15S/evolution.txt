@@ -31,8 +31,8 @@ Modularity:   MPI hot-plug ABI (shapes, broadphase, solver stages, tick
                command; TUI --broadphase/--solver flags; capsule example.
 Data Layout:  growable bodies/contacts (ceilings kept), O(1) pair probes
                + id cache, islands O(J+B), small-first node pool,
-               process-wide det counters. Suite v2 31/31 green
-               (28 physics + 3 diag).
+               process-wide det counters. Suite v2 32/32 green
+               (29 physics + 3 diag).
 Modularity2:  lifetime-hardened registry/loader (tombstones, locks,
                builtin-takeover refusal, busy-unload, dladdr purge,
                origin-tracked hotload); per-stage mod_state; true segment

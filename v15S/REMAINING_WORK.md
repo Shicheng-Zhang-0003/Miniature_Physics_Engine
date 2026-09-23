@@ -34,7 +34,7 @@
   forget-pointers on every unregister path, proven by `loader_lifecycle`.
 - [ ] Document numerical guarantees and unsupported CCD/rotational cases precisely.
 - [x] Root README exists (`readme.md`); release gates updated to verified
-  behavior (31/31 v2, MFS 11 gated + 5 info, lifetime rules).
+  behavior (32/32 v2, MFS 11 gated + 5 info, lifetime rules).
 - [x] Thread-safety boundaries: registry/MEI/MFS-internal locks, leaf-lock
   ordering, tick-boundary loader rule documented in headers (TSAN proof
   remains future work).
@@ -46,7 +46,7 @@
 - [x] All 30 tests reimplemented (`mpe_suite_a/b/c.c` + `mpe_suite_main.c`)
   as one binary `test_mpe_suite` (`make build_suite`, exact dispatch).
 - [x] Root-caused v1's 3 FAILs as TEST bugs (missing frictional floor +
-  wrong list4 axis); v2 ports pass 31/31 including the fixed setups.
+  wrong list4 axis); v2 ports pass 32/32 including the fixed setups.
 - [x] v2 exposed + fixed an engine bug: uninitialized `cylinder_half_length`
   (sphere/cube inits) broke determinism across tests in one process.
 - [x] Runner (`--suite`), `installcheck`, `run_all.sh` moved to v2 canonical.
@@ -76,7 +76,7 @@ Battery `/tmp/tui_validate.py` (kept outside the tree; rerun: `python3 /tmp/tui_
 
 ## MPI + MFS audit fixes (2026-09-23): everything implemented + verified
 
-MPI core (engine suite v2 31/31 green, incl. new `loader_lifecycle`):
+MPI core (engine suite v2 32/32 green, incl. `loader_lifecycle` + `ftc_ecosystem`):
 - P0 closed: load validates before registering (rollback truncates to
   snapshot); cleanup NULLs stage slots; retain/release resolve the OWNING
   handle by registry origin + dladdr (old pointer compare never matched);
@@ -131,3 +131,34 @@ MFS (suite 11 gated + 5 info, 0 fail; was 13/3 + broken make):
   README counts).
 - Known follow-ups: anisotropic friction keystone (roller-correct strafe);
   engine cyl-plane rolling decay on slop contacts; property tests.
+
+## FTC terminal wiring (2026-09-23): drive/configure/telemetry live
+
+- `mpe_loader_symbol()` resolves plugin APIs by path/module/ecosystem
+  name without new references (terminal drives APIs the engine never
+  links; no stale pointers: resolved per invocation).
+- `eco ls|attach|detach|command|config` terminal commands +
+  `mpe_ecosystem_state()` per-world state lookup.
+- `ftc spawn|list|drive|telemetry|preset` terminal commands (dlsym'd
+  fleet API, auto-attach + auto tile floor, persisting commands).
+- Bundle `command()` implements help/spawn/drive/list/telemetry;
+  `config_get(shooter_rpm)` works; fleet lookup falls back through
+  bundle-internal attachments (weak-linked, standalone .so unaffected).
+- Suite `ftc_ecosystem` proves the terminal-identical path headlessly
+  (3.59 m driven); how_to_use documents the full session.
+
+## POSIX terminal commands (2026-09-23): libglib out of command logic
+
+- New `ui_input/term_posix.h` (static-inline, zero link surface):
+  ASCII case/compare/down (locale-independent), NULL-tolerant
+  strdup/strndup, printf-to-malloc, prefix test, empty-keeping
+  strsplit (g_strsplit contract), NULL-tolerant strfreev, quote-aware
+  argv parser (g_shell_parse_argv subset: quotes + backslash, no
+  expansion; unmatched quote errors), CLOCK_MONOTONIC time.
+- Converted: debug_terminal x2 copies (compare/split/alias/argv/errno-
+  free errors/time/types), term_fs/query/sys/admin (prefix/compare/
+  int64_t), microvim x2 copies (dup/free/format/ascii).
+- Deliberately kept at the display/input edge: GTK signal signatures,
+  text buffers, key events (GdkModifierType), CSS refs, app quit.
+- Proven by /tmp/posix_test.c (parser/split/ascii/time unit checks)
+  plus full gates: engine 32/32, MFS 11+5, tui-smoke green.
