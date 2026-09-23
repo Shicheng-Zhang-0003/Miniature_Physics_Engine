@@ -11,6 +11,13 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#include <strings.h>
+
+static gint64 posix_monotonic_time(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (gint64)ts.tv_sec * 1000000LL + ts.tv_nsec / 1000LL;
+}
 void cmd_ps(int argc, char **argv) {
     bool detailed = false;
     for (int argument_index = 1; argument_index < argc; argument_index++) {
@@ -229,19 +236,20 @@ void cmd_export(int argc, char **argv) {
         return;
     }
     for (int argument_index = 1; argument_index < argc; argument_index++) {
-        char **parts = g_strsplit(argv[argument_index], "=", 2);
-        if ((!parts[0]) || (!parts[1])) {
+        char *eq_sign = strchr(argv[argument_index], '=');
+        if (!eq_sign) {
             term_printf("term_err", "mpe: export: usage: export KEY=value\n");
-            g_strfreev(parts);
             continue;
         }
-        const char *variable_name = parts[0];
+        *eq_sign = '\0';
+        const char *variable_name = argv[argument_index];
+        char *variable_value_str = eq_sign + 1;
         float variable_value = 0.0f;
-        if (!term_parse_float(parts[1], &variable_value)) {
-            term_printf("term_err", "mpe: export: invalid value '%s'\n", parts[1]);
-            g_strfreev(parts);
+        if (!term_parse_float(variable_value_str, &variable_value)) {
+            term_printf("term_err", "mpe: export: invalid value '%s'\n", variable_value_str);
             continue;
         }
+        *eq_sign = '=';
         if (term_str_eq(variable_name, "CAMERA_SPEED")) {
             main_camera_fov.movement_speed = variable_value;
             term_printf("term_ok", "CAMERA_SPEED=%.4f\n", variable_value);
@@ -271,7 +279,7 @@ void cmd_export(int argc, char **argv) {
                 term_printf("term_err", "mpe: export: %s: unknown key\n", variable_name);
             }
         }
-        g_strfreev(parts);
+
     }
 }
 /* MPE_TASK_38_REGISTRY_EXPORT_END */
@@ -386,7 +394,7 @@ void cmd_sync(int argc, char **argv) {
 void cmd_uptime(int argc, char **argv) {
     (void) argc;
     (void) argv;
-    gint64 now = g_get_monotonic_time();
+    gint64 now = posix_monotonic_time();
     double elapsed = (double) (now - term_engine_start_time) / 1000000.0;
     int hours = (int) (elapsed / 3600.0);
     int minutes = (int) (fmod(elapsed, 3600.0) / 60.0);
@@ -475,9 +483,9 @@ void cmd_time(int argc, char **argv) {
             cmd_buf[offset] = '\0';
         }
     }
-    gint64 start_time = g_get_monotonic_time();
+    gint64 start_time = posix_monotonic_time();
     term_execute(cmd_buf);
-    gint64 end_time = g_get_monotonic_time();
+    gint64 end_time = posix_monotonic_time();
     double elapsed = (double) (end_time - start_time) / 1000000.0;
     term_printf("term_dim", "\nreal\t%dm%.3fs\n", (int) (elapsed / 60.0), fmod(elapsed, 60.0));
 }
@@ -495,6 +503,13 @@ void cmd_time(int argc, char **argv) {
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#include <strings.h>
+
+static gint64 posix_monotonic_time(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (gint64)ts.tv_sec * 1000000LL + ts.tv_nsec / 1000LL;
+}
 void cmd_ps(int argc, char **argv) {
     bool detailed = false;
     for (int argument_index = 1; argument_index < argc; argument_index++) {
@@ -713,19 +728,20 @@ void cmd_export(int argc, char **argv) {
         return;
     }
     for (int argument_index = 1; argument_index < argc; argument_index++) {
-        char **parts = g_strsplit(argv[argument_index], "=", 2);
-        if ((!parts[0]) || (!parts[1])) {
+        char *eq_sign = strchr(argv[argument_index], '=');
+        if (!eq_sign) {
             term_printf("term_err", "mpe: export: usage: export KEY=value\n");
-            g_strfreev(parts);
             continue;
         }
-        const char *variable_name = parts[0];
+        *eq_sign = '\0';
+        const char *variable_name = argv[argument_index];
+        char *variable_value_str = eq_sign + 1;
         float variable_value = 0.0f;
-        if (!term_parse_float(parts[1], &variable_value)) {
-            term_printf("term_err", "mpe: export: invalid value '%s'\n", parts[1]);
-            g_strfreev(parts);
+        if (!term_parse_float(variable_value_str, &variable_value)) {
+            term_printf("term_err", "mpe: export: invalid value '%s'\n", variable_value_str);
             continue;
         }
+        *eq_sign = '=';
         if (term_str_eq(variable_name, "CAMERA_SPEED")) {
             main_camera_fov.movement_speed = variable_value;
             term_printf("term_ok", "CAMERA_SPEED=%.4f\n", variable_value);
@@ -755,7 +771,7 @@ void cmd_export(int argc, char **argv) {
                 term_printf("term_err", "mpe: export: %s: unknown key\n", variable_name);
             }
         }
-        g_strfreev(parts);
+
     }
 }
 /* MPE_TASK_38_REGISTRY_EXPORT_END */
@@ -867,7 +883,7 @@ void cmd_sync(int argc, char **argv) {
 void cmd_uptime(int argc, char **argv) {
     (void) argc;
     (void) argv;
-    gint64 now = g_get_monotonic_time();
+    gint64 now = posix_monotonic_time();
     double elapsed = (double) (now - term_engine_start_time) / 1000000.0;
     int hours = (int) (elapsed / 3600.0);
     int minutes = (int) (fmod(elapsed, 3600.0) / 60.0);
@@ -956,9 +972,9 @@ void cmd_time(int argc, char **argv) {
             cmd_buf[offset] = '\0';
         }
     }
-    gint64 start_time = g_get_monotonic_time();
+    gint64 start_time = posix_monotonic_time();
     term_execute(cmd_buf);
-    gint64 end_time = g_get_monotonic_time();
+    gint64 end_time = posix_monotonic_time();
     double elapsed = (double) (end_time - start_time) / 1000000.0;
     term_printf("term_dim", "\nreal\t%dm%.3fs\n", (int) (elapsed / 60.0), fmod(elapsed, 60.0));
 }

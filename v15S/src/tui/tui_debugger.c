@@ -16,6 +16,7 @@
 #include "../physics/broadphase.h"
 #include "../physics/islands.h"
 #include <math.h>
+#include <ncurses.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -231,10 +232,22 @@ void tui_debugger_cleanup(tui_debugger_t *dbg) {
     if (!dbg) {
         return;
     }
-    dbg->main_win = NULL;
-    dbg->sidebar_win = NULL;
-    dbg->detail_win = NULL;
-    dbg->status_win = NULL;
+    if (dbg->main_win) {
+        delwin(dbg->main_win);
+        dbg->main_win = NULL;
+    }
+    if (dbg->sidebar_win) {
+        delwin(dbg->sidebar_win);
+        dbg->sidebar_win = NULL;
+    }
+    if (dbg->detail_win) {
+        delwin(dbg->detail_win);
+        dbg->detail_win = NULL;
+    }
+    if (dbg->status_win) {
+        delwin(dbg->status_win);
+        dbg->status_win = NULL;
+    }
 }
 
 void tui_debugger_step(tui_debugger_t *dbg, float dt) {

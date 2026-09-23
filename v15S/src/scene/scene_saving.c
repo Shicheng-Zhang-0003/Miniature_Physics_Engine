@@ -56,6 +56,10 @@ int save_scene(const char *file_destination_path) {
 #if __BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__
 #error "v200 scene format is little-endian; big-endian hosts need byteswap (unimplemented)"
 #endif
+    if (!file_destination_path || !*file_destination_path) {
+        fprintf(stderr, "Error SVF01: null/empty path\n");
+        return 0;
+    }
     char tmp_template[520];
     if (snprintf(tmp_template, sizeof(tmp_template), "%s.XXXXXX", file_destination_path) >= (int)sizeof(tmp_template)) {
         fprintf(stderr, "Error SVF01: path too long\n");
@@ -99,6 +103,7 @@ int save_scene(const char *file_destination_path) {
         ok = ok && scene_w32(f, &crc, rb->object_id); /* MPE_FTC_058 */
         ok = ok && scene_w32(f, &crc, (uint32_t) rb->nice_value);
         ok = ok && scene_w32(f, &crc, rb->is_sleeping ? 1u : 0u);
+        ok = ok && scene_wfloat(f, &crc, rb->sleep_timer);
         ok = ok && scene_w32(f, &crc, rb->kinematic ? 1u : 0u);
         ok = ok && scene_w32(f, &crc, rb->object_generation);
     }
@@ -128,6 +133,9 @@ int save_scene(const char *file_destination_path) {
     for (int j = 0; j < constraint_pool_capacity(); j++) {
         const constraint *c = constraint_pool_at(physics_world_get_primary(), j);
         if ((c) && (c->type != constraint_revolute) && (c->type != constraint_spring)) {
+            if (c->type < constraint_fixed || c->type > constraint_rope) {
+                continue;
+            }
             constraint_counts[c->type - constraint_fixed]++;
         }
     }

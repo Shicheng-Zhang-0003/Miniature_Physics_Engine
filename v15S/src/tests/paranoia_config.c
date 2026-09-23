@@ -111,7 +111,7 @@ int main(void) {
         else { printf("[PASS] invalid key returns false\n"); }
     }
 
-    /* Test 6: Type mismatch handling */
+    /* Test 7: Type mismatch handling */
     {
         int out;
         int result = mpe_config_get_int("world.gravity", &out); /* gravity is float */

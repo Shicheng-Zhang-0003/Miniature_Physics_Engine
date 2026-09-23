@@ -11,6 +11,13 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#include <strings.h>
+
+static gint64 posix_monotonic_time(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (gint64)ts.tv_sec * 1000000LL + ts.tv_nsec / 1000LL;
+}
 bool all_targets_matched_any(int argc, char **argv) {
     for (int i = 2; i < argc; i++) {
         if (term_is_all_token(argv[i])) {
@@ -783,7 +790,7 @@ void cmd_su(int argc, char **argv) {
     main_inputs.is_debug_mode_active = !main_inputs.is_debug_mode_active;
     debug_terminal_sync_mode();
     if (term_engine_start_time == 0) {
-        term_engine_start_time = g_get_monotonic_time();
+        term_engine_start_time = posix_monotonic_time();
     } /* FIX_029 */
     if (main_inputs.is_debug_mode_active) {
         term_ok("Switched to debug mode.\n");
@@ -913,7 +920,7 @@ bool mv_file_is_allowed(const char *filepath) {
     const char *dot = strrchr(filepath, '.');
     if (dot) {
         for (int i = 0; mv_blocked_extensions[i]; i++) {
-            if (g_ascii_strcasecmp(dot, mv_blocked_extensions[i]) == 0) {
+            if (strcasecmp(dot, mv_blocked_extensions[i]) == 0) {
                 return false;
             }
         }
@@ -927,7 +934,7 @@ bool mv_file_is_allowed(const char *filepath) {
     /* Check if it has an allowed extension */
     if (dot) {
         for (int i = 0; mv_allowed_extensions[i]; i++) {
-            if (g_ascii_strcasecmp(dot, mv_allowed_extensions[i]) == 0) {
+            if (strcasecmp(dot, mv_allowed_extensions[i]) == 0) {
                 return true;
             }
         }
@@ -1007,6 +1014,13 @@ void cmd_vi(int argc, char **argv) {
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#include <strings.h>
+
+static gint64 posix_monotonic_time(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (gint64)ts.tv_sec * 1000000LL + ts.tv_nsec / 1000LL;
+}
 bool all_targets_matched_any(int argc, char **argv) {
     for (int i = 2; i < argc; i++) {
         if (term_is_all_token(argv[i])) {
@@ -1779,7 +1793,7 @@ void cmd_su(int argc, char **argv) {
     main_inputs.is_debug_mode_active = !main_inputs.is_debug_mode_active;
     debug_terminal_sync_mode();
     if (term_engine_start_time == 0) {
-        term_engine_start_time = g_get_monotonic_time();
+        term_engine_start_time = posix_monotonic_time();
     } /* FIX_029 */
     if (main_inputs.is_debug_mode_active) {
         term_ok("Switched to debug mode.\n");
@@ -1909,7 +1923,7 @@ bool mv_file_is_allowed(const char *filepath) {
     const char *dot = strrchr(filepath, '.');
     if (dot) {
         for (int i = 0; mv_blocked_extensions[i]; i++) {
-            if (g_ascii_strcasecmp(dot, mv_blocked_extensions[i]) == 0) {
+            if (strcasecmp(dot, mv_blocked_extensions[i]) == 0) {
                 return false;
             }
         }
@@ -1923,7 +1937,7 @@ bool mv_file_is_allowed(const char *filepath) {
     /* Check if it has an allowed extension */
     if (dot) {
         for (int i = 0; mv_allowed_extensions[i]; i++) {
-            if (g_ascii_strcasecmp(dot, mv_allowed_extensions[i]) == 0) {
+            if (strcasecmp(dot, mv_allowed_extensions[i]) == 0) {
                 return true;
             }
         }
