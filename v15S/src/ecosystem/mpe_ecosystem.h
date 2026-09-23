@@ -55,6 +55,8 @@ int mpe_ecosystem_count(void);
 const mpe_ecosystem_desc_t *mpe_ecosystem_at(int index);
 /* Detach everywhere (loader unload path; hooks run pre-dlclose). */
 void mpe_ecosystem_detach_everywhere(const char *eco_name);
+/* Per-world state for terminal-driven commands (NULL when detached). */
+void *mpe_ecosystem_state(mpe_world_t *world, const char *eco_name);
 
 /* Ecosystem management */
 int mpe_ecosystem_attach(mpe_world_t *world, const char *eco_name);

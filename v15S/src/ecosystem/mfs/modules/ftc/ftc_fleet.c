@@ -36,9 +36,18 @@ void ftc_fleet_destroy(void *fleet_state) {
     free(f);
 }
 
+/* Weak link into the bundle's internal registry (defined by
+ * mfs_internal.c, ABSENT from standalone mpe_ftc.so builds). Lets fleet
+ * lookup work through bundle attachments without linking bundle code:
+ * when weak-unresolved the pointer is NULL and only the tick-table path
+ * applies. */
+__attribute__((weak)) void *mfs_internal_module_state_for(const void *world, const char *name);
+
 /* Locate the fleet attached to a world by module name (no side table:
  * the state pointer lives in the world's own tick tables, so worlds
- * never share fleet state). */
+ * never share fleet state). Falls back to the bundle-internal attachment
+ * when the world uses the mfs-simulator ecosystem instead of a direct
+ * ftc-fleet tick attach. */
 static ftc_fleet_t *fleet_of(struct physics_world *world) {
     if (!world) return NULL;
     for (int i = 0; i < world->tick_module_count; i++) {
@@ -46,6 +55,10 @@ static ftc_fleet_t *fleet_of(struct physics_world *world) {
             strcmp(world->tick_modules[i]->name, FTC_FLEET_MODULE_NAME) == 0) {
             return (ftc_fleet_t *)world->tick_module_state[i];
         }
+    }
+    if (mfs_internal_module_state_for) {
+        return (ftc_fleet_t *)mfs_internal_module_state_for((const void *)world,
+                                                            FTC_FLEET_MODULE_NAME);
     }
     return NULL;
 }

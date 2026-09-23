@@ -44,6 +44,10 @@ int mfs_internal_module_detach(const char *name, physics_world *world);
 /* Get internal module state by name */
 void *mfs_internal_module_state(const char *name);
 
+/* Get internal module state for a specific world (NULL when that world
+ * has no attachment). Powers fleet lookup through bundle attachments. */
+void *mfs_internal_module_state_for(const void *world, const char *name);
+
 /* Run pre_step for all attached internal modules */
 void mfs_internal_modules_pre_step(physics_world *world, float dt);
 
