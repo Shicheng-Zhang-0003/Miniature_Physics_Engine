@@ -31,7 +31,7 @@ LIBS ?= $(BASE_LIBS)
 BUILD_DIR ?= build
 # Explicit engine sources: everything except tests/ (headless mains with
 # their own #ifdef guards must never link into the engine binary).
-ENGINE_SRCS := $(wildcard *.c config/*.c core/*.c physics/*.c render/*.c scene/*.c ui_input/*.c)
+ENGINE_SRCS := $(wildcard *.c config/*.c core/*.c physics/*.c render/*.c scene/*.c ui_input/*.c) ecosystem/mpe_ecosystem.c
 OBJECTS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(ENGINE_SRCS))
 DEPS := $(OBJECTS:.o=.d)
 
@@ -53,127 +53,77 @@ release:
 	$(MAKE) BUILD_DIR=build-release CFLAGS="$(BASE_CFLAGS) -O3 -DNDEBUG" engine
 
 PREFIX ?= $(HOME)/.local
-install: engine mpe-tui
+install: engine mpe-tui plugins/mpe_capsule.so
 	install -d $(DESTDIR)$(PREFIX)/bin
 	install -m 0755 engine $(DESTDIR)$(PREFIX)/bin/mpe-engine
 	install -m 0755 mpe-tui $(DESTDIR)$(PREFIX)/bin/mpe-tui
 	install -d $(DESTDIR)$(PREFIX)/share/mpe/shaders
 	install -m 0644 render/shaders/*.glsl $(DESTDIR)$(PREFIX)/share/mpe/shaders/ || true
+	install -d $(DESTDIR)$(PREFIX)/lib/mpe/plugins
+	install -m 0644 plugins/*.so $(DESTDIR)$(PREFIX)/lib/mpe/plugins/ || true
 	install -d $(DESTDIR)$(PREFIX)/share/mpe/status
 	@echo "NOTE: run from v15S/src or set MPE_SHADER_DIR=$(PREFIX)/share/mpe/shaders"
 
-installcheck:
-	@echo "--- installcheck: headless suite must pass ---"
-	python3 ../../tools/test_runner.py 2>&1 | tail -5
+uninstall:
+	rm -f $(DESTDIR)$(PREFIX)/bin/mpe-engine $(DESTDIR)$(PREFIX)/bin/mpe-tui
+	rm -rf $(DESTDIR)$(PREFIX)/share/mpe $(DESTDIR)$(PREFIX)/lib/mpe
+
+installcheck: build_suite
+	@echo "--- installcheck: Suite v2 must pass ---"
+	./test_mpe_suite --all 2>&1 | tee /tmp/mpe_installcheck.log | tail -5
+	grep -q "Blocking failures: 0" /tmp/mpe_installcheck.log
+
+installcheck-v1:
+	@echo "--- installcheck-v1: legacy 30-binary suite (known: stack/driven_wheel/list4 fail, test bugs) ---"
+	python3 ../../tools/test_runner.py 2>&1 | tee /tmp/mpe_installcheck_v1.log | tail -5
 
 check-deps:
-	@pkg-config --exists gtk4 epoxy ncurses x11 || (echo "missing deps: need gtk4 epoxy ncurses x11"; exit 1)
-	@echo "deps OK"
+	@pkg-config --exists gtk4 epoxy x11 || (echo "missing deps: need gtk4 epoxy x11"; exit 1)
+	@echo "deps OK (engine). For mpe-tui also: pkg-config --exists ncurses"
+
+check-deps-tui:
+	@pkg-config --exists ncurses || (echo "missing dep for mpe-tui: need ncurses"; exit 1)
+	@echo "tui deps OK"
 
 check-flags:
+	@if [ "$(ENABLE_NATIVE)" = "1" ] && [ "$(ALLOW_NONPORTABLE)" != "1" ]; then echo "FAIL: ENABLE_NATIVE=1 breaks bitwise determinism; set ALLOW_NONPORTABLE=1 to override"; exit 1; fi
 	@if [ "$(ENABLE_NATIVE)" = "1" ]; then echo "WARNING: NATIVE BUILD - NOT BITWISE PORTABLE"; fi
 	@echo "$(CFLAGS)" | grep -q "ffp-contract=off" || (echo "FAIL: -ffp-contract=off missing from CFLAGS"; exit 1)
 	@echo "flags OK"
 
 help:
-	@echo "targets: engine (default) | debug | release | install | clean"
-	@echo "         test_<name> (build+run) | build_<name> (build only)"
-	@echo "         mpe-tui (terminal debugger + snapshot suite) | tui-smoke"
-	@echo "         ecosystem | mfs_ecosystem | modinfo"
-	@echo "         flow: python3 ../../tools/test_runner.py"
+	@echo "targets: engine (default) | debug | release | install | installcheck | clean | distclean"
+	@echo "         test_<name> (build+run) | build_<name> (build only) | paranoia_*"
+	@echo "         build_suite | test_suite | test_suite_all (Suite v2: 31 tests, canonical)"
+	@echo "         mpe-tui (terminal debugger + snapshot suite) | tui-smoke | plugins/*.so"
+	@echo "         mfs_ecosystem.so (delegates to ecosystem/mfs/Makefile)"
+	@echo "         check-deps | check-deps-tui | check-flags"
+	@echo "         flow: python3 ../../tools/test_runner.py --suite [--all]"
 
 # MFS lives in its distinct folder: ecosystem/mfs/ (see ecosystem/mfs/README_MFS.md).
-# Objects build via the MFS_ECOSYSTEM_OBJS recursive rule below (with -fPIC);
-# the generic $(BUILD_DIR)/%.o rule must not claim them (no duplicate recipes).
-
-$(BUILD_DIR)/%.o: %.c
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -c $< -o $@
+# It builds itself (ecosystem/mfs/Makefile, objects in ecosystem/mfs/build/);
+# the generic $(BUILD_DIR)/%.o rule below is engine-only.
 
 $(BUILD_DIR)/%.o: %.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf build build-debug build-release engine test_* mpe-tui
+	rm -rf build build-debug build-release engine test_* mpe-tui *.so plugins/*.so
+	find . -name '*.d' -delete
 	@echo "NOTE: user data status/engine.cfg preserved (use distclean to remove)"
 
 distclean: clean
 	rm -rf status/engine.cfg status/engine.cfg.backup
 
-# ---- Module system ----
-module: module/mpe_module.o module/mpe_registry.o module/mpe_loader.o
-	$(CC) $(CFLAGS) -shared module/mpe_module.o module/mpe_registry.o module/mpe_loader.o -lm -ldl -o module.so
-
-# ---- Ecosystem system ----
-ecosystem: ecosystem/mpe_ecosystem.o
-	$(CC) $(CFLAGS) -shared ecosystem/mpe_ecosystem.o -lm -ldl -o ecosystem.so
-
-# ---- MFS overarching ecosystem (v15S/src/ecosystem/mfs/: modules,
-# submodules, tests, docs under the "mfs-simulator" umbrella) ----
-MFS_ECOSYSTEM_SRCS = ecosystem/mfs/mfs_ecosystem.c ecosystem/mfs/mfs_internal.c \
-	ecosystem/mfs/modules/module_1/mfs_module_1.c \
-	ecosystem/mfs/modules/module_1/submodules/gamepad/gamepad.c \
-	ecosystem/mfs/modules/ftc/ftc_module.c ecosystem/mfs/modules/ftc/ftc_fleet.c \
-	ecosystem/mfs/modules/ftc/gui_robot_registry.c \
-	ecosystem/mfs/modules/ftc/submodules/robot.c ecosystem/mfs/modules/ftc/submodules/drivetrain.c \
-	ecosystem/mfs/modules/ftc/submodules/motor.c ecosystem/mfs/modules/ftc/submodules/motor_presets.c \
-	ecosystem/mfs/modules/ftc/submodules/battery.c
-MFS_ECOSYSTEM_OBJS = $(patsubst %.c,$(BUILD_DIR)/%.o,$(MFS_ECOSYSTEM_SRCS))
-
-# Direct -fPIC rules (explicit targets take precedence over the generic
-# pattern rule). MFS-internal includes are MFS-root-relative
-# ("modules/..."), hence -Iecosystem/mfs; engine headers via -I. as usual.
-$(BUILD_DIR)/ecosystem/mfs/mfs_ecosystem.o: ecosystem/mfs/mfs_ecosystem.c
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -fPIC -Iecosystem/mfs -c $< -o $@
-
-$(BUILD_DIR)/ecosystem/mfs/mfs_internal.o: ecosystem/mfs/mfs_internal.c
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -fPIC -Iecosystem/mfs -c $< -o $@
-
-$(BUILD_DIR)/ecosystem/mfs/modules/module_1/mfs_module_1.o: ecosystem/mfs/modules/module_1/mfs_module_1.c
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -fPIC -Iecosystem/mfs -c $< -o $@
-
-$(BUILD_DIR)/ecosystem/mfs/modules/module_1/submodules/gamepad/gamepad.o: ecosystem/mfs/modules/module_1/submodules/gamepad/gamepad.c
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -fPIC -Iecosystem/mfs -c $< -o $@
-
-$(BUILD_DIR)/ecosystem/mfs/modules/ftc/ftc_module.o: ecosystem/mfs/modules/ftc/ftc_module.c
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -fPIC -Iecosystem/mfs -c $< -o $@
-
-$(BUILD_DIR)/ecosystem/mfs/modules/ftc/ftc_fleet.o: ecosystem/mfs/modules/ftc/ftc_fleet.c
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -fPIC -Iecosystem/mfs -c $< -o $@
-
-$(BUILD_DIR)/ecosystem/mfs/modules/ftc/gui_robot_registry.o: ecosystem/mfs/modules/ftc/gui_robot_registry.c
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -fPIC -Iecosystem/mfs $(shell pkg-config --cflags gtk4 epoxy 2>/dev/null) -c $< -o $@
-
-$(BUILD_DIR)/ecosystem/mfs/modules/ftc/submodules/robot.o: ecosystem/mfs/modules/ftc/submodules/robot.c
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -fPIC -Iecosystem/mfs -c $< -o $@
-
-$(BUILD_DIR)/ecosystem/mfs/modules/ftc/submodules/drivetrain.o: ecosystem/mfs/modules/ftc/submodules/drivetrain.c
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -fPIC -Iecosystem/mfs -c $< -o $@
-
-$(BUILD_DIR)/ecosystem/mfs/modules/ftc/submodules/motor.o: ecosystem/mfs/modules/ftc/submodules/motor.c
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -fPIC -Iecosystem/mfs -c $< -o $@
-
-$(BUILD_DIR)/ecosystem/mfs/modules/ftc/submodules/motor_presets.o: ecosystem/mfs/modules/ftc/submodules/motor_presets.c
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -fPIC -Iecosystem/mfs -c $< -o $@
-
-$(BUILD_DIR)/ecosystem/mfs/modules/ftc/submodules/battery.o: ecosystem/mfs/modules/ftc/submodules/battery.c
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -fPIC -Iecosystem/mfs -c $< -o $@
-
-mfs_ecosystem.so: $(MFS_ECOSYSTEM_OBJS)
-	$(CC) $(CFLAGS) -fPIC -shared $(MFS_ECOSYSTEM_OBJS) -lm -ldl -o mfs_ecosystem.so
+# ---- MFS overarching ecosystem (v15S/src/ecosystem/mfs/) ----
+# Single build lives in ecosystem/mfs/Makefile (thin .so files, build/ objs).
+# This target only delegates and stages the artifact here; do NOT duplicate
+# the recipe (a duplicated recipe already drifted once: GUI registry linked
+# here, excluded there).
+mfs_ecosystem.so:
+	$(MAKE) -C ecosystem/mfs mfs_ecosystem.so
+	cp ecosystem/mfs/mfs_ecosystem.so ./mfs_ecosystem.so
 
 # ---- MPE terminal debugger + snapshot suite (TUI) ----
 # Terminal-only executable: live ncurses inspector (overview / object+math /
@@ -183,7 +133,9 @@ mfs_ecosystem.so: $(MFS_ECOSYSTEM_OBJS)
 # for its physics symbols but never invoked — output is terminal only).
 TUI_SRCS := tui/tui_main.c tui/tui_debugger.c tui/tui_dump.c
 TUI_CORE = $(MPE_TEST_CORE) $(SPRING_TEST_SRCS)
-TUI_LIBS := -lm $(shell pkg-config --libs ncurses) $(shell pkg-config --libs epoxy)
+# epoxy kept: spring_joint.o render path references GL symbols even though
+# the TUI never calls it at runtime (physics symbols live in the same TU).
+TUI_LIBS := -lm $(shell pkg-config --libs ncurses) $(shell pkg-config --libs epoxy) -ldl
 build_tui: $(TUI_SRCS) $(TUI_CORE)
 	$(CC) $(CFLAGS) -Dmpe_tui_main $(TUI_SRCS) $(TUI_CORE) $(TUI_LIBS) -o mpe-tui
 mpe-tui: build_tui
@@ -199,7 +151,7 @@ tui-smoke: build_tui
 	./mpe-tui --snapshot 60 --scene demo --solver seq-impulse --broadphase hash > /dev/null
 	@echo "[PASS] tui-smoke: all scenes dump finite state"
 
-.PHONY: clean debug release install help mpe-tui build_tui tui-smoke
+.PHONY: clean distclean debug release install installcheck check-deps check-deps-tui check-flags help mpe-tui build_tui tui-smoke plugins mfs_ecosystem.so headless build_suite test_suite test_suite_all
 
 -include $(DEPS)
 
@@ -210,8 +162,8 @@ tui-smoke: build_tui
 # TRUE god file split: collision_mechanics.c (2305 lines) → 4 focused TUs
 MPE_TEST_CORE := core/physics_world.c core/rigidbody.c core/mpe_registry.c core/mpe_loader.c core/det_math.c core/mpe_primary.c \
 	physics/collision_narrowphase.c physics/collision_cache.c physics/collision_solver.c physics/collision_ccd.c physics/collision_cylinder.c physics/broadphase.c physics/constraint.c physics/revolute_joint.c physics/depenetration.c physics/islands.c \
-	config/mpe_config.c config/mpe_config_schema.c scene/boundary.c
-MPE_TEST_LIBS := -lm -ldl
+	config/mpe_config.c config/mpe_config_schema.c scene/boundary.c ecosystem/mpe_ecosystem.c
+MPE_TEST_LIBS := -lm -ldl -pthread
 
 build_two_world: tests/two_world_test.c $(MPE_TEST_CORE)
 	$(CC) $(CFLAGS) -Dmpe_two_world_test tests/two_world_test.c $(MPE_TEST_CORE) $(MPE_TEST_LIBS) -o test_two_world
@@ -372,6 +324,19 @@ test_module: build_module
 plugins/mpe_capsule.so: plugins/mpe_capsule.c core/mpe_module.h core/mpe_registry.h
 	mkdir -p plugins
 	$(CC) $(BASE_CFLAGS) -fPIC -shared plugins/mpe_capsule.c -o plugins/mpe_capsule.so
+# ---- Suite v2: single-binary C regression suite (from-scratch rewrite) ----
+# One binary, exact-name dispatch, shared builders (no 30x core recompile).
+# Links core + spring physics + scene I/O (stubs for scene_init/camera live
+# in tests/mpe_suite_main.c). Replaces the 30-binary v1 layout over time.
+MPE_SUITE_SRCS := tests/mpe_suite_main.c tests/mpe_suite_a.c tests/mpe_suite_b.c tests/mpe_suite_c.c tests/mpe_suite_loader.c
+MPE_SUITE_DEPS := $(MPE_TEST_CORE) $(SPRING_TEST_SRCS) $(SCENE_TEST_SRCS)
+build_suite: $(MPE_SUITE_SRCS) $(MPE_SUITE_DEPS)
+	$(CC) $(CFLAGS) -rdynamic $(MPE_SUITE_SRCS) $(MPE_TEST_CORE) $(SPRING_TEST_SRCS) $(SCENE_TEST_SRCS) $(MPE_TEST_LIBS) $(shell pkg-config --libs epoxy) -o test_mpe_suite
+test_suite: build_suite
+	./test_mpe_suite
+test_suite_all: build_suite
+	./test_mpe_suite --all
+
 plugins: plugins/mpe_capsule.so
 
 .PHONY: clean build_two_world test_two_world build_revolute test_revolute \
