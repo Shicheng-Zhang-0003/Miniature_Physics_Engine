@@ -33,14 +33,33 @@ void cmd_mod(int argc, char **argv) {
         snprintf(buf, sizeof(buf), "loaded .so: %d\n", mpe_loader_count());
         term_out(buf);
         for (int i = 0; i < mpe_loader_count(); i++) {
-            snprintf(buf, sizeof(buf), "  %s\n", mpe_loader_path_at(i));
+            const char *nm = mpe_loader_name_at(i);
+            snprintf(buf, sizeof(buf), "  %s (%s)\n", mpe_loader_path_at(i), nm ? nm : "?");
             term_out(buf);
         }
+        /* Pair-handler table (foreign shapes visible here). */
+        term_out("pair handlers:\n");
+        for (int i = 0; i < MPE_MAX_PAIR_HANDLERS; i++) {
+            int ta = 0, tb = 0, ca = 0, cb = 0;
+            char nm[64] = {0};
+            if (mpe_registry_pair_describe(i, &ta, &tb, &ca, &cb, nm, sizeof(nm)) != 0) break;
+            snprintf(buf, sizeof(buf), "  #%d (%d,%d,%d,%d) %s\n", i, ta, tb, ca, cb, nm);
+            term_out(buf);
+        }
+        /* Stage backends. */
+        if (mpe_find_broadphase("hash")) term_out("broadphase: hash (builtin)\n");
+        if (mpe_find_solver("seq-impulse")) term_out("solver: seq-impulse (builtin)\n");
         physics_world *w = physics_world_get_primary();
         snprintf(buf, sizeof(buf), "attached to primary: %d\n", w ? w->tick_module_count : 0);
         term_out(buf);
         if (w) for (int i = 0; i < w->tick_module_count; i++) {
             snprintf(buf, sizeof(buf), "  %s\n", w->tick_modules[i] ? w->tick_modules[i]->name : "?");
+            term_out(buf);
+        }
+        if (w) {
+            snprintf(buf, sizeof(buf), "primary stages: broadphase=%s solver=%s\n",
+                     w->broadphase_if ? "foreign" : "builtin",
+                     w->solver_if ? "foreign" : "builtin");
             term_out(buf);
         }
         return;
@@ -52,14 +71,30 @@ void cmd_mod(int argc, char **argv) {
         return;
     }
     if (term_str_eq(argv[1], "unload") && argc >= 3) {
-        if (mpe_loader_unload(argv[2]) == 0) term_ok("mpe: mod: unloaded\n");
-        else term_err("mpe: mod: unload failed (unknown handle)\n");
+        int ur = mpe_loader_unload(argv[2]);
+        if (ur == 0) term_ok("mpe: mod: unloaded\n");
+        else if (ur == -2) {
+            term_err("mpe: mod: unload refused (busy: detach/reset world slots first)\n");
+        } else term_err("mpe: mod: unload failed (unknown handle)\n");
         return;
     }
     if (term_str_eq(argv[1], "attach") && argc >= 3) {
         const mpe_module_desc_t *d = mpe_find_module(argv[2]);
         if (!d) { term_err("mpe: mod: unknown module\n"); return; }
-        int r = physics_world_attach_module(physics_world_get_primary(), d);
+        /* Only tick-capable modules attach: shapes/stages have no hooks
+         * and would pin the .so while doing nothing. */
+        if (!d->pre_step && !d->post_step && !d->attach && !d->detach) {
+            term_err("mpe: mod: not a tick module (no hooks; nothing to attach)\n");
+            return;
+        }
+        physics_world *pw = physics_world_get_primary();
+        for (int i = 0; i < (pw ? pw->tick_module_count : 0); i++) {
+            if (pw->tick_modules[i] && term_str_eq(pw->tick_modules[i]->name, argv[2])) {
+                term_ok("mpe: mod: already attached\n");
+                return;
+            }
+        }
+        int r = physics_world_attach_module(pw, d);
         if (r >= 0) term_ok("mpe: mod: attached\n");
         else term_err("mpe: mod: attach failed (table full / attach hook)\n");
         return;
@@ -125,9 +160,10 @@ void cmd_modinfo(int argc, char **argv) {
         if (d->pre_step) term_out("hooks:       pre_step\n");
         if (d->post_step) term_out("hooks:       post_step\n");
     }
-    /* check if loaded */
+    /* check if loaded (compare loader module NAMES, not paths). */
     for (int i = 0; i < mpe_loader_count(); i++) {
-        if (term_str_eq(mpe_loader_path_at(i), d->name)) {
+        const char *nm = mpe_loader_name_at(i);
+        if (nm && term_str_eq(nm, d->name)) {
             snprintf(buf, sizeof(buf), "loaded:      yes (%s)\n", mpe_loader_path_at(i));
             term_out(buf);
             return;

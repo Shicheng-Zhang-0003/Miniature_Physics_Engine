@@ -119,7 +119,8 @@ void simulation_physics_tick(float frame_delta_time) {
         if (world->broadphase_if && world->broadphase_if->generate) {
             detected_collision_count = world->broadphase_if->generate(world, world->pair_buffer,
                                                                       mpe_max_broadphase_pairs,
-                                                                      fixed_physics_dt, NULL);
+                                                                      fixed_physics_dt,
+                                                                      world->broadphase_state);
         } else {
             detected_collision_count =
                 broadphase_generate_pairing(world, world->pair_buffer, mpe_max_broadphase_pairs,
@@ -196,6 +197,9 @@ void simulation_physics_tick(float frame_delta_time) {
                 if (floor_rigid_body->static_state) {
                     continue;
                 }
+                if (floor_rigid_body->no_collide) {
+                    continue; /* render-only proxies: no floor contact */
+                }
                 bool was_sleeping = floor_rigid_body->is_sleeping;
                 collision_data floor_collision = {0};
                 if (collision_static_plane_body(&world->static_plane_body, floor_rigid_body, 0.0f, &floor_collision,
@@ -251,9 +255,16 @@ void simulation_physics_tick(float frame_delta_time) {
         }
         constraint_apply_motors(world, fixed_physics_dt);
         /* Foreign forcefield / motor modules (same hook as world path). */
-        for (int mi = 0; mi < world->tick_module_count; mi++) {
-            if (world->tick_modules[mi] && world->tick_modules[mi]->pre_step) {
-                world->tick_modules[mi]->pre_step(world, fixed_physics_dt, world->tick_module_state[mi]);
+        { /* Snapshot hook table: hooks may attach/detach (see world path). */
+            const mpe_module_desc_t *mods[16];
+            void *states[16];
+            int nmods = world->tick_module_count < 16 ? world->tick_module_count : 16;
+            for (int mi = 0; mi < nmods; mi++) {
+                mods[mi] = world->tick_modules[mi];
+                states[mi] = world->tick_module_state[mi];
+            }
+            for (int mi = 0; mi < nmods; mi++) {
+                if (mods[mi] && mods[mi]->pre_step) mods[mi]->pre_step(world, fixed_physics_dt, states[mi]);
             }
         }
         if (world->tick_v0 && world->tick_v0_capacity >= mpe_max_bodies) {
@@ -297,9 +308,9 @@ void simulation_physics_tick(float frame_delta_time) {
                 /* Local convergence (see physics_world.c): settle the
                  * manifold's coupled contacts before propagating upward. */
                 if (world->solver_if && world->solver_if->resolve) {
-                    world->solver_if->resolve(world, &world->manifolds[m], fixed_physics_dt, false, iter, NULL);
+                    world->solver_if->resolve(world, &world->manifolds[m], fixed_physics_dt, false, iter, world->solver_state);
                     world->solver_if->resolve(world, &world->manifolds[m], fixed_physics_dt, false, iter + 1,
-                                              NULL);
+                                              world->solver_state);
                 } else {
                     collision_resolve_iterative(&world->manifolds[m], fixed_physics_dt, false, iter,
                                                 leg_step_cfg);
@@ -319,7 +330,7 @@ void simulation_physics_tick(float frame_delta_time) {
         /* Poisson restitution + joint relaxation + friction relaxation
          * (see physics_world.c). */
         if (world->solver_if && world->solver_if->poisson) {
-            world->solver_if->poisson(world, world->manifolds, manifold_count, NULL);
+            world->solver_if->poisson(world, world->manifolds, manifold_count, world->solver_state);
         } else {
             collision_apply_poisson_restitution(world->manifolds, manifold_count, leg_step_cfg);
         }
@@ -332,7 +343,7 @@ void simulation_physics_tick(float frame_delta_time) {
                 }
                 if (world->solver_if && world->solver_if->resolve) {
                     world->solver_if->resolve(world, &world->manifolds[m], fixed_physics_dt, true, relax_iter,
-                                              NULL);
+                                              world->solver_state);
                 } else {
                     collision_resolve_iterative(&world->manifolds[m], fixed_physics_dt, true, relax_iter,
                                                 leg_step_cfg);
@@ -342,7 +353,7 @@ void simulation_physics_tick(float frame_delta_time) {
         /* TRUTH: split was missing on legacy (sank to slop). Add it + the
          * post-split wake revisit (see physics_world.c). */
         if (world->solver_if && world->solver_if->split) {
-            world->solver_if->split(world, world->manifolds, manifold_count, fixed_physics_dt, NULL);
+            world->solver_if->split(world, world->manifolds, manifold_count, fixed_physics_dt, world->solver_state);
         } else {
             collision_apply_split_impulse(world->manifolds, manifold_count, fixed_physics_dt, leg_step_cfg);
         }
@@ -364,7 +375,7 @@ void simulation_physics_tick(float frame_delta_time) {
         }
         /* Rolling resistance once per tick (uses solved normal impulses). */
         if (world->solver_if && world->solver_if->rolling) {
-            world->solver_if->rolling(world, world->manifolds, manifold_count, fixed_physics_dt, NULL);
+            world->solver_if->rolling(world, world->manifolds, manifold_count, fixed_physics_dt, world->solver_state);
         } else {
             collision_apply_rolling_resistance(world->manifolds, manifold_count, fixed_physics_dt, leg_step_cfg);
         }
@@ -458,9 +469,16 @@ void simulation_physics_tick(float frame_delta_time) {
         a3_positional_depenetration_pass_dt(world, world->pair_buffer, &detected_collision_count,
                                             a3_boundary_moved_any, fixed_physics_dt);
         /* Foreign post-step modules (same hook as world path). */
-        for (int mi = 0; mi < world->tick_module_count; mi++) {
-            if (world->tick_modules[mi] && world->tick_modules[mi]->post_step) {
-                world->tick_modules[mi]->post_step(world, fixed_physics_dt, world->tick_module_state[mi]);
+        { /* Snapshot hook table (see pre-step above). */
+            const mpe_module_desc_t *mods[16];
+            void *states[16];
+            int nmods = world->tick_module_count < 16 ? world->tick_module_count : 16;
+            for (int mi = 0; mi < nmods; mi++) {
+                mods[mi] = world->tick_modules[mi];
+                states[mi] = world->tick_module_state[mi];
+            }
+            for (int mi = 0; mi < nmods; mi++) {
+                if (mods[mi] && mods[mi]->post_step) mods[mi]->post_step(world, fixed_physics_dt, states[mi]);
             }
         }
         /* AUDIT: no cache clear here (see physics_world.c): body-local

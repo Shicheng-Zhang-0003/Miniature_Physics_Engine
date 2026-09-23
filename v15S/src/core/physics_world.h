@@ -130,6 +130,11 @@ typedef struct physics_world {
      * motors, loggers). States parallel tick_modules[]. */
     const mpe_broadphase_if_t *broadphase_if;
     const mpe_solver_if_t *solver_if;
+    /* Per-stage foreign state (set alongside the iface; passed as the
+     * mod_state hook argument instead of NULL). Owned by the module;
+     * freed by its detach/unload path, never by the world. */
+    void *broadphase_state;
+    void *solver_state;
     const mpe_module_desc_t *tick_modules[16];
     void *tick_module_state[16];
     int tick_module_count;
@@ -183,6 +188,18 @@ int physics_world_attach_module(physics_world *world, const mpe_module_desc_t *d
 int physics_world_detach_module(physics_world *world, const char *name);
 void physics_world_set_broadphase(physics_world *world, const mpe_broadphase_if_t *iface);
 void physics_world_set_solver(physics_world *world, const mpe_solver_if_t *iface);
+void physics_world_set_broadphase_state(physics_world *world, void *state);
+void physics_world_set_solver_state(physics_world *world, void *state);
+/* Live-world registry (cap MPE_MAX_LIVE_WORLDS=64; worlds beyond the cap
+ * step normally but are invisible to auto-purge — unload then requires
+ * manual detach first). Returns pointers copied; n = copied count. */
+#define MPE_MAX_LIVE_WORLDS 64
+int physics_world_live_list(physics_world **out, int cap);
+/* Registry/loader unload paths: reset stage slots aliasing dead entries
+ * and detach a named tick module in ALL live worlds (hooks run while the
+ * .so is still mapped). */
+void physics_world_forget_stage_pointers(const mpe_broadphase_if_t *bi, const mpe_solver_if_t *si);
+void physics_world_detach_module_everywhere(const char *name);
 /* Pool growth (×2 to ceiling). Used by add_* paths and cache save. */
 int physics_world_grow_bodies(physics_world *world);
 int physics_world_grow_contact_cache(physics_world *world);
