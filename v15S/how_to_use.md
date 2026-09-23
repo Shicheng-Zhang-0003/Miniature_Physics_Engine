@@ -140,6 +140,17 @@ Common commands:
 | `mod load ./plugins/mpe_capsule.so` | Hot-plug a foreign shape |
 | `mod attach capsule-shape` | Attach a module to the world |
 | `mod use-solver seq-impulse` | Swap the solver backend |
+| `mod load ecosystem/mfs/mfs_ecosystem.so` | Load the MFS robotics bundle |
+| `eco attach mfs-simulator` | Attach the bundle to the primary world |
+| `eco command mfs-simulator help` | List bundle commands |
+| `ftc spawn` | Spawn an FTC robot (5203 26.9 mecanum, at origin) |
+| `ftc drive 0 tank 1 1` | Drive robot 0 forward (persists until changed) |
+| `ftc drive 0 mecanum 0 1 0` | Strafe robot 0 right |
+| `ftc drive 0 stop` | Stop robot 0 |
+| `ftc telemetry 0` | Pose, odometry, battery, per-wheel state |
+| `ftc list` | List all robots |
+| `ftc preset 26.9` | List matching motor presets |
+| `eco config mfs-simulator get shooter_rpm` | Read bundle config |
 
 Type `help` for the full command list or `man <command>` for usage. `Ctrl+L` clears the screen. `Escape` closes the terminal.
 
@@ -278,6 +289,40 @@ Lifetime rules (all enforced, all tested by `loader_lifecycle`):
   any inner `mpe_module_desc`): `mod load ecosystem/mfs/mfs_ecosystem.so`.
 
 ---
+
+## Driving FTC Robots
+
+The MFS robotics bundle (`ecosystem/mfs/mfs_ecosystem.so`) hot-plugs
+through the same module system. Full session from the debug terminal:
+
+```
+mod load ecosystem/mfs/mfs_ecosystem.so   # load the bundle
+eco attach mfs-simulator                  # attach it to the primary world
+ftc spawn                                 # mecanum robot, 5203 26.9, at origin
+ftc drive 0 tank 1 1                      # full forward (persists until changed)
+ftc telemetry 0                           # pose, odometry, battery, wheels
+ftc drive 0 stop                          # stop
+```
+
+Notes:
+- `ftc spawn [preset-substr] [mecanum|tank] [x y z]` — e.g.
+  `ftc spawn 50.9 tank 2 0 -3`. Presets list via `ftc preset [substr]`.
+- Drive commands persist: the tick module re-applies them every tick
+  until `stop` or a new command. The simulation must be stepping (the
+  engine steps continuously while open).
+- A tile floor is required for traction. `spawn` adds a 20×20 Coulomb
+  slab (top y=0, μ 1.0/0.8) automatically when the world has no
+  floor-like body, and says so. Without frictional contact, drive
+  commands produce slip-regime artifacts instead of motion.
+- `ftc list` shows every robot with live odometry; a `SLIP` tag marks
+  ticks where roller thrust bypassed the wheel encoders (structurally
+  unobservable strafe — fused from chassis motion, flagged honestly).
+- Bundle config: `eco config mfs-simulator get shooter_rpm`
+  (module_1 game state); bundle verbs via `eco command mfs-simulator
+  <spawn|drive|list|telemetry|help> [...]` — the same surface the
+  `ftc` commands drive through.
+- Detach with `eco detach mfs-simulator`, unload with
+  `mod unload ecosystem/mfs/mfs_ecosystem.so` (refused while referenced).
 
 ## Validation Tests
 
@@ -426,7 +471,7 @@ Run:
 Headless suites (no display needed):
 
 ```bash
-make build_suite && ./test_mpe_suite --all   # engine: 31/31 green
+make build_suite && ./test_mpe_suite --all   # engine: 32/32 green
 ecosystem/mfs/build_tests.sh                 # robotics: 8 gated + 5 info
 ```
 

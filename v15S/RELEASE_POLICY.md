@@ -8,8 +8,8 @@ documentation, and hygiene only — no new features.
 system (MPI hot-plug), per-world config, data-structure upgrades
 (growable pools, O(1) caches), kernel global-state removal, and the TUI
 stress suite. It keeps the v15R3 physics-truth contract (defaults
-bit-identical unless noted) and extends the suite to 31/31
-(28 physics + 3 diag-informational).
+bit-identical unless noted) and extends the suite to 32/32
+(29 physics + 3 diag-informational).
 
 ## What v15 Delivered
 
@@ -25,7 +25,7 @@ The v15 series introduced the centralised configuration system:
 Under the v15R3 freeze:
 
 1. Correctness fixes with headless proof (new or extended tests).
-2. Stability fixes required by validation (F5–F11, 31-test suite).
+2. Stability fixes required by validation (F5–F11, 32-test suite).
 3. Build and repository hygiene.
 4. Documentation updates to match the architecture.
 5. Validation improvements (tests, TUI snapshot scenes, gates).
@@ -64,8 +64,8 @@ Under the v15R3 freeze:
   inspector plus deterministic pipeable state dumps; `make tui-smoke`.
 - Adversarial headless tests: `f10_long_run` (settle gates incl. run-max),
   `sleep_contact_wake` (first-touch wake + no-churn control), `f11_torture`
-  (fixed-seed config extremes, corruption gates). Suite total: 31/31 green on the v15S head
-  (28 physics + 3 diag-informational; 29/29 on the v15R3 tag).
+  (fixed-seed config extremes, corruption gates). Suite total: 32/32 green on the v15S head
+  (29 physics + 3 diag-informational; 29/29 on the v15R3 tag).
 - Driven-wheel truth: test moved into the resolvable spin regime with
   load-bearing gates (grounded height, rolling coupling, spin cap).
 
