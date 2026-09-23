@@ -21,6 +21,10 @@ int mpe_loader_count(void);
 const char *mpe_loader_path_at(int i);
 /* Module display name of handle i (from its mpe_module_desc), or NULL. */
 const char *mpe_loader_name_at(int i);
+/* Resolve an exported symbol from a loaded handle (path, module name, or
+ * ecosystem name). RTLD_NOLOAD: never loads, only resolves. NULL when
+ * unknown — for terminal-driven plugin APIs (ftc/eco commands). */
+void *mpe_loader_symbol(const char *path_or_name, const char *sym);
 /* World attachment accounting prevents dlclose while a world can still call
  * a module callback. Static (non-dlopen) descriptors are harmless no-ops.
  * Matched by module NAME (registry copies vs .so originals differ). */

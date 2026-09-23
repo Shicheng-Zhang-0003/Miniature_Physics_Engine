@@ -168,6 +168,22 @@ int mfs_internal_module_detach(const char *name, physics_world *world) {
     return rc;
 }
 
+void *mfs_internal_module_state_for(const void *world, const char *name) {
+    if (!world || !name) return 0;
+    pthread_mutex_lock(&s_mfs_lock);
+    void *out = 0;
+    for (int i = 0; i < 8; i++) {
+        if (s_internal_modules[i].desc && s_internal_modules[i].attached &&
+            s_internal_modules[i].world == world &&
+            strcmp(s_internal_modules[i].desc->name, name) == 0) {
+            out = s_internal_modules[i].state;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&s_mfs_lock);
+    return out;
+}
+
 void *mfs_internal_module_state(const char *name) {
     if (!name) return 0;
     pthread_mutex_lock(&s_mfs_lock);
