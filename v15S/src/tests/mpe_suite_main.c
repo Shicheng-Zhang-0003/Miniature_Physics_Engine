@@ -96,6 +96,7 @@ int mpe_t_f11_torture(void);
 int mpe_t_frustum(void);
 int mpe_t_module(void);
 int mpe_t_loader_lifecycle(void);
+int mpe_t_ftc_ecosystem(void);
 
 typedef struct {
     const char *name;
@@ -135,6 +136,7 @@ static const mpe_entry_t mpe_registry[] = {
     {"frustum", mpe_t_frustum, 1},
     {"module", mpe_t_module, 0},
     {"loader_lifecycle", mpe_t_loader_lifecycle, 0},
+    {"ftc_ecosystem", mpe_t_ftc_ecosystem, 0},
 };
 
 #define MPE_NTESTS ((int)(sizeof(mpe_registry) / sizeof(mpe_registry[0])))

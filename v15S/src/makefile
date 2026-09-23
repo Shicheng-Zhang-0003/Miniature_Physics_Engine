@@ -328,10 +328,14 @@ plugins/mpe_capsule.so: plugins/mpe_capsule.c core/mpe_module.h core/mpe_registr
 # One binary, exact-name dispatch, shared builders (no 30x core recompile).
 # Links core + spring physics + scene I/O (stubs for scene_init/camera live
 # in tests/mpe_suite_main.c). Replaces the 30-binary v1 layout over time.
-MPE_SUITE_SRCS := tests/mpe_suite_main.c tests/mpe_suite_a.c tests/mpe_suite_b.c tests/mpe_suite_c.c tests/mpe_suite_loader.c
+MPE_SUITE_SRCS := tests/mpe_suite_main.c tests/mpe_suite_a.c tests/mpe_suite_b.c tests/mpe_suite_c.c tests/mpe_suite_loader.c tests/mpe_suite_ftc.c
 MPE_SUITE_DEPS := $(MPE_TEST_CORE) $(SPRING_TEST_SRCS) $(SCENE_TEST_SRCS)
-build_suite: $(MPE_SUITE_SRCS) $(MPE_SUITE_DEPS)
+# The ftc_ecosystem test needs the bundle fixture: build it first.
+build_suite: $(MPE_SUITE_SRCS) $(MPE_SUITE_DEPS) ecosystem/mfs/mfs_ecosystem.so plugins/mpe_capsule.so
 	$(CC) $(CFLAGS) -rdynamic $(MPE_SUITE_SRCS) $(MPE_TEST_CORE) $(SPRING_TEST_SRCS) $(SCENE_TEST_SRCS) $(MPE_TEST_LIBS) $(shell pkg-config --libs epoxy) -o test_mpe_suite
+
+ecosystem/mfs/mfs_ecosystem.so:
+	$(MAKE) -C ecosystem/mfs mfs_ecosystem.so
 test_suite: build_suite
 	./test_mpe_suite
 test_suite_all: build_suite
