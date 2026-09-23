@@ -86,10 +86,10 @@ static void mv_set_line(int index, const char *text) {
     }
     /* Enforce max line length (TERM-010): truncate instead of overflowing. */
     if (text && strlen(text) >= (size_t) mv_max_line_len) {
-        char *tmp = g_strndup(text, mv_max_line_len - 1);
-        mv.lines[index] = tmp ? tmp : g_strdup("");
+        char *tmp = term_strndup(text, mv_max_line_len - 1);
+        mv.lines[index] = tmp ? tmp : term_strdup("");
     } else {
-        mv.lines[index] = g_strdup(text ? text : "");
+        mv.lines[index] = term_strdup(text ? text : "");
     }
 }
 
@@ -99,10 +99,10 @@ static void mv_insert_line(int index, const char *text) {
         mv.lines[i] = mv.lines[i - 1];
     }
     if (text && strlen(text) >= (size_t) mv_max_line_len) {
-        char *tmp = g_strndup(text, mv_max_line_len - 1);
-        mv.lines[index] = tmp ? tmp : g_strdup("");
+        char *tmp = term_strndup(text, mv_max_line_len - 1);
+        mv.lines[index] = tmp ? tmp : term_strdup("");
     } else {
-        mv.lines[index] = g_strdup(text ? text : "");
+        mv.lines[index] = term_strdup(text ? text : "");
     }
     mv.line_count++;
 }
@@ -163,7 +163,7 @@ static void mv_undo_push(void) {
     mv_snapshot *snap = &mv.undo_stack[mv.undo_top];
     snap->lines = (char **) malloc((size_t) mv.line_count * sizeof(char *));
     for (int i = 0; i < mv.line_count; i++) {
-        snap->lines[i] = g_strdup(mv.lines[i]);
+        snap->lines[i] = term_strdup(mv.lines[i]);
     }
     snap->line_count = mv.line_count;
     snap->line_capacity = mv.line_count;
@@ -179,7 +179,7 @@ static void mv_undo_perform(void) {
     mv_clear_lines();
     mv_ensure_capacity(snap->line_count);
     for (int i = 0; i < snap->line_count; i++) {
-        mv.lines[i] = g_strdup(snap->lines[i]);
+        mv.lines[i] = term_strdup(snap->lines[i]);
     }
     mv.line_count = snap->line_count;
     mv.undo_top--;
@@ -195,7 +195,7 @@ static void mv_redo_perform(void) {
     mv_clear_lines();
     mv_ensure_capacity(snap->line_count);
     for (int i = 0; i < snap->line_count; i++) {
-        mv.lines[i] = g_strdup(snap->lines[i]);
+        mv.lines[i] = term_strdup(snap->lines[i]);
     }
     mv.line_count = snap->line_count;
     mv.undo_top++;
@@ -354,7 +354,7 @@ static void mv_search_execute(bool forward) {
     }
     /* Lower pattern once instead of per-line per-attempt (old code allocated
      * two strings per line scanned). */
-    char *pattern_lower = g_ascii_strdown(mv.search_buf, -1);
+    char *pattern_lower = term_ascii_strdown(mv.search_buf);
     if (!pattern_lower) {
         return;
     }
@@ -373,7 +373,7 @@ static void mv_search_execute(bool forward) {
             for (size_t i = 0; i + pat_len <= line_len; i++) {
                 bool eq = true;
                 for (size_t k = 0; k < pat_len; k++) {
-                    if (g_ascii_tolower(line[i + k]) != pattern_lower[k]) {
+                    if (term_ascii_tolower(line[i + k]) != pattern_lower[k]) {
                         eq = false;
                         break;
                     }
@@ -391,7 +391,7 @@ static void mv_search_execute(bool forward) {
                         for (size_t j = (size_t)(mv.cursor_col + 1); j + pat_len <= line_len; j++) {
                             bool eq2 = true;
                             for (size_t k = 0; k < pat_len; k++) {
-                                if (g_ascii_tolower(line[j + k]) != pattern_lower[k]) {
+                                if (term_ascii_tolower(line[j + k]) != pattern_lower[k]) {
                                     eq2 = false;
                                     break;
                                 }
@@ -412,13 +412,13 @@ static void mv_search_execute(bool forward) {
                     }
                     mv.cursor_row = row;
                     mv.cursor_col = (int) (match - line);
-                    g_free(pattern_lower);
+                    free(pattern_lower);
                     return;
                 }
             }
         }
     }
-    g_free(pattern_lower);
+    free(pattern_lower);
 }
 
 /* ------------------------------------------------------------------ */
@@ -456,7 +456,7 @@ static void mv_delete_line_op(void) {
     if (mv.yank_text) {
         free(mv.yank_text);
     }
-    mv.yank_text = g_strdup(mv.lines[mv.cursor_row]);
+    mv.yank_text = term_strdup(mv.lines[mv.cursor_row]);
     mv.yank_is_linewise = true;
     mv_delete_line(mv.cursor_row);
     mv.modified = true;
@@ -474,7 +474,7 @@ static void mv_delete_to_end(void) {
     if (mv.yank_text) {
         free(mv.yank_text);
     }
-    mv.yank_text = g_strdup(mv.lines[row] + col);
+    mv.yank_text = term_strdup(mv.lines[row] + col);
     mv.yank_is_linewise = false;
     mv.lines[row][col] = '\0';
     mv.modified = true;
@@ -491,9 +491,9 @@ static void mv_delete_to_start(void) {
     if (mv.yank_text) {
         free(mv.yank_text);
     }
-    mv.yank_text = g_strndup(mv.lines[row], col);
+    mv.yank_text = term_strndup(mv.lines[row], col);
     mv.yank_is_linewise = false;
-    char *new_line = g_strdup(mv.lines[row] + col);
+    char *new_line = term_strdup(mv.lines[row] + col);
     free(mv.lines[row]);
     mv.lines[row] = new_line;
     mv.cursor_col = 0;
@@ -504,7 +504,7 @@ static void mv_yank_line(void) {
     if (mv.yank_text) {
         free(mv.yank_text);
     }
-    mv.yank_text = g_strdup(mv.lines[mv.cursor_row]);
+    mv.yank_text = term_strdup(mv.lines[mv.cursor_row]);
     mv.yank_is_linewise = true;
 }
 
@@ -544,9 +544,9 @@ static void mv_join_lines(void) {
     }
     mv_undo_push();
     int len_a = mv_line_len(mv.cursor_row);
-    char *joined = g_strdup_printf("%s %s", mv.lines[mv.cursor_row], mv.lines[mv.cursor_row + 1]);
+    char *joined = term_format("%s %s", mv.lines[mv.cursor_row], mv.lines[mv.cursor_row + 1]);
     mv_set_line(mv.cursor_row, joined);
-    g_free(joined);
+    free(joined);
     mv_delete_line(mv.cursor_row + 1);
     mv.cursor_col = len_a;
     mv.modified = true;
@@ -574,10 +574,10 @@ static void mv_insert_char(char c) {
 static void mv_insert_newline(void) {
     int row = mv.cursor_row;
     int col = mv.cursor_col;
-    char *second_half = g_strdup(mv.lines[row] + col);
+    char *second_half = term_strdup(mv.lines[row] + col);
     mv.lines[row][col] = '\0';
     mv_insert_line(row + 1, second_half);
-    g_free(second_half);
+    free(second_half);
     mv.cursor_row++;
     mv.cursor_col = 0;
     mv.modified = true;
@@ -589,9 +589,9 @@ static void mv_backspace(void) {
     } else if (mv.cursor_row > 0) {
         mv_undo_push();
         int prev_len = mv_line_len(mv.cursor_row - 1);
-        char *joined = g_strdup_printf("%s%s", mv.lines[mv.cursor_row - 1], mv.lines[mv.cursor_row]);
+        char *joined = term_format("%s%s", mv.lines[mv.cursor_row - 1], mv.lines[mv.cursor_row]);
         mv_set_line(mv.cursor_row - 1, joined);
-        g_free(joined);
+        free(joined);
         mv_delete_line(mv.cursor_row);
         mv.cursor_row--;
         mv.cursor_col = prev_len;
@@ -669,8 +669,8 @@ setting a flag that microvim_render will pick up */
                 }
             }
             char *line = mv.lines[mv.cursor_row];
-            char *lower_line = g_ascii_strdown(line, -1);
-            char *lower_old = g_ascii_strdown(p1, -1);
+            char *lower_line = term_ascii_strdown(line);
+            char *lower_old = term_ascii_strdown(p1);
             char *match = strstr(lower_line, lower_old);
             if (match) {
                 mv_undo_push();
@@ -690,8 +690,8 @@ setting a flag that microvim_render will pick up */
                     if (!global_replace) {
                         break;
                     }
-                    g_free(lower_line);
-                    lower_line = g_ascii_strdown(mv.lines[mv.cursor_row], -1);
+                    free(lower_line);
+                    lower_line = term_ascii_strdown(mv.lines[mv.cursor_row]);
                     pos += new_len;
                     match = strstr(lower_line + pos, lower_old);
                     if (match) {
@@ -699,8 +699,8 @@ setting a flag that microvim_render will pick up */
                     }
                 } while (match);
             }
-            g_free(lower_line);
-            g_free(lower_old);
+            free(lower_line);
+            free(lower_old);
         }
         mv.mode = mv_normal;
     } else if (isdigit((unsigned char) cmd[0])) {
@@ -726,7 +726,7 @@ setting a flag that microvim_render will pick up */
 /* ------------------------------------------------------------------ */
 static void mv_handle_normal_key(guint keyval, guint keycode, GdkModifierType state) {
     (void) keycode;
-    guint key = keyval;
+    unsigned key = keyval;
     bool ctrl = (state & GDK_CONTROL_MASK) != 0;
 
     if (ctrl) {
@@ -1024,7 +1024,7 @@ static void mv_handle_normal_key(guint keyval, guint keycode, GdkModifierType st
 static void mv_handle_insert_key(guint keyval, guint keycode, GdkModifierType state) {
     (void) keycode;
     (void) state;
-    guint key = keyval;
+    unsigned key = keyval;
     if (key == GDK_KEY_Escape) {
         mv.mode = mv_normal;
         if (mv.cursor_col > 0) {
@@ -1104,7 +1104,7 @@ static void mv_handle_insert_key(guint keyval, guint keycode, GdkModifierType st
 static void mv_handle_command_key(guint keyval, guint keycode, GdkModifierType state) {
     (void) keycode;
     (void) state;
-    guint key = keyval;
+    unsigned key = keyval;
     if (key == GDK_KEY_Escape) {
         mv.mode = mv_normal;
         mv.command_len = 0;
@@ -1131,7 +1131,7 @@ static void mv_handle_command_key(guint keyval, guint keycode, GdkModifierType s
 static void mv_handle_search_key(guint keyval, guint keycode, GdkModifierType state) {
     (void) keycode;
     (void) state;
-    guint key = keyval;
+    unsigned key = keyval;
     if (key == GDK_KEY_Escape) {
         mv.mode = mv_normal;
         return;
@@ -1457,10 +1457,10 @@ static void mv_set_line(int index, const char *text) {
     }
     /* Enforce max line length (TERM-010): truncate instead of overflowing. */
     if (text && strlen(text) >= (size_t) mv_max_line_len) {
-        char *tmp = g_strndup(text, mv_max_line_len - 1);
-        mv.lines[index] = tmp ? tmp : g_strdup("");
+        char *tmp = term_strndup(text, mv_max_line_len - 1);
+        mv.lines[index] = tmp ? tmp : term_strdup("");
     } else {
-        mv.lines[index] = g_strdup(text ? text : "");
+        mv.lines[index] = term_strdup(text ? text : "");
     }
 }
 
@@ -1470,10 +1470,10 @@ static void mv_insert_line(int index, const char *text) {
         mv.lines[i] = mv.lines[i - 1];
     }
     if (text && strlen(text) >= (size_t) mv_max_line_len) {
-        char *tmp = g_strndup(text, mv_max_line_len - 1);
-        mv.lines[index] = tmp ? tmp : g_strdup("");
+        char *tmp = term_strndup(text, mv_max_line_len - 1);
+        mv.lines[index] = tmp ? tmp : term_strdup("");
     } else {
-        mv.lines[index] = g_strdup(text ? text : "");
+        mv.lines[index] = term_strdup(text ? text : "");
     }
     mv.line_count++;
 }
@@ -1534,7 +1534,7 @@ static void mv_undo_push(void) {
     mv_snapshot *snap = &mv.undo_stack[mv.undo_top];
     snap->lines = (char **) malloc((size_t) mv.line_count * sizeof(char *));
     for (int i = 0; i < mv.line_count; i++) {
-        snap->lines[i] = g_strdup(mv.lines[i]);
+        snap->lines[i] = term_strdup(mv.lines[i]);
     }
     snap->line_count = mv.line_count;
     snap->line_capacity = mv.line_count;
@@ -1550,7 +1550,7 @@ static void mv_undo_perform(void) {
     mv_clear_lines();
     mv_ensure_capacity(snap->line_count);
     for (int i = 0; i < snap->line_count; i++) {
-        mv.lines[i] = g_strdup(snap->lines[i]);
+        mv.lines[i] = term_strdup(snap->lines[i]);
     }
     mv.line_count = snap->line_count;
     mv.undo_top--;
@@ -1566,7 +1566,7 @@ static void mv_redo_perform(void) {
     mv_clear_lines();
     mv_ensure_capacity(snap->line_count);
     for (int i = 0; i < snap->line_count; i++) {
-        mv.lines[i] = g_strdup(snap->lines[i]);
+        mv.lines[i] = term_strdup(snap->lines[i]);
     }
     mv.line_count = snap->line_count;
     mv.undo_top++;
@@ -1725,7 +1725,7 @@ static void mv_search_execute(bool forward) {
     }
     /* Lower pattern once instead of per-line per-attempt (old code allocated
      * two strings per line scanned). */
-    char *pattern_lower = g_ascii_strdown(mv.search_buf, -1);
+    char *pattern_lower = term_ascii_strdown(mv.search_buf);
     if (!pattern_lower) {
         return;
     }
@@ -1744,7 +1744,7 @@ static void mv_search_execute(bool forward) {
             for (size_t i = 0; i + pat_len <= line_len; i++) {
                 bool eq = true;
                 for (size_t k = 0; k < pat_len; k++) {
-                    if (g_ascii_tolower(line[i + k]) != pattern_lower[k]) {
+                    if (term_ascii_tolower(line[i + k]) != pattern_lower[k]) {
                         eq = false;
                         break;
                     }
@@ -1762,7 +1762,7 @@ static void mv_search_execute(bool forward) {
                         for (size_t j = (size_t)(mv.cursor_col + 1); j + pat_len <= line_len; j++) {
                             bool eq2 = true;
                             for (size_t k = 0; k < pat_len; k++) {
-                                if (g_ascii_tolower(line[j + k]) != pattern_lower[k]) {
+                                if (term_ascii_tolower(line[j + k]) != pattern_lower[k]) {
                                     eq2 = false;
                                     break;
                                 }
@@ -1783,13 +1783,13 @@ static void mv_search_execute(bool forward) {
                     }
                     mv.cursor_row = row;
                     mv.cursor_col = (int) (match - line);
-                    g_free(pattern_lower);
+                    free(pattern_lower);
                     return;
                 }
             }
         }
     }
-    g_free(pattern_lower);
+    free(pattern_lower);
 }
 
 /* ------------------------------------------------------------------ */
@@ -1827,7 +1827,7 @@ static void mv_delete_line_op(void) {
     if (mv.yank_text) {
         free(mv.yank_text);
     }
-    mv.yank_text = g_strdup(mv.lines[mv.cursor_row]);
+    mv.yank_text = term_strdup(mv.lines[mv.cursor_row]);
     mv.yank_is_linewise = true;
     mv_delete_line(mv.cursor_row);
     mv.modified = true;
@@ -1845,7 +1845,7 @@ static void mv_delete_to_end(void) {
     if (mv.yank_text) {
         free(mv.yank_text);
     }
-    mv.yank_text = g_strdup(mv.lines[row] + col);
+    mv.yank_text = term_strdup(mv.lines[row] + col);
     mv.yank_is_linewise = false;
     mv.lines[row][col] = '\0';
     mv.modified = true;
@@ -1862,9 +1862,9 @@ static void mv_delete_to_start(void) {
     if (mv.yank_text) {
         free(mv.yank_text);
     }
-    mv.yank_text = g_strndup(mv.lines[row], col);
+    mv.yank_text = term_strndup(mv.lines[row], col);
     mv.yank_is_linewise = false;
-    char *new_line = g_strdup(mv.lines[row] + col);
+    char *new_line = term_strdup(mv.lines[row] + col);
     free(mv.lines[row]);
     mv.lines[row] = new_line;
     mv.cursor_col = 0;
@@ -1875,7 +1875,7 @@ static void mv_yank_line(void) {
     if (mv.yank_text) {
         free(mv.yank_text);
     }
-    mv.yank_text = g_strdup(mv.lines[mv.cursor_row]);
+    mv.yank_text = term_strdup(mv.lines[mv.cursor_row]);
     mv.yank_is_linewise = true;
 }
 
@@ -1915,9 +1915,9 @@ static void mv_join_lines(void) {
     }
     mv_undo_push();
     int len_a = mv_line_len(mv.cursor_row);
-    char *joined = g_strdup_printf("%s %s", mv.lines[mv.cursor_row], mv.lines[mv.cursor_row + 1]);
+    char *joined = term_format("%s %s", mv.lines[mv.cursor_row], mv.lines[mv.cursor_row + 1]);
     mv_set_line(mv.cursor_row, joined);
-    g_free(joined);
+    free(joined);
     mv_delete_line(mv.cursor_row + 1);
     mv.cursor_col = len_a;
     mv.modified = true;
@@ -1945,10 +1945,10 @@ static void mv_insert_char(char c) {
 static void mv_insert_newline(void) {
     int row = mv.cursor_row;
     int col = mv.cursor_col;
-    char *second_half = g_strdup(mv.lines[row] + col);
+    char *second_half = term_strdup(mv.lines[row] + col);
     mv.lines[row][col] = '\0';
     mv_insert_line(row + 1, second_half);
-    g_free(second_half);
+    free(second_half);
     mv.cursor_row++;
     mv.cursor_col = 0;
     mv.modified = true;
@@ -1960,9 +1960,9 @@ static void mv_backspace(void) {
     } else if (mv.cursor_row > 0) {
         mv_undo_push();
         int prev_len = mv_line_len(mv.cursor_row - 1);
-        char *joined = g_strdup_printf("%s%s", mv.lines[mv.cursor_row - 1], mv.lines[mv.cursor_row]);
+        char *joined = term_format("%s%s", mv.lines[mv.cursor_row - 1], mv.lines[mv.cursor_row]);
         mv_set_line(mv.cursor_row - 1, joined);
-        g_free(joined);
+        free(joined);
         mv_delete_line(mv.cursor_row);
         mv.cursor_row--;
         mv.cursor_col = prev_len;
@@ -2040,8 +2040,8 @@ setting a flag that microvim_render will pick up */
                 }
             }
             char *line = mv.lines[mv.cursor_row];
-            char *lower_line = g_ascii_strdown(line, -1);
-            char *lower_old = g_ascii_strdown(p1, -1);
+            char *lower_line = term_ascii_strdown(line);
+            char *lower_old = term_ascii_strdown(p1);
             char *match = strstr(lower_line, lower_old);
             if (match) {
                 mv_undo_push();
@@ -2061,8 +2061,8 @@ setting a flag that microvim_render will pick up */
                     if (!global_replace) {
                         break;
                     }
-                    g_free(lower_line);
-                    lower_line = g_ascii_strdown(mv.lines[mv.cursor_row], -1);
+                    free(lower_line);
+                    lower_line = term_ascii_strdown(mv.lines[mv.cursor_row]);
                     pos += new_len;
                     match = strstr(lower_line + pos, lower_old);
                     if (match) {
@@ -2070,8 +2070,8 @@ setting a flag that microvim_render will pick up */
                     }
                 } while (match);
             }
-            g_free(lower_line);
-            g_free(lower_old);
+            free(lower_line);
+            free(lower_old);
         }
         mv.mode = mv_normal;
     } else if (isdigit((unsigned char) cmd[0])) {

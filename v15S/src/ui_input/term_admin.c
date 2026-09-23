@@ -13,10 +13,10 @@
 #include <time.h>
 #include <strings.h>
 
-static gint64 posix_monotonic_time(void) {
+static int64_t posix_monotonic_time(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (gint64)ts.tv_sec * 1000000LL + ts.tv_nsec / 1000LL;
+    return (int64_t)ts.tv_sec * 1000000LL + ts.tv_nsec / 1000LL;
 }
 bool all_targets_matched_any(int argc, char **argv) {
     for (int i = 2; i < argc; i++) {
@@ -1016,10 +1016,10 @@ void cmd_vi(int argc, char **argv) {
 #include <time.h>
 #include <strings.h>
 
-static gint64 posix_monotonic_time(void) {
+static int64_t posix_monotonic_time(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (gint64)ts.tv_sec * 1000000LL + ts.tv_nsec / 1000LL;
+    return (int64_t)ts.tv_sec * 1000000LL + ts.tv_nsec / 1000LL;
 }
 bool all_targets_matched_any(int argc, char **argv) {
     for (int i = 2; i < argc; i++) {

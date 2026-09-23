@@ -465,7 +465,7 @@ void cmd_grep(int argc, char **argv) {
     char *newline_pos;
     while ((newline_pos = strchr(line_start, '\n')) != NULL) {
         *newline_pos = '\0';
-        if (g_ascii_strncasecmp(line_start, pattern, strlen(pattern)) == 0 || strstr(line_start, pattern) != NULL) {
+        if (term_ascii_strncasecmp(line_start, pattern, strlen(pattern)) == 0 || strstr(line_start, pattern) != NULL) {
             term_printf(NULL, "%s\n", line_start);
             match_count++;
         }
@@ -1114,7 +1114,7 @@ void cmd_grep(int argc, char **argv) {
     char *newline_pos;
     while ((newline_pos = strchr(line_start, '\n')) != NULL) {
         *newline_pos = '\0';
-        if (g_ascii_strncasecmp(line_start, pattern, strlen(pattern)) == 0 || strstr(line_start, pattern) != NULL) {
+        if (term_ascii_strncasecmp(line_start, pattern, strlen(pattern)) == 0 || strstr(line_start, pattern) != NULL) {
             term_printf(NULL, "%s\n", line_start);
             match_count++;
         }

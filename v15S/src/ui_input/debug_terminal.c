@@ -80,7 +80,7 @@ char term_alias_values[term_alias_max][term_alias_value_len];
 int term_alias_count = 0;
 
 bool term_sudo_active = false;
-gint64 term_engine_start_time = 0; /* FIX_029 */
+int64_t term_engine_start_time = 0; /* FIX_029 */
 /* MPE_TASK_V15R2_PHASE7_ALIAS_STORAGE_END */
 
 static void term_append_with_tag(const char *tag_name, const char *text) {
@@ -183,7 +183,7 @@ bool term_str_eq(const char *string_a, const char *string_b) {
     if ((!string_a) || (!string_b)) {
         return false;
     }
-    return g_ascii_strcasecmp(string_a, string_b) == 0;
+    return term_ascii_strcasecmp(string_a, string_b) == 0;
 }
 const char *term_last_path_component(const char *token) {
     if (!token) {
@@ -279,8 +279,11 @@ int term_parse_movement_destination(const char *token, float *x, float *y, float
     if (!token) {
         return 0;
     }
-    char **parts = g_strsplit(token, "/", -1);
+    char **parts = term_strsplit(token, '/');
     int movement_kind = 0;
+    if (!parts) {
+        return 0;
+    }
     for (int part_index = 0; parts[part_index]; part_index++) {
         if (term_str_eq(parts[part_index], "pos") || term_str_eq(parts[part_index], "vel")) {
             if ((!parts[part_index + 1]) || (!parts[part_index + 2]) || (!parts[part_index + 3])) {
@@ -303,7 +306,7 @@ int term_parse_movement_destination(const char *token, float *x, float *y, float
             break;
         }
     }
-    g_strfreev(parts);
+    term_strfreev(parts);
     return movement_kind;
 }
 /* GTK4: weak fallback command handlers — real implementations live in
@@ -435,6 +438,8 @@ const terminal_command terminal_commands[] = {
     {"microvim", true, cmd_vi, "microvim [filename]", "open microvim editor"},
     /* MPE_TASK_V15R2_PHASE8_TABLE_END */
     {"mod", true, cmd_mod, "mod ls|load|unload|attach|detach|use-*", "hot plug physics modules"},
+    {"eco", true, cmd_eco, "eco ls|attach|detach|command|config", "drive ecosystem bundles"},
+    {"ftc", true, cmd_ftc, "ftc spawn|list|drive|telemetry|preset", "drive FTC robots"},
 };
 const size_t terminal_command_count = sizeof(terminal_commands) / sizeof(terminal_commands[0]);
 
@@ -461,7 +466,7 @@ void term_execute(char *command_line) {
         }
         first_word[word_index] = '\0';
         for (int alias_index = 0; alias_index < term_alias_count; alias_index++) {
-            if (g_ascii_strcasecmp(first_word, term_alias_names[alias_index]) == 0) {
+            if (term_ascii_strcasecmp(first_word, term_alias_names[alias_index]) == 0) {
                 static char expanded_command[2048];
                 int ew = snprintf(expanded_command, sizeof(expanded_command), "%s%s", term_alias_values[alias_index], scan);
                 if (ew < 0 || (size_t)ew >= sizeof(expanded_command)) { term_err("mpe: alias expansion too long, refused\n"); break; }
@@ -478,11 +483,11 @@ void term_execute(char *command_line) {
     term_out("\n");
     int argument_count = 0;
     char **argument_vector = NULL;
-    GError *parse_error = NULL;
-    if (!g_shell_parse_argv(command_line, &argument_count, &argument_vector, &parse_error)) {
-        if (parse_error) {
-            term_printf("term_err", "mpe: %s\n", parse_error->message);
-            g_clear_error(&parse_error);
+    char parse_errbuf[256] = {0};
+    if (!term_parse_argv(command_line, &argument_count, &argument_vector, parse_errbuf,
+                         sizeof(parse_errbuf))) {
+        if (parse_errbuf[0]) {
+            term_printf("term_err", "mpe: %s\n", parse_errbuf);
         } else {
             term_err("mpe: parse error\n");
         }
@@ -490,7 +495,7 @@ void term_execute(char *command_line) {
     }
     if (argument_count <= 0) {
         if (argument_vector) {
-            g_strfreev(argument_vector);
+            term_strfreev(argument_vector);
         }
         return;
     }
@@ -503,16 +508,16 @@ void term_execute(char *command_line) {
     }
     if (!found_command) {
         term_printf("term_err", "mpe: %s: command not found\n", argument_vector[0]);
-        g_strfreev(argument_vector);
+        term_strfreev(argument_vector);
         return;
     }
     if ((found_command->mutates) && (!main_inputs.is_debug_mode_active) && (!term_sudo_active)) {
         term_printf("term_err", "mpe: %s: Permission denied (switch to debug mode with 0)\n", found_command->name);
-        g_strfreev(argument_vector);
+        term_strfreev(argument_vector);
         return;
     }
     found_command->handler(argument_count, argument_vector);
-    g_strfreev(argument_vector);
+    term_strfreev(argument_vector);
 }
 /* ------------------------------------------------------------------ */
 /* GTK signals — GTK4 (GtkEventControllerKey)                          */
@@ -578,8 +583,8 @@ static gboolean on_terminal_window_key_pressed(GtkEventControllerKey *controller
     if (microvim_is_active()) {
         if ((keyval == GDK_KEY_Escape) && (microvim_get_mode() == mv_normal)) {
             /* Double-escape in normal mode exits editor */
-            static gint64 last_escape_time = 0;
-            gint64 now = g_get_monotonic_time();
+            static int64_t last_escape_time = 0;
+            int64_t now = term_monotonic_us();
             if ((now - last_escape_time) < 500000) {
                 microvim_close();
                 if (terminal_entry) {
@@ -785,7 +790,7 @@ void debug_terminal_open(GtkWidget *parent_window) {
     term_update_prompt();
     debug_terminal_sync_mode();
     if (term_engine_start_time == 0) {
-        term_engine_start_time = g_get_monotonic_time();
+        term_engine_start_time = term_monotonic_us();
     } /* FIX_029 */
     term_printf("term_echo", "MPE POSIX Debug Terminal %s\n", a3_version_string);
     term_out("Virtual root: /obj /joint /world /camera /spawner\n");
@@ -875,7 +880,7 @@ char term_alias_values[term_alias_max][term_alias_value_len];
 int term_alias_count = 0;
 
 bool term_sudo_active = false;
-gint64 term_engine_start_time = 0; /* FIX_029 */
+int64_t term_engine_start_time = 0; /* FIX_029 */
 /* MPE_TASK_V15R2_PHASE7_ALIAS_STORAGE_END */
 
 static void term_append_with_tag(const char *tag_name, const char *text) {
@@ -978,7 +983,7 @@ bool term_str_eq(const char *string_a, const char *string_b) {
     if ((!string_a) || (!string_b)) {
         return false;
     }
-    return g_ascii_strcasecmp(string_a, string_b) == 0;
+    return term_ascii_strcasecmp(string_a, string_b) == 0;
 }
 const char *term_last_path_component(const char *token) {
     if (!token) {
@@ -1074,8 +1079,11 @@ int term_parse_movement_destination(const char *token, float *x, float *y, float
     if (!token) {
         return 0;
     }
-    char **parts = g_strsplit(token, "/", -1);
+    char **parts = term_strsplit(token, '/');
     int movement_kind = 0;
+    if (!parts) {
+        return 0;
+    }
     for (int part_index = 0; parts[part_index]; part_index++) {
         if (term_str_eq(parts[part_index], "pos") || term_str_eq(parts[part_index], "vel")) {
             if ((!parts[part_index + 1]) || (!parts[part_index + 2]) || (!parts[part_index + 3])) {
@@ -1098,7 +1106,7 @@ int term_parse_movement_destination(const char *token, float *x, float *y, float
             break;
         }
     }
-    g_strfreev(parts);
+    term_strfreev(parts);
     return movement_kind;
 }
 /* Command declarations moved to term_priv.h. */
@@ -1201,6 +1209,8 @@ const terminal_command terminal_commands[] = {
     {"microvim", true, cmd_vi, "microvim [filename]", "open microvim editor"},
     /* MPE_TASK_V15R2_PHASE8_TABLE_END */
     {"mod", true, cmd_mod, "mod ls|load|unload|attach|detach|use-*", "hot plug physics modules"},
+    {"eco", true, cmd_eco, "eco ls|attach|detach|command|config", "drive ecosystem bundles"},
+    {"ftc", true, cmd_ftc, "ftc spawn|list|drive|telemetry|preset", "drive FTC robots"},
 };
 const size_t terminal_command_count = sizeof(terminal_commands) / sizeof(terminal_commands[0]);
 
@@ -1227,7 +1237,7 @@ void term_execute(char *command_line) {
         }
         first_word[word_index] = '\0';
         for (int alias_index = 0; alias_index < term_alias_count; alias_index++) {
-            if (g_ascii_strcasecmp(first_word, term_alias_names[alias_index]) == 0) {
+            if (term_ascii_strcasecmp(first_word, term_alias_names[alias_index]) == 0) {
                 static char expanded_command[2048];
                 int ew = snprintf(expanded_command, sizeof(expanded_command), "%s%s", term_alias_values[alias_index], scan);
                 if (ew < 0 || (size_t)ew >= sizeof(expanded_command)) { term_err("mpe: alias expansion too long, refused\n"); break; }
@@ -1244,11 +1254,11 @@ void term_execute(char *command_line) {
     term_out("\n");
     int argument_count = 0;
     char **argument_vector = NULL;
-    GError *parse_error = NULL;
-    if (!g_shell_parse_argv(command_line, &argument_count, &argument_vector, &parse_error)) {
-        if (parse_error) {
-            term_printf("term_err", "mpe: %s\n", parse_error->message);
-            g_clear_error(&parse_error);
+    char parse_errbuf[256] = {0};
+    if (!term_parse_argv(command_line, &argument_count, &argument_vector, parse_errbuf,
+                         sizeof(parse_errbuf))) {
+        if (parse_errbuf[0]) {
+            term_printf("term_err", "mpe: %s\n", parse_errbuf);
         } else {
             term_err("mpe: parse error\n");
         }
@@ -1256,7 +1266,7 @@ void term_execute(char *command_line) {
     }
     if (argument_count <= 0) {
         if (argument_vector) {
-            g_strfreev(argument_vector);
+            term_strfreev(argument_vector);
         }
         return;
     }
@@ -1269,16 +1279,16 @@ void term_execute(char *command_line) {
     }
     if (!found_command) {
         term_printf("term_err", "mpe: %s: command not found\n", argument_vector[0]);
-        g_strfreev(argument_vector);
+        term_strfreev(argument_vector);
         return;
     }
     if ((found_command->mutates) && (!main_inputs.is_debug_mode_active) && (!term_sudo_active)) {
         term_printf("term_err", "mpe: %s: Permission denied (switch to debug mode with 0)\n", found_command->name);
-        g_strfreev(argument_vector);
+        term_strfreev(argument_vector);
         return;
     }
     found_command->handler(argument_count, argument_vector);
-    g_strfreev(argument_vector);
+    term_strfreev(argument_vector);
 }
 /* ------------------------------------------------------------------ */
 /* GTK signals                                                         */
@@ -1335,8 +1345,8 @@ static gboolean on_terminal_window_keypress(GtkWidget *widget, GdkEventKey *even
     if (microvim_is_active()) {
         if ((event->keyval == GDK_KEY_Escape) && (microvim_get_mode() == mv_normal)) {
             /* Double-escape in normal mode exits editor */
-            static gint64 last_escape_time = 0;
-            gint64 now = g_get_monotonic_time();
+            static int64_t last_escape_time = 0;
+            int64_t now = term_monotonic_us();
             if ((now - last_escape_time) < 500000) {
                 microvim_close();
                 if (terminal_entry) {
@@ -1487,7 +1497,7 @@ void debug_terminal_open(GtkWidget *parent_window) {
     term_update_prompt();
     debug_terminal_sync_mode();
     if (term_engine_start_time == 0) {
-        term_engine_start_time = g_get_monotonic_time();
+        term_engine_start_time = term_monotonic_us();
     } /* FIX_029 */
     term_printf("term_echo", "MPE POSIX Debug Terminal %s\n", a3_version_string);
     term_out("Virtual root: /obj /joint /world /camera /spawner\n");
