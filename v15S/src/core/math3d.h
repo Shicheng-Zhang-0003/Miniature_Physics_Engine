@@ -185,10 +185,10 @@ static inline math3 vector4_to_math3(vector4 quaternion) {
      * accumulation overflows to Inf for ~1e20 components, diverging from
      * the double path at extremes. */
     double n2_d = (double) quaternion.w * (double) quaternion.w + (double) quaternion.x * (double) quaternion.x +
-                  (double) quaternion.y * (double) quaternion.y + (double) quaternion.z * (double) quaternion.z;
-    float n2 = (n2_d > (double) FLT_MAX) ? INFINITY : (float) n2_d;
-    if (isfinite(n2) && (n2 > 1e-12f)) {
-        float inv = 1.0f / sqrtf(n2);
+                   (double) quaternion.y * (double) quaternion.y + (double) quaternion.z * (double) quaternion.z;
+    if (isfinite(n2_d) && (n2_d > 1e-12)) {
+        double inv_d = 1.0 / sqrt(n2_d);
+        float inv = (float)inv_d;
         quaternion.w *= inv;
         quaternion.x *= inv;
         quaternion.y *= inv;

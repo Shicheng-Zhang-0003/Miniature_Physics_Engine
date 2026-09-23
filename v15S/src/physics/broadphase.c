@@ -266,16 +266,20 @@ static void broadphase_update_cell_size(struct physics_world *world, rigidbody *
                                                           : ws->cached_body_count - body_count;
     bool count_stable = (ws->cached_body_count > 0) && (count_delta * 10 < ws->cached_body_count);
     if (count_stable && ws->ticks_since_cell_recompute < 60 && ws->current_cell_size > 0.0f) {
-        /* Cheap size-distribution probe: sample up to 16 bodies for avg radius drift. */
-        float probe_sum = 0.0f;
+        /* Cheap size-distribution probe: stratified sample of up to 16 bodies
+         * (hash stride avoids bias when statics/walls sit first). Double
+         * accumulation for exactness. */
+        double probe_sum = 0.0;
         int probe_n = body_count < 16 ? body_count : 16;
         for (int pi = 0; pi < probe_n; pi++) {
-            float pr = broadphase_bounding_radius(&bodies[(pi * body_count) / probe_n]);
+            unsigned pi_u = (unsigned)pi;
+            int idx = (int)(((pi_u * 2654435761u) % (unsigned)body_count));
+            float pr = broadphase_bounding_radius(&bodies[idx]);
             if (isfinite(pr) && pr > 0.0f) {
-                probe_sum += pr;
+                probe_sum += (double)pr;
             }
         }
-        float probe_avg = probe_n > 0 ? probe_sum / (float) probe_n : 0.0f;
+        float probe_avg = probe_n > 0 ? (float)(probe_sum / (double)probe_n) : 0.0f;
         float cached_avg = ws->current_cell_size / C->broadphase.cell_size_multiplier;
         if (cached_avg <= 0.0f) {
             cached_avg = 0.5f;
@@ -288,20 +292,20 @@ static void broadphase_update_cell_size(struct physics_world *world, rigidbody *
     ws->cached_body_count = body_count;
     ws->ticks_since_cell_recompute = 0;
 
-    float radius_sum = 0.0f;
+    double radius_sum = 0.0;
     float max_radius = 0.0f;
 
     for (int object_index = 0; object_index < body_count; object_index++) {
         float object_radius = broadphase_bounding_radius(&bodies[object_index]);
         if ((isfinite(object_radius)) && (object_radius > 0.0f)) {
-            radius_sum += object_radius;
+            radius_sum += (double)object_radius;
             if (object_radius > max_radius) {
                 max_radius = object_radius;
             }
         }
     }
 
-    float average_radius = radius_sum / (float) body_count;
+    float average_radius = (float)(radius_sum / (double)body_count);
     if ((!isfinite(average_radius)) || (average_radius <= 0.0f)) {
         average_radius = 0.5f;
     }
@@ -359,6 +363,7 @@ int broadphase_generate_pairing(struct physics_world *world, broadphase_pair *co
     int collision_pair_counter = 0;
     for (int i = 0; i < body_count; i++) {
         rigidbody *rb = &bodies[i];
+        if (rb->no_collide) continue; /* render-only proxies: never paired */
         float extent_x, extent_y, extent_z;
         if (rb->type == object_sphere) {
             extent_x = extent_y = extent_z = rb->radius;
@@ -409,12 +414,15 @@ int broadphase_generate_pairing(struct physics_world *world, broadphase_pair *co
             if (ang_sweep > 2.0f) {
                 ang_sweep = 2.0f;
             }
+            /* Linear clamp 10m (not 2m): 150m/s*dt=2.5m must still share a
+             * cell; cull sweep (4m) covers only pairs that exist. Cost is
+             * bounded by max_cell_span/node cap. Angular stays 2m. */
             float dx = fabsf(rb->velocity.x) * dt;
             float dy = fabsf(rb->velocity.y) * dt;
             float dz = fabsf(rb->velocity.z) * dt;
-            if (!isfinite(dx) || dx < 0.0f) dx = 0.0f; else if (dx > 2.0f) dx = 2.0f;
-            if (!isfinite(dy) || dy < 0.0f) dy = 0.0f; else if (dy > 2.0f) dy = 2.0f;
-            if (!isfinite(dz) || dz < 0.0f) dz = 0.0f; else if (dz > 2.0f) dz = 2.0f;
+            if (!isfinite(dx) || dx < 0.0f) dx = 0.0f; else if (dx > 10.0f) dx = 10.0f;
+            if (!isfinite(dy) || dy < 0.0f) dy = 0.0f; else if (dy > 10.0f) dy = 10.0f;
+            if (!isfinite(dz) || dz < 0.0f) dz = 0.0f; else if (dz > 10.0f) dz = 10.0f;
             extent_x += dx + ang_sweep;
             extent_y += dy + ang_sweep;
             extent_z += dz + ang_sweep;

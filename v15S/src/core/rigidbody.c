@@ -215,16 +215,18 @@ void rigidbody_sanitize(rigidbody *rigid_body) {
         rigid_body->orientation = vector4_identity();
         needs_inertia_recalc = true;
     } else {
-        float orientation_length_squared = rigid_body->orientation.w * rigid_body->orientation.w +
-                                           rigid_body->orientation.x * rigid_body->orientation.x +
-                                           rigid_body->orientation.y * rigid_body->orientation.y +
-                                           rigid_body->orientation.z * rigid_body->orientation.z;
+        /* Double accumulation (parity with vector4_normalisation): float
+         * overflows to Inf for ~1e20 components and mis-sanitizes. */
+        double orientation_length_squared = (double)rigid_body->orientation.w * (double)rigid_body->orientation.w +
+                                           (double)rigid_body->orientation.x * (double)rigid_body->orientation.x +
+                                           (double)rigid_body->orientation.y * (double)rigid_body->orientation.y +
+                                           (double)rigid_body->orientation.z * (double)rigid_body->orientation.z;
 
         /* FIX-AUDIT: vector4_to_math3 assumes a unit quaternion. The old
          * [0.25,4.0] deadband let |q| up to 2.0 through, scaling R by |q|^2
          * and I_world by |q|^4. Normalize on any meaningful drift. */
-        if (!isfinite(orientation_length_squared) || (fabsf(orientation_length_squared - 1.0f) > 1e-6f)) {
-            if (orientation_length_squared > 1e-12f) {
+        if (!isfinite(orientation_length_squared) || (fabs(orientation_length_squared - 1.0) > 1e-6)) {
+            if (orientation_length_squared > 1e-12) {
                 rigid_body->orientation = vector4_normalisation(rigid_body->orientation);
             } else {
                 rigid_body->orientation = vector4_identity();
@@ -276,6 +278,38 @@ void rigidbody_sanitize(rigidbody *rigid_body) {
         /* AUDIT: axle is local X (see initialisation). */
         rigid_body->half_extensions = (vector3){rigid_body->cylinder_half_length, rigid_body->radius,
                                                rigid_body->radius};
+    } else if (rigid_body->type == object_custom) {
+        /* Foreign shapes own their bounding volume: radius stays the
+         * plugin-maintained bounding radius (broadphase-critical), and
+         * MUST NOT be rewritten to |half_extensions| (that inflated every
+         * sphere-backed custom by sqrt(3) and broke capsule cross-sections).
+         * Only validate finiteness/ranges here. */
+        if (!isfinite(rigid_body->half_extensions.x) || (rigid_body->half_extensions.x <= 0.0f)) {
+            rigid_body->half_extensions.x = 0.01f;
+        }
+        if (!isfinite(rigid_body->half_extensions.y) || (rigid_body->half_extensions.y <= 0.0f)) {
+            rigid_body->half_extensions.y = 0.01f;
+        }
+        if (!isfinite(rigid_body->half_extensions.z) || (rigid_body->half_extensions.z <= 0.0f)) {
+            rigid_body->half_extensions.z = 0.01f;
+        }
+        if (!isfinite(rigid_body->radius) || (rigid_body->radius <= 0.0f)) {
+            rigid_body->radius = 0.01f;
+            needs_inertia_recalc = true;
+        }
+        if (rigid_body->radius > 100.0f) {
+            rigid_body->radius = 100.0f;
+            needs_inertia_recalc = true;
+        }
+        if (rigid_body->half_extensions.x > 100.0f) {
+            rigid_body->half_extensions.x = 100.0f;
+        }
+        if (rigid_body->half_extensions.y > 100.0f) {
+            rigid_body->half_extensions.y = 100.0f;
+        }
+        if (rigid_body->half_extensions.z > 100.0f) {
+            rigid_body->half_extensions.z = 100.0f;
+        }
     } else {
         if (!isfinite(rigid_body->half_extensions.x) || (rigid_body->half_extensions.x <= 0.0f)) {
             rigid_body->half_extensions.x = 0.01f;
@@ -432,6 +466,14 @@ void rigidbody_initialisation_sphere(rigidbody *rigid_body, float radius, float 
     if (!rigid_body) {
         return;
     }
+    /* DETERMINISM: zero type-foreign + diagnostic fields. malloc'd bodies
+     * carry heap garbage; cylinder_half_length was never set for spheres,
+     * so twin worlds diverged bitwise depending on heap history (found by
+     * the v2 suite running all tests in one process). */
+    rigid_body->cylinder_half_length = 0.0f;
+    rigid_body->custom_shape = -1;
+    rigid_body->max_relative_speed_sq = 0.0f;
+    rigid_body->no_collide = false;
     if (!isfinite(radius) || radius <= 0.0f) {
         radius = 0.5f;
     }
@@ -754,6 +796,24 @@ void rb_integrate_velocity(rigidbody *rigid_body, float delta_time, float linear
         vector3 list4_gyro_alpha =
         math3_multiplication_vector3(rigid_body->inverse_inertia_system, list4_gyro_torque_world);
 
+        /* Stability guard: explicit Euler on stiff needles
+         * (Ixx<<Iyy) gives |alpha|*dt >> |w|, exploding in one tick.
+         * Cap gyro contribution so |alpha_gyro|*dt <= 0.2*|w|. */
+        {
+            float wlen = vector3_length(rigid_body->angular_velocity);
+            float alen = vector3_length(list4_gyro_alpha);
+            if (isfinite(wlen) && isfinite(alen) && alen > 0.0f && wlen > 0.0f) {
+                float max_alpha = 0.2f * wlen / delta_time;
+                if (alen > max_alpha) {
+                    list4_gyro_alpha = vector3_scaling(list4_gyro_alpha, max_alpha / alen);
+                }
+            } else if ((!isfinite(alen) || alen <= 0.0f) && 0) {
+            }
+            if (!a3_vector3_is_finite(list4_gyro_alpha)) {
+                list4_gyro_alpha = vector3_zero();
+            }
+        }
+
         rigid_body->angular_acceleration =
             vector3_addition(rigid_body->angular_acceleration, list4_gyro_alpha);
     }
@@ -886,6 +946,11 @@ void rigidbody_initialisation_cube(rigidbody *rigid_body, vector3 position_input
     if (!rigid_body) {
         return;
     }
+    /* DETERMINISM: see sphere init — cubes never set cylinder_half_length. */
+    rigid_body->cylinder_half_length = 0.0f;
+    rigid_body->custom_shape = -1;
+    rigid_body->max_relative_speed_sq = 0.0f;
+    rigid_body->no_collide = false;
     if (!isfinite(half_extensions.x) || half_extensions.x <= 0.0f) {
         half_extensions.x = 0.5f;
     }
@@ -1109,6 +1174,10 @@ void rigidbody_initialisation_cylinder(rigidbody *rigid_body, float radius, floa
     if (!rigid_body) {
         return;
     }
+    /* DETERMINISM: foreign-shape + diagnostic fields zeroed (see sphere). */
+    rigid_body->custom_shape = -1;
+    rigid_body->max_relative_speed_sq = 0.0f;
+    rigid_body->no_collide = false;
     if (!isfinite(radius) || radius <= 0.0f) {
         radius = 0.5f;
     }

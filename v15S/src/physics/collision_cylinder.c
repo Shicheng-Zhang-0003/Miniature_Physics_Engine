@@ -251,22 +251,28 @@ bool collision_cylinder_sphere(rigidbody *cyl, rigidbody *sph,
         /* Push out the nearest face: cap vs barrel. */
         float axial_clear = h - fabsf(x);
         float radial_clear = r_c - radial_len;
+        vector3 out_dir;
         if (axial_clear < radial_clear) {
             float s = (x >= 0.0f) ? 1.0f : -1.0f;
-            nrm = vector3_scaling(axis, s); /* cyl -> sphere side */
+            vector3 interior_outward = vector3_scaling(axis, s); /* cyl -> sphere side */
+            nrm = vector3_scaling(interior_outward, -1.0f); /* A->B = inward */
             closest = vector3_addition(cyl->position, vector3_scaling(axis, s * h));
             closest = vector3_addition(closest, radial_vec); /* keep radial offset on cap disc */
+            out_dir = interior_outward; /* position push is outward */
         } else {
-            nrm = radial_dir;
+            vector3 interior_outward = radial_dir;
+            nrm = vector3_scaling(interior_outward, -1.0f); /* A->B = inward */
             if (radial_len <= 1e-9f) {
                 /* Center on axle: pick any perpendicular. */
                 vector3 up = (fabsf(axis.y) < 0.99f) ? (vector3){0.0f, 1.0f, 0.0f}
                                                     : (vector3){1.0f, 0.0f, 0.0f};
-                nrm = vector3_normalisation(vector3_subtraction(
+                interior_outward = vector3_normalisation(vector3_subtraction(
                     up, vector3_scaling(axis, vector3_dot(up, axis))));
+                nrm = vector3_scaling(interior_outward, -1.0f);
             }
             vector3 axle_pt = vector3_addition(cyl->position, vector3_scaling(axis, x));
-            closest = vector3_addition(axle_pt, vector3_scaling(nrm, r_c));
+            closest = vector3_addition(axle_pt, vector3_scaling(interior_outward, r_c));
+            out_dir = interior_outward; /* position push is outward */
         }
         center_dist = 0.0f; /* center inside: gap = -min_clear below */
         float min_clear = (axial_clear < radial_clear) ? axial_clear : radial_clear;
@@ -284,6 +290,10 @@ bool collision_cylinder_sphere(rigidbody *cyl, rigidbody *sph,
         out->contact_count = 1;
         contact_point_data *cp_in = &out->contacts[0];
         cp_in->penetration = (-gap > 0.0f) ? -gap : 0.0f;
+        /* Contact point must lie on the cylinder surface (closest), not
+         * pushed outward by min_clear (which zeroed rb lever arms and
+         * broke pen/dist consistency: |pos-sph| was 2*clear). */
+        (void)out_dir;
         cp_in->position = closest;
         return true;
     }
