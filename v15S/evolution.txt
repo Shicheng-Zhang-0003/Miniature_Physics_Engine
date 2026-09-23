@@ -3,7 +3,7 @@ MPE Evolution Lineage
 
 V0.9-Buffer:  Direct Translation Layer from V1.5RC2 of MPE
 V1.5RC2:      v15R2 — Configuration System (69 tunables, registry, menu)
-MFS:          MPE FTC Simulator — Physics-first pivot (parked in robotics_backup/
+MFS:          MPE FTC Simulator — Physics-first pivot (parked (now consolidated in src/ecosystem/mfs/)
               during the MPE-only run)
               Milestone 1: Foundation & Robotics Core ✅
               Milestone 2: Physics Keystone (cylinders, anisotropic friction) ✅
@@ -31,7 +31,15 @@ Modularity:   MPI hot-plug ABI (shapes, broadphase, solver stages, tick
                command; TUI --broadphase/--solver flags; capsule example.
 Data Layout:  growable bodies/contacts (ceilings kept), O(1) pair probes
                + id cache, islands O(J+B), small-first node pool,
-               process-wide det counters. 30/30 green (29 + module).
+               process-wide det counters. Suite v2 31/31 green
+               (28 physics + 3 diag).
+Modularity2:  lifetime-hardened registry/loader (tombstones, locks,
+               builtin-takeover refusal, busy-unload, dladdr purge,
+               origin-tracked hotload); per-stage mod_state; true segment
+               capsule; no_collide proxies; ecosystem bundles loadable.
+MFS:          tile floors everywhere; implicit motor solve + disturbance
+               observer; torque-derived strafe + odom fusion; PTC fuse;
+               per-world MEI; suite 8 gated + 5 info green.
 Globals:      kernel holds zero sim state; primary owned by
                core/mpe_primary.c (app layer); registry process-global
                by design; UI/diagnostics stay app-global by design.
