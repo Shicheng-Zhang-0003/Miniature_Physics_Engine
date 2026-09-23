@@ -33,6 +33,10 @@ void gui_robot_tick(float dt);
 /* Apply keyboard drive input to all registered robots. */
 void gui_robot_apply_drive(float forward, float strafe, float rotate);
 
+/* Release a slot / release all slots (bodies persist until scene_clear). */
+void gui_robot_despawn(int index);
+void gui_robot_clear(void);
+
 /* Query */
 int gui_robot_get_count(void);
 ftc_robot *gui_robot_get(int index);

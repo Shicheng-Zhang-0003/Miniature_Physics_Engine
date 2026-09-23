@@ -29,15 +29,21 @@ typedef struct {
 
     /* Axle direction in chassis-local space (for reading wheel speed) */
     float axle_axis_x, axle_axis_y, axle_axis_z;
-    /* MPE_FTC_082: mecanum chassis-force fields */
-    vector3 mecanum_chassis_force;
-    float mecanum_chassis_torque;
-    /* MFS_162_DEAD_FIELD: mecanum_active removed */
+    /* (removed: mecanum_chassis_force/torque dead fields, zero uses) */
     ftc_drivetrain_type drivetrain_type; /* MFS_DRIVETRAIN_TYPE */
 
     /* MFS_151_ODOMETRY: Wheel encoders and pose estimation */
     float wheel_radians[FTC_MAX_WHEELS]; /* MFS_163_BOUNDS_FIX: was [4], OOB if wheel_count > 4 */
     float odom_x, odom_z, odom_theta;
+    /* odom_slip: lateral roller thrust bypasses the wheels (direct chassis
+     * force), so wheel encoders are structurally blind to strafe. When the
+     * chassis-derived lateral velocity disagrees with the encoder FK, odom
+     * lateral is fused from chassis motion (dead-wheel equivalent) and
+     * this flag is set. 0 = pure encoders, 1 = fused. */
+    int odom_slip;
+    /* clamp_events: counts ticks where the velocity safety monitor fired
+     * (was a silent 3 m/s hard clamp; now telemetry only). */
+    int clamp_events;
     /* MFS_TRACTION_CONTROL: per-wheel torque scale (1 = full). Cut when
      * slip is detected so a spun-up wheel re-grips instead of sliding
      * forever (kinetic friction alone can never re-capture a wheel whose

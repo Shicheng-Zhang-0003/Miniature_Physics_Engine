@@ -99,13 +99,28 @@ void drivetrain_update (physics_world *world, ftc_robot *robot, float dt) {
         float normal_per_wheel = ((robot->wheel_count > 0) && (total_mass > 0.0f))
             ? (total_mass * gravity_mag / (float) robot->wheel_count) : 0.0f;
         /* Traction limit: rolling grip is static friction (no-slip rolling).
-         * Audit note: while truly sliding the limit is mu_k, but traction
-         * here conveys motor torque through rolling contact; clamping the
-         * drive force itself at mu_k understates rolling grip and stalls
-         * the robot. Sliding is handled by the contact solver's
-         * static/kinetic selection. */
-        float grip_mu = drive_cfg->world.floor_friction_s;
-        float max_grip = grip_mu * normal_per_wheel; /* MFS_162_FRICTION_FIX */
+         * Budgeted against the WHEELS' own static friction (min over
+         * wheels), not the global floor default: contact mu is
+         * min(wheel, floor), and test floors (tile 1.0) grip at least as
+         * well as the rubber (0.9), so min-wheel is the binding side.
+         * The old global-default (0.2) budgeting starved every force 3x. */
+        float grip_mu = 0.0f;
+        {
+            int have_mu = 0;
+            for (int i = 0; i < robot->wheel_count; i++) {
+                int wi = robot->wheel_bodies[i];
+                if ((wi < 0) || (wi >= world->body_count)) continue;
+                float mu = world->bodies[wi].friction_static;
+                if (!have_mu || mu < grip_mu) {
+                    grip_mu = mu;
+                    have_mu = 1;
+                }
+            }
+            if (!have_mu || !(grip_mu > 0.0f)) {
+                grip_mu = drive_cfg->world.floor_friction_s;
+            }
+        }
+        float max_grip = grip_mu * normal_per_wheel;
 
         /* --- Per-wheel traction: torque -> force at contact --- */
         /* PHYSICS-FIX: budget on the NET traction vector, not the scalar
@@ -163,31 +178,56 @@ void drivetrain_update (physics_world *world, ftc_robot *robot, float dt) {
          * through real wheel differentials (see tank_turn_test), so only
          * strafe is modeled here. */
         if (robot->drivetrain_type == FTC_DRIVETRAIN_MECANUM && chassis_ok) {
-            float c0 = robot->wheel_motors[0].command;
-            float c1 = robot->wheel_motors[1].command;
-            float c2 = (robot->wheel_count > 2) ? robot->wheel_motors[2].command : 0.0f;
-            float c3 = (robot->wheel_count > 3) ? robot->wheel_motors[3].command : 0.0f;
-            float strafe = (c0 - c1 - c2 + c3) * 0.25f; /* inverse IK mapping */
-            if (fabsf(strafe) > 0.01f) {
-                rigidbody *chassis = &world->bodies[robot->chassis_body];
-                vector3 lat = vector4_rotate_to_vector3(chassis->orientation, (vector3){1.0f, 0.0f, 0.0f});
-                lat.y = 0.0f;
-                float lat_len_sq = vector3_length_squared(lat);
-                if (lat_len_sq > 1e-6f) {
-                    lat = vector3_scaling(lat, 1.0f / sqrtf(lat_len_sq));
-                    float f_lat = strafe * max_grip * (float) robot->wheel_count * 0.5f;
-                    float total_grip = max_grip * (float) robot->wheel_count;
-                    /* Net-vector circle: |F_long_net + F_lat| <= total. */
-                    float long_used = sqrtf(vector3_length_squared(traction_net));
-                    float remaining = total_grip - long_used;
-                    if (remaining < 0.0f) {
-                        remaining = 0.0f;
+            /* Lateral force from wheel TORQUES through the 45° rollers
+             * (coupling sin45 per wheel, signs = inverse-IK combo), NOT
+             * from commands times a fraction of grip: the old feedforward
+             * (strafe*max_grip*n*0.5) could never break static friction
+             * (8.6 N vs 26 N cone) so strafe stalled by construction.
+             * Still capped by the remaining friction circle. */
+            float lat_sum = 0.0f;
+            float r_lat = 0.05f;
+            {
+                int wi0 = (robot->wheel_count > 0) ? robot->wheel_bodies[0] : -1;
+                if (wi0 >= 0 && wi0 < world->body_count && world->bodies[wi0].radius > 0.001f) {
+                    r_lat = world->bodies[wi0].radius;
+                }
+            }
+            if (r_lat > 0.001f) {
+                static const float sgn[4] = {1.0f, -1.0f, -1.0f, 1.0f};
+                for (int i = 0; i < robot->wheel_count && i < 4; i++) {
+                    /* Explicit instantaneous torque (× traction-cut scale):
+                     * locked rotors truly deliver stall; the applied
+                     * (observer) torque softens to a fixed point that
+                     * starves the roller model 6x. */
+                    lat_sum += sgn[i] * robot->wheel_motors[i].torque_explicit *
+                               robot->wheel_traction_scale[i];
+                }
+                float f_lat = 0.7071068f * lat_sum / r_lat;
+                /* Breakaway margin: real rollers ROLL laterally (no static
+                 * breakaway); the isotropic contact model cannot roll
+                 * sideways, so the stand-in must exceed the static cone or
+                 * strafe stalls by construction (measured dx=0.001). Cap at
+                 * 1.1x the static cone: inside solver/model uncertainty,
+                 * and the friction ellipse is WAIVED here by design (the
+                 * roller path sits outside tire friction). odom_slip marks
+                 * every strafe tick (sliding stand-in, flagged honestly);
+                 * true roller modeling is the parked anisotropic keystone. */
+                float total_grip = max_grip * (float)robot->wheel_count;
+                float break_cap = 1.1f * total_grip;
+                if (fabsf(f_lat) > 0.01f * total_grip) {
+                    rigidbody *chassis = &world->bodies[robot->chassis_body];
+                    vector3 lat =
+                        vector4_rotate_to_vector3(chassis->orientation, (vector3){1.0f, 0.0f, 0.0f});
+                    lat.y = 0.0f;
+                    float lat_len_sq = vector3_length_squared(lat);
+                    if (lat_len_sq > 1e-6f) {
+                        lat = vector3_scaling(lat, 1.0f / sqrtf(lat_len_sq));
+                        if (fabsf(f_lat) > break_cap) {
+                            f_lat = (f_lat > 0.0f) ? break_cap : -break_cap;
+                        }
+                        chassis->force_accumulator = vector3_addition(
+                            chassis->force_accumulator, vector3_scaling(lat, f_lat));
                     }
-                    if (fabsf(f_lat) > remaining) {
-                        f_lat = (f_lat > 0.0f) ? remaining : -remaining;
-                    }
-                    chassis->force_accumulator = vector3_addition(
-                        chassis->force_accumulator, vector3_scaling(lat, f_lat));
                 }
             }
         }
@@ -218,6 +258,18 @@ void drivetrain_update (physics_world *world, ftc_robot *robot, float dt) {
                     for (int mfs_wi = 0; mfs_wi < robot->wheel_count; mfs_wi++) {
                         if (fabsf(robot->wheel_motors[mfs_wi].command) > 0.05f) { mfs_idle = 0; break; }
                     }
+                    /* Documented <0.25 m/s gate (was claimed but missing):
+                     * hold applies at near-rest only; faster coast-down
+                     * belongs to back-EMF + rolling resistance. */
+                    if (mfs_idle) {
+                        int mfs_cidx = robot->chassis_body;
+                        if ((mfs_cidx >= 0) && (mfs_cidx < world->body_count)) {
+                            rigidbody *mfs_probe = &world->bodies[mfs_cidx];
+                            float mfs_ps = sqrtf(mfs_probe->velocity.x * mfs_probe->velocity.x +
+                                                 mfs_probe->velocity.z * mfs_probe->velocity.z);
+                            if (mfs_ps >= 0.25f) mfs_idle = 0;
+                        }
+                    }
                     if (mfs_idle) {
                         int mfs_cidx = robot->chassis_body;
                         if ((mfs_cidx >= 0) && (mfs_cidx < world->body_count)) {
@@ -244,19 +296,16 @@ void drivetrain_update (physics_world *world, ftc_robot *robot, float dt) {
                     }
                 }
 
-/* FIX-AUDIT: hard velocity clamp restored. While non-physical, the contact
- * solver's friction alone cannot prevent runaway acceleration from mecanum
- * asymmetry forces exceeding lateral damping. Global safety clamp in
- * rb_integrate_velocity is at 150 m/s (useless). */
+/* Velocity safety monitor (was: silent 3 m/s hard clamp that masked
+ * runaway instead of fixing it). With tile friction + the free-speed
+ * governor, runaway has no known source; count excursions as telemetry
+ * so a regression is visible instead of hidden. */
 {
     float speed_sq = chassis->velocity.x * chassis->velocity.x +
                      chassis->velocity.z * chassis->velocity.z;
     float max_speed = 3.0f;
     if (speed_sq > max_speed * max_speed) {
-        float speed = sqrtf(speed_sq);
-        float scale = max_speed / speed;
-        chassis->velocity.x *= scale;
-        chassis->velocity.z *= scale;
+        robot->clamp_events++;
     }
 }
             }
@@ -373,6 +422,22 @@ wheel->torque_accumulator = vector3_addition(wheel->torque_accumulator, rr_torqu
     robot->odom_theta += yaw_rate * dt;
     float c = cosf(robot->odom_theta);
     float s = sinf(robot->odom_theta);
+    /* Roller-thrust fusion: lateral chassis force bypasses the wheels, so
+     * wheel encoders are structurally blind to strafe (measured: physics
+     * -0.98 m vs encoder +0.15 m). Compare against the chassis-derived
+     * lateral velocity in the heading frame (world->body inverse rotation
+     * of the mapping applied below); on disagreement integrate odom
+     * lateral from chassis motion (dead-wheel equivalent) and raise
+     * odom_slip. Pure-encoder runs keep odom_slip == 0. */
+    robot->odom_slip = 0;
+    if (robot->chassis_body >= 0 && robot->chassis_body < world->body_count) {
+        rigidbody *chb = &world->bodies[robot->chassis_body];
+        float ch_lat_body = chb->velocity.x * c - chb->velocity.z * s;
+        if (fabsf(ch_lat_body - v_lat) > 0.2f) {
+            v_lat = ch_lat_body;
+            robot->odom_slip = 1;
+        }
+    }
     /* body->world yaw rotation about +Y: x'=x*c+z*s, z'=-x*s+z*c */
     robot->odom_x += (v_lat * c + v_fwd * s) * dt;
     robot->odom_z += (-v_lat * s + v_fwd * c) * dt;

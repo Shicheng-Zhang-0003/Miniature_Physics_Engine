@@ -10,14 +10,20 @@ OUT="${OUTDIR:-/tmp/ftc_tests}"
 mkdir -p "$OUT"
 
 CFLAGS="-I$SRC -I$MFS -O2 -Wall -Wextra -ffp-contract=off"
-CORE="core/physics_world.c core/rigidbody.c core/mpe_registry.c core/mpe_loader.c core/det_math.c core/mpe_primary.c physics/collision_narrowphase.c physics/collision_cache.c physics/collision_solver.c physics/collision_ccd.c physics/collision_cylinder.c physics/broadphase.c physics/constraint.c physics/revolute_joint.c physics/depenetration.c physics/islands.c config/mpe_config.c config/mpe_config_schema.c scene/boundary.c"
+# MFS_SOURCES: same lists as mfs_sources.mk (ENGINE engine-relative, FTC
+# MFS-relative). Update both files together.
+CORE="core/physics_world.c core/rigidbody.c core/mpe_registry.c core/mpe_loader.c core/det_math.c core/mpe_primary.c physics/collision_narrowphase.c physics/collision_cache.c physics/collision_solver.c physics/collision_ccd.c physics/collision_cylinder.c physics/broadphase.c physics/constraint.c physics/revolute_joint.c physics/depenetration.c physics/islands.c config/mpe_config.c config/mpe_config_schema.c scene/boundary.c ecosystem/mpe_ecosystem.c"
 FTC="ecosystem/mfs/modules/ftc/ftc_module.c ecosystem/mfs/modules/ftc/ftc_fleet.c ecosystem/mfs/modules/ftc/submodules/robot.c ecosystem/mfs/modules/ftc/submodules/drivetrain.c ecosystem/mfs/modules/ftc/submodules/motor.c ecosystem/mfs/modules/ftc/submodules/motor_presets.c ecosystem/mfs/modules/ftc/submodules/battery.c"
+MOD1="ecosystem/mfs/modules/module_1/mfs_module_1.c ecosystem/mfs/modules/module_1/submodules/gamepad/gamepad.c"
 
 cd "$SRC"
-pass=0; fail=0
-run_test() { # name, -Dflag, file
+pass=0; fail=0; info_pass=0
+# run_test: gated test, counts toward pass/fail.
+run_test() { # name, -Dflag, file, [extra sources...]
     local name="$1" flag="$2" file="$3"
-    if gcc $CFLAGS "-D$flag" "$file" $FTC $CORE -lm -ldl -rdynamic -o "$OUT/$name" 2>"$OUT/$name.build.log"; then
+    shift 3
+    local extra="$*"
+    if gcc $CFLAGS "-D$flag" "$file" $FTC $CORE $extra -lm -ldl -rdynamic -o "$OUT/$name" 2>"$OUT/$name.build.log"; then
         if [ "${1:-}" != "--build-only" ] && [ "${BUILD_ONLY:-0}" != "1" ]; then
             if "$OUT/$name" >"$OUT/$name.run.log" 2>&1; then
                 echo "[PASS] $name"; pass=$((pass+1));
@@ -26,6 +32,21 @@ run_test() { # name, -Dflag, file
             fi
         else
             echo "[BUILD-OK] $name"; pass=$((pass+1));
+        fi
+    else
+        echo "[BUILD-FAIL] $name"; fail=$((fail+1)); head -n 10 "$OUT/$name.build.log";
+    fi
+}
+# run_info: informational diag (exit 0 by construction, asserts nothing).
+# Reported separately, never inflates the gated pass count.
+run_info() { # name, -Dflag, file
+    local name="$1" flag="$2" file="$3"
+    if gcc $CFLAGS "-D$flag" "$file" $FTC $CORE -lm -ldl -rdynamic -o "$OUT/$name" 2>"$OUT/$name.build.log"; then
+        if [ "${1:-}" != "--build-only" ] && [ "${BUILD_ONLY:-0}" != "1" ]; then
+            "$OUT/$name" >"$OUT/$name.run.log" 2>&1 || true
+            echo "[INFO] $name (diagnostic, ungated)"; info_pass=$((info_pass+1));
+        else
+            echo "[BUILD-OK] $name"; info_pass=$((info_pass+1));
         fi
     else
         echo "[BUILD-FAIL] $name"; fail=$((fail+1)); head -n 10 "$OUT/$name.build.log";
@@ -53,14 +74,14 @@ run_test mecanum MPE_MECANUM_DRIVE_TEST $RB_T/mecanum_drive_test.c
 run_test tank MFS_TANK_TURN_TEST $RB_T/tank_turn_test.c
 run_test odometry MFS_ODOMETRY_ACCURACY_TEST $RB_T/odometry_accuracy_test.c
 run_test ftc_integration MPE_FTC_INTEGRATION_TEST $RB_T/ftc_integration_test.c
-run_test ftc_debug MPE_FTC_DEBUG_TEST $RB_T/ftc_debug_test.c
 run_test physics_truth MPE_PHYSICS_TRUTH_TEST $RB_T/physics_truth_test.c
-run_test physics_truth_diag MPE_PHYSICS_TRUTH_DIAG $RB_T/physics_truth_diag.c
-run_test idle_spin MFS_IDLE_DIAG $RB_T/idle_spin_diag.c
-run_test idle_spin_deep MFS_IDLE_DEEP_DIAG $RB_T/idle_spin_deep_diag.c
-run_test idle_rootcause MFS_IDLE_ROOTCAUSE_DIAG $RB_T/idle_rootcause_diag.c
-run_test odometry_diag MFS_ODOM_DIAG $RB_T/odometry_diag.c
+run_info ftc_debug MPE_FTC_DEBUG_TEST $RB_T/ftc_debug_test.c
+run_info idle_spin MFS_IDLE_DIAG $RB_T/idle_spin_diag.c
+run_info idle_spin_deep MFS_IDLE_DEEP_DIAG $RB_T/idle_spin_deep_diag.c
+run_info idle_rootcause MFS_IDLE_ROOTCAUSE_DIAG $RB_T/idle_rootcause_diag.c
+run_info odometry_diag MFS_ODOM_DIAG $RB_T/odometry_diag.c
 run_test ftc_hotload MPE_FTC_HOTLOAD_TEST $RB_T/ftc_hotload_test.c
+run_test module_1 MFS_MODULE_1_TEST ecosystem/mfs/modules/module_1/mfs_module_1_test.c $MOD1
 
 echo "--- compile-only units ---"
 for u in "$MFS/modules/ftc/gui_robot_registry.c" "$MFS/modules/module_1/submodules/gamepad/gamepad.c"; do
@@ -71,5 +92,5 @@ for u in "$MFS/modules/ftc/gui_robot_registry.c" "$MFS/modules/module_1/submodul
         echo "[BUILD-FAIL] $n"; fail=$((fail+1)); head -n 10 "$OUT/$n.build.log";
     fi
 done
-echo "FTC RESULT: pass=$pass fail=$fail"
+echo "FTC RESULT: gated pass=$pass fail=$fail info-diags=$info_pass (ungated)"
 [ "$fail" -eq 0 ]

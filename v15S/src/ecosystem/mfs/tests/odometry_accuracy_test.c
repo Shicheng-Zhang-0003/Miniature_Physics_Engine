@@ -10,15 +10,11 @@
 #include "config/mpe_config.h"
 #include "modules/ftc/submodules/robot.h"
 #include "modules/ftc/submodules/drivetrain.h"
+#include "ecosystem/mfs/tests/mfs_test_common.h"
 
 int main(void) {
-    mpe_config_init();
-    /* MFS_PORT_V15S: robot worlds need 128 iterations (40:1 chassis/wheel
-     * mass ratio; see teleop_drive_test.c). */
-    g_cfg.timestep.solver_iterations = 128;
     physics_world world;
-    physics_world_init(&world);
-    constraint_pool_init(&world);
+    mfs_test_world(&world); /* 128 iters + tile floor (see header) */
 
     ftc_robot robot;
     int rc = ftc_robot_create(&world, &robot, 0.0f, ftc_robot_rest_height(), 0.0f, MOTOR_GB_5203_26_9);

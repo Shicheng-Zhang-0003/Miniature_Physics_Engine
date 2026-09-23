@@ -49,9 +49,12 @@ typedef struct {
 
 /* Ecosystem registry API */
 int mpe_ecosystem_register(const mpe_ecosystem_desc_t *desc);
+int mpe_ecosystem_unregister(const char *name);
 const mpe_ecosystem_desc_t *mpe_ecosystem_find(const char *name);
 int mpe_ecosystem_count(void);
 const mpe_ecosystem_desc_t *mpe_ecosystem_at(int index);
+/* Detach everywhere (loader unload path; hooks run pre-dlclose). */
+void mpe_ecosystem_detach_everywhere(const char *eco_name);
 
 /* Ecosystem management */
 int mpe_ecosystem_attach(mpe_world_t *world, const char *eco_name);
