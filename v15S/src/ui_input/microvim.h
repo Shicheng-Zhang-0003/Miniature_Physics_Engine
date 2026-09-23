@@ -4,6 +4,7 @@
 
 #include <gtk/gtk.h>
 #include <stdbool.h>
+#include "term_posix.h" /* POSIX command-logic helpers (no libglib) */
 
 typedef enum { mv_normal, mv_insert, mv_command, mv_search } mv_mode;
 

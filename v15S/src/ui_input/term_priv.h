@@ -10,6 +10,7 @@
 #include <strings.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include "term_posix.h" /* POSIX command-logic helpers (no libglib) */
 #include "../core/rigidbody.h"
 #include "../config/mpe_constants.h"
 
@@ -42,7 +43,7 @@ extern char term_alias_names[term_alias_max][term_alias_name_len];
 extern char term_alias_values[term_alias_max][term_alias_value_len];
 extern int term_alias_count;
 extern bool term_sudo_active;
-extern gint64 term_engine_start_time;
+extern int64_t term_engine_start_time;
 
 /* output + capture + prompt (defined in debug_terminal.c) */
 void term_out(const char *text);
@@ -178,5 +179,7 @@ void cmd_dmesg(int argc, char **argv);
 void cmd_vi(int argc, char **argv);
 void cmd_mod(int argc, char **argv);
 void cmd_modinfo(int argc, char **argv);
+void cmd_eco(int argc, char **argv);
+void cmd_ftc(int argc, char **argv);
 
 #endif /* term_priv_h */

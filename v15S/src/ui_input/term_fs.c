@@ -368,12 +368,12 @@ void cmd_kill(int argc, char **argv) {
     enum { kill_term, kill_stop, kill_cont };
     int kill_action = kill_term;
     int argument_index = 1;
-    if ((argc > 1) && ((argv[1][0] == '-') || (g_str_has_prefix(argv[1], "SIG")))) {
+    if ((argc > 1) && ((argv[1][0] == '-') || (term_str_has_prefix(argv[1], "SIG")))) {
         const char *signal_text = argv[1];
         if (signal_text[0] == '-') {
             signal_text++;
         }
-        if (g_str_has_prefix(signal_text, "SIG")) {
+        if (term_str_has_prefix(signal_text, "SIG")) {
             signal_text += 3;
         }
         if (term_str_eq(signal_text, "STOP") || term_str_eq(signal_text, "19")) {
@@ -816,12 +816,12 @@ void cmd_kill(int argc, char **argv) {
     enum { kill_term, kill_stop, kill_cont };
     int kill_action = kill_term;
     int argument_index = 1;
-    if ((argc > 1) && ((argv[1][0] == '-') || (g_str_has_prefix(argv[1], "SIG")))) {
+    if ((argc > 1) && ((argv[1][0] == '-') || (term_str_has_prefix(argv[1], "SIG")))) {
         const char *signal_text = argv[1];
         if (signal_text[0] == '-') {
             signal_text++;
         }
-        if (g_str_has_prefix(signal_text, "SIG")) {
+        if (term_str_has_prefix(signal_text, "SIG")) {
             signal_text += 3;
         }
         if (term_str_eq(signal_text, "STOP") || term_str_eq(signal_text, "19")) {

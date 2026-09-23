@@ -13,10 +13,10 @@
 #include <time.h>
 #include <strings.h>
 
-static gint64 posix_monotonic_time(void) {
+static int64_t posix_monotonic_time(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (gint64)ts.tv_sec * 1000000LL + ts.tv_nsec / 1000LL;
+    return (int64_t)ts.tv_sec * 1000000LL + ts.tv_nsec / 1000LL;
 }
 void cmd_ps(int argc, char **argv) {
     bool detailed = false;
@@ -394,7 +394,7 @@ void cmd_sync(int argc, char **argv) {
 void cmd_uptime(int argc, char **argv) {
     (void) argc;
     (void) argv;
-    gint64 now = posix_monotonic_time();
+    int64_t now = posix_monotonic_time();
     double elapsed = (double) (now - term_engine_start_time) / 1000000.0;
     int hours = (int) (elapsed / 3600.0);
     int minutes = (int) (fmod(elapsed, 3600.0) / 60.0);
@@ -483,9 +483,9 @@ void cmd_time(int argc, char **argv) {
             cmd_buf[offset] = '\0';
         }
     }
-    gint64 start_time = posix_monotonic_time();
+    int64_t start_time = posix_monotonic_time();
     term_execute(cmd_buf);
-    gint64 end_time = posix_monotonic_time();
+    int64_t end_time = posix_monotonic_time();
     double elapsed = (double) (end_time - start_time) / 1000000.0;
     term_printf("term_dim", "\nreal\t%dm%.3fs\n", (int) (elapsed / 60.0), fmod(elapsed, 60.0));
 }
@@ -505,10 +505,10 @@ void cmd_time(int argc, char **argv) {
 #include <time.h>
 #include <strings.h>
 
-static gint64 posix_monotonic_time(void) {
+static int64_t posix_monotonic_time(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (gint64)ts.tv_sec * 1000000LL + ts.tv_nsec / 1000LL;
+    return (int64_t)ts.tv_sec * 1000000LL + ts.tv_nsec / 1000LL;
 }
 void cmd_ps(int argc, char **argv) {
     bool detailed = false;
@@ -883,7 +883,7 @@ void cmd_sync(int argc, char **argv) {
 void cmd_uptime(int argc, char **argv) {
     (void) argc;
     (void) argv;
-    gint64 now = posix_monotonic_time();
+    int64_t now = posix_monotonic_time();
     double elapsed = (double) (now - term_engine_start_time) / 1000000.0;
     int hours = (int) (elapsed / 3600.0);
     int minutes = (int) (fmod(elapsed, 3600.0) / 60.0);
@@ -972,9 +972,9 @@ void cmd_time(int argc, char **argv) {
             cmd_buf[offset] = '\0';
         }
     }
-    gint64 start_time = posix_monotonic_time();
+    int64_t start_time = posix_monotonic_time();
     term_execute(cmd_buf);
-    gint64 end_time = posix_monotonic_time();
+    int64_t end_time = posix_monotonic_time();
     double elapsed = (double) (end_time - start_time) / 1000000.0;
     term_printf("term_dim", "\nreal\t%dm%.3fs\n", (int) (elapsed / 60.0), fmod(elapsed, 60.0));
 }
