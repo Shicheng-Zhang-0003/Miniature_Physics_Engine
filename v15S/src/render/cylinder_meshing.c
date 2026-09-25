@@ -7,13 +7,18 @@
 #include <math.h>
 
 void init_cylinder_system(mesh *mesh_object, int radial_segments) {
+    if (!mesh_object) return;
+    mesh_object->index_count = 0;
+    mesh_object->wireframe_index_count = 0;
     if (radial_segments < 8) {
         radial_segments = 8;
     }
+    if (radial_segments > 4096) return;
     int ring_verts = radial_segments + 1;
     /* Rings: x=-1 barrel, x=+1 barrel, x=-1 cap disc, x=+1 cap disc, + 2 cap centers. */
     int vertex_count = ring_verts * 4 + 2;
     float *vertex_data = malloc((size_t) vertex_count * 6 * sizeof(float));
+    if (!vertex_data) return;
     int vi = 0;
     for (int ring = 0; ring < 4; ring++) {
         float x = (ring == 0 || ring == 2) ? -1.0f : 1.0f;
@@ -56,6 +61,11 @@ void init_cylinder_system(mesh *mesh_object, int radial_segments) {
     /* Side quads + two cap fans. */
     mesh_object->index_count = radial_segments * 6 + radial_segments * 3 * 2;
     unsigned int *element_indices = malloc((size_t) mesh_object->index_count * sizeof(unsigned int));
+    if (!element_indices) {
+        free(vertex_data);
+        mesh_object->index_count = 0;
+        return;
+    }
     int ei = 0;
     for (int s = 0; s < radial_segments; s++) {
         element_indices[ei++] = ring0 + s;
@@ -78,6 +88,13 @@ void init_cylinder_system(mesh *mesh_object, int radial_segments) {
     /* Wireframe: two rim loops + 4 axial rails. */
     mesh_object->wireframe_index_count = radial_segments * 2 * 2 + 4 * 2;
     unsigned int *wireframe_indices = malloc((size_t) mesh_object->wireframe_index_count * sizeof(unsigned int));
+    if (!wireframe_indices) {
+        free(element_indices);
+        free(vertex_data);
+        mesh_object->index_count = 0;
+        mesh_object->wireframe_index_count = 0;
+        return;
+    }
     int wi = 0;
     for (int s = 0; s < radial_segments; s++) {
         wireframe_indices[wi++] = ring0 + s;
