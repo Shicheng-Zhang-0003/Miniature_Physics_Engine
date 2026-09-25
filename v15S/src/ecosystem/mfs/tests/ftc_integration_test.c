@@ -20,6 +20,7 @@ int main(void) {
     int rc = ftc_robot_create(&world, &robot, 0.0f, ftc_robot_rest_height(), 0.0f, MOTOR_GB_5203_26_9);
     if (rc != 0) {
         printf("[FAIL] could not create robot\n");
+        physics_world_cleanup(&world);
         return 1;
     }
 
@@ -74,7 +75,10 @@ int main(void) {
     ftc_robot_get_position(&world, &robot, &end_x, &end_y, &end_z);
     printf("[info] final pos: (%.3f, %.3f, %.3f)\n", end_x, end_y, end_z);
 
-    if (fail) return 1;
+    if (fail) {
+        physics_world_cleanup(&world);
+        return 1;
+    }
 
     /* Verify robot moved significantly from start */
     float total_dist = sqrtf((end_x - start_x) * (end_x - start_x) +
@@ -83,6 +87,7 @@ int main(void) {
 
     if (total_dist < 0.5f) {
         printf("[FAIL] robot barely moved (%.4f m)\n", total_dist);
+        physics_world_cleanup(&world);
         return 1;
     }
 
@@ -90,10 +95,12 @@ int main(void) {
     float dy = fabsf(end_y - start_y);
     if (dy > 0.5f) {
         printf("[FAIL] robot flipped or fell (dy=%.4f)\n", dy);
+        physics_world_cleanup(&world);
         return 1;
     }
 
     printf("[PASS] FTC integration: robot drove, turned, strafed, stayed upright\n");
+    physics_world_cleanup(&world);
     return 0;
 }
 #endif /* MPE_FTC_INTEGRATION_TEST */
