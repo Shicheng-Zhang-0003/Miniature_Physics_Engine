@@ -11,6 +11,7 @@
 #include "../physics/constraint.h"
 #include <stdio.h>
 #include <stdint.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 static int read_float(FILE *f, float *v) {
@@ -118,6 +119,15 @@ static int scene_load_quat(FILE *f, uint32_t *crc, vector4 *q) {
            scene_rfloat(f, crc, &q->z);
 }
 
+static bool scene_vec3_finite(vector3 v) {
+    return isfinite(v.x) && isfinite(v.y) && isfinite(v.z);
+}
+
+static bool scene_vec3_axis_valid(vector3 v) {
+    float length_squared = vector3_length_squared(v);
+    return isfinite(length_squared) && length_squared >= 1e-12f;
+}
+
 static bool scene_id_in_staged(const int32_t *staged_ids, int staged_count, uint32_t id) {
     if (id == 0) {
         return false;
@@ -149,14 +159,6 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
         /* Empty scene round-trips: valid header + zero bodies + joints + CRC. */
         /* Fall through to section parsing with zero bodies. */
     }
-    if (!scene_ensure_pool_capacity(count)) {
-        return 0;
-    }
-    /* count is now guaranteed <= body_capacity after ensure_pool_capacity. */
-    if (count > (physics_world_get_primary()->body_capacity)) {
-        return 0;
-    }
-
     /* Allocate at least 1 element even for count==0 (malloc(0) may
      * return NULL on some platforms, which would abort the load). */
     int alloc_count = count > 0 ? count : 1;
@@ -209,7 +211,9 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
          * object_custom persists as bare type tag (no plugin blob yet):
          * accept and init as sphere placeholder so one custom body never
          * vetoes the whole file. Full blob persistence is future work. */
-        if ((type_u > (uint32_t) object_custom) || (id_u == 0) || (!isfinite(mass)) || (mass < 0.0f)) {
+        if ((type_u > (uint32_t) object_custom) || (id_u == 0) || (gen_u == 0) ||
+            (static_u > 1u) || (sleep_u > 1u) || (kin_u > 1u) || (nice_u > (uint32_t) INT_MAX) ||
+            (!isfinite(mass)) || (mass < 0.0f) || (sleep_timer_f < 0.0f)) {
             body_ok = 0;
             break;
         }
@@ -232,6 +236,14 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
                         (double)orient.y * orient.y + (double)orient.z * orient.z;
             if (!all_fin || !(q2 > 1e-12) || fabsf(pos.x) > 1e6f || fabsf(pos.y) > 1e6f ||
                 fabsf(pos.z) > 1e6f) {
+                body_ok = 0;
+                break;
+            }
+            if ((type_u == (uint32_t) object_sphere && !(radius > 0.0f)) ||
+                (type_u == (uint32_t) object_cube &&
+                 (!(half_ext.x > 0.0f) || !(half_ext.y > 0.0f) || !(half_ext.z > 0.0f))) ||
+                (type_u == (uint32_t) object_cylinder && (!(radius > 0.0f) || !(half_len > 0.0f))) ||
+                (type_u == (uint32_t) object_custom && !(radius > 0.0f))) {
                 body_ok = 0;
                 break;
             }
@@ -332,7 +344,7 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
         }
         if ((id_a == 0) || (id_a == id_b) || (!scene_id_in_staged(staged_ids, staged_body_count, id_a)) ||
             (!scene_id_in_staged(staged_ids, staged_body_count, id_b)) || (!isfinite(eq)) || (!isfinite(k)) ||
-            (!isfinite(c)) || (k < 0.0f) || (c < 0.0f)) {
+            (!isfinite(c)) || (eq < 0.0f) || (k < 0.0f) || (c < 0.0f)) {
             continue;
         }
         staged_springs[staged_spring_count].id_a = id_a;
@@ -369,7 +381,8 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
         if (!fixed_ok) break;
         if ((fc.type != (uint32_t) constraint_fixed) || (fc.id_a == 0) || (fc.id_a == fc.id_b) ||
             (!scene_id_in_staged(staged_ids, staged_body_count, fc.id_a)) ||
-            (!scene_id_in_staged(staged_ids, staged_body_count, fc.id_b))) {
+            (!scene_id_in_staged(staged_ids, staged_body_count, fc.id_b)) ||
+            (!scene_vec3_finite(fc.anchor_a)) || (!scene_vec3_finite(fc.anchor_b))) {
             continue;
         }
         staged_fixeds[staged_fixed_count++] = fc;
@@ -403,6 +416,7 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
         if ((dc.type != (uint32_t) constraint_distance) || (dc.id_a == 0) || (dc.id_a == dc.id_b) ||
             (!scene_id_in_staged(staged_ids, staged_body_count, dc.id_a)) ||
             (!scene_id_in_staged(staged_ids, staged_body_count, dc.id_b)) ||
+            (!scene_vec3_finite(dc.anchor_a)) || (!scene_vec3_finite(dc.anchor_b)) ||
             (!isfinite(dc.rest_length)) || (dc.rest_length < 0.0f)) {
             continue;
         }
@@ -447,8 +461,12 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
         if ((pc.type != (uint32_t) constraint_prismatic) || (pc.id_a == 0) || (pc.id_a == pc.id_b) ||
             (!scene_id_in_staged(staged_ids, staged_body_count, pc.id_a)) ||
             (!scene_id_in_staged(staged_ids, staged_body_count, pc.id_b)) ||
+            (!scene_vec3_finite(pc.anchor_a)) || (!scene_vec3_finite(pc.anchor_b)) ||
+            (!scene_vec3_finite(pc.axis_a)) || (!scene_vec3_finite(pc.axis_b)) ||
+            (!scene_vec3_axis_valid(pc.axis_a)) ||
             (!isfinite(pc.motor_target_speed)) || (!isfinite(pc.motor_max_force)) || (pc.motor_max_force < 0.0f) ||
-            (!isfinite(pc.limit_min)) || (!isfinite(pc.limit_max))) {
+            (!isfinite(pc.limit_min)) || (!isfinite(pc.limit_max)) ||
+            (pc.limits_enabled && pc.limit_min > pc.limit_max)) {
             continue;
         }
         staged_prisms[staged_prism_count++] = pc;
@@ -482,6 +500,7 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
         if ((rc.type != (uint32_t) constraint_rope) || (rc.id_a == 0) || (rc.id_a == rc.id_b) ||
             (!scene_id_in_staged(staged_ids, staged_body_count, rc.id_a)) ||
             (!scene_id_in_staged(staged_ids, staged_body_count, rc.id_b)) ||
+            (!scene_vec3_finite(rc.anchor_a)) || (!scene_vec3_finite(rc.anchor_b)) ||
             (!isfinite(rc.rest_length)) || (rc.rest_length < 0.0f)) {
             continue;
         }
@@ -528,8 +547,12 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
         if ((r.type != (uint32_t) constraint_revolute) || (r.id_a == 0) || (r.id_a == r.id_b) ||
             (!scene_id_in_staged(staged_ids, staged_body_count, r.id_a)) ||
             (!scene_id_in_staged(staged_ids, staged_body_count, r.id_b)) ||
+            (!scene_vec3_finite(r.anchor_a)) || (!scene_vec3_finite(r.anchor_b)) ||
+            (!scene_vec3_finite(r.axis_a)) || (!scene_vec3_finite(r.axis_b)) ||
+            (!scene_vec3_axis_valid(r.axis_a)) ||
             (!isfinite(r.motor_target)) || (!isfinite(r.motor_max_torque)) || (r.motor_max_torque < 0.0f) ||
-            (!isfinite(r.limit_min)) || (!isfinite(r.limit_max))) {
+            (!isfinite(r.limit_min)) || (!isfinite(r.limit_max)) ||
+            (r.limits_enabled && r.limit_min > r.limit_max)) {
             continue;
         }
         staged_revs[staged_rev_count++] = r;
@@ -546,8 +569,33 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
                           (((uint32_t) footer[2]) << 16) | (((uint32_t) footer[3]) << 24);
         crc_ok = (stored == (crc ^ 0xFFFFFFFFu));
     }
+    if (crc_ok) {
+        /* v200 has no extension area: reject concatenated records and other
+         * trailing bytes instead of accepting an ambiguous scene. */
+        crc_ok = (fgetc(f) == EOF) && !ferror(f);
+    }
+    if (crc_ok && ((uint64_t) fixed_count_u + (uint64_t) dist_count_u + (uint64_t) prism_count_u +
+                   (uint64_t) rope_count_u + (uint64_t) rev_count_u > (uint64_t) mpe_max_joints)) {
+        crc_ok = 0;
+    }
     if (!crc_ok) {
-        fprintf(stderr, "Error LDF04: CRC mismatch (corrupt scene file)\n");
+        fprintf(stderr, "Error LDF04: invalid CRC, trailing data, or corrupt scene file\n");
+        free(staged_bodies);
+        free(staged_ids);
+        free(staged_springs);
+        free(staged_revs);
+        free(staged_fixeds);
+        free(staged_dists);
+        free(staged_prisms);
+        free(staged_ropes);
+        return 0;
+    }
+
+    /* Delay world-pool growth until the complete staged file has passed all
+     * parsing, structural validation, CRC, and EOF checks. A rejected file
+     * must not invalidate existing body pointers via realloc. */
+    physics_world *primary = physics_world_get_primary();
+    if ((!primary) || (!scene_ensure_pool_capacity(count)) || (count > primary->body_capacity)) {
         free(staged_bodies);
         free(staged_ids);
         free(staged_springs);
