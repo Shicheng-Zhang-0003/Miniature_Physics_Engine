@@ -6,8 +6,14 @@
 #include <stdlib.h>
 #include <math.h>
 void init_sm_system(mesh *mesh_object, int horizontal_sections, int vertical_stacks) {
+    if (!mesh_object) return;
+    mesh_object->index_count = 0;
+    mesh_object->wireframe_index_count = 0;
+    if (horizontal_sections < 3 || horizontal_sections > 1024 ||
+        vertical_stacks < 2 || vertical_stacks > 512) return;
     int vertex_count = (vertical_stacks + 1) * (horizontal_sections + 1);
     float *vertex_data = malloc(vertex_count * 6 * sizeof(float));
+    if (!vertex_data) return;
     int vertex_index = 0;
     for (int stack_step = 0; stack_step <= vertical_stacks; stack_step++) {
         float phi_angle = math_pi / 2 - stack_step * math_pi / vertical_stacks;
@@ -26,6 +32,10 @@ void init_sm_system(mesh *mesh_object, int horizontal_sections, int vertical_sta
     }
     int wireframe_indices_size = (horizontal_sections + 2 * vertical_stacks + 2 * vertical_stacks) * 2;
     unsigned int *wireframe_indices = malloc(wireframe_indices_size * sizeof(unsigned int));
+    if (!wireframe_indices) {
+        free(vertex_data);
+        return;
+    }
     int wireframe_index = 0;
     int middle_stack_index = vertical_stacks / 2;
     for (int section_index = 0; section_index < horizontal_sections; section_index++) {
@@ -52,6 +62,13 @@ void init_sm_system(mesh *mesh_object, int horizontal_sections, int vertical_sta
     mesh_object->wireframe_index_count = wireframe_index;
     mesh_object->index_count = vertical_stacks * horizontal_sections * 6;
     unsigned int *element_indices = malloc(mesh_object->index_count * sizeof(unsigned int));
+    if (!element_indices) {
+        free(wireframe_indices);
+        free(vertex_data);
+        mesh_object->wireframe_index_count = 0;
+        mesh_object->index_count = 0;
+        return;
+    }
     int element_index = 0;
     for (int stack_index = 0; stack_index < vertical_stacks; stack_index++) {
         int current_row_start = stack_index * (horizontal_sections + 1);
