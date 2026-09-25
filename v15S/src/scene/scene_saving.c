@@ -11,6 +11,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
 
@@ -20,8 +21,8 @@
  *   bodies[]: u32 type, f32 mass, radius, half_length,
  *     half_extents xyz, position xyz, velocity xyz, angular_velocity xyz,
  *     orientation wxyz, colour xyz, restitution, fric_s, fric_k,
- *     u32 static, u32 object_id, i32 nice_value, u32 sleeping, u32 kinematic,
- *     u32 generation,
+ *     u32 static, u32 object_id, i32 nice_value, u32 sleeping, f32 sleep_timer,
+ *     u32 kinematic, u32 generation,
  *   u32 spring_count, springs[]: u32 id_a, id_b, f32 eq, k, c,
  *   u32 revolute_count, revolutes[]: u32 type, id_a, id_b,
  *     anchor_a xyz, anchor_b xyz, axis_a xyz, axis_b xyz,
@@ -50,6 +51,32 @@ static int save_quat(FILE *f, uint32_t *crc, vector4 q) {
            scene_wfloat(f, crc, q.z);
 }
 
+static int scene_sync_parent_directory(const char *path) {
+    char parent[520];
+    size_t length = strlen(path);
+    if (length >= sizeof(parent)) {
+        return 0;
+    }
+    memcpy(parent, path, length + 1);
+    char *slash = strrchr(parent, '/');
+    if (!slash) {
+        memcpy(parent, ".", 2);
+    } else if (slash == parent) {
+        slash[1] = '\0';
+    } else {
+        *slash = '\0';
+    }
+    int dir_fd = open(parent, O_RDONLY);
+    if (dir_fd < 0) {
+        return 0;
+    }
+    int ok = (fsync(dir_fd) == 0);
+    if (close(dir_fd) != 0) {
+        ok = 0;
+    }
+    return ok;
+}
+
 int save_scene(const char *file_destination_path) {
     /* R3-03: Atomic write. mkstemp + 0600 + fsync + rename: no symlink
      * hijack, no partial file on crash. */
@@ -58,6 +85,12 @@ int save_scene(const char *file_destination_path) {
 #endif
     if (!file_destination_path || !*file_destination_path) {
         fprintf(stderr, "Error SVF01: null/empty path\n");
+        return 0;
+    }
+    physics_world *world = physics_world_get_primary();
+    if ((!world) || (world->body_count < 0) || (world->body_count > mpe_max_bodies) ||
+        ((world->body_count > 0) && (!world->bodies))) {
+        fprintf(stderr, "Error SVF01: invalid primary world\n");
         return 0;
     }
     char tmp_template[520];
@@ -71,7 +104,12 @@ int save_scene(const char *file_destination_path) {
         fprintf(stderr, "Error SVF01: Could not create temp file\n");
         return 0;
     }
-    fchmod(tmp_fd, 0600);
+    if (fchmod(tmp_fd, 0600) != 0) {
+        close(tmp_fd);
+        remove(tmp_template);
+        fprintf(stderr, "Error SVF03: Could not secure temp file\n");
+        return 0;
+    }
     FILE *f = fdopen(tmp_fd, "wb");
     if (!f) {
         close(tmp_fd);
@@ -243,14 +281,30 @@ int save_scene(const char *file_destination_path) {
         remove(tmp_template);
         return 0;
     }
-    fflush(f);
+    /* Surface delayed filesystem failures before publishing the staged file. */
+    if ((fflush(f) != 0) || ferror(f)) {
+        ok = 0;
+    }
     int fsync_fd = fileno(f);
-    if (fsync_fd >= 0) fsync(fsync_fd);
-    fclose(f);
+    if ((fsync_fd < 0) || (fsync(fsync_fd) != 0)) {
+        ok = 0;
+    }
+    if (fclose(f) != 0) {
+        ok = 0;
+    }
+    if (!ok) {
+        fprintf(stderr, "Error SVF03: Flush or sync failure\n");
+        remove(tmp_template);
+        return 0;
+    }
     /* R3-03: Atomic rename over the target */
     if (rename(tmp_template, file_destination_path) != 0) {
         fprintf(stderr, "Error SVF02: Could not rename temp file\n");
         remove(tmp_template);
+        return 0;
+    }
+    if (!scene_sync_parent_directory(file_destination_path)) {
+        fprintf(stderr, "Error SVF04: Scene replaced, but parent-directory sync failed; crash durability is uncertain\n");
         return 0;
     }
     return 1;
