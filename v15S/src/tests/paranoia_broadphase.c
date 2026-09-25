@@ -13,7 +13,8 @@ int main(void) {
     /* Test 1: No false negatives - fast moving small sphere should collide with thin wall
      * Broadphase uses swept AABB with |v|*dt + |w|*R*dt expansion. At 100 m/s, dt=1/60:
      * displacement = 1.67m > wall thickness 0.1m, so should pair.
-     * CCD should clamp to TOI. Known limitation: sphere-cube CCD may miss at extreme speeds. */
+     * CCD should clamp to TOI. The center must stop at the near face, outside
+     * the wall's expanded radius; ending inside the wall is a missed sweep. */
     {
         physics_world world;
         physics_world_init(&world);
@@ -37,18 +38,16 @@ int main(void) {
 
         for (int t = 0; t < 120; t++) {
             physics_world_step(&world, dt);
-            if (world.bodies[sphere].position.x >= -0.05f) {
+            if ((world.bodies[sphere].position.x >= -0.25f) &&
+                (world.bodies[sphere].position.x <= -0.10f) &&
+                (fabsf(world.bodies[sphere].velocity.x) < 1.0f)) {
                 collided = 1;
                 break;
             }
         }
 
         printf("[INFO] broadphase_fast_thin collided=%d\n", collided);
-        /* At 100 m/s, sphere travels 1.67m/tick. CCD for sphere-cube is volume sweep
-         * (swept sphere vs OBB) which may miss at extreme speeds due to linear sweep
-         * approximation. This is a known CCD limitation for sphere-cube pairs.
-         * If CCD catches it, great; if not, it's a known limitation. */
-        if (!collided) { printf("[INFO] broadphase missed fast thin collision (known CCD limitation)\n"); }
+        if (!collided) { printf("[FAIL] broadphase/CCD missed fast thin collision\n"); fail = 1; }
         else { printf("[PASS] broadphase catches fast thin collisions\n"); }
         physics_world_cleanup(&world);
     }
@@ -64,6 +63,14 @@ int main(void) {
 
         /* Huge floor */
         int floor = physics_world_add_cube(&world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){100.0f, 0.5f, 100.0f}, 0.0f);
+        if (floor < 0) {
+            printf("[FAIL] broadphase_large_object could not create floor\n");
+            fail = 1;
+            physics_world_cleanup(&world);
+        } else {
+            world.bodies[floor].friction_static = 0.8f;
+            world.bodies[floor].friction_kinetic = 0.6f;
+        }
 
         /* Small sphere falling */
         int sphere = physics_world_add_sphere(&world, 0.1f, 1.0f, (vector3){50.0f, 10.0f, 50.0f});

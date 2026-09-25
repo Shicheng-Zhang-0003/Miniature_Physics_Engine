@@ -107,7 +107,7 @@ int main(void) {
         rigidbody_wake(&w2.bodies[s]);
 
         const float dt = 1.0f / 60.0f;
-        float apex = 0.0f, t_apex = 0.0f, x_apex = 0.0f;
+        float apex = 0.0f;
         float max_y_error = 0.0f;
 
         for (int t = 0; t < 500; t++) {
@@ -117,8 +117,6 @@ int main(void) {
 
             if (b->position.y > apex) {
                 apex = b->position.y;
-                t_apex = (float)(t + 1) * dt;
-                x_apex = b->position.x;
             }
 
             float texact = (float)(t + 1) * dt;
@@ -132,8 +130,6 @@ int main(void) {
         }
 
         float apex_e = 1.0f + vy * vy / (2.0f * g);
-        float t_e = vy / g;
-        float x_e = vx * t_e;
 
         printf("[INFO] drag=0.99 apex=%.6f (drag1_exact=%.6f) err=%.6f max_y_err_vs_drag1=%.6f\n",
                apex, apex_e, fabsf(apex - apex_e), max_y_error);
@@ -185,13 +181,9 @@ int main(void) {
         physics_world_cleanup(&w3);
     }
 
-    /* Test 4: Horizontal motion with drag=1 - should be perfectly uniform
-     * With drag=1 and gravity=0, exact integration: x = x0 + v0*t (exact).
-     * No drag in horizontal (drag is isotropic but gravity=0 -> no velocity change).
-     * Discrete time stepping: exact position update.
-     * NOTE: Current engine shows ~170m drift over 60s for horizontal motion.
-     * This is a known issue with the free-flight path for pure horizontal motion.
-     * Tolerance adjusted to match observed behavior. */
+    /* Test 4: Horizontal motion with drag=1 is uniform. The built-in world
+     * safety bounds are +/-250m, so stop before they can clamp the body; this
+     * test is an integrator oracle, not a boundary test. */
     {
         g_cfg.world.drag = 1.0f;
         g_cfg.world.gravity = 0.0f; /* no gravity */
@@ -206,25 +198,24 @@ int main(void) {
         const float dt = 1.0f / 60.0f;
         float max_x_err = 0.0f, max_z_err = 0.0f;
 
-        for (int t = 0; t < 3600; t++) { /* 60 seconds */
+        for (int t = 0; t < 1500; t++) { /* 25 seconds; x remains below 250m */
             physics_world_step(&w4, dt);
             rigidbody *b = &w4.bodies[s];
-            float texact = (float)(t + 1) * dt;
-            float x_exact = 7.0f * texact;
-            float z_exact = 3.0f * texact;
-            float x_err = fabsf(b->position.x - x_exact);
-            float z_err = fabsf(b->position.z - z_exact);
+            double texact = (double)(t + 1) / 60.0;
+            double x_exact = 7.0 * texact;
+            double z_exact = 3.0 * texact;
+            float x_err = (float)fabs((double)b->position.x - x_exact);
+            float z_err = (float)fabs((double)b->position.z - z_exact);
             if (x_err > max_x_err) max_x_err = x_err;
             if (z_err > max_z_err) max_z_err = z_err;
         }
 
         printf("[INFO] horizontal drag=1 max_x_err=%.6f max_z_err=%.6f\n", max_x_err, max_z_err);
-        /* Known issue: horizontal free-flight with drag=1 shows drift.
-         * z_err is tiny (~0.006m) but x_err is ~170m over 60s.
-         * This is a known limitation in the free-flight path for pure horizontal motion.
-         * Tolerance adjusted to 200m to match observed behavior. */
-        if (max_x_err > 200.0f || max_z_err > 0.01f) { printf("[FAIL] horizontal drift with drag=1\n"); fail = 1; }
-        else { printf("[PASS] horizontal motion within known tolerance (drag=1)\n"); }
+        /* Float world state accumulates small roundoff over 1500 ticks; a
+         * 1cm bound is generous relative to that error and far below the old
+         * 170m boundary-clamp artifact. */
+        if (max_x_err > 0.01f || max_z_err > 0.01f) { printf("[FAIL] horizontal drift with drag=1\n"); fail = 1; }
+        else { printf("[PASS] horizontal motion matches analytic free flight\n"); }
 
         physics_world_cleanup(&w4);
     }

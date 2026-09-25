@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <math.h>
 #include "core/physics_world.h"
+#include "core/rigidbody.h"
+#include "physics/collision_mechanics.h"
 #include "physics/constraint.h"
 #include "config/mpe_config.h"
 
@@ -55,6 +57,7 @@ int main(void) {
         g_cfg.world.drag = 1.0f;
 
         int floor = physics_world_add_cube(&world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
+        world.bodies[floor].restitution = 0.0f;
         int sphere = physics_world_add_sphere(&world, 0.5f, 1.0f, (vector3){0.0f, 50.0f, 0.0f});
         world.bodies[sphere].velocity = (vector3){0.0f, -60.0f, 0.0f};
         world.bodies[sphere].restitution = 0.0f;
@@ -87,6 +90,7 @@ int main(void) {
         g_cfg.world.drag = 1.0f;
 
         int floor = physics_world_add_cube(&world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){5.0f, 0.5f, 5.0f}, 0.0f);
+        world.bodies[floor].restitution = 0.0f;
 
         int cyl = physics_world_add_cylinder(&world, 0.3f, 0.5f, 1.0f, (vector3){0.0f, 2.0f, 0.0f});
         world.bodies[cyl].angular_velocity = (vector3){0.0f, 0.0f, 100.0f}; /* fast spin */
@@ -107,11 +111,9 @@ int main(void) {
         physics_world_cleanup(&world);
     }
 
-    /* Test 4: Two fast spheres colliding head-on
-     * CCD for sphere-sphere only does floor plane + volume sweep.
-     * Volume sweep uses linear relative velocity sweep (AABB).
-     * At 80 m/s each, relative 160 m/s, displacement 2.67m/tick > diameter 1m.
-     * The linear sweep against bounding spheres should catch it. */
+    /* Test 4: Two fast spheres collide head-on. Check the post-impact
+     * separating velocity; a post-step distance check can miss a collision
+     * that has already been resolved during the same tick. */
     {
         physics_world world;
         physics_world_init(&world);
@@ -126,6 +128,8 @@ int main(void) {
         world.bodies[b].velocity = (vector3){-80.0f, 0.0f, 0.0f};
         world.bodies[a].restitution = 1.0f;
         world.bodies[b].restitution = 1.0f;
+        world.bodies[a].friction_static = world.bodies[b].friction_static = 0.0f;
+        world.bodies[a].friction_kinetic = world.bodies[b].friction_kinetic = 0.0f;
         rigidbody_wake(&world.bodies[a]);
         rigidbody_wake(&world.bodies[b]);
 
@@ -134,24 +138,27 @@ int main(void) {
 
         for (int t = 0; t < 60; t++) {
             physics_world_step(&world, dt);
-            float d = vector3_length(vector3_subtraction(world.bodies[0].position, world.bodies[1].position));
-            if (d <= 1.0f) { collided = 1; break; }
+            if (world.bodies[a].velocity.x < 0.0f && world.bodies[b].velocity.x > 0.0f) {
+                collided = 1;
+                break;
+            }
         }
 
         printf("[INFO] ccd_fast_spheres collided=%d\n", collided);
-        /* Volume sweep is conservative (bounding spheres). At 160 m/s relative,
-         * swept AABB may or may not catch depending on cell alignment.
-         * This is a known CCD limitation for fast sphere-sphere. */
-        if (!collided) { printf("[INFO] CCD missed fast sphere-sphere (known volume sweep limitation)\n"); }
-        else { printf("[PASS] CCD catches fast sphere-sphere\n"); }
+        if (!collided) { printf("[FAIL] CCD missed fast sphere-sphere\n"); fail = 1; }
+        else if (fabsf(world.bodies[a].velocity.x + world.bodies[b].velocity.x) > 0.1f ||
+                 fabsf(fabsf(world.bodies[a].velocity.x) - 80.0f) > 1.0f) {
+            printf("[FAIL] sphere-sphere impact violated equal-mass elastic invariants\n");
+            fail = 1;
+        } else { printf("[PASS] CCD catches fast sphere-sphere with momentum and energy conserved\n"); }
         physics_world_cleanup(&world);
     }
 
-    /* Test 5: CCD remainder integration - exact parabola after TOI
-     * The exact remainder integration is exact for gravity+drag.
-     * But the test's y_exact assumes continuous from t=0, while remainder
-     * starts from the CCD-clamped state (TOI). The max error is expected to be
-     * larger than 1mm due to discrete TOI resolution and remainder start. */
+    /* Test 5: CCD's gravity+drag advance composes across the TOI split.
+     * Clamp a sphere against a wall, then integrate the recorded remainder
+     * without solving contact. Its path must equal one unsplit free-flight
+     * interval; this tests the integrator semigroup without inventing a floor
+     * trajectory or mixing in the contact impulse. */
     {
         physics_world world;
         physics_world_init(&world);
@@ -160,28 +167,36 @@ int main(void) {
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 1.0f;
 
-        int sphere = physics_world_add_sphere(&world, 0.1f, 1.0f, (vector3){-1.0f, 10.0f, 0.0f});
-        world.bodies[sphere].velocity = (vector3){20.0f, -30.0f, 0.0f};
+        int wall = physics_world_add_cube(&world, (vector3){0.0f, 0.0f, 0.0f},
+                                          (vector3){0.025f, 20.0f, 5.0f}, 0.0f);
+        int sphere = physics_world_add_sphere(&world, 0.1f, 1.0f, (vector3){-0.2f, 10.0f, 0.0f});
+        world.bodies[sphere].velocity = (vector3){20.0f, -3.0f, 0.0f};
         world.bodies[sphere].restitution = 0.0f;
         rigidbody_wake(&world.bodies[sphere]);
 
         const float dt = 1.0f / 60.0f;
-        float max_height_err = 0.0f;
-
-        for (int t = 0; t < 300; t++) {
-            physics_world_step(&world, dt);
-            rigidbody *b = &world.bodies[0];
-            float texact = (float)(t + 1) * dt;
-            float y_exact = 10.0f - 30.0f * texact - 0.5f * 9.81f * texact * texact;
-            float err = fabsf(b->position.y - y_exact);
-            if (err > max_height_err) max_height_err = err;
+        float remaining[2] = {dt, dt};
+        vector3 initial_position = world.bodies[sphere].position;
+        vector3 initial_velocity = world.bodies[sphere].velocity;
+        int clamped = collision_ccd_sweep_clamp_full(world.bodies, world.body_count, dt,
+                                                      remaining, &g_cfg, NULL, NULL);
+        if (clamped != 1 || !(remaining[sphere] > 0.0f && remaining[sphere] < dt)) {
+            printf("[FAIL] CCD did not record a valid wall TOI (clamped=%d remainder=%.8f)\n",
+                   clamped, remaining[sphere]);
+            fail = 1;
+        } else {
+            rb_integrate_position_exact(&world.bodies[sphere], remaining[sphere], &g_cfg, true);
+            double t = (double)dt;
+            double y_expected = (double)initial_position.y + (double)initial_velocity.y * t +
+                                0.5 * (double)g_cfg.world.gravity * t * t;
+            double x_expected = (double)initial_position.x + (double)initial_velocity.x * t;
+            double err = hypot((double)world.bodies[sphere].position.x - x_expected,
+                               (double)world.bodies[sphere].position.y - y_expected);
+            printf("[INFO] ccd_remainder_semigroup error=%.9g TOI_remainder=%.8f\n", err, remaining[sphere]);
+            if (err > 2e-5) { printf("[FAIL] CCD split-flight semigroup error %.9g\n", err); fail = 1; }
+            else { printf("[PASS] CCD TOI and remainder compose to unsplit free flight\n"); }
         }
-
-        printf("[INFO] ccd_remainder_parabola max_err=%.4f\n", max_height_err);
-        /* Remainder integration starts from clamped TOI state, not t=0.
-         * Error accumulates from TOI discretization. Tolerance 1m. */
-        if (max_height_err > 1.0f) { printf("[FAIL] CCD remainder not exact parabola %.4f\n", max_height_err); fail = 1; }
-        else { printf("[PASS] CCD remainder integration exact within tolerance\n"); }
+        (void)wall;
         physics_world_cleanup(&world);
     }
 

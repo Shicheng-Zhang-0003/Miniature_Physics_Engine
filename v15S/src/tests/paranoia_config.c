@@ -52,7 +52,7 @@ int main(void) {
         mpe_config_set_int("timestep.solver_iterations", 32);
         mpe_config_set_float("solver.penetration_slop", 0.02f);
 
-        char path[256] = "/tmp/paranoia_config.cfg";
+        char path[256] = "../../temp/paranoia_config.cfg";
         bool save_result = mpe_config_save(path);
         if (!save_result) { printf("[FAIL] config save failed\n"); fail = 1; }
 
@@ -72,6 +72,7 @@ int main(void) {
         printf("[INFO] config_persist mismatch=%d\n", mismatch);
         if (mismatch) { printf("[FAIL] config persistence failed\n"); fail = 1; }
         else { printf("[PASS] config exact roundtrip\n"); }
+        remove(path);
     }
 
     /* Test 3: Debug-only params - cannot be set in game mode */
