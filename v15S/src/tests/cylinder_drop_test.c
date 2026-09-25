@@ -42,6 +42,7 @@ int main(void) {
 
     if ((floor_idx < 0) || (cyl_idx < 0) || (sph_idx < 0)) {
         printf("[FAIL] could not create bodies\n");
+        physics_world_cleanup(&world);
         return 1;
     }
 
@@ -65,34 +66,41 @@ int main(void) {
 
     if (nan_seen) {
         printf("[FAIL] NaN during drop\n");
+        physics_world_cleanup(&world);
         return 1;
     }
 
     /* 1. Sphere sanity: with gravity it must fall and rest near y=radius. */
     if (sph_y > 0.20f) {
         printf("[GAP] control sphere did not fall (y=%.4f) — gravity or integration broken\n", sph_y);
+        physics_world_cleanup(&world);
         return 1;
     }
     if (sph_y < -0.05f) {
         printf("[FAIL] control sphere tunneled the floor (y=%.4f)\n", sph_y);
+        physics_world_cleanup(&world);
         return 1;
     }
     if (sph_y < 0.03f || sph_y > 0.07f) {
         printf("[FAIL] control sphere did not settle at rest height (y=%.4f, expect ~0.05)\n", sph_y);
+        physics_world_cleanup(&world);
         return 1;
     }
 
     /* 2. Cylinder: did it fall through the floor? */
     if (cyl_y < -0.05f) {
         printf("[GAP] cylinder fell through the floor (y=%.4f) — cylinder contact missing\n", cyl_y);
+        physics_world_cleanup(&world);
         return 1;
     }
     if (cyl_y < 0.03f || cyl_y > 0.07f) {
         printf("[FAIL] cylinder did not settle at rest height (y=%.4f, expect ~0.05)\n", cyl_y);
+        physics_world_cleanup(&world);
         return 1;
     }
 
     printf("[PASS] cylinder rested on the floor (y=%.4f)\n", cyl_y);
+    physics_world_cleanup(&world);
     return 0;
 }
 

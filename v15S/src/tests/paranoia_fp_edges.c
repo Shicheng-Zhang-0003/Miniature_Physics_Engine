@@ -64,7 +64,6 @@ int main(void) {
         world.bodies[a].position.x = NAN; /* should be sanitized */
         rigidbody_wake(&world.bodies[a]);
 
-        const float dt = 1.0f / 60.0f;
         physics_world_step(&world, 1.0f / 60.0f);
 
         int nan_count = 0;
@@ -106,34 +105,16 @@ int main(void) {
         physics_world_cleanup(&world);
     }
 
-    /* Test 5: Subnormal numbers in physics - should not flush to zero */
+    /* Test 5: Verify real subnormal arithmetic, independent of sleep gates. */
     {
-        physics_world world;
-        physics_world_init(&world);
-        constraint_pool_init(&world);
-
-        g_cfg.world.gravity = 0.0f;
-        g_cfg.world.drag = 1.0f;
-
-        int a = physics_world_add_sphere(&world, 0.5f, 1.0f, (vector3){0.0f, 0.0f, 0.0f});
-        world.bodies[a].velocity = (vector3){1e-30f, 1e-30f, 1e-30f}; /* subnormal */
-        rigidbody_wake(&world.bodies[a]);
-
-        const float dt = 1.0f / 60.0f;
-        int flushed = 0;
-        for (int t = 0; t < 60; t++) {
-            physics_world_step(&world, dt);
-            if (world.bodies[0].velocity.x == 0.0f && world.bodies[0].velocity.y == 0.0f && world.bodies[0].velocity.z == 0.0f) {
-                flushed = 1;
-                break;
-            }
-        }
-
-        printf("[INFO] subnormal_handling flushed=%d\n", flushed);
-        /* With FTZ/DAZ disabled, subnormals should persist */
-        if (flushed) { printf("[INFO] subnormals flushed (may be expected)\n"); }
-        else { printf("[PASS] subnormals preserved\n"); }
-        physics_world_cleanup(&world);
+        volatile float smallest_subnormal = 0x1p-149f;
+        volatile float doubled_subnormal = smallest_subnormal + smallest_subnormal;
+        int preserved = smallest_subnormal > 0.0f && !isnormal(smallest_subnormal) &&
+                        doubled_subnormal == 0x1p-148f;
+        printf("[INFO] subnormal smallest=%a doubled=%a\n",
+               (double)smallest_subnormal, (double)doubled_subnormal);
+        if (!preserved) { printf("[FAIL] subnormal addition flushed or changed\n"); fail = 1; }
+        else { printf("[PASS] subnormal addition preserved\n"); }
     }
 
     /* Test 6: Matrix inversion near-singular - should not crash */

@@ -119,7 +119,7 @@ int main(void) {
     check(rev_idx >= 0, "revolute created pre-save");
     constraint_set_revolute_motor(world, rev_idx, true, 2.5f, 10.0f);
 
-    const char *path = "/tmp/mpe_scene_roundtrip.dat";
+    const char *path = "../../temp/mpe_scene_roundtrip.dat";
     check(save_scene(path) == 1, "save_scene succeeds");
     check(world->spring_joint_count == 1, "one joint saved");
 
@@ -194,7 +194,7 @@ int main(void) {
         size_t got = fread(bytes, 1, (size_t) fsize, rf);
         fclose(rf);
         check(got == (size_t) fsize, "scene file readable for tamper test");
-        const char *tamper_path = "/tmp/mpe_scene_tampered.dat";
+        const char *tamper_path = "../../temp/mpe_scene_tampered.dat";
         /* TRUTH: byte 20 = body 0 radius field (header 12 + type 4 +
          * mass 4 = 20). Corrupts payload, footer intact -> must reject. */
         bytes[20] ^= 0xFFu;

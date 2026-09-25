@@ -17,17 +17,20 @@ int main(void) {
         physics_world_init(&world);
         constraint_pool_init(&world);
 
-        g_cfg.world.gravity = -9.81f;
+        g_cfg.world.gravity = 0.0f;
         g_cfg.world.drag = 1.0f;
 
-        int a = physics_world_add_sphere(&world, 0.2f, 1.0f, (vector3){0.0f, 2.0f, 0.0f});
-        int b = physics_world_add_sphere(&world, 0.2f, 1.0f, (vector3){0.0f, 5.0f, 0.0f});
+        int a = physics_world_add_sphere(&world, 0.2f, 1.0f, (vector3){0.0f, 100.0f, 0.0f});
+        int b = physics_world_add_sphere(&world, 0.2f, 1.0f, (vector3){4.0f, 100.0f, 0.0f});
         world.bodies[a].restitution = 0.0f;
         world.bodies[b].restitution = 0.0f;
         int joint = add_joint_by_ids(&world, world.bodies[a].object_id, world.bodies[b].object_id, 3.0f, 100.0f, 1.0f);
+        if (joint < 0) { printf("[FAIL] spring joint creation failed\n"); fail = 1; }
 
         const float dt = 1.0f / 60.0f;
+        const float E_initial = 50.0f; /* 0.5*k*(4m-3m)^2 */
         float E_max = 0.0f, E_min = 1e9f;
+        float max_speed = 0.0f;
 
         for (int t = 0; t < 3600; t++) {
             physics_world_step(&world, dt);
@@ -36,16 +39,20 @@ int main(void) {
             float L = vector3_length(vector3_subtraction(world.bodies[0].position, world.bodies[1].position));
             float E_spring = 0.5f * 100.0f * (L - 3.0f) * (L - 3.0f);
             float E = Ea + Eb + E_spring;
+            float speed = fmaxf(vector3_length(world.bodies[a].velocity), vector3_length(world.bodies[b].velocity));
+            if (speed > max_speed) max_speed = speed;
             if (E > E_max) E_max = E;
             if (E < E_min) E_min = E;
         }
 
         float rel_range = (E_max - E_min) / E_max;
-        printf("[INFO] spring_energy range=%.6f (explicit Euler on underdamped spring, zeta=0.07)\n", rel_range);
-        /* Explicit Euler on underdamped spring (zeta=0.07, w0*dt=0.236): significant energy growth.
-         * Measured ~99% range over 60s. Tolerance 1.5x measured to catch regressions. */
-        if (rel_range > 1.5f) { printf("[FAIL] spring energy unbounded %.2f%%\n", rel_range*100); fail = 1; }
-        else { printf("[PASS] spring energy bounded within explicit Euler limits\n"); }
+        float peak_ratio = E_max / E_initial;
+        printf("[INFO] spring_energy range=%.6f peak/E0=%.4f max_speed=%.4f (60s, zeta=0.07)\n",
+               rel_range, peak_ratio, max_speed);
+        if (!(max_speed > 0.1f)) { printf("[FAIL] spring did not activate\n"); fail = 1; }
+        if (!isfinite(peak_ratio) || peak_ratio > 1.10f) {
+            printf("[FAIL] spring energy peak exceeded 10%% numerical allowance\n"); fail = 1;
+        } else { printf("[PASS] spring energy remains bounded near its initial value\n"); }
         physics_world_cleanup(&world);
     }
 
@@ -62,7 +69,8 @@ int main(void) {
         int b = physics_world_add_sphere(&world, 0.5f, 1.0f, (vector3){1.0f, 0.0f, 0.0f});
         world.bodies[a].restitution = 0.0f;
         world.bodies[b].restitution = 0.0f;
-        int joint = add_joint_by_ids(&world, world.bodies[a].object_id, world.bodies[b].object_id, 1.0f, 10000.0f, 0.0f); /* extremely stiff */
+        int joint = add_joint_by_ids(&world, world.bodies[a].object_id, world.bodies[b].object_id, 0.5f, 10000.0f, 0.0f); /* compressed and extremely stiff */
+        if (joint < 0) { printf("[FAIL] stiff spring creation failed\n"); fail = 1; }
 
         const float dt = 1.0f / 60.0f;
         int nan_count = 0;
@@ -96,7 +104,8 @@ int main(void) {
 
         int a = physics_world_add_sphere(&world, 0.5f, 1.0f, (vector3){0.0f, 0.0f, 0.0f});
         int b = physics_world_add_sphere(&world, 0.5f, 1.0f, (vector3){0.0f, 0.0f, 0.0f}); /* exact same position */
-        int joint = add_joint_by_ids(&world, world.bodies[0].object_id, world.bodies[1].object_id, 1.0f, 100.0f, 0.0f);
+        int joint = add_joint_by_ids(&world, world.bodies[a].object_id, world.bodies[b].object_id, 1.0f, 100.0f, 0.0f);
+        if (joint < 0) { printf("[FAIL] coincident spring creation failed\n"); fail = 1; }
 
         const float dt = 1.0f / 60.0f;
         int nan_count = 0;
@@ -125,7 +134,8 @@ int main(void) {
 
         int a = physics_world_add_sphere(&world, 0.2f, 1.0f, (vector3){0.0f, 2.0f, 0.0f});
         int b = physics_world_add_sphere(&world, 0.2f, 1.0f, (vector3){0.0f, 5.0f, 0.0f});
-        int joint = add_joint_by_ids(&world, world.bodies[0].object_id, world.bodies[1].object_id, 3.0f, 100.0f, 1.0f);
+        int joint = add_joint_by_ids(&world, world.bodies[a].object_id, world.bodies[b].object_id, 3.0f, 100.0f, 1.0f);
+        if (joint < 0) { printf("[FAIL] removable spring creation failed\n"); fail = 1; }
 
         const float dt = 1.0f / 60.0f;
         for (int t = 0; t < 60; t++) physics_world_step(&world, dt);
@@ -157,7 +167,8 @@ int main(void) {
         world.bodies[a].sleep_timer = 1.0f;
 
         int b = physics_world_add_sphere(&world, 0.5f, 1.0f, (vector3){0.0f, 3.0f, 0.0f});
-        int joint = add_joint_by_ids(&world, world.bodies[0].object_id, world.bodies[1].object_id, 2.5f, 50.0f, 1.0f);
+        int joint = add_joint_by_ids(&world, world.bodies[a].object_id, world.bodies[b].object_id, 2.0f, 50.0f, 1.0f);
+        if (joint < 0) { printf("[FAIL] waking spring creation failed\n"); fail = 1; }
 
         const float dt = 1.0f / 60.0f;
         for (int t = 0; t < 600; t++) physics_world_step(&world, dt);

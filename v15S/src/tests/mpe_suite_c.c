@@ -552,7 +552,7 @@ int mpe_t_scene_roundtrip(void) {
     uint32_t idb = w->bodies[b].object_id;
     float px = w->bodies[a].position.x, py = w->bodies[a].position.y;
     int n_body = w->body_count;
-    const char *path = "/tmp/mpe_suite_roundtrip.dat";
+    const char *path = "../../temp/mpe_suite_roundtrip.dat";
     MPE_CHECK(&t, save_scene(path) != 0);
     /* Mutate, then reload and compare. */
     w->bodies[a].position = (vector3){99.0f, 99.0f, 99.0f};
@@ -664,6 +664,20 @@ int mpe_t_module(void) {
 }
 
 /* math3_inverse: analytic inverse at small inertia tensors. */
+static uint32_t mpe_inverse_rng(uint32_t *state) {
+    /* xorshift32: fixed seed, no libc/global RNG state and identical inputs. */
+    uint32_t x = *state;
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    *state = x;
+    return x;
+}
+
+static float mpe_inverse_rand_signed(uint32_t *state) {
+    return (float)(mpe_inverse_rng(state) >> 8) * (1.0f / 16777216.0f) * 2.0f - 1.0f;
+}
+
 int mpe_t_math3_inverse(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "math3_inverse");
@@ -681,8 +695,56 @@ int mpe_t_math3_inverse(void) {
     math3 tiny = {{{4e-12f, 0, 0}, {0, 4e-12f, 0}, {0, 0, 4e-12f}}};
     math3 tinv = math3_inverse(tiny);
     MPE_CHECK(&t, isfinite(tinv.matrix[0][0]) && tinv.matrix[0][0] > 0.0f);
+
+    /* Property sweep: 256 deterministic SPD matrices built as L*L^T.
+     * Sweep their magnitude over 2^-24 .. 2^24 and verify A*A^-1 ~= I.
+     * This tests scale invariance and non-diagonal cofactors independently
+     * of the hand-picked matrix above, without stochastic CI behavior. */
+    uint32_t seed = 0x6d706531u;
+    for (int sample = 0; sample < 256; ++sample) {
+        float lower[3][3] = {{0.0f}};
+        lower[0][0] = 0.75f + 0.75f * (mpe_inverse_rng(&seed) >> 8) * (1.0f / 16777216.0f);
+        lower[1][1] = 0.75f + 0.75f * (mpe_inverse_rng(&seed) >> 8) * (1.0f / 16777216.0f);
+        lower[2][2] = 0.75f + 0.75f * (mpe_inverse_rng(&seed) >> 8) * (1.0f / 16777216.0f);
+        lower[1][0] = 0.35f * mpe_inverse_rand_signed(&seed);
+        lower[2][0] = 0.35f * mpe_inverse_rand_signed(&seed);
+        lower[2][1] = 0.35f * mpe_inverse_rand_signed(&seed);
+        int exponent = -24 + (sample * 37 % 49);
+        float scale = ldexpf(1.0f, exponent);
+        math3 candidate = {{{0.0f}}};
+        for (int row = 0; row < 3; ++row) {
+            for (int col = 0; col < 3; ++col) {
+                double sum = 0.0;
+                for (int k = 0; k < 3; ++k) {
+                    sum += (double)lower[row][k] * (double)lower[col][k];
+                }
+                candidate.matrix[row][col] = (float)(sum * (double)scale);
+            }
+        }
+        math3 candidate_inverse = math3_inverse(candidate);
+        math3 product = math3_multiplication(candidate, candidate_inverse);
+        for (int row = 0; row < 3; ++row) {
+            for (int col = 0; col < 3; ++col) {
+                float want = (row == col) ? 1.0f : 0.0f;
+                MPE_CHECK_NEAR(&t, product.matrix[row][col], want, 2.5e-4f,
+                               "seeded-spd-inverse-identity");
+            }
+        }
+    }
+
+    /* Singular-axis and non-finite inputs have documented safe fallbacks. */
+    math3 locked = {{{0.0f, 0.0f, 0.0f}, {0.0f, 2.0f, 0.0f}, {0.0f, 0.0f, 4.0f}}};
+    math3 locked_inverse = math3_inverse(locked);
+    MPE_CHECK_NEAR(&t, locked_inverse.matrix[0][0], 0.0f, 0.0f, "locked-axis-inverse");
+    MPE_CHECK_NEAR(&t, locked_inverse.matrix[1][1], 0.5f, 0.0f, "live-axis-inverse-y");
+    MPE_CHECK_NEAR(&t, locked_inverse.matrix[2][2], 0.25f, 0.0f, "live-axis-inverse-z");
+    math3 invalid = {{{NAN, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}}};
+    math3 invalid_inverse = math3_inverse(invalid);
+    MPE_CHECK(&t, invalid_inverse.matrix[0][0] == 0.0f && invalid_inverse.matrix[1][1] == 0.0f &&
+                     invalid_inverse.matrix[2][2] == 0.0f);
+    MPE_INFO("matrix inverse property sweep: 256 fixed-seed SPD matrices, exponent range [-24, 24]");
     if (t.failures == 0) {
-        printf("[PASS] matrix inverse exact\n");
+        printf("[PASS] matrix inverse analytic, scaled, singular-axis, and non-finite cases\n");
     }
     mpe_test_end(&t);
     return t.failures;
