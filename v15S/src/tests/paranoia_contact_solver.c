@@ -21,48 +21,69 @@ int main(void) {
 
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 1.0f;
+        world.static_plane_enabled = true;
+        world.static_plane_body.restitution = 0.8f;
+        world.static_plane_body.friction_static = 0.0f;
+        world.static_plane_body.friction_kinetic = 0.0f;
 
-        int s = physics_world_add_sphere(&world, 0.5f, 1.0f, (vector3){0.0f, 5.0f, 0.0f});
+        int s = physics_world_add_sphere(&world, 0.5f, 1.0f, (vector3){0.0f, 5.5f, 0.0f});
         world.bodies[s].restitution = 0.8f;
         world.bodies[s].friction_static = 0.0f;
         world.bodies[s].friction_kinetic = 0.0f;
         rigidbody_wake(&world.bodies[s]);
 
         const float dt = 1.0f / 60.0f;
-        float apex_heights[10];
+        float apex_heights[4];
         int apex_count = 0;
+        float restitution_samples[4];
+        int restitution_count = 0;
+        float previous_vy = world.bodies[s].velocity.y;
 
-        for (int t = 0; t < 2000; t++) {
+        for (int t = 0; t < 6000; t++) {
             physics_world_step(&world, dt);
             rigidbody *b = &world.bodies[s];
-            if (b->position.y > 0.0f && (apex_count == 0 || b->position.y > apex_heights[apex_count-1])) {
-                apex_heights[apex_count] = b->position.y;
+            if (previous_vy < 0.0f && b->velocity.y > 0.0f && restitution_count < 4) {
+                float incoming = (world.manifolds && world.manifolds[0].contact_count > 0)
+                                     ? -world.manifolds[0].contacts[0].impact_velocity
+                                     : 0.0f;
+                restitution_samples[restitution_count++] =
+                    (incoming > 0.0f) ? b->velocity.y / incoming : 0.0f;
+            }
+            if (previous_vy > 0.0f && b->velocity.y <= 0.0f && apex_count < 4) {
+                apex_heights[apex_count] = b->position.y - b->radius;
                 apex_count++;
             }
-            if (apex_count >= 10) break;
+            previous_vy = b->velocity.y;
+            if (apex_count >= 4) break;
         }
 
-        float expected_apex = 5.0f;
         float e = 0.8f;
-        int passed = 1;
-        for (int i = 0; i < apex_count; i++) {
-            expected_apex *= e * e;
-            float ratio = apex_heights[i] / expected_apex;
-            /* Sequential impulse + Poisson: apex ratio converges to ~e (0.8), not e^2 (0.64).
-             * Measured ratio ~1.5-1.6 due to solver convergence. Tolerance: 2x expected. */
-            if (fabsf(ratio - 1.0f) > 1.0f) {
-                printf("[FAIL] bounce %d: apex=%.4f expected=%.4f ratio=%.4f\n", i+1, apex_heights[i], expected_apex, ratio);
+        if (apex_count < 3) {
+            printf("[FAIL] only %d measurable restitution apexes\n", apex_count);
+            fail = 1;
+        }
+        for (int i = 0; i < restitution_count; i++) {
+            float error = fabsf(restitution_samples[i] - e);
+            printf("[INFO] bounce %d: apex=%.4f measured_e=%.5f expected_e=%.2f\n",
+                   i + 1, apex_heights[i], restitution_samples[i], e);
+            /* Measure Newton restitution at the contact itself. Apex heights
+             * include CCD's substep position and are not a valid per-impact
+             * oracle when the solver advances only the remaining fraction. */
+            if (error > 0.03f) {
+                printf("[FAIL] bounce %d: measured restitution error %.4f\n", i + 1, error);
                 fail = 1;
-                passed = 0;
             }
         }
-        if (passed) printf("[PASS] Poisson restitution series within solver bounds\n");
+        if (restitution_count < 3) {
+            printf("[FAIL] only %d measurable impact restitution samples\n", restitution_count);
+            fail = 1;
+        }
+        if (apex_count >= 3 && restitution_count >= 3 && fail == 0)
+            printf("[PASS] Poisson restitution matches the measured impact-speed ratio\n");
         physics_world_cleanup(&world);
     }
 
-    /* Test 2: Coulomb friction - static hold against lateral push.
-     * Sequential impulse solver: static friction holds if |F_push| <= mu_s * N.
-     * At 64 iterations, residual drift ~0.1m over 10s for 0.5 m/s push on mu=1.0. */
+    /* Test 2: Coulomb friction arrests low-speed slip on a real floor slab. */
     {
         physics_world world;
         physics_world_init(&world);
@@ -70,6 +91,11 @@ int main(void) {
 
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 1.0f;
+        int floor = physics_world_add_cube(&world, (vector3){0.0f, -0.5f, 0.0f},
+                                           (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
+        world.bodies[floor].restitution = 0.0f;
+        world.bodies[floor].friction_static = 1.0f;
+        world.bodies[floor].friction_kinetic = 0.8f;
 
         int cube = physics_world_add_cube(&world, (vector3){0.0f, 1.0f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
         world.bodies[cube].restitution = 0.0f;
@@ -77,12 +103,7 @@ int main(void) {
         world.bodies[cube].friction_kinetic = 0.8f;
         rigidbody_wake(&world.bodies[cube]);
 
-        int floor = physics_world_add_cube(&world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
-        world.bodies[floor].restitution = 0.0f;
-        world.bodies[floor].friction_static = 1.0f;
-        world.bodies[floor].friction_kinetic = 0.8f;
-
-        world.bodies[cube].velocity = (vector3){0.5f, 0.0f, 0.0f};
+        world.bodies[cube].velocity = (vector3){0.05f, 0.0f, 0.0f};
 
         const float dt = 1.0f / 60.0f;
         float max_x = 0.0f;
@@ -93,17 +114,13 @@ int main(void) {
             if (fabsf(b->position.x) > max_x) max_x = fabsf(b->position.x);
         }
 
-        printf("[INFO] static_friction max_x_drift=%.6f (10s, mu=1.0, push=0.5m/s)\n", max_x);
-        /* 64 iterations, discrete time step: residual drift ~0.1-0.2m over 10s.
-         * Tolerance: 0.5m. */
-        if (max_x > 0.5f) { printf("[FAIL] static friction excessive drift %.4f\n", max_x); fail = 1; }
-        else { printf("[PASS] static friction holds within solver tolerance\n"); }
+        printf("[INFO] static_friction drift=%.6f (10s, mu=1.0, initial vx=0.05m/s)\n", max_x);
+        if (max_x > 0.05f) { printf("[FAIL] static friction excessive drift %.4f\n", max_x); fail = 1; }
+        else { printf("[PASS] static friction arrests low-speed slip\n"); }
         physics_world_cleanup(&world);
     }
 
-    /* Test 3: Friction stopping distance - v^2/(2*mu_k*g).
-     * Sequential impulse: kinetic friction applied per iteration.
-     * Use low static friction so the cube actually slides (mu_s < v*dt threshold). */
+    /* Test 3: Sliding-block stopping distance - d = v0^2/(2*mu_k*g). */
     {
         physics_world world;
         physics_world_init(&world);
@@ -111,16 +128,24 @@ int main(void) {
 
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 1.0f;
+        int floor = physics_world_add_cube(&world, (vector3){0.0f, -0.5f, 0.0f},
+                                           (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
+        world.bodies[floor].restitution = 0.0f;
+        world.bodies[floor].friction_static = 0.3f;
+        world.bodies[floor].friction_kinetic = 0.3f;
 
-        int cube = physics_world_add_cube(&world, (vector3){0.0f, 0.5f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
+        int cube = physics_world_add_cube(&world, (vector3){-6.0f, 0.55f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
         world.bodies[cube].restitution = 0.0f;
-        world.bodies[cube].friction_static = 0.1f; /* Low enough to not hold 2 m/s */
+        world.bodies[cube].friction_static = 0.3f;
         world.bodies[cube].friction_kinetic = 0.3f;
-        world.bodies[cube].velocity = (vector3){2.0f, 0.0f, 0.0f};
+        world.bodies[cube].velocity = (vector3){4.0f, 0.0f, 0.0f};
         rigidbody_wake(&world.bodies[cube]);
 
         const float dt = 1.0f / 60.0f;
-        float x_start = 0.0f, x_end = 0.0f;
+        for (int t = 0; t < 60; t++) physics_world_step(&world, dt);
+        float x_start = world.bodies[cube].position.x;
+        float v_start = vector3_length(world.bodies[cube].velocity);
+        float x_end = x_start;
         int stopped = 0;
 
         for (int t = 0; t < 600; t++) {
@@ -132,14 +157,13 @@ int main(void) {
             }
         }
 
-        float expected = 2.0f * 2.0f / (2.0f * 0.3f * 9.81f); /* ~0.68m */
+        float expected = v_start * v_start / (2.0f * 0.3f * 9.81f);
         float actual = fabsf(x_end - x_start);
         float err = fabsf(actual - expected) / expected;
 
         printf("[INFO] friction_stop expected=%.4f actual=%.4f err=%.2f%%\n", expected, actual, err*100);
-        /* Sequential impulse friction: stopping distance within 30% of analytic.
-         * Discrete time step + iteration count affects accuracy. */
-        if (err > 0.3f) { printf("[FAIL] stopping distance error %.2f%%\n", err*100); fail = 1; }
+        /* Same setup/material combine as the passing canonical oracle. */
+        if (!stopped || err > 0.15f) { printf("[FAIL] stopping distance error %.2f%% (stopped=%d)\n", err*100, stopped); fail = 1; }
         else { printf("[PASS] Coulomb stopping distance within solver tolerance\n"); }
 
         physics_world_cleanup(&world);
@@ -153,6 +177,11 @@ int main(void) {
 
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 1.0f;
+        int floor = physics_world_add_cube(&world, (vector3){0.0f, -0.5f, 0.0f},
+                                           (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
+        world.bodies[floor].restitution = 0.0f;
+        world.bodies[floor].friction_static = 0.0f;
+        world.bodies[floor].friction_kinetic = 0.0f;
 
         int cube = physics_world_add_cube(&world, (vector3){0.0f, 1.0f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
         world.bodies[cube].restitution = 0.0f;
@@ -192,6 +221,11 @@ int main(void) {
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 1.0f;
         g_cfg.world.rolling_resistance_coeff = 0.01f;
+        int floor = physics_world_add_cube(&world, (vector3){0.0f, -0.5f, 0.0f},
+                                           (vector3){100.0f, 0.5f, 100.0f}, 0.0f);
+        world.bodies[floor].restitution = 0.0f;
+        world.bodies[floor].friction_static = 0.5f;
+        world.bodies[floor].friction_kinetic = 0.5f;
 
         int s = physics_world_add_sphere(&world, 0.5f, 1.0f, (vector3){0.0f, 0.5f, 0.0f});
         world.bodies[s].velocity = (vector3){2.0f, 0.0f, 0.0f};
@@ -200,7 +234,8 @@ int main(void) {
         rigidbody_wake(&world.bodies[s]);
 
         const float dt = 1.0f / 60.0f;
-        float x_start = 0.0f, x_end = 0.0f;
+        float x_start = world.bodies[s].position.x;
+        float x_end = x_start;
         int stopped = 0;
 
         for (int t = 0; t < 6000; t++) {
@@ -208,17 +243,23 @@ int main(void) {
             rigidbody *b = &world.bodies[s];
             if (!stopped && vector3_length(b->velocity) < 0.01f) {
                 stopped = 1;
-                x_end = b->position.x;
             }
+            x_end = b->position.x;
         }
 
         float dist = fabsf(x_end - x_start);
-        printf("[INFO] rolling_resistance rolled %.2f m (analytic ~20m, stopped=%d)\n", dist, stopped);
-        /* Rolling resistance in this engine applies torque at contact patch.
-         * At mu_r=0.01, R=0.5, deceleration ~0.1 m/s^2. Stop distance ~20m.
-         * Tolerance: 1-50m (accounting for discrete time, patch sharing). */
-        if (dist < 0.5f || dist > 50.0f) { printf("[FAIL] rolling resistance distance %.2f m unrealistic\n", dist); fail = 1; }
-        else { printf("[PASS] rolling resistance deceleration plausible\n"); }
+        float final_speed = vector3_length(world.bodies[s].velocity);
+        float final_spin = vector3_length(world.bodies[s].angular_velocity);
+        printf("[INFO] rolling_resistance distance=%.2f m final_speed=%.4f final_spin=%.4f stopped=%d\n",
+               dist, final_speed, final_spin, stopped);
+        /* For a solid sphere rolling without slip, a = mu_r*g/(1+I/(mR^2))
+         * = 5/7*mu_r*g; the ideal stop distance here is about 28.6 m. */
+        if (!stopped || dist < 5.0f || dist > 45.0f || final_speed > 0.01f) {
+            printf("[FAIL] rolling resistance violates sphere decay model\n");
+            fail = 1;
+        } else {
+            printf("[PASS] rolling resistance decelerates the sphere within the rigid-body model\n");
+        }
 
         physics_world_cleanup(&world);
     }

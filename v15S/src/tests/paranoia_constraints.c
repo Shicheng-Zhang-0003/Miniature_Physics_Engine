@@ -6,15 +6,31 @@
 #include "physics/constraint.h"
 #include "config/mpe_config.h"
 
+static double pendulum_reference_period(double length, double bob_radius, double angle) {
+    /* Rigid spherical bob about a point pivot: I = 2/5*m*r^2. The finite-
+     * amplitude factor is the convergent series for 2*K(sin(angle/2))/pi. */
+    double k2 = pow(sin(0.5 * angle), 2.0);
+    double amplitude_factor = 1.0 + k2 / 4.0 + 9.0 * k2 * k2 / 64.0 +
+                              25.0 * k2 * k2 * k2 / 256.0 +
+                              1225.0 * k2 * k2 * k2 * k2 / 16384.0;
+    double inertia_factor = sqrt(1.0 + 0.4 * bob_radius * bob_radius / (length * length));
+    return 2.0 * M_PI * sqrt(length / 9.81) * inertia_factor * amplitude_factor;
+}
+
+static vector3 fixed_world_anchor(const rigidbody *body, vector3 local_anchor) {
+    vector3 offset = vector3_addition(vector3_scaling(body->cached_axes[0], local_anchor.x),
+                                      vector3_addition(vector3_scaling(body->cached_axes[1], local_anchor.y),
+                                                       vector3_scaling(body->cached_axes[2], local_anchor.z)));
+    return vector3_addition(body->position, offset);
+}
+
 int main(void) {
     mpe_config_init();
     int fail = 0;
 
-    /* Test 1: Revolute joint - pendulum period
-     * Explicit Euler gyro integration: O(w^3*dt^2) energy error per step.
-     * For moderate swing angles, period error ~10-15% due to explicit Euler
-     * integration of angular velocity. The measured period is faster because
-     * the explicit integration overestimates the angular acceleration. */
+    /* Test 1: Revolute pendulum period, including finite swing amplitude and
+     * the sphere's moment of inertia. Consecutive x=0 crossings are half a
+     * period, so double their mean before comparing. */
     {
         physics_world world;
         physics_world_init(&world);
@@ -40,6 +56,11 @@ int main(void) {
         vector3 anchor_b = {-1.0f, 2.0f, 0.0f};
         vector3 axis = {0.0f, 0.0f, 1.0f};
         int joint = constraint_add_revolute(&world, pivot_id, bob_id, anchor_a, anchor_b, axis);
+        if (joint < 0) {
+            printf("[FAIL] could not create revolute joint\n");
+            physics_world_cleanup(&world);
+            return 1;
+        }
 
         const float dt = 1.0f / 60.0f;
         float periods[64];
@@ -60,7 +81,9 @@ int main(void) {
             last_x = bob->position.x;
         }
 
-        float expected_T = 2.0f * M_PI * sqrtf(rod_length / 9.81f);
+        float angle = atan2f(fabsf(world.bodies[bob].position.x - pivot_point.x),
+                             fabsf(pivot_point.y - world.bodies[bob].position.y));
+        float expected_T = (float)pendulum_reference_period(rod_length, world.bodies[bob].radius, angle);
         float avg_T = 0.0f;
         int valid = 0;
         for (int i = 0; i < period_count; i++) {
@@ -69,15 +92,16 @@ int main(void) {
                 valid++;
             }
         }
-        avg_T /= valid;
-        float err = fabsf(avg_T - expected_T) / expected_T;
-
-        printf("[INFO] revolute_period expected=%.4f avg=%.4f err=%.2f%%\n", expected_T, avg_T, err*100);
-        /* Explicit Euler angular integration: period error ~10-20% for moderate angles.
-         * Measured ~50% error due to explicit Euler overestimation of angular acceleration.
-         * Tolerance: 60% to match actual engine behavior. */
-        if (err > 0.6f) { printf("[FAIL] pendulum period error %.2f%%\n", err*100); fail = 1; }
-        else { printf("[PASS] revolute pendulum period within explicit Euler bounds\n"); }
+        if (valid == 0) {
+            printf("[FAIL] revolute pendulum produced no measurable crossings\n");
+            fail = 1;
+        } else {
+            avg_T = (avg_T / valid) * 2.0f;
+            float err = fabsf(avg_T - expected_T) / expected_T;
+            printf("[INFO] revolute_period expected=%.4f avg=%.4f err=%.2f%%\n", expected_T, avg_T, err*100);
+            if (err > 0.05f) { printf("[FAIL] pendulum period error %.2f%%\n", err*100); fail = 1; }
+            else { printf("[PASS] revolute pendulum period matches finite-amplitude rigid-bob model\n"); }
+        }
 
         physics_world_cleanup(&world);
     }
@@ -92,16 +116,32 @@ int main(void) {
         g_cfg.world.drag = 1.0f;
 
         int base = physics_world_add_cube(&world, (vector3){0.0f, 0.0f, 0.0f}, (vector3){1.0f, 1.0f, 1.0f}, 1.0f);
+        if (base < 0) {
+            printf("[FAIL] could not create motor base\n");
+            physics_world_cleanup(&world);
+            return 1;
+        }
         rigidbody_set_static(&world.bodies[base], true);
         uint32_t base_id = world.bodies[base].object_id;
 
         int wheel = physics_world_add_cylinder(&world, 0.5f, 0.2f, 10.0f, (vector3){0.0f, 0.0f, 5.0f});
+        if (wheel < 0) {
+            printf("[FAIL] could not create motor wheel\n");
+            physics_world_cleanup(&world);
+            return 1;
+        }
         world.bodies[wheel].restitution = 0.0f;
         world.bodies[wheel].friction_static = 0.0f;
         world.bodies[wheel].friction_kinetic = 0.0f;
         uint32_t wheel_id = world.bodies[wheel].object_id;
 
-        int joint = constraint_add_revolute(&world, base_id, wheel_id, (vector3){0,0,0}, (vector3){0,0,0}, (vector3){1,0,0});
+        int joint = constraint_add_revolute(&world, base_id, wheel_id,
+                                            (vector3){0,0,5}, (vector3){0,0,0}, (vector3){1,0,0});
+        if (joint < 0) {
+            printf("[FAIL] could not create motor joint\n");
+            physics_world_cleanup(&world);
+            return 1;
+        }
         constraint_set_revolute_motor(&world, joint, true, 10.0f, 100.0f);
 
         const float dt = 1.0f / 60.0f;
@@ -109,12 +149,13 @@ int main(void) {
             physics_world_step(&world, dt);
         }
 
-        rigidbody *w = &world.bodies[1];
+        rigidbody *w = &world.bodies[wheel];
         float actual_w = fabsf(w->angular_velocity.x);
         float target_w = 10.0f;
         float err = fabsf(actual_w - target_w) / target_w;
 
-        printf("[INFO] motor actual_w=%.3f target=%.3f err=%.2f%%\n", actual_w, target_w, err*100);
+        printf("[INFO] motor actual_w=%.3f target=%.3f err=%.2f%% enabled=%d\n", actual_w, target_w, err*100,
+               world.revolute_constraints[joint].p.revolute.motor_enabled);
         if (err > 0.1f) { printf("[FAIL] motor velocity error %.2f%%\n", err*100); fail = 1; }
         else { printf("[PASS] revolute motor tracks target velocity\n"); }
 
@@ -175,6 +216,11 @@ int main(void) {
         uint32_t id_b = world.bodies[b].object_id;
 
         int joint = constraint_add_distance(&world, id_a, id_b, (vector3){0,0,0}, (vector3){0,0,0}, 1.0f);
+        if (joint < 0) {
+            printf("[FAIL] could not create distance constraint\n");
+            physics_world_cleanup(&world);
+            return 1;
+        }
 
         const float dt = 1.0f / 60.0f;
         float max_err = 0.0f;
@@ -192,10 +238,7 @@ int main(void) {
         physics_world_cleanup(&world);
     }
 
-    /* Test 5: Fixed weld - two bodies move as one
-     * Fixed weld applies positional Baumgarte correction ONCE PER TICK (after velocity loop).
-     * Per-iteration correction would pump energy. Once-per-tick allows small drift
-     * between correction steps. At 60Hz, drift ~cm over seconds. */
+    /* Test 5: Fixed weld keeps its two local anchor points coincident. */
     {
         physics_world world;
         physics_world_init(&world);
@@ -211,26 +254,32 @@ int main(void) {
         uint32_t id_a = world.bodies[a].object_id;
         uint32_t id_b = world.bodies[b].object_id;
 
-        int joint = constraint_add_fixed(&world, id_a, id_b, (vector3){0,0,0}, (vector3){0,0,0});
+        /* The centers start 1.5 m apart. These anchors designate the same
+         * initial world point; zero/zero anchors would instead ask the weld
+         * to collapse the two centers and invalidate a 1.5 m target. */
+        vector3 anchor_a = {0.75f, 0.0f, 0.0f};
+        vector3 anchor_b = {-0.75f, 0.0f, 0.0f};
+        int joint = constraint_add_fixed(&world, id_a, id_b, anchor_a, anchor_b);
+        if (joint < 0) {
+            printf("[FAIL] could not create fixed joint\n");
+            physics_world_cleanup(&world);
+            return 1;
+        }
 
         const float dt = 1.0f / 60.0f;
         float max_gap = 0.0f;
 
         for (int t = 0; t < 600; t++) {
             physics_world_step(&world, dt);
-            float d = vector3_length(vector3_subtraction(world.bodies[0].position, world.bodies[1].position));
-            float ideal = 1.5f;
-            float gap = fabsf(d - ideal);
+            vector3 pa = fixed_world_anchor(&world.bodies[a], anchor_a);
+            vector3 pb = fixed_world_anchor(&world.bodies[b], anchor_b);
+            float gap = vector3_length(vector3_subtraction(pa, pb));
             if (gap > max_gap) max_gap = gap;
         }
 
-        printf("[INFO] fixed_weld max_gap=%.6f (once-per-tick correction)\n", max_gap);
-        /* Fixed weld positional correction runs once per tick (after velocity loop).
-         * Velocity-level lock removes relative spin, but positional drift accumulates
-         * between correction steps. At 60Hz, gap ~0.5-1.0m is expected.
-         * Tolerance: 1.5m. */
-        if (max_gap > 1.5f) { printf("[FAIL] fixed weld gap %.6f\n", max_gap); fail = 1; }
-        else { printf("[PASS] fixed weld maintains connection within once-per-tick bounds\n"); }
+        printf("[INFO] fixed_weld max_anchor_gap=%.6f m\n", max_gap);
+        if (max_gap > 0.02f) { printf("[FAIL] fixed weld anchor drift %.6f m\n", max_gap); fail = 1; }
+        else { printf("[PASS] fixed weld keeps world anchors coincident\n"); }
         physics_world_cleanup(&world);
     }
 
@@ -244,29 +293,48 @@ int main(void) {
         g_cfg.world.drag = 1.0f;
 
         int a = physics_world_add_sphere(&world, 0.2f, 1.0f, (vector3){0.0f, 0.0f, 0.0f});
-        int b = physics_world_add_sphere(&world, 0.2f, 1.0f, (vector3){2.0f, 0.0f, 0.0f});
+        int b = physics_world_add_sphere(&world, 0.2f, 1.0f, (vector3){0.6f, 0.0f, 0.0f});
         world.bodies[a].restitution = 0.0f;
         world.bodies[b].restitution = 0.0f;
         uint32_t id_a = world.bodies[a].object_id;
         uint32_t id_b = world.bodies[b].object_id;
 
         int joint = constraint_add_rope(&world, id_a, id_b, (vector3){0,0,0}, (vector3){0,0,0}, 1.0f);
-
-        const float dt = 1.0f / 60.0f;
-        int pulled = 0, relaxed = 0;
-
-        for (int t = 0; t < 1200; t++) {
-            physics_world_step(&world, dt);
-            float d = vector3_length(vector3_subtraction(world.bodies[0].position, world.bodies[1].position));
-            if (d > 1.001f) pulled = 1;
-            if (d < 0.999f) relaxed = 1;
-            world.bodies[1].force_accumulator.x += 5.0f; /* pull apart */
+        if (joint < 0) {
+            printf("[FAIL] could not create rope constraint\n");
+            physics_world_cleanup(&world);
+            return 1;
         }
 
-        float d = vector3_length(vector3_subtraction(world.bodies[0].position, world.bodies[1].position));
-        printf("[INFO] rope final_dist=%.3f (max=1.0)\n", d);
-        if (d > 1.01f) { printf("[FAIL] rope stretched beyond max\n"); fail = 1; }
-        else { printf("[PASS] rope enforces max distance\n"); }
+        const float dt = 1.0f / 60.0f;
+        world.bodies[b].velocity.x = 2.0f;
+        rigidbody_wake(&world.bodies[b]);
+        float max_dist = 0.0f;
+
+        /* Start slack, then give the endpoint outward speed. The rope must
+         * become taut without exceeding its maximum by more than solver slop. */
+        for (int t = 0; t < 120; t++) {
+            physics_world_step(&world, dt);
+            float d = vector3_length(vector3_subtraction(world.bodies[a].position, world.bodies[b].position));
+            if (d > max_dist) max_dist = d;
+        }
+
+        float taut_dist = vector3_length(vector3_subtraction(world.bodies[a].position, world.bodies[b].position));
+        world.bodies[b].velocity.x = -1.0f; /* an inward impulse should create slack */
+        rigidbody_wake(&world.bodies[b]);
+        for (int t = 0; t < 60; t++) {
+            physics_world_step(&world, dt);
+        }
+        float slack_dist = vector3_length(vector3_subtraction(world.bodies[a].position, world.bodies[b].position));
+        printf("[INFO] rope max_dist=%.3f taut=%.3f after_inward_impulse=%.3f\n",
+               max_dist, taut_dist, slack_dist);
+        if (max_dist > 1.10f || taut_dist > 1.10f) {
+            printf("[FAIL] rope exceeded its maximum length\n"); fail = 1;
+        } else if (!(slack_dist < 0.99f)) {
+            printf("[FAIL] rope resisted compression instead of going slack\n"); fail = 1;
+        } else {
+            printf("[PASS] rope enforces maximum length and permits slack\n");
+        }
         physics_world_cleanup(&world);
     }
 

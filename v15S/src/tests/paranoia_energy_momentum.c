@@ -31,8 +31,8 @@ int main(void) {
         g_cfg.world.drag = 1.0f;
 
         /* Place bodies at center with velocities for collision within 2s */
-        int a = physics_world_add_sphere(&world, 0.5f, 2.0f, (vector3){-50.0f, 100.0f, 0.0f});
-        int b = physics_world_add_sphere(&world, 0.3f, 1.0f, (vector3){50.0f, 100.0f, 0.0f});
+        int a = physics_world_add_sphere(&world, 0.5f, 2.0f, (vector3){-6.0f, 100.0f, 0.0f});
+        int b = physics_world_add_sphere(&world, 0.3f, 1.0f, (vector3){6.0f, 100.0f, 0.0f});
         world.bodies[a].velocity = (vector3){5.0f, 0.0f, 0.0f};
         world.bodies[b].velocity = (vector3){-3.0f, 0.0f, 0.0f};
         world.bodies[a].restitution = 1.0f;
@@ -41,14 +41,16 @@ int main(void) {
         rigidbody_wake(&world.bodies[b]);
 
         vector3 P0 = {0,0,0};
-        P0 = vector3_addition(P0, vector3_scaling(world.bodies[0].velocity, world.bodies[0].mass));
-        P0 = vector3_addition(P0, vector3_scaling(world.bodies[1].velocity, world.bodies[1].mass));
+        P0 = vector3_addition(P0, vector3_scaling(world.bodies[a].velocity, world.bodies[a].mass));
+        P0 = vector3_addition(P0, vector3_scaling(world.bodies[b].velocity, world.bodies[b].mass));
 
         const float dt = 1.0f / 60.0f;
         float max_err = 0.0f;
+        int collided = 0;
 
         for (int t = 0; t < 120; t++) {
             physics_world_step(&world, dt);
+            if (fabsf(world.bodies[a].velocity.x - 5.0f) > 0.01f) collided = 1;
             vector3 P = {0,0,0};
             for (int i = 0; i < world.body_count; i++) {
                 P = vector3_addition(P, vector3_scaling(world.bodies[i].velocity, world.bodies[i].mass));
@@ -58,6 +60,13 @@ int main(void) {
         }
 
         printf("[INFO] momentum_conservation max_err=%.6f (initial |P|=%.6f, 2s)\n", max_err, vector3_length(P0));
+        if (!collided) { printf("[FAIL] momentum case never collided\n"); fail = 1; }
+        printf("[INFO] elastic_collision vx_a=%.4f vx_b=%.4f (expected -0.3333, 7.6667)\n",
+               world.bodies[a].velocity.x, world.bodies[b].velocity.x);
+        if (fabsf(world.bodies[a].velocity.x + 1.0f / 3.0f) > 0.1f ||
+            fabsf(world.bodies[b].velocity.x - 23.0f / 3.0f) > 0.1f) {
+            printf("[FAIL] elastic collision velocities disagree with the analytic solution\n"); fail = 1;
+        }
         /* Sequential impulse + friction: ~1e-3 drift per collision, 1 collision in 2s */
         if (max_err > 1e-3f) { printf("[FAIL] momentum drift %.6f\n", max_err); fail = 1; }
         else { printf("[PASS] linear momentum conserved (err < 1mm/s momentum)\n"); }
@@ -195,9 +204,12 @@ int main(void) {
         uint32_t id_b = world.bodies[b].object_id;
 
         int joint = add_joint_by_ids(&world, id_a, id_b, 3.0f, 100.0f, 1.0f); /* k=100, c=1 */
+        if (joint < 0) { printf("[FAIL] spring joint creation failed\n"); fail = 1; }
 
         const float dt = 1.0f / 60.0f;
+        const float E_initial = 50.0f; /* 0.5*k*(4m-3m)^2 */
         float E_max = 0.0f, E_min = 1e9f;
+        float max_speed = 0.0f;
 
         for (int t = 0; t < 120; t++) {
             physics_world_step(&world, dt);
@@ -207,16 +219,21 @@ int main(void) {
             float L = vector3_length(vector3_subtraction(world.bodies[0].position, world.bodies[1].position));
             E_spring = 0.5f * 100.0f * (L - 3.0f) * (L - 3.0f);
             float E = Ea + Eb + E_spring;
+            if (!isfinite(E)) { printf("[FAIL] spring energy became non-finite\n"); fail = 1; break; }
+            float speed = fmaxf(vector3_length(world.bodies[a].velocity), vector3_length(world.bodies[b].velocity));
+            if (speed > max_speed) max_speed = speed;
             if (E > E_max) E_max = E;
             if (E < E_min) E_min = E;
         }
 
         float rel_range = (E_max - E_min) / E_max;
-        printf("[INFO] spring_energy range=%.6f (2s, explicit Euler on underdamped spring)\n", rel_range);
-        /* Explicit Euler on underdamped spring (zeta=0.07, w0*dt=0.236): significant energy growth.
-         * Measured ~98% range over 2s. Tolerance 1.5x measured to catch regressions. */
-        if (rel_range > 1.5f) { printf("[FAIL] spring energy unbounded %.2f%%\n", rel_range*100); fail = 1; }
-        else { printf("[PASS] spring energy bounded within explicit Euler limits (2s)\n"); }
+        float peak_ratio = E_max / E_initial;
+        printf("[INFO] spring_energy range=%.6f peak/E0=%.4f max_speed=%.4f (2s, explicit Euler)\n",
+               rel_range, peak_ratio, max_speed);
+        if (!(max_speed > 0.1f)) { printf("[FAIL] spring fixture never oscillated\n"); fail = 1; }
+        if (!isfinite(peak_ratio) || peak_ratio > 1.10f) {
+            printf("[FAIL] spring energy peak exceeded 10%% numerical allowance\n"); fail = 1;
+        } else { printf("[PASS] spring energy remains bounded near its initial value\n"); }
         physics_world_cleanup(&world);
     }
 
@@ -247,8 +264,6 @@ int main(void) {
             physics_world_step(&world, dt);
         }
 
-        float com_v = (vector3_length(world.bodies[0].velocity) * 2.0f + 
-                       vector3_length(world.bodies[1].velocity) * 1.0f) / 3.0f;
         vector3 P = {0,0,0};
         float M = 0.0f;
         for (int i = 0; i < world.body_count; i++) {
