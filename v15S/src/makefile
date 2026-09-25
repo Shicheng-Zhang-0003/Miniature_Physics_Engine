@@ -1,5 +1,7 @@
 # MPE engine makefile (MPE-only).
 CC = gcc
+MPE_TEMP := $(abspath ../../temp)
+export TMPDIR := $(MPE_TEMP)
 ENABLE_NATIVE ?= 0
 NATIVE_FLAG := $(if $(filter 1,$(ENABLE_NATIVE)),-march=native,)
 # GTK4: Full transition — GTK4 is now the default (v15S). GTK3 remains
@@ -68,14 +70,13 @@ uninstall:
 	rm -f $(DESTDIR)$(PREFIX)/bin/mpe-engine $(DESTDIR)$(PREFIX)/bin/mpe-tui
 	rm -rf $(DESTDIR)$(PREFIX)/share/mpe $(DESTDIR)$(PREFIX)/lib/mpe
 
-installcheck: build_suite
-	@echo "--- installcheck: Suite v2 must pass ---"
-	./test_mpe_suite --all 2>&1 | tee /tmp/mpe_installcheck.log | tail -5
-	grep -q "Blocking failures: 0" /tmp/mpe_installcheck.log
+installcheck:
+	@echo "--- installcheck: full MPE verification profile ---"
+	python3 ../../tools/test_runner.py --profile full
 
 installcheck-v1:
-	@echo "--- installcheck-v1: legacy 30-binary suite (known: stack/driven_wheel/list4 fail, test bugs) ---"
-	python3 ../../tools/test_runner.py 2>&1 | tee /tmp/mpe_installcheck_v1.log | tail -5
+	@echo "--- installcheck-v1: isolated legacy + paranoia regressions ---"
+	python3 ../../tools/test_runner.py --profile physics
 
 check-deps:
 	@pkg-config --exists gtk4 epoxy x11 || (echo "missing deps: need gtk4 epoxy x11"; exit 1)
@@ -94,11 +95,12 @@ check-flags:
 help:
 	@echo "targets: engine (default) | debug | release | install | installcheck | clean | distclean"
 	@echo "         test_<name> (build+run) | build_<name> (build only) | paranoia_*"
-	@echo "         build_suite | test_suite | test_suite_all (Suite v2: 31 tests, canonical)"
+	@echo "         test_runner.py --profile quick|physics|full (default: full, JUnit + JSON reports)"
+	@echo "         build_suite | test_suite | test_suite_all (canonical C regression suite)"
 	@echo "         mpe-tui (terminal debugger + snapshot suite) | tui-smoke | plugins/*.so"
 	@echo "         mfs_ecosystem.so (delegates to ecosystem/mfs/Makefile)"
 	@echo "         check-deps | check-deps-tui | check-flags"
-	@echo "         flow: python3 ../../tools/test_runner.py --suite [--all]"
+	@echo "         flow: python3 ../../tools/test_runner.py --profile full"
 
 # MFS lives in its distinct folder: ecosystem/mfs/ (see ecosystem/mfs/README_MFS.md).
 # It builds itself (ecosystem/mfs/Makefile, objects in ecosystem/mfs/build/);
@@ -133,6 +135,7 @@ mfs_ecosystem.so:
 # for its physics symbols but never invoked — output is terminal only).
 TUI_SRCS := tui/tui_main.c tui/tui_debugger.c tui/tui_dump.c
 TUI_CORE = $(MPE_TEST_CORE) $(SPRING_TEST_SRCS)
+TUI_OUT ?= ../../temp/tui_smoke
 # epoxy kept: spring_joint.o render path references GL symbols even though
 # the TUI never calls it at runtime (physics symbols live in the same TU).
 TUI_LIBS := -lm $(shell pkg-config --libs ncurses) $(shell pkg-config --libs epoxy) -ldl
@@ -140,18 +143,19 @@ build_tui: $(TUI_SRCS) $(TUI_CORE)
 	$(CC) $(CFLAGS) -Dmpe_tui_main $(TUI_SRCS) $(TUI_CORE) $(TUI_LIBS) -o mpe-tui
 mpe-tui: build_tui
 tui-smoke: build_tui
-	./mpe-tui --snapshot 60 --scene demo > /dev/null
-	./mpe-tui --stream 120 --every 60 --scene demo > /dev/null
-	./mpe-tui --snapshot 10 --scene tower > /dev/null
-	./mpe-tui --snapshot 10 --scene pendulum > /dev/null
-	./mpe-tui --snapshot 10 --scene springlab > /dev/null
-	./mpe-tui --snapshot 600 --scene f10 > /dev/null
-	./mpe-tui --snapshot 600 --scene stress > /dev/null
-	./mpe-tui --snapshot 60 --scene ccd > /dev/null
-	./mpe-tui --snapshot 60 --scene demo --solver seq-impulse --broadphase hash > /dev/null
+	mkdir -p $(TUI_OUT)
+	./mpe-tui --snapshot 60 --scene demo > $(TUI_OUT)/demo_snapshot.log
+	./mpe-tui --stream 120 --every 60 --scene demo > $(TUI_OUT)/demo_stream.log
+	./mpe-tui --snapshot 10 --scene tower > $(TUI_OUT)/tower.log
+	./mpe-tui --snapshot 10 --scene pendulum > $(TUI_OUT)/pendulum.log
+	./mpe-tui --snapshot 10 --scene springlab > $(TUI_OUT)/springlab.log
+	./mpe-tui --snapshot 600 --scene f10 > $(TUI_OUT)/f10.log
+	./mpe-tui --snapshot 600 --scene stress > $(TUI_OUT)/stress.log
+	./mpe-tui --snapshot 60 --scene ccd > $(TUI_OUT)/ccd.log
+	./mpe-tui --snapshot 60 --scene demo --solver seq-impulse --broadphase hash > $(TUI_OUT)/demo_hash.log
 	@echo "[PASS] tui-smoke: all scenes dump finite state"
 
-.PHONY: clean distclean debug release install installcheck check-deps check-deps-tui check-flags help mpe-tui build_tui tui-smoke plugins mfs_ecosystem.so headless build_suite test_suite test_suite_all
+.PHONY: clean distclean debug release install installcheck check-deps check-deps-tui check-flags help mpe-tui build_tui tui-smoke plugins mfs_ecosystem.so ecosystem/mfs/mfs_ecosystem.so headless build_suite test_suite test_suite_all
 
 -include $(DEPS)
 
@@ -219,6 +223,7 @@ SCENE_TEST_SRCS := scene/scene_load.c scene/scene_saving.c scene/scene_id_remap.
 build_scene_roundtrip: tests/scene_roundtrip_test.c $(MPE_TEST_CORE) $(SCENE_TEST_SRCS)
 	$(CC) $(CFLAGS) -Dmpe_scene_roundtrip_test tests/scene_roundtrip_test.c $(MPE_TEST_CORE) $(SCENE_TEST_SRCS) $(MPE_TEST_LIBS) -o test_scene_roundtrip
 test_scene_roundtrip: build_scene_roundtrip
+	mkdir -p ../../temp
 	./test_scene_roundtrip
 
 build_static_hold: tests/static_hold_test.c $(MPE_TEST_CORE)
@@ -337,8 +342,10 @@ build_suite: $(MPE_SUITE_SRCS) $(MPE_SUITE_DEPS) ecosystem/mfs/mfs_ecosystem.so 
 ecosystem/mfs/mfs_ecosystem.so:
 	$(MAKE) -C ecosystem/mfs mfs_ecosystem.so
 test_suite: build_suite
+	mkdir -p ../../temp
 	./test_mpe_suite
 test_suite_all: build_suite
+	mkdir -p ../../temp
 	./test_mpe_suite --all
 
 plugins: plugins/mpe_capsule.so
@@ -422,9 +429,10 @@ build_paranoia_determinism: tests/paranoia_determinism.c $(PARANOIA_TEST_CORE)
 test_paranoia_determinism: build_paranoia_determinism
 	./test_paranoia_determinism
 
-build_paranoia_scene_persistence: tests/paranoia_scene_persistence.c $(PARANOIA_TEST_CORE) scene/scene_load.c scene/scene_saving.c scene/scene_id_remap.c scene/scene_crc.c
-	$(CC) $(PARANOIA_CFLAGS) -Dmpe_paranoia_scene_persistence tests/paranoia_scene_persistence.c $(PARANOIA_TEST_CORE) scene/scene_load.c scene/scene_saving.c scene/scene_id_remap.c scene/scene_crc.c $(MPE_TEST_LIBS) -o test_paranoia_scene_persistence
+build_paranoia_scene_persistence: tests/paranoia_scene_persistence.c $(PARANOIA_TEST_CORE) physics/spring_joint.c scene/scene_init.c scene/scene_load.c scene/scene_saving.c scene/scene_id_remap.c scene/scene_crc.c
+	$(CC) $(PARANOIA_CFLAGS) -Dmpe_paranoia_scene_persistence tests/paranoia_scene_persistence.c $(PARANOIA_TEST_CORE) physics/spring_joint.c scene/scene_init.c scene/scene_load.c scene/scene_saving.c scene/scene_id_remap.c scene/scene_crc.c $(MPE_TEST_LIBS) $(shell pkg-config --libs epoxy) -o test_paranoia_scene_persistence
 test_paranoia_scene_persistence: build_paranoia_scene_persistence
+	mkdir -p ../../temp
 	./test_paranoia_scene_persistence
 
 build_paranoia_spring_joints: tests/paranoia_spring_joints.c $(PARANOIA_TEST_CORE) physics/spring_joint.c
@@ -445,4 +453,5 @@ test_paranoia_fp_edges: build_paranoia_fp_edges
 build_paranoia_config: tests/paranoia_config.c $(PARANOIA_TEST_CORE)
 	$(CC) $(PARANOIA_CFLAGS) -Dmpe_paranoia_config tests/paranoia_config.c $(PARANOIA_TEST_CORE) $(MPE_TEST_LIBS) -o test_paranoia_config
 test_paranoia_config: build_paranoia_config
+	mkdir -p ../../temp
 	./test_paranoia_config
