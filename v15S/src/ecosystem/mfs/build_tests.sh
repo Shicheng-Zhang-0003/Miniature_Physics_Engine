@@ -6,10 +6,17 @@
 set -euo pipefail
 MFS="$(cd "$(dirname "$0")" && pwd)"
 SRC="$(cd "$MFS/../.." && pwd)"
-OUT="${OUTDIR:-/tmp/ftc_tests}"
+ROOT="$(cd "$SRC/../.." && pwd)"
+TMPDIR="$ROOT/temp"
+export TMPDIR
+export MPE_GAMEPAD_DEVICE=disabled
+OUT="${OUTDIR:-$TMPDIR/ftc_tests}"
 mkdir -p "$OUT"
 
-CFLAGS="-I$SRC -I$MFS -O2 -Wall -Wextra -ffp-contract=off"
+TEST_CC="${MFS_TEST_CC:-gcc}"
+# Optional extra flags let the unified runner repeat the same MFS gates under
+# sanitizers without maintaining a second set of recipes.
+CFLAGS="-I$SRC -I$MFS -O2 -Wall -Wextra -ffp-contract=off ${MFS_TEST_CFLAGS:-}"
 # MFS_SOURCES: same lists as mfs_sources.mk (ENGINE engine-relative, FTC
 # MFS-relative). Update both files together.
 CORE="core/physics_world.c core/rigidbody.c core/mpe_registry.c core/mpe_loader.c core/det_math.c core/mpe_primary.c physics/collision_narrowphase.c physics/collision_cache.c physics/collision_solver.c physics/collision_ccd.c physics/collision_cylinder.c physics/broadphase.c physics/constraint.c physics/revolute_joint.c physics/depenetration.c physics/islands.c config/mpe_config.c config/mpe_config_schema.c scene/boundary.c ecosystem/mpe_ecosystem.c"
@@ -23,9 +30,9 @@ run_test() { # name, -Dflag, file, [extra sources...]
     local name="$1" flag="$2" file="$3"
     shift 3
     local extra="$*"
-    if gcc $CFLAGS "-D$flag" "$file" $FTC $CORE $extra -lm -ldl -rdynamic -o "$OUT/$name" 2>"$OUT/$name.build.log"; then
+    if "$TEST_CC" $CFLAGS "-D$flag" "$file" $FTC $CORE $extra -lm -ldl -rdynamic -o "$OUT/$name" 2>"$OUT/$name.build.log"; then
         if [ "${1:-}" != "--build-only" ] && [ "${BUILD_ONLY:-0}" != "1" ]; then
-            if "$OUT/$name" >"$OUT/$name.run.log" 2>&1; then
+            if run_binary "$name" >"$OUT/$name.run.log" 2>&1; then
                 echo "[PASS] $name"; pass=$((pass+1));
             else
                 echo "[FAIL] $name (exit $?)"; fail=$((fail+1)); tail -n 5 "$OUT/$name.run.log";
@@ -37,13 +44,25 @@ run_test() { # name, -Dflag, file, [extra sources...]
         echo "[BUILD-FAIL] $name"; fail=$((fail+1)); head -n 10 "$OUT/$name.build.log";
     fi
 }
+# The hotload regression deliberately loads a second image containing a
+# second, distinct `mpe_module_desc` global. Leak/address/UB checks stay on;
+# disable only ASan's process-wide duplicate-global heuristic for that one
+# intentional static-plus-dlopen topology.
+run_binary() {
+    local name="$1"
+    if [ "$name" = "ftc_hotload" ] && [ "${MFS_ASAN_HOTLOAD_ODR_SUPPRESS:-0}" = "1" ]; then
+        ASAN_OPTIONS="${ASAN_OPTIONS:-detect_leaks=1:halt_on_error=1}:detect_odr_violation=0" "$OUT/$name"
+    else
+        "$OUT/$name"
+    fi
+}
 # run_info: informational diag (exit 0 by construction, asserts nothing).
 # Reported separately, never inflates the gated pass count.
 run_info() { # name, -Dflag, file
     local name="$1" flag="$2" file="$3"
-    if gcc $CFLAGS "-D$flag" "$file" $FTC $CORE -lm -ldl -rdynamic -o "$OUT/$name" 2>"$OUT/$name.build.log"; then
+    if "$TEST_CC" $CFLAGS "-D$flag" "$file" $FTC $CORE -lm -ldl -rdynamic -o "$OUT/$name" 2>"$OUT/$name.build.log"; then
         if [ "${1:-}" != "--build-only" ] && [ "${BUILD_ONLY:-0}" != "1" ]; then
-            "$OUT/$name" >"$OUT/$name.run.log" 2>&1 || true
+            run_binary "$name" >"$OUT/$name.run.log" 2>&1 || true
             echo "[INFO] $name (diagnostic, ungated)"; info_pass=$((info_pass+1));
         else
             echo "[BUILD-OK] $name"; info_pass=$((info_pass+1));
@@ -58,7 +77,7 @@ if [ "${1:-}" = "--build-only" ]; then BUILD_ONLY=1; fi
 echo "--- FTC module plugin (hot-plug .so; must precede ftc_hotload) ---"
 mkdir -p "$MFS/plugins" "$SRC/plugins"
 FTC_MOD="$FTC"
-if gcc $CFLAGS -fPIC -shared $FTC_MOD -lm -o "$MFS/plugins/mpe_ftc.so" 2>"$OUT/mpe_ftc.build.log"; then
+if "$TEST_CC" $CFLAGS -fPIC -shared $FTC_MOD -lm -o "$MFS/plugins/mpe_ftc.so" 2>"$OUT/mpe_ftc.build.log"; then
     echo "[BUILD-OK] mfs/plugins/mpe_ftc.so"; pass=$((pass+1));
 else
     echo "[BUILD-FAIL] mfs/plugins/mpe_ftc.so"; fail=$((fail+1)); head -n 10 "$OUT/mpe_ftc.build.log";
@@ -86,7 +105,8 @@ run_test module_1 MFS_MODULE_1_TEST ecosystem/mfs/modules/module_1/mfs_module_1_
 echo "--- compile-only units ---"
 for u in "$MFS/modules/ftc/gui_robot_registry.c" "$MFS/modules/module_1/submodules/gamepad/gamepad.c"; do
     n=$(basename $u .c)
-    if gcc $CFLAGS -DMPE_GTK4=1 $(pkg-config --cflags gtk4 epoxy 2>/dev/null) -c "$u" -o "$OUT/$n.o" 2>"$OUT/$n.build.log"; then
+    GTK_CFLAGS="$(pkg-config --cflags gtk4 epoxy 2>"$OUT/pkg-config.log")"
+    if "$TEST_CC" $CFLAGS -DMPE_GTK4=1 $GTK_CFLAGS -c "$u" -o "$OUT/$n.o" 2>"$OUT/$n.build.log"; then
         echo "[BUILD-OK] $n"; pass=$((pass+1));
     else
         echo "[BUILD-FAIL] $n"; fail=$((fail+1)); head -n 10 "$OUT/$n.build.log";

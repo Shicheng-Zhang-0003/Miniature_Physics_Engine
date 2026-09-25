@@ -41,9 +41,9 @@ typedef struct {
     bool invert_right_x;
 } gamepad_state;
 
-/* open the evdev joystick device. returns true on success.
- * if device_path is null, defaults to /dev/input/js0.
- * on failure, prints a hint about the 'input' group. */
+/* Open the configured joystick device. If device_path is null,
+ * MPE_GAMEPAD_DEVICE selects the path; "disabled" skips device access;
+ * otherwise the default is /dev/input/js0. */
 bool gamepad_init(gamepad_state *pad, const char *device_path);
 
 /* close the device and release resources. */
