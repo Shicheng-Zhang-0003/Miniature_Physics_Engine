@@ -11,11 +11,17 @@
 
 extern camera main_camera_fov;
 void grid_init(grid_mesh *grid_mesh_object, int half_extent, int cell_spacing) {
+    if (!grid_mesh_object) return;
+    grid_mesh_object->line_vertex_count = 0;
+    if (half_extent < 0 || half_extent > 1000000 ||
+        cell_spacing <= 0 || cell_spacing > 1000000) return;
     //Count the lines: one iteration per X axis, one along Z axis
     int grid_line_steps = (half_extent * 2) / cell_spacing + 1;
+    if (grid_line_steps > 100000) return;
     //Each line (2 vertices, 3 floats)
     int vertex_float_count = grid_line_steps * 4 * 3; //(* 2 * 2 iteration per axis)
     float *vertex_data = malloc(vertex_float_count * sizeof(float));
+    if (!vertex_data) return;
     int vertex_index = 0;
     for (int step_coordinate = -half_extent; step_coordinate <= half_extent; step_coordinate += cell_spacing) {
         //Line along the Z axis at X = step_coordinate;
