@@ -1,5 +1,26 @@
 # Remaining Work
 
+## Verification suite upgrade (2026-09-25)
+
+- [x] Unified runner profiles: `quick`, `physics`, and `full`; dynamic C and
+  Makefile test discovery; strict result accounting; project-local per-run logs,
+  JSON summaries, JUnit reports, and preserved TUI snapshots.
+- [x] Runner contract tests for registries, result parsing, MFS summaries, TUI
+  snapshot validation, command-launch failure reporting, and report generation
+  (11 Python tests).
+- [x] Fixed-seed matrix inverse property sweep: 256 SPD matrices over scales
+  from 2^-24 to 2^24, plus singular-axis and non-finite input gates.
+- [x] Full profile passes all 32 canonical, 30 isolated legacy, 14 paranoia,
+  MFS, TUI, and engine build checks; the C, MFS, and TUI test groups also pass
+  combined ASan/UBSan. Final report: 220/220 checks, zero failures.
+- [x] Added missing `physics_world_cleanup` calls to cylinder-drop, driven-wheel,
+  and FTC integration test paths after LeakSanitizer identified fixture leaks.
+- [x] Quick profile rerun after adding command-launch failure handling; all
+  11 harness contracts and canonical cases pass.
+- [ ] Expand seeded property coverage from matrix inversion to collision,
+  constraint, and configuration invariants; add differential oracles across
+  multiple analytic systems and a ThreadSanitizer run.
+
 ## Fixed in 2026-09-23 despot audit (verified: engine + mpe-tui + 27/30 headless green, same 3 pre-existing FAILs as clean HEAD: stack, driven_wheel, list4_cylinder_floor)
 
 - [x] det_reduce_pi4 quadrant correction (+1/+3, was +2), single-count trig fallback, lazy sin/cos branch.
@@ -8,12 +29,12 @@
 - [x] Revolute 6x6 in double with equilibration; quat sanitize + quat->mat double parity; lookAt re-orthogonalized.
 - [x] Registry owns pair/module strings (no .so rodata dangle); register_broadphase/solver return int; capsule destructor + NULL/slop-per-world; loader clears primary stage pointers on unload.
 - [x] scene_saving NULL/type-bounds; scene_load full-float + duplicate-ID veto, legacy empty-scene, custom identity preserved (100); config localtime_r + truncation consume + 0700 dirs; tui_dump NULL/cache; tui header/ delwin/auto-config; terminal capture/alias hardening; term type mismatch repaired (engine builds).
-- [x] test_runner --include-paranoia + exact-match; makefile installcheck grep, help, clean, module target, .PHONY, install plugins + uninstall, check-deps-tui, native hard-fail; .gitignore mpe-tui; docs (joints persist all 5, counts 28+3, compat versions, freeze, version string, BE, Wayland-P1, native, V04 run-max, V03 F10/F11, deps).
-- [x] Pre-existing FAILs confirmed on clean HEAD (not regressions): stack, driven_wheel, list4_cylinder_floor. fix_log contradiction corrected; run_all.sh logs to /tmp; verify.sh runs full suite + tui-smoke.
+- [x] test_runner --include-paranoia + exact-match; makefile installcheck grep, help, clean, module target, .PHONY, install plugins + uninstall, check-deps-tui, native hard-fail; .gitignore mpe-tui; docs (joints persist all 5, historical suite count 28+3, compat versions, freeze, version string, BE, Wayland-P1, native, V04 run-max, V03 F10/F11, deps).
+- [x] Pre-existing FAILs confirmed on clean HEAD (not regressions): stack, driven_wheel, list4_cylinder_floor. fix_log contradiction corrected; run_all.sh and verify.sh keep logs under the project temp directory.
 
 ## High priority (still open)
 
-- [ ] Repair the remaining paranoia tests and make their mathematical oracles valid.
+- [ ] Continue migrating the remaining paranoia tests to canonical builders and tighten any weak gates.
 - [ ] Diagnose and fix cylinder collision and sleep/depenetration failures with minimal reproducible cases.
 - [x] Plugin load/attach/unload + stage-backend lifetime regression test
   (`loader_lifecycle` in Suite v2: real capsule .so, busy -2, purge, reload).
@@ -21,10 +42,10 @@
 
 ## Correctness and validation
 
-- [ ] Add valid CCD, constraint, friction, restitution, and free-flight invariant tests with documented tolerances.
-- [ ] Build and run every paranoia target, including energy/momentum, scene persistence, and spring-joint tests.
-- [ ] Run the complete suite under AddressSanitizer and UndefinedBehaviorSanitizer.
-- [ ] Add randomized/property-based physics tests and differential checks for simple analytic cases.
+- [x] Correct and run CCD, constraint, friction, restitution, and free-flight invariant checks; audit continuation records the oracles and tolerances.
+- [x] Build and run all 14 paranoia targets, including energy/momentum, scene persistence, and spring-joint checks.
+- [x] Run canonical, isolated legacy, paranoia, MFS, and TUI checks under combined AddressSanitizer and UndefinedBehaviorSanitizer (full runner profile).
+- [ ] Add broader randomized/property-based physics tests and differential checks for simple analytic cases.
 
 ## Operational and release hygiene
 
@@ -50,12 +71,11 @@
 - [x] v2 exposed + fixed an engine bug: uninitialized `cylinder_half_length`
   (sphere/cube inits) broke determinism across tests in one process.
 - [x] Runner (`--suite`), `installcheck`, `run_all.sh` moved to v2 canonical.
-- [ ] Migrate the 14 paranoia tests to v2 builders; tighten vacuous gates
-  (paranoia_constraints energy growth, contact_solver apex detector, etc.).
+- [ ] Migrate the 14 paranoia tests to v2 builders; remaining legacy suites still duplicate setup and need shared helpers.
 
 ## TUI ground-up validation (2026-09-23): 45/45 from raw dumps
 
-Battery `/tmp/tui_validate.py` (kept outside the tree; rerun: `python3 /tmp/tui_validate.py` from `v15S/src`):
+Headless/raw-dump battery (the one-off helper was not retained; its results are preserved here, and current runs use workspace test targets):
 - determinism byte-identical x7 scenes; tower 6-asleep exact heights KE=0;
   pendulum T=3.0556 vs sphere-compound 3.0105 (1.5%, nonlinear-correct);
   spring T=1.4051 vs 1.4050, dE<3.9%; CCD 60/144/300 stopped at face -0.55;
@@ -160,5 +180,28 @@ MFS (suite 11 gated + 5 info, 0 fail; was 13/3 + broken make):
   int64_t), microvim x2 copies (dup/free/format/ascii).
 - Deliberately kept at the display/input edge: GTK signal signatures,
   text buffers, key events (GdkModifierType), CSS refs, app quit.
-- Proven by /tmp/posix_test.c (parser/split/ascii/time unit checks)
+- Proven by a one-off POSIX helper (parser/split/ascii/time unit checks; the helper was not retained)
   plus full gates: engine 32/32, MFS 11+5, tui-smoke green.
+
+## Audit continuation (2026-09-24)
+
+- [x] Full legacy + paranoia run: 44/44 pass, zero blocking failures
+  (`temp/runner-final.log`).
+- [x] End-to-end verification: warning-enabled engine build, canonical Suite v2
+  32/32, MFS 11 gated + 5 informational, and TUI smoke finite
+  (`temp/verify-overall.log`, `temp/verify-mfs.log`).
+- [x] GCC `-fanalyzer` across the active v15S engine. Mesh allocation and
+  terminal-editor buffer/undo failure paths were fixed; one retained-undo
+  ownership warning remains from analyzer inability to follow the static undo
+  ring, whose entries are freed on reload and close (`temp/gcc-analyzer-final.log`).
+- [x] Headless runs disable gamepad probing; the canonical suite build refreshes
+  the MFS bundle through its owning Makefile before loading it. Script/test
+  scratch and logs use the project `temp/` directory.
+- [ ] Run ASan/UBSan, randomized/property tests, differential analytic checks,
+  and thread-sanitizer validation.
+- [ ] Complete rotational CCD for rotation-only tunneling and consolidate the
+  GUI/headless simulation step paths.
+- [ ] Audit non-built historical artifacts; the frozen `v15R3` source tree is
+  absent from this workspace (only its release notes are present).
+
+Audit notes and boundaries are in `../AUDIT_REPORT_2026-09-24.md`.

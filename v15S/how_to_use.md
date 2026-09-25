@@ -468,12 +468,16 @@ Run:
 ./engine
 ```
 
-Headless suites (no display needed):
+Verification profiles (run from the repository root; no display is needed):
 
 ```bash
-make build_suite && ./test_mpe_suite --all   # engine: 32/32 green
-ecosystem/mfs/build_tests.sh                 # robotics: 8 gated + 5 info
+python3 tools/test_runner.py --profile quick   # harness checks + canonical C suite
+python3 tools/test_runner.py --profile physics # plus isolated legacy + paranoia cases
+python3 tools/test_runner.py --profile full    # engine, MFS, TUI, ASan + UBSan repeats
+python3 tools/test_runner.py --list            # discovered test inventory
 ```
+
+Every run writes JSON and JUnit summaries and command logs below `temp/qa_runs/`.
 
 The engine has been tested on Ubuntu 24.04.4 LTS. Intel MacOS users may attempt to install the same dependencies via Homebrew, but this is unsupported. Windows is not supported.
 

@@ -1,6 +1,6 @@
 # 🧊 MINIATURE PHYSICS ENGINE (MPE)
 
-> **Active head:** `v15S` — GTK4 port of the `v15R3` release with a modular kernel, per-world config, and upgraded data structures. Build and test from `v15S/src`: `make && python3 ../../tools/test_runner.py`.
+> **Active head:** `v15S` — GTK4 port of the `v15R3` release with a modular kernel, per-world config, and upgraded data structures. Build from `v15S/src`; run the complete verification matrix from the repository root with `python3 tools/test_runner.py --profile full`.
 
 **License:** GPL-3.0 · **Language:** C · **UI:** GTK4 · **Renderer:** OpenGL 3.3 Core
 
@@ -311,22 +311,30 @@ See [`v15S/evolution.txt`](v15S/evolution.txt) for the full lineage back to stag
 
 ---
 
-## 🧪 Headless test suite
+## 🧪 Verification suite
 
-MPE ships a headless regression suite (no GTK/OpenGL required) — **32/32 green** via Suite v2
-(single C binary `v15S/src/test_mpe_suite`, 29 physics + 3 diag-informational):
+The unified test runner provides quick, physics, and full profiles. The full
+profile builds the active engine, checks the canonical 32-case C suite, runs
+all 30 isolated legacy cases and 14 paranoia cases, then repeats the physics,
+MFS, and TUI suites under AddressSanitizer and UndefinedBehaviorSanitizer. It
+also checks generated TUI snapshots and writes JSON and JUnit reports, snapshots,
+and per-command logs below each run's directory in `temp/qa_runs/`.
 
 ```bash
-cd v15S/src && make build_suite && ./test_mpe_suite --all   # canonical
-python3 ../../tools/test_runner.py --suite                   # same via runner
+python3 tools/test_runner.py --profile quick   # runner contracts + canonical C suite
+python3 tools/test_runner.py --profile physics # also isolated legacy + paranoia cases
+python3 tools/test_runner.py --profile full    # full build, physics, MFS, TUI, sanitizers
+python3 tools/test_runner.py --list            # discover registered test cases
 ```
 
-Suite v2 runs all tests in one process with shared audited builders (exact-name
-dispatch, saved/restored config, real Coulomb floors everywhere). It fixed three
-v1 setup bugs (stack/driven_wheel/list4 never enabled floor friction; list4 also
-rotated about the wrong axis) and caught an engine uninit-field bug
-(`cylinder_half_length` garbage on spheres broke cross-test determinism).
-Legacy v1 (30 binaries) is kept for transition (`test_runner.py` without `--suite`).
+The canonical C suite runs all cases in one process with shared audited builders
+(exact-name dispatch, saved/restored config, real Coulomb floors everywhere).
+The full profile also runs each older C case in a separate process to catch
+cross-test contamination. The runner verifies that reported case names exactly
+match the C registry, distinguishes informational diagnostics from gates, and
+fails on missing, duplicate, or malformed test output. Its 11 Python contract
+tests cover registry discovery, result parsing, report generation, TUI snapshot
+validation, and command-launch failures.
 
 | Test | Proves |
 |------|--------|
@@ -360,11 +368,11 @@ Legacy v1 (30 binaries) is kept for transition (`test_runner.py` without `--suit
 | `loader_lifecycle` | Plugin load/busy-unload/purge, builtin-hijack refusal, stage reset, `mod_state` threading |
 | `ftc_ecosystem` | Bundle load → attach → spawn/drive/telemetry → detach/unload end-to-end |
 
-Run with `python3 tools/test_runner.py --suite` (canonical) or `./test_mpe_suite --all` from `v15S/src`.
+Run the focused canonical suite with `python3 tools/test_runner.py --profile quick`; use `--profile full` for all registered suites and sanitizers.
 
 ### MFS robotics (`v15S/src/ecosystem/mfs/`)
 - **FTC stack**: motor presets (spec-sheet derived), back-EMF electrical model with implicit-in-speed solve + disturbance observer (stall *and* free speed exact), traction budgeting against wheel materials, torque-derived mecanum strafe with `odom_slip` flag, tile-friction test floors.
-- **Suite**: `build_tests.sh` — 8 gated tests + 5 informational diags, all green (was 13 pass / 3 fail + broken `make`).
+- **Suite**: `build_tests.sh` — 11 gated tests + 5 informational diagnostics, all green (was 13 pass / 3 fail + broken `make`).
 - **Modules**: `ftc-fleet` tick module (hot-pluggable, bitwise-identical static vs `.so`), `mfs_module_1` game module, `mfs-simulator` ecosystem bundle (loadable via `mod load ecosystem/mfs/mfs_ecosystem.so`).
 
 ### Determinism and precision
