@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <errno.h>
 #include <linux/joystick.h>
 
@@ -19,15 +20,23 @@ bool gamepad_init(gamepad_state *pad, const char *device_path) {
     memset(pad, 0, sizeof(gamepad_state));
     pad->fd = -1;
     pad->deadzone = 0.15f;
-    if (!device_path) { device_path = "/dev/input/js0"; }
+    if (!device_path) {
+        const char *configured_path = getenv("MPE_GAMEPAD_DEVICE");
+        if (configured_path && strcmp(configured_path, "disabled") == 0) {
+            strncpy(pad->device_path, configured_path,
+                    sizeof(pad->device_path) - 1);
+            pad->device_path[sizeof(pad->device_path) - 1] = '\0';
+            return false;
+        }
+        device_path = configured_path && configured_path[0]
+                          ? configured_path : "/dev/input/js0";
+    }
     strncpy(pad->device_path, device_path, sizeof(pad->device_path) - 1);
     pad->device_path[sizeof(pad->device_path) - 1] = '\0';
     pad->fd = open(device_path, O_RDONLY | O_NONBLOCK);
     if (pad->fd < 0) {
         fprintf(stderr, "[gamepad] could not open %s: %s\n",
                 device_path, strerror(errno));
-        fprintf(stderr, "[gamepad] hint: try 'sudo usermod -aG input $USER' "
-                "then log out and back in\n");
         pad->connected = false;
         return false;
     }

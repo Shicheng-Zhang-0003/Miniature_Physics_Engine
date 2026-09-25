@@ -83,7 +83,7 @@ MFS_MOD1_TEST_EXTRA = $(BUILD)/modules/ftc/submodules/robot.o \
 test: $(MFS_MOD1_OBJS) $(MFS_MOD1_TEST_EXTRA) $(MFS_ENGINE_OBJS)
 	$(CC) $(CFLAGS) -DMFS_MODULE_1_TEST modules/module_1/mfs_module_1_test.c $(MFS_MOD1_OBJS) \
 	    $(MFS_MOD1_TEST_EXTRA) $(MFS_ENGINE_OBJS) -lm -ldl -o $(BUILD)/test_mfs_module_1
-	./$(BUILD)/test_mfs_module_1
+	MPE_GAMEPAD_DEVICE=disabled ./$(BUILD)/test_mfs_module_1
 
 clean:
 	rm -rf $(BUILD) mfs_module_1.so mfs_ecosystem.so plugins/mpe_ftc.so test_mfs_module_1

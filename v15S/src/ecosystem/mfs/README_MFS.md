@@ -10,7 +10,7 @@ v15S/src/ecosystem/mfs/                  # MFS root ("mfs-simulator")
   README_MFS.md                          # this file
   Makefile                               # unified standalone build (thin .so, build/ objs)
   mfs_sources.mk                         # canonical engine+FTC file lists (mirrored in build_tests.sh)
-  build_tests.sh                         # FTC/robotics test build + run (8 gated + 5 info)
+  build_tests.sh                         # FTC/robotics test build + run (11 gated + 5 info)
   mfs_ecosystem.c                        # overarching descriptor: registers
                                          #   modules/module_1 + modules/ftc
   mfs_internal.c/.h                      # internal static module registry
@@ -88,11 +88,11 @@ Design rules modules follow (and future modules should too):
 From `v15S/src`:
 
 ```
-ecosystem/mfs/build_tests.sh            # full FTC suite (8 gated tests + 5 info diags + build checks)
+ecosystem/mfs/build_tests.sh            # full FTC suite (11 gated tests + 5 info diags + build checks)
 ecosystem/mfs/build_tests.sh --build-only
 ```
 
-Binaries and logs go to `/tmp/ftc_tests` (override with `OUTDIR=...`).
+Binaries and logs go to `../../temp/ftc_tests` by default (override with `OUTDIR=...`).
 The script also stages `mpe_ftc.so` at `src/plugins/` — the kernel loader
 only accepts `plugins/<name>.so` under its working directory, so that copy
 is what `mod load` and the hotload test use (same binary as
