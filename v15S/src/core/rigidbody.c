@@ -807,7 +807,6 @@ void rb_integrate_velocity(rigidbody *rigid_body, float delta_time, float linear
                 if (alen > max_alpha) {
                     list4_gyro_alpha = vector3_scaling(list4_gyro_alpha, max_alpha / alen);
                 }
-            } else if ((!isfinite(alen) || alen <= 0.0f) && 0) {
             }
             if (!a3_vector3_is_finite(list4_gyro_alpha)) {
                 list4_gyro_alpha = vector3_zero();
@@ -849,12 +848,38 @@ void rb_integrate_position(rigidbody *rigid_body, float delta_time) {
     rb_integrate_position_exact(rigid_body, delta_time, &g_cfg, false);
 }
 
+/* Integrate the prescribed/current world-frame angular velocity as an exact
+ * exponential-map rotor. Kinematic bodies use this too: their angular
+ * velocity is prescribed just like their linear velocity. */
+static void rb_integrate_orientation(rigidbody *rigid_body, float delta_time) {
+    float spin_sq = vector3_length_squared(rigid_body->angular_velocity);
+    if (!isfinite(spin_sq) || !(spin_sq > 0.0f)) {
+        rigid_body->orientation = vector4_normalisation(rigid_body->orientation);
+    } else {
+        float spin_rate = sqrtf(spin_sq);
+        double half_angle = 0.5 * (double) spin_rate * (double) delta_time;
+        double s = det_sin(half_angle);
+        double c = det_cos(half_angle);
+        double inv = 1.0 / (double) spin_rate;
+        vector4 spin_rotor = {(float) c,
+                              (float) (rigid_body->angular_velocity.x * inv * s),
+                              (float) (rigid_body->angular_velocity.y * inv * s),
+                              (float) (rigid_body->angular_velocity.z * inv * s)};
+        rigid_body->orientation =
+            vector4_normalisation(vector4_multiplication(spin_rotor, rigid_body->orientation));
+    }
+    rigidbody_update_axes(rigid_body);
+}
+
 void rb_integrate_position_exact(rigidbody *rigid_body, float delta_time, const mpe_config_t *cfg, bool free_flight) {
     if (!rigid_body) {
         return;
     }
-    if ((rigid_body->static_state) || (!(delta_time > 0.0f))) {
+    if ((rigid_body->static_state) || (!(delta_time > 0.0f)) || (!isfinite(delta_time))) {
         return;
+    }
+    if (!cfg) {
+        cfg = &g_cfg;
     }
     if (rigid_body->is_sleeping) {
         return;
@@ -867,7 +892,7 @@ void rb_integrate_position_exact(rigidbody *rigid_body, float delta_time, const 
          * bypassing sanitize cannot strand a stale timer. */
         rigid_body->sleep_timer = 0.0f;
         rigid_body->position = vector3_addition(rigid_body->position, vector3_scaling(rigid_body->velocity, delta_time));
-        rigidbody_update_axes(rigid_body);
+        rb_integrate_orientation(rigid_body, delta_time);
         return;
     }
 
@@ -877,33 +902,8 @@ void rb_integrate_position_exact(rigidbody *rigid_body, float delta_time, const 
         rb_integrate_position_constrained(rigid_body, delta_time);
     }
 
-    /* Exact exponential-map rotation: q' = normalize(dq(w,|w|dt) * q).
-     * First-order Euler (q += 0.5*dt*w*q) accumulates orientation phase
-     * error for fast spinners; the closed-form rotor is exact for constant
-     * w over the tick and unconditionally stable. Frame order (world-frame
-     * left multiplication) matches the previous scheme.
-     * TRUTH: no spin-rate gate (a 1e-6 threshold drops micro-rotation and
-     * loses ~1e-3 rad per megatick); exact down to zero. Non-finite spin
-     * (poisoned w) normalizes orientation instead of building an INF rotor
-     * that teleports attitude. */
-    float spin_sq = vector3_length_squared(rigid_body->angular_velocity);
-    if (!isfinite(spin_sq) || !(spin_sq > 0.0f)) {
-        rigid_body->orientation = vector4_normalisation(rigid_body->orientation);
-    } else {
-        float spin_rate = sqrtf(spin_sq);
-        /* Deterministic rotor: full-range sin/cos with argument reduction.
-         * Exact for constant w over the tick, unconditionally stable. */
-        double half_angle = 0.5 * (double) spin_rate * (double) delta_time;
-        vector4 spin_rotor;
-        double s = det_sin(half_angle);
-        double c = det_cos(half_angle);
-        double inv = 1.0 / (double) spin_rate;
-        spin_rotor = (vector4){(float) c, (float) (rigid_body->angular_velocity.x * inv * s),
-                              (float) (rigid_body->angular_velocity.y * inv * s),
-                              (float) (rigid_body->angular_velocity.z * inv * s)};
-        rigid_body->orientation = vector4_normalisation(vector4_multiplication(spin_rotor, rigid_body->orientation));
-    }
-    rigidbody_update_axes(rigid_body);
+    /* Exact exponential-map rotation; shared with kinematic integration. */
+    rb_integrate_orientation(rigid_body, delta_time);
 
     float speed_sq = vector3_length_squared(rigid_body->velocity);
     float angular_speed_sq = vector3_length_squared(rigid_body->angular_velocity);
