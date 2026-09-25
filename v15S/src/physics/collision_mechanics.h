@@ -106,14 +106,15 @@ void collision_apply_poisson_restitution(collision_data *manifolds, int manifold
  * positions not yet moved). Exact pre-solve approach speed. */
 void collision_refresh_impact_velocities(collision_data *manifolds, int manifold_count);
 /* CCD swept clamp: for bodies whose per-tick displacement exceeds their
- * contact thickness, analytic time-of-impact against the floor plane,
- * spheres, and static boxes. Clamps the body to the TOI configuration and
+ * contact thickness, time-of-impact against the floor plane, sphere/custom
+ * bounding spheres, finite cylinders, and boxes (including moving boxes via
+ * relative linear velocity). Clamps the body to the TOI configuration and
  * keeps velocity, so discrete narrowphase then sees penetration≈0 with the
  * true approach velocity (restitution/friction respond correctly).
  * TRUTH P0-3: fills time_remaining_out[i] = dt - toi (dt if unclamped).
  * Post-solve integration MUST advance only the remainder, else toi+dt
- * double-counts. Linear sweep only (angular motion ignored over the tick);
- * dynamic-box obstacles are paired by the swept broadphase but not TOI-clamped. */
+ * double-counts. TOI geometry uses linear translation and a conservative
+ * angular speed gate; obstacle rotation during the tick is not swept. */
 int collision_ccd_sweep_clamp(rigidbody *bodies, int body_count, float dt);
 int collision_ccd_sweep_clamp_full(rigidbody *bodies, int body_count, float dt, float *time_remaining_out,
                                     const mpe_config_t *cfg, float *best_tois_out, unsigned char *hit_flags_out);

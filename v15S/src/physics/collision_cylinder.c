@@ -407,6 +407,46 @@ bool collision_cylinder_cube(rigidbody *cyl, rigidbody *cube,
 
     axis = vector3_scaling(axis, 1.0f / sqrtf(axis_len_sq));
 
+    /* A cylinder wholly over the top face of a static, axis-aligned slab is
+     * an exact cylinder/plane problem. Reuse the cap/barrel support manifold
+     * instead of the generic segment-plus-radius capsule approximation below,
+     * whose round end bulges past a true cylinder cap by as much as radius.
+     * This avoids false early contact and the visible floating gap over floors. */
+    if (cube->static_state) {
+        vector3 *box_axes = cube->cached_axes;
+        float box_extents[3] = {cube->half_extensions.x, cube->half_extensions.y,
+                                cube->half_extensions.z};
+        int up_index = 0;
+        float up_alignment = fabsf(box_axes[0].y);
+        for (int i = 1; i < 3; i++) {
+            float alignment = fabsf(box_axes[i].y);
+            if (alignment > up_alignment) {
+                up_index = i;
+                up_alignment = alignment;
+            }
+        }
+        if (up_alignment > 0.9999f) {
+            int side_a_index = (up_index + 1) % 3;
+            int side_b_index = (up_index + 2) % 3;
+            vector3 side_a = box_axes[side_a_index];
+            vector3 side_b = box_axes[side_b_index];
+            vector3 from_box = vector3_subtraction(cyl->position, cube->position);
+            float ca = vector3_dot(from_box, side_a);
+            float cb = vector3_dot(from_box, side_b);
+            float axle_a = vector3_dot(axis, side_a);
+            float axle_b = vector3_dot(axis, side_b);
+            float support_a = h * fabsf(axle_a) + r * sqrtf(fmaxf(0.0f, 1.0f - axle_a * axle_a));
+            float support_b = h * fabsf(axle_b) + r * sqrtf(fmaxf(0.0f, 1.0f - axle_b * axle_b));
+            float slop = C->solver.penetration_slop;
+            if ((fabsf(ca) + support_a <= box_extents[side_a_index] + slop) &&
+                (fabsf(cb) + support_b <= box_extents[side_b_index] + slop)) {
+                float up_sign = (box_axes[up_index].y >= 0.0f) ? 1.0f : -1.0f;
+                float plane_y = cube->position.y + up_sign * box_extents[up_index];
+                return collision_static_plane_cylinder(cube, cyl, plane_y, out, C);
+            }
+        }
+    }
+
     vector3 e1 = vector3_subtraction(cyl->position, vector3_scaling(axis, h));
     vector3 seg = vector3_scaling(axis, 2.0f * h);
 
@@ -808,8 +848,16 @@ bool collision_cylinder_cylinder(rigidbody *cyl_a, rigidbody *cyl_b,
             }
             return true;
         }
-        /* Parallel but axially separated beyond faces: fall through to side
-         * test below (may still touch barrel-to-barrel laterally). */
+        /* The segment-plus-radius fallback below is a capsule approximation.
+         * Its round end caps extend each cylinder by its radius, so using it
+         * while parallel axes are still separated along the axle creates a
+         * false collision before the flat cylinder faces meet. For aligned
+         * axes, a positive axial gap proves the finite cylinders are disjoint. */
+        if (axial_gap > slop) {
+            return false;
+        }
+        /* Axial intervals overlap (or are within slop); the segment test below
+         * can now represent a barrel-side contact without rounded end caps. */
     }
 
     vector3 a1 = vector3_subtraction(cyl_a->position, vector3_scaling(ax, ha));
