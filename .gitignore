@@ -59,3 +59,9 @@ status/
 # ============ Sanitizer / temp build artifacts ============
 /tmp/
 *.san
+
+# Keep the Python test harness itself versioned despite the broad C artifact
+# pattern above; discard only interpreter cache files.
+!tools/tests/*.py
+__pycache__/
+*.py[cod]
