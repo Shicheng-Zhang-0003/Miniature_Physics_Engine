@@ -1,4 +1,60 @@
 /* GTK4-PREP: GTK3 preserved under #else; GTK4 full port follows. */
+#define _GNU_SOURCE
+#include <errno.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <stdatomic.h>
+#include <string.h>
+#include <unistd.h>
+
+/* tee is confined to a direct child of the application status directory.
+ * openat + O_NOFOLLOW also prevents a status symlink or target symlink from
+ * redirecting the write outside that directory. */
+static int term_tee_write_status(const char *path, const char *text,
+                                size_t *bytes_written) {
+    if (!path || !text || !bytes_written) return -1;
+    const char *name = strncmp(path, "status/", 7) == 0 ? path + 7 : path;
+    if (!name[0] || strchr(name, '/') || strstr(name, "..") ||
+        strcmp(name, ".") == 0) return -1;
+
+    int dirfd = open("status", O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW);
+    if (dirfd < 0) return -1;
+
+    static atomic_ulong sequence;
+    char temporary[80];
+    int fd = -1;
+    for (int attempt = 0; attempt < 16 && fd < 0; ++attempt) {
+        unsigned long serial = atomic_fetch_add_explicit(
+                                   &sequence, 1, memory_order_relaxed) + 1;
+        snprintf(temporary, sizeof(temporary), ".mpe-tee-%ld-%lu",
+                 (long)getpid(), serial);
+        fd = openat(dirfd, temporary,
+                    O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW,
+                    0600);
+        if (fd < 0 && errno != EEXIST) break;
+    }
+    if (fd < 0) {
+        close(dirfd);
+        return -1;
+    }
+
+    FILE *output = fdopen(fd, "w");
+    if (!output) {
+        close(fd);
+        unlinkat(dirfd, temporary, 0);
+        close(dirfd);
+        return -1;
+    }
+    size_t length = strlen(text);
+    *bytes_written = fwrite(text, 1, length, output);
+    int failed = (*bytes_written != length) || ferror(output);
+    if (fclose(output) != 0) failed = 1;
+    if (!failed && renameat(dirfd, temporary, dirfd, name) != 0) failed = 1;
+    if (failed) unlinkat(dirfd, temporary, 0);
+    close(dirfd);
+    return failed ? -1 : 0;
+}
+
 #ifdef MPE_GTK4
 /* term_admin.c — Admin/batch/scene/shell commands: sed..dmesg + vi.
  * Split from debug_terminal.c (pure motion, no behaviour change).
@@ -666,24 +722,6 @@ void cmd_tee(int argc, char **argv) {
         return;
     }
     const char *output_filename = argv[1];
-    /* Jail: only allow writes inside status/ or /tmp/mpe-*. Absolute paths
-     * elsewhere or ".." traversal could overwrite engine sources/shaders. */
-    bool allowed = false;
-    if (strncmp(output_filename, "status/", 7) == 0) {
-        allowed = true;
-    } else if (strncmp(output_filename, "/tmp/mpe-", 9) == 0) {
-        allowed = true;
-    } else if (strchr(output_filename, '/') == NULL) {
-        /* Bare filename -> sandbox into status/. */
-        allowed = true;
-    }
-    if (strstr(output_filename, "..") != NULL) {
-        allowed = false;
-    }
-    if (!allowed) {
-        term_err("mpe: tee: path jailed (use status/<file> or /tmp/mpe-<file>)\n");
-        return;
-    }
     char sub_command[2048];
     sub_command[0] = '\0';
     size_t offset = 0;
@@ -703,19 +741,14 @@ void cmd_tee(int argc, char **argv) {
     term_capture_end();
     char *captured = term_capture_get();
     if (captured && captured[0] != '\0') {
-        char resolved[512];
-        if (strchr(output_filename, '/') == NULL) {
-            snprintf(resolved, sizeof(resolved), "status/%s", output_filename);
+        size_t bytes_written = 0;
+        if (term_tee_write_status(output_filename, captured, &bytes_written) == 0) {
+            const char *name = strncmp(output_filename, "status/", 7) == 0
+                                   ? output_filename + 7 : output_filename;
+            term_printf("term_ok", "tee: wrote %zu bytes to status/%s\n",
+                        bytes_written, name);
         } else {
-            snprintf(resolved, sizeof(resolved), "%s", output_filename);
-        }
-        FILE *output_file = fopen(resolved, "w");
-        if (output_file) {
-            fputs(captured, output_file);
-            fclose(output_file);
-            term_printf("term_ok", "tee: wrote %zu bytes to %s\n", strlen(captured), resolved);
-        } else {
-            term_printf("term_err", "mpe: tee: %s: cannot open for writing\n", resolved);
+            term_err("mpe: tee: use a direct filename inside status/; write failed\n");
         }
     }
     term_capture_reset();
@@ -1669,24 +1702,6 @@ void cmd_tee(int argc, char **argv) {
         return;
     }
     const char *output_filename = argv[1];
-    /* Jail: only allow writes inside status/ or /tmp/mpe-*. Absolute paths
-     * elsewhere or ".." traversal could overwrite engine sources/shaders. */
-    bool allowed = false;
-    if (strncmp(output_filename, "status/", 7) == 0) {
-        allowed = true;
-    } else if (strncmp(output_filename, "/tmp/mpe-", 9) == 0) {
-        allowed = true;
-    } else if (strchr(output_filename, '/') == NULL) {
-        /* Bare filename -> sandbox into status/. */
-        allowed = true;
-    }
-    if (strstr(output_filename, "..") != NULL) {
-        allowed = false;
-    }
-    if (!allowed) {
-        term_err("mpe: tee: path jailed (use status/<file> or /tmp/mpe-<file>)\n");
-        return;
-    }
     char sub_command[2048];
     sub_command[0] = '\0';
     size_t offset = 0;
@@ -1706,19 +1721,14 @@ void cmd_tee(int argc, char **argv) {
     term_capture_end();
     char *captured = term_capture_get();
     if (captured && captured[0] != '\0') {
-        char resolved[512];
-        if (strchr(output_filename, '/') == NULL) {
-            snprintf(resolved, sizeof(resolved), "status/%s", output_filename);
+        size_t bytes_written = 0;
+        if (term_tee_write_status(output_filename, captured, &bytes_written) == 0) {
+            const char *name = strncmp(output_filename, "status/", 7) == 0
+                                   ? output_filename + 7 : output_filename;
+            term_printf("term_ok", "tee: wrote %zu bytes to status/%s\n",
+                        bytes_written, name);
         } else {
-            snprintf(resolved, sizeof(resolved), "%s", output_filename);
-        }
-        FILE *output_file = fopen(resolved, "w");
-        if (output_file) {
-            fputs(captured, output_file);
-            fclose(output_file);
-            term_printf("term_ok", "tee: wrote %zu bytes to %s\n", strlen(captured), resolved);
-        } else {
-            term_printf("term_err", "mpe: tee: %s: cannot open for writing\n", resolved);
+            term_err("mpe: tee: use a direct filename inside status/; write failed\n");
         }
     }
     term_capture_reset();
