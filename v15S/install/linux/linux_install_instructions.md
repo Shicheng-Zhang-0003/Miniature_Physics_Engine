@@ -48,7 +48,7 @@ After dependencies have been installed:
         (expects 32/32 green: 29 physics + 3 diag-informational)
     Robotics suite:
         ecosystem/mfs/build_tests.sh
-        (expects 8 gated green + 5 informational diags)
+        (expects 11 gated green + 5 informational diagnostics)
 
 
 ```
