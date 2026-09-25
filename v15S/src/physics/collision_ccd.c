@@ -18,6 +18,11 @@ static float ccd_support_depth(const rigidbody *body) {
     if (body->type == object_sphere) {
         return body->radius;
     }
+    if (body->type == object_custom) {
+        /* The core's documented fallback geometry for custom shapes is a
+         * bounding sphere until a CCD stage override is attached. */
+        return body->radius;
+    }
     if (body->type == object_cylinder) {
         float ay = body->cached_axes[0].y;
         if (ay > 1.0f) {
@@ -39,10 +44,53 @@ static float ccd_min_thickness(const rigidbody *body) {
     if (body->type == object_sphere) {
         return body->radius;
     }
+    if (body->type == object_custom) {
+        return body->radius;
+    }
     if (body->type == object_cylinder) {
         return fminf(body->radius, body->cylinder_half_length);
     }
     return fminf(body->half_extensions.x, fminf(body->half_extensions.y, body->half_extensions.z));
+}
+
+/* Earliest positive time at which |dp + dv*t| reaches radius. Compute the
+ * quadratic in double and use the cancellation-resistant q formulation; the
+ * direct (-b-sqrt(D))/(2a) root loses the near root for distant/high-speed
+ * pairs and can silently miss a real sweep. */
+static float ccd_sphere_sweep_toi(vector3 dp, vector3 dv, float radius, float dt) {
+    if (!isfinite(dp.x) || !isfinite(dp.y) || !isfinite(dp.z) || !isfinite(dv.x) || !isfinite(dv.y) ||
+        !isfinite(dv.z) || !isfinite(radius) || !(radius > 0.0f) || !isfinite(dt) || !(dt > 0.0f)) {
+        return -1.0f;
+    }
+    double dx = (double) dp.x, dy = (double) dp.y, dz = (double) dp.z;
+    double vx = (double) dv.x, vy = (double) dv.y, vz = (double) dv.z;
+    double r = (double) radius;
+    double a = vx * vx + vy * vy + vz * vz;
+    double c = dx * dx + dy * dy + dz * dz - r * r;
+    if (!(a > 0.0) || !(c > 0.0)) {
+        return -1.0f; /* no relative motion, or already overlapping */
+    }
+    double b = 2.0 * (dx * vx + dy * vy + dz * vz);
+    double discriminant = fma(b, b, -4.0 * a * c);
+    if (!(discriminant >= 0.0)) {
+        return -1.0f;
+    }
+    double root = sqrt(discriminant);
+    double q = -0.5 * (b + copysign(root, b));
+    double t0, t1;
+    if (q == 0.0) {
+        t0 = t1 = -b / (2.0 * a);
+    } else {
+        t0 = q / a;
+        t1 = c / q;
+    }
+    double toi = INFINITY;
+    if (t0 > 0.0 && t0 < toi) toi = t0;
+    if (t1 > 0.0 && t1 < toi) toi = t1;
+    if (!(toi < (double) dt)) {
+        return -1.0f;
+    }
+    return (float) toi;
 }
 
 int collision_ccd_sweep_clamp_full(rigidbody *bodies, int body_count, float dt, float *time_remaining_out,
@@ -203,9 +251,9 @@ int collision_ccd_sweep_clamp_full(rigidbody *bodies, int body_count, float dt, 
         }
 
         /* 2. Volumes: spheres, boxes (static AND dynamic via relative
-         * velocity in obstacle frame), cylinders (conservative bounding
-         * spheres). Independent of floor state: fast horizontal motion at or
-         * below support depth must still sweep volumes. */
+         * velocity in obstacle frame), cylinders and custom shapes (using
+         * conservative bounding spheres where exact sweep geometry is not
+         * available). */
         if (do_volumes) {
         for (int j = 0; j < body_count; j++) {
             if (j == i) {
@@ -217,26 +265,15 @@ int collision_ccd_sweep_clamp_full(rigidbody *bodies, int body_count, float dt, 
             }
             vector3 other_v =
                 ((other->static_state) || (other->is_sleeping)) ? vector3_zero() : other->velocity;
-            if (other->type == object_sphere) {
+            if ((other->type == object_sphere) || (other->type == object_custom)) {
                 vector3 dp = vector3_subtraction(other->position, mover->position);
                 vector3 dv = vector3_subtraction(other_v, mover->velocity);
-                /* TRUTH: non-sphere movers use bounding radius (conservative,
-                 * never misses). Old min_thickness underestimated boxes. */
-                float rr = (mover->type == object_sphere)
-                    ? (mover->radius + other->radius)
-                    : (broadphase_bounding_radius(mover) + other->radius);
-                float a = vector3_dot(dv, dv);
-                float c = vector3_dot(dp, dp) - rr * rr;
-                if ((c <= 0.0f) || (a <= 1e-12f)) {
-                    continue; /* already overlapping or no relative motion */
-                }
-                float b = 2.0f * vector3_dot(dp, dv);
-                float disc = b * b - 4.0f * a * c;
-                if (disc < 0.0f) {
-                    continue;
-                }
-                float toi = (-b - sqrtf(disc)) / (2.0f * a);
-                if ((toi > 0.0f) && (toi < best_toi) && (toi <= dt)) {
+                float mover_radius = (mover->type == object_sphere) ? mover->radius
+                                                                    : broadphase_bounding_radius(mover);
+                float other_radius = (other->type == object_sphere) ? other->radius
+                                                                    : broadphase_bounding_radius(other);
+                float toi = ccd_sphere_sweep_toi(dp, dv, mover_radius + other_radius, dt);
+                if ((toi > 0.0f) && (toi < best_toi)) {
                     best_toi = toi;
                     hit = true;
                 }
@@ -282,14 +319,8 @@ int collision_ccd_sweep_clamp_full(rigidbody *bodies, int body_count, float dt, 
                     float best_cyl_toi = dt;
                     for (int ep = 0; ep < 2; ep++) {
                         vector3 dp = (ep == 0) ? dp1 : dp2;
-                        float a = vector3_dot(dv, dv);
-                        float c = vector3_dot(dp, dp) - rr * rr;
-                        if ((c <= 0.0f) || (a <= 1e-12f)) continue;
-                        float b = 2.0f * vector3_dot(dp, dv);
-                        float disc = b * b - 4.0f * a * c;
-                        if (disc < 0.0f) continue;
-                        float toi = (-b - sqrtf(disc)) / (2.0f * a);
-                        if ((toi > 0.0f) && (toi < best_cyl_toi) && (toi <= dt)) {
+                        float toi = ccd_sphere_sweep_toi(dp, dv, rr, dt);
+                        if ((toi > 0.0f) && (toi < best_cyl_toi)) {
                             best_cyl_toi = toi;
                         }
                     }
@@ -306,35 +337,26 @@ int collision_ccd_sweep_clamp_full(rigidbody *bodies, int body_count, float dt, 
                         vector3 dp_mid = vector3_subtraction(other->position, mover->position);
                         float dp_ax = vector3_dot(dp_mid, ax);
                         vector3 dp_perp = vector3_subtraction(dp_mid, vector3_scaling(ax, dp_ax));
-                        float dp_perp_len_sq = vector3_length_squared(dp_perp);
-                        (void)sqrtf(dv_perp_len_sq); /* dv_perp_len used in debug builds */
 
                         /* Quadratic for perpendicular distance == rr.
                          * |dp_perp + t*dv_perp|^2 = rr^2 */
-                        float a = dv_perp_len_sq;
-                        float b = 2.0f * vector3_dot(dp_perp, dv_perp);
-                        float c = dp_perp_len_sq - rr * rr;
-                        if (a > 1e-12f) {
-                            float disc = b * b - 4.0f * a * c;
-                            if (disc >= 0.0f) {
-                                float toi = (-b - sqrtf(disc)) / (2.0f * a);
-                                if ((toi > 0.0f) && (toi < best_cyl_toi) && (toi <= dt)) {
-                                    /* Check if contact point is within segment bounds at TOI.
-                                     * TRUTH: strict |axial|<=h (barrel only). The old
-                                     * h+rr double-covered the caps (already swept
-                                     * exactly as endpoint spheres above) and reported
-                                     * barrel hits rr beyond the segment end, where the
-                                     * true distance sqrt(rr^2+(axial-h)^2)>rr:
-                                     * early (wrong-side) clamps. */
-                                    vector3 rel_pos = vector3_addition(dp_mid, vector3_scaling(dv, toi));
-                                    float rel_ax = vector3_dot(rel_pos, ax);
-                                    if (fabsf(rel_ax) <= h) {
-                                        best_cyl_toi = toi;
-                                    }
+                        {
+                            float toi = ccd_sphere_sweep_toi(dp_perp, dv_perp, rr, dt);
+                            if ((toi > 0.0f) && (toi < best_cyl_toi)) {
+                                /* Check if contact point is within segment bounds at TOI.
+                                 * TRUTH: strict |axial|<=h (barrel only). The old
+                                 * h+rr double-covered the caps (already swept
+                                 * exactly as endpoint spheres above) and reported
+                                 * barrel hits rr beyond the segment end, where the
+                                 * true distance sqrt(rr^2+(axial-h)^2)>rr:
+                                 * early (wrong-side) clamps. */
+                                vector3 rel_pos = vector3_addition(dp_mid, vector3_scaling(dv, toi));
+                                float rel_ax = vector3_dot(rel_pos, ax);
+                                if (fabsf(rel_ax) <= h) {
+                                    best_cyl_toi = toi;
                                 }
                             }
                         }
-                        (void)dv_perp_len_sq; /* silence unused in some configs */
                     }
 
                     if ((best_cyl_toi > 0.0f) && (best_cyl_toi < best_toi)) {
@@ -348,18 +370,8 @@ int collision_ccd_sweep_clamp_full(rigidbody *bodies, int body_count, float dt, 
                     vector3 dp = vector3_subtraction(other->position, mover->position);
                     vector3 dv = vector3_subtraction(other_v, mover->velocity);
                     float rr = broadphase_bounding_radius(mover) + broadphase_bounding_radius(other);
-                    float a = vector3_dot(dv, dv);
-                    float c = vector3_dot(dp, dp) - rr * rr;
-                    if ((c <= 0.0f) || (a <= 1e-12f)) {
-                        continue;
-                    }
-                    float b = 2.0f * vector3_dot(dp, dv);
-                    float disc = b * b - 4.0f * a * c;
-                    if (disc < 0.0f) {
-                        continue;
-                    }
-                    float toi = (-b - sqrtf(disc)) / (2.0f * a);
-                    if ((toi > 0.0f) && (toi < best_toi) && (toi <= dt)) {
+                    float toi = ccd_sphere_sweep_toi(dp, dv, rr, dt);
+                    if ((toi > 0.0f) && (toi < best_toi)) {
                         best_toi = toi;
                         hit = true;
                     }

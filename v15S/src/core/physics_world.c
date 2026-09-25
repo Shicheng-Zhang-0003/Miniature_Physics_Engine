@@ -1,13 +1,7 @@
-/* MPE_FTC_059C: physics world — full pipeline.
- * Supersedes MPE_FTC_056 (free-body step).
- * Pipeline mirrors the legacy loop in simulation.c, minus:
- *   - sleep staticize hack (sleeping bodies keep real mass here),
- *   - positional depenetration pass,
- *   - joints/constraints (Phase 1).
- * NOTE: the contact warm-start cache is still engine-global. Worlds
- * must seed non-overlapping object_id ranges (see tests/two_world_test.c).
- * A per-world cache is tracked as future work.
- */
+/* Canonical explicit-world step pipeline. Body storage, contacts, solver
+ * scratch, config, joints, and warm-start cache are owned per world. The GTK
+ * callback still has a parallel fixed-step loop in simulation_physics_loop.c;
+ * shared pair dispatch does not make those whole pipelines identical. */
 #include "physics_world.h"
 #include "mpe_registry.h"
 #include "mpe_loader.h"
@@ -49,6 +43,22 @@ static void live_world_add(physics_world *world) {
     }
     if (s_live_count < MPE_MAX_LIVE_WORLDS) s_live_worlds[s_live_count++] = world;
     pthread_mutex_unlock(&s_live_lock);
+}
+
+/* `physics_world` is commonly a stack object whose bytes are indeterminate
+ * before its first init. Detect re-init by address in the registry instead
+ * of probing fields in that uninitialized object. */
+static bool live_world_contains(const physics_world *world) {
+    bool found = false;
+    pthread_mutex_lock(&s_live_lock);
+    for (int i = 0; i < s_live_count; i++) {
+        if (s_live_worlds[i] == world) {
+            found = true;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&s_live_lock);
+    return found;
 }
 
 static void live_world_remove(physics_world *world) {
@@ -118,15 +128,10 @@ void physics_world_init(physics_world *world) {
     if (!world) {
         return;
     }
-    /* Stack worlds arrive with indeterminate bytes; unconditional memset is
-     * the only safe first step (callers declare `physics_world w;` without
-     * = {0}). Double-init leak is avoided by cleaning up live pools first
-     * ONLY when they look valid (capacity within ceiling and count sane);
-     * otherwise memset directly. */
-    bool looks_live = (world->bodies != NULL && world->body_capacity > 0 &&
-                       world->body_capacity <= mpe_max_bodies &&
-                       world->body_count >= 0 && world->body_count <= world->body_capacity);
-    if (looks_live) {
+    /* Stack worlds may have indeterminate bytes on first init. Only the live
+     * registry can tell us whether this address already owns allocated pools;
+     * reading fields before the first memset would itself be undefined. */
+    if (live_world_contains(world)) {
         physics_world_cleanup(world);
     }
     det_pin_fp_state();
@@ -827,6 +832,12 @@ void physics_world_step(physics_world *world, float dt) {    if ((!world) || (!w
     for (int i = 0; i < world->body_count; i++) {
         rigidbody_sanitize(&world->bodies[i]);
     }
+    /* Contact preparation accumulates relative speed for sleep gating. Reset
+     * before narrowphase so this tick's measurements survive to the sleep
+     * update below (and stale values from last tick cannot leak forward). */
+    for (int i = 0; i < world->body_count; i++) {
+        world->bodies[i].max_relative_speed_sq = 0.0f;
+    }
     /* TRUTH: snapshot config once per tick. Menu/terminal mutating g_cfg
      * mid-tick (between substeps) would otherwise change behavior halfway
      * through the frame. Hot path uses these locals, never g_cfg directly.
@@ -981,11 +992,6 @@ void physics_world_step(physics_world *world, float dt) {    if ((!world) || (!w
             (unsigned char) (islands_body_awake(world, ma) || islands_body_awake(world, mb));
     }
     collision_manifold_solve_order(world, world->manifolds, manifold_count, world->manifold_order);
-
-    /* Reset max relative speed for sleep gating (updated during contact processing). */
-    for (int i = 0; i < world->body_count; i++) {
-        world->bodies[i].max_relative_speed_sq = 0.0f;
-    }
 
     vector3 gravity = {0.0f, step_gravity, 0.0f};
     /* Snapshot start-of-tick velocities for exact free-flight. The analytic
