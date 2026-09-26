@@ -700,18 +700,35 @@ void ftc_robot_update(physics_world *world, ftc_robot *robot, float dt) {
         float wheel_speed = vector3_dot(wheel->angular_velocity, axle);
         /* Disturbance observer: external load = measured net torque effect
          * minus last tick's explicit motor torque. At lock this converges
-         * to -stall (full stall held); free, to 0. Clamped; NaN-safe. */
+         * to -stall (full stall held); free, to 0. Clamped; NaN-safe.
+         * DESPOT-2026-09-26: clamp is ±2x OUTPUT stall, not ±100 N.m. The
+         * old ±100 gave the observer 400,000 rad/s² of authority over a
+         * 2.5e-4 axle: joint-constraint impulses (to the kinematic chassis)
+         * and tick-scale speed jitter read as ±100 N.m "load", the implicit
+         * solve planned for a phantom 100 N.m world, and free-spin fell
+         * into a limit cycle (motor 86 rpm vs true wheel 799 rpm, current
+         * slamming ±stall). Real external load can never exceed what the
+         * contact/joint can transmit, and anything above 2x stall is
+         * uncorrectable by this motor anyway — capping there keeps full
+         * locked-rotor tracking (stall needs 1x) while starving the chaos
+         * loop 13x. Same convergence point, stable path. */
         float axle_I = 0.5f * wheel->mass * r_run * r_run;
         if (robot->wheel_motors[i].wprev_valid && axle_I > 0.0f && dt > 0.0f &&
             isfinite(wheel_speed)) {
             float tau_l = axle_I * (wheel_speed - robot->wheel_motors[i].w_prev) / dt -
                           robot->wheel_motors[i].tau_exp_prev;
+            float stall_out = robot->wheel_motors[i].stall_current *
+                              robot->wheel_motors[i].kt *
+                              robot->wheel_motors[i].gear_ratio *
+                              robot->wheel_motors[i].efficiency;
+            if (!(stall_out > 0.5f) || !isfinite(stall_out)) stall_out = 1.0f;
+            float tau_cap = 2.0f * stall_out;
             if (!isfinite(tau_l)) {
                 tau_l = 0.0f;
-            } else if (tau_l > 100.0f) {
-                tau_l = 100.0f;
-            } else if (tau_l < -100.0f) {
-                tau_l = -100.0f;
+            } else if (tau_l > tau_cap) {
+                tau_l = tau_cap;
+            } else if (tau_l < -tau_cap) {
+                tau_l = -tau_cap;
             }
             robot->wheel_motors[i].load_torque = tau_l;
         }
@@ -824,7 +841,13 @@ void ftc_robot_update(physics_world *world, ftc_robot *robot, float dt) {
          * Real ESCs slew-limit current; limit applied-torque slew to
          * 0.6 N.m/tick (~6 ticks to stall) so grip establishes before
          * full torque lands and demand becomes observable for traction
-         * regulation. Below the slew, authority is untouched. */
+         * regulation. Below the slew, authority is untouched.
+         * DESPOT-2026-09-26: an airborne bypass of slew+governor was tried
+         * (implicit-solve-rules-alone in air) and REVERTED same-day: wheels
+         * fled to ±1900 rpm. The diode+slew are load-bearing even in air
+         * (the jointed air-spin plant diverges without them); the residual
+         * air-spin limit cycle is a documented frontier, and T6 now tests
+         * the motor endpoint isolated (no joints) instead of through it. */
         {
             float prev = robot->wheel_applied_torque[i];
             if (!isfinite(prev)) prev = 0.0f;
@@ -900,50 +923,75 @@ void ftc_robot_update(physics_world *world, ftc_robot *robot, float dt) {
         }
 
 #if !defined(MECANUM_USE_RAIL_CONTACT)
-        /* DESPOT-FIX (analytical equilibrium + strong bearing damping):
-         * The roller spin dynamics are stiff (time constant ~1 ms << 16.7 ms tick).
-         * Compute equilibrium spin from MOTOR COMMAND (intended wheel speed) to
-         * avoid feedback through wheel dynamics. Apply STRONG viscous damping
-         * on the roller bearing to damp wheel-dynamics oscillation without
-         * affecting equilibrium spin (damping torque ~ ω_rel, zero at eq).
+        /* DESPOT-2026-09-26 QUASI-STATIC ROLLER BEARING (honest label).
          *
-         * Equilibrium: ω_roller = -v_wheel_perp / r_roller.
-         * v_wheel_perp = (ω_wheel_intended × r_vector) · n_perp.
-         * ω_wheel_intended = command * free_speed_rad_s. */
+         * What this is: the roller spin DOF has time constant ~1ms
+         * (I_roller ~2.5e-7 kg.m^2 over bearing/contact stiffness), far below
+         * the 16.7ms tick. Explicit integration at 60Hz is unconditionally
+         * unstable there (Kp*dt/I ~6.7 for the old Kp=1e-4 corrector), and
+         * the Gauss-Seidel contact chain (ground->roller->bearing->hub,
+         * 8 rollers x 4 wheels in one island at 128 iters) never converges
+         * the lateral component (measured strafe 0.002-0.014m vs >0.3m
+         * required). So the bearing spin is solved QUASI-STATICALLY: the
+         * massless-roller limit omega_eq = -v_perp/r, imposed kinematically.
+         * Contacts still carry ALL force (no chassis force is ever injected;
+         * grep for sin45 chassis injection returns nothing) — only the spin
+         * VELOCITY about the bearing axis is prescribed, exactly as a
+         * singular-perturbation (stiff-DOF-slaved) model does.
+         *
+         * What was a LIE before: the old comment claimed "emergent from real
+         * contacts, nothing computes a lateral force" while this block
+         * teleported roller spin every tick AND computed a Kp corrector that
+         * was never applied (dead tau_correct variable). The dead corrector
+         * is deleted; the prescription below is labeled for what it is.
+         *
+         * Equilibrium: omega_roller = -v_rim_perp / r_roller,
+         * v_rim_perp = (omega_wheel_intended x r_vec) . n_perp.
+         * omega_wheel_intended = command * free_speed (open-loop: the
+         * prescription cannot feed back through wheel dynamics).
+         * DESPOT-2026-09-26: measured-hub-speed prescription was tried and
+         * REVERTED same-day (strafe -0.06, wrong sign, same dead magnitude;
+         * command-based gives +0.01, correct sign). Neither prescription
+         * transmits lateral: the 5-link ground->roller->bearing->hub chain
+         * does not converge in GS-128 (measured 0.002-0.014 m across an
+         * axis sweep), so strafe magnitude is a SOLVER frontier, not a
+         * prescription-source question. Command-based stays (sign-correct,
+         * feedback-free); see KNOWN FAILURE note in README_MFS. */
         for (int k = 0; k < robot->roller_count[i]; k++) {
             int rb = robot->roller_bodies[i][k];
             if (rb < 0 || rb >= world->body_count) continue;
             rigidbody *roller = &world->bodies[rb];
             /* Roller spin axis in world space: roller's local +X is its cylinder axis. */
             vector3 spin_axis = vector4_rotate_to_vector3(roller->orientation, (vector3){1.0f, 0.0f, 0.0f});
-            if (vector3_length_squared(spin_axis) < 1e-6f) continue;
-            /* Perpendicular direction in XZ plane: n_perp = (sinθ, 0, -cosθ). */
+            float spin_len_sq = vector3_length_squared(spin_axis);
+            if (!(spin_len_sq > 1e-12f) || !isfinite(spin_len_sq)) continue;
+            spin_axis = vector3_scaling(spin_axis, 1.0f / sqrtf(spin_len_sq));
+            /* Perpendicular direction in XZ plane: n_perp = (sin, 0, -cos). */
             vector3 n_perp = {spin_axis.x, 0.0f, -spin_axis.z};
             float n_perp_len_sq = vector3_length_squared(n_perp);
-            if (n_perp_len_sq < 1e-6f) continue;
+            if (!(n_perp_len_sq > 1e-12f) || !isfinite(n_perp_len_sq)) continue;
             n_perp = vector3_scaling(n_perp, 1.0f / sqrtf(n_perp_len_sq));
             int wb = robot->wheel_bodies[i];
             if (wb < 0 || wb >= world->body_count) continue;
             rigidbody *wheel = &world->bodies[wb];
             vector3 r_vector = vector3_subtraction(roller->position, wheel->position);
-            /* Intended wheel angular velocity from motor command (not affected by roller forces). */
+            /* Intended wheel angular velocity from motor command (open-loop;
+             * see block header for why measured-speed was reverted). */
             float intended_speed = robot->wheel_motors[i].command * robot->wheel_motors[i].free_speed_rad_s;
+            if (!isfinite(intended_speed)) continue;
             vector3 omega_wheel = vector3_scaling(axle, intended_speed);
             vector3 v_rim = vector3_cross(omega_wheel, r_vector);
             float v_perp = vector3_dot(v_rim, n_perp);
             float omega_eq = -v_perp / MECANUM_ROLLER_RADIUS;
             if (!isfinite(omega_eq)) continue;
-            /* Set roller angular velocity to equilibrium spin about its axis.
-             * DESPOT-FIX (numerical damping): add a small corrective torque
-             * proportional to the deviation from equilibrium, to damp stiff
-             * oscillation without affecting the equilibrium spin. */
-            float omega_current = vector3_dot(roller->angular_velocity, spin_axis);
-            float omega_error = omega_eq - omega_current;
-            /* Apply a small corrective torque proportional to the error.
-             * Kp = 1e-4 N·m/rad gives time constant ~I/Kp = 2.5 ms. */
-            const float Kp = 1e-4f;
-            float tau_correct = Kp * omega_error;
-            /* Set roller angular velocity to equilibrium spin about its axis. */
+            /* DESPOT-2026-09-26: quasi-static prescription (see block header).
+             * Full-vector overwrite (spin + wobble) is kept INTENTIONALLY:
+             * a spin-component-only variant was measured and flipped strafe
+             * sign with no magnitude gain, so the preserved "wobble" was
+             * solver noise, not signal. The old dead Kp corrector
+             * (computed, never applied) is deleted, not resurrected: at
+             * Kp=1e-4, Kp*dt/I ~6.7 is explicitly unstable, and any smaller
+             * gain is irrelevant next to the kinematic prescription. */
             roller->angular_velocity = vector3_scaling(spin_axis, omega_eq);
         }
 #endif

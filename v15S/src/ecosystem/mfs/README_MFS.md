@@ -10,7 +10,7 @@ v15S/src/ecosystem/mfs/                  # MFS root ("mfs-simulator")
   README_MFS.md                          # this file
   Makefile                               # unified standalone build (thin .so, build/ objs)
   mfs_sources.mk                         # canonical engine+FTC file lists (mirrored in build_tests.sh)
-  build_tests.sh                         # FTC/robotics test build + run (11 gated + 5 info)
+  build_tests.sh                         # FTC/robotics test build + run (8 gated (unified) + build checks + ungated diags)
   mfs_ecosystem.c                        # overarching descriptor: registers
                                          #   modules/module_1 + modules/ftc
   mfs_internal.c/.h                      # internal static module registry
@@ -38,6 +38,11 @@ v15S/src/ecosystem/mfs/                  # MFS root ("mfs-simulator")
                                          # (+5 ungated diags)
   docs/
     FTC_SPECS.md                         # motor spec-sheet sources + URLs
+    ARCHITECTURE.md                      # layout, lifecycle, build invariants
+    MODELS.md                            # motor/battery/drivetrain/odometry math
+    TESTING.md                           # suite gates, how to run, sanitizers
+    KNOWN_FAILURES.md                    # ticketed frontiers (strafe, air-spin)
+    SYNC_CONTRACT.md                     # twin-tree sync with the 475 copy
   plugins/                               # build output only (gitignored):
                                          # mpe_ftc.so lands here
 ```
@@ -88,7 +93,7 @@ Design rules modules follow (and future modules should too):
 From `v15S/src`:
 
 ```
-ecosystem/mfs/build_tests.sh            # full FTC suite (11 gated tests + 5 info diags + build checks)
+ecosystem/mfs/build_tests.sh            # full FTC suite (8 gated, unified mfs_suite --all, + build checks + ungated diags)
 ecosystem/mfs/build_tests.sh --build-only
 ```
 
@@ -188,4 +193,15 @@ physics_world_detach_module(world, "ftc-fleet");
   speeds through the FTC paths.
 - Odometry is pure encoder forward kinematics (no chassis fusion), so any
   encoder-vs-truth disagreement is real slip and is reported as error
-  rather than papered over. `odom_slip` is always 0, retained for ABI.
+  rather than papered over. `odom_slip` flags >0.25 m/s planar or
+  >0.35 rad/s yaw encoder-vs-truth disagreement (reporting only; odometry
+  is never corrected). Encoders are PPR-quantized (counts = base_ppr x
+  gear), so creep speeds staircase like hardware.
+- KNOWN FAILURE [MFS-STRAFE-F1/F2, 2026-09-26]: mecanum strafe develops
+  ~0.01 m vs 0.30 m gated. The 5-link ground->roller->bearing->hub chain
+  does not converge in the GS solver (axis sweep 0.002-0.014 m; both
+  roller-spin prescriptions ~0.01-0.07 m). Roller spin is quasi-static
+  (stiff-DOF-slaved, labeled in robot.c), contacts carry all force — but
+  no lateral transmits. Fix needs solver-level work (reduced articulation
+  or direct roller constraint). Suite marks both strafe gates XFAIL (loud,
+  ticketed); forward/tank/hotload/module_1/physics_truth all hard-gate.

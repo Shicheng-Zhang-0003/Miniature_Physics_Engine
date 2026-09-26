@@ -54,10 +54,31 @@ GAMEPAD_OBJ="$OUT/gamepad.o"
 } || { echo "[BUILD-FAIL] mfs_suite"; fail=$((fail+1)); head -n 20 "$OUT/mfs_suite.build.log"; }
 
 if [ "${BUILD_ONLY:-0}" != "1" ] && [ "${1:-}" != "--build-only" ]; then
-    # Run unified suite with --all
+    # Run unified suite with --all.
+    # DESPOT-2026-09-26: under ASan the hotload case dlopens a plugin image
+    # containing a second mpe_module_desc (intentional duplicate-global, the
+    # very thing hotload proves loadable). Suppress only the ODR heuristic —
+    # leaks/UB remain armed — when the runner asks for it (it always does in
+    # the sanitizer profile via MFS_ASAN_HOTLOAD_ODR_SUPPRESS=1).
     echo "--- Running unified MFS suite ---"
-    "$OUT/mfs_suite" --all
+    # DESPOT-2026-09-26: suite stdout goes to mfs_suite.run.log (kept as an
+    # artifact AND scanned by the runner for sanitizer errors via *.run.log).
+    # It must not inline here: the runner's mfs-count-contract counts
+    # script-level [PASS]/[BUILD-OK] lines against the script summary (5),
+    # and 8 inlined suite [PASS] lines break that count (13 != 5).
+    if [ "${MFS_ASAN_HOTLOAD_ODR_SUPPRESS:-0}" = "1" ]; then
+        ASAN_OPTIONS="${ASAN_OPTIONS:-detect_leaks=1:halt_on_error=1}:detect_odr_violation=0" "$OUT/mfs_suite" --all >"$OUT/mfs_suite.run.log" 2>&1
+    else
+        "$OUT/mfs_suite" --all >"$OUT/mfs_suite.run.log" 2>&1
+    fi
     suite_rc=$?
+    # Pointer only (never inline suite [PASS] lines: the runner counts
+    # script-level bracket lines against the script summary).
+    echo "(full suite output: $OUT/mfs_suite.run.log)"
+    grep -E "^(=== SUMMARY ===|Total:|Pass:|Fail:)" "$OUT/mfs_suite.run.log" || true
+    if grep -q "ERROR: AddressSanitizer\|runtime error:" "$OUT/mfs_suite.run.log"; then
+        echo "[FAIL] mfs_suite sanitizer error (see mfs_suite.run.log)"; fail=$((fail+1)); suite_rc=1
+    fi
     if [ $suite_rc -eq 0 ]; then
         echo "[PASS] mfs_suite --all"
         pass=$((pass+1));

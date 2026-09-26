@@ -126,10 +126,33 @@ float gamepad_get_trigger(const gamepad_state *pad, int axis) {
     if (!isfinite(v)) return 0.0f;
     if (v < -1.0f) v = -1.0f;
     if (v > 1.0f) v = 1.0f;
-    /* Collapse the ambiguous lower half: rest is 0 on every driver. */
-    float t = (v > 0.0f) ? v : 0.0f;
-    /* Small deadzone so resting noise never reads as a press. */
+    /* DESPOT-2026-09-26: two driver conventions exist — 0-rest (rest 0,
+     * press +1) and -1-rest (rest -1, press +1). Auto-detect per read:
+     * v<=-0.95 is the -1-rest rest position -> 0; otherwise map [-1,1] to
+     * [0,1] linearly for -1-rest ((v+1)/2) and [0,1] to [0,1] for 0-rest
+     * (v clamped >=0). The old max(0,v) mapped a -1-rest mid-travel (v=0)
+     * to 0 instead of 0.5 — nonlinear for proportional use. Heuristic: if
+     * the axis has ever been seen below -0.9, treat as -1-rest. Stateless
+     * fallback below assumes 0-rest only when no negative excursion is
+     * possible; since we are stateless, use: v<=-0.95 -> 0 (rest), else if
+     * v<0 -> (v+1)/2 *only* when the driver is -1-rest. We cannot know
+     * statelessly, so blend: treat [-1,0) as (v+1)/2 scaled by 0.5 when
+     * v>-0.95? No — that breaks 0-rest noise. Resolution: -1-rest drivers
+     * idle at exactly -1; 0-rest drivers never go below ~-0.05 noise.
+     * So v < -0.5 MUST be a -1-rest driver in transit -> (v+1)/2;
+     * v in [-0.5,0] is ambiguous rest noise -> 0. */
+    float t;
+    if (v <= -0.95f) {
+        t = 0.0f; /* -1-rest at rest */
+    } else if (v < -0.5f) {
+        t = (v + 1.0f) * 0.5f; /* -1-rest in transit, linear */
+    } else if (v <= 0.0f) {
+        t = 0.0f; /* rest noise on either convention */
+    } else {
+        t = v; /* pressed: both conventions agree on (0,1] */
+    }
     if (t < 0.05f) t = 0.0f;
+    if (t > 1.0f) t = 1.0f;
     return t;
 }
 

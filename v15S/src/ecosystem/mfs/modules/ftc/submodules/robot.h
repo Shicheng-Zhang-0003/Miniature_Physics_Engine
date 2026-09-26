@@ -22,12 +22,14 @@ typedef struct {
     int wheel_joints[FTC_MAX_WHEELS]; /* revolute joint indices */
     int wheel_count;
 
-    /* Mecanum rollers: real bodies on real free bearings (see robot.c for
-     * the geometry rationale). They are what actually touches the floor, and
-     * the lateral force is emergent from their contacts - nothing computes a
-     * lateral force directly. Joints are FREE (motor and limits both off):
-     * revolute_solve zeroes the axis impulse in that case, so a roller spins
-     * under its own contact torque exactly as a real bearing does. */
+    /* Mecanum rollers: real bodies on real free revolute bearings (see
+     * robot.c for geometry). They are what touches the floor and all CONTACT
+     * FORCE comes from the engine's Coulomb solver (no chassis force is ever
+     * injected). The bearing SPIN velocity is quasi-static (stiff DOF slaved,
+     * DESPOT-2026-09-26): roller spin about its axle is prescribed to the
+     * massless-roller equilibrium each tick with a small dissipative bearing
+     * torque, because 60Hz explicit integration of the ~1ms roller mode is
+     * unconditionally unstable. Off-axis wobble is preserved. */
 /* FIX-AUDIT-DESPOT: was MFS_ROLLERS_PER_Wheel (lowercase 'heel' typo).
  * Renamed to MFS_ROLLERS_PER_WHEEL; the old spelling is kept as a
  * backward-compatible alias so out-of-tree code keeps compiling.
@@ -58,14 +60,21 @@ typedef struct {
 
     /* MFS_151_ODOMETRY: Wheel encoders and pose estimation */
     float wheel_radians[FTC_MAX_WHEELS]; /* MFS_163_BOUNDS_FIX: was [4], OOB if wheel_count > 4 */
+    /* DESPOT-2026-09-26: encoder quantization state. wheel_radians above is
+     * the TRUE continuous hub angle; the counts below are what a real
+     * quadrature encoder reports (integer, PPR-limited). Odometry integrates
+     * the QUANTIZED deltas (staircase, zero at creep speeds), not the true
+     * omegas — previously PPR was plumbed but never consumed, so resolution
+     * error was unmodeled. counts_per_rev is derived per robot from the
+     * preset (base_ppr * gear_ratio); zero-size memset gives count 0. */
+    int wheel_encoder_counts[FTC_MAX_WHEELS];
+    float wheel_radians_quant[FTC_MAX_WHEELS];
     float odom_x, odom_z, odom_theta;
-    /* odom_slip: RETAINED FOR ABI/telemetry only, always 0.
-     * FIX-AUDIT-DESPOT: the old doc described a chassis-fusion behaviour
-     * (lateral fused from chassis motion on encoder disagreement, flag=1).
-     * That fusion is removed: odometry is pure encoder kinematics now, so
-     * no tick ever sets this. It stays in the struct so saved telemetry
-     * and out-of-tree readers keep their layout; genuine slip shows up as
-     * encoder-vs-truth error, not as this flag. */
+    /* odom_slip: slip REPORT flag (no fusion — odometry is never corrected).
+     * DESPOT-2026-09-26: was hard-zeroed "ABI only". Now 1 when the
+     * encoder-implied chassis motion disagrees with the true chassis motion
+     * beyond (0.25 m/s planar or 0.35 rad/s yaw), else 0. Pure reporting:
+     * odom_x/z/theta are still integrated from encoders only. */
     int odom_slip;
     /* clamp_events: counts ticks where the velocity safety monitor fired
      * (was a silent 3 m/s hard clamp; now telemetry only). */
