@@ -4,6 +4,11 @@
  * bugs: no frictional floor (default static_plane_enabled=false leaves only
  * the frictionless emergency boundary clamp). v2 gives every grounded test
  * a real Coulomb floor via mpe_floor_slab()/mpe_floor_plane().
+ *
+ * TOLERANCE FORK (rolling): canonical rolling_decay truth (9.5-13.5 m in
+ * 8 s, mu_r=0.02) lives in suite_a; the paranoia rolling smoke (5-45 m,
+ * 100 s, mu_r=0.01) is intentionally wide and must not be mistaken for
+ * the calibration band.
  */
 #include <math.h>
 #include <stdint.h>
@@ -290,7 +295,10 @@ static void mpe_settle_scene(physics_world *w) {
 }
 
 /* f11 torture scene: pile WITHOUT floor (unchanged legacy geometry).
- * Verdict stays robustness-only (no NaN, nothing fallen). */
+ * Verdict stays robustness-only (no NaN, nothing fallen). WARNING: this
+ * crash-oracle is NOT a stability proof — under extreme configs perpetual
+ * fall/creep is the true outcome, so end speeds are reported, never gated.
+ * Do not cite PASS as "stable". */
 static void mpe_torture_scene(physics_world *w) {
     mpe_pile_bodies(w);
 }
@@ -525,6 +533,8 @@ int mpe_t_f11_torture(void) {
     }
     MPE_INFO("torture end speeds (reported, never gated): lin=%.3f ang=%.3f nan=%ld fallen=%ld", end_lin,
              end_ang, nan_ticks, fallen_ticks);
+    /* Crash-oracle only: PASS = finite state + world intact, NOT stability.
+     * Do not misread as a stability proof. */
     MPE_CHECK(&t, nan_ticks == 0 && fallen_ticks == 0);
     if (t.failures == 0) {
         printf("[PASS] torture survived extremes without corruption\n");

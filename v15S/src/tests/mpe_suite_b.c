@@ -1,6 +1,8 @@
 /* MPE Suite v2 — file B: joints + shapes (8 tests).
  * spring impl lives here (needs spring_joint TU + scene stubs, defined in
- * mpe_suite_main.c). list4 is FIXED (Z-rotation + frictional floor). */
+ * mpe_suite_main.c). list4 is FIXED (Z-rotation + frictional floor).
+ * NOTE: compound-pendulum inertia ii = 1/12*m*(L^2+w^2) + m*d^2 lives in
+ * suite_a (mpe_t_pendulum) with the m=1, d=1 substitution shown there. */
 #include <math.h>
 #include <stdio.h>
 #include "mpe_test.h"
@@ -57,6 +59,7 @@ int mpe_t_spring(void) {
     if (crossings >= 4) {
         measured_t = 2.0f * (float)(last_cross - first_cross) * dt / (float)(crossings - 1);
     }
+    /* T = 2*pi*sqrt(m/k) with m=1, k=20. */
     float analytic_t = 2.0f * 3.14159265f * sqrtf(1.0f / k);
     MPE_INFO("period: measured=%.4f analytic=%.4f crossings=%d", measured_t, analytic_t, crossings);
     MPE_CHECK(&t, crossings >= 4);

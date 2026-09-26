@@ -26,6 +26,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
+#include <pthread.h>
 
 /* ================================================================
  * Ecosystem State
@@ -42,25 +43,38 @@ typedef struct {
     int nworlds;
 } mfs_ecosystem_state_t;
 
-static void eco_track_world(mfs_ecosystem_state_t *state, mpe_world_t *world) {
-    if (!state || !world) return;
+/* FIX-AUDIT-DESPOT: was void + silent drop on overflow. Warns and returns
+ * -1 when the world table is full so a lost terminal world is visible. */
+static int eco_track_world(mfs_ecosystem_state_t *state, mpe_world_t *world) {
+    if (!state || !world) return -1;
     for (int i = 0; i < state->nworlds; i++) {
-        if (state->worlds[i] == world) return;
+        if (state->worlds[i] == world) return 0;
     }
     if (state->nworlds < MFS_ECO_MAX_WORLDS) {
         state->worlds[state->nworlds++] = world;
+        return 0;
     }
+    fprintf(stderr, "mfs_ecosystem: world table full (%d); extra world not tracked\n",
+            MFS_ECO_MAX_WORLDS);
+    return -1;
 }
 
 static void eco_untrack_world(mfs_ecosystem_state_t *state, mpe_world_t *world) {
     if (!state) return;
+    /* DESPOT-FIX: the old clear-all path (world==NULL) shifted worlds[j] =
+     * worlds[j+1] then nworlds-- without adjusting i, skipping the element
+     * that slid into slot i and leaking one tracked world. Decrement i after
+     * a clear-all removal so every slot is visited. Single-world removal
+     * keeps the early break. */
     for (int i = 0; i < state->nworlds; i++) {
         if (state->worlds[i] == world || !world) {
             for (int j = i; j + 1 < state->nworlds; j++) {
                 state->worlds[j] = state->worlds[j + 1];
             }
+            state->worlds[state->nworlds - 1] = NULL;
             state->nworlds--;
             if (world) break;
+            i--; /* re-examine the slot that just slid in (clear-all only) */
         }
     }
 }
@@ -74,6 +88,16 @@ static mpe_world_t *eco_primary_world(mfs_ecosystem_state_t *state) {
  * Ecosystem Lifecycle
  * ================================================================ */
 
+/* FIX-AUDIT-DESPOT: was `static int s_registry_initialized` (racy under
+ * concurrent attach, and re-cleared the table on every process reuse).
+ * pthread_once makes one-time init thread-safe. */
+static pthread_once_t s_registry_once = PTHREAD_ONCE_INIT;
+static void eco_registry_init_once(void) {
+    /* Ignore BUSY here: a live attachment means someone else already
+     * initialised the registry out from under us, which is the goal. */
+    (void)mfs_internal_registry_init();
+}
+
 static int mfs_ecosystem_attach(mpe_world_t *world, void **eco_state) {
     if (!world || !eco_state) return -1;
 
@@ -81,42 +105,55 @@ static int mfs_ecosystem_attach(mpe_world_t *world, void **eco_state) {
     if (!state) return -1;
 
     /* Initialize internal module registry once only */
-    static int s_registry_initialized = 0;
-    if (!s_registry_initialized) {
-        mfs_internal_registry_init();
-        s_registry_initialized = 1;
-    }
+    pthread_once(&s_registry_once, eco_registry_init_once);
     /* Ensure-registered (idempotent): repeat attaches to other worlds
-     * must not fail on duplicate registration. */
+     * must not fail on duplicate registration. Distinguish the failure
+     * modes so "registry is full" is not silently reported as a generic
+     * attach failure (M4). */
     extern const mpe_module_desc_t mfs_module_1_desc;
-    if (!mfs_internal_module_registered(MFS_MODULE_1_NAME) &&
-        mfs_internal_module_register(&mfs_module_1_desc) < 0) {
-        free(state);
-        return -1;
+    if (!mfs_internal_module_registered(MFS_MODULE_1_NAME)) {
+        int rc = mfs_internal_module_register(&mfs_module_1_desc);
+        if (rc != MFS_REG_OK) {
+            fprintf(stderr, "mfs_ecosystem: register(%s) failed rc=%d\n",
+                    MFS_MODULE_1_NAME, rc);
+            free(state);
+            return -1;
+        }
     }
     /* NOTE: ftc_module.c exports the loader-reserved symbol
      * mpe_module_desc (dlsym'd by `mod load` for mpe_ftc.so); it IS the
      * ftc-fleet descriptor, so the static bundle references it directly
      * instead of duplicating the struct. */
     extern const mpe_module_desc_t mpe_module_desc;
-    if (!mfs_internal_module_registered("ftc-fleet") &&
-        mfs_internal_module_register(&mpe_module_desc) < 0) {
-        free(state);
-        return -1;
+    if (!mfs_internal_module_registered("ftc-fleet")) {
+        int rc = mfs_internal_module_register(&mpe_module_desc);
+        if (rc != MFS_REG_OK) {
+            fprintf(stderr, "mfs_ecosystem: register(ftc-fleet) failed rc=%d\n", rc);
+            free(state);
+            return -1;
+        }
     }
 
-    /* Attach internal modules */
-    if (mfs_internal_module_attach("mfs-simulator", (mpe_world_t*)world) < 0) {
+    /* Attach internal modules. On a failure of the second attach, roll
+     * back the first: previously it was left attached to the world while
+     * the ecosystem returned -1 and freed only its own state, leaking the
+     * module's bodies and its slot in the world. */
+    if (mfs_internal_module_attach("mfs-simulator", (mpe_world_t*)world) != MFS_REG_OK) {
+        fprintf(stderr, "mfs_ecosystem: attach(mfs-simulator) failed\n");
         free(state);
         return -1;
     }
-    if (mfs_internal_module_attach("ftc-fleet", (mpe_world_t*)world) < 0) {
+    if (mfs_internal_module_attach("ftc-fleet", (mpe_world_t*)world) != MFS_REG_OK) {
+        fprintf(stderr, "mfs_ecosystem: attach(ftc-fleet) failed; rolling back\n");
+        mfs_internal_module_detach("mfs-simulator", (physics_world *)world);
         free(state);
         return -1;
     }
     
     state->modules_initialized = true;
     state->modules_attached = true;
+    /* Tracking is best-effort for the terminal surface; the attach itself
+     * already succeeded, so a full table only warns (see eco_track_world). */
     eco_track_world(state, world);
 
     *eco_state = state;
@@ -155,11 +192,17 @@ static void mfs_ecosystem_post_step(mpe_world_t *world, float dt, void *eco_stat
  * ================================================================ */
 
 static int mfs_ecosystem_config_get(void *eco_state, const char *key, char *out, int maxlen) {
-    (void)eco_state;
     if (!key || !out || maxlen <= 0) return -1;
     if (strcmp(key, "shooter_rpm") == 0) {
+        /* FIX-AUDIT-DESPOT: was mfs_internal_module_state() (any-world:
+         * ambiguous when several worlds hold the module). Terminal commands
+         * operate on worlds[0], so read that world's attachment. */
+        mfs_ecosystem_state_t *state = (mfs_ecosystem_state_t *)eco_state;
+        mpe_world_t *primary = (state && state->nworlds > 0) ? state->worlds[0] : NULL;
+        if (!primary) return -1;
         mfs_module_1_state *ms =
-            (mfs_module_1_state *)mfs_internal_module_state(MFS_MODULE_1_NAME);
+            (mfs_module_1_state *)mfs_internal_module_state_for((const void *)primary,
+                                                               MFS_MODULE_1_NAME);
         if (!ms) return -1;
         snprintf(out, (size_t)maxlen, "%.1f", (double)ms->shooter_rpm);
         return 0;
@@ -177,14 +220,30 @@ static int mfs_ecosystem_config_set(void *eco_state, const char *key, const char
     return -1;
 }
 
-/* Preset lookup by substring ("5203-26.9" or "26.9"); -1 when unknown. */
+/* Preset lookup by name. Exact match wins; otherwise substring match.
+ * Returns -1 when unknown. On ambiguous substring (several presets contain
+ * `want`, e.g. "26.9"), the first match wins AND a stderr warning names the
+ * ambiguity so a mistyped spawn is visible instead of silently picking one.
+ * DESPOT-FIX: old code was pure first-substring with no warning. */
 static int eco_preset_by_name(const char *want) {
     if (!want || !*want) return -1;
     for (int id = 0; id < MOTOR_COUNT; id++) {
         const char *nm = motor_preset_name((motor_preset_id)id);
-        if (nm && strstr(nm, want)) return id;
+        if (nm && strcmp(nm, want) == 0) return id;
     }
-    return -1;
+    int found = -1, matches = 0;
+    for (int id = 0; id < MOTOR_COUNT; id++) {
+        const char *nm = motor_preset_name((motor_preset_id)id);
+        if (nm && strstr(nm, want)) {
+            if (found < 0) found = id;
+            matches++;
+        }
+    }
+    if (matches > 1) {
+        fprintf(stderr, "mfs: preset '%s' is ambiguous (%d matches); using '%s'\n",
+                want, matches, motor_preset_name((motor_preset_id)found));
+    }
+    return found;
 }
 
 /* Tile floor guarantee (same contract as the terminal spawn path:
@@ -193,7 +252,11 @@ static int eco_ensure_floor(physics_world *w) {
     if (!w) return -1;
     for (int i = 0; i < w->body_count; i++) {
         rigidbody *b = &w->bodies[i];
-        if (!b->static_state && !(b->mass == 0.0f)) continue;
+        /* FIX-AUDIT-DESPOT: was a two-clause predicate
+         * (`!static_state && mass != 0`) that second-guessed the engine's
+         * own static flag. Canonical check is the flag alone: mass-0 slabs
+         * are static by construction. */
+        if (!b->static_state) continue;
         float top = b->position.y + b->half_extensions.y;
         if (top > -0.05f && top < 0.05f && fabsf(b->position.x) < 5.0f &&
             fabsf(b->position.z) < 5.0f && b->half_extensions.x >= 5.0f &&
@@ -312,9 +375,12 @@ static int mfs_ecosystem_command(void *eco_state, int argc, char **argv) {
                 printf("mfs: usage: drive <i> tank <l> <r>\n");
                 return -1;
             }
-            drivetrain_tank(r, eco_argf(argv, 3, argc, 0), eco_argf(argv, 4, argc, 0));
-            printf("mfs: robot %d tank l=%.2f r=%.2f\n", idx, eco_argf(argv, 3, argc, 0),
-                   eco_argf(argv, 4, argc, 0));
+            /* FIX-AUDIT-DESPOT: parse each arg once into locals (was
+             * eco_argf per use: repeated strtod + repeated defaulting). */
+            float tl = eco_argf(argv, 3, argc, 0);
+            float tr = eco_argf(argv, 4, argc, 0);
+            drivetrain_tank(r, tl, tr);
+            printf("mfs: robot %d tank l=%.2f r=%.2f\n", idx, tl, tr);
             return 0;
         }
         if (strcmp(argv[2], "mecanum") == 0) {
@@ -322,10 +388,11 @@ static int mfs_ecosystem_command(void *eco_state, int argc, char **argv) {
                 printf("mfs: usage: drive <i> mecanum <f> <s> <r>\n");
                 return -1;
             }
-            drivetrain_mecanum(r, eco_argf(argv, 3, argc, 0), eco_argf(argv, 4, argc, 0),
-                               eco_argf(argv, 5, argc, 0));
-            printf("mfs: robot %d mecanum f=%.2f s=%.2f r=%.2f\n", idx, eco_argf(argv, 3, argc, 0),
-                   eco_argf(argv, 4, argc, 0), eco_argf(argv, 5, argc, 0));
+            float mf = eco_argf(argv, 3, argc, 0);
+            float ms = eco_argf(argv, 4, argc, 0);
+            float mr = eco_argf(argv, 5, argc, 0);
+            drivetrain_mecanum(r, mf, ms, mr);
+            printf("mfs: robot %d mecanum f=%.2f s=%.2f r=%.2f\n", idx, mf, ms, mr);
             return 0;
         }
         printf("mfs: drive mode must be tank|mecanum|stop\n");

@@ -145,7 +145,10 @@ int mpe_t_incline_accel(void) {
     MPE_CHECK_REL(&t, a_meas, a_exact, 0.04f, "slide-accel");
     vector3 dpb = vector3_subtraction(p_b, p_a);
     float s_meas = vector3_dot(dpb, d);
-    float s_exact = v_a * 1.0f + 0.5f * a_exact * 1.0f;
+    /* FIX-AUDIT-DESPOT: s = v*t + 0.5*a*t*t with t = 60*dt = 1.0 s
+     * (was v*t + 0.5*a*1.0; identical at t=1 but dimensionally wrong). */
+    const float t_window = 1.0f; /* 60 ticks * dt */
+    float s_exact = v_a * t_window + 0.5f * a_exact * t_window * t_window;
     MPE_CHECK_REL(&t, s_meas, s_exact, 0.03f, "slide-displacement");
     if (t.failures == 0) {
         printf("[PASS] frictionless slide accelerates at g*sin(theta)\n");
@@ -155,7 +158,9 @@ int mpe_t_incline_accel(void) {
     return t.failures;
 }
 
-/* pendulum: compound T = 2*pi*sqrt(I/g), I = 1/12(4+0.04)+1, 3%, >=6 crossings. */
+/* pendulum: compound T = 2*pi*sqrt(I/(m*g*d)), I = 1/12*m*(L^2+w^2) + m*d^2
+ * with m=1, d=1 (pivot->COM), L=2, w=0.2: I = 1/12*1*(4+0.04) + 1*1^2.
+ * 3%, >=6 crossings. */
 int mpe_t_pendulum(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "pendulum");
@@ -173,6 +178,7 @@ int mpe_t_pendulum(void) {
     MPE_CHECK(&t, constraint_add_revolute(&w, pid, rid, (vector3){0.0f, -0.3f, 0.0f},
                                           (vector3){0.0f, 1.0f, 0.0f},
                                           (vector3){0.0f, 0.0f, 1.0f}) >= 0);
+    /* I = 1/12*m*(L^2+w^2) + m*d^2 with m=1, d=1, L=2, w=0.2. */
     float ii = (1.0f / 12.0f) * (4.0f + 0.04f) + 1.0f;
     float t_exact = 2.0f * 3.14159265f * sqrtf(ii / 9.81f);
     const float dt = 1.0f / 60.0f;
@@ -212,7 +218,11 @@ int mpe_t_pendulum(void) {
     return t.failures;
 }
 
-/* bounce_series: e=0.6 from 3.5m: apexes 1.76, 0.954 (e^2 law), 12/15%. */
+/* bounce_series: e=0.6 from 3.5m: apexes 1.76, 0.954 (e^2 law), 12/15%,
+ * plus the paranoia Newton oracle (outgoing/incoming impact-velocity ratio
+ * ~e at the contact itself; apexes include CCD substep position and are
+ * not a valid per-impact oracle when the solver advances only the
+ * remainder fraction). */
 int mpe_t_bounce_series(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "bounce_series");
@@ -227,6 +237,11 @@ int mpe_t_bounce_series(void) {
     rigidbody_wake(&w.bodies[s]);
     const float dt = 1.0f / 60.0f;
     float apex1 = 0.0f, apex2 = 0.0f;
+    /* FIX-AUDIT-DESPOT: canonical Newton velocity-ratio oracle promoted
+     * from paranoia_contact_solver (impact_velocity ratio, not apexes). */
+    float newton_samples[4] = {0};
+    int newton_n = 0;
+    float prev_vy = w.bodies[s].velocity.y;
     for (int k = 0; k < 300; k++) {
         physics_world_step(&w, dt);
         float y = w.bodies[s].position.y;
@@ -235,6 +250,17 @@ int mpe_t_bounce_series(void) {
             t.failures++;
             break;
         }
+        float vy = w.bodies[s].velocity.y;
+        if (prev_vy < 0.0f && vy > 0.0f && newton_n < 4) {
+            float incoming = 0.0f;
+            if (w.manifolds && w.manifolds[0].contact_count > 0) {
+                incoming = -w.manifolds[0].contacts[0].impact_velocity;
+            }
+            if (incoming > 0.0f) {
+                newton_samples[newton_n++] = vy / incoming;
+            }
+        }
+        prev_vy = vy;
         float time = (float)(k + 1) * dt;
         if ((time > 1.0f) && (time < 1.7f) && (y > apex1)) {
             apex1 = y;
@@ -248,6 +274,11 @@ int mpe_t_bounce_series(void) {
     MPE_INFO("apex1=%.4f (expect %.4f) apex2=%.4f (expect %.4f)", apex1, e1, apex2, e2);
     MPE_CHECK_REL(&t, apex1, e1, 0.12f, "apex1");
     MPE_CHECK_REL(&t, apex2, e2, 0.15f, "apex2");
+    for (int i = 0; i < newton_n; i++) {
+        MPE_INFO("bounce %d: Newton e=%.4f (expect 0.60)", i + 1, newton_samples[i]);
+        MPE_CHECK_NEAR(&t, newton_samples[i], 0.6f, 0.08f, "newton-e");
+    }
+    MPE_CHECK(&t, newton_n >= 1);
     if (t.failures == 0) {
         printf("[PASS] bounce series decays geometrically\n");
     }
@@ -428,7 +459,11 @@ int mpe_t_static_hold(void) {
 
 /* rolling_decay: rolling ball (v=2 + backspin w=(0,0,-4)) decays at the
  * contact-patch rate: 9.5-13.5m in 8 s with mu_r=0.02. Plane enabled with
- * default floor friction (untouched). */
+ * default floor friction (untouched).
+ * TOLERANCE FORK: this 9.5-13.5 band is the canonical truth (torque-only
+ * model, 8 s, mu_r=0.02, pinned material); the paranoia smoke in
+ * paranoia_contact_solver.c Test 5 uses a wide 5-45 m band over 100 s at
+ * mu_r=0.01 to catch only gross model breaks, not calibration drift. */
 int mpe_t_rolling_decay(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "rolling_decay");
@@ -508,7 +543,12 @@ int mpe_t_kinematic(void) {
     return t.failures;
 }
 
-/* ccd_sweep: 144m/s wall face in [-0.75,-0.45], |vx|<5; floor min>=0.40 rest 0.5+/-0.05. */
+/* ccd_sweep: 144m/s wall face in [-0.75,-0.45], |vx|<5; floor min>=0.40 rest 0.5+/-0.05.
+ * Wall-face derivation: wall centre x=0 half 0.05 -> left face -0.05;
+ * minus sphere radius 0.5 -> ideal rest centre -0.55. Window [-0.75,-0.45]
+ * = -0.55 + [-0.20,+0.10]: admits one-tick CCD clamp + slop (0.01) +
+ * penetration correction, while tunneling (x >> 0) or bounce-back miss
+ * (x << -1) still fail. */
 int mpe_t_ccd_sweep(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "ccd_sweep");

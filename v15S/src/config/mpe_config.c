@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include <math.h>
 #include <time.h>
 #include <sys/stat.h>
@@ -267,7 +269,11 @@ bool mpe_config_save(const char *path) {
             const char *dot = strchr(g_registry[i].key, '.');
             const char *field = dot ? (dot + 1) : g_registry[i].key;
             if (g_registry[i].type == p_float) {
-                fprintf(file, "%s = %.6f\n", field, param_read_double(&g_registry[i]));
+                /* FIX-AUDIT-DESPOT: %.6f truncated to 6 decimals (gravity
+                 * -9.81 survives, but values like 0.0001 print as 0.000100
+                 * and high-precision tunables never round-tripped). %.9g
+                 * carries 9 significant digits = exact float round-trip. */
+                fprintf(file, "%s = %.9g\n", field, param_read_double(&g_registry[i]));
             } else {
                 fprintf(file, "%s = %d\n", field, (int) param_read_double(&g_registry[i]));
             }
@@ -276,12 +282,54 @@ bool mpe_config_save(const char *path) {
             fprintf(file, "\n");
         }
     }
-    fclose(file);
+    /* FIX-AUDIT-DESPOT: fsync the file before rename (like scene_saving:
+     * a crash between write and flush must not publish a torn config).
+     * Directory sync is best-effort with a warning (bytes are durable). */
+    if (fflush(file) != 0) {
+        fclose(file);
+        remove(tmp_path);
+        return false;
+    }
+    {
+        int fd = fileno(file);
+        if (fd < 0 || fsync(fd) != 0) {
+            fclose(file);
+            remove(tmp_path);
+            return false;
+        }
+    }
+    if (fclose(file) != 0) {
+        remove(tmp_path);
+        return false;
+    }
     /* R3-03: Atomic rename over the target */
     if (rename(tmp_path, path) != 0) {
         remove(tmp_path);
         return false;
-    } return true;
+    }
+    {
+        char parent[512];
+        strncpy(parent, path, sizeof(parent) - 1);
+        parent[sizeof(parent) - 1] = '\0';
+        char *slash = strrchr(parent, '/');
+        if (!slash) {
+            memcpy(parent, ".", 2);
+        } else if (slash == parent) {
+            slash[1] = '\0';
+        } else {
+            *slash = '\0';
+        }
+        int dir_fd = open(parent, O_RDONLY);
+        if (dir_fd >= 0) {
+            if (fsync(dir_fd) != 0) {
+                fprintf(stderr, "[config] warning: parent-directory sync failed for '%s'\n", path);
+            }
+            if (close(dir_fd) != 0) {
+                fprintf(stderr, "[config] warning: parent-directory close failed for '%s'\n", path);
+            }
+        }
+    }
+    return true;
 }
 
 static char *term_trim(char *str) {
@@ -343,10 +391,18 @@ bool mpe_config_load(const char *path) {
         char *key_part = term_trim(cursor);
         char *value_part = term_trim(equals + 1);
         char full_key[128];
+        int key_len;
         if (section[0] != '\0') {
-            snprintf(full_key, sizeof(full_key), "%s.%s", section, key_part);
+            key_len = snprintf(full_key, sizeof(full_key), "%s.%s", section, key_part);
         } else {
-            snprintf(full_key, sizeof(full_key), "%s", key_part);
+            key_len = snprintf(full_key, sizeof(full_key), "%s", key_part);
+        }
+        /* FIX-AUDIT-DESPOT: unchecked snprintf truncation could forge a
+         * shorter-but-valid key ("abc...x" -> "abc") and mis-assign an
+         * unrelated tunable. Drop overlong keys instead of guessing. */
+        if (key_len < 0 || (size_t)key_len >= sizeof(full_key)) {
+            fprintf(stderr, "[config] warning: overlong key dropped (section='%s')\n", section);
+            continue;
         }
         const mpe_param *param = mpe_config_find(full_key);
         if (!param) {
@@ -357,7 +413,12 @@ bool mpe_config_load(const char *path) {
         if ((endptr == value_part) || (!isfinite(parsed))) {
             continue;
         }
-        param_write_double(param, parsed);
+        /* FIX-AUDIT-DESPOT: clamping was silent (a hostile/hand-edited file
+         * could halve gravity with no trace). Log every clamped load. */
+        if (param_write_double(param, parsed)) {
+            fprintf(stderr, "[config] '%s' clamped to [%g, %g] (file had %g)\n",
+                    full_key, param->min, param->max, parsed);
+        }
     }
     fclose(file);
     return true;

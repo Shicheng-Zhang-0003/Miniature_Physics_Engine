@@ -129,6 +129,13 @@ void revolute_solve(revolute_params *p, rigidbody *body_a, rigidbody *body_b, fl
     if ((!p) || (!body_a) || (!body_b) || (dt <= 0.0f)) {
         return;
     }
+    /* FIX-AUDIT-DESPOT: jointed bodies are force-woken here INTENTIONALLY
+     * (FTC robots are always active; a sleeping hinge partner would freeze
+     * the constraint). Sleep is still allowed when the joint is passive
+     * (no motor, no limits): the island/sleep pass may put both partners
+     * down and they stay down until contact/spring/motor wakes them — the
+     * drift corrections above are gated on effective inv mass so they never
+     * kick a sleeper back awake by themselves. */
     /* Jointed bodies stay awake so the constraint always acts. */
     if (body_a->is_sleeping) rigidbody_wake(body_a);
     if (body_b->is_sleeping) rigidbody_wake(body_b);
@@ -196,7 +203,22 @@ void revolute_solve(revolute_params *p, rigidbody *body_a, rigidbody *body_b, fl
     double K[6][6];
     mat6_zero(K);
 
-    /* Point-to-point block (3×3): K_p2p = inv_mass_sum*I - skew_a*Ia^-1*skew_a - skew_b*Ib^-1*skew_b */
+    /* Point-to-point block (3×3):
+     * K_p2p = (1/mA + 1/mB)*I3 - [rA]×*IA^-1*[rA]× - [rB]×*IB^-1*[rB]×
+     *
+     * Derivation: K = J*M^-1*J^T with J_p2p = [I | -I | -[rA]× | [rB]×].
+     * Body-A angular contribution: (-S)*IA^-1*(-S)^T where S = [rA]×.
+     * (-S)^T = -(S^T) = -(-S) = +S, so the contribution is
+     * (-S)*IA^-1*(+S) = -(S*IA^-1*S) = -term_a. SUBTRACT term_a.
+     * DESPOT-CORRECTION: a prior edit claimed (-S)^T*IA^-1*(-S) = S*IA^-1*S
+     * (dropping the transpose's sign) and flipped this to ADD. That is wrong:
+     * S*M*S (no transpose) is NEGATIVE-semidefinite (eigenvalues {0,-|r|²·λ}),
+     * so adding it makes K indefinite at anchor arms beyond ~0.3 m (wheel
+     * offsets 0.24/0.20 m are already marginal) — inverted joint impulses
+     * killed tank yaw, mecanum strafe and the T15 rod anchor while symmetric
+     * forward drive survived. K = J*M^-1*J^T is PD by construction; the
+     * subtraction is what keeps it so. Verified numerically: K_old PD at all
+     * arms, K_new indefinite past ~0.3 m. */
     math3 term_a = math3_multiplication(skew_a, math3_multiplication(I_inv_a, skew_a));
     math3 term_b = math3_multiplication(skew_b, math3_multiplication(I_inv_b, skew_b));
     for (int i = 0; i < 3; i++) {
@@ -389,6 +411,8 @@ fallback_sequential:
         for (int i = 0; i < 3; i++) k.matrix[i][i] = inv_mass_sum;
         math3 term_a = math3_multiplication(skew_a, math3_multiplication(I_inv_a, skew_a));
         math3 term_b = math3_multiplication(skew_b, math3_multiplication(I_inv_b, skew_b));
+        /* DESPOT-CORRECTION: same as the 6x6 path — SUBTRACT rotational
+         * terms (S*M*S is negative-semidefinite; see derivation above). */
         for (int i = 0; i < 3; i++) for (int j = 0; j < 3; j++) k.matrix[i][j] -= term_a.matrix[i][j] + term_b.matrix[i][j];
         math3 k_inv = math3_inverse(k);
         vector3 rhs_vec = vector3_scaling(vector3_addition(relative_velocity, bias_p2p), -1.0f);
@@ -982,12 +1006,17 @@ void fixed_correct_angular_drift(fixed_params *p, rigidbody *body_a, rigidbody *
     /* Guard near-singular (both infinite mass): nothing to correct. */
     math3 m_inv = math3_inverse(m);
     vector3 impulse = vector3_scaling(math3_multiplication_vector3(m_inv, corr_world), -1.0f);
-    if (!body_a->static_state) {
+    /* FIX-AUDIT-DESPOT: gate on EFFECTIVE inv inertia (>0), not just
+     * !static_state. static_state misses sleeping/kinematic (effective 0):
+     * the old gate applied drift impulses to bodies the velocity solve
+     * treats as immovable, waking sleepers every tick and fighting
+     * prescribed kinematic motion. Zero-effective sides skip. */
+    if (rigidbody_effective_inv_mass(body_a) > 0.0f) {
         body_a->angular_velocity = vector3_subtraction(
             body_a->angular_velocity,
             math3_multiplication_vector3(rigidbody_effective_inv_inertia(body_a), impulse));
     }
-    if (!body_b->static_state) {
+    if (rigidbody_effective_inv_mass(body_b) > 0.0f) {
         body_b->angular_velocity = vector3_addition(
             body_b->angular_velocity,
             math3_multiplication_vector3(rigidbody_effective_inv_inertia(body_b), impulse));
@@ -1024,13 +1053,17 @@ void revolute_correct_axis_drift(revolute_params *p, rigidbody *body_a, rigidbod
         math3 drift_angular_mass_inv = math3_inverse(drift_angular_mass);
         vector3 axis_impulse =
             vector3_scaling(math3_multiplication_vector3(drift_angular_mass_inv, axis_correction), -1.0f);
-        /* Apply angular impulse to both bodies */
-        if (!body_a->static_state) {
+        /* Apply angular impulse to both bodies.
+         * FIX-AUDIT-DESPOT: gate on EFFECTIVE inv mass (>0), not just
+         * !static_state (same sleeping/kinematic hole as the fixed-weld
+         * drift above: effective helpers already zero those sides, so the
+         * impulse application must skip them or sleepers get kicked). */
+        if (rigidbody_effective_inv_mass(body_a) > 0.0f) {
             body_a->angular_velocity = vector3_subtraction(
                 body_a->angular_velocity,
                 math3_multiplication_vector3(rigidbody_effective_inv_inertia(body_a), axis_impulse));
         }
-        if (!body_b->static_state) {
+        if (rigidbody_effective_inv_mass(body_b) > 0.0f) {
             body_b->angular_velocity = vector3_addition(
                 body_b->angular_velocity,
                 math3_multiplication_vector3(rigidbody_effective_inv_inertia(body_b), axis_impulse));

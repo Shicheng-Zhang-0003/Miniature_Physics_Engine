@@ -51,6 +51,10 @@ void simulation_camera_tick(float frame_delta_time) {
         if (!main_inputs.space_key_pressed && !main_inputs.shift_key_pressed) {
             main_camera_fov.vertical_velocity = 0.0f;
         }
+        /* FIX-AUDIT-DESPOT: movement_speed is m/s here (direct velocity
+         * integrate). Game grounded mode uses the same field as an accel
+         * gain (see camera.h + camera_move_*): one field, two call
+         * conventions, documented at the declaration. */
         float debug_speed = main_camera_fov.movement_speed * frame_delta_time;
         if (main_inputs.w_key_pressed) {
             main_camera_fov.position = vector3_addition(

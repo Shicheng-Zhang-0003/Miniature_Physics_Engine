@@ -100,7 +100,7 @@ All narrowphase functions take the owning world's config; dispatch is registry-f
 
 - Bodies and contact caches grow ×2 from small initials to compile-time ceilings; an empty world costs kilobytes.
 - Contact-pair novelty probes and id→index lookups are O(1) per-world hash operations (verified + linear fallback inside).
-- Determinism fallback counters are process-wide and asserted zero in-contract by `module_test`.
+- Determinism fallback counters are process-wide and asserted zero in-contract by `module`.
 
 ---
 
@@ -371,7 +371,7 @@ validation, and command-launch failures.
 Run the focused canonical suite with `python3 tools/test_runner.py --profile quick`; use `--profile full` for all registered suites and sanitizers.
 
 ### MFS robotics (`v15S/src/ecosystem/mfs/`)
-- **FTC stack**: motor presets (spec-sheet derived), back-EMF electrical model with implicit-in-speed solve + disturbance observer (stall *and* free speed exact), traction budgeting against wheel materials, torque-derived mecanum strafe with `odom_slip` flag, tile-friction test floors.
+- **FTC stack**: motor presets (spec-sheet derived), back-EMF electrical model with implicit-in-speed solve + disturbance observer (stall *and* free speed exact), traction budgeting against wheel materials, emergent roller-anisotropy mecanum strafe (no chassis-force cheat; lateral grip emerges from the anisotropic contact ellipse), pure-encoder odometry with `odom_slip` flag, tile-friction test floors.
 - **Suite**: `build_tests.sh` — 11 gated tests + 5 informational diagnostics, all green (was 13 pass / 3 fail + broken `make`).
 - **Modules**: `ftc-fleet` tick module (hot-pluggable, bitwise-identical static vs `.so`), `mfs_module_1` game module, `mfs-simulator` ecosystem bundle (loadable via `mod load ecosystem/mfs/mfs_ecosystem.so`).
 

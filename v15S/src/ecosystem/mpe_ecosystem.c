@@ -19,6 +19,22 @@ struct attached_eco {
     void *state;
     const void *world; /* per-world attachment (was process-global) */
 };
+/* FIX-AUDIT-DESPOT snapshot-ABA protocol (read before touching this table).
+ * s_attached[].desc aliases an interior s_ecosystems[] slot, so slot reuse
+ * is an ABA hazard: unregister(name)+register(new-desc) could retarget a
+ * live attachment behind its back. The ordering below closes it:
+ *  - mpe_ecosystem_unregister detaches EVERYWHERE first (hooks run while
+ *    mapped), THEN clears the live flag under lock, so no attached entry
+ *    aliases a dead slot at any instant; a later register reuses only
+ *    unaliased slots and new attaches snapshot the new desc explicitly.
+ *  - attach stores the slot pointer under lock; the out-of-lock d->attach
+ *    call below reuses that same pointer. Topology changes (register/
+ *    unregister/attach/detach) are load-time operations and must be
+ *    externally serialized against each other (as with loader transactions);
+ *    pre/post_step snapshot desc+state under lock into locals before
+ *    invoking, so a step never calls through a mid-unload pointer (unload
+ *    itself detaches everywhere pre-dlclose). Do NOT hold a *desc across an
+ *    unlock anywhere else. */
 static struct attached_eco s_attached[8];
 
 int mpe_ecosystem_register(const mpe_ecosystem_desc_t *desc) {
@@ -40,6 +56,11 @@ int mpe_ecosystem_register(const mpe_ecosystem_desc_t *desc) {
             rc = i;
             break;
         }
+    }
+    if (rc < 0) {
+        /* FIX-AUDIT-DESPOT: slot-full was a silent -1. */
+        fprintf(stderr, "[ecosystem] registry full (16); refusing '%s'\n",
+                desc && desc->name ? desc->name : "?");
     }
     pthread_mutex_unlock(&s_eco_lock);
     return rc;
@@ -146,6 +167,10 @@ int mpe_ecosystem_attach(mpe_world_t *world, const char *eco_name) {
             return 0;
         }
     }
+    /* FIX-AUDIT-DESPOT: attach-table-full was a silent -1 (world ran without
+     * the ecosystem and nobody knew). */
+    fprintf(stderr, "[ecosystem] attach table full (8); refusing '%s'\n",
+            eco_name ? eco_name : "?");
     pthread_mutex_unlock(&s_eco_lock);
     return -1;
 }

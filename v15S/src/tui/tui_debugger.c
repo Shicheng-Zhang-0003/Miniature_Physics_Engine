@@ -82,10 +82,17 @@ static vector3 tui_anchor_world(const rigidbody *rb, vector3 local) {
     return vector3_addition(rb->position, off);
 }
 
-/* Linear index of a body id, or -1. */
+/* Linear index of a body id, or -1.
+ * FIX-AUDIT-DESPOT: O(1) id->index cache first (like tui_dump.c), linear
+ * fallback for stale-cache gaps; linear alone would still be OK for
+ * <100 bodies but the cache keeps joint lookups cheap in stress scenes. */
 static int tui_index_by_id(physics_world *world, uint32_t id) {
     if (!world || id == 0) {
         return -1;
+    }
+    int hit = physics_world_index_by_id(world, id);
+    if (hit >= 0) {
+        return hit;
     }
     for (int i = 0; i < world->body_count; i++) {
         if (world->bodies[i].object_id == id) {
@@ -903,7 +910,10 @@ void tui_render_scene_graph(tui_debugger_t *dbg) {
     int r = 0;
     mvwprintw(dbg->main_win, r++, 0, "RELATIVE POSITIONS (pairwise distances, showing up to %d pairs)",
               h > 4 ? h - 4 : 0);
-    /* Closest / farthest over all pairs (cap scan for huge scenes). */
+    /* Closest / farthest over all pairs (cap scan for huge scenes).
+     * LOSSY SUMMARY: only the first 96 bodies are scanned and only the
+     * visible rows are listed; this is an inspection aid, not the full
+     * O(N^2) graph. */
     int cap = n > 96 ? 96 : n;
     float cmin = 1e30f, cmax = -1e30f;
     int cmini = -1, cminj = -1, cmaxi = -1, cmaxj = -1;

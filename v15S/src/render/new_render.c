@@ -134,6 +134,9 @@ void render_cleanup(void) {
     }
     render_init_status = render_uninitialized;
 }
+/* Primary-world-only renderer: draws physics_world_get_primary().
+ * TODO(world-param): take an explicit physics_world* so headless/secondary
+ * worlds can render without relying on the app-owned primary. */
 void render_scene_current(int widget_width, int widget_height) {
     if (widget_width <= 0 || widget_height <= 0) {
         return;

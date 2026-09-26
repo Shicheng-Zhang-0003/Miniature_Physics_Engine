@@ -454,9 +454,21 @@ bool collision_cylinder_cube(rigidbody *cyl, rigidbody *cube,
      * (replaces 9-sample polling which missed between samples for long
      * rods and shared one normal across faces). dist²(t) is convex;
      * 28 iterations pin t* to ~1e-6 (0.02mm on a 10m axle, 500x below
-     * slop). Deterministic, no RNG. */
+     * slop). Deterministic, no RNG.
+     * FIX-AUDIT-DESPOT convexity TRUTH: dist²(t)=|p(t)-closest_OBB(p(t))|²
+     * with p(t) affine. Inside a single Voronoi region of the box the
+     * clamp is fixed, so dist² is a convex quadratic there; across regions
+     * the pointwise minimum of convex pieces stays convex (each region's
+     * quadratic extended). Ternary search therefore converges to the true
+     * segment minimum — no sampling, no RNG, bit-deterministic. */
     float lo = 0.0f, hi = 1.0f;
     for (int it = 0; it < 28; it++) {
+        /* FIX-AUDIT-DESPOT early-exit: once the bracket is below 1e-7 of
+         * axle length (~1nm on a 10m axle, 1e4x below slop) further
+         * iterations only burn narrowphase budget converging fp noise. */
+        if ((hi - lo) < 1e-7f) {
+            break;
+        }
         float m1 = lo + (hi - lo) / 3.0f;
         float m2 = hi - (hi - lo) / 3.0f;
         float d1 = cylcube_seg_obb_dist2(cube, e1, seg, m1, NULL);
@@ -917,8 +929,30 @@ bool collision_cylinder_cylinder(rigidbody *cyl_a, rigidbody *cyl_b,
     if (dist > 0.0001f) {
         out->normal_vector = vector3_scaling(
             vector3_subtraction(pb, pa), 1.0f / dist);
+    } else if (axis_dot > 0.95f) {
+        /* FIX-AUDIT-DESPOT: coincident PARALLEL axes (axles overlapping):
+         * the lateral direction is undefined, and the old arbitrary +Y
+         * could lie along the axles (zero lateral correction, jitter as
+         * fp noise picks sides). Prefer the flat-cap face normal: coaxial
+         * overlap is a face-face contact (axial gap path above owns the
+         * shallow case; this is its degenerate twin). Sign faces B. */
+        vector3 delta_ax = vector3_subtraction(cyl_b->position, cyl_a->position);
+        float axial_s = vector3_dot(delta_ax, ax);
+        vector3 face_n = vector3_scaling(ax, (axial_s >= 0.0f) ? 1.0f : -1.0f);
+        /* If the centers coincide axially too, the face normal is still
+         * the stable choice (deterministic, never noise-picked). */
+        out->normal_vector = face_n;
     } else {
-        out->normal_vector = (vector3){0.0f, 1.0f, 0.0f};
+        /* Skew/crossed coincident axles: deterministic perpendicular to
+         * A's axle (never the arbitrary world-up, which may itself be
+         * parallel to an axle). */
+        vector3 ref =
+            (fabsf(ax.x) < 0.9f) ? (vector3){1.0f, 0.0f, 0.0f} : (vector3){0.0f, 1.0f, 0.0f};
+        vector3 perp = vector3_subtraction(ref, vector3_scaling(ax, vector3_dot(ref, ax)));
+        if (vector3_length_squared(perp) < 1e-12f) {
+            perp = (vector3){0.0f, 0.0f, 1.0f};
+        }
+        out->normal_vector = vector3_normalisation(perp);
     }
     contact_point_data *cp = &out->contacts[0];
     float raw_pen = min_dist - dist;

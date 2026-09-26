@@ -1,5 +1,10 @@
 # MPE v15R3 — Release Notes
 
+> Historical record: the 29/29 headless count below is the frozen v15R3 tag.
+> The current v15S head is 32/32 (29 physics + 3 diag-informational) — see
+> `readme.md` version history. The canonical case `module` below was
+> `module_test` in v1 binaries.
+
 **Status:** tagged release (v15R3 tag in git history, frozen there with `a3_release_freeze = 1`; v15S head has `freeze = 0`):
 correctness, stability, validation, documentation, and hygiene changes only.
 

@@ -72,9 +72,12 @@ void motor_update(motor *m, float wheel_angular_vel, float dt, float battery_vol
 
     /* Torque = Kt * I (motor-shaft ideal); efficiency applied once at the
      * gearbox output below. NOTE: Kt and Kv are fit independently to the
-     * output-shaft stall/free-speed spec endpoints; their ratio absorbs
-     * gearbox friction + no-load current, so motor-shaft Kt==Ke is not
-     * enforced. See audit: CoreHex gear=1.0 mislabels output as shaft. */
+     * output-shaft stall/free-speed spec endpoints, so their ratio absorbs
+     * gearbox friction + no-load current (Kt != Ke is the friction budget,
+     * not a units error): motor-shaft Kt==Ke is deliberately not enforced.
+     * FIX-AUDIT-DESPOT: the old comment cited a CoreHex gear=1.0 preset
+     * row that no longer exists (Core Hex is 72:1 in the preset table);
+     * removed as stale, kept the Kt!=Ke rationale. */
     m->torque = m->kt * m->current;
 
     /* Output torque at wheel (after gearing, minus gearbox loss) */
@@ -83,6 +86,19 @@ void motor_update(motor *m, float wheel_angular_vel, float dt, float battery_vol
 
     /* Speed tracking (signed: reverse reads negative). */
     m->rpm = wheel_angular_vel / MOTOR_RPM_TO_RAD_S;
+
+    /* FIX-AUDIT-DESPOT: heating lived only in motor_update_load, so the
+     * explicit path (fallback + direct callers) never warmed or derated.
+     * Same copper-loss update in both paths (nominal R, matching the
+     * implicit path exactly); not dead code, unified. */
+    {
+        float heat_generated = m->current * m->current * m->resistance * dt;
+        float cooling = (m->temperature - 25.0f) * 0.01f * dt;
+        m->temperature += heat_generated * 0.1f - cooling;
+        if (m->temperature < 25.0f) {
+            m->temperature = 25.0f;
+        }
+    }
 }
 
 void motor_update_load(motor *m, float wheel_angular_vel, float dt, float battery_voltage,
@@ -103,9 +119,16 @@ void motor_update_load(motor *m, float wheel_angular_vel, float dt, float batter
      * no load and starves locked wheels ~10x (turn/strafe die while free
      * spin converges). Stall/free endpoints identical to explicit. */
     float applied_voltage = battery_voltage * m->command;
-    float A = m->kt * m->gear_ratio * m->efficiency / m->resistance;
+    /* DESPOT-FIX (math lie): old code derived A from nominal R but computed
+     * current from nominal R too, while motor_update() used copper-derated
+     * r_eff — the two paths disagreed by 0.39%/C and diverged under heat.
+     * Both now use the same r_eff so stall/free endpoints AND transients
+     * match across paths. */
+    float r_eff = m->resistance * (1.0f + 0.00393f * (m->temperature - 25.0f));
+    if (!(r_eff > 0.0f) || !isfinite(r_eff)) r_eff = m->resistance;
+    float A = m->kt * m->gear_ratio * m->efficiency / r_eff;
     float B = m->kv * m->gear_ratio;
-    if (!(m->resistance > 0.0f) || !isfinite(A) || !isfinite(B)) {
+    if (!(r_eff > 0.0f) || !isfinite(A) || !isfinite(B)) {
         motor_update(m, wheel_angular_vel, dt, battery_voltage);
         return;
     }
@@ -116,8 +139,53 @@ void motor_update_load(motor *m, float wheel_angular_vel, float dt, float batter
         motor_update(m, wheel_angular_vel, dt, battery_voltage);
         return;
     }
+    /* Clamp the predicted end-of-tick speed to the motor's own no-load speed.
+     *
+     * The implicit solve above linearises back-EMF, so on a lightly loaded
+     * wheel it badly OVER-predicts: at 26.9:1 with I=2.5e-4 kg.m^2 it
+     * predicted ~63 rad/s in a single 1/60 s tick against a 23.35 rad/s
+     * free speed. Because m->back_emf is derived from w_end, that
+     * over-prediction also inflated the reported back-EMF and current, and
+     * callers that trusted w_end had to bolt on an external free-speed
+     * governor (which throttled per-tick torque to ~0.04 N.m and became the
+     * accidental speed limiter for the whole drivetrain).
+     *
+     * A motor cannot exceed its own no-load speed on its own power: the
+     * no-load point of the V-w line is w_free = V/(kv*gear), which is also
+     * where back-EMF exactly cancels the applied voltage and current (hence
+     * torque) goes to zero. So clamping to that bound is not a fudge - it is
+     * the physically exact saturation of this model, and it makes the
+     * current/torque endpoints correct instead of merely bounded.
+     *
+     * The clamp is deliberately ONE-SIDED with respect to the measured speed:
+     * never clamp below |w_measured|, or a wheel already turning faster than
+     * free speed would see less back-EMF than it should, regenerative
+     * braking would silently switch off, and the wheel would run away
+     * instead of being pulled back down.
+     */
+    {
+        float w_lim = m->free_speed_rad_s;
+        if (m->kv > 0.0f && m->gear_ratio > 0.0f) {
+            float w_v = battery_voltage / (m->kv * m->gear_ratio);
+            if (w_v < w_lim) {
+                w_lim = w_v;
+            }
+        }
+        if (!isfinite(w_lim) || (w_lim < 0.0f)) {
+            w_lim = m->free_speed_rad_s;
+        }
+        if (fabsf(wheel_angular_vel) > w_lim) {
+            w_lim = fabsf(wheel_angular_vel); /* keep full braking authority */
+        }
+        if (w_end > w_lim) {
+            w_end = w_lim;
+        }
+        if (w_end < -w_lim) {
+            w_end = -w_lim;
+        }
+    }
     m->back_emf = m->kv * (w_end * m->gear_ratio);
-    float raw_current = (applied_voltage - m->back_emf) / m->resistance;
+    float raw_current = (applied_voltage - m->back_emf) / r_eff;
     if (raw_current > m->stall_current) {
         raw_current = m->stall_current;
     }
@@ -130,17 +198,31 @@ void motor_update_load(motor *m, float wheel_angular_vel, float dt, float batter
     /* Explicit instantaneous twin (see header): correct locked-rotor
      * force sizing at the measured speed. */
     {
-        float exp_i = (applied_voltage - m->kv * (wheel_angular_vel * m->gear_ratio)) / m->resistance;
+        float exp_i = (applied_voltage - m->kv * (wheel_angular_vel * m->gear_ratio)) / r_eff;
         if (exp_i > m->stall_current) exp_i = m->stall_current;
         else if (exp_i < -m->stall_current) exp_i = -m->stall_current;
         m->torque_explicit = m->kt * exp_i * m->gear_ratio * m->efficiency;
         m->tau_exp_prev = m->torque_explicit;
     }
     m->rpm = w_end / MOTOR_RPM_TO_RAD_S;
-    float heat_generated = m->current * m->current * m->resistance * dt;
+    float heat_generated = m->current * m->current * r_eff * dt;
     float cooling = (m->temperature - 25.0f) * 0.01f * dt;
     m->temperature += heat_generated * 0.1f - cooling;
     if (m->temperature < 25.0f) {
         m->temperature = 25.0f;
     }
+}
+
+/* FIX-AUDIT-DESPOT: teleport/back-button paths move bodies discontinuously,
+ * which the disturbance observer reads as an infinite load spike
+ * (I*dw/dt across a warp). Reset the observer on every teleport so the
+ * next tick starts from "no load information" instead of a phantom stall. */
+void motor_reset_observer(motor *m) {
+    if (!m) {
+        return;
+    }
+    m->wprev_valid = 0;
+    m->load_torque = 0.0f;
+    m->w_prev = 0.0f;
+    m->tau_exp_prev = 0.0f;
 }

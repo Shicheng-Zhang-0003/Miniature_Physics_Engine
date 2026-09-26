@@ -27,8 +27,25 @@ int constraint_add_revolute (struct physics_world *world, uint32_t id_a, uint32_
             world->revolute_constraints [i].body_id_b = id_b;
             world->revolute_constraints [i].p.revolute.anchor_a = anchor_a;
             world->revolute_constraints [i].p.revolute.anchor_b = anchor_b;
-            world->revolute_constraints [i].p.revolute.axis_a = vector3_normalisation (axis_a);
-            world->revolute_constraints [i].p.revolute.axis_b = vector3_normalisation (axis_a);
+            /* axis_a is in body A's local space. Transform to body B's local space:
+             * axis_world = q_a * axis_a; axis_b = q_b^-1 * axis_world = q_b^-1 * q_a * axis_a */
+            vector3 axis_a_norm = vector3_normalisation(axis_a);
+            rigidbody *body_a_ptr = NULL, *body_b_ptr = NULL;
+            for (int bi = 0; bi < world->body_count; bi++) {
+                if (world->bodies[bi].object_id == id_a) body_a_ptr = &world->bodies[bi];
+                else if (world->bodies[bi].object_id == id_b) body_b_ptr = &world->bodies[bi];
+            }
+            vector3 axis_b_local = axis_a_norm;
+            if (body_a_ptr && body_b_ptr) {
+                vector4 q_a = body_a_ptr->orientation;
+                vector4 q_b = body_b_ptr->orientation;
+                vector3 axis_world = vector4_rotate_to_vector3(q_a, axis_a_norm);
+                vector4 q_b_inv = {q_b.w, -q_b.x, -q_b.y, -q_b.z};
+                axis_b_local = vector4_rotate_to_vector3(q_b_inv, axis_world);
+                axis_b_local = vector3_normalisation(axis_b_local);
+            }
+            world->revolute_constraints [i].p.revolute.axis_a = axis_a_norm;
+            world->revolute_constraints [i].p.revolute.axis_b = axis_b_local;
             world->revolute_constraints [i].p.revolute.motor_enabled = false;
             world->revolute_constraints [i].p.revolute.limits_enabled = false;
             world->revolute_constraints [i].p.revolute.motor_target_speed = 0.0f;

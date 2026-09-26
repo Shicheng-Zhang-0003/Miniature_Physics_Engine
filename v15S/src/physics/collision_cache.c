@@ -108,62 +108,12 @@ bool contact_cache_has_pair(struct physics_world *world, uint32_t id_a, uint32_t
     return false;
 }
 
-static uint32_t a3_task05_mix_u32(uint32_t hash_value, uint32_t input_value) {
-    hash_value ^= input_value + 0x9e3779b9u + (hash_value << 6) + (hash_value >> 2);
-    return hash_value;
-}
-
-static uint32_t a3_task05_float_bits(float value) {
-    union {
-        float float_value;
-        uint32_t integer_value;
-    } converter;
-
-    converter.float_value = value;
-    return converter.integer_value;
-}
-
+/* FIX-AUDIT-DESPOT: thin wrapper over the shared stamp in
+ * collision_mechanics.h (single source of truth with the solver's match
+ * side). See the header note for why match-role predicates stay in the
+ * solver TU. */
 static uint32_t a3_task05_body_property_stamp(const rigidbody *rigid_body) {
-    if (!rigid_body) {
-        return 0;
-    }
-
-    uint32_t stamp = 2166136261u;
-
-    stamp = a3_task05_mix_u32(stamp, (uint32_t) rigid_body->type);
-    stamp = a3_task05_mix_u32(stamp, rigid_body->static_state ? 1u : 0u);
-
-    stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(rigid_body->mass));
-    stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(rigid_body->inverse_mass));
-    stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(rigid_body->radius));
-
-    stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(rigid_body->half_extensions.x));
-    stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(rigid_body->half_extensions.y));
-    stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(rigid_body->half_extensions.z));
-
-    /* TRUTH: friction/restitution/kinematic affect the solved impulse.
-     * Old stamp omitted them: editing friction or toggling kinematic hit a
-     * stale acc_n*new_mu (wrong friction cone for a tick). Include.
-     * TRUTH: cylinder_half_length and custom_shape likewise change lever
-     * arms and dispatch: editing h hit stale acc with the wrong geometry. */
-    stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(rigid_body->friction_static));
-    stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(rigid_body->friction_kinetic));
-    stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(rigid_body->restitution));
-    stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(rigid_body->cylinder_half_length));
-    stamp = a3_task05_mix_u32(stamp, (uint32_t) rigid_body->custom_shape);
-    stamp = a3_task05_mix_u32(stamp, rigid_body->kinematic ? 2u : 0u);
-    stamp = a3_task05_mix_u32(stamp, rigid_body->is_sleeping ? 4u : 0u);
-
-    /* Orientation quantized to 1e-3: rotation invalidates local-space cache
-     * matching. Without this, a body that rotates significantly between
-     * frames can false-positive match a stale contact (PHYS-007). Quantizing
-     * keeps resting contacts stable while forcing a miss on real rotation. */
-    stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(roundf(rigid_body->orientation.w * 1000.0f) / 1000.0f));
-    stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(roundf(rigid_body->orientation.x * 1000.0f) / 1000.0f));
-    stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(roundf(rigid_body->orientation.y * 1000.0f) / 1000.0f));
-    stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(roundf(rigid_body->orientation.z * 1000.0f) / 1000.0f));
-
-    return stamp;
+    return a3_contact_cache_body_stamp(rigid_body);
 }
 
 void contact_cache_save(struct physics_world *world, collision_data *manifolds, int count) {

@@ -187,15 +187,13 @@ void a3_positional_depenetrate_manifold_w(struct physics_world *world, collision
     }
     float inverse_mass_sum = inverse_mass_a + inverse_mass_b;
 
-    /* TRUTH: if either body is sleeping and we didn't wake it (overlap
-     * below threshold), the sleeping body must not be moved by
-     * depenetration. Skip correction entirely to preserve sleep state. */
-    if ((a_sleeping || b_sleeping) && 
-        !((a_sleeping && b_sleeping && max_depth > C->depenetration.wake_depth_thresh) ||
-          (a_sleeping && body_b->static_state && max_depth > C->depenetration.wake_depth_thresh) ||
-          (b_sleeping && body_a->static_state && max_depth > C->depenetration.wake_depth_thresh))) {
-        return;
-    }
+    /* FIX-AUDIT-DESPOT: the old early-return here skipped correction ENTIRELY
+     * when any side slept below the wake threshold. That froze a real overlap
+     * in place: the awake body plows into a just-below-threshold sleeper and
+     * neither moves (tunneling by inches over seconds). Sleeping sides already
+     * contribute effective inv mass 0 above, so the mass-weighted correction
+     * below moves ONLY the awake side automatically (if both are effectively
+     * locked, inv_sum<=0 returns next). No early return needed. */
     if (inverse_mass_sum <= 0.0f) {
         return;
     }

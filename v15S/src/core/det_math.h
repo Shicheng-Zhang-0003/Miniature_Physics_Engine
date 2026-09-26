@@ -26,18 +26,28 @@
  */
 #include <math.h>
 #include <stdbool.h>
+#include <stdatomic.h>
 #include <assert.h>
 
 /* TRUTH: count every libm fallback so desync is diagnosable, never silent.
  * Single process-wide definition (core/det_math.c); the old per-TU
  * statics gave every translation unit its own counters, so a test
  * asserting zero only observed its own TU. Counters stay active in release:
- * NDEBUG must never silence desync telemetry. */
-extern unsigned long det_fallback_pow_count;
-extern unsigned long det_fallback_trig_count;
+ * NDEBUG must never silence desync telemetry.
+ * FIX-AUDIT-DESPOT: counters are _Atomic; physics steps may run on worker
+ * threads while the main thread samples totals. Plain unsigned long ++ is a
+ * data race (UB, lost counts). All mutation goes through __atomic_fetch_add
+ * (RELAXED: counts are telemetry, no ordering needed); reads use
+ * __atomic_load_n. */
+extern _Atomic unsigned long det_fallback_pow_count;
+extern _Atomic unsigned long det_fallback_trig_count;
 void det_fallback_reset(void);
-static inline unsigned long det_fallback_pow_total(void) { return det_fallback_pow_count; }
-static inline unsigned long det_fallback_trig_total(void) { return det_fallback_trig_count; }
+static inline unsigned long det_fallback_pow_total(void) {
+    return __atomic_load_n(&det_fallback_pow_count, __ATOMIC_RELAXED);
+}
+static inline unsigned long det_fallback_trig_total(void) {
+    return __atomic_load_n(&det_fallback_trig_count, __ATOMIC_RELAXED);
+}
 
 /* TRUTH: pin FP state for cross-platform determinism. Portable subset:
  * round-to-nearest (fesetround). x86/ARM denormal-flush differences (FTZ/DAZ/FZ/DZ)

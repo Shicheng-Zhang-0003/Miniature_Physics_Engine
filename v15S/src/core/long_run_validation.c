@@ -118,9 +118,15 @@ static void long_run_validation_report(void) {
     printf("[A3] result: %s\n", pass ? "PASS" : "FAIL");
     /* MPE_TASK_39_FIX_RESTORE_CONFIG */
     if (long_run_validation_restore_config) {
-        mpe_config_load("status/engine.cfg.backup");
+        /* FIX-AUDIT-DESPOT: the restore path ignored mpe_config_load's
+         * return, so a missing/corrupt backup silently left torture values
+         * live for every later run. Check and say so. */
+        if (!mpe_config_load("status/engine.cfg.backup")) {
+            fprintf(stderr, "[A3] WARNING: config restore from status/engine.cfg.backup failed; torture values remain live\n");
+        } else {
+            printf("[A3] Config restored from backup\n");
+        }
         long_run_validation_restore_config = 0;
-        printf("[A3] Config restored from backup\n");
     }
     long_run_validation_is_torture = 0;
     /* MPE_TASK_39_CONFIG_REPORT_BEGIN */
@@ -155,11 +161,22 @@ static void long_run_validation_evaluate(void) {
             continue;
         }
 
-        if (rigid_body->position.y < -1.0f) {
+        /* FIX-AUDIT-DESPOT: fallen gate is floor-relative, not a magic y.
+         * The solver/boundary floor convention is y=0 (static plane body +
+         * boundary_apply_floor callers); a body counts as fallen only below
+         * floor_y - 1m (a full meter of free fall past the safety net, past
+         * any floor_emergency_slop tolerance). */
+        const float floor_y = 0.0f;
+        if (rigid_body->position.y < floor_y - 1.0f) {
             current_fallen_count++;
         }
 
-        if (rigid_body->is_sleeping) {
+        /* FIX-AUDIT-DESPOT: sleeping/awake asymmetry. The awake branch
+         * excludes statics (infinite-mass floor slabs are neither awake
+         * nor asleep) but the sleeping branch counted every is_sleeping
+         * body including statics, so sleeping+awake != dynamic bodies.
+         * Exclude statics here too, mirroring the awake branch. */
+        if (rigid_body->is_sleeping && !rigid_body->static_state) {
             current_sleeping_count++;
         } else if (!rigid_body->static_state) {
             current_awake_count++;
