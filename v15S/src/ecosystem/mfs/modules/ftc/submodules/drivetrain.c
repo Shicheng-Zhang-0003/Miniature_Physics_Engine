@@ -107,10 +107,15 @@ void drivetrain_mecanum (ftc_robot *robot, float forward, float strafe, float ro
  *     and not any other real force - it was velocity-proportional air drag
  *     applied to a solid body at a magnitude chosen to hide sliding.
  *
- * The mecanum wheels are now modelled as what they are: a hub carrying 16
- * real rollers on free bearings (see robot.c). Lateral thrust is an
- * emergent consequence of rigid-body dynamics and Coulomb friction, so it
- * is bounded by the friction cone for free and needs no fudge factor.
+ * The mecanum wheels are now modelled as what they are: a hub carrying 8
+ * real rollers on free revolute bearings (see robot.c). Lateral thrust
+ * comes from rigid-body contacts through the engine's Coulomb solver, so
+ * the CONTACT FORCE is cone-bounded by the engine for free and no chassis
+ * force is ever injected here (verified: no sin45/chassis-force code
+ * remains). MFS itself computes no cone budget — traction is regulated by
+ * the slip-threshold loop in robot.c, not by a friction-circle model.
+ * The roller BEARING spin is quasi-static (see robot.c DESPOT-2026-09-26):
+ * stiff-DOF-slaved, honestly labeled, not "fully emergent".
  * --------------------------------------------------------------------- */
 static void drivetrain_odometry_update (physics_world *world, ftc_robot *robot, float dt);
 
@@ -231,6 +236,23 @@ static void drivetrain_odometry_update (physics_world *world, ftc_robot *robot, 
     float w_rad[FTC_MAX_WHEELS] = {0};
     float r = 0.0f;
 
+    /* DESPOT-2026-09-26: encoder quantization. Real hub encoders report
+     * integer counts (base_ppr * gear_ratio per output rev). Previously the
+     * PPR table existed but odometry differentiated the true continuous
+     * omega, so a creeping wheel (0.05 rad/s) still reported smooth motion.
+     * Now: integrate true angle, quantize to counts, differentiate the
+     * QUANTIZED angle for odometry. Low-speed motion staircases / sticks at
+     * zero exactly like hardware. */
+    float counts_per_rev = 0.0f;
+    {
+        int base_ppr = motor_preset_base_encoder_ppr(robot->motor_preset);
+        float gear = (robot->wheel_count > 0) ? robot->wheel_motors[0].gear_ratio : 1.0f;
+        if (base_ppr > 0 && gear > 0.0f && isfinite(gear)) {
+            counts_per_rev = (float)base_ppr * gear;
+        }
+    }
+    const float quant_on = (counts_per_rev > 1.0f && dt > 0.0f) ? 1.0f : 0.0f;
+
     for (int i = 0; i < robot->wheel_count && i < FTC_MAX_WHEELS; i++) {
         const int wi = robot->wheel_bodies[i];
         if ((wi < 0) || (wi >= world->body_count)) {continue;}
@@ -241,7 +263,21 @@ static void drivetrain_odometry_update (physics_world *world, ftc_robot *robot, 
         }
         const float omega = vector3_dot(w->angular_velocity, axle);
         robot->wheel_radians[i] += omega * dt;
-        w_rad[i] = omega;
+        if (quant_on > 0.5f) {
+            /* True angle -> integer counts -> quantized angle. */
+            const float revs = robot->wheel_radians[i] * 0.15915494309189535f; /* /2pi */
+            int new_count = (int)floorf(revs * counts_per_rev);
+            if (!isfinite((float)new_count)) new_count = robot->wheel_encoder_counts[i];
+            int old_count = robot->wheel_encoder_counts[i];
+            robot->wheel_encoder_counts[i] = new_count;
+            float q_angle = (float)new_count * 6.283185307179586f / counts_per_rev;
+            float dq = q_angle - robot->wheel_radians_quant[i];
+            robot->wheel_radians_quant[i] = q_angle;
+            w_rad[i] = (old_count == new_count) ? 0.0f : (dq / dt);
+        } else {
+            robot->wheel_radians_quant[i] = robot->wheel_radians[i];
+            w_rad[i] = omega;
+        }
     }
 
     /* Ground-contact radius seen by the encoder. */
@@ -294,12 +330,30 @@ static void drivetrain_odometry_update (physics_world *world, ftc_robot *robot, 
     }
     const float c = cosf(robot->odom_theta);
     const float s = sinf(robot->odom_theta);
-    /* odom_slip is retained as a field for telemetry compatibility. It is no
-     * longer computed from a truth comparison, because doing so would require
-     * reading the chassis and fusing it in - exactly the hack being removed.
-     * It stays 0 for genuinely encoder-only odometry. */
-    robot->odom_slip = 0;
     /* body->world yaw about +Y: x' = x*c + z*s ; z' = -x*s + z*c */
     robot->odom_x += (v_lat * c + v_fwd * s) * dt;
     robot->odom_z += (-v_lat * s + v_fwd * c) * dt;
+    /* DESPOT-2026-09-26: odom_slip REPORT (no fusion — odom_* above are
+     * never corrected). Compare encoder-implied planar/yaw rates against
+     * the true chassis body rates. Beyond 0.25 m/s planar or 0.35 rad/s yaw
+     * disagreement the encoders are slipping/peeled: flag 1, else 0. */
+    {
+        int slip = 0;
+        int ci = robot->chassis_body;
+        if (ci >= 0 && ci < world->body_count) {
+            const rigidbody *ch = &world->bodies[ci];
+            float tvx = ch->velocity.x, tvz = ch->velocity.z;
+            /* Encoder-implied world velocity (same rotation as above). */
+            float evx = v_lat * c + v_fwd * s;
+            float evz = -v_lat * s + v_fwd * c;
+            float ex = evx - tvx, ez = evz - tvz;
+            float planar_err = sqrtf(ex * ex + ez * ez);
+            float yaw_err = fabsf(yaw_rate - ch->angular_velocity.y);
+            if ((isfinite(planar_err) && planar_err > 0.25f) ||
+                (isfinite(yaw_err) && yaw_err > 0.35f)) {
+                slip = 1;
+            }
+        }
+        robot->odom_slip = slip;
+    }
 }

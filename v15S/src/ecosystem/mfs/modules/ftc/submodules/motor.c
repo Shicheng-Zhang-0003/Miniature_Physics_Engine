@@ -89,10 +89,12 @@ void motor_update(motor *m, float wheel_angular_vel, float dt, float battery_vol
 
     /* FIX-AUDIT-DESPOT: heating lived only in motor_update_load, so the
      * explicit path (fallback + direct callers) never warmed or derated.
-     * Same copper-loss update in both paths (nominal R, matching the
-     * implicit path exactly); not dead code, unified. */
+     * DESPOT-2026-09-26: old comment claimed "nominal R, matching the
+     * implicit path exactly" — false. Implicit heats with r_eff (hot
+     * copper), explicit heated with nominal R: 0.39%/°C divergence that
+     * grows under sustained stall. Both now heat with r_eff. */
     {
-        float heat_generated = m->current * m->current * m->resistance * dt;
+        float heat_generated = m->current * m->current * r_eff * dt;
         float cooling = (m->temperature - 25.0f) * 0.01f * dt;
         m->temperature += heat_generated * 0.1f - cooling;
         if (m->temperature < 25.0f) {
