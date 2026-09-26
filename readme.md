@@ -372,7 +372,7 @@ Run the focused canonical suite with `python3 tools/test_runner.py --profile qui
 
 ### MFS robotics (`v15S/src/ecosystem/mfs/`)
 - **FTC stack**: motor presets (spec-sheet derived), back-EMF electrical model with implicit-in-speed solve + disturbance observer (stall *and* free speed exact), traction budgeting against wheel materials, emergent roller-anisotropy mecanum strafe (no chassis-force cheat; lateral grip emerges from the anisotropic contact ellipse), pure-encoder odometry with `odom_slip` flag, tile-friction test floors.
-- **Suite**: `build_tests.sh` — 11 gated tests + 5 informational diagnostics, all green (was 13 pass / 3 fail + broken `make`).
+- **Suite**: `build_tests.sh` — 8 gated tests (unified mfs_suite --all) + build checks + ungated diags, all green (was 13 pass / 3 fail + broken `make`).
 - **Modules**: `ftc-fleet` tick module (hot-pluggable, bitwise-identical static vs `.so`), `mfs_module_1` game module, `mfs-simulator` ecosystem bundle (loadable via `mod load ecosystem/mfs/mfs_ecosystem.so`).
 
 ### Determinism and precision
