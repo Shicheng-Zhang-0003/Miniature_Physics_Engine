@@ -125,8 +125,30 @@ int constraint_add_prismatic(struct physics_world *world, uint32_t id_a, uint32_
             world->revolute_constraints [i].body_id_b = id_b;
             world->revolute_constraints [i].p.prismatic.anchor_a = anchor_a;
             world->revolute_constraints [i].p.prismatic.anchor_b = anchor_b;
-            world->revolute_constraints [i].p.prismatic.axis_a = vector3_normalisation(axis_a);
-            world->revolute_constraints [i].p.prismatic.axis_b = vector3_normalisation(axis_a);
+            /* DESPOT-2026-09-26: axis_a is in body A's local space. The old
+             * code copied it verbatim into axis_b, so a prismatic created
+             * between rotated bodies slid along misaligned axes. Same
+             * transform as constraint_add_revolute: axis_world = q_a*axis_a,
+             * axis_b = q_b^-1*axis_world. Falls back to axis_a when bodies
+             * are not yet in the world (creation order). */
+            {
+                vector3 axis_a_norm = vector3_normalisation(axis_a);
+                vector3 axis_b_local = axis_a_norm;
+                rigidbody *pa = NULL, *pb = NULL;
+                for (int bi = 0; bi < world->body_count; bi++) {
+                    if (world->bodies[bi].object_id == id_a) pa = &world->bodies[bi];
+                    else if (world->bodies[bi].object_id == id_b) pb = &world->bodies[bi];
+                }
+                if (pa && pb) {
+                    vector3 axis_world = vector4_rotate_to_vector3(pa->orientation, axis_a_norm);
+                    vector4 q_b_inv = {pb->orientation.w, -pb->orientation.x,
+                                       -pb->orientation.y, -pb->orientation.z};
+                    axis_b_local = vector3_normalisation(
+                        vector4_rotate_to_vector3(q_b_inv, axis_world));
+                }
+                world->revolute_constraints [i].p.prismatic.axis_a = axis_a_norm;
+                world->revolute_constraints [i].p.prismatic.axis_b = axis_b_local;
+            }
             world->revolute_constraints [i].p.prismatic.limits_enabled = false;
             world->revolute_constraints [i].p.prismatic.limit_min = 0.0f;
             world->revolute_constraints [i].p.prismatic.limit_max = 0.0f;

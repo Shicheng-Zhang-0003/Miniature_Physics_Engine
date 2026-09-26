@@ -146,11 +146,16 @@ void rigidbody_set_kinematic(rigidbody *rigid_body, bool make_kinematic);
  * isotropic). Coeffs are clamped to [0, 5] like friction_static/_kinetic;
  * non-finite input is rejected. Disabling restores the isotropic disc and
  * zeroes the coefficients so no stale ellipse can be read back. */
-void rigidbody_set_friction_anisotropic(rigidbody *rigid_body, vector3 axis_local, float mu_roll, float mu_lateral);
+/* DESPOT-2026-09-26: param names were mu_roll/mu_lateral, inviting a backwards
+ * wiring (roll sounds grippy, lateral sounds free — it is the opposite).
+ * mu_along = coefficient ALONG axis_local (the FREE / roller-spin direction,
+ * LOW); mu_across = coefficient PERPENDICULAR in-plane (the GRIPPED roller
+ * axis, HIGH). Maps 1:1 onto friction_along_axis / friction_across_axis. */
+void rigidbody_set_friction_anisotropic(rigidbody *rigid_body, vector3 axis_local, float mu_along, float mu_across);
 /* Same, but friction_anisotropy_axis is interpreted in `frame_id`'s frame
  * instead of this body's. Pass 0 to keep the body-local default. */
 void rigidbody_set_friction_anisotropic_in_frame(rigidbody *rigid_body, uint32_t frame_id,
-                                                  vector3 axis_local, float mu_roll, float mu_lateral);
+                                                  vector3 axis_local, float mu_along, float mu_across);
 void rigidbody_clear_friction_anisotropic(rigidbody *rigid_body);
 
 void rb_integrate_velocity(rigidbody *rigid_body, float delta_time, float linear_damping, float angular_damping);
