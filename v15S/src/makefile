@@ -22,6 +22,10 @@ else
 endif
 BASE_CFLAGS = -g $(GTK_CFLAGS) -I. $(NATIVE_FLAG) $(GTK_DEFINES) -Wall -Wextra -MMD -MP -ffp-contract=off
 BASE_LIBS = $(GTK_LIBS) $(X11_LIBS) -lm -ldl -rdynamic
+# Opt-in strict warnings: `make WARNINGS_AS_ERRORS=1` appends -Werror.
+WARNINGS_AS_ERRORS ?= 0
+WERROR_FLAG := $(if $(filter 1,$(WARNINGS_AS_ERRORS)),-Werror,)
+BASE_CFLAGS += $(WERROR_FLAG)
 # Determinism flags are hard-appended after $(CFLAGS) on every compile/link
 # so environment CFLAGS can never silently drop -ffp-contract=off (bitwise
 # twins depend on it). NATIVE builds emit a portability warning (see below).
@@ -31,8 +35,11 @@ CFLAGS ?= $(BASE_CFLAGS) -O3
 LIBS ?= $(BASE_LIBS)
 
 BUILD_DIR ?= build
-# Explicit engine sources: everything except tests/ (headless mains with
-# their own #ifdef guards must never link into the engine binary).
+# ENGINE_SRCS uses a wildcard (not an explicit list) so new engine TUs are
+# picked up automatically; `make check-new-files` surfaces untracked .c
+# files that the wildcard would silently absorb without review. Explicit
+# exclusions: tests/ (headless mains with their own #ifdef guards must
+# never link into the engine binary).
 ENGINE_SRCS := $(wildcard *.c config/*.c core/*.c physics/*.c render/*.c scene/*.c ui_input/*.c) ecosystem/mpe_ecosystem.c
 OBJECTS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(ENGINE_SRCS))
 DEPS := $(OBJECTS:.o=.d)
@@ -92,6 +99,9 @@ check-flags:
 	@echo "$(CFLAGS)" | grep -q "ffp-contract=off" || (echo "FAIL: -ffp-contract=off missing from CFLAGS"; exit 1)
 	@echo "flags OK"
 
+check-new-files:
+	@git status --porcelain -- '*.c' '*.h' | grep -q '^??' && { echo "new untracked sources (review ENGINE_SRCS wildcard):"; git status --porcelain -- '*.c' '*.h' | grep '^??'; exit 1; } || echo "no untracked sources"
+
 help:
 	@echo "targets: engine (default) | debug | release | install | installcheck | clean | distclean"
 	@echo "         test_<name> (build+run) | build_<name> (build only) | paranoia_*"
@@ -99,7 +109,8 @@ help:
 	@echo "         build_suite | test_suite | test_suite_all (canonical C regression suite)"
 	@echo "         mpe-tui (terminal debugger + snapshot suite) | tui-smoke | plugins/*.so"
 	@echo "         mfs_ecosystem.so (delegates to ecosystem/mfs/Makefile)"
-	@echo "         check-deps | check-deps-tui | check-flags"
+	@echo "         check-deps | check-deps-tui | check-flags | check-new-files"
+	@echo "         WARNINGS_AS_ERRORS=1 for -Werror"
 	@echo "         flow: python3 ../../tools/test_runner.py --profile full"
 
 # MFS lives in its distinct folder: ecosystem/mfs/ (see ecosystem/mfs/README_MFS.md).
@@ -155,7 +166,7 @@ tui-smoke: build_tui
 	./mpe-tui --snapshot 60 --scene demo --solver seq-impulse --broadphase hash > $(TUI_OUT)/demo_hash.log
 	@echo "[PASS] tui-smoke: all scenes dump finite state"
 
-.PHONY: clean distclean debug release install installcheck check-deps check-deps-tui check-flags help mpe-tui build_tui tui-smoke plugins mfs_ecosystem.so ecosystem/mfs/mfs_ecosystem.so headless build_suite test_suite test_suite_all
+.PHONY: clean distclean debug release install installcheck check-deps check-deps-tui check-flags check-new-files help mpe-tui build_tui tui-smoke plugins mfs_ecosystem.so ecosystem/mfs/mfs_ecosystem.so headless build_suite test_suite test_suite_all
 
 -include $(DEPS)
 

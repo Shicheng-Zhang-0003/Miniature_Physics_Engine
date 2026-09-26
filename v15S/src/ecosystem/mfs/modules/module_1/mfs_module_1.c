@@ -132,8 +132,11 @@ __attribute__((used)) void mfs_module_1_gamepad_step(mfs_module_1_state *state, 
     float left_y = gamepad_get_axis(pad, gamepad_axis_left_y);
     float right_x = gamepad_get_axis(pad, gamepad_axis_right_x);
     /* (right_y unread: no pitch mapping exists) */
-    float lt = gamepad_get_axis(pad, gamepad_axis_left_trigger);
-    float rt = gamepad_get_axis(pad, gamepad_axis_right_trigger);
+    /* DESPOT-FIX: triggers via gamepad_get_trigger() ([0,1] pressed amount,
+     * rest-robust across drivers) — was gamepad_get_axis() ([-1,1]) which
+     * misfired the 0.5 gate at rest on 0-rest drivers. */
+    float lt = gamepad_get_trigger(pad, gamepad_axis_left_trigger);
+    float rt = gamepad_get_trigger(pad, gamepad_axis_right_trigger);
     
     /* Read buttons */
     bool btn_a = gamepad_get_button(pad, gamepad_button_a);
@@ -230,9 +233,81 @@ __attribute__((used)) void mfs_module_1_gamepad_step(mfs_module_1_state *state, 
     if (btn_back) {
         rigidbody *chassis = mfs_get_chassis(state);
         if (chassis) {
-            chassis->position = (vector3){0.0f, 0.2f, -3.0f};
+            physics_world *world = state->world;
+            vector3 target = (vector3){0.0f, 0.2f, -3.0f};
+            vector3 delta = vector3_subtraction(target, chassis->position);
+
+            /* M8 FULL-ASSEMBLY RESET FIX: this used to move ONLY the chassis.
+             * The four wheel bodies and their revolute joints stayed at the
+             * old pose, so the next joint correction yanked every wheel back
+             * with a large artificial impulse (and a matching spike in the
+             * encoder deltas, because the wheels genuinely moved). It also
+             * skipped odometry entirely. Now the whole assembly is
+             * translated by one delta: orientation is unchanged, so the
+             * revolute anchors and accumulated_angle stay valid, which is
+             * what keeps the joints from having to correct anything.
+             *
+             * FIX-AUDIT-DESPOT: the old loop ALSO misused index_by_id on
+             * wheel_bodies (which hold INDICES, not object ids — add_*
+             * returns the slot), so it translated the wrong bodies and left
+             * wheel 3 + every roller behind. Index-held fields (wheels,
+             * rollers, chassis) are used as indices with bounds checks;
+             * id-held fields (flywheel, intake) resolve via index_by_id —
+             * uniformly through one reset step below. Owned extras (rollers,
+             * flywheel, intake) move too, and every wheel motor observer is
+             * reset: a warp is a discontinuous dw the disturbance observer
+             * would otherwise read as a phantom stall spike. */
+            int n = state->robot.wheel_count;
+            if (n > FTC_MAX_WHEELS) n = FTC_MAX_WHEELS;
+            for (int i = 0; i < n; i++) {
+                int wi = state->robot.wheel_bodies[i];
+                if (wi < 0 || wi >= world->body_count) continue;
+                rigidbody *w = &world->bodies[wi];
+                w->position = vector3_addition(w->position, delta);
+                w->velocity = vector3_zero();
+                w->angular_velocity = vector3_zero();
+                w->is_sleeping = false;
+                w->sleep_timer = 0.0f;
+                for (int k = 0; k < state->robot.roller_count[i]; k++) {
+                    int rb = state->robot.roller_bodies[i][k];
+                    if (rb < 0 || rb >= world->body_count) continue;
+                    rigidbody *ro = &world->bodies[rb];
+                    ro->position = vector3_addition(ro->position, delta);
+                    ro->velocity = vector3_zero();
+                    ro->angular_velocity = vector3_zero();
+                    ro->is_sleeping = false;
+                    ro->sleep_timer = 0.0f;
+                }
+                motor_reset_observer(&state->robot.wheel_motors[i]);
+            }
+            {
+                int fw = physics_world_index_by_id(
+                    world, (uint32_t)state->shooter_flywheel_body);
+                if (fw >= 0) {
+                    rigidbody *f = &world->bodies[fw];
+                    f->position = vector3_addition(f->position, delta);
+                    f->velocity = vector3_zero();
+                    f->angular_velocity = vector3_zero();
+                    f->is_sleeping = false;
+                    f->sleep_timer = 0.0f;
+                }
+                int ir = physics_world_index_by_id(
+                    world, (uint32_t)state->intake_roller_body);
+                if (ir >= 0) {
+                    rigidbody *rr = &world->bodies[ir];
+                    rr->position = vector3_addition(rr->position, delta);
+                    rr->velocity = vector3_zero();
+                    rr->angular_velocity = vector3_zero();
+                    rr->is_sleeping = false;
+                    rr->sleep_timer = 0.0f;
+                }
+            }
+            chassis->position = target;
             chassis->velocity = vector3_zero();
             chassis->angular_velocity = vector3_zero();
+            chassis->is_sleeping = false;
+            chassis->sleep_timer = 0.0f;
+
             state->robot.odom_x = 0.0f;
             state->robot.odom_z = -3.0f;
             state->robot.odom_theta = 0.0f;
@@ -346,15 +421,19 @@ __attribute__((used)) void mfs_module_1_robot_create(mfs_module_1_state *state) 
         /* Configure robot battery */
         state->robot.battery.nominal_voltage = 12.8f;
         state->robot.battery.capacity_ah = 3.0f;
-        state->robot.battery.internal_resistance = 0.015f;
+        /* FIX-AUDIT-DESPOT: 0.06 NiMH pack-level (was 0.015 LiPo-class);
+         * keep in sync with battery_init. */
+        state->robot.battery.internal_resistance = 0.06f;
         state->robot.battery.charge_fraction = 1.0f;
         
-        /* Initialize wheel roller angles for mecanum (+45/-45 layout) */
-        for (int i = 0; i < state->robot.wheel_count; i++) {
-            state->robot.wheel_is_mecanum[i] = true;
-            state->robot.wheel_roller_angle[i] = (i % 2 == 0) ? 0.785398f : -0.785398f; /* +45, -45 deg */
-            state->robot.wheel_traction_scale[i] = 1.0f;
-        }
+        /* M9 DEAD-FIELD FIX: this block re-initialized wheel_is_mecanum,
+         * wheel_roller_angle and wheel_traction_scale AFTER ftc_robot_init
+         * had already set all three authoritatively, and it wrote a
+         * DIFFERENT roller pattern: `i%2` gives +,-,+,- (a Z arrangement,
+         * which does not produce lateral motion) while robot.c sets the
+         * correct mecanum X pattern +,-,-,+. Nothing read the field, so it
+         * was a trap for whoever wires the roller model up. Deleted: the
+         * single source of truth is ftc_robot_init / robot.c. */
         
         /* Initialize odometry */
         state->robot.odom_x = 0.0f;
@@ -521,9 +600,20 @@ __attribute__((used)) void mfs_module_1_ball_physics_step(mfs_module_1_state *st
             vector3 spin_dir = vector3_scaling(spin_axis, 1.0f / spin_rate);
             vector3 vel_dir = (speed > 0.001f) ? vector3_scaling(ball->velocity, 1.0f / speed) : (vector3){0,0,0};
             
-            /* Magnus force perpendicular to both spin and velocity */
+            /* Magnus force along spin x velocity (FIX-AUDIT-DESPOT direction
+             * word: perpendicular-to-both is ambiguous about ORDER — the
+             * model applies cross(spin_dir, vel_dir), i.e. spin-cross-
+             * velocity, matching the code below).
+             *
+             * M6 MAGNUS SCALING FIX: the standard lift is
+             *     F = 0.5*rho*A*v^2*Cl,  Cl = S*(omega*r)/v
+             * which collapses to F = 0.5*rho*A*S*omega*r*v, i.e. LINEAR in
+             * spin and velocity. The old expression had the right omega*v
+             * shape but was missing the ball radius r, so the magnitude was
+             * short by 1/r (~42x for a 24 mm ball). */
             vector3 magnus_dir = vector3_cross(spin_dir, vel_dir);
-            float magnus_mag = 0.5f * air_density * cross_section * spin_rate * speed * 0.1f;  /* S = 0.1 typical */
+            float magnus_mag = 0.5f * air_density * cross_section *
+                               spin_rate * MFS_BIOBUZZ_BALL_RADIUS * speed * 0.1f; /* S = 0.1 */
             vector3 magnus = vector3_scaling(magnus_dir, magnus_mag);
             rb_apply_forces_perfect(ball, magnus);
         }
@@ -536,19 +626,29 @@ __attribute__((used)) void mfs_module_1_ball_physics_step(mfs_module_1_state *st
 
 __attribute__((used)) void mfs_module_1_intake_step(mfs_module_1_state *state, float dt) {
     physics_world *world = state->world;
-    if (!state->intake_deployed || state->intake_roller_body <= 0) return;
-    
-    int roller_idx = physics_world_index_by_id(world, state->intake_roller_body);
-    if (roller_idx < 0) return;
-    
-    rigidbody *roller = &world->bodies[roller_idx];
+    /* FIX-AUDIT-DESPOT: was `intake_roller_body <= 0` + index_by_id — an
+     * object-id checked with an index idiom (id 0/negative conflates
+     * "unset" with "gone"). Resolve the id straight to a body pointer:
+     * NULL means unset-or-gone, uniformly. */
+    if (!state->intake_deployed) return;
+    if (!world) return;
+    rigidbody *roller =
+        physics_world_body_by_id(world, (uint32_t)state->intake_roller_body);
+    if (!roller) return;
     
     /* Control intake roller speed */
     float target_omega = state->intake_active ? 
         (state->intake_speed_rpm * M_PI / 30.0f) : 0.0f;
     
-    float current_omega = vector3_length(roller->angular_velocity);
-    float omega_error = target_omega - (roller->angular_velocity.x > 0 ? current_omega : -current_omega);
+    /* M7 AXIAL PROJECTION FIX: the sign of the roller's spin was read from
+     * the world X component of angular_velocity, while the drive torque below
+     * is applied about the roller's own world axle (cached_axes[0]). When the
+     * roller yaws with the chassis those two disagree, so the controller
+     * compared the target against |omega| with the wrong sign and drove the
+     * roller the wrong way (or oscillated). Project onto the axle instead:
+     * the error is simply target minus actual axial spin. */
+    float axial_omega = vector3_dot(roller->angular_velocity, roller->cached_axes[0]);
+    float omega_error = target_omega - axial_omega;
     
     /* Simple P-control for intake motor */
     float torque = omega_error * 0.2f;  /* Proportional gain */
@@ -575,8 +675,24 @@ __attribute__((used)) void mfs_module_1_intake_step(mfs_module_1_state *state, f
             float pickup_radius = MFS_INTAKE_ROLLER_RADIUS + MFS_BIOBUZZ_BALL_RADIUS + MFS_INTAKE_COMPLIANCE;
             
             if (dist < pickup_radius && ball->velocity.y < 0.5f) {
-                /* Apply intake force to pull ball in */
-                vector3 to_roller = vector3_scaling(diff, -1.0f / dist);
+                /* FIX-AUDIT-DESPOT: balls_collected was never incremented
+                 * (dead stat). Count each ball once, on first intake touch;
+                 * the flag (not the distance edge) makes it tick-stable. */
+                if (i >= 0 && i < 16 && !state->ball_counted[i]) {
+                    state->ball_counted[i] = true;
+                    state->balls_collected++;
+                }
+                /* M5 DIVIDE-BY-ZERO GUARD: at exact roller/ball coincidence
+                 * dist is 0 and 1/dist is inf, which then propagates through
+                 * the force accumulator as a NaN position and permanently
+                 * poisons the body (rb_apply_forces_perfect rejects
+                 * non-finite, but the entrain term below did not). Below the
+                 * epsilon the direction is undefined, so use straight down:
+                 * that is where a ball resting in the intake throat belongs,
+                 * and the entrain term still applies either way. */
+                vector3 to_roller = (dist > 1.0e-6f)
+                    ? vector3_scaling(diff, -1.0f / dist)
+                    : (vector3){0.0f, -1.0f, 0.0f};
                 vector3 intake_force = vector3_scaling(to_roller, 2.0f);  /* 2N intake force */
                 rb_apply_forces_perfect(ball, intake_force);
                 
@@ -598,12 +714,11 @@ __attribute__((used)) void mfs_module_1_intake_step(mfs_module_1_state *state, f
 
 __attribute__((used)) void mfs_module_1_shooter_step(mfs_module_1_state *state, float dt) {
     physics_world *world = state->world;
-    if (state->shooter_flywheel_body <= 0) return;
-    
-    int flywheel_idx = physics_world_index_by_id(world, state->shooter_flywheel_body);
-    if (flywheel_idx < 0) return;
-    
-    rigidbody *flywheel = &world->bodies[flywheel_idx];
+    /* FIX-AUDIT-DESPOT: same id-vs-index cleanup as the intake step. */
+    if (!world) return;
+    rigidbody *flywheel =
+        physics_world_body_by_id(world, (uint32_t)state->shooter_flywheel_body);
+    if (!flywheel) return;
     /* Spin axis: the joint axis (0,1,0) tilted 35° about the chassis X at
      * creation. Reading/writing raw .y spun the wrong axis once tilted
      * (18% torque loss + rpm misread). Track the chassis frame so yaw
@@ -631,6 +746,19 @@ __attribute__((used)) void mfs_module_1_shooter_step(mfs_module_1_state *state, 
         if (torque > 0.3f) torque = 0.3f;
         flywheel->torque_accumulator =
             vector3_addition(flywheel->torque_accumulator, vector3_scaling(sax, torque));
+        /* FIX-AUDIT-DESPOT shooter reaction couple: a flywheel motor is two
+         * bodies acting on each other — mirror robot.c:704-713 and apply
+         * -tau to the chassis about the same axis. Without this the
+         * shooter spun up for free (angular momentum from nowhere) and the
+         * chassis never felt the spin-up yaw/pitch kick a real mount does. */
+        {
+            rigidbody *chassis = mfs_get_chassis(state);
+            if (chassis) {
+                chassis->torque_accumulator =
+                    vector3_subtraction(chassis->torque_accumulator,
+                                        vector3_scaling(sax, torque));
+            }
+        }
         
         if (state->shooter_rpm >= state->shooter_target_rpm * 0.95f) {
             state->shooter_ready = true;
@@ -661,15 +789,30 @@ __attribute__((used)) void mfs_module_1_shooter_step(mfs_module_1_state *state, 
                 
                 if (surf_speed > 5.0f) {
                     vector3 launch_dir = vector3_scaling(surface_vel, 1.0f / surf_speed);
-                    /* Apply launch impulse */
-                    vector3 impulse = vector3_scaling(launch_dir, 
-                        MFS_BIOBUZZ_BALL_MASS * surf_speed * 0.8f);  /* 80% transfer */
-                    rb_apply_forces_localised(ball, impulse, ball->position);
-                    
+                    /* C1 UNIT FIX: m*surf_speed is an IMPULSE (N.s), but
+                     * rb_apply_forces_localised accumulates a FORCE (N) that
+                     * the integrator turns into a = F/m. Passing the impulse
+                     * straight through therefore delivered only
+                     * 0.8*surf_speed*dt m/s of velocity - a factor of dt
+                     * (60x at 1/60 s) too little, so fired balls barely moved.
+                     * Convert the intended velocity change to the equivalent
+                     * one-tick force: F = m*dv/dt. */
+                    if (dt > 0.0f) {
+                        float dv = surf_speed * 0.8f;  /* 80% transfer */
+                        vector3 force = vector3_scaling(launch_dir,
+                            MFS_BIOBUZZ_BALL_MASS * dv / dt);
+                        rb_apply_forces_localised(ball, force, ball->position);
+                    }
+
                     state->balls_fired++;  /* fired, not scored: no goal detection exists */
                     state->shooter_fire_cmd = false;  /* Consume fire command */
+                    /* FIX-AUDIT-DESPOT: break lives INSIDE the success branch.
+                     * The old break sat after the if, so a ball in position
+                     * with low surface speed (or dt<=0) still ended the scan
+                     * and the fire command starved behind an unshootable ball
+                     * while a shootable one sat later in the list. */
+                    break;  /* Only shoot one ball per fire command */
                 }
-                break;  /* Only shoot one ball per fire command */
             }
         }
     }

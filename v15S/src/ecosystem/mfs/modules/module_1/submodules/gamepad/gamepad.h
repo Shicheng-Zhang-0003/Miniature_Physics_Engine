@@ -55,6 +55,11 @@ void gamepad_poll(gamepad_state *pad);
 /* read an axis value in [-1, 1] with deadzone and inversion applied. */
 float gamepad_get_axis(const gamepad_state *pad, int axis);
 
+/* DESPOT-FIX: triggers report as [-1,1] axes but drivers disagree on rest:
+ * some rest at -1, some at 0. Mapped robustly to [0,1] pressed amount as
+ * max(0,v): rest -> 0 on either convention, never false-fires. */
+float gamepad_get_trigger(const gamepad_state *pad, int axis);
+
 /* read a button's pressed state. */
 bool gamepad_get_button(const gamepad_state *pad, int button);
 

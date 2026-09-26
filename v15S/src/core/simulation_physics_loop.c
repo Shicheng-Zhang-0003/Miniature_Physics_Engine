@@ -82,6 +82,11 @@ void simulation_physics_tick(float frame_delta_time) {
     float linear_damping_factor =
         (float) det_pow_retention((double) leg_cfg->world.drag, (double) fixed_physics_dt);
     /* TRUTH: scale=1.0 means no extra rotary damping (matches canonical). */
+    /* FIX-AUDIT-DESPOT: computed once per FRAME here, but consumed per
+     * SUBSTEP below. fixed_dt is const today so values agree; if it ever
+     * varies (variable-step legacy callers), stale damping integrates the
+     * wrong drag. Recomputed at the top of each substep iteration (cheap:
+     * two det_pow calls); these frame-level values seed the first pass. */
     float angular_damping_factor = (leg_cfg->world.angular_damping_scale >= 1.0f)
                                        ? 1.0f
                                        : (float) det_pow_retention(
@@ -101,6 +106,16 @@ void simulation_physics_tick(float frame_delta_time) {
      * counter keeps per-frame accumulate semantics (reset above). */
     while (physics_time_accumulator >= fixed_physics_dt) {
         int ovfl_sub_mark = world->manifold_overflow_count;
+        /* FIX-AUDIT-DESPOT: refresh damping per substep (see decl note):
+         * det_pow_retention is pure, so recompute is exact and keeps a
+         * future variable-dt caller honest. */
+        linear_damping_factor =
+            (float) det_pow_retention((double) leg_cfg->world.drag, (double) fixed_physics_dt);
+        angular_damping_factor = (leg_cfg->world.angular_damping_scale >= 1.0f)
+                                     ? 1.0f
+                                     : (float) det_pow_retention(
+                                           (double) (leg_cfg->world.drag * leg_cfg->world.angular_damping_scale),
+                                           (double) fixed_physics_dt);
         /* Sanitize all bodies */
         for (int sanitize_index = 0; sanitize_index < world->body_count; sanitize_index++) {
             rigidbody_sanitize(&world->bodies[sanitize_index]);
@@ -204,24 +219,32 @@ void simulation_physics_tick(float frame_delta_time) {
                 collision_data floor_collision = {0};
                 if (collision_static_plane_body(&world->static_plane_body, floor_rigid_body, 0.0f, &floor_collision,
                                                 mpe_world_cfg(world))) {
-                    if (manifold_count < a3_max_manifolds) {
-                        float deepest = 0.0f;
-                        for (int fi = 0; fi < floor_collision.contact_count; fi++) {
-                            if (floor_collision.contacts[fi].penetration > deepest) {
-                                deepest = floor_collision.contacts[fi].penetration;
-                            }
+                    /* FIX-AUDIT-DESPOT: was a hard `manifold_count <
+                     * a3_max_manifolds` cap while the canonical world path
+                     * grows manifold_capacity toward that ceiling. Diverged
+                     * caps drop floor contacts on one path but not the
+                     * other (GUI vs headless disagreement under load).
+                     * Growable here too; overflow counts on real failure. */
+                    if (manifold_count >= world->manifold_capacity) {
+                        if (physics_world_grow_manifolds(world) != 0) {
+                            world->manifold_overflow_count++;
+                            continue;
                         }
-                        if (was_sleeping && deepest > mpe_world_cfg(world)->depenetration.wake_depth_thresh) {
-                            rigidbody_wake(floor_rigid_body);
+                    }
+                    float deepest = 0.0f;
+                    for (int fi = 0; fi < floor_collision.contact_count; fi++) {
+                        if (floor_collision.contacts[fi].penetration > deepest) {
+                            deepest = floor_collision.contacts[fi].penetration;
                         }
-                        collision_prepare_solver(world, &floor_collision, &world->manifolds[manifold_count],
-                                                 fixed_physics_dt);
-                        manifold_count++;
-                        if (world->has_contact) {
-                            world->has_contact[floor_object_index] = 1;
-                        }
-                    } else {
-                        world->manifold_overflow_count++;
+                    }
+                    if (was_sleeping && deepest > mpe_world_cfg(world)->depenetration.wake_depth_thresh) {
+                        rigidbody_wake(floor_rigid_body);
+                    }
+                    collision_prepare_solver(world, &floor_collision, &world->manifolds[manifold_count],
+                                             fixed_physics_dt);
+                    manifold_count++;
+                    if (world->has_contact) {
+                        world->has_contact[floor_object_index] = 1;
                     }
                 }
             }
@@ -267,7 +290,7 @@ void simulation_physics_tick(float frame_delta_time) {
                 if (mods[mi] && mods[mi]->pre_step) mods[mi]->pre_step(world, fixed_physics_dt, states[mi]);
             }
         }
-        if (world->tick_v0 && world->tick_v0_capacity >= mpe_max_bodies) {
+        if (world->tick_v0 && world->tick_v0_capacity >= world->body_count) {
             for (int si = 0; si < world->body_count; si++) {
                 world->tick_v0[si] = world->bodies[si].velocity;
             }
@@ -406,7 +429,10 @@ void simulation_physics_tick(float frame_delta_time) {
             if (n > mpe_max_bodies) {
                 n = mpe_max_bodies;
             }
-            memset(leg_joint, 0, (size_t) n);
+            /* FIX-AUDIT-DESPOT tail safety (same hole as physics_world.c
+             * joint_membership): clear the whole thread-local array, not
+             * just n, or a shrinking world leaves stale joint flags. */
+            memset(leg_joint, 0, sizeof(leg_joint));
             for (int ji = 0; ji < mpe_max_joints; ji++) {
                 if (!world->revolute_constraints[ji].is_active) {
                     continue;

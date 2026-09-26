@@ -89,6 +89,11 @@ the project `temp/` directory.
 
 ## Test suite upgrade: 2026-09-25
 
+Counts: 29/29 is the frozen v15R3 tag; the current v15S head is 32/32
+(29 physics + 3 diag-informational, canonical case name `module` — the
+v1 binary was `module_test`). MFS strafe is emergent roller-anisotropy
+(no chassis-force cheat); odometry is pure-encoder with `odom_slip`.
+
 The unified runner in `tools/test_runner.py` now offers `quick`, `physics`, and
 `full` profiles. It discovers the canonical C cases from their registry and
 isolated cases from Makefile build targets, checks that the C binary's listed

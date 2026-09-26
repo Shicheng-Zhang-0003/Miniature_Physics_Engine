@@ -231,8 +231,43 @@ static void test_motor_free_speed(void) {
      * 2.2x). Loaded chassis speed is covered by teleop/T12 gates. */
     g_cfg.world.drag = 1.0f;
     g_cfg.world.angular_damping_scale = 1.0f;
+    /* DESPOT-FIX (rig lie): the old code teleported ONLY the chassis to
+     * y=2.0 and left wheels/rollers on the floor — the 4 wheel joints
+     * (plus 32 roller joints) spanned ~1.95 m and winched the wheels
+     * upward through a chaotic pendulum for the whole 3 s run (measured
+     * wheel y 0.05→0.40, rpm swinging +217→-82→+221 run to run). The gate
+     * measured pendulum chaos, not free speed. Lift the WHOLE robot so
+     * every joint starts at rest length, zero all velocities, and reset
+     * the speed-differentiating observer (a warp reads as infinite load
+     * without this) — then the wheels truly dangle. */
+    {
+        const vector3 lift = {0.0f, 1.9f, 0.0f};
+        rigidbody *chassis0 = &world.bodies[robot.chassis_body];
+        chassis0->position = vector3_addition(chassis0->position, lift);
+        chassis0->velocity = vector3_zero();
+        chassis0->angular_velocity = vector3_zero();
+        for (int w = 0; w < robot.wheel_count; w++) {
+            int wi = robot.wheel_bodies[w];
+            if (wi < 0 || wi >= world.body_count) continue;
+            rigidbody *wb = &world.bodies[wi];
+            wb->position = vector3_addition(wb->position, lift);
+            wb->velocity = vector3_zero();
+            wb->angular_velocity = vector3_zero();
+            rigidbody_update_axes(wb);
+            motor_reset_observer(&robot.wheel_motors[w]);
+            for (int k = 0; k < robot.roller_count[w]; k++) {
+                int rb = robot.roller_bodies[w][k];
+                if (rb < 0 || rb >= world.body_count) continue;
+                rigidbody *rbb = &world.bodies[rb];
+                rbb->position = vector3_addition(rbb->position, lift);
+                rbb->velocity = vector3_zero();
+                rbb->angular_velocity = vector3_zero();
+                rigidbody_update_axes(rbb);
+            }
+        }
+        rigidbody_update_axes(chassis0);
+    }
     rigidbody *chassis = &world.bodies[robot.chassis_body];
-    chassis->position = (vector3){0.0f, 2.0f, 0.0f};
     rigidbody_set_kinematic(chassis, true);
     chassis->velocity = vector3_zero();
 

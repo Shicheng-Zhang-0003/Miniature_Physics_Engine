@@ -3,6 +3,8 @@
 #include "../core/physics_world.h"
 #include "../physics/broadphase.h"
 #include "../physics/collision_mechanics.h"
+#include <assert.h>
+#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <pthread.h>
@@ -77,6 +79,10 @@ int mpe_register_pair_handler(int ta, int tb, int ca, int cb, mpe_collide_fn fn,
         }
     }
     if (s_pair_count >= MPE_MAX_PAIR_HANDLERS) {
+        /* FIX-AUDIT-DESPOT: slot-full was a silent -1 (plugin load looked
+         * like success downstream). Log so `mod` failures are diagnosable. */
+        fprintf(stderr, "[registry] pair table full (%d); refusing '%s'\n",
+                MPE_MAX_PAIR_HANDLERS, name ? name : "?");
         pthread_mutex_unlock(&s_reg_lock);
         return -1;
     }
@@ -93,13 +99,32 @@ int mpe_register_pair_handler(int ta, int tb, int ca, int cb, mpe_collide_fn fn,
 
 int mpe_unregister_pair_handler(mpe_collide_fn fn) {
     if (!fn) return -1;
+    /* FIX-AUDIT-DESPOT: missing lock added — every other registry mutation
+     * and lookup takes s_reg_lock; the unlocked memmove raced concurrent
+     * dispatch (find) and loader purge walks.
+     * Tombstones deliberately NOT used here (unlike broadphase/solver/
+     * modules): worlds store the pair fn BY VALUE — dispatch copies it per
+     * pair per tick via mpe_find_pair_handler (see physics_world_process_pair)
+     * and never retains &s_pairs[i] — so memmove under lock cannot dangle a
+     * world. Loader purge snapshots fns via mpe_registry_pair_fn_at (also
+     * under lock) before calling back in here. */
+    pthread_mutex_lock(&s_reg_lock);
+    /* By-value invariant: no live world may alias &s_pairs[i]. Pair dispatch
+     * is lookup-per-pair (value copy); broadphase/solver/module slots ARE
+     * aliased by worlds and therefore use tombstones instead. */
+    assert(s_pair_count >= 0 && s_pair_count <= MPE_MAX_PAIR_HANDLERS);
     int removed = 0;
     for (int i = 0; i < s_pair_count;) {
         if (s_pairs[i].fn == fn) {
+            /* Pinned builtins [0, s_builtin_pairs) refuse foreign overwrite
+             * at register time; explicit unregister of a builtin fn is still
+             * honored here (loader purge only ever passes plugin-range fns,
+             * verified by fn_in_plugin, so builtins cannot be purged). */
             for (int j = i; j + 1 < s_pair_count; j++) s_pairs[j] = s_pairs[j + 1];
             s_pair_count--; removed++;
         } else i++;
     }
+    pthread_mutex_unlock(&s_reg_lock);
     return removed ? 0 : -1;
 }
 
@@ -241,6 +266,9 @@ int mpe_register_broadphase(const char *name, const mpe_broadphase_if_t *iface) 
         }
     }
     if (s_broad_count >= 8) {
+        /* FIX-AUDIT-DESPOT: silent slot-full -> stderr diagnostic. */
+        fprintf(stderr, "[registry] broadphase table full (8); refusing '%s'\n",
+                name ? name : "?");
         pthread_mutex_unlock(&s_reg_lock);
         return -1;
     }
@@ -300,6 +328,9 @@ int mpe_register_solver(const char *name, const mpe_solver_if_t *iface) {
         }
     }
     if (s_solver_count >= 8) {
+        /* FIX-AUDIT-DESPOT: silent slot-full -> stderr diagnostic. */
+        fprintf(stderr, "[registry] solver table full (8); refusing '%s'\n",
+                name ? name : "?");
         pthread_mutex_unlock(&s_reg_lock);
         return -1;
     }
@@ -417,6 +448,9 @@ int mpe_register_module(const mpe_module_desc_t *desc) {
         }
     }
     if (s_module_count >= MPE_MAX_MODULES) {
+        /* FIX-AUDIT-DESPOT: silent slot-full -> stderr diagnostic. */
+        fprintf(stderr, "[registry] module table full (%d); refusing '%s'\n",
+                MPE_MAX_MODULES, desc && desc->name ? desc->name : "?");
         pthread_mutex_unlock(&s_reg_lock);
         return -1;
     }

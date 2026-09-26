@@ -10,6 +10,94 @@
 #include <stdbool.h>
 #include <math.h>
 
+/* World-space anisotropy (MATERIAL) axis for a contact, honouring each body's
+ * optional reference frame (friction_anisotropy_frame).
+ *
+ * This is the frame the elliptical Coulomb cone is defined in, and therefore
+ * the one the solver must build its tangent basis from. Resolving it in the
+ * wrong frame is not cosmetic: t1 follows the SLIP direction, so an axis
+ * carried by a spinning hub sweeps with the hub and the contact silently
+ * loses the rail it was supposed to have.
+ *
+ * Lives here rather than in collision_mechanics.h because it needs the full
+ * physics_world definition, and physics_world.h includes collision_mechanics.h.
+ * `world` may be NULL, in which case a framed axis degrades to the owner's own
+ * frame (the only defined choice when the frame body is unknown). */
+static bool a3_contact_anisotropy_axis(const physics_world *world, const rigidbody *body_a,
+                                       const rigidbody *body_b, vector3 *out_axis) {
+    const rigidbody *owner = NULL;
+    for (int side = 0; side < 2; side++) {
+        const rigidbody *rb = (side == 0) ? body_a : body_b;
+        if (rb && rb->friction_anisotropic) {
+            owner = rb;
+            break;
+        }
+    }
+    if (!owner) {
+        return false;
+    }
+    const rigidbody *frame = owner;
+    if (world && (owner->friction_anisotropy_frame != 0)) {
+        /* FIX-AUDIT-DESPOT: was an O(n) id scan per CONTACT (prepare runs
+         * it per contact per tick: O(contacts*bodies)). Route through the
+         * world's id->index cache (O(1) hit; the lookup verifies against
+         * the live array and misses safely, so stale frames degrade to the
+         * owner's own frame, never to a wrong body). */
+        int frame_idx = physics_world_index_by_id((physics_world *) world, owner->friction_anisotropy_frame);
+        if ((frame_idx >= 0) && (frame_idx < world->body_count)) {
+            frame = &world->bodies[frame_idx];
+        }
+    }
+    *out_axis = vector4_rotate_to_vector3(frame->orientation, owner->friction_anisotropy_axis);
+    return true;
+}
+
+/* Tangent basis for an anisotropic contact, built from the MATERIAL axis
+ * rather than from the slip direction.
+ *
+ * Why: the elliptical cone is only the anisotropic Coulomb law when its
+ * semi-axes are measured in the material frame. The solver's normal t1 tracks
+ * the slip, so evaluating the ellipse in a slip-aligned basis collapses it to
+ * "limit the total tangential impulse, slightly differently by direction",
+ * which cannot express a rail at all. With mu_across = 0 every slip direction
+ * has some component across the material axis, so that formulation zeroes the
+ * WHOLE impulse and the wheel loses all grip instead of gaining a direction -
+ * which is exactly what the mecanum sweep measured. In the material frame the
+ * same mu_across = 0 pins only the second tangent and leaves the first free: a
+ * true one-way rail, which is what a free roller physically transmits.
+ *
+ * The material frame also exists when there is no slip, which is precisely when
+ * a rail contact most needs it. Returns false when there is no usable material
+ * frame (not anisotropic, or axis parallel to the contact normal), in which
+ * case the caller keeps its ordinary slip-aligned basis. */
+static bool a3_anisotropic_tangent_frame(const physics_world *world, const rigidbody *body_a,
+                                          const rigidbody *body_b, vector3 normal,
+                                          vector3 *out_t1, vector3 *out_t2) {
+    vector3 axis;
+    if (!a3_contact_anisotropy_axis(world, body_a, body_b, &axis)) {
+        return false;
+    }
+    if (!isfinite(axis.x) || !isfinite(axis.y) || !isfinite(axis.z) ||
+        (vector3_length_squared(axis) < 1.0e-8f)) {
+        return false;
+    }
+    /* Project into the contact plane; an axis normal to the contact describes
+     * no in-plane direction, so it is not a usable tangent frame. */
+    vector3 t1 = vector3_subtraction(axis, vector3_scaling(normal, vector3_dot(axis, normal)));
+    if (vector3_length_squared(t1) < 1.0e-6f) {
+        return false;
+    }
+    t1 = vector3_normalisation(t1);
+    vector3 t2 = vector3_cross(normal, t1);
+    if (vector3_length_squared(t2) < 1.0e-6f) {
+        return false;
+    }
+    *out_t1 = t1;
+    *out_t2 = vector3_normalisation(t2);
+    return true;
+}
+
+
 #define contact_hash_bits 12
 #define contact_hash_size (1 << contact_hash_bits)
 #define contact_hash_mask (contact_hash_size - 1)
@@ -43,63 +131,12 @@ static inline vector3 collision_body_local_to_world_offset(rigidbody *body, vect
 
 
 
-static uint32_t a3_task05_mix_u32(uint32_t hash_value, uint32_t input_value) {
-    hash_value ^= input_value + 0x9e3779b9u + (hash_value << 6) + (hash_value >> 2);
-    return hash_value;
-}
-
-static uint32_t a3_task05_float_bits(float value) {
-    union {
-        float float_value;
-        uint32_t integer_value;
-    } converter;
-
-    converter.float_value = value;
-    return converter.integer_value;
-}
-
+/* FIX-AUDIT-DESPOT: thin wrapper over the shared stamp in
+ * collision_mechanics.h (single source of truth with contact_cache_save).
+ * Kept under the legacy a3_task05_ name so call sites below don't churn;
+ * bodies must match exactly or warm-start injects stale impulses. */
 static uint32_t a3_task05_body_property_stamp(const rigidbody *rigid_body) {
-    if (!rigid_body) {
-        return 0;
-    }
-
-    uint32_t stamp = 2166136261u;
-
-    stamp = a3_task05_mix_u32(stamp, (uint32_t) rigid_body->type);
-    stamp = a3_task05_mix_u32(stamp, rigid_body->static_state ? 1u : 0u);
-
-    stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(rigid_body->mass));
-    stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(rigid_body->inverse_mass));
-    stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(rigid_body->radius));
-
-    stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(rigid_body->half_extensions.x));
-    stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(rigid_body->half_extensions.y));
-    stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(rigid_body->half_extensions.z));
-
-    /* TRUTH: friction/restitution/kinematic affect the solved impulse.
-     * Old stamp omitted them: editing friction or toggling kinematic hit a
-     * stale acc_n*new_mu (wrong friction cone for a tick). Include.
-     * TRUTH: cylinder_half_length and custom_shape likewise change lever
-     * arms and dispatch: editing h hit stale acc with the wrong geometry.
-     * Must match contact_cache_save's stamp exactly (both sides). */
-    stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(rigid_body->friction_static));
-    stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(rigid_body->friction_kinetic));
-    stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(rigid_body->restitution));
-    stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(rigid_body->cylinder_half_length));
-    stamp = a3_task05_mix_u32(stamp, (uint32_t) rigid_body->custom_shape);
-    stamp = a3_task05_mix_u32(stamp, rigid_body->kinematic ? 2u : 0u);
-    stamp = a3_task05_mix_u32(stamp, rigid_body->is_sleeping ? 4u : 0u);
-
-    /* Orientation quantized to 1e-3: rotation invalidates local-space cache
-     * matching. Without this, a body that rotates significantly between
-     * frames can false-positive match a stale contact (PHYS-007). Quantizing
-     * keeps resting contacts stable while forcing a miss on real rotation. */
-    stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(roundf(rigid_body->orientation.w * 1000.0f) / 1000.0f));
-    stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(roundf(rigid_body->orientation.x * 1000.0f) / 1000.0f));
-    stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(roundf(rigid_body->orientation.y * 1000.0f) / 1000.0f));
-    stamp = a3_task05_mix_u32(stamp, a3_task05_float_bits(roundf(rigid_body->orientation.z * 1000.0f) / 1000.0f));
-
-    return stamp;
+    return a3_contact_cache_body_stamp(rigid_body);
 }
 
 static bool a3_task05_cached_impulses_are_usable(float normal_impulse, float tangent_impulse) {
@@ -380,13 +417,27 @@ void collision_prepare_solver(struct physics_world *world, collision_data *sourc
         /* Frame select: true sliding keeps the slip direction
          * (meaningful); sticking uses the remembered direction or, with
          * no memory yet, no frame (normal-only this tick — the sweep
-         * cannot invent a hold direction from noise). */
-        if (!frame_sliding) {
-            if (vector3_length_squared(adopted_tangent) > 0.0001f) {
-                cp->tangent_vector = adopted_tangent;
-            } else {
-                cp->tangent_vector = vector3_zero();
-            }
+         * cannot invent a hold direction from noise).
+         *
+         * Anisotropic contacts are the exception and take their basis from
+         * the MATERIAL frame instead (see a3_anisotropic_tangent_frame): the
+         * elliptical cone is only the anisotropic Coulomb law when measured
+         * against the material axes, and a slip-aligned basis reduces it to a
+         * magnitude limit that cannot express a rail. The material frame is
+         * also available when there is no slip at all, which is exactly when a
+         * rail contact most needs it. */
+        vector3 aniso_t1 = vector3_zero();
+        vector3 aniso_t2 = vector3_zero();
+        const bool have_material_frame =
+            a3_anisotropic_tangent_frame(world, m->object_a, m->object_b, m->normal_vector, &aniso_t1, &aniso_t2);
+        if (have_material_frame) {
+            /* DESPOT-FIX: this branch was EMPTY — the material frame was
+             * computed and discarded, so anisotropic contacts kept a stale
+             * (or zero) tangent: friction froze at warm-start and rollers
+             * could never develop rail force (measured strafe ~0.0005 m).
+             * Assign the material basis; tangent2/effective-masses below
+             * then derive from it consistently. */
+            cp->tangent_vector = aniso_t1;
         } else {
             if (tangent_speed > 0.0001f) {
                 cp->tangent_vector = vector3_scaling(rel_vel_tangent, -1.0f / tangent_speed);
@@ -485,14 +536,28 @@ void collision_prepare_solver(struct physics_world *world, collision_data *sourc
                     if (tangent_speed >= sth) mu_cap = mu_k;
                 }
                 if (!(mu_cap >= 0.0f) || !isfinite(mu_cap)) mu_cap = 0.0f;
-                float tcone = mu_cap * cp->accumulated_normal_impulse;
                 float t1 = cp->accumulated_tangent_impulse, t2 = cp->accumulated_tangent2_impulse;
-                float tcombo = sqrtf(t1 * t1 + t2 * t2);
-                if (tcombo > tcone && tcombo > 0.0f) {
-                    float s = tcone / tcombo;
-                    cp->accumulated_tangent_impulse = t1 * s;
-                    cp->accumulated_tangent2_impulse = t2 * s;
-                }
+                /* Same cone the sweep below uses, so warm start can never
+                 * re-admit an impulse the sweep would immediately clamp out.
+                 * Isotropic bodies resolve to mu_roll == mu_lateral, i.e. the
+                 * legacy disc. */
+                float mu_roll, mu_lateral;
+                vector3 aniso_axis;
+                a3_contact_friction_cone(m->object_a, m->object_b, mu_cap, &mu_roll, &mu_lateral, &aniso_axis);
+                /* DESPOT-FIX: the ellipse axis IS the basis t1 by construction
+                 * (prepare assigned the material frame to tangent_vector, so
+                 * projecting it back is identity). Passing the cone's
+                 * owner-frame axis instead disagrees whenever a reference
+                 * frame is set (rail hubs: cone rotates the stored
+                 * chassis-frame rail by the SPINNING hub; basis is the steady
+                 * chassis frame) — the clamp then measured the ellipse in a
+                 * sweeping frame and the rail force smeared to nothing. The
+                 * separate frame-aware re-resolution is subsumed by this. */
+                (void)aniso_axis;
+                a3_anisotropic_coulomb_clamp(m->normal_vector, cp->tangent_vector, cp->tangent2, t1, t2,
+                                             cp->accumulated_normal_impulse, mu_roll, mu_lateral,
+                                             cp->tangent_vector,
+                                             &cp->accumulated_tangent_impulse, &cp->accumulated_tangent2_impulse);
             }
             vector3 impulse = vector3_addition(
                 vector3_scaling(m->normal_vector, cp->accumulated_normal_impulse),
@@ -609,12 +674,21 @@ void collision_manifold_solve_order(struct physics_world *world, collision_data 
     }
 }
 
+
+
 float collision_resolve_iterative(collision_data *m, float dt, bool friction_only, int start_index,
                                   const mpe_config_t *cfg) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
     if (dt <= 0.0f) {
         dt = 1.0f / 60.0f;
     }
+    /* FIX-AUDIT-DESPOT cost TRUTH: callers visit every manifold TWICE per
+     * iteration (see physics_world_step: resolve(...,iter) +
+     * resolve(...,iter+1)), so the "64 iterations" knob is really 128
+     * contact visits per manifold per tick (plus 2 friction-only relaxation
+     * sweeps after Poisson). Convergent, not divergent — the second visit
+     * settles coupled contacts within one sweep — but profiling must count
+     * 2x the knob, and halving the knob halves 2x the work. */
     /* Returns the largest impulse magnitude applied this visit (normal +
      * friction deltas). Callers use it for local-convergence polishing. */
     float max_applied = 0.0f;
@@ -747,21 +821,30 @@ float collision_resolve_iterative(collision_data *m, float dt, bool friction_onl
             }
             float friction_coeff =
                 (slip_speed < static_friction_threshold) ? static_friction_coeff : kinetic_friction_coeff;
-            float max_friction = cp->accumulated_normal_impulse * friction_coeff;
 
-            /* Coulomb disc: solve both tangents, clamp the COMBINED vector. */
+            /* Coulomb cone: solve both tangents, clamp the COMBINED vector.
+             * Isotropic bodies (the default, and every pre-existing body)
+             * resolve mu_roll == mu_lateral, which is the legacy disc clamp
+             * below, unchanged. Anisotropic bodies (mecanum rollers) get an
+             * ellipse: grip along their roll axis, sliding across it. */
             float lambda_t1 = -vt1 * eff1;
             float lambda_t2 = has_t2 ? (-vt2 * eff2) : 0.0f;
             float new_acc1 = cp->accumulated_tangent_impulse + lambda_t1;
             float new_acc2 = cp->accumulated_tangent2_impulse + lambda_t2;
-            float combo_sq = new_acc1 * new_acc1 + new_acc2 * new_acc2;
-            if ((max_friction > 0.0f) && (combo_sq > max_friction * max_friction)) {
-                float scale = max_friction / sqrtf(combo_sq);
-                new_acc1 *= scale;
-                new_acc2 *= scale;
-            } else if (max_friction <= 0.0f) {
-                new_acc1 = 0.0f;
-                new_acc2 = 0.0f;
+            {
+                float mu_roll, mu_lateral;
+                vector3 aniso_axis;
+                a3_contact_friction_cone(m->object_a, m->object_b, friction_coeff, &mu_roll, &mu_lateral,
+                                         &aniso_axis);
+                /* DESPOT-FIX: axis IS the basis t1 (prepare stored the
+                 * material frame in the contact tangents; projecting it back
+                 * is identity). The cone's owner-frame axis sweeps with a
+                 * spinning hub whenever a reference frame is set — see the
+                 * warm-start site above. */
+                (void)aniso_axis;
+                a3_anisotropic_coulomb_clamp(m->normal_vector, tangent, tangent2, new_acc1, new_acc2,
+                                             cp->accumulated_normal_impulse, mu_roll, mu_lateral, tangent,
+                                             &new_acc1, &new_acc2);
             }
             /* TRUTH: full friction step (see normal solve: SOR deleted). */
             float step1 = new_acc1 - cp->accumulated_tangent_impulse;

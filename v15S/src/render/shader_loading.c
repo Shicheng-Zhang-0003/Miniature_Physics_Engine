@@ -14,6 +14,9 @@ GLuint compile_shader(const char *shader_source, GLenum shader_type) {
     if (!compilation_success) {
         glGetShaderInfoLog(shader_object, 512, NULL, information_log);
         fprintf(stderr, "Shader compile failed: \n%s\n", information_log);
+        /* FIX-AUDIT-DESPOT: delete the failed shader object (was leaked). */
+        glDeleteShader(shader_object);
+        return 0;
     }
     return shader_object;
 }

@@ -303,7 +303,10 @@ int tui_dump_snapshot(FILE *out, physics_world *world, unsigned long tick, float
         }
     }
 
-    /* ---- relative positions: all pairs ---- */
+    /* ---- relative positions: all pairs ----
+     * LOSSY SUMMARY: for n>24 only 64 pairs are listed, and the min/max
+     * scan covers only the first 96 bodies (24/64/96 truncation). This
+     * keeps snapshots diffable at stress scale; it is not the full graph. */
     int n = world->body_count;
     int cap = n > 96 ? 96 : n;
     long total_pairs = (long) n * (n - 1) / 2;

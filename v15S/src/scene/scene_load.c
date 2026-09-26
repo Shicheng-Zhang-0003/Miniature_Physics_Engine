@@ -265,9 +265,18 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
         } else if (type == object_cylinder) {
             rigidbody_initialisation_cylinder(&staged_bodies[i], radius, half_len, mass, pos);
         } else if (type == object_custom) {
-            /* v200 has no custom blob: restore as custom id 100 (capsule)
-             * with persisted radius so dispatch still finds the handler
-             * instead of degrading to sphere. */
+            /* FIX-AUDIT-DESPOT: v200 carries NO custom blob (no custom_shape,
+             * no plugin state) — only the bare type tag + radius. There is
+             * no faithful restore: this LOUD placeholder keeps the file
+             * loadable (one custom never vetoes the whole scene) but says
+             * so on stderr per body, with the staged orientation preserved
+             * below (the old code forced identity, hiding corruption).
+             * Full blob persistence is future work; until then customs do
+             * NOT round-trip. */
+            fprintf(stderr,
+                    "[scene] v200 custom body id %u: no plugin blob in format; "
+                    "restored as capsule placeholder (custom_shape=100, radius kept). "
+                    "Custom bodies do not round-trip.\n", id_u);
             memset(&staged_bodies[i], 0, sizeof(staged_bodies[i]));
             staged_bodies[i].type = object_custom;
             staged_bodies[i].custom_shape = 100;
@@ -761,19 +770,23 @@ int scene_loading(const char *file_source_path)
         return 1;
     }
 
+    /* FIX-AUDIT-DESPOT: veto over-capacity files instead of truncating.
+     * Truncation silently dropped bodies AND misaligned the joint section
+     * (joints after a truncated body array parse as garbage). A file that
+     * claims more than mpe_max_bodies is corrupt or hostile: reject it and
+     * leave the live scene untouched. */
     if (count > mpe_max_bodies) {
-        count = mpe_max_bodies;
-    }
-
-    if (!scene_ensure_pool_capacity(count)) {
+        fprintf(stderr, "Error LDF05: body count %d exceeds maximum %d; vetoing load\n",
+                count, mpe_max_bodies);
         fclose(f);
         return 0;
     }
 
-    if (count > (physics_world_get_primary()->body_capacity)) {
-        count = (physics_world_get_primary()->body_capacity);
-    }
-
+    /* FIX-AUDIT-DESPOT: stage into malloc, never realloc the live pool
+     * before validation. The old scene_ensure_pool_capacity(count) here
+     * grew (realloc'd) the live body array before a single byte was
+     * validated, invalidating every live body pointer on a corrupt file.
+     * Pool growth happens once, after validation, at commit time below. */
     /* --- Allocate staging buffers --- */
     rigidbody *staged_bodies = (rigidbody *)malloc((size_t)count * sizeof(rigidbody));
     if (!staged_bodies) {
@@ -948,7 +961,17 @@ int scene_loading(const char *file_source_path)
         return 0;
     }
 
-    /* --- Commit: clear scene and install staged data --- */
+    /* --- Commit: grow the live pool ONLY now that the staged file has
+     * fully validated (see FIX-AUDIT-DESPOT note at staging time), then
+     * clear the scene and install staged data --- */
+    if (!scene_ensure_pool_capacity(staged_body_count)) {
+        fprintf(stderr, "Error LDF06: body pool growth failed for %d bodies\n",
+                staged_body_count);
+        free(staged_bodies);
+        if (staged_ids) free(staged_ids);
+        if (staged_joints) free(staged_joints);
+        return 0;
+    }
     scene_clear();
     /* FIX-AUDIT: stale revolute joints survived every load (only the
      * spring pool was reset), constraining dead IDs. v1 files carry no

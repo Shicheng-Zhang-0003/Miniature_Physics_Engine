@@ -101,8 +101,9 @@ Self-consistent line: 4.9431/60×20 = 1.6477 ≈ 1.6453 ✓. Encoder:
 - goBILDA 3100-0012-0020: 12 V NiMH, 3000 mAh, XT30, 20 A fuse,
   30 A max discharge.
 - `battery_init`: 12.8 V nominal = fresh-pack assumption (spec nominal
-  is 12.0 V); 0.015 Ω internal resistance nominal; **3.0 Ah exact**.
-  The old 5.0 Ah compromise is retired.
+  is 12.0 V); 0.06 Ω pack-level internal resistance nominal (NiMH 10-cell
+  + wiring; FIX-AUDIT-DESPOT: was 0.015 Ω LiPo-class, hiding ~4x of sag);
+  **3.0 Ah exact**. The old 5.0 Ah compromise is retired.
 
 ## Wheels & chassis references
 

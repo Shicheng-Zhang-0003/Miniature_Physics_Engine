@@ -5,6 +5,11 @@
 #include <string.h>
 
 #define FTC_FLEET_INIT_CAP 4
+/* FIX-AUDIT-DESPOT: hard cap 32 is an array bound, NOT a performance claim.
+ * Practical limit is 2-4 robots: each mecanum robot adds 4 wheels + up to
+ * 32 roller bodies + 36 joints to one Gauss-Seidel island, and solver cost
+ * grows superlinearly with constraint count at 128 iterations. Past ~4 the
+ * tick slows and contacts go unconverged; raise only with profiling. */
 #define FTC_FLEET_MAX 32
 
 /* Module registry name shared with ftc_module.c's descriptor. */
@@ -70,6 +75,11 @@ int ftc_fleet_spawn(struct physics_world *world, float x, float y, float z,
     if (f->count >= FTC_FLEET_MAX) return -1;
     if (f->count >= f->cap) {
         int ncap = f->cap * 2;
+        /* DESPOT-FIX: old growth could realloc past FTC_FLEET_MAX (cap 32 ->
+         * ncap 64) then keep spawning to 32 while holding 64 slots. Clamp so
+         * capacity never exceeds the bound. */
+        if (ncap > FTC_FLEET_MAX) ncap = FTC_FLEET_MAX;
+        if (ncap <= f->cap) return -1;
         ftc_robot *nr = (ftc_robot *)realloc(f->robots, (size_t)ncap * sizeof(ftc_robot));
         if (!nr) return -1;
         f->robots = nr;

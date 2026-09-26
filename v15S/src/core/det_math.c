@@ -6,12 +6,14 @@
 #include <fenv.h>
 #include <stdint.h>
 
-unsigned long det_fallback_pow_count = 0;
-unsigned long det_fallback_trig_count = 0;
+/* FIX-AUDIT-DESPOT: _Atomic process-wide counters (see header). RELAXED
+ * ordering: telemetry only, no happens-before needed. */
+_Atomic unsigned long det_fallback_pow_count = 0;
+_Atomic unsigned long det_fallback_trig_count = 0;
 
 void det_fallback_reset(void) {
-    det_fallback_pow_count = 0;
-    det_fallback_trig_count = 0;
+    __atomic_store_n(&det_fallback_pow_count, 0, __ATOMIC_RELAXED);
+    __atomic_store_n(&det_fallback_trig_count, 0, __ATOMIC_RELAXED);
 }
 
 void det_pin_fp_state(void) {
@@ -54,16 +56,19 @@ void det_assert_no_fallback_trig(void) {
 
 void det_mark_fallback_pow(void) {
     det_fallback_pow_used = true;
-    det_fallback_pow_count++;
+    /* FIX-AUDIT-DESPOT: atomic increment (see header). */
+    __atomic_fetch_add(&det_fallback_pow_count, 1, __ATOMIC_RELAXED);
 }
 
 void det_mark_fallback_trig(void) {
     det_fallback_trig_used = true;
-    det_fallback_trig_count++;
+    /* FIX-AUDIT-DESPOT: atomic increment (see header). */
+    __atomic_fetch_add(&det_fallback_trig_count, 1, __ATOMIC_RELAXED);
 }
 #else
-void det_mark_fallback_pow(void) { det_fallback_pow_count++; }
-void det_mark_fallback_trig(void) { det_fallback_trig_count++; }
+/* FIX-AUDIT-DESPOT: atomic increments (see header). */
+void det_mark_fallback_pow(void) { __atomic_fetch_add(&det_fallback_pow_count, 1, __ATOMIC_RELAXED); }
+void det_mark_fallback_trig(void) { __atomic_fetch_add(&det_fallback_trig_count, 1, __ATOMIC_RELAXED); }
 /* Release no-ops so the assert declarations in det_math.h always link.
  * Counters above stay active in release; only the debug tripwire is a no-op. */
 void det_assert_no_fallback_pow(void) { }

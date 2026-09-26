@@ -11,7 +11,7 @@
 
 typedef struct {
     float nominal_voltage; /* V (12.8 fresh) */
-    float internal_resistance; /* ohms (0.015 LiPo; see battery.c FIX 112) */
+    float internal_resistance; /* ohms (0.06 NiMH pack-level; see battery.c FIX-AUDIT-DESPOT) */
     float capacity_ah; /* amp-hours */
     float charge_fraction; /* 0..1 */
     float fuse_heat; /* 0..1+ ; >=1 tripped until load drops */

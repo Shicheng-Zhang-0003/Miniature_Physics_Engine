@@ -206,6 +206,20 @@ static inline uint32_t a3_broadphase_pair_hash(uint64_t key) {
     return (uint32_t) (mixed_key & a3_pair_hash_mask);
 }
 
+/* FIX-AUDIT-DESPOT: total order on canonical (min,max) pairs for the
+ * pre-return sort in broadphase_generate_pairing. */
+static int broadphase_pair_cmp(const void *pa, const void *pb) {
+    const broadphase_pair *a = (const broadphase_pair *)pa;
+    const broadphase_pair *b = (const broadphase_pair *)pb;
+    if (a->object_index_a != b->object_index_a) {
+        return (a->object_index_a < b->object_index_a) ? -1 : 1;
+    }
+    if (a->object_index_b != b->object_index_b) {
+        return (a->object_index_b < b->object_index_b) ? -1 : 1;
+    }
+    return 0;
+}
+
 static void broadphase_pair_dedupe_begin(broadphase_workspace *ws) {
     if (!ws) {
         return;
@@ -222,7 +236,11 @@ static void broadphase_pair_dedupe_begin(broadphase_workspace *ws) {
 static bool pair_already_checked(broadphase_workspace *ws, int min_obj, int max_obj) {
     uint64_t key = a3_broadphase_pair_key(min_obj, max_obj);
     uint32_t index = a3_broadphase_pair_hash(key);
-    for (uint32_t probe = 0; probe < a3_pair_hash_table_size; probe++) {
+    /* FIX-AUDIT-DESPOT: cap the linear probe (was a full-table 256K walk on
+     * pathological clustering: one tick could burn O(pairs*table)). 4096
+     * probes bound the worst case; exhaustion emits the pair (fail-open,
+     * duplicate narrowphase work) and counts overflow for visibility. */
+    for (uint32_t probe = 0; probe < 4096; probe++) {
         uint32_t slot = (index + probe) & a3_pair_hash_mask;
         if (ws->pair_hash_generations[slot] != ws->pair_hash_generation) {
             ws->pair_hash_keys[slot] = key;
@@ -445,7 +463,13 @@ int broadphase_generate_pairing(struct physics_world *world, broadphase_pair *co
         /* FIX-AUDIT: old code SHRANK the occupied interval to max_span,
          * so cells the body truly covers were never inserted -> missed
          * pairs (false negatives). Broadphase must never miss. Keep the
-         * full span (correct); count the event for perf visibility. */
+         * full span (correct); count the event for perf visibility.
+         * FIX-AUDIT-DESPOT: cost TRUTH — a huge body (250m wall, 1m cells)
+         * inserts ~millions of nodes: the node-pool cap (1M) + overflow
+         * counter + O(n^2) fail-closed fallback below bound the damage, but
+         * such ticks are degraded by design. large_object_clamp_count is the
+         * early telemetry: if it is nonzero, expect pool pressure this tick
+         * (see overflow counters) and do not trust timing. */
         bool a3_large_object_clamped = false;
         const int max_span = mpe_world_cfg(world)->broadphase.max_cell_span_per_axis;
 
@@ -555,10 +579,16 @@ int broadphase_generate_pairing(struct physics_world *world, broadphase_pair *co
     /* Fail-closed: node-pool exhaustion drops cell inserts (false negatives).
      * If any insert failed this tick, supplement with brute-force swept
      * pairing over all i<j not already emitted. O(n^2) only on overflow
-     * ticks; guarantees the broadphase never misses. */
+     * ticks; guarantees the broadphase never misses.
+     * FIX-AUDIT-DESPOT: the fallback MUST honor no_collide (the insert path
+     * skips render-only proxies above, but this loop re-adds every i<j).
+     * Without the check a pool-exhaustion tick resurrects proxy pairs the
+     * rest of the pipeline assumes cannot exist. */
     if (ws->node_overflow_count != overflow_before) {
         for (int ai = 0; ai < body_count && collision_pair_counter < maximum_pairs_allowed; ai++) {
+            if (bodies[ai].no_collide) continue;
             for (int bi = ai + 1; bi < body_count && collision_pair_counter < maximum_pairs_allowed; bi++) {
+                if (bodies[bi].no_collide) continue;
                 if (pair_already_checked(ws, ai, bi)) continue;
                 rigidbody *rb_a = &bodies[ai];
                 rigidbody *rb_b = &bodies[bi];
@@ -593,5 +623,15 @@ int broadphase_generate_pairing(struct physics_world *world, broadphase_pair *co
             }
         }
     }
+    /* FIX-AUDIT-DESPOT: canonical pair order for determinism. Emission order
+     * above follows spatial-hash bucket chains (cell-coordinate hashes), so
+     * two worlds with identical bodies but different insertion histories
+     * could observe pairs in different orders; the solver/island passes
+     * below are order-sensitive. Every pair is already stored (min,max);
+     * sort by (min,max) so the narrowphase sees one canonical sequence.
+     * qsort with a total order on unique deduped keys yields a unique
+     * output regardless of libc algorithm. */
+    qsort(collision_pairs_output_array, (size_t)collision_pair_counter,
+          sizeof(broadphase_pair), broadphase_pair_cmp);
     return collision_pair_counter;
 }

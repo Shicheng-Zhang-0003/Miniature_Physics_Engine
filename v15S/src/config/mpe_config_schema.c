@@ -140,7 +140,7 @@ static mpe_param s_registry[] = {
      * cat_broadphase
      * ============================================================ */
     {"broadphase.cell_size_default", "Default Cell Size", "Grid cell size when scene is empty (m)", p_float,
-     cat_broadphase, &g_cfg.broadphase.cell_size_default, 5.0, 0.5, 100.0, true},
+     cat_broadphase, &g_cfg.broadphase.cell_size_default, 10.0, 0.5, 100.0, true},
 
     {"broadphase.cell_size_min", "Min Cell Size", "Smallest adaptive cell size (m)", p_float, cat_broadphase,
      &g_cfg.broadphase.cell_size_min, 1.0, 0.1, 100.0, true},

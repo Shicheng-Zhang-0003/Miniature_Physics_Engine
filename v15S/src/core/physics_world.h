@@ -213,6 +213,10 @@ int physics_world_index_by_id(physics_world *world, uint32_t id);
 rigidbody *physics_world_body_by_id(physics_world *world, uint32_t id);
 /* Shape dispatch: registry-first, built-in fallback. Returns true on contact. */
 bool mpe_shape_dispatch(physics_world *world, rigidbody *a, rigidbody *b, collision_data *out);
+/* FIX-AUDIT-DESPOT: per-tick deterministic state hash for lockstep desync
+ * detection (CRC32 over body pos/vel/orient/ids in index order; see
+ * scene/scene_crc.c). NULL world hashes as 0. */
+uint32_t physics_world_hash_state(const struct physics_world *world);
 /* R3-07: Add four static wall bodies around the playable area.
  * half_width and half_depth define the playable half-extents.
  * wall_height and wall_thickness define the wall geometry.

@@ -9,6 +9,7 @@
 #include "../physics/spring_joint_types.h"
 #include "../physics/collision_mechanics.h"
 #include "../physics/broadphase.h"
+#include "../physics/constraint.h"
 #include "../ui_input/input_state.h"
 #include "../ui_input/object_selector.h"
 #include <stdlib.h>
@@ -246,8 +247,21 @@ void scene_remove_object_by_index(int object_index) {
     }
 
     uint32_t previous_selected_id = selected_object_id; /* A3_PATCH_08_SELECTION_ID */
-    remove_joints_from_object(physics_world_get_primary(), object_index);
-    contact_cache_clear(physics_world_get_primary());
+    physics_world *world = physics_world_get_primary();
+    /* FIX-AUDIT-DESPOT: capture the doomed id BEFORE the memmove below.
+     * Generic constraints key on body ids, not indices: without this pass
+     * a removed body left live hinges referencing a recycled id. */
+    uint32_t removed_id = world->bodies[object_index].object_id;
+    remove_joints_from_object(world, object_index);
+    if (removed_id != 0) {
+        for (int ci = constraint_pool_capacity() - 1; ci >= 0; ci--) {
+            const constraint *c = constraint_pool_at(world, ci);
+            if (c && c->is_active && (c->body_id_a == removed_id || c->body_id_b == removed_id)) {
+                constraint_remove(world, ci);
+            }
+        }
+    }
+    contact_cache_clear(world);
 
     for (int i = object_index; i < (physics_world_get_primary()->body_count) - 1; i++) {
         (physics_world_get_primary()->bodies)[i] = (physics_world_get_primary()->bodies)[i + 1];
@@ -656,5 +670,9 @@ void scene_spawn_config_torture_test(void) {
 void scene_clear(void) {
     (physics_world_get_primary()->body_count) = 0;
     physics_world_bump_revision(physics_world_get_primary());
+    /* FIX-AUDIT-DESPOT: joint_init_pool clears only the spring pool. The
+     * generic constraint pool (revolute/fixed/distance/prismatic/rope) must
+     * also reset, or a cleared scene keeps constraining recycled ids. */
+    constraint_pool_init(physics_world_get_primary());
     joint_init_pool(physics_world_get_primary());
 }

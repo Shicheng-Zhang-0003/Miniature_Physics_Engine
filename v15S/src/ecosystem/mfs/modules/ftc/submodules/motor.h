@@ -54,4 +54,8 @@ void motor_update(motor *m, float wheel_angular_vel, float dt, float battery_vol
 void motor_update_load(motor *m, float wheel_angular_vel, float dt, float battery_voltage,
                        float axle_inertia);
 
+/* DESPOT-FIX: defined in motor.c but never declared — every caller took an
+ * implicit declaration (works by ABI luck, breaks under -Werror). */
+void motor_reset_observer(motor *m);
+
 #endif /* motor_h */

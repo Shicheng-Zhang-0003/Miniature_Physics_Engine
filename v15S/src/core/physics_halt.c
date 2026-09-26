@@ -3,11 +3,18 @@
  * GTK redraw/overlay stays in simulation.c (it needs the widget pointer).
  */
 /* GTK4-PREP: zero GUI headers in core. */
+#include <stdatomic.h>
 #include <stdbool.h>
 
 /* MPE_TASK_V15R2_PHYSICS_HALT_BEGIN */
-static int physics_halt_ticks_remaining = 0;
-static bool physics_halted = false;
+/* FIX-AUDIT-DESPOT: the halt flag is written by UI/debug threads
+ * (physics_halt_set/for_ticks) and read by the physics tick
+ * (physics_halt_tick_update / physics_is_halted). Plain bool/int made
+ * that a data race (UB; torn reads on some targets). _Atomic with
+ * sequential consistency is the cheapest correct fix — no mutex needed,
+ * single-word flag, tick path never blocks. */
+static _Atomic int physics_halt_ticks_remaining = 0;
+static _Atomic bool physics_halted = false;
 
 void physics_halt_set(bool halted) {
     physics_halted = halted;

@@ -17,4 +17,13 @@ int scene_wfloat(FILE *f, uint32_t *crc, float v);
 int scene_r32(FILE *f, uint32_t *crc, uint32_t *v);
 int scene_rfloat(FILE *f, uint32_t *crc, float *v);
 
+/* FIX-AUDIT-DESPOT: per-tick deterministic state hash for lockstep
+ * desync detection. CRC32-IEEE over body pos/vel/orientation/ids in
+ * body-index order (float bits fed little-endian; +/-0 canonicalized to
+ * +0 so numerically-equal states hash equal). NULL world hashes as 0.
+ * Implemented here (not physics_world.c) so headless twins and the GUI
+ * share one definition. Declared for worlds in core/physics_world.h. */
+struct physics_world;
+uint32_t physics_world_hash_state(const struct physics_world *world);
+
 #endif /* scene_crc_h */

@@ -16,7 +16,11 @@ mpe-tui.d
 test_*
 build/
 .fixes_generation_1/
-reference_materials/
+# DESPOT-FIX: was `reference_materials/` — that ignored the 12-file 19MB
+# collision/solver/textbook reference library (Coumans/Gottschalk/Mirtich/
+# Baraff/Catto/Teschner), risking untracked loss of the audit's own sources.
+# Build outputs are already covered by *.o/*.so/build/ above; references stay
+# tracked.
 
 # ============ Fix-script backups ============
 # Every fix script creates .pre_NNN backups before mutating

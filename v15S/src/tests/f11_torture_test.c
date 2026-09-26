@@ -5,6 +5,8 @@
  * Verdict matches F11: corruption gates only (NaN / fallen); speeds are
  * reported, never gated — under extremes, perpetual fall is the true
  * outcome. Takes ~seconds. Built via `make test_f11_torture`.
+ * WARNING: crash-oracle only — PASS means no corruption, NOT stability.
+ * Do not misread as a stability proof.
  */
 #ifdef mpe_f11_torture_test
 #include <stdio.h>

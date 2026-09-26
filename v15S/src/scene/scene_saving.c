@@ -304,8 +304,12 @@ int save_scene(const char *file_destination_path) {
         return 0;
     }
     if (!scene_sync_parent_directory(file_destination_path)) {
+        /* FIX-AUDIT-DESPOT: the scene bytes are durable (fsync'd + renamed);
+         * only the directory entry is not. Failing the whole save (return 0)
+         * lied to callers and risked retry loops overwriting a good file.
+         * Return 2 = success with durability warning (see scene_saving.h). */
         fprintf(stderr, "Error SVF04: Scene replaced, but parent-directory sync failed; crash durability is uncertain\n");
-        return 0;
+        return 2;
     }
     return 1;
 }
