@@ -1,0 +1,209 @@
+# MFS Mathematical Models
+
+Every equation the robots run on, with the file that implements it, the
+constants that tune it, and what is deliberately NOT modeled. No physics
+here is invented: motor endpoints come from `docs/FTC_SPECS.md`, and every
+tuned constant below is labeled TUNED.
+
+Notation: commands are -1..1, `dt` is the tick (1/60 s), torques in N·m
+unless noted.
+
+## 1. DC motor (`modules/ftc/submodules/motor.c`)
+
+Quasi-static DC: no inductance `L·di/dt`, no PWM switching, no brush drop.
+
+**Spec derivation** (`motor_from_spec`, motor.c:7-44; presets at 12.0 V):
+
+```
+Kt = stall_out / (gear · eff) / Istall     (motor-shaft, N·m/A)
+R  = Vnom / Istall                          (ohms)
+Kv = Vnom / (free_rad_s · gear)             (V per motor-shaft rad/s)
+```
+
+Preset `stall` is OUTPUT-shaft (post-gearbox, includes loss), so dividing by
+`gear·eff` recovers motor-shaft Kt and simulated stall output equals the
+published stall exactly; efficiency cancels and is kept as a build marker
+(0.85 planetary / 0.80 spur). `Kt != Kv` deliberately: the ratio absorbs
+gearbox friction + no-load current (two-endpoint fit, not textbook Kt==Ke).
+
+**Per-tick update** (`motor_update`, motor.c:46-102):
+
+```
+Vapp    = Vbatt · cmd
+backEMF = Kv · (w_wheel · gear)
+r_eff   = R · (1 + 0.00393 · (T - 25))      (copper derating)
+I       = clamp((Vapp - backEMF) / r_eff, ±Istall)
+τ_motor = Kt · I
+τ_out   = τ_motor · gear · eff
+```
+
+Exact stall (w=0 → I=Istall → τ=spec) and exact free (I=0 at
+`w_free = V/(Kv·gear)`) by construction.
+
+**Implicit-in-speed solve** (`motor_update_load`, motor.c:104-214) —
+required, not optional: axle inertia `Iaxle = ½·m·r² ≈ 2.5e-4` with stall
+~3.7 N·m moves ~30 rad/s/tick explicit, unconditionally unstable:
+
+```
+A = Kt·gear·eff / r_eff,   B = Kv·gear
+w_end = (w + (A·V + τL)·dt / Iaxle) / (1 + A·B·dt / Iaxle)
+```
+
+`τL` is the disturbance-observer load (below). `w_end` is clamped to
+`min(spec_free, V/(Kv·gear))`, one-sided (never below `|w_meas|`, preserving
+regen braking) — the physically exact saturation of the V–w line. A
+`torque_explicit` twin at measured speed is kept for feedforward sizing vs
+the observer-softened `output_torque`.
+
+**Disturbance observer** (robot.c:704-719):
+`τL = Iaxle·(w - w_prev)/dt - τ_exp_prev`, clamped to **±2× output stall**
+(NaN-guarded; reset on teleport via `motor_reset_observer`). The old ±100
+clamp gave the observer 400,000 rad/s² of authority and fed a free-spin
+limit cycle; 2× stall keeps full locked-rotor tracking while starving the
+chaos loop. Holds full stall at lock; converges to ~0 when free.
+
+**Thermal** (both paths heat with `r_eff`):
+`dT = I²·r·dt·0.1 - (T-25)·0.01·dt`, floor 25 °C. Coefficients are
+telemetry-grade magic (no thermal mass, no magnet derating) — negligible at
+FTC currents.
+
+**Not modeled:** inductance, PWM, brush drop, gearbox stiction,
+load-dependent efficiency, per-motor PTC (fuse is pack-level only),
+encoder quantization in torque paths (see §4 for odometry).
+
+## 2. Battery (`modules/ftc/submodules/battery.c`, `.h`)
+
+Fresh-pack assumption 12.8 V (spec nominal is 12.0 V — documented):
+
+```
+OCV(soc) = 12.8 - 4·(1-soc)²,  floor 10.0 V   (nominal curve fit, admitted)
+Vterm    = OCV - Rint · I_signed,   Rint = 0.06 Ω (NiMH 10-cell + wiring)
+```
+
+- **Fuse:** 20 A PTC (`MPE_BATTERY_FUSE_A`), `heat += over·dt/20`
+  (~20 A·s to trip, transients ride through), cools `dt/5` below 15 A
+  (`MPE_BATTERY_FUSE_RESET_A`), cap 10. Tripped returns **1.2 V brownout,
+  not 0** (resettable-fuse correct). NaN/Inf rejected.
+- **Drain:** `soc -= I·dt/3600/3.0`, clamped [0,1]; regen credited at 50%,
+  suppressed at full charge.
+- **Pack integration** (robot.c:651-673): sag uses the **signed** current sum
+  (opposing turn currents cancel — correct), fuse uses the **abs** sum
+  (stall sums, regen doesn't cool — correct).
+
+**Not modeled:** Peukert, temperature/age, transient RC; fuse constants are
+engineering picks, not measured PTC curves.
+
+## 3. Drivetrain (`modules/ftc/submodules/drivetrain.c`)
+
+**Mixers.** Tank: even indices left, odd right. Mecanum IK with
+max-normalize (refuses `wheel_count != 4` loudly — no geometry for other
+counts):
+
+```
+FL = f+s-r,  FR = f-s+r,  BL = f-s-r,  BR = f+s+r
+```
+
+**No chassis-force cheat.** The old `sin45·Στ/r` lateral injection, 1.1×
+breakaway margin, and chassis drag are deleted (verified absent by grep).
+Lateral force comes only from engine contacts through the solver; MFS
+computes **no friction cone itself** — traction below is slip-threshold
+hysteresis (TUNED), not cone budgeting.
+
+**Traction control** (robot.c:721-797): demand `w_expected` from rigid-body
+chassis velocity at the wheel center projected on the rolling direction;
+`slip = w - w_expected`. Cuts **overspeed only** (`over > 4.0 rad/s` →
+scale 0.15; recovers +0.2/step when `over < 2.0`), under-speed keeps full
+torque (anti-deadlock). Gates: observability (`|w_expected| < 0.5 rad/s` →
+open loop; never regulate on unobservable error) and airborne
+(`wheel_bottom <= 0.05 m`).
+
+**Torque shaping** (robot.c:819-885, all TUNED unless noted):
+
+- slew 0.6 N·m/tick (ESC current-slew stand-in; lets grip establish),
+- governor diode at 1.155× free on **measured** speed (zero outward push
+  past bound, no reversing slam),
+- idle brake: at `|cmd| < 0.05`, back-EMF braking torque clamped to
+  `I·|w|/dt` (exact per-tick stop; kills the ±25 rad/s idle limit cycle),
+- torque applied as a **couple** `+τ` hub / `-τ` chassis (reaction
+  correctness; `MFS_NO_TORQUE_COUPLE` kill-switch).
+
+**Rolling resistance:** `Frr = Crr·N/nwheels`, `τ = Frr·r_eff` opposing spin
+about the axle, only when `|cmd| < 0.05` and `|ω| > 0.01`. `Crr` comes from
+world config (engine default 0.02); `N` includes chassis + wheels + rollers.
+Velocity monitor counts `> 3 m/s` planar as `clamp_events` (telemetry only;
+the old silent clamp is gone).
+
+## 4. Odometry (`drivetrain.c:230-305`, `robot.h:59-69`)
+
+Pure encoder forward kinematics, no fusion — honest:
+
+```
+v_fwd = mean(w)·R
+v_lat = (FL-FR-BL+BR)/4·R
+yaw   = ((-FL+FR-BL+BR)/4·R) / 0.44        (mecanum; 0.44 = Lx+Lz, correct arm)
+yaw   = ((wr-wl)·R) / 0.48                  (tank; 0.48 = 2×0.24 track)
+```
+
+`R` = first `wheel_effective_radius > 1 mm`, else 0.05. Heading wrapped to
+[-π,π] every tick (bounds libm error growth; `deterministic=false` still
+honestly claimed).
+
+- **Encoder quantization (real):** `wheel_radians` integrates the true hub
+  angle, but odometry differentiates the **quantized** angle
+  (`counts = base_ppr × gear_ratio` per output rev; base PPR from
+  `motor_preset_base_encoder_ppr`: 28 goBILDA/REV, 7 NeveRest, 24-count
+  TorqueNADO). Creep speeds staircase / stick at zero like hardware.
+- **`odom_slip` (reporting only, never fused):** 1 when encoder-implied
+  motion disagrees with the true chassis beyond 0.25 m/s planar or
+  0.35 rad/s yaw, else 0. Retained in the struct for ABI.
+
+## 5. Robot assembly (`modules/ftc/submodules/robot.c`)
+
+- Chassis box half (0.225, 0.075, 0.225) m, **8.0 kg** (~18 lb, inside the
+  19.05 kg limit); wheels r = 0.05 m (100 mm class), m = 0.2 kg, offsets
+  X ±0.24 / Z ±0.20 m; rest height 0.18 m (5 mm clearance);
+  `WHEEL_PRELOAD` = 2 mm below touch inside the 10 mm slop (persistent
+  contact without positional fight); mass ratio 8/0.2 = **40:1 → tests pin
+  128 solver iterations** (engine default 64 cannot converge it).
+- Revolute chassis→wheel on the X axle; hubs rubber 0.9/0.7; mecanum plate
+  recessed to 30 mm; `wheel_effective_radius` = roller envelope (all levers
+  use it, not the plate radius).
+- Rollers: **8×1 per wheel** (was 8×2 — measured worse at 2× cost),
+  r = 6 mm, L = 16 mm, 14.2 g steel-derived, X-pattern ±45° (generalizes
+  past 4 wheels), free revolute bearings, isotropic rubber 0.9/0.7
+  (roller-level anisotropic caps strangled rolling — directionality lives
+  in the bearing constraint).
+- **Roller spin is quasi-static** (stiff-DOF-slaved, labeled in code):
+  time constant ~1 ms ≪ 16.7 ms tick, so bearing spin is prescribed to the
+  massless-roller equilibrium from motor command each tick while contacts
+  carry all force. See `docs/KNOWN_FAILURES.md` for the strafe frontier.
+- Partial-spawn unwind via body watermark + exact-index joint removal;
+  per-wheel/per-roller wake (sleep never swallows traction); idle hold
+  gated below 0.25 m/s.
+
+## 6. Game robot (`modules/module_1/mfs_module_1.c`, `.h`)
+
+BioBuzz field (12×12 m floor slab + walls + 1.5w×2.5h goal), mecanum robot,
+gamepad drive, intake + shooter + balls:
+
+- Balls: r = 21 mm, m = 2.6 g, e = 0.65, μ 0.45/0.35; max 16, carry 3.
+  Aero: drag `½·ρ·Cd·A·v²` (Cd 0.47 sphere); Magnus `½·ρ·A·S·ω·r·v`,
+  S = 0.1, gate `spin > 10`. No spin decay (declared Module-2 scope).
+- Intake: front-lower roller r25 mm/L200 mm/0.05 kg, P-gain 0.2 cap 0.5 N·m
+  about the axle; pickup within `R+r+5 mm` compliance + 2 N pull + entrain
+  `0.3·dt` surface velocity (magnitudes are picks).
+- Shooter: flywheel r50 mm/0.3 kg on a 1.0×H pylon, joint tilted 35°,
+  P-gain 0.05 cap 0.3 N·m, target `MFS_SHOOTER_TARGET_RPM` = 4000 rpm,
+  ready at 95%, reaction `-τ` on chassis; fire: ball within 8 cm,
+  `dv = 0.8·surf`, `F = m·dv/dt` (impulse-vs-force unit fix documented),
+  80% transfer. No goal/score detection (`balls_fired` counts discharge —
+  honest comment).
+
+## 7. Gamepad (`modules/module_1/submodules/gamepad/`)
+
+F310 XInput map, deadzone 0.15 rescaled, asymmetric js scaling fixed
+(-32768/32767 sides land exactly on ∓1). Triggers handle both driver
+conventions (0-rest and -1-rest; linear in transit, 0.05 press gate).
+`MPE_GAMEPAD_DEVICE=disabled` skips hardware silently (headless). `Back`
+resets the **full assembly** (chassis + wheels + rollers + flywheel +
+intake by one delta, velocities zeroed, observers + odometry reset).

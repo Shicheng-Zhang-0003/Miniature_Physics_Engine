@@ -39,6 +39,20 @@
 - [x] Plugin load/attach/unload + stage-backend lifetime regression test
   (`loader_lifecycle` in Suite v2: real capsule .so, busy -2, purge, reload).
 - [ ] Replace the duplicate GUI and headless physics pipelines with one canonical step path.
+- [ ] [MFS-STRAFE-F1/F2] Mecanum strafe transmits ~0.01 m vs 0.30 m gated.
+  The 5-link ground->roller->bearing->hub chain does not converge in GS-128
+  (axis sweep 0.002-0.014 m; command- and measured-speed roller-spin
+  prescriptions 0.01/-0.06 m — magnitude dead either way, so it is a solver
+  frontier, not a prescription question). Needs reduced articulation or a
+  direct roller constraint. Suite marks both strafe gates XFAIL (loud,
+  ticketed); everything else hard-gates. (2026-09-26 despot audit.)
+- [ ] Jointed air-spin limit cycle: free-spinning jointed wheels oscillate
+  (motor 86 rpm vs true wheel 799 rpm) via revolute-to-kinematic-chassis
+  impulses vs slew/governor/implicit-solve. Contained (diode+slew bound it;
+  an airborne bypass was tried and reverted after runaway to ±1900 rpm).
+  T6/T8 now test the motor endpoint isolated (pass); the jointed-air plant
+  is covered by T11 stability only. Proper fix is joint-aware motor
+  integration or bearing damping. (2026-09-26 despot audit.)
 
 ## Correctness and validation
 
@@ -55,7 +69,9 @@
   forget-pointers on every unregister path, proven by `loader_lifecycle`.
 - [ ] Document numerical guarantees and unsupported CCD/rotational cases precisely.
 - [x] Root README exists (`readme.md`); release gates updated to verified
-  behavior (32/32 v2, MFS 11 gated + 5 info, lifetime rules).
+  behavior (32/32 v2, MFS 8 gated unified incl. 2 loud strafe XFAILs,
+  lifetime rules). Updated 2026-09-26 (was "11 gated + 5 info" for the
+  retired per-test binaries).
 - [x] Thread-safety boundaries: registry/MEI/MFS-internal locks, leaf-lock
   ordering, tick-boundary loader rule documented in headers (TSAN proof
   remains future work).
