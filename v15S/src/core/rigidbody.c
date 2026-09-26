@@ -883,20 +883,32 @@ void rb_integrate_velocity(rigidbody *rigid_body, float delta_time, float linear
      * truncating |v| destroys momentum/energy (impact momentum becomes
      * post-clamp, wrong by clamp ratio). Stability for fast bodies is CCD's
      * job (analytic TOI, no cap) + substeps, never truncation.
-     * max_linear/angular_speed params retained as INFORM guards (see
-     * validation_report overflow counters); they never scale velocities. */
+     * max_linear/angular_speed params are INFORM-only thresholds consumed
+     * by long_run_validation run-max gates and F10/F11 reporting; they
+     * never scale velocities here. */
     (void) g_cfg.timestep.max_linear_speed;
     (void) g_cfg.timestep.max_angular_speed;
 
-    void rb_integrate_position(rigidbody *rigid_body, float delta_time) {
+    /* DESPOT-2026-09-26: accumulators are per-tick. They are filled by
+     * gravity+springs+motors+module pre_step, consumed above, and MUST be
+     * drained here. Without this, F=m*g applied each tick accumulates
+     * (tick2 sees 2*m*g, tick N sees N*m*g) and every dynamic body explodes.
+     * This drain was deleted on 26/09/26 and broke 12/29 physics gates. */
+    rigid_body->force_accumulator = vector3_zero();
+    rigid_body->torque_accumulator = vector3_zero();
+}
+
+/* File-scope (NOT nested): GCC nested functions use trampolines, break
+ * strict-C/Clang/MSVC, and hide the global symbol the header promises.
+ * DESPOT-2026-09-26: this was accidentally nested inside
+ * rb_integrate_velocity on 26/09/26, leaving the global undefined. */
+void rb_integrate_position(rigidbody *rigid_body, float delta_time) {
     /* TRUTH: SAFE default = constrained symplectic Euler (x += v_live*dt).
      * The old default (exact free-flight on live velocity) double-applied
      * gravity/damping for any caller that already ran rb_integrate_velocity.
      * Exact free-flight needs v_pre: restore tick_v0 first, then call
      * rb_integrate_position_exact(..., free_flight=true) explicitly. */
     rb_integrate_position_exact(rigid_body, delta_time, &g_cfg, false);
-}
-
 }
 
 /* Integrate the prescribed/current world-frame angular velocity as an exact
@@ -1211,7 +1223,7 @@ void rigidbody_set_kinematic(rigidbody *rigid_body, bool make_kinematic) {
  * Validation lives in rigidbody_sanitize so a deserialised scene or a direct
  * field poke is cleaned by the same path as everything else; these setters
  * only reject inputs and then defer to sanitize for the actual bounds. */
-void rigidbody_set_friction_anisotropic(rigidbody *rigid_body, vector3 axis_local, float mu_roll, float mu_lateral) {
+void rigidbody_set_friction_anisotropic(rigidbody *rigid_body, vector3 axis_local, float mu_along, float mu_across) {
     if (!rigid_body) {
         return;
     }
@@ -1220,32 +1232,32 @@ void rigidbody_set_friction_anisotropic(rigidbody *rigid_body, vector3 axis_loca
     if (!a3_vector3_is_finite(axis_local) || (vector3_length_squared(axis_local) < 1.0e-8f)) {
         return;
     }
-    if (!isfinite(mu_roll) || !isfinite(mu_lateral)) {
+    if (!isfinite(mu_along) || !isfinite(mu_across)) {
         return;
     }
     rigid_body->friction_anisotropic = true;
     rigid_body->friction_anisotropy_axis = vector3_normalisation(axis_local);
-    rigid_body->friction_along_axis = mu_roll;
-    rigid_body->friction_across_axis = mu_lateral;
+    rigid_body->friction_along_axis = mu_along;
+    rigid_body->friction_across_axis = mu_across;
     rigid_body->friction_anisotropy_frame = 0;
     rigidbody_sanitize(rigid_body);
 }
 
 void rigidbody_set_friction_anisotropic_in_frame(rigidbody *rigid_body, uint32_t frame_id,
-                                                  vector3 axis_local, float mu_roll, float mu_lateral) {
+                                                  vector3 axis_local, float mu_along, float mu_across) {
     if (!rigid_body) {
         return;
     }
     if (!a3_vector3_is_finite(axis_local) || (vector3_length_squared(axis_local) < 1.0e-8f)) {
         return;
     }
-    if (!isfinite(mu_roll) || !isfinite(mu_lateral)) {
+    if (!isfinite(mu_along) || !isfinite(mu_across)) {
         return;
     }
     rigid_body->friction_anisotropic = true;
     rigid_body->friction_anisotropy_axis = vector3_normalisation(axis_local);
-    rigid_body->friction_along_axis = mu_roll;
-    rigid_body->friction_across_axis = mu_lateral;
+    rigid_body->friction_along_axis = mu_along;
+    rigid_body->friction_across_axis = mu_across;
     rigid_body->friction_anisotropy_frame = frame_id;
     rigidbody_sanitize(rigid_body);
 }
