@@ -14,6 +14,11 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
+/* DESPOT-2026-09-26: legacy (<=v153) structs were written native-order.
+ * This is LE-exact because scene_saving.c hard-fails compilation on
+ * big-endian hosts (#error), so native == LE on every buildable target.
+ * v200+ uses explicit-LE field codecs; do not "fix" these to byteswap
+ * without also versioning the legacy files (they are LE dumps). */
 static int read_float(FILE *f, float *v) {
     return fread(v, sizeof(float), 1, f) == 1;
 }

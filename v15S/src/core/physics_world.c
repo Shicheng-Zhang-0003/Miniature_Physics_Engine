@@ -128,11 +128,18 @@ void physics_world_init(physics_world *world) {
     if (!world) {
         return;
     }
-    /* MPE_FTC_076a: zero the world BEFORE checking live_world_contains, since
-     * stack-allocated worlds have indeterminate bytes that could accidentally
-     * match a live world address and trigger a bogus cleanup of garbage.
-     * The pointer value (address) is stable; memset only clears the struct
-     * contents, not the pointer variable itself. */
+    /* MPE_FTC_076a (upheld DESPOT-2026-09-26): zero BEFORE the liveness
+     * check. live_world_contains compares only the ADDRESS, but a true
+     * result on REUSED stack garbage (a leaked live world at the same slot
+     * from an earlier test that never cleaned up) would run cleanup over
+     * indeterminate bytes — garbage tick_module_count reads OOB and SEGVs
+     * (ASan-proven in mfs_suite). Zero-first makes cleanup a safe no-op on
+     * garbage AND on valid-but-empty worlds.
+     * The re-init leak this ordering implies (pools orphaned when re-init
+     * without cleanup) is fixed at the CALLERS, not here: every re-init
+     * site must physics_world_cleanup first (reset_primary does; MFS suite
+     * tests clean up every world on every exit path). An init that guesses
+     * liveness from garbage is worse than one that requires discipline. */
     memset(world, 0, sizeof(physics_world));
     if (live_world_contains(world)) {
         physics_world_cleanup(world);

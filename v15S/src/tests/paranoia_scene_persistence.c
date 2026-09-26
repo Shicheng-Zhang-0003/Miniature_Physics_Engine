@@ -19,6 +19,10 @@ void clear_selection(void) {}
 
 static void reset_primary(void) {
     physics_world *w = physics_world_get_primary();
+    /* DESPOT-2026-09-26: cleanup BEFORE init. Init memsets first (garbage-
+     * safe), so re-init without cleanup orphans every pool (ASan: 26 MB
+     * leaked across this test's resets). The primary is always valid here. */
+    physics_world_cleanup(w);
     physics_world_init(w);
     scene_clear();
 }
