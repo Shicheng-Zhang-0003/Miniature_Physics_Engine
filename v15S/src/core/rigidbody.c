@@ -364,6 +364,45 @@ void rigidbody_sanitize(rigidbody *rigid_body) {
         rigid_body->friction_kinetic = 5.0f;
     }
 
+    /* Anisotropic friction: a degenerate axis must fall back to the
+     * isotropic disc, never to a half-valid ellipse (a zero axis cannot be
+     * projected into the contact plane, so the roll direction would be
+     * whatever the solver happened to pick).
+     *
+     * NOTE: the `friction_anisotropic` FLAG is deliberately not touched
+     * here. It is a _Bool, and the body pool is malloc'd with only selected
+     * fields zeroed by the initialisation helpers, so reading it in order to
+     * "normalise" it is a load of indeterminate _Bool (UB, and UBSan flags
+     * it) and would additionally make anisotropy depend on heap history.
+     * The flag is a plain opt-in set by rigidbody_set_friction_anisotropic
+     * and cleared by ..._clear_..., and every initialisation helper sets it
+     * to false. Resetting it here would also wrongly discard a caller's
+     * anisotropy on any later sanitize pass. */
+    if (!isfinite(rigid_body->friction_along_axis) || (rigid_body->friction_along_axis < 0.0f)) {
+        rigid_body->friction_along_axis = 0.0f;
+    }
+    if (rigid_body->friction_along_axis > 5.0f) {
+        rigid_body->friction_along_axis = 5.0f;
+    }
+    if (!isfinite(rigid_body->friction_across_axis) || (rigid_body->friction_across_axis < 0.0f)) {
+        rigid_body->friction_across_axis = 0.0f;
+    }
+    if (rigid_body->friction_across_axis > 5.0f) {
+        rigid_body->friction_across_axis = 5.0f;
+    }
+    if (rigid_body->friction_anisotropic) {
+        if (!a3_vector3_is_finite(rigid_body->friction_anisotropy_axis) ||
+            (vector3_length_squared(rigid_body->friction_anisotropy_axis) < 1.0e-8f)) {
+            rigid_body->friction_anisotropic = false;
+    rigid_body->friction_anisotropy_frame = 0;
+            rigid_body->friction_along_axis = 0.0f;
+            rigid_body->friction_across_axis = 0.0f;
+        } else {
+            rigid_body->friction_anisotropy_axis =
+                vector3_normalisation(rigid_body->friction_anisotropy_axis);
+        }
+    }
+
     if (!isfinite(rigid_body->restitution) || (rigid_body->restitution < 0.0f)) {
         rigid_body->restitution = 0.0f;
     }
@@ -474,6 +513,14 @@ void rigidbody_initialisation_sphere(rigidbody *rigid_body, float radius, float 
     rigid_body->custom_shape = -1;
     rigid_body->max_relative_speed_sq = 0.0f;
     rigid_body->no_collide = false;
+    /* DETERMINISM: the body pool is malloc'd, so this _Bool would otherwise
+     * be read as heap garbage (indeterminate value = UB, and twin worlds
+     * would disagree on anisotropy based on heap history). */
+    rigid_body->friction_anisotropic = false;
+    rigid_body->friction_anisotropy_frame = 0;
+    rigid_body->friction_along_axis = 0.0f;
+    rigid_body->friction_across_axis = 0.0f;
+    rigid_body->friction_anisotropy_axis = (vector3){0.0f, 0.0f, 0.0f};
     if (!isfinite(radius) || radius <= 0.0f) {
         radius = 0.5f;
     }
@@ -531,6 +578,9 @@ void rigidbody_initialisation_sphere(rigidbody *rigid_body, float radius, float 
     rigid_body->friction_kinetic = g_cfg.body_defaults.sphere_fric_k;
     //Inertial Tensors
     //I = (2/5)*m*r^2 solid sphere (correctly-rounded 2.0f/5.0f, not 0.4f literal).
+    /* FIX-AUDIT-DESPOT: inertia formulas verified against rigid-body theory
+     * (sphere (2/5)mr², box (m/12)(h²+d²), cylinder ½mr² axial +
+     * (m/12)(3r²+l²) transverse, axle=X). Correct — no change. */
     float inertia_coefficient_sphere = (2.0f / 5.0f) * mass * radius * radius;
     rigid_body->inertia_tensor_local = (math3){{{0}}};
     rigid_body->inertia_tensor_local.matrix[0][0] = inertia_coefficient_sphere;
@@ -627,7 +677,10 @@ void rb_apply_forces_localised(rigidbody *rigid_body, vector3 force_applied, vec
     //Torque = r * F (r = vector from Centre of Mass to the point of actual contact between objects)
     vector3 relative_contact_vector = vector3_subtraction(locale_impact, rigid_body->position);
     /* TRUTH: clamp lever arm. 1e10m off -> torque explosion. 100m is already
-     * far beyond the ±250m playable volume contact geometry. */
+     * far beyond the ±250m playable volume contact geometry.
+     * FIX-AUDIT-DESPOT: clamp verified present (100m sphere). Without it a
+     * corrupt/off-volume impact point scales torque without bound (τ=r×F)
+     * and one bad contact detonates the whole island. */
     float lever_sq = vector3_length_squared(relative_contact_vector);
     if (!isfinite(lever_sq)) {
         return;
@@ -835,17 +888,15 @@ void rb_integrate_velocity(rigidbody *rigid_body, float delta_time, float linear
     (void) g_cfg.timestep.max_linear_speed;
     (void) g_cfg.timestep.max_angular_speed;
 
-    rigid_body->force_accumulator = vector3_zero();
-    rigid_body->torque_accumulator = vector3_zero();
-}
-
-void rb_integrate_position(rigidbody *rigid_body, float delta_time) {
+    void rb_integrate_position(rigidbody *rigid_body, float delta_time) {
     /* TRUTH: SAFE default = constrained symplectic Euler (x += v_live*dt).
      * The old default (exact free-flight on live velocity) double-applied
      * gravity/damping for any caller that already ran rb_integrate_velocity.
      * Exact free-flight needs v_pre: restore tick_v0 first, then call
      * rb_integrate_position_exact(..., free_flight=true) explicitly. */
     rb_integrate_position_exact(rigid_body, delta_time, &g_cfg, false);
+}
+
 }
 
 /* Integrate the prescribed/current world-frame angular velocity as an exact
@@ -951,6 +1002,14 @@ void rigidbody_initialisation_cube(rigidbody *rigid_body, vector3 position_input
     rigid_body->custom_shape = -1;
     rigid_body->max_relative_speed_sq = 0.0f;
     rigid_body->no_collide = false;
+    /* DETERMINISM: the body pool is malloc'd, so this _Bool would otherwise
+     * be read as heap garbage (indeterminate value = UB, and twin worlds
+     * would disagree on anisotropy based on heap history). */
+    rigid_body->friction_anisotropic = false;
+    rigid_body->friction_anisotropy_frame = 0;
+    rigid_body->friction_along_axis = 0.0f;
+    rigid_body->friction_across_axis = 0.0f;
+    rigid_body->friction_anisotropy_axis = (vector3){0.0f, 0.0f, 0.0f};
     if (!isfinite(half_extensions.x) || half_extensions.x <= 0.0f) {
         half_extensions.x = 0.5f;
     }
@@ -1145,6 +1204,63 @@ void rigidbody_set_kinematic(rigidbody *rigid_body, bool make_kinematic) {
     rigidbody_update_axes(rigid_body);
 }
 
+/* Anisotropic friction control. See rigidbody.h for the model: the contact
+ * Coulomb cone becomes an ellipse whose semi-axes are friction_along_axis along
+ * friction_anisotropy_axis and friction_across_axis perpendicular to it.
+ *
+ * Validation lives in rigidbody_sanitize so a deserialised scene or a direct
+ * field poke is cleaned by the same path as everything else; these setters
+ * only reject inputs and then defer to sanitize for the actual bounds. */
+void rigidbody_set_friction_anisotropic(rigidbody *rigid_body, vector3 axis_local, float mu_roll, float mu_lateral) {
+    if (!rigid_body) {
+        return;
+    }
+    /* A zero-length or non-finite axis cannot define a roll direction, so
+     * refuse rather than hand the solver an arbitrary plane. */
+    if (!a3_vector3_is_finite(axis_local) || (vector3_length_squared(axis_local) < 1.0e-8f)) {
+        return;
+    }
+    if (!isfinite(mu_roll) || !isfinite(mu_lateral)) {
+        return;
+    }
+    rigid_body->friction_anisotropic = true;
+    rigid_body->friction_anisotropy_axis = vector3_normalisation(axis_local);
+    rigid_body->friction_along_axis = mu_roll;
+    rigid_body->friction_across_axis = mu_lateral;
+    rigid_body->friction_anisotropy_frame = 0;
+    rigidbody_sanitize(rigid_body);
+}
+
+void rigidbody_set_friction_anisotropic_in_frame(rigidbody *rigid_body, uint32_t frame_id,
+                                                  vector3 axis_local, float mu_roll, float mu_lateral) {
+    if (!rigid_body) {
+        return;
+    }
+    if (!a3_vector3_is_finite(axis_local) || (vector3_length_squared(axis_local) < 1.0e-8f)) {
+        return;
+    }
+    if (!isfinite(mu_roll) || !isfinite(mu_lateral)) {
+        return;
+    }
+    rigid_body->friction_anisotropic = true;
+    rigid_body->friction_anisotropy_axis = vector3_normalisation(axis_local);
+    rigid_body->friction_along_axis = mu_roll;
+    rigid_body->friction_across_axis = mu_lateral;
+    rigid_body->friction_anisotropy_frame = frame_id;
+    rigidbody_sanitize(rigid_body);
+}
+
+void rigidbody_clear_friction_anisotropic(rigidbody *rigid_body) {
+    if (!rigid_body) {
+        return;
+    }
+    rigid_body->friction_anisotropic = false;
+    rigid_body->friction_anisotropy_frame = 0;
+    rigid_body->friction_along_axis = 0.0f;
+    rigid_body->friction_across_axis = 0.0f;
+    rigid_body->friction_anisotropy_axis = vector3_zero();
+}
+
 /* MPE_FTC_090: Cylinder inertia and initialization */
 void rigidbody_update_inertia_cylinder(rigidbody *rigid_body) {
     if (!rigid_body) {
@@ -1178,6 +1294,14 @@ void rigidbody_initialisation_cylinder(rigidbody *rigid_body, float radius, floa
     rigid_body->custom_shape = -1;
     rigid_body->max_relative_speed_sq = 0.0f;
     rigid_body->no_collide = false;
+    /* DETERMINISM: the body pool is malloc'd, so this _Bool would otherwise
+     * be read as heap garbage (indeterminate value = UB, and twin worlds
+     * would disagree on anisotropy based on heap history). */
+    rigid_body->friction_anisotropic = false;
+    rigid_body->friction_anisotropy_frame = 0;
+    rigid_body->friction_along_axis = 0.0f;
+    rigid_body->friction_across_axis = 0.0f;
+    rigid_body->friction_anisotropy_axis = (vector3){0.0f, 0.0f, 0.0f};
     if (!isfinite(radius) || radius <= 0.0f) {
         radius = 0.5f;
     }

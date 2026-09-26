@@ -1,5 +1,6 @@
 /* Scene v2 codec implementation. See scene_crc.h. */
 #include "scene_crc.h"
+#include <string.h>
 
 static uint32_t crc_table[256];
 static int crc_table_ready = 0;
@@ -83,4 +84,53 @@ int scene_rfloat(FILE *f, uint32_t *crc, float *v) {
     converter.u = u;
     *v = converter.f;
     return 1;
+}
+
+/* FIX-AUDIT-DESPOT: lockstep state hash (see header). Deferred include of
+ * physics_world.h keeps scene_crc.h light; the hash feeds CRC32 over LE
+ * bytes so it is bit-identical on every LE host (v200's LE contract).
+ * +0/-0 canonicalized: bitwise twins must not desync on sign-of-zero. */
+#include "../core/physics_world.h"
+
+static uint32_t hash_u32_le(uint32_t crc, uint32_t v) {
+    unsigned char b[4];
+    b[0] = (unsigned char)(v & 0xFFu);
+    b[1] = (unsigned char)((v >> 8) & 0xFFu);
+    b[2] = (unsigned char)((v >> 16) & 0xFFu);
+    b[3] = (unsigned char)((v >> 24) & 0xFFu);
+    return scene_crc32_update(crc, b, 4);
+}
+
+static uint32_t hash_float_le(uint32_t crc, float f) {
+    uint32_t u = 0;
+    memcpy(&u, &f, sizeof(u));
+    if (f == 0.0f) {
+        u = 0u; /* canonicalize +/-0 */
+    }
+    return hash_u32_le(crc, u);
+}
+
+uint32_t physics_world_hash_state(const struct physics_world *world) {
+    if (!world || !world->bodies || world->body_count <= 0) {
+        return 0u;
+    }
+    uint32_t crc = 0xFFFFFFFFu;
+    crc = hash_u32_le(crc, (uint32_t)world->body_count);
+    for (int i = 0; i < world->body_count; i++) {
+        const rigidbody *rb = &world->bodies[i];
+        crc = hash_u32_le(crc, rb->object_id);
+        crc = hash_u32_le(crc, rb->object_generation);
+        crc = hash_u32_le(crc, (uint32_t)rb->type);
+        crc = hash_float_le(crc, rb->position.x);
+        crc = hash_float_le(crc, rb->position.y);
+        crc = hash_float_le(crc, rb->position.z);
+        crc = hash_float_le(crc, rb->velocity.x);
+        crc = hash_float_le(crc, rb->velocity.y);
+        crc = hash_float_le(crc, rb->velocity.z);
+        crc = hash_float_le(crc, rb->orientation.w);
+        crc = hash_float_le(crc, rb->orientation.x);
+        crc = hash_float_le(crc, rb->orientation.y);
+        crc = hash_float_le(crc, rb->orientation.z);
+    }
+    return crc ^ 0xFFFFFFFFu;
 }

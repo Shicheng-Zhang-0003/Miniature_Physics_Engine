@@ -1,6 +1,18 @@
 /* MFS_GUI_ROBOT_REGISTRY: GUI-side robot management.
 * Owns the registry of active robots, their physics world binding,
 * visual proxy objects in obj_per_scene, and per-tick sync.
+*
+* FIX-AUDIT-DESPOT contract (was undocumented):
+* - CAPACITY: at most MFS_MAX_GUI_ROBOTS (4) robots; spawn returns -1 past
+*   it. The 4-cap mirrors the practical fleet limit (see FTC_FLEET_MAX doc
+*   in ftc_fleet.c): GUI robots are full roller assemblies, not ghosts.
+* - WORLD BINDING: the registry binds to the PRIMARY world on first spawn
+*   (physics_world_get_primary) and never rebinds; all later spawns land in
+*   that world even if the primary changes. Call gui_robot_clear before
+*   switching worlds.
+* - DRIVE TYPE: spawn builds MECANUM robots only (ftc_robot_create); the
+*   tank branch in gui_robot_apply_drive serves robots whose
+*   drivetrain_type a host flips afterwards, not anything spawn produces.
 */
 #ifndef gui_robot_registry_h
 #define gui_robot_registry_h

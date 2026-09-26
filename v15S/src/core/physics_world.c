@@ -128,14 +128,16 @@ void physics_world_init(physics_world *world) {
     if (!world) {
         return;
     }
-    /* Stack worlds may have indeterminate bytes on first init. Only the live
-     * registry can tell us whether this address already owns allocated pools;
-     * reading fields before the first memset would itself be undefined. */
+    /* MPE_FTC_076a: zero the world BEFORE checking live_world_contains, since
+     * stack-allocated worlds have indeterminate bytes that could accidentally
+     * match a live world address and trigger a bogus cleanup of garbage.
+     * The pointer value (address) is stable; memset only clears the struct
+     * contents, not the pointer variable itself. */
+    memset(world, 0, sizeof(physics_world));
     if (live_world_contains(world)) {
         physics_world_cleanup(world);
     }
     det_pin_fp_state();
-    memset(world, 0, sizeof(physics_world)); /* MPE_FTC_076a */
     /* Static plane body (floor at y=0) - disabled by default. */
     world->static_plane_enabled = false;
     /* Initialize static plane body (floor at y=0) with neutral restitution. */
@@ -996,8 +998,12 @@ void physics_world_step(physics_world *world, float dt) {    if ((!world) || (!w
     vector3 gravity = {0.0f, step_gravity, 0.0f};
     /* Snapshot start-of-tick velocities for exact free-flight. The analytic
      * position/velocity solution must start from v_pre; live velocity after
-     * rb_integrate_velocity is v_post (forces already applied). */
-    if (world->tick_v0 && world->tick_v0_capacity >= mpe_max_bodies) {
+     * rb_integrate_velocity is v_post (forces already applied).
+     * FIX-AUDIT-DESPOT: was >= mpe_max_bodies (always true today, since the
+     * pool allocates exactly that — but a future smaller/tighter allocation
+     * would silently skip the snapshot and integrate free-flight from
+     * v_post, double-applying gravity. Gate on what we actually read. */
+    if (world->tick_v0 && world->tick_v0_capacity >= world->body_count) {
         for (int i = 0; i < world->body_count; i++) {
             world->tick_v0[i] = world->bodies[i].velocity;
         }
@@ -1116,7 +1122,14 @@ void physics_world_step(physics_world *world, float dt) {    if ((!world) || (!w
     /* TRUTH: split can wake sleepers (deep overlap) that were skipped as
      * both-asleep with no manifold. They would integrate with has_contact=0
      * (false free-flight). Re-process newly-awake skipped pairs now so they
-     * get a manifold + has_contact before integration. */
+     * get a manifold + has_contact before integration.
+     * FIX-AUDIT-DESPOT late-manifold-after-split: those fresh manifolds
+     * missed the iteration/Poisson/split passes above (they solve cold next
+     * tick = one-tick-late response + a first-tick penetration souvenir).
+     * Run one extra resolve+Poisson+split iteration over exactly the late
+     * range now (has_contact is already set by process_pair above, so the
+     * gravity gate stays honest). Rolling below then sees their normals. */
+    int late_manifold_start = manifold_count;
     for (int p = 0; p < pair_count; p++) {
         if (!world->pair_skipped[p]) {
             continue;
@@ -1132,6 +1145,19 @@ void physics_world_step(physics_world *world, float dt) {    if ((!world) || (!w
         }
         physics_world_process_pair(world, ia, ib, dt, &manifold_count);
         world->pair_skipped[p] = 0;
+    }
+    if (manifold_count > late_manifold_start) {
+        for (int m = late_manifold_start; m < manifold_count; m++) {
+            world->manifold_awake[m] = 1; /* newly-awake by construction */
+        }
+        for (int m = late_manifold_start; m < manifold_count; m++) {
+            mpe_step_resolve(world, &world->manifolds[m], dt, false, 0, step_cfg);
+            mpe_step_resolve(world, &world->manifolds[m], dt, false, 1, step_cfg);
+        }
+        mpe_step_poisson(world, &world->manifolds[late_manifold_start],
+                         manifold_count - late_manifold_start, step_cfg);
+        mpe_step_split(world, &world->manifolds[late_manifold_start],
+                       manifold_count - late_manifold_start, dt, step_cfg);
     }
     /* Rolling resistance once per tick (uses solved normal impulses). */
     mpe_step_rolling(world, world->manifolds, manifold_count, dt, step_cfg);
@@ -1162,7 +1188,12 @@ void physics_world_step(physics_world *world, float dt) {    if ((!world) || (!w
         if (n > mpe_max_bodies) {
             n = mpe_max_bodies;
         }
-        memset(joint_membership, 0, (size_t) n);
+        /* FIX-AUDIT-DESPOT tail safety: was memset(..., n) — a tick with
+         * FEWER bodies than the last tick left stale 1s past n, so removed
+         * bodies' indices kept other bodies "jointed" (wrong symplectic
+         * path, gravity double-count). The array is thread-local and fixed
+         * size: always clear the whole thing. */
+        memset(joint_membership, 0, sizeof(joint_membership));
         for (int ji = 0; ji < mpe_max_joints; ji++) {
             if (!world->revolute_constraints[ji].is_active) {
                 continue;
@@ -1199,7 +1230,9 @@ void physics_world_step(physics_world *world, float dt) {    if ((!world) || (!w
         rigidbody *ib = &world->bodies[i];
         bool has_joint = (i < mpe_max_bodies) ? (joint_membership[i] != 0) : false;
         bool free_flight = ((world->has_contact) ? (world->has_contact[i] == 0) : true) && !has_joint;
-        if (free_flight && world->tick_v0 && world->tick_v0_capacity >= mpe_max_bodies) {
+        /* FIX-AUDIT-DESPOT: capacity gate matches the snapshot gate above
+         * (>= live body_count, not >= mpe_max_bodies). */
+        if (free_flight && world->tick_v0 && world->tick_v0_capacity >= world->body_count) {
             /* Restore start-of-tick velocity so the analytic solution starts
              * from v_pre (Euler already applied gravity+damping to live). */
             ib->velocity = world->tick_v0[i];

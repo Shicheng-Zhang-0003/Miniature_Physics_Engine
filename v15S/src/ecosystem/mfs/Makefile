@@ -22,8 +22,20 @@ MFS = .
 BUILD = build
 
 CC ?= gcc
+# NOTE (float builds, FIX-AUDIT-DESPOT): -O3 here vs -O2 in build_tests.sh.
+# Both pass -ffp-contract=off, but -O3 vectorises/reorders FP math, so .so
+# results are not promised bit-identical to the -O2 test binaries
+# (IEEE-exact only within one build config + libm).
+# -MMD -MP: emit a .d sidecar per object so header edits force a rebuild.
+# CRITICAL, not tidiness: these objects are compiled against ENGINE headers
+# (core/rigidbody.h defines the rigidbody layout the plugin indexes into
+# physics_world->bodies). Without dependency tracking, changing an engine
+# header left mfs_ecosystem.so "up to date" with a stale sizeof(rigidbody),
+# so the plugin read the bodies array at the wrong stride and robot spawn
+# failed with "no fleet attached". Append-only fields do NOT save you here:
+# the struct SIZE still changes. See README_MFS.md build-invariants.
 CFLAGS = -I$(MPE_SRC) -I$(MFS) -O3 -Wall -Wextra -ffp-contract=off -fPIC -fno-inline -fno-lto -fno-inline-functions-called-once -fvisibility=default \
-         -DMPE_MODULE_ABI=1 -DMPE_ECOSYSTEM_ABI=1 -DMPE_GTK4=1
+         -DMPE_MODULE_ABI=1 -DMPE_ECOSYSTEM_ABI=1 -DMPE_GTK4=1 -MMD -MP
 
 include mfs_sources.mk
 
@@ -41,6 +53,7 @@ MFS_ECO_SRCS = mfs_ecosystem.c mfs_internal.c
 MFS_ECO_OBJS = $(patsubst %.c,$(BUILD)/%.o,$(MFS_ECO_SRCS))
 
 ALL_MFS_OBJS = $(MFS_MOD1_OBJS) $(MFS_FTC_MOD_OBJS) $(MFS_ECO_OBJS)
+ALL_MFS_DEPS = $(ALL_MFS_OBJS:.o=.d) $(patsubst %.c,$(BUILD)/eng/%.d,$(MFS_ENGINE_SRCS))
 
 all: mfs_module_1.so mfs_ecosystem.so plugins/mpe_ftc.so
 
@@ -68,7 +81,8 @@ plugins/mpe_ftc.so: $(MFS_FTC_MOD_OBJS)
 # module_1 drives through drivetrain_update: link the FTC submodule
 # objects too (not ftc_module.o — unneeded here), plus engine objects
 # (single test binary, not a plugin: no -rdynamic host to resolve against).
-include mfs_sources.mk
+# (FIX-AUDIT-DESPOT: the duplicate `include mfs_sources.mk` that lived here
+# is removed; the top include already defines MFS_ENGINE_SRCS/FTC_SRCS.)
 MFS_ENGINE_OBJS = $(patsubst %.c,$(BUILD)/eng/%.o,$(MFS_ENGINE_SRCS))
 $(BUILD)/eng/%.o: $(MPE_SRC)/%.c
 	@mkdir -p $(dir $@)
@@ -87,5 +101,7 @@ test: $(MFS_MOD1_OBJS) $(MFS_MOD1_TEST_EXTRA) $(MFS_ENGINE_OBJS)
 
 clean:
 	rm -rf $(BUILD) mfs_module_1.so mfs_ecosystem.so plugins/mpe_ftc.so test_mfs_module_1
+
+-include $(ALL_MFS_DEPS)
 
 .PHONY: all test clean

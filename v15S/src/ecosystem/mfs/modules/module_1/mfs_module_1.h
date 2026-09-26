@@ -23,6 +23,10 @@
  * - Flywheel shooter (energy-based launch, Magnus effect)
  * - Biobuzz ball: 42mm diameter, 2.6g, COR 0.65
  *
+ * Units: forces passed to rb_apply_forces*() are in NEWTONS (the engine
+ * integrates a = F/m). A velocity change `dv` applied over one tick
+ * needs m*dv/dt, not m*dv. Angles are radians, rates rad/s.
+ *
  * Module 2 will add: detailed aerodynamics, ball spin decay,
  * intake roller slip modeling, shooter motor thermal limits.
  */
@@ -61,9 +65,17 @@
 #define MFS_ROBOT_CHASSIS_WIDTH       0.45f
 #define MFS_ROBOT_CHASSIS_LENGTH      0.45f
 #define MFS_ROBOT_CHASSIS_HEIGHT      0.15f
-#define MFS_ROBOT_CHASSIS_MASS        3.5f
+/* DESPOT-FIX: was 3.5f, contradicting robot.c CHASSIS_MASS 8.0f actually used
+ * at creation (8.8kg total with wheels+rollers per docs). 3.5 was dead and
+ * misleading — any reader sizing forces from this header was 2.3x off.
+ * Canonical chassis mass is 8.0f; keep the name for compat. */
+#define MFS_ROBOT_CHASSIS_MASS        8.0f
 #define MFS_ROBOT_WHEEL_PRESET        MOTOR_GB_5203_19_2  /* goBILDA 5203 19.2:1 */
-#define MFS_ROBOT_MAX_BALLS           3
+/* DESPOT-FIX: was 3 while ball_body_ids/ball_counted hold 16, attach spawns
+ * 5, and max_balls is set to 16 at runtime. 3 is the gameplay CARRY limit,
+ * not the storage bound. Storage bound is 16; carry limit kept separately. */
+#define MFS_ROBOT_MAX_BALLS           16
+#define MFS_ROBOT_MAX_CARRIED_BALLS   3
 
 /* Intake configuration */
 #define MFS_INTAKE_ROLLER_RADIUS      0.025f
@@ -96,6 +108,10 @@ typedef struct mfs_module_1_state {
     int ball_count;
     int max_balls;
     float ball_spawn_timer;
+    /* FIX-AUDIT-DESPOT: balls_collected was write-never (dead stat). Each
+     * ball is counted once on first intake touch via ball_counted[i];
+     * indices are stable (balls are never removed). */
+    bool ball_counted[16];
     
     /* Intake state */
     int intake_roller_body;
@@ -115,7 +131,11 @@ typedef struct mfs_module_1_state {
     
     /* Game state */
     int balls_fired;
-    int balls_collected;
+    int balls_collected; /* first-touch intake count (see ball_counted) */
+    /* match_time: accumulated every pre_step; no in-tree consumer yet —
+     * kept as host telemetry (match clock), not dead logic. ball_spawn_timer
+     * is reserved for periodic respawn (attach currently spawns once);
+     * both documented rather than removed (FIX-AUDIT-DESPOT). */
     float match_time;
     
     /* Robot control inputs */
@@ -146,6 +166,12 @@ typedef struct mfs_module_1_state {
 
 /* Module descriptor (exported symbol for dlopen) */
 extern const mpe_module_desc_t mfs_module_1_desc;
+
+/* MPI interface functions (called by engine) */
+int mfs_module_1_attach(mpe_world_t *world, void **mod_state);
+void mfs_module_1_detach(mpe_world_t *world, void *mod_state);
+void mfs_module_1_pre_step(mpe_world_t *world, float dt, void *mod_state);
+void mfs_module_1_post_step(mpe_world_t *world, float dt, void *mod_state);
 
 /* Public API for host control */
 void mfs_module_1_set_drive_commands(mfs_module_1_state *state,

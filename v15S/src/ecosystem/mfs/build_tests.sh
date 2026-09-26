@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# MFS overarching ecosystem: FTC/robotics test build + run.
+# MFS overarching ecosystem: FTC/robotics test build + run (v2).
 # Everything MFS-wise lives under v15S/src/ecosystem/mfs/ (modules,
 # submodules, tests, docs). Run from v15S/src:
 #   ecosystem/mfs/build_tests.sh [--build-only]
@@ -14,61 +14,20 @@ OUT="${OUTDIR:-$TMPDIR/ftc_tests}"
 mkdir -p "$OUT"
 
 TEST_CC="${MFS_TEST_CC:-gcc}"
-# Optional extra flags let the unified runner repeat the same MFS gates under
-# sanitizers without maintaining a second set of recipes.
 CFLAGS="-I$SRC -I$MFS -O2 -Wall -Wextra -ffp-contract=off ${MFS_TEST_CFLAGS:-}"
-# MFS_SOURCES: same lists as mfs_sources.mk (ENGINE engine-relative, FTC
-# MFS-relative). Update both files together.
 CORE="core/physics_world.c core/rigidbody.c core/mpe_registry.c core/mpe_loader.c core/det_math.c core/mpe_primary.c physics/collision_narrowphase.c physics/collision_cache.c physics/collision_solver.c physics/collision_ccd.c physics/collision_cylinder.c physics/broadphase.c physics/constraint.c physics/revolute_joint.c physics/depenetration.c physics/islands.c config/mpe_config.c config/mpe_config_schema.c scene/boundary.c ecosystem/mpe_ecosystem.c"
 FTC="ecosystem/mfs/modules/ftc/ftc_module.c ecosystem/mfs/modules/ftc/ftc_fleet.c ecosystem/mfs/modules/ftc/submodules/robot.c ecosystem/mfs/modules/ftc/submodules/drivetrain.c ecosystem/mfs/modules/ftc/submodules/motor.c ecosystem/mfs/modules/ftc/submodules/motor_presets.c ecosystem/mfs/modules/ftc/submodules/battery.c"
 MOD1="ecosystem/mfs/modules/module_1/mfs_module_1.c ecosystem/mfs/modules/module_1/submodules/gamepad/gamepad.c"
 
 cd "$SRC"
 pass=0; fail=0; info_pass=0
-# run_test: gated test, counts toward pass/fail.
-run_test() { # name, -Dflag, file, [extra sources...]
-    local name="$1" flag="$2" file="$3"
-    shift 3
-    local extra="$*"
-    if "$TEST_CC" $CFLAGS "-D$flag" "$file" $FTC $CORE $extra -lm -ldl -rdynamic -o "$OUT/$name" 2>"$OUT/$name.build.log"; then
-        if [ "${1:-}" != "--build-only" ] && [ "${BUILD_ONLY:-0}" != "1" ]; then
-            if run_binary "$name" >"$OUT/$name.run.log" 2>&1; then
-                echo "[PASS] $name"; pass=$((pass+1));
-            else
-                echo "[FAIL] $name (exit $?)"; fail=$((fail+1)); tail -n 5 "$OUT/$name.run.log";
-            fi
-        else
-            echo "[BUILD-OK] $name"; pass=$((pass+1));
-        fi
-    else
-        echo "[BUILD-FAIL] $name"; fail=$((fail+1)); head -n 10 "$OUT/$name.build.log";
-    fi
-}
-# The hotload regression deliberately loads a second image containing a
-# second, distinct `mpe_module_desc` global. Leak/address/UB checks stay on;
-# disable only ASan's process-wide duplicate-global heuristic for that one
-# intentional static-plus-dlopen topology.
+
 run_binary() {
     local name="$1"
     if [ "$name" = "ftc_hotload" ] && [ "${MFS_ASAN_HOTLOAD_ODR_SUPPRESS:-0}" = "1" ]; then
         ASAN_OPTIONS="${ASAN_OPTIONS:-detect_leaks=1:halt_on_error=1}:detect_odr_violation=0" "$OUT/$name"
     else
         "$OUT/$name"
-    fi
-}
-# run_info: informational diag (exit 0 by construction, asserts nothing).
-# Reported separately, never inflates the gated pass count.
-run_info() { # name, -Dflag, file
-    local name="$1" flag="$2" file="$3"
-    if "$TEST_CC" $CFLAGS "-D$flag" "$file" $FTC $CORE -lm -ldl -rdynamic -o "$OUT/$name" 2>"$OUT/$name.build.log"; then
-        if [ "${1:-}" != "--build-only" ] && [ "${BUILD_ONLY:-0}" != "1" ]; then
-            run_binary "$name" >"$OUT/$name.run.log" 2>&1 || true
-            echo "[INFO] $name (diagnostic, ungated)"; info_pass=$((info_pass+1));
-        else
-            echo "[BUILD-OK] $name"; info_pass=$((info_pass+1));
-        fi
-    else
-        echo "[BUILD-FAIL] $name"; fail=$((fail+1)); head -n 10 "$OUT/$name.build.log";
     fi
 }
 
@@ -82,29 +41,42 @@ if "$TEST_CC" $CFLAGS -fPIC -shared $FTC_MOD -lm -o "$MFS/plugins/mpe_ftc.so" 2>
 else
     echo "[BUILD-FAIL] mfs/plugins/mpe_ftc.so"; fail=$((fail+1)); head -n 10 "$OUT/mpe_ftc.build.log";
 fi
-# The kernel loader only accepts plugins/<name>.so under its CWD, so stage
-# a copy at the jailed location too (same binary; gitignored build output).
 cp "$MFS/plugins/mpe_ftc.so" "$SRC/plugins/mpe_ftc.so"
 
+# Build unified suite binary (include module_1 and gamepad objects for MPI functions)
 RB_T="$MFS/tests"
-export FTC_SO="plugins/mpe_ftc.so"
-run_test teleop MPE_TELEOP_DRIVE_TEST $RB_T/teleop_drive_test.c
-run_test mecanum MPE_MECANUM_DRIVE_TEST $RB_T/mecanum_drive_test.c
-run_test tank MFS_TANK_TURN_TEST $RB_T/tank_turn_test.c
-run_test odometry MFS_ODOMETRY_ACCURACY_TEST $RB_T/odometry_accuracy_test.c
-run_test ftc_integration MPE_FTC_INTEGRATION_TEST $RB_T/ftc_integration_test.c
-run_test physics_truth MPE_PHYSICS_TRUTH_TEST $RB_T/physics_truth_test.c
-run_info ftc_debug MPE_FTC_DEBUG_TEST $RB_T/ftc_debug_test.c
-run_info idle_spin MFS_IDLE_DIAG $RB_T/idle_spin_diag.c
-run_info idle_spin_deep MFS_IDLE_DEEP_DIAG $RB_T/idle_spin_deep_diag.c
-run_info idle_rootcause MFS_IDLE_ROOTCAUSE_DIAG $RB_T/idle_rootcause_diag.c
-run_info odometry_diag MFS_ODOM_DIAG $RB_T/odometry_diag.c
-run_test ftc_hotload MPE_FTC_HOTLOAD_TEST $RB_T/ftc_hotload_test.c
-run_test module_1 MFS_MODULE_1_TEST ecosystem/mfs/modules/module_1/mfs_module_1_test.c $MOD1
+MOD1_OBJ="$OUT/mfs_module_1.o"
+GAMEPAD_OBJ="$OUT/gamepad.o"
+"$TEST_CC" $CFLAGS -c "$MFS/modules/module_1/mfs_module_1.c" -o "$MOD1_OBJ" 2>"$OUT/mfs_module_1.build.log" || { echo "[BUILD-FAIL] mfs_module_1.o"; fail=$((fail+1)); head -n 10 "$OUT/mfs_module_1.build.log"; }
+"$TEST_CC" $CFLAGS -c "$MFS/modules/module_1/submodules/gamepad/gamepad.c" -o "$GAMEPAD_OBJ" 2>"$OUT/gamepad.build.log" || { echo "[BUILD-FAIL] gamepad.o"; fail=$((fail+1)); head -n 10 "$OUT/gamepad.build.log"; }
+"$TEST_CC" $CFLAGS "$RB_T/mfs_suite_main.c" "$RB_T/mfs_suite_a.c" "$RB_T/mfs_suite_b.c" "$RB_T/mfs_suite_c.c" $FTC $CORE "$MOD1_OBJ" "$GAMEPAD_OBJ" -lm -ldl -rdynamic -o "$OUT/mfs_suite" 2>"$OUT/mfs_suite.build.log" && {
+    echo "[BUILD-OK] mfs_suite (unified)"; pass=$((pass+1));
+} || { echo "[BUILD-FAIL] mfs_suite"; fail=$((fail+1)); head -n 20 "$OUT/mfs_suite.build.log"; }
 
-echo "--- compile-only units ---"
+if [ "${BUILD_ONLY:-0}" != "1" ] && [ "${1:-}" != "--build-only" ]; then
+    # Run unified suite with --all
+    echo "--- Running unified MFS suite ---"
+    "$OUT/mfs_suite" --all
+    suite_rc=$?
+    if [ $suite_rc -eq 0 ]; then
+        echo "[PASS] mfs_suite --all"
+        pass=$((pass+1));
+    else
+        echo "[FAIL] mfs_suite --all (exit $suite_rc)"; fail=$((fail+1));
+    fi
+else
+    # Build-only mode: just verify binary runs --list
+    "$OUT/mfs_suite" --list >"$OUT/mfs_suite_list.log" 2>&1
+    echo "[BUILD-OK] mfs_suite (unified)"; pass=$((pass+1));
+fi
+
+# Diagnostic (ungated) - compile only
 for u in "$MFS/modules/ftc/gui_robot_registry.c" "$MFS/modules/module_1/submodules/gamepad/gamepad.c"; do
     n=$(basename $u .c)
+    if [ "$n" = "gui_robot_registry" ] && ! pkg-config --exists gtk4 epoxy 2>/dev/null; then
+        echo "[SKIP] $n (gtk4 dev headers absent; not part of any loadable module)";
+        continue;
+    fi
     GTK_CFLAGS="$(pkg-config --cflags gtk4 epoxy 2>"$OUT/pkg-config.log")"
     if "$TEST_CC" $CFLAGS -DMPE_GTK4=1 $GTK_CFLAGS -c "$u" -o "$OUT/$n.o" 2>"$OUT/$n.build.log"; then
         echo "[BUILD-OK] $n"; pass=$((pass+1));
@@ -112,5 +84,6 @@ for u in "$MFS/modules/ftc/gui_robot_registry.c" "$MFS/modules/module_1/submodul
         echo "[BUILD-FAIL] $n"; fail=$((fail+1)); head -n 10 "$OUT/$n.build.log";
     fi
 done
+
 echo "FTC RESULT: gated pass=$pass fail=$fail info-diags=$info_pass (ungated)"
 [ "$fail" -eq 0 ]

@@ -4,8 +4,9 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <errno.h>
+#include <math.h>
+#include <stdlib.h>
 #include <linux/joystick.h>
 
 /* MFS_155_GAMEPAD_PRIMARY: singleton gamepad state */
@@ -17,19 +18,30 @@ gamepad_state *gamepad_get_primary(void) {
 
 bool gamepad_init(gamepad_state *pad, const char *device_path) {
     if (!pad) { return false; }
+    /* FIX-AUDIT-DESPOT: double-init leaked the old fd (open overwrote it).
+     * Stash liveness BEFORE the memset wipes it, then close. Gated on
+     * connected (not fd >= 0 alone): a calloc'd pad has fd == 0, which is
+     * stdin, not a joystick. */
+    int old_fd = pad->fd;
+    bool was_connected = pad->connected;
     memset(pad, 0, sizeof(gamepad_state));
+    if (was_connected && old_fd >= 0) {
+        close(old_fd);
+    }
     pad->fd = -1;
     pad->deadzone = 0.15f;
+    /* DESPOT-FIX: MPE_GAMEPAD_DEVICE was set to "disabled" by every headless
+     * script but never read here — gamepad_init(NULL) always opened
+     * /dev/input/js0 and spammed stderr on headless boxes. Now: NULL path
+     * consults the env; "disabled" skips device access silently (returns
+     * false, not connected); any other value is the device path. */
     if (!device_path) {
-        const char *configured_path = getenv("MPE_GAMEPAD_DEVICE");
-        if (configured_path && strcmp(configured_path, "disabled") == 0) {
-            strncpy(pad->device_path, configured_path,
-                    sizeof(pad->device_path) - 1);
-            pad->device_path[sizeof(pad->device_path) - 1] = '\0';
+        const char *env = getenv("MPE_GAMEPAD_DEVICE");
+        if (env && strcmp(env, "disabled") == 0) {
+            pad->connected = false;
             return false;
         }
-        device_path = configured_path && configured_path[0]
-                          ? configured_path : "/dev/input/js0";
+        device_path = (env && *env) ? env : "/dev/input/js0";
     }
     strncpy(pad->device_path, device_path, sizeof(pad->device_path) - 1);
     pad->device_path[sizeof(pad->device_path) - 1] = '\0';
@@ -37,6 +49,8 @@ bool gamepad_init(gamepad_state *pad, const char *device_path) {
     if (pad->fd < 0) {
         fprintf(stderr, "[gamepad] could not open %s: %s\n",
                 device_path, strerror(errno));
+        fprintf(stderr, "[gamepad] hint: try 'sudo usermod -aG input $USER' "
+                "then log out and back in\n");
         pad->connected = false;
         return false;
     }
@@ -63,7 +77,13 @@ void gamepad_poll(gamepad_state *pad) {
         __u8 type = ev.type & ~JS_EVENT_INIT;
         if (type == JS_EVENT_AXIS) {
             if (ev.number < gamepad_axis_count) {
-                pad->axes[ev.number] = (float) ev.value / 32767.0f;
+                /* FIX-AUDIT-DESPOT: js values are asymmetric (-32768..32767).
+                 * Dividing everything by 32767 maps full-down to -1.00003
+                 * (out of the documented [-1,1] range). Scale each side by
+                 * its own extreme so both ends land exactly on +-1. */
+                pad->axes[ev.number] = (ev.value < 0)
+                    ? (float)ev.value / 32768.0f
+                    : (float)ev.value / 32767.0f;
             }
         } else if (type == JS_EVENT_BUTTON) {
             if (ev.number < gamepad_button_count) {
@@ -98,6 +118,19 @@ float gamepad_get_axis(const gamepad_state *pad, int axis) {
     if (axis == gamepad_axis_left_x && pad->invert_left_x) { value = -value; }
     if (axis == gamepad_axis_right_x && pad->invert_right_x) { value = -value; }
     return apply_deadzone(value, pad->deadzone);
+}
+
+float gamepad_get_trigger(const gamepad_state *pad, int axis) {
+    if (!pad || axis < 0 || axis >= gamepad_axis_count) { return 0.0f; }
+    float v = pad->axes[axis];
+    if (!isfinite(v)) return 0.0f;
+    if (v < -1.0f) v = -1.0f;
+    if (v > 1.0f) v = 1.0f;
+    /* Collapse the ambiguous lower half: rest is 0 on every driver. */
+    float t = (v > 0.0f) ? v : 0.0f;
+    /* Small deadzone so resting noise never reads as a press. */
+    if (t < 0.05f) t = 0.0f;
+    return t;
 }
 
 bool gamepad_get_button(const gamepad_state *pad, int button) {

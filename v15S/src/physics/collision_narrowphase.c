@@ -130,12 +130,14 @@ bool collision_sphere_cube(rigidbody *sphere, rigidbody *cube, collision_data *c
 
     contact_point_data *cp = &collision_output_data->contacts[0];
     if (inside) {
-        /* FIX-AUDIT: normal convention is A->B (sphere->cube). Sphere near
-         * +face: cube.pos-sphere.pos points -axis (toward cube center).
-         * Old code returned +axis (outward), pushing the sphere deeper via
-         * vA -= lam*n. Negate to satisfy dot(cube.pos-sphere.pos,n)>0. */
-        vector3 outward = vector3_scaling(axes_cube[nearest_face_axis], nearest_face_sign);
-        collision_output_data->normal_vector = vector3_scaling(outward, -1.0f);
+/* FIX-AUDIT: normal convention is B->A (cube->sphere). The outward
+             * normal points from cube center to sphere (away from cube center).
+             * For a floor's top face, outward points UP (+Y), which is the
+             * correct direction for the collision normal (cube->sphere).
+             * Old code negated it, pointing inward (sphere->cube), which
+             * reversed restitution impulse direction causing energy gain. */
+            vector3 outward = vector3_scaling(axes_cube[nearest_face_axis], nearest_face_sign);
+            collision_output_data->normal_vector = outward;
         cp->penetration = sphere->radius + minimum_distance;
         /* Contact on the cube FACE (not the sphere center): the lever arms
          * ra/rb must span contact-to-center for correct torque. */
@@ -157,9 +159,9 @@ bool collision_sphere_cube(rigidbody *sphere, rigidbody *cube, collision_data *c
             collision_output_data->normal_vector = vector3_scaling(difference, -1.0f / distance);
         } else {
             /* Degenerate: center within 0.1mm of surface. True normal is
-             * the nearest face normal (A->B = -outward), not -Y. */
+             * the nearest face normal (B->A = outward). */
             vector3 outward = vector3_scaling(axes_cube[nearest_face_axis], nearest_face_sign);
-            collision_output_data->normal_vector = vector3_scaling(outward, -1.0f);
+            collision_output_data->normal_vector = outward;
         }
         float raw_pen_sc = sphere->radius - distance;
         /* TRUTH: clamp slop-band negatives to zero (friction-only). */

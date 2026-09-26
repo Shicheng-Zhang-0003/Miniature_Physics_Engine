@@ -34,6 +34,25 @@ static rigidbody *spring_find_body(rigidbody *bodies, int body_count, uint32_t o
     return NULL;
 }
 
+/* FIX-AUDIT-DESPOT: O(J*B) killer. spring_apply_core_dt called the linear
+ * scan above twice per joint (2*B comparisons per joint, J*B total per
+ * tick). Route through the world's id->index cache (O(1) hit, linear
+ * fallback inside physics_world_index_by_id so correctness never depends
+ * on cache freshness) whenever the pass runs over the world's own array.
+ * Foreign arrays (headless explicit-body callers) keep the linear scan
+ * with an early-out on id==0. TODO: per-spring body_index cache with
+ * revision check would skip even the hash probe for static topologies. */
+static rigidbody *spring_find_body_cached(physics_world *world, rigidbody *bodies, int body_count,
+                                          uint32_t object_id) {
+    if (object_id == 0) {
+        return NULL;
+    }
+    if (world && bodies && bodies == world->bodies) {
+        return physics_world_body_by_id(world, object_id);
+    }
+    return spring_find_body(bodies, body_count, object_id);
+}
+
 void joint_init_pool(physics_world *world) {
     if (!world) {
         return;
@@ -122,8 +141,8 @@ static void spring_apply_core_dt(physics_world *world, rigidbody *bodies, int bo
 
         spring_joint *current_spring_joint = &world->spring_joints[joint_index];
 
-        rigidbody *rigid_body_a = spring_find_body(bodies, body_count, current_spring_joint->object_id_a);
-        rigidbody *rigid_body_b = spring_find_body(bodies, body_count, current_spring_joint->object_id_b);
+        rigidbody *rigid_body_a = spring_find_body_cached(world, bodies, body_count, current_spring_joint->object_id_a);
+        rigidbody *rigid_body_b = spring_find_body_cached(world, bodies, body_count, current_spring_joint->object_id_b);
 
         if ((!rigid_body_a) || (!rigid_body_b)) {
             remove_joint(world, joint_index);

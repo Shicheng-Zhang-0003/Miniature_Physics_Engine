@@ -212,7 +212,11 @@ int main(void) {
      * From 2 m/s: stop distance = v^2/(2*a) = 4/(2*0.098) = 20.4m.
      * Time to stop = v/a = 20.4s. Test runs 100s (6000 ticks).
      * Rolling resistance only activates when rolling (w = v/R). If sphere
-     * doesn't spin up, rolling resistance doesn't apply. */
+     * doesn't spin up, rolling resistance doesn't apply.
+     * TOLERANCE FORK: this 5-45 m band is a paranoia smoke (gross model
+     * break only); the canonical calibration truth is 9.5-13.5 m in 8 s
+     * at mu_r=0.02 (see mpe_suite_a.c rolling_decay). Do not tighten this
+     * smoke to the canonical band. */
     {
         physics_world world;
         physics_world_init(&world);

@@ -2,6 +2,18 @@
 #include "camera.h"
 #include <math.h>
 void camera_update_vectors(camera *camera_object) {
+    if (!camera_object) {
+        return;
+    }
+    /* FIX-AUDIT-DESPOT: NaN guard. yaw/pitch integrate raw mouse deltas and
+     * IJKL rates every tick; one NaN (hotplug mouse event, corrupt config
+     * steer_sensitivity) poisoned forward/side/vertical forever because
+     * every later frame derived from the poisoned vectors. Reset to the
+     * spawn basis instead of propagating. */
+    if (!isfinite(camera_object->yaw) || !isfinite(camera_object->pitch)) {
+        camera_object->yaw = -90.0f;
+        camera_object->pitch = 0.0f;
+    }
     //Front Vector --> Pitch and Yaw
     //Deg to Rad
     float yaw_radians = camera_object->yaw * degrad;
@@ -12,13 +24,32 @@ void camera_update_vectors(camera *camera_object) {
     updated_forward_vector.z = sinf(yaw_radians) * cosf(pitch_radians);
     //Normalise Frontal Vector
     camera_object->forward_vector = vector3_normalisation(updated_forward_vector);
+    if (!isfinite(camera_object->forward_vector.x) || !isfinite(camera_object->forward_vector.y) ||
+        !isfinite(camera_object->forward_vector.z)) {
+        /* FIX-AUDIT-DESPOT: fail-closed basis (spawn look, -Z) when the
+         * trig/normalise path still yields non-finite (defensive; the yaw/
+         * pitch reset above should already have prevented it). */
+        camera_object->forward_vector = (vector3){0.0f, 0.0f, -1.0f};
+    }
     //Calculate Right Side and Vertical Vectors
     //Cross of Frontal and Up view {0, 1, 0} --> Right Axis
     vector3 global_up_vector = {0.0f, 1.0f, 0.0f};
     camera_object->side_vector = vector3_normalisation(vector3_cross(camera_object->forward_vector, global_up_vector));
+    if (!isfinite(camera_object->side_vector.x) || !isfinite(camera_object->side_vector.y) ||
+        !isfinite(camera_object->side_vector.z)) {
+        /* FIX-AUDIT-DESPOT: forward was near-parallel to world-up (pitch
+         * +-89 clamp keeps this rare but reachable): cross degenerates.
+         * Fall back to world +X instead of a NaN strafe axis. */
+        camera_object->side_vector = (vector3){1.0f, 0.0f, 0.0f};
+    }
     //Cross right and front gives the UP axis
     camera_object->vertical_vector =
         vector3_normalisation(vector3_cross(camera_object->side_vector, camera_object->forward_vector));
+    if (!isfinite(camera_object->vertical_vector.x) || !isfinite(camera_object->vertical_vector.y) ||
+        !isfinite(camera_object->vertical_vector.z)) {
+        /* FIX-AUDIT-DESPOT: see above. */
+        camera_object->vertical_vector = (vector3){0.0f, 1.0f, 0.0f};
+    }
 }
 void initialize_camera(camera *camera_object, vector3 starting_position) {
     camera_object->position = starting_position;

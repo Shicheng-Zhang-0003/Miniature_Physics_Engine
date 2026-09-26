@@ -27,7 +27,11 @@ struct physics_world;
 
 /* Spawn a robot into the fleet attached to `world`. Returns the fleet
  * index (>= 0), or -1 if no ftc-fleet module is attached, the fleet is
- * full, or creation fails. Robots are simulated in spawn order. */
+ * full, or creation fails. Robots are simulated in spawn order.
+ * FIX-AUDIT-DESPOT: the FTC_FLEET_MAX (32) hard cap is an array bound, not
+ * a performance claim — practical limit is 2-4 robots (each mecanum robot
+ * adds 4 wheels + up to 32 roller bodies + 36 joints to one solver island;
+ * cost grows superlinearly at 128 iterations). */
 int ftc_fleet_spawn(struct physics_world *world, float x, float y, float z,
                     motor_preset_id preset, ftc_drivetrain_type drivetrain_type);
 

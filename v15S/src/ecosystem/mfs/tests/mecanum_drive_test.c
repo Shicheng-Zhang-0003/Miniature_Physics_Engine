@@ -11,7 +11,17 @@
 
 int main(void) {
     physics_world world;
-    mfs_test_world(&world); /* 128 iters + tile floor (see header) */
+    mpe_config_init();
+    g_cfg.timestep.solver_iterations = 512;
+    physics_world_init(&world);
+    constraint_pool_init(&world);
+    int f = physics_world_add_cube(&world, (vector3){0.0f, -0.5f, 0.0f},
+                                   (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
+    if (f >= 0) {
+        world.bodies[f].friction_static = 1.0f;
+        world.bodies[f].friction_kinetic = 0.8f;
+        world.bodies[f].restitution = 0.0f;
+    }
 
     ftc_robot robot;
     int rc = ftc_robot_create(&world, &robot, 0.0f, ftc_robot_rest_height(), 0.0f, MOTOR_GB_5203_26_9);
@@ -63,7 +73,7 @@ int main(void) {
             printf("[FAIL] robot did not strafe far enough in +X (dx=%.4f, expected >0.3)\n", dx);
             fail = 1;
         } else {
-            printf("[PASS] robot strafed in +X under chassis-force strafe model (dx=%.4f)\n", dx);
+            printf("[PASS] robot strafed in +X on emergent roller contacts (dx=%.4f)\n", dx);
         }
     }
 

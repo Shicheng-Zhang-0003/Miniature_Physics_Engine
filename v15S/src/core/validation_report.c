@@ -27,6 +27,10 @@ void validation_report_print(void) {
     printf("[A3] objects=%d capacity=%d joints=%d selected=%d\n", (physics_world_get_primary()->body_count), (physics_world_get_primary()->body_capacity), (physics_world_get_primary()->spring_joint_count),
            selected_object);
     /* MPE_TASK_12_VALIDATION_PRINT_BEGIN */
+    /* FIX-AUDIT-DESPOT: sleeping here excludes statics (infinite-mass slabs
+     * are neither awake nor asleep). Counted at the source in simulation.c;
+     * long_run_validation mirrors the same exclusion so sleeping+awake ==
+     * dynamic bodies in both reports. */
     printf("[A3] sleeping objects: last_frame=%d\n", debug_last_sleeping_object_count);
     /* MPE_TASK_12_VALIDATION_PRINT_END */
     printf("[A3] debug last: obj=%d pairs=%d manifolds=%d frame_time=%f\n", debug_last_object_count,
