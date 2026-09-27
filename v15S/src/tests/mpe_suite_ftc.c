@@ -11,14 +11,39 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+#include "core/mpe_platform.h"
+#ifndef MPE_OS_WINDOWS
 #include <unistd.h>
-#include <dlfcn.h>
+#endif
+#include "core/mpe_platform.h"
 #include "mpe_test.h"
 #include "core/mpe_registry.h"
 #include "core/mpe_loader.h"
 #include "ecosystem/mpe_ecosystem.h"
 #include "ecosystem/mfs/modules/ftc/submodules/robot.h"
 #include "ecosystem/mfs/modules/ftc/ftc_fleet.h"
+
+/* Windows-aware plugin path: pick existing .so/.dll variant. */
+static const char *mpe_pick_plugin(const char *so_path, char *buf, size_t n) {
+#ifdef MPE_OS_WINDOWS
+    /* so_path like "plugins/mpe_capsule.so": try as-is, then .dll variant. */
+    if (access(so_path, R_OK) == 0) return so_path;
+    size_t L = strlen(so_path);
+    if (L > 3 && strcmp(so_path + L - 3, ".so") == 0) {
+        snprintf(buf, n, "%.*s.dll", (int)(L - 3), so_path);
+        if (access(buf, R_OK) == 0) return buf;
+    } else if (L > 4 && _stricmp(so_path + L - 4, ".dll") == 0) {
+        snprintf(buf, n, "%.*s.so", (int)(L - 4), so_path);
+        if (access(buf, R_OK) == 0) return buf;
+    }
+    /* try MPE_PLUGIN_EXT variant of basename */
+    return so_path;
+#else
+    (void)buf; (void)n;
+    return so_path;
+#endif
+}
+
 
 typedef int (*spawn_fn_t)(struct physics_world *, float, float, float, motor_preset_id,
                           ftc_drivetrain_type);
@@ -31,13 +56,14 @@ int mpe_t_ftc_ecosystem(void) {
     mpe_config_init();
     g_cfg.timestep.solver_iterations = 128;
 
-    if (access("ecosystem/mfs/mfs_ecosystem.so", R_OK) != 0) {
+    char eco_buf[1024]; const char *eco_path = mpe_pick_plugin("ecosystem/mfs/mfs_ecosystem.so", eco_buf, sizeof(eco_buf));
+    if (access(eco_path, R_OK) != 0) {
         printf("[SKIP] bundle not built (run from v15S/src after make)\n");
         mpe_test_end(&t);
         return t.failures;
     }
     char err[512] = {0};
-    MPE_CHECK(&t, mpe_loader_load("ecosystem/mfs/mfs_ecosystem.so", err, sizeof(err)) == 0);
+    MPE_CHECK(&t, mpe_loader_load(eco_path, err, sizeof(err)) == 0);
     MPE_CHECK(&t, mpe_ecosystem_find("mfs-simulator") != NULL);
 
     physics_world w;
@@ -63,7 +89,7 @@ int mpe_t_ftc_ecosystem(void) {
     spawn_fn_t p_spawn = NULL;
     get_fn_t p_get = NULL;
     {
-        void *h = dlopen("ecosystem/mfs/mfs_ecosystem.so", RTLD_NOW | RTLD_LOCAL | RTLD_NOLOAD);
+        void *h = dlopen(eco_path, RTLD_NOW | RTLD_LOCAL | RTLD_NOLOAD);
         if (h) {
             p_spawn = (spawn_fn_t)dlsym(h, "ftc_fleet_spawn");
             p_get = (get_fn_t)dlsym(h, "ftc_fleet_get");
@@ -105,7 +131,7 @@ int mpe_t_ftc_ecosystem(void) {
         MPE_CHECK(&t, fabsf(w.bodies[r1->chassis_body].position.y - 0.18f) < 1.0f);
     }
     MPE_CHECK(&t, mpe_ecosystem_detach(&w, "mfs-simulator") == 0);
-    MPE_CHECK(&t, mpe_loader_unload("ecosystem/mfs/mfs_ecosystem.so") == 0);
+    MPE_CHECK(&t, mpe_loader_unload(eco_path) == 0);
     MPE_CHECK(&t, mpe_ecosystem_find("mfs-simulator") == NULL);
     physics_world_cleanup(&w);
     if (t.failures == 0) {

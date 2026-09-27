@@ -1,9 +1,9 @@
 /* MPE_TASK_V15R2_EVENT_LOG_IMPL_BEGIN */
 #include "event_log.h"
+#include "mpe_platform.h"
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
-#include <pthread.h>
 
 typedef struct {
     char message[event_msg_length];

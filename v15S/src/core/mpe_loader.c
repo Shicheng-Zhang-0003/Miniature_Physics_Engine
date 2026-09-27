@@ -1,12 +1,13 @@
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE /* dladdr */
+#endif
 #include "mpe_loader.h"
+#include "mpe_platform.h"
 #include "mpe_registry.h"
 #include "physics_world.h"
 #include "../ecosystem/mpe_ecosystem.h"
-#include <dlfcn.h>
 #include <string.h>
 #include <stdio.h>
-#include <limits.h>
 #include <stdlib.h>
 
 #define MPE_MAX_HANDLES 32
@@ -20,14 +21,39 @@ static struct {
 } s_h[MPE_MAX_HANDLES];
 static int s_n = 0;
 
-/* Jail: plugins/<name>.so for modules, ecosystem/mfs/<name>.so for
- * ecosystem bundles (both CWD-relative, normally v15S/src). Same
- * traversal-proofing in both roots. */
+/* Jail: plugins/<name>.so|.dll for modules, ecosystem/mfs/<name>.so|.dll
+ * for ecosystem bundles (both CWD-relative, normally v15S/src). Same
+ * traversal-proofing in both roots. Windows accepts '/' and '\\', both
+ * extensions, case-insensitively; Linux keeps exact '.so' behaviour. */
+static int mpe_has_plugin_ext(const char *base) {
+    size_t n = strlen(base);
+#ifdef MPE_OS_WINDOWS
+    /* accept .so (MSYS2) and .dll (native) case-insensitively */
+    if (n >= 4 && _stricmp(base + n - 4, ".dll") == 0) return 1;
+    if (n >= 3 && _stricmp(base + n - 3, ".so") == 0) return 1;
+    return 0;
+#else
+    if (n < 3) return 0;
+    return strcmp(base + n - 3, ".so") == 0;
+#endif
+}
 static int plugin_path_is_confined(const char *path, char resolved[PATH_MAX]) {
+#ifdef MPE_OS_WINDOWS
+    /* Normalise backslashes to slashes for prefix matching. */
+    char norm[PATH_MAX * 2];
+    size_t pi = 0;
+    if (!path) return 0;
+    for (size_t i = 0; path[i] && pi + 1 < sizeof(norm); i++) {
+        norm[pi++] = (path[i] == '\\') ? '/' : path[i];
+    }
+    norm[pi] = '\0';
+    path = norm;
+#endif
     const char *prefix_a = "plugins/";
     const char *prefix_b = "./plugins/";
     const char *prefix_c = "ecosystem/mfs/";
     const char *prefix_d = "./ecosystem/mfs/";
+    const char *prefix_e = ".\\plugins\\";
     const char *dir = NULL;
     const char *base = NULL;
     if (path && strncmp(path, prefix_a, strlen(prefix_a)) == 0) {
@@ -45,8 +71,12 @@ static int plugin_path_is_confined(const char *path, char resolved[PATH_MAX]) {
     } else {
         return 0;
     }
-    if (!*base || strchr(base, '/') || strstr(base, "..") || strlen(base) < 4 ||
-        strcmp(base + strlen(base) - 3, ".so") != 0) return 0;
+    (void)prefix_e;
+    if (!*base || strchr(base, '/') ||
+#ifdef MPE_OS_WINDOWS
+        strchr(base, '\\') ||
+#endif
+        strstr(base, "..") || !mpe_has_plugin_ext(base)) return 0;
     char root[PATH_MAX];
     if (!realpath(dir, root) || !realpath(path, resolved)) return 0;
     size_t root_len = strlen(root);
@@ -60,7 +90,7 @@ int mpe_loader_load(const char *path, char *errbuf, int errlen) {
     }
     char resolved[PATH_MAX];
     if (!plugin_path_is_confined(path, resolved)) {
-        if (errbuf && errlen > 0) snprintf(errbuf, (size_t)errlen, "path must resolve inside plugins/<name>.so");
+        if (errbuf && errlen > 0) snprintf(errbuf, (size_t)errlen, "path must resolve inside plugins/<name>" MPE_PLUGIN_EXT);
         return -1;
     }
     /* Length validated BEFORE any registration (a late failure used to
@@ -89,6 +119,13 @@ int mpe_loader_load(const char *path, char *errbuf, int errlen) {
     if (!h) {
         if (errbuf && errlen > 0) snprintf(errbuf, (size_t)errlen, "%s", dlerror());
         return -1;
+    }
+    /* MSVC has no constructor/destructor: call explicit init if exported.
+     * Idempotent on GCC (flag-guarded), so harmless on Linux/MinGW. */
+    {
+        dlerror();
+        void (*p_init)(void) = (void (*)(void))dlsym(h, "mpe_capsule_init");
+        if (dlerror() == NULL && p_init) p_init();
     }
     /* Precedence: ecosystem bundles (mpe_ecosystem_desc) win over plain
      * modules. A bundle links its inner modules' objects for code, so it
@@ -160,17 +197,35 @@ int mpe_loader_load(const char *path, char *errbuf, int errlen) {
     return -1;
 }
 
-/* Path equality: realpath when possible, basename fallback otherwise. */
+/* Path equality: realpath when possible, basename fallback otherwise.
+ * Windows: case-insensitive, both separators. */
 static int same_path(const char *a, const char *b) {
     if (!a || !b) return 0;
+#ifdef MPE_OS_WINDOWS
+    if (_stricmp(a, b) == 0) return 1;
+#else
     if (strcmp(a, b) == 0) return 1;
+#endif
     char ca[PATH_MAX], cb[PATH_MAX];
+#ifdef MPE_OS_WINDOWS
+    if (realpath(a, ca) && realpath(b, cb) && _stricmp(ca, cb) == 0) return 1;
+    const char *ba = strrchr(a, '/');
+    const char *bsa = strrchr(a, '\\');
+    const char *bb = strrchr(b, '/');
+    const char *bsb = strrchr(b, '\\');
+    if (bsa && (!ba || bsa > ba)) ba = bsa;
+    if (bsb && (!bb || bsb > bb)) bb = bsb;
+    ba = ba ? ba + 1 : a;
+    bb = bb ? bb + 1 : b;
+    return _stricmp(ba, bb) == 0;
+#else
     if (realpath(a, ca) && realpath(b, cb) && strcmp(ca, cb) == 0) return 1;
     const char *ba = strrchr(a, '/');
     const char *bb = strrchr(b, '/');
     ba = ba ? ba + 1 : a;
     bb = bb ? bb + 1 : b;
     return strcmp(ba, bb) == 0;
+#endif
 }
 
 static int handle_by_path(const char *path) {
@@ -205,6 +260,20 @@ static int handle_for_desc(const mpe_module_desc_t *d) {
 static int fn_in_plugin(mpe_collide_fn fn, const char *resolved) {
     Dl_info info;
     if (!fn || !resolved || dladdr((const void *)fn, &info) == 0 || !info.dli_fname) return 0;
+#ifdef MPE_OS_WINDOWS
+    if (_stricmp(info.dli_fname, resolved) == 0) return 1;
+    char canon[PATH_MAX];
+    if (realpath(info.dli_fname, canon) && _stricmp(canon, resolved) == 0) return 1;
+    const char *a = strrchr(info.dli_fname, '/');
+    const char *asa = strrchr(info.dli_fname, '\\');
+    const char *b = strrchr(resolved, '/');
+    const char *bsb = strrchr(resolved, '\\');
+    if (asa && (!a || asa > a)) a = asa;
+    if (bsb && (!b || bsb > b)) b = bsb;
+    a = a ? a + 1 : info.dli_fname;
+    b = b ? b + 1 : resolved;
+    return _stricmp(a, b) == 0;
+#else
     if (strcmp(info.dli_fname, resolved) == 0) return 1;
     char canon[PATH_MAX];
     if (realpath(info.dli_fname, canon) && strcmp(canon, resolved) == 0) return 1;
@@ -213,6 +282,7 @@ static int fn_in_plugin(mpe_collide_fn fn, const char *resolved) {
     a = a ? a + 1 : info.dli_fname;
     b = b ? b + 1 : resolved;
     return strcmp(a, b) == 0;
+#endif
 }
 
 /* Does any live world reference this handle's code? Tick attachments by
@@ -317,7 +387,11 @@ int mpe_loader_unload(const char *path_or_name) {
     if (!path_or_name) return -1;
     char resolved[PATH_MAX];
     const char *identity = path_or_name;
+#ifdef MPE_OS_WINDOWS
+    if (strchr(path_or_name, '/') || strchr(path_or_name, '\\')) {
+#else
     if (strchr(path_or_name, '/')) {
+#endif
         if (!plugin_path_is_confined(path_or_name, resolved)) return -1;
         identity = resolved;
     }
@@ -335,6 +409,9 @@ int mpe_loader_unload(const char *path_or_name) {
                     mpe_ecosystem_detach_everywhere(enm);
                     mpe_ecosystem_unregister(enm);
                 }
+                dlerror();
+                void (*p_fini)(void) = (void (*)(void))dlsym(s_h[i].h, "mpe_capsule_fini");
+                if (dlerror() == NULL && p_fini) p_fini();
                 dlclose(s_h[i].h);
                 for (int j = i; j + 1 < s_n; j++) s_h[j] = s_h[j + 1];
                 s_n--;
@@ -357,6 +434,11 @@ int mpe_loader_unload(const char *path_or_name) {
                 mpe_unregister_module_origin(modname, s_h[i].path);
             }
             purge_plugin_pairs(i);
+            dlerror();
+            {
+                void (*p_fini)(void) = (void (*)(void))dlsym(s_h[i].h, "mpe_capsule_fini");
+                if (dlerror() == NULL && p_fini) p_fini();
+            }
             dlclose(s_h[i].h);
             for (int j = i; j + 1 < s_n; j++) s_h[j] = s_h[j + 1];
             s_n--;
@@ -389,7 +471,11 @@ void *mpe_loader_symbol(const char *path_or_name, const char *sym) {
     if (!path_or_name || !sym || !*sym) return NULL;
     char resolved[PATH_MAX];
     const char *identity = path_or_name;
+#ifdef MPE_OS_WINDOWS
+    int by_path = (strchr(path_or_name, '/') != NULL || strchr(path_or_name, '\\') != NULL);
+#else
     int by_path = (strchr(path_or_name, '/') != NULL);
+#endif
     if (by_path) {
         if (!plugin_path_is_confined(path_or_name, resolved)) return NULL;
         identity = resolved;

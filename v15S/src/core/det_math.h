@@ -28,6 +28,7 @@
 #include <stdbool.h>
 #include <stdatomic.h>
 #include <assert.h>
+#include "mpe_platform.h"
 
 /* TRUTH: count every libm fallback so desync is diagnosable, never silent.
  * Single process-wide definition (core/det_math.c); the old per-TU
@@ -42,12 +43,22 @@
 extern _Atomic unsigned long det_fallback_pow_count;
 extern _Atomic unsigned long det_fallback_trig_count;
 void det_fallback_reset(void);
+#ifdef MPE_HAS_GNUC_ATTR
 static inline unsigned long det_fallback_pow_total(void) {
     return __atomic_load_n(&det_fallback_pow_count, __ATOMIC_RELAXED);
 }
 static inline unsigned long det_fallback_trig_total(void) {
     return __atomic_load_n(&det_fallback_trig_count, __ATOMIC_RELAXED);
 }
+#else
+/* MSVC: C11 atomics (no __atomic builtins). */
+static inline unsigned long det_fallback_pow_total(void) {
+    return atomic_load(&det_fallback_pow_count);
+}
+static inline unsigned long det_fallback_trig_total(void) {
+    return atomic_load(&det_fallback_trig_count);
+}
+#endif
 
 /* TRUTH: pin FP state for cross-platform determinism. Portable subset:
  * round-to-nearest (fesetround). x86/ARM denormal-flush differences (FTZ/DAZ/FZ/DZ)

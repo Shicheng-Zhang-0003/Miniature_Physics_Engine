@@ -2,7 +2,9 @@
 #define frame_timer_h
 /* GTK4-PREP: zero GUI headers in core. This header used <glib.h> for
  * g_get_monotonic_time/gint64 only; POSIX clock_gettime gives identical
- * microsecond-monotonic semantics with no system GUI dependency. */
+ * microsecond-monotonic semantics with no system GUI dependency.
+ * Windows: clock_gettime/fallback via core/mpe_platform.h. */
+#include "mpe_platform.h"
 #include <stdint.h>
 #include <time.h>
 typedef struct {

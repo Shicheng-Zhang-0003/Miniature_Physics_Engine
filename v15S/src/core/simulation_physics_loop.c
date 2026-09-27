@@ -11,6 +11,7 @@
 #include "../config/mpe_config.h"
 #include "../config/mpe_constants.h"
 #include "physics_world.h"
+#include "mpe_platform.h"
 #include "debug_counters.h"
 #include "det_math.h"
 #include "../physics/depenetration.h"
@@ -26,15 +27,17 @@
 #include <math.h>
 #include <stdbool.h>
 #include <string.h>
+#ifndef MPE_OS_WINDOWS
 #include <sys/stat.h>
 #include <unistd.h>
+#endif
 
 extern input_status main_inputs;
 extern camera main_camera_fov;
 extern int selected_object;
 extern frame_timer main_timer;
 /* Canonical spring pass (weak: spring-less headless links skip it). */
-void mpe_springs_apply(physics_world *world, float dt) __attribute__((weak));
+MPE_WEAK void mpe_springs_apply(physics_world *world, float dt);
 /* Forward from simulation.c / overlay / debug_terminal (now headless-clean). */
 void simulation_camera_tick(float frame_delta_time);
 void simulation_input_dispatch(void *parent_window);

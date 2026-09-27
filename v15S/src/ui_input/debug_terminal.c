@@ -1,4 +1,5 @@
 /* GTK4-PREP: GTK3 preserved under #else; GTK4 full port follows. */
+#include "../core/mpe_platform.h"
 #ifdef MPE_GTK4
 
 #include "../mpe_engine.h"
@@ -313,9 +314,10 @@ int term_parse_movement_destination(const char *token, float *x, float *y, float
  * term_*.c when those TUs are ported to GTK4. Weak linkage allows the
  * debug terminal to link even when term_*.c remain stubs (empty #ifdef
  * MPE_GTK4 blocks). Once term_*.c provide strong symbols, the linker
- * prefers those. */
-#if defined(MPE_GTK4) && defined(__GNUC__)
-#define MPE_WEAK_CMD(name) __attribute__((weak)) void name(int argc, char **argv) { (void)argc; (void)argv; term_err("mpe: " #name ": not yet ported to GTK4\n"); }
+ * prefers those. On MSVC (no weak) the stubs are omitted: term_*.c always
+ * provide strong symbols there. */
+#if defined(MPE_GTK4) && MPE_WEAK_SUPPORTED
+#define MPE_WEAK_CMD(name) MPE_WEAK void name(int argc, char **argv) { (void)argc; (void)argv; term_err("mpe: " #name ": not yet ported to GTK4\n"); }
 MPE_WEAK_CMD(cmd_help) MPE_WEAK_CMD(cmd_man) MPE_WEAK_CMD(cmd_clear) MPE_WEAK_CMD(cmd_history)
 MPE_WEAK_CMD(cmd_pwd) MPE_WEAK_CMD(cmd_cd) MPE_WEAK_CMD(cmd_ls) MPE_WEAK_CMD(cmd_ll) MPE_WEAK_CMD(cmd_cat)
 MPE_WEAK_CMD(cmd_touch) MPE_WEAK_CMD(cmd_cp) MPE_WEAK_CMD(cmd_rm) MPE_WEAK_CMD(cmd_mv) MPE_WEAK_CMD(cmd_ln)
