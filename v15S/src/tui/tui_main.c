@@ -9,13 +9,34 @@
  * Exit code is 0 on finite state, 1 when any body goes non-finite.
  */
 #include <math.h>
+#include "../core/mpe_platform.h"
+#ifdef MPE_OS_WINDOWS
+#if defined(__has_include)
+#if __has_include(<ncurses.h>)
 #include <ncurses.h>
+#elif __has_include(<ncurses/ncurses.h>)
+#include <ncurses/ncurses.h>
+#elif __has_include(<curses.h>)
+#include <curses.h>
+#elif __has_include(<pdcurses.h>)
+#include <pdcurses.h>
+#else
+#include <ncurses.h>
+#endif
+#else
+#include <curses.h>
+#endif
+#else
+#include <ncurses.h>
+#endif
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#ifndef MPE_OS_WINDOWS
 #include <unistd.h>
+#endif
 
 #include "../ui_input/camera.h"
 #include "core/physics_world.h"

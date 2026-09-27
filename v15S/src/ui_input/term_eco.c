@@ -8,6 +8,7 @@
  *   eco config <name> set <key> <value> write a bundle config key
  * Bundles load via `mod load ecosystem/mfs/<name>.so` (or plugins/<name>.so).
  */
+#include "../core/mpe_platform.h"
 #include "term_priv.h"
 #include "../core/mpe_loader.h"
 #include "../ecosystem/mpe_ecosystem.h"

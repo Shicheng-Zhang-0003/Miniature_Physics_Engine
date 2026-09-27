@@ -10,6 +10,7 @@
  * Spawn auto-attaches the ftc-fleet module to the primary world.
  * Drive commands persist until changed (motors hold their command).
  */
+#include "../core/mpe_platform.h"
 #include "term_priv.h"
 #include "../core/mpe_loader.h"
 #include "../core/mpe_registry.h"

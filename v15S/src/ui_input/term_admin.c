@@ -1,17 +1,67 @@
 /* GTK4-PREP: GTK3 preserved under #else; GTK4 full port follows. */
+#include "../core/mpe_platform.h"
 #define _GNU_SOURCE
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdatomic.h>
 #include <string.h>
+#ifndef MPE_OS_WINDOWS
 #include <unistd.h>
+#endif
 
 /* tee is confined to a direct child of the application status directory.
  * openat + O_NOFOLLOW also prevents a status symlink or target symlink from
  * redirecting the write outside that directory. */
+#ifdef MPE_OS_WINDOWS
 static int term_tee_write_status(const char *path, const char *text,
-                                size_t *bytes_written) {
+                                 size_t *bytes_written) {
+    if (!path || !text || !bytes_written) return -1;
+    const char *name = strncmp(path, "status/", 7) == 0 ? path + 7 : path;
+    /* also accept Windows separator */
+    if (strncmp(path, "status\\", 7) == 0) name = path + 7;
+    if (!name[0] || strchr(name, '/') || strchr(name, '\\') || strstr(name, "..") ||
+        strcmp(name, ".") == 0) return -1;
+    /* Reject reparse-point/symlink escapes best-effort (Windows). */
+    DWORD sattr = GetFileAttributesA("status");
+    if (sattr != INVALID_FILE_ATTRIBUTES &&
+        (sattr & FILE_ATTRIBUTE_REPARSE_POINT)) return -1;
+    static volatile LONG sequence = 0;
+    char tmp_path[512], dst_path[512];
+    for (int attempt = 0; attempt < 16; attempt++) {
+        LONG serial = InterlockedIncrement(&sequence);
+        snprintf(tmp_path, sizeof(tmp_path), "status/.mpe-tee-%d-%ld.tmp",
+                 (int)_getpid(), (long)serial);
+        snprintf(dst_path, sizeof(dst_path), "status/%s", name);
+        /* O_EXCL emulation: fail if temp already exists */
+        DWORD tattr = GetFileAttributesA(tmp_path);
+        if (tattr != INVALID_FILE_ATTRIBUTES) continue;
+        FILE *output = fopen(tmp_path, "wx");
+        if (!output) {
+            if (errno != EEXIST) return -1;
+            continue;
+        }
+        size_t length = strlen(text);
+        *bytes_written = fwrite(text, 1, length, output);
+        int failed = (*bytes_written != length) || ferror(output);
+        if (fclose(output) != 0) failed = 1;
+        if (!failed) {
+            /* Atomic replace when possible; MoveFileEx is atomic on NTFS. */
+            if (!MoveFileExA(tmp_path, dst_path,
+                             MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+                /* fallback: remove + rename */
+                DeleteFileA(dst_path);
+                if (!MoveFileA(tmp_path, dst_path)) failed = 1;
+            }
+        }
+        if (failed) DeleteFileA(tmp_path);
+        return failed ? -1 : 0;
+    }
+    return -1;
+}
+#else
+static int term_tee_write_status(const char *path, const char *text,
+                                 size_t *bytes_written) {
     if (!path || !text || !bytes_written) return -1;
     const char *name = strncmp(path, "status/", 7) == 0 ? path + 7 : path;
     if (!name[0] || strchr(name, '/') || strstr(name, "..") ||
@@ -54,6 +104,7 @@ static int term_tee_write_status(const char *path, const char *text,
     close(dirfd);
     return failed ? -1 : 0;
 }
+#endif /* MPE_OS_WINDOWS */
 
 #ifdef MPE_GTK4
 /* term_admin.c — Admin/batch/scene/shell commands: sed..dmesg + vi.
@@ -67,7 +118,9 @@ static int term_tee_write_status(const char *path, const char *text,
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#ifndef MPE_OS_WINDOWS
 #include <strings.h>
+#endif
 
 static int64_t posix_monotonic_time(void) {
     struct timespec ts;
@@ -1047,7 +1100,9 @@ void cmd_vi(int argc, char **argv) {
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#ifndef MPE_OS_WINDOWS
 #include <strings.h>
+#endif
 
 static int64_t posix_monotonic_time(void) {
     struct timespec ts;

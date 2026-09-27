@@ -3,6 +3,7 @@
  */
 /* GTK4-PREP: zero GUI headers in core. */
 #include "long_run_validation.h"
+#include "core/mpe_platform.h"
 #include "physics_world.h"
 #include "debug_counters.h"
 #include "mpe_version.h"
@@ -12,7 +13,9 @@
 #include "../physics/collision_mechanics.h"
 #include <stdio.h>
 #include <math.h>
+#ifndef MPE_OS_WINDOWS
 #include <unistd.h>
+#endif
 
 /* MPE_TASK_13_LONG_RUN_HELPERS_BEGIN */
 

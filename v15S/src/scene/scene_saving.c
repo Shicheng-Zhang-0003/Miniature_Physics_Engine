@@ -1,5 +1,6 @@
 /* GTK4-PREP: zero GUI headers in scene. */
 #include "scene_saving.h"
+#include "core/mpe_platform.h"
 #include "scene_crc.h"
 #include "../core/physics_world.h"
 #include "../core/rigidbody.h"
@@ -12,7 +13,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
+#ifndef MPE_OS_WINDOWS
 #include <unistd.h>
+#endif
 #include <sys/stat.h>
 
 /* Scene format v200: explicit little-endian fields + sectioned joints +
@@ -52,6 +55,13 @@ static int save_quat(FILE *f, uint32_t *crc, vector4 q) {
 }
 
 static int scene_sync_parent_directory(const char *path) {
+#ifdef MPE_OS_WINDOWS
+    /* Windows has no dir-fsync; file data was already _commit'ed + renamed
+     * (atomic on NTFS via MoveFileEx). Treat as success to avoid turning
+     * every save into a durability warning on Windows. */
+    (void)path;
+    return 1;
+#else
     char parent[520];
     size_t length = strlen(path);
     if (length >= sizeof(parent)) {
@@ -75,6 +85,7 @@ static int scene_sync_parent_directory(const char *path) {
         ok = 0;
     }
     return ok;
+#endif
 }
 
 int save_scene(const char *file_destination_path) {

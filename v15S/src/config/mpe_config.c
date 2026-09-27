@@ -1,10 +1,13 @@
 /* MPE_TASK_28_CONFIG_IMPL_BEGIN */
 #include "mpe_config.h"
+#include "core/mpe_platform.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
+#ifndef MPE_OS_WINDOWS
 #include <unistd.h>
+#endif
 #include <math.h>
 #include <time.h>
 #include <sys/stat.h>

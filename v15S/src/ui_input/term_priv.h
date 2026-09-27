@@ -6,8 +6,11 @@
 #define term_priv_h
 
 #define _POSIX_C_SOURCE 200809L
+#include "../core/mpe_platform.h"
 #include <gtk/gtk.h>
+#ifndef MPE_OS_WINDOWS
 #include <strings.h>
+#endif
 #include <stdbool.h>
 #include <stdint.h>
 #include "term_posix.h" /* POSIX command-logic helpers (no libglib) */

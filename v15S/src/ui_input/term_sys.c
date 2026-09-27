@@ -4,6 +4,7 @@
  * Split from debug_terminal.c (pure motion, no behaviour change).
  * Shared shell core lives in debug_terminal.c; see term_priv.h. */
 #include "../mpe_engine.h"
+#include "../core/mpe_platform.h"
 #include "debug_terminal.h"
 #include "term_priv.h"
 #include <stdio.h>
@@ -11,7 +12,9 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#ifndef MPE_OS_WINDOWS
 #include <strings.h>
+#endif
 
 static int64_t posix_monotonic_time(void) {
     struct timespec ts;
@@ -503,7 +506,9 @@ void cmd_time(int argc, char **argv) {
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#ifndef MPE_OS_WINDOWS
 #include <strings.h>
+#endif
 
 static int64_t posix_monotonic_time(void) {
     struct timespec ts;
