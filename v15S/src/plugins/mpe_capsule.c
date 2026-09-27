@@ -13,6 +13,7 @@
  * Build: make plugins/mpe_capsule.so ; load via `mod load` or mpe_loader_load.
  */
 #include "../core/mpe_module.h"
+#include "../core/mpe_platform.h"
 #include "../core/mpe_registry.h"
 #include "../core/rigidbody.h"
 #include "../core/physics_world.h"
@@ -333,17 +334,32 @@ static bool capsule_vs_capsule(rigidbody *a, rigidbody *b, void *out, mpe_world_
     return capsule_contact(a, b, out, w);
 }
 
-__attribute__((constructor)) static void capsule_register(void) {
+static int s_capsule_registered = 0;
+MPE_CTOR static void capsule_register(void) {
+    if (s_capsule_registered) return;
     mpe_register_pair_handler(3, 0, 100, -1, capsule_vs_other, "capsule-sphere");
     mpe_register_pair_handler(3, 1, 100, -1, capsule_vs_other, "capsule-cube");
     mpe_register_pair_handler(3, 2, 100, -1, capsule_vs_other, "capsule-cylinder");
     mpe_register_pair_handler(3, 3, 100, 100, capsule_vs_capsule, "capsule-capsule");
+    s_capsule_registered = 1;
 }
 
-__attribute__((destructor)) static void capsule_unregister(void) {
+MPE_DTOR static void capsule_unregister(void) {
     /* Self-unregister so dlclose never leaves dangling fn pointers. */
+    if (!s_capsule_registered) return;
     mpe_unregister_pair_handler(capsule_vs_other);
     mpe_unregister_pair_handler(capsule_vs_capsule);
+    s_capsule_registered = 0;
+}
+
+/* Explicit init/fini for toolchains without constructor support (MSVC).
+ * The loader calls these if present (see mpe_loader.c); idempotent so
+ * calling after a constructor is harmless. Linux behaviour unchanged. */
+MPE_EXPORT void mpe_capsule_init(void) {
+    capsule_register();
+}
+MPE_EXPORT void mpe_capsule_fini(void) {
+    capsule_unregister();
 }
 
 const mpe_module_desc_t mpe_module_desc = {

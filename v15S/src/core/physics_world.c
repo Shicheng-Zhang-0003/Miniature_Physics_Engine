@@ -5,6 +5,7 @@
 #include "physics_world.h"
 #include "mpe_registry.h"
 #include "mpe_loader.h"
+#include "mpe_platform.h"
 #include "../physics/collision_mechanics.h"
 #include "../physics/broadphase.h"
 #include "../physics/constraint.h" /* MPE_FTC_067 */
@@ -15,13 +16,12 @@
 /* Canonical spring pass is weakly linked so spring-less headless test
  * binaries (which omit physics/spring_joint.c for its GL dependency)
  * still link; the GUI engine and TUI link it and get real forces. */
-void mpe_springs_apply(physics_world *world, float dt) __attribute__((weak));
+MPE_WEAK void mpe_springs_apply(physics_world *world, float dt);
 #include "../config/mpe_config.h"
 #include "../config/mpe_constants.h"
 #include <stdlib.h>
 #include <math.h>
 #include <string.h> /* MPE_FTC_076a */
-#include <pthread.h>
 
 /* Live-world registry: init registers, cleanup removes. Loader and
  * registry-unregister paths iterate it to detach/reset every world that

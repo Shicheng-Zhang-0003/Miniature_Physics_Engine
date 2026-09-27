@@ -1,13 +1,35 @@
 /* MFS Suite v2 — file C: hotload + module_1 (3 tests). */
 #include <math.h>
 #include <stdio.h>
-#include <dlfcn.h>
+#include "core/mpe_platform.h"
 #include <string.h>
 #include "mfs_test.h"
 #include "core/mpe_loader.h"
 #include "ecosystem/mpe_ecosystem.h"
 #include "modules/ftc/ftc_fleet.h"
 #include "modules/module_1/mfs_module_1.h"
+
+/* Windows-aware plugin path: pick existing .so/.dll variant. */
+static const char *mpe_pick_plugin(const char *so_path, char *buf, size_t n) {
+#ifdef MPE_OS_WINDOWS
+    /* so_path like "plugins/mpe_capsule.so": try as-is, then .dll variant. */
+    if (access(so_path, R_OK) == 0) return so_path;
+    size_t L = strlen(so_path);
+    if (L > 3 && strcmp(so_path + L - 3, ".so") == 0) {
+        snprintf(buf, n, "%.*s.dll", (int)(L - 3), so_path);
+        if (access(buf, R_OK) == 0) return buf;
+    } else if (L > 4 && _stricmp(so_path + L - 4, ".dll") == 0) {
+        snprintf(buf, n, "%.*s.so", (int)(L - 4), so_path);
+        if (access(buf, R_OK) == 0) return buf;
+    }
+    /* try MPE_PLUGIN_EXT variant of basename */
+    return so_path;
+#else
+    (void)buf; (void)n;
+    return so_path;
+#endif
+}
+
 
 #define DT (1.0f/60.0f)
 #define FTC_ITERS 128
@@ -81,8 +103,11 @@ int mfs_t_ftc_hotload(void) {
         MFS_CHECK(t_ptr, sqrtf(dx * dx + dz * dz) >= 0.5f);
     }
 
-    /* Dynamic path: identical script through the .so descriptor. */
-    void *handle = dlopen("./plugins/mpe_ftc.so", RTLD_NOW);
+    /* Dynamic path: identical script through the plugin descriptor (.so/.dll). */
+    char ftc_buf[1024]; const char *ftc_path = mpe_pick_plugin("./plugins/mpe_ftc.so", ftc_buf, sizeof(ftc_buf));
+    /* fallback: also try without ./ prefix (MSYS2 vs native CWD) */
+    if (access(ftc_path, R_OK) != 0) { ftc_path = mpe_pick_plugin("plugins/mpe_ftc.so", ftc_buf, sizeof(ftc_buf)); }
+    void *handle = dlopen(ftc_path, RTLD_NOW);
     if (!handle) { t_ptr->failures++; physics_world_cleanup(&w1); return t_ptr->failures; }
     const mpe_module_desc_t *dyn_desc = dlsym(handle, "mpe_module_desc");
     typedef int (*spawn_fn_t)(struct physics_world *, float, float, float, int, int);

@@ -1,14 +1,16 @@
 #ifndef mpe_loader_h
 #define mpe_loader_h
-/* Dynamic .so loader for MPI modules.
+/* Dynamic plugin loader for MPI modules (.so on Linux, .dll on Windows).
  *
  * Contracts (tick-boundary admin):
  *  - load/unload must run at a tick boundary (quiesced via physics_halt
  *    or between steps). Concurrent loader use from step threads is misuse:
  *    rollback on load failure truncates to a pre-dlopen snapshot, which
  *    assumes no other loader transaction is in flight.
- *  - Paths must resolve inside plugins/<name>.so RELATIVE TO THE PROCESS
- *    WORKING DIRECTORY (normally v15S/src). Launches from elsewhere fail
+ *  - Paths must resolve inside plugins/<name>.so (Linux) or
+ *    plugins/<name>.dll (Windows) RELATIVE TO THE PROCESS WORKING
+ *    DIRECTORY (normally v15S/src). Windows accepts '/' and '\\' and both
+ *    extensions (MSYS2 .so + native .dll). Launches from elsewhere fail
  *    closed with "path must resolve inside...". TOCTOU between realpath
  *    and dlopen is accepted for a local-debug affordance (not a sandbox).
  *  - Unload return codes: 0 ok, -1 unknown handle/bad path, -2 busy

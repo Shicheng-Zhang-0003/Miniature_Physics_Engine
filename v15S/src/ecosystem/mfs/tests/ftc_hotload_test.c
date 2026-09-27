@@ -17,7 +17,7 @@
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
-#include <dlfcn.h>
+#include "core/mpe_platform.h"
 #include "core/physics_world.h"
 #include "physics/constraint.h"
 #include "config/mpe_config.h"
@@ -27,6 +27,28 @@
 #include "modules/ftc/submodules/drivetrain.h"
 #include "modules/ftc/ftc_fleet.h"
 #include "ecosystem/mfs/tests/mfs_test_common.h"
+
+/* Windows-aware plugin path: pick existing .so/.dll variant. */
+static const char *mpe_pick_plugin(const char *so_path, char *buf, size_t n) {
+#ifdef MPE_OS_WINDOWS
+    /* so_path like "plugins/mpe_capsule.so": try as-is, then .dll variant. */
+    if (access(so_path, R_OK) == 0) return so_path;
+    size_t L = strlen(so_path);
+    if (L > 3 && strcmp(so_path + L - 3, ".so") == 0) {
+        snprintf(buf, n, "%.*s.dll", (int)(L - 3), so_path);
+        if (access(buf, R_OK) == 0) return buf;
+    } else if (L > 4 && _stricmp(so_path + L - 4, ".dll") == 0) {
+        snprintf(buf, n, "%.*s.so", (int)(L - 4), so_path);
+        if (access(buf, R_OK) == 0) return buf;
+    }
+    /* try MPE_PLUGIN_EXT variant of basename */
+    return so_path;
+#else
+    (void)buf; (void)n;
+    return so_path;
+#endif
+}
+
 
 extern const mpe_module_desc_t mpe_module_desc; /* static copy (ftc_module.c) */
 
@@ -65,9 +87,10 @@ static void print_bits(const char *tag, float a, float b) {
 }
 
 int main(int argc, char **argv) {
-    const char *so = getenv("FTC_SO");
-    if (!so && argc > 1) so = argv[1];
-    if (!so) so = "plugins/mpe_ftc.so";
+    const char *so_env = getenv("FTC_SO");
+    if (!so_env && argc > 1) so_env = argv[1];
+    char so_buf[1024]; const char *so_picked = so_env ? so_env : mpe_pick_plugin("plugins/mpe_ftc.so", so_buf, sizeof(so_buf));
+    const char *so = so_picked;
 
     /* ---- 1. dynamic import through the kernel loader ---- */
     char err[512] = {0};

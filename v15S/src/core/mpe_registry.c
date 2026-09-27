@@ -1,4 +1,5 @@
 #include "mpe_registry.h"
+#include "mpe_platform.h"
 #include "../core/rigidbody.h"
 #include "../core/physics_world.h"
 #include "../physics/broadphase.h"
@@ -7,7 +8,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <pthread.h>
 
 /* Process-global registry lock: every mutation and every lookup takes it.
  * Dispatch calls find per pair; uncontended mutex cost (~20 ns) is noise

@@ -12,10 +12,35 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+#include "core/mpe_platform.h"
+#ifndef MPE_OS_WINDOWS
 #include <unistd.h>
+#endif
 #include "mpe_test.h"
 #include "core/mpe_registry.h"
 #include "core/mpe_loader.h"
+
+/* Windows-aware plugin path: pick existing .so/.dll variant. */
+static const char *mpe_pick_plugin(const char *so_path, char *buf, size_t n) {
+#ifdef MPE_OS_WINDOWS
+    /* so_path like "plugins/mpe_capsule.so": try as-is, then .dll variant. */
+    if (access(so_path, R_OK) == 0) return so_path;
+    size_t L = strlen(so_path);
+    if (L > 3 && strcmp(so_path + L - 3, ".so") == 0) {
+        snprintf(buf, n, "%.*s.dll", (int)(L - 3), so_path);
+        if (access(buf, R_OK) == 0) return buf;
+    } else if (L > 4 && _stricmp(so_path + L - 4, ".dll") == 0) {
+        snprintf(buf, n, "%.*s.so", (int)(L - 4), so_path);
+        if (access(buf, R_OK) == 0) return buf;
+    }
+    /* try MPE_PLUGIN_EXT variant of basename */
+    return so_path;
+#else
+    (void)buf; (void)n;
+    return so_path;
+#endif
+}
+
 
 static int saw_state = 0;
 static void *saw_ptr = NULL;
@@ -103,15 +128,16 @@ int mpe_t_loader_lifecycle(void) {
         physics_world_cleanup(&w);
     }
 
-    /* ---- live .so lifecycle (needs CWD=v15S/src) ---- */
-    if (access("plugins/mpe_capsule.so", R_OK) != 0) {
-        printf("[SKIP] plugins/mpe_capsule.so not visible (run from v15S/src)\n");
+    /* ---- live plugin lifecycle (needs CWD=v15S/src) ---- */
+    char cap_buf[1024]; const char *cap_path = mpe_pick_plugin("plugins/mpe_capsule.so", cap_buf, sizeof(cap_buf));
+    if (access(cap_path, R_OK) != 0) {
+        printf("[SKIP] plugins/mpe_capsule%s not visible (run from v15S/src)\n", MPE_PLUGIN_EXT);
         mpe_test_end(&t);
         return t.failures;
     }
     {
         char err[512] = {0};
-        MPE_CHECK(&t, mpe_loader_load("plugins/mpe_capsule.so", err, sizeof(err)) == 0);
+        MPE_CHECK(&t, mpe_loader_load(cap_path, err, sizeof(err)) == 0);
         MPE_CHECK(&t, mpe_find_module("capsule-shape") != NULL);
         MPE_CHECK(&t, mpe_find_pair_handler(3, 0, 100, -1) != NULL);
         /* Direct analytic check of the rewritten segment capsule.
@@ -151,20 +177,20 @@ int mpe_t_loader_lifecycle(void) {
         MPE_CHECK(&t, d != NULL);
         MPE_CHECK(&t, physics_world_attach_module(&w, d) >= 0);
         /* Attached (hookless but pinned): unload must refuse with -2. */
-        MPE_CHECK(&t, mpe_loader_unload("plugins/mpe_capsule.so") == -2);
+        MPE_CHECK(&t, mpe_loader_unload(cap_path) == -2);
         MPE_CHECK(&t, physics_world_detach_module(&w, "capsule-shape") == 0);
-        MPE_CHECK(&t, mpe_loader_unload("plugins/mpe_capsule.so") == 0);
+        MPE_CHECK(&t, mpe_loader_unload(cap_path) == 0);
         /* Purged: no module entry, no pair handlers from the .so. */
         MPE_CHECK(&t, mpe_find_module("capsule-shape") == NULL);
         MPE_CHECK(&t, mpe_find_pair_handler(3, 0, 100, -1) == NULL);
         MPE_CHECK(&t, mpe_find_pair_handler(3, 3, 100, 100) == NULL);
         /* Unknown handle still -1 (distinct from busy -2). */
-        MPE_CHECK(&t, mpe_loader_unload("plugins/does_not_exist.so") == -1);
+        MPE_CHECK(&t, mpe_loader_unload("plugins/does_not_exist" MPE_PLUGIN_EXT) == -1);
         physics_world_cleanup(&w);
         /* Reload works after full unload (slot reuse path). */
-        MPE_CHECK(&t, mpe_loader_load("plugins/mpe_capsule.so", err, sizeof(err)) == 0);
+        MPE_CHECK(&t, mpe_loader_load(cap_path, err, sizeof(err)) == 0);
         MPE_CHECK(&t, mpe_find_pair_handler(3, 0, 100, -1) != NULL);
-        MPE_CHECK(&t, mpe_loader_unload("plugins/mpe_capsule.so") == 0);
+        MPE_CHECK(&t, mpe_loader_unload(cap_path) == 0);
         MPE_CHECK(&t, mpe_find_pair_handler(3, 0, 100, -1) == NULL);
     }
 

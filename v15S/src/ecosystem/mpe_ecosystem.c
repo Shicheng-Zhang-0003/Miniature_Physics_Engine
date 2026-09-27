@@ -3,9 +3,9 @@
 #include "../core/mpe_module.h"
 #include "../core/mpe_registry.h"
 #include "../core/mpe_loader.h"
+#include "../core/mpe_platform.h"
 #include <string.h>
 #include <stdio.h>
-#include <pthread.h>
 
 #define MPE_MAX_ECOSYSTEMS 16
 #define MPE_MAX_ATTACHED_ECOSYSTEMS 8
