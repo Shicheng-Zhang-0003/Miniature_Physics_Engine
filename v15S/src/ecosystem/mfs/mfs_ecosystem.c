@@ -15,6 +15,7 @@
 
 #include "ecosystem/mpe_ecosystem.h"
 #include "mfs_internal.h"
+#include "mfs_platform.h"
 #include "modules/module_1/mfs_module_1.h"
 #include "modules/ftc/ftc_fleet.h"
 #include "modules/ftc/submodules/drivetrain.h"
@@ -26,7 +27,6 @@
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
-#include <pthread.h>
 
 /* ================================================================
  * Ecosystem State
@@ -442,7 +442,7 @@ static int mfs_ecosystem_command(void *eco_state, int argc, char **argv) {
  * Ecosystem Descriptor
  * ================================================================ */
 
-__attribute__((used)) const mpe_ecosystem_desc_t mpe_ecosystem_desc = {
+MPE_USED const mpe_ecosystem_desc_t mpe_ecosystem_desc = {
     .abi = 1,
     .name = "mfs-simulator",
     .version = "1.0",

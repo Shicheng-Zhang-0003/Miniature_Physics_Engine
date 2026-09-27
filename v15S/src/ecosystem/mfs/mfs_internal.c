@@ -17,10 +17,10 @@
  *              idempotent path. Exactly one attach() ever runs per slot.
  */
 #include "mfs_internal.h"
+#include "mfs_platform.h"
 #include "core/mpe_module.h"
 #include <string.h>
 #include <stdlib.h>
-#include <pthread.h>
 
 typedef struct {
     const mpe_module_desc_t *desc;
