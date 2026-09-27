@@ -8,7 +8,9 @@
 *.d
 *.obj
 *.a
+*.lib
 *.so
+*.dll
 *.exe
 engine
 mpe-tui

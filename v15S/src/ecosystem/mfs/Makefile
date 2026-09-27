@@ -11,17 +11,35 @@
 # trig in odometry/rotors plus live gamepad polling in module_1; route
 # through core/det_math.h before claiming true).
 #
-# Thin-.so rule: module .so files contain ONLY MFS objects; engine symbols
-# resolve against the -rdynamic host at dlopen (same pattern as
-# build_tests.sh mpe_ftc.so). Linking engine objects into the .so caused
-# version skew and duplicate-symbol failures. Objects live in build/ (never
-# scattered across core/ physics/ config/ scene/).
+# Thin-plugin rule: module plugins contain ONLY MFS objects; engine symbols
+# resolve against the host at load (Linux: -rdynamic host at dlopen;
+# Windows: LoadLibrary shim in core/mpe_platform.h). Linking engine objects
+# into the plugin caused version skew and duplicate-symbol failures.
+# Objects live in build/ (never scattered across core/ physics/ config/ scene/).
+# Windows: produces .dll (MSYS2) / .dll (native); Linux: .so. Both kept.
 
 MPE_SRC = ../..
 MFS = .
 BUILD = build
 
 CC ?= gcc
+# ---- Windows detection (Linux unchanged) ----
+MPE_WINDOWS ?= $(strip $(if $(filter Windows_NT,$(OS)),1,$(if $(findstring mingw,$(CC)),1,$(if $(findstring MINGW,$(shell uname -s 2>/dev/null)),1,$(if $(findstring MSYS,$(shell uname -s 2>/dev/null)),1,)))))
+ifeq ($(MPE_WINDOWS),1)
+  PLUGIN_EXT := .dll
+  EXE_EXT := .exe
+  MPE_DL_LIBS :=
+  MPE_RDYNAMIC :=
+  MPE_WIN_LIBS := -lwinmm -lxinput -lws2_32 -static-libgcc -Wl,-Bstatic -lwinpthread -Wl,-Bdynamic
+  MPE_FPIC :=
+else
+  PLUGIN_EXT := .so
+  EXE_EXT :=
+  MPE_DL_LIBS := -ldl
+  MPE_RDYNAMIC := -rdynamic
+  MPE_WIN_LIBS :=
+  MPE_FPIC := -fPIC
+endif
 # NOTE (float builds, FIX-AUDIT-DESPOT): -O3 here vs -O2 in build_tests.sh.
 # Both pass -ffp-contract=off, but -O3 vectorises/reorders FP math, so .so
 # results are not promised bit-identical to the -O2 test binaries
@@ -34,7 +52,7 @@ CC ?= gcc
 # so the plugin read the bodies array at the wrong stride and robot spawn
 # failed with "no fleet attached". Append-only fields do NOT save you here:
 # the struct SIZE still changes. See README_MFS.md build-invariants.
-CFLAGS = -I$(MPE_SRC) -I$(MFS) -O3 -Wall -Wextra -ffp-contract=off -fPIC -fno-inline -fno-lto -fno-inline-functions-called-once -fvisibility=default \
+CFLAGS = -I$(MPE_SRC) -I$(MFS) -O3 -Wall -Wextra -ffp-contract=off $(MPE_FPIC) -fno-inline -fno-lto -fno-inline-functions-called-once -fvisibility=default \
          -DMPE_MODULE_ABI=1 -DMPE_ECOSYSTEM_ABI=1 -DMPE_GTK4=1 -MMD -MP
 
 include mfs_sources.mk
@@ -55,32 +73,66 @@ MFS_ECO_OBJS = $(patsubst %.c,$(BUILD)/%.o,$(MFS_ECO_SRCS))
 ALL_MFS_OBJS = $(MFS_MOD1_OBJS) $(MFS_FTC_MOD_OBJS) $(MFS_ECO_OBJS)
 ALL_MFS_DEPS = $(ALL_MFS_OBJS:.o=.d) $(patsubst %.c,$(BUILD)/eng/%.d,$(MFS_ENGINE_SRCS))
 
-all: mfs_module_1.so mfs_ecosystem.so plugins/mpe_ftc.so
+all: mfs_module_1$(PLUGIN_EXT) mfs_ecosystem$(PLUGIN_EXT) plugins/mpe_ftc$(PLUGIN_EXT)
 
 # NOTE: patterns match with MFS (=.) as CWD. Run make from ecosystem/mfs/.
 $(BUILD)/%.o: %.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# mfs_ecosystem.so is a BUNDLE: it references mfs_module_1_desc and the
+# mfs_ecosystem is a BUNDLE: it references mfs_module_1_desc and the
 # FTC mpe_module_desc directly, so it links those objects in (unlike the
-# thin single-module .so files below, which resolve engine symbols against
-# the -rdynamic host at dlopen).
+# thin single-module plugins below, which resolve engine symbols against
+# the host at load).
 MFS_BUNDLE_OBJS = $(MFS_ECO_OBJS) $(MFS_MOD1_OBJS) $(MFS_FTC_MOD_OBJS)
 
-mfs_module_1.so: $(MFS_MOD1_OBJS)
-	$(CC) $(CFLAGS) -shared $(MFS_MOD1_OBJS) -lm -ldl -o mfs_module_1.so
+# Windows thin DLLs must link against the host import lib (Linux .so allows
+# undefined, Windows DLLs do not). Engine Makefile generates libengine.a
+# on Windows (engine.exe export lib). build_tests.sh handles this via the
+# suite host lib; `make` here uses the engine lib when present.
+ifeq ($(MPE_WINDOWS),1)
+  MPE_HOST_LIB := $(MPE_SRC)/libengine.a
+else
+  MPE_HOST_LIB :=
+endif
 
-mfs_ecosystem.so: $(MFS_BUNDLE_OBJS)
-	$(CC) $(CFLAGS) -shared $(MFS_BUNDLE_OBJS) -lm -ldl -o mfs_ecosystem.so
+mfs_module_1$(PLUGIN_EXT): $(MFS_MOD1_OBJS)
+ifeq ($(MPE_WINDOWS),1)
+	@if [ -f "$(MPE_HOST_LIB)" ]; then $(CC) $(CFLAGS) -shared $(MFS_MOD1_OBJS) "$(MPE_HOST_LIB)" -lm $(MPE_DL_LIBS) $(MPE_WIN_LIBS) -o mfs_module_1$(PLUGIN_EXT); else echo "Windows: need $(MPE_HOST_LIB) (build engine first: make -C ../.. engine) or use build_tests.sh (suite host)"; exit 1; fi
+else
+	$(CC) $(CFLAGS) -shared $(MFS_MOD1_OBJS) -lm $(MPE_DL_LIBS) $(MPE_WIN_LIBS) -o mfs_module_1$(PLUGIN_EXT)
+endif
 
-plugins/mpe_ftc.so: $(MFS_FTC_MOD_OBJS)
+mfs_ecosystem$(PLUGIN_EXT): $(MFS_BUNDLE_OBJS)
+ifeq ($(MPE_WINDOWS),1)
+	@if [ -f "$(MPE_HOST_LIB)" ]; then $(CC) $(CFLAGS) -shared $(MFS_BUNDLE_OBJS) "$(MPE_HOST_LIB)" -lm $(MPE_DL_LIBS) $(MPE_WIN_LIBS) -o mfs_ecosystem$(PLUGIN_EXT); else echo "Windows: need $(MPE_HOST_LIB) (build engine first: make -C ../.. engine) or use build_tests.sh (suite host)"; exit 1; fi
+else
+	$(CC) $(CFLAGS) -shared $(MFS_BUNDLE_OBJS) -lm $(MPE_DL_LIBS) $(MPE_WIN_LIBS) -o mfs_ecosystem$(PLUGIN_EXT)
+endif
+
+plugins/mpe_ftc$(PLUGIN_EXT): $(MFS_FTC_MOD_OBJS)
 	@mkdir -p plugins
-	$(CC) $(CFLAGS) -shared $(MFS_FTC_MOD_OBJS) -lm -ldl -o plugins/mpe_ftc.so
+ifeq ($(MPE_WINDOWS),1)
+	@if [ -f "$(MPE_HOST_LIB)" ]; then $(CC) $(CFLAGS) -shared $(MFS_FTC_MOD_OBJS) "$(MPE_HOST_LIB)" -lm $(MPE_DL_LIBS) $(MPE_WIN_LIBS) -o plugins/mpe_ftc$(PLUGIN_EXT); else echo "Windows: need $(MPE_HOST_LIB) (build engine first: make -C ../.. engine) or use build_tests.sh (suite host)"; exit 1; fi
+else
+	$(CC) $(CFLAGS) -shared $(MFS_FTC_MOD_OBJS) -lm $(MPE_DL_LIBS) $(MPE_WIN_LIBS) -o plugins/mpe_ftc$(PLUGIN_EXT)
+endif
+
+# Linux-compat aliases (scripts/tests referencing .so keep working on Linux;
+# on Windows both .so (MSYS2) and .dll (native) are accepted by the loader).
+# Only defined when PLUGIN_EXT differs (Windows) to avoid self-dependency.
+ifeq ($(PLUGIN_EXT),.dll)
+mfs_module_1.so: mfs_module_1$(PLUGIN_EXT)
+	@cp mfs_module_1$(PLUGIN_EXT) mfs_module_1.so 2>/dev/null || true
+mfs_ecosystem.so: mfs_ecosystem$(PLUGIN_EXT)
+	@cp mfs_ecosystem$(PLUGIN_EXT) mfs_ecosystem.so 2>/dev/null || true
+plugins/mpe_ftc.so: plugins/mpe_ftc$(PLUGIN_EXT)
+	@cp plugins/mpe_ftc$(PLUGIN_EXT) plugins/mpe_ftc.so 2>/dev/null || true
+endif
 
 # module_1 drives through drivetrain_update: link the FTC submodule
 # objects too (not ftc_module.o — unneeded here), plus engine objects
-# (single test binary, not a plugin: no -rdynamic host to resolve against).
+# (single test binary, not a plugin: no host to resolve against).
 # (FIX-AUDIT-DESPOT: the duplicate `include mfs_sources.mk` that lived here
 # is removed; the top include already defines MFS_ENGINE_SRCS/FTC_SRCS.)
 MFS_ENGINE_OBJS = $(patsubst %.c,$(BUILD)/eng/%.o,$(MFS_ENGINE_SRCS))
@@ -96,11 +148,11 @@ MFS_MOD1_TEST_EXTRA = $(BUILD)/modules/ftc/submodules/robot.o \
 
 test: $(MFS_MOD1_OBJS) $(MFS_MOD1_TEST_EXTRA) $(MFS_ENGINE_OBJS)
 	$(CC) $(CFLAGS) -DMFS_MODULE_1_TEST modules/module_1/mfs_module_1_test.c $(MFS_MOD1_OBJS) \
-	    $(MFS_MOD1_TEST_EXTRA) $(MFS_ENGINE_OBJS) -lm -ldl -o $(BUILD)/test_mfs_module_1
-	MPE_GAMEPAD_DEVICE=disabled ./$(BUILD)/test_mfs_module_1
+	    $(MFS_MOD1_TEST_EXTRA) $(MFS_ENGINE_OBJS) -lm $(MPE_DL_LIBS) $(MPE_WIN_LIBS) -pthread -o $(BUILD)/test_mfs_module_1$(EXE_EXT)
+	MPE_GAMEPAD_DEVICE=disabled ./$(BUILD)/test_mfs_module_1$(EXE_EXT)
 
 clean:
-	rm -rf $(BUILD) mfs_module_1.so mfs_ecosystem.so plugins/mpe_ftc.so test_mfs_module_1
+	rm -rf $(BUILD) mfs_module_1.so mfs_module_1.dll mfs_ecosystem.so mfs_ecosystem.dll plugins/mpe_ftc.so plugins/mpe_ftc.dll test_mfs_module_1 test_mfs_module_1.exe
 
 -include $(ALL_MFS_DEPS)
 

@@ -17,6 +17,7 @@ import datetime as dt
 import json
 import os
 import re
+import shutil
 import signal
 import subprocess
 import sys
@@ -31,6 +32,26 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 PROJECT_TEMP = PROJECT_ROOT / "temp"
 SRC_DIR = PROJECT_ROOT / "v15S" / "src"
 MAKEFILE = SRC_DIR / "makefile"
+IS_WINDOWS = os.name == "nt" or sys.platform.startswith("win")
+PLUGIN_EXT = ".dll" if IS_WINDOWS else ".so"
+EXE_EXT = ".exe" if IS_WINDOWS else ""
+if IS_WINDOWS and shutil.which("mingw32-make") and not shutil.which("make"):
+    MAKE_CMD = "mingw32-make"
+else:
+    MAKE_CMD = "make"
+def _exe(name: str) -> str:
+    return name + EXE_EXT if not name.endswith(EXE_EXT) and EXE_EXT else name
+def _nproc() -> str:
+    if IS_WINDOWS:
+        try:
+            return str(int(os.environ.get("NUMBER_OF_PROCESSORS", "4")))
+        except ValueError:
+            return "4"
+    try:
+        import multiprocessing
+        return str(multiprocessing.cpu_count())
+    except Exception:
+        return "4"
 SUITE_SOURCE = SRC_DIR / "tests" / "mpe_suite_main.c"
 LEGACY_TARGET = re.compile(r"^[ \t]*build_([A-Za-z0-9_]+):\s+tests/([A-Za-z0-9_]+\.c)(?:\s|$)", re.M)
 SUITE_ENTRY = re.compile(r'^\s*\{"([a-z0-9_]+)",\s*[^,]+,\s*([01])\},\s*$', re.M)
@@ -213,10 +234,14 @@ class Runner:
         if extra_env:
             env.update(extra_env)
         started = time.monotonic()
+        popen_kwargs: dict = dict(cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        if not IS_WINDOWS:
+            popen_kwargs["start_new_session"] = True
+        else:
+            popen_kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
         try:
             proc = subprocess.Popen(
-                list(command), cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                start_new_session=True,
+                list(command), **popen_kwargs,
             )
         except OSError as error:
             duration = time.monotonic() - started
@@ -231,15 +256,21 @@ class Runner:
         except subprocess.TimeoutExpired:
             timed_out = True
             try:
-                os.killpg(proc.pid, signal.SIGTERM)
-            except ProcessLookupError:
+                if IS_WINDOWS:
+                    proc.terminate()
+                else:
+                    os.killpg(proc.pid, signal.SIGTERM)
+            except (ProcessLookupError, OSError):
                 pass
             try:
                 raw, _ = proc.communicate(timeout=3)
             except subprocess.TimeoutExpired:
                 try:
-                    os.killpg(proc.pid, signal.SIGKILL)
-                except ProcessLookupError:
+                    if IS_WINDOWS:
+                        proc.kill()
+                    else:
+                        os.killpg(proc.pid, signal.SIGKILL)
+                except (ProcessLookupError, OSError):
                     pass
                 raw, _ = proc.communicate()
         duration = time.monotonic() - started
@@ -267,15 +298,18 @@ class Runner:
     def core_suite(self, entries: Sequence[tuple[str, bool]], *, sanitizer: bool = False) -> bool:
         name = "suite-v2-asan-ubsan" if sanitizer else "suite-v2-build"
         print(f"\n--- {'ASan + UBSan ' if sanitizer else ''}canonical C suite ---")
+        if IS_WINDOWS and sanitizer:
+            self.add(name, "sanitizers", "SKIP", kind="phase", detail="ASan/UBSan not supported on Windows MinGW; skipped")
+            return True
         if sanitizer:
             build, _ = self.command(
-                name, "sanitizers", ["make", "build_suite", f"CFLAGS={self.sanitizer_cflags()}"], cwd=SRC_DIR,
+                name, "sanitizers", [MAKE_CMD, "build_suite", f"CFLAGS={self.sanitizer_cflags()}"], cwd=SRC_DIR,
                 timeout=900, kind="phase",
             )
-            binary = SRC_DIR / "test_mpe_suite"
+            binary = SRC_DIR / _exe("test_mpe_suite")
         else:
-            build, _ = self.command(name, "suite-v2", ["make", "build_suite"], cwd=SRC_DIR, timeout=900)
-            binary = SRC_DIR / "test_mpe_suite"
+            build, _ = self.command(name, "suite-v2", [MAKE_CMD, "build_suite"], cwd=SRC_DIR, timeout=900)
+            binary = SRC_DIR / _exe("test_mpe_suite")
         if build.status != "PASS":
             return False
 
@@ -338,7 +372,7 @@ class Runner:
         report_suite = "sanitizers" if sanitizer else suite
         prefix = "asan-ubsan/" if sanitizer else ""
         print(f"\n--- Build {len(targets)} {'ASan + UBSan ' if sanitizer else ''}{suite} targets ---")
-        command = ["make", "-j4", *targets]
+        command = [MAKE_CMD, f"-j{_nproc()}", *targets]
         if sanitizer:
             command.append(f"CFLAGS={self.sanitizer_cflags()}")
         build, _ = self.command(f"{prefix}{suite}-build", report_suite, command, cwd=SRC_DIR,
@@ -348,7 +382,7 @@ class Runner:
             return False
         print(f"\n--- Run {len(names)} {'ASan + UBSan ' if sanitizer else ''}{suite} cases in isolated processes ---")
         for name in names:
-            binary = SRC_DIR / f"test_{name}"
+            binary = SRC_DIR / _exe(f"test_{name}")
             row, output = self.command(f"{prefix}{suite}-{name}", report_suite, [str(binary)], cwd=SRC_DIR,
                                        timeout=120, extra_env=self.sanitizer_env() if sanitizer else None)
             if sanitizer and ("ERROR: AddressSanitizer" in output or "runtime error:" in output):
@@ -358,12 +392,16 @@ class Runner:
         return okay
 
     def mfs(self, *, sanitizer: bool = False) -> bool:
+        if IS_WINDOWS and sanitizer:
+            self.add("asan-ubsan-mfs-suite", "sanitizers", "SKIP", kind="phase", detail="ASan/UBSan not supported on Windows; skipped")
+            return True
         print(f"\n--- {'ASan + UBSan ' if sanitizer else ''}MFS robotics tests ---")
         out = self.run_dir / ("mfs-sanitizers" if sanitizer else "mfs")
         out.mkdir(parents=True, exist_ok=True)
+        _mfs_cmd = ["bash", "./build_tests.sh"] if IS_WINDOWS and shutil.which("bash") else (["sh", "./build_tests.sh"] if IS_WINDOWS else ["./build_tests.sh"])
         result, output = self.command(
             "asan-ubsan-mfs-suite" if sanitizer else "mfs-suite", "sanitizers" if sanitizer else "mfs",
-            ["./build_tests.sh"], cwd=SRC_DIR / "ecosystem" / "mfs", timeout=1500,
+            _mfs_cmd, cwd=SRC_DIR / "ecosystem" / "mfs", timeout=1500,
             extra_env={"OUTDIR": str(out), **({
                 "MFS_TEST_CFLAGS": "-O1 -fno-omit-frame-pointer -fsanitize=address,undefined",
                 "MFS_ASAN_HOTLOAD_ODR_SUPPRESS": "1",
@@ -405,10 +443,13 @@ class Runner:
         return result.status == "PASS" and not sanitizer_error
 
     def tui(self, *, sanitizer: bool = False) -> bool:
+        if IS_WINDOWS and sanitizer:
+            self.add("asan-ubsan-tui-smoke", "sanitizers", "SKIP", kind="phase", detail="ASan/UBSan not supported on Windows; skipped")
+            return True
         print(f"\n--- {'ASan + UBSan ' if sanitizer else ''}TUI headless snapshot tests ---")
         smoke_dir = self.run_dir / ("tui-sanitizers" if sanitizer else "tui")
         smoke_dir.mkdir(parents=True, exist_ok=True)
-        command = ["make", "tui-smoke", f"TUI_OUT={smoke_dir}"]
+        command = [MAKE_CMD, "tui-smoke", f"TUI_OUT={smoke_dir}"]
         if sanitizer:
             command.append(f"CFLAGS={self.sanitizer_cflags()}")
         result, _ = self.command("asan-ubsan-tui-smoke" if sanitizer else "tui-smoke-build-run",
@@ -430,9 +471,9 @@ class Runner:
 
     def engine_build(self) -> bool:
         print("\n--- Full GTK engine build and deterministic flags ---")
-        build, _ = self.command("engine-clean-rebuild", "engine", ["make", "-B", "engine"], cwd=SRC_DIR,
+        build, _ = self.command("engine-clean-rebuild", "engine", [MAKE_CMD, "-B", "engine"], cwd=SRC_DIR,
                                 timeout=1200)
-        flags, _ = self.command("engine-check-flags", "engine", ["make", "check-flags"], cwd=SRC_DIR,
+        flags, _ = self.command("engine-check-flags", "engine", [MAKE_CMD, "check-flags"], cwd=SRC_DIR,
                                 timeout=60)
         version_ok = False
         header = SRC_DIR / "mpe_engine.h"
