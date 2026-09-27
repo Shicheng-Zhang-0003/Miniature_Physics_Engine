@@ -34,7 +34,7 @@ typedef struct {
     float axes[gamepad_axis_count];
     bool buttons[gamepad_button_count];
     char device_path[256];
-    int fd;
+    int fd; /* POSIX: joystick fd (>=0) or -1. Windows: XInput index 0..3 or -1. */
     float deadzone;
     bool invert_left_y;
     bool invert_left_x;
@@ -43,7 +43,8 @@ typedef struct {
 
 /* Open the configured joystick device. If device_path is null,
  * MPE_GAMEPAD_DEVICE selects the path; "disabled" skips device access;
- * otherwise the default is /dev/input/js0. */
+ * otherwise the default is /dev/input/js0 on Linux and xinput:0 on
+ * Windows (XInput controller 0; xinput:N selects N, jsN maps to N). */
 bool gamepad_init(gamepad_state *pad, const char *device_path);
 
 /* close the device and release resources. */

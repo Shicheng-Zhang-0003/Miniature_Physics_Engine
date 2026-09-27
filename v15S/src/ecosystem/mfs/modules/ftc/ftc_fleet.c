@@ -1,6 +1,7 @@
 /* FTC robot fleet implementation. */
 #include "ftc_fleet.h"
 #include "submodules/drivetrain.h"
+#include "mfs_platform.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -42,11 +43,37 @@ void ftc_fleet_destroy(void *fleet_state) {
 }
 
 /* Weak link into the bundle's internal registry (defined by
- * mfs_internal.c, ABSENT from standalone mpe_ftc.so builds). Lets fleet
+ * mfs_internal.c, ABSENT from standalone mpe_ftc builds). Lets fleet
  * lookup work through bundle attachments without linking bundle code:
  * when weak-unresolved the pointer is NULL and only the tick-table path
  * applies. */
-__attribute__((weak)) void *mfs_internal_module_state_for(const void *world, const char *name);
+#if MPE_WEAK_SUPPORTED
+MPE_WEAK void *mfs_internal_module_state_for(const void *world, const char *name);
+#else
+/* No weak support (MSVC): avoid a link-time undefined reference (Windows
+ * DLLs must resolve all symbols at link). Resolve the bundle helper at
+ * runtime via GetProcAddress; NULL = tick-table path only. Works for both
+ * standalone and bundle builds. */
+typedef void *(*mfs_internal_lookup_fn)(const void *, const char *);
+static void *mfs_bundle_lookup_runtime(const void *world, const char *name) {
+    static mfs_internal_lookup_fn fn = NULL;
+    static int tried = 0;
+    if (!tried) {
+        tried = 1;
+        HMODULE h = GetModuleHandleA(NULL);
+        if (h) fn = (mfs_internal_lookup_fn)GetProcAddress(h, "mfs_internal_module_state_for");
+        if (!fn) {
+            h = GetModuleHandleA("mfs_ecosystem.dll");
+            if (h) fn = (mfs_internal_lookup_fn)GetProcAddress(h, "mfs_internal_module_state_for");
+        }
+        if (!fn) {
+            h = GetModuleHandleA("mfs_ecosystem.so");
+            if (h) fn = (mfs_internal_lookup_fn)GetProcAddress(h, "mfs_internal_module_state_for");
+        }
+    }
+    return fn ? fn(world, name) : NULL;
+}
+#endif
 
 /* Locate the fleet attached to a world by module name (no side table:
  * the state pointer lives in the world's own tick tables, so worlds
@@ -61,10 +88,17 @@ static ftc_fleet_t *fleet_of(struct physics_world *world) {
             return (ftc_fleet_t *)world->tick_module_state[i];
         }
     }
+#if MPE_WEAK_SUPPORTED
     if (mfs_internal_module_state_for) {
         return (ftc_fleet_t *)mfs_internal_module_state_for((const void *)world,
                                                             FTC_FLEET_MODULE_NAME);
     }
+#else
+    {
+        void *p = mfs_bundle_lookup_runtime((const void *)world, FTC_FLEET_MODULE_NAME);
+        if (p) return (ftc_fleet_t *)p;
+    }
+#endif
     return NULL;
 }
 

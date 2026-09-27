@@ -5,10 +5,11 @@
  *
  * This file is compiled into a static library (libmfs_module_1_core.a)
  * which is then linked with --whole-archive into the shared module.
- * All functions are marked with __attribute__((used)) to prevent
- * optimization removal since they're referenced via function pointers.
+ * All functions are marked with MPE_USED to prevent optimization removal
+ * since they're referenced via function pointers.
  */
 #include "mfs_module_1.h"
+#include "mfs_platform.h"
 #include "core/det_math.h"
 #include "core/mpe_registry.h"
 #include "physics/collision_mechanics.h"
@@ -23,16 +24,16 @@
 #include <string.h>
 
 /* Forward declarations for module hooks (referenced in descriptor) */
-__attribute__((used)) int mfs_module_1_attach(mpe_world_t *world, void **mod_state);
-__attribute__((used)) void mfs_module_1_detach(mpe_world_t *world, void *mod_state);
-__attribute__((used)) void mfs_module_1_pre_step(mpe_world_t *world, float dt, void *mod_state);
-__attribute__((used)) void mfs_module_1_post_step(mpe_world_t *world, float dt, void *mod_state);
+MPE_USED int mfs_module_1_attach(mpe_world_t *world, void **mod_state);
+MPE_USED void mfs_module_1_detach(mpe_world_t *world, void *mod_state);
+MPE_USED void mfs_module_1_pre_step(mpe_world_t *world, float dt, void *mod_state);
+MPE_USED void mfs_module_1_post_step(mpe_world_t *world, float dt, void *mod_state);
 
 /* ================================================================
  * Module Descriptor (exported for dlopen)
  * ================================================================ */
 
-__attribute__((used)) const mpe_module_desc_t mfs_module_1_desc = {
+MPE_USED const mpe_module_desc_t mfs_module_1_desc = {
     .abi = MPE_MODULE_ABI,
     .name = MFS_MODULE_1_NAME,
     .version = MFS_MODULE_1_VERSION,
@@ -56,7 +57,7 @@ __attribute__((used)) const mpe_module_desc_t mfs_module_1_desc = {
  * Module Lifecycle
  * ================================================================ */
 
-__attribute__((used)) int mfs_module_1_attach(mpe_world_t *world, void **mod_state) {
+MPE_USED int mfs_module_1_attach(mpe_world_t *world, void **mod_state) {
     if (!world || !mod_state) return -1;
     
     mfs_module_1_state *state = calloc(1, sizeof(mfs_module_1_state));
@@ -99,7 +100,7 @@ __attribute__((used)) int mfs_module_1_attach(mpe_world_t *world, void **mod_sta
     return 0;
 }
 
-__attribute__((used)) void mfs_module_1_detach(mpe_world_t *world, void *mod_state) {
+MPE_USED void mfs_module_1_detach(mpe_world_t *world, void *mod_state) {
     (void)world;
     if (!mod_state) return;
     
@@ -121,7 +122,7 @@ __attribute__((used)) void mfs_module_1_detach(mpe_world_t *world, void *mod_sta
  * Gamepad Control Step (F310 mapping)
  * ================================================================ */
 
-__attribute__((used)) void mfs_module_1_gamepad_step(mfs_module_1_state *state, float dt) {
+MPE_USED void mfs_module_1_gamepad_step(mfs_module_1_state *state, float dt) {
     (void)dt;
     if (!state->gamepad_initialized || !state->gamepad_control_enabled) return;
     
@@ -319,7 +320,7 @@ __attribute__((used)) void mfs_module_1_gamepad_step(mfs_module_1_state *state, 
  * Pre-step: Main simulation tick
  * ================================================================ */
 
-__attribute__((used)) void mfs_module_1_pre_step(mpe_world_t *world, float dt, void *mod_state) {
+MPE_USED void mfs_module_1_pre_step(mpe_world_t *world, float dt, void *mod_state) {
     mfs_module_1_state *state = (mfs_module_1_state *)mod_state;
     if (!state || !state->robot_created) return;
     
@@ -350,7 +351,7 @@ __attribute__((used)) void mfs_module_1_pre_step(mpe_world_t *world, float dt, v
     drivetrain_update((physics_world *)world, &state->robot, dt);
 }
 
-__attribute__((used)) void mfs_module_1_post_step(mpe_world_t *world, float dt, void *mod_state) {
+MPE_USED void mfs_module_1_post_step(mpe_world_t *world, float dt, void *mod_state) {
     (void)world; (void)dt; (void)mod_state;
     /* No post-step work needed for Module 1 */
 }
@@ -359,7 +360,7 @@ __attribute__((used)) void mfs_module_1_post_step(mpe_world_t *world, float dt, 
  * Field Creation
  * ================================================================ */
 
-__attribute__((used)) void mfs_module_1_field_create(mfs_module_1_state *state) {
+MPE_USED void mfs_module_1_field_create(mfs_module_1_state *state) {
     physics_world *world = state->world;
     const float half_w = MFS_BIOBUZZ_FIELD_WIDTH * 0.5f;
     const float half_l = MFS_BIOBUZZ_FIELD_LENGTH * 0.5f;
@@ -407,7 +408,7 @@ __attribute__((used)) void mfs_module_1_field_create(mfs_module_1_state *state) 
  * Robot Creation
  * ================================================================ */
 
-__attribute__((used)) void mfs_module_1_robot_create(mfs_module_1_state *state) {
+MPE_USED void mfs_module_1_robot_create(mfs_module_1_state *state) {
     physics_world *world = state->world;
     
     /* Create FTC robot with mecanum drivetrain */
@@ -451,7 +452,7 @@ __attribute__((used)) void mfs_module_1_robot_create(mfs_module_1_state *state) 
  * Intake Creation (Roller-based compliant intake)
  * ================================================================ */
 
-__attribute__((used)) void mfs_module_1_intake_create(mfs_module_1_state *state) {
+MPE_USED void mfs_module_1_intake_create(mfs_module_1_state *state) {
     physics_world *world = state->world;
     rigidbody *chassis = mfs_get_chassis(state);
     if (!chassis) return;
@@ -497,7 +498,7 @@ __attribute__((used)) void mfs_module_1_intake_create(mfs_module_1_state *state)
  * Shooter Creation (Flywheel-based)
  * ================================================================ */
 
-__attribute__((used)) void mfs_module_1_shooter_create(mfs_module_1_state *state) {
+MPE_USED void mfs_module_1_shooter_create(mfs_module_1_state *state) {
     physics_world *world = state->world;
     rigidbody *chassis = mfs_get_chassis(state);
     if (!chassis) return;
@@ -550,7 +551,7 @@ __attribute__((used)) void mfs_module_1_shooter_create(mfs_module_1_state *state
  * Ball Spawning & Physics
  * ================================================================ */
 
-__attribute__((used)) void mfs_module_1_ball_spawn(mfs_module_1_state *state, vector3 pos) {
+MPE_USED void mfs_module_1_ball_spawn(mfs_module_1_state *state, vector3 pos) {
     if (state->ball_count >= state->max_balls) return;
     
     physics_world *world = state->world;
@@ -569,7 +570,7 @@ __attribute__((used)) void mfs_module_1_ball_spawn(mfs_module_1_state *state, ve
     }
 }
 
-__attribute__((used)) void mfs_module_1_ball_physics_step(mfs_module_1_state *state, float dt) {
+MPE_USED void mfs_module_1_ball_physics_step(mfs_module_1_state *state, float dt) {
     (void)dt;
     physics_world *world = state->world;
     if (!world) return;
@@ -624,7 +625,7 @@ __attribute__((used)) void mfs_module_1_ball_physics_step(mfs_module_1_state *st
  * Intake Step
  * ================================================================ */
 
-__attribute__((used)) void mfs_module_1_intake_step(mfs_module_1_state *state, float dt) {
+MPE_USED void mfs_module_1_intake_step(mfs_module_1_state *state, float dt) {
     physics_world *world = state->world;
     /* FIX-AUDIT-DESPOT: was `intake_roller_body <= 0` + index_by_id — an
      * object-id checked with an index idiom (id 0/negative conflates
@@ -712,7 +713,7 @@ __attribute__((used)) void mfs_module_1_intake_step(mfs_module_1_state *state, f
  * Shooter Step
  * ================================================================ */
 
-__attribute__((used)) void mfs_module_1_shooter_step(mfs_module_1_state *state, float dt) {
+MPE_USED void mfs_module_1_shooter_step(mfs_module_1_state *state, float dt) {
     physics_world *world = state->world;
     /* FIX-AUDIT-DESPOT: same id-vs-index cleanup as the intake step. */
     if (!world) return;
@@ -822,7 +823,7 @@ __attribute__((used)) void mfs_module_1_shooter_step(mfs_module_1_state *state, 
  * Robot Drive Step
  * ================================================================ */
 
-__attribute__((used)) void mfs_module_1_robot_drive_step(mfs_module_1_state *state, float dt) {
+MPE_USED void mfs_module_1_robot_drive_step(mfs_module_1_state *state, float dt) {
     (void)dt;
     if (!state->robot_created) return;
     
@@ -837,7 +838,7 @@ __attribute__((used)) void mfs_module_1_robot_drive_step(mfs_module_1_state *sta
  * Public API
  * ================================================================ */
 
-__attribute__((used)) void mfs_module_1_set_drive_commands(mfs_module_1_state *state,
+MPE_USED void mfs_module_1_set_drive_commands(mfs_module_1_state *state,
                                      float forward, float strafe, float rotate) {
     if (!state) return;
     state->drive_forward = forward;
@@ -845,18 +846,18 @@ __attribute__((used)) void mfs_module_1_set_drive_commands(mfs_module_1_state *s
     state->drive_rotate = rotate;
 }
 
-__attribute__((used)) void mfs_module_1_set_intake(mfs_module_1_state *state, bool active) {
+MPE_USED void mfs_module_1_set_intake(mfs_module_1_state *state, bool active) {
     if (!state) return;
     state->intake_active = active;
 }
 
-__attribute__((used)) void mfs_module_1_set_shooter(mfs_module_1_state *state, bool spinup, bool fire) {
+MPE_USED void mfs_module_1_set_shooter(mfs_module_1_state *state, bool spinup, bool fire) {
     if (!state) return;
     state->shooter_spinup_cmd = spinup;
     state->shooter_fire_cmd = fire;
 }
 
-__attribute__((used)) void mfs_module_1_get_stats(const mfs_module_1_state *state,
+MPE_USED void mfs_module_1_get_stats(const mfs_module_1_state *state,
                             int *balls_collected, int *balls_fired,
                             float *shooter_rpm, bool *shooter_ready) {
     if (!state) return;
