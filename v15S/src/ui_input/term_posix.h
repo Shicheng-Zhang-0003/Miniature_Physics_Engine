@@ -8,10 +8,13 @@
  * signatures, text buffers, key events) — nothing here replaces those.
  * All functions are static inline: zero link surface, no ODR risk
  * across the duplicated GTK4/GTK3 blocks that include this header.
+ * Windows: clock_gettime etc via core/mpe_platform.h (no behaviour change
+ * on Linux).
  */
 #ifndef _POSIX_C_SOURCE
 #define _POSIX_C_SOURCE 200809L
 #endif
+#include "../core/mpe_platform.h"
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>

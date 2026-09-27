@@ -1,5 +1,6 @@
 /* GTK4-PREP: zero GUI headers in render (GL only). */
 #include <epoxy/gl.h>
+#include "../core/mpe_platform.h"
 #include <epoxy/gl_generated.h>
 #include "../core/physics_world.h"
 #include "../core/rigidbody.h"
@@ -73,7 +74,7 @@ void render_init() {
     instanced_shader_program = create_shader_program(vs_path, fs_path);
     if (instanced_shader_program == 0) {
         char alt_vs[512], alt_fs[512];
-        const char *home = getenv("HOME");
+        const char *home = mpe_home_dir();
         if (home) {
             snprintf(alt_vs, sizeof(alt_vs), "%s/.local/share/mpe/shaders/vertex_shader.glsl", home);
             snprintf(alt_fs, sizeof(alt_fs), "%s/.local/share/mpe/shaders/fragment_shader.glsl", home);

@@ -8,6 +8,7 @@
  *   mod use-broadphase <name|builtin>  swap broadphase backend
  *   mod use-solver <name|builtin>      swap solver backend
  */
+#include "../core/mpe_platform.h"
 #include "term_priv.h"
 #include "../core/mpe_registry.h"
 #include "../core/mpe_loader.h"

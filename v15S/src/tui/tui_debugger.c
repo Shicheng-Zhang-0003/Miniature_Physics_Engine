@@ -16,7 +16,25 @@
 #include "../physics/broadphase.h"
 #include "../physics/islands.h"
 #include <math.h>
+#ifdef MPE_OS_WINDOWS
+#if defined(__has_include)
+#if __has_include(<ncurses.h>)
 #include <ncurses.h>
+#elif __has_include(<ncurses/ncurses.h>)
+#include <ncurses/ncurses.h>
+#elif __has_include(<curses.h>)
+#include <curses.h>
+#elif __has_include(<pdcurses.h>)
+#include <pdcurses.h>
+#else
+#include <ncurses.h>
+#endif
+#else
+#include <curses.h>
+#endif
+#else
+#include <ncurses.h>
+#endif
 #include <stdio.h>
 #include <string.h>
 

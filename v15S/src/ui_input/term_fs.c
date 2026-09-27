@@ -3,6 +3,7 @@
 /* term_fs.c — Filesystem commands: help..kill.
  * Split from debug_terminal.c (pure motion, no behaviour change).
  * Shared shell core lives in debug_terminal.c; see term_priv.h. */
+#include "../core/mpe_platform.h"
 #include "../mpe_engine.h"
 #include "debug_terminal.h"
 #include "term_priv.h"

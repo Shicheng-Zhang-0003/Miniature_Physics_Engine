@@ -1,4 +1,5 @@
 #include "mpe_engine.h"
+#include "core/mpe_platform.h"
 #include "core/validation_report.h"
 #include "physics/depenetration.h"
 #include "core/simulation_camera.h"
@@ -10,7 +11,9 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <sys/stat.h>
-#include <unistd.h> /* MPE_TASK_39 access() */
+#ifndef MPE_OS_WINDOWS
+#include <unistd.h>
+#endif /* MPE_TASK_39 access() */
 
 //World Status right now
 frame_timer main_timer;

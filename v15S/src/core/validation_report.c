@@ -4,6 +4,7 @@
 */
 /* GTK4-PREP: zero GUI headers in core. */
 #include "../config/mpe_config.h"
+#include "core/mpe_platform.h"
 #include "../config/mpe_constants.h"
 #include "physics_world.h"
 #include "debug_counters.h"
@@ -14,7 +15,9 @@
 #include "../ui_input/input_state.h"
 #include "../ui_input/camera.h"
 #include <stdio.h>
+#ifndef MPE_OS_WINDOWS
 #include <unistd.h>
+#endif
 #include <math.h>
 #include <stdbool.h>
 
