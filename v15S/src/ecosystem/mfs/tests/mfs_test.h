@@ -61,6 +61,19 @@ static inline void mfs_test_end(mfs_test_t *t) {
         g_cfg = t->cfg_saved;
         t->cfg_active = 0;
     }
+    /* DESPOT-2026-09-28 (programming: reset-but-never-asserted): the v2
+     * header promises "determinism counters asserted zero" — now they are.
+     * Heading frame is det_sin/cos in-contract and engine damping pow is
+     * chunked in-contract, so any nonzero total is a real regression. */
+    {
+        unsigned long fp = det_fallback_pow_total();
+        unsigned long ft = det_fallback_trig_total();
+        t->checks++;
+        if (fp != 0 || ft != 0) {
+            t->failures++;
+            printf("[FAIL] %s: det fallbacks pow=%lu trig=%lu (want 0)\n", t->name, fp, ft);
+        }
+    }
 }
 
 #define MFS_CHECK(t, cond) \
@@ -146,8 +159,25 @@ static inline int mfs_test_finite(physics_world *w) {
             !isfinite(rb->angular_velocity.x) || !isfinite(rb->angular_velocity.y) || !isfinite(rb->angular_velocity.z)) {
             return 0;
         }
+        /* DESPOT-2026-09-28 (programming: orientation/current/SoC/odom
+         * unchecked): a NaN quaternion poisons every contact lever in the
+         * next tick while pos/vel stay finite — watch it too. */
+        if (!isfinite(rb->orientation.w) || !isfinite(rb->orientation.x) ||
+            !isfinite(rb->orientation.y) || !isfinite(rb->orientation.z)) {
+            return 0;
+        }
     }
     return 1;
+}
+
+/* DESPOT-2026-09-28 (programming: direct w.bodies[chassis_body] with no
+ * bounds check — OOB read if chassis_body == -1). Single checked accessor;
+ * NULL means unset-or-gone, uniformly. */
+static inline rigidbody *mfs_chassis_or_null(physics_world *w, ftc_robot *robot) {
+    if (!w || !robot) return NULL;
+    int idx = robot->chassis_body;
+    if (idx < 0 || idx >= w->body_count) return NULL;
+    return &w->bodies[idx];
 }
 
 static inline int mfs_step(physics_world *w, int n, float dt) {
@@ -165,7 +195,8 @@ static inline int mfs_step(physics_world *w, int n, float dt) {
  * Fixes the old rig bug where only chassis was lifted, winching wheels up
  * through pendulum chaos. */
 static inline void mfs_lift_whole_robot(physics_world *w, ftc_robot *robot, const vector3 *lift) {
-    rigidbody *chassis = &w->bodies[robot->chassis_body];
+    rigidbody *chassis = mfs_chassis_or_null(w, robot);
+    if (!chassis) return;
     chassis->position = vector3_addition(chassis->position, *lift);
     chassis->velocity = vector3_zero();
     chassis->angular_velocity = vector3_zero();
@@ -197,7 +228,8 @@ static inline void mfs_lift_whole_robot(physics_world *w, ftc_robot *robot, cons
 static inline void mfs_lift_robot_for_free_spin(physics_world *w, ftc_robot *robot) {
     const vector3 lift = {0.0f, 1.9f, 0.0f};
     mfs_lift_whole_robot(w, robot, &lift);
-    rigidbody *chassis = &w->bodies[robot->chassis_body];
+    rigidbody *chassis = mfs_chassis_or_null(w, robot);
+    if (!chassis) return;
     rigidbody_set_kinematic(chassis, true);
     chassis->velocity = vector3_zero();
 }

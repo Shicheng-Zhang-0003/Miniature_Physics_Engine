@@ -8,45 +8,18 @@
 #define DT (1.0f/60.0f)
 #define FTC_ITERS 128
 
-#define MFS_BEGIN_TEST(name) \
-    mfs_test_t t; \
-    mfs_test_begin(&t, name); \
-    mfs_test_t *t_ptr = &t; \
-    physics_world w; \
-    mfs_test_world(&w); \
-    g_cfg.timestep.solver_iterations = FTC_ITERS; \
-    constraint_pool_init(&w); \
-    mfs_test_t *t = t_ptr;
-
-#define MFS_END_TEST() \
-    physics_world_cleanup(&w); \
-    mfs_test_end(t_ptr); \
-    return t_ptr->failures;
-
-#define MFS_CREATE_ROBOT_ROBOT() \
-    int rc = ftc_robot_create_with_drive(&w, &robot, 0.0f, ftc_robot_rest_height(), 0.0f, \
-                                         MOTOR_GB_5203_26_9, FTC_DRIVETRAIN_TANK); \
-    if (rc != 0) { printf("[FAIL] could not create robot\n"); }
-
-#define MFS_ROBOT_LIFT_FREE_SPIN() \
-    do { \
-        const vector3 lift = {0.0f, 1.9f, 0.0f}; \
-        mfs_lift_whole_robot(&w, &robot, &lift); \
-        rigidbody *chassis = &w.bodies[robot.chassis_body]; \
-        rigidbody_set_kinematic(chassis, true); \
-        chassis->velocity = vector3_zero(); \
-    } while(0)
-
-#define MFS_DRIVE_TANK(l, r) drivetrain_tank(&robot, l, r)
-#define MFS_UPDATE() drivetrain_update(&w, &robot, DT); physics_world_step(&w, DT)
-#define MFS_CHECK_FINITE() if (!mfs_test_finite(&w)) { t_ptr->failures++; }
+/* DESPOT-2026-09-28: deleted 7 dead macros (MFS_BEGIN/END_TEST with a
+ * shadowed `t` redefinition, CREATE_ROBOT, LIFT_FREE_SPIN with unchecked
+ * chassis access, DRIVE_TANK/UPDATE/CHECK_FINITE) — defined, never used.
+ * Tests use explicit begin/world/end; lifts use mfs_lift_whole_robot. */
 
 /* T1: Free fall y = h - 0.5*g*t^2, v = -g*t ±0.5 */
 int mfs_t_freefall(void) {
     mfs_test_t t; mfs_test_begin(&t, "freefall"); mfs_test_t *t_ptr = &t;
     physics_world w; mfs_test_world(&w);
     int s = physics_world_add_sphere(&w, 0.5f, 1.0f, (vector3){0.0f, 10.0f, 0.0f});
-    if (s < 0) { t_ptr->failures++; return t_ptr->failures; }
+    /* DESPOT-2026-09-28: early return leaked the world + saved config. */
+    if (s < 0) { t_ptr->failures++; physics_world_cleanup(&w); mfs_test_end(t_ptr); return t_ptr->failures; }
     w.bodies[s].velocity = (vector3){0.0f, 0.0f, 0.0f};
     w.bodies[s].restitution = 0.0f;
     const float dt = 1.0f/60.0f;

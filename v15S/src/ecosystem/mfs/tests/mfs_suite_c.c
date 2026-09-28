@@ -108,7 +108,8 @@ int mfs_t_ftc_hotload(void) {
     /* fallback: also try without ./ prefix (MSYS2 vs native CWD) */
     if (access(ftc_path, R_OK) != 0) { ftc_path = mpe_pick_plugin("plugins/mpe_ftc.so", ftc_buf, sizeof(ftc_buf)); }
     void *handle = dlopen(ftc_path, RTLD_NOW);
-    if (!handle) { t_ptr->failures++; physics_world_cleanup(&w1); return t_ptr->failures; }
+    /* DESPOT-2026-09-28: early return leaked saved config (no end). */
+    if (!handle) { t_ptr->failures++; physics_world_cleanup(&w1); mfs_test_end(t_ptr); return t_ptr->failures; }
     const mpe_module_desc_t *dyn_desc = dlsym(handle, "mpe_module_desc");
     typedef int (*spawn_fn_t)(struct physics_world *, float, float, float, int, int);
     typedef ftc_robot *(*get_fn_t)(struct physics_world *, int);
@@ -176,6 +177,9 @@ int mfs_t_ftc_hotload(void) {
     physics_world_detach_module(&w1, "ftc-fleet");
     physics_world_cleanup(&w1);
     physics_world_cleanup(&w2);
+    /* DESPOT-2026-09-28: begin without end leaked config (and never
+     * checked det counters) — end restores + asserts zero fallbacks. */
+    mfs_test_end(t_ptr);
     return t_ptr->failures;
 }
 
@@ -195,7 +199,13 @@ int mfs_t_module_1(void) {
 
     extern const mpe_module_desc_t mfs_module_1_desc;
     void *state = NULL;
-    if (mfs_module_1_attach(&w, &state) != 0) { t_ptr->failures++; return t_ptr->failures; }
+    /* DESPOT-2026-09-28: attach-fail return leaked the world + config. */
+    if (mfs_module_1_attach(&w, &state) != 0) {
+        t_ptr->failures++;
+        physics_world_cleanup(&w);
+        mfs_test_end(t_ptr);
+        return t_ptr->failures;
+    }
     mfs_module_1_state *ms = (mfs_module_1_state *)state;
     const float dt = DT;
     int fail = 0;
@@ -237,16 +247,34 @@ int mfs_t_module_1(void) {
     }
     mfs_module_1_detach(&w, state);
     physics_world_cleanup(&w);
+    /* DESPOT-2026-09-28: begin without end (see hotload). */
+    mfs_test_end(t_ptr);
     return t_ptr->failures;
 }
 
 /* physics_truth: re-exported from suite_b for unified run */
 int mfs_t_physics_truth(void) {
-    return mfs_t_freefall() + mfs_t_inertia() + mfs_t_bounce() +
+    /* DESPOT-2026-09-28 (programming: suite_b raw tests never reset/check
+     * det counters — only freefall uses begin/end). Aggregate gate over all
+     * 15 subtests: any out-of-contract transcendental anywhere fails loud.
+     * Config needs no save here: every raw subtest starts with
+     * mpe_config_init() (init IS the isolation), and freefall's begin/end
+     * restores around itself. */
+    det_fallback_reset();
+    int rc = mfs_t_freefall() + mfs_t_inertia() + mfs_t_bounce() +
            mfs_t_rolling() + mfs_t_rolling_resistance() +
            mfs_t_motor_free_speed() + mfs_t_motor_stall() +
            mfs_t_back_emf() + mfs_t_static_friction() +
            mfs_t_kinetic_friction() + mfs_t_stability() +
            mfs_t_coast_down() + mfs_t_energy() +
            mfs_t_cylinder_rest() + mfs_t_revolute_anchor();
+    {
+        unsigned long fp = det_fallback_pow_total();
+        unsigned long ft = det_fallback_trig_total();
+        if (fp != 0 || ft != 0) {
+            printf("[FAIL] physics_truth: det fallbacks pow=%lu trig=%lu (want 0)\n", fp, ft);
+            rc++;
+        }
+    }
+    return rc;
 }
