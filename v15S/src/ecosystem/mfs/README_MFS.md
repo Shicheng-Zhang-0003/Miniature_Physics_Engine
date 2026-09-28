@@ -90,7 +90,7 @@ Design rules modules follow (and future modules should too):
 
 ## Build & run
 
-From `v15S/src`:
+From `v15S/src` (canonical — what CI and the release ritual use):
 
 ```
 ecosystem/mfs/build_tests.sh            # full FTC suite (8 gated, unified mfs_suite --all, + build checks + ungated diags)
@@ -103,9 +103,19 @@ only accepts `plugins/<name>.so` under its working directory, so that copy
 is what `mod load` and the hotload test use (same binary as
 `mfs/plugins/`; both gitignored build output). Test mains select via `-D`.
 
-Standalone (out-of-tree, engine untouched): `make -C ecosystem/mfs`
-(`mfs_module_1.so`, `mfs_ecosystem.so`, `mpe_ftc.so` into `plugins/`),
-`make -C ecosystem/mfs test`, or from `v15S/src`: `make mfs_ecosystem.so`.
+Standalone, from a bare 461-MFS checkout (dual-mode since 2026-09-28 —
+same file, auto-discovers the engine via `$MFS_ENGINE_SRC` or sibling
+`../475-MPE/v15S/src`):
+
+```
+./build_tests.sh [--build-only]   # full suite, outputs under ./temp/ftc_tests
+make && make test                 # thin .so files + module_1 test
+```
+
+Thin-`.so` builds (either tree): `make` produces `mfs_module_1.so`,
+`mfs_ecosystem.so`, `plugins/mpe_ftc.so`; `make test` runs the module_1
+test. Out-of-tree engine work needs nothing else; or from `v15S/src`:
+`make mfs_ecosystem.so`.
 
 Inside the engine terminal (no rebuild needed — full drive session):
 
@@ -158,14 +168,22 @@ physics_world_detach_module(world, "ftc-fleet");
 - Traction control (`wheel_traction_scale`): cuts torque only on
   overspeed (burnout); under-speed keeps full torque so wheels spin up
   to rolling speed instead of skidding.
-- Mecanum strafe is EMERGENT from real roller contacts (FIX-AUDIT-DESPOT:
-  this replaces the retired chassis-force era — no more `sin45·Στ/r`
-  roller force on the chassis, no 1.1× static-cone breakaway margin, no
-  `odom_slip` fusion ticks). Each wheel carries 8 real roller bodies on
-  free revolute bearings (see `robot.c` geometry rationale); lateral thrust
-  falls out of rigid-body dynamics + Coulomb friction, bounded by the
-  friction cone for free. Odometry is therefore pure encoder kinematics
-  and `odom_slip` stays 0 (retained in the struct for ABI only).
+- Mecanum strafe is TRANSMITTED by the analytic roller force
+  (MFS-STRAFE-A, default ON for mecanum only): each wheel carries its
+  roller-axle direction (`wheel_roller_angle`, X-pattern ±45°) and
+  `drivetrain_mecanum_analytic` applies the Coulomb-capped (0.7*N),
+  dissipative, contact-gated lateral force at the wheel contact plus its
+  r×F motor-load torque — bounded by the friction cone for free, no
+  chassis force ever (verified: no sin45/torque-proportional term; the
+  retired `sin45·Στ/r` chassis injection stays deleted). Analytic-mode
+  hubs ship zero isotropic friction (engine contact supplies the normal
+  only: one tangential model, no double count), and no roller
+  bodies/joints are built (6 bodies / 4 joints). This replaces the
+  retired chassis-force era AND the articulated 32-roller build (kept
+  behind `ftc_robot_set_mecanum_analytic_default(0)` for forensics):
+  strafe +X 3.40 m in 3 s vs 0.30 m gated; diagonal (0.5,0.5) composes
+  to (1.19,1.20) m. Odometry is therefore pure encoder kinematics
+  and `odom_slip` stays honest (1 during peel, reporting only).
 - Motor model: implicit-in-speed solve with disturbance observer
   (stall *and* free speed both exact), free-speed governor backstop,
   copper thermal derating, 20 A PTC fuse with brownout recovery.
@@ -187,21 +205,29 @@ physics_world_detach_module(world, "ftc-fleet");
 - Static settle shows a systematic left-high roll (~15 mm) that follows
   world X under 90° rotation: solver pair-order lock-in, not assembly
   geometry. Harmless to all gates.
-- Wheel spin is bounded two ways: the free-speed governor (hard backstop
-  at 1.1× free speed) and the implicit motor solve (no discrete-time
-  overshoot). Unbounded torque can no longer pump wheels to span-busting
-  speeds through the FTC paths.
+- Wheel spin is bounded two ways: the free-speed governor (diode at 1.155×
+  the voltage-scaled no-load point on measured speed) and the implicit
+  motor solve (no discrete-time overshoot). Unbounded torque can no longer
+  pump wheels to span-busting speeds through the FTC paths.
 - Odometry is pure encoder forward kinematics (no chassis fusion), so any
   encoder-vs-truth disagreement is real slip and is reported as error
   rather than papered over. `odom_slip` flags >0.25 m/s planar or
   >0.35 rad/s yaw encoder-vs-truth disagreement (reporting only; odometry
   is never corrected). Encoders are PPR-quantized (counts = base_ppr x
   gear), so creep speeds staircase like hardware.
-- KNOWN FAILURE [MFS-STRAFE-F1/F2, 2026-09-26]: mecanum strafe develops
-  ~0.01 m vs 0.30 m gated. The 5-link ground->roller->bearing->hub chain
-  does not converge in the GS solver (axis sweep 0.002-0.014 m; both
-  roller-spin prescriptions ~0.01-0.07 m). Roller spin is quasi-static
-  (stiff-DOF-slaved, labeled in robot.c), contacts carry all force — but
-  no lateral transmits. Fix needs solver-level work (reduced articulation
-  or direct roller constraint). Suite marks both strafe gates XFAIL (loud,
-  ticketed); forward/tank/hotload/module_1/physics_truth all hard-gate.
+- KNOWN FAILURE [MFS-STRAFE-F1 FIXED 2026-09-28, F2 FIXED 2026-09-28]:
+  F1 strafe develops 2.96–3.40 m vs 0.30 m gated (hard-gated in the
+  suite). F2 transmit fixed (physics 0.87 m in 1 s vs 0.10 m, hard-gated)
+  AND encoder tracking fixed (odom ~1.08 m vs 0.87 m physics, ~25% vs 30%
+  allowed — was 88% over): the implicit clamp and governor took
+  min(spec, V-line) while the explicit observer twin ran unclamped, so at
+  fresh-pack voltage the paths disagreed 6.7% and the observer carried a
+  phantom load into peel; voltage-scaling both bounds to the V-line
+  no-load point closed it (A/B isolated, deterministic under -O2 and
+  -O1+ASan). Margin is thin (25 vs 30) — the XFAIL branch stays as a
+  fallback tripwire. `odom_slip` still flags real slip elsewhere.
+  The articulated 5-link ground->roller->bearing->hub chain does not
+  converge in the GS solver (0.03–0.17 m chaotic across 64–512
+  iterations; solver mathematics in KNOWN_FAILURES.md); the rail-ellipse
+  aggregate also measured dead (0.001 m, static-stick lock). All 8 suite
+  tests hard-gate; forward/tank/hotload/module_1/physics_truth unaffected.

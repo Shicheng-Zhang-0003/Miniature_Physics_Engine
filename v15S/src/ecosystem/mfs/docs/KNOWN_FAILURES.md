@@ -4,24 +4,83 @@ Defects and limits that are measured, ticketed, and NOT hidden by gates.
 Suite marks are XFAIL (loud + ticketed) or documented observations — never
 silent passes. Measurements from the 2026-09-26 audit on this tree.
 
-## [MFS-STRAFE-F1/F2] Mecanum strafe does not transmit (structural)
+## [MFS-STRAFE-F1] Mecanum strafe did not transmit (FIXED 2026-09-28)
 
-- **Symptom:** pure strafe develops ~0.01 m in 3 s vs 0.30 m gated
-  (`mecanum`); odometry strafe phase sees physics dx ≈ 0.005–0.012 m while
-  encoders report ≈ 0.6–0.76 m (correct reporting of real slip).
-- **Mechanism:** the 5-link ground → roller → bearing → hub constraint chain
-  does not converge in the Gauss-Seidel solver at 128 iterations. Measured:
-  roller-axis sweep 0.002–0.014 m; command-prescribed roller spin +0.01 m;
-  measured-speed prescription −0.06 m (wrong sign, same dead magnitude —
-  so it is a solver frontier, not a prescription-source question).
+- **Was:** pure strafe developed ~0.01 m in 3 s vs 0.30 m gated
+  (`mecanum`); the 5-link ground → roller → bearing → hub chain did not
+  converge in GS-128 (roller-axis sweep 0.002–0.014 m; both roller-spin
+  prescriptions ~0.01–0.07 m).
+- **Fix (approach (a)):** analytic roller-kinematics lateral force at each
+  wheel contact (`drivetrain_mecanum_analytic` in
+  `modules/ftc/submodules/drivetrain.c`; model selected in `robot.c` via
+  the `mecanum_analytic` flag, default ON for mecanum only, tank
+  untouched). No roller bodies/joints are built in analytic mode (6
+  bodies / 4 joints); the force is Coulomb-capped (|F| <= 0.7*N,
+  static-share normal), dissipative (opposes measured axle-slip, zero at
+  zero slip), contact-gated, applied at the wheel (plus r×F motor load) —
+  never to the chassis, no sin45 torque term (grep-clean, verified).
+  Analytic-mode hubs ship zero isotropic friction so engine contact
+  supplies the normal only: a single tangential model, never
+  double-counted past the cone.
+- **Measured (128 iters, tile floor):** strafe +X 3.40 m / -X 3.66 m in
+  3 s (gate 0.30 m); mecanum forward 2.52 m, reverse 3.09 m; diagonal
+  (0.5, 0.5) → (1.19, 1.20) m; yaw in strafe <= 0.13 rad; iteration sweep
+  64–512 flat at 3.40–3.64 m. Suite hard-gates F1 now.
+- **Approaches measured and parked:** (b) wheel-level anisotropic rail
+  ellipse (the `MECANUM_USE_RAIL_CONTACT` path): 0.001 m at 128 — the
+  solver's static stick converges to lock; (c) iteration raise 64–512 on
+  the articulated build: strafe wandered 0.03–0.17 m chaotically
+  (non-monotonic), forward decayed 3.10→2.21 m — structural, not
+  under-convergence. Engine 512-iteration ceiling tried for the sweep,
+  then reverted (unneeded at 128 with the fix).
 - **What was ruled out:** the retired chassis-force cheat (`sin45·Στ/r`,
-  gone — verified by grep); roller geometry (X-pattern ±45 verified);
-  governor starvation and P2P sign (both fixed, strafe still dead); the rail
-  aggregate model (also measured dead, plus forward peel-out).
-- **Fix needs:** solver-level work — reduced-coordinate articulation or a
-  direct roller constraint. Not gating pressure.
-- **Suite status:** both strafe gates XFAIL with measured values printed;
-  forward / tank / hotload / module_1 / physics_truth all hard-gate.
+  still gone — verified by grep); roller geometry (X-pattern ±45
+  verified); governor starvation and P2P sign (fixed earlier).
+- **Revert path:** `ftc_robot_set_mecanum_analytic_default(0)` before
+  creation restores the articulated real-roller build (forensics).
+
+## [MFS-STRAFE-F2] Odometry strafe tracking (FIXED 2026-09-28)
+
+- **Transmit half FIXED (analytic lateral):** strafe physics reaches
+  0.87 m in 1 s vs 0.10 m required; hard-gated.
+- **Tracking half FIXED (voltage-scaled motor/governor bounds):** encoders
+  report ~1.08 m vs 0.87 m physics (~25% over; needs <= 30%). Was 88% over
+  (~1.53 m vs 0.81 m): the implicit clamp took min(spec, V-line) while the
+  explicit observer twin ran unclamped, so at fresh-pack voltage the two
+  paths disagreed 6.7% and the observer carried a phantom load into peel.
+  Scaling BOTH bounds to the V-line no-load point `Vterm/(kv·gear)`
+  (motor.c clamp + robot.c governor, spec kept as Kv-degenerate fallback)
+  closed it — isolated by A/B (spec-fixed bounds reproduce 88%, V-line
+  bounds give 25%, transmit 3.40 m both ways). `odom_slip` still flags real
+  slip elsewhere. Deterministic (bit-identical across runs, -O2 and
+  -O1+ASan, zero sanitizer errors).
+- **Margin note:** 25% vs 30% allowed is thin. The suite's XFAIL branch
+  stays as a fallback tripwire (fires only if tracking ever regresses past
+  30%), not as the verdict. Phase-1 forward tracking (8.9%) stays
+  hard-gated with room to spare.
+
+## Solver mathematics: why GS could not converge the 5-link chain
+
+- Kept for forensics (the articulated build is one flag away). Per
+  roller, the lateral path is floor contact (Coulomb cone projection, a
+  non-smooth inequality) → roller body (14 g, I ≈ 2.5e-7 kg·m²) →
+  revolute bearing P2P (3-DOF position lock, Baumgarte-biased) + axis
+  alignment (2-DOF) → hub (0.2 kg) → revolute → chassis (8 kg). Mass
+  ratios up to 571:1 spread the effective-mass matrix spectrum; the
+  friction-cone projection and the bearing stiffness fight over the same
+  roller velocity each sweep (contacts solved, then joints overwrite,
+  2 visits/iteration). Gauss-Seidel converges such coupled
+  inequality/equality systems only when the coupling is weak; here the
+  bearing is quasi-rigid next to a 14 g roller, so successive sweeps
+  oscillate between sticking the contact and satisfying the joint —
+  the fixed point exists (the true articulated solution strafes) but
+  the contraction factor is ~1 at 571:1, hence 0.03–0.17 m of chaotic
+  partial convergence at 64–512 iterations instead of monotone
+  refinement. Forward survived because its force path projects mostly
+  onto the P2P position lock (stiff, convergent), while lateral lives
+  in the cone-projection/bearing-stiffness null fight. Reduced
+  articulation (analytic: 6 bodies/4 joints, no bearing in the loop)
+  removes the coupling rather than out-iterating it.
 
 ## Jointed air-spin limit cycle (contained frontier)
 

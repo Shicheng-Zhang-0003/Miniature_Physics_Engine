@@ -42,18 +42,25 @@ Exact stall (w=0 → I=Istall → τ=spec) and exact free (I=0 at
 
 **Implicit-in-speed solve** (`motor_update_load`, motor.c:104-214) —
 required, not optional: axle inertia `Iaxle = ½·m·r² ≈ 2.5e-4` with stall
-~3.7 N·m moves ~30 rad/s/tick explicit, unconditionally unstable:
+~2.4 N·m moves ~160 rad/s/tick explicit (DESPOT-2026-09-28: was "~30",
+recomputed 2.38·(1/60)/2.5e-4 ≈ 159 for 19.2:1, 250+ for 26.9:1 and up),
+unconditionally unstable:
 
 ```
 A = Kt·gear·eff / r_eff,   B = Kv·gear
 w_end = (w + (A·V + τL)·dt / Iaxle) / (1 + A·B·dt / Iaxle)
 ```
 
-`τL` is the disturbance-observer load (below). `w_end` is clamped to
-`min(spec_free, V/(Kv·gear))`, one-sided (never below `|w_meas|`, preserving
-regen braking) — the physically exact saturation of the V–w line. A
-`torque_explicit` twin at measured speed is kept for feedforward sizing vs
-the observer-softened `output_torque`.
+`τL` is the disturbance-observer load (below). `w_end` is clamped to the
+V-line no-load point `Vbatt/(Kv·gear)` at the CURRENT bus voltage
+(DESPOT-2026-09-28: was `min(spec_free, V-line)` — at fresh-pack 12.8 V the
+V-line sits 6.7% above spec, so min() pinned implicit 6.7% below explicit
+and the "identical endpoints" claim was false off-nominal; spec survives
+only as the Kv-degenerate fallback), one-sided (never below `|w_meas|`,
+preserving regen braking) — the physically exact saturation of the V–w
+line. A `torque_explicit` twin at measured speed feeds the observer
+(`tau_exp_prev`; DESPOT-2026-09-28: the old "feedforward roller-thrust
+sizing" consumer never existed — the analytic lateral is slip-driven).
 
 **Disturbance observer** (robot.c:704-719):
 `τL = Iaxle·(w - w_prev)/dt - τ_exp_prev`, clamped to **±2× output stall**
@@ -63,9 +70,11 @@ limit cycle; 2× stall keeps full locked-rotor tracking while starving the
 chaos loop. Holds full stall at lock; converges to ~0 when free.
 
 **Thermal** (both paths heat with `r_eff`):
-`dT = I²·r·dt·0.1 - (T-25)·0.01·dt`, floor 25 °C. Coefficients are
-telemetry-grade magic (no thermal mass, no magnet derating) — negligible at
-FTC currents.
+`dT = I²·r·dt·0.1 - (T-25)·0.01·dt`, floor 25 °C, ceiling 150 °C (magnet
+limit). Coefficients are telemetry-grade magic — but NOT "negligible at
+FTC currents" (DESPOT-2026-09-28: equilibrium is ΔT_eq = 10·I²·r, so a 2 A
+cruise at r≈1.3 Ω settles +52 °C, +20% R; sustained stall is contained in
+practice by the pack fuse browning out, not by this model).
 
 **Not modeled:** inductance, PWM, brush drop, gearbox stiction,
 load-dependent efficiency, per-motor PTC (fuse is pack-level only),
@@ -120,12 +129,41 @@ open loop; never regulate on unobservable error) and airborne
 **Torque shaping** (robot.c:819-885, all TUNED unless noted):
 
 - slew 0.6 N·m/tick (ESC current-slew stand-in; lets grip establish),
-- governor diode at 1.155× free on **measured** speed (zero outward push
-  past bound, no reversing slam),
+- governor diode at 1.155× the VOLTAGE-SCALED no-load point
+  `Vterm/(kv·gear)` on **measured** speed (DESPOT-2026-09-28: was 1.155×
+  spec-fixed — at 10 V sag the true no-load point is 0.83× spec, so the
+  old diode permitted ~39% past true free; spec is now the Kv-degenerate
+  fallback only). Zero outward push past bound, no reversing slam,
 - idle brake: at `|cmd| < 0.05`, back-EMF braking torque clamped to
   `I·|w|/dt` (exact per-tick stop; kills the ±25 rad/s idle limit cycle),
 - torque applied as a **couple** `+τ` hub / `-τ` chassis (reaction
   correctness; `MFS_NO_TORQUE_COUPLE` kill-switch).
+
+**Analytic mecanum lateral** (`drivetrain_mecanum_analytic`,
+MFS-STRAFE-A, default ON for mecanum only — tank untouched, `false`
+restores the articulated 32-roller build for forensics). The 5-link
+floor→roller→bearing→hub chain cannot converge in GS-128/512 (mass ratios
+to 571:1, cone-projection vs bearing-stiffness fight — see KNOWN_FAILURES
+for the solver math), so analytic mode builds NO roller bodies (6 bodies /
+4 joints) and the roller geometry survives as the per-wheel axle direction:
+
+```
+a = normalize(chassis_R · roller_axle_local),  a.y = 0 (contact plane)
+v_slip = (v_wheel + ω × r_c) · a,   r_c = (0,-r_run,0)
+F = -a · f_max · clamp(v_slip / VREF, -1, 1)
+f_max = MU · N_static_share,   MU = 0.7, VREF = 0.05 m/s
+```
+
+Honesty case (why physics, not the retired `sin45·Στ/r` cheat): per-WHEEL
+force + `r_c × F` reaction torque (genuinely loads the motor) — never to
+the chassis; Coulomb-capped (`|F| ≤ MU·N`, static-share normal, documented
+~25% load-transfer error under hard accel); dissipative (`F ∝ −v_slip`,
+zero at zero slip — the cheat pushed at full stall with no motion);
+contact-gated at TRUE-CONTACT scale (patch bottom ≤ 1 cm, the slop scale —
+DESPOT-2026-09-28: was 5 cm of hover force); single tangential model
+(analytic hubs ship zero isotropic friction, engine supplies the normal
+only — never double-counted); axle in the CHASSIS mount frame (hub-local
+would sweep with spin); deterministic (`det_sin/cos` + arithmetic).
 
 **Rolling resistance:** `Frr = Crr·N/nwheels`, `τ = Frr·r_eff` opposing spin
 about the axle, only when `|cmd| < 0.05` and `|ω| > 0.01`. `Crr` comes from
@@ -151,8 +189,13 @@ honestly claimed).
 - **Encoder quantization (real):** `wheel_radians` integrates the true hub
   angle, but odometry differentiates the **quantized** angle
   (`counts = base_ppr × gear_ratio` per output rev; base PPR from
-  `motor_preset_base_encoder_ppr`: 28 goBILDA/REV, 7 NeveRest, 24-count
-  TorqueNADO). Creep speeds staircase / stick at zero like hardware.
+  `motor_preset_base_encoder_ppr` is quadrature-DECODED counts per motor
+  rev as the hub reports them: 28 goBILDA/HD-Hex/UP/NeveRest (=7 pulses
+  ×4; AndyMark 1120 = 28×40), 24 TorqueNADO (=6 cycles ×4; 1440 = 24×60),
+  4 Core Hex (4×72 = 288). DESPOT-2026-09-28: was 7/6/28 — 4× coarse on
+  NeveRest/TorqueNADO, 7× fine on Core Hex). Quantization is
+  round-half-away symmetric (was floor(): half-count bias on reversal).
+  Creep speeds staircase / stick at zero like hardware.
 - **`odom_slip` (reporting only, never fused):** 1 when encoder-implied
   motion disagrees with the true chassis beyond 0.25 m/s planar or
   0.35 rad/s yaw, else 0. Retained in the struct for ABI.
