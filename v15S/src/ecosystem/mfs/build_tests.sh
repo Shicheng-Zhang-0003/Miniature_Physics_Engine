@@ -5,15 +5,54 @@
 #   ecosystem/mfs/build_tests.sh [--build-only]
 # Windows: runs on MSYS2 bash (native .dll/.exe produced, runnable without
 # MSYS2). Linux behaviour unchanged.
+#
+# DUAL-MODE (DESPOT-2026-09-28): this file is SOURCE-IDENTICAL in both trees
+# (standalone 461-MFS root and embedded 475-MPE/v15S/src/ecosystem/mfs/).
+# It auto-detects which tree it lives in and where the engine sources are:
+#
+#   embedded:   $MFS/../../core/physics_world.c exists -> SRC=$MFS/../..
+#   standalone: $MFS_ENGINE_SRC env, else sibling ../475-MPE/v15S/src,
+#               else fail fast with the fix (not a gcc wall).
+#
+# Canonical invocations:
+#   cd <475-MPE>/v15S/src && ecosystem/mfs/build_tests.sh [--build-only]
+#   461-MFS/build_tests.sh [--build-only]   (needs the 475 engine alongside,
+#       or MFS_ENGINE_SRC=/path/to/v15S/src)
+#
+# All MFS file references below are ABSOLUTE ($MFS/...) so the script works
+# from any CWD; engine CORE files are absolute ($SRC/...) for the same
+# reason. The script still `cd`s to $SRC for legacy tooling that expects it.
 set -euo pipefail
 MFS="$(cd "$(dirname "$0")" && pwd)"
-SRC="$(cd "$MFS/../.." && pwd)"
-ROOT="$(cd "$SRC/../.." && pwd)"
-TMPDIR="$ROOT/temp"
+
+# ---- engine-tree discovery (dual-mode) ----
+if [ -f "$MFS/../../core/physics_world.c" ] && [ -d "$MFS/modules/ftc" ]; then
+    MODE="embedded"
+    SRC="$(cd "$MFS/../.." && pwd)"
+    ROOT="$(cd "$SRC/../.." && pwd)"
+    OUT="${OUTDIR:-$ROOT/temp/ftc_tests}"
+else
+    MODE="standalone"
+    CAND="${MFS_ENGINE_SRC:-}"
+    if [ -z "$CAND" ]; then
+        CAND="$(cd "$MFS/../475-MPE/v15S/src" 2>/dev/null && pwd || true)"
+    fi
+    if [ -n "$CAND" ] && [ -f "$CAND/core/physics_world.c" ]; then
+        SRC="$CAND"
+    else
+        echo "[BUILD-FAIL] engine tree not found (standalone MFS needs the 475 engine)" >&2
+        echo "  looked at: \$MFS_ENGINE_SRC, $MFS/../475-MPE/v15S/src" >&2
+        echo "  fix: MFS_ENGINE_SRC=/path/to/475-MPE/v15S/src $0 $*" >&2
+        echo "  or run the embedded copy: cd <475-MPE>/v15S/src && ecosystem/mfs/build_tests.sh" >&2
+        exit 2
+    fi
+    OUT="${OUTDIR:-$MFS/temp/ftc_tests}"
+fi
+TMPDIR="$(dirname "$OUT")"
 export TMPDIR
 export MPE_GAMEPAD_DEVICE=disabled
-OUT="${OUTDIR:-$TMPDIR/ftc_tests}"
 mkdir -p "$OUT"
+OUT="$(cd "$OUT" && pwd)"
 
 TEST_CC="${MFS_TEST_CC:-gcc}"
 # ---- Windows detection (MSYS2/MinGW/native; Linux unchanged) ----
@@ -51,11 +90,21 @@ else
   PTHREAD="-pthread"
 fi
 CFLAGS="-I$SRC -I$MFS -O2 -Wall -Wextra -ffp-contract=off ${MFS_TEST_CFLAGS:-}"
-CORE="core/physics_world.c core/rigidbody.c core/mpe_registry.c core/mpe_loader.c core/det_math.c core/mpe_primary.c physics/collision_narrowphase.c physics/collision_cache.c physics/collision_solver.c physics/collision_ccd.c physics/collision_cylinder.c physics/broadphase.c physics/constraint.c physics/revolute_joint.c physics/depenetration.c physics/islands.c config/mpe_config.c config/mpe_config_schema.c scene/boundary.c ecosystem/mpe_ecosystem.c"
-FTC="ecosystem/mfs/modules/ftc/ftc_module.c ecosystem/mfs/modules/ftc/ftc_fleet.c ecosystem/mfs/modules/ftc/submodules/robot.c ecosystem/mfs/modules/ftc/submodules/drivetrain.c ecosystem/mfs/modules/ftc/submodules/motor.c ecosystem/mfs/modules/ftc/submodules/motor_presets.c ecosystem/mfs/modules/ftc/submodules/battery.c"
-MOD1="ecosystem/mfs/modules/module_1/mfs_module_1.c ecosystem/mfs/modules/module_1/submodules/gamepad/gamepad.c"
+# Engine CORE: absolute engine paths (was engine-relative + cd; absolute
+# survives any CWD and both modes).
+CORE="$SRC/core/physics_world.c $SRC/core/rigidbody.c $SRC/core/mpe_registry.c $SRC/core/mpe_loader.c $SRC/core/det_math.c $SRC/core/mpe_primary.c $SRC/physics/collision_narrowphase.c $SRC/physics/collision_cache.c $SRC/physics/collision_solver.c $SRC/physics/collision_ccd.c $SRC/physics/collision_cylinder.c $SRC/physics/broadphase.c $SRC/physics/constraint.c $SRC/physics/revolute_joint.c $SRC/physics/depenetration.c $SRC/physics/islands.c $SRC/config/mpe_config.c $SRC/config/mpe_config_schema.c $SRC/scene/boundary.c $SRC/ecosystem/mpe_ecosystem.c"
+# MFS sources: absolute under $MFS (identical layout in both trees).
+FTC="$MFS/modules/ftc/ftc_module.c $MFS/modules/ftc/ftc_fleet.c $MFS/modules/ftc/submodules/robot.c $MFS/modules/ftc/submodules/drivetrain.c $MFS/modules/ftc/submodules/motor.c $MFS/modules/ftc/submodules/motor_presets.c $MFS/modules/ftc/submodules/battery.c"
+MOD1_SRCS="$MFS/modules/module_1/mfs_module_1.c $MFS/modules/module_1/submodules/gamepad/gamepad.c"
 
 cd "$SRC"
+# Engine-tree guard (embedded already proven above; standalone proven by
+# discovery): fail fast with the fix, not a gcc wall.
+if [ ! -f "$SRC/core/physics_world.c" ] || [ ! -d "$MFS/modules/ftc" ]; then
+    echo "[BUILD-FAIL] not an engine tree (expected v15S/src layout at $SRC)" >&2
+    echo "  run from v15S/src: ecosystem/mfs/build_tests.sh" >&2
+    exit 2
+fi
 pass=0; fail=0; info_pass=0
 
 run_binary() {
@@ -100,7 +149,7 @@ if [ "$MPE_WINDOWS" = "1" ]; then
     cp "$SRC/plugins/mpe_ftc$PLUGIN_EXT" "$SRC/plugins/mpe_ftc.so" 2>/dev/null || true
   fi
 else
-  echo "--- FTC module plugin (hot-plug $PLUGIN_EXT; must precede ftc_hotload) ---"
+  echo "--- FTC module plugin (hot-plug $PLUGIN_EXT; must precede ftc_hotload) [$MODE] ---"
   mkdir -p "$MFS/plugins" "$SRC/plugins"
   FTC_MOD="$FTC"
   if "$TEST_CC" $CFLAGS $FPIC -shared $FTC_MOD -lm $WIN_LIBS -o "$MFS/plugins/mpe_ftc$PLUGIN_EXT" 2>"$OUT/mpe_ftc.build.log"; then
