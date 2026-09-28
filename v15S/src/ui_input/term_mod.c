@@ -1,7 +1,9 @@
 /* Phase-4: `mod` terminal command — hot plug-and-play physics modules.
  * Usage:
  *   mod ls                        list registry modules + loaded .so
- *   mod load <path.so>            dlopen plugin (registers shape/solver/etc)
+ *   mod load <path.so>            dlopen plugin (run from v15S/src;
+ *                                 modules: plugins/<name>.so,
+ *                                 bundles: ecosystem/mfs/<name>.so)
  *   mod unload <path|name>        dlclose (quiesce between ticks)
  *   mod attach <name>             attach tick module to primary world
  *   mod detach <name>             detach tick module

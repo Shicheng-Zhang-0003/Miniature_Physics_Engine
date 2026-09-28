@@ -626,7 +626,7 @@ int mpe_t_module(void) {
     MPE_CHECK(&t, A.bodies[ic].type == object_custom);
     /* tick-module hook attach/step/detach */
     static const mpe_module_desc_t hook = {MPE_MODULE_ABI, "suite-hook", "1.0", "generic",
-                                           true, NULL, NULL, mpe_mod_pre, NULL};
+                                           true, NULL, NULL, mpe_mod_pre, NULL, NULL};
     MPE_CHECK(&t, mpe_register_module(&hook) >= 0);
     const mpe_module_desc_t *found = mpe_find_module("suite-hook");
     MPE_CHECK(&t, found != NULL);

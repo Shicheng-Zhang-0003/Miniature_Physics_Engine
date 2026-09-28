@@ -18,9 +18,12 @@ int main(void) {
         (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
 
     /* Static cylinder resting on floor */
-    int cyl = physics_world_add_cylinder(&world,
+    if (physics_world_add_cylinder(&world,
         0.05f, 0.02f, 0.0f,
-        (vector3){0.0f, 0.06f, 0.0f});
+        (vector3){0.0f, 0.06f, 0.0f}) < 0) {
+        printf("[FAIL] cylinder spawn\n");
+        return 1;
+    }
 
     /* Sphere approaching the cylinder along Z */
     int sph = physics_world_add_sphere(&world,

@@ -208,6 +208,36 @@ void editor_reset(void) {
     main_inputs.down_arrow_pressed = false;
     main_inputs.enter_key_pressed = false;
     main_inputs.e_key_pressed = false;
+    /* Transient motion + pointer state: a reset must not leave held WASD,
+     * queued clicks, or stale deltas driving the next context. Persistent
+     * modes (is_mouse_locked, is_debug_mode_active, suppress_mouse_delta)
+     * are deliberately kept: they describe the session, not the edit. */
+    main_inputs.w_key_pressed = false;
+    main_inputs.a_key_pressed = false;
+    main_inputs.s_key_pressed = false;
+    main_inputs.d_key_pressed = false;
+    main_inputs.space_key_pressed = false;
+    main_inputs.shift_key_pressed = false;
+    main_inputs.i_key_pressed = false;
+    main_inputs.j_key_pressed = false;
+    main_inputs.k_key_pressed = false;
+    main_inputs.l_key_pressed = false;
+    main_inputs.r_key_pressed = false;
+    main_inputs.f_key_pressed = false;
+    main_inputs.right_mouse_button_clicked = false;
+    main_inputs.middle_mouse_button_clicked = false;
+    main_inputs.mouse_delta_x = 0.0f;
+    main_inputs.mouse_delta_y = 0.0f;
+    main_inputs.enter_spawn_held = false;
+    /* One-shot test/debug requests sampled from the old context. */
+    main_inputs.stability_test_pressed = false;
+    main_inputs.sleep_wake_test_pressed = false;
+    main_inputs.editor_torture_pressed = false;
+    main_inputs.spawn_stress_pressed = false;
+    main_inputs.validation_report_pressed = false;
+    main_inputs.debug_terminal_pressed = false;
+    main_inputs.long_run_validation_pressed = false;
+    main_inputs.config_torture_pressed = false;
     config_menu_close();
 }
 
@@ -303,6 +333,36 @@ void editor_reset(void) {
     main_inputs.down_arrow_pressed = false;
     main_inputs.enter_key_pressed = false;
     main_inputs.e_key_pressed = false;
+    /* Transient motion + pointer state: a reset must not leave held WASD,
+     * queued clicks, or stale deltas driving the next context. Persistent
+     * modes (is_mouse_locked, is_debug_mode_active, suppress_mouse_delta)
+     * are deliberately kept: they describe the session, not the edit. */
+    main_inputs.w_key_pressed = false;
+    main_inputs.a_key_pressed = false;
+    main_inputs.s_key_pressed = false;
+    main_inputs.d_key_pressed = false;
+    main_inputs.space_key_pressed = false;
+    main_inputs.shift_key_pressed = false;
+    main_inputs.i_key_pressed = false;
+    main_inputs.j_key_pressed = false;
+    main_inputs.k_key_pressed = false;
+    main_inputs.l_key_pressed = false;
+    main_inputs.r_key_pressed = false;
+    main_inputs.f_key_pressed = false;
+    main_inputs.right_mouse_button_clicked = false;
+    main_inputs.middle_mouse_button_clicked = false;
+    main_inputs.mouse_delta_x = 0.0f;
+    main_inputs.mouse_delta_y = 0.0f;
+    main_inputs.enter_spawn_held = false;
+    /* One-shot test/debug requests sampled from the old context. */
+    main_inputs.stability_test_pressed = false;
+    main_inputs.sleep_wake_test_pressed = false;
+    main_inputs.editor_torture_pressed = false;
+    main_inputs.spawn_stress_pressed = false;
+    main_inputs.validation_report_pressed = false;
+    main_inputs.debug_terminal_pressed = false;
+    main_inputs.long_run_validation_pressed = false;
+    main_inputs.config_torture_pressed = false;
     config_menu_close(); /* MPE_TASK_35 */
 }
 

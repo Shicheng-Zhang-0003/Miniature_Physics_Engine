@@ -21,19 +21,6 @@ static GLint a3_wire_uniform_viewframe = -1;
 static GLint a3_wire_uniform_projection = -1;
 static GLint a3_wire_uniform_model = -1;
 static GLint a3_wire_uniform_object_colour = -1;
-
-static void a3_wire_cache_uniforms(GLuint shader_program) {
-    if (shader_program == a3_wire_cached_program) {
-        return;
-    }
-
-    a3_wire_cached_program = shader_program;
-    a3_wire_uniform_viewframe = glGetUniformLocation(shader_program, "viewframe");
-    a3_wire_uniform_projection = glGetUniformLocation(shader_program, "projection");
-    a3_wire_uniform_model = glGetUniformLocation(shader_program, "model");
-    a3_wire_uniform_object_colour = glGetUniformLocation(shader_program, "object_colour");
-}
-
 static GLint a3_wire_uniform_normal_matrix = -1;
 static GLint a3_wire_uniform_camera_position = -1;
 static GLint a3_wire_uniform_light_position = -1;
@@ -41,9 +28,20 @@ static GLint a3_wire_uniform_ambient = -1;
 static GLint a3_wire_uniform_specular_coeff = -1;
 static GLint a3_wire_uniform_specular_exp = -1;
 
-static void a3_wire_cache_missing_uniforms(GLuint shader_program) {
-    static GLuint a3_wire_missing_cached_program = 0;
+static void a3_wire_cache_uniforms(GLuint shader_program) {
+    if (shader_program == a3_wire_cached_program) {
+        return;
+    }
+    a3_wire_cached_program = shader_program;
+    a3_wire_uniform_viewframe = glGetUniformLocation(shader_program, "viewframe");
+    a3_wire_uniform_projection = glGetUniformLocation(shader_program, "projection");
+    a3_wire_uniform_model = glGetUniformLocation(shader_program, "model");
+    a3_wire_uniform_object_colour = glGetUniformLocation(shader_program, "object_colour");
+}
 
+static GLuint a3_wire_missing_cached_program = 0;
+
+static void a3_wire_cache_missing_uniforms(GLuint shader_program) {
     if (shader_program == a3_wire_missing_cached_program) {
         return;
     }
@@ -55,6 +53,21 @@ static void a3_wire_cache_missing_uniforms(GLuint shader_program) {
     a3_wire_uniform_ambient = glGetUniformLocation(shader_program, "u_ambient_strength");
     a3_wire_uniform_specular_coeff = glGetUniformLocation(shader_program, "u_specular_coeff");
     a3_wire_uniform_specular_exp = glGetUniformLocation(shader_program, "u_specular_exponent");
+}
+
+void wireframe_invalidate_cache(void) {
+    a3_wire_cached_program = 0;
+    a3_wire_missing_cached_program = 0;
+    a3_wire_uniform_viewframe = -1;
+    a3_wire_uniform_projection = -1;
+    a3_wire_uniform_model = -1;
+    a3_wire_uniform_object_colour = -1;
+    a3_wire_uniform_normal_matrix = -1;
+    a3_wire_uniform_camera_position = -1;
+    a3_wire_uniform_light_position = -1;
+    a3_wire_uniform_ambient = -1;
+    a3_wire_uniform_specular_coeff = -1;
+    a3_wire_uniform_specular_exp = -1;
 }
 
 void wireframe_render_object(GLuint shader_program, math4 view_matrix, math4 projection_matrix, rigidbody *rigid_body,
@@ -88,13 +101,32 @@ void wireframe_render_object(GLuint shader_program, math4 view_matrix, math4 pro
     math4_to_flat_array(model_matrix, model_matrix_flat_array);
     glUniform3f(a3_wire_uniform_object_colour, wireframe_colour.x, wireframe_colour.y, wireframe_colour.z);
     glUniformMatrix4fv(a3_wire_uniform_model, 1, GL_FALSE, model_matrix_flat_array);
-    math3 a3_wire_normal_matrix = math3_identity();
+    /* Normal matrix: rotation * inverse-scale (inverse-transpose of the
+     * T*R*S model, matching vertex_shader.glsl:18-29). Identity lit
+     * rotated bodies as if unrotated. math3 is ROW-major while GL takes
+     * column-major, so upload transposed: flat[col*3+row] = N[row][col]. */
+    float a3_wire_scale_xyz[3];
+    if (rigid_body->type == object_sphere) {
+        float s = rigid_body->radius * 1.01f;
+        a3_wire_scale_xyz[0] = s;
+        a3_wire_scale_xyz[1] = s;
+        a3_wire_scale_xyz[2] = s;
+    } else if (rigid_body->type == object_cylinder) {
+        a3_wire_scale_xyz[0] = rigid_body->cylinder_half_length * 1.01f;
+        a3_wire_scale_xyz[1] = rigid_body->radius * 1.01f;
+        a3_wire_scale_xyz[2] = rigid_body->radius * 1.01f;
+    } else {
+        a3_wire_scale_xyz[0] = rigid_body->half_extensions.x * 1.01f;
+        a3_wire_scale_xyz[1] = rigid_body->half_extensions.y * 1.01f;
+        a3_wire_scale_xyz[2] = rigid_body->half_extensions.z * 1.01f;
+    }
+    math3 a3_wire_rotation = vector4_to_math3(rigid_body->orientation);
     float a3_wire_normal_matrix_flat[9];
-
     for (int row_index = 0; row_index < 3; row_index++) {
         for (int column_index = 0; column_index < 3; column_index++) {
-            a3_wire_normal_matrix_flat[row_index * 3 + column_index] =
-                a3_wire_normal_matrix.matrix[row_index][column_index];
+            float inv_scale = 1.0f / fmaxf(fabsf(a3_wire_scale_xyz[column_index]), 0.0001f);
+            a3_wire_normal_matrix_flat[column_index * 3 + row_index] =
+                a3_wire_rotation.matrix[row_index][column_index] * inv_scale;
         }
     }
 

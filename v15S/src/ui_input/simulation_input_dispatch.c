@@ -32,8 +32,10 @@ void simulation_input_dispatch(GtkWidget *parent_window) {
             } else {
                 main_inputs.object_menu_level = 1;
             }
-        }
+            /* Guarded: with no selection E must not disturb the config
+             * menu (previously closed unconditionally). */
             config_menu_close();
+        }
     }
     if (main_inputs.f_key_pressed) {
         if (selected_object >= 0) {
@@ -178,8 +180,10 @@ void simulation_input_dispatch(GtkWidget *parent_window) {
             } else {
                 main_inputs.object_menu_level = 1;
             }
-        }
+            /* Guarded: with no selection E must not disturb the config
+             * menu (previously closed unconditionally). */
             config_menu_close();
+        }
     }
     if (main_inputs.f_key_pressed) {
         if (selected_object >= 0) {

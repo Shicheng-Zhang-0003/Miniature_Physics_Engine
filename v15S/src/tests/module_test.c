@@ -15,6 +15,7 @@ static const mpe_module_desc_t my_mod = {
     .abi = MPE_MODULE_ABI, .name = "test-hook", .version = "1.0",
     .kind = "generic", .deterministic = true,
     .attach = 0, .detach = 0, .pre_step = my_pre, .post_step = 0,
+    .stage_detach = 0,
 };
 
 /* Custom-routing probe: sentinel normal proves registry->custom dispatch. */

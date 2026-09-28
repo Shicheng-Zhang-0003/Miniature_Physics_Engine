@@ -53,10 +53,17 @@ static grid_mesh main_grid;
 static float *sphere_instances = NULL;
 static float *cube_instances = NULL;
 static float *cylinder_instances = NULL;
+static void render_delete_gl_objects(void);
+void render_cleanup(void);
 void render_init() {
-    if (render_init_status != render_uninitialized) {
-        return;
+    /* Re-init safe: initialising twice used to either leak (re-running
+     * creation) or wedge on stale state (early return). Tear down the
+     * previous GL + CPU state first so re-init is a clean rebuild. A
+     * previous failure simply retries. */
+    if (render_init_status == render_ok) {
+        render_cleanup();
     }
+    render_init_status = render_uninitialized;
     const char *shader_dir = getenv("MPE_SHADER_DIR");
     char vs_path[512], fs_path[512], uvs_path[512], ufs_path[512];
     if (shader_dir && shader_dir[0]) {
@@ -85,6 +92,7 @@ void render_init() {
     if ((instanced_shader_program == 0) || (utility_shader_program == 0)) {
         fprintf(stderr, "RENDER INIT FAILED: shader program creation failed (instanced=%u, utility=%u)\n",
                 instanced_shader_program, utility_shader_program);
+        render_delete_gl_objects();
         render_init_status = render_failed;
         return;
     }
@@ -115,12 +123,80 @@ void render_init() {
         free(sphere_instances); sphere_instances = NULL;
         free(cube_instances); cube_instances = NULL;
         free(cylinder_instances); cylinder_instances = NULL;
+        render_delete_gl_objects();
         render_init_status = render_failed;
         return;
     }
     render_init_status = render_ok;
 }
+/* Delete one instanced mesh's GL objects (all ids zero-guarded so a
+ * context-less or repeated cleanup is a safe no-op). */
+static void render_delete_mesh(mesh *mesh_object) {
+    if (!mesh_object) return;
+    if (mesh_object->vertex_array_object) {
+        glDeleteVertexArrays(1, &mesh_object->vertex_array_object);
+        mesh_object->vertex_array_object = 0;
+    }
+    if (mesh_object->vertex_buffer_object) {
+        glDeleteBuffers(1, &mesh_object->vertex_buffer_object);
+        mesh_object->vertex_buffer_object = 0;
+    }
+    if (mesh_object->element_buffer_object) {
+        glDeleteBuffers(1, &mesh_object->element_buffer_object);
+        mesh_object->element_buffer_object = 0;
+    }
+    if (mesh_object->wireframe_element_buffer_object) {
+        glDeleteBuffers(1, &mesh_object->wireframe_element_buffer_object);
+        mesh_object->wireframe_element_buffer_object = 0;
+    }
+    if (mesh_object->instance_vbo) {
+        glDeleteBuffers(1, &mesh_object->instance_vbo);
+        mesh_object->instance_vbo = 0;
+    }
+    mesh_object->index_count = 0;
+    mesh_object->wireframe_index_count = 0;
+    mesh_object->instance_capacity = 0;
+}
+
+/* Unconditional GL teardown shared by render_cleanup and the mid-init
+ * failure paths (which run with a current context but a not-yet-ok
+ * status). All ids are zero-guarded. */
+static void render_delete_gl_objects(void) {
+    if (instanced_shader_program) {
+        glDeleteProgram(instanced_shader_program);
+        instanced_shader_program = 0;
+    }
+    if (utility_shader_program) {
+        glDeleteProgram(utility_shader_program);
+        utility_shader_program = 0;
+    }
+    render_delete_mesh(&sphere_mesh);
+    render_delete_mesh(&cube_mesh);
+    render_delete_mesh(&cylinder_mesh);
+    if (main_grid.vertex_array_object) {
+        glDeleteVertexArrays(1, &main_grid.vertex_array_object);
+        main_grid.vertex_array_object = 0;
+    }
+    if (main_grid.vertex_buffer_object) {
+        glDeleteBuffers(1, &main_grid.vertex_buffer_object);
+        main_grid.vertex_buffer_object = 0;
+    }
+    main_grid.line_vertex_count = 0;
+    wireframe_invalidate_cache();
+    grid_invalidate_cache();
+}
+
 void render_cleanup(void) {
+    /* GL objects: the old cleanup freed only the CPU instance buffers and
+     * leaked every program/VAO/VBO on each init/cleanup cycle. Delete them
+     * here (callers run on the GL thread with the context current — see
+     * root_gtk destroy paths). Gated on render_ok so a context-less or
+     * repeated cleanup never issues GL calls for objects that were never
+     * created; every id is additionally zero-guarded. Uniform caches in
+     * wireframe/grid are invalidated because GL reuses deleted ids. */
+    if (render_init_status == render_ok) {
+        render_delete_gl_objects();
+    }
     if (sphere_instances) {
         free(sphere_instances);
         sphere_instances = NULL;
