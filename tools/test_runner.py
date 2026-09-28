@@ -8,6 +8,10 @@ Profiles:
 
 All run artifacts are written below the project-local temp/qa_runs directory.
 This module uses only the Python standard library.
+
+Strict contract: suite cases that print [SKIP] (self-skipped coverage) fail
+the run unless --allow-skip is given; [XFAIL] markers are surfaced in the
+summary counts but never block.
 """
 
 from __future__ import annotations
@@ -56,6 +60,7 @@ SUITE_SOURCE = SRC_DIR / "tests" / "mpe_suite_main.c"
 LEGACY_TARGET = re.compile(r"^[ \t]*build_([A-Za-z0-9_]+):\s+tests/([A-Za-z0-9_]+\.c)(?:\s|$)", re.M)
 SUITE_ENTRY = re.compile(r'^\s*\{"([a-z0-9_]+)",\s*[^,]+,\s*([01])\},\s*$', re.M)
 SUITE_RESULT = re.compile(r"^\s+\[(PASS|FAIL)\]\s+([a-z0-9_]+)\s+\(checks failed: (\d+)\)\s*$", re.M)
+SUITE_RUNNING = re.compile(r"\s*Running ([A-Za-z0-9_]+)\.\.\.\s*")
 TUI_HEADER = re.compile(r"^### MPE-TUI snapshot tick=(\d+) time=([^ ]+) dt=([^ ]+) bodies=(\d+) result=(PASS|FAIL)\s*$", re.M)
 NONFINITE_WORD = re.compile(r"(?<![A-Za-z])(?:nan|[+-]?inf(?:inity)?)(?![A-Za-z])", re.I)
 
@@ -119,6 +124,32 @@ def parse_mfs_summary(output: str) -> tuple[int, int, int]:
     return tuple(map(int, match.groups()))
 
 
+def parse_skip_xfail(output: str) -> tuple[list[tuple[str, str]], list[str]]:
+    """Surface self-skip and expected-failure markers hidden inside suite output.
+
+    C cases such as loader_lifecycle/ftc_ecosystem print `[SKIP] ...` and
+    return zero checks-failed, so their `[PASS]` line looks green while the
+    coverage never ran. MFS robotics cases print `[XFAIL] ...` for loud,
+    ticketed, expected failures. Returns ([(test, message)], [message]):
+    skips are attributed to the most recent `Running <name>...` header
+    (`unknown` when no header precedes them).
+    """
+    skips: list[tuple[str, str]] = []
+    xfails: list[str] = []
+    current = "unknown"
+    for line in output.splitlines():
+        running = SUITE_RUNNING.fullmatch(line)
+        if running:
+            current = running.group(1)
+            continue
+        stripped = line.strip()
+        if stripped.startswith("[SKIP]"):
+            skips.append((current, stripped[len("[SKIP]"):].strip()))
+        elif stripped.startswith("[XFAIL]"):
+            xfails.append(stripped)
+    return skips, xfails
+
+
 def validate_tui_file(path: Path) -> tuple[bool, str]:
     if not path.is_file() or path.stat().st_size == 0:
         return False, "snapshot artifact missing or empty"
@@ -147,6 +178,8 @@ def result_counts(results: Iterable[Result]) -> dict[str, int]:
         "total": len(rows),
         "passed": sum(r.status == "PASS" for r in rows),
         "failed": sum(r.status == "FAIL" for r in rows),
+        "skipped": sum(r.status == "SKIP" for r in rows),
+        "xfailed": sum(r.status == "XFAIL" for r in rows),
         "informational": sum(r.severity == "info" for r in rows),
         "blocking_failures": sum(r.blocking for r in rows),
     }
@@ -190,10 +223,12 @@ def write_reports(run_dir: Path, metadata: dict, results: Sequence[Result]) -> N
 
 
 class Runner:
-    def __init__(self, profile: str, run_dir: Path, test_filter: str | None = None):
+    def __init__(self, profile: str, run_dir: Path, test_filter: str | None = None,
+                 allow_skip: bool = False):
         self.profile = profile
         self.run_dir = run_dir
         self.test_filter = test_filter
+        self.allow_skip = allow_skip
         self.results: list[Result] = []
         self.env = os.environ.copy()
         self.env.update({
@@ -361,7 +396,31 @@ class Runner:
             self.add("suite-v2-summary-contract", "suite-v2", "FAIL", kind="contract", return_code=None,
                      detail="suite summary missing, count mismatched, or has blocking failures", log=run.log)
             return False
-        return run.status == "PASS" and all(status == "PASS" and failures == 0 for status, _case, failures in rows)
+        report_suite = "sanitizers" if sanitizer else "suite-v2"
+        # SKIP/XFAIL markers never appear in [PASS]/[FAIL] lines: a case can
+        # report green while its coverage never ran ([SKIP]) or while a
+        # known frontier failed loudly ([XFAIL]). Surface both so a
+        # 220/220-style summary cannot hide them. Skips fail the strict
+        # contract unless --allow-skip; xfails are visible but non-blocking.
+        skips, xfails = parse_skip_xfail(output)
+        for test, message in skips:
+            self.add(f"skip/{test}", report_suite, "SKIP", kind="skip-marker", severity="skip",
+                     log=run.log, detail=message or "test skipped its own coverage")
+        if xfails:
+            shown = "; ".join(xfails[:5])
+            if len(xfails) > 5:
+                shown += f"; ... (+{len(xfails) - 5} more)"
+            self.add("xfail-markers", report_suite, "XFAIL", kind="xfail-marker", severity="info",
+                     log=run.log, detail=f"{len(xfails)} expected-failure marker(s): {shown}")
+        okay = run.status == "PASS" and all(status == "PASS" and failures == 0 for status, _case, failures in rows)
+        if skips and not self.allow_skip:
+            self.add("suite-v2-skip-contract", report_suite, "FAIL", kind="contract", return_code=None,
+                     log=run.log,
+                     detail=f"{len(skips)} test(s) self-skipped "
+                            f"({', '.join(sorted({t for t, _ in skips}))}); "
+                            f"strict contract requires --allow-skip to accept skips")
+            okay = False
+        return okay
 
     def build_and_run_targets(self, names: Sequence[str], suite: str, *, sanitizer: bool = False) -> bool:
         if self.test_filter:
@@ -544,6 +603,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--profile", choices=("quick", "physics", "full"), default="full",
                         help="quick: canonical; physics: canonical + isolated legacy/paranoia; full: everything (default)")
     parser.add_argument("--test", help="run one exact canonical, legacy, or paranoia test")
+    parser.add_argument("--allow-skip", action="store_true",
+                        help="accept self-skipped suite cases ([SKIP] lines); without it, "
+                             "any skip fails the strict contract")
     parser.add_argument("--list", action="store_true", help="list dynamically discovered tests and profiles")
     parser.add_argument("--suite", nargs="?", const="all", help="compatibility alias for the canonical C suite")
     parser.add_argument("--include-paranoia", action="store_true", help="compatibility alias for --profile physics")
@@ -601,7 +663,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "started_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
         "python": sys.version.split()[0],
     }
-    runner = Runner(args.profile, run_dir, args.test)
+    runner = Runner(args.profile, run_dir, args.test, allow_skip=args.allow_skip)
     print(f"MPE test runner | profile={args.profile} | run={run_id}")
     print(f"Artifacts: {run_dir}")
     okay = runner.run_profile()
@@ -609,6 +671,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     counts = result_counts(runner.results)
     print("\n=== MPE verification summary ===")
     print(f"Checks: {counts['total']} | passed: {counts['passed']} | failed: {counts['failed']} | "
+          f"skipped: {counts['skipped']} | xfailed: {counts['xfailed']} | "
           f"informational: {counts['informational']} | blocking failures: {counts['blocking_failures']}")
     print(f"JSON: {run_dir / 'summary.json'}")
     print(f"JUnit: {run_dir / 'junit.xml'}")

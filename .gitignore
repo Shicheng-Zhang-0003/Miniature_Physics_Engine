@@ -64,6 +64,7 @@ status/
 
 # ============ Sanitizer / temp build artifacts ============
 /tmp/
+temp/
 *.san
 
 # Keep the Python test harness itself versioned despite the broad C artifact
