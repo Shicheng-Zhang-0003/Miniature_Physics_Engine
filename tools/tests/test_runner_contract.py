@@ -80,9 +80,12 @@ class OutputContractTests(unittest.TestCase):
             runner.Result("gate-pass", "physics"),
             runner.Result("gate-fail", "physics", status="FAIL"),
             runner.Result("diag", "diagnostics", severity="info"),
+            runner.Result("skip/loader_lifecycle", "suite-v2", status="SKIP", severity="skip"),
+            runner.Result("xfail-markers", "mfs", status="XFAIL", severity="info"),
         ]
         self.assertEqual(runner.result_counts(results), {
-            "total": 3, "passed": 2, "failed": 1, "informational": 1, "blocking_failures": 1,
+            "total": 5, "passed": 2, "failed": 1, "skipped": 1, "xfailed": 1,
+            "informational": 2, "blocking_failures": 1,
         })
 
     def test_json_and_junit_reports_are_valid(self) -> None:
@@ -103,6 +106,41 @@ class OutputContractTests(unittest.TestCase):
             self.assertEqual(result.status, "FAIL")
             self.assertIsNone(result.return_code)
             self.assertIn("failed to start", output)
+
+
+class SkipXfailContractTests(unittest.TestCase):
+    def test_parse_skip_xfail_attributes_skips_to_running_case(self) -> None:
+        output = (
+            "  Running loader_lifecycle...\n"
+            "[SKIP] plugins/mpe_capsule.so not visible (run from v15S/src)\n"
+            "  [PASS] loader_lifecycle (checks failed: 0)\n"
+            "  Running ftc_ecosystem...\n"
+            "[SKIP] bundle not built (run from v15S/src after make)\n"
+            "  [PASS] ftc_ecosystem (checks failed: 0)\n"
+            "[XFAIL][MFS-STRAFE-F1] mecanum strafe dx=0.1000 < 0.30\n"
+        )
+        skips, xfails = runner.parse_skip_xfail(output)
+        self.assertEqual([test for test, _ in skips], ["loader_lifecycle", "ftc_ecosystem"])
+        self.assertIn("mpe_capsule", skips[0][1])
+        self.assertEqual(len(xfails), 1)
+        self.assertIn("MFS-STRAFE-F1", xfails[0])
+
+    def test_parse_skip_xfail_handles_orphan_markers(self) -> None:
+        skips, xfails = runner.parse_skip_xfail("[SKIP] no header above\n[XFAIL] lone\n")
+        self.assertEqual(skips, [("unknown", "no header above")])
+        self.assertEqual(xfails, ["[XFAIL] lone"])
+
+    def test_parse_skip_xfail_empty_output(self) -> None:
+        self.assertEqual(runner.parse_skip_xfail("  [PASS] alpha (checks failed: 0)\n"), ([], []))
+
+    def test_allow_skip_flag_defaults_to_strict(self) -> None:
+        args = runner.build_parser().parse_args(["--profile", "quick"])
+        self.assertFalse(args.allow_skip)
+        args = runner.build_parser().parse_args(["--profile", "quick", "--allow-skip"])
+        self.assertTrue(args.allow_skip)
+        with tempfile.TemporaryDirectory(dir=runner.PROJECT_TEMP) as scratch:
+            self.assertFalse(runner.Runner("quick", Path(scratch)).allow_skip)
+            self.assertTrue(runner.Runner("quick", Path(scratch), allow_skip=True).allow_skip)
 
 
 if __name__ == "__main__":
