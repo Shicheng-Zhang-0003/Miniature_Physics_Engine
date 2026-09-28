@@ -22,9 +22,12 @@ typedef struct {
     float output_torque; /* N·m at wheel after gearing */
     /* Explicit instantaneous torque at the measured speed (same endpoints
      * as output_torque, no observer softening): the STABLE torque actually
-     * applied is output_torque (implicit+observer); this field sizes
-     * feedforward force models (roller thrust) at true locked-rotor
-     * physics instead of the observer's soft fixed point. */
+     * applied is output_torque (implicit+observer); this field is the
+     * observer's reference (tau_exp_prev: external load = measured net
+     * effect minus this). DESPOT-2026-09-28: the old comment claimed it
+     * "sizes feedforward force models (roller thrust)" — no such consumer
+     * exists (the analytic lateral is purely slip-velocity-driven; the
+     * retired sin45*sum(tau)/r term is gone). */
     float torque_explicit;
     float rpm; /* current output speed */
     float temperature; /* simplified thermal model */
@@ -47,10 +50,11 @@ void motor_from_spec(motor *m, float stall_torque_nm, float free_speed_rpm, floa
 void motor_update(motor *m, float wheel_angular_vel, float dt, float battery_voltage);
 /* Implicit-in-speed variant: solves back-EMF equilibrium at end-of-tick
  * speed, so light wheels cannot relaxation-oscillate around free speed
- * (explicit Euler moves ~30 rad/s per tick at stall torque vs a 2.5e-4
- * inertia — unconditionally unstable without this). Same spec endpoints
- * (stall/free); only the transient is stabilized. axle_inertia <= 0
- * falls back to the explicit update. */
+ * (explicit Euler moves ~160 rad/s per tick at stall torque vs a 2.5e-4
+ * axle inertia — DESPOT-2026-09-28: was "~30", recomputed 2.38*(1/60)/
+ * 2.5e-4 ~= 159 for 19.2:1, 250+ for 26.9:1 and up — unconditionally
+ * unstable without this). Same spec endpoints (stall/free); only the
+ * transient is stabilized. axle_inertia <= 0 falls back to explicit. */
 void motor_update_load(motor *m, float wheel_angular_vel, float dt, float battery_voltage,
                        float axle_inertia);
 

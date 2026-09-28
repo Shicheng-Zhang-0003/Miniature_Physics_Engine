@@ -27,9 +27,12 @@ typedef struct {
      * FORCE comes from the engine's Coulomb solver (no chassis force is ever
      * injected). The bearing SPIN velocity is quasi-static (stiff DOF slaved,
      * DESPOT-2026-09-26): roller spin about its axle is prescribed to the
-     * massless-roller equilibrium each tick with a small dissipative bearing
-     * torque, because 60Hz explicit integration of the ~1ms roller mode is
-     * unconditionally unstable. Off-axis wobble is preserved. */
+     * massless-roller equilibrium each tick via full-vector overwrite
+     * (DESPOT-2026-09-28: the old comment promised "off-axis wobble is
+     * preserved with a small dissipative bearing torque" — no such torque
+     * exists; the overwrite kills wobble too, INTENTIONALLY per robot.c),
+     * because 60Hz explicit integration of the ~1ms roller mode is
+     * unconditionally unstable. */
 /* FIX-AUDIT-DESPOT: was MFS_ROLLERS_PER_Wheel (lowercase 'heel' typo).
  * Renamed to MFS_ROLLERS_PER_WHEEL; the old spelling is kept as a
  * backward-compatible alias so out-of-tree code keeps compiling.
@@ -96,7 +99,37 @@ typedef struct {
      * hooks). It now lives here, owned by the robot that defines it. */
     float wheel_roller_angle[FTC_MAX_WHEELS]; /* radians, +45/-45 layout */
     bool wheel_is_mecanum[FTC_MAX_WHEELS];
+    /* MFS-STRAFE-A (analytic lateral, default ON for mecanum only):
+     * when true, no roller bodies/joints are built (hub contacts the floor
+     * directly at full radius) and drivetrain_update applies the
+     * roller-kinematics lateral force analytically at each wheel contact
+     * (Coulomb-capped, dissipative, contact-gated — see drivetrain.c).
+     * False restores the real-roller articulated build (32 dynamic bodies
+     * on free revolute bearings) for forensics. Tank robots always read
+     * false: plain cylinders, engine friction only. */
+    bool mecanum_analytic;
 } ftc_robot;
+
+/* MFS-STRAFE-A analytic constants (shared with drivetrain.c): slide
+ * coefficient for roller-axle slip on tile (wheel-rubber kinetic class;
+ * tile muk 0.8 binds, so the wheel is the limiting material) and the
+ * Coulomb smoothing speed (linear viscous region below it kills sign
+ * chatter; saturated Coulomb above it). */
+#ifndef MFS_MECANUM_ANALYTIC_MU
+#define MFS_MECANUM_ANALYTIC_MU 0.7f
+#endif
+#ifndef MFS_MECANUM_ANALYTIC_VREF
+#define MFS_MECANUM_ANALYTIC_VREF 0.05f
+#endif
+/* Default: ON for mecanum builds, OFF for tank (plain cylinders). */
+#define MFS_MECANUM_ANALYTIC_DEFAULT 1
+
+/* Forensics/revert switch for the analytic lateral (creation default ON;
+ * tank robots never build rollers regardless). Call BEFORE
+ * ftc_robot_create_with_drive (creation memsets the struct, so a per-robot
+ * pre-set would not survive): 0 restores the articulated real-roller build
+ * for subsequently created mecanum robots, nonzero re-enables analytic. */
+void ftc_robot_set_mecanum_analytic_default(int on);
 
 /* Create a 4-wheel robot at the given position. Returns 0 on success. */
 /* MPE_FTC_095: chassis-centre height where wheels rest on the floor */

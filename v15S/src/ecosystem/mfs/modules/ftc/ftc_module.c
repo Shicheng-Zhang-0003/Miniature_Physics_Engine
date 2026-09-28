@@ -19,9 +19,12 @@
  * (drivetrain_tank/mecanum on ftc_fleet_get(world, i)).
  *
  * Determinism: marked NON-deterministic — the odometry heading frame
- * integrates with libm cosf/sinf (drivetrain.c). Force/torque paths
- * are IEEE-exact; only the pose readout varies across libms. Same
- * machine + same libm is bit-stable (proven by ftc_hotload_test).
+ * now uses det_sin/det_cos (drivetrain.c, in-contract via [-pi,pi] wrap,
+ * zero trig fallback), but other libm uses remain in the TU
+ * (sqrtf/fabsf/floorf/fmodf), so the module as a whole stays
+ * deterministic=false. Force/torque paths are IEEE-exact; only the pose
+ * readout could vary across libms. Same machine + same libm is bit-stable
+ * (proven by ftc_hotload_test).
  */
 #include "ftc_fleet.h"
 #include "core/mpe_module.h"
@@ -48,9 +51,10 @@ const mpe_module_desc_t mpe_module_desc = {
     .name = "ftc-fleet",
     .version = "1.0",
     .kind = "generic",
-    .deterministic = false, /* odometry cosf/sinf; see above */
+    .deterministic = false, /* heading det_sin/det_cos now exact, but other libm remains; see above */
     .attach = ftc_fleet_attach,
     .detach = ftc_fleet_detach,
     .pre_step = ftc_fleet_pre_step,
     .post_step = 0,
+    .stage_detach = 0, /* tick-only fleet: no foreign broadphase/solver state */
 };
