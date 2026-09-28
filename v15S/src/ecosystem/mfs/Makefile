@@ -1,15 +1,23 @@
 # MFS overarching module ecosystem ("mfs-simulator")
 #
-# Location: v15S/src/ecosystem/mfs/  (under the kernel MEI tree)
+# DUAL-MODE (DESPOT-2026-09-28): this file is SOURCE-IDENTICAL in both trees
+# (standalone 461-MFS root and embedded 475-MPE/v15S/src/ecosystem/mfs/).
+# MPE_SRC auto-detects the engine tree; override with
+#   make MPE_SRC=/path/to/475-MPE/v15S/src
+# or MFS_ENGINE_SRC env. Standalone default assumes the sibling layout
+#   projects/461-MFS + projects/475-MPE (same parent folder).
+#
+# Location (embedded): v15S/src/ecosystem/mfs/  (under the kernel MEI tree)
 # Full map: see README_MFS.md
 #
 # Include convention (location-independent, do not use ../ crosses):
 #   engine headers -> "core/...", "physics/...", "config/..."  (-I$(MPE_SRC))
 #   MFS-internal   -> "modules/...", e.g. "modules/ftc/submodules/robot.h" (-I.)
 #
-# Physics-truth note: deterministic=false on both bundled modules (libm
-# trig in odometry/rotors plus live gamepad polling in module_1; route
-# through core/det_math.h before claiming true).
+# Physics-truth note: deterministic=false on both bundled modules (heading
+# frame is det_sin/det_cos exact now, but other libm uses remain in the TUs
+# plus live gamepad polling in module_1; route the rest through
+# core/det_math.h before claiming true).
 #
 # Thin-plugin rule: module plugins contain ONLY MFS objects; engine symbols
 # resolve against the host at load (Linux: -rdynamic host at dlopen;
@@ -18,7 +26,18 @@
 # Objects live in build/ (never scattered across core/ physics/ config/ scene/).
 # Windows: produces .dll (MSYS2) / .dll (native); Linux: .so. Both kept.
 
-MPE_SRC = ../..
+# ---- engine-tree discovery (dual-mode; explicit MPE_SRC always wins) ----
+ifeq ($(origin MPE_SRC),undefined)
+  ifneq ($(wildcard ../../core/physics_world.c),)
+    MPE_SRC = ../..
+  else ifneq ($(wildcard ../475-MPE/v15S/src/core/physics_world.c),)
+    MPE_SRC = ../475-MPE/v15S/src
+  else ifneq ($(MFS_ENGINE_SRC),)
+    MPE_SRC = $(MFS_ENGINE_SRC)
+  else
+    $(error MPE engine not found. Run make from v15S/src/ecosystem/mfs, or set MPE_SRC=/path/to/475-MPE/v15S/src (sibling layout projects/461-MFS + projects/475-MPE also works))
+  endif
+endif
 MFS = .
 BUILD = build
 
@@ -64,8 +83,18 @@ include mfs_sources.mk
 MOD1_SRCS = modules/module_1/mfs_module_1.c modules/module_1/submodules/gamepad/gamepad.c
 MFS_MOD1_OBJS = $(patsubst %.c,$(BUILD)/%.o,$(MOD1_SRCS))
 # MFS_FTC_SRCS is engine-relative (see mfs_sources.mk); strip the prefix
-# for local builds.
-MFS_FTC_LOCAL = $(patsubst ecosystem/mfs/%,%,$(MFS_FTC_SRCS))
+# for local builds. DUAL-MODE: the strip is a no-op in standalone checkouts
+# (paths have no prefix there), so fall back to the explicit MFS-relative
+# list when any entry still carries the prefix.
+MFS_FTC_LOCAL_TMP = $(patsubst ecosystem/mfs/%,%,$(MFS_FTC_SRCS))
+MFS_FTC_STANDALONE_SRCS = modules/ftc/ftc_module.c \
+    modules/ftc/ftc_fleet.c \
+    modules/ftc/submodules/robot.c \
+    modules/ftc/submodules/drivetrain.c \
+    modules/ftc/submodules/motor.c \
+    modules/ftc/submodules/motor_presets.c \
+    modules/ftc/submodules/battery.c
+MFS_FTC_LOCAL = $(if $(filter ecosystem/mfs/%,$(MFS_FTC_LOCAL_TMP)),$(MFS_FTC_STANDALONE_SRCS),$(MFS_FTC_LOCAL_TMP))
 MFS_FTC_MOD_OBJS = $(patsubst %.c,$(BUILD)/%.o,$(MFS_FTC_LOCAL))
 MFS_ECO_SRCS = mfs_ecosystem.c mfs_internal.c
 MFS_ECO_OBJS = $(patsubst %.c,$(BUILD)/%.o,$(MFS_ECO_SRCS))
