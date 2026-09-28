@@ -20,6 +20,7 @@
 #include "modules/ftc/submodules/motor.h"
 #include "modules/ftc/submodules/battery.h"
 #include <stdlib.h>
+#include <stdio.h>
 #include <math.h>
 #include <string.h>
 
@@ -46,6 +47,7 @@ MPE_USED const mpe_module_desc_t mfs_module_1_desc = {
     .detach = mfs_module_1_detach,
     .pre_step = mfs_module_1_pre_step,
     .post_step = mfs_module_1_post_step,
+    .stage_detach = 0, /* tick-only module: no foreign broadphase/solver state */
 };
 
 /* NOTE: no mpe_module_desc alias here on purpose. Both this TU and
@@ -68,6 +70,16 @@ MPE_USED int mfs_module_1_attach(mpe_world_t *world, void **mod_state) {
     state->shooter_target_rpm = MFS_SHOOTER_TARGET_RPM;
     state->intake_speed_rpm = MFS_INTAKE_ROLLER_SPEED_RPM;
     state->gamepad_control_enabled = true;
+    /* DESPOT-2026-09-28 (programming: calloc-zero is a VALID id/index):
+     * poison id/joint slots to -1 so a failed create can never be mistaken
+     * for "joint 0 / body id 0 exists". Checked below before attach claims
+     * success. */
+    state->field_floor_id = -1;
+    state->goal_frame_id = -1;
+    state->intake_roller_body = -1;
+    state->intake_pivot_joint = -1;
+    state->shooter_flywheel_body = -1;
+    state->shooter_pivot_joint = -1;
 
     /* Joint pools: the robot/intake/shooter are joint assemblies.
      * Without this, constraint_add_revolute fails and robot creation
@@ -80,11 +92,25 @@ MPE_USED int mfs_module_1_attach(mpe_world_t *world, void **mod_state) {
         state->gamepad.deadzone = 0.15f;
     }
     
-    /* Create field, robot, intake, shooter */
+    /* Create field, robot, intake, shooter.
+     * DESPOT-2026-09-28 (programming: attach always returned 0 even when
+     * field/robot creation failed — a floorless world "attached" fine).
+     * Field + robot are load-bearing (no floor = no physics; no robot = no
+     * module); intake/shooter degrade gracefully to joint -1 (steps guard
+     * on robot_created + joint >= 0). Fail the attach, not the robot. */
     mfs_module_1_field_create(state);
     mfs_module_1_robot_create(state);
     mfs_module_1_intake_create(state);
     mfs_module_1_shooter_create(state);
+
+    if (state->field_floor_id < 0 || !state->robot_created) {
+        /* Partial bodies stay in the world by the detach-never-deletes
+         * contract; the caller owns world cleanup (test worlds are freed
+         * on this path — see mfs_suite_c module_1). */
+        mfs_module_1_detach(world, state);
+        *mod_state = NULL;
+        return -1;
+    }
     
     /* Spawn initial balls */
     for (int i = 0; i < 5; i++) {
@@ -377,10 +403,21 @@ MPE_USED void mfs_module_1_field_create(mfs_module_1_state *state) {
         world->bodies[floor_idx].restitution = 0.0f;
         world->bodies[floor_idx].friction_static = 0.7f;
         world->bodies[floor_idx].friction_kinetic = 0.6f;
+    } else {
+        /* DESPOT-2026-09-28: floor failure was silent (attach still
+         * returned 0). Poison explicitly; attach fails without a floor. */
+        state->field_floor_id = -1;
+        return;
     }
-    
-    /* Boundary walls */
-    physics_world_add_boundary_walls(world, half_w, half_l, wall_h, wall_t);
+
+    /* Boundary walls.
+     * DESPOT-2026-09-28: return was ignored (silent floorless/wall-less
+     * on pool exhaustion). A wall-less field still attaches (walls are
+     * not load-bearing for the module test), but the failure is now loud
+     * instead of silent. */
+    if (physics_world_add_boundary_walls(world, half_w, half_l, wall_h, wall_t) != 0) {
+        fprintf(stderr, "[mfs-module-1] field_create: boundary walls failed (pool exhausted?)\n");
+    }
     
     /* Goal frame - two vertical posts + crossbar */
     const float goal_w = MFS_BIOBUZZ_GOAL_WIDTH;
@@ -488,6 +525,13 @@ MPE_USED void mfs_module_1_intake_create(mfs_module_1_state *state) {
             constraint_set_revolute_motor(world, joint_idx, true, 
                 state->intake_speed_rpm * M_PI / 30.0f,  /* rad/s */
                 0.5f);  /* max torque */
+        } else {
+            /* DESPOT-2026-09-28: joint failure was silent (body left
+             * jointless, steps spin it free). No body-removal API exists,
+             * so unwind is impossible — the degraded mode (free roller,
+             * steps resolve by id and stay NULL-safe) is now loud instead
+             * of silent. Joint stays -1 (attach poison). */
+            fprintf(stderr, "[mfs-module-1] intake_create: revolute joint failed (pool exhausted?)\n");
         }
     }
     
@@ -532,6 +576,10 @@ MPE_USED void mfs_module_1_shooter_create(mfs_module_1_state *state) {
             (vector3){0.0f, 1.0f, 0.0f});  /* spin axis = Y (horizontal) */
         if (joint_idx >= 0) {
             state->shooter_pivot_joint = joint_idx;
+        } else {
+            /* DESPOT-2026-09-28: same loud-degraded treatment as intake
+             * (no removal API; steps stay id-resolved and NULL-safe). */
+            fprintf(stderr, "[mfs-module-1] shooter_create: revolute joint failed (pool exhausted?)\n");
         }
         
         /* Angle the flywheel up by 35 degrees */
