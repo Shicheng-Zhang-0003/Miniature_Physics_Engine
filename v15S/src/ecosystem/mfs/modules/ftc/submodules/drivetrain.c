@@ -2,6 +2,7 @@
 /* MPE_FTC_082 TEMPORARY — replace with anisotropic friction (MPE_FTC_095): Fixed syntax error (stray '}') + real mecanum chassis forces */
 #include "drivetrain.h"
 #include "core/math3d.h"
+#include "core/det_math.h"
 #include "config/mpe_config.h"
 #include <stdio.h>
 #include <math.h>
@@ -119,6 +120,103 @@ void drivetrain_mecanum (ftc_robot *robot, float forward, float strafe, float ro
  * --------------------------------------------------------------------- */
 static void drivetrain_odometry_update (physics_world *world, ftc_robot *robot, float dt);
 
+/* ---------------------------------------------------------------------
+ * MFS-STRAFE-A: analytic mecanum roller force.
+ *
+ * Replaces 32 articulated roller bodies + 32 bearing joints + the
+ * quasi-static spin prescription (the 5-link ground->roller->bearing->hub
+ * chain that GS-128/512 cannot converge: strafe wandered 0.03-0.17 m
+ * chaotically with iteration count, never reaching 0.30 m). Analytic
+ * mode builds NO roller bodies (hub contacts the floor directly; 6
+ * bodies / 4 joints, trivially converged) and the roller geometry
+ * survives here as the per-wheel axle direction.
+ *
+ * Why this is physics and not the retired cheat (grep-clean: no sin45
+ * torque term, no chassis force anywhere in this TU):
+ *   - Applied to each WHEEL's force/torque accumulators at the contact
+ *     patch (force) and about the wheel centre (r×F reaction torque,
+ *     which honestly loads the motor) — never to the chassis.
+ *   - Coulomb-capped: |F| <= MU*N with N the wheel's static-share normal
+ *     (documented approximation: ignores dynamic load transfer) and MU
+ *     the wheel-rubber kinetic coefficient. It cannot exceed the cone.
+ *   - Dissipative: F always opposes the measured axle-slip velocity
+ *     (smoothed Coulomb, linear viscous region below VREF so standstill
+ *     holds without sign chatter). Zero slip gives zero force — unlike
+ *     the retired sin45*sum(tau)/r term, which pushed at full stall with
+ *     no motion and no cone and ran 4.3x over the ceiling.
+   *   - Contact-gated at TRUE-CONTACT scale (patch bottom within 1 cm of
+   *     the floor — the engine slop scale): airborne wheels get nothing.
+   *     DESPOT-2026-09-28: was 0.05 m "same as the traction loop" — a full
+   *     wheel radius of hover still drew the full Coulomb cone. The two
+   *     gates are now deliberately different: FORCE needs contact (1 cm),
+   *     while the traction CUT keeps its conservative 0.05 m (stays engaged
+   *     near ground — safe direction).
+ *   - Single tangential model: analytic-mode hubs ship zero isotropic
+ *     friction (see robot.c), so engine contact supplies the normal only
+ *     and this is the SOLE tangential force — never double-counted.
+ *   - Frame-honest: the axle lives in the CHASSIS (mount) frame, not the
+ *     spinning hub (a hub-local axle would sweep with the wheel and the
+ *     contact would have no fixed rail — the same bug class the parked
+ *     rail model fixed with its frame id).
+ * Deterministic: det_sin/det_cos + arithmetic + sqrtf only.
+ * --------------------------------------------------------------------- */
+static void drivetrain_mecanum_analytic (physics_world *world, ftc_robot *robot) {
+    if ((!world) || (!robot)) {return;}
+    if (!robot->mecanum_analytic) {return;}
+    if (robot->drivetrain_type != FTC_DRIVETRAIN_MECANUM) {return;}
+    if (robot->wheel_count <= 0) {return;}
+    int ci = robot->chassis_body;
+    if ((ci < 0) || (ci >= world->body_count)) {return;}
+    rigidbody *ch = &world->bodies[ci];
+    float total_mass = ch->mass;
+    for (int i = 0; i < robot->wheel_count; i++) {
+        int wi = robot->wheel_bodies[i];
+        if ((wi >= 0) && (wi < world->body_count)) {
+            total_mass += world->bodies[wi].mass;
+        }
+    }
+    if (!(total_mass > 0.0f) || !isfinite(total_mass)) {return;}
+    const mpe_config_t *cfg = mpe_world_cfg(world);
+    float g_mag = 9.81f;
+    if (cfg->world.gravity < 0.0f) {g_mag = -cfg->world.gravity;}
+    if (!(g_mag > 0.0f) || !isfinite(g_mag)) {return;}
+    float n_per_wheel = total_mass * g_mag / (float)robot->wheel_count;
+    float f_max = MFS_MECANUM_ANALYTIC_MU * n_per_wheel;
+    if (!(f_max >= 0.0f) || !isfinite(f_max)) {return;}
+    for (int i = 0; i < robot->wheel_count; i++) {
+        int wi = robot->wheel_bodies[i];
+        if ((wi < 0) || (wi >= world->body_count)) {continue;}
+        rigidbody *wheel = &world->bodies[wi];
+        float r_run = 0.0f;
+        if ((i >= 0) && (i < FTC_MAX_WHEELS) && (robot->wheel_effective_radius[i] > 0.001f)) {
+            r_run = robot->wheel_effective_radius[i];
+        }
+        if (!(r_run > 0.001f) || !isfinite(r_run)) {continue;}
+        /* DESPOT-2026-09-28: was 0.05 m — hover force. True-contact scale. */
+        if (wheel->position.y - r_run > 0.01f) {continue;} /* airborne */
+        float theta = robot->wheel_roller_angle[i];
+        if (!isfinite(theta)) {continue;}
+        vector3 a_local = {(float)det_sin((double)theta), 0.0f, (float)det_cos((double)theta)};
+        vector3 a_world = vector4_rotate_to_vector3(ch->orientation, a_local);
+        a_world.y = 0.0f; /* contact plane */
+        float a_len_sq = vector3_length_squared(a_world);
+        if (!(a_len_sq > 1e-12f) || !isfinite(a_len_sq)) {continue;}
+        a_world = vector3_scaling(a_world, 1.0f / sqrtf(a_len_sq));
+        /* Contact-patch slip velocity (bottom point; planar only — the
+         * normal solver owns Y). */
+        vector3 r_c = {0.0f, -r_run, 0.0f};
+        vector3 v_c = vector3_addition(wheel->velocity, vector3_cross(wheel->angular_velocity, r_c));
+        v_c.y = 0.0f;
+        float v_a = vector3_dot(v_c, a_world);
+        if (!isfinite(v_a)) {continue;}
+        float u = v_a / MFS_MECANUM_ANALYTIC_VREF;
+        if (u > 1.0f) {u = 1.0f;} else if (u < -1.0f) {u = -1.0f;}
+        vector3 F = vector3_scaling(a_world, -f_max * u);
+        wheel->force_accumulator = vector3_addition(wheel->force_accumulator, F);
+        wheel->torque_accumulator = vector3_addition(wheel->torque_accumulator, vector3_cross(r_c, F));
+    }
+}
+
 void drivetrain_update (physics_world *world, ftc_robot *robot, float dt) {
     if ((!world) || (!robot) || (dt <= 0.0f)) {return;}
     const mpe_config_t *drive_cfg = mpe_world_cfg(world);
@@ -127,6 +225,11 @@ void drivetrain_update (physics_world *world, ftc_robot *robot, float dt) {
      * as a torque couple between hub and chassis. Ground friction is then
      * resolved by the engine's contact solver. */
     ftc_robot_update(world, robot, dt);
+
+    /* MFS-STRAFE-A analytic lateral (mecanum only, contact-level, cone-
+     * capped — see function header). Lands in the accumulators alongside
+     * motor torque, pre-integration, same tick. */
+    drivetrain_mecanum_analytic(world, robot);
 
     /* Rolling resistance.
      *
@@ -264,9 +367,14 @@ static void drivetrain_odometry_update (physics_world *world, ftc_robot *robot, 
         const float omega = vector3_dot(w->angular_velocity, axle);
         robot->wheel_radians[i] += omega * dt;
         if (quant_on > 0.5f) {
-            /* True angle -> integer counts -> quantized angle. */
+            /* True angle -> integer counts -> quantized angle.
+             * DESPOT-2026-09-28: was floor() — negative creep reported -1
+             * immediately while positive needed a full count (half-count
+             * directional bias on reversal; hardware quadrature is
+             * symmetric). Round-half-away-from-zero. */
             const float revs = robot->wheel_radians[i] * 0.15915494309189535f; /* /2pi */
-            int new_count = (int)floorf(revs * counts_per_rev);
+            const float exact = revs * counts_per_rev;
+            int new_count = (int)(exact >= 0.0f ? floorf(exact + 0.5f) : ceilf(exact - 0.5f));
             if (!isfinite((float)new_count)) new_count = robot->wheel_encoder_counts[i];
             int old_count = robot->wheel_encoder_counts[i];
             robot->wheel_encoder_counts[i] = new_count;
@@ -314,9 +422,14 @@ static void drivetrain_odometry_update (physics_world *world, ftc_robot *robot, 
     /* DESPOT-FIX (math lie): odom_theta grew unbounded and cosf/sinf lost
      * precision on long runs (libm trig error grows with |theta|; past ~1e4
      * rad the heading is noise). Wrap to [-pi,pi] every tick — exact for
-     * rotation, keeps libm in its accurate regime. Uses only fmodf/fabsf
-     * (no new deps); deterministic=false still holds (libm), but error is
-     * now bounded instead of growing. */
+     * rotation, keeps trig in its accurate regime. Uses only fmodf/fabsf
+     * (no new deps).
+     * TRUTH (determinism): heading frame now uses det_sin/det_cos
+     * (core/det_math.h, IEEE-exact polynomials, no libm). Theta is wrapped
+     * to [-pi,pi] above, so |x|<1e15 contract always holds — zero trig
+     * fallback in practice. deterministic=false still declared: other libm
+     * uses remain in this TU (sqrtf/fabsf/floorf/fmodf), so the module as a
+     * whole is not yet provably fallback-free. */
     {
         const float pi = 3.14159265358979323846f;
         const float two_pi = 6.28318530717958647692f;
@@ -328,8 +441,8 @@ static void drivetrain_odometry_update (physics_world *world, ftc_robot *robot, 
             robot->odom_theta = wrapped - pi;
         }
     }
-    const float c = cosf(robot->odom_theta);
-    const float s = sinf(robot->odom_theta);
+    const float c = (float)det_cos((double)robot->odom_theta);
+    const float s = (float)det_sin((double)robot->odom_theta);
     /* body->world yaw about +Y: x' = x*c + z*s ; z' = -x*s + z*c */
     robot->odom_x += (v_lat * c + v_fwd * s) * dt;
     robot->odom_z += (-v_lat * s + v_fwd * c) * dt;

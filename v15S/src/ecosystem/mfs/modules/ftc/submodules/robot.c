@@ -203,6 +203,10 @@ static vector4 rb_orient_from_axis(vector3 axis) {
     return vector4_normalisation((vector4){1.0f + d, c.x, c.y, c.z});
 }
 
+/* MFS-STRAFE-A forensics default (1 = analytic, 0 = articulated).
+ * Declared early: creation reads it. */
+static int s_mecanum_analytic_default = MFS_MECANUM_ANALYTIC_DEFAULT;
+
 /* MPE_FTC_095: chassis-centre height where the wheels just touch floor y=0 */
 float ftc_robot_rest_height(void) {
     return WHEEL_RADIUS - WHEEL_Y_OFFSET;
@@ -244,6 +248,10 @@ return -1;
     }
     robot->motor_preset = preset;
     robot->drivetrain_type = drivetrain_type;
+    /* MFS-STRAFE-A: analytic lateral defaults ON for mecanum only (tank
+     * keeps plain cylinders + engine friction). Read at build time below. */
+    robot->mecanum_analytic =
+        (drivetrain_type == FTC_DRIVETRAIN_MECANUM) && (s_mecanum_analytic_default != 0);
     robot->axle_axis_x = 1.0f; /* axles point along X (left-right) */
     robot->axle_axis_y = 0.0f;
     robot->axle_axis_z = 0.0f;
@@ -321,16 +329,19 @@ return -1;
 #if defined(MECANUM_USE_RAIL_CONTACT)
         const float hub_radius = WHEEL_RADIUS;
 #else
-        /* DESPOT-FIX: plate recessed INSIDE the roller ring (30 mm). The
-         * pitch-radius plate (44 mm) sat exactly on the roller-center
-         * circle, half-burying every roller so it ground the plate with
-         * 0.9 rubber friction on top of its pin joint (measured: chassis
-         * jacked +14 mm, 0.42 rad yaw in straight drive, judder). With a
-         * 30 mm plate the clearance is 44-30-6 = 8 mm: the only hub-ground
-         * path is through rollers on their bearings, as the geometry
-         * comment above always specified. */
-        const float hub_radius = wheel_is_mecanum_w ? MECANUM_HUB_PLATE_RADIUS
-                                                    : WHEEL_RADIUS;
+        /* MFS-STRAFE-A: analytic mode contacts the floor on the hub
+         * directly (full running radius, no roller bodies), so the plate
+         * is the contact body. Articulated mode recesses it inside the
+         * roller ring (DESPOT-FIX, kept: the pitch-radius plate (44 mm)
+         * sat exactly on the roller-center circle, half-burying every
+         * roller so it ground the plate with 0.9 rubber friction on top
+         * of its pin joint — measured chassis jacked +14 mm, 0.42 rad yaw
+         * in straight drive, judder. With a 30 mm plate the clearance is
+         * 44-30-6 = 8 mm: the only hub-ground path is through rollers on
+         * their bearings, as the geometry comment above specifies). */
+        const float hub_radius = (wheel_is_mecanum_w && !robot->mecanum_analytic)
+                                     ? MECANUM_HUB_PLATE_RADIUS
+                                     : WHEEL_RADIUS;
 #endif
         /* Running-surface radius, DERIVED per drivetrain (FIX-AUDIT-DESPOT):
          * mecanum contacts the ground on the roller envelope
@@ -348,9 +359,18 @@ return -1;
         }
         /* Grippy rubber on tile (was engine defaults ~0.3/0.2: glassy).
          * Contact mu = min(wheel, floor); the drivetrain budgets against
-         * these same wheel materials (see drivetrain_update). */
-        world->bodies[robot->wheel_bodies[i]].friction_static = 0.9f;
-        world->bodies[robot->wheel_bodies[i]].friction_kinetic = 0.7f;
+         * these same wheel materials (see drivetrain_update).
+         * MFS-STRAFE-A: analytic mode zeroes hub friction (the analytic
+         * roller force in drivetrain_update is then the SOLE tangential
+         * model — one contact force, never double-counted past the cone).
+         * Normal impulse is unaffected (friction 0 still collides). */
+        if (wheel_is_mecanum_w && robot->mecanum_analytic) {
+            world->bodies[robot->wheel_bodies[i]].friction_static = 0.0f;
+            world->bodies[robot->wheel_bodies[i]].friction_kinetic = 0.0f;
+        } else {
+            world->bodies[robot->wheel_bodies[i]].friction_static = 0.9f;
+            world->bodies[robot->wheel_bodies[i]].friction_kinetic = 0.7f;
+        }
         world->bodies[robot->wheel_bodies[i]].restitution = 0.0f;
 
         uint32_t wheel_id = world->bodies[robot->wheel_bodies[i]].object_id;
@@ -464,7 +484,11 @@ return -1;
                 rail_axis, MECANUM_MU_ROLLER_RAIL, MECANUM_MU_PLATE_ACROSS);
         }
 #else
-        if (is_mecanum) {
+        /* MFS-STRAFE-A: analytic mode builds NO roller bodies/joints (the
+         * roller geometry survives analytically in wheel_roller_angle +
+         * the drivetrain lateral force). Articulated mode below is kept
+         * for forensics (ftc_robot_set_mecanum_analytic(robot, 0)). */
+        if (is_mecanum && !robot->mecanum_analytic) {
             /* Real free rollers on real free bearings.
              *
              * Each roller is a genuine body, a genuine cylinder, joined to the
@@ -481,7 +505,8 @@ return -1;
              * mecanum wheel and is also what makes the roller perpendicular
              * to the radial direction at the contact, so it is geometrically
              * free to spin there. */
-            const float sgn = (roller_angle >= 0.0f) ? 1.0f : -1.0f;
+            const float sgn0 = (roller_angle >= 0.0f) ? 1.0f : -1.0f;
+            (void)sgn0; /* sign carried by roller_axis below (X = sin); kept for readability */
 /* DESPOT-FIX: the old code used a hardcoded sgn for X only,
              * leaving Z always positive. The roller axis must rotate with
              * the actual roller_angle in the XZ plane. Angle is measured
@@ -824,15 +849,15 @@ void ftc_robot_update(physics_world *world, ftc_robot *robot, float dt) {
          * The gate is now on MEASURED speed: at/past the bound, overshoot
          * is clipped as before; below it, full stall torque is delivered
          * and the contact solver (not the governor) decides breakaway.
-         * DESPOT-FIX 2 (diode, not deadbeat): PARKED — the diode (zero
-         * outward push past the bound, no reversing slam) unmasked violent
-         * chatter in loaded driving (teleop yaw returned 0.38 rad): without
-         * the deadbeat pull-back, peel-out wheels run away past the bound
-         * and roller/hub chaos steers the chassis. Restored deadbeat-gated-
-         * on-measured-speed below (full stall below the bound for
-         * breakaway; exact land-on-bound above it). The unloaded free-spin
-         * limit cycle is a separate frontier (bearing-damping model).
-         * Diode kept in history for that work; deadbeat ships. */
+         * DESPOT-FIX 2 (diode, not deadbeat) — TRUTH UPDATE 2026-09-28:
+         * an exact land-on-bound deadbeat (tau = I*(wfree-w)/dt pull-back)
+         * was described here, but what ships below is a DIODE (zero
+         * outward push past the bound, no reversing slam). The deadbeat
+         * paragraph above is kept as history of what was tried; the diode
+         * is what runs because the deadbeat re-introduced limit-cycle
+         * chatter in loaded driving. Diode kept intentionally; the
+         * unloaded free-spin limit cycle is a separate frontier
+         * (bearing-damping model). */
         float torque = robot->wheel_motors[i].output_torque;
         /* DESPOT-FIX (torque slew): feather standing starts. A 0->stall
          * step in one tick (74 N-equiv vs 19 N cone) outruns the contact:
@@ -866,9 +891,24 @@ void ftc_robot_update(physics_world *world, ftc_robot *robot, float dt) {
          * DESPOT-FIX: added 5% hysteresis (1.1 * 1.05 = 1.155x free speed)
          * to prevent chatter at the bound — at exactly the bound the
          * implicit solve already pulls back; the diode only catches true
-         * runaway. Below wfree, full stall torque for breakaway. */
+         * runaway. Below wfree, full stall torque for breakaway.
+         * DESPOT-2026-09-28 (math lie, was spec-fixed): the bound was
+         * |spec_free|*1.155 at every voltage — under sag (10 V) the true
+         * no-load point is 0.83x spec, so the diode permitted ~39% past
+         * true free before engaging (8% overshoot at fresh pack). The
+         * bound is now the voltage-scaled no-load point w_free(V) =
+         * Vterm/(kv*gear) with the same 1.155 hysteresis; spec survives
+         * only as the fallback when Kv is degenerate. */
         {
-            float wfree = fabsf(robot->wheel_motors[i].free_speed_rad_s) * 1.155f;
+            const motor *gov_m = &robot->wheel_motors[i];
+            float wfree = fabsf(gov_m->free_speed_rad_s) * 1.155f;
+            if (gov_m->kv > 0.0f && gov_m->gear_ratio > 0.0f && isfinite(terminal_voltage) &&
+                terminal_voltage > 0.0f) {
+                float wv = terminal_voltage / (gov_m->kv * gov_m->gear_ratio) * 1.155f;
+                if (isfinite(wv) && wv > 0.0f) {
+                    wfree = wv;
+                }
+            }
             if (wfree > 0.0f && torque > 0.0f && wheel_speed > wfree) {
                 torque = 0.0f;
             } else if (wfree > 0.0f && torque < 0.0f && wheel_speed < -wfree) {
@@ -924,6 +964,11 @@ void ftc_robot_update(physics_world *world, ftc_robot *robot, float dt) {
 
 #if !defined(MECANUM_USE_RAIL_CONTACT)
         /* DESPOT-2026-09-26 QUASI-STATIC ROLLER BEARING (honest label).
+         * MFS-STRAFE-A 2026-09-28: runs only in ARTICULATED mode
+         * (mecanum_analytic false). Analytic mode builds zero rollers,
+         * so the loop below no-ops and the wheel-level Coulomb force in
+         * drivetrain_mecanum_analytic carries lateral instead. Kept for
+         * the forensics build.
          *
          * What this is: the roller spin DOF has time constant ~1ms
          * (I_roller ~2.5e-7 kg.m^2 over bearing/contact stiffness), far below
@@ -1013,6 +1058,10 @@ void ftc_robot_set_wheel_commands(ftc_robot *robot, const float *commands, int c
         }
         robot->wheel_motors[i].command = cmd;
     }
+}
+
+void ftc_robot_set_mecanum_analytic_default(int on) {
+    s_mecanum_analytic_default = (on != 0) ? 1 : 0;
 }
 
 void ftc_robot_get_position(physics_world *world, ftc_robot *robot, float *px, float *py, float *pz) {

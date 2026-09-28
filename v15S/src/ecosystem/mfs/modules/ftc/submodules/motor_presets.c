@@ -26,7 +26,11 @@ typedef struct {
     float stall_current;
     float gear_ratio;
     float efficiency;
-    int base_encoder_ppr;  /* PPR at motor shaft (for encoder math) */
+    int base_encoder_ppr;  /* Quadrature-DECODED counts per motor-shaft rev,
+                                * i.e. what the hub/SDK reports (goBILDA 28,
+                                * NeveRest 28 = 7 pulses x4, TorqueNADO 24 =
+                                * 6 cycles x4, Core Hex 4). Output counts =
+                                * base_encoder_ppr x gear_ratio. */
 } motor_preset_spec;
 
 static const motor_preset_spec presets[MOTOR_COUNT] = {
@@ -79,32 +83,34 @@ static const motor_preset_spec presets[MOTOR_COUNT] = {
     /* ================================================================
      * AndyMark NeveRest Classic — published output specs
      * Base am-3104: 6000 RPM, 0.062 N-m stall, 11.5 A, 7 PPR encoder
+     * (7 pulses = 28 quadrature-decoded counts; AndyMark lists 280 ppr
+     * AND 1120 ticks/rev — the hub/SDK reports decoded 1120 = 28x40).
      * Classic gearboxes: 12T pinion, 0.80 nominal efficiency (spur)
      * ================================================================ */
-    {MOTOR_NR_CLASSIC_40,    "NeveRest Classic 40",    2.4715f,  160.0f, 11.5f, 40.0f, 0.80f, 7},
-    {MOTOR_NR_CLASSIC_60,    "NeveRest Classic 60",    3.7070f,  105.0f, 11.5f, 60.0f, 0.80f, 7},
+    {MOTOR_NR_CLASSIC_40,    "NeveRest Classic 40",    2.4715f,  160.0f, 11.5f, 40.0f, 0.80f, 28},
+    {MOTOR_NR_CLASSIC_60,    "NeveRest Classic 60",    3.7070f,  105.0f, 11.5f, 60.0f, 0.80f, 28},
 
     /* ================================================================
      * AndyMark NeveRest Orbital — published + ideal-derived
-     * Same base motor (am-3104, 17T pinion), 7 PPR encoder.
+     * Same base motor (am-3104, 17T pinion), 28 decoded counts.
      * Orbital gearboxes: planetary, 0.85 nominal efficiency.
      * Published free speeds run ~10% above 6000/ratio (6600-class base).
      * PHYSICS-FIX: stalls are ideal-derived base*ratio (0.062 Nm base):
      * the old table ran ~4.3x high (e.g. 3.7:1 1.1904 vs 0.229 ideal),
      * overstating wheel force 4x and guaranteeing burnout/slip.
      * ================================================================ */
-    {MOTOR_NR_ORBITAL_1_1,   "NeveRest Orbital 1:1",   0.0620f, 6600.0f, 11.5f, 1.0f,  0.85f, 7},
-    {MOTOR_NR_ORBITAL_3_7,   "NeveRest Orbital 3.7:1", 0.2294f, 1784.0f, 11.5f, 3.7f,  0.85f, 7},
-    {MOTOR_NR_ORBITAL_13_7,  "NeveRest Orbital 13.7:1",0.8494f,  482.0f, 11.5f, 13.7f, 0.85f, 7},
-    {MOTOR_NR_ORBITAL_19_2,  "NeveRest Orbital 19.2:1",1.1904f,  344.0f, 11.5f, 19.2f, 0.85f, 7},
-    {MOTOR_NR_ORBITAL_50_9,  "NeveRest Orbital 50.9:1",3.1558f, 130.0f, 11.5f, 50.9f, 0.85f, 7},
-    {MOTOR_NR_ORBITAL_263_7, "NeveRest Orbital 263.7:1",16.3494f,  25.0f, 11.5f, 263.7f, 0.85f, 7},
+    {MOTOR_NR_ORBITAL_1_1,   "NeveRest Orbital 1:1",   0.0620f, 6600.0f, 11.5f, 1.0f,  0.85f, 28},
+    {MOTOR_NR_ORBITAL_3_7,   "NeveRest Orbital 3.7:1", 0.2294f, 1784.0f, 11.5f, 3.7f,  0.85f, 28},
+    {MOTOR_NR_ORBITAL_13_7,  "NeveRest Orbital 13.7:1",0.8494f,  482.0f, 11.5f, 13.7f, 0.85f, 28},
+    {MOTOR_NR_ORBITAL_19_2,  "NeveRest Orbital 19.2:1",1.1904f,  344.0f, 11.5f, 19.2f, 0.85f, 28},
+    {MOTOR_NR_ORBITAL_50_9,  "NeveRest Orbital 50.9:1",3.1558f, 130.0f, 11.5f, 50.9f, 0.85f, 28},
+    {MOTOR_NR_ORBITAL_263_7, "NeveRest Orbital 263.7:1",16.3494f,  25.0f, 11.5f, 263.7f, 0.85f, 28},
 
     /* ================================================================
-     * AndyMark NeveRest Hex — same as Classic ratios
+     * AndyMark NeveRest Hex — same as Classic ratios (28 decoded)
      * ================================================================ */
-    {MOTOR_NR_HEX_40,        "NeveRest Hex 40:1",      2.4715f,  160.0f, 11.5f, 40.0f, 0.80f, 7},
-    {MOTOR_NR_HEX_60,        "NeveRest Hex 60:1",      3.7070f,  105.0f, 11.5f, 60.0f, 0.80f, 7},
+    {MOTOR_NR_HEX_40,        "NeveRest Hex 40:1",      2.4715f,  160.0f, 11.5f, 40.0f, 0.80f, 28},
+    {MOTOR_NR_HEX_60,        "NeveRest Hex 60:1",      3.7070f,  105.0f, 11.5f, 60.0f, 0.80f, 28},
 
     /* ================================================================
      * REV Robotics HD Hex (REV-41-1291 base)
@@ -116,8 +122,12 @@ static const motor_preset_spec presets[MOTOR_COUNT] = {
     {MOTOR_REV_HD_HEX_20,    "REV HD Hex 20:1 spur",   2.1000f,  300.0f, 8.5f, 20.0f, 0.80f, 28},  /* ideal-derived */
     {MOTOR_REV_HD_HEX_40,    "REV HD Hex 40:1 spur",   4.2000f,  150.0f, 8.5f, 40.0f, 0.80f, 28},  /* ideal-derived */
 
-    /* REV Core Hex (REV-41-1300) — integrated 72:1 planetary */
-    {MOTOR_REV_CORE_HEX,     "REV Core Hex",           3.2000f,  125.0f, 4.4f, 72.0f, 0.80f, 28},  /* published */
+    /* REV Core Hex (REV-41-1300) — integrated 72:1 planetary.
+     * DESPOT-2026-09-28: base count is 4 (REV reports 4/motor-rev, 288 at
+     * the output = 4x72), NOT 28 — the old 28 gave 7x too-fine
+     * quantization (2016 vs 288). HD Hex above keeps 28 (550-class base
+     * reports 28/motor-rev). */
+    {MOTOR_REV_CORE_HEX,     "REV Core Hex",           3.2000f,  125.0f, 4.4f, 72.0f, 0.80f, 4},  /* published */
 
     /* ================================================================
      * REV UltraPlanetary (cartridge stacks on HD Hex base)
@@ -139,12 +149,13 @@ static const motor_preset_spec presets[MOTOR_COUNT] = {
 
     /* ================================================================
      * Pitsco TETRIX MAX TorqueNADO — published output specs
-     * Spur gearbox, 8.7 A stall, 6 cycles/rev motor (24 counts).
-     * 20:1 → 480 CPR, 40:1 → 960 CPR, 60:1 → 1440 CPR at output.
+     * Spur gearbox, 8.7 A stall, 6 cycles/rev motor = 24 decoded counts.
+     * 20:1 → 480 CPR, 40:1 → 960 CPR, 60:1 → 1440 CPR at output
+     * (DESPOT-2026-09-28: was 6, giving 360 vs 1440 at 60:1 — 4x coarse).
      * ================================================================ */
-    {MOTOR_TN_20,            "TorqueNADO 20:1",        1.6453f,  300.0f, 8.7f, 20.0f, 0.80f, 6},
-    {MOTOR_TN_40,            "TorqueNADO 40:1",        3.2907f,  150.0f, 8.7f, 40.0f, 0.80f, 6},
-    {MOTOR_TN_60,            "TorqueNADO 60:1",        4.9431f,  100.0f, 8.7f, 60.0f, 0.80f, 6},
+    {MOTOR_TN_20,            "TorqueNADO 20:1",        1.6453f,  300.0f, 8.7f, 20.0f, 0.80f, 24},
+    {MOTOR_TN_40,            "TorqueNADO 40:1",        3.2907f,  150.0f, 8.7f, 40.0f, 0.80f, 24},
+    {MOTOR_TN_60,            "TorqueNADO 60:1",        4.9431f,  100.0f, 8.7f, 60.0f, 0.80f, 24},
 };
 
 void motor_preset_apply(motor *m, motor_preset_id id) {

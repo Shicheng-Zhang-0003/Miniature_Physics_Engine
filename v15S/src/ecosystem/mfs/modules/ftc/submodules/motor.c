@@ -57,7 +57,13 @@ void motor_update(motor *m, float wheel_angular_vel, float dt, float battery_vol
     float applied_voltage = battery_voltage * m->command;
 
     /* Copper thermal derating: winding resistance rises with the modeled
-     * temperature (was write-only telemetry). Small at FTC currents. */
+     * temperature (was write-only telemetry).
+     * DESPOT-2026-09-28 (math truth): the old "small at FTC currents"
+     * claim was false — equilibrium is dT_eq = 10*I^2*r (thermal mass
+     * 10 J/K vs 0.01/K cooling), so a 2 A cruise at r~=1.3 ohm settles
+     * +52 C (+20% R). Sustained stall is contained in practice by the
+     * pack fuse browning out (~1 s at 4-motor stall), not by this model,
+     * so a 150 C magnet ceiling clamps the integrator below. */
     float r_eff = m->resistance * (1.0f + 0.00393f * (m->temperature - 25.0f));
     if (!(r_eff > 0.0f) || !isfinite(r_eff)) r_eff = m->resistance;
     /* Current = (V - BackEMF) / R, clamped to stall */
@@ -100,6 +106,9 @@ void motor_update(motor *m, float wheel_angular_vel, float dt, float battery_vol
         if (m->temperature < 25.0f) {
             m->temperature = 25.0f;
         }
+        if (m->temperature > 150.0f) {
+            m->temperature = 150.0f; /* magnet ceiling (see derating note) */
+        }
     }
 }
 
@@ -141,7 +150,8 @@ void motor_update_load(motor *m, float wheel_angular_vel, float dt, float batter
         motor_update(m, wheel_angular_vel, dt, battery_voltage);
         return;
     }
-    /* Clamp the predicted end-of-tick speed to the motor's own no-load speed.
+    /* Clamp the predicted end-of-tick speed to the motor's own no-load speed
+     * AT THE CURRENT BUS VOLTAGE.
      *
      * The implicit solve above linearises back-EMF, so on a lightly loaded
      * wheel it badly OVER-predicts: at 26.9:1 with I=2.5e-4 kg.m^2 it
@@ -153,11 +163,21 @@ void motor_update_load(motor *m, float wheel_angular_vel, float dt, float batter
      * accidental speed limiter for the whole drivetrain).
      *
      * A motor cannot exceed its own no-load speed on its own power: the
-     * no-load point of the V-w line is w_free = V/(kv*gear), which is also
-     * where back-EMF exactly cancels the applied voltage and current (hence
-     * torque) goes to zero. So clamping to that bound is not a fudge - it is
-     * the physically exact saturation of this model, and it makes the
-     * current/torque endpoints correct instead of merely bounded.
+     * no-load point of the V-w line is w_free(V) = V/(kv*gear), which is
+     * also where back-EMF exactly cancels the applied voltage and current
+     * (hence torque) goes to zero. So clamping to that bound is not a
+     * fudge - it is the physically exact saturation of this model, and it
+     * makes the current/torque endpoints correct instead of merely bounded.
+     *
+     * DESPOT-2026-09-28 (math lie, was min(spec, V-line)): the old bound
+     * took min(spec_free, V/(kv*gear)) and called it "physically exact".
+     * At a fresh pack (12.8 V) the V-line sits 6.7% ABOVE spec, so min()
+     * pinned the implicit path to spec while the explicit path correctly
+     * reached the voltage-scaled speed — the "identical endpoints" claim
+     * was false off-nominal. The bound is now the V-line itself (the true
+     * no-load point at this voltage); the 12 V spec value survives only
+     * as the fallback when Kv is degenerate. Explicit/implicit endpoints
+     * agree at ANY bus voltage now.
      *
      * The clamp is deliberately ONE-SIDED with respect to the measured speed:
      * never clamp below |w_measured|, or a wheel already turning faster than
@@ -166,12 +186,9 @@ void motor_update_load(motor *m, float wheel_angular_vel, float dt, float batter
      * instead of being pulled back down.
      */
     {
-        float w_lim = m->free_speed_rad_s;
-        if (m->kv > 0.0f && m->gear_ratio > 0.0f) {
-            float w_v = battery_voltage / (m->kv * m->gear_ratio);
-            if (w_v < w_lim) {
-                w_lim = w_v;
-            }
+        float w_lim = m->free_speed_rad_s; /* 12 V spec point: fallback only */
+        if (m->kv > 0.0f && m->gear_ratio > 0.0f && isfinite(battery_voltage) && battery_voltage > 0.0f) {
+            w_lim = battery_voltage / (m->kv * m->gear_ratio);
         }
         if (!isfinite(w_lim) || (w_lim < 0.0f)) {
             w_lim = m->free_speed_rad_s;
@@ -212,6 +229,9 @@ void motor_update_load(motor *m, float wheel_angular_vel, float dt, float batter
     m->temperature += heat_generated * 0.1f - cooling;
     if (m->temperature < 25.0f) {
         m->temperature = 25.0f;
+    }
+    if (m->temperature > 150.0f) {
+        m->temperature = 150.0f; /* magnet ceiling (see derating note) */
     }
 }
 
