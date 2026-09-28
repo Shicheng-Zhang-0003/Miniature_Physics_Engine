@@ -80,6 +80,20 @@ static void a3_grid_cache_uniforms(GLuint shader_program) {
     a3_grid_uniform_specular_exp = glGetUniformLocation(shader_program, "u_specular_exponent");
 }
 
+void grid_invalidate_cache(void) {
+    a3_grid_cached_program = 0;
+    a3_grid_uniform_viewframe = -1;
+    a3_grid_uniform_projection = -1;
+    a3_grid_uniform_model = -1;
+    a3_grid_uniform_normal_matrix = -1;
+    a3_grid_uniform_object_colour = -1;
+    a3_grid_uniform_camera_position = -1;
+    a3_grid_uniform_light_position = -1;
+    a3_grid_uniform_ambient = -1;
+    a3_grid_uniform_specular_coeff = -1;
+    a3_grid_uniform_specular_exp = -1;
+}
+
 void grid_render(grid_mesh *grid_mesh_object, GLuint shader_program, math4 view_matrix, math4 projection_matrix) {
     glUseProgram(shader_program);
     a3_grid_cache_uniforms(shader_program);

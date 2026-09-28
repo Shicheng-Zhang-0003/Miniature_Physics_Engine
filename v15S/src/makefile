@@ -61,6 +61,10 @@ DETERMINISM_FLAGS = -ffp-contract=off -fno-fast-math
 # Command-line CFLAGS/LIBS (e.g. compile_asan) override these defaults.
 CFLAGS ?= $(BASE_CFLAGS) -O3
 LIBS ?= $(BASE_LIBS)
+# TRUTH: hard-append determinism flags so env CFLAGS can never silently drop
+# -ffp-contract=off (bitwise twins depend on it). Recipe-level
+# $(DETERMINISM_FLAGS) below covers command-line CFLAGS=... overrides too.
+CFLAGS += $(DETERMINISM_FLAGS)
 
 BUILD_DIR ?= build
 # ENGINE_SRCS uses a wildcard (not an explicit list) so new engine TUs are
@@ -74,9 +78,9 @@ DEPS := $(OBJECTS:.o=.d)
 
 engine: $(OBJECTS)
 ifeq ($(MPE_WINDOWS),1)
-	$(CC) $(CFLAGS) $(OBJECTS) $(LIBS) -Wl,--export-all-symbols -Wl,--out-implib,libengine.a -o engine$(EXE_EXT)
+	$(CC) $(CFLAGS) $(DETERMINISM_FLAGS) $(OBJECTS) $(LIBS) -Wl,--export-all-symbols -Wl,--out-implib,libengine.a -o engine$(EXE_EXT)
 else
-	$(CC) $(CFLAGS) $(OBJECTS) $(LIBS) -o engine$(EXE_EXT)
+	$(CC) $(CFLAGS) $(DETERMINISM_FLAGS) $(OBJECTS) $(LIBS) -o engine$(EXE_EXT)
 endif
 
 # ---- Headless test binary (no GTK/GL deps) ----
@@ -151,7 +155,7 @@ help:
 
 $(BUILD_DIR)/%.o: %.c
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) $(DETERMINISM_FLAGS) -c $< -o $@
 
 clean:
 	rm -rf build build-debug build-release engine engine.exe test_* mpe-tui mpe-tui.exe *.so *.dll *.a *.lib plugins/*.so plugins/*.dll

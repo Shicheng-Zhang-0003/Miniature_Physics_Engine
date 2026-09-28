@@ -82,7 +82,7 @@ static int ftc_ensure_driving(void) {
         dmod = (const mpe_module_desc_t *)ftc_sym("mpe_module_desc");
     }
     if (!dmod) {
-        term_err("mpe: ftc: bundle not loaded (mod load ecosystem/mfs/mfs_ecosystem.so)\n");
+        term_err("mpe: ftc: bundle not loaded (from v15S/src: mod load ecosystem/mfs/mfs_ecosystem.so, or mod load plugins/mpe_ftc.so)\n");
         return -1;
     }
     physics_world *w = physics_world_get_primary();
@@ -188,6 +188,36 @@ void cmd_ftc(int argc, char **argv) {
         float x = ftc_argf(argv, ai, argc, 0.0f);
         float y = ftc_argf(argv, ai + 1, argc, p_rest());
         float z = ftc_argf(argv, ai + 2, argc, 0.0f);
+        if (ai >= argc) {
+            /* Default placement: stride successive spawns along +X so two
+             * `ftc spawn` invocations never interpenetrate at the origin
+             * (stacked spawns detonate via depenetration + solver blast —
+             * measured 8.3 m/s runmax for 3 stacked articulated robots).
+             * Explicit coordinates are used verbatim. */
+            int (*p_count)(struct physics_world *) =
+                (int (*)(struct physics_world *))ftc_sym("ftc_fleet_count");
+            int n = (p_count && w) ? p_count(w) : 0;
+            if (n > 0) {
+                x = 3.0f * (float)n;
+                char buf[128];
+                snprintf(buf, sizeof(buf),
+                         "mpe: ftc: fleet has %d robot(s); offsetting spawn to x=%.1f (pass x y z to override)\n",
+                         n, x);
+                term_out(buf);
+            }
+        } else if (w) {
+            /* Explicit placement into occupied space: warn, still proceed. */
+            int occupied = 0;
+            for (int i = 0; i < w->body_count && !occupied; i++) {
+                rigidbody *b = &w->bodies[i];
+                if (b->static_state || b->mass == 0.0f) continue;
+                if (fabsf(b->position.x - x) < 1.2f && fabsf(b->position.z - z) < 1.2f &&
+                    fabsf(b->position.y - y) < 1.0f)
+                    occupied = 1;
+            }
+            if (occupied)
+                term_out("mpe: ftc: warning: spawn volume occupied (expect contact settling)\n");
+        }
         if (ftc_ensure_floor(w) < 0) {
             term_err("mpe: ftc: could not ensure floor\n");
             return;

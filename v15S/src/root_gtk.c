@@ -1,4 +1,5 @@
 #include <gtk/gtk.h>
+#include <stdio.h>
 #include "mpe_engine.h"
 camera main_camera_fov;
 input_status main_inputs;
@@ -71,7 +72,13 @@ static void app_activate(GApplication *app, gpointer user_data) {
     initialize_input(&main_inputs);
 
     GtkWidget *main_window = gtk_application_window_new(GTK_APPLICATION(app));
-    gtk_window_set_title(GTK_WINDOW(main_window), "MPE v15R3 — GTK4");
+    {
+        /* Window title derives from the version macro (never a stale
+         * hardcoded tag). */
+        char mpe_window_title[128];
+        snprintf(mpe_window_title, sizeof(mpe_window_title), "MPE %s — GTK4", a3_version_string);
+        gtk_window_set_title(GTK_WINDOW(main_window), mpe_window_title);
+    }
     gtk_window_set_default_size(GTK_WINDOW(main_window), 1280, 720);
     g_signal_connect(main_window, "destroy", G_CALLBACK(on_main_window_destroy_gtk4), NULL);
 
@@ -187,6 +194,13 @@ int main_algorithm(int argc, char *argv[]) {
     initialize_input(&main_inputs);
     //Widgeting
     GtkWidget *main_window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+    {
+        /* Window title derives from the version macro (never a stale
+         * hardcoded tag). */
+        char mpe_window_title[128];
+        snprintf(mpe_window_title, sizeof(mpe_window_title), "MPE %s", a3_version_string);
+        gtk_window_set_title(GTK_WINDOW(main_window), mpe_window_title);
+    }
     g_signal_connect(main_window, "destroy", G_CALLBACK(on_main_window_destroy), NULL);
     GtkWidget *gl_area_widget = gtk_gl_area_new();
     gtk_gl_area_set_has_depth_buffer(GTK_GL_AREA(gl_area_widget), TRUE);
