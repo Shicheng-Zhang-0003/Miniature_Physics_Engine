@@ -48,7 +48,10 @@ series is 24 V and NOT FTC-legal — excluded.
 ## AndyMark NeveRest (am-3104 base)
 
 Base motor am-3104: 12 VDC, 6000 RPM ±10% no-load, 0.062 N·m stall,
-11.5 A stall, 0.4 A free, 7 PPR encoder. Source: AndyMark am-3104 pages.
+11.5 A stall, 0.4 A free, 7 PPR encoder (7 pulses = 28 quadrature-decoded
+counts; the hub/SDK reports decoded counts — AndyMark lists 280 ppr AND
+1120 ticks/rev, and 1120 = 28×40. DESPOT-2026-09-28: presets used 7, 4×
+too coarse). Source: AndyMark am-3104 pages.
 (All Classic/Orbital/Hex gearboxes accept this motor; all NeveRest
 versions are FTC-legal per AndyMark.)
 
@@ -69,8 +72,7 @@ Orbital 3.7 (~1784 RPM) and 50.9 (~130 RPM) presets exist
 | Preset | Spec | Free RPM | Stall (N·m) | Stall A | Basis |
 |---|---|---|---|---|---|
 | `MOTOR_REV_CORE_HEX` | REV-41-1300, 72:1 | 125 pub | 3.2 pub | 4.4 pub | published |
-| `MOTOR_REV_HD_HEX` | REV-41-1291 bare | 6000 pub | 0.105 pub | 8.5 pub | published |
-| `MOTOR_REV_HD_HEX_20` | 20:1 spur | 300 pub | 2.10 ideal-derived | 8.5 | derived |
+| `MOTOR_REV_HD_HEX` | REV-41-1291 bare | 6000 pub | 0.105 pub | 8.5 pub | published || `MOTOR_REV_HD_HEX_20` | 20:1 spur | 300 pub | 2.10 ideal-derived | 8.5 | derived |
 | `MOTOR_REV_HD_HEX_40` | 40:1 spur | 150 pub | 4.20 ideal-derived | 8.5 | derived |
 | `MOTOR_REV_UP_12` | UltraPlanetary 3×4 | 500 nom | 1.26 ideal-derived | 8.5 | derived |
 | `MOTOR_REV_UP_60` | UltraPlanetary 3×4×5 | 100 nom | 6.30 ideal-derived | 8.5 | derived |
@@ -80,6 +82,11 @@ Sources: REV DUO docs (Core Hex page; HD Hex page: base 6000 RPM /
 20:1→300 RPM; UltraPlanetary kit: 3/4/5 cartridges, stacks 3:1–60:1).
 Geared HD/UP stall torques are NOT published by REV — ideal-derived
 (base × ratio), marked as such. NEO brushless is FRC-only, excluded.
+
+Encoder convention (DESPOT-2026-09-28): `base_encoder_ppr` is decoded
+counts per motor rev as the hub reports them. Core Hex reports 4/motor-rev
+(288 at the output = 4×72 — DESPOT: presets used 28, 7× too fine); HD Hex
+and UltraPlanetary report 28/motor-rev (550-class).
 
 ## Pitsco TETRIX TorqueNADO (spur, 324 g, 6 mm D, 8.7 A stall)
 

@@ -27,9 +27,9 @@ What the suite contains, what each gate proves, and how to run it.
 | Test | Drives | Gates |
 |---|---|---|
 | `teleop` | tank full-forward, 180 ticks | disp ≥ 0.5 m, \|dy\| ≤ 1.0, yaw ≤ 0.3 rad |
-| `mecanum` | strafe 180 ticks | **XFAIL** (strafe frontier — see KNOWN_FAILURES) |
+| `mecanum` | strafe 180 ticks | strafe ≥ 0.30 m (MFS-STRAFE-F1 FIXED; was XFAIL) |
 | `tank` | differential turn 120 ticks | disp ≤ 0.3 m, yaw ≥ 0.1 rad |
-| `odometry` | fwd 180 + strafe 60 ticks | move > 0.2 m, odom error < 30% (fwd); strafe phase **XFAIL** |
+| `odometry` | fwd 180 + strafe 60 ticks | move > 0.2 m, odom error < 30% (fwd); strafe transmit ≥ 0.10 m + tracking ≤ 30% (MFS-STRAFE-F2 FIXED; was XFAIL, tripwire kept) |
 | `ftc_integration` | fwd + turn + strafe smoke | disp > 0.5 m, dy < 0.5 m, finite |
 | `ftc_hotload` | static vs `dlopen` fleet | spawn-refused-unattached, OOB NULL, **bitwise pose+odometry**, detach coast < 2.0 m, re-attach |
 | `module_1` | drive@30, shooter@50, stage+fire@80 | drive ≥ 0.5 m, shooter ≥ 3000 rpm, fired ≥ 1 |
@@ -59,13 +59,13 @@ pass=5 fail=0` summary; full suite output goes to `$OUT/mfs_suite.run.log`
 (kept as artifact and scanned for sanitizer errors). `MPE_GAMEPAD_DEVICE`
 is forced to `disabled` (no `/dev/input/js0` probing on headless boxes).
 
-**Standalone caveat:** this repo's `build_tests.sh` and `mfs_sources.mk`
-assume the engine tree (`v15S/src` layout: `core/`, `physics/`,
-`ecosystem/mpe_ecosystem.c`). They do **not** run from a bare checkout of
-this repo. Standalone `make` here builds the thin `.so` files only
-(`mfs_module_1.so`, `mfs_ecosystem.so`, `plugins/mpe_ftc.so`); the test
-binaries need engine sources. Fixing standalone test builds is open work —
-until then, run the suite from the engine tree.
+**Standalone (FIXED 2026-09-28, was "does not run from a bare checkout"):** 
+`build_tests.sh` and the `Makefile` are dual-mode — source-identical in both
+trees, auto-detecting the engine (`$MFS_ENGINE_SRC`, else sibling
+`../475-MPE/v15S/src`, else fail-fast with the fix). From a bare 461-MFS
+checkout: `./build_tests.sh [--build-only]` and `make && make test` both
+work (suite runs 8/8, outputs under `461-MFS/temp/`). The engine-tree
+invocation above remains canonical for CI/release.
 
 ## Sanitizers
 
