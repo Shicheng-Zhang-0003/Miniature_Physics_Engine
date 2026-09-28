@@ -85,16 +85,29 @@ int physics_world_live_list(physics_world **out, int cap) {
 }
 
 /* Reset stage slots aliasing dead registry entries (called by registry
- * unregister paths while the old code is still mapped). */
+ * unregister paths while the old code is still mapped). Foreign stage
+ * state is owned by the module (header: never freed by the world), so the
+ * module's stage_detach hook runs first (resolved by code address — stage
+ * slots keep the iface, not the desc), then the pointers are dropped. */
 void physics_world_forget_stage_pointers(const mpe_broadphase_if_t *bi, const mpe_solver_if_t *si) {
     physics_world *ws[MPE_MAX_LIVE_WORLDS];
     int n = physics_world_live_list(ws, MPE_MAX_LIVE_WORLDS);
     for (int i = 0; i < n; i++) {
         if (bi && ws[i]->broadphase_if == bi) {
+            if (bi->generate)
+                mpe_loader_call_stage_detach_for_fn((const void *)bi->generate, ws[i]);
             ws[i]->broadphase_if = NULL;
             ws[i]->broadphase_state = NULL;
         }
         if (si && ws[i]->solver_if == si) {
+            if (si->resolve)
+                mpe_loader_call_stage_detach_for_fn((const void *)si->resolve, ws[i]);
+            else if (si->poisson)
+                mpe_loader_call_stage_detach_for_fn((const void *)si->poisson, ws[i]);
+            else if (si->rolling)
+                mpe_loader_call_stage_detach_for_fn((const void *)si->rolling, ws[i]);
+            else if (si->split)
+                mpe_loader_call_stage_detach_for_fn((const void *)si->split, ws[i]);
             ws[i]->solver_if = NULL;
             ws[i]->solver_state = NULL;
         }

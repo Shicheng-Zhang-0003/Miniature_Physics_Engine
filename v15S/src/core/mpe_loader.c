@@ -9,6 +9,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <pthread.h>
+#include <sys/stat.h>
 
 #define MPE_MAX_HANDLES 32
 static struct {
@@ -17,7 +19,9 @@ static struct {
     const mpe_module_desc_t *desc;      /* module .so (NULL for ecosystems) */
     const mpe_ecosystem_desc_t *eco;    /* ecosystem .so (NULL for modules) */
     int is_ecosystem;
-    int attachments;
+    int attachments; /* guarded by s_loader_lock (retain/release from any thread) */
+    long long f_mtime; /* on-disk identity at load: re-load of a changed file */
+    long long f_size;  /* must NOT silently keep stale code (despot trap) */
 } s_h[MPE_MAX_HANDLES];
 static int s_n = 0;
 
@@ -37,6 +41,54 @@ static int mpe_has_plugin_ext(const char *base) {
     return strcmp(base + n - 3, ".so") == 0;
 #endif
 }
+/* On-disk identity for stale-.so detection (despot trap: `mod load` on an
+ * already-loaded path used to return 0/“loaded” while running the OLD
+ * in-memory image — e.g. articulated rollers after the analytic rebuild.
+ * Changed files now fail with -3 instead of silently lying). */
+static int file_identity(const char *path, long long *mt, long long *sz) {
+    struct stat st;
+    if (stat(path, &st) != 0) return -1;
+    /* Nanosecond mtime: second granularity misses same-second rebuilds. */
+#if defined(__APPLE__)
+    long long nsec = (long long)st.st_mtimespec.tv_nsec;
+#else
+    long long nsec = (long long)st.st_mtim.tv_nsec;
+#endif
+    if (mt) *mt = (long long)st.st_mtime * 1000000000LL + nsec;
+    if (sz) *sz = (long long)st.st_size;
+    return 0;
+}
+
+/* Loader-table lock: serialises every s_h[]/s_n read and mutation plus the
+ * attachments accounting (retain/release run on step-adjacent threads while
+ * unload runs at the tick boundary). Recursive: detach paths call back into
+ * retain/release (physics_world_detach_module) while the unload path holds
+ * it. Lock ORDER is always loader -> registry (registry calls into the
+ * loader only after dropping s_reg_lock; see mpe_registry.c unregister
+ * paths), so the two locks can never deadlock against each other. The lock
+ * is NOT held across dlopen: plugin constructors register (locking
+ * internally), so holding it would serialize constructor work for no
+ * benefit; load re-validates the table after dlopen instead. */
+static pthread_mutex_t s_loader_lock;
+static pthread_once_t s_loader_lock_once = PTHREAD_ONCE_INIT;
+static void s_loader_lock_init(void) {
+    pthread_mutexattr_t at;
+    pthread_mutexattr_init(&at);
+    pthread_mutexattr_settype(&at, PTHREAD_MUTEX_RECURSIVE);
+    pthread_mutex_init(&s_loader_lock, &at);
+    pthread_mutexattr_destroy(&at);
+}
+static inline void loader_lock(void) {
+    pthread_once(&s_loader_lock_once, s_loader_lock_init);
+    pthread_mutex_lock(&s_loader_lock);
+}
+static inline void loader_unlock(void) {
+    pthread_mutex_unlock(&s_loader_lock);
+}
+
+/* Jail: plugins/<name>.so for modules, ecosystem/mfs/<name>.so for
+ * ecosystem bundles (both CWD-relative, normally v15S/src). Same
+ * traversal-proofing in both roots. */
 static int plugin_path_is_confined(const char *path, char resolved[PATH_MAX]) {
 #ifdef MPE_OS_WINDOWS
     /* Normalise backslashes to slashes for prefix matching. */
@@ -90,7 +142,23 @@ int mpe_loader_load(const char *path, char *errbuf, int errlen) {
     }
     char resolved[PATH_MAX];
     if (!plugin_path_is_confined(path, resolved)) {
-        if (errbuf && errlen > 0) snprintf(errbuf, (size_t)errlen, "path must resolve inside plugins/<name>" MPE_PLUGIN_EXT);
+        /* Distinguish "file missing / wrong working directory" (the common
+         * MFS stumble: engine must run from v15S/src) from a genuine jail
+         * violation so users are told how to fix it. Extension is
+         * platform-aware (MPE_PLUGIN_EXT: .so, or .dll on Windows). */
+        if (errbuf && errlen > 0) {
+            FILE *probe = fopen(path, "rb");
+            if (probe) {
+                fclose(probe);
+                snprintf(errbuf, (size_t)errlen,
+                         "path escapes module jail (run from v15S/src; use plugins/<name>%s or ecosystem/mfs/<name>%s)",
+                         MPE_PLUGIN_EXT, MPE_PLUGIN_EXT);
+            } else {
+                snprintf(errbuf, (size_t)errlen,
+                         "no such file '%s' (run from v15S/src; modules live at plugins/<name>%s, bundles at ecosystem/mfs/<name>%s)",
+                         path, MPE_PLUGIN_EXT, MPE_PLUGIN_EXT);
+            }
+        }
         return -1;
     }
     /* Length validated BEFORE any registration (a late failure used to
@@ -99,18 +167,46 @@ int mpe_loader_load(const char *path, char *errbuf, int errlen) {
         if (errbuf && errlen > 0) snprintf(errbuf, (size_t)errlen, "path too long");
         return -1;
     }
+    /* Table pre-check under lock; the lock is dropped across dlopen below
+     * (constructors run there) and every table predicate is re-checked
+     * after it, so a racing load can never double-insert. */
+    loader_lock();
     for (int i = 0; i < s_n; i++)
-        if (strcmp(s_h[i].path, resolved) == 0) return 0; /* already loaded */
+        if (strcmp(s_h[i].path, resolved) == 0) {
+            /* Already loaded: serve the in-memory image ONLY if the file
+             * is unchanged. A rebuild on disk + silent old-code execution
+             * is the stale-.so despot trap — refuse with -3 and a fix. */
+            long long mt_now = 0, sz_now = 0;
+            if (file_identity(resolved, &mt_now, &sz_now) != 0) {
+                if (errbuf && errlen > 0)
+                    snprintf(errbuf, (size_t)errlen,
+                             "already loaded but file vanished '%s' (restart engine to clear)", path);
+                loader_unlock();
+                return -1;
+            }
+            if (mt_now != s_h[i].f_mtime || sz_now != s_h[i].f_size) {
+                if (errbuf && errlen > 0)
+                    snprintf(errbuf, (size_t)errlen,
+                             "already loaded but file changed on disk (stale code running): unload '%s', then load again — or restart the engine",
+                             path);
+                loader_unlock();
+                return -3;
+            }
+            loader_unlock();
+            return 0;
+        } /* already loaded */
     if (s_n >= MPE_MAX_HANDLES) {
         if (errbuf && errlen > 0) snprintf(errbuf, (size_t)errlen, "handle table full");
+        loader_unlock();
         return -1;
     }
+    loader_unlock();
     /* Snapshot registry counts so constructor registrations can be rolled
-     * back if anything below fails. The lock is NOT held across dlopen:
-     * plugin constructors register (locking internally), so holding it
-     * would deadlock. Load/unload are tick-boundary admin operations;
-     * concurrent loader use from step threads is misuse (documented in
-     * mpe_loader.h). */
+     * back if anything below fails. The registry lock is NOT held across
+     * dlopen: plugin constructors register (locking internally), so
+     * holding it would deadlock. Load/unload are tick-boundary admin
+     * operations; concurrent loader use from step threads is misuse
+     * (documented in mpe_loader.h). */
     int snap_pairs = mpe_registry_pair_count();
     int snap_broad = mpe_registry_broadphase_count();
     int snap_solvers = mpe_registry_solver_count();
@@ -127,6 +223,27 @@ int mpe_loader_load(const char *path, char *errbuf, int errlen) {
         void (*p_init)(void) = (void (*)(void))dlsym(h, "mpe_capsule_init");
         if (dlerror() == NULL && p_init) p_init();
     }
+    loader_lock();
+    /* Re-validate under lock: a concurrent load may have won the race. */
+    for (int i = 0; i < s_n; i++) {
+        if (strcmp(s_h[i].path, resolved) == 0) {
+            loader_unlock();
+            dlclose(h);
+            mpe_registry_truncate_pairs(snap_pairs);
+            mpe_registry_truncate_broadphase(snap_broad);
+            mpe_registry_truncate_solvers(snap_solvers);
+            return 0;
+        }
+    }
+    if (s_n >= MPE_MAX_HANDLES) {
+        loader_unlock();
+        if (errbuf && errlen > 0) snprintf(errbuf, (size_t)errlen, "handle table full");
+        dlclose(h);
+        mpe_registry_truncate_pairs(snap_pairs);
+        mpe_registry_truncate_broadphase(snap_broad);
+        mpe_registry_truncate_solvers(snap_solvers);
+        return -1;
+    }
     /* Precedence: ecosystem bundles (mpe_ecosystem_desc) win over plain
      * modules. A bundle links its inner modules' objects for code, so it
      * exports their mpe_module_desc too — taking it would register a
@@ -138,11 +255,13 @@ int mpe_loader_load(const char *path, char *errbuf, int errlen) {
     if (!sym_err && eco_first) {
         if (eco_first->abi != MPE_ECOSYSTEM_ABI || !eco_first->name) {
             if (errbuf && errlen > 0) snprintf(errbuf, (size_t)errlen, "ecosystem ABI/name mismatch");
+            loader_unlock();
             dlclose(h);
             return -1;
         }
         if (mpe_ecosystem_register(eco_first) < 0) {
             if (errbuf && errlen > 0) snprintf(errbuf, (size_t)errlen, "ecosystem registry full/dup");
+            loader_unlock();
             dlclose(h);
             return -1;
         }
@@ -152,7 +271,9 @@ int mpe_loader_load(const char *path, char *errbuf, int errlen) {
         s_h[s_n].eco = eco_first;
         s_h[s_n].is_ecosystem = 1;
         s_h[s_n].attachments = 0;
+        file_identity(resolved, &s_h[s_n].f_mtime, &s_h[s_n].f_size);
         s_n++;
+        loader_unlock();
         return 0;
     }
     dlerror();
@@ -162,6 +283,7 @@ int mpe_loader_load(const char *path, char *errbuf, int errlen) {
     if (!sym_err && desc) {
         if (desc->abi != MPE_MODULE_ABI || !desc->name) {
             if (errbuf && errlen > 0) snprintf(errbuf, (size_t)errlen, "ABI/name mismatch");
+            loader_unlock();
             dlclose(h);
             mpe_registry_truncate_pairs(snap_pairs);
             mpe_registry_truncate_broadphase(snap_broad);
@@ -170,6 +292,7 @@ int mpe_loader_load(const char *path, char *errbuf, int errlen) {
         }
         if (mpe_register_module(desc) < 0) {
             if (errbuf && errlen > 0) snprintf(errbuf, (size_t)errlen, "registry full/dup");
+            loader_unlock();
             dlclose(h);
             mpe_registry_truncate_pairs(snap_pairs);
             mpe_registry_truncate_broadphase(snap_broad);
@@ -184,12 +307,15 @@ int mpe_loader_load(const char *path, char *errbuf, int errlen) {
         s_h[s_n].eco = NULL;
         s_h[s_n].is_ecosystem = 0;
         s_h[s_n].attachments = 0;
+        file_identity(resolved, &s_h[s_n].f_mtime, &s_h[s_n].f_size);
         s_n++;
+        loader_unlock();
         mpe_registry_set_origin(desc->name, resolved);
         return 0;
     }
     if (errbuf && errlen > 0)
         snprintf(errbuf, (size_t)errlen, "missing mpe_module_desc: %s", sym_err ? sym_err : "null");
+    loader_unlock();
     dlclose(h); /* destructor self-unregisters well-behaved plugins */
     mpe_registry_truncate_pairs(snap_pairs);
     mpe_registry_truncate_broadphase(snap_broad);
@@ -228,29 +354,93 @@ static int same_path(const char *a, const char *b) {
 #endif
 }
 
-static int handle_by_path(const char *path) {
+static int handle_by_path_locked(const char *path) {
     for (int i = 0; i < s_n; i++) {
         if (same_path(s_h[i].path, path)) return i;
     }
     return -1;
 }
 
+/* NOTE: every *_locked helper below requires s_loader_lock held. Public
+ * entry points take it; unload-time sweeps already hold it throughout. */
+
 /* Which loaded handle owns this desc? Registry-slot origin first (exact
  * for registry copies handed out by find), else the desc's own image.
  * -1 = static/host code that never unloads. */
-static int handle_for_desc(const mpe_module_desc_t *d) {
+static int handle_for_desc_locked(const mpe_module_desc_t *d) {
     if (!d) return -1;
     const char *origin = mpe_registry_module_origin(d);
     if (origin) {
         char obuf[256];
         snprintf(obuf, sizeof(obuf), "%s", origin);
-        return handle_by_path(obuf);
+        return handle_by_path_locked(obuf);
     }
     Dl_info info;
     if (dladdr((const void *)d, &info) && info.dli_fname) {
-        return handle_by_path(info.dli_fname);
+        return handle_by_path_locked(info.dli_fname);
     }
     return -1;
+}
+
+/* Validated stage_detach read: the hook is an append-only tail field, so a
+ * .so built against the older header has no such pointer and the word past
+ * its struct is unowned image data. Read exactly one function pointer
+ * (benign: same mapped page), require non-NULL, then require dladdr to
+ * resolve it INSIDE the owning plugin image before invoking — stale
+ * garbage can never redirect control. `owner_path` is the handle path;
+ * NULL falls back to the desc's own image. */
+static void call_stage_detach_validated(const mpe_module_desc_t *desc, const char *owner_path,
+                                        physics_world *w) {
+    if (!desc || !w) return;
+    void (*hook)(physics_world *) = NULL;
+    memcpy(&hook, &desc->stage_detach, sizeof(hook));
+    if (!hook) return; /* old .so, or module with no foreign stage state */
+    Dl_info hi;
+    if (dladdr((const void *)hook, &hi) == 0 || !hi.dli_fname) return;
+    const char *dpath = owner_path;
+    Dl_info di;
+    char dbuf[PATH_MAX];
+    if (!dpath) {
+        if (dladdr((const void *)desc, &di) && di.dli_fname) {
+            snprintf(dbuf, sizeof(dbuf), "%s", di.dli_fname);
+            dpath = dbuf;
+        } else {
+            return;
+        }
+    }
+    if (!same_path(hi.dli_fname, dpath)) return; /* foreign/garbage: refuse */
+    hook(w);
+}
+
+/* Code-address variant (locked): stage slots keep the iface, not the desc. */
+static void call_stage_detach_for_fn_locked(const void *fn, physics_world *w) {
+    if (!fn || !w) return;
+    Dl_info info;
+    if (dladdr(fn, &info) == 0 || !info.dli_fname) return;
+    int hi = handle_by_path_locked(info.dli_fname);
+    if (hi < 0 || s_h[hi].is_ecosystem || !s_h[hi].desc) return;
+    call_stage_detach_validated(s_h[hi].desc, s_h[hi].path, w);
+}
+
+void mpe_loader_call_stage_detach(const void *desc, struct physics_world *world) {
+    if (!desc || !world) return;
+    /* Invoked under lock: teardown paths guarantee the .so is still mapped
+     * exactly while the loader table is stable; dropping the lock before
+     * the call would admit a racing dlclose under the hook. The lock is
+     * recursive and the order stays loader -> registry, so module code
+     * that re-enters the loader/registry cannot deadlock. */
+    loader_lock();
+    const mpe_module_desc_t *d = (const mpe_module_desc_t *)desc;
+    int hi = handle_for_desc_locked(d);
+    call_stage_detach_validated(d, (hi >= 0) ? s_h[hi].path : NULL, world);
+    loader_unlock();
+}
+
+void mpe_loader_call_stage_detach_for_fn(const void *fn, struct physics_world *world) {
+    if (!fn || !world) return;
+    loader_lock();
+    call_stage_detach_for_fn_locked(fn, world);
+    loader_unlock();
 }
 
 /* True when fn's code lives inside the plugin at path `resolved`.
@@ -287,10 +477,11 @@ static int fn_in_plugin(mpe_collide_fn fn, const char *resolved) {
 
 /* Does any live world reference this handle's code? Tick attachments by
  * owning handle (origin-aware: a static same-named desc does NOT pin the
- * .so), stage hooks by code address, plus the retain counter. */
+ * .so), stage hooks by code address, plus the retain counter.
+ * Requires s_loader_lock. */
 static int desc_busy_in_world(physics_world *w, int hi) {
     for (int k = 0; k < w->tick_module_count; k++) {
-        if (w->tick_modules[k] && handle_for_desc(w->tick_modules[k]) == hi) {
+        if (w->tick_modules[k] && handle_for_desc_locked(w->tick_modules[k]) == hi) {
             return 1;
         }
     }
@@ -313,7 +504,7 @@ static int desc_busy_in_world(physics_world *w, int hi) {
 }
 
 static int handle_busy(int hi) {
-    if (s_h[hi].attachments > 0) return 1;
+    if (s_h[hi].attachments > 0) return 1; /* locked caller (unload) */
     physics_world *ws[MPE_MAX_LIVE_WORLDS];
     int n = physics_world_live_list(ws, MPE_MAX_LIVE_WORLDS);
     for (int i = 0; i < n; i++) {
@@ -323,15 +514,17 @@ static int handle_busy(int hi) {
 }
 
 /* Detach only tick modules owned by this handle (origin-aware: static
- * same-named attachments are left alone). Hooks run pre-dlclose. */
+ * same-named attachments are left alone). Hooks run pre-dlclose.
+ * Requires s_loader_lock. */
 static void detach_handle_modules(int hi) {
     physics_world *ws[MPE_MAX_LIVE_WORLDS];
     int n = physics_world_live_list(ws, MPE_MAX_LIVE_WORLDS);
+    const mpe_module_desc_t *owner = s_h[hi].is_ecosystem ? NULL : s_h[hi].desc;
     for (int i = 0; i < n; i++) {
         physics_world *w = ws[i];
         for (int k = 0; k < w->tick_module_count;) {
             const mpe_module_desc_t *d = w->tick_modules[k];
-            if (d && d->name && handle_for_desc(d) == hi) {
+            if (d && d->name && handle_for_desc_locked(d) == hi) {
                 char nm[128];
                 snprintf(nm, sizeof(nm), "%s", d->name);
                 physics_world_detach_module(w, nm);
@@ -339,9 +532,13 @@ static void detach_handle_modules(int hi) {
                 k++;
             }
         }
-        /* Stage slots owned by this handle revert to builtin. */
+        /* Stage slots owned by this handle revert to builtin. Foreign
+         * stage state is owned by the module (physics_world.h:133-137:
+         * never freed by the world), so run its stage_detach hook BEFORE
+         * NULLing the pointers — otherwise the state leaks. */
         if (w->broadphase_if && w->broadphase_if->generate &&
             fn_in_plugin((mpe_collide_fn)(void *)w->broadphase_if->generate, s_h[hi].path)) {
+            if (owner) call_stage_detach_validated(owner, s_h[hi].path, w);
             w->broadphase_if = NULL;
             w->broadphase_state = NULL;
         }
@@ -352,6 +549,7 @@ static void detach_handle_modules(int hi) {
                                      (const void *)w->solver_if->split };
             for (int k = 0; k < 4; k++) {
                 if (hooks[k] && fn_in_plugin((mpe_collide_fn)hooks[k], s_h[hi].path)) {
+                    if (owner) call_stage_detach_validated(owner, s_h[hi].path, w);
                     w->solver_if = NULL;
                     w->solver_state = NULL;
                     break;
@@ -395,6 +593,7 @@ int mpe_loader_unload(const char *path_or_name) {
         if (!plugin_path_is_confined(path_or_name, resolved)) return -1;
         identity = resolved;
     }
+    loader_lock();
     for (int i = 0; i < s_n; i++) {
         const char *n = s_h[i].is_ecosystem
                             ? (s_h[i].eco && s_h[i].eco->name ? s_h[i].eco->name : "")
@@ -415,11 +614,12 @@ int mpe_loader_unload(const char *path_or_name) {
                 dlclose(s_h[i].h);
                 for (int j = i; j + 1 < s_n; j++) s_h[j] = s_h[j + 1];
                 s_n--;
+                loader_unlock();
                 return 0;
             }
             /* -2 = busy (referenced by a live world); detach/stage-reset
              * first, then retry. -1 = unknown handle. */
-            if (handle_busy(i)) return -2;
+            if (handle_busy(i)) { loader_unlock(); return -2; }
             char modname[128];
             snprintf(modname, sizeof(modname), "%s", n ? n : "");
             /* Targeted teardown, all pre-dlclose: detach only this
@@ -442,25 +642,41 @@ int mpe_loader_unload(const char *path_or_name) {
             dlclose(s_h[i].h);
             for (int j = i; j + 1 < s_n; j++) s_h[j] = s_h[j + 1];
             s_n--;
+            loader_unlock();
             return 0;
         }
     }
+    loader_unlock();
     return -1;
 }
 
-int mpe_loader_count(void) { return s_n; }
+int mpe_loader_count(void) {
+    loader_lock();
+    int n = s_n;
+    loader_unlock();
+    return n;
+}
 const char *mpe_loader_path_at(int i) {
-    if (i < 0 || i >= s_n) return 0;
-    return s_h[i].path;
+    /* Interior pointer: valid until the next load/unload (callers copy). */
+    loader_lock();
+    const char *out = (i >= 0 && i < s_n) ? s_h[i].path : NULL;
+    loader_unlock();
+    return out;
 }
 
 const char *mpe_loader_name_at(int i) {
-    if (i < 0 || i >= s_n) return 0;
-    if (s_h[i].is_ecosystem) {
-        return (s_h[i].eco && s_h[i].eco->name) ? s_h[i].eco->name : 0;
+    /* Interior pointer: valid until the next load/unload (callers copy). */
+    loader_lock();
+    const char *out = NULL;
+    if (i >= 0 && i < s_n) {
+        if (s_h[i].is_ecosystem) {
+            out = (s_h[i].eco && s_h[i].eco->name) ? s_h[i].eco->name : NULL;
+        } else if (s_h[i].desc && s_h[i].desc->name) {
+            out = s_h[i].desc->name;
+        }
     }
-    if (!s_h[i].desc || !s_h[i].desc->name) return 0;
-    return s_h[i].desc->name;
+    loader_unlock();
+    return out;
 }
 
 /* Resolve a symbol from a loaded handle (by path, module name, or
@@ -480,31 +696,45 @@ void *mpe_loader_symbol(const char *path_or_name, const char *sym) {
         if (!plugin_path_is_confined(path_or_name, resolved)) return NULL;
         identity = resolved;
     }
+    loader_lock();
+    void *out = NULL;
     for (int i = 0; i < s_n; i++) {
         const char *n = s_h[i].is_ecosystem
                             ? ((s_h[i].eco && s_h[i].eco->name) ? s_h[i].eco->name : "")
                             : ((s_h[i].desc && s_h[i].desc->name) ? s_h[i].desc->name : "");
         if (strcmp(s_h[i].path, identity) != 0 && strcmp(n, identity) != 0) continue;
-        /* Resolve against the stored open handle (never loads). */
+        /* Resolve against the stored open handle (never loads). dlsym
+         * takes no loader/registry lock; the table is stable under ours. */
         dlerror();
         void *p = dlsym(s_h[i].h, sym);
-        if (dlerror() != NULL) return NULL;
-        return p;
+        if (dlerror() != NULL) { out = NULL; break; }
+        out = p;
+        break;
     }
-    return NULL;
+    loader_unlock();
+    return out;
 }
 
 /* Retain/release resolve the OWNING handle (origin-aware): attach may
  * store a registry copy or a static original, and a static same-named
  * desc must never pin the .so. Pointer comparison alone could never
  * match (registry copy vs .so original), so the old guard never fired;
- * name comparison alone over-matches statics. handle_for_desc does both. */
+ * name comparison alone over-matches statics. handle_for_desc_locked does
+ * both. The attachments counter is guarded by s_loader_lock (equivalent
+ * to an atomic fetch_add for this table's purposes: every increment and
+ * the busy-check in unload are mutually exclusive). */
 void mpe_loader_retain_module(const void *desc) {
-    int hi = handle_for_desc((const mpe_module_desc_t *)desc);
+    if (!desc) return;
+    loader_lock();
+    int hi = handle_for_desc_locked((const mpe_module_desc_t *)desc);
     if (hi >= 0) s_h[hi].attachments++;
+    loader_unlock();
 }
 
 void mpe_loader_release_module(const void *desc) {
-    int hi = handle_for_desc((const mpe_module_desc_t *)desc);
+    if (!desc) return;
+    loader_lock();
+    int hi = handle_for_desc_locked((const mpe_module_desc_t *)desc);
     if (hi >= 0 && s_h[hi].attachments > 0) s_h[hi].attachments--;
+    loader_unlock();
 }

@@ -992,18 +992,35 @@ void collision_apply_rolling_resistance(collision_data *manifolds, int manifold_
     }
     for (int m = 0; m < manifold_count; m++) {
         collision_data *man = &manifolds[m];
-        /* Shared patch: halve per side when BOTH bodies are dynamic (each
-         * side dissipates half the patch loss; floor/static bodies take the
-         * full single-sided rate). TRUTH: the 0.5 is a game tune, not
-         * derived (each body physically dissipates its own full contact
-         * patch). Kept: halving dynamic-dynamic decay matches the
-         * rolling_decay band; use share=1.0 if per-body full dissipation
-         * is ever required. */
+        /* Shared patch: split total dissipation across sides when BOTH bodies
+         * are dynamic (floor/static bodies take the full single-sided rate).
+         * TRUTH: fixed 0.5 was an admitted tune, not derived. Mass-weighted
+         * (I-normalized) split: share_a = I_b/(I_a+I_b) ~= m_b/(m_a+m_b)
+         * = inv_a/(inv_a+inv_b) for similar geometry; lighter body carries
+         * the larger share, heavy slab ~0, equal masses recover 0.5 exactly.
+         * Shares sum to 1.0 so total dynamic-dynamic dissipation is preserved
+         * (rolling_decay band unchanged: that test is sphere-vs-static,
+         * share=1.0 path). Dissipative clamps below (dw<=speed) untouched. */
         bool b_dynamic =
             (man->object_b) && (!man->object_b->static_state) && (!man->object_b->is_sleeping);
         bool a_dynamic =
             (man->object_a) && (!man->object_a->static_state) && (!man->object_a->is_sleeping);
-        float share = (a_dynamic && b_dynamic) ? 0.5f : 1.0f;
+        float share_a = 1.0f, share_b = 1.0f;
+        if (a_dynamic && b_dynamic) {
+            float inv_a = rigidbody_effective_inv_mass(man->object_a);
+            float inv_b = rigidbody_effective_inv_mass(man->object_b);
+            double sum = (double)inv_a + (double)inv_b;
+            if (isfinite(sum) && sum > 1e-12) {
+                share_a = (float)((double)inv_a / sum);
+                share_b = (float)((double)inv_b / sum);
+                if (!isfinite(share_a) || share_a < 0.0f) share_a = 0.5f;
+                if (!isfinite(share_b) || share_b < 0.0f) share_b = 0.5f;
+                if (share_a > 1.0f) share_a = 1.0f;
+                if (share_b > 1.0f) share_b = 1.0f;
+            } else {
+                share_a = share_b = 0.5f;
+            }
+        }
         for (int i = 0; i < man->contact_count; i++) {
             contact_point_data *cp = &man->contacts[i];
             if (cp->accumulated_normal_impulse <= 0.0f) {
@@ -1056,6 +1073,7 @@ void collision_apply_rolling_resistance(collision_data *manifolds, int manifold_
                         if (!isfinite(inertia_axis) || inertia_axis <= 0.0f) {
                             continue;
                         }
+                        float share = (bi == 0) ? share_a : share_b;
                         float dw = share * rolling_mu * normal_force * r_eff * dt / inertia_axis;
                         if (!isfinite(dw) || dw < 0.0f) {
                             continue;
@@ -1076,7 +1094,8 @@ void collision_apply_rolling_resistance(collision_data *manifolds, int manifold_
                         if (!isfinite(inertia_spin) || inertia_spin <= 0.0f) {
                             continue;
                         }
-                        float dw_spin = share * rolling_mu * normal_force * patch * dt / inertia_spin;
+                        float share_sp = (bi == 0) ? share_a : share_b;
+                        float dw_spin = share_sp * rolling_mu * normal_force * patch * dt / inertia_spin;
                         if (!isfinite(dw_spin) || dw_spin < 0.0f) {
                             continue;
                         }

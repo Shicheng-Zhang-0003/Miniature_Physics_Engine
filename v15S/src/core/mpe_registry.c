@@ -1,10 +1,13 @@
+#define _GNU_SOURCE /* dladdr for stage_detach validation */
 #include "mpe_registry.h"
 #include "mpe_platform.h"
 #include "../core/rigidbody.h"
 #include "../core/physics_world.h"
 #include "../physics/broadphase.h"
 #include "../physics/collision_mechanics.h"
+#include <dlfcn.h>
 #include <assert.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -383,7 +386,24 @@ const mpe_solver_if_t *mpe_find_solver(const char *name) {
 static void module_store(int i, const mpe_module_desc_t *desc, int keep_origin) {
     char origin_keep[256];
     snprintf(origin_keep, sizeof(origin_keep), "%s", keep_origin ? s_module_origin[i] : "");
-    s_modules[i] = *desc;
+    /* Size-safe copy for the append-only stage_detach tail (ABI still 1):
+     * a .so built against the older header owns fewer bytes, so copy the
+     * v1 prefix field-by-field and default the tail to NULL; only adopt a
+     * non-NULL hook that dladdr proves lives in mapped code (stale
+     * trailing garbage can never become a function pointer). */
+    memset(&s_modules[i], 0, sizeof(s_modules[i]));
+    memcpy(&s_modules[i], desc, offsetof(mpe_module_desc_t, stage_detach));
+    s_modules[i].stage_detach = NULL;
+    {
+        void (*hook)(mpe_world_t *) = NULL;
+        memcpy(&hook, &desc->stage_detach, sizeof(hook));
+        if (hook) {
+            Dl_info hi;
+            if (dladdr((const void *)hook, &hi) != 0 && hi.dli_fname) {
+                s_modules[i].stage_detach = hook;
+            }
+        }
+    }
     snprintf(s_module_names[i], sizeof(s_module_names[i]), "%s", desc->name);
     snprintf(s_module_versions[i], sizeof(s_module_versions[i]), "%s",
              desc->version ? desc->version : "?");

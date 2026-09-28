@@ -221,7 +221,15 @@ static inline double det_cos_small(double x) {
 /* Argument reduction for sin/cos: reduce x to [-pi/4, pi/4] using
  * exact rational approximations of pi. Returns reduced x and quadrant. */
 static inline double det_reduce_pi4(double x, int *quadrant) {
-    const double pi_half = 1.57079632679489661923132169163975144209858469968755;
+    /* TRUTH (Cody-Waite two-stage): pi/2 = C1+C2 with C1 low bits removed
+     * so k*C1 is near-exact and the remainder rides in C2. Single-double
+     * r = x-k*(pi/2) rounds k*(pi/2) with error ~k*6e-17 (~4e-13 at 1e4).
+     * Two-stage r = (x-k*C1)-k*C2 keeps |err| < ~1e-15 up to 1e4 and
+     * <5e-13 across the full |x|<1e15 contract. C1+C2 == double(pi/2)
+     * bit-for-bit, so small-arg paths are unchanged.
+     * C1 = 0x3FF921FB54400000 (low ~11 mantissa bits zero), C2 = remainder. */
+    const double pi_half_hi = 1.57079632673412561417e+00;
+    const double pi_half_lo = 6.07710050650619224932e-11;
     const double pi_quarter = 0.78539816339744830961566084581987572104929234984378;
     const double two_over_pi = 0.63661977236758134307553505349005744813783858296183;
     
@@ -242,9 +250,12 @@ static inline double det_reduce_pi4(double x, int *quadrant) {
     }
     long long k = (long long) (k_d >= 0.0 ? k_d + 0.5 : k_d - 0.5);
     *quadrant = (int) ((k % 4 + 4) % 4); /* defined for negatives */
-    double x_red = x - (double) k * pi_half;
+    /* Cody-Waite: r = (x - k*C1) - k*C2 in double, in this order. */
+    double kd = (double)k; /* exact: |k| < 1e15 < 2^53 */
+    double x_red = (x - kd * pi_half_hi) - kd * pi_half_lo;
     /* Correct for rounding error in k: shifting by one quadrant (+/-pi/2),
      * not two. +2 was a 180-degree correction for a 90-degree error. */
+    const double pi_half = pi_half_hi + pi_half_lo; /* == double(pi/2) */
     if (x_red > pi_quarter) {
         x_red -= pi_half;
         *quadrant = (*quadrant + 1) & 3;
