@@ -9,6 +9,12 @@
 #ifndef math_pi
 #define math_pi 3.14159265358979323846f
 #endif
+/* TRUTH: math_pi is float (f-suffix caps double paths at ~3.1415927).
+ * MATH_PI is the double-precision constant for double computation
+ * (frob norm, reductions). math_pi kept for float-ABI compat. */
+#ifndef MATH_PI
+#define MATH_PI 3.14159265358979323846
+#endif
 //Define Radians and Degree Calculation converter
 #define degrad (math_pi / 180.0f)
 #define raddeg (180.0f / math_pi)
@@ -246,7 +252,6 @@ static inline math3 math3_inverse(math3 matrix) {
             }
             frob_sq_d += v * v;
         }
-    float frob_sq = (frob_sq_d > (double) FLT_MAX) ? INFINITY : (float) frob_sq_d;
     double det_d = (double) matrix.matrix[0][0] *
                        ((double) matrix.matrix[1][1] * matrix.matrix[2][2] -
                         (double) matrix.matrix[2][1] * matrix.matrix[1][2]) -
@@ -254,18 +259,22 @@ static inline math3 math3_inverse(math3 matrix) {
                        ((double) matrix.matrix[1][0] * matrix.matrix[2][2] -
                         (double) matrix.matrix[1][2] * matrix.matrix[2][0]) +
                    (double) matrix.matrix[0][2] *
-                       ((double) matrix.matrix[1][0] * matrix.matrix[2][1] -
+                       (                   (double) matrix.matrix[1][0] * matrix.matrix[2][1] -
                         (double) matrix.matrix[1][1] * matrix.matrix[2][0]);
-    float determinant =
-        (det_d > (double) FLT_MAX || det_d < -(double) FLT_MAX) ? ((det_d > 0) ? INFINITY : -INFINITY) : (float) det_d;
     /* Scale-invariant singularity test: |det| / ||M||_F^3 < 1e-12.
-     * For M = s*M0: det ~ s^3, ||M||_F^3 ~ s^3, ratio is constant. */
-    float frob_norm_cubed = frob_sq * sqrtf(fmaxf(frob_sq, 1e-24f));
-    float eps = 1e-12f * frob_norm_cubed;
-    if (frob_sq <= 0.0f) {
-        eps = 1e-24f;
+     * For M = s*M0: det ~ s^3, ||M||_F^3 ~ s^3, ratio is constant.
+     * TRUTH: frob_norm_cubed in double throughout. The old float path
+     * (frob_sq * sqrtf(frob_sq)) overflowed to INF for large M
+     * (||M||_F^3 ~ 1e115 fits double, not float), forcing every large
+     * matrix singular. Double keeps the ratio scale-invariant.
+     * (DESPOT-2026-09-28: dead float frob_sq/determinant removed — all
+     * live paths use the _d doubles.) */
+    double frob_norm_cubed_d = frob_sq_d * sqrt(fmax(frob_sq_d, 1e-24));
+    double eps_d = 1e-12 * frob_norm_cubed_d;
+    if (!(frob_sq_d > 0.0)) {
+        eps_d = 1e-24;
     }
-    if ((!isfinite(determinant)) || (fabsf(determinant) < eps)) {
+    if ((!isfinite(det_d)) || (fabs(det_d) < eps_d)) {
         /* TRUTH: adjugate of a singular matrix is zero everywhere, which
          * locks ALL rotation even when only one axis is degenerate
          * (needle cylinder Ixx=0, Iyy=Izz=a). If the matrix is (near-)

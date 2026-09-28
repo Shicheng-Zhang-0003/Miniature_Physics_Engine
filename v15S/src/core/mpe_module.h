@@ -17,6 +17,13 @@
  *    rebuilding all plugins. Registry find results are unowned interior
  *    pointers — copy what you keep, never store them across unload.
  *    Unregistering a module/stage detaches it from every live world first.
+ *  - ABI STAYS 1 FOR stage_detach (append-only tail field): the field was
+ *    added at the END of mpe_module_desc_t, so a .so built against the
+ *    older header keeps working — readers MUST null-check stage_detach
+ *    before calling (an old .so has no such pointer; the loader further
+ *    validates the address via dladdr before invoking). Any future field
+ *    reordering, removal, or semantic change to the existing fields
+ *    requires bumping MPE_MODULE_ABI.
  */
 #include <stdbool.h>
 #include <stdint.h>
@@ -39,6 +46,13 @@ typedef struct {
     void (*detach)(mpe_world_t *world, void *mod_state);
     void (*pre_step)(mpe_world_t *world, float dt, void *mod_state);
     void (*post_step)(mpe_world_t *world, float dt, void *mod_state);
+    /* Optional stage-state destructor (append-only; ABI still 1 — see
+     * note above). Called with the owning world BEFORE the engine drops
+     * that module's broadphase_state/solver_state (loader unload +
+     * registry stage-unregister paths). NULL = no foreign stage state.
+     * Old .so binaries (smaller struct) read as NULL via the loader's
+     * validated accessor — never call this pointer without null-check. */
+    void (*stage_detach)(mpe_world_t *world);
 } mpe_module_desc_t;
 
 /* Shape pair handler: collide A vs B into manifold_out (collision_data*).

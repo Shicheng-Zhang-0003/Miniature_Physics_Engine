@@ -372,4 +372,5 @@ const mpe_module_desc_t mpe_module_desc = {
     .detach = 0,
     .pre_step = 0,
     .post_step = 0,
+    .stage_detach = 0, /* shape-only: no foreign broadphase/solver state */
 };
