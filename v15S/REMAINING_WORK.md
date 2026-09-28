@@ -39,13 +39,24 @@
 - [x] Plugin load/attach/unload + stage-backend lifetime regression test
   (`loader_lifecycle` in Suite v2: real capsule .so, busy -2, purge, reload).
 - [ ] Replace the duplicate GUI and headless physics pipelines with one canonical step path.
-- [ ] [MFS-STRAFE-F1/F2] Mecanum strafe transmits ~0.01 m vs 0.30 m gated.
-  The 5-link ground->roller->bearing->hub chain does not converge in GS-128
-  (axis sweep 0.002-0.014 m; command- and measured-speed roller-spin
-  prescriptions 0.01/-0.06 m — magnitude dead either way, so it is a solver
-  frontier, not a prescription question). Needs reduced articulation or a
-  direct roller constraint. Suite marks both strafe gates XFAIL (loud,
-  ticketed); everything else hard-gates. (2026-09-26 despot audit.)
+  Evidence 2026-09-28 (despot audit, harness at /tmp/opencode/path_equiv.c):
+  passive 6-cube tower, 600 ticks, 64 iters — legacy `simulation_physics_tick`
+  vs canonical `physics_world_step` agree BITWISE (max deviation 0.00000 m all
+  bodies). Driven-robot runs differ ~2.7% over 180 ticks via motor-observer
+  feedback amplification (expected, not a path bug). Unification stays a
+  maintenance item, not a correctness bug.
+- [x] [MFS-STRAFE-F1 FIXED 2026-09-28] Mecanum strafe now transmits 3.40 m
+  (was ~0.01 m vs 0.30 m gated) via analytic roller-kinematics lateral force
+  at each wheel contact with rollers removed from the solver (no chassis-force
+  cheat; verified by grep). F1 hard-gates. [F2 FIXED 2026-09-28]: tracking
+  closed by voltage-scaling the implicit clamp + governor to the V-line
+  no-load point (was min(spec, V-line): 6.7% path disagreement at fresh
+  pack fed observer phantom load into peel; A/B isolated: 88% over with
+  spec-fixed bounds, ~25% with V-line, transmit 3.40 m both ways).
+  Deterministic (-O2 and -O1+ASan identical); XFAIL branch kept as
+  fallback tripwire. See `docs/KNOWN_FAILURES.md`.
+  (2026-09-26 despot audit; F1 fixed 2026-09-28 despot audit; F2 tracking
+  fixed same-night despot sweep.)
 - [ ] Jointed air-spin limit cycle: free-spinning jointed wheels oscillate
   (motor 86 rpm vs true wheel 799 rpm) via revolute-to-kinematic-chassis
   impulses vs slew/governor/implicit-solve. Contained (diode+slew bound it;
@@ -69,9 +80,11 @@
   forget-pointers on every unregister path, proven by `loader_lifecycle`.
 - [ ] Document numerical guarantees and unsupported CCD/rotational cases precisely.
 - [x] Root README exists (`readme.md`); release gates updated to verified
-  behavior (32/32 v2, MFS 8 gated unified incl. 2 loud strafe XFAILs,
-  lifetime rules). Updated 2026-09-26 (was "11 gated + 5 info" for the
-  retired per-test binaries).
+  behavior (32/32 v2, MFS 8 gated unified: strafe F1+F2 hard-gate since
+  2026-09-28 (F2 margin thin, 25 vs 30, XFAIL tripwire kept); lifetime
+  rules). Updated
+  2026-09-28 (was "11 gated + 5 info" for the retired per-test binaries,
+  then "incl. 2 loud strafe XFAILs").
 - [x] Thread-safety boundaries: registry/MEI/MFS-internal locks, leaf-lock
   ordering, tick-boundary loader rule documented in headers (TSAN proof
   remains future work).

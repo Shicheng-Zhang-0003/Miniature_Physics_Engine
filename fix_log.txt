@@ -1,4 +1,64 @@
 
+=== MFS+MPE despot sweep: 2026-09-28 (night run) ===
+=== Operational: standalone 461-MFS could not build or run at all ===
+build_tests.sh + Makefile assumed the engine tree (ecosystem/mfs/... +
+core/... paths). Both are now DUAL-MODE, source-identical in both trees:
+auto-discover engine via $MFS_ENGINE_SRC else sibling ../475-MPE/v15S/src,
+absolute MFS/CORE paths (relative OUTDIR broke after cd $SRC — canonicalized),
+fail-fast with the fix. Standalone now: build-only + full suite 8/8 + make +
+make test green. sync checker ignores temp/ scratch.
+=== Math lies fixed (MFS, all A/B measured, deterministic) ===
+L1-L3 encoder convention = decoded hub counts: NeveRest 7->28 (1120=28x40),
+TorqueNADO 6->24 (1440=24x60), Core Hex 28->4 (288=4x72). L4 implicit clamp
+min(spec,V-line)->V-line (6.7% path disagreement at fresh pack killed endpoint
+identity off-nominal). L5 governor spec-fixed->Vterm/(kv*gear) (39% overshoot
+past true free at 10 V sag). L6 deadbeat comment->diode truth. L7 roller
+wobble comment->overwrite truth. L8 torque_explicit consumer comment removed.
+L9 analytic gate 0.05->0.01 m true-contact (5 cm hover force). L10 ~30->~160
+rad/s/tick explicit instability. L11 thermal "negligible" retracted (dT_eq =
+10*I^2*r; +52 C at 2 A cruise) + 150 C magnet ceiling. L12 floor()->symmetric
+round. BONUS: L4+L5 closed F2 tracking (88%->25% over, A/B isolated, -O2 and
+-O1+ASan identical) — F2 FIXED, XFAIL kept as tripwire (margin thin, 25/30).
+=== Programming weaknesses fixed (MFS) ===
+module_1 attach propagates field/robot failure (-1 + detach, no more floorless
+attach); id/joint slots poisoned -1 (calloc 0 is valid); field walls + intake/
+shooter joint failures loud. mfs_test.h: mfs_chassis_or_null (2 suite_a OOBs +
+2 lift helpers), finite watchdog covers orientation, mfs_test_end asserts det
+fallbacks zero. suite_b: 7 dead macros deleted, freefall leak fixed. suite_c:
+hotload/module_1 missing ends added, physics_truth aggregate det gate (raw
+subtests use mpe_config_init isolation — documented, not refactored).
+=== MPE repeat ===
+math3d.h dead float frob_sq/determinant removed (double paths own it).
+Rolling-resistance split mass-weighted (was 0.5 tune; equal masses recover 0.5,
+static path unchanged). Runner: SKIP/XFAIL surfacing (no green-washed coverage).
+Full profile 198/198, 0 fail/skip/xfail, 6 info (diag x2 profiles). -fanalyzer
+clean (known microvim false positive only).
+=== Docs ===
+MODELS (implicit/V-line, thermal eq, encoder convention, analytic lateral
+section, governor), FTC_SPECS (NeveRest/Core Hex decoded notes), KNOWN_FAILURES
+(F2 FIXED + A/B), README_MFS (build dual-mode, F2 FIXED, governor), TESTING
+(gate table, standalone FIXED), root readme (analytic strafe), REMAINING_WORK
+(F2 FIXED). Mirrored to 461-MFS; sync checker green.
+
+=== MPE fix session: 2026-09-28 ===
+=== MPE-side despot sweep (warnings, ABI hygiene, stale traps, spawn, paths) ===
+
+Zero-warning tree (was 1: unused 'cyl' in tests/cylinder_sphere_test.c, now
+checked with FAIL return). All module descriptors explicit on stage_detach
+(ftc_module, mfs_module_1; capsule/suite/module_test already done).
+temp/ gitignored (was untracked scratch). term_ftc spawn strides +3m per
+fleet robot (stacked default spawns detonated) + occupancy warning; explicit
+coords verbatim. Loader stale-.so trap closed: ns-mtime+size identity per
+handle, re-load of changed file fails -3 with unload/reload guidance
+(proven: load/touch/-3). Joint-sign scare investigated and CLEARED: full
+6x6 P2P/cross/application derivation re-checked against contact solver +
+2D Lagrange case — all signs correct (my first derivation dropped the outer
+minus on the anchor Jacobian). Path equivalence measured: passive tower
+600 ticks bitwise identical legacy-vs-canonical; driven 2.7% is observer
+feedback, not a path bug (harnesses in /tmp/opencode/). -fanalyzer clean
+except known microvim undo-ring false positive. Full profile: 198/198,
+0 blocking (192 gate + 6 info).
+
 === MPE fix session: 2026-09-23 ===
 === Modularisation + MFS audit and fix (MPI P0/P1, MFS critical/high/med) ===
 

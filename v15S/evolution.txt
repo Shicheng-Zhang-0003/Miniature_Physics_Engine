@@ -43,3 +43,11 @@ MFS:          tile floors everywhere; implicit motor solve + disturbance
 Globals:      kernel holds zero sim state; primary owned by
                core/mpe_primary.c (app layer); registry process-global
                by design; UI/diagnostics stay app-global by design.
+Despot-0928:  standalone 461-MFS builds+runs (dual-mode build_tests.sh +
+               Makefile, engine auto-discovery; 8/8 both trees); decoded
+               encoder convention (NR 28/TN 24/CoreHex 4); V-line motor
+               clamp + governor (F2 tracking 88%->25%, FIXED, tripwire
+               kept); true-contact analytic gate; thermal honesty + 150 C
+               ceiling; module_1 failure propagation; det-fallback gates
+               everywhere; runner SKIP/XFAIL surfacing; full profile
+               198/198 sanitizers-clean.
