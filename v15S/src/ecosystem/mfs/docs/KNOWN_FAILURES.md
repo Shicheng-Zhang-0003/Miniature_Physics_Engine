@@ -553,3 +553,41 @@ motor shaft is a representative FTC-class brushless figure and a MODELLING
 CHOICE, not a spec value — no preset carries rotor-inertia data. The shape of
 the correction is right; the magnitude is order-of-magnitude only. Sizing it
 per-SKU would need vendor data that is not in the tree.
+
+### DEEP-2026-09-29 — Enclosed-sphere ejection: what is actually true, and what is still open
+
+The long-standing "1 of 4 sub-cases unresolved" note was a **test fixture bug**
+and has been retracted: the test spawned the cylinder at y=0 with half-length 1,
+i.e. 1 m *inside* the world's y>=0 boundary, so the boundary position clamp
+fought the contact normal every tick. With the cylinder clear of the floor, all
+four sub-cases eject the sphere in the right direction. Two related test bugs
+were fixed alongside it: the penetration formula was radial-only (wrong for a
+sphere near a cap, where the minimum clearance is axial and the radial term is
+~0, so it reported 2.0 m for a 0.7 m overlap), and the engine's own `pen` is
+`min_clear + r_s` (conservative, not geometric overlap).
+
+**What was measured, and what remains open.**
+
+An isolated harness — cylinder clear of the boundary, no floor, gravity 0 —
+resolves **all four sub-cases fully**, and the result is **identical at 8, 16,
+32, 64 and 128 solver iterations**. So this is emphatically *not* an
+iteration-count limitation, and the depenetration route itself is sound.
+
+The canonical suite world still shows a **0.2–0.3 m residual** after the same
+120 steps. So the residual is real for *that* world and the two differ. An
+attempt to close the gap by pinning the config before world creation made things
+strictly worse (8 checks failed instead of 0): `mpe_config_init()` resets
+suite-wide defaults the test was implicitly relying on, so that hypothesis was
+wrong and was reverted rather than left half-applied.
+
+**Honest status: the mechanism is not yet established.** The candidates are a
+world-configuration difference or a coupling between the contact and whatever
+else the canonical world contains; the iteration sweep rules out solver
+convergence but not those. The two load-bearing assertions (never driven
+deeper, always moving outward) are gated and hold in all four sub-cases, and
+the residual is printed every run so it cannot quietly regress.
+
+**For whoever picks this up:** instrument what differs between the canonical
+world and the isolated harness before changing physics. The tempting move —
+raise the gate, or tune the solver to make 0.3 m go away — would destroy the
+measurement that is currently telling the truth.
