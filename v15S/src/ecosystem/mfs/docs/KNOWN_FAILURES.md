@@ -433,3 +433,48 @@ long you wait. Same binary, only the fix toggled:
 
 All three assertions fail pre-fix and pass post-fix. Full profile 206/206,
 suite 34/34, ASan/UBSan green.
+
+### MFS-H7-2026-09-29 — Fired balls carried no spin, so the Magnus model was unreachable — FIXED
+
+**Symptom.** Balls left the shooter with zero spin. The Magnus lift in
+`mfs_module_1_ball_physics_step()` was therefore dead code: it is gated on
+`spin_rate > 10.0` rad/s, and nothing in the game could ever put a ball above
+that. The only way a ball could spin at all was being clipped off-centre by the
+contact solver, which is not a shooter.
+
+**Root cause.** The launch block transferred **linear velocity only**. It
+computed `surface_vel = omega_flywheel x r`, used its *direction* for the
+launch force and its *magnitude* for the speed, and never wrote
+`ball->angular_velocity` at all. The transfer model was half-implemented: the
+surface velocity of a contact point implies a spin on the driven body, and that
+consequence was dropped.
+
+**Fix.** A ball driven by a flywheel is spun by contact friction until its own
+contact point matches the flywheel surface. Using the same `omega x r = v`
+convention the flywheel itself uses:
+
+    omega_ball = v_surface / r_ball
+
+so the smaller ball spins *faster* than the surface speed alone implies — which
+is the point of a flywheel. A 50 mm flywheel at 4000 rpm (20.9 m/s surface)
+hands a 24 mm ball roughly 870 rad/s. Applied with the same 80% transfer as
+the linear term so the two stay self-consistent.
+
+**Honest limitation.** This is a contact-model approximation, not a friction
+solve. It does not resolve slip, so it cannot express "this ball skids instead
+of rolling", and it will over-spin a ball that is barely touching. It is
+strictly an improvement on the prior state, where the spin channel was never
+written at all.
+
+**Verification — `mfs_t_ball_spin`, registered and gated** (MFS 12/12):
+
+| measurement | pre-fix | post-fix |
+|---|---|---|
+| fired ball \|v\| | 14.967 m/s | 14.967 m/s |
+| fired ball \|omega\| | **0.0 rad/s** | **742.1 rad/s** |
+
+The spin was *exactly* zero before, which is the signature of an unwritten
+channel rather than a weak one. The flywheel in the same run reached 3957 rpm
+against a 4000 rpm target, so the launch had real surface speed to transfer and
+the fix is genuinely using it. Full profile 206/206, suite 34/34,
+ASan/UBSan green.

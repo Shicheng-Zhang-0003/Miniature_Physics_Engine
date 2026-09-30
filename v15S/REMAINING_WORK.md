@@ -330,3 +330,12 @@ Audit notes and boundaries are in `../AUDIT_REPORT_2026-09-24.md`.
   leaves fixed. Unified all three on `(0, cos35, sin35)`. Gated by the new
   `mfs_t_shooter_axis`: pre-fix `|disc·joint| = 0.0000` (perpendicular) and a
   90° launch; post-fix 1.0000 and 35.00°. MFS 11/11.
+
+- [x] **MFS H7 (fired balls carried no spin, Magnus unreachable) — FIXED
+  2026-09-29.** The launch transferred linear velocity only and never wrote
+  `ball->angular_velocity`, so the Magnus branch's `spin_rate > 10.0` gate was
+  unreachable — live code nothing could trigger. Added the contact spin
+  transfer (`omega_ball = v_surface / r_ball`, same 80% factor as the linear
+  term). Gated by the new `mfs_t_ball_spin`: \|omega\| was exactly 0.0, now
+  742.1 rad/s (flywheel at 3957 rpm of a 4000 rpm target). MFS 12/12.
+  *Approximation, not a friction solve — cannot express skid.*

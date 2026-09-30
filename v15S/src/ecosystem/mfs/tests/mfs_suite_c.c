@@ -500,3 +500,93 @@ int mfs_t_shooter_axis(void) {
     mfs_test_end(t_ptr);
     return t_ptr->failures;
 }
+
+/* mfs_t_ball_spin: GATED regression for MFS H7 (DESPOT-2026-09-29).
+ *
+ * The launch transferred linear velocity only, so a fired ball left with
+ * angular_velocity == 0. The Magnus model in ball_physics_step is gated on
+ * `spin_rate > 10.0` rad/s, which made it structurally unreachable from the
+ * shooter: live code that nothing in the game could ever trigger.
+ */
+int mfs_t_ball_spin(void) {
+    mfs_test_t t; mfs_test_begin(&t, "ball_spin"); mfs_test_t *t_ptr = &t;
+    physics_world w; mfs_test_world(&w);
+    g_cfg.timestep.solver_iterations = FTC_ITERS;
+    constraint_pool_init(&w);
+
+    extern const mpe_module_desc_t mfs_module_1_desc;
+    void *state = NULL;
+    if (mfs_module_1_attach(&w, &state) != 0) {
+        t_ptr->failures++;
+        physics_world_cleanup(&w);
+        mfs_test_end(t_ptr);
+        return t_ptr->failures;
+    }
+    mfs_module_1_state *ms = (mfs_module_1_state *)state;
+    const float dt = DT;
+    int fail = 0;
+
+    MFS_CHECK(t_ptr, ms->ball_count > 0);
+    MFS_CHECK(t_ptr, ms->shooter_flywheel_body >= 0);
+    if (ms->ball_count == 0 || ms->shooter_flywheel_body < 0) {
+        mfs_module_1_detach(&w, state);
+        physics_world_cleanup(&w);
+        mfs_test_end(t_ptr);
+        return t_ptr->failures;
+    }
+
+    /* Spin the flywheel up to its target, then place a ball in the hopper and
+     * fire, exactly as the module's own test does. */
+    mfs_module_1_set_shooter(ms, true, false);
+    for (int tick = 0; tick < 240 && !fail; tick++) {
+        mfs_module_1_pre_step(&w, dt, state);
+        physics_world_step(&w, dt);
+        mfs_module_1_post_step(&w, dt, state);
+        if (!mfs_test_finite(&w)) fail = 1;
+    }
+
+    int fw = physics_world_index_by_id(&w, ms->shooter_flywheel_body);
+    int b0 = physics_world_index_by_id(&w, ms->ball_body_ids[0]);
+    MFS_CHECK(t_ptr, fw >= 0);
+    MFS_CHECK(t_ptr, b0 >= 0);
+
+    if (!fail && fw >= 0 && b0 >= 0) {
+        rigidbody *flywheel = &w.bodies[fw];
+        rigidbody *ball = &w.bodies[b0];
+        /* Put the ball in contact with the flywheel rim. */
+        w.bodies[b0].position =
+            vector3_addition(flywheel->position, (vector3){0.05f, 0.0f, 0.0f});
+        w.bodies[b0].velocity = vector3_zero();
+        w.bodies[b0].angular_velocity = vector3_zero();
+        MFS_INFO("flywheel spin before fire: %.1f rad/s (%.0f rpm)",
+                 vector3_length(flywheel->angular_velocity),
+                 vector3_length(flywheel->angular_velocity) * 30.0f / (float)M_PI);
+
+        mfs_module_1_set_shooter(ms, true, true);
+        int fired_before = ms->balls_fired;
+        for (int tick = 0; tick < 8 && !fail; tick++) {
+            mfs_module_1_pre_step(&w, dt, state);
+            physics_world_step(&w, dt);
+            mfs_module_1_post_step(&w, dt, state);
+            if (!mfs_test_finite(&w)) fail = 1;
+        }
+
+        MFS_CHECK(t_ptr, ms->balls_fired > fired_before);
+        float spin = vector3_length(ball->angular_velocity);
+        float speed = vector3_length(ball->velocity);
+        MFS_INFO("fired ball: |v|=%.3f m/s, |omega|=%.1f rad/s, Magnus gate is 10.0",
+                 speed, spin);
+        MFS_CHECK(t_ptr, speed > 1.0f);
+        /* THE H7 ASSERTION. Below the Magnus gate the lift model is dead. */
+        MFS_CHECK(t_ptr, spin > 10.0f);
+        if (t_ptr->failures == 0) {
+            printf("[PASS] fired ball carries spin (%.1f rad/s, above the "
+                   "10.0 rad/s Magnus gate)\n", spin);
+        }
+    }
+
+    mfs_module_1_detach(&w, state);
+    physics_world_cleanup(&w);
+    mfs_test_end(t_ptr);
+    return t_ptr->failures;
+}

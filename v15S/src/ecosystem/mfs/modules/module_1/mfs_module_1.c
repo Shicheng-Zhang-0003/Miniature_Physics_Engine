@@ -892,6 +892,38 @@ MPE_USED void mfs_module_1_shooter_step(mfs_module_1_state *state, float dt) {
                         rb_apply_forces_localised(ball, force, ball->position);
                     }
 
+                    /* MFS H7 (DESPOT-2026-09-29): the launch transferred
+                     * linear velocity ONLY. The ball therefore left with
+                     * angular_velocity == 0, and ball_physics_step's Magnus
+                     * branch is gated on `spin_rate > 10.0` rad/s -- so the
+                     * model was structurally unreachable from the shooter.
+                     * The spin code was live but dead in practice: the only
+                     * way a ball could ever spin was being struck off-centre
+                     * by the contact solver, which is not a shooter.
+                     *
+                     * A ball driven by a flywheel is spun by contact friction
+                     * until its own contact point matches the flywheel's
+                     * surface. Using the same omega x r = v convention the
+                     * flywheel itself uses, that is
+                     *     omega_ball = v_surface / r_ball
+                     * so the smaller ball spins FASTER than the surface speed
+                     * implies -- which is why a 50 mm flywheel at 4000 rpm
+                     * (surface 20.9 m/s) hands a 24 mm ball ~870 rad/s.
+                     *
+                     * This is a contact-model approximation, not a friction
+                     * solve: it does not resolve slip, so it cannot express
+                     * "the ball skids instead of rolling". It is strictly
+                     * better than the previous state, where the spin channel
+                     * was never written at all, and it is applied with the
+                     * same 80% transfer as the linear term so the two stay
+                     * self-consistent. */
+                    if (MFS_BIOBUZZ_BALL_RADIUS > 1e-4f) {
+                        vector3 spin = vector3_scaling(surface_vel,
+                            0.8f / MFS_BIOBUZZ_BALL_RADIUS);
+                        ball->angular_velocity =
+                            vector3_addition(ball->angular_velocity, spin);
+                    }
+
                     state->balls_fired++;  /* fired, not scored: no goal detection exists */
                     state->shooter_fire_cmd = false;  /* Consume fire command */
                     /* FIX-AUDIT-DESPOT: break lives INSIDE the success branch.
