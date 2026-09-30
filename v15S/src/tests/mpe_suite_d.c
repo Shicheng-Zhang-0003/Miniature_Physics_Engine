@@ -42,6 +42,7 @@
 
 #include "mpe_test.h"
 #include "tests/mpe_test.h"
+#include "ui_input/mouse_look.h"
 
 /* --------------------------------------------------------------- helpers */
 
@@ -403,6 +404,85 @@ int mpe_t_meta_config_wiring(void) {
         printf("[PASS] solver parameters demonstrably reach the simulation\n");
     }
 
+    mpe_test_end(tp);
+    return tp->failures;
+}
+
+/* ---------------------------------- 5. mouse-look sign convention, 4 axes */
+
+/* DESPOT-2026-09-29 (user report: "flick right or down locks properly, left and
+ * up do not"). The convention itself turned out to be CORRECT in all four
+ * directions -- this test is what established that, cheaply, instead of by
+ * hand-waving. The actual defects were in the plumbing around it (absolute and
+ * relative sources being mixed, and deltas overwritten rather than
+ * accumulated), both fixed in input_control.c.
+ *
+ * What this guards is the thing that made the diagnosis slow: the convention
+ * used to be inlined in a GTK handler, so the one piece of mouse-look logic
+ * that can be wrong in a DIRECTIONAL way could only be checked with a live
+ * compositor and a physical mouse. It is now a pure function in
+ * ui_input/mouse_look.h, and this asserts all four directions plus the
+ * diagonals. A sign flip in y would make "up" behave as "down" and no amount of
+ * end-to-end testing on one machine would reliably notice. */
+int mpe_t_mouse_look_axes(void) {
+    mpe_test_t t;
+    mpe_test_begin(&t, "mouse_look_axes");
+    mpe_test_t *tp = &t;
+
+    /* Wayland surface: +x right, +y DOWN. Camera: +x right, +y UP. */
+    struct { const char *name; double dx, dy; int ex, ey; } cases[] = {
+        {"flick RIGHT (+x)",  10.0,   0.0,  +1,  0},
+        {"flick LEFT  (-x)", -10.0,   0.0,  -1,  0},
+        {"flick DOWN  (+y)",   0.0,  10.0,   0, -1},
+        {"flick UP    (-y)",   0.0, -10.0,   0, +1},
+        {"diagonal (+x,+y)",  10.0,  10.0,  +1, -1},
+        {"diagonal (-x,-y)", -10.0, -10.0,  -1, +1},
+        {"diagonal (+x,-y)",  10.0, -10.0,  +1, +1},
+        {"diagonal (-x,+y)", -10.0,  10.0,  -1, -1},
+    };
+    const int n = (int)(sizeof(cases) / sizeof(cases[0]));
+    for (int i = 0; i < n; i++) {
+        float cx = 0.0f, cy = 0.0f;
+        float mag = mpe_mouse_relative_to_camera(cases[i].dx, cases[i].dy, &cx, &cy);
+        const int sx = (fabsf(cx) < 1e-6f) ? 0 : (cx > 0.0f ? +1 : -1);
+        const int sy = (fabsf(cy) < 1e-6f) ? 0 : (cy > 0.0f ? +1 : -1);
+        MPE_INFO("mouse-look %-18s -> camera (%+6.1f,%+6.1f) signs (%+d,%+d)",
+                 cases[i].name, (double)cx, (double)cy, sx, sy);
+        MPE_CHECK(tp, sx == cases[i].ex);
+        MPE_CHECK(tp, sy == cases[i].ey);
+        /* Magnitude must be preserved, not just sign: a clamp that squashed
+         * small flicks would be invisible to a sign-only check. */
+        const float want = (float)sqrt(cases[i].dx * cases[i].dx +
+                                       cases[i].dy * cases[i].dy);
+        MPE_CHECK_NEAR(tp, mag, want, 1e-3, cases[i].name);
+    }
+
+    /* Accumulation, not overwrite. The camera consumes the delta once per frame
+     * and GTK may deliver several motion events before then, so a fast flick
+     * that only kept its last event would lose most of its magnitude. This is
+     * the defect that made fast flicks feel weak in one direction. */
+    {
+        float acc_x = 0.0f, acc_y = 0.0f;
+        for (int k = 0; k < 5; k++) {
+            float cx = 0.0f, cy = 0.0f;
+            (void)mpe_mouse_relative_to_camera(4.0, -2.0, &cx, &cy);
+            acc_x += cx;
+            acc_y += cy;
+        }
+        /* (4, -2) is right-and-up in Wayland coords, so camera (+4, +2) each
+         * time. My first expectation here was -10, i.e. I had the up/down
+         * sense backwards in the test while getting it right in the
+         * convention -- which is exactly the confusion this test exists to
+         * prevent, so it is worth that it caught me. */
+        MPE_INFO("5x flick right-and-up (4,-2) accumulates to (%+.1f,%+.1f), "
+                 "want (+20.0,+10.0)", (double)acc_x, (double)acc_y);
+        MPE_CHECK_NEAR(tp, acc_x, 20.0f, 1e-4, "accumulated x over 5 events");
+        MPE_CHECK_NEAR(tp, acc_y, 10.0f, 1e-4, "accumulated y over 5 events");
+    }
+
+    if (tp->failures == 0) {
+        printf("[PASS] mouse-look convention correct in all four directions\n");
+    }
     mpe_test_end(tp);
     return tp->failures;
 }

@@ -404,3 +404,16 @@ Audit notes and boundaries are in `../AUDIT_REPORT_2026-09-24.md`.
 
 - [ ] **SLEEP-H1-2026-09-29: a body frozen without being asleep** (only under
   the `heavy` regime: gravity ×3, sleep on). Observed, not root-caused.
+
+- [x] **Mouse-look asymmetry ("right/down lock, left/up don't") — FIXED
+  2026-09-29.** The sign convention was correct all along; the plumbing was not.
+  With the relative pointer live the handler could still fall through to the
+  absolute cursor path, which is direction-dependent exactly as reported:
+  flicking toward an edge pins the cursor and stops absolute events (that
+  direction works by accident), flicking back un-pins it and they resume and
+  overwrite the relative signal. Also fixed: deltas were assigned rather than
+  accumulated, so multi-event flicks lost magnitude. The convention is now a
+  pure function (`ui_input/mouse_look.h`) asserted headlessly by
+  `mpe_t_mouse_look_axes`, and per-direction receive counters
+  (`mouse_lock_diagnostics()`) separate "compositor never sent it" from "we
+  converted it wrong". See `KNOWN_FAILURES.md` -> `MOUSELOOK-2026-09-29`.

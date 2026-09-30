@@ -55,6 +55,7 @@
 #include "../mpe_engine.h"
 #include "mouse_lock.h"
 #include "input_state.h"
+#include "mouse_look.h"
 #include <gtk/gtk.h>
 #include <gdk/gdk.h>
 #include <string.h>
@@ -110,6 +111,15 @@ static struct zwp_relative_pointer_v1 *mpe_rel_ptr = NULL;
 static double mpe_rel_dx = 0.0, mpe_rel_dy = 0.0;
 static int    mpe_rel_dirty = 0;
 
+/* Diagnostics. The user-visible symptom of a broken lock is DIRECTIONAL, and a
+ * directional symptom is undebuggable without knowing whether the compositor
+ * delivered the events at all. These counters separate "the compositor never
+ * sent it" from "we received it and converted it wrong". Reset per lock
+ * attempt by mouse_lock_diagnostics_reset(). */
+static unsigned long mpe_rel_events = 0;
+static unsigned long mpe_rel_pos_x = 0, mpe_rel_neg_x = 0;
+static unsigned long mpe_rel_pos_y = 0, mpe_rel_neg_y = 0;
+
 static int mpe_surface_is_wayland(GdkSurface *surface) {
     if (!surface) return 0;
     return mpe_display_is_wayland(gdk_surface_get_display(surface));
@@ -122,9 +132,29 @@ static void mpe_rel_handle_motion(void *data, struct zwp_relative_pointer_v1 *rp
                                   wl_fixed_t dx_unacc, wl_fixed_t dy_unacc) {
     (void)data; (void)rp; (void)utime_hi; (void)utime_lo;
     (void)dx_unacc; (void)dy_unacc;
-    mpe_rel_dx += wl_fixed_to_double(dx);
-    mpe_rel_dy += wl_fixed_to_double(dy);
+    const double rx = wl_fixed_to_double(dx);
+    const double ry = wl_fixed_to_double(dy);
+    mpe_rel_dx += rx;
+    mpe_rel_dy += ry;
     mpe_rel_dirty = 1;
+    mpe_rel_events++;
+    if (rx > 0.0) mpe_rel_pos_x++; else if (rx < 0.0) mpe_rel_neg_x++;
+    if (ry > 0.0) mpe_rel_pos_y++; else if (ry < 0.0) mpe_rel_neg_y++;
+}
+
+void mouse_lock_diagnostics(unsigned long *events,
+                            unsigned long *pos_x, unsigned long *neg_x,
+                            unsigned long *pos_y, unsigned long *neg_y) {
+    if (events) *events = mpe_rel_events;
+    if (pos_x)  *pos_x  = mpe_rel_pos_x;
+    if (neg_x)  *neg_x  = mpe_rel_neg_x;
+    if (pos_y)  *pos_y  = mpe_rel_pos_y;
+    if (neg_y)  *neg_y  = mpe_rel_neg_y;
+}
+
+void mouse_lock_diagnostics_reset(void) {
+    mpe_rel_events = mpe_rel_pos_x = mpe_rel_neg_x = 0;
+    mpe_rel_pos_y = mpe_rel_neg_y = 0;
 }
 
 static const struct zwp_relative_pointer_v1_listener mpe_rel_listener = {
@@ -170,10 +200,28 @@ mpe_get_rel_manager(struct wl_display *wl_display) {
     return mpe_rel_manager;
 }
 
+
 int mouse_lock_relative_available(void) {
     GdkDisplay *display = gdk_display_get_default();
     if (!display || !GDK_IS_WAYLAND_DISPLAY(display)) return 0;
     return mpe_get_rel_manager(gdk_wayland_display_get_wl_display(display)) != NULL;
+}
+
+/* Non-zero when a real relative-pointer lock is attached. The caller must not
+ * fall back to absolute cursor coordinates while this is true: with a live
+ * relative pointer the cursor is unconstrained and free to travel anywhere, so
+ * its position carries no information about how far the hand moved. */
+int mouse_lock_relative_active(void) {
+    return mpe_rel_ptr != NULL;
+}
+
+/* DESPOT-2026-09-29: the sign convention lives in ui_input/mouse_look.h, as a
+ * pure function with no GTK dependency, so the headless suite can assert all
+ * four directions. Duplicating it here is what let it be wrong in one
+ * direction and right in the other with nothing able to notice. */
+float mouse_lock_relative_to_camera(double rdx, double rdy,
+                                    float *out_x, float *out_y) {
+    return mpe_mouse_relative_to_camera(rdx, rdy, out_x, out_y);
 }
 
 int mouse_lock_take_relative_delta(double *dx, double *dy) {
@@ -224,7 +272,59 @@ static int mpe_rel_pointer_acquire(GdkSurface *surface) {
 
 /* No Wayland relative-pointer support compiled in (e.g. Windows): lock falls
  * back to the historical hide-the-cursor behaviour. */
+/* Diagnostics. The user-visible symptom of a broken lock is directional, and
+ * a directional symptom is undebuggable without knowing whether the compositor
+ * delivered the events at all. These counters separate "the compositor never
+ * sent it" from "we received it and converted it wrong". Reset by
+ * mouse_lock_enable so each lock attempt is measured on its own. */
+static unsigned long mpe_rel_events = 0;
+static unsigned long mpe_rel_pos_x = 0, mpe_rel_neg_x = 0;
+static unsigned long mpe_rel_pos_y = 0, mpe_rel_neg_y = 0;
+
+void mouse_lock_diagnostics(unsigned long *events,
+                            unsigned long *pos_x, unsigned long *neg_x,
+                            unsigned long *pos_y, unsigned long *neg_y) {
+    if (events) *events = mpe_rel_events;
+    if (pos_x)  *pos_x  = mpe_rel_pos_x;
+    if (neg_x)  *neg_x  = mpe_rel_neg_x;
+    if (pos_y)  *pos_y  = mpe_rel_pos_y;
+    if (neg_y)  *neg_y  = mpe_rel_neg_y;
+}
+
+void mouse_lock_diagnostics_reset(void) {
+    mpe_rel_events = mpe_rel_pos_x = mpe_rel_neg_x = 0;
+    mpe_rel_pos_y = mpe_rel_neg_y = 0;
+}
+
 int mouse_lock_relative_available(void) { return 0; }
+/* DESPOT-2026-09-29: the ONE place the sign convention lives.
+ *
+ * Previously the conversion was inlined in on_mouse_movements(), which made it
+ * untestable -- the sign convention is exactly the kind of thing that is wrong
+ * in one direction and right in the other, and there was no way to check it
+ * without a live compositor and a physical mouse.
+ *
+ * Wayland surface coordinates are +x right, +y DOWN. Camera pitch is
+ * +up. So y is negated and x is not. Exposed as a pure function so the suite
+ * can assert all four directions from a headless build.
+ *
+ * Returns the magnitude of the input so callers can distinguish "no motion"
+ * from "motion that happened to be zero on one axis". */
+float mouse_lock_relative_to_camera(double rdx, double rdy,
+                                    float *out_x, float *out_y) {
+    if (out_x) *out_x = (float)rdx;
+    if (out_y) *out_y = (float)-rdy;
+    return (float)(rdx * rdx + rdy * rdy);
+}
+
+/* Non-zero when a real relative-pointer lock is attached. The caller must not
+ * fall back to absolute cursor coordinates while this is true: with a live
+ * relative pointer the cursor is free to travel anywhere and carries no
+ * information about intent. */
+int mouse_lock_relative_active(void) {
+    return mpe_rel_ptr != NULL;
+}
+
 int mouse_lock_take_relative_delta(double *dx, double *dy) { (void)dx; (void)dy; return 0; }
 static void mpe_rel_pointer_destroy(void) {}
 static int  mpe_rel_pointer_acquire(GdkSurface *surface) { (void)surface; return 0; }

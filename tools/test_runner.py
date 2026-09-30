@@ -93,10 +93,11 @@ class Result:
 # physics property must hold across the spread rather than at one point.
 MPE_TEST_REGIMES = ("default", "light", "heavy", "brittle", "sticky")
 
-# 39 = 36 pre-existing + 3 metamorphic (meta_rotation, meta_convergence,
-# meta_config_wiring). meta_sleep was written and withdrawn, so the count is 39
-# and this constant says so rather than being quietly lowered.
-MIN_SUITE_ENTRIES = 39
+# 40 = 36 pre-existing + 4 metamorphic (meta_rotation, meta_convergence,
+# meta_config_wiring, mouse_look_axes). meta_sleep was written and withdrawn,
+# so the count is 40 and this constant says so rather than being quietly
+# lowered.
+MIN_SUITE_ENTRIES = 40
 
 
 def discover_suite_entries(source: str) -> list[tuple[str, bool]]:

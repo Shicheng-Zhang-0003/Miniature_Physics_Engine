@@ -85,14 +85,40 @@ gboolean on_mouse_movements(GtkEventControllerMotion *ctrl, double x, double y, 
      * When it is active, absolute cursor coordinates are meaningless -- using
      * them is exactly the bug that let the pointer reach the screen edge and
      * stall the camera. Prefer the relative delta and ignore x/y entirely. */
-    {
-        double rdx=0.0, rdy=0.0;
-        if (mouse_lock_take_relative_delta(&rdx, &rdy)) {
-            st->mouse_delta_x = (float)rdx;
-            st->mouse_delta_y = (float)-rdy;
-            last_x = -1; last_y = -1;   /* force re-anchor if we ever fall back */
-            return FALSE;
-        }
+    /* DESPOT-2026-09-29 (user-reported: flick RIGHT/DOWN works, LEFT/UP does
+     * not). Three real defects here, all of which lose or corrupt motion in a
+     * DIRECTIONAL way:
+     *
+     * 1. FALL-THROUGH. When the relative pointer is live but no new relative
+     *    event has been dispatched yet, take_relative_delta() returns 0 and we
+     *    fell straight through to the ABSOLUTE path. With a live relative
+     *    pointer the on-screen cursor is unconstrained and free to travel
+     *    anywhere, so `x - last_x` there is not "how far the user moved their
+     *    hand" -- it is just where the compositor happened to leave the arrow.
+     *    Mixing the two sources is the whole hazard the relative pointer exists
+     *    to remove. Now: if the relative lock is live, the absolute path is
+     *    skipped outright.
+     *
+     * 2. OVERWRITE INSTEAD OF ACCUMULATE. Both paths ASSIGNED
+     *    mouse_delta_x/y. GTK can deliver several motion events per frame and
+     *    the camera consumes the delta once per frame, so every event but the
+     *    last was silently thrown away -- a fast flick lost most of its
+     *    magnitude, and a slow one lost all of it. Now accumulated with +=, so
+     *    the camera sees everything that happened.
+     *
+     * 3. `last_x/last_y = -1` after a relative event forced a re-anchor on the
+     *    next absolute event. Pointless once the absolute path is disabled,
+     *    and it was one more way the two paths could interleave.
+     */
+    if (mouse_lock_relative_active()) {
+        double rdx = 0.0, rdy = 0.0;
+        (void)mouse_lock_take_relative_delta(&rdx, &rdy);
+        float cx = 0.0f, cy = 0.0f;
+        (void)mouse_lock_relative_to_camera(rdx, rdy, &cx, &cy);
+        st->mouse_delta_x += cx;
+        st->mouse_delta_y += cy;
+        last_x = -1; last_y = -1;
+        return FALSE;
     }
     GtkWidget *w = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(ctrl));
     int ww = w ? gtk_widget_get_width(w) : 800;
@@ -113,8 +139,11 @@ gboolean on_mouse_movements(GtkEventControllerMotion *ctrl, double x, double y, 
     if (dy > wh/2) dy = wh/2;
     if (dy < -wh/2) dy = -wh/2;
     if(dx!=0||dy!=0) {
-        st->mouse_delta_x = (float)dx;
-        st->mouse_delta_y = -(float)dy;
+        /* Accumulate, for the same reason as the relative path above: the
+         * camera consumes the delta once per frame, and GTK may deliver
+         * several motion events before then. */
+        st->mouse_delta_x += (float)dx;
+        st->mouse_delta_y += -(float)dy;
     }
     /* Track actual cursor position. On X11 reset_centre() warps back
      * to the surface centre (no-op on Wayland, where warping is

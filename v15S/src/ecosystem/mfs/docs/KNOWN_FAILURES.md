@@ -727,3 +727,67 @@ preserved as a comment in `tests/mpe_suite_d.c`.
 
 For whoever picks this up: the first question is whether a non-sleeping body can
 be frozen at all, or whether the regime is corrupting velocity some other way.
+
+### MOUSELOOK-2026-09-29 — "Flick right/down locks, left/up does not" — FIXED (plumbing), and the convention was never wrong
+
+User report after the relative-pointer fix landed: flicking the mouse or
+trackpad **right or down** locked properly; **left and up** did not.
+
+**The sign convention was correct.** Verified all four directions plus the four
+diagonals: Wayland is +x right / +y DOWN, the camera consumes +x right / +y UP,
+so x passes through and y is negated, and that is what the code does. The
+asymmetry was not in the convention.
+
+**What was actually wrong — three defects in `on_mouse_movements()`, all of
+which lose motion in a directional way:**
+
+1. **FALL-THROUGH (the likely primary cause).** When the relative pointer was
+   live but no new relative event had been dispatched yet,
+   `mouse_lock_take_relative_delta()` returned 0 and the handler fell straight
+   into the ABSOLUTE path. With a live relative pointer the cursor is
+   *unconstrained* — nothing stops it travelling — so `x - last_x` there is not
+   "how far the hand moved", it is merely where the compositor left the arrow.
+   That is direction-dependent in exactly the reported way: flicking toward an
+   edge **pins** the cursor, which *stops* absolute events from contaminating
+   the signal, so that direction works; flicking back **un-pins** it, absolute
+   events resume, and they overwrite the relative signal. The working direction
+   was working by accident.
+   Fix: `mouse_lock_relative_active()` gates the absolute path off outright
+   while a real relative lock is attached. Mixing the two sources is the entire
+   hazard the relative pointer exists to remove.
+
+2. **OVERWRITE INSTEAD OF ACCUMULATE.** Both paths did
+   `mouse_delta_x = ...`. The camera consumes the delta once per frame, but GTK
+   can deliver several motion events before then, so every event but the last
+   was silently discarded — a fast flick lost most of its magnitude and a slow
+   one lost all of it. Now `+=`.
+
+3. `last_x/last_y = -1` after a relative event forced a re-anchor on the next
+   absolute event — pointless once (1) disables that path, and one more way for
+   the two sources to interleave.
+
+**Testability, which is the real lesson.** The convention was inlined in a GTK
+handler, so the one piece of mouse-look logic that can be wrong in a
+*directional* way could only be checked with a live compositor and a physical
+mouse — which is why this was reported by hand and not caught. It is now a pure
+function, `mpe_mouse_relative_to_camera()`, in `ui_input/mouse_look.h`, with no
+GTK and no engine dependency, asserted by the new `mpe_t_mouse_look_axes` from
+the headless suite: all four directions, all four diagonals, magnitude
+preservation, and the accumulation property from (2).
+
+**Two of my own test bugs, recorded because the test caught both immediately:**
+
+* The function's comment said it returned the magnitude while it returned
+  `dx^2+dy^2`. The suite caught it on the first run. The contract now returns
+  the true magnitude and says so.
+* I asserted a flick of `(4,-2)` accumulated to `-10` in camera y, i.e. I had
+  up/down backwards **in the test** while getting it right in the convention.
+  Worth that it caught me: that confusion is the whole failure mode.
+
+**Diagnostics added, for if it is still not right.** `mouse_lock_diagnostics()`
+reports per-direction receive counts (`pos_x/neg_x/pos_y/neg_y`) and total
+events, resettable per lock attempt. This separates the two possibilities that
+look identical from the outside: *the compositor never delivered the event*
+(counts asymmetric or zero) versus *we received it and went wrong* (counts
+symmetric). That distinction is what this bug lacked and what made it
+expensive.
