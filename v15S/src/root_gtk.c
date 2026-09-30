@@ -1,6 +1,7 @@
 #include <gtk/gtk.h>
 #include <stdio.h>
 #include "mpe_engine.h"
+#include "ui_input/mouse_lock.h"
 camera main_camera_fov;
 input_status main_inputs;
 static guint physics_timeout_id = 0;
@@ -174,8 +175,35 @@ static gboolean on_rendered_GTK3(GtkGLArea *gl_area_widget, GdkGLContext *gl_con
 }
 int main_algorithm(int argc, char *argv[]);
 int main_algorithm(int argc, char *argv[]) {
-    g_setenv("GDK_BACKEND", "x11", TRUE);
+    /* DESPOT-2026-09-29: THIS LINE WAS THE MOUSE LOCK BUG.
+     *
+     * `g_setenv("GDK_BACKEND", "x11", TRUE)` forced the X11 backend, so the
+     * GTK4 engine never ran on native Wayland at all -- it went through
+     * XWayland. The "force X11 because mouse lock is broken on Wayland"
+     * workaround from the GTK3 era was never removed when the port happened;
+     * it was carried forward and quietly became the reason mouse lock could
+     * not be fixed, because every Wayland-side fix was dead code behind it.
+     *
+     * Both the forced x11 and the dead Wayland path then explain the whole
+     * reported behaviour exactly:
+     *
+     *   - WINDOWED: X11 re-centring only happens on a motion event, and motion
+     *     events stop once the cursor leaves the window. So the warp never
+     *     fires, the cursor leaves, and the camera freezes: "the mouse exits
+     *     after too much movement". Nothing is wrong with the warp; it simply
+     *     cannot rescue a cursor that has already left.
+     *   - FULLSCREEN: the window covers the whole screen, so the cursor cannot
+     *     leave and the warp keeps working. It only degrades at the screen
+     *     edges, which is the residual up/left/right/down asymmetry.
+     *
+     * The backend is now chosen by GDK: native Wayland when WAYLAND_DISPLAY is
+     * set, X11 otherwise. Both paths are implemented and tested, so neither is
+     * a fallback hack any more. */
     gtk_init(&argc, &argv);
+    /* Bind the Wayland globals ONCE here, at startup. Doing it lazily on the
+     * first click needed a wl_display_roundtrip() from inside a GTK handler,
+     * which re-enters GDK's own event delivery. No-op on X11. */
+    mouse_lock_init();
     mpe_config_init(); /* MPE_TASK_29_CONFIG_INIT */
     event_log_init(); /* MPE_TASK_V15R2_EVENT_LOG_INIT */
     /* MPE_TASK_34_CONFIG_LOAD_BEGIN */

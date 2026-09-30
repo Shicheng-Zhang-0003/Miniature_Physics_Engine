@@ -417,3 +417,15 @@ Audit notes and boundaries are in `../AUDIT_REPORT_2026-09-24.md`.
   `mpe_t_mouse_look_axes`, and per-direction receive counters
   (`mouse_lock_diagnostics()`) separate "compositor never sent it" from "we
   converted it wrong". See `KNOWN_FAILURES.md` -> `MOUSELOOK-2026-09-29`.
+
+- [x] **MOUSE LOCK ACTUAL ROOT CAUSE (2026-09-29): `root_gtk.c` still did
+  `g_setenv("GDK_BACKEND", "x11", TRUE)`.** The GTK4 engine never ran on native
+  Wayland — it used XWayland — so every Wayland-side fix was dead code behind
+  that one line, and the GTK3-era "force X11" workaround was never removed.
+  Windowed failure = X11 warp cannot fire once the cursor has left the window.
+  Fullscreen = window covers the screen so the cursor cannot leave. Three
+  changes shipped together: backend no longer forced (GDK picks native
+  Wayland or X11), `zwp_locked_pointer_v1` confinement added (the relative
+  pointer supplies deltas but does **not** confine — that was the windowed
+  failure), and globals bound once at startup instead of lazily from inside a
+  GTK handler. See `KNOWN_FAILURES.md` -> `MOUSELOOK2-2026-09-29`.

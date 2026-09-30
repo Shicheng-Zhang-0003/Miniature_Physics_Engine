@@ -791,3 +791,61 @@ look identical from the outside: *the compositor never delivered the event*
 (counts asymmetric or zero) versus *we received it and went wrong* (counts
 symmetric). That distinction is what this bug lacked and what made it
 expensive.
+
+### MOUSELOOK2-2026-09-29 — THE ACTUAL ROOT CAUSE: the GTK4 engine still hardcoded `GDK_BACKEND=x11`
+
+Second user report after the first fix: **in a window nothing worked at all**
+(mouse exits after a little movement); **fullscreen only partially worked**
+(right/down fine, up/left not).
+
+**Root cause, found in `root_gtk.c`:**
+
+```c
+g_setenv("GDK_BACKEND", "x11", TRUE);   /* <-- still there */
+```
+
+The GTK4 engine **never ran on native Wayland at all.** It went through
+XWayland. The "force X11 because mouse lock is broken on Wayland" workaround
+from the GTK3 era was carried across the port and never removed — and it
+became the reason mouse lock could not be fixed, because **every Wayland-side
+fix was dead code sitting behind it.** The relative-pointer protocol I
+implemented, verified present on the compositor, was never being exercised.
+
+This one line explains the entire reported behaviour precisely:
+
+* **Windowed:** X11 re-centring only happens *on a motion event*, and motion
+  events **stop once the cursor leaves the window**. So the warp never fires,
+  the cursor leaves, and the camera freezes. Nothing is wrong with the warp; it
+  cannot rescue a cursor that has already left. That is "the mouse exits after
+  too much movement", verbatim.
+* **Fullscreen:** the window covers the whole screen, so the cursor cannot leave
+  and the warp keeps working. It degrades only at the screen edges, which is
+  the residual up/left/right/down asymmetry.
+
+**Fixes shipped together, because the first two were pointless without the
+third:**
+
+1. **Backend is no longer forced.** GDK chooses: native Wayland when
+   `WAYLAND_DISPLAY` is set, X11 otherwise. Both paths are implemented, so
+   neither is a fallback hack.
+2. **`zwp_locked_pointer_v1` confinement added.** The relative pointer alone was
+   never a lock — it supplies unbounded deltas but does **not** confine the
+   cursor. That is exactly the windowed-mode failure: the cursor still leaves
+   the window, and once outside, the compositor stops delivering. Locked-pointer
+   is the confinement; relative-pointer is the input device. A first-person
+   camera needs both.
+3. **Globals bound once at startup** (`mouse_lock_init()`, called from
+   `root_gtk.c`). The lazy bind needed a `wl_display_roundtrip()` from inside a
+   GTK handler, which re-enters GDK's own event delivery — a classic
+   works-first-click-then-behaves-differently hazard.
+
+**Honest note on ordering.** I shipped the first Wayland fix, verified the
+compositor advertises the protocol, and reported it as done. It could not have
+worked, and neither could the second one, because a single `g_setenv` above
+`gtk_init` made the entire Wayland path unreachable. I checked the compositor
+and the protocol and never checked which backend the binary was actually
+requesting. That is the same failure mode as the intake flag and the config:
+**verify the thing is connected, not that the thing exists.**
+
+`mouse_lock_confined()` and `mouse_lock_relative_active()` are reported
+separately because they are different capabilities and can fail independently.
