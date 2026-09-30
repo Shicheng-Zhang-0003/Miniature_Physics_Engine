@@ -427,7 +427,7 @@ plugins/mpe_capsule$(PLUGIN_EXT): plugins/mpe_capsule.c core/mpe_module.h core/m
 # One binary, exact-name dispatch, shared builders (no 30x core recompile).
 # Links core + spring physics + scene I/O (stubs for scene_init/camera live
 # in tests/mpe_suite_main.c). Replaces the 30-binary v1 layout over time.
-MPE_SUITE_SRCS := tests/mpe_suite_main.c tests/mpe_suite_a.c tests/mpe_suite_b.c tests/mpe_suite_c.c tests/mpe_suite_loader.c tests/mpe_suite_ftc.c
+MPE_SUITE_SRCS := tests/mpe_suite_main.c tests/mpe_suite_a.c tests/mpe_suite_b.c tests/mpe_suite_c.c tests/mpe_suite_d.c tests/mpe_suite_loader.c tests/mpe_suite_ftc.c
 MPE_SUITE_DEPS := $(MPE_TEST_CORE) $(SPRING_TEST_SRCS) $(SCENE_TEST_SRCS)
 # The ftc_ecosystem test needs the bundle fixture: build it first.
 build_suite: $(MPE_SUITE_SRCS) $(MPE_SUITE_DEPS) ecosystem/mfs/mfs_ecosystem$(PLUGIN_EXT) plugins/mpe_capsule$(PLUGIN_EXT)

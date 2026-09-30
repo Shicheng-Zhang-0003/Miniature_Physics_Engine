@@ -651,3 +651,79 @@ suite running with `bias_factor = 0` and `penetration_slop = 0`: a solver with n
 positional recovery at all. It is not a depenetration limitation and never was.
 All four sub-cases now gate on full resolution against the engine's real
 `penetration_slop`.
+
+### META-ROTATION-2026-09-29 — Sphere-sphere contact is not rotation-equivariant (stale contact) — OPEN, XFAIL
+
+Found by a new metamorphic test, not by any golden value.
+
+**The test.** Rotate an entire initial condition by R, simulate, rotate the
+result back by R; you must get the unrotated run's answer. This holds for any
+correct engine regardless of what it computes, so it has no golden number to
+be wrong in the same way as the code.
+
+**Bisected** with a standalone probe, same build flags:
+
+| probe | max abs position divergence |
+|---|---|
+| free flight, 1 sphere, no floor | **0.000000e+00** — exact |
+| drop onto floor, 1 sphere | **1.49e-08 m** — float noise |
+| head-on **sphere-sphere** pair, no floor | **1.195e+00 m** — BROKEN |
+
+Integration is exactly equivariant and the floor contact path is equivariant to
+float precision. The defect is specific to **sphere-sphere contact**.
+
+**Mechanism, instrumented per tick.** The spheres do collide and do bounce apart
+in both worlds (separation 0.563 m → 1.0 m → 3.2 m in the unrotated run, which
+is correct). But `has_contact` reads **0** in the unrotated world and stays
+**2** in the rotated world all the way to tick 150 — when the spheres are
+**2.59 m apart** and cannot possibly be touching. The rotated run is still being
+fed a contact, so impulses keep being applied to a separated pair. That is the
+whole of the 0.98 m/s vs 0.82 m/s separation-rate difference measured.
+
+**What to chase:** a manifold, or its warm-start impulses, surviving past
+separation. It is emphatically **not** a tolerance question and **not** a
+golden-value miss — a body pair 2.6 m apart must not be in contact. The test is
+held at a tight 1e-4 m so that fixing the stale contact turns it green rather
+than requiring the threshold to be relaxed.
+
+Reported as a loud `[XFAIL][META-ROTATION]`; the suite surfaces it on every run.
+
+**Two false alarms I caused first, recorded so nobody repeats them:**
+
+1. I assumed `vector4` was `{x,y,z,w}`. It is declared **scalar-first**:
+   `typedef struct { float w, x, y, z; } vector4;` (math3d.h). So a
+   positional conjugate initializer builds components rotated by one slot, not
+   the conjugate of anything, and produced a 4 METRE "equivariance failure".
+   The engine was exact — a 90° rotation about Z maps X→Y and Y→−X to full
+   float precision. The test now uses named fields.
+2. I rotated *every* body including the floor box, so the rotated run had a
+   **tilted floor** — a different problem, not a test of equivariance. The
+   rotation helper now takes the first dynamic index and rotates only that
+   range; a mass-0 body is not necessarily flagged `static_state`, so filtering
+   on that flag was also wrong.
+
+Both were my test's fault. I checked the engine's quaternion math directly
+before believing either, which is the only reason they did not become false
+findings about the engine.
+
+### SLEEP-H1-2026-09-29 — Body frozen without being asleep, under the `heavy` regime — OBSERVED, NOT ROOT-CAUSED
+
+Found while building the regime matrix, and deliberately left unresolved rather
+than shipped as a test.
+
+A ball launched at 3 m/s with sleep **enabled**, under the `heavy` regime
+(gravity ×3), reported after 0.5 s: `|v| = 0.0000 m/s`, position back at
+exactly its spawn height, distance travelled `0.0000 m`, and
+`is_sleeping = FALSE`. So it was frozen without being asleep. The same test
+passes in `default`, `light`, `brittle` and `sticky`.
+
+This is a *different signal* from a sleep-threshold problem and it is not
+explained. A related test (`mpe_t_meta_sleep`) was written, failed to converge
+on its second arm (a cube dropped on the static plane still read 0.817 m/s after
+10 simulated seconds, so "settles" was not a property the engine exhibited), and
+was **withdrawn** rather than shipped red or green for a reason nobody could
+state. `meta_sleep` is deliberately absent from the registry; the reasoning is
+preserved as a comment in `tests/mpe_suite_d.c`.
+
+For whoever picks this up: the first question is whether a non-sleeping body can
+be frozen at all, or whether the regime is corrupting velocity some other way.

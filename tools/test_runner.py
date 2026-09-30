@@ -89,7 +89,14 @@ class Result:
 
 
 # Floor on the number of canonical suite entries. See discover_suite_entries.
-MIN_SUITE_ENTRIES = 36
+# DESPOT-2026-09-29: the full suite is re-run under each of these, so a
+# physics property must hold across the spread rather than at one point.
+MPE_TEST_REGIMES = ("default", "light", "heavy", "brittle", "sticky")
+
+# 39 = 36 pre-existing + 3 metamorphic (meta_rotation, meta_convergence,
+# meta_config_wiring). meta_sleep was written and withdrawn, so the count is 39
+# and this constant says so rather than being quietly lowered.
+MIN_SUITE_ENTRIES = 39
 
 
 def discover_suite_entries(source: str) -> list[tuple[str, bool]]:
@@ -399,6 +406,43 @@ class Runner:
             run_name, "suite-v2" if not sanitizer else "sanitizers", cmd, cwd=SRC_DIR,
             timeout=900, extra_env=self.sanitizer_env() if sanitizer else None,
         )
+        # DESPOT-2026-09-29: REGIME MATRIX.
+        #
+        # A single run of the suite is one point in configuration space. The
+        # CONFIG-2026-09-29 defect -- the whole suite running with
+        # solver_iterations=0, bias 0, slop 0 -- was green, and no amount of
+        # rerunning it could ever have surfaced that, because every run was the
+        # same wrong point. Running the FULL suite across perturbed
+        # configurations turns a number into a function of parameters, and a
+        # property that holds at one setting and not another is exactly the
+        # kind of thing a golden value cannot see.
+        #
+        # The matrix immediately earned its place: the very first run found a
+        # test that passed in four regimes and failed in the fifth.
+        if not sanitizer and not self.test_filter:
+            for regime in MPE_TEST_REGIMES:
+                reg_run, reg_out = self.command(
+                    f"suite-v2-regime-{regime}", "suite-v2", cmd, cwd=SRC_DIR,
+                    timeout=1200, extra_env={"MPE_TEST_REGIME": regime},
+                )
+                reg_ok = True
+                try:
+                    reg_rows = parse_suite_output(reg_out, entries)
+                except ValueError as error:
+                    self.add(f"suite-v2-regime-{regime}-output", "suite-v2", "FAIL",
+                             kind="contract", return_code=None, detail=str(error), log=reg_run.log)
+                    continue
+                for status, case, failures in reg_rows:
+                    if not (status == "PASS" and failures == 0):
+                        reg_ok = False
+                        self.add(f"regime-{regime}/{case}", "suite-v2", "FAIL",
+                                 kind="regime", return_code=reg_run.return_code, log=reg_run.log,
+                                 detail=f"passes in other regimes but fails under MPE_TEST_REGIME={regime}")
+                self.add(f"suite-v2-regime-{regime}", "suite-v2",
+                         "PASS" if reg_ok else "FAIL", kind="regime", log=reg_run.log,
+                         detail=f"full suite under MPE_TEST_REGIME={regime}")
+                if not reg_ok:
+                    return False
         try:
             rows = parse_suite_output(output, expected)
         except ValueError as error:
