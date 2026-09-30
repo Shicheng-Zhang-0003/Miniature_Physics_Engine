@@ -181,6 +181,32 @@ static int mpe_run_one(const mpe_entry_t *e) {
 }
 
 int main(int argc, char **argv) {
+    /* DESPOT-2026-09-29 THE BIG ONE. The suite never loaded the config.
+     *
+     * g_cfg is a plain global in mpe_config_schema.c, so the C runtime
+     * zero-initialises it. mpe_test_begin() only *saves* g_cfg, and nothing
+     * in this binary's startup path called mpe_config_init() — so every test
+     * that relied on the shared harness ran against an all-zero config:
+     *
+     *   solver_iterations    0   (real 64)  -> the sequential-impulse solver
+     *                                            ran ZERO iterations
+     *   solver.bias_factor   0   (real 0.1) -> no Baumgarte positional bias,
+     *                                            i.e. no penetration recovery
+     *   solver.penetration_slop 0 (real 0.01)
+     *   body_defaults restitution/friction all 0 (real 0.5 / 0.3)
+     *   world.gravity        0   (real -9.81)
+     *   timestep.max_substeps 0  (real 5)
+     *
+     * The shipped game is fine: root_gtk.c calls mpe_config_init() twice, as
+     * do headless_main.c and tui/tui_main.c. The MFS harness calls it in
+     * mfs_test_world(). This suite was the one path that did not — so the
+     * engine's own comment in physics_world.c about "a world initialised
+     * before mpe_config_init() runs sees a zeroed g_cfg" was describing this
+     * suite, permanently, and nobody connected the two.
+     *
+     * Loaded here, once, before any test runs. Individual test files that
+     * call mpe_config_init() themselves are unaffected (idempotent). */
+    mpe_config_init();
     printf("MPE Suite v2 — src: v15S (single binary, exact dispatch)\n");
     printf("============================================================\n");
     if (argc >= 2 && strcmp(argv[1], "--list") == 0) {
