@@ -498,3 +498,58 @@ channel rather than a weak one. The flywheel in the same run reached 3957 rpm
 against a 4000 rpm target, so the launch had real surface speed to transfer and
 the fix is genuinely using it. Full profile 206/206, suite 34/34,
 ASan/UBSan green.
+
+### MOTOR-II-2026-09-29 — Delivered-torque accounting: real gain, but coupled to the odometry model — NOT LANDED
+
+Re-attempted 2026-09-29 now that the gated stall test exists. **Result: it is
+worth doing, and it cannot be done alone.** Not landed; this records the
+measurement so the next attempt does not have to rediscover it.
+
+**The change.** The observer compared `I_axle * alpha` against the motor's
+*commanded* torque, but `tau_exp_prev` includes whatever went into accelerating
+the rotor. That torque never reaches the wheel, so the difference was being
+misread as external load. The fix reflects the rotor into the inertia the
+estimator sees:
+
+    I_total = I_axle + J_rotor * gear_ratio^2
+
+**Measured, same binary, only this changed:**
+
+| metric | baseline | with reflected rotor |
+|---|---|---|
+| stall open loop | 3.6509 N.m (-2.03%) | 3.6509 N.m (-2.03%) — **unchanged** |
+| stall closed loop | 3.1279 N.m (-16.06%) | 3.1279 N.m (-16.06%) — **unchanged** |
+| strafe, physics | 0.8739 m | **0.9727 m** (+11%) |
+| strafe, odometry | 1.1202 m | **2.1371 m** (+91%) |
+| odometry distance error | 9.0% | 8.8% |
+| suite | 12/12 | **11/12** |
+
+**Two things worth recording.**
+
+1. *The stall gate did its job.* The reason this change was reverted in the
+   first place was that it dragged the stall endpoint from 3.73 N.m to 2.21
+   N.m with no test to catch it. This time the endpoint was **byte-identical**
+   in both phases. The reflected-inertia correction is orthogonal to the stall
+   fixed point — at a locked rotor `alpha == 0`, so the extra inertia term
+   vanishes. The original regression must have come from a different (and now
+   superseded) form of the change, not from this one.
+
+2. *Physics improved, odometry broke.* Real chassis strafe transmit went up
+   11%, which is the point. But the encoder-based odometry went up 91%, so it
+   now over-reports by 2.2x against what the chassis actually does, and the
+   odometry test correctly goes red. The wheels are slipping more (more torque
+   available, same traction limit), and the odometry model has no slip term, so
+   it counts rotation the chassis never converts into travel.
+
+**Why not landed anyway.** A red test is a truthful signal that a change is
+incomplete, and a half-landed change here would make the drivetrain *report*
+worse than it *behaves* — the odometry is what a driver trusts. The correct
+landing unit is delivered-torque **plus** a slip term in the odometry model,
+then the lateral `VREF` retune on top. Doing it in the other order is what
+produced the original revert.
+
+**Open question for whoever picks this up.** `J_rotor = 3.0e-6 kg.m^2` at the
+motor shaft is a representative FTC-class brushless figure and a MODELLING
+CHOICE, not a spec value — no preset carries rotor-inertia data. The shape of
+the correction is right; the magnitude is order-of-magnitude only. Sizing it
+per-SKU would need vendor data that is not in the tree.

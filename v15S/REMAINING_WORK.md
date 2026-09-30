@@ -352,3 +352,15 @@ Audit notes and boundaries are in `../AUDIT_REPORT_2026-09-24.md`.
   `[FAIL] ftc_hotload (failures=N)` with no reason, so a genuine failure
   reached CI with nothing pointing at what broke. Now the count also goes to
   stderr with a pointer to the per-check lines and the run log.
+
+- [ ] **MFS motor chain, step 2 — re-measured 2026-09-29, needs a bigger
+  landing unit.** Delivered-torque accounting (reflected rotor inertia,
+  `I_total = I_axle + J_rotor*gear^2`) genuinely works now: physics strafe
+  transmit 0.8739 -> 0.9727 m (+11%), and the stall endpoint is
+  **byte-identical** in both phases (the original revert's stall regression does
+  not reproduce for this form of the change). But encoder odometry goes
+  1.1202 -> 2.1371 m, over-reporting by 2.2x, and the odometry test correctly
+  goes red. The wheels slip more and the odometry model has no slip term.
+  **Land it together with an odometry slip term and the lateral `VREF` retune,
+  not before.** Not landed for exactly that reason. Full numbers in
+  `KNOWN_FAILURES.md` -> `MOTOR-II-2026-09-29`.
