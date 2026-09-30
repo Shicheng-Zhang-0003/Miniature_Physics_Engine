@@ -62,6 +62,7 @@
 #ifdef MPE_WAYLAND_RELATIVE_POINTER
 #include <gdk/wayland/gdkwayland.h>
 #include "wayland/relative-pointer-unstable-v1-client-protocol.h"
+#include "wayland/pointer-constraints-unstable-v1-client-protocol.h"
 #endif
 #ifdef MPE_GTK4_X11_WARP
 #include <X11/Xlib.h>
@@ -105,6 +106,34 @@ static struct zwp_relative_pointer_manager_v1 *mpe_rel_manager = NULL;
 static int    mpe_rel_manager_searched = 0;   /* one lazy registry bind */
 static struct zwp_relative_pointer_v1 *mpe_rel_ptr = NULL;
 
+/* DESPOT-2026-09-29 (user report, second round). The relative pointer ALONE is
+ * not a lock.
+ *
+ * Observed: in a WINDOW, nothing worked at all -- the mouse still left the
+ * window after a little movement. Fullscreen only partially worked. That is
+ * the exact signature of using one protocol where two are required:
+ *
+ *   zwp_relative_pointer_v1 reports UNBOUNDED deltas and never moves the
+ *   cursor. It is an input device, not a confinement. It says nothing about
+ *   where the pointer is allowed to be.
+ *
+ *   zwp_locked_pointer_v1 is the confinement. Once locked, the pointer cannot
+ *   leave the surface AT ALL, and the compositor keeps feeding motion.
+ *
+ * Without the second, the cursor still wanders out of a small window, and once
+ * it is outside, the compositor stops sending anything -- so the camera freezes
+ * and the game looks like it exited. In fullscreen the window is the screen, so
+ * the cursor has nowhere to escape to and it mostly worked, which is why the
+ * bug looked like an odd direction-dependent edge case rather than "the
+ * confinement is missing".
+ *
+ * Both together are the standard combination for a first-person camera:
+ * locked_pointer confines and keeps events flowing, relative_pointer supplies
+ * the unbounded deltas that confinement would otherwise clip. */
+static struct zwp_pointer_constraints_v1 *mpe_pc_manager = NULL;
+static struct zwp_locked_pointer_v1 *mpe_locked_ptr = NULL;
+static int mpe_locked_active = 0;
+
 /* Accumulated relative motion since the last drain. Written from the
  * Wayland dispatch (GDK's queue, main thread) and read from the GTK
  * handler on the same thread, so no locking is required. */
@@ -119,6 +148,11 @@ static int    mpe_rel_dirty = 0;
 static unsigned long mpe_rel_events = 0;
 static unsigned long mpe_rel_pos_x = 0, mpe_rel_neg_x = 0;
 static unsigned long mpe_rel_pos_y = 0, mpe_rel_neg_y = 0;
+
+/* Forward decl: mouse_lock_init() binds the globals at startup, before this
+ * helper's definition. */
+static struct zwp_relative_pointer_manager_v1 *
+mpe_get_rel_manager(struct wl_display *wl_display);
 
 static int mpe_surface_is_wayland(GdkSurface *surface) {
     if (!surface) return 0;
@@ -183,6 +217,20 @@ static const struct wl_registry_listener mpe_rel_reg_listener = {
     mpe_rel_reg_global_remove,
 };
 
+/* DESPOT-2026-09-29: bind BOTH globals once, at STARTUP.
+ *
+ * The bind needs a wl_display_roundtrip() to actually receive the globals, and
+ * doing that lazily from inside a GTK event handler (the old behaviour: the
+ * first click-to-lock called it) means re-entering GDK's own event dispatch
+ * mid-handler. That is exactly the kind of thing that works on the first click
+ * and then behaves differently, so the bind is now done once from application
+ * startup, before the event loop exists to re-enter. */
+void mouse_lock_init(void) {
+    GdkDisplay *display = gdk_display_get_default();
+    if (!display || !GDK_IS_WAYLAND_DISPLAY(display)) return;
+    (void)mpe_get_rel_manager(gdk_wayland_display_get_wl_display(display));
+}
+
 /* Bind the global once and cache it: it is a compositor capability, so it
  * cannot change for the lifetime of the display. */
 static struct zwp_relative_pointer_manager_v1 *
@@ -215,6 +263,14 @@ int mouse_lock_relative_active(void) {
     return mpe_rel_ptr != NULL;
 }
 
+/* Non-zero when the pointer is genuinely CONFINED to the surface. Reported
+ * separately from relative_active() because they are different capabilities and
+ * can fail independently: a compositor may offer relative motion without
+ * pointer constraints. */
+int mouse_lock_confined(void) {
+    return mpe_locked_active;
+}
+
 /* DESPOT-2026-09-29: the sign convention lives in ui_input/mouse_look.h, as a
  * pure function with no GTK dependency, so the headless suite can assert all
  * four directions. Duplicating it here is what let it be wrong in one
@@ -235,6 +291,11 @@ int mouse_lock_take_relative_delta(double *dx, double *dy) {
 }
 
 static void mpe_rel_pointer_destroy(void) {
+    if (mpe_locked_ptr) {
+        zwp_locked_pointer_v1_destroy(mpe_locked_ptr);
+        mpe_locked_ptr = NULL;
+    }
+    mpe_locked_active = 0;
     if (mpe_rel_ptr) {
         zwp_relative_pointer_v1_destroy(mpe_rel_ptr);
         mpe_rel_ptr = NULL;
@@ -265,6 +326,25 @@ static int mpe_rel_pointer_acquire(GdkSurface *surface) {
         zwp_relative_pointer_manager_v1_get_relative_pointer(mgr, wl_pointer);
     if (!mpe_rel_ptr) return 0;
     zwp_relative_pointer_v1_add_listener(mpe_rel_ptr, &mpe_rel_listener, NULL);
+
+    /* Confinement. Best-effort: a compositor may implement one protocol and not
+     * the other, and losing confinement must not lose the deltas. */
+    /* GTK4 note: there is no gdk_surface_get_wayland_surface(); the accessor
+     * takes the GdkSurface directly. It is a private GDK header, which is a
+     * real fragility, so this is the ONE place the dependency is paid and the
+     * result is used immediately. */
+    struct wl_surface *wl_surf = NULL;
+    if (mpe_pc_manager && GDK_IS_WAYLAND_SURFACE(surface)) {
+        wl_surf = gdk_wayland_surface_get_wl_surface(surface);
+    }
+    if (wl_surf) {
+        {
+            mpe_locked_ptr = zwp_pointer_constraints_v1_lock_pointer(
+                mpe_pc_manager, wl_surf, wl_pointer, NULL,
+                ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
+            if (mpe_locked_ptr) mpe_locked_active = 1;
+        }
+    }
     return 1;
 }
 
@@ -323,6 +403,14 @@ float mouse_lock_relative_to_camera(double rdx, double rdy,
  * information about intent. */
 int mouse_lock_relative_active(void) {
     return mpe_rel_ptr != NULL;
+}
+
+/* Non-zero when the pointer is genuinely CONFINED to the surface. Reported
+ * separately from relative_active() because they are different capabilities and
+ * can fail independently: a compositor may offer relative motion without
+ * pointer constraints. */
+int mouse_lock_confined(void) {
+    return mpe_locked_active;
 }
 
 int mouse_lock_take_relative_delta(double *dx, double *dy) { (void)dx; (void)dy; return 0; }

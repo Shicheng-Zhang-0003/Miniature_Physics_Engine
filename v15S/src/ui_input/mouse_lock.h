@@ -27,6 +27,14 @@ float mouse_lock_relative_to_camera(double rdx, double rdy,
 //Non-zero while a real relative-pointer lock is attached. While true, absolute
 //cursor coordinates must be ignored entirely.
 int mouse_lock_relative_active(void);
+//Non-zero when the pointer is genuinely confined to the surface via
+//zwp_locked_pointer_v1. This is the confinement; relative_active() is only the
+//deltas. They can fail independently.
+int mouse_lock_confined(void);
+//Bind the Wayland globals ONCE at application startup. Doing it lazily from
+//inside a GTK handler required a wl_display_roundtrip() mid-dispatch, which
+//re-enters GDK's own event delivery. Safe to call more than once.
+void mouse_lock_init(void);
 //Directional receive counters, so "compositor never sent it" is separable from
 //"we received it and converted it wrong". Reset per lock attempt.
 void mouse_lock_diagnostics(unsigned long *events, unsigned long *pos_x,
