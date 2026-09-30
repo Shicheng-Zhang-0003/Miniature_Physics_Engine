@@ -433,6 +433,11 @@ int mfs_t_stall_endpoint(void) {
             if (tau_l > cap) tau_l = cap;
             if (tau_l < -cap) tau_l = -cap;
             mo.load_torque = tau_l;
+            /* Reproduce the caller-side handshake from robot.c: it is
+             * robot.c that sets wprev_valid, not motor.c (see
+             * DESPOT-2026-09-29 note below). Without this the observer gate
+             * at motor.c:146 stays closed and tau_L is silently 0. */
+            mo.wprev_valid = (i > 0) ? 1 : 0;
             motor_update_load(&mo, held_w, dt, 12.0f, axle_I);
             w_prev = held_w;
         }
@@ -442,11 +447,11 @@ int mfs_t_stall_endpoint(void) {
                  mo.output_torque, spec_stall_nm,
                  100.0 * (mo.output_torque - spec_stall_nm) / spec_stall_nm,
                  mo.load_torque);
-        /* [MOTOR-III] DESPOT-2026-09-29: this is a REAL defect, reported as
-         * a loud XFAIL rather than a hard failure so the suite can stay green
-         * while the fix is written -- and, critically, so it cannot be
-         * forgotten. The runner surfaces every [XFAIL] line; it is not a
-         * silent pass.
+        /* [MOTOR-III] DESPOT-2026-09-29. Engaging the observer softens the
+         * locked-rotor endpoint by ~16% (3.1279 vs 3.7265 N.m). Gated at
+         * 25% so it is green today, but tight enough that the historical
+         * 41%-low delivered-torque regression (2.21 N.m) would fail here
+         * rather than only being noticed by hand.
          *
          * Mechanism, now measured rather than inferred: the observer's
          * load_torque DOES converge correctly (-3.698 against a -3.7265
@@ -462,19 +467,24 @@ int mfs_t_stall_endpoint(void) {
          * closed loop 0.71 N.m (broken), so the defect is in the observer
          * -> implicit-solve coupling, not in the electrical model.
          *
-         * This also DISPROVES the blocked-rotor gate in robot.c as a fix: the
-         * gate snaps load_torque to -stall_out, and load_torque is already
-         * within 1% of that. Snapping the input of a broken coupling more
-         * precisely cannot fix the coupling. */
-        double err_pc = 100.0 * (mo.output_torque - spec_stall_nm) / spec_stall_nm;
-        if (fabsf(mo.output_torque - spec_stall_nm) <= 0.25f * spec_stall_nm) {
-            printf("[PASS] closed-loop locked rotor within 25%% of spec\n");
-        } else {
-            printf("[XFAIL][MOTOR-III] closed-loop locked rotor: tau=%.4f N.m vs "
-                   "spec %.4f (%+.1f%%), load_torque=%.4f (estimator OK, solve "
-                   "coupling is not). See KNOWN_FAILURES.md MOTOR-III-2026-09-29\n",
-                   mo.output_torque, spec_stall_nm, err_pc, mo.load_torque);
-        }
+         * COUPLING FRAGILITY FOUND WHILE WRITING THIS (DESPOT-2026-09-29):
+         * the first version of this test read 0.7081 N.m and I attributed it
+         * to the observer->solve coupling. That was wrong, and the bug was in
+         * my test: motor.c:146 gates the load term on `m->wprev_valid`, but
+         * motor.c NEVER SETS IT — only robot.c:797 does. Any caller that
+         * forgets the handshake gets tau_L == 0, i.e. a silently dead
+         * disturbance observer, with no warning and no way to tell from the
+         * motor's own state. The first run was measuring "observer disabled",
+         * not "observer mis-coupled". The handshake is now reproduced above.
+         *
+         * This is still a real robustness defect even though it is not the
+         * stall bug: the observer's on/off state is maintained by the caller,
+         * so a second consumer (the plugin path, a future submodule, the
+         * standalone build) silently loses disturbance rejection. Either
+         * motor_update_load should own the flag, or the header should say
+         * loudly that the caller must set it. */
+        MFS_CHECK_REL(t_ptr, mo.output_torque, spec_stall_nm, 0.25,
+                      "closed-loop locked-rotor output torque");
     }
 
     if (t_ptr->failures == 0) {

@@ -33,9 +33,18 @@ typedef struct {
     float temperature; /* simplified thermal model */
     /* Disturbance observer (implicit-load solve): external load torque
      * = measured net torque effect minus last tick's explicit motor
-     * torque. Lets the implicit solve hold full stall torque against
-     * locked wheels (prediction-error observers converge to a soft
-     * fixed point ~6x low) while staying stable on free wheels. */
+     * torque. Lets the implicit solve hold near-full stall torque against
+     * locked wheels while staying stable on free wheels.
+     * DESPOT-2026-09-29: the old comment here claimed prediction-error
+     * observers "converge to a soft fixed point ~6x low". That was measured,
+     * not assumed, by the new gated `mfs_t_stall_endpoint`: engaging the
+     * observer softens the locked-rotor endpoint by 16% (3.1279 N.m against
+     * a 3.7265 N.m spec), not 6x. The claim is retracted. */
+    /* CALLER CONTRACT (DESPOT-2026-09-29): `wprev_valid` gates whether
+     * load_torque is used at all (see motor.c, motor_update_load), and
+     * motor.c NEVER sets it -- only the caller does. Forgetting it yields a
+     * silently dead observer (tau_L == 0) with no diagnostic. The shipped
+     * robot sets it in robot.c; any other consumer must as well. */
     float load_torque;
     float w_prev;
     float tau_exp_prev;

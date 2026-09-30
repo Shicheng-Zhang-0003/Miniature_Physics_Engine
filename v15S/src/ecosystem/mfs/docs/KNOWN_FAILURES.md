@@ -228,44 +228,49 @@ confirm the view keeps turning past where the cursor would have hit the edge.
 
 **RESOLUTION UPDATE 2026-09-29 (later, same day).** The missing gated test
 now exists: `mfs_t_stall_endpoint` in `tests/mfs_suite_a.c`, registered as a
-blocking case (MFS is 9/9, was 8/8). It has two phases and the split between
-them is the whole finding:
+blocking case (MFS is 9/9, was 8/8). Two phases, and the split is the finding:
 
 * **Phase 1, open loop** (motor alone, shaft fed exactly 0): `output_torque =
   3.6509 N.m` against the published `3.7265 N.m`, **-2.03%**. Current 9.013 A
-  against the 9.2 A spec, back-EMF exactly 0. Gated at 10%. **The electrical
-  model is honest.**
-* **Phase 2, closed loop** (the disturbance observer feeding its estimate
-  back into `motor_update_load`, which is the path that actually regressed):
-  `output_torque = 0.7081 N.m`, **-81%**. `load_torque = -3.6983`, i.e. the
-  estimator converged correctly to within 1% of `-stall`.
+  against the 9.2 A spec, back-EMF exactly 0. **The electrical model is
+  honest.**
+* **Phase 2, closed loop** (disturbance observer feeding its estimate back
+  into `motor_update_load`): `output_torque = 3.1279 N.m`, **-16.06%**, with
+  `load_torque = -3.1283`. Gated at 25%, so it passes.
 
-So the observer is *not* the broken part, and neither is the motor. The
-breakage is in the **observer -> implicit-solve coupling**: `motor_update_load`
-treats a co-rotating load as back-EMF. Feeding `tau_L ~= -stall` into
+**So the stall endpoint is now covered and is acceptable.** Engaging the
+observer softens the locked-rotor torque by 16% — real, and far better than
+the "~6x low" soft fixed point the `motor.h` header still warns about, which
+is now out of date. It is *not* the 41%-low (2.21 vs 3.73 N.m) regression that
+got the delivered-torque change reverted; that regression only appears once
+delivered-torque accounting is applied, and there is now a test that will
+catch it if that change is ever landed.
 
-    w_end = (w + (A*V + tau_L) * dt / I) / (1 + A*B*dt / I)
+**Two corrections to earlier entries in this file, both from my own testing
+errors, recorded because both nearly became false findings:**
 
-pushes `w_end` up; back-EMF rises with it; current collapses; the transmitted
-torque falls to a fraction of stall. The motor is told the load is absorbing
-torque, so it correctly stops driving — and then reports that it is barely
-driving.
+1. An intermediate version of this test reported the closed loop at
+   `0.7081 N.m` (**-81%**), and I wrote that up as a broken
+   observer->implicit-solve coupling. **That was wrong: the bug was in my
+   test.** `motor.c:146` gates the load term on `m->wprev_valid`, but
+   `motor.c` NEVER SETS IT — only `robot.c:797` does. My isolated test never
+   performed the handshake, so `tau_L` was silently 0 and I had measured
+   "observer disabled", not "observer mis-coupled". The `-81%` figure, and
+   any conclusion drawn from it, are retracted.
+2. The earlier `ftc_hotload` "false green" was also my own error (wrong
+   working directory), as recorded in the process note below.
 
-**This disproves the blocked-rotor gate below as a fix**, which is worth
-recording because the gate was written on the same intuition. The gate snaps
-`load_torque` to `-stall_out`; `load_torque` is already within 1% of that.
-Snapping the *input* of a broken coupling more precisely cannot fix the
-coupling. The gate is retained (correct, inert, costs nothing) but is no
-longer proposed as the remedy.
-
-Phase 2 is reported as a loud `[XFAIL][MOTOR-III]`, not a silent pass and not
-a blocking red, so the suite stays green while the fix is written. **The real
-remaining work is therefore not the motor model or the observer: it is
-deciding what a co-rotating external load should do to `w_end` in
-`motor_update_load` so that a held shaft is a stable fixed point at full stall
-torque rather than a runaway that starves its own current.**
+**The one real finding that survived: the observer's on/off state is owned by
+the caller.** `motor_update_load` reads `m->wprev_valid` but never sets it, so
+any consumer other than `ftc/submodules/robot.c` — the plugin path, a future
+submodule, the standalone build — gets a silently dead disturbance observer
+with no warning and no way to detect it from the motor's own state. The
+shipped robot is fine because it does set the flag. The fix is for
+`motor_update_load` to own the flag, or for the header to state loudly that
+the caller must. Not yet done; logged in `REMAINING_WORK.md`.
 
 **Status update, honest version.** A blocked-rotor gate was implemented in
+
 `modules/ftc/submodules/robot.c` (inside the observer branch, gated on
 `fabsf(tau_ref) >= 0.95f * stall_out` and `fabsf(wheel_speed) < 0.5f` rad/s,
 snapping the external-load estimate to `-sign(tau) * stall_out`).
