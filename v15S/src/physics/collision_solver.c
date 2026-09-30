@@ -315,17 +315,26 @@ void collision_prepare_solver(struct physics_world *world, collision_data *sourc
                 world->contact_cache_misses++;
             }
         }
-        /* PHYSICS-TRUTH (F10 10-stack): normal warm-start feedback is
-         * unstable in this tree — restoring last tick's normal as the
-         * iterations' seed ejects the column at ~13 m/s (measured over
-         * guard/cap/cone/tightness/adoption ablations; cold normal holds
-         * runmax 0.05), while the restored values themselves stay healthy
-         * (~0.5, bounded: no save-bigger loop). Tangent memory still
-         * restores (friction hold needs it; proven harmless) and the
-         * tangent frame still adopts. Normal solves from zero every tick
-         * (converges at 64–128 iterations for 10-high; low-iteration tall
-         * stacks may creep — tune iterations, not seeds). Re-enable
-         * normal warm-start only with a stability proof on f10_long_run. */
+        /* PHYSICS-TRUTH (F10 10-stack): NORMAL warm-start is DISABLED here.
+         *
+         * This line unconditionally discards whatever the cache lookup above
+         * restored. It is deliberate, and the reason is measured: restoring
+         * last tick's normal as the iterations' seed ejected the 10-stack at
+         * ~13 m/s across guard/cap/cone/tightness/adoption ablations, while
+         * the restored values themselves stayed healthy (~0.5, bounded: no
+         * save-bigger loop). Tangent memory still restores (friction hold
+         * needs it, proven harmless) and the tangent frame still adopts. The
+         * normal therefore SOLVES FROM ZERO EVERY TICK, converging at 64-128
+         * iterations for a 10-high stack; low-iteration tall stacks may creep
+         * — tune iterations, not seeds.
+         *
+         * HONESTY NOTE: readme.md and RELEASE_POLICY.md advertise
+         * "warm-starting contact solver ... for stable stacking" and
+         * "strict warm-start" as headline features. That is HALF TRUE. Only
+         * the TANGENT impulses are warm-started; the normal — which carries
+         * the large majority of the impulse — is cold every tick. The docs
+         * have been corrected to say so. Re-enable normal warm-start only
+         * with a stability proof on f10_long_run. */
         cp->accumulated_normal_impulse = 0.0f;
 
         vector3 va = vector3_addition(m->object_a->velocity, vector3_cross(m->object_a->angular_velocity, cp->ra));

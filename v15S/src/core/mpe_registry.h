@@ -35,7 +35,21 @@ int mpe_register_pair_handler(int type_a, int type_b, int custom_a, int custom_b
 mpe_collide_fn mpe_find_pair_handler(int type_a, int type_b, int custom_a, int custom_b);
 /* Truncation rollback for loader failure paths (never below builtins). */
 int mpe_registry_pair_count(void);
+/* Capacity of the per-module origin buffer. The loader must refuse a longer
+ * path rather than let it truncate: unload matches the origin with strcmp, so
+ * a silently truncated origin never matches and the module slot is left LIVE
+ * with its function pointers aimed at a dlclose'd image.
+ * DESPOT-2026-09-29: the loader's guard was PATH_MAX-64 (4031) while this
+ * buffer was 256, so any checkout path over ~180 characters produced exactly
+ * that state. */
+#define MPE_MODULE_ORIGIN_MAX 256
+
 void mpe_registry_truncate_pairs(int keep);
+/* Roll back the module table to `keep` entries, clearing each dropped slot's
+ * live flag, hooks and strings. DESPOT-2026-09-29: this was missing, so every
+ * load-failure path left live module descriptors pointing into a dlclose'd
+ * image. */
+void mpe_registry_truncate_modules(int keep);
 int mpe_registry_broadphase_count(void);
 void mpe_registry_truncate_broadphase(int keep);
 int mpe_registry_solver_count(void);

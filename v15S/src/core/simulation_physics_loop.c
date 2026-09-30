@@ -290,7 +290,18 @@ void simulation_physics_tick(float frame_delta_time) {
                 states[mi] = world->tick_module_state[mi];
             }
             for (int mi = 0; mi < nmods; mi++) {
-                if (mods[mi] && mods[mi]->pre_step) mods[mi]->pre_step(world, fixed_physics_dt, states[mi]);
+                /* DESPOT-2026-09-29: re-resolve the state from the LIVE table
+                 * before calling. The snapshot defers the structural change
+                 * but not mod_state's lifetime: a hook earlier in this loop
+                 * can detach a later one, freeing the state this call would
+                 * otherwise pass. Same guard as physics_world_step. */
+                if (mods[mi] && mods[mi]->pre_step) {
+                    void *live = NULL;
+                    if (physics_world_module_live_state(world, mods[mi], &live)) {
+                        mods[mi]->pre_step(world, fixed_physics_dt, live);
+                    }
+                }
+                (void) states;
             }
         }
         if (world->tick_v0 && world->tick_v0_capacity >= world->body_count) {
@@ -507,7 +518,13 @@ void simulation_physics_tick(float frame_delta_time) {
                 states[mi] = world->tick_module_state[mi];
             }
             for (int mi = 0; mi < nmods; mi++) {
-                if (mods[mi] && mods[mi]->post_step) mods[mi]->post_step(world, fixed_physics_dt, states[mi]);
+                if (mods[mi] && mods[mi]->post_step) {
+                    void *live = NULL;
+                    if (physics_world_module_live_state(world, mods[mi], &live)) {
+                        mods[mi]->post_step(world, fixed_physics_dt, live);
+                    }
+                }
+                (void) states;
             }
         }
         /* AUDIT: no cache clear here (see physics_world.c): body-local

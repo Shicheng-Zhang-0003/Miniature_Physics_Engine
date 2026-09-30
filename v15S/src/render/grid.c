@@ -127,9 +127,17 @@ void grid_render(grid_mesh *grid_mesh_object, GLuint shader_program, math4 view_
     const float grid_surface_normal_x = 0.0f;
     const float grid_surface_normal_y = 1.0f;
     const float grid_surface_normal_z = 0.0f;
+    /* DESPOT-2026-09-29 ORDER FIX. glVertexAttrib3f sets the generic attribute
+     * value on the CURRENTLY BOUND VAO. This call sat BEFORE
+     * glBindVertexArray(grid...), i.e. with VAO 0 bound (left over from the
+     * previous frame's glBindVertexArray(0) below), so the grid VAO never
+     * received the value and attribute 1 stayed at the GL default (0,0,0,1).
+     * utility_fragment.glsl then evaluates normalize(vec3(0)) = 0/0 = NaN,
+     * which propagates through dot/reflect/pow into the fragment colour.
+     * Bind first, then set. */
+    glBindVertexArray(grid_mesh_object->vertex_array_object);
     glVertexAttrib3f(1, grid_surface_normal_x, grid_surface_normal_y,
                      grid_surface_normal_z); // Constant normal pointing up for the grid
-    glBindVertexArray(grid_mesh_object->vertex_array_object);
     glDrawArrays(GL_LINES, 0, grid_mesh_object->line_vertex_count);
     glBindVertexArray(0);
 }

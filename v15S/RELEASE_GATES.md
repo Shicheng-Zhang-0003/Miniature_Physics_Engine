@@ -104,9 +104,10 @@ They should be recorded as post-stable work items.
 - [X] F9 validation report prints useful state including config dump.
 - [X] F10 long-run validation passes (three-gate wake: first-touch novelty + fast-other + deep).
 - [X] F11 config torture test runs without crash.
-- [X] F11 verdict is robustness-only (no NaN, nothing fallen); speeds reported, never gated.
+- [X] F11 verdict is robustness-only: no NaN, and every non-static body stays inside the world volume the boundary enforces. NOTE: the original "nothing fallen" gate (`position.y < -0.2`) was **unreachable** — `physics_world_step` clamps every body to `y >= 0 - slop` unconditionally, so it could never fire. Replaced 2026-09-29 with a volume invariant that can actually fail.
 - [X] F11 pins solver resolution (gravity −17…−1, ≥96 iterations — proven envelope for the 10:1 column); material/world extremes stay fully random.
-- [X] Headless suite 32/32 green (Suite v2 `test_mpe_suite --all` — 29 physics + 3 diag-informational), including `f10_long_run`, `sleep_contact_wake`, `f11_torture`, `loader_lifecycle`, `ftc_ecosystem`.
+- [X] Headless suite green (Suite v2 `test_mpe_suite --all` — 33 physics + 2 diag-informational as of 2026-09-29), including `f10_long_run`, `sleep_contact_wake`, `f11_torture`, `loader_lifecycle`, `ftc_ecosystem`, plus three regression tests added by the 2026-09-29 audit: `revolute_matrix`, `cylinder_platform`, `cylinder_sphere_inside`.
+- [X] A case that cannot run now reports SKIP and is **excluded from the green count** (2026-09-29). It previously returned 0, so `make test_suite` could report "29/29 green" with two cases having executed nothing.
 - [X] `mpe-tui` snapshot suite green for all scenes (`make tui-smoke`: demo/tower/pendulum/springlab/f10/stress/ccd).
 - [X] The engine can idle for several minutes without explosion.
 
@@ -210,6 +211,7 @@ These belong after `v15R3`.
 ### 15. Modularity, data structures, GTK4
 - [X] Engine builds and runs on GTK4; mouse lock works on X11 (verified). Wayland path is Wayland-safe by design (no X11-only lock) but P1-unverified until a Weston/Sway matrix is logged.
 - [X] No simulation globals in the kernel: every step takes an explicit `physics_world`; the single GUI primary is app-owned (`core/mpe_primary.c`); registry is process-global by design (documented).
+- [X] Determinism flags are now unconditional (2026-09-29). `make CFLAGS="-O2"` and `CFLAGS=-O2 make` previously **silently dropped** `-ffp-contract=off` (re-enabling FMA contraction, defeating bitwise determinism) and `-MMD -MP` (stopping header dependency tracking). Fixed with `override CFLAGS +=`.
 - [X] Module system: shapes/broadphase/solver/tick-modules register and hot-load (`.so` ABI-checked, CWD-jailed); unload refuses busy (`-2`) and purges all live worlds pre-`dlclose`; builtins refuse silent takeover; per-stage `mod_state` threaded; `mod` terminal command and TUI `--broadphase/--solver` flags work; `module` + `loader_lifecycle` headless tests green (lifecycle proven against the real capsule `.so`: load/busy/detach/unload/purge/reload).
 - [X] Per-world config authoritative in every hot path (narrowphase/solver/CCD/joints/depenetration/broadphase); NULL-call convention keeps direct unit callers working.
 - [X] O(1) contact-pair probes and id→index lookups (verified + linear fallback); islands joint pass O(J+B); growable body/contact pools with ceilings; small-first broadphase nodes; process-wide determinism counters asserted zero in-contract.

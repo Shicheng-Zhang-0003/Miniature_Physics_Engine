@@ -58,9 +58,11 @@ int mpe_t_ftc_ecosystem(void) {
 
     char eco_buf[1024]; const char *eco_path = mpe_pick_plugin("ecosystem/mfs/mfs_ecosystem.so", eco_buf, sizeof(eco_buf));
     if (access(eco_path, R_OK) != 0) {
+        /* DESPOT-2026-09-29: returned 0, reporting a green case that ran
+         * nothing. See mpe_suite_loader.c. */
         printf("[SKIP] bundle not built (run from v15S/src after make)\n");
         mpe_test_end(&t);
-        return t.failures;
+        return MPE_SKIPPED;
     }
     char err[512] = {0};
     MPE_CHECK(&t, mpe_loader_load(eco_path, err, sizeof(err)) == 0);
@@ -122,13 +124,24 @@ int mpe_t_ftc_ecosystem(void) {
 
     ftc_robot *r1 = p_get ? p_get(&w, 0) : NULL;
     MPE_CHECK(&t, r1 != NULL);
-    if (r1 && r1->chassis_body >= 0) {
+    /* DESPOT-2026-09-29: both motion assertions were wrapped in
+     * `if (r1 && r1->chassis_body >= 0)`. chassis_body == -1 -- which the MFS
+     * harness explicitly defends against, mfs_test.h mfs_chassis_or_null --
+     * made the whole block vanish while the case still reported PASS having
+     * verified nothing about motion. An unconditional index here is also an
+     * out-of-bounds read, so this is the MFS fix applied to the engine side. */
+    MPE_CHECK(&t, r1 != NULL);
+    MPE_CHECK(&t, r1 && r1->chassis_body >= 0);
+    MPE_CHECK(&t, r1 && r1->chassis_body < w.body_count);
+    if (r1 && r1->chassis_body >= 0 && r1->chassis_body < w.body_count) {
         float dx = w.bodies[r1->chassis_body].position.x - x0;
         float dz = w.bodies[r1->chassis_body].position.z - z0;
         float disp = sqrtf(dx * dx + dz * dz);
         MPE_INFO("ecosystem drive displacement=%.4f m", disp);
         MPE_CHECK(&t, disp >= 0.5f);
-        MPE_CHECK(&t, fabsf(w.bodies[r1->chassis_body].position.y - 0.18f) < 1.0f);
+        /* +/- 1 m on an 18 cm rest height was a +/-1 m band; tighten to a
+         * value that would actually notice a robot at the wrong height. */
+        MPE_CHECK(&t, fabsf(w.bodies[r1->chassis_body].position.y - 0.18f) < 0.25f);
     }
     MPE_CHECK(&t, mpe_ecosystem_detach(&w, "mfs-simulator") == 0);
     MPE_CHECK(&t, mpe_loader_unload(eco_path) == 0);

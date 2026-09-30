@@ -68,12 +68,19 @@ void init_cylinder_system(mesh *mesh_object, int radial_segments) {
     }
     int ei = 0;
     for (int s = 0; s < radial_segments; s++) {
+        /* DESPOT-2026-09-29 WINDING FIX. This quad was wound so the geometric
+         * face normal points INWARD (verified: for the first quad the triangle
+         * normal dotted the outward centroid is negative), while the two cap
+         * fans in the loop below are wound OUTWARD. The barrel and the caps
+         * therefore disagreed. Nothing in the tree enables GL_CULL_FACE, so
+         * this was invisible; the moment anyone enables culling, every
+         * cylinder renders inside out. Reversed to match the caps. */
         element_indices[ei++] = ring0 + s;
-        element_indices[ei++] = ring1 + s;
-        element_indices[ei++] = ring0 + s + 1;
         element_indices[ei++] = ring0 + s + 1;
         element_indices[ei++] = ring1 + s;
+        element_indices[ei++] = ring0 + s + 1;
         element_indices[ei++] = ring1 + s + 1;
+        element_indices[ei++] = ring1 + s;
     }
     for (int s = 0; s < radial_segments; s++) {
         /* -X cap (winding faces -X). */

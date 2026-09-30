@@ -46,13 +46,13 @@ int main(void) {
         }
     }
     printf("[info] max |L-L0|/|L0| over 2 s tumble: %.5f\n", max_err);
-    /* TRUTH: 3% over 120 ticks (2 s) with measured 2.5% drift from explicit
-     * gyro Euler (first-order, O(w^3*dt^2) energy error on tumblers).
-     * Tightening to 1%/600 ticks was measured to RED (drift accumulates);
-     * that needs implicit-midpoint gyro integration first (future work),
-     * not a band-aid band. */
+    /* DESPOT-2026-09-29: gate tightened 3% -> 0.5%. The old comment blamed
+     * the first-order gyroscopic integrator and noted 1% "was measured to
+     * RED". That integrator is fixed: torque-free rotation now derives omega
+     * from the exactly-conserved world-frame L at the orientation it itself
+     * produces. Measured drift 2.68% -> 0.0028% over the same 2 s. */
     int fail = 0;
-    if (max_err > 0.03f) {
+    if (max_err > 0.005f) {
         printf("[FAIL] angular momentum drifts (%.4f)\n", max_err);
         fail = 1;
     } else {

@@ -77,7 +77,10 @@ void cmd_mod(int argc, char **argv) {
         int ur = mpe_loader_unload(argv[2]);
         if (ur == 0) term_ok("mpe: mod: unloaded\n");
         else if (ur == -2) {
-            term_err("mpe: mod: unload refused (busy: detach/reset world slots first)\n");
+            term_err("mpe: mod: unload refused (busy: a live world still references this image; "
+                     "detach the tick module / reset the stage slot first)\n");
+        } else if (ur == -3) {
+            term_err("mpe: mod: unload refused (registered name too long to tear down safely)\n");
         } else term_err("mpe: mod: unload failed (unknown handle)\n");
         return;
     }

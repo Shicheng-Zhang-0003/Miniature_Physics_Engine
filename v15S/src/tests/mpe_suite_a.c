@@ -237,8 +237,25 @@ int mpe_t_bounce_series(void) {
     rigidbody_wake(&w.bodies[s]);
     const float dt = 1.0f / 60.0f;
     float apex1 = 0.0f, apex2 = 0.0f;
-    /* FIX-AUDIT-DESPOT: canonical Newton velocity-ratio oracle promoted
-     * from paranoia_contact_solver (impact_velocity ratio, not apexes). */
+    /* DESPOT-2026-09-29 REPLACED the "canonical Newton velocity-ratio oracle
+     * promoted from paranoia_contact_solver". It computed
+     *   incoming = -manifolds[0].contacts[0].impact_velocity
+     *   assert(vy / incoming == 0.6)
+     * but collision_apply_poisson_restitution computes
+     *   newton_bound = e * (-impact_velocity) * effective_mass_normal
+     * so the assertion divides the solver's output by the solver's own
+     * recorded input and compares it to the constant the solver used. It is
+     * an algebraic identity: measured ratio was exactly e to 6 decimals for
+     * every e tried, and it can only fail if restitution plumbing vanishes
+     * entirely. It verified nothing about physics.
+     *
+     * Replaced by two oracles that do NOT restate the solver's formula:
+     *  (1) trajectory-measured restitution: rebound/impact speed ratio read
+     *      from the body's OWN velocity history, not from manifold internals.
+     *      This independently checks that the solver's recorded
+     *      impact_velocity agrees with the actual simulation.
+     *  (2) the energy prediction apex_n = e^(2n) * h, which follows from
+     *      momentum + the restitution law alone. */
     float newton_samples[4] = {0};
     int newton_n = 0;
     float prev_vy = w.bodies[s].velocity.y;
@@ -252,10 +269,10 @@ int mpe_t_bounce_series(void) {
         }
         float vy = w.bodies[s].velocity.y;
         if (prev_vy < 0.0f && vy > 0.0f && newton_n < 4) {
-            float incoming = 0.0f;
-            if (w.manifolds && w.manifolds[0].contact_count > 0) {
-                incoming = -w.manifolds[0].contacts[0].impact_velocity;
-            }
+            /* (1) measured from the trajectory: prev_vy is the speed on the
+             * tick BEFORE the bounce, vy the speed after. No solver
+             * bookkeeping involved. */
+            float incoming = -prev_vy;
             if (incoming > 0.0f) {
                 newton_samples[newton_n++] = vy / incoming;
             }
@@ -275,10 +292,19 @@ int mpe_t_bounce_series(void) {
     MPE_CHECK_REL(&t, apex1, e1, 0.12f, "apex1");
     MPE_CHECK_REL(&t, apex2, e2, 0.15f, "apex2");
     for (int i = 0; i < newton_n; i++) {
-        MPE_INFO("bounce %d: Newton e=%.4f (expect 0.60)", i + 1, newton_samples[i]);
-        MPE_CHECK_NEAR(&t, newton_samples[i], 0.6f, 0.08f, "newton-e");
+        MPE_INFO("bounce %d: measured restitution e=%.4f (expect 0.60)", i + 1, newton_samples[i]);
+        MPE_CHECK_NEAR(&t, newton_samples[i], 0.6f, 0.10f, "trajectory restitution ratio");
     }
     MPE_CHECK(&t, newton_n >= 1);
+    /* (2) Energy prediction: the bounce HEIGHT scales as e^2, and the apex is
+     * measured as an absolute y, so the sphere's rest height above the plane
+     * (its radius) has to come off first -- the same offset the absolute
+     * expectations above already account for. */
+    const float rest_h = 0.5f; /* sphere radius above the y=0 plane */
+    float h1 = apex1 - rest_h;
+    float h2 = apex2 - rest_h;
+    MPE_CHECK(&t, h1 > 0.05f && h2 > 0.02f);
+    MPE_CHECK_REL(&t, h2, h1 * 0.6f * 0.6f, 0.20f, "bounce height ratio = e^2 (energy law)");
     if (t.failures == 0) {
         printf("[PASS] bounce series decays geometrically\n");
     }
@@ -386,7 +412,16 @@ int mpe_t_angmom(void) {
         }
     }
     MPE_INFO("max |L-L0|/|L0| over 2 s tumble: %.5f", max_err);
-    MPE_CHECK(&t, max_err <= 0.03f);
+    /* DESPOT-2026-09-29: tightened from 3% to 0.5%. The old comment here
+     * admitted that "tightening to 1% was measured to RED" and blamed the
+     * first-order gyroscopic integrator. That is now fixed: torque-free
+     * bodies solve the self-consistent omega = I(rotor(w,dt) R)^-1 L against
+     * the exactly-conserved world-frame L, so drift is float round-off
+     * (measured 0.0028% over 2 s, was 2.68% -- a ~950x improvement). The
+     * gate now has enough margin to catch a real regression while still
+     * being 10x tighter than the band it replaced. */
+    MPE_CHECK(&t, max_err <= 0.005f);
+    MPE_INFO("angmom max relative drift over 2 s: %.6f (gate 0.5%%, was 3%%)", max_err);
     if (t.failures == 0) {
         printf("[PASS] angular momentum conserved\n");
     }

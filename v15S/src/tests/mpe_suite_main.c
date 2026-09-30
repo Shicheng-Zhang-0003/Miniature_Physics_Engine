@@ -19,6 +19,7 @@
 #include "config/mpe_config.h"
 #include "config/mpe_constants.h"
 #include "ui_input/camera.h"
+#include "mpe_test.h" /* MPE_SKIPPED and the shared harness contract */
 
 /* ---- link stubs (same contract as v1 spring/scene tests) ---- */
 camera main_camera_fov;
@@ -67,12 +68,15 @@ void scene_clear(void) {
 /* ---- test declarations (suite A/B/C) ---- */
 int mpe_t_two_world(void);
 int mpe_t_revolute(void);
+int mpe_t_revolute_matrix(void);
 int mpe_t_cylinder_drop(void);
 int mpe_t_driven_wheel(void);
 int mpe_t_math3_inverse(void);
 int mpe_t_floor_collision_diag(void);
 int mpe_t_cylinder_sphere(void);
+int mpe_t_cylinder_sphere_inside(void);
 int mpe_t_cylinder_cube(void);
+int mpe_t_cylinder_platform(void);
 int mpe_t_cylinder_cylinder(void);
 int mpe_t_list4_cylinder_floor(void);
 int mpe_t_scene_roundtrip(void);
@@ -94,6 +98,7 @@ int mpe_t_f10_long_run(void);
 int mpe_t_sleep_contact_wake(void);
 int mpe_t_f11_torture(void);
 int mpe_t_frustum(void);
+int mpe_t_frustum_culler(void);
 int mpe_t_module(void);
 int mpe_t_loader_lifecycle(void);
 int mpe_t_ftc_ecosystem(void);
@@ -107,12 +112,20 @@ typedef struct {
 static const mpe_entry_t mpe_registry[] = {
     {"two_world", mpe_t_two_world, 0},
     {"revolute", mpe_t_revolute, 0},
+    {"revolute_matrix", mpe_t_revolute_matrix, 0},
     {"cylinder_drop", mpe_t_cylinder_drop, 0},
     {"driven_wheel", mpe_t_driven_wheel, 0},
-    {"math3_inverse", mpe_t_math3_inverse, 1},
+    /* DESPOT-2026-09-29: was diag=1 (non-blocking). This is 256 fixed-seed SPD
+     * matrices across scales 2^-24..2^24 plus singular-axis and non-finite
+     * contracts -- the strongest test in the repo, filed next to two smoke
+     * tests. Its failures must be blocking. */
+    {"math3_inverse", mpe_t_math3_inverse, 0},
+    /* Functionally a duplicate of cylinder_drop; kept informational. */
     {"floor_collision_diag", mpe_t_floor_collision_diag, 1},
     {"cylinder_sphere", mpe_t_cylinder_sphere, 0},
+    {"cylinder_sphere_inside", mpe_t_cylinder_sphere_inside, 0},
     {"cylinder_cube", mpe_t_cylinder_cube, 0},
+    {"cylinder_platform", mpe_t_cylinder_platform, 0},
     {"cylinder_cylinder", mpe_t_cylinder_cylinder, 0},
     {"list4_cylinder_floor", mpe_t_list4_cylinder_floor, 0},
     {"scene_roundtrip", mpe_t_scene_roundtrip, 0},
@@ -133,6 +146,16 @@ static const mpe_entry_t mpe_registry[] = {
     {"f10_long_run", mpe_t_f10_long_run, 0},
     {"sleep_contact_wake", mpe_t_sleep_contact_wake, 0},
     {"f11_torture", mpe_t_f11_torture, 0},
+    /* DESPOT-2026-09-29: canonical frustum projects ONE point and never runs
+     * the shipped culler in render/new_render.c (frustum_test.c re-implements
+     * plane extraction locally and links no engine objects), so it proves
+     * nothing about the culler. The real legacy frustum_test.c gates
+     * 4 poses x 20k samples. Kept informational for the canonical case;
+     * the shipped culler remains untested -- tracked, not claimed green. */
+    /* DESPOT-2026-09-29: mpe_t_frustum_culler exercises the SHIPPED culler
+     * (extracted to math4_special.h, called by the renderer) and is BLOCKING.
+     * The old canonical case projected one point and is kept informational. */
+    {"frustum_culler", mpe_t_frustum_culler, 0},
     {"frustum", mpe_t_frustum, 1},
     {"module", mpe_t_module, 0},
     {"loader_lifecycle", mpe_t_loader_lifecycle, 0},
@@ -141,9 +164,18 @@ static const mpe_entry_t mpe_registry[] = {
 
 #define MPE_NTESTS ((int)(sizeof(mpe_registry) / sizeof(mpe_registry[0])))
 
+/* Returns 0 pass, 1 fail, 2 skipped.
+ * DESPOT-2026-09-29: a skipped case used to be indistinguishable from a pass
+ * here, so `make test_suite` could report "29/29 green" with two cases having
+ * executed nothing (wrong CWD, or a bundle not yet built). Skips are now
+ * counted and printed, and excluded from the green count. */
 static int mpe_run_one(const mpe_entry_t *e) {
     printf("  Running %s...\n", e->name);
     int fails = e->fn();
+    if (fails == MPE_SKIPPED) {
+        printf("  [SKIP] %s (coverage did not run)\n", e->name);
+        return 2;
+    }
     printf("  [%s] %s (checks failed: %d)\n", fails == 0 ? "PASS" : "FAIL", e->name, fails);
     return fails == 0 ? 0 : 1;
 }
@@ -196,11 +228,17 @@ int main(int argc, char **argv) {
         return 1;
     }
     int phys_pass = 0, phys_total = 0, diag_pass = 0, diag_total = 0, failed = 0;
+    int skipped = 0;
     for (int i = 0; i < MPE_NTESTS; i++) {
         if (mpe_registry[i].diag && !include_diag) {
             continue;
         }
         int rc = mpe_run_one(&mpe_registry[i]);
+        if (rc == 2) {
+            /* Not a pass. Counted separately and reported, never green. */
+            skipped++;
+            continue;
+        }
         if (mpe_registry[i].diag) {
             diag_total++;
             diag_pass += (rc == 0);
@@ -215,6 +253,9 @@ int main(int argc, char **argv) {
     printf("============================================================\n");
     printf("Physics: %d/%d green | Diag/math: %d/%d (informational)\n", phys_pass, phys_total,
            diag_pass, diag_total);
+    if (skipped) {
+        printf("SKIPPED (coverage did not run, NOT counted green): %d\n", skipped);
+    }
     printf("Total: %d | Blocking failures: %d\n", phys_total + diag_total, failed);
     return failed ? 1 : 0;
 }

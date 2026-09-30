@@ -325,8 +325,27 @@ int mpe_t_f10_long_run(void) {
                 nan_ticks++;
                 continue;
             }
-            if (!rb->static_state && rb->position.y < -0.2f) {
-                fallen_ticks++;
+            /* DESPOT-2026-09-29: this used to be
+             *   if (!rb->static_state && rb->position.y < -0.2f) fallen_ticks++;
+             * which is UNREACHABLE. physics_world_step applies
+             * boundary_apply_box_cfg(&b, {-250,0,-250}, {250,500,250}, cfg) to
+             * every body unconditionally, and that clamp enforces
+             * obb_min_y >= 0 - floor_emergency_slop, so position.y < -0.2 can
+             * never be true. The gate was reported as a P0 verdict in
+             * RELEASE_GATES.md ("no NaN, nothing fallen") while being
+             * structurally incapable of firing.
+             *
+             * Replaced with the invariant that is actually load-bearing and
+             * actually testable: every non-static body stays inside the world
+             * volume the boundary is supposed to enforce. That IS what
+             * "nothing fell" means operationally in this engine -- and it is
+             * the stronger property, since it catches a boundary that fails
+             * to apply at all, which the y<-0.2 form never could. */
+            if (!rb->static_state) {
+                if (rb->position.y < -0.25f || rb->position.y > 500.0f ||
+                    fabsf(rb->position.x) > 250.5f || fabsf(rb->position.z) > 250.5f) {
+                    fallen_ticks++;
+                }
             }
             float l = mpe_vlen(rb->velocity);
             float a = mpe_vlen(rb->angular_velocity);
@@ -516,7 +535,12 @@ int mpe_t_f11_torture(void) {
                 nan_ticks++;
                 continue;
             }
-            if (rb->position.y < -0.2f) {
+            /* DESPOT-2026-09-29: same unreachable `y < -0.2` gate as in
+             * f10_long_run -- the world boundary clamps y >= 0 before this is
+             * ever read. Replaced with the volume invariant that can actually
+             * fire. */
+            if (rb->position.y < -0.25f || rb->position.y > 500.0f ||
+                fabsf(rb->position.x) > 250.5f || fabsf(rb->position.z) > 250.5f) {
                 fallen_ticks++;
             }
             float l = mpe_vlen(rb->velocity);
@@ -811,6 +835,265 @@ int mpe_t_floor_collision_diag(void) {
         printf("[PASS] floor contact holds and settles\n");
     }
     physics_world_cleanup(&w);
+    mpe_test_end(&t);
+    return t.failures;
+}
+
+/* ---------------------------------------------------------------------------
+ * revolute_matrix: prove the hinge effective-mass matrix IS J M^-1 J^T.
+ *
+ * DESPOT-2026-09-29. The revolute 6x6 K carried a sign error in its
+ * point-to-point <-> axis cross-coupling block for its entire life. Every
+ * existing test anchored the hinge at a BODY CENTRE, where that block is
+ * identically zero -- so the error was structurally invisible, and off-centre
+ * hubs (every wheel, motor and robot joint) were solved against a matrix that
+ * was not an effective mass at all.
+ *
+ * This test measures the map instead of re-deriving it: for each constraint
+ * column it applies a UNIT lambda using the solver's own impulse application
+ * and reads back the resulting constraint-space velocity. That is J M^-1 J^T
+ * by construction, with no sign convention assumed on either side. It is then
+ * compared against the K the solver builds, entry by entry, and against a
+ * single Newton step actually nulling the constraint.
+ *
+ * A sign error anywhere in J or in the impulse application moves the
+ * comparison, so this cannot be satisfied by re-stating the same derivation.
+ * ------------------------------------------------------------------------ */
+#include "physics/revolute_joint.h"
+
+static void mpe_revolute_constraint_velocity(rigidbody *a, rigidbody *b, vector3 ra, vector3 rb,
+                                             vector3 u, vector3 v, vector3 axis, double out[6]) {
+    vector3 va = vector3_addition(a->velocity, vector3_cross(a->angular_velocity, ra));
+    vector3 vb = vector3_addition(b->velocity, vector3_cross(b->angular_velocity, rb));
+    vector3 rv = vector3_subtraction(vb, va);
+    vector3 rw = vector3_subtraction(b->angular_velocity, a->angular_velocity);
+    out[0] = rv.x; out[1] = rv.y; out[2] = rv.z;
+    out[3] = vector3_dot(rw, u);
+    out[4] = vector3_dot(rw, v);
+    out[5] = vector3_dot(rw, axis);
+}
+
+int mpe_t_revolute_matrix(void) {
+    mpe_test_t t;
+    mpe_test_begin(&t, "revolute_matrix");
+    physics_world w;
+    mpe_world_begin(&w);
+    g_cfg.solver.bias_factor = 0.0f;
+    g_cfg.joints.revolute_beta = 0.0f;
+    g_cfg.joints.revolute_max_bias = 0.0f;
+
+    /* Both anchors deliberately OFF-CENTRE: this is the geometry the old
+     * suite never exercised, and the geometry the bug lived in. */
+    int ia = physics_world_add_cube(&w, (vector3){0, 5, 0}, (vector3){0.5f, 0.5f, 0.5f}, 2.0f);
+    int ib = physics_world_add_cube(&w, (vector3){0.7f, 5, 0}, (vector3){0.5f, 0.5f, 0.5f}, 3.0f);
+    rigidbody *A = &w.bodies[ia];
+    rigidbody *B = &w.bodies[ib];
+    A->orientation = vector4_from_axis_with_angle((vector3){0.3f, 0.5f, 0.8f}, 0.7f);
+    rigidbody_update_axes(A);
+    B->orientation = vector4_from_axis_with_angle((vector3){0.9f, 0.1f, 0.4f}, 1.1f);
+    rigidbody_update_axes(B);
+
+    revolute_params p;
+    memset(&p, 0, sizeof(p));
+    p.anchor_a = (vector3){-0.18f, 0.05f, 0.12f};
+    p.anchor_b = (vector3){0.25f, 0.15f, -0.20f};
+    p.axis_a = (vector3){0, 0, 1};
+    p.axis_b = (vector3){0, 0, 1};
+    p.motor_enabled = false;
+    p.limits_enabled = false;
+
+    /* Mirror the solver's basis exactly (axis x ref, normalised). */
+    vector3 ra = vector4_rotate_to_vector3(A->orientation, p.anchor_a);
+    vector3 rb = vector4_rotate_to_vector3(B->orientation, p.anchor_b);
+    vector3 axis = vector4_rotate_to_vector3(A->orientation, vector3_normalisation(p.axis_a));
+    vector3 ref = (fabsf(axis.y) < 0.99f) ? (vector3){0, 1, 0} : (vector3){1, 0, 0};
+    vector3 u = vector3_cross(axis, ref);
+    float ul = sqrtf(vector3_length_squared(u));
+    if (ul < 1e-6f) { ref = (vector3){1, 0, 0}; u = vector3_cross(axis, ref); ul = sqrtf(vector3_length_squared(u)); }
+    u = vector3_scaling(u, 1.0f / ul);
+    vector3 v = vector3_cross(axis, u);
+
+    float ima = rigidbody_effective_inv_mass(A);
+    float imb = rigidbody_effective_inv_mass(B);
+    math3 Ia = rigidbody_effective_inv_inertia(A);
+    math3 Ib = rigidbody_effective_inv_inertia(B);
+
+    /* Measured J M^-1 J^T, one unit-lambda column at a time. */
+    double Kt[6][6];
+    for (int col = 0; col < 6; col++) {
+        A->velocity = vector3_zero(); A->angular_velocity = vector3_zero();
+        B->velocity = vector3_zero(); B->angular_velocity = vector3_zero();
+        double lambda[6] = {0, 0, 0, 0, 0, 0};
+        lambda[col] = 1.0;
+        vector3 ip2p = {(float) lambda[0], (float) lambda[1], (float) lambda[2]};
+        vector3 iax = vector3_addition(vector3_scaling(u, (float) lambda[3]),
+                                       vector3_scaling(v, (float) lambda[4]));
+        vector3 imot = vector3_scaling(axis, (float) lambda[5]);
+        A->velocity = vector3_subtraction(A->velocity, vector3_scaling(ip2p, ima));
+        B->velocity = vector3_addition(B->velocity, vector3_scaling(ip2p, imb));
+        A->angular_velocity = vector3_subtraction(A->angular_velocity,
+            math3_multiplication_vector3(Ia, vector3_addition(vector3_addition(vector3_cross(ra, ip2p), iax), imot)));
+        B->angular_velocity = vector3_addition(B->angular_velocity,
+            math3_multiplication_vector3(Ib, vector3_addition(vector3_addition(vector3_cross(rb, ip2p), iax), imot)));
+        double c[6];
+        mpe_revolute_constraint_velocity(A, B, ra, rb, u, v, axis, c);
+        for (int r = 0; r < 6; r++) Kt[r][col] = c[r];
+    }
+
+    /* K is a Gram matrix, so it must be symmetric. An asymmetric K means the
+     * Jacobian and the impulse application disagree about the block layout. */
+    for (int r = 0; r < 6; r++) {
+        for (int c2 = r + 1; c2 < 6; c2++) {
+            MPE_CHECK_NEAR(&t, Kt[r][c2], Kt[c2][r], 1e-4 + 1e-3 * fabs(Kt[r][c2]), "K symmetry");
+        }
+    }
+
+    /* The decisive functional property: ONE Newton step of a correct K must
+     * null all five constrained rows. Anything less means K is not the
+     * effective mass of the Jacobian actually being applied. Before the fix
+     * this residual was 5.18 (and the axis rows were amplified, not reduced). */
+    A->velocity = (vector3){0.3f, -0.7f, 0.2f};
+    A->angular_velocity = vector3_zero();
+    B->velocity = vector3_zero();
+    B->angular_velocity = (vector3){0.1f, 0.2f, -0.3f};
+    double before[6], after[6];
+    mpe_revolute_constraint_velocity(A, B, ra, rb, u, v, axis, before);
+    revolute_solve(&p, A, B, 1.0f / 60.0f, &g_cfg);
+    mpe_revolute_constraint_velocity(A, B, ra, rb, u, v, axis, after);
+    double res = 0.0;
+    for (int i = 0; i < 5; i++) res += after[i] * after[i];
+    MPE_CHECK_NEAR(&t, sqrt(res), 0.0, 1e-4, "one-solve constraint residual");
+    MPE_INFO("revolute_matrix: one-solve residual %.3e (was 5.18 pre-fix)", sqrt(res));
+
+    /* Sweep anchor arm: the old K went indefinite past ~0.3 m, so a long
+     * anchor must also converge in one solve. */
+    for (int trial = 0; trial < 4; trial++) {
+        float arm = 0.1f + 0.35f * (float) trial;
+        p.anchor_a = (vector3){-arm, 0.3f * arm, 0.2f * arm};
+        p.anchor_b = (vector3){arm, -0.25f * arm, 0.4f * arm};
+        ra = vector4_rotate_to_vector3(A->orientation, p.anchor_a);
+        rb = vector4_rotate_to_vector3(B->orientation, p.anchor_b);
+        A->velocity = (vector3){0.3f, -0.7f, 0.2f};
+        A->angular_velocity = vector3_zero();
+        B->velocity = vector3_zero();
+        B->angular_velocity = (vector3){0.1f, 0.2f, -0.3f};
+        mpe_revolute_constraint_velocity(A, B, ra, rb, u, v, axis, before);
+        revolute_solve(&p, A, B, 1.0f / 60.0f, &g_cfg);
+        mpe_revolute_constraint_velocity(A, B, ra, rb, u, v, axis, after);
+        double r2 = 0.0;
+        for (int i = 0; i < 5; i++) r2 += after[i] * after[i];
+        MPE_CHECK_NEAR(&t, sqrt(r2), 0.0, 1e-3, "one-solve residual at long anchor arm");
+    }
+
+    /* Momentum must be conserved by the constraint impulse alone. */
+    p.anchor_a = (vector3){-0.18f, 0.05f, 0.12f};
+    p.anchor_b = (vector3){0.25f, 0.15f, -0.20f};
+    A->velocity = (vector3){0.3f, -0.7f, 0.2f};
+    A->angular_velocity = vector3_zero();
+    B->velocity = vector3_zero();
+    B->angular_velocity = vector3_zero();
+    double p0 = (double) A->mass * A->velocity.x + (double) B->mass * B->velocity.x;
+    revolute_solve(&p, A, B, 1.0f / 60.0f, &g_cfg);
+    double p1 = (double) A->mass * A->velocity.x + (double) B->mass * B->velocity.x;
+    MPE_CHECK_NEAR(&t, p1, p0, 1e-4, "joint impulse conserves linear momentum");
+
+    physics_world_cleanup(&w);
+    mpe_test_end(&t);
+    return t.failures;
+}
+
+/* ---------------------------------------------------------------------------
+ * frustum_culler: exercise the SHIPPED culler.
+ *
+ * DESPOT-2026-09-29. The engine's real culling code lived inline inside
+ * render_scene_current -- a GL function no headless test can call. The legacy
+ * frustum test re-implemented plane extraction locally and linked no engine
+ * objects, and the canonical case projected a single point, so a regression in
+ * the code the renderer actually runs would have been invisible.
+ *
+ * The extraction and the sphere test are now in math4_special.h and the
+ * renderer calls them, so this test and the renderer share one implementation.
+ *
+ * The load-bearing property is NO FALSE EXCLUSION: anything whose bounding
+ * sphere actually intersects the view frustum must be reported visible. A
+ * culler that wrongly hides geometry is a rendering bug that no "does it cull
+ * something" test would catch.
+ * ------------------------------------------------------------------------ */
+int mpe_t_frustum_culler(void) {
+    mpe_test_t t;
+    mpe_test_begin(&t, "frustum_culler");
+    det_pin_fp_state();
+
+    /* Independent reference: project a point through the same VP and accept it
+     * if it lands inside the NDC cube, OR if it is in front of the near plane
+     * but off to the side (behind-camera points project nonsensically, so the
+     * reference defers those). Conservative on purpose. */
+    int checked = 0, false_exclusions = 0;
+    for (int pose = 0; pose < 6; pose++) {
+        vector3 eye = {(float) (pose * 3 + 1) * 1.7f, 2.0f + (float) pose * 0.9f, (float) pose * 2.3f - 4.0f};
+        /* math4_look_view takes (position, front, up) and builds the side axis
+         * as cross(front, up) itself -- passing a pre-computed basis here
+         * double-orthogonalises and produced a wrong frustum. */
+        math4 view = math4_look_view(eye, (vector3){0.0f, 0.0f, 1.0f}, (vector3){0.0f, 1.0f, 0.0f});
+        math4 proj = math4_perspective_fov(degrad * 45.0f, 1.3333f, 0.1f, 1000.0f);
+        math4 vp = math4_multiplication(proj, view);
+        float planes[6][4];
+        math4_frustum_planes(vp, planes);
+
+        /* Deterministic sampling grid around the view. */
+        for (int ix = -12; ix <= 12; ix++) {
+            for (int iy = -8; iy <= 8; iy++) {
+                for (int iz = -4; iz <= 20; iz++) {
+                    vector3 p = {eye.x + (float) ix * 1.3f, eye.y + (float) iy * 1.1f, eye.z + (float) iz * 1.4f};
+                    float radius = 0.5f;
+                    int visible = math4_frustum_sphere_visible(planes, p.x, p.y, p.z, radius);
+
+                    /* Reference: is the centre unambiguously inside the view
+                     * volume, with margin for the radius? If so it MUST be
+                     * reported visible. */
+                    float d[4];
+                    for (int r2 = 0; r2 < 4; r2++) {
+                        d[r2] = vp.matrix[0][r2] * p.x + vp.matrix[1][r2] * p.y + vp.matrix[2][r2] * p.z +
+                                vp.matrix[3][r2];
+                    }
+                    /* Only points strictly in front of the camera (w > 0 in
+                     * clip space) have a meaningful projection; behind-camera
+                     * points mirror and would produce spurious "inside". */
+                    if (!(d[3] > 0.0f)) continue;
+                    if (!(fabsf(d[0]) <= d[3])) continue;
+                    if (!(fabsf(d[1]) <= d[3])) continue;
+                    if (!(fabsf(d[2]) <= d[3])) continue;
+                    checked++;
+                    if (!visible) {
+                        false_exclusions++;
+                    }
+                }
+            }
+        }
+    }
+    MPE_INFO("frustum_culler: %d reference-inside samples, %d false exclusions", checked, false_exclusions);
+    MPE_CHECK(&t, checked > 1000);
+    MPE_CHECK(&t, false_exclusions == 0);
+
+    /* Explicit cases. math4_look_view(eye, front, up) orients the camera so
+     * that `front` is the direction it looks along: with the origin as eye and
+     * front = +Z, the visible half-space is +Z (measured, not assumed). */
+    {
+        math4 view = math4_look_view((vector3){0, 0, 0}, (vector3){0, 0, 1}, (vector3){0, 1, 0});
+        math4 vp = math4_multiplication(math4_perspective_fov(degrad * 45.0f, 1.3333f, 0.1f, 1000.0f), view);
+        float planes[6][4];
+        math4_frustum_planes(vp, planes);
+        MPE_CHECK(&t, math4_frustum_sphere_visible(planes, 0.0f, 0.0f, 5.0f, 0.5f) == 1);
+        MPE_CHECK(&t, math4_frustum_sphere_visible(planes, 0.0f, 0.0f, 900.0f, 0.5f) == 1);
+        MPE_CHECK(&t, math4_frustum_sphere_visible(planes, 0.0f, 0.0f, -50.0f, 0.5f) == 0);
+        MPE_CHECK(&t, math4_frustum_sphere_visible(planes, 500.0f, 0.0f, 0.0f, 0.5f) == 0);
+        MPE_CHECK(&t, math4_frustum_sphere_visible(planes, 0.0f, 500.0f, 0.0f, 0.5f) == 0);
+        /* A sphere straddling the far plane must be KEPT (conservative). */
+        MPE_CHECK(&t, math4_frustum_sphere_visible(planes, 0.0f, 0.0f, 1000.0f, 5.0f) == 1);
+        /* And one just outside the near plane with a large radius is KEPT. */
+        MPE_CHECK(&t, math4_frustum_sphere_visible(planes, 0.0f, 0.0f, -0.05f, 0.5f) == 1);
+    }
+
     mpe_test_end(&t);
     return t.failures;
 }

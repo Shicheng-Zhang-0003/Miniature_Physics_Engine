@@ -218,6 +218,21 @@ void render_scene_current(int widget_width, int widget_height) {
     if (widget_width <= 0 || widget_height <= 0) {
         return;
     }
+    /* DESPOT-2026-09-29: this guarded only render_failed. render_uninitialized
+     * fell through, and the three instance buffers are NULL until render_init()
+     * mallocs them, so the body loop wrote through a null pointer:
+     *   target_array = sphere_instances;   -> NULL
+     *   math4_to_flat_array(m, &target_array[idx]);  -> write to address 0
+     * Reachable: root_gtk.c connects the window "destroy" handler to
+     * render_cleanup (which frees the buffers and resets the status to
+     * render_uninitialized) independently of the "render" signal, so a frame
+     * delivered during teardown with body_count > 0 writes through 0. */
+    if (render_init_status == render_uninitialized) {
+        glViewport(0, 0, widget_width, widget_height);
+        glClearColor(0.05f, 0.05f, 0.1f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        return;
+    }
     if (render_init_status == render_failed) {
         glViewport(0, 0, widget_width, widget_height);
         glClearColor(0.5f, 0.0f, 0.0f, 1.0f);
@@ -242,56 +257,22 @@ void render_scene_current(int widget_width, int widget_height) {
      * come from broadphase_bounding_radius (rotation-invariant, never
      * wrongly excludes). Zero persistent memory: planes live on stack. */
     math4 view_projection = math4_multiplication(projection_matrix, view_matrix);
-    vector4 frustum_planes[6];
-    {
-        float row0[4] = {view_projection.matrix[0][0], view_projection.matrix[1][0], view_projection.matrix[2][0],
-                         view_projection.matrix[3][0]};
-        float row1[4] = {view_projection.matrix[0][1], view_projection.matrix[1][1], view_projection.matrix[2][1],
-                         view_projection.matrix[3][1]};
-        float row2[4] = {view_projection.matrix[0][2], view_projection.matrix[1][2], view_projection.matrix[2][2],
-                         view_projection.matrix[3][2]};
-        float row3[4] = {view_projection.matrix[0][3], view_projection.matrix[1][3], view_projection.matrix[2][3],
-                         view_projection.matrix[3][3]};
-        float combos[6][4];
-        for (int k = 0; k < 4; k++) {
-            combos[0][k] = row3[k] + row0[k];
-            combos[1][k] = row3[k] - row0[k];
-            combos[2][k] = row3[k] + row1[k];
-            combos[3][k] = row3[k] - row1[k];
-            combos[4][k] = row3[k] + row2[k];
-            combos[5][k] = row3[k] - row2[k];
-        }
-        for (int p = 0; p < 6; p++) {
-            float len =
-                sqrtf(combos[p][0] * combos[p][0] + combos[p][1] * combos[p][1] + combos[p][2] * combos[p][2]);
-            if (len < 0.000001f) {
-                len = 1.0f;
-            }
-            /* vector4 packs {w,x,y,z}: store (d,a,b,c) so .x/.y/.z/.w
-             * read as the (a,b,c,d) plane coefficients below. */
-            frustum_planes[p] =
-                (vector4){combos[p][3] / len, combos[p][0] / len, combos[p][1] / len, combos[p][2] / len};
-        }
-    }
+    /* DESPOT-2026-09-29: the plane extraction and the sphere test now live in
+     * math4_special.h so the shipped culler is reachable from a headless test
+     * (mpe_t_frustum_culler). Previously it was inline here, in a GL function
+     * nothing could call, so no gate ever executed the real culler. */
+    float frustum_planes[6][4];
+    math4_frustum_planes(view_projection, frustum_planes);
     int sphere_inst_count = 0;
     int cube_inst_count = 0;
     int cylinder_inst_count = 0;
     for (int object_index = 0; object_index < (physics_world_get_primary()->body_count); object_index++) {
         rigidbody *rigid_body = &(physics_world_get_primary()->bodies)[object_index];
-        /* Sphere-vs-frustum: outside if signed distance < -radius on any plane. */
+        /* Sphere-vs-frustum: culled only when fully outside one plane. */
         {
             float bound = broadphase_bounding_radius(rigid_body);
-            bool culled = false;
-            for (int p = 0; p < 6; p++) {
-                float dist = frustum_planes[p].x * rigid_body->position.x +
-                             frustum_planes[p].y * rigid_body->position.y +
-                             frustum_planes[p].z * rigid_body->position.z + frustum_planes[p].w;
-                if (dist < -bound) {
-                    culled = true;
-                    break;
-                }
-            }
-            if (culled) {
+            if (!math4_frustum_sphere_visible(frustum_planes, rigid_body->position.x, rigid_body->position.y,
+                                              rigid_body->position.z, bound)) {
                 continue;
             }
         }

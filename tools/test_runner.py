@@ -61,6 +61,12 @@ LEGACY_TARGET = re.compile(r"^[ \t]*build_([A-Za-z0-9_]+):\s+tests/([A-Za-z0-9_]
 SUITE_ENTRY = re.compile(r'^\s*\{"([a-z0-9_]+)",\s*[^,]+,\s*([01])\},\s*$', re.M)
 SUITE_RESULT = re.compile(r"^\s+\[(PASS|FAIL)\]\s+([a-z0-9_]+)\s+\(checks failed: (\d+)\)\s*$", re.M)
 SUITE_RUNNING = re.compile(r"\s*Running ([A-Za-z0-9_]+)\.\.\.\s*")
+
+# DESPOT-2026-09-29: a bare "[FAIL]" line in a binary's stdout means the binary
+# detected a real assertion failure. Exit code alone misses these: some legacy
+# and paranoia binaries print [FAIL] and still exit 0 (e.g. a void helper that
+# prints but never sets the failure flag). Scanned for every non-sanitizer run.
+_FAIL_MARKER_RE = re.compile(r"^\s*\[FAIL\]", re.MULTILINE)
 TUI_HEADER = re.compile(r"^### MPE-TUI snapshot tick=(\d+) time=([^ ]+) dt=([^ ]+) bodies=(\d+) result=(PASS|FAIL)\s*$", re.M)
 NONFINITE_WORD = re.compile(r"(?<![A-Za-z])(?:nan|[+-]?inf(?:inity)?)(?![A-Za-z])", re.I)
 
@@ -82,12 +88,27 @@ class Result:
         return self.severity == "gate" and self.status == "FAIL"
 
 
+# Floor on the number of canonical suite entries. See discover_suite_entries.
+MIN_SUITE_ENTRIES = 36
+
+
 def discover_suite_entries(source: str) -> list[tuple[str, bool]]:
     """Read the single authoritative C registry and retain diag classification."""
     entries = [(name, diag == "1") for name, diag in SUITE_ENTRY.findall(source)]
     names = [name for name, _ in entries]
     if not entries or len(names) != len(set(names)):
         raise ValueError("canonical C suite registry is empty or has duplicate names")
+    # DESPOT-2026-09-29: pin a floor on the discovered count. Without it, a
+    # registry entry and its make target can be deleted together and EVERY
+    # headline count shrinks silently -- which is how the documented "220/220"
+    # drifted to 204 with no failure anywhere. Deleting coverage is now a loud
+    # edit to this constant rather than an invisible one.
+    if len(entries) < MIN_SUITE_ENTRIES:
+        raise ValueError(
+            f"canonical C suite registry has {len(entries)} entries, below the "
+            f"pinned floor of {MIN_SUITE_ENTRIES}. If this is a deliberate "
+            f"removal, lower MIN_SUITE_ENTRIES and say why in the commit."
+        )
     return entries
 
 
@@ -447,6 +468,18 @@ class Runner:
             if sanitizer and ("ERROR: AddressSanitizer" in output or "runtime error:" in output):
                 row.status = "FAIL"
                 row.detail = "sanitizer reported an error"
+            # DESPOT-2026-09-29: exit code alone is not sufficient. Legacy and
+            # paranoia binaries print "[FAIL] ..." for real assertion failures
+            # and can still exit 0 -- paranoia_freeflight_exact.c is a worked
+            # example: its check_finite() prints [FAIL] on a non-finite vector
+            # but never sets the failure flag, so main() returns 0. That test
+            # also cannot be caught by a tolerance check, because with a fully
+            # NaN body every `fabsf(NaN - x) > tol` is false, so all of its
+            # gates pass vacuously. Scanning the output closes that class of
+            # false green for every binary, not just this one.
+            if row.status == "PASS" and _FAIL_MARKER_RE.search(output):
+                row.status = "FAIL"
+                row.detail = "binary printed a [FAIL] marker but exited 0"
             okay = okay and row.status == "PASS"
         return okay
 

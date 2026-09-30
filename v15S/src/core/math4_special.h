@@ -171,4 +171,72 @@ static inline void math4_to_flat_array(math4 matrix, float *output_array) {
         }
     }
 }
+
+/* ---------------------------------------------------------------------------
+ * Frustum culling (Gribb/Hartmann), extracted so the shipped renderer and a
+ * test exercise the SAME code.
+ *
+ * DESPOT-2026-09-29: this logic lived inline inside render_scene_current, a GL
+ * function no headless test can call, so the culler the engine actually runs
+ * was untested -- the legacy frustum test re-implemented plane extraction
+ * locally and linked no engine objects, and the canonical case projected a
+ * single point. A regression in the real culler would have been invisible.
+ * The renderer now calls these two functions.
+ *
+ * `planes` is filled with six INWARD-facing planes in {a,b,c,d} order, so
+ * the signed distance of p is a*x + b*y + c*z + d.
+ *
+ * DESPOT-2026-09-29: the first version of this extraction kept the original
+ * inline code's packing, which stored the vector4 as (d,a,b,c) and read it
+ * back as .x*x + .y*y + .z*z + .w. Copying that packing while writing a
+ * (a,b,c,d) consumer transposed the planes: the far plane came out with a
+ * zero z coefficient and a huge x coefficient, so EVERY point was culled.
+ * mpe_t_frustum_culler caught it immediately. The packing is now the natural
+ * (a,b,c,d) and no consumer has to remember a reordering.
+ *
+ * The extraction transposes the column-major view-projection into rows first:
+ * m[col][row] means row r is {m[0][r], m[1][r], m[2][r], m[3][r]}.
+ * ------------------------------------------------------------------------ */
+static inline void math4_frustum_planes(math4 view_projection, float planes[6][4]) {
+    float row0[4] = {view_projection.matrix[0][0], view_projection.matrix[1][0], view_projection.matrix[2][0],
+                     view_projection.matrix[3][0]};
+    float row1[4] = {view_projection.matrix[0][1], view_projection.matrix[1][1], view_projection.matrix[2][1],
+                     view_projection.matrix[3][1]};
+    float row2[4] = {view_projection.matrix[0][2], view_projection.matrix[1][2], view_projection.matrix[2][2],
+                     view_projection.matrix[3][2]};
+    float row3[4] = {view_projection.matrix[0][3], view_projection.matrix[1][3], view_projection.matrix[2][3],
+                     view_projection.matrix[3][3]};
+    const float combos[6][4] = {
+        {row3[0] + row0[0], row3[1] + row0[1], row3[2] + row0[2], row3[3] + row0[3]},
+        {row3[0] - row0[0], row3[1] - row0[1], row3[2] - row0[2], row3[3] - row0[3]},
+        {row3[0] + row1[0], row3[1] + row1[1], row3[2] + row1[2], row3[3] + row1[3]},
+        {row3[0] - row1[0], row3[1] - row1[1], row3[2] - row1[2], row3[3] - row1[3]},
+        {row3[0] + row2[0], row3[1] + row2[1], row3[2] + row2[2], row3[3] + row2[3]},
+        {row3[0] - row2[0], row3[1] - row2[1], row3[2] - row2[2], row3[3] - row2[3]},
+    };
+    for (int p = 0; p < 6; p++) {
+        float len = sqrtf(combos[p][0] * combos[p][0] + combos[p][1] * combos[p][1] + combos[p][2] * combos[p][2]);
+        if (len < 0.000001f) {
+            len = 1.0f;
+        }
+        planes[p][0] = combos[p][0] / len; /* a */
+        planes[p][1] = combos[p][1] / len; /* b */
+        planes[p][2] = combos[p][2] / len; /* c */
+        planes[p][3] = combos[p][3] / len; /* d */
+    }
+}
+
+/* Conservative sphere-vs-frustum: a sphere is culled only if it is fully
+ * outside one plane by more than its own radius, so a sphere straddling a
+ * plane is always kept. Returns 1 = visible, 0 = culled. */
+static inline int math4_frustum_sphere_visible(const float planes[6][4], float cx, float cy, float cz,
+                                               float radius) {
+    for (int p = 0; p < 6; p++) {
+        float dist = planes[p][0] * cx + planes[p][1] * cy + planes[p][2] * cz + planes[p][3];
+        if (dist < -radius) {
+            return 0;
+        }
+    }
+    return 1;
+}
 #endif
