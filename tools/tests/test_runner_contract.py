@@ -14,17 +14,39 @@ from tools import test_runner as runner
 
 class RegistryContractTests(unittest.TestCase):
     def test_c_registry_has_unique_names_and_diag_tags(self) -> None:
-        entries = runner.discover_suite_entries('''
-            {"alpha", test_alpha, 0},
-            {"diagnostic", test_diag, 1},
-        ''')
+        saved = runner.MIN_SUITE_ENTRIES
+        runner.MIN_SUITE_ENTRIES = 1
+        try:
+            entries = runner.discover_suite_entries('''
+                {"alpha", test_alpha, 0},
+                {"diagnostic", test_diag, 1},
+            ''')
+        finally:
+            runner.MIN_SUITE_ENTRIES = saved
         self.assertEqual(entries, [("alpha", False), ("diagnostic", True)])
 
     def test_c_registry_rejects_duplicate_and_empty_registries(self) -> None:
-        with self.assertRaisesRegex(ValueError, "duplicate"):
-            runner.discover_suite_entries('{"same", f1, 0}, {"same", f2, 1},')
-        with self.assertRaisesRegex(ValueError, "empty"):
-            runner.discover_suite_entries("/* no cases */")
+        saved = runner.MIN_SUITE_ENTRIES
+        runner.MIN_SUITE_ENTRIES = 1
+        try:
+            with self.assertRaisesRegex(ValueError, "duplicate"):
+                runner.discover_suite_entries('{"same", f1, 0}, {"same", f2, 1},')
+            with self.assertRaisesRegex(ValueError, "empty"):
+                runner.discover_suite_entries("/* no cases */")
+        finally:
+            runner.MIN_SUITE_ENTRIES = saved
+
+    def test_c_registry_pins_a_floor_so_coverage_cannot_shrink_silently(self) -> None:
+        """DESPOT-2026-09-29: deleting an entry and its make target used to
+        shrink every headline count with no failure anywhere (documented 220,
+        actual 204). A registry below the floor must be a loud error."""
+        saved = runner.MIN_SUITE_ENTRIES
+        runner.MIN_SUITE_ENTRIES = 5
+        try:
+            with self.assertRaisesRegex(ValueError, "below the pinned floor"):
+                runner.discover_suite_entries('{"only", f, 0},')
+        finally:
+            runner.MIN_SUITE_ENTRIES = saved
 
     def test_makefile_targets_split_isolated_suites(self) -> None:
         legacy, paranoia = runner.discover_make_targets('''

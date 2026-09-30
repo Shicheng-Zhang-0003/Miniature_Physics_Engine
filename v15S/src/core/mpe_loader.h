@@ -27,6 +27,16 @@
  *    through its locked public API (never by direct struct access), so the
  *    lock order loader -> registry always holds. */
 int mpe_loader_load(const char *path, char *errbuf, int errlen);
+/* Unload a loaded handle by path or name.
+ *   0  unloaded
+ *  -1  unknown handle
+ *  -2  busy: a live world still references this image (as a tick module or
+ *      as a broadphase/solver stage). Applies to ECOSYSTEM bundles too --
+ *      they used to bypass this check and could be dlclose'd while a world
+ *      held a descriptor pointer into the image, which segfaulted on the next
+ *      step. Detach, then retry.
+ *  -3  refused: the registered name does not fit the 128-byte teardown
+ *      buffer and truncating it would half-tear-down the registry. */
 int mpe_loader_unload(const char *path_or_name);
 int mpe_loader_count(void);
 const char *mpe_loader_path_at(int i);

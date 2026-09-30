@@ -53,6 +53,49 @@ static math3 math3_addition(math3 a, math3 b) {
  * masses with long anchors). float (23-bit, ~1e7) cannot hold cond(K)>1e10:
  * pivot test is meaningless and lambda is garbage. Solve in double with
  * row/column equilibration (D=sqrt(diag), Ks=D^-1 K D^-1). */
+/* Positive-definiteness probe for the symmetric K.
+ *
+ * K = J*M^-1*J^T is POSITIVE SEMIDEFINITE by construction for any Jacobian
+ * J and any SPD M^-1 (a Lagrangian Gram matrix), and positive definite when
+ * the constraint set is non-redundant — which it is here (3 independent p2p
+ * rows, 2 independent axis rows, 1 motor row).
+ *
+ * DESPOT-2026-09-29: the K sign error below produced an INDEFINITE K, and
+ * mat6_invert happily returned a plausible-looking inverse of it: the
+ * equilibrated Gauss-Jordan never checks definiteness, so a wrong K became
+ * garbage impulses with no diagnostic anywhere. Cholesky is the correct test
+ * and costs nothing at 6x6. Returns 0 on a non-PD (or non-finite) K so the
+ * caller can fall through to the sequential solver and report, rather than
+ * applying nonsense.
+ *
+ * Only the symmetric part is tested; K is built symmetric by assignment, and
+ * using (A+A^T)/2 keeps the probe honest if that ever stops being true. */
+static int mat6_is_positive_definite(double m[6][6]) {
+    double L[6][6];
+    for (int i = 0; i < 6; i++) for (int j = 0; j < 6; j++) L[i][j] = 0.5 * (m[i][j] + m[j][i]);
+    for (int i = 0; i < 6; i++) {
+        for (int j = 0; j <= i; j++) {
+            double sum = L[i][j];
+            for (int k = 0; k < j; k++) sum -= L[i][k] * L[j][k];
+            if (i == j) {
+                /* K carries an absolute scale spanning invM..Iinv*r^2 and a
+                 * 1e-10 regulariser; test the pivot against a scale-relative
+                 * floor rather than an absolute one, or a legitimately tiny
+                 * but well-conditioned row reads as singular. */
+                double scale = 0.0;
+                for (int c = 0; c < 6; c++) scale += L[i][c] * L[i][c];
+                scale = (scale > 0.0) ? scale : 1.0;
+                if (!(sum > 1e-14 * scale)) return 0;
+                L[i][i] = sqrt(sum);
+            } else {
+                if (!(L[j][j] > 0.0)) return 0;
+                L[i][j] = sum / L[j][j];
+            }
+            if (!isfinite(L[i][j])) return 0;
+        }
+    }
+    return 1;
+}
 static void mat6_zero(double m[6][6]) {
     for (int i = 0; i < 6; i++) for (int j = 0; j < 6; j++) m[i][j] = 0.0;
 }
@@ -124,6 +167,40 @@ static int mat6_invert(double m[6][6], double out[6][6]) {
     return 1;
 }
 
+
+/* DESPOT-2026-09-29: shared sleep guard for every joint solver.
+ *
+ * The joint solvers used to wake BOTH partners unconditionally, on every
+ * iteration, on the stated grounds that "a sleeping hinge partner would
+ * freeze the constraint". The measured consequence: a single box on a floor
+ * sleeps at tick 47, but two boxes joined by a PASSIVE revolute never sleep at
+ * all -- 0/400 ticks. That is permanent solver cost, sleep churn, and it
+ * defeats the island skip in constraint.c.
+ *
+ * The fix is safe because islands_build() already merges jointed bodies into
+ * one island: a jointed pair is either both awake or both asleep. When both
+ * are asleep the constraint is satisfied by construction (velocities are
+ * pinned to zero and the island is skipped), so the joint has nothing to do.
+ *
+ * `active_drive` must be true when the joint is genuinely doing work -- a
+ * motor with a non-zero target, or a limit currently engaged. Those cases
+ * still force a wake, because a driven joint must not be frozen by sleep.
+ * The motor's own force path (rb_apply_forces_*) wakes via the torque
+ * accumulator, so this is belt-and-braces rather than the only mechanism. */
+static int a3_joint_solve_may_skip(int sleeping_a, int sleeping_b, int active_drive) {
+    if (active_drive) {
+        return 0;
+    }
+    return sleeping_a && sleeping_b;
+}
+
+static int a3_revolute_active_drive(const revolute_params *p) {
+    if (p->motor_enabled && fabsf(p->motor_target_speed) > 1e-9f) {
+        return 1;
+    }
+    return 0;
+}
+
 void revolute_solve(revolute_params *p, rigidbody *body_a, rigidbody *body_b, float dt, const mpe_config_t *cfg) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
     if ((!p) || (!body_a) || (!body_b) || (dt <= 0.0f)) {
@@ -137,9 +214,13 @@ void revolute_solve(revolute_params *p, rigidbody *body_a, rigidbody *body_b, fl
      * drift corrections above are gated on effective inv mass so they never
      * kick a sleeper back awake by themselves. */
     /* Jointed bodies stay awake so the constraint always acts. */
+    if (a3_joint_solve_may_skip(body_a->is_sleeping, body_b->is_sleeping,
+                                a3_revolute_active_drive(p))) {
+        return;
+    }
     if (body_a->is_sleeping) rigidbody_wake(body_a);
     if (body_b->is_sleeping) rigidbody_wake(body_b);
-    
+
     float inv_mass_a = rigidbody_effective_inv_mass(body_a);
     float inv_mass_b = rigidbody_effective_inv_mass(body_b);
     if ((inv_mass_a <= 0.0f) && (inv_mass_b <= 0.0f)) {
@@ -190,11 +271,9 @@ void revolute_solve(revolute_params *p, rigidbody *body_a, rigidbody *body_b, fl
         : vector3_scaling(position_error, baumgarte_beta / dt);
 
     /* Effective mass/inertia. */
-    float inv_mass_sum = inv_mass_a + inv_mass_b;
     math3 I_inv_a = rigidbody_effective_inv_inertia(body_a);
     math3 I_inv_b = rigidbody_effective_inv_inertia(body_b);
-    math3 skew_a = skew_symmetric(r_a);
-    math3 skew_b = skew_symmetric(r_b);
+    math3 I_sum = math3_addition(I_inv_a, I_inv_b);
 
     /* Build 6×6 K-matrix (effective mass matrix for the 5 constraints + motor).
      * Rows 0-2: point-to-point (x, y, z)
@@ -203,85 +282,127 @@ void revolute_solve(revolute_params *p, rigidbody *body_a, rigidbody *body_b, fl
     double K[6][6];
     mat6_zero(K);
 
-    /* Point-to-point block (3×3):
-     * K_p2p = (1/mA + 1/mB)*I3 - [rA]×*IA^-1*[rA]× - [rB]×*IB^-1*[rB]×
+    /* ---------- K = J*M^-1*J^T, assembled from the Jacobian ----------
      *
-     * Derivation: K = J*M^-1*J^T with J_p2p = [I | -I | -[rA]× | [rB]×].
-     * Body-A angular contribution: (-S)*IA^-1*(-S)^T where S = [rA]×.
-     * (-S)^T = -(S^T) = -(-S) = +S, so the contribution is
-     * (-S)*IA^-1*(+S) = -(S*IA^-1*S) = -term_a. SUBTRACT term_a.
-     * DESPOT-CORRECTION: a prior edit claimed (-S)^T*IA^-1*(-S) = S*IA^-1*S
-     * (dropping the transpose's sign) and flipped this to ADD. That is wrong:
-     * S*M*S (no transpose) is NEGATIVE-semidefinite (eigenvalues {0,-|r|²·λ}),
-     * so adding it makes K indefinite at anchor arms beyond ~0.3 m (wheel
-     * offsets 0.24/0.20 m are already marginal) — inverted joint impulses
-     * killed tank yaw, mecanum strafe and the T15 rod anchor while symmetric
-     * forward drive survived. K = J*M^-1*J^T is PD by construction; the
-     * subtraction is what keeps it so. Verified numerically: K_old PD at all
-     * arms, K_new indefinite past ~0.3 m. */
-    math3 term_a = math3_multiplication(skew_a, math3_multiplication(I_inv_a, skew_a));
-    math3 term_b = math3_multiplication(skew_b, math3_multiplication(I_inv_b, skew_b));
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 3; j++) {
-            K[i][j] = (i==j ? inv_mass_sum : 0.0f) - term_a.matrix[i][j] - term_b.matrix[i][j];
+     * DESPOT-2026-09-29 REWRITE. K used to be hand-written block by block
+     * with each sign derived by hand. Two sign errors lived in those
+     * derivations for the whole life of the joint, and BOTH were invisible
+     * because every test anchored the joint at a body centre (where the
+     * cross-coupling block is identically zero).
+     *
+     * This version builds the 6x12 Jacobian J explicitly and forms
+     * K = J*M^-1*J^T mechanically, so K cannot disagree with the impulses
+     * that are applied. The Jacobian is fixed by the impulse application
+     * below, which is the only thing that defines it:
+     *
+     *   v_a -= p2p/m_a ;  w_a -= IA^-1 ( r_a x p2p + lam_u*u + lam_v*v + lam_m*axis )
+     *   v_b += p2p/m_b ;  w_b += IB^-1 ( r_b x p2p + lam_u*u + lam_v*v + lam_m*axis )
+     *
+     * Reading J^T off that (P = M^-1 J^T lambda, state order
+     * [v_a | w_a | v_b | w_b]) and using skew symmetry (S is skew, so
+     * COLUMN i of S equals -ROW i of S -- this transpose is exactly what the
+     * old derivation dropped) gives:
+     *
+     *   J_p2p row i = [ -e_i ,  +(S_a row i) , +e_i , -(S_b row i) ]
+     *   J_axis_u    = [  0   ,      -u       ,  0   ,    +u      ]
+     *   J_axis_v    = [  0   ,      -v       ,  0   ,    +v      ]
+     *   J_motor     = [  0   ,    -axis      ,  0   ,   +axis    ]
+     *
+     * with M^-1 = diag( (1/m_a)I3 , IA^-1 , (1/m_b)I3 , IB^-1 ).
+     *
+     * Consequences of using the mechanical form:
+     *  - the p2p/axis cross block is -(Au + Bu), BOTH terms negative. The
+     *    old code had (-Au + Bu); an intermediate fix used (+Au + Bu).
+     *    Only (-Au - Bu) matches the measured constraint-space map.
+     *  - the motor row is NOT decoupled from the p2p rows. The old
+     *    "motor is pure angular, no linear coupling" comment was wrong:
+     *    measured K[0][5] = -0.45, K[1][5] = -0.04. The p2p Jacobian has
+     *    angular columns, so it couples to any purely-angular constraint.
+     *    Zeroing those entries was only harmless while the motor was off
+     *    (lambda[5] forced to 0); with the motor driven it corrupted the
+     *    solve. Now every entry is real.
+     *
+     * Measured proof: tests/mpe_suite_c.c mpe_t_revolute_matrix builds the
+     * true 6x6 map by applying a unit lambda in each column with the impulse
+     * application above and comparing against this K, entry by entry. */
+    {
+        /* Each constraint row is stored as FOUR 3-vectors: the coefficients it
+         * places on body A's linear and angular velocity, and body B's. K is
+         * then a plain bilinear form, with no block-index arithmetic to get
+         * wrong (the previous J[6][12] layout was off by two columns in the
+         * body-B angular block, which is exactly the sort of silent sign /
+         * index error this rewrite exists to prevent).
+         *
+         * State order is [v_a | w_a | v_b | w_b]; M^-1 is
+         * diag( (1/m_a) I , IA^-1 , (1/m_b) I , IB^-1 ). */
+        vector3 na[6], nwa[6], nb[6], nwb[6];
+        for (int r2 = 0; r2 < 6; r2++) {
+            na[r2] = vector3_zero(); nwa[r2] = vector3_zero();
+            nb[r2] = vector3_zero(); nwb[r2] = vector3_zero();
+        }
+        vector3 rows_a[3], rows_b[3];
+        rows_a[0] = (vector3){0.0f, -r_a.z, r_a.y};
+        rows_a[1] = (vector3){r_a.z, 0.0f, -r_a.x};
+        rows_a[2] = (vector3){-r_a.y, r_a.x, 0.0f};
+        rows_b[0] = (vector3){0.0f, -r_b.z, r_b.y};
+        rows_b[1] = (vector3){r_b.z, 0.0f, -r_b.x};
+        rows_b[2] = (vector3){-r_b.y, r_b.x, 0.0f};
+
+        for (int i = 0; i < 3; i++) {
+            /* p2p row i: na = -e_i, nwa = +(S_a row i), nb = +e_i, nwb = -(S_b row i) */
+            float e[3] = {0.0f, 0.0f, 0.0f};
+            e[i] = 1.0f;
+            na[i] = vector3_scaling((vector3){e[0], e[1], e[2]}, -1.0f);
+            nwa[i] = rows_a[i];
+            nb[i] = (vector3){e[0], e[1], e[2]};
+            nwb[i] = vector3_scaling(rows_b[i], -1.0f);
+        }
+        nwa[3] = vector3_scaling(u, -1.0f);            nwb[3] = u;
+        nwa[4] = vector3_scaling(v, -1.0f);            nwb[4] = v;
+        nwa[5] = vector3_scaling(axis_world, -1.0f);   nwb[5] = axis_world;
+
+        for (int r2 = 0; r2 < 6; r2++) {
+
+
+            for (int c = 0; c < 6; c++) {
+                double acc = (double) vector3_dot(na[r2], na[c]) * (double) inv_mass_a
+                           + (double) vector3_dot(nwa[r2], math3_multiplication_vector3(I_inv_a, nwa[c]))
+                           + (double) vector3_dot(nb[r2], nb[c]) * (double) inv_mass_b
+                           + (double) vector3_dot(nwb[r2], math3_multiplication_vector3(I_inv_b, nwb[c]));
+                K[r2][c] = acc;
+            }
+
         }
     }
 
-    /* Cross-coupling block (3×2): K_p2p_axis = J_p2p * M^-1 * J_axis^T
-     * J_p2p = [I, -I, -skew(r_a), skew(r_b)]
-     * J_axis_u = [0, 0, -u, u]
-     * J_axis_v = [0, 0, -v, v] */
-    for (int i = 0; i < 3; i++) {
-        vector3 skew_a_row_i;
-        if (i == 0) skew_a_row_i = (vector3){0, -r_a.z, r_a.y};
-        else if (i == 1) skew_a_row_i = (vector3){r_a.z, 0, -r_a.x};
-        else skew_a_row_i = (vector3){-r_a.y, r_a.x, 0};
-        
-        vector3 skew_b_row_i;
-        if (i == 0) skew_b_row_i = (vector3){0, -r_b.z, r_b.y};
-        else if (i == 1) skew_b_row_i = (vector3){r_b.z, 0, -r_b.x};
-        else skew_b_row_i = (vector3){-r_b.y, r_b.x, 0};
-        
-        vector3 Ia_skew_a = math3_multiplication_vector3(I_inv_a, skew_a_row_i);
-        vector3 Ib_skew_b = math3_multiplication_vector3(I_inv_b, skew_b_row_i);
-        
-        K[i][3] = -vector3_dot(Ia_skew_a, u) + vector3_dot(Ib_skew_b, u);
-        K[i][4] = -vector3_dot(Ia_skew_a, v) + vector3_dot(Ib_skew_b, v);
-        K[3][i] = K[i][3]; /* symmetric */
-        K[4][i] = K[i][4];
-    }
-    
-    /* Axis-Axis block (2×2): K_axis = J_axis * M^-1 * J_axis^T */
-    math3 I_sum = math3_addition(I_inv_a, I_inv_b);
-    K[3][3] = vector3_dot(u, math3_multiplication_vector3(I_sum, u));
-    K[4][4] = vector3_dot(v, math3_multiplication_vector3(I_sum, v));
-    K[3][4] = vector3_dot(u, math3_multiplication_vector3(I_sum, v));
-    K[4][3] = K[3][4];
-    
-    /* Motor row/column (row 5): K_motor = axis · (Ia^-1 + Ib^-1) · axis */
-    float axis_mass_inv = vector3_dot(axis_world, math3_multiplication_vector3(I_sum, axis_world));
-    K[5][5] = (axis_mass_inv > 1e-12f) ? axis_mass_inv : 1e-12f;
-    
-    /* Motor coupling with axis alignment rows (3,4): K[5][3] = axis · I_sum · u, etc.
-     * Free hinge when disabled: decouple row/col 5 and force lambda[5]=0
-     * (enforcing along_axis=0 would weld the hinge into a rotational lock). */
-    if (p->motor_enabled) {
-        K[5][3] = vector3_dot(axis_world, math3_multiplication_vector3(I_sum, u));
-        K[3][5] = K[5][3];
-        K[5][4] = vector3_dot(axis_world, math3_multiplication_vector3(I_sum, v));
-        K[4][5] = K[5][4];
-    } else {
-        K[5][3] = 0.0f; K[3][5] = 0.0f;
-        K[5][4] = 0.0f; K[4][5] = 0.0f;
-    }
-    /* Motor coupling with P2P rows (0,1,2): zero (motor is pure angular, no linear coupling). */
-    for (int i = 0; i < 3; i++) {
-        K[i][5] = 0.0f;
-        K[5][i] = 0.0f;
+    /* DESPOT-2026-09-29: with the motor DISABLED the along-axis relative
+     * angular velocity is genuinely unconstrained (a free hinge), so the
+     * constraint set is the 5 rows/cols {p2p, axis_u, axis_v} and row/col 5
+     * must be REMOVED from the system. Zeroing it here (rather than after the
+     * solve) is what keeps "force lambda[5] = 0" consistent with the matrix:
+     * the couplings are real, so nulling lambda[5] post-solve would leave the
+     * p2p rows short by exactly K[0..2][5]*lambda5 -- measured 1.7e-2
+     * residual when the zeroing was done after the solve.
+     * The old code zeroed the motor<->p2p couplings UNCONDITIONALLY, calling
+     * it "no linear coupling"; that comment was wrong (measured K[0][5] =
+     * -0.45) and it silently corrupted every motor-driven solve. */
+    if (!p->motor_enabled) {
+        for (int i = 0; i < 6; i++) { K[i][5] = 0.0; K[5][i] = 0.0; }
+        K[5][5] = 1.0; /* decoupled placeholder; never read (lambda[5] = 0) */
     }
 
     /* Add regularization for numerical stability (tiny diagonal). */
     for (int i = 0; i < 6; i++) K[i][i] += 1e-10;
+
+    /* DESPOT-2026-09-29: K is a J*M^-1*J^T Gram matrix, so it is PD by
+     * construction. Prove it here rather than trusting it: a non-PD K means
+     * the Jacobian and the impulse application have gone out of sync, and
+     * inverting it anyway yields plausible garbage impulses (that is exactly
+     * how the cross-block sign error stayed invisible). Fall through to the
+     * sequential solver, which is slower but stays correct. */
+    if (!mat6_is_positive_definite(K)) {
+        goto fallback_sequential;
+    }
 
     /* RHS = -(J*v + bias). Bias only on P2P (first 3 rows). */
     double rhs[6];
@@ -403,16 +524,22 @@ void revolute_solve(revolute_params *p, rigidbody *body_a, rigidbody *body_b, fl
     return;
 
 fallback_sequential:
-    /* Fallback to original sequential solve if 5×5 solve fails. */
+    /* Fallback to original sequential solve if the 6x6 solve fails. */
     /* ---- point-to-point ---- */
     {
+        /* The sequential path solves the p2p rows on their own (no axis or
+         * motor coupling), so it needs only the 3x3 diagonal block. K's
+         * cross/motor blocks are built mechanically above and are not used
+         * here. */
+        math3 skew_a = skew_symmetric(r_a);
+        math3 skew_b = skew_symmetric(r_b);
         float inv_mass_sum = inv_mass_a + inv_mass_b;
         math3 k = {{{0.0f}}};
         for (int i = 0; i < 3; i++) k.matrix[i][i] = inv_mass_sum;
         math3 term_a = math3_multiplication(skew_a, math3_multiplication(I_inv_a, skew_a));
         math3 term_b = math3_multiplication(skew_b, math3_multiplication(I_inv_b, skew_b));
-        /* DESPOT-CORRECTION: same as the 6x6 path — SUBTRACT rotational
-         * terms (S*M*S is negative-semidefinite; see derivation above). */
+        /* SUBTRACT rotational terms (S*M*S is negative-semidefinite; a
+         * J*M^-1*J^T Gram block must be PSD). */
         for (int i = 0; i < 3; i++) for (int j = 0; j < 3; j++) k.matrix[i][j] -= term_a.matrix[i][j] + term_b.matrix[i][j];
         math3 k_inv = math3_inverse(k);
         vector3 rhs_vec = vector3_scaling(vector3_addition(relative_velocity, bias_p2p), -1.0f);
@@ -491,6 +618,9 @@ void revolute_pre_step(revolute_params *p, rigidbody *body_a, rigidbody *body_b,
 void prismatic_solve(prismatic_params *p, rigidbody *body_a, rigidbody *body_b, float dt, const mpe_config_t *cfg) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
     if ((!p) || (!body_a) || (!body_b) || (dt <= 0.0f)) {
+        return;
+    }
+    if (a3_joint_solve_may_skip(body_a->is_sleeping, body_b->is_sleeping, 0)) {
         return;
     }
     if (body_a->is_sleeping) rigidbody_wake(body_a);
@@ -656,6 +786,9 @@ void rope_solve(rope_params *p, rigidbody *body_a, rigidbody *body_b, float dt, 
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
     if ((!p) || (!body_a) || (!body_b) || (dt <= 0.0f)) return;
     if (!isfinite(p->rest_length) || p->rest_length < 0.0f) return;
+    if (a3_joint_solve_may_skip(body_a->is_sleeping, body_b->is_sleeping, 0)) {
+        return;
+    }
     if (body_a->is_sleeping) rigidbody_wake(body_a);
     if (body_b->is_sleeping) rigidbody_wake(body_b);
 
@@ -765,6 +898,9 @@ void prismatic_apply_motor(prismatic_params *p, rigidbody *body_a, rigidbody *bo
 void fixed_solve(fixed_params *p, rigidbody *body_a, rigidbody *body_b, float dt, const mpe_config_t *cfg) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
     if ((!p) || (!body_a) || (!body_b) || (dt <= 0.0f)) {
+        return;
+    }
+    if (a3_joint_solve_may_skip(body_a->is_sleeping, body_b->is_sleeping, 0)) {
         return;
     }
     if (body_a->is_sleeping) {
@@ -919,6 +1055,9 @@ void distance_solve(distance_params *p, rigidbody *body_a, rigidbody *body_b, fl
         return;
     }
     if (!isfinite(p->rest_length) || p->rest_length < 0.0f) {
+        return;
+    }
+    if (a3_joint_solve_may_skip(body_a->is_sleeping, body_b->is_sleeping, 0)) {
         return;
     }
     if (body_a->is_sleeping) {

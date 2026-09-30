@@ -10,9 +10,12 @@
   (11 Python tests).
 - [x] Fixed-seed matrix inverse property sweep: 256 SPD matrices over scales
   from 2^-24 to 2^24, plus singular-axis and non-finite input gates.
-- [x] Full profile passes all 32 canonical, 30 isolated legacy, 14 paranoia,
-  MFS, TUI, and engine build checks; the C, MFS, and TUI test groups also pass
-  combined ASan/UBSan. Final report: 220/220 checks, zero failures.
+- [x] Full profile passes all canonical, isolated legacy, paranoia, MFS, TUI,
+  and engine build checks; the C, MFS, and TUI test groups also pass combined
+  ASan/UBSan. **Count drift (2026-09-29):** the historical "220/220" figure no
+  longer matches what the runner emits -- the current full run reports
+  **204 checks**. The number has moved because entries were added and removed;
+  the runner does not pin a floor, so it can silently shrink (tracked).
 - [x] Added missing `physics_world_cleanup` calls to cylinder-drop, driven-wheel,
   and FTC integration test paths after LeakSanitizer identified fixture leaks.
 - [x] Quick profile rerun after adding command-launch failure handling; all
@@ -35,9 +38,47 @@
 ## High priority (still open)
 
 - [ ] Continue migrating the remaining paranoia tests to canonical builders and tighten any weak gates.
-- [ ] Diagnose and fix cylinder collision and sleep/depenetration failures with minimal reproducible cases.
+- [x] Diagnose and fix cylinder collision and sleep/depenetration failures with
+  minimal reproducible cases. *2026-09-29: two cylinder defects found and fixed
+  -- (a) the static-slab fast path was gated only laterally, so a cylinder
+  anywhere beneath a static box reported unbounded phantom penetration and was
+  levitated at +0.1033 m/tick with gravity cancelled until it tunnelled through
+  and slept on top; (b) the cylinder/sphere INSIDE branch negated its normal,
+  driving an enclosed sphere deeper. Both now have regression tests proven to
+  fail when the fix is reverted. See docs/KNOWN_FAILURES.md.*
+- [ ] Deep-overlap ejection route for an enclosed sphere is unstable (open): 3
+  of 4 sub-cases resolve correctly, one (sphere at +Y) ends up deeper because
+  the pair's centre of mass is driven across the axis first. Narrowphase is
+  correct in all four; this is a depenetration/split-impulse robustness issue.
 - [x] Plugin load/attach/unload + stage-backend lifetime regression test
   (`loader_lifecycle` in Suite v2: real capsule .so, busy -2, purge, reload).
+- [x] **Mouse lock broken on Wayland since the first playable release — ROOT-CAUSED
+  AND FIXED (2026-09-29, `ui_input/mouse_lock.c`).** See
+  `docs/KNOWN_FAILURES.md` → `REL-PTR-2026-09-29` for the full analysis. Summary:
+  "lock" only ever *hid the cursor*; camera deltas came from absolute cursor
+  position (`dx = x - last_x`). On X11 that was rescued by `XWarpPointer`
+  re-centring, which GTK4 broke by dropping the GTK3-only `GDK_WINDOWING_X11`
+  guard macro — so **v15S mouse lock was broken on X11 and Wayland both**.
+  On Wayland warping is protocol-forbidden, so the cursor physically ran to the
+  screen edge, the compositor clipped the motion, and the camera stalled; once
+  the pointer left the surface no events arrived at all, so it could never
+  re-lock. Fix: real lock via the `zwp_relative_pointer_manager_v1`
+  relative-pointer protocol (wayland-scanner generated, wired into the
+  makefile), which reports unbounded unclipped deltas and never moves the
+  cursor; `on_mouse_movements()` now prefers it and ignores absolute
+  coordinates. X11 warp restored behind an explicit define. Falls back to the
+  old edge-limited path if the compositor lacks the protocol. Verified: the
+  live compositor advertises the global (probe), engine builds warning-free,
+  suite 34/34, full profile 206/206.
+
+- [x] **GTK3/GTK4 duplication in `ui_input/` — DONE (2026-09-29).** 6,832 lines
+  deleted across 18 files; the whole directory had carried a full duplicate body
+  for every handler. This was the root cause of the `e_key_pressed` latch existing
+  in two copies (a one-line fix that had to be made twice). Removed the GTK3
+  halves and the now-vacuous `#ifdef MPE_GTK4` guards, so the code compiles
+  unconditionally. `make GTK_PKG=gtk+-3.0` now `$(error)`s instead of silently
+  offering a build that cannot link. Verified: engine builds clean with no
+  warnings, suite 34/34, full profile 206/206.
 - [ ] Replace the duplicate GUI and headless physics pipelines with one canonical step path.
   Evidence 2026-09-28 (despot audit, harness at /tmp/opencode/path_equiv.c):
   passive 6-cube tower, 600 ticks, 64 iters — legacy `simulation_physics_tick`
@@ -70,7 +111,23 @@
 - [x] Correct and run CCD, constraint, friction, restitution, and free-flight invariant checks; audit continuation records the oracles and tolerances.
 - [x] Build and run all 14 paranoia targets, including energy/momentum, scene persistence, and spring-joint checks.
 - [x] Run canonical, isolated legacy, paranoia, MFS, and TUI checks under combined AddressSanitizer and UndefinedBehaviorSanitizer (full runner profile).
-- [ ] Add broader randomized/property-based physics tests and differential checks for simple analytic cases.
+- [x] Add broader randomized/property-based physics tests and differential
+  checks for simple analytic cases. *Partially done 2026-09-29: matrix-inverse
+  property sweep, cylinder-SDF brute force, 15-axis SAT depth/orientation sweep,
+  broadphase pair coverage, and an independent free-flight ODE comparison all
+  exist (or were added as part of the audit). Still open: seeded property
+  coverage for collision, constraint and configuration invariants, and a
+  ThreadSanitizer run.*
+- [ ] **Torque-free angular momentum is still first-order.** A tumbling box
+  loses ~2.7% of |L| in 2 s. Measured 2026-09-29: this is inherent to the
+  first-order rotational integrator, NOT to the old 0.2*|omega| magnitude cap
+  (removing the cap entirely moved the number by 0.0000%). An implicit-midpoint
+  scheme is now in place and correct under external torque but degenerates to
+  explicit for the torque-free case. A torque-free L-conservation update was
+  tried and measured WORSE (48% drift, non-contracting fixed point) and was
+  reverted. The real fix is a second-order scheme for Euler's equations
+  (exact symmetric-body precession, or L coupled to the orientation update).
+  Until then the `angmom` gate stays at 3%.
 
 ## Operational and release hygiene
 
@@ -78,6 +135,19 @@
   delegates to ecosystem/mfs/Makefile (was duplicated and drifted).
 - [x] Module stage detachment before unload: detach-everywhere +
   forget-pointers on every unregister path, proven by `loader_lifecycle`.
+- [x] Runner now pins a floor on the discovered suite size
+  (`MIN_SUITE_ENTRIES`, currently 36) and has a contract test for it. Deleting
+  a registry entry and its make target together used to shrink every headline
+  count with no failure anywhere.
+- [x] The SHIPPED frustum culler is now covered (2026-09-29). Plane extraction
+  and the sphere test were inline inside `render_scene_current`, a GL function
+  no headless test can call, so the real culler was untested while the legacy
+  test re-implemented it locally and the canonical case projected one point.
+  Both are now in `math4_special.h`, the renderer calls them, and
+  `mpe_t_frustum_culler` (blocking) sweeps 6 camera poses for no false
+  exclusions over 20,064 reference-inside samples. Writing that test caught a
+  real transposition bug in the first extraction attempt (the inline code stored
+  planes as `(d,a,b,c)`; the shared helper reads `(a,b,c,d)`).
 - [ ] Document numerical guarantees and unsupported CCD/rotational cases precisely.
 - [x] Root README exists (`readme.md`); release gates updated to verified
   behavior (32/32 v2, MFS 8 gated unified: strafe F1+F2 hard-gate since
@@ -234,3 +304,13 @@ MFS (suite 11 gated + 5 info, 0 fail; was 13/3 + broken make):
   absent from this workspace (only its release notes are present).
 
 Audit notes and boundaries are in `../AUDIT_REPORT_2026-09-24.md`.
+
+- [ ] **MFS motor chain, step 1 (the real blocker): make the stall endpoint a
+  GATED test.** `[MOTOR-III]`'s blocked-rotor gate is physically sound but
+  cannot help while nothing in the shipped suite holds a wheel at stall — A/B
+  showed byte-identical results with and without it. Without a gated
+  straight-push/stall test, the delivered-torque change (strafe 0.87 -> 1.26 m)
+  and the lateral `VREF` retune that follows it cannot be *verified*, only
+  believed. This is test authoring, not physics, and it is the prerequisite
+  for everything else in the motor chain. See
+  `ecosystem/mfs/docs/KNOWN_FAILURES.md` -> `MOTOR-III-2026-09-29`.

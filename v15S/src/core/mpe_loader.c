@@ -163,7 +163,12 @@ int mpe_loader_load(const char *path, char *errbuf, int errlen) {
     }
     /* Length validated BEFORE any registration (a late failure used to
      * dlclose while the module stayed registered -> dangling dispatch). */
-    if (strlen(resolved) >= PATH_MAX - 64) {
+    /* DESPOT-2026-09-29: this allowed PATH_MAX-64 (4031) bytes, but the
+     * registry stores a module's origin in a 256-byte buffer and compares it
+     * with strcmp at unload. A longer path truncated silently, so the
+     * origin-scoped unregister never matched and the module slot survived
+     * the dlclose still live. Bound the load by what the registry can store. */
+    if (strlen(resolved) >= MPE_MODULE_ORIGIN_MAX - 1) {
         if (errbuf && errlen > 0) snprintf(errbuf, (size_t)errlen, "path too long");
         return -1;
     }
@@ -210,6 +215,11 @@ int mpe_loader_load(const char *path, char *errbuf, int errlen) {
     int snap_pairs = mpe_registry_pair_count();
     int snap_broad = mpe_registry_broadphase_count();
     int snap_solvers = mpe_registry_solver_count();
+    /* DESPOT-2026-09-29: module table was never snapshotted, so nothing could
+     * roll it back. A constructor that registers a module and then fails the
+     * desc checks used to leave a live descriptor pointing into a dlclose'd
+     * image. */
+    int snap_modules = mpe_module_count();
     dlerror();
     void *h = dlopen(resolved, RTLD_NOW | RTLD_LOCAL);
     if (!h) {
@@ -230,6 +240,7 @@ int mpe_loader_load(const char *path, char *errbuf, int errlen) {
             loader_unlock();
             dlclose(h);
             mpe_registry_truncate_pairs(snap_pairs);
+            mpe_registry_truncate_modules(snap_modules);
             mpe_registry_truncate_broadphase(snap_broad);
             mpe_registry_truncate_solvers(snap_solvers);
             return 0;
@@ -240,6 +251,7 @@ int mpe_loader_load(const char *path, char *errbuf, int errlen) {
         if (errbuf && errlen > 0) snprintf(errbuf, (size_t)errlen, "handle table full");
         dlclose(h);
         mpe_registry_truncate_pairs(snap_pairs);
+            mpe_registry_truncate_modules(snap_modules);
         mpe_registry_truncate_broadphase(snap_broad);
         mpe_registry_truncate_solvers(snap_solvers);
         return -1;
@@ -257,12 +269,20 @@ int mpe_loader_load(const char *path, char *errbuf, int errlen) {
             if (errbuf && errlen > 0) snprintf(errbuf, (size_t)errlen, "ecosystem ABI/name mismatch");
             loader_unlock();
             dlclose(h);
+            mpe_registry_truncate_pairs(snap_pairs);
+            mpe_registry_truncate_modules(snap_modules);
+            mpe_registry_truncate_broadphase(snap_broad);
+            mpe_registry_truncate_solvers(snap_solvers);
             return -1;
         }
         if (mpe_ecosystem_register(eco_first) < 0) {
             if (errbuf && errlen > 0) snprintf(errbuf, (size_t)errlen, "ecosystem registry full/dup");
             loader_unlock();
             dlclose(h);
+            mpe_registry_truncate_pairs(snap_pairs);
+            mpe_registry_truncate_modules(snap_modules);
+            mpe_registry_truncate_broadphase(snap_broad);
+            mpe_registry_truncate_solvers(snap_solvers);
             return -1;
         }
         s_h[s_n].h = h;
@@ -286,6 +306,7 @@ int mpe_loader_load(const char *path, char *errbuf, int errlen) {
             loader_unlock();
             dlclose(h);
             mpe_registry_truncate_pairs(snap_pairs);
+            mpe_registry_truncate_modules(snap_modules);
             mpe_registry_truncate_broadphase(snap_broad);
             mpe_registry_truncate_solvers(snap_solvers);
             return -1;
@@ -295,6 +316,7 @@ int mpe_loader_load(const char *path, char *errbuf, int errlen) {
             loader_unlock();
             dlclose(h);
             mpe_registry_truncate_pairs(snap_pairs);
+            mpe_registry_truncate_modules(snap_modules);
             mpe_registry_truncate_broadphase(snap_broad);
             mpe_registry_truncate_solvers(snap_solvers);
             return -1;
@@ -318,6 +340,7 @@ int mpe_loader_load(const char *path, char *errbuf, int errlen) {
     loader_unlock();
     dlclose(h); /* destructor self-unregisters well-behaved plugins */
     mpe_registry_truncate_pairs(snap_pairs);
+            mpe_registry_truncate_modules(snap_modules);
     mpe_registry_truncate_broadphase(snap_broad);
     mpe_registry_truncate_solvers(snap_solvers);
     return -1;
@@ -371,7 +394,7 @@ static int handle_for_desc_locked(const mpe_module_desc_t *d) {
     if (!d) return -1;
     const char *origin = mpe_registry_module_origin(d);
     if (origin) {
-        char obuf[256];
+        char obuf[MPE_MODULE_ORIGIN_MAX];
         snprintf(obuf, sizeof(obuf), "%s", origin);
         return handle_by_path_locked(obuf);
     }
@@ -599,15 +622,52 @@ int mpe_loader_unload(const char *path_or_name) {
                             ? (s_h[i].eco && s_h[i].eco->name ? s_h[i].eco->name : "")
                             : (s_h[i].desc ? s_h[i].desc->name : "");
         if (strcmp(s_h[i].path, identity) == 0 || strcmp(n, identity) == 0) {
-            /* Ecosystem bundles detach everywhere (no busy concept: the
-             * detach pass itself quiesces every world pre-dlclose). */
+            /* Ecosystem bundles are NOT exempt from the busy check.
+             *
+             * DESPOT-2026-09-29 CRITICAL. The comment here used to claim
+             * "no busy concept: the detach pass itself quiesces every world
+             * pre-dlclose". That is false. mpe_ecosystem_detach_everywhere
+             * only clears the ECOSYSTEM registry's own attachment table
+             * (mpe_ecosystem.c s_attached[]); it does not touch
+             * world->tick_modules[]. A bundle can legitimately export
+             * mpe_module_desc, and term_ftc.c attaches exactly that:
+             * `ftc_sym("mpe_module_desc")` then physics_world_attach_module.
+             * The world then holds a pointer INTO the bundle image, and this
+             * branch dlclose'd it with attachments > 0 and returned 0. The
+             * next physics_world_step read the descriptor out of unmapped
+             * memory and called through it.
+             *
+             * handle_busy() and detach_handle_modules() both resolve a
+             * descriptor to its owning handle via dladdr, so they already work
+             * for ecosystem handles -- they were simply never called here. */
+            if (s_h[i].attachments > 0) { loader_unlock(); return -2; }
+            {
+                physics_world *ws[MPE_MAX_LIVE_WORLDS];
+                int nw = physics_world_live_list(ws, MPE_MAX_LIVE_WORLDS);
+                for (int wi2 = 0; wi2 < nw; wi2++) {
+                    if (desc_busy_in_world(ws[wi2], i)) { loader_unlock(); return -2; }
+                }
+            }
             if (s_h[i].is_ecosystem) {
                 char enm[128];
                 snprintf(enm, sizeof(enm), "%s", n ? n : "");
+                if (strlen(enm) == sizeof(enm) - 1 && strlen(n ? n : "") >= sizeof(enm)) {
+                    /* The name does not fit the buffer. Truncating it would
+                     * make detach_everywhere/unregister match nothing, leaving
+                     * entries aliasing a dead slot. Refuse rather than
+                     * half-tear-down. */
+                    loader_unlock();
+                    return -3;
+                }
                 if (enm[0]) {
                     mpe_ecosystem_detach_everywhere(enm);
                     mpe_ecosystem_unregister(enm);
                 }
+                /* Same pre-dlclose teardown the module branch uses: detach any
+                 * tick modules and stage slots owned by this image, and drop
+                 * pair handlers whose code lives here. */
+                detach_handle_modules(i);
+                purge_plugin_pairs(i);
                 dlerror();
                 void (*p_fini)(void) = (void (*)(void))dlsym(s_h[i].h, "mpe_capsule_fini");
                 if (dlerror() == NULL && p_fini) p_fini();

@@ -24,31 +24,53 @@ MPE_TEMP := $(abspath ../../temp)
 export TMPDIR := $(MPE_TEMP)
 ENABLE_NATIVE ?= 0
 NATIVE_FLAG := $(if $(filter 1,$(ENABLE_NATIVE)),-march=native,)
-# GTK4: Full transition — GTK4 is now the default (v15S). GTK3 remains
-# available via `make GTK_PKG=gtk+-3.0` for reference, but the tree is
-# GTK4-only going forward. Original v15R3 GTK3 engine is preserved in git
-# history and `v15S` is the GTK4 truthful port.
+# GTK4 only. The GTK3 code path was removed from the tree on 2026-09-29:
+# 6,832 lines of never-compiled duplicate across 18 files in ui_input/ (the
+# whole directory carried a full GTK3/GTK4 body copy of every handler). The
+# v15R3 GTK3 engine is preserved in git history, and RELEASE_POLICY already
+# records v15S as the GTK4 port, so keeping a second unbuildable copy in-tree
+# only risked the two copies drifting -- which it had, to the point where a
+# one-line fix (the never-cleared `e_key_pressed` latch) had to be applied
+# twice, once per copy.
+# `make GTK_PKG=gtk+-3.0` now fails loudly instead of silently offering a
+# build that can no longer link.
 GTK_PKG ?= gtk4
 ifeq ($(GTK_PKG),gtk4)
    GTK_CFLAGS := $(shell pkg-config --cflags gtk4 epoxy)
    GTK_LIBS   := $(shell pkg-config --libs gtk4 epoxy)
-   GTK_DEFINES := -DMPE_GTK4=1
+   GTK_DEFINES = -DMPE_GTK4=1 $(GTK_X11_DEFINES) $(WAYLAND_REL)
 ifeq ($(MPE_WINDOWS),1)
    X11_LIBS    :=
+   GTK_X11_DEFINES :=
 else
    X11_LIBS    := -lX11
+   # DESPOT-2026-09-29: the X11 pointer re-centre warp was guarded on
+   # GDK_WINDOWING_X11, a GTK3 macro that GTK4 does not define, so under
+   # v15S the warp was compiled out on X11 as well -- mouse lock was broken
+   # on BOTH backends. Restore it behind an explicit define.
+   GTK_X11_DEFINES := -DMPE_GTK4_X11_WARP=1
+endif
+# Wayland relative-pointer lock (DESPOT-2026-09-29): the root fix for mouse
+# lock on Wayland. Not available on Windows.
+ifeq ($(MPE_WINDOWS),1)
+   WAYLAND_REL    :=
+   WAYLAND_LIBS   :=
+else
+   WAYLAND_REL    := -DMPE_WAYLAND_RELATIVE_POINTER=1
+   WAYLAND_LIBS   := -lwayland-client
 endif
 else
-   GTK_CFLAGS := $(shell pkg-config --cflags gtk+-3.0 epoxy)
-   GTK_LIBS   := $(shell pkg-config --libs gtk+-3.0 epoxy)
-   GTK_DEFINES := -DMPE_GTK3=1
+   $(error GTK3 support was removed 2026-09-29; the tree is GTK4-only. Use \
+     GTK_PKG=gtk4 (the default). The v15R3 GTK3 engine is in git history.)
+endif
+ifneq (,$(filter 0,$(MPE_WINDOWS)))
    X11_LIBS    :=
 endif
 BASE_CFLAGS = -g $(GTK_CFLAGS) -I. $(NATIVE_FLAG) $(GTK_DEFINES) -Wall -Wextra -MMD -MP -ffp-contract=off
 ifeq ($(MPE_WINDOWS),1)
 BASE_LIBS = $(GTK_LIBS) $(X11_LIBS) -lm -pthread $(MPE_WIN_LIBS)
 else
-BASE_LIBS = $(GTK_LIBS) $(X11_LIBS) -lm -ldl -rdynamic
+BASE_LIBS = $(GTK_LIBS) $(X11_LIBS) $(WAYLAND_LIBS) -lm -ldl -rdynamic
 endif
 # Opt-in strict warnings: `make WARNINGS_AS_ERRORS=1` appends -Werror.
 WARNINGS_AS_ERRORS ?= 0
@@ -61,10 +83,23 @@ DETERMINISM_FLAGS = -ffp-contract=off -fno-fast-math
 # Command-line CFLAGS/LIBS (e.g. compile_asan) override these defaults.
 CFLAGS ?= $(BASE_CFLAGS) -O3
 LIBS ?= $(BASE_LIBS)
-# TRUTH: hard-append determinism flags so env CFLAGS can never silently drop
-# -ffp-contract=off (bitwise twins depend on it). Recipe-level
-# $(DETERMINISM_FLAGS) below covers command-line CFLAGS=... overrides too.
-CFLAGS += $(DETERMINISM_FLAGS)
+# TRUTH: hard-append determinism flags so NEITHER environment NOR
+# command-line CFLAGS can silently drop -ffp-contract=off (bitwise twins
+# depend on it). DESPOT-2026-09-29: plain `CFLAGS +=` is a NO-OP for
+# command-line variables, and `CFLAGS ?=` does not assign when CFLAGS comes
+# from the ENVIRONMENT -- so both of the ordinary ways a developer or CI sets
+# flags (`make CFLAGS="-O2"` and `CFLAGS=-O2 make`) silently disabled FMA
+# contraction AND dropped -MMD -MP, breaking header dependency tracking. That
+# made the project's headline determinism guarantee opt-out by accident.
+# `override` makes the append unconditional, so every one of the 40 recipes
+# that reference $(CFLAGS) is covered without touching each of them.
+override CFLAGS += $(DETERMINISM_FLAGS)
+# DESPOT-2026-09-29: the same trap applied to dependency generation. -MMD -MP
+# lives in BASE_CFLAGS, which `CFLAGS ?= $(BASE_CFLAGS) -O3` only reaches when
+# CFLAGS is unset -- so `CFLAGS=-O2 make` silently stopped producing .d files,
+# and header edits stopped triggering rebuilds. Appended with `override` so it
+# survives an environment or command-line CFLAGS.
+override CFLAGS += -MMD -MP
 
 BUILD_DIR ?= build
 # ENGINE_SRCS uses a wildcard (not an explicit list) so new engine TUs are
@@ -73,6 +108,10 @@ BUILD_DIR ?= build
 # exclusions: tests/ (headless mains with their own #ifdef guards must
 # never link into the engine binary).
 ENGINE_SRCS := $(wildcard *.c config/*.c core/*.c physics/*.c render/*.c scene/*.c ui_input/*.c) ecosystem/mpe_ecosystem.c
+ifneq ($(MPE_WINDOWS),1)
+  # wayland-scanner output for zwp_relative_pointer_manager_v1 (mouse lock).
+  ENGINE_SRCS += $(wildcard ui_input/wayland/*.c)
+endif
 OBJECTS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(ENGINE_SRCS))
 DEPS := $(OBJECTS:.o=.d)
 

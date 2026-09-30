@@ -48,6 +48,11 @@ Under the v15R3 freeze:
 - Solver islanding (union-find sleep islands).
 - Scene format v200 (stable IDs, joints, CRC32, atomic staged load).
 - Poisson restitution, split impulse, rolling resistance, gyroscopic torque.
+  **Note (2026-09-29):** the gyroscopic term uses an implicit-midpoint update
+  (correct under external torque) and a loose runaway backstop in place of the
+  old 0.2*|omega| magnitude cap, which discarded the direction of the
+  gyroscopic acceleration. Torque-free angular momentum is still conserved only
+  to ~2.7% in 2 s -- that drift is the first-order integrator, not the cap.
 - Physics-truth pass: Verlet-exact free flight, post-integration Poisson gate,
   strict warm-start, true cylinder SDF, hysteresis deleted, speed-clamp and
   restitution-cap deleted. Intentional behavior change vs v14S: default

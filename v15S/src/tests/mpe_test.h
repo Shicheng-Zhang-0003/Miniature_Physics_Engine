@@ -52,12 +52,32 @@ static inline void mpe_test_begin(mpe_test_t *t, const char *name) {
     det_fallback_reset();
 }
 
+/* DESPOT-2026-09-29: the header claimed "determinism counters asserted zero"
+ * and mpe_test_end did not assert them -- only 1 of 32 tests did, by hand. A
+ * libm fallback inside a test is a silent cross-platform determinism escape,
+ * and nothing was watching. Assert here, where every test already passes. */
+static inline int mpe_det_fallbacks_used(void) {
+    return (int) (det_fallback_pow_total() + det_fallback_trig_total());
+}
+
 static inline void mpe_test_end(mpe_test_t *t) {
     if (t->cfg_active) {
+        if (mpe_det_fallbacks_used() != 0) {
+            t->failures++;
+            printf("[FAIL] %s: %d libm determinism fallback(s) during test "
+                   "(pow=%lu trig=%lu); results are no longer bit-deterministic\n",
+                   t->name ? t->name : "?", mpe_det_fallbacks_used(),
+                   (unsigned long) det_fallback_pow_total(),
+                   (unsigned long) det_fallback_trig_total());
+        }
         g_cfg = t->cfg_saved;
         t->cfg_active = 0;
     }
 }
+
+/* Return value for a case that could not run. Distinct from 0 (pass) and 1
+ * (fail) so the summary can report skips instead of counting them green. */
+#define MPE_SKIPPED 2
 
 #define MPE_CHECK(t, cond) \
     do { \
@@ -113,10 +133,17 @@ static inline void mpe_world_begin(physics_world *w) {
 static inline int mpe_world_finite(physics_world *w) {
     for (int i = 0; i < w->body_count; i++) {
         rigidbody *b = &w->bodies[i];
+        /* DESPOT-2026-09-29: the ORIENTATION was not checked. A NaN quaternion
+         * poisons every contact lever arm in the next tick while position and
+         * velocity stay perfectly finite, so this whole function reported a
+         * corrupted world as clean. The MFS harness (mfs_test.h) already had
+         * the check; the MPE harness was the un-fixed copy. */
         if (!isfinite(b->position.x) || !isfinite(b->position.y) || !isfinite(b->position.z) ||
             !isfinite(b->velocity.x) || !isfinite(b->velocity.y) || !isfinite(b->velocity.z) ||
             !isfinite(b->angular_velocity.x) || !isfinite(b->angular_velocity.y) ||
-            !isfinite(b->angular_velocity.z)) {
+            !isfinite(b->angular_velocity.z) ||
+            !isfinite(b->orientation.w) || !isfinite(b->orientation.x) ||
+            !isfinite(b->orientation.y) || !isfinite(b->orientation.z)) {
             return 0;
         }
     }

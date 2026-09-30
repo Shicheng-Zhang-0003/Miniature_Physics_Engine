@@ -201,6 +201,39 @@ void mpe_registry_truncate_pairs(int keep) {
     pthread_mutex_unlock(&s_reg_lock);
 }
 
+/* DESPOT-2026-09-29: module-table rollback. This did not exist, so EVERY
+ * load-failure path rolled back pairs/broadphase/solvers and left the module
+ * table alone. A .so whose constructor calls mpe_register_module but whose
+ * own mpe_module_desc fails the ABI/name check (or is absent) therefore
+ * dlclose'd with s_module_live[i] == 1 and attach/detach/pre_step/post_step
+ * still pointing into the unmapped image. mpe_find_module then handed that
+ * descriptor out and `mod attach` jumped into unmapped memory, with no
+ * diagnostic anywhere.
+ *
+ * The truncate clears the live flag and every function pointer of the
+ * dropped slots, so a stale descriptor can at worst fail a NULL check rather
+ * than call unmapped code. It also runs each dropped slot's detach hook is
+ * NOT attempted: nothing was ever attached through them on a failed load, and
+ * their state was never initialised. */
+void mpe_registry_truncate_modules(int keep) {
+    pthread_mutex_lock(&s_reg_lock);
+    if (keep < 0) keep = 0;
+    if (keep < s_module_count) {
+        for (int i = keep; i < s_module_count; i++) {
+            s_module_live[i] = 0;
+            s_modules[i].attach = NULL;
+            s_modules[i].detach = NULL;
+            s_modules[i].pre_step = NULL;
+            s_modules[i].post_step = NULL;
+            s_modules[i].stage_detach = NULL;
+            s_module_names[i][0] = 0;
+            s_module_origin[i][0] = 0;
+        }
+        s_module_count = keep;
+    }
+    pthread_mutex_unlock(&s_reg_lock);
+}
+
 int mpe_registry_broadphase_count(void) {
     pthread_mutex_lock(&s_reg_lock);
     int n = s_broad_count;

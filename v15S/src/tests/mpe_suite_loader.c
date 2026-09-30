@@ -131,9 +131,14 @@ int mpe_t_loader_lifecycle(void) {
     /* ---- live plugin lifecycle (needs CWD=v15S/src) ---- */
     char cap_buf[1024]; const char *cap_path = mpe_pick_plugin("plugins/mpe_capsule.so", cap_buf, sizeof(cap_buf));
     if (access(cap_path, R_OK) != 0) {
+        /* DESPOT-2026-09-29: this returned t.failures == 0, so mpe_run_one
+         * printed "[PASS] loader_lifecycle" and the summary read 29/29 green
+         * while the case had executed nothing. A case that could not run must
+         * not report green. Returns MPE_SKIPPED (distinct from pass and from
+         * fail) so the summary can report it separately. */
         printf("[SKIP] plugins/mpe_capsule%s not visible (run from v15S/src)\n", MPE_PLUGIN_EXT);
         mpe_test_end(&t);
-        return t.failures;
+        return MPE_SKIPPED;
     }
     {
         char err[512] = {0};

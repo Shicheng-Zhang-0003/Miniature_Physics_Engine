@@ -8,10 +8,18 @@
 #include "physics/constraint.h"
 #include "config/mpe_config.h"
 
-static void check_finite(const char* ctx, vector3 v) {
+/* DESPOT-2026-09-29: this used to be `static void` and PRINT [FAIL] without
+ * recording it, so main() returned 0 on a non-finite vector and the binary
+ * exited 0 -- scored PASS. It is also uncatchable by a tolerance gate: with a
+ * fully NaN body every `fabsf(NaN - x) > tol` is false, so all six tolerance
+ * gates in this file pass vacuously at the same time. Now returns non-zero and
+ * the caller ORs it into the exit status. */
+static int check_finite(const char* ctx, vector3 v) {
     if (!isfinite(v.x) || !isfinite(v.y) || !isfinite(v.z)) {
         printf("[FAIL] %s: non-finite vector (%.6f, %.6f, %.6f)\n", ctx, v.x, v.y, v.z);
+        return 1;
     }
+    return 0;
 }
 
 int main(void) {
@@ -41,7 +49,7 @@ int main(void) {
         for (int t = 0; t < 500; t++) {
             physics_world_step(&w1, dt);
             rigidbody *b = &w1.bodies[s];
-            check_finite("projectile_drag1", b->position);
+            fail |= check_finite("projectile_drag1", b->position);
 
             if (b->position.y > apex) {
                 apex = b->position.y;
@@ -113,7 +121,7 @@ int main(void) {
         for (int t = 0; t < 500; t++) {
             physics_world_step(&w2, dt);
             rigidbody *b = &w2.bodies[s];
-            check_finite("projectile_drag099", b->position);
+            fail |= check_finite("projectile_drag099", b->position);
 
             if (b->position.y > apex) {
                 apex = b->position.y;

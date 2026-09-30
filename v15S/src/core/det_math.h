@@ -88,7 +88,15 @@ static inline double det_ln_pos(double x) {
     double u2 = u * u;
     double term = u;
     double sum = u;
-    for (int k = 1; k <= 10; k++) {
+    /* DESPOT-2026-09-29: 10 iterations (11 terms) was NOT enough for the
+     * documented bound. The atanh tail after the last term is
+     *   |u|^(2K+3) / ((2K+3)(1-u^2)) * 2,
+     * which at the worst case |u| = 1/3 (m = 0.5) is 1.04e-12 for K = 10 --
+     * i.e. the measured worst error was 1.029e-12 against a documented
+     * "< 1e-12". Deterministic and physically negligible, but the header's
+     * error table is a contract and it was not being met. K = 13 gives a tail
+     * of ~1.1e-15, so the total error is now round-off limited (~2e-15). */
+    for (int k = 1; k <= 13; k++) {
         term *= u2;
         sum += term / (double)(2 * k + 1);
     }

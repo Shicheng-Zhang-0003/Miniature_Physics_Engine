@@ -248,27 +248,47 @@ bool collision_cylinder_sphere(rigidbody *cyl, rigidbody *sph,
     float center_dist; /* |p_s - closest|, center to cylinder surface */
     bool inside = (fabsf(x) <= h) && (radial_len <= r_c);
     if (inside) {
-        /* Push out the nearest face: cap vs barrel. */
+        /* Push out the nearest face: cap vs barrel.
+         *
+         * DESPOT-2026-09-29 CORRECTION. This branch used
+         *   nrm = -interior_outward    with the comment "A->B = inward"
+         * which is wrong. The engine's contact convention (see
+         * collision_resolve_iterative) is: the normal points A->B, impulse is
+         * n*lambda with lambda >= 0, and the solver applies
+         *   v_a -= n*lambda/m_a      v_b += n*lambda/m_b
+         * so B is pushed along +n. Here object_a is the CYLINDER and
+         * object_b the SPHERE, and the sphere is the one that must move --
+         * it has to be ejected from the cylinder along interior_outward, the
+         * direction of its own offset from the axis. So n must be
+         * +interior_outward.
+         *
+         * With the negation, +n pointed back INTO the cylinder, so the solver
+         * drove the sphere DEEPER (measured: sphere at (0,1.7,0) inside an
+         * r=2 cylinder got n = (0,-1,0) and was pushed further in), while
+         * the cylinder was yanked toward it. All three correction paths --
+         * the velocity solve, the split impulse and the positional
+         * depenetration pass -- share this one normal, so the divergence never
+         * recovered. */
         float axial_clear = h - fabsf(x);
         float radial_clear = r_c - radial_len;
         vector3 out_dir;
         if (axial_clear < radial_clear) {
             float s = (x >= 0.0f) ? 1.0f : -1.0f;
             vector3 interior_outward = vector3_scaling(axis, s); /* cyl -> sphere side */
-            nrm = vector3_scaling(interior_outward, -1.0f); /* A->B = inward */
+            nrm = interior_outward;                               /* A->B: toward the sphere */
             closest = vector3_addition(cyl->position, vector3_scaling(axis, s * h));
             closest = vector3_addition(closest, radial_vec); /* keep radial offset on cap disc */
             out_dir = interior_outward; /* position push is outward */
         } else {
             vector3 interior_outward = radial_dir;
-            nrm = vector3_scaling(interior_outward, -1.0f); /* A->B = inward */
+            nrm = interior_outward;                               /* A->B: toward the sphere */
             if (radial_len <= 1e-9f) {
                 /* Center on axle: pick any perpendicular. */
                 vector3 up = (fabsf(axis.y) < 0.99f) ? (vector3){0.0f, 1.0f, 0.0f}
                                                     : (vector3){1.0f, 0.0f, 0.0f};
                 interior_outward = vector3_normalisation(vector3_subtraction(
                     up, vector3_scaling(axis, vector3_dot(up, axis))));
-                nrm = vector3_scaling(interior_outward, -1.0f);
+                nrm = interior_outward;
             }
             vector3 axle_pt = vector3_addition(cyl->position, vector3_scaling(axis, x));
             closest = vector3_addition(axle_pt, vector3_scaling(interior_outward, r_c));
@@ -442,7 +462,58 @@ bool collision_cylinder_cube(rigidbody *cyl, rigidbody *cube,
                 (fabsf(cb) + support_b <= box_extents[side_b_index] + slop)) {
                 float up_sign = (box_axes[up_index].y >= 0.0f) ? 1.0f : -1.0f;
                 float plane_y = cube->position.y + up_sign * box_extents[up_index];
-                return collision_static_plane_cylinder(cube, cyl, plane_y, out, C);
+                /* DESPOT-2026-09-29 CRITICAL FIX: the two tests above are
+                 * purely LATERAL, and collision_static_plane_cylinder then
+                 * models the slab's near face as an INFINITE plane. Any
+                 * cylinder laterally under the slab therefore matched --
+                 * including one arbitrarily far away -- and got
+                 * penetration = plane_y - lowest_point, which grows without
+                 * bound.
+                 *
+                 * Measured: platform at y=10 (half-height 0.5, so the top face
+                 * is 10.5) and a cylinder at y=5 reported penetration 6.0 m
+                 * and a -Y normal. End to end through physics_world_step the
+                 * cylinder was levitated at exactly +0.1033 m/tick
+                 * (= split-impulse 0.0833 + depenetration cap 0.02) with its
+                 * velocity pinned at 0.0000 -- gravity exactly cancelled --
+                 * until it tunnelled THROUGH the 1 m slab, landed on top and
+                 * went to sleep there permanently. A cube in the same
+                 * position free-fell correctly.
+                 *
+                 * The gate below is the one the infinite-plane model
+                 * actually needs: the cylinder's vertical extent must reach
+                 * the slab's near face. `far_y` is the slab's opposite face;
+                 * a cylinder entirely beyond it is not touching anything.
+                 * A cylinder INSIDE the slab still passes (top above the near
+                 * face) and is pushed out, which is the intended resolution.
+                 */
+                float far_y = cube->position.y - up_sign * box_extents[up_index];
+                /* Vertical half-extent of the cylinder about its own centre. */
+                float axis_y = axis.y;
+                if (axis_y > 1.0f) axis_y = 1.0f;
+                if (axis_y < -1.0f) axis_y = -1.0f;
+                float v_support = h * fabsf(axis_y) + r * sqrtf(fmaxf(0.0f, 1.0f - axis_y * axis_y));
+                float cyl_low = cyl->position.y - v_support;
+                float cyl_high = cyl->position.y + v_support;
+                /* The shortcut models the slab's near face as an infinite
+                 * plane, so it is only valid when the cylinder actually
+                 * REACHES that face. `far_y` is the slab's opposite face; a
+                 * cylinder embedded between the two faces falls through to
+                 * the generic segment-OBB path, which resolves it by true
+                 * closest point rather than pushing it out the top.
+                 *
+                 * DESPOT-2026-09-29: an earlier version of this gate ALSO
+                 * required the cylinder to reach the far face. That is wrong
+                 * -- a cylinder resting ON TOP of a slab is entirely on the
+                 * near side by construction, so the condition rejected the
+                 * primary use case and broke list4_cylinder_floor and
+                 * paranoia_cylinder_collision. One condition is correct. */
+                (void) far_y;
+                int reaches_near_face = (up_sign >= 0.0f) ? (cyl_high >= plane_y - slop)
+                                                          : (cyl_low <= plane_y + slop);
+                if (reaches_near_face) {
+                    return collision_static_plane_cylinder(cube, cyl, plane_y, out, C);
+                }
             }
         }
     }

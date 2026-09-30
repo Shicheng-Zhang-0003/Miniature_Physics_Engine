@@ -25,7 +25,7 @@ The kernel is fully modular: every pipeline stage (broadphase, narrowphase shape
 
 `v15S` is the GTK4 + modular-kernel evolution of `v15R3` (whose release record is preserved in [`release_notes_v15R3.md`](release_notes_v15R3.md)). Highlights over `v15R3`:
 
-- **GTK4 port** — event controllers, gestures, overlay, dialogs; Wayland-safe input (no more X11-only mouse lock).
+- **GTK4 port** — event controllers, gestures, overlay, dialogs; Wayland-safe input (no more X11-only mouse lock). GTK4 is the only supported toolkit; the GTK3 body was removed in 2026-09 (v15R3's GTK3 engine is in git history).
 - **Module system (MPI)** — stable C ABI (`core/mpe_module.h`): register/override shapes, broadphase, solver stages, and tick modules; load `.so` plugins live (`mod load`), attach/detach per world.
 - **Per-world configuration** — every physics function takes the owning world's config (`NULL` = global default); two worlds can run different gravity/iterations/slop side by side.
 - **Upgraded data structures** — growable body/contact pools (512→16384, 4K→64K ceilings), O(1) contact-pair hash probes, per-world id→index cache (islands O(J+B)), small-first broadphase node pool, process-wide determinism counters.
@@ -35,7 +35,7 @@ The kernel is fully modular: every pipeline stage (broadphase, narrowphase shape
 Inherited from `v15R3`:
 
 - **Domain-driven architecture** — clean `core`, `physics`, `render`, `scene`, `ui_input` modules.
-- **Warm-starting contact solver** with multi-point Sutherland–Hodgman manifolds for stable stacking.
+- **Warm-starting contact solver** with multi-point Sutherland–Hodgman manifolds for stable stacking. *Caveat: the warm start covers the friction tangents only — the normal solves cold each tick by design; see the Solver section.*
 - **Full constraint framework** — revolute, fixed, prismatic, distance, and rope constraints plus spring joints (scene v200 persists springs + all five constraint types; all types live in the headless suite and the TUI demo).
 - **3D spatial-hash grid broadphase** with adaptive cell sizing.
 - **Interactive spring-joint system** with live magenta rendering.
@@ -85,7 +85,8 @@ All narrowphase functions take the owning world's config; dispatch is registry-f
 
 ### Solver
 
-- **Impulse-based sequential solver**, 64 iterations by default (configurable 1–128), with **warm starting** (per-world O(1) hash cache).
+- **Impulse-based sequential solver**, 64 iterations by default (configurable 1–128). The 64 knob is really 128 manifold visits per tick — every manifold is visited twice per iteration (`collision_solver.c:685`).
+- **Warm starting is TANGENT-ONLY.** The tangent impulses are restored from a per-world O(1) hash cache, and the tangent frame is adopted across ticks. The **normal impulse is deliberately cold every tick**: restoring it as the iteration seed ejected the 10-high stack at ~13 m/s in measured ablations, while the restored values themselves stayed healthy (`collision_solver.c:318-343`). So "warm starting" here means friction memory, not the dominant term.
 - Every stage (resolve, Poisson restitution, rolling resistance, split impulse) is an optional module hook — foreign solvers observe or replace per stage.
 - Static + kinetic friction, rolling friction, Catto split-impulse penetration correction (no velocity Baumgarte).
 - Positional depenetration pass for pile stability (registry-routed, per-world config).

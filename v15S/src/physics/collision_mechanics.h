@@ -260,11 +260,21 @@ static inline uint32_t a3_contact_cache_body_stamp(const rigidbody *rigid_body) 
     return stamp;
 }
 
+/* Capacity of collision_data::contacts. DESPOT-2026-09-29: this was a bare
+ * literal 4, and plugin pair handlers choose contact_count themselves, so the
+ * bound was not expressed anywhere the writers could see it. Named now, and
+ * the array is sized from it so the two cannot drift. Anything that clamps a
+ * foreign handler's contact_count must use this. */
+#define MPE_MAX_MANIFOLD_CONTACTS 4
+/* Capacity of the Sutherland-Hodgman clip polygon buffers. A convex face
+ * clipped by 4 half-planes yields at most 8 vertices; 16 is slack. */
+#define MPE_MAX_MANIFOLD_POLY 16
+
 typedef struct {
     rigidbody *object_a;
     rigidbody *object_b;
     vector3 normal_vector;
-    contact_point_data contacts[4];
+    contact_point_data contacts[MPE_MAX_MANIFOLD_CONTACTS];
     int contact_count;
 } collision_data;
 bool collision_dual_sphere(rigidbody *rigidbody_object_a, rigidbody *rigidbody_object_b,

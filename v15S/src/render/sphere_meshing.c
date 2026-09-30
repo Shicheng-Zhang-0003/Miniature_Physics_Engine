@@ -75,12 +75,17 @@ void init_sm_system(mesh *mesh_object, int horizontal_sections, int vertical_sta
         int next_row_start = current_row_start + horizontal_sections + 1;
         for (int section_index = 0; section_index < horizontal_sections;
              section_index++, current_row_start++, next_row_start++) {
+            /* DESPOT-2026-09-29 WINDING FIX: both triangles were wound so the
+             * face normal points inward (measured dot of the geometric normal
+             * with the outward centroid is negative for both). Latent only
+             * because nothing enables GL_CULL_FACE; reversed so enabling
+             * culling cannot turn every sphere inside out. */
             element_indices[element_index++] = current_row_start;
-            element_indices[element_index++] = next_row_start;
-            element_indices[element_index++] = current_row_start + 1;
             element_indices[element_index++] = current_row_start + 1;
             element_indices[element_index++] = next_row_start;
+            element_indices[element_index++] = current_row_start + 1;
             element_indices[element_index++] = next_row_start + 1;
+            element_indices[element_index++] = next_row_start;
         }
     }
     glGenVertexArrays(1, &mesh_object->vertex_array_object);

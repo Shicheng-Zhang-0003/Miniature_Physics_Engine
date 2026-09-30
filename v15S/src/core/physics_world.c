@@ -504,6 +504,38 @@ void physics_world_set_solver_state(physics_world *world, void *state) {
     world->solver_state = state;
 }
 
+
+/* DESPOT-2026-09-29: re-resolve a snapshotted module's live state.
+ *
+ * physics_world_step snapshots {desc, state} and then invokes each hook,
+ * which the header and readme both describe as safe ("a hook may
+ * attach/detach (structural change deferred in effect to next tick)").
+ * Deferring the TABLE change is not enough: physics_world_detach_module runs
+ * desc->detach(), which FREES mod_state (ftc_fleet_detach -> ftc_fleet_destroy
+ * -> free). The snapshot then reached that slot and called
+ * mods[mi]->pre_step(world, dt, states[mi]) with a dangling state pointer.
+ * The dlclose variant is worse: a hook that also calls mpe_loader_unload on a
+ * sibling unmaps the image, and the loop reads the function pointer straight
+ * out of unmapped memory.
+ *
+ * Fix: never call through the snapshotted state. Look the descriptor up in
+ * the LIVE table each time and skip it if it is no longer attached. Modules
+ * attached mid-tick are correctly deferred to the next tick (matching the
+ * documented contract), and modules detached mid-tick are never invoked. */
+bool physics_world_module_live_state(physics_world *world, const mpe_module_desc_t *desc, void **out_state) {
+    if (out_state) *out_state = NULL;
+    if (!world || !desc) return false;
+    int n = world->tick_module_count;
+    if (n > 16) n = 16;
+    for (int i = 0; i < n; i++) {
+        if (world->tick_modules[i] == desc) {
+            if (out_state) *out_state = world->tick_module_state[i];
+            return true;
+        }
+    }
+    return false;
+}
+
 int physics_world_attach_module(physics_world *world, const mpe_module_desc_t *desc) {
     if (!world || !desc || desc->abi != MPE_MODULE_ABI) return -1;
     for (int i = 0; i < world->tick_module_count; i++)
@@ -543,6 +575,45 @@ int physics_world_detach_module(physics_world *world, const char *name) {
  * registered orientation first, then the swapped orientation with a
  * normal flip — mirroring the legacy inline chains. Custom shapes
  * go through the registry only (no built-in fallback). */
+/* Sanitise a manifold a FOREIGN pair handler just wrote.
+ *
+ * DESPOT-2026-09-29: `collision_data` is handed to plugin pair handlers by
+ * pointer, and nothing validated what they wrote back. contacts[] is a fixed
+ * 4-element array, but the handler chooses contact_count, so returning
+ * count = 64 made collision_prepare_solver write 60 contact_point_data
+ * structs past the end of the manifold slot -- corrupting neighbouring
+ * manifolds and then the heap. A handler returning object_a = NULL NULL-derefs
+ * two lines into the solver (the guard only covered the cache id).
+ *
+ * mpe_module.h documents the struct as NOT a frozen ABI, so a plugin is
+ * exactly as likely to get this wrong as to get it right. Clamp here, at the
+ * single choke point every plugin path passes through, and refuse a manifold
+ * whose bodies are not the pair we asked about.
+ */
+static bool a3_sanitize_plugin_manifold(collision_data *out, const rigidbody *a, const rigidbody *b) {
+    if (!out) return false;
+    if (out->contact_count < 0 || out->contact_count > MPE_MAX_MANIFOLD_CONTACTS) {
+        out->contact_count = MPE_MAX_MANIFOLD_CONTACTS;
+    }
+    /* The pipeline is dispatching the pair (a,b); that is what the solver
+     * must act on, so the dispatcher asserts it rather than trusting the
+     * handler. A handler that leaves these NULL would NULL-deref two lines
+     * into collision_prepare_solver; one that points them at other bodies
+     * would have the solver apply impulses to unrelated objects. Both are
+     * removed by overwriting, which also keeps a sloppy-but-harmless handler
+     * (tests/module_test.c sets object_b = a) working. */
+    out->object_a = (rigidbody *)a;
+    out->object_b = (rigidbody *)b;
+    if (out->contact_count > 0) {
+        float n2 = vector3_length_squared(out->normal_vector);
+        if (!isfinite(n2) || !(n2 > 1e-12f)) {
+            out->contact_count = 0;
+            return false;
+        }
+    }
+    return true;
+}
+
 bool mpe_shape_dispatch(physics_world *world, rigidbody *a, rigidbody *b, collision_data *out) {
     if (!a || !b || !out) return false;
     /* Render-only proxies never collide (semantic backstop for direct
@@ -552,12 +623,17 @@ bool mpe_shape_dispatch(physics_world *world, rigidbody *a, rigidbody *b, collis
     int ca = (a->type == object_custom) ? a->custom_shape : -1;
     int cb = (b->type == object_custom) ? b->custom_shape : -1;
     mpe_collide_fn fn = mpe_find_pair_handler((int)a->type, (int)b->type, ca, cb);
-    if (fn) return fn(a, b, out, world);
+    if (fn) {
+        if (!fn(a, b, out, world)) return false;
+        if (!a3_sanitize_plugin_manifold(out, a, b)) return false;
+        return true;
+    }
     /* try swapped orientation (registry may hold canonical order only) */
     fn = mpe_find_pair_handler((int)b->type, (int)a->type, cb, ca);
     if (fn) {
         collision_data tmp = {0};
         if (!fn(b, a, &tmp, world)) return false;
+        if (!a3_sanitize_plugin_manifold(&tmp, b, a)) return false;
         *out = tmp;
         out->normal_vector = vector3_scaling(tmp.normal_vector, -1.0f);
         out->object_a = a;
@@ -1036,14 +1112,30 @@ void physics_world_step(physics_world *world, float dt) {    if ((!world) || (!w
         rb_apply_forces_perfect(rb, vector3_scaling(gravity, rb->mass));
     }
 
-    /* Deterministic retention factors (never libm pow: see det_math.h). */
-    float linear_damping = (float) det_pow_retention((double) step_drag, (double) dt);
+    /* Deterministic retention factors (never libm pow: see det_math.h).
+     *
+     * DESPOT-2026-09-29: the drag value was passed to det_pow_retention
+     * UNCLAMPED. det_pow_retention's contract is base in (0, 1.1]; anything
+     * else takes the counted libm path, so a drag of 0 (or negative, or NaN)
+     * -- a perfectly reachable state, since a world initialised before
+     * mpe_config_init() runs sees a zeroed g_cfg -- silently escaped the
+     * deterministic path on EVERY tick, once per world per step. Caught by
+     * the new det-fallback assertion in mpe_test_end. Clamp to the contract
+     * here, exactly as rb_integrate_position_exact_free_flight already does,
+     * so an out-of-range config is corrected rather than desynchronised. */
+    float drag_clamped = step_drag;
+    if (!isfinite(drag_clamped) || drag_clamped <= 0.0f) drag_clamped = 1.0f;
+    if (drag_clamped > 1.0f) drag_clamped = 1.0f;
+    float linear_damping = (float) det_pow_retention((double) drag_clamped, (double) dt);
     /* TRUTH: scale=1.0 means NO extra rotary damping (retention 1.0), even
      * when drag<1 damps translation. Air barely damps rotation; coupling
      * them (old: pow(drag*scale)) damped spin in vacuum whenever drag<1.
      * FIX-AUDIT: angular scale was hardcoded 0.97 (damped even at drag=1). */
+    float ang_base = drag_clamped * step_ang_scale;
+    if (!isfinite(ang_base) || ang_base <= 0.0f) ang_base = 1.0f;
+    if (ang_base > 1.0f) ang_base = 1.0f;
     float angular_damping =
-        (step_ang_scale >= 1.0f) ? 1.0f : (float) det_pow_retention((double) (step_drag * step_ang_scale), (double) dt);
+        (step_ang_scale >= 1.0f) ? 1.0f : (float) det_pow_retention((double) ang_base, (double) dt);
     /* Springs before integration (weak-linked canonical entry). */
     if (mpe_springs_apply) {
         mpe_springs_apply(world, dt);
@@ -1061,7 +1153,16 @@ void physics_world_step(physics_world *world, float dt) {    if ((!world) || (!w
             states[mi] = world->tick_module_state[mi];
         }
         for (int mi = 0; mi < nmods; mi++) {
-            if (mods[mi] && mods[mi]->pre_step) mods[mi]->pre_step(world, dt, states[mi]);
+            if (!mods[mi] || !mods[mi]->pre_step) continue;
+            /* Re-resolve: a hook earlier in this loop may have detached this
+             * one, freeing states[mi]. See a3_module_live_state. A module
+             * that legitimately holds NULL state is distinguished from one
+             * that is no longer attached, so a NULL-state module detached
+             * mid-tick is still skipped. */
+            void *live = NULL;
+            if (!physics_world_module_live_state(world, mods[mi], &live)) continue;
+            mods[mi]->pre_step(world, dt, live);
+            (void) states;
         }
     }
     for (int i = 0; i < world->body_count; i++) {
@@ -1288,7 +1389,11 @@ void physics_world_step(physics_world *world, float dt) {    if ((!world) || (!w
             states[mi] = world->tick_module_state[mi];
         }
         for (int mi = 0; mi < nmods; mi++) {
-            if (mods[mi] && mods[mi]->post_step) mods[mi]->post_step(world, dt, states[mi]);
+            if (!mods[mi] || !mods[mi]->post_step) continue;
+            void *live = NULL;
+            if (!physics_world_module_live_state(world, mods[mi], &live)) continue;
+            mods[mi]->post_step(world, dt, live);
+            (void) states;
         }
     }
     /* AUDIT: the warm-start cache is deliberately NOT cleared here. Cached

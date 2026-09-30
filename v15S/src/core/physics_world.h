@@ -185,6 +185,11 @@ void physics_world_process_pair(physics_world *world, int index_a, int index_b, 
 physics_world *physics_world_get_primary(void);
 /* Phase-2: modular attach/dispatch. */
 int physics_world_attach_module(physics_world *world, const mpe_module_desc_t *desc);
+/* Resolve a module's CURRENT mod_state from the live attachment table.
+ * Returns false when the module is not attached (e.g. a hook detached it
+ * earlier in this tick). Tick-hook dispatch must use this rather than a
+ * snapshotted state pointer, which detach frees. */
+bool physics_world_module_live_state(physics_world *world, const mpe_module_desc_t *desc, void **out_state);
 int physics_world_detach_module(physics_world *world, const char *name);
 void physics_world_set_broadphase(physics_world *world, const mpe_broadphase_if_t *iface);
 void physics_world_set_solver(physics_world *world, const mpe_solver_if_t *iface);
