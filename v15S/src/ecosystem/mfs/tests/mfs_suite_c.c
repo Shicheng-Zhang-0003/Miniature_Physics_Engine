@@ -396,3 +396,107 @@ int mfs_t_intake_stop(void) {
     mfs_test_end(t_ptr);
     return t_ptr->failures;
 }
+
+/* mfs_t_shooter_axis: GATED regression for MFS H6 (DESPOT-2026-09-29).
+ *
+ * The flywheel had three disagreeing spin axes:
+ *   - the disc's own symmetry axis, which the engine defines as
+ *     `cached_axes[0]` (body-local X);
+ *   - the revolute joint's axis, built as chassis (0,1,0);
+ *   - the spin-up torque axis, (0, cos35, sin35).
+ *
+ * The "angle it up by 35 degrees" step rotated the body about X — the very
+ * axis it rotates around, so the symmetry axis never moved. A thin disc driven
+ * to spin about an axis lying largely in its own plane is tumbling, not
+ * spinning: wrong rim speed at the contact patch, so the 35 degree launch was
+ * unreachable by construction.
+ *
+ * This asserts the axes AGREE rather than asserting a spin rate, because the
+ * geometric defect is the thing that is wrong and the rate symptom depends on
+ * how long you wait.
+ */
+int mfs_t_shooter_axis(void) {
+    mfs_test_t t; mfs_test_begin(&t, "shooter_axis"); mfs_test_t *t_ptr = &t;
+    physics_world w; mfs_test_world(&w);
+    g_cfg.timestep.solver_iterations = FTC_ITERS;
+    constraint_pool_init(&w);
+
+    extern const mpe_module_desc_t mfs_module_1_desc;
+    void *state = NULL;
+    if (mfs_module_1_attach(&w, &state) != 0) {
+        t_ptr->failures++;
+        physics_world_cleanup(&w);
+        mfs_test_end(t_ptr);
+        return t_ptr->failures;
+    }
+    mfs_module_1_state *ms = (mfs_module_1_state *)state;
+
+    MFS_CHECK(t_ptr, ms->shooter_flywheel_body >= 0);
+    MFS_CHECK(t_ptr, ms->shooter_pivot_joint >= 0);
+    if (ms->shooter_flywheel_body < 0 || ms->shooter_pivot_joint < 0) {
+        mfs_module_1_detach(&w, state);
+        physics_world_cleanup(&w);
+        mfs_test_end(t_ptr);
+        return t_ptr->failures;
+    }
+
+    rigidbody *fw = physics_world_body_by_id(&w, (uint32_t)ms->shooter_flywheel_body);
+    rigidbody *ch = mfs_get_chassis(ms);
+    MFS_CHECK(t_ptr, fw != NULL);
+    MFS_CHECK(t_ptr, ch != NULL);
+
+    if (fw && ch) {
+        /* The disc's symmetry axis, in world space. */
+        vector3 disc_axis = fw->cached_axes[0];
+        float dl = sqrtf(vector3_length_squared(disc_axis));
+        MFS_CHECK(t_ptr, dl > 0.5f);
+        if (dl > 0.5f) {
+            disc_axis = vector3_scaling(disc_axis, 1.0f / dl);
+        }
+        /* The joint's axis, in world space (axis_a is in body A = chassis). */
+        const constraint *jc = constraint_pool_at(&w, ms->shooter_pivot_joint);
+        MFS_CHECK(t_ptr, jc != NULL);
+        vector3 joint_axis = jc ? jc->p.revolute.axis_a : (vector3){0.0f, 1.0f, 0.0f};
+        float jl = sqrtf(vector3_length_squared(joint_axis));
+        MFS_CHECK(t_ptr, jl > 0.5f);
+        if (jl > 0.5f) {
+            joint_axis = vector3_scaling(joint_axis, 1.0f / jl);
+        }
+        /* The axis the step function applies torque about. */
+        float tilt = MFS_SHOOTER_LAUNCH_ANGLE_DEG * (float)M_PI / 180.0f;
+        vector3 torque_axis = vector4_rotate_to_vector3(
+            ch->orientation, (vector3){0.0f, cosf(tilt), sinf(tilt)});
+
+        float d_disc_joint = fabsf(vector3_dot(disc_axis, joint_axis));
+        float d_disc_torque = fabsf(vector3_dot(disc_axis, torque_axis));
+        MFS_INFO("shooter axes: |disc.joint|=%.4f |disc.torque|=%.4f "
+                 "(pre-fix the disc axis was chassis X, so both were "
+                 "cos(35deg)=0.819)", d_disc_joint, d_disc_torque);
+
+        /* A flywheel is only a flywheel if it spins about its own symmetry
+         * axis. 0.999 tolerates float drift but nothing else. */
+        MFS_CHECK(t_ptr, d_disc_joint > 0.999f);
+        MFS_CHECK(t_ptr, d_disc_torque > 0.999f);
+
+        /* And the launch angle must actually be 35 degrees: rim velocity is
+         * perpendicular to the symmetry axis, so the angle of that axis above
+         * horizontal is the complement of the launch angle. Guard the sense
+         * too -- a 145 degree axis would launch the ball into the floor. */
+        float axis_pitch = atan2f(disc_axis.y,
+                                  sqrtf(disc_axis.x * disc_axis.x + disc_axis.z * disc_axis.z));
+        float launch_deg = 90.0f - axis_pitch * 180.0f / (float)M_PI;
+        MFS_INFO("launch angle from disc axis: %.2f deg (target %.2f)",
+                 launch_deg, MFS_SHOOTER_LAUNCH_ANGLE_DEG);
+        MFS_CHECK_NEAR(t_ptr, launch_deg, MFS_SHOOTER_LAUNCH_ANGLE_DEG, 1.0f,
+                       "launch angle above horizontal");
+
+        if (t_ptr->failures == 0) {
+            printf("[PASS] flywheel symmetry axis, joint axis and torque axis agree\n");
+        }
+    }
+
+    mfs_module_1_detach(&w, state);
+    physics_world_cleanup(&w);
+    mfs_test_end(t_ptr);
+    return t_ptr->failures;
+}
