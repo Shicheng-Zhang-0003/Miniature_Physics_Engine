@@ -305,12 +305,17 @@ MFS (suite 11 gated + 5 info, 0 fail; was 13/3 + broken make):
 
 Audit notes and boundaries are in `../AUDIT_REPORT_2026-09-24.md`.
 
-- [ ] **MFS motor chain, step 1 (the real blocker): make the stall endpoint a
-  GATED test.** `[MOTOR-III]`'s blocked-rotor gate is physically sound but
-  cannot help while nothing in the shipped suite holds a wheel at stall — A/B
-  showed byte-identical results with and without it. Without a gated
-  straight-push/stall test, the delivered-torque change (strafe 0.87 -> 1.26 m)
-  and the lateral `VREF` retune that follows it cannot be *verified*, only
-  believed. This is test authoring, not physics, and it is the prerequisite
-  for everything else in the motor chain. See
-  `ecosystem/mfs/docs/KNOWN_FAILURES.md` -> `MOTOR-III-2026-09-29`.
+- [ ] **MFS motor chain: fix the observer -> implicit-solve coupling.**
+  Step 1 (the gated stall test) is DONE — `mfs_t_stall_endpoint`, MFS 9/9.
+  It localises the defect precisely: open loop 3.6509 N·m vs 3.7265 spec
+  (**-2.03%, electrical model honest**); closed loop 0.7081 N·m (**-81%**,
+  broken) with `load_torque = -3.6983` (observer converging correctly). The
+  breakage is that `motor_update_load` treats a co-rotating external load as
+  back-EMF, so `w_end` rises, back-EMF rises with it, current collapses, and a
+  held shaft ends up transmitting a fraction of stall. The motor model and the
+  observer are both exonerated; only the coupling needs work. The fix is to
+  make a held shaft a stable fixed point at full stall torque.
+  Phase 2 is a loud `[XFAIL][MOTOR-III]` today. Then: re-apply delivered-torque
+  accounting and retune lateral `VREF`, both of which are now measurable
+  because step 1 exists. See `KNOWN_FAILURES.md` -> `MOTOR-III-2026-09-29`.
+

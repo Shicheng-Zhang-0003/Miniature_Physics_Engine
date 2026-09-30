@@ -511,6 +511,34 @@ class Runner:
                      log=result.log, detail=str(error))
             return False
         rows = re.findall(r"^\[(PASS|BUILD-OK|INFO)\]\s+(.+?)(?:\s+\(diagnostic, ungated\))?$", output, re.M)
+        # DESPOT-2026-09-29: MFS [XFAIL] markers were being discarded. The
+        # MFS suite prints loud expected-failure markers (MFS-STRAFE-F2,
+        # MOTOR-III) but parse_skip_xfail was only ever called on the suite-v2
+        # stage, so every one of them vanished before the summary. A 206/206
+        # line could therefore hide a known-red frontier with no trace -- the
+        # exact false-green shape this runner exists to prevent. Surface them
+        # here too: visible, counted, non-blocking.
+        # The per-case markers live in the suite's own run log, not in the
+        # captured stdout (build_tests.sh redirects the suite to
+        # mfs_suite.run.log so it can be kept as an artifact), so the text to
+        # scan is the log contents.
+        _mfs_text = output
+        for _lp in sorted(out.glob("*.run.log")):
+            try:
+                _mfs_text += "\n" + _lp.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+        _mfs_skips, _mfs_xfails = parse_skip_xfail(_mfs_text)
+        for _test, _message in _mfs_skips:
+            self.add(f"mfs-skip/{_test}", "mfs", "SKIP", kind="skip-marker", severity="skip",
+                     log=result.log, detail=_message or "MFS case self-skipped its coverage")
+        if _mfs_xfails:
+            _shown = "; ".join(_mfs_xfails[:5])
+            if len(_mfs_xfails) > 5:
+                _shown += f"; ... (+{len(_mfs_xfails) - 5} more)"
+            self.add("mfs-xfail-markers", "mfs", "XFAIL", kind="xfail-marker", severity="info",
+                     log=result.log,
+                     detail=f"{len(_mfs_xfails)} expected-failure marker(s): {_shown}")
         sanitizer_error = False
         if sanitizer:
             for log_path in out.glob("*.run.log"):
