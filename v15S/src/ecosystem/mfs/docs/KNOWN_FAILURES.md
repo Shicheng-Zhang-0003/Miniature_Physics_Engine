@@ -226,6 +226,45 @@ confirm the view keeps turning past where the cursor would have hit the edge.
 
 ### MOTOR-III-2026-09-29 — Disturbance observer cannot see a blocked rotor (PARTIAL: gate added, effect unproven)
 
+**RESOLUTION UPDATE 2026-09-29 (later, same day).** The missing gated test
+now exists: `mfs_t_stall_endpoint` in `tests/mfs_suite_a.c`, registered as a
+blocking case (MFS is 9/9, was 8/8). It has two phases and the split between
+them is the whole finding:
+
+* **Phase 1, open loop** (motor alone, shaft fed exactly 0): `output_torque =
+  3.6509 N.m` against the published `3.7265 N.m`, **-2.03%**. Current 9.013 A
+  against the 9.2 A spec, back-EMF exactly 0. Gated at 10%. **The electrical
+  model is honest.**
+* **Phase 2, closed loop** (the disturbance observer feeding its estimate
+  back into `motor_update_load`, which is the path that actually regressed):
+  `output_torque = 0.7081 N.m`, **-81%**. `load_torque = -3.6983`, i.e. the
+  estimator converged correctly to within 1% of `-stall`.
+
+So the observer is *not* the broken part, and neither is the motor. The
+breakage is in the **observer -> implicit-solve coupling**: `motor_update_load`
+treats a co-rotating load as back-EMF. Feeding `tau_L ~= -stall` into
+
+    w_end = (w + (A*V + tau_L) * dt / I) / (1 + A*B*dt / I)
+
+pushes `w_end` up; back-EMF rises with it; current collapses; the transmitted
+torque falls to a fraction of stall. The motor is told the load is absorbing
+torque, so it correctly stops driving — and then reports that it is barely
+driving.
+
+**This disproves the blocked-rotor gate below as a fix**, which is worth
+recording because the gate was written on the same intuition. The gate snaps
+`load_torque` to `-stall_out`; `load_torque` is already within 1% of that.
+Snapping the *input* of a broken coupling more precisely cannot fix the
+coupling. The gate is retained (correct, inert, costs nothing) but is no
+longer proposed as the remedy.
+
+Phase 2 is reported as a loud `[XFAIL][MOTOR-III]`, not a silent pass and not
+a blocking red, so the suite stays green while the fix is written. **The real
+remaining work is therefore not the motor model or the observer: it is
+deciding what a co-rotating external load should do to `w_end` in
+`motor_update_load` so that a held shaft is a stable fixed point at full stall
+torque rather than a runaway that starves its own current.**
+
 **Status update, honest version.** A blocked-rotor gate was implemented in
 `modules/ftc/submodules/robot.c` (inside the observer branch, gated on
 `fabsf(tau_ref) >= 0.95f * stall_out` and `fabsf(wheel_speed) < 0.5f` rad/s,
@@ -264,6 +303,18 @@ delivered-torque accounting, (3) then retune lateral `VREF`. Step 1 does not
 exist yet, and without it steps 2 and 3 cannot be verified rather than merely
 believed. That is the actual next piece of work, and it is a test-authoring
 task, not a physics task.
+
+**Runner honesty fix (shipped with the above).** While adding this test,
+`tools/test_runner.py` was found to **discard every MFS `[XFAIL]` marker**.
+`parse_skip_xfail()` was only ever called on the `suite-v2` stage; the MFS
+stage never called it, and the per-case markers live in `mfs_suite.run.log`
+rather than the captured stdout, so they had no path to the summary at all. A
+`206/206 ... xfailed: 0` line could therefore hide a known-red frontier with
+no trace — the exact false-green shape this runner exists to prevent. The
+pre-existing `MFS-STRAFE-F2` marker had been invisible this whole time. The
+MFS stage now reads the run log and surfaces both. The full-profile line
+changed from `206/206, xfailed: 0` to the truthful `206 passed, 2 xfailed`
+(one MOTOR-III, one MFS-STRAFE-F2), with `0 blocking failures` unchanged.
 
 **Process note (recorded because it nearly shipped as a false finding).**
 While A/B-ing this, `mfs_suite --all` appeared to report `[FAIL] ftc_hotload`
