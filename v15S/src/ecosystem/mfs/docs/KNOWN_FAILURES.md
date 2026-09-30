@@ -393,3 +393,43 @@ only the fix toggled:
 Both assertions fail on the pre-fix code and pass on the fixed code, so this
 is a real regression guard and not a test written to agree with whatever the
 code happened to do. Full profile 206/206, ASan/UBSan green.
+
+### MFS-H6-2026-09-29 — Flywheel spun about an axis perpendicular to its own symmetry axis — FIXED
+
+**Symptom.** The 35° shooter launch was unreachable by construction.
+
+**Root cause — three spin axes, none of them agreeing.**
+
+1. The engine defines a cylinder's symmetry axis as `cached_axes[0]`, i.e. the
+   body's **local X**. The flywheel was created unrotated, so its symmetry axis
+   started along the chassis X.
+2. The "angle it up by 35 degrees" step rotated the body about **X** — the very
+   axis that rotation leaves invariant. So the symmetry axis never moved at
+   all. That step was a no-op on the quantity it was supposed to change.
+3. The revolute joint was built about chassis `(0,1,0)`, and the spin-up torque
+   is applied about `(0, cos35, sin35)`.
+
+So a **thin disc was being driven to spin about an axis lying entirely in its
+own plane**. That is a tumble, not a flywheel: the rim speed at the contact
+patch is not the tangential speed a flywheel imparts, and the launch angle is
+whatever the geometry says — measured, 90° (a flat horizontal disc), not 35°.
+
+**Fix.** Make all three the same axis. Rim velocity is perpendicular to the
+symmetry axis, so for a 35° launch the symmetry axis must be
+`(0, cos35, sin35)` in chassis coordinates. The disc is oriented by a 90°
+rotation about `(0, −sin35, cos35)`, which maps its local X onto that axis,
+and the joint is built on the same axis.
+
+**Verification — `mfs_t_shooter_axis`, registered and gated** (MFS 11/11).
+It asserts the axes *agree* rather than asserting a spin rate, because the
+geometric defect is the thing that is wrong and a rate symptom depends on how
+long you wait. Same binary, only the fix toggled:
+
+| measurement | pre-fix | post-fix |
+|---|---|---|
+| \|disc · joint\| | **0.0000** (perpendicular) | **1.0000** |
+| \|disc · torque\| | **0.0000** | **1.0000** |
+| launch angle above horizontal | **90.00°** | **35.00°** |
+
+All three assertions fail pre-fix and pass post-fix. Full profile 206/206,
+suite 34/34, ASan/UBSan green.

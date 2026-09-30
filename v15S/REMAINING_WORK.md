@@ -323,3 +323,10 @@ Audit notes and boundaries are in `../AUDIT_REPORT_2026-09-24.md`.
   tick (this also revived the dead momentary-reverse). Gated by the new
   `mfs_t_intake_stop`: OFF now 0.004 rad/s (was 62.532, i.e. never stopped),
   reverse now -59.495 (was +61.371, i.e. never reversed). MFS 10/10.
+
+- [x] **MFS H6 (flywheel spun perpendicular to its own symmetry axis) —
+  FIXED 2026-09-29.** Three disagreeing axes; the "tilt 35° about X" step was
+  a no-op on the disc's symmetry axis because that is the axis X-rotation
+  leaves fixed. Unified all three on `(0, cos35, sin35)`. Gated by the new
+  `mfs_t_shooter_axis`: pre-fix `|disc·joint| = 0.0000` (perpendicular) and a
+  90° launch; post-fix 1.0000 and 35.00°. MFS 11/11.

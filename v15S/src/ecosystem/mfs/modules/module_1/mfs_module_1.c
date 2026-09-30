@@ -567,13 +567,36 @@ MPE_USED void mfs_module_1_shooter_create(mfs_module_1_state *state) {
         flywheel->friction_static = 0.1f;
         flywheel->friction_kinetic = 0.05f;
         
-        /* Revolute joint to chassis for flywheel spin */
+        /* MFS H6 (DESPOT-2026-09-29): the spin axis, the cylinder's own
+         * symmetry axis, and the joint axis were three different directions.
+         *
+         * The engine's cylinder symmetry axis is `cached_axes[0]`, i.e. the
+         * body's local X. The old code created the flywheel with its local X
+         * therefore along the chassis X, then "angled it up by 35 degrees" by
+         * rotating about X — a rotation about X leaves X INVARIANT, so the
+         * disc's symmetry axis never moved at all. Meanwhile the joint was
+         * built about chassis (0,1,0) and the spin-up torque is applied about
+         * (0, cos35, sin35). So a thin disc was being driven to spin about an
+         * axis lying largely in its own plane: a tumble, not a flywheel, with
+         * the wrong rim speed at the contact patch and therefore no way to
+         * launch at 35 degrees.
+         *
+         * Fix: make all three the same axis. We want the rim velocity (which
+         * is perpendicular to the symmetry axis) to leave at 35 degrees above
+         * horizontal, so the symmetry axis is (0, cos35, sin35) in chassis
+         * coordinates. Rotating the body's local X onto that is a 90 degree
+         * rotation about the unit perpendicular (0, -sin35, cos35). */
+        float spin_tilt = MFS_SHOOTER_LAUNCH_ANGLE_DEG * (float)M_PI / 180.0f;
+        float sp_cos = cosf(spin_tilt), sp_sin = sinf(spin_tilt);
+        vector3 spin_axis_chassis = {0.0f, sp_cos, sp_sin};
+
+        /* Revolute joint to chassis for flywheel spin, about the SAME axis. */
         int joint_idx = constraint_add_revolute(world,
             chassis->object_id,
             flywheel->object_id,
             (vector3){0.0f, MFS_ROBOT_CHASSIS_HEIGHT*1.0f, -MFS_ROBOT_CHASSIS_LENGTH*0.5f - 0.05f},
             (vector3){0.0f, 0.0f, 0.0f},
-            (vector3){0.0f, 1.0f, 0.0f});  /* spin axis = Y (horizontal) */
+            spin_axis_chassis);
         if (joint_idx >= 0) {
             state->shooter_pivot_joint = joint_idx;
         } else {
@@ -582,11 +605,13 @@ MPE_USED void mfs_module_1_shooter_create(mfs_module_1_state *state) {
             fprintf(stderr, "[mfs-module-1] shooter_create: revolute joint failed (pool exhausted?)\n");
         }
         
-        /* Angle the flywheel up by 35 degrees */
-        float angle = MFS_SHOOTER_LAUNCH_ANGLE_DEG * M_PI / 180.0f;
+        /* Orient the disc so its symmetry axis (local X -> cached_axes[0])
+         * IS the spin axis. See the H6 note above: the previous tilt about X
+         * could not move the symmetry axis, because that is the axis it
+         * rotates about. */
         rigidbody *flywheel_body = &world->bodies[flywheel_idx];
         flywheel_body->orientation = vector4_from_axis_with_angle(
-            (vector3){1.0f, 0.0f, 0.0f}, angle);
+            (vector3){0.0f, -sp_sin, sp_cos}, (float)M_PI * 0.5f);
         rigidbody_update_axes(flywheel_body);
     }
     
