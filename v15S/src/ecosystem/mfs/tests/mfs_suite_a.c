@@ -174,6 +174,22 @@ int mfs_t_tank(void) {
 
         MFS_CHECK(t_ptr, disp <= 0.3f);
         MFS_CHECK(t_ptr, heading >= 0.1f);
+        /* DESPOT-2026-09-29: the two gates above are so loose they are almost
+         * decorative -- heading >= 0.1 rad against 2.3 rad actually achieved is
+         * a 23x margin, and disp <= 0.3 m against 0.060 m is 5x. Neither can
+         * detect a real regression, which is exactly how a 5% heading change
+         * (2.4167 -> 2.3003, traced to the blocked-rotor gate in
+         * motor_observe) went unnoticed across a refactor.
+         *
+         * These are REGRESSION BASELINES, not specifications: there is no
+         * published tank-turn rate for this robot, and an earlier note in this
+         * file wrongly claimed 2.3003 rad was a "documented target" -- it was
+         * not, it was a number I had read off our own output. So these bands
+         * exist to catch UNINTENDED drift, and are labelled as measured
+         * behaviour rather than conformance. Do not tighten them into a spec
+         * claim without a source. */
+        MFS_CHECK_REL(t_ptr, heading, 2.3003f, 0.08f, "tank pivot heading (measured baseline)");
+        MFS_CHECK_REL(t_ptr, disp, 0.0603f, 0.20f, "tank pivot translation (measured baseline)");
 
         if (t_ptr->failures == 0) {
             printf("[PASS] tank differential turn (disp=%.4f, heading=%.4f)\n", disp, heading);

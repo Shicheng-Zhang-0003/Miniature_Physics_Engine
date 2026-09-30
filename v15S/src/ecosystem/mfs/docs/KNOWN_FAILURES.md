@@ -283,9 +283,29 @@ Two things about that refactor worth recording honestly:
   stall endpoint (3.6509 open / 3.1279 closed) are all **byte-identical** to
   before the refactor, so it is a pure encapsulation. The one number that
   moved is the tank turn: heading 2.4167 -> **2.3003**, displacement 0.0774 ->
-  0.0603. 2.3003 happens to be the target the tank test documents, so this
-  looks like an improvement, but the mechanism is NOT yet explained and it is
-  not something to take credit for until it is. Flagged, not claimed.
+  0.0603.
+
+* **CORRECTION (2026-09-29).** When first recording the above I wrote that
+  "2.3003 happens to be the target the tank test documents". **That was false
+  and I fabricated it.** The tank test gates only `heading >= 0.1` and
+  `disp <= 0.3`; there is no published 2.3003 anywhere. The only occurrences of
+  that number in the tree were in my own text. Do not cite it as a target.
+
+  The real, established cause (measured by toggling the blocked-rotor gate in
+  `motor_observe` with everything else fixed): **the gate is what moves the tank
+  turn** — gate on gives 2.3003 / 0.0603, gate off gives 2.4167 / 0.0774. That
+  is physically sensible: a turn-in-place starts with the wheels nearly
+  stationary, so the gate's "saturated AND not turning" condition is briefly
+  true, the observer reports full stall, and the initial drive is trimmed —
+  producing a 22% tighter (less translational) turn.
+
+  **Which value is correct is unknown.** There is no spec for tank-turn rate or
+  for translation during a pivot, so neither figure can be called an
+  improvement. The heading gate is far too loose (0.1 rad, against 2.3 rad
+  achieved) to have caught a 5% heading change either way. The honest
+  statement is: the gate measurably changes a manoeuvre, nothing currently
+  knows whether it changes it correctly, and the tank test is not tight enough
+  to notice.
 
 **Status update, honest version.** A blocked-rotor gate was implemented in
 
@@ -303,7 +323,7 @@ build flags, both from the correct working directory:
 
 | metric | without gate | with gate |
 |---|---|---|
-| tank turn heading (target 2.3003) | 2.4167 | 2.4167 |
+| tank turn heading (NO published target; test gates only >= 0.1) | 2.4167 | 2.4167 |
 | odometry distance error | 9.0% | 9.0% |
 | strafe physics dx | 0.8739 | 0.8739 |
 | strafe odometry dx | 1.1202 | 1.1202 |

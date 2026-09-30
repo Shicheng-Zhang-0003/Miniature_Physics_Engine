@@ -212,7 +212,20 @@ int main(int argc, char **argv) {
     physics_world_cleanup(&w2);
     if (dlclose(h) != 0) { printf("[FAIL] dlclose\n"); failures++; }
     else printf("[PASS] dlclose\n");
-    printf(failures ? "FTC HOTLOAD: %d FAILURES\n" : "FTC HOTLOAD: all green\n", failures);
+    if (failures) {
+        /* DESPOT-2026-09-29: the summary line used to be the ONLY thing
+         * printed on failure -- the individual [FAIL] <reason> lines above went
+         * to the same stream but the suite summary that the QA runner scrapes
+         * is just "[FAIL] ftc_hotload (failures=N)", so a genuine failure
+         * arrived in CI with no indication of what had actually broken. Worse,
+         * this case is sensitive to the working directory, so it fails for
+         * reasons that look identical to a real regression. Name the count
+         * loudly and point at the log. */
+        fprintf(stderr, "FTC HOTLOAD: %d FAILURE(S) -- see the per-check "
+                        "[FAIL] lines above and mfs_suite.run.log\n", failures);
+    } else {
+        printf("FTC HOTLOAD: all green\n");
+    }
     return failures ? 1 : 0;
 }
 #endif /* MPE_FTC_HOTLOAD_TEST */
