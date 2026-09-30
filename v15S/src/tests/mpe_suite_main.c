@@ -109,7 +109,20 @@ typedef struct {
     int diag; /* 1 = diag-informational, excluded from default run */
 } mpe_entry_t;
 
+/* DESPOT-2026-09-29: metamorphic suite. These carry NO golden numbers -- they
+ * assert relations (rotation equivariance, solver convergence monotonicity,
+ * sleep thresholds, config reachability) that any correct engine satisfies
+ * regardless of what it computes. That is the one property every defect in
+ * this audit shared: the code and the expected number were wrong the same
+ * way, or the measurement could not express the thing it was checking. */
+extern int mpe_t_meta_rotation(void);
+extern int mpe_t_meta_convergence(void);
+extern int mpe_t_meta_config_wiring(void);
+
 static const mpe_entry_t mpe_registry[] = {
+    {"meta_rotation", mpe_t_meta_rotation, 0},
+    {"meta_convergence", mpe_t_meta_convergence, 0},
+    {"meta_config_wiring", mpe_t_meta_config_wiring, 0},
     {"two_world", mpe_t_two_world, 0},
     {"revolute", mpe_t_revolute, 0},
     {"revolute_matrix", mpe_t_revolute_matrix, 0},
@@ -207,6 +220,14 @@ int main(int argc, char **argv) {
      * Loaded here, once, before any test runs. Individual test files that
      * call mpe_config_init() themselves are unaffected (idempotent). */
     mpe_config_init();
+    /* DESPOT-2026-09-29: print the regime up front so a CI log line records
+     * which configuration produced the result. The suite is now expected to be
+     * run once per regime (see tools/test_runner.py); a green result without
+     * a regime tag is no longer a complete measurement. */
+    {
+        const char *regime = getenv("MPE_TEST_REGIME");
+        printf("regime: %s\n", (regime && *regime) ? regime : "default");
+    }
     printf("MPE Suite v2 — src: v15S (single binary, exact dispatch)\n");
     printf("============================================================\n");
     if (argc >= 2 && strcmp(argv[1], "--list") == 0) {

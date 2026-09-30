@@ -374,3 +374,33 @@ Audit notes and boundaries are in `../AUDIT_REPORT_2026-09-24.md`.
   themselves correctly; the suite was the one path that did not. Fixing it
   resolved DEEP-2026-09-29 as a side effect. Full analysis in
   `KNOWN_FAILURES.md` -> `CONFIG-2026-09-29`.
+
+- [x] **Test-harness upgrade (2026-09-29).** Four additions, all aimed at the
+  failure modes that actually let defects through this audit:
+  1. *Harness contract* — `mpe_test_begin()` now **initialises** `g_cfg`
+     (it only used to save/restore, faithfully preserving inherited garbage)
+     and `mpe_test_end()` **refuses to certify** a result produced under a
+     degenerate config. A green line from a solver that was never switched on
+     is now impossible.
+  2. *Regime matrix* — the **entire** suite re-runs under five configurations
+     (`default/light/heavy/brittle/sticky`: iterations 8–128, gravity ×0.25–×3,
+     friction ×0.25–×4, restitution 0–0.95, sleep on/off). Wired into
+     `test_runner.py`. A property that holds at one setting and not another is
+     invisible to a single golden number — that is exactly how CONFIG-2026-09-29
+     stayed green. It found a failure on its first run.
+  3. *Metamorphic tests* (`tests/mpe_suite_d.c`, 3 registered) — rotation
+     equivariance, solver-convergence monotonicity, and config reachability.
+     **No golden numbers**: they assert relations any correct engine satisfies.
+  4. *Withdrawn honestly* — `meta_sleep` was written, failed to converge, and
+     was removed rather than shipped red or unjustifiably green.
+
+- [ ] **META-ROTATION-2026-09-29: sphere-sphere contact is not
+  rotation-equivariant.** Free flight is exact (0.0) and floor contact is float
+  noise (1.5e-08), so the defect is specific to sphere-sphere: `has_contact`
+  stays set in one configuration after the bodies are 2.59 m apart, so impulses
+  keep being applied to a separated pair. XFAIL at a tight 1e-4 m so a real fix
+  turns it green rather than needing the threshold relaxed. This is a stale
+  manifold / warm-start lifetime bug, not a tolerance question.
+
+- [ ] **SLEEP-H1-2026-09-29: a body frozen without being asleep** (only under
+  the `heavy` regime: gravity ×3, sleep on). Observed, not root-caused.

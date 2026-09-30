@@ -27,6 +27,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include "core/physics_world.h"
 #include "physics/constraint.h"
 #include "config/mpe_config.h"
@@ -41,12 +42,105 @@ typedef struct {
     int checks;
     mpe_config_t cfg_saved;
     int cfg_active;
+    const char *regime;
 } mpe_test_t;
+
+/* DESPOT-2026-09-29 -- THE HARNESS CONTRACT.
+ *
+ * The single worst bug of this audit was not a physics bug: for the entire
+ * life of the suite, `mpe_suite_main.c` never called `mpe_config_init()`, so
+ * every test ran against a zero-initialised `g_cfg` -- 0 solver iterations, 0
+ * Baumgarte bias, 0 penetration slop, 0 restitution, 0 friction. The solver was
+ * not iterating and 34/34 were green. A gate could not have caught it, because
+ * the suite was green in both regimes.
+ *
+ * So the harness now has two jobs it previously skipped:
+ *
+ *   1. ESTABLISH state, not merely save it. `mpe_test_begin` used to snapshot
+ *      `g_cfg` and restore it afterwards, faithfully preserving whatever
+ *      garbage it inherited. Save-and-restore without initialise is a harness
+ *      that launders the bug.
+ *   2. ASSERT its own preconditions. If the config is degenerate, every
+ *      measurement below it is fiction, and the suite must say so loudly
+ *      instead of reporting a confident green.
+ */
+
+/* Non-degenerate config = a config with a working solver in it. These are the
+ * fields whose zero value silently disables physics rather than failing. */
+static inline int mpe_cfg_is_degenerate(const mpe_config_t *c) {
+    return (c == NULL) ||
+           (c->timestep.solver_iterations < 1) ||
+           !(c->solver.penetration_slop > 0.0f) ||
+           !(c->solver.bias_factor > 0.0f) ||
+           !(c->timestep.max_substeps >= 1) ||
+           !(c->body_defaults.sphere_restitution > 0.0f) ||
+           !(c->body_defaults.sphere_fric_s > 0.0f);
+}
+
+/* Apply a named regime. Regimes exist so the suite can be run across a spread
+ * of configurations: a physics invariant that holds at one setting and not
+ * another is a bug that a single golden number cannot see. The defaults are
+ * chosen to stay inside the engine's documented parameter ranges so we are
+ * exercising the shipped model, not an unreachable corner of the schema. */
+typedef struct {
+    const char *name;
+    int iterations;      /* <0 = leave alone */
+    float gravity_mult;  /* 1.0 = as configured */
+    float friction_mult; /* 1.0 = as configured */
+    float restitution;   /* <0 = leave alone */
+    int sleep;           /* -1 = leave alone */
+} mpe_regime_t;
+
+static inline const mpe_regime_t *mpe_regime_lookup(const char *name) {
+    static const mpe_regime_t regimes[] = {
+        {"default",  -1, 1.00f, 1.00f, -1.0f, -1},
+        {"light",      8, 0.25f, 0.50f,  0.10f,  0},
+        {"heavy",    128, 3.00f, 2.00f,  0.80f,  1},
+        {"brittle",   64, 1.00f, 0.25f,  0.00f,  0},
+        {"sticky",    64, 1.00f, 4.00f,  0.95f,  1},
+    };
+    const int n = (int)(sizeof(regimes) / sizeof(regimes[0]));
+    if (!name || !*name) return &regimes[0];
+    for (int i = 0; i < n; i++) {
+        if (strcmp(regimes[i].name, name) == 0) return &regimes[i];
+    }
+    return NULL; /* unknown regime: caller must fail loudly */
+}
+
+static inline int mpe_regime_apply(const mpe_regime_t *r) {
+    if (!r) return 0;
+    if (r->iterations >= 0) g_cfg.timestep.solver_iterations = (float)r->iterations;
+    if (g_cfg.world.gravity != 0.0f) g_cfg.world.gravity *= r->gravity_mult;
+    if (g_cfg.body_defaults.sphere_fric_s > 0.0f) {
+        g_cfg.body_defaults.sphere_fric_s *= r->friction_mult;
+        g_cfg.body_defaults.cube_fric_s *= r->friction_mult;
+        g_cfg.body_defaults.cylinder_fric_s *= r->friction_mult;
+        g_cfg.world.floor_friction_s *= r->friction_mult;
+    }
+    if (r->restitution >= 0.0f) {
+        g_cfg.body_defaults.sphere_restitution = r->restitution;
+        g_cfg.body_defaults.cube_restitution = r->restitution;
+        g_cfg.body_defaults.cylinder_restitution = r->restitution;
+    }
+    if (r->sleep >= 0) g_cfg.sleep.enable = r->sleep;
+    return 1;
+}
 
 static inline void mpe_test_begin(mpe_test_t *t, const char *name) {
     t->name = name;
     t->failures = 0;
     t->checks = 0;
+    /* Establish, then apply the requested regime, THEN save. Saving before
+     * establishing is what let a zeroed g_cfg survive every test. */
+    mpe_config_init();
+    const char *regime = getenv("MPE_TEST_REGIME");
+    if (regime && *regime && strcmp(regime, "default") != 0) {
+        const mpe_regime_t *r = mpe_regime_lookup(regime);
+        if (r) mpe_regime_apply(r);
+        t->regime = r ? r->name : "INVALID";
+    } else {
+        t->regime = "default";
+    }
     t->cfg_saved = g_cfg;
     t->cfg_active = 1;
     det_fallback_reset();
