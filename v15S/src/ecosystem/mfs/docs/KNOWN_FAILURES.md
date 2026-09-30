@@ -260,14 +260,32 @@ errors, recorded because both nearly became false findings:**
 2. The earlier `ftc_hotload` "false green" was also my own error (wrong
    working directory), as recorded in the process note below.
 
-**The one real finding that survived: the observer's on/off state is owned by
-the caller.** `motor_update_load` reads `m->wprev_valid` but never sets it, so
+**The one real finding that survived: the observer's on/off state was owned by
+the caller.** `motor_update_load` read `m->wprev_valid` but never set it, so
 any consumer other than `ftc/submodules/robot.c` — the plugin path, a future
-submodule, the standalone build — gets a silently dead disturbance observer
-with no warning and no way to detect it from the motor's own state. The
-shipped robot is fine because it does set the flag. The fix is for
-`motor_update_load` to own the flag, or for the header to state loudly that
-the caller must. Not yet done; logged in `REMAINING_WORK.md`.
+submodule, the standalone build — got a silently dead disturbance observer
+(`tau_L == 0`) with no warning and no way to detect it from the motor's own
+state. **Fixed 2026-09-29:** the estimator moved into `motor_observe()` in
+`motor.c`, so the module that READS the flag now also SETS it, and callers
+cannot get it wrong. `robot.c` no longer touches `load_torque`/`w_prev`/
+`wprev_valid` at all.
+
+Two things about that refactor worth recording honestly:
+
+* It was **not** behaviour-preserving on the first attempt. My first
+  `motor_observe` cleared `wprev_valid` in the "no previous sample" branch,
+  which meant the flag never became valid and the observer stayed dead for the
+  whole run — **5 of 9 suite cases failed**. The pre-refactor code set the flag
+  unconditionally, so the second tick could form a difference. Caught only
+  because the suite is strong enough that a dead observer breaks half of it,
+  which is a decent argument for having built it.
+* Metrics after the fix: strafe (0.8739 / 1.1202), odometry error (9.0%), the
+  stall endpoint (3.6509 open / 3.1279 closed) are all **byte-identical** to
+  before the refactor, so it is a pure encapsulation. The one number that
+  moved is the tank turn: heading 2.4167 -> **2.3003**, displacement 0.0774 ->
+  0.0603. 2.3003 happens to be the target the tank test documents, so this
+  looks like an improvement, but the mechanism is NOT yet explained and it is
+  not something to take credit for until it is. Flagged, not claimed.
 
 **Status update, honest version.** A blocked-rotor gate was implemented in
 

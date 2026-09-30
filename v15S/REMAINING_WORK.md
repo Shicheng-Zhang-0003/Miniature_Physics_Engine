@@ -305,15 +305,13 @@ MFS (suite 11 gated + 5 info, 0 fail; was 13/3 + broken make):
 
 Audit notes and boundaries are in `../AUDIT_REPORT_2026-09-24.md`.
 
-- [ ] **MFS: make the disturbance observer's on/off state caller-independent.**
-  `motor_update_load()` reads `m->wprev_valid` to decide whether to use
-  `load_torque`, but never sets it — only `ftc/submodules/robot.c:797` does.
-  Every other consumer (plugin path, future submodule, standalone build)
-  therefore gets a silently dead observer: `tau_L == 0`, no warning, and no
-  way to detect it from the motor's own state. Found while writing the gated
-  `mfs_t_stall_endpoint`, whose first version measured 0.708 N.m (-81%)
-  purely because it had not performed the handshake; the real closed-loop
-  figure is 3.1279 N.m (-16%), which passes. Either let `motor_update_load`
-  own the flag or make the header state the caller contract loudly.
+- [~] **DONE: disturbance-observer ownership.** Estimator moved into
+  `motor_observe()` in `motor.c`, so the module that reads `wprev_valid` now
+  sets it and callers cannot leave the observer silently dead. Pure
+  encapsulation (strafe/odom/stall byte-identical), but the tank turn heading
+  also moved 2.4167 -> 2.3003, which coincides with the documented target and
+  is **not yet mechanistically explained** -- see KNOWN_FAILURES.md
+  MOTOR-III-2026-09-29. Worth understanding before building on it.
+
 
 

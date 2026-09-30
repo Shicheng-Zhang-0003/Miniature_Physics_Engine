@@ -737,64 +737,15 @@ void ftc_robot_update(physics_world *world, ftc_robot *robot, float dt) {
          * uncorrectable by this motor anyway — capping there keeps full
          * locked-rotor tracking (stall needs 1x) while starving the chaos
          * loop 13x. Same convergence point, stable path. */
-        float axle_I = 0.5f * wheel->mass * r_run * r_run;
-        if (robot->wheel_motors[i].wprev_valid && axle_I > 0.0f && dt > 0.0f &&
-            isfinite(wheel_speed)) {
-            float tau_l = axle_I * (wheel_speed - robot->wheel_motors[i].w_prev) / dt -
-                          robot->wheel_motors[i].tau_exp_prev;
-            float stall_out = robot->wheel_motors[i].stall_current *
-                              robot->wheel_motors[i].kt *
-                              robot->wheel_motors[i].gear_ratio *
-                              robot->wheel_motors[i].efficiency;
-            if (!(stall_out > 0.5f) || !isfinite(stall_out)) stall_out = 1.0f;
-            float tau_cap = 2.0f * stall_out;
-            if (!isfinite(tau_l)) {
-                tau_l = 0.0f;
-            } else if (tau_l > tau_cap) {
-                tau_l = tau_cap;
-            } else if (tau_l < -tau_cap) {
-                tau_l = -tau_cap;
-            }
-            /* Blocked-rotor gate (DESPOT-2026-09-29, [MOTOR-III]).
-             *
-             * The estimator above is a DIFFERENCE: it infers the external
-             * load from I*alpha minus last tick's commanded torque, so at
-             * the stall endpoint it can only approach -stall asymptotically.
-             * It consistently undershoots there, which makes the implicit
-             * solve plan for a load smaller than reality: the motor never
-             * commands the full stall torque the held wheel needs, so the
-             * stall endpoint reads 2.21 N.m against a 3.73 N.m spec
-             * (measured, straight-push test).
-             *
-             * But a motor that is AT its torque limit and whose shaft is NOT
-             * turning is, by definition, transmitting its full stall torque to
-             * the load. That is the torque-speed endpoint of the same model
-             * the solver already uses for the free-speed bound, so snapping
-             * to it is exact, not a fudge: we are not inventing a gain, we
-             * are evaluating the model at a point where its answer is known.
-             *
-             * This is the discriminator the pure observer lacks. Without it a
-             * blocked rotor and a genuine load are the same signature
-             * ("torque applied, no acceleration") and the observer ratchets
-             * down indefinitely; with it the endpoint is pinned and the
-             * governor keeps full authority exactly where it is needed.
-             *
-             * Only fires when the motor is actually saturated AND the wheel
-             * is essentially not turning, so a spinning wheel is unaffected
-             * and free-spin convergence (tau_l -> 0) is preserved. */
-            {
-                float tau_ref = robot->wheel_motors[i].tau_exp_prev;
-                float w_blk = 0.5f; /* rad/s: below this the shaft is held */
-                if (isfinite(tau_ref) && stall_out > 0.5f &&
-                    fabsf(tau_ref) >= 0.95f * stall_out &&
-                    isfinite(wheel_speed) && fabsf(wheel_speed) < w_blk) {
-                    tau_l = (tau_ref >= 0.0f) ? -stall_out : stall_out;
-                }
-            }
-            robot->wheel_motors[i].load_torque = tau_l;
-        }
-        robot->wheel_motors[i].w_prev = isfinite(wheel_speed) ? wheel_speed : 0.0f;
-        robot->wheel_motors[i].wprev_valid = 1;
+        /* DESPOT-2026-09-29: the disturbance observer now lives in motor.c
+         * (motor_observe), in the same module as the gate in
+         * motor_update_load that consumes it. It used to be inlined here
+         * while motor.c only ever READ wprev_valid, so a caller that forgot
+         * to set it got a silently dead observer (tau_L == 0) with no
+         * diagnostic. That mistake produced a wrong diagnosis of the stall
+         * endpoint; see KNOWN_FAILURES.md -> MOTOR-III-2026-09-29. */
+        motor_observe(&robot->wheel_motors[i], wheel_speed, dt,
+                      0.5f * wheel->mass * r_run * r_run);
 
         /* MFS_TRACTION_CONTROL: compare against the rolling speed the
          * chassis motion demands at this wheel (rigid-body velocity at
