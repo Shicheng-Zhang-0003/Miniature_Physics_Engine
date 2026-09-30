@@ -315,3 +315,11 @@ Audit notes and boundaries are in `../AUDIT_REPORT_2026-09-24.md`.
 
 
 
+
+- [x] **MFS H5 (intake could not be stopped) — FIXED 2026-09-29.** Two
+  actuators on one joint, neither wired to state: a joint motor frozen on at
+  creation-time speed, and a P-control it outvoted. Unified onto the joint
+  motor, driven from `intake_active`/`intake_speed_rpm`/`intake_power` every
+  tick (this also revived the dead momentary-reverse). Gated by the new
+  `mfs_t_intake_stop`: OFF now 0.004 rad/s (was 62.532, i.e. never stopped),
+  reverse now -59.495 (was +61.371, i.e. never reversed). MFS 10/10.
