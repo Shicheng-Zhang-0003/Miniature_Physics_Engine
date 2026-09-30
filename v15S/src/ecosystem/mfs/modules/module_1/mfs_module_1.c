@@ -685,31 +685,45 @@ MPE_USED void mfs_module_1_intake_step(mfs_module_1_state *state, float dt) {
         physics_world_body_by_id(world, (uint32_t)state->intake_roller_body);
     if (!roller) return;
     
-    /* Control intake roller speed */
-    float target_omega = state->intake_active ? 
-        (state->intake_speed_rpm * M_PI / 30.0f) : 0.0f;
-    
-    /* M7 AXIAL PROJECTION FIX: the sign of the roller's spin was read from
-     * the world X component of angular_velocity, while the drive torque below
-     * is applied about the roller's own world axle (cached_axes[0]). When the
-     * roller yaws with the chassis those two disagree, so the controller
-     * compared the target against |omega| with the wrong sign and drove the
-     * roller the wrong way (or oscillated). Project onto the axle instead:
-     * the error is simply target minus actual axial spin. */
-    float axial_omega = vector3_dot(roller->angular_velocity, roller->cached_axes[0]);
-    float omega_error = target_omega - axial_omega;
-    
-    /* Simple P-control for intake motor */
-    float torque = omega_error * 0.2f;  /* Proportional gain */
-    if (torque > 0.5f) torque = 0.5f;
-    if (torque < -0.5f) torque = -0.5f;
+    /* MFS H5 (DESPOT-2026-09-29): the intake roller had TWO actuators fighting
+     * each other, and neither was wired to the state that controls intake.
+     *
+     *  1. The revolute joint motor, enabled once at creation with
+     *     `intake_speed_rpm` and never touched again — permanently on, at the
+     *     creation-time speed.
+     *  2. A P-control here that applied torque directly to the roller body.
+     *
+     * Consequences: the P-control correctly targeted 0 when `intake_active`
+     * was false, but the joint motor kept driving at full creation speed
+     * regardless, so THE INTAKE COULD NOT BE STOPPED. Conversely the speed
+     * slider (600-1200 RPM) and the momentary-reverse `intake_power` were
+     * dead: the slider never reached the motor, and `intake_power` was
+     * written twice and read by nothing at all.
+     *
+     * Fix: ONE actuator, the joint motor, driven from state every tick. The
+     * P-control is removed rather than kept alongside it — two controllers on
+     * one joint is the defect, not a redundancy, and the joint motor is the
+     * right one because it is solved inside the constraint system (so it
+     * cannot fight the joint) and honours motor_max_torque. */
+    float target_omega = 0.0f;
+    if (state->intake_active) {
+        target_omega = state->intake_speed_rpm * M_PI / 30.0f;
+        /* `intake_power` < 0 is the momentary reverse (B while held). It was
+         * previously dead; honour it now. */
+        if (state->intake_power < 0.0f) target_omega = -target_omega;
+    }
+    if (state->intake_pivot_joint >= 0) {
+        /* enabled even at target 0: that is what actually brakes/coasts the
+         * roller to a stop instead of leaving it spinning forever. */
+        constraint_set_revolute_motor(world, state->intake_pivot_joint, true,
+                                      target_omega, 0.5f);
+    }
 
-    /* Torque about the roller's world axle (cached_axes[0]), not raw X:
-     * the roller yaws with the chassis. */
-    roller->torque_accumulator =
-        vector3_addition(roller->torque_accumulator,
-                         vector3_scaling(roller->cached_axes[0], torque));
-    
+    /* M7 AXIAL PROJECTION FIX, now moot for actuation but worth keeping the
+     * principle on record: the roller's spin is about its own world axle
+     * (cached_axes[0]), not raw X, because the roller yaws with the chassis.
+     * The joint motor projects on the joint axis, so it needs no fix. */
+
     /* Ball pickup detection: check contacts between intake and balls */
     if (state->intake_active) {
         for (int i = 0; i < state->ball_count; i++) {

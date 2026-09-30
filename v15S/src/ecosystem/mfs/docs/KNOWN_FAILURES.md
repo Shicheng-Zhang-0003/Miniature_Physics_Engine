@@ -350,3 +350,46 @@ wrong. The genuine (much smaller) weakness is that `ftc_hotload` prints
 `[FAIL] ftc_hotload (failures=N)` with no reason, so a genuine failure of that
 case is hard to diagnose — worth improving, but it is a diagnostics gap, not a
 masked failure.
+
+### MFS-H5-2026-09-29 — Intake roller had two actuators and could not be stopped — FIXED
+
+**Symptom.** The intake could not be switched off. The 600–1200 RPM speed
+slider had no effect, and the momentary reverse (B while held) did nothing.
+
+**Root cause.** Two actuators on one joint, neither wired to the intake state:
+
+1. A revolute joint motor, enabled once in `mfs_module_1_intake_create()` with
+   `intake_speed_rpm`, and **never touched again** — permanently on at the
+   creation-time speed.
+2. A P-control in `mfs_module_1_intake_step()` applying torque straight to the
+   roller body. This one *did* correctly target 0 when `intake_active` was
+   false — and was simply overruled by the joint motor still driving at full
+   speed.
+
+So the P-control was not wrong, it was outvoted. The speed slider never
+reached the motor because the motor's target was frozen at creation, and
+`intake_power` was written in two places and read by **nothing at all** —
+verifiably dead code.
+
+**Fix.** One actuator: the joint motor, re-driven from state every tick
+(0 when inactive, `intake_speed_rpm` when active, negated when
+`intake_power < 0`). The P-control is removed rather than kept alongside it —
+two controllers on one joint was the defect, not redundancy, and the joint
+motor is the correct one because it is solved inside the constraint system
+(so it cannot fight the joint) and honours `motor_max_torque`. The motor is
+kept `enabled` at target 0 on purpose: that is what actually brakes the roller
+to rest rather than leaving it coasting.
+
+**Verification — the test whose absence let this survive.** `mfs_t_intake_stop`
+is registered and **gated** (MFS is 10/10, was 9/9). Measured, same binary,
+only the fix toggled:
+
+| phase | pre-fix | post-fix |
+|---|---|---|
+| intake ON | 62.848 rad/s | 62.848 rad/s |
+| intake OFF | **62.532 rad/s** (does not stop) | **0.004 rad/s** |
+| momentary reverse | **+61.371 rad/s** (never reverses) | **−59.495 rad/s** |
+
+Both assertions fail on the pre-fix code and pass on the fixed code, so this
+is a real regression guard and not a test written to agree with whatever the
+code happened to do. Full profile 206/206, ASan/UBSan green.

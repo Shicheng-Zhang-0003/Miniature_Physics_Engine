@@ -21,6 +21,7 @@ extern int mfs_t_ftc_hotload(void);
 extern int mfs_t_module_1(void);
 extern int mfs_t_physics_truth(void);
 extern int mfs_t_stall_endpoint(void);
+extern int mfs_t_intake_stop(void);
 
 static const mfs_test_entry_t registry[] = {
     {"teleop",      mfs_t_teleop,      false},
@@ -32,6 +33,7 @@ static const mfs_test_entry_t registry[] = {
     {"module_1",    mfs_t_module_1,    false},
     {"physics_truth", mfs_t_physics_truth, false},
     {"stall_endpoint", mfs_t_stall_endpoint, false},
+    {"intake_stop", mfs_t_intake_stop, false},
 };
 
 int main(int argc, char **argv) {

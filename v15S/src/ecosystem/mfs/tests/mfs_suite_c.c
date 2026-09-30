@@ -278,3 +278,121 @@ int mfs_t_physics_truth(void) {
     }
     return rc;
 }
+/* mfs_t_intake_stop: GATED regression for MFS H5 (DESPOT-2026-09-29).
+ *
+ * The intake roller had two actuators: a revolute joint motor enabled once at
+ * creation and never touched again, plus a P-control applying torque straight
+ * to the roller body. The P-control targeted 0 when intake_active was false,
+ * but the joint motor kept driving at the creation-time speed, so THE INTAKE
+ * COULD NOT BE STOPPED. The 600-1200 RPM speed slider never reached the motor
+ * and `intake_power` (momentary reverse) was written twice and read by
+ * nothing.
+ *
+ * This is the test whose absence let that survive: nothing in the gated suite
+ * ever switched the intake off and checked that it stopped.
+ */
+int mfs_t_intake_stop(void) {
+    mfs_test_t t; mfs_test_begin(&t, "intake_stop"); mfs_test_t *t_ptr = &t;
+    physics_world w; mfs_test_world(&w);
+    g_cfg.timestep.solver_iterations = FTC_ITERS;
+    constraint_pool_init(&w);
+
+    extern const mpe_module_desc_t mfs_module_1_desc;
+    void *state = NULL;
+    if (mfs_module_1_attach(&w, &state) != 0) {
+        t_ptr->failures++;
+        physics_world_cleanup(&w);
+        mfs_test_end(t_ptr);
+        return t_ptr->failures;
+    }
+    mfs_module_1_state *ms = (mfs_module_1_state *)state;
+    const float dt = DT;
+    int fail = 0;
+
+    /* Resolve the roller once, by id, the way the module does. */
+    MFS_CHECK(t_ptr, ms->intake_roller_body >= 0);
+    MFS_CHECK(t_ptr, ms->intake_pivot_joint >= 0);
+    if (ms->intake_roller_body < 0 || ms->intake_pivot_joint < 0) {
+        physics_world_cleanup(&w);
+        mfs_test_end(t_ptr);
+        return t_ptr->failures;
+    }
+
+    float omega_on = 0.0f;
+    /* Phase 1: intake ON, let it spin up. */
+    mfs_module_1_set_intake(ms, true);
+    for (int tick = 0; tick < 120 && !fail; tick++) {
+        mfs_module_1_pre_step(&w, dt, state);
+            mfs_module_1_post_step(&w, dt, state);
+        physics_world_step(&w, dt);
+        if (!mfs_test_finite(&w)) fail = 1;
+    }
+    if (!fail) {
+        rigidbody *roller = physics_world_body_by_id(&w, (uint32_t)ms->intake_roller_body);
+        MFS_CHECK(t_ptr, roller != NULL);
+        if (roller) {
+            omega_on = vector3_dot(roller->angular_velocity, roller->cached_axes[0]);
+        }
+        MFS_INFO("intake ON: axial omega=%.3f rad/s", omega_on);
+        /* It must actually be spinning, or "it stopped later" proves nothing. */
+        MFS_CHECK(t_ptr, fabsf(omega_on) > 1.0f);
+    }
+
+    /* Phase 2: intake OFF. This is the H5 assertion. */
+    if (!fail) {
+        mfs_module_1_set_intake(ms, false);
+        for (int tick = 0; tick < 180 && !fail; tick++) {
+            mfs_module_1_pre_step(&w, dt, state);
+            mfs_module_1_post_step(&w, dt, state);
+            physics_world_step(&w, dt);
+            if (!mfs_test_finite(&w)) fail = 1;
+        }
+        rigidbody *roller = physics_world_body_by_id(&w, (uint32_t)ms->intake_roller_body);
+        MFS_CHECK(t_ptr, roller != NULL);
+        if (roller) {
+            float omega_off = vector3_dot(roller->angular_velocity, roller->cached_axes[0]);
+            MFS_INFO("intake OFF: axial omega=%.3f rad/s (was %.3f)", omega_off, omega_on);
+            /* Pre-fix the joint motor held the full creation-time speed here
+             * forever, so this is the assertion that actually pins H5. */
+            MFS_CHECK(t_ptr, fabsf(omega_off) < 0.25f * fabsf(omega_on));
+            if (t_ptr->failures == 0) {
+                printf("[PASS] intake stops when disabled\n");
+            }
+        }
+    }
+
+    /* Phase 3: momentary reverse must actually reverse (intake_power was
+     * dead code -- written, never read). */
+    if (!fail) {
+        mfs_module_1_set_intake(ms, true);
+        for (int tick = 0; tick < 120 && !fail; tick++) {
+            mfs_module_1_pre_step(&w, dt, state);
+            mfs_module_1_post_step(&w, dt, state);
+            physics_world_step(&w, dt);
+            if (!mfs_test_finite(&w)) fail = 1;
+        }
+        ms->intake_power = -1.0f;
+        for (int tick = 0; tick < 180 && !fail; tick++) {
+            mfs_module_1_pre_step(&w, dt, state);
+            mfs_module_1_post_step(&w, dt, state);
+            physics_world_step(&w, dt);
+            if (!mfs_test_finite(&w)) fail = 1;
+        }
+        ms->intake_power = 0.0f;
+        rigidbody *roller = physics_world_body_by_id(&w, (uint32_t)ms->intake_roller_body);
+        MFS_CHECK(t_ptr, roller != NULL);
+        if (roller) {
+            float omega_rev = vector3_dot(roller->angular_velocity, roller->cached_axes[0]);
+            MFS_INFO("intake REVERSE: axial omega=%.3f rad/s", omega_rev);
+            MFS_CHECK(t_ptr, omega_rev < -0.5f);
+            if (t_ptr->failures == 0) {
+                printf("[PASS] intake reverses on intake_power < 0\n");
+            }
+        }
+    }
+
+    if (state) mfs_module_1_detach(&w, state);
+    physics_world_cleanup(&w);
+    mfs_test_end(t_ptr);
+    return t_ptr->failures;
+}
