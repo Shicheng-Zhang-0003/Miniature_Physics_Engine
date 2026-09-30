@@ -507,11 +507,24 @@ int mpe_t_cylinder_sphere_inside(void) {
              * minimum clearance axially, and the radial term is ~0 there, so
              * a radial-only formula reports 2.0 m for a case that is actually
              * 0.7 m overlapped. */
+            /* DESPOT-2026-09-29: this was `RS - min(axial_clear, radial_clear)`,
+             * which is only meaningful while the sphere CENTRE is inside the
+             * cylinder. Once ejected clear it reports a large positive
+             * "overlap" for a sphere sitting well outside -- it cannot express
+             * separation at all, and it silently turned a fully-resolved
+             * ejection (measured radial 2.44 against a radius-2.0 cylinder)
+             * into an apparent 0.94 m overlap. Use the real signed distance to
+             * a solid cylinder instead:
+             *   sd = min(max(d_ax, d_rad), 0) + length(max(d_ax,0), max(d_rad,0))
+             * which is negative inside, zero on the surface, positive outside,
+             * and so handles ejection and approach with one expression. */
             const float RC = 2.0f, HH = 1.0f, RS = 0.5f;
-            float axial_clear = HH - fabsf(off.x);
-            float radial_clear = RC - radial;
-            float min_clear = (axial_clear < radial_clear) ? axial_clear : radial_clear;
-            float pen1 = RS - min_clear; /* >0 while overlapping */
+            float d_ax = fabsf(off.x) - HH;
+            float d_rad = radial - RC;
+            float sd = fminf(fmaxf(d_ax, d_rad), 0.0f) +
+                       sqrtf(fmaxf(d_ax, 0.0f) * fmaxf(d_ax, 0.0f) +
+                             fmaxf(d_rad, 0.0f) * fmaxf(d_rad, 0.0f));
+            float pen1 = RS - sd; /* >0 overlapping, <0 clear */
             MPE_INFO("case %d: pen0=%.4f pen1=%.4f axial=%.4f radial=%.4f",
                      c, pen0, pen1, axial, radial);
             /* Load-bearing: never driven deeper, and always moving outward. */

@@ -364,3 +364,13 @@ Audit notes and boundaries are in `../AUDIT_REPORT_2026-09-24.md`.
   **Land it together with an odometry slip term and the lateral `VREF` retune,
   not before.** Not landed for exactly that reason. Full numbers in
   `KNOWN_FAILURES.md` -> `MOTOR-II-2026-09-29`.
+
+- [x] **The suite never loaded the config (2026-09-29) — FIXED, and it was the
+  root cause of the "unexplained" deep-overlap residual.** `g_cfg` is a
+  zero-initialised global and `tests/mpe_suite_main.c` never called
+  `mpe_config_init()`, so the MPE suite ran with `solver_iterations = 0`,
+  `bias_factor = 0`, `penetration_slop = 0`, zero restitution and zero friction.
+  The solver was not iterating. The game, headless, TUI and MFS all configure
+  themselves correctly; the suite was the one path that did not. Fixing it
+  resolved DEEP-2026-09-29 as a side effect. Full analysis in
+  `KNOWN_FAILURES.md` -> `CONFIG-2026-09-29`.

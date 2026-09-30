@@ -554,6 +554,72 @@ CHOICE, not a spec value — no preset carries rotor-inertia data. The shape of
 the correction is right; the magnitude is order-of-magnitude only. Sizing it
 per-SKU would need vendor data that is not in the tree.
 
+### CONFIG-2026-09-29 — THE BIG ONE: the MPE test suite never loaded the config
+
+**`g_cfg` is a plain global, so the C runtime zero-initialises it. Nothing in
+`tests/mpe_suite_main.c` ever called `mpe_config_init()`.** The whole MPE suite
+had been validating physics against an all-zero configuration:
+
+| field | suite was using | real default |
+|---|---|---|
+| `solver_iterations` | **0** | 64 |
+| `solver.bias_factor` | **0** | 0.1 |
+| `solver.penetration_slop` | **0** | 0.01 |
+| `body_defaults.*_restitution` | **0** | 0.5 |
+| `body_defaults.*_fric_s` | **0** | 0.3 |
+| `world.gravity` | 0 | −9.81 |
+| `timestep.max_substeps` | 0 | 5 |
+
+So the sequential-impulse solver ran **zero iterations**, with **no Baumgarte
+positional bias** and **no penetration slop**, on bodies with no restitution and
+no grip. Every physics result this suite produced — including the revolute
+matrix, the manifold-reduction change, the torque-free angular-momentum work,
+the cylinder/sphere inside normal — was measured on a solver that was not
+solving.
+
+**Why nobody spotted it.** The shipped game is fine: `root_gtk.c` calls
+`mpe_config_init()` (twice), as do `headless_main.c` and `tui/tui_main.c`. The
+MFS harness calls it in `mfs_test_world()`. Some individual MPE test *files*
+call it too. `mpe_suite_main.c` was the single path that did not, so the game
+looked configured and the suite looked tested.
+
+The clue was already in the tree, written by this same session's drag fix, in
+`core/physics_world.c`:
+
+> "...a perfectly reachable state, since a world initialised **before
+> `mpe_config_init()` runs sees a zeroed g_cfg**..."
+
+That comment was describing *this suite*, permanently. Nobody connected the two.
+
+**It also resolves DEEP-2026-09-29.** The "unexplained 0.2–0.3 m residual" in
+enclosed-sphere ejection was measured under the zeroed config. With the real
+config loaded, all four sub-cases eject correctly and the residual disappears
+(case 1 clears by 0.50 m, case 2 by 0.17 m, case 3 lands at 0.0100 m — which is
+*exactly* the real `penetration_slop`, i.e. resolved). The mechanism I could not
+establish did not need establishing: the solver simply had bias 0 and slop 0, so
+it had no positional recovery to give.
+
+**A second bug was hiding behind the first.** The residual assertion used
+`pen = RS - min(axial_clear, radial_clear)`, which is only meaningful while the
+sphere *centre* is inside the cylinder. Once ejected clear it reports a large
+positive "overlap" for a sphere sitting well outside — so a fully-resolved
+ejection (measured radial 2.44 against a radius-2.0 cylinder) was being
+reported as a 0.94 m overlap. Replaced with the real signed distance to a solid
+cylinder, which is negative inside, zero on the surface and positive outside,
+so ejection and approach use one expression.
+
+**Impact: 34/34 before and after, and that is the point.** The suite was green
+either way, so no gate caught this. It was found by going looking for the class
+of defect that had dominated this whole session — *a value that is set but never
+wired to the thing that consumes it* — applied to the config instead of to a
+joint motor or an intake flag.
+
+**Lesson worth keeping.** `mpe_test_begin()` saves and restores `g_cfg` but
+never *initialises* it. Any harness that saves-and-restores state should also
+establish the state, or it will faithfully preserve whatever garbage it
+inherited. MFS got this right by accident (`mfs_test_world()` calls
+`mpe_config_init()`); the MPE harness never did.
+
 ### DEEP-2026-09-29 — Enclosed-sphere ejection: what is actually true, and what is still open
 
 The long-standing "1 of 4 sub-cases unresolved" note was a **test fixture bug**
@@ -580,14 +646,8 @@ strictly worse (8 checks failed instead of 0): `mpe_config_init()` resets
 suite-wide defaults the test was implicitly relying on, so that hypothesis was
 wrong and was reverted rather than left half-applied.
 
-**Honest status: the mechanism is not yet established.** The candidates are a
-world-configuration difference or a coupling between the contact and whatever
-else the canonical world contains; the iteration sweep rules out solver
-convergence but not those. The two load-bearing assertions (never driven
-deeper, always moving outward) are gated and hold in all four sub-cases, and
-the residual is printed every run so it cannot quietly regress.
-
-**For whoever picks this up:** instrument what differs between the canonical
-world and the isolated harness before changing physics. The tempting move —
-raise the gate, or tune the solver to make 0.3 m go away — would destroy the
-measurement that is currently telling the truth.
+**RESOLVED — see CONFIG-2026-09-29.** The "unexplained residual" was this
+suite running with `bias_factor = 0` and `penetration_slop = 0`: a solver with no
+positional recovery at all. It is not a depenetration limitation and never was.
+All four sub-cases now gate on full resolution against the engine's real
+`penetration_slop`.
