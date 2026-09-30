@@ -305,14 +305,6 @@ MFS (suite 11 gated + 5 info, 0 fail; was 13/3 + broken make):
 
 Audit notes and boundaries are in `../AUDIT_REPORT_2026-09-24.md`.
 
-- [~] **DONE: disturbance-observer ownership.** Estimator moved into
-  `motor_observe()` in `motor.c`, so the module that reads `wprev_valid` now
-  sets it and callers cannot leave the observer silently dead. Pure
-  encapsulation (strafe/odom/stall byte-identical), but the tank turn heading
-  also moved 2.4167 -> 2.3003, which coincides with the documented target and
-  is **not yet mechanistically explained** -- see KNOWN_FAILURES.md
-  MOTOR-III-2026-09-29. Worth understanding before building on it.
-
 
 
 
@@ -339,3 +331,24 @@ Audit notes and boundaries are in `../AUDIT_REPORT_2026-09-24.md`.
   term). Gated by the new `mfs_t_ball_spin`: \|omega\| was exactly 0.0, now
   742.1 rad/s (flywheel at 3957 rpm of a 4000 rpm target). MFS 12/12.
   *Approximation, not a friction solve — cannot express skid.*
+
+- [x] **Tank turn: unexplained 5% heading change — RESOLVED, and a fabricated
+  claim retracted (2026-09-29).** Two separate things came out of this.
+  First, the cause: toggling the blocked-rotor gate in `motor_observe` with
+  everything else fixed reproduces it exactly (gate on 2.3003/0.0603, gate off
+  2.4167/0.0774). A pivot turn starts with the wheels nearly stationary, so the
+  gate's "saturated AND not turning" condition is briefly true and the initial
+  drive is trimmed — a 22% tighter turn. Which value is *correct* is unknown:
+  there is no published tank-turn rate for this robot.
+  Second, and more important: I had written that 2.3003 "happens to be the
+  target the tank test documents". **That was fabricated** — the test gates only
+  `heading >= 0.1` and `disp <= 0.3`, and the only occurrences of 2.3003 in the
+  tree were in my own text. Retracted in `KNOWN_FAILURES.md`.
+  Acting on it: those gates were 23x and 5x too loose to catch a 5% change.
+  Now pinned to the measured baseline at 8% / 20% tolerance, explicitly
+  labelled a regression baseline and NOT a specification.
+
+- [x] **`ftc_hotload` failure diagnostics.** It printed only
+  `[FAIL] ftc_hotload (failures=N)` with no reason, so a genuine failure
+  reached CI with nothing pointing at what broke. Now the count also goes to
+  stderr with a pointer to the per-check lines and the run log.
