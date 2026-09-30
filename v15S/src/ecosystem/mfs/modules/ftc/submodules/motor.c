@@ -239,6 +239,75 @@ void motor_update_load(motor *m, float wheel_angular_vel, float dt, float batter
  * which the disturbance observer reads as an infinite load spike
  * (I*dw/dt across a warp). Reset the observer on every teleport so the
  * next tick starts from "no load information" instead of a phantom stall. */
+/* DESPOT-2026-09-29: own the disturbance observer here, in the same module
+ * as the gate that consumes it.
+ *
+ * Before this, the load estimate lived inline in ftc_robot_update() while
+ * motor_update_load() gated on `m->wprev_valid` — a flag motor.c READ but
+ * never SET. That worked only because exactly one caller remembered to set
+ * it. Every other consumer (the plugin path, a future submodule, the
+ * standalone build) silently got tau_L == 0: a dead disturbance observer,
+ * no warning, and no way to detect it from the motor's own state. It cost me
+ * a wrong diagnosis — the new gated stall test read 0.708 N.m (-81%) purely
+ * because the harness had not performed the handshake.
+ *
+ * Now the estimate and its validity flag are set here, by the module that
+ * reads them, and callers cannot get it wrong. */
+void motor_observe(motor *m, float wheel_angular_vel, float dt, float axle_inertia) {
+    if (!m) {
+        return;
+    }
+    /* w_prev is the PREVIOUS sample; the estimate is a difference against it,
+     * so the new reading is stored only after the difference is taken. */
+    if (!(axle_inertia > 0.0f) || !(dt > 0.0f) || !isfinite(wheel_angular_vel)) {
+        /* Degenerate input: no observation is possible. Hold the last state
+         * rather than claiming a fresh sample, so the next tick can still
+         * difference against a real one. */
+        return;
+    }
+    if (!m->wprev_valid) {
+        /* First sample: record it and arm the difference. Publishing a load
+         * now would be inventing a number from one point, so publish none.
+         * (Setting the flag here is what lets the SECOND tick observe; the
+         * pre-refactor code did this unconditionally and my first attempt
+         * cleared the flag instead, which silently kept the observer dead
+         * for the whole run -- 5 of 9 suite cases failed.) */
+        m->w_prev = wheel_angular_vel;
+        m->load_torque = 0.0f;
+        m->wprev_valid = 1;
+        return;
+    }
+    float stall_out = m->stall_current * m->kt * m->gear_ratio * m->efficiency;
+    if (!(stall_out > 0.5f) || !isfinite(stall_out)) {
+        stall_out = 1.0f;
+    }
+    float tau_cap = 2.0f * stall_out;
+    float tau_l = axle_inertia * (wheel_angular_vel - m->w_prev) / dt - m->tau_exp_prev;
+    if (!isfinite(tau_l)) {
+        tau_l = 0.0f;
+    } else if (tau_l > tau_cap) {
+        tau_l = tau_cap;
+    } else if (tau_l < -tau_cap) {
+        tau_l = -tau_cap;
+    }
+    /* Blocked-rotor gate: a motor at its torque limit whose shaft is not
+     * turning is, by definition, transmitting its full stall torque. This
+     * evaluates the model where its answer is known rather than inventing a
+     * gain. Only when saturated AND not turning, so free-spin convergence
+     * (tau_l -> 0) is untouched. */
+    {
+        float tau_ref = m->tau_exp_prev;
+        const float w_blk = 0.5f;
+        if (isfinite(tau_ref) && fabsf(tau_ref) >= 0.95f * stall_out &&
+            isfinite(wheel_angular_vel) && fabsf(wheel_angular_vel) < w_blk) {
+            tau_l = (tau_ref >= 0.0f) ? -stall_out : stall_out;
+        }
+    }
+    m->load_torque = tau_l;
+    m->w_prev = wheel_angular_vel;
+    m->wprev_valid = 1;
+}
+
 void motor_reset_observer(motor *m) {
     if (!m) {
         return;
