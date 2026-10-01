@@ -718,7 +718,7 @@ Both were my test's fault. I checked the engine's quaternion math directly
 before believing either, which is the only reason they did not become false
 findings about the engine.
 
-### SLEEP-H1-2026-09-29 — Body frozen without being asleep, under the `heavy` regime — OBSERVED, NOT ROOT-CAUSED
+### SLEEP-H1-2026-09-29 — EXONERATED 2026-10-01: normal pre-sleep rest, wrong test expectation
 
 Found while building the regime matrix, and deliberately left unresolved rather
 than shipped as a test.
@@ -739,6 +739,18 @@ preserved as a comment in `tests/mpe_suite_d.c`.
 
 For whoever picks this up: the first question is whether a non-sleeping body can
 be frozen at all, or whether the regime is corrupting velocity some other way.
+
+**Verdict 2026-10-01: ENGINE EXONERATED — no frozen body exists.** Reproduced
+the exact signature under heavy (vertical 3 m/s pop from rest on a slab:
+|v| = 0.0000 at spawn height, 0.0000 travelled, is_sleeping FALSE at 0.5 s)
+with per-tick instruments: the ball settles at ~0.33 s, the sleep timer reads
+0.20 against a 0.5 s duration at the 0.5 s sample, and it falls lawfully
+asleep at ~0.83 s. The engine was mid-countdown, not stuck. The withdrawn
+expectation (moving XOR asleep) missed the legitimate third state — settled
+with timer pending — which is correct behavior, not a freeze. Locked with the
+committed `sleep_settle` gate (moves → settles → sleeps-iff-enabled, all five
+regimes); the direction-B companion (cube allegedly unsettled at 10 s) also
+settles and sleeps normally today.
 
 ### MOUSELOOK-2026-09-29 — "Flick right/down locks, left/up does not" — FIXED (plumbing), and the convention was never wrong
 

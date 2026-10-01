@@ -409,8 +409,15 @@ Audit notes and boundaries are in `../AUDIT_REPORT_2026-09-24.md`.
   dormant tripwire. Phantom-floor audit (CCD/depenetration acting below y=0
   with the solver floor disabled) recorded as honest design, not changed.
 
-- [ ] **SLEEP-H1-2026-09-29: a body frozen without being asleep** (only under
-  the `heavy` regime: gravity ×3, sleep on). Observed, not root-caused.
+- [x] **SLEEP-H1-2026-09-29 — EXONERATED 2026-10-01, expectation was the bug.**
+  Reproduced EXACTLY under heavy (vertical pop from rest: v=0.0000 at spawn
+  height, 0 travelled, is_sleeping FALSE at 0.5 s) — then watched it fall
+  lawfully asleep at 0.83 s when the 0.5 s timer expired. Nothing frozen,
+  nothing stuck: the ball had settled at ~0.33 s and the engine was
+  mid-countdown. The withdrawn test demanded (moving XOR asleep), missing the
+  legitimate third state (settled, timer pending). Locked with the committed
+  `sleep_settle` gate (moves → settles → sleeps-iff-enabled, all regimes);
+  direction-B companion (unsettled cube) also settles fine today.
 
 - [x] **Mouse-look asymmetry ("right/down lock, left/up don't") — FIXED
   2026-09-29.** The sign convention was correct all along; the plumbing was not.
