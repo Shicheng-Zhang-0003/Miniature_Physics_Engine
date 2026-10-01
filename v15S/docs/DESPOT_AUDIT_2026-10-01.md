@@ -41,9 +41,20 @@ operational) + baseline registry discovery (41 canonical / 30 legacy /
 - Bounding-sphere CCD for boxes: `R_bound≈√3*half` fires early, air gap +
   creep. Tighter swept support (box/segment TOI) is future work.
 - 1-tick-stale world inertia: `k` built from last tick `R·I⁻¹·Rᵀ`; error
-  `O(|w|dt·I_aniso)`. Refresh-before-prepare is future work (cost vs gain).
+  `O(|w|dt·I_aniso)`. FIXED 2026-10-01 (refresh R·I⁻¹·Rᵀ from current
+  orientation at prepare; exact mults, suite green).
 - Dead-reckoned hinge angle vs measured `q_rel` twist; prismatic already
-  enforces on measured pos. Revolute measured-angle enforcement is future.
+  enforces on measured pos. 2026-10-01 verdict (measured, then scoped back):
+  per-iteration `accumulated = limit` clamps REMOVED (they froze the books at
+  the stop while truth sat 0.085 past it — enforcement blind forever after).
+  A quaternion-delta measured replacement was proven better settled (0.04 vs
+  0.085) but worse in transients with free-spin bias, so dead reckoning
+  ships with live books; static rest-past-stop under starved solvers stays
+  ticketed (positional re-seat loses to P2P bias — tried, reverted, see
+  revolute_joint.c notes). In-envelope behavior exact (0.0000 violation).
+- TSan 2026-10-01: canonical suite 41/41 green, ZERO warnings
+  (single-threaded paths clean). NOTE: needs `setarch -R` (ASLR off) — GCC 13
+  TSan vs glibc 2.39 shadow-mapping conflict, toolchain issue, recorded.
 - Greedy 4-point support (face-clip max-fan, cylinder farthest-same-face):
   deterministic, suboptimal on long quads. Max-area subset is future.
 - Dead knobs labelled in `config/mpe_config.h` (bias→split-only, thresh is
