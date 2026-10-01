@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 # V-04: F10 long-run validation (3600 ticks / 60s). GUI interaction required.
-set -uo pipefail
-SRC="v15S/src"
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+TEMP="$ROOT/temp"
+mkdir -p "$TEMP"
+export TMPDIR="$TEMP"
+export MPE_GAMEPAD_DEVICE=disabled
+SRC="$ROOT/v15S/src"
 [[ -d "$SRC" ]] || { echo "ERROR: $SRC not found." >&2; exit 1; }
 
 echo "=== V-04: F10 Long-Run Validation ==="

@@ -11,7 +11,7 @@ GATES = [
     ("6. Editor Stability", "Select/delete/jointed-delete/marked-delete no crash; invalid-selection menus safe; save/load with menus safe."),
     ("7. Physics Stability", "Rest without jitter; cubes stack; sphere/cube collide; restitution; friction; sleep/wake; no NaNs."),
     ("8. Broadphase/Solver Visibility", "Node/pair/manifold overflow visible; dedupe exhaustion visible; counters in overlay/report."),
-    ("9. Validation Tests", "F5/F6/F7/F8/F9/F10/F11 pass; 32/32 headless green; tui-smoke green; engine idles minutes without explosion."),
+    ("9. Validation Tests", "F5/F6/F7/F8/F9/F10/F11 pass; 41/41 headless green; tui-smoke green; engine idles minutes without explosion."),
     ("10. Configuration System", "Menu and terminal edit live parameters; save/load/reset round-trip; bounds and debug-only controls work."),
     ("11. Documentation", "README + user guide + checklist match code; broadphase + timestep descriptions accurate."),
     ("12. Repository Hygiene", "No tracked build artifacts; .gitignore exists; duplicate docs clarified."),
@@ -20,6 +20,23 @@ GATES = [
 ]
 
 def main():
+    import argparse
+    ap = argparse.ArgumentParser(description="V-03 P0 gate walk (interactive by default).")
+    ap.add_argument("--non-interactive", action="store_true",
+                    help="DESPOT-2026-10-01: headless/CI mode — record all gates UNVERIFIED, write log under temp/, exit 2.")
+    args = ap.parse_args()
+    if args.non_interactive:
+        stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        log = os.path.join(root, "temp", "v03_gate_validation.log")
+        os.makedirs(os.path.dirname(log), exist_ok=True)
+        with open(log, "w") as f:
+            f.write(f"MPE v15S P0 Gate Validation - {stamp}\n\n")
+            for name, _ in GATES:
+                f.write(f"[UNVERIFIED] {name}\n")
+            f.write("\nResult: UNVERIFIED (non-interactive; needs display for F5-F11)\n")
+        print(f"Log written to {log} (non-interactive: gates UNVERIFIED)")
+        raise SystemExit(2)
     print("=== V-03: P0 Release Gate Checklist Walk ===")
     print("Manually verify each gate, then record the result.\n")
     results = []
@@ -33,7 +50,11 @@ def main():
             print("    Enter p, f, or s.")
 
     stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    log = os.path.join("v15S", "v03_gate_validation.log")
+    # DESPOT-2026-10-01: was CWD-relative v15S/v03_gate_validation.log (outside
+    # temp/, *.log-ignored, never archived). Project temp convention.
+    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    log = os.path.join(root, "temp", "v03_gate_validation.log")
+    os.makedirs(os.path.dirname(log), exist_ok=True)
     failures = [r for r in results if r[1] in ("FAIL", "SKIP")]
     with open(log, "w") as f:
         f.write(f"MPE v15S P0 Gate Validation - {stamp}\n\n")

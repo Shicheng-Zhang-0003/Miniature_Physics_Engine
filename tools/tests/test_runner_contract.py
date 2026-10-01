@@ -49,16 +49,27 @@ class RegistryContractTests(unittest.TestCase):
             runner.MIN_SUITE_ENTRIES = saved
 
     def test_makefile_targets_split_isolated_suites(self) -> None:
-        legacy, paranoia = runner.discover_make_targets('''
-            build_alpha: tests/alpha_test.c
-            build_paranoia_edge: tests/paranoia_edge.c
-        ''')
+        saved_leg, saved_par = runner.MIN_LEGACY_ENTRIES, runner.MIN_PARANOIA_ENTRIES
+        runner.MIN_LEGACY_ENTRIES, runner.MIN_PARANOIA_ENTRIES = 1, 1
+        try:
+            legacy, paranoia = runner.discover_make_targets('''
+                build_alpha: tests/alpha_test.c
+                build_paranoia_edge: tests/paranoia_edge.c
+            ''')
+        finally:
+            runner.MIN_LEGACY_ENTRIES, runner.MIN_PARANOIA_ENTRIES = saved_leg, saved_par
         self.assertEqual(legacy, ["alpha"])
         self.assertEqual(paranoia, ["paranoia_edge"])
 
     def test_makefile_target_discovery_rejects_empty_inventory(self) -> None:
         with self.assertRaisesRegex(ValueError, "empty group"):
             runner.discover_make_targets("# no tests")
+
+    def test_makefile_targets_pin_floors_so_suites_cannot_shrink(self) -> None:
+        """DESPOT-2026-10-01: legacy 30 + paranoia 14 floors."""
+        with self.assertRaisesRegex(ValueError, "below floor"):
+            runner.discover_make_targets('build_alpha: tests/alpha_test.c\n'
+                                         'build_paranoia_edge: tests/paranoia_edge.c\n')
 
 
 class OutputContractTests(unittest.TestCase):
