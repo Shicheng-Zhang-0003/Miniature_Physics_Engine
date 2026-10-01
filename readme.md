@@ -5,7 +5,7 @@
 > floor, overlap pops, stuck F11 torture values) that is now largely repaired:
 > live scenes rest on the infinite solver plane with validated friction,
 > stacks spawn overlap-free, and F11 always restores (backup, else compiled
-> defaults). Headless truth holds at 41/41. The all-clear is still pending
+> defaults). Headless truth holds at 42/42. The all-clear is still pending
 > user confirmation in the live window — until this notice is lifted, prefer
 > the last known proper release **`V1.5R3`** (`git checkout V1.5R3`) for
 > critical stable work.
@@ -303,7 +303,7 @@ make
 
 ## 📜 Version History
 
-- **v15S (current head)** — GTK4 port, module system (MPI hot-plug), per-world config, data-structure upgrades (growable pools, O(1) caches), kernel global-state removal, TUI stress suite (`stress`/`ccd` scenes, backend flags), 41/41 headless green (39 physics + 2 diag-informational; DESPOT-2026-10-01: was stale 32/32).
+- **v15S (current head)** — GTK4 port, module system (MPI hot-plug), per-world config, data-structure upgrades (growable pools, O(1) caches), kernel global-state removal, TUI stress suite (`stress`/`ccd` scenes, backend flags), 42/42 headless green (40 physics + 2 diag-informational; DESPOT-2026-10-01: was stale 32/32, 41/41 before sleep_settle).
 - **v15R3 (release)** — configuration system, physics-truth pass, full constraint framework, TUI debugger + snapshot suite, 29/29 headless green. Release notes: [`release_notes_v15R3.md`](release_notes_v15R3.md).
 - **v15R2** — config-system hardening + MFS robotics (prior RC, parked (now consolidated in `v15S/src/ecosystem/mfs/`)).
 - **v1.4 Alpha RC3** — domain-driven restructure, spatial-hash broadphase, physics-world encapsulation.

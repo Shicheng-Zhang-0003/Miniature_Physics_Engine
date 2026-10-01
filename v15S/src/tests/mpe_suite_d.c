@@ -370,8 +370,12 @@ int mpe_t_meta_convergence(void) {
  *
  * A test that is red in one regime, or green for a reason nobody can state, is
  * worse than no test: it launders an uninvestigated behaviour behind a green
- * line. So the test is out until someone can say what the engine should do.
- * The other three tests in this file carry the load and all pass in all five
+ * line. So the test stayed out until 2026-10-01, when per-tick instruments
+ * showed the engine mid-countdown (settled at ~0.33 s, timer 0.20 vs 0.5 s
+ * duration at the sample, lawfully asleep at ~0.83 s) — the expectation was
+ * the bug, a false moving-XOR-asleep dichotomy. Its replacement,
+ * mpe_t_sleep_settle below, asserts the full lawful trajectory instead.
+ * The other tests in this file carry the load and all pass in all five
  * regimes.
  */
 
@@ -425,7 +429,70 @@ int mpe_t_meta_config_wiring(void) {
     return tp->failures;
 }
 
-/* ---------------------------------- 5. mouse-look sign convention, 4 axes */
+/* ------------------------------- 5. sleep honesty, three states (SLEEP-H1) */
+
+/* DESPOT-2026-10-01: this is the test SLEEP-H1 asked for. The withdrawn
+ * meta_sleep demanded (moving XOR asleep) 0.5 s after launch and met a third
+ * state it had no name for: SETTLED with the sleep timer still pending
+ * (|v| = 0.0000 at spawn height, 0.0000 travelled, is_sleeping FALSE under
+ * heavy — reproduced exactly, then watched fall lawfully asleep at 0.83 s
+ * when the 0.5 s timer expired). Nothing was frozen and nothing was stuck;
+ * the expectation was a false dichotomy. So this asserts the full lawful
+ * trajectory instead: it MOVES when launched (never frozen from the start),
+ * it SETTLES (no perpetual motion), and then it either SLEEPS (switch on) or
+ * stays honestly awake with a zero timer (switch off). Measured across all
+ * five regimes before gating (heavy settles in ~20 ticks, sticky needs the
+ * full window); margins below are orders off the measured values. */
+int mpe_t_sleep_settle(void) {
+    mpe_test_t t;
+    mpe_test_begin(&t, "sleep_settle");
+    mpe_test_t *tp = &t;
+
+    physics_world w;
+    mpe_world_begin(&w);
+    MPE_CHECK(tp, mpe_floor_slab(&w, 0.8f, 0.6f, 0.2f) >= 0);
+    int b = physics_world_add_sphere(&w, 0.3f, 1.0f, (vector3){0.0f, 0.31f, 0.0f});
+    MPE_CHECK(tp, b >= 0);
+    w.bodies[b].velocity = (vector3){0.0f, 3.0f, 0.0f};
+    vector3 p0 = w.bodies[b].position;
+    const float dt = 1.0f / 60.0f;
+
+    /* Max displacement over the opening (not position at one instant: under
+     * heavy gravity the pop returns through home mid-window, aliasing a
+     * point sample to ~0). A body frozen from the start never leaves home. */
+    double travel15 = 0.0;
+    for (int k = 0; k < 15; k++) {
+        MPE_CHECK(tp, mpe_step(&w, 1, dt));
+        double d = (double) vector3_length(vector3_subtraction(w.bodies[b].position, p0));
+        if (d > travel15) {
+            travel15 = d;
+        }
+    }
+    MPE_INFO("sleep_settle: 15-tick max travel = %.4f m (regime %s)", travel15, tp->regime);
+    MPE_CHECK(tp, travel15 > 1e-3);
+
+    MPE_CHECK(tp, mpe_step(&w, 585, dt));
+    float vend = vector3_length(w.bodies[b].velocity);
+    float yend = w.bodies[b].position.y;
+    MPE_INFO("sleep_settle: settled v = %.4f m/s y = %.4f m sleep = %d timer = %.2f (regime %s)",
+             vend, yend, w.bodies[b].is_sleeping, w.bodies[b].sleep_timer, tp->regime);
+    MPE_CHECK(tp, vend < 0.05f);
+    MPE_CHECK(tp, yend > 0.2f && yend < 0.6f);
+    if (g_cfg.sleep.enable) {
+        MPE_CHECK(tp, w.bodies[b].is_sleeping);
+    } else {
+        MPE_CHECK(tp, !w.bodies[b].is_sleeping);
+        MPE_CHECK(tp, w.bodies[b].sleep_timer == 0.0f);
+    }
+    if (tp->failures == 0) {
+        printf("[PASS] launch settles then sleeps iff enabled (three-state honesty)\n");
+    }
+    physics_world_cleanup(&w);
+    mpe_test_end(tp);
+    return tp->failures;
+}
+
+/* ---------------------------------- 6. mouse-look sign convention, 4 axes */
 
 /* DESPOT-2026-09-29 (user report: "flick right or down locks properly, left and
  * up do not"). The convention itself turned out to be CORRECT in all four

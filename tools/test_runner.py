@@ -98,12 +98,12 @@ class Result:
 # physics property must hold across the spread rather than at one point.
 MPE_TEST_REGIMES = ("default", "light", "heavy", "brittle", "sticky")
 
-# 41 = 36 pre-existing + 3 metamorphic (meta_rotation, meta_convergence,
-# meta_config_wiring) + mouse_look_axes + body_materials_live. meta_sleep was
-# written and withdrawn, so the floor stays 41 and this comment says so rather
-# than being quietly lowered. DESPOT-2026-10-01: was "40 = 36+4", stale vs its
-# own constant.
-MIN_SUITE_ENTRIES = 41
+# 42 = 36 pre-existing + 3 metamorphic (meta_rotation, meta_convergence,
+# meta_config_wiring) + mouse_look_axes + body_materials_live + sleep_settle.
+# meta_sleep was written and withdrawn, so the floor only ever moves by
+# deliberate addition, and this comment says so rather than being quietly
+# edited. DESPOT-2026-10-01: was "41 = ... + body_materials_live".
+MIN_SUITE_ENTRIES = 42
 # DESPOT-2026-10-01: pin per-suite floors so deleting a legacy/paranoia target
 # + its make target together cannot shrink the headline silently (the 220->204
 # drift). Canonical floor above; legacy 30 + paranoia 14 pinned here.
