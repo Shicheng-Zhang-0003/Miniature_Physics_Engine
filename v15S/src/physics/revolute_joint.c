@@ -521,8 +521,15 @@ void revolute_solve(revolute_params *p, rigidbody *body_a, rigidbody *body_b, fl
                 body_b->angular_velocity = vector3_addition(
                     body_b->angular_velocity,
                     math3_multiplication_vector3(I_inv_b, limit_impulse));
-                if (at_min) p->accumulated_angle = min_limit;
-                if (at_max) p->accumulated_angle = max_limit;
+                /* DESPOT-2026-10-01: NO accumulated_angle = limit clamp here.
+                 * That clamp existed to stop dead-reckoning windup into the
+                 * stop, but it PINNED the books at the limit while the true
+                 * twist sat 0.085 past it (measured) — enforcement blind
+                 * forever after, since acc == min reads as "holding". With
+                 * the clamp gone the books keep integrating live velocity and
+                 * can never freeze-false; whatever drift violent motion
+                 * causes stays visible to enforcement instead of being paved
+                 * over. The velocity kill above is the enforcement. */
             }
         }
     }
@@ -585,14 +592,29 @@ fallback_sequential:
                     math3_multiplication_vector3(I_inv_a, limit_impulse));
                 body_b->angular_velocity = vector3_addition(body_b->angular_velocity,
                     math3_multiplication_vector3(I_inv_b, limit_impulse));
-                if (at_min) p->accumulated_angle = min_limit;
-                if (at_max) p->accumulated_angle = max_limit;
+                /* DESPOT-2026-10-01: no books clamp (see 6x6 path above). */
             }
         }
     }
 }
 
-/* TRUTH: once-per-tick angle integration (called before the solver loop). */
+/* TRUTH: once-per-tick angle integration (called before the solver loop).
+ * DESPOT-2026-10-01: a measured-twist replacement (quaternion-delta
+ * accumulation, exact ops) was tried here and REVERTED. It tracked settled
+ * stops better (0.04 vs 0.085 residual) but was worse in transients, added a
+ * 0.01 rad / 2 min bias under free multi-turn spin, and rests on a
+ * swing-twist decomposition that is frame-ambiguous under large swing — the
+ * torture probe cannot tell method error from definition ambiguity. Dead
+ * reckoning's projection ISOLATES the twist rate exactly (swing never
+ * contaminates a velocity projection), so in-envelope behaviour (steady
+ * motor drives, pendulum swings: measured 0.0000 violation) is exact, and
+ * the only error source is in-loop velocity changes the pre-loop sample
+ * misses — i.e. exactly when the solver is starved. What ships instead is
+ * the blindness fix below: the old per-iteration `accumulated = limit`
+ * clamps FROZE the books at the stop while the true twist sat 0.085 past it
+ * (enforcement blind forever after). With the clamps gone the books keep
+ * integrating live velocity and can never freeze-false; residual drift under
+ * violent motion is honest and documented, not hidden. */
 void revolute_pre_step(revolute_params *p, rigidbody *body_a, rigidbody *body_b, float dt, const mpe_config_t *cfg) {
     (void) cfg;
     if ((!p) || (!body_a) || (!body_b) || (!(dt > 0.0f))) {
@@ -616,7 +638,8 @@ void revolute_pre_step(revolute_params *p, rigidbody *body_a, rigidbody *body_b,
     }
     p->accumulated_angle += d;
     /* TRUTH: no wrap (see init site): the joint coordinate stays unwrapped
-     * so multi-turn limits work; limit kills rebase it every solve. */
+     * so multi-turn limits work. (The per-solve limit clamps that used to
+     * rebase the books here were removed: see the 6x6 path note.) */
 }
 
 /* Prismatic: single-axis slide with optional limits and motor. */
@@ -1215,4 +1238,13 @@ void revolute_correct_axis_drift(revolute_params *p, rigidbody *body_a, rigidbod
                 math3_multiplication_vector3(rigidbody_effective_inv_inertia(body_b), axis_impulse));
         }
     }
+    /* NOTE (DESPOT-2026-10-01): a positional limit re-seat (Baumgarte drive
+     * of escaped twist back into range, same pattern as above) was tried and
+     * REVERTED: it loses a tug-of-war with the P2P anchor bias (which keeps
+     * rotating the arm with angular parts of its own correction), so the
+     * violation never shrinks no matter the gain, and escalating the gain
+     * toward oscillation is not a trade worth making blind. Velocity-level
+     * enforcement on live (never-frozen) books is what ships; static
+     * rest-past-stop under a starved solver stays a ticketed limit
+     * (see REMAINING_WORK). */
 }
