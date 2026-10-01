@@ -31,7 +31,7 @@ Modularity:   MPI hot-plug ABI (shapes, broadphase, solver stages, tick
                command; TUI --broadphase/--solver flags; capsule example.
 Data Layout:  growable bodies/contacts (ceilings kept), O(1) pair probes
                + id cache, islands O(J+B), small-first node pool,
-               process-wide det counters. Suite v2 32/32 green
+               process-wide det counters. Suite v2 41/41 green (DESPOT-2026-10-01: was stale 32/32)
                (29 physics + 3 diag).
 Modularity2:  lifetime-hardened registry/loader (tombstones, locks,
                builtin-takeover refusal, busy-unload, dladdr purge,
@@ -39,12 +39,12 @@ Modularity2:  lifetime-hardened registry/loader (tombstones, locks,
                capsule; no_collide proxies; ecosystem bundles loadable.
 MFS:          tile floors everywhere; implicit motor solve + disturbance
                observer; torque-derived strafe + odom fusion; PTC fuse;
-               per-world MEI; suite 8 gated + 5 info green.
+               per-world MEI; suite 12 inner green (unified binary).
 Globals:      kernel holds zero sim state; primary owned by
                core/mpe_primary.c (app layer); registry process-global
                by design; UI/diagnostics stay app-global by design.
 Despot-0928:  standalone 461-MFS builds+runs (dual-mode build_tests.sh +
-               Makefile, engine auto-discovery; 8/8 both trees); decoded
+               Makefile, engine auto-discovery; 12/12 inner both trees); decoded
                encoder convention (NR 28/TN 24/CoreHex 4); V-line motor
                clamp + governor (F2 tracking 88%->25%, FIXED, tripwire
                kept); true-contact analytic gate; thermal honesty + 150 C

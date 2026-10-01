@@ -293,7 +293,7 @@ make
 
 ## 📜 Version History
 
-- **v15S (current head)** — GTK4 port, module system (MPI hot-plug), per-world config, data-structure upgrades (growable pools, O(1) caches), kernel global-state removal, TUI stress suite (`stress`/`ccd` scenes, backend flags), 32/32 headless green (29 physics + 3 diag-informational).
+- **v15S (current head)** — GTK4 port, module system (MPI hot-plug), per-world config, data-structure upgrades (growable pools, O(1) caches), kernel global-state removal, TUI stress suite (`stress`/`ccd` scenes, backend flags), 41/41 headless green (39 physics + 2 diag-informational; DESPOT-2026-10-01: was stale 32/32).
 - **v15R3 (release)** — configuration system, physics-truth pass, full constraint framework, TUI debugger + snapshot suite, 29/29 headless green. Release notes: [`release_notes_v15R3.md`](release_notes_v15R3.md).
 - **v15R2** — config-system hardening + MFS robotics (prior RC, parked (now consolidated in `v15S/src/ecosystem/mfs/`)).
 - **v1.4 Alpha RC3** — domain-driven restructure, spatial-hash broadphase, physics-world encapsulation.
@@ -373,7 +373,7 @@ Run the focused canonical suite with `python3 tools/test_runner.py --profile qui
 
 ### MFS robotics (`v15S/src/ecosystem/mfs/`)
 - **FTC stack**: motor presets (spec-sheet derived, decoded-count encoder convention), back-EMF electrical model with implicit-in-speed solve + disturbance observer (stall *and* free speed exact at any bus voltage via V-line bounds), traction budgeting against wheel materials, analytic mecanum roller-kinematics lateral force (Coulomb-capped, dissipative, contact-gated at the wheel — no chassis-force cheat; the articulated 32-roller build is kept for forensics), pure-encoder odometry with `odom_slip` flag, tile-friction test floors.
-- **Suite**: `build_tests.sh` — 8 gated tests (unified mfs_suite --all) + build checks + ungated diags, all green (was 13 pass / 3 fail + broken `make`).
+- **Suite**: `build_tests.sh` — 12 inner tests via unified mfs_suite --all (script reports suite+build gates) + build checks + ungated diags, all green (was 13 pass / 3 fail + broken `make`; DESPOT-2026-10-01: was stale 8).
 - **Modules**: `ftc-fleet` tick module (hot-pluggable, bitwise-identical static vs `.so`), `mfs_module_1` game module, `mfs-simulator` ecosystem bundle (loadable via `mod load ecosystem/mfs/mfs_ecosystem.so`).
 
 ### Determinism and precision
