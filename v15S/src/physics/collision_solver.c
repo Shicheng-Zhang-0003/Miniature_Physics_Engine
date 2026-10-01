@@ -217,6 +217,19 @@ void collision_prepare_solver(struct physics_world *world, collision_data *sourc
     if (dt <= 0.0f) {
         dt = 1.0f / 60.0f;
     }
+    /* DESPOT-2026-10-01: refresh world inertia from CURRENT orientation.
+     * inverse_inertia_system was last written by rb_integrate_velocity at the
+     * START of the previous tick; orientation has since advanced, so k built
+     * from the cache is 1 tick stale (error O(|w|dt·I_aniso), systematic for
+     * tumblers). Recompute R·I⁻¹·Rᵀ here from exact mults (deterministic). */
+    for (int bi = 0; bi < 2; bi++) {
+        rigidbody *b = (bi == 0) ? m->object_a : m->object_b;
+        if (b && !b->static_state && !b->kinematic && rigidbody_effective_inv_mass(b) > 0.0f) {
+            math3 R = vector4_to_math3(b->orientation);
+            math3 Rt = math3_transposition(R);
+            b->inverse_inertia_system = math3_multiplication(R, math3_multiplication(b->inverse_inertia_tensor_local, Rt));
+        }
+    }
     /* Per-world cache; a missing cache degrades to all-miss (cold solve).
      * No global fallback remains. */
     cached_contact *cache_array = (world) ? world->world_contact_cache : NULL;
