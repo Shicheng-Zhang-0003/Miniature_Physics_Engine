@@ -154,6 +154,18 @@ int mpe_ecosystem_attach(mpe_world_t *world, const char *eco_name) {
                 void *st = 0;
                 int r = d->attach((mpe_world_t *)world, &st);
                 pthread_mutex_lock(&s_eco_lock);
+                /* DESPOT-2026-10-01 ABA close: attach ran unlocked, so an
+                 * unregister+register could have swapped the descriptor.
+                 * Re-validate identity before committing state; on mismatch
+                 * detach the orphan state and fail rather than aliasing a
+                 * dead .so. */
+                if (s_attached[i].desc != d) {
+                    pthread_mutex_unlock(&s_eco_lock);
+                    if (r == 0 && d->detach) {
+                        d->detach((mpe_world_t *)world, st);
+                    }
+                    return -1;
+                }
                 if (r < 0) {
                     s_attached[i].desc = 0;
                     s_attached[i].state = 0;

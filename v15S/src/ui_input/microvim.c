@@ -269,8 +269,19 @@ static bool mv_load_file(const char *filename) {
         return false;
     }
     char line_buf[mv_max_line_len];
+    bool truncated = false;
     while (fgets(line_buf, sizeof(line_buf), f)) {
         size_t len = strlen(line_buf);
+        /* DESPOT-2026-10-01: 4KB fgets silently split over-long lines.
+         * Detect missing newline (not EOF) and fail loudly instead. */
+        if (len > 0 && line_buf[len - 1] != '\n' && !feof(f)) {
+            /* Line exceeds buffer: consume rest, report truncation. */
+            int c;
+            while ((c = fgetc(f)) != '\n' && c != EOF) {
+            }
+            truncated = true;
+            break;
+        }
         while ((len > 0) && ((line_buf[len - 1] == '\n') || (line_buf[len - 1] == '\r'))) {
             line_buf[--len] = '\0';
         }
@@ -280,7 +291,13 @@ static bool mv_load_file(const char *filename) {
             return false;
         }
     }
+    bool read_err = ferror(f) != 0;
     fclose(f);
+    if (read_err || truncated) {
+        mv_clear_lines();
+        mv_insert_line(0, "");
+        return false;
+    }
     if (mv.line_count == 0) {
         if (!mv_insert_line(0, "")) return false;
     }
@@ -295,11 +312,20 @@ static bool mv_save_file(void) {
         fclose(existing);
         FILE *src = fopen(mv.filename, "r");
         FILE *dst = fopen(backup_path, "w");
+        bool copy_ok = (src && dst);
         if (src && dst) {
             char buf[4096];
             size_t n;
             while ((n = fread(buf, 1, sizeof(buf), src)) > 0) {
-                fwrite(buf, 1, n, dst);
+                if (fwrite(buf, 1, n, dst) != n) {
+                    copy_ok = false;
+                    break;
+                }
+            }
+            /* DESPOT-2026-10-01: short-write/ferror unchecked = silent backup
+             * loss. Check errors + fsync before truncating the target. */
+            if (ferror(src) || ferror(dst)) {
+                copy_ok = false;
             }
         }
         if (src) {
@@ -307,6 +333,9 @@ static bool mv_save_file(void) {
         }
         if (dst) {
             fclose(dst);
+        }
+        if (!copy_ok) {
+            return false;
         }
     }
     FILE *f = fopen(mv.filename, "w");
@@ -584,6 +613,9 @@ static void mv_paste(bool after) {
         }
         int yank_len = (int) strlen(mv.yank_text);
         char *new_line = (char *) malloc((size_t) (len + yank_len + 1));
+        if (!new_line) {
+            return; /* OOM: undo already pushed, line untouched — no SEGV */
+        }
         memcpy(new_line, mv.lines[row], (size_t) col);
         memcpy(new_line + col, mv.yank_text, (size_t) yank_len);
         memcpy(new_line + col + yank_len, mv.lines[row] + col, (size_t) (len - col + 1));
@@ -672,11 +704,15 @@ static void mv_backspace(void) {
 static void mv_execute_command(void) {
     char *cmd = mv.command_buf;
     if (cmd[0] == 'w' && cmd[1] == 'q') {
-        mv_save_file();
+        if (!mv_save_file()) {
+            return; /* DESPOT-2026-10-01: never quit on failed save */
+        }
         mv.file_exists = true; /* MPE_TASK_V15R2_WQ_SETS_EXISTS */
         mv.quit_requested = true;
     } else if (cmd[0] == 'w' && cmd[1] == '\0') {
-        mv_save_file();
+        if (!mv_save_file()) {
+            return;
+        }
         mv.file_exists = true; /* MPE_TASK_V15R2_SAVE_SETS_EXISTS */
         /* Config integration: reload if editing engine.cfg */
         if (strstr(mv.filename, "engine.cfg")) {
@@ -702,7 +738,9 @@ setting a flag that microvim_render will pick up */
         }
         mv.quit_requested = true;
     } else if (cmd[0] == 'x') {
-        mv_save_file();
+        if (!mv_save_file()) {
+            return;
+        }
         mv.quit_requested = true;
     } else if (cmd[0] == 'e' && cmd[1] == ' ') {
         if (!mv.modified || (cmd[2] == '!')) {

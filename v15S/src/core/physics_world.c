@@ -274,6 +274,11 @@ void physics_world_cleanup(physics_world *world) {
     if (!world) {
         return;
     }
+    /* DESPOT-2026-10-01: never trust a wild count from a never-init world.
+     * Clamp to the static slot ceiling before walking the table. */
+    if (world->tick_module_count < 0 || world->tick_module_count > 8) {
+        world->tick_module_count = 0;
+    }
     /* Detach modules first: plugin attach() may own per-world state. */
     for (int i = world->tick_module_count - 1; i >= 0; i--) {
         if (world->tick_modules[i] && world->tick_modules[i]->detach) {
@@ -373,7 +378,8 @@ int physics_world_grow_contact_cache(physics_world *world) {
 }
 
 int physics_world_grow_manifolds(physics_world *world) {
-    if (!world || !world->manifolds) {
+    if (!world || !world->manifolds || !world->manifold_awake || !world->manifold_order ||
+        !world->manifold_sort_keys) {
         return -1;
     }
     if (world->manifold_capacity >= a3_max_manifolds) {

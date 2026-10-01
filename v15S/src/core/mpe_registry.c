@@ -291,10 +291,13 @@ int mpe_register_broadphase(const char *name, const mpe_broadphase_if_t *iface) 
             return rc;
         }
     }
-    /* Reuse a tombstoned slot before growing. */
+    /* Reuse a tombstoned slot ONLY for the same name (DESPOT-2026-10-01).
+     * Reusing a dead slot for a different name rewrites *deadp while an
+     * unregister purge is in flight (unlock→purge window), purging the wrong
+     * address: dead stage leaks, live stage resets. Same-name reuse is safe;
+     * different names always append (table is 8, refusal is loud). */
     for (int i = 0; i < s_broad_count; i++) {
-        if (!s_broad[i].live) {
-            snprintf(s_broad[i].name, sizeof(s_broad[i].name), "%s", name);
+        if (!s_broad[i].live && strcmp(s_broad[i].name, name) == 0) {
             s_broad[i].iface = *iface;
             s_broad[i].live = 1;
             pthread_mutex_unlock(&s_reg_lock);
@@ -354,9 +357,9 @@ int mpe_register_solver(const char *name, const mpe_solver_if_t *iface) {
             return rc;
         }
     }
+    /* Same-name tombstone reuse only (see broadphase note above). */
     for (int i = 0; i < s_solver_count; i++) {
-        if (!s_solvers[i].live) {
-            snprintf(s_solvers[i].name, sizeof(s_solvers[i].name), "%s", name);
+        if (!s_solvers[i].live && strcmp(s_solvers[i].name, name) == 0) {
             s_solvers[i].iface = *iface;
             s_solvers[i].live = 1;
             pthread_mutex_unlock(&s_reg_lock);
