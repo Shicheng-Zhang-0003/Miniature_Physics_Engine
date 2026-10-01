@@ -347,9 +347,40 @@ uint32_t scene_get_object_id_at_index(int object_index) {
     return (physics_world_get_primary()->bodies)[object_index].object_id;
 }
 
+void scene_ensure_friction_floor(void) {
+    physics_world *world = physics_world_get_primary();
+    /* Idempotent: reuse a large static slab near y=-0.5 if present. */
+    for (int i = 0; i < world->body_count; i++) {
+        rigidbody *b = &world->bodies[i];
+        if (b->static_state && b->type == object_cube && fabsf(b->position.y + 0.5f) < 0.05f &&
+            b->half_extensions.x >= 20.0f && b->half_extensions.z >= 20.0f) {
+            b->friction_static = 0.8f;
+            b->friction_kinetic = 0.7f;
+            b->restitution = 0.0f;
+            return;
+        }
+    }
+    int floor_idx = scene_add_cube((vector3){0.0f, -0.5f, 0.0f}, (vector3){30.0f, 0.5f, 30.0f}, 0.0f);
+    if (floor_idx >= 0) {
+        world->bodies[floor_idx].friction_static = 0.8f;
+        world->bodies[floor_idx].friction_kinetic = 0.7f;
+        world->bodies[floor_idx].restitution = 0.0f;
+    }
+}
+
 void scene_spawn_stability_stack(void) {
+    /* DESPOT-2026-10-01: F5/F6/F8 never created a floor. The stack rested on
+     * the perfectly-plastic boundary clamp (zero friction, velocity kill, no
+     * restitution, no rolling resistance) while the headless suite and F10
+     * rest on a Coulomb slab — hence "phasing/squirting", "dead then violent
+     * bounce" (boundary vs solver fighting over penetration), and "no rolling
+     * resistance". Ensure the same F10 Coulomb slab here, idempotent. */
+    scene_ensure_friction_floor();
     for (int i = 0; i < 10; i++) {
-        float stack_y = 0.5f + (float) i * 0.99f;
+        /* DESPOT-2026-10-01: 0.99 spacing baked 1cm overlap into every
+         * interface; split+depenetration ejected it as a launch transient.
+         * 1.002 leaves a 2mm air gap — tight stack, no initial penetration. */
+        float stack_y = 0.5f + (float) i * 1.002f;
 
         int spawned_object_index = scene_add_cube((vector3){20.0f, stack_y, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
 
@@ -365,6 +396,7 @@ void scene_spawn_stability_stack(void) {
 }
 
 void scene_spawn_sleep_wake_test(void) {
+    scene_ensure_friction_floor();
     int target_object_index = scene_add_cube((vector3){20.0f, 0.5f, 10.0f}, (vector3){0.5f, 0.5f, 0.5f}, 2.0f);
 
     if (target_object_index >= 0) {
@@ -449,6 +481,7 @@ void scene_editor_torture_test(void) {
 }
 
 void scene_spawn_stress_test(void) {
+    scene_ensure_friction_floor();
     broadphase_reset_overflow_counts(physics_world_get_primary());
 
     int objects_to_spawn = 300;
@@ -546,9 +579,9 @@ void scene_spawn_long_run_validation(void) {
         }
     }
 
-    /* Stability stack: 10 cubes at x=20. */
+    /* Stability stack: 10 cubes at x=20 (2mm air gap, no built-in overlap). */
     for (int i = 0; i < 10; i++) {
-        float stack_y = 0.5f + (float) i * 0.99f;
+        float stack_y = 0.5f + (float) i * 1.002f;
         int spawned_object_index = scene_add_cube((vector3){20.0f, stack_y, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
         if (spawned_object_index >= 0) {
             (physics_world_get_primary()->bodies)[spawned_object_index].colour = (vector3){0.8f, 0.8f, 0.2f};

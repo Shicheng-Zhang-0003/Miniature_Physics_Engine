@@ -28,6 +28,11 @@ int scene_ensure_pool_capacity(int required_capacity);
 
 void scene_spawn_stability_stack(void);
 
+/* Coulomb floor slab (top y=0, mu 0.8/0.7, e=0), idempotent. F10 owns its
+ * floor inline; F5/F6/F8 share this so live stacks rest on friction, not on
+ * the plastic boundary clamp. */
+void scene_ensure_friction_floor(void);
+
 void scene_spawn_sleep_wake_test(void);
 
 void scene_editor_torture_test(void);
