@@ -354,32 +354,32 @@ uint32_t scene_get_object_id_at_index(int object_index) {
 
 void scene_ensure_friction_floor(void) {
     physics_world *world = physics_world_get_primary();
-    /* Idempotent: reuse a large static slab near y=-0.5 if present. */
-    for (int i = 0; i < world->body_count; i++) {
-        rigidbody *b = &world->bodies[i];
-        if (b->static_state && b->type == object_cube && fabsf(b->position.y + 0.5f) < 0.05f &&
-            b->half_extensions.x >= 20.0f && b->half_extensions.z >= 20.0f) {
-            b->friction_static = 0.8f;
-            b->friction_kinetic = 0.7f;
-            b->restitution = 0.0f;
-            return;
-        }
-    }
-    int floor_idx = scene_add_cube((vector3){0.0f, -0.5f, 0.0f}, (vector3){30.0f, 0.5f, 30.0f}, 0.0f);
-    if (floor_idx >= 0) {
-        world->bodies[floor_idx].friction_static = 0.8f;
-        world->bodies[floor_idx].friction_kinetic = 0.7f;
-        world->bodies[floor_idx].restitution = 0.0f;
-    }
+    /* DESPOT-2026-10-01 (2nd order): the 60x60 slab fixed friction only
+     * INSIDE its area — outside it the boundary clamp still ruled, so F10
+     * proved "normal inside the orange box, broken outside". The solver's
+     * infinite plane (static_plane_enabled, documented "default for GUI" in
+     * physics_world.c but never actually enabled) is the uniform fix:
+     * slab-vs-plane settle is equivalent headlessly (run-max 0.0013 vs
+     * 0.0000, both all-asleep, KE=0 over 3600 ticks), and the plane's neutral
+     * restitution (min() = body e) un-breaks live bounce: e=0 stacks stay
+     * dead, e=0.5 spheres bounce. Friction matched to the validated slab
+     * (0.8/0.7); GUI scope only — headless tests manage their own flags. */
+    world->static_plane_enabled = true;
+    g_cfg.world.floor_friction_s = 0.8f;
+    g_cfg.world.floor_friction_k = 0.7f;
+    world->static_plane_body.friction_static = 0.8f;
+    world->static_plane_body.friction_kinetic = 0.7f;
 }
 
 void scene_spawn_stability_stack(void) {
     /* DESPOT-2026-10-01: F5/F6/F8 never created a floor. The stack rested on
      * the perfectly-plastic boundary clamp (zero friction, velocity kill, no
      * restitution, no rolling resistance) while the headless suite and F10
-     * rest on a Coulomb slab — hence "phasing/squirting", "dead then violent
-     * bounce" (boundary vs solver fighting over penetration), and "no rolling
-     * resistance". Ensure the same F10 Coulomb slab here, idempotent. */
+     * rest on Coulomb friction — hence "phasing/squirting", "dead then
+     * violent bounce" (boundary vs solver fighting over penetration), and
+     * "no rolling resistance". The infinite solver plane (see
+     * scene_ensure_friction_floor) covers the whole world uniformly, so
+     * there is no in/out-of-slab cliff. */
     scene_ensure_friction_floor();
     for (int i = 0; i < 10; i++) {
         /* DESPOT-2026-10-01: 0.99 spacing baked 1cm overlap into every
@@ -572,17 +572,13 @@ void scene_spawn_long_run_validation(void) {
      * frictional floor — bodies rested on the frictionless emergency
      * boundary clamp, so the opening transient's outward slide never damped
      * (no stick, no sleep) and the pile dispersed to ±230 m by 60 s while
-     * the loose gates (fin<5, runmax<15) still passed. Coulomb floor slab
-     * (top y=0, mu 0.8/0.7 matched to the scene) restores the documented
-     * dead-calm settle: 27/27 asleep, KE=0, run-max 0.0 at 60 s. */
-    {
-        int floor_idx = scene_add_cube((vector3){0.0f, -0.5f, 0.0f}, (vector3){30.0f, 0.5f, 30.0f}, 0.0f);
-        if (floor_idx >= 0) {
-            (physics_world_get_primary()->bodies)[floor_idx].friction_static = 0.8f;
-            (physics_world_get_primary()->bodies)[floor_idx].friction_kinetic = 0.7f;
-            (physics_world_get_primary()->bodies)[floor_idx].restitution = 0.0f;
-        }
-    }
+     * the loose gates (fin<5, runmax<15) still passed. Coulomb floor
+     * (DESPOT-2026-10-01: infinite solver plane via
+     * scene_ensure_friction_floor, replacing the original 60x60 slab — slab
+     * vs plane settle proven equivalent headlessly, and the finite slab left
+     * a "normal inside the orange box, broken outside" cliff) restores the
+     * documented dead-calm settle: 27/27 asleep, KE=0, run-max 0.0 at 60 s. */
+    scene_ensure_friction_floor();
 
     /* Stability stack: 10 cubes at x=20 (2mm air gap, no built-in overlap). */
     for (int i = 0; i < 10; i++) {
