@@ -394,13 +394,20 @@ Audit notes and boundaries are in `../AUDIT_REPORT_2026-09-24.md`.
   4. *Withdrawn honestly* — `meta_sleep` was written, failed to converge, and
      was removed rather than shipped red or unjustifiably green.
 
-- [ ] **META-ROTATION-2026-09-29: sphere-sphere contact is not
-  rotation-equivariant.** Free flight is exact (0.0) and floor contact is float
-  noise (1.5e-08), so the defect is specific to sphere-sphere: `has_contact`
-  stays set in one configuration after the bodies are 2.59 m apart, so impulses
-  keep being applied to a separated pair. XFAIL at a tight 1e-4 m so a real fix
-  turns it green rather than needing the threshold relaxed. This is a stale
-  manifold / warm-start lifetime bug, not a tolerance question.
+- [x] **META-ROTATION-2026-09-29 — EXONERATED 2026-10-01, fixture was the bug.**
+  The "stale contact" theory (has_contact stuck after 2.59 m separation) was
+  a misread of per-BODY flags: the persisting contact was sphere-FLOOR (the
+  rotated trajectory genuinely reached the floor), not sphere-sphere. Deeper:
+  R^-1 Phi(R x) = Phi(x) needs an R-symmetric environment, and the y=0
+  backstop (CCD sweep + depenetration shove + boundary clamp assume it even
+  in "floorless" worlds) plus the box deny arbitrary-R probes — the rotated
+  run truly interacts with the backstop while the unrotated one does not
+  (measured: ~1e-7 agreement through the bounce, then a positional-only shove
+  with no velocity change and no contact flag in one world only). Fixture now
+  floorless with a yaw-only probe (maximal valid symmetry); engine holds
+  5.4e-07 m / 1.5e-07 m/s over 150 ticks incl. a real bounce. XFAIL kept as a
+  dormant tripwire. Phantom-floor audit (CCD/depenetration acting below y=0
+  with the solver floor disabled) recorded as honest design, not changed.
 
 - [ ] **SLEEP-H1-2026-09-29: a body frozen without being asleep** (only under
   the `heavy` regime: gravity ×3, sleep on). Observed, not root-caused.
