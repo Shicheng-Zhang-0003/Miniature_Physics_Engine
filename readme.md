@@ -1,5 +1,11 @@
 # 🧊 MINIATURE PHYSICS ENGINE (MPE)
 
+> ⚠️ **STATUS: UNSTABLE HEAD — DO NOT USE FOR STABLE WORK.**
+> The engine on `main` (`v15S` dev head) is inherently unstable right now:
+> stacking/bounce/rolling behaviour is under active repair and visual results
+> cannot be trusted. For full stable work, default to the last known proper
+> release **`V1.5R3`** (`git checkout V1.5R3`) until this notice is lifted.
+
 > **Active head:** `v15S` — GTK4 port of the `v15R3` release with a modular kernel, per-world config, and upgraded data structures. Build from `v15S/src`; run the complete verification matrix from the repository root with `python3 tools/test_runner.py --profile full`.
 
 **License:** GPL-3.0 · **Language:** C · **UI:** GTK4 · **Renderer:** OpenGL 3.3 Core
