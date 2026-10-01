@@ -88,17 +88,37 @@ void simulation_input_dispatch(GtkWidget *parent_window) {
     if (main_inputs.long_run_validation_pressed) {
         scene_spawn_long_run_validation();
         long_run_validation_start(a3_long_run_validation_ticks);
-        long_run_validation_restore_config = 1;
+        /* DESPOT-2026-10-01: F10 never dirties the config (no randomization;
+         * floor friction set by the scene is the intended live value), so
+         * there is nothing to restore. Old code set restore_config=1, which
+         * made a plain F10 attempt a backup load and print a bogus
+         * "torture values remain live" warning when no backup existed. */
+        long_run_validation_restore_config = 0;
         long_run_validation_is_torture = 0;
         main_inputs.long_run_validation_pressed = false;
     }
     if (main_inputs.config_torture_pressed) {
-        mpe_config_save("status/engine.cfg.backup");
-        scene_spawn_config_torture_test();
-        long_run_validation_start(a3_long_run_validation_ticks);
-        long_run_validation_restore_config = 1;
-        long_run_validation_is_torture = 1;
-        main_inputs.config_torture_pressed = false;
+        /* DESPOT-2026-10-01: two stuck-in-torture bugs closed here. (1) A
+         * second F11 while a run is active re-saved the ALREADY-TORTURED
+         * config over the clean backup, so the restore reloaded torture and
+         * the engine never came back. Refuse re-entry loudly instead.
+         * (2) The save return was ignored: a failed backup plus a failed
+         * restore left torture live with no honest fallback (and the user
+         * deleting engine.cfg rightly suspected it — the backup is a
+         * separate file, but a missing backup hit the same path). */
+        if (long_run_validation_active) {
+            printf("[A3] Config torture already running; ignoring re-press (backup kept clean)\n");
+            main_inputs.config_torture_pressed = false;
+        } else {
+            if (!mpe_config_save("status/engine.cfg.backup")) {
+                printf("[A3] WARNING: config backup failed; F11 will fall back to compiled defaults on restore\n");
+            }
+            scene_spawn_config_torture_test();
+            long_run_validation_start(a3_long_run_validation_ticks);
+            long_run_validation_restore_config = 1;
+            long_run_validation_is_torture = 1;
+            main_inputs.config_torture_pressed = false;
+        }
     }
 
 /* Spawn gun (Enter hold) */

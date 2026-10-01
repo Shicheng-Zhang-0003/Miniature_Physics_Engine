@@ -123,9 +123,15 @@ static void long_run_validation_report(void) {
     if (long_run_validation_restore_config) {
         /* FIX-AUDIT-DESPOT: the restore path ignored mpe_config_load's
          * return, so a missing/corrupt backup silently left torture values
-         * live for every later run. Check and say so. */
+         * live for every later run. Check and say so.
+         * DESPOT-2026-10-01: saying so is not enough — a failed restore must
+         * NEVER leave torture live. Fall back to compiled defaults (always
+         * available, no files involved), so F11 always ends in a known-good
+         * state: backup if possible, defaults if not, torture never. */
         if (!mpe_config_load("status/engine.cfg.backup")) {
-            fprintf(stderr, "[A3] WARNING: config restore from status/engine.cfg.backup failed; torture values remain live\n");
+            fprintf(stderr, "[A3] WARNING: config restore from status/engine.cfg.backup failed; "
+                            "resetting to compiled defaults instead (torture never stays live)\n");
+            mpe_config_reset_defaults();
         } else {
             printf("[A3] Config restored from backup\n");
         }

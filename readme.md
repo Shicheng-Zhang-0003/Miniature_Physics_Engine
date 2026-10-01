@@ -1,10 +1,14 @@
 # 🧊 MINIATURE PHYSICS ENGINE (MPE)
 
-> ⚠️ **STATUS: UNSTABLE HEAD — DO NOT USE FOR STABLE WORK.**
-> The engine on `main` (`v15S` dev head) is inherently unstable right now:
-> stacking/bounce/rolling behaviour is under active repair and visual results
-> cannot be trusted. For full stable work, default to the last known proper
-> release **`V1.5R3`** (`git checkout V1.5R3`) until this notice is lifted.
+> ⚠️ **STATUS: ACTIVE REPAIR — MOSTLY FIXED, VERIFY BEFORE STABLE WORK.**
+> The `main` head (`v15S` dev) had a Tom-and-Jerry physics episode (frictionless
+> floor, overlap pops, stuck F11 torture values) that is now largely repaired:
+> live scenes rest on the infinite solver plane with validated friction,
+> stacks spawn overlap-free, and F11 always restores (backup, else compiled
+> defaults). Headless truth holds at 41/41. The all-clear is still pending
+> user confirmation in the live window — until this notice is lifted, prefer
+> the last known proper release **`V1.5R3`** (`git checkout V1.5R3`) for
+> critical stable work.
 
 > **Active head:** `v15S` — GTK4 port of the `v15R3` release with a modular kernel, per-world config, and upgraded data structures. Build from `v15S/src`; run the complete verification matrix from the repository root with `python3 tools/test_runner.py --profile full`.
 
