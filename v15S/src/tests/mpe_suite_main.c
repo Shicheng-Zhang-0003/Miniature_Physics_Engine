@@ -119,12 +119,14 @@ extern int mpe_t_meta_rotation(void);
 extern int mpe_t_meta_convergence(void);
 extern int mpe_t_meta_config_wiring(void);
 extern int mpe_t_mouse_look_axes(void);
+extern int mpe_t_body_materials_live(void);
 
 static const mpe_entry_t mpe_registry[] = {
     {"meta_rotation", mpe_t_meta_rotation, 0},
     {"meta_convergence", mpe_t_meta_convergence, 0},
     {"meta_config_wiring", mpe_t_meta_config_wiring, 0},
     {"mouse_look_axes", mpe_t_mouse_look_axes, 0},
+    {"body_materials_live", mpe_t_body_materials_live, 0},
     {"two_world", mpe_t_two_world, 0},
     {"revolute", mpe_t_revolute, 0},
     {"revolute_matrix", mpe_t_revolute_matrix, 0},

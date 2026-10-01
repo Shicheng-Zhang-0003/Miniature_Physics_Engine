@@ -43,6 +43,8 @@
 #include "mpe_test.h"
 #include "tests/mpe_test.h"
 #include "ui_input/mouse_look.h"
+#include "core/rigidbody.h"
+#include "config/mpe_config.h"
 
 /* --------------------------------------------------------------- helpers */
 
@@ -482,6 +484,88 @@ int mpe_t_mouse_look_axes(void) {
 
     if (tp->failures == 0) {
         printf("[PASS] mouse-look convention correct in all four directions\n");
+    }
+    mpe_test_end(tp);
+    return tp->failures;
+}
+
+/* ------------------- 6. body materials are live at construction time */
+
+/* DESPOT-2026-09-29 -- THE GAME-WORLD CONFIG-ORDER BUG.
+ *
+ * `g_cfg` is a plain global: all zero until mpe_config_init() runs. Body
+ * materials are stamped from it at CONSTRUCTION time and are never
+ * retro-fitted by physics_world_init(). So any body built before the config
+ * exists is permanently stuck with zero friction and zero restitution -- no
+ * tangential traction, no spin-down torque, nothing that can be repaired
+ * afterwards.
+ *
+ * The game hit this: root_gtk.c built the whole default scene from
+ * when_realised() while mpe_config_init() sat later in app_activate(). The
+ * report that identified it was spatial, not numerical: physics correct
+ * INSIDE the F10 validation region and wrong everywhere outside, because
+ * runtime-spawned content is created after the config exists and default-scene
+ * content was created before it.
+ *
+ * The suite could not have caught this on its own: every test calls
+ * mpe_test_begin(), which initialises the config, so the ordering was always
+ * correct in CI and only wrong in the game. This test therefore checks the
+ * PROPERTY rather than the call order -- a body built right now, in a process
+ * whose config we deliberately do not touch, must still come out with live
+ * materials. That is the invariant the fix restores. */
+int mpe_t_body_materials_live(void) {
+    mpe_test_t t;
+    mpe_test_begin(&t, "body_materials_live");
+    mpe_test_t *tp = &t;
+
+    /* REPRODUCE THE GAME'S PRECONDITION, not the happy path.
+     *
+     * Every test starts with an initialised config, so building a body here
+     * always looks healthy -- with or without the fix. Pretending the process
+     * has not initialised yet is what makes this test able to fail. The first
+     * version of this test did not do that and was decorative; it is exactly
+     * the kind of test that launders an unverified fix. */
+    mpe_config_force_unready_for_test();
+    MPE_CHECK(tp, !mpe_config_is_ready());
+
+    rigidbody cube;
+    rigidbody_initialisation_cube(&cube, (vector3){0, 0, 0},
+                                  (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
+    MPE_INFO("cube built now: friction_static=%.3f friction_kinetic=%.3f "
+             "restitution=%.3f (zeroed config would give 0/0/0)",
+             (double)cube.friction_static, (double)cube.friction_kinetic,
+             (double)cube.restitution);
+    /* THE LOAD-BEARING ASSERTION. Against a zeroed config these were 0.0. */
+    MPE_CHECK(tp, cube.friction_static > 0.0f);
+    MPE_CHECK(tp, cube.friction_kinetic > 0.0f);
+    /* The constructor must have repaired readiness on the way past. */
+    MPE_CHECK(tp, mpe_config_is_ready());
+
+    rigidbody cyl;
+    rigidbody_initialisation_cylinder(&cyl, 0.3f, 0.2f, 1.0f, (vector3){0, 0, 0});
+    MPE_INFO("cylinder built now: friction_static=%.3f restitution=%.3f",
+             (double)cyl.friction_static, (double)cyl.restitution);
+    MPE_CHECK(tp, cyl.friction_static > 0.0f);
+
+    /* And the solver config a body is born into must be usable, or the body
+     * is fine but the world around it is not. */
+    MPE_CHECK(tp, !mpe_cfg_is_degenerate(&g_cfg));
+
+    /* The guard is idempotent and must not reset an intentionally modified
+     * config -- a second call has to be a no-op, or a caller that tweaks
+     * friction mid-session would silently lose the tweak. */
+    {
+        const float saved = g_cfg.body_defaults.cube_fric_s;
+        g_cfg.body_defaults.cube_fric_s = 0.777f;
+        mpe_config_ensure_ready();
+        MPE_CHECK_NEAR(tp, g_cfg.body_defaults.cube_fric_s, 0.777f, 1e-6,
+                       "second ensure_ready is a no-op");
+        g_cfg.body_defaults.cube_fric_s = saved;
+    }
+
+    if (tp->failures == 0) {
+        printf("[PASS] bodies are constructed with live materials "
+               "(no zero-friction objects)\n");
     }
     mpe_test_end(tp);
     return tp->failures;

@@ -849,3 +849,99 @@ requesting. That is the same failure mode as the intake flag and the config:
 
 `mouse_lock_confined()` and `mouse_lock_relative_active()` are reported
 separately because they are different capabilities and can fail independently.
+
+### SCENEORDER-2026-09-29 — THE GAME WAS RUNNING WITH ZERO-FRICTION, ZERO-RESTITUTION OBJECTS — FIXED
+
+The user's framing was the key: *"if the physics math tests all show correct,
+then something is wrong with configuration of objects and settings."* They were
+right, and the decisive clue was not numerical at all.
+
+**The observation that identified it:** physics was **correct inside the F10
+validation region and wrong everywhere outside it**. A spatial boundary drawn
+around a *creation-time* difference. Runtime-spawned content (F5, F8, F10, and
+everything the player spawns) is created after the config exists; default-scene
+content was created before it.
+
+**Root cause — the config did not exist when the scene was built.**
+
+`root_gtk.c`, first entry point:
+
+```
+line 39   when_realised()  ->  scene_init_default()   <- spawns the whole default scene
+line 63   app_activate()   ->  mpe_config_init()      <- 24 lines too late
+line 65                     ->  mpe_config_load("status/engine.cfg")
+line 71                     ->  physics_world_init(primary)
+```
+
+`g_cfg` is a plain global in `mpe_config_schema.c`, so the C runtime
+zero-initialises it. Body materials are stamped from it **at construction time**
+and `physics_world_init()` does **not** retro-fit them onto existing bodies:
+
+```c
+/* core/rigidbody.c */
+rigid_body->restitution     = g_cfg.body_defaults.cube_restitution;  /* 0.0, not 0.5 */
+rigid_body->friction_static = g_cfg.body_defaults.cube_fric_s;      /* 0.0, not 0.4 */
+```
+
+Measured, same process, either side of `mpe_config_init()`:
+
+| | cube restitution | cube friction |
+|---|---|---|
+| before init | **0.000** | **0.000** |
+| after init | 0.500 | 0.400 |
+
+So **every object in the default scene was permanently built with no friction
+and no restitution.**
+
+**That accounts for all three reports, and specifically:**
+
+* *"objects rotating endlessly / rolling endlessly like a cartoon character"* —
+  zero friction means no tangential traction AND no spin-down torque. Nothing
+  decelerates a zero-friction body. This is the clearest of the three.
+* *"bounce can go from no bounce to massive bounce in an instant"* — a world
+  containing a mix of zero-material default objects and correctly-material
+  runtime objects produces contacts whose behaviour depends on **which two
+  bodies** happen to touch, so restitution swings between dead and violent.
+* *"F5 cubes phasing through each other"* — F5 sets its own friction (0.8/0.7),
+  but the stack rests on the static plane and friction combines with `min()`,
+  so the effective stack friction was very low and the stack squirted.
+
+**Fix — make the ordering unobservable rather than merely corrected:**
+
+1. `mpe_config_ensure_ready()` (config/mpe_config.c): idempotent init, plus
+   `mpe_config_is_ready()`.
+2. Called at the **choke point every body passes through** —
+   `rigidbody_initialisation_cube/cylinder/sphere`. Belt.
+3. Called at the top of `scene_init_default()` — the function that was actually
+   called out of order. Braces.
+4. `root_gtk.c` startup now configures first, explicitly, so the log is honest.
+5. `mpe_config_force_unready_for_test()`: a test hook to reproduce the
+   precondition.
+
+**Why the suite could never have caught this on its own, and what changed.**
+Every test calls `mpe_test_begin()`, which initialises the config — so the
+ordering was always correct in CI and only wrong in the game. The regression
+test therefore reproduces the *precondition* rather than the happy path: it
+forces the config unready, then builds a body and requires live materials. My
+first attempt at that test was decorative (it passed with the fix removed,
+because the test harness had already initialised the config); I stripped the
+guards and confirmed it now fails:
+
+```
+WITHOUT the fix:  cube friction_static=0.000 friction_kinetic=0.000 restitution=0.000
+                  [FAIL] cube.friction_static > 0.0f
+                  [FAIL] cube.friction_kinetic > 0.0f
+                  [FAIL] mpe_config_is_ready()
+                  [FAIL] cyl.friction_static > 0.0f
+WITH the fix:     friction_static=0.400 friction_kinetic=0.300 restitution=0.500
+```
+
+That is the same failure mode as the dead `intake_power` flag, the frozen joint
+motor, the never-initialised test config, and the forced `GDK_BACKEND=x11`:
+**something that exists, is correct in isolation, and is never actually wired
+to the thing that consumes it.** Five instances now. The pattern worth taking
+away is not about this codebase -- it is that "it exists" and "it is connected"
+are different claims, and only one of them was ever being checked.
+
+Verification: 39/39 green in the suite, and in all five regimes; engine builds
+with zero warnings. The three visual symptoms are the user's to confirm.
