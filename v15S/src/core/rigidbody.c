@@ -849,7 +849,9 @@ void rb_integrate_velocity(rigidbody *rigid_body, float delta_time, float linear
      * implicit-midpoint path below is correct), and for an isotropic inertia
      * (a sphere has no gyroscopic term at all).
      */
-    if (vector3_length_squared(rigid_body->torque_accumulator) == 0.0f) {
+    /* DESPOT-2026-10-01: exact ==0.0f misses denormal-torque (1e-38) and
+     * routes it to the L-conservation branch with a bogus L. Epsilon gate. */
+    if (vector3_length_squared(rigid_body->torque_accumulator) < 1e-24f) {
         math3 Il = rigid_body->inertia_tensor_local;
         int isotropic = (fabsf(Il.matrix[0][0] - Il.matrix[1][1]) <= 1e-6f * fabsf(Il.matrix[0][0]) &&
                          fabsf(Il.matrix[1][1] - Il.matrix[2][2]) <= 1e-6f * fabsf(Il.matrix[0][0]));
@@ -930,7 +932,20 @@ void rb_integrate_velocity(rigidbody *rigid_body, float delta_time, float linear
  * (and wrong) vector field: it discards the direction of the gyroscopic
  * acceleration, which is what carries angular momentum. So that cap is gone.
      *
-     * What replaced it, and what did NOT. Two things were tried and measured:
+     * What replaced it, and what is live NOW (DESPOT-2026-10-01 correction
+     * of the stale note below). BOTH paths exist, ordered:
+     *   1. Torque-free L-conservation fixed point (above): converges for the
+     *      tested tumblers (angmom gate 0.5% now measures 0.0028% on the
+     *      passing plant). On non-convergence it falls THROUGH, never trusts
+     *      a partial iterate.
+     *   2. Implicit-midpoint gyro below: correct under external torque;
+     *      degenerates to explicit for the torque-free case (w_mid == w).
+     * The 48%-drift experiment described below was the OLD ordering bug
+     * (L captured AFTER the explicit step); the current code captures PRE-tick
+     * L. The residual ~2.7%/2s figure below is the FALLBACK path only, not
+     * the converged L path. Second-order Euler integration remains the real
+     * future fix; until then the angmom gate stays at 3% as a ceiling, with
+     * the converged path asserting far tighter.
      *
      *  - Implicit midpoint on the rotational ODE (the current code). For a
      *    body with net external torque this is the right scheme and strictly

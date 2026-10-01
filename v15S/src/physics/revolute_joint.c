@@ -24,6 +24,7 @@
  *   */
 #include "revolute_joint.h"
 #include "../config/mpe_config.h"
+#include "../core/det_math.h"
 #include <math.h>
 #include <stdio.h>
 
@@ -435,16 +436,14 @@ void revolute_solve(revolute_params *p, rigidbody *body_a, rigidbody *body_b, fl
     if (!p->motor_enabled) {
         lambda[5] = 0.0f; /* free hinge: never apply axis torque */
     } else if (p->motor_max_torque > 0.0f) {
-        /* Single clamped drive: constraint torque respects max_torque over
-         * THIS tick's dt (hardcoded 1/60 overstated torque 6x when clamped
-         * to 0.1s). (Torque-accumulator pre-pass also drives; the clamp
-         * here keeps the constraint path from overriding weak motors.)
-         * TRUTH: full single-drive decoupling (accumulator only) was
-         * considered and REJECTED with cause: the clamped row converges
-         * hinges through contact in one tick where accumulator-only lags,
-         * and no test exhibits overshoot with the clamp in place
-         * (revolute/pendulum green, motor stays within no-overshoot). */
-        float max_lam = p->motor_max_torque * dt;
+        /* Single-budget split drive (DESPOT-2026-10-01): torque reaches the
+         * bodies through TWO paths — the accumulator feedforward
+         * (revolute_apply_motor, integrated as torque*dt) AND this clamped
+         * constraint row. Old code clamped EACH to max_torque, so the sum
+         * drove up to 2x commanded torque. Each path now owns half the
+         * budget; the sum respects motor_max_torque while keeping the
+         * one-tick contact convergence the clamped row provides. */
+        float max_lam = 0.5f * p->motor_max_torque * dt;
         if (lambda[5] > max_lam) lambda[5] = max_lam;
         else if (lambda[5] < -max_lam) lambda[5] = -max_lam;
     }
@@ -473,6 +472,12 @@ void revolute_solve(revolute_params *p, rigidbody *body_a, rigidbody *body_b, fl
     /* ---- angle limits: persistent relative-angle tracking + velocity-level enforcement ---- */
     if (p->limits_enabled) {
         if (!p->angle_initialized) {
+            /* DESPOT-2026-10-01: atan2f/sqrtf are libm transcendentals, not
+             * IEEE-exact ops. This runs once per joint-limits-enable (cold
+             * path, not per-tick), so mark the trig fallback for honesty
+             * rather than pretending determinism. Per-tick angle uses
+             * dead-reckoned integration below (exact mults/adds only). */
+            det_mark_fallback_trig();
             vector4 q_a_inv = {body_a->orientation.w, -body_a->orientation.x, -body_a->orientation.y, -body_a->orientation.z};
             vector4 q_rel = vector4_multiplication(q_a_inv, body_b->orientation);
             q_rel = vector4_normalisation(q_rel);
@@ -1018,11 +1023,13 @@ void revolute_apply_motor(revolute_params *p, rigidbody *body_a, rigidbody *body
         motor_gain = 50.0f;
     }
     float desired_torque = speed_error * motor_gain;
-    if (desired_torque > p->motor_max_torque) {
-        desired_torque = p->motor_max_torque;
+    /* Half-budget here, half in the constraint row (see note above). */
+    float half_max = 0.5f * p->motor_max_torque;
+    if (desired_torque > half_max) {
+        desired_torque = half_max;
     }
-    if (desired_torque < -p->motor_max_torque) {
-        desired_torque = -p->motor_max_torque;
+    if (desired_torque < -half_max) {
+        desired_torque = -half_max;
     }
     /* Stability: no overshoot in one tick. */
     {

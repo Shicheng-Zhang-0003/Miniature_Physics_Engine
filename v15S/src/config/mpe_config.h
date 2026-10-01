@@ -71,6 +71,14 @@ typedef struct {
     } sleep;
 
     struct {
+        /* TRUTH (DESPOT-2026-10-01 labelled, was misleading names):
+         * penetration_slop = single contact slop (m). bias_factor /
+         * max_separation_bias drive ONLY split-impulse positional correction
+         * (no velocity Baumgarte anywhere — see collision_solver header).
+         * restitution_velocity_thresh is a SPEED (m/s, stored float, sign
+         * enforced at use). timestep.max_linear/angular_speed are
+         * inform-only (never scale velocities; see rigidbody.c). Names kept
+         * for registry stability; physics in comments is authoritative. */
         float penetration_slop;
         float bias_factor;
         float max_separation_bias;
