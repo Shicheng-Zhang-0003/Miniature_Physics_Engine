@@ -60,7 +60,21 @@ static void app_activate(GApplication *app, gpointer user_data) {
     setvbuf(stdout, NULL, _IONBF, 0);
     setvbuf(stderr, NULL, _IONBF, 0);
     printf("[GTK4] app_activate\n"); fflush(stdout);
-    mpe_config_init();
+    /* DESPOT-2026-09-29: config first, scene second.
+     *
+     * when_realised() below calls scene_init_default(), and body materials are
+     * stamped from g_cfg at construction time. when_realised is a GL-area
+     * callback and can run BEFORE app_activate() finishes, so the scene used to
+     * be built against a zeroed g_cfg: every default object got zero friction
+     * and zero restitution, permanently. That is the "endless rolling /
+     * spinning like a cartoon" and "bounce from nothing to violent" report, and
+     * the reason F10's runtime-spawned region was the one place that behaved.
+     *
+     * mpe_config_ensure_ready() is now also called from scene_init_default() and
+     * from every rigidbody_initialisation_*(), so the ordering is now safe by
+     * construction rather than by discipline. This call keeps the startup log
+     * honest about what happens first. */
+    mpe_config_ensure_ready();
     event_log_init();
     if (mpe_config_load("status/engine.cfg")) {
         printf("[config] loaded status/engine.cfg\n"); fflush(stdout);
@@ -204,7 +218,7 @@ int main_algorithm(int argc, char *argv[]) {
      * first click needed a wl_display_roundtrip() from inside a GTK handler,
      * which re-enters GDK's own event delivery. No-op on X11. */
     mouse_lock_init();
-    mpe_config_init(); /* MPE_TASK_29_CONFIG_INIT */
+    mpe_config_ensure_ready(); /* was mpe_config_init(): must precede the scene */
     event_log_init(); /* MPE_TASK_V15R2_EVENT_LOG_INIT */
     /* MPE_TASK_34_CONFIG_LOAD_BEGIN */
     if (mpe_config_load("status/engine.cfg")) {

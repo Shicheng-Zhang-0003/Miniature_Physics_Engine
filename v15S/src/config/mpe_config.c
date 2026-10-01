@@ -106,8 +106,12 @@ const mpe_param *mpe_config_find(const char *key) {
     return NULL;
 }
 
+/* DESPOT-2026-09-29: see mpe_config_ensure_ready(). */
+static bool g_config_ready = false;
+
 void mpe_config_init(void) {
     memset(&g_cfg, 0, sizeof(g_cfg));
+    g_config_ready = true;
     for (size_t i = 0; i < g_registry_count; i++) {
         param_write_double(&g_registry[i], g_registry[i].def);
     }
@@ -123,6 +127,54 @@ void mpe_config_init(void) {
                     g_registry[i].key ? g_registry[i].key : "(null)");
         }
     }
+}
+
+/* DESPOT-2026-09-29: the init-order guard.
+ *
+ * `g_cfg` is a plain global, so it is ALL ZERO until mpe_config_init() runs.
+ * Body materials are stamped from it at CONSTRUCTION time
+ * (rigidbody.c: restitution/friction = g_cfg.body_defaults.*), and
+ * physics_world_init() does NOT retro-fit them onto bodies that already exist.
+ *
+ * So any body created before mpe_config_init() is permanently built with zero
+ * friction and zero restitution. That is not a subtle tuning error: a body
+ * with no friction has no tangential traction and no spin-down torque, so it
+ * rolls and spins forever.
+ *
+ * The game hit exactly this. root_gtk.c built the entire default scene from
+ * when_realised() (scene_init_default) while mpe_config_init() sat 24 lines
+ * later in app_activate(). The user-visible signature was unmistakable once
+ * reported: physics correct INSIDE the F10 validation region and wrong
+ * everywhere outside it -- because runtime-spawned content is created after
+ * the config exists, and default-scene content was created before it. A
+ * spatial boundary around a creation-time difference is the fingerprint of
+ * this bug specifically.
+ *
+ * This function makes the ordering unobservable: idempotent, and callable from
+ * anywhere that is about to build a body. */
+void mpe_config_ensure_ready(void) {
+    if (g_config_ready) {
+        return;
+    }
+    mpe_config_init();
+    g_config_ready = true;
+}
+
+bool mpe_config_is_ready(void) {
+    return g_config_ready;
+}
+
+/* DESPOT-2026-09-29: test hook ONLY.
+ *
+ * Pretends the process has not initialised its config yet, so a suite test can
+ * reproduce the exact precondition that broke the game (a body constructed
+ * against a zeroed g_cfg) instead of merely asserting the happy path. Without
+ * this the regression test is decorative: mpe_test_begin() initialises the
+ * config, so a body built inside a test always looks healthy and the test
+ * cannot fail even with the fix removed. Not for production use. */
+void mpe_config_force_unready_for_test(void) {
+    memset(&g_cfg, 0, sizeof(g_cfg));
+    g_config_ready = false;
 }
 
 void mpe_config_reset_defaults(void) {

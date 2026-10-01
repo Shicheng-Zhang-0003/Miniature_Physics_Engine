@@ -187,6 +187,17 @@ typedef struct {
  * ------------------------------------------------------------------ */
 extern mpe_config_t g_cfg;
 
+/* DESPOT-2026-09-29: idempotent init. Call before building ANY body, because
+ * body materials are stamped from g_cfg at construction time and are never
+ * retro-fitted. Building a body while g_cfg is still zero yields a body with
+ * zero friction and zero restitution that can never be repaired. */
+void mpe_config_ensure_ready(void);
+/* True once the config has been initialised. Gated by a suite test so a
+ * zero-config world can never be certified again. */
+bool mpe_config_is_ready(void);
+/* TEST HOOK ONLY: reproduce the "config not yet initialised" precondition. */
+void mpe_config_force_unready_for_test(void);
+
 /* ------------------------------------------------------------------
  * The registry table — cold path iterates this
  * Declared in mpe_config_schema.c, extern'd here for iteration.

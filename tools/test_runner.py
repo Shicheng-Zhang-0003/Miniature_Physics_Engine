@@ -97,7 +97,7 @@ MPE_TEST_REGIMES = ("default", "light", "heavy", "brittle", "sticky")
 # meta_config_wiring, mouse_look_axes). meta_sleep was written and withdrawn,
 # so the count is 40 and this constant says so rather than being quietly
 # lowered.
-MIN_SUITE_ENTRIES = 40
+MIN_SUITE_ENTRIES = 41
 
 
 def discover_suite_entries(source: str) -> list[tuple[str, bool]]:

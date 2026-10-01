@@ -429,3 +429,20 @@ Audit notes and boundaries are in `../AUDIT_REPORT_2026-09-24.md`.
   pointer supplies deltas but does **not** confine — that was the windowed
   failure), and globals bound once at startup instead of lazily from inside a
   GTK handler. See `KNOWN_FAILURES.md` -> `MOUSELOOK2-2026-09-29`.
+
+- [x] **GAME RAN WITH ZERO-FRICTION OBJECTS (2026-09-29) — FIXED.**
+  `root_gtk.c` built the entire default scene from `when_realised()` while
+  `mpe_config_init()` ran 24 lines later in `app_activate()`. `g_cfg` is a
+  plain global, so it was still all zero, and body materials are stamped from
+  it at construction time and never retro-fitted: every default-scene object
+  got `friction = 0` and `restitution = 0` permanently. That is the endless
+  rolling/spinning, the bounce swinging between dead and violent, and the F5
+  stack squirting. The tell was spatial, not numerical: **correct inside the F10
+  region, wrong outside it** — runtime-spawned content is born after the config
+  exists, default-scene content before it.
+  Fixed structurally: `mpe_config_ensure_ready()` called from every
+  `rigidbody_initialisation_*()` (the choke point) and from
+  `scene_init_default()`, so caller order no longer matters. Gated by
+  `mpe_t_body_materials_live`, which forces the unready precondition and fails
+  4 assertions with the fix removed. See `KNOWN_FAILURES.md` ->
+  `SCENEORDER-2026-09-29`.

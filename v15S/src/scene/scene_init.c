@@ -236,6 +236,24 @@ int scene_add_cylinder(float radius, float half_length, float mass, vector3 init
 }
 
 void scene_init_default(void) {
+    /* DESPOT-2026-09-29: the actual site of the bug.
+     *
+     * root_gtk.c called this from when_realised() while mpe_config_init() ran
+     * 24 lines later in app_activate(). Because g_cfg is a plain global it was
+     * still all zero, and every body spawned below took
+     * restitution = g_cfg.body_defaults.cube_restitution (0.0) and
+     * friction_static = g_cfg.body_defaults.cube_fric_s (0.0) -- permanently,
+     * since physics_world_init() does not retro-fit materials.
+     *
+     * The signature that identified it: physics correct INSIDE the F10
+     * validation region, wrong everywhere outside. Runtime-spawned content is
+     * born after the config exists; default-scene content was born before it.
+     *
+     * The guard belongs here as well as in rigidbody.c: this is the function
+     * that was called out of order, and being explicit at the scene boundary
+     * means the next person who reorders startup cannot silently reintroduce
+     * it. The rigidbody guards are the belt to this braces. */
+    mpe_config_ensure_ready();
     scene_clear();
     int object_grey_index = scene_add_object(2.0f, 0.0f, (vector3){0.0f, 2.0f, 0.0f});
     (physics_world_get_primary()->bodies)[object_grey_index].colour = (vector3){0.8f, 0.8f, 0.8f};

@@ -502,6 +502,14 @@ void rigidbody_update_axes(rigidbody *rigid_body) {
     /* MPE_TASK_15_AXIS_STAMP_END */
 } //Init
 void rigidbody_initialisation_sphere(rigidbody *rigid_body, float radius, float mass, vector3 position_input) {
+    /* DESPOT-2026-09-29: body materials below are stamped from g_cfg at
+     * construction time and are NEVER retro-fitted by physics_world_init().
+     * If the caller built this body before mpe_config_init(), the zeroed g_cfg
+     * would silently give it no friction and no restitution -- a body that
+     * rolls and spins forever, and cannot be repaired later. Ensure the config
+     * exists at the choke point every body passes through, so call ORDER in the
+     * caller stops mattering. Idempotent: one branch after the first call. */
+    mpe_config_ensure_ready();
     if (!rigid_body) {
         return;
     }
@@ -1136,6 +1144,14 @@ void rb_integrate_position_exact(rigidbody *rigid_body, float delta_time, const 
 /* make_half_extents REMOVED (trivial helper, zero callers). */
 // Initialize a cube: Box, OBB
 void rigidbody_initialisation_cube(rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass) {
+    /* DESPOT-2026-09-29: body materials below are stamped from g_cfg at
+     * construction time and are NEVER retro-fitted by physics_world_init().
+     * If the caller built this body before mpe_config_init(), the zeroed g_cfg
+     * would silently give it no friction and no restitution -- a body that
+     * rolls and spins forever, and cannot be repaired later. Ensure the config
+     * exists at the choke point every body passes through, so call ORDER in the
+     * caller stops mattering. Idempotent: one branch after the first call. */
+    mpe_config_ensure_ready();
     if (!rigid_body) {
         return;
     }
@@ -1429,6 +1445,14 @@ void rigidbody_update_inertia_cylinder(rigidbody *rigid_body) {
 }
 
 void rigidbody_initialisation_cylinder(rigidbody *rigid_body, float radius, float half_length, float mass, vector3 position_input) {
+    /* DESPOT-2026-09-29: body materials below are stamped from g_cfg at
+     * construction time and are NEVER retro-fitted by physics_world_init().
+     * If the caller built this body before mpe_config_init(), the zeroed g_cfg
+     * would silently give it no friction and no restitution -- a body that
+     * rolls and spins forever, and cannot be repaired later. Ensure the config
+     * exists at the choke point every body passes through, so call ORDER in the
+     * caller stops mattering. Idempotent: one branch after the first call. */
+    mpe_config_ensure_ready();
     if (!rigid_body) {
         return;
     }
