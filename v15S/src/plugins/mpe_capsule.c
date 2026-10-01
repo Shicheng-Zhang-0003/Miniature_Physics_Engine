@@ -126,6 +126,10 @@ static bool capsule_vs_cube_sampled(rigidbody *cap, vector3 ax, float h, float r
         !isfinite(cube->half_extensions.z)) {
         return false;
     }
+    /* DESPOT-2026-10-01: guard cast/overflow BEFORE (int)(h/r). */
+    if (!isfinite(h) || !isfinite(r) || h < 0.0f || h > 100.0f || r < 1e-6f || r > 100.0f) {
+        return false;
+    }
     int n = (h <= 0.0f) ? 1 : (2 * (int)(h / (r > 0.0f ? r : 1.0f)) + 3);
     if (n < 1) n = 1;
     if (n > 9) n = 9;
@@ -206,6 +210,10 @@ static bool capsule_vs_cylinder_sampled(rigidbody *cap, vector3 ax, float h, flo
     if (!(l2 > 1e-12f) || !isfinite(l2)) return false;
     cax = vector3_scaling(cax, 1.0f / sqrtf(l2));
     float cr = cyl->radius, ch = cyl->cylinder_half_length;
+    /* DESPOT-2026-10-01: same overflow guard as cube path. */
+    if (!isfinite(h) || !isfinite(r) || h < 0.0f || h > 100.0f || r < 1e-6f || r > 100.0f) {
+        return false;
+    }
     int n = (h <= 0.0f) ? 1 : (2 * (int)(h / (r > 0.0f ? r : 1.0f)) + 3);
     if (n < 1) n = 1;
     if (n > 9) n = 9;

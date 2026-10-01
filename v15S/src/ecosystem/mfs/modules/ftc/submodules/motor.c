@@ -47,6 +47,15 @@ void motor_update(motor *m, float wheel_angular_vel, float dt, float battery_vol
     if ((!m) || (dt <= 0.0f)) {
         return;
     }
+    /* DESPOT-2026-10-01: fail-closed on non-finite bus voltage (NULL-battery
+     * NAN, corrupt pack). Old code let NAN through: current/torque/temperature
+     * all latched NAN and the pack bricked for the run. Clamp to OCV floor. */
+    if (!isfinite(battery_voltage)) {
+        battery_voltage = 12.0f;
+    }
+    if (!isfinite(wheel_angular_vel)) {
+        return;
+    }
 
     float motor_shaft_vel = wheel_angular_vel * m->gear_ratio;
 
@@ -116,6 +125,9 @@ void motor_update_load(motor *m, float wheel_angular_vel, float dt, float batter
                        float axle_inertia) {
     if ((!m) || (dt <= 0.0f)) {
         return;
+    }
+    if (!isfinite(battery_voltage)) {
+        battery_voltage = 12.0f;
     }
     if (!(axle_inertia > 0.0f) || !isfinite(axle_inertia)) {
         motor_update(m, wheel_angular_vel, dt, battery_voltage);

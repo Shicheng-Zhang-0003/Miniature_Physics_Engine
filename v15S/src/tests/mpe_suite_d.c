@@ -204,6 +204,7 @@ int mpe_t_meta_rotation(void) {
     physics_world wa, wb;
     const int wa_dyn = meta_build(&wa, 1);
     const int wb_dyn = meta_build(&wb, 1);
+    (void) wa_dyn; /* index of dynamic body in A (B rotated via wb_dyn below) */
     MPE_CHECK(tp, wa.body_count == wb.body_count);
     if (wa.body_count != wb.body_count) {
         physics_world_cleanup(&wa);

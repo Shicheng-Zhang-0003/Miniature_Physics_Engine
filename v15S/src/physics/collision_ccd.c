@@ -71,7 +71,11 @@ static float ccd_sphere_sweep_toi(vector3 dp, vector3 dv, float radius, float dt
         return -1.0f; /* no relative motion, or already overlapping */
     }
     double b = 2.0 * (dx * vx + dy * vy + dz * vz);
-    double discriminant = fma(b, b, -4.0 * a * c);
+    /* DESPOT-2026-10-01: fma(b,b,-4*a*c) is a libm/hardware-FMA op, not an
+     * IEEE-exact +,-,*,/,sqrt sequence. Cross-target contraction differs,
+     * so the TOI clamp/no-clamp bifurcation desyncs. Plain double mults
+     * are bit-identical under -ffp-contract=off (see det_math.h). */
+    double discriminant = b * b - 4.0 * a * c;
     if (!(discriminant >= 0.0)) {
         return -1.0f;
     }
