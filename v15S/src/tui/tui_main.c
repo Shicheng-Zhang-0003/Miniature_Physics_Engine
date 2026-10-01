@@ -33,6 +33,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include <time.h>
 #ifndef MPE_OS_WINDOWS
 #include <unistd.h>
@@ -345,6 +346,22 @@ static double now_seconds(void) {
     return (double) ts.tv_sec + (double) ts.tv_nsec * 1e-9;
 }
 
+/* DESPOT-2026-10-01: atol() on CLI counts is unchecked (non-numeric -> 0,
+ * LONG_MAX overflow UB, huge ticks -> hang). Strict strtol with fallback. */
+static long tui_parse_count(const char *s, long fallback) {
+    if (!s || !*s) {
+        return fallback;
+    }
+    errno = 0;
+    char *end = NULL;
+    long v = strtol(s, &end, 10);
+    if (errno != 0 || end == s || *end != '\0' || v < 0 || v > 100000) {
+        fprintf(stderr, "mpe-tui: invalid count '%s', using %ld\n", s, fallback);
+        return fallback;
+    }
+    return v;
+}
+
 int main(int argc, char *argv[]) {
     const float dt = 1.0f / 60.0f;
     const char *scene = "demo";
@@ -363,15 +380,15 @@ int main(int argc, char *argv[]) {
         } else if (strcmp(argv[i], "--snapshot") == 0) {
             want_snapshot = true;
             if (i + 1 < argc && argv[i + 1][0] != '-') {
-                ticks = atol(argv[++i]);
+                ticks = tui_parse_count(argv[++i], 600);
             }
         } else if (strcmp(argv[i], "--stream") == 0) {
             want_stream = true;
             if (i + 1 < argc && argv[i + 1][0] != '-') {
-                ticks = atol(argv[++i]);
+                ticks = tui_parse_count(argv[++i], 600);
             }
         } else if (strcmp(argv[i], "--every") == 0 && i + 1 < argc) {
-            every = atol(argv[++i]);
+            every = tui_parse_count(argv[++i], 60);
         } else if (strcmp(argv[i], "--scene") == 0 && i + 1 < argc) {
             scene = argv[++i];
         } else if (strcmp(argv[i], "--broadphase") == 0 && i + 1 < argc) {
@@ -379,7 +396,7 @@ int main(int argc, char *argv[]) {
         } else if (strcmp(argv[i], "--solver") == 0 && i + 1 < argc) {
             want_solver = argv[++i];
         } else if (strcmp(argv[i], "--ticks") == 0 && i + 1 < argc) {
-            live_ticks = atol(argv[++i]);
+            live_ticks = tui_parse_count(argv[++i], 0);
         } else {
             fprintf(stderr, "mpe-tui: unknown option '%s' (see --help)\n", argv[i]);
             return 2;

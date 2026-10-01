@@ -91,6 +91,13 @@ int tui_dump_snapshot(FILE *out, physics_world *world, unsigned long tick, float
     if (!out || !world || !world->bodies) {
         return 1;
     }
+    /* DESPOT-2026-10-01: negative/huge body_count printed bodies=-N and drove
+     * negative pair headers. Validate against live allocation before dumping. */
+    if (world->body_count < 0 || world->body_count > world->body_capacity) {
+        fprintf(out, "### MPE-TUI snapshot tick=%lu time=%.4f dt=%.5f bodies=0 result=FAIL(bad-count)\n",
+                tick, tick * (double) dt, dt);
+        return 1;
+    }
     int bad = 0;
     for (int i = 0; i < world->body_count; i++) {
         rigidbody *rb = &world->bodies[i];

@@ -346,8 +346,10 @@ int mpe_loader_load(const char *path, char *errbuf, int errlen) {
     return -1;
 }
 
-/* Path equality: realpath when possible, basename fallback otherwise.
- * Windows: case-insensitive, both separators. */
+/* Path equality: exact match or realpath-canonicalised match ONLY.
+ * DESPOT-2026-10-01: the old basename fallback made different dirs with the
+ * same filename compare equal, so unload/detach/handle_for_desc could tear
+ * down the wrong handle and dlclose a still-referenced image. Exact paths. */
 static int same_path(const char *a, const char *b) {
     if (!a || !b) return 0;
 #ifdef MPE_OS_WINDOWS
@@ -358,22 +360,10 @@ static int same_path(const char *a, const char *b) {
     char ca[PATH_MAX], cb[PATH_MAX];
 #ifdef MPE_OS_WINDOWS
     if (realpath(a, ca) && realpath(b, cb) && _stricmp(ca, cb) == 0) return 1;
-    const char *ba = strrchr(a, '/');
-    const char *bsa = strrchr(a, '\\');
-    const char *bb = strrchr(b, '/');
-    const char *bsb = strrchr(b, '\\');
-    if (bsa && (!ba || bsa > ba)) ba = bsa;
-    if (bsb && (!bb || bsb > bb)) bb = bsb;
-    ba = ba ? ba + 1 : a;
-    bb = bb ? bb + 1 : b;
-    return _stricmp(ba, bb) == 0;
+    return 0;
 #else
     if (realpath(a, ca) && realpath(b, cb) && strcmp(ca, cb) == 0) return 1;
-    const char *ba = strrchr(a, '/');
-    const char *bb = strrchr(b, '/');
-    ba = ba ? ba + 1 : a;
-    bb = bb ? bb + 1 : b;
-    return strcmp(ba, bb) == 0;
+    return 0;
 #endif
 }
 
@@ -717,23 +707,42 @@ int mpe_loader_count(void) {
     return n;
 }
 const char *mpe_loader_path_at(int i) {
-    /* Interior pointer: valid until the next load/unload (callers copy). */
+    /* DESPOT-2026-10-01: interior pointer dangled across load/unload/dlclose.
+     * Return a rotating snapshot copy (4 slots, PATH_MAX each) taken under
+     * lock. Valid until 4 further calls or next unload — callers needing
+     * longevity must copy. No heap, no NULL-deref, no use-after-dlclose. */
+    static char snaps[4][PATH_MAX];
+    static int next = 0;
     loader_lock();
-    const char *out = (i >= 0 && i < s_n) ? s_h[i].path : NULL;
+    const char *src = (i >= 0 && i < s_n) ? s_h[i].path : NULL;
+    const char *out = NULL;
+    if (src) {
+        snprintf(snaps[next], sizeof(snaps[next]), "%s", src);
+        out = snaps[next];
+        next = (next + 1) & 3;
+    }
     loader_unlock();
     return out;
 }
 
 const char *mpe_loader_name_at(int i) {
-    /* Interior pointer: valid until the next load/unload (callers copy). */
+    /* Same snapshot discipline as path_at (see above). */
+    static char snaps[4][128];
+    static int next = 0;
     loader_lock();
+    const char *src = NULL;
     const char *out = NULL;
     if (i >= 0 && i < s_n) {
         if (s_h[i].is_ecosystem) {
-            out = (s_h[i].eco && s_h[i].eco->name) ? s_h[i].eco->name : NULL;
+            src = (s_h[i].eco && s_h[i].eco->name) ? s_h[i].eco->name : NULL;
         } else if (s_h[i].desc && s_h[i].desc->name) {
-            out = s_h[i].desc->name;
+            src = s_h[i].desc->name;
         }
+    }
+    if (src) {
+        snprintf(snaps[next], sizeof(snaps[next]), "%s", src);
+        out = snaps[next];
+        next = (next + 1) & 3;
     }
     loader_unlock();
     return out;

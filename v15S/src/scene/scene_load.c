@@ -717,6 +717,10 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
 
 int scene_loading(const char *file_source_path)
 {
+    if (!file_source_path) {
+        fprintf(stderr, "Error LDF01: NULL path\n");
+        return 0;
+    }
     FILE *f = fopen(file_source_path, "rb");
     if (!f) {
         fprintf(stderr, "Error LDF01: Could not open %s\n", file_source_path);
@@ -923,7 +927,16 @@ int scene_loading(const char *file_source_path)
     }
 
     /* --- Stage all joints --- */
+    /* DESPOT-2026-10-01: bound raw int32 from file before malloc/volume loop.
+     * Unbounded count = huge alloc / DoS; negative = signed confusion. */
     if (read_int(f, &staged_joint_count) && (staged_joint_count > 0)) {
+        if (staged_joint_count > 4096) {
+            fprintf(stderr, "Error LDF: joint count %d exceeds 4096\n", staged_joint_count);
+            free(staged_bodies);
+            free(staged_ids);
+            fclose(f);
+            return 0;
+        }
         staged_joints = (staged_joint *)malloc(
             (size_t)staged_joint_count * sizeof(staged_joint));
         if (!staged_joints) {
