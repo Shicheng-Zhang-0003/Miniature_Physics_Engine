@@ -178,13 +178,15 @@ check-new-files:
 	@git status --porcelain -- '*.c' '*.h' | grep -q '^??' && { echo "new untracked sources (review ENGINE_SRCS wildcard):"; git status --porcelain -- '*.c' '*.h' | grep '^??'; exit 1; } || echo "no untracked sources"
 
 help:
-	@echo "targets: engine (default) | debug | release | install | installcheck | clean | distclean"
+	@echo "targets: engine (default) | debug | release | install | installcheck | installcheck-v1 | clean | distclean"
 	@echo "         test_<name> (build+run) | build_<name> (build only) | paranoia_*"
-	@echo "         test_runner.py --profile quick|physics|full (default: full, JUnit + JSON reports)"
-	@echo "         build_suite | test_suite | test_suite_all (canonical C regression suite)"
-	@echo "         mpe-tui (terminal debugger + snapshot suite) | tui-smoke | plugins/*.so"
-	@echo "         mfs_ecosystem.so (delegates to ecosystem/mfs/Makefile)"
-	@echo "         check-deps | check-deps-tui | check-flags | check-new-files"
+	@echo "         test_runner.py --profile quick|physics|full (runner default: full; make default: engine)"
+	@echo "           --list | --test NAME | --allow-skip (strict SKIP fails without it)"
+	@echo "           MPE_TEST_REGIME=default|light|heavy|brittle|sticky (quick re-runs full suite x5)"
+	@echo "         build_suite | test_suite | test_suite_all (canonical C suite: 41 cases, MIN_SUITE_ENTRIES=41)"
+	@echo "         mpe-tui (terminal debugger + snapshot suite) | tui-smoke TUI_OUT=<dir> | plugins/*.so"
+	@echo "         mfs_ecosystem.so (delegates to ecosystem/mfs/Makefile; OUTDIR=<dir> for build_tests.sh)"
+	@echo "         check-deps | check-deps-tui | check-flags | check-new-files (wildcard guard)"
 	@echo "         WARNINGS_AS_ERRORS=1 for -Werror"
 	@echo "         flow: python3 ../../tools/test_runner.py --profile full"
 

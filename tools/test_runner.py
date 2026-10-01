@@ -2,16 +2,21 @@
 """MPE verification runner.
 
 Profiles:
-  quick    Python runner-contract tests and the canonical C regression suite.
-  physics  quick + every isolated legacy case and all paranoia cases.
-  full     physics + ASan/UBSan suite, MFS robotics, TUI snapshots, engine build.
+  quick    Python runner-contract tests and the canonical C regression suite
+           (41 cases incl. 2 informational diags; full suite re-run under 5
+           regimes default/light/heavy/brittle/sticky via MPE_TEST_REGIME).
+  physics  quick + every isolated legacy case (30) and all paranoia cases (14).
+  full     physics + ASan/UBSan suite, MFS robotics (12 gated), TUI snapshots
+           (9 files), engine build + check-flags.
 
 All run artifacts are written below the project-local temp/qa_runs directory.
 This module uses only the Python standard library.
 
 Strict contract: suite cases that print [SKIP] (self-skipped coverage) fail
 the run unless --allow-skip is given; [XFAIL] markers are surfaced in the
-summary counts but never block.
+summary counts but never block. Registry floors: MIN_SUITE_ENTRIES=41,
+MIN_LEGACY_ENTRIES=30, MIN_PARANOIA_ENTRIES=14; summary contract requires
+Total == registry size and Blocking failures == 0.
 """
 
 from __future__ import annotations
@@ -93,11 +98,17 @@ class Result:
 # physics property must hold across the spread rather than at one point.
 MPE_TEST_REGIMES = ("default", "light", "heavy", "brittle", "sticky")
 
-# 40 = 36 pre-existing + 4 metamorphic (meta_rotation, meta_convergence,
-# meta_config_wiring, mouse_look_axes). meta_sleep was written and withdrawn,
-# so the count is 40 and this constant says so rather than being quietly
-# lowered.
+# 41 = 36 pre-existing + 3 metamorphic (meta_rotation, meta_convergence,
+# meta_config_wiring) + mouse_look_axes + body_materials_live. meta_sleep was
+# written and withdrawn, so the floor stays 41 and this comment says so rather
+# than being quietly lowered. DESPOT-2026-10-01: was "40 = 36+4", stale vs its
+# own constant.
 MIN_SUITE_ENTRIES = 41
+# DESPOT-2026-10-01: pin per-suite floors so deleting a legacy/paranoia target
+# + its make target together cannot shrink the headline silently (the 220->204
+# drift). Canonical floor above; legacy 30 + paranoia 14 pinned here.
+MIN_LEGACY_ENTRIES = 30
+MIN_PARANOIA_ENTRIES = 14
 
 
 def discover_suite_entries(source: str) -> list[tuple[str, bool]]:
@@ -129,6 +140,14 @@ def discover_make_targets(makefile: str) -> tuple[list[str], list[str]]:
     paranoia = sorted(name for name in targets if name.startswith("paranoia_"))
     if not legacy or not paranoia:
         raise ValueError("makefile test target discovery found an empty group")
+    if len(legacy) < MIN_LEGACY_ENTRIES:
+        raise ValueError(
+            f"legacy suite has {len(legacy)} targets, below floor {MIN_LEGACY_ENTRIES}"
+        )
+    if len(paranoia) < MIN_PARANOIA_ENTRIES:
+        raise ValueError(
+            f"paranoia suite has {len(paranoia)} targets, below floor {MIN_PARANOIA_ENTRIES}"
+        )
     return legacy, paranoia
 
 

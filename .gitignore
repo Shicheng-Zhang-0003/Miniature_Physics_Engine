@@ -1,6 +1,7 @@
 # ============================================================
 # MPE root .gitignore
-# Repo root contains: v15R3/  fixes/ (retired)  tools/  run_all.sh  verify.sh
+# Repo root contains: v15S/  tools/  reference_materials/  run_all.sh  verify.sh
+# (DESPOT-2026-10-01: was stale "v15R3/ fixes/ (retired)".)
 # ============================================================
 
 # ============ Build output (matches anywhere in tree) ============
