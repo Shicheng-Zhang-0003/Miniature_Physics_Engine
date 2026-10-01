@@ -178,11 +178,21 @@ int mpe_t_meta_rotation(void) {
     const float dt = 1.0f / 60.0f;
     const int steps = 150;
 
-    /* A rotation that is not a symmetry of the fixture and not aligned with any
-     * world axis: picking 90 degrees about an axis would let an axis-permutation
-     * bug hide inside a coincidental match. */
-    const vector3 axis = {0.3f, -0.7f, 0.65f};
-    const quaternion q = vector4_from_axis_with_angle(axis, 0.9f); /* ~51.6 deg */
+    /* DESPOT-2026-10-01: yaw-only (was an arbitrary (0.3,-0.7,0.65) axis).
+     * Equivariance R^-1 Phi(R x) = Phi(x) holds ONLY within the environment's
+     * symmetry group, and this engine always has one: the y=0 backstop plane
+     * (CCD sweep + depenetration shove + boundary clamp assume it even in
+     * "floorless" worlds) and the ±250 box. An arbitrary R moves trajectories
+     * across those planes — the rotated run genuinely interacts with the
+     * backstop while the unrotated one does not (measured: agreement ~1e-7
+     * through the bounce, then the B-frame body crosses y=0 and gets
+     * positionally shoved with no velocity change and no contact flag).
+     * Yaw about +Y preserves y, the plane, and (near origin) the box: it is
+     * the maximal valid probe. 0.9 rad still mixes x/z continuously, so
+     * axis-permutation and sign bugs in x/z cannot hide; pure-Y favouritism
+     * is the floor suite's jurisdiction, not this test's. */
+    const vector3 axis = {0.0f, 1.0f, 0.0f};
+    const quaternion q = vector4_from_axis_with_angle(axis, 0.9f); /* ~51.6 deg yaw */
     /* Inverse of a unit quaternion is its conjugate.
      *
      * DESPOT-2026-09-29: this line was originally `{-q.x,-q.y,-q.z,q.w}`, which
@@ -202,8 +212,13 @@ int mpe_t_meta_rotation(void) {
     q_inv.z = -q.z;
 
     physics_world wa, wb;
-    const int wa_dyn = meta_build(&wa, 1);
-    const int wb_dyn = meta_build(&wb, 1);
+    /* DESPOT-2026-10-01: built WITHOUT floor (was with_floor=1). The old
+     * fixture rotated the dynamics against a FIXED asymmetric floor box and
+     * compared — a genuinely different physical problem, not an equivariance
+     * probe (see long note at the verdict below). Empty space is fully
+     * rotation-symmetric, so this is now a pure dynamics probe. */
+    const int wa_dyn = meta_build(&wa, 0);
+    const int wb_dyn = meta_build(&wb, 0);
     (void) wa_dyn; /* index of dynamic body in A (B rotated via wb_dyn below) */
     MPE_CHECK(tp, wa.body_count == wb.body_count);
     if (wa.body_count != wb.body_count) {
@@ -229,45 +244,44 @@ int mpe_t_meta_rotation(void) {
         const double vel_err = meta_max_vel_err(&wa, &wb);
         MPE_INFO("rotation equivariance: max |dpos| = %.3e m, max |dvel| = %.3e m/s",
                  pos_err, vel_err);
-        /* EXPECTED TO FAIL TODAY -- a real, reproduced engine defect. Loudly
-         * XFAIL rather than blocked, so the suite stays green while it is
-         * fixed and the frontier cannot be forgotten.
+        /* DESPOT-2026-10-01 CORRECTION: the 2026-09-29 "stale contact" theory
+         * below is WRONG, kept as a struck record of a misdiagnosis. Reprobed
+         * per tick: positions agree to ~1e-7 through the sphere-sphere bounce
+         * (ticks 0-9), then diverge at tick 10 — exactly when the ROTATED
+         * world (and only it) reports a floor contact (has_contact floor+d0)
+         * and its d0 bounces +y off a floor the unrotated d0 never reaches.
+         * has_contact is reset every tick in both step paths, so nothing is
+         * stale; the flags were read correctly but attributed to the wrong
+         * pair (per-BODY flags: floor+d0, not the 2.6 m-separated spheres).
+         * The true mechanism: R^-1 Phi(R x) = Phi(x) requires an R-symmetric
+         * ENVIRONMENT, and the fixed floor box is not one — rotating the
+         * dynamics against it changes impact angles with the floor, a
+         * genuinely different problem (the mirror image of false alarm #2
+         * below: leaving the floor fixed while rotating everything else is
+         * equally not a control). The fixture now runs floorless, and the
+         * engine holds ~1e-7 across a real bounce. If this XFAIL ever fires
+         * again, suspect the environment first, the dynamics second.
          *
+         * Original 2026-09-29 note follows (theory retracted, numbers kept):
          * Bisected with a standalone probe (same build flags):
          *   free flight, 1 sphere, no floor ......... 0.000000e+00  EXACT
          *   drop onto floor, 1 sphere ............... 1.490e-08      float noise
-         *   head-on SPHERE-SPHERE pair, no floor .... 1.195e+00      BROKEN
-         * So integration and the floor contact path are both correctly
-         * rotation-equivariant; the defect is specific to sphere-sphere
-         * contact.
-         *
-         * The mechanism, instrumented per tick: the two spheres do collide and
-         * do bounce apart in both worlds (separation 0.563 m -> 1.0 m -> 3.2 m
-         * in the unrotated run, which is correct). But `has_contact` reads 0
-         * for the unrotated world and stays 2 for the rotated world all the way
-         * to 150 ticks, when the spheres are 2.59 m apart and cannot possibly
-         * be touching. So the rotated run is still being fed a contact --
-         * impulses keep being applied to a pair that has separated, which is
-         * exactly the 0.98 m/s vs 0.82 m/s separation-rate difference measured.
-         *
-         * That is a STALE CONTACT, and it is the bug to chase: a manifold (or
-         * its warm-start impulses) surviving past separation. It is not a
-         * golden-value miss and it is not a tolerance question; a body pair
-         * 2.6 m apart must not be in contact.
-         *
-         * Kept at a tight 1e-4 m so that when the stale contact is fixed this
-         * test goes green rather than needing its threshold moved. */
+         *   head-on SPHERE-SPHERE pair, WITH floor .. 1.195e+00      FIXTURE
+         * (was mislabelled "no floor ... BROKEN"). */
         if (pos_err < 1e-4 && vel_err < 1e-3) {
             printf("[PASS] physics is rotation-equivariant (no world-axis "
-                   "special cases, no stale contacts)\n");
+                    "special cases, no stale contacts)\n");
         } else {
-            printf("[XFAIL][META-ROTATION] rotation equivariance broken for "
-                   "sphere-sphere contact: max|dpos|=%.3e m, max|dvel|=%.3e m/s. "
-                   "Free flight is exact (0.0) and floor contact is float noise "
-                   "(1.5e-08), so the defect is specific to sphere-sphere. "
-                   "has_contact persists after separation. See "
-                   "KNOWN_FAILURES.md META-ROTATION-2026-09-29\n",
-                   pos_err, vel_err);
+            /* Retained as a tripwire: if this ever fires, suspect the
+             * ENVIRONMENT first (floor/backstop symmetry vs probe rotation —
+             * see the two retracted theories in the comment above), the
+             * dynamics second. */
+            printf("[XFAIL][META-ROTATION] rotation equivariance broken: "
+                    "max|dpos|=%.3e m, max|dvel|=%.3e m/s. "
+                    "Engine holds ~5e-07 across a real bounce since the "
+                    "2026-10-01 fixture fix (floorless + yaw-only probe). "
+                    "See KNOWN_FAILURES.md META-ROTATION-2026-09-29\n",
+                    pos_err, vel_err);
         }
     }
 

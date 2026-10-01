@@ -652,9 +652,9 @@ positional recovery at all. It is not a depenetration limitation and never was.
 All four sub-cases now gate on full resolution against the engine's real
 `penetration_slop`.
 
-### META-ROTATION-2026-09-29 — Sphere-sphere contact is not rotation-equivariant (stale contact) — OPEN, XFAIL
+### META-ROTATION-2026-09-29 — EXONERATED 2026-10-01: the fixture was the bug, not sphere-sphere contact
 
-Found by a new metamorphic test, not by any golden value.
+Found by a new metamorphic test, MISDIAGNOSED twice, closed on the third probe.
 
 **The test.** Rotate an entire initial condition by R, simulate, rotate the
 result back by R; you must get the unrotated run's answer. This holds for any
@@ -680,11 +680,23 @@ is correct). But `has_contact` reads **0** in the unrotated world and stays
 fed a contact, so impulses keep being applied to a separated pair. That is the
 whole of the 0.98 m/s vs 0.82 m/s separation-rate difference measured.
 
-**What to chase:** a manifold, or its warm-start impulses, surviving past
-separation. It is emphatically **not** a tolerance question and **not** a
-golden-value miss — a body pair 2.6 m apart must not be in contact. The test is
-held at a tight 1e-4 m so that fixing the stale contact turns it green rather
-than requiring the threshold to be relaxed.
+**What to chase:** nothing — see 2026-10-01 verdict below. The tight 1e-4 m
+gate stays as a dormant tripwire.
+
+**Verdict 2026-10-01: ENGINE EXONERATED.** Per-tick reprobe killed the stale
+theory: `has_contact` resets every tick in both step paths, and positions
+agree to ~1e-7 THROUGH the bounce (ticks 0–9). Divergence starts at tick 10
+as a positional-only shove (mm/tick, no velocity change, no contact flag) in
+the rotated world only — the depenetration floor pass and CCD floor sweep
+acting on a B-frame trajectory that crosses y=0, i.e. a phantom floor the
+solver floor never ordered. But that is honest backstop design (boundary box
+min-y=0 exists in both step paths), and it exposes the real error: the probe
+demanded equivariance under an ARBITRARY rotation while the environment (y=0
+backstop + box) is only yaw-symmetric. R^-1 Phi(R x) = Phi(x) is untestable
+outside the environment's symmetry group. Fixture fixed (floorless, yaw-only
+0.9 rad about +Y): **5.44e-07 m / 1.45e-07 m/s over 150 ticks with a real
+bounce. PASS.** The XFAIL text is kept dormant; if it ever fires, suspect the
+environment first, the dynamics second.
 
 Reported as a loud `[XFAIL][META-ROTATION]`; the suite surfaces it on every run.
 
