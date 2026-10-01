@@ -255,6 +255,11 @@ void scene_init_default(void) {
      * it. The rigidbody guards are the belt to this braces. */
     mpe_config_ensure_ready();
     scene_clear();
+    /* DESPOT-2026-10-01: default sandbox also needs the Coulomb slab.
+     * Without it, every spawned/dropped object rests on the plastic boundary
+     * clamp (no friction, no rolling resistance, no bounce) while tests rest
+     * on friction — the same mismatch that broke F5/F8. */
+    scene_ensure_friction_floor();
     int object_grey_index = scene_add_object(2.0f, 0.0f, (vector3){0.0f, 2.0f, 0.0f});
     (physics_world_get_primary()->bodies)[object_grey_index].colour = (vector3){0.8f, 0.8f, 0.8f};
 }
