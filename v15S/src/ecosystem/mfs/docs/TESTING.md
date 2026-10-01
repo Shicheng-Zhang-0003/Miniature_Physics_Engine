@@ -4,7 +4,7 @@ What the suite contains, what each gate proves, and how to run it.
 
 ## Suite layout
 
-- **Unified suite** (`tests/mfs_suite_main.c` + `mfs_suite_a/b/c.c`, 8 gated
+- **Unified suite** (`tests/mfs_suite_main.c` + `mfs_suite_a/b/c.c`, 12 gated
   tests, registry with exact-name dispatch, config save/restore, NaN
   watchdog). This is what `build_tests.sh` runs and what the release gates
   count.

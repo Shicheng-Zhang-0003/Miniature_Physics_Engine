@@ -10,7 +10,7 @@ v15S/src/ecosystem/mfs/                  # MFS root ("mfs-simulator")
   README_MFS.md                          # this file
   Makefile                               # unified standalone build (thin .so, build/ objs)
   mfs_sources.mk                         # canonical engine+FTC file lists (mirrored in build_tests.sh)
-  build_tests.sh                         # FTC/robotics test build + run (8 gated (unified) + build checks + ungated diags)
+  build_tests.sh                         # FTC/robotics test build + run (12 gated (unified) + build checks + ungated diags)
   mfs_ecosystem.c                        # overarching descriptor: registers
                                          #   modules/module_1 + modules/ftc
   mfs_internal.c/.h                      # internal static module registry
@@ -93,7 +93,7 @@ Design rules modules follow (and future modules should too):
 From `v15S/src` (canonical — what CI and the release ritual use):
 
 ```
-ecosystem/mfs/build_tests.sh            # full FTC suite (8 gated, unified mfs_suite --all, + build checks + ungated diags)
+ecosystem/mfs/build_tests.sh            # full FTC suite (12 inner via unified mfs_suite --all, + build checks + ungated diags)
 ecosystem/mfs/build_tests.sh --build-only
 ```
 
