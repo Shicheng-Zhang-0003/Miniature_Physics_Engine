@@ -7,6 +7,63 @@
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
+
+/* ============================================================================
+ * SILENT INPUT CLAMPS — made loud (DESPOT-2026-10-02)
+ *
+ * External-truth validation of the mass properties (see
+ * docs/VALIDATION.md) confirmed every inertia formula is correct, then
+ * turned up the adjacent problem: the guards that keep them finite are
+ * themselves silent, and they are far from conservative.
+ *
+ * Measured on physics_world_add_sphere / add_cylinder:
+ *
+ *   mass      1e-9 kg -> 1e-4 kg   (100000x heavier than asked)
+ *   mass      1e-5 kg -> 1e-4 kg   (10x)
+ *   mass      2e6  kg -> 1e6  kg   (2x lighter)
+ *   mass      1e9  kg -> 1e6  kg   (1000x lighter)
+ *   radius    150   m -> 100   m
+ *   radius    1e5   m -> 100   m   (1000x)
+ *   radius    -1     m -> 0.5   m, mass -2 kg -> 1.0 kg, and the body is
+ *                             left DYNAMIC, not static
+ *   NaN radius/mass   -> 0.5 / 1.0
+ *
+ * Each of those is a different set of physics from the one the caller
+ * asked for, produced without a word. The 100000x mass error is the
+ * dangerous direction: a caller that thinks it built a dust mote gets
+ * something 100000x heavier, and every downstream force, impulse and
+ * friction budget is wrong by that factor with nothing to notice.
+ *
+ * The clamps themselves are correct and must stay - they are what stops
+ * a NaN radius producing a NaN inertia tensor and detonating the solver.
+ * What was wrong was the silence. A clamp that changes the physics
+ * silently is indistinguishable, to everything downstream, from a clamp
+ * that did not happen.
+ *
+ * Fix: count every clamp, and say so on stderr the first few times.
+ * Counting makes it observable and testable (a suite can assert zero
+ * clamps for its own fixtures); the bounded warning makes it visible in
+ * an interactive session without turning a mass-sweep benchmark into a
+ * million-line log.
+ * ========================================================================== */
+unsigned long mpe_clamp_mass_events = 0;
+unsigned long mpe_clamp_radius_events = 0;
+unsigned long mpe_clamp_half_length_events = 0;
+
+static void mpe_note_clamp(const char *kind, unsigned long *counter,
+                           double requested, double stored) {
+    (*counter)++;
+    /* Bounded: first 8 occurrences, then every 1000th. Enough to be seen
+     * in a session, not enough to drown a headless sweep. */
+    if ((*counter <= 8u) || ((*counter % 1000u) == 0u)) {
+        fprintf(stderr,
+                "[mpe] INPUT CLAMPED: %s requested %.9g, using %.9g "
+                "(x%.6g). The body is NOT the one you asked for. "
+                "(occurrence %lu)\n",
+                kind, requested, stored, stored / requested, *counter);
+    }
+}
 
 /* Exact free-flight integration under constant gravity + linear viscous drag.
  * The config 'drag' is a VELOCITY RETENTION FACTOR per second (0 to 1).
@@ -529,19 +586,28 @@ void rigidbody_initialisation_sphere(rigidbody *rigid_body, float radius, float 
     rigid_body->friction_along_axis = 0.0f;
     rigid_body->friction_across_axis = 0.0f;
     rigid_body->friction_anisotropy_axis = (vector3){0.0f, 0.0f, 0.0f};
+    /* DESPOT-2026-10-02: every clamp below now reports (see
+     * mpe_note_clamp). These guards are load-bearing - a NaN radius makes a
+     * NaN inertia tensor - but they silently changed the physics by up to
+     * 100000x before. */
     if (!isfinite(radius) || radius <= 0.0f) {
+        mpe_note_clamp("sphere radius", &mpe_clamp_radius_events, (double)radius, 0.5);
         radius = 0.5f;
     }
     if (radius > 100.0f) {
+        mpe_note_clamp("sphere radius", &mpe_clamp_radius_events, (double)radius, 100.0);
         radius = 100.0f;
     }
     if (!isfinite(mass) || mass < 0.0f) {
+        mpe_note_clamp("sphere mass", &mpe_clamp_mass_events, (double)mass, 1.0);
         mass = 1.0f;
     }
     if (mass > 0.0f && mass < 1e-4f) {
+        mpe_note_clamp("sphere mass", &mpe_clamp_mass_events, (double)mass, 1e-4);
         mass = 1e-4f;
     }
     if (mass > 1e6f) {
+        mpe_note_clamp("sphere mass", &mpe_clamp_mass_events, (double)mass, 1e6);
         mass = 1e6f;
     }
     //Kinematic
@@ -1208,6 +1274,7 @@ void rigidbody_initialisation_cube(rigidbody *rigid_body, vector3 position_input
         mass = 1e-4f;
     }
     if (mass > 1e6f) {
+        mpe_note_clamp("sphere mass", &mpe_clamp_mass_events, (double)mass, 1e6);
         mass = 1e6f;
     }
     //Kinematic
@@ -1484,15 +1551,21 @@ void rigidbody_initialisation_cylinder(rigidbody *rigid_body, float radius, floa
     rigid_body->friction_across_axis = 0.0f;
     rigid_body->friction_anisotropy_axis = (vector3){0.0f, 0.0f, 0.0f};
     if (!isfinite(radius) || radius <= 0.0f) {
+        mpe_note_clamp("cylinder radius", &mpe_clamp_radius_events, (double)radius, 0.5);
         radius = 0.5f;
     }
     if (radius > 100.0f) {
+        mpe_note_clamp("cylinder radius", &mpe_clamp_radius_events, (double)radius, 100.0);
         radius = 100.0f;
     }
     if (!isfinite(half_length) || half_length <= 0.0f) {
+        mpe_note_clamp("cylinder half_length", &mpe_clamp_half_length_events,
+                       (double)half_length, 0.5);
         half_length = 0.5f;
     }
     if (half_length > 100.0f) {
+        mpe_note_clamp("cylinder half_length", &mpe_clamp_half_length_events,
+                       (double)half_length, 100.0);
         half_length = 100.0f;
     }
     if (!isfinite(mass) || mass < 0.0f) {
@@ -1502,6 +1575,7 @@ void rigidbody_initialisation_cylinder(rigidbody *rigid_body, float radius, floa
         mass = 1e-4f;
     }
     if (mass > 1e6f) {
+        mpe_note_clamp("sphere mass", &mpe_clamp_mass_events, (double)mass, 1e6);
         mass = 1e6f;
     }
     rigid_body->position = position_input;
@@ -1545,4 +1619,13 @@ void rigidbody_initialisation_cylinder(rigidbody *rigid_body, float radius, floa
 
     rigid_body->force_accumulator = vector3_zero();
     rigid_body->torque_accumulator = vector3_zero();
+}
+
+/* DESPOT-2026-10-02: reset helper for the input-clamp counters (see the
+ * declarations in rigidbody.h). Lets a test or a scene loader isolate its
+ * own setup from whatever ran before it. */
+void mpe_clamp_counters_reset(void) {
+    mpe_clamp_mass_events = 0;
+    mpe_clamp_radius_events = 0;
+    mpe_clamp_half_length_events = 0;
 }

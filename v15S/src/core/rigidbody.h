@@ -204,4 +204,26 @@ static inline math3 rigidbody_effective_inv_inertia(const rigidbody *rb) {
     }
     return rb->inverse_inertia_system;
 }
+
+/* DESPOT-2026-10-02: input-clamp observability.
+ *
+ * The engine guards mass / radius / cylinder half-length into finite,
+ * physically sane ranges before they reach the inertia tensors (a NaN
+ * radius would produce a NaN tensor and detonate the solver). Those guards
+ * are correct and stay. They were, however, SILENT, and they are not
+ * conservative: a request for 1e-9 kg is served as 1e-4 kg (100000x
+ * heavier) and 1e9 kg as 1e6 kg (1000x lighter), with no diagnostic. A
+ * caller that believes it built a specific body is wrong, and nothing
+ * downstream can tell.
+ *
+ * These counters make the substitution observable. A test fixture can
+ * assert that its own setup clamped nothing; a scene loader can detect a
+ * corrupt file; an interactive session gets a bounded stderr warning (see
+ * mpe_note_clamp in rigidbody.c). Reset them with
+ * mpe_clamp_counters_reset() between phases. */
+extern unsigned long mpe_clamp_mass_events;
+extern unsigned long mpe_clamp_radius_events;
+extern unsigned long mpe_clamp_half_length_events;
+void mpe_clamp_counters_reset(void);
+
 #endif
