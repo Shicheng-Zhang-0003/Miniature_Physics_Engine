@@ -73,3 +73,16 @@ temp/
 !tools/tests/*.py
 __pycache__/
 *.py[cod]
+
+# reference_materials/ : third-party papers (Mirtich, Baraff, Catto, Gottschalk,
+# Coumans, Schmidl, Anitescu, Teschner). ~18 MB of COPYRIGHTED material that
+# must not be pushed to a public repository. They are the authorities the
+# validation doc cites; fetch them from the publishers and drop them here:
+#   collision_detection/  Gottschalk OBBTree 1996; Coumans CCD 2005;
+#                        Schmidl FastImpulseContactSuite 2004;
+#                        vandenBergen ProximityQueries
+#   constraint_solvers/  Anitescu fixed-timestep; Catto GDC 2005/2011/2013
+#   impulse_simulation/  Mirtich 1995 + PhD thesis 1996
+#   spatial_hashing/     Teschner GDC 2003
+#   textbooks_theses/    Baraff thesis
+reference_materials/
