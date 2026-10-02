@@ -51,3 +51,7 @@ Despot-0928:  standalone 461-MFS builds+runs (dual-mode build_tests.sh +
                ceiling; module_1 failure propagation; det-fallback gates
                everywhere; runner SKIP/XFAIL surfacing; full profile
                198/198 sanitizers-clean.
+ExtTruth-1002: 22 closed-form checks green (C battery + Python oracle),
+               sleep_settle gate locks SLEEP-H1 exoneration (suite 42/42),
+               poisoned live engine.cfg neutralized, phantom-joint pool trap
+               ticketed P2.
