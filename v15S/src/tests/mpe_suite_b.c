@@ -664,3 +664,200 @@ int mpe_t_mass_properties(void) {
     mpe_test_end(&t);
     return t.failures;
 }
+
+/* ======================================================================
+ * REFERENCE MATH GATE  (DESPOT-2026-10-02)
+ *
+ * Closes three of the coverage gaps declared in docs/VALIDATION.md, each
+ * against a reference that is already vendored in reference_materials/:
+ *
+ *  1. Gottschalk 1996 - the separating-axis theorem. 15 axial projections
+ *     (3+3 face normals, 9 edge cross products) suffice to decide OBB/OBB
+ *     overlap. Checked against an INDEPENDENT dense reference (the 15
+ *     canonical axes plus a 240-direction swept probe), not against the
+ *     engine's own project_obb.
+ *  2. Catto GDC 2011 - beta (ERP) feeds position error back to velocity:
+ *     bias = (beta/h)*C. beta = 0 must leave a positional error
+ *     uncorrected, and the error must converge monotonically faster as
+ *     beta rises.
+ *  3. Coulomb - once sliding, the acceleration must be (F - mu_k*N)/m.
+ * ====================================================================== */
+
+/* Independent OBB overlap test. Separating axis exists iff
+ *   |dot(t, n)| > rA(n) + rB(n)  for some candidate direction n.
+ * Probes the 15 canonical axes plus a swept set, so a missed axis in the
+ * engine cannot hide behind a shared assumption. */
+/* Fixed 1/60 s tick: this gate's reference predictions assume it, so it is
+ * declared locally rather than inherited from whatever the suite header
+ * happens to define. */
+#define MPE_REF_MATH_DT (1.0f / 60.0f)
+
+static float mpe_ref_proj_r(const vector3 ax[3], vector3 he, vector3 n) {
+    return he.x * fabsf(vector3_dot(ax[0], n))
+         + he.y * fabsf(vector3_dot(ax[1], n))
+         + he.z * fabsf(vector3_dot(ax[2], n));
+}
+static int mpe_ref_obb_overlap(vector3 ca, vector4 qa, vector3 ha,
+                               vector3 cb, vector4 qb, vector3 hb) {
+    vector3 aa[3], ab[3];
+    aa[0] = vector4_rotate_to_vector3(qa, (vector3){1,0,0});
+    aa[1] = vector4_rotate_to_vector3(qa, (vector3){0,1,0});
+    aa[2] = vector4_rotate_to_vector3(qa, (vector3){0,0,1});
+    ab[0] = vector4_rotate_to_vector3(qb, (vector3){1,0,0});
+    ab[1] = vector4_rotate_to_vector3(qb, (vector3){0,1,0});
+    ab[2] = vector4_rotate_to_vector3(qb, (vector3){0,0,1});
+    vector3 t = vector3_subtraction(cb, ca);
+    for (int k = 0; k < 15 + 240; k++) {
+        vector3 n;
+        if (k < 15) {
+            if (k < 3) n = aa[k];
+            else if (k < 6) n = ab[k - 3];
+            else { int i = (k - 6) / 3, j = (k - 6) % 3;
+                   n = vector3_cross(aa[i], ab[j]); }
+        } else {
+            int m = k - 15;
+            float u = (float)(m / 16) * 0.3926990817f;
+            float v = (float)(m % 16) * 0.3926990817f;
+            vector3 e0 = vector3_cross(aa[0], ab[0]);
+            if (vector3_length_squared(e0) < 1e-6f) e0 = aa[1];
+            e0 = vector3_scaling(e0, 1.0f / sqrtf(vector3_length_squared(e0)));
+            vector3 e1 = vector3_cross(e0, aa[0]);
+            e1 = vector3_scaling(e1, 1.0f / sqrtf(vector3_length_squared(e1)));
+            vector3 e2 = vector3_cross(e0, e1);
+            n = vector3_addition(vector3_addition(
+                       vector3_scaling(e0, cosf(u) * cosf(v)),
+                       vector3_scaling(e1, sinf(u))),
+                   vector3_scaling(e2, cosf(u) * sinf(v)));
+        }
+        float L2 = vector3_length_squared(n);
+        if (L2 < 1e-8f) continue;
+        n = vector3_scaling(n, 1.0f / sqrtf(L2));
+        if (fabsf(vector3_dot(t, n)) > mpe_ref_proj_r(aa, ha, n) + mpe_ref_proj_r(ab, hb, n)) {
+            return 0;   /* a separating axis exists -> disjoint */
+        }
+    }
+    return 1;
+}
+
+int mpe_t_reference_math(void) {
+    mpe_test_t t;
+    mpe_test_begin(&t, "reference_math");
+
+    /* ---- 1. SAT vs Gottschalk ------------------------------------- */
+    {
+        physics_world w;
+        mpe_config_init();
+        g_cfg.timestep.solver_iterations = 64;
+        g_cfg.sleep.enable = 0;
+        physics_world_init(&w);
+        const vector3 ha = {0.5f, 0.5f, 0.5f};
+        const vector3 hb = {0.5f, 0.5f, 0.5f};
+        const vector4 qa = vector4_identity();
+        const vector4 qb = vector4_from_axis_with_angle((vector3){0,0,1}, 0.7853981634f);
+        int agree = 0, tested = 0;
+        unsigned seed = 12345u;
+        for (int k = 0; k < 400; k++) {
+            seed = seed * 1103515245u + 12345u;
+            float ra = (float)((seed >> 16) % 1000) / 1000.0f - 0.5f;
+            seed = seed * 1103515245u + 12345u;
+            float rb = (float)((seed >> 16) % 1000) / 1000.0f - 0.5f;
+            seed = seed * 1103515245u + 12345u;
+            float ang = (float)((seed >> 16) % 628) / 100.0f;
+            seed = seed * 1103515245u + 12345u;
+            vector3 axis = {(float)((seed >> 8) & 0xFF) / 255.0f - 0.5f,
+                            (float)((seed >> 16) & 0xFF) / 255.0f - 0.5f,
+                            (float)((seed >> 24) & 0xFF) / 255.0f - 0.5f};
+            if (vector3_length_squared(axis) < 1e-4f) axis = (vector3){0,0,1};
+            vector3 pa = {ra, rb, -ra}, pb = {rb, ra, -rb};
+            vector4 qq = vector4_from_axis_with_angle(axis, ang);
+            int a = physics_world_add_cube(&w, pa, ha, 1.0f);
+            int b = physics_world_add_cube(&w, pb, hb, 1.0f);
+            w.bodies[a].orientation = qa;
+            w.bodies[b].orientation = qq;
+            rigidbody_update_axes(&w.bodies[a]);
+            rigidbody_update_axes(&w.bodies[b]);
+            collision_data cd = {0};
+            int hit = collision_dual_cube(&w.bodies[a], &w.bodies[b], &cd, &g_cfg) ? 1 : 0;
+            int ref = mpe_ref_obb_overlap(pa, qa, ha, pb, qq, hb);
+            tested++;
+            if ((hit != 0) == (ref != 0)) agree++;
+        }
+        MPE_INFO("SAT vs independent dense reference: %d/%d configurations agree", agree, tested);
+        MPE_CHECK(&t, agree == tested);
+        physics_world_cleanup(&w);
+    }
+
+    /* ---- 2. beta (ERP) vs Catto ----------------------------------- */
+    {
+        const float betas[4] = {0.0f, 0.1f, 0.3f, 0.8f};
+        float retained[4];
+        for (int c = 0; c < 4; c++) {
+            physics_world w;
+            mpe_config_init();
+            g_cfg.timestep.solver_iterations = 64;
+            g_cfg.sleep.enable = 0;
+            g_cfg.world.gravity = 0.0f;   /* isolate the constraint */
+            g_cfg.world.drag = 1.0f;
+            g_cfg.joints.revolute_beta = betas[c];
+            physics_world_init(&w);
+            constraint_pool_init(&w);
+            int anchor = physics_world_add_cube(&w, (vector3){0,50,0}, (vector3){0.5f,0.5f,0.5f}, 0.0f);
+            int child  = physics_world_add_cube(&w, (vector3){0.30f,50,0}, (vector3){0.25f,0.25f,0.25f}, 1.0f);
+            uint32_t ia = w.bodies[anchor].object_id, ib = w.bodies[child].object_id;
+            constraint_add_revolute(&w, ia, ib, (vector3){0,0,0}, (vector3){0,0,0}, (vector3){0,1,0});
+            float e0 = fabsf(w.bodies[child].position.x);
+            for (int k = 0; k < 60; k++) physics_world_step(&w, MPE_REF_MATH_DT);
+            retained[c] = fabsf(w.bodies[child].position.x) / (e0 > 0 ? e0 : 1.0f);
+            MPE_INFO("ERP beta=%.2f -> position error retained %.4f after 60 ticks",
+                     (double)betas[c], (double)retained[c]);
+            physics_world_cleanup(&w);
+        }
+        /* Catto: beta feeds position error back to velocity, so larger beta
+         * must converge faster, monotonically. */
+        MPE_CHECK(&t, retained[0] >= retained[1]);
+        MPE_CHECK(&t, retained[1] > retained[2]);
+        MPE_CHECK(&t, retained[2] > retained[3]);
+    }
+
+    /* ---- 3. Coulomb, sliding branch -------------------------------- */
+    {
+        const float m = 1.0f, mus = 0.6f, muk = 0.4f, G_N = 9.80665f;
+        const float N = m * G_N;
+        /* strictly above mu_s*N: must slide at (F - mu_k*N)/m */
+        const float fracs[3] = {1.10f, 1.30f, 1.60f};
+        for (int k = 0; k < 3; k++) {
+            float F = fracs[k] * mus * N;
+            physics_world w;
+            mpe_config_init();
+            g_cfg.timestep.solver_iterations = 64;
+            g_cfg.sleep.enable = 0;
+            g_cfg.world.drag = 1.0f;
+            physics_world_init(&w);
+            int fl = physics_world_add_cube(&w, (vector3){0,-0.5f,0}, (vector3){40,0.5f,40}, 0.0f);
+            w.bodies[fl].friction_static = mus; w.bodies[fl].friction_kinetic = muk;
+            w.bodies[fl].restitution = 0.0f;
+            int b = physics_world_add_cube(&w, (vector3){0,0.5f,0}, (vector3){0.5f,0.5f,0.5f}, m);
+            w.bodies[b].friction_static = mus; w.bodies[b].friction_kinetic = muk;
+            w.bodies[b].restitution = 0.0f;
+            for (int s = 0; s < 40; s++) physics_world_step(&w, MPE_REF_MATH_DT);
+            for (int s = 0; s < 30; s++) {
+                w.bodies[b].force_accumulator = vector3_addition(
+                    w.bodies[b].force_accumulator, (vector3){F,0,0});
+                rigidbody_wake(&w.bodies[b]);
+                physics_world_step(&w, MPE_REF_MATH_DT);
+            }
+            float pred = ((F - muk * N) / m) * (30.0f * MPE_REF_MATH_DT);
+            MPE_INFO("Coulomb slide F/(mu_s*N)=%.2f: measured v=%.5f predicted %.5f",
+                     (double)fracs[k], (double)w.bodies[b].velocity.x, (double)pred);
+            MPE_CHECK_REL(&t, w.bodies[b].velocity.x, pred, 0.05f,
+                          "Coulomb sliding branch (F - mu_k N)/m");
+            physics_world_cleanup(&w);
+        }
+    }
+
+    if (t.failures == 0) {
+        printf("[PASS] SAT/Gottschalk, ERP/Catto and Coulomb match their references\n");
+    }
+    mpe_test_end(&t);
+    return t.failures;
+}
