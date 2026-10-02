@@ -325,7 +325,7 @@ See [`v15S/evolution.txt`](v15S/evolution.txt) for the full lineage back to stag
 ## 🧪 Verification suite
 
 The unified test runner provides quick, physics, and full profiles. The full
-profile builds the active engine, checks the canonical 32-case C suite, runs
+profile builds the active engine, checks the canonical 42-case C suite, runs
 all 30 isolated legacy cases and 14 paranoia cases, then repeats the physics,
 MFS, and TUI suites under AddressSanitizer and UndefinedBehaviorSanitizer. It
 also checks generated TUI snapshots and writes JSON and JUnit reports, snapshots,
@@ -343,19 +343,28 @@ The canonical C suite runs all cases in one process with shared audited builders
 The full profile also runs each older C case in a separate process to catch
 cross-test contamination. The runner verifies that reported case names exactly
 match the C registry, distinguishes informational diagnostics from gates, and
-fails on missing, duplicate, or malformed test output. Its 11 Python contract
+fails on missing, duplicate, or malformed test output. Its 17 Python contract
 tests cover registry discovery, result parsing, report generation, TUI snapshot
 validation, and command-launch failures.
 
 | Test | Proves |
 |------|--------|
+| `meta_rotation` | Yaw rotation equivariance to 5e-07 (no world-axis special cases) |
+| `meta_convergence` | Solver error monotonic in iteration count (no divergence) |
+| `meta_config_wiring` | Config parameters demonstrably reach the simulation |
+| `sleep_settle` | Launch settles then sleeps-iff-enabled (three-state honesty) |
+| `mouse_look_axes` | Mouse-look sign convention on 4 axes + diagonals |
+| `body_materials_live` | Bodies stamped with live materials (config-ordering guard) |
 | `two_world` | Independent `physics_world` instances |
 | `revolute` | Hinge joints hold anchor and allow swing |
+| `revolute_matrix` | Hinge effective-mass matrix is J·M⁻¹·Jᵀ |
 | `cylinder_drop` | Cylinder settles on the floor |
 | `driven_wheel` | Torque → friction → translation (grounded, coupled) |
 | `math3_inverse` | Matrix inverse at small inertia tensors |
 | `floor_collision_diag` | Floor contact diagnostics |
 | `cylinder_sphere/cube/cylinder` | Cylinder narrowphase pairs |
+| `cylinder_sphere_inside` | Enclosed-sphere containment case |
+| `cylinder_platform` | Cylinder-on-platform edge case |
 | `list4_cylinder_floor` | Tipped-cylinder floor regression |
 | `scene_roundtrip` | Save/load v200 round-trip (springs + all constraint types) |
 | `static_hold` | Coulomb stick holds / yields past friction angle |
@@ -375,11 +384,34 @@ validation, and command-launch failures.
 | `sleep_contact_wake` | Slow pushers wake sleepers; resting contact doesn't churn |
 | `f11_torture` | Deterministic config extremes without corruption |
 | `frustum` | Frustum culling math |
+| `frustum_culler` | Shipped renderer culler over reference samples |
 | `module` | Per-world config, registry dispatch, custom shapes, solver hooks, id cache, pool growth, det counters |
 | `loader_lifecycle` | Plugin load/busy-unload/purge, builtin-hijack refusal, stage reset, `mod_state` threading |
 | `ftc_ecosystem` | Bundle load → attach → spawn/drive/telemetry → detach/unload end-to-end |
 
 Run the focused canonical suite with `python3 tools/test_runner.py --profile quick`; use `--profile full` for all registered suites and sanitizers.
+
+### External-truth battery (2026-10-02, `temp/ext_truth.c` + `temp/ext_oracle_check.py`)
+
+Independent of the suite above: separately-coded harness, oracles hand-derived
+from closed forms (kinematics, Newton, Coulomb, Hooke, compound pendulum,
+Poisson series, moments of inertia), cross-checked by a second implementation
+in Python. 22/22 green, representative errors: free-fall 4e-5, projectile
+5e-5, pendulum period 0.1%, spring period 0.8%, sliding stop 1.3%,
+inertias ≤2e-6, elastic exchange exact, hold-creep 0.0, Galileo exact.
+Covers free-fall, projectile, bounce heights, pendulum, spring, 1D elastic
+exchange, Coulomb stop/hold/slide angles, sphere/box/cylinder inertia via
+torque, tower equilibrium, range linearity, mass-independence of fall, and
+the restitution threshold. Not committed (lives in gitignored `temp/`);
+re-run by compiling `temp/ext_truth.c` against the `v15S/src` core objects
+plus `temp/stubs_ext.c` (exact recipe in
+`v15S/docs/DESPOT_AUDIT_2026-10-01.md`), then
+`python3 temp/ext_oracle_check.py`.
+
+Known honest limits confirmed by the battery: sliding stop applies to sliding
+bodies (spheres roll — rolling resistance governs them); tall-tower
+equilibrium includes the sleep optimizer (sleepless towers lean on solver
+micro-jitter, documented); bounce-height oracles carry slop-scale error.
 
 ### MFS robotics (`v15S/src/ecosystem/mfs/`)
 - **FTC stack**: motor presets (spec-sheet derived, decoded-count encoder convention), back-EMF electrical model with implicit-in-speed solve + disturbance observer (stall *and* free speed exact at any bus voltage via V-line bounds), traction budgeting against wheel materials, analytic mecanum roller-kinematics lateral force (Coulomb-capped, dissipative, contact-gated at the wheel — no chassis-force cheat; the articulated 32-roller build is kept for forensics), pure-encoder odometry with `odom_slip` flag, tile-friction test floors.
