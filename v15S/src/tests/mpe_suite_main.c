@@ -115,6 +115,7 @@ typedef struct {
  * regardless of what it computes. That is the one property every defect in
  * this audit shared: the code and the expected number were wrong the same
  * way, or the measurement could not express the thing it was checking. */
+extern int mpe_t_mass_properties(void);
 extern int mpe_t_meta_rotation(void);
 extern int mpe_t_meta_convergence(void);
 extern int mpe_t_meta_config_wiring(void);
@@ -129,6 +130,7 @@ static const mpe_entry_t mpe_registry[] = {
     {"sleep_settle", mpe_t_sleep_settle, 0},
     {"mouse_look_axes", mpe_t_mouse_look_axes, 0},
     {"body_materials_live", mpe_t_body_materials_live, 0},
+    {"mass_properties", mpe_t_mass_properties, 0},
     {"two_world", mpe_t_two_world, 0},
     {"revolute", mpe_t_revolute, 0},
     {"revolute_matrix", mpe_t_revolute_matrix, 0},

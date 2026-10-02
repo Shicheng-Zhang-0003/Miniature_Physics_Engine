@@ -544,3 +544,123 @@ int mpe_t_cylinder_sphere_inside(void) {
     mpe_test_end(&t);
     return t.failures;
 }
+
+/* ======================================================================
+ * EXTERNAL-TRUTH MASS PROPERTIES  (DESPOT-2026-10-02)
+ *
+ * The engine's inertia formulas were asserted correct in a code comment
+ * ("FIX-AUDIT-DESPOT: inertia formulas verified against rigid-body theory")
+ * but no test exercised them, and in particular nothing exercised a
+ * cylinder about a TRANSVERSE axis - the MFS side had already flagged that
+ * as an uncovered case. This closes it, and it checks the formulas against
+ * closed-form mechanics rather than against the engine's own opinion:
+ *
+ *   sphere     I = (2/5) m r^2                on every axis
+ *   box        I = (m/12)(h^2 + d^2)          per axis, full extents
+ *   cylinder   I = (1/2) m r^2                about the symmetry axis
+ *              I = (m/12)(3r^2 + l^2)          about a transverse axis
+ *
+ * Also gated here, because it was the actual finding: the guards that keep
+ * those tensors finite SILENTLY rewrote the caller's mass and geometry, by
+ * factors up to 100000x. A fixture that clamps nothing is now assertable.
+ * ====================================================================== */
+int mpe_t_mass_properties(void) {
+    mpe_test_t t;
+    mpe_test_begin(&t, "mass_properties");
+    mpe_config_init();
+    g_cfg.sleep.enable = 0;
+    physics_world w;
+    mpe_world_begin(&w);
+
+    /* A well-formed fixture must trip ZERO clamps. Any clamp here means the
+     * test itself is asking for a body it will not get. */
+    mpe_clamp_counters_reset();
+
+    /* sphere: (2/5) m r^2 */
+    {
+        const float m = 3.0f, r = 0.7f;
+        int s = physics_world_add_sphere(&w, r, m, (vector3){0.0f, 60.0f, 0.0f});
+        MPE_CHECK(&t, s >= 0);
+        const float ref = 0.4f * m * r * r;
+        MPE_CHECK_NEAR(&t, w.bodies[s].inertia_tensor_local.matrix[0][0], ref, 1e-5f, "sphere Ixx");
+        MPE_CHECK_NEAR(&t, w.bodies[s].inertia_tensor_local.matrix[1][1], ref, 1e-5f, "sphere Iyy");
+        MPE_CHECK_NEAR(&t, w.bodies[s].inertia_tensor_local.matrix[2][2], ref, 1e-5f, "sphere Izz");
+        MPE_CHECK_NEAR(&t, w.bodies[s].inverse_mass, 1.0f / m, 1e-6f, "sphere inverse_mass");
+        /* inverse tensor must actually invert the tensor */
+        math3 id = math3_multiplication(w.bodies[s].inverse_inertia_tensor_local,
+                                        w.bodies[s].inertia_tensor_local);
+        MPE_CHECK_NEAR(&t, id.matrix[0][0], 1.0f, 1e-5f, "inv(I)*I xx");
+        MPE_CHECK_NEAR(&t, id.matrix[1][1], 1.0f, 1e-5f, "inv(I)*I yy");
+        MPE_CHECK_NEAR(&t, id.matrix[2][2], 1.0f, 1e-5f, "inv(I)*I zz");
+        MPE_CHECK_NEAR(&t, id.matrix[0][1], 0.0f, 1e-6f, "inv(I)*I off-diagonal");
+    }
+    /* box: (m/12)(other two squared) */
+    {
+        const float m = 5.0f;
+        const vector3 half = {0.5f, 0.25f, 1.0f};
+        int c = physics_world_add_cube(&w, (vector3){0.0f, 60.0f, 0.0f}, half, m);
+        MPE_CHECK(&t, c >= 0);
+        const float W = half.x * 2.0f, H = half.y * 2.0f, D = half.z * 2.0f;
+        MPE_CHECK_NEAR(&t, w.bodies[c].inertia_tensor_local.matrix[0][0],
+                       (m / 12.0f) * (H * H + D * D), 1e-5f, "box Ixx");
+        MPE_CHECK_NEAR(&t, w.bodies[c].inertia_tensor_local.matrix[1][1],
+                       (m / 12.0f) * (W * W + D * D), 1e-5f, "box Iyy");
+        MPE_CHECK_NEAR(&t, w.bodies[c].inertia_tensor_local.matrix[2][2],
+                       (m / 12.0f) * (W * W + H * H), 1e-5f, "box Izz");
+        /* geometry must survive verbatim: a clamped half-extent would change
+         * the inertia silently, so this is also a clamp assertion */
+        MPE_CHECK_NEAR(&t, w.bodies[c].half_extensions.x, half.x, 1e-6f, "box half_ext x");
+        MPE_CHECK_NEAR(&t, w.bodies[c].half_extensions.y, half.y, 1e-6f, "box half_ext y");
+        MPE_CHECK_NEAR(&t, w.bodies[c].half_extensions.z, half.z, 1e-6f, "box half_ext z");
+    }
+    /* cylinder: axial 1/2 m r^2, transverse (m/12)(3r^2 + l^2) -- the axis
+     * that had never been covered by any test in either tree */
+    {
+        const float m = 2.5f, r = 0.3f, hl = 0.9f;
+        int c = physics_world_add_cylinder(&w, r, hl, m, (vector3){0.0f, 60.0f, 0.0f});
+        MPE_CHECK(&t, c >= 0);
+        const float l = 2.0f * hl;
+        MPE_CHECK_NEAR(&t, w.bodies[c].inertia_tensor_local.matrix[0][0],
+                       0.5f * m * r * r, 1e-5f, "cylinder AXIAL Ixx");
+        MPE_CHECK_NEAR(&t, w.bodies[c].inertia_tensor_local.matrix[1][1],
+                       (m / 12.0f) * (3.0f * r * r + l * l), 1e-5f, "cylinder TRANSVERSE Iyy");
+        MPE_CHECK_NEAR(&t, w.bodies[c].inertia_tensor_local.matrix[2][2],
+                       (m / 12.0f) * (3.0f * r * r + l * l), 1e-5f, "cylinder TRANSVERSE Izz");
+        /* axle is local X, so the half-extent along X is the half-LENGTH */
+        MPE_CHECK_NEAR(&t, w.bodies[c].half_extensions.x, hl, 1e-6f, "cylinder half_ext x = half_length");
+        MPE_CHECK_NEAR(&t, w.bodies[c].half_extensions.y, r, 1e-6f, "cylinder half_ext y = radius");
+        MPE_CHECK_NEAR(&t, w.bodies[c].half_extensions.z, r, 1e-6f, "cylinder half_ext z = radius");
+    }
+
+    /* THE FINDING: this fixture clamped nothing, so nothing was rewritten. */
+    MPE_INFO("fixture clamped nothing: mass=%lu radius=%lu half_length=%lu",
+             mpe_clamp_mass_events, mpe_clamp_radius_events, mpe_clamp_half_length_events);
+    MPE_CHECK(&t, mpe_clamp_mass_events == 0 && mpe_clamp_radius_events == 0 &&
+                   mpe_clamp_half_length_events == 0);
+
+    physics_world_cleanup(&w);
+
+    /* And the counters must actually FIRE when the input is out of range --
+     * an observability mechanism that never triggers is not one. */
+    {
+        physics_world w2;
+        mpe_world_begin(&w2);
+        mpe_clamp_counters_reset();
+        int s = physics_world_add_sphere(&w2, 0.5f, 1e-9f, (vector3){0.0f, 60.0f, 0.0f});
+        MPE_CHECK(&t, s >= 0);
+        MPE_CHECK(&t, mpe_clamp_mass_events > 0);
+        /* and the substitution is the documented 1e-4 floor, i.e. 100000x
+         * heavier than asked -- the number that makes this worth reporting */
+        MPE_INFO("1e-9 kg requested -> %g kg stored (clamp events=%lu)",
+                 (double)w2.bodies[s].mass, mpe_clamp_mass_events);
+        MPE_CHECK_NEAR(&t, w2.bodies[s].mass, 1e-4f, 1e-9f, "clamped mass floor");
+        physics_world_cleanup(&w2);
+    }
+    mpe_clamp_counters_reset();
+
+    if (t.failures == 0) {
+        printf("[PASS] mass properties match closed-form rigid-body mechanics\n");
+    }
+    mpe_test_end(&t);
+    return t.failures;
+}
