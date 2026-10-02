@@ -1,5 +1,17 @@
 # MFS — overarching module ecosystem ("mfs-simulator")
 
+> **Audit state (2026-10-02).** This tree had silently drifted 11 files behind
+> its twin at `475-MPE/v15S/src/ecosystem/mfs`, including four gated tests it
+> did not contain, because `sync_mfs_check.sh` — advertised in
+> `docs/SYNC_CONTRACT.md` as usable from this root — could not locate the twin
+> from here and exited with the same status as real drift. The drift guard is
+> fixed and now reports three distinct outcomes (in sync / drift / **did not
+> run**); the drift was mirrored (the twin was verified to be a strict
+> superset, so nothing was lost); and `.gitignore` was added after finding 13
+> build artifacts tracked since the initial import. Suite is now **13 gated
+> tests, 13/13**, clean under ASan+UBSan. See `docs/KNOWN_FAILURES.md` for the
+> full ledger.
+
 Everything MFS-wise lives under this folder: modules and submodules
 contained within the overarching MFS module ecosystem. (Previously
 `v15S/robotics_backup/` + scattered `mfs_*` dirs; consolidated here with
@@ -10,7 +22,7 @@ v15S/src/ecosystem/mfs/                  # MFS root ("mfs-simulator")
   README_MFS.md                          # this file
   Makefile                               # unified standalone build (thin .so, build/ objs)
   mfs_sources.mk                         # canonical engine+FTC file lists (mirrored in build_tests.sh)
-  build_tests.sh                         # FTC/robotics test build + run (12 gated (unified) + build checks + ungated diags)
+  build_tests.sh                         # FTC/robotics test build + run (14 gated (unified) + build checks + ungated diags)
   mfs_ecosystem.c                        # overarching descriptor: registers
                                          #   modules/module_1 + modules/ftc
   mfs_internal.c/.h                      # internal static module registry
@@ -30,12 +42,13 @@ v15S/src/ecosystem/mfs/                  # MFS root ("mfs-simulator")
         motor.c/.h                       # DC electrical model
         motor_presets.c/.h               # 57-preset FTC catalog (see docs/)
         battery.c/.h                     # sag + drain model
-  tests/                                 # teleop, mecanum, tank, odometry,
+  tests/                                 # teleop, mecanum, tank, odometry, external-truth,
                                          # ftc integration, physics truth,
                                          # hotload, module_1 test,
                                          # mfs_test_common.h (shared setup:
                                          #   128 iters + tile floor),
                                          # (+5 ungated diags)
+  .gitignore                            # build/, temp/, plugins/, *.o/.so
   docs/
     FTC_SPECS.md                         # motor spec-sheet sources + URLs
     ARCHITECTURE.md                      # layout, lifecycle, build invariants
@@ -43,6 +56,7 @@ v15S/src/ecosystem/mfs/                  # MFS root ("mfs-simulator")
     TESTING.md                           # suite gates, how to run, sanitizers
     KNOWN_FAILURES.md                    # ticketed frontiers (strafe, air-spin)
     SYNC_CONTRACT.md                     # twin-tree sync with the 475 copy
+    VALIDATION.md                        # external-truth reference, 76 checks, findings
   plugins/                               # build output only (gitignored):
                                          # mpe_ftc.so lands here
 ```

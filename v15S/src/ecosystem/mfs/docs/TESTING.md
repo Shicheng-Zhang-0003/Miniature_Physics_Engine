@@ -4,7 +4,7 @@ What the suite contains, what each gate proves, and how to run it.
 
 ## Suite layout
 
-- **Unified suite** (`tests/mfs_suite_main.c` + `mfs_suite_a/b/c.c`, 12 gated
+- **Unified suite** (`tests/mfs_suite_main.c` + `mfs_suite_a/b/c.c`, 14 gated
   tests, registry with exact-name dispatch, config save/restore, NaN
   watchdog). This is what `build_tests.sh` runs and what the release gates
   count.
@@ -33,6 +33,8 @@ What the suite contains, what each gate proves, and how to run it.
 | `ftc_integration` | fwd + turn + strafe smoke | disp > 0.5 m, dy < 0.5 m, finite |
 | `ftc_hotload` | static vs `dlopen` fleet | spawn-refused-unattached, OOB NULL, **bitwise pose+odometry**, detach coast < 2.0 m, re-attach |
 | `module_1` | drive@30, shooter@50, stage+fire@80 | drive ≥ 0.5 m, shooter ≥ 3000 rpm, fired ≥ 1 |
+| `external_truth` | free fall vs `g_n`=9.80665, viscous-drag ODE, `α=τ/I`, cylinder/sphere inertia, restitution `v_out=e·v_in`, rolling no-slip, energy, Coulomb `d=v₀²/2μg`, DC motor `V=IR+K_eω` + stall/free endpoints, battery OCV/sag/PTC `I²t`/capacity (DESPOT-2026-10-02) |
+| `drive_directions` | pure fwd / rev / strafe / rotate ±, steady-state window | axis dominance (fwd→+Z, strafe→+X, rotate→yaw), planar cross-talk ceilings (fwd 25%, strafe 35%), **rotate vs rotate⁻ must have opposite yaw sign**, yaw/planar dominance ratio, fwd/rev antisymmetry (DESPOT-2026-10-02) |
 | `physics_truth` | 15 subtests (T1–T15) | freefall, inertia, bounce `e²(h-r)+r`, rolling, rolling-resistance decay band, **isolated** motor free-speed/stall/back-EMF, static hold, stopping distance `v²/2μg`, 3000-tick stability, coast-down, energy, cylinder rest, revolute anchor |
 
 Physics-truth notes: T6/T8 test the **motor model isolated** (no
@@ -64,7 +66,7 @@ is forced to `disabled` (no `/dev/input/js0` probing on headless boxes).
 trees, auto-detecting the engine (`$MFS_ENGINE_SRC`, else sibling
 `../475-MPE/v15S/src`, else fail-fast with the fix). From a bare 461-MFS
 checkout: `./build_tests.sh [--build-only]` and `make && make test` both
-work (suite runs 8/8, outputs under `461-MFS/temp/`). The engine-tree
+work (suite runs 14/14, outputs under `461-MFS/temp/`). The engine-tree
 invocation above remains canonical for CI/release.
 
 ## Sanitizers

@@ -96,7 +96,13 @@ int mfs_t_bounce(void) {
     }
     if (!bounced) { physics_world_cleanup(&w); return 1; }
     float h0 = 5.0f; float e = 0.6f; float r = 0.5f;
-    float h_bounce = e*e*(h0 - 0.5f) + 0.5f;
+    /* DESPOT-2026-10-02: the bounce formula was written with bare 0.5f
+     * literals on both sides while `r` sat beside it unused (the compiler
+     * said so: -Wunused-variable). Numerically identical, since r was 0.5f,
+     * but it spelled the physics as two magic numbers in a file whose whole
+     * point is that the expectation is derived, not typed in. Now written
+     * as the documented e^2*(h-r)+r with the symbols it is derived from. */
+    float h_bounce = e*e*(h0 - r) + r;
     float err = fabsf(max_y - h_bounce) / h_bounce;
     if (err > 0.3f) { physics_world_cleanup(&w); return 1; }
     physics_world_cleanup(&w);
@@ -456,3 +462,296 @@ int mfs_t_revolute_anchor(void) {
     return 0;
 }
 
+
+/* ======================================================================
+ * EXTERNAL-TRUTH GATE  (DESPOT-2026-10-02)
+ *
+ * Every other test in this file checks the engine against ITSELF: it
+ * re-derives what the code says it should do, or compares two paths
+ * through the same model. That cannot catch a shared misconception - if
+ * the inertia tensor, the integrator and the expected value are all
+ * wrong the same way, the test is green and the physics is fiction.
+ *
+ * This one checks the model against constants and laws that are NOT
+ * this project's, so a shared error cannot cancel:
+ *
+ *   g_n  = 9.80665 m/s^2   standard acceleration of gravity, EXACT by
+ *          definition (CGPM 1901, 3rd General Conference on Weights and
+ *          Measures; reaffirmed in CODATA 2022). NOTE the engine default
+ *          is -9.81, which is +0.0341% off this; the closed-form
+ *          references below therefore use g_n, and the residual bias is
+ *          the point of several tolerances here.
+ *   Coulomb restitution is DEFINED as v_out = e*v_in, which is checked
+ *          here in velocity form rather than via rebound apex. The apex
+ *          form mixes in the bounce count, the trigger instant and drag,
+ *          and an apex-based check on a mis-specified slab reported a
+ *          spurious 51% error during the 2026-10-02 audit.
+ *   The DC machine laws V = I*R + Ke*w and tau = Kt*I are textbook.
+ *   Friction, energy, momentum and rolling are elementary mechanics.
+ *
+ * Each sub-check names the law it is enforcing. Tolerances are set from
+ * what a discrete impulse/Euler integrator can physically deliver at
+ * dt = 1/60 s, not from whatever the code happens to print.
+ * ====================================================================== */
+
+/* reference: free fall + linear viscous drag (engine model), RK4 */
+static float mfs_ref_visc_v(float v0, float c, float g, float T) {
+    const int steps = 4000;
+    const float dt = T / (float)steps;
+    float v = v0;
+    for (int i = 0; i < steps; i++) {
+        float k1 = -g - c * v;
+        float k2 = -g - c * (v + k1 * dt * 0.5f);
+        float k3 = -g - c * (v + k2 * dt * 0.5f);
+        float k4 = -g - c * (v + k3 * dt);
+        v += (k1 + 2.0f * k2 + 2.0f * k3 + k4) * dt * (1.0f / 6.0f);
+    }
+    return v;
+}
+
+int mfs_t_external_truth(void) {
+    mfs_test_t t; mfs_test_begin(&t, "external_truth");
+    mfs_test_t *t_ptr = &t;
+
+    const float G_N = 9.80665f;   /* CODATA 2022, exact */
+
+    /* ---- 1. free fall against g_n, and against the viscous ODE -------- */
+    {
+        physics_world w; mfs_test_world(&w);
+        int s = physics_world_add_sphere(&w, 0.5f, 1.0f, (vector3){0, 100.0f, 0});
+        w.bodies[s].restitution = 0.0f;
+        if (s < 0) { t_ptr->failures++; physics_world_cleanup(&w); return t_ptr->failures; }
+        for (int k = 0; k < 120; k++) physics_world_step(&w, DT);
+        rigidbody *b = &w.bodies[s];
+        /* drag-free closed form, tolerance covers the engine's -9.81 vs
+         * g_n (+0.034%) plus first-order integration error */
+        MFS_CHECK_NEAR(t_ptr, b->position.y, 100.0f - 0.5f * G_N * 4.0f, 0.20f,
+                       "freefall y vs g_n");
+        /* the engine's viscous retention: c = -ln(drag) per second */
+        float c = (g_cfg.world.drag > 0.0f && g_cfg.world.drag < 1.0f)
+                      ? (float)-log((double)g_cfg.world.drag) : 0.0f;
+        MFS_CHECK_NEAR(t_ptr, b->velocity.y,
+                       mfs_ref_visc_v(0.0f, c, (float)G_N, 2.0f), 0.05f,
+                       "freefall vy vs viscous ODE (c=-ln drag)");
+        physics_world_cleanup(&w);
+    }
+
+    /* ---- 2. rotational dynamics: alpha = tau/I (exact algebra) -------- */
+    {
+        physics_world w; mfs_test_world(&w);
+        int c = physics_world_add_cylinder(&w, 0.1f, 0.5f, 2.0f, (vector3){0, 5, 0});
+        if (c < 0) { t_ptr->failures++; physics_world_cleanup(&w); return t_ptr->failures; }
+        rigidbody *b = &w.bodies[c];
+        MFS_CHECK_NEAR(t_ptr, b->inertia_tensor_local.matrix[0][0],
+                       0.5f * 2.0f * 0.1f * 0.1f, 1e-5f,
+                       "cylinder I_xx = m r^2/2 (solid)");
+        const float tau = 10.0f;
+        for (int k = 0; k < 60; k++) {
+            b->torque_accumulator = vector3_addition(b->torque_accumulator,
+                                                     vector3_scaling((vector3){1,0,0}, tau));
+            physics_world_step(&w, DT);
+        }
+        float I = b->inertia_tensor_local.matrix[0][0];
+        MFS_CHECK_NEAR(t_ptr, vector3_dot(b->angular_velocity, (vector3){1,0,0}),
+                       (tau / I) * 1.0f, 0.02f * (tau / I), "omega = (tau/I) t after 1 s");
+        physics_world_cleanup(&w);
+    }
+
+    /* ---- 3. sphere inertia: 2/5 m r^2 (solid) ------------------------ */
+    {
+        physics_world w; mfs_test_world(&w);
+        int s = physics_world_add_sphere(&w, 0.5f, 1.0f, (vector3){0, 50, 0});
+        if (s < 0) { t_ptr->failures++; physics_world_cleanup(&w); return t_ptr->failures; }
+        MFS_CHECK_NEAR(t_ptr, w.bodies[s].inertia_tensor_local.matrix[0][0],
+                       0.4f * 1.0f * 0.25f, 1e-4f, "sphere I_xx = 2/5 m r^2");
+        physics_world_cleanup(&w);
+    }
+
+    /* ---- 4. Coulomb restitution, in its DEFINING velocity form -------- */
+    {
+        const float r = 0.05f;
+        const float es[] = {0.2f, 0.4f, 0.6f, 0.8f};
+        for (int i = 0; i < 4; i++) {
+            float e = es[i];
+            mpe_config_init();
+            g_cfg.timestep.solver_iterations = 128;
+            g_cfg.sleep.enable = 0;
+            physics_world w; physics_world_init(&w); constraint_pool_init(&w);
+            /* slab TOP exactly at y=+1: clear of the engine's perfectly
+             * plastic boundary backstop at y=0, which would otherwise
+             * dominate a restitution measurement (validated separately:
+             * with no material floor the boundary returns e = 0). */
+            int f = physics_world_add_cube(&w, (vector3){0, 0, 0}, (vector3){60, 1.0f, 60}, 0);
+            if (f < 0) { t_ptr->failures++; physics_world_cleanup(&w); return t_ptr->failures; }
+            w.bodies[f].friction_static = 1.0f; w.bodies[f].friction_kinetic = 0.8f;
+            w.bodies[f].restitution = e;
+            int s = physics_world_add_sphere(&w, r, 1.0f, (vector3){0, 6.0f, 0});
+            if (s < 0) { t_ptr->failures++; physics_world_cleanup(&w); return t_ptr->failures; }
+            w.bodies[s].restitution = e;
+            w.bodies[s].velocity = vector3_zero();
+            float vin = 0.0f, vout = 0.0f;
+            int contacted = 0;
+            for (int k = 0; k < 600; k++) {
+                physics_world_step(&w, DT);
+                float y = w.bodies[s].position.y, vy = w.bodies[s].velocity.y;
+                if (!contacted && y <= 1.0f + r + 2e-3f && vy < 0.0f) { vin = -vy; contacted = 1; }
+                if (contacted && vy > vout) vout = vy;
+            }
+            MFS_INFO("restitution e=%.2f v_in=%.4f v_out=%.4f eff=%.4f",
+                     (double)e, (double)vin, (double)vout,
+                     (double)(vin > 1e-3f ? vout / vin : 0.0f));
+            MFS_CHECK(t_ptr, vin > 0.5f);
+            MFS_CHECK_REL(t_ptr, vout, e * vin, 0.20f, "restitution v_out = e*v_in");
+            physics_world_cleanup(&w);
+        }
+    }
+
+    /* ---- 5. rolling without slipping: v + w r = 0 ---------------------- */
+    {
+        physics_world w; mfs_test_world(&w);
+        int f = physics_world_add_cube(&w, (vector3){0, -0.5f, 0}, (vector3){20, 0.5f, 20}, 0);
+        if (f < 0) { t_ptr->failures++; physics_world_cleanup(&w); return t_ptr->failures; }
+        w.bodies[f].friction_static = 1.0f; w.bodies[f].friction_kinetic = 0.8f;
+        w.bodies[f].restitution = 0.0f;
+        const float rr = 0.5f;
+        int s = physics_world_add_sphere(&w, rr, 1.0f, (vector3){-5, rr, 0});
+        if (s < 0) { t_ptr->failures++; physics_world_cleanup(&w); return t_ptr->failures; }
+        w.bodies[s].velocity = (vector3){5, 0, 0};
+        w.bodies[s].angular_velocity = (vector3){0, 0, -5.0f / rr};
+        w.bodies[s].restitution = 0.0f;
+        for (int k = 0; k < 60; k++) physics_world_step(&w, DT);
+        rigidbody *b = &w.bodies[s];
+        float slip = b->velocity.x + vector3_dot(b->angular_velocity, (vector3){0,0,1}) * rr;
+        MFS_INFO("rolling v=%.6f w*r=%.6f slip=%.2e", (double)b->velocity.x,
+                 (double)(vector3_dot(b->angular_velocity, (vector3){0,0,1}) * rr), (double)slip);
+        MFS_CHECK_NEAR(t_ptr, slip, 0.0f, 0.02f, "rolling no-slip residual");
+        physics_world_cleanup(&w);
+    }
+
+    /* ---- 6. energy conservation over a free fall ---------------------- */
+    {
+        physics_world w; mfs_test_world(&w);
+        int s = physics_world_add_sphere(&w, 0.5f, 1.0f, (vector3){0, 10.0f, 0});
+        if (s < 0) { t_ptr->failures++; physics_world_cleanup(&w); return t_ptr->failures; }
+        w.bodies[s].restitution = 0.0f;
+        float E0 = 1.0f * G_N * 10.0f;
+        for (int k = 0; k < 60; k++) physics_world_step(&w, DT);
+        rigidbody *b = &w.bodies[s];
+        float E = b->mass * G_N * b->position.y
+                + 0.5f * b->mass * vector3_length_squared(b->velocity);
+        MFS_CHECK_REL(t_ptr, E, E0, 0.01f, "energy conservation (1% over a 4.9 m drop)");
+        physics_world_cleanup(&w);
+    }
+
+    /* ---- 7. DC machine: V = I R + Ke w, tau = Kt I, on the V-w line --- */
+    {
+        const float V = 12.8f;   /* fresh pack, battery_init() nominal */
+        const motor_preset_id ids[] = {MOTOR_GB_5203_1_1, MOTOR_GB_5203_19_2,
+                                       MOTOR_REV_CORE_HEX};
+        const float spec[] = {0.1442f, 2.3830f, 3.2000f};
+        for (int n = 0; n < 3; n++) {
+            motor m; motor_preset_apply(&m, ids[n]);
+            /* stall endpoint: tau_out(0) must equal the published spec */
+            m.command = 1.0f;
+            motor_update(&m, 0.0f, DT, V);
+            MFS_CHECK_NEAR(t_ptr, m.output_torque, spec[n], 0.02f * spec[n],
+                           "motor stall torque = published spec");
+            /* interior points on the electrical line */
+            for (int q = 1; q <= 3; q++) {
+                float frac = (float)q / 4.0f;
+                float w = m.free_speed_rad_s * frac;
+                motor_update(&m, w, DT, V);
+                float I_ref = (V - m.kv * (w * m.gear_ratio)) / m.resistance;
+                if (I_ref > m.stall_current) I_ref = m.stall_current;
+                MFS_CHECK_NEAR(t_ptr, m.current, I_ref, 0.02f * (I_ref > 0 ? I_ref : 1.0f),
+                               "motor I = (V - Ke w)/R");
+                MFS_CHECK_NEAR(t_ptr, m.output_torque,
+                               m.kt * I_ref * m.gear_ratio * m.efficiency,
+                               0.02f * m.output_torque, "motor tau = Kt I");
+            }
+            /* free speed reached at 12.8 V from rest must be the V-line
+             * no-load point, i.e. exactly (12.8/12.0) x the 12 V spec */
+            {
+                motor mm; motor_preset_apply(&mm, ids[n]);
+                battery bb; battery_init(&bb);
+                const float Ia = 2.5e-4f;
+                float w = 0.0f; mm.command = 1.0f;
+                for (int k = 0; k < 2000; k++) {
+                    float Vb = battery_get_voltage(&bb, mm.current);
+                    motor_update_load(&mm, w, DT, Vb, Ia);
+                    if (!isfinite(mm.output_torque)) { t_ptr->failures++; break; }
+                    w += (mm.output_torque / Ia) * DT;
+                }
+                MFS_CHECK_REL(t_ptr, w / mm.free_speed_rad_s, 12.8f / 12.0f, 0.01f,
+                              "motor free speed scales 12.8/12.0 exactly");
+            }
+        }
+    }
+
+    /* ---- 8. battery: OCV(SoC), sag = I*Rint, PTC I^2t, capacity ------ */
+    {
+        battery b; battery_init(&b);
+        MFS_CHECK_NEAR(t_ptr, battery_get_voltage(&b, 0.0f), 12.8f, 0.02f,
+                       "battery OCV at full charge");
+        MFS_CHECK_NEAR(t_ptr, battery_get_voltage(&b, 20.0f), 12.8f - 20.0f * 0.06f, 0.02f,
+                       "battery sag = OCV - I*Rint (NiMH pack-level 0.06 ohm)");
+        /* PTC: heat += (I-20) dt / 20, trips at heat >= 1 => t = 20/(I-20) */
+        {
+            battery f; battery_init(&f);
+            int ticks = 0;
+            while (!battery_fuse_tripped(&f) && ticks < 20000) {
+                battery_fuse_step(&f, 36.8f, DT); ticks++;
+            }
+            MFS_INFO("PTC trips at %.3f s at 36.8 A (theory %.3f)",
+                     (double)(ticks * DT), (double)(20.0f / (36.8f - 20.0f)));
+            MFS_CHECK_NEAR(t_ptr, (float)(ticks * DT), 20.0f / (36.8f - 20.0f), 0.03f,
+                           "PTC trip time = I^2t characteristic");
+            MFS_CHECK_NEAR(t_ptr, battery_get_voltage(&f, 0.0f), 1.2f, 0.01f,
+                           "PTC brownout voltage (not zero)");
+        }
+        {
+            battery d; battery_init(&d);
+            battery_drain(&d, 3.0f, 3600.0f);
+            MFS_CHECK_NEAR(t_ptr, d.charge_fraction, 0.0f, 1e-3f,
+                           "3.0 Ah pack emptied by 1 h at 3 A");
+        }
+    }
+
+    /* ---- 9. Coulomb sliding: d = v0^2 / (2 mu g_n) --------------------- */
+    {
+        physics_world w; mfs_test_world(&w);
+        int f = physics_world_add_cube(&w, (vector3){-10, -0.5f, 0}, (vector3){10, 0.5f, 10}, 0);
+        if (f < 0) { t_ptr->failures++; physics_world_cleanup(&w); return t_ptr->failures; }
+        w.bodies[f].friction_static = 0.3f; w.bodies[f].friction_kinetic = 0.3f;
+        w.bodies[f].restitution = 0.0f;
+        int b2 = physics_world_add_cube(&w, (vector3){-6.0f, 0.55f, 0}, (vector3){0.5f,0.5f,0.5f}, 1.0f);
+        if (b2 < 0) { t_ptr->failures++; physics_world_cleanup(&w); return t_ptr->failures; }
+        w.bodies[b2].friction_static = 0.3f; w.bodies[b2].friction_kinetic = 0.3f;
+        w.bodies[b2].restitution = 0.0f;
+        w.bodies[b2].velocity = (vector3){4, 0, 0};
+        rigidbody_wake(&w.bodies[b2]);
+        for (int k = 0; k < 60; k++) physics_world_step(&w, DT);
+        float v0 = vector3_length(w.bodies[b2].velocity);
+        float x0 = w.bodies[b2].position.x;
+        for (int k = 0; k < 1200; k++) {
+            physics_world_step(&w, DT);
+            if (vector3_length(w.bodies[b2].velocity) < 0.005f) break;
+        }
+        float d = w.bodies[b2].position.x - x0;
+        MFS_INFO("sliding: v0=%.4f measured d=%.4f analytic=%.4f",
+                 (double)v0, (double)d, (double)(v0*v0/(2.0f*0.3f*G_N)));
+        MFS_CHECK_REL(t_ptr, d, v0 * v0 / (2.0f * 0.3f * G_N), 0.10f,
+                      "sliding distance = v0^2/(2 mu g_n)");
+        physics_world_cleanup(&w);
+    }
+
+    /* ---- 10. gravity bias, stated rather than hidden ------------------ */
+    {
+        MFS_INFO("engine gravity=%.6f vs g_n=%.5f (bias %+.4f%%)",
+                 (double)g_cfg.world.gravity, (double)G_N,
+                 (double)(100.0f * ((float)g_cfg.world.gravity / -G_N - 1.0f)));
+    }
+
+    mfs_test_end(t_ptr);
+    return t_ptr->failures;
+}
