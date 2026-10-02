@@ -197,7 +197,13 @@ int mfs_t_module_1(void) {
     g_cfg.timestep.solver_iterations = FTC_ITERS;
     constraint_pool_init(&w);
 
-    extern const mpe_module_desc_t mfs_module_1_desc;
+    /* DESPOT-2026-10-02: the `extern const mpe_module_desc_t
+     * mfs_module_1_desc;` declaration that sat here was never used - this
+     * test drives the module by calling mfs_module_1_attach() directly, not
+     * through the descriptor, so the compiler had been warning about a dead
+     * declaration on every build (-Wunused-variable). Removed. The
+     * descriptor IS exercised for real by the ftc_hotload case above, which
+     * dlsym's it out of the plugin, so no coverage is lost. */
     void *state = NULL;
     /* DESPOT-2026-09-28: attach-fail return leaked the world + config. */
     if (mfs_module_1_attach(&w, &state) != 0) {
@@ -297,7 +303,7 @@ int mfs_t_intake_stop(void) {
     g_cfg.timestep.solver_iterations = FTC_ITERS;
     constraint_pool_init(&w);
 
-    extern const mpe_module_desc_t mfs_module_1_desc;
+    /* DESPOT-2026-10-02: dead `extern mfs_module_1_desc` declaration removed (-Wunused-variable); this case calls the module entry points directly, and the descriptor is genuinely exercised by ftc_hotload. */
     void *state = NULL;
     if (mfs_module_1_attach(&w, &state) != 0) {
         t_ptr->failures++;
@@ -421,7 +427,7 @@ int mfs_t_shooter_axis(void) {
     g_cfg.timestep.solver_iterations = FTC_ITERS;
     constraint_pool_init(&w);
 
-    extern const mpe_module_desc_t mfs_module_1_desc;
+    /* DESPOT-2026-10-02: dead `extern mfs_module_1_desc` declaration removed (-Wunused-variable); this case calls the module entry points directly, and the descriptor is genuinely exercised by ftc_hotload. */
     void *state = NULL;
     if (mfs_module_1_attach(&w, &state) != 0) {
         t_ptr->failures++;
@@ -514,7 +520,7 @@ int mfs_t_ball_spin(void) {
     g_cfg.timestep.solver_iterations = FTC_ITERS;
     constraint_pool_init(&w);
 
-    extern const mpe_module_desc_t mfs_module_1_desc;
+    /* DESPOT-2026-10-02: dead `extern mfs_module_1_desc` declaration removed (-Wunused-variable); this case calls the module entry points directly, and the descriptor is genuinely exercised by ftc_hotload. */
     void *state = NULL;
     if (mfs_module_1_attach(&w, &state) != 0) {
         t_ptr->failures++;

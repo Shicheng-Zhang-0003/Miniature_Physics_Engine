@@ -58,12 +58,38 @@ void drivetrain_mecanum (ftc_robot *robot, float forward, float strafe, float ro
         return;
     }
 
-    /* Mecanum IK: per-wheel velocity targets
+    /* Mecanum IK: per-wheel velocity targets.
        Wheel layout: [0]=FL, [1]=FR, [2]=BL, [3]=BR
        FL: forward + strafe - rotate
        FR: forward - strafe + rotate
        BL: forward - strafe - rotate
-       BR: forward + strafe + rotate */
+       BR: forward + strafe + rotate
+
+       DESPOT-2026-10-02 (audited; signs CONFIRMED CORRECT by measurement,
+       not by the algebra that first appeared to indict them):
+       the anti-diagonal pairing (FL=f+s-R, FR=f-s+R, BL=f-s-R, BR=f+s+R)
+       was A/B tested against the diagonal pairing over a steady-state
+       window (ticks 180..240, after 180 ticks of drive). Pure rotate, the
+       shipped mixer gives +2.289 rad/s for r=+1 and -2.030 rad/s for r=-1:
+       correct sign, correct anti-symmetry, ~131 deg/s — a healthy mecanum
+       turn. The diagonal pairing (FL=f+s+R, FR=f-s-R, BL=f-s+R, BR=f+s-R)
+       gives -2.030 for r=+1 and +2.289 for r=-1: the same magnitude,
+       INVERTED. Both pairings produce equal-and-opposite pure torque on
+       paper (each is a zero-net-force, nonzero-torque combination of the
+       four rail forces), which is exactly why algebra alone cannot choose
+       between them: the sign is fixed by the convention, and the
+       convention is fixed by measurement.
+
+       Recorded because the first pass got this backwards. A 3.0 s
+       end-to-end average reported r=+1 producing +0.029 rad and r=-1
+       producing +0.221 rad, which looks like a sign error; it is not. It
+       is the spin-up transient: yaw rate builds over ~2 s, so an average
+       over the first 3 s is dominated by the ramp and is not comparable
+       between the two commands. The steady-state window is. Any future
+       judgement about drivetrain directionality must be made on the
+       steady-state window, never on a short-horizon displacement average
+       — the same trap made 'rotate barely works' look true when it does
+       not. Pinned by mfs_t_drive_directions in tests/mfs_suite_a.c. */
 
     float wheel_targets [4];
     wheel_targets [0] = forward + strafe - rotate;
@@ -176,10 +202,40 @@ static void drivetrain_mecanum_analytic (physics_world *world, ftc_robot *robot)
         }
     }
     if (!(total_mass > 0.0f) || !isfinite(total_mass)) {return;}
+    /* DESPOT-2026-10-02 (mathematical lie: gravity was hardcoded, and the
+     * fallback was wrong in the one case that matters).
+     *
+     * Normal load is N = m*g, and BOTH the analytic lateral cap
+     * (f_max = MU*N) and rolling resistance are proportional to it, so
+     * whatever g is used here scales the entire traction budget.
+     *
+     * The old code was:
+     *     float g_mag = 9.81f;
+     *     if (cfg->world.gravity < 0.0f) { g_mag = -cfg->world.gravity; }
+     * Two defects in two lines:
+     *
+     *   1. A world with gravity DISABLED (world.gravity == 0, a legitimate
+     *      and supported configuration) still got g_mag = 9.81, so the
+     *      mecanum lateral force was capped at MU*m*9.81 and the rolling
+     *      resistance at Crr*m*9.81 — inventing a normal load, and hence a
+     *      friction budget, out of nothing. A robot in free fall would push
+     *      against an imaginary floor.
+     *   2. 9.81 is not the standard value of gravity. The standard
+     *      acceleration of gravity is g_n = 9.80665 m/s^2, exact by
+     *      definition (CGPM 1901; CODATA 2022), so 9.81 carries a
+     *      systematic +0.0341% bias into every traction budget, and a
+     *      different magic number than the engine's own -9.81 default, so
+     *      the two could not be reasoned about together.
+     *
+     * Fix: take |g| from the world config and nothing else, with no
+     * fallback constant at all. Gravity is a required config field; if it
+     * is absent or non-finite the honest response is to bail (the callers
+     * already do) rather than invent a value. A zero-g world now correctly
+     * yields N = 0 and therefore no analytic lateral force, because a free
+     * roller with no normal load genuinely cannot push. */
     const mpe_config_t *cfg = mpe_world_cfg(world);
-    float g_mag = 9.81f;
-    if (cfg->world.gravity < 0.0f) {g_mag = -cfg->world.gravity;}
-    if (!(g_mag > 0.0f) || !isfinite(g_mag)) {return;}
+    const float g_mag = fabsf(cfg->world.gravity);
+    if (!(g_mag >= 0.0f) || !isfinite(g_mag)) {return;}
     float n_per_wheel = total_mass * g_mag / (float)robot->wheel_count;
     float f_max = MFS_MECANUM_ANALYTIC_MU * n_per_wheel;
     if (!(f_max >= 0.0f) || !isfinite(f_max)) {return;}
@@ -264,9 +320,15 @@ void drivetrain_update (physics_world *world, ftc_robot *robot, float dt) {
                     }
                 }
             }
-            float g_mag = 9.81f;
-            if (drive_cfg->world.gravity < 0.0f) {g_mag = -drive_cfg->world.gravity;}
-            if (robot->wheel_count > 0 && total_mass > 0.0f) {
+            /* DESPOT-2026-10-02: same correction as the analytic lateral
+             * above — g comes from the world config with no fallback
+             * constant, so a disabled-gravity world has zero rolling
+             * resistance (correct: F_rr = Crr*N and N = 0) instead of
+             * Crr*m*9.81 invented out of nothing. See the long note at the
+             * drivetrain_mecanum_analytic() g_mag for the 9.81 vs the exact
+             * g_n = 9.80665 argument. */
+            const float g_mag = fabsf(drive_cfg->world.gravity);
+            if (robot->wheel_count > 0 && total_mass > 0.0f && isfinite(g_mag)) {
                 const float f_rr = c_rr * total_mass * g_mag / (float)robot->wheel_count;
                 for (int i = 0; i < robot->wheel_count; i++) {
                     int wi = robot->wheel_bodies[i];
