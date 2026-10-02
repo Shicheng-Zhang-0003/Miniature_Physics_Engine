@@ -115,3 +115,45 @@ operational) + baseline registry discovery (41 canonical / 30 legacy /
   seeded collision/constraint property + TSan, Wayland matrix (X11 verified).
 
 All changes built under `temp/` scratch; no outside-tree writes.
+
+## F. External-truth verification 2026-10-02 (no engine changes from it)
+
+Independent battery (`temp/ext_truth.c`, separately-coded harness; oracles
+hand-derived from closed forms, cross-checked by a second implementation in
+Python, `temp/ext_oracle_check.py`). **22/22 green** in C, 20/20 oracle
+agreement in Python. Full log: `temp/ext_truth.log`.
+
+Re-run recipe (from `temp/`, engine at `../v15S/src`):
+`CORE="<core list: core/physics_world.c core/rigidbody.c core/mpe_registry.c
+core/mpe_loader.c core/det_math.c core/mpe_primary.c
+physics/collision_narrowphase.c physics/collision_cache.c
+physics/collision_solver.c physics/collision_ccd.c physics/collision_cylinder.c
+physics/broadphase.c physics/constraint.c physics/revolute_joint.c
+physics/depenetration.c physics/islands.c config/mpe_config.c
+config/mpe_config_schema.c scene/boundary.c ecosystem/mpe_ecosystem.c
+physics/spring_joint.c>"`;
+`gcc -I../v15S/src $CORE stubs_ext.c ext_truth.c -lm -ldl -pthread -lepoxy
+-o ext_truth && ./ext_truth && python3 ext_oracle_check.py`
+(`stubs_ext.c` stubs `scene_resolve_object_by_id` + `main_camera_fov`, the
+same set the spring test stubs.)
+
+Findings (all dispositioned, none left open):
+- Four first-run failures were HARNESS bugs (rolling-vs-sliding oracle,
+  half-vs-full inertia sides, transient-vs-creep gating, exact-touch setup),
+  corrected same-session; the engine was right in each case.
+- Poisoned live config (SEVERE while present): `v15S/src/status/engine.cfg`
+  + `.backup` held F11-torture values (gravity −17, drag 0.63, rolling 4.95,
+  sleep OFF) from the pre-fix era, and the GUI loads `engine.cfg` on
+  startup — live sessions started in torture state. Both files deleted
+  (clean defaults regenerate; F11 rewrite prevents recurrence).
+- Uninitialized joint pools (P2 hardening, proposed not applied):
+  `physics_world_init` zeroes the joint count but not `is_active` flags;
+  every in-tree caller pairs it with `constraint_pool_init`, so nothing live
+  is affected, but out-of-tree init-alone callers get phantom joints (bit a
+  harness here: 0.64 phantom lean). Proposed: clear pools inside init.
+- Sleepless tall-tower lean (0.64 vs 0.004 with sleep): documented design —
+  sleep is load-bearing for tall stacks; `sleep.enable=0` is truth mode.
+- TSan note moved here from §B: canonical suite 41→42 cases 0 warnings
+  (needs `setarch -R` for the GCC 13 TSan vs glibc 2.39 mapping conflict).
+- Suite is 42/42 (40 physics + 2 diag) with `sleep_settle`; MFS 12/12 inner;
+  TUI 9/9 finite; quick profile 56/56, 0 blocking.

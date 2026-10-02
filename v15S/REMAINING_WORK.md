@@ -7,7 +7,7 @@
   JSON summaries, JUnit reports, and preserved TUI snapshots.
 - [x] Runner contract tests for registries, result parsing, MFS summaries, TUI
   snapshot validation, command-launch failure reporting, and report generation
-  (11 Python tests).
+  (17 Python tests).
 - [x] Fixed-seed matrix inverse property sweep: 256 SPD matrices over scales
   from 2^-24 to 2^24, plus singular-axis and non-finite input gates.
 - [x] Full profile passes all canonical, isolated legacy, paranoia, MFS, TUI,
@@ -19,7 +19,18 @@
 - [x] Added missing `physics_world_cleanup` calls to cylinder-drop, driven-wheel,
   and FTC integration test paths after LeakSanitizer identified fixture leaks.
 - [x] Quick profile rerun after adding command-launch failure handling; all
-  11 harness contracts and canonical cases pass.
+  17 harness contracts and canonical cases pass.
+- [x] External-truth battery 2026-10-02: 22 closed-form checks
+  (free-fall, projectile, bounce heights, pendulum, spring, elastic exchange,
+  Coulomb stop/hold/slide, 3 inertias via torque, tower, range linearity,
+  Galileo, restitution threshold) green in C plus a second Python oracle
+  implementation green; harness bugs caught and corrected; poisoned live
+  config neutralized; see `docs/DESPOT_AUDIT_2026-10-01.md` §F.
+- [ ] Uninitialized joint pools (P2 hardening, proposed 2026-10-02):
+  `physics_world_init` zeroes the joint count but not `is_active` flags —
+  every in-tree caller pairs it with `constraint_pool_init`, so nothing live
+  is affected, but init-alone callers get phantom joints. Clear the pools
+  inside init (one loop, zero behavior change for paired callers).
 - [ ] Expand seeded property coverage from matrix inversion to collision,
   constraint, and configuration invariants; add differential oracles across
   multiple analytic systems and a ThreadSanitizer run.
