@@ -98,6 +98,21 @@ Vterm    = OCV - Rint · I_signed,   Rint = 0.06 Ω (NiMH 10-cell + wiring)
 - **Pack integration** (robot.c:651-673): sag uses the **signed** current sum
   (opposing turn currents cancel — correct), fuse uses the **abs** sum
   (stall sums, regen doesn't cool — correct).
+- **The fuse dominates high-current manoeuvres, and this is measurable.**
+  A full-power mecanum pivot or a tank pivot-in-place puts all four motors near
+  stall: 4 x 9.2 A = **36.8 A** against the **20 A** rating. The PTC
+  integrates `heat += (36.8-20)*dt/20` = **+0.84 per second**, so it trips in
+  **~1.2 s**, after which `battery_get_voltage()` returns the 1.2 V brownout
+  and the drive nearly stops. Measured consequence for the same `rotate +1`
+  command: **+2.29 rad/s** of yaw from a command-free settle on a fresh pack,
+  **+0.46 rad/s** after 330 continuous ticks of driving on that same pack —
+  a 5x spread caused entirely by pack state. Straight-line cross-talk is
+  state dependent for the same reason (strafe leaks 28% of its lateral rate
+  into forward and yaw when driven hard, 2.6% on a fresher pack).
+  **Any assertion on drivetrain authority must be structural, not absolute**;
+  see `mfs_t_drive_directions` in `docs/TESTING.md`. This is faithful FTC
+  behaviour — real robots brown out the same way — and it is reported rather
+  than smoothed over.
 
 **Not modeled:** Peukert, temperature/age, transient RC; fuse constants are
 engineering picks, not measured PTC curves.
@@ -111,6 +126,42 @@ counts):
 ```
 FL = f+s-r,  FR = f-s+r,  BL = f-s-r,  BR = f+s+r
 ```
+
+**Mixer signs verified by measurement, not by algebra (DESPOT-2026-10-02).**
+The diagonal pairing above and the anti-diagonal pairing
+(`FL=f+s+r, FR=f-s-r, BL=f-s+r, BR=f+s-r`) are BOTH zero-net-force with a
+pure torque for this roller pattern, so closed-form reasoning cannot choose
+between them — the sign is fixed only by convention, and the convention is
+fixed by what the robot does. A/B over a steady-state window (ticks 180-240)
+gives, for pure `rotate`:
+
+| mixer | `rotate +1` | `rotate -1` | verdict |
+|---|---|---|---|
+| shipped (diagonal) | **+2.289 rad/s** | **-2.030 rad/s** | correct sign, anti-symmetric |
+| anti-diagonal | -2.030 rad/s | +2.289 rad/s | same magnitude, INVERTED |
+
+Shipped mixer kept. Measured steady-state response of the shipped mixer
+(tile floor, 128 iterations, 26.9:1 preset, battery as reached by the rig):
+
+| command | v_x (m/s) | v_z (m/s) | yaw (rad/s) |
+|---|---|---|---|
+| forward +1 | +0.243 | **+1.173** | -0.029 |
+| reverse -1 | -0.240 | **-0.979** | -0.134 |
+| strafe +X | **+0.869** | -0.244 | +0.245 |
+| rotate +1 | -0.029 | -0.004 | **+0.388** |
+
+Forward leaks 21% laterally and 2.5% into yaw; strafe leaks 28% into forward
+and 28% into yaw (real mecanum cross-talk — the X roller pattern is not
+symmetric under a pure lateral command, which is why teams re-zero heading
+against the field mid-strafe). Pinned by `mfs_t_drive_directions`.
+
+**Measuring direction requires a steady-state window.** Yaw *rate* builds
+over roughly 2 s from rest, so a displacement average over the first few
+seconds measures the spin-up ramp. A 3.0 s end-to-end average makes
+`rotate +1` and `rotate -1` look 7.6x asymmetric (0.029 rad vs 0.221 rad)
+when a steady-state window shows them near-perfectly anti-symmetric. This
+false signal briefly presented as a rotate sign error; see
+`docs/KNOWN_FAILURES.md`.
 
 **No chassis-force cheat.** The old `sin45·Στ/r` lateral injection, 1.1×
 breakaway margin, and chassis drag are deleted (verified absent by grep).
@@ -128,7 +179,15 @@ open loop; never regulate on unobservable error) and airborne
 
 **Torque shaping** (robot.c:819-885, all TUNED unless noted):
 
-- slew 0.6 N·m/tick (ESC current-slew stand-in; lets grip establish),
+- slew 0.6 N·m/tick (ESC current-slew stand-in; lets grip establish). Its
+  memory `wheel_applied_torque` is the torque **actually delivered** on the
+  previous tick — stored after the governor and idle brake, not before
+  (DESPOT-2026-10-02: it used to hold the largest value the pipeline passed
+  through, so a governor or brake clip was invisible to the limiter and the
+  instant the wheel came back under the bound the full 0->stall step was
+  restored in one tick, defeating the slew exactly when it mattered. Cost of
+  the correction, measured and deterministic: tank pivot heading -18.5%,
+  mecanum yaw authority -17%),
 - governor diode at 1.155× the VOLTAGE-SCALED no-load point
   `Vterm/(kv·gear)` on **measured** speed (DESPOT-2026-09-28: was 1.155×
   spec-fixed — at 10 V sag the true no-load point is 0.83× spec, so the

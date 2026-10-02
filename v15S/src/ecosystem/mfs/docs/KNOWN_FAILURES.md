@@ -147,6 +147,225 @@ problem. Recorded 2026-09-29.
   re-applied; doing it in the other order destabilises the stall endpoint, and
   doing both at once zeroes drive entirely (measured: strafe transmit 0.00 m).
 
+## [DESPOT-2026-10-02] Full mathematical / programming / operational audit
+
+Recorded from a standalone run against this tree. Every number below was
+measured, not estimated; the probe programs live in `temp/audit/`.
+
+### Operational — the drift guard was blind, and the docs were wrong about git
+
+- **The sync checker could never run from the tree it was advertised for.**
+  `docs/SYNC_CONTRACT.md` states "a local copy also lives at this repo's root
+  (`./sync_mfs_check.sh`) for standalone use." It could not work there. The
+  path resolution was `ROOT="$HERE/.."` then `EMBED="$ROOT/v15S/src/ecosystem/mfs"`,
+  which is right when the script sits at `<475>/tools/` but not when it sits at
+  the 461 root: there `HERE/..` is the shared *parent* directory, so it
+  searched for `…/projects/v15S/src/ecosystem/mfs` instead of
+  `…/projects/475-MPE/v15S/src/ecosystem/mfs`. Every standalone run died with
+  "embedded not found" and exit 1 — a status that reads like a misconfiguration,
+  not like blindness.
+- **The drift it existed to catch was present.** This tree was last committed
+  28 Sep; its twin had been committed through 30 Sep. 11 files had drifted,
+  including **4 gated tests that do not exist here** (`stall_endpoint`,
+  `intake_stop`, `shooter_axis`, `ball_spin`), a `motor_observe()` refactor
+  that moved the disturbance observer into `motor.c`, and a 971-line
+  `KNOWN_FAILURES.md` against this tree's 122. The twin was verified to be a
+  **strict superset** (0 lines of unique content here), so mirroring was
+  lossless, and the suite went 8/8 → 12/12 on mirror.
+- **The checker now distinguishes three outcomes, not one:** 0 = in sync,
+  1 = drift found, **2 = could not locate a tree (the guard did not run)**.
+  It also prints both resolved paths so a green result is attributable.
+- **Build artifacts were committed.** `README_MFS.md` and
+  `docs/ARCHITECTURE.md` both described `build/` and `plugins/` as
+  "gitignored build output". There was no `.gitignore` in the repository at
+  all, and 13 `.o`/`.so` files had been tracked since the initial import
+  (`02fe0b2`). Added `.gitignore`; `git rm --cached` for all 13. Tracked file
+  count 67 → 54.
+
+### Mathematical — drivetrain directionality was untested, and one method was wrong
+
+The suite gated **magnitudes on single axes** and never directions:
+`mecanum` asserted `dx >= 0.30` after a strafe, `teleop`/`ftc_integration`
+asserted `sqrt(x²+z²) >= 0.5` after a forward command. A mixer with `f` and `s`
+transposed, a flipped rotate sign, or a drivetrain that answered `rotate -1`
+harder than `rotate +1` would all have passed. Writing a 3-DOF probe to answer
+an unrelated question exposed this, and the first conclusion drawn from it was
+**wrong**:
+
+- **A rotate sign "error" that was not one.** The probe reported, over a 3.0 s
+  end-to-end average, `rotate +1 → +0.029 rad` and `rotate -1 → +0.221 rad` —
+  a 7.6× asymmetry that reads exactly like an inverted rotate. Measured on a
+  **steady-state window** instead (ticks 180–240, after 180 ticks of drive),
+  the shipped mixer gives **+2.289 rad/s for `rotate +1` and −2.030 rad/s for
+  `rotate -1`** — correct sign, correct anti-symmetry, ~131°/s. The
+  anti-diagonal mixer was A/B tested and gives −2.030 / +2.289: same
+  magnitudes, **inverted**. Both pairings are zero-net-force with a pure
+  torque on paper, which is precisely why algebra cannot choose between them:
+  the sign is fixed by convention and the convention is fixed by measurement.
+  **The shipped mixer is correct and was left alone.** The cause of the false
+  signal is recorded in `drivetrain.c`: yaw *rate* builds over ~2 s from rest,
+  so a short-horizon displacement average measures the spin-up ramp, not the
+  drivetrain.
+- **`mfs_t_drive_directions` added** to close the gap. It pins axis dominance
+  (forward→+Z, strafe→+X, rotate→yaw), cross-talk ceilings, and — the gate
+  that would have caught the sign question — that `rotate` and its reverse
+  produce **opposite yaw signs**. Suite 12 → 13.
+
+### Mathematical — yaw authority is battery-state dominated, by more than 4×
+
+The same `rotate +1` command measures **+2.29 rad/s** from a command-free
+settle on a fresh pack and **+0.46 rad/s** after 330 continuous ticks of
+driving on that same fresh pack. This is not model instability, it is the pack:
+
+- A full-power pivot puts all four motors near stall: **4 × 9.2 A = 36.8 A**
+  against a **20 A** pack PTC.
+- The PTC integrates `heat += (36.8−20)·dt/20`, i.e. **+0.84/s**, so it trips
+  in **≈1.2 s**.
+- `battery_get_voltage()` then returns the **1.2 V brownout** and the drive
+  nearly stops for the rest of the run.
+
+This is faithful FTC behaviour (real robots brown out in exactly this
+situation) but it means any yaw assertion must be **structural, not absolute**.
+`mfs_t_drive_directions` is written accordingly: it gates which axis dominates
+and whether the two directions are opposite, both of which are battery
+independent, and deliberately does *not* gate absolute yaw rate. Measured
+straight-line cross-talk is battery dependent too — a sustained strafe leaks
+**28%** of its lateral rate into forward and into yaw (2.6% on a fresher pack),
+which is why that ceiling is 0.35 and not 0.25.
+
+### Programming
+
+- **`wheel_applied_torque` did not hold the applied torque.** `robot.c` stored
+  it (the slew limiter's "what did we deliver last tick" memory) *before* the
+  free-speed governor and the idle brake, both of which cut torque. During a
+  full-power pivot the governor zeroes delivered torque while the memory kept
+  the full pre-shaping value, so the instant a wheel came back under the bound
+  the slew restored full torque **in one tick** — reintroducing the exact
+  0→stall step the slew exists to prevent, through the back door. The store now
+  happens after every shaping stage, immediately before the accumulator write.
+  Cost, measured and deterministic (bit-identical over three `-O2` runs and
+  under `-O1+ASan`): tank pivot heading **2.3003 → 1.8741 rad (−18.5%)**,
+  translation 0.0603 → 0.0530 m; mecanum yaw authority −17%. The
+  `tank` regression baseline was re-measured with the causal chain recorded.
+  A limiter is a rate limit on *delivered* torque, so its memory must be
+  delivered torque; the alternative is a variable that does not mean its name.
+- **Partial-spawn unwind left stale body indices.** The `fail:` path in
+  `ftc_robot_create_with_drive` re-poisoned `wheel_joints` and `roller_joints`
+  but left `wheel_bodies` holding whatever partial creation had written. After
+  the pool rewind those indices point at whatever *else* owns those slots, or
+  out of range if the pool shrank — a debug print or retry loop inspecting the
+  half-built robot would read another robot's wheel as its own. Body indices,
+  roller bodies and roller counts are now poisoned alongside the joint indices.
+- **`MFS_ROBOT_MAX_CARRIED_BALLS` was never enforced.** It has been declared
+  in `mfs_module_1.h` since it was written and described in the file's own
+  DESPOT-FIX note as "the gameplay CARRY limit", and no code path read it: the
+  intake drew in every ball it touched, up to the 16-ball storage bound. A
+  limit that is written down and not enforced is worse than none, because a
+  reader sizes gameplay from it. The intake now counts balls actually held
+  against the throat — using the same `pickup_radius` the pickup test uses, so
+  the two cannot disagree — and holds station at 3.
+- **`MFS_ROBOT_MAX_BALLS` was decorative.** `attach` hardcoded
+  `state->max_balls = 16` while the macro sat unreferenced: two numbers for one
+  quantity, with the macro free to drift without changing behaviour. Both the
+  array bound and the spawner now come from the constant, clamped to the array
+  size.
+
+### Sanitizer profile
+
+`MFS_TEST_CFLAGS="-O1 -fno-omit-frame-pointer -fsanitize=address,undefined"`
+`MFS_ASAN_HOTLOAD_ODR_SUPPRESS=1 ./build_tests.sh` → **13/13**, zero AddressSanitizer
+errors, zero UBSan runtime errors, zero leaks (only the intentional hotload
+ODR heuristic suppressed).
+
+## [DESPOT-2026-10-02] External-truth validation: what held and what did not
+
+Full table, constants and authorities in `docs/VALIDATION.md`. 76 automated
+comparisons against references computed independently (closed-form textbook
+algebra, or from-scratch RK4), **76 passed / 0 failed**, plus a permanent
+`external_truth` gate. Constants were fetched, not remembered:
+`g_n = 9.80665 m/s²` (CGPM 1901 / CODATA 2022, exact), `atm = 101325 Pa`,
+`ρ = 1.225 kg/m³` (ISA sea level), `C_d = 0.47`.
+
+**Validated exactly (0.00% error, five significant figures):**
+- Rotational dynamics `α = τ/I`; cylinder inertia `½mr²`; sphere inertia `⅖mr²`.
+- **The engine's air drag is exactly linear viscous with `c = −ln(drag)` per
+  second.** Integrating `dv/dt = −g − cv` with `c = 0.0100503 /s` predicts a
+  2 s free-fall velocity of −19.4241 m/s; the engine produces −19.4241 m/s,
+  and the closed form agrees with an independent RK4 to 1e-6.
+- DC motor: stall endpoint equals the published spec; free speed equals
+  `V/(K_e·gear)` and scales by exactly 12.8/12.0; the whole V–ω line matches
+  `I = (V − K_eω)/R` to ≤0.15%.
+- Battery OCV curve, `V = OCV − I·R_int`, PTC brownout voltage, and the
+  1 h / 3 A capacity drain — all 0.00%.
+
+**Valid to expected discretisation error:** free fall 0.16%, Coulomb sliding
+distance 5.0%, energy conservation 0.31% over a 4.9 m drop, elastic-collision
+velocities and momentum 0.67%, rolling no-slip residual 0.17%, restitution
+5–6% typical (15.7% worst), PTC `I²t` trip time 0.80%.
+
+### [DRAG-122x] The engine's drag cannot represent real air (OPEN, documented)
+
+`world.drag = 0.99` is `c = 0.0100503 /s`, a **terminal speed of 976 m/s**.
+Quadratic aerodynamics for the same 42 mm / 2.6 g ball (`C_d = 0.47`,
+`ρ = 1.225`) gives **8.00 m/s**. The engine's own drag is **122×** too weak.
+
+Not a bug — the config schema says so outright ("VISCOUS retention base
+(truth: linear viscous c=−ln(drag), NOT quadratic aero)"). Recorded because
+the consequence was nowhere written down: **the BioBuzz ball's flight time
+and range are set almost entirely by the quadratic term `mfs_module_1` adds on
+top**, not by the engine. Tuning ball flight from the engine alone will
+correctly conclude drag is negligible, and reach the wrong answer.
+
+### [BOUNDARY-E0] The y=0 boundary box is perfectly plastic (OPEN, documented)
+
+`boundary_apply_box_cfg(..., {-250,0,-250}, {250,500,250}, ...)` is applied to
+every non-static body **regardless of `static_plane_enabled`**. With the
+material plane disabled this leaves a frictionless, perfectly-plastic
+(e = 0) backstop at y = 0.
+
+Measured: with no material floor, a ball dropped from 5 m never rebounds
+(`e_eff = 0`) at any radius from 0.02 m to 0.64 m. With a material slab
+present, restitution is correct at every one of those radii (effective
+0.216 / 0.430 / 0.639 / 0.843 for set 0.20 / 0.40 / 0.60 / 0.80, a
+consistent +6% discrete-impulse bias).
+
+**Operational consequence:** a test that forgets a material floor is not
+measuring `e = 0` — it is measuring the boundary, and will report a bounce
+failure that has nothing to do with the restitution it meant to exercise.
+The `external_truth` gate places its slab with the top at exactly `y = +1.0`,
+clear of the boundary, and says why.
+
+### [GRAVITY-BIAS] Engine gravity is +0.0342% off `g_n` (OPEN, now measured)
+
+`world.gravity` defaults to `-9.81`; the standard value is `9.80665`, exact.
+The bias is small but systematic and enters every normal load, so it scales
+every friction budget and rolling-resistance term. Now *reported* by the
+`external_truth` gate rather than left implicit in a default. Correcting the
+engine default is a 475-tree change and is out of MFS scope.
+
+### Retracted during this audit — recorded because it nearly shipped
+
+- **"Restitution is 51% wrong."** Measured by comparing a rebound APEX against
+  `e²(h−r)+r` on a slab whose thickness was 2 m instead of 1 m, so the
+  reference geometry was wrong and the ball never reached the intended
+  surface (`ymin = 1.54` against a nominal `1.05`). Measured in the
+  **defining velocity form** `v_out = e·v_in`, restitution is correct.
+  Restitution must be gated in velocity, not apex: the apex form mixes in the
+  bounce count, the trigger instant and drag.
+- **"The rotate mixer signs are inverted."** Already retracted earlier the
+  same day; see the `DESPOT-2026-10-02` section above.
+
+### Declared coverage gaps
+
+- Cylinder inertia about a **transverse** axis (`m(3r²+L²)/12`) is exercised
+  by no test; only the symmetry axis and the sphere are gated.
+- **Angular** momentum in oblique and multi-body contacts is unvalidated
+  (linear momentum is, to 0.67%).
+- The **analytic mecanum lateral force** is gated for behaviour (axis
+  dominance, anti-symmetry) but its magnitude has no independent
+  roller-contact reference, because it is an admitted continuum
+  approximation with no closed form.
+
 ## Historical (fixed, kept for forensics)
 
 - Preset table mixed NeveRest-class RPMs with invented torques under

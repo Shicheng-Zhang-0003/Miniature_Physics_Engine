@@ -66,7 +66,17 @@ MPE_USED int mfs_module_1_attach(mpe_world_t *world, void **mod_state) {
     if (!state) return -1;
     
     state->world = world;
-    state->max_balls = 16;
+    /* DESPOT-2026-10-02 (programming: decorative bound). This was a bare
+     * literal 16 while MFS_ROBOT_MAX_BALLS existed in the header and was
+     * referenced nowhere — two numbers for one quantity, with the macro
+     * free to drift without changing behaviour. Bound the array and the
+     * spawner from the same constant. */
+    state->max_balls = MFS_ROBOT_MAX_BALLS;
+    if (state->max_balls > (int)(sizeof(state->ball_body_ids) /
+                                 sizeof(state->ball_body_ids[0]))) {
+        state->max_balls = (int)(sizeof(state->ball_body_ids) /
+                                 sizeof(state->ball_body_ids[0]));
+    }
     state->shooter_target_rpm = MFS_SHOOTER_TARGET_RPM;
     state->intake_speed_rpm = MFS_INTAKE_ROLLER_SPEED_RPM;
     state->gamepad_control_enabled = true;
@@ -751,6 +761,35 @@ MPE_USED void mfs_module_1_intake_step(mfs_module_1_state *state, float dt) {
 
     /* Ball pickup detection: check contacts between intake and balls */
     if (state->intake_active) {
+        /* DESPOT-2026-10-02 (the declared carry limit did not exist).
+         * MFS_ROBOT_MAX_CARRIED_BALLS has been declared in the header since
+         * it was written, described in the DESPOT-FIX note above as "the
+         * gameplay CARRY limit", and never read by any code path: the intake
+         * below pulled in every ball it touched, up to the 16-ball storage
+         * bound. A limit that is written down and not enforced is worse than
+         * no limit, because a reader sizes gameplay assumptions from it.
+         *
+         * "Carrying" is counted as balls actually held against the intake
+         * throat, not balls ever touched — a robot that has driven over and
+         * past a ball is not carrying it, and must be able to pick up again
+         * after the previous ball is discharged. Counted with the same
+         * pickup_radius the pickup test below uses, so the two cannot
+         * disagree about what "in the intake" means. */
+        int carried = 0;
+        for (int i = 0; i < state->ball_count && carried < MFS_ROBOT_MAX_CARRIED_BALLS; i++) {
+            int ball_idx = physics_world_index_by_id(world, state->ball_body_ids[i]);
+            if (ball_idx < 0) continue;
+            rigidbody *b = &world->bodies[ball_idx];
+            vector3 d = vector3_subtraction(b->position, roller->position);
+            if (vector3_length(d) < MFS_INTAKE_ROLLER_RADIUS +
+                                      MFS_BIOBUZZ_BALL_RADIUS +
+                                      MFS_INTAKE_COMPLIANCE) {
+                carried++;
+            }
+        }
+        if (carried >= MFS_ROBOT_MAX_CARRIED_BALLS) {
+            return;  /* hopper full: hold station, do not draw more in */
+        }
         for (int i = 0; i < state->ball_count; i++) {
             int ball_idx = physics_world_index_by_id(world, state->ball_body_ids[i]);
             if (ball_idx < 0) continue;

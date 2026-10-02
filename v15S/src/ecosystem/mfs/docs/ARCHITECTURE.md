@@ -32,6 +32,15 @@ plugins/                            # build output only (gitignored)
 build/                              # object files (gitignored)
 ```
 
+## Validation
+
+Two tiers, deliberately separate. Most tests re-derive what the code claims
+or compare two paths through the same model — that cannot catch a shared
+misconception. `external_truth` checks the model against constants and laws
+that are not this project's (`g_n = 9.80665`, CODATA 2022, exact), so a
+shared error cannot cancel. Full table and findings in
+`docs/VALIDATION.md`.
+
 ## Module vs submodule (hard rule)
 
 - A **module** exports an MPI descriptor (`mpe_module_desc_t`: attach /
@@ -67,6 +76,14 @@ build/                              # object files (gitignored)
 - `mfs_internal.*` is the only shared mutable state: pthread mutex + cond,
   16 slots, `in_flight` refcount, snapshot-then-invoke dispatch (hooks may
   attach/detach mid-tick; use-after-free and double-attach races closed).
+  Three per-slot fields carry that contract: `in_flight` (detach blocks
+  until it drains), `detaching` (new callbacks are refused once a detach
+  owns the slot, so the drain always terminates), and `attached` (published
+  only after `attach()` returns, so a concurrent attach either waits or
+  takes the idempotent path). `mfs_internal_modules_detach_all()` was
+  re-checked against `mfs_internal_module_detach()` during the 2026-10-02
+  audit specifically for the `detaching` reset on the no-callback path and
+  is correct on both.
 - Physics stepping itself is single-threaded and deterministic in
   force/torque paths; both modules report `deterministic = false` honestly
   because odometry integrates the heading with libm `cosf/sinf` and
@@ -75,6 +92,13 @@ build/                              # object files (gitignored)
 
 ## Build invariants (do not break these)
 
+- **Repository hygiene:** `build/`, `temp/`, `plugins/` and all object/shared
+  objects are gitignored. This was documented from the start and **implemented
+  on 2026-10-02**: there had been no `.gitignore` at all, and 13 `.o`/`.so`
+  files were tracked since the initial import (`02fe0b2`). Binary objects in
+  history are unreviewable in diffs and carry dead weight to every clone.
+  Tracked file count went 67 -> 54. If you see an artifact in `git status`
+  as *tracked*, that is a regression.
 - **Thin `.so` pattern:** module shared objects contain ONLY MFS objects;
   engine symbols resolve against the `-rdynamic` host at dlopen. Linking
   engine objects into the `.so` caused version skew and duplicate symbols.

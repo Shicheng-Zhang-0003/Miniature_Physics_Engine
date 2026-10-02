@@ -23,16 +23,37 @@ synced):
 
 ## Checking
 
-From the 475 side (canonical invocation):
+From either side:
 
 ```
-475-MPE/tools/sync_mfs_check.sh
-# override: SYNC_MFS_STAND=/path/to/461-MFS
+475-MPE/tools/sync_mfs_check.sh          # 475 side (canonical)
+461-MFS/sync_mfs_check.sh                # standalone side
+SYNC_MFS_STAND=/path/to/461-MFS 475-MPE/tools/sync_mfs_check.sh
+SYNC_MFS_EMBED=/path/to/embedded/mfs 461-MFS/sync_mfs_check.sh
 ```
 
-Exit 0 = source-identical (prints confirmation). Exit 1 = drift, listing
-every differing file. A local copy also lives at this repo's root
-(`./sync_mfs_check.sh`) for standalone use.
+Both copies resolve the other tree by searching a list of candidate
+locations rather than assuming one layout, and both print the two resolved
+paths so a green result is attributable to a specific pair of trees.
+
+**Exit codes are three-valued, deliberately:**
+
+| code | meaning |
+|---|---|
+| 0 | in sync — source-identical, artifacts ignored |
+| 1 | **drift found** — every differing file is listed |
+| 2 | **the guard did not run** — a tree could not be located, or both sides resolved to the same tree |
+
+Exit 2 exists because of the failure this contract failed to catch for its
+whole life (DESPOT-2026-10-02). The standalone copy originally resolved the
+embedded tree as `$HERE/../v15S/src/ecosystem/mfs`, which is correct from
+`<475>/tools/` but wrong from the 461 root — there `HERE/..` is the shared
+parent directory, so it looked for `…/projects/v15S/…` instead of
+`…/projects/475-MPE/v15S/…`. Every standalone run exited 1 with
+"embedded not found", a status indistinguishable from real drift, and the
+drift was in fact present and undetected: this tree had drifted 11 files
+behind its twin, including four gated tests that did not exist here. **A
+guard that cannot tell "no drift" from "did not look" is not a guard.**
 
 ## Mirroring (when the checker fails)
 

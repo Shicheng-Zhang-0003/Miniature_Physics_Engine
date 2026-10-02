@@ -629,6 +629,23 @@ fail:
         world->body_count = body_watermark;
         physics_world_bump_revision(world);
     }
+    /* DESPOT-2026-10-02 (programming: stale indices survived the unwind).
+     * This path re-poisoned wheel_joints and roller_joints but left
+     * wheel_bodies holding whatever partial creation had written. Those
+     * indices now point at bodies at/below the rewound watermark — i.e. at
+     * whatever ELSE owns those slots after the rewind, or out of range if
+     * the pool shrank. A caller that inspected the half-built robot after a
+     * -1 return (debug print, retry loop, a fleet that logs and continues)
+     * would read another robot's wheel as its own. Poison the body indices
+     * in the same breath as the joint indices so every accessor in the
+     * struct agrees that the robot does not exist. */
+    for (int i = 0; i < FTC_MAX_WHEELS; i++) {
+        robot->wheel_bodies[i] = -1;
+    }
+    memset(robot->roller_bodies, 0xFF, sizeof(robot->roller_bodies));
+    for (int i = 0; i < FTC_MAX_WHEELS; i++) {
+        robot->roller_count[i] = 0;
+    }
     robot->chassis_body = -1;
     robot->wheel_count = 0;
     return -1;
@@ -869,7 +886,28 @@ void ftc_robot_update(physics_world *world, ftc_robot *robot, float dt) {
             if (dl > max_slew) want = prev + max_slew;
             else if (dl < -max_slew) want = prev - max_slew;
             torque = want;
-            robot->wheel_applied_torque[i] = torque;
+            /* DESPOT-2026-10-02 (programming lie: the slew state was the
+             * wrong number). The store used to happen HERE, before the
+             * free-speed governor and the idle brake below, both of which
+             * may CUT torque. So the field named wheel_applied_torque did
+             * not hold the torque that was applied: it held the largest
+             * value the pipeline had passed through this tick. The slew
+             * limiter is a rate limit on DELIVERED torque, so its memory
+             * has to be delivered torque.
+             *
+             * Consequence while it was wrong: the governor zeroes torque
+             * whenever the wheel sits at/over its free-speed bound, and the
+             * idle brake clamps it to exactly stop-in-one-tick. In both
+             * cases the stored state stayed high, so the moment the wheel
+             * came back under the bound (load rise, or the brake releasing
+             * as |w| decayed) the full pre-shaping torque was reinstated in
+             * a single tick with no ramp — exactly the 0->stall step the
+             * slew exists to prevent, reintroduced through the back door
+             * the moment the governor or brake had clipped anything.
+             *
+             * The store now happens after every shaping stage, immediately
+             * before the accumulator write, so the field means what its name
+             * says: the torque banked into the axle on the previous tick. */
         }
         /* Free-speed governor: a motor cannot push its wheel past free
          * speed under its own power. Below free speed torque is untouched
@@ -916,6 +954,13 @@ void ftc_robot_update(physics_world *world, ftc_robot *robot, float dt) {
                 }
             }
         }
+        /* DESPOT-2026-10-02: bank the DELIVERED torque into the slew state
+         * here, after the governor diode and the idle brake, not before
+         * them (see the slew block above for why the old position made
+         * wheel_applied_torque a fiction). This is the value the next tick
+         * slews from, so it must be the value that actually reached the
+         * axle accumulator below. */
+        robot->wheel_applied_torque[i] = isfinite(torque) ? torque : 0.0f;
         /* Apply the motor torque about the real axle, as a TORQUE COUPLE:
          * +tau on the hub, -tau on the chassis. A motor is two bodies acting
          * on each other, so the reaction is not optional - applying tau to the
