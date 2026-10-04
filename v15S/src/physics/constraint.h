@@ -39,14 +39,14 @@ typedef struct {
 typedef struct {
     vector3 anchor_a;
     vector3 anchor_b;
-    vector3 axis_a;           /* Slide axis in body A's local space */
-    vector3 axis_b;           /* Slide axis in body B's local space (zero = same as axis_a) */
-    float limit_min;          /* Minimum translation along axis (meters) */
-    float limit_max;          /* Maximum translation along axis (meters) */
+    vector3 axis_a; /* Slide axis in body A's local space */
+    vector3 axis_b; /* Slide axis in body B's local space (zero = same as axis_a) */
+    float limit_min; /* Minimum translation along axis (meters) */
+    float limit_max; /* Maximum translation along axis (meters) */
     bool limits_enabled;
     bool motor_enabled;
     float motor_target_speed; /* Target linear speed along axis (m/s) */
-    float motor_max_force;    /* Maximum motor force (N) */
+    float motor_max_force; /* Maximum motor force (N) */
     /* Persistent position tracking for limit enforcement. */
     float accumulated_position;
     bool position_initialized;
@@ -68,8 +68,8 @@ typedef struct {
 typedef struct {
     vector3 anchor_a;
     vector3 anchor_b;
-    float rest_length;        /* Maximum distance (rope length) */
-} rope_params;                /* Inequality distance constraint: pulls only, no push */
+    float rest_length; /* Maximum distance (rope length) */
+} rope_params; /* Inequality distance constraint: pulls only, no push */
 
 typedef struct {
     constraint_type type;
@@ -87,14 +87,14 @@ typedef struct {
 
 struct physics_world;
 void constraint_pool_init (struct physics_world *world);
-int  constraint_add_revolute (struct physics_world *world, uint32_t id_a, uint32_t id_b, vector3 anchor_a,
-                              vector3 anchor_b, vector3 axis_a);
-int constraint_add_fixed(struct physics_world *world, uint32_t id_a, uint32_t id_b, vector3 anchor_a,
-                         vector3 anchor_b);
-int constraint_add_distance(struct physics_world *world, uint32_t id_a, uint32_t id_b, vector3 anchor_a,
-                            vector3 anchor_b, float rest_length);
+int constraint_add_revolute (struct physics_world *world, uint32_t id_a, uint32_t id_b, vector3 anchor_a,
+                             vector3 anchor_b, vector3 axis_a);
+int constraint_add_fixed (struct physics_world *world, uint32_t id_a, uint32_t id_b, vector3 anchor_a,
+                          vector3 anchor_b);
+int constraint_add_distance (struct physics_world *world, uint32_t id_a, uint32_t id_b, vector3 anchor_a,
+                             vector3 anchor_b, float rest_length);
 void constraint_remove (struct physics_world *world, int index);
-int  constraint_get_count (const struct physics_world *world);
+int constraint_get_count (const struct physics_world *world);
 void constraint_set_revolute_motor (struct physics_world *world, int index, bool enabled, float target_speed,
                                     float max_torque);
 /* Scene persistence support (v200): per-body hinge axis, joint limits,
@@ -107,11 +107,13 @@ void constraint_set_revolute_limits (struct physics_world *world, int index, boo
 int constraint_add_prismatic (struct physics_world *world, uint32_t id_a, uint32_t id_b, vector3 anchor_a,
                               vector3 anchor_b, vector3 axis_a);
 void constraint_set_prismatic_axes (struct physics_world *world, int index, vector3 axis_a, vector3 axis_b);
-void constraint_set_prismatic_limits (struct physics_world *world, int index, bool enabled, float limit_min, float limit_max);
-void constraint_set_prismatic_motor (struct physics_world *world, int index, bool enabled, float target_speed, float max_force);
+void constraint_set_prismatic_limits (struct physics_world *world, int index, bool enabled, float limit_min,
+                                      float limit_max);
+void constraint_set_prismatic_motor (struct physics_world *world, int index, bool enabled, float target_speed,
+                                     float max_force);
 /* Rope constraint (inequality distance, pull-only) API */
-int constraint_add_rope (struct physics_world *world, uint32_t id_a, uint32_t id_b, vector3 anchor_a,
-                         vector3 anchor_b, float max_length);
+int constraint_add_rope (struct physics_world *world, uint32_t id_a, uint32_t id_b, vector3 anchor_a, vector3 anchor_b,
+                         float max_length);
 int constraint_pool_capacity (void);
 const constraint *constraint_pool_at (const struct physics_world *world, int index);
 /* Solve joints — call once per solver iteration inside solver loop. */

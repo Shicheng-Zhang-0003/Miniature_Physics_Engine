@@ -10,7 +10,7 @@
 /* Union-find scratch lives in the world (heap members); the module keeps
  * no state of its own. Queries take the world explicitly. */
 
-static int island_find(struct physics_world *world, int x) {
+static int island_find (struct physics_world *world, int x) {
     int root = x;
     while (world->island_parent[root] != root) {
         root = world->island_parent[root];
@@ -23,9 +23,9 @@ static int island_find(struct physics_world *world, int x) {
     return root;
 }
 
-static void island_union(struct physics_world *world, int a, int b) {
-    int ra = island_find(world, a);
-    int rb = island_find(world, b);
+static void island_union (struct physics_world *world, int a, int b) {
+    int ra = island_find (world, a);
+    int rb = island_find (world, b);
     if (ra == rb) {
         return;
     }
@@ -37,7 +37,7 @@ static void island_union(struct physics_world *world, int a, int b) {
     }
 }
 
-static int island_index_of(rigidbody *bodies, rigidbody *body, int body_count) {
+static int island_index_of (rigidbody *bodies, rigidbody *body, int body_count) {
     if ((!bodies) || (!body) || (body_count <= 0)) {
         return -1;
     }
@@ -52,13 +52,12 @@ static int island_index_of(rigidbody *bodies, rigidbody *body, int body_count) {
     return idx;
 }
 
-static bool islands_ready(const struct physics_world *world) {
-    return (world) && (world->bodies) && (world->island_parent) && (world->island_label) &&
-           (world->island_awake_flags);
+static bool islands_ready (const struct physics_world *world) {
+    return (world) && (world->bodies) && (world->island_parent) && (world->island_label) && (world->island_awake_flags);
 }
 
-void islands_build(struct physics_world *world, broadphase_pair *pairs, int pair_count) {
-    if (!islands_ready(world)) {
+void islands_build (struct physics_world *world, broadphase_pair *pairs, int pair_count) {
+    if (!islands_ready (world)) {
         return;
     }
     rigidbody *bodies = world->bodies;
@@ -92,7 +91,7 @@ void islands_build(struct physics_world *world, broadphase_pair *pairs, int pair
             if (a_sleep && b_sleep) {
                 continue;
             }
-            island_union(world, a, b);
+            island_union (world, a, b);
         }
     }
     /* Joints join islands. O(J) via the world's id->index cache
@@ -104,28 +103,28 @@ void islands_build(struct physics_world *world, broadphase_pair *pairs, int pair
     {
         uint32_t ids_a[mpe_max_joints];
         uint32_t ids_b[mpe_max_joints];
-        int joints = constraint_get_active_ids(world, ids_a, ids_b, mpe_max_joints);
+        int joints = constraint_get_active_ids (world, ids_a, ids_b, mpe_max_joints);
         for (int j = 0; j < joints; j++) {
-            int ia = physics_world_index_by_id(world, ids_a[j]);
-            int ib = physics_world_index_by_id(world, ids_b[j]);
+            int ia = physics_world_index_by_id (world, ids_a[j]);
+            int ib = physics_world_index_by_id (world, ids_b[j]);
             if ((ia >= 0) && (ib >= 0) && (ia != ib)) {
-                island_union(world, ia, ib);
+                island_union (world, ia, ib);
             }
         }
         for (int j = 0; j < mpe_max_joints; j++) {
             if (!world->spring_joints[j].is_active) {
                 continue;
             }
-            int ia = physics_world_index_by_id(world, world->spring_joints[j].object_id_a);
-            int ib = physics_world_index_by_id(world, world->spring_joints[j].object_id_b);
+            int ia = physics_world_index_by_id (world, world->spring_joints[j].object_id_a);
+            int ib = physics_world_index_by_id (world, world->spring_joints[j].object_id_b);
             if ((ia >= 0) && (ib >= 0) && (ia != ib)) {
-                island_union(world, ia, ib);
+                island_union (world, ia, ib);
             }
         }
     }
     /* Labels in first-seen order; awake if any dynamic member is awake. */
     for (int i = 0; i < body_count; i++) {
-        int root = island_find(world, i);
+        int root = island_find (world, i);
         if (world->island_label[root] < 0) {
             world->island_label[root] = world->island_total;
             world->island_awake_flags[world->island_total] = 0;
@@ -138,29 +137,29 @@ void islands_build(struct physics_world *world, broadphase_pair *pairs, int pair
     }
 }
 
-int islands_count(const struct physics_world *world) {
+int islands_count (const struct physics_world *world) {
     if (!world) {
         return 0;
     }
     return world->island_total;
 }
 
-int islands_body_island(struct physics_world *world, rigidbody *body) {
-    if (!islands_ready(world)) {
+int islands_body_island (struct physics_world *world, rigidbody *body) {
+    if (!islands_ready (world)) {
         return -1;
     }
     if (world->bodies != world->island_base) {
         return -1;
     }
-    int idx = island_index_of(world->bodies, body, world->island_body_count);
+    int idx = island_index_of (world->bodies, body, world->island_body_count);
     if (idx < 0) {
         return -1;
     }
     return world->island_label[idx];
 }
 
-bool islands_body_awake(struct physics_world *world, rigidbody *body) {
-    int island = islands_body_island(world, body);
+bool islands_body_awake (struct physics_world *world, rigidbody *body) {
+    int island = islands_body_island (world, body);
     if (island < 0 || island >= world->island_total) {
         return true;
     }

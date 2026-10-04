@@ -19,17 +19,17 @@
  * big-endian hosts (#error), so native == LE on every buildable target.
  * v200+ uses explicit-LE field codecs; do not "fix" these to byteswap
  * without also versioning the legacy files (they are LE dumps). */
-static int read_float(FILE *f, float *v) {
-    return fread(v, sizeof(float), 1, f) == 1;
+static int read_float (FILE *f, float *v) {
+    return fread (v, sizeof (float), 1, f) == 1;
 }
-static int read_int(FILE *f, int32_t *v) {
-    return fread(v, sizeof(int32_t), 1, f) == 1;
+static int read_int (FILE *f, int32_t *v) {
+    return fread (v, sizeof (int32_t), 1, f) == 1;
 }
-static int read_vec3(FILE *f, vector3 *v) {
-    return fread(v, sizeof(vector3), 1, f) == 1;
+static int read_vec3 (FILE *f, vector3 *v) {
+    return fread (v, sizeof (vector3), 1, f) == 1;
 }
-static int read_vec4(FILE *f, vector4 *v) {
-    return fread(v, sizeof(vector4), 1, f) == 1;
+static int read_vec4 (FILE *f, vector4 *v) {
+    return fread (v, sizeof (vector4), 1, f) == 1;
 }
 
 /* R3-02: Staged scene load.
@@ -115,25 +115,25 @@ typedef struct {
     float rest_length;
 } staged_rope;
 
-static int scene_load_vec3(FILE *f, uint32_t *crc, vector3 *v) {
-    return scene_rfloat(f, crc, &v->x) && scene_rfloat(f, crc, &v->y) && scene_rfloat(f, crc, &v->z);
+static int scene_load_vec3 (FILE *f, uint32_t *crc, vector3 *v) {
+    return scene_rfloat (f, crc, &v->x) && scene_rfloat (f, crc, &v->y) && scene_rfloat (f, crc, &v->z);
 }
 
-static int scene_load_quat(FILE *f, uint32_t *crc, vector4 *q) {
-    return scene_rfloat(f, crc, &q->w) && scene_rfloat(f, crc, &q->x) && scene_rfloat(f, crc, &q->y) &&
-           scene_rfloat(f, crc, &q->z);
+static int scene_load_quat (FILE *f, uint32_t *crc, vector4 *q) {
+    return scene_rfloat (f, crc, &q->w) && scene_rfloat (f, crc, &q->x) && scene_rfloat (f, crc, &q->y) &&
+           scene_rfloat (f, crc, &q->z);
 }
 
-static bool scene_vec3_finite(vector3 v) {
-    return isfinite(v.x) && isfinite(v.y) && isfinite(v.z);
+static bool scene_vec3_finite (vector3 v) {
+    return isfinite (v.x) && isfinite (v.y) && isfinite (v.z);
 }
 
-static bool scene_vec3_axis_valid(vector3 v) {
-    float length_squared = vector3_length_squared(v);
-    return isfinite(length_squared) && length_squared >= 1e-12f;
+static bool scene_vec3_axis_valid (vector3 v) {
+    float length_squared = vector3_length_squared (v);
+    return isfinite (length_squared) && length_squared >= 1e-12f;
 }
 
-static bool scene_id_in_staged(const int32_t *staged_ids, int staged_count, uint32_t id) {
+static bool scene_id_in_staged (const int32_t *staged_ids, int staged_count, uint32_t id) {
     if (id == 0) {
         return false;
     }
@@ -150,10 +150,10 @@ static bool scene_id_in_staged(const int32_t *staged_ids, int staged_count, uint
  * everything validates (including the CRC32 footer) before the live scene
  * is touched. IDs are preserved verbatim (no remap); the allocator is
  * advanced past them. Returns 1 on commit, 0 leaving the scene untouched. */
-static int scene_loading_v200(FILE *f, uint32_t header_crc) {
+static int scene_loading_v200 (FILE *f, uint32_t header_crc) {
     uint32_t crc = header_crc;
     uint32_t body_count_u = 0;
-    if (!scene_r32(f, &crc, &body_count_u)) {
+    if (!scene_r32 (f, &crc, &body_count_u)) {
         return 0;
     }
     if ((body_count_u > (uint32_t) mpe_max_bodies)) {
@@ -167,11 +167,11 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
     /* Allocate at least 1 element even for count==0 (malloc(0) may
      * return NULL on some platforms, which would abort the load). */
     int alloc_count = count > 0 ? count : 1;
-    rigidbody *staged_bodies = (rigidbody *) malloc((size_t) alloc_count * sizeof(rigidbody));
-    int32_t *staged_ids = (int32_t *) malloc((size_t) alloc_count * sizeof(int32_t));
+    rigidbody *staged_bodies = (rigidbody *) malloc ((size_t) alloc_count * sizeof (rigidbody));
+    int32_t *staged_ids = (int32_t *) malloc ((size_t) alloc_count * sizeof (int32_t));
     if ((!staged_bodies) || (!staged_ids)) {
-        free(staged_bodies);
-        free(staged_ids);
+        free (staged_bodies);
+        free (staged_ids);
         return 0;
     }
     for (int i = 0; i < count; i++) {
@@ -189,26 +189,26 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
         vector4 orient = {1.0f, 0.0f, 0.0f, 0.0f};
         vector3 colour = {0.0f, 0.0f, 0.0f};
         float rest = 0.0f, fs = 0.0f, fk = 0.0f;
-        body_ok = body_ok && scene_r32(f, &crc, &type_u);
-        body_ok = body_ok && scene_rfloat(f, &crc, &mass);
-        body_ok = body_ok && scene_rfloat(f, &crc, &radius);
-        body_ok = body_ok && scene_rfloat(f, &crc, &half_len);
-        body_ok = body_ok && scene_load_vec3(f, &crc, &half_ext);
-        body_ok = body_ok && scene_load_vec3(f, &crc, &pos);
-        body_ok = body_ok && scene_load_vec3(f, &crc, &vel);
-        body_ok = body_ok && scene_load_vec3(f, &crc, &ang);
-        body_ok = body_ok && scene_load_quat(f, &crc, &orient);
-        body_ok = body_ok && scene_load_vec3(f, &crc, &colour);
-        body_ok = body_ok && scene_rfloat(f, &crc, &rest);
-        body_ok = body_ok && scene_rfloat(f, &crc, &fs);
-        body_ok = body_ok && scene_rfloat(f, &crc, &fk);
-        body_ok = body_ok && scene_r32(f, &crc, &static_u);
-        body_ok = body_ok && scene_r32(f, &crc, &id_u);
-        body_ok = body_ok && scene_r32(f, &crc, &nice_u);
-        body_ok = body_ok && scene_r32(f, &crc, &sleep_u);
-        body_ok = body_ok && scene_rfloat(f, &crc, &sleep_timer_f);
-        body_ok = body_ok && scene_r32(f, &crc, &kin_u);
-        body_ok = body_ok && scene_r32(f, &crc, &gen_u);
+        body_ok = body_ok && scene_r32 (f, &crc, &type_u);
+        body_ok = body_ok && scene_rfloat (f, &crc, &mass);
+        body_ok = body_ok && scene_rfloat (f, &crc, &radius);
+        body_ok = body_ok && scene_rfloat (f, &crc, &half_len);
+        body_ok = body_ok && scene_load_vec3 (f, &crc, &half_ext);
+        body_ok = body_ok && scene_load_vec3 (f, &crc, &pos);
+        body_ok = body_ok && scene_load_vec3 (f, &crc, &vel);
+        body_ok = body_ok && scene_load_vec3 (f, &crc, &ang);
+        body_ok = body_ok && scene_load_quat (f, &crc, &orient);
+        body_ok = body_ok && scene_load_vec3 (f, &crc, &colour);
+        body_ok = body_ok && scene_rfloat (f, &crc, &rest);
+        body_ok = body_ok && scene_rfloat (f, &crc, &fs);
+        body_ok = body_ok && scene_rfloat (f, &crc, &fk);
+        body_ok = body_ok && scene_r32 (f, &crc, &static_u);
+        body_ok = body_ok && scene_r32 (f, &crc, &id_u);
+        body_ok = body_ok && scene_r32 (f, &crc, &nice_u);
+        body_ok = body_ok && scene_r32 (f, &crc, &sleep_u);
+        body_ok = body_ok && scene_rfloat (f, &crc, &sleep_timer_f);
+        body_ok = body_ok && scene_r32 (f, &crc, &kin_u);
+        body_ok = body_ok && scene_r32 (f, &crc, &gen_u);
         if (!body_ok) {
             break;
         }
@@ -216,9 +216,9 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
          * object_custom persists as bare type tag (no plugin blob yet):
          * accept and init as sphere placeholder so one custom body never
          * vetoes the whole file. Full blob persistence is future work. */
-        if ((type_u > (uint32_t) object_custom) || (id_u == 0) || (gen_u == 0) ||
-            (static_u > 1u) || (sleep_u > 1u) || (kin_u > 1u) || (nice_u > (uint32_t) INT_MAX) ||
-            (!isfinite(mass)) || (mass < 0.0f) || (sleep_timer_f < 0.0f)) {
+        if ((type_u > (uint32_t) object_custom) || (id_u == 0) || (gen_u == 0) || (static_u > 1u) || (sleep_u > 1u) ||
+            (kin_u > 1u) || (nice_u > (uint32_t) INT_MAX) || (!isfinite (mass)) || (mass < 0.0f) ||
+            (sleep_timer_f < 0.0f)) {
             body_ok = 0;
             break;
         }
@@ -226,21 +226,20 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
          * must veto the file, never poison the live world. Zero-quat vetoed
          * (normalisation would yield identity, hiding corruption). */
         {
-            float vals[] = {pos.x, pos.y, pos.z, vel.x, vel.y, vel.z,
-                            ang.x, ang.y, ang.z, orient.w, orient.x, orient.y, orient.z,
-                            colour.x, colour.y, colour.z, rest, fs, fk, sleep_timer_f,
-                            radius, half_len, half_ext.x, half_ext.y, half_ext.z};
+            float vals[] = {pos.x,    pos.y,      pos.z,      vel.x,     vel.y,    vel.z,         ang.x,
+                            ang.y,    ang.z,      orient.w,   orient.x,  orient.y, orient.z,      colour.x,
+                            colour.y, colour.z,   rest,       fs,        fk,       sleep_timer_f, radius,
+                            half_len, half_ext.x, half_ext.y, half_ext.z};
             bool all_fin = true;
-            for (size_t vi = 0; vi < sizeof(vals) / sizeof(vals[0]); vi++) {
-                if (!isfinite(vals[vi])) {
+            for (size_t vi = 0; vi < sizeof (vals) / sizeof (vals[0]); vi++) {
+                if (!isfinite (vals[vi])) {
                     all_fin = false;
                     break;
                 }
             }
-            double q2 = (double)orient.w * orient.w + (double)orient.x * orient.x +
-                        (double)orient.y * orient.y + (double)orient.z * orient.z;
-            if (!all_fin || !(q2 > 1e-12) || fabsf(pos.x) > 1e6f || fabsf(pos.y) > 1e6f ||
-                fabsf(pos.z) > 1e6f) {
+            double q2 = (double) orient.w * orient.w + (double) orient.x * orient.x + (double) orient.y * orient.y +
+                        (double) orient.z * orient.z;
+            if (!all_fin || !(q2 > 1e-12) || fabsf (pos.x) > 1e6f || fabsf (pos.y) > 1e6f || fabsf (pos.z) > 1e6f) {
                 body_ok = 0;
                 break;
             }
@@ -256,7 +255,7 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
         /* Duplicate-ID veto: staged file with cloned IDs would alias the
          * id_cache and mis-wire joints. */
         for (int di = 0; di < i; di++) {
-            if (staged_ids[di] == (int32_t)id_u) {
+            if (staged_ids[di] == (int32_t) id_u) {
                 body_ok = 0;
                 break;
             }
@@ -266,9 +265,9 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
         }
         object_type type = (object_type) type_u;
         if (type == object_cube) {
-            rigidbody_initialisation_cube(&staged_bodies[i], pos, half_ext, mass);
+            rigidbody_initialisation_cube (&staged_bodies[i], pos, half_ext, mass);
         } else if (type == object_cylinder) {
-            rigidbody_initialisation_cylinder(&staged_bodies[i], radius, half_len, mass, pos);
+            rigidbody_initialisation_cylinder (&staged_bodies[i], radius, half_len, mass, pos);
         } else if (type == object_custom) {
             /* FIX-AUDIT-DESPOT: v200 carries NO custom blob (no custom_shape,
              * no plugin state) — only the bare type tag + radius. There is
@@ -278,27 +277,27 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
              * below (the old code forced identity, hiding corruption).
              * Full blob persistence is future work; until then customs do
              * NOT round-trip. */
-            fprintf(stderr,
-                    "[scene] v200 custom body id %u: no plugin blob in format; "
-                    "restored as capsule placeholder (custom_shape=100, radius kept). "
-                    "Custom bodies do not round-trip.\n", id_u);
-            memset(&staged_bodies[i], 0, sizeof(staged_bodies[i]));
+            fprintf (stderr,
+                     "[scene] v200 custom body id %u: no plugin blob in format; "
+                     "restored as capsule placeholder (custom_shape=100, radius kept). "
+                     "Custom bodies do not round-trip.\n",
+                     id_u);
+            memset (&staged_bodies[i], 0, sizeof (staged_bodies[i]));
             staged_bodies[i].type = object_custom;
             staged_bodies[i].custom_shape = 100;
-            staged_bodies[i].radius = (isfinite(radius) && radius > 0.0f) ? radius : 0.5f;
+            staged_bodies[i].radius = (isfinite (radius) && radius > 0.0f) ? radius : 0.5f;
             staged_bodies[i].mass = mass;
             staged_bodies[i].inverse_mass = (mass > 0.0f) ? 1.0f / mass : 0.0f;
             staged_bodies[i].position = pos;
-            staged_bodies[i].orientation = vector4_identity();
-            staged_bodies[i].half_extensions = (vector3){staged_bodies[i].radius,
-                                                         staged_bodies[i].radius,
-                                                         staged_bodies[i].radius};
+            staged_bodies[i].orientation = vector4_identity ();
+            staged_bodies[i].half_extensions =
+                (vector3){staged_bodies[i].radius, staged_bodies[i].radius, staged_bodies[i].radius};
         } else {
-            rigidbody_initialisation_sphere(&staged_bodies[i], radius, mass, pos);
+            rigidbody_initialisation_sphere (&staged_bodies[i], radius, mass, pos);
         }
         staged_bodies[i].velocity = vel;
         staged_bodies[i].angular_velocity = ang;
-        staged_bodies[i].orientation = vector4_normalisation(orient);
+        staged_bodies[i].orientation = vector4_normalisation (orient);
         staged_bodies[i].colour = colour;
         staged_bodies[i].restitution = rest;
         staged_bodies[i].friction_static = fs;
@@ -307,20 +306,20 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
         staged_bodies[i].object_id = id_u;
         staged_bodies[i].object_generation = gen_u;
         if (static_u != 0) {
-            rigidbody_set_static(&staged_bodies[i], true);
+            rigidbody_set_static (&staged_bodies[i], true);
         } else {
-            rigidbody_set_static(&staged_bodies[i], false);
+            rigidbody_set_static (&staged_bodies[i], false);
         }
         if (kin_u != 0) {
-            rigidbody_set_kinematic(&staged_bodies[i], true);
+            rigidbody_set_kinematic (&staged_bodies[i], true);
         }
         if ((sleep_u != 0) && (!staged_bodies[i].static_state) && (!staged_bodies[i].kinematic)) {
             staged_bodies[i].is_sleeping = true;
             staged_bodies[i].sleep_timer = sleep_timer_f;
-            staged_bodies[i].velocity = vector3_zero();
-            staged_bodies[i].angular_velocity = vector3_zero();
+            staged_bodies[i].velocity = vector3_zero ();
+            staged_bodies[i].angular_velocity = vector3_zero ();
         }
-        rigidbody_sanitize(&staged_bodies[i]);
+        rigidbody_sanitize (&staged_bodies[i]);
         /* Sanitize repairs out-of-range material values but must not
          * renumber a preserved identity. */
         staged_bodies[i].object_id = id_u;
@@ -339,10 +338,10 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
     int dropped_staged = 0;
     int springs_ok = body_ok;
     if (springs_ok) {
-        springs_ok = springs_ok && scene_r32(f, &crc, &spring_count_u);
+        springs_ok = springs_ok && scene_r32 (f, &crc, &spring_count_u);
     }
     if (springs_ok && (spring_count_u > 0) && (spring_count_u <= (uint32_t) mpe_max_joints)) {
-        staged_springs = (staged_joint *) malloc((size_t) spring_count_u * sizeof(staged_joint));
+        staged_springs = (staged_joint *) malloc ((size_t) spring_count_u * sizeof (staged_joint));
         if (!staged_springs) {
             springs_ok = 0;
         }
@@ -352,17 +351,17 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
     for (uint32_t j = 0; springs_ok && (j < spring_count_u); j++) {
         uint32_t id_a = 0, id_b = 0;
         float eq = 0.0f, k = 0.0f, c = 0.0f;
-        springs_ok = springs_ok && scene_r32(f, &crc, &id_a);
-        springs_ok = springs_ok && scene_r32(f, &crc, &id_b);
-        springs_ok = springs_ok && scene_rfloat(f, &crc, &eq);
-        springs_ok = springs_ok && scene_rfloat(f, &crc, &k);
-        springs_ok = springs_ok && scene_rfloat(f, &crc, &c);
+        springs_ok = springs_ok && scene_r32 (f, &crc, &id_a);
+        springs_ok = springs_ok && scene_r32 (f, &crc, &id_b);
+        springs_ok = springs_ok && scene_rfloat (f, &crc, &eq);
+        springs_ok = springs_ok && scene_rfloat (f, &crc, &k);
+        springs_ok = springs_ok && scene_rfloat (f, &crc, &c);
         if (!springs_ok) {
             break;
         }
-        if ((id_a == 0) || (id_a == id_b) || (!scene_id_in_staged(staged_ids, staged_body_count, id_a)) ||
-            (!scene_id_in_staged(staged_ids, staged_body_count, id_b)) || (!isfinite(eq)) || (!isfinite(k)) ||
-            (!isfinite(c)) || (eq < 0.0f) || (k < 0.0f) || (c < 0.0f)) {
+        if ((id_a == 0) || (id_a == id_b) || (!scene_id_in_staged (staged_ids, staged_body_count, id_a)) ||
+            (!scene_id_in_staged (staged_ids, staged_body_count, id_b)) || (!isfinite (eq)) || (!isfinite (k)) ||
+            (!isfinite (c)) || (eq < 0.0f) || (k < 0.0f) || (c < 0.0f)) {
             dropped_staged++;
             continue;
         }
@@ -380,10 +379,10 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
     int staged_fixed_count = 0;
     int fixed_ok = springs_ok;
     if (fixed_ok) {
-        fixed_ok = fixed_ok && scene_r32(f, &crc, &fixed_count_u);
+        fixed_ok = fixed_ok && scene_r32 (f, &crc, &fixed_count_u);
     }
     if (fixed_ok && (fixed_count_u > 0) && (fixed_count_u <= (uint32_t) mpe_max_joints)) {
-        staged_fixeds = (staged_fixed *) malloc((size_t) fixed_count_u * sizeof(staged_fixed));
+        staged_fixeds = (staged_fixed *) malloc ((size_t) fixed_count_u * sizeof (staged_fixed));
         if (!staged_fixeds) {
             fixed_ok = 0;
         }
@@ -392,16 +391,16 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
     }
     for (uint32_t j = 0; fixed_ok && (j < fixed_count_u); j++) {
         staged_fixed fc;
-        fixed_ok = fixed_ok && scene_r32(f, &crc, &fc.type);
-        fixed_ok = fixed_ok && scene_r32(f, &crc, &fc.id_a);
-        fixed_ok = fixed_ok && scene_r32(f, &crc, &fc.id_b);
-        fixed_ok = fixed_ok && scene_load_vec3(f, &crc, &fc.anchor_a);
-        fixed_ok = fixed_ok && scene_load_vec3(f, &crc, &fc.anchor_b);
+        fixed_ok = fixed_ok && scene_r32 (f, &crc, &fc.type);
+        fixed_ok = fixed_ok && scene_r32 (f, &crc, &fc.id_a);
+        fixed_ok = fixed_ok && scene_r32 (f, &crc, &fc.id_b);
+        fixed_ok = fixed_ok && scene_load_vec3 (f, &crc, &fc.anchor_a);
+        fixed_ok = fixed_ok && scene_load_vec3 (f, &crc, &fc.anchor_b);
         if (!fixed_ok) break;
         if ((fc.type != (uint32_t) constraint_fixed) || (fc.id_a == 0) || (fc.id_a == fc.id_b) ||
-            (!scene_id_in_staged(staged_ids, staged_body_count, fc.id_a)) ||
-            (!scene_id_in_staged(staged_ids, staged_body_count, fc.id_b)) ||
-            (!scene_vec3_finite(fc.anchor_a)) || (!scene_vec3_finite(fc.anchor_b))) {
+            (!scene_id_in_staged (staged_ids, staged_body_count, fc.id_a)) ||
+            (!scene_id_in_staged (staged_ids, staged_body_count, fc.id_b)) || (!scene_vec3_finite (fc.anchor_a)) ||
+            (!scene_vec3_finite (fc.anchor_b))) {
             dropped_staged++;
             continue;
         }
@@ -414,10 +413,10 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
     int staged_dist_count = 0;
     int dist_ok = fixed_ok;
     if (dist_ok) {
-        dist_ok = dist_ok && scene_r32(f, &crc, &dist_count_u);
+        dist_ok = dist_ok && scene_r32 (f, &crc, &dist_count_u);
     }
     if (dist_ok && (dist_count_u > 0) && (dist_count_u <= (uint32_t) mpe_max_joints)) {
-        staged_dists = (staged_distance *) malloc((size_t) dist_count_u * sizeof(staged_distance));
+        staged_dists = (staged_distance *) malloc ((size_t) dist_count_u * sizeof (staged_distance));
         if (!staged_dists) {
             dist_ok = 0;
         }
@@ -426,18 +425,17 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
     }
     for (uint32_t j = 0; dist_ok && (j < dist_count_u); j++) {
         staged_distance dc;
-        dist_ok = dist_ok && scene_r32(f, &crc, &dc.type);
-        dist_ok = dist_ok && scene_r32(f, &crc, &dc.id_a);
-        dist_ok = dist_ok && scene_r32(f, &crc, &dc.id_b);
-        dist_ok = dist_ok && scene_load_vec3(f, &crc, &dc.anchor_a);
-        dist_ok = dist_ok && scene_load_vec3(f, &crc, &dc.anchor_b);
-        dist_ok = dist_ok && scene_rfloat(f, &crc, &dc.rest_length);
+        dist_ok = dist_ok && scene_r32 (f, &crc, &dc.type);
+        dist_ok = dist_ok && scene_r32 (f, &crc, &dc.id_a);
+        dist_ok = dist_ok && scene_r32 (f, &crc, &dc.id_b);
+        dist_ok = dist_ok && scene_load_vec3 (f, &crc, &dc.anchor_a);
+        dist_ok = dist_ok && scene_load_vec3 (f, &crc, &dc.anchor_b);
+        dist_ok = dist_ok && scene_rfloat (f, &crc, &dc.rest_length);
         if (!dist_ok) break;
         if ((dc.type != (uint32_t) constraint_distance) || (dc.id_a == 0) || (dc.id_a == dc.id_b) ||
-            (!scene_id_in_staged(staged_ids, staged_body_count, dc.id_a)) ||
-            (!scene_id_in_staged(staged_ids, staged_body_count, dc.id_b)) ||
-            (!scene_vec3_finite(dc.anchor_a)) || (!scene_vec3_finite(dc.anchor_b)) ||
-            (!isfinite(dc.rest_length)) || (dc.rest_length < 0.0f)) {
+            (!scene_id_in_staged (staged_ids, staged_body_count, dc.id_a)) ||
+            (!scene_id_in_staged (staged_ids, staged_body_count, dc.id_b)) || (!scene_vec3_finite (dc.anchor_a)) ||
+            (!scene_vec3_finite (dc.anchor_b)) || (!isfinite (dc.rest_length)) || (dc.rest_length < 0.0f)) {
             dropped_staged++;
             continue;
         }
@@ -450,10 +448,10 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
     int staged_prism_count = 0;
     int prism_ok = dist_ok;
     if (prism_ok) {
-        prism_ok = prism_ok && scene_r32(f, &crc, &prism_count_u);
+        prism_ok = prism_ok && scene_r32 (f, &crc, &prism_count_u);
     }
     if (prism_ok && (prism_count_u > 0) && (prism_count_u <= (uint32_t) mpe_max_joints)) {
-        staged_prisms = (staged_prismatic *) malloc((size_t) prism_count_u * sizeof(staged_prismatic));
+        staged_prisms = (staged_prismatic *) malloc ((size_t) prism_count_u * sizeof (staged_prismatic));
         if (!staged_prisms) {
             prism_ok = 0;
         }
@@ -463,30 +461,29 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
     for (uint32_t j = 0; prism_ok && (j < prism_count_u); j++) {
         staged_prismatic pc;
         uint32_t motor_u = 0, limits_u = 0;
-        prism_ok = prism_ok && scene_r32(f, &crc, &pc.type);
-        prism_ok = prism_ok && scene_r32(f, &crc, &pc.id_a);
-        prism_ok = prism_ok && scene_r32(f, &crc, &pc.id_b);
-        prism_ok = prism_ok && scene_load_vec3(f, &crc, &pc.anchor_a);
-        prism_ok = prism_ok && scene_load_vec3(f, &crc, &pc.anchor_b);
-        prism_ok = prism_ok && scene_load_vec3(f, &crc, &pc.axis_a);
-        prism_ok = prism_ok && scene_load_vec3(f, &crc, &pc.axis_b);
-        prism_ok = prism_ok && scene_r32(f, &crc, &motor_u);
-        prism_ok = prism_ok && scene_rfloat(f, &crc, &pc.motor_target_speed);
-        prism_ok = prism_ok && scene_rfloat(f, &crc, &pc.motor_max_force);
-        prism_ok = prism_ok && scene_r32(f, &crc, &limits_u);
-        prism_ok = prism_ok && scene_rfloat(f, &crc, &pc.limit_min);
-        prism_ok = prism_ok && scene_rfloat(f, &crc, &pc.limit_max);
+        prism_ok = prism_ok && scene_r32 (f, &crc, &pc.type);
+        prism_ok = prism_ok && scene_r32 (f, &crc, &pc.id_a);
+        prism_ok = prism_ok && scene_r32 (f, &crc, &pc.id_b);
+        prism_ok = prism_ok && scene_load_vec3 (f, &crc, &pc.anchor_a);
+        prism_ok = prism_ok && scene_load_vec3 (f, &crc, &pc.anchor_b);
+        prism_ok = prism_ok && scene_load_vec3 (f, &crc, &pc.axis_a);
+        prism_ok = prism_ok && scene_load_vec3 (f, &crc, &pc.axis_b);
+        prism_ok = prism_ok && scene_r32 (f, &crc, &motor_u);
+        prism_ok = prism_ok && scene_rfloat (f, &crc, &pc.motor_target_speed);
+        prism_ok = prism_ok && scene_rfloat (f, &crc, &pc.motor_max_force);
+        prism_ok = prism_ok && scene_r32 (f, &crc, &limits_u);
+        prism_ok = prism_ok && scene_rfloat (f, &crc, &pc.limit_min);
+        prism_ok = prism_ok && scene_rfloat (f, &crc, &pc.limit_max);
         if (!prism_ok) break;
         pc.motor_enabled = motor_u;
         pc.limits_enabled = limits_u;
         if ((pc.type != (uint32_t) constraint_prismatic) || (pc.id_a == 0) || (pc.id_a == pc.id_b) ||
-            (!scene_id_in_staged(staged_ids, staged_body_count, pc.id_a)) ||
-            (!scene_id_in_staged(staged_ids, staged_body_count, pc.id_b)) ||
-            (!scene_vec3_finite(pc.anchor_a)) || (!scene_vec3_finite(pc.anchor_b)) ||
-            (!scene_vec3_finite(pc.axis_a)) || (!scene_vec3_finite(pc.axis_b)) ||
-            (!scene_vec3_axis_valid(pc.axis_a)) ||
-            (!isfinite(pc.motor_target_speed)) || (!isfinite(pc.motor_max_force)) || (pc.motor_max_force < 0.0f) ||
-            (!isfinite(pc.limit_min)) || (!isfinite(pc.limit_max)) ||
+            (!scene_id_in_staged (staged_ids, staged_body_count, pc.id_a)) ||
+            (!scene_id_in_staged (staged_ids, staged_body_count, pc.id_b)) || (!scene_vec3_finite (pc.anchor_a)) ||
+            (!scene_vec3_finite (pc.anchor_b)) || (!scene_vec3_finite (pc.axis_a)) ||
+            (!scene_vec3_finite (pc.axis_b)) || (!scene_vec3_axis_valid (pc.axis_a)) ||
+            (!isfinite (pc.motor_target_speed)) || (!isfinite (pc.motor_max_force)) || (pc.motor_max_force < 0.0f) ||
+            (!isfinite (pc.limit_min)) || (!isfinite (pc.limit_max)) ||
             (pc.limits_enabled && pc.limit_min > pc.limit_max)) {
             dropped_staged++;
             continue;
@@ -500,10 +497,10 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
     int staged_rope_count = 0;
     int rope_ok = prism_ok;
     if (rope_ok) {
-        rope_ok = rope_ok && scene_r32(f, &crc, &rope_count_u);
+        rope_ok = rope_ok && scene_r32 (f, &crc, &rope_count_u);
     }
     if (rope_ok && (rope_count_u > 0) && (rope_count_u <= (uint32_t) mpe_max_joints)) {
-        staged_ropes = (staged_rope *) malloc((size_t) rope_count_u * sizeof(staged_rope));
+        staged_ropes = (staged_rope *) malloc ((size_t) rope_count_u * sizeof (staged_rope));
         if (!staged_ropes) {
             rope_ok = 0;
         }
@@ -512,18 +509,17 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
     }
     for (uint32_t j = 0; rope_ok && (j < rope_count_u); j++) {
         staged_rope rc;
-        rope_ok = rope_ok && scene_r32(f, &crc, &rc.type);
-        rope_ok = rope_ok && scene_r32(f, &crc, &rc.id_a);
-        rope_ok = rope_ok && scene_r32(f, &crc, &rc.id_b);
-        rope_ok = rope_ok && scene_load_vec3(f, &crc, &rc.anchor_a);
-        rope_ok = rope_ok && scene_load_vec3(f, &crc, &rc.anchor_b);
-        rope_ok = rope_ok && scene_rfloat(f, &crc, &rc.rest_length);
+        rope_ok = rope_ok && scene_r32 (f, &crc, &rc.type);
+        rope_ok = rope_ok && scene_r32 (f, &crc, &rc.id_a);
+        rope_ok = rope_ok && scene_r32 (f, &crc, &rc.id_b);
+        rope_ok = rope_ok && scene_load_vec3 (f, &crc, &rc.anchor_a);
+        rope_ok = rope_ok && scene_load_vec3 (f, &crc, &rc.anchor_b);
+        rope_ok = rope_ok && scene_rfloat (f, &crc, &rc.rest_length);
         if (!rope_ok) break;
         if ((rc.type != (uint32_t) constraint_rope) || (rc.id_a == 0) || (rc.id_a == rc.id_b) ||
-            (!scene_id_in_staged(staged_ids, staged_body_count, rc.id_a)) ||
-            (!scene_id_in_staged(staged_ids, staged_body_count, rc.id_b)) ||
-            (!scene_vec3_finite(rc.anchor_a)) || (!scene_vec3_finite(rc.anchor_b)) ||
-            (!isfinite(rc.rest_length)) || (rc.rest_length < 0.0f)) {
+            (!scene_id_in_staged (staged_ids, staged_body_count, rc.id_a)) ||
+            (!scene_id_in_staged (staged_ids, staged_body_count, rc.id_b)) || (!scene_vec3_finite (rc.anchor_a)) ||
+            (!scene_vec3_finite (rc.anchor_b)) || (!isfinite (rc.rest_length)) || (rc.rest_length < 0.0f)) {
             dropped_staged++;
             continue;
         }
@@ -536,10 +532,10 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
     int staged_rev_count = 0;
     int revs_ok = rope_ok;
     if (revs_ok) {
-        revs_ok = revs_ok && scene_r32(f, &crc, &rev_count_u);
+        revs_ok = revs_ok && scene_r32 (f, &crc, &rev_count_u);
     }
     if (revs_ok && (rev_count_u > 0) && (rev_count_u <= (uint32_t) mpe_max_joints)) {
-        staged_revs = (staged_revolute *) malloc((size_t) rev_count_u * sizeof(staged_revolute));
+        staged_revs = (staged_revolute *) malloc ((size_t) rev_count_u * sizeof (staged_revolute));
         if (!staged_revs) {
             revs_ok = 0;
         }
@@ -549,32 +545,30 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
     for (uint32_t j = 0; revs_ok && (j < rev_count_u); j++) {
         staged_revolute r;
         uint32_t motor_u = 0, limits_u = 0;
-        revs_ok = revs_ok && scene_r32(f, &crc, &r.type);
-        revs_ok = revs_ok && scene_r32(f, &crc, &r.id_a);
-        revs_ok = revs_ok && scene_r32(f, &crc, &r.id_b);
-        revs_ok = revs_ok && scene_load_vec3(f, &crc, &r.anchor_a);
-        revs_ok = revs_ok && scene_load_vec3(f, &crc, &r.anchor_b);
-        revs_ok = revs_ok && scene_load_vec3(f, &crc, &r.axis_a);
-        revs_ok = revs_ok && scene_load_vec3(f, &crc, &r.axis_b);
-        revs_ok = revs_ok && scene_r32(f, &crc, &motor_u);
-        revs_ok = revs_ok && scene_rfloat(f, &crc, &r.motor_target);
-        revs_ok = revs_ok && scene_rfloat(f, &crc, &r.motor_max_torque);
-        revs_ok = revs_ok && scene_r32(f, &crc, &limits_u);
-        revs_ok = revs_ok && scene_rfloat(f, &crc, &r.limit_min);
-        revs_ok = revs_ok && scene_rfloat(f, &crc, &r.limit_max);
+        revs_ok = revs_ok && scene_r32 (f, &crc, &r.type);
+        revs_ok = revs_ok && scene_r32 (f, &crc, &r.id_a);
+        revs_ok = revs_ok && scene_r32 (f, &crc, &r.id_b);
+        revs_ok = revs_ok && scene_load_vec3 (f, &crc, &r.anchor_a);
+        revs_ok = revs_ok && scene_load_vec3 (f, &crc, &r.anchor_b);
+        revs_ok = revs_ok && scene_load_vec3 (f, &crc, &r.axis_a);
+        revs_ok = revs_ok && scene_load_vec3 (f, &crc, &r.axis_b);
+        revs_ok = revs_ok && scene_r32 (f, &crc, &motor_u);
+        revs_ok = revs_ok && scene_rfloat (f, &crc, &r.motor_target);
+        revs_ok = revs_ok && scene_rfloat (f, &crc, &r.motor_max_torque);
+        revs_ok = revs_ok && scene_r32 (f, &crc, &limits_u);
+        revs_ok = revs_ok && scene_rfloat (f, &crc, &r.limit_min);
+        revs_ok = revs_ok && scene_rfloat (f, &crc, &r.limit_max);
         if (!revs_ok) {
             break;
         }
         r.motor_enabled = motor_u;
         r.limits_enabled = limits_u;
         if ((r.type != (uint32_t) constraint_revolute) || (r.id_a == 0) || (r.id_a == r.id_b) ||
-            (!scene_id_in_staged(staged_ids, staged_body_count, r.id_a)) ||
-            (!scene_id_in_staged(staged_ids, staged_body_count, r.id_b)) ||
-            (!scene_vec3_finite(r.anchor_a)) || (!scene_vec3_finite(r.anchor_b)) ||
-            (!scene_vec3_finite(r.axis_a)) || (!scene_vec3_finite(r.axis_b)) ||
-            (!scene_vec3_axis_valid(r.axis_a)) ||
-            (!isfinite(r.motor_target)) || (!isfinite(r.motor_max_torque)) || (r.motor_max_torque < 0.0f) ||
-            (!isfinite(r.limit_min)) || (!isfinite(r.limit_max)) ||
+            (!scene_id_in_staged (staged_ids, staged_body_count, r.id_a)) ||
+            (!scene_id_in_staged (staged_ids, staged_body_count, r.id_b)) || (!scene_vec3_finite (r.anchor_a)) ||
+            (!scene_vec3_finite (r.anchor_b)) || (!scene_vec3_finite (r.axis_a)) || (!scene_vec3_finite (r.axis_b)) ||
+            (!scene_vec3_axis_valid (r.axis_a)) || (!isfinite (r.motor_target)) || (!isfinite (r.motor_max_torque)) ||
+            (r.motor_max_torque < 0.0f) || (!isfinite (r.limit_min)) || (!isfinite (r.limit_max)) ||
             (r.limits_enabled && r.limit_min > r.limit_max)) {
             dropped_staged++;
             continue;
@@ -586,32 +580,33 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
     int crc_ok = revs_ok;
     unsigned char footer[4] = {0, 0, 0, 0};
     if (crc_ok) {
-        crc_ok = (fread(footer, 1, 4, f) == 4);
+        crc_ok = (fread (footer, 1, 4, f) == 4);
     }
     if (crc_ok) {
-        uint32_t stored = ((uint32_t) footer[0]) | (((uint32_t) footer[1]) << 8) |
-                          (((uint32_t) footer[2]) << 16) | (((uint32_t) footer[3]) << 24);
+        uint32_t stored = ((uint32_t) footer[0]) | (((uint32_t) footer[1]) << 8) | (((uint32_t) footer[2]) << 16) |
+                          (((uint32_t) footer[3]) << 24);
         crc_ok = (stored == (crc ^ 0xFFFFFFFFu));
     }
     if (crc_ok) {
         /* v200 has no extension area: reject concatenated records and other
          * trailing bytes instead of accepting an ambiguous scene. */
-        crc_ok = (fgetc(f) == EOF) && !ferror(f);
+        crc_ok = (fgetc (f) == EOF) && !ferror (f);
     }
     if (crc_ok && ((uint64_t) fixed_count_u + (uint64_t) dist_count_u + (uint64_t) prism_count_u +
-                   (uint64_t) rope_count_u + (uint64_t) rev_count_u > (uint64_t) mpe_max_joints)) {
+                       (uint64_t) rope_count_u + (uint64_t) rev_count_u >
+                   (uint64_t) mpe_max_joints)) {
         crc_ok = 0;
     }
     if (!crc_ok) {
-        fprintf(stderr, "Error LDF04: invalid CRC, trailing data, or corrupt scene file\n");
-        free(staged_bodies);
-        free(staged_ids);
-        free(staged_springs);
-        free(staged_revs);
-        free(staged_fixeds);
-        free(staged_dists);
-        free(staged_prisms);
-        free(staged_ropes);
+        fprintf (stderr, "Error LDF04: invalid CRC, trailing data, or corrupt scene file\n");
+        free (staged_bodies);
+        free (staged_ids);
+        free (staged_springs);
+        free (staged_revs);
+        free (staged_fixeds);
+        free (staged_dists);
+        free (staged_prisms);
+        free (staged_ropes);
         return 0;
     }
 
@@ -619,125 +614,121 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
      * parsing, structural validation, CRC, and EOF checks. A rejected file
      * must not invalidate existing body pointers via realloc. */
     if (dropped_staged > 0) {
-        fprintf(stderr, "[scene] v200 load: dropped %d dangling/invalid staged joint entries\n",
-                dropped_staged);
+        fprintf (stderr, "[scene] v200 load: dropped %d dangling/invalid staged joint entries\n", dropped_staged);
     }
-    physics_world *primary = physics_world_get_primary();
-    if ((!primary) || (!scene_ensure_pool_capacity(count)) || (count > primary->body_capacity)) {
-        free(staged_bodies);
-        free(staged_ids);
-        free(staged_springs);
-        free(staged_revs);
-        free(staged_fixeds);
-        free(staged_dists);
-        free(staged_prisms);
-        free(staged_ropes);
+    physics_world *primary = physics_world_get_primary ();
+    if ((!primary) || (!scene_ensure_pool_capacity (count)) || (count > primary->body_capacity)) {
+        free (staged_bodies);
+        free (staged_ids);
+        free (staged_springs);
+        free (staged_revs);
+        free (staged_fixeds);
+        free (staged_dists);
+        free (staged_prisms);
+        free (staged_ropes);
         return 0;
     }
 
     /* --- Commit: clear scene AND joint pools, install staged data --- */
-    scene_clear();
-    constraint_pool_init(physics_world_get_primary());
-    scene_id_remap_reset();
-    contact_cache_clear(physics_world_get_primary());
-    joint_init_pool(physics_world_get_primary());
+    scene_clear ();
+    constraint_pool_init (physics_world_get_primary ());
+    scene_id_remap_reset ();
+    contact_cache_clear (physics_world_get_primary ());
+    joint_init_pool (physics_world_get_primary ());
 
-    (physics_world_get_primary()->body_count) = staged_body_count;
+    (physics_world_get_primary ()->body_count) = staged_body_count;
     for (int i = 0; i < staged_body_count; i++) {
         int staged_cs = staged_bodies[i].custom_shape;
-        (physics_world_get_primary()->bodies)[i] = staged_bodies[i];
-        (physics_world_get_primary()->bodies)[i].body_index = i;
+        (physics_world_get_primary ()->bodies)[i] = staged_bodies[i];
+        (physics_world_get_primary ()->bodies)[i].body_index = i;
         /* Preserve foreign custom identity (staged); non-custom bodies
          * keep custom_shape=-1. Clobbering customs to -1 broke dispatch
          * (100/-1 mismatch rejects the capsule handler). */
-        if ((physics_world_get_primary()->bodies)[i].type == object_custom) {
+        if ((physics_world_get_primary ()->bodies)[i].type == object_custom) {
             if (staged_cs < 100) {
                 staged_cs = 100;
             }
-            (physics_world_get_primary()->bodies)[i].custom_shape = staged_cs;
+            (physics_world_get_primary ()->bodies)[i].custom_shape = staged_cs;
         } else {
-            (physics_world_get_primary()->bodies)[i].custom_shape = -1;
+            (physics_world_get_primary ()->bodies)[i].custom_shape = -1;
         }
-        (physics_world_get_primary()->bodies)[i].max_relative_speed_sq = 0.0f;
-        rigidbody_update_axes(&(physics_world_get_primary()->bodies)[i]);
-        scene_note_loaded_id((physics_world_get_primary()->bodies)[i].object_id);
+        (physics_world_get_primary ()->bodies)[i].max_relative_speed_sq = 0.0f;
+        rigidbody_update_axes (&(physics_world_get_primary ()->bodies)[i]);
+        scene_note_loaded_id ((physics_world_get_primary ()->bodies)[i].object_id);
     }
-    physics_world_bump_revision(physics_world_get_primary());
+    physics_world_bump_revision (physics_world_get_primary ());
     for (int j = 0; j < staged_spring_count; j++) {
-        add_joint_by_ids(physics_world_get_primary(), staged_springs[j].id_a, staged_springs[j].id_b, staged_springs[j].eq, staged_springs[j].k,
-                         staged_springs[j].c);
+        add_joint_by_ids (physics_world_get_primary (), staged_springs[j].id_a, staged_springs[j].id_b,
+                          staged_springs[j].eq, staged_springs[j].k, staged_springs[j].c);
     }
     for (int j = 0; j < staged_rev_count; j++) {
         staged_revolute *r = &staged_revs[j];
-        int index = constraint_add_revolute(physics_world_get_primary(), r->id_a, r->id_b, r->anchor_a, r->anchor_b, r->axis_a);
+        int index = constraint_add_revolute (physics_world_get_primary (), r->id_a, r->id_b, r->anchor_a, r->anchor_b,
+                                             r->axis_a);
         if (index >= 0) {
-            constraint_set_revolute_axes(physics_world_get_primary(), index, r->axis_a, r->axis_b);
-            constraint_set_revolute_motor(physics_world_get_primary(), index, r->motor_enabled != 0, r->motor_target, r->motor_max_torque);
-            constraint_set_revolute_limits(physics_world_get_primary(), index, r->limits_enabled != 0, r->limit_min, r->limit_max);
+            constraint_set_revolute_axes (physics_world_get_primary (), index, r->axis_a, r->axis_b);
+            constraint_set_revolute_motor (physics_world_get_primary (), index, r->motor_enabled != 0, r->motor_target,
+                                           r->motor_max_torque);
+            constraint_set_revolute_limits (physics_world_get_primary (), index, r->limits_enabled != 0, r->limit_min,
+                                            r->limit_max);
         }
     }
 
     /* Install fixed constraints. */
     for (int j = 0; j < staged_fixed_count; j++) {
         staged_fixed *fc = &staged_fixeds[j];
-        constraint_add_fixed(physics_world_get_primary(),
-            scene_id_remap_resolve(fc->id_a),
-            scene_id_remap_resolve(fc->id_b),
-            fc->anchor_a, fc->anchor_b);
+        constraint_add_fixed (physics_world_get_primary (), scene_id_remap_resolve (fc->id_a),
+                              scene_id_remap_resolve (fc->id_b), fc->anchor_a, fc->anchor_b);
     }
 
     /* Install distance constraints. */
     for (int j = 0; j < staged_dist_count; j++) {
         staged_distance *dc = &staged_dists[j];
-        constraint_add_distance(physics_world_get_primary(),
-            scene_id_remap_resolve(dc->id_a),
-            scene_id_remap_resolve(dc->id_b),
-            dc->anchor_a, dc->anchor_b, dc->rest_length);
+        constraint_add_distance (physics_world_get_primary (), scene_id_remap_resolve (dc->id_a),
+                                 scene_id_remap_resolve (dc->id_b), dc->anchor_a, dc->anchor_b, dc->rest_length);
     }
 
     /* Install prismatic constraints. */
     for (int j = 0; j < staged_prism_count; j++) {
         staged_prismatic *pc = &staged_prisms[j];
-        int index = constraint_add_prismatic(physics_world_get_primary(),
-            scene_id_remap_resolve(pc->id_a),
-            scene_id_remap_resolve(pc->id_b),
-            pc->anchor_a, pc->anchor_b, pc->axis_a);
+        int index =
+            constraint_add_prismatic (physics_world_get_primary (), scene_id_remap_resolve (pc->id_a),
+                                      scene_id_remap_resolve (pc->id_b), pc->anchor_a, pc->anchor_b, pc->axis_a);
         if (index >= 0) {
-            constraint_set_prismatic_axes(physics_world_get_primary(), index, pc->axis_a, pc->axis_b);
-            constraint_set_prismatic_motor(physics_world_get_primary(), index, pc->motor_enabled != 0, pc->motor_target_speed, pc->motor_max_force);
-            constraint_set_prismatic_limits(physics_world_get_primary(), index, pc->limits_enabled != 0, pc->limit_min, pc->limit_max);
+            constraint_set_prismatic_axes (physics_world_get_primary (), index, pc->axis_a, pc->axis_b);
+            constraint_set_prismatic_motor (physics_world_get_primary (), index, pc->motor_enabled != 0,
+                                            pc->motor_target_speed, pc->motor_max_force);
+            constraint_set_prismatic_limits (physics_world_get_primary (), index, pc->limits_enabled != 0,
+                                             pc->limit_min, pc->limit_max);
         }
     }
 
     /* Install rope constraints. */
     for (int j = 0; j < staged_rope_count; j++) {
         staged_rope *rc = &staged_ropes[j];
-        constraint_add_rope(physics_world_get_primary(),
-            scene_id_remap_resolve(rc->id_a),
-            scene_id_remap_resolve(rc->id_b),
-            rc->anchor_a, rc->anchor_b, rc->rest_length);
+        constraint_add_rope (physics_world_get_primary (), scene_id_remap_resolve (rc->id_a),
+                             scene_id_remap_resolve (rc->id_b), rc->anchor_a, rc->anchor_b, rc->rest_length);
     }
 
-    free(staged_bodies);
-    free(staged_ids);
-    free(staged_springs);
-    free(staged_revs);
-    free(staged_fixeds);
-    free(staged_dists);
-    free(staged_prisms);
-    free(staged_ropes);
+    free (staged_bodies);
+    free (staged_ids);
+    free (staged_springs);
+    free (staged_revs);
+    free (staged_fixeds);
+    free (staged_dists);
+    free (staged_prisms);
+    free (staged_ropes);
     return 1;
 }
 
-int scene_loading(const char *file_source_path)
-{
+int scene_loading (const char *file_source_path) {
     if (!file_source_path) {
-        fprintf(stderr, "Error LDF01: NULL path\n");
+        fprintf (stderr, "Error LDF01: NULL path\n");
         return 0;
     }
-    FILE *f = fopen(file_source_path, "rb");
+    FILE *f = fopen (file_source_path, "rb");
     if (!f) {
-        fprintf(stderr, "Error LDF01: Could not open %s\n", file_source_path);
+        fprintf (stderr, "Error LDF01: Could not open %s\n", file_source_path);
         return 0;
     }
 
@@ -752,35 +743,35 @@ int scene_loading(const char *file_source_path)
      * the v200 reader. (Legacy versions have no checksum.) */
     uint32_t header_crc = 0xFFFFFFFFu;
     uint32_t magic_le = 0, version_le = 0;
-    if ((!scene_r32(f, &header_crc, &magic_le)) || (magic_le != (uint32_t) mpe_magic)) {
-        fprintf(stderr, "Error LDF02: Invalid magic number\n");
-        fclose(f);
+    if ((!scene_r32 (f, &header_crc, &magic_le)) || (magic_le != (uint32_t) mpe_magic)) {
+        fprintf (stderr, "Error LDF02: Invalid magic number\n");
+        fclose (f);
         return 0;
     }
-    if (!scene_r32(f, &header_crc, &version_le)) {
-        fprintf(stderr, "Error LDF03: Version mismatch\n");
-        fclose(f);
+    if (!scene_r32 (f, &header_crc, &version_le)) {
+        fprintf (stderr, "Error LDF03: Version mismatch\n");
+        fclose (f);
         return 0;
     }
     int32_t version = (int32_t) version_le;
     int32_t count = 0;
 
     if (version == 200) {
-        int v200_result = scene_loading_v200(f, header_crc);
-        fclose(f);
+        int v200_result = scene_loading_v200 (f, header_crc);
+        fclose (f);
         return v200_result;
     }
 
     /* Legacy native-order reader (v130..v153). */
     if ((version != 130) && (version != 140) && (version != 150) && (version != 151) && (version != 152) &&
         (version != 153)) {
-        fprintf(stderr, "Error LDF03: Version mismatch\n");
-        fclose(f);
+        fprintf (stderr, "Error LDF03: Version mismatch\n");
+        fclose (f);
         return 0;
     }
 
-    if ((!read_int(f, &count)) || (count < 0)) {
-        fclose(f);
+    if ((!read_int (f, &count)) || (count < 0)) {
+        fclose (f);
         return 0;
     }
 
@@ -788,8 +779,8 @@ int scene_loading(const char *file_source_path)
         /* Empty legacy scene is valid: clear and succeed (v200 already
          * handles count==0; legacy malloc(0) could return NULL and
          * misreport OOM). */
-        scene_clear();
-        fclose(f);
+        scene_clear ();
+        fclose (f);
         return 1;
     }
 
@@ -799,9 +790,8 @@ int scene_loading(const char *file_source_path)
      * claims more than mpe_max_bodies is corrupt or hostile: reject it and
      * leave the live scene untouched. */
     if (count > mpe_max_bodies) {
-        fprintf(stderr, "Error LDF05: body count %d exceeds maximum %d; vetoing load\n",
-                count, mpe_max_bodies);
-        fclose(f);
+        fprintf (stderr, "Error LDF05: body count %d exceeds maximum %d; vetoing load\n", count, mpe_max_bodies);
+        fclose (f);
         return 0;
     }
 
@@ -811,9 +801,9 @@ int scene_loading(const char *file_source_path)
      * validated, invalidating every live body pointer on a corrupt file.
      * Pool growth happens once, after validation, at commit time below. */
     /* --- Allocate staging buffers --- */
-    rigidbody *staged_bodies = (rigidbody *)malloc((size_t)count * sizeof(rigidbody));
+    rigidbody *staged_bodies = (rigidbody *) malloc ((size_t) count * sizeof (rigidbody));
     if (!staged_bodies) {
-        fclose(f);
+        fclose (f);
         return 0;
     }
 
@@ -826,13 +816,14 @@ int scene_loading(const char *file_source_path)
      * was abused as a temp holder, which destroyed the persisted value. */
     int32_t *staged_ids = NULL;
     if (count > 0) {
-        staged_ids = (int32_t *)malloc((size_t)count * sizeof(int32_t));
+        staged_ids = (int32_t *) malloc ((size_t) count * sizeof (int32_t));
         if (!staged_ids) {
-            free(staged_bodies);
-            fclose(f);
+            free (staged_bodies);
+            fclose (f);
             return 0;
         }
-        for (int i = 0; i < count; i++) staged_ids[i] = 0;
+        for (int i = 0; i < count; i++)
+            staged_ids[i] = 0;
     }
 
     /* --- Stage all bodies --- */
@@ -848,40 +839,40 @@ int scene_loading(const char *file_source_path)
          * angular velocity, orientation, colour, restitution,
          * friction x2, static flag, object id (v150+),
          * nice_value + sleep state (v152+). */
-        if (!read_int(f, &type_int))               break;
-        if (!read_float(f, &temp.mass))            break;
-        if (!read_float(f, &temp.radius))          break;
+        if (!read_int (f, &type_int)) break;
+        if (!read_float (f, &temp.mass)) break;
+        if (!read_float (f, &temp.radius)) break;
         /* R3-04: Read cylinder_half_length. Present in version >= 151.
          * For older versions, default to radius/2. */
         if (version >= 151) {
-            if (!read_float(f, &temp.cylinder_half_length)) break;
+            if (!read_float (f, &temp.cylinder_half_length)) break;
         } else {
             temp.cylinder_half_length = temp.radius * 0.5f;
         }
-        if (!read_vec3(f, &temp.half_extensions))  break;
-        if (!read_vec3(f, &temp.position))         break;
-        if (!read_vec3(f, &temp.velocity))         break;
-        if (!read_vec3(f, &temp.angular_velocity)) break;
-        if (!read_vec4(f, &temp.orientation))      break;
-        if (!read_vec3(f, &temp.colour))           break;
-        if (!read_float(f, &temp.restitution))     break;
-        if (!read_float(f, &temp.friction_static)) break;
-        if (!read_float(f, &temp.friction_kinetic)) break;
-        if (!read_int(f, &static_int))             break;
+        if (!read_vec3 (f, &temp.half_extensions)) break;
+        if (!read_vec3 (f, &temp.position)) break;
+        if (!read_vec3 (f, &temp.velocity)) break;
+        if (!read_vec3 (f, &temp.angular_velocity)) break;
+        if (!read_vec4 (f, &temp.orientation)) break;
+        if (!read_vec3 (f, &temp.colour)) break;
+        if (!read_float (f, &temp.restitution)) break;
+        if (!read_float (f, &temp.friction_static)) break;
+        if (!read_float (f, &temp.friction_kinetic)) break;
+        if (!read_int (f, &static_int)) break;
 
         saved_object_id = 0;
         if (version >= 150) {
-            if (!read_int(f, &saved_object_id)) break;
+            if (!read_int (f, &saved_object_id)) break;
         }
         if (version >= 152) {
-            if (!read_int(f, &saved_nice)) break;
-            if (!read_int(f, &saved_sleep)) break;
+            if (!read_int (f, &saved_nice)) break;
+            if (!read_int (f, &saved_sleep)) break;
         }
         if (version >= 153) {
-            if (!read_int(f, &saved_kinematic)) break;
+            if (!read_int (f, &saved_kinematic)) break;
         }
 
-        temp.type = (object_type)type_int;
+        temp.type = (object_type) type_int;
         temp.static_state = (static_int != 0);
 
         /* DESPOT-2026-10-04: the legacy reader had NO finite/range
@@ -891,65 +882,79 @@ int scene_loading(const char *file_source_path)
          * quats straight into the live world. Mirror the v200 vetoes here:
          * fail-closed, scene untouched. */
         {
-            float ldf_vals[] = {temp.mass, temp.radius, temp.cylinder_half_length,
-                                temp.half_extensions.x, temp.half_extensions.y, temp.half_extensions.z,
-                                temp.position.x, temp.position.y, temp.position.z,
-                                temp.velocity.x, temp.velocity.y, temp.velocity.z,
-                                temp.angular_velocity.x, temp.angular_velocity.y, temp.angular_velocity.z,
-                                temp.orientation.w, temp.orientation.x, temp.orientation.y,
-                                temp.orientation.z, temp.colour.x, temp.colour.y, temp.colour.z,
-                                temp.restitution, temp.friction_static, temp.friction_kinetic};
+            float ldf_vals[] = {temp.mass,
+                                temp.radius,
+                                temp.cylinder_half_length,
+                                temp.half_extensions.x,
+                                temp.half_extensions.y,
+                                temp.half_extensions.z,
+                                temp.position.x,
+                                temp.position.y,
+                                temp.position.z,
+                                temp.velocity.x,
+                                temp.velocity.y,
+                                temp.velocity.z,
+                                temp.angular_velocity.x,
+                                temp.angular_velocity.y,
+                                temp.angular_velocity.z,
+                                temp.orientation.w,
+                                temp.orientation.x,
+                                temp.orientation.y,
+                                temp.orientation.z,
+                                temp.colour.x,
+                                temp.colour.y,
+                                temp.colour.z,
+                                temp.restitution,
+                                temp.friction_static,
+                                temp.friction_kinetic};
             bool ldf_fin = true;
-            for (size_t ldf_vi = 0; ldf_vi < sizeof(ldf_vals) / sizeof(ldf_vals[0]); ldf_vi++) {
-                if (!isfinite(ldf_vals[ldf_vi])) {
+            for (size_t ldf_vi = 0; ldf_vi < sizeof (ldf_vals) / sizeof (ldf_vals[0]); ldf_vi++) {
+                if (!isfinite (ldf_vals[ldf_vi])) {
                     ldf_fin = false;
                     break;
                 }
             }
-            double ldf_q2 = (double) temp.orientation.w * temp.orientation.w +
-                            (double) temp.orientation.x * temp.orientation.x +
-                            (double) temp.orientation.y * temp.orientation.y +
-                            (double) temp.orientation.z * temp.orientation.z;
+            double ldf_q2 =
+                (double) temp.orientation.w * temp.orientation.w + (double) temp.orientation.x * temp.orientation.x +
+                (double) temp.orientation.y * temp.orientation.y + (double) temp.orientation.z * temp.orientation.z;
             if (!ldf_fin || (type_int < (int32_t) object_sphere) || (type_int > (int32_t) object_custom) ||
-                !(ldf_q2 > 1e-12) || fabsf(temp.position.x) > 1e6f || fabsf(temp.position.y) > 1e6f ||
-                fabsf(temp.position.z) > 1e6f || !(temp.mass >= 0.0f)) {
-                fprintf(stderr, "Error LDF: legacy body %d failed validation (non-finite/bad type/degenerate)\n", i);
-                free(staged_bodies);
+                !(ldf_q2 > 1e-12) || fabsf (temp.position.x) > 1e6f || fabsf (temp.position.y) > 1e6f ||
+                fabsf (temp.position.z) > 1e6f || !(temp.mass >= 0.0f)) {
+                fprintf (stderr, "Error LDF: legacy body %d failed validation (non-finite/bad type/degenerate)\n", i);
+                free (staged_bodies);
                 if (staged_ids) {
-                    free(staged_ids);
+                    free (staged_ids);
                 }
-                fclose(f);
+                fclose (f);
                 return 0;
             }
         }
 
         /* Initialise the staged body */
         if (temp.type == object_cube) {
-            rigidbody_initialisation_cube(&staged_bodies[i],
-                temp.position, temp.half_extensions, temp.mass);
+            rigidbody_initialisation_cube (&staged_bodies[i], temp.position, temp.half_extensions, temp.mass);
         } else if (temp.type == object_cylinder) {
             /* R3-04: Cylinder branch. Previously cylinders were silently
              * re-initialised as spheres, corrupting their geometry. */
-            rigidbody_initialisation_cylinder(&staged_bodies[i],
-                temp.radius, temp.cylinder_half_length, temp.mass, temp.position);
+            rigidbody_initialisation_cylinder (&staged_bodies[i], temp.radius, temp.cylinder_half_length, temp.mass,
+                                               temp.position);
         } else {
-            rigidbody_initialisation_sphere(&staged_bodies[i],
-                temp.radius, temp.mass, temp.position);
+            rigidbody_initialisation_sphere (&staged_bodies[i], temp.radius, temp.mass, temp.position);
         }
 
-        staged_bodies[i].velocity          = temp.velocity;
-        staged_bodies[i].angular_velocity  = temp.angular_velocity;
-        staged_bodies[i].orientation       = vector4_normalisation(temp.orientation);
-        staged_bodies[i].colour            = temp.colour;
-        staged_bodies[i].restitution       = temp.restitution;
-        staged_bodies[i].friction_static   = temp.friction_static;
-        staged_bodies[i].friction_kinetic  = temp.friction_kinetic;
-        staged_bodies[i].static_state      = temp.static_state;
+        staged_bodies[i].velocity = temp.velocity;
+        staged_bodies[i].angular_velocity = temp.angular_velocity;
+        staged_bodies[i].orientation = vector4_normalisation (temp.orientation);
+        staged_bodies[i].colour = temp.colour;
+        staged_bodies[i].restitution = temp.restitution;
+        staged_bodies[i].friction_static = temp.friction_static;
+        staged_bodies[i].friction_kinetic = temp.friction_kinetic;
+        staged_bodies[i].static_state = temp.static_state;
 
         if (staged_bodies[i].static_state) {
-            rigidbody_set_static(&staged_bodies[i], true);
+            rigidbody_set_static (&staged_bodies[i], true);
         } else {
-            rigidbody_set_static(&staged_bodies[i], false);
+            rigidbody_set_static (&staged_bodies[i], false);
         }
 
         /* Single sanitization point: set_static already refreshed inertia
@@ -961,18 +966,18 @@ int scene_loading(const char *file_source_path)
          * awake with default damping. Saved IDs go to staged_ids. */
         staged_bodies[i].nice_value = saved_nice;
         if (saved_kinematic != 0) {
-            rigidbody_set_kinematic(&staged_bodies[i], true);
+            rigidbody_set_kinematic (&staged_bodies[i], true);
         }
         if ((saved_sleep != 0) && (!staged_bodies[i].static_state) && (!staged_bodies[i].kinematic)) {
             staged_bodies[i].is_sleeping = true;
             staged_bodies[i].sleep_timer = 0.0f;
-            staged_bodies[i].velocity = vector3_zero();
-            staged_bodies[i].angular_velocity = vector3_zero();
+            staged_bodies[i].velocity = vector3_zero ();
+            staged_bodies[i].angular_velocity = vector3_zero ();
         }
         /* Single sanitize covers the whole legacy path (set_kinematic already
          * sanitizes, but non-kinematic bodies need it here). */
         if (saved_kinematic == 0) {
-            rigidbody_sanitize(&staged_bodies[i]);
+            rigidbody_sanitize (&staged_bodies[i]);
         }
         staged_ids[i] = saved_object_id;
 
@@ -982,20 +987,19 @@ int scene_loading(const char *file_source_path)
     /* --- Stage all joints --- */
     /* DESPOT-2026-10-01: bound raw int32 from file before malloc/volume loop.
      * Unbounded count = huge alloc / DoS; negative = signed confusion. */
-    if (read_int(f, &staged_joint_count) && (staged_joint_count > 0)) {
+    if (read_int (f, &staged_joint_count) && (staged_joint_count > 0)) {
         if (staged_joint_count > 4096) {
-            fprintf(stderr, "Error LDF: joint count %d exceeds 4096\n", staged_joint_count);
-            free(staged_bodies);
-            free(staged_ids);
-            fclose(f);
+            fprintf (stderr, "Error LDF: joint count %d exceeds 4096\n", staged_joint_count);
+            free (staged_bodies);
+            free (staged_ids);
+            fclose (f);
             return 0;
         }
-        staged_joints = (staged_joint *)malloc(
-            (size_t)staged_joint_count * sizeof(staged_joint));
+        staged_joints = (staged_joint *) malloc ((size_t) staged_joint_count * sizeof (staged_joint));
         if (!staged_joints) {
-            free(staged_bodies);
-            free(staged_ids);
-            fclose(f);
+            free (staged_bodies);
+            free (staged_ids);
+            fclose (f);
             return 0;
         }
 
@@ -1008,94 +1012,89 @@ int scene_loading(const char *file_source_path)
              * success (bodies truncate→veto, joints truncate→partial
              * commit). A short joint section is corruption: veto the
              * whole load, scene untouched. */
-            if (!read_int(f, &id_a) || !read_int(f, &id_b) || !read_float(f, &eq) || !read_float(f, &k) ||
-                !read_float(f, &c)) {
-                fprintf(stderr, "Error LDF: legacy joint section truncated at joint %d/%d\n", j,
-                        staged_joint_count);
-                free(staged_bodies);
+            if (!read_int (f, &id_a) || !read_int (f, &id_b) || !read_float (f, &eq) || !read_float (f, &k) ||
+                !read_float (f, &c)) {
+                fprintf (stderr, "Error LDF: legacy joint section truncated at joint %d/%d\n", j, staged_joint_count);
+                free (staged_bodies);
                 if (staged_ids) {
-                    free(staged_ids);
+                    free (staged_ids);
                 }
                 if (staged_joints) {
-                    free(staged_joints);
+                    free (staged_joints);
                 }
-                fclose(f);
+                fclose (f);
                 return 0;
             }
 
-            staged_joints[j].id_a = (uint32_t)id_a;
-            staged_joints[j].id_b = (uint32_t)id_b;
-            staged_joints[j].eq   = eq;
-            staged_joints[j].k    = k;
-            staged_joints[j].c    = c;
+            staged_joints[j].id_a = (uint32_t) id_a;
+            staged_joints[j].id_b = (uint32_t) id_b;
+            staged_joints[j].eq = eq;
+            staged_joints[j].k = k;
+            staged_joints[j].c = c;
         }
     } else {
         staged_joint_count = 0;
     }
 
-    fclose(f);
+    fclose (f);
 
     /* --- Validate staged data before committing --- */
     if (staged_body_count == 0 || staged_body_count < count) {
         /* Nothing to commit or partial read (truncated file). Do not
          * clear the live scene — a partial load must leave the scene
          * untouched. */
-        free(staged_bodies);
-        if (staged_ids) free(staged_ids);
-        if (staged_joints) free(staged_joints);
+        free (staged_bodies);
+        if (staged_ids) free (staged_ids);
+        if (staged_joints) free (staged_joints);
         return 0;
     }
 
     /* --- Commit: grow the live pool ONLY now that the staged file has
      * fully validated (see FIX-AUDIT-DESPOT note at staging time), then
      * clear the scene and install staged data --- */
-    if (!scene_ensure_pool_capacity(staged_body_count)) {
-        fprintf(stderr, "Error LDF06: body pool growth failed for %d bodies\n",
-                staged_body_count);
-        free(staged_bodies);
-        if (staged_ids) free(staged_ids);
-        if (staged_joints) free(staged_joints);
+    if (!scene_ensure_pool_capacity (staged_body_count)) {
+        fprintf (stderr, "Error LDF06: body pool growth failed for %d bodies\n", staged_body_count);
+        free (staged_bodies);
+        if (staged_ids) free (staged_ids);
+        if (staged_joints) free (staged_joints);
         return 0;
     }
-    scene_clear();
+    scene_clear ();
     /* FIX-AUDIT: stale revolute joints survived every load (only the
      * spring pool was reset), constraining dead IDs. v1 files carry no
      * revolute data, so clearing is strictly more correct there too. */
-    constraint_pool_init(physics_world_get_primary());
-    scene_id_remap_reset();
-    contact_cache_clear(physics_world_get_primary());
-    joint_init_pool(physics_world_get_primary());
+    constraint_pool_init (physics_world_get_primary ());
+    scene_id_remap_reset ();
+    contact_cache_clear (physics_world_get_primary ());
+    joint_init_pool (physics_world_get_primary ());
 
-    (physics_world_get_primary()->body_count) = staged_body_count;
+    (physics_world_get_primary ()->body_count) = staged_body_count;
 
     for (int i = 0; i < staged_body_count; i++) {
-        (physics_world_get_primary()->bodies)[i] = staged_bodies[i];
+        (physics_world_get_primary ()->bodies)[i] = staged_bodies[i];
 
         /* Recover the saved object ID from staging (v150+). */
         int32_t saved_id = staged_ids[i];
 
-        (physics_world_get_primary()->bodies)[i].object_id = scene_allocate_object_id();
+        (physics_world_get_primary ()->bodies)[i].object_id = scene_allocate_object_id ();
 
         if ((version >= 150) && (saved_id > 0)) {
-            scene_id_remap_add((uint32_t)saved_id, (physics_world_get_primary()->bodies)[i].object_id);
+            scene_id_remap_add ((uint32_t) saved_id, (physics_world_get_primary ()->bodies)[i].object_id);
         }
 
-        (physics_world_get_primary()->bodies)[i].object_generation = 1;
+        (physics_world_get_primary ()->bodies)[i].object_generation = 1;
     }
 
     /* Install staged joints */
     for (int j = 0; j < staged_joint_count; j++) {
-        add_joint_by_ids(physics_world_get_primary(), 
-            scene_id_remap_resolve(staged_joints[j].id_a),
-            scene_id_remap_resolve(staged_joints[j].id_b),
-            staged_joints[j].eq,
-            staged_joints[j].k,
-            staged_joints[j].c);
+        add_joint_by_ids (physics_world_get_primary (), scene_id_remap_resolve (staged_joints[j].id_a),
+                          scene_id_remap_resolve (staged_joints[j].id_b), staged_joints[j].eq, staged_joints[j].k,
+                          staged_joints[j].c);
     }
 
-    free(staged_bodies);
-    if (staged_ids) free(staged_ids);
-    if (staged_joints) free(staged_joints);
+    free (staged_bodies);
+    if (staged_ids) free (staged_ids);
+    if (staged_joints) free (staged_joints);
 
     return 1;
 }

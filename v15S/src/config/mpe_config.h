@@ -47,7 +47,7 @@ typedef struct {
         float drag;
         float floor_friction_s;
         float floor_friction_k;
-    float rolling_resistance_coeff; /* MFS_132 */
+        float rolling_resistance_coeff; /* MFS_132 */
         float angular_damping_scale; /* FIX-AUDIT: was hardcoded 0.97 */
     } world;
 
@@ -211,12 +211,12 @@ extern mpe_config_t g_cfg;
  * body materials are stamped from g_cfg at construction time and are never
  * retro-fitted. Building a body while g_cfg is still zero yields a body with
  * zero friction and zero restitution that can never be repaired. */
-void mpe_config_ensure_ready(void);
+void mpe_config_ensure_ready (void);
 /* True once the config has been initialised. Gated by a suite test so a
  * zero-config world can never be certified again. */
-bool mpe_config_is_ready(void);
+bool mpe_config_is_ready (void);
 /* TEST HOOK ONLY: reproduce the "config not yet initialised" precondition. */
-void mpe_config_force_unready_for_test(void);
+void mpe_config_force_unready_for_test (void);
 
 /* ------------------------------------------------------------------
  * The registry table — cold path iterates this
@@ -230,28 +230,28 @@ extern const size_t g_registry_count;
  * ------------------------------------------------------------------ */
 
 /* Initialize g_cfg to compile-time defaults. Call once at startup. */
-void mpe_config_init(void);
+void mpe_config_init (void);
 
 /* Reset all tunables to their defaults. */
-void mpe_config_reset_defaults(void);
+void mpe_config_reset_defaults (void);
 
 /* Typed getters — return false for a missing key, NULL output, or type mismatch. */
-bool mpe_config_get_float(const char *key, float *out);
-bool mpe_config_get_int(const char *key, int *out);
-bool mpe_config_get_bool(const char *key, bool *out);
+bool mpe_config_get_float (const char *key, float *out);
+bool mpe_config_get_int (const char *key, int *out);
+bool mpe_config_get_bool (const char *key, bool *out);
 
 /* Typed setters — look up by key, clamp to [min,max], write to g_cfg.
  * Returns false for a missing key, type mismatch, non-finite float, or a
  * value that required clamping. */
-bool mpe_config_set_float(const char *key, float value);
-bool mpe_config_set_int(const char *key, int value);
-bool mpe_config_set_bool(const char *key, bool value);
+bool mpe_config_set_float (const char *key, float value);
+bool mpe_config_set_int (const char *key, int value);
+bool mpe_config_set_bool (const char *key, bool value);
 
 /* Serialization — text INI format to/from disk.
  * load: missing keys keep defaults; unknown keys ignored; returns false on IO error.
  * save: writes all params grouped by category. */
-bool mpe_config_load(const char *path);
-bool mpe_config_save(const char *path);
+bool mpe_config_load (const char *path);
+bool mpe_config_save (const char *path);
 
 /* DESPOT-2026-10-04 (torture-leak closure): guarded save. Refuses (returns
  * false, logs to stderr, bumps the blocked counter) when F11 torture values
@@ -259,22 +259,22 @@ bool mpe_config_save(const char *path);
  * defaults. Use for EVERY write to status/engine.cfg; the raw mpe_config_save
  * stays for the F11 backup path (which must capture the CLEAN config before
  * randomizing) and for explicit torture dumps. */
-bool mpe_config_save_guarded(const char *path);
-unsigned long mpe_config_torture_save_blocked_total(void);
+bool mpe_config_save_guarded (const char *path);
+unsigned long mpe_config_torture_save_blocked_total (void);
 
 /* Iteration helpers for menu/terminal. */
-size_t mpe_config_count_by_category(param_category cat);
-size_t mpe_config_get_by_category(param_category cat, const mpe_param **out_params, size_t max_params);
+size_t mpe_config_count_by_category (param_category cat);
+size_t mpe_config_get_by_category (param_category cat, const mpe_param **out_params, size_t max_params);
 
 /* Find a param by key. Returns NULL if not found. */
-const mpe_param *mpe_config_find(const char *key);
+const mpe_param *mpe_config_find (const char *key);
 
 /* Category name for display. */
-const char *mpe_config_category_name(param_category cat);
+const char *mpe_config_category_name (param_category cat);
 
 /* MPE_TASK_39_FIX_BACKUP_DECL_BEGIN */
-bool mpe_config_save_backup(const char *path);
-bool mpe_config_load_backup(const char *path);
+bool mpe_config_save_backup (const char *path);
+bool mpe_config_load_backup (const char *path);
 /* MPE_TASK_39_FIX_BACKUP_DECL_END */
 
 #endif /* mpe_config_h */

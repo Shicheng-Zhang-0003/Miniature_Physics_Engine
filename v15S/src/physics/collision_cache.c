@@ -21,7 +21,7 @@
 #define contact_hash_size (1 << contact_hash_bits)
 #define contact_hash_mask (contact_hash_size - 1)
 
-static inline uint32_t contact_pair_key(uint32_t id_a, uint32_t id_b) {
+static inline uint32_t contact_pair_key (uint32_t id_a, uint32_t id_b) {
     uint32_t lo = (id_a < id_b) ? id_a : id_b;
     uint32_t hi = (id_a < id_b) ? id_b : id_a;
     uint64_t key = ((uint64_t) lo << 32) | (uint64_t) hi;
@@ -34,19 +34,19 @@ static inline uint32_t contact_pair_key(uint32_t id_a, uint32_t id_b) {
     return (uint32_t) (key & contact_hash_mask);
 }
 
-static inline vector4 collision_inverse_orientation(vector4 orientation) {
+static inline vector4 collision_inverse_orientation (vector4 orientation) {
     return (vector4){orientation.w, -orientation.x, -orientation.y, -orientation.z};
 }
 
-static inline vector3 collision_world_offset_to_body_local(rigidbody *body, vector3 world_offset) {
-    return vector4_rotate_to_vector3(collision_inverse_orientation(body->orientation), world_offset);
+static inline vector3 collision_world_offset_to_body_local (rigidbody *body, vector3 world_offset) {
+    return vector4_rotate_to_vector3 (collision_inverse_orientation (body->orientation), world_offset);
 }
 
-static inline vector3 collision_body_local_to_world_offset(rigidbody *body, vector3 local_offset) {
-    return vector4_rotate_to_vector3(body->orientation, local_offset);
+static inline vector3 collision_body_local_to_world_offset (rigidbody *body, vector3 local_offset) {
+    return vector4_rotate_to_vector3 (body->orientation, local_offset);
 }
 
-void contact_cache_stats_reset(struct physics_world *world) {
+void contact_cache_stats_reset (struct physics_world *world) {
     if (!world) {
         return;
     }
@@ -54,21 +54,21 @@ void contact_cache_stats_reset(struct physics_world *world) {
     world->contact_cache_misses = 0;
 }
 
-int contact_cache_get_hits(const struct physics_world *world) {
+int contact_cache_get_hits (const struct physics_world *world) {
     if (!world) {
         return 0;
     }
     return world->contact_cache_hits;
 }
 
-int contact_cache_get_misses(const struct physics_world *world) {
+int contact_cache_get_misses (const struct physics_world *world) {
     if (!world) {
         return 0;
     }
     return world->contact_cache_misses;
 }
 
-bool contact_cache_has_pair(struct physics_world *world, uint32_t id_a, uint32_t id_b) {
+bool contact_cache_has_pair (struct physics_world *world, uint32_t id_a, uint32_t id_b) {
     /* TRUTH: zero ids mean "unknown", not "seen". Returning true suppressed
      * first-touch wake for id-0 bodies (they never woke sleepers). */
     if (!world || id_a == 0 || id_b == 0) {
@@ -84,7 +84,7 @@ bool contact_cache_has_pair(struct physics_world *world, uint32_t id_a, uint32_t
      * result identical). Degrades to linear only if heads are missing. */
     int32_t *heads = world->contact_hash_head;
     if (heads) {
-        uint32_t slot = contact_pair_key(id_a, id_b);
+        uint32_t slot = contact_pair_key (id_a, id_b);
         for (int32_t s = heads[slot], guard = 0; s >= 0 && s < count && guard <= count;
              s = cache[s].hash_next, guard++) {
             uint32_t ca = cache[s].object_id_a;
@@ -112,11 +112,11 @@ bool contact_cache_has_pair(struct physics_world *world, uint32_t id_a, uint32_t
  * collision_mechanics.h (single source of truth with the solver's match
  * side). See the header note for why match-role predicates stay in the
  * solver TU. */
-static uint32_t a3_task05_body_property_stamp(const rigidbody *rigid_body) {
-    return a3_contact_cache_body_stamp(rigid_body);
+static uint32_t a3_task05_body_property_stamp (const rigidbody *rigid_body) {
+    return a3_contact_cache_body_stamp (rigid_body);
 }
 
-void contact_cache_save(struct physics_world *world, collision_data *manifolds, int count) {
+void contact_cache_save (struct physics_world *world, collision_data *manifolds, int count) {
     /* Per-world warm-start cache (no global fallback remains). A missing
      * cache degrades to no warm start for the next tick. */
     if ((!world) || (!world->world_contact_cache)) {
@@ -130,7 +130,7 @@ void contact_cache_save(struct physics_world *world, collision_data *manifolds, 
         collision_data *manifold = &manifolds[m];
         for (int i = 0; i < manifold->contact_count; i++) {
             if (*cache_count >= world->world_contact_cache_capacity) {
-                if (physics_world_grow_contact_cache(world) != 0) {
+                if (physics_world_grow_contact_cache (world) != 0) {
                     break;
                 }
                 cache_array = world->world_contact_cache;
@@ -140,8 +140,8 @@ void contact_cache_save(struct physics_world *world, collision_data *manifolds, 
             cc->object_id_a = (manifold->object_a) ? manifold->object_a->object_id : 0;
             cc->object_id_b = (manifold->object_b) ? manifold->object_b->object_id : 0;
             /* MPE_TASK_05_CACHE_SAVE_STAMP_BEGIN */
-            cc->property_stamp_a = a3_task05_body_property_stamp(manifold->object_a);
-            cc->property_stamp_b = a3_task05_body_property_stamp(manifold->object_b);
+            cc->property_stamp_a = a3_task05_body_property_stamp (manifold->object_a);
+            cc->property_stamp_b = a3_task05_body_property_stamp (manifold->object_b);
             /* MPE_TASK_05_CACHE_SAVE_STAMP_END */
             cc->local_position_a = cp->local_position_a;
             cc->local_position_b = cp->local_position_b;
@@ -170,14 +170,14 @@ void contact_cache_save(struct physics_world *world, collision_data *manifolds, 
                 cc->hash_next = -1;
                 continue;
             }
-            uint32_t slot = contact_pair_key(cc->object_id_a, cc->object_id_b);
+            uint32_t slot = contact_pair_key (cc->object_id_a, cc->object_id_b);
             cc->hash_next = hash_head[slot];
             hash_head[slot] = c;
         }
     }
 }
 
-void contact_cache_clear(struct physics_world *world) {
+void contact_cache_clear (struct physics_world *world) {
     if (!world) {
         return;
     }

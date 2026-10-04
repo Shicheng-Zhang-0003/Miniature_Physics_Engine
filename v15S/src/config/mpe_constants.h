@@ -50,7 +50,8 @@
  * SCENE I/O — binary format identification
  * ------------------------------------------------------------------ */
 #define mpe_magic 0x4D504533 /* "MPE3" */
-#define mpe_version 200 /* v200: LE fields, stable IDs, revolute section, CRC32 footer.
+#define mpe_version                                                                                                    \
+    200 /* v200: LE fields, stable IDs, revolute section, CRC32 footer.
                          * v153 and older keep their native-order legacy reader. */
 
 /* ------------------------------------------------------------------

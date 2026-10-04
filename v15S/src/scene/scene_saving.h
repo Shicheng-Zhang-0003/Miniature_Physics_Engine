@@ -7,5 +7,5 @@
  * warning (FIX-AUDIT-DESPOT: scene bytes durable, dir entry not — callers
  * must treat nonzero as saved), 0 on failure (live scene untouched, no
  * file published). */
-int save_scene(const char *file_destination_path);
+int save_scene (const char *file_destination_path);
 #endif
