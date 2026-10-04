@@ -743,21 +743,42 @@ int mpe_t_f11_torture(void) {
      *    randomised to -1..-17 and the project's own measurement puts the 10:1
      *    column's stability boundary near -17.12, so toppling is the honest
      *    outcome and asserting the stack stands would be asserting a wish.
-     *  - Therefore this does NOT gate "the stack stayed up". It gates the one
-     *    thing that is never acceptable: two rigid cubes occupying each other.
-     *  - The bound is set from MEASUREMENT across the F11 seed sweep with the
-     *    corrected fixture, not fitted to make a line green: the corrected
-     *    scene measures 0.0016-0.24 m across seeds 0..9, while the reverted
-     *    per-contact split impulse measured 0.24-0.83 m on the same seeds. The
-     *    gate sits at 0.50 m, which passes the shipped behaviour with ~2x
-     *    headroom on the worst measured seed and FAILS the measured
-     *    regression this audit introduced and then reverted. That is the
-     *    point: it is a regression detector, not a stability claim.
-     */
+     *  - So this does NOT gate "the stack stayed up". It gates the one thing
+     *    that is never acceptable: two rigid cubes occupying each other.
+     *
+     * MEASURED, and an earlier version of this comment was WRONG about it. All
+     * pairs, 1500 ticks, all-pairs sampling every tick, corrected fixture:
+     *
+     *     seed        0        1        2        3        6        7
+     *     corrected 0.0016   0.2405   0.6925   0.5638   0.0164   0.1337
+     *     pre-fix   0.8409   0.9815   0.9336   0.1028   0.0771   0.6869
+     *
+     * The claim that the fix is "0.0016-0.24 across seeds" was false: it is
+     * 0.0016-0.69. And note what the table also shows -- seed 3 is BETTER
+     * before the fix (0.103) than after (0.564). A single global threshold
+     * therefore CANNOT separate the corrected fixture from the broken one:
+     * the spread WITHIN each group is as large as the gap BETWEEN them, because
+     * the torture outcome is chaotic.
+     *
+     * So the gate is deliberately scoped to what it can actually certify: the
+     * seed this case runs (mpe_rng = 0xC0FFEE, fixed, not drawn from a loop).
+     * For that seed the corrected scene measures 0.0100 m -- which is the
+     * penetration slop, i.e. resting contacts and nothing more -- and the
+     * pre-fix scene measured 0.8409 m. The bound is 0.05: 5x headroom over the
+     * shipped value, 16x under the defect it exists to catch.
+     *
+     * SEED VARIANCE IS A SEPARATE, DECLARED LIMIT, not something this gate
+     * pretends to cover. Under extreme randomized gravity the column buckles
+     * and cubes can transiently overlap by up to ~0.69 m. Whether that is
+     * acceptable, or whether the buckling transient needs its own remedy, is
+     * open. See docs/VALIDATION.md -> [F11-BUCKLE-INTERPENETRATION].
+     *
+     * Falsifiability was demonstrated rather than assumed: tightening this bound
+     * below the measured value turns the case red with exit status 1. */
     MPE_INFO("worst pairwise cube-cube overlap over the run: %.4f m at tick %d "
-             "(bound 0.50 m; 1.0 would mean one cube entirely inside another)",
+             "(bound 0.05 m; measured at the penetration slop, so resting contacts)",
              worst_overlap, worst_overlap_tick);
-    MPE_CHECK(&t, worst_overlap < 0.50f);
+    MPE_CHECK(&t, worst_overlap < 0.05f);
     /* Crash-oracle only: PASS = finite state, NOT stability.
      * Do not misread as a stability proof. `fallen_ticks` is reported above and
      * is NOT in this gate: it is unfireable with the safety net on and
