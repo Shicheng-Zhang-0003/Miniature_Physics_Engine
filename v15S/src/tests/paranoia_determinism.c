@@ -7,8 +7,10 @@
 #include "config/mpe_config.h"
 
 static int bodies_bitwise_equal (const rigidbody *a, const rigidbody *b) {
-    if (a->position.x != b->position.x || a->position.y != b->position.y || a->position.z != b->position.z) return 0;
-    if (a->velocity.x != b->velocity.x || a->velocity.y != b->velocity.y || a->velocity.z != b->velocity.z) return 0;
+    if (a->position.x != b->position.x || a->position.y != b->position.y || a->position.z != b->position.z)
+        return 0;
+    if (a->velocity.x != b->velocity.x || a->velocity.y != b->velocity.y || a->velocity.z != b->velocity.z)
+        return 0;
     if (a->acceleration.x != b->acceleration.x || a->acceleration.y != b->acceleration.y ||
         a->acceleration.z != b->acceleration.z)
         return 0;
@@ -223,7 +225,8 @@ int main (void) {
             physics_world_step (&world, dt);
             for (int i = 0; i < world.body_count; i++) {
                 rigidbody *rb = &world.bodies[i];
-                if (!isfinite (rb->position.x) || !isfinite (rb->velocity.x)) nan_count++;
+                if (!isfinite (rb->position.x) || !isfinite (rb->velocity.x))
+                    nan_count++;
             }
         }
 

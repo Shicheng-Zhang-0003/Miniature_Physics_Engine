@@ -60,10 +60,12 @@ MPE_USED const mpe_module_desc_t mfs_module_1_desc = {
  * ================================================================ */
 
 MPE_USED int mfs_module_1_attach (mpe_world_t *world, void **mod_state) {
-    if (!world || !mod_state) return -1;
+    if (!world || !mod_state)
+        return -1;
 
     mfs_module_1_state *state = calloc (1, sizeof (mfs_module_1_state));
-    if (!state) return -1;
+    if (!state)
+        return -1;
 
     state->world = world;
     /* DESPOT-2026-10-02 (programming: decorative bound). This was a bare
@@ -132,7 +134,8 @@ MPE_USED int mfs_module_1_attach (mpe_world_t *world, void **mod_state) {
 
 MPE_USED void mfs_module_1_detach (mpe_world_t *world, void *mod_state) {
     (void) world;
-    if (!mod_state) return;
+    if (!mod_state)
+        return;
 
     mfs_module_1_state *state = (mfs_module_1_state *) mod_state;
 
@@ -154,7 +157,8 @@ MPE_USED void mfs_module_1_detach (mpe_world_t *world, void *mod_state) {
 
 MPE_USED void mfs_module_1_gamepad_step (mfs_module_1_state *state, float dt) {
     (void) dt;
-    if (!state->gamepad_initialized || !state->gamepad_control_enabled) return;
+    if (!state->gamepad_initialized || !state->gamepad_control_enabled)
+        return;
 
     gamepad_state *pad = &state->gamepad;
 
@@ -205,7 +209,8 @@ MPE_USED void mfs_module_1_gamepad_step (mfs_module_1_state *state, float dt) {
         state->gamepad_control_enabled = !state->gamepad_control_enabled;
     }
 
-    if (!state->gamepad_control_enabled) return;
+    if (!state->gamepad_control_enabled)
+        return;
 
     /* Drive mapping (mecanum):
      * Left stick Y = forward/backward (inverted)
@@ -289,10 +294,12 @@ MPE_USED void mfs_module_1_gamepad_step (mfs_module_1_state *state, float dt) {
              * reset: a warp is a discontinuous dw the disturbance observer
              * would otherwise read as a phantom stall spike. */
             int n = state->robot.wheel_count;
-            if (n > FTC_MAX_WHEELS) n = FTC_MAX_WHEELS;
+            if (n > FTC_MAX_WHEELS)
+                n = FTC_MAX_WHEELS;
             for (int i = 0; i < n; i++) {
                 int wi = state->robot.wheel_bodies[i];
-                if (wi < 0 || wi >= world->body_count) continue;
+                if (wi < 0 || wi >= world->body_count)
+                    continue;
                 rigidbody *w = &world->bodies[wi];
                 w->position = vector3_addition (w->position, delta);
                 w->velocity = vector3_zero ();
@@ -301,7 +308,8 @@ MPE_USED void mfs_module_1_gamepad_step (mfs_module_1_state *state, float dt) {
                 w->sleep_timer = 0.0f;
                 for (int k = 0; k < state->robot.roller_count[i]; k++) {
                     int rb = state->robot.roller_bodies[i][k];
-                    if (rb < 0 || rb >= world->body_count) continue;
+                    if (rb < 0 || rb >= world->body_count)
+                        continue;
                     rigidbody *ro = &world->bodies[rb];
                     ro->position = vector3_addition (ro->position, delta);
                     ro->velocity = vector3_zero ();
@@ -350,7 +358,8 @@ MPE_USED void mfs_module_1_gamepad_step (mfs_module_1_state *state, float dt) {
 
 MPE_USED void mfs_module_1_pre_step (mpe_world_t *world, float dt, void *mod_state) {
     mfs_module_1_state *state = (mfs_module_1_state *) mod_state;
-    if (!state || !state->robot_created) return;
+    if (!state || !state->robot_created)
+        return;
 
     /* Poll gamepad for input */
     if (state->gamepad_initialized) {
@@ -489,7 +498,8 @@ MPE_USED void mfs_module_1_robot_create (mfs_module_1_state *state) {
 MPE_USED void mfs_module_1_intake_create (mfs_module_1_state *state) {
     physics_world *world = state->world;
     rigidbody *chassis = mfs_get_chassis (state);
-    if (!chassis) return;
+    if (!chassis)
+        return;
 
     /* Roller positioned at front-lower of chassis */
     vector3 robot_pos = chassis->position;
@@ -539,7 +549,8 @@ MPE_USED void mfs_module_1_intake_create (mfs_module_1_state *state) {
 MPE_USED void mfs_module_1_shooter_create (mfs_module_1_state *state) {
     physics_world *world = state->world;
     rigidbody *chassis = mfs_get_chassis (state);
-    if (!chassis) return;
+    if (!chassis)
+        return;
 
     /* Flywheel on a pylon clear of the chassis: at 0.8*H the tilted disc
      * grazed the chassis top inside the 10 mm slop band and slop friction
@@ -614,7 +625,8 @@ MPE_USED void mfs_module_1_shooter_create (mfs_module_1_state *state) {
  * ================================================================ */
 
 MPE_USED void mfs_module_1_ball_spawn (mfs_module_1_state *state, vector3 pos) {
-    if (state->ball_count >= state->max_balls) return;
+    if (state->ball_count >= state->max_balls)
+        return;
 
     physics_world *world = state->world;
     int idx = physics_world_add_sphere (world, MFS_BIOBUZZ_BALL_RADIUS, MFS_BIOBUZZ_BALL_MASS, pos);
@@ -632,7 +644,8 @@ MPE_USED void mfs_module_1_ball_spawn (mfs_module_1_state *state, vector3 pos) {
 MPE_USED void mfs_module_1_ball_physics_step (mfs_module_1_state *state, float dt) {
     (void) dt;
     physics_world *world = state->world;
-    if (!world) return;
+    if (!world)
+        return;
 
     const float air_density = 1.225f;
     const float drag_coeff = 0.47f; /* Sphere */
@@ -640,7 +653,8 @@ MPE_USED void mfs_module_1_ball_physics_step (mfs_module_1_state *state, float d
 
     for (int i = 0; i < state->ball_count; i++) {
         int body_idx = physics_world_index_by_id (world, state->ball_body_ids[i]);
-        if (body_idx < 0) continue;
+        if (body_idx < 0)
+            continue;
 
         rigidbody *ball = &world->bodies[body_idx];
 
@@ -690,10 +704,13 @@ MPE_USED void mfs_module_1_intake_step (mfs_module_1_state *state, float dt) {
      * object-id checked with an index idiom (id 0/negative conflates
      * "unset" with "gone"). Resolve the id straight to a body pointer:
      * NULL means unset-or-gone, uniformly. */
-    if (!state->intake_deployed) return;
-    if (!world) return;
+    if (!state->intake_deployed)
+        return;
+    if (!world)
+        return;
     rigidbody *roller = physics_world_body_by_id (world, (uint32_t) state->intake_roller_body);
-    if (!roller) return;
+    if (!roller)
+        return;
 
     /* MFS H5 (DESPOT-2026-09-29): the intake roller had TWO actuators fighting
      * each other, and neither was wired to the state that controls intake.
@@ -720,7 +737,8 @@ MPE_USED void mfs_module_1_intake_step (mfs_module_1_state *state, float dt) {
         target_omega = state->intake_speed_rpm * M_PI / 30.0f;
         /* `intake_power` < 0 is the momentary reverse (B while held). It was
          * previously dead; honour it now. */
-        if (state->intake_power < 0.0f) target_omega = -target_omega;
+        if (state->intake_power < 0.0f)
+            target_omega = -target_omega;
     }
     if (state->intake_pivot_joint >= 0) {
         /* enabled even at target 0: that is what actually brakes/coasts the
@@ -752,7 +770,8 @@ MPE_USED void mfs_module_1_intake_step (mfs_module_1_state *state, float dt) {
         int carried = 0;
         for (int i = 0; i < state->ball_count && carried < MFS_ROBOT_MAX_CARRIED_BALLS; i++) {
             int ball_idx = physics_world_index_by_id (world, state->ball_body_ids[i]);
-            if (ball_idx < 0) continue;
+            if (ball_idx < 0)
+                continue;
             rigidbody *b = &world->bodies[ball_idx];
             vector3 d = vector3_subtraction (b->position, roller->position);
             if (vector3_length (d) < MFS_INTAKE_ROLLER_RADIUS + MFS_BIOBUZZ_BALL_RADIUS + MFS_INTAKE_COMPLIANCE) {
@@ -764,7 +783,8 @@ MPE_USED void mfs_module_1_intake_step (mfs_module_1_state *state, float dt) {
         }
         for (int i = 0; i < state->ball_count; i++) {
             int ball_idx = physics_world_index_by_id (world, state->ball_body_ids[i]);
-            if (ball_idx < 0) continue;
+            if (ball_idx < 0)
+                continue;
 
             rigidbody *ball = &world->bodies[ball_idx];
 
@@ -813,9 +833,11 @@ MPE_USED void mfs_module_1_intake_step (mfs_module_1_state *state, float dt) {
 MPE_USED void mfs_module_1_shooter_step (mfs_module_1_state *state, float dt) {
     physics_world *world = state->world;
     /* FIX-AUDIT-DESPOT: same id-vs-index cleanup as the intake step. */
-    if (!world) return;
+    if (!world)
+        return;
     rigidbody *flywheel = physics_world_body_by_id (world, (uint32_t) state->shooter_flywheel_body);
-    if (!flywheel) return;
+    if (!flywheel)
+        return;
     /* Spin axis: the joint axis (0,1,0) tilted 35° about the chassis X at
      * creation. Reading/writing raw .y spun the wrong axis once tilted
      * (18% torque loss + rpm misread). Track the chassis frame so yaw
@@ -840,7 +862,8 @@ MPE_USED void mfs_module_1_shooter_step (mfs_module_1_state *state, float dt) {
         float target_omega = state->shooter_target_rpm * M_PI / 30.0f;
         float omega_error = target_omega - current_omega_y;
         float torque = omega_error * 0.05f; /* Flywheel motor torque constant */
-        if (torque > 0.3f) torque = 0.3f;
+        if (torque > 0.3f)
+            torque = 0.3f;
         flywheel->torque_accumulator = vector3_addition (flywheel->torque_accumulator, vector3_scaling (sax, torque));
         /* FIX-AUDIT-DESPOT shooter reaction couple: a flywheel motor is two
          * bodies acting on each other — mirror robot.c:704-713 and apply
@@ -870,7 +893,8 @@ MPE_USED void mfs_module_1_shooter_step (mfs_module_1_state *state, float dt) {
         /* Find a ball in the shooter hopper (near flywheel) */
         for (int i = 0; i < state->ball_count; i++) {
             int ball_idx = physics_world_index_by_id (world, state->ball_body_ids[i]);
-            if (ball_idx < 0) continue;
+            if (ball_idx < 0)
+                continue;
 
             rigidbody *ball = &world->bodies[ball_idx];
             vector3 diff = vector3_subtraction (ball->position, flywheel->position);
@@ -947,7 +971,8 @@ MPE_USED void mfs_module_1_shooter_step (mfs_module_1_state *state, float dt) {
 
 MPE_USED void mfs_module_1_robot_drive_step (mfs_module_1_state *state, float dt) {
     (void) dt;
-    if (!state->robot_created) return;
+    if (!state->robot_created)
+        return;
 
     /* Canonical mecanum mixer (normalized, FTC rotate convention).
      * The hand mixer here was rotate-inverted vs drivetrain_mecanum and
@@ -961,30 +986,38 @@ MPE_USED void mfs_module_1_robot_drive_step (mfs_module_1_state *state, float dt
  * ================================================================ */
 
 MPE_USED void mfs_module_1_set_drive_commands (mfs_module_1_state *state, float forward, float strafe, float rotate) {
-    if (!state) return;
+    if (!state)
+        return;
     state->drive_forward = forward;
     state->drive_strafe = strafe;
     state->drive_rotate = rotate;
 }
 
 MPE_USED void mfs_module_1_set_intake (mfs_module_1_state *state, bool active) {
-    if (!state) return;
+    if (!state)
+        return;
     state->intake_active = active;
 }
 
 MPE_USED void mfs_module_1_set_shooter (mfs_module_1_state *state, bool spinup, bool fire) {
-    if (!state) return;
+    if (!state)
+        return;
     state->shooter_spinup_cmd = spinup;
     state->shooter_fire_cmd = fire;
 }
 
 MPE_USED void mfs_module_1_get_stats (const mfs_module_1_state *state, int *balls_collected, int *balls_fired,
                                       float *shooter_rpm, bool *shooter_ready) {
-    if (!state) return;
-    if (balls_collected) *balls_collected = state->balls_collected;
-    if (balls_fired) *balls_fired = state->balls_fired;
-    if (shooter_rpm) *shooter_rpm = state->shooter_rpm;
-    if (shooter_ready) *shooter_ready = state->shooter_ready;
+    if (!state)
+        return;
+    if (balls_collected)
+        *balls_collected = state->balls_collected;
+    if (balls_fired)
+        *balls_fired = state->balls_fired;
+    if (shooter_rpm)
+        *shooter_rpm = state->shooter_rpm;
+    if (shooter_ready)
+        *shooter_ready = state->shooter_ready;
 }
 
 /* ================================================================

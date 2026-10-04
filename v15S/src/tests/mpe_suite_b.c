@@ -721,7 +721,8 @@ static int mpe_ref_obb_overlap (vector3 ca, vector4 qa, vector3 ha, vector3 cb, 
     for (int k = 0; k < 15 + 240; k++) {
         vector3 n;
         if (k < 15) {
-            if (k < 3) n = aa[k];
+            if (k < 3)
+                n = aa[k];
             else if (k < 6)
                 n = ab[k - 3];
             else {
@@ -733,7 +734,8 @@ static int mpe_ref_obb_overlap (vector3 ca, vector4 qa, vector3 ha, vector3 cb, 
             float u = (float) (m / 16) * 0.3926990817f;
             float v = (float) (m % 16) * 0.3926990817f;
             vector3 e0 = vector3_cross (aa[0], ab[0]);
-            if (vector3_length_squared (e0) < 1e-6f) e0 = aa[1];
+            if (vector3_length_squared (e0) < 1e-6f)
+                e0 = aa[1];
             e0 = vector3_scaling (e0, 1.0f / sqrtf (vector3_length_squared (e0)));
             vector3 e1 = vector3_cross (e0, aa[0]);
             e1 = vector3_scaling (e1, 1.0f / sqrtf (vector3_length_squared (e1)));
@@ -743,7 +745,8 @@ static int mpe_ref_obb_overlap (vector3 ca, vector4 qa, vector3 ha, vector3 cb, 
                 vector3_scaling (e2, cosf (u) * sinf (v)));
         }
         float L2 = vector3_length_squared (n);
-        if (L2 < 1e-8f) continue;
+        if (L2 < 1e-8f)
+            continue;
         n = vector3_scaling (n, 1.0f / sqrtf (L2));
         if (fabsf (vector3_dot (t, n)) > mpe_ref_proj_r (aa, ha, n) + mpe_ref_proj_r (ab, hb, n)) {
             return 0; /* a separating axis exists -> disjoint */
@@ -784,7 +787,8 @@ int mpe_t_reference_math (void) {
             seed = seed * 1103515245u + 12345u;
             vector3 axis = {(float) ((seed >> 8) & 0xFF) / 255.0f - 0.5f, (float) ((seed >> 16) & 0xFF) / 255.0f - 0.5f,
                             (float) ((seed >> 24) & 0xFF) / 255.0f - 0.5f};
-            if (vector3_length_squared (axis) < 1e-4f) axis = (vector3){0, 0, 1};
+            if (vector3_length_squared (axis) < 1e-4f)
+                axis = (vector3){0, 0, 1};
             vector3 pa = {ra, rb, -ra}, pb = {rb, ra, -rb};
             vector4 qq = vector4_from_axis_with_angle (axis, ang);
             int a = physics_world_add_cube (&w, pa, ha, 1.0f);
@@ -797,7 +801,8 @@ int mpe_t_reference_math (void) {
             int hit = collision_dual_cube (&w.bodies[a], &w.bodies[b], &cd, &g_cfg) ? 1 : 0;
             int ref = mpe_ref_obb_overlap (pa, qa, ha, pb, qq, hb);
             tested++;
-            if ((hit != 0) == (ref != 0)) agree++;
+            if ((hit != 0) == (ref != 0))
+                agree++;
         }
         MPE_INFO ("SAT vs independent dense reference: %d/%d configurations agree", agree, tested);
         MPE_CHECK (&t, agree == tested);

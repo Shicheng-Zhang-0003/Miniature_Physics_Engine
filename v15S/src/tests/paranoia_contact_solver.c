@@ -53,7 +53,8 @@ int main (void) {
                 apex_count++;
             }
             previous_vy = b->velocity.y;
-            if (apex_count >= 4) break;
+            if (apex_count >= 4)
+                break;
         }
 
         float e = 0.8f;
@@ -109,7 +110,8 @@ int main (void) {
         for (int t = 0; t < 600; t++) {
             physics_world_step (&world, dt);
             rigidbody *b = &world.bodies[cube];
-            if (fabsf (b->position.x) > max_x) max_x = fabsf (b->position.x);
+            if (fabsf (b->position.x) > max_x)
+                max_x = fabsf (b->position.x);
         }
 
         printf ("[INFO] static_friction drift=%.6f (10s, mu=1.0, initial vx=0.05m/s)\n", max_x);
@@ -201,7 +203,8 @@ int main (void) {
         for (int t = 0; t < 100; t++) {
             physics_world_step (&world, dt);
             rigidbody *b = &world.bodies[cube];
-            if (b->velocity.y > max_vy) max_vy = b->velocity.y;
+            if (b->velocity.y > max_vy)
+                max_vy = b->velocity.y;
         }
 
         printf ("[INFO] split_impulse max_vy_after_impact=%.4f (expected 0)\n", max_vy);

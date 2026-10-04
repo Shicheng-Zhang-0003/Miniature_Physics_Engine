@@ -71,8 +71,10 @@ static int name_fits (const char *name, size_t cap) {
 }
 
 int mpe_register_pair_handler (int ta, int tb, int ca, int cb, mpe_collide_fn fn, const char *name) {
-    if (!fn) return -1;
-    if (!name_fits (name ? name : "?", sizeof (s_pairs[0].name))) return -1;
+    if (!fn)
+        return -1;
+    if (!name_fits (name ? name : "?", sizeof (s_pairs[0].name)))
+        return -1;
     pthread_mutex_lock (&s_reg_lock);
     int rc = -1;
     for (int i = 0; i < s_pair_count; i++) {
@@ -108,7 +110,8 @@ int mpe_register_pair_handler (int ta, int tb, int ca, int cb, mpe_collide_fn fn
 }
 
 int mpe_unregister_pair_handler (mpe_collide_fn fn) {
-    if (!fn) return -1;
+    if (!fn)
+        return -1;
     /* FIX-AUDIT-DESPOT: missing lock added — every other registry mutation
      * and lookup takes s_reg_lock; the unlocked memmove raced concurrent
      * dispatch (find) and loader purge walks.
@@ -143,16 +146,20 @@ int mpe_unregister_pair_handler (mpe_collide_fn fn) {
 
 static int match_score (const mpe_pair_entry_t *e, int ta, int tb, int ca, int cb) {
     int s = 0;
-    if (e->type_a == ta) s += 4;
+    if (e->type_a == ta)
+        s += 4;
     else if (e->type_a != -1)
         return -1;
-    if (e->type_b == tb) s += 4;
+    if (e->type_b == tb)
+        s += 4;
     else if (e->type_b != -1)
         return -1;
-    if (e->custom_a == ca) s += 2;
+    if (e->custom_a == ca)
+        s += 2;
     else if (e->custom_a != -1)
         return -1;
-    if (e->custom_b == cb) s += 2;
+    if (e->custom_b == cb)
+        s += 2;
     else if (e->custom_b != -1)
         return -1;
     return s;
@@ -160,14 +167,19 @@ static int match_score (const mpe_pair_entry_t *e, int ta, int tb, int ca, int c
 
 /* Human-readable pair-table dump for `mod ls` (types + owned name). */
 int mpe_registry_pair_describe (int idx, int *ta, int *tb, int *ca, int *cb, char *name, int namelen) {
-    if (idx < 0) return -1;
+    if (idx < 0)
+        return -1;
     pthread_mutex_lock (&s_reg_lock);
     int rc = -1;
     if (idx < s_pair_count) {
-        if (ta) *ta = s_pairs[idx].type_a;
-        if (tb) *tb = s_pairs[idx].type_b;
-        if (ca) *ca = s_pairs[idx].custom_a;
-        if (cb) *cb = s_pairs[idx].custom_b;
+        if (ta)
+            *ta = s_pairs[idx].type_a;
+        if (tb)
+            *tb = s_pairs[idx].type_b;
+        if (ca)
+            *ca = s_pairs[idx].custom_a;
+        if (cb)
+            *cb = s_pairs[idx].custom_b;
         if (name && namelen > 0) {
             snprintf (name, (size_t) namelen, "%s", s_pairs[idx].name);
         }
@@ -180,7 +192,8 @@ int mpe_registry_pair_describe (int idx, int *ta, int *tb, int *ca, int *cb, cha
 /* Indexed snapshot for loader purge walks (skips tombstone-free table:
  * pairs have no tombstones; memmove under lock is safe). */
 int mpe_registry_pair_fn_at (int idx, mpe_collide_fn *out) {
-    if (!out) return -1;
+    if (!out)
+        return -1;
     pthread_mutex_lock (&s_reg_lock);
     int rc = -1;
     if (idx >= 0 && idx < s_pair_count) {
@@ -217,8 +230,10 @@ int mpe_registry_pair_count (void) {
 
 void mpe_registry_truncate_pairs (int keep) {
     pthread_mutex_lock (&s_reg_lock);
-    if (keep < s_builtin_pairs) keep = s_builtin_pairs;
-    if (keep < s_pair_count) s_pair_count = keep;
+    if (keep < s_builtin_pairs)
+        keep = s_builtin_pairs;
+    if (keep < s_pair_count)
+        s_pair_count = keep;
     pthread_mutex_unlock (&s_reg_lock);
 }
 
@@ -238,7 +253,8 @@ void mpe_registry_truncate_pairs (int keep) {
  * their state was never initialised. */
 void mpe_registry_truncate_modules (int keep) {
     pthread_mutex_lock (&s_reg_lock);
-    if (keep < 0) keep = 0;
+    if (keep < 0)
+        keep = 0;
     if (keep < s_module_count) {
         for (int i = keep; i < s_module_count; i++) {
             s_module_live[i] = 0;
@@ -264,8 +280,10 @@ int mpe_registry_broadphase_count (void) {
 
 void mpe_registry_truncate_broadphase (int keep) {
     pthread_mutex_lock (&s_reg_lock);
-    if (keep < 1) keep = 1; /* builtin "hash" is index 0, pinned */
-    if (keep < s_broad_count) s_broad_count = keep;
+    if (keep < 1)
+        keep = 1; /* builtin "hash" is index 0, pinned */
+    if (keep < s_broad_count)
+        s_broad_count = keep;
     pthread_mutex_unlock (&s_reg_lock);
 }
 
@@ -278,8 +296,10 @@ int mpe_registry_solver_count (void) {
 
 void mpe_registry_truncate_solvers (int keep) {
     pthread_mutex_lock (&s_reg_lock);
-    if (keep < 1) keep = 1; /* builtin "seq-impulse" is index 0, pinned */
-    if (keep < s_solver_count) s_solver_count = keep;
+    if (keep < 1)
+        keep = 1; /* builtin "seq-impulse" is index 0, pinned */
+    if (keep < s_solver_count)
+        s_solver_count = keep;
     pthread_mutex_unlock (&s_reg_lock);
 }
 
@@ -296,8 +316,10 @@ static int is_builtin_stage (const char *name) {
 }
 
 int mpe_register_broadphase (const char *name, const mpe_broadphase_if_t *iface) {
-    if (!name || !iface) return -1;
-    if (!name_fits (name, sizeof (s_broad[0].name))) return -1;
+    if (!name || !iface)
+        return -1;
+    if (!name_fits (name, sizeof (s_broad[0].name)))
+        return -1;
     pthread_mutex_lock (&s_reg_lock);
     int rc = -1;
     for (int i = 0; i < s_broad_count; i++) {
@@ -340,7 +362,8 @@ int mpe_register_broadphase (const char *name, const mpe_broadphase_if_t *iface)
 }
 
 int mpe_unregister_broadphase (const char *name) {
-    if (!name) return -1;
+    if (!name)
+        return -1;
     pthread_mutex_lock (&s_reg_lock);
     int rc = -1;
     const mpe_broadphase_if_t *deadp = NULL;
@@ -356,13 +379,16 @@ int mpe_unregister_broadphase (const char *name) {
     /* Worlds aliasing the interior pointer must reset to builtin (NULL)
      * before the caller can dlclose. Slot memory stays put (tombstone),
      * so no other world's pointer shifts meaning. */
-    if (deadp) physics_world_forget_stage_pointers (deadp, NULL);
+    if (deadp)
+        physics_world_forget_stage_pointers (deadp, NULL);
     return rc;
 }
 
 int mpe_register_solver (const char *name, const mpe_solver_if_t *iface) {
-    if (!name || !iface) return -1;
-    if (!name_fits (name, sizeof (s_solvers[0].name))) return -1;
+    if (!name || !iface)
+        return -1;
+    if (!name_fits (name, sizeof (s_solvers[0].name)))
+        return -1;
     pthread_mutex_lock (&s_reg_lock);
     int rc = -1;
     for (int i = 0; i < s_solver_count; i++) {
@@ -401,7 +427,8 @@ int mpe_register_solver (const char *name, const mpe_solver_if_t *iface) {
 }
 
 int mpe_unregister_solver (const char *name) {
-    if (!name) return -1;
+    if (!name)
+        return -1;
     pthread_mutex_lock (&s_reg_lock);
     int rc = -1;
     const mpe_solver_if_t *deadp = NULL;
@@ -414,12 +441,14 @@ int mpe_unregister_solver (const char *name) {
         }
     }
     pthread_mutex_unlock (&s_reg_lock);
-    if (deadp) physics_world_forget_stage_pointers (NULL, deadp);
+    if (deadp)
+        physics_world_forget_stage_pointers (NULL, deadp);
     return rc;
 }
 
 const mpe_broadphase_if_t *mpe_find_broadphase (const char *name) {
-    if (!name) return 0;
+    if (!name)
+        return 0;
     pthread_mutex_lock (&s_reg_lock);
     const mpe_broadphase_if_t *out = 0;
     for (int i = 0; i < s_broad_count; i++)
@@ -432,7 +461,8 @@ const mpe_broadphase_if_t *mpe_find_broadphase (const char *name) {
 }
 
 const mpe_solver_if_t *mpe_find_solver (const char *name) {
-    if (!name) return 0;
+    if (!name)
+        return 0;
     pthread_mutex_lock (&s_reg_lock);
     const mpe_solver_if_t *out = 0;
     for (int i = 0; i < s_solver_count; i++)
@@ -477,7 +507,8 @@ static void module_store (int i, const mpe_module_desc_t *desc, int keep_origin)
 
 /* Loader-registered provenance (call right after mpe_register_module). */
 int mpe_registry_set_origin (const char *name, const char *path) {
-    if (!name || !path) return -1;
+    if (!name || !path)
+        return -1;
     pthread_mutex_lock (&s_reg_lock);
     int rc = -1;
     for (int i = 0; i < s_module_count; i++) {
@@ -494,7 +525,8 @@ int mpe_registry_set_origin (const char *name, const char *path) {
 /* Origin of the slot this desc pointer aliases, or NULL (static desc,
  * unknown pointer, or dead slot). */
 const char *mpe_registry_module_origin (const mpe_module_desc_t *desc) {
-    if (!desc) return NULL;
+    if (!desc)
+        return NULL;
     pthread_mutex_lock (&s_reg_lock);
     const char *out = NULL;
     for (int i = 0; i < s_module_count; i++) {
@@ -508,8 +540,10 @@ const char *mpe_registry_module_origin (const mpe_module_desc_t *desc) {
 }
 
 int mpe_register_module (const mpe_module_desc_t *desc) {
-    if (!desc || desc->abi != MPE_MODULE_ABI || !desc->name) return -1;
-    if (!name_fits (desc->name, sizeof (s_module_names[0]))) return -1;
+    if (!desc || desc->abi != MPE_MODULE_ABI || !desc->name)
+        return -1;
+    if (!name_fits (desc->name, sizeof (s_module_names[0])))
+        return -1;
     pthread_mutex_lock (&s_reg_lock);
     int rc = -1;
     for (int i = 0; i < s_module_count; i++) {
@@ -541,7 +575,8 @@ int mpe_register_module (const mpe_module_desc_t *desc) {
 }
 
 int mpe_unregister_module (const char *name) {
-    if (!name) return -1;
+    if (!name)
+        return -1;
     pthread_mutex_lock (&s_reg_lock);
     int rc = -1;
     for (int i = 0; i < s_module_count; i++) {
@@ -554,7 +589,8 @@ int mpe_unregister_module (const char *name) {
     pthread_mutex_unlock (&s_reg_lock);
     /* Attached worlds hold &s_modules[i]: tombstone keeps the address
      * stable; detach everywhere so no world calls a dead module. */
-    if (rc == 0) physics_world_detach_module_everywhere (name);
+    if (rc == 0)
+        physics_world_detach_module_everywhere (name);
     return rc;
 }
 
@@ -562,7 +598,8 @@ int mpe_unregister_module (const char *name) {
  * whose origin matches (a static same-named desc is left alone), with NO
  * world-detach side effect (the loader detaches targeted refs first). */
 int mpe_unregister_module_origin (const char *name, const char *path) {
-    if (!name || !path) return -1;
+    if (!name || !path)
+        return -1;
     pthread_mutex_lock (&s_reg_lock);
     int rc = -1;
     for (int i = 0; i < s_module_count; i++) {
@@ -599,7 +636,8 @@ const mpe_module_desc_t *mpe_module_at (int i) {
     const mpe_module_desc_t *out = 0;
     int seen = -1;
     for (int k = 0; k < s_module_count; k++) {
-        if (!s_module_live[k]) continue;
+        if (!s_module_live[k])
+            continue;
         if (++seen == i) {
             out = &s_modules[k];
             break;
@@ -610,7 +648,8 @@ const mpe_module_desc_t *mpe_module_at (int i) {
 }
 
 const mpe_module_desc_t *mpe_find_module (const char *name) {
-    if (!name) return 0;
+    if (!name)
+        return 0;
     pthread_mutex_lock (&s_reg_lock);
     const mpe_module_desc_t *out = 0;
     for (int i = 0; i < s_module_count; i++)

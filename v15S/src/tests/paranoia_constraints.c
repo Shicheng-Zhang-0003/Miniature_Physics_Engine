@@ -74,7 +74,8 @@ int main (void) {
                 if (period_count > 0 && period_count - 1 < (int) (sizeof (periods) / sizeof (periods[0]))) {
                     periods[period_count - 1] = (t - last_cross) * (1.0f / 60.0f);
                 }
-                if (period_count < (int) (sizeof (periods) / sizeof (periods[0]))) period_count++;
+                if (period_count < (int) (sizeof (periods) / sizeof (periods[0])))
+                    period_count++;
                 last_cross = t;
             }
             last_x = bob->position.x;
@@ -238,7 +239,8 @@ int main (void) {
             physics_world_step (&world, dt);
             float d = vector3_length (vector3_subtraction (world.bodies[0].position, world.bodies[1].position));
             float err = fabsf (d - 1.0f);
-            if (err > max_err) max_err = err;
+            if (err > max_err)
+                max_err = err;
         }
 
         printf ("[INFO] distance_constraint max_err=%.6f\n", max_err);
@@ -287,7 +289,8 @@ int main (void) {
             vector3 pa = fixed_world_anchor (&world.bodies[a], anchor_a);
             vector3 pb = fixed_world_anchor (&world.bodies[b], anchor_b);
             float gap = vector3_length (vector3_subtraction (pa, pb));
-            if (gap > max_gap) max_gap = gap;
+            if (gap > max_gap)
+                max_gap = gap;
         }
 
         printf ("[INFO] fixed_weld max_anchor_gap=%.6f m\n", max_gap);
@@ -333,7 +336,8 @@ int main (void) {
         for (int t = 0; t < 120; t++) {
             physics_world_step (&world, dt);
             float d = vector3_length (vector3_subtraction (world.bodies[a].position, world.bodies[b].position));
-            if (d > max_dist) max_dist = d;
+            if (d > max_dist)
+                max_dist = d;
         }
 
         float taut_dist = vector3_length (vector3_subtraction (world.bodies[a].position, world.bodies[b].position));

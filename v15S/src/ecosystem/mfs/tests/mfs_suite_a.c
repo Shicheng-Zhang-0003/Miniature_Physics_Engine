@@ -393,7 +393,8 @@ int mfs_t_odometry (void) {
         mfs_drive_tank (robot, 1.0f, 1.0f);
         drivetrain_update (&w, robot, dt);
         physics_world_step (&w, dt);
-        if (!mfs_test_finite (&w)) fail = 1;
+        if (!mfs_test_finite (&w))
+            fail = 1;
     }
 
     if (!fail) {
@@ -441,7 +442,8 @@ int mfs_t_odometry (void) {
                 mfs_drive_mecanum (robot, 0.0f, 1.0f, 0.0f);
                 drivetrain_update (&w, robot, dt);
                 physics_world_step (&w, dt);
-                if (!mfs_test_finite (&w)) fail = 1;
+                if (!mfs_test_finite (&w))
+                    fail = 1;
             }
             if (!fail) {
                 float end_x2, end_y2, end_z2;
@@ -609,8 +611,10 @@ int mfs_t_stall_endpoint (void) {
             float tau_l = axle_I * alpha - mo.tau_exp_prev;
             float stall_out = mo.stall_current * mo.kt * mo.gear_ratio * mo.efficiency;
             float cap = 2.0f * stall_out;
-            if (tau_l > cap) tau_l = cap;
-            if (tau_l < -cap) tau_l = -cap;
+            if (tau_l > cap)
+                tau_l = cap;
+            if (tau_l < -cap)
+                tau_l = -cap;
             mo.load_torque = tau_l;
             /* Reproduce the caller-side handshake from robot.c: it is
              * robot.c that sets wprev_valid, not motor.c (see
@@ -678,8 +682,10 @@ int mfs_t_stall_endpoint (void) {
                 float tau_l = I25 * alpha - m25.tau_exp_prev;
                 float stall_out = m25.stall_current * m25.kt * m25.gear_ratio * m25.efficiency;
                 float cap = 2.0f * stall_out;
-                if (tau_l > cap) tau_l = cap;
-                if (tau_l < -cap) tau_l = -cap;
+                if (tau_l > cap)
+                    tau_l = cap;
+                if (tau_l < -cap)
+                    tau_l = -cap;
                 m25.load_torque = tau_l;
                 m25.wprev_valid = (i > 0) ? 1 : 0;
                 motor_update_load (&m25, hw, dt, 12.0f, I25);
@@ -744,7 +750,8 @@ static float mfs_yaw_of (const rigidbody *b) {
 
 static int mfs_measure_rates (physics_world *w, ftc_robot *robot, float f, float s, float r, mfs_axis_rates *out) {
     rigidbody *ch = mfs_chassis_or_null (w, robot);
-    if (!ch || !robot) return -1;
+    if (!ch || !robot)
+        return -1;
     const float dt = 1.0f / 60.0f;
     /* 90 ticks settle, 180 ticks spin the drivetrain up, then measure. */
     for (int k = 0; k < 90; k++) {

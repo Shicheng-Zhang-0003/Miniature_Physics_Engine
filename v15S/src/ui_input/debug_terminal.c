@@ -324,33 +324,33 @@ int term_parse_movement_destination (const char *token, float *x, float *y, floa
         term_err ("mpe: " #name ": not yet ported to GTK4\n");                                                         \
     }
 MPE_WEAK_CMD (cmd_help)
-MPE_WEAK_CMD (cmd_man) MPE_WEAK_CMD (cmd_clear) MPE_WEAK_CMD (cmd_history) MPE_WEAK_CMD (cmd_pwd) MPE_WEAK_CMD (cmd_cd)
-    MPE_WEAK_CMD (cmd_ls) MPE_WEAK_CMD (cmd_ll) MPE_WEAK_CMD (cmd_cat) MPE_WEAK_CMD (cmd_touch) MPE_WEAK_CMD (
-        cmd_cp) MPE_WEAK_CMD (cmd_rm) MPE_WEAK_CMD (cmd_mv) MPE_WEAK_CMD (cmd_ln) MPE_WEAK_CMD (cmd_unlink)
-        MPE_WEAK_CMD (cmd_chmod) MPE_WEAK_CMD (cmd_chown) MPE_WEAK_CMD (cmd_kill) MPE_WEAK_CMD (cmd_ps) MPE_WEAK_CMD (
-            cmd_top) MPE_WEAK_CMD (cmd_df) MPE_WEAK_CMD (cmd_du) MPE_WEAK_CMD (cmd_uname) MPE_WEAK_CMD (cmd_whoami)
-            MPE_WEAK_CMD (cmd_date) MPE_WEAK_CMD (cmd_echo) MPE_WEAK_CMD (cmd_env) MPE_WEAK_CMD (cmd_export)
-                MPE_WEAK_CMD (cmd_config) MPE_WEAK_CMD (cmd_exit) MPE_WEAK_CMD (cmd_logout) MPE_WEAK_CMD (cmd_quit)
-                    MPE_WEAK_CMD (cmd_poweroff) MPE_WEAK_CMD (cmd_shutdown) MPE_WEAK_CMD (cmd_reboot) MPE_WEAK_CMD (
-                        cmd_halt) MPE_WEAK_CMD (cmd_sleep) MPE_WEAK_CMD (cmd_sync) MPE_WEAK_CMD (cmd_uptime)
-                        MPE_WEAK_CMD (cmd_free) MPE_WEAK_CMD (cmd_w) MPE_WEAK_CMD (cmd_hostname) MPE_WEAK_CMD (cmd_id)
-                            MPE_WEAK_CMD (cmd_which) MPE_WEAK_CMD (cmd_true) MPE_WEAK_CMD (cmd_false) MPE_WEAK_CMD (
-                                cmd_time) MPE_WEAK_CMD (cmd_stat) MPE_WEAK_CMD (cmd_find) MPE_WEAK_CMD (cmd_wc)
-                                MPE_WEAK_CMD (cmd_file) MPE_WEAK_CMD (cmd_diff) MPE_WEAK_CMD (cmd_xxd)
-                                    MPE_WEAK_CMD (cmd_sort) MPE_WEAK_CMD (cmd_grep) MPE_WEAK_CMD (cmd_head)
-                                        MPE_WEAK_CMD (cmd_tail) MPE_WEAK_CMD (cmd_less) MPE_WEAK_CMD (cmd_sed)
-                                            MPE_WEAK_CMD (cmd_nice) MPE_WEAK_CMD (cmd_renice) MPE_WEAK_CMD (cmd_ping)
-                                                MPE_WEAK_CMD (cmd_mount) MPE_WEAK_CMD (cmd_umount)
-                                                    MPE_WEAK_CMD (cmd_mkfs) MPE_WEAK_CMD (cmd_fsck)
-                                                        MPE_WEAK_CMD (cmd_netstat) MPE_WEAK_CMD (cmd_ifconfig)
-                                                            MPE_WEAK_CMD (cmd_lsmod) MPE_WEAK_CMD (cmd_alias)
-                                                                MPE_WEAK_CMD (cmd_unalias) MPE_WEAK_CMD (cmd_jobs)
-                                                                    MPE_WEAK_CMD (cmd_lsof) MPE_WEAK_CMD (cmd_seq)
-                                                                        MPE_WEAK_CMD (cmd_tee) MPE_WEAK_CMD (cmd_watch)
-                                                                            MPE_WEAK_CMD (cmd_sudo)
-                                                                                MPE_WEAK_CMD (cmd_su)
-                                                                                    MPE_WEAK_CMD (cmd_dmesg)
-                                                                                        MPE_WEAK_CMD (cmd_vi)
+MPE_WEAK_CMD (cmd_man)
+MPE_WEAK_CMD (cmd_clear) MPE_WEAK_CMD (cmd_history) MPE_WEAK_CMD (cmd_pwd) MPE_WEAK_CMD (cmd_cd) MPE_WEAK_CMD (
+    cmd_ls) MPE_WEAK_CMD (cmd_ll) MPE_WEAK_CMD (cmd_cat) MPE_WEAK_CMD (cmd_touch) MPE_WEAK_CMD (cmd_cp)
+    MPE_WEAK_CMD (cmd_rm) MPE_WEAK_CMD (cmd_mv) MPE_WEAK_CMD (cmd_ln) MPE_WEAK_CMD (cmd_unlink) MPE_WEAK_CMD (
+        cmd_chmod) MPE_WEAK_CMD (cmd_chown) MPE_WEAK_CMD (cmd_kill) MPE_WEAK_CMD (cmd_ps) MPE_WEAK_CMD (cmd_top)
+        MPE_WEAK_CMD (cmd_df) MPE_WEAK_CMD (cmd_du) MPE_WEAK_CMD (cmd_uname) MPE_WEAK_CMD (cmd_whoami) MPE_WEAK_CMD (
+            cmd_date) MPE_WEAK_CMD (cmd_echo) MPE_WEAK_CMD (cmd_env) MPE_WEAK_CMD (cmd_export) MPE_WEAK_CMD (cmd_config)
+            MPE_WEAK_CMD (cmd_exit) MPE_WEAK_CMD (cmd_logout) MPE_WEAK_CMD (cmd_quit) MPE_WEAK_CMD (cmd_poweroff)
+                MPE_WEAK_CMD (cmd_shutdown) MPE_WEAK_CMD (cmd_reboot) MPE_WEAK_CMD (cmd_halt) MPE_WEAK_CMD (cmd_sleep)
+                    MPE_WEAK_CMD (cmd_sync) MPE_WEAK_CMD (cmd_uptime) MPE_WEAK_CMD (cmd_free) MPE_WEAK_CMD (cmd_w)
+                        MPE_WEAK_CMD (cmd_hostname) MPE_WEAK_CMD (cmd_id) MPE_WEAK_CMD (cmd_which) MPE_WEAK_CMD (
+                            cmd_true) MPE_WEAK_CMD (cmd_false) MPE_WEAK_CMD (cmd_time) MPE_WEAK_CMD (cmd_stat)
+                            MPE_WEAK_CMD (cmd_find) MPE_WEAK_CMD (cmd_wc) MPE_WEAK_CMD (cmd_file)
+                                MPE_WEAK_CMD (cmd_diff) MPE_WEAK_CMD (cmd_xxd) MPE_WEAK_CMD (cmd_sort)
+                                    MPE_WEAK_CMD (cmd_grep) MPE_WEAK_CMD (cmd_head) MPE_WEAK_CMD (cmd_tail)
+                                        MPE_WEAK_CMD (cmd_less) MPE_WEAK_CMD (cmd_sed) MPE_WEAK_CMD (cmd_nice)
+                                            MPE_WEAK_CMD (cmd_renice) MPE_WEAK_CMD (cmd_ping) MPE_WEAK_CMD (cmd_mount)
+                                                MPE_WEAK_CMD (cmd_umount) MPE_WEAK_CMD (cmd_mkfs)
+                                                    MPE_WEAK_CMD (cmd_fsck) MPE_WEAK_CMD (cmd_netstat)
+                                                        MPE_WEAK_CMD (cmd_ifconfig) MPE_WEAK_CMD (cmd_lsmod)
+                                                            MPE_WEAK_CMD (cmd_alias) MPE_WEAK_CMD (cmd_unalias)
+                                                                MPE_WEAK_CMD (cmd_jobs) MPE_WEAK_CMD (cmd_lsof)
+                                                                    MPE_WEAK_CMD (cmd_seq) MPE_WEAK_CMD (cmd_tee)
+                                                                        MPE_WEAK_CMD (cmd_watch) MPE_WEAK_CMD (cmd_sudo)
+                                                                            MPE_WEAK_CMD (cmd_su)
+                                                                                MPE_WEAK_CMD (cmd_dmesg)
+                                                                                    MPE_WEAK_CMD (cmd_vi)
 #undef MPE_WEAK_CMD
 #endif
     /* Command declarations moved to term_priv.h. */

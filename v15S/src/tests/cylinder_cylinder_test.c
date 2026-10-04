@@ -34,7 +34,8 @@ int main (void) {
             }
         }
     }
-    if (fail) return 1;
+    if (fail)
+        return 1;
 
     float z1 = world.bodies[c1].position.z;
     float z2 = world.bodies[c2].position.z;

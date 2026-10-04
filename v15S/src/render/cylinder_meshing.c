@@ -7,18 +7,21 @@
 #include <math.h>
 
 void init_cylinder_system (mesh *mesh_object, int radial_segments) {
-    if (!mesh_object) return;
+    if (!mesh_object)
+        return;
     mesh_object->index_count = 0;
     mesh_object->wireframe_index_count = 0;
     if (radial_segments < 8) {
         radial_segments = 8;
     }
-    if (radial_segments > 4096) return;
+    if (radial_segments > 4096)
+        return;
     int ring_verts = radial_segments + 1;
     /* Rings: x=-1 barrel, x=+1 barrel, x=-1 cap disc, x=+1 cap disc, + 2 cap centers. */
     int vertex_count = ring_verts * 4 + 2;
     float *vertex_data = malloc ((size_t) vertex_count * 6 * sizeof (float));
-    if (!vertex_data) return;
+    if (!vertex_data)
+        return;
     int vi = 0;
     for (int ring = 0; ring < 4; ring++) {
         float x = (ring == 0 || ring == 2) ? -1.0f : 1.0f;

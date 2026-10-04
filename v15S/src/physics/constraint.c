@@ -42,7 +42,8 @@ int constraint_add_revolute (struct physics_world *world, uint32_t id_a, uint32_
             vector3 axis_a_norm = vector3_normalisation (axis_a);
             rigidbody *body_a_ptr = NULL, *body_b_ptr = NULL;
             for (int bi = 0; bi < world->body_count; bi++) {
-                if (world->bodies[bi].object_id == id_a) body_a_ptr = &world->bodies[bi];
+                if (world->bodies[bi].object_id == id_a)
+                    body_a_ptr = &world->bodies[bi];
                 else if (world->bodies[bi].object_id == id_b)
                     body_b_ptr = &world->bodies[bi];
             }
@@ -169,7 +170,8 @@ int constraint_add_prismatic (struct physics_world *world, uint32_t id_a, uint32
                 vector3 axis_b_local = axis_a_norm;
                 rigidbody *pa = NULL, *pb = NULL;
                 for (int bi = 0; bi < world->body_count; bi++) {
-                    if (world->bodies[bi].object_id == id_a) pa = &world->bodies[bi];
+                    if (world->bodies[bi].object_id == id_a)
+                        pa = &world->bodies[bi];
                     else if (world->bodies[bi].object_id == id_b)
                         pb = &world->bodies[bi];
                 }

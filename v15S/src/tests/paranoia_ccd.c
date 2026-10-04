@@ -74,7 +74,8 @@ int main (void) {
         for (int t = 0; t < 200; t++) {
             physics_world_step (&world, dt);
             float y = world.bodies[1].position.y;
-            if (y < min_y) min_y = y;
+            if (y < min_y)
+                min_y = y;
             if (y <= 0.55f) {
                 hit_floor = 1;
                 break;
@@ -113,7 +114,8 @@ int main (void) {
 
         for (int t = 0; t < 600; t++) {
             physics_world_step (&world, dt);
-            if (world.bodies[cyl].position.y < min_y) min_y = world.bodies[cyl].position.y;
+            if (world.bodies[cyl].position.y < min_y)
+                min_y = world.bodies[cyl].position.y;
         }
 
         printf ("[INFO] ccd_spin_cyl min_y=%.4f\n", min_y);

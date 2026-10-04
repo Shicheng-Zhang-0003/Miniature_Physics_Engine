@@ -6,13 +6,16 @@
 #include <stdlib.h>
 #include <math.h>
 void init_sm_system (mesh *mesh_object, int horizontal_sections, int vertical_stacks) {
-    if (!mesh_object) return;
+    if (!mesh_object)
+        return;
     mesh_object->index_count = 0;
     mesh_object->wireframe_index_count = 0;
-    if (horizontal_sections < 3 || horizontal_sections > 1024 || vertical_stacks < 2 || vertical_stacks > 512) return;
+    if (horizontal_sections < 3 || horizontal_sections > 1024 || vertical_stacks < 2 || vertical_stacks > 512)
+        return;
     int vertex_count = (vertical_stacks + 1) * (horizontal_sections + 1);
     float *vertex_data = malloc (vertex_count * 6 * sizeof (float));
-    if (!vertex_data) return;
+    if (!vertex_data)
+        return;
     int vertex_index = 0;
     for (int stack_step = 0; stack_step <= vertical_stacks; stack_step++) {
         float phi_angle = math_pi / 2 - stack_step * math_pi / vertical_stacks;

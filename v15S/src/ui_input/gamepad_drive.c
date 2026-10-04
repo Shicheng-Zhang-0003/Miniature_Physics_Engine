@@ -18,7 +18,8 @@
 
 static void *gpd_sym (const char *sym) {
     void *p = mpe_loader_symbol (GPD_HANDLE_PRIMARY, sym);
-    if (p) return p;
+    if (p)
+        return p;
     return mpe_loader_symbol (GPD_HANDLE_MODULE, sym);
 }
 
@@ -45,7 +46,8 @@ static int s_reported_stage = -1;
 static void gpd_report_stage (int stage) {
     /* One line per transition so a dead controller always says why (bundle,
      * pad, robot) instead of silently no-op'ing. */
-    if (stage == s_reported_stage) return;
+    if (stage == s_reported_stage)
+        return;
     s_reported_stage = stage;
     switch (stage) {
     case 0:
@@ -74,7 +76,8 @@ static void gpd_resolve (void) {
      * controller was dead until engine restart, with no diagnostic. Retry
      * until the fleet entry points resolve; the rest may legitimately stay
      * NULL only when the bundle is absent (checked per-tick below). */
-    if (s_syms_resolved && s_fleet_get && s_mecanum) return;
+    if (s_syms_resolved && s_fleet_get && s_mecanum)
+        return;
     s_fleet_get = (ftc_robot * (*) (struct physics_world *, int) ) gpd_sym ("ftc_fleet_get");
     s_mecanum = (void (*) (ftc_robot *, float, float, float)) gpd_sym ("drivetrain_mecanum");
     s_pad_init = (bool (*) (gamepad_state *, const char *)) gpd_sym ("gamepad_init");
@@ -83,17 +86,20 @@ static void gpd_resolve (void) {
     s_pad_button = (bool (*) (const gamepad_state *, int)) gpd_sym ("gamepad_get_button");
     s_pad_connected = (bool (*) (const gamepad_state *)) gpd_sym ("gamepad_is_connected");
     s_pad_deadzone = (void (*) (gamepad_state *, float)) gpd_sym ("gamepad_set_deadzone");
-    if (s_fleet_get && s_mecanum) s_syms_resolved = 1;
+    if (s_fleet_get && s_mecanum)
+        s_syms_resolved = 1;
 }
 
 void gamepad_drive_init (void) {
     gpd_resolve ();
-    if (!s_pad_init || s_pad_open_attempted) return;
+    if (!s_pad_init || s_pad_open_attempted)
+        return;
     s_pad_open_attempted = 1;
     memset (&s_pad, 0, sizeof (s_pad));
     s_pad.fd = -1;
     if (s_pad_init (&s_pad, NULL)) {
-        if (s_pad_deadzone) s_pad_deadzone (&s_pad, 0.15f);
+        if (s_pad_deadzone)
+            s_pad_deadzone (&s_pad, 0.15f);
         fprintf (stderr, "[gamepad] opened %s\n", s_pad.device_path[0] ? s_pad.device_path : "(default device)");
         fflush (stderr);
     }
@@ -102,7 +108,8 @@ void gamepad_drive_init (void) {
 }
 
 static void gpd_stop_robot (ftc_robot *r) {
-    if (s_mecanum && r) s_mecanum (r, 0.0f, 0.0f, 0.0f);
+    if (s_mecanum && r)
+        s_mecanum (r, 0.0f, 0.0f, 0.0f);
 }
 
 void gamepad_drive_tick (void) {
@@ -140,7 +147,8 @@ void gamepad_drive_tick (void) {
 
     /* START toggles control even while disabled (else latch-dead). */
     int start_now = s_pad_button (&s_pad, gamepad_button_start) ? 1 : 0;
-    if (start_now && !s_prev_start) s_control_enabled = !s_control_enabled;
+    if (start_now && !s_prev_start)
+        s_control_enabled = !s_control_enabled;
     s_prev_start = start_now;
 
     physics_world *w = physics_world_get_primary ();

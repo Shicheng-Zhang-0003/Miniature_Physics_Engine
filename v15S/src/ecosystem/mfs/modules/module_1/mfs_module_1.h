@@ -204,8 +204,10 @@ void mfs_module_1_gamepad_step (mfs_module_1_state *state, float dt);
 
 /* Helper: get chassis body */
 static inline rigidbody *mfs_get_chassis (const mfs_module_1_state *state) {
-    if (!state || !state->robot_created || !state->world) return NULL;
-    if (state->robot.chassis_body < 0 || state->robot.chassis_body >= state->world->body_count) return NULL;
+    if (!state || !state->robot_created || !state->world)
+        return NULL;
+    if (state->robot.chassis_body < 0 || state->robot.chassis_body >= state->world->body_count)
+        return NULL;
     return &state->world->bodies[state->robot.chassis_body];
 }
 

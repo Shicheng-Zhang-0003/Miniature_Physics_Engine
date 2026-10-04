@@ -236,11 +236,13 @@ static inline const char *mpe_dl_strerror_win (DWORD e, char *buf, size_t n) {
 }
 static inline void *mpe_win_dlopen (const char *path, int flags) {
     (void) flags;
-    if (!path || !*path) return NULL;
+    if (!path || !*path)
+        return NULL;
     /* RTLD_NOLOAD emulation: only resolve if already loaded. */
     if (flags & RTLD_NOLOAD) {
         HMODULE h = GetModuleHandleA (path);
-        if (h) return (void *) h;
+        if (h)
+            return (void *) h;
         /* also try basename probe via loaded-module enumeration fallback:
          * GetModuleHandleA fails for bare filenames not yet loaded — that
          * is the correct NOLOAD failure. */
@@ -255,7 +257,8 @@ static inline void *mpe_win_dlopen (const char *path, int flags) {
     return (void *) h;
 }
 static inline void *mpe_win_dlsym (void *h, const char *sym) {
-    if (!h || !sym) return NULL;
+    if (!h || !sym)
+        return NULL;
     FARPROC p = GetProcAddress ((HMODULE) h, sym);
     if (!p) {
         mpe_dl_strerror_win (GetLastError (), mpe_dl_errbuf, sizeof (mpe_dl_errbuf));
@@ -264,11 +267,13 @@ static inline void *mpe_win_dlsym (void *h, const char *sym) {
     return (void *) p;
 }
 static inline int mpe_win_dlclose (void *h) {
-    if (!h) return -1;
+    if (!h)
+        return -1;
     return FreeLibrary ((HMODULE) h) ? 0 : -1;
 }
 static inline const char *mpe_win_dlerror (void) {
-    if (!mpe_dl_errbuf[0]) return NULL;
+    if (!mpe_dl_errbuf[0])
+        return NULL;
     /* dlerror() consumes the error (POSIX semantics). */
     static char out[1024];
     snprintf (out, sizeof (out), "%s", mpe_dl_errbuf);
@@ -283,13 +288,15 @@ typedef struct {
 } Dl_info;
 static inline int mpe_win_dladdr (const void *addr, Dl_info *info) {
     HMODULE h = NULL;
-    if (!addr || !info) return 0;
+    if (!addr || !info)
+        return 0;
     if (!GetModuleHandleExA (GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
                              (LPCSTR) addr, &h))
         return 0;
     static char fname[MAX_PATH * 2];
     DWORD n = GetModuleFileNameA (h, fname, sizeof (fname));
-    if (n == 0 || n >= sizeof (fname)) return 0;
+    if (n == 0 || n >= sizeof (fname))
+        return 0;
     info->dli_fname = fname;
     info->dli_fbase = (void *) h;
     info->dli_sname = NULL;
@@ -501,18 +508,21 @@ static inline char *mpe_realpath (const char *path, char *resolved) {
     }
     if (!resolved) {
         resolved = (char *) malloc (PATH_MAX * 2);
-        if (!resolved) return NULL;
+        if (!resolved)
+            return NULL;
         need_free = 1;
     }
     n = GetFullPathNameA (path, PATH_MAX * 2, resolved, NULL);
     if (n == 0 || n >= (DWORD) (PATH_MAX * 2)) {
-        if (need_free) free (resolved);
+        if (need_free)
+            free (resolved);
         errno = ENOENT;
         return NULL;
     }
     /* Normalise separators to '/' for internal comparisons (loader jail). */
     for (char *p = resolved; *p; ++p)
-        if (*p == '\\') *p = '/';
+        if (*p == '\\')
+            *p = '/';
     (void) tmp;
     return resolved;
 }
@@ -527,7 +537,8 @@ static inline struct tm *mpe_localtime_r (const time_t *t, struct tm *out) {
         errno = EINVAL;
         return NULL;
     }
-    if (localtime_s (out, t) != 0) return NULL;
+    if (localtime_s (out, t) != 0)
+        return NULL;
     return out;
 }
 #ifdef localtime_r
@@ -555,11 +566,13 @@ static inline int mpe_strncasecmp (const char *a, const char *b, size_t n) {
 static inline char *mpe_strndup (const char *s, size_t n) {
     size_t len = 0;
     char *out;
-    if (!s) return NULL;
+    if (!s)
+        return NULL;
     while (len < n && s[len])
         len++;
     out = (char *) malloc (len + 1);
-    if (!out) return NULL;
+    if (!out)
+        return NULL;
     memcpy (out, s, len);
     out[len] = '\0';
     return out;
@@ -629,9 +642,11 @@ static inline int mpe_clock_gettime (int clk, struct timespec *ts) {
 /* getenv HOME fallback: also consult USERPROFILE (native Windows). */
 static inline const char *mpe_home_dir (void) {
     const char *h = getenv ("HOME");
-    if (h && *h) return h;
+    if (h && *h)
+        return h;
     h = getenv ("USERPROFILE");
-    if (h && *h) return h;
+    if (h && *h)
+        return h;
     return NULL;
 }
 
@@ -651,7 +666,8 @@ static inline int mpe_mkdir_p (const char *path) {
     /* Minimal mkdir -p: create each ancestor with _mkdir. */
     char tmp[PATH_MAX * 2];
     size_t n;
-    if (!path || !*path) return -1;
+    if (!path || !*path)
+        return -1;
     snprintf (tmp, sizeof (tmp), "%s", path);
     n = strlen (tmp);
     /* strip trailing slashes */

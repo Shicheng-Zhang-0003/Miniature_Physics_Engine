@@ -37,9 +37,11 @@ int main (void) {
             physics_world_step (&world, dt);
             int awake_count = 0;
             for (int i = 0; i < world.body_count; i++) {
-                if (!world.bodies[i].is_sleeping) awake_count++;
+                if (!world.bodies[i].is_sleeping)
+                    awake_count++;
             }
-            if (awake_count > max_wake) max_wake = awake_count;
+            if (awake_count > max_wake)
+                max_wake = awake_count;
         }
 
         printf ("[INFO] sleeping_stack max_awake=%d (expected 0)\n", max_wake);
@@ -134,10 +136,14 @@ int main (void) {
             float sep = fabsf (ba->position.y - bb->position.y);
             float vel_a = vector3_length (ba->velocity);
             float vel_b = vector3_length (bb->velocity);
-            if (sep > max_sep) max_sep = sep;
-            if (vel_a > max_vel) max_vel = vel_a;
-            if (vel_b > max_vel) max_vel = vel_b;
-            if (!isfinite (ba->position.y) || !isfinite (bb->position.y)) nan_count++;
+            if (sep > max_sep)
+                max_sep = sep;
+            if (vel_a > max_vel)
+                max_vel = vel_a;
+            if (vel_b > max_vel)
+                max_vel = vel_b;
+            if (!isfinite (ba->position.y) || !isfinite (bb->position.y))
+                nan_count++;
         }
 
         printf ("[INFO] deep_overlap max_sep=%.3f max_vel=%.3f nan=%d\n", max_sep, max_vel, nan_count);

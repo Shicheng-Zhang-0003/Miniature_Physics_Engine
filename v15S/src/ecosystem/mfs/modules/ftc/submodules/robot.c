@@ -699,7 +699,8 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
         float idle_max = 0.0f;
         for (int ci = 0; ci < robot->wheel_count; ci++) {
             float a = fabsf (robot->wheel_motors[ci].command);
-            if (a > idle_max) idle_max = a;
+            if (a > idle_max)
+                idle_max = a;
         }
         int wi0 = (robot->wheel_count > 0) ? robot->wheel_bodies[0] : -1;
         int engaged = (wi0 >= 0 && wi0 < world->body_count && world->bodies[wi0].friction_static > 0.45f) ? 1 : 0;
@@ -710,9 +711,11 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
         }
         idle_tires = engaged;
         for (int ci = 0; ci < robot->wheel_count; ci++) {
-            if (!robot->wheel_is_mecanum[ci]) continue;
+            if (!robot->wheel_is_mecanum[ci])
+                continue;
             int wi = robot->wheel_bodies[ci];
-            if (wi < 0 || wi >= world->body_count) continue;
+            if (wi < 0 || wi >= world->body_count)
+                continue;
             if (idle_tires) {
                 world->bodies[wi].friction_static = 0.9f;
                 world->bodies[wi].friction_kinetic = 0.7f;
@@ -780,7 +783,8 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
         if (i >= 0 && i < FTC_MAX_WHEELS && robot->wheel_effective_radius[i] > 0.001f) {
             r_run = robot->wheel_effective_radius[i];
         }
-        if (!(r_run > 0.001f) || !isfinite (r_run)) r_run = wheel->radius;
+        if (!(r_run > 0.001f) || !isfinite (r_run))
+            r_run = wheel->radius;
 
         /* Read wheel angular velocity about the actual rotated axle axis in world space */
         vector3 axle = wheel->cached_axes[0];
@@ -967,11 +971,13 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
              * no ramp. */
             if (!idle_coast) {
                 float prev = robot->wheel_applied_torque[i];
-                if (!isfinite (prev)) prev = 0.0f;
+                if (!isfinite (prev))
+                    prev = 0.0f;
                 float want = torque;
                 float dl = want - prev;
                 const float max_slew = 0.6f;
-                if (dl > max_slew) want = prev + max_slew;
+                if (dl > max_slew)
+                    want = prev + max_slew;
                 else if (dl < -max_slew)
                     want = prev - max_slew;
                 torque = want;
@@ -1141,31 +1147,37 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
          * feedback-free); see KNOWN FAILURE note in README_MFS. */
         for (int k = 0; k < robot->roller_count[i]; k++) {
             int rb = robot->roller_bodies[i][k];
-            if (rb < 0 || rb >= world->body_count) continue;
+            if (rb < 0 || rb >= world->body_count)
+                continue;
             rigidbody *roller = &world->bodies[rb];
             /* Roller spin axis in world space: roller's local +X is its cylinder axis. */
             vector3 spin_axis = vector4_rotate_to_vector3 (roller->orientation, (vector3){1.0f, 0.0f, 0.0f});
             float spin_len_sq = vector3_length_squared (spin_axis);
-            if (!(spin_len_sq > 1e-12f) || !isfinite (spin_len_sq)) continue;
+            if (!(spin_len_sq > 1e-12f) || !isfinite (spin_len_sq))
+                continue;
             spin_axis = vector3_scaling (spin_axis, 1.0f / sqrtf (spin_len_sq));
             /* Perpendicular direction in XZ plane: n_perp = (sin, 0, -cos). */
             vector3 n_perp = {spin_axis.x, 0.0f, -spin_axis.z};
             float n_perp_len_sq = vector3_length_squared (n_perp);
-            if (!(n_perp_len_sq > 1e-12f) || !isfinite (n_perp_len_sq)) continue;
+            if (!(n_perp_len_sq > 1e-12f) || !isfinite (n_perp_len_sq))
+                continue;
             n_perp = vector3_scaling (n_perp, 1.0f / sqrtf (n_perp_len_sq));
             int wb = robot->wheel_bodies[i];
-            if (wb < 0 || wb >= world->body_count) continue;
+            if (wb < 0 || wb >= world->body_count)
+                continue;
             rigidbody *wheel = &world->bodies[wb];
             vector3 r_vector = vector3_subtraction (roller->position, wheel->position);
             /* Intended wheel angular velocity from motor command (open-loop;
              * see block header for why measured-speed was reverted). */
             float intended_speed = robot->wheel_motors[i].command * robot->wheel_motors[i].free_speed_rad_s;
-            if (!isfinite (intended_speed)) continue;
+            if (!isfinite (intended_speed))
+                continue;
             vector3 omega_wheel = vector3_scaling (axle, intended_speed);
             vector3 v_rim = vector3_cross (omega_wheel, r_vector);
             float v_perp = vector3_dot (v_rim, n_perp);
             float omega_eq = -v_perp / MECANUM_ROLLER_RADIUS;
-            if (!isfinite (omega_eq)) continue;
+            if (!isfinite (omega_eq))
+                continue;
             /* DESPOT-2026-09-26: quasi-static prescription (see block header).
              * Full-vector overwrite (spin + wobble) is kept INTENTIONALLY:
              * a spin-component-only variant was measured and flipped strafe

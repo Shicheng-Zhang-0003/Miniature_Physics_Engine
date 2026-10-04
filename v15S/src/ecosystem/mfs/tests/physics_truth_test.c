@@ -190,7 +190,8 @@ static void test_rolling_resistance_stopping (void) {
     ftc_robot robot;
     int rc = ftc_robot_create (&world, &robot, 0.0f, ftc_robot_rest_height (), 0.0f, MOTOR_GB_5203_26_9);
     TEST_ASSERT (rc == 0, "robot created successfully");
-    if (rc != 0) return;
+    if (rc != 0)
+        return;
 
     /* Drive forward for 1 second to build up speed */
     for (int i = 0; i < 60; i++) {
@@ -257,7 +258,8 @@ static void test_motor_free_speed (void) {
         chassis0->angular_velocity = vector3_zero ();
         for (int w = 0; w < robot.wheel_count; w++) {
             int wi = robot.wheel_bodies[w];
-            if (wi < 0 || wi >= world.body_count) continue;
+            if (wi < 0 || wi >= world.body_count)
+                continue;
             rigidbody *wb = &world.bodies[wi];
             wb->position = vector3_addition (wb->position, lift);
             wb->velocity = vector3_zero ();
@@ -266,7 +268,8 @@ static void test_motor_free_speed (void) {
             motor_reset_observer (&robot.wheel_motors[w]);
             for (int k = 0; k < robot.roller_count[w]; k++) {
                 int rb = robot.roller_bodies[w][k];
-                if (rb < 0 || rb >= world.body_count) continue;
+                if (rb < 0 || rb >= world.body_count)
+                    continue;
                 rigidbody *rbb = &world.bodies[rb];
                 rbb->position = vector3_addition (rbb->position, lift);
                 rbb->velocity = vector3_zero ();
@@ -526,7 +529,8 @@ static void test_numerical_stability_no_nan (void) {
                 break;
             }
         }
-        if (has_nan) break;
+        if (has_nan)
+            break;
     }
 
     TEST_ASSERT (!has_nan, "no NaN/Inf over 3000 ticks with mixed objects");

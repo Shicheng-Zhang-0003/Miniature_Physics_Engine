@@ -159,7 +159,8 @@ void render_init () {
 /* Delete one instanced mesh's GL objects (all ids zero-guarded so a
  * context-less or repeated cleanup is a safe no-op). */
 static void render_delete_mesh (mesh *mesh_object) {
-    if (!mesh_object) return;
+    if (!mesh_object)
+        return;
     if (mesh_object->vertex_array_object) {
         glDeleteVertexArrays (1, &mesh_object->vertex_array_object);
         mesh_object->vertex_array_object = 0;

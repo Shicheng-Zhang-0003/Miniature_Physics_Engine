@@ -146,7 +146,8 @@ static double meta_max_pos_err (const physics_world *a, const physics_world *b) 
     for (int i = 0; i < n; i++) {
         vector3 d = vector3_subtraction (a->bodies[i].position, b->bodies[i].position);
         double m = (double) vector3_length (d);
-        if (m > worst) worst = m;
+        if (m > worst)
+            worst = m;
     }
     return worst;
 }
@@ -157,7 +158,8 @@ static double meta_max_vel_err (const physics_world *a, const physics_world *b) 
     for (int i = 0; i < n; i++) {
         vector3 d = vector3_subtraction (a->bodies[i].velocity, b->bodies[i].velocity);
         double m = (double) vector3_length (d);
-        if (m > worst) worst = m;
+        if (m > worst)
+            worst = m;
     }
     return worst;
 }
@@ -385,10 +387,12 @@ static void meta_build_stack (physics_world *w) {
 static double meta_stack_pos_err (const physics_world *a, const physics_world *b) {
     double worst = 0.0;
     for (int i = 1; i <= META_CONV_STACK_H; i++) {
-        if (i >= a->body_count || i >= b->body_count) continue;
+        if (i >= a->body_count || i >= b->body_count)
+            continue;
         vector3 d = vector3_subtraction (a->bodies[i].position, b->bodies[i].position);
         double m = (double) vector3_length (d);
-        if (m > worst) worst = m;
+        if (m > worst)
+            worst = m;
     }
     return worst;
 }

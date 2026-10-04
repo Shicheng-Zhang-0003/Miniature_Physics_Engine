@@ -396,7 +396,8 @@ static int scene_loading_v200 (FILE *f, uint32_t header_crc) {
         fixed_ok = fixed_ok && scene_r32 (f, &crc, &fc.id_b);
         fixed_ok = fixed_ok && scene_load_vec3 (f, &crc, &fc.anchor_a);
         fixed_ok = fixed_ok && scene_load_vec3 (f, &crc, &fc.anchor_b);
-        if (!fixed_ok) break;
+        if (!fixed_ok)
+            break;
         if ((fc.type != (uint32_t) constraint_fixed) || (fc.id_a == 0) || (fc.id_a == fc.id_b) ||
             (!scene_id_in_staged (staged_ids, staged_body_count, fc.id_a)) ||
             (!scene_id_in_staged (staged_ids, staged_body_count, fc.id_b)) || (!scene_vec3_finite (fc.anchor_a)) ||
@@ -431,7 +432,8 @@ static int scene_loading_v200 (FILE *f, uint32_t header_crc) {
         dist_ok = dist_ok && scene_load_vec3 (f, &crc, &dc.anchor_a);
         dist_ok = dist_ok && scene_load_vec3 (f, &crc, &dc.anchor_b);
         dist_ok = dist_ok && scene_rfloat (f, &crc, &dc.rest_length);
-        if (!dist_ok) break;
+        if (!dist_ok)
+            break;
         if ((dc.type != (uint32_t) constraint_distance) || (dc.id_a == 0) || (dc.id_a == dc.id_b) ||
             (!scene_id_in_staged (staged_ids, staged_body_count, dc.id_a)) ||
             (!scene_id_in_staged (staged_ids, staged_body_count, dc.id_b)) || (!scene_vec3_finite (dc.anchor_a)) ||
@@ -474,7 +476,8 @@ static int scene_loading_v200 (FILE *f, uint32_t header_crc) {
         prism_ok = prism_ok && scene_r32 (f, &crc, &limits_u);
         prism_ok = prism_ok && scene_rfloat (f, &crc, &pc.limit_min);
         prism_ok = prism_ok && scene_rfloat (f, &crc, &pc.limit_max);
-        if (!prism_ok) break;
+        if (!prism_ok)
+            break;
         pc.motor_enabled = motor_u;
         pc.limits_enabled = limits_u;
         if ((pc.type != (uint32_t) constraint_prismatic) || (pc.id_a == 0) || (pc.id_a == pc.id_b) ||
@@ -515,7 +518,8 @@ static int scene_loading_v200 (FILE *f, uint32_t header_crc) {
         rope_ok = rope_ok && scene_load_vec3 (f, &crc, &rc.anchor_a);
         rope_ok = rope_ok && scene_load_vec3 (f, &crc, &rc.anchor_b);
         rope_ok = rope_ok && scene_rfloat (f, &crc, &rc.rest_length);
-        if (!rope_ok) break;
+        if (!rope_ok)
+            break;
         if ((rc.type != (uint32_t) constraint_rope) || (rc.id_a == 0) || (rc.id_a == rc.id_b) ||
             (!scene_id_in_staged (staged_ids, staged_body_count, rc.id_a)) ||
             (!scene_id_in_staged (staged_ids, staged_body_count, rc.id_b)) || (!scene_vec3_finite (rc.anchor_a)) ||
@@ -839,37 +843,55 @@ int scene_loading (const char *file_source_path) {
          * angular velocity, orientation, colour, restitution,
          * friction x2, static flag, object id (v150+),
          * nice_value + sleep state (v152+). */
-        if (!read_int (f, &type_int)) break;
-        if (!read_float (f, &temp.mass)) break;
-        if (!read_float (f, &temp.radius)) break;
+        if (!read_int (f, &type_int))
+            break;
+        if (!read_float (f, &temp.mass))
+            break;
+        if (!read_float (f, &temp.radius))
+            break;
         /* R3-04: Read cylinder_half_length. Present in version >= 151.
          * For older versions, default to radius/2. */
         if (version >= 151) {
-            if (!read_float (f, &temp.cylinder_half_length)) break;
+            if (!read_float (f, &temp.cylinder_half_length))
+                break;
         } else {
             temp.cylinder_half_length = temp.radius * 0.5f;
         }
-        if (!read_vec3 (f, &temp.half_extensions)) break;
-        if (!read_vec3 (f, &temp.position)) break;
-        if (!read_vec3 (f, &temp.velocity)) break;
-        if (!read_vec3 (f, &temp.angular_velocity)) break;
-        if (!read_vec4 (f, &temp.orientation)) break;
-        if (!read_vec3 (f, &temp.colour)) break;
-        if (!read_float (f, &temp.restitution)) break;
-        if (!read_float (f, &temp.friction_static)) break;
-        if (!read_float (f, &temp.friction_kinetic)) break;
-        if (!read_int (f, &static_int)) break;
+        if (!read_vec3 (f, &temp.half_extensions))
+            break;
+        if (!read_vec3 (f, &temp.position))
+            break;
+        if (!read_vec3 (f, &temp.velocity))
+            break;
+        if (!read_vec3 (f, &temp.angular_velocity))
+            break;
+        if (!read_vec4 (f, &temp.orientation))
+            break;
+        if (!read_vec3 (f, &temp.colour))
+            break;
+        if (!read_float (f, &temp.restitution))
+            break;
+        if (!read_float (f, &temp.friction_static))
+            break;
+        if (!read_float (f, &temp.friction_kinetic))
+            break;
+        if (!read_int (f, &static_int))
+            break;
 
         saved_object_id = 0;
         if (version >= 150) {
-            if (!read_int (f, &saved_object_id)) break;
+            if (!read_int (f, &saved_object_id))
+                break;
         }
         if (version >= 152) {
-            if (!read_int (f, &saved_nice)) break;
-            if (!read_int (f, &saved_sleep)) break;
+            if (!read_int (f, &saved_nice))
+                break;
+            if (!read_int (f, &saved_sleep))
+                break;
         }
         if (version >= 153) {
-            if (!read_int (f, &saved_kinematic)) break;
+            if (!read_int (f, &saved_kinematic))
+                break;
         }
 
         temp.type = (object_type) type_int;
@@ -1044,8 +1066,10 @@ int scene_loading (const char *file_source_path) {
          * clear the live scene — a partial load must leave the scene
          * untouched. */
         free (staged_bodies);
-        if (staged_ids) free (staged_ids);
-        if (staged_joints) free (staged_joints);
+        if (staged_ids)
+            free (staged_ids);
+        if (staged_joints)
+            free (staged_joints);
         return 0;
     }
 
@@ -1055,8 +1079,10 @@ int scene_loading (const char *file_source_path) {
     if (!scene_ensure_pool_capacity (staged_body_count)) {
         fprintf (stderr, "Error LDF06: body pool growth failed for %d bodies\n", staged_body_count);
         free (staged_bodies);
-        if (staged_ids) free (staged_ids);
-        if (staged_joints) free (staged_joints);
+        if (staged_ids)
+            free (staged_ids);
+        if (staged_joints)
+            free (staged_joints);
         return 0;
     }
     scene_clear ();
@@ -1093,8 +1119,10 @@ int scene_loading (const char *file_source_path) {
     }
 
     free (staged_bodies);
-    if (staged_ids) free (staged_ids);
-    if (staged_joints) free (staged_joints);
+    if (staged_ids)
+        free (staged_ids);
+    if (staged_joints)
+        free (staged_joints);
 
     return 1;
 }

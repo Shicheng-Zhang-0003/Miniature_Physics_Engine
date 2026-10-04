@@ -37,17 +37,21 @@ static int win_parse_index (const char *device_path) {
     const char *s = device_path;
     if (!s) {
         const char *env = getenv ("MPE_GAMEPAD_DEVICE");
-        if (env && strcmp (env, "disabled") == 0) return -2;
+        if (env && strcmp (env, "disabled") == 0)
+            return -2;
         s = (env && *env) ? env : "xinput:0";
     } else if (strcmp (s, "disabled") == 0) {
         return -2;
     }
-    if (strncmp (s, "xinput:", 7) == 0) s += 7;
+    if (strncmp (s, "xinput:", 7) == 0)
+        s += 7;
     /* bare number? */
-    if (s[0] >= '0' && s[0] <= '9' && s[1] == '\0') return s[0] - '0';
+    if (s[0] >= '0' && s[0] <= '9' && s[1] == '\0')
+        return s[0] - '0';
     /* /dev/input/jsN style passed through WSL docs -> map jsN to N */
     const char *js = strstr (s, "js");
-    if (js && js[1] >= '0' && js[1] <= '9') return js[1] - '0';
+    if (js && js[1] >= '0' && js[1] <= '9')
+        return js[1] - '0';
     return 0;
 }
 
@@ -83,8 +87,10 @@ bool gamepad_init (gamepad_state *pad, const char *device_path) {
         pad->connected = false;
         return false;
     }
-    if (idx < 0) idx = 0;
-    if (idx > 3) idx = 3;
+    if (idx < 0)
+        idx = 0;
+    if (idx > 3)
+        idx = 3;
 #ifdef MPE_HAVE_XINPUT
     XINPUT_STATE st;
     memset (&st, 0, sizeof (st));
@@ -166,10 +172,14 @@ void gamepad_poll (gamepad_state *pad) {
     pad->buttons[gamepad_button_stick_l] = (b & XINPUT_GAMEPAD_LEFT_THUMB) != 0;
     pad->buttons[gamepad_button_stick_r] = (b & XINPUT_GAMEPAD_RIGHT_THUMB) != 0;
     /* D-pad -> extra buttons 11..14 when in range. */
-    if (gamepad_button_count > 11) pad->buttons[11] = (b & XINPUT_GAMEPAD_DPAD_UP) != 0;
-    if (gamepad_button_count > 12) pad->buttons[12] = (b & XINPUT_GAMEPAD_DPAD_DOWN) != 0;
-    if (gamepad_button_count > 13) pad->buttons[13] = (b & XINPUT_GAMEPAD_DPAD_LEFT) != 0;
-    if (gamepad_button_count > 14) pad->buttons[14] = (b & XINPUT_GAMEPAD_DPAD_RIGHT) != 0;
+    if (gamepad_button_count > 11)
+        pad->buttons[11] = (b & XINPUT_GAMEPAD_DPAD_UP) != 0;
+    if (gamepad_button_count > 12)
+        pad->buttons[12] = (b & XINPUT_GAMEPAD_DPAD_DOWN) != 0;
+    if (gamepad_button_count > 13)
+        pad->buttons[13] = (b & XINPUT_GAMEPAD_DPAD_LEFT) != 0;
+    if (gamepad_button_count > 14)
+        pad->buttons[14] = (b & XINPUT_GAMEPAD_DPAD_RIGHT) != 0;
 #else
     /* No XInput headers: always disconnected, neutral. */
     pad->connected = false;
@@ -313,9 +323,12 @@ float gamepad_get_trigger (const gamepad_state *pad, int axis) {
         return 0.0f;
     }
     float v = pad->axes[axis];
-    if (!isfinite (v)) return 0.0f;
-    if (v < -1.0f) v = -1.0f;
-    if (v > 1.0f) v = 1.0f;
+    if (!isfinite (v))
+        return 0.0f;
+    if (v < -1.0f)
+        v = -1.0f;
+    if (v > 1.0f)
+        v = 1.0f;
     /* DESPOT-2026-09-26: two driver conventions exist — 0-rest (rest 0,
      * press +1) and -1-rest (rest -1, press +1). Auto-detect per read:
      * v<=-0.95 is the -1-rest rest position -> 0; otherwise map [-1,1] to
@@ -341,8 +354,10 @@ float gamepad_get_trigger (const gamepad_state *pad, int axis) {
     } else {
         t = v; /* pressed: both conventions agree on (0,1] */
     }
-    if (t < 0.05f) t = 0.0f;
-    if (t > 1.0f) t = 1.0f;
+    if (t < 0.05f)
+        t = 0.0f;
+    if (t > 1.0f)
+        t = 1.0f;
     return t;
 }
 

@@ -30,9 +30,11 @@
 #include "core/mpe_module.h"
 
 static int ftc_fleet_attach (mpe_world_t *world, void **mod_state) {
-    if (!world || !mod_state) return -1;
+    if (!world || !mod_state)
+        return -1;
     void *f = ftc_fleet_create ();
-    if (!f) return -1;
+    if (!f)
+        return -1;
     *mod_state = f;
     return 0;
 }

@@ -46,7 +46,8 @@ int main (void) {
 
         int inf_count = 0;
         for (int i = 0; i < world.body_count; i++) {
-            if (isinf (world.bodies[i].position.x) || isinf (world.bodies[i].velocity.x)) inf_count++;
+            if (isinf (world.bodies[i].position.x) || isinf (world.bodies[i].velocity.x))
+                inf_count++;
         }
 
         printf ("[INFO] inf_sanitization inf_count=%d\n", inf_count);
@@ -76,7 +77,8 @@ int main (void) {
 
         int nan_count = 0;
         for (int i = 0; i < world.body_count; i++) {
-            if (isnan (world.bodies[i].position.x)) nan_count++;
+            if (isnan (world.bodies[i].position.x))
+                nan_count++;
         }
 
         printf ("[INFO] nan_sanitization nan_count=%d\n", nan_count);

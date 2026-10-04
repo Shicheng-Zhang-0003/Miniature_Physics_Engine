@@ -63,7 +63,8 @@ int main (void) {
             float x_exact = vx * texact;
             float y_error = fabsf (b->position.y - y_exact);
             float x_error = fabsf (b->position.x - x_exact);
-            if (y_error > max_height_error) max_height_error = y_error;
+            if (y_error > max_height_error)
+                max_height_error = y_error;
             /* x error tolerance: dt=1/60, vx=10 -> ~0.17m per tick discretization.
              * The exact integration is exact for the ODE, but t_apex is quantized to dt. */
             if (x_error > 0.2f) {
@@ -77,7 +78,8 @@ int main (void) {
                 fail = 1;
             }
 
-            if (b->position.y < 0.15f) break;
+            if (b->position.y < 0.15f)
+                break;
         }
 
         float apex_e = 1.0f + vy * vy / (2.0f * g);
@@ -149,9 +151,11 @@ int main (void) {
              * The trajectory should be LOWER (damped) but smooth. */
             float y_drag1 = 1.0f + vy * texact - 0.5f * g * texact * texact;
             float y_error = fabsf (b->position.y - y_drag1);
-            if (y_error > max_y_error) max_y_error = y_error;
+            if (y_error > max_y_error)
+                max_y_error = y_error;
 
-            if (b->position.y < 0.15f) break;
+            if (b->position.y < 0.15f)
+                break;
         }
 
         float apex_e = 1.0f + vy * vy / (2.0f * g);
@@ -242,8 +246,10 @@ int main (void) {
             double z_exact = 3.0 * texact;
             float x_err = (float) fabs ((double) b->position.x - x_exact);
             float z_err = (float) fabs ((double) b->position.z - z_exact);
-            if (x_err > max_x_err) max_x_err = x_err;
-            if (z_err > max_z_err) max_z_err = z_err;
+            if (x_err > max_x_err)
+                max_x_err = x_err;
+            if (z_err > max_z_err)
+                max_z_err = z_err;
         }
 
         printf ("[INFO] horizontal drag=1 max_x_err=%.6f max_z_err=%.6f\n", max_x_err, max_z_err);
@@ -279,10 +285,12 @@ int main (void) {
         for (int t = 0; t < 3600; t++) { /* 60 seconds */
             physics_world_step (&w5, dt);
             rigidbody *b = &w5.bodies[s];
-            if (b->position.y < 0.6f) break; /* landed */
+            if (b->position.y < 0.6f)
+                break; /* landed */
 
             float E = rb_get_kinetic_energy (b) + b->mass * 9.81f * b->position.y;
-            if (E0 < 0.0f) E0 = E;
+            if (E0 < 0.0f)
+                E0 = E;
             E_max = fmaxf (E_max, E);
             E_min = fminf (E_min, E);
         }

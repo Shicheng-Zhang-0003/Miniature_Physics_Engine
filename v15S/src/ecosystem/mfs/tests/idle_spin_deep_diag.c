@@ -75,12 +75,14 @@ int main (void) {
     int any_asleep = 0, all_asleep = 1;
     for (int w = 0; w < robot.wheel_count; w++) {
         int s = (int) world.bodies[robot.wheel_bodies[w]].is_sleeping;
-        if (s) any_asleep = 1;
+        if (s)
+            any_asleep = 1;
         else
             all_asleep = 0;
     }
     printf ("\nVERDICT: ");
-    if (all_asleep) printf ("ALL wheels ASLEEP -> sleep-system bug (linear-only sleep check)\n");
+    if (all_asleep)
+        printf ("ALL wheels ASLEEP -> sleep-system bug (linear-only sleep check)\n");
     else if (any_asleep)
         printf ("SOME wheels asleep -> partial sleep bug\n");
     else

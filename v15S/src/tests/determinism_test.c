@@ -52,24 +52,42 @@ static int bodies_equal (const rigidbody *a, const rigidbody *b) {
      * inertia, accumulators, axes and IDs — and invoking UB across
      * bool/int/enum padding. Named compare covers the full dynamic state
      * with no layout assumptions (memcmp would trip on padding garbage). */
-    if (!vec3_eq (a->position, b->position)) return 0;
-    if (!vec3_eq (a->velocity, b->velocity)) return 0;
-    if (!vec3_eq (a->acceleration, b->acceleration)) return 0;
-    if (!vec4_eq (a->orientation, b->orientation)) return 0;
-    if (!vec3_eq (a->angular_velocity, b->angular_velocity)) return 0;
-    if (!vec3_eq (a->angular_acceleration, b->angular_acceleration)) return 0;
-    if (!vec3_eq (a->force_accumulator, b->force_accumulator)) return 0;
-    if (!vec3_eq (a->torque_accumulator, b->torque_accumulator)) return 0;
-    if (a->mass != b->mass || a->inverse_mass != b->inverse_mass) return 0;
-    if (a->friction_static != b->friction_static || a->friction_kinetic != b->friction_kinetic) return 0;
-    if (a->restitution != b->restitution) return 0;
-    if (a->radius != b->radius || a->cylinder_half_length != b->cylinder_half_length) return 0;
-    if (!vec3_eq (a->half_extensions, b->half_extensions)) return 0;
-    if (!vec3_eq (a->cached_axes[0], b->cached_axes[0])) return 0;
-    if (!vec3_eq (a->cached_axes[1], b->cached_axes[1])) return 0;
-    if (!vec3_eq (a->cached_axes[2], b->cached_axes[2])) return 0;
-    if (a->object_id != b->object_id || a->object_generation != b->object_generation) return 0;
-    if (a->type != b->type || a->custom_shape != b->custom_shape) return 0;
+    if (!vec3_eq (a->position, b->position))
+        return 0;
+    if (!vec3_eq (a->velocity, b->velocity))
+        return 0;
+    if (!vec3_eq (a->acceleration, b->acceleration))
+        return 0;
+    if (!vec4_eq (a->orientation, b->orientation))
+        return 0;
+    if (!vec3_eq (a->angular_velocity, b->angular_velocity))
+        return 0;
+    if (!vec3_eq (a->angular_acceleration, b->angular_acceleration))
+        return 0;
+    if (!vec3_eq (a->force_accumulator, b->force_accumulator))
+        return 0;
+    if (!vec3_eq (a->torque_accumulator, b->torque_accumulator))
+        return 0;
+    if (a->mass != b->mass || a->inverse_mass != b->inverse_mass)
+        return 0;
+    if (a->friction_static != b->friction_static || a->friction_kinetic != b->friction_kinetic)
+        return 0;
+    if (a->restitution != b->restitution)
+        return 0;
+    if (a->radius != b->radius || a->cylinder_half_length != b->cylinder_half_length)
+        return 0;
+    if (!vec3_eq (a->half_extensions, b->half_extensions))
+        return 0;
+    if (!vec3_eq (a->cached_axes[0], b->cached_axes[0]))
+        return 0;
+    if (!vec3_eq (a->cached_axes[1], b->cached_axes[1]))
+        return 0;
+    if (!vec3_eq (a->cached_axes[2], b->cached_axes[2]))
+        return 0;
+    if (a->object_id != b->object_id || a->object_generation != b->object_generation)
+        return 0;
+    if (a->type != b->type || a->custom_shape != b->custom_shape)
+        return 0;
     return (a->is_sleeping == b->is_sleeping) && (a->sleep_timer == b->sleep_timer) &&
            (a->static_state == b->static_state) && (a->kinematic == b->kinematic);
 }
@@ -77,18 +95,27 @@ static int bodies_equal (const rigidbody *a, const rigidbody *b) {
 static int caches_equal (const physics_world *a, const physics_world *b) {
     /* TRUTH: count-only compare passed with divergent contents. Field-wise
      * (no memcmp: padding garbage differs legitimately). */
-    if (a->world_contact_cache_count != b->world_contact_cache_count) return 0;
+    if (a->world_contact_cache_count != b->world_contact_cache_count)
+        return 0;
     for (int i = 0; i < a->world_contact_cache_count; i++) {
         const cached_contact *ca = &a->world_contact_cache[i];
         const cached_contact *cb = &b->world_contact_cache[i];
-        if (ca->object_id_a != cb->object_id_a || ca->object_id_b != cb->object_id_b) return 0;
-        if (ca->property_stamp_a != cb->property_stamp_a || ca->property_stamp_b != cb->property_stamp_b) return 0;
-        if (!vec3_eq (ca->local_position_a, cb->local_position_a)) return 0;
-        if (!vec3_eq (ca->local_position_b, cb->local_position_b)) return 0;
-        if (ca->accumulated_normal_impulse != cb->accumulated_normal_impulse) return 0;
-        if (ca->accumulated_tangent_impulse != cb->accumulated_tangent_impulse) return 0;
-        if (!vec3_eq (ca->tangent_dir, cb->tangent_dir)) return 0;
-        if (ca->hash_next != cb->hash_next) return 0;
+        if (ca->object_id_a != cb->object_id_a || ca->object_id_b != cb->object_id_b)
+            return 0;
+        if (ca->property_stamp_a != cb->property_stamp_a || ca->property_stamp_b != cb->property_stamp_b)
+            return 0;
+        if (!vec3_eq (ca->local_position_a, cb->local_position_a))
+            return 0;
+        if (!vec3_eq (ca->local_position_b, cb->local_position_b))
+            return 0;
+        if (ca->accumulated_normal_impulse != cb->accumulated_normal_impulse)
+            return 0;
+        if (ca->accumulated_tangent_impulse != cb->accumulated_tangent_impulse)
+            return 0;
+        if (!vec3_eq (ca->tangent_dir, cb->tangent_dir))
+            return 0;
+        if (ca->hash_next != cb->hash_next)
+            return 0;
     }
     return 1;
 }

@@ -33,7 +33,8 @@ int main (void) {
         for (int t = 0; t < 60; t++) {
             physics_world_step (&world, dt);
             for (int i = 0; i < world.body_count; i++) {
-                if (!isfinite (world.bodies[i].position.x)) nan_count++;
+                if (!isfinite (world.bodies[i].position.x))
+                    nan_count++;
             }
         }
 
@@ -66,9 +67,11 @@ int main (void) {
 
         for (int t = 0; t < 600; t++) {
             physics_world_step (&world, dt);
-            if (!isfinite (world.bodies[0].orientation.w)) nan_count++;
+            if (!isfinite (world.bodies[0].orientation.w))
+                nan_count++;
             float angle = 2.0f * acosf (fabsf (world.bodies[0].orientation.w));
-            if (angle > max_angle) max_angle = angle;
+            if (angle > max_angle)
+                max_angle = angle;
         }
 
         printf ("[INFO] extreme_rotation nan=%d max_angle=%.1f rad\n", nan_count, max_angle);
@@ -96,7 +99,8 @@ int main (void) {
         int nan_count = 0;
         for (int t = 0; t < 6000; t++) {
             physics_world_step (&world, 1e-6f); /* 1 microsecond steps */
-            if (!isfinite (world.bodies[0].position.y)) nan_count++;
+            if (!isfinite (world.bodies[0].position.y))
+                nan_count++;
         }
 
         printf ("[INFO] tiny_dt nan=%d\n", nan_count);
@@ -123,7 +127,8 @@ int main (void) {
 
         int nan_count = 0;
         physics_world_step (&world, 1000.0f); /* huge dt - should be clamped to 0.1f */
-        if (!isfinite (world.bodies[0].position.y)) nan_count++;
+        if (!isfinite (world.bodies[0].position.y))
+            nan_count++;
 
         printf ("[INFO] huge_dt nan=%d pos_y=%.2f\n", nan_count, world.bodies[0].position.y);
         if (nan_count > 0) {
@@ -149,7 +154,8 @@ int main (void) {
 
         int nan_count = 0;
         physics_world_step (&world, -1.0f); /* negative dt */
-        if (!isfinite (world.bodies[0].position.y)) nan_count++;
+        if (!isfinite (world.bodies[0].position.y))
+            nan_count++;
 
         printf ("[INFO] negative_dt nan=%d\n", nan_count);
         if (nan_count > 0) {
@@ -183,7 +189,8 @@ int main (void) {
         for (int t = 0; t < 600; t++) {
             physics_world_step (&world, dt);
             for (int i = 0; i < world.body_count; i++) {
-                if (!isfinite (world.bodies[i].position.x)) nan_count++;
+                if (!isfinite (world.bodies[i].position.x))
+                    nan_count++;
             }
         }
 
@@ -219,7 +226,8 @@ int main (void) {
         for (int t = 0; t < 600; t++) {
             physics_world_step (&world, dt);
             for (int i = 0; i < world.body_count; i++) {
-                if (!isfinite (world.bodies[i].position.x)) nan_count++;
+                if (!isfinite (world.bodies[i].position.x))
+                    nan_count++;
             }
         }
 
@@ -251,7 +259,8 @@ int main (void) {
 
         for (int t = 0; t < 600; t++) {
             physics_world_step (&world, dt);
-            if (!isfinite (world.bodies[0].orientation.w)) nan_count++;
+            if (!isfinite (world.bodies[0].orientation.w))
+                nan_count++;
         }
 
         printf ("[INFO] thin_rod nan=%d\n", nan_count);
@@ -282,7 +291,8 @@ int main (void) {
 
         for (int t = 0; t < 60; t++) {
             physics_world_step (&world, dt);
-            if (!isfinite (world.bodies[0].orientation.w)) nan_count++;
+            if (!isfinite (world.bodies[0].orientation.w))
+                nan_count++;
         }
 
         printf ("[INFO] near_zero_quat nan=%d\n", nan_count);

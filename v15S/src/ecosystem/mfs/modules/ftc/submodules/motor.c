@@ -74,7 +74,8 @@ void motor_update (motor *m, float wheel_angular_vel, float dt, float battery_vo
      * pack fuse browning out (~1 s at 4-motor stall), not by this model,
      * so a 150 C magnet ceiling clamps the integrator below. */
     float r_eff = m->resistance * (1.0f + 0.00393f * (m->temperature - 25.0f));
-    if (!(r_eff > 0.0f) || !isfinite (r_eff)) r_eff = m->resistance;
+    if (!(r_eff > 0.0f) || !isfinite (r_eff))
+        r_eff = m->resistance;
     /* Current = (V - BackEMF) / R, clamped to stall */
     float raw_current = (applied_voltage - m->back_emf) / r_eff;
     if (raw_current > m->stall_current) {
@@ -155,7 +156,8 @@ void motor_update_load (motor *m, float wheel_angular_vel, float dt, float batte
      * Both now use the same r_eff so stall/free endpoints AND transients
      * match across paths. */
     float r_eff = m->resistance * (1.0f + 0.00393f * (m->temperature - 25.0f));
-    if (!(r_eff > 0.0f) || !isfinite (r_eff)) r_eff = m->resistance;
+    if (!(r_eff > 0.0f) || !isfinite (r_eff))
+        r_eff = m->resistance;
     float A = m->kt * m->gear_ratio * m->efficiency / r_eff;
     float B = m->kv * m->gear_ratio;
     if (!(r_eff > 0.0f) || !isfinite (A) || !isfinite (B)) {
@@ -237,7 +239,8 @@ void motor_update_load (motor *m, float wheel_angular_vel, float dt, float batte
      * force sizing at the measured speed. */
     {
         float exp_i = (applied_voltage - m->kv * (wheel_angular_vel * m->gear_ratio)) / r_eff;
-        if (exp_i > m->stall_current) exp_i = m->stall_current;
+        if (exp_i > m->stall_current)
+            exp_i = m->stall_current;
         else if (exp_i < -m->stall_current)
             exp_i = -m->stall_current;
         m->torque_explicit = m->kt * exp_i * m->gear_ratio * m->efficiency;

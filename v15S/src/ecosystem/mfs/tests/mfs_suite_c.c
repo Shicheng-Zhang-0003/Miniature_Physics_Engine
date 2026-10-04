@@ -13,14 +13,17 @@
 static const char *mpe_pick_plugin (const char *so_path, char *buf, size_t n) {
 #ifdef MPE_OS_WINDOWS
     /* so_path like "plugins/mpe_capsule.so": try as-is, then .dll variant. */
-    if (access (so_path, R_OK) == 0) return so_path;
+    if (access (so_path, R_OK) == 0)
+        return so_path;
     size_t L = strlen (so_path);
     if (L > 3 && strcmp (so_path + L - 3, ".so") == 0) {
         snprintf (buf, n, "%.*s.dll", (int) (L - 3), so_path);
-        if (access (buf, R_OK) == 0) return buf;
+        if (access (buf, R_OK) == 0)
+            return buf;
     } else if (L > 4 && _stricmp (so_path + L - 4, ".dll") == 0) {
         snprintf (buf, n, "%.*s.so", (int) (L - 4), so_path);
-        if (access (buf, R_OK) == 0) return buf;
+        if (access (buf, R_OK) == 0)
+            return buf;
     }
     /* try MPE_PLUGIN_EXT variant of basename */
     return so_path;
@@ -91,10 +94,12 @@ int mfs_t_ftc_hotload (void) {
     ftc_robot *r1 = ftc_fleet_get (&w1, 0);
     MFS_CHECK (t_ptr, r1 != NULL);
     float sx = 0, sy = 0, sz = 0;
-    if (r1) ftc_robot_get_position (&w1, r1, &sx, &sy, &sz);
+    if (r1)
+        ftc_robot_get_position (&w1, r1, &sx, &sy, &sz);
     int ok1 = 1;
     for (int k = 0; k < 180 && ok1; k++) {
-        if (r1) drivetrain_mecanum (r1, 1.0f, 0.0f, 0.0f);
+        if (r1)
+            drivetrain_mecanum (r1, 1.0f, 0.0f, 0.0f);
         physics_world_step (&w1, dt); /* pre_step drives the fleet */
         if (!mfs_test_finite (&w1)) {
             ok1 = 0;
@@ -102,7 +107,8 @@ int mfs_t_ftc_hotload (void) {
     }
     MFS_CHECK (t_ptr, ok1);
     float ex = sx, ey = sy, ez = sz;
-    if (r1) ftc_robot_get_position (&w1, r1, &ex, &ey, &ez);
+    if (r1)
+        ftc_robot_get_position (&w1, r1, &ex, &ey, &ez);
     {
         float dx = ex - sx, dz = ez - sz;
         MFS_CHECK (t_ptr, sqrtf (dx * dx + dz * dz) >= 0.5f);
@@ -144,7 +150,8 @@ int mfs_t_ftc_hotload (void) {
     }
     const char *ftc_path = NULL;
     for (size_t ci = 0; ci < sizeof (ftc_candidates) / sizeof (ftc_candidates[0]); ci++) {
-        if (!ftc_candidates[ci]) continue;
+        if (!ftc_candidates[ci])
+            continue;
         if (access (ftc_candidates[ci], R_OK) == 0) {
             ftc_path = ftc_candidates[ci];
             break;
@@ -153,7 +160,8 @@ int mfs_t_ftc_hotload (void) {
     if (!ftc_path) {
         printf ("[FAIL] ftc_hotload: FTC plugin not found. Tried:");
         for (size_t ci = 0; ci < sizeof (ftc_candidates) / sizeof (ftc_candidates[0]); ci++)
-            if (ftc_candidates[ci]) printf (" %s", ftc_candidates[ci]);
+            if (ftc_candidates[ci])
+                printf (" %s", ftc_candidates[ci]);
         printf (". Set MPE_FTC_PLUGIN to the built plugin, or run from "
                 "ecosystem/mfs. (build_tests.sh builds it.)\n");
         t_ptr->failures++;
@@ -185,7 +193,8 @@ int mfs_t_ftc_hotload (void) {
     mfs_test_world (&w2);
     g_cfg.timestep.solver_iterations = FTC_ITERS;
     constraint_pool_init (&w2);
-    if (dyn_desc) MFS_CHECK (t_ptr, physics_world_attach_module (&w2, dyn_desc) >= 0);
+    if (dyn_desc)
+        MFS_CHECK (t_ptr, physics_world_attach_module (&w2, dyn_desc) >= 0);
     int d0 = -1;
     if (dyn_spawn)
         d0 = dyn_spawn (&w2, 0.0f, ftc_robot_rest_height (), 0.0f, MOTOR_GB_5203_26_9, FTC_DRIVETRAIN_MECANUM);
@@ -193,10 +202,12 @@ int mfs_t_ftc_hotload (void) {
     ftc_robot *r2 = dyn_get ? dyn_get (&w2, 0) : NULL;
     MFS_CHECK (t_ptr, r2 != NULL);
     float tx = 0, ty = 0, tz = 0;
-    if (r2) ftc_robot_get_position (&w2, r2, &tx, &ty, &tz);
+    if (r2)
+        ftc_robot_get_position (&w2, r2, &tx, &ty, &tz);
     int ok2 = 1;
     for (int k = 0; k < 180 && ok2; k++) {
-        if (r2 && dyn_mec) dyn_mec (r2, 1.0f, 0.0f, 0.0f);
+        if (r2 && dyn_mec)
+            dyn_mec (r2, 1.0f, 0.0f, 0.0f);
         physics_world_step (&w2, dt);
         if (!mfs_test_finite (&w2)) {
             ok2 = 0;
@@ -204,7 +215,8 @@ int mfs_t_ftc_hotload (void) {
     }
     MFS_CHECK (t_ptr, ok2);
     float fx = tx, fy = ty, fz = tz;
-    if (r2) ftc_robot_get_position (&w2, r2, &fx, &fy, &fz);
+    if (r2)
+        ftc_robot_get_position (&w2, r2, &fx, &fy, &fz);
     {
         float dx = fx - tx, dz = fz - tz;
         MFS_CHECK (t_ptr, sqrtf (dx * dx + dz * dz) >= 0.5f);
@@ -222,7 +234,8 @@ int mfs_t_ftc_hotload (void) {
 
     /* Detach lifecycle on the dynamic world (r2 dangles after detach). */
     int w2chassis = (r2) ? r2->chassis_body : -1;
-    if (dyn_desc) MFS_CHECK (t_ptr, physics_world_detach_module (&w2, "ftc-fleet") == 0);
+    if (dyn_desc)
+        MFS_CHECK (t_ptr, physics_world_detach_module (&w2, "ftc-fleet") == 0);
     MFS_CHECK (t_ptr, ftc_fleet_count (&w1) == 1);
     int okc = 1;
     for (int k = 0; k < 60 && okc; k++) {
@@ -238,7 +251,8 @@ int mfs_t_ftc_hotload (void) {
         float ddx = gx - fx, ddz = gz - fz;
         MFS_CHECK (t_ptr, sqrtf (ddx * ddx + ddz * ddz) < 2.0f);
     }
-    if (handle) dlclose (handle);
+    if (handle)
+        dlclose (handle);
     physics_world_detach_module (&w1, "ftc-fleet");
     physics_world_cleanup (&w1);
     physics_world_cleanup (&w2);
@@ -400,7 +414,8 @@ int mfs_t_intake_stop (void) {
         mfs_module_1_pre_step (&w, dt, state);
         mfs_module_1_post_step (&w, dt, state);
         physics_world_step (&w, dt);
-        if (!mfs_test_finite (&w)) fail = 1;
+        if (!mfs_test_finite (&w))
+            fail = 1;
     }
     if (!fail) {
         rigidbody *roller = physics_world_body_by_id (&w, (uint32_t) ms->intake_roller_body);
@@ -420,7 +435,8 @@ int mfs_t_intake_stop (void) {
             mfs_module_1_pre_step (&w, dt, state);
             mfs_module_1_post_step (&w, dt, state);
             physics_world_step (&w, dt);
-            if (!mfs_test_finite (&w)) fail = 1;
+            if (!mfs_test_finite (&w))
+                fail = 1;
         }
         rigidbody *roller = physics_world_body_by_id (&w, (uint32_t) ms->intake_roller_body);
         MFS_CHECK (t_ptr, roller != NULL);
@@ -490,7 +506,8 @@ int mfs_t_intake_stop (void) {
             mfs_module_1_pre_step (&w, dt, state);
             mfs_module_1_post_step (&w, dt, state);
             physics_world_step (&w, dt);
-            if (!mfs_test_finite (&w)) fail = 1;
+            if (!mfs_test_finite (&w))
+                fail = 1;
         }
         for (int tick = 0; tick < 180 && !fail; tick++) {
             mfs_module_1_pre_step (&w, dt, state);
@@ -502,7 +519,8 @@ int mfs_t_intake_stop (void) {
             mfs_module_1_intake_step (ms, dt);
             mfs_module_1_post_step (&w, dt, state);
             physics_world_step (&w, dt);
-            if (!mfs_test_finite (&w)) fail = 1;
+            if (!mfs_test_finite (&w))
+                fail = 1;
         }
         ms->intake_power = 0.0f;
         rigidbody *roller = physics_world_body_by_id (&w, (uint32_t) ms->intake_roller_body);
@@ -517,7 +535,8 @@ int mfs_t_intake_stop (void) {
         }
     }
 
-    if (state) mfs_module_1_detach (&w, state);
+    if (state)
+        mfs_module_1_detach (&w, state);
     physics_world_cleanup (&w);
     mfs_test_end (t_ptr);
     return t_ptr->failures;
@@ -671,7 +690,8 @@ int mfs_t_ball_spin (void) {
         mfs_module_1_pre_step (&w, dt, state);
         physics_world_step (&w, dt);
         mfs_module_1_post_step (&w, dt, state);
-        if (!mfs_test_finite (&w)) fail = 1;
+        if (!mfs_test_finite (&w))
+            fail = 1;
     }
 
     int fw = physics_world_index_by_id (&w, ms->shooter_flywheel_body);
@@ -695,7 +715,8 @@ int mfs_t_ball_spin (void) {
             mfs_module_1_pre_step (&w, dt, state);
             physics_world_step (&w, dt);
             mfs_module_1_post_step (&w, dt, state);
-            if (!mfs_test_finite (&w)) fail = 1;
+            if (!mfs_test_finite (&w))
+                fail = 1;
         }
 
         MFS_CHECK (t_ptr, ms->balls_fired > fired_before);

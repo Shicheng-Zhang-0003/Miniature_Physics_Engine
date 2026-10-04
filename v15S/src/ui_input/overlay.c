@@ -26,12 +26,14 @@ static void overlay_append_overflow_text (char *buffer, size_t buffer_size) {
     int large_clamp_count = broadphase_get_large_object_clamp_count (physics_world_get_primary ());
     if (large_clamp_count > 0) {
         size_t l = strlen (buffer);
-        if (l < buffer_size) snprintf (buffer + l, buffer_size - l, " | BP large clamps:%d", large_clamp_count);
+        if (l < buffer_size)
+            snprintf (buffer + l, buffer_size - l, " | BP large clamps:%d", large_clamp_count);
     }
     int dedupe_overflow_count = broadphase_get_pair_dedupe_overflow_count (physics_world_get_primary ());
     if (dedupe_overflow_count > 0) {
         size_t l = strlen (buffer);
-        if (l < buffer_size) snprintf (buffer + l, buffer_size - l, " | BP dedupe overflow:%d", dedupe_overflow_count);
+        if (l < buffer_size)
+            snprintf (buffer + l, buffer_size - l, " | BP dedupe overflow:%d", dedupe_overflow_count);
     }
     if (debug_last_manifold_overflow_count > 0) {
         size_t l = strlen (buffer);
@@ -114,7 +116,8 @@ static void overlay_append_stats_text (char *buffer, size_t buffer_size) {
                 snprintf (buffer + ll, buffer_size - ll, " | LR:%ds", long_run_validation_ticks_remaining / 60);
         }
         size_t sl = strlen (buffer);
-        if (sl < buffer_size) snprintf (buffer + sl, buffer_size - sl, " | Sleep:%d", debug_last_sleeping_object_count);
+        if (sl < buffer_size)
+            snprintf (buffer + sl, buffer_size - sl, " | Sleep:%d", debug_last_sleeping_object_count);
     }
 }
 void overlay_update (void) {
@@ -132,7 +135,8 @@ void overlay_update (void) {
             gtk_widget_set_visible (menu_label, FALSE);
     }
     if (spawner_menu_label) {
-        if (main_inputs.spawner_menu_level == 0) gtk_widget_set_visible (spawner_menu_label, FALSE);
+        if (main_inputs.spawner_menu_level == 0)
+            gtk_widget_set_visible (spawner_menu_label, FALSE);
         else {
             char buf[512];
             if (main_inputs.spawner_menu_level == 1) {
@@ -187,7 +191,8 @@ void overlay_update (void) {
         }
     }
     if (velocity_menu_label) {
-        if (main_inputs.velocity_menu_level == 0) gtk_widget_set_visible (velocity_menu_label, FALSE);
+        if (main_inputs.velocity_menu_level == 0)
+            gtk_widget_set_visible (velocity_menu_label, FALSE);
         else {
             char buf[512];
             if (main_inputs.velocity_menu_level == 1)
@@ -246,7 +251,8 @@ void overlay_update (void) {
     if (object_menu_label) {
         if ((main_inputs.object_menu_level == 0) || (selected_object < 0) ||
             (selected_object >= (physics_world_get_primary ()->body_count))) {
-            if (!overlay_has_valid_selection ()) main_inputs.object_menu_level = 0;
+            if (!overlay_has_valid_selection ())
+                main_inputs.object_menu_level = 0;
             gtk_widget_set_visible (object_menu_label, FALSE);
         } else {
             char buf[512];
@@ -298,7 +304,8 @@ void overlay_update (void) {
                 gtk_widget_set_visible (config_menu_label, FALSE);
         }
     }
-    if (!debug_information_label) return;
+    if (!debug_information_label)
+        return;
     char ibuf[1024];
     char mode[32];
     snprintf (mode, sizeof (mode), "%s", main_inputs.is_debug_mode_active ? "DEBUG MODE" : "GAME MODE");

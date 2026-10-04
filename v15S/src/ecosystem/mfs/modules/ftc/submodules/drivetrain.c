@@ -529,7 +529,8 @@ static void drivetrain_odometry_update (physics_world *world, ftc_robot *robot, 
             const float revs = robot->wheel_radians[i] * 0.15915494309189535f; /* /2pi */
             const float exact = revs * counts_per_rev;
             int new_count = (int) (exact >= 0.0f ? floorf (exact + 0.5f) : ceilf (exact - 0.5f));
-            if (!isfinite ((float) new_count)) new_count = robot->wheel_encoder_counts[i];
+            if (!isfinite ((float) new_count))
+                new_count = robot->wheel_encoder_counts[i];
             int old_count = robot->wheel_encoder_counts[i];
             robot->wheel_encoder_counts[i] = new_count;
             float q_angle = (float) new_count * 6.283185307179586f / counts_per_rev;
@@ -597,7 +598,8 @@ static void drivetrain_odometry_update (physics_world *world, ftc_robot *robot, 
             robot->odom_theta = 0.0f;
         } else if (robot->odom_theta > pi || robot->odom_theta < -pi) {
             float wrapped = fmodf (robot->odom_theta + pi, two_pi);
-            if (wrapped < 0.0f) wrapped += two_pi;
+            if (wrapped < 0.0f)
+                wrapped += two_pi;
             robot->odom_theta = wrapped - pi;
         }
     }

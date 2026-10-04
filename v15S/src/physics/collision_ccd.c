@@ -88,8 +88,10 @@ static float ccd_sphere_sweep_toi (vector3 dp, vector3 dv, float radius, float d
         t1 = c / q;
     }
     double toi = INFINITY;
-    if (t0 > 0.0 && t0 < toi) toi = t0;
-    if (t1 > 0.0 && t1 < toi) toi = t1;
+    if (t0 > 0.0 && t0 < toi)
+        toi = t0;
+    if (t1 > 0.0 && t1 < toi)
+        toi = t1;
     if (!(toi < (double) dt)) {
         return -1.0f;
     }
@@ -241,8 +243,10 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
                         double t1 = (-b - sqrt_disc) / denom;
                         double t2 = (-b + sqrt_disc) / denom;
                         double toi = 1e30;
-                        if (t1 > 0.0) toi = t1;
-                        if (t2 > 0.0 && t2 < toi) toi = t2;
+                        if (t1 > 0.0)
+                            toi = t1;
+                        if (t2 > 0.0 && t2 < toi)
+                            toi = t2;
                         if (toi > 0.0 && toi < (double) best_toi) {
                             best_toi = (float) toi;
                             hit = true;
@@ -451,9 +455,12 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
         const mpe_config_t *CC = C;
         float drag_c = CC->world.drag;
         float grav_c = CC->world.gravity;
-        if (!isfinite (drag_c) || drag_c <= 0.0f) drag_c = 1.0f;
-        if (drag_c > 1.0f) drag_c = 1.0f;
-        if (!isfinite (grav_c)) grav_c = 0.0f;
+        if (!isfinite (drag_c) || drag_c <= 0.0f)
+            drag_c = 1.0f;
+        if (drag_c > 1.0f)
+            drag_c = 1.0f;
+        if (!isfinite (grav_c))
+            grav_c = 0.0f;
         double cdr = (drag_c >= 1.0f - 1e-6f) ? 0.0 : -det_ln_pos ((double) drag_c);
         for (int i = 0; i < body_count; i++) {
             if (!hit_flags[i]) {

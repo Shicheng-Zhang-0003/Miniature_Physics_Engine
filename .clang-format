@@ -60,11 +60,12 @@ SpacesInParentheses: false
 SpacesInSquareBrackets: false
 SpacesInContainerLiterals: false
 
-# Line breaks - exemplar packs short functions and short ifs
+# Line breaks - exemplar: packed single-line functions; if/else bodies
+# ALWAYS stacked multi-line (never bunched), loops expanded.
 AllowShortBlocksOnASingleLine: false
 AllowShortCaseLabelsOnASingleLine: false
 AllowShortFunctionsOnASingleLine: Inline
-AllowShortIfStatementsOnASingleLine: Always
+AllowShortIfStatementsOnASingleLine: Never
 AllowShortLoopsOnASingleLine: false
 AlwaysBreakAfterReturnType: None
 BinPackArguments: true

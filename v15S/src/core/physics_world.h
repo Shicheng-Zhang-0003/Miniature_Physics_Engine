@@ -167,11 +167,13 @@ mpe_config_t *physics_world_get_config (physics_world *world);
 /* Hot-path accessor: per-world cfg if bound, else global.
  * Never NULL after mpe_config_init() has run once. */
 static inline const mpe_config_t *mpe_world_cfg (const physics_world *world) {
-    if (world && world->cfg) return world->cfg;
+    if (world && world->cfg)
+        return world->cfg;
     return &g_cfg;
 }
 static inline mpe_config_t *mpe_world_cfg_mut (physics_world *world) {
-    if (world && world->cfg) return world->cfg;
+    if (world && world->cfg)
+        return world->cfg;
     return &g_cfg;
 }
 int physics_world_add_sphere (physics_world *world, float radius, float mass, vector3 position);

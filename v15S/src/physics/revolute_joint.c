@@ -90,13 +90,16 @@ static int mat6_is_positive_definite (double m[6][6]) {
                 for (int c = 0; c < 6; c++)
                     scale += L[i][c] * L[i][c];
                 scale = (scale > 0.0) ? scale : 1.0;
-                if (!(sum > 1e-14 * scale)) return 0;
+                if (!(sum > 1e-14 * scale))
+                    return 0;
                 L[i][i] = sqrt (sum);
             } else {
-                if (!(L[j][j] > 0.0)) return 0;
+                if (!(L[j][j] > 0.0))
+                    return 0;
                 L[i][j] = sum / L[j][j];
             }
-            if (!isfinite (L[i][j])) return 0;
+            if (!isfinite (L[i][j]))
+                return 0;
         }
     }
     return 1;
@@ -153,7 +156,8 @@ static int mat6_invert (double m[6][6], double out[6][6]) {
                 pivot = row;
             }
         }
-        if (!(max_val > 1e-18) || !isfinite (max_val)) return 0; /* singular */
+        if (!(max_val > 1e-18) || !isfinite (max_val))
+            return 0; /* singular */
         if (pivot != col) {
             for (int j = 0; j < 12; j++) {
                 double tmp = aug[col][j];
@@ -165,7 +169,8 @@ static int mat6_invert (double m[6][6], double out[6][6]) {
         for (int j = 0; j < 12; j++)
             aug[col][j] /= piv_val;
         for (int row = 0; row < 6; row++) {
-            if (row == col) continue;
+            if (row == col)
+                continue;
             double factor = aug[row][col];
             for (int j = 0; j < 12; j++)
                 aug[row][j] -= factor * aug[col][j];
@@ -229,8 +234,10 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
     if (a3_joint_solve_may_skip (body_a->is_sleeping, body_b->is_sleeping, a3_revolute_active_drive (p))) {
         return;
     }
-    if (body_a->is_sleeping) rigidbody_wake (body_a);
-    if (body_b->is_sleeping) rigidbody_wake (body_b);
+    if (body_a->is_sleeping)
+        rigidbody_wake (body_a);
+    if (body_b->is_sleeping)
+        rigidbody_wake (body_b);
 
     float inv_mass_a = rigidbody_effective_inv_mass (body_a);
     float inv_mass_b = rigidbody_effective_inv_mass (body_b);
@@ -253,7 +260,8 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
     /* Hinge axis in world space (from body A). */
     vector3 axis_world = vector4_rotate_to_vector3 (body_a->orientation, vector3_normalisation (p->axis_a));
     float axis_len_sq = vector3_length_squared (axis_world);
-    if (axis_len_sq < 1e-12f) return;
+    if (axis_len_sq < 1e-12f)
+        return;
     axis_world = vector3_scaling (axis_world, 1.0f / sqrtf (axis_len_sq));
 
     /* Build orthonormal basis (u, v) perpendicular to axis for axis alignment constraints.
@@ -470,7 +478,8 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
          * budget; the sum respects motor_max_torque while keeping the
          * one-tick contact convergence the clamped row provides. */
         float max_lam = 0.5f * p->motor_max_torque * dt;
-        if (lambda[5] > max_lam) lambda[5] = max_lam;
+        if (lambda[5] > max_lam)
+            lambda[5] = max_lam;
         else if (lambda[5] < -max_lam)
             lambda[5] = -max_lam;
     }
@@ -520,7 +529,8 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
             float half_angle = atan2f (sqrtf (q_rel.x * q_rel.x + q_rel.y * q_rel.y + q_rel.z * q_rel.z), q_rel.w);
             vector3 rot_axis = {q_rel.x, q_rel.y, q_rel.z};
             float rot_axis_len = sqrtf (vector3_length_squared (rot_axis));
-            if (rot_axis_len > 1e-6f) rot_axis = vector3_scaling (rot_axis, 1.0f / rot_axis_len);
+            if (rot_axis_len > 1e-6f)
+                rot_axis = vector3_scaling (rot_axis, 1.0f / rot_axis_len);
             else
                 rot_axis = axis_world;
             float axis_dot = vector3_dot (rot_axis, axis_world);
@@ -691,12 +701,15 @@ void prismatic_solve (prismatic_params *p, rigidbody *body_a, rigidbody *body_b,
     if (a3_joint_solve_may_skip (body_a->is_sleeping, body_b->is_sleeping, 0)) {
         return;
     }
-    if (body_a->is_sleeping) rigidbody_wake (body_a);
-    if (body_b->is_sleeping) rigidbody_wake (body_b);
+    if (body_a->is_sleeping)
+        rigidbody_wake (body_a);
+    if (body_b->is_sleeping)
+        rigidbody_wake (body_b);
 
     float inv_a = rigidbody_effective_inv_mass (body_a);
     float inv_b = rigidbody_effective_inv_mass (body_b);
-    if ((inv_a <= 0.0f) && (inv_b <= 0.0f)) return;
+    if ((inv_a <= 0.0f) && (inv_b <= 0.0f))
+        return;
 
     vector3 r_a = vector4_rotate_to_vector3 (body_a->orientation, p->anchor_a);
     vector3 r_b = vector4_rotate_to_vector3 (body_b->orientation, p->anchor_b);
@@ -849,13 +862,17 @@ void prismatic_pre_step (prismatic_params *p, rigidbody *body_a, rigidbody *body
 /* Rope: inequality distance constraint (pulls only, no push). */
 void rope_solve (rope_params *p, rigidbody *body_a, rigidbody *body_b, float dt, const mpe_config_t *cfg) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
-    if ((!p) || (!body_a) || (!body_b) || (dt <= 0.0f)) return;
-    if (!isfinite (p->rest_length) || p->rest_length < 0.0f) return;
+    if ((!p) || (!body_a) || (!body_b) || (dt <= 0.0f))
+        return;
+    if (!isfinite (p->rest_length) || p->rest_length < 0.0f)
+        return;
     if (a3_joint_solve_may_skip (body_a->is_sleeping, body_b->is_sleeping, 0)) {
         return;
     }
-    if (body_a->is_sleeping) rigidbody_wake (body_a);
-    if (body_b->is_sleeping) rigidbody_wake (body_b);
+    if (body_a->is_sleeping)
+        rigidbody_wake (body_a);
+    if (body_b->is_sleeping)
+        rigidbody_wake (body_b);
 
     float inv_a = rigidbody_effective_inv_mass (body_a);
     float inv_b = rigidbody_effective_inv_mass (body_b);
@@ -866,10 +883,12 @@ void rope_solve (rope_params *p, rigidbody *body_a, rigidbody *body_b, float dt,
     vector3 delta = vector3_subtraction (world_b, world_a);
     float dist = vector3_length (delta);
 
-    if (dist < 1e-9f) return;
+    if (dist < 1e-9f)
+        return;
 
     /* Only pull when stretched beyond rest_length (inequality). */
-    if (dist <= p->rest_length) return;
+    if (dist <= p->rest_length)
+        return;
 
     vector3 n = vector3_scaling (delta, 1.0f / dist);
     float err = dist - p->rest_length;
@@ -880,7 +899,8 @@ void rope_solve (rope_params *p, rigidbody *body_a, rigidbody *body_b, float dt,
 
     float bias = C->joints.revolute_beta * err / dt;
     float max_b = C->joints.revolute_max_bias;
-    if (bias > max_b) bias = max_b;
+    if (bias > max_b)
+        bias = max_b;
     else if (bias < -max_b)
         bias = -max_b;
 
@@ -889,7 +909,8 @@ void rope_solve (rope_params *p, rigidbody *body_a, rigidbody *body_b, float dt,
     float k = inv_a + inv_b +
               vector3_dot (ra_n, math3_multiplication_vector3 (rigidbody_effective_inv_inertia (body_a), ra_n)) +
               vector3_dot (rb_n, math3_multiplication_vector3 (rigidbody_effective_inv_inertia (body_b), rb_n));
-    if (k <= 1e-12f) return;
+    if (k <= 1e-12f)
+        return;
 
     float lambda = -(rel_n + bias) / k;
     /* TRUTH: n=(B-A)/dist, impulse=n*lambda, B+=, A-=. Stretched+separating

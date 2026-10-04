@@ -44,7 +44,8 @@ int main (void) {
             }
         }
     }
-    if (fail) return 1;
+    if (fail)
+        return 1;
 
     float end_x, end_y, end_z;
     ftc_robot_get_position (&world, &robot, &end_x, &end_y, &end_z);

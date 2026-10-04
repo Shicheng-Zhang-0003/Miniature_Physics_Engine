@@ -94,17 +94,22 @@ static inline const mpe_regime_t *mpe_regime_lookup (const char *name) {
         {"sticky", 64, 1.00f, 4.00f, 0.95f, 1},
     };
     const int n = (int) (sizeof (regimes) / sizeof (regimes[0]));
-    if (!name || !*name) return &regimes[0];
+    if (!name || !*name)
+        return &regimes[0];
     for (int i = 0; i < n; i++) {
-        if (strcmp (regimes[i].name, name) == 0) return &regimes[i];
+        if (strcmp (regimes[i].name, name) == 0)
+            return &regimes[i];
     }
     return NULL; /* unknown regime: caller must fail loudly */
 }
 
 static inline int mpe_regime_apply (const mpe_regime_t *r) {
-    if (!r) return 0;
-    if (r->iterations >= 0) g_cfg.timestep.solver_iterations = (float) r->iterations;
-    if (g_cfg.world.gravity != 0.0f) g_cfg.world.gravity *= r->gravity_mult;
+    if (!r)
+        return 0;
+    if (r->iterations >= 0)
+        g_cfg.timestep.solver_iterations = (float) r->iterations;
+    if (g_cfg.world.gravity != 0.0f)
+        g_cfg.world.gravity *= r->gravity_mult;
     if (g_cfg.body_defaults.sphere_fric_s > 0.0f) {
         g_cfg.body_defaults.sphere_fric_s *= r->friction_mult;
         g_cfg.body_defaults.cube_fric_s *= r->friction_mult;
@@ -116,7 +121,8 @@ static inline int mpe_regime_apply (const mpe_regime_t *r) {
         g_cfg.body_defaults.cube_restitution = r->restitution;
         g_cfg.body_defaults.cylinder_restitution = r->restitution;
     }
-    if (r->sleep >= 0) g_cfg.sleep.enable = r->sleep;
+    if (r->sleep >= 0)
+        g_cfg.sleep.enable = r->sleep;
     return 1;
 }
 
@@ -130,7 +136,8 @@ static inline void mpe_test_begin (mpe_test_t *t, const char *name) {
     const char *regime = getenv ("MPE_TEST_REGIME");
     if (regime && *regime && strcmp (regime, "default") != 0) {
         const mpe_regime_t *r = mpe_regime_lookup (regime);
-        if (r) mpe_regime_apply (r);
+        if (r)
+            mpe_regime_apply (r);
         t->regime = r ? r->name : "INVALID";
     } else {
         t->regime = "default";

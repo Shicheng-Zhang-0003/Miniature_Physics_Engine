@@ -36,10 +36,13 @@ int main (void) {
         for (int t = 0; t < 120; t++) {
             physics_world_step (&world, dt);
             float d = vector3_length (vector3_subtraction (world.bodies[a].position, world.bodies[b].position));
-            if (d < min_center_separation) min_center_separation = d;
-            if (d <= 2.05f) contacted = 1; /* h_a+h_b = 2m for coaxial cap contact */
+            if (d < min_center_separation)
+                min_center_separation = d;
+            if (d <= 2.05f)
+                contacted = 1; /* h_a+h_b = 2m for coaxial cap contact */
             float penetration = 2.0f - d;
-            if (penetration > max_pen) max_pen = penetration;
+            if (penetration > max_pen)
+                max_pen = penetration;
         }
 
         float relative_speed = fabsf (world.bodies[a].velocity.x - world.bodies[b].velocity.x);
@@ -79,7 +82,8 @@ int main (void) {
         for (int t = 0; t < 600; t++) {
             physics_world_step (&world, dt);
             float d = fabsf (world.bodies[0].position.x - world.bodies[1].position.x);
-            if (d > max_drift) max_drift = d;
+            if (d > max_drift)
+                max_drift = d;
         }
 
         printf ("[INFO] cyl_cyl_parallel max_drift=%.4f\n", max_drift);
@@ -132,8 +136,10 @@ int main (void) {
             physics_world_step (&world, dt);
             rigidbody *b = &world.bodies[cyl];
             float v = vector3_length (b->velocity);
-            if (v > max_vel) max_vel = v;
-            if (v > 0.5f) stable = 0; /* Allow some sliding on 17 deg tilt */
+            if (v > max_vel)
+                max_vel = v;
+            if (v > 0.5f)
+                stable = 0; /* Allow some sliding on 17 deg tilt */
         }
 
         printf ("[INFO] cyl_tilted_floor stable=%d max_vel=%.4f\n", stable, max_vel);
@@ -177,9 +183,11 @@ int main (void) {
             physics_world_step (&world, dt);
             rigidbody *b = &world.bodies[cyl];
             float axis_y = fabsf (vector3_dot (b->cached_axes[0], (vector3){0.0f, 1.0f, 0.0f}));
-            if (axis_y > 1.0f) axis_y = 1.0f;
+            if (axis_y > 1.0f)
+                axis_y = 1.0f;
             float tilt = acosf (axis_y);
-            if (tilt > max_tilt) max_tilt = tilt;
+            if (tilt > max_tilt)
+                max_tilt = tilt;
         }
 
         float support_error = fabsf (world.bodies[cyl].position.y - 2.0f);
@@ -311,9 +319,11 @@ int main (void) {
             physics_world_step (&world, dt);
             rigidbody *b = &world.bodies[coin];
             float axis_y = fabsf (vector3_dot (b->cached_axes[0], (vector3){0.0f, 1.0f, 0.0f}));
-            if (axis_y > 1.0f) axis_y = 1.0f;
+            if (axis_y > 1.0f)
+                axis_y = 1.0f;
             float tilt = acosf (axis_y);
-            if (tilt > max_tilt) max_tilt = tilt;
+            if (tilt > max_tilt)
+                max_tilt = tilt;
         }
 
         printf ("[INFO] thin_cylinder max_tilt=%.6f\n", max_tilt);

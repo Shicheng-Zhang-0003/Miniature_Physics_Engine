@@ -44,7 +44,8 @@ int mfs_t_freefall (void) {
         t_ptr->failures++;
         printf ("[FAIL] freefall velocity\n");
     }
-    if (t_ptr->failures == 0) printf ("[PASS] freefall\n");
+    if (t_ptr->failures == 0)
+        printf ("[PASS] freefall\n");
     physics_world_cleanup (&w);
     return t_ptr->failures;
 }
@@ -289,7 +290,8 @@ int mfs_t_motor_free_speed (void) {
         for (int i = 0; i < 180; i++) {
             float V = battery_get_voltage (&b, m.current);
             motor_update_load (&m, w, dt, V, axle_I);
-            if (!isfinite (w) || !isfinite (m.output_torque)) return 1;
+            if (!isfinite (w) || !isfinite (m.output_torque))
+                return 1;
             w += (m.output_torque / axle_I) * dt;
             battery_fuse_step (&b, fabsf (m.current), dt);
             battery_drain (&b, m.current, dt);
@@ -298,7 +300,8 @@ int mfs_t_motor_free_speed (void) {
         float rpm_error = fabsf (m.rpm - spec_rpm) / spec_rpm;
         printf ("[info] open-loop no-load line: %.4f rpm vs spec %.4f (%+.4f%%)\n", m.rpm, spec_rpm,
                 100.0f * (m.rpm - spec_rpm) / spec_rpm);
-        if (rpm_error > 0.10f) rc = 1;
+        if (rpm_error > 0.10f)
+            rc = 1;
     }
     /* ---- Phase 2: observer armed exactly as robot.c arms it -------------- */
     {
@@ -331,8 +334,10 @@ int mfs_t_motor_free_speed (void) {
         /* Gate what is meaningful without inventing a spec: must stay finite
          * and must not run away. A runaway or a NaN fails; a bounded limit
          * cycle is a known tracked defect, not a failure of this gate. */
-        if (!finite) rc = 1;
-        if (fabsf (m.rpm) > 4.0f * spec_rpm) rc = 1;
+        if (!finite)
+            rc = 1;
+        if (fabsf (m.rpm) > 4.0f * spec_rpm)
+            rc = 1;
     }
     return rc;
 }
@@ -392,23 +397,28 @@ int mfs_t_back_emf (void) {
     for (int t = 0; t < 60; t++) {
         float V = battery_get_voltage (&b, m.current);
         motor_update_load (&m, w, dt, V, axle_I);
-        if (!isfinite (w) || !isfinite (m.output_torque)) return 1;
+        if (!isfinite (w) || !isfinite (m.output_torque))
+            return 1;
         w += (m.output_torque / axle_I) * dt;
         battery_fuse_step (&b, fabsf (m.current), dt);
         battery_drain (&b, m.current, dt);
     }
-    if (!(w > 5.0f)) return 1; /* must be spinning before the cut */
+    if (!(w > 5.0f))
+        return 1; /* must be spinning before the cut */
     m.command = 0.0f;
     for (int t = 0; t < 120; t++) {
         float V = battery_get_voltage (&b, m.current);
         motor_update_load (&m, w, dt, V, axle_I);
-        if (!isfinite (w) || !isfinite (m.output_torque)) return 1;
+        if (!isfinite (w) || !isfinite (m.output_torque))
+            return 1;
         w += (m.output_torque / axle_I) * dt;
         battery_fuse_step (&b, fabsf (m.current), dt);
         battery_drain (&b, m.current, dt);
     }
-    if (fabsf (w) >= 1.0f) return 1;
-    if (fabsf (m.output_torque) >= 0.2f) return 1;
+    if (fabsf (w) >= 1.0f)
+        return 1;
+    if (fabsf (m.output_torque) >= 0.2f)
+        return 1;
     return 0;
 }
 /* T9: Static friction hold */
@@ -503,7 +513,8 @@ int mfs_t_kinetic_friction (void) {
             physics_world_cleanup (&w);
             return 1;
         }
-        if (vector3_length (w.bodies[b].velocity) < 0.005f) break;
+        if (vector3_length (w.bodies[b].velocity) < 0.005f)
+            break;
     }
     float dist = w.bodies[b].position.x - x0;
     float analytic = v0 * v0 / (2.0f * 0.3f * 9.81f);
@@ -824,7 +835,8 @@ int mfs_t_external_truth (void) {
                     vin = -vy;
                     contacted = 1;
                 }
-                if (contacted && vy > vout) vout = vy;
+                if (contacted && vy > vout)
+                    vout = vy;
             }
             MFS_INFO ("restitution e=%.2f v_in=%.4f v_out=%.4f eff=%.4f", (double) e, (double) vin, (double) vout,
                       (double) (vin > 1e-3f ? vout / vin : 0.0f));
@@ -905,7 +917,8 @@ int mfs_t_external_truth (void) {
                 float w = m.free_speed_rad_s * frac;
                 motor_update (&m, w, DT, V);
                 float I_ref = (V - m.kv * (w * m.gear_ratio)) / m.resistance;
-                if (I_ref > m.stall_current) I_ref = m.stall_current;
+                if (I_ref > m.stall_current)
+                    I_ref = m.stall_current;
                 MFS_CHECK_NEAR (t_ptr, m.current, I_ref, 0.02f * (I_ref > 0 ? I_ref : 1.0f), "motor I = (V - Ke w)/R");
                 MFS_CHECK_NEAR (t_ptr, m.output_torque, m.kt * I_ref * m.gear_ratio * m.efficiency,
                                 0.02f * m.output_torque, "motor tau = Kt I");
@@ -1012,7 +1025,8 @@ int mfs_t_external_truth (void) {
         float x0 = w.bodies[b2].position.x;
         for (int k = 0; k < 1200; k++) {
             physics_world_step (&w, DT);
-            if (vector3_length (w.bodies[b2].velocity) < 0.005f) break;
+            if (vector3_length (w.bodies[b2].velocity) < 0.005f)
+                break;
         }
         float d = w.bodies[b2].position.x - x0;
         MFS_INFO ("sliding: v0=%.4f measured d=%.4f analytic=%.4f", (double) v0, (double) d,

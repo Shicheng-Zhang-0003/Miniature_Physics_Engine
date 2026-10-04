@@ -482,14 +482,18 @@ int mpe_t_f10_long_run (void) {
                     nan2++;
                     continue;
                 }
-                if (rb->static_state) continue;
+                if (rb->static_state)
+                    continue;
                 /* The slab's top surface is y = 0. Any dynamic body whose CENTRE
                  * drops below the slab top by more than its own half-height
                  * plus slop has passed through the floor. With the net off there
                  * is nothing else that could have stopped it. */
-                if (rb->position.y < -1.0f) fell++;
-                if (rb->position.y < lowest) lowest = rb->position.y;
-                if (fabsf (rb->position.x) > 250.0f || fabsf (rb->position.z) > 250.0f) fell++;
+                if (rb->position.y < -1.0f)
+                    fell++;
+                if (rb->position.y < lowest)
+                    lowest = rb->position.y;
+                if (fabsf (rb->position.x) > 250.0f || fabsf (rb->position.z) > 250.0f)
+                    fell++;
             }
         }
         MPE_INFO ("safety net OFF: fell=%ld nan=%ld lowest_centre_y=%.4f (slab top y=0)", fell, nan2, lowest);
@@ -1327,10 +1331,14 @@ int mpe_t_frustum_culler (void) {
                     /* Only points strictly in front of the camera (w > 0 in
                      * clip space) have a meaningful projection; behind-camera
                      * points mirror and would produce spurious "inside". */
-                    if (!(d[3] > 0.0f)) continue;
-                    if (!(fabsf (d[0]) <= d[3])) continue;
-                    if (!(fabsf (d[1]) <= d[3])) continue;
-                    if (!(fabsf (d[2]) <= d[3])) continue;
+                    if (!(d[3] > 0.0f))
+                        continue;
+                    if (!(fabsf (d[0]) <= d[3]))
+                        continue;
+                    if (!(fabsf (d[1]) <= d[3]))
+                        continue;
+                    if (!(fabsf (d[2]) <= d[3]))
+                        continue;
                     checked++;
                     if (!visible) {
                         false_exclusions++;

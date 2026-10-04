@@ -79,8 +79,10 @@ int main (void) {
         for (int i = 0; i < world.body_count; i++) {
             float ty = fabsf (world.bodies[i].velocity.y);
             float tz = fabsf (world.bodies[i].velocity.z);
-            if (ty > tmax) tmax = ty;
-            if (tz > tmax) tmax = tz;
+            if (ty > tmax)
+                tmax = ty;
+            if (tz > tmax)
+                tmax = tz;
         }
         if (tmax > 0.05f) {
             printf ("[FAIL] spurious transverse motion (%.4f)\n", tmax);

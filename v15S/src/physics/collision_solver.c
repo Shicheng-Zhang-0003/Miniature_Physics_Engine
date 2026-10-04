@@ -415,8 +415,10 @@ void collision_prepare_solver (struct physics_world *world, collision_data *sour
         {
             float rsq = vector3_length_squared (rel_vel);
             if (isfinite (rsq)) {
-                if (rsq > m->object_a->max_relative_speed_sq) m->object_a->max_relative_speed_sq = rsq;
-                if (rsq > m->object_b->max_relative_speed_sq) m->object_b->max_relative_speed_sq = rsq;
+                if (rsq > m->object_a->max_relative_speed_sq)
+                    m->object_a->max_relative_speed_sq = rsq;
+                if (rsq > m->object_b->max_relative_speed_sq)
+                    m->object_b->max_relative_speed_sq = rsq;
             }
         }
 
@@ -608,10 +610,13 @@ void collision_prepare_solver (struct physics_world *world, collision_data *sour
                         float mks_b = m->object_b ? m->object_b->friction_kinetic : 0.0f;
                         float mu_k = (mks_a < mks_b) ? mks_a : mks_b;
                         float sth = mu_cfg->solver.static_friction_thresh;
-                        if (!(sth > 0.0f) || !isfinite (sth)) sth = 0.02f;
-                        if (tangent_speed >= sth) mu_cap = mu_k;
+                        if (!(sth > 0.0f) || !isfinite (sth))
+                            sth = 0.02f;
+                        if (tangent_speed >= sth)
+                            mu_cap = mu_k;
                     }
-                    if (!(mu_cap >= 0.0f) || !isfinite (mu_cap)) mu_cap = 0.0f;
+                    if (!(mu_cap >= 0.0f) || !isfinite (mu_cap))
+                        mu_cap = 0.0f;
                     float t1 = cp->accumulated_tangent_impulse, t2 = cp->accumulated_tangent2_impulse;
                     /* Same cone the sweep below uses, so warm start can never
                  * re-admit an impulse the sweep would immediately clamp out.
@@ -1156,10 +1161,14 @@ void collision_apply_rolling_resistance (collision_data *manifolds, int manifold
             if (isfinite (sum) && sum > 1e-12) {
                 share_a = (float) ((double) inv_a / sum);
                 share_b = (float) ((double) inv_b / sum);
-                if (!isfinite (share_a) || share_a < 0.0f) share_a = 0.5f;
-                if (!isfinite (share_b) || share_b < 0.0f) share_b = 0.5f;
-                if (share_a > 1.0f) share_a = 1.0f;
-                if (share_b > 1.0f) share_b = 1.0f;
+                if (!isfinite (share_a) || share_a < 0.0f)
+                    share_a = 0.5f;
+                if (!isfinite (share_b) || share_b < 0.0f)
+                    share_b = 0.5f;
+                if (share_a > 1.0f)
+                    share_a = 1.0f;
+                if (share_b > 1.0f)
+                    share_b = 1.0f;
             } else {
                 share_a = share_b = 0.5f;
             }

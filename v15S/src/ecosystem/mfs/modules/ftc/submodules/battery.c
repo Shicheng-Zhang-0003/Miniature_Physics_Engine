@@ -65,20 +65,25 @@ float battery_get_voltage (const battery *b, float total_current_draw) {
 }
 
 void battery_fuse_step (battery *b, float total_current_draw, float dt) {
-    if (!b || dt <= 0.0f) return;
+    if (!b || dt <= 0.0f)
+        return;
     /* DESPOT-FIX: NaN/Inf current used to poison fuse_heat forever (NaN
      * comparisons false, heat stuck). Reject non-finite loads. */
-    if (!isfinite (total_current_draw)) return;
-    if (!isfinite (b->fuse_heat)) b->fuse_heat = 0.0f;
+    if (!isfinite (total_current_draw))
+        return;
+    if (!isfinite (b->fuse_heat))
+        b->fuse_heat = 0.0f;
     float over = total_current_draw - MPE_BATTERY_FUSE_A;
     if (over > 0.0f) {
         /* ~20 A·s above rating trips (brief breakaway transients ride
          * through; sustained stall trips). */
         b->fuse_heat += over * dt / 20.0f;
-        if (b->fuse_heat > 10.0f) b->fuse_heat = 10.0f; /* cap: flag, not accumulator */
+        if (b->fuse_heat > 10.0f)
+            b->fuse_heat = 10.0f; /* cap: flag, not accumulator */
     } else if (total_current_draw < MPE_BATTERY_FUSE_RESET_A) {
         b->fuse_heat -= dt / 5.0f;
-        if (b->fuse_heat < 0.0f) b->fuse_heat = 0.0f;
+        if (b->fuse_heat < 0.0f)
+            b->fuse_heat = 0.0f;
     }
 }
 
@@ -87,7 +92,8 @@ int battery_fuse_tripped (const battery *b) {
 }
 
 void battery_reset_fuse (battery *b) {
-    if (b) b->fuse_heat = 0.0f;
+    if (b)
+        b->fuse_heat = 0.0f;
 }
 
 void battery_drain (battery *b, float total_current_draw, float dt) {
@@ -98,8 +104,10 @@ void battery_drain (battery *b, float total_current_draw, float dt) {
      * run; negative spikes over-charged past physics. Reject non-finite,
      * allow negative (regen, credited upstream at 50%) but keep SoC in
      * [0,1] — overcharge is clamped, never stored. */
-    if (!isfinite (total_current_draw)) return;
-    if (!isfinite (b->charge_fraction)) b->charge_fraction = 1.0f;
+    if (!isfinite (total_current_draw))
+        return;
+    if (!isfinite (b->charge_fraction))
+        b->charge_fraction = 1.0f;
     float amp_hours_used = (total_current_draw * dt) / 3600.0f;
     b->charge_fraction -= amp_hours_used / b->capacity_ah;
     if (b->charge_fraction < 0.0f) {

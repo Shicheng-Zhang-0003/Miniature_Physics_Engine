@@ -378,7 +378,8 @@ int broadphase_generate_pairing (struct physics_world *world, broadphase_pair *c
     int collision_pair_counter = 0;
     for (int i = 0; i < body_count; i++) {
         rigidbody *rb = &bodies[i];
-        if (rb->no_collide) continue; /* render-only proxies: never paired */
+        if (rb->no_collide)
+            continue; /* render-only proxies: never paired */
         float extent_x, extent_y, extent_z;
         if (rb->type == object_sphere) {
             extent_x = extent_y = extent_z = rb->radius;
@@ -435,13 +436,16 @@ int broadphase_generate_pairing (struct physics_world *world, broadphase_pair *c
             float dx = fabsf (rb->velocity.x) * dt;
             float dy = fabsf (rb->velocity.y) * dt;
             float dz = fabsf (rb->velocity.z) * dt;
-            if (!isfinite (dx) || dx < 0.0f) dx = 0.0f;
+            if (!isfinite (dx) || dx < 0.0f)
+                dx = 0.0f;
             else if (dx > 10.0f)
                 dx = 10.0f;
-            if (!isfinite (dy) || dy < 0.0f) dy = 0.0f;
+            if (!isfinite (dy) || dy < 0.0f)
+                dy = 0.0f;
             else if (dy > 10.0f)
                 dy = 10.0f;
-            if (!isfinite (dz) || dz < 0.0f) dz = 0.0f;
+            if (!isfinite (dz) || dz < 0.0f)
+                dz = 0.0f;
             else if (dz > 10.0f)
                 dz = 10.0f;
             extent_x += dx + ang_sweep;
@@ -589,10 +593,13 @@ int broadphase_generate_pairing (struct physics_world *world, broadphase_pair *c
      * rest of the pipeline assumes cannot exist. */
     if (ws->node_overflow_count != overflow_before) {
         for (int ai = 0; ai < body_count && collision_pair_counter < maximum_pairs_allowed; ai++) {
-            if (bodies[ai].no_collide) continue;
+            if (bodies[ai].no_collide)
+                continue;
             for (int bi = ai + 1; bi < body_count && collision_pair_counter < maximum_pairs_allowed; bi++) {
-                if (bodies[bi].no_collide) continue;
-                if (pair_already_checked (ws, ai, bi)) continue;
+                if (bodies[bi].no_collide)
+                    continue;
+                if (pair_already_checked (ws, ai, bi))
+                    continue;
                 rigidbody *rb_a = &bodies[ai];
                 rigidbody *rb_b = &bodies[bi];
                 vector3 dp = vector3_subtraction (rb_a->position, rb_b->position);
@@ -604,19 +611,25 @@ int broadphase_generate_pairing (struct physics_world *world, broadphase_pair *c
                     float vrel = vector3_length (dv);
                     float wa = vector3_length (rb_a->angular_velocity) * broadphase_bounding_radius (rb_a);
                     float wb = vector3_length (rb_b->angular_velocity) * broadphase_bounding_radius (rb_b);
-                    if (!isfinite (vrel)) vrel = 0.0f;
-                    if (!isfinite (wa)) wa = 0.0f;
-                    if (!isfinite (wb)) wb = 0.0f;
+                    if (!isfinite (vrel))
+                        vrel = 0.0f;
+                    if (!isfinite (wa))
+                        wa = 0.0f;
+                    if (!isfinite (wb))
+                        wb = 0.0f;
                     sweep = (vrel + wa + wb) * dt;
-                    if (!isfinite (sweep) || sweep < 0.0f) sweep = 0.0f;
+                    if (!isfinite (sweep) || sweep < 0.0f)
+                        sweep = 0.0f;
                     else if (sweep > 4.0f)
                         sweep = 4.0f;
                 }
                 float slop_fb = mpe_world_cfg (world)->solver.penetration_slop;
-                if (!isfinite (slop_fb) || slop_fb < 0.0f) slop_fb = 0.0f;
+                if (!isfinite (slop_fb) || slop_fb < 0.0f)
+                    slop_fb = 0.0f;
                 float swept_sum = rad_sum + slop_fb + sweep;
                 bool fb_hit = false;
-                if (!isfinite (dist_sq) || !isfinite (swept_sum)) fb_hit = true;
+                if (!isfinite (dist_sq) || !isfinite (swept_sum))
+                    fb_hit = true;
                 else if (dist_sq <= swept_sum * swept_sum)
                     fb_hit = true;
                 if (fb_hit) {
