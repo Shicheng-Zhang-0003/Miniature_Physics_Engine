@@ -6,7 +6,6 @@
 #include "core/physics_world.h"
 #include "physics/constraint.h"
 #include "config/mpe_config.h"
-
 int main (void) {
     mpe_config_init ();
     /* The infinite solver floor is coplanar with the slab (both y=0) and
@@ -19,7 +18,6 @@ int main (void) {
     physics_world world;
     physics_world_init (&world);
     constraint_pool_init (&world);
-
     /* Static floor slab, top at y=0, body friction 0.3. */
     int floor = physics_world_add_cube (&world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
     world.bodies[floor].friction_static = 0.3f;
@@ -29,7 +27,6 @@ int main (void) {
     world.bodies[box].friction_kinetic = 0.3f;
     world.bodies[box].velocity = (vector3){4.0f, 0.0f, 0.0f};
     rigidbody_wake (&world.bodies[box]);
-
     const float dt = 1.0f / 60.0f;
     for (int t = 0; t < 60; t++) {
         physics_world_step (&world, dt); /* settle onto the slab */

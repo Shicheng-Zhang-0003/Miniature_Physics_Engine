@@ -22,7 +22,6 @@
 #include "ecosystem/mpe_ecosystem.h"
 #include "ecosystem/mfs/modules/ftc/submodules/robot.h"
 #include "ecosystem/mfs/modules/ftc/ftc_fleet.h"
-
 /* Windows-aware plugin path: pick existing .so/.dll variant. */
 static const char *mpe_pick_plugin (const char *so_path, char *buf, size_t n) {
 #ifdef MPE_OS_WINDOWS
@@ -47,16 +46,13 @@ static const char *mpe_pick_plugin (const char *so_path, char *buf, size_t n) {
     return so_path;
 #endif
 }
-
 typedef int (*spawn_fn_t) (struct physics_world *, float, float, float, motor_preset_id, ftc_drivetrain_type);
 typedef ftc_robot *(*get_fn_t) (struct physics_world *, int);
 typedef void (*tank_fn_t) (ftc_robot *, float, float);
-
 int mpe_t_ftc_ecosystem (void) {
     mpe_test_t t;
     mpe_test_begin (&t, "ftc_ecosystem");
     g_cfg.timestep.solver_iterations = 128;
-
     char eco_buf[1024];
     const char *eco_path = mpe_pick_plugin ("ecosystem/mfs/mfs_ecosystem.so", eco_buf, sizeof (eco_buf));
     if (access (eco_path, R_OK) != 0) {
@@ -69,7 +65,6 @@ int mpe_t_ftc_ecosystem (void) {
     char err[512] = {0};
     MPE_CHECK (&t, mpe_loader_load (eco_path, err, sizeof (err)) == 0);
     MPE_CHECK (&t, mpe_ecosystem_find ("mfs-simulator") != NULL);
-
     physics_world w;
     mpe_world_begin (&w);
     MPE_CHECK (&t, mpe_floor_slab (&w, 1.0f, 0.8f, 0.0f) >= 0);
@@ -83,12 +78,10 @@ int mpe_t_ftc_ecosystem (void) {
         mpe_test_end (&t);
         return t.failures + 1;
     }
-
     char *sp[] = {"spawn"};
     MPE_CHECK (&t, ed->command (st, 1, sp) == 0);
     char *dv[] = {"drive", "0", "tank", "1.0", "1.0"};
     MPE_CHECK (&t, ed->command (st, 5, dv) == 0);
-
     /* Pose reader resolves exactly like the terminal does. */
     spawn_fn_t p_spawn = NULL;
     get_fn_t p_get = NULL;
@@ -107,7 +100,6 @@ int mpe_t_ftc_ecosystem (void) {
         x0 = w.bodies[r0->chassis_body].position.x;
         z0 = w.bodies[r0->chassis_body].position.z;
     }
-
     const float dt = 1.0f / 60.0f;
     for (int k = 0; k < 180; k++) {
         mpe_ecosystem_pre_step (&w, dt);
@@ -123,7 +115,6 @@ int mpe_t_ftc_ecosystem (void) {
     MPE_CHECK (&t, ed->command (st, 2, tl) == 0);
     char *li[] = {"list"};
     MPE_CHECK (&t, ed->command (st, 1, li) == 0);
-
     ftc_robot *r1 = p_get ? p_get (&w, 0) : NULL;
     MPE_CHECK (&t, r1 != NULL);
     /* DESPOT-2026-09-29: both motion assertions were wrapped in

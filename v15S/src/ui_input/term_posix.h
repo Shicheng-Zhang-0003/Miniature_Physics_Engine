@@ -24,12 +24,10 @@
 #include <stdarg.h>
 #include <time.h>
 #include <errno.h>
-
 /* ASCII-only lowercase (locale-independent, unlike tolower(3)). */
 static inline int term_ascii_tolower (int c) {
     return (c >= 'A' && c <= 'Z') ? (c + ('a' - 'A')) : c;
 }
-
 /* Locale-independent strcasecmp for command/variable names.
  * NULL-tolerant (NULL sorts before any string); 0 means equal. */
 static inline int term_ascii_strcasecmp (const char *a, const char *b) {
@@ -52,7 +50,6 @@ static inline int term_ascii_strcasecmp (const char *a, const char *b) {
     }
     return term_ascii_tolower ((unsigned char) *a) - term_ascii_tolower ((unsigned char) *b);
 }
-
 /* Bounded variant: compares at most n chars. */
 static inline int term_ascii_strncasecmp (const char *a, const char *b, size_t n) {
     if (n == 0) {
@@ -80,7 +77,6 @@ static inline int term_ascii_strncasecmp (const char *a, const char *b, size_t n
     }
     return 0;
 }
-
 /* malloc'd ASCII-lowercased copy (NULL in -> NULL out). */
 static inline char *term_ascii_strdown (const char *s) {
     if (!s) {
@@ -96,7 +92,6 @@ static inline char *term_ascii_strdown (const char *s) {
     }
     return out;
 }
-
 /* NULL-tolerant strdup/strndup (g_strdup crashes on NULL; these return it). */
 static inline char *term_strdup (const char *s) {
     if (!s) {
@@ -110,7 +105,6 @@ static inline char *term_strdup (const char *s) {
     memcpy (out, s, n + 1u);
     return out;
 }
-
 static inline char *term_strndup (const char *s, size_t n) {
     if (!s) {
         return NULL;
@@ -127,11 +121,9 @@ static inline char *term_strndup (const char *s, size_t n) {
     out[len] = '\0';
     return out;
 }
-
 static inline void term_strfree (char *s) {
     free (s);
 }
-
 /* malloc'd printf (replaces g_strdup_printf). NULL on OOM/encoding error. */
 static inline char *term_format (const char *fmt, ...) {
     char stack[256];
@@ -154,7 +146,6 @@ static inline char *term_format (const char *fmt, ...) {
     va_end (ap);
     return out;
 }
-
 /* Prefix test (replaces g_str_has_prefix). */
 static inline int term_str_has_prefix (const char *s, const char *prefix) {
     if (!s || !prefix) {
@@ -163,7 +154,6 @@ static inline int term_str_has_prefix (const char *s, const char *prefix) {
     size_t n = strlen (prefix);
     return strncmp (s, prefix, n) == 0;
 }
-
 /* Split on every occurrence of delim, KEEPING empty tokens (matches the
  * g_strsplit(s, "/", -1) contract the path parser relies on: a leading
  * delimiter yields a leading empty token). NULL-terminated array;
@@ -212,7 +202,6 @@ static inline char **term_strsplit (const char *s, char delim) {
     out[idx] = NULL;
     return out;
 }
-
 /* Free a NULL-terminated string vector (NULL-tolerant, like g_strfreev). */
 static inline void term_strfreev (char **v) {
     if (!v) {
@@ -223,7 +212,6 @@ static inline void term_strfreev (char **v) {
     }
     free (v);
 }
-
 /* Quote-aware command-line splitter replacing g_shell_parse_argv for the
  * terminal's needs: single/double quotes group words, backslash escapes
  * the next char (inside and outside quotes). No $ expansion, no tilde,
@@ -360,7 +348,6 @@ static inline int term_parse_argv (const char *cmd, int *argc_out, char ***argv_
     }
     return 1;
 }
-
 /* Monotonic microseconds (replaces g_get_monotonic_time). */
 static inline int64_t term_monotonic_us (void) {
     struct timespec ts;
@@ -374,5 +361,4 @@ static inline int64_t term_monotonic_us (void) {
     }
     return 0;
 }
-
 #endif /* term_posix_h */

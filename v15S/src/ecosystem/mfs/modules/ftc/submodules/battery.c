@@ -2,7 +2,6 @@
 #include "battery.h"
 #include <math.h>
 #include <stdio.h>
-
 void battery_init (battery *b) {
     if (!b) {
         return;
@@ -22,7 +21,6 @@ void battery_init (battery *b) {
     b->capacity_ah = 3.0f;
     b->charge_fraction = 1.0f;
 }
-
 float battery_get_voltage (const battery *b, float total_current_draw) {
     /* FIX-AUDIT-DESPOT: was a silent 12.8 V default on NULL, which made a
      * missing-battery bug read as a fresh pack. NULL is a caller bug: warn
@@ -63,7 +61,6 @@ float battery_get_voltage (const battery *b, float total_current_draw) {
     }
     return terminal;
 }
-
 void battery_fuse_step (battery *b, float total_current_draw, float dt) {
     if (!b || dt <= 0.0f)
         return;
@@ -86,16 +83,13 @@ void battery_fuse_step (battery *b, float total_current_draw, float dt) {
             b->fuse_heat = 0.0f;
     }
 }
-
 int battery_fuse_tripped (const battery *b) {
     return (b && b->fuse_heat >= 1.0f) ? 1 : 0;
 }
-
 void battery_reset_fuse (battery *b) {
     if (b)
         b->fuse_heat = 0.0f;
 }
-
 void battery_drain (battery *b, float total_current_draw, float dt) {
     if ((!b) || (dt <= 0.0f)) {
         return;

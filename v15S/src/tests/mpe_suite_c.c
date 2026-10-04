@@ -20,7 +20,6 @@
 #include "core/mpe_loader.h"
 #include "scene/scene_load.h"
 #include "scene/scene_saving.h"
-
 /* stack FIXED: v1 placed 6 cubes on the frictionless emergency clamp, so
  * lateral micro-motion never damped and the tower pumped to v~2m/s. v2
  * stands it on a mass-0 Coulomb slab (mu 0.4/0.3, e=0). Same tight gates. */
@@ -72,7 +71,6 @@ int mpe_t_stack (void) {
     mpe_test_end (&t);
     return t.failures;
 }
-
 /* driven_wheel FIXED: v1 never enabled the solver plane, so torque spun
  * the wheel to wx=96 with dz=0 (no Coulomb manifold exists without the
  * plane/slab). v2 enables the plane with synced floor friction. Same
@@ -137,17 +135,14 @@ int mpe_t_driven_wheel (void) {
     mpe_test_end (&t);
     return t.failures;
 }
-
 static int mpe_vec3_eq (vector3 a, vector3 b) {
     return (a.x == b.x) && (a.y == b.y) && (a.z == b.z) && isfinite (a.x) && isfinite (a.y) && isfinite (a.z) &&
            isfinite (b.x) && isfinite (b.y) && isfinite (b.z);
 }
-
 static int mpe_vec4_eq (vector4 a, vector4 b) {
     return (a.w == b.w) && (a.x == b.x) && (a.y == b.y) && (a.z == b.z) && isfinite (a.w) && isfinite (a.x) &&
            isfinite (a.y) && isfinite (a.z) && isfinite (b.w) && isfinite (b.x) && isfinite (b.y) && isfinite (b.z);
 }
-
 static int mpe_bodies_equal (const rigidbody *a, const rigidbody *b) {
     if (!mpe_vec3_eq (a->position, b->position)) {
         return 0;
@@ -206,7 +201,6 @@ static int mpe_bodies_equal (const rigidbody *a, const rigidbody *b) {
     return (a->is_sleeping == b->is_sleeping) && (a->sleep_timer == b->sleep_timer) &&
            (a->static_state == b->static_state) && (a->kinematic == b->kinematic);
 }
-
 static void mpe_det_scene (physics_world *w) {
     physics_world_init (w);
     constraint_pool_init (w);
@@ -227,7 +221,6 @@ static void mpe_det_scene (physics_world *w) {
     w->bodies[d].velocity = (vector3){0.0f, -0.2f, 0.0f};
     physics_world_add_cube (w, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
 }
-
 int mpe_t_determinism (void) {
     mpe_test_t t;
     mpe_test_begin (&t, "determinism");
@@ -257,10 +250,8 @@ int mpe_t_determinism (void) {
     mpe_test_end (&t);
     return t.failures;
 }
-
 #define F10_TICKS 1500
 #define F10_TRANSIENT 120
-
 static void mpe_f10_cube (physics_world *w, vector3 p) {
     int idx = physics_world_add_cube (w, p, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
     if (idx >= 0) {
@@ -269,7 +260,6 @@ static void mpe_f10_cube (physics_world *w, vector3 p) {
         w->bodies[idx].friction_kinetic = 0.7f;
     }
 }
-
 /* Adversarial pile bodies (shared by f10 settle + f11 torture builders). */
 /* Adversarial pile bodies (shared by f10 settle + f11 torture builders).
  *
@@ -308,7 +298,6 @@ static void mpe_pile_bodies (physics_world *w) {
         }
     }
 }
-
 /* f10 settle scene: pile + Coulomb floor (see scene_init.c note). */
 static void mpe_settle_scene (physics_world *w) {
     int f = physics_world_add_cube (w, (vector3){0.0f, -0.5f, 0.0f}, (vector3){30.0f, 0.5f, 30.0f}, 0.0f);
@@ -319,7 +308,6 @@ static void mpe_settle_scene (physics_world *w) {
     }
     mpe_pile_bodies (w);
 }
-
 /* f11 torture scene.
  *
  * DESPOT-2026-10-03: THIS HAD NO FLOOR, AND THAT MADE IT A SCENARIO THE GUI
@@ -352,7 +340,6 @@ static void mpe_torture_scene (physics_world *w) {
     }
     mpe_pile_bodies (w);
 }
-
 int mpe_t_f10_long_run (void) {
     mpe_test_t t;
     mpe_test_begin (&t, "f10_long_run");
@@ -443,7 +430,6 @@ int mpe_t_f10_long_run (void) {
     MPE_CHECK (&t, run_max_lin < 2.0f && run_max_ang < 2.0f);
     MPE_CHECK (&t, asleep == dynamic_n && dynamic_n > 0);
     physics_world_cleanup (&w);
-
     /* ---- Phase 2 (DESPOT-2026-10-03): THE `fallen` GATE, MADE REAL.
      *
      * Phase 1 above runs with the world-edge safety net ON, which is the
@@ -501,7 +487,6 @@ int mpe_t_f10_long_run (void) {
         MPE_CHECK (&t, fell == 0);
         physics_world_cleanup (&w2);
     }
-
     if (t.failures == 0) {
         printf ("[PASS] long-run 10-stack+pile settles and stays calm; and with "
                 "the world-edge safety net OFF nothing falls through the floor\n");
@@ -509,7 +494,6 @@ int mpe_t_f10_long_run (void) {
     mpe_test_end (&t);
     return t.failures;
 }
-
 int mpe_t_sleep_contact_wake (void) {
     mpe_test_t t;
     mpe_test_begin (&t, "sleep_contact_wake");
@@ -578,7 +562,6 @@ int mpe_t_sleep_contact_wake (void) {
     mpe_test_end (&t);
     return t.failures;
 }
-
 /* DESPOT-2026-10-03: worst PAIRWISE cube-cube overlap, measured with the
  * engine's own SAT + face clip so the number is the same quantity the solver
  * works against, not an AABB approximation.
@@ -616,16 +599,13 @@ static float mpe_worst_cube_overlap (physics_world *w, int first, int count) {
     }
     return worst;
 }
-
 static uint32_t mpe_rng = 0xC0FFEEu;
-
 static uint32_t mpe_next (void) {
     mpe_rng ^= mpe_rng << 13;
     mpe_rng ^= mpe_rng >> 17;
     mpe_rng ^= mpe_rng << 5;
     return mpe_rng;
 }
-
 int mpe_t_f11_torture (void) {
     mpe_test_t t;
     mpe_test_begin (&t, "f11_torture");
@@ -747,7 +727,6 @@ int mpe_t_f11_torture (void) {
     }
     MPE_INFO ("torture end speeds (reported, never gated): lin=%.3f ang=%.3f nan=%ld fallen=%ld", end_lin, end_ang,
               nan_ticks, fallen_ticks);
-
     /* DESPOT-2026-10-03: THE INTERPENETRATION GATE.
      *
      * f11 had NO check of any kind on how deeply two cubes intersect, which is
@@ -811,7 +790,6 @@ int mpe_t_f11_torture (void) {
     mpe_test_end (&t);
     return t.failures;
 }
-
 /* scene_roundtrip: bodies + springs + revolute survive save/load on primary. */
 int mpe_t_scene_roundtrip (void) {
     mpe_test_t t;
@@ -855,18 +833,15 @@ int mpe_t_scene_roundtrip (void) {
     mpe_test_end (&t);
     return t.failures;
 }
-
 /* module: per-world cfg, registry dispatch, custom shapes, hooks, id cache,
  * pool growth, det counters. Condensed port of module_test.c. */
 static int mpe_mod_pre_calls = 0;
-
 static void mpe_mod_pre (mpe_world_t *world, float dt, void *st) {
     (void) world;
     (void) dt;
     (void) st;
     mpe_mod_pre_calls++;
 }
-
 int mpe_t_module (void) {
     mpe_test_t t;
     mpe_test_begin (&t, "module");
@@ -938,7 +913,6 @@ int mpe_t_module (void) {
     mpe_test_end (&t);
     return t.failures;
 }
-
 /* math3_inverse: analytic inverse at small inertia tensors. */
 static uint32_t mpe_inverse_rng (uint32_t *state) {
     /* xorshift32: fixed seed, no libc/global RNG state and identical inputs. */
@@ -949,11 +923,9 @@ static uint32_t mpe_inverse_rng (uint32_t *state) {
     *state = x;
     return x;
 }
-
 static float mpe_inverse_rand_signed (uint32_t *state) {
     return (float) (mpe_inverse_rng (state) >> 8) * (1.0f / 16777216.0f) * 2.0f - 1.0f;
 }
-
 int mpe_t_math3_inverse (void) {
     mpe_test_t t;
     mpe_test_begin (&t, "math3_inverse");
@@ -970,7 +942,6 @@ int mpe_t_math3_inverse (void) {
     math3 tiny = {{{4e-12f, 0, 0}, {0, 4e-12f, 0}, {0, 0, 4e-12f}}};
     math3 tinv = math3_inverse (tiny);
     MPE_CHECK (&t, isfinite (tinv.matrix[0][0]) && tinv.matrix[0][0] > 0.0f);
-
     /* Property sweep: 256 deterministic SPD matrices built as L*L^T.
      * Sweep their magnitude over 2^-24 .. 2^24 and verify A*A^-1 ~= I.
      * This tests scale invariance and non-diagonal cofactors independently
@@ -1005,7 +976,6 @@ int mpe_t_math3_inverse (void) {
             }
         }
     }
-
     /* Singular-axis and non-finite inputs have documented safe fallbacks. */
     math3 locked = {{{0.0f, 0.0f, 0.0f}, {0.0f, 2.0f, 0.0f}, {0.0f, 0.0f, 4.0f}}};
     math3 locked_inverse = math3_inverse (locked);
@@ -1023,7 +993,6 @@ int mpe_t_math3_inverse (void) {
     mpe_test_end (&t);
     return t.failures;
 }
-
 /* frustum: Gribb/Hartmann extraction culls outside, keeps inside. */
 int mpe_t_frustum (void) {
     mpe_test_t t;
@@ -1047,7 +1016,6 @@ int mpe_t_frustum (void) {
     mpe_test_end (&t);
     return t.failures;
 }
-
 /* floor_collision_diag: cylinder drops 1m onto slab, settles at r, calms. */
 int mpe_t_floor_collision_diag (void) {
     mpe_test_t t;
@@ -1098,7 +1066,6 @@ int mpe_t_floor_collision_diag (void) {
     mpe_test_end (&t);
     return t.failures;
 }
-
 /* ---------------------------------------------------------------------------
  * revolute_matrix: prove the hinge effective-mass matrix IS J M^-1 J^T.
  *
@@ -1120,7 +1087,6 @@ int mpe_t_floor_collision_diag (void) {
  * comparison, so this cannot be satisfied by re-stating the same derivation.
  * ------------------------------------------------------------------------ */
 #include "physics/revolute_joint.h"
-
 static void mpe_revolute_constraint_velocity (rigidbody *a, rigidbody *b, vector3 ra, vector3 rb, vector3 u, vector3 v,
                                               vector3 axis, double out[6]) {
     vector3 va = vector3_addition (a->velocity, vector3_cross (a->angular_velocity, ra));
@@ -1134,7 +1100,6 @@ static void mpe_revolute_constraint_velocity (rigidbody *a, rigidbody *b, vector
     out[4] = vector3_dot (rw, v);
     out[5] = vector3_dot (rw, axis);
 }
-
 int mpe_t_revolute_matrix (void) {
     mpe_test_t t;
     mpe_test_begin (&t, "revolute_matrix");
@@ -1143,7 +1108,6 @@ int mpe_t_revolute_matrix (void) {
     g_cfg.solver.bias_factor = 0.0f;
     g_cfg.joints.revolute_beta = 0.0f;
     g_cfg.joints.revolute_max_bias = 0.0f;
-
     /* Both anchors deliberately OFF-CENTRE: this is the geometry the old
      * suite never exercised, and the geometry the bug lived in. */
     int ia = physics_world_add_cube (&w, (vector3){0, 5, 0}, (vector3){0.5f, 0.5f, 0.5f}, 2.0f);
@@ -1154,7 +1118,6 @@ int mpe_t_revolute_matrix (void) {
     rigidbody_update_axes (A);
     B->orientation = vector4_from_axis_with_angle ((vector3){0.9f, 0.1f, 0.4f}, 1.1f);
     rigidbody_update_axes (B);
-
     revolute_params p;
     memset (&p, 0, sizeof (p));
     p.anchor_a = (vector3){-0.18f, 0.05f, 0.12f};
@@ -1163,7 +1126,6 @@ int mpe_t_revolute_matrix (void) {
     p.axis_b = (vector3){0, 0, 1};
     p.motor_enabled = false;
     p.limits_enabled = false;
-
     /* Mirror the solver's basis exactly (axis x ref, normalised). */
     vector3 ra = vector4_rotate_to_vector3 (A->orientation, p.anchor_a);
     vector3 rb = vector4_rotate_to_vector3 (B->orientation, p.anchor_b);
@@ -1178,12 +1140,10 @@ int mpe_t_revolute_matrix (void) {
     }
     u = vector3_scaling (u, 1.0f / ul);
     vector3 v = vector3_cross (axis, u);
-
     float ima = rigidbody_effective_inv_mass (A);
     float imb = rigidbody_effective_inv_mass (B);
     math3 Ia = rigidbody_effective_inv_inertia (A);
     math3 Ib = rigidbody_effective_inv_inertia (B);
-
     /* Measured J M^-1 J^T, one unit-lambda column at a time. */
     double Kt[6][6];
     for (int col = 0; col < 6; col++) {
@@ -1209,7 +1169,6 @@ int mpe_t_revolute_matrix (void) {
         for (int r = 0; r < 6; r++)
             Kt[r][col] = c[r];
     }
-
     /* K is a Gram matrix, so it must be symmetric. An asymmetric K means the
      * Jacobian and the impulse application disagree about the block layout. */
     for (int r = 0; r < 6; r++) {
@@ -1217,7 +1176,6 @@ int mpe_t_revolute_matrix (void) {
             MPE_CHECK_NEAR (&t, Kt[r][c2], Kt[c2][r], 1e-4 + 1e-3 * fabs (Kt[r][c2]), "K symmetry");
         }
     }
-
     /* The decisive functional property: ONE Newton step of a correct K must
      * null all five constrained rows. Anything less means K is not the
      * effective mass of the Jacobian actually being applied. Before the fix
@@ -1235,7 +1193,6 @@ int mpe_t_revolute_matrix (void) {
         res += after[i] * after[i];
     MPE_CHECK_NEAR (&t, sqrt (res), 0.0, 1e-4, "one-solve constraint residual");
     MPE_INFO ("revolute_matrix: one-solve residual %.3e (was 5.18 pre-fix)", sqrt (res));
-
     /* Sweep anchor arm: the old K went indefinite past ~0.3 m, so a long
      * anchor must also converge in one solve. */
     for (int trial = 0; trial < 4; trial++) {
@@ -1256,7 +1213,6 @@ int mpe_t_revolute_matrix (void) {
             r2 += after[i] * after[i];
         MPE_CHECK_NEAR (&t, sqrt (r2), 0.0, 1e-3, "one-solve residual at long anchor arm");
     }
-
     /* Momentum must be conserved by the constraint impulse alone. */
     p.anchor_a = (vector3){-0.18f, 0.05f, 0.12f};
     p.anchor_b = (vector3){0.25f, 0.15f, -0.20f};
@@ -1268,12 +1224,10 @@ int mpe_t_revolute_matrix (void) {
     revolute_solve (&p, A, B, 1.0f / 60.0f, &g_cfg);
     double p1 = (double) A->mass * A->velocity.x + (double) B->mass * B->velocity.x;
     MPE_CHECK_NEAR (&t, p1, p0, 1e-4, "joint impulse conserves linear momentum");
-
     physics_world_cleanup (&w);
     mpe_test_end (&t);
     return t.failures;
 }
-
 /* ---------------------------------------------------------------------------
  * frustum_culler: exercise the SHIPPED culler.
  *
@@ -1295,7 +1249,6 @@ int mpe_t_frustum_culler (void) {
     mpe_test_t t;
     mpe_test_begin (&t, "frustum_culler");
     det_pin_fp_state ();
-
     /* Independent reference: project a point through the same VP and accept it
      * if it lands inside the NDC cube, OR if it is in front of the near plane
      * but off to the side (behind-camera points project nonsensically, so the
@@ -1311,7 +1264,6 @@ int mpe_t_frustum_culler (void) {
         math4 vp = math4_multiplication (proj, view);
         float planes[6][4];
         math4_frustum_planes (vp, planes);
-
         /* Deterministic sampling grid around the view. */
         for (int ix = -12; ix <= 12; ix++) {
             for (int iy = -8; iy <= 8; iy++) {
@@ -1319,7 +1271,6 @@ int mpe_t_frustum_culler (void) {
                     vector3 p = {eye.x + (float) ix * 1.3f, eye.y + (float) iy * 1.1f, eye.z + (float) iz * 1.4f};
                     float radius = 0.5f;
                     int visible = math4_frustum_sphere_visible (planes, p.x, p.y, p.z, radius);
-
                     /* Reference: is the centre unambiguously inside the view
                      * volume, with margin for the radius? If so it MUST be
                      * reported visible. */
@@ -1350,7 +1301,6 @@ int mpe_t_frustum_culler (void) {
     MPE_INFO ("frustum_culler: %d reference-inside samples, %d false exclusions", checked, false_exclusions);
     MPE_CHECK (&t, checked > 1000);
     MPE_CHECK (&t, false_exclusions == 0);
-
     /* Explicit cases. math4_look_view(eye, front, up) orients the camera so
      * that `front` is the direction it looks along: with the origin as eye and
      * front = +Z, the visible half-space is +Z (measured, not assumed). */
@@ -1369,7 +1319,6 @@ int mpe_t_frustum_culler (void) {
         /* And one just outside the near plane with a large radius is KEPT. */
         MPE_CHECK (&t, math4_frustum_sphere_visible (planes, 0.0f, 0.0f, -0.05f, 0.5f) == 1);
     }
-
     mpe_test_end (&t);
     return t.failures;
 }

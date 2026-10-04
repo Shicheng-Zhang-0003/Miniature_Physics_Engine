@@ -27,7 +27,6 @@
 #include "modules/ftc/submodules/drivetrain.h"
 #include "modules/ftc/ftc_fleet.h"
 #include "ecosystem/mfs/tests/mfs_test_common.h"
-
 /* Windows-aware plugin path: pick existing .so/.dll variant. */
 static const char *mpe_pick_plugin (const char *so_path, char *buf, size_t n) {
 #ifdef MPE_OS_WINDOWS
@@ -52,9 +51,7 @@ static const char *mpe_pick_plugin (const char *so_path, char *buf, size_t n) {
     return so_path;
 #endif
 }
-
 extern const mpe_module_desc_t mpe_module_desc; /* static copy (ftc_module.c) */
-
 static const float DT = 1.0f / 60.0f;
 static int failures = 0;
 #define CHECK(cond, ...)                                                                                               \
@@ -68,7 +65,6 @@ static int failures = 0;
             failures++;                                                                                                \
         }                                                                                                              \
     } while (0)
-
 static int finite_world (physics_world *w) {
     for (int i = 0; i < w->body_count; i++) {
         rigidbody *rb = &w->bodies[i];
@@ -79,23 +75,19 @@ static int finite_world (physics_world *w) {
     }
     return 1;
 }
-
 static void setup_world (physics_world *w) {
     mfs_test_world (w); /* 128 iters + tile floor (see header) */
 }
-
 /* dlsym'd dynamic API surface (full import: descriptor + fleet + drive) */
 typedef int (*spawn_fn_t) (struct physics_world *, float, float, float, motor_preset_id, ftc_drivetrain_type);
 typedef ftc_robot *(*get_fn_t) (struct physics_world *, int);
 typedef void (*tank_fn_t) (ftc_robot *, float, float);
-
 static void print_bits (const char *tag, float a, float b) {
     uint32_t ua, ub;
     memcpy (&ua, &a, 4);
     memcpy (&ub, &b, 4);
     printf ("[info] %s: %a vs %a (0x%08x vs 0x%08x)\n", tag, a, b, ua, ub);
 }
-
 int main (int argc, char **argv) {
     const char *so_env = getenv ("FTC_SO");
     if (!so_env && argc > 1)
@@ -103,7 +95,6 @@ int main (int argc, char **argv) {
     char so_buf[1024];
     const char *so_picked = so_env ? so_env : mpe_pick_plugin ("plugins/mpe_ftc.so", so_buf, sizeof (so_buf));
     const char *so = so_picked;
-
     /* ---- 1. dynamic import through the kernel loader ---- */
     char err[512] = {0};
     CHECK (mpe_loader_load (so, err, sizeof (err)) == 0, "dlopen %s", so);
@@ -124,7 +115,6 @@ int main (int argc, char **argv) {
     if (!dyn_spawn || !dyn_get || !dyn_tank || !dyn_desc)
         return 1;
     CHECK (dyn_desc != &mpe_module_desc, "dynamic desc is a distinct image copy");
-
     /* ---- 2a. static path: attach linked-in desc, spawn, drive ---- */
     physics_world w1;
     setup_world (&w1);
@@ -159,7 +149,6 @@ int main (int argc, char **argv) {
     float dz1 = ex - sx, dz1z = ez - sz;
     float disp1 = sqrtf (dz1 * dz1 + dz1z * dz1z);
     CHECK (disp1 >= 0.5f, "static module path drives (%.4f m)", disp1);
-
     /* ---- 2b. dynamic path: identical script through the .so ---- */
     physics_world w2;
     setup_world (&w2);
@@ -184,7 +173,6 @@ int main (int argc, char **argv) {
     float dx2 = fx - tx, dz2 = fz - tz;
     float disp2 = sqrtf (dx2 * dx2 + dz2 * dz2);
     CHECK (disp2 >= 0.5f, "dynamic module path drives (%.4f m)", disp2);
-
     /* ---- 3. bitwise equivalence static vs dynamic ---- */
     int same = (memcmp (&ex, &fx, 4) == 0) && (memcmp (&ey, &fy, 4) == 0) && (memcmp (&ez, &fz, 4) == 0) &&
                (memcmp (&r1->odom_x, &r2->odom_x, 4) == 0) && (memcmp (&r1->odom_z, &r2->odom_z, 4) == 0) &&
@@ -196,7 +184,6 @@ int main (int argc, char **argv) {
         print_bits ("odom_x", r1->odom_x, r2->odom_x);
     }
     CHECK (same, "static vs dynamic bitwise-identical pose+odometry");
-
     /* ---- 4. detach lifecycle: torques stop, re-attach works ----
      * NOTE: r2 dangles after detach (the fleet array is freed — same
      * dangling-pointer rule as bodies after physics_world_cleanup), so
@@ -226,7 +213,6 @@ int main (int argc, char **argv) {
     int s9 = ftc_fleet_spawn (&w2, 5.0f, ftc_robot_rest_height (), 5.0f, MOTOR_GB_5203_26_9, FTC_DRIVETRAIN_TANK);
     CHECK (s9 == 0, "spawn into re-attached fleet");
     CHECK (mpe_loader_unload (so) == 0, "unload .so");
-
     /* Balance every attach (module state is freed by detach, not by
      * world cleanup — same split as malloc/free). */
     CHECK (physics_world_detach_module (&w1, "ftc-fleet") == 0, "detach static");

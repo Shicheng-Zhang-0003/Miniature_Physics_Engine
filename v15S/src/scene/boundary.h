@@ -3,7 +3,6 @@
 #include "../core/math3d.h"
 #include "../core/rigidbody.h"
 #include "../config/mpe_config.h"
-
 /* TRUTH: per-world config (NULL = global). The old signatures read g_cfg
  * directly, so foreign worlds with different floor_emergency_slop got the
  * wrong safety net. */

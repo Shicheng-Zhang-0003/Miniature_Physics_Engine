@@ -6,14 +6,11 @@
 #include "../core/mpe_platform.h"
 #include <string.h>
 #include <stdio.h>
-
 #define MPE_MAX_ECOSYSTEMS 16
 #define MPE_MAX_ATTACHED_ECOSYSTEMS 8
-
 static mpe_ecosystem_desc_t s_ecosystems[16];
 static int s_eco_live[16];
 static pthread_mutex_t s_eco_lock = PTHREAD_MUTEX_INITIALIZER;
-
 struct attached_eco {
     mpe_ecosystem_desc_t *desc;
     void *state;
@@ -36,7 +33,6 @@ struct attached_eco {
  *    itself detaches everywhere pre-dlclose). Do NOT hold a *desc across an
  *    unlock anywhere else. */
 static struct attached_eco s_attached[8];
-
 int mpe_ecosystem_register (const mpe_ecosystem_desc_t *desc) {
     if (!desc || desc->abi != MPE_ECOSYSTEM_ABI || !desc->name)
         return -1;
@@ -65,7 +61,6 @@ int mpe_ecosystem_register (const mpe_ecosystem_desc_t *desc) {
     pthread_mutex_unlock (&s_eco_lock);
     return rc;
 }
-
 /* Unregister + detach everywhere first (interior pointers in s_attached
  * must not survive the removal). */
 int mpe_ecosystem_unregister (const char *name) {
@@ -85,7 +80,6 @@ int mpe_ecosystem_unregister (const char *name) {
     pthread_mutex_unlock (&s_eco_lock);
     return rc;
 }
-
 const mpe_ecosystem_desc_t *mpe_ecosystem_find (const char *name) {
     if (!name)
         return 0;
@@ -99,7 +93,6 @@ const mpe_ecosystem_desc_t *mpe_ecosystem_find (const char *name) {
     pthread_mutex_unlock (&s_eco_lock);
     return out;
 }
-
 int mpe_ecosystem_count (void) {
     pthread_mutex_lock (&s_eco_lock);
     int c = 0;
@@ -124,7 +117,6 @@ const mpe_ecosystem_desc_t *mpe_ecosystem_at (int i) {
     pthread_mutex_unlock (&s_eco_lock);
     return out;
 }
-
 /* Attach ecosystem to a world (per-world: the same ecosystem may attach
  * to several worlds with independent state). */
 int mpe_ecosystem_attach (mpe_world_t *world, const char *eco_name) {
@@ -193,7 +185,6 @@ int mpe_ecosystem_attach (mpe_world_t *world, const char *eco_name) {
     pthread_mutex_unlock (&s_eco_lock);
     return -1;
 }
-
 int mpe_ecosystem_detach (mpe_world_t *world, const char *eco_name) {
     if (!world || !eco_name)
         return -1;
@@ -216,7 +207,6 @@ int mpe_ecosystem_detach (mpe_world_t *world, const char *eco_name) {
     pthread_mutex_unlock (&s_eco_lock);
     return rc;
 }
-
 /* Per-world state lookup for terminal-driven commands (eco command/
  * config forward to these states on the primary world). */
 void *mpe_ecosystem_state (mpe_world_t *world, const char *eco_name) {
@@ -234,7 +224,6 @@ void *mpe_ecosystem_state (mpe_world_t *world, const char *eco_name) {
     pthread_mutex_unlock (&s_eco_lock);
     return out;
 }
-
 /* Detach everywhere (unload path): hooks run while the .so is mapped. */
 void mpe_ecosystem_detach_everywhere (const char *eco_name) {
     if (!eco_name)
@@ -263,7 +252,6 @@ void mpe_ecosystem_detach_everywhere (const char *eco_name) {
             d->detach ((mpe_world_t *) w, st);
     }
 }
-
 void mpe_ecosystem_pre_step (mpe_world_t *world, float dt) {
     mpe_ecosystem_desc_t *ds[8];
     void *sts[8];
@@ -280,7 +268,6 @@ void mpe_ecosystem_pre_step (mpe_world_t *world, float dt) {
     for (int i = 0; i < n; i++)
         ds[i]->pre_step ((mpe_world_t *) world, dt, sts[i]);
 }
-
 void mpe_ecosystem_post_step (mpe_world_t *world, float dt) {
     mpe_ecosystem_desc_t *ds[8];
     void *sts[8];
@@ -297,7 +284,6 @@ void mpe_ecosystem_post_step (mpe_world_t *world, float dt) {
     for (int i = 0; i < n; i++)
         ds[i]->post_step ((mpe_world_t *) world, dt, sts[i]);
 }
-
 /* Register built-in ecosystems */
 void mpe_register_ecosystems (void) {
     // Ecosystems loaded as .so files via mpe_loader

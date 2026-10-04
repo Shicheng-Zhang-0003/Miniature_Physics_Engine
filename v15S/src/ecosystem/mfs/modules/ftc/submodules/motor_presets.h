@@ -22,7 +22,6 @@
 #ifndef motor_presets_h
 #define motor_presets_h
 #include "motor.h"
-
 typedef enum {
     /* ================================================================
      * goBILDA 5203 Series — Yellow Jacket Planetary (8mm REX, 24mm shaft)
@@ -42,7 +41,6 @@ typedef enum {
     MOTOR_GB_5203_99_5, /* 5203-2402-0100: 99.5:1,   60 RPM, 133.2 kg·cm = 13.0625 Nm */
     MOTOR_GB_5203_139, /* 5203-2402-0139: 139:1,    43 RPM, 185   kg·cm = 18.1423 Nm */
     MOTOR_GB_5203_188, /* 5203-2402-0188: 188:1,    30 RPM, 250   kg·cm = 24.5166 Nm */
-
     /* ================================================================
      * goBILDA 5204 Series — Yellow Jacket Planetary (8mm REX, 80mm shaft)
      * Identical gear ratios & physics to 5203; longer shaft for direct wheel mount.
@@ -59,7 +57,6 @@ typedef enum {
     MOTOR_GB_5204_99_5,
     MOTOR_GB_5204_139,
     MOTOR_GB_5204_188,
-
     /* ================================================================
      * goBILDA 5202 Series — Yellow Jacket Planetary (6mm D-shaft, 24mm shaft)
      * Identical gear ratios & physics to 5203; 6mm D-shaft instead of 8mm REX.
@@ -76,7 +73,6 @@ typedef enum {
     MOTOR_GB_5202_99_5,
     MOTOR_GB_5202_139,
     MOTOR_GB_5202_188,
-
     /* ================================================================
      * AndyMark NeveRest Classic (6mm D-shaft, 38mm dia gearbox)
      * Base motor am-3104: 12 VDC, 6000 RPM ±10% no-load, 0.062 N·m stall,
@@ -87,7 +83,6 @@ typedef enum {
      * ================================================================ */
     MOTOR_NR_CLASSIC_40, /* am-2964: 40:1,  160 RPM, 350 oz-in = 2.4715 Nm (published) */
     MOTOR_NR_CLASSIC_60, /* am-3103: 60:1,  105 RPM, 2.734 ft-lb = 3.707  Nm (published) */
-
     /* ================================================================
      * AndyMark NeveRest Orbital (6mm D-shaft, 37mm dia planetary)
      * Same base motor (am-3104), 17T pinion. Steel+plastic gears.
@@ -102,7 +97,6 @@ typedef enum {
     MOTOR_NR_ORBITAL_19_2, /* 19.2:1,  ~344 RPM, 1.1904 Nm (ideal: 0.062*19.2; published ~344 RPM) */
     MOTOR_NR_ORBITAL_50_9, /* 50.9:1,  ~130 RPM, 3.1558 Nm (ideal: 0.062*50.9; published ~130 RPM) */
     MOTOR_NR_ORBITAL_263_7, /* 263.7:1,  ~25 RPM, 16.3494 Nm (ideal: 0.062*263.7; published ~25 RPM) */
-
     /* ================================================================
      * AndyMark NeveRest Hex (6mm D-shaft, hexagonal gearbox)
      * Same base motor. Gearboxes: 40:1, 60:1 (Classic compatible).
@@ -110,7 +104,6 @@ typedef enum {
      * ================================================================ */
     MOTOR_NR_HEX_40, /* 40:1, 160 RPM (same as Classic 40) */
     MOTOR_NR_HEX_60, /* 60:1, 105 RPM (same as Classic 60) */
-
     /* ================================================================
      * REV Robotics HD Hex (REV-41-1291 base)
      * 550-class brushed DC: 12 VDC, 6000 RPM no-load, 0.105 N·m stall,
@@ -120,14 +113,11 @@ typedef enum {
      * Body: 37mm dia, 234g. 5mm hex output or female hex coupler.
      * ================================================================ */
     MOTOR_REV_HD_HEX, /* REV-41-1291 bare: 1:1, 6000 RPM, 0.105 Nm, 8.5 A (published) */
-
     /* REV HD Hex with Spur Gearboxes (ideal-derived: base × ratio) */
     MOTOR_REV_HD_HEX_20, /* 20:1 spur (REV-41-1064/1298): 300 RPM, 2.10 Nm, 8.5 A (ideal) */
     MOTOR_REV_HD_HEX_40, /* 40:1 spur (REV-41-1065/1301): 150 RPM, 4.20 Nm, 8.5 A (ideal) */
-
     /* REV Core Hex (REV-41-1300) — integrated 72:1 planetary, 90° orientation */
     MOTOR_REV_CORE_HEX, /* REV-41-1300: 72:1, 125 RPM, 3.2 Nm, 4.4 A (published) */
-
     /* ================================================================
      * REV UltraPlanetary (cartridge-based modular gearbox for HD Hex)
      * Cartridges: 3:1, 4:1, 5:1 (stackable). Input stage + pinion pressed on HD Hex.
@@ -141,7 +131,6 @@ typedef enum {
     MOTOR_REV_UP_20, /* 4×5 stack: 20:1, 300 RPM, 2.10 Nm, 8.5 A (ideal) */
     MOTOR_REV_UP_60, /* 3×4×5 stack: 60:1, 100 RPM, 6.30 Nm, 8.5 A (ideal) */
     MOTOR_REV_UP_80, /* 4x4x5 stack: 80:1, 75 RPM, 8.40 Nm, 8.5 A (ideal-derived; reuses one 4:1 cartridge) */
-
     /* ================================================================
      * Pitsco TETRIX MAX TorqueNADO (spur, 6mm D-shaft, 37mm dia, 324g)
      * 12 VDC, 8.7 A stall. All-steel gears, oil bushing output support.
@@ -152,20 +141,14 @@ typedef enum {
     MOTOR_TN_20, /* 20:1, 300 RPM, 233 oz-in = 1.6453 Nm, 8.7 A (published) */
     MOTOR_TN_40, /* 40:1, 150 RPM, 466 oz-in = 3.2907 Nm, 8.7 A (published) */
     MOTOR_TN_60, /* 60:1, 100 RPM, 700 oz-in = 4.9431 Nm, 8.7 A (published) */
-
     MOTOR_COUNT
 } motor_preset_id;
-
 /* Apply a preset to a motor struct (derives Kt from published OUTPUT stall). */
 void motor_preset_apply (motor *m, motor_preset_id id);
-
 /* Get the human-readable name for a preset. */
 const char *motor_preset_name (motor_preset_id id);
-
 /* Get the gear ratio for encoder math (counts per rev = base_ppr × gear_ratio). */
 float motor_preset_gear_ratio (motor_preset_id id);
-
 /* Get the base encoder PPR at motor shaft for this motor family. */
 int motor_preset_base_encoder_ppr (motor_preset_id id);
-
 #endif /* motor_presets_h */

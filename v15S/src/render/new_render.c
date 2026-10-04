@@ -20,7 +20,6 @@
 #include <stdlib.h>
 #include <math.h>
 #include <stdbool.h>
-
 extern camera main_camera_fov;
 extern mesh cube_mesh;
 static GLuint instanced_shader_program = 0;
@@ -185,7 +184,6 @@ static void render_delete_mesh (mesh *mesh_object) {
     mesh_object->wireframe_index_count = 0;
     mesh_object->instance_capacity = 0;
 }
-
 /* Unconditional GL teardown shared by render_cleanup and the mid-init
  * failure paths (which run with a current context but a not-yet-ok
  * status). All ids are zero-guarded. */
@@ -213,7 +211,6 @@ static void render_delete_gl_objects (void) {
     wireframe_invalidate_cache ();
     grid_invalidate_cache ();
 }
-
 void render_cleanup (void) {
     /* GL objects: the old cleanup freed only the CPU instance buffers and
      * leaked every program/VAO/VBO on each init/cleanup cycle. Delete them

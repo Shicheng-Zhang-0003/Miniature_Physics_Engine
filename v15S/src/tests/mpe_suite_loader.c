@@ -19,7 +19,6 @@
 #include "mpe_test.h"
 #include "core/mpe_registry.h"
 #include "core/mpe_loader.h"
-
 /* Windows-aware plugin path: pick existing .so/.dll variant. */
 static const char *mpe_pick_plugin (const char *so_path, char *buf, size_t n) {
 #ifdef MPE_OS_WINDOWS
@@ -44,10 +43,8 @@ static const char *mpe_pick_plugin (const char *so_path, char *buf, size_t n) {
     return so_path;
 #endif
 }
-
 static int saw_state = 0;
 static void *saw_ptr = NULL;
-
 static float rec_resolve (mpe_world_t *world, void *manifold, float dt, bool friction_only, int iter, void *mod_state) {
     (void) world;
     (void) manifold;
@@ -58,16 +55,13 @@ static float rec_resolve (mpe_world_t *world, void *manifold, float dt, bool fri
     saw_ptr = mod_state;
     return 0.0f;
 }
-
 static void *saw_bp_state = NULL;
-
 static int fake_generate (mpe_world_t *world, broadphase_pair *pairs_out, int max_pairs, float dt, void *mod_state) {
     saw_bp_state = mod_state;
     /* Delegate to the real backend so manifolds exist for resolve. */
     extern int broadphase_generate_pairing (mpe_world_t * world, broadphase_pair * out, int max, float dt);
     return broadphase_generate_pairing (world, pairs_out, max_pairs, dt);
 }
-
 static bool fake_sphere (rigidbody *a, rigidbody *b, void *out, mpe_world_t *w) {
     (void) a;
     (void) b;
@@ -75,12 +69,10 @@ static bool fake_sphere (rigidbody *a, rigidbody *b, void *out, mpe_world_t *w) 
     (void) w;
     return false;
 }
-
 int mpe_t_loader_lifecycle (void) {
     mpe_test_t t;
     mpe_test_begin (&t, "loader_lifecycle");
     mpe_register_builtins ();
-
     /* ---- static-only: builtin hijack refusal + name length ---- */
     {
         mpe_broadphase_if_t evil_bp = {fake_generate};
@@ -96,7 +88,6 @@ int mpe_t_loader_lifecycle (void) {
         MPE_CHECK (&t, mpe_find_broadphase ("hash") != NULL);
         MPE_CHECK (&t, mpe_find_solver ("seq-impulse") != NULL);
     }
-
     /* ---- static-only: stage reset + mod_state threading ---- */
     {
         physics_world w;
@@ -127,7 +118,6 @@ int mpe_t_loader_lifecycle (void) {
         MPE_CHECK (&t, w.solver_if == NULL && w.solver_state == NULL);
         physics_world_cleanup (&w);
     }
-
     /* ---- live plugin lifecycle (needs CWD=v15S/src) ---- */
     char cap_buf[1024];
     const char *cap_path = mpe_pick_plugin ("plugins/mpe_capsule.so", cap_buf, sizeof (cap_buf));
@@ -198,7 +188,6 @@ int mpe_t_loader_lifecycle (void) {
         MPE_CHECK (&t, mpe_loader_unload (cap_path) == 0);
         MPE_CHECK (&t, mpe_find_pair_handler (3, 0, 100, -1) == NULL);
     }
-
     if (t.failures == 0) {
         printf ("[PASS] loader lifecycle green\n");
     }

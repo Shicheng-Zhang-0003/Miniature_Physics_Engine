@@ -1,9 +1,7 @@
 /* GTK4 port (v15S). The GTK3 body was removed 2026-09-29; git history
  * holds the v15R3 GTK3 engine. */
-
 #include "../mpe_engine.h"
 #include "editor.h"
-
 static void editor_reacquire_mouse (GtkWidget *parent_window) {
     if (!parent_window) {
         return;
@@ -23,26 +21,22 @@ static void editor_reacquire_mouse (GtkWidget *parent_window) {
         mouse_lock_reacquire (parent_window);
     }
 }
-
 static rigidbody *editor_selected_object_or_null (void) {
     if ((selected_object < 0) || (selected_object >= (physics_world_get_primary ()->body_count))) {
         return NULL;
     }
     return &(physics_world_get_primary ()->bodies)[selected_object];
 }
-
 void editor_update_menus (GtkWidget *parent_window) {
     if ((selected_object < 0) || (selected_object >= (physics_world_get_primary ()->body_count))) {
         if (main_inputs.object_menu_level > 0) {
             main_inputs.object_menu_level = 0;
         }
     }
-
     if ((main_inputs.marked_joint_object_index < 0) ||
         (main_inputs.marked_joint_object_index >= (physics_world_get_primary ()->body_count))) {
         main_inputs.marked_joint_object_index = -1;
     }
-
     // Spawner Menu Logic
     if (main_inputs.spawner_menu_level == 3) {
         g_cfg.spawner.mass = open_numerical_input_dialog (parent_window, "Sphere Mass (kg)", g_cfg.spawner.mass);
@@ -99,7 +93,6 @@ void editor_update_menus (GtkWidget *parent_window) {
         }
         main_inputs.spawner_menu_level = 0;
     }
-
     if (main_inputs.spawner_menu_level == 8) {
         /* Three-way spawn-type cycle (was a two-way toggle). */
         if (main_inputs.up_arrow_pressed) {
@@ -111,13 +104,11 @@ void editor_update_menus (GtkWidget *parent_window) {
             main_inputs.up_arrow_pressed = false;
             main_inputs.down_arrow_pressed = false;
         }
-
         if (main_inputs.enter_key_pressed) {
             main_inputs.spawner_menu_level = 0;
             main_inputs.enter_key_pressed = false;
         }
     }
-
     // User Mechanics Menu Logic
     if (main_inputs.velocity_menu_level == 3) {
         g_cfg.spawner.speed = open_numerical_input_dialog (parent_window, "Spawn Speed (m/s)", g_cfg.spawner.speed);
@@ -212,7 +203,6 @@ void editor_update_menus (GtkWidget *parent_window) {
         g_cfg.timestep.solver_iterations = (int) iters;
         main_inputs.velocity_menu_level = 0;
     }
-
     // Selected Object Menu Logic
     if (main_inputs.object_menu_level == 2) {
         rigidbody *selected_rigid_body = editor_selected_object_or_null ();
@@ -292,7 +282,6 @@ void editor_update_menus (GtkWidget *parent_window) {
         /* MPE_TASK_19_EDITOR_EDIT_WAKE_FRICTION_END */
         main_inputs.object_menu_level = 0;
     }
-
     if (main_inputs.object_menu_level == 5) {
         rigidbody *selected_rigid_body = editor_selected_object_or_null ();
         if (!selected_rigid_body) {
@@ -306,7 +295,6 @@ void editor_update_menus (GtkWidget *parent_window) {
             main_inputs.up_arrow_pressed = false;
             main_inputs.down_arrow_pressed = false;
         }
-
         if (main_inputs.enter_key_pressed) {
             main_inputs.object_menu_level = 0;
             main_inputs.enter_key_pressed = false;
@@ -323,11 +311,8 @@ void editor_update_menus (GtkWidget *parent_window) {
             float dist = vector3_length (vector3_subtraction (rb_b->position, rb_a->position));
             if (add_joint (physics_world_get_primary (), main_inputs.marked_joint_object_index, selected_object, dist,
                            g_cfg.joints.default_spring_k,
-
                            g_cfg.joints.default_damping) < 0) { /* MFS_166_JOINT_CHECK */
-
                 printf ("[editor] warning: could not create joint (pool full?)\n");
-
             } /* MPE_TASK_31 */
         }
         main_inputs.marked_joint_object_index = -1;

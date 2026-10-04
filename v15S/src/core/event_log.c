@@ -4,13 +4,11 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
-
 typedef struct {
     char message[event_msg_length];
     time_t timestamp;
     log_level level;
 } engine_event;
-
 static engine_event event_log_ring[event_log_capacity];
 static int event_log_head = 0;
 static int event_log_count = 0;
@@ -20,7 +18,6 @@ static int event_log_count = 0;
  * slot). One process-wide mutex serializes push vs get/clear/init; time()
  * and vsnprintf run under it (log rate is low, never hot-path). */
 static pthread_mutex_t event_log_lock = PTHREAD_MUTEX_INITIALIZER;
-
 void event_log_init (void) {
     pthread_mutex_lock (&event_log_lock);
     event_log_head = 0;
@@ -28,7 +25,6 @@ void event_log_init (void) {
     memset (event_log_ring, 0, sizeof (event_log_ring));
     pthread_mutex_unlock (&event_log_lock);
 }
-
 void event_log_push (log_level level, const char *format, ...) {
     if (!format) {
         return;
@@ -47,14 +43,12 @@ void event_log_push (log_level level, const char *format, ...) {
     }
     pthread_mutex_unlock (&event_log_lock);
 }
-
 int event_log_get_count (void) {
     pthread_mutex_lock (&event_log_lock);
     int n = event_log_count;
     pthread_mutex_unlock (&event_log_lock);
     return n;
 }
-
 const char *event_log_get_message (int index, log_level *level, time_t *timestamp) {
     /* NOTE: the returned pointer aliases the ring slot: the caller must
      * copy it before the next push/init/clear (same contract as before;
@@ -81,7 +75,6 @@ const char *event_log_get_message (int index, log_level *level, time_t *timestam
     pthread_mutex_unlock (&event_log_lock);
     return msg;
 }
-
 void event_log_clear (void) {
     pthread_mutex_lock (&event_log_lock);
     event_log_head = 0;

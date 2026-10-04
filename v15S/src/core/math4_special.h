@@ -169,7 +169,6 @@ static inline void math4_to_flat_array (math4 matrix, float *output_array) {
         }
     }
 }
-
 /* ---------------------------------------------------------------------------
  * Frustum culling (Gribb/Hartmann), extracted so the shipped renderer and a
  * test exercise the SAME code.
@@ -223,7 +222,6 @@ static inline void math4_frustum_planes (math4 view_projection, float planes[6][
         planes[p][3] = combos[p][3] / len; /* d */
     }
 }
-
 /* Conservative sphere-vs-frustum: a sphere is culled only if it is fully
  * outside one plane by more than its own radius, so a sphere straddling a
  * plane is always kept. Returns 1 = visible, 0 = culled. */

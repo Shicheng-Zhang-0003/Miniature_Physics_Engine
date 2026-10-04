@@ -6,5 +6,4 @@
  * is a legacy alias kept so out-of-tree includes keep working. Do not add
  * declarations here — extend mpe_ecosystem.h instead. */
 #include "mpe_ecosystem.h"
-
 #endif

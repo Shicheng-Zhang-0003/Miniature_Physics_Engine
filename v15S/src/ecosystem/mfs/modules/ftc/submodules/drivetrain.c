@@ -6,7 +6,6 @@
 #include "config/mpe_config.h"
 #include <stdio.h>
 #include <math.h>
-
 void drivetrain_tank (ftc_robot *robot, float left_power, float right_power) {
     if (!robot) {
         return;
@@ -32,7 +31,6 @@ void drivetrain_tank (ftc_robot *robot, float left_power, float right_power) {
     ftc_robot_set_wheel_commands (robot, commands, robot->wheel_count);
     /* MFS_162_DEAD_FIELD: mecanum_active removed */
 }
-
 /* MPE_FTC_075 + MPE_FTC_082: Mecanum drive with inverse kinematics
  *
  * Since the wheel model uses spheres (no natural rolling direction),
@@ -64,7 +62,6 @@ void drivetrain_mecanum (ftc_robot *robot, float forward, float strafe, float ro
     if (rotate < -1.0f) {
         rotate = -1.0f;
     }
-
     /* M10 HONEST LIMIT: the mecanum inverse kinematics below is a
      * four-corner layout ([0]=FL [1]=FR [2]=BL [3]=BR). FTC_MAX_WHEELS is
      * 8, but ftc_robot carries no description of where an extra wheel sits,
@@ -81,14 +78,12 @@ void drivetrain_mecanum (ftc_robot *robot, float forward, float strafe, float ro
         ftc_robot_set_wheel_commands (robot, zero, robot->wheel_count);
         return;
     }
-
     /* Mecanum IK: per-wheel velocity targets.
        Wheel layout: [0]=FL, [1]=FR, [2]=BL, [3]=BR
        FL: forward + strafe - rotate
        FR: forward - strafe + rotate
        BL: forward - strafe - rotate
        BR: forward + strafe + rotate
-
        DESPOT-2026-10-02 (audited; signs CONFIRMED CORRECT by measurement,
        not by the algebra that first appeared to indict them):
        the anti-diagonal pairing (FL=f+s-R, FR=f-s+R, BL=f-s-R, BR=f+s+R)
@@ -103,7 +98,6 @@ void drivetrain_mecanum (ftc_robot *robot, float forward, float strafe, float ro
        four rail forces), which is exactly why algebra alone cannot choose
        between them: the sign is fixed by the convention, and the
        convention is fixed by measurement.
-
        Recorded because the first pass got this backwards. A 3.0 s
        end-to-end average reported r=+1 producing +0.029 rad and r=-1
        producing +0.221 rad, which looks like a sign error; it is not. It
@@ -114,13 +108,11 @@ void drivetrain_mecanum (ftc_robot *robot, float forward, float strafe, float ro
        steady-state window, never on a short-horizon displacement average
        — the same trap made 'rotate barely works' look true when it does
        not. Pinned by mfs_t_drive_directions in tests/mfs_suite_a.c. */
-
     float wheel_targets[4];
     wheel_targets[0] = forward + strafe - rotate;
     wheel_targets[1] = forward - strafe + rotate;
     wheel_targets[2] = forward - strafe - rotate;
     wheel_targets[3] = forward + strafe + rotate;
-
     /* Normalize if any target exceeds 1.0 */
     float max_mag = 0.0f;
     for (int i = 0; i < 4; i++) {
@@ -134,11 +126,9 @@ void drivetrain_mecanum (ftc_robot *robot, float forward, float strafe, float ro
             wheel_targets[i] /= max_mag;
         }
     }
-
     /* Set motor commands (forward component uses wheel traction) */
     ftc_robot_set_wheel_commands (robot, wheel_targets, 4);
 }
-
 /* ---------------------------------------------------------------------
  * DRIVETRAIN: no force model at all.
  *
@@ -170,7 +160,6 @@ void drivetrain_mecanum (ftc_robot *robot, float forward, float strafe, float ro
  * stiff-DOF-slaved, honestly labeled, not "fully emergent".
  * --------------------------------------------------------------------- */
 static void drivetrain_odometry_update (physics_world *world, ftc_robot *robot, float dt);
-
 /* ---------------------------------------------------------------------
  * MFS-STRAFE-A: analytic mecanum roller force.
  *
@@ -351,23 +340,19 @@ static void drivetrain_mecanum_analytic (physics_world *world, ftc_robot *robot)
         wheel->torque_accumulator = vector3_addition (wheel->torque_accumulator, vector3_cross (r_c, F));
     }
 }
-
 void drivetrain_update (physics_world *world, ftc_robot *robot, float dt) {
     if ((!world) || (!robot) || (dt <= 0.0f)) {
         return;
     }
     const mpe_config_t *drive_cfg = mpe_world_cfg (world);
-
     /* The only actuation: the real motor model in ftc_robot_update, applied
      * as a torque couple between hub and chassis. Ground friction is then
      * resolved by the engine's contact solver. */
     ftc_robot_update (world, robot, dt);
-
     /* MFS-STRAFE-A analytic lateral (mecanum only, contact-level, cone-
      * capped — see function header). Lands in the accumulators alongside
      * motor torque, pre-integration, same tick. */
     drivetrain_mecanum_analytic (world, robot);
-
     /* Rolling resistance.
      *
      * A rigid-body contact solver is perfectly elastic, so a real wheel
@@ -442,7 +427,6 @@ void drivetrain_update (physics_world *world, ftc_robot *robot, float dt) {
             }
         }
     }
-
     /* Velocity safety monitor: pure telemetry. The old code silently clamped
      * the chassis to 3 m/s, which hid runaway instead of fixing it. A clamp
      * is a non-physical force, so it is gone; excursions are only counted so
@@ -457,10 +441,8 @@ void drivetrain_update (physics_world *world, ftc_robot *robot, float dt) {
             }
         }
     }
-
     drivetrain_odometry_update (world, robot, dt);
 }
-
 /* ---------------------------------------------------------------------
  * Encoder odometry: forward kinematics from the wheel encoders.
  *
@@ -490,7 +472,6 @@ void drivetrain_update (physics_world *world, ftc_robot *robot, float dt) {
 static void drivetrain_odometry_update (physics_world *world, ftc_robot *robot, float dt) {
     float w_rad[FTC_MAX_WHEELS] = {0};
     float r = 0.0f;
-
     /* DESPOT-2026-09-26: encoder quantization. Real hub encoders report
      * integer counts (base_ppr * gear_ratio per output rev). Previously the
      * PPR table existed but odometry differentiated the true continuous
@@ -507,7 +488,6 @@ static void drivetrain_odometry_update (physics_world *world, ftc_robot *robot, 
         }
     }
     const float quant_on = (counts_per_rev > 1.0f && dt > 0.0f) ? 1.0f : 0.0f;
-
     for (int i = 0; i < robot->wheel_count && i < FTC_MAX_WHEELS; i++) {
         const int wi = robot->wheel_bodies[i];
         if ((wi < 0) || (wi >= world->body_count)) {
@@ -542,7 +522,6 @@ static void drivetrain_odometry_update (physics_world *world, ftc_robot *robot, 
             w_rad[i] = omega;
         }
     }
-
     /* Ground-contact radius seen by the encoder. */
     for (int i = 0; i < robot->wheel_count; i++) {
         if (robot->wheel_effective_radius[i] > 0.001f) {
@@ -553,7 +532,6 @@ static void drivetrain_odometry_update (physics_world *world, ftc_robot *robot, 
     if (r <= 0.001f) {
         r = 0.05f;
     }
-
     float v_fwd = 0.0f, v_lat = 0.0f, yaw_rate = 0.0f;
     if (robot->wheel_count >= 4) {
         const float wfl = w_rad[0], wfr = w_rad[1];
@@ -578,7 +556,6 @@ static void drivetrain_odometry_update (physics_world *world, ftc_robot *robot, 
         v_fwd = ((wl + wr) * 0.5f) * r;
         yaw_rate = ((wr - wl) * r) / 0.48f;
     }
-
     robot->odom_theta += yaw_rate * dt;
     /* DESPOT-FIX (math lie): odom_theta grew unbounded and cosf/sinf lost
      * precision on long runs (libm trig error grows with |theta|; past ~1e4

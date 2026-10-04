@@ -11,10 +11,8 @@
 #include "core/physics_world.h"
 #include "physics/constraint.h"
 #include "config/mpe_config.h"
-
 #define MFS_TEST_TILE_MU_S 1.0f
 #define MFS_TEST_TILE_MU_K 0.8f
-
 static inline void mfs_test_world (physics_world *w) {
     mpe_config_init ();
     g_cfg.timestep.solver_iterations = 128;
@@ -27,7 +25,6 @@ static inline void mfs_test_world (physics_world *w) {
         w->bodies[f].restitution = 0.0f;
     }
 }
-
 /* Floor slab only (no config touch): for subtests that manage their own
  * envelope (physics_truth FTC_ITERS macros). Top y=0, e matched by caller
  * (contact restitution is min-combined). */
@@ -40,7 +37,6 @@ static inline int mfs_test_floor_e (physics_world *w, float mus, float muk, floa
     w->bodies[f].restitution = e;
     return f;
 }
-
 static inline int mfs_test_finite (physics_world *w) {
     for (int i = 0; i < w->body_count; i++) {
         rigidbody *rb = &w->bodies[i];
@@ -51,5 +47,4 @@ static inline int mfs_test_finite (physics_world *w) {
     }
     return 1;
 }
-
 #endif /* mfs_test_common_h */

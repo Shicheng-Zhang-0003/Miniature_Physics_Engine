@@ -2,7 +2,6 @@
 #define scene_init_h
 #include "../core/math3d.h"
 #include "../core/rigidbody.h"
-
 /* Body storage lives in the primary physics_world (body_capacity member);
  * no file-scope pool remains. */
 int scene_add_object (float radius, float mass, vector3 initial_position);
@@ -12,31 +11,23 @@ int scene_add_cylinder (float radius, float half_length, float mass, vector3 ini
 void scene_init_default (void);
 void scene_clear (void);
 void scene_remove_object_by_index (int object_index);
-
 uint32_t scene_allocate_object_id (void);
 void scene_assign_new_identity (int object_index);
 /* Advance the allocator past a loaded stable ID (v200 scenes preserve IDs;
  * future allocations must not collide with them). */
 void scene_note_loaded_id (uint32_t object_id);
-
 int scene_find_object_index_by_id (uint32_t object_id);
 bool scene_object_id_exists (uint32_t object_id);
 rigidbody *scene_resolve_object_by_id (uint32_t object_id);
 uint32_t scene_get_object_id_at_index (int object_index);
-
 int scene_ensure_pool_capacity (int required_capacity);
-
 void scene_spawn_stability_stack (void);
-
 /* Coulomb floor slab (top y=0, mu 0.8/0.7, e=0), idempotent. F10 owns its
  * floor inline; F5/F6/F8 share this so live stacks rest on friction, not on
  * the plastic boundary clamp. */
 void scene_ensure_friction_floor (void);
-
 void scene_spawn_sleep_wake_test (void);
-
 void scene_editor_torture_test (void);
-
 void scene_spawn_stress_test (void);
 /* MPE_TASK_13_LONG_RUN_SCENE_DECL_BEGIN */
 void scene_spawn_long_run_validation (void);

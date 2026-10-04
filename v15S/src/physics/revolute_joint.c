@@ -27,7 +27,6 @@
 #include "../core/det_math.h"
 #include <math.h>
 #include <stdio.h>
-
 static math3 skew_symmetric (vector3 v) {
     math3 m = {{{0.0f}}};
     m.matrix[0][1] = -v.z;
@@ -38,7 +37,6 @@ static math3 skew_symmetric (vector3 v) {
     m.matrix[2][1] = v.x;
     return m;
 }
-
 static math3 math3_addition (math3 a, math3 b) {
     math3 r;
     for (int i = 0; i < 3; i++) {
@@ -48,7 +46,6 @@ static math3 math3_addition (math3 a, math3 b) {
     }
     return r;
 }
-
 /* 6x6 matrix operations for coupled hinge solve + motor.
  * TRUTH: K spans invM (~1e-6..1e4) plus Iinv*r^2 (up to ~1e15 for tiny
  * masses with long anchors). float (23-bit, ~1e7) cannot hold cond(K)>1e10:
@@ -184,7 +181,6 @@ static int mat6_invert (double m[6][6], double out[6][6]) {
     }
     return 1;
 }
-
 /* DESPOT-2026-09-29: shared sleep guard for every joint solver.
  *
  * The joint solvers used to wake BOTH partners unconditionally, on every
@@ -210,14 +206,12 @@ static int a3_joint_solve_may_skip (int sleeping_a, int sleeping_b, int active_d
     }
     return sleeping_a && sleeping_b;
 }
-
 static int a3_revolute_active_drive (const revolute_params *p) {
     if (p->motor_enabled && fabsf (p->motor_target_speed) > 1e-9f) {
         return 1;
     }
     return 0;
 }
-
 void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, float dt, const mpe_config_t *cfg) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
     if ((!p) || (!body_a) || (!body_b) || (dt <= 0.0f)) {
@@ -238,32 +232,26 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
         rigidbody_wake (body_a);
     if (body_b->is_sleeping)
         rigidbody_wake (body_b);
-
     float inv_mass_a = rigidbody_effective_inv_mass (body_a);
     float inv_mass_b = rigidbody_effective_inv_mass (body_b);
     if ((inv_mass_a <= 0.0f) && (inv_mass_b <= 0.0f)) {
         return;
     }
-
     vector3 r_a = vector4_rotate_to_vector3 (body_a->orientation, p->anchor_a);
     vector3 r_b = vector4_rotate_to_vector3 (body_b->orientation, p->anchor_b);
-
     /* Anchor positions and velocities. */
     vector3 anchor_a_world = vector3_addition (body_a->position, r_a);
     vector3 anchor_b_world = vector3_addition (body_b->position, r_b);
     vector3 position_error = vector3_subtraction (anchor_b_world, anchor_a_world);
-
     vector3 vel_a_at_anchor = vector3_addition (body_a->velocity, vector3_cross (body_a->angular_velocity, r_a));
     vector3 vel_b_at_anchor = vector3_addition (body_b->velocity, vector3_cross (body_b->angular_velocity, r_b));
     vector3 relative_velocity = vector3_subtraction (vel_b_at_anchor, vel_a_at_anchor);
-
     /* Hinge axis in world space (from body A). */
     vector3 axis_world = vector4_rotate_to_vector3 (body_a->orientation, vector3_normalisation (p->axis_a));
     float axis_len_sq = vector3_length_squared (axis_world);
     if (axis_len_sq < 1e-12f)
         return;
     axis_world = vector3_scaling (axis_world, 1.0f / sqrtf (axis_len_sq));
-
     /* Build orthonormal basis (u, v) perpendicular to axis for axis alignment constraints.
      * u = normalize(axis × ref), v = axis × u. */
     vector3 ref = (fabsf (axis_world.y) < 0.99f) ? (vector3){0.0f, 1.0f, 0.0f} : (vector3){1.0f, 0.0f, 0.0f};
@@ -276,7 +264,6 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
     }
     u = vector3_scaling (u, 1.0f / u_len);
     vector3 v = vector3_cross (axis_world, u); /* already unit length */
-
     /* Baumgarte bias for position error (point-to-point only; axis alignment is velocity-only).
      * TRUTH: velocity-level P2P bias solved INSIDE the iteration loop is
      * correct here (bias includes live rel_vel and converges; it is NOT the
@@ -298,19 +285,16 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
     vector3 bias_p2p = (bias_speed > max_bias_speed && bias_speed > 0.0f)
                            ? vector3_scaling (position_error, (baumgarte_beta / dt) * (max_bias_speed / bias_speed))
                            : vector3_scaling (position_error, baumgarte_beta / dt);
-
     /* Effective mass/inertia. */
     math3 I_inv_a = rigidbody_effective_inv_inertia (body_a);
     math3 I_inv_b = rigidbody_effective_inv_inertia (body_b);
     math3 I_sum = math3_addition (I_inv_a, I_inv_b);
-
     /* Build 6×6 K-matrix (effective mass matrix for the 5 constraints + motor).
      * Rows 0-2: point-to-point (x, y, z)
      * Rows 3-4: axis alignment (u, v components of relative angular velocity)
      * Row 5: motor (relative angular velocity along hinge axis) */
     double K[6][6];
     mat6_zero (K);
-
     /* ---------- K = J*M^-1*J^T, assembled from the Jacobian ----------
      *
      * DESPOT-2026-09-29 REWRITE. K used to be hand-written block by block
@@ -378,7 +362,6 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
         rows_b[0] = (vector3){0.0f, -r_b.z, r_b.y};
         rows_b[1] = (vector3){r_b.z, 0.0f, -r_b.x};
         rows_b[2] = (vector3){-r_b.y, r_b.x, 0.0f};
-
         for (int i = 0; i < 3; i++) {
             /* p2p row i: na = -e_i, nwa = +(S_a row i), nb = +e_i, nwb = -(S_b row i) */
             float e[3] = {0.0f, 0.0f, 0.0f};
@@ -394,7 +377,6 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
         nwb[4] = v;
         nwa[5] = vector3_scaling (axis_world, -1.0f);
         nwb[5] = axis_world;
-
         for (int r2 = 0; r2 < 6; r2++) {
             for (int c = 0; c < 6; c++) {
                 double acc = (double) vector3_dot (na[r2], na[c]) * (double) inv_mass_a +
@@ -405,7 +387,6 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
             }
         }
     }
-
     /* DESPOT-2026-09-29: with the motor DISABLED the along-axis relative
      * angular velocity is genuinely unconstrained (a free hinge), so the
      * constraint set is the 5 rows/cols {p2p, axis_u, axis_v} and row/col 5
@@ -424,11 +405,9 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
         }
         K[5][5] = 1.0; /* decoupled placeholder; never read (lambda[5] = 0) */
     }
-
     /* Add regularization for numerical stability (tiny diagonal). */
     for (int i = 0; i < 6; i++)
         K[i][i] += 1e-10;
-
     /* DESPOT-2026-09-29: K is a J*M^-1*J^T Gram matrix, so it is PD by
      * construction. Prove it here rather than trusting it: a non-PD K means
      * the Jacobian and the impulse application have gone out of sync, and
@@ -438,7 +417,6 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
     if (!mat6_is_positive_definite (K)) {
         goto fallback_sequential;
     }
-
     /* RHS = -(J*v + bias). Bias only on P2P (first 3 rows). */
     double rhs[6];
     /* P2P rows: -(relative_velocity + bias_p2p) */
@@ -458,7 +436,6 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
     } else {
         rhs[5] = 0.0f;
     }
-
     /* Solve K * lambda = rhs (double). */
     double K_inv[6][6];
     if (!mat6_invert (K, K_inv)) {
@@ -483,7 +460,6 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
         else if (lambda[5] < -max_lam)
             lambda[5] = -max_lam;
     }
-
     /* Apply impulses.
      * P2P impulse (3D): applied to both bodies.
      * Axis impulses (2D): angular impulses along u and v.
@@ -493,7 +469,6 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
         vector3_addition (vector3_scaling (u, (float) lambda[3]), vector3_scaling (v, (float) lambda[4]));
     float motor_lambda = (float) lambda[5];
     vector3 motor_impulse = vector3_scaling (axis_world, motor_lambda);
-
     body_a->velocity = vector3_subtraction (body_a->velocity, vector3_scaling (impulse_p2p, inv_mass_a));
     body_b->velocity = vector3_addition (body_b->velocity, vector3_scaling (impulse_p2p, inv_mass_b));
     body_a->angular_velocity = vector3_subtraction (
@@ -506,7 +481,6 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
         math3_multiplication_vector3 (
             I_inv_b,
             vector3_addition (vector3_addition (vector3_cross (r_b, impulse_p2p), axis_impulse), motor_impulse)));
-
     /* ---- angle limits: persistent relative-angle tracking + velocity-level enforcement ---- */
     if (p->limits_enabled) {
         if (!p->angle_initialized) {
@@ -548,14 +522,12 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
                                                                                    : vector3_normalisation (p->axis_a));
             p->angle_initialized = true;
         }
-
         float min_limit = p->limit_min_rad;
         float max_limit = p->limit_max_rad;
         float along_axis =
             vector3_dot (vector3_subtraction (body_b->angular_velocity, body_a->angular_velocity), axis_world);
         bool at_min = (p->accumulated_angle <= min_limit + 1e-4f) && (along_axis < 0.0f);
         bool at_max = (p->accumulated_angle >= max_limit - 1e-4f) && (along_axis > 0.0f);
-
         if (at_min || at_max) {
             float axis_mass_inv = vector3_dot (axis_world, math3_multiplication_vector3 (I_sum, axis_world));
             float axis_mass = (axis_mass_inv > 1e-12f) ? (1.0f / axis_mass_inv) : 0.0f;
@@ -579,7 +551,6 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
         }
     }
     return;
-
 fallback_sequential:
     /* Fallback to original sequential solve if the 6x6 solve fails. */
     /* ---- point-to-point ---- */
@@ -647,7 +618,6 @@ fallback_sequential:
         }
     }
 }
-
 /* TRUTH: once-per-tick angle integration (called before the solver loop).
  * DESPOT-2026-10-01: a measured-twist replacement (quaternion-delta
  * accumulation, exact ops) was tried here and REVERTED. It tracked settled
@@ -691,7 +661,6 @@ void revolute_pre_step (revolute_params *p, rigidbody *body_a, rigidbody *body_b
      * so multi-turn limits work. (The per-solve limit clamps that used to
      * rebase the books here were removed: see the 6x6 path note.) */
 }
-
 /* Prismatic: single-axis slide with optional limits and motor. */
 void prismatic_solve (prismatic_params *p, rigidbody *body_a, rigidbody *body_b, float dt, const mpe_config_t *cfg) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
@@ -705,33 +674,27 @@ void prismatic_solve (prismatic_params *p, rigidbody *body_a, rigidbody *body_b,
         rigidbody_wake (body_a);
     if (body_b->is_sleeping)
         rigidbody_wake (body_b);
-
     float inv_a = rigidbody_effective_inv_mass (body_a);
     float inv_b = rigidbody_effective_inv_mass (body_b);
     if ((inv_a <= 0.0f) && (inv_b <= 0.0f))
         return;
-
     vector3 r_a = vector4_rotate_to_vector3 (body_a->orientation, p->anchor_a);
     vector3 r_b = vector4_rotate_to_vector3 (body_b->orientation, p->anchor_b);
     vector3 world_a = vector3_addition (body_a->position, r_a);
     vector3 world_b = vector3_addition (body_b->position, r_b);
-
     /* Slide axis in world space (from body A). */
     vector3 axis_a_world = vector4_rotate_to_vector3 (body_a->orientation, vector3_normalisation (p->axis_a));
     vector3 axis_b_world = (vector3_length_squared (p->axis_b) > 1e-12f)
                                ? vector4_rotate_to_vector3 (body_b->orientation, vector3_normalisation (p->axis_b))
                                : axis_a_world;
-
     /* Relative velocity along slide axis. */
     vector3 vel_a = vector3_addition (body_a->velocity, vector3_cross (body_a->angular_velocity, r_a));
     vector3 vel_b = vector3_addition (body_b->velocity, vector3_cross (body_b->angular_velocity, r_b));
     vector3 rel_vel = vector3_subtraction (vel_b, vel_a);
     float rel_n = vector3_dot (rel_vel, axis_a_world);
-
     /* Current position along axis (measured, not dead-reckoned). */
     vector3 delta = vector3_subtraction (world_b, world_a);
     float current_pos = vector3_dot (delta, axis_a_world);
-
     /* Initialize position tracking once (reference = initial slide pos). */
     if (!p->position_initialized) {
         p->accumulated_position = current_pos;
@@ -739,7 +702,6 @@ void prismatic_solve (prismatic_params *p, rigidbody *body_a, rigidbody *body_b,
         p->reference_axis_b = axis_b_world;
         p->position_initialized = true;
     }
-
     /* ---- Perpendicular constraint: full 2-D (not 1-D slip dir).
      * TRUTH: old code killed only instantaneous perp_vel direction; when
      * |perp|~0 it applied zero and orthogonal drift grew free (wobble).
@@ -787,12 +749,10 @@ void prismatic_solve (prismatic_params *p, rigidbody *body_a, rigidbody *body_b,
             }
         }
     }
-
     /* TRUTH: no axial equality — a slider slides freely. Old
      * err=current-accumulated (≈0 by construction) made the lock vacuous
      * when limits were off (free by accident) and double-paid rel_n when
      * limits were on (axis block + limit block). Only limits constrain. */
-
     /* ---- Limits enforcement (measured position, single pay) ---- */
     if (p->limits_enabled) {
         /* TRUTH: limits key off measured current_pos, not dead-reckoned
@@ -823,7 +783,6 @@ void prismatic_solve (prismatic_params *p, rigidbody *body_a, rigidbody *body_b,
         }
     }
 }
-
 /* TRUTH: once-per-tick slide tracking (called before the solver loop). */
 void prismatic_pre_step (prismatic_params *p, rigidbody *body_a, rigidbody *body_b, float dt, const mpe_config_t *cfg) {
     (void) cfg;
@@ -858,7 +817,6 @@ void prismatic_pre_step (prismatic_params *p, rigidbody *body_a, rigidbody *body
         }
     }
 }
-
 /* Rope: inequality distance constraint (pulls only, no push). */
 void rope_solve (rope_params *p, rigidbody *body_a, rigidbody *body_b, float dt, const mpe_config_t *cfg) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
@@ -873,7 +831,6 @@ void rope_solve (rope_params *p, rigidbody *body_a, rigidbody *body_b, float dt,
         rigidbody_wake (body_a);
     if (body_b->is_sleeping)
         rigidbody_wake (body_b);
-
     float inv_a = rigidbody_effective_inv_mass (body_a);
     float inv_b = rigidbody_effective_inv_mass (body_b);
     vector3 r_a = vector4_rotate_to_vector3 (body_a->orientation, p->anchor_a);
@@ -882,28 +839,22 @@ void rope_solve (rope_params *p, rigidbody *body_a, rigidbody *body_b, float dt,
     vector3 world_b = vector3_addition (body_b->position, r_b);
     vector3 delta = vector3_subtraction (world_b, world_a);
     float dist = vector3_length (delta);
-
     if (dist < 1e-9f)
         return;
-
     /* Only pull when stretched beyond rest_length (inequality). */
     if (dist <= p->rest_length)
         return;
-
     vector3 n = vector3_scaling (delta, 1.0f / dist);
     float err = dist - p->rest_length;
-
     vector3 vel_a = vector3_addition (body_a->velocity, vector3_cross (body_a->angular_velocity, r_a));
     vector3 vel_b = vector3_addition (body_b->velocity, vector3_cross (body_b->angular_velocity, r_b));
     float rel_n = vector3_dot (vector3_subtraction (vel_b, vel_a), n);
-
     float bias = C->joints.revolute_beta * err / dt;
     float max_b = C->joints.revolute_max_bias;
     if (bias > max_b)
         bias = max_b;
     else if (bias < -max_b)
         bias = -max_b;
-
     vector3 ra_n = vector3_cross (r_a, n);
     vector3 rb_n = vector3_cross (r_b, n);
     float k = inv_a + inv_b +
@@ -911,7 +862,6 @@ void rope_solve (rope_params *p, rigidbody *body_a, rigidbody *body_b, float dt,
               vector3_dot (rb_n, math3_multiplication_vector3 (rigidbody_effective_inv_inertia (body_b), rb_n));
     if (k <= 1e-12f)
         return;
-
     float lambda = -(rel_n + bias) / k;
     /* TRUTH: n=(B-A)/dist, impulse=n*lambda, B+=, A-=. Stretched+separating
      * (err>0, rel_n>0) needs lambda<0 (pull B toward A). Old clamp killed
@@ -920,7 +870,6 @@ void rope_solve (rope_params *p, rigidbody *body_a, rigidbody *body_b, float dt,
     if (lambda > 0.0f) {
         lambda = 0.0f; /* Only pull, never push. */
     }
-
     vector3 impulse = vector3_scaling (n, lambda);
     body_a->velocity = vector3_subtraction (body_a->velocity, vector3_scaling (impulse, inv_a));
     body_b->velocity = vector3_addition (body_b->velocity, vector3_scaling (impulse, inv_b));
@@ -931,7 +880,6 @@ void rope_solve (rope_params *p, rigidbody *body_a, rigidbody *body_b, float dt,
         body_b->angular_velocity,
         math3_multiplication_vector3 (rigidbody_effective_inv_inertia (body_b), vector3_cross (r_b, impulse)));
 }
-
 /* Prismatic motor: adds drive force to the force accumulator (call once per tick). */
 void prismatic_apply_motor (prismatic_params *p, rigidbody *body_a, rigidbody *body_b, float dt,
                             const mpe_config_t *cfg) {
@@ -980,7 +928,6 @@ void prismatic_apply_motor (prismatic_params *p, rigidbody *body_a, rigidbody *b
     body_a->force_accumulator = vector3_subtraction (body_a->force_accumulator, drive_force);
     body_b->force_accumulator = vector3_addition (body_b->force_accumulator, drive_force);
 }
-
 /* Fixed weld: point-to-point (same K-matrix as revolute) plus full angular
  * lock (kill all relative spin, not just off-axis). Deterministic, no bias
  * beyond the shared Baumgarte cap. */
@@ -1054,7 +1001,6 @@ void fixed_solve (fixed_params *p, rigidbody *body_a, rigidbody *body_b, float d
     body_b->angular_velocity = vector3_addition (
         body_b->angular_velocity, math3_multiplication_vector3 (rigidbody_effective_inv_inertia (body_b), ang_imp));
 }
-
 void revolute_apply_motor (revolute_params *p, rigidbody *body_a, rigidbody *body_b, float dt,
                            const mpe_config_t *cfg) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
@@ -1140,7 +1086,6 @@ void revolute_apply_motor (revolute_params *p, rigidbody *body_a, rigidbody *bod
     body_a->torque_accumulator = vector3_subtraction (body_a->torque_accumulator, drive_torque);
     body_b->torque_accumulator = vector3_addition (body_b->torque_accumulator, drive_torque);
 }
-
 /* Distance: 1D constraint along the anchor axis. Preserves free rotation and
  * tangential motion; only the separation error is corrected. */
 void distance_solve (distance_params *p, rigidbody *body_a, rigidbody *body_b, float dt, const mpe_config_t *cfg) {
@@ -1202,7 +1147,6 @@ void distance_solve (distance_params *p, rigidbody *body_a, rigidbody *body_b, f
         body_b->angular_velocity,
         math3_multiplication_vector3 (rigidbody_effective_inv_inertia (body_b), vector3_cross (r_b, impulse)));
 }
-
 /* TRUTH: fixed-weld angular positional correction (once per tick, AFTER the
  * velocity loop — never inside, same energy-pump rule as revolute axis
  * drift). Velocity-only lock kills relative spin but lets orientation error
@@ -1253,7 +1197,6 @@ void fixed_correct_angular_drift (fixed_params *p, rigidbody *body_a, rigidbody 
             body_b->angular_velocity, math3_multiplication_vector3 (rigidbody_effective_inv_inertia (body_b), impulse));
     }
 }
-
 /* Positional axis-drift correction: MUST be called exactly once per tick,
  * AFTER the velocity iteration loop — never inside it. The error term is
  * positional (orientation difference, unchanged by velocity iterations),

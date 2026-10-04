@@ -6,10 +6,8 @@
 #include "../config/mpe_constants.h"
 #include <stddef.h>
 #include <stdint.h>
-
 /* Union-find scratch lives in the world (heap members); the module keeps
  * no state of its own. Queries take the world explicitly. */
-
 static int island_find (struct physics_world *world, int x) {
     int root = x;
     while (world->island_parent[root] != root) {
@@ -22,7 +20,6 @@ static int island_find (struct physics_world *world, int x) {
     }
     return root;
 }
-
 static void island_union (struct physics_world *world, int a, int b) {
     int ra = island_find (world, a);
     int rb = island_find (world, b);
@@ -36,7 +33,6 @@ static void island_union (struct physics_world *world, int a, int b) {
         world->island_parent[ra] = rb;
     }
 }
-
 static int island_index_of (rigidbody *bodies, rigidbody *body, int body_count) {
     if ((!bodies) || (!body) || (body_count <= 0)) {
         return -1;
@@ -51,11 +47,9 @@ static int island_index_of (rigidbody *bodies, rigidbody *body, int body_count) 
     }
     return idx;
 }
-
 static bool islands_ready (const struct physics_world *world) {
     return (world) && (world->bodies) && (world->island_parent) && (world->island_label) && (world->island_awake_flags);
 }
-
 void islands_build (struct physics_world *world, broadphase_pair *pairs, int pair_count) {
     if (!islands_ready (world)) {
         return;
@@ -136,14 +130,12 @@ void islands_build (struct physics_world *world, broadphase_pair *pairs, int pai
         }
     }
 }
-
 int islands_count (const struct physics_world *world) {
     if (!world) {
         return 0;
     }
     return world->island_total;
 }
-
 int islands_body_island (struct physics_world *world, rigidbody *body) {
     if (!islands_ready (world)) {
         return -1;
@@ -157,7 +149,6 @@ int islands_body_island (struct physics_world *world, rigidbody *body) {
     }
     return world->island_label[idx];
 }
-
 bool islands_body_awake (struct physics_world *world, rigidbody *body) {
     int island = islands_body_island (world, body);
     if (island < 0 || island >= world->island_total) {

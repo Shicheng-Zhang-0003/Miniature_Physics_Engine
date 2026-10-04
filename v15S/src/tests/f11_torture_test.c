@@ -16,7 +16,6 @@
 #include "core/physics_world.h"
 #include "physics/constraint.h"
 #include "config/mpe_config.h"
-
 static uint32_t t_rng = 0xC0FFEEu;
 static uint32_t t_next (void) {
     t_rng ^= t_rng << 13;
@@ -24,7 +23,6 @@ static uint32_t t_next (void) {
     t_rng ^= t_rng << 5;
     return t_rng;
 }
-
 static void f11_add_cube (physics_world *w, vector3 p) {
     int idx = physics_world_add_cube (w, p, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
     if (idx >= 0) {
@@ -33,7 +31,6 @@ static void f11_add_cube (physics_world *w, vector3 p) {
         w->bodies[idx].friction_kinetic = 0.7f;
     }
 }
-
 int main (void) {
     mpe_config_init ();
     /* Deterministic torture over the live registry (fixed seed). */
@@ -79,7 +76,6 @@ int main (void) {
     }
     printf ("[info] torture: gravity=%.2f iters=%d slop=%.3f\n", g_cfg.world.gravity, g_cfg.timestep.solver_iterations,
             g_cfg.solver.penetration_slop);
-
     physics_world world;
     physics_world_init (&world);
     constraint_pool_init (&world);
@@ -105,7 +101,6 @@ int main (void) {
             world.bodies[idx].friction_kinetic = 0.7f;
         }
     }
-
     const float dt = 1.0f / 60.0f;
     long nan_ticks = 0, fallen_ticks = 0;
     float end_lin = 0.0f, end_ang = 0.0f;

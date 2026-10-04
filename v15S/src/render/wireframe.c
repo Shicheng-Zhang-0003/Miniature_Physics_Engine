@@ -10,7 +10,6 @@
 #include "cylinder_meshing.h"
 #include <epoxy/gl.h>
 #include <math.h>
-
 extern camera main_camera_fov;
 extern int selected_object;
 extern mesh sphere_mesh;
@@ -27,7 +26,6 @@ static GLint a3_wire_uniform_light_position = -1;
 static GLint a3_wire_uniform_ambient = -1;
 static GLint a3_wire_uniform_specular_coeff = -1;
 static GLint a3_wire_uniform_specular_exp = -1;
-
 static void a3_wire_cache_uniforms (GLuint shader_program) {
     if (shader_program == a3_wire_cached_program) {
         return;
@@ -38,14 +36,11 @@ static void a3_wire_cache_uniforms (GLuint shader_program) {
     a3_wire_uniform_model = glGetUniformLocation (shader_program, "model");
     a3_wire_uniform_object_colour = glGetUniformLocation (shader_program, "object_colour");
 }
-
 static GLuint a3_wire_missing_cached_program = 0;
-
 static void a3_wire_cache_missing_uniforms (GLuint shader_program) {
     if (shader_program == a3_wire_missing_cached_program) {
         return;
     }
-
     a3_wire_missing_cached_program = shader_program;
     a3_wire_uniform_normal_matrix = glGetUniformLocation (shader_program, "normal_matrix");
     a3_wire_uniform_camera_position = glGetUniformLocation (shader_program, "camera_position");
@@ -54,7 +49,6 @@ static void a3_wire_cache_missing_uniforms (GLuint shader_program) {
     a3_wire_uniform_specular_coeff = glGetUniformLocation (shader_program, "u_specular_coeff");
     a3_wire_uniform_specular_exp = glGetUniformLocation (shader_program, "u_specular_exponent");
 }
-
 void wireframe_invalidate_cache (void) {
     a3_wire_cached_program = 0;
     a3_wire_missing_cached_program = 0;
@@ -69,7 +63,6 @@ void wireframe_invalidate_cache (void) {
     a3_wire_uniform_specular_coeff = -1;
     a3_wire_uniform_specular_exp = -1;
 }
-
 void wireframe_render_object (GLuint shader_program, math4 view_matrix, math4 projection_matrix, rigidbody *rigid_body,
                               vector3 wireframe_colour) {
     glUseProgram (shader_program);
@@ -130,7 +123,6 @@ void wireframe_render_object (GLuint shader_program, math4 view_matrix, math4 pr
                 a3_wire_rotation.matrix[row_index][column_index] * inv_scale;
         }
     }
-
     glUniformMatrix3fv (a3_wire_uniform_normal_matrix, 1, GL_FALSE, a3_wire_normal_matrix_flat);
     glUniform3f (a3_wire_uniform_camera_position, main_camera_fov.position.x, main_camera_fov.position.y,
                  main_camera_fov.position.z);

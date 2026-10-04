@@ -6,7 +6,6 @@
 #include "mpe_test.h"
 #include "physics/spring_joint.h"
 #include "core/rigidbody.h"
-
 /* projectile: apex=1+vy^2/2g, t=vy/g, x=vx*t, planar, 2%. */
 int mpe_t_projectile (void) {
     mpe_test_t t;
@@ -58,7 +57,6 @@ int mpe_t_projectile (void) {
     mpe_test_end (&t);
     return t.failures;
 }
-
 /* friction_stop: d = v0^2/(2*mu*g), 15%. Floor friction synced (min-combine). */
 int mpe_t_friction_stop (void) {
     mpe_test_t t;
@@ -105,7 +103,6 @@ int mpe_t_friction_stop (void) {
     mpe_test_end (&t);
     return t.failures;
 }
-
 /* incline_accel: a = g*sin(30), 4%; s = v*t + a*t^2/2, 3%. */
 int mpe_t_incline_accel (void) {
     mpe_test_t t;
@@ -163,7 +160,6 @@ int mpe_t_incline_accel (void) {
     mpe_test_end (&t);
     return t.failures;
 }
-
 /* pendulum: compound T = 2*pi*sqrt(I/(m*g*d)), I = 1/12*m*(L^2+w^2) + m*d^2
  * with m=1, d=1 (pivot->COM), L=2, w=0.2: I = 1/12*1*(4+0.04) + 1*1^2.
  * 3%, >=6 crossings. */
@@ -223,7 +219,6 @@ int mpe_t_pendulum (void) {
     mpe_test_end (&t);
     return t.failures;
 }
-
 /* bounce_series: e=0.6 from 3.5m: apexes 1.76, 0.954 (e^2 law), 12/15%,
  * plus the paranoia Newton oracle (outgoing/incoming impact-velocity ratio
  * ~e at the contact itself; apexes include CCD substep position and are
@@ -320,7 +315,6 @@ int mpe_t_bounce_series (void) {
     mpe_test_end (&t);
     return t.failures;
 }
-
 /* momentum: gravity-free elastic exchange, |p|<0.05, |KE-9|<0.3. */
 int mpe_t_momentum (void) {
     mpe_test_t t;
@@ -377,7 +371,6 @@ int mpe_t_momentum (void) {
     mpe_test_end (&t);
     return t.failures;
 }
-
 /* angmom: torque-free |L-L0|/|L0| < 3%. */
 int mpe_t_angmom (void) {
     mpe_test_t t;
@@ -433,10 +426,8 @@ int mpe_t_angmom (void) {
     mpe_test_end (&t);
     return t.failures;
 }
-
 /* spring: T = 2*pi*sqrt(m/k), 2%; dE < 5%. Needs spring_joint TU. */
 int mpe_t_spring (void);
-
 /* slope_drift helper (faithful v1 port): drift projected on downslope d,
  * 120 settle + 300 measure ticks. surf=(0,4,0), drop+0.005. */
 static float mpe_slope_drift (mpe_test_t *t, float slope_deg, float mus, float muk, int *asleep_out) {
@@ -474,7 +465,6 @@ static float mpe_slope_drift (mpe_test_t *t, float slope_deg, float mus, float m
     physics_world_cleanup (&w);
     return drift;
 }
-
 /* static_hold: 20deg/mu_s0.9 holds (|drift|<=0.05); -10deg/mu0.1/0.08
  * slides (>=8m) and stays awake. */
 int mpe_t_static_hold (void) {
@@ -497,7 +487,6 @@ int mpe_t_static_hold (void) {
     mpe_test_end (&t);
     return t.failures;
 }
-
 /* rolling_decay: rolling ball (v=2 + backspin w=(0,0,-4)) decays at the
  * contact-patch rate: 9.5-13.5m in 8 s with mu_r=0.02. Plane enabled with
  * default floor friction (untouched).
@@ -549,7 +538,6 @@ int mpe_t_rolling_decay (void) {
     mpe_test_end (&t);
     return t.failures;
 }
-
 /* kinematic: platform y0.5+/-0.01, crate x4.0+/-0.2 carried, |crate-plat|<1. */
 int mpe_t_kinematic (void) {
     mpe_test_t t;
@@ -600,7 +588,6 @@ int mpe_t_kinematic (void) {
     mpe_test_end (&t);
     return t.failures;
 }
-
 /* ccd_sweep: 144m/s wall face in [-0.75,-0.45], |vx|<5; floor min>=0.40 rest 0.5+/-0.05.
  * Wall-face derivation: wall centre x=0 half 0.05 -> left face -0.05;
  * minus sphere radius 0.5 -> ideal rest centre -0.55. Window [-0.75,-0.45]

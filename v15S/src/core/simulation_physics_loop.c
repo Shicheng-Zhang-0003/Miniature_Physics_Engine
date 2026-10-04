@@ -31,7 +31,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #endif
-
 extern input_status main_inputs;
 extern camera main_camera_fov;
 extern int selected_object;
@@ -51,11 +50,9 @@ bool editor_dialog_is_active (void);
 bool physics_halt_tick_update (void);
 void overlay_update (void);
 void long_run_validation_tick_update (void);
-
 /* Pair pipeline relic removed: the legacy GUI tick shares
  * physics_world_process_pair (registry dispatch + 3-gate wake) with the
  * canonical step so both paths stay identical. */
-
 void simulation_physics_tick (float frame_delta_time) {
     /* FIX-AUDIT: static float accumulator bled across scene loads and lost
      * precision on long runs. Double precision here. */

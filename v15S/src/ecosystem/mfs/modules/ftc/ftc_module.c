@@ -28,7 +28,6 @@
  */
 #include "ftc_fleet.h"
 #include "core/mpe_module.h"
-
 static int ftc_fleet_attach (mpe_world_t *world, void **mod_state) {
     if (!world || !mod_state)
         return -1;
@@ -38,16 +37,13 @@ static int ftc_fleet_attach (mpe_world_t *world, void **mod_state) {
     *mod_state = f;
     return 0;
 }
-
 static void ftc_fleet_detach (mpe_world_t *world, void *mod_state) {
     (void) world;
     ftc_fleet_destroy (mod_state);
 }
-
 static void ftc_fleet_pre_step (mpe_world_t *world, float dt, void *mod_state) {
     ftc_fleet_step_all (world, mod_state, dt);
 }
-
 const mpe_module_desc_t mpe_module_desc = {
     .abi = MPE_MODULE_ABI,
     .name = "ftc-fleet",

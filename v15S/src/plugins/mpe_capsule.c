@@ -19,9 +19,7 @@
 #include "../core/physics_world.h"
 #include "../physics/collision_mechanics.h"
 #include <math.h>
-
 #define CAP_EPS 1e-4f /* degenerate epsilon, aligned with engine narrowphase */
-
 /* Capsule frame + the BOUNDING INVARIANT: the engine owns radius as the
  * bounding radius (broadphase-critical; sanitize preserves it for custom
  * bodies), so the cross-section is DERIVED as rc = sqrt(R^2 - h^2), never
@@ -57,7 +55,6 @@ static int capsule_frame (const rigidbody *cap, vector3 *axle_out, float *half_o
     *rad_out = sqrtf (rc2);
     return 0;
 }
-
 static float capsule_slop (mpe_world_t *w) {
     const mpe_config_t *C = (w && w->cfg) ? w->cfg : &g_cfg;
     float slop = C->solver.penetration_slop;
@@ -65,7 +62,6 @@ static float capsule_slop (mpe_world_t *w) {
         slop = 0.01f;
     return slop;
 }
-
 /* Closest point on segment [c-h*ax, c+h*ax] to p. */
 static vector3 seg_closest (vector3 c, vector3 ax, float h, vector3 p) {
     vector3 d = vector3_subtraction (p, c);
@@ -76,7 +72,6 @@ static vector3 seg_closest (vector3 c, vector3 ax, float h, vector3 p) {
         s = h;
     return vector3_addition (c, vector3_scaling (ax, s));
 }
-
 static bool emit_contact (void *out, rigidbody *a, rigidbody *b, vector3 nrm, vector3 pos, float pen) {
     collision_data *o = (collision_data *) out;
     *o = (collision_data){0};
@@ -92,7 +87,6 @@ static bool emit_contact (void *out, rigidbody *a, rigidbody *b, vector3 nrm, ve
     o->contacts[0].local_position_b = vector3_subtraction (pos, b->position);
     return true;
 }
-
 /* Exact segment-vs-sphere: closest segment point to the sphere centre. */
 static bool capsule_vs_sphere_exact (rigidbody *cap, vector3 ax, float h, float r, rigidbody *sph, void *out,
                                      float slop) {
@@ -128,7 +122,6 @@ static bool capsule_vs_sphere_exact (rigidbody *cap, vector3 ax, float h, float 
     }
     return emit_contact (out, cap, sph, nrm, pos, rr - dist);
 }
-
 /* Segment-vs-OBB: sample the segment (endpoints always; interior samples
  * scale with length) as spheres vs the box, keep the deepest. Exact for
  * h=0; for h>0 the sampling error is bounded by (seg_len/(n-1))^2/8r. */
@@ -218,7 +211,6 @@ static bool capsule_vs_cube_sampled (rigidbody *cap, vector3 ax, float h, float 
         return false;
     return emit_contact (out, cap, cube, best_n, best_p, best_pen);
 }
-
 /* Point-vs-solid-cylinder SDF for one segment sample; keep deepest over
  * the same sampling as the cube path. Inside picks min-clearance escape. */
 static bool capsule_vs_cylinder_sampled (rigidbody *cap, vector3 ax, float h, float r, rigidbody *cyl, void *out,
@@ -327,7 +319,6 @@ static bool capsule_vs_cylinder_sampled (rigidbody *cap, vector3 ax, float h, fl
         return false;
     return emit_contact (out, cap, cyl, best_n, best_p, best_pen);
 }
-
 static bool capsule_contact (rigidbody *cap, rigidbody *other, void *out, mpe_world_t *w) {
     if (!cap || !other || !out)
         return false;
@@ -364,15 +355,12 @@ static bool capsule_contact (rigidbody *cap, rigidbody *other, void *out, mpe_wo
     }
     return false;
 }
-
 static bool capsule_vs_other (rigidbody *a, rigidbody *b, void *out, mpe_world_t *w) {
     return capsule_contact (a, b, out, w);
 }
-
 static bool capsule_vs_capsule (rigidbody *a, rigidbody *b, void *out, mpe_world_t *w) {
     return capsule_contact (a, b, out, w);
 }
-
 static int s_capsule_registered = 0;
 MPE_CTOR static void capsule_register (void) {
     if (s_capsule_registered)
@@ -383,7 +371,6 @@ MPE_CTOR static void capsule_register (void) {
     mpe_register_pair_handler (3, 3, 100, 100, capsule_vs_capsule, "capsule-capsule");
     s_capsule_registered = 1;
 }
-
 MPE_DTOR static void capsule_unregister (void) {
     /* Self-unregister so dlclose never leaves dangling fn pointers. */
     if (!s_capsule_registered)
@@ -392,7 +379,6 @@ MPE_DTOR static void capsule_unregister (void) {
     mpe_unregister_pair_handler (capsule_vs_capsule);
     s_capsule_registered = 0;
 }
-
 /* Explicit init/fini for toolchains without constructor support (MSVC).
  * The loader calls these if present (see mpe_loader.c); idempotent so
  * calling after a constructor is harmless. Linux behaviour unchanged. */
@@ -402,7 +388,6 @@ MPE_EXPORT void mpe_capsule_init (void) {
 MPE_EXPORT void mpe_capsule_fini (void) {
     capsule_unregister ();
 }
-
 const mpe_module_desc_t mpe_module_desc = {
     .abi = MPE_MODULE_ABI,
     .name = "capsule-shape",

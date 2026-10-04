@@ -10,19 +10,16 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
-
 /* Bundle identity mirrors term_ftc.c (ecosystem bundle first, then the
  * single-module plugin path). */
 #define GPD_HANDLE_PRIMARY "mfs-simulator"
 #define GPD_HANDLE_MODULE "plugins/mpe_ftc.so"
-
 static void *gpd_sym (const char *sym) {
     void *p = mpe_loader_symbol (GPD_HANDLE_PRIMARY, sym);
     if (p)
         return p;
     return mpe_loader_symbol (GPD_HANDLE_MODULE, sym);
 }
-
 /* Cached bundle entry points (resolved lazily; NULL = bundle absent). */
 static ftc_robot *(*s_fleet_get) (struct physics_world *, int) = NULL;
 static void (*s_mecanum) (ftc_robot *, float, float, float) = NULL;
@@ -33,7 +30,6 @@ static bool (*s_pad_button) (const gamepad_state *, int) = NULL;
 static bool (*s_pad_connected) (const gamepad_state *) = NULL;
 static void (*s_pad_deadzone) (gamepad_state *, float) = NULL;
 static int s_syms_resolved = 0;
-
 static gamepad_state s_pad;
 static int s_pad_open_attempted = 0;
 static int s_frames_since_retry = 0;
@@ -42,7 +38,6 @@ static int s_prev_start = 0;
 static int s_was_commanding = 0;
 static int s_active = 0;
 static int s_reported_stage = -1;
-
 static void gpd_report_stage (int stage) {
     /* One line per transition so a dead controller always says why (bundle,
      * pad, robot) instead of silently no-op'ing. */
@@ -68,7 +63,6 @@ static void gpd_report_stage (int stage) {
     }
     fflush (stderr);
 }
-
 static void gpd_resolve (void) {
     /* DESPOT-FIX 2026-10-04: this ran once and cached NULLs when the first
      * frame ticked before `mod load` — every later tick then silently
@@ -89,7 +83,6 @@ static void gpd_resolve (void) {
     if (s_fleet_get && s_mecanum)
         s_syms_resolved = 1;
 }
-
 void gamepad_drive_init (void) {
     gpd_resolve ();
     if (!s_pad_init || s_pad_open_attempted)
@@ -106,12 +99,10 @@ void gamepad_drive_init (void) {
     /* Missing device is not an error: headless rigs, unplugged pad, or
      * MPE_GAMEPAD_DEVICE=disabled all land here; tick retries below. */
 }
-
 static void gpd_stop_robot (ftc_robot *r) {
     if (s_mecanum && r)
         s_mecanum (r, 0.0f, 0.0f, 0.0f);
 }
-
 void gamepad_drive_tick (void) {
     gpd_resolve ();
     if (!s_fleet_get || !s_mecanum || !s_pad_poll || !s_pad_axis || !s_pad_button || !s_pad_connected) {
@@ -144,13 +135,11 @@ void gamepad_drive_tick (void) {
     }
     s_frames_since_retry = 0;
     s_pad_poll (&s_pad);
-
     /* START toggles control even while disabled (else latch-dead). */
     int start_now = s_pad_button (&s_pad, gamepad_button_start) ? 1 : 0;
     if (start_now && !s_prev_start)
         s_control_enabled = !s_control_enabled;
     s_prev_start = start_now;
-
     physics_world *w = physics_world_get_primary ();
     ftc_robot *r = (w && s_fleet_get) ? s_fleet_get (w, 0) : NULL;
     if (!r) {
@@ -178,11 +167,9 @@ void gamepad_drive_tick (void) {
     s_active = 1;
     gpd_report_stage (3);
 }
-
 int gamepad_drive_active (void) {
     return s_active;
 }
-
 /* ---- joint watchdog (see header) ---- */
 #define FTC_WD_MAXW 8
 static int s_wd_tagged = 0;
@@ -190,7 +177,6 @@ static float s_wd_mount[FTC_WD_MAXW];
 static int s_wd_mount_seen[FTC_WD_MAXW];
 static int s_wd_tilt_hot[FTC_WD_MAXW];
 static int s_wd_jump_hot[FTC_WD_MAXW];
-
 void ftc_watchdog_tick (void) {
     if (!s_fleet_get) {
         return; /* resolve with the driver (no bundle, no watch) */

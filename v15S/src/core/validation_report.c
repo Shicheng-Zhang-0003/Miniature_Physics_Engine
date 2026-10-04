@@ -20,11 +20,9 @@
 #endif
 #include <math.h>
 #include <stdbool.h>
-
 extern camera main_camera_fov;
 extern input_status main_inputs;
 extern int selected_object;
-
 void validation_report_print (void) {
     printf ("[A3] Validation report %s\n", a3_version_string);
     printf ("[A3] objects=%d capacity=%d joints=%d selected=%d\n", (physics_world_get_primary ()->body_count),

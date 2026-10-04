@@ -6,25 +6,20 @@
 #include <math.h>
 #include "core/physics_world.h"
 #include "config/mpe_config.h"
-
 int main (void) {
     mpe_config_init ();
     physics_world world;
     physics_world_init (&world);
-
     /* Static floor so the cylinder rests */
     physics_world_add_cube (&world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
-
     /* Static cylinder resting on floor */
     if (physics_world_add_cylinder (&world, 0.05f, 0.02f, 0.0f, (vector3){0.0f, 0.06f, 0.0f}) < 0) {
         printf ("[FAIL] cylinder spawn\n");
         return 1;
     }
-
     /* Sphere approaching the cylinder along Z */
     int sph = physics_world_add_sphere (&world, 0.08f, 0.3f, (vector3){0.0f, 0.08f, 0.5f});
     world.bodies[sph].velocity = (vector3){0.0f, 0.0f, -2.0f};
-
     const float dt = 1.0f / 60.0f;
     int fail = 0;
     for (int t = 0; t < 120 && !fail; t++) {
@@ -40,7 +35,6 @@ int main (void) {
     }
     if (fail)
         return 1;
-
     /* Sphere started at z=0.5 moving toward cylinder at z=0.
      * After 2 seconds it should have been deflected or stopped.
      * TRUTH: touch happens at z≈0.13 (0.05 half-len + 0.08 radius);
@@ -48,7 +42,6 @@ int main (void) {
      * is intentional: mass==0 builds a static body per init policy.) */
     float sph_z = world.bodies[sph].position.z;
     printf ("[info] sphere final z=%.4f (started at 0.5)\n", sph_z);
-
     if (sph_z < -0.05f) {
         printf ("[FAIL] sphere passed through cylinder\n");
         return 1;

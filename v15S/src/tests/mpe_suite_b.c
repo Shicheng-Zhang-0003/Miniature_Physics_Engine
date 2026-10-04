@@ -8,7 +8,6 @@
 #include "mpe_test.h"
 #include "physics/spring_joint.h"
 #include "core/rigidbody.h"
-
 int mpe_t_spring (void) {
     mpe_test_t t;
     mpe_test_begin (&t, "spring");
@@ -73,7 +72,6 @@ int mpe_t_spring (void) {
     mpe_test_end (&t);
     return t.failures;
 }
-
 int mpe_t_two_world (void) {
     mpe_test_t t;
     mpe_test_begin (&t, "two_world");
@@ -116,7 +114,6 @@ int mpe_t_two_world (void) {
     mpe_test_end (&t);
     return t.failures;
 }
-
 int mpe_t_revolute (void) {
     mpe_test_t t;
     mpe_test_begin (&t, "revolute");
@@ -160,7 +157,6 @@ int mpe_t_revolute (void) {
     mpe_test_end (&t);
     return t.failures;
 }
-
 int mpe_t_cylinder_drop (void) {
     mpe_test_t t;
     mpe_test_begin (&t, "cylinder_drop");
@@ -214,7 +210,6 @@ int mpe_t_cylinder_drop (void) {
     mpe_test_end (&t);
     return t.failures;
 }
-
 int mpe_t_cylinder_sphere (void) {
     mpe_test_t t;
     mpe_test_begin (&t, "cylinder_sphere");
@@ -239,7 +234,6 @@ int mpe_t_cylinder_sphere (void) {
     mpe_test_end (&t);
     return t.failures;
 }
-
 int mpe_t_cylinder_cube (void) {
     mpe_test_t t;
     mpe_test_begin (&t, "cylinder_cube");
@@ -266,7 +260,6 @@ int mpe_t_cylinder_cube (void) {
     mpe_test_end (&t);
     return t.failures;
 }
-
 int mpe_t_cylinder_cylinder (void) {
     mpe_test_t t;
     mpe_test_begin (&t, "cylinder_cylinder");
@@ -291,7 +284,6 @@ int mpe_t_cylinder_cylinder (void) {
     mpe_test_end (&t);
     return t.failures;
 }
-
 /* list4 FIXED: v1 rotated about Y (axle X->Z, still horizontal) yet asserted
  * the vertical rest height h=0.02. v2 tests BOTH poses with the frictional
  * floor enabled (v1 measured free-fall through the frictionless clamp):
@@ -353,7 +345,6 @@ int mpe_t_list4_cylinder_floor (void) {
     mpe_test_end (&t);
     return t.failures;
 }
-
 /* ---------------------------------------------------------------------------
  * cylinder_platform: a cylinder must not collide with a static slab it is
  * nowhere near.
@@ -381,7 +372,6 @@ int mpe_t_cylinder_platform (void) {
     g_cfg.world.gravity = -9.81f;
     g_cfg.world.drag = 1.0f;
     g_cfg.sleep.enable = false;
-
     int ip = physics_world_add_cube (&w, (vector3){0.0f, 10.0f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
     MPE_CHECK (&t, ip >= 0);
     MPE_CHECK (&t, w.bodies[ip].static_state);
@@ -392,7 +382,6 @@ int mpe_t_cylinder_platform (void) {
     MPE_CHECK (&t, ic >= 0 && iu >= 0);
     rigidbody *cyl = &w.bodies[ic];
     rigidbody *cube = &w.bodies[iu];
-
     /* The world still has its y>=0 boundary backstop, so only step long
      * enough that neither body can reach it. */
     const float dt = 1.0f / 60.0f;
@@ -408,7 +397,6 @@ int mpe_t_cylinder_platform (void) {
      * gravity, and position ROSE by 0.1033 m per tick. */
     MPE_CHECK (&t, cyl->velocity.y < -0.1f);
     MPE_CHECK (&t, cyl->position.y < 5.0f);
-
     /* Run longer. Both bodies land on the world's y>=0 boundary backstop
      * (this test world has no floor slab), so past landing the invariant to
      * assert is TRACKING: the cylinder must behave like the free cube
@@ -428,12 +416,10 @@ int mpe_t_cylinder_platform (void) {
     /* speed is physically bounded: no energy injection from a phantom contact */
     MPE_CHECK (&t, isfinite (cyl->velocity.y) && fabsf (cyl->velocity.y) < 12.0f);
     MPE_CHECK (&t, isfinite (cyl->position.y) && isfinite (cyl->position.x));
-
     physics_world_cleanup (&w);
     mpe_test_end (&t);
     return t.failures;
 }
-
 /* ---------------------------------------------------------------------------
  * cylinder_sphere_inside: when the sphere's CENTRE is inside the cylinder, the
  * contact normal must eject it, not drive it deeper.
@@ -459,7 +445,6 @@ int mpe_t_cylinder_sphere_inside (void) {
     g_cfg.world.gravity = 0.0f;
     g_cfg.world.drag = 1.0f;
     g_cfg.sleep.enable = false;
-
     /* r = 2, half-length 1, axle +X. Sphere radius 0.5, centre 4 sub-cases
      * placed inside so each branch (cap vs barrel) and each axis is covered. */
     const int ncase = 4;
@@ -467,7 +452,6 @@ int mpe_t_cylinder_sphere_inside (void) {
                           {0.0f, -1.7f, 0.0f}, /* near -Y barrel  */
                           {0.0f, 0.0f, 1.7f}, /* near +Z barrel  */
                           {0.8f, 0.0f, 0.0f}}; /* near +X cap     */
-
     for (int c = 0; c < ncase; c++) {
         physics_world ww;
         mpe_world_begin (&ww);
@@ -484,7 +468,6 @@ int mpe_t_cylinder_sphere_inside (void) {
         MPE_CHECK (&t, ic >= 0 && is >= 0);
         rigidbody *cyl = &ww.bodies[ic];
         rigidbody *sph = &ww.bodies[is];
-
         collision_data cd;
         memset (&cd, 0, sizeof (cd));
         bool hit = collision_cylinder_sphere (cyl, sph, &cd, &g_cfg);
@@ -500,7 +483,6 @@ int mpe_t_cylinder_sphere_inside (void) {
             MPE_CHECK_NEAR (&t, vector3_length (cd.normal_vector), 1.0f, 1e-3, "unit normal");
             MPE_CHECK (&t, cd.contacts[0].penetration > 0.0f);
         }
-
         /* End to end: the sphere must never be driven DEEPER. That is the
          * exact pre-fix failure -- the negated normal pushed it further in
          * every tick, on all three correction paths. Assert monotonic
@@ -555,12 +537,10 @@ int mpe_t_cylinder_sphere_inside (void) {
         MPE_CHECK (&t, isfinite (sph->position.x) && isfinite (sph->position.y) && isfinite (sph->position.z));
         physics_world_cleanup (&ww);
     }
-
     physics_world_cleanup (&w);
     mpe_test_end (&t);
     return t.failures;
 }
-
 /* ======================================================================
  * EXTERNAL-TRUTH MASS PROPERTIES  (DESPOT-2026-10-02)
  *
@@ -586,11 +566,9 @@ int mpe_t_mass_properties (void) {
     g_cfg.sleep.enable = 0;
     physics_world w;
     mpe_world_begin (&w);
-
     /* A well-formed fixture must trip ZERO clamps. Any clamp here means the
      * test itself is asking for a body it will not get. */
     mpe_clamp_counters_reset ();
-
     /* sphere: (2/5) m r^2 */
     {
         const float m = 3.0f, r = 0.7f;
@@ -645,14 +623,11 @@ int mpe_t_mass_properties (void) {
         MPE_CHECK_NEAR (&t, w.bodies[c].half_extensions.y, r, 1e-6f, "cylinder half_ext y = radius");
         MPE_CHECK_NEAR (&t, w.bodies[c].half_extensions.z, r, 1e-6f, "cylinder half_ext z = radius");
     }
-
     /* THE FINDING: this fixture clamped nothing, so nothing was rewritten. */
     MPE_INFO ("fixture clamped nothing: mass=%lu radius=%lu half_length=%lu", mpe_clamp_mass_events,
               mpe_clamp_radius_events, mpe_clamp_half_length_events);
     MPE_CHECK (&t, mpe_clamp_mass_events == 0 && mpe_clamp_radius_events == 0 && mpe_clamp_half_length_events == 0);
-
     physics_world_cleanup (&w);
-
     /* And the counters must actually FIRE when the input is out of range --
      * an observability mechanism that never triggers is not one. */
     {
@@ -670,14 +645,12 @@ int mpe_t_mass_properties (void) {
         physics_world_cleanup (&w2);
     }
     mpe_clamp_counters_reset ();
-
     if (t.failures == 0) {
         printf ("[PASS] mass properties match closed-form rigid-body mechanics\n");
     }
     mpe_test_end (&t);
     return t.failures;
 }
-
 /* ======================================================================
  * REFERENCE MATH GATE  (DESPOT-2026-10-02)
  *
@@ -695,7 +668,6 @@ int mpe_t_mass_properties (void) {
  *     beta rises.
  *  3. Coulomb - once sliding, the acceleration must be (F - mu_k*N)/m.
  * ====================================================================== */
-
 /* Independent OBB overlap test. Separating axis exists iff
  *   |dot(t, n)| > rA(n) + rB(n)  for some candidate direction n.
  * Probes the 15 canonical axes plus a swept set, so a missed axis in the
@@ -704,7 +676,6 @@ int mpe_t_mass_properties (void) {
  * declared locally rather than inherited from whatever the suite header
  * happens to define. */
 #define MPE_REF_MATH_DT (1.0f / 60.0f)
-
 static float mpe_ref_proj_r (const vector3 ax[3], vector3 he, vector3 n) {
     return he.x * fabsf (vector3_dot (ax[0], n)) + he.y * fabsf (vector3_dot (ax[1], n)) +
            he.z * fabsf (vector3_dot (ax[2], n));
@@ -754,11 +725,9 @@ static int mpe_ref_obb_overlap (vector3 ca, vector4 qa, vector3 ha, vector3 cb, 
     }
     return 1;
 }
-
 int mpe_t_reference_math (void) {
     mpe_test_t t;
     mpe_test_begin (&t, "reference_math");
-
     /* ---- 1. SAT vs Gottschalk ------------------------------------- */
     {
         physics_world w;
@@ -808,7 +777,6 @@ int mpe_t_reference_math (void) {
         MPE_CHECK (&t, agree == tested);
         physics_world_cleanup (&w);
     }
-
     /* ---- 2. beta (ERP) vs Catto ----------------------------------- */
     {
         const float betas[4] = {0.0f, 0.1f, 0.3f, 0.8f};
@@ -841,7 +809,6 @@ int mpe_t_reference_math (void) {
         MPE_CHECK (&t, retained[1] > retained[2]);
         MPE_CHECK (&t, retained[2] > retained[3]);
     }
-
     /* ---- 3. Coulomb, sliding branch -------------------------------- */
     {
         const float m = 1.0f, mus = 0.6f, muk = 0.4f, G_N = 9.80665f;
@@ -878,7 +845,6 @@ int mpe_t_reference_math (void) {
             physics_world_cleanup (&w);
         }
     }
-
     if (t.failures == 0) {
         printf ("[PASS] SAT/Gottschalk, ERP/Catto and Coulomb match their references\n");
     }

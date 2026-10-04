@@ -4,7 +4,6 @@
  * debug_terminal.c without circular includes. */
 #ifndef term_priv_h
 #define term_priv_h
-
 #define _POSIX_C_SOURCE 200809L
 #include "../core/mpe_platform.h"
 #include <gtk/gtk.h>
@@ -16,14 +15,11 @@
 #include "term_posix.h" /* POSIX command-logic helpers (no libglib) */
 #include "../core/rigidbody.h"
 #include "../config/mpe_constants.h"
-
 /* alias table dimensions (storage lives in debug_terminal.c) */
 #define term_alias_max 64
 #define term_alias_name_len 64
 #define term_alias_value_len 256
-
 typedef enum { term_target_object, term_target_joint } term_target_kind;
-
 typedef struct {
     const char *name;
     bool mutates;
@@ -31,7 +27,6 @@ typedef struct {
     const char *usage;
     const char *description;
 } terminal_command;
-
 /* shell state (defined in debug_terminal.c) */
 extern GtkWidget *terminal_window;
 extern GtkWidget *terminal_output_view;
@@ -47,7 +42,6 @@ extern char term_alias_values[term_alias_max][term_alias_value_len];
 extern int term_alias_count;
 extern bool term_sudo_active;
 extern int64_t term_engine_start_time;
-
 /* output + capture + prompt (defined in debug_terminal.c) */
 void term_out (const char *text);
 void term_ok (const char *text);
@@ -60,7 +54,6 @@ void term_capture_end (void);
 void term_capture_reset (void);
 char *term_capture_get (void);
 void term_printf (const char *tag_name, const char *format, ...);
-
 /* token/target helpers (defined in debug_terminal.c) */
 bool term_str_eq (const char *string_a, const char *string_b);
 const char *term_last_path_component (const char *token);
@@ -73,7 +66,6 @@ int term_require_object (const char *token);
 int term_require_joint (const char *token);
 int term_parse_movement_destination (const char *token, float *x, float *y, float *z);
 void term_execute (char *command_line);
-
 /* object/joint model layer (defined in term_obj.c) */
 const char *term_object_type_name (rigidbody *rigid_body);
 const char *term_spawn_type_name (void);
@@ -94,11 +86,9 @@ int term_duplicate_object (int source_index);
 void term_set_object_mass (int object_index, float new_mass);
 void term_set_object_static (int object_index, bool make_static);
 bool term_mode_is_static (const char *mode_text);
-
 /* dispatch table (defined in debug_terminal.c; read by help/man) */
 extern const terminal_command terminal_commands[];
 extern const size_t terminal_command_count;
-
 /* command handlers (defined in term_*.c) */
 void cmd_help (int argc, char **argv);
 void cmd_man (int argc, char **argv);
@@ -184,5 +174,4 @@ void cmd_mod (int argc, char **argv);
 void cmd_modinfo (int argc, char **argv);
 void cmd_eco (int argc, char **argv);
 void cmd_ftc (int argc, char **argv);
-
 #endif /* term_priv_h */

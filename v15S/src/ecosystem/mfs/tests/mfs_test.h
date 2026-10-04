@@ -17,10 +17,8 @@
  *   - NaN watchdog on every step; determinism counters asserted zero.
  *   - Free-spin rig lifts WHOLE robot (chassis + wheels + rollers).
  */
-
 #ifndef mfs_test_h
 #define mfs_test_h
-
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -35,7 +33,6 @@
 #include "modules/ftc/submodules/drivetrain.h"
 #include "modules/ftc/submodules/motor_presets.h"
 #include "modules/ftc/submodules/battery.h"
-
 /* ------------------------------------------------------------------ */
 /* Test context: failure counting + config isolation.                  */
 /* ------------------------------------------------------------------ */
@@ -46,7 +43,6 @@ typedef struct {
     mpe_config_t cfg_saved;
     int cfg_active;
 } mfs_test_t;
-
 static inline void mfs_test_begin (mfs_test_t *t, const char *name) {
     t->name = name;
     t->failures = 0;
@@ -55,7 +51,6 @@ static inline void mfs_test_begin (mfs_test_t *t, const char *name) {
     t->cfg_active = 1;
     det_fallback_reset ();
 }
-
 static inline void mfs_test_end (mfs_test_t *t) {
     if (t->cfg_active) {
         g_cfg = t->cfg_saved;
@@ -75,7 +70,6 @@ static inline void mfs_test_end (mfs_test_t *t) {
         }
     }
 }
-
 #define MFS_CHECK(t, cond)                                                                                             \
     do {                                                                                                               \
         (t)->checks++;                                                                                                 \
@@ -84,7 +78,6 @@ static inline void mfs_test_end (mfs_test_t *t) {
             printf ("[FAIL] %s:%d: %s\n", __FILE__, __LINE__, #cond);                                                  \
         }                                                                                                              \
     } while (0)
-
 #define MFS_CHECK_NEAR(t, actual, expected, tol, label)                                                                \
     do {                                                                                                               \
         (t)->checks++;                                                                                                 \
@@ -97,7 +90,6 @@ static inline void mfs_test_end (mfs_test_t *t) {
                     (double) (tol));                                                                                   \
         }                                                                                                              \
     } while (0)
-
 #define MFS_CHECK_REL(t, actual, expected, reltol, label)                                                              \
     do {                                                                                                               \
         (t)->checks++;                                                                                                 \
@@ -111,18 +103,15 @@ static inline void mfs_test_end (mfs_test_t *t) {
                     (double) (reltol));                                                                                \
         }                                                                                                              \
     } while (0)
-
 #define MFS_INFO(...)                                                                                                  \
     do {                                                                                                               \
         printf ("[info] ");                                                                                            \
         printf (__VA_ARGS__);                                                                                          \
         printf ("\n");                                                                                                 \
     } while (0)
-
 /* ------------------------------------------------------------------ */
 /* World setup helpers.                                                */
 /* ------------------------------------------------------------------ */
-
 static inline void mfs_test_world (physics_world *w) {
     mpe_config_init ();
     g_cfg.timestep.solver_iterations = 128;
@@ -136,7 +125,6 @@ static inline void mfs_test_world (physics_world *w) {
         w->bodies[f].restitution = 0.0f;
     }
 }
-
 /* Floor slab only (no config touch): for subtests that manage their own
  * envelope (physics_truth FTC_ITERS macros). Top y=0, e matched by caller
  * (contact restitution is min-combined). */
@@ -149,7 +137,6 @@ static inline int mfs_test_floor_e (physics_world *w, float mus, float muk, floa
     w->bodies[f].restitution = e;
     return f;
 }
-
 static inline int mfs_test_finite (physics_world *w) {
     for (int i = 0; i < w->body_count; i++) {
         rigidbody *rb = &w->bodies[i];
@@ -169,7 +156,6 @@ static inline int mfs_test_finite (physics_world *w) {
     }
     return 1;
 }
-
 /* DESPOT-2026-09-28 (programming: direct w.bodies[chassis_body] with no
  * bounds check — OOB read if chassis_body == -1). Single checked accessor;
  * NULL means unset-or-gone, uniformly. */
@@ -181,7 +167,6 @@ static inline rigidbody *mfs_chassis_or_null (physics_world *w, ftc_robot *robot
         return NULL;
     return &w->bodies[idx];
 }
-
 static inline int mfs_step (physics_world *w, int n, float dt) {
     for (int t = 0; t < n; t++) {
         physics_world_step (w, dt);
@@ -192,7 +177,6 @@ static inline int mfs_step (physics_world *w, int n, float dt) {
     }
     return 1;
 }
-
 /* Lift WHOLE robot (chassis + wheels + rollers) to true free-spin height.
  * Fixes the old rig bug where only chassis was lifted, winching wheels up
  * through pendulum chaos. */
@@ -228,7 +212,6 @@ static inline void mfs_lift_whole_robot (physics_world *w, ftc_robot *robot, con
         motor_reset_observer (&robot->wheel_motors[wi_idx]);
     }
 }
-
 /* Lift robot to true free-spin height (1.9m above floor). */
 static inline void mfs_lift_robot_for_free_spin (physics_world *w, ftc_robot *robot) {
     const vector3 lift = {0.0f, 1.9f, 0.0f};
@@ -239,7 +222,6 @@ static inline void mfs_lift_robot_for_free_spin (physics_world *w, ftc_robot *ro
     rigidbody_set_kinematic (chassis, true);
     chassis->velocity = vector3_zero ();
 }
-
 /* Common robot creation with guaranteed floor. */
 static inline ftc_robot *mfs_create_robot (physics_world *w, float x, float y, float z, motor_preset_id preset,
                                            ftc_drivetrain_type dtype) {
@@ -253,23 +235,18 @@ static inline ftc_robot *mfs_create_robot (physics_world *w, float x, float y, f
     }
     return robot;
 }
-
 /* Drive helpers. */
 static inline void mfs_drive_tank (ftc_robot *robot, float left, float right) {
     drivetrain_tank (robot, left, right);
 }
-
 static inline void mfs_drive_mecanum (ftc_robot *robot, float fwd, float strafe, float rotate) {
     drivetrain_mecanum (robot, fwd, strafe, rotate);
 }
-
 static inline void mfs_drive_stop (ftc_robot *robot) {
     float z[4] = {0, 0, 0, 0};
     ftc_robot_set_wheel_commands (robot, z, 4);
 }
-
 static inline void mfs_get_pos (physics_world *w, ftc_robot *robot, float *x, float *y, float *z) {
     ftc_robot_get_position (w, robot, x, y, z);
 }
-
 #endif /* mfs_test_h */

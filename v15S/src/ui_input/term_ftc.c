@@ -33,19 +33,16 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-
 /* Bundle identity for symbol resolution (ecosystem name registered by
  * the loader; falls back to the module .so path scheme). */
 #define FTC_HANDLE_PRIMARY "mfs-simulator"
 #define FTC_HANDLE_MODULE "plugins/mpe_ftc.so"
-
 static void *ftc_sym (const char *sym) {
     void *p = mpe_loader_symbol (FTC_HANDLE_PRIMARY, sym);
     if (p)
         return p;
     return mpe_loader_symbol (FTC_HANDLE_MODULE, sym);
 }
-
 static float ftc_argf (char **argv, int i, int argc, float dflt) {
     if (i < argc && argv[i]) {
         char *end = NULL;
@@ -55,7 +52,6 @@ static float ftc_argf (char **argv, int i, int argc, float dflt) {
     }
     return dflt;
 }
-
 /* Tile floor guarantee: robots need frictional contact (the frictionless
  * emergency backstop yields slip-regime artifacts). Adds a 60x60 tile
  * slab (top y=0, mu 1.0/0.8) only when no static floor-like body already
@@ -86,7 +82,6 @@ static int ftc_ensure_floor (physics_world *w) {
     term_out ("mpe: ftc: tile floor added (robots need frictional contact)\n");
     return 1;
 }
-
 /* Ensure the ftc-fleet tick module drives the primary world (idempotent).
  * Returns 0 when driving, -1 when the bundle is missing. Engine APIs
  * (registry, attach) are called directly — this TU links into the
@@ -117,7 +112,6 @@ static int ftc_ensure_driving (void) {
     }
     return 0;
 }
-
 /* Iteration guarantee: the 40:1 chassis/wheel stacked mass ratio cannot
  * converge below 128 sequential-impulse iterations (every MFS test pins
  * 128; the MFS suite documents that default 64 cannot converge it). A
@@ -130,19 +124,16 @@ static void ftc_ensure_iterations (void) {
         term_out ("mpe: ftc: solver iterations raised to 128 (robot joints need it; was lower)\n");
     }
 }
-
 void cmd_ftc (int argc, char **argv) {
     if (argc < 2) {
         term_err ("mpe: ftc: usage: ftc spawn [x y z] | telemetry\n");
         return;
     }
     physics_world *w = physics_world_get_primary ();
-
     /* Single-robot accessors (index 0 implied; bundle API keeps indices). */
     ftc_robot *(*p_get) (struct physics_world *, int) =
         (ftc_robot * (*) (struct physics_world *, int) ) ftc_sym ("ftc_fleet_get");
     int (*p_count) (struct physics_world *) = (int (*) (struct physics_world *)) ftc_sym ("ftc_fleet_count");
-
     if (term_str_eq (argv[1], "spawn")) {
         if (ftc_ensure_driving () != 0)
             return;
@@ -191,7 +182,6 @@ void cmd_ftc (int argc, char **argv) {
         term_ok (buf);
         return;
     }
-
     if (term_str_eq (argv[1], "telemetry")) {
         if (!p_get) {
             term_err ("mpe: ftc: bundle not loaded\n");
@@ -229,6 +219,5 @@ void cmd_ftc (int argc, char **argv) {
         }
         return;
     }
-
     term_err ("mpe: ftc: unknown subcommand (spawn|telemetry)\n");
 }

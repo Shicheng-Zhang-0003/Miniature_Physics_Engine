@@ -11,7 +11,6 @@
  */
 #ifndef mpe_platform_h
 #define mpe_platform_h
-
 /* ------------------------------------------------------------------ */
 /* 1. OS / compiler detection                                          */
 /* ------------------------------------------------------------------ */
@@ -24,7 +23,6 @@
 #define MPE_OS_POSIX 1
 #endif
 #endif
-
 #if defined(_MSC_VER)
 #define MPE_COMPILER_MSVC 1
 #endif
@@ -40,13 +38,11 @@
 #if defined(__GNUC__) || defined(__clang__)
 #define MPE_HAS_GNUC_ATTR 1
 #endif
-
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
 #ifdef MPE_OS_WINDOWS
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -76,7 +72,6 @@
 #define PATH_MAX 4096
 #endif
 #endif
-
 /* ------------------------------------------------------------------ */
 /* 2. Plugin / executable extensions, path separators                  */
 /* ------------------------------------------------------------------ */
@@ -93,7 +88,6 @@
 #define MPE_PATH_SEP '/'
 #define MPE_PATH_SEP_STR "/"
 #endif
-
 /* True if c is a path separator on this platform (Windows accepts both). */
 static inline int mpe_is_path_sep (char c) {
 #ifdef MPE_OS_WINDOWS
@@ -102,7 +96,6 @@ static inline int mpe_is_path_sep (char c) {
     return c == '/';
 #endif
 }
-
 /* ------------------------------------------------------------------ */
 /* 3. Symbol visibility / attribute macros (Linux unchanged)           */
 /* ------------------------------------------------------------------ */
@@ -121,7 +114,6 @@ static inline int mpe_is_path_sep (char c) {
 #define MPE_DTOR
 #define MPE_WEAK_SUPPORTED 0
 #endif
-
 #ifdef MPE_OS_WINDOWS
 #ifdef MPE_BUILDING_DLL
 #define MPE_EXPORT __declspec (dllexport)
@@ -137,7 +129,6 @@ static inline int mpe_is_path_sep (char c) {
 #endif
 #define MPE_IMPORT
 #endif
-
 /* ------------------------------------------------------------------ */
 /* 4. Threading: pthread.h on POSIX + MinGW, shim on MSVC              */
 /* ------------------------------------------------------------------ */
@@ -183,7 +174,6 @@ static BOOL CALLBACK mpe_once_cb (PINIT_ONCE o, PVOID p, PVOID *c) {
 #else
 #include <pthread.h>
 #endif
-
 /* Portable wrappers usable from new code (both POSIX and Windows). */
 typedef pthread_mutex_t mpe_mutex_t;
 typedef pthread_cond_t mpe_cond_t;
@@ -195,7 +185,6 @@ static inline void mpe_mutex_lock (mpe_mutex_t *m) {
 static inline void mpe_mutex_unlock (mpe_mutex_t *m) {
     pthread_mutex_unlock (m);
 }
-
 /* ------------------------------------------------------------------ */
 /* 5. Dynamic loading: dlfcn.h on POSIX, Win32 shim on Windows         */
 /* ------------------------------------------------------------------ */
@@ -310,7 +299,6 @@ static inline int mpe_win_dladdr (const void *addr, Dl_info *info) {
 #define dladdr mpe_win_dladdr
 #endif /* _MPE_DLFCN_SHIM_DEFINED */
 #endif /* MPE_OS_WINDOWS */
-
 /* ------------------------------------------------------------------ */
 /* 6. POSIX file/time/string shims for Windows (Linux: pass-through)   */
 /* ------------------------------------------------------------------ */
@@ -368,7 +356,6 @@ static inline int mpe_win_dladdr (const void *addr, Dl_info *info) {
 #ifndef S_IRWXU
 #define S_IRWXU 0700
 #endif
-
 /* mkdir(path, mode): POSIX takes mode, Win32 _mkdir takes 1 arg. */
 static inline int mpe_mkdir (const char *path,
 #ifdef _MSC_VER
@@ -389,7 +376,6 @@ static inline int mpe_mkdir (const char *path,
 #undef mkdir
 #endif
 #define mkdir(path, mode) mpe_mkdir ((path), (mode))
-
 /* fsync: flush OS buffers. _commit on MSVC/MinGW. */
 static inline int mpe_fsync (int fd) {
 #ifdef _MSC_VER
@@ -403,7 +389,6 @@ static inline int mpe_fsync (int fd) {
 #undef fsync
 #endif
 #define fsync(fd) mpe_fsync (fd)
-
 /* access: map to _access. */
 static inline int mpe_access (const char *p, int mode) {
     return _access (p, mode);
@@ -412,7 +397,6 @@ static inline int mpe_access (const char *p, int mode) {
 #undef access
 #endif
 #define access(p, m) mpe_access ((p), (m))
-
 /* MSVC POSIX names -> underscore variants. MinGW already provides both. */
 #ifdef _MSC_VER
 #ifndef _O_RDONLY
@@ -436,7 +420,6 @@ static inline int mpe_access (const char *p, int mode) {
 #define rmdir _rmdir
 #define strdup _strdup
 #endif
-
 /* getpid / isatty / fileno / fdopen / fchmod / mkstemp / realpath */
 static inline int mpe_getpid (void) {
     return (int) _getpid ();
@@ -445,7 +428,6 @@ static inline int mpe_getpid (void) {
 #undef getpid
 #endif
 #define getpid() mpe_getpid ()
-
 static inline int mpe_isatty (int fd) {
     return _isatty (fd);
 }
@@ -453,7 +435,6 @@ static inline int mpe_isatty (int fd) {
 #undef isatty
 #endif
 #define isatty(fd) mpe_isatty (fd)
-
 static inline int mpe_fchmod (int fd, int mode) {
     (void) fd;
     (void) mode;
@@ -465,7 +446,6 @@ static inline int mpe_fchmod (int fd, int mode) {
 #undef fchmod
 #endif
 #define fchmod(fd, mode) mpe_fchmod ((fd), (mode))
-
 /* mkstemp: Windows _mktemp_s + _open based emulation. Template must end
  * in XXXXXX (same contract as POSIX). Returns open fd, template replaced
  * with actual path. */
@@ -496,7 +476,6 @@ static inline int mpe_mkstemp (char *tmpl) {
 #undef mkstemp
 #endif
 #define mkstemp(t) mpe_mkstemp (t)
-
 /* realpath: GetFullPathNameA based. resolved==NULL => malloc'd (POSIX). */
 static inline char *mpe_realpath (const char *path, char *resolved) {
     char tmp[PATH_MAX * 2];
@@ -530,7 +509,6 @@ static inline char *mpe_realpath (const char *path, char *resolved) {
 #undef realpath
 #endif
 #define realpath(p, r) mpe_realpath ((p), (r))
-
 /* localtime_r: localtime_s on Windows. */
 static inline struct tm *mpe_localtime_r (const time_t *t, struct tm *out) {
     if (!t || !out) {
@@ -545,7 +523,6 @@ static inline struct tm *mpe_localtime_r (const time_t *t, struct tm *out) {
 #undef localtime_r
 #endif
 #define localtime_r(t, o) mpe_localtime_r ((t), (o))
-
 /* strcasecmp / strncasecmp -> _stricmp / _strnicmp */
 static inline int mpe_strcasecmp (const char *a, const char *b) {
     return _stricmp (a, b);
@@ -561,7 +538,6 @@ static inline int mpe_strncasecmp (const char *a, const char *b, size_t n) {
 #undef strncasecmp
 #endif
 #define strncasecmp(a, b, n) mpe_strncasecmp ((a), (b), (n))
-
 /* strdup always exists on MinGW/MSVC (_strdup); strndup may not. */
 static inline char *mpe_strndup (const char *s, size_t n) {
     size_t len = 0;
@@ -581,7 +557,6 @@ static inline char *mpe_strndup (const char *s, size_t n) {
 #undef strndup
 #endif
 #define strndup(s, n) mpe_strndup ((s), (n))
-
 /* clock_gettime fallback via QueryPerformanceCounter. */
 #ifndef CLOCK_MONOTONIC
 #define CLOCK_MONOTONIC 1
@@ -631,14 +606,12 @@ static inline int mpe_clock_gettime (int clk, struct timespec *ts) {
 #undef clock_gettime
 #endif
 #define clock_gettime(c, t) mpe_clock_gettime ((c), (t))
-
 /* open/openat wrappers: O_* extras are 0 on Windows (no-op). openat and
  * renameat/unlinkat have no Win32 equivalent; provide path-join fallback
  * for the single status/ jail use-case. See term_admin.c Windows branch. */
 #ifndef AT_FDCWD
 #define AT_FDCWD (-100)
 #endif
-
 /* getenv HOME fallback: also consult USERPROFILE (native Windows). */
 static inline const char *mpe_home_dir (void) {
     const char *h = getenv ("HOME");
@@ -649,7 +622,6 @@ static inline const char *mpe_home_dir (void) {
         return h;
     return NULL;
 }
-
 #else /* POSIX: nothing to shim (headers come from system) */
 #include <unistd.h>
 static inline const char *mpe_home_dir (void) {
@@ -657,7 +629,6 @@ static inline const char *mpe_home_dir (void) {
     return (h && *h) ? h : NULL;
 }
 #endif /* MPE_OS_WINDOWS */
-
 /* ------------------------------------------------------------------ */
 /* 7. Portable sleep / directory helpers                               */
 /* ------------------------------------------------------------------ */
@@ -689,5 +660,4 @@ static inline int mpe_mkdir_p (const char *path) {
     return 0; /* shell mkdir -p used by make/scripts on POSIX */
 #endif
 }
-
 #endif /* mpe_platform_h */

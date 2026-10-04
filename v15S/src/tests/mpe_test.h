@@ -23,7 +23,6 @@
  */
 #ifndef mpe_test_h
 #define mpe_test_h
-
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -32,7 +31,6 @@
 #include "physics/constraint.h"
 #include "config/mpe_config.h"
 #include "core/det_math.h"
-
 /* ------------------------------------------------------------------ */
 /* Test context: failure counting + config isolation.                  */
 /* ------------------------------------------------------------------ */
@@ -44,7 +42,6 @@ typedef struct {
     int cfg_active;
     const char *regime;
 } mpe_test_t;
-
 /* DESPOT-2026-09-29 -- THE HARNESS CONTRACT.
  *
  * The single worst bug of this audit was not a physics bug: for the entire
@@ -64,7 +61,6 @@ typedef struct {
  *      measurement below it is fiction, and the suite must say so loudly
  *      instead of reporting a confident green.
  */
-
 /* Non-degenerate config = a config with a working solver in it. These are the
  * fields whose zero value silently disables physics rather than failing. */
 static inline int mpe_cfg_is_degenerate (const mpe_config_t *c) {
@@ -72,7 +68,6 @@ static inline int mpe_cfg_is_degenerate (const mpe_config_t *c) {
            !(c->solver.bias_factor > 0.0f) || !(c->timestep.max_substeps >= 1) ||
            !(c->body_defaults.sphere_restitution > 0.0f) || !(c->body_defaults.sphere_fric_s > 0.0f);
 }
-
 /* Apply a named regime. Regimes exist so the suite can be run across a spread
  * of configurations: a physics invariant that holds at one setting and not
  * another is a bug that a single golden number cannot see. The defaults are
@@ -86,7 +81,6 @@ typedef struct {
     float restitution; /* <0 = leave alone */
     int sleep; /* -1 = leave alone */
 } mpe_regime_t;
-
 static inline const mpe_regime_t *mpe_regime_lookup (const char *name) {
     static const mpe_regime_t regimes[] = {
         {"default", -1, 1.00f, 1.00f, -1.0f, -1}, {"light", 8, 0.25f, 0.50f, 0.10f, 0},
@@ -102,7 +96,6 @@ static inline const mpe_regime_t *mpe_regime_lookup (const char *name) {
     }
     return NULL; /* unknown regime: caller must fail loudly */
 }
-
 static inline int mpe_regime_apply (const mpe_regime_t *r) {
     if (!r)
         return 0;
@@ -125,7 +118,6 @@ static inline int mpe_regime_apply (const mpe_regime_t *r) {
         g_cfg.sleep.enable = r->sleep;
     return 1;
 }
-
 static inline void mpe_test_begin (mpe_test_t *t, const char *name) {
     t->name = name;
     t->failures = 0;
@@ -146,7 +138,6 @@ static inline void mpe_test_begin (mpe_test_t *t, const char *name) {
     t->cfg_active = 1;
     det_fallback_reset ();
 }
-
 /* DESPOT-2026-09-29: the header claimed "determinism counters asserted zero"
  * and mpe_test_end did not assert them -- only 1 of 32 tests did, by hand. A
  * libm fallback inside a test is a silent cross-platform determinism escape,
@@ -154,7 +145,6 @@ static inline void mpe_test_begin (mpe_test_t *t, const char *name) {
 static inline int mpe_det_fallbacks_used (void) {
     return (int) (det_fallback_pow_total () + det_fallback_trig_total ());
 }
-
 static inline void mpe_test_end (mpe_test_t *t) {
     if (t->cfg_active) {
         if (mpe_det_fallbacks_used () != 0) {
@@ -168,7 +158,6 @@ static inline void mpe_test_end (mpe_test_t *t) {
         t->cfg_active = 0;
     }
 }
-
 /* Return value for a case that could not run. Distinct from any possible
  * failure count (which is >= 0), so a test with failing checks can never be
  * mistaken for a skip.
@@ -179,7 +168,6 @@ static inline void mpe_test_end (mpe_test_t *t) {
  * heavy incline_accel/list4 all vanished into SKIP). -1 is unreachable by
  * counting failures, closing the collision. */
 #define MPE_SKIPPED (-1)
-
 #define MPE_CHECK(t, cond)                                                                                             \
     do {                                                                                                               \
         (t)->checks++;                                                                                                 \
@@ -188,7 +176,6 @@ static inline void mpe_test_end (mpe_test_t *t) {
             printf ("[FAIL] %s:%d: %s\n", __FILE__, __LINE__, #cond);                                                  \
         }                                                                                                              \
     } while (0)
-
 #define MPE_CHECK_NEAR(t, actual, expected, tol, label)                                                                \
     do {                                                                                                               \
         (t)->checks++;                                                                                                 \
@@ -201,7 +188,6 @@ static inline void mpe_test_end (mpe_test_t *t) {
                     (double) (tol));                                                                                   \
         }                                                                                                              \
     } while (0)
-
 #define MPE_CHECK_REL(t, actual, expected, reltol, label)                                                              \
     do {                                                                                                               \
         (t)->checks++;                                                                                                 \
@@ -215,14 +201,12 @@ static inline void mpe_test_end (mpe_test_t *t) {
                     (double) (reltol));                                                                                \
         }                                                                                                              \
     } while (0)
-
 #define MPE_INFO(...)                                                                                                  \
     do {                                                                                                               \
         printf ("[info] ");                                                                                            \
         printf (__VA_ARGS__);                                                                                          \
         printf ("\n");                                                                                                 \
     } while (0)
-
 /* ------------------------------------------------------------------ */
 /* World setup helpers.                                                */
 /* ------------------------------------------------------------------ */
@@ -230,7 +214,6 @@ static inline void mpe_world_begin (physics_world *w) {
     physics_world_init (w);
     constraint_pool_init (w);
 }
-
 static inline int mpe_world_finite (physics_world *w) {
     for (int i = 0; i < w->body_count; i++) {
         rigidbody *b = &w->bodies[i];
@@ -249,7 +232,6 @@ static inline int mpe_world_finite (physics_world *w) {
     }
     return 1;
 }
-
 /* Step n ticks; returns 0 if any NaN/Inf appears (prints tick). */
 static inline int mpe_step (physics_world *w, int n, float dt) {
     for (int t = 0; t < n; t++) {
@@ -261,7 +243,6 @@ static inline int mpe_step (physics_world *w, int n, float dt) {
     }
     return 1;
 }
-
 /* Explicit mass-0 floor slab, top surface exactly y=0, with matched
  * Coulomb friction and restitution. Preferred floor: a true manifold
  * with per-body material combine (this is what friction_stop,
@@ -276,7 +257,6 @@ static inline int mpe_floor_slab (physics_world *w, float mus, float muk, float 
     w->bodies[f].restitution = e;
     return f;
 }
-
 /* Infinite solver plane at y=0 with synced friction. The plane body reads
  * step_cfg->world.floor_friction_* every tick, so sync the globals AND the
  * cached body copy (covers worlds initialised before the sync). */
@@ -287,7 +267,6 @@ static inline void mpe_floor_plane (physics_world *w, float mus, float muk) {
     w->static_plane_body.friction_static = mus;
     w->static_plane_body.friction_kinetic = muk;
 }
-
 /* DESPOT-2026-10-04 [CLAMP-TAUTOLOGY closure]: bind a per-world config copy
  * with the world-edge safety net OFF. With the net on, a rest-height gate is
  * satisfiable by the emergency clamp alone (a no-op solver still reports
@@ -300,15 +279,12 @@ static inline void mpe_world_no_net (physics_world *w, mpe_config_t *slot) {
     slot->boundary.safety_net_enabled = 0;
     physics_world_set_config (w, slot);
 }
-
 /* Contact evidence: world.has_contact[i] flags bodies that generated a
  * manifold on the CURRENT tick. A clamp-held body never flags. */
 static inline int mpe_body_in_contact (const physics_world *w, int idx) {
     return (w && w->has_contact && idx >= 0 && idx < w->body_count) ? (w->has_contact[idx] != 0) : 0;
 }
-
 static inline float mpe_vlen (vector3 v) {
     return vector3_length (v);
 }
-
 #endif /* mpe_test_h */

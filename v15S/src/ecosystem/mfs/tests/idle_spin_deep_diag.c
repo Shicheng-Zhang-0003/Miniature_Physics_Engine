@@ -1,4 +1,3 @@
-
 #ifdef MFS_IDLE_DEEP_DIAG
 #include <stdio.h>
 #include <math.h>
@@ -8,43 +7,34 @@
 #include "config/mpe_config.h"
 #include "modules/ftc/submodules/robot.h"
 #include "modules/ftc/submodules/drivetrain.h"
-
 static const float DT = 1.0f / 60.0f;
-
 static float axle_omega (physics_world *world, int wi) {
     rigidbody *wheel = &world->bodies[wi];
     vector3 axle = vector4_rotate_to_vector3 (wheel->orientation, (vector3){1.0f, 0.0f, 0.0f});
     return vector3_dot (wheel->angular_velocity, axle);
 }
-
 int main (void) {
     mpe_config_init ();
     /* MFS_PORT_V15S: robot worlds need 128 iterations (40:1 chassis/wheel
      * mass ratio; see teleop_drive_test.c). */
     g_cfg.timestep.solver_iterations = 128;
     printf ("\n=== IDLE SPIN DEEP DIAGNOSTIC ===\n");
-
     physics_world world;
     physics_world_init (&world);
     constraint_pool_init (&world);
-
     physics_world_add_cube (&world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
-
     ftc_robot robot;
     if (ftc_robot_create (&world, &robot, 0.0f, ftc_robot_rest_height (), 0.0f, MOTOR_GB_5203_26_9) != 0) {
         printf ("[FAIL] robot create\n");
         return 1;
     }
-
     float zero[4] = {0.0f, 0.0f, 0.0f, 0.0f};
     ftc_robot_set_wheel_commands (&robot, zero, 4);
-
     /* settle */
     for (int i = 0; i < 120; i++) {
         drivetrain_update (&world, &robot, DT);
         physics_world_step (&world, DT);
     }
-
     printf ("after 120-frame settle, per wheel:\n");
     printf ("  %-6s %-7s %-8s %-11s %-10s %-11s\n", "wheel", "asleep", "cmd", "out_torque", "current", "axle_omega");
     for (int w = 0; w < robot.wheel_count; w++) {
@@ -54,7 +44,6 @@ int main (void) {
                 robot.wheel_motors[w].command, robot.wheel_motors[w].output_torque, robot.wheel_motors[w].current,
                 axle_omega (&world, wi));
     }
-
     /* single-step delta */
     float before[4];
     for (int w = 0; w < robot.wheel_count; w++)
@@ -66,11 +55,9 @@ int main (void) {
         float after = axle_omega (&world, robot.wheel_bodies[w]);
         printf ("  wheel[%d]: %.3f -> %.3f  (delta=%+.4f)\n", w, before[w], after, after - before[w]);
     }
-
     rigidbody *ch = &world.bodies[robot.chassis_body];
     printf ("chassis: asleep=%d lin_speed=%.4f ang_vel_y=%.4f\n", (int) ch->is_sleeping,
             sqrtf (ch->velocity.x * ch->velocity.x + ch->velocity.z * ch->velocity.z), ch->angular_velocity.y);
-
     /* verdict */
     int any_asleep = 0, all_asleep = 1;
     for (int w = 0; w < robot.wheel_count; w++) {
@@ -87,7 +74,6 @@ int main (void) {
         printf ("SOME wheels asleep -> partial sleep bug\n");
     else
         printf ("wheels AWAKE -> check single-step delta to see if braking lands\n");
-
     physics_world_cleanup (&world);
     return 0;
 }

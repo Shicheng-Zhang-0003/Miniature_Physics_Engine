@@ -4,7 +4,6 @@
 * Owns: scene menu key handling, editor menu update, config menu update.
 */
 #include "../mpe_engine.h"
-
 void simulation_menu_dispatch (GtkWidget *parent_window) {
     /* Scene menu: 9 key bindings. All failures are reported via event_log
      * (visible in terminal dmesg) and stdout so save/load never fails
@@ -69,7 +68,6 @@ void simulation_menu_dispatch (GtkWidget *parent_window) {
             g_application_quit (app);
         }
     }
-
     editor_update_menus (parent_window);
     config_menu_update (parent_window);
 }

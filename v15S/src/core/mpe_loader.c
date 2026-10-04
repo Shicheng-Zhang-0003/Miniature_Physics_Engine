@@ -11,7 +11,6 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <sys/stat.h>
-
 #define MPE_MAX_HANDLES 32
 static struct {
     void *h;
@@ -24,7 +23,6 @@ static struct {
     long long f_size; /* must NOT silently keep stale code (despot trap) */
 } s_h[MPE_MAX_HANDLES];
 static int s_n = 0;
-
 /* Jail: plugins/<name>.so|.dll for modules, ecosystem/mfs/<name>.so|.dll
  * for ecosystem bundles (both CWD-relative, normally v15S/src). Same
  * traversal-proofing in both roots. Windows accepts '/' and '\\', both
@@ -64,7 +62,6 @@ static int file_identity (const char *path, long long *mt, long long *sz) {
         *sz = (long long) st.st_size;
     return 0;
 }
-
 /* Loader-table lock: serialises every s_h[]/s_n read and mutation plus the
  * attachments accounting (retain/release run on step-adjacent threads while
  * unload runs at the tick boundary). Recursive: detach paths call back into
@@ -91,7 +88,6 @@ static inline void loader_lock (void) {
 static inline void loader_unlock (void) {
     pthread_mutex_unlock (&s_loader_lock);
 }
-
 /* Jail: plugins/<name>.so for modules, ecosystem/mfs/<name>.so for
  * ecosystem bundles (both CWD-relative, normally v15S/src). Same
  * traversal-proofing in both roots. */
@@ -143,7 +139,6 @@ static int plugin_path_is_confined (const char *path, char resolved[PATH_MAX]) {
     size_t root_len = strlen (root);
     return strncmp (resolved, root, root_len) == 0 && resolved[root_len] == '/';
 }
-
 int mpe_loader_load (const char *path, char *errbuf, int errlen) {
     if (!path || !*path) {
         if (errbuf && errlen > 0)
@@ -372,7 +367,6 @@ int mpe_loader_load (const char *path, char *errbuf, int errlen) {
     mpe_registry_truncate_solvers (snap_solvers);
     return -1;
 }
-
 /* Path equality: exact match or realpath-canonicalised match ONLY.
  * DESPOT-2026-10-01: the old basename fallback made different dirs with the
  * same filename compare equal, so unload/detach/handle_for_desc could tear
@@ -398,7 +392,6 @@ static int same_path (const char *a, const char *b) {
     return 0;
 #endif
 }
-
 static int handle_by_path_locked (const char *path) {
     for (int i = 0; i < s_n; i++) {
         if (same_path (s_h[i].path, path))
@@ -406,10 +399,8 @@ static int handle_by_path_locked (const char *path) {
     }
     return -1;
 }
-
 /* NOTE: every *_locked helper below requires s_loader_lock held. Public
  * entry points take it; unload-time sweeps already hold it throughout. */
-
 /* Which loaded handle owns this desc? Registry-slot origin first (exact
  * for registry copies handed out by find), else the desc's own image.
  * -1 = static/host code that never unloads. */
@@ -428,7 +419,6 @@ static int handle_for_desc_locked (const mpe_module_desc_t *d) {
     }
     return -1;
 }
-
 /* Validated stage_detach read: the hook is an append-only tail field, so a
  * .so built against the older header has no such pointer and the word past
  * its struct is unowned image data. Read exactly one function pointer
@@ -461,7 +451,6 @@ static void call_stage_detach_validated (const mpe_module_desc_t *desc, const ch
         return; /* foreign/garbage: refuse */
     hook (w);
 }
-
 /* Code-address variant (locked): stage slots keep the iface, not the desc. */
 static void call_stage_detach_for_fn_locked (const void *fn, physics_world *w) {
     if (!fn || !w)
@@ -474,7 +463,6 @@ static void call_stage_detach_for_fn_locked (const void *fn, physics_world *w) {
         return;
     call_stage_detach_validated (s_h[hi].desc, s_h[hi].path, w);
 }
-
 void mpe_loader_call_stage_detach (const void *desc, struct physics_world *world) {
     if (!desc || !world)
         return;
@@ -489,7 +477,6 @@ void mpe_loader_call_stage_detach (const void *desc, struct physics_world *world
     call_stage_detach_validated (d, (hi >= 0) ? s_h[hi].path : NULL, world);
     loader_unlock ();
 }
-
 void mpe_loader_call_stage_detach_for_fn (const void *fn, struct physics_world *world) {
     if (!fn || !world)
         return;
@@ -497,7 +484,6 @@ void mpe_loader_call_stage_detach_for_fn (const void *fn, struct physics_world *
     call_stage_detach_for_fn_locked (fn, world);
     loader_unlock ();
 }
-
 /* True when fn's code lives inside the plugin at path `resolved`.
  * Well-behaved plugins self-unregister in their destructor; this is the
  * backstop for the rest. dli_fname may be relative — resolve it when
@@ -536,7 +522,6 @@ static int fn_in_plugin (mpe_collide_fn fn, const char *resolved) {
     return strcmp (a, b) == 0;
 #endif
 }
-
 /* Does any live world reference this handle's code? Tick attachments by
  * owning handle (origin-aware: a static same-named desc does NOT pin the
  * .so), stage hooks by code address, plus the retain counter.
@@ -562,7 +547,6 @@ static int desc_busy_in_world (physics_world *w, int hi) {
     }
     return 0;
 }
-
 static int handle_busy (int hi) {
     if (s_h[hi].attachments > 0)
         return 1; /* locked caller (unload) */
@@ -574,7 +558,6 @@ static int handle_busy (int hi) {
     }
     return 0;
 }
-
 /* Detach only tick modules owned by this handle (origin-aware: static
  * same-named attachments are left alone). Hooks run pre-dlclose.
  * Requires s_loader_lock. */
@@ -620,7 +603,6 @@ static void detach_handle_modules (int hi) {
         }
     }
 }
-
 /* Purge pair handlers whose code lives in this .so (backstop for plugins
  * without a destructor; capsule-style destructors run first via dlclose
  * ordering — purge runs BEFORE dlclose so dladdr still resolves). */
@@ -644,7 +626,6 @@ static void purge_plugin_pairs (int hi) {
             break;
     }
 }
-
 int mpe_loader_unload (const char *path_or_name) {
     if (!path_or_name)
         return -1;
@@ -764,7 +745,6 @@ int mpe_loader_unload (const char *path_or_name) {
     loader_unlock ();
     return -1;
 }
-
 int mpe_loader_count (void) {
     loader_lock ();
     int n = s_n;
@@ -789,7 +769,6 @@ const char *mpe_loader_path_at (int i) {
     loader_unlock ();
     return out;
 }
-
 const char *mpe_loader_name_at (int i) {
     /* Same snapshot discipline as path_at (see above). */
     static char snaps[4][128];
@@ -812,7 +791,6 @@ const char *mpe_loader_name_at (int i) {
     loader_unlock ();
     return out;
 }
-
 /* Resolve a symbol from a loaded handle (by path, module name, or
  * ecosystem name) without taking a new reference. Powers terminal
  * commands (ftc/eco) that drive plugin APIs the engine never links.
@@ -853,7 +831,6 @@ void *mpe_loader_symbol (const char *path_or_name, const char *sym) {
     loader_unlock ();
     return out;
 }
-
 /* Retain/release resolve the OWNING handle (origin-aware): attach may
  * store a registry copy or a static original, and a static same-named
  * desc must never pin the .so. Pointer comparison alone could never
@@ -871,7 +848,6 @@ void mpe_loader_retain_module (const void *desc) {
         s_h[hi].attachments++;
     loader_unlock ();
 }
-
 void mpe_loader_release_module (const void *desc) {
     if (!desc)
         return;

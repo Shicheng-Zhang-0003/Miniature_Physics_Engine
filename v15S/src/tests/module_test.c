@@ -7,7 +7,6 @@
 #include "../core/mpe_registry.h"
 #include "../core/det_math.h"
 #include "../config/mpe_config.h"
-
 static int pre_calls = 0;
 static void my_pre (mpe_world_t *w, float dt, void *s) {
     (void) w;
@@ -15,7 +14,6 @@ static void my_pre (mpe_world_t *w, float dt, void *s) {
     (void) s;
     pre_calls++;
 }
-
 static const mpe_module_desc_t my_mod = {
     .abi = MPE_MODULE_ABI,
     .name = "test-hook",
@@ -28,7 +26,6 @@ static const mpe_module_desc_t my_mod = {
     .post_step = 0,
     .stage_detach = 0,
 };
-
 /* Custom-routing probe: sentinel normal proves registry->custom dispatch. */
 static bool probe_custom_hit = false;
 static bool probe_custom_fn (rigidbody *a, rigidbody *b, void *out, mpe_world_t *w) {
@@ -42,7 +39,6 @@ static bool probe_custom_fn (rigidbody *a, rigidbody *b, void *out, mpe_world_t 
     probe_custom_hit = true;
     return true;
 }
-
 /* Counting solver_if: delegates to the builtin with the world's config. */
 static int *test_counting_solver_calls = NULL;
 static float test_count_resolve (mpe_world_t *world, void *manifold, float dt, bool friction_only, int iter, void *s) {
@@ -54,11 +50,9 @@ static float test_count_resolve (mpe_world_t *world, void *manifold, float dt, b
     return collision_resolve_iterative ((collision_data *) manifold, dt, friction_only, iter, C);
 }
 static const mpe_solver_if_t test_counting_solver = {test_count_resolve, NULL, NULL, NULL};
-
 int mpe_module_test_main (void) {
     mpe_config_init ();
     mpe_register_builtins ();
-
     /* 1. per-world cfg isolation */
     physics_world A, B;
     physics_world_init (&A);
@@ -79,7 +73,6 @@ int mpe_module_test_main (void) {
         return 1;
     }
     printf ("[PASS] per-world cfg isolation\n");
-
     /* 2. registry has built-ins */
     if (!mpe_find_pair_handler (0, 0, -1, -1)) {
         printf ("[FAIL] registry sphere-sphere\n");
@@ -98,7 +91,6 @@ int mpe_module_test_main (void) {
         return 1;
     }
     printf ("[PASS] builtin pair/broadphase/solver registry\n");
-
     /* 3. shape dispatch equivalence: sphere-sphere via registry == direct */
     int ia = physics_world_add_sphere (&A, 0.5f, 1.0f, (vector3){0, 2, 0});
     int ib = physics_world_add_sphere (&A, 0.5f, 1.0f, (vector3){0, 2.4f, 0});
@@ -122,7 +114,6 @@ int mpe_module_test_main (void) {
         }
     }
     printf ("[PASS] shape dispatch matches builtin\n");
-
     /* 4. custom shape add + dispatch (bounding-sphere fallback) */
     int ic = physics_world_add_custom (&A, 100, (vector3){5, 2, 0}, 1.0f, 0.5f);
     if (ic < 0 || A.bodies[ic].type != object_custom) {
@@ -155,7 +146,6 @@ int mpe_module_test_main (void) {
     }
     mpe_unregister_pair_handler (probe_custom_fn);
     printf ("[PASS] custom shape dispatches through registry\n");
-
     /* 5. tick-module hook fires once per step */
     physics_world_attach_module (&A, &my_mod);
     /* minimal step: drop a sphere and step once */
@@ -172,7 +162,6 @@ int mpe_module_test_main (void) {
         return 1;
     }
     printf ("[PASS] detach stops hooks\n");
-
     /* 6. id cache: lookups correct, survives pool growth + revision bumps */
     {
         physics_world W;
@@ -205,7 +194,6 @@ int mpe_module_test_main (void) {
         printf ("[PASS] id cache stable across steps\n");
         physics_world_cleanup (&W);
     }
-
     /* 7. det fallback counters observable process-wide, zero in-contract */
     {
         det_fallback_reset ();
@@ -222,7 +210,6 @@ int mpe_module_test_main (void) {
                 det_fallback_trig_total ());
         physics_world_cleanup (&W);
     }
-
     /* 8. per-world narrowphase config: slop-0 world sees contact, slop-5cm world does not */
     {
         physics_world W;
@@ -245,7 +232,6 @@ int mpe_module_test_main (void) {
         /* solver_if override: counting resolve hook observes iterations */
         physics_world_cleanup (&W);
     }
-
     /* 7. solver_if + broadphase_if overrides take effect */
     {
         int resolve_calls = 0;
@@ -266,13 +252,11 @@ int mpe_module_test_main (void) {
         physics_world_set_solver (&W, NULL);
         physics_world_cleanup (&W);
     }
-
     physics_world_cleanup (&A);
     physics_world_cleanup (&B);
     printf ("[PASS] module system smoke complete\n");
     return 0;
 }
-
 #ifdef mpe_module_test
 int main (void) {
     return mpe_module_test_main ();

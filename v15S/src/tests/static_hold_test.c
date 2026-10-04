@@ -6,7 +6,6 @@
 #include "core/physics_world.h"
 #include "physics/constraint.h"
 #include "config/mpe_config.h"
-
 static float slope_drift (float slope_deg, float mus, float muk, int *asleep_out) {
     physics_world world;
     physics_world_init (&world);
@@ -46,12 +45,10 @@ static float slope_drift (float slope_deg, float mus, float muk, int *asleep_out
     physics_world_cleanup (&world);
     return drift;
 }
-
 int main (void) {
     mpe_config_init ();
     int fail = 0;
     int asleep = 0;
-
     /* 20 deg, mu_s 0.9 (friction angle 42 deg): must hold essentially still. */
     float hold_drift = slope_drift (-20.0f, 0.9f, 0.7f, &asleep);
     printf ("[info] hold case: drift=%.4f m\n", hold_drift);
@@ -61,7 +58,6 @@ int main (void) {
     } else {
         printf ("[PASS] static hold: box stands on 20deg slope at mu_s=0.9\n");
     }
-
     /* 10 deg, mu 0.1 (friction angle 5.7 deg): must slide freely, stay awake.
      * TRUTH: analytic slide is ~21 m (a=g(sin10-mu*cos10)); the old >2.0 m
      * gate passed 90%-overdamped friction. Demand substantial travel.
@@ -79,7 +75,6 @@ int main (void) {
     } else {
         printf ("[PASS] past-angle slide stays free (%.4f m, awake)\n", slide_drift);
     }
-
     if (fail == 0) {
         printf ("[PASS] static-hold truth complete\n");
     }

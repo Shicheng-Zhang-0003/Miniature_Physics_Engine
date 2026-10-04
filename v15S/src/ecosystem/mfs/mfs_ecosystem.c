@@ -16,7 +16,6 @@
  *   built on its submodules/ robot stack
  * - Internal module system (mfs_internal.c) manages module lifecycle
  */
-
 #include "ecosystem/mpe_ecosystem.h"
 #include "mfs_internal.h"
 #include "mfs_platform.h"
@@ -32,13 +31,10 @@
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
-
 /* ================================================================
  * Ecosystem State
  * ================================================================ */
-
 #define MFS_ECO_MAX_WORLDS 8
-
 typedef struct {
     bool modules_initialized;
     bool modules_attached;
@@ -47,7 +43,6 @@ typedef struct {
     mpe_world_t *worlds[MFS_ECO_MAX_WORLDS];
     int nworlds;
 } mfs_ecosystem_state_t;
-
 /* FIX-AUDIT-DESPOT: was void + silent drop on overflow. Warns and returns
  * -1 when the world table is full so a lost terminal world is visible. */
 static int eco_track_world (mfs_ecosystem_state_t *state, mpe_world_t *world) {
@@ -64,7 +59,6 @@ static int eco_track_world (mfs_ecosystem_state_t *state, mpe_world_t *world) {
     fprintf (stderr, "mfs_ecosystem: world table full (%d); extra world not tracked\n", MFS_ECO_MAX_WORLDS);
     return -1;
 }
-
 static void eco_untrack_world (mfs_ecosystem_state_t *state, mpe_world_t *world) {
     if (!state)
         return;
@@ -86,17 +80,14 @@ static void eco_untrack_world (mfs_ecosystem_state_t *state, mpe_world_t *world)
         }
     }
 }
-
 static mpe_world_t *eco_primary_world (mfs_ecosystem_state_t *state) {
     if (!state || state->nworlds <= 0 || !state->worlds[0])
         return NULL;
     return state->worlds[0];
 }
-
 /* ================================================================
  * Ecosystem Lifecycle
  * ================================================================ */
-
 /* FIX-AUDIT-DESPOT: was `static int s_registry_initialized` (racy under
  * concurrent attach, and re-cleared the table on every process reuse).
  * pthread_once makes one-time init thread-safe. */
@@ -106,15 +97,12 @@ static void eco_registry_init_once (void) {
      * initialised the registry out from under us, which is the goal. */
     (void) mfs_internal_registry_init ();
 }
-
 static int mfs_ecosystem_attach (mpe_world_t *world, void **eco_state) {
     if (!world || !eco_state)
         return -1;
-
     mfs_ecosystem_state_t *state = calloc (1, sizeof (mfs_ecosystem_state_t));
     if (!state)
         return -1;
-
     /* Initialize internal module registry once only */
     pthread_once (&s_registry_once, eco_registry_init_once);
     /* Ensure-registered (idempotent): repeat attaches to other worlds
@@ -143,7 +131,6 @@ static int mfs_ecosystem_attach (mpe_world_t *world, void **eco_state) {
             return -1;
         }
     }
-
     /* Attach internal modules. Streamlined 2026-10-04 (v15S release
      * blocker): the bundle attaches ftc-fleet ONLY. The BioBuzz game module
      * (mfs-simulator: field + robot + intake + shooter + balls + gamepad) is
@@ -162,49 +149,38 @@ static int mfs_ecosystem_attach (mpe_world_t *world, void **eco_state) {
         free (state);
         return -1;
     }
-
     state->modules_initialized = true;
     state->modules_attached = true;
     /* Tracking is best-effort for the terminal surface; the attach itself
      * already succeeded, so a full table only warns (see eco_track_world). */
     eco_track_world (state, world);
-
     *eco_state = state;
     return 0;
 }
-
 static void mfs_ecosystem_detach (mpe_world_t *world, void *eco_state) {
     if (!eco_state)
         return;
-
     mfs_ecosystem_state_t *state = (mfs_ecosystem_state_t *) eco_state;
-
     /* Detach all internal modules */
     mfs_internal_modules_detach_all ((mpe_world_t *) world);
     eco_untrack_world (state, world);
-
     free (state);
 }
-
 /* ================================================================
  * Ecosystem Step Hooks
  * ================================================================ */
-
 static void mfs_ecosystem_pre_step (mpe_world_t *world, float dt, void *eco_state) {
     (void) eco_state;
     /* Run pre_step for all attached internal modules */
     mfs_internal_modules_pre_step ((mpe_world_t *) world, dt);
 }
-
 static void mfs_ecosystem_post_step (mpe_world_t *world, float dt, void *eco_state) {
     (void) eco_state;
     mfs_internal_modules_post_step ((mpe_world_t *) world, dt);
 }
-
 /* ================================================================
  * Configuration Interface
  * ================================================================ */
-
 static int mfs_ecosystem_config_get (void *eco_state, const char *key, char *out, int maxlen) {
     if (!key || !out || maxlen <= 0)
         return -1;
@@ -225,7 +201,6 @@ static int mfs_ecosystem_config_get (void *eco_state, const char *key, char *out
     }
     return -1; /* unsupported key (honest: no silent default) */
 }
-
 static int mfs_ecosystem_config_set (void *eco_state, const char *key, const char *value) {
     (void) eco_state;
     if (!key || !value)
@@ -236,7 +211,6 @@ static int mfs_ecosystem_config_set (void *eco_state, const char *key, const cha
     (void) value;
     return -1;
 }
-
 /* Preset lookup by name. Exact match wins; otherwise substring match.
  * Returns -1 when unknown. On ambiguous substring (several presets contain
  * `want`, e.g. "26.9"), the first match wins AND a stderr warning names the
@@ -265,7 +239,6 @@ static int eco_preset_by_name (const char *want) {
     }
     return found;
 }
-
 /* Iteration guarantee (same contract as the terminal spawn path: the
  * 40:1 chassis/wheel mass ratio needs 128 iterations; 64 wobbles axles
  * loose). Loud, never silent; adequate configs untouched. */
@@ -303,7 +276,6 @@ static int eco_ensure_floor (physics_world *w) {
     printf ("mfs: tile floor added (robots need frictional contact)\n");
     return 1;
 }
-
 static float eco_argf (char **argv, int i, int argc, float dflt) {
     if (i < argc && argv[i]) {
         char *end = NULL;
@@ -313,7 +285,6 @@ static float eco_argf (char **argv, int i, int argc, float dflt) {
     }
     return dflt;
 }
-
 /* Bundle command surface (drives the terminal `eco command` path):
  *   help
  *   spawn [preset-substr] [mecanum|tank] [x y z]
@@ -332,7 +303,6 @@ static int mfs_ecosystem_command (void *eco_state, int argc, char **argv) {
         return -1;
     }
     physics_world *w = (physics_world *) world;
-
     if (strcmp (argv[0], "help") == 0) {
         printf ("mfs commands: spawn [preset] [mecanum|tank] [x y z] | "
                 "drive <i> tank <l> <r> | drive <i> mecanum <f> <s> <r> | "
@@ -471,11 +441,9 @@ static int mfs_ecosystem_command (void *eco_state, int argc, char **argv) {
     printf ("mfs: unknown command '%s' (try help)\n", argv[0]);
     return -1;
 }
-
 /* ================================================================
  * Ecosystem Descriptor
  * ================================================================ */
-
 MPE_USED const mpe_ecosystem_desc_t mpe_ecosystem_desc = {
     .abi = 1,
     .name = "mfs-simulator",

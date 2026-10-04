@@ -18,7 +18,6 @@
  */
 #ifndef mouse_look_h
 #define mouse_look_h
-
 /* Convert raw relative-pointer motion into camera-space deltas.
  *
  * Returns the MAGNITUDE of the input (not its square -- the first version
@@ -35,5 +34,4 @@ static inline float mpe_mouse_relative_to_camera (double rdx, double rdy, float 
         *out_y = (float) -rdy;
     return (float) sqrt (rdx * rdx + rdy * rdy);
 }
-
 #endif /* mouse_look_h */

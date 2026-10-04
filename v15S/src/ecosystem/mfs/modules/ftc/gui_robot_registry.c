@@ -6,12 +6,10 @@
 #include "scene/scene_init.h"
 #include <string.h>
 #include <stdio.h>
-
 ftc_robot mfs_gui_robots[MFS_MAX_GUI_ROBOTS];
 int mfs_gui_robot_count = 0;
 physics_world *mfs_gui_robot_world = NULL;
 gui_robot_proxy mfs_gui_proxies[MFS_MAX_GUI_ROBOTS];
-
 /* MFS_125: Nose offset in chassis-local space.
  * FIX-AUDIT: front wheels are at -Z (robot.c), so the nose must be -Z too.
  * Was +0.28 (rear), contradicting wheel labels and drive direction. */
@@ -19,7 +17,6 @@ gui_robot_proxy mfs_gui_proxies[MFS_MAX_GUI_ROBOTS];
 #define MFS_NOSE_OFFSET_Y 0.0f
 #define MFS_NOSE_OFFSET_Z -0.28f
 #define MFS_NOSE_RADIUS 0.03f
-
 int gui_robot_spawn (float x, float y, float z, motor_preset_id preset) {
     if (mfs_gui_robot_count >= MFS_MAX_GUI_ROBOTS) {
         return -1;
@@ -108,7 +105,6 @@ Its bodies array is NULL. We MUST init before adding bodies. */
     mfs_gui_robot_count++;
     return idx;
 }
-
 /* gui_robot_tick OWNS stepping mfs_gui_robot_world (fixed 60 Hz
  * accumulator). Do NOT step that world from the engine loop as well:
  * double-stepping integrates forces twice per tick. Use this tick OR
@@ -181,7 +177,6 @@ void gui_robot_tick (float dt) {
         }
     }
 }
-
 void gui_robot_apply_drive (float forward, float strafe, float rotate) {
     if ((mfs_gui_robot_count <= 0) || (!mfs_gui_robot_world)) {
         return;
@@ -195,7 +190,6 @@ void gui_robot_apply_drive (float forward, float strafe, float rotate) {
         }
     }
 }
-
 /* Release a registry slot. Bodies persist until scene_clear (no
  * mid-array removal exists); proxies are already non-colliding so the
  * leftovers are render-only. */
@@ -209,7 +203,6 @@ void gui_robot_despawn (int index) {
     }
     mfs_gui_robot_count--;
 }
-
 void gui_robot_clear (void) {
     mfs_gui_robot_count = 0;
     /* FIX-AUDIT-DESPOT: the fixed-step accumulator in gui_robot_tick is static
@@ -218,11 +211,9 @@ void gui_robot_clear (void) {
  * a reset that the next tick consumes. */
     s_tick_accumulator_reset = 1;
 }
-
 int gui_robot_get_count (void) {
     return mfs_gui_robot_count;
 }
-
 ftc_robot *gui_robot_get (int index) {
     if ((index < 0) || (index >= mfs_gui_robot_count)) {
         return NULL;

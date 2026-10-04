@@ -50,7 +50,6 @@ void simulation_input_dispatch (GtkWidget *parent_window) {
         }
         main_inputs.f_key_pressed = false;
     }
-
     /* Keyboard-only actions (R select; Delete/M keybinds removed) */
     if (main_inputs.r_key_pressed) {
         if (main_inputs.is_debug_mode_active) {
@@ -134,12 +133,10 @@ void simulation_input_dispatch (GtkWidget *parent_window) {
             main_inputs.config_torture_pressed = false;
         }
     }
-
     /* Spawn gun (Enter hold) */
     static float enter_hold_timer = 0.0f;
     static float enter_spawn_interval_timer = 0.0f;
     static bool enter_previously_held = false;
-
     if ((main_inputs.enter_spawn_held) && (!editor_dialog_is_active ()) && (!main_inputs.is_menu_open) &&
         (main_inputs.spawner_menu_level == 0) && (main_inputs.velocity_menu_level == 0) &&
         (main_inputs.object_menu_level == 0)) {

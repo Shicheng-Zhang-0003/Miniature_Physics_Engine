@@ -11,10 +11,8 @@
 #include "mpe_module.h"
 #include <stddef.h>
 struct rigidbody;
-
 #define MPE_MAX_PAIR_HANDLERS 64
 #define MPE_MAX_MODULES 64
-
 typedef struct {
     int type_a; /* object_type or -1 wildcard; 3 == object_custom */
     int type_b;
@@ -23,7 +21,6 @@ typedef struct {
     mpe_collide_fn fn;
     char name[64]; /* owned copy: never dangles into .so rodata */
 } mpe_pair_entry_t;
-
 void mpe_register_builtins (void);
 /* Explicit lock for multi-step loader transactions (snapshot + dlopen +
  * rollback). Dispatch-time find/register calls lock internally; do NOT
@@ -42,7 +39,6 @@ int mpe_registry_pair_count (void);
  * buffer was 256, so any checkout path over ~180 characters produced exactly
  * that state. */
 #define MPE_MODULE_ORIGIN_MAX 256
-
 void mpe_registry_truncate_pairs (int keep);
 /* Roll back the module table to `keep` entries, clearing each dropped slot's
  * live flag, hooks and strings. DESPOT-2026-09-29: this was missing, so every
@@ -57,7 +53,6 @@ void mpe_registry_truncate_solvers (int keep);
 int mpe_registry_pair_fn_at (int idx, mpe_collide_fn *out);
 /* Human-readable pair-table row for `mod ls`. 0 on success. */
 int mpe_registry_pair_describe (int idx, int *ta, int *tb, int *ca, int *cb, char *name, int namelen);
-
 /* broadphase / solver actives are per-world (world->broadphase_if etc).
  * Global defaults live here.
  * Register returns index on success, -1 on NULL/full/overlong-name, and
@@ -71,7 +66,6 @@ int mpe_unregister_solver (const char *name);
 int mpe_unregister_pair_handler (mpe_collide_fn fn);
 const mpe_broadphase_if_t *mpe_find_broadphase (const char *name);
 const mpe_solver_if_t *mpe_find_solver (const char *name);
-
 /* generic tick modules */
 int mpe_register_module (const mpe_module_desc_t *desc);
 int mpe_unregister_module (const char *name);
@@ -90,5 +84,4 @@ int mpe_module_count (void);
 int mpe_module_slot_count (void);
 const mpe_module_desc_t *mpe_module_at (int i);
 const mpe_module_desc_t *mpe_find_module (const char *name);
-
 #endif

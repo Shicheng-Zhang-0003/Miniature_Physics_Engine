@@ -10,7 +10,6 @@
 #ifndef MPE_OS_WINDOWS
 #include <unistd.h>
 #endif
-
 /* tee is confined to a direct child of the application status directory.
  * openat + O_NOFOLLOW also prevents a status symlink or target symlink from
  * redirecting the write outside that directory. */
@@ -71,11 +70,9 @@ static int term_tee_write_status (const char *path, const char *text, size_t *by
     const char *name = strncmp (path, "status/", 7) == 0 ? path + 7 : path;
     if (!name[0] || strchr (name, '/') || strstr (name, "..") || strcmp (name, ".") == 0)
         return -1;
-
     int dirfd = open ("status", O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW);
     if (dirfd < 0)
         return -1;
-
     static atomic_ulong sequence;
     char temporary[80];
     int fd = -1;
@@ -90,7 +87,6 @@ static int term_tee_write_status (const char *path, const char *text, size_t *by
         close (dirfd);
         return -1;
     }
-
     FILE *output = fdopen (fd, "w");
     if (!output) {
         close (fd);
@@ -111,7 +107,6 @@ static int term_tee_write_status (const char *path, const char *text, size_t *by
     return failed ? -1 : 0;
 }
 #endif /* MPE_OS_WINDOWS */
-
 /* term_admin.c — Admin/batch/scene/shell commands: sed..dmesg + vi.
  * Split from debug_terminal.c (pure motion, no behaviour change).
  * Shared shell core lives in debug_terminal.c; see term_priv.h. */
@@ -126,7 +121,6 @@ static int term_tee_write_status (const char *path, const char *text, size_t *by
 #ifndef MPE_OS_WINDOWS
 #include <strings.h>
 #endif
-
 static int64_t posix_monotonic_time (void) {
     struct timespec ts;
     clock_gettime (CLOCK_MONOTONIC, &ts);
@@ -320,7 +314,6 @@ void cmd_sed (int argc, char **argv) {
         term_printf ("term_ok", "sed: modified %d object(s)\n", modified_count);
     }
 }
-
 void cmd_nice (int argc, char **argv) {
     if (argc < 3) {
         term_err ("usage: nice <priority> <object...>\n");

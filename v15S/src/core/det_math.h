@@ -29,7 +29,6 @@
 #include <stdatomic.h>
 #include <assert.h>
 #include "mpe_platform.h"
-
 /* TRUTH: count every libm fallback so desync is diagnosable, never silent.
  * Single process-wide definition (core/det_math.c); the old per-TU
  * statics gave every translation unit its own counters, so a test
@@ -59,17 +58,14 @@ static inline unsigned long det_fallback_trig_total (void) {
     return atomic_load (&det_fallback_trig_count);
 }
 #endif
-
 /* TRUTH: pin FP state for cross-platform determinism. Portable subset:
  * round-to-nearest (fesetround). x86/ARM denormal-flush differences (FTZ/DAZ/FZ/DZ)
  * pinned via MXCSR/FPCR. Idempotent. */
 void det_pin_fp_state (void);
-
 extern void det_mark_fallback_pow (void);
 extern void det_mark_fallback_trig (void);
 extern void det_assert_no_fallback_pow (void);
 extern void det_assert_no_fallback_trig (void);
-
 /* Natural logarithm for x > 0. |err| < 1e-12 on [0.1, 10]. */
 static inline double det_ln_pos (double x) {
     if (x == 0.0) {
@@ -105,7 +101,6 @@ static inline double det_ln_pos (double x) {
     const double ln2 = 0.693147180559945309417232121458176568;
     return sum + (double) exponent * ln2;
 }
-
 /* Exponential for |x| <= 0.5. |err| < 1e-13. */
 static inline double det_exp_small (double x) {
     if (!isfinite (x)) {
@@ -126,7 +121,6 @@ static inline double det_exp_small (double x) {
     }
     return sum;
 }
-
 /* base^ex for base in (0, 1.1] (covers damping retention bases).
  * TRUTH: never desyncs via libm in-tick. If |product|>0.5, chunk into
  * n pieces each within [-0.5,0.5] and multiply exact powers: r=exp(p/n),
@@ -170,7 +164,6 @@ static inline double det_pow_retention (double base, double ex) {
     }
     return det_exp_small (product);
 }
-
 /* Taylor series for sin/cos on [-pi/4, pi/4] (|x| <= 0.7854).
  * Error bounds: |err| < 1e-15 for |x| <= pi/4. */
 static inline double det_sin_small (double x) {
@@ -207,7 +200,6 @@ static inline double det_sin_small (double x) {
     sum += term; /* x^17/17! */
     return sum;
 }
-
 static inline double det_cos_small (double x) {
     if (!isfinite (x)) {
         /* TRUTH: cos(non-finite) is NaN (libm). See det_sin_small. */
@@ -241,7 +233,6 @@ static inline double det_cos_small (double x) {
     sum += term; /* x^16/16! */
     return sum;
 }
-
 /* Argument reduction for sin/cos: reduce x to [-pi/4, pi/4] using
  * exact rational approximations of pi. Returns reduced x and quadrant. */
 static inline double det_reduce_pi4 (double x, int *quadrant) {
@@ -256,7 +247,6 @@ static inline double det_reduce_pi4 (double x, int *quadrant) {
     const double pi_half_lo = 6.07710050650619224932e-11;
     const double pi_quarter = 0.78539816339744830961566084581987572104929234984378;
     const double two_over_pi = 0.63661977236758134307553505349005744813783858296183;
-
     if (!isfinite (x)) {
         *quadrant = 0;
         return x;
@@ -289,7 +279,6 @@ static inline double det_reduce_pi4 (double x, int *quadrant) {
     }
     return x_red;
 }
-
 /* Full-range sin/cos via argument reduction. Bounds per header contract
  * (|x|<=pi/4 exact; <5e-13 below 1e4; out of contract beyond 1e15).
  * PHYSICS-TRUTH: non-finite input is NaN (libm/IEEE) and marks the trig
@@ -314,7 +303,6 @@ static inline double det_sin (double x) {
     }
     return det_sin_small (xr); /* unreachable */
 }
-
 static inline double det_cos (double x) {
     if (!isfinite (x)) {
         det_mark_fallback_trig ();
@@ -334,5 +322,4 @@ static inline double det_cos (double x) {
     }
     return det_cos_small (xr); /* unreachable */
 }
-
 #endif /* det_math_h */

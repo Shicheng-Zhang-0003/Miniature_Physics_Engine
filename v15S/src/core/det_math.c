@@ -12,12 +12,10 @@
 #include <fenv.h>
 #endif
 #include <stdint.h>
-
 /* FIX-AUDIT-DESPOT: _Atomic process-wide counters (see header). RELAXED
  * ordering: telemetry only, no happens-before needed. */
 _Atomic unsigned long det_fallback_pow_count = 0;
 _Atomic unsigned long det_fallback_trig_count = 0;
-
 #ifdef MPE_HAS_GNUC_ATTR
 #define MPE_ATOMIC_STORE(p, v) __atomic_store_n ((p), (v), __ATOMIC_RELAXED)
 #define MPE_ATOMIC_ADD(p, v) __atomic_fetch_add ((p), (v), __ATOMIC_RELAXED)
@@ -25,12 +23,10 @@ _Atomic unsigned long det_fallback_trig_count = 0;
 #define MPE_ATOMIC_STORE(p, v) atomic_store ((p), (v))
 #define MPE_ATOMIC_ADD(p, v) atomic_fetch_add ((p), (v))
 #endif
-
 void det_fallback_reset (void) {
     MPE_ATOMIC_STORE (&det_fallback_pow_count, 0);
     MPE_ATOMIC_STORE (&det_fallback_trig_count, 0);
 }
-
 void det_pin_fp_state (void) {
 #ifdef MPE_OS_WINDOWS
 #ifndef __GNUC__
@@ -47,7 +43,6 @@ void det_pin_fp_state (void) {
 #ifndef MPE_OS_WINDOWS
     fesetround (FE_TONEAREST);
 #endif
-
 #if defined(__x86_64__) || defined(__i386__)
 #ifdef __SSE__
     unsigned int mxcsr = 0;
@@ -68,7 +63,6 @@ void det_pin_fp_state (void) {
     __asm__ volatile ("vmsr fpscr, %0" ::"r"(fpscr));
 #endif
 }
-
 #ifndef NDEBUG
 #ifdef MPE_COMPILER_MSVC
 #define MPE_THREAD_LOCAL __declspec (thread)
@@ -77,23 +71,19 @@ void det_pin_fp_state (void) {
 #endif
 static MPE_THREAD_LOCAL bool det_fallback_pow_used = false;
 static MPE_THREAD_LOCAL bool det_fallback_trig_used = false;
-
 void det_assert_no_fallback_pow (void) {
     /* TRUTH: old body cleared the flag and returned unconditionally (never
      * fired). A desync tripwire that cannot trip is a lie. */
     assert (!det_fallback_pow_used);
 }
-
 void det_assert_no_fallback_trig (void) {
     assert (!det_fallback_trig_used);
 }
-
 void det_mark_fallback_pow (void) {
     det_fallback_pow_used = true;
     /* FIX-AUDIT-DESPOT: atomic increment (see header). */
     MPE_ATOMIC_ADD (&det_fallback_pow_count, 1);
 }
-
 void det_mark_fallback_trig (void) {
     det_fallback_trig_used = true;
     /* FIX-AUDIT-DESPOT: atomic increment (see header). */

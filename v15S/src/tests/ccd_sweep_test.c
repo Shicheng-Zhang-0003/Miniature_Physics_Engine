@@ -5,12 +5,10 @@
 #include "core/physics_world.h"
 #include "physics/constraint.h"
 #include "config/mpe_config.h"
-
 int main (void) {
     mpe_config_init ();
     int fail = 0;
     const float dt = 1.0f / 60.0f;
-
     /* Case 1: 144 m/s sphere at a 0.1 m wall (2.4 m steps straddle it). */
     {
         physics_world world;
@@ -44,7 +42,6 @@ int main (void) {
         }
         physics_world_cleanup (&world);
     }
-
     /* Case 2: 60 m/s sphere straight down at the floor.
      * DESPOT-2026-10-04 [CLAMP-TAUTOLOGY closure]: this case had NO floor
      * body at all, so its "no tunneling" verdict was produced by the
@@ -94,7 +91,6 @@ int main (void) {
         }
         physics_world_cleanup (&world);
     }
-
     if (fail == 0) {
         printf ("[PASS] ccd sweep truth complete\n");
     }

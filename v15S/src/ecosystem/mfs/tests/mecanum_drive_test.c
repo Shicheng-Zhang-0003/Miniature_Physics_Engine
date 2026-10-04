@@ -8,7 +8,6 @@
 #include "modules/ftc/submodules/robot.h"
 #include "modules/ftc/submodules/drivetrain.h"
 #include "ecosystem/mfs/tests/mfs_test_common.h"
-
 int main (void) {
     physics_world world;
     mpe_config_init ();
@@ -21,27 +20,22 @@ int main (void) {
         world.bodies[f].friction_kinetic = 0.8f;
         world.bodies[f].restitution = 0.0f;
     }
-
     ftc_robot robot;
     int rc = ftc_robot_create (&world, &robot, 0.0f, ftc_robot_rest_height (), 0.0f, MOTOR_GB_5203_26_9);
     if (rc != 0) {
         printf ("[FAIL] could not create robot\n");
         return 1;
     }
-
     float start_x, start_y, start_z;
     ftc_robot_get_position (&world, &robot, &start_x, &start_y, &start_z);
-
     const float dt = 1.0f / 60.0f;
     int fail = 0;
     int total_ticks = 180;
-
     for (int t = 0; t < total_ticks; t++) {
         /* Full strafe right (forward=0, strafe=1, rotate=0) */
         drivetrain_mecanum (&robot, 0.0f, 1.0f, 0.0f);
         drivetrain_update (&world, &robot, dt);
         physics_world_step (&world, dt);
-
         for (int i = 0; i < world.body_count; i++) {
             rigidbody *rb = &world.bodies[i];
             if ((!isfinite (rb->position.x)) || (!isfinite (rb->position.y)) || (!isfinite (rb->position.z))) {
@@ -54,16 +48,13 @@ int main (void) {
             break;
         }
     }
-
     if (!fail) {
         float end_x, end_y, end_z;
         ftc_robot_get_position (&world, &robot, &end_x, &end_y, &end_z);
         float dx = end_x - start_x;
         float dz = end_z - start_z;
-
         printf ("[info] start=(%.3f,%.3f,%.3f) end=(%.3f,%.3f,%.3f)\n", start_x, start_y, start_z, end_x, end_y, end_z);
         printf ("[info] displacement x=%.4f  z=%.4f\n", dx, dz);
-
         /* Robot should have moved sideways (+X for strafe=1). Signed check:
          * FIX-AUDIT: old fabs() passed for -X too, leaving the strafe-sign
          * fix untested. */
@@ -75,7 +66,6 @@ int main (void) {
             printf ("[PASS] robot strafed in +X on emergent roller contacts (dx=%.4f)\n", dx);
         }
     }
-
     physics_world_cleanup (&world);
     return fail;
 }

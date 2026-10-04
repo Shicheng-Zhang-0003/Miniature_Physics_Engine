@@ -17,7 +17,6 @@
  * 2.383 N-m / 9.2 A). Stall current 17 A matches no FTC motor on record.
  */
 #include "motor_presets.h"
-
 typedef struct {
     motor_preset_id id;
     const char *name;
@@ -32,7 +31,6 @@ typedef struct {
                                 * 6 cycles x4, Core Hex 4). Output counts =
                                 * base_encoder_ppr x gear_ratio. */
 } motor_preset_spec;
-
 static const motor_preset_spec presets[MOTOR_COUNT] = {
     /* ================================================================
      * goBILDA 5203 Yellow Jacket planetary — published output specs
@@ -49,7 +47,6 @@ static const motor_preset_spec presets[MOTOR_COUNT] = {
     {MOTOR_GB_5203_99_5, "goBILDA 5203 99.5:1", 13.0625f, 60.0f, 9.2f, 99.5f, 0.85f, 28},
     {MOTOR_GB_5203_139, "goBILDA 5203 139:1", 18.1423f, 43.0f, 9.2f, 139.0f, 0.85f, 28},
     {MOTOR_GB_5203_188, "goBILDA 5203 188:1", 24.5166f, 30.0f, 9.2f, 188.0f, 0.85f, 28},
-
     /* ================================================================
      * goBILDA 5204 Series — identical ratios/physics, 80mm shaft
      * ================================================================ */
@@ -64,7 +61,6 @@ static const motor_preset_spec presets[MOTOR_COUNT] = {
     {MOTOR_GB_5204_99_5, "goBILDA 5204 99.5:1", 13.0625f, 60.0f, 9.2f, 99.5f, 0.85f, 28},
     {MOTOR_GB_5204_139, "goBILDA 5204 139:1", 18.1423f, 43.0f, 9.2f, 139.0f, 0.85f, 28},
     {MOTOR_GB_5204_188, "goBILDA 5204 188:1", 24.5166f, 30.0f, 9.2f, 188.0f, 0.85f, 28},
-
     /* ================================================================
      * goBILDA 5202 Series — identical ratios/physics, 6mm D-shaft
      * ================================================================ */
@@ -79,7 +75,6 @@ static const motor_preset_spec presets[MOTOR_COUNT] = {
     {MOTOR_GB_5202_99_5, "goBILDA 5202 99.5:1", 13.0625f, 60.0f, 9.2f, 99.5f, 0.85f, 28},
     {MOTOR_GB_5202_139, "goBILDA 5202 139:1", 18.1423f, 43.0f, 9.2f, 139.0f, 0.85f, 28},
     {MOTOR_GB_5202_188, "goBILDA 5202 188:1", 24.5166f, 30.0f, 9.2f, 188.0f, 0.85f, 28},
-
     /* ================================================================
      * AndyMark NeveRest Classic — published output specs
      * Base am-3104: 6000 RPM, 0.062 N-m stall, 11.5 A, 7 PPR encoder
@@ -89,7 +84,6 @@ static const motor_preset_spec presets[MOTOR_COUNT] = {
      * ================================================================ */
     {MOTOR_NR_CLASSIC_40, "NeveRest Classic 40", 2.4715f, 160.0f, 11.5f, 40.0f, 0.80f, 28},
     {MOTOR_NR_CLASSIC_60, "NeveRest Classic 60", 3.7070f, 105.0f, 11.5f, 60.0f, 0.80f, 28},
-
     /* ================================================================
      * AndyMark NeveRest Orbital — published + ideal-derived
      * Same base motor (am-3104, 17T pinion), 28 decoded counts.
@@ -105,13 +99,11 @@ static const motor_preset_spec presets[MOTOR_COUNT] = {
     {MOTOR_NR_ORBITAL_19_2, "NeveRest Orbital 19.2:1", 1.1904f, 344.0f, 11.5f, 19.2f, 0.85f, 28},
     {MOTOR_NR_ORBITAL_50_9, "NeveRest Orbital 50.9:1", 3.1558f, 130.0f, 11.5f, 50.9f, 0.85f, 28},
     {MOTOR_NR_ORBITAL_263_7, "NeveRest Orbital 263.7:1", 16.3494f, 25.0f, 11.5f, 263.7f, 0.85f, 28},
-
     /* ================================================================
      * AndyMark NeveRest Hex — same as Classic ratios (28 decoded)
      * ================================================================ */
     {MOTOR_NR_HEX_40, "NeveRest Hex 40:1", 2.4715f, 160.0f, 11.5f, 40.0f, 0.80f, 28},
     {MOTOR_NR_HEX_60, "NeveRest Hex 60:1", 3.7070f, 105.0f, 11.5f, 60.0f, 0.80f, 28},
-
     /* ================================================================
      * REV Robotics HD Hex (REV-41-1291 base)
      * 550-class: 6000 RPM, 0.105 N-m stall, 8.5 A, 28 PPR encoder.
@@ -121,14 +113,12 @@ static const motor_preset_spec presets[MOTOR_COUNT] = {
     {MOTOR_REV_HD_HEX, "REV HD Hex (bare)", 0.1050f, 6000.0f, 8.5f, 1.0f, 0.85f, 28},
     {MOTOR_REV_HD_HEX_20, "REV HD Hex 20:1 spur", 2.1000f, 300.0f, 8.5f, 20.0f, 0.80f, 28}, /* ideal-derived */
     {MOTOR_REV_HD_HEX_40, "REV HD Hex 40:1 spur", 4.2000f, 150.0f, 8.5f, 40.0f, 0.80f, 28}, /* ideal-derived */
-
     /* REV Core Hex (REV-41-1300) — integrated 72:1 planetary.
      * DESPOT-2026-09-28: base count is 4 (REV reports 4/motor-rev, 288 at
      * the output = 4x72), NOT 28 — the old 28 gave 7x too-fine
      * quantization (2016 vs 288). HD Hex above keeps 28 (550-class base
      * reports 28/motor-rev). */
     {MOTOR_REV_CORE_HEX, "REV Core Hex", 3.2000f, 125.0f, 4.4f, 72.0f, 0.80f, 4}, /* published */
-
     /* ================================================================
      * REV UltraPlanetary (cartridge stacks on HD Hex base)
      * All ideal-derived from HD Hex base (6000 RPM, 0.105 Nm, 8.5 A).
@@ -146,7 +136,6 @@ static const motor_preset_spec presets[MOTOR_COUNT] = {
      * stack (reuse one 4:1 cartridge); ideal-derived like the other
      * stacks: 0.105*80 = 8.40 Nm, 6000/80 = 75 RPM. */
     {MOTOR_REV_UP_80, "REV UltraPlanetary 80:1", 8.4000f, 75.0f, 8.5f, 80.0f, 0.85f, 28},
-
     /* ================================================================
      * Pitsco TETRIX MAX TorqueNADO — published output specs
      * Spur gearbox, 8.7 A stall, 6 cycles/rev motor = 24 decoded counts.
@@ -157,7 +146,6 @@ static const motor_preset_spec presets[MOTOR_COUNT] = {
     {MOTOR_TN_40, "TorqueNADO 40:1", 3.2907f, 150.0f, 8.7f, 40.0f, 0.80f, 24},
     {MOTOR_TN_60, "TorqueNADO 60:1", 4.9431f, 100.0f, 8.7f, 60.0f, 0.80f, 24},
 };
-
 void motor_preset_apply (motor *m, motor_preset_id id) {
     /* PHYSICS-GUARD: table and enum must stay in lockstep. The missing
      * UP_80 row once slid every TorqueNADO entry one slot down (dead
@@ -174,21 +162,18 @@ void motor_preset_apply (motor *m, motor_preset_id id) {
     motor_from_spec (m, spec->stall_torque, spec->free_speed_rpm, spec->stall_current, 12.0f, spec->gear_ratio,
                      spec->efficiency);
 }
-
 const char *motor_preset_name (motor_preset_id id) {
     if ((id < 0) || (id >= MOTOR_COUNT)) {
         return "unknown";
     }
     return presets[id].name;
 }
-
 float motor_preset_gear_ratio (motor_preset_id id) {
     if ((id < 0) || (id >= MOTOR_COUNT)) {
         return 1.0f;
     }
     return presets[id].gear_ratio;
 }
-
 int motor_preset_base_encoder_ppr (motor_preset_id id) {
     if ((id < 0) || (id >= MOTOR_COUNT)) {
         return 0;

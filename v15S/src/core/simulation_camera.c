@@ -12,11 +12,9 @@
 #include "../ui_input/camera.h"
 #include "../ui_input/input_state.h"
 #include <math.h>
-
 /* Extern app state (was in mpe_engine.h, now headless-clean via app_state). */
 extern camera main_camera_fov;
 extern input_status main_inputs;
-
 void simulation_camera_tick (float frame_delta_time) {
     /* Game Mode: grounded WASD */
     if (!main_inputs.is_debug_mode_active) {
@@ -33,7 +31,6 @@ void simulation_camera_tick (float frame_delta_time) {
             camera_move_right (&main_camera_fov, frame_delta_time);
         }
     }
-
     /* Perspective steering (mouse look) */
     float perspective_steering_sensitivity = g_cfg.camera.steer_sensitivity;
     if (main_inputs.is_mouse_locked) {
@@ -42,7 +39,6 @@ void simulation_camera_tick (float frame_delta_time) {
         main_inputs.mouse_delta_x = 0.0f;
         main_inputs.mouse_delta_y = 0.0f;
     }
-
     /* IJKL emulation (Debug Mode) */
     /* MFS_127_CAMERA_FLOAT_FIX: Reset vertical velocity when entering debug mode
      * to prevent camera from floating upward due to residual game-mode velocity. */
@@ -92,7 +88,6 @@ void simulation_camera_tick (float frame_delta_time) {
             main_camera_fov.yaw += ijkl_speed;
         }
     }
-
     /* Pitch clamp */
     if (main_camera_fov.pitch > 89.0f) {
         main_camera_fov.pitch = 89.0f;
@@ -101,7 +96,6 @@ void simulation_camera_tick (float frame_delta_time) {
         main_camera_fov.pitch = -89.0f;
     }
     camera_update_vectors (&main_camera_fov);
-
     /* Character logic (Game Mode only) */
     if (!main_inputs.is_debug_mode_active) {
         float horizontal_friction = g_cfg.camera.horizontal_friction;

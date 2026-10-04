@@ -23,17 +23,14 @@
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
-
 /* Forward declarations for module hooks (referenced in descriptor) */
 MPE_USED int mfs_module_1_attach (mpe_world_t *world, void **mod_state);
 MPE_USED void mfs_module_1_detach (mpe_world_t *world, void *mod_state);
 MPE_USED void mfs_module_1_pre_step (mpe_world_t *world, float dt, void *mod_state);
 MPE_USED void mfs_module_1_post_step (mpe_world_t *world, float dt, void *mod_state);
-
 /* ================================================================
  * Module Descriptor (exported for dlopen)
  * ================================================================ */
-
 MPE_USED const mpe_module_desc_t mfs_module_1_desc = {
     .abi = MPE_MODULE_ABI,
     .name = MFS_MODULE_1_NAME,
@@ -49,24 +46,19 @@ MPE_USED const mpe_module_desc_t mfs_module_1_desc = {
     .post_step = mfs_module_1_post_step,
     .stage_detach = 0, /* tick-only module: no foreign broadphase/solver state */
 };
-
 /* NOTE: no mpe_module_desc alias here on purpose. Both this TU and
  * ftc_module.c used to DEFINE it, breaking every link that combined
  * them (multiple-definition). The MFS-internal export is
  * mfs_module_1_desc above; MPI loading uses the ftc-fleet module. */
-
 /* ================================================================
  * Module Lifecycle
  * ================================================================ */
-
 MPE_USED int mfs_module_1_attach (mpe_world_t *world, void **mod_state) {
     if (!world || !mod_state)
         return -1;
-
     mfs_module_1_state *state = calloc (1, sizeof (mfs_module_1_state));
     if (!state)
         return -1;
-
     state->world = world;
     /* DESPOT-2026-10-02 (programming: decorative bound). This was a bare
      * literal 16 while MFS_ROBOT_MAX_BALLS existed in the header and was
@@ -90,18 +82,15 @@ MPE_USED int mfs_module_1_attach (mpe_world_t *world, void **mod_state) {
     state->intake_pivot_joint = -1;
     state->shooter_flywheel_body = -1;
     state->shooter_pivot_joint = -1;
-
     /* Joint pools: the robot/intake/shooter are joint assemblies.
      * Without this, constraint_add_revolute fails and robot creation
      * silently aborts (the module test never ran — see Makefile D1). */
     constraint_pool_init (world);
-
     /* Initialize gamepad (singleton) */
     if (gamepad_init (&state->gamepad, NULL)) {
         state->gamepad_initialized = true;
         state->gamepad.deadzone = 0.15f;
     }
-
     /* Create field, robot, intake, shooter.
      * DESPOT-2026-09-28 (programming: attach always returned 0 even when
      * field/robot creation failed — a floorless world "attached" fine).
@@ -112,7 +101,6 @@ MPE_USED int mfs_module_1_attach (mpe_world_t *world, void **mod_state) {
     mfs_module_1_robot_create (state);
     mfs_module_1_intake_create (state);
     mfs_module_1_shooter_create (state);
-
     if (state->field_floor_id < 0 || !state->robot_created) {
         /* Partial bodies stay in the world by the detach-never-deletes
          * contract; the caller owns world cleanup (test worlds are freed
@@ -121,47 +109,36 @@ MPE_USED int mfs_module_1_attach (mpe_world_t *world, void **mod_state) {
         *mod_state = NULL;
         return -1;
     }
-
     /* Spawn initial balls */
     for (int i = 0; i < 5; i++) {
         vector3 pos = {-4.0f + (i % 3) * 0.5f, MFS_BIOBUZZ_BALL_RADIUS, -2.0f + (i / 3) * 0.5f};
         mfs_module_1_ball_spawn (state, pos);
     }
-
     *mod_state = state;
     return 0;
 }
-
 MPE_USED void mfs_module_1_detach (mpe_world_t *world, void *mod_state) {
     (void) world;
     if (!mod_state)
         return;
-
     mfs_module_1_state *state = (mfs_module_1_state *) mod_state;
-
     if (state->gamepad_initialized) {
         gamepad_close (&state->gamepad);
     }
-
     /* Clean up balls - world cleanup handles bodies */
     for (int i = 0; i < state->ball_count; i++) {
         /* Body cleanup handled by world cleanup */
     }
-
     free (state);
 }
-
 /* ================================================================
  * Gamepad Control Step (F310 mapping)
  * ================================================================ */
-
 MPE_USED void mfs_module_1_gamepad_step (mfs_module_1_state *state, float dt) {
     (void) dt;
     if (!state->gamepad_initialized || !state->gamepad_control_enabled)
         return;
-
     gamepad_state *pad = &state->gamepad;
-
     /* Read axes (with deadzone applied) */
     float left_x = gamepad_get_axis (pad, gamepad_axis_left_x);
     float left_y = gamepad_get_axis (pad, gamepad_axis_left_y);
@@ -172,7 +149,6 @@ MPE_USED void mfs_module_1_gamepad_step (mfs_module_1_state *state, float dt) {
      * misfired the 0.5 gate at rest on 0-rest drivers. */
     float lt = gamepad_get_trigger (pad, gamepad_axis_left_trigger);
     float rt = gamepad_get_trigger (pad, gamepad_axis_right_trigger);
-
     /* Read buttons */
     bool btn_a = gamepad_get_button (pad, gamepad_button_a);
     bool btn_b = gamepad_get_button (pad, gamepad_button_b);
@@ -182,7 +158,6 @@ MPE_USED void mfs_module_1_gamepad_step (mfs_module_1_state *state, float dt) {
     bool btn_rb = gamepad_get_button (pad, gamepad_button_rb);
     bool btn_start = gamepad_get_button (pad, gamepad_button_start);
     bool btn_back = gamepad_get_button (pad, gamepad_button_back);
-
     /* Edge detection for toggles */
     bool start_pressed = btn_start && !state->prev_button_start;
     bool a_pressed = btn_a && !state->prev_button_a;
@@ -190,7 +165,6 @@ MPE_USED void mfs_module_1_gamepad_step (mfs_module_1_state *state, float dt) {
     bool y_pressed = btn_y && !state->prev_button_y;
     /* (removed unused edge vars b/lb/rb/lt/rt_pressed: B is level-read,
      * LB+RB combine in the e-stop below, triggers are level-read) */
-
     /* Update previous button states */
     state->prev_button_start = btn_start;
     state->prev_button_a = btn_a;
@@ -201,17 +175,14 @@ MPE_USED void mfs_module_1_gamepad_step (mfs_module_1_state *state, float dt) {
     state->prev_button_rb = btn_rb;
     state->prev_left_trigger = (lt > 0.5f);
     state->prev_right_trigger = (rt > 0.5f);
-
     /* Toggle gamepad control with Start button. Processed BEFORE the
      * enabled check: otherwise a disabled pad can never re-enable
      * (latch-dead — the toggle lived behind its own gate). */
     if (start_pressed) {
         state->gamepad_control_enabled = !state->gamepad_control_enabled;
     }
-
     if (!state->gamepad_control_enabled)
         return;
-
     /* Drive mapping (mecanum):
      * Left stick Y = forward/backward (inverted)
      * Left stick X = strafe left/right
@@ -220,7 +191,6 @@ MPE_USED void mfs_module_1_gamepad_step (mfs_module_1_state *state, float dt) {
     state->drive_forward = -left_y; /* forward = -Y (up on stick) */
     state->drive_strafe = left_x; /* strafe right = +X */
     state->drive_rotate = right_x; /* rotate right = +X */
-
     /* Intake: A toggles the mode, B momentarily reverses while held and
      * releases back to the mode power. (The old chain double-toggled on
      * A and latched reverse forever after any B-hold: the release path
@@ -233,29 +203,24 @@ MPE_USED void mfs_module_1_gamepad_step (mfs_module_1_state *state, float dt) {
     } else {
         state->intake_power = state->intake_active ? 1.0f : 0.0f;
     }
-
     /* Shooter spin-up (X button toggle) */
     if (x_pressed) {
         state->shooter_spinup_cmd = !state->shooter_spinup_cmd;
     }
-
     /* Shooter fire (Y button) */
     if (y_pressed) {
         state->shooter_fire_cmd = true;
     }
-
     /* Quick fire with right trigger */
     if (rt > 0.5f && state->shooter_ready) {
         state->shooter_fire_cmd = true;
     }
-
     /* Intake speed control with left trigger */
     if (lt > 0.1f) {
         state->intake_speed_rpm = 600.0f + lt * 600.0f; /* 600-1200 RPM */
     } else {
         state->intake_speed_rpm = 600.0f;
     }
-
     /* LB + RB = emergency stop (zero all commands) */
     if (btn_lb && btn_rb) {
         state->drive_forward = 0.0f;
@@ -264,7 +229,6 @@ MPE_USED void mfs_module_1_gamepad_step (mfs_module_1_state *state, float dt) {
         state->intake_active = false;
         state->shooter_spinup_cmd = false;
     }
-
     /* Back button = reset robot position (debug) */
     if (btn_back) {
         rigidbody *chassis = mfs_get_chassis (state);
@@ -272,7 +236,6 @@ MPE_USED void mfs_module_1_gamepad_step (mfs_module_1_state *state, float dt) {
             physics_world *world = state->world;
             vector3 target = (vector3){0.0f, 0.2f, -3.0f};
             vector3 delta = vector3_subtraction (target, chassis->position);
-
             /* M8 FULL-ASSEMBLY RESET FIX: this used to move ONLY the chassis.
              * The four wheel bodies and their revolute joints stayed at the
              * old pose, so the next joint correction yanked every wheel back
@@ -344,68 +307,54 @@ MPE_USED void mfs_module_1_gamepad_step (mfs_module_1_state *state, float dt) {
             chassis->angular_velocity = vector3_zero ();
             chassis->is_sleeping = false;
             chassis->sleep_timer = 0.0f;
-
             state->robot.odom_x = 0.0f;
             state->robot.odom_z = -3.0f;
             state->robot.odom_theta = 0.0f;
         }
     }
 }
-
 /* ================================================================
  * Pre-step: Main simulation tick
  * ================================================================ */
-
 MPE_USED void mfs_module_1_pre_step (mpe_world_t *world, float dt, void *mod_state) {
     mfs_module_1_state *state = (mfs_module_1_state *) mod_state;
     if (!state || !state->robot_created)
         return;
-
     /* Poll gamepad for input */
     if (state->gamepad_initialized) {
         gamepad_poll (&state->gamepad);
         mfs_module_1_gamepad_step (state, dt);
     }
-
     state->match_time += dt;
-
     /* Robot drive */
     mfs_module_1_robot_drive_step (state, dt);
-
     /* Intake logic */
     mfs_module_1_intake_step (state, dt);
-
     /* Shooter logic */
     mfs_module_1_shooter_step (state, dt);
-
     /* Ball physics (spin, drag, Magnus) */
     mfs_module_1_ball_physics_step (state, dt);
-
     /* Full drivetrain update (motor torque + traction + odometry +
      * damping). Calling ftc_robot_update directly skipped all of that:
      * no traction forces, no odometry, no chassis damping. mpe_world_t
      * IS physics_world (see core/mpe_module.h). */
     drivetrain_update ((physics_world *) world, &state->robot, dt);
 }
-
 MPE_USED void mfs_module_1_post_step (mpe_world_t *world, float dt, void *mod_state) {
     (void) world;
     (void) dt;
     (void) mod_state;
     /* No post-step work needed for Module 1 */
 }
-
 /* ================================================================
  * Field Creation
  * ================================================================ */
-
 MPE_USED void mfs_module_1_field_create (mfs_module_1_state *state) {
     physics_world *world = state->world;
     const float half_w = MFS_BIOBUZZ_FIELD_WIDTH * 0.5f;
     const float half_l = MFS_BIOBUZZ_FIELD_LENGTH * 0.5f;
     const float wall_h = 1.0f;
     const float wall_t = 0.1f;
-
     /* Floor - static plane at y=0 */
     int floor_idx = physics_world_add_cube (world, (vector3){0.0f, -0.05f, 0.0f},
                                             (vector3){half_w + 1.0f, 0.05f, half_l + 1.0f}, 0.0f);
@@ -420,7 +369,6 @@ MPE_USED void mfs_module_1_field_create (mfs_module_1_state *state) {
         state->field_floor_id = -1;
         return;
     }
-
     /* Boundary walls.
      * DESPOT-2026-09-28: return was ignored (silent floorless/wall-less
      * on pool exhaustion). A wall-less field still attaches (walls are
@@ -429,40 +377,31 @@ MPE_USED void mfs_module_1_field_create (mfs_module_1_state *state) {
     if (physics_world_add_boundary_walls (world, half_w, half_l, wall_h, wall_t) != 0) {
         fprintf (stderr, "[mfs-module-1] field_create: boundary walls failed (pool exhausted?)\n");
     }
-
     /* Goal frame - two vertical posts + crossbar */
     const float goal_w = MFS_BIOBUZZ_GOAL_WIDTH;
     const float goal_h = MFS_BIOBUZZ_GOAL_HEIGHT;
     const float post_t = 0.08f;
     const float goal_z = half_l;
-
     /* Left post */
     physics_world_add_cube (world, (vector3){-goal_w * 0.5f - post_t * 0.5f, goal_h * 0.5f, goal_z - post_t * 0.5f},
                             (vector3){post_t * 0.5f, goal_h * 0.5f, post_t * 0.5f}, 0.0f);
-
     /* Right post */
     physics_world_add_cube (world, (vector3){goal_w * 0.5f + post_t * 0.5f, goal_h * 0.5f, goal_z - post_t * 0.5f},
                             (vector3){post_t * 0.5f, goal_h * 0.5f, post_t * 0.5f}, 0.0f);
-
     /* Crossbar */
     physics_world_add_cube (world, (vector3){0.0f, goal_h + post_t * 0.5f, goal_z - post_t * 0.5f},
                             (vector3){goal_w * 0.5f + post_t, post_t * 0.5f, post_t * 0.5f}, 0.0f);
 }
-
 /* ================================================================
  * Robot Creation
  * ================================================================ */
-
 MPE_USED void mfs_module_1_robot_create (mfs_module_1_state *state) {
     physics_world *world = state->world;
-
     /* Create FTC robot with mecanum drivetrain */
     int result = ftc_robot_create_with_drive (world, &state->robot, 0.0f, 0.2f, -3.0f, /* Start position */
                                               MFS_ROBOT_WHEEL_PRESET, FTC_DRIVETRAIN_MECANUM);
-
     if (result == 0) {
         state->robot_created = true;
-
         /* Configure robot battery */
         state->robot.battery.nominal_voltage = 12.8f;
         state->robot.battery.capacity_ah = 3.0f;
@@ -470,7 +409,6 @@ MPE_USED void mfs_module_1_robot_create (mfs_module_1_state *state) {
          * keep in sync with battery_init. */
         state->robot.battery.internal_resistance = 0.06f;
         state->robot.battery.charge_fraction = 1.0f;
-
         /* M9 DEAD-FIELD FIX: this block re-initialized wheel_is_mecanum,
          * wheel_roller_angle and wheel_traction_scale AFTER ftc_robot_init
          * had already set all three authoritatively, and it wrote a
@@ -479,37 +417,30 @@ MPE_USED void mfs_module_1_robot_create (mfs_module_1_state *state) {
          * correct mecanum X pattern +,-,-,+. Nothing read the field, so it
          * was a trap for whoever wires the roller model up. Deleted: the
          * single source of truth is ftc_robot_init / robot.c. */
-
         /* Initialize odometry */
         state->robot.odom_x = 0.0f;
         state->robot.odom_z = -3.0f;
         state->robot.odom_theta = 0.0f;
     }
 }
-
 /* ================================================================
  * Helper: get chassis body
  * ================================================================ */
-
 /* ================================================================
  * Intake Creation (Roller-based compliant intake)
  * ================================================================ */
-
 MPE_USED void mfs_module_1_intake_create (mfs_module_1_state *state) {
     physics_world *world = state->world;
     rigidbody *chassis = mfs_get_chassis (state);
     if (!chassis)
         return;
-
     /* Roller positioned at front-lower of chassis */
     vector3 robot_pos = chassis->position;
     vector3 roller_pos = vector3_addition (
         robot_pos, (vector3){0.0f, -MFS_ROBOT_CHASSIS_HEIGHT * 0.3f, MFS_ROBOT_CHASSIS_LENGTH * 0.5f + 0.03f});
-
     int roller_idx = physics_world_add_cylinder (world, MFS_INTAKE_ROLLER_RADIUS, MFS_INTAKE_ROLLER_LENGTH * 0.5f,
                                                  0.05f, /* Light roller mass */
                                                  roller_pos);
-
     if (roller_idx >= 0) {
         state->intake_roller_body = world->bodies[roller_idx].object_id;
         rigidbody *roller = &world->bodies[roller_idx];
@@ -517,7 +448,6 @@ MPE_USED void mfs_module_1_intake_create (mfs_module_1_state *state) {
         roller->friction_static = 0.8f;
         roller->friction_kinetic = 0.7f;
         roller->kinematic = false; /* Driven by motor torque */
-
         /* Revolute joint to chassis for roller spin */
         int joint_idx =
             constraint_add_revolute (world, chassis->object_id, roller->object_id,
@@ -538,37 +468,30 @@ MPE_USED void mfs_module_1_intake_create (mfs_module_1_state *state) {
             fprintf (stderr, "[mfs-module-1] intake_create: revolute joint failed (pool exhausted?)\n");
         }
     }
-
     state->intake_deployed = true;
 }
-
 /* ================================================================
  * Shooter Creation (Flywheel-based)
  * ================================================================ */
-
 MPE_USED void mfs_module_1_shooter_create (mfs_module_1_state *state) {
     physics_world *world = state->world;
     rigidbody *chassis = mfs_get_chassis (state);
     if (!chassis)
         return;
-
     /* Flywheel on a pylon clear of the chassis: at 0.8*H the tilted disc
      * grazed the chassis top inside the 10 mm slop band and slop friction
      * + joint fight killed spin by tick 3. 1.0*H clears slop with margin. */
     vector3 robot_pos = chassis->position;
     vector3 flywheel_pos = vector3_addition (
         robot_pos, (vector3){0.0f, MFS_ROBOT_CHASSIS_HEIGHT * 1.0f, -MFS_ROBOT_CHASSIS_LENGTH * 0.5f - 0.05f});
-
     int flywheel_idx = physics_world_add_cylinder (world, MFS_SHOOTER_FLYWHEEL_RADIUS, 0.015f, /* Thin flywheel */
                                                    MFS_SHOOTER_FLYWHEEL_MASS, flywheel_pos);
-
     if (flywheel_idx >= 0) {
         state->shooter_flywheel_body = world->bodies[flywheel_idx].object_id;
         rigidbody *flywheel = &world->bodies[flywheel_idx];
         flywheel->restitution = 0.0f;
         flywheel->friction_static = 0.1f;
         flywheel->friction_kinetic = 0.05f;
-
         /* MFS H6 (DESPOT-2026-09-29): the spin axis, the cylinder's own
          * symmetry axis, and the joint axis were three different directions.
          *
@@ -591,7 +514,6 @@ MPE_USED void mfs_module_1_shooter_create (mfs_module_1_state *state) {
         float spin_tilt = MFS_SHOOTER_LAUNCH_ANGLE_DEG * (float) M_PI / 180.0f;
         float sp_cos = cosf (spin_tilt), sp_sin = sinf (spin_tilt);
         vector3 spin_axis_chassis = {0.0f, sp_cos, sp_sin};
-
         /* Revolute joint to chassis for flywheel spin, about the SAME axis. */
         int joint_idx = constraint_add_revolute (
             world, chassis->object_id, flywheel->object_id,
@@ -604,7 +526,6 @@ MPE_USED void mfs_module_1_shooter_create (mfs_module_1_state *state) {
              * (no removal API; steps stay id-resolved and NULL-safe). */
             fprintf (stderr, "[mfs-module-1] shooter_create: revolute joint failed (pool exhausted?)\n");
         }
-
         /* Orient the disc so its symmetry axis (local X -> cached_axes[0])
          * IS the spin axis. See the H6 note above: the previous tilt about X
          * could not move the symmetry axis, because that is the axis it
@@ -614,23 +535,18 @@ MPE_USED void mfs_module_1_shooter_create (mfs_module_1_state *state) {
             vector4_from_axis_with_angle ((vector3){0.0f, -sp_sin, sp_cos}, (float) M_PI * 0.5f);
         rigidbody_update_axes (flywheel_body);
     }
-
     state->shooter_rpm = 0.0f;
     state->shooter_spinning_up = false;
     state->shooter_ready = false;
 }
-
 /* ================================================================
  * Ball Spawning & Physics
  * ================================================================ */
-
 MPE_USED void mfs_module_1_ball_spawn (mfs_module_1_state *state, vector3 pos) {
     if (state->ball_count >= state->max_balls)
         return;
-
     physics_world *world = state->world;
     int idx = physics_world_add_sphere (world, MFS_BIOBUZZ_BALL_RADIUS, MFS_BIOBUZZ_BALL_MASS, pos);
-
     if (idx >= 0) {
         rigidbody *ball = &world->bodies[idx];
         ball->restitution = MFS_BIOBUZZ_BALL_RESTITUTION;
@@ -640,24 +556,19 @@ MPE_USED void mfs_module_1_ball_spawn (mfs_module_1_state *state, vector3 pos) {
         state->ball_body_ids[state->ball_count++] = ball->object_id;
     }
 }
-
 MPE_USED void mfs_module_1_ball_physics_step (mfs_module_1_state *state, float dt) {
     (void) dt;
     physics_world *world = state->world;
     if (!world)
         return;
-
     const float air_density = 1.225f;
     const float drag_coeff = 0.47f; /* Sphere */
     const float cross_section = M_PI * MFS_BIOBUZZ_BALL_RADIUS * MFS_BIOBUZZ_BALL_RADIUS;
-
     for (int i = 0; i < state->ball_count; i++) {
         int body_idx = physics_world_index_by_id (world, state->ball_body_ids[i]);
         if (body_idx < 0)
             continue;
-
         rigidbody *ball = &world->bodies[body_idx];
-
         /* Aerodynamic drag */
         float speed = vector3_length (ball->velocity);
         if (speed > 0.1f) {
@@ -666,14 +577,12 @@ MPE_USED void mfs_module_1_ball_physics_step (mfs_module_1_state *state, float d
             vector3 drag = vector3_scaling (drag_dir, drag_force);
             rb_apply_forces_perfect (ball, drag);
         }
-
         /* Magnus effect (lift from spin) */
         vector3 spin_axis = ball->angular_velocity;
         float spin_rate = vector3_length (spin_axis);
         if (spin_rate > 10.0f) { /* Significant spin */
             vector3 spin_dir = vector3_scaling (spin_axis, 1.0f / spin_rate);
             vector3 vel_dir = (speed > 0.001f) ? vector3_scaling (ball->velocity, 1.0f / speed) : (vector3){0, 0, 0};
-
             /* Magnus force along spin x velocity (FIX-AUDIT-DESPOT direction
              * word: perpendicular-to-both is ambiguous about ORDER — the
              * model applies cross(spin_dir, vel_dir), i.e. spin-cross-
@@ -693,11 +602,9 @@ MPE_USED void mfs_module_1_ball_physics_step (mfs_module_1_state *state, float d
         }
     }
 }
-
 /* ================================================================
  * Intake Step
  * ================================================================ */
-
 MPE_USED void mfs_module_1_intake_step (mfs_module_1_state *state, float dt) {
     physics_world *world = state->world;
     /* FIX-AUDIT-DESPOT: was `intake_roller_body <= 0` + index_by_id — an
@@ -711,7 +618,6 @@ MPE_USED void mfs_module_1_intake_step (mfs_module_1_state *state, float dt) {
     rigidbody *roller = physics_world_body_by_id (world, (uint32_t) state->intake_roller_body);
     if (!roller)
         return;
-
     /* MFS H5 (DESPOT-2026-09-29): the intake roller had TWO actuators fighting
      * each other, and neither was wired to the state that controls intake.
      *
@@ -745,12 +651,10 @@ MPE_USED void mfs_module_1_intake_step (mfs_module_1_state *state, float dt) {
          * roller to a stop instead of leaving it spinning forever. */
         constraint_set_revolute_motor (world, state->intake_pivot_joint, true, target_omega, 0.5f);
     }
-
     /* M7 AXIAL PROJECTION FIX, now moot for actuation but worth keeping the
      * principle on record: the roller's spin is about its own world axle
      * (cached_axes[0]), not raw X, because the roller yaws with the chassis.
      * The joint motor projects on the joint axis, so it needs no fix. */
-
     /* Ball pickup detection: check contacts between intake and balls */
     if (state->intake_active) {
         /* DESPOT-2026-10-02 (the declared carry limit did not exist).
@@ -785,14 +689,11 @@ MPE_USED void mfs_module_1_intake_step (mfs_module_1_state *state, float dt) {
             int ball_idx = physics_world_index_by_id (world, state->ball_body_ids[i]);
             if (ball_idx < 0)
                 continue;
-
             rigidbody *ball = &world->bodies[ball_idx];
-
             /* Check if ball is near intake (simple distance check) */
             vector3 diff = vector3_subtraction (ball->position, roller->position);
             float dist = vector3_length (diff);
             float pickup_radius = MFS_INTAKE_ROLLER_RADIUS + MFS_BIOBUZZ_BALL_RADIUS + MFS_INTAKE_COMPLIANCE;
-
             if (dist < pickup_radius && ball->velocity.y < 0.5f) {
                 /* FIX-AUDIT-DESPOT: balls_collected was never incremented
                  * (dead stat). Count each ball once, on first intake touch;
@@ -813,7 +714,6 @@ MPE_USED void mfs_module_1_intake_step (mfs_module_1_state *state, float dt) {
                     (dist > 1.0e-6f) ? vector3_scaling (diff, -1.0f / dist) : (vector3){0.0f, -1.0f, 0.0f};
                 vector3 intake_force = vector3_scaling (to_roller, 2.0f); /* 2N intake force */
                 rb_apply_forces_perfect (ball, intake_force);
-
                 /* Entrain the ball toward roller surface velocity: explicit
                  * rate 0.3/s times dt (dimensionless per-tick fraction).
                  * Compliant-contact stand-in, not a contact force. */
@@ -825,11 +725,9 @@ MPE_USED void mfs_module_1_intake_step (mfs_module_1_state *state, float dt) {
         }
     }
 }
-
 /* ================================================================
  * Shooter Step
  * ================================================================ */
-
 MPE_USED void mfs_module_1_shooter_step (mfs_module_1_state *state, float dt) {
     physics_world *world = state->world;
     /* FIX-AUDIT-DESPOT: same id-vs-index cleanup as the intake step. */
@@ -852,12 +750,10 @@ MPE_USED void mfs_module_1_shooter_step (mfs_module_1_state *state, float dt) {
     }
     float current_omega_y = vector3_dot (flywheel->angular_velocity, sax);
     state->shooter_rpm = fabsf (current_omega_y) * 30.0f / M_PI;
-
     /* Spin-up logic */
     if (state->shooter_spinup_cmd && !state->shooter_ready) {
         state->shooter_spinning_up = true;
         state->shooter_spinup_timer += dt;
-
         /* Apply spin-up torque */
         float target_omega = state->shooter_target_rpm * M_PI / 30.0f;
         float omega_error = target_omega - current_omega_y;
@@ -877,7 +773,6 @@ MPE_USED void mfs_module_1_shooter_step (mfs_module_1_state *state, float dt) {
                     vector3_subtraction (chassis->torque_accumulator, vector3_scaling (sax, torque));
             }
         }
-
         if (state->shooter_rpm >= state->shooter_target_rpm * 0.95f) {
             state->shooter_ready = true;
             state->shooter_spinning_up = false;
@@ -887,7 +782,6 @@ MPE_USED void mfs_module_1_shooter_step (mfs_module_1_state *state, float dt) {
         state->shooter_spinup_timer = 0.0f;
         state->shooter_ready = false;
     }
-
     /* Fire logic */
     if (state->shooter_fire_cmd && state->shooter_ready) {
         /* Find a ball in the shooter hopper (near flywheel) */
@@ -895,16 +789,13 @@ MPE_USED void mfs_module_1_shooter_step (mfs_module_1_state *state, float dt) {
             int ball_idx = physics_world_index_by_id (world, state->ball_body_ids[i]);
             if (ball_idx < 0)
                 continue;
-
             rigidbody *ball = &world->bodies[ball_idx];
             vector3 diff = vector3_subtraction (ball->position, flywheel->position);
             float dist = vector3_length (diff);
-
             if (dist < 0.08f) { /* Ball in shooting position */
                 /* Launch ball: transfer flywheel surface velocity + angle */
                 vector3 surface_vel = vector3_cross (flywheel->angular_velocity, vector3_scaling (diff, 1.0f));
                 float surf_speed = vector3_length (surface_vel);
-
                 if (surf_speed > 5.0f) {
                     vector3 launch_dir = vector3_scaling (surface_vel, 1.0f / surf_speed);
                     /* C1 UNIT FIX: m*surf_speed is an IMPULSE (N.s), but
@@ -920,7 +811,6 @@ MPE_USED void mfs_module_1_shooter_step (mfs_module_1_state *state, float dt) {
                         vector3 force = vector3_scaling (launch_dir, MFS_BIOBUZZ_BALL_MASS * dv / dt);
                         rb_apply_forces_localised (ball, force, ball->position);
                     }
-
                     /* MFS H7 (DESPOT-2026-09-29): the launch transferred
                      * linear velocity ONLY. The ball therefore left with
                      * angular_velocity == 0, and ball_physics_step's Magnus
@@ -950,7 +840,6 @@ MPE_USED void mfs_module_1_shooter_step (mfs_module_1_state *state, float dt) {
                         vector3 spin = vector3_scaling (surface_vel, 0.8f / MFS_BIOBUZZ_BALL_RADIUS);
                         ball->angular_velocity = vector3_addition (ball->angular_velocity, spin);
                     }
-
                     state->balls_fired++; /* fired, not scored: no goal detection exists */
                     state->shooter_fire_cmd = false; /* Consume fire command */
                     /* FIX-AUDIT-DESPOT: break lives INSIDE the success branch.
@@ -964,27 +853,22 @@ MPE_USED void mfs_module_1_shooter_step (mfs_module_1_state *state, float dt) {
         }
     }
 }
-
 /* ================================================================
  * Robot Drive Step
  * ================================================================ */
-
 MPE_USED void mfs_module_1_robot_drive_step (mfs_module_1_state *state, float dt) {
     (void) dt;
     if (!state->robot_created)
         return;
-
     /* Canonical mecanum mixer (normalized, FTC rotate convention).
      * The hand mixer here was rotate-inverted vs drivetrain_mecanum and
      * clamped per-wheel without normalization, distorting combined
      * inputs. Single source of truth now. */
     drivetrain_mecanum (&state->robot, state->drive_forward, state->drive_strafe, state->drive_rotate);
 }
-
 /* ================================================================
  * Public API
  * ================================================================ */
-
 MPE_USED void mfs_module_1_set_drive_commands (mfs_module_1_state *state, float forward, float strafe, float rotate) {
     if (!state)
         return;
@@ -992,20 +876,17 @@ MPE_USED void mfs_module_1_set_drive_commands (mfs_module_1_state *state, float 
     state->drive_strafe = strafe;
     state->drive_rotate = rotate;
 }
-
 MPE_USED void mfs_module_1_set_intake (mfs_module_1_state *state, bool active) {
     if (!state)
         return;
     state->intake_active = active;
 }
-
 MPE_USED void mfs_module_1_set_shooter (mfs_module_1_state *state, bool spinup, bool fire) {
     if (!state)
         return;
     state->shooter_spinup_cmd = spinup;
     state->shooter_fire_cmd = fire;
 }
-
 MPE_USED void mfs_module_1_get_stats (const mfs_module_1_state *state, int *balls_collected, int *balls_fired,
                                       float *shooter_rpm, bool *shooter_ready) {
     if (!state)
@@ -1019,7 +900,6 @@ MPE_USED void mfs_module_1_get_stats (const mfs_module_1_state *state, int *ball
     if (shooter_ready)
         *shooter_ready = state->shooter_ready;
 }
-
 /* ================================================================
  * Helper: get chassis body
  * ================================================================ */

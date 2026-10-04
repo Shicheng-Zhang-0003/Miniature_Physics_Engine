@@ -8,25 +8,21 @@
 #include <math.h>
 #include <stdint.h>
 #include <stdbool.h>
-
 /* All mutable state lives in the per-world workspace (broadphase_workspace,
  * owned by physics_world). No file-scope state remains; worlds never share
  * broadphase data. Static helpers below take the workspace explicitly. */
-
 int broadphase_get_node_overflow_count (const struct physics_world *world) {
     if ((!world) || (!world->broadphase)) {
         return 0;
     }
     return world->broadphase->node_overflow_count;
 }
-
 int broadphase_get_pair_overflow_count (const struct physics_world *world) {
     if ((!world) || (!world->broadphase)) {
         return 0;
     }
     return world->broadphase->pair_overflow_count;
 }
-
 /* MPE_TASK_10_PAIR_DEDUPE_GETTER_BEGIN */
 int broadphase_get_pair_dedupe_overflow_count (const struct physics_world *world) {
     if ((!world) || (!world->broadphase)) {
@@ -35,7 +31,6 @@ int broadphase_get_pair_dedupe_overflow_count (const struct physics_world *world
     return world->broadphase->pair_dedupe_overflow_count;
 }
 /* MPE_TASK_10_PAIR_DEDUPE_GETTER_END */
-
 /* MPE_TASK_11_LARGE_OBJECT_CLAMP_GETTER_BEGIN */
 int broadphase_get_large_object_clamp_count (const struct physics_world *world) {
     if ((!world) || (!world->broadphase)) {
@@ -44,7 +39,6 @@ int broadphase_get_large_object_clamp_count (const struct physics_world *world) 
     return world->broadphase->large_object_clamp_count;
 }
 /* MPE_TASK_11_LARGE_OBJECT_CLAMP_GETTER_END */
-
 void broadphase_reset_overflow_counts (struct physics_world *world) {
     if ((!world) || (!world->broadphase)) {
         return;
@@ -58,7 +52,6 @@ void broadphase_reset_overflow_counts (struct physics_world *world) {
     world->broadphase->large_object_clamp_count = 0;
     /* MPE_TASK_11_LARGE_OBJECT_CLAMP_RESET_END */
 }
-
 void broadphase_cleanup (struct physics_world *world) {
     if ((!world) || (!world->broadphase)) {
         return;
@@ -70,7 +63,6 @@ void broadphase_cleanup (struct physics_world *world) {
         world->broadphase->node_count = 0;
     }
 }
-
 /* MPE_TASK_17_CELL_SIZE_GETTER_BEGIN */
 float broadphase_get_current_cell_size (const struct physics_world *world) {
     if ((!world) || (!world->broadphase)) {
@@ -79,14 +71,12 @@ float broadphase_get_current_cell_size (const struct physics_world *world) {
     return world->broadphase->current_cell_size;
 }
 /* MPE_TASK_17_CELL_SIZE_GETTER_END */
-
 static int hash_coordinate (int x, int y, int z) {
     unsigned int h = ((unsigned int) x) * 73856093u;
     h ^= ((unsigned int) y) * 19349663u;
     h ^= ((unsigned int) z) * 83492791u;
     return (int) (h % hash_table_size);
 }
-
 static bool broadphase_ensure_node_capacity (broadphase_workspace *ws) {
     if (!ws) {
         return false;
@@ -136,7 +126,6 @@ static bool broadphase_ensure_node_capacity (broadphase_workspace *ws) {
     ws->node_pool_capacity = new_capacity;
     return true;
 }
-
 static void insert_into_hash (broadphase_workspace *ws, int object_index, int x, int y, int z) {
     if (!broadphase_ensure_node_capacity (ws)) {
         return;
@@ -147,7 +136,6 @@ static void insert_into_hash (broadphase_workspace *ws, int object_index, int x,
     ws->hash_table[hash] = ws->node_count;
     ws->node_count++;
 }
-
 float broadphase_bounding_radius (rigidbody *rb) {
     if (!rb) {
         return 0.0f;
@@ -188,11 +176,9 @@ float broadphase_bounding_radius (rigidbody *rb) {
     }
     return out;
 }
-
 static inline uint64_t a3_broadphase_pair_key (int object_a, int object_b) {
     return ((uint64_t) (uint32_t) object_a << 32) | (uint64_t) (uint32_t) object_b;
 }
-
 static inline uint32_t a3_broadphase_pair_hash (uint64_t key) {
     uint64_t mixed_key = key;
     mixed_key ^= mixed_key >> 33;
@@ -202,7 +188,6 @@ static inline uint32_t a3_broadphase_pair_hash (uint64_t key) {
     mixed_key ^= mixed_key >> 33;
     return (uint32_t) (mixed_key & a3_pair_hash_mask);
 }
-
 /* FIX-AUDIT-DESPOT: total order on canonical (min,max) pairs for the
  * pre-return sort in broadphase_generate_pairing. */
 static int broadphase_pair_cmp (const void *pa, const void *pb) {
@@ -216,7 +201,6 @@ static int broadphase_pair_cmp (const void *pa, const void *pb) {
     }
     return 0;
 }
-
 static void broadphase_pair_dedupe_begin (broadphase_workspace *ws) {
     if (!ws) {
         return;
@@ -229,7 +213,6 @@ static void broadphase_pair_dedupe_begin (broadphase_workspace *ws) {
         ws->pair_hash_generation = 1;
     }
 }
-
 static bool pair_already_checked (broadphase_workspace *ws, int min_obj, int max_obj) {
     uint64_t key = a3_broadphase_pair_key (min_obj, max_obj);
     uint32_t index = a3_broadphase_pair_hash (key);
@@ -256,7 +239,6 @@ static bool pair_already_checked (broadphase_workspace *ws, int min_obj, int max
     return false;
     /* MPE_TASK_10_PAIR_DEDUPE_FALLBACK_END */
 }
-
 /* MPE_TASK_17_CELL_SIZE_FUNCTION_BEGIN */
 static void broadphase_update_cell_size (struct physics_world *world, rigidbody *bodies,
                                          int body_count) { /* MPE_FTC_059 */
@@ -271,7 +253,6 @@ static void broadphase_update_cell_size (struct physics_world *world, rigidbody 
         ws->ticks_since_cell_recompute = 0;
         return;
     }
-
     /* Cache: skip O(n) rescan if population is stable and we recomputed
      * recently. Recompute when count drifts >10% or every 60 ticks.
      * TRUTH: count alone hides same-count size swaps (spheres -> huge walls).
@@ -306,10 +287,8 @@ static void broadphase_update_cell_size (struct physics_world *world, rigidbody 
     }
     ws->cached_body_count = body_count;
     ws->ticks_since_cell_recompute = 0;
-
     double radius_sum = 0.0;
     float max_radius = 0.0f;
-
     for (int object_index = 0; object_index < body_count; object_index++) {
         float object_radius = broadphase_bounding_radius (&bodies[object_index]);
         if ((isfinite (object_radius)) && (object_radius > 0.0f)) {
@@ -319,7 +298,6 @@ static void broadphase_update_cell_size (struct physics_world *world, rigidbody 
             }
         }
     }
-
     float average_radius = (float) (radius_sum / (double) body_count);
     if ((!isfinite (average_radius)) || (average_radius <= 0.0f)) {
         average_radius = 0.5f;
@@ -327,26 +305,20 @@ static void broadphase_update_cell_size (struct physics_world *world, rigidbody 
     if ((!isfinite (max_radius)) || (max_radius <= 0.0f)) {
         max_radius = 0.5f;
     }
-
     float desired_cell_size = C->broadphase.cell_size_multiplier * average_radius;
     float minimum_required_cell_size = (2.0f * max_radius) / (float) C->broadphase.max_cell_span_per_axis;
-
     if (desired_cell_size < minimum_required_cell_size) {
         desired_cell_size = minimum_required_cell_size;
     }
-
     if (desired_cell_size < C->broadphase.cell_size_min) {
         desired_cell_size = C->broadphase.cell_size_min;
     }
-
     if (desired_cell_size > C->broadphase.cell_size_max) {
         desired_cell_size = C->broadphase.cell_size_max;
     }
-
     ws->current_cell_size = desired_cell_size;
 }
 /* MPE_TASK_17_CELL_SIZE_FUNCTION_END */
-
 int broadphase_generate_pairing (struct physics_world *world, broadphase_pair *collision_pairs_output_array,
                                  int maximum_pairs_allowed, float dt) { /* MPE_FTC_059 */
     if ((!world) || (!world->bodies) || (!world->broadphase) || (!collision_pairs_output_array) ||
@@ -366,7 +338,6 @@ int broadphase_generate_pairing (struct physics_world *world, broadphase_pair *c
         ws->ticks_since_cell_recompute = 0;
         return 0;
     }
-
     broadphase_update_cell_size (world, bodies, body_count); /* MPE_FTC_059e */
     /* MPE_TASK_17_CELL_SIZE_CALL_END */
     for (int i = 0; i < hash_table_size; i++) {
@@ -479,19 +450,15 @@ int broadphase_generate_pairing (struct physics_world *world, broadphase_pair *c
          * (see overflow counters) and do not trust timing. */
         bool a3_large_object_clamped = false;
         const int max_span = mpe_world_cfg (world)->broadphase.max_cell_span_per_axis;
-
         if ((max_x - min_x) > max_span) {
             a3_large_object_clamped = true;
         }
-
         if ((max_y - min_y) > max_span) {
             a3_large_object_clamped = true;
         }
-
         if ((max_z - min_z) > max_span) {
             a3_large_object_clamped = true;
         }
-
         if (a3_large_object_clamped) {
             ws->large_object_clamp_count++;
         }

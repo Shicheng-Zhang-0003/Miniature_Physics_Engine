@@ -3,26 +3,20 @@
 #include <math.h>
 #include <stdio.h>
 #include "mfs_test.h"
-
 /* teleop: straight drive 0.5m, dy<=1m, heading<=0.3rad. */
 int mfs_t_teleop (void) {
     mfs_test_t t;
     mfs_test_begin (&t, "teleop");
     mfs_test_t *t_ptr = &t;
-
     physics_world w;
     mfs_test_world (&w);
-
     ftc_robot *robot =
         mfs_create_robot (&w, 0.0f, ftc_robot_rest_height (), 0.0f, MOTOR_GB_5203_26_9, FTC_DRIVETRAIN_TANK);
     MFS_CHECK (t_ptr, robot != NULL);
-
     float start_x, start_y, start_z;
     mfs_get_pos (&w, robot, &start_x, &start_y, &start_z);
-
     const float dt = 1.0f / 60.0f;
     int fail = 0;
-
     for (int t_tick = 0; t_tick < 180 && !fail; t_tick++) {
         mfs_drive_tank (robot, 1.0f, 1.0f);
         drivetrain_update (&w, robot, dt);
@@ -31,7 +25,6 @@ int mfs_t_teleop (void) {
             fail = 1;
         }
     }
-
     if (!fail) {
         float end_x, end_y, end_z;
         mfs_get_pos (&w, robot, &end_x, &end_y, &end_z);
@@ -47,42 +40,33 @@ int mfs_t_teleop (void) {
                 atan2f (2.0f * (ch->orientation.w * ch->orientation.y + ch->orientation.x * ch->orientation.z),
                         1.0f - 2.0f * (ch->orientation.y * ch->orientation.y + ch->orientation.x * ch->orientation.x)));
         }
-
         MFS_INFO ("disp_xz=%.4f dy=%.4f heading=%.4f", disp_xz, dy, heading);
         MFS_CHECK (t_ptr, disp_xz >= 0.5f);
         MFS_CHECK (t_ptr, dy <= 1.0f);
         MFS_CHECK (t_ptr, heading <= 0.3f);
-
         if (t_ptr->failures == 0) {
             printf ("[PASS] teleop straight drive\n");
         }
     }
-
     physics_world_cleanup (&w);
     free (robot);
     mfs_test_end (t_ptr);
     return t_ptr->failures;
 }
-
 /* mecanum: strafe right >0.3m in +X. */
 int mfs_t_mecanum (void) {
     mfs_test_t t;
     mfs_test_begin (&t, "mecanum");
     mfs_test_t *t_ptr = &t;
-
     physics_world w;
     mfs_test_world (&w);
-
     ftc_robot *robot =
         mfs_create_robot (&w, 0.0f, ftc_robot_rest_height (), 0.0f, MOTOR_GB_5203_26_9, FTC_DRIVETRAIN_MECANUM);
     MFS_CHECK (t_ptr, robot != NULL);
-
     float start_x, start_y, start_z;
     mfs_get_pos (&w, robot, &start_x, &start_y, &start_z);
-
     const float dt = 1.0f / 60.0f;
     int fail = 0;
-
     for (int t_tick = 0; t_tick < 180 && !fail; t_tick++) {
         mfs_drive_mecanum (robot, 0.0f, 1.0f, 0.0f);
         drivetrain_update (&w, robot, dt);
@@ -91,16 +75,13 @@ int mfs_t_mecanum (void) {
             fail = 1;
         }
     }
-
     if (!fail) {
         float end_x, end_y, end_z;
         mfs_get_pos (&w, robot, &end_x, &end_y, &end_z);
         float dx = end_x - start_x;
         float dz = end_z - start_z;
-
         MFS_INFO ("start=(%.3f,%.3f,%.3f) end=(%.3f,%.3f,%.3f)", start_x, start_y, start_z, end_x, end_y, end_z);
         MFS_INFO ("displacement x=%.4f  z=%.4f", dx, dz);
-
         /* MFS-STRAFE-F1 (FIXED 2026-09-28, was XFAIL 2026-09-26): pure
          * strafe now develops 3.40 m in 3 s vs 0.30 m gated (was ~0.01 m;
          * 0.17 m after the engine math3d/det fixes, then 3.40 m with the
@@ -121,13 +102,11 @@ int mfs_t_mecanum (void) {
             printf ("[FAIL][MFS-STRAFE-F1] mecanum strafe dx=%.4f < 0.30\n", dx);
         }
     }
-
     physics_world_cleanup (&w);
     free (robot);
     mfs_test_end (t_ptr);
     return t_ptr->failures;
 }
-
 /* release_settle: drive forward, then release to zero command. The robot
  * must come to rest (vehicle stops, wheels stop, axles stay aligned).
  * DESPOT-2026-10-04: two live-session defects, both unmeasured by the
@@ -153,20 +132,15 @@ int mfs_t_release_settle (void) {
     mfs_test_t t;
     mfs_test_begin (&t, "release_settle");
     mfs_test_t *t_ptr = &t;
-
     physics_world w;
     mfs_test_world (&w);
-
     ftc_robot *robot =
         mfs_create_robot (&w, 0.0f, ftc_robot_rest_height (), 0.0f, MOTOR_GB_5203_26_9, FTC_DRIVETRAIN_MECANUM);
     MFS_CHECK (t_ptr, robot != NULL);
-
     float start_x, start_y, start_z;
     mfs_get_pos (&w, robot, &start_x, &start_y, &start_z);
-
     const float dt = 1.0f / 60.0f;
     int fail = 0;
-
     for (int t_tick = 0; t_tick < 180 && !fail; t_tick++) {
         mfs_drive_mecanum (robot, 1.0f, 0.0f, 0.0f);
         drivetrain_update (&w, robot, dt);
@@ -180,7 +154,6 @@ int mfs_t_release_settle (void) {
     float drive_disp = sqrtf ((drive_x - start_x) * (drive_x - start_x) + (drive_z - start_z) * (drive_z - start_z));
     MFS_INFO ("drive displacement=%.4f m", drive_disp);
     MFS_CHECK (t_ptr, drive_disp >= 0.5f);
-
     for (int t_tick = 0; t_tick < 240 && !fail; t_tick++) {
         mfs_drive_mecanum (robot, 0.0f, 0.0f, 0.0f);
         drivetrain_update (&w, robot, dt);
@@ -189,7 +162,6 @@ int mfs_t_release_settle (void) {
             fail = 1;
         }
     }
-
     if (!fail) {
         rigidbody *ch = mfs_chassis_or_null (&w, robot);
         MFS_CHECK (t_ptr, ch != NULL);
@@ -232,32 +204,25 @@ int mfs_t_release_settle (void) {
             printf ("[PASS] release settles: vehicle stops, wheels stop, axles aligned\n");
         }
     }
-
     physics_world_cleanup (&w);
     free (robot);
     mfs_test_end (t_ptr);
     return t_ptr->failures;
 }
-
 /* tank: differential turn in place. */
 int mfs_t_tank (void) {
     mfs_test_t t;
     mfs_test_begin (&t, "tank");
     mfs_test_t *t_ptr = &t;
-
     physics_world w;
     mfs_test_world (&w);
-
     ftc_robot *robot =
         mfs_create_robot (&w, 0.0f, ftc_robot_rest_height (), 0.0f, MOTOR_GB_5203_26_9, FTC_DRIVETRAIN_TANK);
     MFS_CHECK (t_ptr, robot != NULL);
-
     float start_x, start_y, start_z;
     mfs_get_pos (&w, robot, &start_x, &start_y, &start_z);
-
     const float dt = 1.0f / 60.0f;
     int fail = 0;
-
     for (int t_tick = 0; t_tick < 120 && !fail; t_tick++) {
         mfs_drive_tank (robot, 1.0f, -1.0f);
         drivetrain_update (&w, robot, dt);
@@ -266,7 +231,6 @@ int mfs_t_tank (void) {
             fail = 1;
         }
     }
-
     if (!fail) {
         float end_x, end_y, end_z;
         mfs_get_pos (&w, robot, &end_x, &end_y, &end_z);
@@ -280,9 +244,7 @@ int mfs_t_tank (void) {
             q = ch->orientation;
             heading = fabsf (atan2f (2.0f * (q.w * q.y + q.x * q.z), 1.0f - 2.0f * (q.y * q.y + q.x * q.x)));
         }
-
         MFS_INFO ("displacement=%.4f heading=%.4f", disp, heading);
-
         MFS_CHECK (t_ptr, disp <= 0.3f);
         MFS_CHECK (t_ptr, heading >= 0.1f);
         /* DESPOT-2026-09-29: the two gates above are so loose they are almost
@@ -354,40 +316,31 @@ int mfs_t_tank (void) {
          * determinism, not flake). */
         MFS_CHECK_REL (t_ptr, heading, 1.8741f, 0.08f, "tank pivot heading (measured baseline)");
         MFS_CHECK_REL (t_ptr, disp, 0.0642f, 0.20f, "tank pivot translation (measured baseline)");
-
         if (t_ptr->failures == 0) {
             printf ("[PASS] tank differential turn (disp=%.4f, heading=%.4f)\n", disp, heading);
         }
     }
-
     physics_world_cleanup (&w);
     free (robot);
     mfs_test_end (t_ptr);
     return t_ptr->failures;
 }
-
 /* odometry: forward + strafe accuracy. */
 int mfs_t_odometry (void) {
     mfs_test_t t;
     mfs_test_begin (&t, "odometry");
     mfs_test_t *t_ptr = &t;
-
     physics_world w;
     mfs_test_world (&w);
-
     ftc_robot *robot =
         mfs_create_robot (&w, 0.0f, ftc_robot_rest_height (), 0.0f, MOTOR_GB_5203_26_9, FTC_DRIVETRAIN_TANK);
     MFS_CHECK (t_ptr, robot != NULL);
-
     const float dt = 1.0f / 60.0f;
     int fail = 0;
-
     /* Settle */
     MFS_CHECK (t_ptr, mfs_step (&w, 120, dt));
-
     /* Zero odometry */
     robot->odom_x = robot->odom_z = robot->odom_theta = 0.0f;
-
     /* Phase 1: forward drive */
     for (int t_tick = 0; t_tick < 180 && !fail; t_tick++) {
         mfs_drive_tank (robot, 1.0f, 1.0f);
@@ -396,18 +349,15 @@ int mfs_t_odometry (void) {
         if (!mfs_test_finite (&w))
             fail = 1;
     }
-
     if (!fail) {
         float end_x, end_y, end_z;
         mfs_get_pos (&w, robot, &end_x, &end_y, &end_z);
         float dist = sqrtf (end_x * end_x + end_z * end_z);
         float odom_dist = sqrtf (robot->odom_x * robot->odom_x + robot->odom_z * robot->odom_z);
         float odom_error = fabsf (odom_dist - dist) / dist;
-
         MFS_INFO ("odometry distance error: %.1f%%", odom_error * 100.0f);
         MFS_CHECK (t_ptr, dist >= 0.2f);
         MFS_CHECK_REL (t_ptr, odom_dist, dist, 0.3f, "odometry distance");
-
         /* Phase 2: strafe (MECANUM hardware: tanks cannot strafe, so a
          * fresh mecanum robot is spawned; odometry zeroed).
          * MFS-STRAFE-F2 (FIXED 2026-09-28, was XFAIL 2026-09-26, PARTIAL
@@ -466,33 +416,26 @@ int mfs_t_odometry (void) {
             }
         }
     }
-
     if (t_ptr->failures == 0) {
         printf ("[PASS] odometry tracks physics\n");
     }
-
     physics_world_cleanup (&w);
     free (robot);
     mfs_test_end (t_ptr);
     return t_ptr->failures;
 }
-
 /* ftc_integration: combined drive test. */
 int mfs_t_ftc_integration (void) {
     mfs_test_t t;
     mfs_test_begin (&t, "ftc_integration");
     mfs_test_t *t_ptr = &t;
-
     physics_world w;
     mfs_test_world (&w);
-
     ftc_robot *robot =
         mfs_create_robot (&w, 0.0f, ftc_robot_rest_height (), 0.0f, MOTOR_GB_5203_26_9, FTC_DRIVETRAIN_MECANUM);
     MFS_CHECK (t_ptr, robot != NULL);
-
     const float dt = 1.0f / 60.0f;
     int fail = 0;
-
     for (int t_tick = 0; t_tick < 240 && !fail; t_tick++) {
         if (t_tick < 120) {
             mfs_drive_mecanum (robot, 1.0f, 0.0f, 0.0f);
@@ -508,22 +451,18 @@ int mfs_t_ftc_integration (void) {
             break;
         }
     }
-
     if (!fail) {
         float end_x, end_y, end_z;
         mfs_get_pos (&w, robot, &end_x, &end_y, &end_z);
         float dist = sqrtf (end_x * end_x + end_z * end_z);
         float dy = fabsf (end_y - ftc_robot_rest_height ());
-
         MFS_INFO ("disp_xz=%.4f dy=%.4f", dist, dy);
         MFS_CHECK (t_ptr, dist >= 0.5f);
         MFS_CHECK (t_ptr, dy <= 0.5f);
-
         if (t_ptr->failures == 0) {
             printf ("[PASS] ftc integration drive\n");
         }
     }
-
     physics_world_cleanup (&w);
     free (robot);
     mfs_test_end (t_ptr);
@@ -558,15 +497,12 @@ int mfs_t_stall_endpoint (void) {
     mfs_test_t t;
     mfs_test_begin (&t, "stall_endpoint");
     mfs_test_t *t_ptr = &t;
-
     /* Published OUTPUT-shaft stall torque for 5203-26.9: 38.0 kg*cm. */
     const float spec_stall_nm = 3.7265f;
     const float dt = 1.0f / 60.0f;
-
     motor m;
     motor_from_spec (&m, spec_stall_nm, 223.0f, 9.2f, 12.0f, 26.9f, 0.85f);
     m.command = 1.0f;
-
     /* Settle: with no rotor inertia the electrical state is algebraic, so a
      * few ticks only let the thermal model settle. */
     for (int i = 0; i < 30; i++) {
@@ -577,7 +513,6 @@ int mfs_t_stall_endpoint (void) {
               "current=%.3f A (spec stall 9.2), back_emf=%.4f V",
               m.output_torque, spec_stall_nm, 100.0 * (m.output_torque - spec_stall_nm) / spec_stall_nm, m.current,
               m.back_emf);
-
     /* Zero speed means zero back-EMF, so the current must be the full stall
      * current. If this drifts, the torque below is not a stall measurement. */
     MFS_CHECK_REL (t_ptr, m.current, 9.2f, 0.10, "stall current at zero speed");
@@ -585,7 +520,6 @@ int mfs_t_stall_endpoint (void) {
     /* The published endpoint. 10% band: the spec number is exact and this
      * path is algebraic, so anything looser would hide a real regression. */
     MFS_CHECK_REL (t_ptr, m.output_torque, spec_stall_nm, 0.10, "locked-rotor output torque");
-
     /* ---- Phase 2: the same endpoint WITH the disturbance observer closed
      * around it. This is the path that actually regressed (2.21 N.m against a
      * 3.73 N.m spec): the observer feeds its load estimate back into the
@@ -667,7 +601,6 @@ int mfs_t_stall_endpoint (void) {
          * an observer defect. */
         MFS_CHECK_REL (t_ptr, mo.output_torque, spec_stall_nm * (1.0f / 1.19237f), 0.02,
                        "closed-loop stall, THERMAL derating matches r_eff(T) model");
-
         /* Phase 2b: identical closed loop, copper temperature pinned at 25 C so
          * the observer is measured with no thermal confound. */
         {
@@ -703,14 +636,12 @@ int mfs_t_stall_endpoint (void) {
                            "(observer fidelity, no thermal confound)");
         }
     }
-
     if (t_ptr->failures == 0) {
         printf ("[PASS] stall endpoint (tau=%.4f vs spec %.4f N.m)\n", m.output_torque, spec_stall_nm);
     }
     mfs_test_end (t_ptr);
     return t_ptr->failures;
 }
-
 /* drive_directions: pin the AXIS each pure command actually drives, and pin
  * anti-symmetry under sign reversal.
  *
@@ -742,12 +673,10 @@ int mfs_t_stall_endpoint (void) {
 typedef struct {
     float vx, vz, om; /* steady-state rates: m/s, m/s, rad/s */
 } mfs_axis_rates;
-
 static float mfs_yaw_of (const rigidbody *b) {
     const quaternion q = b->orientation;
     return atan2f (2.0f * (q.w * q.y + q.x * q.z), 1.0f - 2.0f * (q.y * q.y + q.x * q.x));
 }
-
 static int mfs_measure_rates (physics_world *w, ftc_robot *robot, float f, float s, float r, mfs_axis_rates *out) {
     rigidbody *ch = mfs_chassis_or_null (w, robot);
     if (!ch || !robot)
@@ -785,15 +714,12 @@ static int mfs_measure_rates (physics_world *w, ftc_robot *robot, float f, float
     out->om = om / span;
     return 0;
 }
-
 int mfs_t_drive_directions (void) {
     mfs_test_t t;
     mfs_test_begin (&t, "drive_directions");
     mfs_test_t *t_ptr = &t;
     const float dt = 1.0f / 60.0f;
-
     mfs_axis_rates fwd, rev, str, rot_p, rot_n;
-
     /* forward / reverse on one robot */
     {
         physics_world w;
@@ -847,14 +773,12 @@ int mfs_t_drive_directions (void) {
         }
         physics_world_cleanup (&w);
     }
-
     MFS_INFO ("fwd  vx=%+.4f vz=%+.4f om=%+.4f", fwd.vx, fwd.vz, fwd.om);
     MFS_INFO ("rev  vx=%+.4f vz=%+.4f om=%+.4f", rev.vx, rev.vz, rev.om);
     MFS_INFO ("str  vx=%+.4f vz=%+.4f om=%+.4f", str.vx, str.vz, str.om);
     MFS_INFO ("rot+ vx=%+.4f vz=%+.4f om=%+.4f", rot_p.vx, rot_p.vz, rot_p.om);
     MFS_INFO ("rot- vx=%+.4f vz=%+.4f om=%+.4f", rot_n.vx, rot_n.vz, rot_n.om);
     (void) dt;
-
     /* 1. Forward must drive +Z. */
     MFS_CHECK (t_ptr, fwd.vz > 0.5f);
     /* 2. Reverse must drive -Z, and anti-symmetrically. */
@@ -926,7 +850,6 @@ int mfs_t_drive_directions (void) {
      *    (a diode that only ever cuts one way, a latched traction scale)
      *    shows up here as a persistent forward/reverse imbalance. */
     MFS_CHECK_REL (t_ptr, fabsf (fwd.vz), fabsf (rev.vz), 0.35f, "fwd/rev |vz| antisymmetry");
-
     if (t_ptr->failures == 0) {
         printf ("[PASS] drive axes decouple and reverse anti-symmetrically\n");
     }

@@ -1,30 +1,24 @@
 /* GTK4: Full port — no deprecated GTK3 APIs (no gtk_container_add, no gtk_dialog_run). Logic identical to GTK3. */
-
 #include "../mpe_engine.h"
 #include "config_menu.h"
 #include <stdio.h>
 #include <string.h>
-
 static int config_menu_level = 0;
 static int config_menu_active_category = -1;
 static int config_menu_selected_param = -1;
-
 bool config_menu_is_open (void) {
     return config_menu_level > 0;
 }
-
 void config_menu_level_force_open (void) {
     config_menu_level = 1;
     config_menu_active_category = -1;
     config_menu_selected_param = -1;
 }
-
 void config_menu_close (void) {
     config_menu_level = 0;
     config_menu_active_category = -1;
     config_menu_selected_param = -1;
 }
-
 void config_menu_key_press (int key_number) {
     if (config_menu_level == 0) {
         return;
@@ -109,7 +103,6 @@ void config_menu_key_press (int key_number) {
         }
     }
 }
-
 void config_menu_update (GtkWidget *parent_window) {
     if (config_menu_level < 10) {
         return;
@@ -156,7 +149,6 @@ void config_menu_update (GtkWidget *parent_window) {
     }
     config_menu_selected_param = -1;
 }
-
 void config_menu_render (char *buffer, size_t buffer_size) {
     if (config_menu_level == 0) {
         buffer[0] = '\0';

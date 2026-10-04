@@ -21,7 +21,6 @@
 #include "core/mpe_module.h"
 #include <string.h>
 #include <stdlib.h>
-
 typedef struct {
     const mpe_module_desc_t *desc;
     void *state;
@@ -30,17 +29,14 @@ typedef struct {
     unsigned in_flight; /* callbacks running outside the lock */
     bool detaching; /* detach owns the slot; no new callbacks */
 } mfs_slot;
-
 static mfs_slot s_slots[MFS_MAX_INTERNAL_MODULES];
 static int s_slot_count = 0; /* live slots (primary + aliases) */
 static int s_inflight = 0; /* global sum of in_flight, for tests/telemetry */
 static pthread_mutex_t s_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t s_cv = PTHREAD_COND_INITIALIZER;
-
 static int name_matches (const mfs_slot *s, const char *name) {
     return s->desc && s->desc->name && strcmp (s->desc->name, name) == 0;
 }
-
 static void slot_clear (mfs_slot *s) {
     s->desc = NULL;
     s->state = NULL;
@@ -49,11 +45,9 @@ static void slot_clear (mfs_slot *s) {
     s->in_flight = 0;
     s->detaching = false;
 }
-
 static void wake_all (void) {
     pthread_cond_broadcast (&s_cv);
 }
-
 int mfs_internal_registry_init (void) {
     pthread_mutex_lock (&s_lock);
     /* FIX-AUDIT-DESPOT: refuse to clear under live attachments instead of
@@ -72,7 +66,6 @@ int mfs_internal_registry_init (void) {
     pthread_mutex_unlock (&s_lock);
     return MFS_REG_OK;
 }
-
 int mfs_internal_module_registered (const char *name) {
     if (!name)
         return 0;
@@ -87,7 +80,6 @@ int mfs_internal_module_registered (const char *name) {
     pthread_mutex_unlock (&s_lock);
     return found;
 }
-
 int mfs_internal_module_register (const mpe_module_desc_t *desc) {
     if (!desc || !desc->name || desc->abi != MPE_MODULE_ABI)
         return MFS_REG_BAD_ARG;
@@ -110,7 +102,6 @@ int mfs_internal_module_register (const mpe_module_desc_t *desc) {
     pthread_mutex_unlock (&s_lock);
     return MFS_REG_FULL;
 }
-
 int mfs_internal_module_unregister (const char *name) {
     if (!name)
         return MFS_UNREG_NOT_FOUND;
@@ -140,7 +131,6 @@ int mfs_internal_module_unregister (const char *name) {
     pthread_mutex_unlock (&s_lock);
     return freed > 0 ? MFS_UNREG_OK : MFS_UNREG_NOT_FOUND;
 }
-
 int mfs_internal_module_attach (const char *name, physics_world *world) {
     if (!name || !world)
         return MFS_REG_BAD_ARG;
@@ -153,7 +143,6 @@ int mfs_internal_module_attach (const char *name, physics_world *world) {
                 return MFS_REG_OK;
             }
         }
-
         /* Prefer an existing idle slot for this name (primary registration
          * or a previously used alias). */
         int reg = -1;
@@ -164,7 +153,6 @@ int mfs_internal_module_attach (const char *name, physics_world *world) {
                 break;
             }
         }
-
         int made_alias = 0;
         if (reg < 0) {
             /* No idle slot: either every matching slot is busy (wait for it
@@ -210,7 +198,6 @@ int mfs_internal_module_attach (const char *name, physics_world *world) {
             reg = free_slot;
             made_alias = 1;
         }
-
         const mpe_module_desc_t *d = s_slots[reg].desc;
         if (!d || !d->attach) {
             if (made_alias) {
@@ -220,16 +207,13 @@ int mfs_internal_module_attach (const char *name, physics_world *world) {
             pthread_mutex_unlock (&s_lock);
             return MFS_REG_BAD_ARG;
         }
-
         /* Reserve: the in_flight bump both blocks a second attach on this
          * slot and counts as the reference held across the callback. */
         s_slots[reg].in_flight++;
         s_inflight++;
         pthread_mutex_unlock (&s_lock);
-
         void *state = NULL;
         int r = d->attach ((physics_world *) world, &state);
-
         pthread_mutex_lock (&s_lock);
         s_slots[reg].in_flight--;
         s_inflight--;
@@ -252,7 +236,6 @@ int mfs_internal_module_attach (const char *name, physics_world *world) {
         return MFS_REG_OK;
     }
 }
-
 int mfs_internal_module_detach (const char *name, physics_world *world) {
     if (!name || !world)
         return MFS_DET_NOT_FOUND;
@@ -302,9 +285,7 @@ int mfs_internal_module_detach (const char *name, physics_world *world) {
         s_slots[reg].in_flight++;
         s_inflight++;
         pthread_mutex_unlock (&s_lock);
-
         d->detach ((physics_world *) world, st);
-
         pthread_mutex_lock (&s_lock);
         s_slots[reg].in_flight--;
         s_inflight--;
@@ -319,7 +300,6 @@ int mfs_internal_module_detach (const char *name, physics_world *world) {
         return MFS_DET_OK;
     }
 }
-
 void *mfs_internal_module_state_for (const void *world, const char *name) {
     if (!world || !name)
         return NULL;
@@ -335,7 +315,6 @@ void *mfs_internal_module_state_for (const void *world, const char *name) {
     pthread_mutex_unlock (&s_lock);
     return out;
 }
-
 void *mfs_internal_module_state (const char *name) {
     if (!name)
         return NULL;
@@ -353,7 +332,6 @@ void *mfs_internal_module_state (const char *name) {
     pthread_mutex_unlock (&s_lock);
     return out;
 }
-
 /* Shared dispatch for pre_step/post_step. The snapshot is taken under the
  * lock WITH a reference per slot, so a concurrent detach drains instead of
  * freeing state we are about to call. */
@@ -380,7 +358,6 @@ static void mfs_dispatch (physics_world *world, float dt, bool pre) {
         s_inflight++;
     }
     pthread_mutex_unlock (&s_lock);
-
     for (int k = 0; k < n; k++) {
         if (pre) {
             ds[k]->pre_step ((physics_world *) world, dt, sts[k]);
@@ -400,15 +377,12 @@ static void mfs_dispatch (physics_world *world, float dt, bool pre) {
         pthread_mutex_unlock (&s_lock);
     }
 }
-
 void mfs_internal_modules_pre_step (physics_world *world, float dt) {
     mfs_dispatch (world, dt, true);
 }
-
 void mfs_internal_modules_post_step (physics_world *world, float dt) {
     mfs_dispatch (world, dt, false);
 }
-
 void mfs_internal_modules_detach_all (physics_world *world) {
     if (!world)
         return;
@@ -449,14 +423,12 @@ void mfs_internal_modules_detach_all (physics_world *world) {
         pthread_mutex_unlock (&s_lock);
     }
 }
-
 int mfs_internal_modules_inflight (void) {
     pthread_mutex_lock (&s_lock);
     int n = s_inflight;
     pthread_mutex_unlock (&s_lock);
     return n;
 }
-
 int mfs_internal_modules_slot_count (void) {
     pthread_mutex_lock (&s_lock);
     int n = s_slot_count;

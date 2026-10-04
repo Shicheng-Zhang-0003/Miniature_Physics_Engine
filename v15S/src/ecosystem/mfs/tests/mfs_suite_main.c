@@ -5,13 +5,11 @@
 #include <string.h>
 #include <stdbool.h>
 #include "mfs_test.h"
-
 typedef struct {
     const char *name;
     int (*fn) (void);
     bool diag;
 } mfs_test_entry_t;
-
 extern int mfs_t_teleop (void);
 extern int mfs_t_mecanum (void);
 extern int mfs_t_release_settle (void);
@@ -27,7 +25,6 @@ extern int mfs_t_stall_endpoint (void);
 extern int mfs_t_intake_stop (void);
 extern int mfs_t_shooter_axis (void);
 extern int mfs_t_ball_spin (void);
-
 static const mfs_test_entry_t registry[] = {
     {"teleop", mfs_t_teleop, false},
     {"mecanum", mfs_t_mecanum, false},
@@ -45,7 +42,6 @@ static const mfs_test_entry_t registry[] = {
     {"shooter_axis", mfs_t_shooter_axis, false},
     {"ball_spin", mfs_t_ball_spin, false},
 };
-
 int main (int argc, char **argv) {
     if (argc > 1 && strcmp (argv[1], "--list") == 0) {
         printf ("Blocking tests (%zu):\n", sizeof (registry) / sizeof (registry[0]));
@@ -54,7 +50,6 @@ int main (int argc, char **argv) {
         }
         return 0;
     }
-
     if (argc > 1 && strcmp (argv[1], "--all") == 0) {
         int total = 0, pass = 0, fail = 0;
         printf ("=== Running all blocking tests ===\n");
@@ -76,19 +71,16 @@ int main (int argc, char **argv) {
         printf ("Fail:  %d\n", fail);
         return fail > 0 ? 1 : 0;
     }
-
     if (argc < 2) {
         fprintf (stderr, "Usage: %s [--list|--all|<test_name>]\n", argv[0]);
         return 1;
     }
-
     for (size_t i = 0; i < sizeof (registry) / sizeof (registry[0]); i++) {
         if (strcmp (argv[1], registry[i].name) == 0) {
             int rc = registry[i].fn ();
             return rc > 0 ? 1 : 0;
         }
     }
-
     fprintf (stderr, "Unknown test: %s\n", argv[1]);
     return 1;
 }

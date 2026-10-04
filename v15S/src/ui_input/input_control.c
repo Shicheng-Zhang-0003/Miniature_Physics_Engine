@@ -1,5 +1,4 @@
 /* GTK4: Full port — mirrors GTK3 logic with GtkEventControllerKey/Motion/Gesture signatures. */
-
 #include "../mpe_engine.h"
 #include "input_control.h"
 #include "input_state.h"

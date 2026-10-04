@@ -1,31 +1,23 @@
-
 #ifdef mpe_floor_diag
 #include <stdio.h>
 #include <math.h>
 #include "core/physics_world.h"
 #include "config/mpe_config.h"
-
 static const float time_step = 1.0f / 60.0f;
-
 int main (void) {
     mpe_config_init ();
     printf ("\n=== FLOOR COLLISION DIAGNOSTIC ===\n");
-
     physics_world world;
     physics_world_init (&world);
-
     /* DESPOT-2026-10-04 [CLAMP-TAUTOLOGY closure]: same net-OFF + contact
      * evidence treatment as cylinder_drop (this diag duplicates it). */
     mpe_config_t no_net_cfg = g_cfg;
     no_net_cfg.boundary.safety_net_enabled = 0;
     physics_world_set_config (&world, &no_net_cfg);
-
     /* Static floor, top surface at y=0 */
     int floor_idx = physics_world_add_cube (&world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
-
     float r = 0.05f;
     int cyl_idx = physics_world_add_cylinder (&world, r, 0.02f, 0.5f, (vector3){0.0f, 1.0f, 0.0f});
-
     printf ("floor_idx=%d cyl_idx=%d\n", floor_idx, cyl_idx);
     printf ("cylinder initial: pos=(%.4f,%.4f,%.4f) vel=(%.4f,%.4f,%.4f)\n", world.bodies[cyl_idx].position.x,
             world.bodies[cyl_idx].position.y, world.bodies[cyl_idx].position.z, world.bodies[cyl_idx].velocity.x,
@@ -39,7 +31,6 @@ int main (void) {
     printf ("floor top y=%.4f (pos.y + half_ext.y)\n",
             world.bodies[floor_idx].position.y + world.bodies[floor_idx].half_extensions.y);
     printf ("\n");
-
     for (int i = 0; i < 60; i++) { /* MFS_139_EXTEND: run longer to reach floor */
         physics_world_step (&world, time_step);
         printf ("step=%2d y=%.6f vy=%.6f\n", i + 1, world.bodies[cyl_idx].position.y, world.bodies[cyl_idx].velocity.y);
@@ -51,7 +42,6 @@ int main (void) {
         diag_contact = 1;
     }
     printf ("contact_on_final_tick=%d (net OFF)\n", diag_contact);
-
     printf ("\n=== DIAG COMPLETE ===\n");
     /* TRUTH: a diagnostic that cannot fail is decoration. Gate the physical
      * invariants: finite state, no tunneling (y>=-slop), settled rest

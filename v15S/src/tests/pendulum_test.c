@@ -7,13 +7,11 @@
 #include "core/physics_world.h"
 #include "physics/constraint.h"
 #include "config/mpe_config.h"
-
 int main (void) {
     mpe_config_init ();
     physics_world world;
     physics_world_init (&world);
     constraint_pool_init (&world);
-
     /* Static pivot at (0,6,0). Rod 0.2 x 2.0 x 0.2, COM 1 m below anchor.
      * PHYSICS TRUTH: the hinge pin sits at the pivot's BOTTOM face
      * (local (0,-0.2,0)), not its center. Pinning the rod's top face to the
@@ -36,7 +34,6 @@ int main (void) {
         physics_world_cleanup (&world);
         return 1;
     }
-
     /* i about pivot: box-inertia + parallel axis, d = 1. */
     float i = (1.0f / 12.0f) * (4.0f + 0.04f) + 1.0f;
     float t_exact = 2.0f * 3.14159265f * sqrtf (i / 9.81f);

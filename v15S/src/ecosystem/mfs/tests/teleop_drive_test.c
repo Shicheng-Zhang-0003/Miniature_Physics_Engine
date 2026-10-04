@@ -8,11 +8,9 @@
 #include "modules/ftc/submodules/robot.h"
 #include "modules/ftc/submodules/drivetrain.h"
 #include "ecosystem/mfs/tests/mfs_test_common.h"
-
 int main (void) {
     physics_world world;
     mfs_test_world (&world); /* 128 iters + tile floor (see header) */
-
     /* Create robot at origin, using goBILDA 5203 26.9:1 motors (223 RPM) */
     ftc_robot robot;
     int rc = ftc_robot_create (&world, &robot, 0.0f, ftc_robot_rest_height (), 0.0f, MOTOR_GB_5203_26_9);
@@ -20,22 +18,17 @@ int main (void) {
         printf ("[FAIL] could not create robot\n");
         return 1;
     }
-
     float start_x, start_y, start_z;
     ftc_robot_get_position (&world, &robot, &start_x, &start_y, &start_z);
-
     const float dt = 1.0f / 60.0f;
     int fail = 0;
     int total_ticks = 180; /* 3 seconds */
-
     for (int t = 0; t < total_ticks; t++) {
         /* Full forward tank drive */
         drivetrain_tank (&robot, 1.0f, 1.0f);
         drivetrain_update (&world, &robot, dt);
-
         /* Step physics (includes constraints) */
         physics_world_step (&world, dt);
-
         /* Check for NaN */
         for (int i = 0; i < world.body_count; i++) {
             rigidbody *rb = &world.bodies[i];
@@ -50,20 +43,17 @@ int main (void) {
             break;
         }
     }
-
     if (!fail) {
         float end_x, end_y, end_z;
         ftc_robot_get_position (&world, &robot, &end_x, &end_y, &end_z);
         float dz = end_z - start_z;
         float dy = end_y - start_y;
-
         printf ("[info] start=(%.3f,%.3f,%.3f) end=(%.3f,%.3f,%.3f)\n", start_x, start_y, start_z, end_x, end_y, end_z);
         printf ("[info] displacement z=%.4f  dy=%.4f\n", dz, dy);
         printf ("[info] motor RPM: [%.0f, %.0f, %.0f, %.0f]\n", robot.wheel_motors[0].rpm, robot.wheel_motors[1].rpm,
                 robot.wheel_motors[2].rpm, robot.wheel_motors[3].rpm);
         printf ("[info] battery: %.2fV (%.0f%%)\n", battery_get_voltage (&robot.battery, 0.0f),
                 robot.battery.charge_fraction * 100.0f);
-
         /* Robot should have moved in some direction (z or x) */
         float total_displacement = sqrtf (dz * dz + (end_x - start_x) * (end_x - start_x));
         /* Straight-line drive must hold heading: yaw from quaternion
@@ -84,7 +74,6 @@ int main (void) {
             printf ("[PASS] robot drove under motor power (displacement=%.4f, dy=%.4f)\n", total_displacement, dy);
         }
     }
-
     physics_world_cleanup (&world);
     return fail;
 }

@@ -4,7 +4,6 @@
 #include "../core/math3d.h"
 #include "../core/math4_special.h"
 #include "../core/rigidbody.h"
-
 typedef struct {
     GLuint vertex_array_object;
     GLuint vertex_buffer_object;
@@ -15,7 +14,6 @@ typedef struct {
     GLuint instance_vbo;
     int instance_capacity;
 } mesh;
-
 extern mesh sphere_mesh;
 void init_sm_system (mesh *mesh_object, int horizontal_sections, int vertical_stacks);
 #endif

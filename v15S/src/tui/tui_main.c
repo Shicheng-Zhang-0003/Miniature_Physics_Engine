@@ -38,7 +38,6 @@
 #ifndef MPE_OS_WINDOWS
 #include <unistd.h>
 #endif
-
 #include "../ui_input/camera.h"
 #include "core/physics_world.h"
 #include "core/mpe_registry.h"
@@ -46,7 +45,6 @@
 #include "physics/spring_joint.h"
 #include "config/mpe_config.h"
 #include "tui_debugger.h"
-
 /* Stubs for legacy-TU symbols referenced by spring_joint.o (render path
  * only; the TUI never calls GL rendering). Same set as the spring test. */
 camera main_camera_fov;
@@ -61,7 +59,6 @@ rigidbody *scene_resolve_object_by_id (uint32_t id) {
     (void) id;
     return NULL;
 }
-
 static void print_help (const char *prog) {
     printf ("Usage: %s [options]\n", prog);
     printf ("\nModes (default: live TUI when stdout is a TTY, else --snapshot):\n");
@@ -78,15 +75,12 @@ static void print_help (const char *prog) {
     printf ("\nSnapshot sections: [engine] [body i] [springs] [constraints] [pairs]\n");
     printf ("[islands] [stats] [result] — fixed format, diffable.\n");
 }
-
 /* ------------------------------------------------------------------ */
 /* Demo scenes (deterministic; exercise every body + joint type)        */
 /* ------------------------------------------------------------------ */
-
 static void scene_floor (physics_world *world) {
     physics_world_add_cube (world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
 }
-
 static void scene_tower_only (physics_world *world) {
     scene_floor (world);
     const float h = 0.4f;
@@ -94,7 +88,6 @@ static void scene_tower_only (physics_world *world) {
         physics_world_add_cube (world, (vector3){0.0f, h + (float) i * 2.0f * h, 0.0f}, (vector3){h, h, h}, 1.0f);
     }
 }
-
 static void scene_pendulum_only (physics_world *world) {
     scene_floor (world);
     constraint_pool_init (world);
@@ -104,7 +97,6 @@ static void scene_pendulum_only (physics_world *world) {
     constraint_add_revolute (world, world->bodies[pivot].object_id, world->bodies[bob].object_id,
                              (vector3){0.0f, 0.0f, 0.0f}, (vector3){-1.0f, 2.0f, 0.0f}, (vector3){0.0f, 0.0f, 1.0f});
 }
-
 /* F10 long-run validation scene replica (exact geometry/props from
  * scene_spawn_long_run_validation; spawn-overlap resolution NOT applied so
  * the opening transient is, if anything, harsher than in-engine). */
@@ -171,7 +163,6 @@ static void scene_f10_only (physics_world *world) {
         }
     }
 }
-
 /* Spawn-stress scene: 300 mixed bodies in a grid + one of every joint
  * type + a kinematic conveyor + a fast CCD ball. Deterministic. */
 static void scene_stress_only (physics_world *world) {
@@ -202,7 +193,6 @@ static void scene_stress_only (physics_world *world) {
     world->bodies[fast].restitution = 0.0f;
     rigidbody_wake (&world->bodies[fast]);
 }
-
 /* CCD battery: thin static wall + three restitution-0 balls at
  * 60/144/300 m/s in separate z lanes. */
 static void scene_ccd_only (physics_world *world) {
@@ -215,7 +205,6 @@ static void scene_ccd_only (physics_world *world) {
         rigidbody_wake (&world->bodies[s]);
     }
 }
-
 static void scene_springlab_only (physics_world *world) {
     /* Per-scene config: zero-g vacuum WITHOUT touching the global g_cfg,
      * so other scenes/runs in this process are unaffected. */
@@ -229,12 +218,10 @@ static void scene_springlab_only (physics_world *world) {
     int mass = physics_world_add_sphere (world, 0.2f, 1.0f, (vector3){2.5f, 50.0f, 0.0f});
     add_joint_by_ids (world, world->bodies[anchor].object_id, world->bodies[mass].object_id, 2.0f, 20.0f, 0.0f);
 }
-
 static void scene_demo (physics_world *world) {
     scene_floor (world);
     constraint_pool_init (world);
     joint_init_pool (world);
-
     /* 3-cube tower (stacking truth). */
     const float h = 0.4f;
     for (int i = 0; i < 3; i++) {
@@ -249,12 +236,10 @@ static void scene_demo (physics_world *world) {
     int wheel = physics_world_add_cylinder (world, 0.3f, 0.15f, 2.0f, (vector3){5.0f, 0.6f, 2.0f});
     world->bodies[wheel].velocity = (vector3){1.0f, 0.0f, 0.0f};
     rigidbody_wake (&world->bodies[wheel]);
-
     /* Spring lab, high above contacts. */
     int anchor = physics_world_add_cube (world, (vector3){0.0f, 50.0f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 0.0f);
     int smass = physics_world_add_sphere (world, 0.2f, 1.0f, (vector3){2.5f, 50.0f, 0.0f});
     add_joint_by_ids (world, world->bodies[anchor].object_id, world->bodies[smass].object_id, 2.0f, 20.0f, 0.0f);
-
     /* Revolute pendulum. */
     int pivot = physics_world_add_cube (world, (vector3){8.0f, 10.0f, 0.0f}, (vector3){0.2f, 0.2f, 0.2f}, 1.0f);
     rigidbody_set_static (&world->bodies[pivot], true);
@@ -263,7 +248,6 @@ static void scene_demo (physics_world *world) {
                                        (vector3){0.0f, 0.0f, 0.0f}, (vector3){-1.0f, 2.0f, 0.0f},
                                        (vector3){0.0f, 0.0f, 1.0f});
     (void) rev;
-
     /* Prismatic slider (free vertical slide, limited). */
     int pa = physics_world_add_cube (world, (vector3){-8.0f, 20.0f, 0.0f}, (vector3){0.3f, 0.3f, 0.3f}, 1.0f);
     int pb = physics_world_add_cube (world, (vector3){-8.0f, 21.0f, 0.0f}, (vector3){0.3f, 0.3f, 0.3f}, 1.0f);
@@ -273,7 +257,6 @@ static void scene_demo (physics_world *world) {
     if (pri >= 0) {
         constraint_set_prismatic_limits (world, pri, true, -0.5f, 0.5f);
     }
-
     /* Rope (slack) + distance rod + fixed weld, all free-falling groups. */
     int r1 = physics_world_add_sphere (world, 0.25f, 1.0f, (vector3){2.0f, 30.0f, 0.0f});
     int r2 = physics_world_add_sphere (world, 0.25f, 1.0f, (vector3){3.2f, 30.0f, 0.0f});
@@ -287,14 +270,12 @@ static void scene_demo (physics_world *world) {
     int f2 = physics_world_add_cube (world, (vector3){2.0f, 40.5f, 0.0f}, (vector3){0.25f, 0.25f, 0.25f}, 1.0f);
     constraint_add_fixed (world, world->bodies[f1].object_id, world->bodies[f2].object_id, (vector3){0.0f, 0.25f, 0.0f},
                           (vector3){0.0f, -0.25f, 0.0f});
-
     /* Kinematic conveyor + rider (prescribed velocity truth). */
     int plat = physics_world_add_cube (world, (vector3){0.0f, 0.25f, -5.0f}, (vector3){1.0f, 0.25f, 1.0f}, 1.0f);
     rigidbody_set_kinematic (&world->bodies[plat], true);
     world->bodies[plat].velocity = (vector3){1.5f, 0.0f, 0.0f};
     physics_world_add_cube (world, (vector3){0.0f, 0.75f, -5.0f}, (vector3){0.25f, 0.25f, 0.25f}, 1.0f);
 }
-
 static int build_scene (physics_world *world, const char *name) {
     if (!name || strcmp (name, "demo") == 0) {
         scene_demo (world);
@@ -327,15 +308,12 @@ static int build_scene (physics_world *world, const char *name) {
     fprintf (stderr, "mpe-tui: unknown scene '%s' (demo|tower|pendulum|springlab|f10|stress|ccd)\n", name);
     return -1;
 }
-
 /* ------------------------------------------------------------------ */
-
 static double now_seconds (void) {
     struct timespec ts;
     clock_gettime (CLOCK_MONOTONIC, &ts);
     return (double) ts.tv_sec + (double) ts.tv_nsec * 1e-9;
 }
-
 /* DESPOT-2026-10-01: atol() on CLI counts is unchecked (non-numeric -> 0,
  * LONG_MAX overflow UB, huge ticks -> hang). Strict strtol with fallback. */
 static long tui_parse_count (const char *s, long fallback) {
@@ -351,7 +329,6 @@ static long tui_parse_count (const char *s, long fallback) {
     }
     return v;
 }
-
 int main (int argc, char *argv[]) {
     const float dt = 1.0f / 60.0f;
     const char *scene = "demo";
@@ -362,7 +339,6 @@ int main (int argc, char *argv[]) {
     long live_ticks = 0;
     bool want_snapshot = false;
     bool want_stream = false;
-
     for (int i = 1; i < argc; i++) {
         if (strcmp (argv[i], "--help") == 0 || strcmp (argv[i], "-h") == 0) {
             print_help (argv[0]);
@@ -403,9 +379,7 @@ int main (int argc, char *argv[]) {
     if (!want_snapshot && !want_stream && !tty) {
         want_snapshot = true;
     }
-
     mpe_config_init ();
-
     if (want_snapshot || want_stream) {
         physics_world world;
         physics_world_init (&world);
@@ -460,7 +434,6 @@ int main (int argc, char *argv[]) {
         physics_world_cleanup (&world);
         return rc;
     }
-
     /* ---------------- live ncurses inspector ---------------- */
     if (!isatty (STDIN_FILENO)) {
         fprintf (stderr, "mpe-tui: live mode needs a terminal; use --snapshot/--stream without one.\n");
@@ -477,7 +450,6 @@ int main (int argc, char *argv[]) {
     }
     tui_debugger_t dbg;
     tui_debugger_init (&dbg, &world);
-
     initscr ();
     cbreak ();
     noecho ();
@@ -487,7 +459,6 @@ int main (int argc, char *argv[]) {
     if (has_colors ()) {
         start_color ();
     }
-
     double acc = 0.0;
     double last = now_seconds ();
     unsigned long tick = 0;
@@ -527,7 +498,6 @@ int main (int argc, char *argv[]) {
         }
         tui_debugger_render (&dbg);
     }
-
     tui_debugger_cleanup (&dbg);
     endwin ();
     int final_bodies = world.body_count;
