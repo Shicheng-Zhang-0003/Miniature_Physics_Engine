@@ -9,7 +9,7 @@
 > run**); the drift was mirrored (the twin was verified to be a strict
 > superset, so nothing was lost); and `.gitignore` was added after finding 13
 > build artifacts tracked since the initial import. Suite is now **13 gated
-> tests, 13/13**, clean under ASan+UBSan. See `docs/KNOWN_FAILURES.md` for the
+> tests, 14/14**, clean under ASan+UBSan. See `docs/KNOWN_FAILURES.md` for the
 > full ledger.
 
 Everything MFS-wise lives under this folder: modules and submodules
@@ -107,7 +107,7 @@ Design rules modules follow (and future modules should too):
 From `v15S/src` (canonical — what CI and the release ritual use):
 
 ```
-ecosystem/mfs/build_tests.sh            # full FTC suite (12 inner via unified mfs_suite --all, + build checks + ungated diags)
+ecosystem/mfs/build_tests.sh            # full FTC suite (14 inner via unified mfs_suite --all, + build checks + ungated diags)
 ecosystem/mfs/build_tests.sh --build-only
 ```
 

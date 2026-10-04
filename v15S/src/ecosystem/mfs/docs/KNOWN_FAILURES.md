@@ -108,6 +108,77 @@ silent passes. Measurements from the 2026-09-26 audit on this tree.
   rollers) with observer resets; whole-assembly teleport without them
   winches wheels through pendulum chaos (historical false failures).
 
+## [STALL-THERMAL] The -16% stall softening was thermal, not the observer (RESOLVED 2026-10-03)
+
+Recorded here because it was **twice** attributed to the wrong mechanism, and
+because the wrong attribution had already hardened into a test tolerance.
+
+The closed-loop locked-rotor endpoint read **3.1279 N·m** against a
+**3.7265 N·m** spec (-16%) and was blamed on "the observer -> implicit-solve
+coupling". The gate was then widened to **25%** to accommodate it. Measured
+2026-10-03 with the observer armed identically in both runs and copper
+temperature as the only variable:
+
+| | output torque | vs spec |
+|---|---|---|
+| thermal active | 3.12793 N.m | **-16.062%** |
+| temperature pinned at 25 C | **3.72650 N.m** | **+0.000%** |
+
+**The observer contributes exactly nothing.** The mechanism is `motor.c`'s
+copper model `r_eff = R*(1 + 0.00393*(T - 25))`, which reaches `r_eff/R =
+1.19237` at 73.95 C after 300 stall ticks (5 s), and `1/1.19237 = 0.8387`,
+i.e. the whole -16.1%. A motor held at 25 C delivers the full spec stall
+torque through the observer without difficulty.
+
+**Consequence, and why it mattered:** a 25% band chosen to absorb a thermal
+artefact is indistinguishable from a warm motor, so the gate could not have
+failed for the reason it exists -- a genuine 25%-off observer regression would
+have sailed through. Fixed by removing the confound rather than absorbing it:
+`mfs_t_stall_endpoint` now gates BOTH the derated value against the
+`r_eff(T)` model (2%) and the 25 C value against spec at **2%**, ~100x tighter
+than the band it replaces. Header comment at `motor.h` corrected too.
+
+**Do not conflate with [MOTOR-III] below.** That entry is a real and separate
+defect (the observer books post-shaping losses as external load, which
+destroys large-load torque). It is NOT what this 16% is. Two different things
+were being called one thing for three days.
+
+---
+
+## [FREE-SPEED-DEAD-OBSERVER] Both free-speed gates measured a disabled observer (RESOLVED 2026-10-03)
+
+The readme claimed the back-EMF model made "stall **and free speed** exact at
+any bus voltage", and two gates appeared to back it: `mfs_t_motor_free_speed`
+and the `external_truth` sub-7 free-speed check. **Neither called
+`motor_observe()`.** With no call, `m.wprev_valid` stays 0, `tau_L` is
+identically 0, and the disturbance observer is simply absent from the
+measurement -- while the shipped drivetrain arms it every tick
+(`robot.c:764`). The gates measured a configuration the engine never runs in.
+
+Same rig, same build flags, 180 ticks:
+
+| | free speed | vs the no-load line |
+|---|---|---|
+| observer **not** armed (gates as written) | 237.8667 rpm | **+0.0000%** |
+| observer armed, exactly as `robot.c` | 92.0172 rpm | **-61.3156%** |
+
+So the exact-0.00% figure was real but described a dead estimator, and the
+driven wheel sits 61% off the no-load line.
+
+**Resolved by splitting the claim, not by picking a winner.** Free speed is
+independent of winding resistance and of load *by construction*:
+`w_free = V/(kv*gear)` with `kv = V_nom/(w_free_spec*gear)`, so `R` cancels
+exactly. That makes the open-loop check a sharp, estimator-independent test of
+the electrical model and the preset constants -- so it is **kept, and now
+labelled open-loop** in both gates. The observer-armed number is not a free
+speed at all; it is the air-spin / [MOTOR-III] limit-cycle fixed point. It is
+printed with its honest -61.3%, gated on being finite and bounded (not running
+away), and tracked as a defect where it belongs. Pinning a tolerance to a
+limit cycle would be inventing a specification, which is precisely the
+fabricated-tank-target failure retracted on 2026-09-29.
+
+---
+
 ## [MOTOR-III] Disturbance observer feeds shaping back as external load (OPEN, root-caused further)
 
 This is the blocker for [MOTOR-I]/[MOTOR-II], and fixing it revealed a second

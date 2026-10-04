@@ -106,14 +106,14 @@ They should be recorded as post-stable work items.
 - [X] F11 config torture test runs without crash.
 - [X] F11 verdict is robustness-only: no NaN, and every non-static body stays inside the world volume the boundary enforces. NOTE: the original "nothing fallen" gate (`position.y < -0.2`) was **unreachable** — `physics_world_step` clamps every body to `y >= 0 - slop` unconditionally, so it could never fire. Replaced 2026-09-29 with a volume invariant that can actually fail.
 - [X] F11 pins solver resolution (gravity −17…−1, ≥96 iterations — proven envelope for the 10:1 column); material/world extremes stay fully random.
-- [X] Headless suite green (Suite v2 `test_mpe_suite --all` — 42 cases: 40 physics + 2 diag-informational as of 2026-10-01; DESPOT-2026-10-01: was stale 33+2), including `f10_long_run`, `sleep_contact_wake`, `f11_torture`, `loader_lifecycle`, `ftc_ecosystem`, plus 2026-09-29 regressions (`revolute_matrix`, `cylinder_platform`, `cylinder_sphere_inside`) and metamorphics (`meta_rotation`, `meta_convergence`, `meta_config_wiring`) + `mouse_look_axes` + `body_materials_live`.
+- [X] Headless suite green (Suite v2 `test_mpe_suite --all` — **44 registered / 42 blocking**: 40 physics + 2 diag-informational as of 2026-10-03; was 42 as of 2026-10-01, stale 33+2 before that; `MIN_SUITE_ENTRIES` raised 42 -> 44 so the drift guard now covers the two newest gates), including `f10_long_run`, `sleep_contact_wake`, `f11_torture`, `loader_lifecycle`, `ftc_ecosystem`, plus 2026-09-29 regressions (`revolute_matrix`, `cylinder_platform`, `cylinder_sphere_inside`) and metamorphics (`meta_rotation`, `meta_convergence`, `meta_config_wiring`) + `mouse_look_axes` + `body_materials_live`.
 - [X] A case that cannot run now reports SKIP and is **excluded from the green count** (2026-09-29). It previously returned 0, so `make test_suite` could report "29/29 green" with two cases having executed nothing.
 - [X] `mpe-tui` snapshot suite green for all scenes (`make tui-smoke`: demo/tower/pendulum/springlab/f10/stress/ccd).
 - [X] The engine can idle for several minutes without explosion.
 
 ### 10. Configuration System
 - [X] Config menu (key 6) opens and navigates correctly.
-- [X] All 78 tunable parameters are editable via the menu.
+- [X] All 79 tunable parameters are editable via the menu (78 + `boundary.safety_net_enabled`, 2026-10-03).
 - [X] Debug-only parameters are refused in Game Mode.
 - [X] Config saves to `status/engine.cfg` on exit.
 - [X] Config loads on startup and overrides defaults.
@@ -237,7 +237,7 @@ If any mandatory gate fails, the correct action is:
 
 ### Release verdict (v15R3, tagged)
 
-All P0 gates pass: clean build with zero new errors, 42/42 headless green (40 physics + 2 diag) on the v15S head (29/29 on the frozen v15R3 tag),
+All P0 gates pass: clean build with zero new errors, 44 registered / 42 blocking headless green (40 physics + 2 diag) on the v15S head, and 234/234 verification checks green under AddressSanitizer + UndefinedBehaviorSanitizer at this HEAD (29/29 on the frozen v15R3 tag),
 `tui-smoke` green, F10 settle verdict green (headless 3600-tick equivalent
 plus committed `f10_long_run`), F11 robustness green in-engine and headless
 (`f11_torture`). P1 known limitations are documented in

@@ -8,8 +8,11 @@ documentation, and hygiene only — no new features.
 system (MPI hot-plug), per-world config, data-structure upgrades
 (growable pools, O(1) caches), kernel global-state removal, and the TUI
 stress suite. It keeps the v15R3 physics-truth contract (defaults
-bit-identical unless noted) and extends the suite to 42/42 (40 physics + 2 diag; DESPOT-2026-10-01: was stale 32/32)
-(29 physics + 3 diag-informational).
+bit-identical unless noted) and extends the suite to 44 registered / 42 blocking
+green (40 physics + 2 diag-informational; DESPOT-2026-10-03: floor raised 42 -> 44;
+DESPOT-2026-10-01: was stale 32/32). The "29 physics + 3 diag" split that used to
+appear here was a v15R3-era figure contradicting the total in the same sentence;
+it is gone rather than restated.
 
 ## What v15 Delivered
 
@@ -69,8 +72,8 @@ Under the v15R3 freeze:
   inspector plus deterministic pipeable state dumps; `make tui-smoke`.
 - Adversarial headless tests: `f10_long_run` (settle gates incl. run-max),
   `sleep_contact_wake` (first-touch wake + no-churn control), `f11_torture`
-  (fixed-seed config extremes, corruption gates). Suite total: 42/42 green on the v15S head
-  (29 physics + 3 diag-informational; 29/29 on the v15R3 tag).
+  (fixed-seed config extremes, corruption gates). Suite total: 44 registered / 42 blocking
+  green on the v15S head; 29/29 on the frozen v15R3 tag.
 - Driven-wheel truth: test moved into the resolvable spin regime with
   load-bearing gates (grounded height, rolling coupling, spin cap).
 
