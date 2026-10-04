@@ -14,7 +14,7 @@ This module uses only the Python standard library.
 
 Strict contract: suite cases that print [SKIP] (self-skipped coverage) fail
 the run unless --allow-skip is given; [XFAIL] markers are surfaced in the
-summary counts but never block. Registry floors: MIN_SUITE_ENTRIES=41,
+summary counts but never block. Registry floors: MIN_SUITE_ENTRIES=44,
 MIN_LEGACY_ENTRIES=30, MIN_PARANOIA_ENTRIES=14; summary contract requires
 Total == registry size and Blocking failures == 0.
 """
@@ -98,12 +98,23 @@ class Result:
 # physics property must hold across the spread rather than at one point.
 MPE_TEST_REGIMES = ("default", "light", "heavy", "brittle", "sticky")
 
-# 42 = 36 pre-existing + 3 metamorphic (meta_rotation, meta_convergence,
-# meta_config_wiring) + mouse_look_axes + body_materials_live + sleep_settle.
+# DESPOT-2026-10-03: RAISED 42 -> 44, AND THE FLOOR IS NOW EXACT.
+#
+# The floor existed to stop coverage being deleted silently, but it sat BELOW
+# the real registry size, so it was blind for the two newest gates: deleting
+# `mass_properties` and `reference_math` from mpe_registry[] together with
+# their make targets kept every stated contract green while the readme, the
+# makefile help text and this file all went on quoting different totals. That
+# is the exact failure the floor was added to prevent, reproduced anyway.
+#
+# 44 = 42 blocking (physics) + 2 informational (diagnostic).
+#   36 pre-existing + 3 metamorphic (meta_rotation, meta_convergence,
+#   meta_config_wiring) + mouse_look_axes + body_materials_live +
+#   sleep_settle + mass_properties + reference_math
 # meta_sleep was written and withdrawn, so the floor only ever moves by
 # deliberate addition, and this comment says so rather than being quietly
-# edited. DESPOT-2026-10-01: was "41 = ... + body_materials_live".
-MIN_SUITE_ENTRIES = 42
+# edited. History: 41 -> 42 (2026-10-01, sleep_settle) -> 44 (2026-10-03).
+MIN_SUITE_ENTRIES = 44
 # DESPOT-2026-10-01: pin per-suite floors so deleting a legacy/paranoia target
 # + its make target together cannot shrink the headline silently (the 220->204
 # drift). Canonical floor above; legacy 30 + paranoia 14 pinned here.
