@@ -17,9 +17,29 @@ Constants were fetched, not remembered:
 
 | quantity | value | authority |
 |---|---|---|
-| standard acceleration of gravity `g_n` | **9.80665 m/s²** | CGPM 1901 (3rd GCWM); CODATA 2022. Exact by definition. |
-| standard atmosphere | **101 325 Pa** | CODATA 2022. Exact. |
-| air density (ISA, sea level, 15 °C) | **1.225 kg/m³** | International Standard Atmosphere |
+| standard acceleration of gravity `g_n` | **9.80665 m/s²** | CGPM 1901, **Declaration 2** (3rd CGPM, CR 70); CODATA 2022 recommended value. **Exact by convention** — see note. |
+| standard atmosphere | **101 325 Pa** | CODATA 2022, Table XXXIII. Exact (SI-defining). |
+| air density (ISA, sea level, 15 °C) | **1.225 kg/m³** | **ISO 2533:1975 / U.S. Standard Atmosphere 1976** — *not* CODATA, which does not report it. |
+| speed of sound (ISA, sea level, 15 °C) | 340.294 m/s | ISO 2533:1975 (tabulated; ≈340.294951 from R = 287.05287, γ = 1.4) |
+
+**Precision note on `g_n`, verified against BIPM/CGPM and NIST records
+(2026-10-03).** The value is right and unchanged: CODATA 2018, 2022 and the
+2026 listing all give `9.806 65 (exact)`, and no revision is proposed at the
+28th CGPM (Versailles, 13–15 Oct 2026). Two citation details were imprecise and
+are corrected here:
+
+- CGPM 1901 issued **Declaration 2** on the unit of mass and the conventional
+  value of `g_n` (CR 70), not a "Resolution". It *adopted a value*; it did not
+  define an SI unit in terms of `g_n`.
+- Therefore "exact **by definition**" is loose. `g_n` is not an SI defining
+  constant and is not derived from `h`; it is exact **by convention**, which is
+  the stronger and more accurate statement (a conventional value carries zero
+  uncertainty by construction). BIPM's own note records that the value was the
+  reference for the now-obsolete unit *kilogram-force*.
+
+There is **no "CGPM 2022 Resolution 1 redefinition of `g_n`"** — that resolution
+is on metrology governance and none of the seven 2022 resolutions touch `g_n`.
+This audit checked for it specifically so the claim could not reappear.
 
 Method references are the papers vendored in `reference_materials/`:
 
@@ -258,3 +278,255 @@ The one-off cross-check harness lives in `temp/audit/` and is deliberately
 untracked: `probe_engine.c` (engine measurements) and
 `validate_engine.py` (independent references and the comparison). What is
 tracked is the gate.
+---
+
+# Audit of 2026-10-03 — test-integrity and mechanism findings
+
+A second pass, run after the reference material above was already in place.
+Its theme is narrower and more uncomfortable: **not "is the physics right" but
+"can the tests tell you when it stops being right."** Every claim below was
+verified by running the shipped code, not by reading it.
+
+## [META-ROTATION-UNGATED] A blocking gate that could not fail — FIXED
+
+`meta_rotation` is registered as a **blocking physics** case and is the only
+gate for rotation equivariance. Its failure branch printed `[XFAIL]` and
+**never incremented `tp->failures`**. `tools/test_runner.py` records `[XFAIL]`
+as `severity="info"`, i.e. non-blocking — so the case reported PASS on any
+equivariance violation whatsoever.
+
+Proven, not argued. A world-axis-dependent acceleration was injected into
+`rb_integrate_velocity` (`acc.x += 0.05f * pos.x`, `acc.z += 0.035f * pos.z`) —
+precisely the defect class the case exists to catch:
+
+```
+[info] rotation equivariance: max |dpos| = 1.759e-04 m
+[XFAIL][META-ROTATION] rotation equivariance broken: max|dpos|=1.759e-04 m
+  [PASS] meta_rotation (checks failed: 0)      <- PASS, exit status 0
+```
+
+The tripwire fired *correctly* and the test still reported green. A controlled
+comparison in one directory, same flags:
+
+| build | result | caught by |
+|---|---|---|
+| clean | 41/42 | — |
+| bug injected | 38/42 | `rolling_decay`, `spring`, `f10_long_run` |
+
+A rotation-equivariance break was caught by three unrelated tests and **not**
+by the one named after it.
+
+Fixed by making the failure branch increment `failures`. The clean engine
+measures `max|dpos| = 5.440e-07`, so the existing `1e-4` gate has ~184×
+headroom and did not need to move. Re-verified: clean build PASSES, injected
+build **FAILS with exit status 1**.
+
+## [SOLVER-NON-MONOTONIC] `meta_convergence` was measuring nothing — FIXED
+
+Worse than non-gating: **vacuous**. The fixture was a head-on sphere-sphere
+pair, whose single contact point has an exact effective mass and no coupling.
+Measured on the real engine, that scene is **bitwise identical at 1, 2, 4, 8,
+16, 32, 64 and 128 solver iterations**. Every arm reported error
+`0.0000e+00` against the 256-iteration reference, so the gate
+`err <= prev*1.35 + 1e-5` passed trivially — and would also have passed with
+`solver_iterations` wired to nothing at all.
+
+The suite's only "solver convergence" gate could not observe the solver. The
+fixture comment claimed an earlier version "reported exactly 0.0000 error
+because nothing collided" and that the fix made it "exercise real contact".
+The collision *was* real; it was **trivial**.
+
+Replaced with an 8-high cube stack, where load transfers through layers of
+4-point manifolds. The knob is now plainly live — `max|dpos|` vs a
+128-iteration reference:
+
+| iterations | default | heavy |
+|---|---|---|
+| 1 | 3.73 | 3.04 |
+| 4 | 3.88 | 4.08 |
+| 16 | 0.400 | 3.59 |
+| 32 | **0.490 ↑** | 4.88 |
+| 64 | 0.0629 | 3.17 |
+
+Two gates now, and the first is the one that matters:
+
+- **anti-vacuity** — the 1-iteration arm must differ from the reference by
+  more than 1 mm (measured 3.6 m). This is the gate that would have caught the
+  old fixture, and it is the general defence against a test that measures a
+  converged system.
+- **no divergence** — bounded growth arm-over-arm.
+
+A third gate, "strictly decreasing", was written, measured, and **deliberately
+not kept**: the table shows error is *not* monotonic in iteration count for a
+friction stack, even at default config. That is a real property of the
+formulation (support-first ordering plus two visits per iteration interact with
+which corner wins each sweep), not a defect. Asserting strict monotonicity
+would have been asserting a wish — the exact failure this project already made
+once with the withdrawn `mpe_t_meta_sleep`. The readme's claim "solver error
+monotonic in iteration count" is therefore corrected: it is **not monotonic**,
+and the gate says what is actually true.
+
+## [FALLEN-UNFIRABLE] The "nothing fell through the world" gate could not fire — FIXED
+
+`f10_long_run` and `f11_torture` both gate a `fallen` counter. With the
+world-edge safety net installed, `boundary_apply_box_cfg` unconditionally
+enforces all four sub-conditions (`obb_min_y ≥ −es`, `|x| ≤ 250+es`, …), so
+the counter was structurally incapable of firing. The earlier note claimed the
+volume invariant was "the stronger property, since it catches a boundary that
+fails to apply at all" — but the boundary cannot fail to apply while it is
+unconditionally installed, so that reasoning was wrong and the gate measured
+the clamp, not the solver.
+
+Fixed by adding `boundary.safety_net_enabled` (registry 78 → 79, default **1**,
+so shipped behaviour is byte-identical) so the net can be switched off, and
+`f10_long_run` now runs a **phase 2** on the same scene and same seed with the
+net **off** and the real Coulomb slab in place. Now the contact solver alone
+has to hold every body up:
+
+```
+[info] safety net OFF: fell=0 nan=0 lowest_centre_y=0.3500 (slab top y=0)
+```
+
+That is the property the gate always claimed, and it is now falsifiable — if
+the solver tunnels or the slab leaks, it fires.
+
+`f11_torture`'s counter was made **report-only, deliberately**: its scene is a
+pile with no floor, so with the net on the counter is unfireable and with the
+net off a rising count is the *correct* outcome. Neither variant is a test, so
+its verdict stays the honest crash oracle it has always been described as.
+
+## [CLAMP-TAUTOLOGY] Several rest-height assertions are satisfied by the clamp
+
+With floor contact response fully disabled (`static_plane_enabled = false`,
+the engine default at `physics_world.c:162`, and no floor body), the only thing
+that can stop a falling body is the emergency clamp:
+
+```
+sphere r=0.05             support=0.0500  final y=0.050000  -> RESTS EXACTLY AT SUPPORT
+cylinder r=0.05 (axle X)  support=0.0500  final y=0.050000  -> RESTS EXACTLY AT SUPPORT
+```
+
+`0.050000` is exactly the value `cylinder_drop` asserts
+(`MPE_CHECK_NEAR(cyl_y, 0.05f, 0.02f)`) and `floor_collision_diag` asserts.
+`ccd_sweep`'s floor case has no floor at all, so its "swept TOI: no
+tunneling" verdict was likewise produced by the clamp. A build with the
+contact solver stubbed to a no-op would pass these.
+
+**Not changed here, and why.** Tightening them is a real task, not a doc edit:
+the correct fix is for each to assert a property the clamp cannot satisfy
+(approach velocity, contact-point count, absence of a boundary correction),
+which requires per-case re-derivation of the expectation. The tests that
+genuinely load the solver — `friction_stop`, `incline_accel`, `stack`,
+`reference_math` §3, `static_hold`, `rolling_decay` — need a real tangential
+force and are unaffected. Recorded rather than quietly re-baselined.
+
+## [MFS-OBSERVER] Two misattributions of one number — FIXED
+
+The MFS closed-loop stall endpoint read 3.1279 N·m against a 3.7265 N·m spec
+and was attributed to "the observer → implicit-solve coupling", with a **25%
+tolerance chosen to accommodate it**. Measured, observer armed identically in
+both runs, copper temperature the only variable:
+
+| | output torque | vs spec |
+|---|---|---|
+| thermal active | 3.12793 N·m | −16.062% |
+| **temperature pinned 25 °C** | **3.72650 N·m** | **+0.000%** |
+
+The observer contributes **exactly nothing**. The mechanism is the copper
+model `r_eff = R·(1 + 0.00393·(T − 25))`, which reaches `r_eff/R = 1.19237` at
+73.95 °C after 300 stall ticks, and `1/1.19237 = 0.8387` — the entire −16.1%.
+So a 25% "observer robustness" band was encoding a thermal artefact, and a
+genuine 25%-off observer regression would have been indistinguishable from a
+warm motor.
+
+Fixed by removing the confound instead of absorbing it: `stall_endpoint` now
+gates the derated value against the `r_eff(T)` model **and** the 25 °C value
+against spec at **2%** (~100× tighter).
+
+Related: **both free-speed gates never called `motor_observe()`**, so `τ_L ≡ 0`
+and the disturbance observer was absent from the measurement — while the
+shipped drivetrain arms it every tick (`robot.c:764`). Same rig:
+
+| | free speed | vs no-load line |
+|---|---|---|
+| observer not armed (gates as written) | 237.8667 rpm | +0.0000% |
+| observer armed, as `robot.c` | 92.0172 rpm | **−61.3156%** |
+
+So the readme's "free speed exact at any bus voltage" was measured on a
+configuration the engine never runs in. Resolved by **splitting the claim
+rather than picking a winner**: free speed is independent of `R` and of load
+*by construction* (`w_free = V/(kv·gear)`, `kv = V_nom/(w_free·gear)`, so `R`
+cancels), which makes the open-loop check a sharp test of the electrical
+model — so it is kept and now **labelled open-loop**. The observer-armed value
+is a limit cycle, not a free speed; it is printed with its honest −61.3% and
+gated on being finite and bounded. Pinning a number to a limit cycle would be
+inventing a specification — the "fabricated tank target" failure this project
+retracted on 2026-09-29. The defect stays tracked as `[MOTOR-III]`.
+
+## [MFS-FIXTURE] Two MFS gates were red at pristine HEAD, both fixture bugs
+
+- **`intake_stop`** could not pass. `intake_power` is *recomputed every tick*
+  by `pre_step` from the gamepad edge state, and `mfs_module_1_intake_step()`
+  is called *inside* `pre_step` — so writing the field from the test lands
+  either before the overwrite or after the motor has already been commanded.
+  Measured: the roller returned `+58.068 rad/s`, **bit-identical to the broken
+  run**, which is how the ordering was confirmed rather than assumed. Also,
+  `intake_active` was left `false` by the previous phase, and reverse is
+  deliberately gated on an engaged intake. Fixed by driving the *consumer*
+  directly — which is exactly the defect the H5 fix addressed ("written twice
+  and read by nothing at all") — and re-enabling the intake. Now `-62.570
+  rad/s`, the documented expected value.
+- **`ftc_hotload`** failed **silently**: exit status 1 with *zero bytes* on
+  stdout and stderr, because the `dlopen` failure path did
+  `failures++` and returned with no diagnostic. Worse, the plugin path was
+  CWD-relative and POSIX `mpe_pick_plugin` returns it verbatim with no
+  existence check, so the same source, same build and same `.so` passed or
+  failed purely on the working directory — and the runner invokes it from the
+  repository root, so it never passed there. This is the same class as the
+  engine runner defect already recorded ("a `206/206 … xfailed: 0` line could
+  hide a known-red frontier with no trace"). Fixed: an explicit candidate list
+  with `MPE_FTC_PLUGIN` override, the resolved path printed, every path tried
+  named on failure, and `build_tests.sh` exporting the absolute path so the
+  harness no longer depends on CWD.
+
+**MFS is now 14/14**, verified from the repository root rather than only from
+`ecosystem/mfs`.
+
+## Verified NON-findings
+
+Recorded because a wrong fix is worse than no fix, and because these were
+reported as defects and did not survive checking.
+
+- **`math3_inverse` Frobenius overflow — NOT a bug.** The claim was that
+  `frob_sq * sqrt(frob_sq)` reaches `inf` and makes every finite determinant
+  read as singular. `math3` elements are `float` and non-finite inputs are
+  rejected on entry, so `‖M‖_F² ≤ 9·(3.4e38)² ≈ 1.04e78` and
+  `‖M‖_F³ ≤ 1.06e117` — **provably inside double's 1.8e308**. The overflow
+  needs double-precision matrix elements the type cannot hold. The existing
+  double promotion is correct and sufficient; no change made.
+- **OBB face-clip winding — NOT a bug.** Reported as a transposed-index
+  self-intersecting bowtie in the Sutherland–Hodgman input polygon. The
+  construction is `c − (u·eu + v·ev)`, not `c − u·eu + v·ev`, so the order is
+  `(+eu,+ev) (+eu,−ev) (−eu,−ev) (−eu,+ev)` — a correct cyclic quad. Verified
+  three ways: shoelace on the constructed vertices gives area 16.0 for a 4×4
+  square; and on cases that genuinely force clipping (big box on a small
+  pedestal, box overhanging a ledge, 4000 rotated asymmetric poses) every
+  reported contact lands exactly on a true corner of the computed overlap
+  patch, 0 non-finite.
+- **MFS gamepad probing `/dev/input/js0` — NOT a defect.** `build_tests.sh`
+  exports `MPE_GAMEPAD_DEVICE=disabled` unconditionally and `gamepad_init`
+  consults it for a NULL path. The only `gamepad` line in a harness run is the
+  compile check. The device-open message came from a manual invocation that
+  bypassed the environment.
+- **`g_n` and the ISA constants — NOT wrong.** `9.80665` is current and
+  unchanged; `1.225 kg/m³` is correctly attributed to ISO 2533:1975, not
+  CODATA (which does not report it). Only the "exact by definition" phrasing
+  needed tightening, above.
+
+## Standing lesson
+
+Three of the four defects in this section were in **tests or harnesses**, not
+in the physics. Two more were numbers attributed to the wrong mechanism. In
+every case the *detection* machinery was the thing that was broken, and in
+every case the honest fix was to **measure** rather than to adjust a tolerance
+until the line went green.
