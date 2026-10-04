@@ -609,7 +609,7 @@ phasing into and folding into each other like they are hollow."* That is a
 correct observation and it was caused **partly by this audit's own previous
 commit**, so the record has to start there.
 
-## [SPLIT-IMPULSE-REVERTED] My 120009 change caused it. Measured, then reverted.
+## [SPLIT-IMPULSE-REVERTED] My 205549 change caused it. Measured, then reverted.
 
 The earlier commit replaced the whole-body positional translation with
 per-contact split impulse and lever arms, because Catto GDC 2014 p.53 and
