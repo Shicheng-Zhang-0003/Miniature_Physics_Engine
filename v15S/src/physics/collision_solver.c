@@ -1163,6 +1163,15 @@ void collision_apply_split_impulse(collision_data *manifolds, int manifold_count
         max_bias_vel = 10.0f;
     }
     const float max_corr = max_bias_vel * dt;
+    /* Shared wake depth (see the wake site below). Clamped to the same
+     * [0, 0.1] the schema registers it with. */
+    float wake_depth = C->depenetration.wake_depth_thresh;
+    if (!isfinite(wake_depth) || wake_depth < 0.0f) {
+        wake_depth = 0.02f;
+    }
+    if (wake_depth > 0.1f) {
+        wake_depth = 0.1f;
+    }
     for (int m = 0; m < manifold_count; m++) {
         collision_data *man = &manifolds[m];
         rigidbody *body_a = man->object_a;
@@ -1194,34 +1203,123 @@ void collision_apply_split_impulse(collision_data *manifolds, int manifold_count
             }
             continue;
         }
-        float deepest = 0.0f;
+        /* DESPOT-2026-10-03: PER-CONTACT POSITIONAL CORRECTION WITH LEVER ARMS.
+         *
+         * The previous body of this function computed `deepest` -- the maximum
+         * penetration over the manifold -- DISCARDED which contact it belonged
+         * to, and then translated both bodies along the normal by
+         * corr/(inv_a+inv_b) AT THE BODY CENTRE. That is a purely translational
+         * projection. It cannot produce angular correction, so a tilted box
+         * with one buried corner is shoved sideways along the normal instead of
+         * being rotated back flat.
+         *
+         * The standard formulation (Catto, "Understanding Constraints",
+         * GDC 2014, p.53) applies a PSEUDO-IMPULSE at each CONTACT POINT with
+         * its lever arm:
+         *
+         *     m  v'  = n * lambda
+         *     I  w'  = (r x n) * lambda
+         *     C'      = (v' + w' x r) . n  -  beta * s
+         *     x2      = x1 + h * (v2 + v')
+         *
+         * Box2D 2.x SolvePositionConstraints and Bullet's
+         * resolveSplitPenetrationImpulseCacheFriendly both do exactly this,
+         * including the rA/rB lever arms. Applying a single whole-body
+         * translation is a DIFFERENT algorithm -- it is van den Bergen's
+         * position projection, which Catto explicitly distinguishes ("the
+         * algorithm only projects translations").
+         *
+         * Why it matters here and not just on paper: a manifold of 4 points
+         * with `deepest` at the (0,0) corner translates the body as though the
+         * WHOLE face were buried by that corner's depth. With the per-contact
+         * form, the far corners contribute little (shallow) and the buried
+         * corner dominates its own correction, and the r x n term supplies the
+         * torque that rights the tilt.
+         *
+         * Single pass, no iteration, exactly as before -- the cost profile is
+         * unchanged (one pass over contacts instead of one pass per manifold).
+         * What changed is WHERE the correction is applied and HOW MUCH each
+         * contact contributes. */
+        math3 inv_inertia_a = rigidbody_effective_inv_inertia(body_a);
+        math3 inv_inertia_b = rigidbody_effective_inv_inertia(body_b);
+        float corr_total = 0.0f;
         for (int i = 0; i < man->contact_count; i++) {
-            if (man->contacts[i].penetration > deepest) {
-                deepest = man->contacts[i].penetration;
+            const contact_point_data *cp = &man->contacts[i];
+            float corr_i = beta * fmaxf(cp->penetration - slop, 0.0f);
+            if (corr_i > max_corr) {
+                corr_i = max_corr;
+            }
+            if (corr_i <= 0.0f) {
+                continue;
+            }
+            /* Normal-direction effective mass AT THIS CONTACT POINT, including
+             * the angular term  n . ((I^-1 (r x n)) x r).  Without the angular
+             * term the correction magnitude is wrong for any contact whose
+             * lever arm is long -- which is every corner of a box. */
+            vector3 ra_cross_n = vector3_cross(cp->ra, man->normal_vector);
+            vector3 rb_cross_n = vector3_cross(cp->rb, man->normal_vector);
+            float k = inv_a + inv_b +
+                      vector3_dot(man->normal_vector,
+                                  vector3_cross(math3_multiplication_vector3(inv_inertia_a, ra_cross_n), cp->ra)) +
+                      vector3_dot(man->normal_vector,
+                                  vector3_cross(math3_multiplication_vector3(inv_inertia_b, rb_cross_n), cp->rb));
+            if (!(k > 0.0f) || !isfinite(k)) {
+                continue; /* degenerate lever arms; the linear term alone below */
+            }
+            /* Pseudo-impulse for this contact: units of impulse, so the
+             * positional displacement it commands is dt-scaled like any other
+             * impulse in the step. */
+            float lambda = corr_i / k;
+            if (!isfinite(lambda)) {
+                continue;
+            }
+            corr_total += corr_i;
+            vector3 push = vector3_scaling(man->normal_vector, lambda);
+            /* TRUTH: kinematic has stored inv!=0 but effective 0. Old
+             * !static_state moved kinematics, corrupting prescribed motion.
+             * Gate on effective inv (zero for kinematic/sleeping/static). */
+            if (inv_a > 0.0f) {
+                body_a->position = vector3_subtraction(body_a->position, vector3_scaling(push, inv_a));
+                /* Angular part: dtheta = I^-1 (r x push), integrated over dt as
+                 * the pseudo-velocity the formulation defines. This is the term
+                 * that rights a tilt instead of shearing it. */
+                vector3 dw = math3_multiplication_vector3(inv_inertia_a, vector3_cross(cp->ra, push));
+                if (isfinite(dw.x) && isfinite(dw.y) && isfinite(dw.z) && vector3_length_squared(dw) > 1e-24f) {
+                    /* Compose, never replace: the existing orientation carries
+                     * the whole history and must be pre-multiplied by the
+                     * incremental pseudo-rotation. */
+                    vector4 dq = vector4_from_axis_with_angle(vector3_normalisation(dw),
+                                                              vector3_length(dw) * dt);
+                    body_a->orientation = vector4_normalisation(
+                        vector4_multiplication(dq, body_a->orientation));
+                    rigidbody_update_axes(body_a);
+                }
+            }
+            if (inv_b > 0.0f) {
+                body_b->position = vector3_addition(body_b->position, vector3_scaling(push, inv_b));
+                vector3 dw = math3_multiplication_vector3(inv_inertia_b, vector3_cross(cp->rb, push));
+                if (isfinite(dw.x) && isfinite(dw.y) && isfinite(dw.z) && vector3_length_squared(dw) > 1e-24f) {
+                    vector4 dq = vector4_from_axis_with_angle(vector3_normalisation(dw),
+                                                              vector3_length(dw) * dt);
+                    body_b->orientation = vector4_normalisation(
+                        vector4_multiplication(dq, body_b->orientation));
+                    rigidbody_update_axes(body_b);
+                }
+            }
+            /* DESPOT-2026-10-03: was a hard-coded 0.01 m, which directly
+             * CONTRADICTED the config schema's own measured note
+             * ("measured 0.01 re-admits the F10 runaway, runmax 13.07 m/s
+             * ejection, sleep churn on resting residual, while 0.02 holds
+             * runmax 0.00"). A source literal that the documentation records
+             * as a measured failure mode is a bug in one of them; it was the
+             * literal. Now reads the knob, so wake_depth_thresh finally
+             * governs BOTH depenetration and the split pass instead of half
+             * of them, and the two cannot drift apart again. */
+            if (corr_i > wake_depth) {
+                if (!body_a->static_state) rigidbody_wake(body_a);
+                if (!body_b->static_state) rigidbody_wake(body_b);
             }
         }
-        float corr = beta * fmaxf(deepest - slop, 0.0f);
-        if (corr > max_corr) {
-            corr = max_corr;
-        }
-        if (corr <= 0.0f) {
-            continue;
-        }
-        vector3 shift = vector3_scaling(man->normal_vector, corr / inv_sum);
-        /* TRUTH: kinematic has stored inv!=0 but effective 0. Old
-         * !static_state moved kinematics, corrupting prescribed motion.
-         * Gate on effective inv (zero for kinematic/sleeping/static). */
-        if (inv_a > 0.0f) {
-            body_a->position = vector3_subtraction(body_a->position, vector3_scaling(shift, inv_a));
-            if (corr > 0.01f) {
-                rigidbody_wake(body_a);
-            }
-        }
-        if (inv_b > 0.0f) {
-            body_b->position = vector3_addition(body_b->position, vector3_scaling(shift, inv_b));
-            if (corr > 0.01f) {
-                rigidbody_wake(body_b);
-            }
-        }
+        (void) corr_total;
     }
 }
