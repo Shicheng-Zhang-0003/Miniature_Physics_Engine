@@ -440,8 +440,8 @@ const terminal_command terminal_commands[] = {
     {"microvim", true, cmd_vi, "microvim [filename]", "open microvim editor"},
     /* MPE_TASK_V15R2_PHASE8_TABLE_END */
     {"mod", true, cmd_mod, "mod ls|load|unload|attach|detach|use-*", "hot plug physics modules"},
-    {"eco", true, cmd_eco, "eco ls|attach|detach|command|config", "drive ecosystem bundles"},
-    {"ftc", true, cmd_ftc, "ftc spawn|list|drive|telemetry|preset", "drive FTC robots"},
+    {"eco", true, cmd_eco, "eco attach|detach|command", "drive ecosystem bundles"},
+    {"ftc", true, cmd_ftc, "ftc spawn [x y z]|drive <f> <s> <r>|stop|telemetry", "drive the mecanum robot"},
 };
 const size_t terminal_command_count = sizeof(terminal_commands) / sizeof(terminal_commands[0]);
 
