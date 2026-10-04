@@ -7,35 +7,30 @@
 #include "core/physics_world.h"
 #include "config/mpe_config.h"
 
-int main(void) {
-    mpe_config_init();
+int main (void) {
+    mpe_config_init ();
     physics_world world;
-    physics_world_init(&world);
+    physics_world_init (&world);
 
     /* Static floor */
-    physics_world_add_cube(&world,
-        (vector3){0.0f, -0.5f, 0.0f},
-        (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
+    physics_world_add_cube (&world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
 
     /* Two cylinders approaching along Z */
-    int c1 = physics_world_add_cylinder(&world,
-        0.05f, 0.02f, 0.5f,
-        (vector3){0.0f, 0.06f, -0.3f});
-    int c2 = physics_world_add_cylinder(&world,
-        0.05f, 0.02f, 0.5f,
-        (vector3){0.0f, 0.06f, 0.3f});
+    int c1 = physics_world_add_cylinder (&world, 0.05f, 0.02f, 0.5f, (vector3){0.0f, 0.06f, -0.3f});
+    int c2 = physics_world_add_cylinder (&world, 0.05f, 0.02f, 0.5f, (vector3){0.0f, 0.06f, 0.3f});
 
-    world.bodies[c1].velocity = (vector3){0.0f, 0.0f,  2.0f};
+    world.bodies[c1].velocity = (vector3){0.0f, 0.0f, 2.0f};
     world.bodies[c2].velocity = (vector3){0.0f, 0.0f, -2.0f};
 
     const float dt = 1.0f / 60.0f;
     int fail = 0;
     for (int t = 0; t < 120 && !fail; t++) {
-        physics_world_step(&world, dt);
+        physics_world_step (&world, dt);
         for (int i = 0; i < world.body_count; i++) {
-            if (!isfinite(world.bodies[i].position.z)) {
-                printf("[FAIL] NaN at tick %d\n", t);
-                fail = 1; break;
+            if (!isfinite (world.bodies[i].position.z)) {
+                printf ("[FAIL] NaN at tick %d\n", t);
+                fail = 1;
+                break;
             }
         }
     }
@@ -44,21 +39,21 @@ int main(void) {
     float z1 = world.bodies[c1].position.z;
     float z2 = world.bodies[c2].position.z;
     float gap = z2 - z1;
-    printf("[info] c1 z=%.4f  c2 z=%.4f  gap=%.4f\n", z1, z2, gap);
+    printf ("[info] c1 z=%.4f  c2 z=%.4f  gap=%.4f\n", z1, z2, gap);
 
     /* They started 0.6 apart. After colliding, c1 should still
      * be behind c2 (gap > 0). TRUTH: two-sided — gap<-0.05 is pass-through,
      * gap>1.0 is fly-apart-without-touching (solver never engaged). */
     if (gap < -0.05f) {
-        printf("[FAIL] cylinders passed through each other\n");
+        printf ("[FAIL] cylinders passed through each other\n");
         return 1;
     }
     if (gap > 1.0f) {
-        printf("[FAIL] cylinders never interacted (gap=%.4f)\n", gap);
+        printf ("[FAIL] cylinders never interacted (gap=%.4f)\n", gap);
         return 1;
     }
-    printf("[PASS] cylinder-cylinder collision works\n");
-    physics_world_cleanup(&world);
+    printf ("[PASS] cylinder-cylinder collision works\n");
+    physics_world_cleanup (&world);
     return 0;
 }
 #endif /* mfs_cyl_cyl_test */

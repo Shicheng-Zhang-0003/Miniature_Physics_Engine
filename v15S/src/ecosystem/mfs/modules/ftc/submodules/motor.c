@@ -4,8 +4,8 @@
 
 #define MOTOR_RPM_TO_RAD_S 0.104719755f /* 2*pi/60 */
 
-void motor_from_spec(motor *m, float stall_torque_nm, float free_speed_rpm, float stall_current_a,
-                     float nominal_voltage, float gear_ratio, float efficiency) {
+void motor_from_spec (motor *m, float stall_torque_nm, float free_speed_rpm, float stall_current_a,
+                      float nominal_voltage, float gear_ratio, float efficiency) {
     if (!m) {
         return;
     }
@@ -43,17 +43,17 @@ void motor_from_spec(motor *m, float stall_torque_nm, float free_speed_rpm, floa
     m->wprev_valid = 0;
 }
 
-void motor_update(motor *m, float wheel_angular_vel, float dt, float battery_voltage) {
+void motor_update (motor *m, float wheel_angular_vel, float dt, float battery_voltage) {
     if ((!m) || (dt <= 0.0f)) {
         return;
     }
     /* DESPOT-2026-10-01: fail-closed on non-finite bus voltage (NULL-battery
      * NAN, corrupt pack). Old code let NAN through: current/torque/temperature
      * all latched NAN and the pack bricked for the run. Clamp to OCV floor. */
-    if (!isfinite(battery_voltage)) {
+    if (!isfinite (battery_voltage)) {
         battery_voltage = 12.0f;
     }
-    if (!isfinite(wheel_angular_vel)) {
+    if (!isfinite (wheel_angular_vel)) {
         return;
     }
 
@@ -74,7 +74,7 @@ void motor_update(motor *m, float wheel_angular_vel, float dt, float battery_vol
      * pack fuse browning out (~1 s at 4-motor stall), not by this model,
      * so a 150 C magnet ceiling clamps the integrator below. */
     float r_eff = m->resistance * (1.0f + 0.00393f * (m->temperature - 25.0f));
-    if (!(r_eff > 0.0f) || !isfinite(r_eff)) r_eff = m->resistance;
+    if (!(r_eff > 0.0f) || !isfinite (r_eff)) r_eff = m->resistance;
     /* Current = (V - BackEMF) / R, clamped to stall */
     float raw_current = (applied_voltage - m->back_emf) / r_eff;
     if (raw_current > m->stall_current) {
@@ -129,16 +129,15 @@ void motor_update(motor *m, float wheel_angular_vel, float dt, float battery_vol
     }
 }
 
-void motor_update_load(motor *m, float wheel_angular_vel, float dt, float battery_voltage,
-                       float axle_inertia) {
+void motor_update_load (motor *m, float wheel_angular_vel, float dt, float battery_voltage, float axle_inertia) {
     if ((!m) || (dt <= 0.0f)) {
         return;
     }
-    if (!isfinite(battery_voltage)) {
+    if (!isfinite (battery_voltage)) {
         battery_voltage = 12.0f;
     }
-    if (!(axle_inertia > 0.0f) || !isfinite(axle_inertia)) {
-        motor_update(m, wheel_angular_vel, dt, battery_voltage);
+    if (!(axle_inertia > 0.0f) || !isfinite (axle_inertia)) {
+        motor_update (m, wheel_angular_vel, dt, battery_voltage);
         return;
     }
     /* Implicit Euler on the electrical dynamics with disturbance
@@ -156,18 +155,18 @@ void motor_update_load(motor *m, float wheel_angular_vel, float dt, float batter
      * Both now use the same r_eff so stall/free endpoints AND transients
      * match across paths. */
     float r_eff = m->resistance * (1.0f + 0.00393f * (m->temperature - 25.0f));
-    if (!(r_eff > 0.0f) || !isfinite(r_eff)) r_eff = m->resistance;
+    if (!(r_eff > 0.0f) || !isfinite (r_eff)) r_eff = m->resistance;
     float A = m->kt * m->gear_ratio * m->efficiency / r_eff;
     float B = m->kv * m->gear_ratio;
-    if (!(r_eff > 0.0f) || !isfinite(A) || !isfinite(B)) {
-        motor_update(m, wheel_angular_vel, dt, battery_voltage);
+    if (!(r_eff > 0.0f) || !isfinite (A) || !isfinite (B)) {
+        motor_update (m, wheel_angular_vel, dt, battery_voltage);
         return;
     }
-    float tau_L = (m->wprev_valid && isfinite(m->load_torque)) ? m->load_torque : 0.0f;
-    float w_end = (wheel_angular_vel + (A * applied_voltage + tau_L) * dt / axle_inertia) /
-                  (1.0f + A * B * dt / axle_inertia);
-    if (!isfinite(w_end)) {
-        motor_update(m, wheel_angular_vel, dt, battery_voltage);
+    float tau_L = (m->wprev_valid && isfinite (m->load_torque)) ? m->load_torque : 0.0f;
+    float w_end =
+        (wheel_angular_vel + (A * applied_voltage + tau_L) * dt / axle_inertia) / (1.0f + A * B * dt / axle_inertia);
+    if (!isfinite (w_end)) {
+        motor_update (m, wheel_angular_vel, dt, battery_voltage);
         return;
     }
     /* Clamp the predicted end-of-tick speed to the motor's own no-load speed
@@ -207,14 +206,14 @@ void motor_update_load(motor *m, float wheel_angular_vel, float dt, float batter
      */
     {
         float w_lim = m->free_speed_rad_s; /* 12 V spec point: fallback only */
-        if (m->kv > 0.0f && m->gear_ratio > 0.0f && isfinite(battery_voltage) && battery_voltage > 0.0f) {
+        if (m->kv > 0.0f && m->gear_ratio > 0.0f && isfinite (battery_voltage) && battery_voltage > 0.0f) {
             w_lim = battery_voltage / (m->kv * m->gear_ratio);
         }
-        if (!isfinite(w_lim) || (w_lim < 0.0f)) {
+        if (!isfinite (w_lim) || (w_lim < 0.0f)) {
             w_lim = m->free_speed_rad_s;
         }
-        if (fabsf(wheel_angular_vel) > w_lim) {
-            w_lim = fabsf(wheel_angular_vel); /* keep full braking authority */
+        if (fabsf (wheel_angular_vel) > w_lim) {
+            w_lim = fabsf (wheel_angular_vel); /* keep full braking authority */
         }
         if (w_end > w_lim) {
             w_end = w_lim;
@@ -239,7 +238,8 @@ void motor_update_load(motor *m, float wheel_angular_vel, float dt, float batter
     {
         float exp_i = (applied_voltage - m->kv * (wheel_angular_vel * m->gear_ratio)) / r_eff;
         if (exp_i > m->stall_current) exp_i = m->stall_current;
-        else if (exp_i < -m->stall_current) exp_i = -m->stall_current;
+        else if (exp_i < -m->stall_current)
+            exp_i = -m->stall_current;
         m->torque_explicit = m->kt * exp_i * m->gear_ratio * m->efficiency;
         m->tau_exp_prev = m->torque_explicit;
     }
@@ -273,13 +273,13 @@ void motor_update_load(motor *m, float wheel_angular_vel, float dt, float batter
  *
  * Now the estimate and its validity flag are set here, by the module that
  * reads them, and callers cannot get it wrong. */
-void motor_observe(motor *m, float wheel_angular_vel, float dt, float axle_inertia) {
+void motor_observe (motor *m, float wheel_angular_vel, float dt, float axle_inertia) {
     if (!m) {
         return;
     }
     /* w_prev is the PREVIOUS sample; the estimate is a difference against it,
      * so the new reading is stored only after the difference is taken. */
-    if (!(axle_inertia > 0.0f) || !(dt > 0.0f) || !isfinite(wheel_angular_vel)) {
+    if (!(axle_inertia > 0.0f) || !(dt > 0.0f) || !isfinite (wheel_angular_vel)) {
         /* Degenerate input: no observation is possible. Hold the last state
          * rather than claiming a fresh sample, so the next tick can still
          * difference against a real one. */
@@ -298,12 +298,12 @@ void motor_observe(motor *m, float wheel_angular_vel, float dt, float axle_inert
         return;
     }
     float stall_out = m->stall_current * m->kt * m->gear_ratio * m->efficiency;
-    if (!(stall_out > 0.5f) || !isfinite(stall_out)) {
+    if (!(stall_out > 0.5f) || !isfinite (stall_out)) {
         stall_out = 1.0f;
     }
     float tau_cap = 2.0f * stall_out;
     float tau_l = axle_inertia * (wheel_angular_vel - m->w_prev) / dt - m->tau_exp_prev;
-    if (!isfinite(tau_l)) {
+    if (!isfinite (tau_l)) {
         tau_l = 0.0f;
     } else if (tau_l > tau_cap) {
         tau_l = tau_cap;
@@ -318,8 +318,8 @@ void motor_observe(motor *m, float wheel_angular_vel, float dt, float axle_inert
     {
         float tau_ref = m->tau_exp_prev;
         const float w_blk = 0.5f;
-        if (isfinite(tau_ref) && fabsf(tau_ref) >= 0.95f * stall_out &&
-            isfinite(wheel_angular_vel) && fabsf(wheel_angular_vel) < w_blk) {
+        if (isfinite (tau_ref) && fabsf (tau_ref) >= 0.95f * stall_out && isfinite (wheel_angular_vel) &&
+            fabsf (wheel_angular_vel) < w_blk) {
             tau_l = (tau_ref >= 0.0f) ? -stall_out : stall_out;
         }
     }
@@ -328,7 +328,7 @@ void motor_observe(motor *m, float wheel_angular_vel, float dt, float axle_inert
     m->wprev_valid = 1;
 }
 
-void motor_reset_observer(motor *m) {
+void motor_reset_observer (motor *m) {
     if (!m) {
         return;
     }

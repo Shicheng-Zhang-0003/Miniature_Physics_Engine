@@ -8,20 +8,20 @@
 #include "core/math3d.h"
 #include "core/math4_special.h"
 
-static vector4 math4_mul_vec4(math4 m, vector4 v) {
+static vector4 math4_mul_vec4 (math4 m, vector4 v) {
     /* vector4 packs {w,x,y,z}; matrix columns 0..3 pair with x,y,z,w. */
     float vc[4] = {v.x, v.y, v.z, v.w};
     /* column-major: out[row] = sum_col M[col][row] * v[col], with
      * vector (x,y,z,w) mapped to columns 0..3. */
     float out[4] = {0.0f, 0.0f, 0.0f, 0.0f};
     for (int row = 0; row < 4; row++) {
-        out[row] = m.matrix[0][row] * vc[0] + m.matrix[1][row] * vc[1] + m.matrix[2][row] * vc[2] +
-                   m.matrix[3][row] * vc[3];
+        out[row] =
+            m.matrix[0][row] * vc[0] + m.matrix[1][row] * vc[1] + m.matrix[2][row] * vc[2] + m.matrix[3][row] * vc[3];
     }
     return (vector4){out[3], out[0], out[1], out[2]};
 }
 
-static void extract_planes(math4 vp, vector4 planes[6]) {
+static void extract_planes (math4 vp, vector4 planes[6]) {
     float row0[4] = {vp.matrix[0][0], vp.matrix[1][0], vp.matrix[2][0], vp.matrix[3][0]};
     float row1[4] = {vp.matrix[0][1], vp.matrix[1][1], vp.matrix[2][1], vp.matrix[3][1]};
     float row2[4] = {vp.matrix[0][2], vp.matrix[1][2], vp.matrix[2][2], vp.matrix[3][2]};
@@ -36,7 +36,7 @@ static void extract_planes(math4 vp, vector4 planes[6]) {
         combos[5][k] = row3[k] - row2[k];
     }
     for (int p = 0; p < 6; p++) {
-        float len = sqrtf(combos[p][0] * combos[p][0] + combos[p][1] * combos[p][1] + combos[p][2] * combos[p][2]);
+        float len = sqrtf (combos[p][0] * combos[p][0] + combos[p][1] * combos[p][1] + combos[p][2] * combos[p][2]);
         if (len < 0.000001f) {
             len = 1.0f;
         }
@@ -45,7 +45,7 @@ static void extract_planes(math4 vp, vector4 planes[6]) {
     }
 }
 
-static bool planes_inside(vector4 planes[6], vector3 p) {
+static bool planes_inside (vector4 planes[6], vector3 p) {
     for (int i = 0; i < 6; i++) {
         float d = planes[i].x * p.x + planes[i].y * p.y + planes[i].z * p.z + planes[i].w;
         if (d < 0.0f) {
@@ -55,7 +55,7 @@ static bool planes_inside(vector4 planes[6], vector3 p) {
     return true;
 }
 
-int main(void) {
+int main (void) {
     int fail = 0;
     /* Camera poses: pos, front, up. */
     vector3 poses[4][3] = {
@@ -65,11 +65,11 @@ int main(void) {
         {{0.0f, 100.0f, 0.01f}, {0.0f, -1.0f, -0.01f}, {0.0f, 0.0f, -1.0f}},
     };
     for (int pose = 0; pose < 4; pose++) {
-        math4 proj = math4_perspective_fov((3.14159265f / 180.0f) * 45.0f, 16.0f / 9.0f, 0.1f, 1000.0f);
-        math4 view = math4_look_view(poses[pose][0], poses[pose][1], poses[pose][2]);
-        math4 vp = math4_multiplication(proj, view);
+        math4 proj = math4_perspective_fov ((3.14159265f / 180.0f) * 45.0f, 16.0f / 9.0f, 0.1f, 1000.0f);
+        math4 view = math4_look_view (poses[pose][0], poses[pose][1], poses[pose][2]);
+        math4 vp = math4_multiplication (proj, view);
         vector4 planes[6];
-        extract_planes(vp, planes);
+        extract_planes (vp, planes);
         unsigned int rng = 12345u + (unsigned int) pose * 999u;
         int inside_clip = 0, culled = 0, false_out = 0, far_kept = 0;
         for (int s = 0; s < 20000; s++) {
@@ -80,7 +80,7 @@ int main(void) {
             rng = rng * 1664525u + 1013904223u;
             float fz = ((rng >> 8) % 10000) / 10000.0f;
             vector3 p = {(fx - 0.5f) * 200.0f, fy * 100.0f, (fz - 0.5f) * 200.0f};
-            vector4 clip = math4_mul_vec4(vp, (vector4){1.0f, p.x, p.y, p.z});
+            vector4 clip = math4_mul_vec4 (vp, (vector4){1.0f, p.x, p.y, p.z});
             float w = clip.w;
             bool in_clip = false, clearly_out = false;
             if (w > 0.0001f) {
@@ -91,7 +91,7 @@ int main(void) {
             } else {
                 clearly_out = true;
             }
-            bool kept = planes_inside(planes, p);
+            bool kept = planes_inside (planes, p);
             if (in_clip) {
                 inside_clip++;
                 if (!kept) {
@@ -105,25 +105,25 @@ int main(void) {
                 }
             }
         }
-        printf("[info] pose %d: clip-inside=%d false-excluded=%d far-outside=%d far-kept=%d\n", pose, inside_clip,
-               false_out, culled, far_kept);
+        printf ("[info] pose %d: clip-inside=%d false-excluded=%d far-outside=%d far-kept=%d\n", pose, inside_clip,
+                false_out, culled, far_kept);
         if (false_out > 0) {
-            printf("[FAIL] pose %d: %d visible points culled\n", pose, false_out);
+            printf ("[FAIL] pose %d: %d visible points culled\n", pose, false_out);
             fail = 1;
         }
         /* TRUTH: far_kept==culled only fails if culling NEVER fires once in
          * 20k (99.9% kept passes). Demand real culling power + coverage. */
         if (inside_clip <= 0) {
-            printf("[FAIL] pose %d: no inside points sampled\n", pose);
+            printf ("[FAIL] pose %d: no inside points sampled\n", pose);
             fail = 1;
         }
         if ((culled > 0) && ((float) far_kept / (float) culled > 0.2f)) {
-            printf("[FAIL] pose %d: culling too weak (kept %d/%d far)\n", pose, far_kept, culled);
+            printf ("[FAIL] pose %d: culling too weak (kept %d/%d far)\n", pose, far_kept, culled);
             fail = 1;
         }
     }
     if (!fail) {
-        printf("[PASS] frustum planes agree with clip space; no false exclusion\n");
+        printf ("[PASS] frustum planes agree with clip space; no false exclusion\n");
     }
     return fail;
 }

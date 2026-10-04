@@ -8,16 +8,26 @@
 #include <math.h>
 
 void drivetrain_tank (ftc_robot *robot, float left_power, float right_power) {
-    if (!robot) {return;}
-    if (left_power > 1.0f) {left_power = 1.0f;}
-    if (left_power < -1.0f) {left_power = -1.0f;}
-    if (right_power > 1.0f) {right_power = 1.0f;}
-    if (right_power < -1.0f) {right_power = -1.0f;}
+    if (!robot) {
+        return;
+    }
+    if (left_power > 1.0f) {
+        left_power = 1.0f;
+    }
+    if (left_power < -1.0f) {
+        left_power = -1.0f;
+    }
+    if (right_power > 1.0f) {
+        right_power = 1.0f;
+    }
+    if (right_power < -1.0f) {
+        right_power = -1.0f;
+    }
     /* Wheel layout: [0]=front-left, [1]=front-right, [2]=back-left, [3]=back-right */
-    float commands [FTC_MAX_WHEELS];
+    float commands[FTC_MAX_WHEELS];
     for (int i = 0; i < robot->wheel_count; i++) {
-        bool is_left = (i % 2 == 0);  /* 0,2 = left; 1,3 = right */
-        commands [i] = is_left ? left_power : right_power;
+        bool is_left = (i % 2 == 0); /* 0,2 = left; 1,3 = right */
+        commands[i] = is_left ? left_power : right_power;
     }
     ftc_robot_set_wheel_commands (robot, commands, robot->wheel_count);
     /* MFS_162_DEAD_FIELD: mecanum_active removed */
@@ -32,14 +42,28 @@ void drivetrain_tank (ftc_robot *robot, float left_power, float right_power) {
  * force for the strafe/rotate components. drivetrain_update() applies
  * that chassis force after ftc_robot_update(). */
 void drivetrain_mecanum (ftc_robot *robot, float forward, float strafe, float rotate) {
-    if (!robot) {return;}
+    if (!robot) {
+        return;
+    }
     /* Clamp inputs */
-    if (forward > 1.0f) {forward = 1.0f;}
-    if (forward < -1.0f) {forward = -1.0f;}
-    if (strafe > 1.0f) {strafe = 1.0f;}
-    if (strafe < -1.0f) {strafe = -1.0f;}
-    if (rotate > 1.0f) {rotate = 1.0f;}
-    if (rotate < -1.0f) {rotate = -1.0f;}
+    if (forward > 1.0f) {
+        forward = 1.0f;
+    }
+    if (forward < -1.0f) {
+        forward = -1.0f;
+    }
+    if (strafe > 1.0f) {
+        strafe = 1.0f;
+    }
+    if (strafe < -1.0f) {
+        strafe = -1.0f;
+    }
+    if (rotate > 1.0f) {
+        rotate = 1.0f;
+    }
+    if (rotate < -1.0f) {
+        rotate = -1.0f;
+    }
 
     /* M10 HONEST LIMIT: the mecanum inverse kinematics below is a
      * four-corner layout ([0]=FL [1]=FR [2]=BL [3]=BR). FTC_MAX_WHEELS is
@@ -49,12 +73,12 @@ void drivetrain_mecanum (ftc_robot *robot, float forward, float strafe, float ro
      * local array and produced arbitrary wheel targets. Fail loudly and
      * stop the chassis instead. */
     if (robot->wheel_count != 4) {
-        fprintf(stderr,
-            "drivetrain_mecanum: mecanum IK is defined for exactly 4 wheels "
-            "(FL,FR,BL,BR); robot has %d. Refusing to drive.\n",
-            robot->wheel_count);
+        fprintf (stderr,
+                 "drivetrain_mecanum: mecanum IK is defined for exactly 4 wheels "
+                 "(FL,FR,BL,BR); robot has %d. Refusing to drive.\n",
+                 robot->wheel_count);
         float zero[FTC_MAX_WHEELS] = {0.0f};
-        ftc_robot_set_wheel_commands(robot, zero, robot->wheel_count);
+        ftc_robot_set_wheel_commands (robot, zero, robot->wheel_count);
         return;
     }
 
@@ -91,27 +115,28 @@ void drivetrain_mecanum (ftc_robot *robot, float forward, float strafe, float ro
        — the same trap made 'rotate barely works' look true when it does
        not. Pinned by mfs_t_drive_directions in tests/mfs_suite_a.c. */
 
-    float wheel_targets [4];
-    wheel_targets [0] = forward + strafe - rotate;
-    wheel_targets [1] = forward - strafe + rotate;
-    wheel_targets [2] = forward - strafe - rotate;
-    wheel_targets [3] = forward + strafe + rotate;
+    float wheel_targets[4];
+    wheel_targets[0] = forward + strafe - rotate;
+    wheel_targets[1] = forward - strafe + rotate;
+    wheel_targets[2] = forward - strafe - rotate;
+    wheel_targets[3] = forward + strafe + rotate;
 
     /* Normalize if any target exceeds 1.0 */
     float max_mag = 0.0f;
     for (int i = 0; i < 4; i++) {
-        float mag = fabsf (wheel_targets [i]);
-        if (mag > max_mag) {max_mag = mag;}
+        float mag = fabsf (wheel_targets[i]);
+        if (mag > max_mag) {
+            max_mag = mag;
+        }
     }
     if (max_mag > 1.0f) {
-        for (int i = 0; i < 4; i++) {wheel_targets [i] /= max_mag;}
+        for (int i = 0; i < 4; i++) {
+            wheel_targets[i] /= max_mag;
+        }
     }
 
     /* Set motor commands (forward component uses wheel traction) */
     ftc_robot_set_wheel_commands (robot, wheel_targets, 4);
-
-
-    
 }
 
 /* ---------------------------------------------------------------------
@@ -187,10 +212,18 @@ static void drivetrain_odometry_update (physics_world *world, ftc_robot *robot, 
  * Deterministic: det_sin/det_cos + arithmetic + sqrtf only.
  * --------------------------------------------------------------------- */
 static void drivetrain_mecanum_analytic (physics_world *world, ftc_robot *robot) {
-    if ((!world) || (!robot)) {return;}
-    if (!robot->mecanum_analytic) {return;}
-    if (robot->drivetrain_type != FTC_DRIVETRAIN_MECANUM) {return;}
-    if (robot->wheel_count <= 0) {return;}
+    if ((!world) || (!robot)) {
+        return;
+    }
+    if (!robot->mecanum_analytic) {
+        return;
+    }
+    if (robot->drivetrain_type != FTC_DRIVETRAIN_MECANUM) {
+        return;
+    }
+    if (robot->wheel_count <= 0) {
+        return;
+    }
     /* DESPOT-2026-10-04: idle = engine tires own the contact (robot.c
      * idle-tire switch restores real hub friction below command). Running
      * this lateral force alongside would double-count past the cone, and
@@ -203,13 +236,15 @@ static void drivetrain_mecanum_analytic (physics_world *world, ftc_robot *robot)
      * every tick. */
     {
         int wi0 = (robot->wheel_count > 0) ? robot->wheel_bodies[0] : -1;
-        int tires_idle =
-            (wi0 >= 0 && wi0 < world->body_count &&
-             world->bodies[wi0].friction_static > 0.45f) ? 1 : 0;
-        if (tires_idle) {return;}
+        int tires_idle = (wi0 >= 0 && wi0 < world->body_count && world->bodies[wi0].friction_static > 0.45f) ? 1 : 0;
+        if (tires_idle) {
+            return;
+        }
     }
     int ci = robot->chassis_body;
-    if ((ci < 0) || (ci >= world->body_count)) {return;}
+    if ((ci < 0) || (ci >= world->body_count)) {
+        return;
+    }
     rigidbody *ch = &world->bodies[ci];
     float total_mass = ch->mass;
     for (int i = 0; i < robot->wheel_count; i++) {
@@ -218,7 +253,9 @@ static void drivetrain_mecanum_analytic (physics_world *world, ftc_robot *robot)
             total_mass += world->bodies[wi].mass;
         }
     }
-    if (!(total_mass > 0.0f) || !isfinite(total_mass)) {return;}
+    if (!(total_mass > 0.0f) || !isfinite (total_mass)) {
+        return;
+    }
     /* DESPOT-2026-10-02 (mathematical lie: gravity was hardcoded, and the
      * fallback was wrong in the one case that matters).
      *
@@ -250,64 +287,86 @@ static void drivetrain_mecanum_analytic (physics_world *world, ftc_robot *robot)
      * already do) rather than invent a value. A zero-g world now correctly
      * yields N = 0 and therefore no analytic lateral force, because a free
      * roller with no normal load genuinely cannot push. */
-    const mpe_config_t *cfg = mpe_world_cfg(world);
-    const float g_mag = fabsf(cfg->world.gravity);
-    if (!(g_mag >= 0.0f) || !isfinite(g_mag)) {return;}
-    float n_per_wheel = total_mass * g_mag / (float)robot->wheel_count;
+    const mpe_config_t *cfg = mpe_world_cfg (world);
+    const float g_mag = fabsf (cfg->world.gravity);
+    if (!(g_mag >= 0.0f) || !isfinite (g_mag)) {
+        return;
+    }
+    float n_per_wheel = total_mass * g_mag / (float) robot->wheel_count;
     float f_max = MFS_MECANUM_ANALYTIC_MU * n_per_wheel;
-    if (!(f_max >= 0.0f) || !isfinite(f_max)) {return;}
+    if (!(f_max >= 0.0f) || !isfinite (f_max)) {
+        return;
+    }
     for (int i = 0; i < robot->wheel_count; i++) {
         int wi = robot->wheel_bodies[i];
-        if ((wi < 0) || (wi >= world->body_count)) {continue;}
+        if ((wi < 0) || (wi >= world->body_count)) {
+            continue;
+        }
         rigidbody *wheel = &world->bodies[wi];
         float r_run = 0.0f;
         if ((i >= 0) && (i < FTC_MAX_WHEELS) && (robot->wheel_effective_radius[i] > 0.001f)) {
             r_run = robot->wheel_effective_radius[i];
         }
-        if (!(r_run > 0.001f) || !isfinite(r_run)) {continue;}
+        if (!(r_run > 0.001f) || !isfinite (r_run)) {
+            continue;
+        }
         /* DESPOT-2026-09-28: was 0.05 m — hover force. True-contact scale. */
-        if (wheel->position.y - r_run > 0.01f) {continue;} /* airborne */
+        if (wheel->position.y - r_run > 0.01f) {
+            continue;
+        } /* airborne */
         float theta = robot->wheel_roller_angle[i];
-        if (!isfinite(theta)) {continue;}
-        vector3 a_local = {(float)det_sin((double)theta), 0.0f, (float)det_cos((double)theta)};
-        vector3 a_world = vector4_rotate_to_vector3(ch->orientation, a_local);
+        if (!isfinite (theta)) {
+            continue;
+        }
+        vector3 a_local = {(float) det_sin ((double) theta), 0.0f, (float) det_cos ((double) theta)};
+        vector3 a_world = vector4_rotate_to_vector3 (ch->orientation, a_local);
         a_world.y = 0.0f; /* contact plane */
-        float a_len_sq = vector3_length_squared(a_world);
-        if (!(a_len_sq > 1e-12f) || !isfinite(a_len_sq)) {continue;}
-        a_world = vector3_scaling(a_world, 1.0f / sqrtf(a_len_sq));
+        float a_len_sq = vector3_length_squared (a_world);
+        if (!(a_len_sq > 1e-12f) || !isfinite (a_len_sq)) {
+            continue;
+        }
+        a_world = vector3_scaling (a_world, 1.0f / sqrtf (a_len_sq));
         /* Contact-patch slip velocity (bottom point; planar only — the
          * normal solver owns Y). */
         vector3 r_c = {0.0f, -r_run, 0.0f};
-        vector3 v_c = vector3_addition(wheel->velocity, vector3_cross(wheel->angular_velocity, r_c));
+        vector3 v_c = vector3_addition (wheel->velocity, vector3_cross (wheel->angular_velocity, r_c));
         v_c.y = 0.0f;
-        float v_a = vector3_dot(v_c, a_world);
-        if (!isfinite(v_a)) {continue;}
+        float v_a = vector3_dot (v_c, a_world);
+        if (!isfinite (v_a)) {
+            continue;
+        }
         float u = v_a / MFS_MECANUM_ANALYTIC_VREF;
-        if (u > 1.0f) {u = 1.0f;} else if (u < -1.0f) {u = -1.0f;}
-        vector3 F = vector3_scaling(a_world, -f_max * u);
-        wheel->force_accumulator = vector3_addition(wheel->force_accumulator, F);
+        if (u > 1.0f) {
+            u = 1.0f;
+        } else if (u < -1.0f) {
+            u = -1.0f;
+        }
+        vector3 F = vector3_scaling (a_world, -f_max * u);
+        wheel->force_accumulator = vector3_addition (wheel->force_accumulator, F);
         /* DESPOT-2026-10-04 (axle projection TRIED AND REVERTED): keeping
          * only the axle-parallel part of r×F did not move the harsh-drive
          * tilt blowup at all (same onset tick, same 69°+ in 90 ticks), so
          * the pump is not (only) the analytic reaction — full r×F stays
          * until the pump is found, not assumed. */
-        wheel->torque_accumulator = vector3_addition(wheel->torque_accumulator, vector3_cross(r_c, F));
+        wheel->torque_accumulator = vector3_addition (wheel->torque_accumulator, vector3_cross (r_c, F));
     }
 }
 
 void drivetrain_update (physics_world *world, ftc_robot *robot, float dt) {
-    if ((!world) || (!robot) || (dt <= 0.0f)) {return;}
-    const mpe_config_t *drive_cfg = mpe_world_cfg(world);
+    if ((!world) || (!robot) || (dt <= 0.0f)) {
+        return;
+    }
+    const mpe_config_t *drive_cfg = mpe_world_cfg (world);
 
     /* The only actuation: the real motor model in ftc_robot_update, applied
      * as a torque couple between hub and chassis. Ground friction is then
      * resolved by the engine's contact solver. */
-    ftc_robot_update(world, robot, dt);
+    ftc_robot_update (world, robot, dt);
 
     /* MFS-STRAFE-A analytic lateral (mecanum only, contact-level, cone-
      * capped — see function header). Lands in the accumulators alongside
      * motor torque, pre-integration, same tick. */
-    drivetrain_mecanum_analytic(world, robot);
+    drivetrain_mecanum_analytic (world, robot);
 
     /* Rolling resistance.
      *
@@ -326,8 +385,7 @@ void drivetrain_update (physics_world *world, ftc_robot *robot, float dt) {
      * it does not substitute its own default. */
     {
         const float c_rr = drive_cfg->world.rolling_resistance_coeff;
-        const int chassis_ok = ((robot->chassis_body >= 0) &&
-                                (robot->chassis_body < world->body_count));
+        const int chassis_ok = ((robot->chassis_body >= 0) && (robot->chassis_body < world->body_count));
         if (c_rr > 0.0f && chassis_ok) {
             float total_mass = world->bodies[robot->chassis_body].mass;
             for (int i = 0; i < robot->wheel_count; i++) {
@@ -349,28 +407,37 @@ void drivetrain_update (physics_world *world, ftc_robot *robot, float dt) {
              * Crr*m*9.81 invented out of nothing. See the long note at the
              * drivetrain_mecanum_analytic() g_mag for the 9.81 vs the exact
              * g_n = 9.80665 argument. */
-            const float g_mag = fabsf(drive_cfg->world.gravity);
-            if (robot->wheel_count > 0 && total_mass > 0.0f && isfinite(g_mag)) {
-                const float f_rr = c_rr * total_mass * g_mag / (float)robot->wheel_count;
+            const float g_mag = fabsf (drive_cfg->world.gravity);
+            if (robot->wheel_count > 0 && total_mass > 0.0f && isfinite (g_mag)) {
+                const float f_rr = c_rr * total_mass * g_mag / (float) robot->wheel_count;
                 for (int i = 0; i < robot->wheel_count; i++) {
                     int wi = robot->wheel_bodies[i];
-                    if ((wi < 0) || (wi >= world->body_count)) {continue;}
+                    if ((wi < 0) || (wi >= world->body_count)) {
+                        continue;
+                    }
                     rigidbody *wheel = &world->bodies[wi];
                     /* Effective contact radius: the rollers define the
                      * running surface, not the hub plate. */
                     const float r_eff = robot->wheel_effective_radius[i];
-                    if (r_eff <= 0.001f) {continue;}
+                    if (r_eff <= 0.001f) {
+                        continue;
+                    }
                     vector3 axle = wheel->cached_axes[0];
-                    if (vector3_length_squared(axle) < 0.0001f) {continue;}
-                    float omega = vector3_dot(wheel->angular_velocity, axle);
-                    if (fabsf(omega) < 0.01f) {continue;}
+                    if (vector3_length_squared (axle) < 0.0001f) {
+                        continue;
+                    }
+                    float omega = vector3_dot (wheel->angular_velocity, axle);
+                    if (fabsf (omega) < 0.01f) {
+                        continue;
+                    }
                     /* Free-rolling only: a driven wheel's net torque is the
                      * motor's business, not rolling resistance's. */
-                    if (fabsf(robot->wheel_motors[i].command) > 0.05f) {continue;}
+                    if (fabsf (robot->wheel_motors[i].command) > 0.05f) {
+                        continue;
+                    }
                     float sign = (omega > 0.0f) ? -1.0f : 1.0f;
-                    wheel->torque_accumulator = vector3_addition(
-                        wheel->torque_accumulator,
-                        vector3_scaling(axle, sign * f_rr * r_eff));
+                    wheel->torque_accumulator =
+                        vector3_addition (wheel->torque_accumulator, vector3_scaling (axle, sign * f_rr * r_eff));
                 }
             }
         }
@@ -384,13 +451,14 @@ void drivetrain_update (physics_world *world, ftc_robot *robot, float dt) {
         int cidx = robot->chassis_body;
         if ((cidx >= 0) && (cidx < world->body_count)) {
             const rigidbody *cb = &world->bodies[cidx];
-            const float speed_sq = (cb->velocity.x * cb->velocity.x) +
-                                   (cb->velocity.z * cb->velocity.z);
-            if (speed_sq > 9.0f) {robot->clamp_events++;}
+            const float speed_sq = (cb->velocity.x * cb->velocity.x) + (cb->velocity.z * cb->velocity.z);
+            if (speed_sq > 9.0f) {
+                robot->clamp_events++;
+            }
         }
     }
 
-    drivetrain_odometry_update(world, robot, dt);
+    drivetrain_odometry_update (world, robot, dt);
 }
 
 /* ---------------------------------------------------------------------
@@ -432,23 +500,25 @@ static void drivetrain_odometry_update (physics_world *world, ftc_robot *robot, 
      * zero exactly like hardware. */
     float counts_per_rev = 0.0f;
     {
-        int base_ppr = motor_preset_base_encoder_ppr(robot->motor_preset);
+        int base_ppr = motor_preset_base_encoder_ppr (robot->motor_preset);
         float gear = (robot->wheel_count > 0) ? robot->wheel_motors[0].gear_ratio : 1.0f;
-        if (base_ppr > 0 && gear > 0.0f && isfinite(gear)) {
-            counts_per_rev = (float)base_ppr * gear;
+        if (base_ppr > 0 && gear > 0.0f && isfinite (gear)) {
+            counts_per_rev = (float) base_ppr * gear;
         }
     }
     const float quant_on = (counts_per_rev > 1.0f && dt > 0.0f) ? 1.0f : 0.0f;
 
     for (int i = 0; i < robot->wheel_count && i < FTC_MAX_WHEELS; i++) {
         const int wi = robot->wheel_bodies[i];
-        if ((wi < 0) || (wi >= world->body_count)) {continue;}
+        if ((wi < 0) || (wi >= world->body_count)) {
+            continue;
+        }
         rigidbody *w = &world->bodies[wi];
         vector3 axle = w->cached_axes[0];
-        if (vector3_length_squared(axle) < 0.0001f) {
-            axle = vector4_rotate_to_vector3(w->orientation, (vector3){1.0f, 0.0f, 0.0f});
+        if (vector3_length_squared (axle) < 0.0001f) {
+            axle = vector4_rotate_to_vector3 (w->orientation, (vector3){1.0f, 0.0f, 0.0f});
         }
-        const float omega = vector3_dot(w->angular_velocity, axle);
+        const float omega = vector3_dot (w->angular_velocity, axle);
         robot->wheel_radians[i] += omega * dt;
         if (quant_on > 0.5f) {
             /* True angle -> integer counts -> quantized angle.
@@ -458,11 +528,11 @@ static void drivetrain_odometry_update (physics_world *world, ftc_robot *robot, 
              * symmetric). Round-half-away-from-zero. */
             const float revs = robot->wheel_radians[i] * 0.15915494309189535f; /* /2pi */
             const float exact = revs * counts_per_rev;
-            int new_count = (int)(exact >= 0.0f ? floorf(exact + 0.5f) : ceilf(exact - 0.5f));
-            if (!isfinite((float)new_count)) new_count = robot->wheel_encoder_counts[i];
+            int new_count = (int) (exact >= 0.0f ? floorf (exact + 0.5f) : ceilf (exact - 0.5f));
+            if (!isfinite ((float) new_count)) new_count = robot->wheel_encoder_counts[i];
             int old_count = robot->wheel_encoder_counts[i];
             robot->wheel_encoder_counts[i] = new_count;
-            float q_angle = (float)new_count * 6.283185307179586f / counts_per_rev;
+            float q_angle = (float) new_count * 6.283185307179586f / counts_per_rev;
             float dq = q_angle - robot->wheel_radians_quant[i];
             robot->wheel_radians_quant[i] = q_angle;
             w_rad[i] = (old_count == new_count) ? 0.0f : (dq / dt);
@@ -479,20 +549,26 @@ static void drivetrain_odometry_update (physics_world *world, ftc_robot *robot, 
             break;
         }
     }
-    if (r <= 0.001f) {r = 0.05f;}
+    if (r <= 0.001f) {
+        r = 0.05f;
+    }
 
     float v_fwd = 0.0f, v_lat = 0.0f, yaw_rate = 0.0f;
     if (robot->wheel_count >= 4) {
         const float wfl = w_rad[0], wfr = w_rad[1];
         const float wbl = w_rad[2], wbr = w_rad[3];
-        v_fwd  = ((wfl + wfr + wbl + wbr) * 0.25f) * r;
-        v_lat  = ((wfl - wfr - wbl + wbr) * 0.25f) * r;
+        v_fwd = ((wfl + wfr + wbl + wbr) * 0.25f) * r;
+        v_lat = ((wfl - wfr - wbl + wbr) * 0.25f) * r;
         /* Mecanum yaw moment arm is (Lx + Lz), not the differential 2*Lx. */
         yaw_rate = (((-wfl + wfr - wbl + wbr) * 0.25f) * r) / 0.44f;
     } else if (robot->wheel_count >= 2) {
         float wl = 0.0f, wr = 0.0f;
         for (int i = 0; i < robot->wheel_count; i++) {
-            if ((i % 2) == 0) {wl += w_rad[i];} else {wr += w_rad[i];}
+            if ((i % 2) == 0) {
+                wl += w_rad[i];
+            } else {
+                wr += w_rad[i];
+            }
         }
         const int nl = (robot->wheel_count + 1) / 2;
         const int nr = robot->wheel_count / 2;
@@ -517,16 +593,16 @@ static void drivetrain_odometry_update (physics_world *world, ftc_robot *robot, 
     {
         const float pi = 3.14159265358979323846f;
         const float two_pi = 6.28318530717958647692f;
-        if (!isfinite(robot->odom_theta)) {
+        if (!isfinite (robot->odom_theta)) {
             robot->odom_theta = 0.0f;
         } else if (robot->odom_theta > pi || robot->odom_theta < -pi) {
-            float wrapped = fmodf(robot->odom_theta + pi, two_pi);
+            float wrapped = fmodf (robot->odom_theta + pi, two_pi);
             if (wrapped < 0.0f) wrapped += two_pi;
             robot->odom_theta = wrapped - pi;
         }
     }
-    const float c = (float)det_cos((double)robot->odom_theta);
-    const float s = (float)det_sin((double)robot->odom_theta);
+    const float c = (float) det_cos ((double) robot->odom_theta);
+    const float s = (float) det_sin ((double) robot->odom_theta);
     /* body->world yaw about +Y: x' = x*c + z*s ; z' = -x*s + z*c */
     robot->odom_x += (v_lat * c + v_fwd * s) * dt;
     robot->odom_z += (-v_lat * s + v_fwd * c) * dt;
@@ -544,10 +620,9 @@ static void drivetrain_odometry_update (physics_world *world, ftc_robot *robot, 
             float evx = v_lat * c + v_fwd * s;
             float evz = -v_lat * s + v_fwd * c;
             float ex = evx - tvx, ez = evz - tvz;
-            float planar_err = sqrtf(ex * ex + ez * ez);
-            float yaw_err = fabsf(yaw_rate - ch->angular_velocity.y);
-            if ((isfinite(planar_err) && planar_err > 0.25f) ||
-                (isfinite(yaw_err) && yaw_err > 0.35f)) {
+            float planar_err = sqrtf (ex * ex + ez * ez);
+            float yaw_err = fabsf (yaw_rate - ch->angular_velocity.y);
+            if ((isfinite (planar_err) && planar_err > 0.25f) || (isfinite (yaw_err) && yaw_err > 0.35f)) {
                 slip = 1;
             }
         }

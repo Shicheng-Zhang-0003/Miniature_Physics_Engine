@@ -23,8 +23,8 @@
 #define F10_TICKS 1500
 #define F10_TRANSIENT 120
 
-static void f10_add_cube(physics_world *w, vector3 p) {
-    int idx = physics_world_add_cube(w, p, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
+static void f10_add_cube (physics_world *w, vector3 p) {
+    int idx = physics_world_add_cube (w, p, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
     if (idx >= 0) {
         w->bodies[idx].restitution = 0.0f;
         w->bodies[idx].friction_static = 0.8f;
@@ -32,19 +32,18 @@ static void f10_add_cube(physics_world *w, vector3 p) {
     }
 }
 
-int main(void) {
-    mpe_config_init();
+int main (void) {
+    mpe_config_init ();
     physics_world world;
-    physics_world_init(&world);
-    constraint_pool_init(&world);
+    physics_world_init (&world);
+    constraint_pool_init (&world);
 
     /* Coulomb floor (top y=0, mu matched). Floorless, the pile rests on the
      * frictionless boundary clamp and disperses (0/27 asleep, KE=30 at
      * 60 s) while loose gates still pass — the same setup-bug family as
      * stack/driven_wheel/list4. With floor: 27/27 asleep, KE=0, runmax 0. */
     {
-        int f = physics_world_add_cube(&world, (vector3){0.0f, -0.5f, 0.0f},
-                                       (vector3){30.0f, 0.5f, 30.0f}, 0.0f);
+        int f = physics_world_add_cube (&world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){30.0f, 0.5f, 30.0f}, 0.0f);
         if (f >= 0) {
             world.bodies[f].friction_static = 0.8f;
             world.bodies[f].friction_kinetic = 0.7f;
@@ -53,21 +52,21 @@ int main(void) {
     }
 
     for (int i = 0; i < 10; i++) {
-        f10_add_cube(&world, (vector3){20.0f, 0.5f + (float) i * 0.99f, 0.0f});
+        f10_add_cube (&world, (vector3){20.0f, 0.5f + (float) i * 0.99f, 0.0f});
     }
     for (int gx = 0; gx < 3; gx++) {
         for (int gz = 0; gz < 3; gz++) {
-            f10_add_cube(&world, (vector3){-20.0f + ((float) gx - 1.0f) * 1.1f, 0.5f, ((float) gz - 1.0f) * 1.1f});
+            f10_add_cube (&world, (vector3){-20.0f + ((float) gx - 1.0f) * 1.1f, 0.5f, ((float) gz - 1.0f) * 1.1f});
         }
     }
     for (int gx = 0; gx < 2; gx++) {
         for (int gz = 0; gz < 2; gz++) {
-            f10_add_cube(&world, (vector3){-20.0f + ((float) gx - 0.5f) * 1.1f, 1.49f, ((float) gz - 0.5f) * 1.1f});
+            f10_add_cube (&world, (vector3){-20.0f + ((float) gx - 0.5f) * 1.1f, 1.49f, ((float) gz - 0.5f) * 1.1f});
         }
     }
-    f10_add_cube(&world, (vector3){-20.0f, 2.48f, 0.0f});
+    f10_add_cube (&world, (vector3){-20.0f, 2.48f, 0.0f});
     for (int i = 0; i < 3; i++) {
-        int idx = physics_world_add_sphere(&world, 0.35f, 1.0f, (vector3){-30.0f + (float) i * 3.0f, 0.35f, 8.0f});
+        int idx = physics_world_add_sphere (&world, 0.35f, 1.0f, (vector3){-30.0f + (float) i * 3.0f, 0.35f, 8.0f});
         if (idx >= 0) {
             world.bodies[idx].restitution = 0.0f;
             world.bodies[idx].friction_static = 0.8f;
@@ -82,22 +81,22 @@ int main(void) {
     long nan_ticks = 0, fallen_ticks = 0;
 
     for (int t = 0; t < F10_TICKS; t++) {
-        physics_world_step(&world, dt);
+        physics_world_step (&world, dt);
         float mx_lin = 0.0f, mx_ang = 0.0f;
         for (int i = 0; i < world.body_count; i++) {
             rigidbody *rb = &world.bodies[i];
-            if (!isfinite(rb->position.x) || !isfinite(rb->position.y) || !isfinite(rb->position.z) ||
-                !isfinite(rb->velocity.x) || !isfinite(rb->velocity.y) || !isfinite(rb->velocity.z) ||
-                !isfinite(rb->angular_velocity.x) || !isfinite(rb->angular_velocity.y) ||
-                !isfinite(rb->angular_velocity.z)) {
+            if (!isfinite (rb->position.x) || !isfinite (rb->position.y) || !isfinite (rb->position.z) ||
+                !isfinite (rb->velocity.x) || !isfinite (rb->velocity.y) || !isfinite (rb->velocity.z) ||
+                !isfinite (rb->angular_velocity.x) || !isfinite (rb->angular_velocity.y) ||
+                !isfinite (rb->angular_velocity.z)) {
                 nan_ticks++;
                 continue;
             }
             if (!rb->static_state && rb->position.y < -0.2f) {
                 fallen_ticks++;
             }
-            float l = vector3_length(rb->velocity);
-            float a = vector3_length(rb->angular_velocity);
+            float l = vector3_length (rb->velocity);
+            float a = vector3_length (rb->angular_velocity);
             if (l > mx_lin) {
                 mx_lin = l;
             }
@@ -124,8 +123,8 @@ int main(void) {
         }
     }
 
-    printf("[info] final lin=%.5f ang=%.5f runmax lin=%.5f ang=%.5f transient lin=%.5f ang=%.5f nan=%ld fallen=%ld\n",
-           fin_lin, fin_ang, run_max_lin, run_max_ang, trans_lin, trans_ang, nan_ticks, fallen_ticks);
+    printf ("[info] final lin=%.5f ang=%.5f runmax lin=%.5f ang=%.5f transient lin=%.5f ang=%.5f nan=%ld fallen=%ld\n",
+            fin_lin, fin_ang, run_max_lin, run_max_ang, trans_lin, trans_ang, nan_ticks, fallen_ticks);
     /* TRUTH (2026-09-23 TUI validation): the old "run-max ~10-15 is a solver
      * limitation" comment rationalized a missing floor, not solver truth.
      * Floorless, the pile slides on the frictionless clamp and disperses
@@ -142,17 +141,15 @@ int main(void) {
             }
         }
     }
-    printf("[info] asleep=%d/%d\n", asleep, dynamic_n);
-    int pass = world.body_count > 0 && nan_ticks == 0 && fallen_ticks == 0 &&
-               fin_lin < 0.25f && fin_ang < 0.5f &&
-               run_max_lin < 2.0f && run_max_ang < 2.0f &&
-               asleep == dynamic_n && dynamic_n > 0;
+    printf ("[info] asleep=%d/%d\n", asleep, dynamic_n);
+    int pass = world.body_count > 0 && nan_ticks == 0 && fallen_ticks == 0 && fin_lin < 0.25f && fin_ang < 0.5f &&
+               run_max_lin < 2.0f && run_max_ang < 2.0f && asleep == dynamic_n && dynamic_n > 0;
     if (pass) {
-        printf("[PASS] long-run 10-stack+pile settles and stays calm\n");
+        printf ("[PASS] long-run 10-stack+pile settles and stays calm\n");
     } else {
-        printf("[FAIL] long-run instability (see runmax/final above)\n");
+        printf ("[FAIL] long-run instability (see runmax/final above)\n");
     }
-    physics_world_cleanup(&world);
+    physics_world_cleanup (&world);
     return pass ? 0 : 1;
 }
 #endif /* mpe_f10_long_run_test */

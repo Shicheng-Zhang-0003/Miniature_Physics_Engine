@@ -12,22 +12,25 @@
 #include "modules/ftc/submodules/drivetrain.h"
 #include "ecosystem/mfs/tests/mfs_test_common.h"
 
-int main(void) {
+int main (void) {
     physics_world world;
-    mfs_test_world(&world); /* 128 iters + tile floor (see header) */
+    mfs_test_world (&world); /* 128 iters + tile floor (see header) */
 
     ftc_robot robot;
-    int rc = ftc_robot_create(&world, &robot, 0.0f, ftc_robot_rest_height(), 0.0f, MOTOR_GB_5203_26_9);
-    if (rc != 0) { printf("[FAIL] could not create robot\n"); return 1; }
+    int rc = ftc_robot_create (&world, &robot, 0.0f, ftc_robot_rest_height (), 0.0f, MOTOR_GB_5203_26_9);
+    if (rc != 0) {
+        printf ("[FAIL] could not create robot\n");
+        return 1;
+    }
 
     const float dt = 1.0f / 60.0f;
     int fail = 0;
 
     /* Phase 0: Let robot settle for 120 ticks */
     for (int t = 0; t < 120; t++) {
-        drivetrain_tank(&robot, 0.0f, 0.0f);
-        drivetrain_update(&world, &robot, dt);
-        physics_world_step(&world, dt);
+        drivetrain_tank (&robot, 0.0f, 0.0f);
+        drivetrain_update (&world, &robot, dt);
+        physics_world_step (&world, dt);
     }
 
     /* Reset odometry */
@@ -39,15 +42,14 @@ int main(void) {
     float start_z = world.bodies[robot.chassis_body].position.z;
 
     /* Phase 1: Drive forward at full power for 180 ticks (3 seconds) */
-    printf("[info] Phase 1: driving forward 3s\n");
+    printf ("[info] Phase 1: driving forward 3s\n");
     for (int t = 0; t < 180 && !fail; t++) {
-        drivetrain_tank(&robot, 1.0f, 1.0f);
-        drivetrain_update(&world, &robot, dt);
-        physics_world_step(&world, dt);
+        drivetrain_tank (&robot, 1.0f, 1.0f);
+        drivetrain_update (&world, &robot, dt);
+        physics_world_step (&world, dt);
         for (int i = 0; i < world.body_count; i++) {
-            if (!isfinite(world.bodies[i].position.x) ||
-                !isfinite(world.bodies[i].position.z)) {
-                printf("[FAIL] NaN at tick %d\n", t);
+            if (!isfinite (world.bodies[i].position.x) || !isfinite (world.bodies[i].position.z)) {
+                printf ("[FAIL] NaN at tick %d\n", t);
                 fail = 1;
                 break;
             }
@@ -59,31 +61,31 @@ int main(void) {
     float end_z = world.bodies[robot.chassis_body].position.z;
     float physics_dz = end_z - start_z;
     float physics_dx = end_x - start_x;
-    float physics_dist = sqrtf(physics_dz * physics_dz + physics_dx * physics_dx);
+    float physics_dist = sqrtf (physics_dz * physics_dz + physics_dx * physics_dx);
 
-    printf("[info] physics: dx=%.4f dz=%.4f dist=%.4f\n", physics_dx, physics_dz, physics_dist);
-    printf("[info] odometry: dx=%.4f dz=%.4f theta=%.4f\n", robot.odom_x, robot.odom_z, robot.odom_theta);
+    printf ("[info] physics: dx=%.4f dz=%.4f dist=%.4f\n", physics_dx, physics_dz, physics_dist);
+    printf ("[info] odometry: dx=%.4f dz=%.4f theta=%.4f\n", robot.odom_x, robot.odom_z, robot.odom_theta);
 
     /* Robot should have moved at least 0.2 m forward */
     if (physics_dist < 0.2f) {
-        printf("[FAIL] robot barely moved (%.4f m)\n", physics_dist);
+        printf ("[FAIL] robot barely moved (%.4f m)\n", physics_dist);
         return 1;
     }
-    printf("[PASS] robot moved %.4f m\n", physics_dist);
+    printf ("[PASS] robot moved %.4f m\n", physics_dist);
 
     /* Odometry should track physics within 30% error */
-    float odom_dist = sqrtf(robot.odom_z * robot.odom_z + robot.odom_x * robot.odom_x);
-    float dist_error = fabsf(odom_dist - physics_dist) / (physics_dist + 0.001f);
-    printf("[info] odometry distance error: %.1f%%\n", dist_error * 100.0f);
+    float odom_dist = sqrtf (robot.odom_z * robot.odom_z + robot.odom_x * robot.odom_x);
+    float dist_error = fabsf (odom_dist - physics_dist) / (physics_dist + 0.001f);
+    printf ("[info] odometry distance error: %.1f%%\n", dist_error * 100.0f);
 
     if (dist_error > 0.3f) {
-        printf("[FAIL] odometry drift too large (%.1f%%)\n", dist_error * 100.0f);
+        printf ("[FAIL] odometry drift too large (%.1f%%)\n", dist_error * 100.0f);
         return 1;
     }
-    printf("[PASS] odometry tracks physics (error=%.1f%%)\n", dist_error * 100.0f);
+    printf ("[PASS] odometry tracks physics (error=%.1f%%)\n", dist_error * 100.0f);
 
     /* Phase 2: Strafe test — verify odometry X sign matches physics X */
-    printf("[info] Phase 2: strafe test\n");
+    printf ("[info] Phase 2: strafe test\n");
     robot.odom_x = robot.odom_z = robot.odom_theta = 0.0f;
     for (int i = 0; i < robot.wheel_count && i < FTC_MAX_WHEELS; i++)
         robot.wheel_radians[i] = 0.0f;
@@ -92,29 +94,29 @@ int main(void) {
 
     /* Mecanum strafe: forward=0, strafe=1, rotate=0 */
     for (int t = 0; t < 60 && !fail; t++) {
-        drivetrain_mecanum(&robot, 0.0f, 1.0f, 0.0f);
-        drivetrain_update(&world, &robot, dt);
-        physics_world_step(&world, dt);
+        drivetrain_mecanum (&robot, 0.0f, 1.0f, 0.0f);
+        drivetrain_update (&world, &robot, dt);
+        physics_world_step (&world, dt);
     }
 
     end_x = world.bodies[robot.chassis_body].position.x;
     float strafe_dx = end_x - start_x;
-    printf("[info] strafe: physics dx=%.4f odometry dx=%.4f\n", strafe_dx, robot.odom_x);
+    printf ("[info] strafe: physics dx=%.4f odometry dx=%.4f\n", strafe_dx, robot.odom_x);
 
     /* FIX-AUDIT: old minima gate silently skipped when strafe was small.
      * Strafe must actually move (>0.1m) and encoder odom must agree in sign. */
-    if (fabsf(strafe_dx) < 0.1f) {
-        printf("[FAIL] strafe too small to verify (dx=%.4f)\n", strafe_dx);
+    if (fabsf (strafe_dx) < 0.1f) {
+        printf ("[FAIL] strafe too small to verify (dx=%.4f)\n", strafe_dx);
         return 1;
     }
     if ((strafe_dx > 0 && robot.odom_x < 0) || (strafe_dx < 0 && robot.odom_x > 0)) {
-        printf("[FAIL] odometry strafe sign disagrees with physics\n");
+        printf ("[FAIL] odometry strafe sign disagrees with physics\n");
         return 1;
     }
-    printf("[PASS] odometry strafe sign matches physics\n");
+    printf ("[PASS] odometry strafe sign matches physics\n");
 
-    printf("[PASS] odometry accuracy test complete\n");
-    physics_world_cleanup(&world);
+    printf ("[PASS] odometry accuracy test complete\n");
+    physics_world_cleanup (&world);
     return 0;
 }
 #endif /* MFS_ODOMETRY_ACCURACY_TEST */

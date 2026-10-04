@@ -32,19 +32,19 @@ struct physics_world;
  * a performance claim — practical limit is 2-4 robots (each mecanum robot
  * adds 4 wheels + up to 32 roller bodies + 36 joints to one solver island;
  * cost grows superlinearly at 128 iterations). */
-int ftc_fleet_spawn(struct physics_world *world, float x, float y, float z,
-                    motor_preset_id preset, ftc_drivetrain_type drivetrain_type);
+int ftc_fleet_spawn (struct physics_world *world, float x, float y, float z, motor_preset_id preset,
+                     ftc_drivetrain_type drivetrain_type);
 
 /* Live robot count in the world's fleet (0 if none attached). */
-int ftc_fleet_count(struct physics_world *world);
+int ftc_fleet_count (struct physics_world *world);
 
 /* Mutable robot access for commanding (drivetrain_tank/mecanum) and
  * inspection (odometry, battery). NULL on bad world/index. */
-ftc_robot *ftc_fleet_get(struct physics_world *world, int index);
+ftc_robot *ftc_fleet_get (struct physics_world *world, int index);
 
 /* ---- module plumbing (used by ftc_module.c; not application API) ---- */
-void *ftc_fleet_create(void);
-void ftc_fleet_destroy(void *fleet_state);
-void ftc_fleet_step_all(struct physics_world *world, void *fleet_state, float dt);
+void *ftc_fleet_create (void);
+void ftc_fleet_destroy (void *fleet_state);
+void ftc_fleet_step_all (struct physics_world *world, void *fleet_state, float dt);
 
 #endif /* ftc_fleet_h */
