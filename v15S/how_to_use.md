@@ -234,9 +234,13 @@ In the debug terminal:
 Press `F11` to randomise all 79 tunables to extreme bounded values and run
 a 60-second long-run validation. This stress-tests the engine under
 adversarial parameter combinations (each press uses the next seed, printed
-for bisection). F11 is a robustness verdict: PASS means no NaN and nothing
-fell through the world — speeds are reported, never gated (under extremes,
-perpetual fall/creep can be the TRUE outcome). Solver resolution is pinned
+for bisection). F11 is a robustness verdict: PASS means no NaN and that no two
+cubes interpenetrate by more than 0.05 m — speeds are reported, never gated
+(under extremes, perpetual fall/creep and column buckling can be the TRUE
+outcome). "Nothing fell through the world" is deliberately NOT part of it:
+with the world-edge safety net installed that is unfireable, so it is gated
+for real in the F10 long-run case instead, which re-runs the same scene with
+the net switched off. Solver resolution is pinned
 during torture (gravity −17…−1, ≥96 iterations — the proven envelope for the
 10:1 validation column; material/world extremes stay fully random). F10 at
 defaults keeps the full settle verdict (final < 0.25 m/s, run-max < 2.0 m/s
@@ -402,7 +406,7 @@ All values are in SI units (metres, kilograms, seconds).
 
 The engine uses a fixed 60 Hz physics timestep with an accumulator, allowing up to 5 physics ticks per rendered frame to prevent spiral-of-death. Each physics tick runs 64 sequential-impulse solver iterations by default (timestep.solver_iterations, 1–128), giving stable collision resolution for stacked objects and rolling behaviour. Rolling resistance applies contact-patch torque (Hertz patch, shared-patch split for body-body); static/kinetic Coulomb friction uses a two-tangent disc clamp.
 
-Objects with velocity below 0.05 m/s and angular velocity below 0.01 rad/s are put to sleep automatically to prevent floating-point jitter.
+Objects with linear speed below **0.01 m/s** (`sleep.linear_thresh_sq = 0.0001`) and angular speed below **0.035 rad/s** (`sleep.angular_thresh_sq = 0.0012`, about 2°/s) for the configured duration are put to sleep automatically to prevent floating-point jitter.
 
 ---
 

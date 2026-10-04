@@ -8,7 +8,7 @@
 > fixed and now reports three distinct outcomes (in sync / drift / **did not
 > run**); the drift was mirrored (the twin was verified to be a strict
 > superset, so nothing was lost); and `.gitignore` was added after finding 13
-> build artifacts tracked since the initial import. Suite is now **13 gated
+> build artifacts tracked since the initial import. Suite is now **14 gated
 > tests, 14/14**, clean under ASan+UBSan. See `docs/KNOWN_FAILURES.md` for the
 > full ledger.
 
@@ -195,7 +195,10 @@ physics_world_detach_module(world, "ftc-fleet");
   bodies/joints are built (6 bodies / 4 joints). This replaces the
   retired chassis-force era AND the articulated 32-roller build (kept
   behind `ftc_robot_set_mecanum_analytic_default(0)` for forensics):
-  strafe +X 3.40 m in 3 s vs 0.30 m gated; diagonal (0.5,0.5) composes
+  strafe +X 2.2872 m in 3 s vs 0.30 m gated; diagonal (0.5,0.5) composes
+  (DESPOT-2026-10-03: this figure was documented as 3.40 m. Measured 2.2872 m
+  by the gate itself -- `mfs_suite mecanum` prints it. The old number came from
+  a stale source comment and had drifted from the code.)
   to (1.19,1.20) m. Odometry is therefore pure encoder kinematics
   and `odom_slip` stays honest (1 during peel, reporting only).
 - Motor model: implicit-in-speed solve with disturbance observer
@@ -230,15 +233,21 @@ physics_world_detach_module(world, "ftc-fleet");
   is never corrected). Encoders are PPR-quantized (counts = base_ppr x
   gear), so creep speeds staircase like hardware.
 - KNOWN FAILURE [MFS-STRAFE-F1 FIXED 2026-09-28, F2 FIXED 2026-09-28]:
-  F1 strafe develops 2.96–3.40 m vs 0.30 m gated (hard-gated in the
+  F1 strafe develops 2.2872 m vs 0.30 m gated (hard-gated in the
   suite). F2 transmit fixed (physics 0.87 m in 1 s vs 0.10 m, hard-gated)
-  AND encoder tracking fixed (odom ~1.08 m vs 0.87 m physics, ~25% vs 30%
-  allowed — was 88% over): the implicit clamp and governor took
-  min(spec, V-line) while the explicit observer twin ran unclamped, so at
-  fresh-pack voltage the paths disagreed 6.7% and the observer carried a
-  phantom load into peel; voltage-scaling both bounds to the V-line
-  no-load point closed it (A/B isolated, deterministic under -O2 and
-  -O1+ASan). Margin is thin (25 vs 30) — the XFAIL branch stays as a
+  AND the encoder tracking half is **STILL OPEN, not fixed** — measured
+  2026-10-03: `physics dx = 0.6318`, `odometry dx = 0.9076`, which is
+  **+43.7%**, outside the 30% band. The suite prints this as
+  `[XFAIL][MFS-STRAFE-F2] ... tracking open`, so it is surfaced as a
+  known-red marker rather than hidden, but this README described it as
+  closed with better numbers than the run produces (it claimed odom 1.08 vs
+  physics 0.87, i.e. ~25%, and neither figure matches). Transmit (F1) is
+  genuinely fixed and hard-gated; tracking (F2) is not. Original diagnosis:
+  the implicit clamp and governor took min(spec, V-line) while the explicit
+  observer twin ran unclamped, so at fresh-pack voltage the paths disagreed
+  6.7% and the observer carried a phantom load into peel; voltage-scaling
+  both bounds to the V-line no-load point narrowed it but did not close it.
+  The XFAIL branch stays as a
   fallback tripwire. `odom_slip` still flags real slip elsewhere.
   The articulated 5-link ground->roller->bearing->hub chain does not
   converge in the GS solver (0.03–0.17 m chaotic across 64–512

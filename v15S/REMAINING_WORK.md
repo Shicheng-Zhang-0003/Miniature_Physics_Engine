@@ -13,9 +13,14 @@
 - [x] Full profile passes all canonical, isolated legacy, paranoia, MFS, TUI,
   and engine build checks; the C, MFS, and TUI test groups also pass combined
   ASan/UBSan. **Count drift (2026-09-29):** the historical "220/220" figure no
-  longer matches what the runner emits -- the current full run reports
-  **204 checks**. The number has moved because entries were added and removed;
-  the runner does not pin a floor, so it can silently shrink (tracked).
+  longer matched what the runner emitted. **CLOSED 2026-10-03:** the runner now
+  reports **234 checks** and `MIN_SUITE_ENTRIES` is pinned at 44 (the exact
+  registry size), so coverage can no longer be deleted silently. Worth recording
+  how this actually went: the floor was added on 2026-09-29 and pinned at 42
+  while the registry held 44, so it was blind for the two newest gates -- the
+  same failure it was created to prevent, reproduced inside a week. A floor that
+  sits below the real count is worse than no floor, because it reads as
+  protection.
 - [x] Added missing `physics_world_cleanup` calls to cylinder-drop, driven-wheel,
   and FTC integration test paths after LeakSanitizer identified fixture leaks.
 - [x] Quick profile rerun after adding command-launch failure handling; all
@@ -157,7 +162,7 @@
 - [x] Module stage detachment before unload: detach-everywhere +
   forget-pointers on every unregister path, proven by `loader_lifecycle`.
 - [x] Runner now pins a floor on the discovered suite size
-  (`MIN_SUITE_ENTRIES`, currently 36) and has a contract test for it. Deleting
+  (`MIN_SUITE_ENTRIES`, raised to 44 on 2026-10-03 (was 36, then 42 — and both times it sat BELOW the real registry, which is the exact failure the floor exists to prevent)) and has a contract test for it. Deleting
   a registry entry and its make target together used to shrink every headline
   count with no failure anywhere.
 - [x] The SHIPPED frustum culler is now covered (2026-09-29). Plane extraction
@@ -418,9 +423,18 @@ Audit notes and boundaries are in `../AUDIT_REPORT_2026-09-24.md`.
      `test_runner.py`. A property that holds at one setting and not another is
      invisible to a single golden number — that is exactly how CONFIG-2026-09-29
      stayed green. It found a failure on its first run.
-  3. *Metamorphic tests* (`tests/mpe_suite_d.c`, 3 registered) — rotation
-     equivariance, solver-convergence monotonicity, and config reachability.
+  3. *Metamorphic tests* (`tests/mpe_suite_d.c`, **6** registered) — rotation
+     equivariance, solver boundedness plus a live-knob check, config
+     reachability, sleep honesty, mouse-look axes, body-material ordering.
      **No golden numbers**: they assert relations any correct engine satisfies.
+     **DESPOT-2026-10-03, two of these were not doing that.** `meta_rotation`
+     could not fail (its failure branch printed `[XFAIL]` without incrementing
+     `failures`), and `meta_convergence` was measuring a fixture that was
+     BITWISE IDENTICAL at 1 through 128 solver iterations, so its gate passed
+     trivially. Both fixed and both re-verified by deliberately breaking the
+     engine. Note also that error is measurably **non-monotonic** in iteration
+     count for a friction stack, so the old "monotonicity" wording was never
+     true and the gate now asserts boundedness instead.
   4. *Withdrawn honestly* — `meta_sleep` was written, failed to converge, and
      was removed rather than shipped red or unjustifiably green.
 
