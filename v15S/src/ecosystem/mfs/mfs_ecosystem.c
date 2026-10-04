@@ -282,7 +282,7 @@ static int eco_ensure_floor(physics_world *w) {
         }
     }
     int f = physics_world_add_cube(w, (vector3){0.0f, -0.5f, 0.0f},
-                                   (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
+                                   (vector3){30.0f, 0.5f, 30.0f}, 0.0f);
     if (f < 0) return -1;
     w->bodies[f].friction_static = 1.0f;
     w->bodies[f].friction_kinetic = 0.8f;

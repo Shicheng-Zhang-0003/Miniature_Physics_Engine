@@ -1,5 +1,6 @@
 /* See gamepad_drive.h. */
 #include "gamepad_drive.h"
+#include "../mpe_engine.h"
 #include "../core/mpe_platform.h"
 #include "../core/mpe_loader.h"
 #include "../core/physics_world.h"
@@ -8,6 +9,7 @@
 #include "../ecosystem/mfs/modules/module_1/submodules/gamepad/gamepad.h"
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 
 /* Bundle identity mirrors term_ftc.c (ecosystem bundle first, then the
  * single-module plugin path). */
@@ -172,4 +174,87 @@ void gamepad_drive_tick(void) {
 
 int gamepad_drive_active(void) {
     return s_active;
+}
+
+/* ---- joint watchdog (see header) ---- */
+#define FTC_WD_MAXW 8
+static int s_wd_tagged = 0;
+static float s_wd_mount[FTC_WD_MAXW];
+static int s_wd_mount_seen[FTC_WD_MAXW];
+static int s_wd_tilt_hot[FTC_WD_MAXW];
+static int s_wd_jump_hot[FTC_WD_MAXW];
+
+void ftc_watchdog_tick(void) {
+    if (!s_fleet_get) {
+        return; /* resolve with the driver (no bundle, no watch) */
+    }
+    if (!s_wd_tagged) {
+        s_wd_tagged = 1;
+        const mpe_config_t *wc = NULL;
+        physics_world *pw0 = physics_world_get_primary();
+        if (pw0) {
+            wc = mpe_world_cfg(pw0);
+        }
+        fprintf(stderr, "[ftc-watchdog] build %s iters=%d sleep=%d (primary cfg)\n", a3_version_string,
+                wc ? wc->timestep.solver_iterations : -1, wc ? wc->sleep.enable : -1);
+        fflush(stderr);
+    }
+    physics_world *w = physics_world_get_primary();
+    ftc_robot *r = (w && s_fleet_get) ? s_fleet_get(w, 0) : NULL;
+    if (!r || r->chassis_body < 0 || r->chassis_body >= w->body_count) {
+        return;
+    }
+    rigidbody *ch = &w->bodies[r->chassis_body];
+    vector3 chx = ch->cached_axes[0];
+    for (int i = 0; i < r->wheel_count && i < FTC_WD_MAXW; i++) {
+        int bi = r->wheel_bodies[i];
+        if (bi < 0 || bi >= w->body_count) {
+            continue;
+        }
+        rigidbody *wh = &w->bodies[bi];
+        int bad = (!isfinite(wh->position.x)) || (!isfinite(wh->position.y)) ||
+                  (!isfinite(wh->position.z)) || (!isfinite(wh->orientation.w)) ||
+                  (!isfinite(wh->orientation.x)) || (!isfinite(wh->orientation.y)) ||
+                  (!isfinite(wh->orientation.z)) || (!isfinite(wh->angular_velocity.x)) ||
+                  (!isfinite(wh->angular_velocity.y)) || (!isfinite(wh->angular_velocity.z));
+        vector3 d = vector3_subtraction(wh->position, ch->position);
+        float md = vector3_length(d);
+        if (!s_wd_mount_seen[i] && isfinite(md)) {
+            s_wd_mount_seen[i] = 1;
+            s_wd_mount[i] = md;
+        }
+        float dot = vector3_dot(wh->cached_axes[0], chx);
+        if (dot > 1.0f) {
+            dot = 1.0f;
+        }
+        if (dot < -1.0f) {
+            dot = -1.0f;
+        }
+        float tilt = acosf(dot) * 57.29578f;
+        float wsp = vector3_dot(wh->angular_velocity, wh->cached_axes[0]);
+        if (bad) {
+            fprintf(stderr, "[ftc-watchdog] wheel %d NON-FINITE state (pos/ori/vel)\n", i);
+            fflush(stderr);
+        }
+        if (s_wd_mount_seen[i] && isfinite(md) && fabsf(md - s_wd_mount[i]) > 0.05f &&
+            !s_wd_jump_hot[i]) {
+            s_wd_jump_hot[i] = 1;
+            fprintf(stderr,
+                    "[ftc-watchdog] wheel %d MOUNT JUMP mount=%.3f base=%.3f tilt=%.1f w=%+.1f "
+                    "chpos=(%+.2f,%+.2f,%+.2f)\n",
+                    i, md, s_wd_mount[i], tilt, wsp, ch->position.x, ch->position.y,
+                    ch->position.z);
+            fflush(stderr);
+        } else if (s_wd_jump_hot[i] && fabsf(md - s_wd_mount[i]) < 0.025f) {
+            s_wd_jump_hot[i] = 0;
+        }
+        if (tilt > 10.0f && !s_wd_tilt_hot[i]) {
+            s_wd_tilt_hot[i] = 1;
+            fprintf(stderr, "[ftc-watchdog] wheel %d TILT %.1f deg (mount=%.3f base=%.3f w=%+.1f)\n",
+                    i, tilt, md, s_wd_mount[i], wsp);
+            fflush(stderr);
+        } else if (s_wd_tilt_hot[i] && tilt < 5.0f) {
+            s_wd_tilt_hot[i] = 0;
+        }
+    }
 }

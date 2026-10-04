@@ -55,9 +55,13 @@ static float ftc_argf(char **argv, int i, int argc, float dflt) {
 }
 
 /* Tile floor guarantee: robots need frictional contact (the frictionless
- * emergency backstop yields slip-regime artifacts). Adds a 20x20 tile
+ * emergency backstop yields slip-regime artifacts). Adds a 60x60 tile
  * slab (top y=0, mu 1.0/0.8) only when no static floor-like body already
- * covers the origin. Reported, never silent. */
+ * covers the origin. Reported, never silent.
+ * DESPOT-2026-10-04b: was 20x20 — a robot driving ~1 m/s reaches the edge
+ * in ~10 s and drops a wheel off it (matches a live "wheel snapped"
+ * report timeline exactly). 60x60 matches the proven F10 validation slab
+ * and stays inside the broadphase cell-span budget. */
 static int ftc_ensure_floor(physics_world *w) {
     if (!w) return -1;
     for (int i = 0; i < w->body_count; i++) {
@@ -71,7 +75,7 @@ static int ftc_ensure_floor(physics_world *w) {
         }
     }
     int f = physics_world_add_cube(w, (vector3){0.0f, -0.5f, 0.0f},
-                                   (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
+                                   (vector3){30.0f, 0.5f, 30.0f}, 0.0f);
     if (f < 0) return -1;
     w->bodies[f].friction_static = 1.0f;
     w->bodies[f].friction_kinetic = 0.8f;
