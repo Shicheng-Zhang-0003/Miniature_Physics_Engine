@@ -260,6 +260,40 @@ release, mecanum robot, tile floor):
   < 0.1 m/s, wheels < 2 rad/s, axles < 3°). MOTOR-III above is untouched:
   the observer still runs (and still limit-cycles) on the DRIVEN path;
   idle simply no longer asks it to plan torque.
+- Idle switching is HYSTERETIC (engage <0.03, release >0.08, mode stored
+  in the hub friction fields so motor path, analytic gate and friction
+  switch together): a rescaled-deadzone stick riding a single 0.05
+  threshold flapped all four every tick. Explicit path also publishes
+  tau_exp_prev now (stale drive reference poisoned post-idle re-drive:
+  measured strafe 10x dead until the handshake).
+
+## [ABUSE-TILT] Sustained harsh mixed drive walks axles to flip (OPEN frontier, pre-existing)
+
+Recorded 2026-10-04. Sibling of the fixed items above, NOT fixed: ~90+
+ticks of sustained full mixed drive (0.5 fwd + 0.5 strafe + 0.3 rotate)
+walks wheel axles 5° → 69° → 180° (frozen-in-tilt end state, mounts hold,
+never NaN). Gated behaviors (single-mode bursts ≤180 ticks) stay ≤1.4°.
+
+- Pre-existing: fully pre-change tree (pre-friction-fix engine + pre-change
+  MFS) blows up identically (163.8° at the same tick), so no fix above
+  caused it — but none cured it either.
+- Six measured negative results (do not re-attempt without new evidence):
+  analytic reaction projected to axle (same onset tick); axis-drift beta
+  0.1 → 0.3 (same blowup); mount-frame motor axle (earlier: 175°);
+  observer frozen (delayed only, 128°); proportional traction-cut engage
+  (same blowup — AND moved tank 0.0642 → 0.0397 m and broke drive
+  antisymmetry, so the slam is load-bearing: reverted); slew 0.6 → 0.2.
+- What IS established: needs motor torque (zeroed-torque abuse stays
+  0.2°/1800 ticks); per-tick wheel jumps hit ±85 rad/s (peel + slew-rail
+  steps on 2.5e-4 inertia); the 0.05-command idle boundary is not the
+  trigger (hysteresis changed nothing here); recovery is impossible once
+  flipped (static rim-lock beats the velocity-level drift corrector —
+  respawn is the recovery).
+- Next honest measurement, not yet taken: per-wheel torque-budget cap at
+  the contact cone (motor can never demand more than the ground can
+  transmit) would remove peel overspeed structurally, but it retunes all
+  drive authority and the suite above proves this loop is gate-calibrated
+  and fragile — budget for a full re-baseline pass before attempting.
 
 ## [DESPOT-2026-10-02] Full mathematical / programming / operational audit
 

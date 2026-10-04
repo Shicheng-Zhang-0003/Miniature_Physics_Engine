@@ -98,6 +98,14 @@ void motor_update(motor *m, float wheel_angular_vel, float dt, float battery_vol
     /* Output torque at wheel (after gearing, minus gearbox loss) */
     m->output_torque = m->torque * m->gear_ratio * m->efficiency; /* MFS_122: restore gearing */
     m->torque_explicit = m->output_torque; /* explicit path: applied == instantaneous */
+    /* DESPOT-2026-10-04 (stale-reference handshake): the observer reads
+     * tau_exp_prev every tick (motor_observe), but only the implicit path
+     * published it — an idle spell on the explicit path froze the
+     * drive-phase reference, so re-drive planned against a phantom stall
+     * (measured: post-idle strafe died 10x with ±stall chatter from tick
+     * 0). Whichever path runs publishes its expectation; the observer is
+     * then consistent across path switches by construction. */
+    m->tau_exp_prev = m->torque_explicit;
 
     /* Speed tracking (signed: reverse reads negative). */
     m->rpm = wheel_angular_vel / MOTOR_RPM_TO_RAD_S;
