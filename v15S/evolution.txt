@@ -31,15 +31,16 @@ Modularity:   MPI hot-plug ABI (shapes, broadphase, solver stages, tick
                command; TUI --broadphase/--solver flags; capsule example.
 Data Layout:  growable bodies/contacts (ceilings kept), O(1) pair probes
                + id cache, islands O(J+B), small-first node pool,
-               process-wide det counters. Suite v2 42/42 green (DESPOT-2026-10-01: was stale 32/32, 41/41 before sleep_settle)
-               (29 physics + 3 diag).
+               process-wide det counters. Suite v2 44 registered / 42 blocking green
+               (DESPOT-2026-10-03: meta_rotation made blocking, meta_convergence rebuilt on a
+               load-bearing stack; DESPOT-2026-10-01: was stale 32/32, 41/41 before sleep_settle)
 Modularity2:  lifetime-hardened registry/loader (tombstones, locks,
                builtin-takeover refusal, busy-unload, dladdr purge,
                origin-tracked hotload); per-stage mod_state; true segment
                capsule; no_collide proxies; ecosystem bundles loadable.
 MFS:          tile floors everywhere; implicit motor solve + disturbance
                observer; torque-derived strafe + odom fusion; PTC fuse;
-               per-world MEI; suite 12 inner green (unified binary).
+               per-world MEI; suite 14 inner green (unified binary).
 Globals:      kernel holds zero sim state; primary owned by
                core/mpe_primary.c (app layer); registry process-global
                by design; UI/diagnostics stay app-global by design.

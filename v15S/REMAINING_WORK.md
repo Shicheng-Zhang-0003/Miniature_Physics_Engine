@@ -56,7 +56,7 @@
   levitated at +0.1033 m/tick with gravity cancelled until it tunnelled through
   and slept on top; (b) the cylinder/sphere INSIDE branch negated its normal,
   driving an enclosed sphere deeper. Both now have regression tests proven to
-  fail when the fix is reverted. See docs/KNOWN_FAILURES.md.*
+  fail when the fix is reverted. See src/ecosystem/mfs/docs/KNOWN_FAILURES.md.*
 - [ ] Deep-overlap ejection route for an enclosed sphere is unstable (open): 3
   of 4 sub-cases resolve correctly, one (sphere at +Y) ends up deeper because
   the pair's centre of mass is driven across the axis first. Narrowphase is
@@ -65,7 +65,7 @@
   (`loader_lifecycle` in Suite v2: real capsule .so, busy -2, purge, reload).
 - [x] **Mouse lock broken on Wayland since the first playable release — ROOT-CAUSED
   AND FIXED (2026-09-29, `ui_input/mouse_lock.c`).** See
-  `docs/KNOWN_FAILURES.md` → `REL-PTR-2026-09-29` for the full analysis. Summary:
+  `src/ecosystem/mfs/docs/KNOWN_FAILURES.md` → `REL-PTR-2026-09-29` for the full analysis. Summary:
   "lock" only ever *hid the cursor*; camera deltas came from absolute cursor
   position (`dx = x - last_x`). On X11 that was rescued by `XWarpPointer`
   re-centring, which GTK4 broke by dropping the GTK3-only `GDK_WINDOWING_X11`
@@ -106,7 +106,7 @@
   pack fed observer phantom load into peel; A/B isolated: 88% over with
   spec-fixed bounds, ~25% with V-line, transmit 3.40 m both ways).
   Deterministic (-O2 and -O1+ASan identical); XFAIL branch kept as
-  fallback tripwire. See `docs/KNOWN_FAILURES.md`.
+  fallback tripwire. See `src/ecosystem/mfs/docs/KNOWN_FAILURES.md`.
   (2026-09-26 despot audit; F1 fixed 2026-09-28 despot audit; F2 tracking
   fixed same-night despot sweep.)
 - [ ] Jointed air-spin limit cycle: free-spinning jointed wheels oscillate
@@ -129,16 +129,26 @@
   exist (or were added as part of the audit). Still open: seeded property
   coverage for collision, constraint and configuration invariants, and a
   ThreadSanitizer run.*
-- [ ] **Torque-free angular momentum is still first-order.** A tumbling box
-  loses ~2.7% of |L| in 2 s. Measured 2026-09-29: this is inherent to the
-  first-order rotational integrator, NOT to the old 0.2*|omega| magnitude cap
-  (removing the cap entirely moved the number by 0.0000%). An implicit-midpoint
-  scheme is now in place and correct under external torque but degenerates to
-  explicit for the torque-free case. A torque-free L-conservation update was
-  tried and measured WORSE (48% drift, non-contracting fixed point) and was
-  reverted. The real fix is a second-order scheme for Euler's equations
-  (exact symmetric-body precession, or L coupled to the orientation update).
-  Until then the `angmom` gate stays at 3%.
+- [x] **Torque-free angular momentum — CLOSED, and this entry was badly stale.**
+  It previously read: *"still first-order … loses ~2.7% of |L| in 2 s … the
+  `angmom` gate stays at 3%."* **Both numbers were wrong by the time anyone
+  read them.** `tests/mpe_suite_a.c:414-424` records the actual state: the gate
+  was tightened 3% -> **0.5%**, and measured drift is **0.0028% over 2 s, was
+  2.68% — a ~950x improvement**. The mechanism is that torque-free bodies now
+  solve the self-consistent `omega = I(rotor(w,dt) R)^-1 L` against the
+  exactly-conserved world-frame `L`, so residual drift is float round-off. The
+  "second-order scheme" future work described above is therefore already done
+  and the residual 2.7% belongs to the FALLBACK path only
+  (`docs/DESPOT_AUDIT_2026-10-01.md:23-26`), not to the live solver.
+
+  Caveat recorded rather than smoothed over: this gate uses an anisotropic
+  cube, while `docs/VALIDATION.md` retracts a *cube*-based `|I^-1 w|^2`
+  measurement as physically meaningless (for an asymmetric top the world
+  inertia changes as the body rotates, so `I^-1 w` is not conserved even with
+  zero torque). Those two readings are not obviously compatible. The cube here
+  measures `|L|` itself against a conserved world-frame `L`, which is a
+  different and defensible quantity, but the tension is noted rather than
+  resolved. A sphere control would settle it and is worth adding.
 
 ## Operational and release hygiene
 
@@ -311,8 +321,17 @@ MFS (suite 11 gated + 5 info, 0 fail; was 13/3 + broken make):
   and thread-sanitizer validation.
 - [ ] Complete rotational CCD for rotation-only tunneling and consolidate the
   GUI/headless simulation step paths.
-- [ ] Audit non-built historical artifacts; the frozen `v15R3` source tree is
-  absent from this workspace (only its release notes are present).
+- [ ] Audit non-built historical artifacts. **The previous wording here was
+  false and is corrected:** it claimed the frozen `v15R3` source tree was
+  "absent from this workspace (only its release notes are present)". It was
+  absent from the *checked-out working directory*, which is a different
+  statement. Verified 2026-10-03: the `V1.5R3` tag is present and complete —
+  `git ls-tree -r V1.5R3` returns **191 files, 142 of them under `v15R3/src/`**,
+  including the full GTK3 tree and its makefile (readable, and it does
+  `pkg-config --cflags gtk+-3.0 epoxy`, confirming it is the GTK3 generation).
+  The repository is not shallow. So the tree is fully recoverable with
+  `git checkout V1.5R3` — which is exactly what the readme tells a reader to do
+  — and the P0 gates that rest on it can be audited rather than assumed.
 
 Audit notes and boundaries are in `../AUDIT_REPORT_2026-09-24.md`.
 
