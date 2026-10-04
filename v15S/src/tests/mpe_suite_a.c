@@ -11,7 +11,6 @@
 int mpe_t_projectile(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "projectile");
-    mpe_config_init();
     g_cfg.world.drag = 1.0f;
     g_cfg.world.angular_damping_scale = 1.0f;
     g_cfg.world.gravity = -9.81f;
@@ -64,7 +63,12 @@ int mpe_t_projectile(void) {
 int mpe_t_friction_stop(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "friction_stop");
-    mpe_config_init();
+    /* DESPOT-2026-10-04: absolute oracle (d=v0^2/2ug, u=0.3 explicit) derived
+     * at g=-9.81. The regime matrix scales gravity; without this pin the
+     * test measures the regime, not Coulomb's law (light-regime actual
+     * 6.85m matched scaled-g prediction 7.08m — physics right, oracle
+     * wrong). Same pin pattern as projectile. */
+    g_cfg.world.gravity = -9.81f;
     g_cfg.world.floor_friction_s = 0.3f;
     g_cfg.world.floor_friction_k = 0.3f;
     physics_world w;
@@ -107,7 +111,10 @@ int mpe_t_friction_stop(void) {
 int mpe_t_incline_accel(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "incline_accel");
-    mpe_config_init();
+    /* DESPOT-2026-10-04: oracle a=g*sin30 hardcoded at 9.81 (see a_exact).
+     * Pin reference gravity; the regime still varies iterations, materials
+     * and sleep around it. */
+    g_cfg.world.gravity = -9.81f;
     physics_world w;
     mpe_world_begin(&w);
     float ang = -30.0f * 3.14159265f / 180.0f;
@@ -164,7 +171,9 @@ int mpe_t_incline_accel(void) {
 int mpe_t_pendulum(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "pendulum");
-    mpe_config_init();
+    /* DESPOT-2026-10-04: T=2π√(I/mgd) with 9.81 in the denominator
+     * (see t_exact). Pin it. */
+    g_cfg.world.gravity = -9.81f;
     physics_world w;
     mpe_world_begin(&w);
     int pivot = physics_world_add_cube(&w, (vector3){0.0f, 6.0f, 0.0f},
@@ -226,7 +235,9 @@ int mpe_t_pendulum(void) {
 int mpe_t_bounce_series(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "bounce_series");
-    mpe_config_init();
+    /* DESPOT-2026-10-04: apex timing windows (1.0-1.7s, 1.9-2.6s) assume
+     * g=-9.81 fall times; e=0.6 is already explicit on both bodies. Pin g. */
+    g_cfg.world.gravity = -9.81f;
     physics_world w;
     mpe_world_begin(&w);
     mpe_floor_plane(&w, 0.4f, 0.3f);
@@ -317,7 +328,6 @@ int mpe_t_bounce_series(void) {
 int mpe_t_momentum(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "momentum");
-    mpe_config_init();
     g_cfg.world.gravity = 0.0f;
     g_cfg.sleep.enable = 0;
     physics_world w;
@@ -375,7 +385,6 @@ int mpe_t_momentum(void) {
 int mpe_t_angmom(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "angmom");
-    mpe_config_init();
     g_cfg.world.drag = 1.0f;
     g_cfg.world.gravity = 0.0f;
     g_cfg.sleep.enable = 0;
@@ -476,7 +485,9 @@ static float mpe_slope_drift(mpe_test_t *t, float slope_deg, float mus, float mu
 int mpe_t_static_hold(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "static_hold");
-    mpe_config_init();
+    /* DESPOT-2026-10-04: slide-distance oracle (>=8m) assumes g=-9.81 drive
+     * (materials are explicit per-case). Pin it. */
+    g_cfg.world.gravity = -9.81f;
     int asleep = 0;
     float hold_drift = mpe_slope_drift(&t, -20.0f, 0.9f, 0.7f, &asleep);
     MPE_INFO("hold case: drift=%.4f m", hold_drift);
@@ -502,10 +513,17 @@ int mpe_t_static_hold(void) {
 int mpe_t_rolling_decay(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "rolling_decay");
-    mpe_config_init();
     g_cfg.world.drag = 1.0f;
     g_cfg.world.angular_damping_scale = 1.0f;
     g_cfg.world.rolling_resistance_coeff = 0.02f;
+    /* DESPOT-2026-10-04: the 9.5-13.5m band was calibrated at g=-9.81 with
+     * default floor friction and reference restitution; the regime scales
+     * all three (light rolled 14.9m, heavy 4.8m — both correct physics for
+     * their g). Pin the reference conditions the band was measured under. */
+    g_cfg.world.gravity = -9.81f;
+    g_cfg.world.floor_friction_s = 0.2f;
+    g_cfg.world.floor_friction_k = 0.1f;
+    g_cfg.body_defaults.sphere_restitution = 0.5f;
     physics_world w;
     mpe_world_begin(&w);
     w.static_plane_enabled = true;
@@ -541,7 +559,17 @@ int mpe_t_rolling_decay(void) {
 int mpe_t_kinematic(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "kinematic");
-    mpe_config_init();
+    /* DESPOT-2026-10-04: carry coupling needs reference traction (cube
+     * 0.4/0.3 from body_defaults, which the regime scales) at reference
+     * stiffness (64 iters; 8-iteration cold-start traction is a documented
+     * limit, not this test's subject — see meta_convergence). */
+    g_cfg.timestep.solver_iterations = 64;
+    g_cfg.body_defaults.cube_fric_s = 0.4f;
+    g_cfg.body_defaults.cube_fric_k = 0.3f;
+    /* DESPOT-2026-10-04, second half: catch-up acceleration is u*g, so at
+     * 0.25x gravity the crate needs 122 ticks to reach platform speed in a
+     * 120-tick window — correct physics, broken premise. Pin reference g. */
+    g_cfg.world.gravity = -9.81f;
     physics_world w;
     mpe_world_begin(&w);
     int p = physics_world_add_cube(&w, (vector3){0, 0.5f, 0}, (vector3){2.0f, 0.5f, 2.0f}, 5.0f);
@@ -587,7 +615,6 @@ int mpe_t_kinematic(void) {
 int mpe_t_ccd_sweep(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "ccd_sweep");
-    mpe_config_init();
     physics_world w;
     mpe_world_begin(&w);
     MPE_CHECK(&t, physics_world_add_cube(&w, (vector3){0, 5.0f, 0}, (vector3){0.05f, 5.0f, 5.0f},
@@ -605,14 +632,22 @@ int mpe_t_ccd_sweep(void) {
     MPE_CHECK(&t, fx >= -0.75f && fx <= -0.45f);
     MPE_CHECK(&t, fabsf(fvx) < 5.0f);
     physics_world_cleanup(&w);
-    /* Case 2: 60 m/s sphere straight down at the floor. */
+    /* Case 2: 60 m/s sphere straight down at the floor.
+     * DESPOT-2026-10-04 [CLAMP-TAUTOLOGY closure]: this case had NO floor
+     * body — its "no tunneling" verdict was produced by the emergency
+     * clamp, so a no-op solver passed it. Real slab + net OFF (as in
+     * cylinder_drop) so only manifolds + CCD can earn the gates. */
     mpe_world_begin(&w);
+    mpe_config_t no_net2;
+    mpe_world_no_net(&w, &no_net2);
+    MPE_CHECK(&t, mpe_floor_slab(&w, 0.4f, 0.3f, 0.0f) >= 0);
     int d = physics_world_add_sphere(&w, 0.5f, 1.0f, (vector3){0, 5.0f, 0});
     MPE_CHECK(&t, d >= 0);
     w.bodies[d].velocity = (vector3){0, -60.0f, 0};
     w.bodies[d].restitution = 0.0f;
     rigidbody_wake(&w.bodies[d]);
     float min_y = 1e9f;
+    int ever_contact2 = 0;
     for (int k = 0; k < 120; k++) {
         physics_world_step(&w, dt);
         if (!mpe_world_finite(&w)) {
@@ -622,9 +657,14 @@ int mpe_t_ccd_sweep(void) {
         if (w.bodies[d].position.y < min_y) {
             min_y = w.bodies[d].position.y;
         }
+        if (mpe_body_in_contact(&w, d)) {
+            ever_contact2 = 1;
+        }
     }
     float rest_y = w.bodies[d].position.y;
-    MPE_INFO("floor case: min_center_y=%.4f rest_y=%.3f", min_y, rest_y);
+    MPE_INFO("floor case: min_center_y=%.4f rest_y=%.3f ever_contact=%d (net OFF, real slab)", min_y, rest_y,
+             ever_contact2);
+    MPE_CHECK(&t, ever_contact2);
     MPE_CHECK(&t, min_y >= 0.40f);
     MPE_CHECK(&t, rest_y >= 0.45f && rest_y <= 0.55f);
     if (t.failures == 0) {

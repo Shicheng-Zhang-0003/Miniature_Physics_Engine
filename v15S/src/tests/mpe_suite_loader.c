@@ -78,7 +78,6 @@ static bool fake_sphere(rigidbody *a, rigidbody *b, void *out, mpe_world_t *w) {
 int mpe_t_loader_lifecycle(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "loader_lifecycle");
-    mpe_config_init();
     mpe_register_builtins();
 
     /* ---- static-only: builtin hijack refusal + name length ---- */

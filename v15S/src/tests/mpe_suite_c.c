@@ -27,7 +27,19 @@
 int mpe_t_stack(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "stack");
-    mpe_config_init();
+    /* DESPOT-2026-10-04: "tower stands" at reference stiffness (64 iters —
+     * 8-iteration cold-start traction is meta_convergence's subject, not
+     * this test's), reference gravity and reference cube friction (the slab
+     * is explicit but the cubes inherit scaled body_defaults). */
+    g_cfg.world.gravity = -9.81f;
+    g_cfg.timestep.solver_iterations = 64;
+    g_cfg.body_defaults.cube_fric_s = 0.4f;
+    g_cfg.body_defaults.cube_fric_k = 0.3f;
+    /* DESPOT-2026-10-04, second half: the calm gates (v<=0.05, drift<=0.05)
+     * also require the sleep optimizer — a sleepless tower leans on solver
+     * micro-jitter forever (documented), so sleep=0 regimes fail all three
+     * level/velocity gates with byte-identical numbers. Reference sleep on. */
+    g_cfg.sleep.enable = 1;
     physics_world w;
     mpe_world_begin(&w);
     MPE_CHECK(&t, mpe_floor_slab(&w, 0.4f, 0.3f, 0.0f) >= 0);
@@ -69,8 +81,16 @@ int mpe_t_stack(void) {
 int mpe_t_driven_wheel(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "driven_wheel");
-    mpe_config_init();
     MPE_INFO("gravity = %.4f", g_cfg.world.gravity);
+    /* DESPOT-2026-10-04: the traction envelope (torque 0.020 < u_k·N·r with
+     * N at 1g, dz>=1.5m in 3s, vz/(w·r) coupling) is calibrated at -9.81
+     * with reference cylinder friction at reference stiffness. The regime
+     * changes the load (heavy: same torque moves 0.49m at 3g — correct
+     * physics, broken premise), the grip and the iteration count. */
+    g_cfg.world.gravity = -9.81f;
+    g_cfg.timestep.solver_iterations = 64;
+    g_cfg.body_defaults.cylinder_fric_s = 0.4f;
+    g_cfg.body_defaults.cylinder_fric_k = 0.3f;
     physics_world w;
     mpe_world_begin(&w);
     mpe_floor_plane(&w, 0.4f, 0.1f);
@@ -213,7 +233,6 @@ static void mpe_det_scene(physics_world *w) {
 int mpe_t_determinism(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "determinism");
-    mpe_config_init();
     physics_world w1, w2;
     mpe_det_scene(&w1);
     mpe_det_scene(&w2);
@@ -344,7 +363,16 @@ static void mpe_torture_scene(physics_world *w) {
 int mpe_t_f10_long_run(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "f10_long_run");
-    mpe_config_init();
+    /* DESPOT-2026-10-04: phase 1 gates settle AND sleep (asleep==dynamic_n)
+     * at reference stiffness. The regime breaks both premises at once:
+     * sleep=0 makes the asleep gate unfireable by construction, and 8
+     * iterations cannot calm 27 bodies (runmax 4.3 — the documented
+     * iteration tax, not a regression). Bodies/slab pin their own materials;
+     * pin gravity, iterations and the sleep master switch. Phase 2 already
+     * scopes its own conditions explicitly below. */
+    g_cfg.world.gravity = -9.81f;
+    g_cfg.timestep.solver_iterations = 64;
+    g_cfg.sleep.enable = 1;
     physics_world w;
     mpe_world_begin(&w);
     mpe_settle_scene(&w);
@@ -490,7 +518,6 @@ int mpe_t_f10_long_run(void) {
 int mpe_t_sleep_contact_wake(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "sleep_contact_wake");
-    mpe_config_init();
     physics_world w;
     mpe_world_begin(&w);
     int sleeper = physics_world_add_sphere(&w, 0.5f, 1.0f, (vector3){2.0f, 0.5f, 0.0f});
@@ -610,7 +637,6 @@ static uint32_t mpe_next(void) {
 int mpe_t_f11_torture(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "f11_torture");
-    mpe_config_init();
     mpe_rng = 0xC0FFEEu;
     for (size_t i = 0; i < g_registry_count; i++) {
         /* mpe_param layout: type/key/min/max/storage (see mpe_config.h).
@@ -798,7 +824,6 @@ int mpe_t_f11_torture(void) {
 int mpe_t_scene_roundtrip(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "scene_roundtrip");
-    mpe_config_init();
     physics_world *w = physics_world_get_primary();
     physics_world_init(w);
     constraint_pool_init(w);
@@ -853,7 +878,6 @@ static void mpe_mod_pre(mpe_world_t *world, float dt, void *st) {
 int mpe_t_module(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "module");
-    mpe_config_init();
     mpe_register_builtins();
     physics_world A, B;
     physics_world_init(&A);
@@ -941,7 +965,6 @@ static float mpe_inverse_rand_signed(uint32_t *state) {
 int mpe_t_math3_inverse(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "math3_inverse");
-    mpe_config_init();
     math3 m = {{{4.0f, 1.0f, 0.0f}, {1.0f, 3.0f, 1.0f}, {0.0f, 1.0f, 2.0f}}};
     math3 inv = math3_inverse(m);
     math3 id = math3_multiplication(m, inv);
@@ -1014,7 +1037,6 @@ int mpe_t_math3_inverse(void) {
 int mpe_t_frustum(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "frustum");
-    mpe_config_init();
     math4 proj = math4_perspective_fov(45.0f * 3.14159265f / 180.0f, 16.0f / 9.0f, 0.1f, 1000.0f);
     math4 view = math4_look_view((vector3){0, 2, 8}, (vector3){0, 0, -1}, (vector3){0, 1, 0});
     math4 vp = math4_multiplication(proj, view);
@@ -1040,23 +1062,46 @@ int mpe_t_frustum(void) {
 int mpe_t_floor_collision_diag(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "floor_collision_diag");
-    mpe_config_init();
     physics_world w;
     mpe_world_begin(&w);
+    /* DESPOT-2026-10-04: net OFF + contact evidence (see mpe_world_no_net;
+     * this diag duplicates cylinder_drop and had the same hole). */
+    mpe_config_t no_net3;
+    mpe_world_no_net(&w, &no_net3);
     MPE_CHECK(&t, mpe_floor_slab(&w, 0.4f, 0.3f, 0.0f) >= 0);
     int cyl = physics_world_add_cylinder(&w, 0.05f, 0.02f, 0.5f, (vector3){0.0f, 1.0f, 0.0f});
     MPE_CHECK(&t, cyl >= 0);
     const float dt = 1.0f / 60.0f;
-    if (!mpe_step(&w, 300, dt)) {
-        t.failures++;
+    /* Manual loop (not mpe_step): has_contact reflects the CURRENT tick and
+     * a settled body may sleep by tick 300, so final-tick contact is not a
+     * valid gate — track ever-contacted across the run instead. */
+    float diag_fall = 0.0f;
+    int diag_contact = 0;
+    for (int k = 0; k < 300; k++) {
+        physics_world_step(&w, dt);
+        if (!mpe_world_finite(&w)) {
+            printf("[FAIL] non-finite state at tick %d\n", k);
+            t.failures++;
+            break;
+        }
+        float av = fabsf(w.bodies[cyl].velocity.y);
+        if (av > diag_fall) {
+            diag_fall = av;
+        }
+        if (mpe_body_in_contact(&w, cyl)) {
+            diag_contact = 1;
+        }
     }
     float fy = w.bodies[cyl].position.y;
     float fvy = w.bodies[cyl].velocity.y;
-    MPE_INFO("floor state y=%.4f vy=%.4f", fy, fvy);
+    MPE_INFO("floor state y=%.4f vy=%.4f max_fall=%.3f ever_contact=%d (net OFF)", fy, fvy, diag_fall,
+             diag_contact);
     MPE_CHECK(&t, isfinite(fy) && isfinite(fvy));
     MPE_CHECK(&t, fy >= -0.05f);
     MPE_CHECK_NEAR(&t, fy, 0.05f, 0.03f, "floor-rest");
     MPE_CHECK(&t, fabsf(fvy) <= 0.5f);
+    MPE_CHECK(&t, diag_fall > 0.5f);
+    MPE_CHECK(&t, diag_contact);
     if (t.failures == 0) {
         printf("[PASS] floor contact holds and settles\n");
     }

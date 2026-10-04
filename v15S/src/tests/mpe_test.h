@@ -169,9 +169,16 @@ static inline void mpe_test_end(mpe_test_t *t) {
     }
 }
 
-/* Return value for a case that could not run. Distinct from 0 (pass) and 1
- * (fail) so the summary can report skips instead of counting them green. */
-#define MPE_SKIPPED 2
+/* Return value for a case that could not run. Distinct from any possible
+ * failure count (which is >= 0), so a test with failing checks can never be
+ * mistaken for a skip.
+ * DESPOT-2026-10-04: this used to be 2 — and mpe_run_one compared the raw
+ * failure count against it, so ANY test with exactly 2 failed checks
+ * reported "[SKIP] (coverage did not run)" instead of "[FAIL]". The C
+ * summary then undercounted blocking failures (light-regime driven_wheel,
+ * heavy incline_accel/list4 all vanished into SKIP). -1 is unreachable by
+ * counting failures, closing the collision. */
+#define MPE_SKIPPED (-1)
 
 #define MPE_CHECK(t, cond) \
     do { \
@@ -259,8 +266,7 @@ static inline int mpe_step(physics_world *w, int n, float dt) {
 /* Explicit mass-0 floor slab, top surface exactly y=0, with matched
  * Coulomb friction and restitution. Preferred floor: a true manifold
  * with per-body material combine (this is what friction_stop,
- * static_hold and determinism already used). */
-static inline int mpe_floor_slab(physics_world *w, float mus, float muk, float e) {
+ * static_hold and determinism already used). */static inline int mpe_floor_slab(physics_world *w, float mus, float muk, float e) {
     int f = physics_world_add_cube(w, (vector3){0.0f, -0.5f, 0.0f},
                                    (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
     if (f < 0) {
@@ -281,6 +287,25 @@ static inline void mpe_floor_plane(physics_world *w, float mus, float muk) {
     w->static_plane_enabled = true;
     w->static_plane_body.friction_static = mus;
     w->static_plane_body.friction_kinetic = muk;
+}
+
+/* DESPOT-2026-10-04 [CLAMP-TAUTOLOGY closure]: bind a per-world config copy
+ * with the world-edge safety net OFF. With the net on, a rest-height gate is
+ * satisfiable by the emergency clamp alone (a no-op solver still reports
+ * y=support and passes). With it off, only genuine contact manifolds can
+ * hold a body up. The copy is taken from the (regime-applied) g_cfg, so all
+ * other tunables — including the active test regime — carry over; the
+ * caller's mpe_config_t slot must outlive the stepping loop. */
+static inline void mpe_world_no_net(physics_world *w, mpe_config_t *slot) {
+    *slot = g_cfg;
+    slot->boundary.safety_net_enabled = 0;
+    physics_world_set_config(w, slot);
+}
+
+/* Contact evidence: world.has_contact[i] flags bodies that generated a
+ * manifold on the CURRENT tick. A clamp-held body never flags. */
+static inline int mpe_body_in_contact(const physics_world *w, int idx) {
+    return (w && w->has_contact && idx >= 0 && idx < w->body_count) ? (w->has_contact[idx] != 0) : 0;
 }
 
 static inline float mpe_vlen(vector3 v) {
