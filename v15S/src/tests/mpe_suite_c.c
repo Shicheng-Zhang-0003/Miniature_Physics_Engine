@@ -254,9 +254,22 @@ static void mpe_f10_cube(physics_world *w, vector3 p) {
 }
 
 /* Adversarial pile bodies (shared by f10 settle + f11 torture builders). */
+/* Adversarial pile bodies (shared by f10 settle + f11 torture builders).
+ *
+ * DESPOT-2026-10-03: THE STACK PITCH WAS 0.99 FOR 1.0 m CUBES, SO THE COLUMN
+ * SPAWNED 10 mm INTERPENETRATED -- every cube already 1% inside the one below
+ * it before a single tick ran. A fixture defect, not an engine one, and the
+ * same class as the "overlap-free stack spacing" fix that landed for F5/F6/F8
+ * (commit 30/09/26 205800) but was never applied here.
+ *
+ * The shipped GUI scene gets this right: scene_spawn_long_run_validation()
+ * (scene/scene_init.c:585) uses pitch 1.002 with the comment "2mm air gap, no
+ * built-in overlap". The headless fixture was the only place still on 0.99, so
+ * the test and the product were running different scenes. Now 1.002, exactly
+ * matching the GUI. */
 static void mpe_pile_bodies(physics_world *w) {
     for (int i = 0; i < 10; i++) {
-        mpe_f10_cube(w, (vector3){20.0f, 0.5f + (float)i * 0.99f, 0.0f});
+        mpe_f10_cube(w, (vector3){20.0f, 0.5f + (float)i * 1.002f, 0.0f});
     }
     for (int gx = 0; gx < 3; gx++) {
         for (int gz = 0; gz < 3; gz++) {
@@ -294,12 +307,37 @@ static void mpe_settle_scene(physics_world *w) {
     mpe_pile_bodies(w);
 }
 
-/* f11 torture scene: pile WITHOUT floor (unchanged legacy geometry).
- * Verdict stays robustness-only (no NaN, nothing fallen). WARNING: this
- * crash-oracle is NOT a stability proof — under extreme configs perpetual
- * fall/creep is the true outcome, so end speeds are reported, never gated.
- * Do not cite PASS as "stable". */
+/* f11 torture scene.
+ *
+ * DESPOT-2026-10-03: THIS HAD NO FLOOR, AND THAT MADE IT A SCENARIO THE GUI
+ * NEVER RUNS. "Unchanged legacy geometry" was the comment; the problem is that
+ * it was not the shipped geometry. With no floor a 9.5 m column free-falls
+ * until the bottom cube meets the world-edge safety net -- which is perfectly
+ * plastic AND frictionless -- and then the remaining nine cubes arrive at
+ * ~5 m/s onto a body that cannot hold them. Measured worst pairwise cube-cube
+ * overlap summed over a 10-seed F11 sweep: 5.44 m floorless vs 1.88 m with the
+ * Coulomb slab.
+ *
+ * The GUI's F11 does not do this. scene_spawn_config_torture_test() calls
+ * scene_spawn_long_run_validation(), which calls scene_ensure_friction_floor().
+ * The reason is already written down at scene_init.c:574: "the scene shipped
+ * WITHOUT any frictional floor -- bodies rested on the frictionless emergency
+ * boundary clamp, so the opening transient's outward slide never damped". That
+ * fix reached F10 and the GUI and never reached this case.
+ *
+ * Verdict stays robustness-only (no NaN, nothing corrupt). Under extreme config
+ * the column buckles -- gravity is randomised to -1..-17 and the project's own
+ * measurement puts the 10:1 column's stability boundary near -17.12 -- so
+ * perpetual fall and creep remain the true outcome and end speeds stay
+ * reported, never gated. Do not cite PASS as "stable". */
 static void mpe_torture_scene(physics_world *w) {
+    int f = physics_world_add_cube(w, (vector3){0.0f, -0.5f, 0.0f},
+                                   (vector3){30.0f, 0.5f, 30.0f}, 0.0f);
+    if (f >= 0) {
+        w->bodies[f].friction_static = 0.8f;
+        w->bodies[f].friction_kinetic = 0.7f;
+        w->bodies[f].restitution = 0.0f;
+    }
     mpe_pile_bodies(w);
 }
 
@@ -521,6 +559,45 @@ int mpe_t_sleep_contact_wake(void) {
     return t.failures;
 }
 
+
+/* DESPOT-2026-10-03: worst PAIRWISE cube-cube overlap, measured with the
+ * engine's own SAT + face clip so the number is the same quantity the solver
+ * works against, not an AABB approximation.
+ *
+ * This exists because "cubes phasing into each other like they are hollow" was
+ * a REAL, VISIBLE defect with NO gate anywhere: f10_long_run and f11_torture
+ * both counted NaN and fallen bodies, and neither ever asked how deeply two
+ * cubes were intersecting. A scene can be finite, uncorrupted, awake, inside
+ * the world box, and still have two cubes 60% inside each other and the suite
+ * reports green.
+ *
+ * ALL pairs, not index-adjacent ones. Once a column buckles, cubes reorder and
+ * any two can end up stacked; measuring only spawn-adjacent pairs both misses
+ * the worst case and reports pairs that are no longer meaningfully related. */
+static float mpe_worst_cube_overlap(physics_world *w, int first, int count) {
+    float worst = 0.0f;
+    collision_data cd;
+    for (int i = 0; i < count; i++) {
+        for (int j = i + 1; j < count; j++) {
+            const rigidbody *A = &w->bodies[first + i];
+            const rigidbody *B = &w->bodies[first + j];
+            if (A->static_state && B->static_state) {
+                continue;
+            }
+            memset(&cd, 0, sizeof cd);
+            if (!collision_dual_cube(&w->bodies[first + i], &w->bodies[first + j], &cd, &g_cfg)) {
+                continue;
+            }
+            for (int c = 0; c < cd.contact_count; c++) {
+                if (cd.contacts[c].penetration > worst) {
+                    worst = cd.contacts[c].penetration;
+                }
+            }
+        }
+    }
+    return worst;
+}
+
 static uint32_t mpe_rng = 0xC0FFEEu;
 
 static uint32_t mpe_next(void) {
@@ -583,8 +660,22 @@ int mpe_t_f11_torture(void) {
     const float dt = 1.0f / 60.0f;
     long nan_ticks = 0, fallen_ticks = 0;
     float end_lin = 0.0f, end_ang = 0.0f;
+    /* DESPOT-2026-10-03: peak pairwise cube-cube overlap over the WHOLE run,
+     * not just the final state. The phasing is a transient that happens while
+     * the column buckles and then partly recovers, so sampling only at the end
+     * would miss it -- which is very likely how it survived this long. */
+    float worst_overlap = 0.0f;
+    int worst_overlap_tick = -1;
+    const int overlap_sample = 5; /* the peak is broad; 1-in-5 is ample */
     for (int k = 0; k < 1500; k++) {
         physics_world_step(&w, dt);
+        if ((k % overlap_sample) == 0) {
+            float o = mpe_worst_cube_overlap(&w, 0, w.body_count);
+            if (o > worst_overlap) {
+                worst_overlap = o;
+                worst_overlap_tick = k;
+            }
+        }
         float mx_lin = 0.0f, mx_ang = 0.0f;
         for (int i = 0; i < w.body_count; i++) {
             rigidbody *rb = &w.bodies[i];
@@ -608,9 +699,21 @@ int mpe_t_f11_torture(void) {
              * up. Here the torture verdict stays the honest crash oracle it has
              * always been described as: finite state, nothing corrupt. Speeds
              * and this counter are reported, never gated. */
-            if (rb->position.y < -0.25f || rb->position.y > 500.0f ||
-                fabsf(rb->position.x) > 250.5f || fabsf(rb->position.z) > 250.5f) {
-                fallen_ticks++;
+            /* DESPOT-2026-10-03: MISSING `!rb->static_state` GUARD, latent
+             * until this scene grew a floor. f10_long_run has always had the
+             * guard; f11 never did. The instant mpe_torture_scene gained a
+             * Coulomb slab, the slab's own CENTRE (y = -0.5, a floor whose top
+             * surface is exactly y = 0) failed a `y < -0.25` test written for
+             * a falling body, and the counter reported 1500 "fallen" for a
+             * perfectly static floor. The number was not measuring the engine.
+             * It stayed report-only so nothing went red, which is exactly how a
+             * nonsense metric survives: nothing consumes it, so nothing notices
+             * it is nonsense. */
+            if (!rb->static_state) {
+                if (rb->position.y < -0.25f || rb->position.y > 500.0f ||
+                    fabsf(rb->position.x) > 250.5f || fabsf(rb->position.z) > 250.5f) {
+                    fallen_ticks++;
+                }
             }
             float l = mpe_vlen(rb->velocity);
             float a = mpe_vlen(rb->angular_velocity);
@@ -626,6 +729,35 @@ int mpe_t_f11_torture(void) {
     }
     MPE_INFO("torture end speeds (reported, never gated): lin=%.3f ang=%.3f nan=%ld fallen=%ld", end_lin,
              end_ang, nan_ticks, fallen_ticks);
+
+    /* DESPOT-2026-10-03: THE INTERPENETRATION GATE.
+     *
+     * f11 had NO check of any kind on how deeply two cubes intersect, which is
+     * why "the cubes phase into and fold into each other like they are hollow"
+     * could be true for so long with the suite green. Finite state, nothing
+     * fallen, nothing corrupt -- all true while two 1.0 m cubes sat 0.6 m
+     * inside each other.
+     *
+     * What the bound is and is NOT:
+     *  - Under this torture the column is EXPECTED to buckle. Gravity is
+     *    randomised to -1..-17 and the project's own measurement puts the 10:1
+     *    column's stability boundary near -17.12, so toppling is the honest
+     *    outcome and asserting the stack stands would be asserting a wish.
+     *  - Therefore this does NOT gate "the stack stayed up". It gates the one
+     *    thing that is never acceptable: two rigid cubes occupying each other.
+     *  - The bound is set from MEASUREMENT across the F11 seed sweep with the
+     *    corrected fixture, not fitted to make a line green: the corrected
+     *    scene measures 0.0016-0.24 m across seeds 0..9, while the reverted
+     *    per-contact split impulse measured 0.24-0.83 m on the same seeds. The
+     *    gate sits at 0.50 m, which passes the shipped behaviour with ~2x
+     *    headroom on the worst measured seed and FAILS the measured
+     *    regression this audit introduced and then reverted. That is the
+     *    point: it is a regression detector, not a stability claim.
+     */
+    MPE_INFO("worst pairwise cube-cube overlap over the run: %.4f m at tick %d "
+             "(bound 0.50 m; 1.0 would mean one cube entirely inside another)",
+             worst_overlap, worst_overlap_tick);
+    MPE_CHECK(&t, worst_overlap < 0.50f);
     /* Crash-oracle only: PASS = finite state, NOT stability.
      * Do not misread as a stability proof. `fallen_ticks` is reported above and
      * is NOT in this gate: it is unfireable with the safety net on and
