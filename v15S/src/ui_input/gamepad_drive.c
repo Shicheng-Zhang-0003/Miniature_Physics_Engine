@@ -195,7 +195,8 @@ void ftc_watchdog_tick(void) {
         if (pw0) {
             wc = mpe_world_cfg(pw0);
         }
-        fprintf(stderr, "[ftc-watchdog] build %s iters=%d sleep=%d (primary cfg)\n", a3_version_string,
+        fprintf(stderr, "[ftc-watchdog] build %s (%s %s) iters=%d sleep=%d (primary cfg)\n",
+                a3_version_string, __DATE__, __TIME__,
                 wc ? wc->timestep.solver_iterations : -1, wc ? wc->sleep.enable : -1);
         fflush(stderr);
     }
