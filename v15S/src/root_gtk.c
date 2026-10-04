@@ -7,12 +7,10 @@ camera main_camera_fov;
 input_status main_inputs;
 static guint physics_timeout_id = 0;
 GtkWidget *g_gl_area = NULL;
-
 #ifdef MPE_GTK4
 /* ====================== GTK4 PATH ====================== */
 /* Forward: GTK4 needs GtkApplication; keep physics/error handling identical. */
 static GtkApplication *mpe_app = NULL;
-
 static void on_main_window_destroy_gtk4 (GtkWidget *widget, gpointer user_data) {
     (void) widget;
     (void) user_data;
@@ -53,9 +51,7 @@ static gboolean on_rendered (GtkGLArea *gl_area_widget, GdkGLContext *gl_context
     render_scene_current (w, h);
     return TRUE;
 }
-
 /* GTK4: use input_control.c full handlers directly. */
-
 static void app_activate (GApplication *app, gpointer user_data) {
     (void) user_data;
     setvbuf (stdout, NULL, _IONBF, 0);
@@ -90,7 +86,6 @@ static void app_activate (GApplication *app, gpointer user_data) {
     physics_world_init (physics_world_get_primary ());
     initialize_camera (&main_camera_fov, (vector3){0.0f, 20.0f, 50.0f});
     initialize_input (&main_inputs);
-
     GtkWidget *main_window = gtk_application_window_new (GTK_APPLICATION (app));
     {
         /* Window title derives from the version macro (never a stale
@@ -101,47 +96,39 @@ static void app_activate (GApplication *app, gpointer user_data) {
     }
     gtk_window_set_default_size (GTK_WINDOW (main_window), 1280, 720);
     g_signal_connect (main_window, "destroy", G_CALLBACK (on_main_window_destroy_gtk4), NULL);
-
     GtkWidget *gl_area_widget = gtk_gl_area_new ();
     g_gl_area = gl_area_widget;
     gtk_gl_area_set_has_depth_buffer (GTK_GL_AREA (gl_area_widget), TRUE);
     gtk_gl_area_set_allowed_apis (GTK_GL_AREA (gl_area_widget), GDK_GL_API_GL);
     g_signal_connect (gl_area_widget, "render", G_CALLBACK (on_rendered), NULL);
     g_signal_connect (gl_area_widget, "realize", G_CALLBACK (when_realised), NULL);
-
     /* Keyboard controllers — direct to input_control.c full handlers */
     GtkEventController *key_ctrl = gtk_event_controller_key_new ();
     g_signal_connect (key_ctrl, "key-pressed", G_CALLBACK (on_keypress), &main_inputs);
     g_signal_connect (key_ctrl, "key-released", G_CALLBACK (on_key_released), &main_inputs);
     gtk_widget_add_controller (main_window, key_ctrl);
-
     /* Mouse motion controller on the GL area for proper cursor tracking */
     GtkEventController *motion_ctrl = gtk_event_controller_motion_new ();
     g_signal_connect (motion_ctrl, "motion", G_CALLBACK (on_mouse_movements), &main_inputs);
     gtk_widget_add_controller (gl_area_widget, motion_ctrl);
-
     /* Click gesture on the GL area for mouse lock */
     GtkGesture *click = gtk_gesture_click_new ();
     gtk_gesture_single_set_button (GTK_GESTURE_SINGLE (click), 0);
     g_signal_connect (click, "pressed", G_CALLBACK (on_button_press), &main_inputs);
     g_signal_connect (click, "released", G_CALLBACK (on_button_release), &main_inputs);
     gtk_widget_add_controller (gl_area_widget, GTK_EVENT_CONTROLLER (click));
-
     /* Focus controller on the GL area */
     GtkEventController *focus_ctrl = gtk_event_controller_focus_new ();
     g_signal_connect (focus_ctrl, "leave", G_CALLBACK (on_focus_out), &main_inputs);
     gtk_widget_add_controller (gl_area_widget, focus_ctrl);
-
     GtkWidget *ui_overlay_layout = overlay_initialise (gl_area_widget);
     gtk_window_set_child (GTK_WINDOW (main_window), ui_overlay_layout);
-
     gtk_widget_set_can_focus (main_window, TRUE);
     gtk_widget_grab_focus (main_window);
     physics_timeout_id = g_timeout_add (16, physics_step_increment, gl_area_widget);
     frame_timer_init (&main_timer);
     gtk_window_present (GTK_WINDOW (main_window));
 }
-
 /* Keep old main_algorithm for source compat but route through GApplication. */
 int main_algorithm (int argc, char *argv[]) {
     mpe_app = gtk_application_new ("org.mpe.engine", G_APPLICATION_DEFAULT_FLAGS);
@@ -164,7 +151,6 @@ int main_algorithm (int argc, char *argv[]) {
 int main (int argc, char *argv[]) {
     return main_algorithm (argc, argv);
 }
-
 #else /* ====================== GTK3 PATH (unchanged) ====================== */
 static void on_main_window_destroy (GtkWidget *widget, gpointer user_data) {
     (void) widget;

@@ -7,7 +7,6 @@
 #include <math.h>
 #include "core/math3d.h"
 #include "core/math4_special.h"
-
 static vector4 math4_mul_vec4 (math4 m, vector4 v) {
     /* vector4 packs {w,x,y,z}; matrix columns 0..3 pair with x,y,z,w. */
     float vc[4] = {v.x, v.y, v.z, v.w};
@@ -20,7 +19,6 @@ static vector4 math4_mul_vec4 (math4 m, vector4 v) {
     }
     return (vector4){out[3], out[0], out[1], out[2]};
 }
-
 static void extract_planes (math4 vp, vector4 planes[6]) {
     float row0[4] = {vp.matrix[0][0], vp.matrix[1][0], vp.matrix[2][0], vp.matrix[3][0]};
     float row1[4] = {vp.matrix[0][1], vp.matrix[1][1], vp.matrix[2][1], vp.matrix[3][1]};
@@ -44,7 +42,6 @@ static void extract_planes (math4 vp, vector4 planes[6]) {
         planes[p] = (vector4){combos[p][3] / len, combos[p][0] / len, combos[p][1] / len, combos[p][2] / len};
     }
 }
-
 static bool planes_inside (vector4 planes[6], vector3 p) {
     for (int i = 0; i < 6; i++) {
         float d = planes[i].x * p.x + planes[i].y * p.y + planes[i].z * p.z + planes[i].w;
@@ -54,7 +51,6 @@ static bool planes_inside (vector4 planes[6], vector3 p) {
     }
     return true;
 }
-
 int main (void) {
     int fail = 0;
     /* Camera poses: pos, front, up. */

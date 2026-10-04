@@ -6,11 +6,9 @@
 #include "physics/constraint.h"
 #include "config/mpe_config.h"
 #include "config/mpe_constants.h"
-
 int main (void) {
     mpe_config_init ();
     int fail = 0;
-
     /* Test 1: Config bounds clamping - all params */
     {
         mpe_config_init ();
@@ -47,7 +45,6 @@ int main (void) {
             printf ("[PASS] config bounds clamping works\n");
         }
     }
-
     /* Test 2: Config persistence - save/load roundtrip */
     {
         mpe_config_init ();
@@ -55,21 +52,18 @@ int main (void) {
         mpe_config_set_float ("world.drag", 0.95f);
         mpe_config_set_int ("timestep.solver_iterations", 32);
         mpe_config_set_float ("solver.penetration_slop", 0.02f);
-
         char path[256] = "../../temp/paranoia_config.cfg";
         bool save_result = mpe_config_save (path);
         if (!save_result) {
             printf ("[FAIL] config save failed\n");
             fail = 1;
         }
-
         mpe_config_reset_defaults ();
         bool load_result = mpe_config_load (path);
         if (!load_result) {
             printf ("[FAIL] config load failed\n");
             fail = 1;
         }
-
         float g, d;
         int iters;
         float slop;
@@ -77,10 +71,8 @@ int main (void) {
         mpe_config_get_float ("world.drag", &d);
         mpe_config_get_int ("timestep.solver_iterations", &iters);
         mpe_config_get_float ("solver.penetration_slop", &slop);
-
         int mismatch =
             (fabsf (g + 5.0f) > 0.0f) || (fabsf (d - 0.95f) > 0.0f) || (iters != 32) || (fabsf (slop - 0.02f) > 0.0f);
-
         printf ("[INFO] config_persist mismatch=%d\n", mismatch);
         if (mismatch) {
             printf ("[FAIL] config persistence failed\n");
@@ -90,7 +82,6 @@ int main (void) {
         }
         remove (path);
     }
-
     /* Test 3: Debug-only params - cannot be set in game mode */
     {
         mpe_config_init ();
@@ -100,17 +91,14 @@ int main (void) {
             printf ("[FAIL] setter accepted wrong type\n");
             fail = 1;
         }
-
         /* In actual game mode this would be enforced by UI layer */
         printf ("[INFO] debug_only_params test (manual verification)\n");
     }
-
     /* Test 4: Config migration - old files load with defaults for new params */
     {
         /* Would need actual old config file - tested manually */
         printf ("[INFO] config migration tested manually\n");
     }
-
     /* Test 5: Category iteration - all params accessible */
     {
         mpe_config_init ();
@@ -121,7 +109,6 @@ int main (void) {
         } else {
             printf ("[PASS] cat_world has %zu params\n", count);
         }
-
         count = mpe_config_count_by_category (cat_solver);
         if (count == 0) {
             printf ("[FAIL] cat_solver empty\n");
@@ -130,7 +117,6 @@ int main (void) {
             printf ("[PASS] cat_solver has %zu params\n", count);
         }
     }
-
     /* Test 6: Invalid key handling */
     {
         float out;
@@ -142,7 +128,6 @@ int main (void) {
             printf ("[PASS] invalid key returns false\n");
         }
     }
-
     /* Test 7: Type mismatch handling */
     {
         int out;
@@ -154,7 +139,6 @@ int main (void) {
             printf ("[PASS] type mismatch returns false\n");
         }
     }
-
     return fail;
 }
 #endif

@@ -6,13 +6,11 @@
 #include "core/physics_world.h"
 #include "physics/constraint.h"
 #include "config/mpe_config.h"
-
 int main (void) {
     mpe_config_init ();
     physics_world world;
     physics_world_init (&world);
     constraint_pool_init (&world);
-
     /* A frictional slab is part of the fixture: the implicit world
      * backstop arrests downward motion but cannot support a stable tower. */
     int floor = physics_world_add_cube (&world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
@@ -24,7 +22,6 @@ int main (void) {
     world.bodies[floor].restitution = 0.0f;
     world.bodies[floor].friction_static = 0.8f;
     world.bodies[floor].friction_kinetic = 0.6f;
-
     const float h = 0.4f;
     int cubes[6];
     for (int i = 0; i < 6; i++) {

@@ -1,7 +1,6 @@
 /* GTK4 port (v15S). The GTK3 body was removed 2026-09-29; git history
  * holds the v15R3 GTK3 engine. */
 #include "../core/mpe_platform.h"
-
 #include "../mpe_engine.h"
 #include "debug_terminal.h"
 #include "term_priv.h"
@@ -13,7 +12,6 @@
 #include <math.h>
 #include <time.h>
 #include <gdk/gdkkeysyms.h>
-
 /* MPE_TASK_23_POSIX_DEBUG_TERMINAL */
 GtkWidget *terminal_window = NULL;
 GtkWidget *terminal_output_view = NULL;
@@ -24,7 +22,6 @@ char term_cwd[256] = "/";
 char term_history[term_history_size][term_history_length + 1];
 int term_history_count = 0;
 int term_history_cursor = -1;
-
 /* ------------------------------------------------------------------ */
 /* Output helpers                                                      */
 /* ------------------------------------------------------------------ */
@@ -41,7 +38,6 @@ static char *term_capture_buffer = NULL;
 static size_t term_capture_length = 0;
 static size_t term_capture_capacity = 0;
 static bool term_capturing = false;
-
 void term_capture_begin (void) {
     term_capture_length = 0;
     if (!term_capture_buffer) {
@@ -56,15 +52,12 @@ void term_capture_begin (void) {
     term_capturing = true;
     term_capture_buffer[0] = '\0';
 }
-
 void term_capture_end (void) {
     term_capturing = false;
 }
-
 char *term_capture_get (void) {
     return term_capture_buffer ? term_capture_buffer : "";
 }
-
 void term_capture_reset (void) {
     if (term_capture_buffer) {
         free (term_capture_buffer);
@@ -79,11 +72,9 @@ void term_capture_reset (void) {
 char term_alias_names[term_alias_max][term_alias_name_len];
 char term_alias_values[term_alias_max][term_alias_value_len];
 int term_alias_count = 0;
-
 bool term_sudo_active = false;
 int64_t term_engine_start_time = 0; /* FIX_029 */
 /* MPE_TASK_V15R2_PHASE7_ALIAS_STORAGE_END */
-
 static void term_append_with_tag (const char *tag_name, const char *text) {
     /* MPE_TASK_V15R2_OUTPUT_CAPTURE_INTERCEPT */
     if (!text) {
@@ -457,7 +448,6 @@ MPE_WEAK_CMD (cmd_clear) MPE_WEAK_CMD (cmd_history) MPE_WEAK_CMD (cmd_pwd) MPE_W
         {"ftc", true, cmd_ftc, "ftc spawn [x y z]|telemetry", "spawn/inspect the robot (F310 drives)"},
 };
 const size_t terminal_command_count = sizeof (terminal_commands) / sizeof (terminal_commands[0]);
-
 /* ------------------------------------------------------------------ */
 /* Listing/print helpers                                               */
 /* ------------------------------------------------------------------ */
@@ -551,7 +541,6 @@ static void on_terminal_entry_activate (GtkEntry *entry, gpointer user_data) {
     term_execute (command_copy);
     gtk_editable_set_text (GTK_EDITABLE (entry), "");
 }
-
 static gboolean on_terminal_entry_key_pressed (GtkEventControllerKey *controller, guint keyval, guint keycode,
                                                GdkModifierType state, gpointer user_data) {
     (void) controller;
@@ -590,7 +579,6 @@ static gboolean on_terminal_entry_key_pressed (GtkEventControllerKey *controller
     }
     return FALSE;
 }
-
 static gboolean on_terminal_window_key_pressed (GtkEventControllerKey *controller, guint keyval, guint keycode,
                                                 GdkModifierType state, gpointer user_data) {
     (void) controller;
@@ -654,7 +642,6 @@ static gboolean on_terminal_window_key_pressed (GtkEventControllerKey *controlle
     }
     return FALSE;
 }
-
 static void on_terminal_window_destroy (GtkWidget *widget, gpointer user_data) {
     (void) widget;
     (void) user_data;
@@ -666,7 +653,6 @@ static void on_terminal_window_destroy (GtkWidget *widget, gpointer user_data) {
     term_history_cursor = -1;
     term_capture_reset (); /* FIX_030: free capture buffer on close */
 }
-
 /* GTK4 uses close-request in addition to destroy; keep both for robustness. */
 static gboolean on_terminal_window_close_request (GtkWindow *window, gpointer user_data) {
     (void) window;
@@ -675,7 +661,6 @@ static gboolean on_terminal_window_close_request (GtkWindow *window, gpointer us
     on_terminal_window_destroy (NULL, NULL);
     return FALSE; /* allow close to proceed */
 }
-
 /* ------------------------------------------------------------------ */
 /* Public interface                                                    */
 /* ------------------------------------------------------------------ */
@@ -722,14 +707,12 @@ void debug_terminal_open (GtkWidget *parent_window) {
     }
     g_signal_connect (terminal_window, "destroy", G_CALLBACK (on_terminal_window_destroy), NULL);
     g_signal_connect (terminal_window, "close-request", G_CALLBACK (on_terminal_window_close_request), NULL);
-
     /* Window-level key controller (Esc, MicroVim routing) */
     {
         GtkEventController *window_key_controller = gtk_event_controller_key_new ();
         g_signal_connect (window_key_controller, "key-pressed", G_CALLBACK (on_terminal_window_key_pressed), NULL);
         gtk_widget_add_controller (terminal_window, window_key_controller);
     }
-
     static bool terminal_css_installed = false;
     if (!terminal_css_installed) {
         GtkCssProvider *css_provider = gtk_css_provider_new ();
@@ -752,12 +735,10 @@ void debug_terminal_open (GtkWidget *parent_window) {
     }
     GtkWidget *root_box = gtk_box_new (GTK_ORIENTATION_VERTICAL, 0);
     gtk_window_set_child (GTK_WINDOW (terminal_window), root_box);
-
     GtkWidget *scrolled_window = gtk_scrolled_window_new ();
     gtk_widget_set_hexpand (scrolled_window, TRUE);
     gtk_widget_set_vexpand (scrolled_window, TRUE);
     gtk_box_append (GTK_BOX (root_box), scrolled_window);
-
     terminal_output_view = gtk_text_view_new ();
     gtk_text_view_set_editable (GTK_TEXT_VIEW (terminal_output_view), FALSE);
     gtk_text_view_set_cursor_visible (GTK_TEXT_VIEW (terminal_output_view), FALSE);
@@ -772,14 +753,11 @@ void debug_terminal_open (GtkWidget *parent_window) {
     gtk_text_buffer_create_tag (terminal_output_buffer, "term_err", "foreground", "#ff7b72", NULL);
     gtk_text_buffer_create_tag (terminal_output_buffer, "term_dim", "foreground", "#5f7387", NULL);
     gtk_scrolled_window_set_child (GTK_SCROLLED_WINDOW (scrolled_window), terminal_output_view);
-
     GtkWidget *input_box = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 6);
     gtk_box_append (GTK_BOX (root_box), input_box);
-
     terminal_prompt_label = gtk_label_new ("mpe:/>");
     gtk_widget_set_margin_start (terminal_prompt_label, 10);
     gtk_box_append (GTK_BOX (input_box), terminal_prompt_label);
-
     terminal_entry = gtk_entry_new ();
     gtk_entry_set_placeholder_text (GTK_ENTRY (terminal_entry), "type help and press Enter");
     gtk_widget_set_hexpand (terminal_entry, TRUE);
@@ -787,14 +765,12 @@ void debug_terminal_open (GtkWidget *parent_window) {
     gtk_widget_set_margin_top (terminal_entry, 4);
     gtk_widget_set_margin_bottom (terminal_entry, 4);
     gtk_box_append (GTK_BOX (input_box), terminal_entry);
-
     g_signal_connect (terminal_entry, "activate", G_CALLBACK (on_terminal_entry_activate), NULL);
     {
         GtkEventController *entry_key_controller = gtk_event_controller_key_new ();
         g_signal_connect (entry_key_controller, "key-pressed", G_CALLBACK (on_terminal_entry_key_pressed), NULL);
         gtk_widget_add_controller (terminal_entry, entry_key_controller);
     }
-
     if (main_inputs.is_mouse_locked) {
         if ((parent_window) && (GTK_IS_WIDGET (parent_window))) {
             GtkWidget *toplevel = GTK_WIDGET (gtk_widget_get_root (parent_window));

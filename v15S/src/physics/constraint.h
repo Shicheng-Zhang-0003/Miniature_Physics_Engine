@@ -8,7 +8,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 struct physics_world;
-
 typedef enum {
     constraint_spring,
     constraint_revolute,
@@ -17,7 +16,6 @@ typedef enum {
     constraint_distance,
     constraint_rope
 } constraint_type;
-
 typedef struct {
     vector3 anchor_a;
     vector3 anchor_b;
@@ -35,7 +33,6 @@ typedef struct {
     vector3 reference_axis_a;
     vector3 reference_axis_b;
 } revolute_params;
-
 typedef struct {
     vector3 anchor_a;
     vector3 anchor_b;
@@ -53,24 +50,20 @@ typedef struct {
     vector3 reference_axis_a;
     vector3 reference_axis_b;
 } prismatic_params;
-
 typedef struct {
     vector3 anchor_a;
     vector3 anchor_b;
 } fixed_params;
-
 typedef struct {
     vector3 anchor_a;
     vector3 anchor_b;
     float rest_length;
 } distance_params;
-
 typedef struct {
     vector3 anchor_a;
     vector3 anchor_b;
     float rest_length; /* Maximum distance (rope length) */
 } rope_params; /* Inequality distance constraint: pulls only, no push */
-
 typedef struct {
     constraint_type type;
     uint32_t body_id_a;
@@ -84,7 +77,6 @@ typedef struct {
         rope_params rope;
     } p;
 } constraint;
-
 struct physics_world;
 void constraint_pool_init (struct physics_world *world);
 int constraint_add_revolute (struct physics_world *world, uint32_t id_a, uint32_t id_b, vector3 anchor_a,

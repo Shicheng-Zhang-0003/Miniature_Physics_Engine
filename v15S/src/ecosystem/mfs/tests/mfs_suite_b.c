@@ -4,15 +4,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "mfs_test.h"
-
 #define DT (1.0f / 60.0f)
 #define FTC_ITERS 128
-
 /* DESPOT-2026-09-28: deleted 7 dead macros (MFS_BEGIN/END_TEST with a
  * shadowed `t` redefinition, CREATE_ROBOT, LIFT_FREE_SPIN with unchecked
  * chassis access, DRIVE_TANK/UPDATE/CHECK_FINITE) — defined, never used.
  * Tests use explicit begin/world/end; lifts use mfs_lift_whole_robot. */
-
 /* T1: Free fall y = h - 0.5*g*t^2, v = -g*t ±0.5 */
 int mfs_t_freefall (void) {
     mfs_test_t t;
@@ -49,7 +46,6 @@ int mfs_t_freefall (void) {
     physics_world_cleanup (&w);
     return t_ptr->failures;
 }
-
 /* T2: Inertia alpha = tau/(0.5*m*r^2) ±10% */
 int mfs_t_inertia (void) {
     physics_world w;
@@ -84,7 +80,6 @@ int mfs_t_inertia (void) {
     physics_world_cleanup (&w);
     return 0;
 }
-
 /* T3: Bounce restitution h_bounce = e^2*(h-r) + r ±30% */
 int mfs_t_bounce (void) {
     physics_world w;
@@ -147,7 +142,6 @@ int mfs_t_bounce (void) {
     physics_world_cleanup (&w);
     return 0;
 }
-
 /* T4: Rolling v = omega*r ±30% */
 int mfs_t_rolling (void) {
     physics_world w;
@@ -187,7 +181,6 @@ int mfs_t_rolling (void) {
     physics_world_cleanup (&w);
     return 0;
 }
-
 /* T5: Rolling resistance coast ±30% */
 int mfs_t_rolling_resistance (void) {
     physics_world w;
@@ -236,7 +229,6 @@ int mfs_t_rolling_resistance (void) {
     physics_world_cleanup (&w);
     return 0;
 }
-
 /* T6: Motor free speed (ISOLATED motor model, no joints/world).
  *
  * DESPOT-2026-09-26: the old rig spun a jointed robot in air and gated the
@@ -341,7 +333,6 @@ int mfs_t_motor_free_speed (void) {
     }
     return rc;
 }
-
 /* T7: Motor stall torque ±30% */
 int mfs_t_motor_stall (void) {
     physics_world w;
@@ -375,7 +366,6 @@ int mfs_t_motor_stall (void) {
     physics_world_cleanup (&w);
     return 0;
 }
-
 /* T8: Back-EMF braking to rest (ISOLATED motor model).
  * DESPOT-2026-09-26: the old rig cut power on a jointed robot after 60
  * ticks and gated coast torque < 50% of drive torque after 10 ticks. That
@@ -530,7 +520,6 @@ int mfs_t_kinetic_friction (void) {
     physics_world_cleanup (&w);
     return 0;
 }
-
 /* T11: 3000 ticks no NaN */
 int mfs_t_stability (void) {
     physics_world w;
@@ -555,7 +544,6 @@ int mfs_t_stability (void) {
     physics_world_cleanup (&w);
     return 0;
 }
-
 /* T12: Coast-down after power cut */
 int mfs_t_coast_down (void) {
     physics_world w;
@@ -586,7 +574,6 @@ int mfs_t_coast_down (void) {
     physics_world_cleanup (&w);
     return 0;
 }
-
 /* T13: Energy conservation ±10% */
 int mfs_t_energy (void) {
     physics_world w;
@@ -615,7 +602,6 @@ int mfs_t_energy (void) {
     physics_world_cleanup (&w);
     return 0;
 }
-
 /* T14: Cylinder rests on floor ±0.03m, v<0.1 */
 int mfs_t_cylinder_rest (void) {
     physics_world w;
@@ -641,7 +627,6 @@ int mfs_t_cylinder_rest (void) {
     physics_world_cleanup (&w);
     return 0;
 }
-
 /* T15: Revolute anchor holds under gravity */
 int mfs_t_revolute_anchor (void) {
     physics_world w;
@@ -675,7 +660,6 @@ int mfs_t_revolute_anchor (void) {
     physics_world_cleanup (&w);
     return 0;
 }
-
 /* ======================================================================
  * EXTERNAL-TRUTH GATE  (DESPOT-2026-10-02)
  *
@@ -706,7 +690,6 @@ int mfs_t_revolute_anchor (void) {
  * what a discrete impulse/Euler integrator can physically deliver at
  * dt = 1/60 s, not from whatever the code happens to print.
  * ====================================================================== */
-
 /* reference: free fall + linear viscous drag (engine model), RK4 */
 static float mfs_ref_visc_v (float v0, float c, float g, float T) {
     const int steps = 4000;
@@ -721,14 +704,11 @@ static float mfs_ref_visc_v (float v0, float c, float g, float T) {
     }
     return v;
 }
-
 int mfs_t_external_truth (void) {
     mfs_test_t t;
     mfs_test_begin (&t, "external_truth");
     mfs_test_t *t_ptr = &t;
-
     const float G_N = 9.80665f; /* CODATA 2022, exact */
-
     /* ---- 1. free fall against g_n, and against the viscous ODE -------- */
     {
         physics_world w;
@@ -753,7 +733,6 @@ int mfs_t_external_truth (void) {
                         "freefall vy vs viscous ODE (c=-ln drag)");
         physics_world_cleanup (&w);
     }
-
     /* ---- 2. rotational dynamics: alpha = tau/I (exact algebra) -------- */
     {
         physics_world w;
@@ -777,7 +756,6 @@ int mfs_t_external_truth (void) {
                         0.02f * (tau / I), "omega = (tau/I) t after 1 s");
         physics_world_cleanup (&w);
     }
-
     /* ---- 3. sphere inertia: 2/5 m r^2 (solid) ------------------------ */
     {
         physics_world w;
@@ -792,7 +770,6 @@ int mfs_t_external_truth (void) {
                         "sphere I_xx = 2/5 m r^2");
         physics_world_cleanup (&w);
     }
-
     /* ---- 4. Coulomb restitution, in its DEFINING velocity form -------- */
     {
         const float r = 0.05f;
@@ -845,7 +822,6 @@ int mfs_t_external_truth (void) {
             physics_world_cleanup (&w);
         }
     }
-
     /* ---- 5. rolling without slipping: v + w r = 0 ---------------------- */
     {
         physics_world w;
@@ -878,7 +854,6 @@ int mfs_t_external_truth (void) {
         MFS_CHECK_NEAR (t_ptr, slip, 0.0f, 0.02f, "rolling no-slip residual");
         physics_world_cleanup (&w);
     }
-
     /* ---- 6. energy conservation over a free fall ---------------------- */
     {
         physics_world w;
@@ -898,7 +873,6 @@ int mfs_t_external_truth (void) {
         MFS_CHECK_REL (t_ptr, E, E0, 0.01f, "energy conservation (1% over a 4.9 m drop)");
         physics_world_cleanup (&w);
     }
-
     /* ---- 7. DC machine: V = I R + Ke w, tau = Kt I, on the V-w line --- */
     {
         const float V = 12.8f; /* fresh pack, battery_init() nominal */
@@ -964,7 +938,6 @@ int mfs_t_external_truth (void) {
             }
         }
     }
-
     /* ---- 8. battery: OCV(SoC), sag = I*Rint, PTC I^2t, capacity ------ */
     {
         battery b;
@@ -994,7 +967,6 @@ int mfs_t_external_truth (void) {
             MFS_CHECK_NEAR (t_ptr, d.charge_fraction, 0.0f, 1e-3f, "3.0 Ah pack emptied by 1 h at 3 A");
         }
     }
-
     /* ---- 9. Coulomb sliding: d = v0^2 / (2 mu g_n) --------------------- */
     {
         physics_world w;
@@ -1034,13 +1006,11 @@ int mfs_t_external_truth (void) {
         MFS_CHECK_REL (t_ptr, d, v0 * v0 / (2.0f * 0.3f * G_N), 0.10f, "sliding distance = v0^2/(2 mu g_n)");
         physics_world_cleanup (&w);
     }
-
     /* ---- 10. gravity bias, stated rather than hidden ------------------ */
     {
         MFS_INFO ("engine gravity=%.6f vs g_n=%.5f (bias %+.4f%%)", (double) g_cfg.world.gravity, (double) G_N,
                   (double) (100.0f * ((float) g_cfg.world.gravity / -G_N - 1.0f)));
     }
-
     mfs_test_end (t_ptr);
     return t_ptr->failures;
 }

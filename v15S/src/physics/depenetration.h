@@ -1,14 +1,11 @@
 #ifndef mfs_depenetration_h
 #define mfs_depenetration_h
-
 #include <stdbool.h>
 #include "broadphase.h"
 #include "collision_mechanics.h"
-
 /* MFS_PHASE_A: positional depenetration, extracted from simulation.c.
  * Shared helpers declared here for physics_world path. */
 struct physics_world;
-
 bool a3_depenetration_dispatch (rigidbody *rigid_body_a, rigidbody *rigid_body_b, collision_data *collision_output);
 void a3_positional_depenetrate_manifold (collision_data *manifold);
 /* World-aware variant: correction factors come from the world's config. */
@@ -22,5 +19,4 @@ void a3_positional_depenetration_pass (struct physics_world *world, broadphase_p
                                        int *pair_count_pointer, bool rebuild_broadphase);
 void a3_positional_depenetration_pass_dt (struct physics_world *world, broadphase_pair *pair_buffer,
                                           int *pair_count_pointer, bool rebuild_broadphase, float dt);
-
 #endif

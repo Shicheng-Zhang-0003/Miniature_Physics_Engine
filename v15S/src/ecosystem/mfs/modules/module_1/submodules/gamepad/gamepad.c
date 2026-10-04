@@ -1,10 +1,8 @@
 #include "gamepad.h"
-
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
-
 #ifdef _WIN32
 /* ---------------- Windows backend: XInput (+ stub fallback) -------- */
 #ifndef WIN32_LEAN_AND_MEAN
@@ -22,14 +20,11 @@
 #include <xinput.h>
 #define MPE_HAVE_XINPUT 1
 #endif
-
 /* MFS_155_GAMEPAD_PRIMARY: singleton gamepad state */
 static gamepad_state g_primary_gamepad;
-
 gamepad_state *gamepad_get_primary (void) {
     return &g_primary_gamepad;
 }
-
 /* Parse controller index from device_path / env.
  * Accepted: NULL (use env/default), "disabled", "xinput:N", "N", anything
  * else -> 0. Returns -2 for disabled, else 0..3 (clamped). */
@@ -54,7 +49,6 @@ static int win_parse_index (const char *device_path) {
         return js[1] - '0';
     return 0;
 }
-
 bool gamepad_init (gamepad_state *pad, const char *device_path) {
     if (!pad) {
         return false;
@@ -112,7 +106,6 @@ bool gamepad_init (gamepad_state *pad, const char *device_path) {
     return false;
 #endif
 }
-
 void gamepad_close (gamepad_state *pad) {
     if (!pad) {
         return;
@@ -120,7 +113,6 @@ void gamepad_close (gamepad_state *pad) {
     pad->fd = -1;
     pad->connected = false;
 }
-
 void gamepad_poll (gamepad_state *pad) {
     if (!pad) {
         return;
@@ -185,7 +177,6 @@ void gamepad_poll (gamepad_state *pad) {
     pad->connected = false;
 #endif
 }
-
 #else
 /* ---------------- Linux / POSIX backend (unchanged) ----------------- */
 #include <fcntl.h>
@@ -194,14 +185,11 @@ void gamepad_poll (gamepad_state *pad) {
 #endif
 #include <errno.h>
 #include <linux/joystick.h>
-
 /* MFS_155_GAMEPAD_PRIMARY: singleton gamepad state */
 static gamepad_state g_primary_gamepad;
-
 gamepad_state *gamepad_get_primary (void) {
     return &g_primary_gamepad;
 }
-
 bool gamepad_init (gamepad_state *pad, const char *device_path) {
     if (!pad) {
         return false;
@@ -245,7 +233,6 @@ bool gamepad_init (gamepad_state *pad, const char *device_path) {
     printf ("[gamepad] opened %s\n", device_path);
     return true;
 }
-
 void gamepad_close (gamepad_state *pad) {
     if (!pad) {
         return;
@@ -256,7 +243,6 @@ void gamepad_close (gamepad_state *pad) {
     }
     pad->connected = false;
 }
-
 void gamepad_poll (gamepad_state *pad) {
     if (!pad || !pad->connected || pad->fd < 0) {
         return;
@@ -289,7 +275,6 @@ void gamepad_poll (gamepad_state *pad) {
     }
 }
 #endif
-
 /* ---------------- Shared (portable) helpers ------------------------ */
 static float apply_deadzone (float value, float deadzone) {
     if (value > deadzone) {
@@ -300,7 +285,6 @@ static float apply_deadzone (float value, float deadzone) {
     }
     return 0.0f;
 }
-
 float gamepad_get_axis (const gamepad_state *pad, int axis) {
     if (!pad || axis < 0 || axis >= gamepad_axis_count) {
         return 0.0f;
@@ -317,7 +301,6 @@ float gamepad_get_axis (const gamepad_state *pad, int axis) {
     }
     return apply_deadzone (value, pad->deadzone);
 }
-
 float gamepad_get_trigger (const gamepad_state *pad, int axis) {
     if (!pad || axis < 0 || axis >= gamepad_axis_count) {
         return 0.0f;
@@ -360,21 +343,18 @@ float gamepad_get_trigger (const gamepad_state *pad, int axis) {
         t = 1.0f;
     return t;
 }
-
 bool gamepad_get_button (const gamepad_state *pad, int button) {
     if (!pad || button < 0 || button >= gamepad_button_count) {
         return false;
     }
     return pad->buttons[button];
 }
-
 bool gamepad_is_connected (const gamepad_state *pad) {
     if (!pad) {
         return false;
     }
     return pad->connected;
 }
-
 void gamepad_set_deadzone (gamepad_state *pad, float deadzone) {
     if (!pad) {
         return;

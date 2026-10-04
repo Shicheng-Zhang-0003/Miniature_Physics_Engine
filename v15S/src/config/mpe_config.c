@@ -11,11 +11,9 @@
 #include <math.h>
 #include <time.h>
 #include <sys/stat.h>
-
 /* ==================================================================
  * MPE Config Store Implementation
  * ================================================================== */
-
 const char *mpe_config_category_name (param_category cat) {
     switch (cat) {
     case cat_world:
@@ -48,7 +46,6 @@ const char *mpe_config_category_name (param_category cat) {
         return "unknown";
     }
 }
-
 static double param_read_double (const mpe_param *param) {
     if ((!param) || (!param->storage)) {
         return 0.0;
@@ -64,7 +61,6 @@ static double param_read_double (const mpe_param *param) {
         return 0.0;
     }
 }
-
 static bool param_write_double (const mpe_param *param, double value) {
     if ((!param) || (!param->storage)) {
         return false;
@@ -93,7 +89,6 @@ static bool param_write_double (const mpe_param *param, double value) {
     }
     return clamped;
 }
-
 const mpe_param *mpe_config_find (const char *key) {
     if (!key) {
         return NULL;
@@ -105,10 +100,8 @@ const mpe_param *mpe_config_find (const char *key) {
     }
     return NULL;
 }
-
 /* DESPOT-2026-09-29: see mpe_config_ensure_ready(). */
 static bool g_config_ready = false;
-
 void mpe_config_init (void) {
     memset (&g_cfg, 0, sizeof (g_cfg));
     g_config_ready = true;
@@ -128,7 +121,6 @@ void mpe_config_init (void) {
         }
     }
 }
-
 /* DESPOT-2026-09-29: the init-order guard.
  *
  * `g_cfg` is a plain global, so it is ALL ZERO until mpe_config_init() runs.
@@ -159,11 +151,9 @@ void mpe_config_ensure_ready (void) {
     mpe_config_init ();
     g_config_ready = true;
 }
-
 bool mpe_config_is_ready (void) {
     return g_config_ready;
 }
-
 /* DESPOT-2026-09-29: test hook ONLY.
  *
  * Pretends the process has not initialised its config yet, so a suite test can
@@ -176,11 +166,9 @@ void mpe_config_force_unready_for_test (void) {
     memset (&g_cfg, 0, sizeof (g_cfg));
     g_config_ready = false;
 }
-
 void mpe_config_reset_defaults (void) {
     mpe_config_init ();
 }
-
 bool mpe_config_get_float (const char *key, float *out) {
     const mpe_param *param = mpe_config_find (key);
     if ((!param) || (!out) || param->type != p_float) {
@@ -189,7 +177,6 @@ bool mpe_config_get_float (const char *key, float *out) {
     *out = (float) param_read_double (param);
     return true;
 }
-
 bool mpe_config_get_int (const char *key, int *out) {
     const mpe_param *param = mpe_config_find (key);
     if ((!param) || (!out) || param->type != p_int) {
@@ -198,7 +185,6 @@ bool mpe_config_get_int (const char *key, int *out) {
     *out = (int) param_read_double (param);
     return true;
 }
-
 bool mpe_config_get_bool (const char *key, bool *out) {
     const mpe_param *param = mpe_config_find (key);
     if ((!param) || (!out) || param->type != p_bool) {
@@ -207,7 +193,6 @@ bool mpe_config_get_bool (const char *key, bool *out) {
     *out = (param_read_double (param) != 0.0);
     return true;
 }
-
 bool mpe_config_set_float (const char *key, float value) {
     const mpe_param *param = mpe_config_find (key);
     if (!param || param->type != p_float || !isfinite (value)) {
@@ -216,7 +201,6 @@ bool mpe_config_set_float (const char *key, float value) {
     bool clamped = param_write_double (param, (double) value);
     return !clamped;
 }
-
 bool mpe_config_set_int (const char *key, int value) {
     const mpe_param *param = mpe_config_find (key);
     if (!param || param->type != p_int) {
@@ -225,7 +209,6 @@ bool mpe_config_set_int (const char *key, int value) {
     bool clamped = param_write_double (param, (double) value);
     return !clamped;
 }
-
 bool mpe_config_set_bool (const char *key, bool value) {
     const mpe_param *param = mpe_config_find (key);
     if (!param || param->type != p_bool) {
@@ -234,7 +217,6 @@ bool mpe_config_set_bool (const char *key, bool value) {
     param_write_double (param, value ? 1.0 : 0.0);
     return true;
 }
-
 size_t mpe_config_count_by_category (param_category cat) {
     size_t count = 0;
     for (size_t i = 0; i < g_registry_count; i++) {
@@ -244,7 +226,6 @@ size_t mpe_config_count_by_category (param_category cat) {
     }
     return count;
 }
-
 /* Fill a caller-provided buffer with params of a category.
  * Matches header: size_t get_by_category(cat, out_params, max_params). */
 size_t mpe_config_get_by_category (param_category cat, const mpe_param **out_params, size_t max_params) {
@@ -259,7 +240,6 @@ size_t mpe_config_get_by_category (param_category cat, const mpe_param **out_par
     }
     return filled;
 }
-
 static void ensure_parent_dir (const char *path) {
     char copy[512];
     strncpy (copy, path, sizeof (copy) - 1);
@@ -287,9 +267,7 @@ bool mpe_config_save (const char *path) {
     if (!path) {
         return false;
     }
-
     ensure_parent_dir (path);
-
     /* R3-03: Atomic write. Write to a temporary file first, then
      * atomically rename over the target. */
     char tmp_path[512];
@@ -297,7 +275,6 @@ bool mpe_config_save (const char *path) {
     if (tmp_len < 0 || (size_t) tmp_len >= sizeof (tmp_path)) {
         return false;
     }
-
     FILE *file = fopen (tmp_path, "w");
     if (!file) {
         return false;
@@ -391,7 +368,6 @@ bool mpe_config_save (const char *path) {
     }
     return true;
 }
-
 static char *term_trim (char *str) {
     if (!str) {
         return str;
@@ -410,7 +386,6 @@ static char *term_trim (char *str) {
     }
     return str;
 }
-
 /* DESPOT-2026-10-04: torture-live probe without an include cycle.
  * long_run_validation.c includes mpe_config.h; including its header back
  * here would cycle. The three ints are plain globals — declare, don't
@@ -427,7 +402,6 @@ extern int long_run_validation_active;
 extern int long_run_validation_restore_config;
 extern int long_run_validation_is_torture;
 #endif
-
 static int mpe_config_torture_live_probe (void) {
 #if defined(__GNUC__) || defined(__clang__)
     /* A harness that links config without the validation TU gets NULL
@@ -439,13 +413,10 @@ static int mpe_config_torture_live_probe (void) {
     return (long_run_validation_active && long_run_validation_is_torture) || (long_run_validation_is_torture != 0) ||
            (long_run_validation_restore_config != 0);
 }
-
 static unsigned long s_torture_save_blocked = 0;
-
 unsigned long mpe_config_torture_save_blocked_total (void) {
     return s_torture_save_blocked;
 }
-
 bool mpe_config_save_guarded (const char *path) {
     if (mpe_config_torture_live_probe ()) {
         s_torture_save_blocked++;
@@ -458,7 +429,6 @@ bool mpe_config_save_guarded (const char *path) {
     }
     return mpe_config_save (path);
 }
-
 bool mpe_config_load (const char *path) {
     if (!path) {
         return false;
@@ -543,12 +513,10 @@ bool mpe_config_load (const char *path) {
     return true;
 }
 /* MPE_TASK_28_CONFIG_IMPL_END */
-
 /* MPE_TASK_39_FIX_BACKUP_HELPERS_BEGIN */
 bool mpe_config_save_backup (const char *path) {
     return mpe_config_save (path);
 }
-
 bool mpe_config_load_backup (const char *path) {
     return mpe_config_load (path);
 }

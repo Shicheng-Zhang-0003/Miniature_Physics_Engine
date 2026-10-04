@@ -17,7 +17,6 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
-
 static const char *dump_type (object_type t) {
     switch (t) {
     case object_sphere:
@@ -32,7 +31,6 @@ static const char *dump_type (object_type t) {
         return "unknown";
     }
 }
-
 static const char *dump_state (const rigidbody *rb) {
     if (!rb) {
         return "invalid";
@@ -48,7 +46,6 @@ static const char *dump_state (const rigidbody *rb) {
     }
     return "awake";
 }
-
 static const char *dump_ctype (constraint_type t) {
     switch (t) {
     case constraint_revolute:
@@ -65,7 +62,6 @@ static const char *dump_ctype (constraint_type t) {
         return "spring";
     }
 }
-
 static int dump_index_by_id (physics_world *world, uint32_t id) {
     if (!world || id == 0) {
         return -1;
@@ -82,11 +78,9 @@ static int dump_index_by_id (physics_world *world, uint32_t id) {
     }
     return -1;
 }
-
 static vector3 dump_anchor_world (const rigidbody *rb, vector3 local) {
     return vector3_addition (rb->position, vector4_rotate_to_vector3 (rb->orientation, local));
 }
-
 int tui_dump_snapshot (FILE *out, physics_world *world, unsigned long tick, float dt) {
     if (!out || !world || !world->bodies) {
         return 1;
@@ -114,11 +108,9 @@ int tui_dump_snapshot (FILE *out, physics_world *world, unsigned long tick, floa
             bad = 1;
         }
     }
-
     char b0[160], b1[160], b2[320];
     fprintf (out, "### MPE-TUI snapshot tick=%lu time=%.4f dt=%.5f bodies=%d result=%s\n", tick, tick * (double) dt, dt,
              world->body_count, bad ? "FAIL(non-finite)" : "PASS");
-
     /* ---- engine truth parameters + totals ---- */
     double ke = 0.0;
     vector3 mom = {0.0f, 0.0f, 0.0f};
@@ -164,7 +156,6 @@ int tui_dump_snapshot (FILE *out, physics_world *world, unsigned long tick, floa
              "P=(%+.4f,%+.4f,%+.4f)|P|=%.5f\n",
              awake, sleeping, statics, kinematics, ncustom, world->tick_module_count, world->body_count,
              world->body_capacity, ke, mom.x, mom.y, mom.z, vector3_length (mom));
-
     /* ---- bodies: characteristics + mathematics ---- */
     for (int i = 0; i < world->body_count; i++) {
         rigidbody *rb = &world->bodies[i];
@@ -210,7 +201,6 @@ int tui_dump_snapshot (FILE *out, physics_world *world, unsigned long tick, floa
                  rb->cached_axes[1].y, rb->cached_axes[1].z, rb->cached_axes[2].x, rb->cached_axes[2].y,
                  rb->cached_axes[2].z);
     }
-
     /* ---- springs ---- */
     int springs = 0;
     for (int i = 0; i < mpe_max_joints; i++) {
@@ -245,7 +235,6 @@ int tui_dump_snapshot (FILE *out, physics_world *world, unsigned long tick, floa
                  sj->equilibrium_length, len, ext, axis.x, axis.y, axis.z, vr, sj->spring_constant,
                  sj->damping_coefficient, ext * sj->spring_constant + vr * sj->damping_coefficient);
     }
-
     /* ---- generic constraints ---- */
     int constr = 0;
     for (int i = 0; i < mpe_max_joints; i++) {
@@ -317,7 +306,6 @@ int tui_dump_snapshot (FILE *out, physics_world *world, unsigned long tick, floa
             fprintf (out, "\n");
         }
     }
-
     /* ---- relative positions: all pairs ----
      * LOSSY SUMMARY: for n>24 only 64 pairs are listed, and the min/max
      * scan covers only the first 96 bodies (24/64/96 truncation). This
@@ -362,14 +350,12 @@ int tui_dump_snapshot (FILE *out, physics_world *world, unsigned long tick, floa
     if (!show_all) {
         fprintf (out, "  ... truncated to %d pairs (scan covered first %d bodies)\n", shown, cap);
     }
-
     /* ---- islands ---- */
     fprintf (out, "[islands] count=%d\n", islands_count (world));
     for (int i = 0; i < n; i++) {
         int isl = islands_body_island (world, &world->bodies[i]);
         fprintf (out, "  body %d island=%d awake=%d\n", i, isl, islands_body_awake (world, &world->bodies[i]) ? 1 : 0);
     }
-
     /* ---- solver / broadphase diagnostics ---- */
     fprintf (out, "[stats] cacheHit=%d cacheMiss=%d cacheCount=%d/%d manifoldOvfl=%d cell=%.4f\n",
              contact_cache_get_hits (world), contact_cache_get_misses (world), world->world_contact_cache_count,

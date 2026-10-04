@@ -18,7 +18,6 @@
 #include <unistd.h>
 #endif
 #include <sys/stat.h>
-
 /* Scene format v200: explicit little-endian fields + sectioned joints +
  * CRC32 footer. Layout (all integers/floats LE):
  *   u32 magic ("MPE3"), u32 version (200), u32 body_count,
@@ -45,16 +44,13 @@
  *   u32 crc32 (IEEE, over every preceding byte).
  * Older versions (<=153) keep their native-order legacy reader in
  * scene_load.c; the saver only ever writes v200. */
-
 static int save_vec3 (FILE *f, uint32_t *crc, vector3 v) {
     return scene_wfloat (f, crc, v.x) && scene_wfloat (f, crc, v.y) && scene_wfloat (f, crc, v.z);
 }
-
 static int save_quat (FILE *f, uint32_t *crc, vector4 q) {
     return scene_wfloat (f, crc, q.w) && scene_wfloat (f, crc, q.x) && scene_wfloat (f, crc, q.y) &&
            scene_wfloat (f, crc, q.z);
 }
-
 static int scene_sync_parent_directory (const char *path) {
 #ifdef MPE_OS_WINDOWS
     /* Windows has no dir-fsync; file data was already _commit'ed + renamed
@@ -88,7 +84,6 @@ static int scene_sync_parent_directory (const char *path) {
     return ok;
 #endif
 }
-
 int save_scene (const char *file_destination_path) {
     /* R3-03: Atomic write. mkstemp + 0600 + fsync + rename: no symlink
      * hijack, no partial file on crash. */
@@ -139,7 +134,6 @@ int save_scene (const char *file_destination_path) {
         fprintf (stderr, "Error SVF01: path too long\n");
         return 0;
     }
-
     int tmp_fd = mkstemp (tmp_template);
     if (tmp_fd < 0) {
         fprintf (stderr, "Error SVF01: Could not create temp file\n");
@@ -206,7 +200,6 @@ int save_scene (const char *file_destination_path) {
         ok = ok && scene_wfloat (f, &crc, (physics_world_get_primary ()->spring_joints)[j].spring_constant);
         ok = ok && scene_wfloat (f, &crc, (physics_world_get_primary ()->spring_joints)[j].damping_coefficient);
     }
-
     /* Save all constraint types from the unified constraint pool. */
     int constraint_counts[5] = {0}; /* fixed, distance, prismatic, rope (revolute handled separately) */
     for (int j = 0; j < constraint_pool_capacity (); j++) {
@@ -218,7 +211,6 @@ int save_scene (const char *file_destination_path) {
             constraint_counts[c->type - constraint_fixed]++;
         }
     }
-
     /* Fixed constraints */
     ok = ok && scene_w32 (f, &crc, (uint32_t) constraint_counts[constraint_fixed - constraint_fixed]);
     for (int j = 0; ok && (j < constraint_pool_capacity ()); j++) {
@@ -231,7 +223,6 @@ int save_scene (const char *file_destination_path) {
         ok = ok && save_vec3 (f, &crc, c->p.fixed.anchor_a);
         ok = ok && save_vec3 (f, &crc, c->p.fixed.anchor_b);
     }
-
     /* Distance constraints */
     ok = ok && scene_w32 (f, &crc, (uint32_t) constraint_counts[constraint_distance - constraint_fixed]);
     for (int j = 0; ok && (j < constraint_pool_capacity ()); j++) {
@@ -245,7 +236,6 @@ int save_scene (const char *file_destination_path) {
         ok = ok && save_vec3 (f, &crc, c->p.distance.anchor_b);
         ok = ok && scene_wfloat (f, &crc, c->p.distance.rest_length);
     }
-
     /* Prismatic constraints */
     ok = ok && scene_w32 (f, &crc, (uint32_t) constraint_counts[constraint_prismatic - constraint_fixed]);
     for (int j = 0; ok && (j < constraint_pool_capacity ()); j++) {
@@ -266,7 +256,6 @@ int save_scene (const char *file_destination_path) {
         ok = ok && scene_wfloat (f, &crc, c->p.prismatic.limit_min);
         ok = ok && scene_wfloat (f, &crc, c->p.prismatic.limit_max);
     }
-
     /* Rope constraints */
     ok = ok && scene_w32 (f, &crc, (uint32_t) constraint_counts[constraint_rope - constraint_fixed]);
     for (int j = 0; ok && (j < constraint_pool_capacity ()); j++) {
@@ -280,7 +269,6 @@ int save_scene (const char *file_destination_path) {
         ok = ok && save_vec3 (f, &crc, c->p.rope.anchor_b);
         ok = ok && scene_wfloat (f, &crc, c->p.rope.rest_length);
     }
-
     /* Revolute constraints (kept for backward compatibility) */
     int active_revolutes = 0;
     for (int j = 0; j < constraint_pool_capacity (); j++) {
@@ -309,7 +297,6 @@ int save_scene (const char *file_destination_path) {
         ok = ok && scene_wfloat (f, &crc, c->p.revolute.limit_min_rad);
         ok = ok && scene_wfloat (f, &crc, c->p.revolute.limit_max_rad);
     }
-
     /* Footer CRC over every preceding byte (finalize + raw LE append). */
     uint32_t final_crc = crc ^ 0xFFFFFFFFu;
     if (ok) {

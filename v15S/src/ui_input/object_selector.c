@@ -96,31 +96,24 @@ void select_object_by_index (int object_index) {
         clear_selection ();
         return;
     }
-
     selected_object = object_index;
     selected_object_id = (physics_world_get_primary ()->bodies)[object_index].object_id;
 }
-
 void selection_validate (void) {
     if (selected_object_id == 0) {
         clear_selection ();
         return;
     }
-
     int object_index = scene_find_object_index_by_id (selected_object_id);
-
     if (object_index < 0) {
         clear_selection ();
         return;
     }
-
     selected_object = object_index;
 }
-
 uint32_t selection_get_id (void) {
     return selected_object_id;
 }
-
 int selector_ray_tracing (void) {
     vector3 ray_origin_position = main_camera_fov.position;
     vector3 ray_direction_vector = vector3_normalisation (main_camera_fov.forward_vector);

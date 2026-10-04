@@ -5,11 +5,9 @@
 #include "core/physics_world.h"
 #include "physics/constraint.h"
 #include "config/mpe_config.h"
-
 int main (void) {
     mpe_config_init ();
     int fail = 0;
-
     /* Test 1: Sleeping stack - depenetration must not wake or move sleeping bodies
      * if no external contact occurs. A fully sleeping stack with internal overlaps
      * should remain asleep and stable. */
@@ -18,7 +16,6 @@ int main (void) {
         physics_world world;
         physics_world_init (&world);
         constraint_pool_init (&world);
-
         /* Create a 5-cube tower with 1cm overlaps, all initially asleep */
         for (int i = 0; i < 5; i++) {
             int idx = physics_world_add_cube (&world, (vector3){0.0f, 0.5f + (float) i * 0.99f, 0.0f},
@@ -29,10 +26,8 @@ int main (void) {
             world.bodies[idx].is_sleeping = true;
             world.bodies[idx].sleep_timer = 1.0f;
         }
-
         const float dt = 1.0f / 60.0f;
         int max_wake = 0;
-
         for (int t = 0; t < 1200; t++) {
             physics_world_step (&world, dt);
             int awake_count = 0;
@@ -43,7 +38,6 @@ int main (void) {
             if (awake_count > max_wake)
                 max_wake = awake_count;
         }
-
         printf ("[INFO] sleeping_stack max_awake=%d (expected 0)\n", max_wake);
         if (max_wake > 0) {
             printf ("[FAIL] depenetration woke sleeping bodies\n");
@@ -51,10 +45,8 @@ int main (void) {
         } else {
             printf ("[PASS] depenetration respects sleep state\n");
         }
-
         physics_world_cleanup (&world);
     }
-
     /* Test 2: Mixed awake/sleeping - awake body falls on sleeping body.
      * Three-gate wake system SHOULD wake the sleeping body on first-touch novelty.
      * This is INTENDED behavior - the sleeping body wakes, then depenetration moves it.
@@ -63,7 +55,6 @@ int main (void) {
         physics_world world;
         physics_world_init (&world);
         constraint_pool_init (&world);
-
         /* Sleeping cube on floor */
         int sleeping = physics_world_add_cube (&world, (vector3){0.0f, 0.5f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
         world.bodies[sleeping].restitution = 0.0f;
@@ -71,27 +62,22 @@ int main (void) {
         world.bodies[sleeping].friction_kinetic = 0.7f;
         world.bodies[sleeping].is_sleeping = true;
         world.bodies[sleeping].sleep_timer = 1.0f;
-
         /* Awake sphere falling on top */
         int awake = physics_world_add_sphere (&world, 0.3f, 1.0f, (vector3){0.0f, 2.0f, 0.0f});
         world.bodies[awake].restitution = 0.0f;
         world.bodies[awake].friction_static = 0.8f;
         world.bodies[awake].friction_kinetic = 0.7f;
-
         const float dt = 1.0f / 60.0f;
         float sleeping_y_initial = world.bodies[sleeping].position.y;
         int sleeping_woke = 0;
-
         for (int t = 0; t < 600; t++) {
             physics_world_step (&world, dt);
             if (world.bodies[sleeping].is_sleeping == false) {
                 sleeping_woke = 1;
             }
         }
-
         float sleeping_y_final = world.bodies[sleeping].position.y;
         float y_drift = fabsf (sleeping_y_final - sleeping_y_initial);
-
         printf ("[INFO] mixed_awake_sleep sleeping_woke=%d y_drift=%.6f\n", sleeping_woke, y_drift);
         /* Three-gate wake SHOULD wake sleeping body on first touch (new edge).
          * Then depenetration will move it (correct behavior). */
@@ -105,16 +91,13 @@ int main (void) {
         } else {
             printf ("[PASS] three-gate wake + depenetration work correctly\n");
         }
-
         physics_world_cleanup (&world);
     }
-
     /* Test 3: Deep spawn overlap - depenetration must resolve without exploding */
     {
         physics_world world;
         physics_world_init (&world);
         constraint_pool_init (&world);
-
         /* Two cubes spawned with 50% overlap */
         int a = physics_world_add_cube (&world, (vector3){0.0f, 0.5f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
         int b = physics_world_add_cube (&world, (vector3){0.0f, 0.5f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
@@ -124,11 +107,9 @@ int main (void) {
         world.bodies[b].friction_static = 0.8f;
         world.bodies[a].friction_kinetic = 0.7f;
         world.bodies[b].friction_kinetic = 0.7f;
-
         const float dt = 1.0f / 60.0f;
         float max_sep = 0.0f, max_vel = 0.0f;
         int nan_count = 0;
-
         for (int t = 0; t < 1800; t++) {
             physics_world_step (&world, dt);
             rigidbody *ba = &world.bodies[a];
@@ -145,7 +126,6 @@ int main (void) {
             if (!isfinite (ba->position.y) || !isfinite (bb->position.y))
                 nan_count++;
         }
-
         printf ("[INFO] deep_overlap max_sep=%.3f max_vel=%.3f nan=%d\n", max_sep, max_vel, nan_count);
         if (nan_count > 0) {
             printf ("[FAIL] deep overlap produced NaN\n");
@@ -161,10 +141,8 @@ int main (void) {
         } else {
             printf ("[PASS] deep overlap resolved smoothly\n");
         }
-
         physics_world_cleanup (&world);
     }
-
     return fail;
 }
 #endif

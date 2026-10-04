@@ -5,23 +5,18 @@
 #include "core/physics_world.h"
 #include "physics/constraint.h"
 #include "config/mpe_config.h"
-
 int main (void) {
     mpe_config_init ();
     physics_world world;
     physics_world_init (&world);
-
     int pivot_index = physics_world_add_cube (&world, (vector3){0.0f, 10.0f, 0.0f}, (vector3){0.2f, 0.2f, 0.2f}, 1.0f);
     rigidbody_set_static (&world.bodies[pivot_index], true);
     uint32_t pivot_id = world.bodies[pivot_index].object_id;
-
     int bob_index = physics_world_add_sphere (&world, 0.3f, 2.0f, (vector3){1.0f, 8.0f, 0.0f});
     uint32_t bob_id = world.bodies[bob_index].object_id;
-
     vector3 pivot_point = {0.0f, 10.0f, 0.0f};
     float rod_length = vector3_length (vector3_subtraction (pivot_point, world.bodies[bob_index].position));
     vector3 start_position = world.bodies[bob_index].position;
-
     constraint_pool_init (&world);
     vector3 anchor_a = {0.0f, 0.0f, 0.0f}; /* pivot centre -> world (0,10,0) */
     vector3 anchor_b = {-1.0f, 2.0f, 0.0f}; /* bob-local -> world (0,10,0)   */
@@ -31,7 +26,6 @@ int main (void) {
         printf ("[FAIL] could not add revolute joint\n");
         return 1;
     }
-
     const float dt = 1.0f / 60.0f;
     int fail = 0;
     float max_drift = 0.0f;

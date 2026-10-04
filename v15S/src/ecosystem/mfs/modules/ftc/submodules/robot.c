@@ -5,7 +5,6 @@
 #include "config/mpe_config.h"
 #include <math.h>
 #include <string.h>
-
 /* Robot dimensions (metres, approximate FTC 18" x 18" chassis) */
 #define CHASSIS_HALF_X 0.225f
 #define CHASSIS_HALF_Y 0.075f
@@ -21,7 +20,6 @@
      0.005f) /* MFS_PORT_V15S: 5mm ground clearance. The old +0.01f tucked wheel tops 10mm INSIDE the chassis box, so the contact solver fought the joint-held pose every tick (sinking, chatter, pitch-unload). Joints hold anchors, not volumes — interpenetrating rest poses are solver poison. */
 #define WHEEL_PRELOAD                                                                                                  \
     0.002f /* MFS_PORT_V15S: joint anchors sit 2mm BELOW exact touch so P2P preloads wheels into persistent floor contact. Inside slop (10mm): no positional fight, but the manifold never grazes out to a hover-skid (which starves odometry). Real suspensions run droop/preload the same way. */
-
 /* ---------------------------------------------------------------------
  * MECANUM ROLLER GEOMETRY (real dimensions, not a force model)
  *
@@ -68,7 +66,6 @@
 #endif
 #define MECANUM_ROLLER_ROW_X 0.010f /* +-10 mm from wheel centre plane */
 #define MECANUM_HUB_PLATE_RADIUS 0.030f /* recessed plate: 8 mm clear of rollers */
-
 /* DESPOT-DECISION: the aggregate RAIL contact is PARKED; real rollers are
  * active again (see below for why the rail plates stalled).
  * Model history, measured in this engine:
@@ -90,13 +87,11 @@
  * rail model is mathematically insufficient; the real-roller model
  * with free-bearing constraints is the active path.) */
 #undef MECANUM_USE_RAIL_CONTACT
-
 /* DESPOT-FIX: lock the storage bound to the builder. If someone raises
  * ROWS/ROW again, this fails at compile time instead of silently overflowing
  * roller_bodies/roller_joints at runtime. */
 _Static_assert (MFS_ROLLERS_PER_WHEEL >= MECANUM_ROLLERS_PER_ROW * MECANUM_ROLLER_ROWS,
                 "MFS_ROLLERS_PER_WHEEL too small for roller builder");
-
 /* Mecanum contact-patch friction anisotropy.
  *
  * A free roller is a RAIL, not an ellipse. Its bearing is free, so it rolls
@@ -164,9 +159,7 @@ _Static_assert (MFS_ROLLERS_PER_WHEEL >= MECANUM_ROLLERS_PER_ROW * MECANUM_ROLLE
 #ifndef MFS_ROLLER_AXIS_Y
 #define MFS_ROLLER_AXIS_Y 0.0f
 #endif
-
 #define MECANUM_ROLLER_ANGLE 0.7853981634f /* 45 deg, the defining dimension */
-
 /* Roller mass is DERIVED from its own geometry and a stated material, not
  * picked as a round number. A 4 g "roller" was an untraceable magic value.
  * Steel (7850 kg/m^3) is the standard material for real mecanum rollers:
@@ -179,7 +172,6 @@ _Static_assert (MFS_ROLLERS_PER_WHEEL >= MECANUM_ROLLERS_PER_ROW * MECANUM_ROLLE
 #define MECANUM_ROLLER_LENGTH (2.0f * MECANUM_ROLLER_HALF_LEN)
 #define MECANUM_ROLLER_VOLUME (M_PI * MECANUM_ROLLER_RADIUS * MECANUM_ROLLER_RADIUS * MECANUM_ROLLER_LENGTH)
 #define MECANUM_ROLLER_MASS (MECANUM_ROLLER_DENSITY * MECANUM_ROLLER_VOLUME)
-
 /* Orient a body so its local +X (the cylinder axis) points along `axis`.
  * Built from the minimal rotation taking +X to the target, so a cylinder is
  * created with its axis already correct instead of being rotated afterwards.
@@ -205,16 +197,13 @@ static vector4 rb_orient_from_axis (vector3 axis) {
     vector3 c = vector3_cross (from, a);
     return vector4_normalisation ((vector4){1.0f + d, c.x, c.y, c.z});
 }
-
 /* MFS-STRAFE-A forensics default (1 = analytic, 0 = articulated).
  * Declared early: creation reads it. */
 static int s_mecanum_analytic_default = MFS_MECANUM_ANALYTIC_DEFAULT;
-
 /* MPE_FTC_095: chassis-centre height where the wheels just touch floor y=0 */
 float ftc_robot_rest_height (void) {
     return WHEEL_RADIUS - WHEEL_Y_OFFSET;
 }
-
 int ftc_world_setup_field (physics_world *world, float mus, float muk) {
     /* DESPOT-FIX: was `return 1` on bad args — the only `1`-on-error in the
      * tree (everyone else uses 0 ok / -1 fail, and callers test `!= 0`).
@@ -239,7 +228,6 @@ int ftc_world_setup_field (physics_world *world, float mus, float muk) {
     world->static_plane_body.friction_kinetic = muk;
     return 0;
 }
-
 int ftc_robot_create_with_drive (physics_world *world, ftc_robot *robot, float x, float y, float z,
                                  motor_preset_id preset, ftc_drivetrain_type drivetrain_type) {
     /* MFS_161_NULL_FIX: null-check FIRST, before any dereference */
@@ -264,7 +252,6 @@ int ftc_robot_create_with_drive (physics_world *world, ftc_robot *robot, float x
     robot->axle_axis_y = 0.0f;
     robot->axle_axis_z = 0.0f;
     battery_init (&robot->battery);
-
     /* FLEET PARTIAL-SPAWN UNWIND: bodies form an append-only pool with no
      * removal API, and ftc_robot_create_with_drive can fail part way through
      * (e.g. the joint table is full at wheel 3). Previously every one of
@@ -294,16 +281,13 @@ int ftc_robot_create_with_drive (physics_world *world, ftc_robot *robot, float x
      * joint slots to -1 before creation so "not created" is unambiguous. */
     memset (robot->wheel_joints, 0xFF, sizeof (robot->wheel_joints));
     memset (robot->roller_joints, 0xFF, sizeof (robot->roller_joints));
-
     /* Chassis: a box at the given position */
     robot->chassis_body = physics_world_add_cube (
         world, (vector3){x, y, z}, (vector3){CHASSIS_HALF_X, CHASSIS_HALF_Y, CHASSIS_HALF_Z}, CHASSIS_MASS);
     if (robot->chassis_body < 0) {
         goto fail;
     }
-
     uint32_t chassis_id = world->bodies[robot->chassis_body].object_id;
-
     /* 4 wheels at corners */
     float wheel_positions[4][3] = {
         {x - WHEEL_OFFSET_X, y + WHEEL_Y_OFFSET, z - WHEEL_OFFSET_Z}, /* front-left */
@@ -312,7 +296,6 @@ int ftc_robot_create_with_drive (physics_world *world, ftc_robot *robot, float x
         {x + WHEEL_OFFSET_X, y + WHEEL_Y_OFFSET, z + WHEEL_OFFSET_Z}, /* back-right */
     };
     robot->wheel_count = 4;
-
     for (int i = 0; i < robot->wheel_count; i++) {
         /* The HUB is the rigid plate the rollers bolt to. Its collision
          * radius is the plate radius, NOT the 0.050 m outer envelope: on a
@@ -386,16 +369,13 @@ int ftc_robot_create_with_drive (physics_world *world, ftc_robot *robot, float x
             world->bodies[robot->wheel_bodies[i]].friction_kinetic = 0.7f;
         }
         world->bodies[robot->wheel_bodies[i]].restitution = 0.0f;
-
         uint32_t wheel_id = world->bodies[robot->wheel_bodies[i]].object_id;
-
         /* Revolute joint: chassis (body_a) to wheel (body_b), axle along X.
          * Anchor sits WHEEL_PRELOAD below exact touch (see above). */
         vector3 anchor_on_chassis = {wheel_positions[i][0] - x, WHEEL_Y_OFFSET - WHEEL_PRELOAD,
                                      wheel_positions[i][2] - z};
         vector3 anchor_on_wheel = {0.0f, 0.0f, 0.0f}; /* wheel centre */
         vector3 axle_axis = {robot->axle_axis_x, robot->axle_axis_y, robot->axle_axis_z};
-
         robot->wheel_joints[i] =
             constraint_add_revolute (world, chassis_id, wheel_id, anchor_on_chassis, anchor_on_wheel, axle_axis);
         if (robot->wheel_joints[i] < 0) {
@@ -406,7 +386,6 @@ int ftc_robot_create_with_drive (physics_world *world, ftc_robot *robot, float x
         } else {
             goto fail; /* joint untrackable: unwind rather than leak */
         }
-
         /* MFS_PORT_V15S: roller geometry is robot-local state now (the
          * parked rigidbody is_mecanum/roller_angle_rad fields are gone
          * from the core). Standard layout: FL +45°, FR -45°, BL -45°,
@@ -429,10 +408,8 @@ int ftc_robot_create_with_drive (physics_world *world, ftc_robot *robot, float x
         }
         robot->wheel_roller_angle[i] = roller_angle;
         robot->wheel_is_mecanum[i] = is_mecanum;
-
         /* Set up motor for this wheel */
         motor_preset_apply (&robot->wheel_motors[i], preset);
-
         /* --- Mecanum contact: wheel-level anisotropic Coulomb friction ---
          * The 64-real-roller model (16 free-bearing roller bodies per wheel)
          * was built first and measured. It does not work in this engine, and
@@ -526,7 +503,6 @@ int ftc_robot_create_with_drive (physics_world *world, ftc_robot *robot, float x
             int roller_count = 0;
             const vector3 wc = {wheel_positions[i][0], wheel_positions[i][1], wheel_positions[i][2]};
             const uint32_t wheel_id_w = world->bodies[robot->wheel_bodies[i]].object_id;
-
             if (n_rollers > MFS_ROLLERS_PER_WHEEL) {
                 goto fail;
             }
@@ -590,7 +566,6 @@ int ftc_robot_create_with_drive (physics_world *world, ftc_robot *robot, float x
                  * cylinder lying across the rail. */
                 world->bodies[rb].orientation = rb_orient_from_axis (roller_axis);
                 robot->roller_bodies[i][k] = rb;
-
                 const uint32_t roller_id = world->bodies[rb].object_id;
                 const int rj = constraint_add_revolute (world, wheel_id_w, roller_id, offset,
                                                         (vector3){0.0f, 0.0f, 0.0f}, roller_axis);
@@ -609,9 +584,7 @@ int ftc_robot_create_with_drive (physics_world *world, ftc_robot *robot, float x
         }
 #endif
     }
-
     return 0;
-
 fail:
     /* Release exactly the joints this call created (creation order), then
      * rewind the append-only body pool. constraint_remove deactivates by
@@ -653,16 +626,13 @@ fail:
     robot->wheel_count = 0;
     return -1;
 }
-
 int ftc_robot_create (physics_world *world, ftc_robot *robot, float x, float y, float z, motor_preset_id preset) {
     return ftc_robot_create_with_drive (world, robot, x, y, z, preset, FTC_DRIVETRAIN_MECANUM);
 }
-
 void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
     if ((!world) || (!robot) || (dt <= 0.0f)) {
         return;
     }
-
     /* A commanded robot is awake by definition. Wake the chassis when any
      * wheel is commanded: motor vibration and driver intent keep a real
      * robot active, and the velocity integrator drains forces for sleeping
@@ -740,7 +710,6 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
             }
         }
     }
-
     /* Sum currents for battery sag.
      * FIX-AUDIT: old fabs() sum doubled sag in turn-in-place (opposing
      * currents cancel on a real pack) and made regen always drain. Use
@@ -764,7 +733,6 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
         drain_current = 0.0f;
     }
     battery_drain (&robot->battery, drain_current, dt);
-
     /* Update each wheel motor */
     for (int i = 0; i < robot->wheel_count; i++) {
         int wheel_idx = robot->wheel_bodies[i];
@@ -772,7 +740,6 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
             continue;
         }
         rigidbody *wheel = &world->bodies[wheel_idx];
-
         /* DESPOT-FIX: running radius, not plate radius. wheel->radius is
          * the hub PLATE (30 mm recessed on mecanum rollers); every lever
          * below (observer inertia, rolling demand, motor inertia,
@@ -785,7 +752,6 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
         }
         if (!(r_run > 0.001f) || !isfinite (r_run))
             r_run = wheel->radius;
-
         /* Read wheel angular velocity about the actual rotated axle axis in world space */
         vector3 axle = wheel->cached_axes[0];
         if (vector3_length_squared (axle) < 0.0001f) {
@@ -814,7 +780,6 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
          * diagnostic. That mistake produced a wrong diagnosis of the stall
          * endpoint; see KNOWN_FAILURES.md -> MOTOR-III-2026-09-29. */
         motor_observe (&robot->wheel_motors[i], wheel_speed, dt, 0.5f * wheel->mass * r_run * r_run);
-
         /* MFS_TRACTION_CONTROL: compare against the rolling speed the
          * chassis motion demands at this wheel (rigid-body velocity at
          * the wheel center, projected on the rolling direction). A wheel
@@ -881,7 +846,6 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
                 }
             }
         }
-
         /* Update motor electrical state.
          * DESPOT-2026-10-04 (idle/coast split): at ~zero command the wheel
          * is uncommanded rotating mass, not a driven plant. The implicit
@@ -908,7 +872,6 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
         } else {
             motor_update_load (&robot->wheel_motors[i], wheel_speed, dt, terminal_voltage, axle_inertia);
         }
-
         /* Traction cut applies to delivered torque (both the axle drive
          * below and the traction loop in drivetrain_update read
          * output_torque). Electrical readings (current/rpm) stay
@@ -920,7 +883,6 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
         if (!idle_coast) {
             robot->wheel_motors[i].output_torque *= robot->wheel_traction_scale[i];
         }
-
         /* Apply motor torque along the actual physical axle in world space.
          * Free-speed governor: a motor cannot push its wheel past free
          * speed under its own power (measured pathology: +248 rad/s in
@@ -1104,7 +1066,6 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
                 rigidbody_wake (&world->bodies[rb]);
             }
         }
-
 #if !defined(MECANUM_USE_RAIL_CONTACT)
         /* DESPOT-2026-09-26 QUASI-STATIC ROLLER BEARING (honest label).
          * MFS-STRAFE-A 2026-09-28: runs only in ARTICULATED mode
@@ -1191,7 +1152,6 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
 #endif
     }
 }
-
 void ftc_robot_set_wheel_commands (ftc_robot *robot, const float *commands, int count) {
     if (!robot) {
         return;
@@ -1208,11 +1168,9 @@ void ftc_robot_set_wheel_commands (ftc_robot *robot, const float *commands, int 
         robot->wheel_motors[i].command = cmd;
     }
 }
-
 void ftc_robot_set_mecanum_analytic_default (int on) {
     s_mecanum_analytic_default = (on != 0) ? 1 : 0;
 }
-
 void ftc_robot_get_position (physics_world *world, ftc_robot *robot, float *px, float *py, float *pz) {
     if ((!world) || (!robot)) {
         return;

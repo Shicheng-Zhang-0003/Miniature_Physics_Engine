@@ -15,7 +15,6 @@
 #ifndef MPE_OS_WINDOWS
 #include <strings.h>
 #endif
-
 static int64_t posix_monotonic_time (void) {
     struct timespec ts;
     clock_gettime (CLOCK_MONOTONIC, &ts);

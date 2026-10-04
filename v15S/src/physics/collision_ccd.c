@@ -12,7 +12,6 @@
 #include "collision_cylinder.h"
 #include "broadphase.h"
 #include <float.h>
-
 static float ccd_support_depth (const rigidbody *body) {
     /* Lowest-point offset below the center along world -Y. */
     if (body->type == object_sphere) {
@@ -38,7 +37,6 @@ static float ccd_support_depth (const rigidbody *body) {
            body->half_extensions.y * fabsf (vector3_dot (body->cached_axes[1], down)) +
            body->half_extensions.z * fabsf (vector3_dot (body->cached_axes[2], down));
 }
-
 static float ccd_min_thickness (const rigidbody *body) {
     if (body->type == object_sphere) {
         return body->radius;
@@ -51,7 +49,6 @@ static float ccd_min_thickness (const rigidbody *body) {
     }
     return fminf (body->half_extensions.x, fminf (body->half_extensions.y, body->half_extensions.z));
 }
-
 /* Earliest positive time at which |dp + dv*t| reaches radius. Compute the
  * quadratic in double and use the cancellation-resistant q formulation; the
  * direct (-b-sqrt(D))/(2a) root loses the near root for distant/high-speed
@@ -97,7 +94,6 @@ static float ccd_sphere_sweep_toi (vector3 dp, vector3 dv, float radius, float d
     }
     return (float) toi;
 }
-
 int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt, float *time_remaining_out,
                                     const mpe_config_t *cfg, float *best_tois_out, unsigned char *hit_flags_out) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
@@ -179,7 +175,6 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
         }
         float best_toi = dt;
         bool hit = false;
-
         /* 1. Floor plane y = 0. Exact quadratic CCD under constant gravity.
          * Equation: 0.5*g*t^2 + v0*t + y0 = 0, with v0 the CENTER vertical
          * velocity and y0 the lowest-point height (center minus support).
@@ -189,7 +184,6 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
          * translational — see below). */
         float r_lowest_y = ccd_support_depth (mover);
         float lowest = mover->position.y - r_lowest_y;
-
         /* Floor TOI uses the CENTER (translational) velocity, never the
          * lowest-point velocity v_center + omega x r. Rotation alone cannot
          * translate the center through the plane: a pure spinner reports a
@@ -255,7 +249,6 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
                 }
             }
         }
-
         /* 2. Volumes: spheres, boxes (static AND dynamic via relative
          * velocity in obstacle frame), cylinders and custom shapes (using
          * conservative bounding spheres where exact sweep geometry is not
@@ -310,16 +303,13 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
                         float r_cyl = other->radius;
                         float r_sph = mover->radius;
                         float rr = r_cyl + r_sph;
-
                         /* Cylinder endpoints in world space. */
                         vector3 ep1 = vector3_addition (other->position, vector3_scaling (ax, -h));
                         vector3 ep2 = vector3_addition (other->position, vector3_scaling (ax, h));
-
                         /* Relative motion. */
                         vector3 dp1 = vector3_subtraction (ep1, mover->position);
                         vector3 dp2 = vector3_subtraction (ep2, mover->position);
                         vector3 dv = vector3_subtraction (other_v, mover->velocity);
-
                         /* Sweep against both endpoint spheres. */
                         float best_cyl_toi = dt;
                         for (int ep = 0; ep < 2; ep++) {
@@ -329,7 +319,6 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
                                 best_cyl_toi = toi;
                             }
                         }
-
                         /* Sweep against barrel (capsule segment).
                      * Project relative velocity onto plane perpendicular to axle. */
                         float dv_ax = vector3_dot (dv, ax);
@@ -342,7 +331,6 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
                             vector3 dp_mid = vector3_subtraction (other->position, mover->position);
                             float dp_ax = vector3_dot (dp_mid, ax);
                             vector3 dp_perp = vector3_subtraction (dp_mid, vector3_scaling (ax, dp_ax));
-
                             /* Quadratic for perpendicular distance == rr.
                          * |dp_perp + t*dv_perp|^2 = rr^2 */
                             {
@@ -363,7 +351,6 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
                                 }
                             }
                         }
-
                         if ((best_cyl_toi > 0.0f) && (best_cyl_toi < best_toi)) {
                             best_toi = best_cyl_toi;
                             hit = true;
@@ -432,7 +419,6 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
                 }
             }
         } /* do_volumes */
-
         /* Phase 1: record only (no move yet — symmetric two-phase). */
         if (hit && best_toi < dt && best_toi > 0.0f) {
             best_tois[i] = best_toi;
@@ -540,11 +526,9 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
     }
     return clamped;
 }
-
 int collision_ccd_sweep_clamp (rigidbody *bodies, int body_count, float dt) {
     return collision_ccd_sweep_clamp_full (bodies, body_count, dt, NULL, NULL, NULL, NULL);
 }
-
 int collision_ccd_sweep_clamp_world (struct physics_world *world, float dt) {
     if (!world || !world->bodies || world->body_count <= 0) {
         return 0;

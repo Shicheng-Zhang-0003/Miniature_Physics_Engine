@@ -1,24 +1,19 @@
 /* MPE_FTC_073: FTC robot object */
 #ifndef robot_h
 #define robot_h
-
 #include "motor.h"
 #include "motor_presets.h"
 #include "battery.h"
 #include "core/physics_world.h"
-
 #define FTC_MAX_WHEELS 8
-
 /* MFS_DRIVETRAIN_TYPE: explicit wheel/traction model selection. */
 typedef enum { FTC_DRIVETRAIN_MECANUM = 0, FTC_DRIVETRAIN_TANK = 1 } ftc_drivetrain_type;
-
 typedef struct {
     /* Body indices in physics_world */
     int chassis_body;
     int wheel_bodies[FTC_MAX_WHEELS];
     int wheel_joints[FTC_MAX_WHEELS]; /* revolute joint indices */
     int wheel_count;
-
     /* Mecanum rollers: real bodies on real free revolute bearings (see
      * robot.c for geometry). They are what touches the floor and all CONTACT
      * FORCE comes from the engine's Coulomb solver (no chassis force is ever
@@ -47,17 +42,14 @@ typedef struct {
      * the geometric lever arm (rolling resistance, odometry radius) must use
      * this, not the hub plate radius. */
     float wheel_effective_radius[FTC_MAX_WHEELS];
-
     /* Motor + electrical */
     motor wheel_motors[FTC_MAX_WHEELS];
     motor_preset_id motor_preset;
     battery battery;
-
     /* Axle direction in chassis-local space (for reading wheel speed) */
     float axle_axis_x, axle_axis_y, axle_axis_z;
     /* (removed: mecanum_chassis_force/torque dead fields, zero uses) */
     ftc_drivetrain_type drivetrain_type; /* MFS_DRIVETRAIN_TYPE */
-
     /* MFS_151_ODOMETRY: Wheel encoders and pose estimation */
     float wheel_radians[FTC_MAX_WHEELS]; /* MFS_163_BOUNDS_FIX: was [4], OOB if wheel_count > 4 */
     /* DESPOT-2026-09-26: encoder quantization state. wheel_radians above is
@@ -106,7 +98,6 @@ typedef struct {
      * false: plain cylinders, engine friction only. */
     bool mecanum_analytic;
 } ftc_robot;
-
 /* MFS-STRAFE-A analytic constants (shared with drivetrain.c): slide
  * coefficient for roller-axle slip on tile (wheel-rubber kinetic class;
  * tile muk 0.8 binds, so the wheel is the limiting material) and the
@@ -120,22 +111,18 @@ typedef struct {
 #endif
 /* Default: ON for mecanum builds, OFF for tank (plain cylinders). */
 #define MFS_MECANUM_ANALYTIC_DEFAULT 1
-
 /* Forensics/revert switch for the analytic lateral (creation default ON;
  * tank robots never build rollers regardless). Call BEFORE
  * ftc_robot_create_with_drive (creation memsets the struct, so a per-robot
  * pre-set would not survive): 0 restores the articulated real-roller build
  * for subsequently created mecanum robots, nonzero re-enables analytic. */
 void ftc_robot_set_mecanum_analytic_default (int on);
-
 /* Create a 4-wheel robot at the given position. Returns 0 on success. */
 /* MPE_FTC_095: chassis-centre height where wheels rest on the floor */
 float ftc_robot_rest_height (void);
 int ftc_robot_create_with_drive (physics_world *world, ftc_robot *robot, float x, float y, float z,
                                  motor_preset_id preset, ftc_drivetrain_type drivetrain_type);
-
 int ftc_robot_create (physics_world *world, ftc_robot *robot, float x, float y, float z, motor_preset_id preset);
-
 /* Install the drive field: enable MPE's static ground plane and set its
  * friction. RETURNS 0 on success.
  *
@@ -157,15 +144,11 @@ int ftc_robot_create (physics_world *world, ftc_robot *robot, float x, float y, 
  * written to the world config as well as the cached plane body, so the
  * value is honoured regardless of world initialisation order. */
 int ftc_world_setup_field (physics_world *world, float mus, float muk);
-
 /* Update all motors for one tick. Reads wheel angular velocity,
    computes electrical state, applies torque to wheel bodies. */
 void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt);
-
 /* Set wheel motor commands (-1..1). */
 void ftc_robot_set_wheel_commands (ftc_robot *robot, const float *commands, int count);
-
 /* Get the chassis body's position (for validation). */
 void ftc_robot_get_position (physics_world *world, ftc_robot *robot, float *px, float *py, float *pz);
-
 #endif /* robot_h */

@@ -16,13 +16,10 @@
 #ifndef MPE_OS_WINDOWS
 #include <unistd.h>
 #endif
-
 /* MPE_TASK_13_LONG_RUN_HELPERS_BEGIN */
-
 int long_run_validation_active = 0;
 int long_run_validation_ticks_remaining = 0;
 int long_run_validation_total_ticks = 0;
-
 static float long_run_validation_last_max_linear_speed = 0.0f;
 static float long_run_validation_last_max_angular_speed = 0.0f;
 static float long_run_validation_max_linear_speed = 0.0f;
@@ -55,7 +52,6 @@ int long_run_validation_restore_config = 0;
  * at defaults keeps the full settle verdict. Matches RELEASE_GATES verbatim:
  * F11 "runs without crash / without NaN or crash" — it never promised calm. */
 int long_run_validation_is_torture = 0;
-
 /* DESPOT-2026-10-04: in-memory clean-config snapshot. The file backup
  * (status/engine.cfg.backup) is CWD-relative and can go missing between the
  * F11 save and the restore (different CWD, deleted file, crashed run), and
@@ -64,17 +60,14 @@ int long_run_validation_is_torture = 0;
  * A memcpy'd snapshot cannot go missing. */
 static mpe_config_t s_clean_cfg;
 static int s_clean_cfg_valid = 0;
-
 int long_run_validation_torture_live (void) {
     return (long_run_validation_active && long_run_validation_is_torture) || (long_run_validation_is_torture != 0) ||
            (long_run_validation_restore_config != 0);
 }
-
 void long_run_validation_snapshot_clean (void) {
     s_clean_cfg = g_cfg;
     s_clean_cfg_valid = 1;
 }
-
 void long_run_validation_cancel_restore (void) {
     if (!long_run_validation_torture_live ()) {
         return;
@@ -94,31 +87,25 @@ void long_run_validation_cancel_restore (void) {
     long_run_validation_restore_config = 0;
     long_run_validation_is_torture = 0;
 }
-
 static int a3_task13_body_is_invalid (rigidbody *rigid_body) {
     if ((!isfinite (rigid_body->position.x)) || (!isfinite (rigid_body->position.y)) ||
         (!isfinite (rigid_body->position.z))) {
         return 1;
     }
-
     if ((!isfinite (rigid_body->velocity.x)) || (!isfinite (rigid_body->velocity.y)) ||
         (!isfinite (rigid_body->velocity.z))) {
         return 1;
     }
-
     if ((!isfinite (rigid_body->angular_velocity.x)) || (!isfinite (rigid_body->angular_velocity.y)) ||
         (!isfinite (rigid_body->angular_velocity.z))) {
         return 1;
     }
-
     if ((!isfinite (rigid_body->orientation.w)) || (!isfinite (rigid_body->orientation.x)) ||
         (!isfinite (rigid_body->orientation.y)) || (!isfinite (rigid_body->orientation.z))) {
         return 1;
     }
-
     return 0;
 }
-
 static void long_run_validation_report (void) {
     /* FIX-AUDIT: old gate used final-tick speed only, so spike-then-settle
      * passed. Gate on final AND post-transient run-max (ticks 120+): launch
@@ -137,7 +124,6 @@ static void long_run_validation_report (void) {
                (long_run_validation_last_max_angular_speed < 0.5f) && (long_run_validation_max_linear_speed < 2.0f) &&
                (long_run_validation_max_angular_speed < 4.0f);
     }
-
     printf ("[A3] Long-run validation report %s\n", a3_version_string);
     printf ("[A3] mode: %s\n",
             long_run_validation_is_torture ? "torture (corruption gates only)" : "validation (full settle gates)");
@@ -200,7 +186,6 @@ static void long_run_validation_report (void) {
     /* MPE_TASK_39_CONFIG_REPORT_END */
     fflush (stdout);
 }
-
 static void long_run_validation_evaluate (void) {
     float current_max_linear_speed = 0.0f;
     float current_max_angular_speed = 0.0f;
@@ -208,15 +193,12 @@ static void long_run_validation_evaluate (void) {
     int current_awake_count = 0;
     int current_fallen_count = 0;
     int current_nan_count = 0;
-
     for (int object_index = 0; object_index < (physics_world_get_primary ()->body_count); object_index++) {
         rigidbody *rigid_body = &(physics_world_get_primary ()->bodies)[object_index];
-
         if (a3_task13_body_is_invalid (rigid_body)) {
             current_nan_count++;
             continue;
         }
-
         /* FIX-AUDIT-DESPOT: fallen gate is floor-relative, not a magic y.
          * The solver/boundary floor convention is y=0 (static plane body +
          * boundary_apply_floor callers); a body counts as fallen only below
@@ -226,7 +208,6 @@ static void long_run_validation_evaluate (void) {
         if (rigid_body->position.y < floor_y - 1.0f) {
             current_fallen_count++;
         }
-
         /* FIX-AUDIT-DESPOT: sleeping/awake asymmetry. The awake branch
          * excludes statics (infinite-mass floor slabs are neither awake
          * nor asleep) but the sleeping branch counted every is_sleeping
@@ -237,22 +218,17 @@ static void long_run_validation_evaluate (void) {
         } else if (!rigid_body->static_state) {
             current_awake_count++;
         }
-
         float linear_speed = vector3_length (rigid_body->velocity);
         float angular_speed = vector3_length (rigid_body->angular_velocity);
-
         if (linear_speed > current_max_linear_speed) {
             current_max_linear_speed = linear_speed;
         }
-
         if (angular_speed > current_max_angular_speed) {
             current_max_angular_speed = angular_speed;
         }
     }
-
     long_run_validation_last_max_linear_speed = current_max_linear_speed;
     long_run_validation_last_max_angular_speed = current_max_angular_speed;
-
     if (long_run_validation_tick_index < LONG_RUN_TRANSIENT_TICKS) {
         /* Opening transient: record peak, don't gate (see note above). */
         if (current_max_linear_speed > long_run_validation_transient_linear) {
@@ -266,50 +242,39 @@ static void long_run_validation_evaluate (void) {
         if (current_max_linear_speed > long_run_validation_max_linear_speed) {
             long_run_validation_max_linear_speed = current_max_linear_speed;
         }
-
         if (current_max_angular_speed > long_run_validation_max_angular_speed) {
             long_run_validation_max_angular_speed = current_max_angular_speed;
         }
     }
-
     long_run_validation_final_sleeping_count = current_sleeping_count;
     long_run_validation_final_awake_count = current_awake_count;
-
     long_run_validation_nan_count += current_nan_count;
     long_run_validation_fallen_count += current_fallen_count;
-
     if (debug_last_manifold_overflow_count > long_run_validation_max_manifold_overflow) {
         long_run_validation_max_manifold_overflow = debug_last_manifold_overflow_count;
     }
 }
-
 void long_run_validation_tick_update (void) {
     if (!long_run_validation_active) {
         return;
     }
-
     long_run_validation_evaluate ();
     long_run_validation_tick_index++;
-
     if (long_run_validation_ticks_remaining > 0) {
         long_run_validation_ticks_remaining--;
     }
-
     if (long_run_validation_ticks_remaining <= 0) {
         long_run_validation_report ();
         long_run_validation_active = 0;
     }
 }
-
 void long_run_validation_start (int duration_ticks) {
     if (duration_ticks <= 0) {
         duration_ticks = 1;
     }
-
     long_run_validation_active = 1;
     long_run_validation_ticks_remaining = duration_ticks;
     long_run_validation_total_ticks = duration_ticks;
-
     long_run_validation_last_max_linear_speed = 0.0f;
     long_run_validation_last_max_angular_speed = 0.0f;
     long_run_validation_max_linear_speed = 0.0f;
@@ -322,10 +287,8 @@ void long_run_validation_start (int duration_ticks) {
     long_run_validation_tick_index = 0;
     long_run_validation_transient_linear = 0.0f;
     long_run_validation_transient_angular = 0.0f;
-
     broadphase_reset_overflow_counts (physics_world_get_primary ());
     contact_cache_clear (physics_world_get_primary ());
-
     printf ("[A3] Long-run validation started: %d ticks (%.1f seconds)\n", duration_ticks,
             (float) duration_ticks / 60.0f);
     /* MPE_TASK_39_CONFIG_REPORT_BEGIN */

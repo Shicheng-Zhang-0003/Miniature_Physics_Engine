@@ -17,7 +17,6 @@
 #include "../core/physics_world.h"
 #include <stdio.h>
 #include <string.h>
-
 void cmd_mod (int argc, char **argv) {
     if (argc < 2) {
         term_err ("mpe: mod: usage: mod ls|load|unload|attach|detach|use-broadphase|use-solver\n");
@@ -160,7 +159,6 @@ void cmd_mod (int argc, char **argv) {
     }
     term_err ("mpe: mod: unknown subcommand\n");
 }
-
 /* modinfo command — show detailed info about a module */
 void cmd_modinfo (int argc, char **argv) {
     if (argc < 2) {

@@ -19,9 +19,7 @@
 #include "scene/scene_id_remap.h"
 #include "physics/spring_joint.h"
 #include "physics/constraint.h"
-
 /* --- Stubs for TU-bound symbols (operate on the primary world) --- */
-
 uint32_t scene_allocate_object_id (void) {
     physics_world *world = physics_world_get_primary ();
     if (world->next_object_id == 0) {
@@ -29,7 +27,6 @@ uint32_t scene_allocate_object_id (void) {
     }
     return world->next_object_id++;
 }
-
 void scene_note_loaded_id (uint32_t object_id) {
     if ((object_id == 0) || (object_id == 0xFFFFFFFFu)) {
         return;
@@ -39,18 +36,15 @@ void scene_note_loaded_id (uint32_t object_id) {
         world->next_object_id = object_id + 1;
     }
 }
-
 int scene_ensure_pool_capacity (int required_capacity) {
     (void) required_capacity;
     return 1;
 }
-
 void scene_clear (void) {
     physics_world *world = physics_world_get_primary ();
     world->body_count = 0;
     joint_init_pool (world);
 }
-
 void joint_init_pool (physics_world *world) {
     if (!world) {
         return;
@@ -60,7 +54,6 @@ void joint_init_pool (physics_world *world) {
     }
     world->spring_joint_count = 0;
 }
-
 int add_joint_by_ids (physics_world *world, uint32_t id_a, uint32_t id_b, float eq, float k, float c) {
     if (!world) {
         return -1;
@@ -82,7 +75,6 @@ int add_joint_by_ids (physics_world *world, uint32_t id_a, uint32_t id_b, float 
     }
     return -1;
 }
-
 static int failures = 0;
 #define check(cond, label)                                                                                             \
     do {                                                                                                               \
@@ -94,13 +86,11 @@ static int failures = 0;
         }                                                                                                              \
     } while (0)
 #define checkf(a, b, eps, label) check (fabsf ((a) - (b)) <= (eps), label)
-
 int main (void) {
     mpe_config_init ();
     physics_world *world = physics_world_get_primary ();
     physics_world_init (world);
     scene_id_remap_reset ();
-
     /* Body 0: dynamic sphere with distinctive state. */
     rigidbody_initialisation_sphere (&world->bodies[0], 0.5f, 2.0f, (vector3){1.0f, 2.0f, 3.0f});
     world->bodies[0].velocity = (vector3){0.25f, -0.5f, 1.0f};
@@ -121,11 +111,9 @@ int main (void) {
                                            (vector3){0.0f, 0.0f, 1.0f});
     check (rev_idx >= 0, "revolute created pre-save");
     constraint_set_revolute_motor (world, rev_idx, true, 2.5f, 10.0f);
-
     const char *path = "../../temp/mpe_scene_roundtrip.dat";
     check (save_scene (path) == 1, "save_scene succeeds");
     check (world->spring_joint_count == 1, "one joint saved");
-
     scene_clear ();
     world->next_object_id = 100; /* v200 preserves IDs: allocator drift must NOT leak into loaded IDs */
     check (scene_loading (path) == 1, "scene_loading succeeds");
@@ -136,7 +124,6 @@ int main (void) {
      * allocate() must return exactly 100 (drift to 3 would alias live IDs;
      * drift anywhere else leaks). */
     check (scene_allocate_object_id () == 100, "allocator preserved at 100 past loaded IDs");
-
     rigidbody *s = &world->bodies[0];
     check (s->type == object_sphere, "body 0 type round-trips");
     checkf (s->mass, 2.0f, 1e-5f, "body 0 mass round-trips");
@@ -155,12 +142,10 @@ int main (void) {
     checkf (s->angular_velocity.x, 0.0f, 1e-5f, "body 0 angular velocity round-trips");
     checkf (s->friction_static, g_cfg.body_defaults.sphere_fric_s, 1e-5f, "body 0 friction round-trips");
     check (s->object_generation == 1, "body 0 generation round-trips");
-
     rigidbody *c = &world->bodies[1];
     check (c->type == object_cube, "body 1 type round-trips");
     checkf (c->mass, 1.0f, 1e-5f, "body 1 mass round-trips");
     check (c->is_sleeping, "body 1 sleep state persists");
-
     check (world->spring_joint_count == 1, "one joint restored");
     if (world->spring_joint_count == 1) {
         uint32_t ja = world->spring_joints[0].object_id_a;
@@ -170,7 +155,6 @@ int main (void) {
         check (((ja == i0) && (jb == i1)) || ((ja == i1) && (jb == i0)), "joint endpoints remapped to loaded bodies");
         checkf (world->spring_joints[0].spring_constant, 20.0f, 1e-5f, "joint params round-trip");
     }
-
     check (constraint_get_count (world) == 1, "one revolute restored");
     if (constraint_get_count (world) == 1) {
         const constraint *rc = constraint_pool_at (world, 0);
@@ -183,7 +167,6 @@ int main (void) {
             checkf (rc->p.revolute.motor_max_torque, 10.0f, 1e-5f, "revolute motor torque round-trips");
         }
     }
-
     /* CRC32 tamper rejection: corrupt one payload byte (mass field), keep
      * the footer. Load must fail AND leave the live scene untouched. */
     {
@@ -209,7 +192,6 @@ int main (void) {
         check (world->bodies[0].object_id == 1, "live IDs untouched by failed load");
         remove (tamper_path);
     }
-
     remove (path);
     physics_world_cleanup (world);
     if (failures == 0)

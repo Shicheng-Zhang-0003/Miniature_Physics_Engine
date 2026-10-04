@@ -4,7 +4,6 @@
 #include <math.h>
 #include "core/physics_world.h"
 #include "config/mpe_config.h"
-
 int main (void) {
     mpe_config_init ();
     physics_world world_a;

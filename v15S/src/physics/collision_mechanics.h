@@ -1,6 +1,5 @@
 #ifndef collisions_h
 #define collisions_h
-
 #include <stdio.h>
 #include <math.h>
 #include <stdint.h>
@@ -71,7 +70,6 @@ typedef struct {
      * Tail-appended: existing offsets (and the plugin ABI) do not shift. */
     float snap_friction_mu;
 } contact_point_data;
-
 /* ---- Anisotropic Coulomb cone --------------------------------------------
  *
  * Legacy friction clamps the COMBINED tangential impulse to a DISC of radius
@@ -185,7 +183,6 @@ static inline void a3_anisotropic_coulomb_clamp (vector3 normal, vector3 t1, vec
         *out2 = p2 * scale;
     }
 }
-
 /* Combine two bodies into one contact cone. mu_iso is the isotropic
  * coefficient the legacy path would have used (already min-of-bodies and
  * already stick/slip selected), and is used directly when neither body is
@@ -217,7 +214,6 @@ static inline void a3_contact_friction_cone (const rigidbody *body_a, const rigi
         }
     }
 }
-
 /* ---- Shared warm-start stamp (single source of truth) --------------------
  * FIX-AUDIT-DESPOT: collision_solver.c and collision_cache.c each carried a
  * private copy of this stamp (a3_task05_body_property_stamp). The solver
@@ -235,7 +231,6 @@ static inline uint32_t a3_contact_cache_mix_u32 (uint32_t hash_value, uint32_t i
     hash_value ^= input_value + 0x9e3779b9u + (hash_value << 6) + (hash_value >> 2);
     return hash_value;
 }
-
 static inline uint32_t a3_contact_cache_float_bits (float value) {
     union {
         float float_value;
@@ -244,7 +239,6 @@ static inline uint32_t a3_contact_cache_float_bits (float value) {
     converter.float_value = value;
     return converter.integer_value;
 }
-
 static inline uint32_t a3_contact_cache_body_stamp (const rigidbody *rigid_body) {
     if (!rigid_body) {
         return 0;
@@ -275,7 +269,6 @@ static inline uint32_t a3_contact_cache_body_stamp (const rigidbody *rigid_body)
         stamp, a3_contact_cache_float_bits (roundf (rigid_body->orientation.z * 1000.0f) / 1000.0f));
     return stamp;
 }
-
 /* Capacity of collision_data::contacts. DESPOT-2026-09-29: this was a bare
  * literal 4, and plugin pair handlers choose contact_count themselves, so the
  * bound was not expressed anywhere the writers could see it. Named now, and
@@ -285,7 +278,6 @@ static inline uint32_t a3_contact_cache_body_stamp (const rigidbody *rigid_body)
 /* Capacity of the Sutherland-Hodgman clip polygon buffers. A convex face
  * clipped by 4 half-planes yields at most 8 vertices; 16 is slack. */
 #define MPE_MAX_MANIFOLD_POLY 16
-
 typedef struct {
     rigidbody *object_a;
     rigidbody *object_b;
@@ -361,14 +353,12 @@ struct physics_world;
 int collision_ccd_sweep_clamp_world (struct physics_world *world, float dt);
 void contact_cache_save (struct physics_world *world, collision_data *manifolds, int count); /* MFS_131 */
 void contact_cache_clear (struct physics_world *world); /* MFS_131 */
-
 bool collision_static_plane_sphere (rigidbody *plane_body, rigidbody *sphere, float plane_y,
                                     collision_data *collision_output_data, const mpe_config_t *cfg);
 bool collision_static_plane_cube (rigidbody *plane_body, rigidbody *cube, float plane_y,
                                   collision_data *collision_output_data, const mpe_config_t *cfg);
 bool collision_static_plane_body (rigidbody *plane_body, rigidbody *body, float plane_y,
                                   collision_data *collision_output_data, const mpe_config_t *cfg);
-
 void contact_cache_stats_reset (struct physics_world *world);
 int contact_cache_get_hits (const struct physics_world *world);
 int contact_cache_get_misses (const struct physics_world *world);
@@ -382,5 +372,4 @@ bool contact_cache_has_pair (struct physics_world *world, uint32_t id_a, uint32_
 bool collision_cylinder_sphere (rigidbody *cyl, rigidbody *sph, collision_data *out, const mpe_config_t *cfg);
 bool collision_cylinder_cube (rigidbody *cyl, rigidbody *cube, collision_data *out, const mpe_config_t *cfg);
 bool collision_cylinder_cylinder (rigidbody *cyl_a, rigidbody *cyl_b, collision_data *out, const mpe_config_t *cfg);
-
 #endif

@@ -1,7 +1,6 @@
 /* MPE_FTC_055: Real physics world — pure simulation state. No camera/input/UI. */
 #ifndef physics_world_h
 #define physics_world_h
-
 #include "rigidbody.h"
 #include "../config/mpe_constants.h" /* MFS_131 */
 #include "../config/mpe_config.h"
@@ -11,7 +10,6 @@
 #include "../physics/broadphase.h"
 #include "../physics/collision_mechanics.h"
 #include <stdint.h>
-
 /* MFS_131A: warm-start contact cache entry. Moved here from
  * collision_mechanics.c so physics_world can own a per-world cache
  * (Milestone 3, item 101). */
@@ -37,7 +35,6 @@ typedef struct {
      * per tick in contact-heavy scenes). */
     int32_t hash_next;
 } cached_contact;
-
 typedef struct physics_world {
     rigidbody *bodies;
     int body_count;
@@ -156,7 +153,6 @@ typedef struct physics_world {
     uint64_t body_revision;
     uint64_t id_cache_revision;
 } physics_world;
-
 void physics_world_init (physics_world *world);
 void physics_world_cleanup (physics_world *world);
 /* Phase-1: bind per-world config (NULL rebinds global g_cfg).

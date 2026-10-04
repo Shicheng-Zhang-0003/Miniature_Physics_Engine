@@ -5,7 +5,6 @@
 #include "core/simulation_camera.h"
 #include "core/simulation_physics_loop.h"
 #include "core/long_run_validation.h"
-
 #include "ui_input/simulation_dispatch.h"
 #include "ui_input/gamepad_drive.h"
 #include <gtk/gtk.h>
@@ -15,14 +14,12 @@
 #ifndef MPE_OS_WINDOWS
 #include <unistd.h>
 #endif /* MPE_TASK_39 access() */
-
 //World Status right now
 frame_timer main_timer;
 /* RETIRED: obj_per_scene/object_count/object_capacity lived here.
  * Body storage is owned by the primary physics_world now; see
  * core/physics_world.h. This TU keeps app/diag state (timer, debug
  * counters) plus the GTK frame dispatch below. */
-
 int debug_last_object_count = 0;
 int debug_last_broadphase_pair_count = 0;
 int debug_last_manifold_count = 0;
@@ -33,7 +30,6 @@ int debug_last_sleeping_object_count = 0;
 /* MPE_TASK_09_MANIFOLD_OVERFLOW_COUNTER_BEGIN */
 int debug_last_manifold_overflow_count = 0;
 /* MPE_TASK_09_MANIFOLD_OVERFLOW_COUNTER_END */
-
 /* MPE_TASK_20A_DEPENETRATION_HELPERS_BEGIN */
 /* MPE_TASK_20A_DEPENETRATION_HELPERS_END */
 gboolean physics_step_increment (gpointer user_data_pointer) {
@@ -46,7 +42,6 @@ gboolean physics_step_increment (gpointer user_data_pointer) {
         parent_window = gtk_widget_get_toplevel (GTK_WIDGET (user_data_pointer));
 #endif
     }
-
     /* Guard checks */
     if (editor_dialog_is_active ()) {
         return TRUE;
@@ -56,7 +51,6 @@ gboolean physics_step_increment (gpointer user_data_pointer) {
         overlay_update ();
         return TRUE;
     }
-
     /* Mode watch */
     static bool a3_previous_debug_mode_state = false;
     static bool a3_debug_mode_watch_ready = false;
@@ -67,10 +61,8 @@ gboolean physics_step_increment (gpointer user_data_pointer) {
         a3_previous_debug_mode_state = main_inputs.is_debug_mode_active;
         debug_terminal_sync_mode ();
     }
-
     /* Change-rate keys (Left/Right) REMOVED: pre-dialog relics. Rates are
      * config values now (ui.change_rate_game/debug via menu 6/terminal). */
-
     /* Status dir + frame timer */
     static int status_dir_checked = 0;
     if (!status_dir_checked) {
@@ -80,14 +72,11 @@ gboolean physics_step_increment (gpointer user_data_pointer) {
     frame_timer_update (&main_timer);
     float frame_delta_time = main_timer.delta_time;
     debug_last_frame_time = frame_delta_time;
-
     /* Camera + character */
     simulation_camera_tick (frame_delta_time);
-
     /* Input dispatch (mouse/keyboard bindings, menus, spawn) */
     /* NOTE: input dispatch still inline for now — extract in next pass */
     simulation_input_dispatch (parent_window);
-
     /* F310 gamepad: the single robot controller. Polls and commands
      * ftc-fleet robot 0 mecanum before the tick (commands persist through
      * the fleet pre_step). Silent no-op without bundle, pad, or robot. */
@@ -95,15 +84,12 @@ gboolean physics_step_increment (gpointer user_data_pointer) {
     /* Joint watchdog: event-driven mount/tilt/NaN evidence for live
      * "wheel snapped" reports (see gamepad_drive.h). */
     ftc_watchdog_tick ();
-
     /* Menu handling */
     simulation_menu_dispatch (parent_window);
     editor_update_menus (parent_window);
     config_menu_update (parent_window);
-
     /* THE PHYSICS LOOP */
     simulation_physics_tick (frame_delta_time);
-
     /* Post-physics bookkeeping */
     gtk_widget_queue_draw (GTK_WIDGET (user_data_pointer));
     int a3_sleeping_object_count = 0;
@@ -123,5 +109,4 @@ gboolean physics_step_increment (gpointer user_data_pointer) {
     overlay_update ();
     return TRUE;
 }
-
 /* a3_positional_depenetration_pass now lives in physics/depenetration.c. */

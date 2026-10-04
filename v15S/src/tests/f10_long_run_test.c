@@ -19,10 +19,8 @@
 #include "core/physics_world.h"
 #include "physics/constraint.h"
 #include "config/mpe_config.h"
-
 #define F10_TICKS 1500
 #define F10_TRANSIENT 120
-
 static void f10_add_cube (physics_world *w, vector3 p) {
     int idx = physics_world_add_cube (w, p, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
     if (idx >= 0) {
@@ -31,13 +29,11 @@ static void f10_add_cube (physics_world *w, vector3 p) {
         w->bodies[idx].friction_kinetic = 0.7f;
     }
 }
-
 int main (void) {
     mpe_config_init ();
     physics_world world;
     physics_world_init (&world);
     constraint_pool_init (&world);
-
     /* Coulomb floor (top y=0, mu matched). Floorless, the pile rests on the
      * frictionless boundary clamp and disperses (0/27 asleep, KE=30 at
      * 60 s) while loose gates still pass — the same setup-bug family as
@@ -50,7 +46,6 @@ int main (void) {
             world.bodies[f].restitution = 0.0f;
         }
     }
-
     for (int i = 0; i < 10; i++) {
         f10_add_cube (&world, (vector3){20.0f, 0.5f + (float) i * 0.99f, 0.0f});
     }
@@ -73,13 +68,11 @@ int main (void) {
             world.bodies[idx].friction_kinetic = 0.7f;
         }
     }
-
     const float dt = 1.0f / 60.0f;
     float run_max_lin = 0.0f, run_max_ang = 0.0f;
     float trans_lin = 0.0f, trans_ang = 0.0f;
     float fin_lin = 0.0f, fin_ang = 0.0f;
     long nan_ticks = 0, fallen_ticks = 0;
-
     for (int t = 0; t < F10_TICKS; t++) {
         physics_world_step (&world, dt);
         float mx_lin = 0.0f, mx_ang = 0.0f;
@@ -122,7 +115,6 @@ int main (void) {
             }
         }
     }
-
     printf ("[info] final lin=%.5f ang=%.5f runmax lin=%.5f ang=%.5f transient lin=%.5f ang=%.5f nan=%ld fallen=%ld\n",
             fin_lin, fin_ang, run_max_lin, run_max_ang, trans_lin, trans_ang, nan_ticks, fallen_ticks);
     /* TRUTH (2026-09-23 TUI validation): the old "run-max ~10-15 is a solver

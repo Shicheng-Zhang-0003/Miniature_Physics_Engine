@@ -156,7 +156,6 @@ void cmd_touch (int argc, char **argv) {
             term_err ("mpe: touch: unknown type 'robot' (types: sph, cube, cyl)\n");
             return;
         }
-
         object_type spawn_type = object_sphere;
         if (strstr (argv[argument_index], "cyl")) {
             spawn_type = object_cylinder;

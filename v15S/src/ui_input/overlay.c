@@ -1,5 +1,4 @@
 /* GTK4: Full port — overlay with GL area. GTK3 preserved under #else. */
-
 #include "../mpe_engine.h"
 #include "overlay.h"
 #include "object_spawner.h"
@@ -19,7 +18,6 @@ extern int selected_object;
 static void overlay_append_overflow_text (char *buffer, size_t buffer_size);
 static void overlay_append_stats_text (char *buffer, size_t buffer_size);
 static bool overlay_has_valid_selection (void);
-
 static void overlay_append_overflow_text (char *buffer, size_t buffer_size) {
     int node_overflow_count = broadphase_get_node_overflow_count (physics_world_get_primary ());
     int pair_overflow_count = broadphase_get_pair_overflow_count (physics_world_get_primary ());

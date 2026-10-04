@@ -6,13 +6,11 @@
 #include "core/physics_world.h"
 #include "physics/constraint.h"
 #include "config/mpe_config.h"
-
 int main (void) {
     mpe_config_init ();
     physics_world world;
     physics_world_init (&world);
     constraint_pool_init (&world);
-
     float ang = -30.0f * 3.14159265f / 180.0f;
     vector3 n = {-sinf (ang), cosf (ang), 0.0f};
     vector3 surf = {0.0f, 6.0f, 0.0f};
@@ -32,7 +30,6 @@ int main (void) {
     g_cfg.sleep.enable = 0; /* measure motion, not sleep freeze */
     rb->friction_static = 0.0f;
     rb->friction_kinetic = 0.0f;
-
     const float dt = 1.0f / 60.0f;
     vector3 d = {cosf (ang), sinf (ang), 0.0f};
     /* Measure acceleration over the middle second (settled sliding). */

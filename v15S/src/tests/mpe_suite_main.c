@@ -20,23 +20,19 @@
 #include "config/mpe_constants.h"
 #include "ui_input/camera.h"
 #include "mpe_test.h" /* MPE_SKIPPED and the shared harness contract */
-
 /* ---- link stubs (same contract as v1 spring/scene tests) ---- */
 camera main_camera_fov;
 rigidbody *obj_per_scene = NULL;
 int object_count = 0;
 int object_capacity = 0;
-
 int scene_find_object_index_by_id (uint32_t id) {
     (void) id;
     return -1;
 }
-
 rigidbody *scene_resolve_object_by_id (uint32_t id) {
     (void) id;
     return NULL;
 }
-
 uint32_t scene_allocate_object_id (void) {
     physics_world *w = physics_world_get_primary ();
     if (w->next_object_id == 0) {
@@ -44,7 +40,6 @@ uint32_t scene_allocate_object_id (void) {
     }
     return w->next_object_id++;
 }
-
 void scene_note_loaded_id (uint32_t id) {
     if ((id == 0) || (id == 0xFFFFFFFFu)) {
         return;
@@ -54,17 +49,14 @@ void scene_note_loaded_id (uint32_t id) {
         w->next_object_id = id + 1;
     }
 }
-
 int scene_ensure_pool_capacity (int n) {
     (void) n;
     return 1;
 }
-
 void scene_clear (void) {
     physics_world *w = physics_world_get_primary ();
     w->body_count = 0;
 }
-
 /* ---- test declarations (suite A/B/C) ---- */
 int mpe_t_two_world (void);
 int mpe_t_revolute (void);
@@ -102,13 +94,11 @@ int mpe_t_frustum_culler (void);
 int mpe_t_module (void);
 int mpe_t_loader_lifecycle (void);
 int mpe_t_ftc_ecosystem (void);
-
 typedef struct {
     const char *name;
     int (*fn) (void);
     int diag; /* 1 = diag-informational, excluded from default run */
 } mpe_entry_t;
-
 /* DESPOT-2026-09-29: metamorphic suite. These carry NO golden numbers -- they
  * assert relations (rotation equivariance, solver convergence monotonicity,
  * sleep thresholds, config reachability) that any correct engine satisfies
@@ -123,7 +113,6 @@ extern int mpe_t_meta_config_wiring (void);
 extern int mpe_t_sleep_settle (void);
 extern int mpe_t_mouse_look_axes (void);
 extern int mpe_t_body_materials_live (void);
-
 static const mpe_entry_t mpe_registry[] = {
     {"meta_rotation", mpe_t_meta_rotation, 0},
     {"meta_convergence", mpe_t_meta_convergence, 0},
@@ -184,9 +173,7 @@ static const mpe_entry_t mpe_registry[] = {
     {"loader_lifecycle", mpe_t_loader_lifecycle, 0},
     {"ftc_ecosystem", mpe_t_ftc_ecosystem, 0},
 };
-
 #define MPE_NTESTS ((int) (sizeof (mpe_registry) / sizeof (mpe_registry[0])))
-
 /* Returns 0 pass, 1 fail, 2 skipped.
  * DESPOT-2026-09-29: a skipped case used to be indistinguishable from a pass
  * here, so `make test_suite` could report "29/29 green" with two cases having
@@ -202,7 +189,6 @@ static int mpe_run_one (const mpe_entry_t *e) {
     printf ("  [%s] %s (checks failed: %d)\n", fails == 0 ? "PASS" : "FAIL", e->name, fails);
     return fails == 0 ? 0 : 1;
 }
-
 int main (int argc, char **argv) {
     /* DESPOT-2026-09-29 THE BIG ONE. The suite never loaded the config.
      *

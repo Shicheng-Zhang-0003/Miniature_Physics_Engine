@@ -10,13 +10,11 @@
 #include "scene/scene_init.h"
 #include "config/mpe_config.h"
 #include "ui_input/input_state.h"
-
 /* UI stub globals for scene_init.c */
 int selected_object = -1;
 uint32_t selected_object_id = 0;
 input_status main_inputs = {0};
 void clear_selection (void) {}
-
 static void reset_primary (void) {
     physics_world *w = physics_world_get_primary ();
     /* DESPOT-2026-09-26: cleanup BEFORE init. Init memsets first (garbage-
@@ -26,20 +24,16 @@ static void reset_primary (void) {
     physics_world_init (w);
     scene_clear ();
 }
-
 int main (void) {
     mpe_config_init ();
     int fail = 0;
-
     /* Test 1: Exact state roundtrip - positions, velocities, orientations, sleep state */
     {
         reset_primary ();
         physics_world *world = physics_world_get_primary ();
         constraint_pool_init (world);
-
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 0.99f;
-
         int a = physics_world_add_sphere (world, 0.5f, 2.0f, (vector3){1.0f, 5.0f, 2.0f});
         world->bodies[a].velocity = (vector3){1.5f, -0.5f, 0.25f};
         world->bodies[a].angular_velocity = (vector3){3.0f, -1.0f, 2.0f};
@@ -48,7 +42,6 @@ int main (void) {
         world->bodies[a].friction_kinetic = 0.7f;
         world->bodies[a].nice_value = 5;
         rigidbody_wake (&world->bodies[a]);
-
         int b = physics_world_add_cube (world, (vector3){-1.0f, 2.0f, -1.0f}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
         world->bodies[b].velocity = (vector3){-0.75f, 0.0f, 0.5f};
         world->bodies[b].angular_velocity = (vector3){0.0f, 2.0f, -1.5f};
@@ -57,13 +50,11 @@ int main (void) {
         world->bodies[b].friction_kinetic = 0.6f;
         world->bodies[b].nice_value = 10;
         rigidbody_wake (&world->bodies[b]);
-
         int c = physics_world_add_cylinder (world, 0.3f, 0.4f, 1.5f, (vector3){0.0f, 4.0f, 1.0f});
         world->bodies[c].velocity = (vector3){0.2f, -1.0f, -0.3f};
         world->bodies[c].angular_velocity = (vector3){-2.0f, 0.5f, 1.0f};
         world->bodies[c].restitution = 0.2f;
         rigidbody_wake (&world->bodies[c]);
-
         /* Add joints */
         constraint_pool_init (world);
         int joint1 = constraint_add_revolute (world, world->bodies[a].object_id, world->bodies[b].object_id,
@@ -76,16 +67,13 @@ int main (void) {
             printf ("[FAIL] could not create all scene-persistence joints\n");
             fail = 1;
         }
-
         const float dt = 1.0f / 60.0f;
         for (int t = 0; t < 600; t++)
             physics_world_step (world, dt);
-
         /* Capture exact state */
         rigidbody ref_bodies[3];
         for (int i = 0; i < 3; i++)
             ref_bodies[i] = world->bodies[i];
-
         /* Save scene */
         char path[256] = "../../temp/paranoia_scene.mpe";
         int save_result = save_scene (path);
@@ -97,7 +85,6 @@ int main (void) {
             printf ("[FAIL] joint fixtures are incomplete before save\n");
             fail = 1;
         }
-
         /* Load into new primary */
         reset_primary ();
         constraint_pool_init (physics_world_get_primary ());
@@ -106,14 +93,12 @@ int main (void) {
             printf ("[FAIL] scene load failed\n");
             fail = 1;
         }
-
         /* Compare exact state */
         physics_world *loaded = physics_world_get_primary ();
         int mismatch = 0;
         for (int i = 0; i < 3 && i < loaded->body_count; i++) {
             rigidbody *orig = &ref_bodies[i];
             rigidbody *ld = &loaded->bodies[i];
-
             if (fabsf (orig->position.x - ld->position.x) > 0.0f || fabsf (orig->position.y - ld->position.y) > 0.0f ||
                 fabsf (orig->position.z - ld->position.z) > 0.0f)
                 mismatch = 1;
@@ -146,7 +131,6 @@ int main (void) {
             if (orig->object_generation != ld->object_generation)
                 mismatch = 1;
         }
-
         if (mismatch) {
             printf ("[FAIL] scene roundtrip state mismatch\n");
             fail = 1;
@@ -175,42 +159,32 @@ int main (void) {
         }
         remove (path);
     }
-
     /* Test 2: CRC validation - tampered file rejected */
     { printf ("[INFO] CRC validation path tested in scene_roundtrip_test\n"); }
-
     /* Test 3: Legacy format compatibility (v153 and older) */
     { printf ("[INFO] legacy format tested in scene_roundtrip_test\n"); }
-
     /* Test 4: Scene with sleeping bodies - sleep state preserved */
     {
         reset_primary ();
         physics_world *world = physics_world_get_primary ();
         constraint_pool_init (world);
-
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 0.99f;
-
         int a = physics_world_add_sphere (world, 0.5f, 1.0f, (vector3){0.0f, 0.5f, 0.0f});
         world->bodies[a].is_sleeping = true;
         world->bodies[a].sleep_timer = 10.0f;
         rigidbody_wake (&world->bodies[a]);
-
         const float dt = 1.0f / 60.0f;
         for (int t = 0; t < 120; t++)
             physics_world_step (world, dt);
-
         /* Force sleep state for roundtrip test */
         world->bodies[a].is_sleeping = true;
         world->bodies[a].sleep_timer = 5.0f;
-
         char path[256] = "../../temp/paranoia_sleep.mpe";
         save_scene (path);
-
         reset_primary ();
         constraint_pool_init (physics_world_get_primary ());
         scene_loading (path);
-
         physics_world *loaded = physics_world_get_primary ();
         if (!loaded->bodies[0].is_sleeping) {
             printf ("[FAIL] sleep state not preserved\n");
@@ -223,16 +197,13 @@ int main (void) {
         printf ("[PASS] sleep state exact roundtrip\n");
         remove (path);
     }
-
     /* Test 5: Scene with springs - spring state preserved */
     {
         reset_primary ();
         physics_world *world = physics_world_get_primary ();
         constraint_pool_init (world);
-
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 1.0f;
-
         int a = physics_world_add_sphere (world, 0.2f, 1.0f, (vector3){0.0f, 2.0f, 0.0f});
         int b = physics_world_add_sphere (world, 0.2f, 1.0f, (vector3){0.0f, 5.0f, 0.0f});
         world->bodies[a].restitution = 0.0f;
@@ -242,11 +213,9 @@ int main (void) {
             printf ("[FAIL] spring fixture creation failed\n");
             fail = 1;
         }
-
         const float dt = 1.0f / 60.0f;
         for (int t = 0; t < 300; t++)
             physics_world_step (world, dt);
-
         char path[256] = "../../temp/paranoia_spring.mpe";
         int save_result = save_scene (path);
         float L0_orig = world->spring_joints[0].equilibrium_length;
@@ -256,7 +225,6 @@ int main (void) {
             printf ("[FAIL] spring scene save failed\n");
             fail = 1;
         }
-
         reset_primary ();
         constraint_pool_init (physics_world_get_primary ());
         int load_result = scene_loading (path);
@@ -264,7 +232,6 @@ int main (void) {
             printf ("[FAIL] spring scene load failed\n");
             fail = 1;
         }
-
         physics_world *loaded = physics_world_get_primary ();
         if (loaded->spring_joint_count != 1) {
             printf ("[FAIL] spring not saved\n");
@@ -283,7 +250,6 @@ int main (void) {
         }
         remove (path);
     }
-
     physics_world_cleanup (physics_world_get_primary ());
     return fail;
 }

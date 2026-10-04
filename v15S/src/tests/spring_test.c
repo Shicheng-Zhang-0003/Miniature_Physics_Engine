@@ -9,7 +9,6 @@
 #include "physics/spring_joint.h"
 #include "config/mpe_config.h"
 #include "config/mpe_constants.h"
-
 /* Stubs for legacy-TU symbols in spring_joint.o (world path never calls). */
 camera main_camera_fov;
 rigidbody *obj_per_scene = NULL;
@@ -23,7 +22,6 @@ rigidbody *scene_resolve_object_by_id (uint32_t id) {
     (void) id;
     return NULL;
 }
-
 int main (void) {
     mpe_config_init ();
     g_cfg.world.drag = 1.0f;
@@ -33,7 +31,6 @@ int main (void) {
     physics_world_init (&world);
     constraint_pool_init (&world);
     joint_init_pool (&world);
-
     /* Static anchor + unit mass, k=20, c=0, L0=2, amplitude 0.5 along x.
      * T = 2*pi*sqrt(1/20) = 1.40496 s. High in the air: no contacts. */
     const float k = 20.0f;
@@ -46,7 +43,6 @@ int main (void) {
         physics_world_cleanup (&world);
         return 1;
     }
-
     const float dt = 1.0f / 60.0f;
     float prev_x = world.bodies[mass].position.x - 2.0f; /* extension */
     int crossings = 0;

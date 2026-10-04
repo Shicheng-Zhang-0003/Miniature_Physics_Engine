@@ -5,7 +5,6 @@
 #include <epoxy/gl_generated.h>
 #include <stdlib.h>
 #include <math.h>
-
 void init_cylinder_system (mesh *mesh_object, int radial_segments) {
     if (!mesh_object)
         return;
@@ -58,7 +57,6 @@ void init_cylinder_system (mesh *mesh_object, int radial_segments) {
     vertex_data[vi++] = 1.0f;
     vertex_data[vi++] = 0.0f;
     vertex_data[vi++] = 0.0f;
-
     int ring0 = 0, ring1 = ring_verts, ring2 = ring_verts * 2, ring3 = ring_verts * 3;
     int center_neg = ring_verts * 4, center_pos = ring_verts * 4 + 1;
     /* Side quads + two cap fans. */
@@ -117,7 +115,6 @@ void init_cylinder_system (mesh *mesh_object, int radial_segments) {
         wireframe_indices[wi++] = ring0 + s;
         wireframe_indices[wi++] = ring1 + s;
     }
-
     glGenVertexArrays (1, &mesh_object->vertex_array_object);
     glGenBuffers (1, &mesh_object->vertex_buffer_object);
     glGenBuffers (1, &mesh_object->element_buffer_object);

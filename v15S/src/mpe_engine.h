@@ -1,43 +1,35 @@
 #ifndef mpe_engine_h
 #define mpe_engine_h
-
 #include <gtk/gtk.h>
 #include <epoxy/gl.h>
-
 /* MPE_TASK_25_CONSTANTS_INCLUDE */
 #include "config/mpe_constants.h"
 #include "config/mpe_config.h"
-
 #include "core/math3d.h"
 #include "core/math4_special.h"
 #include "core/rigidbody.h"
 #include "core/frame_timer.h"
 #include "core/physics_world.h"
 #include "core/event_log.h" /* MPE_TASK_V15R2 */
-
 #include "physics/collision_mechanics.h"
 #include "physics/broadphase.h"
 #include "physics/spring_joint.h"
-
 #include "render/shader_loading.h"
 #include "render/sphere_meshing.h"
 #include "render/cube_meshing.h"
 #include "render/cylinder_meshing.h"
 #include "render/grid.h"
 #include "render/wireframe.h"
-
 #include "scene/scene_init.h"
 #include "scene/boundary.h"
 #include "scene/scene_saving.h"
 #include "scene/scene_load.h"
-
 #include "ui_input/input_control.h"
 #include "ui_input/camera.h"
 #include "ui_input/mouse_lock.h"
 #include "ui_input/object_spawner.h"
 #include "ui_input/object_selector.h"
 #include "ui_input/overlay.h"
-
 #include "ui_input/editor.h"
 /* MPE_TASK_18_TERMINAL_INCLUDE_BEGIN */
 #include "ui_input/debug_terminal.h"
@@ -50,50 +42,38 @@
 /* scratch. The file-scope globals below are gone for good; GUI code  */
 /* reaches simulation state via physics_world_get_primary().          */
 /* ------------------------------------------------------------------ */
-
 /* ------------------------------------------------------------------ */
 /* Global application input and camera state (retained: app, not sim) */
 /* ------------------------------------------------------------------ */
-
 extern camera main_camera_fov;
 extern input_status main_inputs;
 extern GtkWidget *g_gl_area;
-
 /* ------------------------------------------------------------------ */
 /* Global editor, world, and timing state                            */
 /* ------------------------------------------------------------------ */
-
 extern int selected_object;
-
 extern frame_timer main_timer;
-
 /* ------------------------------------------------------------------ */
 /* Top-level render entry points                                      */
 /* ------------------------------------------------------------------ */
-
 void render_init (void);
 void render_cleanup (void);
 void render_scene_current (int widget_width, int widget_height);
-
 /* ------------------------------------------------------------------ */
 /* Top-level physics tick entry point                                 */
 /* ------------------------------------------------------------------ */
-
 gboolean physics_step_increment (gpointer user_data_pointer);
 /* Depenetration pass (defined in physics/depenetration.c; takes the owning
  * world). Kept declared here for GUI callers. */
 struct physics_world;
 void a3_positional_depenetration_pass (struct physics_world *world, broadphase_pair *pair_buffer,
                                        int *pair_count_pointer, bool rebuild_broadphase);
-
 /* ------------------------------------------------------------------ */
 /* Optional GTK application activation entry point                    */
 /* ------------------------------------------------------------------ */
-
 float open_numerical_input_dialog (GtkWidget *parent, const char *title, float current_value);
 void editor_reset (void); /* MPE_TASK_V15R2_FIX */
 bool editor_dialog_is_active (void); /* MFS_PHASE_A */
-
 extern int debug_last_object_count;
 extern int debug_last_broadphase_pair_count;
 extern int debug_last_manifold_count;
@@ -121,12 +101,9 @@ void physics_halt_for_ticks (int ticks);
 bool physics_is_halted (void);
 bool physics_halt_tick_update (void); /* MFS_PHASE_A */
 /* MPE_TASK_V15R2_PHYSICS_HALT_EXTERN_END */
-
 #define a3_version_string "v15S-dev" /* v15S development head */
-
 /* MPE_RELEASE_FREEZE_BEGIN */
 #define a3_release_freeze 0
 #define a3_release_freeze_note "v15S development head"
 /* MPE_RELEASE_FREEZE_END */
-
 #endif // mpe_engine_h

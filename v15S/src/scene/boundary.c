@@ -6,7 +6,6 @@
 #include "../config/mpe_constants.h"
 #include <math.h>
 #include <stdbool.h>
-
 /* MPE_TASK_08_FLOOR_EMERGENCY_TUNING_BEGIN */
 /* MPE_TASK_08_FLOOR_EMERGENCY_TUNING_END */
 // Helper: Get lowest point of OBB along an axis

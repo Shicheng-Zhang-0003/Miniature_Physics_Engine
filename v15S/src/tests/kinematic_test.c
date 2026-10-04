@@ -6,21 +6,17 @@
 #include "core/physics_world.h"
 #include "physics/constraint.h"
 #include "config/mpe_config.h"
-
 int main (void) {
     mpe_config_init ();
     physics_world world;
     physics_world_init (&world);
     constraint_pool_init (&world);
-
     /* Platform: box bottom at y=0, driven +x at 2 m/s, immune to gravity. */
     int p = physics_world_add_cube (&world, (vector3){0, 0.5f, 0}, (vector3){2.0f, 0.5f, 2.0f}, 5.0f);
     rigidbody_set_kinematic (&world.bodies[p], true);
     world.bodies[p].velocity = (vector3){2.0f, 0.0f, 0.0f};
-
     /* Crate resting on top. */
     int c = physics_world_add_cube (&world, (vector3){0, 1.26f, 0}, (vector3){0.25f, 0.25f, 0.25f}, 1.0f);
-
     const float dt = 1.0f / 60.0f;
     for (int t = 0; t < 120; t++) {
         /* Re-assert drive (a real driver sets this every tick). */

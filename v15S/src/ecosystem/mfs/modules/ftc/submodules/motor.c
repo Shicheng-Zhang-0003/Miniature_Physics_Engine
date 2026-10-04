@@ -1,9 +1,7 @@
 /* MPE_FTC_070: DC motor electrical model implementation */
 #include "motor.h"
 #include <math.h>
-
 #define MOTOR_RPM_TO_RAD_S 0.104719755f /* 2*pi/60 */
-
 void motor_from_spec (motor *m, float stall_torque_nm, float free_speed_rpm, float stall_current_a,
                       float nominal_voltage, float gear_ratio, float efficiency) {
     if (!m) {
@@ -13,22 +11,18 @@ void motor_from_spec (motor *m, float stall_torque_nm, float free_speed_rpm, flo
     m->free_speed_rad_s = free_speed_rpm * MOTOR_RPM_TO_RAD_S;
     m->gear_ratio = (gear_ratio > 0.0f) ? gear_ratio : 1.0f;
     m->efficiency = (efficiency > 0.0f && efficiency <= 1.0f) ? efficiency : 0.85f;
-
     /* Kt = motor-shaft stall torque / stall_current.
      * FIX-AUDIT: preset stall is OUTPUT-shaft (post-gearbox, includes loss)
      * but output applied eff again -> stall*eff (15-20% low). Derive the
      * ideal motor-shaft torque as stall/(gear*eff) so output == spec. */
     float motor_stall_torque = stall_torque_nm / (m->gear_ratio * m->efficiency);
     m->kt = (stall_current_a > 0.0f) ? (motor_stall_torque / stall_current_a) : 0.0f;
-
     /* R = V_nominal / stall_current */
     m->resistance = (stall_current_a > 0.0f) ? (nominal_voltage / stall_current_a) : 1.0f;
-
     /* Kv: at free speed, current ~ 0, so BackEMF ~ V_nominal */
     /* Kv = V / omega_free  (motor shaft, before gearing) */
     float motor_free_speed = m->free_speed_rad_s * m->gear_ratio;
     m->kv = (motor_free_speed > 0.0f) ? (nominal_voltage / motor_free_speed) : 0.0f;
-
     m->command = 0.0f;
     m->current = 0.0f;
     m->back_emf = 0.0f;
@@ -42,7 +36,6 @@ void motor_from_spec (motor *m, float stall_torque_nm, float free_speed_rpm, flo
     m->tau_exp_prev = 0.0f;
     m->wprev_valid = 0;
 }
-
 void motor_update (motor *m, float wheel_angular_vel, float dt, float battery_voltage) {
     if ((!m) || (dt <= 0.0f)) {
         return;
@@ -56,15 +49,11 @@ void motor_update (motor *m, float wheel_angular_vel, float dt, float battery_vo
     if (!isfinite (wheel_angular_vel)) {
         return;
     }
-
     float motor_shaft_vel = wheel_angular_vel * m->gear_ratio;
-
     /* BackEMF opposes applied voltage */
     m->back_emf = m->kv * motor_shaft_vel;
-
     /* Applied voltage from command */
     float applied_voltage = battery_voltage * m->command;
-
     /* Copper thermal derating: winding resistance rises with the modeled
      * temperature (was write-only telemetry).
      * DESPOT-2026-09-28 (math truth): the old "small at FTC currents"
@@ -85,7 +74,6 @@ void motor_update (motor *m, float wheel_angular_vel, float dt, float battery_vo
         raw_current = -m->stall_current;
     }
     m->current = raw_current;
-
     /* Torque = Kt * I (motor-shaft ideal); efficiency applied once at the
      * gearbox output below. NOTE: Kt and Kv are fit independently to the
      * output-shaft stall/free-speed spec endpoints, so their ratio absorbs
@@ -95,7 +83,6 @@ void motor_update (motor *m, float wheel_angular_vel, float dt, float battery_vo
      * row that no longer exists (Core Hex is 72:1 in the preset table);
      * removed as stale, kept the Kt!=Ke rationale. */
     m->torque = m->kt * m->current;
-
     /* Output torque at wheel (after gearing, minus gearbox loss) */
     m->output_torque = m->torque * m->gear_ratio * m->efficiency; /* MFS_122: restore gearing */
     m->torque_explicit = m->output_torque; /* explicit path: applied == instantaneous */
@@ -107,10 +94,8 @@ void motor_update (motor *m, float wheel_angular_vel, float dt, float battery_vo
      * 0). Whichever path runs publishes its expectation; the observer is
      * then consistent across path switches by construction. */
     m->tau_exp_prev = m->torque_explicit;
-
     /* Speed tracking (signed: reverse reads negative). */
     m->rpm = wheel_angular_vel / MOTOR_RPM_TO_RAD_S;
-
     /* FIX-AUDIT-DESPOT: heating lived only in motor_update_load, so the
      * explicit path (fallback + direct callers) never warmed or derated.
      * DESPOT-2026-09-26: old comment claimed "nominal R, matching the
@@ -129,7 +114,6 @@ void motor_update (motor *m, float wheel_angular_vel, float dt, float battery_vo
         }
     }
 }
-
 void motor_update_load (motor *m, float wheel_angular_vel, float dt, float battery_voltage, float axle_inertia) {
     if ((!m) || (dt <= 0.0f)) {
         return;
@@ -257,7 +241,6 @@ void motor_update_load (motor *m, float wheel_angular_vel, float dt, float batte
         m->temperature = 150.0f; /* magnet ceiling (see derating note) */
     }
 }
-
 /* FIX-AUDIT-DESPOT: teleport/back-button paths move bodies discontinuously,
  * which the disturbance observer reads as an infinite load spike
  * (I*dw/dt across a warp). Reset the observer on every teleport so the
@@ -330,7 +313,6 @@ void motor_observe (motor *m, float wheel_angular_vel, float dt, float axle_iner
     m->w_prev = wheel_angular_vel;
     m->wprev_valid = 1;
 }
-
 void motor_reset_observer (motor *m) {
     if (!m) {
         return;

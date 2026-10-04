@@ -1,4 +1,3 @@
-
 #ifdef MFS_IDLE_ROOTCAUSE_DIAG
 #include <stdio.h>
 #include <math.h>
@@ -8,28 +7,22 @@
 #include "config/mpe_config.h"
 #include "modules/ftc/submodules/robot.h"
 #include "modules/ftc/submodules/drivetrain.h"
-
 static const float DT = 1.0f / 60.0f;
-
 int main (void) {
     mpe_config_init ();
     /* MFS_PORT_V15S: robot worlds need 128 iterations (40:1 chassis/wheel
      * mass ratio; see teleop_drive_test.c). */
     g_cfg.timestep.solver_iterations = 128;
     printf ("\n=== IDLE ROOT-CAUSE DIAGNOSTIC ===\n");
-
     physics_world world;
     physics_world_init (&world);
     constraint_pool_init (&world);
-
     physics_world_add_cube (&world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
-
     ftc_robot robot;
     if (ftc_robot_create (&world, &robot, 0.0f, ftc_robot_rest_height (), 0.0f, MOTOR_GB_5203_26_9) != 0) {
         printf ("[FAIL] robot create\n");
         return 1;
     }
-
     const char *names[4] = {"FL", "FR", "BL", "BR"};
     printf ("wheel configuration:\n");
     for (int w = 0; w < robot.wheel_count; w++) {
@@ -38,15 +31,12 @@ int main (void) {
         printf ("  [%d]=%s  roller_angle=%8.2f deg  is_mecanum=%d  radius=%.4f\n", w, names[w],
                 robot.wheel_roller_angle[w] * 57.2957795f, robot.wheel_is_mecanum[w] ? 1 : 0, wheel->radius);
     }
-
     float zero[4] = {0.0f, 0.0f, 0.0f, 0.0f};
     ftc_robot_set_wheel_commands (&robot, zero, 4);
-
     for (int i = 0; i < 120; i++) {
         drivetrain_update (&world, &robot, DT);
         physics_world_step (&world, DT);
     }
-
     printf ("idle (zero input) after settle:\n");
     for (int w = 0; w < robot.wheel_count; w++) {
         int wi = robot.wheel_bodies[w];
@@ -58,11 +48,9 @@ int main (void) {
         float oa = vector3_dot (wheel->angular_velocity, axle);
         printf ("  [%d]=%s  axle_omega=%8.4f rad/s\n", w, names[w], oa);
     }
-
     rigidbody *ch = &world.bodies[robot.chassis_body];
     printf ("chassis vel=(%.5f, %.5f, %.5f) ang_vel_y=%.5f\n", ch->velocity.x, ch->velocity.y, ch->velocity.z,
             ch->angular_velocity.y);
-
     physics_world_cleanup (&world);
     return 0;
 }

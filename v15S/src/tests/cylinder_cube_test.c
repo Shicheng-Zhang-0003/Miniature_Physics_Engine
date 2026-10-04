@@ -6,22 +6,17 @@
 #include <math.h>
 #include "core/physics_world.h"
 #include "config/mpe_config.h"
-
 int main (void) {
     mpe_config_init ();
     physics_world world;
     physics_world_init (&world);
-
     /* Static floor */
     physics_world_add_cube (&world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
-
     /* Static cube wall at z=0.5 */
     physics_world_add_cube (&world, (vector3){0.0f, 0.25f, 0.5f}, (vector3){0.5f, 0.25f, 0.1f}, 0.0f);
-
     /* Cylinder rolling toward the wall */
     int cyl = physics_world_add_cylinder (&world, 0.05f, 0.02f, 0.5f, (vector3){0.0f, 0.06f, -0.5f});
     world.bodies[cyl].velocity = (vector3){0.0f, 0.0f, 3.0f};
-
     const float dt = 1.0f / 60.0f;
     int fail = 0;
     for (int t = 0; t < 180 && !fail; t++) {
@@ -36,11 +31,9 @@ int main (void) {
     }
     if (fail)
         return 1;
-
     float cyl_z = world.bodies[cyl].position.z;
     float cyl_vz = world.bodies[cyl].velocity.z;
     printf ("[info] cylinder final z=%.4f vz=%.4f (wall face at z=0.4)\n", cyl_z, cyl_vz);
-
     /* TRUTH: two-sided. Wall face at z=0.4 (center 0.5 - half 0.1);
      * cylinder surface must not cross it, and must be spent (bounced back
      * or stopped), not flying. Old z>0.8 allowed 0.45m penetration. */

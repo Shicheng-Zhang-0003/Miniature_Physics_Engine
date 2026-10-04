@@ -16,7 +16,6 @@
 #include "../core/physics_world.h"
 #include <stdio.h>
 #include <string.h>
-
 void cmd_eco (int argc, char **argv) {
     if (argc < 2) {
         term_err ("mpe: eco: usage: eco attach|detach|command\n");

@@ -6,7 +6,6 @@
 #include "core/physics_world.h"
 #include "physics/constraint.h"
 #include "config/mpe_config.h"
-
 int main (void) {
     mpe_config_init ();
     g_cfg.world.drag = 1.0f;
@@ -16,7 +15,6 @@ int main (void) {
     physics_world world;
     physics_world_init (&world);
     constraint_pool_init (&world);
-
     const float vx = 8.0f, vy = 12.0f;
     const float g = fabsf (g_cfg.world.gravity);
     if (fabsf (g - 9.81f) > 1e-6f) {
@@ -26,7 +24,6 @@ int main (void) {
     int s = physics_world_add_sphere (&world, 0.2f, 1.0f, (vector3){0.0f, 1.0f, 0.0f});
     world.bodies[s].velocity = (vector3){vx, vy, 0.0f};
     rigidbody_wake (&world.bodies[s]);
-
     const float dt = 1.0f / 60.0f;
     float apex = 0.0f, t_apex = 0.0f, x_apex = 0.0f;
     for (int t = 0; t < 400; t++) {

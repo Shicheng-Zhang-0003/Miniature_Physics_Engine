@@ -1,10 +1,8 @@
 /* Scene v2 codec implementation. See scene_crc.h. */
 #include "scene_crc.h"
 #include <string.h>
-
 static uint32_t crc_table[256];
 static int crc_table_ready = 0;
-
 static void crc_make_table (void) {
     for (uint32_t n = 0; n < 256; n++) {
         uint32_t c = n;
@@ -15,7 +13,6 @@ static void crc_make_table (void) {
     }
     crc_table_ready = 1;
 }
-
 uint32_t scene_crc32_update (uint32_t crc, const void *data, unsigned long length) {
     if (!crc_table_ready) {
         crc_make_table ();
@@ -26,18 +23,15 @@ uint32_t scene_crc32_update (uint32_t crc, const void *data, unsigned long lengt
     }
     return crc;
 }
-
 static void encode_le32 (unsigned char out[4], uint32_t v) {
     out[0] = (unsigned char) (v & 0xFFu);
     out[1] = (unsigned char) ((v >> 8) & 0xFFu);
     out[2] = (unsigned char) ((v >> 16) & 0xFFu);
     out[3] = (unsigned char) ((v >> 24) & 0xFFu);
 }
-
 static uint32_t decode_le32 (const unsigned char in[4]) {
     return ((uint32_t) in[0]) | (((uint32_t) in[1]) << 8) | (((uint32_t) in[2]) << 16) | (((uint32_t) in[3]) << 24);
 }
-
 int scene_w32 (FILE *f, uint32_t *crc, uint32_t v) {
     unsigned char buf[4];
     encode_le32 (buf, v);
@@ -49,7 +43,6 @@ int scene_w32 (FILE *f, uint32_t *crc, uint32_t v) {
     }
     return 1;
 }
-
 int scene_wfloat (FILE *f, uint32_t *crc, float v) {
     union {
         float f;
@@ -58,7 +51,6 @@ int scene_wfloat (FILE *f, uint32_t *crc, float v) {
     converter.f = v;
     return scene_w32 (f, crc, converter.u);
 }
-
 int scene_r32 (FILE *f, uint32_t *crc, uint32_t *v) {
     unsigned char buf[4];
     if (fread (buf, 1, 4, f) != 4) {
@@ -70,7 +62,6 @@ int scene_r32 (FILE *f, uint32_t *crc, uint32_t *v) {
     *v = decode_le32 (buf);
     return 1;
 }
-
 int scene_rfloat (FILE *f, uint32_t *crc, float *v) {
     uint32_t u = 0;
     union {
@@ -84,13 +75,11 @@ int scene_rfloat (FILE *f, uint32_t *crc, float *v) {
     *v = converter.f;
     return 1;
 }
-
 /* FIX-AUDIT-DESPOT: lockstep state hash (see header). Deferred include of
  * physics_world.h keeps scene_crc.h light; the hash feeds CRC32 over LE
  * bytes so it is bit-identical on every LE host (v200's LE contract).
  * +0/-0 canonicalized: bitwise twins must not desync on sign-of-zero. */
 #include "../core/physics_world.h"
-
 static uint32_t hash_u32_le (uint32_t crc, uint32_t v) {
     unsigned char b[4];
     b[0] = (unsigned char) (v & 0xFFu);
@@ -99,7 +88,6 @@ static uint32_t hash_u32_le (uint32_t crc, uint32_t v) {
     b[3] = (unsigned char) ((v >> 24) & 0xFFu);
     return scene_crc32_update (crc, b, 4);
 }
-
 static uint32_t hash_float_le (uint32_t crc, float f) {
     uint32_t u = 0;
     memcpy (&u, &f, sizeof (u));
@@ -108,7 +96,6 @@ static uint32_t hash_float_le (uint32_t crc, float f) {
     }
     return hash_u32_le (crc, u);
 }
-
 uint32_t physics_world_hash_state (const struct physics_world *world) {
     if (!world || !world->bodies || world->body_count <= 0) {
         return 0u;

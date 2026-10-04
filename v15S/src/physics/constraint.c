@@ -6,7 +6,6 @@
 #include "islands.h"
 #include "../core/physics_world.h"
 #include "../config/mpe_constants.h"
-
 void constraint_pool_init (struct physics_world *world) {
     if (!world) {
         return;
@@ -16,7 +15,6 @@ void constraint_pool_init (struct physics_world *world) {
     }
     world->revolute_constraint_count = 0;
 }
-
 int constraint_add_revolute (struct physics_world *world, uint32_t id_a, uint32_t id_b, vector3 anchor_a,
                              vector3 anchor_b, vector3 axis_a) {
     if (!world) {
@@ -75,7 +73,6 @@ int constraint_add_revolute (struct physics_world *world, uint32_t id_a, uint32_
     }
     return -1;
 }
-
 void constraint_remove (struct physics_world *world, int index) {
     if (!world) {
         return;
@@ -89,7 +86,6 @@ void constraint_remove (struct physics_world *world, int index) {
     world->revolute_constraints[index].is_active = false;
     world->revolute_constraint_count--;
 }
-
 int constraint_add_fixed (struct physics_world *world, uint32_t id_a, uint32_t id_b, vector3 anchor_a,
                           vector3 anchor_b) {
     if (!world) {
@@ -112,7 +108,6 @@ int constraint_add_fixed (struct physics_world *world, uint32_t id_a, uint32_t i
     }
     return -1;
 }
-
 int constraint_add_distance (struct physics_world *world, uint32_t id_a, uint32_t id_b, vector3 anchor_a,
                              vector3 anchor_b, float rest_length) {
     if (!world) {
@@ -139,7 +134,6 @@ int constraint_add_distance (struct physics_world *world, uint32_t id_a, uint32_
     }
     return -1;
 }
-
 /* Prismatic (slider) joint: single-axis slide. */
 int constraint_add_prismatic (struct physics_world *world, uint32_t id_a, uint32_t id_b, vector3 anchor_a,
                               vector3 anchor_b, vector3 axis_a) {
@@ -200,7 +194,6 @@ int constraint_add_prismatic (struct physics_world *world, uint32_t id_a, uint32
     }
     return -1;
 }
-
 /* Rope constraint: inequality distance (pulls only). */
 int constraint_add_rope (struct physics_world *world, uint32_t id_a, uint32_t id_b, vector3 anchor_a, vector3 anchor_b,
                          float max_length) {
@@ -228,14 +221,12 @@ int constraint_add_rope (struct physics_world *world, uint32_t id_a, uint32_t id
     }
     return -1;
 }
-
 int constraint_get_count (const struct physics_world *world) {
     if (!world) {
         return 0;
     }
     return world->revolute_constraint_count;
 }
-
 void constraint_set_revolute_motor (struct physics_world *world, int index, bool enabled, float target_speed,
                                     float max_torque) {
     if (!world) {
@@ -254,7 +245,6 @@ void constraint_set_revolute_motor (struct physics_world *world, int index, bool
     world->revolute_constraints[index].p.revolute.motor_target_speed = target_speed;
     world->revolute_constraints[index].p.revolute.motor_max_torque = max_torque;
 }
-
 void constraint_set_revolute_axes (struct physics_world *world, int index, vector3 axis_a, vector3 axis_b) {
     if (!world) {
         return;
@@ -277,7 +267,6 @@ void constraint_set_revolute_axes (struct physics_world *world, int index, vecto
                                                                ? vector3_normalisation (axis_b)
                                                                : world->revolute_constraints[index].p.revolute.axis_a;
 }
-
 void constraint_set_revolute_limits (struct physics_world *world, int index, bool enabled, float limit_min_rad,
                                      float limit_max_rad) {
     if (!world) {
@@ -309,7 +298,6 @@ void constraint_set_revolute_limits (struct physics_world *world, int index, boo
         world->revolute_constraints[index].p.revolute.reference_axis_b = vector3_zero ();
     }
 }
-
 /* Prismatic joint setters */
 void constraint_set_prismatic_axes (struct physics_world *world, int index, vector3 axis_a, vector3 axis_b) {
     if (!world) {
@@ -337,7 +325,6 @@ void constraint_set_prismatic_axes (struct physics_world *world, int index, vect
     world->revolute_constraints[index].p.prismatic.reference_axis_a = vector3_zero ();
     world->revolute_constraints[index].p.prismatic.reference_axis_b = vector3_zero ();
 }
-
 void constraint_set_prismatic_limits (struct physics_world *world, int index, bool enabled, float limit_min,
                                       float limit_max) {
     if (!world) {
@@ -365,7 +352,6 @@ void constraint_set_prismatic_limits (struct physics_world *world, int index, bo
         world->revolute_constraints[index].p.prismatic.reference_axis_b = vector3_zero ();
     }
 }
-
 void constraint_set_prismatic_motor (struct physics_world *world, int index, bool enabled, float target_speed,
                                      float max_force) {
     if (!world) {
@@ -384,11 +370,9 @@ void constraint_set_prismatic_motor (struct physics_world *world, int index, boo
     world->revolute_constraints[index].p.prismatic.motor_target_speed = target_speed;
     world->revolute_constraints[index].p.prismatic.motor_max_force = max_force;
 }
-
 int constraint_pool_capacity (void) {
     return mpe_max_joints;
 }
-
 const constraint *constraint_pool_at (const struct physics_world *world, int index) {
     if (!world) {
         return NULL;
@@ -401,18 +385,15 @@ const constraint *constraint_pool_at (const struct physics_world *world, int ind
     }
     return &world->revolute_constraints[index];
 }
-
 /* Global id cache retired: lookups go through the owning world's
  * per-world cache (physics_world_body_by_id), so interleaved worlds
  * and threads can never alias each other's entries. */
-
 /* Global id cache retired: lookups go through the owning world's
  * per-world cache (physics_world_index_by_id), so interleaved worlds
  * and threads can never alias each other's entries. */
 static rigidbody *find_body_by_id_cached (struct physics_world *world, uint32_t id) {
     return physics_world_body_by_id (world, id);
 }
-
 static void constraint_dispatch (struct physics_world *world, float dt, bool motors_pass) {
     if ((!world) || (!world->bodies) || (world->body_count <= 0) || (world->revolute_constraint_count <= 0)) {
         return;
@@ -476,14 +457,12 @@ static void constraint_dispatch (struct physics_world *world, float dt, bool mot
         }
     }
 }
-
 void constraint_solve_all (struct physics_world *world, float dt) {
     if (!(dt > 0.0f)) {
         return;
     }
     constraint_dispatch (world, dt, false);
 }
-
 void constraint_pre_step_all (struct physics_world *world, float dt) {
     if ((!world) || (!world->bodies) || (world->body_count <= 0) || (!(dt > 0.0f))) {
         return;
@@ -509,7 +488,6 @@ void constraint_pre_step_all (struct physics_world *world, float dt) {
         }
     }
 }
-
 int constraint_get_active_ids (const struct physics_world *world, uint32_t *ids_a, uint32_t *ids_b, int capacity) {
     if ((!world) || (!ids_a) || (!ids_b) || (capacity <= 0)) {
         return 0;
@@ -525,7 +503,6 @@ int constraint_get_active_ids (const struct physics_world *world, uint32_t *ids_
     }
     return count;
 }
-
 void constraint_correct_axis_drift_all (struct physics_world *world, float dt) {
     if ((!world) || (!world->bodies) || (world->body_count <= 0) || (!(dt > 0.0f)) ||
         (world->revolute_constraint_count <= 0)) {
@@ -552,7 +529,6 @@ void constraint_correct_axis_drift_all (struct physics_world *world, float dt) {
         }
     }
 }
-
 void constraint_apply_motors (struct physics_world *world, float dt) {
     if (!(dt > 0.0f)) {
         return;

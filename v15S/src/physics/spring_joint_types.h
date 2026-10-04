@@ -4,15 +4,12 @@
  * Behaviour and layout unchanged. */
 #ifndef spring_joint_types_h
 #define spring_joint_types_h
-
 #include <stdint.h>
 #include <stdbool.h>
 #include "../core/rigidbody.h" /* clean (math only); gives rigidbody. physics_world stays forward-declared. */
-
 #ifndef mpe_max_joints
 #define mpe_max_joints 1024
 #endif
-
 typedef struct {
     uint32_t object_id_a, object_id_b; /* A3_PATCH_09_JOINT_IDS */
     float equilibrium_length;
@@ -20,7 +17,6 @@ typedef struct {
     float damping_coefficient;
     bool is_active;
 } spring_joint;
-
 /* GTK4-PREP: spring pool entry points live here (GL-free) so core, scene,
  * tests, and the TUI can use springs without epoxy/OpenGL headers.
  * spring_joint.h keeps only the GL render declaration. */
@@ -43,5 +39,4 @@ void apply_spring_forces_world_dt (physics_world *world, rigidbody *bodies, int 
 /* Canonical per-tick spring entry: both step paths call exactly this.
  * Weak-linked at step call sites so spring-less headless binaries link. */
 void mpe_springs_apply (physics_world *world, float dt);
-
 #endif /* spring_joint_types_h */

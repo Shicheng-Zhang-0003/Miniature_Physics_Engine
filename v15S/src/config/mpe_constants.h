@@ -1,7 +1,6 @@
 /* MPE_TASK_25_CONSTANTS_MANIFEST_BEGIN */
 #ifndef mpe_constants_h
 #define mpe_constants_h
-
 /* ==================================================================
  * MPE Compile-Time Constants Manifest
  *
@@ -15,7 +14,6 @@
  * remain in their domain files until v15R1 Task 29-33 migrates
  * them into the mpe_config_t runtime store.
  * ================================================================== */
-
 /* ------------------------------------------------------------------
  * CAPACITY — object and joint pool limits (ceilings + initial sizes)
  * ------------------------------------------------------------------ */
@@ -24,7 +22,6 @@
 #define mpe_max_joints 1024
 #define mpe_max_broadphase_pairs 65536
 #define a3_max_manifolds 8192
-
 /* ------------------------------------------------------------------
  * BROADPHASE — spatial hash grid structure
  * ------------------------------------------------------------------ */
@@ -32,20 +29,17 @@
 #define max_objects mpe_max_bodies /* alias for clarity in broadphase.c */
 #define a3_pair_hash_table_size (1 << 18)
 #define a3_pair_hash_mask (a3_pair_hash_table_size - 1)
-
 /* ------------------------------------------------------------------
  * CONTACT CACHE — warm-starting impulse cache (ceiling + initial)
  * ------------------------------------------------------------------ */
 #define max_cached_contacts 65536
 #define mpe_initial_contacts 4096
 #define mpe_id_cache_size 2048
-
 /* ------------------------------------------------------------------
  * DEBUG TERMINAL — history buffer dimensions
  * ------------------------------------------------------------------ */
 #define term_history_size 64
 #define term_history_length 511
-
 /* ------------------------------------------------------------------
  * SCENE I/O — binary format identification
  * ------------------------------------------------------------------ */
@@ -53,12 +47,10 @@
 #define mpe_version                                                                                                    \
     200 /* v200: LE fields, stable IDs, revolute section, CRC32 footer.
                          * v153 and older keep their native-order legacy reader. */
-
 /* ------------------------------------------------------------------
  * VALIDATION — built-in test durations
  * ------------------------------------------------------------------ */
 #define a3_long_run_validation_ticks 3600 /* 60 seconds at 60 Hz */
-
 /* ------------------------------------------------------------------
  * PHYSICS NUMERICS — centralized epsilon / threshold constants.
  * Previously scattered as raw literals (0.98f, 1.01f, 0.0001f, ...).
@@ -78,6 +70,5 @@
 #define mpe_ray_tmax_pos 1e30f
 #define mpe_spawn_nudge 0.005f
 #define mpe_spawn_max_move 1.0f
-
 #endif /* mpe_constants_h */
 /* MPE_TASK_25_CONSTANTS_MANIFEST_END */

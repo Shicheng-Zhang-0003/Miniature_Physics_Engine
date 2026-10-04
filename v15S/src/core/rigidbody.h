@@ -1,6 +1,5 @@
 #ifndef rigidbody_h
 #define rigidbody_h
-
 #include <stdio.h>
 #include <math.h>
 #include <stdbool.h>
@@ -148,7 +147,6 @@ float rb_get_kinetic_energy (rigidbody *rigid_body);
 /* make_half_extents REMOVED (trivial helper, zero callers). */
 void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass);
 void rigidbody_wake (rigidbody *rigid_body);
-
 void rigidbody_sanitize (rigidbody *rigid_body);
 void rigidbody_set_static (rigidbody *rigid_body, bool make_static);
 void rigidbody_set_kinematic (rigidbody *rigid_body, bool make_kinematic);
@@ -168,12 +166,10 @@ void rigidbody_set_friction_anisotropic (rigidbody *rigid_body, vector3 axis_loc
 void rigidbody_set_friction_anisotropic_in_frame (rigidbody *rigid_body, uint32_t frame_id, vector3 axis_local,
                                                   float mu_along, float mu_across);
 void rigidbody_clear_friction_anisotropic (rigidbody *rigid_body);
-
 void rb_integrate_velocity (rigidbody *rigid_body, float delta_time, float linear_damping, float angular_damping);
 void rb_integrate_position (rigidbody *rigid_body, float delta_time);
 void rb_integrate_position_exact (rigidbody *rigid_body, float delta_time, const mpe_config_t *cfg, bool free_flight);
 /* rb_integrate_position_free_flight_original REMOVED (was dead, invited double-counts). */
-
 /* Effective-mass helpers: sleeping/static/kinematic bodies behave as infinite
  * mass WITHOUT mutating stored inverse_mass/inertia. Use these in the solver,
  * split impulse, and depenetration instead of zeroing the stored fields
@@ -188,7 +184,6 @@ static inline float rigidbody_effective_inv_mass (const rigidbody *rb) {
     }
     return rb->inverse_mass;
 }
-
 static inline bool rigidbody_is_awake_for_solver (const rigidbody *rb) {
     if (!rb) {
         return false;
@@ -202,7 +197,6 @@ static inline bool rigidbody_is_awake_for_solver (const rigidbody *rb) {
      * immovable via effective_* helpers. Sleeping is the only solver-skip. */
     return !rb->is_sleeping;
 }
-
 /* Effective inverse inertia: zero matrix for infinite-mass bodies, otherwise
  * the stored world-space inverse. Avoids mutating the stored field. */
 static inline math3 rigidbody_effective_inv_inertia (const rigidbody *rb) {
@@ -215,7 +209,6 @@ static inline math3 rigidbody_effective_inv_inertia (const rigidbody *rb) {
     }
     return rb->inverse_inertia_system;
 }
-
 /* DESPOT-2026-10-02: input-clamp observability.
  *
  * The engine guards mass / radius / cylinder half-length into finite,
@@ -236,5 +229,4 @@ extern unsigned long mpe_clamp_mass_events;
 extern unsigned long mpe_clamp_radius_events;
 extern unsigned long mpe_clamp_half_length_events;
 void mpe_clamp_counters_reset (void);
-
 #endif

@@ -10,7 +10,6 @@
 #include "core/physics_world.h"
 #include "physics/constraint.h"
 #include "config/mpe_config.h"
-
 static void build_scene (physics_world *world) {
     physics_world_init (world);
     constraint_pool_init (world);
@@ -34,17 +33,14 @@ static void build_scene (physics_world *world) {
     /* Static floor slab for contact coverage. */
     physics_world_add_cube (world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
 }
-
 static int vec3_eq (vector3 a, vector3 b) {
     return (a.x == b.x) && (a.y == b.y) && (a.z == b.z) && isfinite (a.x) && isfinite (a.y) && isfinite (a.z) &&
            isfinite (b.x) && isfinite (b.y) && isfinite (b.z);
 }
-
 static int vec4_eq (vector4 a, vector4 b) {
     return (a.w == b.w) && (a.x == b.x) && (a.y == b.y) && (a.z == b.z) && isfinite (a.w) && isfinite (a.x) &&
            isfinite (a.y) && isfinite (a.z) && isfinite (b.w) && isfinite (b.x) && isfinite (b.y) && isfinite (b.z);
 }
-
 static int bodies_equal (const rigidbody *a, const rigidbody *b) {
     /* TRUTH: compare NAMED fields explicitly. The old float-window walk
      * (&position.x, 22 floats) assumed struct layout (pos/vel/acc/orient/
@@ -91,7 +87,6 @@ static int bodies_equal (const rigidbody *a, const rigidbody *b) {
     return (a->is_sleeping == b->is_sleeping) && (a->sleep_timer == b->sleep_timer) &&
            (a->static_state == b->static_state) && (a->kinematic == b->kinematic);
 }
-
 static int caches_equal (const physics_world *a, const physics_world *b) {
     /* TRUTH: count-only compare passed with divergent contents. Field-wise
      * (no memcmp: padding garbage differs legitimately). */
@@ -119,7 +114,6 @@ static int caches_equal (const physics_world *a, const physics_world *b) {
     }
     return 1;
 }
-
 int main (void) {
     mpe_config_init ();
     physics_world w1, w2;

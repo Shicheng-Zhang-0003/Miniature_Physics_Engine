@@ -5,7 +5,6 @@
  * read is_debug_mode/is_mouse_locked etc without pulling gtk/gtk.h.
  * UI-only event handlers remain in input_control.h (GTK-dependent). */
 #include <stdbool.h>
-
 typedef struct {
     bool w_key_pressed, a_key_pressed, s_key_pressed, d_key_pressed, space_key_pressed, shift_key_pressed,
         escape_key_pressed, f_key_pressed;
@@ -34,5 +33,4 @@ typedef struct {
     bool suppress_mouse_delta;
     int marked_joint_object_index;
 } input_status;
-
 #endif /* input_state_h */

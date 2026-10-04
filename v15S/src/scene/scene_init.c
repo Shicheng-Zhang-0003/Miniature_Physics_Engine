@@ -18,25 +18,20 @@
 #include <stdbool.h>
 #include <math.h>
 #include <string.h>
-
 extern input_status main_inputs;
-
 /* Body storage and the ID allocator live in the primary world (retired:
  * file-scope (physics_world_get_primary()->bodies)/(physics_world_get_primary()->body_count)/(physics_world_get_primary()->body_capacity)/next_object_id).
  * These helpers are primary-world shims (signatures unchanged) so GUI
  * callers keep working during and after the migration. */
-
 static void scene_ensure_primary (void) {
     physics_world *world = physics_world_get_primary ();
     if (!world->bodies) {
         physics_world_init (world);
     }
 }
-
 void scene_allocate_pool (void) {
     scene_ensure_primary ();
 }
-
 uint32_t scene_allocate_object_id (void) {
     physics_world *world = physics_world_get_primary ();
     scene_ensure_primary ();
@@ -45,7 +40,6 @@ uint32_t scene_allocate_object_id (void) {
     }
     return world->next_object_id++;
 }
-
 void scene_note_loaded_id (uint32_t object_id) {
     /* 0 is never a valid body id; UINT32_MAX cannot advance further. */
     if ((object_id == 0) || (object_id == 0xFFFFFFFFu)) {
@@ -56,7 +50,6 @@ void scene_note_loaded_id (uint32_t object_id) {
         world->next_object_id = object_id + 1;
     }
 }
-
 void scene_assign_new_identity (int object_index) {
     if ((object_index < 0) || (object_index >= (physics_world_get_primary ()->body_count))) {
         return;
@@ -64,7 +57,6 @@ void scene_assign_new_identity (int object_index) {
     (physics_world_get_primary ()->bodies)[object_index].object_id = scene_allocate_object_id ();
     (physics_world_get_primary ()->bodies)[object_index].object_generation = 1;
 }
-
 int scene_ensure_pool_capacity (int required_capacity) {
     /* Growable pools: grow on demand to the compile-time ceiling. */
     if (required_capacity <= 0) {
@@ -84,72 +76,56 @@ int scene_ensure_pool_capacity (int required_capacity) {
     }
     return 1;
 }
-
 /* Spawn-overlap probe: routed through the shape registry so custom
  * shapes separate correctly too (replaces the 3x3 inline chain). */
 static bool a3_spawn_collision_dispatch (rigidbody *rigid_body_a, rigidbody *rigid_body_b,
                                          collision_data *collision_output) {
     return mpe_shape_dispatch (physics_world_get_primary (), rigid_body_a, rigid_body_b, collision_output);
 }
-
 static void scene_resolve_spawn_overlap (int new_object_index) {
     if ((new_object_index < 0) || (new_object_index >= (physics_world_get_primary ()->body_count))) {
         return;
     }
-
     rigidbody *new_body = &(physics_world_get_primary ()->bodies)[new_object_index];
     if (new_body->static_state) {
         return;
     }
-
     const int max_attempts = g_cfg.spawner.overlap_max_attempts; /* MPE_TASK_32 */
     const float overlap_threshold = g_cfg.spawner.overlap_thresh; /* MPE_TASK_32 */
-
     for (int attempt = 0; attempt < max_attempts; attempt++) {
         bool overlap_found = false;
-
         for (int other_index = 0; other_index < (physics_world_get_primary ()->body_count); other_index++) {
             if (other_index == new_object_index) {
                 continue;
             }
-
             rigidbody *other_body = &(physics_world_get_primary ()->bodies)[other_index];
             collision_data overlap_collision = {0};
-
             if (!a3_spawn_collision_dispatch (new_body, other_body, &overlap_collision)) {
                 continue;
             }
-
             float max_depth = 0.0f;
-
             for (int contact_index = 0; contact_index < overlap_collision.contact_count; contact_index++) {
                 float depth = overlap_collision.contacts[contact_index].penetration;
                 if (depth > max_depth) {
                     max_depth = depth;
                 }
             }
-
             if (max_depth <= overlap_threshold) {
                 continue;
             }
-
             overlap_found = true;
-
             float normal_length_squared = vector3_length_squared (overlap_collision.normal_vector);
             vector3 separation_normal;
-
             if ((!isfinite (normal_length_squared)) || (normal_length_squared < 0.000001f)) {
                 separation_normal = (vector3){0.0f, 1.0f, 0.0f};
             } else {
                 separation_normal =
                     vector3_scaling (overlap_collision.normal_vector, 1.0f / sqrtf (normal_length_squared));
             }
-
             float move_distance = (max_depth - overlap_threshold) + 0.005f;
             if (move_distance > 1.0f) {
                 move_distance = 1.0f;
             }
-
             if (overlap_collision.object_a == new_body) {
                 new_body->position =
                     vector3_subtraction (new_body->position, vector3_scaling (separation_normal, move_distance));
@@ -157,17 +133,14 @@ static void scene_resolve_spawn_overlap (int new_object_index) {
                 new_body->position =
                     vector3_addition (new_body->position, vector3_scaling (separation_normal, move_distance));
             }
-
             rigidbody_wake (new_body);
         }
-
         if (!overlap_found) {
             break;
         }
     }
 }
 /* MPE_TASK_20B_SPAWN_SEPARATION_END */
-
 int scene_add_object (float radius, float mass, vector3 initial_position) {
     scene_allocate_pool ();
     physics_world *world = physics_world_get_primary ();
@@ -192,7 +165,6 @@ int scene_add_object (float radius, float mass, vector3 initial_position) {
     scene_resolve_spawn_overlap (current_object_index); /* MPE_TASK_20B_SPAWN_RESOLVE_CALL */
     return current_object_index;
 }
-
 int scene_add_cube (vector3 position, vector3 half_extensions, float mass) {
     scene_allocate_pool ();
     physics_world *cworld = physics_world_get_primary ();
@@ -216,7 +188,6 @@ int scene_add_cube (vector3 position, vector3 half_extensions, float mass) {
     scene_resolve_spawn_overlap (current_object_index); /* MPE_TASK_20B_SPAWN_RESOLVE_CALL */
     return current_object_index;
 }
-
 int scene_add_cylinder (float radius, float half_length, float mass, vector3 initial_position) {
     scene_allocate_pool ();
     physics_world *yworld = physics_world_get_primary ();
@@ -240,7 +211,6 @@ int scene_add_cylinder (float radius, float half_length, float mass, vector3 ini
     scene_resolve_spawn_overlap (current_object_index);
     return current_object_index;
 }
-
 void scene_init_default (void) {
     /* DESPOT-2026-09-29: the actual site of the bug.
      *
@@ -269,12 +239,10 @@ void scene_init_default (void) {
     int object_grey_index = scene_add_object (2.0f, 0.0f, (vector3){0.0f, 2.0f, 0.0f});
     (physics_world_get_primary ()->bodies)[object_grey_index].colour = (vector3){0.8f, 0.8f, 0.8f};
 }
-
 void scene_remove_object_by_index (int object_index) {
     if ((object_index < 0) || (object_index >= (physics_world_get_primary ()->body_count))) {
         return;
     }
-
     uint32_t previous_selected_id = selected_object_id; /* A3_PATCH_08_SELECTION_ID */
     physics_world *world = physics_world_get_primary ();
     /* FIX-AUDIT-DESPOT: capture the doomed id BEFORE the memmove below.
@@ -291,20 +259,16 @@ void scene_remove_object_by_index (int object_index) {
         }
     }
     contact_cache_clear (world);
-
     for (int i = object_index; i < (physics_world_get_primary ()->body_count) - 1; i++) {
         (physics_world_get_primary ()->bodies)[i] = (physics_world_get_primary ()->bodies)[i + 1];
         (physics_world_get_primary ()->bodies)[i].body_index = i;
     }
-
     (physics_world_get_primary ()->body_count) -= 1;
     physics_world_bump_revision (physics_world_get_primary ());
-
     if (previous_selected_id == 0) {
         clear_selection ();
     } else {
         int refreshed_selection_index = scene_find_object_index_by_id (previous_selected_id);
-
         if (refreshed_selection_index < 0) {
             clear_selection ();
             main_inputs.object_menu_level = 0;
@@ -313,36 +277,29 @@ void scene_remove_object_by_index (int object_index) {
             selected_object_id = previous_selected_id;
         }
     }
-
     if (main_inputs.marked_joint_object_index == object_index) {
         main_inputs.marked_joint_object_index = -1;
     } else if (main_inputs.marked_joint_object_index > object_index) {
         main_inputs.marked_joint_object_index -= 1;
     }
-
     if ((selected_object < 0) || (selected_object >= (physics_world_get_primary ()->body_count))) {
         main_inputs.object_menu_level = 0;
     }
 }
-
 int scene_find_object_index_by_id (uint32_t object_id) {
     if (object_id == 0) {
         return -1;
     }
-
     for (int i = 0; i < (physics_world_get_primary ()->body_count); i++) {
         if ((physics_world_get_primary ()->bodies)[i].object_id == object_id) {
             return i;
         }
     }
-
     return -1;
 }
-
 bool scene_object_id_exists (uint32_t object_id) {
     return scene_find_object_index_by_id (object_id) >= 0;
 }
-
 rigidbody *scene_resolve_object_by_id (uint32_t object_id) {
     int object_index = scene_find_object_index_by_id (object_id);
     if (object_index < 0) {
@@ -350,14 +307,12 @@ rigidbody *scene_resolve_object_by_id (uint32_t object_id) {
     }
     return &(physics_world_get_primary ()->bodies)[object_index];
 }
-
 uint32_t scene_get_object_id_at_index (int object_index) {
     if ((object_index < 0) || (object_index >= (physics_world_get_primary ()->body_count))) {
         return 0;
     }
     return (physics_world_get_primary ()->bodies)[object_index].object_id;
 }
-
 void scene_ensure_friction_floor (void) {
     physics_world *world = physics_world_get_primary ();
     /* DESPOT-2026-10-01 (2nd order): the 60x60 slab fixed friction only
@@ -376,7 +331,6 @@ void scene_ensure_friction_floor (void) {
     world->static_plane_body.friction_static = 0.8f;
     world->static_plane_body.friction_kinetic = 0.7f;
 }
-
 void scene_spawn_stability_stack (void) {
     /* DESPOT-2026-10-01: F5/F6/F8 never created a floor. The stack rested on
      * the perfectly-plastic boundary clamp (zero friction, velocity kill, no
@@ -392,9 +346,7 @@ void scene_spawn_stability_stack (void) {
          * interface; split+depenetration ejected it as a launch transient.
          * 1.002 leaves a 2mm air gap — tight stack, no initial penetration. */
         float stack_y = 0.5f + (float) i * 1.002f;
-
         int spawned_object_index = scene_add_cube ((vector3){20.0f, stack_y, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
-
         if (spawned_object_index >= 0) {
             (physics_world_get_primary ()->bodies)[spawned_object_index].colour = (vector3){0.8f, 0.8f, 0.2f};
             (physics_world_get_primary ()->bodies)[spawned_object_index].velocity = vector3_zero ();
@@ -405,11 +357,9 @@ void scene_spawn_stability_stack (void) {
         }
     }
 }
-
 void scene_spawn_sleep_wake_test (void) {
     scene_ensure_friction_floor ();
     int target_object_index = scene_add_cube ((vector3){20.0f, 0.5f, 10.0f}, (vector3){0.5f, 0.5f, 0.5f}, 2.0f);
-
     if (target_object_index >= 0) {
         (physics_world_get_primary ()->bodies)[target_object_index].colour = (vector3){0.2f, 0.8f, 0.8f};
         (physics_world_get_primary ()->bodies)[target_object_index].velocity = vector3_zero ();
@@ -420,9 +370,7 @@ void scene_spawn_sleep_wake_test (void) {
         (physics_world_get_primary ()->bodies)[target_object_index].friction_static = 0.8f;
         (physics_world_get_primary ()->bodies)[target_object_index].friction_kinetic = 0.7f;
     }
-
     int projectile_object_index = scene_add_object (0.35f, 3.0f, (vector3){20.0f, 0.5f, 16.0f});
-
     if (projectile_object_index >= 0) {
         (physics_world_get_primary ()->bodies)[projectile_object_index].colour = (vector3){1.0f, 0.2f, 0.2f};
         (physics_world_get_primary ()->bodies)[projectile_object_index].velocity = (vector3){0.0f, 0.0f, -18.0f};
@@ -430,83 +378,64 @@ void scene_spawn_sleep_wake_test (void) {
         (physics_world_get_primary ()->bodies)[projectile_object_index].restitution = 0.0f;
     }
 }
-
 void scene_editor_torture_test (void) {
     printf ("[A3] Editor torture test: spawning jointed objects at x=-20\n");
-
     int object_a_index = scene_add_object (0.35f, 1.0f, (vector3){-20.0f, 2.0f, 0.0f});
     int object_b_index = scene_add_cube ((vector3){-17.0f, 2.0f, 0.0f}, (vector3){0.4f, 0.4f, 0.4f}, 1.5f);
     int object_c_index = scene_add_object (0.35f, 1.0f, (vector3){-14.0f, 2.0f, 0.0f});
-
     if ((object_a_index < 0) || (object_b_index < 0) || (object_c_index < 0)) {
         printf ("[A3] Editor torture test failed: could not spawn test objects.\n");
         return;
     }
-
     (physics_world_get_primary ()->bodies)[object_a_index].restitution = 0.0f;
     (physics_world_get_primary ()->bodies)[object_b_index].restitution = 0.0f;
     (physics_world_get_primary ()->bodies)[object_c_index].restitution = 0.0f;
-
     selected_object = object_b_index;
     main_inputs.object_menu_level = 1;
     main_inputs.marked_joint_object_index = object_a_index;
-
     float first_joint_length =
         vector3_length (vector3_subtraction ((physics_world_get_primary ()->bodies)[object_b_index].position,
                                              (physics_world_get_primary ()->bodies)[object_a_index].position));
-
     add_joint (physics_world_get_primary (), object_a_index, object_b_index, first_joint_length,
                g_cfg.joints.default_spring_k, g_cfg.joints.default_damping); /* MPE_TASK_31 */
     scene_remove_object_by_index (object_b_index);
-
     int shifted_object_c_index = object_c_index;
     if (shifted_object_c_index > object_b_index) {
         shifted_object_c_index--;
     }
-
     selected_object = object_a_index;
     main_inputs.object_menu_level = 1;
     main_inputs.marked_joint_object_index = shifted_object_c_index;
-
     if ((shifted_object_c_index >= 0) && (shifted_object_c_index < (physics_world_get_primary ()->body_count))) {
         float second_joint_length = vector3_length (
             vector3_subtraction ((physics_world_get_primary ()->bodies)[shifted_object_c_index].position,
                                  (physics_world_get_primary ()->bodies)[object_a_index].position));
-
         add_joint (physics_world_get_primary (), object_a_index, shifted_object_c_index, second_joint_length,
                    g_cfg.joints.default_spring_k, g_cfg.joints.default_damping); /* MPE_TASK_31 */
         scene_remove_object_by_index (shifted_object_c_index);
     }
-
     if ((object_a_index >= 0) && (object_a_index < (physics_world_get_primary ()->body_count))) {
         (physics_world_get_primary ()->bodies)[object_a_index].colour = (vector3){0.2f, 1.0f, 0.2f};
     }
-
     clear_selection ();
     main_inputs.object_menu_level = 0;
     main_inputs.marked_joint_object_index = -1;
     main_inputs.is_menu_open = false;
     main_inputs.spawner_menu_level = 0;
     main_inputs.velocity_menu_level = 0;
-
     printf (
         "[A3] Editor torture test complete: deleted jointed selected/marked objects; green survivor left at x=-20.\n");
 }
-
 void scene_spawn_stress_test (void) {
     scene_ensure_friction_floor ();
     broadphase_reset_overflow_counts (physics_world_get_primary ());
-
     int objects_to_spawn = 300;
-
     if ((physics_world_get_primary ()->body_count) + objects_to_spawn > mpe_max_bodies) {
         objects_to_spawn = mpe_max_bodies - (physics_world_get_primary ()->body_count);
     }
-
     if (objects_to_spawn <= 0) {
         return;
     }
-
     /* RESPONSIVENESS: stack each F8 batch ABOVE existing content. Pressing
      * F8 twice used to spawn the second 10x10x3 grid at the identical
      * y=5..10 coordinates while the first batch was still falling through
@@ -531,29 +460,22 @@ void scene_spawn_stress_test (void) {
             batch_base_y = top_y + 3.0f;
         }
     }
-
     int grid_width = 10;
     int grid_depth = 10;
-
     for (int i = 0; i < objects_to_spawn; i++) {
         int grid_x = i % grid_width;
         int grid_z = (i / grid_width) % grid_depth;
         int layer = i / (grid_width * grid_depth);
-
         float x = -9.0f + (float) grid_x * 2.0f;
         float z = -9.0f + (float) grid_z * 2.0f;
         float y = batch_base_y + (float) layer * 2.5f;
-
         float jitter = (float) (i % 7) * 0.05f - 0.15f;
-
         int spawned_object_index = -1;
-
         if ((i % 2) == 0) {
             spawned_object_index = scene_add_object (0.35f, 1.0f, (vector3){x, y, z});
         } else {
             spawned_object_index = scene_add_cube ((vector3){x, y, z}, (vector3){0.4f, 0.4f, 0.4f}, 1.5f);
         }
-
         if (spawned_object_index >= 0) {
             (physics_world_get_primary ()->bodies)[spawned_object_index].velocity = (vector3){jitter, -1.0f, -jitter};
             (physics_world_get_primary ()->bodies)[spawned_object_index].angular_velocity = vector3_zero ();
@@ -564,7 +486,6 @@ void scene_spawn_stress_test (void) {
         }
     }
 }
-
 /* MPE_TASK_13_LONG_RUN_SCENE_BEGIN */
 void scene_spawn_long_run_validation (void) {
     /* MPE_TASK_13_LONG_RUN_VALIDATION_SCENE */
@@ -575,7 +496,6 @@ void scene_spawn_long_run_validation (void) {
     main_inputs.is_menu_open = false;
     main_inputs.spawner_menu_level = 0;
     main_inputs.velocity_menu_level = 0;
-
     /* TRUTH (2026-09-23 TUI validation): the scene shipped WITHOUT any
      * frictional floor — bodies rested on the frictionless emergency
      * boundary clamp, so the opening transient's outward slide never damped
@@ -587,7 +507,6 @@ void scene_spawn_long_run_validation (void) {
      * a "normal inside the orange box, broken outside" cliff) restores the
      * documented dead-calm settle: 27/27 asleep, KE=0, run-max 0.0 at 60 s. */
     scene_ensure_friction_floor ();
-
     /* Stability stack: 10 cubes at x=20 (2mm air gap, no built-in overlap). */
     for (int i = 0; i < 10; i++) {
         float stack_y = 0.5f + (float) i * 1.002f;
@@ -601,7 +520,6 @@ void scene_spawn_long_run_validation (void) {
             (physics_world_get_primary ()->bodies)[spawned_object_index].friction_kinetic = 0.7f;
         }
     }
-
     /* Pile base: 3x3 cubes at x=-20. */
     for (int gx = 0; gx < 3; gx++) {
         for (int gz = 0; gz < 3; gz++) {
@@ -618,7 +536,6 @@ void scene_spawn_long_run_validation (void) {
             }
         }
     }
-
     /* Pile middle: 2x2 cubes. */
     for (int gx = 0; gx < 2; gx++) {
         for (int gz = 0; gz < 2; gz++) {
@@ -635,7 +552,6 @@ void scene_spawn_long_run_validation (void) {
             }
         }
     }
-
     /* Pile top: one cube. */
     int top_cube_index = scene_add_cube ((vector3){-20.0f, 2.48f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
     if (top_cube_index >= 0) {
@@ -646,7 +562,6 @@ void scene_spawn_long_run_validation (void) {
         (physics_world_get_primary ()->bodies)[top_cube_index].friction_static = 0.8f;
         (physics_world_get_primary ()->bodies)[top_cube_index].friction_kinetic = 0.7f;
     }
-
     /* A few resting spheres. */
     for (int i = 0; i < 3; i++) {
         int spawned_object_index = scene_add_object (0.35f, 1.0f, (vector3){-30.0f + (float) i * 3.0f, 0.35f, 8.0f});
@@ -661,7 +576,6 @@ void scene_spawn_long_run_validation (void) {
     }
 }
 /* MPE_TASK_13_LONG_RUN_SCENE_END */
-
 /* MPE_TASK_39_CONFIG_TORTURE_SCENE_BEGIN */
 void scene_spawn_config_torture_test (void) {
     /* Deterministic xorshift32 (fixed seed + run counter) instead of
@@ -727,7 +641,6 @@ void scene_spawn_config_torture_test (void) {
     fflush (stdout);
 }
 /* MPE_TASK_39_CONFIG_TORTURE_SCENE_END */
-
 void scene_clear (void) {
     (physics_world_get_primary ()->body_count) = 0;
     physics_world_bump_revision (physics_world_get_primary ());

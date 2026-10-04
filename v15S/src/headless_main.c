@@ -6,7 +6,6 @@
 #include "config/mpe_config.h"
 #include "core/physics_world.h"
 #include "core/det_math.h"
-
 int main (int argc, char *argv[]) {
     int ticks = (argc > 1) ? atoi (argv[1]) : 3600;
     /* FIX-AUDIT-DESPOT: pin FP state explicitly in the headless smoke path.

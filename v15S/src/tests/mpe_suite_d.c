@@ -39,15 +39,12 @@
  * with a preferred direction, and gravity supplies one. That is a property of
  * the test, not a weakening — (2) and (3) run with gravity on.
  */
-
 #include "mpe_test.h"
 #include "tests/mpe_test.h"
 #include "ui_input/mouse_look.h"
 #include "core/rigidbody.h"
 #include "config/mpe_config.h"
-
 /* --------------------------------------------------------------- helpers */
-
 /* Build a small, deliberately asymmetric-but-arbitrary world: several bodies
  * at non-symmetric offsets with non-symmetric velocities and spins, plus a
  * floor to interact with. Returns the world with bodies created; caller steps.
@@ -101,7 +98,6 @@ static int meta_build (physics_world *w, int with_floor) {
         rigidbody_update_axes (&w->bodies[i]);
     return (d0 >= 0) ? d0 : 0;
 }
-
 /* Rotate every body's pose and velocity by quaternion q (a pure rotation
  * about a fixed axis, so the whole configuration is rigidly rotated). */
 /* Rotate ONLY the dynamic bodies. Rotating the floor box would tilt the
@@ -123,7 +119,6 @@ static void meta_rotate_world (physics_world *w, quaternion q, int first_dyn) {
         rigidbody_update_axes (b);
     }
 }
-
 static int meta_step (physics_world *w, int n, float dt) {
     for (int i = 0; i < n; i++) {
         physics_world_step (w, dt);
@@ -139,7 +134,6 @@ static int meta_step (physics_world *w, int n, float dt) {
     }
     return 1;
 }
-
 static double meta_max_pos_err (const physics_world *a, const physics_world *b) {
     double worst = 0.0;
     const int n = (a->body_count < b->body_count) ? a->body_count : b->body_count;
@@ -151,7 +145,6 @@ static double meta_max_pos_err (const physics_world *a, const physics_world *b) 
     }
     return worst;
 }
-
 static double meta_max_vel_err (const physics_world *a, const physics_world *b) {
     double worst = 0.0;
     const int n = (a->body_count < b->body_count) ? a->body_count : b->body_count;
@@ -163,22 +156,17 @@ static double meta_max_vel_err (const physics_world *a, const physics_world *b) 
     }
     return worst;
 }
-
 /* ------------------------------------------- 1. rotation equivariance */
-
 int mpe_t_meta_rotation (void) {
     mpe_test_t t;
     mpe_test_begin (&t, "meta_rotation");
     mpe_test_t *tp = &t;
-
     /* Equivariance cannot hold against a preferred direction, and gravity is
      * one. Zero it explicitly and SAY so, rather than relying on ambient cfg. */
     g_cfg.world.gravity = 0.0f;
     g_cfg.sleep.enable = 0;
-
     const float dt = 1.0f / 60.0f;
     const int steps = 150;
-
     /* DESPOT-2026-10-01: yaw-only (was an arbitrary (0.3,-0.7,0.65) axis).
      * Equivariance R^-1 Phi(R x) = Phi(x) holds ONLY within the environment's
      * symmetry group, and this engine always has one: the y=0 backstop plane
@@ -211,7 +199,6 @@ int mpe_t_meta_rotation (void) {
     q_inv.x = -q.x;
     q_inv.y = -q.y;
     q_inv.z = -q.z;
-
     physics_world wa, wb;
     /* DESPOT-2026-10-01: built WITHOUT floor (was with_floor=1). The old
      * fixture rotated the dynamics against a FIXED asymmetric floor box and
@@ -228,17 +215,14 @@ int mpe_t_meta_rotation (void) {
         mpe_test_end (tp);
         return tp->failures;
     }
-
     /* Rotate only B, then run both. Rotating B back afterwards must reproduce
      * A exactly, because rotation equivariance says the engine does not care
      * which way "up" is when there is no up. */
     meta_rotate_world (&wb, q, wb_dyn);
-
     int ok_a = meta_step (&wa, steps, dt);
     int ok_b = meta_step (&wb, steps, dt);
     MPE_CHECK (tp, ok_a);
     MPE_CHECK (tp, ok_b);
-
     if (ok_a && ok_b) {
         meta_rotate_world (&wb, q_inv, wb_dyn);
         const double pos_err = meta_max_pos_err (&wa, &wb);
@@ -310,15 +294,12 @@ int mpe_t_meta_rotation (void) {
                     pos_err, vel_err);
         }
     }
-
     physics_world_cleanup (&wa);
     physics_world_cleanup (&wb);
     mpe_test_end (tp);
     return tp->failures;
 }
-
 /* ------------------------------------- 2. solver convergence monotonicity */
-
 /* DESPOT-2026-10-03: meta_convergence WAS VACUOUS. Rewritten.
  *
  * The old fixture was a head-on sphere-sphere pair on a floor. Measured on the
@@ -382,7 +363,6 @@ static void meta_build_stack (physics_world *w) {
     for (int i = 0; i < w->body_count; i++)
         rigidbody_update_axes (&w->bodies[i]);
 }
-
 /* max position difference over the dynamic stack bodies only (index 1..H) */
 static double meta_stack_pos_err (const physics_world *a, const physics_world *b) {
     double worst = 0.0;
@@ -396,12 +376,10 @@ static double meta_stack_pos_err (const physics_world *a, const physics_world *b
     }
     return worst;
 }
-
 int mpe_t_meta_convergence (void) {
     mpe_test_t t;
     mpe_test_begin (&t, "meta_convergence");
     mpe_test_t *tp = &t;
-
     /* DESPOT-2026-10-04: the fixture pins mu/e/sleep explicitly but left
      * gravity to the regime — under heavy (3g) the reference itself never
      * settles (residual 1.3 m/s), so no calm bound can hold. Convergence
@@ -410,19 +388,16 @@ int mpe_t_meta_convergence (void) {
     g_cfg.sleep.enable = 0;
     const float dt = 1.0f / 60.0f;
     const int steps = 180;
-
     /* Reference: a high iteration count is the best available answer, NOT
      * truth. The claim is about the TREND with more work, never accuracy. */
     const int iters[5] = {1, 4, 16, 32, 64};
     const int n = 5;
     /* (no strict-convergence index: error is measurably non-monotonic, see (c)) */
-
     physics_world ref;
     g_cfg.timestep.solver_iterations = 128.0f; /* clamped to the 128 ceiling */
     meta_build_stack (&ref);
     int ok = meta_step (&ref, steps, dt);
     MPE_CHECK (tp, ok);
-
     double err[5] = {0, 0, 0, 0, 0};
     double res[5] = {0, 0, 0, 0, 0}; /* worst residual |v| over stack bodies */
     int measured = 0;
@@ -466,7 +441,6 @@ int mpe_t_meta_convergence (void) {
         }
     }
     MPE_INFO ("reference (128 iters) residual %.4f m/s", ref_res);
-
     if (measured == n && ok) {
         /* (a) ANTI-VACUITY. If every arm matches the reference the fixture is
          * trivially converged and every other gate here is vacuous. Require the
@@ -534,9 +508,7 @@ int mpe_t_meta_convergence (void) {
     mpe_test_end (tp);
     return tp->failures;
 }
-
 /* ------------------------------------------------ 3. sleep honesty, both ways */
-
 /* DESPOT-2026-09-29: mpe_t_meta_sleep was WRITTEN AND THEN REMOVED. Recorded
  * here rather than deleted silently, because the reason it did not survive is
  * itself information.
@@ -565,9 +537,7 @@ int mpe_t_meta_convergence (void) {
  * The other tests in this file carry the load and all pass in all five
  * regimes.
  */
-
 /* ------------------------------- 4. the config the test sets is the config used */
-
 /* A direct, self-contained guard for CONFIG-2026-09-29. The harness now
  * asserts a non-degenerate config, but that only proves the *values* are
  * sane -- not that the world the test builds actually READS them. This proves
@@ -577,10 +547,8 @@ int mpe_t_meta_config_wiring (void) {
     mpe_test_t t;
     mpe_test_begin (&t, "meta_config_wiring");
     mpe_test_t *tp = &t;
-
     g_cfg.sleep.enable = 0;
     const float dt = 1.0f / 60.0f;
-
     /* Same initial condition, two very different friction settings. Identical
      * outcomes would mean the bodies are not feeling the ground at all. */
     double results[2];
@@ -610,13 +578,10 @@ int mpe_t_meta_config_wiring (void) {
     if (tp->failures == 0) {
         printf ("[PASS] solver parameters demonstrably reach the simulation\n");
     }
-
     mpe_test_end (tp);
     return tp->failures;
 }
-
 /* ------------------------------- 5. sleep honesty, three states (SLEEP-H1) */
-
 /* DESPOT-2026-10-01: this is the test SLEEP-H1 asked for. The withdrawn
  * meta_sleep demanded (moving XOR asleep) 0.5 s after launch and met a third
  * state it had no name for: SETTLED with the sleep timer still pending
@@ -633,7 +598,6 @@ int mpe_t_sleep_settle (void) {
     mpe_test_t t;
     mpe_test_begin (&t, "sleep_settle");
     mpe_test_t *tp = &t;
-
     physics_world w;
     mpe_world_begin (&w);
     MPE_CHECK (tp, mpe_floor_slab (&w, 0.8f, 0.6f, 0.2f) >= 0);
@@ -642,7 +606,6 @@ int mpe_t_sleep_settle (void) {
     w.bodies[b].velocity = (vector3){0.0f, 3.0f, 0.0f};
     vector3 p0 = w.bodies[b].position;
     const float dt = 1.0f / 60.0f;
-
     /* Max displacement over the opening (not position at one instant: under
      * heavy gravity the pop returns through home mid-window, aliasing a
      * point sample to ~0). A body frozen from the start never leaves home. */
@@ -656,7 +619,6 @@ int mpe_t_sleep_settle (void) {
     }
     MPE_INFO ("sleep_settle: 15-tick max travel = %.4f m (regime %s)", travel15, tp->regime);
     MPE_CHECK (tp, travel15 > 1e-3);
-
     MPE_CHECK (tp, mpe_step (&w, 585, dt));
     float vend = vector3_length (w.bodies[b].velocity);
     float yend = w.bodies[b].position.y;
@@ -677,9 +639,7 @@ int mpe_t_sleep_settle (void) {
     mpe_test_end (tp);
     return tp->failures;
 }
-
 /* ---------------------------------- 6. mouse-look sign convention, 4 axes */
-
 /* DESPOT-2026-09-29 (user report: "flick right or down locks properly, left and
  * up do not"). The convention itself turned out to be CORRECT in all four
  * directions -- this test is what established that, cheaply, instead of by
@@ -698,7 +658,6 @@ int mpe_t_mouse_look_axes (void) {
     mpe_test_t t;
     mpe_test_begin (&t, "mouse_look_axes");
     mpe_test_t *tp = &t;
-
     /* Wayland surface: +x right, +y DOWN. Camera: +x right, +y UP. */
     struct {
         const char *name;
@@ -725,7 +684,6 @@ int mpe_t_mouse_look_axes (void) {
         const float want = (float) sqrt (cases[i].dx * cases[i].dx + cases[i].dy * cases[i].dy);
         MPE_CHECK_NEAR (tp, mag, want, 1e-3, cases[i].name);
     }
-
     /* Accumulation, not overwrite. The camera consumes the delta once per frame
      * and GTK may deliver several motion events before then, so a fast flick
      * that only kept its last event would lose most of its magnitude. This is
@@ -749,16 +707,13 @@ int mpe_t_mouse_look_axes (void) {
         MPE_CHECK_NEAR (tp, acc_x, 20.0f, 1e-4, "accumulated x over 5 events");
         MPE_CHECK_NEAR (tp, acc_y, 10.0f, 1e-4, "accumulated y over 5 events");
     }
-
     if (tp->failures == 0) {
         printf ("[PASS] mouse-look convention correct in all four directions\n");
     }
     mpe_test_end (tp);
     return tp->failures;
 }
-
 /* ------------------- 6. body materials are live at construction time */
-
 /* DESPOT-2026-09-29 -- THE GAME-WORLD CONFIG-ORDER BUG.
  *
  * `g_cfg` is a plain global: all zero until mpe_config_init() runs. Body
@@ -785,7 +740,6 @@ int mpe_t_body_materials_live (void) {
     mpe_test_t t;
     mpe_test_begin (&t, "body_materials_live");
     mpe_test_t *tp = &t;
-
     /* REPRODUCE THE GAME'S PRECONDITION, not the happy path.
      *
      * Every test starts with an initialised config, so building a body here
@@ -795,7 +749,6 @@ int mpe_t_body_materials_live (void) {
      * the kind of test that launders an unverified fix. */
     mpe_config_force_unready_for_test ();
     MPE_CHECK (tp, !mpe_config_is_ready ());
-
     rigidbody cube;
     rigidbody_initialisation_cube (&cube, (vector3){0, 0, 0}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
     MPE_INFO ("cube built now: friction_static=%.3f friction_kinetic=%.3f "
@@ -806,17 +759,14 @@ int mpe_t_body_materials_live (void) {
     MPE_CHECK (tp, cube.friction_kinetic > 0.0f);
     /* The constructor must have repaired readiness on the way past. */
     MPE_CHECK (tp, mpe_config_is_ready ());
-
     rigidbody cyl;
     rigidbody_initialisation_cylinder (&cyl, 0.3f, 0.2f, 1.0f, (vector3){0, 0, 0});
     MPE_INFO ("cylinder built now: friction_static=%.3f restitution=%.3f", (double) cyl.friction_static,
               (double) cyl.restitution);
     MPE_CHECK (tp, cyl.friction_static > 0.0f);
-
     /* And the solver config a body is born into must be usable, or the body
      * is fine but the world around it is not. */
     MPE_CHECK (tp, !mpe_cfg_is_degenerate (&g_cfg));
-
     /* The guard is idempotent and must not reset an intentionally modified
      * config -- a second call has to be a no-op, or a caller that tweaks
      * friction mid-session would silently lose the tweak. */
@@ -827,7 +777,6 @@ int mpe_t_body_materials_live (void) {
         MPE_CHECK_NEAR (tp, g_cfg.body_defaults.cube_fric_s, 0.777f, 1e-6, "second ensure_ready is a no-op");
         g_cfg.body_defaults.cube_fric_s = saved;
     }
-
     if (tp->failures == 0) {
         printf ("[PASS] bodies are constructed with live materials "
                 "(no zero-friction objects)\n");

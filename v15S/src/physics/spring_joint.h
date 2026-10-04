@@ -5,10 +5,8 @@
 #include "../core/rigidbody.h"
 #include "../core/physics_world.h"
 #include "spring_joint_types.h"
-
 #include <stdint.h>
 #include <epoxy/gl.h>
-
 /* Spring pool lives in physics_world (per-world state). The functions below
  * take the owning world explicitly; legacy single-world callers pass the
  * primary world. No file-scope pool remains. */

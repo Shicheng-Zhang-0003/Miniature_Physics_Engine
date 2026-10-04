@@ -1,6 +1,5 @@
 /* GTK4 port (v15S). The GTK3 body was removed 2026-09-29; git history
  * holds the v15R3 GTK3 engine. */
-
 /* MPE_TASK_V15R2_MICROVIM_IMPL_BEGIN */
 #include "../mpe_engine.h"
 #include "microvim.h"
@@ -11,11 +10,9 @@
 #include <stdint.h>
 #include <ctype.h>
 #include <gdk/gdkkeysyms.h>
-
 #define mv_view_height 40
 #define mv_undo_depth 64
 #define mv_max_line_len 4096
-
 /* ------------------------------------------------------------------ */
 /* State                                                                */
 /* ------------------------------------------------------------------ */
@@ -24,7 +21,6 @@ typedef struct {
     int line_count;
     int line_capacity;
 } mv_snapshot;
-
 static struct {
     char **lines;
     int line_count;
@@ -52,7 +48,6 @@ static struct {
     int undo_top;
     int redo_top;
 } mv;
-
 /* ------------------------------------------------------------------ */
 /* Line buffer helpers                                                  */
 /* ------------------------------------------------------------------ */
@@ -65,7 +60,6 @@ static void mv_clear_lines (void) {
     }
     mv.line_count = 0;
 }
-
 static bool mv_ensure_capacity (int needed) {
     if (needed < 0 || (size_t) needed > SIZE_MAX / sizeof (*mv.lines))
         return false;
@@ -88,7 +82,6 @@ static bool mv_ensure_capacity (int needed) {
     mv.line_capacity = new_cap;
     return true;
 }
-
 static bool mv_set_line (int index, const char *text) {
     if (index < 0)
         return false;
@@ -104,7 +97,6 @@ static bool mv_set_line (int index, const char *text) {
     mv.lines[index] = replacement;
     return true;
 }
-
 static bool mv_insert_line (int index, const char *text) {
     if (index < 0 || index > mv.line_count || mv.line_count == INT_MAX)
         return false;
@@ -121,7 +113,6 @@ static bool mv_insert_line (int index, const char *text) {
     mv.line_count++;
     return true;
 }
-
 static void mv_delete_line (int index) {
     if ((index < 0) || (index >= mv.line_count)) {
         return;
@@ -137,14 +128,12 @@ static void mv_delete_line (int index) {
             microvim_close ();
     }
 }
-
 static int mv_line_len (int row) {
     if ((row < 0) || (row >= mv.line_count) || !mv.lines || !mv.lines[row]) {
         return 0;
     }
     return (int) strlen (mv.lines[row]);
 }
-
 static void mv_clamp_cursor (void) {
     if (mv.line_count <= 0) {
         mv.cursor_row = 0;
@@ -165,7 +154,6 @@ static void mv_clamp_cursor (void) {
         mv.cursor_col = 0;
     }
 }
-
 /* ------------------------------------------------------------------ */
 /* Undo                                                                 */
 /* ------------------------------------------------------------------ */
@@ -179,14 +167,12 @@ static void mv_snapshot_clear (mv_snapshot *snap) {
     }
     *snap = (mv_snapshot){0};
 }
-
 static void mv_clear_undo_history (void) {
     for (int i = 0; i < mv_undo_depth; i++)
         mv_snapshot_clear (&mv.undo_stack[i]);
     mv.undo_top = 0;
     mv.redo_top = 0;
 }
-
 static bool mv_undo_push (void) {
     if (mv.line_count <= 0 || !mv.lines)
         return false;
@@ -220,7 +206,6 @@ static bool mv_undo_push (void) {
     mv.redo_top = mv.undo_top;
     return true;
 }
-
 static bool mv_restore_snapshot (const mv_snapshot *snap) {
     if (!snap || snap->line_count <= 0 || !snap->lines)
         return false;
@@ -247,7 +232,6 @@ static bool mv_restore_snapshot (const mv_snapshot *snap) {
     free (restored);
     return true;
 }
-
 static void mv_undo_perform (void) {
     if (mv.undo_top <= 0) {
         return;
@@ -259,7 +243,6 @@ static void mv_undo_perform (void) {
     mv.modified = true;
     mv_clamp_cursor ();
 }
-
 static void mv_redo_perform (void) {
     if (mv.undo_top >= mv.redo_top) {
         return;
@@ -271,7 +254,6 @@ static void mv_redo_perform (void) {
     mv.modified = true;
     mv_clamp_cursor ();
 }
-
 /* ------------------------------------------------------------------ */
 /* File I/O                                                             */
 /* ------------------------------------------------------------------ */
@@ -321,7 +303,6 @@ static bool mv_load_file (const char *filename) {
     }
     return true;
 }
-
 static bool mv_save_file (void) {
     char backup_path[560];
     snprintf (backup_path, sizeof (backup_path), "%s.bak", mv.filename);
@@ -367,14 +348,12 @@ static bool mv_save_file (void) {
     mv.modified = false;
     return true;
 }
-
 /* ------------------------------------------------------------------ */
 /* Word motion                                                          */
 /* ------------------------------------------------------------------ */
 static bool mv_is_word_char (char c) {
     return isalnum ((unsigned char) c) || (c == '_');
 }
-
 static void mv_word_forward (void) {
     int row = mv.cursor_row;
     int col = mv.cursor_col;
@@ -398,7 +377,6 @@ static void mv_word_forward (void) {
     mv.cursor_col = col;
     mv_clamp_cursor ();
 }
-
 static void mv_word_backward (void) {
     int row = mv.cursor_row;
     int col = mv.cursor_col;
@@ -421,7 +399,6 @@ static void mv_word_backward (void) {
     mv.cursor_col = col;
     mv_clamp_cursor ();
 }
-
 static void mv_word_end (void) {
     int row = mv.cursor_row;
     int col = mv.cursor_col;
@@ -448,7 +425,6 @@ static void mv_word_end (void) {
     mv.cursor_col = col;
     mv_clamp_cursor ();
 }
-
 /* ------------------------------------------------------------------ */
 /* Search                                                               */
 /* ------------------------------------------------------------------ */
@@ -524,7 +500,6 @@ static void mv_search_execute (bool forward) {
     }
     free (pattern_lower);
 }
-
 /* ------------------------------------------------------------------ */
 /* Editing operations                                                   */
 /* ------------------------------------------------------------------ */
@@ -542,7 +517,6 @@ static void mv_delete_char_under_cursor (void) {
     mv.modified = true;
     mv_clamp_cursor ();
 }
-
 static void mv_delete_char_before_cursor (void) {
     int col = mv.cursor_col;
     if (col <= 0) {
@@ -556,7 +530,6 @@ static void mv_delete_char_before_cursor (void) {
     mv.cursor_col--;
     mv.modified = true;
 }
-
 static void mv_delete_line_op (void) {
     if (!mv_undo_push ())
         return;
@@ -569,7 +542,6 @@ static void mv_delete_line_op (void) {
     mv.modified = true;
     mv_clamp_cursor ();
 }
-
 static void mv_delete_to_end (void) {
     int row = mv.cursor_row;
     int col = mv.cursor_col;
@@ -588,7 +560,6 @@ static void mv_delete_to_end (void) {
     mv.modified = true;
     mv_clamp_cursor ();
 }
-
 static void mv_delete_to_start (void) {
     int row = mv.cursor_row;
     int col = mv.cursor_col;
@@ -608,7 +579,6 @@ static void mv_delete_to_start (void) {
     mv.cursor_col = 0;
     mv.modified = true;
 }
-
 static void mv_yank_line (void) {
     if (mv.yank_text) {
         free (mv.yank_text);
@@ -616,7 +586,6 @@ static void mv_yank_line (void) {
     mv.yank_text = term_strdup (mv.lines[mv.cursor_row]);
     mv.yank_is_linewise = true;
 }
-
 static void mv_paste (bool after) {
     if (!mv.yank_text) {
         return;
@@ -651,7 +620,6 @@ static void mv_paste (bool after) {
     mv.modified = true;
     mv_clamp_cursor ();
 }
-
 static void mv_join_lines (void) {
     if (mv.cursor_row >= mv.line_count - 1) {
         return;
@@ -670,7 +638,6 @@ static void mv_join_lines (void) {
     mv.modified = true;
     mv_clamp_cursor ();
 }
-
 static void mv_insert_char (char c) {
     int row = mv.cursor_row;
     int col = mv.cursor_col;
@@ -690,7 +657,6 @@ static void mv_insert_char (char c) {
     mv.cursor_col++;
     mv.modified = true;
 }
-
 static void mv_insert_newline (void) {
     int row = mv.cursor_row;
     int col = mv.cursor_col;
@@ -705,7 +671,6 @@ static void mv_insert_newline (void) {
     mv.cursor_col = 0;
     mv.modified = true;
 }
-
 static void mv_backspace (void) {
     if (mv.cursor_col > 0) {
         mv_delete_char_before_cursor ();
@@ -725,7 +690,6 @@ static void mv_backspace (void) {
         mv.modified = true;
     }
 }
-
 /* ------------------------------------------------------------------ */
 /* Command mode execution                                               */
 /* ------------------------------------------------------------------ */
@@ -875,7 +839,6 @@ setting a flag that microvim_render will pick up */
     mv.command_len = 0;
     mv.command_buf[0] = '\0';
 }
-
 /* ------------------------------------------------------------------ */
 /* Key handling                                                         */
 /* ------------------------------------------------------------------ */
@@ -883,7 +846,6 @@ static void mv_handle_normal_key (guint keyval, guint keycode, GdkModifierType s
     (void) keycode;
     unsigned key = keyval;
     bool ctrl = (state & GDK_CONTROL_MASK) != 0;
-
     if (ctrl) {
         if (key == GDK_KEY_f) {
             mv.cursor_row += mv_view_height;
@@ -911,7 +873,6 @@ static void mv_handle_normal_key (guint keyval, guint keycode, GdkModifierType s
         }
         return;
     }
-
     if (mv.pending_op) {
         char op = mv.pending_op;
         mv.pending_op = 0;
@@ -978,7 +939,6 @@ static void mv_handle_normal_key (guint keyval, guint keycode, GdkModifierType s
         }
         return;
     }
-
     switch (key) {
     case GDK_KEY_h:
     case GDK_KEY_Left:
@@ -1190,7 +1150,6 @@ static void mv_handle_normal_key (guint keyval, guint keycode, GdkModifierType s
         break;
     }
 }
-
 static void mv_handle_insert_key (guint keyval, guint keycode, GdkModifierType state) {
     (void) keycode;
     (void) state;
@@ -1271,7 +1230,6 @@ static void mv_handle_insert_key (guint keyval, guint keycode, GdkModifierType s
         mv_insert_char ((char) key);
     }
 }
-
 static void mv_handle_command_key (guint keyval, guint keycode, GdkModifierType state) {
     (void) keycode;
     (void) state;
@@ -1298,7 +1256,6 @@ static void mv_handle_command_key (guint keyval, guint keycode, GdkModifierType 
         mv.command_buf[mv.command_len] = '\0';
     }
 }
-
 static void mv_handle_search_key (guint keyval, guint keycode, GdkModifierType state) {
     (void) keycode;
     (void) state;
@@ -1324,7 +1281,6 @@ static void mv_handle_search_key (guint keyval, guint keycode, GdkModifierType s
         mv.search_buf[mv.search_len] = '\0';
     }
 }
-
 /* ------------------------------------------------------------------ */
 /* Rendering                                                            */
 /* ------------------------------------------------------------------ */
@@ -1343,14 +1299,12 @@ void microvim_ensure_tags (GtkTextBuffer *buffer) {
                                     NULL);
     }
 }
-
 void microvim_render (GtkTextBuffer *buffer) {
     if (!buffer) {
         return;
     }
     microvim_ensure_tags (buffer);
     gtk_text_buffer_set_text (buffer, "", -1);
-
     /* Adjust scroll */
     if (mv.cursor_row < mv.scroll_offset) {
         mv.scroll_offset = mv.cursor_row;
@@ -1361,10 +1315,8 @@ void microvim_render (GtkTextBuffer *buffer) {
     if (mv.scroll_offset < 0) {
         mv.scroll_offset = 0;
     }
-
     GtkTextIter end_iter;
     char line_buf[mv_max_line_len + 64];
-
     for (int view_line = 0; view_line < mv_view_height - 2; view_line++) {
         int row = mv.scroll_offset + view_line;
         if (row < mv.line_count) {
@@ -1405,7 +1357,6 @@ void microvim_render (GtkTextBuffer *buffer) {
         gtk_text_buffer_get_end_iter (buffer, &end_iter);
         gtk_text_buffer_insert (buffer, &end_iter, "\n", -1);
     }
-
     /* Status bar */
     char status_buf[1024];
     const char *mode_text = "";
@@ -1416,7 +1367,6 @@ void microvim_render (GtkTextBuffer *buffer) {
     } else if (mv.mode == mv_search) {
         mode_text = mv.search_forward ? "/" : "?";
     }
-
     if (mv.mode == mv_command) {
         snprintf (status_buf, sizeof (status_buf), ":%s", mv.command_buf);
     } else if (mv.mode == mv_search) {
@@ -1439,7 +1389,6 @@ void microvim_render (GtkTextBuffer *buffer) {
     gtk_text_buffer_get_end_iter (buffer, &end_iter);
     gtk_text_buffer_insert_with_tags_by_name (buffer, &end_iter, status_buf, -1,
                                               (mv.mode == mv_insert) ? "mv_insert_label" : "mv_status", NULL);
-
     /* Place cursor */
     GtkTextIter cursor_iter;
     int target_line = mv.cursor_row - mv.scroll_offset;
@@ -1453,7 +1402,6 @@ void microvim_render (GtkTextBuffer *buffer) {
     gtk_text_buffer_get_iter_at_line_offset (buffer, &cursor_iter, target_line, col_offset);
     gtk_text_buffer_place_cursor (buffer, &cursor_iter);
 }
-
 /* ------------------------------------------------------------------ */
 /* Public API                                                           */
 /* ------------------------------------------------------------------ */
@@ -1463,7 +1411,6 @@ mv_mode microvim_get_mode (void) {
 bool microvim_is_active (void) {
     return mv.active;
 }
-
 void microvim_open (const char *filename) {
     microvim_close ();
     memset (&mv, 0, sizeof (mv));
@@ -1499,7 +1446,6 @@ void microvim_open (const char *filename) {
         mv.show_line_numbers = true;
     }
 }
-
 void microvim_close (void) {
     mv_clear_lines ();
     if (mv.lines) {
@@ -1523,7 +1469,6 @@ void microvim_close (void) {
     mv.active = false;
     mv.quit_requested = false;
 }
-
 void microvim_handle_key (guint keyval, guint keycode, GdkModifierType state) {
     if (!mv.active) {
         return;
