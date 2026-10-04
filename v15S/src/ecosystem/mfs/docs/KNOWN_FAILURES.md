@@ -294,6 +294,9 @@ never NaN). Gated behaviors (single-mode bursts ≤180 ticks) stay ≤1.4°.
   transmit) would remove peel overspeed structurally, but it retunes all
   drive authority and the suite above proves this loop is gate-calibrated
   and fragile — budget for a full re-baseline pass before attempting.
+- Governor foldback (ramp to zero across the top 15.5% instead of the
+  diode bang) tried 2026-10-04: delayed the flip (1530 vs 1380 ticks) but
+  did not prevent it. Reverted; the diode stays by design (see robot.c).
 
 ## [DESPOT-2026-10-02] Full mathematical / programming / operational audit
 

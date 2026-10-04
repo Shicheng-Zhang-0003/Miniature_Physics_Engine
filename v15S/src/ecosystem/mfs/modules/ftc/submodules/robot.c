@@ -1036,6 +1036,17 @@ void ftc_robot_update(physics_world *world, ftc_robot *robot, float dt) {
             } else if (wfree > 0.0f && torque < 0.0f && wheel_speed < -wfree) {
                 torque = 0.0f;
             }
+            /* DESPOT-2026-10-04 (governor foldback TRIED AND REVERTED):
+             * ramping torque to zero across [wfree/1.155, wfree] instead of
+             * the diode bang delayed the harsh-abuse tilt blowup slightly
+             * (first 10° at the same tick, flip at 1530 vs 1380) but did not
+             * prevent it — the pump is not (only) the governor edge (also
+             * tried: reaction projection, beta 0.3, mount-frame axle,
+             * observer freeze, proportional cut, finer slew; cut also moved
+             * tank/drive gates and was reverted for that). The diode stays
+             * by design (see above); the blowup is recorded as a frontier
+             * in KNOWN_FAILURES.md, proven pre-existing on the fully
+             * pre-change tree. */
         }
         /* MFS_145_IDLE_BRAKE: back-EMF braking is a damper — it brings a coasting
          * wheel to rest and can never reverse it (no back-EMF once stopped).
