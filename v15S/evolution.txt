@@ -97,3 +97,8 @@ Despot-1004e: abuse-tilt frontier recorded (pre-existing, not a regression:
   (explicit publishes tau_exp_prev; post-idle strafe 0.24->1.85m),
   proportional-cut + axle-projection tried and REVERTED with numbers
   (cut moves tank/baselines; projection changes nothing). Full 234 green.
+
+Despot-1004f: live wheel-snap triage (watchdog + floor).
+  ftc_watchdog_tick reports mount jumps/tilt/NaN with build tag every
+  GUI frame (event-driven). Tile floor 20->60m (10 s drive-off matched
+  a live snap timeline; matches proven F10 slab, inside cell-span).

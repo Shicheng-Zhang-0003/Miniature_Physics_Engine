@@ -90,6 +90,9 @@ gboolean physics_step_increment(gpointer user_data_pointer) {
      * ftc-fleet robot 0 mecanum before the tick (commands persist through
      * the fleet pre_step). Silent no-op without bundle, pad, or robot. */
     gamepad_drive_tick();
+    /* Joint watchdog: event-driven mount/tilt/NaN evidence for live
+     * "wheel snapped" reports (see gamepad_drive.h). */
+    ftc_watchdog_tick();
 
     /* Menu handling */
     simulation_menu_dispatch(parent_window);

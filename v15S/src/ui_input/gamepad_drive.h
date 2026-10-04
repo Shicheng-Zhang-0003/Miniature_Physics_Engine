@@ -32,4 +32,11 @@ void gamepad_drive_tick(void);
 /* True while the pad holds live commands (for status/telemetry honesty). */
 int gamepad_drive_active(void);
 
+/* Joint watchdog: watches fleet robot 0 wheel mounts every GUI frame and
+ * reports discontinuities (mount jump = anchor integrity, tilt spikes,
+ * NaN) with a build tag, so a live "wheel snapped" report arrives with
+ * evidence instead of adjectives. Event-driven (rising edge, re-arms
+ * below half threshold); silent otherwise. */
+void ftc_watchdog_tick(void);
+
 #endif /* gamepad_drive_h */
