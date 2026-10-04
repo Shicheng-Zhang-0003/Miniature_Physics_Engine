@@ -82,7 +82,11 @@ void config_menu_key_press(int key_number) {
             config_menu_active_category = cat_ui;
             config_menu_level = 10 + cat_ui;
         } else if (key_number == 7) {
-            mpe_config_save("status/engine.cfg");
+            /* DESPOT-2026-10-04: guarded like menu-4 (see simulation_menu_dispatch). */
+            if (!mpe_config_save_guarded("status/engine.cfg")) {
+                event_log_push(2, "config save REFUSED (torture live) or FAILED");
+                fprintf(stderr, "[config-menu] save refused (torture live) or failed\n");
+            }
         } else if (key_number == 8) {
             mpe_config_reset_defaults();
             contact_cache_clear(physics_world_get_primary());

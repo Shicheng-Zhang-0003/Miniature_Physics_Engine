@@ -56,6 +56,45 @@ int long_run_validation_restore_config = 0;
  * F11 "runs without crash / without NaN or crash" — it never promised calm. */
 int long_run_validation_is_torture = 0;
 
+/* DESPOT-2026-10-04: in-memory clean-config snapshot. The file backup
+ * (status/engine.cfg.backup) is CWD-relative and can go missing between the
+ * F11 save and the restore (different CWD, deleted file, crashed run), and
+ * any of those left torture live in g_cfg with the exit-save publishing it
+ * as the next boot's defaults — the exact 2026-10-04 engine.cfg incident.
+ * A memcpy'd snapshot cannot go missing. */
+static mpe_config_t s_clean_cfg;
+static int s_clean_cfg_valid = 0;
+
+int long_run_validation_torture_live(void) {
+    return (long_run_validation_active && long_run_validation_is_torture) ||
+           (long_run_validation_is_torture != 0) || (long_run_validation_restore_config != 0);
+}
+
+void long_run_validation_snapshot_clean(void) {
+    s_clean_cfg = g_cfg;
+    s_clean_cfg_valid = 1;
+}
+
+void long_run_validation_cancel_restore(void) {
+    if (!long_run_validation_torture_live()) {
+        return;
+    }
+    if (s_clean_cfg_valid) {
+        g_cfg = s_clean_cfg;
+        fprintf(stderr, "[A3] torture state cancelled: clean config restored from memory snapshot\n");
+    } else if (!mpe_config_load("status/engine.cfg.backup")) {
+        fprintf(stderr, "[A3] WARNING: torture cancel without memory snapshot or backup; "
+                        "resetting to compiled defaults (torture never stays live)\n");
+        mpe_config_reset_defaults();
+    } else {
+        fprintf(stderr, "[A3] torture state cancelled: clean config restored from backup file\n");
+    }
+    s_clean_cfg_valid = 0;
+    long_run_validation_active = 0;
+    long_run_validation_restore_config = 0;
+    long_run_validation_is_torture = 0;
+}
+
 static int a3_task13_body_is_invalid(rigidbody *rigid_body) {
     if ((!isfinite(rigid_body->position.x)) || (!isfinite(rigid_body->position.y)) ||
         (!isfinite(rigid_body->position.z))) {
@@ -127,8 +166,14 @@ static void long_run_validation_report(void) {
          * DESPOT-2026-10-01: saying so is not enough — a failed restore must
          * NEVER leave torture live. Fall back to compiled defaults (always
          * available, no files involved), so F11 always ends in a known-good
-         * state: backup if possible, defaults if not, torture never. */
-        if (!mpe_config_load("status/engine.cfg.backup")) {
+         * state: backup if possible, defaults if not, torture never.
+         * DESPOT-2026-10-04: memory snapshot first (CWD-independent, cannot
+         * go missing); backup file second; compiled defaults last. */
+        if (s_clean_cfg_valid) {
+            g_cfg = s_clean_cfg;
+            s_clean_cfg_valid = 0;
+            printf("[A3] Config restored from memory snapshot\n");
+        } else if (!mpe_config_load("status/engine.cfg.backup")) {
             fprintf(stderr, "[A3] WARNING: config restore from status/engine.cfg.backup failed; "
                             "resetting to compiled defaults instead (torture never stays live)\n");
             mpe_config_reset_defaults();

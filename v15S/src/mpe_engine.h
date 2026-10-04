@@ -102,6 +102,12 @@ extern float debug_last_frame_time;
 extern int long_run_validation_active;
 extern int long_run_validation_ticks_remaining;
 extern int long_run_validation_total_ticks;
+/* DESPOT-2026-10-04: torture-leak closure. Declared here (not via
+ * long_run_validation.h) so every TU including mpe_engine.h can guard
+ * config saves without new includes. */
+int long_run_validation_torture_live(void);
+void long_run_validation_snapshot_clean(void);
+void long_run_validation_cancel_restore(void);
 /* MPE_TASK_13_LONG_RUN_EXTERN_END */
 /* MPE_TASK_12_SLEEPING_COUNT_EXTERN_BEGIN */
 extern int debug_last_sleeping_object_count;

@@ -253,6 +253,15 @@ bool mpe_config_set_bool(const char *key, bool value);
 bool mpe_config_load(const char *path);
 bool mpe_config_save(const char *path);
 
+/* DESPOT-2026-10-04 (torture-leak closure): guarded save. Refuses (returns
+ * false, logs to stderr, bumps the blocked counter) when F11 torture values
+ * are live in g_cfg, so no caller can publish torture as the next boot's
+ * defaults. Use for EVERY write to status/engine.cfg; the raw mpe_config_save
+ * stays for the F11 backup path (which must capture the CLEAN config before
+ * randomizing) and for explicit torture dumps. */
+bool mpe_config_save_guarded(const char *path);
+unsigned long mpe_config_torture_save_blocked_total(void);
+
 /* Iteration helpers for menu/terminal. */
 size_t mpe_config_count_by_category(param_category cat);
 size_t mpe_config_get_by_category(param_category cat, const mpe_param **out_params, size_t max_params);
