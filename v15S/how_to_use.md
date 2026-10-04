@@ -191,7 +191,7 @@ every scene dumps finite state.
 
 ## Configuration System (Key 6)
 
-Press `6` to open the **Configuration Menu**. This provides live access to all 78 tunable engine parameters.
+Press `6` to open the **Configuration Menu**. This provides live access to all 79 tunable engine parameters.
 
 The menu is organised into 13 categories:
 
@@ -231,7 +231,7 @@ In the debug terminal:
 
 ### F11 Config Torture Test
 
-Press `F11` to randomise all 78 tunables to extreme bounded values and run
+Press `F11` to randomise all 79 tunables to extreme bounded values and run
 a 60-second long-run validation. This stress-tests the engine under
 adversarial parameter combinations (each press uses the next seed, printed
 for bisection). F11 is a robustness verdict: PASS means no NaN and nothing

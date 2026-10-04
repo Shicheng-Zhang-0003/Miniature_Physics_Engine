@@ -530,3 +530,130 @@ in the physics. Two more were numbers attributed to the wrong mechanism. In
 every case the *detection* machinery was the thing that was broken, and in
 every case the honest fix was to **measure** rather than to adjust a tolerance
 until the line went green.
+
+---
+
+# Second pass, 2026-10-03 — the cube-phasing bug, and a self-inflicted regression
+
+The user reported, in the F11 torture view: *"the f5 cube stack cubes start
+phasing into and folding into each other like they are hollow."* That is a
+correct observation and it was caused **partly by this audit's own previous
+commit**, so the record has to start there.
+
+## [SPLIT-IMPULSE-REVERTED] My 120009 change caused it. Measured, then reverted.
+
+The earlier commit replaced the whole-body positional translation with
+per-contact split impulse and lever arms, because Catto GDC 2014 p.53 and
+Box2D/Bullet genuinely do it that way and a centre-only translation cannot
+right a tilt. The *premise* was right. The *implementation* was not: I applied
+each contact's correction **independently**, so a 4-point manifold gave the
+body 4× the intended translation plus four independent angular kicks at
+r = 0.5 m. On the F10/F11 10-high pile:
+
+| | before | after |
+|---|---|---|
+| worst pairwise overlap | 0.0537 m | **0.2253 m** (4.2× worse) |
+| max &#124;ω&#124; of the stack | 0.0000 rad/s | **1.9217 rad/s** |
+
+0.2253 m between 1.0 m cubes **is** the reported symptom.
+
+I then implemented the *correct* form — shared Gauss–Seidel with a per-point
+accumulated impulse clamped at ≥ 0, which is what actually makes the contacts
+share the correction in Box2D. It fixed the over-correction (0.2253 → 0.0818 m,
+ω back to 0.0001) and improved the isolated tilted box (0.354° → 0.312°). It was
+**still a net regression** across the F11 seed sweep:
+
+| seed | 1 | 2 | 3 | 6 | 7 | 9 | **sum** |
+|---|---|---|---|---|---|---|---|
+| original | 0.440 | 0.808 | 0.220 | 0.240 | 0.349 | 0.363 | **2.420** |
+| shared + angular | 0.650 | 0.832 | 0.060 | 0.504 | 0.407 | 0.500 | **2.953** |
+| shared, linear only | 0.766 | 0.642 | 0.832 | 0.728 | 0.648 | 0.417 | **4.033** |
+
+Better on one seed, worse on five. In a buckling pile the angular positional
+kick feeds energy into the next tick's velocity solve, and the column already
+sits at its stability boundary. **Reverted**, and verified bitwise identical to
+the pre-audit solver on all ten F11 seeds. The 0.042° gain on an isolated case
+does not pay for that, and the negative result is recorded in the source so it
+is not attempted a third time.
+
+Kept from that commit: the wake threshold is no longer a hard-coded `0.01 m`
+that contradicted the config schema's own measured note.
+
+## [F11-BUCKLE-INTERPENETRATION] Three real defects, none in the contact solver
+
+**1. The column spawned 10 mm interpenetrated.** `mpe_pile_bodies` placed ten
+1.0 m cubes at 0.99 m pitch, so every cube began 1 % inside the one below it.
+The shipped GUI scene has always been correct — `scene_spawn_long_run_validation`
+(`scene_init.c:585`) uses pitch **1.002** with the comment *"2mm air gap, no
+built-in overlap"*. The headless fixture was the only place still on 0.99, so
+**the test and the product were running different scenes**. Now 1.002.
+
+**2. The torture scene had no floor.** With nothing underneath, a 9.5 m column
+free-falls until the bottom cube meets the world-edge safety net — perfectly
+plastic *and* frictionless — and the remaining nine arrive at ≈5 m/s onto a
+surface that cannot hold them. `scene_spawn_config_torture_test()` calls
+`scene_spawn_long_run_validation()`, which calls `scene_ensure_friction_floor()`;
+the reason is already written down at `scene_init.c:574`. That fix reached F10
+and the GUI and never reached this case.
+
+Measured effect, worst pairwise cube-cube overlap, summed over a 10-seed sweep:
+**5.44 m → 1.88 m**. For the default seed alone: **0.841 m → 0.0016 m**.
+
+**3. Nothing ever measured interpenetration.** `f10_long_run` and `f11_torture`
+counted NaN and fallen bodies. A scene can be finite, uncorrupted, awake and
+inside the world box while two cubes sit 60 % inside each other, with the suite
+green — which is exactly what happened. Added `mpe_worst_cube_overlap()`, sampled
+every 5th tick of the **whole run** rather than at the end, because the phasing
+is a transient during the buckle that then partly recovers; sampling only the
+final state would very likely have missed it.
+
+## [A CORRECTION TO MY OWN DOCUMENTATION]
+
+My first version of that gate claimed *"the corrected scene measures
+0.0016–0.24 m across seeds"*. **That was wrong.** Measured properly, all pairs,
+1500 ticks:
+
+| seed | 0 | 1 | 2 | 3 | 6 | 7 |
+|---|---|---|---|---|---|---|
+| corrected | 0.0016 | 0.2405 | **0.6925** | **0.5638** | 0.0164 | 0.1337 |
+| pre-fix | 0.8409 | 0.9815 | 0.9336 | **0.1028** | 0.0771 | 0.6869 |
+
+The true range is 0.0016–**0.69** m, and note what the second row shows: seed 3
+is *better* before the fix (0.103) than after (0.564). **A single global
+threshold cannot separate the corrected fixture from the broken one** — the
+spread *within* each group is as large as the gap *between* them, because the
+torture outcome is chaotic. Any bound I had picked would have been fitted to a
+story rather than to a distribution.
+
+So the gate is deliberately scoped to what it can certify: the seed the case
+actually runs (fixed seed `0xC0FFEE`). There it measures **0.0100 m** — which is
+the penetration slop, i.e. resting contacts and nothing else — against **0.8409 m**
+pre-fix. Bound set to **0.05 m**: 5× headroom over the shipped value, 16× under
+the defect it exists to catch. Falsifiability demonstrated, not assumed:
+tightening below the measured value turns the case red with exit status 1.
+
+## Open: the buckling transient itself — DECLARED, NOT SOLVED
+
+Under extreme randomized gravity the 10:1 column buckles (the project's own
+measurement puts its stability boundary near −17.12) and cubes can transiently
+overlap by up to ~0.69 m. What *is* established:
+
+- The engine is **not** broadly broken: with default config, a 10-cube stack
+  dropped 6 m onto the friction floor peaks at **0.0128 m** interpenetration —
+  the slop. `max_separation_bias` changes that number by **0.000000 m**.
+- **Solver iterations are the dominant lever for a stable column**, and sharply
+  so. Gravity −17, otherwise default:
+
+  | iterations | 64 | 96 | 128 |
+  |---|---|---|---|
+  | worst overlap | 0.3105 | **0.0024** | **0.0000** |
+
+  127× then exact. `bias_factor` (0.1 → 0.5 → 1.0) changes nothing.
+- Neither the correction budget (`max_separation_bias`, `depenetration.
+  max_correction`, `correction_factor`) nor forcing 128 iterations fixes the
+  F11 seeds: 128 helps seeds 1/2/6 and *hurts* 3 and 9.
+
+So the residual is a genuine open item, not something quietly re-baselined. The
+honest next measurement is the one the pointer already gives: instrument λ_n
+directly during a buckle to establish whether the deep overlap is a normal-force
+shortfall or a contact-pair detection failure, since no budget knob touches it.
