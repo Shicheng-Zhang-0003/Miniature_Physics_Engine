@@ -213,9 +213,36 @@ int mfs_t_tank(void) {
          * baseline is a fixed point of the model, not noise.
          *
          * Translation moved 0.0603 -> 0.0530 (-12%), same cause, still inside
-         * its 20% band; left as measured. */
+         * its 20% band; left as measured.
+         *
+         * DESPOT-2026-10-04: translation baseline re-measured 0.0530 -> 0.0642
+         * (+21%) as a direct, understood consequence of the engine
+         * tick-start friction selection (physics/collision_solver.c,
+         * contact_point_data.snap_friction_mu). Cause chain, in order:
+         *   1. Stick/slip mu used to re-evaluate on live per-iteration slip
+         *      (solver transient). Under torque-injection transients the
+         *      first iteration always saw the tick's own F*dt above the
+         *      0.02 static gate, so kinetic was selected and the accumulation
+         *      saturated at the kinetic clamp; late-iteration static
+         *      re-selection could not add the missing (mu_s-mu_k)*Fn.
+         *      Measured engine-level: mu_s=0.9/1.5 broke at ~5.9N.
+         *   2. Selection now uses pre-force tick-start slip once per tick.
+         *      A rolling wheel's longitudinal slip is ~0 at tick start, so
+         *      static persists through the torque transient and the contact
+         *      holds to the full mu_s cone (engine breakaway now 0.999-1.005
+         *      of mu_s*N, dt- and iteration-independent).
+         *   3. Stronger longitudinal grip drives the pivot slightly harder:
+         *      translation 0.0530 -> 0.0642, heading 1.8741 -> 1.9179 (+2.3%,
+         *      still inside its 8% band). Mecanum strafe dx=2.2872 is
+         *      byte-identical, so the anisotropic cone path is untouched, as
+         *      designed. Structural gates (disp <= 0.3, heading >= 0.1) hold
+         *      with wide margin.
+         * This is a correction, not a regression. Verified a fixed point:
+         * bit-identical disp/heading over three -O2 runs and under
+         * -O1+ASan/UBSan (both failed identically pre-rebaseline, proving
+         * determinism, not flake). */
         MFS_CHECK_REL(t_ptr, heading, 1.8741f, 0.08f, "tank pivot heading (measured baseline)");
-        MFS_CHECK_REL(t_ptr, disp, 0.0530f, 0.20f, "tank pivot translation (measured baseline)");
+        MFS_CHECK_REL(t_ptr, disp, 0.0642f, 0.20f, "tank pivot translation (measured baseline)");
 
         if (t_ptr->failures == 0) {
             printf("[PASS] tank differential turn (disp=%.4f, heading=%.4f)\n", disp, heading);
