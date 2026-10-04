@@ -12,6 +12,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include <fcntl.h>
 #ifndef MPE_OS_WINDOWS
 #include <unistd.h>
@@ -103,6 +104,24 @@ int save_scene(const char *file_destination_path) {
         ((world->body_count > 0) && (!world->bodies))) {
         fprintf(stderr, "Error SVF01: invalid primary world\n");
         return 0;
+    }
+    /* DESPOT-2026-10-04: refuse to persist a NaN live state. A NaN body
+     * faithfully written today is a file the loader will (correctly) veto
+     * tomorrow — fail at save time with the live scene still intact, not at
+     * load time with the only copy poisoned. */
+    for (int svf_i = 0; svf_i < world->body_count; svf_i++) {
+        rigidbody *svf_rb = &world->bodies[svf_i];
+        float svf_vals[] = {svf_rb->mass, svf_rb->radius, svf_rb->position.x, svf_rb->position.y,
+                            svf_rb->position.z, svf_rb->velocity.x, svf_rb->velocity.y,
+                            svf_rb->velocity.z, svf_rb->angular_velocity.x, svf_rb->angular_velocity.y,
+                            svf_rb->angular_velocity.z, svf_rb->orientation.w, svf_rb->orientation.x,
+                            svf_rb->orientation.y, svf_rb->orientation.z};
+        for (size_t svf_vi = 0; svf_vi < sizeof(svf_vals) / sizeof(svf_vals[0]); svf_vi++) {
+            if (!isfinite(svf_vals[svf_vi])) {
+                fprintf(stderr, "Error SVF05: body %d has non-finite state; scene NOT saved\n", svf_i);
+                return 0;
+            }
+        }
     }
     char tmp_template[520];
     if (snprintf(tmp_template, sizeof(tmp_template), "%s.XXXXXX", file_destination_path) >= (int)sizeof(tmp_template)) {

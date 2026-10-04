@@ -228,6 +228,15 @@ def validate_tui_file(path: Path) -> tuple[bool, str]:
             int(row[3])
         except ValueError:
             return False, "snapshot header has malformed numeric fields"
+    # DESPOT-2026-10-04: the [pairs] section is truncated at scale (first 96
+    # bodies scanned, 64 pairs shown). A stress dump that never examines
+    # bodies 97+ still gated green. Require full-scan coverage except for
+    # the stress scene, where truncation is declared and diff-scoped.
+    if "stress" not in path.name:
+        for match in re.finditer(r"^\[pairs\].*?scan=(\d+)/(\d+)\s*$", content, re.M):
+            scanned, total = int(match.group(1)), int(match.group(2))
+            if scanned != total:
+                return False, f"snapshot pair scan truncated ({scanned}/{total}); only stress may truncate"
     return True, f"{len(headers)} finite PASS frame(s)"
 
 
@@ -451,6 +460,11 @@ class Runner:
         # The matrix immediately earned its place: the very first run found a
         # test that passed in four regimes and failed in the fifth.
         if not sanitizer and not self.test_filter:
+            # DESPOT-2026-10-04: run regimes to COMPLETION (collect the
+            # conjunction at the end) instead of early-returning on the first
+            # failing regime — an early return hides whether the other
+            # regimes also fail, halving the diagnostic value.
+            regimes_ok = True
             for regime in MPE_TEST_REGIMES:
                 reg_run, reg_out = self.command(
                     f"suite-v2-regime-{regime}", "suite-v2", cmd, cwd=SRC_DIR,
@@ -462,6 +476,7 @@ class Runner:
                 except ValueError as error:
                     self.add(f"suite-v2-regime-{regime}-output", "suite-v2", "FAIL",
                              kind="contract", return_code=None, detail=str(error), log=reg_run.log)
+                    regimes_ok = False
                     continue
                 for status, case, failures in reg_rows:
                     if not (status == "PASS" and failures == 0):
@@ -472,8 +487,9 @@ class Runner:
                 self.add(f"suite-v2-regime-{regime}", "suite-v2",
                          "PASS" if reg_ok else "FAIL", kind="regime", log=reg_run.log,
                          detail=f"full suite under MPE_TEST_REGIME={regime}")
-                if not reg_ok:
-                    return False
+                regimes_ok = regimes_ok and reg_ok
+            if not regimes_ok:
+                return False
         try:
             rows = parse_suite_output(output, expected)
         except ValueError as error:
@@ -627,6 +643,15 @@ class Runner:
             self.add(("asan-ubsan/" if sanitizer else "") + case,
                      "sanitizers" if sanitizer else "mfs", "PASS", severity="info" if status == "INFO" else "gate",
                      log=result.log, detail="informational diagnostic")
+        # DESPOT-2026-10-04: duplicate MFS case names were never checked
+        # (suite-v2 discovery raises on dupes; MFS did not), so a repeated
+        # case could inflate the gated count while hiding a missing one.
+        _mfs_names = [case for _, case in rows]
+        if len(set(_mfs_names)) != len(_mfs_names):
+            _dupes = sorted({n for n in _mfs_names if _mfs_names.count(n) > 1})
+            self.add("mfs-duplicate-contract", "mfs", "FAIL", kind="contract", return_code=None, log=result.log,
+                     detail=f"duplicate MFS case names: {_dupes!r}")
+            return False
         if len([1 for status, _ in rows if status in ("PASS", "BUILD-OK")]) != gated_pass:
             self.add("mfs-count-contract", "mfs", "FAIL", kind="contract", return_code=None, log=result.log,
                      detail="per-case gated output does not match summary count")
@@ -738,7 +763,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--profile", choices=("quick", "physics", "full"), default="full",
                         help="quick: canonical; physics: canonical + isolated legacy/paranoia; full: everything (default)")
-    parser.add_argument("--test", help="run one exact canonical, legacy, or paranoia test")
+    parser.add_argument("--test",
+                        help="run one exact canonical, legacy, or paranoia test (DIAGNOSTIC ONLY: "
+                             "skips the regime matrix and the summary contract, so a green "
+                             "--test run does not imply suite-green)")
     parser.add_argument("--allow-skip", action="store_true",
                         help="accept self-skipped suite cases ([SKIP] lines); without it, "
                              "any skip fails the strict contract")
@@ -802,7 +830,39 @@ def main(argv: Sequence[str] | None = None) -> int:
     runner = Runner(args.profile, run_dir, args.test, allow_skip=args.allow_skip)
     print(f"MPE test runner | profile={args.profile} | run={run_id}")
     print(f"Artifacts: {run_dir}")
+    # DESPOT-2026-10-04: C tests run with cwd=SRC_DIR and use CWD-relative
+    # status/engine.cfg[.backup]. A test that saves config (or runs F11
+    # torture paths) can clobber the developer's real file — the 2026-10-04
+    # engine.cfg incident. Snapshot before, diff after, restore + fail.
+    _cfg_paths = [SRC_DIR / "status" / "engine.cfg", SRC_DIR / "status" / "engine.cfg.backup"]
+    _cfg_before: dict[str, bytes | None] = {}
+    for _p in _cfg_paths:
+        try:
+            _cfg_before[str(_p)] = _p.read_bytes() if _p.is_file() else None
+        except OSError:
+            _cfg_before[str(_p)] = None
     okay = runner.run_profile()
+    _cfg_mutated: list[str] = []
+    for _p in _cfg_paths:
+        try:
+            _after = _p.read_bytes() if _p.is_file() else None
+        except OSError:
+            _after = None
+        if _after != _cfg_before[str(_p)]:
+            _cfg_mutated.append(_p.name)
+            try:
+                if _cfg_before[str(_p)] is None:
+                    if _p.is_file():
+                        _p.unlink()
+                else:
+                    _p.write_bytes(_cfg_before[str(_p)])
+            except OSError:
+                pass
+    if _cfg_mutated:
+        runner.add("config-mutation-contract", "harness", "FAIL", kind="contract", return_code=None,
+                   detail=f"profile mutated and was restored: {sorted(_cfg_mutated)}; "
+                          "C tests must not write status/engine.cfg* as a side effect")
+        okay = False
     write_reports(run_dir, metadata, runner.results)
     counts = result_counts(runner.results)
     print("\n=== MPE verification summary ===")

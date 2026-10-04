@@ -16,6 +16,7 @@
 #include "wireframe.h"
 #include "../physics/spring_joint.h"
 #include <sys/types.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 #include <stdbool.h>
@@ -89,6 +90,18 @@ void render_init() {
         }
     }
     utility_shader_program = create_shader_program(uvs_path, ufs_path);
+    if ((utility_shader_program == 0) && (instanced_shader_program != 0)) {
+        /* DESPOT-2026-10-04: the utility shader had no ~/.local fallback
+         * while the instanced one did — a missing utility file red-screened
+         * the whole renderer even with a good instanced program. Retry it. */
+        const char *home_u = mpe_home_dir();
+        if (home_u) {
+            char alt_uvs[512], alt_ufs[512];
+            snprintf(alt_uvs, sizeof(alt_uvs), "%s/.local/share/mpe/shaders/utility_vertex.glsl", home_u);
+            snprintf(alt_ufs, sizeof(alt_ufs), "%s/.local/share/mpe/shaders/utility_fragment.glsl", home_u);
+            utility_shader_program = create_shader_program(alt_uvs, alt_ufs);
+        }
+    }
     if ((instanced_shader_program == 0) || (utility_shader_program == 0)) {
         fprintf(stderr, "RENDER INIT FAILED: shader program creation failed (instanced=%u, utility=%u)\n",
                 instanced_shader_program, utility_shader_program);
@@ -96,21 +109,35 @@ void render_init() {
         render_init_status = render_failed;
         return;
     }
-    instanced_uniforms.projection_matrix_location = glGetUniformLocation(instanced_shader_program, "projection");
-    instanced_uniforms.view_matrix_location = glGetUniformLocation(instanced_shader_program, "viewframe");
-    instanced_uniforms.camera_position_location = glGetUniformLocation(instanced_shader_program, "camera_position");
-    instanced_uniforms.light_position_location = glGetUniformLocation(instanced_shader_program, "light_position");
-    instanced_uniforms.ambient_strength_location = glGetUniformLocation(instanced_shader_program, "u_ambient_strength");
-    instanced_uniforms.specular_coeff_location = glGetUniformLocation(instanced_shader_program, "u_specular_coeff");
-    instanced_uniforms.specular_exponent_location =
-        glGetUniformLocation(instanced_shader_program, "u_specular_exponent");
-    utility_uniforms.projection_matrix_location = glGetUniformLocation(utility_shader_program, "projection");
-    utility_uniforms.view_matrix_location = glGetUniformLocation(utility_shader_program, "viewframe");
-    utility_uniforms.model_matrix_location = glGetUniformLocation(utility_shader_program, "model");
-    utility_uniforms.normal_matrix_location = glGetUniformLocation(utility_shader_program, "normal_matrix");
-    utility_uniforms.object_colour_location = glGetUniformLocation(utility_shader_program, "object_colour");
-    utility_uniforms.camera_position_location = glGetUniformLocation(utility_shader_program, "camera_position");
-    utility_uniforms.light_position_location = glGetUniformLocation(utility_shader_program, "light_position");
+    /* DESPOT-2026-10-04: glGetUniformLocation == -1 (renamed/missing GLSL
+     * uniform) used to fail silently — every later glUniform is a
+     * spec-defined no-op with wrong lighting and no diagnostic. Name the
+     * missing uniform loudly; keep rendering (locations stay -1 = no-op). */
+#define MPE_CHECK_UNIFORM(field, prog, name)                                                          \
+    do {                                                                                              \
+        (field) = glGetUniformLocation((prog), (name));                                                \
+        if ((field) == -1) {                                                                          \
+            fprintf(stderr, "[render] WARNING: uniform '%s' not found (program %u)\n", (name),          \
+                    (unsigned) (prog));                                                               \
+        }                                                                                             \
+    } while (0)
+    MPE_CHECK_UNIFORM(instanced_uniforms.projection_matrix_location, instanced_shader_program, "projection");
+    MPE_CHECK_UNIFORM(instanced_uniforms.view_matrix_location, instanced_shader_program, "viewframe");
+    MPE_CHECK_UNIFORM(instanced_uniforms.camera_position_location, instanced_shader_program, "camera_position");
+    MPE_CHECK_UNIFORM(instanced_uniforms.light_position_location, instanced_shader_program, "light_position");
+    MPE_CHECK_UNIFORM(instanced_uniforms.ambient_strength_location, instanced_shader_program,
+                      "u_ambient_strength");
+    MPE_CHECK_UNIFORM(instanced_uniforms.specular_coeff_location, instanced_shader_program, "u_specular_coeff");
+    MPE_CHECK_UNIFORM(instanced_uniforms.specular_exponent_location, instanced_shader_program,
+                      "u_specular_exponent");
+    MPE_CHECK_UNIFORM(utility_uniforms.projection_matrix_location, utility_shader_program, "projection");
+    MPE_CHECK_UNIFORM(utility_uniforms.view_matrix_location, utility_shader_program, "viewframe");
+    MPE_CHECK_UNIFORM(utility_uniforms.model_matrix_location, utility_shader_program, "model");
+    MPE_CHECK_UNIFORM(utility_uniforms.normal_matrix_location, utility_shader_program, "normal_matrix");
+    MPE_CHECK_UNIFORM(utility_uniforms.object_colour_location, utility_shader_program, "object_colour");
+    MPE_CHECK_UNIFORM(utility_uniforms.camera_position_location, utility_shader_program, "camera_position");
+    MPE_CHECK_UNIFORM(utility_uniforms.light_position_location, utility_shader_program, "light_position");
+#undef MPE_CHECK_UNIFORM
     grid_init(&main_grid, 250, 5);
     init_sm_system(&sphere_mesh, 32, 32);
     cube_meshing_init();
@@ -268,6 +295,17 @@ void render_scene_current(int widget_width, int widget_height) {
     int cylinder_inst_count = 0;
     for (int object_index = 0; object_index < (physics_world_get_primary()->body_count); object_index++) {
         rigidbody *rigid_body = &(physics_world_get_primary()->bodies)[object_index];
+        /* DESPOT-2026-10-04: a NaN body used to poison the instance buffer
+         * (NaN model matrix → NaN vertices → driver-dependent garbage or
+         * worse). Skip non-finite bodies loudly; the physics side already
+         * counts them and the save path refuses to persist them. */
+        if ((!isfinite(rigid_body->position.x)) || (!isfinite(rigid_body->position.y)) ||
+            (!isfinite(rigid_body->position.z)) || (!isfinite(rigid_body->orientation.w)) ||
+            (!isfinite(rigid_body->orientation.x)) || (!isfinite(rigid_body->orientation.y)) ||
+            (!isfinite(rigid_body->orientation.z))) {
+            fprintf(stderr, "[render] WARNING: skipping non-finite body %d\n", object_index);
+            continue;
+        }
         /* Sphere-vs-frustum: culled only when fully outside one plane. */
         {
             float bound = broadphase_bounding_radius(rigid_body);
@@ -359,4 +397,17 @@ void render_scene_current(int widget_width, int widget_height) {
     glBindVertexArray(0);
     spring_joint_render(utility_shader_program, view_matrix, projection_matrix);
     wireframe_render_selected_object(utility_shader_program, view_matrix, projection_matrix);
+    /* DESPOT-2026-10-04: zero glGetError coverage meant every GL misuse
+     * above (zero VBO/VAO, bad enum, torn context) failed silently. Drain
+     * the error queue once per frame and name it — one bounded stderr line
+     * per code, not per call. */
+    {
+        GLenum render_err = glGetError();
+        if (render_err != GL_NO_ERROR) {
+            fprintf(stderr, "[render] WARNING: glGetError=0x%x in render_scene_current\n",
+                    (unsigned) render_err);
+            while (glGetError() != GL_NO_ERROR) {
+            }
+        }
+    }
 }
