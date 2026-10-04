@@ -561,6 +561,15 @@ int mpe_module_count(void) {
     return n;
 }
 
+/* DESPOT-2026-10-03: index high-water, for rollback snapshots. See the header
+ * for why this must not be mpe_module_count(). */
+int mpe_module_slot_count(void) {
+    pthread_mutex_lock(&s_reg_lock);
+    int n = s_module_count;
+    pthread_mutex_unlock(&s_reg_lock);
+    return n;
+}
+
 const mpe_module_desc_t *mpe_module_at(int i) {
     pthread_mutex_lock(&s_reg_lock);
     const mpe_module_desc_t *out = 0;

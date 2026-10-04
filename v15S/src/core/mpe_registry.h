@@ -81,6 +81,14 @@ int mpe_registry_set_origin(const char *name, const char *path);
 const char *mpe_registry_module_origin(const mpe_module_desc_t *desc);
 int mpe_unregister_module_origin(const char *name, const char *path);
 int mpe_module_count(void);
+/* DESPOT-2026-10-03: the INDEX HIGH-WATER, not the live count.
+ * mpe_module_count() counts live entries; mpe_registry_truncate_modules(keep)
+ * truncates by index. Those are different numbers whenever a tombstone hole
+ * exists (register A, register B, unregister B, register C -> live 2, high
+ * water 3). Snapshotting the live count and truncating to it silently
+ * tombstoned a pre-existing LIVE registration on every failed load. Anything
+ * that snapshots the table for rollback MUST use this. */
+int mpe_module_slot_count(void);
 const mpe_module_desc_t *mpe_module_at(int i);
 const mpe_module_desc_t *mpe_find_module(const char *name);
 
