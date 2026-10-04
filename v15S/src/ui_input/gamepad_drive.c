@@ -38,10 +38,40 @@ static int s_control_enabled = 1; /* START toggles; default ON like module_1 */
 static int s_prev_start = 0;
 static int s_was_commanding = 0;
 static int s_active = 0;
+static int s_reported_stage = -1;
+
+static void gpd_report_stage(int stage) {
+    /* One line per transition so a dead controller always says why (bundle,
+     * pad, robot) instead of silently no-op'ing. */
+    if (stage == s_reported_stage) return;
+    s_reported_stage = stage;
+    switch (stage) {
+    case 0:
+        fprintf(stderr, "[gamepad] no bundle (mod load ecosystem/mfs/mfs_ecosystem.so first)\n");
+        break;
+    case 1:
+        fprintf(stderr, "[gamepad] bundle loaded, waiting for pad (F310 switch X, /dev/input/js0) and robot (ftc spawn)\n");
+        break;
+    case 2:
+        fprintf(stderr, "[gamepad] pad connected, waiting for robot (ftc spawn)\n");
+        break;
+    case 3:
+        fprintf(stderr, "[gamepad] driving robot 0 (START toggles, LB+RB e-stop)\n");
+        break;
+    default:
+        break;
+    }
+    fflush(stderr);
+}
 
 static void gpd_resolve(void) {
-    if (s_syms_resolved) return;
-    s_syms_resolved = 1;
+    /* DESPOT-FIX 2026-10-04: this ran once and cached NULLs when the first
+     * frame ticked before `mod load` — every later tick then silently
+     * no-op'd with a bundle loaded, a pad plugged and a robot spawned. The
+     * controller was dead until engine restart, with no diagnostic. Retry
+     * until the fleet entry points resolve; the rest may legitimately stay
+     * NULL only when the bundle is absent (checked per-tick below). */
+    if (s_syms_resolved && s_fleet_get && s_mecanum) return;
     s_fleet_get = (ftc_robot * (*)(struct physics_world *, int))gpd_sym("ftc_fleet_get");
     s_mecanum = (void (*)(ftc_robot *, float, float, float))gpd_sym("drivetrain_mecanum");
     s_pad_init = (bool (*)(gamepad_state *, const char *))gpd_sym("gamepad_init");
@@ -50,6 +80,7 @@ static void gpd_resolve(void) {
     s_pad_button = (bool (*)(const gamepad_state *, int))gpd_sym("gamepad_get_button");
     s_pad_connected = (bool (*)(const gamepad_state *))gpd_sym("gamepad_is_connected");
     s_pad_deadzone = (void (*)(gamepad_state *, float))gpd_sym("gamepad_set_deadzone");
+    if (s_fleet_get && s_mecanum) s_syms_resolved = 1;
 }
 
 void gamepad_drive_init(void) {
@@ -77,7 +108,8 @@ void gamepad_drive_tick(void) {
     if (!s_fleet_get || !s_mecanum || !s_pad_poll || !s_pad_axis || !s_pad_button ||
         !s_pad_connected) {
         s_active = 0;
-        return; /* no bundle: silent no-op */
+        gpd_report_stage(0);
+        return; /* no bundle: silent except the one-time hint above */
     }
     if (!s_pad_open_attempted) {
         gamepad_drive_init();
@@ -89,6 +121,7 @@ void gamepad_drive_tick(void) {
     /* Hot-plug retry while disconnected (~5 s at 60 fps). */
     if (!s_pad_connected(&s_pad)) {
         s_active = 0;
+        gpd_report_stage(1);
         if (s_was_commanding) {
             physics_world *w = physics_world_get_primary();
             ftc_robot *r = (w && s_fleet_get) ? s_fleet_get(w, 0) : NULL;
@@ -114,6 +147,7 @@ void gamepad_drive_tick(void) {
     if (!r) {
         s_active = 0;
         s_was_commanding = 0;
+        gpd_report_stage(s_pad_connected(&s_pad) ? 2 : 1);
         return; /* no robot: nothing to command (`ftc spawn` first) */
     }
     if (!s_control_enabled) {
@@ -133,6 +167,7 @@ void gamepad_drive_tick(void) {
     s_mecanum(r, fwd, str, rot);
     s_was_commanding = 1;
     s_active = 1;
+    gpd_report_stage(3);
 }
 
 int gamepad_drive_active(void) {
