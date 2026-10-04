@@ -230,6 +230,37 @@ problem. Recorded 2026-09-29.
   re-applied; doing it in the other order destabilises the stall endpoint, and
   doing both at once zeroes drive entirely (measured: strafe transmit 0.00 m).
 
+## [RELEASE-STORM] Zero-command motor limit cycle + glide equilibrium (FIXED 2026-10-04)
+
+Live-session report: wheels tilt/pivot off their shafts, and motor speeds
+never revert to 0 on stick release. Measured headless (drive 180 ticks,
+release, mecanum robot, tile floor):
+
+- **Storm:** at zero command the implicit observer path planned torque
+  against last tick's speed discrepancy; on light wheels with
+  joint-hammered reads that is alternating ±stall — a 4-tick ±0.6
+  slew-rail limit cycle with wheels ±70 rad/s forever. Fix: at
+  |command| < 0.05 run the explicit regen path (passive damper, exact,
+  memoryless), bypass slew (an exact-stop brake needs no ramp; slewing it
+  caused a 4-tick bang-bang), halve the idle-brake clamp (exact-stop +
+  contact in the same tick overshoots past zero and ping-pongs).
+- **Glide:** with the storm gone, wheels held ±25 rad/s and the vehicle
+  glided ~60 s. Analytic-mode hubs ship zero engine friction and the
+  roller force is lateral-only, so nothing coupled wheel spin to chassis
+  translation longitudinally (kill-tests: analytic OFF → full stop;
+  real hub friction → full stop). Fix: at idle, analytic lateral parks
+  and hubs get real 0.9/0.7 engine friction (one tangential model at a
+  time, never double-counted past the cone). Driven operation is byte-for-
+  byte the validated model (strafe 2.2872 m identical).
+- **Tilt** was the joints telling the truth about the storm: 40:1 mass
+  ratio needs the 128 iterations every MFS test pins (default 64 wobbled
+  axles to 15°). Live spawn paths now auto-raise to 128, loudly.
+  Post-fix: full stop <1 s after release, tilt ≤1.4° and flat.
+- Locked by the new `release_settle` gate (drive ≥ 0.5 m, then chassis
+  < 0.1 m/s, wheels < 2 rad/s, axles < 3°). MOTOR-III above is untouched:
+  the observer still runs (and still limit-cycles) on the DRIVEN path;
+  idle simply no longer asks it to plan torque.
+
 ## [DESPOT-2026-10-02] Full mathematical / programming / operational audit
 
 Recorded from a standalone run against this tree. Every number below was

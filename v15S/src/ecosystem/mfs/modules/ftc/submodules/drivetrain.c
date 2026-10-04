@@ -191,6 +191,20 @@ static void drivetrain_mecanum_analytic (physics_world *world, ftc_robot *robot)
     if (!robot->mecanum_analytic) {return;}
     if (robot->drivetrain_type != FTC_DRIVETRAIN_MECANUM) {return;}
     if (robot->wheel_count <= 0) {return;}
+    /* DESPOT-2026-10-04: idle = engine tires own the contact (robot.c
+     * idle-tire switch restores real hub friction below command). Running
+     * this lateral force alongside would double-count past the cone, and
+     * its reaction torque sustained the measured glide+spin equilibrium
+     * (wheels ±25 rad/s, vehicle ~60 s coast) that nothing else could
+     * explain away. Commanded operation is untouched. */
+    {
+        float idle_max = 0.0f;
+        for (int ci = 0; ci < robot->wheel_count; ci++) {
+            float a = fabsf(robot->wheel_motors[ci].command);
+            if (a > idle_max) idle_max = a;
+        }
+        if (idle_max < 0.05f) {return;}
+    }
     int ci = robot->chassis_body;
     if ((ci < 0) || (ci >= world->body_count)) {return;}
     rigidbody *ch = &world->bodies[ci];

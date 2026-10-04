@@ -127,6 +127,119 @@ int mfs_t_mecanum(void) {
     return t_ptr->failures;
 }
 
+/* release_settle: drive forward, then release to zero command. The robot
+ * must come to rest (vehicle stops, wheels stop, axles stay aligned).
+ * DESPOT-2026-10-04: two live-session defects, both unmeasured by the
+ * suite until now —
+ *   1. Motor storm at zero command: the implicit observer path planned
+ *      torque against last tick's discrepancy and, on light wheels with
+ *      joint-hammered speed reads, produced an alternating ±stall limit
+ *      cycle (measured 4-tick ±0.6 slew-rail cycle, wheels ±70 rad/s
+ *      forever). Idle now runs the explicit regen path with slew bypassed
+ *      and a half-stop brake (geometric, no overshoot class).
+ *   2. Glide equilibrium: analytic-mode hubs ship zero engine friction,
+ *      so nothing coupled wheel spin to chassis translation at idle
+ *      (measured frozen ±25 rad/s spin, ~60 s vehicle glide). Idle now
+ *      restores real 0.9/0.7 hub friction and parks the analytic lateral
+ *      (one tangential model at a time, never double-counted past the
+ *      cone); tilt is bounded by converged joints (live flow auto-raises
+ *      to the 128 iterations the 40:1 mass ratio needs).
+ * Gates (128 iters, sleep off — dissipation must do the work, and the
+ * drive phase guards vacuity: a robot that never moves trivially rests):
+ * chassis < 0.1 m/s, every wheel < 2 rad/s, every axle within 3° of the
+ * chassis X (measured post-fix: 0.000-0.028 m/s, 0.0 rad/s, ≤1.4°). */
+int mfs_t_release_settle(void) {
+    mfs_test_t t;
+    mfs_test_begin(&t, "release_settle");
+    mfs_test_t *t_ptr = &t;
+
+    physics_world w;
+    mfs_test_world(&w);
+
+    ftc_robot *robot = mfs_create_robot(&w, 0.0f, ftc_robot_rest_height(), 0.0f,
+                                        MOTOR_GB_5203_26_9, FTC_DRIVETRAIN_MECANUM);
+    MFS_CHECK(t_ptr, robot != NULL);
+
+    float start_x, start_y, start_z;
+    mfs_get_pos(&w, robot, &start_x, &start_y, &start_z);
+
+    const float dt = 1.0f / 60.0f;
+    int fail = 0;
+
+    for (int t_tick = 0; t_tick < 180 && !fail; t_tick++) {
+        mfs_drive_mecanum(robot, 1.0f, 0.0f, 0.0f);
+        drivetrain_update(&w, robot, dt);
+        physics_world_step(&w, dt);
+        if (!mfs_test_finite(&w)) {
+            fail = 1;
+        }
+    }
+    float drive_x = 0, drive_y = 0, drive_z = 0;
+    mfs_get_pos(&w, robot, &drive_x, &drive_y, &drive_z);
+    float drive_disp = sqrtf((drive_x - start_x) * (drive_x - start_x) +
+                             (drive_z - start_z) * (drive_z - start_z));
+    MFS_INFO("drive displacement=%.4f m", drive_disp);
+    MFS_CHECK(t_ptr, drive_disp >= 0.5f);
+
+    for (int t_tick = 0; t_tick < 240 && !fail; t_tick++) {
+        mfs_drive_mecanum(robot, 0.0f, 0.0f, 0.0f);
+        drivetrain_update(&w, robot, dt);
+        physics_world_step(&w, dt);
+        if (!mfs_test_finite(&w)) {
+            fail = 1;
+        }
+    }
+
+    if (!fail) {
+        rigidbody *ch = mfs_chassis_or_null(&w, robot);
+        MFS_CHECK(t_ptr, ch != NULL);
+        float ch_speed = 0.0f;
+        float max_wheel = 0.0f;
+        float max_tilt = 0.0f;
+        if (ch) {
+            ch_speed = vector3_length(ch->velocity);
+            vector3 chx = ch->cached_axes[0];
+            for (int i = 0; i < robot->wheel_count; i++) {
+                int wi = robot->wheel_bodies[i];
+                if (wi < 0 || wi >= w.body_count) {
+                    fail = 1;
+                    break;
+                }
+                rigidbody *wh = &w.bodies[wi];
+                vector3 ax = wh->cached_axes[0];
+                float wsp = fabsf(vector3_dot(wh->angular_velocity, ax));
+                if (wsp > max_wheel) {
+                    max_wheel = wsp;
+                }
+                float dot = vector3_dot(ax, chx);
+                if (dot > 1.0f) {
+                    dot = 1.0f;
+                }
+                if (dot < -1.0f) {
+                    dot = -1.0f;
+                }
+                float tilt = acosf(dot) * 57.29578f;
+                if (tilt > max_tilt) {
+                    max_tilt = tilt;
+                }
+            }
+        }
+        MFS_INFO("settle: chassis=%.4f m/s maxwheel=%.2f rad/s maxtilt=%.2f deg", ch_speed,
+                 max_wheel, max_tilt);
+        MFS_CHECK(t_ptr, ch_speed < 0.1f);
+        MFS_CHECK(t_ptr, max_wheel < 2.0f);
+        MFS_CHECK(t_ptr, max_tilt < 3.0f);
+        if (t_ptr->failures == 0) {
+            printf("[PASS] release settles: vehicle stops, wheels stop, axles aligned\n");
+        }
+    }
+
+    physics_world_cleanup(&w);
+    free(robot);
+    mfs_test_end(t_ptr);
+    return t_ptr->failures;
+}
+
 /* tank: differential turn in place. */
 int mfs_t_tank(void) {
     mfs_test_t t;

@@ -14,6 +14,7 @@ typedef struct {
 
 extern int mfs_t_teleop(void);
 extern int mfs_t_mecanum(void);
+extern int mfs_t_release_settle(void);
 extern int mfs_t_tank(void);
 extern int mfs_t_odometry(void);
 extern int mfs_t_ftc_integration(void);
@@ -30,6 +31,7 @@ extern int mfs_t_ball_spin(void);
 static const mfs_test_entry_t registry[] = {
     {"teleop",      mfs_t_teleop,      false},
     {"mecanum",     mfs_t_mecanum,     false},
+    {"release_settle", mfs_t_release_settle, false},
     {"tank",        mfs_t_tank,        false},
     {"odometry",    mfs_t_odometry,    false},
     {"ftc_integration", mfs_t_ftc_integration, false},
