@@ -196,6 +196,17 @@ if [ "${BUILD_ONLY:-0}" != "1" ] && [ "${1:-}" != "--build-only" ]; then
     # script-level [PASS]/[BUILD-OK] lines against the script summary (5),
     # and 8 inlined suite [PASS] lines break that count (13 != 5).
     SUITE_BIN="$OUT/mfs_suite$EXE_EXT"
+    # DESPOT-2026-10-03: hand the suite the plugin by ABSOLUTE path.
+    # mfs_t_ftc_hotload resolves the FTC plugin relative to the WORKING
+    # DIRECTORY, so the same source, same build and same .so passed or failed
+    # purely on where build_tests.sh happened to be invoked from. It passed
+    # when run as `cd ecosystem/mfs && ./build_tests.sh` and failed when the
+    # runner invoked it from the repository root -- which is why CI never saw
+    # it. Do not rely on CWD: name the artifact explicitly.
+    if [ -f "$MFS/plugins/mpe_ftc$PLUGIN_EXT" ]; then
+        MPE_FTC_PLUGIN="$MFS/plugins/mpe_ftc$PLUGIN_EXT"
+        export MPE_FTC_PLUGIN
+    fi
     # Cross from Linux: prefix with wine (empty on native Windows/MSYS2).
     # shellcheck disable=SC2086
     if [ "${MFS_ASAN_HOTLOAD_ODR_SUPPRESS:-0}" = "1" ]; then

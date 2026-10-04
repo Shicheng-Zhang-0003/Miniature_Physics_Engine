@@ -118,7 +118,17 @@ typedef struct mfs_module_1_state {
     int intake_pivot_joint;
     bool intake_deployed;
     float intake_speed_rpm;
-    float intake_power;         /* -1..1 */
+    /* -1..1. DESPOT-2026-10-03: semantics now stated, because getting them
+     * wrong is what made mfs_t_intake_stop red at pristine HEAD.
+     *   - RECOMPUTED EVERY TICK by pre_step from the B button edge:
+     *     B held -> -1 (momentary reverse); released -> intake_active ? 1 : 0.
+     *     Writing it from outside pre_step therefore does NOT stick -- set it
+     *     AFTER pre_step, or hold the button.
+     *   - Reverse is GATED ON intake_active. Reversing a stopped intake is a
+     *     deliberate no-op (there is no forward direction to invert), so the
+     *     motor target stays 0 when the intake is off no matter what
+     *     intake_power holds. */
+    float intake_power;
     
     /* Shooter state */
     int shooter_flywheel_body;
