@@ -90,3 +90,10 @@ Despot-1004d: live robot physics fixed (release storm + glide + tilt).
   spawn paths auto-raise to 128 iters (40:1 joints converge, tilt flat).
   Mecanum strafe byte-identical. New release_settle gate (15/15 MFS).
   Full profile still 234 green.
+
+Despot-1004e: abuse-tilt frontier recorded (pre-existing, not a regression:
+  identical blowup on fully pre-change tree). Hysteretic idle switch (mode
+  in hub fields, all four consumers switch together), observer handshake
+  (explicit publishes tau_exp_prev; post-idle strafe 0.24->1.85m),
+  proportional-cut + axle-projection tried and REVERTED with numbers
+  (cut moves tank/baselines; projection changes nothing). Full 234 green.

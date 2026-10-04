@@ -196,14 +196,17 @@ static void drivetrain_mecanum_analytic (physics_world *world, ftc_robot *robot)
      * this lateral force alongside would double-count past the cone, and
      * its reaction torque sustained the measured glide+spin equilibrium
      * (wheels ±25 rad/s, vehicle ~60 s coast) that nothing else could
-     * explain away. Commanded operation is untouched. */
+     * explain away. Commanded operation is untouched.
+     * HYSTERESIS 2026-10-04b: read the SAME hysteretic mode robot.c
+     * publishes in the hub fields (engage <0.03, release >0.08), not raw
+     * commands — a stick riding the boundary flapped analytic on/off
+     * every tick. */
     {
-        float idle_max = 0.0f;
-        for (int ci = 0; ci < robot->wheel_count; ci++) {
-            float a = fabsf(robot->wheel_motors[ci].command);
-            if (a > idle_max) idle_max = a;
-        }
-        if (idle_max < 0.05f) {return;}
+        int wi0 = (robot->wheel_count > 0) ? robot->wheel_bodies[0] : -1;
+        int tires_idle =
+            (wi0 >= 0 && wi0 < world->body_count &&
+             world->bodies[wi0].friction_static > 0.45f) ? 1 : 0;
+        if (tires_idle) {return;}
     }
     int ci = robot->chassis_body;
     if ((ci < 0) || (ci >= world->body_count)) {return;}
@@ -283,6 +286,11 @@ static void drivetrain_mecanum_analytic (physics_world *world, ftc_robot *robot)
         if (u > 1.0f) {u = 1.0f;} else if (u < -1.0f) {u = -1.0f;}
         vector3 F = vector3_scaling(a_world, -f_max * u);
         wheel->force_accumulator = vector3_addition(wheel->force_accumulator, F);
+        /* DESPOT-2026-10-04 (axle projection TRIED AND REVERTED): keeping
+         * only the axle-parallel part of r×F did not move the harsh-drive
+         * tilt blowup at all (same onset tick, same 69°+ in 90 ticks), so
+         * the pump is not (only) the analytic reaction — full r×F stays
+         * until the pump is found, not assumed. */
         wheel->torque_accumulator = vector3_addition(wheel->torque_accumulator, vector3_cross(r_c, F));
     }
 }

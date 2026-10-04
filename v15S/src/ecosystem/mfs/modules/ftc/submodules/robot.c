@@ -689,14 +689,31 @@ void ftc_robot_update(physics_world *world, ftc_robot *robot, float dt) {
      * Without this, brake + rolling resistance damped spin while nothing
      * coupled it to translation: measured frozen ±25 rad/s spin with a
      * ~60 s vehicle glide. Tank and articulated builds never zero, so
-     * they are untouched (gated on mecanum_analytic + wheel flag). */
+     * they are untouched (gated on mecanum_analytic + wheel flag).
+     * HYSTERESIS 2026-10-04b: the mode lives in the hub friction fields
+     * themselves (engaged above 0.45): engage below 0.03 command, release
+     * above 0.08. A single threshold flapped the friction, the analytic
+     * gate, the motor path and the slew bypass every tick when a stick
+     * rode the boundary (rescaled deadzone outputs land exactly there).
+     * Hub fields persist the mode with no struct change, and the motor
+     * path + analytic gate below read the same mode, so all four switch
+     * together or not at all. */
+    int idle_tires = 0;
     if (robot->drivetrain_type == FTC_DRIVETRAIN_MECANUM && robot->mecanum_analytic) {
         float idle_max = 0.0f;
         for (int ci = 0; ci < robot->wheel_count; ci++) {
             float a = fabsf(robot->wheel_motors[ci].command);
             if (a > idle_max) idle_max = a;
         }
-        int idle_tires = (idle_max < 0.05f) ? 1 : 0;
+        int wi0 = (robot->wheel_count > 0) ? robot->wheel_bodies[0] : -1;
+        int engaged = (wi0 >= 0 && wi0 < world->body_count &&
+                       world->bodies[wi0].friction_static > 0.45f) ? 1 : 0;
+        if (!engaged && idle_max < 0.03f) {
+            engaged = 1;
+        } else if (engaged && idle_max > 0.08f) {
+            engaged = 0;
+        }
+        idle_tires = engaged;
         for (int ci = 0; ci < robot->wheel_count; ci++) {
             if (!robot->wheel_is_mecanum[ci]) continue;
             int wi = robot->wheel_bodies[ci];
@@ -849,7 +866,13 @@ void ftc_robot_update(physics_world *world, ftc_robot *robot, float dt) {
              * TUNED HYSTERESIS, not derived constants: the 4.0/2.0 split
              * keeps the cut from chattering at the boundary (cut hard,
              * recover gradually). Retune against burnout behaviour, not
-             * against a formula. */
+             * against a formula.
+             * DESPOT-2026-10-04 (proportional engage TRIED AND REVERTED):
+             * smoothing the 0.15 slam to a proportional ramp moved the
+             * tank pivot 0.0642 -> 0.0397 m (-38%) and broke drive
+             * fwd/rev antisymmetry — the slam is load-bearing for
+             * calibrated drive behaviour, ugly or not. Do not re-attempt
+             * without re-baselining tank + drive_directions first. */
             float *scale = &robot->wheel_traction_scale[i];
             float over = slip * dir;
             if (dir != 0.0f && over > 4.0f) {
@@ -874,7 +897,15 @@ void ftc_robot_update(physics_world *world, ftc_robot *robot, float dt) {
          * it. Observer state still refreshes above every tick, so re-drive
          * resumes with live state. Driven operation is untouched. */
         float axle_inertia = 0.5f * wheel->mass * r_run * r_run;
-        int idle_coast = (fabsf(robot->wheel_motors[i].command) < 0.05f) ? 1 : 0;
+        /* Motor path follows the hysteretic tire mode for analytic
+         * mecanum (all four switch together); other builds keep the
+         * command threshold (their behavior is already green). */
+        int idle_coast;
+        if (robot->drivetrain_type == FTC_DRIVETRAIN_MECANUM && robot->mecanum_analytic) {
+            idle_coast = idle_tires;
+        } else {
+            idle_coast = (fabsf(robot->wheel_motors[i].command) < 0.05f) ? 1 : 0;
+        }
         if (idle_coast) {
             motor_update(&robot->wheel_motors[i], wheel_speed, dt, terminal_voltage);
         } else {
