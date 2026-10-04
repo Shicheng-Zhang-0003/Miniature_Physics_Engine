@@ -12,7 +12,6 @@
 int mpe_t_spring(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "spring");
-    mpe_config_init();
     g_cfg.world.drag = 1.0f;
     g_cfg.world.angular_damping_scale = 1.0f;
     g_cfg.world.gravity = 0.0f;
@@ -79,10 +78,15 @@ int mpe_t_spring(void) {
 int mpe_t_two_world(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "two_world");
-    mpe_config_init();
+    /* DESPOT-2026-10-04: the premise is A at -9.81 vs B at -1.0 (2m+
+     * separation at t=1s). The regime scales A's gravity (light: -2.45,
+     * separation 0.75m — correct physics, broken premise). Pin A. */
+    mpe_config_t cfg_a = g_cfg;
+    cfg_a.world.gravity = -9.81f;
     physics_world wa, wb;
     physics_world_init(&wa);
     physics_world_init(&wb);
+    physics_world_set_config(&wa, &cfg_a);
     mpe_config_t cfg_b = g_cfg;
     cfg_b.world.gravity = -1.0f;
     physics_world_set_config(&wb, &cfg_b);
@@ -118,7 +122,6 @@ int mpe_t_two_world(void) {
 int mpe_t_revolute(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "revolute");
-    mpe_config_init();
     physics_world w;
     mpe_world_begin(&w);
     int pivot = physics_world_add_cube(&w, (vector3){0.0f, 10.0f, 0.0f},
@@ -165,22 +168,44 @@ int mpe_t_revolute(void) {
 int mpe_t_cylinder_drop(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "cylinder_drop");
-    mpe_config_init();
     MPE_INFO("gravity = %.4f", g_cfg.world.gravity);
     physics_world w;
     mpe_world_begin(&w);
+    /* DESPOT-2026-10-04: net OFF (see mpe_world_no_net) — the clamp alone
+     * used to satisfy these rest heights with a no-op solver. */
+    mpe_config_t no_net;
+    mpe_world_no_net(&w, &no_net);
     MPE_CHECK(&t, mpe_floor_slab(&w, 0.4f, 0.3f, 0.0f) >= 0);
     int cyl = physics_world_add_cylinder(&w, 0.05f, 0.02f, 0.5f, (vector3){0.0f, 0.25f, 0.0f});
     int sph = physics_world_add_sphere(&w, 0.05f, 0.5f, (vector3){1.0f, 0.25f, 0.0f});
     MPE_CHECK(&t, cyl >= 0 && sph >= 0);
     const float dt = 1.0f / 60.0f;
-    if (!mpe_step(&w, 300, dt)) {
-        t.failures++;
+    /* The clamp can produce neither genuine free-fall speed nor a contact
+     * record: gate on both, so only the solver can earn the rest heights. */
+    float max_fall = 0.0f;
+    int ever_contact = 0;
+    for (int k = 0; k < 300; k++) {
+        physics_world_step(&w, dt);
+        if (!mpe_world_finite(&w)) {
+            printf("[FAIL] non-finite state at tick %d\n", k);
+            t.failures++;
+            break;
+        }
+        float av = fabsf(w.bodies[cyl].velocity.y);
+        if (av > max_fall) {
+            max_fall = av;
+        }
+        if (mpe_body_in_contact(&w, cyl) || mpe_body_in_contact(&w, sph)) {
+            ever_contact = 1;
+        }
     }
     float cyl_y = w.bodies[cyl].position.y;
     float cyl_vy = w.bodies[cyl].velocity.y;
     float sph_y = w.bodies[sph].position.y;
-    MPE_INFO("sphere y=%.4f cylinder y=%.4f vy=%.4f", sph_y, cyl_y, cyl_vy);
+    MPE_INFO("sphere y=%.4f cylinder y=%.4f vy=%.4f max_fall=%.3f ever_contact=%d (net OFF)", sph_y, cyl_y,
+             cyl_vy, max_fall, ever_contact);
+    MPE_CHECK(&t, max_fall > 0.5f);
+    MPE_CHECK(&t, ever_contact);
     MPE_CHECK(&t, sph_y <= 0.20f);
     MPE_CHECK(&t, sph_y >= -0.05f);
     MPE_CHECK_NEAR(&t, sph_y, 0.05f, 0.02f, "sphere-rest");
@@ -197,7 +222,6 @@ int mpe_t_cylinder_drop(void) {
 int mpe_t_cylinder_sphere(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "cylinder_sphere");
-    mpe_config_init();
     physics_world w;
     mpe_world_begin(&w);
     MPE_CHECK(&t, mpe_floor_slab(&w, 0.4f, 0.3f, 0.0f) >= 0);
@@ -223,7 +247,6 @@ int mpe_t_cylinder_sphere(void) {
 int mpe_t_cylinder_cube(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "cylinder_cube");
-    mpe_config_init();
     physics_world w;
     mpe_world_begin(&w);
     MPE_CHECK(&t, mpe_floor_slab(&w, 0.4f, 0.3f, 0.0f) >= 0);
@@ -252,7 +275,6 @@ int mpe_t_cylinder_cube(void) {
 int mpe_t_cylinder_cylinder(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "cylinder_cylinder");
-    mpe_config_init();
     physics_world w;
     mpe_world_begin(&w);
     MPE_CHECK(&t, mpe_floor_slab(&w, 0.4f, 0.3f, 0.0f) >= 0);
@@ -283,15 +305,19 @@ int mpe_t_cylinder_cylinder(void) {
 int mpe_t_list4_cylinder_floor(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "list4_cylinder_floor");
-    mpe_config_init();
     const float dt = 1.0f / 60.0f;
-    /* Case FACE: stand on the circular face. */
+    /* Case FACE: stand on the circular face.
+     * DESPOT-2026-10-04: rest-height oracles assume a settled (non-bouncing)
+     * cylinder; the regime scales body restitution (sticky 0.95 keeps it
+     * airborne at tick 600 — correct physics, broken premise). Pin the
+     * reference restitution the gates were calibrated under. */
     {
         physics_world w;
         mpe_world_begin(&w);
         mpe_floor_plane(&w, 0.4f, 0.3f);
         int cyl = physics_world_add_cylinder(&w, 0.05f, 0.02f, 0.5f, (vector3){0.0f, 0.25f, 0.0f});
         MPE_CHECK(&t, cyl >= 0);
+        w.bodies[cyl].restitution = 0.3f;
         w.bodies[cyl].orientation =
             vector4_from_axis_with_angle((vector3){0.0f, 0.0f, 1.0f}, math_pi * 0.5f);
         rigidbody_update_axes(&w.bodies[cyl]);
@@ -313,6 +339,7 @@ int mpe_t_list4_cylinder_floor(void) {
         mpe_floor_plane(&w, 0.4f, 0.3f);
         int cyl = physics_world_add_cylinder(&w, 0.05f, 0.02f, 0.5f, (vector3){0.0f, 0.25f, 0.0f});
         MPE_CHECK(&t, cyl >= 0);
+        w.bodies[cyl].restitution = 0.3f;
         w.bodies[cyl].orientation =
             vector4_from_axis_with_angle((vector3){0.0f, 1.0f, 0.0f}, math_pi * 0.5f);
         rigidbody_update_axes(&w.bodies[cyl]);
@@ -567,7 +594,6 @@ int mpe_t_cylinder_sphere_inside(void) {
 int mpe_t_mass_properties(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "mass_properties");
-    mpe_config_init();
     g_cfg.sleep.enable = 0;
     physics_world w;
     mpe_world_begin(&w);

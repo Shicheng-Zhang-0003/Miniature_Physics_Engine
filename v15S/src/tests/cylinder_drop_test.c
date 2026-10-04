@@ -24,6 +24,17 @@ int main(void) {
     physics_world_init(&world);
     world.next_object_id = 1;
 
+    /* DESPOT-2026-10-04 [CLAMP-TAUTOLOGY closure]: this rest height used to
+     * be satisfiable by the world-edge emergency clamp alone — a build with
+     * the contact solver stubbed to a no-op still reported y=0.050000 and
+     * passed. Bind a per-world config with the safety net OFF so ONLY the
+     * contact solver can hold the bodies up, and gate on properties the
+     * clamp cannot produce: genuine free-fall approach speed plus a real
+     * contact record (a clamp-held body has neither). */
+    mpe_config_t no_net_cfg = g_cfg;
+    no_net_cfg.boundary.safety_net_enabled = 0;
+    physics_world_set_config(&world, &no_net_cfg);
+
     /* Static floor: large flat cube, top surface at y = 0. */
     int floor_idx = physics_world_add_cube(&world,
         (vector3){0.0f, -0.5f, 0.0f},
@@ -49,6 +60,8 @@ int main(void) {
     const float dt = 1.0f / 60.0f;
     float cyl_y = 0.25f, cyl_vy = 0.0f, sph_y = 0.25f;
     int nan_seen = 0;
+    float max_fall_speed = 0.0f;
+    int ever_contact = 0;
 
     for (int t = 0; t < 300; t++) {   /* 5 simulated seconds */
         physics_world_step(&world, dt);
@@ -59,13 +72,36 @@ int main(void) {
             nan_seen = 1;
             break;
         }
+        /* Drop is 0.20 m: impact at sqrt(2*9.81*0.2) ~= 1.98 m/s. Anything
+         * far below proves the body never truly fell (spawn-at-rest would
+         * also "rest" at 0.05 without exercising contact at all). */
+        if (fabsf(cyl_vy) > max_fall_speed) {
+            max_fall_speed = fabsf(cyl_vy);
+        }
+        if ((world.has_contact) && ((world.has_contact[cyl_idx]) || (world.has_contact[sph_idx]))) {
+            ever_contact = 1;
+        }
     }
 
     printf("[info] sphere   final y=%.4f\n", sph_y);
-    printf("[info] cylinder final y=%.4f vy=%.4f\n", cyl_y, cyl_vy);
+    printf("[info] cylinder final y=%.4f vy=%.4f max_fall=%.3f ever_contact=%d (net OFF)\n", cyl_y, cyl_vy,
+            max_fall_speed, ever_contact);
 
     if (nan_seen) {
         printf("[FAIL] NaN during drop\n");
+        physics_world_cleanup(&world);
+        return 1;
+    }
+
+    /* 0. Solver-loading gates: the clamp cannot produce these. */
+    if (max_fall_speed < 1.0f) {
+        printf("[FAIL] bodies never truly fell (max|vy|=%.3f, expect ~2.0) — no contact exercised\n",
+               max_fall_speed);
+        physics_world_cleanup(&world);
+        return 1;
+    }
+    if (!ever_contact) {
+        printf("[FAIL] no contact manifold ever generated — rest height would be clamp-held\n");
         physics_world_cleanup(&world);
         return 1;
     }

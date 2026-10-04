@@ -53,7 +53,6 @@ typedef void (*tank_fn_t)(ftc_robot *, float, float);
 int mpe_t_ftc_ecosystem(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "ftc_ecosystem");
-    mpe_config_init();
     g_cfg.timestep.solver_iterations = 128;
 
     char eco_buf[1024]; const char *eco_path = mpe_pick_plugin("ecosystem/mfs/mfs_ecosystem.so", eco_buf, sizeof(eco_buf));

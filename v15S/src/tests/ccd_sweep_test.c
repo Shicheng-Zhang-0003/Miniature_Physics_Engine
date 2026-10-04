@@ -45,28 +45,45 @@ int main(void) {
         physics_world_cleanup(&world);
     }
 
-    /* Case 2: 60 m/s sphere straight down at the floor. */
+    /* Case 2: 60 m/s sphere straight down at the floor.
+     * DESPOT-2026-10-04 [CLAMP-TAUTOLOGY closure]: this case had NO floor
+     * body at all, so its "no tunneling" verdict was produced by the
+     * emergency clamp, not the solver — a no-op solver passed it. Give it
+     * a real floor slab plus net-OFF config (as in cylinder_drop) so only
+     * contact manifolds + CCD can earn the gates. */
     {
         physics_world world;
         physics_world_init(&world);
         constraint_pool_init(&world);
+        mpe_config_t no_net_cfg = g_cfg;
+        no_net_cfg.boundary.safety_net_enabled = 0;
+        physics_world_set_config(&world, &no_net_cfg);
+        physics_world_add_cube(&world, (vector3){0, -0.5f, 0}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
         int s = physics_world_add_sphere(&world, 0.5f, 1.0f, (vector3){0, 5.0f, 0});
         world.bodies[s].velocity = (vector3){0, -60.0f, 0};
         world.bodies[s].restitution = 0.0f;
         rigidbody_wake(&world.bodies[s]);
         float min_y = 1e9f;
+        int ever_contact = 0;
         for (int t = 0; t < 120; t++) {
             physics_world_step(&world, dt);
             if (world.bodies[s].position.y < min_y) {
                 min_y = world.bodies[s].position.y;
             }
+            if ((world.has_contact) && (world.has_contact[s])) {
+                ever_contact = 1;
+            }
         }
-        printf("[info] floor case: min_center_y=%.4f rest_y=%.3f\n", min_y, world.bodies[s].position.y);
+        printf("[info] floor case: min_center_y=%.4f rest_y=%.3f ever_contact=%d (net OFF, real slab)\n", min_y,
+               world.bodies[s].position.y, ever_contact);
         /* TRUTH: two-sided. Old min_y<-0.55 allowed 1.04m penetration
          * (center -0.54, fully through) to pass. Demand no deep tunnel
          * AND settled rest at radius height. */
         float rest_y = world.bodies[s].position.y;
-        if (min_y < 0.40f) {
+        if (!ever_contact) {
+            printf("[FAIL] floor impact generated no contact manifold — rest would be clamp-held\n");
+            fail = 1;
+        } else if (min_y < 0.40f) {
             printf("[FAIL] sphere tunneled the floor (min_y=%.4f)\n", min_y);
             fail = 1;
         } else if (rest_y < 0.45f || rest_y > 0.55f) {
