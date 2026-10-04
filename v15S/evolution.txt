@@ -75,3 +75,10 @@ Despot-1004b: FTC streamlined (v15S release blocker): one field, one robot,
   (intake/shooter/balls/gamepad) registered but parked, explicitly
   attachable; GTK robot registry noted parked (already build-excluded).
   Full profile still 234 green incl. all 14 MFS gates.
+
+Despot-1004c: F310 gamepad is the single robot controller
+  (ui_input/gamepad_drive.c: dlsym'd pad+fleet symbols, START toggle,
+  LB+RB e-stop, stop-once on disconnect/vanish, hot-plug retry; hooked
+  pre-physics in the GUI frame only). Terminal `ftc drive`/`stop` removed
+  (spawn/telemetry remain); tank stays in engine/tests/bundle API.
+  Full profile still 234 green incl. all 14 MFS gates.

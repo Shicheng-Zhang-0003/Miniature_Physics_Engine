@@ -2,7 +2,7 @@
 * PARKED 2026-10-04 (v15S release blocker): no in-tree callers and excluded
 * from every build (gtk include + module-system bypass, audit D19). Kept as
 * source for a future GTK drive tab; the live single-robot path is ftc-fleet
-* via `ftc spawn` / `ftc drive`. Do not rewire without removing the globals.
+* via `ftc spawn` (pad-driven). Do not rewire without removing the globals.
 * Owns the registry of active robots, their physics world binding,
 * visual proxy objects in obj_per_scene, and per-tick sync.
 *
