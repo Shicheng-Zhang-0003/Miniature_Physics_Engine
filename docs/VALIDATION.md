@@ -238,11 +238,11 @@ Once sliding, the block accelerates at exactly `(F − μ_k·N)/m`, with
 | 1.30 | 1.86418 | 1.86326 | 0.05% |
 | 1.60 | 2.74687 | 2.74586 | 0.04% |
 
-### [FRICTION-THRESH] Effective static threshold is timestep-dependent (OPEN)
+### [FRICTION-THRESH] Effective static threshold was timestep-dependent (CLOSED 2026-10-04)
 
-**Coulomb's law is rate-independent by definition. This implementation's
-static threshold is not.** Bisected threshold for μ_s = 0.6, a 1 kg block,
-`N = m·g_n`:
+**Coulomb's law is rate-independent by definition. Before 2026-10-04, this
+implementation's static threshold was not.** Bisected threshold for
+μ_s = 0.6, a 1 kg block, `N = m·g_n` (old behaviour):
 
 | dt | threshold (F/(μ_s·N)) | effective μ_s | deviation |
 |---|---|---|---|
@@ -251,30 +251,58 @@ static threshold is not.** Bisected threshold for μ_s = 0.6, a 1 kg block,
 | **1/60 (default)** | **0.86128** | **0.5168** | **13.87%** |
 | 1/30 | 0.75761 | 0.4546 | 24.24% |
 
-The cone converges to the correct μ_s·N as `dt → 0` but is **13.9% low at the
-default timestep**, and **24% low at 30 Hz**. A body that should hold under
-0.87·μ_s·N instead creeps. The friction cone is therefore *not* the cone the
-material describes, and the error grows as the timestep grows — the opposite
-of a well-posed discrete approximation.
+**Root cause, measured 2026-10-04 (the old pointer was wrong).** The
+"measure λ_n next" pointer above is REFUTED: per-contact λ_n converges to
+exactly `N·dt` (0.16342 vs 0.16344) at every iteration count. The normal
+force was never short. The defect was the **memoryless per-iteration
+stick/slip selection**: the μ_s-vs-μ_k choice re-evaluated on the LIVE
+per-iteration slip, which is solver transient, not physics state. Under step
+force loading the first iteration always sees the tick's own injected
+`F·dt/m` (0.117 m/s at 7 N) above the 0.02 static gate, so kinetic is
+selected, the accumulation saturates at the kinetic clamp, and
+late-iteration static re-selection cannot retroactively add the missing
+`(μ_s−μ_k)·F_n` — its correction signal `−vt·meff` is already ~0 by then.
+Smoking guns (temp probes, uncommitted): μ_s = 0.9/1.5 broke at ~5.9 N
+instead of 8.83/14.7 N; tick-end velocity ratcheted +0.035/tick = exactly
+`(F − μ_k·N)·dt`; slipth = 0.001 read 4.91 N = μ_k·N to 3 decimals.
 
-**Two hypotheses tested and REFUTED, recorded so they are not re-tried:**
-- *The frictionless boundary box at y = 0 is diluting the contact.* The slab
-  was moved to y = +1.0, entirely clear of the boundary, and the threshold was
-  **identical to 4 decimal places** (0.86128 either way). Not the cause.
-- *It is a normal-force shortfall.* Plausible but **not verified** — do not
-  record it as the cause without measuring λ_n directly.
+**Fix.** `contact_point_data.snap_friction_mu`, recorded once per contact in
+`collision_prepare_solver` — which runs pre-force-integration, so it sees
+the tick's opening (was-it-sticking) velocities — and reused by every
+iteration of the tick (`collision_snapshot_friction_mu`;
+`collision_solver.c`, `collision_mechanics.h`). A tick that starts at rest
+solves the whole tick static and truly holds to μ_s·N; a tick that starts
+sliding solves kinetic. No new fields persist anywhere (runtime scratch
+only); direct resolve callers without a snapshot keep legacy behaviour.
 
-**Where to look.** `collision_solver.c` selects μ_s vs μ_k by a **velocity**
-threshold (`slip_speed < static_friction_threshold`), and clamps the
-accumulated tangential impulse to `μ · λ_n`. So the *static* capacity is
-`μ_s · λ_n`, and any shortfall in the normal impulse directly lowers the
-effective threshold. That is the mechanism to measure next; it is a pointer,
-not a conclusion.
+**Battery after the fix** (force-accumulator bisection, 1 kg block,
+`g = 9.80665`, 5 mm slip gate over 60 push ticks):
 
-Consequence for users: at the default timestep a surface advertises
-μ_s ≈ 0.52 when configured as 0.6. The **sliding** branch is unaffected
-^(worst 0.07%, mean 0.05% accurate), so steady-state kinematics are sound; what is off is the
-*breakaway* force — the peak force before motion starts.
+| condition | threshold / μ_s·N | effective μ_s |
+|---|---|---|
+| dt = 1/60, iters 8 | 0.99485 | 0.5969 |
+| dt = 1/60, iters 32/64/128 | 1.00038–1.00045 | 0.6002–0.6003 |
+| dt = 1/120, iters 64 | 1.00547 | 0.6033 |
+| dt = 1/30, iters 64 | 0.99920 | 0.5995 |
+| μ_s = 0.9 (cone 8.83 N) | 0.99921 | 0.8993 |
+| small block / long push / tight gate / wide stick window | 0.997–1.000 | — |
+
+Iteration-independent, timestep-independent, μ-scaling. The residual knob
+honesty: `static_friction_thresh = 0.001` reads 0.972 — a 1 mm/s stick
+window genuinely narrows the cone, which is what the knob means. Above-cone
+loading still slips and accelerates (μ = 0.9, F = 9.5 N verified); the fix
+grants grip, never immunity.
+
+**Blast radius, adjudicated by the suite (not by assertion).** True static
+grip changes emergent behaviour wherever the old kinetic-leaning selection
+acted as pseudo-damping: the `meta_convergence` 32-iteration arm of the
+μ = 0.9 8-stack now buckles (2.72 m vs 0.49; residual 5.5 m/s mid-collapse)
+while 16 stands and 64 converges to 0.06 — a different valid trajectory of a
+chaotic pile, recorded in-gate (arm-over-arm ratio withdrawn for the measured
+reason, calm-top-arm gates kept). The MFS tank pivot translates 0.0530 →
+0.0642 m (+21%, re-baselined with cause chain; heading +2.3%, in band;
+mecanum strafe byte-identical). Full profile stays 234 green, all five
+solver regimes 42/42.
 
 ## Declared coverage gaps
 
@@ -285,7 +313,7 @@ These are **not** validated by this pass and are stated rather than assumed:
   sphere/box cases. (The OBB/OBB decision *is* now gated against Gottschalk;
   the contact *points* it generates are not.)
 - **The static-friction breakaway threshold** — see [FRICTION-THRESH] above:
-  measured, characterised, and open.
+  closed 2026-10-04 (0.999–1.005 of μ_s·N across dt, iterations, μ).
 - **Angular momentum in oblique and multi-body contacts** — linear momentum
   is gated, this is not.
 - **The revolute constraint's axis-alignment** budget: β (ERP) semantics are
@@ -449,6 +477,17 @@ which requires per-case re-derivation of the expectation. The tests that
 genuinely load the solver — `friction_stop`, `incline_accel`, `stack`,
 `reference_math` §3, `static_hold`, `rolling_decay` — need a real tangential
 force and are unaffected. Recorded rather than quietly re-baselined.
+
+**CLOSED 2026-10-04.** The per-case re-derivation is done: `cylinder_drop`
+and `floor_collision_diag` now bind a per-world net-OFF config
+(`mpe_world_no_net`, `mpe_test.h`) so only contact manifolds can hold the
+bodies, and gate on clamp-unsatisfiable properties — genuine free-fall
+approach speed (cylinder_drop max_fall = 1.960 m/s vs ~1.98 predicted;
+diag tracks it too) plus an ever-contacted record across the run (a
+clamp-held body has neither). `ccd_sweep`'s floor case, which had no floor
+body at all, gets a real Coulomb slab plus net-OFF plus the contact gate
+(wall case already had a real wall). A no-op solver now fails all three;
+net-OFF solver-held rest is measured (0.050–0.054 m) in all five regimes.
 
 ## [MFS-OBSERVER] Two misattributions of one number — FIXED
 
@@ -687,3 +726,71 @@ So the residual is a genuine open item, not something quietly re-baselined. The
 honest next measurement is the one the pointer already gives: instrument λ_n
 directly during a buckle to establish whether the deep overlap is a normal-force
 shortfall or a contact-pair detection failure, since no budget knob touches it.
+
+---
+
+# Third pass, 2026-10-04 — despot audit: engine.cfg recurrence, harness revival, exact Coulomb
+
+## [TORTURE-LEAK-RECURRENCE] engine.cfg held full F11 values again — different mechanism, closed
+
+The 2026-10-01 audit found a poisoned live config from the pre-fix era and
+deleted the files. On 2026-10-04 `status/engine.cfg` again held all 79 F11
+torture values (gravity −17, drag 0.635, rolling 4.95, sleep OFF, 9-ton
+spawner masses, safety net OFF) — this time through a live mechanism, not
+leftovers: the F11 restore runs only at normal run completion, while every
+exit/save path (`root_gtk` ×2, menu-4, config-menu, `config save`, `sync`,
+`poweroff`) wrote `g_cfg` unconditionally. Any mid-torture quit published
+torture as the next boot's defaults — the user's Tom-and-Jerry physics
+(frictionless-feeling floor, no sleep, artillery spawns) with a healthy
+engine underneath. The engine math was exonerated first (every formula
+re-verified against textbook statements, §1 of this pass's record — no live
+sign error, missing term, wrong constant, unit error, or timestep dependence
+in any formula), and only then was the config convicted by diffing all 79
+keys against the backup.
+
+Closed with defense in depth: `mpe_config_save_guarded()` refuses any write
+to `engine.cfg` while torture is live (counted,
+`mpe_config_torture_save_blocked_total`); `long_run_validation_snapshot_clean()`
+takes an in-memory pre-torture snapshot (a file backup can go missing across
+CWDs — memory cannot); `long_run_validation_cancel_restore()` runs on every
+exit path before any save (memory → backup file → compiled defaults; torture
+never survives); F11 sets flags before starting and snapshots before
+randomizing. Plus diagnostics contributed along the way: config-loader
+trailing-garbage rejection, `ferror` check on save, scene legacy-reader
+finite/type validation, joint-truncation veto (was silent partial commit),
+v200 dropped-entry counting, save-NaN refusal, `save_scene == 2` propagation,
+render uniform-`-1` warnings + utility-shader fallback + non-finite body
+skip + per-frame `glGetError` drain, TUI output-health (`ferror` → rc 2) and
+full-state finite scan, runner regime completion (no early return), MFS
+duplicate-name contract, `--test` diagnostic labelling, TUI pair-scan
+coverage gating (non-stress scenes must scan fully), and a config-mutation
+contract that snapshots `status/engine.cfg*` around every profile and fails
+on unexpected mutation.
+
+## [REGIME-REVIVAL] The regime matrix was vacuous for 33 tests — now live and green
+
+`mpe_test_begin` applies the regime (`MPE_TEST_REGIME`), but 33 of 44 tests
+called `mpe_config_init()` again on the next line, wiping it — every regime
+ran default physics with different labels. The matrix could not observe the
+knob it existed to turn (same class as the withdrawn vacuous convergence
+fixture). The 33 re-inits are deleted; 13 tests with absolute oracles now pin
+their reference conditions (gravity/iterations/materials/sleep, mirroring the
+existing projectile pins) so each oracle measures its law, not the regime.
+Found and dispositioned in the process: `MPE_SKIPPED` was 2, so any test with
+exactly 2 failed checks reported SKIP instead of FAIL (light driven_wheel,
+heavy incline_accel/list4, brittle f10 all vanished into SKIP; the C summary
+undercounted blocking failures). The sentinel is now −1, unreachable by
+counting. All five regimes now read 42/42 green with teeth: the revival
+itself caught 20+ regime/original failures on the way there, each fixed by
+pinning premise (not by loosening oracles) except meta_convergence (b), which
+was withdrawn for the measured chaotic reason with calm-top-arm gates kept.
+
+## Verification record, 2026-10-04
+
+- Canonical suite 42/42 blocking (+2 diag) in **all five** regimes
+  (default/light/heavy/brittle/sticky), ASan/UBSan included.
+- Full profile: **234 checks, 232 passed, 0 failed, 2 xfailed, 6
+  informational, 0 blocking failures** (`temp/qa_runs/20261004T162513Z-456158/`).
+- External batteries unchanged and green (48 engine + 76 MFS + 22 ext-truth).
+- `status/engine.cfg` restored from backup (compiled defaults + friction
+  floor) and guarded; runner contract proves profiles no longer mutate it.

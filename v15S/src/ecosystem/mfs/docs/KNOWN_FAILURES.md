@@ -332,6 +332,16 @@ which is why that ceiling is 0.35 and not 0.25.
   `tank` regression baseline was re-measured with the causal chain recorded.
   A limiter is a rate limit on *delivered* torque, so its memory must be
   delivered torque; the alternative is a variable that does not mean its name.
+- **Tick-start friction selection grips the pivot harder (2026-10-04).**
+  Engine-side correction with an understood MFS consequence: stick/slip μ is
+  now selected once per tick from pre-force slip instead of re-decided on
+  solver transient, so rolling wheels keep the full μ_s cone through torque
+  transients (engine breakaway 0.999–1.005 of μ_s·N). The pivot drives
+  slightly harder: tank translation **0.0530 → 0.0642 m (+21%)**, heading
+  1.8741 → 1.9179 (+2.3%, inside its 8% band); mecanum strafe dx=2.2872
+  byte-identical (anisotropic path untouched). Baseline re-measured with the
+  chain in `mfs_suite_a.c`; fixed point verified bit-identical over three
+  `-O2` runs and under `-O1+ASan/UBSan. Structural gates unaffected.
 - **Partial-spawn unwind left stale body indices.** The `fail:` path in
   `ftc_robot_create_with_drive` re-poisoned `wheel_joints` and `roller_joints`
   but left `wheel_bodies` holding whatever partial creation had written. After

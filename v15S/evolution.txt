@@ -56,3 +56,12 @@ ExtTruth-1002: 22 closed-form checks green (C battery + Python oracle),
                sleep_settle gate locks SLEEP-H1 exoneration (suite 42/42),
                poisoned live engine.cfg neutralized, phantom-joint pool trap
                ticketed P2.
+
+Despot-1004: torture-leak recurrence closed (engine.cfg restored+guarded,
+  save guards/snapshot/cancel-restore, config-mutation contract); math
+  re-verified formula-by-formula (no errors); CLAMP-TAUTOLOGY closed
+  (net-OFF+contact gates); regime matrix revived (33 re-inits removed,
+  13 pins, MPE_SKIPPED -1, all 5 regimes 42/42); [FRICTION-THRESH] root
+  caused (per-iteration selection) and fixed (tick-start snapshot:
+  0.999-1.005 of mu_s*N); meta (b) withdrawn for measured chaos with
+  calm-top gates; MFS tank re-baselined 0.0530->0.0642; full 234 green.

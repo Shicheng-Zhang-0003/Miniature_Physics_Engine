@@ -157,3 +157,69 @@ Findings (all dispositioned, none left open):
   (needs `setarch -R` for the GCC 13 TSan vs glibc 2.39 mapping conflict).
 - Suite is 42/42 (40 physics + 2 diag) with `sleep_settle`; MFS 12/12 inner;
   TUI 9/9 finite; quick profile 56/56, 0 blocking.
+
+---
+# DESPOT AUDIT 2026-10-04 — torture-leak recurrence, harness revival, exact Coulomb
+
+Requested as a full mathematical, programming and operational audit with
+everything fixed, docs upgraded, commits batched and pushed. Standing
+instruction executed first: check `engine.cfg` before touching physics math.
+
+## 1. engine.cfg: convicted by diff, engine exonerated by proof
+
+`status/engine.cfg` (2026-10-04 09:03) vs `.backup` (2026-10-03 22:14): all
+79 keys differed; every physics-relevant value was F11 torture (list in the
+run record: gravity −17, drag 0.635, rolling 4.946, sleep OFF with 25–430x
+thresholds, restitution gate −0.15, static gate 0.19, broadphase cells
+53/71/440m, spawner masses to 9288 kg, safety net OFF). Backup matched
+compiled schema defaults + the scene-stamped friction floor — the sane
+state. Restored by copy; proofs archived under `/tmp/opencode/`.
+
+Before any physics change, every formula in the hot path was re-verified
+against its textbook statement (Goldstein/Catto/Box2D/Bullet/Ericson/
+Gottschalk/Mirtich/Press): sphere/box/cylinder inertia, exact viscous
+free-flight closed form + Taylor branches, L-conservation fixed point,
+gyro sign/chain, exponential rotor, Hamilton product, rotate formula,
+axis-angle, quat↔mat3, mat3 inverse/adjugate + singularity scale law,
+effective-mass triple products, Coulomb cone + stick/slip select, Poisson
++ Newton bound, split projection + caps, rolling/spin model + units,
+revolute K/Jacobian/RHS/bias, Hooke + Courant numbers, CCD quadratics +
+slab, cylinder SDF + support + segment-segment, SAT-15 + projection.
+Verdict: NO live sign error, missing term, wrong constant, unit error, or
+timestep dependence anywhere. The Tom-and-Jerry physics was configuration,
+not mathematics. (The one real physics defect found — [FRICTION-THRESH]
+selection, §3 — was found by measurement, not by this read.)
+
+## 2. Programming/operational fixes (all measured, all gated)
+
+Torture-leak closure (7 files): guarded saves, in-memory snapshot, exit
+cancel-restore, flag-before-start ordering, stderr+event-log backup
+reporting. Scene: legacy-reader validation, joint-truncation veto,
+drop counting, NaN-save refusal, rc-2 propagation. Render: uniform checks,
+utility fallback, non-finite skip, GL error drain. TUI: ferror rc, full
+finite scan, pair-scan coverage. Runner: regime completion, MFS dupe check,
+`--test` labelling, config-mutation contract. Tests: CLAMP-TAUTOLOGY closed
+(net-OFF + fall-speed + ever-contact on cylinder_drop/floor_diag/ccd-floor),
+MPE_SKIPPED −1, 33 regime re-inits removed, 13 premise pins,
+meta_convergence (b) withdrawn with calm-top replacement.
+
+## 3. [FRICTION-THRESH]: from OPEN to exact Coulomb (full trail in docs/VALIDATION.md)
+
+Old pointer (normal shortfall) REFUTED by λ_n measurement (0.16342 vs
+0.16344). True mechanism: memoryless per-iteration stick/slip selection +
+kinetic-clamp saturation (mu_s=0.9/1.5 broke at ~5.9N; +0.035/tick ratchet
+= (F−μ_k·N)·dt; slipth=0.001 read μ_k·N exactly). Fix: tick-start snapshot
+in prepare (`snap_friction_mu`). Battery: 0.999–1.005 of μ_s·N across dt
+(1/30–1/120), iterations (8–128), μ (0.6–0.9), geometry, push duration.
+Adjudicated blast radius: meta 32-arm buckles (recorded, gate reformulated),
+MFS tank 0.0530→0.0642 (re-baselined with chain, heading in band, strafe
+identical), everything else green.
+
+## 4. Record
+
+Full profile 234 (232 pass, 0 fail, 2 xfail, 6 info, 0 blocking) from
+`temp/qa_runs/20261004T162513Z-456158/`; canonical 42/42 in all five
+regimes; probes uncommitted in gitignored `temp/`; engine.cfg restored and
+guarded. Open items carried forward unchanged: warm-start absence
+(iteration tax), F11 buckle transient, CCD rotation, angular multi-body,
+manifold-point validation, MOTOR-III/F2.
