@@ -71,28 +71,28 @@ extern frame_timer main_timer;
 /* Top-level render entry points                                      */
 /* ------------------------------------------------------------------ */
 
-void render_init(void);
-void render_cleanup(void);
-void render_scene_current(int widget_width, int widget_height);
+void render_init (void);
+void render_cleanup (void);
+void render_scene_current (int widget_width, int widget_height);
 
 /* ------------------------------------------------------------------ */
 /* Top-level physics tick entry point                                 */
 /* ------------------------------------------------------------------ */
 
-gboolean physics_step_increment(gpointer user_data_pointer);
+gboolean physics_step_increment (gpointer user_data_pointer);
 /* Depenetration pass (defined in physics/depenetration.c; takes the owning
  * world). Kept declared here for GUI callers. */
 struct physics_world;
-void a3_positional_depenetration_pass(struct physics_world *world, broadphase_pair *pair_buffer,
-                                      int *pair_count_pointer, bool rebuild_broadphase);
+void a3_positional_depenetration_pass (struct physics_world *world, broadphase_pair *pair_buffer,
+                                       int *pair_count_pointer, bool rebuild_broadphase);
 
 /* ------------------------------------------------------------------ */
 /* Optional GTK application activation entry point                    */
 /* ------------------------------------------------------------------ */
 
-float open_numerical_input_dialog(GtkWidget *parent, const char *title, float current_value);
-void editor_reset(void); /* MPE_TASK_V15R2_FIX */
-bool editor_dialog_is_active(void); /* MFS_PHASE_A */
+float open_numerical_input_dialog (GtkWidget *parent, const char *title, float current_value);
+void editor_reset (void); /* MPE_TASK_V15R2_FIX */
+bool editor_dialog_is_active (void); /* MFS_PHASE_A */
 
 extern int debug_last_object_count;
 extern int debug_last_broadphase_pair_count;
@@ -105,9 +105,9 @@ extern int long_run_validation_total_ticks;
 /* DESPOT-2026-10-04: torture-leak closure. Declared here (not via
  * long_run_validation.h) so every TU including mpe_engine.h can guard
  * config saves without new includes. */
-int long_run_validation_torture_live(void);
-void long_run_validation_snapshot_clean(void);
-void long_run_validation_cancel_restore(void);
+int long_run_validation_torture_live (void);
+void long_run_validation_snapshot_clean (void);
+void long_run_validation_cancel_restore (void);
 /* MPE_TASK_13_LONG_RUN_EXTERN_END */
 /* MPE_TASK_12_SLEEPING_COUNT_EXTERN_BEGIN */
 extern int debug_last_sleeping_object_count;
@@ -116,10 +116,10 @@ extern int debug_last_sleeping_object_count;
 extern int debug_last_manifold_overflow_count;
 /* MPE_TASK_09_MANIFOLD_OVERFLOW_EXTERN_END */
 /* MPE_TASK_V15R2_PHYSICS_HALT_EXTERN_BEGIN */
-void physics_halt_set(bool halted);
-void physics_halt_for_ticks(int ticks);
-bool physics_is_halted(void);
-bool physics_halt_tick_update(void); /* MFS_PHASE_A */
+void physics_halt_set (bool halted);
+void physics_halt_for_ticks (int ticks);
+bool physics_is_halted (void);
+bool physics_halt_tick_update (void); /* MFS_PHASE_A */
 /* MPE_TASK_V15R2_PHYSICS_HALT_EXTERN_END */
 
 #define a3_version_string "v15S-dev" /* v15S development head */

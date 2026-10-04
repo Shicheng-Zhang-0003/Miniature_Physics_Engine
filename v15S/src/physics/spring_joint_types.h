@@ -25,23 +25,23 @@ typedef struct {
  * tests, and the TUI can use springs without epoxy/OpenGL headers.
  * spring_joint.h keeps only the GL render declaration. */
 typedef struct physics_world physics_world;
-void joint_init_pool(physics_world *world);
-int spring_joint_count(const physics_world *world);
-int add_joint_by_ids(physics_world *world, uint32_t object_id_a, uint32_t object_id_b,
-                     float equilibrium_length, float spring_constant, float damping_coefficient);
-int add_joint(physics_world *world, int object_index_a, int object_index_b, float equilibrium_length,
-              float spring_constant, float damping_coefficient);
-void remove_joint(physics_world *world, int joint_pool_index);
-void remove_joints_from_object(physics_world *world, int object_index);
-void remove_joints_from_object_id(physics_world *world, uint32_t object_id);
-void apply_force_all_joints(physics_world *world);
-void apply_force_all_joints_dt(physics_world *world, float dt);
+void joint_init_pool (physics_world *world);
+int spring_joint_count (const physics_world *world);
+int add_joint_by_ids (physics_world *world, uint32_t object_id_a, uint32_t object_id_b, float equilibrium_length,
+                      float spring_constant, float damping_coefficient);
+int add_joint (physics_world *world, int object_index_a, int object_index_b, float equilibrium_length,
+               float spring_constant, float damping_coefficient);
+void remove_joint (physics_world *world, int joint_pool_index);
+void remove_joints_from_object (physics_world *world, int object_index);
+void remove_joints_from_object_id (physics_world *world, uint32_t object_id);
+void apply_force_all_joints (physics_world *world);
+void apply_force_all_joints_dt (physics_world *world, float dt);
 /* World-aware spring pass over an explicit body array (headless + world
  * step path). Reads the pool of the given world. */
-void apply_spring_forces_world(physics_world *world, rigidbody *bodies, int body_count);
-void apply_spring_forces_world_dt(physics_world *world, rigidbody *bodies, int body_count, float dt);
+void apply_spring_forces_world (physics_world *world, rigidbody *bodies, int body_count);
+void apply_spring_forces_world_dt (physics_world *world, rigidbody *bodies, int body_count, float dt);
 /* Canonical per-tick spring entry: both step paths call exactly this.
  * Weak-linked at step call sites so spring-less headless binaries link. */
-void mpe_springs_apply(physics_world *world, float dt);
+void mpe_springs_apply (physics_world *world, float dt);
 
 #endif /* spring_joint_types_h */

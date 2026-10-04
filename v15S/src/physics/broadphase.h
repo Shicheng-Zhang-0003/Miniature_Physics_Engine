@@ -40,23 +40,23 @@ typedef struct {
     int ticks_since_cell_recompute;
 } broadphase_workspace;
 
-int broadphase_generate_pairing(struct physics_world *world, broadphase_pair *collision_pairs_output_array,
-                                int maximum_pairs_allowed, float dt); /* MPE_FTC_059 */
+int broadphase_generate_pairing (struct physics_world *world, broadphase_pair *collision_pairs_output_array,
+                                 int maximum_pairs_allowed, float dt); /* MPE_FTC_059 */
 /* Conservative bounding-sphere radius (rotation-invariant). Shared with the
  * renderer's frustum culling so both use one definition. */
-float broadphase_bounding_radius(rigidbody *rb);
+float broadphase_bounding_radius (rigidbody *rb);
 
-int broadphase_get_node_overflow_count(const struct physics_world *world);
-int broadphase_get_pair_overflow_count(const struct physics_world *world);
+int broadphase_get_node_overflow_count (const struct physics_world *world);
+int broadphase_get_pair_overflow_count (const struct physics_world *world);
 /* MPE_TASK_11_LARGE_OBJECT_CLAMP_HEADER_BEGIN */
-int broadphase_get_large_object_clamp_count(const struct physics_world *world);
+int broadphase_get_large_object_clamp_count (const struct physics_world *world);
 /* MPE_TASK_11_LARGE_OBJECT_CLAMP_HEADER_END */
 /* MPE_TASK_10_PAIR_DEDUPE_HEADER_BEGIN */
-int broadphase_get_pair_dedupe_overflow_count(const struct physics_world *world);
+int broadphase_get_pair_dedupe_overflow_count (const struct physics_world *world);
 /* MPE_TASK_10_PAIR_DEDUPE_HEADER_END */
-void broadphase_reset_overflow_counts(struct physics_world *world);
-void broadphase_cleanup(struct physics_world *world);
+void broadphase_reset_overflow_counts (struct physics_world *world);
+void broadphase_cleanup (struct physics_world *world);
 /* MPE_TASK_17_CELL_SIZE_HEADER_BEGIN */
-float broadphase_get_current_cell_size(const struct physics_world *world);
+float broadphase_get_current_cell_size (const struct physics_world *world);
 /* MPE_TASK_17_CELL_SIZE_HEADER_END */
 #endif

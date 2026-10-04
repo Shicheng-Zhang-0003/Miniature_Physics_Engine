@@ -46,63 +46,63 @@
  * Older versions (<=153) keep their native-order legacy reader in
  * scene_load.c; the saver only ever writes v200. */
 
-static int save_vec3(FILE *f, uint32_t *crc, vector3 v) {
-    return scene_wfloat(f, crc, v.x) && scene_wfloat(f, crc, v.y) && scene_wfloat(f, crc, v.z);
+static int save_vec3 (FILE *f, uint32_t *crc, vector3 v) {
+    return scene_wfloat (f, crc, v.x) && scene_wfloat (f, crc, v.y) && scene_wfloat (f, crc, v.z);
 }
 
-static int save_quat(FILE *f, uint32_t *crc, vector4 q) {
-    return scene_wfloat(f, crc, q.w) && scene_wfloat(f, crc, q.x) && scene_wfloat(f, crc, q.y) &&
-           scene_wfloat(f, crc, q.z);
+static int save_quat (FILE *f, uint32_t *crc, vector4 q) {
+    return scene_wfloat (f, crc, q.w) && scene_wfloat (f, crc, q.x) && scene_wfloat (f, crc, q.y) &&
+           scene_wfloat (f, crc, q.z);
 }
 
-static int scene_sync_parent_directory(const char *path) {
+static int scene_sync_parent_directory (const char *path) {
 #ifdef MPE_OS_WINDOWS
     /* Windows has no dir-fsync; file data was already _commit'ed + renamed
      * (atomic on NTFS via MoveFileEx). Treat as success to avoid turning
      * every save into a durability warning on Windows. */
-    (void)path;
+    (void) path;
     return 1;
 #else
     char parent[520];
-    size_t length = strlen(path);
-    if (length >= sizeof(parent)) {
+    size_t length = strlen (path);
+    if (length >= sizeof (parent)) {
         return 0;
     }
-    memcpy(parent, path, length + 1);
-    char *slash = strrchr(parent, '/');
+    memcpy (parent, path, length + 1);
+    char *slash = strrchr (parent, '/');
     if (!slash) {
-        memcpy(parent, ".", 2);
+        memcpy (parent, ".", 2);
     } else if (slash == parent) {
         slash[1] = '\0';
     } else {
         *slash = '\0';
     }
-    int dir_fd = open(parent, O_RDONLY);
+    int dir_fd = open (parent, O_RDONLY);
     if (dir_fd < 0) {
         return 0;
     }
-    int ok = (fsync(dir_fd) == 0);
-    if (close(dir_fd) != 0) {
+    int ok = (fsync (dir_fd) == 0);
+    if (close (dir_fd) != 0) {
         ok = 0;
     }
     return ok;
 #endif
 }
 
-int save_scene(const char *file_destination_path) {
+int save_scene (const char *file_destination_path) {
     /* R3-03: Atomic write. mkstemp + 0600 + fsync + rename: no symlink
      * hijack, no partial file on crash. */
 #if __BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__
 #error "v200 scene format is little-endian; big-endian hosts need byteswap (unimplemented)"
 #endif
     if (!file_destination_path || !*file_destination_path) {
-        fprintf(stderr, "Error SVF01: null/empty path\n");
+        fprintf (stderr, "Error SVF01: null/empty path\n");
         return 0;
     }
-    physics_world *world = physics_world_get_primary();
+    physics_world *world = physics_world_get_primary ();
     if ((!world) || (world->body_count < 0) || (world->body_count > mpe_max_bodies) ||
         ((world->body_count > 0) && (!world->bodies))) {
-        fprintf(stderr, "Error SVF01: invalid primary world\n");
+        fprintf (stderr, "Error SVF01: invalid primary world\n");
         return 0;
     }
     /* DESPOT-2026-10-04: refuse to persist a NaN live state. A NaN body
@@ -111,95 +111,106 @@ int save_scene(const char *file_destination_path) {
      * load time with the only copy poisoned. */
     for (int svf_i = 0; svf_i < world->body_count; svf_i++) {
         rigidbody *svf_rb = &world->bodies[svf_i];
-        float svf_vals[] = {svf_rb->mass, svf_rb->radius, svf_rb->position.x, svf_rb->position.y,
-                            svf_rb->position.z, svf_rb->velocity.x, svf_rb->velocity.y,
-                            svf_rb->velocity.z, svf_rb->angular_velocity.x, svf_rb->angular_velocity.y,
-                            svf_rb->angular_velocity.z, svf_rb->orientation.w, svf_rb->orientation.x,
-                            svf_rb->orientation.y, svf_rb->orientation.z};
-        for (size_t svf_vi = 0; svf_vi < sizeof(svf_vals) / sizeof(svf_vals[0]); svf_vi++) {
-            if (!isfinite(svf_vals[svf_vi])) {
-                fprintf(stderr, "Error SVF05: body %d has non-finite state; scene NOT saved\n", svf_i);
+        float svf_vals[] = {svf_rb->mass,
+                            svf_rb->radius,
+                            svf_rb->position.x,
+                            svf_rb->position.y,
+                            svf_rb->position.z,
+                            svf_rb->velocity.x,
+                            svf_rb->velocity.y,
+                            svf_rb->velocity.z,
+                            svf_rb->angular_velocity.x,
+                            svf_rb->angular_velocity.y,
+                            svf_rb->angular_velocity.z,
+                            svf_rb->orientation.w,
+                            svf_rb->orientation.x,
+                            svf_rb->orientation.y,
+                            svf_rb->orientation.z};
+        for (size_t svf_vi = 0; svf_vi < sizeof (svf_vals) / sizeof (svf_vals[0]); svf_vi++) {
+            if (!isfinite (svf_vals[svf_vi])) {
+                fprintf (stderr, "Error SVF05: body %d has non-finite state; scene NOT saved\n", svf_i);
                 return 0;
             }
         }
     }
     char tmp_template[520];
-    if (snprintf(tmp_template, sizeof(tmp_template), "%s.XXXXXX", file_destination_path) >= (int)sizeof(tmp_template)) {
-        fprintf(stderr, "Error SVF01: path too long\n");
+    if (snprintf (tmp_template, sizeof (tmp_template), "%s.XXXXXX", file_destination_path) >=
+        (int) sizeof (tmp_template)) {
+        fprintf (stderr, "Error SVF01: path too long\n");
         return 0;
     }
 
-    int tmp_fd = mkstemp(tmp_template);
+    int tmp_fd = mkstemp (tmp_template);
     if (tmp_fd < 0) {
-        fprintf(stderr, "Error SVF01: Could not create temp file\n");
+        fprintf (stderr, "Error SVF01: Could not create temp file\n");
         return 0;
     }
-    if (fchmod(tmp_fd, 0600) != 0) {
-        close(tmp_fd);
-        remove(tmp_template);
-        fprintf(stderr, "Error SVF03: Could not secure temp file\n");
+    if (fchmod (tmp_fd, 0600) != 0) {
+        close (tmp_fd);
+        remove (tmp_template);
+        fprintf (stderr, "Error SVF03: Could not secure temp file\n");
         return 0;
     }
-    FILE *f = fdopen(tmp_fd, "wb");
+    FILE *f = fdopen (tmp_fd, "wb");
     if (!f) {
-        close(tmp_fd);
-        remove(tmp_template);
-        fprintf(stderr, "Error SVF01: Could not open temp file\n");
+        close (tmp_fd);
+        remove (tmp_template);
+        fprintf (stderr, "Error SVF01: Could not open temp file\n");
         return 0;
     }
     uint32_t crc = 0xFFFFFFFFu;
     int ok = 1;
-    ok = ok && scene_w32(f, &crc, (uint32_t) mpe_magic);
-    ok = ok && scene_w32(f, &crc, (uint32_t) mpe_version);
-    ok = ok && scene_w32(f, &crc, (uint32_t) (physics_world_get_primary()->body_count));
-    for (int i = 0; ok && (i < (physics_world_get_primary()->body_count)); i++) {
-        rigidbody *rb = &(physics_world_get_primary()->bodies)[i];
-        ok = ok && scene_w32(f, &crc, (uint32_t) rb->type);
-        ok = ok && scene_wfloat(f, &crc, rb->mass);
-        ok = ok && scene_wfloat(f, &crc, rb->radius);
-        ok = ok && scene_wfloat(f, &crc, rb->cylinder_half_length);
-        ok = ok && save_vec3(f, &crc, rb->half_extensions);
-        ok = ok && save_vec3(f, &crc, rb->position);
-        ok = ok && save_vec3(f, &crc, rb->velocity);
-        ok = ok && save_vec3(f, &crc, rb->angular_velocity);
-        ok = ok && save_quat(f, &crc, rb->orientation);
-        ok = ok && save_vec3(f, &crc, rb->colour);
-        ok = ok && scene_wfloat(f, &crc, rb->restitution);
-        ok = ok && scene_wfloat(f, &crc, rb->friction_static);
-        ok = ok && scene_wfloat(f, &crc, rb->friction_kinetic);
-        ok = ok && scene_w32(f, &crc, rb->static_state ? 1u : 0u);
-        ok = ok && scene_w32(f, &crc, rb->object_id); /* MPE_FTC_058 */
-        ok = ok && scene_w32(f, &crc, (uint32_t) rb->nice_value);
-        ok = ok && scene_w32(f, &crc, rb->is_sleeping ? 1u : 0u);
-        ok = ok && scene_wfloat(f, &crc, rb->sleep_timer);
-        ok = ok && scene_w32(f, &crc, rb->kinematic ? 1u : 0u);
-        ok = ok && scene_w32(f, &crc, rb->object_generation);
+    ok = ok && scene_w32 (f, &crc, (uint32_t) mpe_magic);
+    ok = ok && scene_w32 (f, &crc, (uint32_t) mpe_version);
+    ok = ok && scene_w32 (f, &crc, (uint32_t) (physics_world_get_primary ()->body_count));
+    for (int i = 0; ok && (i < (physics_world_get_primary ()->body_count)); i++) {
+        rigidbody *rb = &(physics_world_get_primary ()->bodies)[i];
+        ok = ok && scene_w32 (f, &crc, (uint32_t) rb->type);
+        ok = ok && scene_wfloat (f, &crc, rb->mass);
+        ok = ok && scene_wfloat (f, &crc, rb->radius);
+        ok = ok && scene_wfloat (f, &crc, rb->cylinder_half_length);
+        ok = ok && save_vec3 (f, &crc, rb->half_extensions);
+        ok = ok && save_vec3 (f, &crc, rb->position);
+        ok = ok && save_vec3 (f, &crc, rb->velocity);
+        ok = ok && save_vec3 (f, &crc, rb->angular_velocity);
+        ok = ok && save_quat (f, &crc, rb->orientation);
+        ok = ok && save_vec3 (f, &crc, rb->colour);
+        ok = ok && scene_wfloat (f, &crc, rb->restitution);
+        ok = ok && scene_wfloat (f, &crc, rb->friction_static);
+        ok = ok && scene_wfloat (f, &crc, rb->friction_kinetic);
+        ok = ok && scene_w32 (f, &crc, rb->static_state ? 1u : 0u);
+        ok = ok && scene_w32 (f, &crc, rb->object_id); /* MPE_FTC_058 */
+        ok = ok && scene_w32 (f, &crc, (uint32_t) rb->nice_value);
+        ok = ok && scene_w32 (f, &crc, rb->is_sleeping ? 1u : 0u);
+        ok = ok && scene_wfloat (f, &crc, rb->sleep_timer);
+        ok = ok && scene_w32 (f, &crc, rb->kinematic ? 1u : 0u);
+        ok = ok && scene_w32 (f, &crc, rb->object_generation);
     }
     /* FIX-AUDIT: scan the FULL pool, not 0..(physics_world_get_primary()->spring_joint_count). Removal
      * leaves holes (active joints above a removed index), which the old
      * bound silently dropped from saves. */
     int active_springs = 0;
     for (int j = 0; j < mpe_max_joints; j++) {
-        if ((physics_world_get_primary()->spring_joints)[j].is_active) {
+        if ((physics_world_get_primary ()->spring_joints)[j].is_active) {
             active_springs++;
         }
     }
-    ok = ok && scene_w32(f, &crc, (uint32_t) active_springs);
+    ok = ok && scene_w32 (f, &crc, (uint32_t) active_springs);
     for (int j = 0; ok && (j < mpe_max_joints); j++) {
-        if (!(physics_world_get_primary()->spring_joints)[j].is_active) {
+        if (!(physics_world_get_primary ()->spring_joints)[j].is_active) {
             continue;
         }
-        ok = ok && scene_w32(f, &crc, (physics_world_get_primary()->spring_joints)[j].object_id_a);
-        ok = ok && scene_w32(f, &crc, (physics_world_get_primary()->spring_joints)[j].object_id_b);
-        ok = ok && scene_wfloat(f, &crc, (physics_world_get_primary()->spring_joints)[j].equilibrium_length);
-        ok = ok && scene_wfloat(f, &crc, (physics_world_get_primary()->spring_joints)[j].spring_constant);
-        ok = ok && scene_wfloat(f, &crc, (physics_world_get_primary()->spring_joints)[j].damping_coefficient);
+        ok = ok && scene_w32 (f, &crc, (physics_world_get_primary ()->spring_joints)[j].object_id_a);
+        ok = ok && scene_w32 (f, &crc, (physics_world_get_primary ()->spring_joints)[j].object_id_b);
+        ok = ok && scene_wfloat (f, &crc, (physics_world_get_primary ()->spring_joints)[j].equilibrium_length);
+        ok = ok && scene_wfloat (f, &crc, (physics_world_get_primary ()->spring_joints)[j].spring_constant);
+        ok = ok && scene_wfloat (f, &crc, (physics_world_get_primary ()->spring_joints)[j].damping_coefficient);
     }
 
     /* Save all constraint types from the unified constraint pool. */
     int constraint_counts[5] = {0}; /* fixed, distance, prismatic, rope (revolute handled separately) */
-    for (int j = 0; j < constraint_pool_capacity(); j++) {
-        const constraint *c = constraint_pool_at(physics_world_get_primary(), j);
+    for (int j = 0; j < constraint_pool_capacity (); j++) {
+        const constraint *c = constraint_pool_at (physics_world_get_primary (), j);
         if ((c) && (c->type != constraint_revolute) && (c->type != constraint_spring)) {
             if (c->type < constraint_fixed || c->type > constraint_rope) {
                 continue;
@@ -209,136 +220,136 @@ int save_scene(const char *file_destination_path) {
     }
 
     /* Fixed constraints */
-    ok = ok && scene_w32(f, &crc, (uint32_t) constraint_counts[constraint_fixed - constraint_fixed]);
-    for (int j = 0; ok && (j < constraint_pool_capacity()); j++) {
-        const constraint *c = constraint_pool_at(physics_world_get_primary(), j);
+    ok = ok && scene_w32 (f, &crc, (uint32_t) constraint_counts[constraint_fixed - constraint_fixed]);
+    for (int j = 0; ok && (j < constraint_pool_capacity ()); j++) {
+        const constraint *c = constraint_pool_at (physics_world_get_primary (), j);
         if ((!c) || (c->type != constraint_fixed)) continue;
-        ok = ok && scene_w32(f, &crc, (uint32_t) c->type);
-        ok = ok && scene_w32(f, &crc, c->body_id_a);
-        ok = ok && scene_w32(f, &crc, c->body_id_b);
-        ok = ok && save_vec3(f, &crc, c->p.fixed.anchor_a);
-        ok = ok && save_vec3(f, &crc, c->p.fixed.anchor_b);
+        ok = ok && scene_w32 (f, &crc, (uint32_t) c->type);
+        ok = ok && scene_w32 (f, &crc, c->body_id_a);
+        ok = ok && scene_w32 (f, &crc, c->body_id_b);
+        ok = ok && save_vec3 (f, &crc, c->p.fixed.anchor_a);
+        ok = ok && save_vec3 (f, &crc, c->p.fixed.anchor_b);
     }
 
     /* Distance constraints */
-    ok = ok && scene_w32(f, &crc, (uint32_t) constraint_counts[constraint_distance - constraint_fixed]);
-    for (int j = 0; ok && (j < constraint_pool_capacity()); j++) {
-        const constraint *c = constraint_pool_at(physics_world_get_primary(), j);
+    ok = ok && scene_w32 (f, &crc, (uint32_t) constraint_counts[constraint_distance - constraint_fixed]);
+    for (int j = 0; ok && (j < constraint_pool_capacity ()); j++) {
+        const constraint *c = constraint_pool_at (physics_world_get_primary (), j);
         if ((!c) || (c->type != constraint_distance)) continue;
-        ok = ok && scene_w32(f, &crc, (uint32_t) c->type);
-        ok = ok && scene_w32(f, &crc, c->body_id_a);
-        ok = ok && scene_w32(f, &crc, c->body_id_b);
-        ok = ok && save_vec3(f, &crc, c->p.distance.anchor_a);
-        ok = ok && save_vec3(f, &crc, c->p.distance.anchor_b);
-        ok = ok && scene_wfloat(f, &crc, c->p.distance.rest_length);
+        ok = ok && scene_w32 (f, &crc, (uint32_t) c->type);
+        ok = ok && scene_w32 (f, &crc, c->body_id_a);
+        ok = ok && scene_w32 (f, &crc, c->body_id_b);
+        ok = ok && save_vec3 (f, &crc, c->p.distance.anchor_a);
+        ok = ok && save_vec3 (f, &crc, c->p.distance.anchor_b);
+        ok = ok && scene_wfloat (f, &crc, c->p.distance.rest_length);
     }
 
     /* Prismatic constraints */
-    ok = ok && scene_w32(f, &crc, (uint32_t) constraint_counts[constraint_prismatic - constraint_fixed]);
-    for (int j = 0; ok && (j < constraint_pool_capacity()); j++) {
-        const constraint *c = constraint_pool_at(physics_world_get_primary(), j);
+    ok = ok && scene_w32 (f, &crc, (uint32_t) constraint_counts[constraint_prismatic - constraint_fixed]);
+    for (int j = 0; ok && (j < constraint_pool_capacity ()); j++) {
+        const constraint *c = constraint_pool_at (physics_world_get_primary (), j);
         if ((!c) || (c->type != constraint_prismatic)) continue;
-        ok = ok && scene_w32(f, &crc, (uint32_t) c->type);
-        ok = ok && scene_w32(f, &crc, c->body_id_a);
-        ok = ok && scene_w32(f, &crc, c->body_id_b);
-        ok = ok && save_vec3(f, &crc, c->p.prismatic.anchor_a);
-        ok = ok && save_vec3(f, &crc, c->p.prismatic.anchor_b);
-        ok = ok && save_vec3(f, &crc, c->p.prismatic.axis_a);
-        ok = ok && save_vec3(f, &crc, c->p.prismatic.axis_b);
-        ok = ok && scene_w32(f, &crc, c->p.prismatic.motor_enabled ? 1u : 0u);
-        ok = ok && scene_wfloat(f, &crc, c->p.prismatic.motor_target_speed);
-        ok = ok && scene_wfloat(f, &crc, c->p.prismatic.motor_max_force);
-        ok = ok && scene_w32(f, &crc, c->p.prismatic.limits_enabled ? 1u : 0u);
-        ok = ok && scene_wfloat(f, &crc, c->p.prismatic.limit_min);
-        ok = ok && scene_wfloat(f, &crc, c->p.prismatic.limit_max);
+        ok = ok && scene_w32 (f, &crc, (uint32_t) c->type);
+        ok = ok && scene_w32 (f, &crc, c->body_id_a);
+        ok = ok && scene_w32 (f, &crc, c->body_id_b);
+        ok = ok && save_vec3 (f, &crc, c->p.prismatic.anchor_a);
+        ok = ok && save_vec3 (f, &crc, c->p.prismatic.anchor_b);
+        ok = ok && save_vec3 (f, &crc, c->p.prismatic.axis_a);
+        ok = ok && save_vec3 (f, &crc, c->p.prismatic.axis_b);
+        ok = ok && scene_w32 (f, &crc, c->p.prismatic.motor_enabled ? 1u : 0u);
+        ok = ok && scene_wfloat (f, &crc, c->p.prismatic.motor_target_speed);
+        ok = ok && scene_wfloat (f, &crc, c->p.prismatic.motor_max_force);
+        ok = ok && scene_w32 (f, &crc, c->p.prismatic.limits_enabled ? 1u : 0u);
+        ok = ok && scene_wfloat (f, &crc, c->p.prismatic.limit_min);
+        ok = ok && scene_wfloat (f, &crc, c->p.prismatic.limit_max);
     }
 
     /* Rope constraints */
-    ok = ok && scene_w32(f, &crc, (uint32_t) constraint_counts[constraint_rope - constraint_fixed]);
-    for (int j = 0; ok && (j < constraint_pool_capacity()); j++) {
-        const constraint *c = constraint_pool_at(physics_world_get_primary(), j);
+    ok = ok && scene_w32 (f, &crc, (uint32_t) constraint_counts[constraint_rope - constraint_fixed]);
+    for (int j = 0; ok && (j < constraint_pool_capacity ()); j++) {
+        const constraint *c = constraint_pool_at (physics_world_get_primary (), j);
         if ((!c) || (c->type != constraint_rope)) continue;
-        ok = ok && scene_w32(f, &crc, (uint32_t) c->type);
-        ok = ok && scene_w32(f, &crc, c->body_id_a);
-        ok = ok && scene_w32(f, &crc, c->body_id_b);
-        ok = ok && save_vec3(f, &crc, c->p.rope.anchor_a);
-        ok = ok && save_vec3(f, &crc, c->p.rope.anchor_b);
-        ok = ok && scene_wfloat(f, &crc, c->p.rope.rest_length);
+        ok = ok && scene_w32 (f, &crc, (uint32_t) c->type);
+        ok = ok && scene_w32 (f, &crc, c->body_id_a);
+        ok = ok && scene_w32 (f, &crc, c->body_id_b);
+        ok = ok && save_vec3 (f, &crc, c->p.rope.anchor_a);
+        ok = ok && save_vec3 (f, &crc, c->p.rope.anchor_b);
+        ok = ok && scene_wfloat (f, &crc, c->p.rope.rest_length);
     }
 
     /* Revolute constraints (kept for backward compatibility) */
     int active_revolutes = 0;
-    for (int j = 0; j < constraint_pool_capacity(); j++) {
-        const constraint *c = constraint_pool_at(physics_world_get_primary(), j);
+    for (int j = 0; j < constraint_pool_capacity (); j++) {
+        const constraint *c = constraint_pool_at (physics_world_get_primary (), j);
         if ((c) && (c->type == constraint_revolute)) {
             active_revolutes++;
         }
     }
-    ok = ok && scene_w32(f, &crc, (uint32_t) active_revolutes);
-    for (int j = 0; ok && (j < constraint_pool_capacity()); j++) {
-        const constraint *c = constraint_pool_at(physics_world_get_primary(), j);
+    ok = ok && scene_w32 (f, &crc, (uint32_t) active_revolutes);
+    for (int j = 0; ok && (j < constraint_pool_capacity ()); j++) {
+        const constraint *c = constraint_pool_at (physics_world_get_primary (), j);
         if ((!c) || (c->type != constraint_revolute)) {
             continue;
         }
-        ok = ok && scene_w32(f, &crc, (uint32_t) c->type);
-        ok = ok && scene_w32(f, &crc, c->body_id_a);
-        ok = ok && scene_w32(f, &crc, c->body_id_b);
-        ok = ok && save_vec3(f, &crc, c->p.revolute.anchor_a);
-        ok = ok && save_vec3(f, &crc, c->p.revolute.anchor_b);
-        ok = ok && save_vec3(f, &crc, c->p.revolute.axis_a);
-        ok = ok && save_vec3(f, &crc, c->p.revolute.axis_b);
-        ok = ok && scene_w32(f, &crc, c->p.revolute.motor_enabled ? 1u : 0u);
-        ok = ok && scene_wfloat(f, &crc, c->p.revolute.motor_target_speed);
-        ok = ok && scene_wfloat(f, &crc, c->p.revolute.motor_max_torque);
-        ok = ok && scene_w32(f, &crc, c->p.revolute.limits_enabled ? 1u : 0u);
-        ok = ok && scene_wfloat(f, &crc, c->p.revolute.limit_min_rad);
-        ok = ok && scene_wfloat(f, &crc, c->p.revolute.limit_max_rad);
+        ok = ok && scene_w32 (f, &crc, (uint32_t) c->type);
+        ok = ok && scene_w32 (f, &crc, c->body_id_a);
+        ok = ok && scene_w32 (f, &crc, c->body_id_b);
+        ok = ok && save_vec3 (f, &crc, c->p.revolute.anchor_a);
+        ok = ok && save_vec3 (f, &crc, c->p.revolute.anchor_b);
+        ok = ok && save_vec3 (f, &crc, c->p.revolute.axis_a);
+        ok = ok && save_vec3 (f, &crc, c->p.revolute.axis_b);
+        ok = ok && scene_w32 (f, &crc, c->p.revolute.motor_enabled ? 1u : 0u);
+        ok = ok && scene_wfloat (f, &crc, c->p.revolute.motor_target_speed);
+        ok = ok && scene_wfloat (f, &crc, c->p.revolute.motor_max_torque);
+        ok = ok && scene_w32 (f, &crc, c->p.revolute.limits_enabled ? 1u : 0u);
+        ok = ok && scene_wfloat (f, &crc, c->p.revolute.limit_min_rad);
+        ok = ok && scene_wfloat (f, &crc, c->p.revolute.limit_max_rad);
     }
 
     /* Footer CRC over every preceding byte (finalize + raw LE append). */
     uint32_t final_crc = crc ^ 0xFFFFFFFFu;
     if (ok) {
-        unsigned char footer[4] = {(unsigned char) (final_crc & 0xFFu),
-                                   (unsigned char) ((final_crc >> 8) & 0xFFu),
+        unsigned char footer[4] = {(unsigned char) (final_crc & 0xFFu), (unsigned char) ((final_crc >> 8) & 0xFFu),
                                    (unsigned char) ((final_crc >> 16) & 0xFFu),
                                    (unsigned char) ((final_crc >> 24) & 0xFFu)};
-        ok = (fwrite(footer, 1, 4, f) == 4);
+        ok = (fwrite (footer, 1, 4, f) == 4);
     }
     /* Fail the save if any buffered write errored. */
-    if ((!ok) || ferror(f)) {
-        fprintf(stderr, "Error SVF03: Write failure\n");
-        fclose(f);
-        remove(tmp_template);
+    if ((!ok) || ferror (f)) {
+        fprintf (stderr, "Error SVF03: Write failure\n");
+        fclose (f);
+        remove (tmp_template);
         return 0;
     }
     /* Surface delayed filesystem failures before publishing the staged file. */
-    if ((fflush(f) != 0) || ferror(f)) {
+    if ((fflush (f) != 0) || ferror (f)) {
         ok = 0;
     }
-    int fsync_fd = fileno(f);
-    if ((fsync_fd < 0) || (fsync(fsync_fd) != 0)) {
+    int fsync_fd = fileno (f);
+    if ((fsync_fd < 0) || (fsync (fsync_fd) != 0)) {
         ok = 0;
     }
-    if (fclose(f) != 0) {
+    if (fclose (f) != 0) {
         ok = 0;
     }
     if (!ok) {
-        fprintf(stderr, "Error SVF03: Flush or sync failure\n");
-        remove(tmp_template);
+        fprintf (stderr, "Error SVF03: Flush or sync failure\n");
+        remove (tmp_template);
         return 0;
     }
     /* R3-03: Atomic rename over the target */
-    if (rename(tmp_template, file_destination_path) != 0) {
-        fprintf(stderr, "Error SVF02: Could not rename temp file\n");
-        remove(tmp_template);
+    if (rename (tmp_template, file_destination_path) != 0) {
+        fprintf (stderr, "Error SVF02: Could not rename temp file\n");
+        remove (tmp_template);
         return 0;
     }
-    if (!scene_sync_parent_directory(file_destination_path)) {
+    if (!scene_sync_parent_directory (file_destination_path)) {
         /* FIX-AUDIT-DESPOT: the scene bytes are durable (fsync'd + renamed);
          * only the directory entry is not. Failing the whole save (return 0)
          * lied to callers and risked retry loops overwriting a good file.
          * Return 2 = success with durability warning (see scene_saving.h). */
-        fprintf(stderr, "Error SVF04: Scene replaced, but parent-directory sync failed; crash durability is uncertain\n");
+        fprintf (stderr,
+                 "Error SVF04: Scene replaced, but parent-directory sync failed; crash durability is uncertain\n");
         return 2;
     }
     return 1;

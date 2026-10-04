@@ -11,20 +11,20 @@
 #include <stdbool.h>
 #include <math.h>
 
-bool collision_dual_sphere(rigidbody *rigidbody_object_a, rigidbody *rigidbody_object_b,
-                           collision_data *collision_output_data, const mpe_config_t *cfg) {
+bool collision_dual_sphere (rigidbody *rigidbody_object_a, rigidbody *rigidbody_object_b,
+                            collision_data *collision_output_data, const mpe_config_t *cfg) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
     /* TRUTH: degenerate spheres (NaN/radius<=0) must return false, never a
      * phantom zero-depth contact with an arbitrary +Y normal. */
-    if (!isfinite(rigidbody_object_a->radius) || !isfinite(rigidbody_object_b->radius)) {
+    if (!isfinite (rigidbody_object_a->radius) || !isfinite (rigidbody_object_b->radius)) {
         return false;
     }
     if (rigidbody_object_a->radius <= 0.0f || rigidbody_object_b->radius <= 0.0f) {
         return false;
     }
-    vector3 relative_position_vector = vector3_subtraction(rigidbody_object_b->position, rigidbody_object_a->position);
-    float distance_between_centres_squared = vector3_length_squared(relative_position_vector);
-    if (!isfinite(distance_between_centres_squared)) {
+    vector3 relative_position_vector = vector3_subtraction (rigidbody_object_b->position, rigidbody_object_a->position);
+    float distance_between_centres_squared = vector3_length_squared (relative_position_vector);
+    if (!isfinite (distance_between_centres_squared)) {
         return false;
     }
     float total_combined_radius = rigidbody_object_a->radius + rigidbody_object_b->radius;
@@ -37,13 +37,13 @@ bool collision_dual_sphere(rigidbody *rigidbody_object_a, rigidbody *rigidbody_o
     if (distance_between_centres_squared >= outer * outer) {
         return false;
     }
-    float distance_between_centres = sqrtf(distance_between_centres_squared);
+    float distance_between_centres = sqrtf (distance_between_centres_squared);
     collision_output_data->object_a = rigidbody_object_a;
     collision_output_data->object_b = rigidbody_object_b;
     const float minimum_distance_threshold_epsilon = 0.0001f;
     if (distance_between_centres > minimum_distance_threshold_epsilon) {
         collision_output_data->normal_vector =
-            vector3_scaling(relative_position_vector, 1.0f / distance_between_centres);
+            vector3_scaling (relative_position_vector, 1.0f / distance_between_centres);
     } else {
         collision_output_data->normal_vector = (vector3){0.0f, 1.0f, 0.0f};
     }
@@ -51,45 +51,46 @@ bool collision_dual_sphere(rigidbody *rigidbody_object_a, rigidbody *rigidbody_o
     contact_point_data *cp = &collision_output_data->contacts[0];
     float raw_pen = total_combined_radius - distance_between_centres;
     cp->penetration = (raw_pen > 0.0f) ? raw_pen : 0.0f;
-    cp->position = vector3_addition(rigidbody_object_a->position,
-                                    vector3_scaling(collision_output_data->normal_vector, rigidbody_object_a->radius));
+    cp->position =
+        vector3_addition (rigidbody_object_a->position,
+                          vector3_scaling (collision_output_data->normal_vector, rigidbody_object_a->radius));
     collision_output_data->contact_count = 1;
     return true;
 }
 
-float project_obb(rigidbody *rigid_body, vector3 axis, vector3 axes[3]) {
-    return rigid_body->half_extensions.x * fabsf(vector3_dot(axes[0], axis)) +
-           rigid_body->half_extensions.y * fabsf(vector3_dot(axes[1], axis)) +
-           rigid_body->half_extensions.z * fabsf(vector3_dot(axes[2], axis));
+float project_obb (rigidbody *rigid_body, vector3 axis, vector3 axes[3]) {
+    return rigid_body->half_extensions.x * fabsf (vector3_dot (axes[0], axis)) +
+           rigid_body->half_extensions.y * fabsf (vector3_dot (axes[1], axis)) +
+           rigid_body->half_extensions.z * fabsf (vector3_dot (axes[2], axis));
 }
 
-bool collision_sphere_cube(rigidbody *sphere, rigidbody *cube, collision_data *collision_output_data,
-                           const mpe_config_t *cfg) {
+bool collision_sphere_cube (rigidbody *sphere, rigidbody *cube, collision_data *collision_output_data,
+                            const mpe_config_t *cfg) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
     /* TRUTH: degenerate inputs must return false, never phantom contacts.
      * Zero-radius spheres and NaN cube geometry previously emitted
      * slop-band contacts with NaN closest points. */
-    if (!isfinite(sphere->radius) || sphere->radius <= 0.0f) {
+    if (!isfinite (sphere->radius) || sphere->radius <= 0.0f) {
         return false;
     }
-    if (!isfinite(cube->half_extensions.x) || !isfinite(cube->half_extensions.y) ||
-        !isfinite(cube->half_extensions.z)) {
+    if (!isfinite (cube->half_extensions.x) || !isfinite (cube->half_extensions.y) ||
+        !isfinite (cube->half_extensions.z)) {
         return false;
     }
     vector3 *axes_cube = cube->cached_axes;
     for (int ai = 0; ai < 3; ai++) {
-        if (!isfinite(axes_cube[ai].x) || !isfinite(axes_cube[ai].y) || !isfinite(axes_cube[ai].z)) {
+        if (!isfinite (axes_cube[ai].x) || !isfinite (axes_cube[ai].y) || !isfinite (axes_cube[ai].z)) {
             return false;
         }
     }
-    vector3 relative_position = vector3_subtraction(sphere->position, cube->position);
+    vector3 relative_position = vector3_subtraction (sphere->position, cube->position);
     vector3 closest_point = cube->position;
     bool inside = true;
     float minimum_distance = 1000000.0f;
     int nearest_face_axis = 0;
     float nearest_face_sign = 1.0f;
     for (int axis_index = 0; axis_index < 3; axis_index++) {
-        float distance = vector3_dot(relative_position, axes_cube[axis_index]);
+        float distance = vector3_dot (relative_position, axes_cube[axis_index]);
         float extent = (axis_index == 0)   ? cube->half_extensions.x
                        : (axis_index == 1) ? cube->half_extensions.y
                                            : cube->half_extensions.z;
@@ -113,10 +114,10 @@ bool collision_sphere_cube(rigidbody *sphere, rigidbody *cube, collision_data *c
                 nearest_face_sign = -1.0f;
             }
         }
-        closest_point = vector3_addition(closest_point, vector3_scaling(axes_cube[axis_index], distance));
+        closest_point = vector3_addition (closest_point, vector3_scaling (axes_cube[axis_index], distance));
     }
-    vector3 difference = vector3_subtraction(sphere->position, closest_point);
-    float distance_sq = vector3_length_squared(difference);
+    vector3 difference = vector3_subtraction (sphere->position, closest_point);
+    float distance_sq = vector3_length_squared (difference);
     /* TRUTH: slop parity. Outside branch must admit [-slop,0) as zero-depth
      * like every other path (dual_sphere, clip, floor, cyl). Old strict
      * radius test flickered resting contact. */
@@ -137,32 +138,31 @@ bool collision_sphere_cube(rigidbody *sphere, rigidbody *cube, collision_data *c
          * center). The 26/09/26 flip to outward (B->A) made vn>0 for
          * approaching pairs, so lambda clamped to 0 and floors/stacks
          * stopped solving (stack drift 55m, static_hold 105m). Restored. */
-        vector3 outward = vector3_scaling(axes_cube[nearest_face_axis], nearest_face_sign);
-        collision_output_data->normal_vector = vector3_scaling(outward, -1.0f);
+        vector3 outward = vector3_scaling (axes_cube[nearest_face_axis], nearest_face_sign);
+        collision_output_data->normal_vector = vector3_scaling (outward, -1.0f);
         cp->penetration = sphere->radius + minimum_distance;
         /* Contact on the cube FACE (not the sphere center): the lever arms
          * ra/rb must span contact-to-center for correct torque. */
-        float face_local[3] = {vector3_dot(relative_position, axes_cube[0]),
-                               vector3_dot(relative_position, axes_cube[1]),
-                               vector3_dot(relative_position, axes_cube[2])};
+        float face_local[3] = {vector3_dot (relative_position, axes_cube[0]),
+                               vector3_dot (relative_position, axes_cube[1]),
+                               vector3_dot (relative_position, axes_cube[2])};
         float face_extent = (nearest_face_axis == 0)   ? cube->half_extensions.x
                             : (nearest_face_axis == 1) ? cube->half_extensions.y
                                                        : cube->half_extensions.z;
         face_local[nearest_face_axis] = nearest_face_sign * face_extent;
-        cp->position = vector3_addition(
-            cube->position,
-            vector3_addition(vector3_scaling(axes_cube[0], face_local[0]),
-                             vector3_addition(vector3_scaling(axes_cube[1], face_local[1]),
-                                              vector3_scaling(axes_cube[2], face_local[2]))));
+        cp->position = vector3_addition (
+            cube->position, vector3_addition (vector3_scaling (axes_cube[0], face_local[0]),
+                                              vector3_addition (vector3_scaling (axes_cube[1], face_local[1]),
+                                                                vector3_scaling (axes_cube[2], face_local[2]))));
     } else {
-        float distance = sqrtf(distance_sq);
+        float distance = sqrtf (distance_sq);
         if (distance > 0.0001f) {
-            collision_output_data->normal_vector = vector3_scaling(difference, -1.0f / distance);
+            collision_output_data->normal_vector = vector3_scaling (difference, -1.0f / distance);
         } else {
             /* Degenerate: center within 0.1mm of surface. True normal is
              * the nearest face normal, A->B = -outward (see above). */
-            vector3 outward = vector3_scaling(axes_cube[nearest_face_axis], nearest_face_sign);
-            collision_output_data->normal_vector = vector3_scaling(outward, -1.0f);
+            vector3 outward = vector3_scaling (axes_cube[nearest_face_axis], nearest_face_sign);
+            collision_output_data->normal_vector = vector3_scaling (outward, -1.0f);
         }
         float raw_pen_sc = sphere->radius - distance;
         /* TRUTH: clamp slop-band negatives to zero (friction-only). */
@@ -173,8 +173,8 @@ bool collision_sphere_cube(rigidbody *sphere, rigidbody *cube, collision_data *c
     return true;
 }
 
-static void clip_obb_faces(rigidbody *ref_body, rigidbody *inc_body, vector3 normal, float overlap,
-                           collision_data *collision_output_data, const mpe_config_t *cfg) {
+static void clip_obb_faces (rigidbody *ref_body, rigidbody *inc_body, vector3 normal, float overlap,
+                            collision_data *collision_output_data, const mpe_config_t *cfg) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
     (void) overlap; /* slop-gated admission below; no phantom fallback uses this */
     vector3 *ref_axes = ref_body->cached_axes;
@@ -182,15 +182,15 @@ static void clip_obb_faces(rigidbody *ref_body, rigidbody *inc_body, vector3 nor
     int ref_axis_idx = 0;
     float max_dot = -1.0f;
     for (int i = 0; i < 3; i++) {
-        float dot_val = vector3_dot(ref_axes[i], normal);
-        if (fabsf(dot_val) > max_dot) {
-            max_dot = fabsf(dot_val);
+        float dot_val = vector3_dot (ref_axes[i], normal);
+        if (fabsf (dot_val) > max_dot) {
+            max_dot = fabsf (dot_val);
             ref_axis_idx = i;
         }
     }
     vector3 ref_normal = ref_axes[ref_axis_idx];
-    if (vector3_dot(ref_normal, normal) < 0.0f) {
-        ref_normal = vector3_scaling(ref_normal, -1.0f);
+    if (vector3_dot (ref_normal, normal) < 0.0f) {
+        ref_normal = vector3_scaling (ref_normal, -1.0f);
     }
     int side_axis_idx_1 = (ref_axis_idx + 1) % 3;
     int side_axis_idx_2 = (ref_axis_idx + 2) % 3;
@@ -203,7 +203,7 @@ static void clip_obb_faces(rigidbody *ref_body, rigidbody *inc_body, vector3 nor
     float ref_extent_2 = (side_axis_idx_2 == 0)   ? ref_extents.x
                          : (side_axis_idx_2 == 1) ? ref_extents.y
                                                   : ref_extents.z;
-    vector3 ref_center = vector3_addition(ref_body->position, vector3_scaling(ref_normal, ref_extent_n));
+    vector3 ref_center = vector3_addition (ref_body->position, vector3_scaling (ref_normal, ref_extent_n));
 
     vector3 *inc_axes = inc_body->cached_axes;
     vector3 inc_extents = inc_body->half_extensions;
@@ -212,7 +212,7 @@ static void clip_obb_faces(rigidbody *ref_body, rigidbody *inc_body, vector3 nor
     float max_abs_dot = -1.0f;
 
     for (int i = 0; i < 3; i++) {
-        float dot_val = fabsf(vector3_dot(inc_axes[i], ref_normal));
+        float dot_val = fabsf (vector3_dot (inc_axes[i], ref_normal));
         if (dot_val > max_abs_dot) {
             max_abs_dot = dot_val;
             inc_axis_idx = i;
@@ -225,8 +225,8 @@ static void clip_obb_faces(rigidbody *ref_body, rigidbody *inc_body, vector3 nor
 
     vector3 inc_normal = inc_axes[inc_axis_idx];
 
-    if (vector3_dot(inc_normal, ref_normal) > 0.0f) {
-        inc_normal = vector3_scaling(inc_normal, -1.0f);
+    if (vector3_dot (inc_normal, ref_normal) > 0.0f) {
+        inc_normal = vector3_scaling (inc_normal, -1.0f);
     }
     /* MPE_F5_FACE_CLIP_INCIDENT_FIX_END */
     int inc_u_idx = (inc_axis_idx + 1) % 3;
@@ -236,29 +236,30 @@ static void clip_obb_faces(rigidbody *ref_body, rigidbody *inc_body, vector3 nor
     float inc_extent_n = (inc_axis_idx == 0) ? inc_extents.x : (inc_axis_idx == 1) ? inc_extents.y : inc_extents.z;
     float inc_extent_u = (inc_u_idx == 0) ? inc_extents.x : (inc_u_idx == 1) ? inc_extents.y : inc_extents.z;
     float inc_extent_v = (inc_v_idx == 0) ? inc_extents.x : (inc_v_idx == 1) ? inc_extents.y : inc_extents.z;
-    vector3 inc_center = vector3_addition(inc_body->position, vector3_scaling(inc_normal, inc_extent_n));
+    vector3 inc_center = vector3_addition (inc_body->position, vector3_scaling (inc_normal, inc_extent_n));
 
     vector3 input_polygon[16];
-    input_polygon[0] = vector3_addition(inc_center, vector3_addition(vector3_scaling(inc_u_axis, inc_extent_u),
-                                                                     vector3_scaling(inc_v_axis, inc_extent_v)));
-    input_polygon[1] = vector3_addition(inc_center, vector3_subtraction(vector3_scaling(inc_u_axis, inc_extent_u),
-                                                                        vector3_scaling(inc_v_axis, inc_extent_v)));
-    input_polygon[2] = vector3_subtraction(inc_center, vector3_addition(vector3_scaling(inc_u_axis, inc_extent_u),
-                                                                        vector3_scaling(inc_v_axis, inc_extent_v)));
-    input_polygon[3] = vector3_subtraction(inc_center, vector3_subtraction(vector3_scaling(inc_u_axis, inc_extent_u),
-                                                                           vector3_scaling(inc_v_axis, inc_extent_v)));
+    input_polygon[0] = vector3_addition (inc_center, vector3_addition (vector3_scaling (inc_u_axis, inc_extent_u),
+                                                                       vector3_scaling (inc_v_axis, inc_extent_v)));
+    input_polygon[1] = vector3_addition (inc_center, vector3_subtraction (vector3_scaling (inc_u_axis, inc_extent_u),
+                                                                          vector3_scaling (inc_v_axis, inc_extent_v)));
+    input_polygon[2] = vector3_subtraction (inc_center, vector3_addition (vector3_scaling (inc_u_axis, inc_extent_u),
+                                                                          vector3_scaling (inc_v_axis, inc_extent_v)));
+    input_polygon[3] =
+        vector3_subtraction (inc_center, vector3_subtraction (vector3_scaling (inc_u_axis, inc_extent_u),
+                                                              vector3_scaling (inc_v_axis, inc_extent_v)));
     int input_count = 4;
 
     vector3 clip_normals[4];
     float clip_offsets[4];
     clip_normals[0] = side_axis_1;
-    clip_offsets[0] = vector3_dot(ref_center, side_axis_1) + ref_extent_1;
-    clip_normals[1] = vector3_scaling(side_axis_1, -1.0f);
-    clip_offsets[1] = -vector3_dot(ref_center, side_axis_1) + ref_extent_1;
+    clip_offsets[0] = vector3_dot (ref_center, side_axis_1) + ref_extent_1;
+    clip_normals[1] = vector3_scaling (side_axis_1, -1.0f);
+    clip_offsets[1] = -vector3_dot (ref_center, side_axis_1) + ref_extent_1;
     clip_normals[2] = side_axis_2;
-    clip_offsets[2] = vector3_dot(ref_center, side_axis_2) + ref_extent_2;
-    clip_normals[3] = vector3_scaling(side_axis_2, -1.0f);
-    clip_offsets[3] = -vector3_dot(ref_center, side_axis_2) + ref_extent_2;
+    clip_offsets[2] = vector3_dot (ref_center, side_axis_2) + ref_extent_2;
+    clip_normals[3] = vector3_scaling (side_axis_2, -1.0f);
+    clip_offsets[3] = -vector3_dot (ref_center, side_axis_2) + ref_extent_2;
 
     vector3 output_polygon[16];
     for (int p = 0; p < 4; p++) {
@@ -268,23 +269,23 @@ static void clip_obb_faces(rigidbody *ref_body, rigidbody *inc_body, vector3 nor
             break;
         }
         vector3 v1 = input_polygon[input_count - 1];
-        float d1 = vector3_dot(v1, clip_normals[p]) - clip_offsets[p];
+        float d1 = vector3_dot (v1, clip_normals[p]) - clip_offsets[p];
         for (int i = 0; i < input_count; i++) {
             vector3 v2 = input_polygon[i];
-            float d2 = vector3_dot(v2, clip_normals[p]) - clip_offsets[p];
+            float d2 = vector3_dot (v2, clip_normals[p]) - clip_offsets[p];
             if (d1 <= 0.0f && d2 <= 0.0f) {
                 if (output_count < 16) {
                     output_polygon[output_count++] = v2;
                 }
             } else if (d1 <= 0.0f && d2 > 0.0f) {
                 float t = d1 / (d1 - d2);
-                vector3 v_int = vector3_addition(v1, vector3_scaling(vector3_subtraction(v2, v1), t));
+                vector3 v_int = vector3_addition (v1, vector3_scaling (vector3_subtraction (v2, v1), t));
                 if (output_count < 16) {
                     output_polygon[output_count++] = v_int;
                 }
             } else if (d1 > 0.0f && d2 <= 0.0f) {
                 float t = d1 / (d1 - d2);
-                vector3 v_int = vector3_addition(v1, vector3_scaling(vector3_subtraction(v2, v1), t));
+                vector3 v_int = vector3_addition (v1, vector3_scaling (vector3_subtraction (v2, v1), t));
                 if (output_count < 16) {
                     output_polygon[output_count++] = v_int;
                 }
@@ -300,7 +301,7 @@ static void clip_obb_faces(rigidbody *ref_body, rigidbody *inc_body, vector3 nor
             input_polygon[i] = output_polygon[i];
         }
     }
-    float ref_height = vector3_dot(ref_center, ref_normal);
+    float ref_height = vector3_dot (ref_center, ref_normal);
     /* Slop-gated persistent contacts (Box2D linearSlop practice): points
      * within penetration slop are admitted as zero-depth contacts. They
      * generate friction (persistent support) but no separation impulse
@@ -329,7 +330,7 @@ static void clip_obb_faces(rigidbody *ref_body, rigidbody *inc_body, vector3 nor
     int cand_count = 0;
     for (int i = 0; i < input_count; i++) {
         vector3 v = input_polygon[i];
-        float penetration = ref_height - vector3_dot(v, ref_normal);
+        float penetration = ref_height - vector3_dot (v, ref_normal);
         if (penetration >= -clip_slop && cand_count < MPE_MAX_MANIFOLD_POLY) {
             cand[cand_count] = v;
             cand_pen[cand_count] = (penetration > 0.0f) ? penetration : 0.0f;
@@ -354,26 +355,32 @@ static void clip_obb_faces(rigidbody *ref_body, rigidbody *inc_body, vector3 nor
         /* 2. Greedily add the candidate that grows the enclosed area most, so
          *    the manifold spans the contact patch instead of clustering. Area
          *    is measured in the contact plane via the ref normal. */
-        vector3 t1 = vector3_cross(ref_normal, cand[keep[0]]);
+        vector3 t1 = vector3_cross (ref_normal, cand[keep[0]]);
         while (keep_count < MPE_MAX_MANIFOLD_CONTACTS) {
             int best = -1;
             float best_area = -1.0f;
             for (int i = 0; i < cand_count; i++) {
                 int taken = 0;
                 for (int k = 0; k < keep_count; k++) {
-                    if (keep[k] == i) { taken = 1; break; }
+                    if (keep[k] == i) {
+                        taken = 1;
+                        break;
+                    }
                 }
                 if (taken) continue;
                 /* Fan area about the current centroid of kept points. */
-                vector3 sum = vector3_zero();
+                vector3 sum = vector3_zero ();
                 for (int k = 0; k < keep_count; k++) {
-                    sum = vector3_addition(sum, cand[keep[k]]);
+                    sum = vector3_addition (sum, cand[keep[k]]);
                 }
-                vector3 centroid = vector3_scaling(sum, 1.0f / (float) keep_count);
-                vector3 e1 = vector3_subtraction(cand[i], centroid);
-                vector3 e2 = vector3_subtraction(cand[keep[0]], centroid);
-                float area = vector3_dot(vector3_cross(e1, e2), t1);
-                if (area > best_area) { best_area = area; best = i; }
+                vector3 centroid = vector3_scaling (sum, 1.0f / (float) keep_count);
+                vector3 e1 = vector3_subtraction (cand[i], centroid);
+                vector3 e2 = vector3_subtraction (cand[keep[0]], centroid);
+                float area = vector3_dot (vector3_cross (e1, e2), t1);
+                if (area > best_area) {
+                    best_area = area;
+                    best = i;
+                }
             }
             if (best < 0) break;
             keep[keep_count++] = best;
@@ -398,7 +405,7 @@ static void clip_obb_faces(rigidbody *ref_body, rigidbody *inc_body, vector3 nor
     collision_output_data->contact_count = manifold_idx;
 }
 
-static inline float a3_cube_extent_axis(rigidbody *cube, int axis_index) {
+static inline float a3_cube_extent_axis (rigidbody *cube, int axis_index) {
     if (axis_index == 0) {
         return cube->half_extensions.x;
     }
@@ -408,8 +415,8 @@ static inline float a3_cube_extent_axis(rigidbody *cube, int axis_index) {
     return cube->half_extensions.z;
 }
 
-static void a3_task04_enforce_cube_normal_consistency(collision_data *collision_output_data, rigidbody *cube_a,
-                                                      rigidbody *cube_b) {
+static void a3_task04_enforce_cube_normal_consistency (collision_data *collision_output_data, rigidbody *cube_a,
+                                                       rigidbody *cube_b) {
     if ((!collision_output_data) || (!cube_a) || (!cube_b)) {
         return;
     }
@@ -426,24 +433,24 @@ static void a3_task04_enforce_cube_normal_consistency(collision_data *collision_
     }
 
     vector3 normal = collision_output_data->normal_vector;
-    float normal_length_squared = vector3_length_squared(normal);
+    float normal_length_squared = vector3_length_squared (normal);
 
-    if ((!isfinite(normal_length_squared)) || (normal_length_squared < 0.000001f)) {
+    if ((!isfinite (normal_length_squared)) || (normal_length_squared < 0.000001f)) {
         normal = (vector3){0.0f, 1.0f, 0.0f};
     } else {
-        normal = vector3_scaling(normal, 1.0f / sqrtf(normal_length_squared));
+        normal = vector3_scaling (normal, 1.0f / sqrtf (normal_length_squared));
     }
 
-    vector3 a_to_b = vector3_subtraction(cube_b->position, cube_a->position);
-    float a_to_b_length_squared = vector3_length_squared(a_to_b);
+    vector3 a_to_b = vector3_subtraction (cube_b->position, cube_a->position);
+    float a_to_b_length_squared = vector3_length_squared (a_to_b);
 
     if (a_to_b_length_squared > 0.000001f) {
         /*
          * Convention:
          * collision normal points from object_a toward object_b.
          */
-        if (vector3_dot(a_to_b, normal) < 0.0f) {
-            normal = vector3_scaling(normal, -1.0f);
+        if (vector3_dot (a_to_b, normal) < 0.0f) {
+            normal = vector3_scaling (normal, -1.0f);
         }
     } else {
         /*
@@ -451,17 +458,17 @@ static void a3_task04_enforce_cube_normal_consistency(collision_data *collision_
          * choose a deterministic orientation by forcing the first
          * significant component to be positive.
          */
-        if (fabsf(normal.x) > 0.000001f) {
+        if (fabsf (normal.x) > 0.000001f) {
             if (normal.x < 0.0f) {
-                normal = vector3_scaling(normal, -1.0f);
+                normal = vector3_scaling (normal, -1.0f);
             }
-        } else if (fabsf(normal.y) > 0.000001f) {
+        } else if (fabsf (normal.y) > 0.000001f) {
             if (normal.y < 0.0f) {
-                normal = vector3_scaling(normal, -1.0f);
+                normal = vector3_scaling (normal, -1.0f);
             }
         } else {
             if (normal.z < 0.0f) {
-                normal = vector3_scaling(normal, -1.0f);
+                normal = vector3_scaling (normal, -1.0f);
             }
         }
     }
@@ -469,19 +476,19 @@ static void a3_task04_enforce_cube_normal_consistency(collision_data *collision_
     collision_output_data->normal_vector = normal;
 }
 
-bool collision_dual_cube(rigidbody *cube_a, rigidbody *cube_b, collision_data *collision_output_data,
-                         const mpe_config_t *cfg) {
+bool collision_dual_cube (rigidbody *cube_a, rigidbody *cube_b, collision_data *collision_output_data,
+                          const mpe_config_t *cfg) {
     /* TRUTH: slop-band parity with sphere/cylinder/floor paths. Strict
      * overlap<0 rejection drops resting pairs sitting at gap<=slop
      * (friction flicker, sleep churn). Admit pen>=-slop everywhere. */
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
     float slop_sat = C->solver.penetration_slop;
-    if (!isfinite(slop_sat) || slop_sat < 0.0f) {
+    if (!isfinite (slop_sat) || slop_sat < 0.0f) {
         slop_sat = 0.0f;
     }
     vector3 *axes_a = cube_a->cached_axes;
     vector3 *axes_b = cube_b->cached_axes;
-    vector3 relative_position = vector3_subtraction(cube_b->position, cube_a->position);
+    vector3 relative_position = vector3_subtraction (cube_b->position, cube_a->position);
     /* AUDIT: face and edge minima tracked separately (see below). */
     float face_minimum_overlap = 1000000.0f;
     vector3 face_best_axis = {0, 0, 0};
@@ -492,9 +499,9 @@ bool collision_dual_cube(rigidbody *cube_a, rigidbody *cube_b, collision_data *c
 
     for (int axis_index = 0; axis_index < 6; axis_index++) {
         vector3 axis = (axis_index < 3) ? axes_a[axis_index] : axes_b[axis_index - 3];
-        float projection_a = project_obb(cube_a, axis, axes_a);
-        float projection_b = project_obb(cube_b, axis, axes_b);
-        float distance = fabsf(vector3_dot(relative_position, axis));
+        float projection_a = project_obb (cube_a, axis, axes_a);
+        float projection_b = project_obb (cube_b, axis, axes_b);
+        float distance = fabsf (vector3_dot (relative_position, axis));
         float overlap = projection_a + projection_b - distance;
         if (overlap < -slop_sat) {
             return false;
@@ -507,14 +514,13 @@ bool collision_dual_cube(rigidbody *cube_a, rigidbody *cube_b, collision_data *c
     }
     for (int axis_index_a = 0; axis_index_a < 3; axis_index_a++) {
         for (int axis_index_b = 0; axis_index_b < 3; axis_index_b++) {
-            vector3 axis = vector3_cross(axes_a[axis_index_a], axes_b[axis_index_b]);
-            float length_squared = vector3_length_squared(axis);
-            if (length_squared < 0.0001f)
-                continue;
-            axis = vector3_scaling(axis, 1.0f / sqrtf(length_squared));
-            float projection_a = project_obb(cube_a, axis, axes_a);
-            float projection_b = project_obb(cube_b, axis, axes_b);
-            float distance = fabsf(vector3_dot(relative_position, axis));
+            vector3 axis = vector3_cross (axes_a[axis_index_a], axes_b[axis_index_b]);
+            float length_squared = vector3_length_squared (axis);
+            if (length_squared < 0.0001f) continue;
+            axis = vector3_scaling (axis, 1.0f / sqrtf (length_squared));
+            float projection_a = project_obb (cube_a, axis, axes_a);
+            float projection_b = project_obb (cube_b, axis, axes_b);
+            float distance = fabsf (vector3_dot (relative_position, axis));
             float overlap = projection_a + projection_b - distance;
             if (overlap < -slop_sat) {
                 return false;
@@ -545,8 +551,8 @@ bool collision_dual_cube(rigidbody *cube_a, rigidbody *cube_b, collision_data *c
         best_axis = face_best_axis;
         best_axis_index = face_best_axis_index;
     }
-    if (vector3_dot(relative_position, best_axis) < 0) {
-        best_axis = vector3_scaling(best_axis, -1.0f);
+    if (vector3_dot (relative_position, best_axis) < 0) {
+        best_axis = vector3_scaling (best_axis, -1.0f);
     }
     collision_output_data->object_a = cube_a;
     collision_output_data->object_b = cube_b;
@@ -559,8 +565,8 @@ bool collision_dual_cube(rigidbody *cube_a, rigidbody *cube_b, collision_data *c
         vector3 edge_dir_a = axes_a[edge_axis_a];
         vector3 edge_dir_b = axes_b[edge_axis_b];
 
-        float edge_extent_a = a3_cube_extent_axis(cube_a, edge_axis_a);
-        float edge_extent_b = a3_cube_extent_axis(cube_b, edge_axis_b);
+        float edge_extent_a = a3_cube_extent_axis (cube_a, edge_axis_a);
+        float edge_extent_b = a3_cube_extent_axis (cube_b, edge_axis_b);
 
         vector3 anchor_a = cube_a->position;
 
@@ -569,13 +575,13 @@ bool collision_dual_cube(rigidbody *cube_a, rigidbody *cube_b, collision_data *c
                 continue;
             }
 
-            float extent = a3_cube_extent_axis(cube_a, axis_index);
+            float extent = a3_cube_extent_axis (cube_a, axis_index);
             vector3 axis = axes_a[axis_index];
 
-            if (vector3_dot(axis, best_axis) > 0.0f) {
-                anchor_a = vector3_addition(anchor_a, vector3_scaling(axis, extent));
+            if (vector3_dot (axis, best_axis) > 0.0f) {
+                anchor_a = vector3_addition (anchor_a, vector3_scaling (axis, extent));
             } else {
-                anchor_a = vector3_subtraction(anchor_a, vector3_scaling(axis, extent));
+                anchor_a = vector3_subtraction (anchor_a, vector3_scaling (axis, extent));
             }
         }
 
@@ -586,30 +592,30 @@ bool collision_dual_cube(rigidbody *cube_a, rigidbody *cube_b, collision_data *c
                 continue;
             }
 
-            float extent = a3_cube_extent_axis(cube_b, axis_index);
+            float extent = a3_cube_extent_axis (cube_b, axis_index);
             vector3 axis = axes_b[axis_index];
 
-            if (vector3_dot(axis, best_axis) > 0.0f) {
-                anchor_b = vector3_subtraction(anchor_b, vector3_scaling(axis, extent));
+            if (vector3_dot (axis, best_axis) > 0.0f) {
+                anchor_b = vector3_subtraction (anchor_b, vector3_scaling (axis, extent));
             } else {
-                anchor_b = vector3_addition(anchor_b, vector3_scaling(axis, extent));
+                anchor_b = vector3_addition (anchor_b, vector3_scaling (axis, extent));
             }
         }
 
-        vector3 anchor_delta = vector3_subtraction(anchor_a, anchor_b);
+        vector3 anchor_delta = vector3_subtraction (anchor_a, anchor_b);
 
-        float aa = vector3_dot(edge_dir_a, edge_dir_a);
-        float bb = vector3_dot(edge_dir_a, edge_dir_b);
-        float cc = vector3_dot(edge_dir_b, edge_dir_b);
-        float d = vector3_dot(edge_dir_a, anchor_delta);
-        float e = vector3_dot(edge_dir_b, anchor_delta);
+        float aa = vector3_dot (edge_dir_a, edge_dir_a);
+        float bb = vector3_dot (edge_dir_a, edge_dir_b);
+        float cc = vector3_dot (edge_dir_b, edge_dir_b);
+        float d = vector3_dot (edge_dir_a, anchor_delta);
+        float e = vector3_dot (edge_dir_b, anchor_delta);
 
         float denominator = aa * cc - bb * bb;
 
         float t_a = 0.0f;
         float t_b = 0.0f;
 
-        if (fabsf(denominator) > 0.000001f) {
+        if (fabsf (denominator) > 0.000001f) {
             t_a = (bb * e - cc * d) / denominator;
             t_b = (aa * e - bb * d) / denominator;
         }
@@ -647,9 +653,9 @@ bool collision_dual_cube(rigidbody *cube_a, rigidbody *cube_b, collision_data *c
             }
         }
 
-        vector3 closest_a = vector3_addition(anchor_a, vector3_scaling(edge_dir_a, t_a));
-        vector3 closest_b = vector3_addition(anchor_b, vector3_scaling(edge_dir_b, t_b));
-        vector3 contact_point = vector3_scaling(vector3_addition(closest_a, closest_b), 0.5f);
+        vector3 closest_a = vector3_addition (anchor_a, vector3_scaling (edge_dir_a, t_a));
+        vector3 closest_b = vector3_addition (anchor_b, vector3_scaling (edge_dir_b, t_b));
+        vector3 contact_point = vector3_scaling (vector3_addition (closest_a, closest_b), 0.5f);
 
         collision_output_data->contact_count = 0;
 
@@ -661,8 +667,8 @@ bool collision_dual_cube(rigidbody *cube_a, rigidbody *cube_b, collision_data *c
         cp->penetration = (minimum_overlap > 0.0f) ? minimum_overlap : 0.0f;
         collision_output_data->contact_count = 1;
 
-        float parallel_alignment = fabsf(bb);
-        float contact_spread = fminf(edge_extent_a, edge_extent_b) * 0.5f;
+        float parallel_alignment = fabsf (bb);
+        float contact_spread = fminf (edge_extent_a, edge_extent_b) * 0.5f;
 
         if ((parallel_alignment > 0.95f) && (contact_spread > 0.05f)) {
             float t_offsets[2];
@@ -695,12 +701,12 @@ bool collision_dual_cube(rigidbody *cube_a, rigidbody *cube_b, collision_data *c
                     }
                 }
 
-                vector3 sample_closest_a = vector3_addition(anchor_a, vector3_scaling(edge_dir_a, sample_t_a));
-                vector3 sample_closest_b = vector3_addition(anchor_b, vector3_scaling(edge_dir_b, sample_t_b));
+                vector3 sample_closest_a = vector3_addition (anchor_a, vector3_scaling (edge_dir_a, sample_t_a));
+                vector3 sample_closest_b = vector3_addition (anchor_b, vector3_scaling (edge_dir_b, sample_t_b));
                 vector3 sample_contact_point =
-                    vector3_scaling(vector3_addition(sample_closest_a, sample_closest_b), 0.5f);
+                    vector3_scaling (vector3_addition (sample_closest_a, sample_closest_b), 0.5f);
 
-                if (vector3_length_squared(vector3_subtraction(sample_contact_point, contact_point)) > 0.0001f) {
+                if (vector3_length_squared (vector3_subtraction (sample_contact_point, contact_point)) > 0.0001f) {
                     contact_point_data *extra_cp =
                         &collision_output_data->contacts[collision_output_data->contact_count];
                     extra_cp->position = sample_contact_point;
@@ -711,16 +717,16 @@ bool collision_dual_cube(rigidbody *cube_a, rigidbody *cube_b, collision_data *c
         }
     } else {
         if (best_axis_index < 3) {
-            clip_obb_faces(cube_a, cube_b, best_axis, minimum_overlap, collision_output_data, cfg);
+            clip_obb_faces (cube_a, cube_b, best_axis, minimum_overlap, collision_output_data, cfg);
         } else {
-            clip_obb_faces(cube_b, cube_a, vector3_scaling(best_axis, -1.0f), minimum_overlap, collision_output_data,
-                           cfg);
+            clip_obb_faces (cube_b, cube_a, vector3_scaling (best_axis, -1.0f), minimum_overlap, collision_output_data,
+                            cfg);
             collision_output_data->object_a = cube_a;
             collision_output_data->object_b = cube_b;
         }
     }
     /* MPE_TASK_04_CUBE_NORMAL_CALL_BEGIN */
-    a3_task04_enforce_cube_normal_consistency(collision_output_data, cube_a, cube_b);
+    a3_task04_enforce_cube_normal_consistency (collision_output_data, cube_a, cube_b);
     /* MPE_TASK_04_CUBE_NORMAL_CALL_END */
     /* TRUTH: clip can return 0 (SAT/clip disagreement at grazing angles).
      * Old code returned true with 0 contacts -> phantom manifold consumed a
@@ -735,8 +741,8 @@ bool collision_dual_cube(rigidbody *cube_a, rigidbody *cube_b, collision_data *c
      * No thread-local state - caller owns the storage.
      * restitution=1.0 is intentionally neutral: effective bounce is
      * min(body_restitution, 1.0) == body_restitution. */
-    void collision_static_plane_body_proxy_fill(rigidbody *out, float plane_y, const mpe_config_t *cfg) {
-    rigidbody_initialisation_sphere(out, 1.0f, 0.0f, (vector3){0.0f, plane_y, 0.0f});
+void collision_static_plane_body_proxy_fill (rigidbody *out, float plane_y, const mpe_config_t *cfg) {
+    rigidbody_initialisation_sphere (out, 1.0f, 0.0f, (vector3){0.0f, plane_y, 0.0f});
     out->static_state = true;
     out->inverse_mass = 0.0f;
     out->inverse_inertia_tensor_local = (math3){{{0}}};
@@ -750,7 +756,7 @@ bool collision_dual_cube(rigidbody *cube_a, rigidbody *cube_b, collision_data *c
     out->friction_kinetic = C->world.floor_friction_k;
 }
 
-bool collision_static_plane_sphere(rigidbody *plane_body, rigidbody *sphere, float plane_y,
+bool collision_static_plane_sphere (rigidbody *plane_body, rigidbody *sphere, float plane_y,
                                     collision_data *collision_output_data, const mpe_config_t *cfg) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
     if (sphere->type != object_sphere) {
@@ -778,8 +784,8 @@ bool collision_static_plane_sphere(rigidbody *plane_body, rigidbody *sphere, flo
     return true;
 }
 
-bool collision_static_plane_cube(rigidbody *plane_body, rigidbody *cube, float plane_y, collision_data *collision_output_data,
-                                 const mpe_config_t *cfg) {
+bool collision_static_plane_cube (rigidbody *plane_body, rigidbody *cube, float plane_y,
+                                  collision_data *collision_output_data, const mpe_config_t *cfg) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
     if (cube->type != object_cube) {
         return false;
@@ -802,9 +808,9 @@ bool collision_static_plane_cube(rigidbody *plane_body, rigidbody *cube, float p
                 float sign_z = sz ? 1.0f : -1.0f;
 
                 vector3 corner = cube->position;
-                corner = vector3_addition(corner, vector3_scaling(axes[0], sign_x * extents.x));
-                corner = vector3_addition(corner, vector3_scaling(axes[1], sign_y * extents.y));
-                corner = vector3_addition(corner, vector3_scaling(axes[2], sign_z * extents.z));
+                corner = vector3_addition (corner, vector3_scaling (axes[0], sign_x * extents.x));
+                corner = vector3_addition (corner, vector3_scaling (axes[1], sign_y * extents.y));
+                corner = vector3_addition (corner, vector3_scaling (axes[2], sign_z * extents.z));
 
                 float penetration = plane_y - corner.y;
 
@@ -860,18 +866,20 @@ bool collision_static_plane_cube(rigidbody *plane_body, rigidbody *cube, float p
     return true;
 }
 
-bool collision_static_plane_body(rigidbody *plane_body, rigidbody *body, float plane_y,
-                                 collision_data *collision_output_data, const mpe_config_t *cfg) {
+bool collision_static_plane_body (rigidbody *plane_body, rigidbody *body, float plane_y,
+                                  collision_data *collision_output_data, const mpe_config_t *cfg) {
     collision_output_data->object_a = body;
     collision_output_data->object_b = plane_body;
     collision_output_data->normal_vector = (vector3){0.0f, -1.0f, 0.0f};
     collision_output_data->contact_count = 0;
-    if (body->type == object_cylinder) {return collision_static_plane_cylinder(plane_body, body, plane_y, collision_output_data, cfg);}
+    if (body->type == object_cylinder) {
+        return collision_static_plane_cylinder (plane_body, body, plane_y, collision_output_data, cfg);
+    }
     if (body->type == object_sphere) {
-        return collision_static_plane_sphere(plane_body, body, plane_y, collision_output_data, cfg);
+        return collision_static_plane_sphere (plane_body, body, plane_y, collision_output_data, cfg);
     }
     if (body->type == object_cube) {
-        return collision_static_plane_cube(plane_body, body, plane_y, collision_output_data, cfg);
+        return collision_static_plane_cube (plane_body, body, plane_y, collision_output_data, cfg);
     }
     return false;
 }

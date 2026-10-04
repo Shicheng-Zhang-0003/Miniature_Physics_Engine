@@ -15,9 +15,8 @@
 /* Narrowphase dispatch relic removed: all pair routing goes through the
  * shape registry (mpe_shape_dispatch), so foreign shapes get positional
  * correction too. This symbol remains as a NULL-world wrapper. */
-bool a3_depenetration_dispatch(rigidbody *rigid_body_a, rigidbody *rigid_body_b,
-                                      collision_data *collision_output) {
-    return mpe_shape_dispatch(NULL, rigid_body_a, rigid_body_b, collision_output);
+bool a3_depenetration_dispatch (rigidbody *rigid_body_a, rigidbody *rigid_body_b, collision_data *collision_output) {
+    return mpe_shape_dispatch (NULL, rigid_body_a, rigid_body_b, collision_output);
 }
 
 /* Single depenetration implementation (see header).
@@ -28,17 +27,17 @@ bool a3_depenetration_dispatch(rigidbody *rigid_body_a, rigidbody *rigid_body_b,
  * Slop-gated (solver slop, single) + 0.5mm early-out: routine sub-mm
  * residuals pass through untouched. Deep pathology (spawn overlap) resolves
  * over ticks bounded by max_correction (teleport bounded, counted). */
-void a3_positional_depenetration_pass(struct physics_world *world, broadphase_pair *pair_buffer,
-                                      int *pair_count_pointer, bool rebuild_broadphase) {
-    a3_positional_depenetration_pass_dt(world, pair_buffer, pair_count_pointer, rebuild_broadphase, 1.0f / 60.0f);
+void a3_positional_depenetration_pass (struct physics_world *world, broadphase_pair *pair_buffer,
+                                       int *pair_count_pointer, bool rebuild_broadphase) {
+    a3_positional_depenetration_pass_dt (world, pair_buffer, pair_count_pointer, rebuild_broadphase, 1.0f / 60.0f);
 }
 
-void a3_positional_depenetration_pass_dt(struct physics_world *world, broadphase_pair *pair_buffer,
-                                         int *pair_count_pointer, bool rebuild_broadphase, float dt) {
+void a3_positional_depenetration_pass_dt (struct physics_world *world, broadphase_pair *pair_buffer,
+                                          int *pair_count_pointer, bool rebuild_broadphase, float dt) {
     if ((!world) || (!world->bodies) || (world->body_count < 2) || (!pair_buffer) || (!pair_count_pointer)) {
         return;
     }
-    if (!(dt > 0.0f) || !isfinite(dt)) {
+    if (!(dt > 0.0f) || !isfinite (dt)) {
         dt = 1.0f / 60.0f;
     }
     rigidbody *bodies = world->bodies;
@@ -47,13 +46,12 @@ void a3_positional_depenetration_pass_dt(struct physics_world *world, broadphase
     int pair_count = *pair_count_pointer;
 
     if (rebuild_broadphase) {
-        pair_count = broadphase_generate_pairing(world, pair_buffer, mpe_max_broadphase_pairs, dt);
+        pair_count = broadphase_generate_pairing (world, pair_buffer, mpe_max_broadphase_pairs, dt);
         *pair_count_pointer = pair_count;
     }
 
-    int depenetration_iterations = rebuild_broadphase
-        ? mpe_world_cfg(world)->depenetration.rebuild_iterations
-        : 1; /* MPE_TASK_30 */
+    int depenetration_iterations =
+        rebuild_broadphase ? mpe_world_cfg (world)->depenetration.rebuild_iterations : 1; /* MPE_TASK_30 */
 
     for (int dep_iteration = 0; dep_iteration < depenetration_iterations; dep_iteration++) {
         for (int pair_index = 0; pair_index < pair_count; pair_index++) {
@@ -72,8 +70,8 @@ void a3_positional_depenetration_pass_dt(struct physics_world *world, broadphase
 
             collision_data depenetration_collision = {0};
 
-            if (mpe_shape_dispatch(world, body_a, body_b, &depenetration_collision)) {
-                a3_positional_depenetrate_manifold_w(world, &depenetration_collision);
+            if (mpe_shape_dispatch (world, body_a, body_b, &depenetration_collision)) {
+                a3_positional_depenetrate_manifold_w (world, &depenetration_collision);
             }
         }
 
@@ -85,18 +83,19 @@ void a3_positional_depenetration_pass_dt(struct physics_world *world, broadphase
 
             collision_data floor_collision = {0};
 
-            if (collision_static_plane_body(&world->static_plane_body, rigid_body, 0.0f, &floor_collision, mpe_world_cfg(world))) {
-                a3_positional_depenetrate_manifold_w(world, &floor_collision);
+            if (collision_static_plane_body (&world->static_plane_body, rigid_body, 0.0f, &floor_collision,
+                                             mpe_world_cfg (world))) {
+                a3_positional_depenetrate_manifold_w (world, &floor_collision);
             }
         }
     }
 }
 
-void a3_positional_depenetrate_manifold(collision_data *manifold) {
-    a3_positional_depenetrate_manifold_w(NULL, manifold);
+void a3_positional_depenetrate_manifold (collision_data *manifold) {
+    a3_positional_depenetrate_manifold_w (NULL, manifold);
 }
 
-void a3_positional_depenetrate_manifold_w(struct physics_world *world, collision_data *manifold) {
+void a3_positional_depenetrate_manifold_w (struct physics_world *world, collision_data *manifold) {
     const mpe_config_t *C = (world && world->cfg) ? world->cfg : &g_cfg;
     if ((!manifold) || (manifold->contact_count <= 0)) {
         return;
@@ -109,8 +108,8 @@ void a3_positional_depenetrate_manifold_w(struct physics_world *world, collision
         return;
     }
 
-    float normal_length_squared = vector3_length_squared(manifold->normal_vector);
-    if ((!isfinite(normal_length_squared)) || (normal_length_squared < 0.000001f)) {
+    float normal_length_squared = vector3_length_squared (manifold->normal_vector);
+    if ((!isfinite (normal_length_squared)) || (normal_length_squared < 0.000001f)) {
         return;
     }
 
@@ -143,19 +142,19 @@ void a3_positional_depenetrate_manifold_w(struct physics_world *world, collision
 
     /* Wake sleeping bodies only when the overlap is meaningful. */
     if ((a_sleeping) && (b_sleeping) && (max_depth > C->depenetration.wake_depth_thresh)) {
-        rigidbody_wake(body_a);
-        rigidbody_wake(body_b);
+        rigidbody_wake (body_a);
+        rigidbody_wake (body_b);
         a_sleeping = false;
         b_sleeping = false;
     }
 
     if ((a_sleeping) && (body_b->static_state) && (max_depth > C->depenetration.wake_depth_thresh)) {
-        rigidbody_wake(body_a);
+        rigidbody_wake (body_a);
         a_sleeping = false;
     }
 
     if ((b_sleeping) && (body_a->static_state) && (max_depth > C->depenetration.wake_depth_thresh)) {
-        rigidbody_wake(body_b);
+        rigidbody_wake (body_b);
         b_sleeping = false;
     }
 
@@ -164,17 +163,17 @@ void a3_positional_depenetrate_manifold_w(struct physics_world *world, collision
      * sleeps through growing penetration = ghost tunneling. Static and
      * both-sleeping cases above; these cover the asymmetric ones. */
     if ((a_sleeping) && (!b_sleeping) && (max_depth > C->depenetration.wake_depth_thresh)) {
-        rigidbody_wake(body_a);
+        rigidbody_wake (body_a);
         a_sleeping = false;
     }
 
     if ((b_sleeping) && (!a_sleeping) && (max_depth > C->depenetration.wake_depth_thresh)) {
-        rigidbody_wake(body_b);
+        rigidbody_wake (body_b);
         b_sleeping = false;
     }
 
-    float inverse_mass_a = rigidbody_effective_inv_mass(body_a);
-    float inverse_mass_b = rigidbody_effective_inv_mass(body_b);
+    float inverse_mass_a = rigidbody_effective_inv_mass (body_a);
+    float inverse_mass_b = rigidbody_effective_inv_mass (body_b);
     /* TRUTH: sleeping bodies with deep overlap already woken above, so
      * effective (zero for still-sleeping) is correct. Kinematic must use
      * effective (zero), never raw stored inv (nonzero) — old code moved
@@ -216,19 +215,19 @@ void a3_positional_depenetrate_manifold_w(struct physics_world *world, collision
         correction_magnitude = C->depenetration.max_correction;
     }
 
-    vector3 correction_vector = vector3_scaling(manifold->normal_vector, correction_magnitude);
+    vector3 correction_vector = vector3_scaling (manifold->normal_vector, correction_magnitude);
 
     if (inverse_mass_a > 0.0f) {
-        body_a->position = vector3_subtraction(body_a->position, vector3_scaling(correction_vector, inverse_mass_a));
+        body_a->position = vector3_subtraction (body_a->position, vector3_scaling (correction_vector, inverse_mass_a));
         if (correction_magnitude > 0.01f) {
-            rigidbody_wake(body_a);
+            rigidbody_wake (body_a);
         }
     }
 
-if (inverse_mass_b > 0.0f) {
-        body_b->position = vector3_addition(body_b->position, vector3_scaling(correction_vector, inverse_mass_b));
+    if (inverse_mass_b > 0.0f) {
+        body_b->position = vector3_addition (body_b->position, vector3_scaling (correction_vector, inverse_mass_b));
         if (correction_magnitude > 0.01f) {
-            rigidbody_wake(body_b);
+            rigidbody_wake (body_b);
         }
     }
 }
