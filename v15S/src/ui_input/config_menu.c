@@ -111,13 +111,13 @@ void config_menu_update (GtkWidget *parent_window) {
         return;
     }
     int category = config_menu_level - 10;
-    static const mpe_param *category_params[64];
+    static const mpe_param *category_params [64];
     size_t param_count = mpe_config_get_by_category ((param_category) category, category_params, 64);
     if ((size_t) config_menu_selected_param >= param_count) {
         config_menu_selected_param = -1;
         return;
     }
-    const mpe_param *param = category_params[config_menu_selected_param];
+    const mpe_param *param = category_params [config_menu_selected_param];
     if ((param->debug_only) && (!main_inputs.is_debug_mode_active)) {
         config_menu_selected_param = -1;
         return;
@@ -151,7 +151,7 @@ void config_menu_update (GtkWidget *parent_window) {
 }
 void config_menu_render (char *buffer, size_t buffer_size) {
     if (config_menu_level == 0) {
-        buffer[0] = '\0';
+        buffer [0] = '\0';
         return;
     }
     if (config_menu_level == 1) {
@@ -189,13 +189,13 @@ void config_menu_render (char *buffer, size_t buffer_size) {
                   mpe_config_count_by_category (cat_ui));
     } else if (config_menu_level >= 10) {
         int category = config_menu_level - 10;
-        static const mpe_param *category_params[64];
+        static const mpe_param *category_params [64];
         size_t param_count = mpe_config_get_by_category ((param_category) category, category_params, 64);
         size_t offset = 0;
         offset += snprintf (buffer + offset, buffer_size - offset, "-- %s --\n",
                             mpe_config_category_name ((param_category) category));
         for (size_t i = 0; (i < param_count) && (offset < buffer_size - 64); i++) {
-            const mpe_param *p = category_params[i];
+            const mpe_param *p = category_params [i];
             float val = 0.0f;
             if (p->type == p_float) {
                 val = *(float *) p->storage;

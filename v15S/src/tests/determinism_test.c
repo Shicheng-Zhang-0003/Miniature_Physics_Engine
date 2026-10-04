@@ -14,22 +14,22 @@ static void build_scene (physics_world *world) {
     physics_world_init (world);
     constraint_pool_init (world);
     int a = physics_world_add_sphere (world, 0.5f, 2.0f, (vector3){-1.0f, 3.0f, 0.5f});
-    world->bodies[a].velocity = (vector3){1.5f, -0.5f, 0.25f};
-    world->bodies[a].angular_velocity = (vector3){3.0f, -1.0f, 2.0f};
-    world->bodies[a].restitution = 0.4f;
+    world->bodies [a].velocity = (vector3){1.5f, -0.5f, 0.25f};
+    world->bodies [a].angular_velocity = (vector3){3.0f, -1.0f, 2.0f};
+    world->bodies [a].restitution = 0.4f;
     int b = physics_world_add_cube (world, (vector3){1.0f, 0.5f, -0.5f}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
-    world->bodies[b].velocity = (vector3){-0.75f, 0.0f, 0.5f};
-    world->bodies[b].angular_velocity = (vector3){0.0f, 2.0f, -1.5f};
-    world->bodies[b].restitution = 0.3f;
+    world->bodies [b].velocity = (vector3){-0.75f, 0.0f, 0.5f};
+    world->bodies [b].angular_velocity = (vector3){0.0f, 2.0f, -1.5f};
+    world->bodies [b].restitution = 0.3f;
     /* TRUTH: nice=0 (no numerical damping). Old nice=3 baked game damping
      * into the determinism proof; determinism must hold for pure physics. */
-    world->bodies[b].nice_value = 0;
+    world->bodies [b].nice_value = 0;
     int c = physics_world_add_cylinder (world, 0.3f, 0.4f, 1.5f, (vector3){0.0f, 2.0f, 1.0f});
-    world->bodies[c].velocity = (vector3){0.2f, -1.0f, -0.3f};
-    world->bodies[c].angular_velocity = (vector3){-2.0f, 0.5f, 1.0f};
-    world->bodies[c].restitution = 0.2f;
+    world->bodies [c].velocity = (vector3){0.2f, -1.0f, -0.3f};
+    world->bodies [c].angular_velocity = (vector3){-2.0f, 0.5f, 1.0f};
+    world->bodies [c].restitution = 0.2f;
     int d = physics_world_add_cube (world, (vector3){0.0f, 1.6f, 0.0f}, (vector3){0.4f, 0.4f, 0.4f}, 1.0f);
-    world->bodies[d].velocity = (vector3){0.0f, -0.2f, 0.0f};
+    world->bodies [d].velocity = (vector3){0.0f, -0.2f, 0.0f};
     /* Static floor slab for contact coverage. */
     physics_world_add_cube (world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
 }
@@ -74,11 +74,11 @@ static int bodies_equal (const rigidbody *a, const rigidbody *b) {
         return 0;
     if (!vec3_eq (a->half_extensions, b->half_extensions))
         return 0;
-    if (!vec3_eq (a->cached_axes[0], b->cached_axes[0]))
+    if (!vec3_eq (a->cached_axes [0], b->cached_axes [0]))
         return 0;
-    if (!vec3_eq (a->cached_axes[1], b->cached_axes[1]))
+    if (!vec3_eq (a->cached_axes [1], b->cached_axes [1]))
         return 0;
-    if (!vec3_eq (a->cached_axes[2], b->cached_axes[2]))
+    if (!vec3_eq (a->cached_axes [2], b->cached_axes [2]))
         return 0;
     if (a->object_id != b->object_id || a->object_generation != b->object_generation)
         return 0;
@@ -93,8 +93,8 @@ static int caches_equal (const physics_world *a, const physics_world *b) {
     if (a->world_contact_cache_count != b->world_contact_cache_count)
         return 0;
     for (int i = 0; i < a->world_contact_cache_count; i++) {
-        const cached_contact *ca = &a->world_contact_cache[i];
-        const cached_contact *cb = &b->world_contact_cache[i];
+        const cached_contact *ca = &a->world_contact_cache [i];
+        const cached_contact *cb = &b->world_contact_cache [i];
         if (ca->object_id_a != cb->object_id_a || ca->object_id_b != cb->object_id_b)
             return 0;
         if (ca->property_stamp_a != cb->property_stamp_a || ca->property_stamp_b != cb->property_stamp_b)
@@ -130,7 +130,7 @@ int main (void) {
         return 1;
     }
     for (int i = 0; i < w1.body_count; i++) {
-        if (!bodies_equal (&w1.bodies[i], &w2.bodies[i])) {
+        if (!bodies_equal (&w1.bodies [i], &w2.bodies [i])) {
             printf ("[FAIL] body %d diverged bitwise\n", i);
             fail = 1;
         }

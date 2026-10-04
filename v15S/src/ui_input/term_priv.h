@@ -33,12 +33,12 @@ extern GtkWidget *terminal_output_view;
 extern GtkTextBuffer *terminal_output_buffer;
 extern GtkWidget *terminal_entry;
 extern GtkWidget *terminal_prompt_label;
-extern char term_cwd[256];
-extern char term_history[term_history_size][term_history_length + 1];
+extern char term_cwd [256];
+extern char term_history [term_history_size] [term_history_length + 1];
 extern int term_history_count;
 extern int term_history_cursor;
-extern char term_alias_names[term_alias_max][term_alias_name_len];
-extern char term_alias_values[term_alias_max][term_alias_value_len];
+extern char term_alias_names [term_alias_max] [term_alias_name_len];
+extern char term_alias_values [term_alias_max] [term_alias_value_len];
 extern int term_alias_count;
 extern bool term_sudo_active;
 extern int64_t term_engine_start_time;
@@ -87,7 +87,7 @@ void term_set_object_mass (int object_index, float new_mass);
 void term_set_object_static (int object_index, bool make_static);
 bool term_mode_is_static (const char *mode_text);
 /* dispatch table (defined in debug_terminal.c; read by help/man) */
-extern const terminal_command terminal_commands[];
+extern const terminal_command terminal_commands [];
 extern const size_t terminal_command_count;
 /* command handlers (defined in term_*.c) */
 void cmd_help (int argc, char **argv);

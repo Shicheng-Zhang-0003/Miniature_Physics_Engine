@@ -25,7 +25,7 @@ int main (void) {
         return 1;
     }
     /* Ensure zero commands */
-    float zero[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    float zero [4] = {0.0f, 0.0f, 0.0f, 0.0f};
     ftc_robot_set_wheel_commands (&robot, zero, 4);
     /* Settle 120 frames with zero input */
     for (int i = 0; i < 120; i++) {
@@ -39,18 +39,18 @@ int main (void) {
         drivetrain_update (&world, &robot, DT);
         physics_world_step (&world, DT);
         if (i % 30 == 0 || i == 299) {
-            printf ("  t=%3d cmd=[%.2f %.2f %.2f %.2f] wheel_omega_axle=[", i, robot.wheel_motors[0].command,
-                    robot.wheel_motors[1].command, robot.wheel_motors[2].command, robot.wheel_motors[3].command);
+            printf ("  t=%3d cmd=[%.2f %.2f %.2f %.2f] wheel_omega_axle=[", i, robot.wheel_motors [0].command,
+                    robot.wheel_motors [1].command, robot.wheel_motors [2].command, robot.wheel_motors [3].command);
             for (int w = 0; w < robot.wheel_count; w++) {
-                int wi = robot.wheel_bodies[w];
-                rigidbody *wheel = &world.bodies[wi];
+                int wi = robot.wheel_bodies [w];
+                rigidbody *wheel = &world.bodies [wi];
                 vector3 axle = vector4_rotate_to_vector3 (wheel->orientation, (vector3){1.0f, 0.0f, 0.0f});
                 float oa = vector3_dot (wheel->angular_velocity, axle);
                 if (fabsf (oa) > max_wheel_omega)
                     max_wheel_omega = fabsf (oa);
                 printf ("%s%.3f", w ? ", " : "", oa);
             }
-            rigidbody *ch = &world.bodies[robot.chassis_body];
+            rigidbody *ch = &world.bodies [robot.chassis_body];
             float cs = sqrtf (ch->velocity.x * ch->velocity.x + ch->velocity.z * ch->velocity.z);
             if (cs > max_chassis_speed)
                 max_chassis_speed = cs;

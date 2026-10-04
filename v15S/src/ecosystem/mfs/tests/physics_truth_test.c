@@ -57,11 +57,11 @@ static void test_free_fall_gravity (void) {
     }
     float t = 1.0f;
     float expected_y = h - 0.5f * 9.81f * t * t;
-    float actual_y = world.bodies[0].position.y;
+    float actual_y = world.bodies [0].position.y;
     float pos_error = fabsf (actual_y - expected_y);
     TEST_ASSERT (pos_error < 0.5f, "sphere position y ≈ h - 0.5*g*t^2");
     float expected_vy = -9.81f * t;
-    float actual_vy = world.bodies[0].velocity.y;
+    float actual_vy = world.bodies [0].velocity.y;
     float vel_error = fabsf (actual_vy - expected_vy);
     TEST_ASSERT (vel_error < 0.5f, "sphere velocity vy ≈ -g*t");
     physics_world_cleanup (&world);
@@ -79,11 +79,11 @@ static void test_cylinder_inertia (void) {
     (void) idx;
     /* Apply known torque about axle (X axis) */
     float torque = 0.01f;
-    world.bodies[0].torque_accumulator.x += torque;
+    world.bodies [0].torque_accumulator.x += torque;
     physics_world_step (&world, DT);
     float expected_I = 0.5f * m * r * r;
     float expected_alpha = torque / expected_I;
-    float actual_alpha = world.bodies[0].angular_velocity.x / DT;
+    float actual_alpha = world.bodies [0].angular_velocity.x / DT;
     float alpha_error = fabsf (actual_alpha - expected_alpha) / expected_alpha;
     TEST_ASSERT (alpha_error < 0.1f, "angular accel ≈ torque / (0.5*m*r^2)");
     physics_world_cleanup (&world);
@@ -102,14 +102,14 @@ static void test_restitution_bounce (void) {
      * falls through the void and `bounced` can never fire (engine innocent). */
     mfs_test_floor_e (&world, 0.4f, 0.3f, e);
     int idx = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0.0f, h, 0.0f});
-    world.bodies[idx].restitution = e;
+    world.bodies [idx].restitution = e;
     /* Simulate until sphere bounces (up to 3 seconds) */
     float max_height_after_bounce = 0.0f;
     bool bounced = false;
     for (int i = 0; i < 180; i++) {
         physics_world_step (&world, DT);
-        float y = world.bodies[idx].position.y;
-        if (world.bodies[idx].velocity.y > 0.1f && !bounced) {
+        float y = world.bodies [idx].position.y;
+        if (world.bodies [idx].velocity.y > 0.1f && !bounced) {
             bounced = true;
         }
         if (bounced && y > max_height_after_bounce) {
@@ -140,11 +140,11 @@ static void test_rolling_kinematics (void) {
     int cyl_idx = physics_world_add_cylinder (&world, r, 0.02f, 0.5f, (vector3){0.0f, r + 0.01f, 0.0f});
     /* Apply torque to make it roll */
     for (int i = 0; i < 120; i++) {
-        world.bodies[cyl_idx].torque_accumulator.x += 0.005f;
+        world.bodies [cyl_idx].torque_accumulator.x += 0.005f;
         physics_world_step (&world, DT);
     }
-    float v = world.bodies[cyl_idx].velocity.z;
-    float omega = world.bodies[cyl_idx].angular_velocity.x;
+    float v = world.bodies [cyl_idx].velocity.z;
+    float omega = world.bodies [cyl_idx].angular_velocity.x;
     float v_expected = omega * r;
     float kinematic_error = fabsf (v - v_expected) / (fabsf (v_expected) + 0.001f);
     TEST_ASSERT (kinematic_error < 0.3f, "rolling v ≈ omega * r");
@@ -171,16 +171,16 @@ static void test_rolling_resistance_stopping (void) {
         physics_world_step (&world, DT);
     }
     /* Cut power — set all wheel commands to 0 */
-    float zero_commands[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    float zero_commands [4] = {0.0f, 0.0f, 0.0f, 0.0f};
     ftc_robot_set_wheel_commands (&robot, zero_commands, 4);
-    float speed_before_cut = world.bodies[robot.chassis_body].velocity.z;
+    float speed_before_cut = world.bodies [robot.chassis_body].velocity.z;
     TEST_ASSERT (fabsf (speed_before_cut) > 0.1f, "robot has velocity before power cut");
     /* Coast for 5 seconds */
     for (int i = 0; i < 300; i++) {
         drivetrain_update (&world, &robot, DT);
         physics_world_step (&world, DT);
     }
-    float final_speed = fabsf (world.bodies[robot.chassis_body].velocity.z);
+    float final_speed = fabsf (world.bodies [robot.chassis_body].velocity.z);
     TEST_ASSERT (final_speed < 0.5f,
                  "robot coasts to near-stop after 5s coast"); /* MFS_134_TEST_FIX: relaxed threshold */
     physics_world_cleanup (&world);
@@ -215,25 +215,25 @@ static void test_motor_free_speed (void) {
      * without this) — then the wheels truly dangle. */
     {
         const vector3 lift = {0.0f, 1.9f, 0.0f};
-        rigidbody *chassis0 = &world.bodies[robot.chassis_body];
+        rigidbody *chassis0 = &world.bodies [robot.chassis_body];
         chassis0->position = vector3_addition (chassis0->position, lift);
         chassis0->velocity = vector3_zero ();
         chassis0->angular_velocity = vector3_zero ();
         for (int w = 0; w < robot.wheel_count; w++) {
-            int wi = robot.wheel_bodies[w];
+            int wi = robot.wheel_bodies [w];
             if (wi < 0 || wi >= world.body_count)
                 continue;
-            rigidbody *wb = &world.bodies[wi];
+            rigidbody *wb = &world.bodies [wi];
             wb->position = vector3_addition (wb->position, lift);
             wb->velocity = vector3_zero ();
             wb->angular_velocity = vector3_zero ();
             rigidbody_update_axes (wb);
-            motor_reset_observer (&robot.wheel_motors[w]);
-            for (int k = 0; k < robot.roller_count[w]; k++) {
-                int rb = robot.roller_bodies[w][k];
+            motor_reset_observer (&robot.wheel_motors [w]);
+            for (int k = 0; k < robot.roller_count [w]; k++) {
+                int rb = robot.roller_bodies [w] [k];
                 if (rb < 0 || rb >= world.body_count)
                     continue;
-                rigidbody *rbb = &world.bodies[rb];
+                rigidbody *rbb = &world.bodies [rb];
                 rbb->position = vector3_addition (rbb->position, lift);
                 rbb->velocity = vector3_zero ();
                 rbb->angular_velocity = vector3_zero ();
@@ -242,7 +242,7 @@ static void test_motor_free_speed (void) {
         }
         rigidbody_update_axes (chassis0);
     }
-    rigidbody *chassis = &world.bodies[robot.chassis_body];
+    rigidbody *chassis = &world.bodies [robot.chassis_body];
     rigidbody_set_kinematic (chassis, true);
     chassis->velocity = vector3_zero ();
     /* Drive at full power for 3 seconds (wheels spin free) */
@@ -253,7 +253,7 @@ static void test_motor_free_speed (void) {
     }
     /* 5203-2402-0027 spec: 223 RPM output */
     float spec_rpm = 223.0f;
-    float actual_rpm = robot.wheel_motors[0].rpm;
+    float actual_rpm = robot.wheel_motors [0].rpm;
     float rpm_error = fabsf (actual_rpm - spec_rpm) / spec_rpm;
     printf ("    [DIAG] free-spin rpm=%.1f spec=%.1f\n", actual_rpm, spec_rpm);
     TEST_ASSERT (rpm_error < 0.3f, "motor RPM approaches spec free speed (223 RPM)");
@@ -278,10 +278,10 @@ static void test_motor_stall_torque (void) {
     drivetrain_tank (&robot, 1.0f, 1.0f);
     for (int t = 0; t < 10; t++) {
         for (int w = 0; w < robot.wheel_count; w++) {
-            int wi = robot.wheel_bodies[w];
+            int wi = robot.wheel_bodies [w];
             if (wi >= 0 && wi < world.body_count) {
-                rigidbody *wheel = &world.bodies[wi];
-                vector3 axle = wheel->cached_axes[0];
+                rigidbody *wheel = &world.bodies [wi];
+                vector3 axle = wheel->cached_axes [0];
                 if (vector3_length_squared (axle) < 0.0001f) {
                     axle = vector4_rotate_to_vector3 (wheel->orientation, (vector3){1.0f, 0.0f, 0.0f});
                 }
@@ -294,7 +294,7 @@ static void test_motor_stall_torque (void) {
     }
     /* 5203-2402-0027 spec: 38.0 kg.cm = 3.727 N-m output stall torque */
     float spec_stall_torque = 3.73f;
-    float actual_torque = robot.wheel_motors[0].output_torque;
+    float actual_torque = robot.wheel_motors [0].output_torque;
     float torque_error = fabsf (actual_torque - spec_stall_torque) / spec_stall_torque;
     TEST_ASSERT (torque_error < 0.3f, "motor output torque ≈ spec stall torque (3.73 N·m)");
     physics_world_cleanup (&world);
@@ -319,17 +319,17 @@ static void test_motor_back_emf_braking (void) {
     /* MFS_137_TEST8: the truth metric for braking is CHASSIS velocity.
      * Wheel RPM is slaved to chassis speed by the revolute constraints,
      * so back-EMF braking shows up as chassis deceleration. */
-    float chassis_v_before = fabsf (world.bodies[robot.chassis_body].velocity.z);
+    float chassis_v_before = fabsf (world.bodies [robot.chassis_body].velocity.z);
     TEST_ASSERT (chassis_v_before > 0.15f, "robot moving before power cut");
     /* Cut power */
-    float zero_commands[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    float zero_commands [4] = {0.0f, 0.0f, 0.0f, 0.0f};
     ftc_robot_set_wheel_commands (&robot, zero_commands, 4);
     /* Coast for 2 seconds */
     for (int i = 0; i < 120; i++) {
         drivetrain_update (&world, &robot, DT);
         physics_world_step (&world, DT);
     }
-    float chassis_v_after = fabsf (world.bodies[robot.chassis_body].velocity.z);
+    float chassis_v_after = fabsf (world.bodies [robot.chassis_body].velocity.z);
     printf ("    [DIAG] chassis_v: before=%.4f after=%.4f ratio=%.3f\n", chassis_v_before, chassis_v_after,
             chassis_v_after / (chassis_v_before + 0.001f));
     /* Two points on one decay curve with T12 (0.3x at 3 s): consistent,
@@ -357,25 +357,25 @@ static void test_static_friction_threshold (void) {
     for (int i = 0; i < 120; i++) {
         physics_world_step (&world, DT);
     }
-    float settled_x = world.bodies[idx].position.x;
-    float settled_vx = world.bodies[idx].velocity.x;
+    float settled_x = world.bodies [idx].position.x;
+    float settled_vx = world.bodies [idx].velocity.x;
     printf ("    [DIAG] settled: x=%.6f vx=%.6f y=%.6f mu_s=%.4f\n", settled_x, settled_vx,
-            world.bodies[idx].position.y, world.bodies[idx].friction_static);
+            world.bodies [idx].position.y, world.bodies [idx].friction_static);
     /* TRUTH PROBE: a cube under gravity alone must not slide.
      * If it does, the friction solver itself is lying. */
     TEST_ASSERT (fabsf (settled_x) < 0.05f, "TRUTH PROBE: cube under gravity alone does not slide");
     /* Zero any residual velocity before the friction test */
-    world.bodies[idx].velocity = (vector3){0.0f, 0.0f, 0.0f};
-    world.bodies[idx].angular_velocity = (vector3){0.0f, 0.0f, 0.0f};
+    world.bodies [idx].velocity = (vector3){0.0f, 0.0f, 0.0f};
+    world.bodies [idx].angular_velocity = (vector3){0.0f, 0.0f, 0.0f};
     /* Apply a force at 50% of the static friction threshold, held for
      * 30 steps. Static friction must fully resist it. */
-    float mu_s = world.bodies[idx].friction_static;
+    float mu_s = world.bodies [idx].friction_static;
     float F_below = 0.5f * mu_s * m * 9.81f;
     for (int i = 0; i < 30; i++) {
-        world.bodies[idx].force_accumulator.x += F_below;
+        world.bodies [idx].force_accumulator.x += F_below;
         physics_world_step (&world, DT);
     }
-    float vx_after = world.bodies[idx].velocity.x;
+    float vx_after = world.bodies [idx].velocity.x;
     printf ("    [DIAG] after 50%%-threshold push: vx=%.6f\n", vx_after);
     TEST_ASSERT (fabsf (vx_after) < 0.2f, "static friction holds below mu_s*m*g threshold");
     physics_world_cleanup (&world);
@@ -399,17 +399,17 @@ static void test_kinetic_friction_deceleration (void) {
     for (int i = 0; i < 120; i++) {
         physics_world_step (&world, DT);
     }
-    world.bodies[idx].velocity = (vector3){2.0f, 0.0f, 0.0f};
+    world.bodies [idx].velocity = (vector3){2.0f, 0.0f, 0.0f};
     rigidbody_wake (
         &world.bodies
              [idx]); /* MFS_140_WAKE: imparting velocity wakes the body (a real push). Without this the settled cube stays asleep and the solver skips it, so no kinetic friction is applied. */
-    float mu_k = world.bodies[idx].friction_kinetic;
+    float mu_k = world.bodies [idx].friction_kinetic;
     float expected_decel = mu_k * 9.81f;
-    float vx_before = world.bodies[idx].velocity.x;
+    float vx_before = world.bodies [idx].velocity.x;
     for (int i = 0; i < 10; i++) {
         physics_world_step (&world, DT);
     }
-    float vx_after = world.bodies[idx].velocity.x;
+    float vx_after = world.bodies [idx].velocity.x;
     float elapsed = 10.0f * DT;
     float actual_decel = (vx_before - vx_after) / elapsed;
     float decel_error = fabsf (actual_decel - expected_decel) / expected_decel;
@@ -438,13 +438,13 @@ static void test_numerical_stability_no_nan (void) {
         if (i < 60) {
             drivetrain_tank (&robot, 1.0f, 1.0f);
         } else {
-            float zero[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+            float zero [4] = {0.0f, 0.0f, 0.0f, 0.0f};
             ftc_robot_set_wheel_commands (&robot, zero, 4);
         }
         drivetrain_update (&world, &robot, DT);
         physics_world_step (&world, DT);
         for (int j = 0; j < world.body_count; j++) {
-            rigidbody *rb = &world.bodies[j];
+            rigidbody *rb = &world.bodies [j];
             if (!isfinite (rb->position.x) || !isfinite (rb->position.y) || !isfinite (rb->position.z) ||
                 !isfinite (rb->velocity.x) || !isfinite (rb->velocity.y) || !isfinite (rb->velocity.z)) {
                 has_nan = true;
@@ -474,17 +474,17 @@ static void test_robot_coast_down (void) {
         drivetrain_update (&world, &robot, DT);
         physics_world_step (&world, DT);
     }
-    float speed_before = fabsf (world.bodies[robot.chassis_body].velocity.z);
+    float speed_before = fabsf (world.bodies [robot.chassis_body].velocity.z);
     TEST_ASSERT (speed_before > 0.1f, "robot moving before power cut"); /* MFS_169: 0.5 too high for 60 ticks */
     /* Cut power */
-    float zero[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    float zero [4] = {0.0f, 0.0f, 0.0f, 0.0f};
     ftc_robot_set_wheel_commands (&robot, zero, 4);
     /* Coast for 3 seconds */
     for (int i = 0; i < 180; i++) {
         drivetrain_update (&world, &robot, DT);
         physics_world_step (&world, DT);
     }
-    float speed_after = fabsf (world.bodies[robot.chassis_body].velocity.z);
+    float speed_after = fabsf (world.bodies [robot.chassis_body].velocity.z);
     TEST_ASSERT (speed_after < speed_before * 0.3f, "robot decelerates significantly after power cut");
     physics_world_cleanup (&world);
 }
@@ -505,8 +505,8 @@ static void test_energy_conservation_free_fall (void) {
     for (int i = 0; i < 60; i++) {
         physics_world_step (&world, DT);
     }
-    float y = world.bodies[idx].position.y;
-    float vy = world.bodies[idx].velocity.y;
+    float y = world.bodies [idx].position.y;
+    float vy = world.bodies [idx].velocity.y;
     float E_final = m * g * y + 0.5f * m * vy * vy; /* PE + KE */
     float energy_error = fabsf (E_final - E_initial) / E_initial;
     TEST_ASSERT (energy_error < 0.1f, "energy conserved in free fall (PE + KE = const)");
@@ -531,11 +531,11 @@ static void test_cylinder_floor_rest (void) {
     for (int i = 0; i < 240; i++) {
         physics_world_step (&world, DT);
         if (i == 0 || i == 1 || i == 2 || i == 4 || i == 9 || i == 29 || i == 59 || i == 119 || i == 239) {
-            printf ("    [TRACE] step=%3d y=%.6f vy=%.6f\n", i + 1, world.bodies[idx].position.y,
-                    world.bodies[idx].velocity.y);
+            printf ("    [TRACE] step=%3d y=%.6f vy=%.6f\n", i + 1, world.bodies [idx].position.y,
+                    world.bodies [idx].velocity.y);
         }
     }
-    float y = world.bodies[idx].position.y;
+    float y = world.bodies [idx].position.y;
     float expected_y = r;
     float y_error = fabsf (y - expected_y);
     printf ("    [DIAG] final y=%.6f expected=%.6f error=%.6f (floor top=0.0)\n", y, expected_y, y_error);
@@ -548,8 +548,8 @@ static void test_cylinder_floor_rest (void) {
      * rolling resistance does not decay on slop-band cylinder-plane
      * contacts — engine follow-up, not MFS scope (sphere decay is
      * proven in the engine suite). Gate the runaway, not the roll. */
-    float vx = world.bodies[idx].velocity.x;
-    float vz = world.bodies[idx].velocity.z;
+    float vx = world.bodies [idx].velocity.x;
+    float vz = world.bodies [idx].velocity.z;
     float vm = sqrtf (vx * vx + vz * vz);
     TEST_ASSERT (vm < 0.1f, "cylinder settled (position held, no runaway)");
     physics_world_cleanup (&world);
@@ -564,11 +564,11 @@ static void test_revolute_anchor_holds (void) {
     constraint_pool_init (&world); /* MFS_139_ISOLATION: clear stale constraints */
     /* Add a static pivot */
     int pivot_idx = physics_world_add_cube (&world, (vector3){0.0f, 5.0f, 0.0f}, (vector3){0.2f, 0.2f, 0.2f}, 0.0f);
-    rigidbody_set_static (&world.bodies[pivot_idx], true);
-    uint32_t pivot_id = world.bodies[pivot_idx].object_id;
+    rigidbody_set_static (&world.bodies [pivot_idx], true);
+    uint32_t pivot_id = world.bodies [pivot_idx].object_id;
     /* Add a hanging bob */
     int bob_idx = physics_world_add_sphere (&world, 0.3f, 2.0f, (vector3){1.0f, 3.0f, 0.0f});
-    uint32_t bob_id = world.bodies[bob_idx].object_id;
+    uint32_t bob_id = world.bodies [bob_idx].object_id;
     /* Create revolute joint */
     vector3 anchor_a = {0.0f, 0.0f, 0.0f};
     vector3 anchor_b = {-1.0f, 2.0f, 0.0f};
@@ -576,13 +576,13 @@ static void test_revolute_anchor_holds (void) {
     int joint_idx = constraint_add_revolute (&world, pivot_id, bob_id, anchor_a, anchor_b, axis);
     TEST_ASSERT (joint_idx >= 0, "revolute joint created");
     float rod_length =
-        vector3_length (vector3_subtraction (world.bodies[pivot_idx].position, world.bodies[bob_idx].position));
+        vector3_length (vector3_subtraction (world.bodies [pivot_idx].position, world.bodies [bob_idx].position));
     /* Simulate for 2 seconds */
     for (int i = 0; i < 120; i++) {
         physics_world_step (&world, DT);
     }
     float rod_length_after =
-        vector3_length (vector3_subtraction (world.bodies[pivot_idx].position, world.bodies[bob_idx].position));
+        vector3_length (vector3_subtraction (world.bodies [pivot_idx].position, world.bodies [bob_idx].position));
     float rod_error = fabsf (rod_length_after - rod_length);
     TEST_ASSERT (rod_error < 0.1f, "revolute anchor holds (rod length preserved)");
     physics_world_cleanup (&world);

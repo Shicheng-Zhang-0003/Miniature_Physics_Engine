@@ -23,7 +23,7 @@ static float ccd_support_depth (const rigidbody *body) {
         return body->radius;
     }
     if (body->type == object_cylinder) {
-        float ay = body->cached_axes[0].y;
+        float ay = body->cached_axes [0].y;
         if (ay > 1.0f) {
             ay = 1.0f;
         }
@@ -33,9 +33,9 @@ static float ccd_support_depth (const rigidbody *body) {
         return body->radius * sqrtf (fmaxf (0.0f, 1.0f - ay * ay)) + body->cylinder_half_length * fabsf (ay);
     }
     vector3 down = {0.0f, -1.0f, 0.0f};
-    return body->half_extensions.x * fabsf (vector3_dot (body->cached_axes[0], down)) +
-           body->half_extensions.y * fabsf (vector3_dot (body->cached_axes[1], down)) +
-           body->half_extensions.z * fabsf (vector3_dot (body->cached_axes[2], down));
+    return body->half_extensions.x * fabsf (vector3_dot (body->cached_axes [0], down)) +
+           body->half_extensions.y * fabsf (vector3_dot (body->cached_axes [1], down)) +
+           body->half_extensions.z * fabsf (vector3_dot (body->cached_axes [2], down));
 }
 static float ccd_min_thickness (const rigidbody *body) {
     if (body->type == object_sphere) {
@@ -106,7 +106,7 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
     bool record_remainder = (time_remaining_out != NULL);
     if (time_remaining_out) {
         for (int k = 0; k < body_count; k++) {
-            time_remaining_out[k] = dt;
+            time_remaining_out [k] = dt;
         }
     }
     /* TRUTH: symmetric two-phase clamp. Old sequential per-body move vs
@@ -118,8 +118,8 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
     unsigned char *hit_flags = NULL;
     bool use_heap = false;
     bool use_caller_scratch = (best_tois_out != NULL) && (hit_flags_out != NULL);
-    float stack_tois[64];
-    unsigned char stack_hits[64];
+    float stack_tois [64];
+    unsigned char stack_hits [64];
     if (use_caller_scratch) {
         best_tois = best_tois_out;
         hit_flags = hit_flags_out;
@@ -137,11 +137,11 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
         hit_flags = stack_hits;
     }
     for (int i = 0; i < body_count; i++) {
-        best_tois[i] = dt;
-        hit_flags[i] = 0;
+        best_tois [i] = dt;
+        hit_flags [i] = 0;
     }
     for (int i = 0; i < body_count; i++) {
-        rigidbody *mover = &bodies[i];
+        rigidbody *mover = &bodies [i];
         if ((mover->static_state) || (mover->is_sleeping) || (mover->no_collide)) {
             continue;
         }
@@ -258,7 +258,7 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
                 if (j == i) {
                     continue;
                 }
-                rigidbody *other = &bodies[j];
+                rigidbody *other = &bodies [j];
                 if (other->no_collide) {
                     continue; /* render-only proxies: never obstacles */
                 }
@@ -292,7 +292,7 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
                  */
                     if (mover->type == object_sphere) {
                         /* Sphere vs cylinder: exact segment-sphere sweep. */
-                        vector3 ax = other->cached_axes[0];
+                        vector3 ax = other->cached_axes [0];
                         float ax_len = vector3_length (ax);
                         if (ax_len < 1e-6f) {
                             ax = (vector3){1.0f, 0.0f, 0.0f};
@@ -374,17 +374,17 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
                     float sr = (mover->type == object_sphere) ? mover->radius : broadphase_bounding_radius (mover);
                     vector3 rel = vector3_subtraction (mover->position, other->position);
                     vector3 rel_v = vector3_subtraction (mover->velocity, other_v);
-                    vector3 ax0 = other->cached_axes[0];
-                    vector3 ax1 = other->cached_axes[1];
-                    vector3 ax2 = other->cached_axes[2];
-                    float pl[3] = {vector3_dot (rel, ax0), vector3_dot (rel, ax1), vector3_dot (rel, ax2)};
-                    float vl[3] = {vector3_dot (rel_v, ax0), vector3_dot (rel_v, ax1), vector3_dot (rel_v, ax2)};
-                    float ex[3] = {other->half_extensions.x + sr, other->half_extensions.y + sr,
+                    vector3 ax0 = other->cached_axes [0];
+                    vector3 ax1 = other->cached_axes [1];
+                    vector3 ax2 = other->cached_axes [2];
+                    float pl [3] = {vector3_dot (rel, ax0), vector3_dot (rel, ax1), vector3_dot (rel, ax2)};
+                    float vl [3] = {vector3_dot (rel_v, ax0), vector3_dot (rel_v, ax1), vector3_dot (rel_v, ax2)};
+                    float ex [3] = {other->half_extensions.x + sr, other->half_extensions.y + sr,
                                    other->half_extensions.z + sr};
                     float tmin = 0.0f, tmax = dt;
                     bool miss = false;
                     for (int a3 = 0; a3 < 3; a3++) {
-                        float p = pl[a3], v = vl[a3], e = ex[a3];
+                        float p = pl [a3], v = vl [a3], e = ex [a3];
                         if (fabsf (v) < 1e-9f) {
                             if ((p < -e) || (p > e)) {
                                 miss = true;
@@ -421,8 +421,8 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
         } /* do_volumes */
         /* Phase 1: record only (no move yet — symmetric two-phase). */
         if (hit && best_toi < dt && best_toi > 0.0f) {
-            best_tois[i] = best_toi;
-            hit_flags[i] = 1;
+            best_tois [i] = best_toi;
+            hit_flags [i] = 1;
         }
     }
     /* Phase 2: apply all clamps simultaneously vs OLD positions.
@@ -449,14 +449,14 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
             grav_c = 0.0f;
         double cdr = (drag_c >= 1.0f - 1e-6f) ? 0.0 : -det_ln_pos ((double) drag_c);
         for (int i = 0; i < body_count; i++) {
-            if (!hit_flags[i]) {
+            if (!hit_flags [i]) {
                 continue;
             }
-            rigidbody *mover = &bodies[i];
+            rigidbody *mover = &bodies [i];
             if ((mover->static_state) || (mover->is_sleeping)) {
                 continue;
             }
-            float toi = best_tois[i];
+            float toi = best_tois [i];
             if (!(toi > 0.0f) || !(toi < dt)) {
                 continue;
             }
@@ -510,12 +510,12 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
             rigidbody_update_axes (mover);
             clamped++;
             float rem = dt - toi;
-            time_remaining_out[i] = (rem > 0.0f) ? rem : 0.0f;
+            time_remaining_out [i] = (rem > 0.0f) ? rem : 0.0f;
         }
     } else {
         /* Degraded NULL mode: no pre-move (would double-count). Count only. */
         for (int i = 0; i < body_count; i++) {
-            if (hit_flags[i]) {
+            if (hit_flags [i]) {
                 clamped++;
             }
         }

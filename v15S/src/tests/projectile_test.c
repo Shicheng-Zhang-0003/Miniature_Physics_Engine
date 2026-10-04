@@ -22,13 +22,13 @@ int main (void) {
         return 1;
     }
     int s = physics_world_add_sphere (&world, 0.2f, 1.0f, (vector3){0.0f, 1.0f, 0.0f});
-    world.bodies[s].velocity = (vector3){vx, vy, 0.0f};
-    rigidbody_wake (&world.bodies[s]);
+    world.bodies [s].velocity = (vector3){vx, vy, 0.0f};
+    rigidbody_wake (&world.bodies [s]);
     const float dt = 1.0f / 60.0f;
     float apex = 0.0f, t_apex = 0.0f, x_apex = 0.0f;
     for (int t = 0; t < 400; t++) {
         physics_world_step (&world, dt);
-        rigidbody *b = &world.bodies[s];
+        rigidbody *b = &world.bodies [s];
         if (!isfinite (b->position.x)) {
             printf ("[FAIL] NaN\n");
             physics_world_cleanup (&world);
@@ -51,7 +51,7 @@ int main (void) {
     /* TRUTH: per-tick sampling quantizes t_apex by dt (1.4%); bands at ~2x
      * discretization + solver error. Spurious z-motion (never driven)
      * fails: planar flight must stay planar. */
-    float z_end = world.bodies[s].position.z;
+    float z_end = world.bodies [s].position.z;
     int fail = 0;
     if (fabsf (z_end) > 0.02f) {
         printf ("[FAIL] spurious out-of-plane motion (z=%.4f)\n", z_end);

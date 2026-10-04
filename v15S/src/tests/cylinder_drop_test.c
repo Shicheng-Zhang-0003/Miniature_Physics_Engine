@@ -47,9 +47,9 @@ int main (void) {
     int ever_contact = 0;
     for (int t = 0; t < 300; t++) { /* 5 simulated seconds */
         physics_world_step (&world, dt);
-        cyl_y = world.bodies[cyl_idx].position.y;
-        cyl_vy = world.bodies[cyl_idx].velocity.y;
-        sph_y = world.bodies[sph_idx].position.y;
+        cyl_y = world.bodies [cyl_idx].position.y;
+        cyl_vy = world.bodies [cyl_idx].velocity.y;
+        sph_y = world.bodies [sph_idx].position.y;
         if ((!isfinite (cyl_y)) || (!isfinite (cyl_vy)) || (!isfinite (sph_y))) {
             nan_seen = 1;
             break;
@@ -60,7 +60,7 @@ int main (void) {
         if (fabsf (cyl_vy) > max_fall_speed) {
             max_fall_speed = fabsf (cyl_vy);
         }
-        if ((world.has_contact) && ((world.has_contact[cyl_idx]) || (world.has_contact[sph_idx]))) {
+        if ((world.has_contact) && ((world.has_contact [cyl_idx]) || (world.has_contact [sph_idx]))) {
             ever_contact = 1;
         }
     }

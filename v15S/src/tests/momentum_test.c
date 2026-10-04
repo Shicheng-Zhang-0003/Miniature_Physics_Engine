@@ -19,29 +19,29 @@ int main (void) {
     /* High above the floor: no gravity-torque/contact interference. */
     int a = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){-3.0f, 20.0f, 0.0f});
     int b = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0.0f, 20.0f, 0.0f});
-    world.bodies[a].velocity = (vector3){3.0f, 0.0f, 0.0f};
-    world.bodies[a].restitution = 1.0f;
-    world.bodies[b].restitution = 1.0f;
-    rigidbody_wake (&world.bodies[a]);
+    world.bodies [a].velocity = (vector3){3.0f, 0.0f, 0.0f};
+    world.bodies [a].restitution = 1.0f;
+    world.bodies [b].restitution = 1.0f;
+    rigidbody_wake (&world.bodies [a]);
     const float dt = 1.0f / 60.0f;
     float p0 = 1.0f * 3.0f; /* total momentum, x */
     for (int t = 0; t < 240; t++) {
         physics_world_step (&world, dt);
         for (int i = 0; i < world.body_count; i++) {
-            if (!isfinite (world.bodies[i].position.x)) {
+            if (!isfinite (world.bodies [i].position.x)) {
                 printf ("[FAIL] NaN\n");
                 physics_world_cleanup (&world);
                 return 1;
             }
         }
         /* Stop once cleanly separated after the hit. */
-        if ((t > 60) && ((world.bodies[b].position.x - world.bodies[a].position.x) > 2.0f) &&
-            (world.bodies[a].velocity.x < world.bodies[b].velocity.x)) {
+        if ((t > 60) && ((world.bodies [b].position.x - world.bodies [a].position.x) > 2.0f) &&
+            (world.bodies [a].velocity.x < world.bodies [b].velocity.x)) {
             break;
         }
     }
-    float va = world.bodies[a].velocity.x;
-    float vb = world.bodies[b].velocity.x;
+    float va = world.bodies [a].velocity.x;
+    float vb = world.bodies [b].velocity.x;
     float p1 = va + vb;
     printf ("[info] post-hit va=%.4f vb=%.4f (expect 0 / 3)\n", va, vb);
     /* TRUTH: 10% bands proved e=0.9 as e=1 (2.85 passes as 3). Bands at
@@ -74,8 +74,8 @@ int main (void) {
         }
         float tmax = 0.0f;
         for (int i = 0; i < world.body_count; i++) {
-            float ty = fabsf (world.bodies[i].velocity.y);
-            float tz = fabsf (world.bodies[i].velocity.z);
+            float ty = fabsf (world.bodies [i].velocity.y);
+            float tz = fabsf (world.bodies [i].velocity.z);
             if (ty > tmax)
                 tmax = ty;
             if (tz > tmax)

@@ -36,22 +36,22 @@ int main (void) {
     const float k = 20.0f;
     int anchor = physics_world_add_cube (&world, (vector3){0.0f, 50.0f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 0.0f);
     int mass = physics_world_add_sphere (&world, 0.2f, 1.0f, (vector3){2.5f, 50.0f, 0.0f});
-    uint32_t ida = world.bodies[anchor].object_id;
-    uint32_t idm = world.bodies[mass].object_id;
+    uint32_t ida = world.bodies [anchor].object_id;
+    uint32_t idm = world.bodies [mass].object_id;
     if (add_joint_by_ids (&world, ida, idm, 2.0f, k, 0.0f) < 0) {
         printf ("[FAIL] joint creation\n");
         physics_world_cleanup (&world);
         return 1;
     }
     const float dt = 1.0f / 60.0f;
-    float prev_x = world.bodies[mass].position.x - 2.0f; /* extension */
+    float prev_x = world.bodies [mass].position.x - 2.0f; /* extension */
     int crossings = 0;
     int first_cross = -1, last_cross = -1;
     float e0 = 0.5f * k * 0.25f;
     float emax_dev = 0.0f;
     for (int t = 0; t < 600; t++) {
         physics_world_step (&world, dt);
-        rigidbody *mb = &world.bodies[mass];
+        rigidbody *mb = &world.bodies [mass];
         if (!isfinite (mb->position.x)) {
             printf ("[FAIL] NaN\n");
             physics_world_cleanup (&world);

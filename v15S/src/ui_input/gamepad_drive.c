@@ -93,7 +93,7 @@ void gamepad_drive_init (void) {
     if (s_pad_init (&s_pad, NULL)) {
         if (s_pad_deadzone)
             s_pad_deadzone (&s_pad, 0.15f);
-        fprintf (stderr, "[gamepad] opened %s\n", s_pad.device_path[0] ? s_pad.device_path : "(default device)");
+        fprintf (stderr, "[gamepad] opened %s\n", s_pad.device_path [0] ? s_pad.device_path : "(default device)");
         fflush (stderr);
     }
     /* Missing device is not an error: headless rigs, unplugged pad, or
@@ -173,10 +173,10 @@ int gamepad_drive_active (void) {
 /* ---- joint watchdog (see header) ---- */
 #define FTC_WD_MAXW 8
 static int s_wd_tagged = 0;
-static float s_wd_mount[FTC_WD_MAXW];
-static int s_wd_mount_seen[FTC_WD_MAXW];
-static int s_wd_tilt_hot[FTC_WD_MAXW];
-static int s_wd_jump_hot[FTC_WD_MAXW];
+static float s_wd_mount [FTC_WD_MAXW];
+static int s_wd_mount_seen [FTC_WD_MAXW];
+static int s_wd_tilt_hot [FTC_WD_MAXW];
+static int s_wd_jump_hot [FTC_WD_MAXW];
 void ftc_watchdog_tick (void) {
     if (!s_fleet_get) {
         return; /* resolve with the driver (no bundle, no watch) */
@@ -197,14 +197,14 @@ void ftc_watchdog_tick (void) {
     if (!r || r->chassis_body < 0 || r->chassis_body >= w->body_count) {
         return;
     }
-    rigidbody *ch = &w->bodies[r->chassis_body];
-    vector3 chx = ch->cached_axes[0];
+    rigidbody *ch = &w->bodies [r->chassis_body];
+    vector3 chx = ch->cached_axes [0];
     for (int i = 0; i < r->wheel_count && i < FTC_WD_MAXW; i++) {
-        int bi = r->wheel_bodies[i];
+        int bi = r->wheel_bodies [i];
         if (bi < 0 || bi >= w->body_count) {
             continue;
         }
-        rigidbody *wh = &w->bodies[bi];
+        rigidbody *wh = &w->bodies [bi];
         int bad = (!isfinite (wh->position.x)) || (!isfinite (wh->position.y)) || (!isfinite (wh->position.z)) ||
                   (!isfinite (wh->orientation.w)) || (!isfinite (wh->orientation.x)) ||
                   (!isfinite (wh->orientation.y)) || (!isfinite (wh->orientation.z)) ||
@@ -212,11 +212,11 @@ void ftc_watchdog_tick (void) {
                   (!isfinite (wh->angular_velocity.z));
         vector3 d = vector3_subtraction (wh->position, ch->position);
         float md = vector3_length (d);
-        if (!s_wd_mount_seen[i] && isfinite (md)) {
-            s_wd_mount_seen[i] = 1;
-            s_wd_mount[i] = md;
+        if (!s_wd_mount_seen [i] && isfinite (md)) {
+            s_wd_mount_seen [i] = 1;
+            s_wd_mount [i] = md;
         }
-        float dot = vector3_dot (wh->cached_axes[0], chx);
+        float dot = vector3_dot (wh->cached_axes [0], chx);
         if (dot > 1.0f) {
             dot = 1.0f;
         }
@@ -224,28 +224,28 @@ void ftc_watchdog_tick (void) {
             dot = -1.0f;
         }
         float tilt = acosf (dot) * 57.29578f;
-        float wsp = vector3_dot (wh->angular_velocity, wh->cached_axes[0]);
+        float wsp = vector3_dot (wh->angular_velocity, wh->cached_axes [0]);
         if (bad) {
             fprintf (stderr, "[ftc-watchdog] wheel %d NON-FINITE state (pos/ori/vel)\n", i);
             fflush (stderr);
         }
-        if (s_wd_mount_seen[i] && isfinite (md) && fabsf (md - s_wd_mount[i]) > 0.05f && !s_wd_jump_hot[i]) {
-            s_wd_jump_hot[i] = 1;
+        if (s_wd_mount_seen [i] && isfinite (md) && fabsf (md - s_wd_mount [i]) > 0.05f && !s_wd_jump_hot [i]) {
+            s_wd_jump_hot [i] = 1;
             fprintf (stderr,
                      "[ftc-watchdog] wheel %d MOUNT JUMP mount=%.3f base=%.3f tilt=%.1f w=%+.1f "
                      "chpos=(%+.2f,%+.2f,%+.2f)\n",
-                     i, md, s_wd_mount[i], tilt, wsp, ch->position.x, ch->position.y, ch->position.z);
+                     i, md, s_wd_mount [i], tilt, wsp, ch->position.x, ch->position.y, ch->position.z);
             fflush (stderr);
-        } else if (s_wd_jump_hot[i] && fabsf (md - s_wd_mount[i]) < 0.025f) {
-            s_wd_jump_hot[i] = 0;
+        } else if (s_wd_jump_hot [i] && fabsf (md - s_wd_mount [i]) < 0.025f) {
+            s_wd_jump_hot [i] = 0;
         }
-        if (tilt > 10.0f && !s_wd_tilt_hot[i]) {
-            s_wd_tilt_hot[i] = 1;
+        if (tilt > 10.0f && !s_wd_tilt_hot [i]) {
+            s_wd_tilt_hot [i] = 1;
             fprintf (stderr, "[ftc-watchdog] wheel %d TILT %.1f deg (mount=%.3f base=%.3f w=%+.1f)\n", i, tilt, md,
-                     s_wd_mount[i], wsp);
+                     s_wd_mount [i], wsp);
             fflush (stderr);
-        } else if (s_wd_tilt_hot[i] && tilt < 5.0f) {
-            s_wd_tilt_hot[i] = 0;
+        } else if (s_wd_tilt_hot [i] && tilt < 5.0f) {
+            s_wd_tilt_hot [i] = 0;
         }
     }
 }

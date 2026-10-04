@@ -27,7 +27,7 @@ int main (void) {
     drivetrain_tank (&robot, 1.0f, 1.0f);
     drivetrain_update (&world, &robot, dt);
     printf ("=== Motor 0 electrical/mechanical state after 1 tick ===\n");
-    motor *m = &robot.wheel_motors[0];
+    motor *m = &robot.wheel_motors [0];
     printf ("  command          = %.3f\n", m->command);
     printf ("  current          = %.3f A\n", m->current);
     printf ("  torque (shaft)   = %.4f N*m\n", m->torque);
@@ -42,15 +42,15 @@ int main (void) {
     physics_world_step (&world, dt);
     printf ("\n=== After physics step ===\n");
     for (int i = 0; i < 4; i++) {
-        int wb = robot.wheel_bodies[i];
+        int wb = robot.wheel_bodies [i];
         printf ("  Wheel %d: ang_vel=(%.2f,%.2f,%.2f) lin_vel=(%.3f,%.3f,%.3f) pos.y=%.4f\n", i,
-                world.bodies[wb].angular_velocity.x, world.bodies[wb].angular_velocity.y,
-                world.bodies[wb].angular_velocity.z, world.bodies[wb].velocity.x, world.bodies[wb].velocity.y,
-                world.bodies[wb].velocity.z, world.bodies[wb].position.y);
+                world.bodies [wb].angular_velocity.x, world.bodies [wb].angular_velocity.y,
+                world.bodies [wb].angular_velocity.z, world.bodies [wb].velocity.x, world.bodies [wb].velocity.y,
+                world.bodies [wb].velocity.z, world.bodies [wb].position.y);
     }
     int cb = robot.chassis_body;
-    printf ("  Chassis: lin_vel=(%.3f,%.3f,%.3f) pos.y=%.4f\n", world.bodies[cb].velocity.x,
-            world.bodies[cb].velocity.y, world.bodies[cb].velocity.z, world.bodies[cb].position.y);
+    printf ("  Chassis: lin_vel=(%.3f,%.3f,%.3f) pos.y=%.4f\n", world.bodies [cb].velocity.x,
+            world.bodies [cb].velocity.y, world.bodies [cb].velocity.z, world.bodies [cb].position.y);
     printf ("\n=== Verdict heuristics ===\n");
     if (m->output_torque > 5.0f)
         printf ("  [SUSPECT] output_torque %.2f N*m is HUGE for a 100mm wheel -> gear ratio likely double-applied\n",

@@ -24,7 +24,7 @@ static float body_support_along_axis (rigidbody *rigid_body, vector3 axis) {
         /* TRUTH: never trust cached_axes blindly (zero/NaN axle from corrupt
          * state). Degraded axle degrades to the bounding radius (conservative
          * clamp: may hold slightly high, never lets escape). */
-        vector3 axle = rigid_body->cached_axes[0];
+        vector3 axle = rigid_body->cached_axes [0];
         float l2 = vector3_length_squared (axle);
         if (!isfinite (l2) || l2 < 1e-8f || l2 > 4.0f) {
             return broadphase_bounding_radius (rigid_body);
@@ -35,9 +35,9 @@ static float body_support_along_axis (rigidbody *rigid_body, vector3 axis) {
         return rigid_body->radius * vector3_length (radial_vec) + rigid_body->cylinder_half_length * fabsf (along);
     }
     vector3 *axes = rigid_body->cached_axes;
-    return rigid_body->half_extensions.x * fabsf (vector3_dot (axes[0], axis)) +
-           rigid_body->half_extensions.y * fabsf (vector3_dot (axes[1], axis)) +
-           rigid_body->half_extensions.z * fabsf (vector3_dot (axes[2], axis));
+    return rigid_body->half_extensions.x * fabsf (vector3_dot (axes [0], axis)) +
+           rigid_body->half_extensions.y * fabsf (vector3_dot (axes [1], axis)) +
+           rigid_body->half_extensions.z * fabsf (vector3_dot (axes [2], axis));
 }
 static float get_obb_min_along_axis (rigidbody *rigid_body, vector3 axis) {
     /* MPE_TASK_16_BOUNDARY_CACHED_AXES_MIN_BEGIN */

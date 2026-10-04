@@ -21,17 +21,17 @@ int mpe_t_spring (void) {
     int anchor = physics_world_add_cube (&w, (vector3){0.0f, 50.0f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 0.0f);
     int mass = physics_world_add_sphere (&w, 0.2f, 1.0f, (vector3){2.5f, 50.0f, 0.0f});
     MPE_CHECK (&t, anchor >= 0 && mass >= 0);
-    uint32_t ida = w.bodies[anchor].object_id;
-    uint32_t idm = w.bodies[mass].object_id;
+    uint32_t ida = w.bodies [anchor].object_id;
+    uint32_t idm = w.bodies [mass].object_id;
     MPE_CHECK (&t, add_joint_by_ids (&w, ida, idm, 2.0f, k, 0.0f) >= 0);
     const float dt = 1.0f / 60.0f;
-    float prev_x = w.bodies[mass].position.x - 2.0f;
+    float prev_x = w.bodies [mass].position.x - 2.0f;
     int crossings = 0, first_cross = -1, last_cross = -1;
     float e0 = 0.5f * k * 0.25f;
     float emax_dev = 0.0f;
     for (int kk = 0; kk < 600; kk++) {
         physics_world_step (&w, dt);
-        rigidbody *mb = &w.bodies[mass];
+        rigidbody *mb = &w.bodies [mass];
         if (!isfinite (mb->position.x)) {
             printf ("[FAIL] NaN\n");
             t.failures++;
@@ -99,13 +99,13 @@ int mpe_t_two_world (void) {
             break;
         }
         if (k == 60) {
-            ya_mid = wa.bodies[0].position.y;
-            yb_mid = wb.bodies[0].position.y;
+            ya_mid = wa.bodies [0].position.y;
+            yb_mid = wb.bodies [0].position.y;
             MPE_INFO ("t=1s: y_a=%.3f (g=-9.81) y_b=%.3f (g=-1.0)", ya_mid, yb_mid);
         }
     }
     MPE_CHECK (&t, (yb_mid - ya_mid) >= 2.0f);
-    MPE_CHECK (&t, wa.bodies[0].position.y <= 9.0f);
+    MPE_CHECK (&t, wa.bodies [0].position.y <= 9.0f);
     if (t.failures == 0) {
         printf ("[PASS] two worlds independent: separated %.3f m at t=1s by per-world gravity\n", yb_mid - ya_mid);
     }
@@ -121,21 +121,21 @@ int mpe_t_revolute (void) {
     mpe_world_begin (&w);
     int pivot = physics_world_add_cube (&w, (vector3){0.0f, 10.0f, 0.0f}, (vector3){0.2f, 0.2f, 0.2f}, 1.0f);
     MPE_CHECK (&t, pivot >= 0);
-    rigidbody_set_static (&w.bodies[pivot], true);
-    uint32_t pid = w.bodies[pivot].object_id;
+    rigidbody_set_static (&w.bodies [pivot], true);
+    uint32_t pid = w.bodies [pivot].object_id;
     int bob = physics_world_add_sphere (&w, 0.3f, 2.0f, (vector3){1.0f, 8.0f, 0.0f});
     MPE_CHECK (&t, bob >= 0);
-    uint32_t bid = w.bodies[bob].object_id;
+    uint32_t bid = w.bodies [bob].object_id;
     vector3 pivot_point = {0.0f, 10.0f, 0.0f};
-    float rod_length = vector3_length (vector3_subtraction (pivot_point, w.bodies[bob].position));
-    vector3 start_position = w.bodies[bob].position;
+    float rod_length = vector3_length (vector3_subtraction (pivot_point, w.bodies [bob].position));
+    vector3 start_position = w.bodies [bob].position;
     MPE_CHECK (&t, constraint_add_revolute (&w, pid, bid, (vector3){0.0f, 0.0f, 0.0f}, (vector3){-1.0f, 2.0f, 0.0f},
                                             (vector3){0.0f, 0.0f, 1.0f}) >= 0);
     const float dt = 1.0f / 60.0f;
     float max_drift = 0.0f;
     for (int k = 0; k < 600; k++) {
         physics_world_step (&w, dt);
-        rigidbody *bb = &w.bodies[bob];
+        rigidbody *bb = &w.bodies [bob];
         if (!isfinite (bb->position.x) || !isfinite (bb->position.y) || !isfinite (bb->position.z)) {
             printf ("[FAIL] bob went non-finite at tick %d\n", k);
             t.failures++;
@@ -146,7 +146,7 @@ int mpe_t_revolute (void) {
             max_drift = drift;
         }
     }
-    float moved = vector3_length (vector3_subtraction (w.bodies[bob].position, start_position));
+    float moved = vector3_length (vector3_subtraction (w.bodies [bob].position, start_position));
     MPE_INFO ("rod=%.4f max_drift=%.4f moved=%.4f", rod_length, max_drift, moved);
     MPE_CHECK (&t, max_drift <= 0.02f);
     MPE_CHECK (&t, moved >= 0.05f);
@@ -183,7 +183,7 @@ int mpe_t_cylinder_drop (void) {
             t.failures++;
             break;
         }
-        float av = fabsf (w.bodies[cyl].velocity.y);
+        float av = fabsf (w.bodies [cyl].velocity.y);
         if (av > max_fall) {
             max_fall = av;
         }
@@ -191,9 +191,9 @@ int mpe_t_cylinder_drop (void) {
             ever_contact = 1;
         }
     }
-    float cyl_y = w.bodies[cyl].position.y;
-    float cyl_vy = w.bodies[cyl].velocity.y;
-    float sph_y = w.bodies[sph].position.y;
+    float cyl_y = w.bodies [cyl].position.y;
+    float cyl_vy = w.bodies [cyl].velocity.y;
+    float sph_y = w.bodies [sph].position.y;
     MPE_INFO ("sphere y=%.4f cylinder y=%.4f vy=%.4f max_fall=%.3f ever_contact=%d (net OFF)", sph_y, cyl_y, cyl_vy,
               max_fall, ever_contact);
     MPE_CHECK (&t, max_fall > 0.5f);
@@ -219,12 +219,12 @@ int mpe_t_cylinder_sphere (void) {
     int cyl = physics_world_add_cylinder (&w, 0.05f, 0.02f, 0.0f, (vector3){0.0f, 0.06f, 0.0f});
     int sph = physics_world_add_sphere (&w, 0.08f, 0.3f, (vector3){0.0f, 0.08f, 0.5f});
     MPE_CHECK (&t, cyl >= 0 && sph >= 0);
-    w.bodies[sph].velocity = (vector3){0.0f, 0.0f, -2.0f};
+    w.bodies [sph].velocity = (vector3){0.0f, 0.0f, -2.0f};
     const float dt = 1.0f / 60.0f;
     if (!mpe_step (&w, 120, dt)) {
         t.failures++;
     }
-    float sph_z = w.bodies[sph].position.z;
+    float sph_z = w.bodies [sph].position.z;
     MPE_INFO ("sphere final z=%.4f (started at 0.5)", sph_z);
     MPE_CHECK (&t, sph_z >= -0.05f);
     if (t.failures == 0) {
@@ -243,13 +243,13 @@ int mpe_t_cylinder_cube (void) {
     MPE_CHECK (&t, physics_world_add_cube (&w, (vector3){0.0f, 0.25f, 0.5f}, (vector3){0.5f, 0.25f, 0.1f}, 0.0f) >= 0);
     int cyl = physics_world_add_cylinder (&w, 0.05f, 0.02f, 0.5f, (vector3){0.0f, 0.06f, -0.5f});
     MPE_CHECK (&t, cyl >= 0);
-    w.bodies[cyl].velocity = (vector3){0.0f, 0.0f, 3.0f};
+    w.bodies [cyl].velocity = (vector3){0.0f, 0.0f, 3.0f};
     const float dt = 1.0f / 60.0f;
     if (!mpe_step (&w, 180, dt)) {
         t.failures++;
     }
-    float cyl_z = w.bodies[cyl].position.z;
-    float cyl_vz = w.bodies[cyl].velocity.z;
+    float cyl_z = w.bodies [cyl].position.z;
+    float cyl_vz = w.bodies [cyl].velocity.z;
     MPE_INFO ("cylinder final z=%.4f vz=%.4f (wall face at z=0.4)", cyl_z, cyl_vz);
     MPE_CHECK (&t, cyl_z <= 0.40f);
     MPE_CHECK (&t, fabsf (cyl_vz) <= 1.0f);
@@ -269,12 +269,12 @@ int mpe_t_cylinder_cylinder (void) {
     int c1 = physics_world_add_cylinder (&w, 0.05f, 0.02f, 0.0f, (vector3){0.0f, 0.06f, 0.0f});
     int c2 = physics_world_add_cylinder (&w, 0.05f, 0.02f, 0.5f, (vector3){0.0f, 0.06f, 0.5f});
     MPE_CHECK (&t, c1 >= 0 && c2 >= 0);
-    w.bodies[c2].velocity = (vector3){0.0f, 0.0f, -2.0f};
+    w.bodies [c2].velocity = (vector3){0.0f, 0.0f, -2.0f};
     const float dt = 1.0f / 60.0f;
     if (!mpe_step (&w, 180, dt)) {
         t.failures++;
     }
-    float z2 = w.bodies[c2].position.z;
+    float z2 = w.bodies [c2].position.z;
     MPE_INFO ("moving cylinder final z=%.4f (started 0.5, other at 0)", z2);
     MPE_CHECK (&t, isfinite (z2) && z2 >= -0.05f);
     if (t.failures == 0) {
@@ -304,14 +304,14 @@ int mpe_t_list4_cylinder_floor (void) {
         mpe_floor_plane (&w, 0.4f, 0.3f);
         int cyl = physics_world_add_cylinder (&w, 0.05f, 0.02f, 0.5f, (vector3){0.0f, 0.25f, 0.0f});
         MPE_CHECK (&t, cyl >= 0);
-        w.bodies[cyl].restitution = 0.3f;
-        w.bodies[cyl].orientation = vector4_from_axis_with_angle ((vector3){0.0f, 0.0f, 1.0f}, math_pi * 0.5f);
-        rigidbody_update_axes (&w.bodies[cyl]);
+        w.bodies [cyl].restitution = 0.3f;
+        w.bodies [cyl].orientation = vector4_from_axis_with_angle ((vector3){0.0f, 0.0f, 1.0f}, math_pi * 0.5f);
+        rigidbody_update_axes (&w.bodies [cyl]);
         if (!mpe_step (&w, 600, dt)) {
             t.failures++;
         }
-        float y = w.bodies[cyl].position.y;
-        float vy = w.bodies[cyl].velocity.y;
+        float y = w.bodies [cyl].position.y;
+        float vy = w.bodies [cyl].velocity.y;
         MPE_INFO ("face: y=%.4f vy=%.4f (rest 0.02)", y, vy);
         MPE_CHECK (&t, y >= -0.05f);
         MPE_CHECK_NEAR (&t, y, 0.02f, 0.01f, "face-rest");
@@ -325,14 +325,14 @@ int mpe_t_list4_cylinder_floor (void) {
         mpe_floor_plane (&w, 0.4f, 0.3f);
         int cyl = physics_world_add_cylinder (&w, 0.05f, 0.02f, 0.5f, (vector3){0.0f, 0.25f, 0.0f});
         MPE_CHECK (&t, cyl >= 0);
-        w.bodies[cyl].restitution = 0.3f;
-        w.bodies[cyl].orientation = vector4_from_axis_with_angle ((vector3){0.0f, 1.0f, 0.0f}, math_pi * 0.5f);
-        rigidbody_update_axes (&w.bodies[cyl]);
+        w.bodies [cyl].restitution = 0.3f;
+        w.bodies [cyl].orientation = vector4_from_axis_with_angle ((vector3){0.0f, 1.0f, 0.0f}, math_pi * 0.5f);
+        rigidbody_update_axes (&w.bodies [cyl]);
         if (!mpe_step (&w, 600, dt)) {
             t.failures++;
         }
-        float y = w.bodies[cyl].position.y;
-        float vy = w.bodies[cyl].velocity.y;
+        float y = w.bodies [cyl].position.y;
+        float vy = w.bodies [cyl].velocity.y;
         MPE_INFO ("barrel: y=%.4f vy=%.4f (rest 0.05)", y, vy);
         MPE_CHECK (&t, y >= -0.05f);
         MPE_CHECK_NEAR (&t, y, 0.05f, 0.01f, "barrel-rest");
@@ -374,14 +374,14 @@ int mpe_t_cylinder_platform (void) {
     g_cfg.sleep.enable = false;
     int ip = physics_world_add_cube (&w, (vector3){0.0f, 10.0f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
     MPE_CHECK (&t, ip >= 0);
-    MPE_CHECK (&t, w.bodies[ip].static_state);
+    MPE_CHECK (&t, w.bodies [ip].static_state);
     /* r=0.5 h=0.4 cylinder, 4.6 m below the slab's underside (y=9.5). */
     int ic = physics_world_add_cylinder (&w, 0.5f, 0.4f, 1.0f, (vector3){0.0f, 5.0f, 0.0f});
     /* Control: an identical cube, same position, offset in z. */
     int iu = physics_world_add_cube (&w, (vector3){0.0f, 5.0f, 3.0f}, (vector3){0.5f, 0.4f, 0.5f}, 1.0f);
     MPE_CHECK (&t, ic >= 0 && iu >= 0);
-    rigidbody *cyl = &w.bodies[ic];
-    rigidbody *cube = &w.bodies[iu];
+    rigidbody *cyl = &w.bodies [ic];
+    rigidbody *cube = &w.bodies [iu];
     /* The world still has its y>=0 boundary backstop, so only step long
      * enough that neither body can reach it. */
     const float dt = 1.0f / 60.0f;
@@ -448,7 +448,7 @@ int mpe_t_cylinder_sphere_inside (void) {
     /* r = 2, half-length 1, axle +X. Sphere radius 0.5, centre 4 sub-cases
      * placed inside so each branch (cap vs barrel) and each axis is covered. */
     const int ncase = 4;
-    vector3 offsets[4] = {{0.0f, 1.7f, 0.0f}, /* near +Y barrel  */
+    vector3 offsets [4] = {{0.0f, 1.7f, 0.0f}, /* near +Y barrel  */
                           {0.0f, -1.7f, 0.0f}, /* near -Y barrel  */
                           {0.0f, 0.0f, 1.7f}, /* near +Z barrel  */
                           {0.8f, 0.0f, 0.0f}}; /* near +X cap     */
@@ -464,10 +464,10 @@ int mpe_t_cylinder_sphere_inside (void) {
          * The earlier "1 of 4 sub-cases unresolved" note in
          * docs/KNOWN_FAILURES.md was this artifact and has been retracted. */
         int ic = physics_world_add_cylinder (&ww, 2.0f, 1.0f, 1.0f, (vector3){0, 3, 0});
-        int is = physics_world_add_sphere (&ww, 0.5f, 1.0f, vector3_addition ((vector3){0, 3, 0}, offsets[c]));
+        int is = physics_world_add_sphere (&ww, 0.5f, 1.0f, vector3_addition ((vector3){0, 3, 0}, offsets [c]));
         MPE_CHECK (&t, ic >= 0 && is >= 0);
-        rigidbody *cyl = &ww.bodies[ic];
-        rigidbody *sph = &ww.bodies[is];
+        rigidbody *cyl = &ww.bodies [ic];
+        rigidbody *sph = &ww.bodies [is];
         collision_data cd;
         memset (&cd, 0, sizeof (cd));
         bool hit = collision_cylinder_sphere (cyl, sph, &cd, &g_cfg);
@@ -478,10 +478,10 @@ int mpe_t_cylinder_sphere_inside (void) {
              * that the solver (which pushes B along +n) ejects it. */
             MPE_CHECK (&t, cd.object_a == cyl);
             MPE_CHECK (&t, cd.object_b == sph);
-            float dn = vector3_dot (cd.normal_vector, offsets[c]);
+            float dn = vector3_dot (cd.normal_vector, offsets [c]);
             MPE_CHECK (&t, dn > 0.0f); /* same hemisphere as the offset */
             MPE_CHECK_NEAR (&t, vector3_length (cd.normal_vector), 1.0f, 1e-3, "unit normal");
-            MPE_CHECK (&t, cd.contacts[0].penetration > 0.0f);
+            MPE_CHECK (&t, cd.contacts [0].penetration > 0.0f);
         }
         /* End to end: the sphere must never be driven DEEPER. That is the
          * exact pre-fix failure -- the negated normal pushed it further in
@@ -496,7 +496,7 @@ int mpe_t_cylinder_sphere_inside (void) {
          * turned out to be the boundary-clamp fixture bug fixed above, not a
          * depenetration problem). */
         {
-            float pen0 = cd.contact_count > 0 ? cd.contacts[0].penetration : 0.0f;
+            float pen0 = cd.contact_count > 0 ? cd.contacts [0].penetration : 0.0f;
             for (int k = 0; k < 120; k++)
                 physics_world_step (&ww, 1.0f / 60.0f);
             vector3 off = vector3_subtraction (sph->position, cyl->position);
@@ -527,7 +527,7 @@ int mpe_t_cylinder_sphere_inside (void) {
             MPE_INFO ("case %d: pen0=%.4f pen1=%.4f axial=%.4f radial=%.4f", c, pen0, pen1, axial, radial);
             /* Load-bearing: never driven deeper, and always moving outward. */
             MPE_CHECK (&t, pen1 <= pen0 + 1e-3f);
-            MPE_CHECK (&t, vector3_dot (off, offsets[c]) > 0.0f);
+            MPE_CHECK (&t, vector3_dot (off, offsets [c]) > 0.0f);
             /* Separation should COMPLETE, not merely begin. Measured in an
              * isolated harness with solver_iterations=128 all four sub-cases
              * reach pen1 <= 0. This canonical world does not pin iterations,
@@ -575,16 +575,16 @@ int mpe_t_mass_properties (void) {
         int s = physics_world_add_sphere (&w, r, m, (vector3){0.0f, 60.0f, 0.0f});
         MPE_CHECK (&t, s >= 0);
         const float ref = 0.4f * m * r * r;
-        MPE_CHECK_NEAR (&t, w.bodies[s].inertia_tensor_local.matrix[0][0], ref, 1e-5f, "sphere Ixx");
-        MPE_CHECK_NEAR (&t, w.bodies[s].inertia_tensor_local.matrix[1][1], ref, 1e-5f, "sphere Iyy");
-        MPE_CHECK_NEAR (&t, w.bodies[s].inertia_tensor_local.matrix[2][2], ref, 1e-5f, "sphere Izz");
-        MPE_CHECK_NEAR (&t, w.bodies[s].inverse_mass, 1.0f / m, 1e-6f, "sphere inverse_mass");
+        MPE_CHECK_NEAR (&t, w.bodies [s].inertia_tensor_local.matrix [0] [0], ref, 1e-5f, "sphere Ixx");
+        MPE_CHECK_NEAR (&t, w.bodies [s].inertia_tensor_local.matrix [1] [1], ref, 1e-5f, "sphere Iyy");
+        MPE_CHECK_NEAR (&t, w.bodies [s].inertia_tensor_local.matrix [2] [2], ref, 1e-5f, "sphere Izz");
+        MPE_CHECK_NEAR (&t, w.bodies [s].inverse_mass, 1.0f / m, 1e-6f, "sphere inverse_mass");
         /* inverse tensor must actually invert the tensor */
-        math3 id = math3_multiplication (w.bodies[s].inverse_inertia_tensor_local, w.bodies[s].inertia_tensor_local);
-        MPE_CHECK_NEAR (&t, id.matrix[0][0], 1.0f, 1e-5f, "inv(I)*I xx");
-        MPE_CHECK_NEAR (&t, id.matrix[1][1], 1.0f, 1e-5f, "inv(I)*I yy");
-        MPE_CHECK_NEAR (&t, id.matrix[2][2], 1.0f, 1e-5f, "inv(I)*I zz");
-        MPE_CHECK_NEAR (&t, id.matrix[0][1], 0.0f, 1e-6f, "inv(I)*I off-diagonal");
+        math3 id = math3_multiplication (w.bodies [s].inverse_inertia_tensor_local, w.bodies [s].inertia_tensor_local);
+        MPE_CHECK_NEAR (&t, id.matrix [0] [0], 1.0f, 1e-5f, "inv(I)*I xx");
+        MPE_CHECK_NEAR (&t, id.matrix [1] [1], 1.0f, 1e-5f, "inv(I)*I yy");
+        MPE_CHECK_NEAR (&t, id.matrix [2] [2], 1.0f, 1e-5f, "inv(I)*I zz");
+        MPE_CHECK_NEAR (&t, id.matrix [0] [1], 0.0f, 1e-6f, "inv(I)*I off-diagonal");
     }
     /* box: (m/12)(other two squared) */
     {
@@ -593,17 +593,17 @@ int mpe_t_mass_properties (void) {
         int c = physics_world_add_cube (&w, (vector3){0.0f, 60.0f, 0.0f}, half, m);
         MPE_CHECK (&t, c >= 0);
         const float W = half.x * 2.0f, H = half.y * 2.0f, D = half.z * 2.0f;
-        MPE_CHECK_NEAR (&t, w.bodies[c].inertia_tensor_local.matrix[0][0], (m / 12.0f) * (H * H + D * D), 1e-5f,
+        MPE_CHECK_NEAR (&t, w.bodies [c].inertia_tensor_local.matrix [0] [0], (m / 12.0f) * (H * H + D * D), 1e-5f,
                         "box Ixx");
-        MPE_CHECK_NEAR (&t, w.bodies[c].inertia_tensor_local.matrix[1][1], (m / 12.0f) * (W * W + D * D), 1e-5f,
+        MPE_CHECK_NEAR (&t, w.bodies [c].inertia_tensor_local.matrix [1] [1], (m / 12.0f) * (W * W + D * D), 1e-5f,
                         "box Iyy");
-        MPE_CHECK_NEAR (&t, w.bodies[c].inertia_tensor_local.matrix[2][2], (m / 12.0f) * (W * W + H * H), 1e-5f,
+        MPE_CHECK_NEAR (&t, w.bodies [c].inertia_tensor_local.matrix [2] [2], (m / 12.0f) * (W * W + H * H), 1e-5f,
                         "box Izz");
         /* geometry must survive verbatim: a clamped half-extent would change
          * the inertia silently, so this is also a clamp assertion */
-        MPE_CHECK_NEAR (&t, w.bodies[c].half_extensions.x, half.x, 1e-6f, "box half_ext x");
-        MPE_CHECK_NEAR (&t, w.bodies[c].half_extensions.y, half.y, 1e-6f, "box half_ext y");
-        MPE_CHECK_NEAR (&t, w.bodies[c].half_extensions.z, half.z, 1e-6f, "box half_ext z");
+        MPE_CHECK_NEAR (&t, w.bodies [c].half_extensions.x, half.x, 1e-6f, "box half_ext x");
+        MPE_CHECK_NEAR (&t, w.bodies [c].half_extensions.y, half.y, 1e-6f, "box half_ext y");
+        MPE_CHECK_NEAR (&t, w.bodies [c].half_extensions.z, half.z, 1e-6f, "box half_ext z");
     }
     /* cylinder: axial 1/2 m r^2, transverse (m/12)(3r^2 + l^2) -- the axis
      * that had never been covered by any test in either tree */
@@ -612,16 +612,16 @@ int mpe_t_mass_properties (void) {
         int c = physics_world_add_cylinder (&w, r, hl, m, (vector3){0.0f, 60.0f, 0.0f});
         MPE_CHECK (&t, c >= 0);
         const float l = 2.0f * hl;
-        MPE_CHECK_NEAR (&t, w.bodies[c].inertia_tensor_local.matrix[0][0], 0.5f * m * r * r, 1e-5f,
+        MPE_CHECK_NEAR (&t, w.bodies [c].inertia_tensor_local.matrix [0] [0], 0.5f * m * r * r, 1e-5f,
                         "cylinder AXIAL Ixx");
-        MPE_CHECK_NEAR (&t, w.bodies[c].inertia_tensor_local.matrix[1][1], (m / 12.0f) * (3.0f * r * r + l * l), 1e-5f,
+        MPE_CHECK_NEAR (&t, w.bodies [c].inertia_tensor_local.matrix [1] [1], (m / 12.0f) * (3.0f * r * r + l * l), 1e-5f,
                         "cylinder TRANSVERSE Iyy");
-        MPE_CHECK_NEAR (&t, w.bodies[c].inertia_tensor_local.matrix[2][2], (m / 12.0f) * (3.0f * r * r + l * l), 1e-5f,
+        MPE_CHECK_NEAR (&t, w.bodies [c].inertia_tensor_local.matrix [2] [2], (m / 12.0f) * (3.0f * r * r + l * l), 1e-5f,
                         "cylinder TRANSVERSE Izz");
         /* axle is local X, so the half-extent along X is the half-LENGTH */
-        MPE_CHECK_NEAR (&t, w.bodies[c].half_extensions.x, hl, 1e-6f, "cylinder half_ext x = half_length");
-        MPE_CHECK_NEAR (&t, w.bodies[c].half_extensions.y, r, 1e-6f, "cylinder half_ext y = radius");
-        MPE_CHECK_NEAR (&t, w.bodies[c].half_extensions.z, r, 1e-6f, "cylinder half_ext z = radius");
+        MPE_CHECK_NEAR (&t, w.bodies [c].half_extensions.x, hl, 1e-6f, "cylinder half_ext x = half_length");
+        MPE_CHECK_NEAR (&t, w.bodies [c].half_extensions.y, r, 1e-6f, "cylinder half_ext y = radius");
+        MPE_CHECK_NEAR (&t, w.bodies [c].half_extensions.z, r, 1e-6f, "cylinder half_ext z = radius");
     }
     /* THE FINDING: this fixture clamped nothing, so nothing was rewritten. */
     MPE_INFO ("fixture clamped nothing: mass=%lu radius=%lu half_length=%lu", mpe_clamp_mass_events,
@@ -639,9 +639,9 @@ int mpe_t_mass_properties (void) {
         MPE_CHECK (&t, mpe_clamp_mass_events > 0);
         /* and the substitution is the documented 1e-4 floor, i.e. 100000x
          * heavier than asked -- the number that makes this worth reporting */
-        MPE_INFO ("1e-9 kg requested -> %g kg stored (clamp events=%lu)", (double) w2.bodies[s].mass,
+        MPE_INFO ("1e-9 kg requested -> %g kg stored (clamp events=%lu)", (double) w2.bodies [s].mass,
                   mpe_clamp_mass_events);
-        MPE_CHECK_NEAR (&t, w2.bodies[s].mass, 1e-4f, 1e-9f, "clamped mass floor");
+        MPE_CHECK_NEAR (&t, w2.bodies [s].mass, 1e-4f, 1e-9f, "clamped mass floor");
         physics_world_cleanup (&w2);
     }
     mpe_clamp_counters_reset ();
@@ -676,39 +676,39 @@ int mpe_t_mass_properties (void) {
  * declared locally rather than inherited from whatever the suite header
  * happens to define. */
 #define MPE_REF_MATH_DT (1.0f / 60.0f)
-static float mpe_ref_proj_r (const vector3 ax[3], vector3 he, vector3 n) {
-    return he.x * fabsf (vector3_dot (ax[0], n)) + he.y * fabsf (vector3_dot (ax[1], n)) +
-           he.z * fabsf (vector3_dot (ax[2], n));
+static float mpe_ref_proj_r (const vector3 ax [3], vector3 he, vector3 n) {
+    return he.x * fabsf (vector3_dot (ax [0], n)) + he.y * fabsf (vector3_dot (ax [1], n)) +
+           he.z * fabsf (vector3_dot (ax [2], n));
 }
 static int mpe_ref_obb_overlap (vector3 ca, vector4 qa, vector3 ha, vector3 cb, vector4 qb, vector3 hb) {
-    vector3 aa[3], ab[3];
-    aa[0] = vector4_rotate_to_vector3 (qa, (vector3){1, 0, 0});
-    aa[1] = vector4_rotate_to_vector3 (qa, (vector3){0, 1, 0});
-    aa[2] = vector4_rotate_to_vector3 (qa, (vector3){0, 0, 1});
-    ab[0] = vector4_rotate_to_vector3 (qb, (vector3){1, 0, 0});
-    ab[1] = vector4_rotate_to_vector3 (qb, (vector3){0, 1, 0});
-    ab[2] = vector4_rotate_to_vector3 (qb, (vector3){0, 0, 1});
+    vector3 aa [3], ab [3];
+    aa [0] = vector4_rotate_to_vector3 (qa, (vector3){1, 0, 0});
+    aa [1] = vector4_rotate_to_vector3 (qa, (vector3){0, 1, 0});
+    aa [2] = vector4_rotate_to_vector3 (qa, (vector3){0, 0, 1});
+    ab [0] = vector4_rotate_to_vector3 (qb, (vector3){1, 0, 0});
+    ab [1] = vector4_rotate_to_vector3 (qb, (vector3){0, 1, 0});
+    ab [2] = vector4_rotate_to_vector3 (qb, (vector3){0, 0, 1});
     vector3 t = vector3_subtraction (cb, ca);
     for (int k = 0; k < 15 + 240; k++) {
         vector3 n;
         if (k < 15) {
             if (k < 3)
-                n = aa[k];
+                n = aa [k];
             else if (k < 6)
-                n = ab[k - 3];
+                n = ab [k - 3];
             else {
                 int i = (k - 6) / 3, j = (k - 6) % 3;
-                n = vector3_cross (aa[i], ab[j]);
+                n = vector3_cross (aa [i], ab [j]);
             }
         } else {
             int m = k - 15;
             float u = (float) (m / 16) * 0.3926990817f;
             float v = (float) (m % 16) * 0.3926990817f;
-            vector3 e0 = vector3_cross (aa[0], ab[0]);
+            vector3 e0 = vector3_cross (aa [0], ab [0]);
             if (vector3_length_squared (e0) < 1e-6f)
-                e0 = aa[1];
+                e0 = aa [1];
             e0 = vector3_scaling (e0, 1.0f / sqrtf (vector3_length_squared (e0)));
-            vector3 e1 = vector3_cross (e0, aa[0]);
+            vector3 e1 = vector3_cross (e0, aa [0]);
             e1 = vector3_scaling (e1, 1.0f / sqrtf (vector3_length_squared (e1)));
             vector3 e2 = vector3_cross (e0, e1);
             n = vector3_addition (
@@ -762,12 +762,12 @@ int mpe_t_reference_math (void) {
             vector4 qq = vector4_from_axis_with_angle (axis, ang);
             int a = physics_world_add_cube (&w, pa, ha, 1.0f);
             int b = physics_world_add_cube (&w, pb, hb, 1.0f);
-            w.bodies[a].orientation = qa;
-            w.bodies[b].orientation = qq;
-            rigidbody_update_axes (&w.bodies[a]);
-            rigidbody_update_axes (&w.bodies[b]);
+            w.bodies [a].orientation = qa;
+            w.bodies [b].orientation = qq;
+            rigidbody_update_axes (&w.bodies [a]);
+            rigidbody_update_axes (&w.bodies [b]);
             collision_data cd = {0};
-            int hit = collision_dual_cube (&w.bodies[a], &w.bodies[b], &cd, &g_cfg) ? 1 : 0;
+            int hit = collision_dual_cube (&w.bodies [a], &w.bodies [b], &cd, &g_cfg) ? 1 : 0;
             int ref = mpe_ref_obb_overlap (pa, qa, ha, pb, qq, hb);
             tested++;
             if ((hit != 0) == (ref != 0))
@@ -779,8 +779,8 @@ int mpe_t_reference_math (void) {
     }
     /* ---- 2. beta (ERP) vs Catto ----------------------------------- */
     {
-        const float betas[4] = {0.0f, 0.1f, 0.3f, 0.8f};
-        float retained[4];
+        const float betas [4] = {0.0f, 0.1f, 0.3f, 0.8f};
+        float retained [4];
         for (int c = 0; c < 4; c++) {
             physics_world w;
             mpe_config_init ();
@@ -788,35 +788,35 @@ int mpe_t_reference_math (void) {
             g_cfg.sleep.enable = 0;
             g_cfg.world.gravity = 0.0f; /* isolate the constraint */
             g_cfg.world.drag = 1.0f;
-            g_cfg.joints.revolute_beta = betas[c];
+            g_cfg.joints.revolute_beta = betas [c];
             physics_world_init (&w);
             constraint_pool_init (&w);
             int anchor = physics_world_add_cube (&w, (vector3){0, 50, 0}, (vector3){0.5f, 0.5f, 0.5f}, 0.0f);
             int child = physics_world_add_cube (&w, (vector3){0.30f, 50, 0}, (vector3){0.25f, 0.25f, 0.25f}, 1.0f);
-            uint32_t ia = w.bodies[anchor].object_id, ib = w.bodies[child].object_id;
+            uint32_t ia = w.bodies [anchor].object_id, ib = w.bodies [child].object_id;
             constraint_add_revolute (&w, ia, ib, (vector3){0, 0, 0}, (vector3){0, 0, 0}, (vector3){0, 1, 0});
-            float e0 = fabsf (w.bodies[child].position.x);
+            float e0 = fabsf (w.bodies [child].position.x);
             for (int k = 0; k < 60; k++)
                 physics_world_step (&w, MPE_REF_MATH_DT);
-            retained[c] = fabsf (w.bodies[child].position.x) / (e0 > 0 ? e0 : 1.0f);
-            MPE_INFO ("ERP beta=%.2f -> position error retained %.4f after 60 ticks", (double) betas[c],
-                      (double) retained[c]);
+            retained [c] = fabsf (w.bodies [child].position.x) / (e0 > 0 ? e0 : 1.0f);
+            MPE_INFO ("ERP beta=%.2f -> position error retained %.4f after 60 ticks", (double) betas [c],
+                      (double) retained [c]);
             physics_world_cleanup (&w);
         }
         /* Catto: beta feeds position error back to velocity, so larger beta
          * must converge faster, monotonically. */
-        MPE_CHECK (&t, retained[0] >= retained[1]);
-        MPE_CHECK (&t, retained[1] > retained[2]);
-        MPE_CHECK (&t, retained[2] > retained[3]);
+        MPE_CHECK (&t, retained [0] >= retained [1]);
+        MPE_CHECK (&t, retained [1] > retained [2]);
+        MPE_CHECK (&t, retained [2] > retained [3]);
     }
     /* ---- 3. Coulomb, sliding branch -------------------------------- */
     {
         const float m = 1.0f, mus = 0.6f, muk = 0.4f, G_N = 9.80665f;
         const float N = m * G_N;
         /* strictly above mu_s*N: must slide at (F - mu_k*N)/m */
-        const float fracs[3] = {1.10f, 1.30f, 1.60f};
+        const float fracs [3] = {1.10f, 1.30f, 1.60f};
         for (int k = 0; k < 3; k++) {
-            float F = fracs[k] * mus * N;
+            float F = fracs [k] * mus * N;
             physics_world w;
             mpe_config_init ();
             g_cfg.timestep.solver_iterations = 64;
@@ -824,24 +824,24 @@ int mpe_t_reference_math (void) {
             g_cfg.world.drag = 1.0f;
             physics_world_init (&w);
             int fl = physics_world_add_cube (&w, (vector3){0, -0.5f, 0}, (vector3){40, 0.5f, 40}, 0.0f);
-            w.bodies[fl].friction_static = mus;
-            w.bodies[fl].friction_kinetic = muk;
-            w.bodies[fl].restitution = 0.0f;
+            w.bodies [fl].friction_static = mus;
+            w.bodies [fl].friction_kinetic = muk;
+            w.bodies [fl].restitution = 0.0f;
             int b = physics_world_add_cube (&w, (vector3){0, 0.5f, 0}, (vector3){0.5f, 0.5f, 0.5f}, m);
-            w.bodies[b].friction_static = mus;
-            w.bodies[b].friction_kinetic = muk;
-            w.bodies[b].restitution = 0.0f;
+            w.bodies [b].friction_static = mus;
+            w.bodies [b].friction_kinetic = muk;
+            w.bodies [b].restitution = 0.0f;
             for (int s = 0; s < 40; s++)
                 physics_world_step (&w, MPE_REF_MATH_DT);
             for (int s = 0; s < 30; s++) {
-                w.bodies[b].force_accumulator = vector3_addition (w.bodies[b].force_accumulator, (vector3){F, 0, 0});
-                rigidbody_wake (&w.bodies[b]);
+                w.bodies [b].force_accumulator = vector3_addition (w.bodies [b].force_accumulator, (vector3){F, 0, 0});
+                rigidbody_wake (&w.bodies [b]);
                 physics_world_step (&w, MPE_REF_MATH_DT);
             }
             float pred = ((F - muk * N) / m) * (30.0f * MPE_REF_MATH_DT);
-            MPE_INFO ("Coulomb slide F/(mu_s*N)=%.2f: measured v=%.5f predicted %.5f", (double) fracs[k],
-                      (double) w.bodies[b].velocity.x, (double) pred);
-            MPE_CHECK_REL (&t, w.bodies[b].velocity.x, pred, 0.05f, "Coulomb sliding branch (F - mu_k N)/m");
+            MPE_INFO ("Coulomb slide F/(mu_s*N)=%.2f: measured v=%.5f predicted %.5f", (double) fracs [k],
+                      (double) w.bodies [b].velocity.x, (double) pred);
+            MPE_CHECK_REL (&t, w.bodies [b].velocity.x, pred, 0.05f, "Coulomb sliding branch (F - mu_k N)/m");
             physics_world_cleanup (&w);
         }
     }

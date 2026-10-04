@@ -67,7 +67,7 @@ static int failures = 0;
     } while (0)
 static int finite_world (physics_world *w) {
     for (int i = 0; i < w->body_count; i++) {
-        rigidbody *rb = &w->bodies[i];
+        rigidbody *rb = &w->bodies [i];
         if (!isfinite (rb->position.x) || !isfinite (rb->position.y) || !isfinite (rb->position.z) ||
             !isfinite (rb->velocity.x) || !isfinite (rb->velocity.y) || !isfinite (rb->velocity.z)) {
             return 0;
@@ -91,14 +91,14 @@ static void print_bits (const char *tag, float a, float b) {
 int main (int argc, char **argv) {
     const char *so_env = getenv ("FTC_SO");
     if (!so_env && argc > 1)
-        so_env = argv[1];
-    char so_buf[1024];
+        so_env = argv [1];
+    char so_buf [1024];
     const char *so_picked = so_env ? so_env : mpe_pick_plugin ("plugins/mpe_ftc.so", so_buf, sizeof (so_buf));
     const char *so = so_picked;
     /* ---- 1. dynamic import through the kernel loader ---- */
-    char err[512] = {0};
+    char err [512] = {0};
     CHECK (mpe_loader_load (so, err, sizeof (err)) == 0, "dlopen %s", so);
-    if (err[0])
+    if (err [0])
         printf ("[info] loader note: %s\n", err);
     const mpe_module_desc_t *dyn = mpe_find_module ("ftc-fleet");
     CHECK (dyn != NULL, "registry lists ftc-fleet after load");
@@ -203,8 +203,8 @@ int main (int argc, char **argv) {
     }
     CHECK (finite_world (&w2), "detached world stays finite");
     {
-        float gx = w2.bodies[w2chassis].position.x;
-        float gz = w2.bodies[w2chassis].position.z;
+        float gx = w2.bodies [w2chassis].position.x;
+        float gz = w2.bodies [w2chassis].position.z;
         float coast = sqrtf ((gx - fx) * (gx - fx) + (gz - fz) * (gz - fz));
         CHECK (coast < 2.0f, "detached robot only coasts (%.4f m, no drive)", coast);
     }

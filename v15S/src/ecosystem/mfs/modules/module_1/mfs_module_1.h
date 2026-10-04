@@ -87,19 +87,19 @@ typedef struct mfs_module_1_state {
     /* Field elements */
     int field_floor_id;
     int goal_frame_id;
-    int boundary_wall_ids[4];
+    int boundary_wall_ids [4];
     /* Robot */
     ftc_robot robot;
     bool robot_created;
     /* Ball management */
-    int ball_body_ids[16]; /* biobuzz balls on field */
+    int ball_body_ids [16]; /* biobuzz balls on field */
     int ball_count;
     int max_balls;
     float ball_spawn_timer;
     /* FIX-AUDIT-DESPOT: balls_collected was write-never (dead stat). Each
      * ball is counted once on first intake touch via ball_counted[i];
      * indices are stable (balls are never removed). */
-    bool ball_counted[16];
+    bool ball_counted [16];
     /* Intake state */
     int intake_roller_body;
     int intake_pivot_joint;
@@ -184,6 +184,6 @@ static inline rigidbody *mfs_get_chassis (const mfs_module_1_state *state) {
         return NULL;
     if (state->robot.chassis_body < 0 || state->robot.chassis_body >= state->world->body_count)
         return NULL;
-    return &state->world->bodies[state->robot.chassis_body];
+    return &state->world->bodies [state->robot.chassis_body];
 }
 #endif /* mfs_module_1_h */

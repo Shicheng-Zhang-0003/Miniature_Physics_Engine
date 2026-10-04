@@ -48,23 +48,23 @@ void a3_positional_depenetration_pass_dt (struct physics_world *world, broadphas
         rebuild_broadphase ? mpe_world_cfg (world)->depenetration.rebuild_iterations : 1; /* MPE_TASK_30 */
     for (int dep_iteration = 0; dep_iteration < depenetration_iterations; dep_iteration++) {
         for (int pair_index = 0; pair_index < pair_count; pair_index++) {
-            int index_a = pair_buffer[pair_index].object_index_a;
-            int index_b = pair_buffer[pair_index].object_index_b;
+            int index_a = pair_buffer [pair_index].object_index_a;
+            int index_b = pair_buffer [pair_index].object_index_b;
             if ((index_a < 0) || (index_a >= body_count)) {
                 continue;
             }
             if ((index_b < 0) || (index_b >= body_count)) {
                 continue;
             }
-            rigidbody *body_a = &bodies[index_a];
-            rigidbody *body_b = &bodies[index_b];
+            rigidbody *body_a = &bodies [index_a];
+            rigidbody *body_b = &bodies [index_b];
             collision_data depenetration_collision = {0};
             if (mpe_shape_dispatch (world, body_a, body_b, &depenetration_collision)) {
                 a3_positional_depenetrate_manifold_w (world, &depenetration_collision);
             }
         }
         for (int object_index = 0; object_index < body_count; object_index++) {
-            rigidbody *rigid_body = &bodies[object_index];
+            rigidbody *rigid_body = &bodies [object_index];
             if (rigid_body->static_state || rigid_body->kinematic) {
                 continue;
             }
@@ -101,7 +101,7 @@ void a3_positional_depenetrate_manifold_w (struct physics_world *world, collisio
      * fight (limit-cycle jitter). Depenetration honors solver slop. */
     const float penetration_slop = C->solver.penetration_slop;
     for (int contact_index = 0; contact_index < manifold->contact_count; contact_index++) {
-        float depth = manifold->contacts[contact_index].penetration;
+        float depth = manifold->contacts [contact_index].penetration;
         if (depth > max_depth) {
             max_depth = depth;
         }

@@ -18,7 +18,7 @@ bool collision_static_plane_cylinder (rigidbody *plane_body, rigidbody *cyl, flo
     if ((r <= 0.0f) || (h <= 0.0f) || (!isfinite (r)) || (!isfinite (h))) {
         return false;
     }
-    vector3 axis = cyl->cached_axes[0];
+    vector3 axis = cyl->cached_axes [0];
     float axis_len_sq = vector3_length_squared (axis);
     if (axis_len_sq < 1e-8f) {
         axis = (vector3){1.0f, 0.0f, 0.0f};
@@ -83,37 +83,37 @@ bool collision_static_plane_cylinder (rigidbody *plane_body, rigidbody *cyl, flo
      * friction contacts instead of flickering support").
      */
     if (fabsf (ay) < 0.35f) {
-        float axle_offsets[2] = {-h, h};
+        float axle_offsets [2] = {-h, h};
         float wheel_slop = C->solver.penetration_slop;
-        float end_pen[2] = {0.0f, 0.0f};
-        bool end_in[2] = {false, false};
+        float end_pen [2] = {0.0f, 0.0f};
+        bool end_in [2] = {false, false};
         for (int i = 0; i < 2; i++) {
-            vector3 end_center = vector3_addition (cyl->position, vector3_scaling (axis, axle_offsets[i]));
+            vector3 end_center = vector3_addition (cyl->position, vector3_scaling (axis, axle_offsets [i]));
             vector3 contact_point = vector3_addition (end_center, radial);
             float local_penetration = plane_y - contact_point.y;
             if (local_penetration > -wheel_slop) {
-                end_in[i] = true;
-                end_pen[i] = (local_penetration > 0.0f) ? local_penetration : 0.0f;
+                end_in [i] = true;
+                end_pen [i] = (local_penetration > 0.0f) ? local_penetration : 0.0f;
             }
         }
         /* Joint rule: one firm end keeps the patch; admit the partner. */
-        if ((end_in[0] != end_in[1]) && ((end_in[0] && end_pen[0] > 0.0f) || (end_in[1] && end_pen[1] > 0.0f))) {
-            int out = end_in[0] ? 1 : 0;
-            vector3 end_center = vector3_addition (cyl->position, vector3_scaling (axis, axle_offsets[out]));
+        if ((end_in [0] != end_in [1]) && ((end_in [0] && end_pen [0] > 0.0f) || (end_in [1] && end_pen [1] > 0.0f))) {
+            int out = end_in [0] ? 1 : 0;
+            vector3 end_center = vector3_addition (cyl->position, vector3_scaling (axis, axle_offsets [out]));
             vector3 contact_point = vector3_addition (end_center, radial);
             float local_penetration = plane_y - contact_point.y;
             if (local_penetration > -2.0f * wheel_slop) {
-                end_in[out] = true;
-                end_pen[out] = 0.0f;
+                end_in [out] = true;
+                end_pen [out] = 0.0f;
             }
         }
         for (int i = 0; i < 2; i++) {
-            if (end_in[i] && (collision_output_data->contact_count < 2)) {
-                vector3 end_center = vector3_addition (cyl->position, vector3_scaling (axis, axle_offsets[i]));
+            if (end_in [i] && (collision_output_data->contact_count < 2)) {
+                vector3 end_center = vector3_addition (cyl->position, vector3_scaling (axis, axle_offsets [i]));
                 vector3 contact_point = vector3_addition (end_center, radial);
-                contact_point_data *cp = &collision_output_data->contacts[collision_output_data->contact_count];
+                contact_point_data *cp = &collision_output_data->contacts [collision_output_data->contact_count];
                 cp->position = contact_point;
-                cp->penetration = end_pen[i];
+                cp->penetration = end_pen [i];
                 collision_output_data->contact_count++;
             }
         }
@@ -160,7 +160,7 @@ bool collision_static_plane_cylinder (rigidbody *plane_body, rigidbody *cyl, flo
                 vector3_scaling (vector3_addition (vector3_scaling (nhat, c), vector3_scaling (what, s)), r));
             float leg_pen = plane_y - rim_point.y;
             if ((leg_pen > -rim_slop) && (collision_output_data->contact_count < 4)) {
-                contact_point_data *cp = &collision_output_data->contacts[collision_output_data->contact_count];
+                contact_point_data *cp = &collision_output_data->contacts [collision_output_data->contact_count];
                 cp->position = rim_point;
                 cp->penetration = (leg_pen > 0.0f) ? leg_pen : 0.0f;
                 collision_output_data->contact_count++;
@@ -173,7 +173,7 @@ bool collision_static_plane_cylinder (rigidbody *plane_body, rigidbody *cyl, flo
             float lowest_offset = (r * horizontal) + (h * fabsf (ay));
             float leg_pen = plane_y - (cyl->position.y - lowest_offset);
             if (leg_pen > -rim_slop) {
-                contact_point_data *cp = &collision_output_data->contacts[0];
+                contact_point_data *cp = &collision_output_data->contacts [0];
                 cp->position = vector3_addition (cap_center, vector3_scaling (nhat, r));
                 cp->penetration = (leg_pen > 0.0f) ? leg_pen : 0.0f;
                 collision_output_data->contact_count = 1;
@@ -195,7 +195,7 @@ bool collision_cylinder_sphere (rigidbody *cyl, rigidbody *sph, collision_data *
     if ((cyl->type != object_cylinder) || (sph->type != object_sphere)) {
         return false;
     }
-    vector3 axis = cyl->cached_axes[0];
+    vector3 axis = cyl->cached_axes [0];
     float axis_len_sq = vector3_length_squared (axis);
     if (axis_len_sq < 1e-8f) {
         axis = (vector3){1.0f, 0.0f, 0.0f};
@@ -278,7 +278,7 @@ bool collision_cylinder_sphere (rigidbody *cyl, rigidbody *sph, collision_data *
         out->object_b = sph;
         out->normal_vector = nrm;
         out->contact_count = 1;
-        contact_point_data *cp_in = &out->contacts[0];
+        contact_point_data *cp_in = &out->contacts [0];
         cp_in->penetration = (-gap > 0.0f) ? -gap : 0.0f;
         /* Contact point must lie on the cylinder surface (closest), not
          * pushed outward by min_clear (which zeroed rb lever arms and
@@ -323,7 +323,7 @@ bool collision_cylinder_sphere (rigidbody *cyl, rigidbody *sph, collision_data *
     } else {
         out->normal_vector = radial_dir;
     }
-    contact_point_data *cp = &out->contacts[0];
+    contact_point_data *cp = &out->contacts [0];
     cp->penetration = (gap2 < 0.0f) ? -gap2 : 0.0f;
     cp->position = closest;
     return true;
@@ -355,16 +355,16 @@ static float cylcube_seg_obb_dist2 (rigidbody *cube, vector3 e1, vector3 seg, fl
     vector3 pt = vector3_addition (e1, vector3_scaling (seg, t));
     vector3 rel = vector3_subtraction (pt, cube->position);
     vector3 *axes = cube->cached_axes;
-    float lx = vector3_dot (rel, axes[0]);
-    float ly = vector3_dot (rel, axes[1]);
-    float lz = vector3_dot (rel, axes[2]);
+    float lx = vector3_dot (rel, axes [0]);
+    float ly = vector3_dot (rel, axes [1]);
+    float lz = vector3_dot (rel, axes [2]);
     float cx = fmaxf (-cube->half_extensions.x, fminf (cube->half_extensions.x, lx));
     float cy = fmaxf (-cube->half_extensions.y, fminf (cube->half_extensions.y, ly));
     float cz = fmaxf (-cube->half_extensions.z, fminf (cube->half_extensions.z, lz));
     vector3 on_obb = cube->position;
-    on_obb = vector3_addition (on_obb, vector3_scaling (axes[0], cx));
-    on_obb = vector3_addition (on_obb, vector3_scaling (axes[1], cy));
-    on_obb = vector3_addition (on_obb, vector3_scaling (axes[2], cz));
+    on_obb = vector3_addition (on_obb, vector3_scaling (axes [0], cx));
+    on_obb = vector3_addition (on_obb, vector3_scaling (axes [1], cy));
+    on_obb = vector3_addition (on_obb, vector3_scaling (axes [2], cz));
     if (obb_out) {
         *obb_out = on_obb;
     }
@@ -380,7 +380,7 @@ bool collision_cylinder_cube (rigidbody *cyl, rigidbody *cube, collision_data *o
     if ((r <= 0.0f) || (h <= 0.0f) || (!isfinite (r)) || (!isfinite (h))) {
         return false;
     }
-    vector3 axis = cyl->cached_axes[0];
+    vector3 axis = cyl->cached_axes [0];
     float axis_len_sq = vector3_length_squared (axis);
     if (axis_len_sq < 1e-8f) {
         axis = (vector3){1.0f, 0.0f, 0.0f};
@@ -394,11 +394,11 @@ bool collision_cylinder_cube (rigidbody *cyl, rigidbody *cube, collision_data *o
      * This avoids false early contact and the visible floating gap over floors. */
     if (cube->static_state) {
         vector3 *box_axes = cube->cached_axes;
-        float box_extents[3] = {cube->half_extensions.x, cube->half_extensions.y, cube->half_extensions.z};
+        float box_extents [3] = {cube->half_extensions.x, cube->half_extensions.y, cube->half_extensions.z};
         int up_index = 0;
-        float up_alignment = fabsf (box_axes[0].y);
+        float up_alignment = fabsf (box_axes [0].y);
         for (int i = 1; i < 3; i++) {
-            float alignment = fabsf (box_axes[i].y);
+            float alignment = fabsf (box_axes [i].y);
             if (alignment > up_alignment) {
                 up_index = i;
                 up_alignment = alignment;
@@ -407,8 +407,8 @@ bool collision_cylinder_cube (rigidbody *cyl, rigidbody *cube, collision_data *o
         if (up_alignment > 0.9999f) {
             int side_a_index = (up_index + 1) % 3;
             int side_b_index = (up_index + 2) % 3;
-            vector3 side_a = box_axes[side_a_index];
-            vector3 side_b = box_axes[side_b_index];
+            vector3 side_a = box_axes [side_a_index];
+            vector3 side_b = box_axes [side_b_index];
             vector3 from_box = vector3_subtraction (cyl->position, cube->position);
             float ca = vector3_dot (from_box, side_a);
             float cb = vector3_dot (from_box, side_b);
@@ -417,10 +417,10 @@ bool collision_cylinder_cube (rigidbody *cyl, rigidbody *cube, collision_data *o
             float support_a = h * fabsf (axle_a) + r * sqrtf (fmaxf (0.0f, 1.0f - axle_a * axle_a));
             float support_b = h * fabsf (axle_b) + r * sqrtf (fmaxf (0.0f, 1.0f - axle_b * axle_b));
             float slop = C->solver.penetration_slop;
-            if ((fabsf (ca) + support_a <= box_extents[side_a_index] + slop) &&
-                (fabsf (cb) + support_b <= box_extents[side_b_index] + slop)) {
-                float up_sign = (box_axes[up_index].y >= 0.0f) ? 1.0f : -1.0f;
-                float plane_y = cube->position.y + up_sign * box_extents[up_index];
+            if ((fabsf (ca) + support_a <= box_extents [side_a_index] + slop) &&
+                (fabsf (cb) + support_b <= box_extents [side_b_index] + slop)) {
+                float up_sign = (box_axes [up_index].y >= 0.0f) ? 1.0f : -1.0f;
+                float plane_y = cube->position.y + up_sign * box_extents [up_index];
                 /* DESPOT-2026-09-29 CRITICAL FIX: the two tests above are
                  * purely LATERAL, and collision_static_plane_cylinder then
                  * models the slab's near face as an INFINITE plane. Any
@@ -446,7 +446,7 @@ bool collision_cylinder_cube (rigidbody *cyl, rigidbody *cube, collision_data *o
                  * A cylinder INSIDE the slab still passes (top above the near
                  * face) and is pushed out, which is the intended resolution.
                  */
-                float far_y = cube->position.y - up_sign * box_extents[up_index];
+                float far_y = cube->position.y - up_sign * box_extents [up_index];
                 /* Vertical half-extent of the cylinder about its own centre. */
                 float axis_y = axis.y;
                 if (axis_y > 1.0f)
@@ -531,23 +531,23 @@ bool collision_cylinder_cube (rigidbody *cyl, rigidbody *cube, collision_data *o
     } else {
         vector3 rel0 = vector3_subtraction (pt_star, cube->position);
         vector3 *axes0 = cube->cached_axes;
-        float l0x = vector3_dot (rel0, axes0[0]);
-        float l0y = vector3_dot (rel0, axes0[1]);
-        float l0z = vector3_dot (rel0, axes0[2]);
+        float l0x = vector3_dot (rel0, axes0 [0]);
+        float l0y = vector3_dot (rel0, axes0 [1]);
+        float l0z = vector3_dot (rel0, axes0 [2]);
         float px = cube->half_extensions.x - fabsf (l0x);
         float py = cube->half_extensions.y - fabsf (l0y);
         float pz = cube->half_extensions.z - fabsf (l0z);
         if ((px < py) && (px < pz)) {
-            n0 = vector3_scaling (axes0[0], (l0x >= 0.0f) ? 1.0f : -1.0f);
+            n0 = vector3_scaling (axes0 [0], (l0x >= 0.0f) ? 1.0f : -1.0f);
         } else if (py < pz) {
-            n0 = vector3_scaling (axes0[1], (l0y >= 0.0f) ? 1.0f : -1.0f);
+            n0 = vector3_scaling (axes0 [1], (l0y >= 0.0f) ? 1.0f : -1.0f);
         } else {
-            n0 = vector3_scaling (axes0[2], (l0z >= 0.0f) ? 1.0f : -1.0f);
+            n0 = vector3_scaling (axes0 [2], (l0z >= 0.0f) ? 1.0f : -1.0f);
         }
     }
     out->normal_vector = n0;
     {
-        contact_point_data *cp = &out->contacts[out->contact_count++];
+        contact_point_data *cp = &out->contacts [out->contact_count++];
         float pen;
         if (toward_len > 0.0001f) {
             pen = r - d_star;
@@ -557,9 +557,9 @@ bool collision_cylinder_cube (rigidbody *cyl, rigidbody *cube, collision_data *o
              * Old r-only underestimated by up to half the box. */
             vector3 rel0b = vector3_subtraction (pt_star, cube->position);
             vector3 *axes0b = cube->cached_axes;
-            float l0xb = vector3_dot (rel0b, axes0b[0]);
-            float l0yb = vector3_dot (rel0b, axes0b[1]);
-            float l0zb = vector3_dot (rel0b, axes0b[2]);
+            float l0xb = vector3_dot (rel0b, axes0b [0]);
+            float l0yb = vector3_dot (rel0b, axes0b [1]);
+            float l0zb = vector3_dot (rel0b, axes0b [2]);
             float pxb = cube->half_extensions.x - fabsf (l0xb);
             float pyb = cube->half_extensions.y - fabsf (l0yb);
             float pzb = cube->half_extensions.z - fabsf (l0zb);
@@ -582,9 +582,9 @@ bool collision_cylinder_cube (rigidbody *cyl, rigidbody *cube, collision_data *o
         if (toward_len <= 0.0001f) {
             vector3 rel0c = vector3_subtraction (pt_star, cube->position);
             vector3 *axes0c = cube->cached_axes;
-            float l0xc = vector3_dot (rel0c, axes0c[0]);
-            float l0yc = vector3_dot (rel0c, axes0c[1]);
-            float l0zc = vector3_dot (rel0c, axes0c[2]);
+            float l0xc = vector3_dot (rel0c, axes0c [0]);
+            float l0yc = vector3_dot (rel0c, axes0c [1]);
+            float l0zc = vector3_dot (rel0c, axes0c [2]);
             float pxc = cube->half_extensions.x - fabsf (l0xc);
             float pyc = cube->half_extensions.y - fabsf (l0yc);
             float pzc = cube->half_extensions.z - fabsf (l0zc);
@@ -632,24 +632,24 @@ bool collision_cylinder_cube (rigidbody *cyl, rigidbody *cube, collision_data *o
     {
         vector3 rel_s = vector3_subtraction (pt_star, cube->position);
         vector3 *axes = cube->cached_axes;
-        float lx = vector3_dot (rel_s, axes[0]);
-        float ly = vector3_dot (rel_s, axes[1]);
-        float lz = vector3_dot (rel_s, axes[2]);
+        float lx = vector3_dot (rel_s, axes [0]);
+        float ly = vector3_dot (rel_s, axes [1]);
+        float lz = vector3_dot (rel_s, axes [2]);
         float px = cube->half_extensions.x - fabsf (lx);
         float py = cube->half_extensions.y - fabsf (ly);
         float pz = cube->half_extensions.z - fabsf (lz);
         int face = 0;
         float face_dist = px;
-        vector3 face_n = vector3_scaling (axes[0], (lx >= 0.0f) ? 1.0f : -1.0f);
+        vector3 face_n = vector3_scaling (axes [0], (lx >= 0.0f) ? 1.0f : -1.0f);
         if (py < face_dist) {
             face_dist = py;
             face = 1;
-            face_n = vector3_scaling (axes[1], (ly >= 0.0f) ? 1.0f : -1.0f);
+            face_n = vector3_scaling (axes [1], (ly >= 0.0f) ? 1.0f : -1.0f);
         }
         if (pz < face_dist) {
             face_dist = pz;
             face = 2;
-            face_n = vector3_scaling (axes[2], (lz >= 0.0f) ? 1.0f : -1.0f);
+            face_n = vector3_scaling (axes [2], (lz >= 0.0f) ? 1.0f : -1.0f);
         }
         float axis_face = fabsf (vector3_dot (axis, face_n));
         if (axis_face < 0.1f) {
@@ -657,14 +657,14 @@ bool collision_cylinder_cube (rigidbody *cyl, rigidbody *cube, collision_data *o
              * interval ends where dist exceeds r+slop (bisection, 16 iters
              * each, exact to 1e-5 of axle length — 0.1mm on 10m, 100x
              * below slop). */
-            float ends[2] = {t_star, t_star};
+            float ends [2] = {t_star, t_star};
             for (int dir = 0; dir < 2; dir++) {
                 float a = t_star, b = (dir == 0) ? 0.0f : 1.0f;
                 /* If endpoint already within band, it IS the end. */
                 vector3 obb_e;
                 float de = sqrtf (cylcube_seg_obb_dist2 (cube, e1, seg, b, &obb_e));
                 if (de < r + slop) {
-                    ends[dir] = b;
+                    ends [dir] = b;
                     continue;
                 }
                 for (int it = 0; it < 16; it++) {
@@ -676,10 +676,10 @@ bool collision_cylinder_cube (rigidbody *cyl, rigidbody *cube, collision_data *o
                         b = mid;
                     }
                 }
-                ends[dir] = a;
+                ends [dir] = a;
             }
             /* Add the farther end if separated from primary along axle. */
-            float t_far = (fabsf (ends[1] - t_star) > fabsf (ends[0] - t_star)) ? ends[1] : ends[0];
+            float t_far = (fabsf (ends [1] - t_star) > fabsf (ends [0] - t_star)) ? ends [1] : ends [0];
             vector3 pt_far = vector3_addition (e1, vector3_scaling (seg, t_far));
             vector3 obb_far;
             float d_far = sqrtf (cylcube_seg_obb_dist2 (cube, e1, seg, t_far, &obb_far));
@@ -693,7 +693,7 @@ bool collision_cylinder_cube (rigidbody *cyl, rigidbody *cube, collision_data *o
                     /* Only add if roughly same face (dot>0.7): wrap-around
                      * edges get discrete treatment next tick, not forced. */
                     if (vector3_dot (nf, n0) > 0.7f) {
-                        contact_point_data *cp2 = &out->contacts[out->contact_count++];
+                        contact_point_data *cp2 = &out->contacts [out->contact_count++];
                         float pen2 = r - d_far;
                         cp2->penetration = (pen2 > 0.0f) ? pen2 : 0.0f;
                         cp2->position = obb_far;
@@ -730,9 +730,9 @@ bool collision_cylinder_cube (rigidbody *cyl, rigidbody *cube, collision_data *o
                     cap_center,
                     vector3_scaling (vector3_addition (vector3_scaling (u, rc), vector3_scaling (v, rs)), r));
                 vector3 rrel = vector3_subtraction (rim, cube->position);
-                float lx = vector3_dot (rrel, baxes[0]);
-                float ly = vector3_dot (rrel, baxes[1]);
-                float lz = vector3_dot (rrel, baxes[2]);
+                float lx = vector3_dot (rrel, baxes [0]);
+                float ly = vector3_dot (rrel, baxes [1]);
+                float lz = vector3_dot (rrel, baxes [2]);
                 float ex = cube->half_extensions.x, ey = cube->half_extensions.y, ez = cube->half_extensions.z;
                 float rim_pen;
                 vector3 rim_pos;
@@ -743,23 +743,23 @@ bool collision_cylinder_cube (rigidbody *cyl, rigidbody *cube, collision_data *o
                         rim_pen = cx;
                         rim_pos = vector3_addition (
                             cube->position,
-                            vector3_addition (vector3_scaling (baxes[1], ly),
-                                              vector3_addition (vector3_scaling (baxes[2], lz),
-                                                                vector3_scaling (baxes[0], (lx >= 0.0f) ? ex : -ex))));
+                            vector3_addition (vector3_scaling (baxes [1], ly),
+                                              vector3_addition (vector3_scaling (baxes [2], lz),
+                                                                vector3_scaling (baxes [0], (lx >= 0.0f) ? ex : -ex))));
                     } else if (cy < cz) {
                         rim_pen = cy;
                         rim_pos = vector3_addition (
                             cube->position,
-                            vector3_addition (vector3_scaling (baxes[0], lx),
-                                              vector3_addition (vector3_scaling (baxes[2], lz),
-                                                                vector3_scaling (baxes[1], (ly >= 0.0f) ? ey : -ey))));
+                            vector3_addition (vector3_scaling (baxes [0], lx),
+                                              vector3_addition (vector3_scaling (baxes [2], lz),
+                                                                vector3_scaling (baxes [1], (ly >= 0.0f) ? ey : -ey))));
                     } else {
                         rim_pen = cz;
                         rim_pos = vector3_addition (
                             cube->position,
-                            vector3_addition (vector3_scaling (baxes[0], lx),
-                                              vector3_addition (vector3_scaling (baxes[1], ly),
-                                                                vector3_scaling (baxes[2], (lz >= 0.0f) ? ez : -ez))));
+                            vector3_addition (vector3_scaling (baxes [0], lx),
+                                              vector3_addition (vector3_scaling (baxes [1], ly),
+                                                                vector3_scaling (baxes [2], (lz >= 0.0f) ? ez : -ez))));
                     }
                 } else {
                     /* Outside: slop-band support only (primary owns depth). */
@@ -767,16 +767,16 @@ bool collision_cylinder_cube (rigidbody *cyl, rigidbody *cube, collision_data *o
                     float cy = fmaxf (-ey, fminf (ey, ly));
                     float cz = fmaxf (-ez, fminf (ez, lz));
                     rim_pos = vector3_addition (cube->position,
-                                                vector3_addition (vector3_scaling (baxes[0], cx),
-                                                                  vector3_addition (vector3_scaling (baxes[1], cy),
-                                                                                    vector3_scaling (baxes[2], cz))));
+                                                vector3_addition (vector3_scaling (baxes [0], cx),
+                                                                  vector3_addition (vector3_scaling (baxes [1], cy),
+                                                                                    vector3_scaling (baxes [2], cz))));
                     float gap = vector3_length (vector3_subtraction (rim, rim_pos));
                     if (gap >= slop) {
                         continue;
                     }
                     rim_pen = 0.0f;
                 }
-                contact_point_data *cpr = &out->contacts[out->contact_count++];
+                contact_point_data *cpr = &out->contacts [out->contact_count++];
                 cpr->position = rim_pos;
                 cpr->penetration = rim_pen;
             }
@@ -809,8 +809,8 @@ bool collision_cylinder_cylinder (rigidbody *cyl_a, rigidbody *cyl_b, collision_
         cyl_b->cylinder_half_length <= 0.0f) {
         return false;
     }
-    vector3 ax = cyl_a->cached_axes[0];
-    vector3 bx = cyl_b->cached_axes[0];
+    vector3 ax = cyl_a->cached_axes [0];
+    vector3 bx = cyl_b->cached_axes [0];
     float ax_len = vector3_length (ax);
     float bx_len = vector3_length (bx);
     if (ax_len < 1e-6f) {
@@ -856,7 +856,7 @@ bool collision_cylinder_cylinder (rigidbody *cyl_a, rigidbody *cyl_b, collision_
             vector3 face_a = vector3_addition (cyl_a->position, vector3_scaling (ax, s * ha));
             vector3 face_b = vector3_subtraction (cyl_b->position, vector3_scaling (ax, s * hb));
             vector3 mid = vector3_scaling (vector3_addition (face_a, face_b), 0.5f);
-            contact_point_data *cp0 = &out->contacts[0];
+            contact_point_data *cp0 = &out->contacts [0];
             cp0->penetration = (axial_gap < 0.0f) ? -axial_gap : 0.0f;
             cp0->position = mid;
             /* Second point for stable face support (offset toward rim). */
@@ -868,11 +868,11 @@ bool collision_cylinder_cylinder (rigidbody *cyl_a, rigidbody *cyl_b, collision_
                         : vector3_normalisation (vector3_cross (
                               ax, (fabsf (ax.y) < 0.99f) ? (vector3){0.0f, 1.0f, 0.0f} : (vector3){1.0f, 0.0f, 0.0f}));
                 vector3 off = vector3_scaling (perp, min_r * 0.5f);
-                contact_point_data *cp1 = &out->contacts[out->contact_count++];
+                contact_point_data *cp1 = &out->contacts [out->contact_count++];
                 /* contact_count already 1; append second: */
                 (void) cp1;
-                out->contacts[1].penetration = cp0->penetration;
-                out->contacts[1].position = vector3_addition (mid, off);
+                out->contacts [1].penetration = cp0->penetration;
+                out->contacts [1].position = vector3_addition (mid, off);
                 out->contact_count = 2;
             }
             return true;
@@ -978,11 +978,11 @@ bool collision_cylinder_cylinder (rigidbody *cyl_a, rigidbody *cyl_b, collision_
         }
         out->normal_vector = vector3_normalisation (perp);
     }
-    contact_point_data *cp = &out->contacts[0];
+    contact_point_data *cp = &out->contacts [0];
     float raw_pen = min_dist - dist;
     cp->penetration = (raw_pen > 0.0f) ? raw_pen : 0.0f;
     cp->position = vector3_scaling (vector3_addition (pa, pb), 0.5f);
-    contact_point_data saved_single = out->contacts[0];
+    contact_point_data saved_single = out->contacts [0];
     /* TRUTH P1-6: parallel barrels share a LINE, not a point. Emit two
      * contacts at the overlap interval ends (both clamped onto segments,
      * symmetric ±), so stacked logs do not rock on a single point. */
@@ -1019,14 +1019,14 @@ bool collision_cylinder_cylinder (rigidbody *cyl_a, rigidbody *cyl_b, collision_
                     if (k == 0) {
                         out->contact_count = 0;
                     }
-                    contact_point_data *cpk = &out->contacts[out->contact_count++];
+                    contact_point_data *cpk = &out->contacts [out->contact_count++];
                     float penk = min_dist - sepk;
                     cpk->penetration = (penk > 0.0f) ? penk : 0.0f;
                     cpk->position = vector3_scaling (vector3_addition (pak, pbk), 0.5f);
                 }
                 if (out->contact_count <= 0) {
                     /* Interval ends missed (curved ends): restore single. */
-                    out->contacts[0] = saved_single;
+                    out->contacts [0] = saved_single;
                     out->contact_count = 1;
                 }
             }

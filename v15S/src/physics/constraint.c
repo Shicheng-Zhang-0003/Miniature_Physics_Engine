@@ -11,7 +11,7 @@ void constraint_pool_init (struct physics_world *world) {
         return;
     }
     for (int i = 0; i < mpe_max_joints; i++) {
-        world->revolute_constraints[i].is_active = false;
+        world->revolute_constraints [i].is_active = false;
     }
     world->revolute_constraint_count = 0;
 }
@@ -29,21 +29,21 @@ int constraint_add_revolute (struct physics_world *world, uint32_t id_a, uint32_
         return -1;
     }
     for (int i = 0; i < mpe_max_joints; i++) {
-        if (!world->revolute_constraints[i].is_active) {
-            world->revolute_constraints[i].type = constraint_revolute;
-            world->revolute_constraints[i].body_id_a = id_a;
-            world->revolute_constraints[i].body_id_b = id_b;
-            world->revolute_constraints[i].p.revolute.anchor_a = anchor_a;
-            world->revolute_constraints[i].p.revolute.anchor_b = anchor_b;
+        if (!world->revolute_constraints [i].is_active) {
+            world->revolute_constraints [i].type = constraint_revolute;
+            world->revolute_constraints [i].body_id_a = id_a;
+            world->revolute_constraints [i].body_id_b = id_b;
+            world->revolute_constraints [i].p.revolute.anchor_a = anchor_a;
+            world->revolute_constraints [i].p.revolute.anchor_b = anchor_b;
             /* axis_a is in body A's local space. Transform to body B's local space:
              * axis_world = q_a * axis_a; axis_b = q_b^-1 * axis_world = q_b^-1 * q_a * axis_a */
             vector3 axis_a_norm = vector3_normalisation (axis_a);
             rigidbody *body_a_ptr = NULL, *body_b_ptr = NULL;
             for (int bi = 0; bi < world->body_count; bi++) {
-                if (world->bodies[bi].object_id == id_a)
-                    body_a_ptr = &world->bodies[bi];
-                else if (world->bodies[bi].object_id == id_b)
-                    body_b_ptr = &world->bodies[bi];
+                if (world->bodies [bi].object_id == id_a)
+                    body_a_ptr = &world->bodies [bi];
+                else if (world->bodies [bi].object_id == id_b)
+                    body_b_ptr = &world->bodies [bi];
             }
             vector3 axis_b_local = axis_a_norm;
             if (body_a_ptr && body_b_ptr) {
@@ -54,19 +54,19 @@ int constraint_add_revolute (struct physics_world *world, uint32_t id_a, uint32_
                 axis_b_local = vector4_rotate_to_vector3 (q_b_inv, axis_world);
                 axis_b_local = vector3_normalisation (axis_b_local);
             }
-            world->revolute_constraints[i].p.revolute.axis_a = axis_a_norm;
-            world->revolute_constraints[i].p.revolute.axis_b = axis_b_local;
-            world->revolute_constraints[i].p.revolute.motor_enabled = false;
-            world->revolute_constraints[i].p.revolute.limits_enabled = false;
-            world->revolute_constraints[i].p.revolute.motor_target_speed = 0.0f;
-            world->revolute_constraints[i].p.revolute.motor_max_torque = 0.0f;
-            world->revolute_constraints[i].p.revolute.limit_min_rad = 0.0f;
-            world->revolute_constraints[i].p.revolute.limit_max_rad = 0.0f;
-            world->revolute_constraints[i].p.revolute.accumulated_angle = 0.0f;
-            world->revolute_constraints[i].p.revolute.angle_initialized = false;
-            world->revolute_constraints[i].p.revolute.reference_axis_a = vector3_zero ();
-            world->revolute_constraints[i].p.revolute.reference_axis_b = vector3_zero ();
-            world->revolute_constraints[i].is_active = true;
+            world->revolute_constraints [i].p.revolute.axis_a = axis_a_norm;
+            world->revolute_constraints [i].p.revolute.axis_b = axis_b_local;
+            world->revolute_constraints [i].p.revolute.motor_enabled = false;
+            world->revolute_constraints [i].p.revolute.limits_enabled = false;
+            world->revolute_constraints [i].p.revolute.motor_target_speed = 0.0f;
+            world->revolute_constraints [i].p.revolute.motor_max_torque = 0.0f;
+            world->revolute_constraints [i].p.revolute.limit_min_rad = 0.0f;
+            world->revolute_constraints [i].p.revolute.limit_max_rad = 0.0f;
+            world->revolute_constraints [i].p.revolute.accumulated_angle = 0.0f;
+            world->revolute_constraints [i].p.revolute.angle_initialized = false;
+            world->revolute_constraints [i].p.revolute.reference_axis_a = vector3_zero ();
+            world->revolute_constraints [i].p.revolute.reference_axis_b = vector3_zero ();
+            world->revolute_constraints [i].is_active = true;
             world->revolute_constraint_count++;
             return i;
         }
@@ -80,10 +80,10 @@ void constraint_remove (struct physics_world *world, int index) {
     if ((index < 0) || (index >= mpe_max_joints)) {
         return;
     }
-    if (!world->revolute_constraints[index].is_active) {
+    if (!world->revolute_constraints [index].is_active) {
         return;
     }
-    world->revolute_constraints[index].is_active = false;
+    world->revolute_constraints [index].is_active = false;
     world->revolute_constraint_count--;
 }
 int constraint_add_fixed (struct physics_world *world, uint32_t id_a, uint32_t id_b, vector3 anchor_a,
@@ -95,13 +95,13 @@ int constraint_add_fixed (struct physics_world *world, uint32_t id_a, uint32_t i
         return -1;
     }
     for (int i = 0; i < mpe_max_joints; i++) {
-        if (!world->revolute_constraints[i].is_active) {
-            world->revolute_constraints[i].type = constraint_fixed;
-            world->revolute_constraints[i].body_id_a = id_a;
-            world->revolute_constraints[i].body_id_b = id_b;
-            world->revolute_constraints[i].p.fixed.anchor_a = anchor_a;
-            world->revolute_constraints[i].p.fixed.anchor_b = anchor_b;
-            world->revolute_constraints[i].is_active = true;
+        if (!world->revolute_constraints [i].is_active) {
+            world->revolute_constraints [i].type = constraint_fixed;
+            world->revolute_constraints [i].body_id_a = id_a;
+            world->revolute_constraints [i].body_id_b = id_b;
+            world->revolute_constraints [i].p.fixed.anchor_a = anchor_a;
+            world->revolute_constraints [i].p.fixed.anchor_b = anchor_b;
+            world->revolute_constraints [i].is_active = true;
             world->revolute_constraint_count++;
             return i;
         }
@@ -120,14 +120,14 @@ int constraint_add_distance (struct physics_world *world, uint32_t id_a, uint32_
         return -1;
     }
     for (int i = 0; i < mpe_max_joints; i++) {
-        if (!world->revolute_constraints[i].is_active) {
-            world->revolute_constraints[i].type = constraint_distance;
-            world->revolute_constraints[i].body_id_a = id_a;
-            world->revolute_constraints[i].body_id_b = id_b;
-            world->revolute_constraints[i].p.distance.anchor_a = anchor_a;
-            world->revolute_constraints[i].p.distance.anchor_b = anchor_b;
-            world->revolute_constraints[i].p.distance.rest_length = rest_length;
-            world->revolute_constraints[i].is_active = true;
+        if (!world->revolute_constraints [i].is_active) {
+            world->revolute_constraints [i].type = constraint_distance;
+            world->revolute_constraints [i].body_id_a = id_a;
+            world->revolute_constraints [i].body_id_b = id_b;
+            world->revolute_constraints [i].p.distance.anchor_a = anchor_a;
+            world->revolute_constraints [i].p.distance.anchor_b = anchor_b;
+            world->revolute_constraints [i].p.distance.rest_length = rest_length;
+            world->revolute_constraints [i].is_active = true;
             world->revolute_constraint_count++;
             return i;
         }
@@ -147,12 +147,12 @@ int constraint_add_prismatic (struct physics_world *world, uint32_t id_a, uint32
         return -1;
     }
     for (int i = 0; i < mpe_max_joints; i++) {
-        if (!world->revolute_constraints[i].is_active) {
-            world->revolute_constraints[i].type = constraint_prismatic;
-            world->revolute_constraints[i].body_id_a = id_a;
-            world->revolute_constraints[i].body_id_b = id_b;
-            world->revolute_constraints[i].p.prismatic.anchor_a = anchor_a;
-            world->revolute_constraints[i].p.prismatic.anchor_b = anchor_b;
+        if (!world->revolute_constraints [i].is_active) {
+            world->revolute_constraints [i].type = constraint_prismatic;
+            world->revolute_constraints [i].body_id_a = id_a;
+            world->revolute_constraints [i].body_id_b = id_b;
+            world->revolute_constraints [i].p.prismatic.anchor_a = anchor_a;
+            world->revolute_constraints [i].p.prismatic.anchor_b = anchor_b;
             /* DESPOT-2026-09-26: axis_a is in body A's local space. The old
              * code copied it verbatim into axis_b, so a prismatic created
              * between rotated bodies slid along misaligned axes. Same
@@ -164,30 +164,30 @@ int constraint_add_prismatic (struct physics_world *world, uint32_t id_a, uint32
                 vector3 axis_b_local = axis_a_norm;
                 rigidbody *pa = NULL, *pb = NULL;
                 for (int bi = 0; bi < world->body_count; bi++) {
-                    if (world->bodies[bi].object_id == id_a)
-                        pa = &world->bodies[bi];
-                    else if (world->bodies[bi].object_id == id_b)
-                        pb = &world->bodies[bi];
+                    if (world->bodies [bi].object_id == id_a)
+                        pa = &world->bodies [bi];
+                    else if (world->bodies [bi].object_id == id_b)
+                        pb = &world->bodies [bi];
                 }
                 if (pa && pb) {
                     vector3 axis_world = vector4_rotate_to_vector3 (pa->orientation, axis_a_norm);
                     vector4 q_b_inv = {pb->orientation.w, -pb->orientation.x, -pb->orientation.y, -pb->orientation.z};
                     axis_b_local = vector3_normalisation (vector4_rotate_to_vector3 (q_b_inv, axis_world));
                 }
-                world->revolute_constraints[i].p.prismatic.axis_a = axis_a_norm;
-                world->revolute_constraints[i].p.prismatic.axis_b = axis_b_local;
+                world->revolute_constraints [i].p.prismatic.axis_a = axis_a_norm;
+                world->revolute_constraints [i].p.prismatic.axis_b = axis_b_local;
             }
-            world->revolute_constraints[i].p.prismatic.limits_enabled = false;
-            world->revolute_constraints[i].p.prismatic.limit_min = 0.0f;
-            world->revolute_constraints[i].p.prismatic.limit_max = 0.0f;
-            world->revolute_constraints[i].p.prismatic.motor_enabled = false;
-            world->revolute_constraints[i].p.prismatic.motor_target_speed = 0.0f;
-            world->revolute_constraints[i].p.prismatic.motor_max_force = 0.0f;
-            world->revolute_constraints[i].p.prismatic.accumulated_position = 0.0f;
-            world->revolute_constraints[i].p.prismatic.position_initialized = false;
-            world->revolute_constraints[i].p.prismatic.reference_axis_a = vector3_zero ();
-            world->revolute_constraints[i].p.prismatic.reference_axis_b = vector3_zero ();
-            world->revolute_constraints[i].is_active = true;
+            world->revolute_constraints [i].p.prismatic.limits_enabled = false;
+            world->revolute_constraints [i].p.prismatic.limit_min = 0.0f;
+            world->revolute_constraints [i].p.prismatic.limit_max = 0.0f;
+            world->revolute_constraints [i].p.prismatic.motor_enabled = false;
+            world->revolute_constraints [i].p.prismatic.motor_target_speed = 0.0f;
+            world->revolute_constraints [i].p.prismatic.motor_max_force = 0.0f;
+            world->revolute_constraints [i].p.prismatic.accumulated_position = 0.0f;
+            world->revolute_constraints [i].p.prismatic.position_initialized = false;
+            world->revolute_constraints [i].p.prismatic.reference_axis_a = vector3_zero ();
+            world->revolute_constraints [i].p.prismatic.reference_axis_b = vector3_zero ();
+            world->revolute_constraints [i].is_active = true;
             world->revolute_constraint_count++;
             return i;
         }
@@ -207,14 +207,14 @@ int constraint_add_rope (struct physics_world *world, uint32_t id_a, uint32_t id
         return -1;
     }
     for (int i = 0; i < mpe_max_joints; i++) {
-        if (!world->revolute_constraints[i].is_active) {
-            world->revolute_constraints[i].type = constraint_rope;
-            world->revolute_constraints[i].body_id_a = id_a;
-            world->revolute_constraints[i].body_id_b = id_b;
-            world->revolute_constraints[i].p.rope.anchor_a = anchor_a;
-            world->revolute_constraints[i].p.rope.anchor_b = anchor_b;
-            world->revolute_constraints[i].p.rope.rest_length = max_length;
-            world->revolute_constraints[i].is_active = true;
+        if (!world->revolute_constraints [i].is_active) {
+            world->revolute_constraints [i].type = constraint_rope;
+            world->revolute_constraints [i].body_id_a = id_a;
+            world->revolute_constraints [i].body_id_b = id_b;
+            world->revolute_constraints [i].p.rope.anchor_a = anchor_a;
+            world->revolute_constraints [i].p.rope.anchor_b = anchor_b;
+            world->revolute_constraints [i].p.rope.rest_length = max_length;
+            world->revolute_constraints [i].is_active = true;
             world->revolute_constraint_count++;
             return i;
         }
@@ -235,15 +235,15 @@ void constraint_set_revolute_motor (struct physics_world *world, int index, bool
     if ((index < 0) || (index >= mpe_max_joints)) {
         return;
     }
-    if (!world->revolute_constraints[index].is_active) {
+    if (!world->revolute_constraints [index].is_active) {
         return;
     }
-    if (world->revolute_constraints[index].type != constraint_revolute) {
+    if (world->revolute_constraints [index].type != constraint_revolute) {
         return;
     }
-    world->revolute_constraints[index].p.revolute.motor_enabled = enabled;
-    world->revolute_constraints[index].p.revolute.motor_target_speed = target_speed;
-    world->revolute_constraints[index].p.revolute.motor_max_torque = max_torque;
+    world->revolute_constraints [index].p.revolute.motor_enabled = enabled;
+    world->revolute_constraints [index].p.revolute.motor_target_speed = target_speed;
+    world->revolute_constraints [index].p.revolute.motor_max_torque = max_torque;
 }
 void constraint_set_revolute_axes (struct physics_world *world, int index, vector3 axis_a, vector3 axis_b) {
     if (!world) {
@@ -252,20 +252,20 @@ void constraint_set_revolute_axes (struct physics_world *world, int index, vecto
     if ((index < 0) || (index >= mpe_max_joints)) {
         return;
     }
-    if (!world->revolute_constraints[index].is_active) {
+    if (!world->revolute_constraints [index].is_active) {
         return;
     }
-    if (world->revolute_constraints[index].type != constraint_revolute) {
+    if (world->revolute_constraints [index].type != constraint_revolute) {
         return;
     }
     if (vector3_length_squared (axis_a) < 1e-12f) {
         return;
     }
-    world->revolute_constraints[index].p.revolute.axis_a = vector3_normalisation (axis_a);
+    world->revolute_constraints [index].p.revolute.axis_a = vector3_normalisation (axis_a);
     /* Zero axis_b means "same as axis_a" (legacy callers). */
-    world->revolute_constraints[index].p.revolute.axis_b = (vector3_length_squared (axis_b) > 1e-12f)
+    world->revolute_constraints [index].p.revolute.axis_b = (vector3_length_squared (axis_b) > 1e-12f)
                                                                ? vector3_normalisation (axis_b)
-                                                               : world->revolute_constraints[index].p.revolute.axis_a;
+                                                               : world->revolute_constraints [index].p.revolute.axis_a;
 }
 void constraint_set_revolute_limits (struct physics_world *world, int index, bool enabled, float limit_min_rad,
                                      float limit_max_rad) {
@@ -275,27 +275,27 @@ void constraint_set_revolute_limits (struct physics_world *world, int index, boo
     if ((index < 0) || (index >= mpe_max_joints)) {
         return;
     }
-    if (!world->revolute_constraints[index].is_active) {
+    if (!world->revolute_constraints [index].is_active) {
         return;
     }
-    if (world->revolute_constraints[index].type != constraint_revolute) {
+    if (world->revolute_constraints [index].type != constraint_revolute) {
         return;
     }
     if ((!isfinite (limit_min_rad)) || (!isfinite (limit_max_rad))) {
         return;
     }
-    world->revolute_constraints[index].p.revolute.limits_enabled = enabled;
-    world->revolute_constraints[index].p.revolute.limit_min_rad =
+    world->revolute_constraints [index].p.revolute.limits_enabled = enabled;
+    world->revolute_constraints [index].p.revolute.limit_min_rad =
         (limit_min_rad < limit_max_rad) ? limit_min_rad : limit_max_rad;
-    world->revolute_constraints[index].p.revolute.limit_max_rad =
+    world->revolute_constraints [index].p.revolute.limit_max_rad =
         (limit_min_rad < limit_max_rad) ? limit_max_rad : limit_min_rad;
     /* Reset angle tracking when limits are (re)enabled so initial configuration
      * establishes the reference frame. */
     if (enabled) {
-        world->revolute_constraints[index].p.revolute.accumulated_angle = 0.0f;
-        world->revolute_constraints[index].p.revolute.angle_initialized = false;
-        world->revolute_constraints[index].p.revolute.reference_axis_a = vector3_zero ();
-        world->revolute_constraints[index].p.revolute.reference_axis_b = vector3_zero ();
+        world->revolute_constraints [index].p.revolute.accumulated_angle = 0.0f;
+        world->revolute_constraints [index].p.revolute.angle_initialized = false;
+        world->revolute_constraints [index].p.revolute.reference_axis_a = vector3_zero ();
+        world->revolute_constraints [index].p.revolute.reference_axis_b = vector3_zero ();
     }
 }
 /* Prismatic joint setters */
@@ -306,24 +306,24 @@ void constraint_set_prismatic_axes (struct physics_world *world, int index, vect
     if ((index < 0) || (index >= mpe_max_joints)) {
         return;
     }
-    if (!world->revolute_constraints[index].is_active) {
+    if (!world->revolute_constraints [index].is_active) {
         return;
     }
-    if (world->revolute_constraints[index].type != constraint_prismatic) {
+    if (world->revolute_constraints [index].type != constraint_prismatic) {
         return;
     }
     if (vector3_length_squared (axis_a) < 1e-12f) {
         return;
     }
-    world->revolute_constraints[index].p.prismatic.axis_a = vector3_normalisation (axis_a);
-    world->revolute_constraints[index].p.prismatic.axis_b = (vector3_length_squared (axis_b) > 1e-12f)
+    world->revolute_constraints [index].p.prismatic.axis_a = vector3_normalisation (axis_a);
+    world->revolute_constraints [index].p.prismatic.axis_b = (vector3_length_squared (axis_b) > 1e-12f)
                                                                 ? vector3_normalisation (axis_b)
-                                                                : world->revolute_constraints[index].p.prismatic.axis_a;
+                                                                : world->revolute_constraints [index].p.prismatic.axis_a;
     /* Reset position tracking when axes change. */
-    world->revolute_constraints[index].p.prismatic.accumulated_position = 0.0f;
-    world->revolute_constraints[index].p.prismatic.position_initialized = false;
-    world->revolute_constraints[index].p.prismatic.reference_axis_a = vector3_zero ();
-    world->revolute_constraints[index].p.prismatic.reference_axis_b = vector3_zero ();
+    world->revolute_constraints [index].p.prismatic.accumulated_position = 0.0f;
+    world->revolute_constraints [index].p.prismatic.position_initialized = false;
+    world->revolute_constraints [index].p.prismatic.reference_axis_a = vector3_zero ();
+    world->revolute_constraints [index].p.prismatic.reference_axis_b = vector3_zero ();
 }
 void constraint_set_prismatic_limits (struct physics_world *world, int index, bool enabled, float limit_min,
                                       float limit_max) {
@@ -333,23 +333,23 @@ void constraint_set_prismatic_limits (struct physics_world *world, int index, bo
     if ((index < 0) || (index >= mpe_max_joints)) {
         return;
     }
-    if (!world->revolute_constraints[index].is_active) {
+    if (!world->revolute_constraints [index].is_active) {
         return;
     }
-    if (world->revolute_constraints[index].type != constraint_prismatic) {
+    if (world->revolute_constraints [index].type != constraint_prismatic) {
         return;
     }
     if ((!isfinite (limit_min)) || (!isfinite (limit_max))) {
         return;
     }
-    world->revolute_constraints[index].p.prismatic.limits_enabled = enabled;
-    world->revolute_constraints[index].p.prismatic.limit_min = (limit_min < limit_max) ? limit_min : limit_max;
-    world->revolute_constraints[index].p.prismatic.limit_max = (limit_min < limit_max) ? limit_max : limit_min;
+    world->revolute_constraints [index].p.prismatic.limits_enabled = enabled;
+    world->revolute_constraints [index].p.prismatic.limit_min = (limit_min < limit_max) ? limit_min : limit_max;
+    world->revolute_constraints [index].p.prismatic.limit_max = (limit_min < limit_max) ? limit_max : limit_min;
     if (enabled) {
-        world->revolute_constraints[index].p.prismatic.accumulated_position = 0.0f;
-        world->revolute_constraints[index].p.prismatic.position_initialized = false;
-        world->revolute_constraints[index].p.prismatic.reference_axis_a = vector3_zero ();
-        world->revolute_constraints[index].p.prismatic.reference_axis_b = vector3_zero ();
+        world->revolute_constraints [index].p.prismatic.accumulated_position = 0.0f;
+        world->revolute_constraints [index].p.prismatic.position_initialized = false;
+        world->revolute_constraints [index].p.prismatic.reference_axis_a = vector3_zero ();
+        world->revolute_constraints [index].p.prismatic.reference_axis_b = vector3_zero ();
     }
 }
 void constraint_set_prismatic_motor (struct physics_world *world, int index, bool enabled, float target_speed,
@@ -360,15 +360,15 @@ void constraint_set_prismatic_motor (struct physics_world *world, int index, boo
     if ((index < 0) || (index >= mpe_max_joints)) {
         return;
     }
-    if (!world->revolute_constraints[index].is_active) {
+    if (!world->revolute_constraints [index].is_active) {
         return;
     }
-    if (world->revolute_constraints[index].type != constraint_prismatic) {
+    if (world->revolute_constraints [index].type != constraint_prismatic) {
         return;
     }
-    world->revolute_constraints[index].p.prismatic.motor_enabled = enabled;
-    world->revolute_constraints[index].p.prismatic.motor_target_speed = target_speed;
-    world->revolute_constraints[index].p.prismatic.motor_max_force = max_force;
+    world->revolute_constraints [index].p.prismatic.motor_enabled = enabled;
+    world->revolute_constraints [index].p.prismatic.motor_target_speed = target_speed;
+    world->revolute_constraints [index].p.prismatic.motor_max_force = max_force;
 }
 int constraint_pool_capacity (void) {
     return mpe_max_joints;
@@ -380,10 +380,10 @@ const constraint *constraint_pool_at (const struct physics_world *world, int ind
     if ((index < 0) || (index >= mpe_max_joints)) {
         return NULL;
     }
-    if (!world->revolute_constraints[index].is_active) {
+    if (!world->revolute_constraints [index].is_active) {
         return NULL;
     }
-    return &world->revolute_constraints[index];
+    return &world->revolute_constraints [index];
 }
 /* Global id cache retired: lookups go through the owning world's
  * per-world cache (physics_world_body_by_id), so interleaved worlds
@@ -402,10 +402,10 @@ static void constraint_dispatch (struct physics_world *world, float dt, bool mot
         return;
     }
     for (int i = 0; i < mpe_max_joints; i++) {
-        if (!world->revolute_constraints[i].is_active) {
+        if (!world->revolute_constraints [i].is_active) {
             continue;
         }
-        constraint *c = &world->revolute_constraints[i];
+        constraint *c = &world->revolute_constraints [i];
         rigidbody *body_a = find_body_by_id_cached (world, c->body_id_a);
         rigidbody *body_b = find_body_by_id_cached (world, c->body_id_b);
         if ((!body_a) || (!body_b)) {
@@ -472,10 +472,10 @@ void constraint_pre_step_all (struct physics_world *world, float dt) {
         return;
     }
     for (int i = 0; i < mpe_max_joints; i++) {
-        if (!world->revolute_constraints[i].is_active) {
+        if (!world->revolute_constraints [i].is_active) {
             continue;
         }
-        constraint *c = &world->revolute_constraints[i];
+        constraint *c = &world->revolute_constraints [i];
         rigidbody *ba = find_body_by_id_cached (world, c->body_id_a);
         rigidbody *bb = find_body_by_id_cached (world, c->body_id_b);
         if ((!ba) || (!bb)) {
@@ -494,11 +494,11 @@ int constraint_get_active_ids (const struct physics_world *world, uint32_t *ids_
     }
     int count = 0;
     for (int i = 0; (i < mpe_max_joints) && (count < capacity); i++) {
-        if (!world->revolute_constraints[i].is_active) {
+        if (!world->revolute_constraints [i].is_active) {
             continue;
         }
-        ids_a[count] = world->revolute_constraints[i].body_id_a;
-        ids_b[count] = world->revolute_constraints[i].body_id_b;
+        ids_a [count] = world->revolute_constraints [i].body_id_a;
+        ids_b [count] = world->revolute_constraints [i].body_id_b;
         count++;
     }
     return count;
@@ -509,10 +509,10 @@ void constraint_correct_axis_drift_all (struct physics_world *world, float dt) {
         return;
     }
     for (int i = 0; i < mpe_max_joints; i++) {
-        if (!world->revolute_constraints[i].is_active) {
+        if (!world->revolute_constraints [i].is_active) {
             continue;
         }
-        constraint *c = &world->revolute_constraints[i];
+        constraint *c = &world->revolute_constraints [i];
         rigidbody *body_a = find_body_by_id_cached (world, c->body_id_a);
         rigidbody *body_b = find_body_by_id_cached (world, c->body_id_b);
         if ((!body_a) || (!body_b)) {

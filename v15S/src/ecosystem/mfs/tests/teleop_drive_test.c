@@ -31,7 +31,7 @@ int main (void) {
         physics_world_step (&world, dt);
         /* Check for NaN */
         for (int i = 0; i < world.body_count; i++) {
-            rigidbody *rb = &world.bodies[i];
+            rigidbody *rb = &world.bodies [i];
             if ((!isfinite (rb->position.x)) || (!isfinite (rb->position.y)) || (!isfinite (rb->position.z)) ||
                 (!isfinite (rb->velocity.x)) || (!isfinite (rb->velocity.y)) || (!isfinite (rb->velocity.z))) {
                 printf ("[FAIL] NaN detected in body %d at tick %d\n", i, t);
@@ -50,15 +50,15 @@ int main (void) {
         float dy = end_y - start_y;
         printf ("[info] start=(%.3f,%.3f,%.3f) end=(%.3f,%.3f,%.3f)\n", start_x, start_y, start_z, end_x, end_y, end_z);
         printf ("[info] displacement z=%.4f  dy=%.4f\n", dz, dy);
-        printf ("[info] motor RPM: [%.0f, %.0f, %.0f, %.0f]\n", robot.wheel_motors[0].rpm, robot.wheel_motors[1].rpm,
-                robot.wheel_motors[2].rpm, robot.wheel_motors[3].rpm);
+        printf ("[info] motor RPM: [%.0f, %.0f, %.0f, %.0f]\n", robot.wheel_motors [0].rpm, robot.wheel_motors [1].rpm,
+                robot.wheel_motors [2].rpm, robot.wheel_motors [3].rpm);
         printf ("[info] battery: %.2fV (%.0f%%)\n", battery_get_voltage (&robot.battery, 0.0f),
                 robot.battery.charge_fraction * 100.0f);
         /* Robot should have moved in some direction (z or x) */
         float total_displacement = sqrtf (dz * dz + (end_x - start_x) * (end_x - start_x));
         /* Straight-line drive must hold heading: yaw from quaternion
          * (solver pair-order asymmetry used to spin full-power straights). */
-        quaternion q = world.bodies[robot.chassis_body].orientation;
+        quaternion q = world.bodies [robot.chassis_body].orientation;
         float heading = fabsf (atan2f (2.0f * (q.w * q.y + q.x * q.z), 1.0f - 2.0f * (q.y * q.y + q.x * q.x)));
         printf ("[info] heading drift=%.4f rad\n", heading);
         if (total_displacement < 0.5f /* MPE_FTC_079: require real driving, not just falling */) {

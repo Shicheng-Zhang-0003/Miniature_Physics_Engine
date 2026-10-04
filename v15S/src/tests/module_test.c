@@ -97,8 +97,8 @@ int mpe_module_test_main (void) {
     (void) ia;
     (void) ib;
     collision_data d1 = {0}, d2 = {0};
-    bool r1 = collision_dual_sphere (&A.bodies[0], &A.bodies[1], &d1, NULL);
-    bool r2 = mpe_shape_dispatch (&A, &A.bodies[0], &A.bodies[1], &d2);
+    bool r1 = collision_dual_sphere (&A.bodies [0], &A.bodies [1], &d1, NULL);
+    bool r2 = mpe_shape_dispatch (&A, &A.bodies [0], &A.bodies [1], &d2);
     if (r1 != r2) {
         printf ("[FAIL] dispatch mismatch\n");
         return 1;
@@ -107,7 +107,7 @@ int mpe_module_test_main (void) {
      * (swapped-frame bug hid here). Compare the manifold content. */
     if (r1 && r2) {
         float dn = vector3_length (vector3_subtraction (d1.normal_vector, d2.normal_vector));
-        float dp = fabsf (d1.contacts[0].penetration - d2.contacts[0].penetration);
+        float dp = fabsf (d1.contacts [0].penetration - d2.contacts [0].penetration);
         if (dn > 1e-5f || dp > 1e-5f || d1.contact_count != d2.contact_count) {
             printf ("[FAIL] dispatch manifold differs (dn=%.6f dp=%.6f)\n", dn, dp);
             return 1;
@@ -116,14 +116,14 @@ int mpe_module_test_main (void) {
     printf ("[PASS] shape dispatch matches builtin\n");
     /* 4. custom shape add + dispatch (bounding-sphere fallback) */
     int ic = physics_world_add_custom (&A, 100, (vector3){5, 2, 0}, 1.0f, 0.5f);
-    if (ic < 0 || A.bodies[ic].type != object_custom) {
+    if (ic < 0 || A.bodies [ic].type != object_custom) {
         printf ("[FAIL] add_custom\n");
         return 1;
     }
     /* place overlapping a sphere to force contact */
-    A.bodies[ic].position = (vector3){0, 2.2f, 0};
-    rigidbody_sanitize (&A.bodies[ic]);
-    if (A.bodies[ic].type != object_custom) {
+    A.bodies [ic].position = (vector3){0, 2.2f, 0};
+    rigidbody_sanitize (&A.bodies [ic]);
+    if (A.bodies [ic].type != object_custom) {
         printf ("[FAIL] sanitize reset custom\n");
         return 1;
     }
@@ -134,7 +134,7 @@ int mpe_module_test_main (void) {
     {
         collision_data dc = {0};
         probe_custom_hit = false;
-        bool rc = mpe_shape_dispatch (&A, &A.bodies[ic], &A.bodies[0], &dc);
+        bool rc = mpe_shape_dispatch (&A, &A.bodies [ic], &A.bodies [0], &dc);
         if (!rc || !probe_custom_hit) {
             printf ("[FAIL] custom dispatch not routed\n");
             return 1;
@@ -174,7 +174,7 @@ int mpe_module_test_main (void) {
             return 1;
         }
         printf ("[PASS] pool grows on demand (cap=%d)\n", W.body_capacity);
-        uint32_t mid_id = W.bodies[300].object_id;
+        uint32_t mid_id = W.bodies [300].object_id;
         if (physics_world_index_by_id (&W, mid_id) != 300) {
             printf ("[FAIL] id lookup cap=%d\n", physics_world_index_by_id (&W, mid_id));
             return 1;
@@ -220,10 +220,10 @@ int mpe_module_test_main (void) {
         physics_world_add_sphere (&W, 0.5f, 1.0f, (vector3){0, 3.005f, 0}); /* 5mm gap */
         collision_data dd = {0};
         cfgW.solver.penetration_slop = 0.01f;
-        bool hit_slop = collision_dual_sphere (&W.bodies[0], &W.bodies[1], &dd, &cfgW);
+        bool hit_slop = collision_dual_sphere (&W.bodies [0], &W.bodies [1], &dd, &cfgW);
         memset (&dd, 0, sizeof (dd));
         cfgW.solver.penetration_slop = 0.0f;
-        bool hit_zero = collision_dual_sphere (&W.bodies[0], &W.bodies[1], &dd, &cfgW);
+        bool hit_zero = collision_dual_sphere (&W.bodies [0], &W.bodies [1], &dd, &cfgW);
         if (!hit_slop || hit_zero) {
             printf ("[FAIL] per-world slop routing\n");
             return 1;

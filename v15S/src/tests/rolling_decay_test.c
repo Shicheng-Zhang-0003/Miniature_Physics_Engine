@@ -18,13 +18,13 @@ int main (void) {
     world.static_plane_enabled = true;
     constraint_pool_init (&world);
     int s = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){-8.0f, 0.5f, 0.0f});
-    world.bodies[s].velocity = (vector3){2.0f, 0.0f, 0.0f};
-    world.bodies[s].angular_velocity = (vector3){0.0f, 0.0f, -4.0f};
-    rigidbody_wake (&world.bodies[s]);
+    world.bodies [s].velocity = (vector3){2.0f, 0.0f, 0.0f};
+    world.bodies [s].angular_velocity = (vector3){0.0f, 0.0f, -4.0f};
+    rigidbody_wake (&world.bodies [s]);
     const float dt = 1.0f / 60.0f;
     for (int t = 0; t < 480; t++) {
         physics_world_step (&world, dt);
-        if (!isfinite (world.bodies[s].position.x)) {
+        if (!isfinite (world.bodies [s].position.x)) {
             printf ("[FAIL] NaN during roll\n");
             physics_world_cleanup (&world);
             return 1;
@@ -36,9 +36,9 @@ int main (void) {
      * truth while excluding perpetual (16) and dead (0); horizontal speed
      * only. vend gate omitted: mu_r=0.02 cannot stop 2 m/s in 8 s
      * (measured 0.88 still rolling: correct, weak resistance). */
-    float dist = world.bodies[s].position.x - (-8.0f);
-    float vh = sqrtf (world.bodies[s].velocity.x * world.bodies[s].velocity.x +
-                      world.bodies[s].velocity.z * world.bodies[s].velocity.z);
+    float dist = world.bodies [s].position.x - (-8.0f);
+    float vh = sqrtf (world.bodies [s].velocity.x * world.bodies [s].velocity.x +
+                      world.bodies [s].velocity.z * world.bodies [s].velocity.z);
     printf ("[info] rolled %.3f m in 8 s, end horizontal speed %.3f\n", dist, vh);
     int fail = 0;
     if (dist > 13.5f) {

@@ -5,11 +5,11 @@
 #include <stdarg.h>
 #include <string.h>
 typedef struct {
-    char message[event_msg_length];
+    char message [event_msg_length];
     time_t timestamp;
     log_level level;
 } engine_event;
-static engine_event event_log_ring[event_log_capacity];
+static engine_event event_log_ring [event_log_capacity];
 static int event_log_head = 0;
 static int event_log_count = 0;
 /* FIX-AUDIT-DESPOT: the ring (head/count/messages) was lock-free mutable
@@ -32,11 +32,11 @@ void event_log_push (log_level level, const char *format, ...) {
     pthread_mutex_lock (&event_log_lock);
     va_list args;
     va_start (args, format);
-    vsnprintf (event_log_ring[event_log_head].message, event_msg_length, format, args);
+    vsnprintf (event_log_ring [event_log_head].message, event_msg_length, format, args);
     va_end (args);
-    event_log_ring[event_log_head].message[event_msg_length - 1] = '\0';
-    event_log_ring[event_log_head].timestamp = time (NULL);
-    event_log_ring[event_log_head].level = level;
+    event_log_ring [event_log_head].message [event_msg_length - 1] = '\0';
+    event_log_ring [event_log_head].timestamp = time (NULL);
+    event_log_ring [event_log_head].level = level;
     event_log_head = (event_log_head + 1) % event_log_capacity;
     if (event_log_count < event_log_capacity) {
         event_log_count++;
@@ -66,12 +66,12 @@ const char *event_log_get_message (int index, log_level *level, time_t *timestam
         actual_index = (event_log_head + index) % event_log_capacity;
     }
     if (level) {
-        *level = event_log_ring[actual_index].level;
+        *level = event_log_ring [actual_index].level;
     }
     if (timestamp) {
-        *timestamp = event_log_ring[actual_index].timestamp;
+        *timestamp = event_log_ring [actual_index].timestamp;
     }
-    const char *msg = event_log_ring[actual_index].message;
+    const char *msg = event_log_ring [actual_index].message;
     pthread_mutex_unlock (&event_log_lock);
     return msg;
 }

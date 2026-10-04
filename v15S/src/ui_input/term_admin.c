@@ -21,14 +21,14 @@ static int term_tee_write_status (const char *path, const char *text, size_t *by
     /* also accept Windows separator */
     if (strncmp (path, "status\\", 7) == 0)
         name = path + 7;
-    if (!name[0] || strchr (name, '/') || strchr (name, '\\') || strstr (name, "..") || strcmp (name, ".") == 0)
+    if (!name [0] || strchr (name, '/') || strchr (name, '\\') || strstr (name, "..") || strcmp (name, ".") == 0)
         return -1;
     /* Reject reparse-point/symlink escapes best-effort (Windows). */
     DWORD sattr = GetFileAttributesA ("status");
     if (sattr != INVALID_FILE_ATTRIBUTES && (sattr & FILE_ATTRIBUTE_REPARSE_POINT))
         return -1;
     static volatile LONG sequence = 0;
-    char tmp_path[512], dst_path[512];
+    char tmp_path [512], dst_path [512];
     for (int attempt = 0; attempt < 16; attempt++) {
         LONG serial = InterlockedIncrement (&sequence);
         snprintf (tmp_path, sizeof (tmp_path), "status/.mpe-tee-%d-%ld.tmp", (int) _getpid (), (long) serial);
@@ -68,13 +68,13 @@ static int term_tee_write_status (const char *path, const char *text, size_t *by
     if (!path || !text || !bytes_written)
         return -1;
     const char *name = strncmp (path, "status/", 7) == 0 ? path + 7 : path;
-    if (!name[0] || strchr (name, '/') || strstr (name, "..") || strcmp (name, ".") == 0)
+    if (!name [0] || strchr (name, '/') || strstr (name, "..") || strcmp (name, ".") == 0)
         return -1;
     int dirfd = open ("status", O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW);
     if (dirfd < 0)
         return -1;
     static atomic_ulong sequence;
-    char temporary[80];
+    char temporary [80];
     int fd = -1;
     for (int attempt = 0; attempt < 16 && fd < 0; ++attempt) {
         unsigned long serial = atomic_fetch_add_explicit (&sequence, 1, memory_order_relaxed) + 1;
@@ -128,7 +128,7 @@ static int64_t posix_monotonic_time (void) {
 }
 bool all_targets_matched_any (int argc, char **argv) {
     for (int i = 2; i < argc; i++) {
-        if (term_is_all_token (argv[i])) {
+        if (term_is_all_token (argv [i])) {
             return true;
         }
     }
@@ -139,8 +139,8 @@ void cmd_sed (int argc, char **argv) {
         term_err ("usage: sed s/field/value/ <target...>\n");
         return;
     }
-    const char *expression = argv[1];
-    if ((expression[0] != 's') || (expression[1] != '/')) {
+    const char *expression = argv [1];
+    if ((expression [0] != 's') || (expression [1] != '/')) {
         term_err ("mpe: sed: expression must start with s/\n");
         return;
     }
@@ -150,26 +150,26 @@ void cmd_sed (int argc, char **argv) {
         term_err ("mpe: sed: malformed expression (missing second /)\n");
         return;
     }
-    char field_name[64];
+    char field_name [64];
     int field_len = (int) (field_end - field_start);
     if (field_len >= 64) {
         field_len = 63;
     }
     strncpy (field_name, field_start, field_len);
-    field_name[field_len] = '\0';
+    field_name [field_len] = '\0';
     const char *value_start = field_end + 1;
     const char *value_end = strchr (value_start, '/');
-    char value_str[64];
+    char value_str [64];
     if (value_end) {
         int value_len = (int) (value_end - value_start);
         if (value_len >= 64) {
             value_len = 63;
         }
         strncpy (value_str, value_start, value_len);
-        value_str[value_len] = '\0';
+        value_str [value_len] = '\0';
     } else {
         strncpy (value_str, value_start, 63);
-        value_str[63] = '\0';
+        value_str [63] = '\0';
     }
     float new_value = 0.0f;
     bool is_numeric = term_parse_float (value_str, &new_value);
@@ -177,11 +177,11 @@ void cmd_sed (int argc, char **argv) {
     bool make_dynamic = term_str_eq (value_str, "dynamic") || term_str_eq (value_str, "0");
     int modified_count = 0;
     for (int argument_index = 2; argument_index < argc; argument_index++) {
-        const char *target = argv[argument_index];
+        const char *target = argv [argument_index];
         bool all_targets = term_is_all_token (target);
         if (all_targets) {
             for (int object_index = 0; object_index < (physics_world_get_primary ()->body_count); object_index++) {
-                rigidbody *rb = &(physics_world_get_primary ()->bodies)[object_index];
+                rigidbody *rb = &(physics_world_get_primary ()->bodies) [object_index];
                 if (term_str_eq (field_name, "mass")) {
                     if (!is_numeric) {
                         continue;
@@ -242,7 +242,7 @@ void cmd_sed (int argc, char **argv) {
             term_printf ("term_err", "mpe: sed: %s: No such object\n", target);
             continue;
         }
-        rigidbody *rb = &(physics_world_get_primary ()->bodies)[object_index];
+        rigidbody *rb = &(physics_world_get_primary ()->bodies) [object_index];
         if (term_str_eq (field_name, "mass")) {
             if (!is_numeric) {
                 term_err ("mpe: sed: mass requires numeric value\n");
@@ -320,8 +320,8 @@ void cmd_nice (int argc, char **argv) {
         return;
     }
     float priority_float = 0.0f;
-    if (!term_parse_float (argv[1], &priority_float)) {
-        term_printf ("term_err", "mpe: nice: invalid priority '%s'\n", argv[1]);
+    if (!term_parse_float (argv [1], &priority_float)) {
+        term_printf ("term_err", "mpe: nice: invalid priority '%s'\n", argv [1]);
         return;
     }
     int priority = (int) priority_float;
@@ -332,12 +332,12 @@ void cmd_nice (int argc, char **argv) {
         priority = 19;
     }
     for (int argument_index = 2; argument_index < argc; argument_index++) {
-        int object_index = term_require_object (argv[argument_index]);
+        int object_index = term_require_object (argv [argument_index]);
         if (object_index < 0) {
             continue;
         }
-        (physics_world_get_primary ()->bodies)[object_index].nice_value = priority;
-        rigidbody_wake (&(physics_world_get_primary ()->bodies)[object_index]);
+        (physics_world_get_primary ()->bodies) [object_index].nice_value = priority;
+        rigidbody_wake (&(physics_world_get_primary ()->bodies) [object_index]);
         term_printf ("term_ok", "/obj/%d nice=%d\n", object_index, priority);
     }
 }
@@ -347,9 +347,9 @@ void cmd_renice (int argc, char **argv) {
 void cmd_ping (int argc, char **argv) {
     int ping_count = 1;
     int argument_index = 1;
-    if ((argc > 1) && (term_str_eq (argv[1], "-c")) && (argc > 2)) {
+    if ((argc > 1) && (term_str_eq (argv [1], "-c")) && (argc > 2)) {
         float v = 0.0f;
-        if (term_parse_float (argv[2], &v)) {
+        if (term_parse_float (argv [2], &v)) {
             ping_count = (int) v;
         }
         if (ping_count < 1) {
@@ -364,11 +364,11 @@ void cmd_ping (int argc, char **argv) {
         term_err ("usage: ping [-c count] <object>\n");
         return;
     }
-    int object_index = term_require_object (argv[argument_index]);
+    int object_index = term_require_object (argv [argument_index]);
     if (object_index < 0) {
         return;
     }
-    rigidbody *rb = &(physics_world_get_primary ()->bodies)[object_index];
+    rigidbody *rb = &(physics_world_get_primary ()->bodies) [object_index];
     if (rb->static_state) {
         term_printf ("term_dim", "PING /obj/%d: no response (static)\n", object_index);
         return;
@@ -391,7 +391,7 @@ void cmd_mount (int argc, char **argv) {
         term_err ("usage: mount <path>\n");
         return;
     }
-    const char *scene_path = argv[1];
+    const char *scene_path = argv [1];
     if (scene_loading (scene_path)) {
         editor_reset ();
         contact_cache_clear (physics_world_get_primary ());
@@ -431,7 +431,7 @@ void cmd_mkfs (int argc, char **argv) {
 void cmd_fsck (int argc, char **argv) {
     bool auto_fix = false;
     for (int i = 1; i < argc; i++) {
-        if (term_str_eq (argv[i], "-y")) {
+        if (term_str_eq (argv [i], "-y")) {
             auto_fix = true;
         }
     }
@@ -439,7 +439,7 @@ void cmd_fsck (int argc, char **argv) {
     int warning_count = 0;
     term_printf ("term_echo", "fsck: checking %d objects...\n", (physics_world_get_primary ()->body_count));
     for (int object_index = 0; object_index < (physics_world_get_primary ()->body_count); object_index++) {
-        rigidbody *rb = &(physics_world_get_primary ()->bodies)[object_index];
+        rigidbody *rb = &(physics_world_get_primary ()->bodies) [object_index];
         bool has_error = false;
         if ((!isfinite (rb->position.x)) || (!isfinite (rb->position.y)) || (!isfinite (rb->position.z))) {
             term_printf ("term_err", "  /obj/%d: position NaN/Inf\n", object_index);
@@ -486,10 +486,10 @@ void cmd_fsck (int argc, char **argv) {
     }
     term_printf ("term_echo", "fsck: checking %d joint slots...\n", mpe_max_joints);
     for (int joint_index = 0; joint_index < mpe_max_joints; joint_index++) {
-        if (!(physics_world_get_primary ()->spring_joints)[joint_index].is_active) {
+        if (!(physics_world_get_primary ()->spring_joints) [joint_index].is_active) {
             continue;
         }
-        spring_joint *j = &(physics_world_get_primary ()->spring_joints)[joint_index];
+        spring_joint *j = &(physics_world_get_primary ()->spring_joints) [joint_index];
         int index_a = scene_find_object_index_by_id (j->object_id_a);
         int index_b = scene_find_object_index_by_id (j->object_id_b);
         if (index_a < 0) {
@@ -538,7 +538,7 @@ void cmd_fsck (int argc, char **argv) {
 void cmd_netstat (int argc, char **argv) {
     bool show_all = false;
     for (int i = 1; i < argc; i++) {
-        if (term_str_eq (argv[i], "-a")) {
+        if (term_str_eq (argv [i], "-a")) {
             show_all = true;
         }
     }
@@ -546,16 +546,16 @@ void cmd_netstat (int argc, char **argv) {
     term_printf (NULL, "Proto  Local        Foreign      State         K        D      Len\n");
     int listed = 0;
     for (int ji = 0; ji < mpe_max_joints; ji++) {
-        if ((!(physics_world_get_primary ()->spring_joints)[ji].is_active) && (!show_all)) {
+        if ((!(physics_world_get_primary ()->spring_joints) [ji].is_active) && (!show_all)) {
             continue;
         }
-        int ia = scene_find_object_index_by_id ((physics_world_get_primary ()->spring_joints)[ji].object_id_a);
-        int ib = scene_find_object_index_by_id ((physics_world_get_primary ()->spring_joints)[ji].object_id_b);
-        const char *state_text = (physics_world_get_primary ()->spring_joints)[ji].is_active ? "ESTABLISHED" : "CLOSED";
+        int ia = scene_find_object_index_by_id ((physics_world_get_primary ()->spring_joints) [ji].object_id_a);
+        int ib = scene_find_object_index_by_id ((physics_world_get_primary ()->spring_joints) [ji].object_id_b);
+        const char *state_text = (physics_world_get_primary ()->spring_joints) [ji].is_active ? "ESTABLISHED" : "CLOSED";
         term_printf (NULL, "spring /obj/%-6d /obj/%-6d %-12s %7.1f %7.1f %7.2f\n", ia, ib, state_text,
-                     (physics_world_get_primary ()->spring_joints)[ji].spring_constant,
-                     (physics_world_get_primary ()->spring_joints)[ji].damping_coefficient,
-                     (physics_world_get_primary ()->spring_joints)[ji].equilibrium_length);
+                     (physics_world_get_primary ()->spring_joints) [ji].spring_constant,
+                     (physics_world_get_primary ()->spring_joints) [ji].damping_coefficient,
+                     (physics_world_get_primary ()->spring_joints) [ji].equilibrium_length);
         listed++;
     }
     if (listed == 0) {
@@ -617,34 +617,34 @@ void cmd_alias (int argc, char **argv) {
             return;
         }
         for (int i = 0; i < term_alias_count; i++) {
-            term_printf (NULL, "alias %s='%s'\n", term_alias_names[i], term_alias_values[i]);
+            term_printf (NULL, "alias %s='%s'\n", term_alias_names [i], term_alias_values [i]);
         }
         return;
     }
     for (int argument_index = 1; argument_index < argc; argument_index++) {
-        char *equals_pos = strchr (argv[argument_index], '=');
+        char *equals_pos = strchr (argv [argument_index], '=');
         if (!equals_pos) {
             bool found = false;
             for (int i = 0; i < term_alias_count; i++) {
-                if (term_str_eq (argv[argument_index], term_alias_names[i])) {
-                    term_printf (NULL, "alias %s='%s'\n", term_alias_names[i], term_alias_values[i]);
+                if (term_str_eq (argv [argument_index], term_alias_names [i])) {
+                    term_printf (NULL, "alias %s='%s'\n", term_alias_names [i], term_alias_values [i]);
                     found = true;
                     break;
                 }
             }
             if (!found) {
-                term_printf ("term_err", "mpe: alias: %s: not found\n", argv[argument_index]);
+                term_printf ("term_err", "mpe: alias: %s: not found\n", argv [argument_index]);
             }
             continue;
         }
         *equals_pos = '\0';
-        const char *alias_name = argv[argument_index];
+        const char *alias_name = argv [argument_index];
         const char *alias_value = equals_pos + 1;
         bool updated = false;
         for (int i = 0; i < term_alias_count; i++) {
-            if (term_str_eq (alias_name, term_alias_names[i])) {
-                strncpy (term_alias_values[i], alias_value, term_alias_value_len - 1);
-                term_alias_values[i][term_alias_value_len - 1] = '\0';
+            if (term_str_eq (alias_name, term_alias_names [i])) {
+                strncpy (term_alias_values [i], alias_value, term_alias_value_len - 1);
+                term_alias_values [i] [term_alias_value_len - 1] = '\0';
                 updated = true;
                 break;
             }
@@ -654,10 +654,10 @@ void cmd_alias (int argc, char **argv) {
                 term_err ("mpe: alias: alias table full\n");
                 continue;
             }
-            strncpy (term_alias_names[term_alias_count], alias_name, term_alias_name_len - 1);
-            term_alias_names[term_alias_count][term_alias_name_len - 1] = '\0';
-            strncpy (term_alias_values[term_alias_count], alias_value, term_alias_value_len - 1);
-            term_alias_values[term_alias_count][term_alias_value_len - 1] = '\0';
+            strncpy (term_alias_names [term_alias_count], alias_name, term_alias_name_len - 1);
+            term_alias_names [term_alias_count] [term_alias_name_len - 1] = '\0';
+            strncpy (term_alias_values [term_alias_count], alias_value, term_alias_value_len - 1);
+            term_alias_values [term_alias_count] [term_alias_value_len - 1] = '\0';
             term_alias_count++;
         }
         term_printf ("term_ok", "alias %s='%s'\n", alias_name, alias_value);
@@ -671,24 +671,24 @@ void cmd_unalias (int argc, char **argv) {
     for (int argument_index = 1; argument_index < argc; argument_index++) {
         bool found = false;
         for (int i = 0; i < term_alias_count; i++) {
-            if (term_str_eq (argv[argument_index], term_alias_names[i])) {
+            if (term_str_eq (argv [argument_index], term_alias_names [i])) {
                 int entries_to_move = term_alias_count - i - 1;
                 if (entries_to_move > 0) {
-                    memmove (term_alias_names[i], term_alias_names[i + 1],
-                             (size_t) entries_to_move * sizeof term_alias_names[0]);
-                    memmove (term_alias_values[i], term_alias_values[i + 1],
-                             (size_t) entries_to_move * sizeof term_alias_values[0]);
+                    memmove (term_alias_names [i], term_alias_names [i + 1],
+                             (size_t) entries_to_move * sizeof term_alias_names [0]);
+                    memmove (term_alias_values [i], term_alias_values [i + 1],
+                             (size_t) entries_to_move * sizeof term_alias_values [0]);
                 }
-                term_alias_names[term_alias_count - 1][0] = '\0';
-                term_alias_values[term_alias_count - 1][0] = '\0';
+                term_alias_names [term_alias_count - 1] [0] = '\0';
+                term_alias_values [term_alias_count - 1] [0] = '\0';
                 term_alias_count--;
                 found = true;
-                term_printf ("term_ok", "unalias %s\n", argv[argument_index]);
+                term_printf ("term_ok", "unalias %s\n", argv [argument_index]);
                 break;
             }
         }
         if (!found) {
-            term_printf ("term_err", "mpe: unalias: %s: not found\n", argv[argument_index]);
+            term_printf ("term_err", "mpe: unalias: %s: not found\n", argv [argument_index]);
         }
     }
 }
@@ -743,15 +743,15 @@ void cmd_seq (int argc, char **argv) {
     int first = 1, last = 1;
     if (argc == 2) {
         float v = 0.0f;
-        if (term_parse_float (argv[1], &v)) {
+        if (term_parse_float (argv [1], &v)) {
             last = (int) v;
         }
     } else if (argc >= 3) {
         float v1 = 0.0f, v2 = 0.0f;
-        if (term_parse_float (argv[1], &v1)) {
+        if (term_parse_float (argv [1], &v1)) {
             first = (int) v1;
         }
-        if (term_parse_float (argv[2], &v2)) {
+        if (term_parse_float (argv [2], &v2)) {
             last = (int) v2;
         }
     }
@@ -774,26 +774,26 @@ void cmd_tee (int argc, char **argv) {
         term_err ("usage: tee <filename> <command...>\n");
         return;
     }
-    const char *output_filename = argv[1];
-    char sub_command[2048];
-    sub_command[0] = '\0';
+    const char *output_filename = argv [1];
+    char sub_command [2048];
+    sub_command [0] = '\0';
     size_t offset = 0;
     for (int i = 2; i < argc; i++) {
         if (i > 2) {
-            sub_command[offset++] = ' ';
+            sub_command [offset++] = ' ';
         }
-        size_t len = strlen (argv[i]);
+        size_t len = strlen (argv [i]);
         if (offset + len < sizeof (sub_command) - 1) {
-            memcpy (sub_command + offset, argv[i], len);
+            memcpy (sub_command + offset, argv [i], len);
             offset += len;
-            sub_command[offset] = '\0';
+            sub_command [offset] = '\0';
         }
     }
     term_capture_begin ();
     term_execute (sub_command);
     term_capture_end ();
     char *captured = term_capture_get ();
-    if (captured && captured[0] != '\0') {
+    if (captured && captured [0] != '\0') {
         size_t bytes_written = 0;
         if (term_tee_write_status (output_filename, captured, &bytes_written) == 0) {
             const char *name = strncmp (output_filename, "status/", 7) == 0 ? output_filename + 7 : output_filename;
@@ -809,18 +809,18 @@ void cmd_watch (int argc, char **argv) {
         term_err ("usage: watch <command...>\n");
         return;
     }
-    char sub_command[2048];
-    sub_command[0] = '\0';
+    char sub_command [2048];
+    sub_command [0] = '\0';
     size_t offset = 0;
     for (int i = 1; i < argc; i++) {
         if (i > 1) {
-            sub_command[offset++] = ' ';
+            sub_command [offset++] = ' ';
         }
-        size_t len = strlen (argv[i]);
+        size_t len = strlen (argv [i]);
         if (offset + len < sizeof (sub_command) - 1) {
-            memcpy (sub_command + offset, argv[i], len);
+            memcpy (sub_command + offset, argv [i], len);
             offset += len;
-            sub_command[offset] = '\0';
+            sub_command [offset] = '\0';
         }
     }
     term_dim ("-- watch: single execution (periodic mode deferred) --\n");
@@ -832,36 +832,36 @@ void cmd_sudo (int argc, char **argv) {
         return;
     }
     if (main_inputs.is_debug_mode_active) {
-        char sub_command[2048];
-        sub_command[0] = '\0';
+        char sub_command [2048];
+        sub_command [0] = '\0';
         size_t offset = 0;
         for (int i = 1; i < argc; i++) {
             if (i > 1) {
-                sub_command[offset++] = ' ';
+                sub_command [offset++] = ' ';
             }
-            size_t len = strlen (argv[i]);
+            size_t len = strlen (argv [i]);
             if (offset + len < sizeof (sub_command) - 1) {
-                memcpy (sub_command + offset, argv[i], len);
+                memcpy (sub_command + offset, argv [i], len);
                 offset += len;
-                sub_command[offset] = '\0';
+                sub_command [offset] = '\0';
             }
         }
         term_execute (sub_command);
         return;
     }
     term_dim ("[sudo] bypassing game-mode restriction\n");
-    char sub_command[2048];
-    sub_command[0] = '\0';
+    char sub_command [2048];
+    sub_command [0] = '\0';
     size_t offset = 0;
     for (int i = 1; i < argc; i++) {
         if (i > 1) {
-            sub_command[offset++] = ' ';
+            sub_command [offset++] = ' ';
         }
-        size_t len = strlen (argv[i]);
+        size_t len = strlen (argv [i]);
         if (offset + len < sizeof (sub_command) - 1) {
-            memcpy (sub_command + offset, argv[i], len);
+            memcpy (sub_command + offset, argv [i], len);
             offset += len;
-            sub_command[offset] = '\0';
+            sub_command [offset] = '\0';
         }
     }
     term_sudo_active = true;
@@ -886,19 +886,19 @@ void cmd_dmesg (int argc, char **argv) {
     int max_events = 32;
     int filter_level = -1;
     for (int i = 1; i < argc; i++) {
-        if (term_str_eq (argv[i], "-n") && (i + 1 < argc)) {
+        if (term_str_eq (argv [i], "-n") && (i + 1 < argc)) {
             float v = 0.0f;
-            if (term_parse_float (argv[i + 1], &v)) {
+            if (term_parse_float (argv [i + 1], &v)) {
                 max_events = (int) v;
             }
             i++;
-        } else if (term_str_eq (argv[i], "-l") && (i + 1 < argc)) {
+        } else if (term_str_eq (argv [i], "-l") && (i + 1 < argc)) {
             i++;
-            if (term_str_eq (argv[i], "info")) {
+            if (term_str_eq (argv [i], "info")) {
                 filter_level = 0;
-            } else if (term_str_eq (argv[i], "warn")) {
+            } else if (term_str_eq (argv [i], "warn")) {
                 filter_level = 1;
-            } else if (term_str_eq (argv[i], "error")) {
+            } else if (term_str_eq (argv [i], "error")) {
                 filter_level = 2;
             }
         }
@@ -930,7 +930,7 @@ void cmd_dmesg (int argc, char **argv) {
             continue;
         }
         struct tm *local_time = localtime (&timestamp);
-        char time_buffer[32];
+        char time_buffer [32];
         strftime (time_buffer, sizeof (time_buffer), "%H:%M:%S", local_time);
         const char *level_text = (level == log_info) ? "INFO" : (level == log_warn) ? "WARN" : "ERR ";
         const char *tag_name = (level == log_error) ? "term_err" : (level == log_warn) ? "term_echo" : NULL;
@@ -950,7 +950,7 @@ typedef struct {
     const char *path;
     const char *description;
 } mv_editable_file;
-static const mv_editable_file mv_known_files[] = {{"status/engine.cfg", "Main engine configuration (79 tunables)"},
+static const mv_editable_file mv_known_files [] = {{"status/engine.cfg", "Main engine configuration (79 tunables)"},
                                                   {"status/engine.cfg.backup", "F10/F11 validation config backup"},
                                                   {"status/engine.cfg.bak", "MicroVim auto-backup (last :w)"},
                                                   {"status/scene.dat", "Scene save file (binary)"},
@@ -987,38 +987,38 @@ static const mv_editable_file mv_known_files[] = {{"status/engine.cfg", "Main en
                                                   {"render/shaders/axis_vertex.glsl", "Axis vertex shader"},
                                                   {"render/shaders/axis_fragment.glsl", "Axis fragment shader"},
                                                   {NULL, NULL}};
-static const char *mv_allowed_extensions[] = {".cfg", ".ini", ".conf", ".txt", ".md", ".glsl",
+static const char *mv_allowed_extensions [] = {".cfg", ".ini", ".conf", ".txt", ".md", ".glsl",
                                               ".sh",  ".py",  ".h",    ".c",   NULL};
-static const char *mv_blocked_extensions[] = {".dat", ".o",   ".so",  ".a",     ".bin",
+static const char *mv_blocked_extensions [] = {".dat", ".o",   ".so",  ".a",     ".bin",
                                               ".exe", ".obj", ".dll", ".dylib", NULL};
 bool mv_file_is_allowed (const char *filepath) {
-    if (!filepath || filepath[0] == '\0') {
+    if (!filepath || filepath [0] == '\0') {
         return false;
     }
     /* Reject absolute paths */
-    if (filepath[0] == '/') {
+    if (filepath [0] == '/') {
         return false;
     }
     /* Reject paths with null bytes (defensive) */
     /* Check blocked extensions first */
     const char *dot = strrchr (filepath, '.');
     if (dot) {
-        for (int i = 0; mv_blocked_extensions[i]; i++) {
-            if (strcasecmp (dot, mv_blocked_extensions[i]) == 0) {
+        for (int i = 0; mv_blocked_extensions [i]; i++) {
+            if (strcasecmp (dot, mv_blocked_extensions [i]) == 0) {
                 return false;
             }
         }
     }
     /* Check if it's in the known files list */
-    for (int i = 0; mv_known_files[i].path; i++) {
-        if (strcmp (filepath, mv_known_files[i].path) == 0) {
+    for (int i = 0; mv_known_files [i].path; i++) {
+        if (strcmp (filepath, mv_known_files [i].path) == 0) {
             return true;
         }
     }
     /* Check if it has an allowed extension */
     if (dot) {
-        for (int i = 0; mv_allowed_extensions[i]; i++) {
-            if (strcasecmp (dot, mv_allowed_extensions[i]) == 0) {
+        for (int i = 0; mv_allowed_extensions [i]; i++) {
+            if (strcasecmp (dot, mv_allowed_extensions [i]) == 0) {
                 return true;
             }
         }
@@ -1028,11 +1028,11 @@ bool mv_file_is_allowed (const char *filepath) {
 /* MPE_TASK_V15R2_MICROVIM_FILE_WHITELIST_END */
 void cmd_vi (int argc, char **argv) {
     /* Handle --list / -l flag */
-    if ((argc > 1) && (term_str_eq (argv[1], "--list") || term_str_eq (argv[1], "-l"))) {
+    if ((argc > 1) && (term_str_eq (argv [1], "--list") || term_str_eq (argv [1], "-l"))) {
         term_printf ("term_echo", "MicroVim editable files:\n");
         term_out ("\n");
-        for (int i = 0; mv_known_files[i].path; i++) {
-            term_printf (NULL, "  %-40s %s\n", mv_known_files[i].path, mv_known_files[i].description);
+        for (int i = 0; mv_known_files [i].path; i++) {
+            term_printf (NULL, "  %-40s %s\n", mv_known_files [i].path, mv_known_files [i].description);
         }
         term_out ("\n");
         term_dim ("Also allowed: any file with extensions: .cfg .ini .conf .txt .md .glsl .sh .py .h .c\n");
@@ -1042,7 +1042,7 @@ void cmd_vi (int argc, char **argv) {
         return;
     }
     /* Handle --help / -h flag */
-    if ((argc > 1) && (term_str_eq (argv[1], "--help") || term_str_eq (argv[1], "-h"))) {
+    if ((argc > 1) && (term_str_eq (argv [1], "--help") || term_str_eq (argv [1], "-h"))) {
         term_printf ("term_echo", "MicroVim — minimal modal editor\n");
         term_out ("\n");
         term_out ("  vi [path]       Open file (default: status/engine.cfg)\n");
@@ -1058,7 +1058,7 @@ void cmd_vi (int argc, char **argv) {
     }
     const char *target_file = "status/engine.cfg";
     if (argc > 1) {
-        target_file = argv[1];
+        target_file = argv [1];
     }
     /* Validate file against whitelist */
     if (!mv_file_is_allowed (target_file)) {

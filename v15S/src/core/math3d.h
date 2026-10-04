@@ -26,7 +26,7 @@ typedef struct {
 } vector3;
 //3 ^ 3 matrix for computing Inertia tensoring
 typedef struct {
-    float matrix[3][3];
+    float matrix [3] [3];
 } math3;
 //4D axial rotational matrix motion (w + xi + yj + zk)
 typedef struct {
@@ -167,15 +167,15 @@ static inline vector4 vector4_from_axis_with_angle (vector3 rotation_axis, float
 } //3 ^ 3 matrix Functions
 static inline math3 math3_identity () {
     math3 result_matrix = {{{0}}};
-    result_matrix.matrix[0][0] = 1.0f;
-    result_matrix.matrix[1][1] = 1.0f;
-    result_matrix.matrix[2][2] = 1.0f;
+    result_matrix.matrix [0] [0] = 1.0f;
+    result_matrix.matrix [1] [1] = 1.0f;
+    result_matrix.matrix [2] [2] = 1.0f;
     return result_matrix;
 } //Multiply specific matrix by a existing vector
 static inline vector3 math3_multiplication_vector3 (math3 matrix, vector3 vector) {
-    return (vector3){matrix.matrix[0][0] * vector.x + matrix.matrix[0][1] * vector.y + matrix.matrix[0][2] * vector.z,
-                     matrix.matrix[1][0] * vector.x + matrix.matrix[1][1] * vector.y + matrix.matrix[1][2] * vector.z,
-                     matrix.matrix[2][0] * vector.x + matrix.matrix[2][1] * vector.y + matrix.matrix[2][2] * vector.z};
+    return (vector3){matrix.matrix [0] [0] * vector.x + matrix.matrix [0] [1] * vector.y + matrix.matrix [0] [2] * vector.z,
+                     matrix.matrix [1] [0] * vector.x + matrix.matrix [1] [1] * vector.y + matrix.matrix [1] [2] * vector.z,
+                     matrix.matrix [2] [0] * vector.x + matrix.matrix [2] [1] * vector.y + matrix.matrix [2] [2] * vector.z};
 } //Convert 4D to rotational matrix (Inertia Tensor rotations)
 //I_total = R * I_local * * R_transposed
 /* TRUTH: callers must pass unit quats. Sanitize normalizes drift >1e-6, but
@@ -208,22 +208,22 @@ static inline math3 vector4_to_math3 (vector4 quaternion) {
     float y_y = quaternion.y * y_double, y_z = quaternion.y * z_double, z_z = quaternion.z * z_double;
     float w_x = quaternion.w * x_double, w_y = quaternion.w * y_double, w_z = quaternion.w * z_double;
     //Affix to math3 format
-    result_matrix.matrix[0][0] = 1.0f - (y_y + z_z), result_matrix.matrix[0][1] = x_y - w_z,
-    result_matrix.matrix[0][2] = x_z + w_y;
-    result_matrix.matrix[1][0] = x_y + w_z, result_matrix.matrix[1][1] = 1.0f - (x_x + z_z),
-    result_matrix.matrix[1][2] = y_z - w_x;
-    result_matrix.matrix[2][0] = x_z - w_y, result_matrix.matrix[2][1] = y_z + w_x,
-    result_matrix.matrix[2][2] = 1.0f - (x_x + y_y);
+    result_matrix.matrix [0] [0] = 1.0f - (y_y + z_z), result_matrix.matrix [0] [1] = x_y - w_z,
+    result_matrix.matrix [0] [2] = x_z + w_y;
+    result_matrix.matrix [1] [0] = x_y + w_z, result_matrix.matrix [1] [1] = 1.0f - (x_x + z_z),
+    result_matrix.matrix [1] [2] = y_z - w_x;
+    result_matrix.matrix [2] [0] = x_z - w_y, result_matrix.matrix [2] [1] = y_z + w_x,
+    result_matrix.matrix [2] [2] = 1.0f - (x_x + y_y);
     return result_matrix;
 } //Matrix Multiplication
 static inline math3 math3_multiplication (math3 matrix_a, math3 matrix_b) {
     math3 result_matrix = {{{0}}};
     for (int row_index = 0; row_index < 3; row_index++) {
         for (int column_index = 0; column_index < 3; column_index++) {
-            result_matrix.matrix[row_index][column_index] =
-                (matrix_a.matrix[row_index][0] * matrix_b.matrix[0][column_index]) +
-                (matrix_a.matrix[row_index][1] * matrix_b.matrix[1][column_index]) +
-                (matrix_a.matrix[row_index][2] * matrix_b.matrix[2][column_index]);
+            result_matrix.matrix [row_index] [column_index] =
+                (matrix_a.matrix [row_index] [0] * matrix_b.matrix [0] [column_index]) +
+                (matrix_a.matrix [row_index] [1] * matrix_b.matrix [1] [column_index]) +
+                (matrix_a.matrix [row_index] [2] * matrix_b.matrix [2] [column_index]);
         }
     }
     return result_matrix;
@@ -232,7 +232,7 @@ static inline math3 math3_transposition (math3 matrix) {
     math3 result_matrix;
     for (int row_index = 0; row_index < 3; row_index++) {
         for (int column_index = 0; column_index < 3; column_index++) {
-            result_matrix.matrix[row_index][column_index] = matrix.matrix[column_index][row_index];
+            result_matrix.matrix [row_index] [column_index] = matrix.matrix [column_index] [row_index];
         }
     }
     return result_matrix;
@@ -243,7 +243,7 @@ static inline math3 math3_inverse (math3 matrix) {
     double frob_sq_d = 0.0;
     for (int _r = 0; _r < 3; _r++)
         for (int _c = 0; _c < 3; _c++) {
-            double v = (double) matrix.matrix[_r][_c];
+            double v = (double) matrix.matrix [_r] [_c];
             if (!isfinite (v)) {
                 math3 nan_out = {{{0.0f}}};
                 return nan_out;
@@ -251,12 +251,12 @@ static inline math3 math3_inverse (math3 matrix) {
             frob_sq_d += v * v;
         }
     double det_d =
-        (double) matrix.matrix[0][0] *
-            ((double) matrix.matrix[1][1] * matrix.matrix[2][2] - (double) matrix.matrix[2][1] * matrix.matrix[1][2]) -
-        (double) matrix.matrix[0][1] *
-            ((double) matrix.matrix[1][0] * matrix.matrix[2][2] - (double) matrix.matrix[1][2] * matrix.matrix[2][0]) +
-        (double) matrix.matrix[0][2] *
-            ((double) matrix.matrix[1][0] * matrix.matrix[2][1] - (double) matrix.matrix[1][1] * matrix.matrix[2][0]);
+        (double) matrix.matrix [0] [0] *
+            ((double) matrix.matrix [1] [1] * matrix.matrix [2] [2] - (double) matrix.matrix [2] [1] * matrix.matrix [1] [2]) -
+        (double) matrix.matrix [0] [1] *
+            ((double) matrix.matrix [1] [0] * matrix.matrix [2] [2] - (double) matrix.matrix [1] [2] * matrix.matrix [2] [0]) +
+        (double) matrix.matrix [0] [2] *
+            ((double) matrix.matrix [1] [0] * matrix.matrix [2] [1] - (double) matrix.matrix [1] [1] * matrix.matrix [2] [0]);
     /* Scale-invariant singularity test: |det| / ||M||_F^3 < 1e-12.
      * For M = s*M0: det ~ s^3, ||M||_F^3 ~ s^3, ratio is constant.
      * TRUTH: frob_norm_cubed in double throughout. The old float path
@@ -281,23 +281,23 @@ static inline math3 math3_inverse (math3 matrix) {
          * returns zero (all locked). World inverse must therefore use
          * R*inv_local*R^T, never math3_inverse(world). Local inertia is
          * always diagonal, so the fallback covers every live call. */
-        float off = fabsf (matrix.matrix[0][1]) + fabsf (matrix.matrix[0][2]) + fabsf (matrix.matrix[1][0]) +
-                    fabsf (matrix.matrix[1][2]) + fabsf (matrix.matrix[2][0]) + fabsf (matrix.matrix[2][1]);
-        float diag_scale = fabsf (matrix.matrix[0][0]) + fabsf (matrix.matrix[1][1]) + fabsf (matrix.matrix[2][2]);
+        float off = fabsf (matrix.matrix [0] [1]) + fabsf (matrix.matrix [0] [2]) + fabsf (matrix.matrix [1] [0]) +
+                    fabsf (matrix.matrix [1] [2]) + fabsf (matrix.matrix [2] [0]) + fabsf (matrix.matrix [2] [1]);
+        float diag_scale = fabsf (matrix.matrix [0] [0]) + fabsf (matrix.matrix [1] [1]) + fabsf (matrix.matrix [2] [2]);
         if ((diag_scale > 0.0f) && isfinite (diag_scale) && (off <= 1e-6f * diag_scale)) {
             math3 d = {{{0.0f}}};
             /* Minimum diagonal for inversion: prevents Inf from 1/0 for needle cylinders.
              * For truly zero inertia (locked axis), inverse is 0 (infinite mass along that axis).
              * For near-zero, clamp to prevent numerical explosion while allowing rotation. */
-            const float min_diag = 1e-12f * fmaxf (fmaxf (fabsf (matrix.matrix[0][0]), fabsf (matrix.matrix[1][1])),
-                                                   fabsf (matrix.matrix[2][2]));
-            float d0 = fabsf (matrix.matrix[0][0]) > min_diag ? matrix.matrix[0][0] : 0.0f;
-            float d1 = fabsf (matrix.matrix[1][1]) > min_diag ? matrix.matrix[1][1] : 0.0f;
-            float d2 = fabsf (matrix.matrix[2][2]) > min_diag ? matrix.matrix[2][2] : 0.0f;
-            d.matrix[0][0] = (d0 != 0.0f) ? (1.0f / d0) : 0.0f;
-            d.matrix[1][1] = (d1 != 0.0f) ? (1.0f / d1) : 0.0f;
-            d.matrix[2][2] = (d2 != 0.0f) ? (1.0f / d2) : 0.0f;
-            if (isfinite (d.matrix[0][0]) && isfinite (d.matrix[1][1]) && isfinite (d.matrix[2][2])) {
+            const float min_diag = 1e-12f * fmaxf (fmaxf (fabsf (matrix.matrix [0] [0]), fabsf (matrix.matrix [1] [1])),
+                                                   fabsf (matrix.matrix [2] [2]));
+            float d0 = fabsf (matrix.matrix [0] [0]) > min_diag ? matrix.matrix [0] [0] : 0.0f;
+            float d1 = fabsf (matrix.matrix [1] [1]) > min_diag ? matrix.matrix [1] [1] : 0.0f;
+            float d2 = fabsf (matrix.matrix [2] [2]) > min_diag ? matrix.matrix [2] [2] : 0.0f;
+            d.matrix [0] [0] = (d0 != 0.0f) ? (1.0f / d0) : 0.0f;
+            d.matrix [1] [1] = (d1 != 0.0f) ? (1.0f / d1) : 0.0f;
+            d.matrix [2] [2] = (d2 != 0.0f) ? (1.0f / d2) : 0.0f;
+            if (isfinite (d.matrix [0] [0]) && isfinite (d.matrix [1] [1]) && isfinite (d.matrix [2] [2])) {
                 return d;
             }
         }
@@ -311,34 +311,34 @@ static inline math3 math3_inverse (math3 matrix) {
     math3 result_matrix;
     //n ~= {0, 2}
     //[0][n]
-    result_matrix.matrix[0][0] = (float) (((double) matrix.matrix[1][1] * (double) matrix.matrix[2][2] -
-                                           (double) matrix.matrix[2][1] * (double) matrix.matrix[1][2]) *
+    result_matrix.matrix [0] [0] = (float) (((double) matrix.matrix [1] [1] * (double) matrix.matrix [2] [2] -
+                                           (double) matrix.matrix [2] [1] * (double) matrix.matrix [1] [2]) *
                                           inverse_determinant);
-    result_matrix.matrix[0][1] = (float) (((double) matrix.matrix[0][2] * (double) matrix.matrix[2][1] -
-                                           (double) matrix.matrix[0][1] * (double) matrix.matrix[2][2]) *
+    result_matrix.matrix [0] [1] = (float) (((double) matrix.matrix [0] [2] * (double) matrix.matrix [2] [1] -
+                                           (double) matrix.matrix [0] [1] * (double) matrix.matrix [2] [2]) *
                                           inverse_determinant);
-    result_matrix.matrix[0][2] = (float) (((double) matrix.matrix[0][1] * (double) matrix.matrix[1][2] -
-                                           (double) matrix.matrix[0][2] * (double) matrix.matrix[1][1]) *
+    result_matrix.matrix [0] [2] = (float) (((double) matrix.matrix [0] [1] * (double) matrix.matrix [1] [2] -
+                                           (double) matrix.matrix [0] [2] * (double) matrix.matrix [1] [1]) *
                                           inverse_determinant);
     //[1][n]
-    result_matrix.matrix[1][0] = (float) (((double) matrix.matrix[1][2] * (double) matrix.matrix[2][0] -
-                                           (double) matrix.matrix[1][0] * (double) matrix.matrix[2][2]) *
+    result_matrix.matrix [1] [0] = (float) (((double) matrix.matrix [1] [2] * (double) matrix.matrix [2] [0] -
+                                           (double) matrix.matrix [1] [0] * (double) matrix.matrix [2] [2]) *
                                           inverse_determinant);
-    result_matrix.matrix[1][1] = (float) (((double) matrix.matrix[0][0] * (double) matrix.matrix[2][2] -
-                                           (double) matrix.matrix[0][2] * (double) matrix.matrix[2][0]) *
+    result_matrix.matrix [1] [1] = (float) (((double) matrix.matrix [0] [0] * (double) matrix.matrix [2] [2] -
+                                           (double) matrix.matrix [0] [2] * (double) matrix.matrix [2] [0]) *
                                           inverse_determinant);
-    result_matrix.matrix[1][2] = (float) (((double) matrix.matrix[1][0] * (double) matrix.matrix[0][2] -
-                                           (double) matrix.matrix[0][0] * (double) matrix.matrix[1][2]) *
+    result_matrix.matrix [1] [2] = (float) (((double) matrix.matrix [1] [0] * (double) matrix.matrix [0] [2] -
+                                           (double) matrix.matrix [0] [0] * (double) matrix.matrix [1] [2]) *
                                           inverse_determinant);
     //[2][n]
-    result_matrix.matrix[2][0] = (float) (((double) matrix.matrix[1][0] * (double) matrix.matrix[2][1] -
-                                           (double) matrix.matrix[2][0] * (double) matrix.matrix[1][1]) *
+    result_matrix.matrix [2] [0] = (float) (((double) matrix.matrix [1] [0] * (double) matrix.matrix [2] [1] -
+                                           (double) matrix.matrix [2] [0] * (double) matrix.matrix [1] [1]) *
                                           inverse_determinant);
-    result_matrix.matrix[2][1] = (float) (((double) matrix.matrix[2][0] * (double) matrix.matrix[0][1] -
-                                           (double) matrix.matrix[0][0] * (double) matrix.matrix[2][1]) *
+    result_matrix.matrix [2] [1] = (float) (((double) matrix.matrix [2] [0] * (double) matrix.matrix [0] [1] -
+                                           (double) matrix.matrix [0] [0] * (double) matrix.matrix [2] [1]) *
                                           inverse_determinant);
-    result_matrix.matrix[2][2] = (float) (((double) matrix.matrix[0][0] * (double) matrix.matrix[1][1] -
-                                           (double) matrix.matrix[1][0] * (double) matrix.matrix[0][1]) *
+    result_matrix.matrix [2] [2] = (float) (((double) matrix.matrix [0] [0] * (double) matrix.matrix [1] [1] -
+                                           (double) matrix.matrix [1] [0] * (double) matrix.matrix [0] [1]) *
                                           inverse_determinant);
     return result_matrix;
 }

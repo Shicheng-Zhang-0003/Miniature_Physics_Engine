@@ -72,7 +72,7 @@ static int dump_index_by_id (physics_world *world, uint32_t id) {
         return hit;
     }
     for (int i = 0; i < world->body_count; i++) {
-        if (world->bodies[i].object_id == id) {
+        if (world->bodies [i].object_id == id) {
             return i;
         }
     }
@@ -94,7 +94,7 @@ int tui_dump_snapshot (FILE *out, physics_world *world, unsigned long tick, floa
     }
     int bad = 0;
     for (int i = 0; i < world->body_count; i++) {
-        rigidbody *rb = &world->bodies[i];
+        rigidbody *rb = &world->bodies [i];
         /* DESPOT-2026-10-04: bad used to cover only pos/vel/angvel while a
          * NaN orientation/colour/mass still printed "nan" under a PASS
          * header. Cover the full persisted state. */
@@ -108,7 +108,7 @@ int tui_dump_snapshot (FILE *out, physics_world *world, unsigned long tick, floa
             bad = 1;
         }
     }
-    char b0[160], b1[160], b2[320];
+    char b0 [160], b1 [160], b2 [320];
     fprintf (out, "### MPE-TUI snapshot tick=%lu time=%.4f dt=%.5f bodies=%d result=%s\n", tick, tick * (double) dt, dt,
              world->body_count, bad ? "FAIL(non-finite)" : "PASS");
     /* ---- engine truth parameters + totals ---- */
@@ -116,7 +116,7 @@ int tui_dump_snapshot (FILE *out, physics_world *world, unsigned long tick, floa
     vector3 mom = {0.0f, 0.0f, 0.0f};
     int awake = 0, sleeping = 0, statics = 0, kinematics = 0;
     for (int i = 0; i < world->body_count; i++) {
-        rigidbody *rb = &world->bodies[i];
+        rigidbody *rb = &world->bodies [i];
         ke += (double) rb_get_kinetic_energy (rb);
         mom = vector3_addition (mom, vector3_scaling (rb->velocity, rb->mass));
         if (rb->static_state) {
@@ -133,7 +133,7 @@ int tui_dump_snapshot (FILE *out, physics_world *world, unsigned long tick, floa
     const mpe_config_t *C = mpe_world_cfg (world);
     int ncustom = 0;
     for (int ci = 0; ci < world->body_count; ci++) {
-        if (world->bodies[ci].type == object_custom) {
+        if (world->bodies [ci].type == object_custom) {
             ncustom++;
         }
     }
@@ -158,7 +158,7 @@ int tui_dump_snapshot (FILE *out, physics_world *world, unsigned long tick, floa
              world->body_capacity, ke, mom.x, mom.y, mom.z, vector3_length (mom));
     /* ---- bodies: characteristics + mathematics ---- */
     for (int i = 0; i < world->body_count; i++) {
-        rigidbody *rb = &world->bodies[i];
+        rigidbody *rb = &world->bodies [i];
         fprintf (out, "[body %d] id=%u gen=%u type=%s state=%s\n", i, rb->object_id, rb->object_generation,
                  dump_type (rb->type), dump_state (rb));
         fprintf (out, "  pos=(%+.5f,%+.5f,%+.5f) vel=(%+.5f,%+.5f,%+.5f)|v|=%.5f\n", rb->position.x, rb->position.y,
@@ -177,7 +177,7 @@ int tui_dump_snapshot (FILE *out, physics_world *world, unsigned long tick, floa
                  rb->cylinder_half_length, rb->half_extensions.x, rb->half_extensions.y, rb->half_extensions.z,
                  broadphase_bounding_radius (rb));
         math3 il = rb->inertia_tensor_local;
-        fprintf (out, "  I_local=diag(%.7f,%.7f,%.7f)\n", il.matrix[0][0], il.matrix[1][1], il.matrix[2][2]);
+        fprintf (out, "  I_local=diag(%.7f,%.7f,%.7f)\n", il.matrix [0] [0], il.matrix [1] [1], il.matrix [2] [2]);
         math3 r = vector4_to_math3 (rb->orientation);
         math3 iw = math3_multiplication (r, math3_multiplication (rb->inertia_tensor_local, math3_transposition (r)));
         tui_format_matrix3 (b2, sizeof (b2), iw, "");
@@ -190,27 +190,27 @@ int tui_dump_snapshot (FILE *out, physics_world *world, unsigned long tick, floa
         fprintf (out, "  P=(%+.5f,%+.5f,%+.5f)|P|=%.6f L=(%+.6f,%+.6f,%+.6f)|L|=%.7f KE=%.7f\n", p.x, p.y, p.z,
                  vector3_length (p), l.x, l.y, l.z, vector3_length (l), rb_get_kinetic_energy (rb));
         int isl = islands_body_island (world, rb);
-        int has = (world->has_contact && i < mpe_max_bodies) ? world->has_contact[i] : -1;
-        float rem = (world->ccd_time_remaining && i < mpe_max_bodies) ? world->ccd_time_remaining[i] : -1.0f;
+        int has = (world->has_contact && i < mpe_max_bodies) ? world->has_contact [i] : -1;
+        float rem = (world->ccd_time_remaining && i < mpe_max_bodies) ? world->ccd_time_remaining [i] : -1.0f;
         fprintf (out,
                  "  sleepT=%.3f island=%d awake=%d hasContact=%d ccdRem=%.6f effInvM=%.7f colour=(%.2f,%.2f,%.2f)\n",
                  rb->sleep_timer, isl, islands_body_awake (world, rb) ? 1 : 0, has, rem,
                  rigidbody_effective_inv_mass (rb), rb->colour.x, rb->colour.y, rb->colour.z);
         fprintf (out, "  axes X=(%+.4f,%+.4f,%+.4f) Y=(%+.4f,%+.4f,%+.4f) Z=(%+.4f,%+.4f,%+.4f)\n",
-                 rb->cached_axes[0].x, rb->cached_axes[0].y, rb->cached_axes[0].z, rb->cached_axes[1].x,
-                 rb->cached_axes[1].y, rb->cached_axes[1].z, rb->cached_axes[2].x, rb->cached_axes[2].y,
-                 rb->cached_axes[2].z);
+                 rb->cached_axes [0].x, rb->cached_axes [0].y, rb->cached_axes [0].z, rb->cached_axes [1].x,
+                 rb->cached_axes [1].y, rb->cached_axes [1].z, rb->cached_axes [2].x, rb->cached_axes [2].y,
+                 rb->cached_axes [2].z);
     }
     /* ---- springs ---- */
     int springs = 0;
     for (int i = 0; i < mpe_max_joints; i++) {
-        if (world->spring_joints[i].is_active) {
+        if (world->spring_joints [i].is_active) {
             springs++;
         }
     }
     fprintf (out, "[springs] active=%d\n", springs);
     for (int i = 0; i < mpe_max_joints; i++) {
-        spring_joint *sj = &world->spring_joints[i];
+        spring_joint *sj = &world->spring_joints [i];
         if (!sj->is_active) {
             continue;
         }
@@ -221,16 +221,16 @@ int tui_dump_snapshot (FILE *out, physics_world *world, unsigned long tick, floa
                      sj->object_id_b, ib);
             continue;
         }
-        vector3 d = vector3_subtraction (world->bodies[ib].position, world->bodies[ia].position);
+        vector3 d = vector3_subtraction (world->bodies [ib].position, world->bodies [ia].position);
         float len = vector3_length (d);
         vector3 axis = len > 1e-9f ? vector3_scaling (d, 1.0f / len) : (vector3){1.0f, 0.0f, 0.0f};
         float ext = len - sj->equilibrium_length;
-        vector3 rv = vector3_subtraction (world->bodies[ib].velocity, world->bodies[ia].velocity);
+        vector3 rv = vector3_subtraction (world->bodies [ib].velocity, world->bodies [ia].velocity);
         float vr = vector3_dot (rv, axis);
         fprintf (out, "  spring slot=%d A=%d(id%u)@(%+.4f,%+.4f,%+.4f) B=%d(id%u)@(%+.4f,%+.4f,%+.4f)\n", i, ia,
-                 sj->object_id_a, world->bodies[ia].position.x, world->bodies[ia].position.y,
-                 world->bodies[ia].position.z, ib, sj->object_id_b, world->bodies[ib].position.x,
-                 world->bodies[ib].position.y, world->bodies[ib].position.z);
+                 sj->object_id_a, world->bodies [ia].position.x, world->bodies [ia].position.y,
+                 world->bodies [ia].position.z, ib, sj->object_id_b, world->bodies [ib].position.x,
+                 world->bodies [ib].position.y, world->bodies [ib].position.z);
         fprintf (out, "    L0=%.4f len=%.4f ext=%+.4f axis=(%+.4f,%+.4f,%+.4f) vrel=%+.4f k=%.3f c=%.3f Hooke=%+.4f\n",
                  sj->equilibrium_length, len, ext, axis.x, axis.y, axis.z, vr, sj->spring_constant,
                  sj->damping_coefficient, ext * sj->spring_constant + vr * sj->damping_coefficient);
@@ -238,13 +238,13 @@ int tui_dump_snapshot (FILE *out, physics_world *world, unsigned long tick, floa
     /* ---- generic constraints ---- */
     int constr = 0;
     for (int i = 0; i < mpe_max_joints; i++) {
-        if (world->revolute_constraints[i].is_active) {
+        if (world->revolute_constraints [i].is_active) {
             constr++;
         }
     }
     fprintf (out, "[constraints] active=%d\n", constr);
     for (int i = 0; i < mpe_max_joints; i++) {
-        constraint *c = &world->revolute_constraints[i];
+        constraint *c = &world->revolute_constraints [i];
         if (!c->is_active) {
             continue;
         }
@@ -256,8 +256,8 @@ int tui_dump_snapshot (FILE *out, physics_world *world, unsigned long tick, floa
             fprintf (out, " endpoint-missing\n");
             continue;
         }
-        rigidbody *a = &world->bodies[ia];
-        rigidbody *b = &world->bodies[ib];
+        rigidbody *a = &world->bodies [ia];
+        rigidbody *b = &world->bodies [ib];
         if (c->type == constraint_revolute) {
             vector3 wa = dump_anchor_world (a, c->p.revolute.anchor_a);
             vector3 wb = dump_anchor_world (b, c->p.revolute.anchor_b);
@@ -317,7 +317,7 @@ int tui_dump_snapshot (FILE *out, physics_world *world, unsigned long tick, floa
     int cmini = -1, cminj = -1, cmaxi = -1, cmaxj = -1;
     for (int i = 0; i < cap; i++) {
         for (int j = i + 1; j < cap; j++) {
-            float d = vector3_length (vector3_subtraction (world->bodies[j].position, world->bodies[i].position));
+            float d = vector3_length (vector3_subtraction (world->bodies [j].position, world->bodies [i].position));
             if (d < cmin) {
                 cmin = d;
                 cmini = i;
@@ -339,7 +339,7 @@ int tui_dump_snapshot (FILE *out, physics_world *world, unsigned long tick, floa
             if (!show_all && shown >= 64) {
                 break;
             }
-            vector3 d = vector3_subtraction (world->bodies[j].position, world->bodies[i].position);
+            vector3 d = vector3_subtraction (world->bodies [j].position, world->bodies [i].position);
             fprintf (out, "  pair %d<->%d dist=%.5f d=(%+.4f,%+.4f,%+.4f)\n", i, j, vector3_length (d), d.x, d.y, d.z);
             shown++;
         }
@@ -353,8 +353,8 @@ int tui_dump_snapshot (FILE *out, physics_world *world, unsigned long tick, floa
     /* ---- islands ---- */
     fprintf (out, "[islands] count=%d\n", islands_count (world));
     for (int i = 0; i < n; i++) {
-        int isl = islands_body_island (world, &world->bodies[i]);
-        fprintf (out, "  body %d island=%d awake=%d\n", i, isl, islands_body_awake (world, &world->bodies[i]) ? 1 : 0);
+        int isl = islands_body_island (world, &world->bodies [i]);
+        fprintf (out, "  body %d island=%d awake=%d\n", i, isl, islands_body_awake (world, &world->bodies [i]) ? 1 : 0);
     }
     /* ---- solver / broadphase diagnostics ---- */
     fprintf (out, "[stats] cacheHit=%d cacheMiss=%d cacheCount=%d/%d manifoldOvfl=%d cell=%.4f\n",

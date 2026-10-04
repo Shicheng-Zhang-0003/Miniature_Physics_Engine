@@ -54,7 +54,7 @@ typedef struct {
     object_type type;
     //Cube Specific Variables
     vector3 half_extensions;
-    vector3 cached_axes[3];
+    vector3 cached_axes [3];
     /* MPE_TASK_15_AXIS_CACHE_FIELD_BEGIN */
     vector4 cached_axes_orientation;
     /* MPE_TASK_15_AXIS_CACHE_FIELD_END */

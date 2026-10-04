@@ -80,9 +80,9 @@ int mpe_t_loader_lifecycle (void) {
         mpe_solver_if_t evil_sv = {rec_resolve, NULL, NULL, NULL};
         MPE_CHECK (&t, mpe_register_solver ("seq-impulse", &evil_sv) < 0);
         MPE_CHECK (&t, mpe_register_pair_handler (0, 0, -1, -1, fake_sphere, "evil") < 0);
-        char longname[128];
+        char longname [128];
         memset (longname, 'x', sizeof (longname) - 1);
-        longname[sizeof (longname) - 1] = '\0';
+        longname [sizeof (longname) - 1] = '\0';
         MPE_CHECK (&t, mpe_register_broadphase (longname, &evil_bp) < 0);
         MPE_CHECK (&t, mpe_find_pair_handler (0, 0, -1, -1) != NULL); /* builtin intact */
         MPE_CHECK (&t, mpe_find_broadphase ("hash") != NULL);
@@ -119,7 +119,7 @@ int mpe_t_loader_lifecycle (void) {
         physics_world_cleanup (&w);
     }
     /* ---- live plugin lifecycle (needs CWD=v15S/src) ---- */
-    char cap_buf[1024];
+    char cap_buf [1024];
     const char *cap_path = mpe_pick_plugin ("plugins/mpe_capsule.so", cap_buf, sizeof (cap_buf));
     if (access (cap_path, R_OK) != 0) {
         /* DESPOT-2026-09-29: this returned t.failures == 0, so mpe_run_one
@@ -132,7 +132,7 @@ int mpe_t_loader_lifecycle (void) {
         return MPE_SKIPPED;
     }
     {
-        char err[512] = {0};
+        char err [512] = {0};
         MPE_CHECK (&t, mpe_loader_load (cap_path, err, sizeof (err)) == 0);
         MPE_CHECK (&t, mpe_find_module ("capsule-shape") != NULL);
         MPE_CHECK (&t, mpe_find_pair_handler (3, 0, 100, -1) != NULL);
@@ -149,20 +149,20 @@ int mpe_t_loader_lifecycle (void) {
                 mpe_world_begin (&cw);
                 int ci = physics_world_add_custom (&cw, 100, (vector3){0.0f, 0.0f, 0.0f}, 1.0f, 0.2236068f);
                 MPE_CHECK (&t, ci >= 0);
-                MPE_CHECK_NEAR (&t, cw.bodies[ci].radius, 0.2236068f, 1e-6f, "bounding-kept");
-                cw.bodies[ci].cylinder_half_length = 0.2f;
-                cw.bodies[ci].orientation = vector4_identity ();
-                rigidbody_update_axes (&cw.bodies[ci]);
+                MPE_CHECK_NEAR (&t, cw.bodies [ci].radius, 0.2236068f, 1e-6f, "bounding-kept");
+                cw.bodies [ci].cylinder_half_length = 0.2f;
+                cw.bodies [ci].orientation = vector4_identity ();
+                rigidbody_update_axes (&cw.bodies [ci]);
                 int si = physics_world_add_sphere (&cw, 0.1f, 1.0f, (vector3){0.0f, 0.15f, 0.0f});
                 MPE_CHECK (&t, si >= 0);
                 collision_data cd = {0};
-                MPE_CHECK (&t, capfn (&cw.bodies[ci], &cw.bodies[si], &cd, &cw));
-                MPE_CHECK_NEAR (&t, cd.contacts[0].penetration, 0.05f, 1e-5f, "capsule-pen");
+                MPE_CHECK (&t, capfn (&cw.bodies [ci], &cw.bodies [si], &cd, &cw));
+                MPE_CHECK_NEAR (&t, cd.contacts [0].penetration, 0.05f, 1e-5f, "capsule-pen");
                 MPE_CHECK_NEAR (&t, cd.normal_vector.y, 1.0f, 1e-5f, "capsule-normal");
-                MPE_CHECK_NEAR (&t, cd.contacts[0].position.y, 0.1f, 1e-5f, "capsule-pos");
-                cw.bodies[si].position = (vector3){0.0f, 0.25f, 0.0f};
+                MPE_CHECK_NEAR (&t, cd.contacts [0].position.y, 0.1f, 1e-5f, "capsule-pos");
+                cw.bodies [si].position = (vector3){0.0f, 0.25f, 0.0f};
                 memset (&cd, 0, sizeof (cd));
-                MPE_CHECK (&t, !capfn (&cw.bodies[ci], &cw.bodies[si], &cd, &cw));
+                MPE_CHECK (&t, !capfn (&cw.bodies [ci], &cw.bodies [si], &cd, &cw));
                 physics_world_cleanup (&cw);
             }
         }

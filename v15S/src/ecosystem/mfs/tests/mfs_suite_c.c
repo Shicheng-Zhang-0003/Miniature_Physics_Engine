@@ -130,7 +130,7 @@ int mfs_t_ftc_hotload (void) {
      * first), report WHICH path was used, and on total failure name every path
      * tried plus dlerror(). Now the gate is CWD-independent and any failure is
      * diagnosable from the output alone. */
-    static const char *ftc_candidates[] = {
+    static const char *ftc_candidates [] = {
         NULL, /* filled from MPE_FTC_PLUGIN below */
         "./plugins/mpe_ftc.so",
         "plugins/mpe_ftc.so",
@@ -140,22 +140,22 @@ int mfs_t_ftc_hotload (void) {
     };
     {
         const char *env = getenv ("MPE_FTC_PLUGIN");
-        ftc_candidates[0] = env;
+        ftc_candidates [0] = env;
     }
     const char *ftc_path = NULL;
-    for (size_t ci = 0; ci < sizeof (ftc_candidates) / sizeof (ftc_candidates[0]); ci++) {
-        if (!ftc_candidates[ci])
+    for (size_t ci = 0; ci < sizeof (ftc_candidates) / sizeof (ftc_candidates [0]); ci++) {
+        if (!ftc_candidates [ci])
             continue;
-        if (access (ftc_candidates[ci], R_OK) == 0) {
-            ftc_path = ftc_candidates[ci];
+        if (access (ftc_candidates [ci], R_OK) == 0) {
+            ftc_path = ftc_candidates [ci];
             break;
         }
     }
     if (!ftc_path) {
         printf ("[FAIL] ftc_hotload: FTC plugin not found. Tried:");
-        for (size_t ci = 0; ci < sizeof (ftc_candidates) / sizeof (ftc_candidates[0]); ci++)
-            if (ftc_candidates[ci])
-                printf (" %s", ftc_candidates[ci]);
+        for (size_t ci = 0; ci < sizeof (ftc_candidates) / sizeof (ftc_candidates [0]); ci++)
+            if (ftc_candidates [ci])
+                printf (" %s", ftc_candidates [ci]);
         printf (". Set MPE_FTC_PLUGIN to the built plugin, or run from "
                 "ecosystem/mfs. (build_tests.sh builds it.)\n");
         t_ptr->failures++;
@@ -238,8 +238,8 @@ int mfs_t_ftc_hotload (void) {
     }
     MFS_CHECK (t_ptr, okc);
     if (w2chassis >= 0 && w2chassis < w2.body_count) {
-        float gx = w2.bodies[w2chassis].position.x;
-        float gz = w2.bodies[w2chassis].position.z;
+        float gx = w2.bodies [w2chassis].position.x;
+        float gz = w2.bodies [w2chassis].position.z;
         float ddx = gx - fx, ddz = gz - fz;
         MFS_CHECK (t_ptr, sqrtf (ddx * ddx + ddz * ddz) < 2.0f);
     }
@@ -297,10 +297,10 @@ int mfs_t_module_1 (void) {
         }
         if (tick == 80 && ms->ball_count > 0) {
             int fw = physics_world_index_by_id (&w, ms->shooter_flywheel_body);
-            int b0 = physics_world_index_by_id (&w, ms->ball_body_ids[0]);
+            int b0 = physics_world_index_by_id (&w, ms->ball_body_ids [0]);
             if (fw >= 0 && b0 >= 0) {
-                w.bodies[b0].position = vector3_addition (w.bodies[fw].position, (vector3){0.05f, 0.0f, 0.0f});
-                w.bodies[b0].velocity = vector3_zero ();
+                w.bodies [b0].position = vector3_addition (w.bodies [fw].position, (vector3){0.05f, 0.0f, 0.0f});
+                w.bodies [b0].velocity = vector3_zero ();
             }
             mfs_module_1_set_shooter (ms, true, true);
         }
@@ -407,7 +407,7 @@ int mfs_t_intake_stop (void) {
         rigidbody *roller = physics_world_body_by_id (&w, (uint32_t) ms->intake_roller_body);
         MFS_CHECK (t_ptr, roller != NULL);
         if (roller) {
-            omega_on = vector3_dot (roller->angular_velocity, roller->cached_axes[0]);
+            omega_on = vector3_dot (roller->angular_velocity, roller->cached_axes [0]);
         }
         MFS_INFO ("intake ON: axial omega=%.3f rad/s", omega_on);
         /* It must actually be spinning, or "it stopped later" proves nothing. */
@@ -426,7 +426,7 @@ int mfs_t_intake_stop (void) {
         rigidbody *roller = physics_world_body_by_id (&w, (uint32_t) ms->intake_roller_body);
         MFS_CHECK (t_ptr, roller != NULL);
         if (roller) {
-            float omega_off = vector3_dot (roller->angular_velocity, roller->cached_axes[0]);
+            float omega_off = vector3_dot (roller->angular_velocity, roller->cached_axes [0]);
             MFS_INFO ("intake OFF: axial omega=%.3f rad/s (was %.3f)", omega_off, omega_on);
             /* Pre-fix the joint motor held the full creation-time speed here
              * forever, so this is the assertion that actually pins H5. */
@@ -510,7 +510,7 @@ int mfs_t_intake_stop (void) {
         rigidbody *roller = physics_world_body_by_id (&w, (uint32_t) ms->intake_roller_body);
         MFS_CHECK (t_ptr, roller != NULL);
         if (roller) {
-            float omega_rev = vector3_dot (roller->angular_velocity, roller->cached_axes[0]);
+            float omega_rev = vector3_dot (roller->angular_velocity, roller->cached_axes [0]);
             MFS_INFO ("intake REVERSE: axial omega=%.3f rad/s", omega_rev);
             MFS_CHECK (t_ptr, omega_rev < -0.5f);
             if (t_ptr->failures == 0) {
@@ -573,7 +573,7 @@ int mfs_t_shooter_axis (void) {
     MFS_CHECK (t_ptr, ch != NULL);
     if (fw && ch) {
         /* The disc's symmetry axis, in world space. */
-        vector3 disc_axis = fw->cached_axes[0];
+        vector3 disc_axis = fw->cached_axes [0];
         float dl = sqrtf (vector3_length_squared (disc_axis));
         MFS_CHECK (t_ptr, dl > 0.5f);
         if (dl > 0.5f) {
@@ -663,16 +663,16 @@ int mfs_t_ball_spin (void) {
             fail = 1;
     }
     int fw = physics_world_index_by_id (&w, ms->shooter_flywheel_body);
-    int b0 = physics_world_index_by_id (&w, ms->ball_body_ids[0]);
+    int b0 = physics_world_index_by_id (&w, ms->ball_body_ids [0]);
     MFS_CHECK (t_ptr, fw >= 0);
     MFS_CHECK (t_ptr, b0 >= 0);
     if (!fail && fw >= 0 && b0 >= 0) {
-        rigidbody *flywheel = &w.bodies[fw];
-        rigidbody *ball = &w.bodies[b0];
+        rigidbody *flywheel = &w.bodies [fw];
+        rigidbody *ball = &w.bodies [b0];
         /* Put the ball in contact with the flywheel rim. */
-        w.bodies[b0].position = vector3_addition (flywheel->position, (vector3){0.05f, 0.0f, 0.0f});
-        w.bodies[b0].velocity = vector3_zero ();
-        w.bodies[b0].angular_velocity = vector3_zero ();
+        w.bodies [b0].position = vector3_addition (flywheel->position, (vector3){0.05f, 0.0f, 0.0f});
+        w.bodies [b0].velocity = vector3_zero ();
+        w.bodies [b0].angular_velocity = vector3_zero ();
         MFS_INFO ("flywheel spin before fire: %.1f rad/s (%.0f rpm)", vector3_length (flywheel->angular_velocity),
                   vector3_length (flywheel->angular_velocity) * 30.0f / (float) M_PI);
         mfs_module_1_set_shooter (ms, true, true);

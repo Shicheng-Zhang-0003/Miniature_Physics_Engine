@@ -68,8 +68,8 @@ void wireframe_render_object (GLuint shader_program, math4 view_matrix, math4 pr
     glUseProgram (shader_program);
     a3_wire_cache_missing_uniforms (shader_program);
     a3_wire_cache_uniforms (shader_program);
-    float view_matrix_flat_array[16];
-    float projection_matrix_flat_array[16];
+    float view_matrix_flat_array [16];
+    float projection_matrix_flat_array [16];
     math4_to_flat_array (view_matrix, view_matrix_flat_array);
     math4_to_flat_array (projection_matrix, projection_matrix_flat_array);
     glUniformMatrix4fv (a3_wire_uniform_viewframe, 1, GL_FALSE, view_matrix_flat_array);
@@ -91,7 +91,7 @@ void wireframe_render_object (GLuint shader_program, math4 view_matrix, math4 pr
     }
     math4 model_matrix =
         math4_multiplication (translation_matrix, math4_multiplication (rotation_matrix, scale_matrix));
-    float model_matrix_flat_array[16];
+    float model_matrix_flat_array [16];
     math4_to_flat_array (model_matrix, model_matrix_flat_array);
     glUniform3f (a3_wire_uniform_object_colour, wireframe_colour.x, wireframe_colour.y, wireframe_colour.z);
     glUniformMatrix4fv (a3_wire_uniform_model, 1, GL_FALSE, model_matrix_flat_array);
@@ -99,28 +99,28 @@ void wireframe_render_object (GLuint shader_program, math4 view_matrix, math4 pr
      * T*R*S model, matching vertex_shader.glsl:18-29). Identity lit
      * rotated bodies as if unrotated. math3 is ROW-major while GL takes
      * column-major, so upload transposed: flat[col*3+row] = N[row][col]. */
-    float a3_wire_scale_xyz[3];
+    float a3_wire_scale_xyz [3];
     if (rigid_body->type == object_sphere) {
         float s = rigid_body->radius * 1.01f;
-        a3_wire_scale_xyz[0] = s;
-        a3_wire_scale_xyz[1] = s;
-        a3_wire_scale_xyz[2] = s;
+        a3_wire_scale_xyz [0] = s;
+        a3_wire_scale_xyz [1] = s;
+        a3_wire_scale_xyz [2] = s;
     } else if (rigid_body->type == object_cylinder) {
-        a3_wire_scale_xyz[0] = rigid_body->cylinder_half_length * 1.01f;
-        a3_wire_scale_xyz[1] = rigid_body->radius * 1.01f;
-        a3_wire_scale_xyz[2] = rigid_body->radius * 1.01f;
+        a3_wire_scale_xyz [0] = rigid_body->cylinder_half_length * 1.01f;
+        a3_wire_scale_xyz [1] = rigid_body->radius * 1.01f;
+        a3_wire_scale_xyz [2] = rigid_body->radius * 1.01f;
     } else {
-        a3_wire_scale_xyz[0] = rigid_body->half_extensions.x * 1.01f;
-        a3_wire_scale_xyz[1] = rigid_body->half_extensions.y * 1.01f;
-        a3_wire_scale_xyz[2] = rigid_body->half_extensions.z * 1.01f;
+        a3_wire_scale_xyz [0] = rigid_body->half_extensions.x * 1.01f;
+        a3_wire_scale_xyz [1] = rigid_body->half_extensions.y * 1.01f;
+        a3_wire_scale_xyz [2] = rigid_body->half_extensions.z * 1.01f;
     }
     math3 a3_wire_rotation = vector4_to_math3 (rigid_body->orientation);
-    float a3_wire_normal_matrix_flat[9];
+    float a3_wire_normal_matrix_flat [9];
     for (int row_index = 0; row_index < 3; row_index++) {
         for (int column_index = 0; column_index < 3; column_index++) {
-            float inv_scale = 1.0f / fmaxf (fabsf (a3_wire_scale_xyz[column_index]), 0.0001f);
-            a3_wire_normal_matrix_flat[column_index * 3 + row_index] =
-                a3_wire_rotation.matrix[row_index][column_index] * inv_scale;
+            float inv_scale = 1.0f / fmaxf (fabsf (a3_wire_scale_xyz [column_index]), 0.0001f);
+            a3_wire_normal_matrix_flat [column_index * 3 + row_index] =
+                a3_wire_rotation.matrix [row_index] [column_index] * inv_scale;
         }
     }
     glUniformMatrix3fv (a3_wire_uniform_normal_matrix, 1, GL_FALSE, a3_wire_normal_matrix_flat);
@@ -154,5 +154,5 @@ void wireframe_render_selected_object (GLuint shader_program, math4 view_matrix,
     }
     //Yellow outline (Selected Object Visibility)
     wireframe_render_object (shader_program, view_matrix, projection_matrix,
-                             &(physics_world_get_primary ()->bodies)[selected_object], (vector3){1.0f, 1.0f, 0.0f});
+                             &(physics_world_get_primary ()->bodies) [selected_object], (vector3){1.0f, 1.0f, 0.0f});
 }

@@ -83,10 +83,10 @@ int main (void) {
          * discharge path is dead code in this test. */
         if (t == 80 && state->ball_count > 0) {
             int fw = physics_world_index_by_id (&world, state->shooter_flywheel_body);
-            int b0 = physics_world_index_by_id (&world, state->ball_body_ids[0]);
+            int b0 = physics_world_index_by_id (&world, state->ball_body_ids [0]);
             if (fw >= 0 && b0 >= 0) {
-                world.bodies[b0].position = vector3_addition (world.bodies[fw].position, (vector3){0.05f, 0.0f, 0.0f});
-                world.bodies[b0].velocity = vector3_zero ();
+                world.bodies [b0].position = vector3_addition (world.bodies [fw].position, (vector3){0.05f, 0.0f, 0.0f});
+                world.bodies [b0].velocity = vector3_zero ();
             }
             mfs_module_1_set_shooter (state, true, true);
         }
@@ -120,7 +120,7 @@ int main (void) {
     /* Verify balls still exist */
     int valid_balls = 0;
     for (int i = 0; i < state->ball_count; i++) {
-        if (physics_world_body_by_id (&world, state->ball_body_ids[i])) {
+        if (physics_world_body_by_id (&world, state->ball_body_ids [i])) {
             valid_balls++;
         }
     }

@@ -48,14 +48,14 @@ const char *term_object_mode (rigidbody *rigid_body) {
     return rigid_body->static_state ? "-r--r--r--" : "-rw-r--r--";
 }
 void term_print_object_long (int object_index) {
-    rigidbody *rigid_body = &(physics_world_get_primary ()->bodies)[object_index];
+    rigidbody *rigid_body = &(physics_world_get_primary ()->bodies) [object_index];
     term_printf (NULL, "%s %4d %8.2f %-4s %-6s pos=(%.2f,%.2f,%.2f) |v|=%.3f id=%u\n", term_object_mode (rigid_body),
                  object_index, rigid_body->mass, term_object_type_name (rigid_body),
                  term_object_state_name (rigid_body), rigid_body->position.x, rigid_body->position.y,
                  rigid_body->position.z, vector3_length (rigid_body->velocity), rigid_body->object_id);
 }
 void term_print_joint_long (int joint_index) {
-    spring_joint *joint = &(physics_world_get_primary ()->spring_joints)[joint_index];
+    spring_joint *joint = &(physics_world_get_primary ()->spring_joints) [joint_index];
     int index_a = scene_find_object_index_by_id (joint->object_id_a);
     int index_b = scene_find_object_index_by_id (joint->object_id_b);
     term_printf (NULL, "lrwxrwxrwx %4d [%d] -> [%d] len=%.2f k=%.1f d=%.1f\n", joint_index, index_a, index_b,
@@ -80,7 +80,7 @@ void term_list_objects (bool long_format) {
 void term_list_joints (bool long_format) {
     int listed_count = 0;
     for (int joint_index = 0; joint_index < mpe_max_joints; joint_index++) {
-        if (!(physics_world_get_primary ()->spring_joints)[joint_index].is_active) {
+        if (!(physics_world_get_primary ()->spring_joints) [joint_index].is_active) {
             continue;
         }
         if (long_format) {
@@ -106,7 +106,7 @@ void term_list_root (bool long_format) {
     }
 }
 void term_print_object_cat (int object_index) {
-    rigidbody *rigid_body = &(physics_world_get_primary ()->bodies)[object_index];
+    rigidbody *rigid_body = &(physics_world_get_primary ()->bodies) [object_index];
     term_printf ("term_echo", "/obj/%d\n", object_index);
     term_printf (NULL, "  id:         %u\n", rigid_body->object_id);
     term_printf (NULL, "  type:       %s\n", term_object_type_name (rigid_body));
@@ -134,7 +134,7 @@ void term_print_object_cat (int object_index) {
     term_printf (NULL, "  sleep_time: %.2f\n", rigid_body->sleep_timer);
 }
 void term_print_joint_cat (int joint_index) {
-    spring_joint *joint = &(physics_world_get_primary ()->spring_joints)[joint_index];
+    spring_joint *joint = &(physics_world_get_primary ()->spring_joints) [joint_index];
     int index_a = scene_find_object_index_by_id (joint->object_id_a);
     int index_b = scene_find_object_index_by_id (joint->object_id_b);
     term_printf ("term_echo", "/joint/%d\n", joint_index);
@@ -206,11 +206,11 @@ int term_create_object (object_type spawn_type) {
         term_err ("mpe: touch: cannot create object (scene full?)\n");
         return -1;
     }
-    (physics_world_get_primary ()->bodies)[created_index].friction_static = g_cfg.spawner.friction_s;
-    (physics_world_get_primary ()->bodies)[created_index].friction_kinetic = g_cfg.spawner.friction_k;
-    (physics_world_get_primary ()->bodies)[created_index].velocity = vector3_zero ();
-    (physics_world_get_primary ()->bodies)[created_index].angular_velocity = vector3_zero ();
-    (physics_world_get_primary ()->bodies)[created_index].colour =
+    (physics_world_get_primary ()->bodies) [created_index].friction_static = g_cfg.spawner.friction_s;
+    (physics_world_get_primary ()->bodies) [created_index].friction_kinetic = g_cfg.spawner.friction_k;
+    (physics_world_get_primary ()->bodies) [created_index].velocity = vector3_zero ();
+    (physics_world_get_primary ()->bodies) [created_index].angular_velocity = vector3_zero ();
+    (physics_world_get_primary ()->bodies) [created_index].colour =
         (vector3){0.35f + 0.65f * ((float) ((created_index + 0) % 3) / 2.0f),
                   0.35f + 0.65f * ((float) ((created_index + 1) % 3) / 2.0f),
                   0.35f + 0.65f * ((float) ((created_index + 2) % 3) / 2.0f)};
@@ -220,7 +220,7 @@ int term_duplicate_object (int source_index) {
     if ((source_index < 0) || (source_index >= (physics_world_get_primary ()->body_count))) {
         return -1;
     }
-    rigidbody snapshot = (physics_world_get_primary ()->bodies)[source_index];
+    rigidbody snapshot = (physics_world_get_primary ()->bodies) [source_index];
     vector3 copy_position = vector3_addition (snapshot.position, (vector3){1.0f, 0.0f, 0.0f});
     int created_index = -1;
     if (snapshot.type == object_sphere) {
@@ -237,7 +237,7 @@ int term_duplicate_object (int source_index) {
         term_err ("mpe: cp: cannot duplicate object (scene full?)\n");
         return -1;
     }
-    rigidbody *created_body = &(physics_world_get_primary ()->bodies)[created_index];
+    rigidbody *created_body = &(physics_world_get_primary ()->bodies) [created_index];
     created_body->colour = snapshot.colour;
     created_body->restitution = snapshot.restitution;
     created_body->friction_static = snapshot.friction_static;
@@ -253,7 +253,7 @@ void term_set_object_mass (int object_index, float new_mass) {
     if ((object_index < 0) || (object_index >= (physics_world_get_primary ()->body_count))) {
         return;
     }
-    rigidbody *rigid_body = &(physics_world_get_primary ()->bodies)[object_index];
+    rigidbody *rigid_body = &(physics_world_get_primary ()->bodies) [object_index];
     if (new_mass < 0.0f) {
         new_mass = 0.0f;
     }
@@ -278,7 +278,7 @@ void term_set_object_static (int object_index, bool make_static) {
     if ((object_index < 0) || (object_index >= (physics_world_get_primary ()->body_count))) {
         return;
     }
-    rigidbody *rigid_body = &(physics_world_get_primary ()->bodies)[object_index];
+    rigidbody *rigid_body = &(physics_world_get_primary ()->bodies) [object_index];
     rigidbody_set_static (rigid_body, make_static);
     contact_cache_clear (physics_world_get_primary ());
 }

@@ -19,14 +19,14 @@ int main (void) {
     }
     /* Sphere approaching the cylinder along Z */
     int sph = physics_world_add_sphere (&world, 0.08f, 0.3f, (vector3){0.0f, 0.08f, 0.5f});
-    world.bodies[sph].velocity = (vector3){0.0f, 0.0f, -2.0f};
+    world.bodies [sph].velocity = (vector3){0.0f, 0.0f, -2.0f};
     const float dt = 1.0f / 60.0f;
     int fail = 0;
     for (int t = 0; t < 120 && !fail; t++) {
         physics_world_step (&world, dt);
         for (int i = 0; i < world.body_count; i++) {
-            if (!isfinite (world.bodies[i].position.x) || !isfinite (world.bodies[i].position.y) ||
-                !isfinite (world.bodies[i].position.z)) {
+            if (!isfinite (world.bodies [i].position.x) || !isfinite (world.bodies [i].position.y) ||
+                !isfinite (world.bodies [i].position.z)) {
                 printf ("[FAIL] NaN at tick %d\n", t);
                 fail = 1;
                 break;
@@ -40,7 +40,7 @@ int main (void) {
      * TRUTH: touch happens at z≈0.13 (0.05 half-len + 0.08 radius);
      * z<-0.05 means 0.2m+ travel THROUGH the cylinder. (Cylinder mass 0.0
      * is intentional: mass==0 builds a static body per init policy.) */
-    float sph_z = world.bodies[sph].position.z;
+    float sph_z = world.bodies [sph].position.z;
     printf ("[info] sphere final z=%.4f (started at 0.5)\n", sph_z);
     if (sph_z < -0.05f) {
         printf ("[FAIL] sphere passed through cylinder\n");

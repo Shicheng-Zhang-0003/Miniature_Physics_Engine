@@ -35,14 +35,14 @@ int main (void) {
         constraint_pool_init (&w1);
         const float vx = 10.0f, vy = 15.0f, g = 9.81f;
         int s = physics_world_add_sphere (&w1, 0.1f, 1.0f, (vector3){0.0f, 1.0f, 0.0f});
-        w1.bodies[s].velocity = (vector3){vx, vy, 0.0f};
-        rigidbody_wake (&w1.bodies[s]);
+        w1.bodies [s].velocity = (vector3){vx, vy, 0.0f};
+        rigidbody_wake (&w1.bodies [s]);
         const float dt = 1.0f / 60.0f;
         float apex = 0.0f, t_apex = 0.0f, x_apex = 0.0f;
         float max_height_error = 0.0f;
         for (int t = 0; t < 500; t++) {
             physics_world_step (&w1, dt);
-            rigidbody *b = &w1.bodies[s];
+            rigidbody *b = &w1.bodies [s];
             fail |= check_finite ("projectile_drag1", b->position);
             if (b->position.y > apex) {
                 apex = b->position.y;
@@ -115,14 +115,14 @@ int main (void) {
         constraint_pool_init (&w2);
         const float vx = 10.0f, vy = 15.0f, g = 9.81f;
         int s = physics_world_add_sphere (&w2, 0.1f, 1.0f, (vector3){0.0f, 1.0f, 0.0f});
-        w2.bodies[s].velocity = (vector3){vx, vy, 0.0f};
-        rigidbody_wake (&w2.bodies[s]);
+        w2.bodies [s].velocity = (vector3){vx, vy, 0.0f};
+        rigidbody_wake (&w2.bodies [s]);
         const float dt = 1.0f / 60.0f;
         float apex = 0.0f;
         float max_y_error = 0.0f;
         for (int t = 0; t < 500; t++) {
             physics_world_step (&w2, dt);
-            rigidbody *b = &w2.bodies[s];
+            rigidbody *b = &w2.bodies [s];
             fail |= check_finite ("projectile_drag099", b->position);
             if (b->position.y > apex) {
                 apex = b->position.y;
@@ -166,13 +166,13 @@ int main (void) {
         physics_world_init (&w3);
         constraint_pool_init (&w3);
         int s = physics_world_add_sphere (&w3, 0.5f, 1.0f, (vector3){0.0f, 10.0f, 0.0f});
-        w3.bodies[s].velocity = (vector3){0.0f, 0.0f, 0.0f};
-        rigidbody_wake (&w3.bodies[s]);
+        w3.bodies [s].velocity = (vector3){0.0f, 0.0f, 0.0f};
+        rigidbody_wake (&w3.bodies [s]);
         const float dt = 1.0f / 60.0f;
         float t_land = 0.0f;
         for (int t = 0; t < 800; t++) {
             physics_world_step (&w3, dt);
-            rigidbody *b = &w3.bodies[s];
+            rigidbody *b = &w3.bodies [s];
             if (b->position.y <= 0.55f) { /* radius = 0.5, floor at y=0 */
                 t_land = (float) (t + 1) * dt;
                 break;
@@ -200,13 +200,13 @@ int main (void) {
         physics_world_init (&w4);
         constraint_pool_init (&w4);
         int s = physics_world_add_sphere (&w4, 0.1f, 1.0f, (vector3){0.0f, 5.0f, 0.0f});
-        w4.bodies[s].velocity = (vector3){7.0f, 0.0f, 3.0f};
-        rigidbody_wake (&w4.bodies[s]);
+        w4.bodies [s].velocity = (vector3){7.0f, 0.0f, 3.0f};
+        rigidbody_wake (&w4.bodies [s]);
         const float dt = 1.0f / 60.0f;
         float max_x_err = 0.0f, max_z_err = 0.0f;
         for (int t = 0; t < 1500; t++) { /* 25 seconds; x remains below 250m */
             physics_world_step (&w4, dt);
-            rigidbody *b = &w4.bodies[s];
+            rigidbody *b = &w4.bodies [s];
             double texact = (double) (t + 1) / 60.0;
             double x_exact = 7.0 * texact;
             double z_exact = 3.0 * texact;
@@ -237,14 +237,14 @@ int main (void) {
         physics_world_init (&w5);
         constraint_pool_init (&w5);
         int s = physics_world_add_sphere (&w5, 0.5f, 2.0f, (vector3){0.0f, 5.0f, 0.0f});
-        w5.bodies[s].velocity = (vector3){3.0f, 8.0f, -2.0f};
-        w5.bodies[s].angular_velocity = (vector3){4.0f, -1.0f, 2.0f};
-        rigidbody_wake (&w5.bodies[s]);
+        w5.bodies [s].velocity = (vector3){3.0f, 8.0f, -2.0f};
+        w5.bodies [s].angular_velocity = (vector3){4.0f, -1.0f, 2.0f};
+        rigidbody_wake (&w5.bodies [s]);
         const float dt = 1.0f / 60.0f;
         float E0 = -1.0f, E_max = 0.0f, E_min = 1e9f;
         for (int t = 0; t < 3600; t++) { /* 60 seconds */
             physics_world_step (&w5, dt);
-            rigidbody *b = &w5.bodies[s];
+            rigidbody *b = &w5.bodies [s];
             if (b->position.y < 0.6f)
                 break; /* landed */
             float E = rb_get_kinetic_energy (b) + b->mass * 9.81f * b->position.y;

@@ -17,17 +17,17 @@ int main (void) {
      * restitution (the documented e=0.6 assumption), not the floor default.
      * The coplanar infinite plane (restitution-neutral 1.0) defers likewise. */
     int floor_idx = physics_world_add_cube (&world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
-    world.bodies[floor_idx].restitution = 0.6f;
+    world.bodies [floor_idx].restitution = 0.6f;
     int s = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0.0f, 4.0f, 0.0f});
-    world.bodies[s].restitution = 0.6f;
-    rigidbody_wake (&world.bodies[s]);
+    world.bodies [s].restitution = 0.6f;
+    rigidbody_wake (&world.bodies [s]);
     const float dt = 1.0f / 60.0f;
     /* Impact/apogee timing: fall 3.5 m (0.845 s), rise v=0.6*8.29 (0.51 s),
      * fall 1.26 m (0.51 s), rise v=2.98 (0.30 s). */
     float apex1 = 0.0f, apex2 = 0.0f;
     for (int t = 0; t < 300; t++) {
         physics_world_step (&world, dt);
-        float y = world.bodies[s].position.y;
+        float y = world.bodies [s].position.y;
         if (!isfinite (y)) {
             printf ("[FAIL] NaN\n");
             physics_world_cleanup (&world);

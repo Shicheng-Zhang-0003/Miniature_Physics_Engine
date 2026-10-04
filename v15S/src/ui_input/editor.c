@@ -25,7 +25,7 @@ static rigidbody *editor_selected_object_or_null (void) {
     if ((selected_object < 0) || (selected_object >= (physics_world_get_primary ()->body_count))) {
         return NULL;
     }
-    return &(physics_world_get_primary ()->bodies)[selected_object];
+    return &(physics_world_get_primary ()->bodies) [selected_object];
 }
 void editor_update_menus (GtkWidget *parent_window) {
     if ((selected_object < 0) || (selected_object >= (physics_world_get_primary ()->body_count))) {
@@ -306,8 +306,8 @@ void editor_update_menus (GtkWidget *parent_window) {
         if (main_inputs.marked_joint_object_index != -1 &&
             main_inputs.marked_joint_object_index < (physics_world_get_primary ()->body_count) &&
             main_inputs.marked_joint_object_index != selected_object) {
-            rigidbody *rb_a = &(physics_world_get_primary ()->bodies)[main_inputs.marked_joint_object_index];
-            rigidbody *rb_b = &(physics_world_get_primary ()->bodies)[selected_object];
+            rigidbody *rb_a = &(physics_world_get_primary ()->bodies) [main_inputs.marked_joint_object_index];
+            rigidbody *rb_b = &(physics_world_get_primary ()->bodies) [selected_object];
             float dist = vector3_length (vector3_subtraction (rb_b->position, rb_a->position));
             if (add_joint (physics_world_get_primary (), main_inputs.marked_joint_object_index, selected_object, dist,
                            g_cfg.joints.default_spring_k,

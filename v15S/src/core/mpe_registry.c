@@ -22,7 +22,7 @@ void mpe_registry_lock (void) {
 void mpe_registry_unlock (void) {
     pthread_mutex_unlock (&s_reg_lock);
 }
-static mpe_pair_entry_t s_pairs[MPE_MAX_PAIR_HANDLERS];
+static mpe_pair_entry_t s_pairs [MPE_MAX_PAIR_HANDLERS];
 static int s_pair_count = 0;
 /* Indices [0, s_builtin_pairs) are engine builtins, pinned after the once
  * init below. Overwriting them with foreign code is refused (silent
@@ -34,26 +34,26 @@ static int s_builtin_pairs = 0;
  * later registers. Purge (forget/detach in all live worlds) still runs
  * on every unregister so nothing calls into unloaded code. */
 static struct {
-    char name[64];
+    char name [64];
     mpe_broadphase_if_t iface;
     int live;
-} s_broad[8];
+} s_broad [8];
 static int s_broad_count = 0;
 static struct {
-    char name[64];
+    char name [64];
     mpe_solver_if_t iface;
     int live;
-} s_solvers[8];
+} s_solvers [8];
 static int s_solver_count = 0;
-static mpe_module_desc_t s_modules[MPE_MAX_MODULES];
-static char s_module_names[MPE_MAX_MODULES][64];
-static char s_module_versions[MPE_MAX_MODULES][32];
-static char s_module_kinds[MPE_MAX_MODULES][32];
+static mpe_module_desc_t s_modules [MPE_MAX_MODULES];
+static char s_module_names [MPE_MAX_MODULES] [64];
+static char s_module_versions [MPE_MAX_MODULES] [32];
+static char s_module_kinds [MPE_MAX_MODULES] [32];
 /* Provenance: plugin .so path that registered the slot, "" for static or
  * direct registrations. Lets the loader tell a static desc and a .so
  * desc of the SAME module name apart (hotload pattern). */
-static char s_module_origin[MPE_MAX_MODULES][256];
-static int s_module_live[MPE_MAX_MODULES];
+static char s_module_origin [MPE_MAX_MODULES] [256];
+static int s_module_live [MPE_MAX_MODULES];
 static int s_module_count = 0;
 #define MPE_BUILTIN_BROADPHASE "hash"
 #define MPE_BUILTIN_SOLVER "seq-impulse"
@@ -63,18 +63,18 @@ static int name_fits (const char *name, size_t cap) {
 int mpe_register_pair_handler (int ta, int tb, int ca, int cb, mpe_collide_fn fn, const char *name) {
     if (!fn)
         return -1;
-    if (!name_fits (name ? name : "?", sizeof (s_pairs[0].name)))
+    if (!name_fits (name ? name : "?", sizeof (s_pairs [0].name)))
         return -1;
     pthread_mutex_lock (&s_reg_lock);
     int rc = -1;
     for (int i = 0; i < s_pair_count; i++) {
-        if (s_pairs[i].type_a == ta && s_pairs[i].type_b == tb && s_pairs[i].custom_a == ca &&
-            s_pairs[i].custom_b == cb) {
-            if (i < s_builtin_pairs && s_pairs[i].fn != fn) {
+        if (s_pairs [i].type_a == ta && s_pairs [i].type_b == tb && s_pairs [i].custom_a == ca &&
+            s_pairs [i].custom_b == cb) {
+            if (i < s_builtin_pairs && s_pairs [i].fn != fn) {
                 rc = -1; /* builtin slot: refuse silent hijack */
             } else {
-                s_pairs[i].fn = fn;
-                snprintf (s_pairs[i].name, sizeof (s_pairs[i].name), "%s", name ? name : "?");
+                s_pairs [i].fn = fn;
+                snprintf (s_pairs [i].name, sizeof (s_pairs [i].name), "%s", name ? name : "?");
                 rc = i;
             }
             pthread_mutex_unlock (&s_reg_lock);
@@ -88,12 +88,12 @@ int mpe_register_pair_handler (int ta, int tb, int ca, int cb, mpe_collide_fn fn
         pthread_mutex_unlock (&s_reg_lock);
         return -1;
     }
-    s_pairs[s_pair_count].type_a = ta;
-    s_pairs[s_pair_count].type_b = tb;
-    s_pairs[s_pair_count].custom_a = ca;
-    s_pairs[s_pair_count].custom_b = cb;
-    s_pairs[s_pair_count].fn = fn;
-    snprintf (s_pairs[s_pair_count].name, sizeof (s_pairs[s_pair_count].name), "%s", name ? name : "?");
+    s_pairs [s_pair_count].type_a = ta;
+    s_pairs [s_pair_count].type_b = tb;
+    s_pairs [s_pair_count].custom_a = ca;
+    s_pairs [s_pair_count].custom_b = cb;
+    s_pairs [s_pair_count].fn = fn;
+    snprintf (s_pairs [s_pair_count].name, sizeof (s_pairs [s_pair_count].name), "%s", name ? name : "?");
     rc = s_pair_count++;
     pthread_mutex_unlock (&s_reg_lock);
     return rc;
@@ -117,13 +117,13 @@ int mpe_unregister_pair_handler (mpe_collide_fn fn) {
     assert (s_pair_count >= 0 && s_pair_count <= MPE_MAX_PAIR_HANDLERS);
     int removed = 0;
     for (int i = 0; i < s_pair_count;) {
-        if (s_pairs[i].fn == fn) {
+        if (s_pairs [i].fn == fn) {
             /* Pinned builtins [0, s_builtin_pairs) refuse foreign overwrite
              * at register time; explicit unregister of a builtin fn is still
              * honored here (loader purge only ever passes plugin-range fns,
              * verified by fn_in_plugin, so builtins cannot be purged). */
             for (int j = i; j + 1 < s_pair_count; j++)
-                s_pairs[j] = s_pairs[j + 1];
+                s_pairs [j] = s_pairs [j + 1];
             s_pair_count--;
             removed++;
         } else
@@ -160,15 +160,15 @@ int mpe_registry_pair_describe (int idx, int *ta, int *tb, int *ca, int *cb, cha
     int rc = -1;
     if (idx < s_pair_count) {
         if (ta)
-            *ta = s_pairs[idx].type_a;
+            *ta = s_pairs [idx].type_a;
         if (tb)
-            *tb = s_pairs[idx].type_b;
+            *tb = s_pairs [idx].type_b;
         if (ca)
-            *ca = s_pairs[idx].custom_a;
+            *ca = s_pairs [idx].custom_a;
         if (cb)
-            *cb = s_pairs[idx].custom_b;
+            *cb = s_pairs [idx].custom_b;
         if (name && namelen > 0) {
-            snprintf (name, (size_t) namelen, "%s", s_pairs[idx].name);
+            snprintf (name, (size_t) namelen, "%s", s_pairs [idx].name);
         }
         rc = 0;
     }
@@ -183,7 +183,7 @@ int mpe_registry_pair_fn_at (int idx, mpe_collide_fn *out) {
     pthread_mutex_lock (&s_reg_lock);
     int rc = -1;
     if (idx >= 0 && idx < s_pair_count) {
-        *out = s_pairs[idx].fn;
+        *out = s_pairs [idx].fn;
         rc = 0;
     }
     pthread_mutex_unlock (&s_reg_lock);
@@ -193,13 +193,13 @@ mpe_collide_fn mpe_find_pair_handler (int ta, int tb, int ca, int cb) {
     pthread_mutex_lock (&s_reg_lock);
     int best = -1, best_score = -1;
     for (int i = 0; i < s_pair_count; i++) {
-        int sc = match_score (&s_pairs[i], ta, tb, ca, cb);
+        int sc = match_score (&s_pairs [i], ta, tb, ca, cb);
         if (sc > best_score) {
             best_score = sc;
             best = i;
         }
     }
-    mpe_collide_fn fn = (best < 0) ? 0 : s_pairs[best].fn;
+    mpe_collide_fn fn = (best < 0) ? 0 : s_pairs [best].fn;
     pthread_mutex_unlock (&s_reg_lock);
     return fn;
 }
@@ -239,14 +239,14 @@ void mpe_registry_truncate_modules (int keep) {
         keep = 0;
     if (keep < s_module_count) {
         for (int i = keep; i < s_module_count; i++) {
-            s_module_live[i] = 0;
-            s_modules[i].attach = NULL;
-            s_modules[i].detach = NULL;
-            s_modules[i].pre_step = NULL;
-            s_modules[i].post_step = NULL;
-            s_modules[i].stage_detach = NULL;
-            s_module_names[i][0] = 0;
-            s_module_origin[i][0] = 0;
+            s_module_live [i] = 0;
+            s_modules [i].attach = NULL;
+            s_modules [i].detach = NULL;
+            s_modules [i].pre_step = NULL;
+            s_modules [i].post_step = NULL;
+            s_modules [i].stage_detach = NULL;
+            s_module_names [i] [0] = 0;
+            s_module_origin [i] [0] = 0;
         }
         s_module_count = keep;
     }
@@ -292,16 +292,16 @@ static int is_builtin_stage (const char *name) {
 int mpe_register_broadphase (const char *name, const mpe_broadphase_if_t *iface) {
     if (!name || !iface)
         return -1;
-    if (!name_fits (name, sizeof (s_broad[0].name)))
+    if (!name_fits (name, sizeof (s_broad [0].name)))
         return -1;
     pthread_mutex_lock (&s_reg_lock);
     int rc = -1;
     for (int i = 0; i < s_broad_count; i++) {
-        if (s_broad[i].live && strcmp (s_broad[i].name, name) == 0) {
-            if (is_builtin_stage (name) && !iface_equal_broad (&s_broad[i].iface, iface)) {
+        if (s_broad [i].live && strcmp (s_broad [i].name, name) == 0) {
+            if (is_builtin_stage (name) && !iface_equal_broad (&s_broad [i].iface, iface)) {
                 rc = -1; /* refuse builtin takeover */
             } else {
-                s_broad[i].iface = *iface;
+                s_broad [i].iface = *iface;
                 rc = i;
             }
             pthread_mutex_unlock (&s_reg_lock);
@@ -314,9 +314,9 @@ int mpe_register_broadphase (const char *name, const mpe_broadphase_if_t *iface)
      * address: dead stage leaks, live stage resets. Same-name reuse is safe;
      * different names always append (table is 8, refusal is loud). */
     for (int i = 0; i < s_broad_count; i++) {
-        if (!s_broad[i].live && strcmp (s_broad[i].name, name) == 0) {
-            s_broad[i].iface = *iface;
-            s_broad[i].live = 1;
+        if (!s_broad [i].live && strcmp (s_broad [i].name, name) == 0) {
+            s_broad [i].iface = *iface;
+            s_broad [i].live = 1;
             pthread_mutex_unlock (&s_reg_lock);
             return i;
         }
@@ -327,9 +327,9 @@ int mpe_register_broadphase (const char *name, const mpe_broadphase_if_t *iface)
         pthread_mutex_unlock (&s_reg_lock);
         return -1;
     }
-    snprintf (s_broad[s_broad_count].name, sizeof (s_broad[s_broad_count].name), "%s", name);
-    s_broad[s_broad_count].iface = *iface;
-    s_broad[s_broad_count].live = 1;
+    snprintf (s_broad [s_broad_count].name, sizeof (s_broad [s_broad_count].name), "%s", name);
+    s_broad [s_broad_count].iface = *iface;
+    s_broad [s_broad_count].live = 1;
     rc = s_broad_count++;
     pthread_mutex_unlock (&s_reg_lock);
     return rc;
@@ -341,9 +341,9 @@ int mpe_unregister_broadphase (const char *name) {
     int rc = -1;
     const mpe_broadphase_if_t *deadp = NULL;
     for (int i = 0; i < s_broad_count; i++) {
-        if (s_broad[i].live && strcmp (s_broad[i].name, name) == 0) {
-            s_broad[i].live = 0;
-            deadp = &s_broad[i].iface;
+        if (s_broad [i].live && strcmp (s_broad [i].name, name) == 0) {
+            s_broad [i].live = 0;
+            deadp = &s_broad [i].iface;
             rc = 0;
             break;
         }
@@ -359,16 +359,16 @@ int mpe_unregister_broadphase (const char *name) {
 int mpe_register_solver (const char *name, const mpe_solver_if_t *iface) {
     if (!name || !iface)
         return -1;
-    if (!name_fits (name, sizeof (s_solvers[0].name)))
+    if (!name_fits (name, sizeof (s_solvers [0].name)))
         return -1;
     pthread_mutex_lock (&s_reg_lock);
     int rc = -1;
     for (int i = 0; i < s_solver_count; i++) {
-        if (s_solvers[i].live && strcmp (s_solvers[i].name, name) == 0) {
-            if (is_builtin_stage (name) && !iface_equal_solver (&s_solvers[i].iface, iface)) {
+        if (s_solvers [i].live && strcmp (s_solvers [i].name, name) == 0) {
+            if (is_builtin_stage (name) && !iface_equal_solver (&s_solvers [i].iface, iface)) {
                 rc = -1; /* refuse builtin takeover */
             } else {
-                s_solvers[i].iface = *iface;
+                s_solvers [i].iface = *iface;
                 rc = i;
             }
             pthread_mutex_unlock (&s_reg_lock);
@@ -377,9 +377,9 @@ int mpe_register_solver (const char *name, const mpe_solver_if_t *iface) {
     }
     /* Same-name tombstone reuse only (see broadphase note above). */
     for (int i = 0; i < s_solver_count; i++) {
-        if (!s_solvers[i].live && strcmp (s_solvers[i].name, name) == 0) {
-            s_solvers[i].iface = *iface;
-            s_solvers[i].live = 1;
+        if (!s_solvers [i].live && strcmp (s_solvers [i].name, name) == 0) {
+            s_solvers [i].iface = *iface;
+            s_solvers [i].live = 1;
             pthread_mutex_unlock (&s_reg_lock);
             return i;
         }
@@ -390,9 +390,9 @@ int mpe_register_solver (const char *name, const mpe_solver_if_t *iface) {
         pthread_mutex_unlock (&s_reg_lock);
         return -1;
     }
-    snprintf (s_solvers[s_solver_count].name, sizeof (s_solvers[s_solver_count].name), "%s", name);
-    s_solvers[s_solver_count].iface = *iface;
-    s_solvers[s_solver_count].live = 1;
+    snprintf (s_solvers [s_solver_count].name, sizeof (s_solvers [s_solver_count].name), "%s", name);
+    s_solvers [s_solver_count].iface = *iface;
+    s_solvers [s_solver_count].live = 1;
     rc = s_solver_count++;
     pthread_mutex_unlock (&s_reg_lock);
     return rc;
@@ -404,9 +404,9 @@ int mpe_unregister_solver (const char *name) {
     int rc = -1;
     const mpe_solver_if_t *deadp = NULL;
     for (int i = 0; i < s_solver_count; i++) {
-        if (s_solvers[i].live && strcmp (s_solvers[i].name, name) == 0) {
-            s_solvers[i].live = 0;
-            deadp = &s_solvers[i].iface;
+        if (s_solvers [i].live && strcmp (s_solvers [i].name, name) == 0) {
+            s_solvers [i].live = 0;
+            deadp = &s_solvers [i].iface;
             rc = 0;
             break;
         }
@@ -422,8 +422,8 @@ const mpe_broadphase_if_t *mpe_find_broadphase (const char *name) {
     pthread_mutex_lock (&s_reg_lock);
     const mpe_broadphase_if_t *out = 0;
     for (int i = 0; i < s_broad_count; i++)
-        if (s_broad[i].live && strcmp (s_broad[i].name, name) == 0) {
-            out = &s_broad[i].iface;
+        if (s_broad [i].live && strcmp (s_broad [i].name, name) == 0) {
+            out = &s_broad [i].iface;
             break;
         }
     pthread_mutex_unlock (&s_reg_lock);
@@ -435,42 +435,42 @@ const mpe_solver_if_t *mpe_find_solver (const char *name) {
     pthread_mutex_lock (&s_reg_lock);
     const mpe_solver_if_t *out = 0;
     for (int i = 0; i < s_solver_count; i++)
-        if (s_solvers[i].live && strcmp (s_solvers[i].name, name) == 0) {
-            out = &s_solvers[i].iface;
+        if (s_solvers [i].live && strcmp (s_solvers [i].name, name) == 0) {
+            out = &s_solvers [i].iface;
             break;
         }
     pthread_mutex_unlock (&s_reg_lock);
     return out;
 }
 static void module_store (int i, const mpe_module_desc_t *desc, int keep_origin) {
-    char origin_keep[256];
-    snprintf (origin_keep, sizeof (origin_keep), "%s", keep_origin ? s_module_origin[i] : "");
+    char origin_keep [256];
+    snprintf (origin_keep, sizeof (origin_keep), "%s", keep_origin ? s_module_origin [i] : "");
     /* Size-safe copy for the append-only stage_detach tail (ABI still 1):
      * a .so built against the older header owns fewer bytes, so copy the
      * v1 prefix field-by-field and default the tail to NULL; only adopt a
      * non-NULL hook that dladdr proves lives in mapped code (stale
      * trailing garbage can never become a function pointer). */
-    memset (&s_modules[i], 0, sizeof (s_modules[i]));
-    memcpy (&s_modules[i], desc, offsetof (mpe_module_desc_t, stage_detach));
-    s_modules[i].stage_detach = NULL;
+    memset (&s_modules [i], 0, sizeof (s_modules [i]));
+    memcpy (&s_modules [i], desc, offsetof (mpe_module_desc_t, stage_detach));
+    s_modules [i].stage_detach = NULL;
     {
         void (*hook) (mpe_world_t *) = NULL;
         memcpy (&hook, &desc->stage_detach, sizeof (hook));
         if (hook) {
             Dl_info hi;
             if (dladdr ((const void *) hook, &hi) != 0 && hi.dli_fname) {
-                s_modules[i].stage_detach = hook;
+                s_modules [i].stage_detach = hook;
             }
         }
     }
-    snprintf (s_module_names[i], sizeof (s_module_names[i]), "%s", desc->name);
-    snprintf (s_module_versions[i], sizeof (s_module_versions[i]), "%s", desc->version ? desc->version : "?");
-    snprintf (s_module_kinds[i], sizeof (s_module_kinds[i]), "%s", desc->kind ? desc->kind : "?");
-    s_modules[i].name = s_module_names[i];
-    s_modules[i].version = s_module_versions[i];
-    s_modules[i].kind = s_module_kinds[i];
-    snprintf (s_module_origin[i], sizeof (s_module_origin[i]), "%s", origin_keep);
-    s_module_live[i] = 1;
+    snprintf (s_module_names [i], sizeof (s_module_names [i]), "%s", desc->name);
+    snprintf (s_module_versions [i], sizeof (s_module_versions [i]), "%s", desc->version ? desc->version : "?");
+    snprintf (s_module_kinds [i], sizeof (s_module_kinds [i]), "%s", desc->kind ? desc->kind : "?");
+    s_modules [i].name = s_module_names [i];
+    s_modules [i].version = s_module_versions [i];
+    s_modules [i].kind = s_module_kinds [i];
+    snprintf (s_module_origin [i], sizeof (s_module_origin [i]), "%s", origin_keep);
+    s_module_live [i] = 1;
 }
 /* Loader-registered provenance (call right after mpe_register_module). */
 int mpe_registry_set_origin (const char *name, const char *path) {
@@ -479,8 +479,8 @@ int mpe_registry_set_origin (const char *name, const char *path) {
     pthread_mutex_lock (&s_reg_lock);
     int rc = -1;
     for (int i = 0; i < s_module_count; i++) {
-        if (s_module_live[i] && strcmp (s_module_names[i], name) == 0) {
-            snprintf (s_module_origin[i], sizeof (s_module_origin[i]), "%s", path);
+        if (s_module_live [i] && strcmp (s_module_names [i], name) == 0) {
+            snprintf (s_module_origin [i], sizeof (s_module_origin [i]), "%s", path);
             rc = 0;
             break;
         }
@@ -496,8 +496,8 @@ const char *mpe_registry_module_origin (const mpe_module_desc_t *desc) {
     pthread_mutex_lock (&s_reg_lock);
     const char *out = NULL;
     for (int i = 0; i < s_module_count; i++) {
-        if (s_module_live[i] && desc == &s_modules[i]) {
-            out = s_module_origin[i][0] ? s_module_origin[i] : NULL;
+        if (s_module_live [i] && desc == &s_modules [i]) {
+            out = s_module_origin [i] [0] ? s_module_origin [i] : NULL;
             break;
         }
     }
@@ -507,12 +507,12 @@ const char *mpe_registry_module_origin (const mpe_module_desc_t *desc) {
 int mpe_register_module (const mpe_module_desc_t *desc) {
     if (!desc || desc->abi != MPE_MODULE_ABI || !desc->name)
         return -1;
-    if (!name_fits (desc->name, sizeof (s_module_names[0])))
+    if (!name_fits (desc->name, sizeof (s_module_names [0])))
         return -1;
     pthread_mutex_lock (&s_reg_lock);
     int rc = -1;
     for (int i = 0; i < s_module_count; i++) {
-        if (s_module_live[i] && strcmp (s_module_names[i], desc->name) == 0) {
+        if (s_module_live [i] && strcmp (s_module_names [i], desc->name) == 0) {
             module_store (i, desc, 1);
             rc = i;
             pthread_mutex_unlock (&s_reg_lock);
@@ -520,7 +520,7 @@ int mpe_register_module (const mpe_module_desc_t *desc) {
         }
     }
     for (int i = 0; i < s_module_count; i++) {
-        if (!s_module_live[i]) {
+        if (!s_module_live [i]) {
             module_store (i, desc, 0);
             pthread_mutex_unlock (&s_reg_lock);
             return i;
@@ -544,8 +544,8 @@ int mpe_unregister_module (const char *name) {
     pthread_mutex_lock (&s_reg_lock);
     int rc = -1;
     for (int i = 0; i < s_module_count; i++) {
-        if (s_module_live[i] && strcmp (s_module_names[i], name) == 0) {
-            s_module_live[i] = 0;
+        if (s_module_live [i] && strcmp (s_module_names [i], name) == 0) {
+            s_module_live [i] = 0;
             rc = 0;
             break;
         }
@@ -566,8 +566,8 @@ int mpe_unregister_module_origin (const char *name, const char *path) {
     pthread_mutex_lock (&s_reg_lock);
     int rc = -1;
     for (int i = 0; i < s_module_count; i++) {
-        if (s_module_live[i] && strcmp (s_module_names[i], name) == 0 && strcmp (s_module_origin[i], path) == 0) {
-            s_module_live[i] = 0;
+        if (s_module_live [i] && strcmp (s_module_names [i], name) == 0 && strcmp (s_module_origin [i], path) == 0) {
+            s_module_live [i] = 0;
             rc = 0;
             break;
         }
@@ -579,7 +579,7 @@ int mpe_module_count (void) {
     pthread_mutex_lock (&s_reg_lock);
     int n = 0;
     for (int i = 0; i < s_module_count; i++)
-        n += s_module_live[i] ? 1 : 0;
+        n += s_module_live [i] ? 1 : 0;
     pthread_mutex_unlock (&s_reg_lock);
     return n;
 }
@@ -596,10 +596,10 @@ const mpe_module_desc_t *mpe_module_at (int i) {
     const mpe_module_desc_t *out = 0;
     int seen = -1;
     for (int k = 0; k < s_module_count; k++) {
-        if (!s_module_live[k])
+        if (!s_module_live [k])
             continue;
         if (++seen == i) {
-            out = &s_modules[k];
+            out = &s_modules [k];
             break;
         }
     }
@@ -612,8 +612,8 @@ const mpe_module_desc_t *mpe_find_module (const char *name) {
     pthread_mutex_lock (&s_reg_lock);
     const mpe_module_desc_t *out = 0;
     for (int i = 0; i < s_module_count; i++)
-        if (s_module_live[i] && strcmp (s_modules[i].name, name) == 0) {
-            out = &s_modules[i];
+        if (s_module_live [i] && strcmp (s_modules [i].name, name) == 0) {
+            out = &s_modules [i];
             break;
         }
     pthread_mutex_unlock (&s_reg_lock);

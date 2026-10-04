@@ -82,17 +82,17 @@ typedef struct {
     int sleep; /* -1 = leave alone */
 } mpe_regime_t;
 static inline const mpe_regime_t *mpe_regime_lookup (const char *name) {
-    static const mpe_regime_t regimes[] = {
+    static const mpe_regime_t regimes [] = {
         {"default", -1, 1.00f, 1.00f, -1.0f, -1}, {"light", 8, 0.25f, 0.50f, 0.10f, 0},
         {"heavy", 128, 3.00f, 2.00f, 0.80f, 1},   {"brittle", 64, 1.00f, 0.25f, 0.00f, 0},
         {"sticky", 64, 1.00f, 4.00f, 0.95f, 1},
     };
-    const int n = (int) (sizeof (regimes) / sizeof (regimes[0]));
+    const int n = (int) (sizeof (regimes) / sizeof (regimes [0]));
     if (!name || !*name)
-        return &regimes[0];
+        return &regimes [0];
     for (int i = 0; i < n; i++) {
-        if (strcmp (regimes[i].name, name) == 0)
-            return &regimes[i];
+        if (strcmp (regimes [i].name, name) == 0)
+            return &regimes [i];
     }
     return NULL; /* unknown regime: caller must fail loudly */
 }
@@ -216,7 +216,7 @@ static inline void mpe_world_begin (physics_world *w) {
 }
 static inline int mpe_world_finite (physics_world *w) {
     for (int i = 0; i < w->body_count; i++) {
-        rigidbody *b = &w->bodies[i];
+        rigidbody *b = &w->bodies [i];
         /* DESPOT-2026-09-29: the ORIENTATION was not checked. A NaN quaternion
          * poisons every contact lever arm in the next tick while position and
          * velocity stay perfectly finite, so this whole function reported a
@@ -252,9 +252,9 @@ static inline int mpe_floor_slab (physics_world *w, float mus, float muk, float 
     if (f < 0) {
         return -1;
     }
-    w->bodies[f].friction_static = mus;
-    w->bodies[f].friction_kinetic = muk;
-    w->bodies[f].restitution = e;
+    w->bodies [f].friction_static = mus;
+    w->bodies [f].friction_kinetic = muk;
+    w->bodies [f].restitution = e;
     return f;
 }
 /* Infinite solver plane at y=0 with synced friction. The plane body reads
@@ -282,7 +282,7 @@ static inline void mpe_world_no_net (physics_world *w, mpe_config_t *slot) {
 /* Contact evidence: world.has_contact[i] flags bodies that generated a
  * manifold on the CURRENT tick. A clamp-held body never flags. */
 static inline int mpe_body_in_contact (const physics_world *w, int idx) {
-    return (w && w->has_contact && idx >= 0 && idx < w->body_count) ? (w->has_contact[idx] != 0) : 0;
+    return (w && w->has_contact && idx >= 0 && idx < w->body_count) ? (w->has_contact [idx] != 0) : 0;
 }
 static inline float mpe_vlen (vector3 v) {
     return vector3_length (v);

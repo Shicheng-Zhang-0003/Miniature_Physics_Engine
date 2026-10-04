@@ -66,7 +66,7 @@ void validation_report_print (void) {
         physics_world *w = physics_world_get_primary ();
         double total_ke = 0.0, total_pe = 0.0;
         for (int i = 0; i < w->body_count; i++) {
-            rigidbody *rb = &w->bodies[i];
+            rigidbody *rb = &w->bodies [i];
             if (rb->static_state) {
                 continue;
             }
@@ -86,7 +86,7 @@ void validation_report_print (void) {
         physics_world *w = physics_world_get_primary ();
         int asleep_islands = 0;
         for (int i = 0; i < w->island_total; i++) {
-            if (w->island_awake_flags[i] == 0) {
+            if (w->island_awake_flags [i] == 0) {
                 asleep_islands++;
             }
         }
@@ -100,13 +100,13 @@ void validation_report_print (void) {
     printf ("[A3] config file: %s\n", (access ("status/engine.cfg", F_OK) == 0) ? "present" : "absent");
     printf ("[A3] config params: %zu registered\n", g_registry_count);
     for (size_t cfg_i = 0; cfg_i < g_registry_count; cfg_i++) {
-        if (g_registry[cfg_i].type == p_int) {
-            printf ("[A3]   %s = %d\n", g_registry[cfg_i].key, *(int *) g_registry[cfg_i].storage);
-        } else if (g_registry[cfg_i].type == p_bool) {
-            printf ("[A3]   %s = %s\n", g_registry[cfg_i].key,
-                    (*(bool *) g_registry[cfg_i].storage) ? "true" : "false");
+        if (g_registry [cfg_i].type == p_int) {
+            printf ("[A3]   %s = %d\n", g_registry [cfg_i].key, *(int *) g_registry [cfg_i].storage);
+        } else if (g_registry [cfg_i].type == p_bool) {
+            printf ("[A3]   %s = %s\n", g_registry [cfg_i].key,
+                    (*(bool *) g_registry [cfg_i].storage) ? "true" : "false");
         } else {
-            printf ("[A3]   %s = %.4f\n", g_registry[cfg_i].key, *(float *) g_registry[cfg_i].storage);
+            printf ("[A3]   %s = %.4f\n", g_registry [cfg_i].key, *(float *) g_registry [cfg_i].storage);
         }
     }
     /* MPE_TASK_39_CONFIG_REPORT_END */

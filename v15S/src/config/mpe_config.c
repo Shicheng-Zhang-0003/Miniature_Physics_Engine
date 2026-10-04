@@ -94,8 +94,8 @@ const mpe_param *mpe_config_find (const char *key) {
         return NULL;
     }
     for (size_t i = 0; i < g_registry_count; i++) {
-        if (strcmp (g_registry[i].key, key) == 0) {
-            return &g_registry[i];
+        if (strcmp (g_registry [i].key, key) == 0) {
+            return &g_registry [i];
         }
     }
     return NULL;
@@ -106,7 +106,7 @@ void mpe_config_init (void) {
     memset (&g_cfg, 0, sizeof (g_cfg));
     g_config_ready = true;
     for (size_t i = 0; i < g_registry_count; i++) {
-        param_write_double (&g_registry[i], g_registry[i].def);
+        param_write_double (&g_registry [i], g_registry [i].def);
     }
     /* Validate registry storage pointers lie inside g_cfg. A struct layout
      * change that silently breaks the registry now fails loudly at startup
@@ -114,10 +114,10 @@ void mpe_config_init (void) {
     const char *base = (const char *) &g_cfg;
     const char *end = base + sizeof (g_cfg);
     for (size_t i = 0; i < g_registry_count; i++) {
-        const char *p = (const char *) g_registry[i].storage;
+        const char *p = (const char *) g_registry [i].storage;
         if (!p || p < base || p >= end) {
             fprintf (stderr, "[config] registry entry '%s' has invalid storage pointer\n",
-                     g_registry[i].key ? g_registry[i].key : "(null)");
+                     g_registry [i].key ? g_registry [i].key : "(null)");
         }
     }
 }
@@ -220,7 +220,7 @@ bool mpe_config_set_bool (const char *key, bool value) {
 size_t mpe_config_count_by_category (param_category cat) {
     size_t count = 0;
     for (size_t i = 0; i < g_registry_count; i++) {
-        if (g_registry[i].category == cat) {
+        if (g_registry [i].category == cat) {
             count++;
         }
     }
@@ -234,16 +234,16 @@ size_t mpe_config_get_by_category (param_category cat, const mpe_param **out_par
     }
     size_t filled = 0;
     for (size_t i = 0; (i < g_registry_count) && (filled < max_params); i++) {
-        if (g_registry[i].category == cat) {
-            out_params[filled++] = &g_registry[i];
+        if (g_registry [i].category == cat) {
+            out_params [filled++] = &g_registry [i];
         }
     }
     return filled;
 }
 static void ensure_parent_dir (const char *path) {
-    char copy[512];
+    char copy [512];
     strncpy (copy, path, sizeof (copy) - 1);
-    copy[sizeof (copy) - 1] = '\0';
+    copy [sizeof (copy) - 1] = '\0';
     /* mkdir -p: create every ancestor component, not just the leaf.
      * 0700 for config (no world-readable secrets); errors checked by
      * caller via subsequent fopen failure. Truncation guarded. */
@@ -270,7 +270,7 @@ bool mpe_config_save (const char *path) {
     ensure_parent_dir (path);
     /* R3-03: Atomic write. Write to a temporary file first, then
      * atomically rename over the target. */
-    char tmp_path[512];
+    char tmp_path [512];
     int tmp_len = snprintf (tmp_path, sizeof (tmp_path), "%s.tmp", path);
     if (tmp_len < 0 || (size_t) tmp_len >= sizeof (tmp_path)) {
         return false;
@@ -282,7 +282,7 @@ bool mpe_config_save (const char *path) {
     time_t now = time (NULL);
     struct tm tm_buf;
     struct tm *local_time = localtime_r (&now, &tm_buf);
-    char stamp[64];
+    char stamp [64];
     if (local_time) {
         strftime (stamp, sizeof (stamp), "%Y-%m-%d %H:%M:%S", local_time);
     } else {
@@ -293,23 +293,23 @@ bool mpe_config_save (const char *path) {
     for (int cat = 0; cat <= cat_ui; cat++) {
         bool wrote_header = false;
         for (size_t i = 0; i < g_registry_count; i++) {
-            if ((int) g_registry[i].category != cat) {
+            if ((int) g_registry [i].category != cat) {
                 continue;
             }
             if (!wrote_header) {
                 fprintf (file, "[%s]\n", mpe_config_category_name ((param_category) cat));
                 wrote_header = true;
             }
-            const char *dot = strchr (g_registry[i].key, '.');
-            const char *field = dot ? (dot + 1) : g_registry[i].key;
-            if (g_registry[i].type == p_float) {
+            const char *dot = strchr (g_registry [i].key, '.');
+            const char *field = dot ? (dot + 1) : g_registry [i].key;
+            if (g_registry [i].type == p_float) {
                 /* FIX-AUDIT-DESPOT: %.6f truncated to 6 decimals (gravity
                  * -9.81 survives, but values like 0.0001 print as 0.000100
                  * and high-precision tunables never round-tripped). %.9g
                  * carries 9 significant digits = exact float round-trip. */
-                fprintf (file, "%s = %.9g\n", field, param_read_double (&g_registry[i]));
+                fprintf (file, "%s = %.9g\n", field, param_read_double (&g_registry [i]));
             } else {
-                fprintf (file, "%s = %d\n", field, (int) param_read_double (&g_registry[i]));
+                fprintf (file, "%s = %d\n", field, (int) param_read_double (&g_registry [i]));
             }
         }
         if (wrote_header) {
@@ -345,14 +345,14 @@ bool mpe_config_save (const char *path) {
         return false;
     }
     {
-        char parent[512];
+        char parent [512];
         strncpy (parent, path, sizeof (parent) - 1);
-        parent[sizeof (parent) - 1] = '\0';
+        parent [sizeof (parent) - 1] = '\0';
         char *slash = strrchr (parent, '/');
         if (!slash) {
             memcpy (parent, ".", 2);
         } else if (slash == parent) {
-            slash[1] = '\0';
+            slash [1] = '\0';
         } else {
             *slash = '\0';
         }
@@ -437,8 +437,8 @@ bool mpe_config_load (const char *path) {
     if (!file) {
         return false;
     }
-    char line[512];
-    char section[64] = "";
+    char line [512];
+    char section [64] = "";
     while (fgets (line, sizeof (line), file)) {
         /* Truncation detection: line without newline was split; consume
          * the rest so a split key never parses as two keys. */
@@ -457,7 +457,7 @@ bool mpe_config_load (const char *path) {
             if (close) {
                 *close = '\0';
                 strncpy (section, cursor + 1, sizeof (section) - 1);
-                section[sizeof (section) - 1] = '\0';
+                section [sizeof (section) - 1] = '\0';
             }
             continue;
         }
@@ -468,9 +468,9 @@ bool mpe_config_load (const char *path) {
         *equals = '\0';
         char *key_part = term_trim (cursor);
         char *value_part = term_trim (equals + 1);
-        char full_key[128];
+        char full_key [128];
         int key_len;
-        if (section[0] != '\0') {
+        if (section [0] != '\0') {
             key_len = snprintf (full_key, sizeof (full_key), "%s.%s", section, key_part);
         } else {
             key_len = snprintf (full_key, sizeof (full_key), "%s", key_part);

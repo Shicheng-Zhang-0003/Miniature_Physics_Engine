@@ -30,7 +30,7 @@ int main (void) {
         drivetrain_update (&world, &robot, dt);
         physics_world_step (&world, dt);
         for (int i = 0; i < world.body_count; i++) {
-            rigidbody *rb = &world.bodies[i];
+            rigidbody *rb = &world.bodies [i];
             if (!isfinite (rb->position.x) || !isfinite (rb->position.y) || !isfinite (rb->position.z)) {
                 printf ("[FAIL] NaN in body %d at tick %d\n", i, t);
                 fail = 1;
@@ -47,7 +47,7 @@ int main (void) {
      * q.y alone is sin(yaw/2)*cos(pitch/2)*... — valid only at small
      * angles. Yaw about +Y: atan2(2*(w*y+x*z), 1-2*(y*y+x*x)). */
     float displacement = sqrtf ((end_x - start_x) * (end_x - start_x) + (end_z - start_z) * (end_z - start_z));
-    quaternion q = world.bodies[robot.chassis_body].orientation;
+    quaternion q = world.bodies [robot.chassis_body].orientation;
     float heading_change = fabsf (atan2f (2.0f * (q.w * q.y + q.x * q.z), 1.0f - 2.0f * (q.y * q.y + q.x * q.x)));
     printf ("[info] displacement=%.4f heading_change=%.4f\n", displacement, heading_change);
     if (displacement > 0.3f) {

@@ -59,7 +59,7 @@ static int scene_sync_parent_directory (const char *path) {
     (void) path;
     return 1;
 #else
-    char parent[520];
+    char parent [520];
     size_t length = strlen (path);
     if (length >= sizeof (parent)) {
         return 0;
@@ -69,7 +69,7 @@ static int scene_sync_parent_directory (const char *path) {
     if (!slash) {
         memcpy (parent, ".", 2);
     } else if (slash == parent) {
-        slash[1] = '\0';
+        slash [1] = '\0';
     } else {
         *slash = '\0';
     }
@@ -105,8 +105,8 @@ int save_scene (const char *file_destination_path) {
      * tomorrow — fail at save time with the live scene still intact, not at
      * load time with the only copy poisoned. */
     for (int svf_i = 0; svf_i < world->body_count; svf_i++) {
-        rigidbody *svf_rb = &world->bodies[svf_i];
-        float svf_vals[] = {svf_rb->mass,
+        rigidbody *svf_rb = &world->bodies [svf_i];
+        float svf_vals [] = {svf_rb->mass,
                             svf_rb->radius,
                             svf_rb->position.x,
                             svf_rb->position.y,
@@ -121,14 +121,14 @@ int save_scene (const char *file_destination_path) {
                             svf_rb->orientation.x,
                             svf_rb->orientation.y,
                             svf_rb->orientation.z};
-        for (size_t svf_vi = 0; svf_vi < sizeof (svf_vals) / sizeof (svf_vals[0]); svf_vi++) {
-            if (!isfinite (svf_vals[svf_vi])) {
+        for (size_t svf_vi = 0; svf_vi < sizeof (svf_vals) / sizeof (svf_vals [0]); svf_vi++) {
+            if (!isfinite (svf_vals [svf_vi])) {
                 fprintf (stderr, "Error SVF05: body %d has non-finite state; scene NOT saved\n", svf_i);
                 return 0;
             }
         }
     }
-    char tmp_template[520];
+    char tmp_template [520];
     if (snprintf (tmp_template, sizeof (tmp_template), "%s.XXXXXX", file_destination_path) >=
         (int) sizeof (tmp_template)) {
         fprintf (stderr, "Error SVF01: path too long\n");
@@ -158,7 +158,7 @@ int save_scene (const char *file_destination_path) {
     ok = ok && scene_w32 (f, &crc, (uint32_t) mpe_version);
     ok = ok && scene_w32 (f, &crc, (uint32_t) (physics_world_get_primary ()->body_count));
     for (int i = 0; ok && (i < (physics_world_get_primary ()->body_count)); i++) {
-        rigidbody *rb = &(physics_world_get_primary ()->bodies)[i];
+        rigidbody *rb = &(physics_world_get_primary ()->bodies) [i];
         ok = ok && scene_w32 (f, &crc, (uint32_t) rb->type);
         ok = ok && scene_wfloat (f, &crc, rb->mass);
         ok = ok && scene_wfloat (f, &crc, rb->radius);
@@ -185,34 +185,34 @@ int save_scene (const char *file_destination_path) {
      * bound silently dropped from saves. */
     int active_springs = 0;
     for (int j = 0; j < mpe_max_joints; j++) {
-        if ((physics_world_get_primary ()->spring_joints)[j].is_active) {
+        if ((physics_world_get_primary ()->spring_joints) [j].is_active) {
             active_springs++;
         }
     }
     ok = ok && scene_w32 (f, &crc, (uint32_t) active_springs);
     for (int j = 0; ok && (j < mpe_max_joints); j++) {
-        if (!(physics_world_get_primary ()->spring_joints)[j].is_active) {
+        if (!(physics_world_get_primary ()->spring_joints) [j].is_active) {
             continue;
         }
-        ok = ok && scene_w32 (f, &crc, (physics_world_get_primary ()->spring_joints)[j].object_id_a);
-        ok = ok && scene_w32 (f, &crc, (physics_world_get_primary ()->spring_joints)[j].object_id_b);
-        ok = ok && scene_wfloat (f, &crc, (physics_world_get_primary ()->spring_joints)[j].equilibrium_length);
-        ok = ok && scene_wfloat (f, &crc, (physics_world_get_primary ()->spring_joints)[j].spring_constant);
-        ok = ok && scene_wfloat (f, &crc, (physics_world_get_primary ()->spring_joints)[j].damping_coefficient);
+        ok = ok && scene_w32 (f, &crc, (physics_world_get_primary ()->spring_joints) [j].object_id_a);
+        ok = ok && scene_w32 (f, &crc, (physics_world_get_primary ()->spring_joints) [j].object_id_b);
+        ok = ok && scene_wfloat (f, &crc, (physics_world_get_primary ()->spring_joints) [j].equilibrium_length);
+        ok = ok && scene_wfloat (f, &crc, (physics_world_get_primary ()->spring_joints) [j].spring_constant);
+        ok = ok && scene_wfloat (f, &crc, (physics_world_get_primary ()->spring_joints) [j].damping_coefficient);
     }
     /* Save all constraint types from the unified constraint pool. */
-    int constraint_counts[5] = {0}; /* fixed, distance, prismatic, rope (revolute handled separately) */
+    int constraint_counts [5] = {0}; /* fixed, distance, prismatic, rope (revolute handled separately) */
     for (int j = 0; j < constraint_pool_capacity (); j++) {
         const constraint *c = constraint_pool_at (physics_world_get_primary (), j);
         if ((c) && (c->type != constraint_revolute) && (c->type != constraint_spring)) {
             if (c->type < constraint_fixed || c->type > constraint_rope) {
                 continue;
             }
-            constraint_counts[c->type - constraint_fixed]++;
+            constraint_counts [c->type - constraint_fixed]++;
         }
     }
     /* Fixed constraints */
-    ok = ok && scene_w32 (f, &crc, (uint32_t) constraint_counts[constraint_fixed - constraint_fixed]);
+    ok = ok && scene_w32 (f, &crc, (uint32_t) constraint_counts [constraint_fixed - constraint_fixed]);
     for (int j = 0; ok && (j < constraint_pool_capacity ()); j++) {
         const constraint *c = constraint_pool_at (physics_world_get_primary (), j);
         if ((!c) || (c->type != constraint_fixed))
@@ -224,7 +224,7 @@ int save_scene (const char *file_destination_path) {
         ok = ok && save_vec3 (f, &crc, c->p.fixed.anchor_b);
     }
     /* Distance constraints */
-    ok = ok && scene_w32 (f, &crc, (uint32_t) constraint_counts[constraint_distance - constraint_fixed]);
+    ok = ok && scene_w32 (f, &crc, (uint32_t) constraint_counts [constraint_distance - constraint_fixed]);
     for (int j = 0; ok && (j < constraint_pool_capacity ()); j++) {
         const constraint *c = constraint_pool_at (physics_world_get_primary (), j);
         if ((!c) || (c->type != constraint_distance))
@@ -237,7 +237,7 @@ int save_scene (const char *file_destination_path) {
         ok = ok && scene_wfloat (f, &crc, c->p.distance.rest_length);
     }
     /* Prismatic constraints */
-    ok = ok && scene_w32 (f, &crc, (uint32_t) constraint_counts[constraint_prismatic - constraint_fixed]);
+    ok = ok && scene_w32 (f, &crc, (uint32_t) constraint_counts [constraint_prismatic - constraint_fixed]);
     for (int j = 0; ok && (j < constraint_pool_capacity ()); j++) {
         const constraint *c = constraint_pool_at (physics_world_get_primary (), j);
         if ((!c) || (c->type != constraint_prismatic))
@@ -257,7 +257,7 @@ int save_scene (const char *file_destination_path) {
         ok = ok && scene_wfloat (f, &crc, c->p.prismatic.limit_max);
     }
     /* Rope constraints */
-    ok = ok && scene_w32 (f, &crc, (uint32_t) constraint_counts[constraint_rope - constraint_fixed]);
+    ok = ok && scene_w32 (f, &crc, (uint32_t) constraint_counts [constraint_rope - constraint_fixed]);
     for (int j = 0; ok && (j < constraint_pool_capacity ()); j++) {
         const constraint *c = constraint_pool_at (physics_world_get_primary (), j);
         if ((!c) || (c->type != constraint_rope))
@@ -300,7 +300,7 @@ int save_scene (const char *file_destination_path) {
     /* Footer CRC over every preceding byte (finalize + raw LE append). */
     uint32_t final_crc = crc ^ 0xFFFFFFFFu;
     if (ok) {
-        unsigned char footer[4] = {(unsigned char) (final_crc & 0xFFu), (unsigned char) ((final_crc >> 8) & 0xFFu),
+        unsigned char footer [4] = {(unsigned char) (final_crc & 0xFFu), (unsigned char) ((final_crc >> 8) & 0xFFu),
                                    (unsigned char) ((final_crc >> 16) & 0xFFu),
                                    (unsigned char) ((final_crc >> 24) & 0xFFu)};
         ok = (fwrite (footer, 1, 4, f) == 4);

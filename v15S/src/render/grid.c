@@ -27,19 +27,19 @@ void grid_init (grid_mesh *grid_mesh_object, int half_extent, int cell_spacing) 
     int vertex_index = 0;
     for (int step_coordinate = -half_extent; step_coordinate <= half_extent; step_coordinate += cell_spacing) {
         //Line along the Z axis at X = step_coordinate;
-        vertex_data[vertex_index++] = (float) step_coordinate;
-        vertex_data[vertex_index++] = 0.0f;
-        vertex_data[vertex_index++] = (float) -half_extent;
-        vertex_data[vertex_index++] = (float) step_coordinate;
-        vertex_data[vertex_index++] = 0.0f;
-        vertex_data[vertex_index++] = (float) half_extent;
+        vertex_data [vertex_index++] = (float) step_coordinate;
+        vertex_data [vertex_index++] = 0.0f;
+        vertex_data [vertex_index++] = (float) -half_extent;
+        vertex_data [vertex_index++] = (float) step_coordinate;
+        vertex_data [vertex_index++] = 0.0f;
+        vertex_data [vertex_index++] = (float) half_extent;
         //Line along X axis at position of Z = step_coordinate
-        vertex_data[vertex_index++] = (float) -half_extent;
-        vertex_data[vertex_index++] = 0.0f;
-        vertex_data[vertex_index++] = (float) step_coordinate;
-        vertex_data[vertex_index++] = (float) half_extent;
-        vertex_data[vertex_index++] = 0.0f;
-        vertex_data[vertex_index++] = (float) step_coordinate;
+        vertex_data [vertex_index++] = (float) -half_extent;
+        vertex_data [vertex_index++] = 0.0f;
+        vertex_data [vertex_index++] = (float) step_coordinate;
+        vertex_data [vertex_index++] = (float) half_extent;
+        vertex_data [vertex_index++] = 0.0f;
+        vertex_data [vertex_index++] = (float) step_coordinate;
     }
     grid_mesh_object->line_vertex_count = vertex_index / 3;
     glGenVertexArrays (1, &grid_mesh_object->vertex_array_object);
@@ -95,23 +95,23 @@ void grid_invalidate_cache (void) {
 void grid_render (grid_mesh *grid_mesh_object, GLuint shader_program, math4 view_matrix, math4 projection_matrix) {
     glUseProgram (shader_program);
     a3_grid_cache_uniforms (shader_program);
-    float view_matrix_flat_array[16], projection_matrix_flat_array[16];
+    float view_matrix_flat_array [16], projection_matrix_flat_array [16];
     math4_to_flat_array (view_matrix, view_matrix_flat_array);
     math4_to_flat_array (projection_matrix, projection_matrix_flat_array);
     glUniformMatrix4fv (a3_grid_uniform_viewframe, 1, GL_FALSE, view_matrix_flat_array);
     glUniformMatrix4fv (a3_grid_uniform_projection, 1, GL_FALSE, projection_matrix_flat_array);
     //Identity Model Matrix (sits at the (0, 0, 0, 0w))
     math4 model_matrix = math4_identity ();
-    float model_matrix_flat_array[16];
+    float model_matrix_flat_array [16];
     math4_to_flat_array (model_matrix, model_matrix_flat_array);
     glUniformMatrix4fv (a3_grid_uniform_model, 1, GL_FALSE, model_matrix_flat_array);
     //Normal Matrix (Identity for the Static Floor)
     math3 identity_normal_matrix = math3_identity ();
-    float normal_matrix_flat_array[9];
+    float normal_matrix_flat_array [9];
     for (int row_index = 0; row_index < 3; row_index++) {
         for (int column_index = 0; column_index < 3; column_index++) {
-            normal_matrix_flat_array[row_index * 3 + column_index] =
-                identity_normal_matrix.matrix[row_index][column_index];
+            normal_matrix_flat_array [row_index * 3 + column_index] =
+                identity_normal_matrix.matrix [row_index] [column_index];
         }
     }
     glUniformMatrix3fv (a3_grid_uniform_normal_matrix, 1, GL_FALSE, normal_matrix_flat_array);

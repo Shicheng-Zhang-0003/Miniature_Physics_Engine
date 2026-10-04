@@ -28,19 +28,19 @@ MPE_WEAK void mpe_springs_apply (physics_world *world, float dt);
  * live worlds (headless tests + GUI + TUI stay far below; overflow
  * refuses init-time registration but stepping still works — the world
  * just can't be auto-purged, documented in the header). */
-static physics_world *s_live_worlds[MPE_MAX_LIVE_WORLDS];
+static physics_world *s_live_worlds [MPE_MAX_LIVE_WORLDS];
 static int s_live_count = 0;
 static pthread_mutex_t s_live_lock = PTHREAD_MUTEX_INITIALIZER;
 static void live_world_add (physics_world *world) {
     pthread_mutex_lock (&s_live_lock);
     for (int i = 0; i < s_live_count; i++) {
-        if (s_live_worlds[i] == world) {
+        if (s_live_worlds [i] == world) {
             pthread_mutex_unlock (&s_live_lock);
             return;
         }
     }
     if (s_live_count < MPE_MAX_LIVE_WORLDS)
-        s_live_worlds[s_live_count++] = world;
+        s_live_worlds [s_live_count++] = world;
     pthread_mutex_unlock (&s_live_lock);
 }
 /* `physics_world` is commonly a stack object whose bytes are indeterminate
@@ -50,7 +50,7 @@ static bool live_world_contains (const physics_world *world) {
     bool found = false;
     pthread_mutex_lock (&s_live_lock);
     for (int i = 0; i < s_live_count; i++) {
-        if (s_live_worlds[i] == world) {
+        if (s_live_worlds [i] == world) {
             found = true;
             break;
         }
@@ -61,9 +61,9 @@ static bool live_world_contains (const physics_world *world) {
 static void live_world_remove (physics_world *world) {
     pthread_mutex_lock (&s_live_lock);
     for (int i = 0; i < s_live_count; i++) {
-        if (s_live_worlds[i] == world) {
+        if (s_live_worlds [i] == world) {
             for (int j = i; j + 1 < s_live_count; j++)
-                s_live_worlds[j] = s_live_worlds[j + 1];
+                s_live_worlds [j] = s_live_worlds [j + 1];
             s_live_count--;
             break;
         }
@@ -76,7 +76,7 @@ int physics_world_live_list (physics_world **out, int cap) {
     pthread_mutex_lock (&s_live_lock);
     int n = (s_live_count < cap) ? s_live_count : cap;
     for (int i = 0; i < n; i++)
-        out[i] = s_live_worlds[i];
+        out [i] = s_live_worlds [i];
     int total = s_live_count;
     pthread_mutex_unlock (&s_live_lock);
     (void) total;
@@ -88,26 +88,26 @@ int physics_world_live_list (physics_world **out, int cap) {
  * module's stage_detach hook runs first (resolved by code address — stage
  * slots keep the iface, not the desc), then the pointers are dropped. */
 void physics_world_forget_stage_pointers (const mpe_broadphase_if_t *bi, const mpe_solver_if_t *si) {
-    physics_world *ws[MPE_MAX_LIVE_WORLDS];
+    physics_world *ws [MPE_MAX_LIVE_WORLDS];
     int n = physics_world_live_list (ws, MPE_MAX_LIVE_WORLDS);
     for (int i = 0; i < n; i++) {
-        if (bi && ws[i]->broadphase_if == bi) {
+        if (bi && ws [i]->broadphase_if == bi) {
             if (bi->generate)
-                mpe_loader_call_stage_detach_for_fn ((const void *) bi->generate, ws[i]);
-            ws[i]->broadphase_if = NULL;
-            ws[i]->broadphase_state = NULL;
+                mpe_loader_call_stage_detach_for_fn ((const void *) bi->generate, ws [i]);
+            ws [i]->broadphase_if = NULL;
+            ws [i]->broadphase_state = NULL;
         }
-        if (si && ws[i]->solver_if == si) {
+        if (si && ws [i]->solver_if == si) {
             if (si->resolve)
-                mpe_loader_call_stage_detach_for_fn ((const void *) si->resolve, ws[i]);
+                mpe_loader_call_stage_detach_for_fn ((const void *) si->resolve, ws [i]);
             else if (si->poisson)
-                mpe_loader_call_stage_detach_for_fn ((const void *) si->poisson, ws[i]);
+                mpe_loader_call_stage_detach_for_fn ((const void *) si->poisson, ws [i]);
             else if (si->rolling)
-                mpe_loader_call_stage_detach_for_fn ((const void *) si->rolling, ws[i]);
+                mpe_loader_call_stage_detach_for_fn ((const void *) si->rolling, ws [i]);
             else if (si->split)
-                mpe_loader_call_stage_detach_for_fn ((const void *) si->split, ws[i]);
-            ws[i]->solver_if = NULL;
-            ws[i]->solver_state = NULL;
+                mpe_loader_call_stage_detach_for_fn ((const void *) si->split, ws [i]);
+            ws [i]->solver_if = NULL;
+            ws [i]->solver_state = NULL;
         }
     }
 }
@@ -116,10 +116,10 @@ void physics_world_forget_stage_pointers (const mpe_broadphase_if_t *bi, const m
 void physics_world_detach_module_everywhere (const char *name) {
     if (!name)
         return;
-    physics_world *ws[MPE_MAX_LIVE_WORLDS];
+    physics_world *ws [MPE_MAX_LIVE_WORLDS];
     int n = physics_world_live_list (ws, MPE_MAX_LIVE_WORLDS);
     for (int i = 0; i < n; i++)
-        physics_world_detach_module (ws[i], name);
+        physics_world_detach_module (ws [i], name);
 }
 /* NOTE: no file-scope simulation state in this TU. The application
  * primary lives in core/mpe_primary.c; all stepping takes explicit
@@ -190,7 +190,7 @@ void physics_world_init (physics_world *world) {
         world->contact_hash_head = (int32_t *) malloc ((size_t) 4096 * sizeof (int32_t));
         if (world->contact_hash_head) {
             for (int i = 0; i < 4096; i++) {
-                world->contact_hash_head[i] = -1;
+                world->contact_hash_head [i] = -1;
             }
         }
     }
@@ -284,12 +284,12 @@ void physics_world_cleanup (physics_world *world) {
     }
     /* Detach modules first: plugin attach() may own per-world state. */
     for (int i = world->tick_module_count - 1; i >= 0; i--) {
-        if (world->tick_modules[i] && world->tick_modules[i]->detach) {
-            world->tick_modules[i]->detach (world, world->tick_module_state[i]);
+        if (world->tick_modules [i] && world->tick_modules [i]->detach) {
+            world->tick_modules [i]->detach (world, world->tick_module_state [i]);
         }
-        mpe_loader_release_module (world->tick_modules[i]);
-        world->tick_modules[i] = NULL;
-        world->tick_module_state[i] = NULL;
+        mpe_loader_release_module (world->tick_modules [i]);
+        world->tick_modules [i] = NULL;
+        world->tick_module_state [i] = NULL;
     }
     /* Stage slots never outlive the world: a cleaned world must not call
      * unloaded code if it is re-init-ed without memset or inspected. */
@@ -426,7 +426,7 @@ void physics_world_bump_revision (physics_world *world) {
 }
 static void physics_world_id_cache_rebuild (physics_world *world) {
     for (int i = 0; i < world->id_cache_size; i++) {
-        world->id_cache_valid[i] = 0;
+        world->id_cache_valid [i] = 0;
     }
     if (!world->bodies || world->body_count <= 0) {
         world->id_cache_revision = world->body_revision;
@@ -434,17 +434,17 @@ static void physics_world_id_cache_rebuild (physics_world *world) {
     }
     uint32_t mask = (uint32_t) (world->id_cache_size - 1);
     for (int i = 0; i < world->body_count; i++) {
-        uint32_t id = world->bodies[i].object_id;
+        uint32_t id = world->bodies [i].object_id;
         if (id == 0 || id == 0xFFFFFFFFu) {
             continue;
         }
         uint32_t h = (id * 2654435761u) & mask;
         for (int probe = 0; probe < 32; probe++) {
             uint32_t s = (h + (uint32_t) probe) & mask;
-            if (!world->id_cache_valid[s]) {
-                world->id_cache_keys[s] = id;
-                world->id_cache_vals[s] = i;
-                world->id_cache_valid[s] = 1;
+            if (!world->id_cache_valid [s]) {
+                world->id_cache_keys [s] = id;
+                world->id_cache_vals [s] = i;
+                world->id_cache_valid [s] = 1;
                 break;
             }
         }
@@ -463,12 +463,12 @@ int physics_world_index_by_id (physics_world *world, uint32_t id) {
         uint32_t h = (id * 2654435761u) & mask;
         for (int probe = 0; probe < 32; probe++) {
             uint32_t s = (h + (uint32_t) probe) & mask;
-            if (!world->id_cache_valid[s]) {
+            if (!world->id_cache_valid [s]) {
                 break;
             }
-            if (world->id_cache_keys[s] == id) {
-                int idx = world->id_cache_vals[s];
-                if (idx >= 0 && idx < world->body_count && world->bodies[idx].object_id == id) {
+            if (world->id_cache_keys [s] == id) {
+                int idx = world->id_cache_vals [s];
+                if (idx >= 0 && idx < world->body_count && world->bodies [idx].object_id == id) {
                     return idx;
                 }
                 break;
@@ -476,7 +476,7 @@ int physics_world_index_by_id (physics_world *world, uint32_t id) {
         }
     }
     for (int i = 0; i < world->body_count; i++) {
-        if (world->bodies[i].object_id == id) {
+        if (world->bodies [i].object_id == id) {
             return i;
         }
     }
@@ -487,7 +487,7 @@ rigidbody *physics_world_body_by_id (physics_world *world, uint32_t id) {
     if (idx < 0) {
         return NULL;
     }
-    return &world->bodies[idx];
+    return &world->bodies [idx];
 }
 void physics_world_set_broadphase (physics_world *world, const mpe_broadphase_if_t *iface) {
     if (!world)
@@ -535,9 +535,9 @@ bool physics_world_module_live_state (physics_world *world, const mpe_module_des
     if (n > 16)
         n = 16;
     for (int i = 0; i < n; i++) {
-        if (world->tick_modules[i] == desc) {
+        if (world->tick_modules [i] == desc) {
             if (out_state)
-                *out_state = world->tick_module_state[i];
+                *out_state = world->tick_module_state [i];
             return true;
         }
     }
@@ -547,15 +547,15 @@ int physics_world_attach_module (physics_world *world, const mpe_module_desc_t *
     if (!world || !desc || desc->abi != MPE_MODULE_ABI)
         return -1;
     for (int i = 0; i < world->tick_module_count; i++)
-        if (world->tick_modules[i] == desc)
+        if (world->tick_modules [i] == desc)
             return i;
     if (world->tick_module_count >= MPE_MAX_TICK_MODULES)
         return -1;
     void *st = NULL;
     if (desc->attach && desc->attach (world, &st) != 0)
         return -1;
-    world->tick_modules[world->tick_module_count] = desc;
-    world->tick_module_state[world->tick_module_count] = st;
+    world->tick_modules [world->tick_module_count] = desc;
+    world->tick_module_state [world->tick_module_count] = st;
     mpe_loader_retain_module (desc);
     return world->tick_module_count++;
 }
@@ -563,18 +563,18 @@ int physics_world_detach_module (physics_world *world, const char *name) {
     if (!world || !name)
         return -1;
     for (int i = 0; i < world->tick_module_count; i++) {
-        if (world->tick_modules[i] && world->tick_modules[i]->name &&
-            strcmp (world->tick_modules[i]->name, name) == 0) {
-            if (world->tick_modules[i]->detach)
-                world->tick_modules[i]->detach (world, world->tick_module_state[i]);
-            mpe_loader_release_module (world->tick_modules[i]);
+        if (world->tick_modules [i] && world->tick_modules [i]->name &&
+            strcmp (world->tick_modules [i]->name, name) == 0) {
+            if (world->tick_modules [i]->detach)
+                world->tick_modules [i]->detach (world, world->tick_module_state [i]);
+            mpe_loader_release_module (world->tick_modules [i]);
             for (int j = i; j + 1 < world->tick_module_count; j++) {
-                world->tick_modules[j] = world->tick_modules[j + 1];
-                world->tick_module_state[j] = world->tick_module_state[j + 1];
+                world->tick_modules [j] = world->tick_modules [j + 1];
+                world->tick_module_state [j] = world->tick_module_state [j + 1];
             }
             world->tick_module_count--;
-            world->tick_modules[world->tick_module_count] = NULL;
-            world->tick_module_state[world->tick_module_count] = NULL;
+            world->tick_modules [world->tick_module_count] = NULL;
+            world->tick_module_state [world->tick_module_count] = NULL;
             return 0;
         }
     }
@@ -656,16 +656,16 @@ bool mpe_shape_dispatch (physics_world *world, rigidbody *a, rigidbody *b, colli
         out->object_b = b;
         /* Swap body-local frames: contacts were solved in (b,a) space. */
         for (int i = 0; i < out->contact_count; i++) {
-            vector3 t = out->contacts[i].local_position_a;
-            out->contacts[i].local_position_a = out->contacts[i].local_position_b;
-            out->contacts[i].local_position_b = t;
-            out->contacts[i].tangent_vector = vector3_scaling (out->contacts[i].tangent_vector, -1.0f);
+            vector3 t = out->contacts [i].local_position_a;
+            out->contacts [i].local_position_a = out->contacts [i].local_position_b;
+            out->contacts [i].local_position_b = t;
+            out->contacts [i].tangent_vector = vector3_scaling (out->contacts [i].tangent_vector, -1.0f);
             /* tangent2 intentionally NOT negated: t2 = n×t1 is invariant
              * under the double flip, and prepare rebuilds it from
              * position+normal anyway (collision_solver.c). */
-            vector3 r = out->contacts[i].ra;
-            out->contacts[i].ra = out->contacts[i].rb;
-            out->contacts[i].rb = r;
+            vector3 r = out->contacts [i].ra;
+            out->contacts [i].ra = out->contacts [i].rb;
+            out->contacts [i].rb = r;
         }
         return true;
     }
@@ -678,7 +678,7 @@ int physics_world_add_sphere (physics_world *world, float radius, float mass, ve
     if (world->body_count >= world->body_capacity && physics_world_grow_bodies (world) != 0) {
         return -1;
     }
-    rigidbody *rb = &world->bodies[world->body_count];
+    rigidbody *rb = &world->bodies [world->body_count];
     rigidbody_initialisation_sphere (rb, radius, mass, position);
     if (world->next_object_id == 0 || world->next_object_id == 0xFFFFFFFFu) {
         world->next_object_id = 1;
@@ -700,7 +700,7 @@ int physics_world_add_cube (physics_world *world, vector3 position, vector3 half
     if (world->body_count >= world->body_capacity && physics_world_grow_bodies (world) != 0) {
         return -1;
     }
-    rigidbody *rb = &world->bodies[world->body_count];
+    rigidbody *rb = &world->bodies [world->body_count];
     rigidbody_initialisation_cube (rb, position, half_extensions, mass);
     if (world->next_object_id == 0 || world->next_object_id == 0xFFFFFFFFu) {
         world->next_object_id = 1;
@@ -723,7 +723,7 @@ int physics_world_add_cylinder (physics_world *world, float radius, float half_l
     if (world->body_count >= world->body_capacity && physics_world_grow_bodies (world) != 0) {
         return -1;
     }
-    rigidbody *rb = &world->bodies[world->body_count];
+    rigidbody *rb = &world->bodies [world->body_count];
     rigidbody_initialisation_cylinder (rb, radius, half_length, mass, position);
     if (world->next_object_id == 0 || world->next_object_id == 0xFFFFFFFFu) {
         world->next_object_id = 1;
@@ -745,7 +745,7 @@ int physics_world_add_custom (physics_world *world, int custom_shape, vector3 po
         return -1;
     if (custom_shape < 100)
         custom_shape = 100;
-    rigidbody *rb = &world->bodies[world->body_count];
+    rigidbody *rb = &world->bodies [world->body_count];
     /* Backing is a sphere (bounding volume + inertia sane until the
      * plugin overrides); type marks it foreign for dispatch. */
     rigidbody_initialisation_sphere (rb, radius > 0.0f ? radius : 0.5f, mass, position);
@@ -800,8 +800,8 @@ void physics_world_process_pair (physics_world *world, int index_a, int index_b,
     if ((index_b < 0) || (index_b >= world->body_count)) {
         return;
     }
-    rigidbody *body_a = &world->bodies[index_a];
-    rigidbody *body_b = &world->bodies[index_b];
+    rigidbody *body_a = &world->bodies [index_a];
+    rigidbody *body_b = &world->bodies [index_b];
     collision_data narrowphase_collision = {0};
     /* Phase-2: registry-first dispatch (foreign shapes plug in here),
          * built-in table fallback preserves exact legacy behaviour. */
@@ -860,8 +860,8 @@ void physics_world_process_pair (physics_world *world, int index_a, int index_b,
             {
                 float deepest = 0.0f;
                 for (int wi = 0; wi < narrowphase_collision.contact_count; wi++) {
-                    if (narrowphase_collision.contacts[wi].penetration > deepest) {
-                        deepest = narrowphase_collision.contacts[wi].penetration;
+                    if (narrowphase_collision.contacts [wi].penetration > deepest) {
+                        deepest = narrowphase_collision.contacts [wi].penetration;
                     }
                 }
                 if (deepest > mpe_world_cfg (world)->depenetration.wake_depth_thresh) {
@@ -873,15 +873,15 @@ void physics_world_process_pair (physics_world *world, int index_a, int index_b,
                     }
                 }
             }
-            collision_prepare_solver (world, &narrowphase_collision, &world->manifolds[(*manifold_count_ptr)], dt);
+            collision_prepare_solver (world, &narrowphase_collision, &world->manifolds [(*manifold_count_ptr)], dt);
             (*manifold_count_ptr)++;
             /* TRUTH P0-1: contact flag for gravity-exactness gating. */
             if (world->has_contact) {
                 if ((index_a >= 0) && (index_a < world->body_count)) {
-                    world->has_contact[index_a] = 1;
+                    world->has_contact [index_a] = 1;
                 }
                 if ((index_b >= 0) && (index_b < world->body_count)) {
-                    world->has_contact[index_b] = 1;
+                    world->has_contact [index_b] = 1;
                 }
             }
         }
@@ -932,13 +932,13 @@ void physics_world_step (physics_world *world, float dt) {
         dt = 0.1f;
     }
     for (int i = 0; i < world->body_count; i++) {
-        rigidbody_sanitize (&world->bodies[i]);
+        rigidbody_sanitize (&world->bodies [i]);
     }
     /* Contact preparation accumulates relative speed for sleep gating. Reset
      * before narrowphase so this tick's measurements survive to the sleep
      * update below (and stale values from last tick cannot leak forward). */
     for (int i = 0; i < world->body_count; i++) {
-        world->bodies[i].max_relative_speed_sq = 0.0f;
+        world->bodies [i].max_relative_speed_sq = 0.0f;
     }
     /* TRUTH: snapshot config once per tick. Menu/terminal mutating g_cfg
      * mid-tick (between substeps) would otherwise change behavior halfway
@@ -952,7 +952,7 @@ void physics_world_step (physics_world *world, float dt) {
     /* TRUTH P0-1: reset contact flags (set below on every manifold). */
     if (world->has_contact) {
         for (int i = 0; i < world->body_count; i++) {
-            world->has_contact[i] = 0;
+            world->has_contact [i] = 0;
         }
     }
     /* CCD: clamp fast bodies to their time-of-impact pose before pairing,
@@ -978,19 +978,19 @@ void physics_world_step (physics_world *world, float dt) {
     }
     int manifold_count = 0;
     for (int q = 0; q < pair_count; q++) {
-        world->pair_skipped[q] = 0;
+        world->pair_skipped [q] = 0;
     }
     contact_cache_stats_reset (world);
     for (int p = 0; p < pair_count; p++) {
-        int index_a = world->pair_buffer[p].object_index_a;
-        int index_b = world->pair_buffer[p].object_index_b;
+        int index_a = world->pair_buffer [p].object_index_a;
+        int index_b = world->pair_buffer [p].object_index_b;
         if ((index_a < 0) || (index_a >= world->body_count) || (index_b < 0) || (index_b >= world->body_count)) {
             continue;
         }
-        rigidbody *body_a = &world->bodies[index_a];
-        rigidbody *body_b = &world->bodies[index_b];
+        rigidbody *body_a = &world->bodies [index_a];
+        rigidbody *body_b = &world->bodies [index_b];
         if ((body_a->is_sleeping) && (body_b->is_sleeping)) {
-            world->pair_skipped[p] = 1;
+            world->pair_skipped [p] = 1;
             continue;
         }
         physics_world_process_pair (world, index_a, index_b, dt, &manifold_count);
@@ -1003,24 +1003,24 @@ void physics_world_step (physics_world *world, float dt) {
     for (int revisit_pass = 0; revisit_pass < 16; revisit_pass++) {
         bool revisit_woke = false;
         for (int p = 0; p < pair_count; p++) {
-            if (!world->pair_skipped[p]) {
+            if (!world->pair_skipped [p]) {
                 continue;
             }
-            int index_a = world->pair_buffer[p].object_index_a;
-            int index_b = world->pair_buffer[p].object_index_b;
+            int index_a = world->pair_buffer [p].object_index_a;
+            int index_b = world->pair_buffer [p].object_index_b;
             if ((index_a < 0) || (index_a >= world->body_count) || (index_b < 0) || (index_b >= world->body_count)) {
-                world->pair_skipped[p] = 0;
+                world->pair_skipped [p] = 0;
                 continue;
             }
-            rigidbody *body_a = &world->bodies[index_a];
-            rigidbody *body_b = &world->bodies[index_b];
+            rigidbody *body_a = &world->bodies [index_a];
+            rigidbody *body_b = &world->bodies [index_b];
             if ((body_a->is_sleeping) && (body_b->is_sleeping)) {
                 continue;
             }
             bool slept_a = body_a->is_sleeping;
             bool slept_b = body_b->is_sleeping;
             physics_world_process_pair (world, index_a, index_b, dt, &manifold_count);
-            world->pair_skipped[p] = 0;
+            world->pair_skipped [p] = 0;
             if ((slept_a && !body_a->is_sleeping) || (slept_b && !body_b->is_sleeping)) {
                 revisit_woke = true;
             }
@@ -1030,7 +1030,7 @@ void physics_world_step (physics_world *world, float dt) {
         }
     }
     for (int i = 0; i < world->body_count; i++) {
-        rigidbody *rb = &world->bodies[i];
+        rigidbody *rb = &world->bodies [i];
         if (rb->static_state) {
             continue;
         }
@@ -1060,17 +1060,17 @@ void physics_world_step (physics_world *world, float dt) {
                 }
                 float deepest = 0.0f;
                 for (int fi = 0; fi < floor_collision.contact_count; fi++) {
-                    if (floor_collision.contacts[fi].penetration > deepest) {
-                        deepest = floor_collision.contacts[fi].penetration;
+                    if (floor_collision.contacts [fi].penetration > deepest) {
+                        deepest = floor_collision.contacts [fi].penetration;
                     }
                 }
                 if (was_sleeping && deepest > step_cfg->depenetration.wake_depth_thresh) {
                     rigidbody_wake (rb);
                 }
-                collision_prepare_solver (world, &floor_collision, &world->manifolds[manifold_count], dt);
+                collision_prepare_solver (world, &floor_collision, &world->manifolds [manifold_count], dt);
                 manifold_count++;
                 if (world->has_contact) {
-                    world->has_contact[i] = 1;
+                    world->has_contact [i] = 1;
                 }
             }
         }
@@ -1080,9 +1080,9 @@ void physics_world_step (physics_world *world, float dt) {
      * (exact no-ops: zero velocity, zeroed inverses). */
     islands_build (world, world->pair_buffer, pair_count);
     for (int m = 0; m < manifold_count; m++) {
-        rigidbody *ma = world->manifolds[m].object_a;
-        rigidbody *mb = world->manifolds[m].object_b;
-        world->manifold_awake[m] = (unsigned char) (islands_body_awake (world, ma) || islands_body_awake (world, mb));
+        rigidbody *ma = world->manifolds [m].object_a;
+        rigidbody *mb = world->manifolds [m].object_b;
+        world->manifold_awake [m] = (unsigned char) (islands_body_awake (world, ma) || islands_body_awake (world, mb));
     }
     collision_manifold_solve_order (world, world->manifolds, manifold_count, world->manifold_order);
     vector3 gravity = {0.0f, step_gravity, 0.0f};
@@ -1095,11 +1095,11 @@ void physics_world_step (physics_world *world, float dt) {
      * v_post, double-applying gravity. Gate on what we actually read. */
     if (world->tick_v0 && world->tick_v0_capacity >= world->body_count) {
         for (int i = 0; i < world->body_count; i++) {
-            world->tick_v0[i] = world->bodies[i].velocity;
+            world->tick_v0 [i] = world->bodies [i].velocity;
         }
     }
     for (int i = 0; i < world->body_count; i++) {
-        rigidbody *rb = &world->bodies[i];
+        rigidbody *rb = &world->bodies [i];
         if ((rb->static_state) || (rb->is_sleeping) || (rb->kinematic)) {
             continue;
         }
@@ -1142,15 +1142,15 @@ void physics_world_step (physics_world *world, float dt) {
      * Snapshot the table: a hook may attach/detach (structural change
      * deferred in effect to next tick — this loop runs the snapshot). */
     {
-        const mpe_module_desc_t *mods[16];
-        void *states[16];
+        const mpe_module_desc_t *mods [16];
+        void *states [16];
         int nmods = world->tick_module_count < 16 ? world->tick_module_count : 16;
         for (int mi = 0; mi < nmods; mi++) {
-            mods[mi] = world->tick_modules[mi];
-            states[mi] = world->tick_module_state[mi];
+            mods [mi] = world->tick_modules [mi];
+            states [mi] = world->tick_module_state [mi];
         }
         for (int mi = 0; mi < nmods; mi++) {
-            if (!mods[mi] || !mods[mi]->pre_step)
+            if (!mods [mi] || !mods [mi]->pre_step)
                 continue;
             /* Re-resolve: a hook earlier in this loop may have detached this
              * one, freeing states[mi]. See a3_module_live_state. A module
@@ -1158,21 +1158,21 @@ void physics_world_step (physics_world *world, float dt) {
              * that is no longer attached, so a NULL-state module detached
              * mid-tick is still skipped. */
             void *live = NULL;
-            if (!physics_world_module_live_state (world, mods[mi], &live))
+            if (!physics_world_module_live_state (world, mods [mi], &live))
                 continue;
-            mods[mi]->pre_step (world, dt, live);
+            mods [mi]->pre_step (world, dt, live);
             (void) states;
         }
     }
     for (int i = 0; i < world->body_count; i++) {
-        rb_integrate_velocity (&world->bodies[i], dt, linear_damping, angular_damping);
+        rb_integrate_velocity (&world->bodies [i], dt, linear_damping, angular_damping);
     }
     /* Sleeping bodies keep real mass/inertia (no staticize mutation).
      * The solver treats them as infinite mass via rigidbody_effective_*
      * helpers, so observable state is never corrupted mid-tick and the
      * path is thread-safe. Zero stale velocities/accumulators only. */
     for (int sleep_index = 0; sleep_index < world->body_count; sleep_index++) {
-        rigidbody *sleep_body = &world->bodies[sleep_index];
+        rigidbody *sleep_body = &world->bodies [sleep_index];
         if ((sleep_body->is_sleeping) && (!sleep_body->static_state)) {
             sleep_body->velocity = vector3_zero ();
             sleep_body->angular_velocity = vector3_zero ();
@@ -1191,9 +1191,9 @@ void physics_world_step (physics_world *world, float dt) {
      * (O(pairs), idempotent) so iteration skips match live sleep state. */
     islands_build (world, world->pair_buffer, pair_count);
     for (int m = 0; m < manifold_count; m++) {
-        rigidbody *ma = world->manifolds[m].object_a;
-        rigidbody *mb = world->manifolds[m].object_b;
-        world->manifold_awake[m] = (unsigned char) (islands_body_awake (world, ma) || islands_body_awake (world, mb));
+        rigidbody *ma = world->manifolds [m].object_a;
+        rigidbody *mb = world->manifolds [m].object_b;
+        world->manifold_awake [m] = (unsigned char) (islands_body_awake (world, ma) || islands_body_awake (world, mb));
     }
     /* Solver iterations with joint coupling inside the loop. */
     int solver_iterations = step_iterations;
@@ -1205,14 +1205,14 @@ void physics_world_step (physics_world *world, float dt) {
     constraint_pre_step_all (world, dt);
     for (int iter = 0; iter < solver_iterations; iter++) {
         for (int o = 0; o < manifold_count; o++) {
-            int m = world->manifold_order[o];
-            if (!world->manifold_awake[m])
+            int m = world->manifold_order [o];
+            if (!world->manifold_awake [m])
                 continue;
             /* TRUTH: two visits per iteration (128 total at default 64, not
              * 64: the count knob undercounts by design for local coupling).
              * Convergent (no energy), just expensive. */
-            mpe_step_resolve (world, &world->manifolds[m], dt, false, iter, step_cfg);
-            mpe_step_resolve (world, &world->manifolds[m], dt, false, iter + 1, step_cfg);
+            mpe_step_resolve (world, &world->manifolds [m], dt, false, iter, step_cfg);
+            mpe_step_resolve (world, &world->manifolds [m], dt, false, iter + 1, step_cfg);
         }
         /* Solve joints inside iteration loop for friction transfer through hinges. */
         constraint_solve_all (world, dt);
@@ -1227,10 +1227,10 @@ void physics_world_step (physics_world *world, float dt) {
     constraint_solve_all (world, dt);
     for (int relax_iter = 0; relax_iter < 2; relax_iter++) {
         for (int o = 0; o < manifold_count; o++) {
-            int m = world->manifold_order[o];
-            if (!world->manifold_awake[m])
+            int m = world->manifold_order [o];
+            if (!world->manifold_awake [m])
                 continue;
-            mpe_step_resolve (world, &world->manifolds[m], dt, true, relax_iter, step_cfg);
+            mpe_step_resolve (world, &world->manifolds [m], dt, true, relax_iter, step_cfg);
         }
     }
     /* Split impulse: positional depenetration with zero velocity change.
@@ -1249,32 +1249,32 @@ void physics_world_step (physics_world *world, float dt) {
      * gravity gate stays honest). Rolling below then sees their normals. */
     int late_manifold_start = manifold_count;
     for (int p = 0; p < pair_count; p++) {
-        if (!world->pair_skipped[p]) {
+        if (!world->pair_skipped [p]) {
             continue;
         }
-        int ia = world->pair_buffer[p].object_index_a;
-        int ib = world->pair_buffer[p].object_index_b;
+        int ia = world->pair_buffer [p].object_index_a;
+        int ib = world->pair_buffer [p].object_index_b;
         if (ia < 0 || ia >= world->body_count || ib < 0 || ib >= world->body_count) {
-            world->pair_skipped[p] = 0;
+            world->pair_skipped [p] = 0;
             continue;
         }
-        if (world->bodies[ia].is_sleeping && world->bodies[ib].is_sleeping) {
+        if (world->bodies [ia].is_sleeping && world->bodies [ib].is_sleeping) {
             continue;
         }
         physics_world_process_pair (world, ia, ib, dt, &manifold_count);
-        world->pair_skipped[p] = 0;
+        world->pair_skipped [p] = 0;
     }
     if (manifold_count > late_manifold_start) {
         for (int m = late_manifold_start; m < manifold_count; m++) {
-            world->manifold_awake[m] = 1; /* newly-awake by construction */
+            world->manifold_awake [m] = 1; /* newly-awake by construction */
         }
         for (int m = late_manifold_start; m < manifold_count; m++) {
-            mpe_step_resolve (world, &world->manifolds[m], dt, false, 0, step_cfg);
-            mpe_step_resolve (world, &world->manifolds[m], dt, false, 1, step_cfg);
+            mpe_step_resolve (world, &world->manifolds [m], dt, false, 0, step_cfg);
+            mpe_step_resolve (world, &world->manifolds [m], dt, false, 1, step_cfg);
         }
-        mpe_step_poisson (world, &world->manifolds[late_manifold_start], manifold_count - late_manifold_start,
+        mpe_step_poisson (world, &world->manifolds [late_manifold_start], manifold_count - late_manifold_start,
                           step_cfg);
-        mpe_step_split (world, &world->manifolds[late_manifold_start], manifold_count - late_manifold_start, dt,
+        mpe_step_split (world, &world->manifolds [late_manifold_start], manifold_count - late_manifold_start, dt,
                         step_cfg);
     }
     /* Rolling resistance once per tick (uses solved normal impulses). */
@@ -1282,7 +1282,7 @@ void physics_world_step (physics_world *world, float dt) {
     /* Sleeping bodies already hold real mass (no staticize was applied),
      * so no restore is needed. Keep velocities pinned at zero. */
     for (int sleep_restore_index = 0; sleep_restore_index < world->body_count; sleep_restore_index++) {
-        rigidbody *sleep_restore_body = &world->bodies[sleep_restore_index];
+        rigidbody *sleep_restore_body = &world->bodies [sleep_restore_index];
         if ((sleep_restore_body->is_sleeping) && (!sleep_restore_body->static_state)) {
             sleep_restore_body->velocity = vector3_zero ();
             sleep_restore_body->angular_velocity = vector3_zero ();
@@ -1297,7 +1297,7 @@ void physics_world_step (physics_world *world, float dt) {
      * worst case) and, worse, looped ji<count indexing pool[ji], missing
      * active joints past holes left by removals. Full-pool scan + id cache
      * is both faster and correct. */
-    static _Thread_local unsigned char joint_membership[mpe_max_bodies];
+    static _Thread_local unsigned char joint_membership [mpe_max_bodies];
     {
         int n = world->body_count;
         if (n > mpe_max_bodies) {
@@ -1310,52 +1310,52 @@ void physics_world_step (physics_world *world, float dt) {
          * size: always clear the whole thing. */
         memset (joint_membership, 0, sizeof (joint_membership));
         for (int ji = 0; ji < mpe_max_joints; ji++) {
-            if (!world->revolute_constraints[ji].is_active) {
+            if (!world->revolute_constraints [ji].is_active) {
                 continue;
             }
-            int ia = physics_world_index_by_id (world, world->revolute_constraints[ji].body_id_a);
-            int ib = physics_world_index_by_id (world, world->revolute_constraints[ji].body_id_b);
+            int ia = physics_world_index_by_id (world, world->revolute_constraints [ji].body_id_a);
+            int ib = physics_world_index_by_id (world, world->revolute_constraints [ji].body_id_b);
             if (ia >= 0 && ia < n) {
-                joint_membership[ia] = 1;
+                joint_membership [ia] = 1;
             }
             if (ib >= 0 && ib < n) {
-                joint_membership[ib] = 1;
+                joint_membership [ib] = 1;
             }
         }
         for (int ji = 0; ji < mpe_max_joints; ji++) {
-            if (!world->spring_joints[ji].is_active) {
+            if (!world->spring_joints [ji].is_active) {
                 continue;
             }
-            int ia = physics_world_index_by_id (world, world->spring_joints[ji].object_id_a);
-            int ib = physics_world_index_by_id (world, world->spring_joints[ji].object_id_b);
+            int ia = physics_world_index_by_id (world, world->spring_joints [ji].object_id_a);
+            int ib = physics_world_index_by_id (world, world->spring_joints [ji].object_id_b);
             if (ia >= 0 && ia < n) {
-                joint_membership[ia] = 1;
+                joint_membership [ia] = 1;
             }
             if (ib >= 0 && ib < n) {
-                joint_membership[ib] = 1;
+                joint_membership [ib] = 1;
             }
         }
     }
     for (int i = 0; i < world->body_count; i++) {
         float step_dt = dt;
-        if ((world->ccd_time_remaining) && (world->ccd_time_remaining[i] < step_dt) &&
-            (world->ccd_time_remaining[i] > 0.0f)) {
-            step_dt = world->ccd_time_remaining[i];
+        if ((world->ccd_time_remaining) && (world->ccd_time_remaining [i] < step_dt) &&
+            (world->ccd_time_remaining [i] > 0.0f)) {
+            step_dt = world->ccd_time_remaining [i];
         }
-        rigidbody *ib = &world->bodies[i];
-        bool has_joint = (i < mpe_max_bodies) ? (joint_membership[i] != 0) : false;
-        bool free_flight = ((world->has_contact) ? (world->has_contact[i] == 0) : true) && !has_joint;
+        rigidbody *ib = &world->bodies [i];
+        bool has_joint = (i < mpe_max_bodies) ? (joint_membership [i] != 0) : false;
+        bool free_flight = ((world->has_contact) ? (world->has_contact [i] == 0) : true) && !has_joint;
         /* FIX-AUDIT-DESPOT: capacity gate matches the snapshot gate above
          * (>= live body_count, not >= mpe_max_bodies). */
         if (free_flight && world->tick_v0 && world->tick_v0_capacity >= world->body_count) {
             /* Restore start-of-tick velocity so the analytic solution starts
              * from v_pre (Euler already applied gravity+damping to live). */
-            ib->velocity = world->tick_v0[i];
+            ib->velocity = world->tick_v0 [i];
         }
         rb_integrate_position_exact (ib, step_dt, step_cfg, free_flight);
         /* Exact integration now handles gravity correctly for all drag values.
          * No correction needed. */
-        rigidbody_sanitize (&world->bodies[i]);
+        rigidbody_sanitize (&world->bodies [i]);
     }
     /* World-edge safety net, same as the legacy path: perfectly plastic,
      * fires only past emergency slop (solver owns all normal contact). */
@@ -1368,9 +1368,9 @@ void physics_world_step (physics_world *world, float dt) {
      * ability to hold a body up. See config/mpe_config.h. */
     if (step_cfg->boundary.safety_net_enabled) {
         for (int i = 0; i < world->body_count; i++) {
-            vector3 a3_pre_boundary_position = world->bodies[i].position;
-            boundary_apply_box_cfg (&world->bodies[i], (vector3){-250, 0, -250}, (vector3){250, 500, 250}, step_cfg);
-            if (vector3_length_squared (vector3_subtraction (world->bodies[i].position, a3_pre_boundary_position)) >
+            vector3 a3_pre_boundary_position = world->bodies [i].position;
+            boundary_apply_box_cfg (&world->bodies [i], (vector3){-250, 0, -250}, (vector3){250, 500, 250}, step_cfg);
+            if (vector3_length_squared (vector3_subtraction (world->bodies [i].position, a3_pre_boundary_position)) >
                 0.000001f) {
                 a3_boundary_moved_any = true;
             }
@@ -1381,20 +1381,20 @@ void physics_world_step (physics_world *world, float dt) {
     /* Phase-2: foreign post-step modules (loggers, correctors).
      * Snapshot the table (see pre-step above). */
     {
-        const mpe_module_desc_t *mods[16];
-        void *states[16];
+        const mpe_module_desc_t *mods [16];
+        void *states [16];
         int nmods = world->tick_module_count < 16 ? world->tick_module_count : 16;
         for (int mi = 0; mi < nmods; mi++) {
-            mods[mi] = world->tick_modules[mi];
-            states[mi] = world->tick_module_state[mi];
+            mods [mi] = world->tick_modules [mi];
+            states [mi] = world->tick_module_state [mi];
         }
         for (int mi = 0; mi < nmods; mi++) {
-            if (!mods[mi] || !mods[mi]->post_step)
+            if (!mods [mi] || !mods [mi]->post_step)
                 continue;
             void *live = NULL;
-            if (!physics_world_module_live_state (world, mods[mi], &live))
+            if (!physics_world_module_live_state (world, mods [mi], &live))
                 continue;
-            mods[mi]->post_step (world, dt, live);
+            mods [mi]->post_step (world, dt, live);
             (void) states;
         }
     }

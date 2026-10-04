@@ -28,25 +28,25 @@ int main (void) {
         /* Place bodies at center with velocities for collision within 2s */
         int a = physics_world_add_sphere (&world, 0.5f, 2.0f, (vector3){-6.0f, 100.0f, 0.0f});
         int b = physics_world_add_sphere (&world, 0.3f, 1.0f, (vector3){6.0f, 100.0f, 0.0f});
-        world.bodies[a].velocity = (vector3){5.0f, 0.0f, 0.0f};
-        world.bodies[b].velocity = (vector3){-3.0f, 0.0f, 0.0f};
-        world.bodies[a].restitution = 1.0f;
-        world.bodies[b].restitution = 1.0f;
-        rigidbody_wake (&world.bodies[a]);
-        rigidbody_wake (&world.bodies[b]);
+        world.bodies [a].velocity = (vector3){5.0f, 0.0f, 0.0f};
+        world.bodies [b].velocity = (vector3){-3.0f, 0.0f, 0.0f};
+        world.bodies [a].restitution = 1.0f;
+        world.bodies [b].restitution = 1.0f;
+        rigidbody_wake (&world.bodies [a]);
+        rigidbody_wake (&world.bodies [b]);
         vector3 P0 = {0, 0, 0};
-        P0 = vector3_addition (P0, vector3_scaling (world.bodies[a].velocity, world.bodies[a].mass));
-        P0 = vector3_addition (P0, vector3_scaling (world.bodies[b].velocity, world.bodies[b].mass));
+        P0 = vector3_addition (P0, vector3_scaling (world.bodies [a].velocity, world.bodies [a].mass));
+        P0 = vector3_addition (P0, vector3_scaling (world.bodies [b].velocity, world.bodies [b].mass));
         const float dt = 1.0f / 60.0f;
         float max_err = 0.0f;
         int collided = 0;
         for (int t = 0; t < 120; t++) {
             physics_world_step (&world, dt);
-            if (fabsf (world.bodies[a].velocity.x - 5.0f) > 0.01f)
+            if (fabsf (world.bodies [a].velocity.x - 5.0f) > 0.01f)
                 collided = 1;
             vector3 P = {0, 0, 0};
             for (int i = 0; i < world.body_count; i++) {
-                P = vector3_addition (P, vector3_scaling (world.bodies[i].velocity, world.bodies[i].mass));
+                P = vector3_addition (P, vector3_scaling (world.bodies [i].velocity, world.bodies [i].mass));
             }
             float err = vector3_length (vector3_subtraction (P, P0));
             if (err > max_err)
@@ -57,10 +57,10 @@ int main (void) {
             printf ("[FAIL] momentum case never collided\n");
             fail = 1;
         }
-        printf ("[INFO] elastic_collision vx_a=%.4f vx_b=%.4f (expected -0.3333, 7.6667)\n", world.bodies[a].velocity.x,
-                world.bodies[b].velocity.x);
-        if (fabsf (world.bodies[a].velocity.x + 1.0f / 3.0f) > 0.1f ||
-            fabsf (world.bodies[b].velocity.x - 23.0f / 3.0f) > 0.1f) {
+        printf ("[INFO] elastic_collision vx_a=%.4f vx_b=%.4f (expected -0.3333, 7.6667)\n", world.bodies [a].velocity.x,
+                world.bodies [b].velocity.x);
+        if (fabsf (world.bodies [a].velocity.x + 1.0f / 3.0f) > 0.1f ||
+            fabsf (world.bodies [b].velocity.x - 23.0f / 3.0f) > 0.1f) {
             printf ("[FAIL] elastic collision velocities disagree with the analytic solution\n");
             fail = 1;
         }
@@ -85,16 +85,16 @@ int main (void) {
         g_cfg.world.drag = 1.0f;
         g_cfg.world.angular_damping_scale = 1.0f;
         int b = physics_world_add_cube (&world, (vector3){0.0f, 100.0f, 0.0f}, (vector3){1.0f, 0.5f, 0.2f}, 1.0f);
-        world.bodies[b].angular_velocity = (vector3){2.0f, 1.5f, 3.0f};
-        rigidbody_wake (&world.bodies[b]);
+        world.bodies [b].angular_velocity = (vector3){2.0f, 1.5f, 3.0f};
+        rigidbody_wake (&world.bodies [b]);
         const float dt = 1.0f / 60.0f;
         /* Compute L0 BEFORE any integration */
-        vector3 L0_vec = body_angular_momentum (&world.bodies[0]);
+        vector3 L0_vec = body_angular_momentum (&world.bodies [0]);
         float L0 = vector3_length (L0_vec);
         float max_rel_err = 0.0f;
         for (int t = 0; t < 120; t++) {
             physics_world_step (&world, dt);
-            vector3 L = body_angular_momentum (&world.bodies[0]);
+            vector3 L = body_angular_momentum (&world.bodies [0]);
             float Lmag = vector3_length (L);
             float rel_err = fabsf (Lmag - L0) / L0;
             if (rel_err > max_rel_err)
@@ -119,14 +119,14 @@ int main (void) {
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 1.0f;
         int s = physics_world_add_sphere (&world, 0.5f, 2.0f, (vector3){0.0f, 5.0f, 0.0f});
-        world.bodies[s].velocity = (vector3){3.0f, 8.0f, -2.0f};
-        world.bodies[s].angular_velocity = (vector3){4.0f, -1.0f, 2.0f};
-        rigidbody_wake (&world.bodies[s]);
+        world.bodies [s].velocity = (vector3){3.0f, 8.0f, -2.0f};
+        world.bodies [s].angular_velocity = (vector3){4.0f, -1.0f, 2.0f};
+        rigidbody_wake (&world.bodies [s]);
         const float dt = 1.0f / 60.0f;
         float E0 = -1.0f, E_max = 0.0f, E_min = 1e9f;
         for (int t = 0; t < 120; t++) {
             physics_world_step (&world, dt);
-            rigidbody *b = &world.bodies[0];
+            rigidbody *b = &world.bodies [0];
             if (b->position.y < 0.6f)
                 break;
             float E = rb_get_kinetic_energy (b) + b->mass * 9.81f * b->position.y;
@@ -156,14 +156,14 @@ int main (void) {
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 0.99f;
         int s = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0.0f, 10.0f, 0.0f});
-        world.bodies[s].velocity = (vector3){5.0f, 10.0f, 3.0f};
-        world.bodies[s].angular_velocity = (vector3){2.0f, 1.0f, -1.0f};
-        rigidbody_wake (&world.bodies[s]);
+        world.bodies [s].velocity = (vector3){5.0f, 10.0f, 3.0f};
+        world.bodies [s].angular_velocity = (vector3){2.0f, 1.0f, -1.0f};
+        rigidbody_wake (&world.bodies [s]);
         const float dt = 1.0f / 60.0f;
         float E0 = -1.0f, E_max = 0.0f;
         for (int t = 0; t < 120; t++) {
             physics_world_step (&world, dt);
-            rigidbody *b = &world.bodies[0];
+            rigidbody *b = &world.bodies [0];
             float E = rb_get_kinetic_energy (b) + b->mass * 9.81f * b->position.y;
             if (E0 < 0.0f)
                 E0 = E;
@@ -194,12 +194,12 @@ int main (void) {
         /* Start at rest length + 1m displacement */
         int a = physics_world_add_sphere (&world, 0.2f, 1.0f, (vector3){-50.0f, 100.0f, 0.0f});
         int b = physics_world_add_sphere (&world, 0.2f, 1.0f, (vector3){-46.0f, 100.0f, 0.0f}); /* 4m apart, rest=3m */
-        world.bodies[a].restitution = 0.0f;
-        world.bodies[b].restitution = 0.0f;
-        world.bodies[a].velocity = (vector3){0, 0, 0};
-        world.bodies[b].velocity = (vector3){0, 0, 0};
-        uint32_t id_a = world.bodies[a].object_id;
-        uint32_t id_b = world.bodies[b].object_id;
+        world.bodies [a].restitution = 0.0f;
+        world.bodies [b].restitution = 0.0f;
+        world.bodies [a].velocity = (vector3){0, 0, 0};
+        world.bodies [b].velocity = (vector3){0, 0, 0};
+        uint32_t id_a = world.bodies [a].object_id;
+        uint32_t id_b = world.bodies [b].object_id;
         int joint = add_joint_by_ids (&world, id_a, id_b, 3.0f, 100.0f, 1.0f); /* k=100, c=1 */
         if (joint < 0) {
             printf ("[FAIL] spring joint creation failed\n");
@@ -211,10 +211,10 @@ int main (void) {
         float max_speed = 0.0f;
         for (int t = 0; t < 120; t++) {
             physics_world_step (&world, dt);
-            float Ea = rb_get_kinetic_energy (&world.bodies[0]);
-            float Eb = rb_get_kinetic_energy (&world.bodies[1]);
+            float Ea = rb_get_kinetic_energy (&world.bodies [0]);
+            float Eb = rb_get_kinetic_energy (&world.bodies [1]);
             float E_spring = 0.0f;
-            float L = vector3_length (vector3_subtraction (world.bodies[0].position, world.bodies[1].position));
+            float L = vector3_length (vector3_subtraction (world.bodies [0].position, world.bodies [1].position));
             E_spring = 0.5f * 100.0f * (L - 3.0f) * (L - 3.0f);
             float E = Ea + Eb + E_spring;
             if (!isfinite (E)) {
@@ -222,7 +222,7 @@ int main (void) {
                 fail = 1;
                 break;
             }
-            float speed = fmaxf (vector3_length (world.bodies[a].velocity), vector3_length (world.bodies[b].velocity));
+            float speed = fmaxf (vector3_length (world.bodies [a].velocity), vector3_length (world.bodies [b].velocity));
             if (speed > max_speed)
                 max_speed = speed;
             if (E > E_max)
@@ -257,12 +257,12 @@ int main (void) {
         g_cfg.world.drag = 1.0f;
         int a = physics_world_add_sphere (&world, 0.5f, 2.0f, (vector3){-50.0f, 100.0f, 0.0f});
         int b = physics_world_add_sphere (&world, 0.3f, 1.0f, (vector3){50.0f, 100.0f, 0.0f});
-        world.bodies[a].velocity = (vector3){2.0f, 0.0f, 0.0f};
-        world.bodies[b].velocity = (vector3){-1.0f, 0.0f, 0.0f};
-        world.bodies[a].restitution = 1.0f;
-        world.bodies[b].restitution = 1.0f;
-        rigidbody_wake (&world.bodies[a]);
-        rigidbody_wake (&world.bodies[b]);
+        world.bodies [a].velocity = (vector3){2.0f, 0.0f, 0.0f};
+        world.bodies [b].velocity = (vector3){-1.0f, 0.0f, 0.0f};
+        world.bodies [a].restitution = 1.0f;
+        world.bodies [b].restitution = 1.0f;
+        rigidbody_wake (&world.bodies [a]);
+        rigidbody_wake (&world.bodies [b]);
         const float dt = 1.0f / 60.0f;
         float com_v0 = (2.0f * 2.0f + 1.0f * (-1.0f)) / 3.0f; /* 1.0 m/s */
         for (int t = 0; t < 600; t++) {
@@ -271,8 +271,8 @@ int main (void) {
         vector3 P = {0, 0, 0};
         float M = 0.0f;
         for (int i = 0; i < world.body_count; i++) {
-            P = vector3_addition (P, vector3_scaling (world.bodies[i].velocity, world.bodies[i].mass));
-            M += world.bodies[i].mass;
+            P = vector3_addition (P, vector3_scaling (world.bodies [i].velocity, world.bodies [i].mass));
+            M += world.bodies [i].mass;
         }
         float com_vx = P.x / M;
         float err = fabsf (com_vx - com_v0);
