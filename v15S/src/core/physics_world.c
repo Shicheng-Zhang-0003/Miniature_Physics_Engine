@@ -275,8 +275,16 @@ void physics_world_cleanup(physics_world *world) {
         return;
     }
     /* DESPOT-2026-10-01: never trust a wild count from a never-init world.
-     * Clamp to the static slot ceiling before walking the table. */
-    if (world->tick_module_count < 0 || world->tick_module_count > 8) {
+     * Clamp to the static slot ceiling before walking the table.
+     * DESPOT-2026-10-03: that ceiling was 8, but tick_modules[] is [16] and
+     * physics_world_attach_module accepts 16. A world with 9..16 modules
+     * attached therefore had its count zeroed here and detached NOTHING:
+     * every module's per-world state leaked, detach() was never called, and
+     * mpe_loader_release_module never ran, so the loader handle kept
+     * attachments > 0 and every later mpe_loader_unload returned -2 busy
+     * forever. One constant, total loss of a safety constraint. The ceiling
+     * must be the array size; better, the single place that knows it. */
+    if (world->tick_module_count < 0 || world->tick_module_count > MPE_MAX_TICK_MODULES) {
         world->tick_module_count = 0;
     }
     /* Detach modules first: plugin attach() may own per-world state. */
@@ -546,7 +554,7 @@ int physics_world_attach_module(physics_world *world, const mpe_module_desc_t *d
     if (!world || !desc || desc->abi != MPE_MODULE_ABI) return -1;
     for (int i = 0; i < world->tick_module_count; i++)
         if (world->tick_modules[i] == desc) return i;
-    if (world->tick_module_count >= 16) return -1;
+    if (world->tick_module_count >= MPE_MAX_TICK_MODULES) return -1;
     void *st = NULL;
     if (desc->attach && desc->attach(world, &st) != 0) return -1;
     world->tick_modules[world->tick_module_count] = desc;
@@ -1217,7 +1225,7 @@ void physics_world_step(physics_world *world, float dt) {    if ((!world) || (!w
         for (int o = 0; o < manifold_count; o++) {
             int m = world->manifold_order[o];
             if (!world->manifold_awake[m]) continue;
-            /* TRUTH: two visits per iteration (132 total at default 64, not
+            /* TRUTH: two visits per iteration (128 total at default 64, not
              * 64: the count knob undercounts by design for local coupling).
              * Convergent (no energy), just expensive. */
             mpe_step_resolve(world, &world->manifolds[m], dt, false, iter, step_cfg);
@@ -1373,11 +1381,19 @@ void physics_world_step(physics_world *world, float dt) {    if ((!world) || (!w
     /* World-edge safety net, same as the legacy path: perfectly plastic,
      * fires only past emergency slop (solver owns all normal contact). */
     bool a3_boundary_moved_any = false;
-    for (int i = 0; i < world->body_count; i++) {
-        vector3 a3_pre_boundary_position = world->bodies[i].position;
-        boundary_apply_box_cfg(&world->bodies[i], (vector3){-250, 0, -250}, (vector3){250, 500, 250}, step_cfg);
-        if (vector3_length_squared(vector3_subtraction(world->bodies[i].position, a3_pre_boundary_position)) > 0.000001f) {
-            a3_boundary_moved_any = true;
+    /* DESPOT-2026-10-03: gated on boundary.safety_net_enabled (default 1, so
+     * shipped behaviour is byte-identical). The net is a fail-safe; a
+     * fail-safe that is unconditionally on makes "nothing fell through the
+     * world" vacuous, which is why the f10/f11 `fallen` counters could never
+     * fire. A test now switches it off to measure the contact solver's own
+     * ability to hold a body up. See config/mpe_config.h. */
+    if (step_cfg->boundary.safety_net_enabled) {
+        for (int i = 0; i < world->body_count; i++) {
+            vector3 a3_pre_boundary_position = world->bodies[i].position;
+            boundary_apply_box_cfg(&world->bodies[i], (vector3){-250, 0, -250}, (vector3){250, 500, 250}, step_cfg);
+            if (vector3_length_squared(vector3_subtraction(world->bodies[i].position, a3_pre_boundary_position)) > 0.000001f) {
+                a3_boundary_moved_any = true;
+            }
         }
     }
 

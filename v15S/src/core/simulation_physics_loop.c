@@ -500,10 +500,14 @@ void simulation_physics_tick(float frame_delta_time) {
              * debug floor-only let bodies escape sideways in debug, diverging
              * from headless. Solver owns normal contact; boundary is plastic. */
             vector3 a3_pre_boundary_position = rigid_body->position;
-            boundary_apply_box_cfg(rigid_body, (vector3){-250, 0, -250}, (vector3){250, 500, 250},
-                                   mpe_world_cfg(world));
-            if (vector3_length_squared(vector3_subtraction(rigid_body->position, a3_pre_boundary_position)) > 0.000001f) {
-                a3_boundary_moved_any = true;
+            /* DESPOT-2026-10-03: same gate as the canonical step path, so the
+             * two paths cannot diverge on this. Default 1 = unchanged. */
+            if (mpe_world_cfg(world)->boundary.safety_net_enabled) {
+                boundary_apply_box_cfg(rigid_body, (vector3){-250, 0, -250}, (vector3){250, 500, 250},
+                                       mpe_world_cfg(world));
+                if (vector3_length_squared(vector3_subtraction(rigid_body->position, a3_pre_boundary_position)) > 0.000001f) {
+                    a3_boundary_moved_any = true;
+                }
             }
         }
         a3_positional_depenetration_pass_dt(world, world->pair_buffer, &detected_collision_count,

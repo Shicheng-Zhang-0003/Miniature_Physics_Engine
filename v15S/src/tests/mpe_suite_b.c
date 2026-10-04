@@ -753,7 +753,12 @@ int mpe_t_reference_math(void) {
         const vector3 ha = {0.5f, 0.5f, 0.5f};
         const vector3 hb = {0.5f, 0.5f, 0.5f};
         const vector4 qa = vector4_identity();
-        const vector4 qb = vector4_from_axis_with_angle((vector3){0,0,1}, 0.7853981634f);
+        /* DESPOT-2026-10-03: removed `qb`, a leftover that had been dead since
+         * this block was written and was the only warning in an otherwise
+         * warning-free suite build. Box B's orientation is `qq`, computed per
+         * iteration from a randomised axis and angle precisely so the
+         * separating-axis comparison is exercised over many orientations; a
+         * fixed second quaternion was never read. */
         int agree = 0, tested = 0;
         unsigned seed = 12345u;
         for (int k = 0; k < 400; k++) {
