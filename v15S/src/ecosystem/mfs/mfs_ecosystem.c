@@ -1,13 +1,16 @@
 /* MFS Ecosystem — "mfs-simulator" overarching descriptor.
  *
- * The single home for everything MFS-wise: it bundles every module the
- * MFS tree ships as internal modules sharing one per-world state slot.
+ * Streamlined 2026-10-04: the single home for MFS driving. Bundle attach
+ * brings up ftc-fleet (one robot via `ftc spawn`, mecanum via `ftc drive`).
+ * The BioBuzz game module (module_1: intake/shooter/balls/gamepad) stays
+ * registered but parked — attach it explicitly if a game session is wanted.
  * Modules live in modules/<name>/, their support libs in
  * modules/<name>/submodules/ (see README_MFS.md for the map).
  *
  * Architecture:
  * - MFS Ecosystem (this file) manages internal modules
  * - modules/module_1 (mfs_module_1.c) implements the BioBuzz simulation
+ *   (PARKED by default; direct API + MFS suite keep it green)
  * - modules/ftc (ftc_module.c) implements the ftc-fleet tick module,
  *   built on its submodules/ robot stack
  * - Internal module system (mfs_internal.c) manages module lifecycle
@@ -134,18 +137,21 @@ static int mfs_ecosystem_attach(mpe_world_t *world, void **eco_state) {
         }
     }
 
-    /* Attach internal modules. On a failure of the second attach, roll
-     * back the first: previously it was left attached to the world while
-     * the ecosystem returned -1 and freed only its own state, leaking the
-     * module's bodies and its slot in the world. */
-    if (mfs_internal_module_attach("mfs-simulator", (mpe_world_t*)world) != MFS_REG_OK) {
-        fprintf(stderr, "mfs_ecosystem: attach(mfs-simulator) failed\n");
-        free(state);
-        return -1;
-    }
+    /* Attach internal modules. Streamlined 2026-10-04 (v15S release
+     * blocker): the bundle attaches ftc-fleet ONLY. The BioBuzz game module
+     * (mfs-simulator: field + robot + intake + shooter + balls + gamepad) is
+     * PARKED by default — it stays registered below so an explicit
+     * `mfs_internal_module_attach("mfs-simulator", world)` (or the module_1
+     * direct API the MFS suite uses) still works, but a plain `eco attach`
+     * no longer drags a second robot, a ball set and a physical-gamepad
+     * probe into every drive session. One field (tile floor on spawn), one
+     * robot (ftc-fleet index 0), one controller (`ftc drive`).
+     * On a failure of the attach, roll back: previously a failed second
+     * attach left the first attached to the world while the ecosystem
+     * returned -1 and freed only its own state, leaking the module's
+     * bodies and its slot in the world. */
     if (mfs_internal_module_attach("ftc-fleet", (mpe_world_t*)world) != MFS_REG_OK) {
-        fprintf(stderr, "mfs_ecosystem: attach(ftc-fleet) failed; rolling back\n");
-        mfs_internal_module_detach("mfs-simulator", (physics_world *)world);
+        fprintf(stderr, "mfs_ecosystem: attach(ftc-fleet) failed\n");
         free(state);
         return -1;
     }
@@ -447,7 +453,7 @@ MPE_USED const mpe_ecosystem_desc_t mpe_ecosystem_desc = {
     .name = "mfs-simulator",
     .version = "1.0",
     .author = "MFS Team",
-    .description = "MFS overarching ecosystem: bundles modules/module_1 (BioBuzz sim) and modules/ftc (ftc-fleet) with their submodules",
+    .description = "MFS overarching ecosystem: ftc-fleet drive module attached by default; BioBuzz game module (module_1) registered but parked, attach explicitly",
     /* PHYSICS-TRUTH: bundles a non-deterministic module (see above). */
     .deterministic = false,
     .attach = mfs_ecosystem_attach,

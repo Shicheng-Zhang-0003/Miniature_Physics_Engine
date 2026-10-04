@@ -131,15 +131,16 @@ Thin-`.so` builds (either tree): `make` produces `mfs_module_1.so`,
 test. Out-of-tree engine work needs nothing else; or from `v15S/src`:
 `make mfs_ecosystem.so`.
 
-Inside the engine terminal (no rebuild needed — full drive session):
+Inside the engine terminal (no rebuild needed — full drive session).
+One field, one robot, one controller (streamlined 2026-10-04):
 
 ```
 mod load ecosystem/mfs/mfs_ecosystem.so   # load the bundle
-eco attach mfs-simulator                  # attach it to the primary world
-ftc spawn                                 # mecanum robot at the origin
-ftc drive 0 tank 1 1                      # full forward (persists)
-ftc telemetry 0                           # pose, odometry, battery, wheels
-ftc drive 0 stop
+eco attach mfs-simulator                  # attach ftc-fleet to the primary world
+ftc spawn                                 # THE mecanum robot, tile field auto-added
+ftc drive 1 0 0                           # full forward (persists; f/s/r)
+ftc telemetry                             # pose, odometry, battery, wheels
+ftc stop
 ```
 
 Lower level (single module instead of the bundle):
@@ -152,9 +153,11 @@ mod attach ftc-fleet        # per-world fleet allocated on primary
 
 `spawn` adds a tile floor automatically when the world has none
 (robots need frictional contact). `eco command mfs-simulator
-<spawn|drive|list|telemetry|help> [...]` drives the same surface the
-`ftc` commands use; `eco config mfs-simulator get shooter_rpm` reads
-bundle config.
+<spawn|drive|list|telemetry|help> [...]` drives the full fleet API
+(multi-robot, tank + mecanum, presets) that `ftc` streamlines for humans;
+`eco attach` no longer pulls in the parked BioBuzz game module
+(intake/shooter/balls/gamepad stay available via explicit module attach
+and the direct API, and stay green in the MFS suite).
 
 Spawning/commanding from host C (same headers, static or dlsym'd):
 

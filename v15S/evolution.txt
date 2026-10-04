@@ -65,3 +65,13 @@ Despot-1004: torture-leak recurrence closed (engine.cfg restored+guarded,
   caused (per-iteration selection) and fixed (tick-start snapshot:
   0.999-1.005 of mu_s*N); meta (b) withdrawn for measured chaos with
   calm-top gates; MFS tank re-baselined 0.0530->0.0642; full 234 green.
+
+Despot-1004b: FTC streamlined (v15S release blocker): one field, one robot,
+  one controller. `ftc` terminal command is spawn/drive/stop/telemetry,
+  mecanum-only, single robot (list/preset/tank/indices parked; fleet API,
+  bundle command surface, tank code and all tests keep the full surface).
+  `eco` slimmed to attach/detach/command (ls/config parked; C API intact).
+  Bundle `eco attach` brings up ftc-fleet only; BioBuzz game module
+  (intake/shooter/balls/gamepad) registered but parked, explicitly
+  attachable; GTK robot registry noted parked (already build-excluded).
+  Full profile still 234 green incl. all 14 MFS gates.
