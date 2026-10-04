@@ -26,7 +26,7 @@
  *    by an internal (recursive) loader mutex. The registry is touched only
  *    through its locked public API (never by direct struct access), so the
  *    lock order loader -> registry always holds. */
-int mpe_loader_load(const char *path, char *errbuf, int errlen);
+int mpe_loader_load (const char *path, char *errbuf, int errlen);
 /* Unload a loaded handle by path or name.
  *   0  unloaded
  *  -1  unknown handle
@@ -37,27 +37,27 @@ int mpe_loader_load(const char *path, char *errbuf, int errlen);
  *      step. Detach, then retry.
  *  -3  refused: the registered name does not fit the 128-byte teardown
  *      buffer and truncating it would half-tear-down the registry. */
-int mpe_loader_unload(const char *path_or_name);
-int mpe_loader_count(void);
-const char *mpe_loader_path_at(int i);
+int mpe_loader_unload (const char *path_or_name);
+int mpe_loader_count (void);
+const char *mpe_loader_path_at (int i);
 /* Module display name of handle i (from its mpe_module_desc), or NULL. */
-const char *mpe_loader_name_at(int i);
+const char *mpe_loader_name_at (int i);
 /* Resolve an exported symbol from a loaded handle (path, module name, or
  * ecosystem name). RTLD_NOLOAD: never loads, only resolves. NULL when
  * unknown — for terminal-driven plugin APIs (ftc/eco commands). */
-void *mpe_loader_symbol(const char *path_or_name, const char *sym);
+void *mpe_loader_symbol (const char *path_or_name, const char *sym);
 /* World attachment accounting prevents dlclose while a world can still call
  * a module callback. Static (non-dlopen) descriptors are harmless no-ops.
  * Matched by module NAME (registry copies vs .so originals differ). */
-void mpe_loader_retain_module(const void *desc);
-void mpe_loader_release_module(const void *desc);
+void mpe_loader_retain_module (const void *desc);
+void mpe_loader_release_module (const void *desc);
 /* Stage-detach dispatch (foreign-state leak backstop). Validates the
  * append-only stage_detach pointer (null-check + dladdr image check so a
  * stale .so built against the pre-hook header can never redirect control)
  * and invokes it with the owning world. No-op on NULL/foreign hooks. */
 struct physics_world;
-void mpe_loader_call_stage_detach(const void *desc, struct physics_world *world);
+void mpe_loader_call_stage_detach (const void *desc, struct physics_world *world);
 /* Code-address variant for stage slots that only retain the iface (not the
  * desc): finds the handle whose .so owns `fn` and runs its stage_detach. */
-void mpe_loader_call_stage_detach_for_fn(const void *fn, struct physics_world *world);
+void mpe_loader_call_stage_detach_for_fn (const void *fn, struct physics_world *world);
 #endif

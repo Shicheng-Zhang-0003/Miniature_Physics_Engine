@@ -22,8 +22,18 @@
  * Inertia formulas (verified, do not "fix"): sphere (2/5)mr² solid;
  * box (m/12)(h²+d²) per axis; cylinder axle-X ½mr² axial,
  * (m/12)(3r²+l²) transverse. */
-typedef enum { object_sphere, object_cube, object_cylinder, object_custom } object_type; /* MPE_FTC_090 + modular custom */
-enum { OBJECT_SPHERE = object_sphere, OBJECT_CUBE = object_cube, OBJECT_CYLINDER = object_cylinder, OBJECT_CUSTOM = object_custom };
+typedef enum {
+    object_sphere,
+    object_cube,
+    object_cylinder,
+    object_custom
+} object_type; /* MPE_FTC_090 + modular custom */
+enum {
+    OBJECT_SPHERE = object_sphere,
+    OBJECT_CUBE = object_cube,
+    OBJECT_CYLINDER = object_cylinder,
+    OBJECT_CUSTOM = object_custom
+};
 typedef struct {
     //Linear Kinematics
     vector3 position, velocity, acceleration;
@@ -111,8 +121,8 @@ typedef struct {
      * only reduce grip in the chosen direction. It cannot add energy or
      * destabilise a body that was stable without it. */
     bool friction_anisotropic;
-    float friction_along_axis;     /* Coulomb coefficient along friction_anisotropy_axis */
-    float friction_across_axis;    /* Coulomb coefficient perpendicular to it, in-plane */
+    float friction_along_axis; /* Coulomb coefficient along friction_anisotropy_axis */
+    float friction_across_axis; /* Coulomb coefficient perpendicular to it, in-plane */
     vector3 friction_anisotropy_axis; /* body-local unit axis (the FREE / roller-spin direction) */
     /* Object id of the body whose frame interprets friction_anisotropy_axis.
      * 0 means "this body" (the default, and what a tyre wants: its material
@@ -125,22 +135,23 @@ typedef struct {
      * the rail where the hardware keeps it. */
     uint32_t friction_anisotropy_frame;
 } rigidbody;
-void rigidbody_update_axes(rigidbody *rigid_body);
-void rigidbody_initialisation_sphere(rigidbody *rigid_body, float radius, float mass, vector3 position_input);
-void rigidbody_update_inertia_sphere(rigidbody *rigid_body);
-void rigidbody_update_inertia_cube(rigidbody *rigid_body);
-void rigidbody_initialisation_cylinder(rigidbody *rigid_body, float radius, float half_length, float mass, vector3 position_input); /* MPE_FTC_090 */
-void rigidbody_update_inertia_cylinder(rigidbody *rigid_body); /* MPE_FTC_090 */
-void rb_apply_forces_perfect(rigidbody *rigid_body, vector3 force_applied);
-void rb_apply_forces_localised(rigidbody *rigid_body, vector3 force_applied, vector3 locale_impact);
-float rb_get_kinetic_energy(rigidbody *rigid_body);
+void rigidbody_update_axes (rigidbody *rigid_body);
+void rigidbody_initialisation_sphere (rigidbody *rigid_body, float radius, float mass, vector3 position_input);
+void rigidbody_update_inertia_sphere (rigidbody *rigid_body);
+void rigidbody_update_inertia_cube (rigidbody *rigid_body);
+void rigidbody_initialisation_cylinder (rigidbody *rigid_body, float radius, float half_length, float mass,
+                                        vector3 position_input); /* MPE_FTC_090 */
+void rigidbody_update_inertia_cylinder (rigidbody *rigid_body); /* MPE_FTC_090 */
+void rb_apply_forces_perfect (rigidbody *rigid_body, vector3 force_applied);
+void rb_apply_forces_localised (rigidbody *rigid_body, vector3 force_applied, vector3 locale_impact);
+float rb_get_kinetic_energy (rigidbody *rigid_body);
 /* make_half_extents REMOVED (trivial helper, zero callers). */
-void rigidbody_initialisation_cube(rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass);
-void rigidbody_wake(rigidbody *rigid_body);
+void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions, float mass);
+void rigidbody_wake (rigidbody *rigid_body);
 
-void rigidbody_sanitize(rigidbody *rigid_body);
-void rigidbody_set_static(rigidbody *rigid_body, bool make_static);
-void rigidbody_set_kinematic(rigidbody *rigid_body, bool make_kinematic);
+void rigidbody_sanitize (rigidbody *rigid_body);
+void rigidbody_set_static (rigidbody *rigid_body, bool make_static);
+void rigidbody_set_kinematic (rigidbody *rigid_body, bool make_kinematic);
 /* Enable/disable anisotropic friction. axis_local is body-local and is
  * normalised here (a zero-length axis is rejected and leaves the body
  * isotropic). Coeffs are clamped to [0, 5] like friction_static/_kinetic;
@@ -151,16 +162,16 @@ void rigidbody_set_kinematic(rigidbody *rigid_body, bool make_kinematic);
  * mu_along = coefficient ALONG axis_local (the FREE / roller-spin direction,
  * LOW); mu_across = coefficient PERPENDICULAR in-plane (the GRIPPED roller
  * axis, HIGH). Maps 1:1 onto friction_along_axis / friction_across_axis. */
-void rigidbody_set_friction_anisotropic(rigidbody *rigid_body, vector3 axis_local, float mu_along, float mu_across);
+void rigidbody_set_friction_anisotropic (rigidbody *rigid_body, vector3 axis_local, float mu_along, float mu_across);
 /* Same, but friction_anisotropy_axis is interpreted in `frame_id`'s frame
  * instead of this body's. Pass 0 to keep the body-local default. */
-void rigidbody_set_friction_anisotropic_in_frame(rigidbody *rigid_body, uint32_t frame_id,
-                                                  vector3 axis_local, float mu_along, float mu_across);
-void rigidbody_clear_friction_anisotropic(rigidbody *rigid_body);
+void rigidbody_set_friction_anisotropic_in_frame (rigidbody *rigid_body, uint32_t frame_id, vector3 axis_local,
+                                                  float mu_along, float mu_across);
+void rigidbody_clear_friction_anisotropic (rigidbody *rigid_body);
 
-void rb_integrate_velocity(rigidbody *rigid_body, float delta_time, float linear_damping, float angular_damping);
-void rb_integrate_position(rigidbody *rigid_body, float delta_time);
-void rb_integrate_position_exact(rigidbody *rigid_body, float delta_time, const mpe_config_t *cfg, bool free_flight);
+void rb_integrate_velocity (rigidbody *rigid_body, float delta_time, float linear_damping, float angular_damping);
+void rb_integrate_position (rigidbody *rigid_body, float delta_time);
+void rb_integrate_position_exact (rigidbody *rigid_body, float delta_time, const mpe_config_t *cfg, bool free_flight);
 /* rb_integrate_position_free_flight_original REMOVED (was dead, invited double-counts). */
 
 /* Effective-mass helpers: sleeping/static/kinematic bodies behave as infinite
@@ -168,7 +179,7 @@ void rb_integrate_position_exact(rigidbody *rigid_body, float delta_time, const 
  * split impulse, and depenetration instead of zeroing the stored fields
  * (the old staticize hack corrupted observable state mid-tick and blocked
  * multithreading). */
-static inline float rigidbody_effective_inv_mass(const rigidbody *rb) {
+static inline float rigidbody_effective_inv_mass (const rigidbody *rb) {
     if (!rb) {
         return 0.0f;
     }
@@ -178,7 +189,7 @@ static inline float rigidbody_effective_inv_mass(const rigidbody *rb) {
     return rb->inverse_mass;
 }
 
-static inline bool rigidbody_is_awake_for_solver(const rigidbody *rb) {
+static inline bool rigidbody_is_awake_for_solver (const rigidbody *rb) {
     if (!rb) {
         return false;
     }
@@ -194,7 +205,7 @@ static inline bool rigidbody_is_awake_for_solver(const rigidbody *rb) {
 
 /* Effective inverse inertia: zero matrix for infinite-mass bodies, otherwise
  * the stored world-space inverse. Avoids mutating the stored field. */
-static inline math3 rigidbody_effective_inv_inertia(const rigidbody *rb) {
+static inline math3 rigidbody_effective_inv_inertia (const rigidbody *rb) {
     math3 zero = {{{0.0f}}};
     if (!rb) {
         return zero;
@@ -224,6 +235,6 @@ static inline math3 rigidbody_effective_inv_inertia(const rigidbody *rb) {
 extern unsigned long mpe_clamp_mass_events;
 extern unsigned long mpe_clamp_radius_events;
 extern unsigned long mpe_clamp_half_length_events;
-void mpe_clamp_counters_reset(void);
+void mpe_clamp_counters_reset (void);
 
 #endif

@@ -37,34 +37,32 @@ struct physics_world;
 typedef struct physics_world mpe_world_t;
 
 typedef struct {
-    uint32_t abi;          /* must equal MPE_MODULE_ABI */
-    const char *name;      /* e.g. "capsule-shape" */
-    const char *version;   /* e.g. "1.0" */
-    const char *kind;      /* "shape" | "broadphase" | "solver" | "forcefield" | "constraint" | "generic" */
-    bool deterministic;    /* true if bit-identical across IEEE targets */
-    int (*attach)(mpe_world_t *world, void **mod_state);
-    void (*detach)(mpe_world_t *world, void *mod_state);
-    void (*pre_step)(mpe_world_t *world, float dt, void *mod_state);
-    void (*post_step)(mpe_world_t *world, float dt, void *mod_state);
+    uint32_t abi; /* must equal MPE_MODULE_ABI */
+    const char *name; /* e.g. "capsule-shape" */
+    const char *version; /* e.g. "1.0" */
+    const char *kind; /* "shape" | "broadphase" | "solver" | "forcefield" | "constraint" | "generic" */
+    bool deterministic; /* true if bit-identical across IEEE targets */
+    int (*attach) (mpe_world_t *world, void **mod_state);
+    void (*detach) (mpe_world_t *world, void *mod_state);
+    void (*pre_step) (mpe_world_t *world, float dt, void *mod_state);
+    void (*post_step) (mpe_world_t *world, float dt, void *mod_state);
     /* Optional stage-state destructor (append-only; ABI still 1 — see
      * note above). Called with the owning world BEFORE the engine drops
      * that module's broadphase_state/solver_state (loader unload +
      * registry stage-unregister paths). NULL = no foreign stage state.
      * Old .so binaries (smaller struct) read as NULL via the loader's
      * validated accessor — never call this pointer without null-check. */
-    void (*stage_detach)(mpe_world_t *world);
+    void (*stage_detach) (mpe_world_t *world);
 } mpe_module_desc_t;
 
 /* Shape pair handler: collide A vs B into manifold_out (collision_data*).
  * Return true on contact (even slop-only friction contact). */
-typedef bool (*mpe_collide_fn)(rigidbody *a, rigidbody *b,
-                               void *manifold_out, mpe_world_t *world);
+typedef bool (*mpe_collide_fn) (rigidbody *a, rigidbody *b, void *manifold_out, mpe_world_t *world);
 
 /* Broadphase interface: typed pair buffer, world for config/scratch.
  * Return value: pair count (0 = degraded tick). NULL entry = builtin. */
 typedef struct {
-    int (*generate)(mpe_world_t *world, broadphase_pair *pairs_out, int max_pairs, float dt,
-                    void *mod_state);
+    int (*generate) (mpe_world_t *world, broadphase_pair *pairs_out, int max_pairs, float dt, void *mod_state);
 } mpe_broadphase_if_t;
 
 /* Solver stage interface: every hook optional (NULL = builtin).
@@ -72,11 +70,10 @@ typedef struct {
  * module state pointer from attach. Builtin semantics: sequential
  * impulses, Poisson restitution, Catto split, rolling resistance. */
 typedef struct {
-    float (*resolve)(mpe_world_t *world, void *manifold, float dt, bool friction_only, int iter,
-                     void *mod_state);
-    void (*poisson)(mpe_world_t *world, void *manifolds, int n, void *mod_state);
-    void (*rolling)(mpe_world_t *world, void *manifolds, int n, float dt, void *mod_state);
-    void (*split)(mpe_world_t *world, void *manifolds, int n, float dt, void *mod_state);
+    float (*resolve) (mpe_world_t *world, void *manifold, float dt, bool friction_only, int iter, void *mod_state);
+    void (*poisson) (mpe_world_t *world, void *manifolds, int n, void *mod_state);
+    void (*rolling) (mpe_world_t *world, void *manifolds, int n, float dt, void *mod_state);
+    void (*split) (mpe_world_t *world, void *manifolds, int n, float dt, void *mod_state);
 } mpe_solver_if_t;
 
 #endif

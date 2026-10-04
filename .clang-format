@@ -1,5 +1,12 @@
 # 475_FTC / MPE Code Style
-# Based on the existing codebase conventions
+# Exemplar: v15S/src/core/exemplar_formatting.h (tracked style reference).
+# Space-before-paren everywhere, packed short functions, single-line
+# short ifs. Manual conventions (not machine-enforced): descriptive
+# loop/param names (row_index, not i), // for short notes. Known deltas
+# vs the exemplar (deliberate, not drops): subscript stays tight
+# (matrix[0], not matrix [0] — clang-format cannot split declarations
+# from uses, so the exemplar's split convention is not automated);
+# top-level definitions stay one-per-line (the exemplar packs `} f(){}`).
 Language: Cpp
 BasedOnStyle: LLVM
 
@@ -42,10 +49,10 @@ AlignConsecutiveDeclarations: false
 AlignOperands: true
 AlignTrailingComments: false
 
-# Spacing
+# Spacing - exemplar: space before every paren
 SpaceAfterCStyleCast: true
 SpaceBeforeAssignmentOperators: true
-SpaceBeforeParens: ControlStatements
+SpaceBeforeParens: Always
 SpaceInEmptyParentheses: false
 SpacesInAngles: false
 SpacesInCStyleCastParentheses: false
@@ -53,11 +60,11 @@ SpacesInParentheses: false
 SpacesInSquareBrackets: false
 SpacesInContainerLiterals: false
 
-# Line breaks
+# Line breaks - exemplar packs short functions and short ifs
 AllowShortBlocksOnASingleLine: false
 AllowShortCaseLabelsOnASingleLine: false
-AllowShortFunctionsOnASingleLine: None
-AllowShortIfStatementsOnASingleLine: Never
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Always
 AllowShortLoopsOnASingleLine: false
 AlwaysBreakAfterReturnType: None
 BinPackArguments: true

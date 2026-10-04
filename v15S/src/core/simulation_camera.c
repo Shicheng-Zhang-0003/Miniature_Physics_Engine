@@ -17,20 +17,20 @@
 extern camera main_camera_fov;
 extern input_status main_inputs;
 
-void simulation_camera_tick(float frame_delta_time) {
+void simulation_camera_tick (float frame_delta_time) {
     /* Game Mode: grounded WASD */
     if (!main_inputs.is_debug_mode_active) {
         if (main_inputs.w_key_pressed) {
-            camera_move_forward(&main_camera_fov, frame_delta_time);
+            camera_move_forward (&main_camera_fov, frame_delta_time);
         }
         if (main_inputs.a_key_pressed) {
-            camera_move_left(&main_camera_fov, frame_delta_time);
+            camera_move_left (&main_camera_fov, frame_delta_time);
         }
         if (main_inputs.s_key_pressed) {
-            camera_move_backward(&main_camera_fov, frame_delta_time);
+            camera_move_backward (&main_camera_fov, frame_delta_time);
         }
         if (main_inputs.d_key_pressed) {
-            camera_move_right(&main_camera_fov, frame_delta_time);
+            camera_move_right (&main_camera_fov, frame_delta_time);
         }
     }
 
@@ -57,24 +57,20 @@ void simulation_camera_tick(float frame_delta_time) {
          * conventions, documented at the declaration. */
         float debug_speed = main_camera_fov.movement_speed * frame_delta_time;
         if (main_inputs.w_key_pressed) {
-            main_camera_fov.position = vector3_addition(
-                main_camera_fov.position,
-                vector3_scaling(main_camera_fov.forward_vector, debug_speed));
+            main_camera_fov.position = vector3_addition (main_camera_fov.position,
+                                                         vector3_scaling (main_camera_fov.forward_vector, debug_speed));
         }
         if (main_inputs.s_key_pressed) {
-            main_camera_fov.position = vector3_subtraction(
-                main_camera_fov.position,
-                vector3_scaling(main_camera_fov.forward_vector, debug_speed));
+            main_camera_fov.position = vector3_subtraction (
+                main_camera_fov.position, vector3_scaling (main_camera_fov.forward_vector, debug_speed));
         }
         if (main_inputs.a_key_pressed) {
-            main_camera_fov.position = vector3_subtraction(
-                main_camera_fov.position,
-                vector3_scaling(main_camera_fov.side_vector, debug_speed));
+            main_camera_fov.position = vector3_subtraction (main_camera_fov.position,
+                                                            vector3_scaling (main_camera_fov.side_vector, debug_speed));
         }
         if (main_inputs.d_key_pressed) {
-            main_camera_fov.position = vector3_addition(
-                main_camera_fov.position,
-                vector3_scaling(main_camera_fov.side_vector, debug_speed));
+            main_camera_fov.position =
+                vector3_addition (main_camera_fov.position, vector3_scaling (main_camera_fov.side_vector, debug_speed));
         }
         if (main_inputs.space_key_pressed) {
             main_camera_fov.position.y += debug_speed;
@@ -83,16 +79,28 @@ void simulation_camera_tick(float frame_delta_time) {
             main_camera_fov.position.y -= debug_speed;
         }
         float ijkl_speed = g_cfg.camera.ijkl_speed * frame_delta_time;
-        if (main_inputs.i_key_pressed) { main_camera_fov.pitch += ijkl_speed; }
-        if (main_inputs.k_key_pressed) { main_camera_fov.pitch -= ijkl_speed; }
-        if (main_inputs.j_key_pressed) { main_camera_fov.yaw -= ijkl_speed; }
-        if (main_inputs.l_key_pressed) { main_camera_fov.yaw += ijkl_speed; }
+        if (main_inputs.i_key_pressed) {
+            main_camera_fov.pitch += ijkl_speed;
+        }
+        if (main_inputs.k_key_pressed) {
+            main_camera_fov.pitch -= ijkl_speed;
+        }
+        if (main_inputs.j_key_pressed) {
+            main_camera_fov.yaw -= ijkl_speed;
+        }
+        if (main_inputs.l_key_pressed) {
+            main_camera_fov.yaw += ijkl_speed;
+        }
     }
 
     /* Pitch clamp */
-    if (main_camera_fov.pitch > 89.0f) { main_camera_fov.pitch = 89.0f; }
-    if (main_camera_fov.pitch < -89.0f) { main_camera_fov.pitch = -89.0f; }
-    camera_update_vectors(&main_camera_fov);
+    if (main_camera_fov.pitch > 89.0f) {
+        main_camera_fov.pitch = 89.0f;
+    }
+    if (main_camera_fov.pitch < -89.0f) {
+        main_camera_fov.pitch = -89.0f;
+    }
+    camera_update_vectors (&main_camera_fov);
 
     /* Character logic (Game Mode only) */
     if (!main_inputs.is_debug_mode_active) {
@@ -109,14 +117,22 @@ void simulation_camera_tick(float frame_delta_time) {
             main_camera_fov.position.y = 2.0f;
             main_camera_fov.vertical_velocity = 0.0f;
             if (main_inputs.space_key_pressed) {
-                float jump_velocity = sqrtf(2.0f * fabsf(g_cfg.world.gravity) * g_cfg.camera.jump_height);
+                float jump_velocity = sqrtf (2.0f * fabsf (g_cfg.world.gravity) * g_cfg.camera.jump_height);
                 main_camera_fov.vertical_velocity = jump_velocity;
                 main_inputs.space_key_pressed = false;
             }
         }
-        if (main_camera_fov.position.x < -250.0f) { main_camera_fov.position.x = -250.0f; }
-        if (main_camera_fov.position.x > 250.0f) { main_camera_fov.position.x = 250.0f; }
-        if (main_camera_fov.position.z < -250.0f) { main_camera_fov.position.z = -250.0f; }
-        if (main_camera_fov.position.z > 250.0f) { main_camera_fov.position.z = 250.0f; }
+        if (main_camera_fov.position.x < -250.0f) {
+            main_camera_fov.position.x = -250.0f;
+        }
+        if (main_camera_fov.position.x > 250.0f) {
+            main_camera_fov.position.x = 250.0f;
+        }
+        if (main_camera_fov.position.z < -250.0f) {
+            main_camera_fov.position.z = -250.0f;
+        }
+        if (main_camera_fov.position.z > 250.0f) {
+            main_camera_fov.position.z = 250.0f;
+        }
     }
 }
