@@ -333,6 +333,10 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
     uint32_t spring_count_u = 0;
     staged_joint *staged_springs = NULL;
     int staged_spring_count = 0;
+    /* DESPOT-2026-10-04: every dropped staged entry across all six sections
+     * is counted and reported once before commit (a file that silently
+     * sheds joints is corruption the operator must see). */
+    int dropped_staged = 0;
     int springs_ok = body_ok;
     if (springs_ok) {
         springs_ok = springs_ok && scene_r32(f, &crc, &spring_count_u);
@@ -359,6 +363,7 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
         if ((id_a == 0) || (id_a == id_b) || (!scene_id_in_staged(staged_ids, staged_body_count, id_a)) ||
             (!scene_id_in_staged(staged_ids, staged_body_count, id_b)) || (!isfinite(eq)) || (!isfinite(k)) ||
             (!isfinite(c)) || (eq < 0.0f) || (k < 0.0f) || (c < 0.0f)) {
+            dropped_staged++;
             continue;
         }
         staged_springs[staged_spring_count].id_a = id_a;
@@ -397,6 +402,7 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
             (!scene_id_in_staged(staged_ids, staged_body_count, fc.id_a)) ||
             (!scene_id_in_staged(staged_ids, staged_body_count, fc.id_b)) ||
             (!scene_vec3_finite(fc.anchor_a)) || (!scene_vec3_finite(fc.anchor_b))) {
+            dropped_staged++;
             continue;
         }
         staged_fixeds[staged_fixed_count++] = fc;
@@ -432,6 +438,7 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
             (!scene_id_in_staged(staged_ids, staged_body_count, dc.id_b)) ||
             (!scene_vec3_finite(dc.anchor_a)) || (!scene_vec3_finite(dc.anchor_b)) ||
             (!isfinite(dc.rest_length)) || (dc.rest_length < 0.0f)) {
+            dropped_staged++;
             continue;
         }
         staged_dists[staged_dist_count++] = dc;
@@ -481,6 +488,7 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
             (!isfinite(pc.motor_target_speed)) || (!isfinite(pc.motor_max_force)) || (pc.motor_max_force < 0.0f) ||
             (!isfinite(pc.limit_min)) || (!isfinite(pc.limit_max)) ||
             (pc.limits_enabled && pc.limit_min > pc.limit_max)) {
+            dropped_staged++;
             continue;
         }
         staged_prisms[staged_prism_count++] = pc;
@@ -516,6 +524,7 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
             (!scene_id_in_staged(staged_ids, staged_body_count, rc.id_b)) ||
             (!scene_vec3_finite(rc.anchor_a)) || (!scene_vec3_finite(rc.anchor_b)) ||
             (!isfinite(rc.rest_length)) || (rc.rest_length < 0.0f)) {
+            dropped_staged++;
             continue;
         }
         staged_ropes[staged_rope_count++] = rc;
@@ -567,6 +576,7 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
             (!isfinite(r.motor_target)) || (!isfinite(r.motor_max_torque)) || (r.motor_max_torque < 0.0f) ||
             (!isfinite(r.limit_min)) || (!isfinite(r.limit_max)) ||
             (r.limits_enabled && r.limit_min > r.limit_max)) {
+            dropped_staged++;
             continue;
         }
         staged_revs[staged_rev_count++] = r;
@@ -608,6 +618,10 @@ static int scene_loading_v200(FILE *f, uint32_t header_crc) {
     /* Delay world-pool growth until the complete staged file has passed all
      * parsing, structural validation, CRC, and EOF checks. A rejected file
      * must not invalidate existing body pointers via realloc. */
+    if (dropped_staged > 0) {
+        fprintf(stderr, "[scene] v200 load: dropped %d dangling/invalid staged joint entries\n",
+                dropped_staged);
+    }
     physics_world *primary = physics_world_get_primary();
     if ((!primary) || (!scene_ensure_pool_capacity(count)) || (count > primary->body_capacity)) {
         free(staged_bodies);
@@ -870,6 +884,45 @@ int scene_loading(const char *file_source_path)
         temp.type = (object_type)type_int;
         temp.static_state = (static_int != 0);
 
+        /* DESPOT-2026-10-04: the legacy reader had NO finite/range
+         * validation (the v200 path vetoes NaN/Inf, bad types, zero quats,
+         * wild positions). A hostile legacy file could stage NaN bodies,
+         * negative types (falling into the else→sphere branch), or zero
+         * quats straight into the live world. Mirror the v200 vetoes here:
+         * fail-closed, scene untouched. */
+        {
+            float ldf_vals[] = {temp.mass, temp.radius, temp.cylinder_half_length,
+                                temp.half_extensions.x, temp.half_extensions.y, temp.half_extensions.z,
+                                temp.position.x, temp.position.y, temp.position.z,
+                                temp.velocity.x, temp.velocity.y, temp.velocity.z,
+                                temp.angular_velocity.x, temp.angular_velocity.y, temp.angular_velocity.z,
+                                temp.orientation.w, temp.orientation.x, temp.orientation.y,
+                                temp.orientation.z, temp.colour.x, temp.colour.y, temp.colour.z,
+                                temp.restitution, temp.friction_static, temp.friction_kinetic};
+            bool ldf_fin = true;
+            for (size_t ldf_vi = 0; ldf_vi < sizeof(ldf_vals) / sizeof(ldf_vals[0]); ldf_vi++) {
+                if (!isfinite(ldf_vals[ldf_vi])) {
+                    ldf_fin = false;
+                    break;
+                }
+            }
+            double ldf_q2 = (double) temp.orientation.w * temp.orientation.w +
+                            (double) temp.orientation.x * temp.orientation.x +
+                            (double) temp.orientation.y * temp.orientation.y +
+                            (double) temp.orientation.z * temp.orientation.z;
+            if (!ldf_fin || (type_int < (int32_t) object_sphere) || (type_int > (int32_t) object_custom) ||
+                !(ldf_q2 > 1e-12) || fabsf(temp.position.x) > 1e6f || fabsf(temp.position.y) > 1e6f ||
+                fabsf(temp.position.z) > 1e6f || !(temp.mass >= 0.0f)) {
+                fprintf(stderr, "Error LDF: legacy body %d failed validation (non-finite/bad type/degenerate)\n", i);
+                free(staged_bodies);
+                if (staged_ids) {
+                    free(staged_ids);
+                }
+                fclose(f);
+                return 0;
+            }
+        }
+
         /* Initialise the staged body */
         if (temp.type == object_cube) {
             rigidbody_initialisation_cube(&staged_bodies[i],
@@ -950,11 +1003,25 @@ int scene_loading(const char *file_source_path)
             int32_t id_a, id_b;
             float eq, k, c;
 
-            if (!read_int(f, &id_a))   { staged_joint_count = j; break; }
-            if (!read_int(f, &id_b))   { staged_joint_count = j; break; }
-            if (!read_float(f, &eq))   { staged_joint_count = j; break; }
-            if (!read_float(f, &k))    { staged_joint_count = j; break; }
-            if (!read_float(f, &c))    { staged_joint_count = j; break; }
+            /* DESPOT-2026-10-04: truncated joints used to silently
+             * downgrade the count and COMMIT a partial joint set as
+             * success (bodies truncate→veto, joints truncate→partial
+             * commit). A short joint section is corruption: veto the
+             * whole load, scene untouched. */
+            if (!read_int(f, &id_a) || !read_int(f, &id_b) || !read_float(f, &eq) || !read_float(f, &k) ||
+                !read_float(f, &c)) {
+                fprintf(stderr, "Error LDF: legacy joint section truncated at joint %d/%d\n", j,
+                        staged_joint_count);
+                free(staged_bodies);
+                if (staged_ids) {
+                    free(staged_ids);
+                }
+                if (staged_joints) {
+                    free(staged_joints);
+                }
+                fclose(f);
+                return 0;
+            }
 
             staged_joints[j].id_a = (uint32_t)id_a;
             staged_joints[j].id_b = (uint32_t)id_b;

@@ -101,10 +101,17 @@ int tui_dump_snapshot(FILE *out, physics_world *world, unsigned long tick, float
     int bad = 0;
     for (int i = 0; i < world->body_count; i++) {
         rigidbody *rb = &world->bodies[i];
+        /* DESPOT-2026-10-04: bad used to cover only pos/vel/angvel while a
+         * NaN orientation/colour/mass still printed "nan" under a PASS
+         * header. Cover the full persisted state. */
         if (!isfinite(rb->position.x) || !isfinite(rb->position.y) || !isfinite(rb->position.z) ||
             !isfinite(rb->velocity.x) || !isfinite(rb->velocity.y) || !isfinite(rb->velocity.z) ||
             !isfinite(rb->angular_velocity.x) || !isfinite(rb->angular_velocity.y) ||
-            !isfinite(rb->angular_velocity.z)) {
+            !isfinite(rb->angular_velocity.z) || !isfinite(rb->orientation.w) ||
+            !isfinite(rb->orientation.x) || !isfinite(rb->orientation.y) || !isfinite(rb->orientation.z) ||
+            !isfinite(rb->colour.x) || !isfinite(rb->colour.y) || !isfinite(rb->colour.z) ||
+            !isfinite(rb->mass) || !isfinite(rb->restitution) || !isfinite(rb->friction_static) ||
+            !isfinite(rb->friction_kinetic)) {
             bad = 1;
         }
     }
@@ -335,8 +342,8 @@ int tui_dump_snapshot(FILE *out, physics_world *world, unsigned long tick, float
             }
         }
     }
-    fprintf(out, "[pairs] total=%ld shown=%s closest=[%d]<->[%d] %.5f farthest=[%d]<->[%d] %.5f\n", total_pairs,
-            n <= 24 ? "all" : "truncated", cmini, cminj, cmin, cmaxi, cmaxj, cmax);
+    fprintf(out, "[pairs] total=%ld shown=%s closest=[%d]<->[%d] %.5f farthest=[%d]<->[%d] %.5f scan=%d/%d\n",
+            total_pairs, n <= 24 ? "all" : "truncated", cmini, cminj, cmin, cmaxi, cmaxj, cmax, cap, n);
     int shown = 0;
     int show_all = n <= 24;
     for (int i = 0; i < cap; i++) {
@@ -375,5 +382,13 @@ int tui_dump_snapshot(FILE *out, physics_world *world, unsigned long tick, float
             broadphase_get_pair_overflow_count(world), broadphase_get_pair_dedupe_overflow_count(world),
             broadphase_get_large_object_clamp_count(world));
     fprintf(out, "[result] %s\n", bad ? "FAIL" : "PASS");
+    /* DESPOT-2026-10-04: ~40 unchecked fprints above — an ENOSPC/EPIPE
+     * mid-dump used to return 0 (PASS) with a short file. Distinguish
+     * stream failure (rc=2) from physics failure (rc=1). */
+    fflush(out);
+    if (ferror(out)) {
+        fprintf(stderr, "[tui] snapshot stream error after %lu ticks\n", tick);
+        return 2;
+    }
     return bad ? 1 : 0;
 }
