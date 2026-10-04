@@ -82,3 +82,11 @@ Despot-1004c: F310 gamepad is the single robot controller
   pre-physics in the GUI frame only). Terminal `ftc drive`/`stop` removed
   (spawn/telemetry remain); tank stays in engine/tests/bundle API.
   Full profile still 234 green incl. all 14 MFS gates.
+
+Despot-1004d: live robot physics fixed (release storm + glide + tilt).
+  Idle runs explicit regen (observer storm gone), slew bypassed at idle,
+  idle brake halved (no ping-pong overshoot), idle analytic parked with
+  real 0.9/0.7 hub friction (longitudinal coupling restored, one cone),
+  spawn paths auto-raise to 128 iters (40:1 joints converge, tilt flat).
+  Mecanum strafe byte-identical. New release_settle gate (15/15 MFS).
+  Full profile still 234 green.

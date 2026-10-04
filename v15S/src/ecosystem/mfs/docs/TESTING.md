@@ -4,7 +4,7 @@ What the suite contains, what each gate proves, and how to run it.
 
 ## Suite layout
 
-- **Unified suite** (`tests/mfs_suite_main.c` + `mfs_suite_a/b/c.c`, 14 gated
+- **Unified suite** (`tests/mfs_suite_main.c` + `mfs_suite_a/b/c.c`, 15 gated
   tests, registry with exact-name dispatch, config save/restore, NaN
   watchdog). This is what `build_tests.sh` runs and what the release gates
   count.
@@ -28,6 +28,7 @@ What the suite contains, what each gate proves, and how to run it.
 |---|---|---|
 | `teleop` | tank full-forward, 180 ticks | disp ≥ 0.5 m, \|dy\| ≤ 1.0, yaw ≤ 0.3 rad |
 | `mecanum` | strafe 180 ticks | strafe ≥ 0.30 m (MFS-STRAFE-F1 FIXED; was XFAIL) |
+| `release_settle` | fwd 180 + release 240 ticks | drive ≥ 0.5 m, then chassis < 0.1 m/s, wheels < 2 rad/s, axles < 3° (DESPOT-2026-10-04: locks the idle-observer storm + glide-equilibrium fixes) |
 | `tank` | differential turn 120 ticks | disp ≤ 0.3 m, yaw ≥ 0.1 rad |
 | `odometry` | fwd 180 + strafe 60 ticks | move > 0.2 m, odom error < 30% (fwd); strafe transmit ≥ 0.10 m + tracking ≤ 30% (MFS-STRAFE-F2 FIXED; was XFAIL, tripwire kept) |
 | `ftc_integration` | fwd + turn + strafe smoke | disp > 0.5 m, dy < 0.5 m, finite |

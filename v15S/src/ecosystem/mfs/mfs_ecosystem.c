@@ -26,6 +26,7 @@
 #include "modules/ftc/submodules/motor_presets.h"
 #include "modules/ftc/submodules/battery.h"
 #include "core/physics_world.h"
+#include "config/mpe_config.h"
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
@@ -253,6 +254,15 @@ static int eco_preset_by_name(const char *want) {
     return found;
 }
 
+/* Iteration guarantee (same contract as the terminal spawn path: the
+ * 40:1 chassis/wheel mass ratio needs 128 iterations; 64 wobbles axles
+ * loose). Loud, never silent; adequate configs untouched. */
+static void eco_ensure_iterations(void) {
+    if (g_cfg.timestep.solver_iterations < 128) {
+        g_cfg.timestep.solver_iterations = 128;
+        printf("mfs: solver iterations raised to 128 (robot joints need it; was lower)\n");
+    }
+}
 /* Tile floor guarantee (same contract as the terminal spawn path:
  * robots need frictional contact; reported, never silent). */
 static int eco_ensure_floor(physics_world *w) {
@@ -350,6 +360,7 @@ static int mfs_ecosystem_command(void *eco_state, int argc, char **argv) {
             printf("mfs: could not ensure floor\n");
             return -1;
         }
+        eco_ensure_iterations();
         int idx = ftc_fleet_spawn(w, x, y, z, (motor_preset_id)preset, dtype);
         if (idx < 0) {
             printf("mfs: spawn failed (no fleet attached? attach the bundle first)\n");

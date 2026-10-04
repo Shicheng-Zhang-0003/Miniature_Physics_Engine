@@ -363,7 +363,16 @@ return -1;
          * MFS-STRAFE-A: analytic mode zeroes hub friction (the analytic
          * roller force in drivetrain_update is then the SOLE tangential
          * model — one contact force, never double-counted past the cone).
-         * Normal impulse is unaffected (friction 0 still collides). */
+         * Normal impulse is unaffected (friction 0 still collides).
+         * DESPOT-2026-10-04 (idle-tire switch): the zero is now COMMAND-
+         * GATED below (see the idle block after the motor setup): driven
+         * wheels keep analytic-lateral-only (strafe-validated behaviour
+         * untouched); uncommanded wheels get real 0.9/0.7 engine friction.
+         * Without this, nothing coupled wheel spin to chassis translation
+         * longitudinally at idle — uncommanded wheels held ±25 rad/s and
+         * the vehicle glided ~60 s with brake + rolling resistance both
+         * engaged. Initial state here is driven-mode (zeroed); the
+         * per-tick switch below owns it afterwards. */
         if (wheel_is_mecanum_w && robot->mecanum_analytic) {
             world->bodies[robot->wheel_bodies[i]].friction_static = 0.0f;
             world->bodies[robot->wheel_bodies[i]].friction_kinetic = 0.0f;
@@ -673,6 +682,34 @@ void ftc_robot_update(physics_world *world, ftc_robot *robot, float dt) {
     if (any_command && robot->chassis_body >= 0 && robot->chassis_body < world->body_count) {
         rigidbody_wake(&world->bodies[robot->chassis_body]);
     }
+    /* DESPOT-2026-10-04 idle-tire switch (see creation comment above):
+     * driven analytic-mecanum wheels keep zeroed hub friction (analytic
+     * lateral owns the contact); uncommanded ones get real 0.9/0.7 engine
+     * friction so tire-to-ground longitudinal coupling exists at idle.
+     * Without this, brake + rolling resistance damped spin while nothing
+     * coupled it to translation: measured frozen ±25 rad/s spin with a
+     * ~60 s vehicle glide. Tank and articulated builds never zero, so
+     * they are untouched (gated on mecanum_analytic + wheel flag). */
+    if (robot->drivetrain_type == FTC_DRIVETRAIN_MECANUM && robot->mecanum_analytic) {
+        float idle_max = 0.0f;
+        for (int ci = 0; ci < robot->wheel_count; ci++) {
+            float a = fabsf(robot->wheel_motors[ci].command);
+            if (a > idle_max) idle_max = a;
+        }
+        int idle_tires = (idle_max < 0.05f) ? 1 : 0;
+        for (int ci = 0; ci < robot->wheel_count; ci++) {
+            if (!robot->wheel_is_mecanum[ci]) continue;
+            int wi = robot->wheel_bodies[ci];
+            if (wi < 0 || wi >= world->body_count) continue;
+            if (idle_tires) {
+                world->bodies[wi].friction_static = 0.9f;
+                world->bodies[wi].friction_kinetic = 0.7f;
+            } else {
+                world->bodies[wi].friction_static = 0.0f;
+                world->bodies[wi].friction_kinetic = 0.0f;
+            }
+        }
+    }
     /* A sleeping chassis with real velocity is inconsistent state: the
      * velocity integrator drains forces for sleepers, so motion freezes
      * mid-drift (measured T8 hold failure). Truly settled bodies sit
@@ -825,16 +862,37 @@ void ftc_robot_update(physics_world *world, ftc_robot *robot, float dt) {
             }
         }
 
-        /* Update motor electrical state (implicit-in-speed: stable for
-         * light wheels; same stall/free endpoints as explicit). */
+        /* Update motor electrical state.
+         * DESPOT-2026-10-04 (idle/coast split): at ~zero command the wheel
+         * is uncommanded rotating mass, not a driven plant. The implicit
+         * observer path plans torque against last tick's speed discrepancy,
+         * and on light wheels with joint-hammered speed reads that plans
+         * alternating ±stall: measured 4-tick ±0.6 slew-rail limit cycle at
+         * cmd=0 with wheels ±70 rad/s forever (release never settles). The
+         * explicit path is the passive regen damper (exact, memoryless);
+         * with the idle brake below it stops the wheel in 1 tick and holds
+         * it. Observer state still refreshes above every tick, so re-drive
+         * resumes with live state. Driven operation is untouched. */
         float axle_inertia = 0.5f * wheel->mass * r_run * r_run;
-        motor_update_load(&robot->wheel_motors[i], wheel_speed, dt, terminal_voltage, axle_inertia);
+        int idle_coast = (fabsf(robot->wheel_motors[i].command) < 0.05f) ? 1 : 0;
+        if (idle_coast) {
+            motor_update(&robot->wheel_motors[i], wheel_speed, dt, terminal_voltage);
+        } else {
+            motor_update_load(&robot->wheel_motors[i], wheel_speed, dt, terminal_voltage,
+                              axle_inertia);
+        }
 
         /* Traction cut applies to delivered torque (both the axle drive
          * below and the traction loop in drivetrain_update read
          * output_torque). Electrical readings (current/rpm) stay
-         * unscaled: they report the commanded state. */
-        robot->wheel_motors[i].output_torque *= robot->wheel_traction_scale[i];
+         * unscaled: they report the commanded state.
+         * DESPOT-2026-10-04: at idle the cut is bypassed. It regulates
+         * drive peel-out (propulsive overspeed); strangling the regen
+         * brake 0.15-coasts it into uselessness while the contact solver
+         * already cone-bounds whatever reaches the ground. */
+        if (!idle_coast) {
+            robot->wheel_motors[i].output_torque *= robot->wheel_traction_scale[i];
+        }
 
         /* Apply motor torque along the actual physical axle in world space.
          * Free-speed governor: a motor cannot push its wheel past free
@@ -878,14 +936,22 @@ void ftc_robot_update(physics_world *world, ftc_robot *robot, float dt) {
          * air-spin limit cycle is a documented frontier, and T6 now tests
          * the motor endpoint isolated (no joints) instead of through it. */
         {
-            float prev = robot->wheel_applied_torque[i];
-            if (!isfinite(prev)) prev = 0.0f;
-            float want = torque;
-            float dl = want - prev;
-            const float max_slew = 0.6f;
-            if (dl > max_slew) want = prev + max_slew;
-            else if (dl < -max_slew) want = prev - max_slew;
-            torque = want;
+            /* DESPOT-2026-10-04: slew feathers DRIVE steps; at idle it is
+             * bypassed. The idle-brake value below is exactly stop-sized,
+             * and rate-limiting it to ±0.6/tick is what produced the
+             * measured 4-tick bang-bang (brake wants -2.x, slew gives 0,
+             * brake sees 0 and skips, repeat forever). An exact stop needs
+             * no ramp. */
+            if (!idle_coast) {
+                float prev = robot->wheel_applied_torque[i];
+                if (!isfinite(prev)) prev = 0.0f;
+                float want = torque;
+                float dl = want - prev;
+                const float max_slew = 0.6f;
+                if (dl > max_slew) want = prev + max_slew;
+                else if (dl < -max_slew) want = prev - max_slew;
+                torque = want;
+            }
             /* DESPOT-2026-10-02 (programming lie: the slew state was the
              * wrong number). The store used to happen HERE, before the
              * free-speed governor and the idle brake below, both of which
@@ -942,13 +1008,21 @@ void ftc_robot_update(physics_world *world, ftc_robot *robot, float dt) {
         }
         /* MFS_145_IDLE_BRAKE: back-EMF braking is a damper — it brings a coasting
          * wheel to rest and can never reverse it (no back-EMF once stopped).
-         * At idle, clamp the braking torque to the amount that stops the wheel
-         * within this timestep. Without this, the stall-clamped back-EMF torque
-         * (~2.17 N·m) reverses the light wheel every step -> ±25 rad/s idle spin. */
+         * DESPOT-2026-10-04 (ping-pong fix): the clamp used to be sized for
+         * an EXACT stop in one tick (I*|w|/dt). That assumes the brake acts
+         * alone — but contact friction and joint impulses act in the same
+         * tick, so brake-plus-contact overshot past zero every tick and the
+         * next tick braked the reversal: measured ±34 rad/s wheel-speed
+         * ping-pong forever at zero command, hammering the revolute joints
+         * until axles visibly tilted (15°). The clamp is now HALF the
+         * stop-in-tick value: geometric decay (no overshoot possible no
+         * matter what contact adds — contact itself never overshoots), so
+         * the wheel converges instead of alternating. Airborne (no contact
+         * help) still stops geometrically in ~10 ticks. */
         if ((fabsf(robot->wheel_motors[i].command) < 0.05f) && ((torque * wheel_speed) < 0.0f)) {
             float mfs_i_axle = 0.5f * wheel->mass * r_run * r_run;
             if (mfs_i_axle > 0.0f) {
-                float mfs_max_brake = mfs_i_axle * fabsf(wheel_speed) / dt;
+                float mfs_max_brake = 0.5f * mfs_i_axle * fabsf(wheel_speed) / dt;
                 if (fabsf(torque) > mfs_max_brake) {
                     torque = (torque > 0.0f) ? mfs_max_brake : -mfs_max_brake;
                 }

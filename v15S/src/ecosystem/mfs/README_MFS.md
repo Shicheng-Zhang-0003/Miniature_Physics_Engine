@@ -8,8 +8,8 @@
 > fixed and now reports three distinct outcomes (in sync / drift / **did not
 > run**); the drift was mirrored (the twin was verified to be a strict
 > superset, so nothing was lost); and `.gitignore` was added after finding 13
-> build artifacts tracked since the initial import. Suite is now **14 gated
-> tests, 14/14**, clean under ASan+UBSan. See `docs/KNOWN_FAILURES.md` for the
+> build artifacts tracked since the initial import. Suite is now **15 gated
+> tests, 15/15**, clean under ASan+UBSan. See `docs/KNOWN_FAILURES.md` for the
 > full ledger.
 
 Everything MFS-wise lives under this folder: modules and submodules
@@ -22,7 +22,7 @@ v15S/src/ecosystem/mfs/                  # MFS root ("mfs-simulator")
   README_MFS.md                          # this file
   Makefile                               # unified standalone build (thin .so, build/ objs)
   mfs_sources.mk                         # canonical engine+FTC file lists (mirrored in build_tests.sh)
-  build_tests.sh                         # FTC/robotics test build + run (14 gated (unified) + build checks + ungated diags)
+  build_tests.sh                         # FTC/robotics test build + run (15 gated (unified) + build checks + ungated diags)
   mfs_ecosystem.c                        # overarching descriptor: registers
                                          #   modules/module_1 + modules/ftc
   mfs_internal.c/.h                      # internal static module registry
@@ -107,7 +107,7 @@ Design rules modules follow (and future modules should too):
 From `v15S/src` (canonical — what CI and the release ritual use):
 
 ```
-ecosystem/mfs/build_tests.sh            # full FTC suite (14 inner via unified mfs_suite --all, + build checks + ungated diags)
+ecosystem/mfs/build_tests.sh            # full FTC suite (15 inner via unified mfs_suite --all, + build checks + ungated diags)
 ecosystem/mfs/build_tests.sh --build-only
 ```
 

@@ -109,6 +109,19 @@ static int ftc_ensure_driving(void) {
     return 0;
 }
 
+/* Iteration guarantee: the 40:1 chassis/wheel stacked mass ratio cannot
+ * converge below 128 sequential-impulse iterations (every MFS test pins
+ * 128; the MFS suite documents that default 64 cannot converge it). A
+ * robot spawned into a 64-iteration world wobbles its revolute axles
+ * loose within seconds (measured 15° tilt) and never settles. Raise with
+ * a loud report, never silently; already-adequate configs are untouched. */
+static void ftc_ensure_iterations(void) {
+    if (g_cfg.timestep.solver_iterations < 128) {
+        g_cfg.timestep.solver_iterations = 128;
+        term_out("mpe: ftc: solver iterations raised to 128 (robot joints need it; was lower)\n");
+    }
+}
+
 void cmd_ftc(int argc, char **argv) {
     if (argc < 2) {
         term_err("mpe: ftc: usage: ftc spawn [x y z] | telemetry\n");
@@ -158,6 +171,7 @@ void cmd_ftc(int argc, char **argv) {
             term_err("mpe: ftc: could not ensure floor\n");
             return;
         }
+        ftc_ensure_iterations();
         int idx = p_spawn(w, x, y, z, (motor_preset_id)preset, FTC_DRIVETRAIN_MECANUM);
         if (idx < 0) {
             term_err("mpe: ftc: spawn failed\n");
