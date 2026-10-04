@@ -1,6 +1,7 @@
 #include <gtk/gtk.h>
 #include <stdio.h>
 #include "mpe_engine.h"
+#include "core/long_run_validation.h"
 #include "ui_input/mouse_lock.h"
 camera main_camera_fov;
 input_status main_inputs;
@@ -144,8 +145,16 @@ int main_algorithm(int argc, char *argv[]) {
     int status = g_application_run(G_APPLICATION(mpe_app), argc, argv);
     g_object_unref(mpe_app);
     mpe_app = NULL;
-    mpe_config_save("status/engine.cfg");
-    printf("[config] saved status/engine.cfg\n");
+    /* DESPOT-2026-10-04: never publish torture as the next boot's defaults.
+     * A mid-F11 window close used to exit-save tortured g_cfg straight over
+     * the clean engine.cfg (the 2026-10-04 Tom-and-Jerry incident). Restore
+     * first, save guarded second, and report a failed save honestly. */
+    long_run_validation_cancel_restore();
+    if (mpe_config_save_guarded("status/engine.cfg")) {
+        printf("[config] saved status/engine.cfg\n");
+    } else {
+        fprintf(stderr, "[config] exit save FAILED or refused (torture live); clean file untouched\n");
+    }
     return status;
 }
 int main(int argc, char *argv[]) {
@@ -273,8 +282,13 @@ int main_algorithm(int argc, char *argv[]) {
     frame_timer_init(&main_timer);
     gtk_main();
     /* MPE_TASK_34_CONFIG_SAVE_BEGIN */
-    mpe_config_save("status/engine.cfg");
-    printf("[config] saved status/engine.cfg\n");
+    /* DESPOT-2026-10-04: same torture guard as the GTK4 exit (see above). */
+    long_run_validation_cancel_restore();
+    if (mpe_config_save_guarded("status/engine.cfg")) {
+        printf("[config] saved status/engine.cfg\n");
+    } else {
+        fprintf(stderr, "[config] exit save FAILED or refused (torture live); clean file untouched\n");
+    }
     /* MPE_TASK_34_CONFIG_SAVE_END */
     return 0;
 }

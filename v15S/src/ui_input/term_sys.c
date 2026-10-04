@@ -293,8 +293,10 @@ void cmd_config(int argc, char **argv) {
         return;
     }
     if (term_str_eq(argv[1], "save")) {
-        if (mpe_config_save("status/engine.cfg")) {
+        if (mpe_config_save_guarded("status/engine.cfg")) {
             term_ok("config saved to status/engine.cfg\n");
+        } else if (long_run_validation_torture_live()) {
+            term_err("mpe: config: save REFUSED — torture live (finish F11 first)\n");
         } else {
             term_err("mpe: config: save failed\n");
         }
@@ -335,7 +337,12 @@ void cmd_quit(int argc, char **argv) {
 void cmd_poweroff(int argc, char **argv) {
     (void) argc;
     (void) argv;
-    mpe_config_save("status/engine.cfg");
+    /* DESPOT-2026-10-04: restore-then-save. poweroff during F11 used to
+     * publish torture as boot defaults via this exact line. */
+    long_run_validation_cancel_restore();
+    if (!mpe_config_save_guarded("status/engine.cfg")) {
+        term_err("mpe: poweroff: config save FAILED or refused; halting anyway\n");
+    }
     term_ok("System halted.\n");
     event_log_push(log_info, "Engine shutdown via terminal poweroff");
     GApplication *app = g_application_get_default();
@@ -385,10 +392,15 @@ void cmd_sleep(int argc, char **argv) {
 void cmd_sync(int argc, char **argv) {
     (void) argc;
     (void) argv;
-    bool cfg_ok = mpe_config_save("status/engine.cfg");
+    bool cfg_ok = mpe_config_save_guarded("status/engine.cfg");
     int scene_ok = save_scene("status/scene.dat");
-    if (cfg_ok && scene_ok) {
+    if (cfg_ok && (scene_ok == 1)) {
         term_ok("sync: config + scene flushed to disk\n");
+    } else if ((cfg_ok) && (scene_ok == 2)) {
+        term_ok("sync: flushed (scene dir-sync uncertain, rc=2)\n");
+    } else if (!cfg_ok && long_run_validation_torture_live()) {
+        term_err("mpe: sync: config REFUSED (torture live); scene ok/FAILED (see below)\n");
+        term_printf("term_err", "mpe: sync: scene=%s\n", scene_ok ? "ok" : "FAILED");
     } else {
         term_printf("term_err", "mpe: sync: config=%s scene=%s\n", cfg_ok ? "ok" : "FAILED",
                     scene_ok ? "ok" : "FAILED");

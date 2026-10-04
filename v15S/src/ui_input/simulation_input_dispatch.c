@@ -86,6 +86,11 @@ void simulation_input_dispatch(GtkWidget *parent_window) {
         main_inputs.debug_terminal_pressed = false;
     }
     if (main_inputs.long_run_validation_pressed) {
+        /* DESPOT-2026-10-04: flags BEFORE start, so the start-time config
+         * dump is labelled with the right mode (old order dumped first,
+         * labelled second). */
+        long_run_validation_restore_config = 0;
+        long_run_validation_is_torture = 0;
         scene_spawn_long_run_validation();
         long_run_validation_start(a3_long_run_validation_ticks);
         /* DESPOT-2026-10-01: F10 never dirties the config (no randomization;
@@ -110,13 +115,22 @@ void simulation_input_dispatch(GtkWidget *parent_window) {
             printf("[A3] Config torture already running; ignoring re-press (backup kept clean)\n");
             main_inputs.config_torture_pressed = false;
         } else {
+            /* DESPOT-2026-10-04: snapshot BEFORE randomizing (memory cannot
+             * go missing like the CWD-relative backup file can), flags
+             * BEFORE start (so the start dump is labelled torture), backup
+             * failure to stderr+event log (a headless operator must see it).
+             * The 2026-10-04 engine.cfg incident was a mid-torture exit with
+             * none of these holding. */
+            long_run_validation_snapshot_clean();
             if (!mpe_config_save("status/engine.cfg.backup")) {
-                printf("[A3] WARNING: config backup failed; F11 will fall back to compiled defaults on restore\n");
+                fprintf(stderr, "[A3] WARNING: config backup failed; F11 will fall back to "
+                                "memory snapshot, else compiled defaults on restore\n");
+                event_log_push(2, "F11 backup FAILED; memory snapshot armed instead");
             }
-            scene_spawn_config_torture_test();
-            long_run_validation_start(a3_long_run_validation_ticks);
             long_run_validation_restore_config = 1;
             long_run_validation_is_torture = 1;
+            scene_spawn_config_torture_test();
+            long_run_validation_start(a3_long_run_validation_ticks);
             main_inputs.config_torture_pressed = false;
         }
     }

@@ -339,8 +339,11 @@ bool mpe_config_save(const char *path) {
     }
     /* FIX-AUDIT-DESPOT: fsync the file before rename (like scene_saving:
      * a crash between write and flush must not publish a torn config).
-     * Directory sync is best-effort with a warning (bytes are durable). */
-    if (fflush(file) != 0) {
+     * Directory sync is best-effort with a warning (bytes are durable).
+     * DESPOT-2026-10-04: also fail on a mid-stream fprintf error (ENOSPC
+     * mid-write flushes cleanly but the content is short) — ferror catches
+     * what fflush cannot. */
+    if (ferror(file) || fflush(file) != 0) {
         fclose(file);
         remove(tmp_path);
         return false;
@@ -406,6 +409,55 @@ static char *term_trim(char *str) {
     return str;
 }
 
+/* DESPOT-2026-10-04: torture-live probe without an include cycle.
+ * long_run_validation.c includes mpe_config.h; including its header back
+ * here would cycle. The three ints are plain globals — declare, don't
+ * include. If the validation TU is ever not linked (unit harnesses that
+ * stub the world), the linker would fail; so the probe is defensive:
+ * torture is reported only when the linked flags say so, and a missing
+ * symbol falls back to "not live" via weak linkage where supported. */
+#if defined(__GNUC__) || defined(__clang__)
+extern int long_run_validation_active __attribute__((weak));
+extern int long_run_validation_restore_config __attribute__((weak));
+extern int long_run_validation_is_torture __attribute__((weak));
+#else
+extern int long_run_validation_active;
+extern int long_run_validation_restore_config;
+extern int long_run_validation_is_torture;
+#endif
+
+static int mpe_config_torture_live_probe(void) {
+#if defined(__GNUC__) || defined(__clang__)
+    /* A harness that links config without the validation TU gets NULL
+     * weak symbols: torture trivially not live, never a link error. */
+    if (!&long_run_validation_active || !&long_run_validation_is_torture ||
+        !&long_run_validation_restore_config) {
+        return 0;
+    }
+#endif
+    return (long_run_validation_active && long_run_validation_is_torture) ||
+           (long_run_validation_is_torture != 0) || (long_run_validation_restore_config != 0);
+}
+
+static unsigned long s_torture_save_blocked = 0;
+
+unsigned long mpe_config_torture_save_blocked_total(void) {
+    return s_torture_save_blocked;
+}
+
+bool mpe_config_save_guarded(const char *path) {
+    if (mpe_config_torture_live_probe()) {
+        s_torture_save_blocked++;
+        fprintf(stderr,
+                "[config] REFUSED save to '%s': F11 torture values are live in g_cfg "
+                "(blocked #%lu). Run the validation to completion or restart; "
+                "the clean config is untouched.\n",
+                path ? path : "(null)", s_torture_save_blocked);
+        return false;
+    }
+    return mpe_config_save(path);
+}
+
 bool mpe_config_load(const char *path) {
     if (!path) {
         return false;
@@ -466,6 +518,17 @@ bool mpe_config_load(const char *path) {
         char *endptr = NULL;
         double parsed = strtod(value_part, &endptr);
         if ((endptr == value_part) || (!isfinite(parsed))) {
+            continue;
+        }
+        /* DESPOT-2026-10-04: strtod accepts "12abc" as 12. A suffixed
+         * value is a corrupt line, not a number — drop it loudly instead
+         * of silently adopting the prefix. */
+        while ((*endptr == ' ') || (*endptr == '\t')) {
+            endptr++;
+        }
+        if (*endptr != '\0') {
+            fprintf(stderr, "[config] warning: trailing garbage dropped (key='%s', value='%s')\n",
+                    full_key, value_part);
             continue;
         }
         /* FIX-AUDIT-DESPOT: clamping was silent (a hostile/hand-edited file
