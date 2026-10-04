@@ -103,13 +103,67 @@ int mfs_t_ftc_hotload(void) {
         MFS_CHECK(t_ptr, sqrtf(dx * dx + dz * dz) >= 0.5f);
     }
 
-    /* Dynamic path: identical script through the plugin descriptor (.so/.dll). */
-    char ftc_buf[1024]; const char *ftc_path = mpe_pick_plugin("./plugins/mpe_ftc.so", ftc_buf, sizeof(ftc_buf));
-    /* fallback: also try without ./ prefix (MSYS2 vs native CWD) */
-    if (access(ftc_path, R_OK) != 0) { ftc_path = mpe_pick_plugin("plugins/mpe_ftc.so", ftc_buf, sizeof(ftc_buf)); }
+    /* Dynamic path: identical script through the plugin descriptor (.so/.dll).
+     *
+     * DESPOT-2026-10-03: THIS GATE FAILED SILENTLY AND WAS CWD-DEPENDENT.
+     * Two defects, both invisible from the outside:
+     *
+     *  1. The dlopen failure path did `t_ptr->failures++` and returned with NO
+     *     diagnostic at all. Running the binary from any directory other than
+     *     ecosystem/mfs produced exit status 1 and not one byte of output on
+     *     stdout OR stderr -- the exact failure mode the project already
+     *     recorded for the engine runner ("a 206/206 ... xfailed: 0 line
+     *     could hide a known-red frontier with no trace"). A gate that cannot
+     *     say what went wrong is a gate nobody can act on.
+     *  2. The path was CWD-relative and POSIX mpe_pick_plugin returns it
+     *     VERBATIM with no existence check (the access() probe only exists on
+     *     the Windows branch). So the same source, same build, same plugin,
+     *     passed or failed purely on the working directory. build_tests.sh
+     *     happens to cd into ecosystem/mfs, which is why CI never saw it.
+     *
+     * Fix: resolve the plugin from an explicit candidate list (env override
+     * first), report WHICH path was used, and on total failure name every path
+     * tried plus dlerror(). Now the gate is CWD-independent and any failure is
+     * diagnosable from the output alone. */
+    static const char *ftc_candidates[] = {
+        NULL, /* filled from MPE_FTC_PLUGIN below */
+        "./plugins/mpe_ftc.so",
+        "plugins/mpe_ftc.so",
+        "mfs/plugins/mpe_ftc.so",
+        "../mfs/plugins/mpe_ftc.so",
+        "./mpe_ftc.so",
+    };
+    {
+        const char *env = getenv("MPE_FTC_PLUGIN");
+        ftc_candidates[0] = env;
+    }
+    const char *ftc_path = NULL;
+    for (size_t ci = 0; ci < sizeof(ftc_candidates) / sizeof(ftc_candidates[0]); ci++) {
+        if (!ftc_candidates[ci]) continue;
+        if (access(ftc_candidates[ci], R_OK) == 0) { ftc_path = ftc_candidates[ci]; break; }
+    }
+    if (!ftc_path) {
+        printf("[FAIL] ftc_hotload: FTC plugin not found. Tried:");
+        for (size_t ci = 0; ci < sizeof(ftc_candidates) / sizeof(ftc_candidates[0]); ci++)
+            if (ftc_candidates[ci]) printf(" %s", ftc_candidates[ci]);
+        printf(". Set MPE_FTC_PLUGIN to the built plugin, or run from "
+               "ecosystem/mfs. (build_tests.sh builds it.)\n");
+        t_ptr->failures++;
+        physics_world_cleanup(&w1);
+        mfs_test_end(t_ptr);
+        return t_ptr->failures;
+    }
+    MFS_INFO("FTC plugin resolved: %s", ftc_path);
     void *handle = dlopen(ftc_path, RTLD_NOW);
     /* DESPOT-2026-09-28: early return leaked saved config (no end). */
-    if (!handle) { t_ptr->failures++; physics_world_cleanup(&w1); mfs_test_end(t_ptr); return t_ptr->failures; }
+    if (!handle) {
+        /* DESPOT-2026-10-03: say WHY. See note above. */
+        printf("[FAIL] ftc_hotload: dlopen(\"%s\") failed: %s\n", ftc_path, dlerror());
+        t_ptr->failures++;
+        physics_world_cleanup(&w1);
+        mfs_test_end(t_ptr);
+        return t_ptr->failures;
+    }
     const mpe_module_desc_t *dyn_desc = dlsym(handle, "mpe_module_desc");
     typedef int (*spawn_fn_t)(struct physics_world *, float, float, float, int, int);
     typedef ftc_robot *(*get_fn_t)(struct physics_world *, int);
@@ -368,18 +422,69 @@ int mfs_t_intake_stop(void) {
     }
 
     /* Phase 3: momentary reverse must actually reverse (intake_power was
-     * dead code -- written, never read). */
+     * dead code -- written, never read).
+     *
+     * DESPOT-2026-10-03: THIS PHASE WAS BROKEN IN TWO WAYS AND WAS RED AT
+     * PRISTINE HEAD. Neither was an engine defect; both were fixture defects,
+     * which is the project's recurring lesson (a red gate whose cause is the
+     * test teaches nothing and trains people to ignore red).
+     *
+     * 1. `intake_power` is RECOMPUTED BY pre_step EVERY TICK from the gamepad
+     *    edge state:
+     *        if (btn_b) state->intake_power = -1.0f;
+     *        else        state->intake_power = state->intake_active ? 1.0f : 0.0f;
+     *    The old phase assigned `ms->intake_power = -1.0f` ONCE before the
+     *    loop, so the very first pre_step overwrote it with +1.0f (no button
+     *    is pressed in headless) and it was never reverse again for 180 ticks.
+     *    The fix is to write it AFTER each pre_step, which is exactly what
+     *    pre_step's own handler would have done had B been held -- so the
+     *    module's input layer is still the thing under test, not bypassed.
+     *
+     * 2. `intake_active` was still FALSE, left over from phase 2. The consumer
+     *    gates the whole target on it:
+     *        if (state->intake_active) { target_omega = ...;
+     *                                      if (intake_power < 0) negate; }
+     *    so with the intake off, reverse is unreachable BY DESIGN (reversing a
+     *    stopped intake is a no-op). The phase has to re-enable the intake
+     *    first. That gate is a deliberate semantic and is now documented in
+     *    mfs_module_1.h rather than left to be rediscovered.
+     *
+     * DESPOT-2026-10-03, second correction to this phase: writing
+     * intake_power from outside cannot work on EITHER side of pre_step.
+     * gamepad_control_enabled defaults to TRUE and the pad is opened even in
+     * headless, so pre_step's handler really does run and really does
+     * overwrite the field every tick:
+     *   - BEFORE pre_step: the handler overwrites it, then intake_step reads
+     *     the overwritten value.
+     *   - AFTER pre_step: intake_step has ALREADY commanded the motor for this
+     *     tick, so the write lands too late to have any effect. (Measured: the
+     *     roller still came back at +58.068 rad/s, bit-identical to the broken
+     *     run, which is how the ordering was confirmed rather than assumed.)
+     *
+     * So this phase drives the CONSUMER directly -- set intake_power, then call
+     * mfs_module_1_intake_step() to command the motor from it. That is exactly
+     * the defect the H5 fix addressed ("intake_power was written twice and read
+     * by nothing at all"), so the consumer is the thing that must be under
+     * test. It also keeps the phase independent of which /dev/input node the
+     * host happens to expose. The B-button edge mapping that FEEDS
+     * intake_power is a separate and far simpler concern.
+     */
     if (!fail) {
-        mfs_module_1_set_intake(ms, true);
+        mfs_module_1_set_intake(ms, true); /* reverse requires an engaged intake */
         for (int tick = 0; tick < 120 && !fail; tick++) {
             mfs_module_1_pre_step(&w, dt, state);
             mfs_module_1_post_step(&w, dt, state);
             physics_world_step(&w, dt);
             if (!mfs_test_finite(&w)) fail = 1;
         }
-        ms->intake_power = -1.0f;
         for (int tick = 0; tick < 180 && !fail; tick++) {
             mfs_module_1_pre_step(&w, dt, state);
+            /* B held: set the state, then command the motor FROM it. This has
+             * to re-command after pre_step because mfs_module_1_intake_step()
+             * runs INSIDE pre_step ("Intake logic") and has already set the
+             * motor target by the time we get here. */
+            ms->intake_power = -1.0f;
+            mfs_module_1_intake_step(ms, dt);
             mfs_module_1_post_step(&w, dt, state);
             physics_world_step(&w, dt);
             if (!mfs_test_finite(&w)) fail = 1;
