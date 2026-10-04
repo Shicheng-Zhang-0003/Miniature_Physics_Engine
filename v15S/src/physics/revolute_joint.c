@@ -263,7 +263,17 @@ void revolute_solve(revolute_params *p, rigidbody *body_a, rigidbody *body_b, fl
      * TRUTH: velocity-level P2P bias solved INSIDE the iteration loop is
      * correct here (bias includes live rel_vel and converges; it is NOT the
      * once-per-tick axis-drift term, which must never enter the loop or its
-     * position error pumps 64x). Do not move either across the boundary. */
+     * position error pumps 64x). Do not move either across the boundary.
+     * DESPOT-2026-10-04 (in-loop axis bias TRIED AND REVERTED, twice): the
+     * external authorities all feed positional error back per-solve (Box2D
+     * position pass, Bullet hinge-row ERP), so an axis bias mirroring the
+     * P2P pattern was implemented and measured — at beta 0.3 it bounded
+     * harsh-drive axle walk (7° vs 180° flip) but moved the MFS tank pivot
+     * -19% and killed reverse-rotate outright; at beta 0.1 it flipped
+     * forward-rotate's SIGN and halved the pivot. Non-monotonic in beta =
+     * the pivot regime is chaotic-sensitive to joint formulation, so no
+     * bolt-on bias ships without a full drive re-baseline. The harsh-abuse
+     * tilt walk stays an open engine-side frontier (see KNOWN_FAILURES). */
     const float baumgarte_beta = C->joints.revolute_beta;
     float bias_speed = baumgarte_beta * vector3_length(position_error) / dt;
     float max_bias_speed = C->joints.revolute_max_bias;

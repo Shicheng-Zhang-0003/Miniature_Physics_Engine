@@ -294,6 +294,20 @@ never NaN). Gated behaviors (single-mode bursts ≤180 ticks) stay ≤1.4°.
   observer frozen (delayed only, 128°); proportional traction-cut engage
   (same blowup — AND moved tank 0.0642 → 0.0397 m and broke drive
   antisymmetry, so the slam is load-bearing: reverted); slew 0.6 → 0.2.
+- External cross-reference 2026-10-04 (Box2D v2/v3 sources, Bullet
+  btHingeConstraint sources): BOTH authorities feed hinge-alignment
+  positional error back per-solve — Box2D via a dedicated POSITION pass
+  over every joint row (SolvePositionConstraints, incl. angular), Bullet
+  via ERP on the hinge angular rows (k = fps * ERP on ax1×ax2). Our axis
+  rows are velocity-only (plus a once-per-tick velocity tweak): the odd
+  one out, and the documented gap. An in-loop axis bias mirroring P2P
+  was therefore implemented — and REVERTED twice: at beta 0.3 it bounded
+  the blowup (7° vs 180°) but moved tank -19% and killed reverse-rotate;
+  at beta 0.1 it flipped forward-rotate's SIGN and halved the pivot.
+  Non-monotonic in beta = the pivot regime is chaotic-sensitive to joint
+  formulation. A bolt-on bias cannot ship without a full drive
+  re-baseline; the proper fix is a joint position-correction pass in the
+  style of the references, budgeted as its own task.
 - What IS established: needs motor torque (zeroed-torque abuse stays
   0.2°/1800 ticks); per-tick wheel jumps hit ±85 rad/s (peel + slew-rail
   steps on 2.5e-4 inertia); the 0.05-command idle boundary is not the

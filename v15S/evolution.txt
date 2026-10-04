@@ -111,3 +111,8 @@ Despot-1004g: snap-triage follow-through (hysteresis + handshake kept,
   (cut moves tank/drive baselines; projection changes nothing).
   Abuse tilt blowup proven pre-existing (identical on fully pre-change
   tree). Full 234 green.
+
+Despot-1004h: external cross-ref (Box2D position pass, Bullet hinge ERP)
+  for axis alignment; in-loop axis bias tried at 0.3 and 0.1, both move
+  MFS drive baselines non-monotonically -> REVERTED with record; joint
+  position-correction pass budgeted as its own task. Full 234 green.
