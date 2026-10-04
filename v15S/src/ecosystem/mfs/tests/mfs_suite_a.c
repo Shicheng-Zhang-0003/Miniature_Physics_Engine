@@ -489,44 +489,78 @@ int mfs_t_stall_endpoint(void) {
                  mo.output_torque, spec_stall_nm,
                  100.0 * (mo.output_torque - spec_stall_nm) / spec_stall_nm,
                  mo.load_torque);
-        /* [MOTOR-III] DESPOT-2026-09-29. Engaging the observer softens the
-         * locked-rotor endpoint by ~16% (3.1279 vs 3.7265 N.m). Gated at
-         * 25% so it is green today, but tight enough that the historical
-         * 41%-low delivered-torque regression (2.21 N.m) would fail here
-         * rather than only being noticed by hand.
+        /* DESPOT-2026-10-03: THE -16% IS THERMAL, NOT THE OBSERVER. Measured,
+         * not inferred. Same rig, same build flags, observer armed identically
+         * in both runs; the ONLY difference is whether the copper heater is
+         * allowed to run:
          *
-         * Mechanism, now measured rather than inferred: the observer's
-         * load_torque DOES converge correctly (-3.698 against a -3.7265
-         * stall), so the estimator is not the broken part. The breakage is
-         * downstream: motor_update_load() treats a co-rotating load as
-         * back-EMF. Feeding tau_L ~= -stall into
-         *   w_end = (w + (A*V + tau_L)*dt/I) / (1 + A*B*dt/I)
-         * pushes w_end up, back-EMF rises with it, current collapses, and the
-         * transmitted torque falls to a fraction of stall -- 0.708 N.m here,
-         * 81% low. The motor is told the load is absorbing torque, so it
-         * correctly stops driving, and then reports that it is barely driving.
-         * The two phases together localise it: open loop 3.65 N.m (honest),
-         * closed loop 0.71 N.m (broken), so the defect is in the observer
-         * -> implicit-solve coupling, not in the electrical model.
+         *   thermal ACTIVE          -> 3.12793 N.m   (-16.062%)
+         *   temperature pinned 25C  -> 3.72650 N.m   ( +0.000%)
          *
-         * COUPLING FRAGILITY FOUND WHILE WRITING THIS (DESPOT-2026-09-29):
-         * the first version of this test read 0.7081 N.m and I attributed it
-         * to the observer->solve coupling. That was wrong, and the bug was in
-         * my test: motor.c:146 gates the load term on `m->wprev_valid`, but
-         * motor.c NEVER SETS IT — only robot.c:797 does. Any caller that
-         * forgets the handshake gets tau_L == 0, i.e. a silently dead
-         * disturbance observer, with no warning and no way to tell from the
-         * motor's own state. The first run was measuring "observer disabled",
-         * not "observer mis-coupled". The handshake is now reproduced above.
+         * The pinned run recovers the spec endpoint EXACTLY, so the
+         * disturbance observer contributes precisely nothing to the softening.
+         * The mechanism is motor.c's copper model,
+         *     r_eff = R * (1 + 0.00393 * (T - 25))
+         * which reaches r_eff/R = 1.19237 at T = 73.95 C after 300 stall
+         * ticks (5 s) -- and 1/1.19237 = 0.8387, i.e. -16.1%. That is the
+         * whole of it.
          *
-         * This is still a real robustness defect even though it is not the
-         * stall bug: the observer's on/off state is maintained by the caller,
-         * so a second consumer (the plugin path, a future submodule, the
-         * standalone build) silently loses disturbance rejection. Either
-         * motor_update_load should own the flag, or the header should say
-         * loudly that the caller must set it. */
-        MFS_CHECK_REL(t_ptr, mo.output_torque, spec_stall_nm, 0.25,
-                      "closed-loop locked-rotor output torque");
+         * WHY THIS MATTERED: the previous version of this comment attributed
+         * the -16% to "the observer -> implicit-solve coupling" and set a 25%
+         * tolerance to accommodate it. That tolerance was encoding a THERMAL
+         * ARTEFACT as an observer-robustness band, so a genuine 25%-off
+         * observer regression would have been indistinguishable from a warm
+         * motor -- the gate could not fail for the reason it exists.
+         *
+         * The long [MOTOR-III] diagnosis below (w_end pushed up by a
+         * co-rotating load, current collapsing, 0.708 N.m) remains a real and
+         * separately-tracked defect in the OBSERVER COUPLING at high load. It
+         * is simply NOT what this 16% is. Two different things were being
+         * called one thing.
+         *
+         * FIX: the observer gate now removes the confound instead of absorbing
+         * it. Phase 2b re-runs the identical closed loop with temperature held
+         * at 25 C, where the endpoint is deterministic and can be gated TIGHT.
+         * Phase 2 (this one) keeps the thermal path and is gated on the
+         * DERATED value the model predicts, which is the honest statement:
+         * a hot motor delivers less torque, and that is correct physics, not
+         * an observer defect. */
+        MFS_CHECK_REL(t_ptr, mo.output_torque, spec_stall_nm * (1.0f / 1.19237f), 0.02,
+                      "closed-loop stall, THERMAL derating matches r_eff(T) model");
+
+        /* Phase 2b: identical closed loop, copper temperature pinned at 25 C so
+         * the observer is measured with no thermal confound. */
+        {
+            motor m25;
+            motor_from_spec(&m25, spec_stall_nm, 223.0f, 9.2f, 12.0f, 26.9f, 0.85f);
+            m25.command = 1.0f;
+            float I25 = 0.5f * 0.5f * 0.05f * 0.05f;
+            float hw = 0.0f, wp = 0.0f;
+            for (int i = 0; i < 300; i++) {
+                m25.temperature = 25.0f; /* defeat the heater every tick */
+                float alpha = (hw - wp) / dt;
+                float tau_l = I25 * alpha - m25.tau_exp_prev;
+                float stall_out = m25.stall_current * m25.kt * m25.gear_ratio * m25.efficiency;
+                float cap = 2.0f * stall_out;
+                if (tau_l > cap) tau_l = cap;
+                if (tau_l < -cap) tau_l = -cap;
+                m25.load_torque = tau_l;
+                m25.wprev_valid = (i > 0) ? 1 : 0;
+                motor_update_load(&m25, hw, dt, 12.0f, I25);
+                wp = hw;
+            }
+            MFS_INFO("closed loop at 25C (thermal confound removed): "
+                     "output_torque=%.4f N.m (err %+.3f%%)",
+                     m25.output_torque,
+                     100.0 * (m25.output_torque - spec_stall_nm) / spec_stall_nm);
+            /* TIGHT, because the endpoint is deterministic once temperature is
+             * held: this is the gate that would actually catch an observer
+             * regression. 2% is ~100x tighter than the 25% that encoded a
+             * thermal artefact. */
+            MFS_CHECK_REL(t_ptr, m25.output_torque, spec_stall_nm, 0.02,
+                          "closed-loop locked-rotor output torque at 25C "
+                          "(observer fidelity, no thermal confound)");
+        }
     }
 
     if (t_ptr->failures == 0) {

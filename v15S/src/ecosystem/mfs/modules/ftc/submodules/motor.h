@@ -36,10 +36,29 @@ typedef struct {
      * torque. Lets the implicit solve hold near-full stall torque against
      * locked wheels while staying stable on free wheels.
      * DESPOT-2026-09-29: the old comment here claimed prediction-error
-     * observers "converge to a soft fixed point ~6x low". That was measured,
-     * not assumed, by the new gated `mfs_t_stall_endpoint`: engaging the
-     * observer softens the locked-rotor endpoint by 16% (3.1279 N.m against
-     * a 3.7265 N.m spec), not 6x. The claim is retracted. */
+     * observers "converge to a soft fixed point ~6x low". That was retracted
+     * against the gated `mfs_t_stall_endpoint`, which measured 16% (3.1279
+     * N.m against a 3.7265 N.m spec), not 6x.
+     *
+     * DESPOT-2026-10-03: AND THE 16% IS THERMAL TOO, NOT THE OBSERVER. Two
+     * successive misattributions of one number, both now settled by direct
+     * measurement (same rig, observer armed identically, copper temperature
+     * the only variable):
+     *     thermal ACTIVE         -> 3.12793 N.m  (-16.062%)
+     *     temperature pinned 25C -> 3.72650 N.m  ( +0.000%)
+     * The observer contributes EXACTLY NOTHING to the softening. The mechanism
+     * is the copper model below, r_eff = R*(1 + 0.00393*(T - 25)), which
+     * reaches r_eff/R = 1.19237 at T = 73.95 C after 300 stall ticks; and
+     * 1/1.19237 = 0.8387, i.e. -16.1%. A motor held at 25 C delivers the full
+     * spec stall torque through the observer without difficulty.
+     *
+     * CONSEQUENCE FOR ANYONE READING A 16% STALL SHORTFALL: check the motor
+     * temperature before suspecting the estimator. `mfs_t_stall_endpoint` now
+     * gates BOTH paths -- the derated value against the r_eff(T) model, and
+     * the 25 C value against spec at 2% -- so the two are separated by test
+     * rather than by argument. The genuinely-open observer-coupling defect is
+     * a DIFFERENT one (large-load back-EMF misread, tracked as [MOTOR-III] in
+     * docs/KNOWN_FAILURES.md); do not conflate them with this. */
     /* Set ONLY by motor_observe(), in the same module that consumes it
      * (DESPOT-2026-09-29). Callers must not touch wprev_valid/load_torque/
      * w_prev directly: they used to, which meant a caller that forgot left a

@@ -177,38 +177,101 @@ int mfs_t_rolling_resistance(void) {
 }
 
 /* T6: Motor free speed (ISOLATED motor model, no joints/world).
+ *
  * DESPOT-2026-09-26: the old rig spun a jointed robot in air and gated the
  * endpoint sample. The jointed air-spin plant is a documented limit cycle
- * (revolute-to-kinematic-chassis impulses + slew/governor vs implicit solve:
- * measured motor 86 rpm vs true wheel 799 rpm, current slamming ±stall) —
- * it cannot gate the MOTOR endpoint. The motor truth (implicit-in-speed
- * solve converges to the V/Kv no-load point) is tested here isolated:
- * preset 26.9:1, 12.8 V fresh pack, axle inertia, 180 ticks. Expectation is
- * the VOLTAGE-SCALED spec: 223 rpm @12.0 V -> 223*12.8/12 = 237.9 @12.8 V
- * (measured 237.9, err 0.0%). Gate ±10% (tighter than the old ±30%: the
- * isolated plant is deterministic to the ulp). The jointed-air behavior
- * stays covered by T11 stability (finite, no NaN) instead of an endpoint. */
+ * (revolute-to-kinematic-chassis impulses + slew/governor vs implicit solve)
+ * and it cannot gate the MOTOR endpoint.
+ *
+ * DESPOT-2026-10-03: THIS GATE HAD A THIRD, UNNOTICED PROBLEM -- it never
+ * called motor_observe(). m.wprev_valid stayed 0, tau_L was identically 0 for
+ * all 180 ticks, and the disturbance observer was simply ABSENT from the
+ * measurement, while the shipped drivetrain arms it every tick (robot.c). So
+ * the gate measured a configuration the engine never runs in.
+ *
+ * Both configurations are now measured, and the gate asserts only what each
+ * one can actually support. Measured, same rig, same build flags:
+ *
+ *   observer NOT armed (open loop):  237.8667 rpm   +0.0000%  <- the V/Kv line
+ *   observer armed (as robot.c):      92.0172 rpm   -61.3156% <- a LIMIT CYCLE
+ *
+ * WHY THE OPEN-LOOP NUMBER IS STILL THE RIGHT THING TO GATE HERE: free speed
+ * is independent of winding resistance and of load BY CONSTRUCTION. With
+ * w_free = V/(kv*gear) and kv = V_nom/(w_free_spec*gear), the no-load point
+ * cancels R exactly, so a gate on it tests the ELECTRICAL MODEL (the V-I-w
+ * line and the constants) with zero dependence on the estimator. That is a
+ * real and valuable check, and it belongs in a motor-model test.
+ *
+ * WHY THE OBSERVER-ARMED NUMBER IS NOT GATED TO A NUMBER HERE: it is not a
+ * measurement of free speed at all -- it is the air-spin / [MOTOR-III]
+ * observer-coupling limit cycle, whose settled value is a property of the
+ * estimator's fixed point and the axle inertia, not of the motor's V-line.
+ * Pinning a number to it would be inventing a specification, which is
+ * precisely the "fabricated tank target" failure this project retracted on
+ * 2026-09-29. It is gated on being FINITE and BOUNDED (it must not run away),
+ * it is printed with its honest value, and the defect stays tracked in
+ * docs/KNOWN_FAILURES.md -> [MOTOR-III] and the air-spin entry where it
+ * belongs. Anyone reading the -61% should read it as "the driven wheel does
+ * not reach the no-load line", not as "the motor model is 61% wrong".
+ */
 int mfs_t_motor_free_speed(void) {
-    motor m;
-    motor_preset_apply(&m, MOTOR_GB_5203_26_9);
-    m.command = 1.0f;
-    battery b;
-    battery_init(&b);
-    const float axle_I = 0.5f * 0.2f * 0.05f * 0.05f;
-    float w = 0.0f;
-    const float dt = DT;
-    for (int i = 0; i < 180; i++) {
-        float V = battery_get_voltage(&b, m.current);
-        motor_update_load(&m, w, dt, V, axle_I);
-        if (!isfinite(w) || !isfinite(m.output_torque)) return 1;
-        w += (m.output_torque / axle_I) * dt;
-        battery_fuse_step(&b, fabsf(m.current), dt);
-        battery_drain(&b, m.current, dt);
+    /* ---- Phase 1: open loop, the electrical model's no-load line --------- */
+    int rc = 0;
+    {
+        motor m;
+        motor_preset_apply(&m, MOTOR_GB_5203_26_9);
+        m.command = 1.0f;
+        battery b;
+        battery_init(&b);
+        const float axle_I = 0.5f * 0.2f * 0.05f * 0.05f;
+        float w = 0.0f;
+        const float dt = DT;
+        for (int i = 0; i < 180; i++) {
+            float V = battery_get_voltage(&b, m.current);
+            motor_update_load(&m, w, dt, V, axle_I);
+            if (!isfinite(w) || !isfinite(m.output_torque)) return 1;
+            w += (m.output_torque / axle_I) * dt;
+            battery_fuse_step(&b, fabsf(m.current), dt);
+            battery_drain(&b, m.current, dt);
+        }
+        float spec_rpm = 223.0f * (12.8f / 12.0f);
+        float rpm_error = fabsf(m.rpm - spec_rpm) / spec_rpm;
+        printf("[info] open-loop no-load line: %.4f rpm vs spec %.4f (%+.4f%%)\n", m.rpm, spec_rpm,
+               100.0f * (m.rpm - spec_rpm) / spec_rpm);
+        if (rpm_error > 0.10f) rc = 1;
     }
-    float spec_rpm = 223.0f * (12.8f / 12.0f);
-    float rpm_error = fabsf(m.rpm - spec_rpm) / spec_rpm;
-    if (rpm_error > 0.10f) return 1;
-    return 0;
+    /* ---- Phase 2: observer armed exactly as robot.c arms it -------------- */
+    {
+        motor m;
+        motor_preset_apply(&m, MOTOR_GB_5203_26_9);
+        m.command = 1.0f;
+        battery b;
+        battery_init(&b);
+        const float axle_I = 0.5f * 0.2f * 0.05f * 0.05f;
+        float w = 0.0f;
+        const float dt = DT;
+        int finite = 1;
+        for (int i = 0; i < 180; i++) {
+            float V = battery_get_voltage(&b, m.current);
+            motor_observe(&m, w, dt, axle_I);
+            motor_update_load(&m, w, dt, V, axle_I);
+            if (!isfinite(w) || !isfinite(m.output_torque)) { finite = 0; break; }
+            w += (m.output_torque / axle_I) * dt;
+            battery_fuse_step(&b, fabsf(m.current), dt);
+            battery_drain(&b, m.current, dt);
+        }
+        float spec_rpm = 223.0f * (12.8f / 12.0f);
+        printf("[info] observer-armed (as robot.c): %.4f rpm vs no-load %.4f (%+.4f%%) "
+               "-- NOT the no-load line; this is the air-spin/MOTOR-III limit "
+               "cycle, tracked in KNOWN_FAILURES.md, not a motor-model error\n",
+               m.rpm, spec_rpm, 100.0f * (m.rpm - spec_rpm) / spec_rpm);
+        /* Gate what is meaningful without inventing a spec: must stay finite
+         * and must not run away. A runaway or a NaN fails; a bounded limit
+         * cycle is a known tracked defect, not a failure of this gate. */
+        if (!finite) rc = 1;
+        if (fabsf(m.rpm) > 4.0f * spec_rpm) rc = 1;
+    }
+    return rc;
 }
 
 /* T7: Motor stall torque ±30% */
@@ -676,6 +739,23 @@ int mfs_t_external_truth(void) {
                 battery bb; battery_init(&bb);
                 const float Ia = 2.5e-4f;
                 float w = 0.0f; mm.command = 1.0f;
+                /* DESPOT-2026-10-03: OPEN LOOP ON PURPOSE, AND NOW LABELLED.
+                 * This check was silently open-loop (no motor_observe, so
+                 * tau_L == 0) while presenting itself as a property of the
+                 * driven motor. Arming the observer was measured and makes it
+                 * fail by 50% to 224% depending on preset, because the armed
+                 * value is the air-spin / [MOTOR-III] limit-cycle fixed point
+                 * and not a free speed at all.
+                 *
+                 * So it is asserted OPEN LOOP and the label now says so. That
+                 * is not a retreat: free speed is independent of R and of load
+                 * BY CONSTRUCTION (w_free = V/(kv*gear), kv =
+                 * V_nom/(w_free_spec*gear), R cancels), so this is a sharp
+                 * test of the electrical model and the preset constants that
+                 * no amount of estimator behaviour can perturb. The driven
+                 * path's behaviour is measured, printed and tracked where it
+                 * belongs: mfs_t_motor_free_speed phase 2 plus
+                 * docs/KNOWN_FAILURES.md -> [MOTOR-III]. */
                 for (int k = 0; k < 2000; k++) {
                     float Vb = battery_get_voltage(&bb, mm.current);
                     motor_update_load(&mm, w, DT, Vb, Ia);
@@ -683,7 +763,7 @@ int mfs_t_external_truth(void) {
                     w += (mm.output_torque / Ia) * DT;
                 }
                 MFS_CHECK_REL(t_ptr, w / mm.free_speed_rad_s, 12.8f / 12.0f, 0.01f,
-                              "motor free speed scales 12.8/12.0 exactly");
+                              "motor free speed scales 12.8/12.0 (open-loop V-line)");
             }
         }
     }
