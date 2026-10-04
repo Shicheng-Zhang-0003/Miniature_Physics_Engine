@@ -127,8 +127,8 @@ static mpe_param s_registry[] = {
     /* TRUTH: depenetration.penetration_slop REMOVED from the registry — dead
      * since the single-slop unification (depenetration honors
      * solver.penetration_slop). The struct field remains for save-file
-     * forward-compat but nothing reads it. Registry count unchanged (this
-     * removal balances the sleep.enable addition at 77). */
+     * forward-compat but nothing reads it. Registry count 78 -> 79 (boundary.safety_net_enabled) (this
+     * removal balances the sleep.enable addition at 77; boundary.safety_net_enabled took it to 79). */
 
     {"depenetration.wake_depth_thresh", "Wake Depth Threshold", "Overlap depth that wakes sleeping pairs (m). TRUTH: kept at 0.02, NOT unified with split wake 0.01: measured 0.01 re-admits the F10 runaway (runmax 13.07 m/s ejection, sleep churn on resting residual) while 0.02 holds runmax 0.00. Resting stacks carry ~0.01 residual; the wake gate must clear it.", p_float,
      cat_depenetration, &g_cfg.depenetration.wake_depth_thresh, 0.02, 0.0, 0.1, true},
@@ -186,6 +186,14 @@ static mpe_param s_registry[] = {
      * ============================================================ */
     {"boundary.floor_emergency_slop", "Floor Emergency Slop", "Tolerance below floor before emergency clamp (m)",
       p_float, cat_boundary, &g_cfg.boundary.floor_emergency_slop, 0.05, 0.0, 1.0, true},
+
+    /* DESPOT-2026-10-03: registry count 78 -> 79. See the field comment in
+     * mpe_config.h: without a way to switch the world-edge safety net OFF,
+     * the "nothing fell through the world" gate in f10_long_run / f11_torture
+     * is satisfied by the clamp rather than by the contact solver, and cannot
+     * fail. Default 1 = shipped behaviour unchanged. */
+    {"boundary.safety_net_enabled", "World-Edge Safety Net", "World-edge emergency clamp. 1 = on (default, unchanged). 0 = OFF: lets a test prove the contact solver alone holds bodies up. TRUTH: turning this off in a live session means a body that leaves the +-250 m box is gone.",
+      p_int, cat_boundary, &g_cfg.boundary.safety_net_enabled, 1.0, 0.0, 1.0, true},
 
     /* ============================================================
      * cat_spawner

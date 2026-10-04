@@ -135,8 +135,14 @@ typedef struct physics_world {
      * freed by its detach/unload path, never by the world. */
     void *broadphase_state;
     void *solver_state;
-    const mpe_module_desc_t *tick_modules[16];
-    void *tick_module_state[16];
+    /* DESPOT-2026-10-03: the tick-module slot ceiling is named ONCE here and
+     * the array is sized from it, so physics_world_cleanup's clamp and
+     * physics_world_attach_module's bound cannot drift apart again. They
+     * already had: cleanup clamped to 8 while the arrays were [16] and attach
+     * accepted 16, so 9..16 attached modules were silently never detached. */
+#define MPE_MAX_TICK_MODULES 16
+    const mpe_module_desc_t *tick_modules[MPE_MAX_TICK_MODULES];
+    void *tick_module_state[MPE_MAX_TICK_MODULES];
     int tick_module_count;
     /* id->index cache (replaces the old file-static global in
      * constraint.c, which was shared across worlds and threads).

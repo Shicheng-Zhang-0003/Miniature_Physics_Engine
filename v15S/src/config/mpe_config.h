@@ -117,6 +117,18 @@ typedef struct {
 
     struct {
         float floor_emergency_slop;
+        /* DESPOT-2026-10-03: the world-edge safety net is a FAIL-SAFE, and a
+         * fail-safe that is always on makes "nothing fell through the world"
+         * vacuously true. f10_long_run and f11_torture both gate a `fallen`
+         * counter, and with the net hard-wired neither can ever fire --
+         * boundary_apply_box_cfg enforces all four sub-conditions, so the
+         * check was reporting the clamp, not the physics.
+         *
+         * Default 1 (unchanged shipped behaviour). A test sets it to 0 to
+         * remove the net and prove the CONTACT SOLVER holds bodies up on its
+         * own, which is the property the gate claims. An observability
+         * mechanism that can never trigger is not one. */
+        int safety_net_enabled;
         /* AUDIT: floor_velocity_slop removed — it was registered but never
          * read by any code path (bounce-vs-rest is velocity-gated in the
          * Poisson pass, not depth-gated). */

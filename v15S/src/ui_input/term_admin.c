@@ -952,7 +952,7 @@ typedef struct {
     const char *path;
     const char *description;
 } mv_editable_file;
-static const mv_editable_file mv_known_files[] = {{"status/engine.cfg", "Main engine configuration (78 tunables)"},
+static const mv_editable_file mv_known_files[] = {{"status/engine.cfg", "Main engine configuration (79 tunables)"},
                                                   {"status/engine.cfg.backup", "F10/F11 validation config backup"},
                                                   {"status/engine.cfg.bak", "MicroVim auto-backup (last :w)"},
                                                   {"status/scene.dat", "Scene save file (binary)"},

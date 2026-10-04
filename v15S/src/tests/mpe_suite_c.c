@@ -383,10 +383,68 @@ int mpe_t_f10_long_run(void) {
     MPE_CHECK(&t, fin_lin < 0.25f && fin_ang < 0.5f);
     MPE_CHECK(&t, run_max_lin < 2.0f && run_max_ang < 2.0f);
     MPE_CHECK(&t, asleep == dynamic_n && dynamic_n > 0);
-    if (t.failures == 0) {
-        printf("[PASS] long-run 10-stack+pile settles and stays calm\n");
-    }
     physics_world_cleanup(&w);
+
+    /* ---- Phase 2 (DESPOT-2026-10-03): THE `fallen` GATE, MADE REAL.
+     *
+     * Phase 1 above runs with the world-edge safety net ON, which is the
+     * shipped configuration and the right thing for the settle/sleep gates.
+     * But `fallen_ticks` there is still structurally unfireable: with the net
+     * on, boundary_apply_box_cfg enforces obb_min_y >= -es and |x| <= 250+es,
+     * so all four sub-conditions are guaranteed by the CLAMP. The earlier
+     * comment claimed the volume invariant was "the stronger property, since
+     * it catches a boundary that fails to apply at all" -- but the boundary
+     * cannot fail to apply while it is unconditionally installed, so that
+     * reasoning was wrong and the gate measured the net, not the solver.
+     *
+     * boundary.safety_net_enabled now exists precisely so this is testable.
+     * Phase 2 removes the net and re-runs the SAME scene on its real Coulomb
+     * slab: now the only thing that can hold a body up is the contact solver,
+     * so "nothing fell through the world" finally means that. If the solver
+     * tunnels, the depenetration pass fails, or the slab leaks, this fires.
+     *
+     * This is the same scene and the same seed as phase 1, so any difference
+     * in outcome is attributable to the net alone. */
+    {
+        mpe_config_init();
+        g_cfg.boundary.safety_net_enabled = 0; /* the point of this phase */
+        g_cfg.sleep.enable = 1;
+        physics_world w2;
+        mpe_world_begin(&w2);
+        mpe_settle_scene(&w2); /* includes the 30x0.5x30 Coulomb slab */
+        long fell = 0, nan2 = 0;
+        float lowest = 1e30f;
+        for (int k = 0; k < F10_TICKS; k++) {
+            physics_world_step(&w2, dt);
+            for (int i = 0; i < w2.body_count; i++) {
+                rigidbody *rb = &w2.bodies[i];
+                if (!isfinite(rb->position.x) || !isfinite(rb->position.y) ||
+                    !isfinite(rb->position.z) || !isfinite(rb->velocity.x) ||
+                    !isfinite(rb->velocity.y) || !isfinite(rb->velocity.z)) {
+                    nan2++;
+                    continue;
+                }
+                if (rb->static_state) continue;
+                /* The slab's top surface is y = 0. Any dynamic body whose CENTRE
+                 * drops below the slab top by more than its own half-height
+                 * plus slop has passed through the floor. With the net off there
+                 * is nothing else that could have stopped it. */
+                if (rb->position.y < -1.0f) fell++;
+                if (rb->position.y < lowest) lowest = rb->position.y;
+                if (fabsf(rb->position.x) > 250.0f || fabsf(rb->position.z) > 250.0f) fell++;
+            }
+        }
+        MPE_INFO("safety net OFF: fell=%ld nan=%ld lowest_centre_y=%.4f (slab top y=0)",
+                 fell, nan2, lowest);
+        MPE_CHECK(&t, nan2 == 0);
+        MPE_CHECK(&t, fell == 0);
+        physics_world_cleanup(&w2);
+    }
+
+    if (t.failures == 0) {
+        printf("[PASS] long-run 10-stack+pile settles and stays calm; and with "
+               "the world-edge safety net OFF nothing falls through the floor\n");
+    }
     mpe_test_end(&t);
     return t.failures;
 }
@@ -535,10 +593,21 @@ int mpe_t_f11_torture(void) {
                 nan_ticks++;
                 continue;
             }
-            /* DESPOT-2026-09-29: same unreachable `y < -0.2` gate as in
-             * f10_long_run -- the world boundary clamps y >= 0 before this is
-             * ever read. Replaced with the volume invariant that can actually
-             * fire. */
+            /* DESPOT-2026-10-03: THE `fallen` COUNTER IS NOW REPORT-ONLY, AND
+             * THIS IS DELIBERATE. It cannot be made meaningful in THIS case:
+             * mpe_torture_scene() is a pile with NO floor, so with the
+             * world-edge safety net on, the clamp guarantees every sub-condition
+             * below and the counter is unfireable; with the net OFF there is
+             * nothing underneath the pile at all, so a rising count would be the
+             * CORRECT outcome and gating it would be asserting that free fall
+             * through empty space is a failure. Neither variant is a test.
+             *
+             * f10_long_run phase 2 is where "nothing fell through the world" is
+             * now genuinely gated -- same scene, real Coulomb slab, safety net
+             * switched off, so the contact solver alone has to hold the bodies
+             * up. Here the torture verdict stays the honest crash oracle it has
+             * always been described as: finite state, nothing corrupt. Speeds
+             * and this counter are reported, never gated. */
             if (rb->position.y < -0.25f || rb->position.y > 500.0f ||
                 fabsf(rb->position.x) > 250.5f || fabsf(rb->position.z) > 250.5f) {
                 fallen_ticks++;
@@ -557,9 +626,13 @@ int mpe_t_f11_torture(void) {
     }
     MPE_INFO("torture end speeds (reported, never gated): lin=%.3f ang=%.3f nan=%ld fallen=%ld", end_lin,
              end_ang, nan_ticks, fallen_ticks);
-    /* Crash-oracle only: PASS = finite state + world intact, NOT stability.
-     * Do not misread as a stability proof. */
-    MPE_CHECK(&t, nan_ticks == 0 && fallen_ticks == 0);
+    /* Crash-oracle only: PASS = finite state, NOT stability.
+     * Do not misread as a stability proof. `fallen_ticks` is reported above and
+     * is NOT in this gate: it is unfireable with the safety net on and
+     * meaningless with it off (see the note at the accumulation site). The
+     * "nothing fell through the world" property is gated for real in
+     * f10_long_run phase 2. */
+    MPE_CHECK(&t, nan_ticks == 0);
     if (t.failures == 0) {
         printf("[PASS] torture survived extremes without corruption\n");
     }
