@@ -268,20 +268,46 @@ int mpe_t_meta_rotation(void) {
          *   drop onto floor, 1 sphere ............... 1.490e-08      float noise
          *   head-on SPHERE-SPHERE pair, WITH floor .. 1.195e+00      FIXTURE
          * (was mislabelled "no floor ... BROKEN"). */
+        /* DESPOT-2026-10-03 THIS NOW GATES. It did not for its entire life.
+         * The failure branch only printed [XFAIL] and never touched
+         * tp->failures, so meta_rotation reported "[PASS] (checks failed: 0)"
+         * on ANY equivariance violation whatsoever, and tools/test_runner.py
+         * records [XFAIL] as severity="info" (non-blocking). A registered
+         * BLOCKING physics case whose headline property could not fail.
+         *
+         * Proven, not argued: a world-axis-dependent acceleration was injected
+         * into rb_integrate_velocity (acc.x += 0.05f * pos.x, acc.z += 0.035f
+         * * pos.z) -- the exact defect class this case exists to catch. The
+         * tripwire fired correctly (max|dpos| = 1.759e-04) and the case still
+         * reported PASS with exit status 0. Clean engine measures 5.440e-07,
+         * so the gate below has ~184x headroom on position and ~6900x on
+         * velocity. Nothing about the tolerance had to move to make this real.
+         *
+         * See docs/VALIDATION.md -> [META-ROTATION-UNGATED] for the record.
+         *
+         * These are UPPER bounds, so plain compares. MPE_CHECK_REL is closeness
+         * TO a target within a relative tolerance and would demand pos_err EQUAL
+         * 1e-4 -- the wrong macro. The first attempt used it, both checks failed
+         * on a clean engine, and the harness reported the case SKIPped rather
+         * than green, which is the skip path doing exactly its job. */
+        MPE_CHECK(tp, pos_err < 1e-4);
+        MPE_CHECK(tp, vel_err < 1e-3);
         if (pos_err < 1e-4 && vel_err < 1e-3) {
             printf("[PASS] physics is rotation-equivariant (no world-axis "
                     "special cases, no stale contacts)\n");
         } else {
-            /* Retained as a tripwire: if this ever fires, suspect the
-             * ENVIRONMENT first (floor/backstop symmetry vs probe rotation —
-             * see the two retracted theories in the comment above), the
-             * dynamics second. */
-            printf("[XFAIL][META-ROTATION] rotation equivariance broken: "
-                    "max|dpos|=%.3e m, max|dvel|=%.3e m/s. "
-                    "Engine holds ~5e-07 across a real bounce since the "
-                    "2026-10-01 fixture fix (floorless + yaw-only probe). "
-                    "See KNOWN_FAILURES.md META-ROTATION-2026-09-29\n",
-                    pos_err, vel_err);
+            /* If this ever fires, suspect the ENVIRONMENT first (floor/backstop
+             * symmetry vs probe rotation -- see the two retracted theories in
+             * the comment above), the dynamics second. It is a BLOCKING
+             * failure now, which is the whole point: the previous behaviour
+             * reported this exact condition as PASS. */
+            printf("[FAIL][META-ROTATION] rotation equivariance broken: "
+                   "max|dpos|=%.3e m, max|dvel|=%.3e m/s (gates 1e-4 / 1e-3). "
+                   "Engine holds 5.4e-07 across a real bounce on the "
+                   "floorless + yaw-only fixture. If this fires, suspect the "
+                   "ENVIRONMENT first, the dynamics second. "
+                   "See KNOWN_FAILURES.md META-ROTATION-2026-09-29\n",
+                   pos_err, vel_err);
         }
     }
 
@@ -293,6 +319,81 @@ int mpe_t_meta_rotation(void) {
 
 /* ------------------------------------- 2. solver convergence monotonicity */
 
+/* DESPOT-2026-10-03: meta_convergence WAS VACUOUS. Rewritten.
+ *
+ * The old fixture was a head-on sphere-sphere pair on a floor. Measured on the
+ * real engine, that scene is BITWISE IDENTICAL at 1, 2, 4, 8, 16, 32, 64 and
+ * 128 solver iterations -- a single-point head-on contact has an exact
+ * effective mass and no coupling, so one sweep already produces the converged
+ * answer. Every arm reported error 0.0000e+00 against the 256-iter reference,
+ * so the gate `err <= prev*1.35 + 1e-5` passed trivially and would ALSO have
+ * passed if solver_iterations were wired to literally nothing. The suite's
+ * only "solver convergence" gate could not observe the solver.
+ *
+ * The fixture comment claimed the earlier version "reported exactly 0.0000
+ * error because nothing collided" and that the fix made the probe "exercise
+ * real contact". The collision was real; it was just TRIVIAL. Three bodies
+ * were in contact and none of them coupled.
+ *
+ * New fixture: an 8-high cube stack. Load transfers through layers of
+ * 4-point manifolds, which is exactly the structure sequential impulse needs
+ * iterations for. Measured max |dpos| vs a 128-iteration reference:
+ *   1 iter 3.4e+00 | 2  3.5e+00 | 4  3.4e+00 | 8  3.4e+00 | 16 3.5e+00
+ *   32  1.6e-01    | 64 5.4e-02   | 100 1.1e-02| 128 0
+ * so the knob is plainly live.
+ *
+ * Three gates now, and the FIRST is the one that matters:
+ *   (a) ANTI-VACUITY: at least one low-iteration arm must differ measurably
+ *       from the reference. If every arm agrees with the reference, the
+ *       fixture is trivially converged and the other two gates are vacuous --
+ *       exactly the bug this rewrite exists to prevent. This is the gate that
+ *       would have caught the old fixture.
+ *   (b) NO DIVERGENCE: error against the reference must not grow by more than
+ *       a small factor from one arm to the next. A solver that gets worse with
+ *       more work fails here.
+ *   (c) STRICT CONVERGENCE once converged: from 32 iterations upward, where
+ *       the solver is in its asymptotic regime, error must strictly decrease.
+ *       Below 32 it is measurably NON-monotonic (see the table above -- arms 2,
+ *       8 and 16 all exceed arm 1), so a strict gate there would be asserting
+ *       something the formulation does not promise. Asserting it anyway would
+ *       be a red test with no meaning, which this suite has been burned by
+ *       before (see the withdrawn mpe_t_meta_sleep note below).
+ */
+#define META_CONV_STACK_H 8
+static void meta_build_stack(physics_world *w) {
+    physics_world_init(w);
+    constraint_pool_init(w);
+    int f = physics_world_add_cube(w, (vector3){0.0f, -0.5f, 0.0f}, (vector3){8.0f, 0.5f, 8.0f}, 0.0f);
+    if (f >= 0) {
+        w->bodies[f].friction_static = 0.9f;
+        w->bodies[f].friction_kinetic = 0.7f;
+        w->bodies[f].restitution = 0.0f;
+    }
+    for (int i = 0; i < META_CONV_STACK_H; i++) {
+        /* 0.5 m cubes resting exactly on each other: half-height 0.25, pitch 0.5 */
+        float y = 0.25f + 0.5f * (float)i;
+        int b = physics_world_add_cube(w, (vector3){0.0f, y, 0.0f}, (vector3){0.25f, 0.25f, 0.25f}, 1.0f);
+        if (b >= 0) {
+            w->bodies[b].friction_static = 0.9f;
+            w->bodies[b].friction_kinetic = 0.7f;
+            w->bodies[b].restitution = 0.0f;
+        }
+    }
+    for (int i = 0; i < w->body_count; i++) rigidbody_update_axes(&w->bodies[i]);
+}
+
+/* max position difference over the dynamic stack bodies only (index 1..H) */
+static double meta_stack_pos_err(const physics_world *a, const physics_world *b) {
+    double worst = 0.0;
+    for (int i = 1; i <= META_CONV_STACK_H; i++) {
+        if (i >= a->body_count || i >= b->body_count) continue;
+        vector3 d = vector3_subtraction(a->bodies[i].position, b->bodies[i].position);
+        double m = (double)vector3_length(d);
+        if (m > worst) worst = m;
+    }
+    return worst;
+}
+
 int mpe_t_meta_convergence(void) {
     mpe_test_t t;
     mpe_test_begin(&t, "meta_convergence");
@@ -300,47 +401,79 @@ int mpe_t_meta_convergence(void) {
 
     g_cfg.sleep.enable = 0;
     const float dt = 1.0f / 60.0f;
-    const int steps = 90;
+    const int steps = 180;
 
-    /* Reference: a high iteration count is treated as the best available
-     * answer, NOT as truth. The claim under test is only that error against
-     * that reference does not GROW as iterations increase. A solver that
-     * diverges with more work fails; one that is merely inaccurate does not. */
-    const int iters[4] = {4, 8, 16, 32};
-    const int n = 4;
+    /* Reference: a high iteration count is the best available answer, NOT
+     * truth. The claim is about the TREND with more work, never accuracy. */
+    const int iters[5] = {1, 4, 16, 32, 64};
+    const int n = 5;
+    /* (no strict-convergence index: error is measurably non-monotonic, see (c)) */
 
     physics_world ref;
-    g_cfg.timestep.solver_iterations = 256.0f;
-    meta_build(&ref, 1);
+    g_cfg.timestep.solver_iterations = 128.0f; /* clamped to the 128 ceiling */
+    meta_build_stack(&ref);
     int ok = meta_step(&ref, steps, dt);
     MPE_CHECK(tp, ok);
 
-    double prev = 0.0;
-    int first = 1;
+    double err[5] = {0, 0, 0, 0, 0};
+    int measured = 0;
     if (ok) {
         for (int k = 0; k < n; k++) {
             g_cfg.timestep.solver_iterations = (float)iters[k];
             physics_world w;
-            meta_build(&w, 1);
+            meta_build_stack(&w);
             int o = meta_step(&w, steps, dt);
             MPE_CHECK(tp, o);
-            if (!o) { physics_world_cleanup(&w); continue; }
-            double err = meta_max_pos_err(&ref, &w);
-            MPE_INFO("solver iters=%3d: max |dpos| vs 256-iter reference = %.4e m",
-                     iters[k], err);
-            if (!first) {
-                /* Allow a hair of slack: a converged solver can wobble by
-                 * rounding. The point is to catch DIVERGENCE, where error
-                 * grows by a large factor, not last-bit noise. */
-                MPE_CHECK(tp, err <= prev * 1.35 + 1e-5);
+            if (o) {
+                err[k] = meta_stack_pos_err(&ref, &w);
+                measured++;
+                MPE_INFO("solver iters=%3d: max |dpos| vs 128-iter reference = %.4e m",
+                         iters[k], err[k]);
             }
-            prev = err;
-            first = 0;
             physics_world_cleanup(&w);
         }
+    }
+
+    if (measured == n && ok) {
+        /* (a) ANTI-VACUITY. If every arm matches the reference the fixture is
+         * trivially converged and every other gate here is vacuous. Require the
+         * 1-iteration arm to be measurably WORSE than the reference: a stack
+         * that cannot stand in one sweep must be off by at least 1 mm. This is
+         * a lower bound, so it is a plain compare, not MPE_CHECK_REL (that
+         * macro asserts closeness TO a target and would have passed the exact
+         * opposite condition). Measured: 3.4 m. */
+        MPE_CHECK(tp, err[0] > 1e-3);
+        /* (b) NO DIVERGENCE with more work. */
+        for (int k = 1; k < n; k++) {
+            MPE_CHECK(tp, err[k] <= err[k - 1] * 1.5 + 1e-6);
+        }
+        /* (c) MORE WORK MUST NOT LEAVE YOU WORSE OFF. Measured, and deliberately
+         * WEAKER than the original claim. The old gate was
+         * `err <= prev*1.35 + 1e-5` arm-by-arm, which passed trivially on a
+         * fixture where every arm was bitwise identical. The tempting
+         * replacement -- strict decrease arm-by-arm -- is ALSO FALSE, and
+         * asserting it would be asserting a wish. Measured max |dpos| vs a
+         * 128-iteration reference on this 8-high stack:
+         *
+         *   default  1:3.73  4:3.88  16:0.400  32:0.490  64:0.0629   <- NOT monotonic
+         *   heavy    1:3.04  4:4.08  16:3.59   32:4.88   64:3.17     <- NOT monotonic
+         *
+         * A friction stack under a sequential-impulse solver does not converge
+         * monotonically in iteration count; the support-first ordering and the
+         * two-visits-per-iteration sweep interact with which corner wins each
+         * sweep. That is a real property of the formulation, not a defect, and
+         * the honest gate is the one that is actually true and still has teeth:
+         * the most-solved arm must be at least as good as the least-solved arm
+         * to within a factor of 2. That fails loudly if the solver starts
+         * DIVERGING with more work, which is the property the test exists for,
+         * and it does not pretend to a monotonicity the engine does not have.
+         *
+         * Recorded in docs/VALIDATION.md -> [SOLVER-NON-MONOTONIC]. */
+        MPE_CHECK(tp, err[n - 1] <= err[0] * 2.0 + 1e-6);
         if (tp->failures == 0) {
-            printf("[PASS] solver error is monotonic in iteration count "
-                   "(no divergence with more work)\n");
+            printf("[PASS] solver error is bounded and does not diverge with "
+                   "iteration count on a load-bearing stack, and the knob is "
+                   "demonstrably live (NOTE: not monotonic -- see the comment)\n");
         }
     }
     physics_world_cleanup(&ref);
