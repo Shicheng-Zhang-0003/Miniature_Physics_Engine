@@ -338,9 +338,61 @@ void collision_prepare_solver(struct physics_world *world, collision_data *sourc
          * last tick's normal as the iterations' seed ejected the 10-stack at
          * ~13 m/s across guard/cap/cone/tightness/adoption ablations, while
          * the restored values themselves stayed healthy (~0.5, bounded: no
-         * save-bigger loop). Tangent memory still restores (friction hold
-         * needs it, proven harmless) and the tangent frame still adopts. The
-         * normal therefore SOLVES FROM ZERO EVERY TICK, converging at 64-128
+         * save-bigger loop).
+         *
+         * DESPOT-2026-10-03: THE CLAIM THAT "TANGENT MEMORY STILL RESTORES"
+         * WAS FALSE, AND PROVING IT CHANGED THE DOCUMENTATION RATHER THAN THE
+         * CODE.
+         *
+         * The restored tangent impulse was projected onto the Coulomb cone at
+         * application time, passing cp->accumulated_normal_impulse as the
+         * cone's fn. The normal is cold-zeroed a few lines above, so fn is
+         * exactly 0.0 on every contact, every tick -- and
+         * a3_anisotropic_coulomb_clamp() opens with
+         *     if (!(fn > 0.0f) || !isfinite(fn)) { *out1=0; *out2=0; return; }
+         * Instrumented on a 4-cube stack taken to rest:
+         *
+         *     restored t1 = 0.154651 | fn passed to cone = 0.000000
+         *     | AFTER clamp  t1 = 0.000000
+         *
+         * So the tangent warm start was deleted by the very clamp that was
+         * added to protect it, and THIS ENGINE HAS NO WORKING WARM START ON
+         * ANY ROW. That also explains why it needs 96-128 iterations for a
+         * 10-cube stack -- 12-30x the published practitioner budget (Catto,
+         * Solver2D 2024: "typically 4 to 8 iterations") -- since with no
+         * cross-tick information carry the whole column is re-propagated from
+         * the floor every tick.
+         *
+         * Restoring it the way the old comment described (seed unclamped, let
+         * the sweep enforce the cone once it has a real lambda_n) was
+         * implemented and MEASURED, and it is a clear REGRESSION, so the clamp
+         * stays. Worst pairwise cube-cube overlap, 10-cube stack:
+         *
+         *     iterations         32       64       96      128
+         *     gravity -9.81   0.1134   0.0145   0.0000   0.0000  (current)
+         *     with warm start 0.1813   0.0763   0.0596   0.0000
+         *     gravity -17.0   0.2084   0.3105   0.0024   0.0000  (current)
+         *     with warm start 0.2274   0.0920   0.0558   0.0700
+         *
+         * Better at 64 iterations under extreme gravity, worse almost
+         * everywhere else, and it turns the suite RED in all five regimes:
+         * f10_long_run loses 23 of 27 bodies to sleep (4/27 asleep,
+         * run_max > 2.0) and f11_torture's interpenetration gate fires at
+         * 0.2791 m against a 0.05 m bound.
+         *
+         * CONCLUSION, recorded so it is not re-derived: the no-warm-start
+         * behaviour is what this engine has actually been tuned around, and
+         * the old comment described an aspiration rather than the
+         * implementation. A tangential seed inconsistent with a cold normal
+         * injects a spurious tangential velocity the solver must then remove,
+         * which costs more than the seed saves. The tangent FRAME adoption
+         * below IS live and does help; only the impulse seed is dead.
+         * Re-enabling an effective warm start needs a formulation that seeds
+         * the NORMAL too, which is separate work with a stability proof
+         * attached, not a one-line un-clamp.
+         *
+         * The tangent frame still adopts. The normal therefore SOLVES FROM
+         * ZERO EVERY TICK, converging at 64-128
          * iterations for a 10-high stack; low-iteration tall stacks may creep
          * — tune iterations, not seeds.
          *
