@@ -23,20 +23,20 @@
 
 /* Open the pad on first use (honours MPE_GAMEPAD_DEVICE; missing device =
  * disconnected, retried periodically for hot-plug). Idempotent. */
-void gamepad_drive_init(void);
+void gamepad_drive_init (void);
 
 /* Poll + command once per GUI frame, before the physics tick. No-op without
  * bundle, pad, or robot 0. Zeroes the wheels once on disconnect/vanish. */
-void gamepad_drive_tick(void);
+void gamepad_drive_tick (void);
 
 /* True while the pad holds live commands (for status/telemetry honesty). */
-int gamepad_drive_active(void);
+int gamepad_drive_active (void);
 
 /* Joint watchdog: watches fleet robot 0 wheel mounts every GUI frame and
  * reports discontinuities (mount jump = anchor integrity, tilt spikes,
  * NaN) with a build tag, so a live "wheel snapped" report arrives with
  * evidence instead of adjectives. Event-driven (rising edge, re-arms
  * below half threshold); silent otherwise. */
-void ftc_watchdog_tick(void);
+void ftc_watchdog_tick (void);
 
 #endif /* gamepad_drive_h */

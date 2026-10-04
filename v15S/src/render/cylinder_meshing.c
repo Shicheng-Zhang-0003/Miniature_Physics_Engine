@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <math.h>
 
-void init_cylinder_system(mesh *mesh_object, int radial_segments) {
+void init_cylinder_system (mesh *mesh_object, int radial_segments) {
     if (!mesh_object) return;
     mesh_object->index_count = 0;
     mesh_object->wireframe_index_count = 0;
@@ -17,15 +17,15 @@ void init_cylinder_system(mesh *mesh_object, int radial_segments) {
     int ring_verts = radial_segments + 1;
     /* Rings: x=-1 barrel, x=+1 barrel, x=-1 cap disc, x=+1 cap disc, + 2 cap centers. */
     int vertex_count = ring_verts * 4 + 2;
-    float *vertex_data = malloc((size_t) vertex_count * 6 * sizeof(float));
+    float *vertex_data = malloc ((size_t) vertex_count * 6 * sizeof (float));
     if (!vertex_data) return;
     int vi = 0;
     for (int ring = 0; ring < 4; ring++) {
         float x = (ring == 0 || ring == 2) ? -1.0f : 1.0f;
         for (int s = 0; s <= radial_segments; s++) {
             float a = (float) s * 2.0f * math_pi / (float) radial_segments;
-            float y = cosf(a);
-            float z = sinf(a);
+            float y = cosf (a);
+            float z = sinf (a);
             vertex_data[vi++] = x;
             vertex_data[vi++] = y;
             vertex_data[vi++] = z;
@@ -60,9 +60,9 @@ void init_cylinder_system(mesh *mesh_object, int radial_segments) {
     int center_neg = ring_verts * 4, center_pos = ring_verts * 4 + 1;
     /* Side quads + two cap fans. */
     mesh_object->index_count = radial_segments * 6 + radial_segments * 3 * 2;
-    unsigned int *element_indices = malloc((size_t) mesh_object->index_count * sizeof(unsigned int));
+    unsigned int *element_indices = malloc ((size_t) mesh_object->index_count * sizeof (unsigned int));
     if (!element_indices) {
-        free(vertex_data);
+        free (vertex_data);
         mesh_object->index_count = 0;
         return;
     }
@@ -94,10 +94,10 @@ void init_cylinder_system(mesh *mesh_object, int radial_segments) {
     }
     /* Wireframe: two rim loops + 4 axial rails. */
     mesh_object->wireframe_index_count = radial_segments * 2 * 2 + 4 * 2;
-    unsigned int *wireframe_indices = malloc((size_t) mesh_object->wireframe_index_count * sizeof(unsigned int));
+    unsigned int *wireframe_indices = malloc ((size_t) mesh_object->wireframe_index_count * sizeof (unsigned int));
     if (!wireframe_indices) {
-        free(element_indices);
-        free(vertex_data);
+        free (element_indices);
+        free (vertex_data);
         mesh_object->index_count = 0;
         mesh_object->wireframe_index_count = 0;
         return;
@@ -115,37 +115,37 @@ void init_cylinder_system(mesh *mesh_object, int radial_segments) {
         wireframe_indices[wi++] = ring1 + s;
     }
 
-    glGenVertexArrays(1, &mesh_object->vertex_array_object);
-    glGenBuffers(1, &mesh_object->vertex_buffer_object);
-    glGenBuffers(1, &mesh_object->element_buffer_object);
-    glBindVertexArray(mesh_object->vertex_array_object);
-    glBindBuffer(GL_ARRAY_BUFFER, mesh_object->vertex_buffer_object);
-    glBufferData(GL_ARRAY_BUFFER, vertex_count * 6 * sizeof(float), vertex_data, GL_STATIC_DRAW);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh_object->element_buffer_object);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh_object->index_count * sizeof(unsigned int), element_indices,
-                 GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *) 0);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *) (3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-    glGenBuffers(1, &mesh_object->wireframe_element_buffer_object);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh_object->wireframe_element_buffer_object);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh_object->wireframe_index_count * sizeof(unsigned int),
-                 wireframe_indices, GL_STATIC_DRAW);
-    glGenBuffers(1, &mesh_object->instance_vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, mesh_object->instance_vbo);
-    glBufferData(GL_ARRAY_BUFFER, mpe_max_bodies * 19 * sizeof(float), NULL, GL_DYNAMIC_DRAW);
+    glGenVertexArrays (1, &mesh_object->vertex_array_object);
+    glGenBuffers (1, &mesh_object->vertex_buffer_object);
+    glGenBuffers (1, &mesh_object->element_buffer_object);
+    glBindVertexArray (mesh_object->vertex_array_object);
+    glBindBuffer (GL_ARRAY_BUFFER, mesh_object->vertex_buffer_object);
+    glBufferData (GL_ARRAY_BUFFER, vertex_count * 6 * sizeof (float), vertex_data, GL_STATIC_DRAW);
+    glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, mesh_object->element_buffer_object);
+    glBufferData (GL_ELEMENT_ARRAY_BUFFER, mesh_object->index_count * sizeof (unsigned int), element_indices,
+                  GL_STATIC_DRAW);
+    glVertexAttribPointer (0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof (float), (void *) 0);
+    glEnableVertexAttribArray (0);
+    glVertexAttribPointer (1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof (float), (void *) (3 * sizeof (float)));
+    glEnableVertexAttribArray (1);
+    glGenBuffers (1, &mesh_object->wireframe_element_buffer_object);
+    glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, mesh_object->wireframe_element_buffer_object);
+    glBufferData (GL_ELEMENT_ARRAY_BUFFER, mesh_object->wireframe_index_count * sizeof (unsigned int),
+                  wireframe_indices, GL_STATIC_DRAW);
+    glGenBuffers (1, &mesh_object->instance_vbo);
+    glBindBuffer (GL_ARRAY_BUFFER, mesh_object->instance_vbo);
+    glBufferData (GL_ARRAY_BUFFER, mpe_max_bodies * 19 * sizeof (float), NULL, GL_DYNAMIC_DRAW);
     for (int i = 0; i < 4; i++) {
-        glVertexAttribPointer(2 + i, 4, GL_FLOAT, GL_FALSE, 19 * sizeof(float), (void *) (i * 4 * sizeof(float)));
-        glEnableVertexAttribArray(2 + i);
-        glVertexAttribDivisor(2 + i, 1);
+        glVertexAttribPointer (2 + i, 4, GL_FLOAT, GL_FALSE, 19 * sizeof (float), (void *) (i * 4 * sizeof (float)));
+        glEnableVertexAttribArray (2 + i);
+        glVertexAttribDivisor (2 + i, 1);
     }
-    glVertexAttribPointer(6, 3, GL_FLOAT, GL_FALSE, 19 * sizeof(float), (void *) (16 * sizeof(float)));
-    glEnableVertexAttribArray(6);
-    glVertexAttribDivisor(6, 1);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh_object->element_buffer_object);
-    glBindVertexArray(0);
-    free(wireframe_indices);
-    free(element_indices);
-    free(vertex_data);
+    glVertexAttribPointer (6, 3, GL_FLOAT, GL_FALSE, 19 * sizeof (float), (void *) (16 * sizeof (float)));
+    glEnableVertexAttribArray (6);
+    glVertexAttribDivisor (6, 1);
+    glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, mesh_object->element_buffer_object);
+    glBindVertexArray (0);
+    free (wireframe_indices);
+    free (element_indices);
+    free (vertex_data);
 }
