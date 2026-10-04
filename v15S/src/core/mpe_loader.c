@@ -219,7 +219,14 @@ int mpe_loader_load(const char *path, char *errbuf, int errlen) {
      * roll it back. A constructor that registers a module and then fails the
      * desc checks used to leave a live descriptor pointing into a dlclose'd
      * image. */
-    int snap_modules = mpe_module_count();
+    /* DESPOT-2026-10-03: this MUST be the index high-water, not the live count.
+     * mpe_module_count() counts live entries while
+     * mpe_registry_truncate_modules(keep) truncates by index, so with a
+     * tombstone hole (reg A, reg B, unreg B, reg C -> live 2, high water 3)
+     * rolling back to the live count tombstoned C, a pre-existing LIVE
+     * registration, silently and with no diagnostic. Silent loss of a
+     * registered module on any failed load. */
+    int snap_modules = mpe_module_slot_count();
     dlerror();
     void *h = dlopen(resolved, RTLD_NOW | RTLD_LOCAL);
     if (!h) {
