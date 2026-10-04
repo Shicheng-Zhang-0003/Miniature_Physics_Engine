@@ -1,7 +1,8 @@
 /* MFS Ecosystem — "mfs-simulator" overarching descriptor.
  *
  * Streamlined 2026-10-04: the single home for MFS driving. Bundle attach
- * brings up ftc-fleet (one robot via `ftc spawn`, mecanum via `ftc drive`).
+ * brings up ftc-fleet (one robot via `ftc spawn`, driven mecanum by the
+ * F310 pad — no terminal drive remains).
  * The BioBuzz game module (module_1: intake/shooter/balls/gamepad) stays
  * registered but parked — attach it explicitly if a game session is wanted.
  * Modules live in modules/<name>/, their support libs in
@@ -145,7 +146,7 @@ static int mfs_ecosystem_attach(mpe_world_t *world, void **eco_state) {
      * direct API the MFS suite uses) still works, but a plain `eco attach`
      * no longer drags a second robot, a ball set and a physical-gamepad
      * probe into every drive session. One field (tile floor on spawn), one
-     * robot (ftc-fleet index 0), one controller (`ftc drive`).
+     * robot (ftc-fleet index 0), one controller (F310 pad mecanum).
      * On a failure of the attach, roll back: previously a failed second
      * attach left the first attached to the world while the ecosystem
      * returned -1 and freed only its own state, leaking the module's

@@ -132,16 +132,20 @@ test. Out-of-tree engine work needs nothing else; or from `v15S/src`:
 `make mfs_ecosystem.so`.
 
 Inside the engine terminal (no rebuild needed — full drive session).
-One field, one robot, one controller (streamlined 2026-10-04):
+One field, one robot, one controller (streamlined 2026-10-04; the
+controller is the physical Logitech F310, mode switch X):
 
 ```
 mod load ecosystem/mfs/mfs_ecosystem.so   # load the bundle
 eco attach mfs-simulator                  # attach ftc-fleet to the primary world
 ftc spawn                                 # THE mecanum robot, tile field auto-added
-ftc drive 1 0 0                           # full forward (persists; f/s/r)
 ftc telemetry                             # pose, odometry, battery, wheels
-ftc stop
 ```
+
+Drive with the pad: left stick = forward/strafe, right stick X = rotate,
+START toggles control, LB+RB e-stop; sticks-centered is stopped. There is
+no terminal drive — `ftc drive`/`stop` were removed when the pad took over
+(all motion is `drivetrain_mecanum`).
 
 Lower level (single module instead of the bundle):
 

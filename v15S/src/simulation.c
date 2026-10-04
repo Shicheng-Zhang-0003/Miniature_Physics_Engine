@@ -7,6 +7,7 @@
 #include "core/long_run_validation.h"
 
 #include "ui_input/simulation_dispatch.h"
+#include "ui_input/gamepad_drive.h"
 #include <gtk/gtk.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -84,6 +85,11 @@ gboolean physics_step_increment(gpointer user_data_pointer) {
     /* Input dispatch (mouse/keyboard bindings, menus, spawn) */
     /* NOTE: input dispatch still inline for now — extract in next pass */
     simulation_input_dispatch(parent_window);
+
+    /* F310 gamepad: the single robot controller. Polls and commands
+     * ftc-fleet robot 0 mecanum before the tick (commands persist through
+     * the fleet pre_step). Silent no-op without bundle, pad, or robot. */
+    gamepad_drive_tick();
 
     /* Menu handling */
     simulation_menu_dispatch(parent_window);

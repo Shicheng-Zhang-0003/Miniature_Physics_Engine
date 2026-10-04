@@ -1,22 +1,23 @@
-/* `ftc` terminal command — the single robot controller.
+/* `ftc` terminal command — spawn and inspect the single robot.
  *
  * Streamlined 2026-10-04 (v15S release blocker): one field, one robot, one
- * controller, full mecanum drive. Exactly three verbs:
+ * controller, full mecanum drive — and the controller is the physical F310
+ * gamepad (see ui_input/gamepad_drive.c), NOT the terminal. Exactly two
+ * verbs remain:
  *   ftc spawn [x y z]          spawn THE mecanum robot (refuses when one exists)
- *   ftc drive <f> <s> <r>      mecanum drive, persists until changed
- *   ftc stop                    halt all wheels
  *   ftc telemetry               pose, odometry, battery, wheels
  * Requires the bundle: `mod load ecosystem/mfs/mfs_ecosystem.so` first
  * (symbols resolve from the loaded handle; the engine never links FTC).
  * Spawn auto-attaches the ftc-fleet module to the primary world and ensures
- * the tile field. Drive commands persist until changed (motors hold).
+ * the tile field.
  *
- * PARKED (not deleted): `list`/`preset` inventory, tank drive, preset
- * selection, multi-robot indices. The fleet API, the bundle `command()`
- * surface (`eco command mfs-simulator ...`), tank drivetrain code and all
- * tests keep the full surface — this command is the simplified human
- * controller, not the API ceiling. Game module (intake/shooter/balls) and
- * the GTK robot registry are parked with it; see README_MFS.md.
+ * PARKED (not deleted): `drive`/`stop` (the gamepad owns all motion now),
+ * `list`/`preset` inventory, tank drive, preset selection, multi-robot
+ * indices. The fleet API, the bundle `command()` surface (`eco command
+ * mfs-simulator ...`), tank drivetrain code and all tests keep the full
+ * surface — this command is spawn+inspect, not the API ceiling. Game module
+ * (intake/shooter/balls) and the GTK robot registry are parked with it;
+ * see README_MFS.md.
  */
 #include "../core/mpe_platform.h"
 #include "term_priv.h"
@@ -110,7 +111,7 @@ static int ftc_ensure_driving(void) {
 
 void cmd_ftc(int argc, char **argv) {
     if (argc < 2) {
-        term_err("mpe: ftc: usage: ftc spawn [x y z] | drive <f> <s> <r> | stop | telemetry\n");
+        term_err("mpe: ftc: usage: ftc spawn [x y z] | telemetry\n");
         return;
     }
     physics_world *w = physics_world_get_primary();
@@ -169,57 +170,6 @@ void cmd_ftc(int argc, char **argv) {
         return;
     }
 
-    if (term_str_eq(argv[1], "drive")) {
-        if (argc < 5) {
-            term_err("mpe: ftc: usage: ftc drive <forward> <strafe> <rotate>\n");
-            return;
-        }
-        if (ftc_ensure_driving() != 0) return;
-        if (!p_get || !w) {
-            term_err("mpe: ftc: bundle not loaded\n");
-            return;
-        }
-        ftc_robot *r = p_get(w, 0);
-        if (!r) {
-            term_err("mpe: ftc: no robot (ftc spawn first)\n");
-            return;
-        }
-        void (*p_mec)(ftc_robot *, float, float, float) =
-            (void (*)(ftc_robot *, float, float, float))ftc_sym("drivetrain_mecanum");
-        if (!p_mec) {
-            term_err("mpe: ftc: bundle API incomplete\n");
-            return;
-        }
-        p_mec(r, ftc_argf(argv, 2, argc, 0), ftc_argf(argv, 3, argc, 0),
-              ftc_argf(argv, 4, argc, 0));
-        term_ok("mpe: ftc: driving\n");
-        return;
-    }
-
-    if (term_str_eq(argv[1], "stop")) {
-        if (ftc_ensure_driving() != 0) return;
-        if (!p_get || !w) {
-            term_err("mpe: ftc: bundle not loaded\n");
-            return;
-        }
-        ftc_robot *r = p_get(w, 0);
-        if (!r) {
-            term_err("mpe: ftc: no robot (ftc spawn first)\n");
-            return;
-        }
-        /* Stop through the mecanum mixer (dlsym'd: the engine never links
-         * FTC) so command state stays consistent with drive. */
-        void (*p_mec)(ftc_robot *, float, float, float) =
-            (void (*)(ftc_robot *, float, float, float))ftc_sym("drivetrain_mecanum");
-        if (!p_mec) {
-            term_err("mpe: ftc: bundle API incomplete\n");
-            return;
-        }
-        p_mec(r, 0.0f, 0.0f, 0.0f);
-        term_ok("mpe: ftc: stopped\n");
-        return;
-    }
-
     if (term_str_eq(argv[1], "telemetry")) {
         if (!p_get) {
             term_err("mpe: ftc: bundle not loaded\n");
@@ -262,5 +212,5 @@ void cmd_ftc(int argc, char **argv) {
         return;
     }
 
-    term_err("mpe: ftc: unknown subcommand (spawn|drive|stop|telemetry)\n");
+    term_err("mpe: ftc: unknown subcommand (spawn|telemetry)\n");
 }
