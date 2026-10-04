@@ -1,12 +1,12 @@
 # 475_FTC / MPE Code Style
 # Exemplar: v15S/src/core/exemplar_formatting.h (tracked style reference).
-# Space-before-paren everywhere, packed short functions, single-line
-# short ifs. Manual conventions (not machine-enforced): descriptive
-# loop/param names (row_index, not i), // for short notes. Known deltas
-# vs the exemplar (deliberate, not drops): subscript stays tight
-# (matrix[0], not matrix [0] — clang-format cannot split declarations
-# from uses, so the exemplar's split convention is not automated);
-# top-level definitions stay one-per-line (the exemplar packs `} f(){}`).
+# Space-before-paren everywhere, packed single-line functions, stacked
+# multi-line if/else (never bunched), zero blank lines, spaced subscripts
+# name [i][j] (via tools, C-aware: strings/comments untouched).
+# Manual conventions (not machine-enforced): descriptive
+# loop/param names (row_index, not i), // for short notes. Known delta
+# vs the exemplar (deliberate): top-level definitions stay one-per-line
+# (the exemplar packs `} f(){}`).
 Language: Cpp
 BasedOnStyle: LLVM
 
