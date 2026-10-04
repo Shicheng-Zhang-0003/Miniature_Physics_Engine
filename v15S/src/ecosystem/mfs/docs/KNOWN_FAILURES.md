@@ -39,25 +39,37 @@ silent passes. Measurements from the 2026-09-26 audit on this tree.
 - **Revert path:** `ftc_robot_set_mecanum_analytic_default(0)` before
   creation restores the articulated real-roller build (forensics).
 
-## [MFS-STRAFE-F2] Odometry strafe tracking (FIXED 2026-09-28)
+## [MFS-STRAFE-F2] Odometry strafe tracking (PARTIALLY FIXED — TRACKING IS STILL OPEN)
 
 - **Transmit half FIXED (analytic lateral):** strafe physics reaches
-  0.87 m in 1 s vs 0.10 m required; hard-gated.
-- **Tracking half FIXED (voltage-scaled motor/governor bounds):** encoders
-  report ~1.08 m vs 0.87 m physics (~25% over; needs <= 30%). Was 88% over
-  (~1.53 m vs 0.81 m): the implicit clamp took min(spec, V-line) while the
-  explicit observer twin ran unclamped, so at fresh-pack voltage the two
-  paths disagreed 6.7% and the observer carried a phantom load into peel.
-  Scaling BOTH bounds to the V-line no-load point `Vterm/(kv·gear)`
-  (motor.c clamp + robot.c governor, spec kept as Kv-degenerate fallback)
-  closed it — isolated by A/B (spec-fixed bounds reproduce 88%, V-line
-  bounds give 25%, transmit 3.40 m both ways). `odom_slip` still flags real
-  slip elsewhere. Deterministic (bit-identical across runs, -O2 and
-  -O1+ASan, zero sanitizer errors).
-- **Margin note:** 25% vs 30% allowed is thin. The suite's XFAIL branch
-  stays as a fallback tripwire (fires only if tracking ever regresses past
-  30%), not as the verdict. Phase-1 forward tracking (8.9%) stays
-  hard-gated with room to spare.
+  0.87 m in 1 s vs 0.10 m required; hard-gated. Confirmed still green.
+- **Tracking half IS NOT FIXED. This entry said FIXED; it was not.**
+  Re-measured 2026-10-03 by running the gate:
+
+      Phase 2: strafe: physics dx=0.6318 odometry dx=0.9076
+      [XFAIL][MFS-STRAFE-F2] strafe phys=0.6318 odom=0.9076 (tracking open)
+
+  That is **+43.7%** (|0.9076 - 0.6318| / 0.6318), outside the 30% band. The
+  entry previously claimed "encoders report ~1.08 m vs 0.87 m physics (~25%
+  over; needs <= 30%)" — **neither number matches what the suite prints**, and
+  the 25% claim sat inside the band while the actual 43.7% does not. So the
+  write-up reported a passing margin for a check that is in fact red.
+
+  What the earlier work actually achieved: the implicit clamp took
+  min(spec, V-line) while the explicit observer twin ran unclamped, so at
+  fresh-pack voltage the two paths disagreed 6.7% and the observer carried a
+  phantom load into peel. Scaling BOTH bounds to the V-line no-load point
+  `Vterm/(kv*gear)` (motor.c clamp + robot.c governor, spec kept as
+  Kv-degenerate fallback) narrowed it substantially — from 88% over to
+  something much smaller — but did not close it. Transmit is 2.2872 m
+  (previously documented as 3.40 m, itself stale; the gate prints the truth).
+- **Why it was not caught:** the XFAIL branch is surfaced by the runner as a
+  non-blocking marker, so a red frontier is *visible* without being *blocking*.
+  That is the correct design for a known-red frontier — but it means "green
+  suite" and "no open defects" are different claims, and this entry conflated
+  them. Corrected here.
+- `odom_slip` still flags real slip elsewhere. Behaviour is deterministic
+  (bit-identical across runs, -O2 and -O1+ASan, zero sanitizer errors).
 
 ## Solver mathematics: why GS could not converge the 5-link chain
 
@@ -135,7 +147,7 @@ artefact is indistinguishable from a warm motor, so the gate could not have
 failed for the reason it exists -- a genuine 25%-off observer regression would
 have sailed through. Fixed by removing the confound rather than absorbing it:
 `mfs_t_stall_endpoint` now gates BOTH the derated value against the
-`r_eff(T)` model (2%) and the 25 C value against spec at **2%**, ~100x tighter
+`r_eff(T)` model (2%) and the 25 C value against spec at **2%**, 12.5x tighter
 than the band it replaces. Header comment at `motor.h` corrected too.
 
 **Do not conflate with [MOTOR-III] below.** That entry is a real and separate
@@ -186,7 +198,7 @@ problem. Recorded 2026-09-29.
 
 - **Defect:** the observer computes
   `tau_L = I*(w - w_prev)/dt - tau_exp_prev`, and `tau_exp_prev` is the RAW
-  unshaped `Kt*I*gear*eff` (`motor.c:224`). The torque actually delivered is
+  unshaped `Kt*I*gear*eff` (`motor.c:228`). The torque actually delivered is
   then multiplied by the traction scale, slew-limited, governor-dioded and
   idle-brake-clamped. So `(delivered - raw)` is booked as "external load"
   every tick. With the traction cut at 0.15x that is 85% of motor torque
@@ -542,7 +554,7 @@ errors, recorded because both nearly became false findings:**
 1. An intermediate version of this test reported the closed loop at
    `0.7081 N.m` (**-81%**), and I wrote that up as a broken
    observer->implicit-solve coupling. **That was wrong: the bug was in my
-   test.** `motor.c:146` gates the load term on `m->wprev_valid`, but
+   test.** `motor.c:158` gates the load term on `m->wprev_valid`, but
    `motor.c` NEVER SETS IT — only `robot.c:797` does. My isolated test never
    performed the handshake, so `tau_L` was silently 0 and I had measured
    "observer disabled", not "observer mis-coupled". The `-81%` figure, and

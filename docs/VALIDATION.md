@@ -138,13 +138,43 @@ a **phantom 1 kg dynamic collider** rather than a failure.
 A clamp that rewrites the physics silently is indistinguishable, downstream,
 from a clamp that did not happen.
 
-**Fix.** Every clamp now increments a counter and emits a bounded stderr
+**Fix.** Every clamp increments a counter and emits a bounded stderr
 diagnostic (`[mpe] INPUT CLAMPED: <kind> requested <x>, using <y> (xN). The
 body is NOT the one you asked for.`), first 8 occurrences then every 1000th
 so a mass sweep cannot flood the log. Counters are exposed as
 `mpe_clamp_mass_events` / `mpe_clamp_radius_events` /
 `mpe_clamp_half_length_events`, with `mpe_clamp_counters_reset()`, so a test
 fixture can assert its own setup clamped nothing.
+
+**DESPOT-2026-10-03 CORRECTION — "every clamp" WAS NOT TRUE, AND THE MISSING
+PATH WAS THE IMPORTANT ONE.** The 2026-10-02 work instrumented thirteen sites
+in the sphere and cylinder *initialisers*. It did not touch
+`rigidbody_sanitize()`, which runs on **every body every tick** and is
+reachable from the terminal editor and from any deserialised scene — and which
+rewrote mass and geometry with **no counter and no diagnostic at all**. So the
+claim above was false precisely where observability matters most, which is the
+same "a clamp that changes the physics silently is indistinguishable from a
+clamp that did not happen" failure the counters were introduced to prevent.
+
+`sanitize()` is also **not policy-identical** to the initialisers, and the
+documented single clamp table concealed it:
+
+| input | initialiser | `rigidbody_sanitize()` |
+|---|---|---|
+| radius ≤ 0 | 0.5 | **0.01** |
+| negative mass | 1.0 (body stays dynamic) | **0.0 if static, else 1.0** |
+| mass > 1e6 | 1e6 | 1e6 |
+| cylinder half_length ≤ 0 | 0.5 | **0.01** |
+
+The negative-mass row is the consequential one: through `sanitize()` a corrupt
+body can quietly become **static** (infinite mass, locked rotation) rather than
+the dynamic 1 kg collider the initialiser would produce.
+
+`sanitize()` now reports too — ten sites, labelled `sanitize <kind>` so the
+diagnostic distinguishes the two paths — bringing the instrumented total from
+13 to **23**. Two divergent clamp policies now both declare themselves instead
+of one loud and one silent. The table above is the honest statement; the old
+single-table presentation was not.
 
 ### Retracted during this audit
 
@@ -197,7 +227,7 @@ known 0.30 m anchor error with gravity off:
 
 Monotonically faster convergence with rising β, as the formulation requires.
 
-### Coulomb — sliding branch: **0.06%**
+### Coulomb — sliding branch: **worst 0.07%** (mean 0.05%)
 
 Once sliding, the block accelerates at exactly `(F − μ_k·N)/m`, with
 `g = 9.80665` (CODATA). Measured after 0.5 s:
@@ -243,7 +273,7 @@ not a conclusion.
 
 Consequence for users: at the default timestep a surface advertises
 μ_s ≈ 0.52 when configured as 0.6. The **sliding** branch is unaffected
-(0.06% accurate), so steady-state kinematics are sound; what is off is the
+^(worst 0.07%, mean 0.05% accurate), so steady-state kinematics are sound; what is off is the
 *breakaway* force — the peak force before motion starts.
 
 ## Declared coverage gaps
@@ -441,7 +471,7 @@ warm motor.
 
 Fixed by removing the confound instead of absorbing it: `stall_endpoint` now
 gates the derated value against the `r_eff(T)` model **and** the 25 °C value
-against spec at **2%** (~100× tighter).
+against spec at **2%** (12.5x tighter).
 
 Related: **both free-speed gates never called `motor_observe()`**, so `τ_L ≡ 0`
 and the disturbance observer was absent from the measurement — while the
@@ -593,7 +623,7 @@ free-falls until the bottom cube meets the world-edge safety net — perfectly
 plastic *and* frictionless — and the remaining nine arrive at ≈5 m/s onto a
 surface that cannot hold them. `scene_spawn_config_torture_test()` calls
 `scene_spawn_long_run_validation()`, which calls `scene_ensure_friction_floor()`;
-the reason is already written down at `scene_init.c:574`. That fix reached F10
+the reason is already written down at `scene_init.c:571-573`. That fix reached F10
 and the GUI and never reached this case.
 
 Measured effect, worst pairwise cube-cube overlap, summed over a 10-seed sweep:

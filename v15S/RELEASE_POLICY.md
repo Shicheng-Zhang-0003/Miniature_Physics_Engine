@@ -28,7 +28,7 @@ The v15 series introduced the centralised configuration system:
 Under the v15R3 freeze:
 
 1. Correctness fixes with headless proof (new or extended tests).
-2. Stability fixes required by validation (F5–F11, 32-test suite).
+2. Stability fixes required by validation (F5–F11, 44-case suite (42 blocking)).
 3. Build and repository hygiene.
 4. Documentation updates to match the architecture.
 5. Validation improvements (tests, TUI snapshot scenes, gates).

@@ -320,7 +320,7 @@ static void mpe_settle_scene(physics_world *w) {
  *
  * The GUI's F11 does not do this. scene_spawn_config_torture_test() calls
  * scene_spawn_long_run_validation(), which calls scene_ensure_friction_floor().
- * The reason is already written down at scene_init.c:574: "the scene shipped
+ * The reason is already written down at scene_init.c:571-573: "the scene shipped
  * WITHOUT any frictional floor -- bodies rested on the frictionless emergency
  * boundary clamp, so the opening transient's outward slide never damped". That
  * fix reached F10 and the GUI and never reached this case.

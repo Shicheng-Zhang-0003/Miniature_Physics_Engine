@@ -51,14 +51,14 @@ The kernel is fully modular: every pipeline stage (broadphase, narrowphase shape
 Inherited from `v15R3`:
 
 - **Domain-driven architecture** — clean `core`, `physics`, `render`, `scene`, `ui_input` modules.
-- **Warm-starting contact solver** with multi-point Sutherland–Hodgman manifolds for stable stacking. *Caveat: the warm start covers the friction tangents only — the normal solves cold each tick by design; see the Solver section.*
+- **Multi-point Sutherland–Hodgman contact manifolds** with support-first ordering for stable stacking. *Caveat, and it is a bigger one than this line used to claim: there is currently **no effective warm start on any row** — the normal is cold by design, and the tangent seed is (measured 2026-10-03) zeroed by its own cone clamp. See the Solver section for the instrumentation and the measured regression that confirmed a fix would be worse.*
 - **Full constraint framework** — revolute, fixed, prismatic, distance, and rope constraints plus spring joints (scene v200 persists springs + all five constraint types; all types live in the headless suite and the TUI demo).
 - **3D spatial-hash grid broadphase** with adaptive cell sizing.
 - **Interactive spring-joint system** with live magenta rendering.
 - **POSIX-style debug terminal** — drive the whole simulation from a shell (now with a `mod` command for hot-plugging physics).
 - **Built-in validation suite** (F5–F11), including a 60-second long-run stability test and config torture test.
 - **Shader/render failure visibility** — the engine no longer continues silently in a broken render state.
-- **Physics-truth pass** — Verlet-exact free flight, post-integration Poisson gate, CCD remainder integration, strict warm-start, true cylinder SDF geometry, no velocity clamps or restitution caps; game-only damping (`nice_value`, angular scale) labeled and defaulted off/vacuum.
+- **Physics-truth pass** — Verlet-exact free flight, post-integration Poisson gate, CCD remainder integration, strict match-gated contact caching, true cylinder SDF geometry, no velocity clamps or restitution caps; game-only damping (`nice_value`, angular scale) labeled and defaulted off/vacuum.
 - **Sleep truth** — three-gate wake (first-touch pair novelty, fast-other, deep overlap): slow pushers wake sleepers at any speed, resting stacks proceed to sleep and stay settled (F10 root cause, fixed).
 - **Terminal debugger + output suite** — `mpe-tui`: live ncurses inspector (bodies, joints, constraints, math, scene graph) plus pipeable `--snapshot`/`--stream` state dumps; see [below](#-terminal-debugger--output-suite-mpe-tui).
 
@@ -102,10 +102,13 @@ All narrowphase functions take the owning world's config; dispatch is registry-f
 ### Solver
 
 - **Impulse-based sequential solver**, 64 iterations by default (configurable 1–128). The 64 knob is really 128 manifold visits per tick — every manifold is visited twice per iteration (`collision_solver.c:707-713`, driven from `core/physics_world.c:1231-1232`).
-- **Warm starting is TANGENT-ONLY — a deliberate, measured deviation from standard practice.** Box2D and Bullet both warm-start the normal *and* the tangent rows (Catto, GDC 2014, slides 33–35). Here the tangent impulses are restored from a per-world O(1) hash cache and the tangent frame is adopted across ticks, but the **normal impulse solves cold every tick**. Reason, measured not assumed: seeding the iteration with last tick's normal impulse ejected the 10-high stack at ~13 m/s across five ablations, while the restored values themselves stayed bounded (~0.5, no save-bigger feedback loop). The disable is `collision_solver.c:351`; the rationale is the comment block at `:331-350`. Consequence, stated plainly: because the Coulomb cone radius is `μ·λ_n`, the cone starts near zero each tick, so tangent warm start is clamped toward zero on the first sweep. That is the price of the stability result, not a free win. (For contrast, Catto's documented deficiency of warm starting is a *stale over-large* `λ_n` under sudden load changes — GDC 2014 slide 35 — which Bullet mitigates with a 0.85 scaling factor; that is a different problem from omitting the row.)
+- **There is effectively NO warm start on any row — and the code comment that claimed otherwise was wrong until 2026-10-03.** Box2D and Bullet warm-start the normal *and* the tangent rows (Catto, GDC 2014, slides 33–35). Here the **normal is deliberately cold**: `collision_solver.c:406` discards the restored normal every tick, because seeding the iteration with last tick's normal ejected the 10-high stack at ~13 m/s in five ablations while the restored values stayed bounded (~0.5). The rationale is the comment block at `:334–405`.
+  The tangent was *supposed* to still be restored. It is not. The restored tangent was projected onto the Coulomb cone at application time using the **cold** normal as the cone's `fn` — so `fn` was exactly `0.0`, and `a3_anisotropic_coulomb_clamp()` opens by returning both tangents as zero when `fn <= 0`. Instrumented on a 4-cube stack at rest: **restored `t1 = 0.154651`, `fn = 0.000000`, after clamp `t1 = 0.000000`**. The warm start was deleted by the very clamp added to protect it.
+  Restoring it the way the comment described was implemented and measured, and it is a **regression** — worse at 32/64/96 iterations at default gravity, and it turns the suite red in all five regimes (`f10_long_run` drops from 27/27 asleep to 4/27). So the clamp stays and the *documentation* was corrected instead. The tangent **frame** adoption is live and does help; only the impulse seed is dead.
+  **Consequence worth knowing:** with no cross-tick information carry, the whole column is re-propagated from the floor every tick, which is why this engine needs **96–128 iterations for a 10-cube stack — 12–30× the published practitioner budget** (Catto, *Solver2D* 2024: "typically 4 to 8 iterations"). That is the real outstanding physics question here, and it is recorded in `docs/VALIDATION.md`.
 - Every stage (resolve, Poisson restitution, rolling resistance, split impulse) is an optional module hook — foreign solvers observe or replace per stage.
 - Static + kinetic friction, rolling friction, and Catto split-impulse penetration correction with **no velocity Baumgarte** — so position-correction energy cannot leak into the velocity state and be re-read by the Poisson restitution gate (Catto, GDC 2014 p.52–53; Bullet's own source comment: *"split impulse fixes issues with restitution in Baumgarte stabilization"*).
-- **Split impulse is per-contact with lever arms.** Each contact gets its own pseudo-impulse and the `r × n` term supplies the angular correction, matching `m v' = nλ`, `I ω' = (r × n)λ` (Catto, GDC 2014 p.53), Box2D 2.x `SolvePositionConstraints`, and Bullet's `resolveSplitPenetrationImpulseCacheFriendly`. The previous whole-body translation along the normal could not un-tilt a body with one buried corner; measured residual tilt on a 20°-tilted box improved 0.354° → 0.312° with stacks bitwise unchanged.
+- **Split impulse is a whole-body translation, not a per-contact correction with lever arms** — and this was measured, not assumed. Catto GDC 2014 p.53 and Box2D 2.x do apply it per contact with an `r × n` angular term, and centre-only translation genuinely cannot right a tilt. Implementing it that way (twice: once as an independent per-contact pass, once as a shared Gauss–Seidel with an accumulated per-point impulse) made the 10-high pile **4.2× worse** — 0.0537 m → 0.2253 m overlap with ω going from 0.0000 to 1.9217 rad/s — and remained a net regression across the F11 seed sweep even after the over-correction was fixed (sum 2.42 → 2.95). Reverted; the negative result is recorded in the source so it is not attempted a third time.
 - Positional depenetration pass for pile stability (registry-routed, per-world config).
 
 ### Integration
@@ -310,7 +313,7 @@ make
 
 ## 📜 Version History
 
-- **v15S (current head)** — GTK4 port, module system (MPI hot-plug), per-world config, data-structure upgrades (growable pools, O(1) caches), kernel global-state removal, TUI stress suite (`stress`/`ccd` scenes, backend flags), 44 registered / 42 blocking green (40 physics + 2 diag-informational) plus a 234-check verification profile green under ASan+UBSan; DESPOT-2026-10-03: floor raised 42 -> 44 and the meta_rotation / meta_convergence gates made genuinely blocking after both were found unable to fail.
+- **v15S (current head)** — GTK4 port, module system (MPI hot-plug), per-world config, data-structure upgrades (growable pools, O(1) caches), kernel global-state removal, TUI stress suite (`stress`/`ccd` scenes, backend flags), 44 registered / 42 blocking green (the 2 diag-informational cases are additional and are excluded from the blocking 42) plus a 234-check verification profile green under ASan+UBSan; DESPOT-2026-10-03: floor raised 42 -> 44 and the meta_rotation / meta_convergence gates made genuinely blocking after both were found unable to fail.
 - **v15R3 (release)** — configuration system, physics-truth pass, full constraint framework, TUI debugger + snapshot suite, 29/29 headless green. Release notes: [`release_notes_v15R3.md`](release_notes_v15R3.md).
 - **v15R2** — config-system hardening + MFS robotics (prior RC, parked (now consolidated in `v15S/src/ecosystem/mfs/`)).
 - **v1.4 Alpha RC3** — domain-driven restructure, spatial-hash broadphase, physics-world encapsulation.
@@ -358,7 +361,7 @@ validation, and command-launch failures.
 | Test | Proves |
 |------|--------|
 | `meta_rotation` | Yaw rotation equivariance to 5e-07 (no world-axis special cases) |
-| `meta_convergence` | Solver error monotonic in iteration count (no divergence) |
+| `meta_convergence` | Solver error is bounded and does not diverge with iteration count, **and the knob is demonstrably live** (it is *not* monotonic — see below) |
 | `meta_config_wiring` | Config parameters demonstrably reach the simulation |
 | `sleep_settle` | Launch settles then sleeps-iff-enabled (three-state honesty) |
 | `mouse_look_axes` | Mouse-look sign convention on 4 axes + diagonals |
@@ -406,7 +409,7 @@ from closed forms (kinematics, Newton, Coulomb, Hooke, compound pendulum,
 Poisson series, moments of inertia), cross-checked by a second implementation
 in Python. 22/22 green, representative errors: free-fall 4e-5, projectile
 5e-5, pendulum period 0.1%, spring period 0.8%, sliding stop 1.3%,
-inertias ≤2e-6, elastic exchange exact, hold-creep 0.0, Galileo exact.
+inertias ≤2e-5 absolute (≤8.1e-7 relative), elastic exchange exact, hold-creep 0.0, Galileo exact.
 Covers free-fall, projectile, bounce heights, pendulum, spring, 1D elastic
 exchange, Coulomb stop/hold/slide angles, sphere/box/cylinder inertia via
 torque, tower equilibrium, range linearity, mass-independence of fall, and
@@ -422,7 +425,7 @@ equilibrium includes the sleep optimizer (sleepless towers lean on solver
 micro-jitter, documented); bounce-height oracles carry slop-scale error.
 
 ### MFS robotics (`v15S/src/ecosystem/mfs/`)
-- **FTC stack**: motor presets (spec-sheet derived, decoded-count encoder convention), back-EMF electrical model with implicit-in-speed solve + disturbance observer (stall *and* free speed exact at any bus voltage via V-line bounds), traction budgeting against wheel materials, analytic mecanum roller-kinematics lateral force (Coulomb-capped, dissipative, contact-gated at the wheel — no chassis-force cheat; the articulated 32-roller build is kept for forensics), pure-encoder odometry with `odom_slip` flag, tile-friction test floors.
+- **FTC stack**: motor presets (spec-sheet derived, decoded-count encoder convention), back-EMF electrical model with implicit-in-speed solve + disturbance observer (the **open-loop** no-load line is exact at any bus voltage via V-line bounds — `R` cancels from `w_free` by construction; the **observer-armed** driven path is a documented limit cycle at −61.3%, tracked as `[MOTOR-III]`), traction budgeting against wheel materials, analytic mecanum roller-kinematics lateral force (Coulomb-capped, dissipative, contact-gated at the wheel — no chassis-force cheat; the articulated 32-roller build is kept for forensics), pure-encoder odometry with `odom_slip` flag, tile-friction test floors.
 - **Suite**: `build_tests.sh` — **14/14** inner tests via unified mfs_suite --all (script reports suite+build gates) + build checks + ungated diags, all green and CWD-independent (2026-10-03: 12 -> 14; two gates were red at the prior HEAD from fixture defects, not engine ones).
 - **Modules**: `ftc-fleet` tick module (hot-pluggable, bitwise-identical static vs `.so`), `mfs_module_1` game module, `mfs-simulator` ecosystem bundle (loadable via `mod load ecosystem/mfs/mfs_ecosystem.so`).
 

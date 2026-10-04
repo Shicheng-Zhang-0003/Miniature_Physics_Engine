@@ -478,7 +478,7 @@ int mfs_t_stall_endpoint(void) {
             /* Reproduce the caller-side handshake from robot.c: it is
              * robot.c that sets wprev_valid, not motor.c (see
              * DESPOT-2026-09-29 note below). Without this the observer gate
-             * at motor.c:146 stays closed and tau_L is silently 0. */
+             * at motor.c:158 stays closed and tau_L is silently 0. */
             mo.wprev_valid = (i > 0) ? 1 : 0;
             motor_update_load(&mo, held_w, dt, 12.0f, axle_I);
             w_prev = held_w;
@@ -555,7 +555,7 @@ int mfs_t_stall_endpoint(void) {
                      100.0 * (m25.output_torque - spec_stall_nm) / spec_stall_nm);
             /* TIGHT, because the endpoint is deterministic once temperature is
              * held: this is the gate that would actually catch an observer
-             * regression. 2% is ~100x tighter than the 25% that encoded a
+             * regression. 2% is 12.5x tighter than the 25% that encoded a
              * thermal artefact. */
             MFS_CHECK_REL(t_ptr, m25.output_torque, spec_stall_nm, 0.02,
                           "closed-loop locked-rotor output torque at 25C "
