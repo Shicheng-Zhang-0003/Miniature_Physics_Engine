@@ -102,3 +102,12 @@ Despot-1004f: live wheel-snap triage (watchdog + floor).
   ftc_watchdog_tick reports mount jumps/tilt/NaN with build tag every
   GUI frame (event-driven). Tile floor 20->60m (10 s drive-off matched
   a live snap timeline; matches proven F10 slab, inside cell-span).
+
+Despot-1004g: snap-triage follow-through (hysteresis + handshake kept,
+  7 abuse-frontier negatives recorded). Idle tire mode hysteretic
+  (engage<0.03/release>0.08 in hub fields; motor+analytic follow one
+  mode); explicit path publishes tau_exp_prev (post-idle strafe fixed).
+  Proportional cut + axle projection tried and REVERTED with gate proof
+  (cut moves tank/drive baselines; projection changes nothing).
+  Abuse tilt blowup proven pre-existing (identical on fully pre-change
+  tree). Full 234 green.
