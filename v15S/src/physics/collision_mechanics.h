@@ -53,6 +53,23 @@ typedef struct {
      * that the friction clamp and Poisson pass then treat as real impact. */
     vector3 ra;
     vector3 rb;
+    /* DESPOT-2026-10-04: tick-start friction selection snapshot. The
+     * stick/slip mu choice used to re-evaluate on the LIVE per-iteration
+     * slip, which is solver transient, not physics state: under step force
+     * loading the first iteration always sees the tick's injected velocity
+     * (F*dt/m, e.g. 0.117 m/s at 7N) above the 0.02 static gate, so kinetic
+     * was selected, the accumulation saturated at the kinetic clamp, and
+     * late-iteration static re-selection could not retroactively add the
+     * missing (mu_s-mu_k)*Fn (its correction signal -vt*meff was already
+     * ~0). Measured: mu_s=0.9/1.5 break at ~5.9N instead of 8.83N/14.7N;
+     * effective static threshold ~= mu_k*N, and the audit's [FRICTION-THRESH]
+     * dt table is points on this surface. The snapshot records the selection
+     * from PRE-SOLVE (post-force-integration) slip once per solve phase, and
+     * every iteration of the phase reuses it — the tick starts at rest, the
+     * whole tick solves static and truly holds to mu_s*N. <0 = unset (direct
+     * resolve callers without a snapshot keep the legacy live behaviour).
+     * Tail-appended: existing offsets (and the plugin ABI) do not shift. */
+    float snap_friction_mu;
 } contact_point_data;
 
 /* ---- Anisotropic Coulomb cone --------------------------------------------
@@ -321,6 +338,13 @@ void collision_apply_poisson_restitution(collision_data *manifolds, int manifold
  * vn = (vb+wb×rb − va−wa×ra)·n from current velocities (ra/rb/n unchanged,
  * positions not yet moved). Exact pre-solve approach speed. */
 void collision_refresh_impact_velocities(collision_data *manifolds, int manifold_count);
+/* DESPOT-2026-10-04: snapshot the stick/slip mu selection from pre-solve
+ * slip (see contact_point_data.snap_friction_mu). Call after velocity
+ * integration, before each solve phase (main iterations, friction-only
+ * relaxation). Pure function of current body velocities + cfg; fixed order;
+ * bit-deterministic. Manifolds without a snapshot (unset <0) resolve with
+ * the legacy per-iteration live selection. */
+void collision_snapshot_friction_mu(collision_data *manifolds, int manifold_count, const mpe_config_t *cfg);
 /* CCD swept clamp: for bodies whose per-tick displacement exceeds their
  * contact thickness, time-of-impact against the floor plane, sphere/custom
  * bounding spheres, finite cylinders, and boxes (including moving boxes via

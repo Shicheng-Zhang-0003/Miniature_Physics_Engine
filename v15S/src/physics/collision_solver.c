@@ -214,6 +214,9 @@ static bool contact_cache_adoptable(const cached_contact *cc, uint32_t id_a, uin
     return vector3_length_squared(cc->tangent_dir) > 0.0001f;
 }
 
+/* Forward: defined beside the other per-phase passes below; called from
+ * prepare (pre-force tick-start selection). */
+void collision_snapshot_friction_mu(collision_data *manifolds, int manifold_count, const mpe_config_t *cfg);
 
 void collision_prepare_solver(struct physics_world *world, collision_data *source, collision_data *m, float dt) {
     *m = *source;
@@ -253,6 +256,7 @@ void collision_prepare_solver(struct physics_world *world, collision_data *sourc
         cp->accumulated_normal_impulse = 0.0f;
         cp->accumulated_tangent_impulse = 0.0f;
         cp->accumulated_tangent2_impulse = 0.0f;
+        cp->snap_friction_mu = -1.0f; /* unset until collision_snapshot_friction_mu runs */
         /* AUDIT: no velocity-level Baumgarte bias is computed here on
          * purpose (see header). g_cfg.solver.bias_factor drives the
          * positional split-impulse correction instead, where bias velocity
@@ -660,6 +664,13 @@ void collision_prepare_solver(struct physics_world *world, collision_data *sourc
          * start included). The restitution pass pays e over the delta. */
         cp->base_normal_impulse = cp->accumulated_normal_impulse;
     }
+    /* DESPOT-2026-10-04: tick-start friction selection, recorded HERE (not
+     * at solve time). Prepare runs pre-force-integration, so these are the
+     * tick's opening velocities — the true was-it-sticking state. A step
+     * path that snapshots post-force instead sees the tick's own injected
+     * F*dt (0.117 m/s at 7N) above the static gate and wrongly solves the
+     * whole tick kinetic (measured: mu_s=0.9/1.5 broke at ~5.9N). */
+    collision_snapshot_friction_mu(m, 1, world ? mpe_world_cfg(world) : &g_cfg);
 }
 
 static void collision_manifold_merge_sort(const float *keys, int *order, int *scratch, int n) {
@@ -889,15 +900,25 @@ float collision_resolve_iterative(collision_data *m, float dt, bool friction_onl
 
             /* Stick/slip select on combined slip speed. With a persistent
              * frame and an honest normal impulse, stick (full slip kill
-             * inside the cone) genuinely holds; sliding clamps to mu_k. */
+             * inside the cone) genuinely holds; sliding clamps to mu_k.
+             * DESPOT-2026-10-04: the selection below used to re-evaluate on
+             * live per-iteration slip (solver transient). Prefer the
+             * tick-start snapshot when a solve phase recorded one (see
+             * collision_snapshot_friction_mu); unset (<0) keeps the legacy
+             * live behaviour for direct resolve callers. */
             const float static_friction_threshold = C->solver.static_friction_thresh; /* MPE_TASK_30 */
             float static_friction_coeff = fminf(m->object_a->friction_static, m->object_b->friction_static);
             float kinetic_friction_coeff = fminf(m->object_a->friction_kinetic, m->object_b->friction_kinetic);
             if (static_friction_coeff < kinetic_friction_coeff) {
                 static_friction_coeff = kinetic_friction_coeff;
             }
-            float friction_coeff =
-                (slip_speed < static_friction_threshold) ? static_friction_coeff : kinetic_friction_coeff;
+            float friction_coeff;
+            if (cp->snap_friction_mu >= 0.0f) {
+                friction_coeff = cp->snap_friction_mu;
+            } else {
+                friction_coeff =
+                    (slip_speed < static_friction_threshold) ? static_friction_coeff : kinetic_friction_coeff;
+            }
 
             /* Coulomb cone: solve both tangents, clamp the COMBINED vector.
              * Isotropic bodies (the default, and every pre-existing body)
@@ -976,6 +997,59 @@ void collision_refresh_impact_velocities(collision_data *manifolds, int manifold
             vector3 vb = vector3_addition(man->object_b->velocity,
                                           vector3_cross(man->object_b->angular_velocity, cp->rb));
             cp->impact_velocity = vector3_dot(vector3_subtraction(vb, va), man->normal_vector);
+        }
+    }
+}
+
+void collision_snapshot_friction_mu(collision_data *manifolds, int manifold_count, const mpe_config_t *cfg) {
+    const mpe_config_t *C = cfg ? cfg : &g_cfg;
+    if ((!manifolds) || (manifold_count <= 0)) {
+        return;
+    }
+    float sth = C->solver.static_friction_thresh;
+    if (!(sth > 0.0f) || !isfinite(sth)) {
+        sth = 0.02f;
+    }
+    for (int m = 0; m < manifold_count; m++) {
+        collision_data *man = &manifolds[m];
+        float mus = (man->object_a) ? man->object_a->friction_static : 0.0f;
+        float muk = (man->object_a) ? man->object_a->friction_kinetic : 0.0f;
+        if (man->object_b) {
+            if (man->object_b->friction_static < mus) {
+                mus = man->object_b->friction_static;
+            }
+            if (man->object_b->friction_kinetic < muk) {
+                muk = man->object_b->friction_kinetic;
+            }
+        }
+        if (!(mus >= 0.0f) || !isfinite(mus)) {
+            mus = 0.0f;
+        }
+        if (!(muk >= 0.0f) || !isfinite(muk)) {
+            muk = 0.0f;
+        }
+        if (mus < muk) {
+            mus = muk;
+        }
+        for (int i = 0; i < man->contact_count; i++) {
+            contact_point_data *cp = &man->contacts[i];
+            if ((!man->object_a) || (!man->object_b)) {
+                cp->snap_friction_mu = 0.0f;
+                continue;
+            }
+            /* Frame-independent slip: full relative point velocity minus
+             * the normal component. Identical to the sweep's
+             * sqrt(vt1^2+vt2^2) once its frame exists, but valid before any
+             * iteration has run (no frame needed). */
+            vector3 va = vector3_addition(man->object_a->velocity,
+                                          vector3_cross(man->object_a->angular_velocity, cp->ra));
+            vector3 vb = vector3_addition(man->object_b->velocity,
+                                          vector3_cross(man->object_b->angular_velocity, cp->rb));
+            vector3 rel = vector3_subtraction(vb, va);
+            float vn = vector3_dot(rel, man->normal_vector);
+            vector3 rel_t = vector3_subtraction(rel, vector3_scaling(man->normal_vector, vn));
+            float slip = vector3_length(rel_t);
+            cp->snap_friction_mu = (slip < sth) ? mus : muk;
         }
     }
 }
