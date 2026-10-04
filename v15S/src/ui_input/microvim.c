@@ -67,7 +67,8 @@ static void mv_clear_lines (void) {
 }
 
 static bool mv_ensure_capacity (int needed) {
-    if (needed < 0 || (size_t) needed > SIZE_MAX / sizeof (*mv.lines)) return false;
+    if (needed < 0 || (size_t) needed > SIZE_MAX / sizeof (*mv.lines))
+        return false;
     if (needed <= mv.line_capacity) {
         return true;
     }
@@ -75,9 +76,11 @@ static bool mv_ensure_capacity (int needed) {
     if (new_cap < needed) {
         new_cap = needed;
     }
-    if ((size_t) new_cap > SIZE_MAX / sizeof (*mv.lines)) return false;
+    if ((size_t) new_cap > SIZE_MAX / sizeof (*mv.lines))
+        return false;
     char **new_lines = (char **) realloc (mv.lines, (size_t) new_cap * sizeof (*mv.lines));
-    if (!new_lines) return false;
+    if (!new_lines)
+        return false;
     for (int i = mv.line_capacity; i < new_cap; i++) {
         new_lines[i] = NULL;
     }
@@ -87,7 +90,8 @@ static bool mv_ensure_capacity (int needed) {
 }
 
 static bool mv_set_line (int index, const char *text) {
-    if (index < 0) return false;
+    if (index < 0)
+        return false;
     char *replacement = text && strlen (text) >= (size_t) mv_max_line_len ? term_strndup (text, mv_max_line_len - 1)
                                                                           : term_strdup (text ? text : "");
     if (!replacement || !mv_ensure_capacity (index + 1)) {
@@ -102,7 +106,8 @@ static bool mv_set_line (int index, const char *text) {
 }
 
 static bool mv_insert_line (int index, const char *text) {
-    if (index < 0 || index > mv.line_count || mv.line_count == INT_MAX) return false;
+    if (index < 0 || index > mv.line_count || mv.line_count == INT_MAX)
+        return false;
     char *replacement = text && strlen (text) >= (size_t) mv_max_line_len ? term_strndup (text, mv_max_line_len - 1)
                                                                           : term_strdup (text ? text : "");
     if (!replacement || !mv_ensure_capacity (mv.line_count + 1)) {
@@ -128,7 +133,8 @@ static void mv_delete_line (int index) {
     mv.lines[mv.line_count - 1] = NULL;
     mv.line_count--;
     if (mv.line_count == 0) {
-        if (!mv_insert_line (0, "")) microvim_close ();
+        if (!mv_insert_line (0, ""))
+            microvim_close ();
     }
 }
 
@@ -164,7 +170,8 @@ static void mv_clamp_cursor (void) {
 /* Undo                                                                 */
 /* ------------------------------------------------------------------ */
 static void mv_snapshot_clear (mv_snapshot *snap) {
-    if (!snap) return;
+    if (!snap)
+        return;
     if (snap->lines) {
         for (int i = 0; i < snap->line_count; i++)
             free (snap->lines[i]);
@@ -181,10 +188,12 @@ static void mv_clear_undo_history (void) {
 }
 
 static bool mv_undo_push (void) {
-    if (mv.line_count <= 0 || !mv.lines) return false;
+    if (mv.line_count <= 0 || !mv.lines)
+        return false;
     int snapshot_count = mv.line_count;
     char **snapshot_lines = (char **) calloc ((size_t) snapshot_count, sizeof (*snapshot_lines));
-    if (!snapshot_lines) return false;
+    if (!snapshot_lines)
+        return false;
     for (int i = 0; i < snapshot_count; i++) {
         if (!mv.lines[i] || !(snapshot_lines[i] = term_strdup (mv.lines[i]))) {
             for (int j = 0; j < i; j++)
@@ -213,9 +222,11 @@ static bool mv_undo_push (void) {
 }
 
 static bool mv_restore_snapshot (const mv_snapshot *snap) {
-    if (!snap || snap->line_count <= 0 || !snap->lines) return false;
+    if (!snap || snap->line_count <= 0 || !snap->lines)
+        return false;
     char **restored = (char **) calloc ((size_t) snap->line_count, sizeof (*restored));
-    if (!restored) return false;
+    if (!restored)
+        return false;
     for (int i = 0; i < snap->line_count; i++) {
         if (!snap->lines[i] || !(restored[i] = term_strdup (snap->lines[i]))) {
             for (int j = 0; j < i; j++)
@@ -242,7 +253,8 @@ static void mv_undo_perform (void) {
         return;
     }
     mv_snapshot *snap = &mv.undo_stack[mv.undo_top - 1];
-    if (!mv_restore_snapshot (snap)) return;
+    if (!mv_restore_snapshot (snap))
+        return;
     mv.undo_top--;
     mv.modified = true;
     mv_clamp_cursor ();
@@ -253,7 +265,8 @@ static void mv_redo_perform (void) {
         return;
     }
     mv_snapshot *snap = &mv.undo_stack[mv.undo_top];
-    if (!mv_restore_snapshot (snap)) return;
+    if (!mv_restore_snapshot (snap))
+        return;
     mv.undo_top++;
     mv.modified = true;
     mv_clamp_cursor ();
@@ -264,10 +277,12 @@ static void mv_redo_perform (void) {
 /* ------------------------------------------------------------------ */
 static bool mv_load_file (const char *filename) {
     mv_clear_lines ();
-    if (!filename || !mv_ensure_capacity (64)) return false;
+    if (!filename || !mv_ensure_capacity (64))
+        return false;
     FILE *f = fopen (filename, "r");
     if (!f) {
-        if (!mv_insert_line (0, "")) return false;
+        if (!mv_insert_line (0, ""))
+            return false;
         return false;
     }
     char line_buf[mv_max_line_len];
@@ -301,7 +316,8 @@ static bool mv_load_file (const char *filename) {
         return false;
     }
     if (mv.line_count == 0) {
-        if (!mv_insert_line (0, "")) return false;
+        if (!mv_insert_line (0, ""))
+            return false;
     }
     return true;
 }
@@ -519,7 +535,8 @@ static void mv_delete_char_under_cursor (void) {
     if (col >= len) {
         return;
     }
-    if (!mv_undo_push ()) return;
+    if (!mv_undo_push ())
+        return;
     char *line = mv.lines[row];
     memmove (line + col, line + col + 1, (size_t) (len - col));
     mv.modified = true;
@@ -531,7 +548,8 @@ static void mv_delete_char_before_cursor (void) {
     if (col <= 0) {
         return;
     }
-    if (!mv_undo_push ()) return;
+    if (!mv_undo_push ())
+        return;
     char *line = mv.lines[mv.cursor_row];
     int len = mv_line_len (mv.cursor_row);
     memmove (line + col - 1, line + col, (size_t) (len - col + 1));
@@ -540,7 +558,8 @@ static void mv_delete_char_before_cursor (void) {
 }
 
 static void mv_delete_line_op (void) {
-    if (!mv_undo_push ()) return;
+    if (!mv_undo_push ())
+        return;
     if (mv.yank_text) {
         free (mv.yank_text);
     }
@@ -558,7 +577,8 @@ static void mv_delete_to_end (void) {
     if (col >= len) {
         return;
     }
-    if (!mv_undo_push ()) return;
+    if (!mv_undo_push ())
+        return;
     if (mv.yank_text) {
         free (mv.yank_text);
     }
@@ -575,7 +595,8 @@ static void mv_delete_to_start (void) {
     if (col <= 0) {
         return;
     }
-    if (!mv_undo_push ()) return;
+    if (!mv_undo_push ())
+        return;
     if (mv.yank_text) {
         free (mv.yank_text);
     }
@@ -600,10 +621,12 @@ static void mv_paste (bool after) {
     if (!mv.yank_text) {
         return;
     }
-    if (!mv_undo_push ()) return;
+    if (!mv_undo_push ())
+        return;
     if (mv.yank_is_linewise) {
         int insert_row = after ? mv.cursor_row + 1 : mv.cursor_row;
-        if (!mv_insert_line (insert_row, mv.yank_text)) return;
+        if (!mv_insert_line (insert_row, mv.yank_text))
+            return;
         mv.cursor_row = insert_row;
         mv.cursor_col = 0;
     } else {
@@ -633,7 +656,8 @@ static void mv_join_lines (void) {
     if (mv.cursor_row >= mv.line_count - 1) {
         return;
     }
-    if (!mv_undo_push ()) return;
+    if (!mv_undo_push ())
+        return;
     int len_a = mv_line_len (mv.cursor_row);
     char *joined = term_format ("%s %s", mv.lines[mv.cursor_row], mv.lines[mv.cursor_row + 1]);
     if (!joined || !mv_set_line (mv.cursor_row, joined)) {
@@ -656,7 +680,8 @@ static void mv_insert_char (char c) {
     } /* FIX_039: prevent overflow */
     char *line = mv.lines[row];
     char *new_line = (char *) malloc ((size_t) (len + 2));
-    if (!new_line) return;
+    if (!new_line)
+        return;
     memcpy (new_line, line, (size_t) col);
     new_line[col] = c;
     memcpy (new_line + col + 1, line + col, (size_t) (len - col + 1));
@@ -685,7 +710,8 @@ static void mv_backspace (void) {
     if (mv.cursor_col > 0) {
         mv_delete_char_before_cursor ();
     } else if (mv.cursor_row > 0) {
-        if (!mv_undo_push ()) return;
+        if (!mv_undo_push ())
+            return;
         int prev_len = mv_line_len (mv.cursor_row - 1);
         char *joined = term_format ("%s%s", mv.lines[mv.cursor_row - 1], mv.lines[mv.cursor_row]);
         if (!joined || !mv_set_line (mv.cursor_row - 1, joined)) {
@@ -802,9 +828,11 @@ setting a flag that microvim_render will pick up */
                 int pos = (int) (match - lower_line);
                 do {
                     int line_len = (int) strlen (mv.lines[mv.cursor_row]);
-                    if (new_len > mv_max_line_len - 1 - (line_len - old_len)) break;
+                    if (new_len > mv_max_line_len - 1 - (line_len - old_len))
+                        break;
                     char *new_line = (char *) malloc ((size_t) (line_len - old_len + new_len + 1));
-                    if (!new_line) break;
+                    if (!new_line)
+                        break;
                     memcpy (new_line, mv.lines[mv.cursor_row], (size_t) pos);
                     memcpy (new_line + pos, p3, (size_t) new_len);
                     memcpy (new_line + pos + new_len, mv.lines[mv.cursor_row] + pos + old_len,
@@ -817,7 +845,8 @@ setting a flag that microvim_render will pick up */
                     }
                     free (lower_line);
                     lower_line = term_ascii_strdown (mv.lines[mv.cursor_row]);
-                    if (!lower_line) break;
+                    if (!lower_line)
+                        break;
                     pos += new_len;
                     match = strstr (lower_line + pos, lower_old);
                     if (match) {
@@ -933,7 +962,8 @@ static void mv_handle_normal_key (guint keyval, guint keycode, GdkModifierType s
         }
         if (key == GDK_KEY_G) {
             if (op == 'd') {
-                if (!mv_undo_push ()) return;
+                if (!mv_undo_push ())
+                    return;
                 while (mv.line_count > mv.cursor_row + 1) {
                     mv_delete_line (mv.line_count - 1);
                 }
@@ -1011,36 +1041,44 @@ static void mv_handle_normal_key (guint keyval, guint keycode, GdkModifierType s
         break;
     }
     case GDK_KEY_i:
-        if (!mv_undo_push ()) break;
+        if (!mv_undo_push ())
+            break;
         mv.mode = mv_insert;
         break;
     case GDK_KEY_I:
-        if (!mv_undo_push ()) break;
+        if (!mv_undo_push ())
+            break;
         mv.cursor_col = 0;
         mv.mode = mv_insert;
         break;
     case GDK_KEY_a:
-        if (!mv_undo_push ()) break;
+        if (!mv_undo_push ())
+            break;
         mv.cursor_col++;
         mv_clamp_cursor ();
         mv.mode = mv_insert;
         break;
     case GDK_KEY_A:
-        if (!mv_undo_push ()) break;
+        if (!mv_undo_push ())
+            break;
         mv.cursor_col = mv_line_len (mv.cursor_row);
         mv.mode = mv_insert;
         break;
     case GDK_KEY_o:
-        if (!mv_undo_push ()) return;
-        if (!mv_insert_line (mv.cursor_row + 1, "")) break;
+        if (!mv_undo_push ())
+            return;
+        if (!mv_insert_line (mv.cursor_row + 1, ""))
+            break;
         mv.cursor_row++;
         mv.cursor_col = 0;
         mv.mode = mv_insert;
         mv.modified = true;
         break;
     case GDK_KEY_O:
-        if (!mv_undo_push ()) return;
-        if (!mv_insert_line (mv.cursor_row, "")) break;
+        if (!mv_undo_push ())
+            return;
+        if (!mv_insert_line (mv.cursor_row, ""))
+            break;
         mv.cursor_col = 0;
         mv.mode = mv_insert;
         mv.modified = true;
@@ -1088,7 +1126,8 @@ static void mv_handle_normal_key (guint keyval, guint keycode, GdkModifierType s
         int col = mv.cursor_col;
         int len = mv_line_len (row);
         if (col < len) {
-            if (!mv_undo_push ()) return;
+            if (!mv_undo_push ())
+                return;
             char c = mv.lines[row][col];
             mv.lines[row][col] =
                 isupper ((unsigned char) c) ? tolower ((unsigned char) c) : toupper ((unsigned char) c);
@@ -1205,7 +1244,8 @@ static void mv_handle_insert_key (guint keyval, guint keycode, GdkModifierType s
     }
     if ((state & GDK_CONTROL_MASK) && (key == GDK_KEY_w)) {
         /* Delete word backward */
-        if (!mv_undo_push ()) return;
+        if (!mv_undo_push ())
+            return;
         int col = mv.cursor_col;
         while (col > 0 && mv.lines[mv.cursor_row][col - 1] == ' ') {
             col--;
@@ -1427,7 +1467,8 @@ bool microvim_is_active (void) {
 void microvim_open (const char *filename) {
     microvim_close ();
     memset (&mv, 0, sizeof (mv));
-    if (!filename) return;
+    if (!filename)
+        return;
     mv.lines = NULL;
     mv.line_capacity = 0;
     mv.line_count = 0;

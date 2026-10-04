@@ -33,7 +33,8 @@ static inline void mfs_test_world (physics_world *w) {
  * (contact restitution is min-combined). */
 static inline int mfs_test_floor_e (physics_world *w, float mus, float muk, float e) {
     int f = physics_world_add_cube (w, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
-    if (f < 0) return -1;
+    if (f < 0)
+        return -1;
     w->bodies[f].friction_static = mus;
     w->bodies[f].friction_kinetic = muk;
     w->bodies[f].restitution = e;

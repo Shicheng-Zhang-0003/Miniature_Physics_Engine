@@ -34,7 +34,8 @@ int main (void) {
             }
         }
     }
-    if (fail) return 1;
+    if (fail)
+        return 1;
 
     float cyl_z = world.bodies[cyl].position.z;
     float cyl_vz = world.bodies[cyl].velocity.z;

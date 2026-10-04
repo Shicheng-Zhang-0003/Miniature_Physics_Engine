@@ -43,9 +43,12 @@ int main (void) {
             float E_spring = 0.5f * 100.0f * (L - 3.0f) * (L - 3.0f);
             float E = Ea + Eb + E_spring;
             float speed = fmaxf (vector3_length (world.bodies[a].velocity), vector3_length (world.bodies[b].velocity));
-            if (speed > max_speed) max_speed = speed;
-            if (E > E_max) E_max = E;
-            if (E < E_min) E_min = E;
+            if (speed > max_speed)
+                max_speed = speed;
+            if (E > E_max)
+                E_max = E;
+            if (E < E_min)
+                E_min = E;
         }
 
         float rel_range = (E_max - E_min) / E_max;
@@ -93,9 +96,11 @@ int main (void) {
             physics_world_step (&world, dt);
             for (int i = 0; i < world.body_count; i++) {
                 rigidbody *rb = &world.bodies[i];
-                if (!isfinite (rb->position.x) || !isfinite (rb->velocity.x)) nan_count++;
+                if (!isfinite (rb->position.x) || !isfinite (rb->velocity.x))
+                    nan_count++;
                 float v = vector3_length (rb->velocity);
-                if (v > max_vel) max_vel = v;
+                if (v > max_vel)
+                    max_vel = v;
             }
         }
 
@@ -136,7 +141,8 @@ int main (void) {
         for (int t = 0; t < 60; t++) {
             physics_world_step (&world, dt);
             for (int i = 0; i < world.body_count; i++) {
-                if (!isfinite (world.bodies[i].position.x)) nan_count++;
+                if (!isfinite (world.bodies[i].position.x))
+                    nan_count++;
             }
         }
 
@@ -177,7 +183,8 @@ int main (void) {
 
         int nan_count = 0;
         for (int i = 0; i < world.body_count; i++) {
-            if (!isfinite (world.bodies[i].position.x)) nan_count++;
+            if (!isfinite (world.bodies[i].position.x))
+                nan_count++;
         }
 
         if (nan_count > 0) {

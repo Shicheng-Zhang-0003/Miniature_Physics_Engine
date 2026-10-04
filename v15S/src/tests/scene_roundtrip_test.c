@@ -212,7 +212,8 @@ int main (void) {
 
     remove (path);
     physics_world_cleanup (world);
-    if (failures == 0) printf ("[PASS] scene round-trip complete\n");
+    if (failures == 0)
+        printf ("[PASS] scene round-trip complete\n");
     else
         printf ("[FAIL] scene round-trip: %d checks failed\n", failures);
     return failures ? 1 : 0;

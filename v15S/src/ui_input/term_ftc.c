@@ -41,7 +41,8 @@
 
 static void *ftc_sym (const char *sym) {
     void *p = mpe_loader_symbol (FTC_HANDLE_PRIMARY, sym);
-    if (p) return p;
+    if (p)
+        return p;
     return mpe_loader_symbol (FTC_HANDLE_MODULE, sym);
 }
 
@@ -49,7 +50,8 @@ static float ftc_argf (char **argv, int i, int argc, float dflt) {
     if (i < argc && argv[i]) {
         char *end = NULL;
         double v = strtod (argv[i], &end);
-        if (end != argv[i] && isfinite (v)) return (float) v;
+        if (end != argv[i] && isfinite (v))
+            return (float) v;
     }
     return dflt;
 }
@@ -63,10 +65,12 @@ static float ftc_argf (char **argv, int i, int argc, float dflt) {
  * report timeline exactly). 60x60 matches the proven F10 validation slab
  * and stays inside the broadphase cell-span budget. */
 static int ftc_ensure_floor (physics_world *w) {
-    if (!w) return -1;
+    if (!w)
+        return -1;
     for (int i = 0; i < w->body_count; i++) {
         rigidbody *b = &w->bodies[i];
-        if (!b->static_state && !(b->mass == 0.0f)) continue;
+        if (!b->static_state && !(b->mass == 0.0f))
+            continue;
         float top = b->position.y + b->half_extensions.y;
         if (top > -0.05f && top < 0.05f && fabsf (b->position.x) < 5.0f && fabsf (b->position.z) < 5.0f &&
             b->half_extensions.x >= 5.0f && b->half_extensions.z >= 5.0f) {
@@ -74,7 +78,8 @@ static int ftc_ensure_floor (physics_world *w) {
         }
     }
     int f = physics_world_add_cube (w, (vector3){0.0f, -0.5f, 0.0f}, (vector3){30.0f, 0.5f, 30.0f}, 0.0f);
-    if (f < 0) return -1;
+    if (f < 0)
+        return -1;
     w->bodies[f].friction_static = 1.0f;
     w->bodies[f].friction_kinetic = 0.8f;
     w->bodies[f].restitution = 0.0f;
@@ -103,7 +108,8 @@ static int ftc_ensure_driving (void) {
         return -1;
     }
     for (int i = 0; i < w->tick_module_count; i++) {
-        if (w->tick_modules[i] == dmod) return 0;
+        if (w->tick_modules[i] == dmod)
+            return 0;
     }
     if (physics_world_attach_module (w, dmod) < 0) {
         term_err ("mpe: ftc: attach failed\n");
@@ -138,7 +144,8 @@ void cmd_ftc (int argc, char **argv) {
     int (*p_count) (struct physics_world *) = (int (*) (struct physics_world *)) ftc_sym ("ftc_fleet_count");
 
     if (term_str_eq (argv[1], "spawn")) {
-        if (ftc_ensure_driving () != 0) return;
+        if (ftc_ensure_driving () != 0)
+            return;
         int (*p_spawn) (struct physics_world *, float, float, float, motor_preset_id, ftc_drivetrain_type) =
             (int (*) (struct physics_world *, float, float, float, motor_preset_id, ftc_drivetrain_type)) ftc_sym (
                 "ftc_fleet_spawn");
@@ -158,7 +165,8 @@ void cmd_ftc (int argc, char **argv) {
         int preset = 0;
         for (int id = 0; id < 512; id++) {
             const char *nm = p_name ((motor_preset_id) id);
-            if (!nm || strcmp (nm, "unknown") == 0) break;
+            if (!nm || strcmp (nm, "unknown") == 0)
+                break;
             if (strstr (nm, "5203") && strstr (nm, "26.9")) {
                 preset = id;
                 break;

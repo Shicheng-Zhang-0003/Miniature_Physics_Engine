@@ -74,18 +74,22 @@ extern input_status main_inputs;
 /* --------------------------------------------------------------- helpers */
 
 static GdkSurface *mpe_surface_for_widget (GtkWidget *widget) {
-    if (!widget || !GTK_IS_WIDGET (widget)) return NULL;
+    if (!widget || !GTK_IS_WIDGET (widget))
+        return NULL;
     GtkWidget *toplevel = gtk_widget_get_ancestor (widget, GTK_TYPE_WINDOW);
-    if (!toplevel) toplevel = widget;
+    if (!toplevel)
+        toplevel = widget;
     GtkNative *native = gtk_widget_get_native (toplevel);
-    if (!native) return NULL;
+    if (!native)
+        return NULL;
     return gtk_native_get_surface (native);
 }
 
 /* Available on every build; the GTK4 Wayland type check needs the GDK
  * wayland backend header, which we only include where it exists. */
 static int mpe_display_is_wayland (GdkDisplay *display) {
-    if (!display) return 0;
+    if (!display)
+        return 0;
 #ifdef MPE_WAYLAND_RELATIVE_POINTER
     return GDK_IS_WAYLAND_DISPLAY (display) ? 1 : 0;
 #else
@@ -154,7 +158,8 @@ static unsigned long mpe_rel_pos_y = 0, mpe_rel_neg_y = 0;
 static struct zwp_relative_pointer_manager_v1 *mpe_get_rel_manager (struct wl_display *wl_display);
 
 static int mpe_surface_is_wayland (GdkSurface *surface) {
-    if (!surface) return 0;
+    if (!surface)
+        return 0;
     return mpe_display_is_wayland (gdk_surface_get_display (surface));
 }
 
@@ -173,21 +178,28 @@ static void mpe_rel_handle_motion (void *data, struct zwp_relative_pointer_v1 *r
     mpe_rel_dy += ry;
     mpe_rel_dirty = 1;
     mpe_rel_events++;
-    if (rx > 0.0) mpe_rel_pos_x++;
+    if (rx > 0.0)
+        mpe_rel_pos_x++;
     else if (rx < 0.0)
         mpe_rel_neg_x++;
-    if (ry > 0.0) mpe_rel_pos_y++;
+    if (ry > 0.0)
+        mpe_rel_pos_y++;
     else if (ry < 0.0)
         mpe_rel_neg_y++;
 }
 
 void mouse_lock_diagnostics (unsigned long *events, unsigned long *pos_x, unsigned long *neg_x, unsigned long *pos_y,
                              unsigned long *neg_y) {
-    if (events) *events = mpe_rel_events;
-    if (pos_x) *pos_x = mpe_rel_pos_x;
-    if (neg_x) *neg_x = mpe_rel_neg_x;
-    if (pos_y) *pos_y = mpe_rel_pos_y;
-    if (neg_y) *neg_y = mpe_rel_neg_y;
+    if (events)
+        *events = mpe_rel_events;
+    if (pos_x)
+        *pos_x = mpe_rel_pos_x;
+    if (neg_x)
+        *neg_x = mpe_rel_neg_x;
+    if (pos_y)
+        *pos_y = mpe_rel_pos_y;
+    if (neg_y)
+        *neg_y = mpe_rel_neg_y;
 }
 
 void mouse_lock_diagnostics_reset (void) {
@@ -230,18 +242,22 @@ static const struct wl_registry_listener mpe_rel_reg_listener = {
  * startup, before the event loop exists to re-enter. */
 void mouse_lock_init (void) {
     GdkDisplay *display = gdk_display_get_default ();
-    if (!display || !GDK_IS_WAYLAND_DISPLAY (display)) return;
+    if (!display || !GDK_IS_WAYLAND_DISPLAY (display))
+        return;
     (void) mpe_get_rel_manager (gdk_wayland_display_get_wl_display (display));
 }
 
 /* Bind the global once and cache it: it is a compositor capability, so it
  * cannot change for the lifetime of the display. */
 static struct zwp_relative_pointer_manager_v1 *mpe_get_rel_manager (struct wl_display *wl_display) {
-    if (mpe_rel_manager_searched) return mpe_rel_manager;
+    if (mpe_rel_manager_searched)
+        return mpe_rel_manager;
     mpe_rel_manager_searched = 1;
-    if (!wl_display) return NULL;
+    if (!wl_display)
+        return NULL;
     struct wl_registry *registry = wl_display_get_registry (wl_display);
-    if (!registry) return NULL;
+    if (!registry)
+        return NULL;
     wl_registry_add_listener (registry, &mpe_rel_reg_listener, &mpe_rel_manager);
     /* One round-trip so the globals are actually delivered. At most once
      * per process, on the first click-to-lock. */
@@ -252,7 +268,8 @@ static struct zwp_relative_pointer_manager_v1 *mpe_get_rel_manager (struct wl_di
 
 int mouse_lock_relative_available (void) {
     GdkDisplay *display = gdk_display_get_default ();
-    if (!display || !GDK_IS_WAYLAND_DISPLAY (display)) return 0;
+    if (!display || !GDK_IS_WAYLAND_DISPLAY (display))
+        return 0;
     return mpe_get_rel_manager (gdk_wayland_display_get_wl_display (display)) != NULL;
 }
 
@@ -281,9 +298,12 @@ float mouse_lock_relative_to_camera (double rdx, double rdy, float *out_x, float
 }
 
 int mouse_lock_take_relative_delta (double *dx, double *dy) {
-    if (!mpe_rel_ptr || !mpe_rel_dirty) return 0;
-    if (dx) *dx = mpe_rel_dx;
-    if (dy) *dy = mpe_rel_dy;
+    if (!mpe_rel_ptr || !mpe_rel_dirty)
+        return 0;
+    if (dx)
+        *dx = mpe_rel_dx;
+    if (dy)
+        *dy = mpe_rel_dy;
     mpe_rel_dx = 0.0;
     mpe_rel_dy = 0.0;
     mpe_rel_dirty = 0;
@@ -306,23 +326,31 @@ static void mpe_rel_pointer_destroy (void) {
 
 /* Start receiving unbounded relative motion on this surface's pointer. */
 static int mpe_rel_pointer_acquire (GdkSurface *surface) {
-    if (mpe_rel_ptr) return 1;
-    if (!mpe_surface_is_wayland (surface)) return 0;
+    if (mpe_rel_ptr)
+        return 1;
+    if (!mpe_surface_is_wayland (surface))
+        return 0;
     GdkDisplay *display = gdk_surface_get_display (surface);
-    if (!display) return 0;
+    if (!display)
+        return 0;
     GdkSeat *seat = gdk_display_get_default_seat (display);
-    if (!seat) return 0;
+    if (!seat)
+        return 0;
     GdkDevice *dev = gdk_seat_get_pointer (seat);
-    if (!dev || !GDK_IS_WAYLAND_DEVICE (dev)) return 0;
+    if (!dev || !GDK_IS_WAYLAND_DEVICE (dev))
+        return 0;
 
     struct zwp_relative_pointer_manager_v1 *mgr = mpe_get_rel_manager (gdk_wayland_display_get_wl_display (display));
-    if (!mgr) return 0; /* compositor lacks the protocol */
+    if (!mgr)
+        return 0; /* compositor lacks the protocol */
 
     struct wl_pointer *wl_pointer = gdk_wayland_device_get_wl_pointer (dev);
-    if (!wl_pointer) return 0;
+    if (!wl_pointer)
+        return 0;
 
     mpe_rel_ptr = zwp_relative_pointer_manager_v1_get_relative_pointer (mgr, wl_pointer);
-    if (!mpe_rel_ptr) return 0;
+    if (!mpe_rel_ptr)
+        return 0;
     zwp_relative_pointer_v1_add_listener (mpe_rel_ptr, &mpe_rel_listener, NULL);
 
     /* Confinement. Best-effort: a compositor may implement one protocol and not
@@ -339,7 +367,8 @@ static int mpe_rel_pointer_acquire (GdkSurface *surface) {
         {
             mpe_locked_ptr = zwp_pointer_constraints_v1_lock_pointer (mpe_pc_manager, wl_surf, wl_pointer, NULL,
                                                                       ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
-            if (mpe_locked_ptr) mpe_locked_active = 1;
+            if (mpe_locked_ptr)
+                mpe_locked_active = 1;
         }
     }
     return 1;
@@ -360,11 +389,16 @@ static unsigned long mpe_rel_pos_y = 0, mpe_rel_neg_y = 0;
 
 void mouse_lock_diagnostics (unsigned long *events, unsigned long *pos_x, unsigned long *neg_x, unsigned long *pos_y,
                              unsigned long *neg_y) {
-    if (events) *events = mpe_rel_events;
-    if (pos_x) *pos_x = mpe_rel_pos_x;
-    if (neg_x) *neg_x = mpe_rel_neg_x;
-    if (pos_y) *pos_y = mpe_rel_pos_y;
-    if (neg_y) *neg_y = mpe_rel_neg_y;
+    if (events)
+        *events = mpe_rel_events;
+    if (pos_x)
+        *pos_x = mpe_rel_pos_x;
+    if (neg_x)
+        *neg_x = mpe_rel_neg_x;
+    if (pos_y)
+        *pos_y = mpe_rel_pos_y;
+    if (neg_y)
+        *neg_y = mpe_rel_neg_y;
 }
 
 void mouse_lock_diagnostics_reset (void) {
@@ -389,8 +423,10 @@ int mouse_lock_relative_available (void) {
  * Returns the magnitude of the input so callers can distinguish "no motion"
  * from "motion that happened to be zero on one axis". */
 float mouse_lock_relative_to_camera (double rdx, double rdy, float *out_x, float *out_y) {
-    if (out_x) *out_x = (float) rdx;
-    if (out_y) *out_y = (float) -rdy;
+    if (out_x)
+        *out_x = (float) rdx;
+    if (out_y)
+        *out_y = (float) -rdy;
     return (float) (rdx * rdx + rdy * rdy);
 }
 
@@ -426,7 +462,8 @@ static int mpe_rel_pointer_acquire (GdkSurface *surface) {
 /* ------------------------------------------------------------- public API */
 
 void mouse_lock_enable (GtkWidget *widget) {
-    if (!widget || !GTK_IS_WIDGET (widget)) return;
+    if (!widget || !GTK_IS_WIDGET (widget))
+        return;
 
     GdkCursor *blank = mpe_blank_cursor_new ();
     if (blank) {
@@ -451,11 +488,13 @@ void mouse_lock_enable (GtkWidget *widget) {
 }
 
 void mouse_lock_disable (GtkWidget *widget) {
-    if (!widget || !GTK_IS_WIDGET (widget)) return;
+    if (!widget || !GTK_IS_WIDGET (widget))
+        return;
     mpe_rel_pointer_destroy ();
     gtk_widget_set_cursor (widget, NULL);
     GdkSurface *surface = mpe_surface_for_widget (widget);
-    if (surface) gdk_surface_set_cursor (surface, NULL);
+    if (surface)
+        gdk_surface_set_cursor (surface, NULL);
 }
 
 void mouse_lock_reset_centre (GtkWidget *window_widget) {
@@ -464,39 +503,50 @@ void mouse_lock_reset_centre (GtkWidget *window_widget) {
      * warping is protocol-forbidden, so it is a no-op.
      * CRITICAL: never touch gdk_x11_* on a Wayland display (unchecked cast
      * segfault). Guard on the display type. */
-    if (!window_widget || !GTK_IS_WIDGET (window_widget)) return;
+    if (!window_widget || !GTK_IS_WIDGET (window_widget))
+        return;
     GdkSurface *surface = mpe_surface_for_widget (window_widget);
-    if (!surface) return;
+    if (!surface)
+        return;
     GdkDisplay *display = gdk_surface_get_display (surface);
-    if (!display) return;
-    if (mpe_display_is_wayland (display)) return;
+    if (!display)
+        return;
+    if (mpe_display_is_wayland (display))
+        return;
 #ifdef MPE_GTK4_X11_WARP
-    if (!GDK_IS_X11_DISPLAY (display) || !GDK_IS_X11_SURFACE (surface)) return;
+    if (!GDK_IS_X11_DISPLAY (display) || !GDK_IS_X11_SURFACE (surface))
+        return;
     Display *xdisplay = gdk_x11_display_get_xdisplay (display);
-    if (!xdisplay) return;
+    if (!xdisplay)
+        return;
     int ww = gdk_surface_get_width (surface);
     int wh = gdk_surface_get_height (surface);
-    if (ww <= 0 || wh <= 0) return;
+    if (ww <= 0 || wh <= 0)
+        return;
     XWarpPointer (xdisplay, None, DefaultRootWindow (xdisplay), 0, 0, 0, 0, ww / 2, wh / 2);
     XFlush (xdisplay);
 #endif
 }
 
 void mouse_lock_reacquire (GtkWidget *window_widget) {
-    if (!main_inputs.is_mouse_locked) return;
-    if (!window_widget || !GTK_IS_WIDGET (window_widget)) return;
+    if (!main_inputs.is_mouse_locked)
+        return;
+    if (!window_widget || !GTK_IS_WIDGET (window_widget))
+        return;
 
     GdkSurface *surface = mpe_surface_for_widget (window_widget);
 
     /* Re-establish real lock. If the surface was rebuilt this is required,
      * otherwise the old relative pointer would be attached to a dead surface
      * and the camera would silently stop responding. */
-    if (!mpe_rel_ptr) mpe_rel_pointer_acquire (surface);
+    if (!mpe_rel_ptr)
+        mpe_rel_pointer_acquire (surface);
 
     GdkCursor *blank = mpe_blank_cursor_new ();
     if (blank) {
         gtk_widget_set_cursor (window_widget, blank);
-        if (surface) gdk_surface_set_cursor (surface, blank);
+        if (surface)
+            gdk_surface_set_cursor (surface, blank);
         g_object_unref (blank);
     } else {
         gtk_widget_set_cursor_from_name (window_widget, "none");

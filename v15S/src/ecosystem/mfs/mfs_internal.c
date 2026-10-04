@@ -74,7 +74,8 @@ int mfs_internal_registry_init (void) {
 }
 
 int mfs_internal_module_registered (const char *name) {
-    if (!name) return 0;
+    if (!name)
+        return 0;
     pthread_mutex_lock (&s_lock);
     int found = 0;
     for (int i = 0; i < MFS_MAX_INTERNAL_MODULES; i++) {
@@ -88,7 +89,8 @@ int mfs_internal_module_registered (const char *name) {
 }
 
 int mfs_internal_module_register (const mpe_module_desc_t *desc) {
-    if (!desc || !desc->name || desc->abi != MPE_MODULE_ABI) return MFS_REG_BAD_ARG;
+    if (!desc || !desc->name || desc->abi != MPE_MODULE_ABI)
+        return MFS_REG_BAD_ARG;
     pthread_mutex_lock (&s_lock);
     for (int i = 0; i < MFS_MAX_INTERNAL_MODULES; i++) {
         if (name_matches (&s_slots[i], desc->name)) {
@@ -110,11 +112,13 @@ int mfs_internal_module_register (const mpe_module_desc_t *desc) {
 }
 
 int mfs_internal_module_unregister (const char *name) {
-    if (!name) return MFS_UNREG_NOT_FOUND;
+    if (!name)
+        return MFS_UNREG_NOT_FOUND;
     pthread_mutex_lock (&s_lock);
     int live = 0;
     for (int i = 0; i < MFS_MAX_INTERNAL_MODULES; i++) {
-        if (!name_matches (&s_slots[i], name)) continue;
+        if (!name_matches (&s_slots[i], name))
+            continue;
         if (s_slots[i].attached || s_slots[i].detaching || s_slots[i].in_flight > 0) {
             live = 1;
             break;
@@ -138,7 +142,8 @@ int mfs_internal_module_unregister (const char *name) {
 }
 
 int mfs_internal_module_attach (const char *name, physics_world *world) {
-    if (!name || !world) return MFS_REG_BAD_ARG;
+    if (!name || !world)
+        return MFS_REG_BAD_ARG;
     pthread_mutex_lock (&s_lock);
     for (;;) {
         /* Idempotent re-attach of the same world: never re-run attach(). */
@@ -168,8 +173,10 @@ int mfs_internal_module_attach (const char *name, physics_world *world) {
             const mpe_module_desc_t *proto = NULL;
             for (int i = 0; i < MFS_MAX_INTERNAL_MODULES; i++) {
                 if (name_matches (&s_slots[i], name)) {
-                    if (s_slots[i].detaching || s_slots[i].in_flight > 0) busy_match = 1;
-                    if (!proto) proto = s_slots[i].desc;
+                    if (s_slots[i].detaching || s_slots[i].in_flight > 0)
+                        busy_match = 1;
+                    if (!proto)
+                        proto = s_slots[i].desc;
                 }
             }
             if (busy_match) {
@@ -247,7 +254,8 @@ int mfs_internal_module_attach (const char *name, physics_world *world) {
 }
 
 int mfs_internal_module_detach (const char *name, physics_world *world) {
-    if (!name || !world) return MFS_DET_NOT_FOUND;
+    if (!name || !world)
+        return MFS_DET_NOT_FOUND;
     pthread_mutex_lock (&s_lock);
     for (;;) {
         int reg = -1;
@@ -313,7 +321,8 @@ int mfs_internal_module_detach (const char *name, physics_world *world) {
 }
 
 void *mfs_internal_module_state_for (const void *world, const char *name) {
-    if (!world || !name) return NULL;
+    if (!world || !name)
+        return NULL;
     pthread_mutex_lock (&s_lock);
     void *out = NULL;
     for (int i = 0; i < MFS_MAX_INTERNAL_MODULES; i++) {
@@ -328,7 +337,8 @@ void *mfs_internal_module_state_for (const void *world, const char *name) {
 }
 
 void *mfs_internal_module_state (const char *name) {
-    if (!name) return NULL;
+    if (!name)
+        return NULL;
     pthread_mutex_lock (&s_lock);
     void *out = NULL;
     /* Only live attachments are reported. Matching on name alone (the
@@ -348,16 +358,20 @@ void *mfs_internal_module_state (const char *name) {
  * lock WITH a reference per slot, so a concurrent detach drains instead of
  * freeing state we are about to call. */
 static void mfs_dispatch (physics_world *world, float dt, bool pre) {
-    if (!world) return;
+    if (!world)
+        return;
     const mpe_module_desc_t *ds[MFS_MAX_INTERNAL_MODULES];
     void *sts[MFS_MAX_INTERNAL_MODULES];
     int slot_of[MFS_MAX_INTERNAL_MODULES];
     int n = 0;
     pthread_mutex_lock (&s_lock);
     for (int i = 0; i < MFS_MAX_INTERNAL_MODULES && n < MFS_MAX_INTERNAL_MODULES; i++) {
-        if (!s_slots[i].desc || !s_slots[i].attached || s_slots[i].detaching) continue;
-        if (s_slots[i].world != (const void *) world) continue;
-        if (!(pre ? s_slots[i].desc->pre_step : s_slots[i].desc->post_step)) continue;
+        if (!s_slots[i].desc || !s_slots[i].attached || s_slots[i].detaching)
+            continue;
+        if (s_slots[i].world != (const void *) world)
+            continue;
+        if (!(pre ? s_slots[i].desc->pre_step : s_slots[i].desc->post_step))
+            continue;
         ds[n] = s_slots[i].desc;
         sts[n] = s_slots[i].state;
         slot_of[n] = i;
@@ -396,7 +410,8 @@ void mfs_internal_modules_post_step (physics_world *world, float dt) {
 }
 
 void mfs_internal_modules_detach_all (physics_world *world) {
-    if (!world) return;
+    if (!world)
+        return;
     for (;;) {
         pthread_mutex_lock (&s_lock);
         int reg = -1;

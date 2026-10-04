@@ -142,7 +142,8 @@ static inline void mfs_test_world (physics_world *w) {
  * (contact restitution is min-combined). */
 static inline int mfs_test_floor_e (physics_world *w, float mus, float muk, float e) {
     int f = physics_world_add_cube (w, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
-    if (f < 0) return -1;
+    if (f < 0)
+        return -1;
     w->bodies[f].friction_static = mus;
     w->bodies[f].friction_kinetic = muk;
     w->bodies[f].restitution = e;
@@ -173,9 +174,11 @@ static inline int mfs_test_finite (physics_world *w) {
  * bounds check — OOB read if chassis_body == -1). Single checked accessor;
  * NULL means unset-or-gone, uniformly. */
 static inline rigidbody *mfs_chassis_or_null (physics_world *w, ftc_robot *robot) {
-    if (!w || !robot) return NULL;
+    if (!w || !robot)
+        return NULL;
     int idx = robot->chassis_body;
-    if (idx < 0 || idx >= w->body_count) return NULL;
+    if (idx < 0 || idx >= w->body_count)
+        return NULL;
     return &w->bodies[idx];
 }
 
@@ -195,13 +198,15 @@ static inline int mfs_step (physics_world *w, int n, float dt) {
  * through pendulum chaos. */
 static inline void mfs_lift_whole_robot (physics_world *w, ftc_robot *robot, const vector3 *lift) {
     rigidbody *chassis = mfs_chassis_or_null (w, robot);
-    if (!chassis) return;
+    if (!chassis)
+        return;
     chassis->position = vector3_addition (chassis->position, *lift);
     chassis->velocity = vector3_zero ();
     chassis->angular_velocity = vector3_zero ();
     for (int wi_idx = 0; wi_idx < robot->wheel_count; wi_idx++) {
         int wi = robot->wheel_bodies[wi_idx];
-        if (wi < 0 || wi >= w->body_count) continue;
+        if (wi < 0 || wi >= w->body_count)
+            continue;
         rigidbody *wb = &w->bodies[wi];
         wb->position = vector3_addition (wb->position, *lift);
         wb->velocity = vector3_zero ();
@@ -209,7 +214,8 @@ static inline void mfs_lift_whole_robot (physics_world *w, ftc_robot *robot, con
         rigidbody_update_axes (wb);
         for (int k = 0; k < robot->roller_count[wi_idx]; k++) {
             int rb = robot->roller_bodies[wi_idx][k];
-            if (rb < 0 || rb >= w->body_count) continue;
+            if (rb < 0 || rb >= w->body_count)
+                continue;
             rigidbody *rbb = &w->bodies[rb];
             rbb->position = vector3_addition (rbb->position, *lift);
             rbb->velocity = vector3_zero ();
@@ -228,7 +234,8 @@ static inline void mfs_lift_robot_for_free_spin (physics_world *w, ftc_robot *ro
     const vector3 lift = {0.0f, 1.9f, 0.0f};
     mfs_lift_whole_robot (w, robot, &lift);
     rigidbody *chassis = mfs_chassis_or_null (w, robot);
-    if (!chassis) return;
+    if (!chassis)
+        return;
     rigidbody_set_kinematic (chassis, true);
     chassis->velocity = vector3_zero ();
 }
@@ -237,7 +244,8 @@ static inline void mfs_lift_robot_for_free_spin (physics_world *w, ftc_robot *ro
 static inline ftc_robot *mfs_create_robot (physics_world *w, float x, float y, float z, motor_preset_id preset,
                                            ftc_drivetrain_type dtype) {
     ftc_robot *robot = (ftc_robot *) calloc (1, sizeof (ftc_robot));
-    if (!robot) return NULL;
+    if (!robot)
+        return NULL;
     int rc = ftc_robot_create_with_drive (w, robot, x, y, z, preset, dtype);
     if (rc != 0) {
         free (robot);

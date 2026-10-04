@@ -29,8 +29,10 @@
  * Called once per motion event, so the sqrt is free. */
 #include <math.h>
 static inline float mpe_mouse_relative_to_camera (double rdx, double rdy, float *out_x, float *out_y) {
-    if (out_x) *out_x = (float) rdx;
-    if (out_y) *out_y = (float) -rdy;
+    if (out_x)
+        *out_x = (float) rdx;
+    if (out_y)
+        *out_y = (float) -rdy;
     return (float) sqrt (rdx * rdx + rdy * rdy);
 }
 

@@ -223,7 +223,8 @@ int save_scene (const char *file_destination_path) {
     ok = ok && scene_w32 (f, &crc, (uint32_t) constraint_counts[constraint_fixed - constraint_fixed]);
     for (int j = 0; ok && (j < constraint_pool_capacity ()); j++) {
         const constraint *c = constraint_pool_at (physics_world_get_primary (), j);
-        if ((!c) || (c->type != constraint_fixed)) continue;
+        if ((!c) || (c->type != constraint_fixed))
+            continue;
         ok = ok && scene_w32 (f, &crc, (uint32_t) c->type);
         ok = ok && scene_w32 (f, &crc, c->body_id_a);
         ok = ok && scene_w32 (f, &crc, c->body_id_b);
@@ -235,7 +236,8 @@ int save_scene (const char *file_destination_path) {
     ok = ok && scene_w32 (f, &crc, (uint32_t) constraint_counts[constraint_distance - constraint_fixed]);
     for (int j = 0; ok && (j < constraint_pool_capacity ()); j++) {
         const constraint *c = constraint_pool_at (physics_world_get_primary (), j);
-        if ((!c) || (c->type != constraint_distance)) continue;
+        if ((!c) || (c->type != constraint_distance))
+            continue;
         ok = ok && scene_w32 (f, &crc, (uint32_t) c->type);
         ok = ok && scene_w32 (f, &crc, c->body_id_a);
         ok = ok && scene_w32 (f, &crc, c->body_id_b);
@@ -248,7 +250,8 @@ int save_scene (const char *file_destination_path) {
     ok = ok && scene_w32 (f, &crc, (uint32_t) constraint_counts[constraint_prismatic - constraint_fixed]);
     for (int j = 0; ok && (j < constraint_pool_capacity ()); j++) {
         const constraint *c = constraint_pool_at (physics_world_get_primary (), j);
-        if ((!c) || (c->type != constraint_prismatic)) continue;
+        if ((!c) || (c->type != constraint_prismatic))
+            continue;
         ok = ok && scene_w32 (f, &crc, (uint32_t) c->type);
         ok = ok && scene_w32 (f, &crc, c->body_id_a);
         ok = ok && scene_w32 (f, &crc, c->body_id_b);
@@ -268,7 +271,8 @@ int save_scene (const char *file_destination_path) {
     ok = ok && scene_w32 (f, &crc, (uint32_t) constraint_counts[constraint_rope - constraint_fixed]);
     for (int j = 0; ok && (j < constraint_pool_capacity ()); j++) {
         const constraint *c = constraint_pool_at (physics_world_get_primary (), j);
-        if ((!c) || (c->type != constraint_rope)) continue;
+        if ((!c) || (c->type != constraint_rope))
+            continue;
         ok = ok && scene_w32 (f, &crc, (uint32_t) c->type);
         ok = ok && scene_w32 (f, &crc, c->body_id_a);
         ok = ok && scene_w32 (f, &crc, c->body_id_b);

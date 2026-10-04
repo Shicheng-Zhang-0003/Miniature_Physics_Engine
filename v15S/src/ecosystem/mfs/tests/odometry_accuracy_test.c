@@ -55,7 +55,8 @@ int main (void) {
             }
         }
     }
-    if (fail) return 1;
+    if (fail)
+        return 1;
 
     float end_x = world.bodies[robot.chassis_body].position.x;
     float end_z = world.bodies[robot.chassis_body].position.z;

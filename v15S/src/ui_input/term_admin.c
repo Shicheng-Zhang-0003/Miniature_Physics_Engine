@@ -16,15 +16,18 @@
  * redirecting the write outside that directory. */
 #ifdef MPE_OS_WINDOWS
 static int term_tee_write_status (const char *path, const char *text, size_t *bytes_written) {
-    if (!path || !text || !bytes_written) return -1;
+    if (!path || !text || !bytes_written)
+        return -1;
     const char *name = strncmp (path, "status/", 7) == 0 ? path + 7 : path;
     /* also accept Windows separator */
-    if (strncmp (path, "status\\", 7) == 0) name = path + 7;
+    if (strncmp (path, "status\\", 7) == 0)
+        name = path + 7;
     if (!name[0] || strchr (name, '/') || strchr (name, '\\') || strstr (name, "..") || strcmp (name, ".") == 0)
         return -1;
     /* Reject reparse-point/symlink escapes best-effort (Windows). */
     DWORD sattr = GetFileAttributesA ("status");
-    if (sattr != INVALID_FILE_ATTRIBUTES && (sattr & FILE_ATTRIBUTE_REPARSE_POINT)) return -1;
+    if (sattr != INVALID_FILE_ATTRIBUTES && (sattr & FILE_ATTRIBUTE_REPARSE_POINT))
+        return -1;
     static volatile LONG sequence = 0;
     char tmp_path[512], dst_path[512];
     for (int attempt = 0; attempt < 16; attempt++) {
@@ -33,37 +36,45 @@ static int term_tee_write_status (const char *path, const char *text, size_t *by
         snprintf (dst_path, sizeof (dst_path), "status/%s", name);
         /* O_EXCL emulation: fail if temp already exists */
         DWORD tattr = GetFileAttributesA (tmp_path);
-        if (tattr != INVALID_FILE_ATTRIBUTES) continue;
+        if (tattr != INVALID_FILE_ATTRIBUTES)
+            continue;
         FILE *output = fopen (tmp_path, "wx");
         if (!output) {
-            if (errno != EEXIST) return -1;
+            if (errno != EEXIST)
+                return -1;
             continue;
         }
         size_t length = strlen (text);
         *bytes_written = fwrite (text, 1, length, output);
         int failed = (*bytes_written != length) || ferror (output);
-        if (fclose (output) != 0) failed = 1;
+        if (fclose (output) != 0)
+            failed = 1;
         if (!failed) {
             /* Atomic replace when possible; MoveFileEx is atomic on NTFS. */
             if (!MoveFileExA (tmp_path, dst_path, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
                 /* fallback: remove + rename */
                 DeleteFileA (dst_path);
-                if (!MoveFileA (tmp_path, dst_path)) failed = 1;
+                if (!MoveFileA (tmp_path, dst_path))
+                    failed = 1;
             }
         }
-        if (failed) DeleteFileA (tmp_path);
+        if (failed)
+            DeleteFileA (tmp_path);
         return failed ? -1 : 0;
     }
     return -1;
 }
 #else
 static int term_tee_write_status (const char *path, const char *text, size_t *bytes_written) {
-    if (!path || !text || !bytes_written) return -1;
+    if (!path || !text || !bytes_written)
+        return -1;
     const char *name = strncmp (path, "status/", 7) == 0 ? path + 7 : path;
-    if (!name[0] || strchr (name, '/') || strstr (name, "..") || strcmp (name, ".") == 0) return -1;
+    if (!name[0] || strchr (name, '/') || strstr (name, "..") || strcmp (name, ".") == 0)
+        return -1;
 
     int dirfd = open ("status", O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW);
-    if (dirfd < 0) return -1;
+    if (dirfd < 0)
+        return -1;
 
     static atomic_ulong sequence;
     char temporary[80];
@@ -72,7 +83,8 @@ static int term_tee_write_status (const char *path, const char *text, size_t *by
         unsigned long serial = atomic_fetch_add_explicit (&sequence, 1, memory_order_relaxed) + 1;
         snprintf (temporary, sizeof (temporary), ".mpe-tee-%ld-%lu", (long) getpid (), serial);
         fd = openat (dirfd, temporary, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0600);
-        if (fd < 0 && errno != EEXIST) break;
+        if (fd < 0 && errno != EEXIST)
+            break;
     }
     if (fd < 0) {
         close (dirfd);
@@ -89,9 +101,12 @@ static int term_tee_write_status (const char *path, const char *text, size_t *by
     size_t length = strlen (text);
     *bytes_written = fwrite (text, 1, length, output);
     int failed = (*bytes_written != length) || ferror (output);
-    if (fclose (output) != 0) failed = 1;
-    if (!failed && renameat (dirfd, temporary, dirfd, name) != 0) failed = 1;
-    if (failed) unlinkat (dirfd, temporary, 0);
+    if (fclose (output) != 0)
+        failed = 1;
+    if (!failed && renameat (dirfd, temporary, dirfd, name) != 0)
+        failed = 1;
+    if (failed)
+        unlinkat (dirfd, temporary, 0);
     close (dirfd);
     return failed ? -1 : 0;
 }

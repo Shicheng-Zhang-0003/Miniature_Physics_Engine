@@ -74,24 +74,30 @@ static void mpe_note_clamp (const char *kind, unsigned long *counter, double req
  * This is EXACT for linear viscous drag (Stokes regime), bit-deterministic via det_math.
  * OVERWRITES rb->velocity with exact v(dt) for consistency. */
 static inline void rb_integrate_position_exact_free_flight (rigidbody *rb, float dt, const mpe_config_t *cfg) {
-    if (!rb || rb->static_state || rb->is_sleeping || rb->kinematic || !(dt > 0.0f)) return;
-    if (!isfinite (dt)) return;
+    if (!rb || rb->static_state || rb->is_sleeping || rb->kinematic || !(dt > 0.0f))
+        return;
+    if (!isfinite (dt))
+        return;
 
     float drag_retention = cfg->world.drag;
     float gravity = cfg->world.gravity;
     /* TRUTH: contract is drag in (0,1] (retention per second). Clamp
      * violations instead of producing NaN: drag>1 (anti-damping) and
      * drag<=0/NaN have no physical meaning here. */
-    if (!isfinite (drag_retention) || drag_retention <= 0.0f) drag_retention = 1.0f;
-    if (drag_retention > 1.0f) drag_retention = 1.0f;
-    if (!isfinite (gravity)) gravity = 0.0f;
+    if (!isfinite (drag_retention) || drag_retention <= 0.0f)
+        drag_retention = 1.0f;
+    if (drag_retention > 1.0f)
+        drag_retention = 1.0f;
+    if (!isfinite (gravity))
+        gravity = 0.0f;
     vector3 g = {0.0f, gravity, 0.0f};
     /* v0 MUST be the start-of-tick (pre-force) velocity. Callers snapshot
      * v_pre before rb_integrate_velocity and restore it before calling this
      * analytic path (see physics_world_step tick_v0). Treating post-force
      * velocity as v(0) double-applies gravity/damping. */
     vector3 v0 = rb->velocity;
-    if (!isfinite (v0.x) || !isfinite (v0.y) || !isfinite (v0.z)) v0 = vector3_zero ();
+    if (!isfinite (v0.x) || !isfinite (v0.y) || !isfinite (v0.z))
+        v0 = vector3_zero ();
 
     if (drag_retention >= 1.0f - 1e-6f) {
         /* c ≈ 0: exact Verlet (drag == 1, conservative).
@@ -156,7 +162,8 @@ static inline void rb_integrate_position_exact_free_flight (rigidbody *rb, float
  * Position: x += v_new * dt.
  * This matches the original stable behavior. */
 static inline void rb_integrate_position_constrained (rigidbody *rb, float dt) {
-    if (!rb || rb->static_state || rb->is_sleeping || rb->kinematic || !(dt > 0.0f)) return;
+    if (!rb || rb->static_state || rb->is_sleeping || rb->kinematic || !(dt > 0.0f))
+        return;
     rb->position = vector3_addition (rb->position, vector3_scaling (rb->velocity, dt));
 }
 
@@ -976,7 +983,8 @@ void rb_integrate_velocity (rigidbody *rigid_body, float delta_time, float linea
                     math3 Rnt = math3_transposition (Rn);
                     math3 In = math3_multiplication (Rn, math3_multiplication (Il, Rnt));
                     vector3 cand = math3_multiplication_vector3 (math3_inverse (In), L);
-                    if (!a3_vector3_is_finite (cand)) break;
+                    if (!a3_vector3_is_finite (cand))
+                        break;
                     float step = vector3_length (vector3_subtraction (cand, w));
                     w_new = cand;
                     w = cand;

@@ -50,13 +50,15 @@ int main (void) {
 
         for (int t = 0; t < 120; t++) {
             physics_world_step (&world, dt);
-            if (fabsf (world.bodies[a].velocity.x - 5.0f) > 0.01f) collided = 1;
+            if (fabsf (world.bodies[a].velocity.x - 5.0f) > 0.01f)
+                collided = 1;
             vector3 P = {0, 0, 0};
             for (int i = 0; i < world.body_count; i++) {
                 P = vector3_addition (P, vector3_scaling (world.bodies[i].velocity, world.bodies[i].mass));
             }
             float err = vector3_length (vector3_subtraction (P, P0));
-            if (err > max_err) max_err = err;
+            if (err > max_err)
+                max_err = err;
         }
 
         printf ("[INFO] momentum_conservation max_err=%.6f (initial |P|=%.6f, 2s)\n", max_err, vector3_length (P0));
@@ -109,7 +111,8 @@ int main (void) {
             vector3 L = body_angular_momentum (&world.bodies[0]);
             float Lmag = vector3_length (L);
             float rel_err = fabsf (Lmag - L0) / L0;
-            if (rel_err > max_rel_err) max_rel_err = rel_err;
+            if (rel_err > max_rel_err)
+                max_rel_err = rel_err;
         }
 
         printf ("[INFO] angmom_conservation max_rel_err=%.6f (2s, matches test_angmom)\n", max_rel_err);
@@ -144,12 +147,16 @@ int main (void) {
         for (int t = 0; t < 120; t++) {
             physics_world_step (&world, dt);
             rigidbody *b = &world.bodies[0];
-            if (b->position.y < 0.6f) break;
+            if (b->position.y < 0.6f)
+                break;
 
             float E = rb_get_kinetic_energy (b) + b->mass * 9.81f * b->position.y;
-            if (E0 < 0.0f) E0 = E;
-            if (E > E_max) E_max = E;
-            if (E < E_min) E_min = E;
+            if (E0 < 0.0f)
+                E0 = E;
+            if (E > E_max)
+                E_max = E;
+            if (E < E_min)
+                E_min = E;
         }
 
         float rel_err = fabsf (E_max - E_min) / E0;
@@ -185,8 +192,10 @@ int main (void) {
             physics_world_step (&world, dt);
             rigidbody *b = &world.bodies[0];
             float E = rb_get_kinetic_energy (b) + b->mass * 9.81f * b->position.y;
-            if (E0 < 0.0f) E0 = E;
-            if (E > E_max) E_max = E;
+            if (E0 < 0.0f)
+                E0 = E;
+            if (E > E_max)
+                E_max = E;
         }
 
         float ratio = E_max / E0;
@@ -248,9 +257,12 @@ int main (void) {
                 break;
             }
             float speed = fmaxf (vector3_length (world.bodies[a].velocity), vector3_length (world.bodies[b].velocity));
-            if (speed > max_speed) max_speed = speed;
-            if (E > E_max) E_max = E;
-            if (E < E_min) E_min = E;
+            if (speed > max_speed)
+                max_speed = speed;
+            if (E > E_max)
+                E_max = E;
+            if (E < E_min)
+                E_min = E;
         }
 
         float rel_range = (E_max - E_min) / E_max;

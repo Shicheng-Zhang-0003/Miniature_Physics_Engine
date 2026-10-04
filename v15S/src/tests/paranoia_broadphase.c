@@ -176,7 +176,8 @@ int main (void) {
 
         int max_pairs = 0;
         for (int t = 0; t < 60; t++)
-            if (pair_counts[t] > max_pairs) max_pairs = pair_counts[t];
+            if (pair_counts[t] > max_pairs)
+                max_pairs = pair_counts[t];
 
         printf ("[INFO] pair_dedup max_overflow=%d\n", max_pairs);
         if (max_pairs > 0) {

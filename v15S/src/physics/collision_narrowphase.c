@@ -349,7 +349,8 @@ static void clip_obb_faces (rigidbody *ref_body, rigidbody *inc_body, vector3 no
          *    deterministic for equal penetrations). */
         int deepest = 0;
         for (int i = 1; i < cand_count; i++) {
-            if (cand_pen[i] > cand_pen[deepest]) deepest = i;
+            if (cand_pen[i] > cand_pen[deepest])
+                deepest = i;
         }
         keep[keep_count++] = deepest;
         /* 2. Greedily add the candidate that grows the enclosed area most, so
@@ -367,7 +368,8 @@ static void clip_obb_faces (rigidbody *ref_body, rigidbody *inc_body, vector3 no
                         break;
                     }
                 }
-                if (taken) continue;
+                if (taken)
+                    continue;
                 /* Fan area about the current centroid of kept points. */
                 vector3 sum = vector3_zero ();
                 for (int k = 0; k < keep_count; k++) {
@@ -382,7 +384,8 @@ static void clip_obb_faces (rigidbody *ref_body, rigidbody *inc_body, vector3 no
                     best = i;
                 }
             }
-            if (best < 0) break;
+            if (best < 0)
+                break;
             keep[keep_count++] = best;
         }
     }
@@ -516,7 +519,8 @@ bool collision_dual_cube (rigidbody *cube_a, rigidbody *cube_b, collision_data *
         for (int axis_index_b = 0; axis_index_b < 3; axis_index_b++) {
             vector3 axis = vector3_cross (axes_a[axis_index_a], axes_b[axis_index_b]);
             float length_squared = vector3_length_squared (axis);
-            if (length_squared < 0.0001f) continue;
+            if (length_squared < 0.0001f)
+                continue;
             axis = vector3_scaling (axis, 1.0f / sqrtf (length_squared));
             float projection_a = project_obb (cube_a, axis, axes_a);
             float projection_b = project_obb (cube_b, axis, axes_b);

@@ -127,15 +127,24 @@ int main (void) {
                 orig->angular_velocity.y != ld->angular_velocity.y ||
                 orig->angular_velocity.z != ld->angular_velocity.z)
                 mismatch = 1;
-            if (orig->mass != ld->mass) mismatch = 1;
-            if (orig->restitution != ld->restitution) mismatch = 1;
-            if (orig->friction_static != ld->friction_static) mismatch = 1;
-            if (orig->friction_kinetic != ld->friction_kinetic) mismatch = 1;
-            if (orig->nice_value != ld->nice_value) mismatch = 1;
-            if (orig->is_sleeping != ld->is_sleeping) mismatch = 1;
-            if (fabsf (orig->sleep_timer - ld->sleep_timer) > 0.0f) mismatch = 1;
-            if (orig->object_id != ld->object_id) mismatch = 1;
-            if (orig->object_generation != ld->object_generation) mismatch = 1;
+            if (orig->mass != ld->mass)
+                mismatch = 1;
+            if (orig->restitution != ld->restitution)
+                mismatch = 1;
+            if (orig->friction_static != ld->friction_static)
+                mismatch = 1;
+            if (orig->friction_kinetic != ld->friction_kinetic)
+                mismatch = 1;
+            if (orig->nice_value != ld->nice_value)
+                mismatch = 1;
+            if (orig->is_sleeping != ld->is_sleeping)
+                mismatch = 1;
+            if (fabsf (orig->sleep_timer - ld->sleep_timer) > 0.0f)
+                mismatch = 1;
+            if (orig->object_id != ld->object_id)
+                mismatch = 1;
+            if (orig->object_generation != ld->object_generation)
+                mismatch = 1;
         }
 
         if (mismatch) {
@@ -151,7 +160,8 @@ int main (void) {
         int revolute_found = 0, distance_found = 0;
         for (int ji = 0; ji < mpe_max_joints; ji++) {
             const constraint *saved_joint = constraint_pool_at (loaded, ji);
-            if (!saved_joint || !saved_joint->is_active) continue;
+            if (!saved_joint || !saved_joint->is_active)
+                continue;
             if (saved_joint->type == constraint_revolute) {
                 revolute_found = saved_joint->p.revolute.motor_enabled &&
                                  fabsf (saved_joint->p.revolute.motor_target_speed - 5.0f) < 1e-5f;

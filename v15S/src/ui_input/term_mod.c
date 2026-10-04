@@ -28,7 +28,8 @@ void cmd_mod (int argc, char **argv) {
         term_out ("registry modules:\n");
         for (int i = 0; i < mpe_module_count (); i++) {
             const mpe_module_desc_t *d = mpe_module_at (i);
-            if (!d) continue;
+            if (!d)
+                continue;
             snprintf (buf, sizeof (buf), "  %s-%s [%s]%s\n", d->name, d->version ? d->version : "?",
                       d->kind ? d->kind : "generic", d->deterministic ? " det" : "");
             term_out (buf);
@@ -45,13 +46,16 @@ void cmd_mod (int argc, char **argv) {
         for (int i = 0; i < MPE_MAX_PAIR_HANDLERS; i++) {
             int ta = 0, tb = 0, ca = 0, cb = 0;
             char nm[64] = {0};
-            if (mpe_registry_pair_describe (i, &ta, &tb, &ca, &cb, nm, sizeof (nm)) != 0) break;
+            if (mpe_registry_pair_describe (i, &ta, &tb, &ca, &cb, nm, sizeof (nm)) != 0)
+                break;
             snprintf (buf, sizeof (buf), "  #%d (%d,%d,%d,%d) %s\n", i, ta, tb, ca, cb, nm);
             term_out (buf);
         }
         /* Stage backends. */
-        if (mpe_find_broadphase ("hash")) term_out ("broadphase: hash (builtin)\n");
-        if (mpe_find_solver ("seq-impulse")) term_out ("solver: seq-impulse (builtin)\n");
+        if (mpe_find_broadphase ("hash"))
+            term_out ("broadphase: hash (builtin)\n");
+        if (mpe_find_solver ("seq-impulse"))
+            term_out ("solver: seq-impulse (builtin)\n");
         physics_world *w = physics_world_get_primary ();
         snprintf (buf, sizeof (buf), "attached to primary: %d\n", w ? w->tick_module_count : 0);
         term_out (buf);
@@ -69,7 +73,8 @@ void cmd_mod (int argc, char **argv) {
     }
     if (term_str_eq (argv[1], "load") && argc >= 3) {
         char err[512] = {0};
-        if (mpe_loader_load (argv[2], err, sizeof (err)) == 0) term_ok ("mpe: mod: loaded\n");
+        if (mpe_loader_load (argv[2], err, sizeof (err)) == 0)
+            term_ok ("mpe: mod: loaded\n");
         else {
             char b[600];
             snprintf (b, sizeof (b), "mpe: mod: load failed: %s\n", err);
@@ -79,7 +84,8 @@ void cmd_mod (int argc, char **argv) {
     }
     if (term_str_eq (argv[1], "unload") && argc >= 3) {
         int ur = mpe_loader_unload (argv[2]);
-        if (ur == 0) term_ok ("mpe: mod: unloaded\n");
+        if (ur == 0)
+            term_ok ("mpe: mod: unloaded\n");
         else if (ur == -2) {
             term_err ("mpe: mod: unload refused (busy: a live world still references this image; "
                       "detach the tick module / reset the stage slot first)\n");
@@ -109,13 +115,15 @@ void cmd_mod (int argc, char **argv) {
             }
         }
         int r = physics_world_attach_module (pw, d);
-        if (r >= 0) term_ok ("mpe: mod: attached\n");
+        if (r >= 0)
+            term_ok ("mpe: mod: attached\n");
         else
             term_err ("mpe: mod: attach failed (table full / attach hook)\n");
         return;
     }
     if (term_str_eq (argv[1], "detach") && argc >= 3) {
-        if (physics_world_detach_module (physics_world_get_primary (), argv[2]) == 0) term_ok ("mpe: mod: detached\n");
+        if (physics_world_detach_module (physics_world_get_primary (), argv[2]) == 0)
+            term_ok ("mpe: mod: detached\n");
         else
             term_err ("mpe: mod: detach failed (not attached)\n");
         return;
@@ -183,8 +191,10 @@ void cmd_modinfo (int argc, char **argv) {
     } else if (d->kind && term_str_eq (d->kind, "solver")) {
         term_out ("type:        solver backend\n");
     } else if (d->kind && term_str_eq (d->kind, "generic")) {
-        if (d->pre_step) term_out ("hooks:       pre_step\n");
-        if (d->post_step) term_out ("hooks:       post_step\n");
+        if (d->pre_step)
+            term_out ("hooks:       pre_step\n");
+        if (d->post_step)
+            term_out ("hooks:       post_step\n");
     }
     /* check if loaded (compare loader module NAMES, not paths). */
     for (int i = 0; i < mpe_loader_count (); i++) {

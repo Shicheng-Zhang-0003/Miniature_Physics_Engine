@@ -9,7 +9,8 @@
 extern camera main_camera_fov;
 extern int selected_object;
 void initialize_input (input_status *s) {
-    if (!s) return;
+    if (!s)
+        return;
     s->w_key_pressed = false;
     s->a_key_pressed = false;
     s->s_key_pressed = false;
@@ -66,24 +67,42 @@ gboolean on_keypress (GtkEventControllerKey *w, guint keyval, guint keycode, Gdk
     (void) keycode;
     (void) state;
     input_status *st = (input_status *) user_data_stored;
-    if (keyval == GDK_KEY_w || keyval == GDK_KEY_W) st->w_key_pressed = true;
-    if (keyval == GDK_KEY_a || keyval == GDK_KEY_A) st->a_key_pressed = true;
-    if (keyval == GDK_KEY_s || keyval == GDK_KEY_S) st->s_key_pressed = true;
-    if (keyval == GDK_KEY_d || keyval == GDK_KEY_D) st->d_key_pressed = true;
-    if (keyval == GDK_KEY_e || keyval == GDK_KEY_E) st->e_key_pressed = true;
-    if (keyval == GDK_KEY_f || keyval == GDK_KEY_F) st->f_key_pressed = true;
-    if (keyval == GDK_KEY_r || keyval == GDK_KEY_R) st->r_key_pressed = true;
-    if (keyval == GDK_KEY_F5) st->stability_test_pressed = true;
-    if (keyval == GDK_KEY_F6) st->sleep_wake_test_pressed = true;
-    if (keyval == GDK_KEY_F7) st->editor_torture_pressed = true;
-    if (keyval == GDK_KEY_F8) st->spawn_stress_pressed = true;
-    if (keyval == GDK_KEY_F9) st->validation_report_pressed = true;
-    if (keyval == GDK_KEY_F10) st->long_run_validation_pressed = true;
-    if (keyval == GDK_KEY_F11) st->config_torture_pressed = true;
-    if (keyval == GDK_KEY_i || keyval == GDK_KEY_I) st->i_key_pressed = true;
-    if (keyval == GDK_KEY_j || keyval == GDK_KEY_J) st->j_key_pressed = true;
-    if (keyval == GDK_KEY_k || keyval == GDK_KEY_K) st->k_key_pressed = true;
-    if (keyval == GDK_KEY_l || keyval == GDK_KEY_L) st->l_key_pressed = true;
+    if (keyval == GDK_KEY_w || keyval == GDK_KEY_W)
+        st->w_key_pressed = true;
+    if (keyval == GDK_KEY_a || keyval == GDK_KEY_A)
+        st->a_key_pressed = true;
+    if (keyval == GDK_KEY_s || keyval == GDK_KEY_S)
+        st->s_key_pressed = true;
+    if (keyval == GDK_KEY_d || keyval == GDK_KEY_D)
+        st->d_key_pressed = true;
+    if (keyval == GDK_KEY_e || keyval == GDK_KEY_E)
+        st->e_key_pressed = true;
+    if (keyval == GDK_KEY_f || keyval == GDK_KEY_F)
+        st->f_key_pressed = true;
+    if (keyval == GDK_KEY_r || keyval == GDK_KEY_R)
+        st->r_key_pressed = true;
+    if (keyval == GDK_KEY_F5)
+        st->stability_test_pressed = true;
+    if (keyval == GDK_KEY_F6)
+        st->sleep_wake_test_pressed = true;
+    if (keyval == GDK_KEY_F7)
+        st->editor_torture_pressed = true;
+    if (keyval == GDK_KEY_F8)
+        st->spawn_stress_pressed = true;
+    if (keyval == GDK_KEY_F9)
+        st->validation_report_pressed = true;
+    if (keyval == GDK_KEY_F10)
+        st->long_run_validation_pressed = true;
+    if (keyval == GDK_KEY_F11)
+        st->config_torture_pressed = true;
+    if (keyval == GDK_KEY_i || keyval == GDK_KEY_I)
+        st->i_key_pressed = true;
+    if (keyval == GDK_KEY_j || keyval == GDK_KEY_J)
+        st->j_key_pressed = true;
+    if (keyval == GDK_KEY_k || keyval == GDK_KEY_K)
+        st->k_key_pressed = true;
+    if (keyval == GDK_KEY_l || keyval == GDK_KEY_L)
+        st->l_key_pressed = true;
     if ((keyval == GDK_KEY_9) && !config_menu_is_open ()) {
         st->spawner_menu_level = 0;
         st->velocity_menu_level = 0;
@@ -94,7 +113,8 @@ gboolean on_keypress (GtkEventControllerKey *w, guint keyval, guint keycode, Gdk
         st->is_menu_open = false;
         st->velocity_menu_level = 0;
         st->object_menu_level = 0;
-        if (st->spawner_menu_level > 0) st->spawner_menu_level = 0;
+        if (st->spawner_menu_level > 0)
+            st->spawner_menu_level = 0;
         else
             st->spawner_menu_level = 1;
     }
@@ -102,7 +122,8 @@ gboolean on_keypress (GtkEventControllerKey *w, guint keyval, guint keycode, Gdk
         st->is_menu_open = false;
         st->spawner_menu_level = 0;
         st->object_menu_level = 0;
-        if (st->velocity_menu_level > 0) st->velocity_menu_level = 0;
+        if (st->velocity_menu_level > 0)
+            st->velocity_menu_level = 0;
         else
             st->velocity_menu_level = 1;
     }
@@ -110,7 +131,8 @@ gboolean on_keypress (GtkEventControllerKey *w, guint keyval, guint keycode, Gdk
         st->spawner_menu_level = 0;
         st->velocity_menu_level = 0;
         st->object_menu_level = 0;
-        if (config_menu_is_open ()) config_menu_close ();
+        if (config_menu_is_open ())
+            config_menu_close ();
         else
             config_menu_level_force_open ();
     }
@@ -118,68 +140,114 @@ gboolean on_keypress (GtkEventControllerKey *w, guint keyval, guint keycode, Gdk
         st->spawner_menu_level == 0 && st->velocity_menu_level == 0 && st->object_menu_level == 0)
         st->debug_terminal_pressed = true;
     if (st->is_menu_open) {
-        if (keyval == GDK_KEY_1) st->menu_1_pressed = true;
-        if (keyval == GDK_KEY_2) st->menu_2_pressed = true;
-        if (keyval == GDK_KEY_3) st->menu_3_pressed = true;
-        if (keyval == GDK_KEY_4) st->menu_4_pressed = true;
-        if (keyval == GDK_KEY_5) st->menu_5_pressed = true;
-        if (keyval == GDK_KEY_6) st->menu_6_pressed = true;
+        if (keyval == GDK_KEY_1)
+            st->menu_1_pressed = true;
+        if (keyval == GDK_KEY_2)
+            st->menu_2_pressed = true;
+        if (keyval == GDK_KEY_3)
+            st->menu_3_pressed = true;
+        if (keyval == GDK_KEY_4)
+            st->menu_4_pressed = true;
+        if (keyval == GDK_KEY_5)
+            st->menu_5_pressed = true;
+        if (keyval == GDK_KEY_6)
+            st->menu_6_pressed = true;
     }
     if (config_menu_is_open ()) {
-        if (keyval == GDK_KEY_0) config_menu_key_press (0);
-        if (keyval == GDK_KEY_1) config_menu_key_press (1);
-        if (keyval == GDK_KEY_2) config_menu_key_press (2);
-        if (keyval == GDK_KEY_3) config_menu_key_press (3);
-        if (keyval == GDK_KEY_4) config_menu_key_press (4);
-        if (keyval == GDK_KEY_5) config_menu_key_press (5);
-        if (keyval == GDK_KEY_7) config_menu_key_press (7);
-        if (keyval == GDK_KEY_8) config_menu_key_press (8);
-        if (keyval == GDK_KEY_9) config_menu_key_press (9);
+        if (keyval == GDK_KEY_0)
+            config_menu_key_press (0);
+        if (keyval == GDK_KEY_1)
+            config_menu_key_press (1);
+        if (keyval == GDK_KEY_2)
+            config_menu_key_press (2);
+        if (keyval == GDK_KEY_3)
+            config_menu_key_press (3);
+        if (keyval == GDK_KEY_4)
+            config_menu_key_press (4);
+        if (keyval == GDK_KEY_5)
+            config_menu_key_press (5);
+        if (keyval == GDK_KEY_7)
+            config_menu_key_press (7);
+        if (keyval == GDK_KEY_8)
+            config_menu_key_press (8);
+        if (keyval == GDK_KEY_9)
+            config_menu_key_press (9);
     }
     if ((st->spawner_menu_level > 0) || (st->velocity_menu_level > 0) || (st->object_menu_level > 0)) {
-        if (keyval == GDK_KEY_Up) st->up_arrow_pressed = true;
-        if (keyval == GDK_KEY_Down) st->down_arrow_pressed = true;
-        if (keyval == GDK_KEY_Return || keyval == GDK_KEY_KP_Enter) st->enter_key_pressed = true;
+        if (keyval == GDK_KEY_Up)
+            st->up_arrow_pressed = true;
+        if (keyval == GDK_KEY_Down)
+            st->down_arrow_pressed = true;
+        if (keyval == GDK_KEY_Return || keyval == GDK_KEY_KP_Enter)
+            st->enter_key_pressed = true;
     }
     if (st->spawner_menu_level == 1) {
-        if (keyval == GDK_KEY_1) st->spawner_menu_level = 2;
-        if (keyval == GDK_KEY_2) st->spawner_menu_level = 5;
-        if (keyval == GDK_KEY_3) st->spawner_menu_level = 8;
-        if (keyval == GDK_KEY_4) st->spawner_menu_level = 9;
+        if (keyval == GDK_KEY_1)
+            st->spawner_menu_level = 2;
+        if (keyval == GDK_KEY_2)
+            st->spawner_menu_level = 5;
+        if (keyval == GDK_KEY_3)
+            st->spawner_menu_level = 8;
+        if (keyval == GDK_KEY_4)
+            st->spawner_menu_level = 9;
     } else if (st->spawner_menu_level == 2) {
-        if (keyval == GDK_KEY_1) st->spawner_menu_level = 3;
-        if (keyval == GDK_KEY_2) st->spawner_menu_level = 4;
+        if (keyval == GDK_KEY_1)
+            st->spawner_menu_level = 3;
+        if (keyval == GDK_KEY_2)
+            st->spawner_menu_level = 4;
     } else if (st->spawner_menu_level == 5) {
-        if (keyval == GDK_KEY_1) st->spawner_menu_level = 6;
-        if (keyval == GDK_KEY_2) st->spawner_menu_level = 7;
+        if (keyval == GDK_KEY_1)
+            st->spawner_menu_level = 6;
+        if (keyval == GDK_KEY_2)
+            st->spawner_menu_level = 7;
     } else if (st->spawner_menu_level == 9) {
-        if (keyval == GDK_KEY_1) st->spawner_menu_level = 10;
-        if (keyval == GDK_KEY_2) st->spawner_menu_level = 11;
-        if (keyval == GDK_KEY_3) st->spawner_menu_level = 12;
+        if (keyval == GDK_KEY_1)
+            st->spawner_menu_level = 10;
+        if (keyval == GDK_KEY_2)
+            st->spawner_menu_level = 11;
+        if (keyval == GDK_KEY_3)
+            st->spawner_menu_level = 12;
     }
     if (st->velocity_menu_level == 1) {
-        if (keyval == GDK_KEY_1) st->velocity_menu_level = 2;
-        if (keyval == GDK_KEY_2) st->velocity_menu_level = 10;
-        if (keyval == GDK_KEY_3) st->velocity_menu_level = 20;
+        if (keyval == GDK_KEY_1)
+            st->velocity_menu_level = 2;
+        if (keyval == GDK_KEY_2)
+            st->velocity_menu_level = 10;
+        if (keyval == GDK_KEY_3)
+            st->velocity_menu_level = 20;
     } else if (st->velocity_menu_level == 2) {
-        if (keyval == GDK_KEY_1) st->velocity_menu_level = 3;
-        if (keyval == GDK_KEY_2) st->velocity_menu_level = 4;
+        if (keyval == GDK_KEY_1)
+            st->velocity_menu_level = 3;
+        if (keyval == GDK_KEY_2)
+            st->velocity_menu_level = 4;
     } else if (st->velocity_menu_level == 20) {
-        if (keyval == GDK_KEY_1) st->velocity_menu_level = 21;
-        if (keyval == GDK_KEY_2) st->velocity_menu_level = 22;
-        if (keyval == GDK_KEY_3) st->velocity_menu_level = 23;
-        if (keyval == GDK_KEY_4) st->velocity_menu_level = 24;
-        if (keyval == GDK_KEY_5) st->velocity_menu_level = 25;
+        if (keyval == GDK_KEY_1)
+            st->velocity_menu_level = 21;
+        if (keyval == GDK_KEY_2)
+            st->velocity_menu_level = 22;
+        if (keyval == GDK_KEY_3)
+            st->velocity_menu_level = 23;
+        if (keyval == GDK_KEY_4)
+            st->velocity_menu_level = 24;
+        if (keyval == GDK_KEY_5)
+            st->velocity_menu_level = 25;
     } else if (st->velocity_menu_level == 10) {
-        if (keyval == GDK_KEY_1) st->velocity_menu_level = 11;
-        if (keyval == GDK_KEY_2) st->velocity_menu_level = 12;
+        if (keyval == GDK_KEY_1)
+            st->velocity_menu_level = 11;
+        if (keyval == GDK_KEY_2)
+            st->velocity_menu_level = 12;
     }
     if (st->object_menu_level == 1) {
-        if (keyval == GDK_KEY_1) st->object_menu_level = 2;
-        if (keyval == GDK_KEY_2) st->object_menu_level = 3;
-        if (keyval == GDK_KEY_3) st->object_menu_level = 4;
-        if (keyval == GDK_KEY_4) st->object_menu_level = 5;
-        if (keyval == GDK_KEY_5) st->object_menu_level = 6;
+        if (keyval == GDK_KEY_1)
+            st->object_menu_level = 2;
+        if (keyval == GDK_KEY_2)
+            st->object_menu_level = 3;
+        if (keyval == GDK_KEY_3)
+            st->object_menu_level = 4;
+        if (keyval == GDK_KEY_4)
+            st->object_menu_level = 5;
+        if (keyval == GDK_KEY_5)
+            st->object_menu_level = 6;
         if (keyval == GDK_KEY_6) {
             if (st->marked_joint_object_index != -1 && st->marked_joint_object_index != selected_object)
                 st->object_menu_level = 7;
@@ -191,21 +259,32 @@ gboolean on_keypress (GtkEventControllerKey *w, guint keyval, guint keycode, Gdk
                 st->object_menu_level = 8;
         }
     } else if (st->object_menu_level == 8) {
-        if (keyval == GDK_KEY_1) st->object_menu_level = 81;
-        if (keyval == GDK_KEY_2) st->object_menu_level = 82;
-        if (keyval == GDK_KEY_3) st->object_menu_level = 83;
-        if (keyval == GDK_KEY_4) st->object_menu_level = 84;
-        if (keyval == GDK_KEY_5) st->object_menu_level = 85;
-        if (keyval == GDK_KEY_6) st->object_menu_level = 86;
-        if (keyval == GDK_KEY_7 && !config_menu_is_open ()) st->object_menu_level = 87;
-        if (keyval == GDK_KEY_8 && !config_menu_is_open ()) st->object_menu_level = 88;
+        if (keyval == GDK_KEY_1)
+            st->object_menu_level = 81;
+        if (keyval == GDK_KEY_2)
+            st->object_menu_level = 82;
+        if (keyval == GDK_KEY_3)
+            st->object_menu_level = 83;
+        if (keyval == GDK_KEY_4)
+            st->object_menu_level = 84;
+        if (keyval == GDK_KEY_5)
+            st->object_menu_level = 85;
+        if (keyval == GDK_KEY_6)
+            st->object_menu_level = 86;
+        if (keyval == GDK_KEY_7 && !config_menu_is_open ())
+            st->object_menu_level = 87;
+        if (keyval == GDK_KEY_8 && !config_menu_is_open ())
+            st->object_menu_level = 88;
     }
     if (((keyval == GDK_KEY_Return || keyval == GDK_KEY_KP_Enter) && !st->is_menu_open && st->spawner_menu_level == 0 &&
          st->velocity_menu_level == 0 && st->object_menu_level == 0))
         st->enter_spawn_held = true;
-    if (keyval == GDK_KEY_space || keyval == GDK_KEY_KP_Space) st->space_key_pressed = true;
-    if (keyval == GDK_KEY_Shift_L || keyval == GDK_KEY_Shift_R) st->shift_key_pressed = true;
-    if (keyval == GDK_KEY_Escape) st->escape_key_pressed = true;
+    if (keyval == GDK_KEY_space || keyval == GDK_KEY_KP_Space)
+        st->space_key_pressed = true;
+    if (keyval == GDK_KEY_Shift_L || keyval == GDK_KEY_Shift_R)
+        st->shift_key_pressed = true;
+    if (keyval == GDK_KEY_Escape)
+        st->escape_key_pressed = true;
     if ((keyval == GDK_KEY_0 || keyval == GDK_KEY_KP_0) && !config_menu_is_open ())
         st->is_debug_mode_active = !st->is_debug_mode_active;
     return FALSE;
@@ -216,24 +295,37 @@ gboolean on_key_released (GtkEventControllerKey *w, guint keyval, guint keycode,
     (void) keycode;
     (void) state;
     input_status *st = (input_status *) user_data_stored;
-    if (keyval == GDK_KEY_w || keyval == GDK_KEY_W) st->w_key_pressed = false;
-    if (keyval == GDK_KEY_a || keyval == GDK_KEY_A) st->a_key_pressed = false;
-    if (keyval == GDK_KEY_s || keyval == GDK_KEY_S) st->s_key_pressed = false;
-    if (keyval == GDK_KEY_d || keyval == GDK_KEY_D) st->d_key_pressed = false;
-    if (keyval == GDK_KEY_r || keyval == GDK_KEY_R) st->r_key_pressed = false;
-    if (keyval == GDK_KEY_i || keyval == GDK_KEY_I) st->i_key_pressed = false;
-    if (keyval == GDK_KEY_j || keyval == GDK_KEY_J) st->j_key_pressed = false;
-    if (keyval == GDK_KEY_k || keyval == GDK_KEY_K) st->k_key_pressed = false;
-    if (keyval == GDK_KEY_l || keyval == GDK_KEY_L) st->l_key_pressed = false;
-    if (keyval == GDK_KEY_space || keyval == GDK_KEY_KP_Space) st->space_key_pressed = false;
-    if (keyval == GDK_KEY_Shift_L || keyval == GDK_KEY_Shift_R) st->shift_key_pressed = false;
-    if (keyval == GDK_KEY_Return || keyval == GDK_KEY_KP_Enter) st->enter_spawn_held = false;
+    if (keyval == GDK_KEY_w || keyval == GDK_KEY_W)
+        st->w_key_pressed = false;
+    if (keyval == GDK_KEY_a || keyval == GDK_KEY_A)
+        st->a_key_pressed = false;
+    if (keyval == GDK_KEY_s || keyval == GDK_KEY_S)
+        st->s_key_pressed = false;
+    if (keyval == GDK_KEY_d || keyval == GDK_KEY_D)
+        st->d_key_pressed = false;
+    if (keyval == GDK_KEY_r || keyval == GDK_KEY_R)
+        st->r_key_pressed = false;
+    if (keyval == GDK_KEY_i || keyval == GDK_KEY_I)
+        st->i_key_pressed = false;
+    if (keyval == GDK_KEY_j || keyval == GDK_KEY_J)
+        st->j_key_pressed = false;
+    if (keyval == GDK_KEY_k || keyval == GDK_KEY_K)
+        st->k_key_pressed = false;
+    if (keyval == GDK_KEY_l || keyval == GDK_KEY_L)
+        st->l_key_pressed = false;
+    if (keyval == GDK_KEY_space || keyval == GDK_KEY_KP_Space)
+        st->space_key_pressed = false;
+    if (keyval == GDK_KEY_Shift_L || keyval == GDK_KEY_Shift_R)
+        st->shift_key_pressed = false;
+    if (keyval == GDK_KEY_Return || keyval == GDK_KEY_KP_Enter)
+        st->enter_spawn_held = false;
     return FALSE;
 }
 gboolean on_mouse_movements (GtkEventControllerMotion *ctrl, double x, double y, gpointer ud) {
     (void) ctrl;
     input_status *st = (input_status *) ud;
-    if (!st) st = &main_inputs;
+    if (!st)
+        st = &main_inputs;
     static double last_x = -1, last_y = -1;
     if (!st->is_mouse_locked) {
         last_x = -1;
@@ -303,10 +395,14 @@ gboolean on_mouse_movements (GtkEventControllerMotion *ctrl, double x, double y,
     }
     double dx = x - last_x;
     double dy = y - last_y;
-    if (dx > ww / 2) dx = ww / 2;
-    if (dx < -ww / 2) dx = -ww / 2;
-    if (dy > wh / 2) dy = wh / 2;
-    if (dy < -wh / 2) dy = -wh / 2;
+    if (dx > ww / 2)
+        dx = ww / 2;
+    if (dx < -ww / 2)
+        dx = -ww / 2;
+    if (dy > wh / 2)
+        dy = wh / 2;
+    if (dy < -wh / 2)
+        dy = -wh / 2;
     if (dx != 0 || dy != 0) {
         /* Accumulate, for the same reason as the relative path above: the
          * camera consumes the delta once per frame, and GTK may deliver
@@ -331,14 +427,19 @@ gboolean on_button_press (GtkGestureClick *gest, int n_press, double x, double y
     (void) y;
     (void) n_press;
     input_status *st = (input_status *) user_data_stored;
-    if (!st) st = &main_inputs;
-    if (!gest || !GTK_IS_GESTURE_SINGLE (gest)) return FALSE;
+    if (!st)
+        st = &main_inputs;
+    if (!gest || !GTK_IS_GESTURE_SINGLE (gest))
+        return FALSE;
     guint btn = gtk_gesture_single_get_current_button (GTK_GESTURE_SINGLE (gest));
-    if (btn == 2) st->middle_mouse_button_clicked = true;
-    if (btn == 3) st->right_mouse_button_clicked = true;
+    if (btn == 2)
+        st->middle_mouse_button_clicked = true;
+    if (btn == 3)
+        st->right_mouse_button_clicked = true;
     if (!st->is_mouse_locked) {
         GtkWidget *target = NULL;
-        if (g_gl_area && GTK_IS_WIDGET (g_gl_area)) target = g_gl_area;
+        if (g_gl_area && GTK_IS_WIDGET (g_gl_area))
+            target = g_gl_area;
         else if (GTK_IS_EVENT_CONTROLLER (gest))
             target = gtk_event_controller_get_widget (GTK_EVENT_CONTROLLER (gest));
         if (!target || !GTK_IS_WIDGET (target)) {
@@ -358,7 +459,8 @@ gboolean on_button_press (GtkGestureClick *gest, int n_press, double x, double y
 }
 gboolean on_button_release (GtkGestureClick *gest, int n_press, double x, double y, gpointer user_data_stored) {
     input_status *st = (input_status *) user_data_stored;
-    if (!st) st = &main_inputs;
+    if (!st)
+        st = &main_inputs;
     (void) n_press;
     (void) x;
     (void) y;
@@ -371,14 +473,17 @@ gboolean on_button_release (GtkGestureClick *gest, int n_press, double x, double
     /* During "released" current_button is often 0 (no button held).
      * Clear the matching flag, or both on 0 so single-clicks can't
      * leave a stuck right/middle flag that raycasts/deletes forever. */
-    if (btn == 2 || btn == 0) st->middle_mouse_button_clicked = false;
-    if (btn == 3 || btn == 0) st->right_mouse_button_clicked = false;
+    if (btn == 2 || btn == 0)
+        st->middle_mouse_button_clicked = false;
+    if (btn == 3 || btn == 0)
+        st->right_mouse_button_clicked = false;
     return FALSE;
 }
 gboolean on_focus_out (GtkEventControllerFocus *ctrl, gpointer user_data_stored) {
     (void) ctrl;
     input_status *st = (input_status *) user_data_stored;
-    if (!st) st = &main_inputs;
+    if (!st)
+        st = &main_inputs;
     st->w_key_pressed = false;
     st->a_key_pressed = false;
     st->s_key_pressed = false;

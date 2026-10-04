@@ -38,7 +38,8 @@ int main (void) {
             }
         }
     }
-    if (fail) return 1;
+    if (fail)
+        return 1;
 
     /* Sphere started at z=0.5 moving toward cylinder at z=0.
      * After 2 seconds it should have been deflected or stopped.

@@ -33,11 +33,14 @@ static int mpe_has_plugin_ext (const char *base) {
     size_t n = strlen (base);
 #ifdef MPE_OS_WINDOWS
     /* accept .so (MSYS2) and .dll (native) case-insensitively */
-    if (n >= 4 && _stricmp (base + n - 4, ".dll") == 0) return 1;
-    if (n >= 3 && _stricmp (base + n - 3, ".so") == 0) return 1;
+    if (n >= 4 && _stricmp (base + n - 4, ".dll") == 0)
+        return 1;
+    if (n >= 3 && _stricmp (base + n - 3, ".so") == 0)
+        return 1;
     return 0;
 #else
-    if (n < 3) return 0;
+    if (n < 3)
+        return 0;
     return strcmp (base + n - 3, ".so") == 0;
 #endif
 }
@@ -47,15 +50,18 @@ static int mpe_has_plugin_ext (const char *base) {
  * Changed files now fail with -3 instead of silently lying). */
 static int file_identity (const char *path, long long *mt, long long *sz) {
     struct stat st;
-    if (stat (path, &st) != 0) return -1;
+    if (stat (path, &st) != 0)
+        return -1;
         /* Nanosecond mtime: second granularity misses same-second rebuilds. */
 #if defined(__APPLE__)
     long long nsec = (long long) st.st_mtimespec.tv_nsec;
 #else
     long long nsec = (long long) st.st_mtim.tv_nsec;
 #endif
-    if (mt) *mt = (long long) st.st_mtime * 1000000000LL + nsec;
-    if (sz) *sz = (long long) st.st_size;
+    if (mt)
+        *mt = (long long) st.st_mtime * 1000000000LL + nsec;
+    if (sz)
+        *sz = (long long) st.st_size;
     return 0;
 }
 
@@ -94,7 +100,8 @@ static int plugin_path_is_confined (const char *path, char resolved[PATH_MAX]) {
     /* Normalise backslashes to slashes for prefix matching. */
     char norm[PATH_MAX * 2];
     size_t pi = 0;
-    if (!path) return 0;
+    if (!path)
+        return 0;
     for (size_t i = 0; path[i] && pi + 1 < sizeof (norm); i++) {
         norm[pi++] = (path[i] == '\\') ? '/' : path[i];
     }
@@ -131,14 +138,16 @@ static int plugin_path_is_confined (const char *path, char resolved[PATH_MAX]) {
         strstr (base, "..") || !mpe_has_plugin_ext (base))
         return 0;
     char root[PATH_MAX];
-    if (!realpath (dir, root) || !realpath (path, resolved)) return 0;
+    if (!realpath (dir, root) || !realpath (path, resolved))
+        return 0;
     size_t root_len = strlen (root);
     return strncmp (resolved, root, root_len) == 0 && resolved[root_len] == '/';
 }
 
 int mpe_loader_load (const char *path, char *errbuf, int errlen) {
     if (!path || !*path) {
-        if (errbuf && errlen > 0) snprintf (errbuf, (size_t) errlen, "empty path");
+        if (errbuf && errlen > 0)
+            snprintf (errbuf, (size_t) errlen, "empty path");
         return -1;
     }
     char resolved[PATH_MAX];
@@ -172,7 +181,8 @@ int mpe_loader_load (const char *path, char *errbuf, int errlen) {
      * origin-scoped unregister never matched and the module slot survived
      * the dlclose still live. Bound the load by what the registry can store. */
     if (strlen (resolved) >= MPE_MODULE_ORIGIN_MAX - 1) {
-        if (errbuf && errlen > 0) snprintf (errbuf, (size_t) errlen, "path too long");
+        if (errbuf && errlen > 0)
+            snprintf (errbuf, (size_t) errlen, "path too long");
         return -1;
     }
     /* Table pre-check under lock; the lock is dropped across dlopen below
@@ -205,7 +215,8 @@ int mpe_loader_load (const char *path, char *errbuf, int errlen) {
             return 0;
         } /* already loaded */
     if (s_n >= MPE_MAX_HANDLES) {
-        if (errbuf && errlen > 0) snprintf (errbuf, (size_t) errlen, "handle table full");
+        if (errbuf && errlen > 0)
+            snprintf (errbuf, (size_t) errlen, "handle table full");
         loader_unlock ();
         return -1;
     }
@@ -234,7 +245,8 @@ int mpe_loader_load (const char *path, char *errbuf, int errlen) {
     dlerror ();
     void *h = dlopen (resolved, RTLD_NOW | RTLD_LOCAL);
     if (!h) {
-        if (errbuf && errlen > 0) snprintf (errbuf, (size_t) errlen, "%s", dlerror ());
+        if (errbuf && errlen > 0)
+            snprintf (errbuf, (size_t) errlen, "%s", dlerror ());
         return -1;
     }
     /* MSVC has no constructor/destructor: call explicit init if exported.
@@ -242,7 +254,8 @@ int mpe_loader_load (const char *path, char *errbuf, int errlen) {
     {
         dlerror ();
         void (*p_init) (void) = (void (*) (void)) dlsym (h, "mpe_capsule_init");
-        if (dlerror () == NULL && p_init) p_init ();
+        if (dlerror () == NULL && p_init)
+            p_init ();
     }
     loader_lock ();
     /* Re-validate under lock: a concurrent load may have won the race. */
@@ -259,7 +272,8 @@ int mpe_loader_load (const char *path, char *errbuf, int errlen) {
     }
     if (s_n >= MPE_MAX_HANDLES) {
         loader_unlock ();
-        if (errbuf && errlen > 0) snprintf (errbuf, (size_t) errlen, "handle table full");
+        if (errbuf && errlen > 0)
+            snprintf (errbuf, (size_t) errlen, "handle table full");
         dlclose (h);
         mpe_registry_truncate_pairs (snap_pairs);
         mpe_registry_truncate_modules (snap_modules);
@@ -276,7 +290,8 @@ int mpe_loader_load (const char *path, char *errbuf, int errlen) {
     const char *sym_err = dlerror ();
     if (!sym_err && eco_first) {
         if (eco_first->abi != MPE_ECOSYSTEM_ABI || !eco_first->name) {
-            if (errbuf && errlen > 0) snprintf (errbuf, (size_t) errlen, "ecosystem ABI/name mismatch");
+            if (errbuf && errlen > 0)
+                snprintf (errbuf, (size_t) errlen, "ecosystem ABI/name mismatch");
             loader_unlock ();
             dlclose (h);
             mpe_registry_truncate_pairs (snap_pairs);
@@ -286,7 +301,8 @@ int mpe_loader_load (const char *path, char *errbuf, int errlen) {
             return -1;
         }
         if (mpe_ecosystem_register (eco_first) < 0) {
-            if (errbuf && errlen > 0) snprintf (errbuf, (size_t) errlen, "ecosystem registry full/dup");
+            if (errbuf && errlen > 0)
+                snprintf (errbuf, (size_t) errlen, "ecosystem registry full/dup");
             loader_unlock ();
             dlclose (h);
             mpe_registry_truncate_pairs (snap_pairs);
@@ -311,7 +327,8 @@ int mpe_loader_load (const char *path, char *errbuf, int errlen) {
     sym_err = dlerror ();
     if (!sym_err && desc) {
         if (desc->abi != MPE_MODULE_ABI || !desc->name) {
-            if (errbuf && errlen > 0) snprintf (errbuf, (size_t) errlen, "ABI/name mismatch");
+            if (errbuf && errlen > 0)
+                snprintf (errbuf, (size_t) errlen, "ABI/name mismatch");
             loader_unlock ();
             dlclose (h);
             mpe_registry_truncate_pairs (snap_pairs);
@@ -321,7 +338,8 @@ int mpe_loader_load (const char *path, char *errbuf, int errlen) {
             return -1;
         }
         if (mpe_register_module (desc) < 0) {
-            if (errbuf && errlen > 0) snprintf (errbuf, (size_t) errlen, "registry full/dup");
+            if (errbuf && errlen > 0)
+                snprintf (errbuf, (size_t) errlen, "registry full/dup");
             loader_unlock ();
             dlclose (h);
             mpe_registry_truncate_pairs (snap_pairs);
@@ -360,25 +378,31 @@ int mpe_loader_load (const char *path, char *errbuf, int errlen) {
  * same filename compare equal, so unload/detach/handle_for_desc could tear
  * down the wrong handle and dlclose a still-referenced image. Exact paths. */
 static int same_path (const char *a, const char *b) {
-    if (!a || !b) return 0;
+    if (!a || !b)
+        return 0;
 #ifdef MPE_OS_WINDOWS
-    if (_stricmp (a, b) == 0) return 1;
+    if (_stricmp (a, b) == 0)
+        return 1;
 #else
-    if (strcmp (a, b) == 0) return 1;
+    if (strcmp (a, b) == 0)
+        return 1;
 #endif
     char ca[PATH_MAX], cb[PATH_MAX];
 #ifdef MPE_OS_WINDOWS
-    if (realpath (a, ca) && realpath (b, cb) && _stricmp (ca, cb) == 0) return 1;
+    if (realpath (a, ca) && realpath (b, cb) && _stricmp (ca, cb) == 0)
+        return 1;
     return 0;
 #else
-    if (realpath (a, ca) && realpath (b, cb) && strcmp (ca, cb) == 0) return 1;
+    if (realpath (a, ca) && realpath (b, cb) && strcmp (ca, cb) == 0)
+        return 1;
     return 0;
 #endif
 }
 
 static int handle_by_path_locked (const char *path) {
     for (int i = 0; i < s_n; i++) {
-        if (same_path (s_h[i].path, path)) return i;
+        if (same_path (s_h[i].path, path))
+            return i;
     }
     return -1;
 }
@@ -390,7 +414,8 @@ static int handle_by_path_locked (const char *path) {
  * for registry copies handed out by find), else the desc's own image.
  * -1 = static/host code that never unloads. */
 static int handle_for_desc_locked (const mpe_module_desc_t *d) {
-    if (!d) return -1;
+    if (!d)
+        return -1;
     const char *origin = mpe_registry_module_origin (d);
     if (origin) {
         char obuf[MPE_MODULE_ORIGIN_MAX];
@@ -412,12 +437,15 @@ static int handle_for_desc_locked (const mpe_module_desc_t *d) {
  * garbage can never redirect control. `owner_path` is the handle path;
  * NULL falls back to the desc's own image. */
 static void call_stage_detach_validated (const mpe_module_desc_t *desc, const char *owner_path, physics_world *w) {
-    if (!desc || !w) return;
+    if (!desc || !w)
+        return;
     void (*hook) (physics_world *) = NULL;
     memcpy (&hook, &desc->stage_detach, sizeof (hook));
-    if (!hook) return; /* old .so, or module with no foreign stage state */
+    if (!hook)
+        return; /* old .so, or module with no foreign stage state */
     Dl_info hi;
-    if (dladdr ((const void *) hook, &hi) == 0 || !hi.dli_fname) return;
+    if (dladdr ((const void *) hook, &hi) == 0 || !hi.dli_fname)
+        return;
     const char *dpath = owner_path;
     Dl_info di;
     char dbuf[PATH_MAX];
@@ -429,22 +457,27 @@ static void call_stage_detach_validated (const mpe_module_desc_t *desc, const ch
             return;
         }
     }
-    if (!same_path (hi.dli_fname, dpath)) return; /* foreign/garbage: refuse */
+    if (!same_path (hi.dli_fname, dpath))
+        return; /* foreign/garbage: refuse */
     hook (w);
 }
 
 /* Code-address variant (locked): stage slots keep the iface, not the desc. */
 static void call_stage_detach_for_fn_locked (const void *fn, physics_world *w) {
-    if (!fn || !w) return;
+    if (!fn || !w)
+        return;
     Dl_info info;
-    if (dladdr (fn, &info) == 0 || !info.dli_fname) return;
+    if (dladdr (fn, &info) == 0 || !info.dli_fname)
+        return;
     int hi = handle_by_path_locked (info.dli_fname);
-    if (hi < 0 || s_h[hi].is_ecosystem || !s_h[hi].desc) return;
+    if (hi < 0 || s_h[hi].is_ecosystem || !s_h[hi].desc)
+        return;
     call_stage_detach_validated (s_h[hi].desc, s_h[hi].path, w);
 }
 
 void mpe_loader_call_stage_detach (const void *desc, struct physics_world *world) {
-    if (!desc || !world) return;
+    if (!desc || !world)
+        return;
     /* Invoked under lock: teardown paths guarantee the .so is still mapped
      * exactly while the loader table is stable; dropping the lock before
      * the call would admit a racing dlclose under the hook. The lock is
@@ -458,7 +491,8 @@ void mpe_loader_call_stage_detach (const void *desc, struct physics_world *world
 }
 
 void mpe_loader_call_stage_detach_for_fn (const void *fn, struct physics_world *world) {
-    if (!fn || !world) return;
+    if (!fn || !world)
+        return;
     loader_lock ();
     call_stage_detach_for_fn_locked (fn, world);
     loader_unlock ();
@@ -470,24 +504,31 @@ void mpe_loader_call_stage_detach_for_fn (const void *fn, struct physics_world *
  * possible, else fall back to basename comparison. */
 static int fn_in_plugin (mpe_collide_fn fn, const char *resolved) {
     Dl_info info;
-    if (!fn || !resolved || dladdr ((const void *) fn, &info) == 0 || !info.dli_fname) return 0;
+    if (!fn || !resolved || dladdr ((const void *) fn, &info) == 0 || !info.dli_fname)
+        return 0;
 #ifdef MPE_OS_WINDOWS
-    if (_stricmp (info.dli_fname, resolved) == 0) return 1;
+    if (_stricmp (info.dli_fname, resolved) == 0)
+        return 1;
     char canon[PATH_MAX];
-    if (realpath (info.dli_fname, canon) && _stricmp (canon, resolved) == 0) return 1;
+    if (realpath (info.dli_fname, canon) && _stricmp (canon, resolved) == 0)
+        return 1;
     const char *a = strrchr (info.dli_fname, '/');
     const char *asa = strrchr (info.dli_fname, '\\');
     const char *b = strrchr (resolved, '/');
     const char *bsb = strrchr (resolved, '\\');
-    if (asa && (!a || asa > a)) a = asa;
-    if (bsb && (!b || bsb > b)) b = bsb;
+    if (asa && (!a || asa > a))
+        a = asa;
+    if (bsb && (!b || bsb > b))
+        b = bsb;
     a = a ? a + 1 : info.dli_fname;
     b = b ? b + 1 : resolved;
     return _stricmp (a, b) == 0;
 #else
-    if (strcmp (info.dli_fname, resolved) == 0) return 1;
+    if (strcmp (info.dli_fname, resolved) == 0)
+        return 1;
     char canon[PATH_MAX];
-    if (realpath (info.dli_fname, canon) && strcmp (canon, resolved) == 0) return 1;
+    if (realpath (info.dli_fname, canon) && strcmp (canon, resolved) == 0)
+        return 1;
     const char *a = strrchr (info.dli_fname, '/');
     const char *b = strrchr (resolved, '/');
     a = a ? a + 1 : info.dli_fname;
@@ -523,11 +564,13 @@ static int desc_busy_in_world (physics_world *w, int hi) {
 }
 
 static int handle_busy (int hi) {
-    if (s_h[hi].attachments > 0) return 1; /* locked caller (unload) */
+    if (s_h[hi].attachments > 0)
+        return 1; /* locked caller (unload) */
     physics_world *ws[MPE_MAX_LIVE_WORLDS];
     int n = physics_world_live_list (ws, MPE_MAX_LIVE_WORLDS);
     for (int i = 0; i < n; i++) {
-        if (desc_busy_in_world (ws[i], hi)) return 1;
+        if (desc_busy_in_world (ws[i], hi))
+            return 1;
     }
     return 0;
 }
@@ -557,7 +600,8 @@ static void detach_handle_modules (int hi) {
          * NULLing the pointers — otherwise the state leaks. */
         if (w->broadphase_if && w->broadphase_if->generate &&
             fn_in_plugin ((mpe_collide_fn) (void *) w->broadphase_if->generate, s_h[hi].path)) {
-            if (owner) call_stage_detach_validated (owner, s_h[hi].path, w);
+            if (owner)
+                call_stage_detach_validated (owner, s_h[hi].path, w);
             w->broadphase_if = NULL;
             w->broadphase_state = NULL;
         }
@@ -566,7 +610,8 @@ static void detach_handle_modules (int hi) {
                                     (const void *) w->solver_if->rolling, (const void *) w->solver_if->split};
             for (int k = 0; k < 4; k++) {
                 if (hooks[k] && fn_in_plugin ((mpe_collide_fn) hooks[k], s_h[hi].path)) {
-                    if (owner) call_stage_detach_validated (owner, s_h[hi].path, w);
+                    if (owner)
+                        call_stage_detach_validated (owner, s_h[hi].path, w);
                     w->solver_if = NULL;
                     w->solver_state = NULL;
                     break;
@@ -586,7 +631,8 @@ static void purge_plugin_pairs (int hi) {
         mpe_collide_fn fns[MPE_MAX_PAIR_HANDLERS];
         int nfns = 0;
         for (int i = 0; i < MPE_MAX_PAIR_HANDLERS && nfns < MPE_MAX_PAIR_HANDLERS; i++) {
-            if (mpe_registry_pair_fn_at (i, &fns[nfns]) == 0) nfns++;
+            if (mpe_registry_pair_fn_at (i, &fns[nfns]) == 0)
+                nfns++;
         }
         for (int i = 0; i < nfns; i++) {
             if (fn_in_plugin (fns[i], s_h[hi].path)) {
@@ -594,12 +640,14 @@ static void purge_plugin_pairs (int hi) {
                 done = 0;
             }
         }
-        if (done) break;
+        if (done)
+            break;
     }
 }
 
 int mpe_loader_unload (const char *path_or_name) {
-    if (!path_or_name) return -1;
+    if (!path_or_name)
+        return -1;
     char resolved[PATH_MAX];
     const char *identity = path_or_name;
 #ifdef MPE_OS_WINDOWS
@@ -607,7 +655,8 @@ int mpe_loader_unload (const char *path_or_name) {
 #else
     if (strchr (path_or_name, '/')) {
 #endif
-        if (!plugin_path_is_confined (path_or_name, resolved)) return -1;
+        if (!plugin_path_is_confined (path_or_name, resolved))
+            return -1;
         identity = resolved;
     }
     loader_lock ();
@@ -669,7 +718,8 @@ int mpe_loader_unload (const char *path_or_name) {
                 purge_plugin_pairs (i);
                 dlerror ();
                 void (*p_fini) (void) = (void (*) (void)) dlsym (s_h[i].h, "mpe_capsule_fini");
-                if (dlerror () == NULL && p_fini) p_fini ();
+                if (dlerror () == NULL && p_fini)
+                    p_fini ();
                 dlclose (s_h[i].h);
                 for (int j = i; j + 1 < s_n; j++)
                     s_h[j] = s_h[j + 1];
@@ -700,7 +750,8 @@ int mpe_loader_unload (const char *path_or_name) {
             dlerror ();
             {
                 void (*p_fini) (void) = (void (*) (void)) dlsym (s_h[i].h, "mpe_capsule_fini");
-                if (dlerror () == NULL && p_fini) p_fini ();
+                if (dlerror () == NULL && p_fini)
+                    p_fini ();
             }
             dlclose (s_h[i].h);
             for (int j = i; j + 1 < s_n; j++)
@@ -767,7 +818,8 @@ const char *mpe_loader_name_at (int i) {
  * commands (ftc/eco) that drive plugin APIs the engine never links.
  * Returns NULL when unknown (caller reports, never crashes). */
 void *mpe_loader_symbol (const char *path_or_name, const char *sym) {
-    if (!path_or_name || !sym || !*sym) return NULL;
+    if (!path_or_name || !sym || !*sym)
+        return NULL;
     char resolved[PATH_MAX];
     const char *identity = path_or_name;
 #ifdef MPE_OS_WINDOWS
@@ -776,7 +828,8 @@ void *mpe_loader_symbol (const char *path_or_name, const char *sym) {
     int by_path = (strchr (path_or_name, '/') != NULL);
 #endif
     if (by_path) {
-        if (!plugin_path_is_confined (path_or_name, resolved)) return NULL;
+        if (!plugin_path_is_confined (path_or_name, resolved))
+            return NULL;
         identity = resolved;
     }
     loader_lock ();
@@ -784,7 +837,8 @@ void *mpe_loader_symbol (const char *path_or_name, const char *sym) {
     for (int i = 0; i < s_n; i++) {
         const char *n = s_h[i].is_ecosystem ? ((s_h[i].eco && s_h[i].eco->name) ? s_h[i].eco->name : "")
                                             : ((s_h[i].desc && s_h[i].desc->name) ? s_h[i].desc->name : "");
-        if (strcmp (s_h[i].path, identity) != 0 && strcmp (n, identity) != 0) continue;
+        if (strcmp (s_h[i].path, identity) != 0 && strcmp (n, identity) != 0)
+            continue;
         /* Resolve against the stored open handle (never loads). dlsym
          * takes no loader/registry lock; the table is stable under ours. */
         dlerror ();
@@ -809,17 +863,21 @@ void *mpe_loader_symbol (const char *path_or_name, const char *sym) {
  * to an atomic fetch_add for this table's purposes: every increment and
  * the busy-check in unload are mutually exclusive). */
 void mpe_loader_retain_module (const void *desc) {
-    if (!desc) return;
+    if (!desc)
+        return;
     loader_lock ();
     int hi = handle_for_desc_locked ((const mpe_module_desc_t *) desc);
-    if (hi >= 0) s_h[hi].attachments++;
+    if (hi >= 0)
+        s_h[hi].attachments++;
     loader_unlock ();
 }
 
 void mpe_loader_release_module (const void *desc) {
-    if (!desc) return;
+    if (!desc)
+        return;
     loader_lock ();
     int hi = handle_for_desc_locked ((const mpe_module_desc_t *) desc);
-    if (hi >= 0 && s_h[hi].attachments > 0) s_h[hi].attachments--;
+    if (hi >= 0 && s_h[hi].attachments > 0)
+        s_h[hi].attachments--;
     loader_unlock ();
 }

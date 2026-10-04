@@ -480,8 +480,10 @@ bool collision_cylinder_cube (rigidbody *cyl, rigidbody *cube, collision_data *o
                 float far_y = cube->position.y - up_sign * box_extents[up_index];
                 /* Vertical half-extent of the cylinder about its own centre. */
                 float axis_y = axis.y;
-                if (axis_y > 1.0f) axis_y = 1.0f;
-                if (axis_y < -1.0f) axis_y = -1.0f;
+                if (axis_y > 1.0f)
+                    axis_y = 1.0f;
+                if (axis_y < -1.0f)
+                    axis_y = -1.0f;
                 float v_support = h * fabsf (axis_y) + r * sqrtf (fmaxf (0.0f, 1.0f - axis_y * axis_y));
                 float cyl_low = cyl->position.y - v_support;
                 float cyl_high = cyl->position.y + v_support;
@@ -946,21 +948,27 @@ bool collision_cylinder_cylinder (rigidbody *cyl_a, rigidbody *cyl_b, collision_
     } else if (a <= 0.000001f) {
         s = 0.0f;
         t = f / e;
-        if (t < 0.0f) t = 0.0f;
-        if (t > 1.0f) t = 1.0f;
+        if (t < 0.0f)
+            t = 0.0f;
+        if (t > 1.0f)
+            t = 1.0f;
     } else {
         float c = vector3_dot (d1, r);
         if (e <= 0.000001f) {
             t = 0.0f;
             s = -c / a;
-            if (s < 0.0f) s = 0.0f;
-            if (s > 1.0f) s = 1.0f;
+            if (s < 0.0f)
+                s = 0.0f;
+            if (s > 1.0f)
+                s = 1.0f;
         } else {
             float b = vector3_dot (d1, d2);
             float denom = a * e - b * b;
             s = (denom > 0.000001f) ? (b * f - c * e) / denom : 0.0f;
-            if (s < 0.0f) s = 0.0f;
-            if (s > 1.0f) s = 1.0f;
+            if (s < 0.0f)
+                s = 0.0f;
+            if (s > 1.0f)
+                s = 1.0f;
             t = (b * s + f) / e;
             if (t < 0.0f) {
                 t = 0.0f;
@@ -970,8 +978,10 @@ bool collision_cylinder_cylinder (rigidbody *cyl_a, rigidbody *cyl_b, collision_
                 t = 1.0f;
                 s = (b - c) / a;
             }
-            if (s < 0.0f) s = 0.0f;
-            if (s > 1.0f) s = 1.0f;
+            if (s < 0.0f)
+                s = 0.0f;
+            if (s > 1.0f)
+                s = 1.0f;
         }
     }
 
