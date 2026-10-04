@@ -24,12 +24,12 @@ void init_sm_system (mesh *mesh_object, int horizontal_sections, int vertical_st
             float position_x = cosf (phi_angle) * cosf (theta_angle);
             float position_y = sinf (phi_angle);
             float position_z = cosf (phi_angle) * sinf (theta_angle);
-            vertex_data[vertex_index++] = position_x;
-            vertex_data[vertex_index++] = position_y;
-            vertex_data[vertex_index++] = position_z;
-            vertex_data[vertex_index++] = position_x;
-            vertex_data[vertex_index++] = position_y;
-            vertex_data[vertex_index++] = position_z;
+            vertex_data [vertex_index++] = position_x;
+            vertex_data [vertex_index++] = position_y;
+            vertex_data [vertex_index++] = position_z;
+            vertex_data [vertex_index++] = position_x;
+            vertex_data [vertex_index++] = position_y;
+            vertex_data [vertex_index++] = position_z;
         }
     }
     int wireframe_indices_size = (horizontal_sections + 2 * vertical_stacks + 2 * vertical_stacks) * 2;
@@ -41,24 +41,24 @@ void init_sm_system (mesh *mesh_object, int horizontal_sections, int vertical_st
     int wireframe_index = 0;
     int middle_stack_index = vertical_stacks / 2;
     for (int section_index = 0; section_index < horizontal_sections; section_index++) {
-        wireframe_indices[wireframe_index++] = middle_stack_index * (horizontal_sections + 1) + section_index;
-        wireframe_indices[wireframe_index++] = middle_stack_index * (horizontal_sections + 1) + section_index + 1;
+        wireframe_indices [wireframe_index++] = middle_stack_index * (horizontal_sections + 1) + section_index;
+        wireframe_indices [wireframe_index++] = middle_stack_index * (horizontal_sections + 1) + section_index + 1;
     }
     int theta_0_index = 0;
     int theta_pi_index = horizontal_sections / 2;
     for (int stack_index = 0; stack_index < vertical_stacks; stack_index++) {
-        wireframe_indices[wireframe_index++] = stack_index * (horizontal_sections + 1) + theta_0_index;
-        wireframe_indices[wireframe_index++] = (stack_index + 1) * (horizontal_sections + 1) + theta_0_index;
-        wireframe_indices[wireframe_index++] = stack_index * (horizontal_sections + 1) + theta_pi_index;
-        wireframe_indices[wireframe_index++] = (stack_index + 1) * (horizontal_sections + 1) + theta_pi_index;
+        wireframe_indices [wireframe_index++] = stack_index * (horizontal_sections + 1) + theta_0_index;
+        wireframe_indices [wireframe_index++] = (stack_index + 1) * (horizontal_sections + 1) + theta_0_index;
+        wireframe_indices [wireframe_index++] = stack_index * (horizontal_sections + 1) + theta_pi_index;
+        wireframe_indices [wireframe_index++] = (stack_index + 1) * (horizontal_sections + 1) + theta_pi_index;
     }
     int theta_pi_half_index = horizontal_sections / 4;
     int theta_three_pi_half_index = 3 * horizontal_sections / 4;
     for (int stack_index = 0; stack_index < vertical_stacks; stack_index++) {
-        wireframe_indices[wireframe_index++] = stack_index * (horizontal_sections + 1) + theta_pi_half_index;
-        wireframe_indices[wireframe_index++] = (stack_index + 1) * (horizontal_sections + 1) + theta_pi_half_index;
-        wireframe_indices[wireframe_index++] = stack_index * (horizontal_sections + 1) + theta_three_pi_half_index;
-        wireframe_indices[wireframe_index++] =
+        wireframe_indices [wireframe_index++] = stack_index * (horizontal_sections + 1) + theta_pi_half_index;
+        wireframe_indices [wireframe_index++] = (stack_index + 1) * (horizontal_sections + 1) + theta_pi_half_index;
+        wireframe_indices [wireframe_index++] = stack_index * (horizontal_sections + 1) + theta_three_pi_half_index;
+        wireframe_indices [wireframe_index++] =
             (stack_index + 1) * (horizontal_sections + 1) + theta_three_pi_half_index;
     }
     mesh_object->wireframe_index_count = wireframe_index;
@@ -82,12 +82,12 @@ void init_sm_system (mesh *mesh_object, int horizontal_sections, int vertical_st
              * with the outward centroid is negative for both). Latent only
              * because nothing enables GL_CULL_FACE; reversed so enabling
              * culling cannot turn every sphere inside out. */
-            element_indices[element_index++] = current_row_start;
-            element_indices[element_index++] = current_row_start + 1;
-            element_indices[element_index++] = next_row_start;
-            element_indices[element_index++] = current_row_start + 1;
-            element_indices[element_index++] = next_row_start + 1;
-            element_indices[element_index++] = next_row_start;
+            element_indices [element_index++] = current_row_start;
+            element_indices [element_index++] = current_row_start + 1;
+            element_indices [element_index++] = next_row_start;
+            element_indices [element_index++] = current_row_start + 1;
+            element_indices [element_index++] = next_row_start + 1;
+            element_indices [element_index++] = next_row_start;
         }
     }
     glGenVertexArrays (1, &mesh_object->vertex_array_object);

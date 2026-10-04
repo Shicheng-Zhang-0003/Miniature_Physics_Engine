@@ -120,9 +120,9 @@ static inline void mfs_test_world (physics_world *w) {
     constraint_pool_init (w);
     int f = physics_world_add_cube (w, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
     if (f >= 0) {
-        w->bodies[f].friction_static = 1.0f;
-        w->bodies[f].friction_kinetic = 0.8f;
-        w->bodies[f].restitution = 0.0f;
+        w->bodies [f].friction_static = 1.0f;
+        w->bodies [f].friction_kinetic = 0.8f;
+        w->bodies [f].restitution = 0.0f;
     }
 }
 /* Floor slab only (no config touch): for subtests that manage their own
@@ -132,14 +132,14 @@ static inline int mfs_test_floor_e (physics_world *w, float mus, float muk, floa
     int f = physics_world_add_cube (w, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
     if (f < 0)
         return -1;
-    w->bodies[f].friction_static = mus;
-    w->bodies[f].friction_kinetic = muk;
-    w->bodies[f].restitution = e;
+    w->bodies [f].friction_static = mus;
+    w->bodies [f].friction_kinetic = muk;
+    w->bodies [f].restitution = e;
     return f;
 }
 static inline int mfs_test_finite (physics_world *w) {
     for (int i = 0; i < w->body_count; i++) {
-        rigidbody *rb = &w->bodies[i];
+        rigidbody *rb = &w->bodies [i];
         if (!isfinite (rb->position.x) || !isfinite (rb->position.y) || !isfinite (rb->position.z) ||
             !isfinite (rb->velocity.x) || !isfinite (rb->velocity.y) || !isfinite (rb->velocity.z) ||
             !isfinite (rb->angular_velocity.x) || !isfinite (rb->angular_velocity.y) ||
@@ -165,7 +165,7 @@ static inline rigidbody *mfs_chassis_or_null (physics_world *w, ftc_robot *robot
     int idx = robot->chassis_body;
     if (idx < 0 || idx >= w->body_count)
         return NULL;
-    return &w->bodies[idx];
+    return &w->bodies [idx];
 }
 static inline int mfs_step (physics_world *w, int n, float dt) {
     for (int t = 0; t < n; t++) {
@@ -188,19 +188,19 @@ static inline void mfs_lift_whole_robot (physics_world *w, ftc_robot *robot, con
     chassis->velocity = vector3_zero ();
     chassis->angular_velocity = vector3_zero ();
     for (int wi_idx = 0; wi_idx < robot->wheel_count; wi_idx++) {
-        int wi = robot->wheel_bodies[wi_idx];
+        int wi = robot->wheel_bodies [wi_idx];
         if (wi < 0 || wi >= w->body_count)
             continue;
-        rigidbody *wb = &w->bodies[wi];
+        rigidbody *wb = &w->bodies [wi];
         wb->position = vector3_addition (wb->position, *lift);
         wb->velocity = vector3_zero ();
         wb->angular_velocity = vector3_zero ();
         rigidbody_update_axes (wb);
-        for (int k = 0; k < robot->roller_count[wi_idx]; k++) {
-            int rb = robot->roller_bodies[wi_idx][k];
+        for (int k = 0; k < robot->roller_count [wi_idx]; k++) {
+            int rb = robot->roller_bodies [wi_idx] [k];
             if (rb < 0 || rb >= w->body_count)
                 continue;
-            rigidbody *rbb = &w->bodies[rb];
+            rigidbody *rbb = &w->bodies [rb];
             rbb->position = vector3_addition (rbb->position, *lift);
             rbb->velocity = vector3_zero ();
             rbb->angular_velocity = vector3_zero ();
@@ -209,7 +209,7 @@ static inline void mfs_lift_whole_robot (physics_world *w, ftc_robot *robot, con
     }
     rigidbody_update_axes (chassis);
     for (int wi_idx = 0; wi_idx < robot->wheel_count; wi_idx++) {
-        motor_reset_observer (&robot->wheel_motors[wi_idx]);
+        motor_reset_observer (&robot->wheel_motors [wi_idx]);
     }
 }
 /* Lift robot to true free-spin height (1.9m above floor). */
@@ -243,7 +243,7 @@ static inline void mfs_drive_mecanum (ftc_robot *robot, float fwd, float strafe,
     drivetrain_mecanum (robot, fwd, strafe, rotate);
 }
 static inline void mfs_drive_stop (ftc_robot *robot) {
-    float z[4] = {0, 0, 0, 0};
+    float z [4] = {0, 0, 0, 0};
     ftc_robot_set_wheel_commands (robot, z, 4);
 }
 static inline void mfs_get_pos (physics_world *w, ftc_robot *robot, float *x, float *y, float *z) {

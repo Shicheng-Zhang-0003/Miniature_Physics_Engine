@@ -18,8 +18,8 @@ GtkWidget *terminal_output_view = NULL;
 GtkTextBuffer *terminal_output_buffer = NULL;
 GtkWidget *terminal_entry = NULL;
 GtkWidget *terminal_prompt_label = NULL;
-char term_cwd[256] = "/";
-char term_history[term_history_size][term_history_length + 1];
+char term_cwd [256] = "/";
+char term_history [term_history_size] [term_history_length + 1];
 int term_history_count = 0;
 int term_history_cursor = -1;
 /* ------------------------------------------------------------------ */
@@ -50,7 +50,7 @@ void term_capture_begin (void) {
         }
     }
     term_capturing = true;
-    term_capture_buffer[0] = '\0';
+    term_capture_buffer [0] = '\0';
 }
 void term_capture_end (void) {
     term_capturing = false;
@@ -69,8 +69,8 @@ void term_capture_reset (void) {
 }
 /* MPE_TASK_V15R2_OUTPUT_CAPTURE_END */
 /* MPE_TASK_V15R2_PHASE7_ALIAS_STORAGE_BEGIN */
-char term_alias_names[term_alias_max][term_alias_name_len];
-char term_alias_values[term_alias_max][term_alias_value_len];
+char term_alias_names [term_alias_max] [term_alias_name_len];
+char term_alias_values [term_alias_max] [term_alias_value_len];
 int term_alias_count = 0;
 bool term_sudo_active = false;
 int64_t term_engine_start_time = 0; /* FIX_029 */
@@ -102,7 +102,7 @@ static void term_append_with_tag (const char *tag_name, const char *text) {
         }
         memcpy (term_capture_buffer + term_capture_length, text, text_len);
         term_capture_length += text_len;
-        term_capture_buffer[term_capture_length] = '\0';
+        term_capture_buffer [term_capture_length] = '\0';
         return;
     }
     if (!terminal_output_buffer) {
@@ -133,7 +133,7 @@ void term_dim (const char *text) {
     term_append_with_tag ("term_dim", text);
 }
 void term_printf (const char *tag_name, const char *format, ...) {
-    char line_buffer[2048];
+    char line_buffer [2048];
     va_list argument_list;
     va_start (argument_list, format);
     vsnprintf (line_buffer, sizeof (line_buffer), format, argument_list);
@@ -144,7 +144,7 @@ void term_update_prompt (void) {
     if (!terminal_prompt_label) {
         return;
     }
-    char prompt_buffer[320];
+    char prompt_buffer [320];
     snprintf (prompt_buffer, sizeof (prompt_buffer), "mpe:%s>", term_cwd);
     gtk_label_set_text (GTK_LABEL (terminal_prompt_label), prompt_buffer);
 }
@@ -152,21 +152,21 @@ void term_update_prompt (void) {
 /* History                                                             */
 /* ------------------------------------------------------------------ */
 static void term_history_push (const char *command_text) {
-    if (command_text[0] == '\0') {
+    if (command_text [0] == '\0') {
         return;
     }
-    if ((term_history_count > 0) && (strcmp (term_history[0], command_text) == 0)) {
+    if ((term_history_count > 0) && (strcmp (term_history [0], command_text) == 0)) {
         return;
     }
     if (term_history_count < term_history_size) {
         term_history_count++;
     }
     for (int history_index = term_history_count - 1; history_index > 0; history_index--) {
-        strncpy (term_history[history_index], term_history[history_index - 1], term_history_length);
-        term_history[history_index][term_history_length] = '\0';
+        strncpy (term_history [history_index], term_history [history_index - 1], term_history_length);
+        term_history [history_index] [term_history_length] = '\0';
     }
-    strncpy (term_history[0], command_text, term_history_length);
-    term_history[0][term_history_length] = '\0';
+    strncpy (term_history [0], command_text, term_history_length);
+    term_history [0] [term_history_length] = '\0';
 }
 /* ------------------------------------------------------------------ */
 /* String/path helpers                                                 */
@@ -233,7 +233,7 @@ int term_joint_from_token (const char *token) {
     if ((parsed_index < 0) || (parsed_index >= mpe_max_joints)) {
         return -1;
     }
-    if (!(physics_world_get_primary ()->spring_joints)[parsed_index].is_active) {
+    if (!(physics_world_get_primary ()->spring_joints) [parsed_index].is_active) {
         return -1;
     }
     return (int) parsed_index;
@@ -276,25 +276,25 @@ int term_parse_movement_destination (const char *token, float *x, float *y, floa
     if (!parts) {
         return 0;
     }
-    for (int part_index = 0; parts[part_index]; part_index++) {
-        if (term_str_eq (parts[part_index], "pos") || term_str_eq (parts[part_index], "vel")) {
-            if ((!parts[part_index + 1]) || (!parts[part_index + 2]) || (!parts[part_index + 3])) {
+    for (int part_index = 0; parts [part_index]; part_index++) {
+        if (term_str_eq (parts [part_index], "pos") || term_str_eq (parts [part_index], "vel")) {
+            if ((!parts [part_index + 1]) || (!parts [part_index + 2]) || (!parts [part_index + 3])) {
                 break;
             }
             float parsed_x, parsed_y, parsed_z;
-            if (!term_parse_float (parts[part_index + 1], &parsed_x)) {
+            if (!term_parse_float (parts [part_index + 1], &parsed_x)) {
                 break;
             }
-            if (!term_parse_float (parts[part_index + 2], &parsed_y)) {
+            if (!term_parse_float (parts [part_index + 2], &parsed_y)) {
                 break;
             }
-            if (!term_parse_float (parts[part_index + 3], &parsed_z)) {
+            if (!term_parse_float (parts [part_index + 3], &parsed_z)) {
                 break;
             }
             *x = parsed_x;
             *y = parsed_y;
             *z = parsed_z;
-            movement_kind = term_str_eq (parts[part_index], "pos") ? 1 : 2;
+            movement_kind = term_str_eq (parts [part_index], "pos") ? 1 : 2;
             break;
         }
     }
@@ -345,7 +345,7 @@ MPE_WEAK_CMD (cmd_clear) MPE_WEAK_CMD (cmd_history) MPE_WEAK_CMD (cmd_pwd) MPE_W
 #undef MPE_WEAK_CMD
 #endif
     /* Command declarations moved to term_priv.h. */
-    const terminal_command terminal_commands[] = {
+    const terminal_command terminal_commands [] = {
         {"help", false, cmd_help, "help [command]", "show help"},
         {"man", false, cmd_man, "man <command>", "manual page"},
         {"clear", false, cmd_clear, "clear", "clear terminal"},
@@ -447,7 +447,7 @@ MPE_WEAK_CMD (cmd_clear) MPE_WEAK_CMD (cmd_history) MPE_WEAK_CMD (cmd_pwd) MPE_W
         {"eco", true, cmd_eco, "eco attach|detach|command", "drive ecosystem bundles"},
         {"ftc", true, cmd_ftc, "ftc spawn [x y z]|telemetry", "spawn/inspect the robot (F310 drives)"},
 };
-const size_t terminal_command_count = sizeof (terminal_commands) / sizeof (terminal_commands[0]);
+const size_t terminal_command_count = sizeof (terminal_commands) / sizeof (terminal_commands [0]);
 /* ------------------------------------------------------------------ */
 /* Listing/print helpers                                               */
 /* ------------------------------------------------------------------ */
@@ -463,17 +463,17 @@ void term_execute (char *command_line) {
     }
     /* MPE_TASK_V15R2_PHASE7_ALIAS_EXPANSION_BEGIN */
     {
-        char first_word[term_alias_name_len];
+        char first_word [term_alias_name_len];
         int word_index = 0;
         const char *scan = command_line;
         while ((*scan) && (*scan != ' ') && (word_index < term_alias_name_len - 1)) {
-            first_word[word_index++] = *scan++;
+            first_word [word_index++] = *scan++;
         }
-        first_word[word_index] = '\0';
+        first_word [word_index] = '\0';
         for (int alias_index = 0; alias_index < term_alias_count; alias_index++) {
-            if (term_ascii_strcasecmp (first_word, term_alias_names[alias_index]) == 0) {
-                static char expanded_command[2048];
-                int ew = snprintf (expanded_command, sizeof (expanded_command), "%s%s", term_alias_values[alias_index],
+            if (term_ascii_strcasecmp (first_word, term_alias_names [alias_index]) == 0) {
+                static char expanded_command [2048];
+                int ew = snprintf (expanded_command, sizeof (expanded_command), "%s%s", term_alias_values [alias_index],
                                    scan);
                 if (ew < 0 || (size_t) ew >= sizeof (expanded_command)) {
                     term_err ("mpe: alias expansion too long, refused\n");
@@ -485,16 +485,16 @@ void term_execute (char *command_line) {
         }
     }
     /* MPE_TASK_V15R2_PHASE7_ALIAS_EXPANSION_END */
-    char prompt_buffer[320];
+    char prompt_buffer [320];
     snprintf (prompt_buffer, sizeof (prompt_buffer), "mpe:%s> ", term_cwd);
     term_echo (prompt_buffer);
     term_out (command_line);
     term_out ("\n");
     int argument_count = 0;
     char **argument_vector = NULL;
-    char parse_errbuf[256] = {0};
+    char parse_errbuf [256] = {0};
     if (!term_parse_argv (command_line, &argument_count, &argument_vector, parse_errbuf, sizeof (parse_errbuf))) {
-        if (parse_errbuf[0]) {
+        if (parse_errbuf [0]) {
             term_printf ("term_err", "mpe: %s\n", parse_errbuf);
         } else {
             term_err ("mpe: parse error\n");
@@ -509,13 +509,13 @@ void term_execute (char *command_line) {
     }
     const terminal_command *found_command = NULL;
     for (size_t command_index = 0; command_index < terminal_command_count; command_index++) {
-        if (term_str_eq (argument_vector[0], terminal_commands[command_index].name)) {
-            found_command = &terminal_commands[command_index];
+        if (term_str_eq (argument_vector [0], terminal_commands [command_index].name)) {
+            found_command = &terminal_commands [command_index];
             break;
         }
     }
     if (!found_command) {
-        term_printf ("term_err", "mpe: %s: command not found\n", argument_vector[0]);
+        term_printf ("term_err", "mpe: %s: command not found\n", argument_vector [0]);
         term_strfreev (argument_vector);
         return;
     }
@@ -533,9 +533,9 @@ void term_execute (char *command_line) {
 static void on_terminal_entry_activate (GtkEntry *entry, gpointer user_data) {
     (void) user_data;
     const char *entry_text = gtk_editable_get_text (GTK_EDITABLE (entry));
-    char command_copy[term_history_length + 1];
+    char command_copy [term_history_length + 1];
     strncpy (command_copy, entry_text, term_history_length);
-    command_copy[term_history_length] = '\0';
+    command_copy [term_history_length] = '\0';
     term_history_push (command_copy);
     term_history_cursor = -1;
     term_execute (command_copy);
@@ -555,7 +555,7 @@ static gboolean on_terminal_entry_key_pressed (GtkEventControllerKey *controller
             if (term_history_cursor < term_history_count - 1) {
                 term_history_cursor++;
             }
-            gtk_editable_set_text (GTK_EDITABLE (terminal_entry), term_history[term_history_cursor]);
+            gtk_editable_set_text (GTK_EDITABLE (terminal_entry), term_history [term_history_cursor]);
             gtk_editable_set_position (GTK_EDITABLE (terminal_entry), -1);
         }
         return TRUE;
@@ -563,7 +563,7 @@ static gboolean on_terminal_entry_key_pressed (GtkEventControllerKey *controller
     if (keyval == GDK_KEY_Down) {
         if (term_history_cursor > 0) {
             term_history_cursor--;
-            gtk_editable_set_text (GTK_EDITABLE (terminal_entry), term_history[term_history_cursor]);
+            gtk_editable_set_text (GTK_EDITABLE (terminal_entry), term_history [term_history_cursor]);
         } else {
             term_history_cursor = -1;
             gtk_editable_set_text (GTK_EDITABLE (terminal_entry), "");

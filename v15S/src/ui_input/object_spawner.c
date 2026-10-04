@@ -37,15 +37,15 @@ void spawner_launch_sphere (float spherical_radius, float physical_mass, float l
     } //Scene already occupied, or stack failure (SAO/SKF)
     //Velocity to the object, camera direction plus player velocity
     vector3 launch_vel = vector3_scaling (main_camera_fov.forward_vector, launch_speed);
-    (physics_world_get_primary ()->bodies)[newly_spawned_object_index].velocity =
+    (physics_world_get_primary ()->bodies) [newly_spawned_object_index].velocity =
         vector3_addition (launch_vel, get_viewpoint_velocity ());
     // Friction
-    (physics_world_get_primary ()->bodies)[newly_spawned_object_index].friction_static =
+    (physics_world_get_primary ()->bodies) [newly_spawned_object_index].friction_static =
         g_cfg.spawner.friction_s; /* MPE_TASK_32 */
-    (physics_world_get_primary ()->bodies)[newly_spawned_object_index].friction_kinetic =
+    (physics_world_get_primary ()->bodies) [newly_spawned_object_index].friction_kinetic =
         g_cfg.spawner.friction_k; /* MPE_TASK_32 */
     //Give the object a random colour for now, distinguish objects
-    (physics_world_get_primary ()->bodies)[newly_spawned_object_index].colour =
+    (physics_world_get_primary ()->bodies) [newly_spawned_object_index].colour =
         (vector3){0.4f + 0.6f * ((float) (newly_spawned_object_index % 3) / 2.0f),
                   0.4f + 0.6f * ((float) ((newly_spawned_object_index + 1) % 3) / 2.0f),
                   0.4f + 0.6f * ((float) ((newly_spawned_object_index + 2) % 3) / 2.0f)};
@@ -56,11 +56,11 @@ void spawner_static_sphere (float spherical_radius, float physical_mass, vector3
         return;
     } //SAO/SKF
     //Friction
-    (physics_world_get_primary ()->bodies)[newly_spawned_object_index].friction_static =
+    (physics_world_get_primary ()->bodies) [newly_spawned_object_index].friction_static =
         g_cfg.spawner.friction_s; /* MPE_TASK_32 */
-    (physics_world_get_primary ()->bodies)[newly_spawned_object_index].friction_kinetic =
+    (physics_world_get_primary ()->bodies) [newly_spawned_object_index].friction_kinetic =
         g_cfg.spawner.friction_k; /* MPE_TASK_32 */
-    (physics_world_get_primary ()->bodies)[newly_spawned_object_index].colour = (vector3){0.8f, 0.8f, 0.8f};
+    (physics_world_get_primary ()->bodies) [newly_spawned_object_index].colour = (vector3){0.8f, 0.8f, 0.8f};
 }
 void spawner_static_cube (vector3 position, vector3 half_extensions, float physical_mass) {
     int newly_spawned_object_index = scene_add_cube (position, half_extensions, physical_mass);
@@ -68,11 +68,11 @@ void spawner_static_cube (vector3 position, vector3 half_extensions, float physi
         return;
     } //SAO/SKF
     //Friction
-    (physics_world_get_primary ()->bodies)[newly_spawned_object_index].friction_static =
+    (physics_world_get_primary ()->bodies) [newly_spawned_object_index].friction_static =
         g_cfg.spawner.friction_s; /* MPE_TASK_32 */
-    (physics_world_get_primary ()->bodies)[newly_spawned_object_index].friction_kinetic =
+    (physics_world_get_primary ()->bodies) [newly_spawned_object_index].friction_kinetic =
         g_cfg.spawner.friction_k; /* MPE_TASK_32 */
-    (physics_world_get_primary ()->bodies)[newly_spawned_object_index].colour = (vector3){0.8f, 0.8f, 0.8f};
+    (physics_world_get_primary ()->bodies) [newly_spawned_object_index].colour = (vector3){0.8f, 0.8f, 0.8f};
 }
 void spawner_launch_cube (vector3 position, vector3 half_extensions, float physical_mass) {
     int newly_spawned_object_index = scene_add_cube (position, half_extensions, physical_mass);
@@ -81,13 +81,13 @@ void spawner_launch_cube (vector3 position, vector3 half_extensions, float physi
     } //SAO/SKF
     //Friction and Velocity (relative to viewpoint)
     vector3 launch_vel = vector3_scaling (main_camera_fov.forward_vector, g_cfg.spawner.speed);
-    (physics_world_get_primary ()->bodies)[newly_spawned_object_index].velocity =
+    (physics_world_get_primary ()->bodies) [newly_spawned_object_index].velocity =
         vector3_addition (launch_vel, get_viewpoint_velocity ());
-    (physics_world_get_primary ()->bodies)[newly_spawned_object_index].friction_static =
+    (physics_world_get_primary ()->bodies) [newly_spawned_object_index].friction_static =
         g_cfg.spawner.friction_s; /* MPE_TASK_32 */
-    (physics_world_get_primary ()->bodies)[newly_spawned_object_index].friction_kinetic =
+    (physics_world_get_primary ()->bodies) [newly_spawned_object_index].friction_kinetic =
         g_cfg.spawner.friction_k; /* MPE_TASK_32 */
-    (physics_world_get_primary ()->bodies)[newly_spawned_object_index].colour =
+    (physics_world_get_primary ()->bodies) [newly_spawned_object_index].colour =
         (vector3){0.6f + 0.4f * ((float) (newly_spawned_object_index % 3) / 2.0f),
                   0.4f + 0.6f * ((float) ((newly_spawned_object_index + 1) % 3) / 2.0f),
                   0.2f + 0.8f * ((float) ((newly_spawned_object_index + 2) % 3) / 2.0f)};
@@ -104,11 +104,11 @@ void spawner_launch_cylinder (float radius, float half_length, float physical_ma
         return;
     }
     vector3 launch_vel = vector3_scaling (main_camera_fov.forward_vector, launch_speed);
-    (physics_world_get_primary ()->bodies)[newly_spawned_object_index].velocity =
+    (physics_world_get_primary ()->bodies) [newly_spawned_object_index].velocity =
         vector3_addition (launch_vel, get_viewpoint_velocity ());
-    (physics_world_get_primary ()->bodies)[newly_spawned_object_index].friction_static = g_cfg.spawner.friction_s;
-    (physics_world_get_primary ()->bodies)[newly_spawned_object_index].friction_kinetic = g_cfg.spawner.friction_k;
-    (physics_world_get_primary ()->bodies)[newly_spawned_object_index].colour =
+    (physics_world_get_primary ()->bodies) [newly_spawned_object_index].friction_static = g_cfg.spawner.friction_s;
+    (physics_world_get_primary ()->bodies) [newly_spawned_object_index].friction_kinetic = g_cfg.spawner.friction_k;
+    (physics_world_get_primary ()->bodies) [newly_spawned_object_index].colour =
         (vector3){0.5f + 0.5f * ((float) (newly_spawned_object_index % 3) / 2.0f),
                   0.5f + 0.5f * ((float) ((newly_spawned_object_index + 1) % 3) / 2.0f),
                   0.5f + 0.5f * ((float) ((newly_spawned_object_index + 2) % 3) / 2.0f)};
@@ -118,7 +118,7 @@ void spawner_static_cylinder (float radius, float half_length, float physical_ma
     if (newly_spawned_object_index < 0) {
         return;
     }
-    (physics_world_get_primary ()->bodies)[newly_spawned_object_index].friction_static = g_cfg.spawner.friction_s;
-    (physics_world_get_primary ()->bodies)[newly_spawned_object_index].friction_kinetic = g_cfg.spawner.friction_k;
-    (physics_world_get_primary ()->bodies)[newly_spawned_object_index].colour = (vector3){0.8f, 0.8f, 0.8f};
+    (physics_world_get_primary ()->bodies) [newly_spawned_object_index].friction_static = g_cfg.spawner.friction_s;
+    (physics_world_get_primary ()->bodies) [newly_spawned_object_index].friction_kinetic = g_cfg.spawner.friction_k;
+    (physics_world_get_primary ()->bodies) [newly_spawned_object_index].colour = (vector3){0.8f, 0.8f, 0.8f};
 }

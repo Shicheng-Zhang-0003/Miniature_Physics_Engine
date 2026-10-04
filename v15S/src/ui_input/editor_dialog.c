@@ -10,7 +10,7 @@ static void on_entry_insert_text (GtkEditable *editable, const gchar *new_text, 
     (void) position;
     (void) user_data;
     for (int i = 0; i < new_text_length; i++) {
-        char c = new_text[i];
+        char c = new_text [i];
         if (!((c >= '0' && c <= '9') || (c == '-') || (c == '.'))) {
             g_signal_stop_emission_by_name (editable, "insert-text");
             return;
@@ -110,7 +110,7 @@ float open_numerical_input_dialog (GtkWidget *parent, const char *title, float c
     gtk_widget_set_margin_start (box, 15);
     gtk_widget_set_margin_end (box, 15);
     gtk_window_set_child (GTK_WINDOW (dialog), box);
-    char label_text[256];
+    char label_text [256];
     snprintf (label_text, sizeof (label_text), "Current value: %.4f\nEnter new value:", current_value);
     GtkWidget *label = gtk_label_new (label_text);
     gtk_widget_set_halign (label, GTK_ALIGN_START);
@@ -118,7 +118,7 @@ float open_numerical_input_dialog (GtkWidget *parent, const char *title, float c
     gtk_box_append (GTK_BOX (box), label);
     GtkWidget *entry = gtk_entry_new ();
     state.entry = entry;
-    char current_value_str[64];
+    char current_value_str [64];
     snprintf (current_value_str, sizeof (current_value_str), "%.4f", current_value);
     gtk_editable_set_text (GTK_EDITABLE (entry), current_value_str);
     gtk_widget_set_hexpand (entry, TRUE);

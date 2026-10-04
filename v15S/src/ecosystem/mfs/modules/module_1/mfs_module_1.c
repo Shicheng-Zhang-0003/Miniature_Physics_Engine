@@ -66,8 +66,8 @@ MPE_USED int mfs_module_1_attach (mpe_world_t *world, void **mod_state) {
      * free to drift without changing behaviour. Bound the array and the
      * spawner from the same constant. */
     state->max_balls = MFS_ROBOT_MAX_BALLS;
-    if (state->max_balls > (int) (sizeof (state->ball_body_ids) / sizeof (state->ball_body_ids[0]))) {
-        state->max_balls = (int) (sizeof (state->ball_body_ids) / sizeof (state->ball_body_ids[0]));
+    if (state->max_balls > (int) (sizeof (state->ball_body_ids) / sizeof (state->ball_body_ids [0]))) {
+        state->max_balls = (int) (sizeof (state->ball_body_ids) / sizeof (state->ball_body_ids [0]));
     }
     state->shooter_target_rpm = MFS_SHOOTER_TARGET_RPM;
     state->intake_speed_rpm = MFS_INTAKE_ROLLER_SPEED_RPM;
@@ -260,32 +260,32 @@ MPE_USED void mfs_module_1_gamepad_step (mfs_module_1_state *state, float dt) {
             if (n > FTC_MAX_WHEELS)
                 n = FTC_MAX_WHEELS;
             for (int i = 0; i < n; i++) {
-                int wi = state->robot.wheel_bodies[i];
+                int wi = state->robot.wheel_bodies [i];
                 if (wi < 0 || wi >= world->body_count)
                     continue;
-                rigidbody *w = &world->bodies[wi];
+                rigidbody *w = &world->bodies [wi];
                 w->position = vector3_addition (w->position, delta);
                 w->velocity = vector3_zero ();
                 w->angular_velocity = vector3_zero ();
                 w->is_sleeping = false;
                 w->sleep_timer = 0.0f;
-                for (int k = 0; k < state->robot.roller_count[i]; k++) {
-                    int rb = state->robot.roller_bodies[i][k];
+                for (int k = 0; k < state->robot.roller_count [i]; k++) {
+                    int rb = state->robot.roller_bodies [i] [k];
                     if (rb < 0 || rb >= world->body_count)
                         continue;
-                    rigidbody *ro = &world->bodies[rb];
+                    rigidbody *ro = &world->bodies [rb];
                     ro->position = vector3_addition (ro->position, delta);
                     ro->velocity = vector3_zero ();
                     ro->angular_velocity = vector3_zero ();
                     ro->is_sleeping = false;
                     ro->sleep_timer = 0.0f;
                 }
-                motor_reset_observer (&state->robot.wheel_motors[i]);
+                motor_reset_observer (&state->robot.wheel_motors [i]);
             }
             {
                 int fw = physics_world_index_by_id (world, (uint32_t) state->shooter_flywheel_body);
                 if (fw >= 0) {
-                    rigidbody *f = &world->bodies[fw];
+                    rigidbody *f = &world->bodies [fw];
                     f->position = vector3_addition (f->position, delta);
                     f->velocity = vector3_zero ();
                     f->angular_velocity = vector3_zero ();
@@ -294,7 +294,7 @@ MPE_USED void mfs_module_1_gamepad_step (mfs_module_1_state *state, float dt) {
                 }
                 int ir = physics_world_index_by_id (world, (uint32_t) state->intake_roller_body);
                 if (ir >= 0) {
-                    rigidbody *rr = &world->bodies[ir];
+                    rigidbody *rr = &world->bodies [ir];
                     rr->position = vector3_addition (rr->position, delta);
                     rr->velocity = vector3_zero ();
                     rr->angular_velocity = vector3_zero ();
@@ -359,10 +359,10 @@ MPE_USED void mfs_module_1_field_create (mfs_module_1_state *state) {
     int floor_idx = physics_world_add_cube (world, (vector3){0.0f, -0.05f, 0.0f},
                                             (vector3){half_w + 1.0f, 0.05f, half_l + 1.0f}, 0.0f);
     if (floor_idx >= 0) {
-        state->field_floor_id = world->bodies[floor_idx].object_id;
-        world->bodies[floor_idx].restitution = 0.0f;
-        world->bodies[floor_idx].friction_static = 0.7f;
-        world->bodies[floor_idx].friction_kinetic = 0.6f;
+        state->field_floor_id = world->bodies [floor_idx].object_id;
+        world->bodies [floor_idx].restitution = 0.0f;
+        world->bodies [floor_idx].friction_static = 0.7f;
+        world->bodies [floor_idx].friction_kinetic = 0.6f;
     } else {
         /* DESPOT-2026-09-28: floor failure was silent (attach still
          * returned 0). Poison explicitly; attach fails without a floor. */
@@ -442,8 +442,8 @@ MPE_USED void mfs_module_1_intake_create (mfs_module_1_state *state) {
                                                  0.05f, /* Light roller mass */
                                                  roller_pos);
     if (roller_idx >= 0) {
-        state->intake_roller_body = world->bodies[roller_idx].object_id;
-        rigidbody *roller = &world->bodies[roller_idx];
+        state->intake_roller_body = world->bodies [roller_idx].object_id;
+        rigidbody *roller = &world->bodies [roller_idx];
         roller->restitution = 0.0f;
         roller->friction_static = 0.8f;
         roller->friction_kinetic = 0.7f;
@@ -487,8 +487,8 @@ MPE_USED void mfs_module_1_shooter_create (mfs_module_1_state *state) {
     int flywheel_idx = physics_world_add_cylinder (world, MFS_SHOOTER_FLYWHEEL_RADIUS, 0.015f, /* Thin flywheel */
                                                    MFS_SHOOTER_FLYWHEEL_MASS, flywheel_pos);
     if (flywheel_idx >= 0) {
-        state->shooter_flywheel_body = world->bodies[flywheel_idx].object_id;
-        rigidbody *flywheel = &world->bodies[flywheel_idx];
+        state->shooter_flywheel_body = world->bodies [flywheel_idx].object_id;
+        rigidbody *flywheel = &world->bodies [flywheel_idx];
         flywheel->restitution = 0.0f;
         flywheel->friction_static = 0.1f;
         flywheel->friction_kinetic = 0.05f;
@@ -530,7 +530,7 @@ MPE_USED void mfs_module_1_shooter_create (mfs_module_1_state *state) {
          * IS the spin axis. See the H6 note above: the previous tilt about X
          * could not move the symmetry axis, because that is the axis it
          * rotates about. */
-        rigidbody *flywheel_body = &world->bodies[flywheel_idx];
+        rigidbody *flywheel_body = &world->bodies [flywheel_idx];
         flywheel_body->orientation =
             vector4_from_axis_with_angle ((vector3){0.0f, -sp_sin, sp_cos}, (float) M_PI * 0.5f);
         rigidbody_update_axes (flywheel_body);
@@ -548,12 +548,12 @@ MPE_USED void mfs_module_1_ball_spawn (mfs_module_1_state *state, vector3 pos) {
     physics_world *world = state->world;
     int idx = physics_world_add_sphere (world, MFS_BIOBUZZ_BALL_RADIUS, MFS_BIOBUZZ_BALL_MASS, pos);
     if (idx >= 0) {
-        rigidbody *ball = &world->bodies[idx];
+        rigidbody *ball = &world->bodies [idx];
         ball->restitution = MFS_BIOBUZZ_BALL_RESTITUTION;
         ball->friction_static = MFS_BIOBUZZ_BALL_FRICTION_S;
         ball->friction_kinetic = MFS_BIOBUZZ_BALL_FRICTION_K;
         ball->colour = (vector3){1.0f, 0.4f, 0.0f}; /* Orange */
-        state->ball_body_ids[state->ball_count++] = ball->object_id;
+        state->ball_body_ids [state->ball_count++] = ball->object_id;
     }
 }
 MPE_USED void mfs_module_1_ball_physics_step (mfs_module_1_state *state, float dt) {
@@ -565,10 +565,10 @@ MPE_USED void mfs_module_1_ball_physics_step (mfs_module_1_state *state, float d
     const float drag_coeff = 0.47f; /* Sphere */
     const float cross_section = M_PI * MFS_BIOBUZZ_BALL_RADIUS * MFS_BIOBUZZ_BALL_RADIUS;
     for (int i = 0; i < state->ball_count; i++) {
-        int body_idx = physics_world_index_by_id (world, state->ball_body_ids[i]);
+        int body_idx = physics_world_index_by_id (world, state->ball_body_ids [i]);
         if (body_idx < 0)
             continue;
-        rigidbody *ball = &world->bodies[body_idx];
+        rigidbody *ball = &world->bodies [body_idx];
         /* Aerodynamic drag */
         float speed = vector3_length (ball->velocity);
         if (speed > 0.1f) {
@@ -673,10 +673,10 @@ MPE_USED void mfs_module_1_intake_step (mfs_module_1_state *state, float dt) {
          * disagree about what "in the intake" means. */
         int carried = 0;
         for (int i = 0; i < state->ball_count && carried < MFS_ROBOT_MAX_CARRIED_BALLS; i++) {
-            int ball_idx = physics_world_index_by_id (world, state->ball_body_ids[i]);
+            int ball_idx = physics_world_index_by_id (world, state->ball_body_ids [i]);
             if (ball_idx < 0)
                 continue;
-            rigidbody *b = &world->bodies[ball_idx];
+            rigidbody *b = &world->bodies [ball_idx];
             vector3 d = vector3_subtraction (b->position, roller->position);
             if (vector3_length (d) < MFS_INTAKE_ROLLER_RADIUS + MFS_BIOBUZZ_BALL_RADIUS + MFS_INTAKE_COMPLIANCE) {
                 carried++;
@@ -686,10 +686,10 @@ MPE_USED void mfs_module_1_intake_step (mfs_module_1_state *state, float dt) {
             return; /* hopper full: hold station, do not draw more in */
         }
         for (int i = 0; i < state->ball_count; i++) {
-            int ball_idx = physics_world_index_by_id (world, state->ball_body_ids[i]);
+            int ball_idx = physics_world_index_by_id (world, state->ball_body_ids [i]);
             if (ball_idx < 0)
                 continue;
-            rigidbody *ball = &world->bodies[ball_idx];
+            rigidbody *ball = &world->bodies [ball_idx];
             /* Check if ball is near intake (simple distance check) */
             vector3 diff = vector3_subtraction (ball->position, roller->position);
             float dist = vector3_length (diff);
@@ -698,8 +698,8 @@ MPE_USED void mfs_module_1_intake_step (mfs_module_1_state *state, float dt) {
                 /* FIX-AUDIT-DESPOT: balls_collected was never incremented
                  * (dead stat). Count each ball once, on first intake touch;
                  * the flag (not the distance edge) makes it tick-stable. */
-                if (i >= 0 && i < 16 && !state->ball_counted[i]) {
-                    state->ball_counted[i] = true;
+                if (i >= 0 && i < 16 && !state->ball_counted [i]) {
+                    state->ball_counted [i] = true;
                     state->balls_collected++;
                 }
                 /* M5 DIVIDE-BY-ZERO GUARD: at exact roller/ball coincidence
@@ -786,10 +786,10 @@ MPE_USED void mfs_module_1_shooter_step (mfs_module_1_state *state, float dt) {
     if (state->shooter_fire_cmd && state->shooter_ready) {
         /* Find a ball in the shooter hopper (near flywheel) */
         for (int i = 0; i < state->ball_count; i++) {
-            int ball_idx = physics_world_index_by_id (world, state->ball_body_ids[i]);
+            int ball_idx = physics_world_index_by_id (world, state->ball_body_ids [i]);
             if (ball_idx < 0)
                 continue;
-            rigidbody *ball = &world->bodies[ball_idx];
+            rigidbody *ball = &world->bodies [ball_idx];
             vector3 diff = vector3_subtraction (ball->position, flywheel->position);
             float dist = vector3_length (diff);
             if (dist < 0.08f) { /* Ball in shooting position */

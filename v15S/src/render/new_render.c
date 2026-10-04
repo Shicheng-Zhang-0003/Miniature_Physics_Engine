@@ -65,8 +65,8 @@ void render_init () {
     }
     render_init_status = render_uninitialized;
     const char *shader_dir = getenv ("MPE_SHADER_DIR");
-    char vs_path[512], fs_path[512], uvs_path[512], ufs_path[512];
-    if (shader_dir && shader_dir[0]) {
+    char vs_path [512], fs_path [512], uvs_path [512], ufs_path [512];
+    if (shader_dir && shader_dir [0]) {
         snprintf (vs_path, sizeof (vs_path), "%s/vertex_shader.glsl", shader_dir);
         snprintf (fs_path, sizeof (fs_path), "%s/fragment_shader.glsl", shader_dir);
         snprintf (uvs_path, sizeof (uvs_path), "%s/utility_vertex.glsl", shader_dir);
@@ -80,7 +80,7 @@ void render_init () {
     /* Installed fallback: <prefix>/share/mpe/shaders (see make install). */
     instanced_shader_program = create_shader_program (vs_path, fs_path);
     if (instanced_shader_program == 0) {
-        char alt_vs[512], alt_fs[512];
+        char alt_vs [512], alt_fs [512];
         const char *home = mpe_home_dir ();
         if (home) {
             snprintf (alt_vs, sizeof (alt_vs), "%s/.local/share/mpe/shaders/vertex_shader.glsl", home);
@@ -95,7 +95,7 @@ void render_init () {
          * the whole renderer even with a good instanced program. Retry it. */
         const char *home_u = mpe_home_dir ();
         if (home_u) {
-            char alt_uvs[512], alt_ufs[512];
+            char alt_uvs [512], alt_ufs [512];
             snprintf (alt_uvs, sizeof (alt_uvs), "%s/.local/share/mpe/shaders/utility_vertex.glsl", home_u);
             snprintf (alt_ufs, sizeof (alt_ufs), "%s/.local/share/mpe/shaders/utility_fragment.glsl", home_u);
             utility_shader_program = create_shader_program (alt_uvs, alt_ufs);
@@ -269,11 +269,11 @@ void render_scene_current (int widget_width, int widget_height) {
     glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     float window_aspect_ratio = (float) (widget_width) / (float) (widget_height);
     math4 projection_matrix = math4_perspective_fov (degrad * 45.0f, window_aspect_ratio, 0.1f, 1000.0f);
-    float projection_matrix_flat_array[16];
+    float projection_matrix_flat_array [16];
     math4_to_flat_array (projection_matrix, projection_matrix_flat_array);
     math4 view_matrix =
         math4_look_view (main_camera_fov.position, main_camera_fov.forward_vector, main_camera_fov.vertical_vector);
-    float view_matrix_flat_array[16];
+    float view_matrix_flat_array [16];
     math4_to_flat_array (view_matrix, view_matrix_flat_array);
     grid_render (&main_grid, utility_shader_program, view_matrix, projection_matrix);
     /* Frustum culling: extract the six inward-facing planes from the
@@ -286,13 +286,13 @@ void render_scene_current (int widget_width, int widget_height) {
      * math4_special.h so the shipped culler is reachable from a headless test
      * (mpe_t_frustum_culler). Previously it was inline here, in a GL function
      * nothing could call, so no gate ever executed the real culler. */
-    float frustum_planes[6][4];
+    float frustum_planes [6] [4];
     math4_frustum_planes (view_projection, frustum_planes);
     int sphere_inst_count = 0;
     int cube_inst_count = 0;
     int cylinder_inst_count = 0;
     for (int object_index = 0; object_index < (physics_world_get_primary ()->body_count); object_index++) {
-        rigidbody *rigid_body = &(physics_world_get_primary ()->bodies)[object_index];
+        rigidbody *rigid_body = &(physics_world_get_primary ()->bodies) [object_index];
         /* DESPOT-2026-10-04: a NaN body used to poison the instance buffer
          * (NaN model matrix → NaN vertices → driver-dependent garbage or
          * worse). Skip non-finite bodies loudly; the physics side already
@@ -330,18 +330,18 @@ void render_scene_current (int widget_width, int widget_height) {
         } else {
             model_scale = rigid_body->half_extensions;
         }
-        float scale_comp[3] = {model_scale.x, model_scale.y, model_scale.z};
+        float scale_comp [3] = {model_scale.x, model_scale.y, model_scale.z};
         math4 model_matrix = {{{0}}};
         for (int mc = 0; mc < 3; mc++) {
             for (int mr = 0; mr < 3; mr++) {
-                model_matrix.matrix[mc][mr] = rotation_matrix.matrix[mc][mr] * scale_comp[mc];
+                model_matrix.matrix [mc] [mr] = rotation_matrix.matrix [mc] [mr] * scale_comp [mc];
             }
-            model_matrix.matrix[mc][3] = 0.0f;
-            model_matrix.matrix[3][mc] = (mc == 0)   ? rigid_body->position.x
+            model_matrix.matrix [mc] [3] = 0.0f;
+            model_matrix.matrix [3] [mc] = (mc == 0)   ? rigid_body->position.x
                                          : (mc == 1) ? rigid_body->position.y
                                                      : rigid_body->position.z;
         }
-        model_matrix.matrix[3][3] = 1.0f;
+        model_matrix.matrix [3] [3] = 1.0f;
         float *target_array;
         int *target_count;
         if (rigid_body->type == object_sphere) {
@@ -356,10 +356,10 @@ void render_scene_current (int widget_width, int widget_height) {
         }
         if ((*target_count) < mpe_max_bodies) {
             int idx = (*target_count) * 19;
-            math4_to_flat_array (model_matrix, &target_array[idx]);
-            target_array[idx + 16] = rigid_body->colour.x;
-            target_array[idx + 17] = rigid_body->colour.y;
-            target_array[idx + 18] = rigid_body->colour.z;
+            math4_to_flat_array (model_matrix, &target_array [idx]);
+            target_array [idx + 16] = rigid_body->colour.x;
+            target_array [idx + 17] = rigid_body->colour.y;
+            target_array [idx + 18] = rigid_body->colour.z;
             (*target_count)++;
         }
     }

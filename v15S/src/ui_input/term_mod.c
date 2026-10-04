@@ -22,8 +22,8 @@ void cmd_mod (int argc, char **argv) {
         term_err ("mpe: mod: usage: mod ls|load|unload|attach|detach|use-broadphase|use-solver\n");
         return;
     }
-    if (term_str_eq (argv[1], "ls")) {
-        char buf[256];
+    if (term_str_eq (argv [1], "ls")) {
+        char buf [256];
         term_out ("registry modules:\n");
         for (int i = 0; i < mpe_module_count (); i++) {
             const mpe_module_desc_t *d = mpe_module_at (i);
@@ -44,7 +44,7 @@ void cmd_mod (int argc, char **argv) {
         term_out ("pair handlers:\n");
         for (int i = 0; i < MPE_MAX_PAIR_HANDLERS; i++) {
             int ta = 0, tb = 0, ca = 0, cb = 0;
-            char nm[64] = {0};
+            char nm [64] = {0};
             if (mpe_registry_pair_describe (i, &ta, &tb, &ca, &cb, nm, sizeof (nm)) != 0)
                 break;
             snprintf (buf, sizeof (buf), "  #%d (%d,%d,%d,%d) %s\n", i, ta, tb, ca, cb, nm);
@@ -60,7 +60,7 @@ void cmd_mod (int argc, char **argv) {
         term_out (buf);
         if (w)
             for (int i = 0; i < w->tick_module_count; i++) {
-                snprintf (buf, sizeof (buf), "  %s\n", w->tick_modules[i] ? w->tick_modules[i]->name : "?");
+                snprintf (buf, sizeof (buf), "  %s\n", w->tick_modules [i] ? w->tick_modules [i]->name : "?");
                 term_out (buf);
             }
         if (w) {
@@ -70,19 +70,19 @@ void cmd_mod (int argc, char **argv) {
         }
         return;
     }
-    if (term_str_eq (argv[1], "load") && argc >= 3) {
-        char err[512] = {0};
-        if (mpe_loader_load (argv[2], err, sizeof (err)) == 0)
+    if (term_str_eq (argv [1], "load") && argc >= 3) {
+        char err [512] = {0};
+        if (mpe_loader_load (argv [2], err, sizeof (err)) == 0)
             term_ok ("mpe: mod: loaded\n");
         else {
-            char b[600];
+            char b [600];
             snprintf (b, sizeof (b), "mpe: mod: load failed: %s\n", err);
             term_err (b);
         }
         return;
     }
-    if (term_str_eq (argv[1], "unload") && argc >= 3) {
-        int ur = mpe_loader_unload (argv[2]);
+    if (term_str_eq (argv [1], "unload") && argc >= 3) {
+        int ur = mpe_loader_unload (argv [2]);
         if (ur == 0)
             term_ok ("mpe: mod: unloaded\n");
         else if (ur == -2) {
@@ -94,8 +94,8 @@ void cmd_mod (int argc, char **argv) {
             term_err ("mpe: mod: unload failed (unknown handle)\n");
         return;
     }
-    if (term_str_eq (argv[1], "attach") && argc >= 3) {
-        const mpe_module_desc_t *d = mpe_find_module (argv[2]);
+    if (term_str_eq (argv [1], "attach") && argc >= 3) {
+        const mpe_module_desc_t *d = mpe_find_module (argv [2]);
         if (!d) {
             term_err ("mpe: mod: unknown module\n");
             return;
@@ -108,7 +108,7 @@ void cmd_mod (int argc, char **argv) {
         }
         physics_world *pw = physics_world_get_primary ();
         for (int i = 0; i < (pw ? pw->tick_module_count : 0); i++) {
-            if (pw->tick_modules[i] && term_str_eq (pw->tick_modules[i]->name, argv[2])) {
+            if (pw->tick_modules [i] && term_str_eq (pw->tick_modules [i]->name, argv [2])) {
                 term_ok ("mpe: mod: already attached\n");
                 return;
             }
@@ -120,20 +120,20 @@ void cmd_mod (int argc, char **argv) {
             term_err ("mpe: mod: attach failed (table full / attach hook)\n");
         return;
     }
-    if (term_str_eq (argv[1], "detach") && argc >= 3) {
-        if (physics_world_detach_module (physics_world_get_primary (), argv[2]) == 0)
+    if (term_str_eq (argv [1], "detach") && argc >= 3) {
+        if (physics_world_detach_module (physics_world_get_primary (), argv [2]) == 0)
             term_ok ("mpe: mod: detached\n");
         else
             term_err ("mpe: mod: detach failed (not attached)\n");
         return;
     }
-    if (term_str_eq (argv[1], "use-broadphase") && argc >= 3) {
-        if (term_str_eq (argv[2], "builtin")) {
+    if (term_str_eq (argv [1], "use-broadphase") && argc >= 3) {
+        if (term_str_eq (argv [2], "builtin")) {
             physics_world_set_broadphase (physics_world_get_primary (), NULL);
             term_ok ("mpe: mod: broadphase=builtin\n");
             return;
         }
-        const mpe_broadphase_if_t *b = mpe_find_broadphase (argv[2]);
+        const mpe_broadphase_if_t *b = mpe_find_broadphase (argv [2]);
         if (!b) {
             term_err ("mpe: mod: unknown broadphase\n");
             return;
@@ -142,13 +142,13 @@ void cmd_mod (int argc, char **argv) {
         term_ok ("mpe: mod: broadphase swapped\n");
         return;
     }
-    if (term_str_eq (argv[1], "use-solver") && argc >= 3) {
-        if (term_str_eq (argv[2], "builtin")) {
+    if (term_str_eq (argv [1], "use-solver") && argc >= 3) {
+        if (term_str_eq (argv [2], "builtin")) {
             physics_world_set_solver (physics_world_get_primary (), NULL);
             term_ok ("mpe: mod: solver=builtin\n");
             return;
         }
-        const mpe_solver_if_t *s = mpe_find_solver (argv[2]);
+        const mpe_solver_if_t *s = mpe_find_solver (argv [2]);
         if (!s) {
             term_err ("mpe: mod: unknown solver\n");
             return;
@@ -165,12 +165,12 @@ void cmd_modinfo (int argc, char **argv) {
         term_err ("mpe: modinfo: usage: modinfo <module-name>\n");
         return;
     }
-    const mpe_module_desc_t *d = mpe_find_module (argv[1]);
+    const mpe_module_desc_t *d = mpe_find_module (argv [1]);
     if (!d) {
         term_err ("mpe: modinfo: module not found\n");
         return;
     }
-    char buf[512];
+    char buf [512];
     snprintf (buf, sizeof (buf), "name:        %s\n", d->name);
     term_out (buf);
     snprintf (buf, sizeof (buf), "version:     %s\n", d->version ? d->version : "?");

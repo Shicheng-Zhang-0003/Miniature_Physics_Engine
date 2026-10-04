@@ -16,13 +16,13 @@ int main (void) {
     physics_world_add_cube (&world, (vector3){0.0f, 0.25f, 0.5f}, (vector3){0.5f, 0.25f, 0.1f}, 0.0f);
     /* Cylinder rolling toward the wall */
     int cyl = physics_world_add_cylinder (&world, 0.05f, 0.02f, 0.5f, (vector3){0.0f, 0.06f, -0.5f});
-    world.bodies[cyl].velocity = (vector3){0.0f, 0.0f, 3.0f};
+    world.bodies [cyl].velocity = (vector3){0.0f, 0.0f, 3.0f};
     const float dt = 1.0f / 60.0f;
     int fail = 0;
     for (int t = 0; t < 180 && !fail; t++) {
         physics_world_step (&world, dt);
         for (int i = 0; i < world.body_count; i++) {
-            if (!isfinite (world.bodies[i].position.z)) {
+            if (!isfinite (world.bodies [i].position.z)) {
                 printf ("[FAIL] NaN at tick %d\n", t);
                 fail = 1;
                 break;
@@ -31,8 +31,8 @@ int main (void) {
     }
     if (fail)
         return 1;
-    float cyl_z = world.bodies[cyl].position.z;
-    float cyl_vz = world.bodies[cyl].velocity.z;
+    float cyl_z = world.bodies [cyl].position.z;
+    float cyl_vz = world.bodies [cyl].velocity.z;
     printf ("[info] cylinder final z=%.4f vz=%.4f (wall face at z=0.4)\n", cyl_z, cyl_vz);
     /* TRUTH: two-sided. Wall face at z=0.4 (center 0.5 - half 0.1);
      * cylinder surface must not cross it, and must be spent (bounced back

@@ -31,9 +31,9 @@ int main (void) {
     /* Reset odometry */
     robot.odom_x = robot.odom_z = robot.odom_theta = 0.0f;
     for (int i = 0; i < robot.wheel_count && i < FTC_MAX_WHEELS; i++)
-        robot.wheel_radians[i] = 0.0f;
-    float start_x = world.bodies[robot.chassis_body].position.x;
-    float start_z = world.bodies[robot.chassis_body].position.z;
+        robot.wheel_radians [i] = 0.0f;
+    float start_x = world.bodies [robot.chassis_body].position.x;
+    float start_z = world.bodies [robot.chassis_body].position.z;
     /* Phase 1: Drive forward at full power for 180 ticks (3 seconds) */
     printf ("[info] Phase 1: driving forward 3s\n");
     for (int t = 0; t < 180 && !fail; t++) {
@@ -41,7 +41,7 @@ int main (void) {
         drivetrain_update (&world, &robot, dt);
         physics_world_step (&world, dt);
         for (int i = 0; i < world.body_count; i++) {
-            if (!isfinite (world.bodies[i].position.x) || !isfinite (world.bodies[i].position.z)) {
+            if (!isfinite (world.bodies [i].position.x) || !isfinite (world.bodies [i].position.z)) {
                 printf ("[FAIL] NaN at tick %d\n", t);
                 fail = 1;
                 break;
@@ -50,8 +50,8 @@ int main (void) {
     }
     if (fail)
         return 1;
-    float end_x = world.bodies[robot.chassis_body].position.x;
-    float end_z = world.bodies[robot.chassis_body].position.z;
+    float end_x = world.bodies [robot.chassis_body].position.x;
+    float end_z = world.bodies [robot.chassis_body].position.z;
     float physics_dz = end_z - start_z;
     float physics_dx = end_x - start_x;
     float physics_dist = sqrtf (physics_dz * physics_dz + physics_dx * physics_dx);
@@ -76,15 +76,15 @@ int main (void) {
     printf ("[info] Phase 2: strafe test\n");
     robot.odom_x = robot.odom_z = robot.odom_theta = 0.0f;
     for (int i = 0; i < robot.wheel_count && i < FTC_MAX_WHEELS; i++)
-        robot.wheel_radians[i] = 0.0f;
-    start_x = world.bodies[robot.chassis_body].position.x;
+        robot.wheel_radians [i] = 0.0f;
+    start_x = world.bodies [robot.chassis_body].position.x;
     /* Mecanum strafe: forward=0, strafe=1, rotate=0 */
     for (int t = 0; t < 60 && !fail; t++) {
         drivetrain_mecanum (&robot, 0.0f, 1.0f, 0.0f);
         drivetrain_update (&world, &robot, dt);
         physics_world_step (&world, dt);
     }
-    end_x = world.bodies[robot.chassis_body].position.x;
+    end_x = world.bodies [robot.chassis_body].position.x;
     float strafe_dx = end_x - start_x;
     printf ("[info] strafe: physics dx=%.4f odometry dx=%.4f\n", strafe_dx, robot.odom_x);
     /* FIX-AUDIT: old minima gate silently skipped when strafe was small.

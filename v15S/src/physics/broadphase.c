@@ -131,9 +131,9 @@ static void insert_into_hash (broadphase_workspace *ws, int object_index, int x,
         return;
     }
     int hash = hash_coordinate (x, y, z);
-    ws->node_pool[ws->node_count].object_index = object_index;
-    ws->node_pool[ws->node_count].next_entry = ws->hash_table[hash];
-    ws->hash_table[hash] = ws->node_count;
+    ws->node_pool [ws->node_count].object_index = object_index;
+    ws->node_pool [ws->node_count].next_entry = ws->hash_table [hash];
+    ws->hash_table [hash] = ws->node_count;
     ws->node_count++;
 }
 float broadphase_bounding_radius (rigidbody *rb) {
@@ -208,7 +208,7 @@ static void broadphase_pair_dedupe_begin (broadphase_workspace *ws) {
     ws->pair_hash_generation++;
     if (ws->pair_hash_generation == 0) {
         for (int i = 0; i < a3_pair_hash_table_size; i++) {
-            ws->pair_hash_generations[i] = 0;
+            ws->pair_hash_generations [i] = 0;
         }
         ws->pair_hash_generation = 1;
     }
@@ -222,12 +222,12 @@ static bool pair_already_checked (broadphase_workspace *ws, int min_obj, int max
      * duplicate narrowphase work) and counts overflow for visibility. */
     for (uint32_t probe = 0; probe < 4096; probe++) {
         uint32_t slot = (index + probe) & a3_pair_hash_mask;
-        if (ws->pair_hash_generations[slot] != ws->pair_hash_generation) {
-            ws->pair_hash_keys[slot] = key;
-            ws->pair_hash_generations[slot] = ws->pair_hash_generation;
+        if (ws->pair_hash_generations [slot] != ws->pair_hash_generation) {
+            ws->pair_hash_keys [slot] = key;
+            ws->pair_hash_generations [slot] = ws->pair_hash_generation;
             return false;
         }
-        if (ws->pair_hash_keys[slot] == key) {
+        if (ws->pair_hash_keys [slot] == key) {
             return true;
         }
     }
@@ -270,7 +270,7 @@ static void broadphase_update_cell_size (struct physics_world *world, rigidbody 
         for (int pi = 0; pi < probe_n; pi++) {
             unsigned pi_u = (unsigned) pi;
             int idx = (int) (((pi_u * 2654435761u) % (unsigned) body_count));
-            float pr = broadphase_bounding_radius (&bodies[idx]);
+            float pr = broadphase_bounding_radius (&bodies [idx]);
             if (isfinite (pr) && pr > 0.0f) {
                 probe_sum += (double) pr;
             }
@@ -290,7 +290,7 @@ static void broadphase_update_cell_size (struct physics_world *world, rigidbody 
     double radius_sum = 0.0;
     float max_radius = 0.0f;
     for (int object_index = 0; object_index < body_count; object_index++) {
-        float object_radius = broadphase_bounding_radius (&bodies[object_index]);
+        float object_radius = broadphase_bounding_radius (&bodies [object_index]);
         if ((isfinite (object_radius)) && (object_radius > 0.0f)) {
             radius_sum += (double) object_radius;
             if (object_radius > max_radius) {
@@ -341,14 +341,14 @@ int broadphase_generate_pairing (struct physics_world *world, broadphase_pair *c
     broadphase_update_cell_size (world, bodies, body_count); /* MPE_FTC_059e */
     /* MPE_TASK_17_CELL_SIZE_CALL_END */
     for (int i = 0; i < hash_table_size; i++) {
-        ws->hash_table[i] = -1;
+        ws->hash_table [i] = -1;
     }
     ws->node_count = 0;
     int overflow_before = ws->node_overflow_count;
     broadphase_pair_dedupe_begin (ws);
     int collision_pair_counter = 0;
     for (int i = 0; i < body_count; i++) {
-        rigidbody *rb = &bodies[i];
+        rigidbody *rb = &bodies [i];
         if (rb->no_collide)
             continue; /* render-only proxies: never paired */
         float extent_x, extent_y, extent_z;
@@ -359,12 +359,12 @@ int broadphase_generate_pairing (struct physics_world *world, broadphase_pair *c
             extent_x = extent_y = extent_z = r;
         } else {
             vector3 *axes = rb->cached_axes;
-            extent_x = fabsf (axes[0].x) * rb->half_extensions.x + fabsf (axes[1].x) * rb->half_extensions.y +
-                       fabsf (axes[2].x) * rb->half_extensions.z;
-            extent_y = fabsf (axes[0].y) * rb->half_extensions.x + fabsf (axes[1].y) * rb->half_extensions.y +
-                       fabsf (axes[2].y) * rb->half_extensions.z;
-            extent_z = fabsf (axes[0].z) * rb->half_extensions.x + fabsf (axes[1].z) * rb->half_extensions.y +
-                       fabsf (axes[2].z) * rb->half_extensions.z;
+            extent_x = fabsf (axes [0].x) * rb->half_extensions.x + fabsf (axes [1].x) * rb->half_extensions.y +
+                       fabsf (axes [2].x) * rb->half_extensions.z;
+            extent_y = fabsf (axes [0].y) * rb->half_extensions.x + fabsf (axes [1].y) * rb->half_extensions.y +
+                       fabsf (axes [2].y) * rb->half_extensions.z;
+            extent_z = fabsf (axes [0].z) * rb->half_extensions.x + fabsf (axes [1].z) * rb->half_extensions.y +
+                       fabsf (axes [2].z) * rb->half_extensions.z;
         }
         if (!isfinite (extent_x) || extent_x < 0.0f) {
             extent_x = 1.0f;
@@ -472,18 +472,18 @@ int broadphase_generate_pairing (struct physics_world *world, broadphase_pair *c
         }
     }
     for (int i = 0; i < hash_table_size; i++) {
-        int node_idx = ws->hash_table[i];
+        int node_idx = ws->hash_table [i];
         while (node_idx != -1) {
-            int obj_a = ws->node_pool[node_idx].object_index;
-            int next_node_idx = ws->node_pool[node_idx].next_entry;
+            int obj_a = ws->node_pool [node_idx].object_index;
+            int next_node_idx = ws->node_pool [node_idx].next_entry;
             while (next_node_idx != -1) {
-                int obj_b = ws->node_pool[next_node_idx].object_index;
+                int obj_b = ws->node_pool [next_node_idx].object_index;
                 if (obj_a != obj_b) {
                     int min_obj = obj_a < obj_b ? obj_a : obj_b;
                     int max_obj = obj_a > obj_b ? obj_a : obj_b;
                     if (!pair_already_checked (ws, min_obj, max_obj)) {
-                        rigidbody *rb_a = &bodies[min_obj];
-                        rigidbody *rb_b = &bodies[max_obj];
+                        rigidbody *rb_a = &bodies [min_obj];
+                        rigidbody *rb_b = &bodies [max_obj];
                         /* TRUTH: swept-insert then unswept cull tunnels fast bodies.
                          * Cells prove swept-AABB overlap; cull must be swept too.
                          * Expand by relative displacement over dt (linear + tip),
@@ -536,8 +536,8 @@ int broadphase_generate_pairing (struct physics_world *world, broadphase_pair *c
                         }
                         if (cull_hit) {
                             if (collision_pair_counter < maximum_pairs_allowed) {
-                                collision_pairs_output_array[collision_pair_counter].object_index_a = min_obj;
-                                collision_pairs_output_array[collision_pair_counter].object_index_b = max_obj;
+                                collision_pairs_output_array [collision_pair_counter].object_index_a = min_obj;
+                                collision_pairs_output_array [collision_pair_counter].object_index_b = max_obj;
                                 collision_pair_counter++;
                             } else {
                                 ws->pair_overflow_count++;
@@ -545,9 +545,9 @@ int broadphase_generate_pairing (struct physics_world *world, broadphase_pair *c
                         }
                     }
                 }
-                next_node_idx = ws->node_pool[next_node_idx].next_entry;
+                next_node_idx = ws->node_pool [next_node_idx].next_entry;
             }
-            node_idx = ws->node_pool[node_idx].next_entry;
+            node_idx = ws->node_pool [node_idx].next_entry;
         }
     }
     /* Fail-closed: node-pool exhaustion drops cell inserts (false negatives).
@@ -560,15 +560,15 @@ int broadphase_generate_pairing (struct physics_world *world, broadphase_pair *c
      * rest of the pipeline assumes cannot exist. */
     if (ws->node_overflow_count != overflow_before) {
         for (int ai = 0; ai < body_count && collision_pair_counter < maximum_pairs_allowed; ai++) {
-            if (bodies[ai].no_collide)
+            if (bodies [ai].no_collide)
                 continue;
             for (int bi = ai + 1; bi < body_count && collision_pair_counter < maximum_pairs_allowed; bi++) {
-                if (bodies[bi].no_collide)
+                if (bodies [bi].no_collide)
                     continue;
                 if (pair_already_checked (ws, ai, bi))
                     continue;
-                rigidbody *rb_a = &bodies[ai];
-                rigidbody *rb_b = &bodies[bi];
+                rigidbody *rb_a = &bodies [ai];
+                rigidbody *rb_b = &bodies [bi];
                 vector3 dp = vector3_subtraction (rb_a->position, rb_b->position);
                 float dist_sq = vector3_length_squared (dp);
                 float rad_sum = broadphase_bounding_radius (rb_a) + broadphase_bounding_radius (rb_b);
@@ -600,8 +600,8 @@ int broadphase_generate_pairing (struct physics_world *world, broadphase_pair *c
                 else if (dist_sq <= swept_sum * swept_sum)
                     fb_hit = true;
                 if (fb_hit) {
-                    collision_pairs_output_array[collision_pair_counter].object_index_a = ai;
-                    collision_pairs_output_array[collision_pair_counter].object_index_b = bi;
+                    collision_pairs_output_array [collision_pair_counter].object_index_a = ai;
+                    collision_pairs_output_array [collision_pair_counter].object_index_b = bi;
                     collision_pair_counter++;
                 }
             }

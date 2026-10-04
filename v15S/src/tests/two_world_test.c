@@ -25,8 +25,8 @@ int main (void) {
     for (int t = 0; t < 600; t++) {
         physics_world_step (&world_a, dt);
         physics_world_step (&world_b, dt);
-        rigidbody *ra = &world_a.bodies[0];
-        rigidbody *rb = &world_b.bodies[0];
+        rigidbody *ra = &world_a.bodies [0];
+        rigidbody *rb = &world_b.bodies [0];
         if ((!isfinite (rb->position.x)) || (!isfinite (rb->position.y)) || (!isfinite (rb->position.z)) ||
             (!isfinite (ra->position.x)) || (!isfinite (ra->position.y)) || (!isfinite (ra->position.z))) {
             printf ("[FAIL] non-finite state on tick %d\n", t);
@@ -48,8 +48,8 @@ int main (void) {
         if ((yb_mid - ya_mid) < 2.0f) {
             printf ("[FAIL] worlds not independent at t=1s (y_a=%.3f y_b=%.3f)\n", ya_mid, yb_mid);
             fail = 1;
-        } else if (world_a.bodies[0].position.y > 9.0f) {
-            printf ("[FAIL] world A sphere did not fall (y=%.3f)\n", world_a.bodies[0].position.y);
+        } else if (world_a.bodies [0].position.y > 9.0f) {
+            printf ("[FAIL] world A sphere did not fall (y=%.3f)\n", world_a.bodies [0].position.y);
             fail = 1;
         } else {
             printf ("[PASS] two worlds independent: separated %.3f m at t=1s by per-world gravity\n", yb_mid - ya_mid);

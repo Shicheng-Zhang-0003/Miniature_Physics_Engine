@@ -241,7 +241,7 @@ int ftc_robot_create_with_drive (physics_world *world, ftc_robot *robot, float x
     /* memset zeroes odom_x/z/theta and wheel_radians — no separate init needed */
     /* Traction scales start open (1.0); memset leaves 0.0 = fully cut. */
     for (int i = 0; i < FTC_MAX_WHEELS; i++) {
-        robot->wheel_traction_scale[i] = 1.0f;
+        robot->wheel_traction_scale [i] = 1.0f;
     }
     robot->motor_preset = preset;
     robot->drivetrain_type = drivetrain_type;
@@ -274,7 +274,7 @@ int ftc_robot_create_with_drive (physics_world *world, ftc_robot *robot, float x
      * mecanum build makes 4+32=36); creation bails out rather than
      * overflow. The old 64 assumed 16 rollers/wheel and overflowed an
      * 8-wheel build. */
-    int created_joints[80];
+    int created_joints [80];
     int ncreated = 0;
     /* FIX-AUDIT-DESPOT: memset(robot,0) above leaves joint slots at 0, which
      * the old `>= 0` fail-path check mistook for live joint 0. Poison all
@@ -287,9 +287,9 @@ int ftc_robot_create_with_drive (physics_world *world, ftc_robot *robot, float x
     if (robot->chassis_body < 0) {
         goto fail;
     }
-    uint32_t chassis_id = world->bodies[robot->chassis_body].object_id;
+    uint32_t chassis_id = world->bodies [robot->chassis_body].object_id;
     /* 4 wheels at corners */
-    float wheel_positions[4][3] = {
+    float wheel_positions [4] [3] = {
         {x - WHEEL_OFFSET_X, y + WHEEL_Y_OFFSET, z - WHEEL_OFFSET_Z}, /* front-left */
         {x + WHEEL_OFFSET_X, y + WHEEL_Y_OFFSET, z - WHEEL_OFFSET_Z}, /* front-right */
         {x - WHEEL_OFFSET_X, y + WHEEL_Y_OFFSET, z + WHEEL_OFFSET_Z}, /* back-left */
@@ -337,12 +337,12 @@ int ftc_robot_create_with_drive (physics_world *world, ftc_robot *robot, float x
          * (pitch radius + roller radius == WHEEL_RADIUS numerically, but the
          * sum records the provenance: change the roller and the radius
          * follows); tank contacts on the tyre, i.e. WHEEL_RADIUS. */
-        robot->wheel_effective_radius[i] =
+        robot->wheel_effective_radius [i] =
             wheel_is_mecanum_w ? (MECANUM_ROLLER_PITCH_RADIUS + MECANUM_ROLLER_RADIUS) : WHEEL_RADIUS;
-        robot->wheel_bodies[i] =
+        robot->wheel_bodies [i] =
             physics_world_add_cylinder (world, hub_radius, WHEEL_HALF_WIDTH, WHEEL_MASS,
-                                        (vector3){wheel_positions[i][0], wheel_positions[i][1], wheel_positions[i][2]});
-        if (robot->wheel_bodies[i] < 0) {
+                                        (vector3){wheel_positions [i] [0], wheel_positions [i] [1], wheel_positions [i] [2]});
+        if (robot->wheel_bodies [i] < 0) {
             goto fail;
         }
         /* Grippy rubber on tile (was engine defaults ~0.3/0.2: glassy).
@@ -362,27 +362,27 @@ int ftc_robot_create_with_drive (physics_world *world, ftc_robot *robot, float x
          * engaged. Initial state here is driven-mode (zeroed); the
          * per-tick switch below owns it afterwards. */
         if (wheel_is_mecanum_w && robot->mecanum_analytic) {
-            world->bodies[robot->wheel_bodies[i]].friction_static = 0.0f;
-            world->bodies[robot->wheel_bodies[i]].friction_kinetic = 0.0f;
+            world->bodies [robot->wheel_bodies [i]].friction_static = 0.0f;
+            world->bodies [robot->wheel_bodies [i]].friction_kinetic = 0.0f;
         } else {
-            world->bodies[robot->wheel_bodies[i]].friction_static = 0.9f;
-            world->bodies[robot->wheel_bodies[i]].friction_kinetic = 0.7f;
+            world->bodies [robot->wheel_bodies [i]].friction_static = 0.9f;
+            world->bodies [robot->wheel_bodies [i]].friction_kinetic = 0.7f;
         }
-        world->bodies[robot->wheel_bodies[i]].restitution = 0.0f;
-        uint32_t wheel_id = world->bodies[robot->wheel_bodies[i]].object_id;
+        world->bodies [robot->wheel_bodies [i]].restitution = 0.0f;
+        uint32_t wheel_id = world->bodies [robot->wheel_bodies [i]].object_id;
         /* Revolute joint: chassis (body_a) to wheel (body_b), axle along X.
          * Anchor sits WHEEL_PRELOAD below exact touch (see above). */
-        vector3 anchor_on_chassis = {wheel_positions[i][0] - x, WHEEL_Y_OFFSET - WHEEL_PRELOAD,
-                                     wheel_positions[i][2] - z};
+        vector3 anchor_on_chassis = {wheel_positions [i] [0] - x, WHEEL_Y_OFFSET - WHEEL_PRELOAD,
+                                     wheel_positions [i] [2] - z};
         vector3 anchor_on_wheel = {0.0f, 0.0f, 0.0f}; /* wheel centre */
         vector3 axle_axis = {robot->axle_axis_x, robot->axle_axis_y, robot->axle_axis_z};
-        robot->wheel_joints[i] =
+        robot->wheel_joints [i] =
             constraint_add_revolute (world, chassis_id, wheel_id, anchor_on_chassis, anchor_on_wheel, axle_axis);
-        if (robot->wheel_joints[i] < 0) {
+        if (robot->wheel_joints [i] < 0) {
             goto fail;
         }
-        if (ncreated < (int) (sizeof (created_joints) / sizeof (created_joints[0]))) {
-            created_joints[ncreated++] = robot->wheel_joints[i];
+        if (ncreated < (int) (sizeof (created_joints) / sizeof (created_joints [0]))) {
+            created_joints [ncreated++] = robot->wheel_joints [i];
         } else {
             goto fail; /* joint untrackable: unwind rather than leak */
         }
@@ -406,10 +406,10 @@ int ftc_robot_create_with_drive (physics_world *world, ftc_robot *robot, float x
             float front_back = (i < 2) ? 1.0f : -1.0f;
             roller_angle = 0.785398f * side * front_back;
         }
-        robot->wheel_roller_angle[i] = roller_angle;
-        robot->wheel_is_mecanum[i] = is_mecanum;
+        robot->wheel_roller_angle [i] = roller_angle;
+        robot->wheel_is_mecanum [i] = is_mecanum;
         /* Set up motor for this wheel */
-        motor_preset_apply (&robot->wheel_motors[i], preset);
+        motor_preset_apply (&robot->wheel_motors [i], preset);
         /* --- Mecanum contact: wheel-level anisotropic Coulomb friction ---
          * The 64-real-roller model (16 free-bearing roller bodies per wheel)
          * was built first and measured. It does not work in this engine, and
@@ -449,7 +449,7 @@ int ftc_robot_create_with_drive (physics_world *world, ftc_robot *robot, float x
          * surface (pitch radius + roller radius = WHEEL_RADIUS), which is
          * the same running radius a tyre would have, so the hub reaching the
          * floor is the honest envelope rather than a shortcut. */
-        robot->roller_count[i] = 0;
+        robot->roller_count [i] = 0;
 #if defined(MECANUM_USE_RAIL_CONTACT)
         if (is_mecanum) {
             /* Wheel-level RAIL contact: the free rollers are collapsed into the
@@ -467,7 +467,7 @@ int ftc_robot_create_with_drive (physics_world *world, ftc_robot *robot, float x
              * the axis is given in the chassis frame. A hub-local axis would
              * sweep around with the wheel and leave the contact with no fixed
              * direction at all. */
-            rigidbody_set_friction_anisotropic_in_frame (&world->bodies[robot->wheel_bodies[i]], chassis_id, rail_axis,
+            rigidbody_set_friction_anisotropic_in_frame (&world->bodies [robot->wheel_bodies [i]], chassis_id, rail_axis,
                                                          MECANUM_MU_ROLLER_RAIL, MECANUM_MU_PLATE_ACROSS);
         }
 #else
@@ -501,8 +501,8 @@ int ftc_robot_create_with_drive (physics_world *world, ftc_robot *robot, float x
             const vector3 roller_axis = {sinf (roller_angle), 0.0f, cosf (roller_angle)};
             const int n_rollers = MECANUM_ROLLERS_PER_ROW * MECANUM_ROLLER_ROWS;
             int roller_count = 0;
-            const vector3 wc = {wheel_positions[i][0], wheel_positions[i][1], wheel_positions[i][2]};
-            const uint32_t wheel_id_w = world->bodies[robot->wheel_bodies[i]].object_id;
+            const vector3 wc = {wheel_positions [i] [0], wheel_positions [i] [1], wheel_positions [i] [2]};
+            const uint32_t wheel_id_w = world->bodies [robot->wheel_bodies [i]].object_id;
             if (n_rollers > MFS_ROLLERS_PER_WHEEL) {
                 goto fail;
             }
@@ -529,9 +529,9 @@ int ftc_robot_create_with_drive (physics_world *world, ftc_robot *robot, float x
                 }
                 /* Same rubber-on-tile material as the hub, so the contact mu
                  * the engine reduces over is the one the drivetrain budgets. */
-                world->bodies[rb].friction_static = 0.9f;
-                world->bodies[rb].friction_kinetic = 0.7f;
-                world->bodies[rb].restitution = 0.0f;
+                world->bodies [rb].friction_static = 0.9f;
+                world->bodies [rb].friction_kinetic = 0.7f;
+                world->bodies [rb].restitution = 0.0f;
                 /* The roller is what decouples hub spin from contact-force
                  * direction, so the anisotropy belongs on the ROLLER, not on
                  * the hub. A contact modelled on the hub cannot do this job:
@@ -557,30 +557,30 @@ int ftc_robot_create_with_drive (physics_world *world, ftc_robot *robot, float x
                  * friction coefficients. Call kept (compiled out) so the
                  * experiment can be re-run by flipping the 0 below. */
 #if 0 /* roller anisotropy: parked, see above */
-                rigidbody_set_friction_anisotropic(&world->bodies[rb], (vector3){1.0f, 0.0f, 0.0f},
+                rigidbody_set_friction_anisotropic(&world->bodies [rb], (vector3){1.0f, 0.0f, 0.0f},
                                                    MECANUM_MU_ROLLER_RAIL, MECANUM_MU_ROLLER_ACROSS);
 #endif
                 /* physics_world_add_cylinder always builds the axis along
                  * local +X, so the roller's own axis has to be turned to the
                  * rail direction or its contact patch is a disc, not a
                  * cylinder lying across the rail. */
-                world->bodies[rb].orientation = rb_orient_from_axis (roller_axis);
-                robot->roller_bodies[i][k] = rb;
-                const uint32_t roller_id = world->bodies[rb].object_id;
+                world->bodies [rb].orientation = rb_orient_from_axis (roller_axis);
+                robot->roller_bodies [i] [k] = rb;
+                const uint32_t roller_id = world->bodies [rb].object_id;
                 const int rj = constraint_add_revolute (world, wheel_id_w, roller_id, offset,
                                                         (vector3){0.0f, 0.0f, 0.0f}, roller_axis);
                 if (rj < 0) {
                     goto fail;
                 }
-                robot->roller_joints[i][k] = rj;
-                if (ncreated < (int) (sizeof (created_joints) / sizeof (created_joints[0]))) {
-                    created_joints[ncreated++] = rj;
+                robot->roller_joints [i] [k] = rj;
+                if (ncreated < (int) (sizeof (created_joints) / sizeof (created_joints [0]))) {
+                    created_joints [ncreated++] = rj;
                 } else {
                     goto fail; /* joint untrackable: unwind rather than leak */
                 }
                 roller_count++;
             }
-            robot->roller_count[i] = roller_count;
+            robot->roller_count [i] = roller_count;
         }
 #endif
     }
@@ -595,10 +595,10 @@ fail:
      * interleaved wheel+roller counts — roller joints leaked and stale
      * wheel slots (0 from memset) removed joint 0. */
     for (int i = 0; i < ncreated; i++) {
-        constraint_remove (world, created_joints[i]);
+        constraint_remove (world, created_joints [i]);
     }
     for (int i = 0; i < FTC_MAX_WHEELS; i++) {
-        robot->wheel_joints[i] = -1;
+        robot->wheel_joints [i] = -1;
     }
     memset (robot->roller_joints, 0xFF, sizeof (robot->roller_joints));
     if (world->body_count > body_watermark) {
@@ -616,11 +616,11 @@ fail:
      * in the same breath as the joint indices so every accessor in the
      * struct agrees that the robot does not exist. */
     for (int i = 0; i < FTC_MAX_WHEELS; i++) {
-        robot->wheel_bodies[i] = -1;
+        robot->wheel_bodies [i] = -1;
     }
     memset (robot->roller_bodies, 0xFF, sizeof (robot->roller_bodies));
     for (int i = 0; i < FTC_MAX_WHEELS; i++) {
-        robot->roller_count[i] = 0;
+        robot->roller_count [i] = 0;
     }
     robot->chassis_body = -1;
     robot->wheel_count = 0;
@@ -640,13 +640,13 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
      * an idle settle. Wheels are woken below per-wheel. */
     int any_command = 0;
     for (int i = 0; i < robot->wheel_count; i++) {
-        if (fabsf (robot->wheel_motors[i].command) > 0.01f) {
+        if (fabsf (robot->wheel_motors [i].command) > 0.01f) {
             any_command = 1;
             break;
         }
     }
     if (any_command && robot->chassis_body >= 0 && robot->chassis_body < world->body_count) {
-        rigidbody_wake (&world->bodies[robot->chassis_body]);
+        rigidbody_wake (&world->bodies [robot->chassis_body]);
     }
     /* DESPOT-2026-10-04 idle-tire switch (see creation comment above):
      * driven analytic-mecanum wheels keep zeroed hub friction (analytic
@@ -668,12 +668,12 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
     if (robot->drivetrain_type == FTC_DRIVETRAIN_MECANUM && robot->mecanum_analytic) {
         float idle_max = 0.0f;
         for (int ci = 0; ci < robot->wheel_count; ci++) {
-            float a = fabsf (robot->wheel_motors[ci].command);
+            float a = fabsf (robot->wheel_motors [ci].command);
             if (a > idle_max)
                 idle_max = a;
         }
-        int wi0 = (robot->wheel_count > 0) ? robot->wheel_bodies[0] : -1;
-        int engaged = (wi0 >= 0 && wi0 < world->body_count && world->bodies[wi0].friction_static > 0.45f) ? 1 : 0;
+        int wi0 = (robot->wheel_count > 0) ? robot->wheel_bodies [0] : -1;
+        int engaged = (wi0 >= 0 && wi0 < world->body_count && world->bodies [wi0].friction_static > 0.45f) ? 1 : 0;
         if (!engaged && idle_max < 0.03f) {
             engaged = 1;
         } else if (engaged && idle_max > 0.08f) {
@@ -681,17 +681,17 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
         }
         idle_tires = engaged;
         for (int ci = 0; ci < robot->wheel_count; ci++) {
-            if (!robot->wheel_is_mecanum[ci])
+            if (!robot->wheel_is_mecanum [ci])
                 continue;
-            int wi = robot->wheel_bodies[ci];
+            int wi = robot->wheel_bodies [ci];
             if (wi < 0 || wi >= world->body_count)
                 continue;
             if (idle_tires) {
-                world->bodies[wi].friction_static = 0.9f;
-                world->bodies[wi].friction_kinetic = 0.7f;
+                world->bodies [wi].friction_static = 0.9f;
+                world->bodies [wi].friction_kinetic = 0.7f;
             } else {
-                world->bodies[wi].friction_static = 0.0f;
-                world->bodies[wi].friction_kinetic = 0.0f;
+                world->bodies [wi].friction_static = 0.0f;
+                world->bodies [wi].friction_kinetic = 0.0f;
             }
         }
     }
@@ -700,7 +700,7 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
      * mid-drift (measured T8 hold failure). Truly settled bodies sit
      * below the sleep thresholds; anything above wakes. */
     if (robot->chassis_body >= 0 && robot->chassis_body < world->body_count) {
-        rigidbody *chb = &world->bodies[robot->chassis_body];
+        rigidbody *chb = &world->bodies [robot->chassis_body];
         if (chb->is_sleeping) {
             const mpe_config_t *sleep_cfg = mpe_world_cfg (world);
             float lv2 = vector3_length_squared (chb->velocity);
@@ -717,13 +717,13 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
      * 50% efficiency, SoC clamped in battery_drain path). */
     float total_current_signed = 0.0f;
     for (int i = 0; i < robot->wheel_count; i++) {
-        total_current_signed += robot->wheel_motors[i].current;
+        total_current_signed += robot->wheel_motors [i].current;
     }
     /* Pack fuse sees the absolute bus load (stall sums, regen doesn't
      * cool the fuse). */
     float fuse_load = 0.0f;
     for (int i = 0; i < robot->wheel_count; i++) {
-        float c = robot->wheel_motors[i].current;
+        float c = robot->wheel_motors [i].current;
         fuse_load += (c > 0.0f) ? c : -c;
     }
     battery_fuse_step (&robot->battery, fuse_load, dt);
@@ -735,11 +735,11 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
     battery_drain (&robot->battery, drain_current, dt);
     /* Update each wheel motor */
     for (int i = 0; i < robot->wheel_count; i++) {
-        int wheel_idx = robot->wheel_bodies[i];
+        int wheel_idx = robot->wheel_bodies [i];
         if ((wheel_idx < 0) || (wheel_idx >= world->body_count)) {
             continue;
         }
-        rigidbody *wheel = &world->bodies[wheel_idx];
+        rigidbody *wheel = &world->bodies [wheel_idx];
         /* DESPOT-FIX: running radius, not plate radius. wheel->radius is
          * the hub PLATE (30 mm recessed on mecanum rollers); every lever
          * below (observer inertia, rolling demand, motor inertia,
@@ -747,13 +747,13 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
          * Using the plate radius halved all inertias and broke the
          * observer/governor calibration the moment the plate recessed. */
         float r_run = wheel->radius;
-        if (i >= 0 && i < FTC_MAX_WHEELS && robot->wheel_effective_radius[i] > 0.001f) {
-            r_run = robot->wheel_effective_radius[i];
+        if (i >= 0 && i < FTC_MAX_WHEELS && robot->wheel_effective_radius [i] > 0.001f) {
+            r_run = robot->wheel_effective_radius [i];
         }
         if (!(r_run > 0.001f) || !isfinite (r_run))
             r_run = wheel->radius;
         /* Read wheel angular velocity about the actual rotated axle axis in world space */
-        vector3 axle = wheel->cached_axes[0];
+        vector3 axle = wheel->cached_axes [0];
         if (vector3_length_squared (axle) < 0.0001f) {
             axle = vector4_rotate_to_vector3 (wheel->orientation, (vector3){1.0f, 0.0f, 0.0f});
         }
@@ -779,7 +779,7 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
          * to set it got a silently dead observer (tau_L == 0) with no
          * diagnostic. That mistake produced a wrong diagnosis of the stall
          * endpoint; see KNOWN_FAILURES.md -> MOTOR-III-2026-09-29. */
-        motor_observe (&robot->wheel_motors[i], wheel_speed, dt, 0.5f * wheel->mass * r_run * r_run);
+        motor_observe (&robot->wheel_motors [i], wheel_speed, dt, 0.5f * wheel->mass * r_run * r_run);
         /* MFS_TRACTION_CONTROL: compare against the rolling speed the
          * chassis motion demands at this wheel (rigid-body velocity at
          * the wheel center, projected on the rolling direction). A wheel
@@ -792,7 +792,7 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
         float wheel_bottom = wheel->position.y - r_run;
         if (robot->chassis_body >= 0 && robot->chassis_body < world->body_count && r_run > 0.001f &&
             wheel_bottom <= 0.05f) {
-            rigidbody *chassis = &world->bodies[robot->chassis_body];
+            rigidbody *chassis = &world->bodies [robot->chassis_body];
             vector3 r_ch_wh = vector3_subtraction (wheel->position, chassis->position);
             vector3 v_contact =
                 vector3_addition (chassis->velocity, vector3_cross (chassis->angular_velocity, r_ch_wh));
@@ -835,7 +835,7 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
              * fwd/rev antisymmetry — the slam is load-bearing for
              * calibrated drive behaviour, ugly or not. Do not re-attempt
              * without re-baselining tank + drive_directions first. */
-            float *scale = &robot->wheel_traction_scale[i];
+            float *scale = &robot->wheel_traction_scale [i];
             float over = slip * dir;
             if (dir != 0.0f && over > 4.0f) {
                 *scale = 0.15f;
@@ -865,12 +865,12 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
         if (robot->drivetrain_type == FTC_DRIVETRAIN_MECANUM && robot->mecanum_analytic) {
             idle_coast = idle_tires;
         } else {
-            idle_coast = (fabsf (robot->wheel_motors[i].command) < 0.05f) ? 1 : 0;
+            idle_coast = (fabsf (robot->wheel_motors [i].command) < 0.05f) ? 1 : 0;
         }
         if (idle_coast) {
-            motor_update (&robot->wheel_motors[i], wheel_speed, dt, terminal_voltage);
+            motor_update (&robot->wheel_motors [i], wheel_speed, dt, terminal_voltage);
         } else {
-            motor_update_load (&robot->wheel_motors[i], wheel_speed, dt, terminal_voltage, axle_inertia);
+            motor_update_load (&robot->wheel_motors [i], wheel_speed, dt, terminal_voltage, axle_inertia);
         }
         /* Traction cut applies to delivered torque (both the axle drive
          * below and the traction loop in drivetrain_update read
@@ -881,7 +881,7 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
          * brake 0.15-coasts it into uselessness while the contact solver
          * already cone-bounds whatever reaches the ground. */
         if (!idle_coast) {
-            robot->wheel_motors[i].output_torque *= robot->wheel_traction_scale[i];
+            robot->wheel_motors [i].output_torque *= robot->wheel_traction_scale [i];
         }
         /* Apply motor torque along the actual physical axle in world space.
          * Free-speed governor: a motor cannot push its wheel past free
@@ -909,7 +909,7 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
          * chatter in loaded driving. Diode kept intentionally; the
          * unloaded free-spin limit cycle is a separate frontier
          * (bearing-damping model). */
-        float torque = robot->wheel_motors[i].output_torque;
+        float torque = robot->wheel_motors [i].output_torque;
         /* DESPOT-FIX (torque slew): feather standing starts. A 0->stall
          * step in one tick (74 N-equiv vs 19 N cone) outruns the contact:
          * symmetric commands peel all wheels at once and lock into chaos
@@ -932,7 +932,7 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
              * brake sees 0 and skips, repeat forever). An exact stop needs
              * no ramp. */
             if (!idle_coast) {
-                float prev = robot->wheel_applied_torque[i];
+                float prev = robot->wheel_applied_torque [i];
                 if (!isfinite (prev))
                     prev = 0.0f;
                 float want = torque;
@@ -983,7 +983,7 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
          * Vterm/(kv*gear) with the same 1.155 hysteresis; spec survives
          * only as the fallback when Kv is degenerate. */
         {
-            const motor *gov_m = &robot->wheel_motors[i];
+            const motor *gov_m = &robot->wheel_motors [i];
             float wfree = fabsf (gov_m->free_speed_rad_s) * 1.155f;
             if (gov_m->kv > 0.0f && gov_m->gear_ratio > 0.0f && isfinite (terminal_voltage) &&
                 terminal_voltage > 0.0f) {
@@ -1022,7 +1022,7 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
          * matter what contact adds — contact itself never overshoots), so
          * the wheel converges instead of alternating. Airborne (no contact
          * help) still stops geometrically in ~10 ticks. */
-        if ((fabsf (robot->wheel_motors[i].command) < 0.05f) && ((torque * wheel_speed) < 0.0f)) {
+        if ((fabsf (robot->wheel_motors [i].command) < 0.05f) && ((torque * wheel_speed) < 0.0f)) {
             float mfs_i_axle = 0.5f * wheel->mass * r_run * r_run;
             if (mfs_i_axle > 0.0f) {
                 float mfs_max_brake = 0.5f * mfs_i_axle * fabsf (wheel_speed) / dt;
@@ -1037,7 +1037,7 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
          * wheel_applied_torque a fiction). This is the value the next tick
          * slews from, so it must be the value that actually reached the
          * axle accumulator below. */
-        robot->wheel_applied_torque[i] = isfinite (torque) ? torque : 0.0f;
+        robot->wheel_applied_torque [i] = isfinite (torque) ? torque : 0.0f;
         /* Apply the motor torque about the real axle, as a TORQUE COUPLE:
          * +tau on the hub, -tau on the chassis. A motor is two bodies acting
          * on each other, so the reaction is not optional - applying tau to the
@@ -1046,7 +1046,7 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
         wheel->torque_accumulator = vector3_addition (wheel->torque_accumulator, vector3_scaling (axle, torque));
 #ifndef MFS_NO_TORQUE_COUPLE
         if ((robot->chassis_body >= 0) && (robot->chassis_body < world->body_count)) {
-            rigidbody *chassis = &world->bodies[robot->chassis_body];
+            rigidbody *chassis = &world->bodies [robot->chassis_body];
             chassis->torque_accumulator =
                 vector3_subtraction (chassis->torque_accumulator, vector3_scaling (axle, torque));
             /* Equal-and-opposite, so the chassis cannot be spun by its own
@@ -1060,10 +1060,10 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
         /* Rollers are the bodies actually in contact, so they must be awake
          * too or sleep freezes the entire traction path while the (lighter,
          * contact-free) hub keeps running. */
-        for (int k = 0; k < robot->roller_count[i]; k++) {
-            int rb = robot->roller_bodies[i][k];
+        for (int k = 0; k < robot->roller_count [i]; k++) {
+            int rb = robot->roller_bodies [i] [k];
             if (rb >= 0 && rb < world->body_count) {
-                rigidbody_wake (&world->bodies[rb]);
+                rigidbody_wake (&world->bodies [rb]);
             }
         }
 #if !defined(MECANUM_USE_RAIL_CONTACT)
@@ -1106,11 +1106,11 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
          * axis sweep), so strafe magnitude is a SOLVER frontier, not a
          * prescription-source question. Command-based stays (sign-correct,
          * feedback-free); see KNOWN FAILURE note in README_MFS. */
-        for (int k = 0; k < robot->roller_count[i]; k++) {
-            int rb = robot->roller_bodies[i][k];
+        for (int k = 0; k < robot->roller_count [i]; k++) {
+            int rb = robot->roller_bodies [i] [k];
             if (rb < 0 || rb >= world->body_count)
                 continue;
-            rigidbody *roller = &world->bodies[rb];
+            rigidbody *roller = &world->bodies [rb];
             /* Roller spin axis in world space: roller's local +X is its cylinder axis. */
             vector3 spin_axis = vector4_rotate_to_vector3 (roller->orientation, (vector3){1.0f, 0.0f, 0.0f});
             float spin_len_sq = vector3_length_squared (spin_axis);
@@ -1123,14 +1123,14 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
             if (!(n_perp_len_sq > 1e-12f) || !isfinite (n_perp_len_sq))
                 continue;
             n_perp = vector3_scaling (n_perp, 1.0f / sqrtf (n_perp_len_sq));
-            int wb = robot->wheel_bodies[i];
+            int wb = robot->wheel_bodies [i];
             if (wb < 0 || wb >= world->body_count)
                 continue;
-            rigidbody *wheel = &world->bodies[wb];
+            rigidbody *wheel = &world->bodies [wb];
             vector3 r_vector = vector3_subtraction (roller->position, wheel->position);
             /* Intended wheel angular velocity from motor command (open-loop;
              * see block header for why measured-speed was reverted). */
-            float intended_speed = robot->wheel_motors[i].command * robot->wheel_motors[i].free_speed_rad_s;
+            float intended_speed = robot->wheel_motors [i].command * robot->wheel_motors [i].free_speed_rad_s;
             if (!isfinite (intended_speed))
                 continue;
             vector3 omega_wheel = vector3_scaling (axle, intended_speed);
@@ -1158,14 +1158,14 @@ void ftc_robot_set_wheel_commands (ftc_robot *robot, const float *commands, int 
     }
     int n = (count < robot->wheel_count) ? count : robot->wheel_count;
     for (int i = 0; i < n; i++) {
-        float cmd = commands[i];
+        float cmd = commands [i];
         if (cmd > 1.0f) {
             cmd = 1.0f;
         }
         if (cmd < -1.0f) {
             cmd = -1.0f;
         }
-        robot->wheel_motors[i].command = cmd;
+        robot->wheel_motors [i].command = cmd;
     }
 }
 void ftc_robot_set_mecanum_analytic_default (int on) {
@@ -1180,12 +1180,12 @@ void ftc_robot_get_position (physics_world *world, ftc_robot *robot, float *px, 
         return;
     }
     if (px) {
-        *px = world->bodies[idx].position.x;
+        *px = world->bodies [idx].position.x;
     }
     if (py) {
-        *py = world->bodies[idx].position.y;
+        *py = world->bodies [idx].position.y;
     }
     if (pz) {
-        *pz = world->bodies[idx].position.z;
+        *pz = world->bodies [idx].position.z;
     }
 }

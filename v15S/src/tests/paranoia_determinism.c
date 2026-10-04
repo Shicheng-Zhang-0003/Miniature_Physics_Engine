@@ -44,22 +44,22 @@ int main (void) {
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 0.99f;
         int s1 = physics_world_add_sphere (&w1, 0.5f, 2.0f, (vector3){-1.0f, 3.0f, 0.5f});
-        w1.bodies[s1].velocity = (vector3){1.5f, -0.5f, 0.25f};
-        w1.bodies[s1].angular_velocity = (vector3){3.0f, -1.0f, 2.0f};
-        w1.bodies[s1].restitution = 0.4f;
+        w1.bodies [s1].velocity = (vector3){1.5f, -0.5f, 0.25f};
+        w1.bodies [s1].angular_velocity = (vector3){3.0f, -1.0f, 2.0f};
+        w1.bodies [s1].restitution = 0.4f;
         int c1 = physics_world_add_cube (&w1, (vector3){1.0f, 0.5f, -0.5f}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
-        w1.bodies[c1].velocity = (vector3){-0.75f, 0.0f, 0.5f};
-        w1.bodies[c1].angular_velocity = (vector3){0.0f, 2.0f, -1.5f};
-        w1.bodies[c1].restitution = 0.3f;
+        w1.bodies [c1].velocity = (vector3){-0.75f, 0.0f, 0.5f};
+        w1.bodies [c1].angular_velocity = (vector3){0.0f, 2.0f, -1.5f};
+        w1.bodies [c1].restitution = 0.3f;
         /* Exact duplicate in w2 */
         int s2 = physics_world_add_sphere (&w2, 0.5f, 2.0f, (vector3){-1.0f, 3.0f, 0.5f});
-        w2.bodies[s2].velocity = (vector3){1.5f, -0.5f, 0.25f};
-        w2.bodies[s2].angular_velocity = (vector3){3.0f, -1.0f, 2.0f};
-        w2.bodies[s2].restitution = 0.4f;
+        w2.bodies [s2].velocity = (vector3){1.5f, -0.5f, 0.25f};
+        w2.bodies [s2].angular_velocity = (vector3){3.0f, -1.0f, 2.0f};
+        w2.bodies [s2].restitution = 0.4f;
         int c2 = physics_world_add_cube (&w2, (vector3){1.0f, 0.5f, -0.5f}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
-        w2.bodies[c2].velocity = (vector3){-0.75f, 0.0f, 0.5f};
-        w2.bodies[c2].angular_velocity = (vector3){0.0f, 2.0f, -1.5f};
-        w2.bodies[c2].restitution = 0.3f;
+        w2.bodies [c2].velocity = (vector3){-0.75f, 0.0f, 0.5f};
+        w2.bodies [c2].angular_velocity = (vector3){0.0f, 2.0f, -1.5f};
+        w2.bodies [c2].restitution = 0.3f;
         const float dt = 1.0f / 60.0f;
         for (int t = 0; t < 1200; t++) {
             physics_world_step (&w1, dt);
@@ -70,7 +70,7 @@ int main (void) {
             mismatch = 1;
         }
         for (int i = 0; i < w1.body_count && !mismatch; i++) {
-            if (!bodies_bitwise_equal (&w1.bodies[i], &w2.bodies[i])) {
+            if (!bodies_bitwise_equal (&w1.bodies [i], &w2.bodies [i])) {
                 mismatch = 1;
                 break;
             }
@@ -92,9 +92,9 @@ int main (void) {
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 0.99f;
         int a = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0.0f, 2.0f, 0.0f});
-        world.bodies[a].velocity = (vector3){1.0f, 0.0f, 0.0f};
-        world.bodies[a].restitution = 0.5f;
-        rigidbody_wake (&world.bodies[a]);
+        world.bodies [a].velocity = (vector3){1.0f, 0.0f, 0.0f};
+        world.bodies [a].restitution = 0.5f;
+        rigidbody_wake (&world.bodies [a]);
         const float dt = 1.0f / 60.0f;
         for (int t = 0; t < 300; t++)
             physics_world_step (&world, dt);
@@ -103,18 +103,18 @@ int main (void) {
         physics_world_init (&world2);
         constraint_pool_init (&world2);
         int b = physics_world_add_sphere (&world2, 0.5f, 1.0f, (vector3){0.0f, 2.0f, 0.0f});
-        world2.bodies[b].velocity = (vector3){1.0f, 0.0f, 0.0f};
-        world2.bodies[b].restitution = 0.5f;
-        rigidbody_wake (&world2.bodies[b]);
+        world2.bodies [b].velocity = (vector3){1.0f, 0.0f, 0.0f};
+        world2.bodies [b].restitution = 0.5f;
+        rigidbody_wake (&world2.bodies [b]);
         for (int t = 0; t < 300; t++)
             physics_world_step (&world2, dt);
         /* Both worlds now have 300 ticks. Compare final state. */
-        float pos_diff = fabsf (world.bodies[0].position.x - world2.bodies[0].position.x) +
-                         fabsf (world.bodies[0].position.y - world2.bodies[0].position.y) +
-                         fabsf (world.bodies[0].position.z - world2.bodies[0].position.z);
-        float vel_diff = fabsf (world.bodies[0].velocity.x - world2.bodies[0].velocity.x) +
-                         fabsf (world.bodies[0].velocity.y - world2.bodies[0].velocity.y) +
-                         fabsf (world.bodies[0].velocity.z - world2.bodies[0].velocity.z);
+        float pos_diff = fabsf (world.bodies [0].position.x - world2.bodies [0].position.x) +
+                         fabsf (world.bodies [0].position.y - world2.bodies [0].position.y) +
+                         fabsf (world.bodies [0].position.z - world2.bodies [0].position.z);
+        float vel_diff = fabsf (world.bodies [0].velocity.x - world2.bodies [0].velocity.x) +
+                         fabsf (world.bodies [0].velocity.y - world2.bodies [0].velocity.y) +
+                         fabsf (world.bodies [0].velocity.z - world2.bodies [0].velocity.z);
         printf ("[INFO] determinism_reinit pos_diff=%.6f vel_diff=%.6f\n", pos_diff, vel_diff);
         if (pos_diff > 0.0f || vel_diff > 0.0f) {
             printf ("[FAIL] re-init not deterministic\n");
@@ -133,32 +133,32 @@ int main (void) {
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 1.0f;
         int a = physics_world_add_cube (&world_ref, (vector3){0.0f, 2.0f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
-        world_ref.bodies[a].velocity = (vector3){2.0f, -1.0f, 0.5f};
-        world_ref.bodies[a].angular_velocity = (vector3){1.0f, 2.0f, -1.0f};
-        world_ref.bodies[a].restitution = 0.3f;
+        world_ref.bodies [a].velocity = (vector3){2.0f, -1.0f, 0.5f};
+        world_ref.bodies [a].angular_velocity = (vector3){1.0f, 2.0f, -1.0f};
+        world_ref.bodies [a].restitution = 0.3f;
         const float dt = 1.0f / 60.0f;
         /* Run reference world to get final position */
         for (int t = 0; t < 600; t++)
             physics_world_step (&world_ref, dt);
-        vector3 pos_ref = world_ref.bodies[0].position;
-        vector3 vel_ref = world_ref.bodies[0].velocity;
+        vector3 pos_ref = world_ref.bodies [0].position;
+        vector3 vel_ref = world_ref.bodies [0].velocity;
         int sub_fail = 0;
         for (int run = 0; run < 10; run++) {
             physics_world world2;
             physics_world_init (&world2);
             constraint_pool_init (&world2);
             int b = physics_world_add_cube (&world2, (vector3){0.0f, 2.0f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
-            world2.bodies[b].velocity = (vector3){2.0f, -1.0f, 0.5f};
-            world2.bodies[b].angular_velocity = (vector3){1.0f, 2.0f, -1.0f};
-            world2.bodies[b].restitution = 0.3f;
+            world2.bodies [b].velocity = (vector3){2.0f, -1.0f, 0.5f};
+            world2.bodies [b].angular_velocity = (vector3){1.0f, 2.0f, -1.0f};
+            world2.bodies [b].restitution = 0.3f;
             for (int t = 0; t < 600; t++)
                 physics_world_step (&world2, dt);
-            float pos_diff = fabsf (world2.bodies[0].position.x - pos_ref.x) +
-                             fabsf (world2.bodies[0].position.y - pos_ref.y) +
-                             fabsf (world2.bodies[0].position.z - pos_ref.z);
-            float vel_diff = fabsf (world2.bodies[0].velocity.x - vel_ref.x) +
-                             fabsf (world2.bodies[0].velocity.y - vel_ref.y) +
-                             fabsf (world2.bodies[0].velocity.z - vel_ref.z);
+            float pos_diff = fabsf (world2.bodies [0].position.x - pos_ref.x) +
+                             fabsf (world2.bodies [0].position.y - pos_ref.y) +
+                             fabsf (world2.bodies [0].position.z - pos_ref.z);
+            float vel_diff = fabsf (world2.bodies [0].velocity.x - vel_ref.x) +
+                             fabsf (world2.bodies [0].velocity.y - vel_ref.y) +
+                             fabsf (world2.bodies [0].velocity.z - vel_ref.z);
             if (pos_diff > 0.0f || vel_diff > 0.0f) {
                 printf ("[FAIL] run %d diverged (pos_diff=%.6f vel_diff=%.6f)\n", run, pos_diff, vel_diff);
                 sub_fail = 1;
@@ -189,7 +189,7 @@ int main (void) {
         for (int t = 0; t < 600; t++) {
             physics_world_step (&world, dt);
             for (int i = 0; i < world.body_count; i++) {
-                rigidbody *rb = &world.bodies[i];
+                rigidbody *rb = &world.bodies [i];
                 if (!isfinite (rb->position.x) || !isfinite (rb->velocity.x))
                     nan_count++;
             }

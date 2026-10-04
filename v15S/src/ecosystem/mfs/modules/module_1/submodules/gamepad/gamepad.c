@@ -41,12 +41,12 @@ static int win_parse_index (const char *device_path) {
     if (strncmp (s, "xinput:", 7) == 0)
         s += 7;
     /* bare number? */
-    if (s[0] >= '0' && s[0] <= '9' && s[1] == '\0')
-        return s[0] - '0';
+    if (s [0] >= '0' && s [0] <= '9' && s [1] == '\0')
+        return s [0] - '0';
     /* /dev/input/jsN style passed through WSL docs -> map jsN to N */
     const char *js = strstr (s, "js");
-    if (js && js[1] >= '0' && js[1] <= '9')
-        return js[1] - '0';
+    if (js && js [1] >= '0' && js [1] <= '9')
+        return js [1] - '0';
     return 0;
 }
 bool gamepad_init (gamepad_state *pad, const char *device_path) {
@@ -75,7 +75,7 @@ bool gamepad_init (gamepad_state *pad, const char *device_path) {
         return false;
     }
     strncpy (pad->device_path, device_path, sizeof (pad->device_path) - 1);
-    pad->device_path[sizeof (pad->device_path) - 1] = '\0';
+    pad->device_path [sizeof (pad->device_path) - 1] = '\0';
     int idx = win_parse_index (device_path);
     if (idx == -2) {
         pad->connected = false;
@@ -129,9 +129,9 @@ void gamepad_poll (gamepad_state *pad) {
          * re-plug is picked up next poll without re-init. */
         pad->connected = false;
         for (int i = 0; i < gamepad_axis_count; i++)
-            pad->axes[i] = 0.0f;
+            pad->axes [i] = 0.0f;
         for (int i = 0; i < gamepad_button_count; i++)
-            pad->buttons[i] = false;
+            pad->buttons [i] = false;
         return;
     }
     pad->connected = true;
@@ -144,34 +144,34 @@ void gamepad_poll (gamepad_state *pad) {
         (st.Gamepad.sThumbRX < 0) ? (float) st.Gamepad.sThumbRX / 32768.0f : (float) st.Gamepad.sThumbRX / 32767.0f;
     float ry =
         (st.Gamepad.sThumbRY < 0) ? (float) st.Gamepad.sThumbRY / 32768.0f : (float) st.Gamepad.sThumbRY / 32767.0f;
-    pad->axes[gamepad_axis_left_x] = lx;
-    pad->axes[gamepad_axis_left_y] = ly;
-    pad->axes[gamepad_axis_right_x] = rx;
-    pad->axes[gamepad_axis_right_y] = ry;
+    pad->axes [gamepad_axis_left_x] = lx;
+    pad->axes [gamepad_axis_left_y] = ly;
+    pad->axes [gamepad_axis_right_x] = rx;
+    pad->axes [gamepad_axis_right_y] = ry;
     /* Triggers: BYTE 0..255, rest 0 -> store [0,1] (0-rest convention;
      * gamepad_get_trigger handles it). */
-    pad->axes[gamepad_axis_left_trigger] = (float) st.Gamepad.bLeftTrigger / 255.0f;
-    pad->axes[gamepad_axis_right_trigger] = (float) st.Gamepad.bRightTrigger / 255.0f;
+    pad->axes [gamepad_axis_left_trigger] = (float) st.Gamepad.bLeftTrigger / 255.0f;
+    pad->axes [gamepad_axis_right_trigger] = (float) st.Gamepad.bRightTrigger / 255.0f;
     WORD b = st.Gamepad.wButtons;
-    pad->buttons[gamepad_button_a] = (b & XINPUT_GAMEPAD_A) != 0;
-    pad->buttons[gamepad_button_b] = (b & XINPUT_GAMEPAD_B) != 0;
-    pad->buttons[gamepad_button_x] = (b & XINPUT_GAMEPAD_X) != 0;
-    pad->buttons[gamepad_button_y] = (b & XINPUT_GAMEPAD_Y) != 0;
-    pad->buttons[gamepad_button_lb] = (b & XINPUT_GAMEPAD_LEFT_SHOULDER) != 0;
-    pad->buttons[gamepad_button_rb] = (b & XINPUT_GAMEPAD_RIGHT_SHOULDER) != 0;
-    pad->buttons[gamepad_button_back] = (b & XINPUT_GAMEPAD_BACK) != 0;
-    pad->buttons[gamepad_button_start] = (b & XINPUT_GAMEPAD_START) != 0;
-    pad->buttons[gamepad_button_stick_l] = (b & XINPUT_GAMEPAD_LEFT_THUMB) != 0;
-    pad->buttons[gamepad_button_stick_r] = (b & XINPUT_GAMEPAD_RIGHT_THUMB) != 0;
+    pad->buttons [gamepad_button_a] = (b & XINPUT_GAMEPAD_A) != 0;
+    pad->buttons [gamepad_button_b] = (b & XINPUT_GAMEPAD_B) != 0;
+    pad->buttons [gamepad_button_x] = (b & XINPUT_GAMEPAD_X) != 0;
+    pad->buttons [gamepad_button_y] = (b & XINPUT_GAMEPAD_Y) != 0;
+    pad->buttons [gamepad_button_lb] = (b & XINPUT_GAMEPAD_LEFT_SHOULDER) != 0;
+    pad->buttons [gamepad_button_rb] = (b & XINPUT_GAMEPAD_RIGHT_SHOULDER) != 0;
+    pad->buttons [gamepad_button_back] = (b & XINPUT_GAMEPAD_BACK) != 0;
+    pad->buttons [gamepad_button_start] = (b & XINPUT_GAMEPAD_START) != 0;
+    pad->buttons [gamepad_button_stick_l] = (b & XINPUT_GAMEPAD_LEFT_THUMB) != 0;
+    pad->buttons [gamepad_button_stick_r] = (b & XINPUT_GAMEPAD_RIGHT_THUMB) != 0;
     /* D-pad -> extra buttons 11..14 when in range. */
     if (gamepad_button_count > 11)
-        pad->buttons[11] = (b & XINPUT_GAMEPAD_DPAD_UP) != 0;
+        pad->buttons [11] = (b & XINPUT_GAMEPAD_DPAD_UP) != 0;
     if (gamepad_button_count > 12)
-        pad->buttons[12] = (b & XINPUT_GAMEPAD_DPAD_DOWN) != 0;
+        pad->buttons [12] = (b & XINPUT_GAMEPAD_DPAD_DOWN) != 0;
     if (gamepad_button_count > 13)
-        pad->buttons[13] = (b & XINPUT_GAMEPAD_DPAD_LEFT) != 0;
+        pad->buttons [13] = (b & XINPUT_GAMEPAD_DPAD_LEFT) != 0;
     if (gamepad_button_count > 14)
-        pad->buttons[14] = (b & XINPUT_GAMEPAD_DPAD_RIGHT) != 0;
+        pad->buttons [14] = (b & XINPUT_GAMEPAD_DPAD_RIGHT) != 0;
 #else
     /* No XInput headers: always disconnected, neutral. */
     pad->connected = false;
@@ -220,7 +220,7 @@ bool gamepad_init (gamepad_state *pad, const char *device_path) {
         device_path = (env && *env) ? env : "/dev/input/js0";
     }
     strncpy (pad->device_path, device_path, sizeof (pad->device_path) - 1);
-    pad->device_path[sizeof (pad->device_path) - 1] = '\0';
+    pad->device_path [sizeof (pad->device_path) - 1] = '\0';
     pad->fd = open (device_path, O_RDONLY | O_NONBLOCK);
     if (pad->fd < 0) {
         fprintf (stderr, "[gamepad] could not open %s: %s\n", device_path, strerror (errno));
@@ -258,11 +258,11 @@ void gamepad_poll (gamepad_state *pad) {
                  * Dividing everything by 32767 maps full-down to -1.00003
                  * (out of the documented [-1,1] range). Scale each side by
                  * its own extreme so both ends land exactly on +-1. */
-                pad->axes[ev.number] = (ev.value < 0) ? (float) ev.value / 32768.0f : (float) ev.value / 32767.0f;
+                pad->axes [ev.number] = (ev.value < 0) ? (float) ev.value / 32768.0f : (float) ev.value / 32767.0f;
             }
         } else if (type == JS_EVENT_BUTTON) {
             if (ev.number < gamepad_button_count) {
-                pad->buttons[ev.number] = (ev.value != 0);
+                pad->buttons [ev.number] = (ev.value != 0);
             }
         }
     }
@@ -289,7 +289,7 @@ float gamepad_get_axis (const gamepad_state *pad, int axis) {
     if (!pad || axis < 0 || axis >= gamepad_axis_count) {
         return 0.0f;
     }
-    float value = pad->axes[axis];
+    float value = pad->axes [axis];
     if (axis == gamepad_axis_left_y && pad->invert_left_y) {
         value = -value;
     }
@@ -305,7 +305,7 @@ float gamepad_get_trigger (const gamepad_state *pad, int axis) {
     if (!pad || axis < 0 || axis >= gamepad_axis_count) {
         return 0.0f;
     }
-    float v = pad->axes[axis];
+    float v = pad->axes [axis];
     if (!isfinite (v))
         return 0.0f;
     if (v < -1.0f)
@@ -347,7 +347,7 @@ bool gamepad_get_button (const gamepad_state *pad, int button) {
     if (!pad || button < 0 || button >= gamepad_button_count) {
         return false;
     }
-    return pad->buttons[button];
+    return pad->buttons [button];
 }
 bool gamepad_is_connected (const gamepad_state *pad) {
     if (!pad) {

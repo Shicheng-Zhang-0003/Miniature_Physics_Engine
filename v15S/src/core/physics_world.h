@@ -63,9 +63,9 @@ typedef struct physics_world {
     /* Joint pools (per-world state; migrated from file-scope globals).
      * Spring joints (Hooke point-to-point) and generic constraints
      * (revolute hinges today). Counts track active entries. */
-    spring_joint spring_joints[mpe_max_joints];
+    spring_joint spring_joints [mpe_max_joints];
     int spring_joint_count;
-    constraint revolute_constraints[mpe_max_joints];
+    constraint revolute_constraints [mpe_max_joints];
     int revolute_constraint_count;
     /* Solver scratch (per-world heap; migrated from file-scope statics so
      * worlds never share mutable solver state).
@@ -138,8 +138,8 @@ typedef struct physics_world {
      * already had: cleanup clamped to 8 while the arrays were [16] and attach
      * accepted 16, so 9..16 attached modules were silently never detached. */
 #define MPE_MAX_TICK_MODULES 16
-    const mpe_module_desc_t *tick_modules[MPE_MAX_TICK_MODULES];
-    void *tick_module_state[MPE_MAX_TICK_MODULES];
+    const mpe_module_desc_t *tick_modules [MPE_MAX_TICK_MODULES];
+    void *tick_module_state [MPE_MAX_TICK_MODULES];
     int tick_module_count;
     /* id->index cache (replaces the old file-static global in
      * constraint.c, which was shared across worlds and threads).

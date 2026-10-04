@@ -113,7 +113,7 @@ extern int mpe_t_meta_config_wiring (void);
 extern int mpe_t_sleep_settle (void);
 extern int mpe_t_mouse_look_axes (void);
 extern int mpe_t_body_materials_live (void);
-static const mpe_entry_t mpe_registry[] = {
+static const mpe_entry_t mpe_registry [] = {
     {"meta_rotation", mpe_t_meta_rotation, 0},
     {"meta_convergence", mpe_t_meta_convergence, 0},
     {"meta_config_wiring", mpe_t_meta_config_wiring, 0},
@@ -173,7 +173,7 @@ static const mpe_entry_t mpe_registry[] = {
     {"loader_lifecycle", mpe_t_loader_lifecycle, 0},
     {"ftc_ecosystem", mpe_t_ftc_ecosystem, 0},
 };
-#define MPE_NTESTS ((int) (sizeof (mpe_registry) / sizeof (mpe_registry[0])))
+#define MPE_NTESTS ((int) (sizeof (mpe_registry) / sizeof (mpe_registry [0])))
 /* Returns 0 pass, 1 fail, 2 skipped.
  * DESPOT-2026-09-29: a skipped case used to be indistinguishable from a pass
  * here, so `make test_suite` could report "29/29 green" with two cases having
@@ -226,45 +226,45 @@ int main (int argc, char **argv) {
     }
     printf ("MPE Suite v2 — src: v15S (single binary, exact dispatch)\n");
     printf ("============================================================\n");
-    if (argc >= 2 && strcmp (argv[1], "--list") == 0) {
+    if (argc >= 2 && strcmp (argv [1], "--list") == 0) {
         printf ("Available tests:\n");
         for (int i = 0; i < MPE_NTESTS; i++) {
-            printf ("  %s%s\n", mpe_registry[i].name, mpe_registry[i].diag ? " (diag)" : "");
+            printf ("  %s%s\n", mpe_registry [i].name, mpe_registry [i].diag ? " (diag)" : "");
         }
         return 0;
     }
-    if (argc >= 2 && strcmp (argv[1], "--help") == 0) {
+    if (argc >= 2 && strcmp (argv [1], "--help") == 0) {
         printf ("usage: test_mpe_suite [--list] [--all] [<exact-name>]\n");
         return 0;
     }
-    int include_diag = (argc >= 2 && strcmp (argv[1], "--all") == 0);
-    if (argc >= 3 && argv[1][0] != '-' && argv[2][0] != '-') {
+    int include_diag = (argc >= 2 && strcmp (argv [1], "--all") == 0);
+    if (argc >= 3 && argv [1] [0] != '-' && argv [2] [0] != '-') {
         /* Multi-name sequence in one process (bisection/debugging). */
         int failed = 0;
         for (int a = 1; a < argc; a++) {
             int found = 0;
             for (int i = 0; i < MPE_NTESTS; i++) {
-                if (strcmp (mpe_registry[i].name, argv[a]) == 0) {
-                    failed += mpe_run_one (&mpe_registry[i]);
+                if (strcmp (mpe_registry [i].name, argv [a]) == 0) {
+                    failed += mpe_run_one (&mpe_registry [i]);
                     found = 1;
                     break;
                 }
             }
             if (!found) {
-                printf ("No tests matching '%s'\n", argv[a]);
+                printf ("No tests matching '%s'\n", argv [a]);
                 failed++;
             }
         }
         return failed ? 1 : 0;
     }
     const char *only = NULL;
-    if (argc >= 2 && !include_diag && argv[1][0] != '-') {
-        only = argv[1];
+    if (argc >= 2 && !include_diag && argv [1] [0] != '-') {
+        only = argv [1];
     }
     if (only) {
         for (int i = 0; i < MPE_NTESTS; i++) {
-            if (strcmp (mpe_registry[i].name, only) == 0) {
-                return mpe_run_one (&mpe_registry[i]);
+            if (strcmp (mpe_registry [i].name, only) == 0) {
+                return mpe_run_one (&mpe_registry [i]);
             }
         }
         printf ("No tests matching '%s'\n", only);
@@ -273,16 +273,16 @@ int main (int argc, char **argv) {
     int phys_pass = 0, phys_total = 0, diag_pass = 0, diag_total = 0, failed = 0;
     int skipped = 0;
     for (int i = 0; i < MPE_NTESTS; i++) {
-        if (mpe_registry[i].diag && !include_diag) {
+        if (mpe_registry [i].diag && !include_diag) {
             continue;
         }
-        int rc = mpe_run_one (&mpe_registry[i]);
+        int rc = mpe_run_one (&mpe_registry [i]);
         if (rc == 2) {
             /* Not a pass. Counted separately and reported, never green. */
             skipped++;
             continue;
         }
-        if (mpe_registry[i].diag) {
+        if (mpe_registry [i].diag) {
             diag_total++;
             diag_pass += (rc == 0);
         } else {

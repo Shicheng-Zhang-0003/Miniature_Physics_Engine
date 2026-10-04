@@ -35,32 +35,32 @@ int main (void) {
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 0.99f;
         int a = physics_world_add_sphere (world, 0.5f, 2.0f, (vector3){1.0f, 5.0f, 2.0f});
-        world->bodies[a].velocity = (vector3){1.5f, -0.5f, 0.25f};
-        world->bodies[a].angular_velocity = (vector3){3.0f, -1.0f, 2.0f};
-        world->bodies[a].restitution = 0.4f;
-        world->bodies[a].friction_static = 0.8f;
-        world->bodies[a].friction_kinetic = 0.7f;
-        world->bodies[a].nice_value = 5;
-        rigidbody_wake (&world->bodies[a]);
+        world->bodies [a].velocity = (vector3){1.5f, -0.5f, 0.25f};
+        world->bodies [a].angular_velocity = (vector3){3.0f, -1.0f, 2.0f};
+        world->bodies [a].restitution = 0.4f;
+        world->bodies [a].friction_static = 0.8f;
+        world->bodies [a].friction_kinetic = 0.7f;
+        world->bodies [a].nice_value = 5;
+        rigidbody_wake (&world->bodies [a]);
         int b = physics_world_add_cube (world, (vector3){-1.0f, 2.0f, -1.0f}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
-        world->bodies[b].velocity = (vector3){-0.75f, 0.0f, 0.5f};
-        world->bodies[b].angular_velocity = (vector3){0.0f, 2.0f, -1.5f};
-        world->bodies[b].restitution = 0.3f;
-        world->bodies[b].friction_static = 0.9f;
-        world->bodies[b].friction_kinetic = 0.6f;
-        world->bodies[b].nice_value = 10;
-        rigidbody_wake (&world->bodies[b]);
+        world->bodies [b].velocity = (vector3){-0.75f, 0.0f, 0.5f};
+        world->bodies [b].angular_velocity = (vector3){0.0f, 2.0f, -1.5f};
+        world->bodies [b].restitution = 0.3f;
+        world->bodies [b].friction_static = 0.9f;
+        world->bodies [b].friction_kinetic = 0.6f;
+        world->bodies [b].nice_value = 10;
+        rigidbody_wake (&world->bodies [b]);
         int c = physics_world_add_cylinder (world, 0.3f, 0.4f, 1.5f, (vector3){0.0f, 4.0f, 1.0f});
-        world->bodies[c].velocity = (vector3){0.2f, -1.0f, -0.3f};
-        world->bodies[c].angular_velocity = (vector3){-2.0f, 0.5f, 1.0f};
-        world->bodies[c].restitution = 0.2f;
-        rigidbody_wake (&world->bodies[c]);
+        world->bodies [c].velocity = (vector3){0.2f, -1.0f, -0.3f};
+        world->bodies [c].angular_velocity = (vector3){-2.0f, 0.5f, 1.0f};
+        world->bodies [c].restitution = 0.2f;
+        rigidbody_wake (&world->bodies [c]);
         /* Add joints */
         constraint_pool_init (world);
-        int joint1 = constraint_add_revolute (world, world->bodies[a].object_id, world->bodies[b].object_id,
+        int joint1 = constraint_add_revolute (world, world->bodies [a].object_id, world->bodies [b].object_id,
                                               (vector3){0, 0, 0}, (vector3){0, 0, 0}, (vector3){0, 0, 1});
         constraint_set_revolute_motor (world, joint1, true, 5.0f, 10.0f);
-        int joint2 = constraint_add_distance (world, world->bodies[b].object_id, world->bodies[c].object_id,
+        int joint2 = constraint_add_distance (world, world->bodies [b].object_id, world->bodies [c].object_id,
                                               (vector3){0, 0, 0}, (vector3){0, 0, 0}, 2.0f);
         int joint3 = add_joint (world, a, c, 3.0f, 50.0f, 1.0f);
         if (joint1 < 0 || joint2 < 0 || joint3 < 0) {
@@ -71,11 +71,11 @@ int main (void) {
         for (int t = 0; t < 600; t++)
             physics_world_step (world, dt);
         /* Capture exact state */
-        rigidbody ref_bodies[3];
+        rigidbody ref_bodies [3];
         for (int i = 0; i < 3; i++)
-            ref_bodies[i] = world->bodies[i];
+            ref_bodies [i] = world->bodies [i];
         /* Save scene */
-        char path[256] = "../../temp/paranoia_scene.mpe";
+        char path [256] = "../../temp/paranoia_scene.mpe";
         int save_result = save_scene (path);
         if (save_result == 0) {
             printf ("[FAIL] scene save failed\n");
@@ -97,8 +97,8 @@ int main (void) {
         physics_world *loaded = physics_world_get_primary ();
         int mismatch = 0;
         for (int i = 0; i < 3 && i < loaded->body_count; i++) {
-            rigidbody *orig = &ref_bodies[i];
-            rigidbody *ld = &loaded->bodies[i];
+            rigidbody *orig = &ref_bodies [i];
+            rigidbody *ld = &loaded->bodies [i];
             if (fabsf (orig->position.x - ld->position.x) > 0.0f || fabsf (orig->position.y - ld->position.y) > 0.0f ||
                 fabsf (orig->position.z - ld->position.z) > 0.0f)
                 mismatch = 1;
@@ -171,26 +171,26 @@ int main (void) {
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 0.99f;
         int a = physics_world_add_sphere (world, 0.5f, 1.0f, (vector3){0.0f, 0.5f, 0.0f});
-        world->bodies[a].is_sleeping = true;
-        world->bodies[a].sleep_timer = 10.0f;
-        rigidbody_wake (&world->bodies[a]);
+        world->bodies [a].is_sleeping = true;
+        world->bodies [a].sleep_timer = 10.0f;
+        rigidbody_wake (&world->bodies [a]);
         const float dt = 1.0f / 60.0f;
         for (int t = 0; t < 120; t++)
             physics_world_step (world, dt);
         /* Force sleep state for roundtrip test */
-        world->bodies[a].is_sleeping = true;
-        world->bodies[a].sleep_timer = 5.0f;
-        char path[256] = "../../temp/paranoia_sleep.mpe";
+        world->bodies [a].is_sleeping = true;
+        world->bodies [a].sleep_timer = 5.0f;
+        char path [256] = "../../temp/paranoia_sleep.mpe";
         save_scene (path);
         reset_primary ();
         constraint_pool_init (physics_world_get_primary ());
         scene_loading (path);
         physics_world *loaded = physics_world_get_primary ();
-        if (!loaded->bodies[0].is_sleeping) {
+        if (!loaded->bodies [0].is_sleeping) {
             printf ("[FAIL] sleep state not preserved\n");
             fail = 1;
         }
-        if (fabsf (loaded->bodies[0].sleep_timer - 5.0f) > 0.01f) {
+        if (fabsf (loaded->bodies [0].sleep_timer - 5.0f) > 0.01f) {
             printf ("[FAIL] sleep_timer not exact\n");
             fail = 1;
         }
@@ -206,8 +206,8 @@ int main (void) {
         g_cfg.world.drag = 1.0f;
         int a = physics_world_add_sphere (world, 0.2f, 1.0f, (vector3){0.0f, 2.0f, 0.0f});
         int b = physics_world_add_sphere (world, 0.2f, 1.0f, (vector3){0.0f, 5.0f, 0.0f});
-        world->bodies[a].restitution = 0.0f;
-        world->bodies[b].restitution = 0.0f;
+        world->bodies [a].restitution = 0.0f;
+        world->bodies [b].restitution = 0.0f;
         int joint = add_joint (world, a, b, 3.0f, 100.0f, 1.0f);
         if (joint < 0) {
             printf ("[FAIL] spring fixture creation failed\n");
@@ -216,11 +216,11 @@ int main (void) {
         const float dt = 1.0f / 60.0f;
         for (int t = 0; t < 300; t++)
             physics_world_step (world, dt);
-        char path[256] = "../../temp/paranoia_spring.mpe";
+        char path [256] = "../../temp/paranoia_spring.mpe";
         int save_result = save_scene (path);
-        float L0_orig = world->spring_joints[0].equilibrium_length;
-        float k_orig = world->spring_joints[0].spring_constant;
-        float c_orig = world->spring_joints[0].damping_coefficient;
+        float L0_orig = world->spring_joints [0].equilibrium_length;
+        float k_orig = world->spring_joints [0].spring_constant;
+        float c_orig = world->spring_joints [0].damping_coefficient;
         if (save_result == 0) {
             printf ("[FAIL] spring scene save failed\n");
             fail = 1;
@@ -238,9 +238,9 @@ int main (void) {
             fail = 1;
         }
         if (loaded->spring_joint_count == 1) {
-            float L0_load = loaded->spring_joints[0].equilibrium_length;
-            float k_load = loaded->spring_joints[0].spring_constant;
-            float c_load = loaded->spring_joints[0].damping_coefficient;
+            float L0_load = loaded->spring_joints [0].equilibrium_length;
+            float k_load = loaded->spring_joints [0].spring_constant;
+            float c_load = loaded->spring_joints [0].damping_coefficient;
             if (L0_orig != L0_load || k_orig != k_load || c_orig != c_load) {
                 printf ("[FAIL] spring params not exact\n");
                 fail = 1;

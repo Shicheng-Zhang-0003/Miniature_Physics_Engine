@@ -44,10 +44,10 @@ static void *ftc_sym (const char *sym) {
     return mpe_loader_symbol (FTC_HANDLE_MODULE, sym);
 }
 static float ftc_argf (char **argv, int i, int argc, float dflt) {
-    if (i < argc && argv[i]) {
+    if (i < argc && argv [i]) {
         char *end = NULL;
-        double v = strtod (argv[i], &end);
-        if (end != argv[i] && isfinite (v))
+        double v = strtod (argv [i], &end);
+        if (end != argv [i] && isfinite (v))
             return (float) v;
     }
     return dflt;
@@ -64,7 +64,7 @@ static int ftc_ensure_floor (physics_world *w) {
     if (!w)
         return -1;
     for (int i = 0; i < w->body_count; i++) {
-        rigidbody *b = &w->bodies[i];
+        rigidbody *b = &w->bodies [i];
         if (!b->static_state && !(b->mass == 0.0f))
             continue;
         float top = b->position.y + b->half_extensions.y;
@@ -76,9 +76,9 @@ static int ftc_ensure_floor (physics_world *w) {
     int f = physics_world_add_cube (w, (vector3){0.0f, -0.5f, 0.0f}, (vector3){30.0f, 0.5f, 30.0f}, 0.0f);
     if (f < 0)
         return -1;
-    w->bodies[f].friction_static = 1.0f;
-    w->bodies[f].friction_kinetic = 0.8f;
-    w->bodies[f].restitution = 0.0f;
+    w->bodies [f].friction_static = 1.0f;
+    w->bodies [f].friction_kinetic = 0.8f;
+    w->bodies [f].restitution = 0.0f;
     term_out ("mpe: ftc: tile floor added (robots need frictional contact)\n");
     return 1;
 }
@@ -103,7 +103,7 @@ static int ftc_ensure_driving (void) {
         return -1;
     }
     for (int i = 0; i < w->tick_module_count; i++) {
-        if (w->tick_modules[i] == dmod)
+        if (w->tick_modules [i] == dmod)
             return 0;
     }
     if (physics_world_attach_module (w, dmod) < 0) {
@@ -134,7 +134,7 @@ void cmd_ftc (int argc, char **argv) {
     ftc_robot *(*p_get) (struct physics_world *, int) =
         (ftc_robot * (*) (struct physics_world *, int) ) ftc_sym ("ftc_fleet_get");
     int (*p_count) (struct physics_world *) = (int (*) (struct physics_world *)) ftc_sym ("ftc_fleet_count");
-    if (term_str_eq (argv[1], "spawn")) {
+    if (term_str_eq (argv [1], "spawn")) {
         if (ftc_ensure_driving () != 0)
             return;
         int (*p_spawn) (struct physics_world *, float, float, float, motor_preset_id, ftc_drivetrain_type) =
@@ -176,13 +176,13 @@ void cmd_ftc (int argc, char **argv) {
             term_err ("mpe: ftc: spawn failed\n");
             return;
         }
-        char buf[224];
+        char buf [224];
         snprintf (buf, sizeof (buf), "mpe: ftc: robot at (%.2f,%.2f,%.2f) %s mecanum\n", x, y, z,
                   p_name ((motor_preset_id) preset));
         term_ok (buf);
         return;
     }
-    if (term_str_eq (argv[1], "telemetry")) {
+    if (term_str_eq (argv [1], "telemetry")) {
         if (!p_get) {
             term_err ("mpe: ftc: bundle not loaded\n");
             return;
@@ -194,12 +194,12 @@ void cmd_ftc (int argc, char **argv) {
             term_err ("mpe: ftc: no robot (ftc spawn first)\n");
             return;
         }
-        char buf[256];
+        char buf [256];
         float px = 0, py = 0, pz = 0;
         if (r->chassis_body >= 0 && r->chassis_body < w->body_count) {
-            px = w->bodies[r->chassis_body].position.x;
-            py = w->bodies[r->chassis_body].position.y;
-            pz = w->bodies[r->chassis_body].position.z;
+            px = w->bodies [r->chassis_body].position.x;
+            py = w->bodies [r->chassis_body].position.y;
+            pz = w->bodies [r->chassis_body].position.z;
         }
         snprintf (buf, sizeof (buf), "mpe: ftc: robot pos=(%.3f,%.3f,%.3f) odom=(%.3f,%.3f,%.3f)%s\n", px, py, pz,
                   r->odom_x, r->odom_z, r->odom_theta, r->odom_slip ? " SLIP" : "");
@@ -207,14 +207,14 @@ void cmd_ftc (int argc, char **argv) {
         if (p_volt && p_fuse) {
             float isum = 0.0f;
             for (int k = 0; k < r->wheel_count; k++)
-                isum += r->wheel_motors[k].current;
+                isum += r->wheel_motors [k].current;
             snprintf (buf, sizeof (buf), "mpe: ftc: battery %.2fV (%.0f%%)%s\n", p_volt (&r->battery, isum),
                       r->battery.charge_fraction * 100.0f, p_fuse (&r->battery) ? " FUSE-TRIPPED" : "");
             term_out (buf);
         }
         for (int k = 0; k < r->wheel_count; k++) {
             snprintf (buf, sizeof (buf), "mpe: ftc: wheel %d cmd=%+.2f rpm=%+.0f I=%+.2fA\n", k,
-                      r->wheel_motors[k].command, r->wheel_motors[k].rpm, r->wheel_motors[k].current);
+                      r->wheel_motors [k].command, r->wheel_motors [k].rpm, r->wheel_motors [k].current);
             term_out (buf);
         }
         return;

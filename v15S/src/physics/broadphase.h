@@ -20,9 +20,9 @@ typedef struct {
     hash_node *node_pool;
     int node_pool_capacity;
     int node_count;
-    int hash_table[hash_table_size];
-    uint64_t pair_hash_keys[a3_pair_hash_table_size];
-    uint32_t pair_hash_generations[a3_pair_hash_table_size];
+    int hash_table [hash_table_size];
+    uint64_t pair_hash_keys [a3_pair_hash_table_size];
+    uint32_t pair_hash_generations [a3_pair_hash_table_size];
     uint32_t pair_hash_generation;
     float current_cell_size;
     int node_overflow_count;

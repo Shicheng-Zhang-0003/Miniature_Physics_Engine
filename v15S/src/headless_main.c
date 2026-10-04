@@ -6,8 +6,8 @@
 #include "config/mpe_config.h"
 #include "core/physics_world.h"
 #include "core/det_math.h"
-int main (int argc, char *argv[]) {
-    int ticks = (argc > 1) ? atoi (argv[1]) : 3600;
+int main (int argc, char *argv []) {
+    int ticks = (argc > 1) ? atoi (argv [1]) : 3600;
     /* FIX-AUDIT-DESPOT: pin FP state explicitly in the headless smoke path.
      * physics_world_init also pins, but the smoke binary's determinism
      * contract must not depend on init ordering (headless twins compare
@@ -25,7 +25,7 @@ int main (int argc, char *argv[]) {
     }
     int invalid = 0;
     for (int i = 0; i < world.body_count; i++) {
-        rigidbody *rb = &world.bodies[i];
+        rigidbody *rb = &world.bodies [i];
         if ((!isfinite (rb->position.x)) || (!isfinite (rb->position.y)) || (!isfinite (rb->position.z))) {
             invalid++;
         }

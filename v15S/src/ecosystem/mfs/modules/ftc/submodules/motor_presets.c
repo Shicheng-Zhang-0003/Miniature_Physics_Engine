@@ -31,7 +31,7 @@ typedef struct {
                                 * 6 cycles x4, Core Hex 4). Output counts =
                                 * base_encoder_ppr x gear_ratio. */
 } motor_preset_spec;
-static const motor_preset_spec presets[MOTOR_COUNT] = {
+static const motor_preset_spec presets [MOTOR_COUNT] = {
     /* ================================================================
      * goBILDA 5203 Yellow Jacket planetary — published output specs
      * RS-555 base, steel planetary, 9.2 A stall, 28 PPR encoder at motor
@@ -150,12 +150,12 @@ void motor_preset_apply (motor *m, motor_preset_id id) {
     /* PHYSICS-GUARD: table and enum must stay in lockstep. The missing
      * UP_80 row once slid every TorqueNADO entry one slot down (dead
      * motor + NULL name). Fail the build, not the robot, on drift. */
-    _Static_assert (sizeof (presets) / sizeof (presets[0]) == MOTOR_COUNT,
+    _Static_assert (sizeof (presets) / sizeof (presets [0]) == MOTOR_COUNT,
                     "motor preset table length must equal MOTOR_COUNT");
     if ((!m) || (id < 0) || (id >= MOTOR_COUNT)) {
         return;
     }
-    const motor_preset_spec *spec = &presets[id];
+    const motor_preset_spec *spec = &presets [id];
     /* PHYSICS-FIX: derive at the 12.0 V spec voltage, not the 12.8 V fresh
      * pack voltage. R/Kv biased +6.7% when derived at 12.8 V; the battery
      * model supplies the fresh-pack voltage at runtime. */
@@ -166,17 +166,17 @@ const char *motor_preset_name (motor_preset_id id) {
     if ((id < 0) || (id >= MOTOR_COUNT)) {
         return "unknown";
     }
-    return presets[id].name;
+    return presets [id].name;
 }
 float motor_preset_gear_ratio (motor_preset_id id) {
     if ((id < 0) || (id >= MOTOR_COUNT)) {
         return 1.0f;
     }
-    return presets[id].gear_ratio;
+    return presets [id].gear_ratio;
 }
 int motor_preset_base_encoder_ppr (motor_preset_id id) {
     if ((id < 0) || (id >= MOTOR_COUNT)) {
         return 0;
     }
-    return presets[id].base_encoder_ppr;
+    return presets [id].base_encoder_ppr;
 }

@@ -19,9 +19,9 @@ int main (void) {
         physics_world_cleanup (&world);
         return 1;
     }
-    world.bodies[floor].restitution = 0.0f;
-    world.bodies[floor].friction_static = 0.8f;
-    world.bodies[floor].friction_kinetic = g_cfg.world.floor_friction_k;
+    world.bodies [floor].restitution = 0.0f;
+    world.bodies [floor].friction_static = 0.8f;
+    world.bodies [floor].friction_kinetic = g_cfg.world.floor_friction_k;
     /* Cylinder wheel resting on a real frictional floor. Spawn slightly above
        (y=0.06) so it drops, settles, and establishes solid contact manifolds. */
     int w = physics_world_add_cylinder (&world, 0.05f, 0.02f, 0.5f, (vector3){0.0f, 0.06f, 0.0f});
@@ -55,17 +55,17 @@ int main (void) {
     for (int t = 0; t < 60; t++) {
         physics_world_step (&world, dt);
     }
-    float start_z = world.bodies[w].position.z;
+    float start_z = world.bodies [w].position.z;
     /* Apply torque for 3 seconds */
     for (int t = 0; t < 180; t++) {
-        rigidbody_wake (&world.bodies[w]);
-        world.bodies[w].torque_accumulator.x += drive_torque;
+        rigidbody_wake (&world.bodies [w]);
+        world.bodies [w].torque_accumulator.x += drive_torque;
         physics_world_step (&world, dt);
     }
-    float dz = world.bodies[w].position.z - start_z;
-    float vz = world.bodies[w].velocity.z;
-    float wx = world.bodies[w].angular_velocity.x;
-    float y = world.bodies[w].position.y;
+    float dz = world.bodies [w].position.z - start_z;
+    float vz = world.bodies [w].velocity.z;
+    float wx = world.bodies [w].angular_velocity.x;
+    float y = world.bodies [w].position.y;
     printf ("[info] grounded wheel: dz=%.4f vz=%.4f wx=%.4f y=%.4f\n", dz, vz, wx, y);
     if (!isfinite (dz) || !isfinite (vz) || !isfinite (wx) || !isfinite (y)) {
         printf ("[FAIL] non-finite wheel state\n");

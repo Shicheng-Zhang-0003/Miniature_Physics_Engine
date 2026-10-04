@@ -16,9 +16,9 @@ int main (void) {
     constraint_pool_init (&world);
     int f = physics_world_add_cube (&world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
     if (f >= 0) {
-        world.bodies[f].friction_static = 1.0f;
-        world.bodies[f].friction_kinetic = 0.8f;
-        world.bodies[f].restitution = 0.0f;
+        world.bodies [f].friction_static = 1.0f;
+        world.bodies [f].friction_kinetic = 0.8f;
+        world.bodies [f].restitution = 0.0f;
     }
     ftc_robot robot;
     int rc = ftc_robot_create (&world, &robot, 0.0f, ftc_robot_rest_height (), 0.0f, MOTOR_GB_5203_26_9);
@@ -37,7 +37,7 @@ int main (void) {
         drivetrain_update (&world, &robot, dt);
         physics_world_step (&world, dt);
         for (int i = 0; i < world.body_count; i++) {
-            rigidbody *rb = &world.bodies[i];
+            rigidbody *rb = &world.bodies [i];
             if ((!isfinite (rb->position.x)) || (!isfinite (rb->position.y)) || (!isfinite (rb->position.z))) {
                 printf ("[FAIL] NaN detected in body %d at tick %d\n", i, t);
                 fail = 1;

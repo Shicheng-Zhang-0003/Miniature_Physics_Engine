@@ -19,26 +19,26 @@ int main (void) {
     float r = 0.05f;
     int cyl_idx = physics_world_add_cylinder (&world, r, 0.02f, 0.5f, (vector3){0.0f, 1.0f, 0.0f});
     printf ("floor_idx=%d cyl_idx=%d\n", floor_idx, cyl_idx);
-    printf ("cylinder initial: pos=(%.4f,%.4f,%.4f) vel=(%.4f,%.4f,%.4f)\n", world.bodies[cyl_idx].position.x,
-            world.bodies[cyl_idx].position.y, world.bodies[cyl_idx].position.z, world.bodies[cyl_idx].velocity.x,
-            world.bodies[cyl_idx].velocity.y, world.bodies[cyl_idx].velocity.z);
-    printf ("cylinder: radius=%.4f half_length=%.4f mass=%.4f\n", world.bodies[cyl_idx].radius,
-            world.bodies[cyl_idx].cylinder_half_length, world.bodies[cyl_idx].mass);
-    printf ("floor: pos=(%.4f,%.4f,%.4f) half_ext=(%.4f,%.4f,%.4f) static=%d\n", world.bodies[floor_idx].position.x,
-            world.bodies[floor_idx].position.y, world.bodies[floor_idx].position.z,
-            world.bodies[floor_idx].half_extensions.x, world.bodies[floor_idx].half_extensions.y,
-            world.bodies[floor_idx].half_extensions.z, world.bodies[floor_idx].static_state);
+    printf ("cylinder initial: pos=(%.4f,%.4f,%.4f) vel=(%.4f,%.4f,%.4f)\n", world.bodies [cyl_idx].position.x,
+            world.bodies [cyl_idx].position.y, world.bodies [cyl_idx].position.z, world.bodies [cyl_idx].velocity.x,
+            world.bodies [cyl_idx].velocity.y, world.bodies [cyl_idx].velocity.z);
+    printf ("cylinder: radius=%.4f half_length=%.4f mass=%.4f\n", world.bodies [cyl_idx].radius,
+            world.bodies [cyl_idx].cylinder_half_length, world.bodies [cyl_idx].mass);
+    printf ("floor: pos=(%.4f,%.4f,%.4f) half_ext=(%.4f,%.4f,%.4f) static=%d\n", world.bodies [floor_idx].position.x,
+            world.bodies [floor_idx].position.y, world.bodies [floor_idx].position.z,
+            world.bodies [floor_idx].half_extensions.x, world.bodies [floor_idx].half_extensions.y,
+            world.bodies [floor_idx].half_extensions.z, world.bodies [floor_idx].static_state);
     printf ("floor top y=%.4f (pos.y + half_ext.y)\n",
-            world.bodies[floor_idx].position.y + world.bodies[floor_idx].half_extensions.y);
+            world.bodies [floor_idx].position.y + world.bodies [floor_idx].half_extensions.y);
     printf ("\n");
     for (int i = 0; i < 60; i++) { /* MFS_139_EXTEND: run longer to reach floor */
         physics_world_step (&world, time_step);
-        printf ("step=%2d y=%.6f vy=%.6f\n", i + 1, world.bodies[cyl_idx].position.y, world.bodies[cyl_idx].velocity.y);
+        printf ("step=%2d y=%.6f vy=%.6f\n", i + 1, world.bodies [cyl_idx].position.y, world.bodies [cyl_idx].velocity.y);
     }
     int diag_contact = 0;
     /* has_contact reflects the last tick only; re-step-free check: a settled
      * body in real contact still flags on the final tick. */
-    if ((world.has_contact) && (world.has_contact[cyl_idx])) {
+    if ((world.has_contact) && (world.has_contact [cyl_idx])) {
         diag_contact = 1;
     }
     printf ("contact_on_final_tick=%d (net OFF)\n", diag_contact);
@@ -47,8 +47,8 @@ int main (void) {
      * invariants: finite state, no tunneling (y>=-slop), settled rest
      * (y in [0.02,0.08] for r=0.05, |vy| small). */
     {
-        float fy = world.bodies[cyl_idx].position.y;
-        float fvy = world.bodies[cyl_idx].velocity.y;
+        float fy = world.bodies [cyl_idx].position.y;
+        float fvy = world.bodies [cyl_idx].velocity.y;
         int fail = 0;
         if (!isfinite (fy) || !isfinite (fvy)) {
             printf ("[FAIL] non-finite floor state\n");

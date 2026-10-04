@@ -30,13 +30,13 @@ static struct {
     int preferred_col;
     mv_mode mode;
     char pending_op;
-    char command_buf[256];
+    char command_buf [256];
     int command_len;
-    char search_buf[256];
+    char search_buf [256];
     int search_len;
     bool search_forward;
     bool modified;
-    char filename[512];
+    char filename [512];
     bool show_line_numbers;
     char *yank_text;
     bool yank_is_linewise;
@@ -44,7 +44,7 @@ static struct {
     bool active;
     bool quit_requested;
     bool file_exists; /* MPE_TASK_V15R2_FILE_EXISTS_FLAG */
-    mv_snapshot undo_stack[mv_undo_depth];
+    mv_snapshot undo_stack [mv_undo_depth];
     int undo_top;
     int redo_top;
 } mv;
@@ -53,9 +53,9 @@ static struct {
 /* ------------------------------------------------------------------ */
 static void mv_clear_lines (void) {
     for (int i = 0; i < mv.line_count; i++) {
-        if (mv.lines[i]) {
-            free (mv.lines[i]);
-            mv.lines[i] = NULL;
+        if (mv.lines [i]) {
+            free (mv.lines [i]);
+            mv.lines [i] = NULL;
         }
     }
     mv.line_count = 0;
@@ -76,7 +76,7 @@ static bool mv_ensure_capacity (int needed) {
     if (!new_lines)
         return false;
     for (int i = mv.line_capacity; i < new_cap; i++) {
-        new_lines[i] = NULL;
+        new_lines [i] = NULL;
     }
     mv.lines = new_lines;
     mv.line_capacity = new_cap;
@@ -91,10 +91,10 @@ static bool mv_set_line (int index, const char *text) {
         free (replacement);
         return false;
     }
-    if (mv.lines[index]) {
-        free (mv.lines[index]);
+    if (mv.lines [index]) {
+        free (mv.lines [index]);
     }
-    mv.lines[index] = replacement;
+    mv.lines [index] = replacement;
     return true;
 }
 static bool mv_insert_line (int index, const char *text) {
@@ -107,9 +107,9 @@ static bool mv_insert_line (int index, const char *text) {
         return false;
     }
     for (int i = mv.line_count; i > index; i--) {
-        mv.lines[i] = mv.lines[i - 1];
+        mv.lines [i] = mv.lines [i - 1];
     }
-    mv.lines[index] = replacement;
+    mv.lines [index] = replacement;
     mv.line_count++;
     return true;
 }
@@ -117,11 +117,11 @@ static void mv_delete_line (int index) {
     if ((index < 0) || (index >= mv.line_count)) {
         return;
     }
-    free (mv.lines[index]);
+    free (mv.lines [index]);
     for (int i = index; i < mv.line_count - 1; i++) {
-        mv.lines[i] = mv.lines[i + 1];
+        mv.lines [i] = mv.lines [i + 1];
     }
-    mv.lines[mv.line_count - 1] = NULL;
+    mv.lines [mv.line_count - 1] = NULL;
     mv.line_count--;
     if (mv.line_count == 0) {
         if (!mv_insert_line (0, ""))
@@ -129,10 +129,10 @@ static void mv_delete_line (int index) {
     }
 }
 static int mv_line_len (int row) {
-    if ((row < 0) || (row >= mv.line_count) || !mv.lines || !mv.lines[row]) {
+    if ((row < 0) || (row >= mv.line_count) || !mv.lines || !mv.lines [row]) {
         return 0;
     }
-    return (int) strlen (mv.lines[row]);
+    return (int) strlen (mv.lines [row]);
 }
 static void mv_clamp_cursor (void) {
     if (mv.line_count <= 0) {
@@ -162,14 +162,14 @@ static void mv_snapshot_clear (mv_snapshot *snap) {
         return;
     if (snap->lines) {
         for (int i = 0; i < snap->line_count; i++)
-            free (snap->lines[i]);
+            free (snap->lines [i]);
         free (snap->lines);
     }
     *snap = (mv_snapshot){0};
 }
 static void mv_clear_undo_history (void) {
     for (int i = 0; i < mv_undo_depth; i++)
-        mv_snapshot_clear (&mv.undo_stack[i]);
+        mv_snapshot_clear (&mv.undo_stack [i]);
     mv.undo_top = 0;
     mv.redo_top = 0;
 }
@@ -181,27 +181,27 @@ static bool mv_undo_push (void) {
     if (!snapshot_lines)
         return false;
     for (int i = 0; i < snapshot_count; i++) {
-        if (!mv.lines[i] || !(snapshot_lines[i] = term_strdup (mv.lines[i]))) {
+        if (!mv.lines [i] || !(snapshot_lines [i] = term_strdup (mv.lines [i]))) {
             for (int j = 0; j < i; j++)
-                free (snapshot_lines[j]);
+                free (snapshot_lines [j]);
             free (snapshot_lines);
             return false;
         }
     }
     for (int i = mv.undo_top; i < mv.redo_top && i < mv_undo_depth; i++)
-        mv_snapshot_clear (&mv.undo_stack[i]);
+        mv_snapshot_clear (&mv.undo_stack [i]);
     mv.redo_top = mv.undo_top;
     if (mv.undo_top >= mv_undo_depth) {
-        mv_snapshot_clear (&mv.undo_stack[0]);
+        mv_snapshot_clear (&mv.undo_stack [0]);
         for (int i = 1; i < mv_undo_depth; i++)
-            mv.undo_stack[i - 1] = mv.undo_stack[i];
-        mv.undo_stack[mv_undo_depth - 1] = (mv_snapshot){0};
+            mv.undo_stack [i - 1] = mv.undo_stack [i];
+        mv.undo_stack [mv_undo_depth - 1] = (mv_snapshot){0};
         mv.undo_top = mv_undo_depth - 1;
         mv.redo_top = mv.undo_top;
     }
-    mv.undo_stack[mv.undo_top].lines = snapshot_lines;
-    mv.undo_stack[mv.undo_top].line_count = snapshot_count;
-    mv.undo_stack[mv.undo_top].line_capacity = snapshot_count;
+    mv.undo_stack [mv.undo_top].lines = snapshot_lines;
+    mv.undo_stack [mv.undo_top].line_count = snapshot_count;
+    mv.undo_stack [mv.undo_top].line_capacity = snapshot_count;
     mv.undo_top++;
     mv.redo_top = mv.undo_top;
     return true;
@@ -213,16 +213,16 @@ static bool mv_restore_snapshot (const mv_snapshot *snap) {
     if (!restored)
         return false;
     for (int i = 0; i < snap->line_count; i++) {
-        if (!snap->lines[i] || !(restored[i] = term_strdup (snap->lines[i]))) {
+        if (!snap->lines [i] || !(restored [i] = term_strdup (snap->lines [i]))) {
             for (int j = 0; j < i; j++)
-                free (restored[j]);
+                free (restored [j]);
             free (restored);
             return false;
         }
     }
     if (!mv_ensure_capacity (snap->line_count)) {
         for (int i = 0; i < snap->line_count; i++)
-            free (restored[i]);
+            free (restored [i]);
         free (restored);
         return false;
     }
@@ -236,7 +236,7 @@ static void mv_undo_perform (void) {
     if (mv.undo_top <= 0) {
         return;
     }
-    mv_snapshot *snap = &mv.undo_stack[mv.undo_top - 1];
+    mv_snapshot *snap = &mv.undo_stack [mv.undo_top - 1];
     if (!mv_restore_snapshot (snap))
         return;
     mv.undo_top--;
@@ -247,7 +247,7 @@ static void mv_redo_perform (void) {
     if (mv.undo_top >= mv.redo_top) {
         return;
     }
-    mv_snapshot *snap = &mv.undo_stack[mv.undo_top];
+    mv_snapshot *snap = &mv.undo_stack [mv.undo_top];
     if (!mv_restore_snapshot (snap))
         return;
     mv.undo_top++;
@@ -267,13 +267,13 @@ static bool mv_load_file (const char *filename) {
             return false;
         return false;
     }
-    char line_buf[mv_max_line_len];
+    char line_buf [mv_max_line_len];
     bool truncated = false;
     while (fgets (line_buf, sizeof (line_buf), f)) {
         size_t len = strlen (line_buf);
         /* DESPOT-2026-10-01: 4KB fgets silently split over-long lines.
          * Detect missing newline (not EOF) and fail loudly instead. */
-        if (len > 0 && line_buf[len - 1] != '\n' && !feof (f)) {
+        if (len > 0 && line_buf [len - 1] != '\n' && !feof (f)) {
             /* Line exceeds buffer: consume rest, report truncation. */
             int c;
             while ((c = fgetc (f)) != '\n' && c != EOF) {
@@ -281,8 +281,8 @@ static bool mv_load_file (const char *filename) {
             truncated = true;
             break;
         }
-        while ((len > 0) && ((line_buf[len - 1] == '\n') || (line_buf[len - 1] == '\r'))) {
-            line_buf[--len] = '\0';
+        while ((len > 0) && ((line_buf [len - 1] == '\n') || (line_buf [len - 1] == '\r'))) {
+            line_buf [--len] = '\0';
         }
         if (!mv_insert_line (mv.line_count, line_buf)) {
             fclose (f);
@@ -304,7 +304,7 @@ static bool mv_load_file (const char *filename) {
     return true;
 }
 static bool mv_save_file (void) {
-    char backup_path[560];
+    char backup_path [560];
     snprintf (backup_path, sizeof (backup_path), "%s.bak", mv.filename);
     FILE *existing = fopen (mv.filename, "r");
     if (existing) {
@@ -313,7 +313,7 @@ static bool mv_save_file (void) {
         FILE *dst = fopen (backup_path, "w");
         bool copy_ok = (src && dst);
         if (src && dst) {
-            char buf[4096];
+            char buf [4096];
             size_t n;
             while ((n = fread (buf, 1, sizeof (buf), src)) > 0) {
                 if (fwrite (buf, 1, n, dst) != n) {
@@ -342,7 +342,7 @@ static bool mv_save_file (void) {
         return false;
     }
     for (int i = 0; i < mv.line_count; i++) {
-        fprintf (f, "%s\n", mv.lines[i]);
+        fprintf (f, "%s\n", mv.lines [i]);
     }
     fclose (f);
     mv.modified = false;
@@ -358,13 +358,13 @@ static void mv_word_forward (void) {
     int row = mv.cursor_row;
     int col = mv.cursor_col;
     int len = mv_line_len (row);
-    while (col < len && mv_is_word_char (mv.lines[row][col])) {
+    while (col < len && mv_is_word_char (mv.lines [row] [col])) {
         col++;
     }
-    while (col < len && !mv_is_word_char (mv.lines[row][col]) && mv.lines[row][col] != ' ') {
+    while (col < len && !mv_is_word_char (mv.lines [row] [col]) && mv.lines [row] [col] != ' ') {
         col++;
     }
-    while (col < len && mv.lines[row][col] == ' ') {
+    while (col < len && mv.lines [row] [col] == ' ') {
         col++;
     }
     if (col >= len) {
@@ -383,15 +383,15 @@ static void mv_word_backward (void) {
     if (col > 0) {
         col--;
     }
-    while (col > 0 && mv.lines[row][col] == ' ') {
+    while (col > 0 && mv.lines [row] [col] == ' ') {
         col--;
     }
-    if (col > 0 && mv_is_word_char (mv.lines[row][col])) {
-        while (col > 0 && mv_is_word_char (mv.lines[row][col - 1])) {
+    if (col > 0 && mv_is_word_char (mv.lines [row] [col])) {
+        while (col > 0 && mv_is_word_char (mv.lines [row] [col - 1])) {
             col--;
         }
     } else if (col > 0) {
-        while (col > 0 && !mv_is_word_char (mv.lines[row][col - 1]) && mv.lines[row][col - 1] != ' ') {
+        while (col > 0 && !mv_is_word_char (mv.lines [row] [col - 1]) && mv.lines [row] [col - 1] != ' ') {
             col--;
         }
     }
@@ -406,15 +406,15 @@ static void mv_word_end (void) {
     if (col < len) {
         col++;
     }
-    while (col < len && mv.lines[row][col] == ' ') {
+    while (col < len && mv.lines [row] [col] == ' ') {
         col++;
     }
-    if (col < len && mv_is_word_char (mv.lines[row][col])) {
-        while (col < len && mv_is_word_char (mv.lines[row][col])) {
+    if (col < len && mv_is_word_char (mv.lines [row] [col])) {
+        while (col < len && mv_is_word_char (mv.lines [row] [col])) {
             col++;
         }
     } else {
-        while (col < len && !mv_is_word_char (mv.lines[row][col]) && mv.lines[row][col] != ' ') {
+        while (col < len && !mv_is_word_char (mv.lines [row] [col]) && mv.lines [row] [col] != ' ') {
             col++;
         }
     }
@@ -442,7 +442,7 @@ static void mv_search_execute (bool forward) {
     int start_row = mv.cursor_row;
     for (int attempt = 0; attempt < mv.line_count * 2; attempt++) {
         int row = (forward ? (start_row + attempt) : (start_row - attempt + mv.line_count * 2)) % mv.line_count;
-        const char *line = mv.lines[row];
+        const char *line = mv.lines [row];
         if (!line) {
             continue;
         }
@@ -453,7 +453,7 @@ static void mv_search_execute (bool forward) {
             for (size_t i = 0; i + pat_len <= line_len; i++) {
                 bool eq = true;
                 for (size_t k = 0; k < pat_len; k++) {
-                    if (term_ascii_tolower (line[i + k]) != pattern_lower[k]) {
+                    if (term_ascii_tolower (line [i + k]) != pattern_lower [k]) {
                         eq = false;
                         break;
                     }
@@ -471,7 +471,7 @@ static void mv_search_execute (bool forward) {
                         for (size_t j = (size_t) (mv.cursor_col + 1); j + pat_len <= line_len; j++) {
                             bool eq2 = true;
                             for (size_t k = 0; k < pat_len; k++) {
-                                if (term_ascii_tolower (line[j + k]) != pattern_lower[k]) {
+                                if (term_ascii_tolower (line [j + k]) != pattern_lower [k]) {
                                     eq2 = false;
                                     break;
                                 }
@@ -512,7 +512,7 @@ static void mv_delete_char_under_cursor (void) {
     }
     if (!mv_undo_push ())
         return;
-    char *line = mv.lines[row];
+    char *line = mv.lines [row];
     memmove (line + col, line + col + 1, (size_t) (len - col));
     mv.modified = true;
     mv_clamp_cursor ();
@@ -524,7 +524,7 @@ static void mv_delete_char_before_cursor (void) {
     }
     if (!mv_undo_push ())
         return;
-    char *line = mv.lines[mv.cursor_row];
+    char *line = mv.lines [mv.cursor_row];
     int len = mv_line_len (mv.cursor_row);
     memmove (line + col - 1, line + col, (size_t) (len - col + 1));
     mv.cursor_col--;
@@ -536,7 +536,7 @@ static void mv_delete_line_op (void) {
     if (mv.yank_text) {
         free (mv.yank_text);
     }
-    mv.yank_text = term_strdup (mv.lines[mv.cursor_row]);
+    mv.yank_text = term_strdup (mv.lines [mv.cursor_row]);
     mv.yank_is_linewise = true;
     mv_delete_line (mv.cursor_row);
     mv.modified = true;
@@ -554,9 +554,9 @@ static void mv_delete_to_end (void) {
     if (mv.yank_text) {
         free (mv.yank_text);
     }
-    mv.yank_text = term_strdup (mv.lines[row] + col);
+    mv.yank_text = term_strdup (mv.lines [row] + col);
     mv.yank_is_linewise = false;
-    mv.lines[row][col] = '\0';
+    mv.lines [row] [col] = '\0';
     mv.modified = true;
     mv_clamp_cursor ();
 }
@@ -571,11 +571,11 @@ static void mv_delete_to_start (void) {
     if (mv.yank_text) {
         free (mv.yank_text);
     }
-    mv.yank_text = term_strndup (mv.lines[row], col);
+    mv.yank_text = term_strndup (mv.lines [row], col);
     mv.yank_is_linewise = false;
-    char *new_line = term_strdup (mv.lines[row] + col);
-    free (mv.lines[row]);
-    mv.lines[row] = new_line;
+    char *new_line = term_strdup (mv.lines [row] + col);
+    free (mv.lines [row]);
+    mv.lines [row] = new_line;
     mv.cursor_col = 0;
     mv.modified = true;
 }
@@ -583,7 +583,7 @@ static void mv_yank_line (void) {
     if (mv.yank_text) {
         free (mv.yank_text);
     }
-    mv.yank_text = term_strdup (mv.lines[mv.cursor_row]);
+    mv.yank_text = term_strdup (mv.lines [mv.cursor_row]);
     mv.yank_is_linewise = true;
 }
 static void mv_paste (bool after) {
@@ -610,11 +610,11 @@ static void mv_paste (bool after) {
         if (!new_line) {
             return; /* OOM: undo already pushed, line untouched — no SEGV */
         }
-        memcpy (new_line, mv.lines[row], (size_t) col);
+        memcpy (new_line, mv.lines [row], (size_t) col);
         memcpy (new_line + col, mv.yank_text, (size_t) yank_len);
-        memcpy (new_line + col + yank_len, mv.lines[row] + col, (size_t) (len - col + 1));
-        free (mv.lines[row]);
-        mv.lines[row] = new_line;
+        memcpy (new_line + col + yank_len, mv.lines [row] + col, (size_t) (len - col + 1));
+        free (mv.lines [row]);
+        mv.lines [row] = new_line;
         mv.cursor_col = col + yank_len - 1;
     }
     mv.modified = true;
@@ -627,7 +627,7 @@ static void mv_join_lines (void) {
     if (!mv_undo_push ())
         return;
     int len_a = mv_line_len (mv.cursor_row);
-    char *joined = term_format ("%s %s", mv.lines[mv.cursor_row], mv.lines[mv.cursor_row + 1]);
+    char *joined = term_format ("%s %s", mv.lines [mv.cursor_row], mv.lines [mv.cursor_row + 1]);
     if (!joined || !mv_set_line (mv.cursor_row, joined)) {
         free (joined);
         return;
@@ -645,27 +645,27 @@ static void mv_insert_char (char c) {
     if (len >= mv_max_line_len - 1) {
         return;
     } /* FIX_039: prevent overflow */
-    char *line = mv.lines[row];
+    char *line = mv.lines [row];
     char *new_line = (char *) malloc ((size_t) (len + 2));
     if (!new_line)
         return;
     memcpy (new_line, line, (size_t) col);
-    new_line[col] = c;
+    new_line [col] = c;
     memcpy (new_line + col + 1, line + col, (size_t) (len - col + 1));
-    free (mv.lines[row]);
-    mv.lines[row] = new_line;
+    free (mv.lines [row]);
+    mv.lines [row] = new_line;
     mv.cursor_col++;
     mv.modified = true;
 }
 static void mv_insert_newline (void) {
     int row = mv.cursor_row;
     int col = mv.cursor_col;
-    char *second_half = term_strdup (mv.lines[row] + col);
+    char *second_half = term_strdup (mv.lines [row] + col);
     if (!second_half || !mv_insert_line (row + 1, second_half)) {
         free (second_half);
         return;
     }
-    mv.lines[row][col] = '\0';
+    mv.lines [row] [col] = '\0';
     free (second_half);
     mv.cursor_row++;
     mv.cursor_col = 0;
@@ -678,7 +678,7 @@ static void mv_backspace (void) {
         if (!mv_undo_push ())
             return;
         int prev_len = mv_line_len (mv.cursor_row - 1);
-        char *joined = term_format ("%s%s", mv.lines[mv.cursor_row - 1], mv.lines[mv.cursor_row]);
+        char *joined = term_format ("%s%s", mv.lines [mv.cursor_row - 1], mv.lines [mv.cursor_row]);
         if (!joined || !mv_set_line (mv.cursor_row - 1, joined)) {
             free (joined);
             return;
@@ -695,13 +695,13 @@ static void mv_backspace (void) {
 /* ------------------------------------------------------------------ */
 static void mv_execute_command (void) {
     char *cmd = mv.command_buf;
-    if (cmd[0] == 'w' && cmd[1] == 'q') {
+    if (cmd [0] == 'w' && cmd [1] == 'q') {
         if (!mv_save_file ()) {
             return; /* DESPOT-2026-10-01: never quit on failed save */
         }
         mv.file_exists = true; /* MPE_TASK_V15R2_WQ_SETS_EXISTS */
         mv.quit_requested = true;
-    } else if (cmd[0] == 'w' && cmd[1] == '\0') {
+    } else if (cmd [0] == 'w' && cmd [1] == '\0') {
         if (!mv_save_file ()) {
             return;
         }
@@ -712,14 +712,14 @@ static void mv_execute_command (void) {
             contact_cache_clear (physics_world_get_primary ());
         }
         mv.mode = mv_normal;
-    } else if (cmd[0] == 'q' && cmd[1] == '!') {
+    } else if (cmd [0] == 'q' && cmd [1] == '!') {
         mv.quit_requested = true;
-    } else if (cmd[0] == 'q' && cmd[1] == '\0') {
+    } else if (cmd [0] == 'q' && cmd [1] == '\0') {
         if (mv.modified) {
             /* MPE_TASK_V15R2_QUIT_MODIFIED_ERROR_BEGIN */
             mv.mode = mv_normal;
             mv.command_len = 0;
-            mv.command_buf[0] = '\0';
+            mv.command_buf [0] = '\0';
             /* Render an error message in the status area by temporarily
 setting a flag that microvim_render will pick up */
             mv.command_len =
@@ -729,13 +729,13 @@ setting a flag that microvim_render will pick up */
             /* MPE_TASK_V15R2_QUIT_MODIFIED_ERROR_END */
         }
         mv.quit_requested = true;
-    } else if (cmd[0] == 'x') {
+    } else if (cmd [0] == 'x') {
         if (!mv_save_file ()) {
             return;
         }
         mv.quit_requested = true;
-    } else if (cmd[0] == 'e' && cmd[1] == ' ') {
-        if (!mv.modified || (cmd[2] == '!')) {
+    } else if (cmd [0] == 'e' && cmd [1] == ' ') {
+        if (!mv.modified || (cmd [2] == '!')) {
             mv_load_file (cmd + 2);
             if (mv.line_count == 0) {
                 microvim_close ();
@@ -753,7 +753,7 @@ setting a flag that microvim_render will pick up */
     } else if (strncmp (cmd, "set nonumber", 12) == 0 || strncmp (cmd, "set nonu", 8) == 0) {
         mv.show_line_numbers = false;
         mv.mode = mv_normal;
-    } else if (cmd[0] == 's' && cmd[1] == '/') {
+    } else if (cmd [0] == 's' && cmd [1] == '/') {
         /* Substitute on current line: s/old/new/ or s/old/new/g */
         char *p1 = cmd + 2;
         char *p2 = strchr (p1, '/');
@@ -768,11 +768,11 @@ setting a flag that microvim_render will pick up */
                     global_replace = true;
                 }
             }
-            if (!p1[0]) {
+            if (!p1 [0]) {
                 mv.command_len = snprintf (mv.command_buf, sizeof (mv.command_buf), "E486: empty substitute pattern");
                 return;
             }
-            char *line = mv.lines[mv.cursor_row];
+            char *line = mv.lines [mv.cursor_row];
             char *lower_line = term_ascii_strdown (line);
             char *lower_old = term_ascii_strdown (p1);
             if (!lower_line || !lower_old) {
@@ -791,24 +791,24 @@ setting a flag that microvim_render will pick up */
                 int new_len = (int) strlen (p3);
                 int pos = (int) (match - lower_line);
                 do {
-                    int line_len = (int) strlen (mv.lines[mv.cursor_row]);
+                    int line_len = (int) strlen (mv.lines [mv.cursor_row]);
                     if (new_len > mv_max_line_len - 1 - (line_len - old_len))
                         break;
                     char *new_line = (char *) malloc ((size_t) (line_len - old_len + new_len + 1));
                     if (!new_line)
                         break;
-                    memcpy (new_line, mv.lines[mv.cursor_row], (size_t) pos);
+                    memcpy (new_line, mv.lines [mv.cursor_row], (size_t) pos);
                     memcpy (new_line + pos, p3, (size_t) new_len);
-                    memcpy (new_line + pos + new_len, mv.lines[mv.cursor_row] + pos + old_len,
+                    memcpy (new_line + pos + new_len, mv.lines [mv.cursor_row] + pos + old_len,
                             (size_t) (line_len - pos - old_len + 1));
-                    free (mv.lines[mv.cursor_row]);
-                    mv.lines[mv.cursor_row] = new_line;
+                    free (mv.lines [mv.cursor_row]);
+                    mv.lines [mv.cursor_row] = new_line;
                     mv.modified = true;
                     if (!global_replace) {
                         break;
                     }
                     free (lower_line);
-                    lower_line = term_ascii_strdown (mv.lines[mv.cursor_row]);
+                    lower_line = term_ascii_strdown (mv.lines [mv.cursor_row]);
                     if (!lower_line)
                         break;
                     pos += new_len;
@@ -822,7 +822,7 @@ setting a flag that microvim_render will pick up */
             free (lower_old);
         }
         mv.mode = mv_normal;
-    } else if (isdigit ((unsigned char) cmd[0])) {
+    } else if (isdigit ((unsigned char) cmd [0])) {
         int target_line = atoi (cmd) - 1;
         if (target_line < 0) {
             target_line = 0;
@@ -837,7 +837,7 @@ setting a flag that microvim_render will pick up */
         mv.mode = mv_normal;
     }
     mv.command_len = 0;
-    mv.command_buf[0] = '\0';
+    mv.command_buf [0] = '\0';
 }
 /* ------------------------------------------------------------------ */
 /* Key handling                                                         */
@@ -1088,8 +1088,8 @@ static void mv_handle_normal_key (guint keyval, guint keycode, GdkModifierType s
         if (col < len) {
             if (!mv_undo_push ())
                 return;
-            char c = mv.lines[row][col];
-            mv.lines[row][col] =
+            char c = mv.lines [row] [col];
+            mv.lines [row] [col] =
                 isupper ((unsigned char) c) ? tolower ((unsigned char) c) : toupper ((unsigned char) c);
             mv.cursor_col++;
             mv.modified = true;
@@ -1101,13 +1101,13 @@ static void mv_handle_normal_key (guint keyval, guint keycode, GdkModifierType s
         mv.mode = mv_search;
         mv.search_forward = true;
         mv.search_len = 0;
-        mv.search_buf[0] = '\0';
+        mv.search_buf [0] = '\0';
         break;
     case GDK_KEY_question:
         mv.mode = mv_search;
         mv.search_forward = false;
         mv.search_len = 0;
-        mv.search_buf[0] = '\0';
+        mv.search_buf [0] = '\0';
         break;
     case GDK_KEY_n:
         mv_search_execute (mv.search_forward);
@@ -1120,18 +1120,18 @@ static void mv_handle_normal_key (guint keyval, guint keycode, GdkModifierType s
         int col = mv.cursor_col;
         int len = mv_line_len (row);
         int start = col;
-        while (start > 0 && mv_is_word_char (mv.lines[row][start - 1])) {
+        while (start > 0 && mv_is_word_char (mv.lines [row] [start - 1])) {
             start--;
         }
         int end = col;
-        while (end < len && mv_is_word_char (mv.lines[row][end])) {
+        while (end < len && mv_is_word_char (mv.lines [row] [end])) {
             end++;
         }
         if (end > start) {
             int wlen = end - start;
             if (wlen < 255) {
-                strncpy (mv.search_buf, mv.lines[row] + start, (size_t) wlen);
-                mv.search_buf[wlen] = '\0';
+                strncpy (mv.search_buf, mv.lines [row] + start, (size_t) wlen);
+                mv.search_buf [wlen] = '\0';
                 mv.search_len = wlen;
                 mv.search_forward = true;
                 mv_search_execute (true);
@@ -1142,7 +1142,7 @@ static void mv_handle_normal_key (guint keyval, guint keycode, GdkModifierType s
     case GDK_KEY_colon:
         mv.mode = mv_command;
         mv.command_len = 0;
-        mv.command_buf[0] = '\0';
+        mv.command_buf [0] = '\0';
         break;
     case GDK_KEY_Escape:
         break;
@@ -1206,15 +1206,15 @@ static void mv_handle_insert_key (guint keyval, guint keycode, GdkModifierType s
         if (!mv_undo_push ())
             return;
         int col = mv.cursor_col;
-        while (col > 0 && mv.lines[mv.cursor_row][col - 1] == ' ') {
+        while (col > 0 && mv.lines [mv.cursor_row] [col - 1] == ' ') {
             col--;
         }
-        while (col > 0 && mv_is_word_char (mv.lines[mv.cursor_row][col - 1])) {
+        while (col > 0 && mv_is_word_char (mv.lines [mv.cursor_row] [col - 1])) {
             col--;
         }
         int deleted = mv.cursor_col - col;
         if (deleted > 0) {
-            char *line = mv.lines[mv.cursor_row];
+            char *line = mv.lines [mv.cursor_row];
             int len = mv_line_len (mv.cursor_row);
             memmove (line + col, line + mv.cursor_col, (size_t) (len - mv.cursor_col + 1));
             mv.cursor_col = col;
@@ -1237,13 +1237,13 @@ static void mv_handle_command_key (guint keyval, guint keycode, GdkModifierType 
     if (key == GDK_KEY_Escape) {
         mv.mode = mv_normal;
         mv.command_len = 0;
-        mv.command_buf[0] = '\0';
+        mv.command_buf [0] = '\0';
         return;
     }
     if (key == GDK_KEY_BackSpace) {
         if (mv.command_len > 0) {
             mv.command_len--;
-            mv.command_buf[mv.command_len] = '\0';
+            mv.command_buf [mv.command_len] = '\0';
         }
         return;
     }
@@ -1252,8 +1252,8 @@ static void mv_handle_command_key (guint keyval, guint keycode, GdkModifierType 
         return;
     }
     if (key >= 32 && key < 127 && mv.command_len < 254) {
-        mv.command_buf[mv.command_len++] = (char) key;
-        mv.command_buf[mv.command_len] = '\0';
+        mv.command_buf [mv.command_len++] = (char) key;
+        mv.command_buf [mv.command_len] = '\0';
     }
 }
 static void mv_handle_search_key (guint keyval, guint keycode, GdkModifierType state) {
@@ -1267,7 +1267,7 @@ static void mv_handle_search_key (guint keyval, guint keycode, GdkModifierType s
     if (key == GDK_KEY_BackSpace) {
         if (mv.search_len > 0) {
             mv.search_len--;
-            mv.search_buf[mv.search_len] = '\0';
+            mv.search_buf [mv.search_len] = '\0';
         }
         return;
     }
@@ -1277,8 +1277,8 @@ static void mv_handle_search_key (guint keyval, guint keycode, GdkModifierType s
         return;
     }
     if (key >= 32 && key < 127 && mv.search_len < 254) {
-        mv.search_buf[mv.search_len++] = (char) key;
-        mv.search_buf[mv.search_len] = '\0';
+        mv.search_buf [mv.search_len++] = (char) key;
+        mv.search_buf [mv.search_len] = '\0';
     }
 }
 /* ------------------------------------------------------------------ */
@@ -1316,7 +1316,7 @@ void microvim_render (GtkTextBuffer *buffer) {
         mv.scroll_offset = 0;
     }
     GtkTextIter end_iter;
-    char line_buf[mv_max_line_len + 64];
+    char line_buf [mv_max_line_len + 64];
     for (int view_line = 0; view_line < mv_view_height - 2; view_line++) {
         int row = mv.scroll_offset + view_line;
         if (row < mv.line_count) {
@@ -1325,11 +1325,11 @@ void microvim_render (GtkTextBuffer *buffer) {
                 gtk_text_buffer_get_end_iter (buffer, &end_iter);
                 gtk_text_buffer_insert_with_tags_by_name (buffer, &end_iter, line_buf, -1, "mv_linenum", NULL);
             }
-            const char *line = mv.lines[row];
+            const char *line = mv.lines [row];
             const char *tag = "mv_normal";
-            if (line[0] == '#') {
+            if (line [0] == '#') {
                 tag = "mv_comment";
-            } else if (line[0] == '[') {
+            } else if (line [0] == '[') {
                 tag = "mv_section";
             } else {
                 char *eq = strchr (line, '=');
@@ -1358,7 +1358,7 @@ void microvim_render (GtkTextBuffer *buffer) {
         gtk_text_buffer_insert (buffer, &end_iter, "\n", -1);
     }
     /* Status bar */
-    char status_buf[1024];
+    char status_buf [1024];
     const char *mode_text = "";
     if (mv.mode == mv_insert) {
         mode_text = "-- INSERT -- ";
@@ -1382,8 +1382,8 @@ void microvim_render (GtkTextBuffer *buffer) {
             file_status_text = " [Modified]";
         }
         snprintf (status_buf, sizeof (status_buf), "%s\"%s\" %dL%s%s%s%d,%d %s %d%%", mode_text, mv.filename,
-                  mv.line_count, file_status_text, mode_text[0] ? "" : "   ", pos_text[0] ? "" : "", mv.cursor_row + 1,
-                  mv.cursor_col + 1, pos_text[0] ? pos_text : "", pct);
+                  mv.line_count, file_status_text, mode_text [0] ? "" : "   ", pos_text [0] ? "" : "", mv.cursor_row + 1,
+                  mv.cursor_col + 1, pos_text [0] ? pos_text : "", pct);
         /* MPE_TASK_V15R2_STATUS_NEW_FILE_END */
     }
     gtk_text_buffer_get_end_iter (buffer, &end_iter);
@@ -1420,7 +1420,7 @@ void microvim_open (const char *filename) {
     mv.line_capacity = 0;
     mv.line_count = 0;
     strncpy (mv.filename, filename, sizeof (mv.filename) - 1);
-    mv.filename[sizeof (mv.filename) - 1] = '\0';
+    mv.filename [sizeof (mv.filename) - 1] = '\0';
     mv.file_exists = mv_load_file (filename); /* MPE_TASK_V15R2_FILE_EXISTS_STORE */
     if (mv.line_count == 0 && !mv_insert_line (0, "")) {
         microvim_close ();
@@ -1457,10 +1457,10 @@ void microvim_close (void) {
         mv.yank_text = NULL;
     }
     for (int i = 0; i < mv_undo_depth; i++) {
-        mv_snapshot *s = &mv.undo_stack[i];
+        mv_snapshot *s = &mv.undo_stack [i];
         if (s->lines) {
             for (int j = 0; j < s->line_count; j++) {
-                free (s->lines[j]);
+                free (s->lines [j]);
             }
             free (s->lines);
             s->lines = NULL;

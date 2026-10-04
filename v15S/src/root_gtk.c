@@ -90,7 +90,7 @@ static void app_activate (GApplication *app, gpointer user_data) {
     {
         /* Window title derives from the version macro (never a stale
          * hardcoded tag). */
-        char mpe_window_title[128];
+        char mpe_window_title [128];
         snprintf (mpe_window_title, sizeof (mpe_window_title), "MPE %s — GTK4", a3_version_string);
         gtk_window_set_title (GTK_WINDOW (main_window), mpe_window_title);
     }
@@ -130,7 +130,7 @@ static void app_activate (GApplication *app, gpointer user_data) {
     gtk_window_present (GTK_WINDOW (main_window));
 }
 /* Keep old main_algorithm for source compat but route through GApplication. */
-int main_algorithm (int argc, char *argv[]) {
+int main_algorithm (int argc, char *argv []) {
     mpe_app = gtk_application_new ("org.mpe.engine", G_APPLICATION_DEFAULT_FLAGS);
     g_signal_connect (mpe_app, "activate", G_CALLBACK (app_activate), NULL);
     int status = g_application_run (G_APPLICATION (mpe_app), argc, argv);
@@ -148,7 +148,7 @@ int main_algorithm (int argc, char *argv[]) {
     }
     return status;
 }
-int main (int argc, char *argv[]) {
+int main (int argc, char *argv []) {
     return main_algorithm (argc, argv);
 }
 #else /* ====================== GTK3 PATH (unchanged) ====================== */
@@ -186,8 +186,8 @@ static gboolean on_rendered_GTK3 (GtkGLArea *gl_area_widget, GdkGLContext *gl_co
     render_scene_current (widget_width, widget_height);
     return TRUE;
 }
-int main_algorithm (int argc, char *argv[]);
-int main_algorithm (int argc, char *argv[]) {
+int main_algorithm (int argc, char *argv []);
+int main_algorithm (int argc, char *argv []) {
     /* DESPOT-2026-09-29: THIS LINE WAS THE MOUSE LOCK BUG.
      *
      * `g_setenv("GDK_BACKEND", "x11", TRUE)` forced the X11 backend, so the
@@ -238,7 +238,7 @@ int main_algorithm (int argc, char *argv[]) {
     {
         /* Window title derives from the version macro (never a stale
          * hardcoded tag). */
-        char mpe_window_title[128];
+        char mpe_window_title [128];
         snprintf (mpe_window_title, sizeof (mpe_window_title), "MPE %s", a3_version_string);
         gtk_window_set_title (GTK_WINDOW (main_window), mpe_window_title);
     }
@@ -282,7 +282,7 @@ int main_algorithm (int argc, char *argv[]) {
     /* MPE_TASK_34_CONFIG_SAVE_END */
     return 0;
 }
-int main (int argc, char *argv[]) {
+int main (int argc, char *argv []) {
     main_algorithm (argc, argv);
     return 0;
 }

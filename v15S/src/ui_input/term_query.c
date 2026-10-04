@@ -17,7 +17,7 @@ void cmd_stat (int argc, char **argv) {
         term_err ("usage: stat <path>\n");
         return;
     }
-    const char *target = argv[1];
+    const char *target = argv [1];
     if (strstr (target, "world")) {
         term_printf ("term_echo", "  File: /world\n");
         term_printf (NULL, "  Size: %zu params    Blocks: 13    IO Block: config\n", g_registry_count);
@@ -51,14 +51,14 @@ void cmd_stat (int argc, char **argv) {
         term_printf ("term_err", "mpe: stat: %s: No such object\n", target);
         return;
     }
-    rigidbody *rb = &(physics_world_get_primary ()->bodies)[object_index];
+    rigidbody *rb = &(physics_world_get_primary ()->bodies) [object_index];
     int joint_count_for_obj = 0;
     for (int ji = 0; ji < mpe_max_joints; ji++) {
-        if (!(physics_world_get_primary ()->spring_joints)[ji].is_active) {
+        if (!(physics_world_get_primary ()->spring_joints) [ji].is_active) {
             continue;
         }
-        int ia = scene_find_object_index_by_id ((physics_world_get_primary ()->spring_joints)[ji].object_id_a);
-        int ib = scene_find_object_index_by_id ((physics_world_get_primary ()->spring_joints)[ji].object_id_b);
+        int ia = scene_find_object_index_by_id ((physics_world_get_primary ()->spring_joints) [ji].object_id_a);
+        int ib = scene_find_object_index_by_id ((physics_world_get_primary ()->spring_joints) [ji].object_id_b);
         if ((ia == object_index) || (ib == object_index)) {
             joint_count_for_obj++;
         }
@@ -100,36 +100,36 @@ void cmd_find (int argc, char **argv) {
     bool filter_static = false;
     bool filter_dynamic = false;
     for (int i = 1; i < argc; i++) {
-        if (term_str_eq (argv[i], "-type") && (i + 1 < argc)) {
+        if (term_str_eq (argv [i], "-type") && (i + 1 < argc)) {
             i++;
-            if (term_str_eq (argv[i], "sphere") || term_str_eq (argv[i], "sph")) {
+            if (term_str_eq (argv [i], "sphere") || term_str_eq (argv [i], "sph")) {
                 filter_type = 0;
-            } else if (term_str_eq (argv[i], "cube")) {
+            } else if (term_str_eq (argv [i], "cube")) {
                 filter_type = 1;
             }
-        } else if (term_str_eq (argv[i], "-mass") && (i + 1 < argc)) {
+        } else if (term_str_eq (argv [i], "-mass") && (i + 1 < argc)) {
             i++;
-            const char *val = argv[i];
-            if (val[0] == '+') {
+            const char *val = argv [i];
+            if (val [0] == '+') {
                 term_parse_float (val + 1, &mass_greater);
-            } else if (val[0] == '-') {
+            } else if (val [0] == '-') {
                 term_parse_float (val + 1, &mass_less);
             } else {
                 term_parse_float (val, &mass_exact);
             }
-        } else if (term_str_eq (argv[i], "-sleeping")) {
+        } else if (term_str_eq (argv [i], "-sleeping")) {
             filter_sleeping = true;
-        } else if (term_str_eq (argv[i], "-awake")) {
+        } else if (term_str_eq (argv [i], "-awake")) {
             filter_awake = true;
-        } else if (term_str_eq (argv[i], "-static")) {
+        } else if (term_str_eq (argv [i], "-static")) {
             filter_static = true;
-        } else if (term_str_eq (argv[i], "-dynamic")) {
+        } else if (term_str_eq (argv [i], "-dynamic")) {
             filter_dynamic = true;
         }
     }
     int match_count = 0;
     for (int object_index = 0; object_index < (physics_world_get_primary ()->body_count); object_index++) {
-        rigidbody *rb = &(physics_world_get_primary ()->bodies)[object_index];
+        rigidbody *rb = &(physics_world_get_primary ()->bodies) [object_index];
         if ((filter_type == 0) && (rb->type != object_sphere)) {
             continue;
         }
@@ -173,18 +173,18 @@ void cmd_wc (int argc, char **argv) {
         return;
     }
     for (int i = 1; i < argc; i++) {
-        if (argv[i][0] == '-') {
+        if (argv [i] [0] == '-') {
             continue;
         }
-        if (strstr (argv[i], "joint")) {
+        if (strstr (argv [i], "joint")) {
             int active_joints = 0;
             for (int ji = 0; ji < mpe_max_joints; ji++) {
-                if ((physics_world_get_primary ()->spring_joints)[ji].is_active) {
+                if ((physics_world_get_primary ()->spring_joints) [ji].is_active) {
                     active_joints++;
                 }
             }
             term_printf (NULL, "%d /joint\n", active_joints);
-        } else if (strstr (argv[i], "obj")) {
+        } else if (strstr (argv [i], "obj")) {
             term_printf (NULL, "%d /obj\n", (physics_world_get_primary ()->body_count));
         } else {
             term_printf (NULL, "%d objects, %d joints\n", (physics_world_get_primary ()->body_count),
@@ -197,7 +197,7 @@ void cmd_file (int argc, char **argv) {
         term_err ("usage: file <path>\n");
         return;
     }
-    const char *target = argv[1];
+    const char *target = argv [1];
     if (strstr (target, "world")) {
         term_printf (NULL, "/world: physics configuration, %zu parameters\n", g_registry_count);
         return;
@@ -213,7 +213,7 @@ void cmd_file (int argc, char **argv) {
     if (term_classify_token (target) == term_target_joint) {
         int joint_index = term_joint_from_token (target);
         if (joint_index >= 0) {
-            spring_joint *j = &(physics_world_get_primary ()->spring_joints)[joint_index];
+            spring_joint *j = &(physics_world_get_primary ()->spring_joints) [joint_index];
             term_printf (NULL, "/joint/%d: spring joint, k=%.1f d=%.1f len=%.2f\n", joint_index, j->spring_constant,
                          j->damping_coefficient, j->equilibrium_length);
         } else {
@@ -226,7 +226,7 @@ void cmd_file (int argc, char **argv) {
         term_printf ("term_err", "mpe: file: %s: No such object\n", target);
         return;
     }
-    rigidbody *rb = &(physics_world_get_primary ()->bodies)[object_index];
+    rigidbody *rb = &(physics_world_get_primary ()->bodies) [object_index];
     term_printf (NULL, "/obj/%d: rigid body, %s, %.2f kg, %s%s\n", object_index, term_object_type_name (rb), rb->mass,
                  rb->static_state ? "static" : "dynamic", rb->is_sleeping ? ", sleeping" : "");
 }
@@ -235,11 +235,11 @@ void cmd_diff (int argc, char **argv) {
         term_err ("usage: diff <object_a> <object_b>\n");
         return;
     }
-    int index_a = term_require_object (argv[1]);
+    int index_a = term_require_object (argv [1]);
     if (index_a < 0) {
         return;
     }
-    int index_b = term_require_object (argv[2]);
+    int index_b = term_require_object (argv [2]);
     if (index_b < 0) {
         return;
     }
@@ -247,8 +247,8 @@ void cmd_diff (int argc, char **argv) {
         term_ok ("Objects are identical (same object)\n");
         return;
     }
-    rigidbody *a = &(physics_world_get_primary ()->bodies)[index_a];
-    rigidbody *b = &(physics_world_get_primary ()->bodies)[index_b];
+    rigidbody *a = &(physics_world_get_primary ()->bodies) [index_a];
+    rigidbody *b = &(physics_world_get_primary ()->bodies) [index_b];
     int diff_count = 0;
     term_printf ("term_echo", "--- /obj/%d\n", index_a);
     term_printf ("term_echo", "+++ /obj/%d\n", index_b);
@@ -310,22 +310,22 @@ void cmd_xxd (int argc, char **argv) {
         term_err ("usage: xxd <object> [-l len] [-s offset]\n");
         return;
     }
-    int object_index = term_require_object (argv[1]);
+    int object_index = term_require_object (argv [1]);
     if (object_index < 0) {
         return;
     }
     int dump_length = (int) sizeof (rigidbody);
     int dump_offset = 0;
     for (int i = 2; i < argc; i++) {
-        if (term_str_eq (argv[i], "-l") && (i + 1 < argc)) {
+        if (term_str_eq (argv [i], "-l") && (i + 1 < argc)) {
             float v = 0.0f;
-            if (term_parse_float (argv[i + 1], &v)) {
+            if (term_parse_float (argv [i + 1], &v)) {
                 dump_length = (int) v;
             }
             i++;
-        } else if (term_str_eq (argv[i], "-s") && (i + 1 < argc)) {
+        } else if (term_str_eq (argv [i], "-s") && (i + 1 < argc)) {
             float v = 0.0f;
-            if (term_parse_float (argv[i + 1], &v)) {
+            if (term_parse_float (argv [i + 1], &v)) {
                 dump_offset = (int) v;
             }
             i++;
@@ -342,7 +342,7 @@ void cmd_xxd (int argc, char **argv) {
     if (dump_length <= 0) {
         dump_length = struct_size - dump_offset;
     }
-    const unsigned char *raw = (const unsigned char *) &(physics_world_get_primary ()->bodies)[object_index];
+    const unsigned char *raw = (const unsigned char *) &(physics_world_get_primary ()->bodies) [object_index];
     term_printf ("term_echo", "xxd /obj/%d  (%d bytes at offset %d of %d)\n", object_index, dump_length, dump_offset,
                  struct_size);
     for (int row = 0; row < dump_length; row += 16) {
@@ -350,20 +350,20 @@ void cmd_xxd (int argc, char **argv) {
         if (row_len > 16) {
             row_len = 16;
         }
-        char hex_part[64];
-        char ascii_part[20];
+        char hex_part [64];
+        char ascii_part [20];
         int hex_offset = 0;
         for (int col = 0; col < 16; col++) {
             if (col < row_len) {
-                unsigned char byte = raw[dump_offset + row + col];
+                unsigned char byte = raw [dump_offset + row + col];
                 hex_offset += snprintf (hex_part + hex_offset, sizeof (hex_part) - hex_offset, "%02x ", byte);
-                ascii_part[col] = ((byte >= 32) && (byte < 127)) ? (char) byte : '.';
+                ascii_part [col] = ((byte >= 32) && (byte < 127)) ? (char) byte : '.';
             } else {
                 hex_offset += snprintf (hex_part + hex_offset, sizeof (hex_part) - hex_offset, "   ");
-                ascii_part[col] = ' ';
+                ascii_part [col] = ' ';
             }
         }
-        ascii_part[row_len] = '\0';
+        ascii_part [row_len] = '\0';
         term_printf (NULL, "%08x: %-48s  |%s|\n", dump_offset + row, hex_part, ascii_part);
     }
 }
@@ -375,8 +375,8 @@ static bool a3_sort_reverse = false;
 int a3_sort_compare (const void *pa, const void *pb) {
     int ia = *(const int *) pa;
     int ib = *(const int *) pb;
-    rigidbody *ra = &(physics_world_get_primary ()->bodies)[ia];
-    rigidbody *rb = &(physics_world_get_primary ()->bodies)[ib];
+    rigidbody *ra = &(physics_world_get_primary ()->bodies) [ia];
+    rigidbody *rb = &(physics_world_get_primary ()->bodies) [ib];
     float va = 0.0f, vb = 0.0f;
     switch (a3_sort_key) {
     case 1:
@@ -410,20 +410,20 @@ void cmd_sort (int argc, char **argv) {
     a3_sort_reverse = false;
     bool list_joints = false;
     for (int i = 1; i < argc; i++) {
-        if (term_str_eq (argv[i], "-k") && (i + 1 < argc)) {
+        if (term_str_eq (argv [i], "-k") && (i + 1 < argc)) {
             i++;
-            if (term_str_eq (argv[i], "mass")) {
+            if (term_str_eq (argv [i], "mass")) {
                 a3_sort_key = 1;
-            } else if (term_str_eq (argv[i], "speed")) {
+            } else if (term_str_eq (argv [i], "speed")) {
                 a3_sort_key = 2;
-            } else if (term_str_eq (argv[i], "type")) {
+            } else if (term_str_eq (argv [i], "type")) {
                 a3_sort_key = 3;
-            } else if (term_str_eq (argv[i], "pos.y")) {
+            } else if (term_str_eq (argv [i], "pos.y")) {
                 a3_sort_key = 4;
             }
-        } else if (term_str_eq (argv[i], "-r")) {
+        } else if (term_str_eq (argv [i], "-r")) {
             a3_sort_reverse = true;
-        } else if (strstr (argv[i], "joint")) {
+        } else if (strstr (argv [i], "joint")) {
             list_joints = true;
         }
     }
@@ -435,14 +435,14 @@ void cmd_sort (int argc, char **argv) {
         term_dim ("(no objects)\n");
         return;
     }
-    static int sort_indices[mpe_max_bodies];
+    static int sort_indices [mpe_max_bodies];
     for (int i = 0; i < (physics_world_get_primary ()->body_count); i++) {
-        sort_indices[i] = i;
+        sort_indices [i] = i;
     }
     qsort (sort_indices, (size_t) (physics_world_get_primary ()->body_count), sizeof (int), a3_sort_compare);
     term_printf (NULL, "%-10s %4s %8s %-4s %-6s %s\n", "MODE", "PID", "MASS", "TYPE", "STATE", "INFO");
     for (int i = 0; i < (physics_world_get_primary ()->body_count); i++) {
-        term_print_object_long (sort_indices[i]);
+        term_print_object_long (sort_indices [i]);
     }
 }
 void cmd_grep (int argc, char **argv) {
@@ -450,16 +450,16 @@ void cmd_grep (int argc, char **argv) {
         term_err ("usage: grep <pattern> [path]\n");
         return;
     }
-    const char *pattern = argv[1];
+    const char *pattern = argv [1];
     term_capture_begin ();
-    if ((argc > 2) && (strstr (argv[2], "joint"))) {
+    if ((argc > 2) && (strstr (argv [2], "joint"))) {
         term_list_joints (true);
     } else {
         term_list_objects (true);
     }
     term_capture_end ();
     char *captured = term_capture_get ();
-    if ((!captured) || (captured[0] == '\0')) {
+    if ((!captured) || (captured [0] == '\0')) {
         term_capture_reset ();
         term_dim ("(no output)\n");
         return;
@@ -476,7 +476,7 @@ void cmd_grep (int argc, char **argv) {
         }
         line_start = newline_pos + 1;
     }
-    if (line_start[0] != '\0') {
+    if (line_start [0] != '\0') {
         if (strstr (line_start, pattern) != NULL) {
             term_printf (NULL, "%s\n", line_start);
             match_count++;
@@ -493,13 +493,13 @@ void cmd_head (int argc, char **argv) {
     int line_count = 10;
     bool list_joints = false;
     for (int i = 1; i < argc; i++) {
-        if (term_str_eq (argv[i], "-n") && (i + 1 < argc)) {
+        if (term_str_eq (argv [i], "-n") && (i + 1 < argc)) {
             float v = 0.0f;
-            if (term_parse_float (argv[i + 1], &v)) {
+            if (term_parse_float (argv [i + 1], &v)) {
                 line_count = (int) v;
             }
             i++;
-        } else if (strstr (argv[i], "joint")) {
+        } else if (strstr (argv [i], "joint")) {
             list_joints = true;
         }
     }
@@ -514,7 +514,7 @@ void cmd_head (int argc, char **argv) {
     }
     term_capture_end ();
     char *captured = term_capture_get ();
-    if ((!captured) || (captured[0] == '\0')) {
+    if ((!captured) || (captured [0] == '\0')) {
         term_capture_reset ();
         term_dim ("(no output)\n");
         return;
@@ -528,7 +528,7 @@ void cmd_head (int argc, char **argv) {
         printed++;
         line_start = newline_pos + 1;
     }
-    if ((printed < line_count) && (line_start[0] != '\0')) {
+    if ((printed < line_count) && (line_start [0] != '\0')) {
         term_printf (NULL, "%s\n", line_start);
     }
     term_capture_reset ();
@@ -537,13 +537,13 @@ void cmd_tail (int argc, char **argv) {
     int line_count = 10;
     bool list_joints = false;
     for (int i = 1; i < argc; i++) {
-        if (term_str_eq (argv[i], "-n") && (i + 1 < argc)) {
+        if (term_str_eq (argv [i], "-n") && (i + 1 < argc)) {
             float v = 0.0f;
-            if (term_parse_float (argv[i + 1], &v)) {
+            if (term_parse_float (argv [i + 1], &v)) {
                 line_count = (int) v;
             }
             i++;
-        } else if (strstr (argv[i], "joint")) {
+        } else if (strstr (argv [i], "joint")) {
             list_joints = true;
         }
     }
@@ -558,7 +558,7 @@ void cmd_tail (int argc, char **argv) {
     }
     term_capture_end ();
     char *captured = term_capture_get ();
-    if ((!captured) || (captured[0] == '\0')) {
+    if ((!captured) || (captured [0] == '\0')) {
         term_capture_reset ();
         term_dim ("(no output)\n");
         return;
@@ -572,7 +572,7 @@ void cmd_tail (int argc, char **argv) {
         }
         scan++;
     }
-    if (captured[strlen (captured) - 1] != '\n') {
+    if (captured [strlen (captured) - 1] != '\n') {
         total_lines++;
     }
     /* Skip to the start of the last N lines */
@@ -595,7 +595,7 @@ void cmd_tail (int argc, char **argv) {
         term_printf (NULL, "%s\n", line_start);
         line_start = newline_pos + 1;
     }
-    if (line_start[0] != '\0') {
+    if (line_start [0] != '\0') {
         term_printf (NULL, "%s\n", line_start);
     }
     term_capture_reset ();
@@ -604,7 +604,7 @@ void cmd_less (int argc, char **argv) {
     int page_size = 40;
     bool list_joints = false;
     for (int i = 1; i < argc; i++) {
-        if (strstr (argv[i], "joint")) {
+        if (strstr (argv [i], "joint")) {
             list_joints = true;
         }
     }
@@ -616,7 +616,7 @@ void cmd_less (int argc, char **argv) {
     }
     term_capture_end ();
     char *captured = term_capture_get ();
-    if ((!captured) || (captured[0] == '\0')) {
+    if ((!captured) || (captured [0] == '\0')) {
         term_capture_reset ();
         term_dim ("(no output)\n");
         return;
@@ -629,7 +629,7 @@ void cmd_less (int argc, char **argv) {
         }
         scan++;
     }
-    if (captured[strlen (captured) - 1] != '\n') {
+    if (captured [strlen (captured) - 1] != '\n') {
         total_lines++;
     }
     term_printf ("term_dim", "-- %d lines total, showing first %d --\n", total_lines, page_size);
@@ -642,7 +642,7 @@ void cmd_less (int argc, char **argv) {
         printed++;
         line_start = newline_pos + 1;
     }
-    if ((printed < page_size) && (line_start[0] != '\0')) {
+    if ((printed < page_size) && (line_start [0] != '\0')) {
         term_printf (NULL, "%s\n", line_start);
         printed++;
     }

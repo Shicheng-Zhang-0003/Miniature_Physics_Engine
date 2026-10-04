@@ -82,9 +82,9 @@ static ftc_fleet_t *fleet_of (struct physics_world *world) {
     if (!world)
         return NULL;
     for (int i = 0; i < world->tick_module_count; i++) {
-        if (world->tick_modules[i] && world->tick_modules[i]->name &&
-            strcmp (world->tick_modules[i]->name, FTC_FLEET_MODULE_NAME) == 0) {
-            return (ftc_fleet_t *) world->tick_module_state[i];
+        if (world->tick_modules [i] && world->tick_modules [i]->name &&
+            strcmp (world->tick_modules [i]->name, FTC_FLEET_MODULE_NAME) == 0) {
+            return (ftc_fleet_t *) world->tick_module_state [i];
         }
     }
 #if MPE_WEAK_SUPPORTED
@@ -122,7 +122,7 @@ int ftc_fleet_spawn (struct physics_world *world, float x, float y, float z, mot
         f->robots = nr;
         f->cap = ncap;
     }
-    if (ftc_robot_create_with_drive (world, &f->robots[f->count], x, y, z, preset, drivetrain_type) != 0) {
+    if (ftc_robot_create_with_drive (world, &f->robots [f->count], x, y, z, preset, drivetrain_type) != 0) {
         return -1;
     }
     return f->count++;
@@ -135,7 +135,7 @@ ftc_robot *ftc_fleet_get (struct physics_world *world, int index) {
     ftc_fleet_t *f = fleet_of (world);
     if (!f || !f->robots || index < 0 || index >= f->count)
         return NULL;
-    return &f->robots[index];
+    return &f->robots [index];
 }
 void ftc_fleet_step_all (struct physics_world *world, void *fleet_state, float dt) {
     ftc_fleet_t *f = (ftc_fleet_t *) fleet_state;
@@ -144,6 +144,6 @@ void ftc_fleet_step_all (struct physics_world *world, void *fleet_state, float d
     /* Spawn order = update order: deterministic across runs and
      * across static/dynamic copies of this code. */
     for (int i = 0; i < f->count; i++) {
-        drivetrain_update (world, &f->robots[i], dt);
+        drivetrain_update (world, &f->robots [i], dt);
     }
 }

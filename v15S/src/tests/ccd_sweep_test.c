@@ -16,14 +16,14 @@ int main (void) {
         constraint_pool_init (&world);
         physics_world_add_cube (&world, (vector3){0, 5.0f, 0}, (vector3){0.05f, 5.0f, 5.0f}, 0.0f);
         int s = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){-5.7f, 5.0f, 0});
-        world.bodies[s].velocity = (vector3){144.0f, 0.0f, 0};
-        world.bodies[s].restitution = 0.0f;
-        rigidbody_wake (&world.bodies[s]);
+        world.bodies [s].velocity = (vector3){144.0f, 0.0f, 0};
+        world.bodies [s].restitution = 0.0f;
+        rigidbody_wake (&world.bodies [s]);
         for (int t = 0; t < 30; t++) {
             physics_world_step (&world, dt);
         }
-        float x = world.bodies[s].position.x;
-        float vx = world.bodies[s].velocity.x;
+        float x = world.bodies [s].position.x;
+        float vx = world.bodies [s].velocity.x;
         printf ("[info] wall case: final_x=%.3f (face contact at -0.55)\n", x);
         /* TRUTH: two-sided. A frozen body at -5.7 or a 0.09m penetration
          * both passed the old one-sided gate. Demand stopped AT the face
@@ -57,26 +57,26 @@ int main (void) {
         physics_world_set_config (&world, &no_net_cfg);
         physics_world_add_cube (&world, (vector3){0, -0.5f, 0}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
         int s = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0, 5.0f, 0});
-        world.bodies[s].velocity = (vector3){0, -60.0f, 0};
-        world.bodies[s].restitution = 0.0f;
-        rigidbody_wake (&world.bodies[s]);
+        world.bodies [s].velocity = (vector3){0, -60.0f, 0};
+        world.bodies [s].restitution = 0.0f;
+        rigidbody_wake (&world.bodies [s]);
         float min_y = 1e9f;
         int ever_contact = 0;
         for (int t = 0; t < 120; t++) {
             physics_world_step (&world, dt);
-            if (world.bodies[s].position.y < min_y) {
-                min_y = world.bodies[s].position.y;
+            if (world.bodies [s].position.y < min_y) {
+                min_y = world.bodies [s].position.y;
             }
-            if ((world.has_contact) && (world.has_contact[s])) {
+            if ((world.has_contact) && (world.has_contact [s])) {
                 ever_contact = 1;
             }
         }
         printf ("[info] floor case: min_center_y=%.4f rest_y=%.3f ever_contact=%d (net OFF, real slab)\n", min_y,
-                world.bodies[s].position.y, ever_contact);
+                world.bodies [s].position.y, ever_contact);
         /* TRUTH: two-sided. Old min_y<-0.55 allowed 1.04m penetration
          * (center -0.54, fully through) to pass. Demand no deep tunnel
          * AND settled rest at radius height. */
-        float rest_y = world.bodies[s].position.y;
+        float rest_y = world.bodies [s].position.y;
         if (!ever_contact) {
             printf ("[FAIL] floor impact generated no contact manifold — rest would be clamp-held\n");
             fail = 1;

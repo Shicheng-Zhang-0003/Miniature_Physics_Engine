@@ -76,10 +76,10 @@ bool contact_cache_has_pair (struct physics_world *world, uint32_t id_a, uint32_
     int32_t *heads = world->contact_hash_head;
     if (heads) {
         uint32_t slot = contact_pair_key (id_a, id_b);
-        for (int32_t s = heads[slot], guard = 0; s >= 0 && s < count && guard <= count;
-             s = cache[s].hash_next, guard++) {
-            uint32_t ca = cache[s].object_id_a;
-            uint32_t cb = cache[s].object_id_b;
+        for (int32_t s = heads [slot], guard = 0; s >= 0 && s < count && guard <= count;
+             s = cache [s].hash_next, guard++) {
+            uint32_t ca = cache [s].object_id_a;
+            uint32_t cb = cache [s].object_id_b;
             if (((ca == id_a) && (cb == id_b)) || ((ca == id_b) && (cb == id_a))) {
                 return true;
             }
@@ -90,8 +90,8 @@ bool contact_cache_has_pair (struct physics_world *world, uint32_t id_a, uint32_
         count = world->world_contact_cache_capacity;
     }
     for (int i = 0; i < count; i++) {
-        uint32_t ca = cache[i].object_id_a;
-        uint32_t cb = cache[i].object_id_b;
+        uint32_t ca = cache [i].object_id_a;
+        uint32_t cb = cache [i].object_id_b;
         if (((ca == id_a) && (cb == id_b)) || ((ca == id_b) && (cb == id_a))) {
             return true;
         }
@@ -116,7 +116,7 @@ void contact_cache_save (struct physics_world *world, collision_data *manifolds,
     int32_t *hash_head = world->contact_hash_head;
     *cache_count = 0;
     for (int m = 0; m < count; m++) {
-        collision_data *manifold = &manifolds[m];
+        collision_data *manifold = &manifolds [m];
         for (int i = 0; i < manifold->contact_count; i++) {
             if (*cache_count >= world->world_contact_cache_capacity) {
                 if (physics_world_grow_contact_cache (world) != 0) {
@@ -124,8 +124,8 @@ void contact_cache_save (struct physics_world *world, collision_data *manifolds,
                 }
                 cache_array = world->world_contact_cache;
             }
-            contact_point_data *cp = &manifold->contacts[i];
-            cached_contact *cc = &cache_array[(*cache_count)++];
+            contact_point_data *cp = &manifold->contacts [i];
+            cached_contact *cc = &cache_array [(*cache_count)++];
             cc->object_id_a = (manifold->object_a) ? manifold->object_a->object_id : 0;
             cc->object_id_b = (manifold->object_b) ? manifold->object_b->object_id : 0;
             /* MPE_TASK_05_CACHE_SAVE_STAMP_BEGIN */
@@ -151,17 +151,17 @@ void contact_cache_save (struct physics_world *world, collision_data *manifolds,
      * predicate and stay unchained. */
     if (hash_head) {
         for (int h = 0; h < contact_hash_size; h++) {
-            hash_head[h] = -1;
+            hash_head [h] = -1;
         }
         for (int c = *cache_count - 1; c >= 0; c--) {
-            cached_contact *cc = &cache_array[c];
+            cached_contact *cc = &cache_array [c];
             if ((cc->object_id_a == 0) || (cc->object_id_b == 0)) {
                 cc->hash_next = -1;
                 continue;
             }
             uint32_t slot = contact_pair_key (cc->object_id_a, cc->object_id_b);
-            cc->hash_next = hash_head[slot];
-            hash_head[slot] = c;
+            cc->hash_next = hash_head [slot];
+            hash_head [slot] = c;
         }
     }
 }

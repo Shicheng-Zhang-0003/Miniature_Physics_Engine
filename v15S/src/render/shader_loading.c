@@ -9,7 +9,7 @@ GLuint compile_shader (const char *shader_source, GLenum shader_type) {
     glCompileShader (shader_object);
     //Error Check
     int compilation_success;
-    char information_log[512];
+    char information_log [512];
     glGetShaderiv (shader_object, GL_COMPILE_STATUS, &compilation_success);
     if (!compilation_success) {
         glGetShaderInfoLog (shader_object, 512, NULL, information_log);
@@ -65,7 +65,7 @@ GLuint create_shader_program (const char *vertex_shader_path, const char *fragme
         fclose (fragment_shader_file);
         return 0;
     }
-    vertex_shader_source[vertex_file_size] = '\0';
+    vertex_shader_source [vertex_file_size] = '\0';
     if (fread (fragment_shader_source, 1, fragment_file_size, fragment_shader_file) != (size_t) fragment_file_size) {
         fprintf (stderr, "Error reading fragment shader\n");
         free (vertex_shader_source);
@@ -74,7 +74,7 @@ GLuint create_shader_program (const char *vertex_shader_path, const char *fragme
         fclose (fragment_shader_file);
         return 0;
     }
-    fragment_shader_source[fragment_file_size] = '\0';
+    fragment_shader_source [fragment_file_size] = '\0';
     fclose (vertex_shader_file);
     fclose (fragment_shader_file);
     // Compilation Process
@@ -95,7 +95,7 @@ GLuint create_shader_program (const char *vertex_shader_path, const char *fragme
     glLinkProgram (shader_program);
     // Linkage error checking
     int linkage_success;
-    char information_log[512];
+    char information_log [512];
     glGetProgramiv (shader_program, GL_LINK_STATUS, &linkage_success);
     if (!linkage_success) {
         glGetProgramInfoLog (shader_program, 512, NULL, information_log);

@@ -29,19 +29,19 @@
 #include <stdio.h>
 static math3 skew_symmetric (vector3 v) {
     math3 m = {{{0.0f}}};
-    m.matrix[0][1] = -v.z;
-    m.matrix[0][2] = v.y;
-    m.matrix[1][0] = v.z;
-    m.matrix[1][2] = -v.x;
-    m.matrix[2][0] = -v.y;
-    m.matrix[2][1] = v.x;
+    m.matrix [0] [1] = -v.z;
+    m.matrix [0] [2] = v.y;
+    m.matrix [1] [0] = v.z;
+    m.matrix [1] [2] = -v.x;
+    m.matrix [2] [0] = -v.y;
+    m.matrix [2] [1] = v.x;
     return m;
 }
 static math3 math3_addition (math3 a, math3 b) {
     math3 r;
     for (int i = 0; i < 3; i++) {
         for (int j = 0; j < 3; j++) {
-            r.matrix[i][j] = a.matrix[i][j] + b.matrix[i][j];
+            r.matrix [i] [j] = a.matrix [i] [j] + b.matrix [i] [j];
         }
     }
     return r;
@@ -68,16 +68,16 @@ static math3 math3_addition (math3 a, math3 b) {
  *
  * Only the symmetric part is tested; K is built symmetric by assignment, and
  * using (A+A^T)/2 keeps the probe honest if that ever stops being true. */
-static int mat6_is_positive_definite (double m[6][6]) {
-    double L[6][6];
+static int mat6_is_positive_definite (double m [6] [6]) {
+    double L [6] [6];
     for (int i = 0; i < 6; i++)
         for (int j = 0; j < 6; j++)
-            L[i][j] = 0.5 * (m[i][j] + m[j][i]);
+            L [i] [j] = 0.5 * (m [i] [j] + m [j] [i]);
     for (int i = 0; i < 6; i++) {
         for (int j = 0; j <= i; j++) {
-            double sum = L[i][j];
+            double sum = L [i] [j];
             for (int k = 0; k < j; k++)
-                sum -= L[i][k] * L[j][k];
+                sum -= L [i] [k] * L [j] [k];
             if (i == j) {
                 /* K carries an absolute scale spanning invM..Iinv*r^2 and a
                  * 1e-10 regulariser; test the pivot against a scale-relative
@@ -85,71 +85,71 @@ static int mat6_is_positive_definite (double m[6][6]) {
                  * but well-conditioned row reads as singular. */
                 double scale = 0.0;
                 for (int c = 0; c < 6; c++)
-                    scale += L[i][c] * L[i][c];
+                    scale += L [i] [c] * L [i] [c];
                 scale = (scale > 0.0) ? scale : 1.0;
                 if (!(sum > 1e-14 * scale))
                     return 0;
-                L[i][i] = sqrt (sum);
+                L [i] [i] = sqrt (sum);
             } else {
-                if (!(L[j][j] > 0.0))
+                if (!(L [j] [j] > 0.0))
                     return 0;
-                L[i][j] = sum / L[j][j];
+                L [i] [j] = sum / L [j] [j];
             }
-            if (!isfinite (L[i][j]))
+            if (!isfinite (L [i] [j]))
                 return 0;
         }
     }
     return 1;
 }
-static void mat6_zero (double m[6][6]) {
+static void mat6_zero (double m [6] [6]) {
     for (int i = 0; i < 6; i++)
         for (int j = 0; j < 6; j++)
-            m[i][j] = 0.0;
+            m [i] [j] = 0.0;
 }
-static void mat6_vec_mul_d (double out[6], double m[6][6], double v[6]) {
+static void mat6_vec_mul_d (double out [6], double m [6] [6], double v [6]) {
     for (int i = 0; i < 6; i++) {
-        out[i] = 0.0;
+        out [i] = 0.0;
         for (int j = 0; j < 6; j++)
-            out[i] += m[i][j] * v[j];
+            out [i] += m [i] [j] * v [j];
     }
 }
-static int mat6_invert (double m[6][6], double out[6][6]) {
+static int mat6_invert (double m [6] [6], double out [6] [6]) {
     /* Equilibrate, then Gauss-Jordan with partial pivoting in double. */
-    double d[6];
+    double d [6];
     for (int i = 0; i < 6; i++) {
-        double dg = m[i][i];
+        double dg = m [i] [i];
         if (!(dg > 0.0)) {
             dg = 0.0;
             for (int j = 0; j < 6; j++) {
-                double v = m[i][j];
+                double v = m [i] [j];
                 if (isfinite (v)) {
                     dg += v * v;
                 }
             }
             dg = (dg > 0.0) ? sqrt (dg) : 1.0;
-            d[i] = dg;
+            d [i] = dg;
         } else {
-            d[i] = sqrt (dg);
+            d [i] = sqrt (dg);
         }
-        if (!(d[i] > 1e-18) || !isfinite (d[i])) {
-            d[i] = 1.0;
+        if (!(d [i] > 1e-18) || !isfinite (d [i])) {
+            d [i] = 1.0;
         }
     }
-    double aug[6][12];
+    double aug [6] [12];
     for (int i = 0; i < 6; i++) {
         for (int j = 0; j < 6; j++) {
-            double s = d[i] * d[j];
-            aug[i][j] = (s > 0.0) ? m[i][j] / s : m[i][j];
+            double s = d [i] * d [j];
+            aug [i] [j] = (s > 0.0) ? m [i] [j] / s : m [i] [j];
         }
         for (int j = 0; j < 6; j++)
-            aug[i][6 + j] = (i == j) ? 1.0 : 0.0;
+            aug [i] [6 + j] = (i == j) ? 1.0 : 0.0;
     }
     for (int col = 0; col < 6; col++) {
         int pivot = col;
-        double max_val = fabs (aug[col][col]);
+        double max_val = fabs (aug [col] [col]);
         for (int row = col + 1; row < 6; row++) {
-            if (fabs (aug[row][col]) > max_val) {
-                max_val = fabs (aug[row][col]);
+            if (fabs (aug [row] [col]) > max_val) {
+                max_val = fabs (aug [row] [col]);
                 pivot = row;
             }
         }
@@ -157,26 +157,26 @@ static int mat6_invert (double m[6][6], double out[6][6]) {
             return 0; /* singular */
         if (pivot != col) {
             for (int j = 0; j < 12; j++) {
-                double tmp = aug[col][j];
-                aug[col][j] = aug[pivot][j];
-                aug[pivot][j] = tmp;
+                double tmp = aug [col] [j];
+                aug [col] [j] = aug [pivot] [j];
+                aug [pivot] [j] = tmp;
             }
         }
-        double piv_val = aug[col][col];
+        double piv_val = aug [col] [col];
         for (int j = 0; j < 12; j++)
-            aug[col][j] /= piv_val;
+            aug [col] [j] /= piv_val;
         for (int row = 0; row < 6; row++) {
             if (row == col)
                 continue;
-            double factor = aug[row][col];
+            double factor = aug [row] [col];
             for (int j = 0; j < 12; j++)
-                aug[row][j] -= factor * aug[col][j];
+                aug [row] [j] -= factor * aug [col] [j];
         }
     }
     for (int i = 0; i < 6; i++) {
         for (int j = 0; j < 6; j++) {
-            double s = d[i] * d[j];
-            out[i][j] = aug[i][6 + j] / s;
+            double s = d [i] * d [j];
+            out [i] [j] = aug [i] [6 + j] / s;
         }
     }
     return 1;
@@ -293,7 +293,7 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
      * Rows 0-2: point-to-point (x, y, z)
      * Rows 3-4: axis alignment (u, v components of relative angular velocity)
      * Row 5: motor (relative angular velocity along hinge axis) */
-    double K[6][6];
+    double K [6] [6];
     mat6_zero (K);
     /* ---------- K = J*M^-1*J^T, assembled from the Jacobian ----------
      *
@@ -348,42 +348,42 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
          *
          * State order is [v_a | w_a | v_b | w_b]; M^-1 is
          * diag( (1/m_a) I , IA^-1 , (1/m_b) I , IB^-1 ). */
-        vector3 na[6], nwa[6], nb[6], nwb[6];
+        vector3 na [6], nwa [6], nb [6], nwb [6];
         for (int r2 = 0; r2 < 6; r2++) {
-            na[r2] = vector3_zero ();
-            nwa[r2] = vector3_zero ();
-            nb[r2] = vector3_zero ();
-            nwb[r2] = vector3_zero ();
+            na [r2] = vector3_zero ();
+            nwa [r2] = vector3_zero ();
+            nb [r2] = vector3_zero ();
+            nwb [r2] = vector3_zero ();
         }
-        vector3 rows_a[3], rows_b[3];
-        rows_a[0] = (vector3){0.0f, -r_a.z, r_a.y};
-        rows_a[1] = (vector3){r_a.z, 0.0f, -r_a.x};
-        rows_a[2] = (vector3){-r_a.y, r_a.x, 0.0f};
-        rows_b[0] = (vector3){0.0f, -r_b.z, r_b.y};
-        rows_b[1] = (vector3){r_b.z, 0.0f, -r_b.x};
-        rows_b[2] = (vector3){-r_b.y, r_b.x, 0.0f};
+        vector3 rows_a [3], rows_b [3];
+        rows_a [0] = (vector3){0.0f, -r_a.z, r_a.y};
+        rows_a [1] = (vector3){r_a.z, 0.0f, -r_a.x};
+        rows_a [2] = (vector3){-r_a.y, r_a.x, 0.0f};
+        rows_b [0] = (vector3){0.0f, -r_b.z, r_b.y};
+        rows_b [1] = (vector3){r_b.z, 0.0f, -r_b.x};
+        rows_b [2] = (vector3){-r_b.y, r_b.x, 0.0f};
         for (int i = 0; i < 3; i++) {
             /* p2p row i: na = -e_i, nwa = +(S_a row i), nb = +e_i, nwb = -(S_b row i) */
-            float e[3] = {0.0f, 0.0f, 0.0f};
-            e[i] = 1.0f;
-            na[i] = vector3_scaling ((vector3){e[0], e[1], e[2]}, -1.0f);
-            nwa[i] = rows_a[i];
-            nb[i] = (vector3){e[0], e[1], e[2]};
-            nwb[i] = vector3_scaling (rows_b[i], -1.0f);
+            float e [3] = {0.0f, 0.0f, 0.0f};
+            e [i] = 1.0f;
+            na [i] = vector3_scaling ((vector3){e [0], e [1], e [2]}, -1.0f);
+            nwa [i] = rows_a [i];
+            nb [i] = (vector3){e [0], e [1], e [2]};
+            nwb [i] = vector3_scaling (rows_b [i], -1.0f);
         }
-        nwa[3] = vector3_scaling (u, -1.0f);
-        nwb[3] = u;
-        nwa[4] = vector3_scaling (v, -1.0f);
-        nwb[4] = v;
-        nwa[5] = vector3_scaling (axis_world, -1.0f);
-        nwb[5] = axis_world;
+        nwa [3] = vector3_scaling (u, -1.0f);
+        nwb [3] = u;
+        nwa [4] = vector3_scaling (v, -1.0f);
+        nwb [4] = v;
+        nwa [5] = vector3_scaling (axis_world, -1.0f);
+        nwb [5] = axis_world;
         for (int r2 = 0; r2 < 6; r2++) {
             for (int c = 0; c < 6; c++) {
-                double acc = (double) vector3_dot (na[r2], na[c]) * (double) inv_mass_a +
-                             (double) vector3_dot (nwa[r2], math3_multiplication_vector3 (I_inv_a, nwa[c])) +
-                             (double) vector3_dot (nb[r2], nb[c]) * (double) inv_mass_b +
-                             (double) vector3_dot (nwb[r2], math3_multiplication_vector3 (I_inv_b, nwb[c]));
-                K[r2][c] = acc;
+                double acc = (double) vector3_dot (na [r2], na [c]) * (double) inv_mass_a +
+                             (double) vector3_dot (nwa [r2], math3_multiplication_vector3 (I_inv_a, nwa [c])) +
+                             (double) vector3_dot (nb [r2], nb [c]) * (double) inv_mass_b +
+                             (double) vector3_dot (nwb [r2], math3_multiplication_vector3 (I_inv_b, nwb [c]));
+                K [r2] [c] = acc;
             }
         }
     }
@@ -400,14 +400,14 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
      * -0.45) and it silently corrupted every motor-driven solve. */
     if (!p->motor_enabled) {
         for (int i = 0; i < 6; i++) {
-            K[i][5] = 0.0;
-            K[5][i] = 0.0;
+            K [i] [5] = 0.0;
+            K [5] [i] = 0.0;
         }
-        K[5][5] = 1.0; /* decoupled placeholder; never read (lambda[5] = 0) */
+        K [5] [5] = 1.0; /* decoupled placeholder; never read (lambda[5] = 0) */
     }
     /* Add regularization for numerical stability (tiny diagonal). */
     for (int i = 0; i < 6; i++)
-        K[i][i] += 1e-10;
+        K [i] [i] += 1e-10;
     /* DESPOT-2026-09-29: K is a J*M^-1*J^T Gram matrix, so it is PD by
      * construction. Prove it here rather than trusting it: a non-PD K means
      * the Jacobian and the impulse application have gone out of sync, and
@@ -418,34 +418,34 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
         goto fallback_sequential;
     }
     /* RHS = -(J*v + bias). Bias only on P2P (first 3 rows). */
-    double rhs[6];
+    double rhs [6];
     /* P2P rows: -(relative_velocity + bias_p2p) */
     vector3 rhs_p2p = vector3_scaling (vector3_addition (relative_velocity, bias_p2p), -1.0f);
-    rhs[0] = rhs_p2p.x;
-    rhs[1] = rhs_p2p.y;
-    rhs[2] = rhs_p2p.z;
+    rhs [0] = rhs_p2p.x;
+    rhs [1] = rhs_p2p.y;
+    rhs [2] = rhs_p2p.z;
     /* Axis rows: -perpendicular_angular_velocity (no bias for axis alignment). */
     vector3 rel_ang = vector3_subtraction (body_b->angular_velocity, body_a->angular_velocity);
-    rhs[3] = -vector3_dot (rel_ang, u);
-    rhs[4] = -vector3_dot (rel_ang, v);
+    rhs [3] = -vector3_dot (rel_ang, u);
+    rhs [4] = -vector3_dot (rel_ang, v);
     /* Motor row: -(along_axis_velocity - motor_target_speed), or 0 when
      * disabled (free spin: no constraint on the hinge axis). */
     float along_axis = vector3_dot (rel_ang, axis_world);
     if (p->motor_enabled) {
-        rhs[5] = -(along_axis - p->motor_target_speed);
+        rhs [5] = -(along_axis - p->motor_target_speed);
     } else {
-        rhs[5] = 0.0f;
+        rhs [5] = 0.0f;
     }
     /* Solve K * lambda = rhs (double). */
-    double K_inv[6][6];
+    double K_inv [6] [6];
     if (!mat6_invert (K, K_inv)) {
         /* Singular - fall back to sequential solve. */
         goto fallback_sequential;
     }
-    double lambda[6];
+    double lambda [6];
     mat6_vec_mul_d (lambda, K_inv, rhs);
     if (!p->motor_enabled) {
-        lambda[5] = 0.0f; /* free hinge: never apply axis torque */
+        lambda [5] = 0.0f; /* free hinge: never apply axis torque */
     } else if (p->motor_max_torque > 0.0f) {
         /* Single-budget split drive (DESPOT-2026-10-01): torque reaches the
          * bodies through TWO paths — the accumulator feedforward
@@ -455,19 +455,19 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
          * budget; the sum respects motor_max_torque while keeping the
          * one-tick contact convergence the clamped row provides. */
         float max_lam = 0.5f * p->motor_max_torque * dt;
-        if (lambda[5] > max_lam)
-            lambda[5] = max_lam;
-        else if (lambda[5] < -max_lam)
-            lambda[5] = -max_lam;
+        if (lambda [5] > max_lam)
+            lambda [5] = max_lam;
+        else if (lambda [5] < -max_lam)
+            lambda [5] = -max_lam;
     }
     /* Apply impulses.
      * P2P impulse (3D): applied to both bodies.
      * Axis impulses (2D): angular impulses along u and v.
      * Motor impulse (1D): angular impulse along axis_world. */
-    vector3 impulse_p2p = {(float) lambda[0], (float) lambda[1], (float) lambda[2]};
+    vector3 impulse_p2p = {(float) lambda [0], (float) lambda [1], (float) lambda [2]};
     vector3 axis_impulse =
-        vector3_addition (vector3_scaling (u, (float) lambda[3]), vector3_scaling (v, (float) lambda[4]));
-    float motor_lambda = (float) lambda[5];
+        vector3_addition (vector3_scaling (u, (float) lambda [3]), vector3_scaling (v, (float) lambda [4]));
+    float motor_lambda = (float) lambda [5];
     vector3 motor_impulse = vector3_scaling (axis_world, motor_lambda);
     body_a->velocity = vector3_subtraction (body_a->velocity, vector3_scaling (impulse_p2p, inv_mass_a));
     body_b->velocity = vector3_addition (body_b->velocity, vector3_scaling (impulse_p2p, inv_mass_b));
@@ -564,14 +564,14 @@ fallback_sequential:
         float inv_mass_sum = inv_mass_a + inv_mass_b;
         math3 k = {{{0.0f}}};
         for (int i = 0; i < 3; i++)
-            k.matrix[i][i] = inv_mass_sum;
+            k.matrix [i] [i] = inv_mass_sum;
         math3 term_a = math3_multiplication (skew_a, math3_multiplication (I_inv_a, skew_a));
         math3 term_b = math3_multiplication (skew_b, math3_multiplication (I_inv_b, skew_b));
         /* SUBTRACT rotational terms (S*M*S is negative-semidefinite; a
          * J*M^-1*J^T Gram block must be PSD). */
         for (int i = 0; i < 3; i++)
             for (int j = 0; j < 3; j++)
-                k.matrix[i][j] -= term_a.matrix[i][j] + term_b.matrix[i][j];
+                k.matrix [i] [j] -= term_a.matrix [i] [j] + term_b.matrix [i] [j];
         math3 k_inv = math3_inverse (k);
         vector3 rhs_vec = vector3_scaling (vector3_addition (relative_velocity, bias_p2p), -1.0f);
         vector3 impulse = math3_multiplication_vector3 (k_inv, rhs_vec);
@@ -713,9 +713,9 @@ void prismatic_solve (prismatic_params *p, rigidbody *body_a, rigidbody *body_b,
         if (bu_len_sq > 1e-12f) {
             bu = vector3_scaling (bu, 1.0f / sqrtf (bu_len_sq));
             vector3 bv = vector3_cross (axis_a_world, bu);
-            vector3 basis[2] = {bu, bv};
+            vector3 basis [2] = {bu, bv};
             for (int bi = 0; bi < 2; bi++) {
-                vector3 dir = basis[bi];
+                vector3 dir = basis [bi];
                 float rel_d = vector3_dot (rel_vel, dir);
                 /* Positional bias: keep anchors coincident off-axis. */
                 float err_d = vector3_dot (delta, dir);
@@ -968,7 +968,7 @@ void fixed_solve (fixed_params *p, rigidbody *body_a, rigidbody *body_b, float d
     math3 k = {{{0.0f}}};
     float inv_sum = inv_a + inv_b;
     for (int i = 0; i < 3; i++) {
-        k.matrix[i][i] = inv_sum;
+        k.matrix [i] [i] = inv_sum;
     }
     math3 term_a =
         math3_multiplication (skew_a, math3_multiplication (rigidbody_effective_inv_inertia (body_a), skew_a));
@@ -977,7 +977,7 @@ void fixed_solve (fixed_params *p, rigidbody *body_a, rigidbody *body_b, float d
     /* k = inv_sum*I - term_a - term_b */
     for (int c = 0; c < 3; c++) {
         for (int r = 0; r < 3; r++) {
-            k.matrix[c][r] -= term_a.matrix[c][r] + term_b.matrix[c][r];
+            k.matrix [c] [r] -= term_a.matrix [c] [r] + term_b.matrix [c] [r];
         }
     }
     math3 k_inv = math3_inverse (k);

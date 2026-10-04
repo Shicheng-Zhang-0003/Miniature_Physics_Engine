@@ -19,7 +19,7 @@ typedef struct {
     int custom_a; /* custom_shape id or -1 wildcard */
     int custom_b;
     mpe_collide_fn fn;
-    char name[64]; /* owned copy: never dangles into .so rodata */
+    char name [64]; /* owned copy: never dangles into .so rodata */
 } mpe_pair_entry_t;
 void mpe_register_builtins (void);
 /* Explicit lock for multi-step loader transactions (snapshot + dlopen +

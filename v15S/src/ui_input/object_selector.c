@@ -8,13 +8,13 @@ static bool ray_obb_intersection (vector3 ray_origin, vector3 ray_dir, rigidbody
     float tmin = -1e30f;
     float tmax = 1e30f;
     vector3 *axes = obb->cached_axes;
-    float extents[3] = {obb->half_extensions.x, obb->half_extensions.y, obb->half_extensions.z};
+    float extents [3] = {obb->half_extensions.x, obb->half_extensions.y, obb->half_extensions.z};
     for (int i = 0; i < 3; i++) {
-        float d = vector3_dot (axes[i], ray_dir);
-        float e = vector3_dot (axes[i], vector3_subtraction (obb->position, ray_origin));
+        float d = vector3_dot (axes [i], ray_dir);
+        float e = vector3_dot (axes [i], vector3_subtraction (obb->position, ray_origin));
         if (fabsf (d) > math_epsilon) {
-            float t1 = (e - extents[i]) / d;
-            float t2 = (e + extents[i]) / d;
+            float t1 = (e - extents [i]) / d;
+            float t2 = (e + extents [i]) / d;
             if (t1 > t2) {
                 float temp = t1;
                 t1 = t2;
@@ -29,7 +29,7 @@ static bool ray_obb_intersection (vector3 ray_origin, vector3 ray_dir, rigidbody
             if (tmin > tmax) {
                 return false;
             }
-        } else if ((-e > extents[i]) || (-e < -extents[i])) {
+        } else if ((-e > extents [i]) || (-e < -extents [i])) {
             return false;
         }
     }
@@ -39,7 +39,7 @@ static bool ray_obb_intersection (vector3 ray_origin, vector3 ray_dir, rigidbody
 /* Exact solid-cylinder raycast (axle = local X, flat caps). Side quadric in
  * cylinder-local space plus two cap discs; nearest positive t wins. */
 static bool ray_cylinder_intersection (vector3 ray_origin, vector3 ray_dir, rigidbody *cyl, float *t_hit) {
-    vector3 ax = cyl->cached_axes[0];
+    vector3 ax = cyl->cached_axes [0];
     float ax_len_sq = vector3_length_squared (ax);
     if (ax_len_sq < 1e-8f) {
         return false;
@@ -62,9 +62,9 @@ static bool ray_cylinder_intersection (vector3 ray_origin, vector3 ray_dir, rigi
         float disc = b * b - 4.0f * a * c;
         if (disc >= 0.0f) {
             float sq = sqrtf (disc);
-            float t_candidates[2] = {(-b - sq) / (2.0f * a), (-b + sq) / (2.0f * a)};
+            float t_candidates [2] = {(-b - sq) / (2.0f * a), (-b + sq) / (2.0f * a)};
             for (int k = 0; k < 2; k++) {
-                float t = t_candidates[k];
+                float t = t_candidates [k];
                 if (t > 0.0f && t < best_t && fabsf (ox + t * dx) <= h) {
                     best_t = t;
                     hit = true;
@@ -97,7 +97,7 @@ void select_object_by_index (int object_index) {
         return;
     }
     selected_object = object_index;
-    selected_object_id = (physics_world_get_primary ()->bodies)[object_index].object_id;
+    selected_object_id = (physics_world_get_primary ()->bodies) [object_index].object_id;
 }
 void selection_validate (void) {
     if (selected_object_id == 0) {
@@ -120,7 +120,7 @@ int selector_ray_tracing (void) {
     float closest_hit_distance = 1e30f;
     int closest_object_index = -1;
     for (int object_index = 0; object_index < (physics_world_get_primary ()->body_count); object_index++) {
-        rigidbody *rigid_body_pointer = &(physics_world_get_primary ()->bodies)[object_index];
+        rigidbody *rigid_body_pointer = &(physics_world_get_primary ()->bodies) [object_index];
         float t_hit = 0.0f;
         bool hit = false;
         if (rigid_body_pointer->type == object_sphere) {
@@ -161,7 +161,7 @@ void selector_apply_force_impulse (float impulse_magnitude) {
     if ((selected_object < 0) || (selected_object >= (physics_world_get_primary ()->body_count))) {
         return;
     }
-    rigidbody *selected_rigid_body = &(physics_world_get_primary ()->bodies)[selected_object];
+    rigidbody *selected_rigid_body = &(physics_world_get_primary ()->bodies) [selected_object];
     vector3 applied_impulse_vector = vector3_scaling (main_camera_fov.forward_vector, impulse_magnitude);
     rb_apply_forces_perfect (selected_rigid_body, applied_impulse_vector);
 }

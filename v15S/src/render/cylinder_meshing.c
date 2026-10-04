@@ -28,35 +28,35 @@ void init_cylinder_system (mesh *mesh_object, int radial_segments) {
             float a = (float) s * 2.0f * math_pi / (float) radial_segments;
             float y = cosf (a);
             float z = sinf (a);
-            vertex_data[vi++] = x;
-            vertex_data[vi++] = y;
-            vertex_data[vi++] = z;
+            vertex_data [vi++] = x;
+            vertex_data [vi++] = y;
+            vertex_data [vi++] = z;
             if (ring < 2) {
                 /* Barrel normal: radial. */
-                vertex_data[vi++] = 0.0f;
-                vertex_data[vi++] = y;
-                vertex_data[vi++] = z;
+                vertex_data [vi++] = 0.0f;
+                vertex_data [vi++] = y;
+                vertex_data [vi++] = z;
             } else {
                 /* Cap normal: axial. */
-                vertex_data[vi++] = x;
-                vertex_data[vi++] = 0.0f;
-                vertex_data[vi++] = 0.0f;
+                vertex_data [vi++] = x;
+                vertex_data [vi++] = 0.0f;
+                vertex_data [vi++] = 0.0f;
             }
         }
     }
     /* Cap centers (flat shading anchors for fans). */
-    vertex_data[vi++] = -1.0f;
-    vertex_data[vi++] = 0.0f;
-    vertex_data[vi++] = 0.0f;
-    vertex_data[vi++] = -1.0f;
-    vertex_data[vi++] = 0.0f;
-    vertex_data[vi++] = 0.0f;
-    vertex_data[vi++] = 1.0f;
-    vertex_data[vi++] = 0.0f;
-    vertex_data[vi++] = 0.0f;
-    vertex_data[vi++] = 1.0f;
-    vertex_data[vi++] = 0.0f;
-    vertex_data[vi++] = 0.0f;
+    vertex_data [vi++] = -1.0f;
+    vertex_data [vi++] = 0.0f;
+    vertex_data [vi++] = 0.0f;
+    vertex_data [vi++] = -1.0f;
+    vertex_data [vi++] = 0.0f;
+    vertex_data [vi++] = 0.0f;
+    vertex_data [vi++] = 1.0f;
+    vertex_data [vi++] = 0.0f;
+    vertex_data [vi++] = 0.0f;
+    vertex_data [vi++] = 1.0f;
+    vertex_data [vi++] = 0.0f;
+    vertex_data [vi++] = 0.0f;
     int ring0 = 0, ring1 = ring_verts, ring2 = ring_verts * 2, ring3 = ring_verts * 3;
     int center_neg = ring_verts * 4, center_pos = ring_verts * 4 + 1;
     /* Side quads + two cap fans. */
@@ -76,22 +76,22 @@ void init_cylinder_system (mesh *mesh_object, int radial_segments) {
          * therefore disagreed. Nothing in the tree enables GL_CULL_FACE, so
          * this was invisible; the moment anyone enables culling, every
          * cylinder renders inside out. Reversed to match the caps. */
-        element_indices[ei++] = ring0 + s;
-        element_indices[ei++] = ring0 + s + 1;
-        element_indices[ei++] = ring1 + s;
-        element_indices[ei++] = ring0 + s + 1;
-        element_indices[ei++] = ring1 + s + 1;
-        element_indices[ei++] = ring1 + s;
+        element_indices [ei++] = ring0 + s;
+        element_indices [ei++] = ring0 + s + 1;
+        element_indices [ei++] = ring1 + s;
+        element_indices [ei++] = ring0 + s + 1;
+        element_indices [ei++] = ring1 + s + 1;
+        element_indices [ei++] = ring1 + s;
     }
     for (int s = 0; s < radial_segments; s++) {
         /* -X cap (winding faces -X). */
-        element_indices[ei++] = center_neg;
-        element_indices[ei++] = ring2 + s + 1;
-        element_indices[ei++] = ring2 + s;
+        element_indices [ei++] = center_neg;
+        element_indices [ei++] = ring2 + s + 1;
+        element_indices [ei++] = ring2 + s;
         /* +X cap. */
-        element_indices[ei++] = center_pos;
-        element_indices[ei++] = ring3 + s;
-        element_indices[ei++] = ring3 + s + 1;
+        element_indices [ei++] = center_pos;
+        element_indices [ei++] = ring3 + s;
+        element_indices [ei++] = ring3 + s + 1;
     }
     /* Wireframe: two rim loops + 4 axial rails. */
     mesh_object->wireframe_index_count = radial_segments * 2 * 2 + 4 * 2;
@@ -105,15 +105,15 @@ void init_cylinder_system (mesh *mesh_object, int radial_segments) {
     }
     int wi = 0;
     for (int s = 0; s < radial_segments; s++) {
-        wireframe_indices[wi++] = ring0 + s;
-        wireframe_indices[wi++] = ring0 + s + 1;
-        wireframe_indices[wi++] = ring1 + s;
-        wireframe_indices[wi++] = ring1 + s + 1;
+        wireframe_indices [wi++] = ring0 + s;
+        wireframe_indices [wi++] = ring0 + s + 1;
+        wireframe_indices [wi++] = ring1 + s;
+        wireframe_indices [wi++] = ring1 + s + 1;
     }
     for (int k = 0; k < 4; k++) {
         int s = k * radial_segments / 4;
-        wireframe_indices[wi++] = ring0 + s;
-        wireframe_indices[wi++] = ring1 + s;
+        wireframe_indices [wi++] = ring0 + s;
+        wireframe_indices [wi++] = ring1 + s;
     }
     glGenVertexArrays (1, &mesh_object->vertex_array_object);
     glGenBuffers (1, &mesh_object->vertex_buffer_object);

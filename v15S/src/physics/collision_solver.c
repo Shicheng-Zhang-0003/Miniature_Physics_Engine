@@ -47,7 +47,7 @@ static bool a3_contact_anisotropy_axis (const physics_world *world, const rigidb
          * owner's own frame, never to a wrong body). */
         int frame_idx = physics_world_index_by_id ((physics_world *) world, owner->friction_anisotropy_frame);
         if ((frame_idx >= 0) && (frame_idx < world->body_count)) {
-            frame = &world->bodies[frame_idx];
+            frame = &world->bodies [frame_idx];
         }
     }
     *out_axis = vector4_rotate_to_vector3 (frame->orientation, owner->friction_anisotropy_axis);
@@ -223,7 +223,7 @@ void collision_prepare_solver (struct physics_world *world, collision_data *sour
         cache_count = 0;
     }
     for (int i = 0; i < m->contact_count; i++) {
-        contact_point_data *cp = &m->contacts[i];
+        contact_point_data *cp = &m->contacts [i];
         cp->ra = vector3_subtraction (cp->position, m->object_a->position);
         cp->rb = vector3_subtraction (cp->position, m->object_b->position);
         cp->local_position_a =
@@ -259,10 +259,10 @@ void collision_prepare_solver (struct physics_world *world, collision_data *sour
             /* Hash walk: visits the pair's entries in save order, i.e. the
              * same first-hit the legacy linear scan below would find. */
             uint32_t slot0 = contact_pair_key (cache_id_a, cache_id_b);
-            for (int32_t slot = hash_head[slot0], guard = 0;
+            for (int32_t slot = hash_head [slot0], guard = 0;
                  (slot >= 0) && (slot < cache_count) && (guard <= cache_count);
-                 slot = cache_array[slot].hash_next, guard++) {
-                cached_contact *cc = &cache_array[slot];
+                 slot = cache_array [slot].hash_next, guard++) {
+                cached_contact *cc = &cache_array [slot];
                 int role = contact_cache_match_role (cc, cache_id_a, cache_id_b, cache_stamp_a, cache_stamp_b,
                                                      cp->local_position_a, cp->local_position_b, prep_match_sq);
                 if (role == 1) {
@@ -283,7 +283,7 @@ void collision_prepare_solver (struct physics_world *world, collision_data *sour
         } else {
             /* Legacy linear fallback (no hash heads, e.g. malloc failure). */
             for (int c = 0; c < cache_count; c++) {
-                cached_contact *cc = &cache_array[c];
+                cached_contact *cc = &cache_array [c];
                 int role = contact_cache_match_role (cc, cache_id_a, cache_id_b, cache_stamp_a, cache_stamp_b,
                                                      cp->local_position_a, cp->local_position_b, prep_match_sq);
                 if (role == 1) {
@@ -430,10 +430,10 @@ void collision_prepare_solver (struct physics_world *world, collision_data *sour
              * save order. */
             if ((hash_head) && (cache_id_a != 0) && (cache_id_b != 0)) {
                 uint32_t slot0 = contact_pair_key (cache_id_a, cache_id_b);
-                for (int32_t slot = hash_head[slot0], guard = 0;
+                for (int32_t slot = hash_head [slot0], guard = 0;
                      (slot >= 0) && (slot < cache_count) && (guard <= cache_count);
-                     slot = cache_array[slot].hash_next, guard++) {
-                    cached_contact *cc = &cache_array[slot];
+                     slot = cache_array [slot].hash_next, guard++) {
+                    cached_contact *cc = &cache_array [slot];
                     if (contact_cache_adoptable (cc, cache_id_a, cache_id_b, cache_stamp_a, cache_stamp_b,
                                                  cp->local_position_a, cp->local_position_b, prep_match_sq)) {
                         adopted_tangent = cc->tangent_dir;
@@ -442,7 +442,7 @@ void collision_prepare_solver (struct physics_world *world, collision_data *sour
                 }
             } else {
                 for (int c = 0; c < cache_count; c++) {
-                    cached_contact *cc = &cache_array[c];
+                    cached_contact *cc = &cache_array [c];
                     if (contact_cache_adoptable (cc, cache_id_a, cache_id_b, cache_stamp_a, cache_stamp_b,
                                                  cp->local_position_a, cp->local_position_b, prep_match_sq)) {
                         adopted_tangent = cc->tangent_dir;
@@ -646,7 +646,7 @@ void collision_prepare_solver (struct physics_world *world, collision_data *sour
 }
 static void collision_manifold_merge_sort (const float *keys, int *order, int *scratch, int n) {
     for (int i = 0; i < n; i++) {
-        order[i] = i;
+        order [i] = i;
     }
     int *src = order;
     int *dst = scratch;
@@ -656,23 +656,23 @@ static void collision_manifold_merge_sort (const float *keys, int *order, int *s
             int hi = lo + 2 * width < n ? lo + 2 * width : n;
             int a = lo, b = mid, o = lo;
             while (a < mid && b < hi) {
-                float ka = keys[src[a]];
-                float kb = keys[src[b]];
+                float ka = keys [src [a]];
+                float kb = keys [src [b]];
                 bool take_a;
                 if (ka < kb) {
                     take_a = true;
                 } else if (ka > kb) {
                     take_a = false;
                 } else {
-                    take_a = src[a] < src[b];
+                    take_a = src [a] < src [b];
                 }
-                dst[o++] = take_a ? src[a++] : src[b++];
+                dst [o++] = take_a ? src [a++] : src [b++];
             }
             while (a < mid) {
-                dst[o++] = src[a++];
+                dst [o++] = src [a++];
             }
             while (b < hi) {
-                dst[o++] = src[b++];
+                dst [o++] = src [b++];
             }
         }
         int *tmp = src;
@@ -681,7 +681,7 @@ static void collision_manifold_merge_sort (const float *keys, int *order, int *s
     }
     if (src != order) {
         for (int i = 0; i < n; i++) {
-            order[i] = src[i];
+            order [i] = src [i];
         }
     }
 }
@@ -695,19 +695,19 @@ void collision_manifold_solve_order (struct physics_world *world, collision_data
     }
     for (int m = 0; m < manifold_count; m++) {
         float lowest = 1000000.0f;
-        for (int i = 0; i < manifolds[m].contact_count; i++) {
-            float y = manifolds[m].contacts[i].position.y;
+        for (int i = 0; i < manifolds [m].contact_count; i++) {
+            float y = manifolds [m].contacts [i].position.y;
             if (y < lowest) {
                 lowest = y;
             }
         }
-        world->manifold_sort_keys[m] = lowest;
-        order_out[m] = m;
+        world->manifold_sort_keys [m] = lowest;
+        order_out [m] = m;
     }
     /* TRUTH: mergesort with thread-local scratch (no malloc, no globals).
      * Deterministic total order, race-free. */
     {
-        static _Thread_local int merge_scratch[8192];
+        static _Thread_local int merge_scratch [8192];
         if (manifold_count <= 8192) {
             collision_manifold_merge_sort (world->manifold_sort_keys, order_out, merge_scratch, manifold_count);
             return;
@@ -715,20 +715,20 @@ void collision_manifold_solve_order (struct physics_world *world, collision_data
     }
     /* Tiny fallback: insertion sort (deterministic, no globals). */
     for (int i = 1; i < manifold_count; i++) {
-        int key_idx = order_out[i];
-        float key_val = world->manifold_sort_keys[key_idx];
+        int key_idx = order_out [i];
+        float key_val = world->manifold_sort_keys [key_idx];
         int j = i - 1;
         while (j >= 0) {
-            int cur_idx = order_out[j];
-            float cur_val = world->manifold_sort_keys[cur_idx];
+            int cur_idx = order_out [j];
+            float cur_val = world->manifold_sort_keys [cur_idx];
             bool shift = (cur_val > key_val) || (cur_val == key_val && cur_idx > key_idx);
             if (!shift) {
                 break;
             }
-            order_out[j + 1] = order_out[j];
+            order_out [j + 1] = order_out [j];
             j--;
         }
-        order_out[j + 1] = key_idx;
+        order_out [j + 1] = key_idx;
     }
 }
 float collision_resolve_iterative (collision_data *m, float dt, bool friction_only, int start_index,
@@ -756,7 +756,7 @@ float collision_resolve_iterative (collision_data *m, float dt, bool friction_on
     (void) start_index;
     for (int k = 0; k < m->contact_count; k++) {
         int i = k;
-        contact_point_data *cp = &m->contacts[i];
+        contact_point_data *cp = &m->contacts [i];
         vector3 va = vector3_addition (m->object_a->velocity, vector3_cross (m->object_a->angular_velocity, cp->ra));
         vector3 vb = vector3_addition (m->object_b->velocity, vector3_cross (m->object_b->angular_velocity, cp->rb));
         vector3 rel_vel = vector3_subtraction (vb, va);
@@ -945,12 +945,12 @@ void collision_refresh_impact_velocities (collision_data *manifolds, int manifol
         return;
     }
     for (int m = 0; m < manifold_count; m++) {
-        collision_data *man = &manifolds[m];
+        collision_data *man = &manifolds [m];
         if ((!man->object_a) || (!man->object_b)) {
             continue;
         }
         for (int i = 0; i < man->contact_count; i++) {
-            contact_point_data *cp = &man->contacts[i];
+            contact_point_data *cp = &man->contacts [i];
             vector3 va =
                 vector3_addition (man->object_a->velocity, vector3_cross (man->object_a->angular_velocity, cp->ra));
             vector3 vb =
@@ -969,7 +969,7 @@ void collision_snapshot_friction_mu (collision_data *manifolds, int manifold_cou
         sth = 0.02f;
     }
     for (int m = 0; m < manifold_count; m++) {
-        collision_data *man = &manifolds[m];
+        collision_data *man = &manifolds [m];
         float mus = (man->object_a) ? man->object_a->friction_static : 0.0f;
         float muk = (man->object_a) ? man->object_a->friction_kinetic : 0.0f;
         if (man->object_b) {
@@ -990,7 +990,7 @@ void collision_snapshot_friction_mu (collision_data *manifolds, int manifold_cou
             mus = muk;
         }
         for (int i = 0; i < man->contact_count; i++) {
-            contact_point_data *cp = &man->contacts[i];
+            contact_point_data *cp = &man->contacts [i];
             if ((!man->object_a) || (!man->object_b)) {
                 cp->snap_friction_mu = 0.0f;
                 continue;
@@ -1017,9 +1017,9 @@ void collision_apply_poisson_restitution (collision_data *manifolds, int manifol
         return;
     }
     for (int m = 0; m < manifold_count; m++) {
-        collision_data *man = &manifolds[m];
+        collision_data *man = &manifolds [m];
         for (int i = 0; i < man->contact_count; i++) {
-            contact_point_data *cp = &man->contacts[i];
+            contact_point_data *cp = &man->contacts [i];
             float e = fminf (man->object_a->restitution, man->object_b->restitution);
             if (e <= 0.0f) {
                 continue;
@@ -1097,7 +1097,7 @@ void collision_apply_rolling_resistance (collision_data *manifolds, int manifold
         return;
     }
     for (int m = 0; m < manifold_count; m++) {
-        collision_data *man = &manifolds[m];
+        collision_data *man = &manifolds [m];
         /* Shared patch: split total dissipation across sides when BOTH bodies
          * are dynamic (floor/static bodies take the full single-sided rate).
          * TRUTH: fixed 0.5 was an admitted tune, not derived. Mass-weighted
@@ -1130,16 +1130,16 @@ void collision_apply_rolling_resistance (collision_data *manifolds, int manifold
             }
         }
         for (int i = 0; i < man->contact_count; i++) {
-            contact_point_data *cp = &man->contacts[i];
+            contact_point_data *cp = &man->contacts [i];
             if (cp->accumulated_normal_impulse <= 0.0f) {
                 continue;
             }
             {
                 float normal_force = cp->accumulated_normal_impulse / dt;
-                rigidbody *bodies[2] = {man->object_a, man->object_b};
-                vector3 rlev[2] = {cp->ra, cp->rb};
+                rigidbody *bodies [2] = {man->object_a, man->object_b};
+                vector3 rlev [2] = {cp->ra, cp->rb};
                 for (int bi = 0; bi < 2; bi++) {
-                    rigidbody *bd = bodies[bi];
+                    rigidbody *bd = bodies [bi];
                     if ((!bd) || (bd->static_state) || (bd->is_sleeping) || (bd->kinematic)) {
                         continue;
                     }
@@ -1154,7 +1154,7 @@ void collision_apply_rolling_resistance (collision_data *manifolds, int manifold
                      * pen_eff=0.5mm floor so resting spin still decays. */
                     float pen_raw = (cp->penetration > 0.0f) ? cp->penetration : 0.0f;
                     float pen_eff = (pen_raw > 0.0005f) ? pen_raw : 0.0005f;
-                    float r_eff = sqrtf (vector3_length_squared (rlev[bi]));
+                    float r_eff = sqrtf (vector3_length_squared (rlev [bi]));
                     if ((!isfinite (r_eff)) || (r_eff < 1e-6f)) {
                         continue;
                     }
@@ -1259,7 +1259,7 @@ void collision_apply_split_impulse (collision_data *manifolds, int manifold_coun
         wake_depth = 0.1f;
     }
     for (int m = 0; m < manifold_count; m++) {
-        collision_data *man = &manifolds[m];
+        collision_data *man = &manifolds [m];
         rigidbody *body_a = man->object_a;
         rigidbody *body_b = man->object_b;
         if ((!body_a) || (!body_b)) {
@@ -1275,8 +1275,8 @@ void collision_apply_split_impulse (collision_data *manifolds, int manifold_coun
              * enough to wake the dynamic sleepers. */
             float deepest_check = 0.0f;
             for (int i = 0; i < man->contact_count; i++) {
-                if (man->contacts[i].penetration > deepest_check) {
-                    deepest_check = man->contacts[i].penetration;
+                if (man->contacts [i].penetration > deepest_check) {
+                    deepest_check = man->contacts [i].penetration;
                 }
             }
             if (deepest_check > C->depenetration.wake_depth_thresh) {
@@ -1349,8 +1349,8 @@ void collision_apply_split_impulse (collision_data *manifolds, int manifold_coun
          * mode is a bug in one of the two; it was the literal. */
         float deepest = 0.0f;
         for (int i = 0; i < man->contact_count; i++) {
-            if (man->contacts[i].penetration > deepest) {
-                deepest = man->contacts[i].penetration;
+            if (man->contacts [i].penetration > deepest) {
+                deepest = man->contacts [i].penetration;
             }
         }
         float corr = beta * fmaxf (deepest - slop, 0.0f);

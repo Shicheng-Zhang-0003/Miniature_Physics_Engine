@@ -25,8 +25,8 @@ int main (void) {
     float swing = 20.0f * 3.14159265f / 180.0f;
     vector3 com = {sinf (swing) * 1.0f, 5.7f - cosf (swing) * 1.0f, 0.0f};
     int rod = physics_world_add_cube (&world, com, (vector3){0.1f, 1.0f, 0.1f}, 1.0f);
-    uint32_t pivot_id = world.bodies[pivot].object_id;
-    uint32_t rod_id = world.bodies[rod].object_id;
+    uint32_t pivot_id = world.bodies [pivot].object_id;
+    uint32_t rod_id = world.bodies [rod].object_id;
     /* Hinge about z, pin 0.1 m below the pivot's bottom face; rod anchor at its top face. */
     if (constraint_add_revolute (&world, pivot_id, rod_id, (vector3){0.0f, -0.3f, 0.0f}, (vector3){0.0f, 1.0f, 0.0f},
                                  (vector3){0.0f, 0.0f, 1.0f}) < 0) {
@@ -38,11 +38,11 @@ int main (void) {
     float i = (1.0f / 12.0f) * (4.0f + 0.04f) + 1.0f;
     float t_exact = 2.0f * 3.14159265f * sqrtf (i / 9.81f);
     const float dt = 1.0f / 60.0f;
-    float prev_x = world.bodies[rod].position.x;
+    float prev_x = world.bodies [rod].position.x;
     int crossings = 0, first = -1, last = -1;
     for (int t = 0; t < 600; t++) {
         physics_world_step (&world, dt);
-        float x = world.bodies[rod].position.x;
+        float x = world.bodies [rod].position.x;
         if (!isfinite (x)) {
             printf ("[FAIL] NaN\n");
             physics_world_cleanup (&world);

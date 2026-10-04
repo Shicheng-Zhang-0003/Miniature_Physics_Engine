@@ -25,7 +25,7 @@ extern int mfs_t_stall_endpoint (void);
 extern int mfs_t_intake_stop (void);
 extern int mfs_t_shooter_axis (void);
 extern int mfs_t_ball_spin (void);
-static const mfs_test_entry_t registry[] = {
+static const mfs_test_entry_t registry [] = {
     {"teleop", mfs_t_teleop, false},
     {"mecanum", mfs_t_mecanum, false},
     {"release_settle", mfs_t_release_settle, false},
@@ -43,24 +43,24 @@ static const mfs_test_entry_t registry[] = {
     {"ball_spin", mfs_t_ball_spin, false},
 };
 int main (int argc, char **argv) {
-    if (argc > 1 && strcmp (argv[1], "--list") == 0) {
-        printf ("Blocking tests (%zu):\n", sizeof (registry) / sizeof (registry[0]));
-        for (size_t i = 0; i < sizeof (registry) / sizeof (registry[0]); i++) {
-            printf ("  %s\n", registry[i].name);
+    if (argc > 1 && strcmp (argv [1], "--list") == 0) {
+        printf ("Blocking tests (%zu):\n", sizeof (registry) / sizeof (registry [0]));
+        for (size_t i = 0; i < sizeof (registry) / sizeof (registry [0]); i++) {
+            printf ("  %s\n", registry [i].name);
         }
         return 0;
     }
-    if (argc > 1 && strcmp (argv[1], "--all") == 0) {
+    if (argc > 1 && strcmp (argv [1], "--all") == 0) {
         int total = 0, pass = 0, fail = 0;
         printf ("=== Running all blocking tests ===\n");
-        for (size_t i = 0; i < sizeof (registry) / sizeof (registry[0]); i++) {
-            printf ("--- %s ---\n", registry[i].name);
-            int rc = registry[i].fn ();
+        for (size_t i = 0; i < sizeof (registry) / sizeof (registry [0]); i++) {
+            printf ("--- %s ---\n", registry [i].name);
+            int rc = registry [i].fn ();
             if (rc == 0) {
-                printf ("[PASS] %s\n", registry[i].name);
+                printf ("[PASS] %s\n", registry [i].name);
                 pass++;
             } else {
-                printf ("[FAIL] %s (failures=%d)\n", registry[i].name, rc);
+                printf ("[FAIL] %s (failures=%d)\n", registry [i].name, rc);
                 fail++;
             }
             total++;
@@ -72,15 +72,15 @@ int main (int argc, char **argv) {
         return fail > 0 ? 1 : 0;
     }
     if (argc < 2) {
-        fprintf (stderr, "Usage: %s [--list|--all|<test_name>]\n", argv[0]);
+        fprintf (stderr, "Usage: %s [--list|--all|<test_name>]\n", argv [0]);
         return 1;
     }
-    for (size_t i = 0; i < sizeof (registry) / sizeof (registry[0]); i++) {
-        if (strcmp (argv[1], registry[i].name) == 0) {
-            int rc = registry[i].fn ();
+    for (size_t i = 0; i < sizeof (registry) / sizeof (registry [0]); i++) {
+        if (strcmp (argv [1], registry [i].name) == 0) {
+            int rc = registry [i].fn ();
             return rc > 0 ? 1 : 0;
         }
     }
-    fprintf (stderr, "Unknown test: %s\n", argv[1]);
+    fprintf (stderr, "Unknown test: %s\n", argv [1]);
     return 1;
 }

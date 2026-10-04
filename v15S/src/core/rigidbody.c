@@ -170,7 +170,7 @@ static bool a3_vector4_is_finite (vector4 v) {
 static bool a3_math3_is_finite (math3 m) {
     for (int row_index = 0; row_index < 3; row_index++) {
         for (int column_index = 0; column_index < 3; column_index++) {
-            if (!isfinite (m.matrix[row_index][column_index])) {
+            if (!isfinite (m.matrix [row_index] [column_index])) {
                 return false;
             }
         }
@@ -180,7 +180,7 @@ static bool a3_math3_is_finite (math3 m) {
 static bool a3_math3_is_zero (math3 m) {
     for (int row_index = 0; row_index < 3; row_index++) {
         for (int column_index = 0; column_index < 3; column_index++) {
-            if (m.matrix[row_index][column_index] != 0.0f) {
+            if (m.matrix [row_index] [column_index] != 0.0f) {
                 return false;
             }
         }
@@ -533,8 +533,8 @@ void rigidbody_sanitize (rigidbody *rigid_body) {
         }
     }
     /* MPE_TASK_15_SANITIZE_AXIS_CACHE_BEGIN */
-    if ((!a3_vector3_is_finite (rigid_body->cached_axes[0])) || (!a3_vector3_is_finite (rigid_body->cached_axes[1])) ||
-        (!a3_vector3_is_finite (rigid_body->cached_axes[2])) ||
+    if ((!a3_vector3_is_finite (rigid_body->cached_axes [0])) || (!a3_vector3_is_finite (rigid_body->cached_axes [1])) ||
+        (!a3_vector3_is_finite (rigid_body->cached_axes [2])) ||
         (!a3_vector4_is_finite (rigid_body->cached_axes_orientation)) ||
         (fabsf (rigid_body->cached_axes_orientation.w - rigid_body->orientation.w) > 0.000001f) ||
         (fabsf (rigid_body->cached_axes_orientation.x - rigid_body->orientation.x) > 0.000001f) ||
@@ -552,12 +552,12 @@ void rigidbody_update_axes (rigidbody *rigid_body) {
         rigid_body->orientation = vector4_identity ();
     }
     math3 rotation_matrix = vector4_to_math3 (rigid_body->orientation);
-    rigid_body->cached_axes[0] =
-        (vector3){rotation_matrix.matrix[0][0], rotation_matrix.matrix[1][0], rotation_matrix.matrix[2][0]};
-    rigid_body->cached_axes[1] =
-        (vector3){rotation_matrix.matrix[0][1], rotation_matrix.matrix[1][1], rotation_matrix.matrix[2][1]};
-    rigid_body->cached_axes[2] =
-        (vector3){rotation_matrix.matrix[0][2], rotation_matrix.matrix[1][2], rotation_matrix.matrix[2][2]};
+    rigid_body->cached_axes [0] =
+        (vector3){rotation_matrix.matrix [0] [0], rotation_matrix.matrix [1] [0], rotation_matrix.matrix [2] [0]};
+    rigid_body->cached_axes [1] =
+        (vector3){rotation_matrix.matrix [0] [1], rotation_matrix.matrix [1] [1], rotation_matrix.matrix [2] [1]};
+    rigid_body->cached_axes [2] =
+        (vector3){rotation_matrix.matrix [0] [2], rotation_matrix.matrix [1] [2], rotation_matrix.matrix [2] [2]};
     /* MPE_TASK_15_AXIS_STAMP_BEGIN */
     rigid_body->cached_axes_orientation = rigid_body->orientation;
     /* MPE_TASK_15_AXIS_STAMP_END */
@@ -661,9 +661,9 @@ void rigidbody_initialisation_sphere (rigidbody *rigid_body, float radius, float
      * (m/12)(3r²+l²) transverse, axle=X). Correct — no change. */
     float inertia_coefficient_sphere = (2.0f / 5.0f) * mass * radius * radius;
     rigid_body->inertia_tensor_local = (math3){{{0}}};
-    rigid_body->inertia_tensor_local.matrix[0][0] = inertia_coefficient_sphere;
-    rigid_body->inertia_tensor_local.matrix[1][1] = inertia_coefficient_sphere;
-    rigid_body->inertia_tensor_local.matrix[2][2] = inertia_coefficient_sphere;
+    rigid_body->inertia_tensor_local.matrix [0] [0] = inertia_coefficient_sphere;
+    rigid_body->inertia_tensor_local.matrix [1] [1] = inertia_coefficient_sphere;
+    rigid_body->inertia_tensor_local.matrix [2] [2] = inertia_coefficient_sphere;
     //Initialize Inverse Inertia System
     if (mass > 0.0f && isfinite (mass)) {
         rigid_body->inverse_inertia_tensor_local = math3_inverse (rigid_body->inertia_tensor_local);
@@ -681,9 +681,9 @@ void rigidbody_update_inertia_sphere (rigidbody *rigid_body) {
     }
     float inertia_coefficient_sphere = (2.0f / 5.0f) * rigid_body->mass * rigid_body->radius * rigid_body->radius;
     rigid_body->inertia_tensor_local = (math3){{{0}}};
-    rigid_body->inertia_tensor_local.matrix[0][0] = inertia_coefficient_sphere;
-    rigid_body->inertia_tensor_local.matrix[1][1] = inertia_coefficient_sphere;
-    rigid_body->inertia_tensor_local.matrix[2][2] = inertia_coefficient_sphere;
+    rigid_body->inertia_tensor_local.matrix [0] [0] = inertia_coefficient_sphere;
+    rigid_body->inertia_tensor_local.matrix [1] [1] = inertia_coefficient_sphere;
+    rigid_body->inertia_tensor_local.matrix [2] [2] = inertia_coefficient_sphere;
     if (rigid_body->mass > 0.0f && isfinite (rigid_body->mass)) {
         rigid_body->inverse_inertia_tensor_local = math3_inverse (rigid_body->inertia_tensor_local);
         rigid_body->inverse_inertia_system = rigid_body->inverse_inertia_tensor_local;
@@ -701,9 +701,9 @@ void rigidbody_update_inertia_cube (rigidbody *rigid_body) {
     float depth = rigid_body->half_extensions.z * 2.0f;
     float mass = rigid_body->mass;
     rigid_body->inertia_tensor_local = (math3){{{0}}};
-    rigid_body->inertia_tensor_local.matrix[0][0] = (mass / 12.0f) * (height * height + depth * depth);
-    rigid_body->inertia_tensor_local.matrix[1][1] = (mass / 12.0f) * (width * width + depth * depth);
-    rigid_body->inertia_tensor_local.matrix[2][2] = (mass / 12.0f) * (width * width + height * height);
+    rigid_body->inertia_tensor_local.matrix [0] [0] = (mass / 12.0f) * (height * height + depth * depth);
+    rigid_body->inertia_tensor_local.matrix [1] [1] = (mass / 12.0f) * (width * width + depth * depth);
+    rigid_body->inertia_tensor_local.matrix [2] [2] = (mass / 12.0f) * (width * width + height * height);
     if (mass > 0.0f && isfinite (mass)) {
         rigid_body->inverse_inertia_tensor_local = math3_inverse (rigid_body->inertia_tensor_local);
         rigid_body->inverse_inertia_system = rigid_body->inverse_inertia_tensor_local;
@@ -916,8 +916,8 @@ void rb_integrate_velocity (rigidbody *rigid_body, float delta_time, float linea
      * routes it to the L-conservation branch with a bogus L. Epsilon gate. */
     if (vector3_length_squared (rigid_body->torque_accumulator) < 1e-24f) {
         math3 Il = rigid_body->inertia_tensor_local;
-        int isotropic = (fabsf (Il.matrix[0][0] - Il.matrix[1][1]) <= 1e-6f * fabsf (Il.matrix[0][0]) &&
-                         fabsf (Il.matrix[1][1] - Il.matrix[2][2]) <= 1e-6f * fabsf (Il.matrix[0][0]));
+        int isotropic = (fabsf (Il.matrix [0] [0] - Il.matrix [1] [1]) <= 1e-6f * fabsf (Il.matrix [0] [0]) &&
+                         fabsf (Il.matrix [1] [1] - Il.matrix [2] [2]) <= 1e-6f * fabsf (Il.matrix [0] [0]));
         if (!isotropic && rigid_body->mass > 0.0f) {
             vector4 R0 = rigid_body->orientation;
             math3 Rm = vector4_to_math3 (R0);
@@ -1285,9 +1285,9 @@ void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_inpu
     float height = half_extensions.y * 2.0f; //full height
     float depth = half_extensions.z * 2.0f; //full depth
     rigid_body->inertia_tensor_local = (math3){{{0}}};
-    rigid_body->inertia_tensor_local.matrix[0][0] = (mass / 12.0f) * (height * height + depth * depth);
-    rigid_body->inertia_tensor_local.matrix[1][1] = (mass / 12.0f) * (width * width + depth * depth);
-    rigid_body->inertia_tensor_local.matrix[2][2] = (mass / 12.0f) * (width * width + height * height);
+    rigid_body->inertia_tensor_local.matrix [0] [0] = (mass / 12.0f) * (height * height + depth * depth);
+    rigid_body->inertia_tensor_local.matrix [1] [1] = (mass / 12.0f) * (width * width + depth * depth);
+    rigid_body->inertia_tensor_local.matrix [2] [2] = (mass / 12.0f) * (width * width + height * height);
     if (mass > 0.0f && isfinite (mass)) {
         rigid_body->inverse_inertia_tensor_local = math3_inverse (rigid_body->inertia_tensor_local);
         rigid_body->inverse_inertia_system = rigid_body->inverse_inertia_tensor_local;
@@ -1467,9 +1467,9 @@ void rigidbody_update_inertia_cylinder (rigidbody *rigid_body) {
     float l = 2.0f * h;
     rigid_body->inertia_tensor_local = (math3){{{0}}};
     /* Axle is along X axis */
-    rigid_body->inertia_tensor_local.matrix[0][0] = 0.5f * mass * r * r;
-    rigid_body->inertia_tensor_local.matrix[1][1] = (mass / 12.0f) * (3.0f * r * r + l * l);
-    rigid_body->inertia_tensor_local.matrix[2][2] = (mass / 12.0f) * (3.0f * r * r + l * l);
+    rigid_body->inertia_tensor_local.matrix [0] [0] = 0.5f * mass * r * r;
+    rigid_body->inertia_tensor_local.matrix [1] [1] = (mass / 12.0f) * (3.0f * r * r + l * l);
+    rigid_body->inertia_tensor_local.matrix [2] [2] = (mass / 12.0f) * (3.0f * r * r + l * l);
     if (mass > 0.0f && isfinite (mass)) {
         rigid_body->inverse_inertia_tensor_local = math3_inverse (rigid_body->inertia_tensor_local);
         rigid_body->inverse_inertia_system = rigid_body->inverse_inertia_tensor_local;

@@ -24,7 +24,7 @@ mpe_config_t g_cfg;
 /* ------------------------------------------------------------------
  * Registry table
  * ------------------------------------------------------------------ */
-static mpe_param s_registry[] = {
+static mpe_param s_registry [] = {
     /* ============================================================
      * cat_world
      * ============================================================ */
@@ -270,6 +270,6 @@ static mpe_param s_registry[] = {
 /* ------------------------------------------------------------------
  * Registry count and public aliases
  * ------------------------------------------------------------------ */
-const size_t g_registry_count = sizeof (s_registry) / sizeof (s_registry[0]);
+const size_t g_registry_count = sizeof (s_registry) / sizeof (s_registry [0]);
 const mpe_param *g_registry = s_registry;
 /* MPE_TASK_27_CONFIG_SCHEMA_END */

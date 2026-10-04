@@ -170,15 +170,15 @@ int mfs_t_release_settle (void) {
         float max_tilt = 0.0f;
         if (ch) {
             ch_speed = vector3_length (ch->velocity);
-            vector3 chx = ch->cached_axes[0];
+            vector3 chx = ch->cached_axes [0];
             for (int i = 0; i < robot->wheel_count; i++) {
-                int wi = robot->wheel_bodies[i];
+                int wi = robot->wheel_bodies [i];
                 if (wi < 0 || wi >= w.body_count) {
                     fail = 1;
                     break;
                 }
-                rigidbody *wh = &w.bodies[wi];
-                vector3 ax = wh->cached_axes[0];
+                rigidbody *wh = &w.bodies [wi];
+                vector3 ax = wh->cached_axes [0];
                 float wsp = fabsf (vector3_dot (wh->angular_velocity, ax));
                 if (wsp > max_wheel) {
                     max_wheel = wsp;

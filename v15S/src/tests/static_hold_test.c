@@ -15,7 +15,7 @@ static float slope_drift (float slope_deg, float mus, float muk, int *asleep_out
     vector3 surf = {0.0f, 4.0f, 0.0f};
     vector3 rc = {surf.x - n.x * 0.5f, surf.y - n.y * 0.5f, 0.0f};
     int ramp = physics_world_add_cube (&world, rc, (vector3){8.0f, 0.5f, 5.0f}, 0.0f);
-    rigidbody *rb = &world.bodies[ramp];
+    rigidbody *rb = &world.bodies [ramp];
     rb->orientation = vector4_from_axis_with_angle ((vector3){0, 0, 1}, ang);
     rigidbody_update_axes (rb);
     rigidbody_sanitize (rb);
@@ -25,22 +25,22 @@ static float slope_drift (float slope_deg, float mus, float muk, int *asleep_out
     float drop = (fabsf (n.x) + fabsf (n.y) + fabsf (n.z)) * h;
     vector3 p0 = {surf.x + n.x * (drop + 0.005f), surf.y + n.y * (drop + 0.005f), 0.0f};
     int box = physics_world_add_cube (&world, p0, (vector3){h, h, h}, 1.0f);
-    world.bodies[box].friction_static = mus;
-    world.bodies[box].friction_kinetic = muk;
+    world.bodies [box].friction_static = mus;
+    world.bodies [box].friction_kinetic = muk;
     const float dt = 1.0f / 60.0f;
     for (int t = 0; t < 120; t++) {
         physics_world_step (&world, dt);
     }
-    vector3 s0 = world.bodies[box].position;
+    vector3 s0 = world.bodies [box].position;
     for (int t = 0; t < 300; t++) {
         physics_world_step (&world, dt);
-        if (!isfinite (world.bodies[box].position.x)) {
+        if (!isfinite (world.bodies [box].position.x)) {
             break;
         }
     }
-    vector3 s1 = world.bodies[box].position;
+    vector3 s1 = world.bodies [box].position;
     vector3 d = {cosf (ang), sinf (ang), 0.0f};
-    *asleep_out = world.bodies[box].is_sleeping;
+    *asleep_out = world.bodies [box].is_sleeping;
     float drift = (s1.x - s0.x) * d.x + (s1.y - s0.y) * d.y;
     physics_world_cleanup (&world);
     return drift;

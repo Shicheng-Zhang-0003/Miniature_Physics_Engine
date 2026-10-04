@@ -33,7 +33,7 @@ static int capsule_frame (const rigidbody *cap, vector3 *axle_out, float *half_o
         return -1;
     if (!isfinite (cap->radius) || cap->radius <= 0.0f)
         return -1;
-    vector3 ax = cap->cached_axes[0];
+    vector3 ax = cap->cached_axes [0];
     if (!isfinite (ax.x) || !isfinite (ax.y) || !isfinite (ax.z))
         return -1;
     float len2 = ax.x * ax.x + ax.y * ax.y + ax.z * ax.z;
@@ -79,12 +79,12 @@ static bool emit_contact (void *out, rigidbody *a, rigidbody *b, vector3 nrm, ve
     o->object_b = b;
     o->normal_vector = nrm;
     o->contact_count = 1;
-    o->contacts[0].position = pos;
-    o->contacts[0].penetration = (pen > 0.0f) ? pen : 0.0f;
+    o->contacts [0].position = pos;
+    o->contacts [0].penetration = (pen > 0.0f) ? pen : 0.0f;
     /* Lever-arm locals are rebuilt by collision_prepare_solver from
      * position; still write sane values for direct consumers. */
-    o->contacts[0].local_position_a = vector3_subtraction (pos, a->position);
-    o->contacts[0].local_position_b = vector3_subtraction (pos, b->position);
+    o->contacts [0].local_position_a = vector3_subtraction (pos, a->position);
+    o->contacts [0].local_position_b = vector3_subtraction (pos, b->position);
     return true;
 }
 /* Exact segment-vs-sphere: closest segment point to the sphere centre. */
@@ -151,7 +151,7 @@ static bool capsule_vs_cube_sampled (rigidbody *cap, vector3 ax, float h, float 
         vector3 rel = vector3_subtraction (c, cube->position);
         vector3 closest = cube->position;
         for (int a3 = 0; a3 < 3; a3++) {
-            vector3 axis = cube->cached_axes[a3];
+            vector3 axis = cube->cached_axes [a3];
             if (!isfinite (axis.x) || !isfinite (axis.y) || !isfinite (axis.z))
                 return false;
             float e = (a3 == 0)   ? cube->half_extensions.x
@@ -183,7 +183,7 @@ static bool capsule_vs_cube_sampled (rigidbody *cap, vector3 ax, float h, float 
             vector3 best_ax = {0, 1, 0};
             float best_sign = 1.0f;
             for (int a3 = 0; a3 < 3; a3++) {
-                vector3 axis = cube->cached_axes[a3];
+                vector3 axis = cube->cached_axes [a3];
                 float e = (a3 == 0)   ? cube->half_extensions.x
                           : (a3 == 1) ? cube->half_extensions.y
                                       : cube->half_extensions.z;
@@ -219,7 +219,7 @@ static bool capsule_vs_cylinder_sampled (rigidbody *cap, vector3 ax, float h, fl
         return false;
     if (!isfinite (cyl->cylinder_half_length) || cyl->cylinder_half_length <= 0.0f)
         return false;
-    vector3 cax = cyl->cached_axes[0];
+    vector3 cax = cyl->cached_axes [0];
     float l2 = vector3_length_squared (cax);
     if (!(l2 > 1e-12f) || !isfinite (l2))
         return false;

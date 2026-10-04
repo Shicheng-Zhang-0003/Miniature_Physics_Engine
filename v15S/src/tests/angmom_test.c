@@ -22,15 +22,15 @@ int main (void) {
     constraint_pool_init (&world);
     /* Distinct half extents => fully populated inertia tensor. */
     int b = physics_world_add_cube (&world, (vector3){0.0f, 50.0f, 0.0f}, (vector3){0.3f, 0.5f, 0.7f}, 2.0f);
-    world.bodies[b].angular_velocity = (vector3){1.0f, 3.0f, 2.0f};
-    rigidbody_wake (&world.bodies[b]);
-    vector3 l0 = body_l (&world.bodies[b]);
+    world.bodies [b].angular_velocity = (vector3){1.0f, 3.0f, 2.0f};
+    rigidbody_wake (&world.bodies [b]);
+    vector3 l0 = body_l (&world.bodies [b]);
     float l0n = vector3_length (l0);
     const float dt = 1.0f / 60.0f;
     float max_err = 0.0f;
     for (int t = 0; t < 120; t++) {
         physics_world_step (&world, dt);
-        vector3 l = body_l (&world.bodies[b]);
+        vector3 l = body_l (&world.bodies [b]);
         float err = vector3_length (vector3_subtraction (l, l0)) / l0n;
         if (err > max_err) {
             max_err = err;

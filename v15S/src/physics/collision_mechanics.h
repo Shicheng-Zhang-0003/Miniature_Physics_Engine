@@ -282,12 +282,12 @@ typedef struct {
     rigidbody *object_a;
     rigidbody *object_b;
     vector3 normal_vector;
-    contact_point_data contacts[MPE_MAX_MANIFOLD_CONTACTS];
+    contact_point_data contacts [MPE_MAX_MANIFOLD_CONTACTS];
     int contact_count;
 } collision_data;
 bool collision_dual_sphere (rigidbody *rigidbody_object_a, rigidbody *rigidbody_object_b,
                             collision_data *collision_output_data, const mpe_config_t *cfg);
-float project_obb (rigidbody *rigid_body, vector3 axis, vector3 axes[3]);
+float project_obb (rigidbody *rigid_body, vector3 axis, vector3 axes [3]);
 bool collision_sphere_cube (rigidbody *sphere, rigidbody *cube, collision_data *collision_output_data,
                             const mpe_config_t *cfg);
 bool collision_dual_cube (rigidbody *cube_a, rigidbody *cube_b, collision_data *collision_output_data,

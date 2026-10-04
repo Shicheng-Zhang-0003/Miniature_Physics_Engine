@@ -62,7 +62,7 @@ GtkWidget *overlay_initialise (GtkWidget *gl_drawing_area_widget) {
      * GL area (selection/mouse-lock silently stops working). */
     gtk_widget_set_can_target (debug_information_label, FALSE);
     {
-        char version_header[64];
+        char version_header [64];
         snprintf (version_header, sizeof (version_header), "- Miniature Physics Engine %s -", a3_version_string);
         gtk_label_set_text (GTK_LABEL (debug_information_label), version_header);
     }
@@ -122,7 +122,7 @@ void overlay_update (void) {
     float adj = g_cfg.ui.change_rate_game;
     if (menu_label) {
         if (main_inputs.is_menu_open) {
-            char buf[512];
+            char buf [512];
             snprintf (buf, sizeof (buf),
                       "-- Scene Menu --\nObjects: %d | Joints: %d\n\n1: Save Scene\n2: Load Scene\n3: Clear Scene\n4: "
                       "Save Config\n5: Reset Config\n6: Exit",
@@ -136,7 +136,7 @@ void overlay_update (void) {
         if (main_inputs.spawner_menu_level == 0)
             gtk_widget_set_visible (spawner_menu_label, FALSE);
         else {
-            char buf[512];
+            char buf [512];
             if (main_inputs.spawner_menu_level == 1) {
                 const char *t = main_inputs.current_spawn_type == 0   ? "Sphere"
                                 : main_inputs.current_spawn_type == 1 ? "Cube"
@@ -183,7 +183,7 @@ void overlay_update (void) {
                           "-- Cylinder Half-Length --\nCurrent: %.2f m\n\nValue dialog active (step %.2f)",
                           g_cfg.spawner.cyl_half_length, adj);
             else
-                buf[0] = 0;
+                buf [0] = 0;
             gtk_label_set_text (GTK_LABEL (spawner_menu_label), buf);
             gtk_widget_set_visible (spawner_menu_label, TRUE);
         }
@@ -192,7 +192,7 @@ void overlay_update (void) {
         if (main_inputs.velocity_menu_level == 0)
             gtk_widget_set_visible (velocity_menu_label, FALSE);
         else {
-            char buf[512];
+            char buf [512];
             if (main_inputs.velocity_menu_level == 1)
                 snprintf (buf, sizeof (buf), "-- User Mechanics --\n1: Spawning\n2: Viewpoint\n3: World Modification");
             else if (main_inputs.velocity_menu_level == 2)
@@ -241,7 +241,7 @@ void overlay_update (void) {
                           "-- Solver Iterations --\nCurrent: %d passes/tick\n\nValue dialog active (step %.2f)",
                           g_cfg.timestep.solver_iterations, adj);
             else
-                buf[0] = 0;
+                buf [0] = 0;
             gtk_label_set_text (GTK_LABEL (velocity_menu_label), buf);
             gtk_widget_set_visible (velocity_menu_label, TRUE);
         }
@@ -253,8 +253,8 @@ void overlay_update (void) {
                 main_inputs.object_menu_level = 0;
             gtk_widget_set_visible (object_menu_label, FALSE);
         } else {
-            char buf[512];
-            rigidbody *t = &(physics_world_get_primary ()->bodies)[selected_object];
+            char buf [512];
+            rigidbody *t = &(physics_world_get_primary ()->bodies) [selected_object];
             if (main_inputs.object_menu_level == 1) {
                 const char *tn = t->type == object_sphere ? "Sphere" : t->type == object_cylinder ? "Cylinder" : "Cube";
                 const char *rl = t->type == object_cube ? "Radius (N/A)" : "Radius";
@@ -288,13 +288,13 @@ void overlay_update (void) {
                           "-- Preset Colours --\n1: Red\n2: Green\n3: Blue\n4: Orange\n5: Cyan\n6: Magenta\n7: "
                           "Yellow\n8: White");
             else
-                buf[0] = 0;
+                buf [0] = 0;
             gtk_label_set_text (GTK_LABEL (object_menu_label), buf);
             gtk_widget_set_visible (object_menu_label, TRUE);
         }
         if (config_menu_label) {
             if (config_menu_is_open ()) {
-                char cb[2048];
+                char cb [2048];
                 config_menu_render (cb, sizeof (cb));
                 gtk_label_set_text (GTK_LABEL (config_menu_label), cb);
                 gtk_widget_set_visible (config_menu_label, TRUE);
@@ -304,8 +304,8 @@ void overlay_update (void) {
     }
     if (!debug_information_label)
         return;
-    char ibuf[1024];
-    char mode[32];
+    char ibuf [1024];
+    char mode [32];
     snprintf (mode, sizeof (mode), "%s", main_inputs.is_debug_mode_active ? "DEBUG MODE" : "GAME MODE");
     if ((selected_object < 0) || (selected_object >= (physics_world_get_primary ()->body_count))) {
         const char *st = main_inputs.current_spawn_type == 0   ? "sphere"
@@ -318,7 +318,7 @@ void overlay_update (void) {
         gtk_label_set_text (GTK_LABEL (debug_information_label), ibuf);
         return;
     }
-    rigidbody *rb = &(physics_world_get_primary ()->bodies)[selected_object];
+    rigidbody *rb = &(physics_world_get_primary ()->bodies) [selected_object];
     float spd = vector3_length (rb->velocity);
     const char *ot = rb->type == object_sphere ? "Sphere" : rb->type == object_cylinder ? "Cylinder" : "Cube";
     const char *stt = rb->static_state ? "(Static)" : "(Dynamic)";

@@ -25,12 +25,12 @@ int mfs_t_freefall (void) {
         mfs_test_end (t_ptr);
         return t_ptr->failures;
     }
-    w.bodies[s].velocity = (vector3){0.0f, 0.0f, 0.0f};
-    w.bodies[s].restitution = 0.0f;
+    w.bodies [s].velocity = (vector3){0.0f, 0.0f, 0.0f};
+    w.bodies [s].restitution = 0.0f;
     const float dt = 1.0f / 60.0f;
     for (int k = 0; k < 60; k++)
         physics_world_step (&w, dt);
-    rigidbody *b = &w.bodies[s];
+    rigidbody *b = &w.bodies [s];
     float y_exact = 10.0f - 0.5f * 9.81f * 1.0f;
     float v_exact = -9.81f * 1.0f;
     if (fabsf (b->position.y - y_exact) > 0.5f) {
@@ -55,7 +55,7 @@ int mfs_t_inertia (void) {
         physics_world_cleanup (&w);
         return 1;
     }
-    rigidbody *b = &w.bodies[cyl];
+    rigidbody *b = &w.bodies [cyl];
     /* Torque along cylinder's axis (X) to test axial moment of inertia I = 0.5*m*r^2.
      * DESPOT-2026-09-26: re-applied EVERY tick (like a motor). Accumulators
      * are per-tick (consumed+drained by rb_integrate_velocity); the old
@@ -93,16 +93,16 @@ int mfs_t_bounce (void) {
         physics_world_cleanup (&w);
         return 1;
     }
-    w.bodies[f].friction_static = 1.0f;
-    w.bodies[f].friction_kinetic = 0.8f;
-    w.bodies[f].restitution = 0.6f;
+    w.bodies [f].friction_static = 1.0f;
+    w.bodies [f].friction_kinetic = 0.8f;
+    w.bodies [f].restitution = 0.6f;
     int s = physics_world_add_sphere (&w, 0.5f, 1.0f, (vector3){0, 5.0f, 0});
     if (s < 0) {
         physics_world_cleanup (&w);
         return 1;
     }
-    w.bodies[s].restitution = 0.6f;
-    w.bodies[s].velocity = (vector3){0, 0, 0};
+    w.bodies [s].restitution = 0.6f;
+    w.bodies [s].velocity = (vector3){0, 0, 0};
     const float dt = DT;
     /* DESPOT-2026-09-26: track the POST-bounce apex, not the drop height.
      * The old global-max rig compared the 5.0 m release against the 2.1 m
@@ -112,7 +112,7 @@ int mfs_t_bounce (void) {
     int bounced = 0;
     for (int k = 0; k < 300; k++) {
         physics_world_step (&w, dt);
-        float y = w.bodies[s].position.y;
+        float y = w.bodies [s].position.y;
         if (!bounced && y < 1.0f) {
             bounced = 1;
             max_y = y;
@@ -155,21 +155,21 @@ int mfs_t_rolling (void) {
         physics_world_cleanup (&w);
         return 1;
     }
-    w.bodies[f].friction_static = 1.0f;
-    w.bodies[f].friction_kinetic = 0.8f;
-    w.bodies[f].restitution = 0.0f;
+    w.bodies [f].friction_static = 1.0f;
+    w.bodies [f].friction_kinetic = 0.8f;
+    w.bodies [f].restitution = 0.0f;
     int s = physics_world_add_sphere (&w, 0.5f, 1.0f, (vector3){-5, 0.5, 0});
     if (s < 0) {
         physics_world_cleanup (&w);
         return 1;
     }
-    w.bodies[s].velocity = (vector3){5, 0, 0};
-    w.bodies[s].angular_velocity = (vector3){0, 0, -10};
-    w.bodies[s].restitution = 0.0f;
+    w.bodies [s].velocity = (vector3){5, 0, 0};
+    w.bodies [s].angular_velocity = (vector3){0, 0, -10};
+    w.bodies [s].restitution = 0.0f;
     const float dt = DT;
     for (int k = 0; k < 60; k++)
         physics_world_step (&w, dt);
-    rigidbody *b = &w.bodies[s];
+    rigidbody *b = &w.bodies [s];
     float vx = b->velocity.x;
     float omega = -b->angular_velocity.z;
     float v_exact = omega * 0.5f;
@@ -195,24 +195,24 @@ int mfs_t_rolling_resistance (void) {
         physics_world_cleanup (&w);
         return 1;
     }
-    w.bodies[f].friction_static = 1.0f;
-    w.bodies[f].friction_kinetic = 0.8f;
-    w.bodies[f].restitution = 0.0f;
+    w.bodies [f].friction_static = 1.0f;
+    w.bodies [f].friction_kinetic = 0.8f;
+    w.bodies [f].restitution = 0.0f;
     int s = physics_world_add_sphere (&w, 0.5f, 1.0f, (vector3){0, 0.5, 0});
     if (s < 0) {
         physics_world_cleanup (&w);
         return 1;
     }
-    w.bodies[s].velocity = (vector3){10, 0, 0};
-    w.bodies[s].angular_velocity = (vector3){0, 0, -20};
-    w.bodies[s].restitution = 0.0f;
+    w.bodies [s].velocity = (vector3){10, 0, 0};
+    w.bodies [s].angular_velocity = (vector3){0, 0, -20};
+    w.bodies [s].restitution = 0.0f;
     const float dt = DT;
     for (int k = 0; k < 60; k++)
         physics_world_step (&w, dt);
-    float v_mid = w.bodies[s].velocity.x;
+    float v_mid = w.bodies [s].velocity.x;
     for (int k = 0; k < 300; k++)
         physics_world_step (&w, dt);
-    float v_end = w.bodies[s].velocity.x;
+    float v_end = w.bodies [s].velocity.x;
     /* DESPOT-2026-09-26: gate matches Crr=0.02 truth (measured 9.79->9.31,
      * ratio 0.95). The old gate demanded >50% decay in 5 s, which needs
      * Crr~0.1 (a=1 m/s^2); at Crr=0.02 (a=0.2 m/s^2) only ~10% is physical.
@@ -347,9 +347,9 @@ int mfs_t_motor_stall (void) {
     drivetrain_tank (&robot, 1.0f, 1.0f);
     for (int t = 0; t < 10; t++) {
         for (int w_idx = 0; w_idx < robot.wheel_count; w_idx++) {
-            int wi = robot.wheel_bodies[w_idx];
+            int wi = robot.wheel_bodies [w_idx];
             if (wi >= 0 && wi < w.body_count) {
-                w.bodies[wi].angular_velocity = (vector3){0, 0, 0};
+                w.bodies [wi].angular_velocity = (vector3){0, 0, 0};
             }
         }
         drivetrain_tank (&robot, 1.0f, 1.0f);
@@ -357,7 +357,7 @@ int mfs_t_motor_stall (void) {
         physics_world_step (&w, DT);
     }
     float stall_spec = 3.7265f;
-    float actual = robot.wheel_motors[0].output_torque;
+    float actual = robot.wheel_motors [0].output_torque;
     float err = fabsf (actual - stall_spec) / stall_spec;
     if (err > 0.3f) {
         physics_world_cleanup (&w);
@@ -424,9 +424,9 @@ int mfs_t_static_friction (void) {
         physics_world_cleanup (&w);
         return 1;
     }
-    w.bodies[f].friction_static = 1.0f;
-    w.bodies[f].friction_kinetic = 0.8f;
-    w.bodies[f].restitution = 0.0f;
+    w.bodies [f].friction_static = 1.0f;
+    w.bodies [f].friction_kinetic = 0.8f;
+    w.bodies [f].restitution = 0.0f;
     ftc_robot robot;
     int rc = ftc_robot_create_with_drive (&w, &robot, 0.0f, ftc_robot_rest_height (), 0.0f, MOTOR_GB_5203_26_9,
                                           FTC_DRIVETRAIN_TANK);
@@ -435,15 +435,15 @@ int mfs_t_static_friction (void) {
         return 1;
     }
     int s = physics_world_add_cube (&w, (vector3){0, -0.5f, 0}, (vector3){10, 0.5, 10}, 0);
-    w.bodies[s].friction_static = 1.0f;
-    w.bodies[s].friction_kinetic = 0.8f;
-    w.bodies[s].restitution = 0.0f;
+    w.bodies [s].friction_static = 1.0f;
+    w.bodies [s].friction_kinetic = 0.8f;
+    w.bodies [s].restitution = 0.0f;
     drivetrain_tank (&robot, 0.5f, 0.5f);
     for (int t = 0; t < 300; t++) {
         drivetrain_update (&w, &robot, DT);
         physics_world_step (&w, DT);
     }
-    rigidbody *ch = &w.bodies[robot.chassis_body];
+    rigidbody *ch = &w.bodies [robot.chassis_body];
     if (fabsf (ch->position.x) >= 0.05f) {
         physics_world_cleanup (&w);
         return 1;
@@ -475,38 +475,38 @@ int mfs_t_kinetic_friction (void) {
         physics_world_cleanup (&w);
         return 1;
     }
-    w.bodies[s].friction_static = 0.3f;
-    w.bodies[s].friction_kinetic = 0.3f;
-    w.bodies[s].restitution = 0.0f;
+    w.bodies [s].friction_static = 0.3f;
+    w.bodies [s].friction_kinetic = 0.3f;
+    w.bodies [s].restitution = 0.0f;
     int b = physics_world_add_cube (&w, (vector3){-6.0f, 0.55f, 0}, (vector3){0.5, 0.5, 0.5}, 1.0f);
     if (b < 0) {
         physics_world_cleanup (&w);
         return 1;
     }
-    w.bodies[b].velocity = (vector3){4, 0, 0};
-    w.bodies[b].friction_static = 0.3f;
-    w.bodies[b].friction_kinetic = 0.3f;
-    w.bodies[b].restitution = 0.0f;
-    rigidbody_wake (&w.bodies[b]);
+    w.bodies [b].velocity = (vector3){4, 0, 0};
+    w.bodies [b].friction_static = 0.3f;
+    w.bodies [b].friction_kinetic = 0.3f;
+    w.bodies [b].restitution = 0.0f;
+    rigidbody_wake (&w.bodies [b]);
     const float dt = 1.0f / 60.0f;
     for (int t = 0; t < 60; t++)
         physics_world_step (&w, dt);
-    float v0 = vector3_length (w.bodies[b].velocity);
-    float x0 = w.bodies[b].position.x;
+    float v0 = vector3_length (w.bodies [b].velocity);
+    float x0 = w.bodies [b].position.x;
     if (!(v0 > 0.5f)) {
         physics_world_cleanup (&w);
         return 1;
     }
     for (int t = 0; t < 600; t++) {
         physics_world_step (&w, dt);
-        if (!isfinite (w.bodies[b].position.x)) {
+        if (!isfinite (w.bodies [b].position.x)) {
             physics_world_cleanup (&w);
             return 1;
         }
-        if (vector3_length (w.bodies[b].velocity) < 0.005f)
+        if (vector3_length (w.bodies [b].velocity) < 0.005f)
             break;
     }
-    float dist = w.bodies[b].position.x - x0;
+    float dist = w.bodies [b].position.x - x0;
     float analytic = v0 * v0 / (2.0f * 0.3f * 9.81f);
     if (!(dist > 0.0f)) {
         physics_world_cleanup (&w);
@@ -560,13 +560,13 @@ int mfs_t_coast_down (void) {
         drivetrain_update (&w, &robot, DT);
         physics_world_step (&w, DT);
     }
-    float v_before = w.bodies[robot.chassis_body].velocity.x;
+    float v_before = w.bodies [robot.chassis_body].velocity.x;
     drivetrain_tank (&robot, 0.0f, 0.0f);
     for (int t = 0; t < 300; t++) {
         drivetrain_update (&w, &robot, DT);
         physics_world_step (&w, DT);
     }
-    float v_after = w.bodies[robot.chassis_body].velocity.x;
+    float v_after = w.bodies [robot.chassis_body].velocity.x;
     if (v_after >= 0.3f * v_before) {
         physics_world_cleanup (&w);
         return 1;
@@ -583,12 +583,12 @@ int mfs_t_energy (void) {
         physics_world_cleanup (&w);
         return 1;
     }
-    w.bodies[s].restitution = 0.0f;
+    w.bodies [s].restitution = 0.0f;
     const float dt = 1.0f / 60.0f;
     float E0 = 1.0f * 9.81f * 10.0f;
     for (int k = 0; k < 60; k++)
         physics_world_step (&w, dt);
-    rigidbody *b = &w.bodies[s];
+    rigidbody *b = &w.bodies [s];
     float PE = b->mass * 9.81f * b->position.y;
     float KE = 0.5f * b->mass * vector3_length_squared (b->velocity) +
                0.5f * vector3_dot (b->angular_velocity,
@@ -614,7 +614,7 @@ int mfs_t_cylinder_rest (void) {
     const float dt = 1.0f / 60.0f;
     for (int k = 0; k < 300; k++)
         physics_world_step (&w, dt);
-    rigidbody *b = &w.bodies[c];
+    rigidbody *b = &w.bodies [c];
     float y_err = fabsf (b->position.y - 0.05f);
     if (y_err >= 0.03f) {
         physics_world_cleanup (&w);
@@ -637,9 +637,9 @@ int mfs_t_revolute_anchor (void) {
     constraint_pool_init (&w);
     int a = physics_world_add_cube (&w, (vector3){0, 3, 0}, (vector3){0.1, 0.1, 0.1}, 0);
     int b = physics_world_add_cylinder (&w, 0.05f, 0.5f, 1.0f, (vector3){0, 1.5f, 0});
-    w.bodies[b].restitution = 0.0f;
-    uint32_t ida = w.bodies[a].object_id;
-    uint32_t idb = w.bodies[b].object_id;
+    w.bodies [b].restitution = 0.0f;
+    uint32_t ida = w.bodies [a].object_id;
+    uint32_t idb = w.bodies [b].object_id;
     int j = constraint_add_revolute (&w, ida, idb, (vector3){0, -1.5f, 0}, (vector3){0, 0, 0}, (vector3){1, 0, 0});
     if (j < 0) {
         physics_world_cleanup (&w);
@@ -651,7 +651,7 @@ int mfs_t_revolute_anchor (void) {
     /* DESPOT-2026-09-26: sign. Body 0 is the static cube (y=3), body 1 the
      * hanging cylinder (y=1.5): len = ya-yb = +1.5. The old bodies[1]-bodies[0]
      * gave -1.5 (3.0 m error on a perfect joint — measured ya=3.000 yb=1.500). */
-    float len = w.bodies[0].position.y - w.bodies[1].position.y;
+    float len = w.bodies [0].position.y - w.bodies [1].position.y;
     float len0 = 1.5f;
     if (fabsf (len - len0) >= 0.01f) {
         physics_world_cleanup (&w);
@@ -714,7 +714,7 @@ int mfs_t_external_truth (void) {
         physics_world w;
         mfs_test_world (&w);
         int s = physics_world_add_sphere (&w, 0.5f, 1.0f, (vector3){0, 100.0f, 0});
-        w.bodies[s].restitution = 0.0f;
+        w.bodies [s].restitution = 0.0f;
         if (s < 0) {
             t_ptr->failures++;
             physics_world_cleanup (&w);
@@ -722,7 +722,7 @@ int mfs_t_external_truth (void) {
         }
         for (int k = 0; k < 120; k++)
             physics_world_step (&w, DT);
-        rigidbody *b = &w.bodies[s];
+        rigidbody *b = &w.bodies [s];
         /* drag-free closed form, tolerance covers the engine's -9.81 vs
          * g_n (+0.034%) plus first-order integration error */
         MFS_CHECK_NEAR (t_ptr, b->position.y, 100.0f - 0.5f * G_N * 4.0f, 0.20f, "freefall y vs g_n");
@@ -743,15 +743,15 @@ int mfs_t_external_truth (void) {
             physics_world_cleanup (&w);
             return t_ptr->failures;
         }
-        rigidbody *b = &w.bodies[c];
-        MFS_CHECK_NEAR (t_ptr, b->inertia_tensor_local.matrix[0][0], 0.5f * 2.0f * 0.1f * 0.1f, 1e-5f,
+        rigidbody *b = &w.bodies [c];
+        MFS_CHECK_NEAR (t_ptr, b->inertia_tensor_local.matrix [0] [0], 0.5f * 2.0f * 0.1f * 0.1f, 1e-5f,
                         "cylinder I_xx = m r^2/2 (solid)");
         const float tau = 10.0f;
         for (int k = 0; k < 60; k++) {
             b->torque_accumulator = vector3_addition (b->torque_accumulator, vector3_scaling ((vector3){1, 0, 0}, tau));
             physics_world_step (&w, DT);
         }
-        float I = b->inertia_tensor_local.matrix[0][0];
+        float I = b->inertia_tensor_local.matrix [0] [0];
         MFS_CHECK_NEAR (t_ptr, vector3_dot (b->angular_velocity, (vector3){1, 0, 0}), (tau / I) * 1.0f,
                         0.02f * (tau / I), "omega = (tau/I) t after 1 s");
         physics_world_cleanup (&w);
@@ -766,16 +766,16 @@ int mfs_t_external_truth (void) {
             physics_world_cleanup (&w);
             return t_ptr->failures;
         }
-        MFS_CHECK_NEAR (t_ptr, w.bodies[s].inertia_tensor_local.matrix[0][0], 0.4f * 1.0f * 0.25f, 1e-4f,
+        MFS_CHECK_NEAR (t_ptr, w.bodies [s].inertia_tensor_local.matrix [0] [0], 0.4f * 1.0f * 0.25f, 1e-4f,
                         "sphere I_xx = 2/5 m r^2");
         physics_world_cleanup (&w);
     }
     /* ---- 4. Coulomb restitution, in its DEFINING velocity form -------- */
     {
         const float r = 0.05f;
-        const float es[] = {0.2f, 0.4f, 0.6f, 0.8f};
+        const float es [] = {0.2f, 0.4f, 0.6f, 0.8f};
         for (int i = 0; i < 4; i++) {
-            float e = es[i];
+            float e = es [i];
             mpe_config_init ();
             g_cfg.timestep.solver_iterations = 128;
             g_cfg.sleep.enable = 0;
@@ -792,22 +792,22 @@ int mfs_t_external_truth (void) {
                 physics_world_cleanup (&w);
                 return t_ptr->failures;
             }
-            w.bodies[f].friction_static = 1.0f;
-            w.bodies[f].friction_kinetic = 0.8f;
-            w.bodies[f].restitution = e;
+            w.bodies [f].friction_static = 1.0f;
+            w.bodies [f].friction_kinetic = 0.8f;
+            w.bodies [f].restitution = e;
             int s = physics_world_add_sphere (&w, r, 1.0f, (vector3){0, 6.0f, 0});
             if (s < 0) {
                 t_ptr->failures++;
                 physics_world_cleanup (&w);
                 return t_ptr->failures;
             }
-            w.bodies[s].restitution = e;
-            w.bodies[s].velocity = vector3_zero ();
+            w.bodies [s].restitution = e;
+            w.bodies [s].velocity = vector3_zero ();
             float vin = 0.0f, vout = 0.0f;
             int contacted = 0;
             for (int k = 0; k < 600; k++) {
                 physics_world_step (&w, DT);
-                float y = w.bodies[s].position.y, vy = w.bodies[s].velocity.y;
+                float y = w.bodies [s].position.y, vy = w.bodies [s].velocity.y;
                 if (!contacted && y <= 1.0f + r + 2e-3f && vy < 0.0f) {
                     vin = -vy;
                     contacted = 1;
@@ -832,9 +832,9 @@ int mfs_t_external_truth (void) {
             physics_world_cleanup (&w);
             return t_ptr->failures;
         }
-        w.bodies[f].friction_static = 1.0f;
-        w.bodies[f].friction_kinetic = 0.8f;
-        w.bodies[f].restitution = 0.0f;
+        w.bodies [f].friction_static = 1.0f;
+        w.bodies [f].friction_kinetic = 0.8f;
+        w.bodies [f].restitution = 0.0f;
         const float rr = 0.5f;
         int s = physics_world_add_sphere (&w, rr, 1.0f, (vector3){-5, rr, 0});
         if (s < 0) {
@@ -842,12 +842,12 @@ int mfs_t_external_truth (void) {
             physics_world_cleanup (&w);
             return t_ptr->failures;
         }
-        w.bodies[s].velocity = (vector3){5, 0, 0};
-        w.bodies[s].angular_velocity = (vector3){0, 0, -5.0f / rr};
-        w.bodies[s].restitution = 0.0f;
+        w.bodies [s].velocity = (vector3){5, 0, 0};
+        w.bodies [s].angular_velocity = (vector3){0, 0, -5.0f / rr};
+        w.bodies [s].restitution = 0.0f;
         for (int k = 0; k < 60; k++)
             physics_world_step (&w, DT);
-        rigidbody *b = &w.bodies[s];
+        rigidbody *b = &w.bodies [s];
         float slip = b->velocity.x + vector3_dot (b->angular_velocity, (vector3){0, 0, 1}) * rr;
         MFS_INFO ("rolling v=%.6f w*r=%.6f slip=%.2e", (double) b->velocity.x,
                   (double) (vector3_dot (b->angular_velocity, (vector3){0, 0, 1}) * rr), (double) slip);
@@ -864,11 +864,11 @@ int mfs_t_external_truth (void) {
             physics_world_cleanup (&w);
             return t_ptr->failures;
         }
-        w.bodies[s].restitution = 0.0f;
+        w.bodies [s].restitution = 0.0f;
         float E0 = 1.0f * G_N * 10.0f;
         for (int k = 0; k < 60; k++)
             physics_world_step (&w, DT);
-        rigidbody *b = &w.bodies[s];
+        rigidbody *b = &w.bodies [s];
         float E = b->mass * G_N * b->position.y + 0.5f * b->mass * vector3_length_squared (b->velocity);
         MFS_CHECK_REL (t_ptr, E, E0, 0.01f, "energy conservation (1% over a 4.9 m drop)");
         physics_world_cleanup (&w);
@@ -876,15 +876,15 @@ int mfs_t_external_truth (void) {
     /* ---- 7. DC machine: V = I R + Ke w, tau = Kt I, on the V-w line --- */
     {
         const float V = 12.8f; /* fresh pack, battery_init() nominal */
-        const motor_preset_id ids[] = {MOTOR_GB_5203_1_1, MOTOR_GB_5203_19_2, MOTOR_REV_CORE_HEX};
-        const float spec[] = {0.1442f, 2.3830f, 3.2000f};
+        const motor_preset_id ids [] = {MOTOR_GB_5203_1_1, MOTOR_GB_5203_19_2, MOTOR_REV_CORE_HEX};
+        const float spec [] = {0.1442f, 2.3830f, 3.2000f};
         for (int n = 0; n < 3; n++) {
             motor m;
-            motor_preset_apply (&m, ids[n]);
+            motor_preset_apply (&m, ids [n]);
             /* stall endpoint: tau_out(0) must equal the published spec */
             m.command = 1.0f;
             motor_update (&m, 0.0f, DT, V);
-            MFS_CHECK_NEAR (t_ptr, m.output_torque, spec[n], 0.02f * spec[n], "motor stall torque = published spec");
+            MFS_CHECK_NEAR (t_ptr, m.output_torque, spec [n], 0.02f * spec [n], "motor stall torque = published spec");
             /* interior points on the electrical line */
             for (int q = 1; q <= 3; q++) {
                 float frac = (float) q / 4.0f;
@@ -901,7 +901,7 @@ int mfs_t_external_truth (void) {
              * no-load point, i.e. exactly (12.8/12.0) x the 12 V spec */
             {
                 motor mm;
-                motor_preset_apply (&mm, ids[n]);
+                motor_preset_apply (&mm, ids [n]);
                 battery bb;
                 battery_init (&bb);
                 const float Ia = 2.5e-4f;
@@ -977,30 +977,30 @@ int mfs_t_external_truth (void) {
             physics_world_cleanup (&w);
             return t_ptr->failures;
         }
-        w.bodies[f].friction_static = 0.3f;
-        w.bodies[f].friction_kinetic = 0.3f;
-        w.bodies[f].restitution = 0.0f;
+        w.bodies [f].friction_static = 0.3f;
+        w.bodies [f].friction_kinetic = 0.3f;
+        w.bodies [f].restitution = 0.0f;
         int b2 = physics_world_add_cube (&w, (vector3){-6.0f, 0.55f, 0}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
         if (b2 < 0) {
             t_ptr->failures++;
             physics_world_cleanup (&w);
             return t_ptr->failures;
         }
-        w.bodies[b2].friction_static = 0.3f;
-        w.bodies[b2].friction_kinetic = 0.3f;
-        w.bodies[b2].restitution = 0.0f;
-        w.bodies[b2].velocity = (vector3){4, 0, 0};
-        rigidbody_wake (&w.bodies[b2]);
+        w.bodies [b2].friction_static = 0.3f;
+        w.bodies [b2].friction_kinetic = 0.3f;
+        w.bodies [b2].restitution = 0.0f;
+        w.bodies [b2].velocity = (vector3){4, 0, 0};
+        rigidbody_wake (&w.bodies [b2]);
         for (int k = 0; k < 60; k++)
             physics_world_step (&w, DT);
-        float v0 = vector3_length (w.bodies[b2].velocity);
-        float x0 = w.bodies[b2].position.x;
+        float v0 = vector3_length (w.bodies [b2].velocity);
+        float x0 = w.bodies [b2].position.x;
         for (int k = 0; k < 1200; k++) {
             physics_world_step (&w, DT);
-            if (vector3_length (w.bodies[b2].velocity) < 0.005f)
+            if (vector3_length (w.bodies [b2].velocity) < 0.005f)
                 break;
         }
-        float d = w.bodies[b2].position.x - x0;
+        float d = w.bodies [b2].position.x - x0;
         MFS_INFO ("sliding: v0=%.4f measured d=%.4f analytic=%.4f", (double) v0, (double) d,
                   (double) (v0 * v0 / (2.0f * 0.3f * G_N)));
         MFS_CHECK_REL (t_ptr, d, v0 * v0 / (2.0f * 0.3f * G_N), 0.10f, "sliding distance = v0^2/(2 mu g_n)");

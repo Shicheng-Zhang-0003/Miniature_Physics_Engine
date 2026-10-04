@@ -210,7 +210,7 @@ typedef struct {
 #ifndef _MPE_DLFCN_SHIM_DEFINED
 #define _MPE_DLFCN_SHIM_DEFINED 1
 #include <stdlib.h>
-static char mpe_dl_errbuf[1024];
+static char mpe_dl_errbuf [1024];
 static inline const char *mpe_dl_strerror_win (DWORD e, char *buf, size_t n) {
     DWORD f =
         FormatMessageA (FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, e, 0, buf, (DWORD) n, NULL);
@@ -218,8 +218,8 @@ static inline const char *mpe_dl_strerror_win (DWORD e, char *buf, size_t n) {
         snprintf (buf, n, "Win32 error %lu", (unsigned long) e);
     } else {
         /* strip trailing CRLF */
-        while (f > 0 && (buf[f - 1] == '\n' || buf[f - 1] == '\r'))
-            buf[--f] = '\0';
+        while (f > 0 && (buf [f - 1] == '\n' || buf [f - 1] == '\r'))
+            buf [--f] = '\0';
     }
     return buf;
 }
@@ -261,12 +261,12 @@ static inline int mpe_win_dlclose (void *h) {
     return FreeLibrary ((HMODULE) h) ? 0 : -1;
 }
 static inline const char *mpe_win_dlerror (void) {
-    if (!mpe_dl_errbuf[0])
+    if (!mpe_dl_errbuf [0])
         return NULL;
     /* dlerror() consumes the error (POSIX semantics). */
-    static char out[1024];
+    static char out [1024];
     snprintf (out, sizeof (out), "%s", mpe_dl_errbuf);
-    mpe_dl_errbuf[0] = '\0';
+    mpe_dl_errbuf [0] = '\0';
     return out;
 }
 typedef struct {
@@ -282,7 +282,7 @@ static inline int mpe_win_dladdr (const void *addr, Dl_info *info) {
     if (!GetModuleHandleExA (GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
                              (LPCSTR) addr, &h))
         return 0;
-    static char fname[MAX_PATH * 2];
+    static char fname [MAX_PATH * 2];
     DWORD n = GetModuleFileNameA (h, fname, sizeof (fname));
     if (n == 0 || n >= sizeof (fname))
         return 0;
@@ -478,7 +478,7 @@ static inline int mpe_mkstemp (char *tmpl) {
 #define mkstemp(t) mpe_mkstemp (t)
 /* realpath: GetFullPathNameA based. resolved==NULL => malloc'd (POSIX). */
 static inline char *mpe_realpath (const char *path, char *resolved) {
-    char tmp[PATH_MAX * 2];
+    char tmp [PATH_MAX * 2];
     DWORD n;
     int need_free = 0;
     if (!path) {
@@ -544,13 +544,13 @@ static inline char *mpe_strndup (const char *s, size_t n) {
     char *out;
     if (!s)
         return NULL;
-    while (len < n && s[len])
+    while (len < n && s [len])
         len++;
     out = (char *) malloc (len + 1);
     if (!out)
         return NULL;
     memcpy (out, s, len);
-    out[len] = '\0';
+    out [len] = '\0';
     return out;
 }
 #ifdef strndup
@@ -635,23 +635,23 @@ static inline const char *mpe_home_dir (void) {
 static inline int mpe_mkdir_p (const char *path) {
 #ifdef MPE_OS_WINDOWS
     /* Minimal mkdir -p: create each ancestor with _mkdir. */
-    char tmp[PATH_MAX * 2];
+    char tmp [PATH_MAX * 2];
     size_t n;
     if (!path || !*path)
         return -1;
     snprintf (tmp, sizeof (tmp), "%s", path);
     n = strlen (tmp);
     /* strip trailing slashes */
-    while (n > 1 && (tmp[n - 1] == '/' || tmp[n - 1] == '\\'))
-        tmp[--n] = '\0';
+    while (n > 1 && (tmp [n - 1] == '/' || tmp [n - 1] == '\\'))
+        tmp [--n] = '\0';
     for (size_t i = 1; i <= n; i++) {
-        if (tmp[i] == '/' || tmp[i] == '\\' || tmp[i] == '\0') {
-            char c = tmp[i];
-            tmp[i] = '\0';
-            if (tmp[0] != '\0') {
+        if (tmp [i] == '/' || tmp [i] == '\\' || tmp [i] == '\0') {
+            char c = tmp [i];
+            tmp [i] = '\0';
+            if (tmp [0] != '\0') {
                 _mkdir (tmp);
             }
-            tmp[i] = c;
+            tmp [i] = c;
         }
     }
     return 0;

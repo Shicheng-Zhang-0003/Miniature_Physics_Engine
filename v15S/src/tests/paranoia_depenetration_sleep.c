@@ -20,11 +20,11 @@ int main (void) {
         for (int i = 0; i < 5; i++) {
             int idx = physics_world_add_cube (&world, (vector3){0.0f, 0.5f + (float) i * 0.99f, 0.0f},
                                               (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
-            world.bodies[idx].restitution = 0.0f;
-            world.bodies[idx].friction_static = 0.8f;
-            world.bodies[idx].friction_kinetic = 0.7f;
-            world.bodies[idx].is_sleeping = true;
-            world.bodies[idx].sleep_timer = 1.0f;
+            world.bodies [idx].restitution = 0.0f;
+            world.bodies [idx].friction_static = 0.8f;
+            world.bodies [idx].friction_kinetic = 0.7f;
+            world.bodies [idx].is_sleeping = true;
+            world.bodies [idx].sleep_timer = 1.0f;
         }
         const float dt = 1.0f / 60.0f;
         int max_wake = 0;
@@ -32,7 +32,7 @@ int main (void) {
             physics_world_step (&world, dt);
             int awake_count = 0;
             for (int i = 0; i < world.body_count; i++) {
-                if (!world.bodies[i].is_sleeping)
+                if (!world.bodies [i].is_sleeping)
                     awake_count++;
             }
             if (awake_count > max_wake)
@@ -57,26 +57,26 @@ int main (void) {
         constraint_pool_init (&world);
         /* Sleeping cube on floor */
         int sleeping = physics_world_add_cube (&world, (vector3){0.0f, 0.5f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
-        world.bodies[sleeping].restitution = 0.0f;
-        world.bodies[sleeping].friction_static = 0.8f;
-        world.bodies[sleeping].friction_kinetic = 0.7f;
-        world.bodies[sleeping].is_sleeping = true;
-        world.bodies[sleeping].sleep_timer = 1.0f;
+        world.bodies [sleeping].restitution = 0.0f;
+        world.bodies [sleeping].friction_static = 0.8f;
+        world.bodies [sleeping].friction_kinetic = 0.7f;
+        world.bodies [sleeping].is_sleeping = true;
+        world.bodies [sleeping].sleep_timer = 1.0f;
         /* Awake sphere falling on top */
         int awake = physics_world_add_sphere (&world, 0.3f, 1.0f, (vector3){0.0f, 2.0f, 0.0f});
-        world.bodies[awake].restitution = 0.0f;
-        world.bodies[awake].friction_static = 0.8f;
-        world.bodies[awake].friction_kinetic = 0.7f;
+        world.bodies [awake].restitution = 0.0f;
+        world.bodies [awake].friction_static = 0.8f;
+        world.bodies [awake].friction_kinetic = 0.7f;
         const float dt = 1.0f / 60.0f;
-        float sleeping_y_initial = world.bodies[sleeping].position.y;
+        float sleeping_y_initial = world.bodies [sleeping].position.y;
         int sleeping_woke = 0;
         for (int t = 0; t < 600; t++) {
             physics_world_step (&world, dt);
-            if (world.bodies[sleeping].is_sleeping == false) {
+            if (world.bodies [sleeping].is_sleeping == false) {
                 sleeping_woke = 1;
             }
         }
-        float sleeping_y_final = world.bodies[sleeping].position.y;
+        float sleeping_y_final = world.bodies [sleeping].position.y;
         float y_drift = fabsf (sleeping_y_final - sleeping_y_initial);
         printf ("[INFO] mixed_awake_sleep sleeping_woke=%d y_drift=%.6f\n", sleeping_woke, y_drift);
         /* Three-gate wake SHOULD wake sleeping body on first touch (new edge).
@@ -101,19 +101,19 @@ int main (void) {
         /* Two cubes spawned with 50% overlap */
         int a = physics_world_add_cube (&world, (vector3){0.0f, 0.5f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
         int b = physics_world_add_cube (&world, (vector3){0.0f, 0.5f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
-        world.bodies[a].restitution = 0.0f;
-        world.bodies[b].restitution = 0.0f;
-        world.bodies[a].friction_static = 0.8f;
-        world.bodies[b].friction_static = 0.8f;
-        world.bodies[a].friction_kinetic = 0.7f;
-        world.bodies[b].friction_kinetic = 0.7f;
+        world.bodies [a].restitution = 0.0f;
+        world.bodies [b].restitution = 0.0f;
+        world.bodies [a].friction_static = 0.8f;
+        world.bodies [b].friction_static = 0.8f;
+        world.bodies [a].friction_kinetic = 0.7f;
+        world.bodies [b].friction_kinetic = 0.7f;
         const float dt = 1.0f / 60.0f;
         float max_sep = 0.0f, max_vel = 0.0f;
         int nan_count = 0;
         for (int t = 0; t < 1800; t++) {
             physics_world_step (&world, dt);
-            rigidbody *ba = &world.bodies[a];
-            rigidbody *bb = &world.bodies[b];
+            rigidbody *ba = &world.bodies [a];
+            rigidbody *bb = &world.bodies [b];
             float sep = fabsf (ba->position.y - bb->position.y);
             float vel_a = vector3_length (ba->velocity);
             float vel_b = vector3_length (bb->velocity);

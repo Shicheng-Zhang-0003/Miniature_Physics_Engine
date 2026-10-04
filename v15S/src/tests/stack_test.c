@@ -19,28 +19,28 @@ int main (void) {
         physics_world_cleanup (&world);
         return 1;
     }
-    world.bodies[floor].restitution = 0.0f;
-    world.bodies[floor].friction_static = 0.8f;
-    world.bodies[floor].friction_kinetic = 0.6f;
+    world.bodies [floor].restitution = 0.0f;
+    world.bodies [floor].friction_static = 0.8f;
+    world.bodies [floor].friction_kinetic = 0.6f;
     const float h = 0.4f;
-    int cubes[6];
+    int cubes [6];
     for (int i = 0; i < 6; i++) {
-        cubes[i] =
+        cubes [i] =
             physics_world_add_cube (&world, (vector3){0.0f, h + (float) i * 2.0f * h, 0.0f}, (vector3){h, h, h}, 1.0f);
-        if (cubes[i] < 0) {
+        if (cubes [i] < 0) {
             printf ("[FAIL] could not create cube %d\n", i);
             physics_world_cleanup (&world);
             return 1;
         }
-        world.bodies[cubes[i]].restitution = 0.0f;
-        world.bodies[cubes[i]].friction_static = 0.8f;
-        world.bodies[cubes[i]].friction_kinetic = 0.6f;
+        world.bodies [cubes [i]].restitution = 0.0f;
+        world.bodies [cubes [i]].friction_static = 0.8f;
+        world.bodies [cubes [i]].friction_kinetic = 0.6f;
     }
     const float dt = 1.0f / 60.0f;
     for (int t = 0; t < 600; t++) {
         physics_world_step (&world, dt);
         for (int i = 0; i < world.body_count; i++) {
-            if (!isfinite (world.bodies[i].position.x)) {
+            if (!isfinite (world.bodies [i].position.x)) {
                 printf ("[FAIL] NaN at tick %d\n", t);
                 physics_world_cleanup (&world);
                 return 1;
@@ -48,7 +48,7 @@ int main (void) {
         }
     }
     int fail = 0;
-    rigidbody *top = &world.bodies[cubes[5]];
+    rigidbody *top = &world.bodies [cubes [5]];
     float top_drift = sqrtf (top->position.x * top->position.x + top->position.z * top->position.z);
     printf ("[info] top drift=%.4f (limit 0.05)\n", top_drift);
     if (top_drift > 0.05f) {
@@ -59,7 +59,7 @@ int main (void) {
     }
     for (int i = 0; i < 6; i++) {
         float y_e = h + (float) i * 2.0f * h;
-        rigidbody *cube = &world.bodies[cubes[i]];
+        rigidbody *cube = &world.bodies [cubes [i]];
         if (fabsf (cube->position.y - y_e) > 0.03f) {
             printf ("[FAIL] level %d sank/floated (y=%.4f)\n", i, cube->position.y);
             fail = 1;

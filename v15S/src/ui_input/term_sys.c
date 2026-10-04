@@ -23,7 +23,7 @@ static int64_t posix_monotonic_time (void) {
 void cmd_ps (int argc, char **argv) {
     bool detailed = false;
     for (int argument_index = 1; argument_index < argc; argument_index++) {
-        if (strstr (argv[argument_index], "aux") || strstr (argv[argument_index], "-a")) {
+        if (strstr (argv [argument_index], "aux") || strstr (argv [argument_index], "-a")) {
             detailed = true;
         }
     }
@@ -34,7 +34,7 @@ void cmd_ps (int argc, char **argv) {
     if (detailed) {
         term_printf (NULL, "%4s %6s %-4s %-6s %8s %8s %s\n", "PID", "ID", "TYPE", "STATE", "MASS", "SPEED", "POSITION");
         for (int object_index = 0; object_index < (physics_world_get_primary ()->body_count); object_index++) {
-            rigidbody *rigid_body = &(physics_world_get_primary ()->bodies)[object_index];
+            rigidbody *rigid_body = &(physics_world_get_primary ()->bodies) [object_index];
             term_printf (NULL, "%4d %6u %-4s %-6s %8.2f %8.3f (%.2f,%.2f,%.2f)\n", object_index, rigid_body->object_id,
                          term_object_type_name (rigid_body), term_object_state_name (rigid_body), rigid_body->mass,
                          vector3_length (rigid_body->velocity), rigid_body->position.x, rigid_body->position.y,
@@ -43,7 +43,7 @@ void cmd_ps (int argc, char **argv) {
     } else {
         term_printf (NULL, "%4s %6s %-4s %-6s %8s\n", "PID", "ID", "TYPE", "STATE", "MASS");
         for (int object_index = 0; object_index < (physics_world_get_primary ()->body_count); object_index++) {
-            rigidbody *rigid_body = &(physics_world_get_primary ()->bodies)[object_index];
+            rigidbody *rigid_body = &(physics_world_get_primary ()->bodies) [object_index];
             term_printf (NULL, "%4d %6u %-4s %-6s %8.2f\n", object_index, rigid_body->object_id,
                          term_object_type_name (rigid_body), term_object_state_name (rigid_body), rigid_body->mass);
         }
@@ -52,9 +52,9 @@ void cmd_ps (int argc, char **argv) {
 void cmd_top (int argc, char **argv) {
     int limit = 10;
     for (int argument_index = 1; argument_index < argc; argument_index++) {
-        if (term_str_eq (argv[argument_index], "-n") && (argument_index + 1 < argc)) {
+        if (term_str_eq (argv [argument_index], "-n") && (argument_index + 1 < argc)) {
             float parsed_limit = 0.0f;
-            if (term_parse_float (argv[argument_index + 1], &parsed_limit)) {
+            if (term_parse_float (argv [argument_index + 1], &parsed_limit)) {
                 limit = (int) parsed_limit;
             }
         }
@@ -69,11 +69,11 @@ void cmd_top (int argc, char **argv) {
         term_dim ("(no objects)\n");
         return;
     }
-    int top_indices[16];
-    float top_speeds[16];
+    int top_indices [16];
+    float top_speeds [16];
     for (int slot_index = 0; slot_index < limit; slot_index++) {
-        top_indices[slot_index] = -1;
-        top_speeds[slot_index] = -1.0f;
+        top_indices [slot_index] = -1;
+        top_speeds [slot_index] = -1.0f;
     }
     for (int slot_index = 0; slot_index < limit; slot_index++) {
         int best_index = -1;
@@ -81,7 +81,7 @@ void cmd_top (int argc, char **argv) {
         for (int object_index = 0; object_index < (physics_world_get_primary ()->body_count); object_index++) {
             bool already_listed = false;
             for (int previous_slot = 0; previous_slot < slot_index; previous_slot++) {
-                if (top_indices[previous_slot] == object_index) {
+                if (top_indices [previous_slot] == object_index) {
                     already_listed = true;
                     break;
                 }
@@ -89,7 +89,7 @@ void cmd_top (int argc, char **argv) {
             if (already_listed) {
                 continue;
             }
-            float object_speed = vector3_length ((physics_world_get_primary ()->bodies)[object_index].velocity);
+            float object_speed = vector3_length ((physics_world_get_primary ()->bodies) [object_index].velocity);
             if (object_speed > best_speed) {
                 best_speed = object_speed;
                 best_index = object_index;
@@ -98,17 +98,17 @@ void cmd_top (int argc, char **argv) {
         if (best_index < 0) {
             break;
         }
-        top_indices[slot_index] = best_index;
-        top_speeds[slot_index] = best_speed;
+        top_indices [slot_index] = best_index;
+        top_speeds [slot_index] = best_speed;
     }
     term_printf (NULL, "%4s %-4s %-6s %8s %s\n", "PID", "TYPE", "STATE", "SPEED", "POSITION");
     for (int slot_index = 0; slot_index < limit; slot_index++) {
-        if (top_indices[slot_index] < 0) {
+        if (top_indices [slot_index] < 0) {
             break;
         }
-        rigidbody *rigid_body = &(physics_world_get_primary ()->bodies)[top_indices[slot_index]];
-        term_printf (NULL, "%4d %-4s %-6s %8.3f (%.2f,%.2f,%.2f)\n", top_indices[slot_index],
-                     term_object_type_name (rigid_body), term_object_state_name (rigid_body), top_speeds[slot_index],
+        rigidbody *rigid_body = &(physics_world_get_primary ()->bodies) [top_indices [slot_index]];
+        term_printf (NULL, "%4d %-4s %-6s %8.3f (%.2f,%.2f,%.2f)\n", top_indices [slot_index],
+                     term_object_type_name (rigid_body), term_object_state_name (rigid_body), top_speeds [slot_index],
                      rigid_body->position.x, rigid_body->position.y, rigid_body->position.z);
     }
 }
@@ -138,11 +138,11 @@ void cmd_du (int argc, char **argv) {
         return;
     }
     for (int argument_index = 1; argument_index < argc; argument_index++) {
-        const char *target = argv[argument_index];
+        const char *target = argv [argument_index];
         if (term_classify_token (target) == term_target_joint) {
             int joint_index = term_joint_from_token (target);
             if (joint_index >= 0) {
-                spring_joint *joint = &(physics_world_get_primary ()->spring_joints)[joint_index];
+                spring_joint *joint = &(physics_world_get_primary ()->spring_joints) [joint_index];
                 term_printf (NULL, "/joint/%d len=%.2f k=%.1f d=%.1f\n", joint_index, joint->equilibrium_length,
                              joint->spring_constant, joint->damping_coefficient);
             } else {
@@ -151,7 +151,7 @@ void cmd_du (int argc, char **argv) {
         } else {
             int object_index = term_object_from_token (target);
             if (object_index >= 0) {
-                rigidbody *rigid_body = &(physics_world_get_primary ()->bodies)[object_index];
+                rigidbody *rigid_body = &(physics_world_get_primary ()->bodies) [object_index];
                 float size_value = (rigid_body->type == object_sphere) ? rigid_body->radius
                                                                        : vector3_length (rigid_body->half_extensions);
                 term_printf (NULL, "/obj/%d mass=%.2f size=%.2f\n", object_index, rigid_body->mass, size_value);
@@ -166,17 +166,17 @@ void cmd_uname (int argc, char **argv) {
     bool print_all = false, print_sys = false, print_rel = false;
     bool print_mach = false, print_os = false;
     for (int i = 1; i < argc; i++) {
-        if (term_str_eq (argv[i], "-a")) {
+        if (term_str_eq (argv [i], "-a")) {
             print_all = true;
-        } else if (term_str_eq (argv[i], "-s")) {
+        } else if (term_str_eq (argv [i], "-s")) {
             print_sys = true;
-        } else if (term_str_eq (argv[i], "-r")) {
+        } else if (term_str_eq (argv [i], "-r")) {
             print_rel = true;
-        } else if (term_str_eq (argv[i], "-m")) {
+        } else if (term_str_eq (argv [i], "-m")) {
             print_mach = true;
-        } else if (term_str_eq (argv[i], "-o")) {
+        } else if (term_str_eq (argv [i], "-o")) {
             print_os = true;
-        } else if (argv[i][0] == '-') {
+        } else if (argv [i] [0] == '-') {
             print_all = true;
         }
     }
@@ -204,13 +204,13 @@ void cmd_date (int argc, char **argv) {
     (void) argv;
     time_t current_time = time (NULL);
     struct tm *local_time = localtime (&current_time);
-    char time_buffer[128];
+    char time_buffer [128];
     strftime (time_buffer, sizeof (time_buffer), "%a %Y-%m-%d %H:%M:%S %Z", local_time);
     term_printf (NULL, "%s\n", time_buffer);
 }
 void cmd_echo (int argc, char **argv) {
     for (int argument_index = 1; argument_index < argc; argument_index++) {
-        term_out (argv[argument_index]);
+        term_out (argv [argument_index]);
         if (argument_index + 1 < argc) {
             term_out (" ");
         }
@@ -224,16 +224,16 @@ void cmd_env (int argc, char **argv) {
     term_printf (NULL, "CAMERA_SPEED=%.4f\n", main_camera_fov.movement_speed);
     int current_category = -1;
     for (size_t i = 0; i < g_registry_count; i++) {
-        if ((int) g_registry[i].category != current_category) {
-            current_category = (int) g_registry[i].category;
+        if ((int) g_registry [i].category != current_category) {
+            current_category = (int) g_registry [i].category;
             term_printf ("term_echo", "[%s]\n", mpe_config_category_name ((param_category) current_category));
         }
-        if (g_registry[i].type == p_int) {
-            term_printf (NULL, "  %s = %d\n", g_registry[i].key, *(int *) g_registry[i].storage);
-        } else if (g_registry[i].type == p_bool) {
-            term_printf (NULL, "  %s = %s\n", g_registry[i].key, (*(bool *) g_registry[i].storage) ? "true" : "false");
+        if (g_registry [i].type == p_int) {
+            term_printf (NULL, "  %s = %d\n", g_registry [i].key, *(int *) g_registry [i].storage);
+        } else if (g_registry [i].type == p_bool) {
+            term_printf (NULL, "  %s = %s\n", g_registry [i].key, (*(bool *) g_registry [i].storage) ? "true" : "false");
         } else {
-            term_printf (NULL, "  %s = %.4f\n", g_registry[i].key, *(float *) g_registry[i].storage);
+            term_printf (NULL, "  %s = %.4f\n", g_registry [i].key, *(float *) g_registry [i].storage);
         }
     }
 }
@@ -245,13 +245,13 @@ void cmd_export (int argc, char **argv) {
         return;
     }
     for (int argument_index = 1; argument_index < argc; argument_index++) {
-        char *eq_sign = strchr (argv[argument_index], '=');
+        char *eq_sign = strchr (argv [argument_index], '=');
         if (!eq_sign) {
             term_printf ("term_err", "mpe: export: usage: export KEY=value\n");
             continue;
         }
         *eq_sign = '\0';
-        const char *variable_name = argv[argument_index];
+        const char *variable_name = argv [argument_index];
         char *variable_value_str = eq_sign + 1;
         float variable_value = 0.0f;
         if (!term_parse_float (variable_value_str, &variable_value)) {
@@ -297,7 +297,7 @@ void cmd_config (int argc, char **argv) {
         term_err ("usage: config save|load|reset\n");
         return;
     }
-    if (term_str_eq (argv[1], "save")) {
+    if (term_str_eq (argv [1], "save")) {
         if (mpe_config_save_guarded ("status/engine.cfg")) {
             term_ok ("config saved to status/engine.cfg\n");
         } else if (long_run_validation_torture_live ()) {
@@ -305,14 +305,14 @@ void cmd_config (int argc, char **argv) {
         } else {
             term_err ("mpe: config: save failed\n");
         }
-    } else if (term_str_eq (argv[1], "load")) {
+    } else if (term_str_eq (argv [1], "load")) {
         if (mpe_config_load ("status/engine.cfg")) {
             contact_cache_clear (physics_world_get_primary ());
             term_ok ("config loaded from status/engine.cfg\n");
         } else {
             term_err ("mpe: config: load failed (file missing?)\n");
         }
-    } else if (term_str_eq (argv[1], "reset")) {
+    } else if (term_str_eq (argv [1], "reset")) {
         mpe_config_reset_defaults ();
         contact_cache_clear (physics_world_get_primary ());
         term_ok ("config reset to defaults\n");
@@ -386,7 +386,7 @@ void cmd_sleep (int argc, char **argv) {
         return;
     }
     float seconds = 0.0f;
-    if ((!term_parse_float (argv[1], &seconds)) || (seconds <= 0.0f)) {
+    if ((!term_parse_float (argv [1], &seconds)) || (seconds <= 0.0f)) {
         term_err ("mpe: sleep: invalid duration\n");
         return;
     }
@@ -454,7 +454,7 @@ void cmd_w (int argc, char **argv) {
                  term_spawn_type_name (), selected_object);
 }
 void cmd_hostname (int argc, char **argv) {
-    if ((argc > 1) && (term_str_eq (argv[1], "-f"))) {
+    if ((argc > 1) && (term_str_eq (argv [1], "-f"))) {
         term_out ("mpe-engine.local\n");
     } else {
         term_out ("mpe-engine\n");
@@ -475,12 +475,12 @@ void cmd_which (int argc, char **argv) {
         return;
     }
     for (size_t i = 0; i < terminal_command_count; i++) {
-        if (term_str_eq (argv[1], terminal_commands[i].name)) {
-            term_printf (NULL, "%s: shell builtin\n", terminal_commands[i].name);
+        if (term_str_eq (argv [1], terminal_commands [i].name)) {
+            term_printf (NULL, "%s: shell builtin\n", terminal_commands [i].name);
             return;
         }
     }
-    term_printf ("term_err", "mpe: which: no %s in (/usr/bin)\n", argv[1]);
+    term_printf ("term_err", "mpe: which: no %s in (/usr/bin)\n", argv [1]);
 }
 void cmd_true (int argc, char **argv) {
     (void) argc;
@@ -495,18 +495,18 @@ void cmd_time (int argc, char **argv) {
         term_err ("usage: time <command...>\n");
         return;
     }
-    char cmd_buf[2048];
-    cmd_buf[0] = '\0';
+    char cmd_buf [2048];
+    cmd_buf [0] = '\0';
     size_t offset = 0;
     for (int i = 1; i < argc; i++) {
         if (i > 1) {
-            cmd_buf[offset++] = ' ';
+            cmd_buf [offset++] = ' ';
         }
-        size_t len = strlen (argv[i]);
+        size_t len = strlen (argv [i]);
         if (offset + len < sizeof (cmd_buf) - 1) {
-            memcpy (cmd_buf + offset, argv[i], len);
+            memcpy (cmd_buf + offset, argv [i], len);
             offset += len;
-            cmd_buf[offset] = '\0';
+            cmd_buf [offset] = '\0';
         }
     }
     int64_t start_time = posix_monotonic_time ();

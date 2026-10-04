@@ -174,13 +174,13 @@ static void long_run_validation_report (void) {
     printf ("[A3] config file: %s\n", (access ("status/engine.cfg", F_OK) == 0) ? "present" : "absent");
     printf ("[A3] config params: %zu registered\n", g_registry_count);
     for (size_t cfg_i = 0; cfg_i < g_registry_count; cfg_i++) {
-        if (g_registry[cfg_i].type == p_int) {
-            printf ("[A3]   %s = %d\n", g_registry[cfg_i].key, *(int *) g_registry[cfg_i].storage);
-        } else if (g_registry[cfg_i].type == p_bool) {
-            printf ("[A3]   %s = %s\n", g_registry[cfg_i].key,
-                    (*(bool *) g_registry[cfg_i].storage) ? "true" : "false");
+        if (g_registry [cfg_i].type == p_int) {
+            printf ("[A3]   %s = %d\n", g_registry [cfg_i].key, *(int *) g_registry [cfg_i].storage);
+        } else if (g_registry [cfg_i].type == p_bool) {
+            printf ("[A3]   %s = %s\n", g_registry [cfg_i].key,
+                    (*(bool *) g_registry [cfg_i].storage) ? "true" : "false");
         } else {
-            printf ("[A3]   %s = %.4f\n", g_registry[cfg_i].key, *(float *) g_registry[cfg_i].storage);
+            printf ("[A3]   %s = %.4f\n", g_registry [cfg_i].key, *(float *) g_registry [cfg_i].storage);
         }
     }
     /* MPE_TASK_39_CONFIG_REPORT_END */
@@ -194,7 +194,7 @@ static void long_run_validation_evaluate (void) {
     int current_fallen_count = 0;
     int current_nan_count = 0;
     for (int object_index = 0; object_index < (physics_world_get_primary ()->body_count); object_index++) {
-        rigidbody *rigid_body = &(physics_world_get_primary ()->bodies)[object_index];
+        rigidbody *rigid_body = &(physics_world_get_primary ()->bodies) [object_index];
         if (a3_task13_body_is_invalid (rigid_body)) {
             current_nan_count++;
             continue;
@@ -295,13 +295,13 @@ void long_run_validation_start (int duration_ticks) {
     printf ("[A3] config file: %s\n", (access ("status/engine.cfg", F_OK) == 0) ? "present" : "absent");
     printf ("[A3] config params: %zu registered\n", g_registry_count);
     for (size_t cfg_i = 0; cfg_i < g_registry_count; cfg_i++) {
-        if (g_registry[cfg_i].type == p_int) {
-            printf ("[A3]   %s = %d\n", g_registry[cfg_i].key, *(int *) g_registry[cfg_i].storage);
-        } else if (g_registry[cfg_i].type == p_bool) {
-            printf ("[A3]   %s = %s\n", g_registry[cfg_i].key,
-                    (*(bool *) g_registry[cfg_i].storage) ? "true" : "false");
+        if (g_registry [cfg_i].type == p_int) {
+            printf ("[A3]   %s = %d\n", g_registry [cfg_i].key, *(int *) g_registry [cfg_i].storage);
+        } else if (g_registry [cfg_i].type == p_bool) {
+            printf ("[A3]   %s = %s\n", g_registry [cfg_i].key,
+                    (*(bool *) g_registry [cfg_i].storage) ? "true" : "false");
         } else {
-            printf ("[A3]   %s = %.4f\n", g_registry[cfg_i].key, *(float *) g_registry[cfg_i].storage);
+            printf ("[A3]   %s = %.4f\n", g_registry [cfg_i].key, *(float *) g_registry [cfg_i].storage);
         }
     }
     /* MPE_TASK_39_CONFIG_REPORT_END */

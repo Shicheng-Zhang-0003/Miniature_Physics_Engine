@@ -50,7 +50,7 @@ void joint_init_pool (physics_world *world) {
         return;
     }
     for (int i = 0; i < mpe_max_joints; i++) {
-        world->spring_joints[i].is_active = false;
+        world->spring_joints [i].is_active = false;
     }
     world->spring_joint_count = 0;
 }
@@ -62,13 +62,13 @@ int add_joint_by_ids (physics_world *world, uint32_t id_a, uint32_t id_b, float 
         return -1;
     }
     for (int i = 0; i < mpe_max_joints; i++) {
-        if (!world->spring_joints[i].is_active) {
-            world->spring_joints[i].object_id_a = id_a;
-            world->spring_joints[i].object_id_b = id_b;
-            world->spring_joints[i].equilibrium_length = eq;
-            world->spring_joints[i].spring_constant = k;
-            world->spring_joints[i].damping_coefficient = c;
-            world->spring_joints[i].is_active = true;
+        if (!world->spring_joints [i].is_active) {
+            world->spring_joints [i].object_id_a = id_a;
+            world->spring_joints [i].object_id_b = id_b;
+            world->spring_joints [i].equilibrium_length = eq;
+            world->spring_joints [i].spring_constant = k;
+            world->spring_joints [i].damping_coefficient = c;
+            world->spring_joints [i].is_active = true;
             world->spring_joint_count++;
             return i;
         }
@@ -92,17 +92,17 @@ int main (void) {
     physics_world_init (world);
     scene_id_remap_reset ();
     /* Body 0: dynamic sphere with distinctive state. */
-    rigidbody_initialisation_sphere (&world->bodies[0], 0.5f, 2.0f, (vector3){1.0f, 2.0f, 3.0f});
-    world->bodies[0].velocity = (vector3){0.25f, -0.5f, 1.0f};
-    world->bodies[0].colour = (vector3){0.1f, 0.2f, 0.3f};
-    world->bodies[0].restitution = 0.4f;
-    world->bodies[0].nice_value = 7;
-    world->bodies[0].object_id = scene_allocate_object_id ();
+    rigidbody_initialisation_sphere (&world->bodies [0], 0.5f, 2.0f, (vector3){1.0f, 2.0f, 3.0f});
+    world->bodies [0].velocity = (vector3){0.25f, -0.5f, 1.0f};
+    world->bodies [0].colour = (vector3){0.1f, 0.2f, 0.3f};
+    world->bodies [0].restitution = 0.4f;
+    world->bodies [0].nice_value = 7;
+    world->bodies [0].object_id = scene_allocate_object_id ();
     /* Body 1: sleeping cube. */
-    rigidbody_initialisation_cube (&world->bodies[1], (vector3){-1.0f, 0.5f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
-    world->bodies[1].is_sleeping = true;
-    world->bodies[1].sleep_timer = 0.0f;
-    world->bodies[1].object_id = scene_allocate_object_id ();
+    rigidbody_initialisation_cube (&world->bodies [1], (vector3){-1.0f, 0.5f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
+    world->bodies [1].is_sleeping = true;
+    world->bodies [1].sleep_timer = 0.0f;
+    world->bodies [1].object_id = scene_allocate_object_id ();
     world->body_count = 2;
     joint_init_pool (world);
     constraint_pool_init (world);
@@ -118,13 +118,13 @@ int main (void) {
     world->next_object_id = 100; /* v200 preserves IDs: allocator drift must NOT leak into loaded IDs */
     check (scene_loading (path) == 1, "scene_loading succeeds");
     check (world->body_count == 2, "two bodies loaded");
-    check (world->bodies[0].object_id == 1, "v200 stable ID preserved (body 0)");
-    check (world->bodies[1].object_id == 2, "v200 stable ID preserved (body 1)");
+    check (world->bodies [0].object_id == 1, "v200 stable ID preserved (body 0)");
+    check (world->bodies [1].object_id == 2, "v200 stable ID preserved (body 1)");
     /* TRUTH: allocator was pinned at 100 pre-load; loaded IDs are 1,2.
      * allocate() must return exactly 100 (drift to 3 would alias live IDs;
      * drift anywhere else leaks). */
     check (scene_allocate_object_id () == 100, "allocator preserved at 100 past loaded IDs");
-    rigidbody *s = &world->bodies[0];
+    rigidbody *s = &world->bodies [0];
     check (s->type == object_sphere, "body 0 type round-trips");
     checkf (s->mass, 2.0f, 1e-5f, "body 0 mass round-trips");
     checkf (s->radius, 0.5f, 1e-5f, "body 0 radius round-trips");
@@ -142,18 +142,18 @@ int main (void) {
     checkf (s->angular_velocity.x, 0.0f, 1e-5f, "body 0 angular velocity round-trips");
     checkf (s->friction_static, g_cfg.body_defaults.sphere_fric_s, 1e-5f, "body 0 friction round-trips");
     check (s->object_generation == 1, "body 0 generation round-trips");
-    rigidbody *c = &world->bodies[1];
+    rigidbody *c = &world->bodies [1];
     check (c->type == object_cube, "body 1 type round-trips");
     checkf (c->mass, 1.0f, 1e-5f, "body 1 mass round-trips");
     check (c->is_sleeping, "body 1 sleep state persists");
     check (world->spring_joint_count == 1, "one joint restored");
     if (world->spring_joint_count == 1) {
-        uint32_t ja = world->spring_joints[0].object_id_a;
-        uint32_t jb = world->spring_joints[0].object_id_b;
-        uint32_t i0 = world->bodies[0].object_id;
-        uint32_t i1 = world->bodies[1].object_id;
+        uint32_t ja = world->spring_joints [0].object_id_a;
+        uint32_t jb = world->spring_joints [0].object_id_b;
+        uint32_t i0 = world->bodies [0].object_id;
+        uint32_t i1 = world->bodies [1].object_id;
         check (((ja == i0) && (jb == i1)) || ((ja == i1) && (jb == i0)), "joint endpoints remapped to loaded bodies");
-        checkf (world->spring_joints[0].spring_constant, 20.0f, 1e-5f, "joint params round-trip");
+        checkf (world->spring_joints [0].spring_constant, 20.0f, 1e-5f, "joint params round-trip");
     }
     check (constraint_get_count (world) == 1, "one revolute restored");
     if (constraint_get_count (world) == 1) {
@@ -181,7 +181,7 @@ int main (void) {
         const char *tamper_path = "../../temp/mpe_scene_tampered.dat";
         /* TRUTH: byte 20 = body 0 radius field (header 12 + type 4 +
          * mass 4 = 20). Corrupts payload, footer intact -> must reject. */
-        bytes[20] ^= 0xFFu;
+        bytes [20] ^= 0xFFu;
         FILE *wf = fopen (tamper_path, "wb");
         fwrite (bytes, 1, (size_t) fsize, wf);
         fclose (wf);
@@ -189,7 +189,7 @@ int main (void) {
         int count_before = world->body_count;
         check (scene_loading (tamper_path) == 0, "tampered scene rejected");
         check (world->body_count == count_before, "live scene untouched by failed load");
-        check (world->bodies[0].object_id == 1, "live IDs untouched by failed load");
+        check (world->bodies [0].object_id == 1, "live IDs untouched by failed load");
         remove (tamper_path);
     }
     remove (path);

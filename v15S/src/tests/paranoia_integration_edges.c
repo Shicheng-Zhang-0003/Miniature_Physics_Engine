@@ -18,16 +18,16 @@ int main (void) {
         g_cfg.world.drag = 1.0f;
         int a = physics_world_add_sphere (&world, 0.5f, 0.0f, (vector3){0.0f, 2.0f, 0.0f}); /* mass=0 */
         int b = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0.0f, 5.0f, 0.0f});
-        world.bodies[a].restitution = 0.0f;
-        world.bodies[b].restitution = 0.0f;
-        world.bodies[b].velocity = (vector3){0.0f, -5.0f, 0.0f};
-        rigidbody_wake (&world.bodies[b]);
+        world.bodies [a].restitution = 0.0f;
+        world.bodies [b].restitution = 0.0f;
+        world.bodies [b].velocity = (vector3){0.0f, -5.0f, 0.0f};
+        rigidbody_wake (&world.bodies [b]);
         const float dt = 1.0f / 60.0f;
         int nan_count = 0;
         for (int t = 0; t < 60; t++) {
             physics_world_step (&world, dt);
             for (int i = 0; i < world.body_count; i++) {
-                if (!isfinite (world.bodies[i].position.x))
+                if (!isfinite (world.bodies [i].position.x))
                     nan_count++;
             }
         }
@@ -48,16 +48,16 @@ int main (void) {
         g_cfg.world.gravity = 0.0f;
         g_cfg.world.drag = 1.0f;
         int a = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0.0f, 0.0f, 0.0f});
-        world.bodies[a].angular_velocity = (vector3){1000.0f, 0.0f, 0.0f};
-        rigidbody_wake (&world.bodies[a]);
+        world.bodies [a].angular_velocity = (vector3){1000.0f, 0.0f, 0.0f};
+        rigidbody_wake (&world.bodies [a]);
         const float dt = 1.0f / 60.0f;
         int nan_count = 0;
         float max_angle = 0.0f;
         for (int t = 0; t < 600; t++) {
             physics_world_step (&world, dt);
-            if (!isfinite (world.bodies[0].orientation.w))
+            if (!isfinite (world.bodies [0].orientation.w))
                 nan_count++;
-            float angle = 2.0f * acosf (fabsf (world.bodies[0].orientation.w));
+            float angle = 2.0f * acosf (fabsf (world.bodies [0].orientation.w));
             if (angle > max_angle)
                 max_angle = angle;
         }
@@ -78,11 +78,11 @@ int main (void) {
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 1.0f;
         int a = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0.0f, 2.0f, 0.0f});
-        rigidbody_wake (&world.bodies[a]);
+        rigidbody_wake (&world.bodies [a]);
         int nan_count = 0;
         for (int t = 0; t < 6000; t++) {
             physics_world_step (&world, 1e-6f); /* 1 microsecond steps */
-            if (!isfinite (world.bodies[0].position.y))
+            if (!isfinite (world.bodies [0].position.y))
                 nan_count++;
         }
         printf ("[INFO] tiny_dt nan=%d\n", nan_count);
@@ -102,12 +102,12 @@ int main (void) {
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 1.0f;
         int a = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0.0f, 10.0f, 0.0f});
-        rigidbody_wake (&world.bodies[a]);
+        rigidbody_wake (&world.bodies [a]);
         int nan_count = 0;
         physics_world_step (&world, 1000.0f); /* huge dt - should be clamped to 0.1f */
-        if (!isfinite (world.bodies[0].position.y))
+        if (!isfinite (world.bodies [0].position.y))
             nan_count++;
-        printf ("[INFO] huge_dt nan=%d pos_y=%.2f\n", nan_count, world.bodies[0].position.y);
+        printf ("[INFO] huge_dt nan=%d pos_y=%.2f\n", nan_count, world.bodies [0].position.y);
         if (nan_count > 0) {
             printf ("[FAIL] huge dt produced NaN\n");
             fail = 1;
@@ -124,10 +124,10 @@ int main (void) {
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 1.0f;
         int a = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0.0f, 5.0f, 0.0f});
-        rigidbody_wake (&world.bodies[a]);
+        rigidbody_wake (&world.bodies [a]);
         int nan_count = 0;
         physics_world_step (&world, -1.0f); /* negative dt */
-        if (!isfinite (world.bodies[0].position.y))
+        if (!isfinite (world.bodies [0].position.y))
             nan_count++;
         printf ("[INFO] negative_dt nan=%d\n", nan_count);
         if (nan_count > 0) {
@@ -147,16 +147,16 @@ int main (void) {
         g_cfg.world.drag = 1.0f;
         int a = physics_world_add_sphere (&world, 0.1f, 1e-4f, (vector3){0.0f, 2.0f, 0.0f}); /* 0.1g */
         int b = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0.0f, 5.0f, 0.0f});
-        world.bodies[a].restitution = 1.0f;
-        world.bodies[b].restitution = 1.0f;
-        rigidbody_wake (&world.bodies[a]);
-        rigidbody_wake (&world.bodies[b]);
+        world.bodies [a].restitution = 1.0f;
+        world.bodies [b].restitution = 1.0f;
+        rigidbody_wake (&world.bodies [a]);
+        rigidbody_wake (&world.bodies [b]);
         const float dt = 1.0f / 60.0f;
         int nan_count = 0;
         for (int t = 0; t < 600; t++) {
             physics_world_step (&world, dt);
             for (int i = 0; i < world.body_count; i++) {
-                if (!isfinite (world.bodies[i].position.x))
+                if (!isfinite (world.bodies [i].position.x))
                     nan_count++;
             }
         }
@@ -178,16 +178,16 @@ int main (void) {
         g_cfg.world.drag = 1.0f;
         int a = physics_world_add_sphere (&world, 10.0f, 1e6f, (vector3){0.0f, 10.0f, 0.0f});
         int b = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0.0f, 2.0f, 0.0f});
-        world.bodies[a].restitution = 1.0f;
-        world.bodies[b].restitution = 1.0f;
-        rigidbody_wake (&world.bodies[a]);
-        rigidbody_wake (&world.bodies[b]);
+        world.bodies [a].restitution = 1.0f;
+        world.bodies [b].restitution = 1.0f;
+        rigidbody_wake (&world.bodies [a]);
+        rigidbody_wake (&world.bodies [b]);
         const float dt = 1.0f / 60.0f;
         int nan_count = 0;
         for (int t = 0; t < 600; t++) {
             physics_world_step (&world, dt);
             for (int i = 0; i < world.body_count; i++) {
-                if (!isfinite (world.bodies[i].position.x))
+                if (!isfinite (world.bodies [i].position.x))
                     nan_count++;
             }
         }
@@ -208,13 +208,13 @@ int main (void) {
         g_cfg.world.gravity = 0.0f;
         g_cfg.world.drag = 1.0f;
         int a = physics_world_add_cylinder (&world, 0.01f, 5.0f, 1.0f, (vector3){0.0f, 0.0f, 0.0f}); /* very thin rod */
-        world.bodies[a].angular_velocity = (vector3){10.0f, 0.0f, 0.0f};
-        rigidbody_wake (&world.bodies[a]);
+        world.bodies [a].angular_velocity = (vector3){10.0f, 0.0f, 0.0f};
+        rigidbody_wake (&world.bodies [a]);
         const float dt = 1.0f / 60.0f;
         int nan_count = 0;
         for (int t = 0; t < 600; t++) {
             physics_world_step (&world, dt);
-            if (!isfinite (world.bodies[0].orientation.w))
+            if (!isfinite (world.bodies [0].orientation.w))
                 nan_count++;
         }
         printf ("[INFO] thin_rod nan=%d\n", nan_count);
@@ -234,13 +234,13 @@ int main (void) {
         g_cfg.world.gravity = 0.0f;
         g_cfg.world.drag = 1.0f;
         int a = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0.0f, 0.0f, 0.0f});
-        world.bodies[a].orientation = (vector4){1e-10f, 1e-10f, 1e-10f, 1e-10f}; /* near zero */
-        rigidbody_wake (&world.bodies[a]);
+        world.bodies [a].orientation = (vector4){1e-10f, 1e-10f, 1e-10f, 1e-10f}; /* near zero */
+        rigidbody_wake (&world.bodies [a]);
         const float dt = 1.0f / 60.0f;
         int nan_count = 0;
         for (int t = 0; t < 60; t++) {
             physics_world_step (&world, dt);
-            if (!isfinite (world.bodies[0].orientation.w))
+            if (!isfinite (world.bodies [0].orientation.w))
                 nan_count++;
         }
         printf ("[INFO] near_zero_quat nan=%d\n", nan_count);

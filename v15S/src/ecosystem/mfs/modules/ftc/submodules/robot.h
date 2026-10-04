@@ -11,8 +11,8 @@ typedef enum { FTC_DRIVETRAIN_MECANUM = 0, FTC_DRIVETRAIN_TANK = 1 } ftc_drivetr
 typedef struct {
     /* Body indices in physics_world */
     int chassis_body;
-    int wheel_bodies[FTC_MAX_WHEELS];
-    int wheel_joints[FTC_MAX_WHEELS]; /* revolute joint indices */
+    int wheel_bodies [FTC_MAX_WHEELS];
+    int wheel_joints [FTC_MAX_WHEELS]; /* revolute joint indices */
     int wheel_count;
     /* Mecanum rollers: real bodies on real free revolute bearings (see
      * robot.c for geometry). They are what touches the floor and all CONTACT
@@ -34,16 +34,16 @@ typedef struct {
  * to the true build count; static assert in robot.c locks them together. */
 #define MFS_ROLLERS_PER_WHEEL 8
 #define MFS_ROLLERS_PER_Wheel MFS_ROLLERS_PER_WHEEL /* compat alias */
-    int roller_bodies[FTC_MAX_WHEELS][MFS_ROLLERS_PER_WHEEL];
-    int roller_joints[FTC_MAX_WHEELS][MFS_ROLLERS_PER_WHEEL];
-    int roller_count[FTC_MAX_WHEELS];
+    int roller_bodies [FTC_MAX_WHEELS] [MFS_ROLLERS_PER_WHEEL];
+    int roller_joints [FTC_MAX_WHEELS] [MFS_ROLLERS_PER_WHEEL];
+    int roller_count [FTC_MAX_WHEELS];
     /* Radius of the running surface: the roller pitch + roller radius for a
      * mecanum wheel, the tyre radius for a tank wheel. Everything that needs
      * the geometric lever arm (rolling resistance, odometry radius) must use
      * this, not the hub plate radius. */
-    float wheel_effective_radius[FTC_MAX_WHEELS];
+    float wheel_effective_radius [FTC_MAX_WHEELS];
     /* Motor + electrical */
-    motor wheel_motors[FTC_MAX_WHEELS];
+    motor wheel_motors [FTC_MAX_WHEELS];
     motor_preset_id motor_preset;
     battery battery;
     /* Axle direction in chassis-local space (for reading wheel speed) */
@@ -51,7 +51,7 @@ typedef struct {
     /* (removed: mecanum_chassis_force/torque dead fields, zero uses) */
     ftc_drivetrain_type drivetrain_type; /* MFS_DRIVETRAIN_TYPE */
     /* MFS_151_ODOMETRY: Wheel encoders and pose estimation */
-    float wheel_radians[FTC_MAX_WHEELS]; /* MFS_163_BOUNDS_FIX: was [4], OOB if wheel_count > 4 */
+    float wheel_radians [FTC_MAX_WHEELS]; /* MFS_163_BOUNDS_FIX: was [4], OOB if wheel_count > 4 */
     /* DESPOT-2026-09-26: encoder quantization state. wheel_radians above is
      * the TRUE continuous hub angle; the counts below are what a real
      * quadrature encoder reports (integer, PPR-limited). Odometry integrates
@@ -59,8 +59,8 @@ typedef struct {
      * omegas — previously PPR was plumbed but never consumed, so resolution
      * error was unmodeled. counts_per_rev is derived per robot from the
      * preset (base_ppr * gear_ratio); zero-size memset gives count 0. */
-    int wheel_encoder_counts[FTC_MAX_WHEELS];
-    float wheel_radians_quant[FTC_MAX_WHEELS];
+    int wheel_encoder_counts [FTC_MAX_WHEELS];
+    float wheel_radians_quant [FTC_MAX_WHEELS];
     float odom_x, odom_z, odom_theta;
     /* odom_slip: slip REPORT flag (no fusion — odometry is never corrected).
      * DESPOT-2026-09-26: was hard-zeroed "ABI only". Now 1 when the
@@ -75,19 +75,19 @@ typedef struct {
      * slip is detected so a spun-up wheel re-grips instead of sliding
      * forever (kinetic friction alone can never re-capture a wheel whose
      * stall torque exceeds the kinetic cone). */
-    float wheel_traction_scale[FTC_MAX_WHEELS];
+    float wheel_traction_scale [FTC_MAX_WHEELS];
     /* DESPOT-FIX (torque slew state): previously applied axle torque per
      * wheel (N.m). The driver feathers standing starts in reality (ESC
      * current-slew limits); a 0->stall step in one tick outruns the
      * contact (74 N-equiv vs 19 N cone) and peel-out locks symmetric
      * commands into chaos. Slew-limiting lets grip establish before full
      * torque lands. Zero-init via memset; memcpy-safe like the rest. */
-    float wheel_applied_torque[FTC_MAX_WHEELS];
+    float wheel_applied_torque [FTC_MAX_WHEELS];
     /* MFS_PORT_V15S: roller geometry used to live on the rigidbody
      * (is_mecanum / roller_angle_rad, removed with the parked solver
      * hooks). It now lives here, owned by the robot that defines it. */
-    float wheel_roller_angle[FTC_MAX_WHEELS]; /* radians, +45/-45 layout */
-    bool wheel_is_mecanum[FTC_MAX_WHEELS];
+    float wheel_roller_angle [FTC_MAX_WHEELS]; /* radians, +45/-45 layout */
+    bool wheel_is_mecanum [FTC_MAX_WHEELS];
     /* MFS-STRAFE-A (analytic lateral, default ON for mecanum only):
      * when true, no roller bodies/joints are built (hub contacts the floor
      * directly at full radius) and drivetrain_update applies the

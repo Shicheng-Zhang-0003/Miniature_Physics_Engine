@@ -88,7 +88,7 @@ static inline char *term_ascii_strdown (const char *s) {
         return NULL;
     }
     for (size_t i = 0; i <= n; i++) {
-        out[i] = (char) term_ascii_tolower ((unsigned char) s[i]);
+        out [i] = (char) term_ascii_tolower ((unsigned char) s [i]);
     }
     return out;
 }
@@ -110,7 +110,7 @@ static inline char *term_strndup (const char *s, size_t n) {
         return NULL;
     }
     size_t len = 0;
-    while (len < n && s[len] != '\0') {
+    while (len < n && s [len] != '\0') {
         len++;
     }
     char *out = (char *) malloc (len + 1u);
@@ -118,7 +118,7 @@ static inline char *term_strndup (const char *s, size_t n) {
         return NULL;
     }
     memcpy (out, s, len);
-    out[len] = '\0';
+    out [len] = '\0';
     return out;
 }
 static inline void term_strfree (char *s) {
@@ -126,7 +126,7 @@ static inline void term_strfree (char *s) {
 }
 /* malloc'd printf (replaces g_strdup_printf). NULL on OOM/encoding error. */
 static inline char *term_format (const char *fmt, ...) {
-    char stack[256];
+    char stack [256];
     va_list ap;
     va_start (ap, fmt);
     int need = vsnprintf (stack, sizeof (stack), fmt, ap);
@@ -162,7 +162,7 @@ static inline char **term_strsplit (const char *s, char delim) {
     if (!s) {
         char **out = (char **) malloc (sizeof (char *));
         if (out) {
-            out[0] = NULL;
+            out [0] = NULL;
         }
         return out;
     }
@@ -184,14 +184,14 @@ static inline char **term_strsplit (const char *s, char delim) {
             char *tok = (char *) malloc (len + 1u);
             if (!tok) {
                 for (size_t k = 0; k < idx; k++) {
-                    free (out[k]);
+                    free (out [k]);
                 }
                 free (out);
                 return NULL;
             }
             memcpy (tok, start, len);
-            tok[len] = '\0';
-            out[idx++] = tok;
+            tok [len] = '\0';
+            out [idx++] = tok;
             if (*s == '\0') {
                 break;
             }
@@ -199,7 +199,7 @@ static inline char **term_strsplit (const char *s, char delim) {
         }
         s++;
     }
-    out[idx] = NULL;
+    out [idx] = NULL;
     return out;
 }
 /* Free a NULL-terminated string vector (NULL-tolerant, like g_strfreev). */
@@ -207,8 +207,8 @@ static inline void term_strfreev (char **v) {
     if (!v) {
         return;
     }
-    for (size_t i = 0; v[i]; i++) {
-        free (v[i]);
+    for (size_t i = 0; v [i]; i++) {
+        free (v [i]);
     }
     free (v);
 }
@@ -267,7 +267,7 @@ static inline int term_parse_argv (const char *cmd, int *argc_out, char ***argv_
                     fail = 1;
                     break;
                 }
-                buf[blen] = '\0';
+                buf [blen] = '\0';
                 if (argc + 1u >= cap) {
                     size_t ncap = cap * 2u;
                     char **nargv = (char **) realloc (argv, ncap * sizeof (char *));
@@ -278,8 +278,8 @@ static inline int term_parse_argv (const char *cmd, int *argc_out, char ***argv_
                     argv = nargv;
                     cap = ncap;
                 }
-                argv[argc] = term_strdup (buf);
-                if (!argv[argc]) {
+                argv [argc] = term_strdup (buf);
+                if (!argv [argc]) {
                     fail = 1;
                     break;
                 }
@@ -306,7 +306,7 @@ static inline int term_parse_argv (const char *cmd, int *argc_out, char ***argv_
             buf = nbuf;
             bcap = nbcap;
         }
-        buf[blen++] = c;
+        buf [blen++] = c;
         in_word = 1;
         p++;
     }
@@ -318,7 +318,7 @@ static inline int term_parse_argv (const char *cmd, int *argc_out, char ***argv_
     }
     if (fail) {
         for (size_t k = 0; k < argc; k++) {
-            free (argv[k]);
+            free (argv [k]);
         }
         free (argv);
         free (buf);
@@ -328,7 +328,7 @@ static inline int term_parse_argv (const char *cmd, int *argc_out, char ***argv_
         char **nargv = (char **) realloc (argv, (argc + 1u) * sizeof (char *));
         if (!nargv) {
             for (size_t k = 0; k < argc; k++) {
-                free (argv[k]);
+                free (argv [k]);
             }
             free (argv);
             free (buf);
@@ -336,7 +336,7 @@ static inline int term_parse_argv (const char *cmd, int *argc_out, char ***argv_
         }
         argv = nargv;
     }
-    argv[argc] = NULL;
+    argv [argc] = NULL;
     free (buf);
     if (argc_out) {
         *argc_out = (int) argc;

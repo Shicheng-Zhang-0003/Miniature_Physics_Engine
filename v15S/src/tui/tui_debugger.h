@@ -30,7 +30,7 @@ typedef struct {
     WINDOW *status_win;
     int term_width;
     int term_height;
-    char filter_text[64];
+    char filter_text [64];
     int filter_len;
     bool filter_active;
 } tui_debugger_t;

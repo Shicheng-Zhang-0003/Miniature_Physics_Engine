@@ -26,9 +26,9 @@ static uint32_t t_next (void) {
 static void f11_add_cube (physics_world *w, vector3 p) {
     int idx = physics_world_add_cube (w, p, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
     if (idx >= 0) {
-        w->bodies[idx].restitution = 0.0f;
-        w->bodies[idx].friction_static = 0.8f;
-        w->bodies[idx].friction_kinetic = 0.7f;
+        w->bodies [idx].restitution = 0.0f;
+        w->bodies [idx].friction_static = 0.8f;
+        w->bodies [idx].friction_kinetic = 0.7f;
     }
 }
 int main (void) {
@@ -36,18 +36,18 @@ int main (void) {
     /* Deterministic torture over the live registry (fixed seed). */
     for (size_t i = 0; i < g_registry_count; i++) {
         /* mpe_param layout: type/key/min/max/storage (see mpe_config.h). */
-        if (g_registry[i].type == p_float) {
-            float range = (float) (g_registry[i].max - g_registry[i].min);
-            *(float *) g_registry[i].storage =
-                (float) g_registry[i].min + ((float) (t_next () >> 8) / 16777216.0f) * range;
-        } else if (g_registry[i].type == p_int) {
+        if (g_registry [i].type == p_float) {
+            float range = (float) (g_registry [i].max - g_registry [i].min);
+            *(float *) g_registry [i].storage =
+                (float) g_registry [i].min + ((float) (t_next () >> 8) / 16777216.0f) * range;
+        } else if (g_registry [i].type == p_int) {
             /* TRUTH: %(range+1), not %range: %1==0 always, so binary params
              * (range 1, e.g. sleep.enable) were NEVER tortured. */
-            int range = (int) (g_registry[i].max - g_registry[i].min);
-            *(int *) g_registry[i].storage =
-                (int) g_registry[i].min + (int) (t_next () % (uint32_t) (range >= 0 ? range + 1 : 1));
-        } else if (g_registry[i].type == p_bool) {
-            *(bool *) g_registry[i].storage = (t_next () & 1u) != 0;
+            int range = (int) (g_registry [i].max - g_registry [i].min);
+            *(int *) g_registry [i].storage =
+                (int) g_registry [i].min + (int) (t_next () % (uint32_t) (range >= 0 ? range + 1 : 1));
+        } else if (g_registry [i].type == p_bool) {
+            *(bool *) g_registry [i].storage = (t_next () & 1u) != 0;
         }
     }
     /* Same guardrails as the engine torture (resolution, not physics). */
@@ -96,9 +96,9 @@ int main (void) {
     for (int i = 0; i < 3; i++) {
         int idx = physics_world_add_sphere (&world, 0.35f, 1.0f, (vector3){-30.0f + (float) i * 3.0f, 0.35f, 8.0f});
         if (idx >= 0) {
-            world.bodies[idx].restitution = 0.0f;
-            world.bodies[idx].friction_static = 0.8f;
-            world.bodies[idx].friction_kinetic = 0.7f;
+            world.bodies [idx].restitution = 0.0f;
+            world.bodies [idx].friction_static = 0.8f;
+            world.bodies [idx].friction_kinetic = 0.7f;
         }
     }
     const float dt = 1.0f / 60.0f;
@@ -108,7 +108,7 @@ int main (void) {
         physics_world_step (&world, dt);
         float mx_lin = 0.0f, mx_ang = 0.0f;
         for (int i = 0; i < world.body_count; i++) {
-            rigidbody *rb = &world.bodies[i];
+            rigidbody *rb = &world.bodies [i];
             /* TRUTH: corruption means ANY non-finite state, including
              * angular velocity (the old check missed spinning NaNs). */
             if (!isfinite (rb->position.x) || !isfinite (rb->position.y) || !isfinite (rb->position.z) ||
