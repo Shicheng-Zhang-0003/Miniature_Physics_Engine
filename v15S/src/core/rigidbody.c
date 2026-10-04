@@ -292,24 +292,47 @@ void rigidbody_sanitize(rigidbody *rigid_body) {
         }
     }
 
+    /* DESPOT-2026-10-03: rigidbody_sanitize WAS CLAMPING SILENTLY. The
+     * observability work (commit 02/10/26 120002) instrumented the thirteen
+     * initialisation clamp sites, but this function -- which runs on EVERY
+     * body EVERY tick, and which is reachable from the terminal editor and
+     * from deserialised scenes -- rewrote mass and geometry with no counter
+     * and no diagnostic at all. So the documented claim that "every clamp
+     * reports" was false for the path that matters most, and it is exactly the
+     * "a clamp that changes the physics silently is indistinguishable from a
+     * clamp that did not happen" failure the counters were added to prevent.
+     *
+     * Note this path is also NOT policy-identical to the initialisers: a
+     * non-positive radius becomes 0.01 here versus 0.5 there, and a negative
+     * mass yields 0.0 for a static body and 1.0 otherwise (so it can quietly
+     * turn a corrupt body STATIC rather than dynamic). Two clamp policies now
+     * report themselves instead of one silent and one loud. */
     if (!isfinite(rigid_body->mass) || (rigid_body->mass < 0.0f)) {
+        double req = (double)rigid_body->mass;
         rigid_body->mass = rigid_body->static_state ? 0.0f : 1.0f;
+        mpe_note_clamp("sanitize mass", &mpe_clamp_mass_events, req, (double)rigid_body->mass);
         needs_inertia_recalc = true;
     }
     if ((!rigid_body->static_state) && (!rigid_body->kinematic)) {
         if (rigid_body->mass > 1e6f) {
+            double req = (double)rigid_body->mass;
             rigid_body->mass = 1e6f;
+            mpe_note_clamp("sanitize mass", &mpe_clamp_mass_events, req, 1e6);
             needs_inertia_recalc = true;
         }
     }
 
     if (rigid_body->type == object_sphere) {
         if (!isfinite(rigid_body->radius) || (rigid_body->radius <= 0.0f)) {
+            double req = (double)rigid_body->radius;
             rigid_body->radius = 0.01f;
+            mpe_note_clamp("sanitize radius", &mpe_clamp_radius_events, req, 0.01);
             needs_inertia_recalc = true;
         }
         if (rigid_body->radius > 100.0f) {
+            double req = (double)rigid_body->radius;
             rigid_body->radius = 100.0f;
+            mpe_note_clamp("sanitize radius", &mpe_clamp_radius_events, req, 100.0);
             needs_inertia_recalc = true;
         }
         /* AUDIT: keep bounding half-extents synced (see initialisation). */
@@ -317,19 +340,27 @@ void rigidbody_sanitize(rigidbody *rigid_body) {
             (vector3){rigid_body->radius, rigid_body->radius, rigid_body->radius};
     } else if (rigid_body->type == object_cylinder) { /* R3-001 */
         if (!isfinite(rigid_body->radius) || (rigid_body->radius <= 0.0f)) {
+            double req = (double)rigid_body->radius;
             rigid_body->radius = 0.01f;
+            mpe_note_clamp("sanitize radius", &mpe_clamp_radius_events, req, 0.01);
             needs_inertia_recalc = true;
         }
         if (rigid_body->radius > 100.0f) {
+            double req = (double)rigid_body->radius;
             rigid_body->radius = 100.0f;
+            mpe_note_clamp("sanitize radius", &mpe_clamp_radius_events, req, 100.0);
             needs_inertia_recalc = true;
         }
         if (!isfinite(rigid_body->cylinder_half_length) || (rigid_body->cylinder_half_length <= 0.0f)) {
+            double req = (double)rigid_body->cylinder_half_length;
             rigid_body->cylinder_half_length = 0.01f;
+            mpe_note_clamp("sanitize cylinder_half_length", &mpe_clamp_half_length_events, req, 0.01);
             needs_inertia_recalc = true;
         }
         if (rigid_body->cylinder_half_length > 100.0f) {
+            double req = (double)rigid_body->cylinder_half_length;
             rigid_body->cylinder_half_length = 100.0f;
+            mpe_note_clamp("sanitize cylinder_half_length", &mpe_clamp_half_length_events, req, 100.0);
             needs_inertia_recalc = true;
         }
         /* AUDIT: axle is local X (see initialisation). */
@@ -351,11 +382,15 @@ void rigidbody_sanitize(rigidbody *rigid_body) {
             rigid_body->half_extensions.z = 0.01f;
         }
         if (!isfinite(rigid_body->radius) || (rigid_body->radius <= 0.0f)) {
+            double req = (double)rigid_body->radius;
             rigid_body->radius = 0.01f;
+            mpe_note_clamp("sanitize radius", &mpe_clamp_radius_events, req, 0.01);
             needs_inertia_recalc = true;
         }
         if (rigid_body->radius > 100.0f) {
+            double req = (double)rigid_body->radius;
             rigid_body->radius = 100.0f;
+            mpe_note_clamp("sanitize radius", &mpe_clamp_radius_events, req, 100.0);
             needs_inertia_recalc = true;
         }
         if (rigid_body->half_extensions.x > 100.0f) {
