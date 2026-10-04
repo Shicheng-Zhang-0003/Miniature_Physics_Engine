@@ -5,10 +5,16 @@
 > floor, overlap pops, stuck F11 torture values) that is now largely repaired:
 > live scenes rest on the infinite solver plane with validated friction,
 > stacks spawn overlap-free, and F11 always restores (backup, else compiled
-(DESPOT-2026-10-02: 43/43 after mass_properties). Headless truth holds at 43/43. The all-clear is still pending
-> user confirmation in the live window — until this notice is lifted, prefer
-> the last known proper release **`V1.5R3`** (`git checkout V1.5R3`) for
-> critical stable work.
+> defaults).
+>
+> **Headless truth: 44 registered / 42 blocking green + 2 diagnostic, 0 blocking
+> failures**, and 234/234 verification checks pass under AddressSanitizer +
+> UndefinedBehaviorSanitizer (`--profile full`, 2026-10-03). Two known-red
+> markers surface as non-blocking `xfail`, never as green.
+>
+> What is *not* yet claimed: the live-window all-clear is still pending user
+> confirmation, so until this notice is lifted, prefer the last known proper
+> release **`V1.5R3`** (`git checkout V1.5R3`) for critical stable work.
 
 > **Active head:** `v15S` — GTK4 port of the `v15R3` release with a modular kernel, per-world config, and upgraded data structures. Build from `v15S/src`; run the complete verification matrix from the repository root with `python3 tools/test_runner.py --profile full`.
 
@@ -95,10 +101,11 @@ All narrowphase functions take the owning world's config; dispatch is registry-f
 
 ### Solver
 
-- **Impulse-based sequential solver**, 64 iterations by default (configurable 1–128). The 64 knob is really 128 manifold visits per tick — every manifold is visited twice per iteration (`collision_solver.c:685`).
-- **Warm starting is TANGENT-ONLY.** The tangent impulses are restored from a per-world O(1) hash cache, and the tangent frame is adopted across ticks. The **normal impulse is deliberately cold every tick**: restoring it as the iteration seed ejected the 10-high stack at ~13 m/s in measured ablations, while the restored values themselves stayed healthy (`collision_solver.c:318-343`). So "warm starting" here means friction memory, not the dominant term.
+- **Impulse-based sequential solver**, 64 iterations by default (configurable 1–128). The 64 knob is really 128 manifold visits per tick — every manifold is visited twice per iteration (`collision_solver.c:707-713`, driven from `core/physics_world.c:1231-1232`).
+- **Warm starting is TANGENT-ONLY — a deliberate, measured deviation from standard practice.** Box2D and Bullet both warm-start the normal *and* the tangent rows (Catto, GDC 2014, slides 33–35). Here the tangent impulses are restored from a per-world O(1) hash cache and the tangent frame is adopted across ticks, but the **normal impulse solves cold every tick**. Reason, measured not assumed: seeding the iteration with last tick's normal impulse ejected the 10-high stack at ~13 m/s across five ablations, while the restored values themselves stayed bounded (~0.5, no save-bigger feedback loop). The disable is `collision_solver.c:351`; the rationale is the comment block at `:331-350`. Consequence, stated plainly: because the Coulomb cone radius is `μ·λ_n`, the cone starts near zero each tick, so tangent warm start is clamped toward zero on the first sweep. That is the price of the stability result, not a free win. (For contrast, Catto's documented deficiency of warm starting is a *stale over-large* `λ_n` under sudden load changes — GDC 2014 slide 35 — which Bullet mitigates with a 0.85 scaling factor; that is a different problem from omitting the row.)
 - Every stage (resolve, Poisson restitution, rolling resistance, split impulse) is an optional module hook — foreign solvers observe or replace per stage.
-- Static + kinetic friction, rolling friction, Catto split-impulse penetration correction (no velocity Baumgarte).
+- Static + kinetic friction, rolling friction, and Catto split-impulse penetration correction with **no velocity Baumgarte** — so position-correction energy cannot leak into the velocity state and be re-read by the Poisson restitution gate (Catto, GDC 2014 p.52–53; Bullet's own source comment: *"split impulse fixes issues with restitution in Baumgarte stabilization"*).
+- **Split impulse is per-contact with lever arms.** Each contact gets its own pseudo-impulse and the `r × n` term supplies the angular correction, matching `m v' = nλ`, `I ω' = (r × n)λ` (Catto, GDC 2014 p.53), Box2D 2.x `SolvePositionConstraints`, and Bullet's `resolveSplitPenetrationImpulseCacheFriendly`. The previous whole-body translation along the normal could not un-tilt a body with one buried corner; measured residual tilt on a 20°-tilted box improved 0.354° → 0.312° with stacks bitwise unchanged.
 - Positional depenetration pass for pile stability (registry-routed, per-world config).
 
 ### Integration
@@ -265,7 +272,7 @@ MPE ships with built-in stability tests:
 | `F8` | Spawn stress: up to 300 mixed objects |
 | `F9` | Print validation report |
 | `F10` | Long-run validation: 3600 ticks (60 s) of idle stability |
-| `F11` | Config torture: 78 tunables randomised to extremes, then 3600 ticks |
+| `F11` | Config torture: 79 tunables randomised to extremes, then 3600 ticks |
 
 `F10` monitors for NaN values, fallen objects, and residual motion, printing `PASS`/`FAIL` at the end. `F11` is a robustness verdict — `PASS` means no NaN and nothing fell through the world (speeds reported, never gated; under extremes, perpetual fall/creep can be the true outcome). Each F11 press uses the next printed seed. Torture pins solver resolution (gravity −17…−1, ≥96 iterations — proven envelope for the 10:1 validation column) while material/world extremes stay fully random.
 
@@ -303,7 +310,7 @@ make
 
 ## 📜 Version History
 
-- **v15S (current head)** — GTK4 port, module system (MPI hot-plug), per-world config, data-structure upgrades (growable pools, O(1) caches), kernel global-state removal, TUI stress suite (`stress`/`ccd` scenes, backend flags), 43/43 headless green (41 physics + 2 diag-informational; DESPOT-2026-10-02: was 42/42; DESPOT-2026-10-01: was stale 32/32, 41/41 before sleep_settle).
+- **v15S (current head)** — GTK4 port, module system (MPI hot-plug), per-world config, data-structure upgrades (growable pools, O(1) caches), kernel global-state removal, TUI stress suite (`stress`/`ccd` scenes, backend flags), 44 registered / 42 blocking green (40 physics + 2 diag-informational) plus a 234-check verification profile green under ASan+UBSan; DESPOT-2026-10-03: floor raised 42 -> 44 and the meta_rotation / meta_convergence gates made genuinely blocking after both were found unable to fail.
 - **v15R3 (release)** — configuration system, physics-truth pass, full constraint framework, TUI debugger + snapshot suite, 29/29 headless green. Release notes: [`release_notes_v15R3.md`](release_notes_v15R3.md).
 - **v15R2** — config-system hardening + MFS robotics (prior RC, parked (now consolidated in `v15S/src/ecosystem/mfs/`)).
 - **v1.4 Alpha RC3** — domain-driven restructure, spatial-hash broadphase, physics-world encapsulation.
@@ -325,7 +332,8 @@ See [`v15S/evolution.txt`](v15S/evolution.txt) for the full lineage back to stag
 ## 🧪 Verification suite
 
 The unified test runner provides quick, physics, and full profiles. The full
-profile builds the active engine, checks the canonical 43-case C suite, runs
+profile builds the active engine, checks the canonical 44-case C suite (42
+blocking), runs
 all 30 isolated legacy cases and 14 paranoia cases, then repeats the physics,
 MFS, and TUI suites under AddressSanitizer and UndefinedBehaviorSanitizer. It
 also checks generated TUI snapshots and writes JSON and JUnit reports, snapshots,
@@ -415,7 +423,7 @@ micro-jitter, documented); bounce-height oracles carry slop-scale error.
 
 ### MFS robotics (`v15S/src/ecosystem/mfs/`)
 - **FTC stack**: motor presets (spec-sheet derived, decoded-count encoder convention), back-EMF electrical model with implicit-in-speed solve + disturbance observer (stall *and* free speed exact at any bus voltage via V-line bounds), traction budgeting against wheel materials, analytic mecanum roller-kinematics lateral force (Coulomb-capped, dissipative, contact-gated at the wheel — no chassis-force cheat; the articulated 32-roller build is kept for forensics), pure-encoder odometry with `odom_slip` flag, tile-friction test floors.
-- **Suite**: `build_tests.sh` — 12 inner tests via unified mfs_suite --all (script reports suite+build gates) + build checks + ungated diags, all green (was 13 pass / 3 fail + broken `make`; DESPOT-2026-10-01: was stale 8).
+- **Suite**: `build_tests.sh` — **14/14** inner tests via unified mfs_suite --all (script reports suite+build gates) + build checks + ungated diags, all green and CWD-independent (2026-10-03: 12 -> 14; two gates were red at the prior HEAD from fixture defects, not engine ones).
 - **Modules**: `ftc-fleet` tick module (hot-pluggable, bitwise-identical static vs `.so`), `mfs_module_1` game module, `mfs-simulator` ecosystem bundle (loadable via `mod load ecosystem/mfs/mfs_ecosystem.so`).
 
 ### Determinism and precision
