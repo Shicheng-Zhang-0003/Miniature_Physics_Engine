@@ -9,5 +9,5 @@
 extern mesh cylinder_mesh;
 /* Unit cylinder: axle along local X, radius 1, half-length 1.
  * Render scale (half_length, radius, radius) maps it to any body. */
-void init_cylinder_system(mesh *mesh_object, int radial_segments);
+void init_cylinder_system (mesh *mesh_object, int radial_segments);
 #endif

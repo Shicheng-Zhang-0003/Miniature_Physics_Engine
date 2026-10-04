@@ -9,29 +9,29 @@ static int config_menu_level = 0;
 static int config_menu_active_category = -1;
 static int config_menu_selected_param = -1;
 
-bool config_menu_is_open(void) {
+bool config_menu_is_open (void) {
     return config_menu_level > 0;
 }
 
-void config_menu_level_force_open(void) {
+void config_menu_level_force_open (void) {
     config_menu_level = 1;
     config_menu_active_category = -1;
     config_menu_selected_param = -1;
 }
 
-void config_menu_close(void) {
+void config_menu_close (void) {
     config_menu_level = 0;
     config_menu_active_category = -1;
     config_menu_selected_param = -1;
 }
 
-void config_menu_key_press(int key_number) {
+void config_menu_key_press (int key_number) {
     if (config_menu_level == 0) {
         return;
     }
     /* Key 6 always closes the config menu (toggle), never a category. */
     if (key_number == 6) {
-        config_menu_close();
+        config_menu_close ();
         return;
     }
     if (config_menu_level == 1) {
@@ -83,13 +83,13 @@ void config_menu_key_press(int key_number) {
             config_menu_level = 10 + cat_ui;
         } else if (key_number == 7) {
             /* DESPOT-2026-10-04: guarded like menu-4 (see simulation_menu_dispatch). */
-            if (!mpe_config_save_guarded("status/engine.cfg")) {
-                event_log_push(2, "config save REFUSED (torture live) or FAILED");
-                fprintf(stderr, "[config-menu] save refused (torture live) or failed\n");
+            if (!mpe_config_save_guarded ("status/engine.cfg")) {
+                event_log_push (2, "config save REFUSED (torture live) or FAILED");
+                fprintf (stderr, "[config-menu] save refused (torture live) or failed\n");
             }
         } else if (key_number == 8) {
-            mpe_config_reset_defaults();
-            contact_cache_clear(physics_world_get_primary());
+            mpe_config_reset_defaults ();
+            contact_cache_clear (physics_world_get_primary ());
         } else if (key_number == 9) {
             config_menu_level = 1;
         } else if (key_number == 0) {
@@ -99,7 +99,7 @@ void config_menu_key_press(int key_number) {
     } else if (config_menu_level >= 10) {
         /* Param list: number selects a param to edit, 0 = back. */
         int category = config_menu_level - 10;
-        size_t param_count = mpe_config_count_by_category((param_category) category);
+        size_t param_count = mpe_config_count_by_category ((param_category) category);
         if ((key_number >= 1) && ((size_t) key_number <= param_count)) {
             config_menu_selected_param = key_number - 1;
         } else if (key_number == 0) {
@@ -110,7 +110,7 @@ void config_menu_key_press(int key_number) {
     }
 }
 
-void config_menu_update(GtkWidget *parent_window) {
+void config_menu_update (GtkWidget *parent_window) {
     if (config_menu_level < 10) {
         return;
     }
@@ -119,7 +119,7 @@ void config_menu_update(GtkWidget *parent_window) {
     }
     int category = config_menu_level - 10;
     static const mpe_param *category_params[64];
-    size_t param_count = mpe_config_get_by_category((param_category) category, category_params, 64);
+    size_t param_count = mpe_config_get_by_category ((param_category) category, category_params, 64);
     if ((size_t) config_menu_selected_param >= param_count) {
         config_menu_selected_param = -1;
         return;
@@ -137,7 +137,7 @@ void config_menu_update(GtkWidget *parent_window) {
     } else if (param->type == p_bool) {
         current_value = (*(bool *) param->storage) ? 1.0f : 0.0f;
     }
-    float new_value = open_numerical_input_dialog(parent_window, param->display, current_value);
+    float new_value = open_numerical_input_dialog (parent_window, param->display, current_value);
     if (new_value < (float) param->min) {
         new_value = (float) param->min;
     }
@@ -152,56 +152,56 @@ void config_menu_update(GtkWidget *parent_window) {
         *(bool *) param->storage = (new_value != 0.0f);
     }
     if ((category == cat_solver) || (category == cat_timestep) || (category == cat_depenetration)) {
-        contact_cache_clear(physics_world_get_primary());
+        contact_cache_clear (physics_world_get_primary ());
     }
     config_menu_selected_param = -1;
 }
 
-void config_menu_render(char *buffer, size_t buffer_size) {
+void config_menu_render (char *buffer, size_t buffer_size) {
     if (config_menu_level == 0) {
         buffer[0] = '\0';
         return;
     }
     if (config_menu_level == 1) {
-        snprintf(buffer, buffer_size,
-                 "-- Config Menu (Page 1) --\n"
-                 "1: World (%zu)\n"
-                 "2: Timestep (%zu)\n"
-                 "3: Sleep (%zu)\n"
-                 "4: Solver (%zu)\n"
-                 "5: Depenetration (%zu)\n"
-                 "7: Broadphase (%zu)\n"
-                 "8: Joints (%zu)\n"
-                 "9: Boundary (%zu)\n"
-                 "0: More...\n"
-                 "6: Close",
-                 mpe_config_count_by_category(cat_world), mpe_config_count_by_category(cat_timestep),
-                 mpe_config_count_by_category(cat_sleep), mpe_config_count_by_category(cat_solver),
-                 mpe_config_count_by_category(cat_depenetration), mpe_config_count_by_category(cat_broadphase),
-                 mpe_config_count_by_category(cat_joints), mpe_config_count_by_category(cat_boundary));
+        snprintf (buffer, buffer_size,
+                  "-- Config Menu (Page 1) --\n"
+                  "1: World (%zu)\n"
+                  "2: Timestep (%zu)\n"
+                  "3: Sleep (%zu)\n"
+                  "4: Solver (%zu)\n"
+                  "5: Depenetration (%zu)\n"
+                  "7: Broadphase (%zu)\n"
+                  "8: Joints (%zu)\n"
+                  "9: Boundary (%zu)\n"
+                  "0: More...\n"
+                  "6: Close",
+                  mpe_config_count_by_category (cat_world), mpe_config_count_by_category (cat_timestep),
+                  mpe_config_count_by_category (cat_sleep), mpe_config_count_by_category (cat_solver),
+                  mpe_config_count_by_category (cat_depenetration), mpe_config_count_by_category (cat_broadphase),
+                  mpe_config_count_by_category (cat_joints), mpe_config_count_by_category (cat_boundary));
     } else if (config_menu_level == 2) {
-        snprintf(buffer, buffer_size,
-                 "-- Config Menu (Page 2) --\n"
-                 "1: Spawner (%zu)\n"
-                 "2: Body Defaults (%zu)\n"
-                 "3: Camera (%zu)\n"
-                 "4: Render (%zu)\n"
-                 "5: UI (%zu)\n"
-                 "7: Save Config\n"
-                 "8: Reset Defaults\n"
-                 "9: Back\n"
-                 "0: Back\n"
-                 "6: Close",
-                 mpe_config_count_by_category(cat_spawner), mpe_config_count_by_category(cat_body_defaults),
-                 mpe_config_count_by_category(cat_camera), mpe_config_count_by_category(cat_render),
-                 mpe_config_count_by_category(cat_ui));
+        snprintf (buffer, buffer_size,
+                  "-- Config Menu (Page 2) --\n"
+                  "1: Spawner (%zu)\n"
+                  "2: Body Defaults (%zu)\n"
+                  "3: Camera (%zu)\n"
+                  "4: Render (%zu)\n"
+                  "5: UI (%zu)\n"
+                  "7: Save Config\n"
+                  "8: Reset Defaults\n"
+                  "9: Back\n"
+                  "0: Back\n"
+                  "6: Close",
+                  mpe_config_count_by_category (cat_spawner), mpe_config_count_by_category (cat_body_defaults),
+                  mpe_config_count_by_category (cat_camera), mpe_config_count_by_category (cat_render),
+                  mpe_config_count_by_category (cat_ui));
     } else if (config_menu_level >= 10) {
         int category = config_menu_level - 10;
         static const mpe_param *category_params[64];
-        size_t param_count = mpe_config_get_by_category((param_category) category, category_params, 64);
+        size_t param_count = mpe_config_get_by_category ((param_category) category, category_params, 64);
         size_t offset = 0;
-        offset += snprintf(buffer + offset, buffer_size - offset, "-- %s --\n",
-                           mpe_config_category_name((param_category) category));
+        offset += snprintf (buffer + offset, buffer_size - offset, "-- %s --\n",
+                            mpe_config_category_name ((param_category) category));
         for (size_t i = 0; (i < param_count) && (offset < buffer_size - 64); i++) {
             const mpe_param *p = category_params[i];
             float val = 0.0f;
@@ -214,14 +214,13 @@ void config_menu_render(char *buffer, size_t buffer_size) {
             }
             const char *debug_tag = (p->debug_only) ? " [D]" : "";
             if (p->type == p_int) {
-                offset += snprintf(buffer + offset, buffer_size - offset, "%zu: %s = %d%s\n", i + 1, p->display,
-                                   (int) val, debug_tag);
+                offset += snprintf (buffer + offset, buffer_size - offset, "%zu: %s = %d%s\n", i + 1, p->display,
+                                    (int) val, debug_tag);
             } else {
-                offset += snprintf(buffer + offset, buffer_size - offset, "%zu: %s = %.4f%s\n", i + 1, p->display, val,
-                                   debug_tag);
+                offset += snprintf (buffer + offset, buffer_size - offset, "%zu: %s = %.4f%s\n", i + 1, p->display, val,
+                                    debug_tag);
             }
         }
-        snprintf(buffer + offset, buffer_size - offset, "0: Back | 6: Close");
+        snprintf (buffer + offset, buffer_size - offset, "0: Back | 6: Close");
     }
 }
-

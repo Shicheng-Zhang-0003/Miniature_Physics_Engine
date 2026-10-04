@@ -7,7 +7,8 @@
 #include <stdbool.h>
 
 typedef struct {
-    bool w_key_pressed, a_key_pressed, s_key_pressed, d_key_pressed, space_key_pressed, shift_key_pressed, escape_key_pressed, f_key_pressed;
+    bool w_key_pressed, a_key_pressed, s_key_pressed, d_key_pressed, space_key_pressed, shift_key_pressed,
+        escape_key_pressed, f_key_pressed;
     bool enter_spawn_held;
     bool r_key_pressed;
     bool i_key_pressed, j_key_pressed, k_key_pressed, l_key_pressed;

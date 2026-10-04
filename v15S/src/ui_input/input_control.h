@@ -6,9 +6,11 @@
 #include <stdbool.h>
 //Initialise input state to zeroing
 void initialize_input (input_status *input_state);
-void input_control_attach_controllers(GtkWidget *widget, gpointer user_data);
-gboolean on_keypress (GtkEventControllerKey *ctrl, guint keyval, guint keycode, GdkModifierType state, gpointer user_data_stored);
-gboolean on_key_released (GtkEventControllerKey *ctrl, guint keyval, guint keycode, GdkModifierType state, gpointer user_data_stored);
+void input_control_attach_controllers (GtkWidget *widget, gpointer user_data);
+gboolean on_keypress (GtkEventControllerKey *ctrl, guint keyval, guint keycode, GdkModifierType state,
+                      gpointer user_data_stored);
+gboolean on_key_released (GtkEventControllerKey *ctrl, guint keyval, guint keycode, GdkModifierType state,
+                          gpointer user_data_stored);
 gboolean on_mouse_movements (GtkEventControllerMotion *ctrl, double x, double y, gpointer user_data_stored);
 gboolean on_button_press (GtkGestureClick *gest, int n_press, double x, double y, gpointer user_data_stored);
 gboolean on_button_release (GtkGestureClick *gest, int n_press, double x, double y, gpointer user_data_stored);
