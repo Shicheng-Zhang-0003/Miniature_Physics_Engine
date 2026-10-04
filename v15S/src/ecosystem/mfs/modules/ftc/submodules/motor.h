@@ -70,11 +70,11 @@ typedef struct {
 } motor;
 
 /* Derive motor params from the four spec-sheet numbers. */
-void motor_from_spec(motor *m, float stall_torque_nm, float free_speed_rpm, float stall_current_a,
-                     float nominal_voltage, float gear_ratio, float efficiency);
+void motor_from_spec (motor *m, float stall_torque_nm, float free_speed_rpm, float stall_current_a,
+                      float nominal_voltage, float gear_ratio, float efficiency);
 
 /* Advance one tick. wheel_angular_vel = output shaft speed (rad/s). */
-void motor_update(motor *m, float wheel_angular_vel, float dt, float battery_voltage);
+void motor_update (motor *m, float wheel_angular_vel, float dt, float battery_voltage);
 /* Implicit-in-speed variant: solves back-EMF equilibrium at end-of-tick
  * speed, so light wheels cannot relaxation-oscillate around free speed
  * (explicit Euler moves ~160 rad/s per tick at stall torque vs a 2.5e-4
@@ -82,18 +82,17 @@ void motor_update(motor *m, float wheel_angular_vel, float dt, float battery_vol
  * 2.5e-4 ~= 159 for 19.2:1, 250+ for 26.9:1 and up — unconditionally
  * unstable without this). Same spec endpoints (stall/free); only the
  * transient is stabilized. axle_inertia <= 0 falls back to explicit. */
-void motor_update_load(motor *m, float wheel_angular_vel, float dt, float battery_voltage,
-                       float axle_inertia);
+void motor_update_load (motor *m, float wheel_angular_vel, float dt, float battery_voltage, float axle_inertia);
 
 /* DESPOT-FIX: defined in motor.c but never declared — every caller took an
  * implicit declaration (works by ABI luck, breaks under -Werror). */
-void motor_reset_observer(motor *m);
+void motor_reset_observer (motor *m);
 /* Disturbance-observer update: estimate the external load on the wheel from
  * the measured shaft acceleration and last tick's explicit motor torque, and
  * publish it (with its validity flag) for motor_update_load() to consume.
  * Call once per wheel per tick, BEFORE motor_update_load(). Safe to call on
  * every consumer path: it cannot be called wrong into a dead observer.
  * DESPOT-2026-09-29. */
-void motor_observe(motor *m, float wheel_angular_vel, float dt, float axle_inertia);
+void motor_observe (motor *m, float wheel_angular_vel, float dt, float axle_inertia);
 
 #endif /* motor_h */

@@ -17,14 +17,14 @@ typedef struct {
     float fuse_heat; /* 0..1+ ; >=1 tripped until load drops */
 } battery;
 
-void battery_init(battery *b);
+void battery_init (battery *b);
 /* Returns terminal voltage under load. total_current = sum of all motor currents. */
-float battery_get_voltage(const battery *b, float total_current_draw);
+float battery_get_voltage (const battery *b, float total_current_draw);
 /* Drain battery over time based on current draw. */
-void battery_drain(battery *b, float total_current_draw, float dt);
+void battery_drain (battery *b, float total_current_draw, float dt);
 /* Fuse thermal step: call once per tick before reading voltage. */
-void battery_fuse_step(battery *b, float total_current_draw, float dt);
-int battery_fuse_tripped(const battery *b);
-void battery_reset_fuse(battery *b);
+void battery_fuse_step (battery *b, float total_current_draw, float dt);
+int battery_fuse_tripped (const battery *b);
+void battery_reset_fuse (battery *b);
 
 #endif /* battery_h */

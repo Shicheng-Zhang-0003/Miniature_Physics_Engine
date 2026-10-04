@@ -75,59 +75,59 @@ typedef struct {
  * underneath live attachments would orphan their state and use-after-free
  * the next pre_step). Returns MFS_REG_OK on success.
  * FIX-AUDIT-DESPOT: was void and cleared unconditionally. */
-int mfs_internal_registry_init(void);
+int mfs_internal_registry_init (void);
 
 /* Register an internal module (compiled directly into ecosystem).
  * Returns MFS_REG_* . A name may be registered only once per descriptor
  * identity; use mfs_internal_module_registered() to make registration
  * idempotent across repeated bundle attaches. */
-int mfs_internal_module_register(const mpe_module_desc_t *desc);
+int mfs_internal_module_register (const mpe_module_desc_t *desc);
 
 /* 1 if name is registered, else 0 (idempotent ensure-register). */
-int mfs_internal_module_registered(const char *name);
+int mfs_internal_module_registered (const char *name);
 
 /* Release a registration (and any alias slots sharing the descriptor).
  * Refuses with MFS_UNREG_STILL_ATTACHED while the module is attached
  * anywhere or has a callback in flight, so slots can no longer leak
  * permanently across attach/detach cycles. */
-int mfs_internal_module_unregister(const char *name);
+int mfs_internal_module_unregister (const char *name);
 
 /* Attach an internal module by name. Idempotent: attaching a module that is
  * already attached to the same world returns MFS_REG_OK without re-running
  * the module's attach. */
-int mfs_internal_module_attach(const char *name, physics_world *world);
+int mfs_internal_module_attach (const char *name, physics_world *world);
 
 /* Detach an internal module by name (waits for in-flight callbacks). */
-int mfs_internal_module_detach(const char *name, physics_world *world);
+int mfs_internal_module_detach (const char *name, physics_world *world);
 
 /* Get internal module state for a specific world. Returns NULL unless that
  * world has a live (attached, not-detaching) attachment — this is the
  * unambiguous accessor and the one callers should prefer. */
-void *mfs_internal_module_state_for(const void *world, const char *name);
+void *mfs_internal_module_state_for (const void *world, const char *name);
 
 /* Get state for ANY live attachment of `name`. Returns NULL when no world
  * currently holds the module. The pre-audit version matched on name alone
  * and could return the NULL state of a detached alias slot while a later
  * slot was live; it now only reports live attachments and is therefore
  * ambiguous only in the (documented, unavoidable) multi-world case. */
-void *mfs_internal_module_state(const char *name);
+void *mfs_internal_module_state (const char *name);
 
 /* Run pre_step for all attached internal modules. */
-void mfs_internal_modules_pre_step(physics_world *world, float dt);
+void mfs_internal_modules_pre_step (physics_world *world, float dt);
 
 /* Run post_step for all attached internal modules. */
-void mfs_internal_modules_post_step(physics_world *world, float dt);
+void mfs_internal_modules_post_step (physics_world *world, float dt);
 
 /* Detach all internal modules attached to `world`. */
-void mfs_internal_modules_detach_all(physics_world *world);
+void mfs_internal_modules_detach_all (physics_world *world);
 
 /* Test/observability: number of callbacks currently executing outside the
  * lock. Non-zero after a pre_step/post_step/attach/detach returns means a
  * module is still running — used by the concurrency suite to assert that
  * detach really does drain. */
-int mfs_internal_modules_inflight(void);
+int mfs_internal_modules_inflight (void);
 
 /* Test/observability: live registration slots (primary + aliases). */
-int mfs_internal_modules_slot_count(void);
+int mfs_internal_modules_slot_count (void);
 
 #endif

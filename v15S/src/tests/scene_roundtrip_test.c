@@ -22,36 +22,36 @@
 
 /* --- Stubs for TU-bound symbols (operate on the primary world) --- */
 
-uint32_t scene_allocate_object_id(void) {
-    physics_world *world = physics_world_get_primary();
+uint32_t scene_allocate_object_id (void) {
+    physics_world *world = physics_world_get_primary ();
     if (world->next_object_id == 0) {
         world->next_object_id = 1;
     }
     return world->next_object_id++;
 }
 
-void scene_note_loaded_id(uint32_t object_id) {
+void scene_note_loaded_id (uint32_t object_id) {
     if ((object_id == 0) || (object_id == 0xFFFFFFFFu)) {
         return;
     }
-    physics_world *world = physics_world_get_primary();
+    physics_world *world = physics_world_get_primary ();
     if (object_id >= world->next_object_id) {
         world->next_object_id = object_id + 1;
     }
 }
 
-int scene_ensure_pool_capacity(int required_capacity) {
+int scene_ensure_pool_capacity (int required_capacity) {
     (void) required_capacity;
     return 1;
 }
 
-void scene_clear(void) {
-    physics_world *world = physics_world_get_primary();
+void scene_clear (void) {
+    physics_world *world = physics_world_get_primary ();
     world->body_count = 0;
-    joint_init_pool(world);
+    joint_init_pool (world);
 }
 
-void joint_init_pool(physics_world *world) {
+void joint_init_pool (physics_world *world) {
     if (!world) {
         return;
     }
@@ -61,7 +61,7 @@ void joint_init_pool(physics_world *world) {
     world->spring_joint_count = 0;
 }
 
-int add_joint_by_ids(physics_world *world, uint32_t id_a, uint32_t id_b, float eq, float k, float c) {
+int add_joint_by_ids (physics_world *world, uint32_t id_a, uint32_t id_b, float eq, float k, float c) {
     if (!world) {
         return -1;
     }
@@ -84,135 +84,137 @@ int add_joint_by_ids(physics_world *world, uint32_t id_a, uint32_t id_b, float e
 }
 
 static int failures = 0;
-#define check(cond, label) do { \
-    if (cond) { printf("  [PASS] %s\n", label); } \
-    else { printf("  [FAIL] %s\n", label); failures++; } \
-} while (0)
-#define checkf(a, b, eps, label) check(fabsf((a) - (b)) <= (eps), label)
+#define check(cond, label)                                                                                             \
+    do {                                                                                                               \
+        if (cond) {                                                                                                    \
+            printf ("  [PASS] %s\n", label);                                                                           \
+        } else {                                                                                                       \
+            printf ("  [FAIL] %s\n", label);                                                                           \
+            failures++;                                                                                                \
+        }                                                                                                              \
+    } while (0)
+#define checkf(a, b, eps, label) check (fabsf ((a) - (b)) <= (eps), label)
 
-int main(void) {
-    mpe_config_init();
-    physics_world *world = physics_world_get_primary();
-    physics_world_init(world);
-    scene_id_remap_reset();
+int main (void) {
+    mpe_config_init ();
+    physics_world *world = physics_world_get_primary ();
+    physics_world_init (world);
+    scene_id_remap_reset ();
 
     /* Body 0: dynamic sphere with distinctive state. */
-    rigidbody_initialisation_sphere(&world->bodies[0], 0.5f, 2.0f,
-        (vector3){1.0f, 2.0f, 3.0f});
+    rigidbody_initialisation_sphere (&world->bodies[0], 0.5f, 2.0f, (vector3){1.0f, 2.0f, 3.0f});
     world->bodies[0].velocity = (vector3){0.25f, -0.5f, 1.0f};
     world->bodies[0].colour = (vector3){0.1f, 0.2f, 0.3f};
     world->bodies[0].restitution = 0.4f;
     world->bodies[0].nice_value = 7;
-    world->bodies[0].object_id = scene_allocate_object_id();
+    world->bodies[0].object_id = scene_allocate_object_id ();
     /* Body 1: sleeping cube. */
-    rigidbody_initialisation_cube(&world->bodies[1],
-        (vector3){-1.0f, 0.5f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
+    rigidbody_initialisation_cube (&world->bodies[1], (vector3){-1.0f, 0.5f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
     world->bodies[1].is_sleeping = true;
     world->bodies[1].sleep_timer = 0.0f;
-    world->bodies[1].object_id = scene_allocate_object_id();
+    world->bodies[1].object_id = scene_allocate_object_id ();
     world->body_count = 2;
-    joint_init_pool(world);
-    constraint_pool_init(world);
-    check(add_joint_by_ids(world, 1, 2, 1.5f, 20.0f, 1.0f) >= 0, "joint created pre-save");
-    int rev_idx = constraint_add_revolute(world, 1, 2, (vector3){0.0f, -0.3f, 0.0f}, (vector3){0.0f, 1.0f, 0.0f},
-                                          (vector3){0.0f, 0.0f, 1.0f});
-    check(rev_idx >= 0, "revolute created pre-save");
-    constraint_set_revolute_motor(world, rev_idx, true, 2.5f, 10.0f);
+    joint_init_pool (world);
+    constraint_pool_init (world);
+    check (add_joint_by_ids (world, 1, 2, 1.5f, 20.0f, 1.0f) >= 0, "joint created pre-save");
+    int rev_idx = constraint_add_revolute (world, 1, 2, (vector3){0.0f, -0.3f, 0.0f}, (vector3){0.0f, 1.0f, 0.0f},
+                                           (vector3){0.0f, 0.0f, 1.0f});
+    check (rev_idx >= 0, "revolute created pre-save");
+    constraint_set_revolute_motor (world, rev_idx, true, 2.5f, 10.0f);
 
     const char *path = "../../temp/mpe_scene_roundtrip.dat";
-    check(save_scene(path) == 1, "save_scene succeeds");
-    check(world->spring_joint_count == 1, "one joint saved");
+    check (save_scene (path) == 1, "save_scene succeeds");
+    check (world->spring_joint_count == 1, "one joint saved");
 
-    scene_clear();
+    scene_clear ();
     world->next_object_id = 100; /* v200 preserves IDs: allocator drift must NOT leak into loaded IDs */
-    check(scene_loading(path) == 1, "scene_loading succeeds");
-    check(world->body_count == 2, "two bodies loaded");
-    check(world->bodies[0].object_id == 1, "v200 stable ID preserved (body 0)");
-    check(world->bodies[1].object_id == 2, "v200 stable ID preserved (body 1)");
+    check (scene_loading (path) == 1, "scene_loading succeeds");
+    check (world->body_count == 2, "two bodies loaded");
+    check (world->bodies[0].object_id == 1, "v200 stable ID preserved (body 0)");
+    check (world->bodies[1].object_id == 2, "v200 stable ID preserved (body 1)");
     /* TRUTH: allocator was pinned at 100 pre-load; loaded IDs are 1,2.
      * allocate() must return exactly 100 (drift to 3 would alias live IDs;
      * drift anywhere else leaks). */
-    check(scene_allocate_object_id() == 100, "allocator preserved at 100 past loaded IDs");
+    check (scene_allocate_object_id () == 100, "allocator preserved at 100 past loaded IDs");
 
     rigidbody *s = &world->bodies[0];
-    check(s->type == object_sphere, "body 0 type round-trips");
-    checkf(s->mass, 2.0f, 1e-5f, "body 0 mass round-trips");
-    checkf(s->radius, 0.5f, 1e-5f, "body 0 radius round-trips");
-    checkf(s->position.x, 1.0f, 1e-5f, "body 0 position round-trips");
-    checkf(s->velocity.y, -0.5f, 1e-5f, "body 0 velocity round-trips");
-    checkf(s->colour.z, 0.3f, 1e-5f, "body 0 colour round-trips");
-    checkf(s->restitution, 0.4f, 1e-5f, "body 0 restitution round-trips");
-    check(s->nice_value == 7, "body 0 nice_value persists");
-    check(!s->is_sleeping, "body 0 awake");
+    check (s->type == object_sphere, "body 0 type round-trips");
+    checkf (s->mass, 2.0f, 1e-5f, "body 0 mass round-trips");
+    checkf (s->radius, 0.5f, 1e-5f, "body 0 radius round-trips");
+    checkf (s->position.x, 1.0f, 1e-5f, "body 0 position round-trips");
+    checkf (s->velocity.y, -0.5f, 1e-5f, "body 0 velocity round-trips");
+    checkf (s->colour.z, 0.3f, 1e-5f, "body 0 colour round-trips");
+    checkf (s->restitution, 0.4f, 1e-5f, "body 0 restitution round-trips");
+    check (s->nice_value == 7, "body 0 nice_value persists");
+    check (!s->is_sleeping, "body 0 awake");
     /* TRUTH: partial-field coverage passed while orientation/angvel/
      * friction/generation silently dropped. Compare the full struct state
      * that v200 claims to persist. */
-    checkf(s->orientation.w, 1.0f, 1e-5f, "body 0 orientation round-trips");
-    checkf(s->orientation.x, 0.0f, 1e-5f, "body 0 orientation round-trips");
-    checkf(s->angular_velocity.x, 0.0f, 1e-5f, "body 0 angular velocity round-trips");
-    checkf(s->friction_static, g_cfg.body_defaults.sphere_fric_s, 1e-5f, "body 0 friction round-trips");
-    check(s->object_generation == 1, "body 0 generation round-trips");
+    checkf (s->orientation.w, 1.0f, 1e-5f, "body 0 orientation round-trips");
+    checkf (s->orientation.x, 0.0f, 1e-5f, "body 0 orientation round-trips");
+    checkf (s->angular_velocity.x, 0.0f, 1e-5f, "body 0 angular velocity round-trips");
+    checkf (s->friction_static, g_cfg.body_defaults.sphere_fric_s, 1e-5f, "body 0 friction round-trips");
+    check (s->object_generation == 1, "body 0 generation round-trips");
 
     rigidbody *c = &world->bodies[1];
-    check(c->type == object_cube, "body 1 type round-trips");
-    checkf(c->mass, 1.0f, 1e-5f, "body 1 mass round-trips");
-    check(c->is_sleeping, "body 1 sleep state persists");
+    check (c->type == object_cube, "body 1 type round-trips");
+    checkf (c->mass, 1.0f, 1e-5f, "body 1 mass round-trips");
+    check (c->is_sleeping, "body 1 sleep state persists");
 
-    check(world->spring_joint_count == 1, "one joint restored");
+    check (world->spring_joint_count == 1, "one joint restored");
     if (world->spring_joint_count == 1) {
         uint32_t ja = world->spring_joints[0].object_id_a;
         uint32_t jb = world->spring_joints[0].object_id_b;
         uint32_t i0 = world->bodies[0].object_id;
         uint32_t i1 = world->bodies[1].object_id;
-        check(((ja == i0) && (jb == i1)) || ((ja == i1) && (jb == i0)),
-              "joint endpoints remapped to loaded bodies");
-        checkf(world->spring_joints[0].spring_constant, 20.0f, 1e-5f, "joint params round-trip");
+        check (((ja == i0) && (jb == i1)) || ((ja == i1) && (jb == i0)), "joint endpoints remapped to loaded bodies");
+        checkf (world->spring_joints[0].spring_constant, 20.0f, 1e-5f, "joint params round-trip");
     }
 
-    check(constraint_get_count(world) == 1, "one revolute restored");
-    if (constraint_get_count(world) == 1) {
-        const constraint *rc = constraint_pool_at(world, 0);
-        check((rc != NULL) && (rc->type == constraint_revolute), "restored joint is revolute");
+    check (constraint_get_count (world) == 1, "one revolute restored");
+    if (constraint_get_count (world) == 1) {
+        const constraint *rc = constraint_pool_at (world, 0);
+        check ((rc != NULL) && (rc->type == constraint_revolute), "restored joint is revolute");
         if (rc) {
-            check(((rc->body_id_a == 1) && (rc->body_id_b == 2)) ||
-                  ((rc->body_id_a == 2) && (rc->body_id_b == 1)),
-                  "revolute endpoints reference preserved IDs");
-            check(rc->p.revolute.motor_enabled, "revolute motor flag round-trips");
-            checkf(rc->p.revolute.motor_target_speed, 2.5f, 1e-5f, "revolute motor target round-trips");
-            checkf(rc->p.revolute.motor_max_torque, 10.0f, 1e-5f, "revolute motor torque round-trips");
+            check (((rc->body_id_a == 1) && (rc->body_id_b == 2)) || ((rc->body_id_a == 2) && (rc->body_id_b == 1)),
+                   "revolute endpoints reference preserved IDs");
+            check (rc->p.revolute.motor_enabled, "revolute motor flag round-trips");
+            checkf (rc->p.revolute.motor_target_speed, 2.5f, 1e-5f, "revolute motor target round-trips");
+            checkf (rc->p.revolute.motor_max_torque, 10.0f, 1e-5f, "revolute motor torque round-trips");
         }
     }
 
     /* CRC32 tamper rejection: corrupt one payload byte (mass field), keep
      * the footer. Load must fail AND leave the live scene untouched. */
     {
-        FILE *rf = fopen(path, "rb");
-        fseek(rf, 0, SEEK_END);
-        long fsize = ftell(rf);
-        fseek(rf, 0, SEEK_SET);
-        unsigned char *bytes = (unsigned char *) malloc((size_t) fsize);
-        size_t got = fread(bytes, 1, (size_t) fsize, rf);
-        fclose(rf);
-        check(got == (size_t) fsize, "scene file readable for tamper test");
+        FILE *rf = fopen (path, "rb");
+        fseek (rf, 0, SEEK_END);
+        long fsize = ftell (rf);
+        fseek (rf, 0, SEEK_SET);
+        unsigned char *bytes = (unsigned char *) malloc ((size_t) fsize);
+        size_t got = fread (bytes, 1, (size_t) fsize, rf);
+        fclose (rf);
+        check (got == (size_t) fsize, "scene file readable for tamper test");
         const char *tamper_path = "../../temp/mpe_scene_tampered.dat";
         /* TRUTH: byte 20 = body 0 radius field (header 12 + type 4 +
          * mass 4 = 20). Corrupts payload, footer intact -> must reject. */
         bytes[20] ^= 0xFFu;
-        FILE *wf = fopen(tamper_path, "wb");
-        fwrite(bytes, 1, (size_t) fsize, wf);
-        fclose(wf);
-        free(bytes);
+        FILE *wf = fopen (tamper_path, "wb");
+        fwrite (bytes, 1, (size_t) fsize, wf);
+        fclose (wf);
+        free (bytes);
         int count_before = world->body_count;
-        check(scene_loading(tamper_path) == 0, "tampered scene rejected");
-        check(world->body_count == count_before, "live scene untouched by failed load");
-        check(world->bodies[0].object_id == 1, "live IDs untouched by failed load");
-        remove(tamper_path);
+        check (scene_loading (tamper_path) == 0, "tampered scene rejected");
+        check (world->body_count == count_before, "live scene untouched by failed load");
+        check (world->bodies[0].object_id == 1, "live IDs untouched by failed load");
+        remove (tamper_path);
     }
 
-    remove(path);
-    physics_world_cleanup(world);
-    if (failures == 0) printf("[PASS] scene round-trip complete\n");
-    else printf("[FAIL] scene round-trip: %d checks failed\n", failures);
+    remove (path);
+    physics_world_cleanup (world);
+    if (failures == 0) printf ("[PASS] scene round-trip complete\n");
+    else
+        printf ("[FAIL] scene round-trip: %d checks failed\n", failures);
     return failures ? 1 : 0;
 }
 #endif /* mpe_scene_roundtrip_test */

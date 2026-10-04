@@ -7,39 +7,39 @@
 #include "physics/constraint.h"
 #include "config/mpe_config.h"
 
-int main(void) {
-    mpe_config_init();
+int main (void) {
+    mpe_config_init ();
     g_cfg.world.drag = 1.0f;
     g_cfg.world.angular_damping_scale = 1.0f;
     g_cfg.world.gravity = -9.81f;
     g_cfg.sleep.enable = 0; /* ballistic truth: no sleep freeze mid-flight */
     physics_world world;
-    physics_world_init(&world);
-    constraint_pool_init(&world);
+    physics_world_init (&world);
+    constraint_pool_init (&world);
 
     const float vx = 8.0f, vy = 12.0f;
-    const float g = fabsf(g_cfg.world.gravity);
-    if (fabsf(g - 9.81f) > 1e-6f) {
-        printf("[FAIL] gravity not pinned (g=%.6f)\n", g);
+    const float g = fabsf (g_cfg.world.gravity);
+    if (fabsf (g - 9.81f) > 1e-6f) {
+        printf ("[FAIL] gravity not pinned (g=%.6f)\n", g);
         return 1;
     }
-    int s = physics_world_add_sphere(&world, 0.2f, 1.0f, (vector3){0.0f, 1.0f, 0.0f});
+    int s = physics_world_add_sphere (&world, 0.2f, 1.0f, (vector3){0.0f, 1.0f, 0.0f});
     world.bodies[s].velocity = (vector3){vx, vy, 0.0f};
-    rigidbody_wake(&world.bodies[s]);
+    rigidbody_wake (&world.bodies[s]);
 
     const float dt = 1.0f / 60.0f;
     float apex = 0.0f, t_apex = 0.0f, x_apex = 0.0f;
     for (int t = 0; t < 400; t++) {
-        physics_world_step(&world, dt);
+        physics_world_step (&world, dt);
         rigidbody *b = &world.bodies[s];
-        if (!isfinite(b->position.x)) {
-            printf("[FAIL] NaN\n");
-            physics_world_cleanup(&world);
+        if (!isfinite (b->position.x)) {
+            printf ("[FAIL] NaN\n");
+            physics_world_cleanup (&world);
             return 1;
         }
         if (b->position.y > apex) {
             apex = b->position.y;
-            t_apex = (float)(t + 1) * dt;
+            t_apex = (float) (t + 1) * dt;
             x_apex = b->position.x;
         }
         if (b->position.y < 0.25f) {
@@ -49,36 +49,36 @@ int main(void) {
     float apex_e = 1.0f + vy * vy / (2.0f * g);
     float t_e = vy / g;
     float x_e = vx * t_e;
-    printf("[info] apex=%.4f (expect %.4f) t=%.4f (expect %.4f) x=%.4f (expect %.4f)\n", apex, apex_e, t_apex, t_e,
-           x_apex, x_e);
+    printf ("[info] apex=%.4f (expect %.4f) t=%.4f (expect %.4f) x=%.4f (expect %.4f)\n", apex, apex_e, t_apex, t_e,
+            x_apex, x_e);
     /* TRUTH: per-tick sampling quantizes t_apex by dt (1.4%); bands at ~2x
      * discretization + solver error. Spurious z-motion (never driven)
      * fails: planar flight must stay planar. */
     float z_end = world.bodies[s].position.z;
     int fail = 0;
-    if (fabsf(z_end) > 0.02f) {
-        printf("[FAIL] spurious out-of-plane motion (z=%.4f)\n", z_end);
+    if (fabsf (z_end) > 0.02f) {
+        printf ("[FAIL] spurious out-of-plane motion (z=%.4f)\n", z_end);
         fail = 1;
     }
-    if (fabsf(apex - apex_e) / apex_e > 0.02f) {
-        printf("[FAIL] apex height off\n");
-        fail = 1;
-    } else {
-        printf("[PASS] ballistic apex exact\n");
-    }
-    if (fabsf(t_apex - t_e) / t_e > 0.02f) {
-        printf("[FAIL] time-to-apex off\n");
+    if (fabsf (apex - apex_e) / apex_e > 0.02f) {
+        printf ("[FAIL] apex height off\n");
         fail = 1;
     } else {
-        printf("[PASS] time-to-apex exact\n");
+        printf ("[PASS] ballistic apex exact\n");
     }
-    if (fabsf(x_apex - x_e) / x_e > 0.02f) {
-        printf("[FAIL] horizontal range off (spurious forces?)\n");
+    if (fabsf (t_apex - t_e) / t_e > 0.02f) {
+        printf ("[FAIL] time-to-apex off\n");
         fail = 1;
     } else {
-        printf("[PASS] horizontal motion force-free\n");
+        printf ("[PASS] time-to-apex exact\n");
     }
-    physics_world_cleanup(&world);
+    if (fabsf (x_apex - x_e) / x_e > 0.02f) {
+        printf ("[FAIL] horizontal range off (spurious forces?)\n");
+        fail = 1;
+    } else {
+        printf ("[PASS] horizontal motion force-free\n");
+    }
+    physics_world_cleanup (&world);
     return fail;
 }
 #endif /* mpe_projectile_test */

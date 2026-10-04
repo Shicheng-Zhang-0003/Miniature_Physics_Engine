@@ -10,10 +10,7 @@
 #define FTC_MAX_WHEELS 8
 
 /* MFS_DRIVETRAIN_TYPE: explicit wheel/traction model selection. */
-typedef enum {
-    FTC_DRIVETRAIN_MECANUM = 0,
-    FTC_DRIVETRAIN_TANK = 1
-} ftc_drivetrain_type;
+typedef enum { FTC_DRIVETRAIN_MECANUM = 0, FTC_DRIVETRAIN_TANK = 1 } ftc_drivetrain_type;
 
 typedef struct {
     /* Body indices in physics_world */
@@ -129,15 +126,15 @@ typedef struct {
  * ftc_robot_create_with_drive (creation memsets the struct, so a per-robot
  * pre-set would not survive): 0 restores the articulated real-roller build
  * for subsequently created mecanum robots, nonzero re-enables analytic. */
-void ftc_robot_set_mecanum_analytic_default(int on);
+void ftc_robot_set_mecanum_analytic_default (int on);
 
 /* Create a 4-wheel robot at the given position. Returns 0 on success. */
 /* MPE_FTC_095: chassis-centre height where wheels rest on the floor */
-float ftc_robot_rest_height(void);
-int ftc_robot_create_with_drive(physics_world *world, ftc_robot *robot, float x, float y, float z,
-                                motor_preset_id preset, ftc_drivetrain_type drivetrain_type);
+float ftc_robot_rest_height (void);
+int ftc_robot_create_with_drive (physics_world *world, ftc_robot *robot, float x, float y, float z,
+                                 motor_preset_id preset, ftc_drivetrain_type drivetrain_type);
 
-int ftc_robot_create(physics_world *world, ftc_robot *robot, float x, float y, float z, motor_preset_id preset);
+int ftc_robot_create (physics_world *world, ftc_robot *robot, float x, float y, float z, motor_preset_id preset);
 
 /* Install the drive field: enable MPE's static ground plane and set its
  * friction. RETURNS 0 on success.
@@ -159,16 +156,16 @@ int ftc_robot_create(physics_world *world, ftc_robot *robot, float x, float y, f
  * field surface (e.g. 0.6 / 0.4 for a typical FTC foam field). They are
  * written to the world config as well as the cached plane body, so the
  * value is honoured regardless of world initialisation order. */
-int ftc_world_setup_field(physics_world *world, float mus, float muk);
+int ftc_world_setup_field (physics_world *world, float mus, float muk);
 
 /* Update all motors for one tick. Reads wheel angular velocity,
    computes electrical state, applies torque to wheel bodies. */
-void ftc_robot_update(physics_world *world, ftc_robot *robot, float dt);
+void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt);
 
 /* Set wheel motor commands (-1..1). */
-void ftc_robot_set_wheel_commands(ftc_robot *robot, const float *commands, int count);
+void ftc_robot_set_wheel_commands (ftc_robot *robot, const float *commands, int count);
 
 /* Get the chassis body's position (for validation). */
-void ftc_robot_get_position(physics_world *world, ftc_robot *robot, float *px, float *py, float *pz);
+void ftc_robot_get_position (physics_world *world, ftc_robot *robot, float *px, float *py, float *pz);
 
 #endif /* robot_h */
