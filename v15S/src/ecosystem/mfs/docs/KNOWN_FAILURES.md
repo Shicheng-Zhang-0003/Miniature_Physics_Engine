@@ -233,29 +233,35 @@ problem. Recorded 2026-09-29.
 ## [RELEASE-STORM] Zero-command motor limit cycle + glide equilibrium (FIXED 2026-10-04)
 
 Live-session report: wheels tilt/pivot off their shafts, and motor speeds
-never revert to 0 on stick release. Measured headless (drive 180 ticks,
-release, mecanum robot, tile floor):
+never revert to 0 on stick release. Forensics, in order — including one
+retracted measurement (honesty first):
 
-- **Storm:** at zero command the implicit observer path planned torque
-  against last tick's speed discrepancy; on light wheels with
-  joint-hammered reads that is alternating ±stall — a 4-tick ±0.6
-  slew-rail limit cycle with wheels ±70 rad/s forever. Fix: at
-  |command| < 0.05 run the explicit regen path (passive damper, exact,
-  memoryless), bypass slew (an exact-stop brake needs no ramp; slewing it
-  caused a 4-tick bang-bang), halve the idle-brake clamp (exact-stop +
-  contact in the same tick overshoots past zero and ping-pongs).
-- **Glide:** with the storm gone, wheels held ±25 rad/s and the vehicle
-  glided ~60 s. Analytic-mode hubs ship zero engine friction and the
-  roller force is lateral-only, so nothing coupled wheel spin to chassis
-  translation longitudinally (kill-tests: analytic OFF → full stop;
-  real hub friction → full stop). Fix: at idle, analytic lateral parks
-  and hubs get real 0.9/0.7 engine friction (one tangential model at a
-  time, never double-counted past the cone). Driven operation is byte-for-
-  byte the validated model (strafe 2.2872 m identical).
-- **Tilt** was the joints telling the truth about the storm: 40:1 mass
-  ratio needs the 128 iterations every MFS test pins (default 64 wobbled
-  axles to 15°). Live spawn paths now auto-raise to 128, loudly.
-  Post-fix: full stop <1 s after release, tilt ≤1.4° and flat.
+- **Retracted characterization (harness bug, owned):** the ±70 rad/s
+  zero-command storm and the ±25 rad/s frozen glide were measured under a
+  DOUBLE-driven probe harness (manual drivetrain_update plus fleet
+  pre_step in the same tick). Re-measured single-driven (fleet only, the
+  live topology), release settles on EITHER code — the storm as described
+  never existed single-driven. The fixes below stand anyway (suite-green,
+  principled hardening), but their live effect is narrower than first
+  claimed: what they provably fix single-driven is the next bullet.
+- **Post-idle re-drive death (proven single-driven):** after any release,
+  the next drive died ~7x (strafe 1.70 m → 0.28 m, ±stall chatter from
+  tick 0). Cause: the explicit idle path never published `tau_exp_prev`,
+  freezing the drive-phase reference — re-drive planned against a phantom
+  stall. Fix: whichever path runs publishes its expectation (one line in
+  `motor_update`); verified by isolation (publish skipped → 0.28 m).
+- **Idle hardening (principled, suite-green):** at |command| < 0.05 run
+  the explicit regen path (passive damper, exact, memoryless), bypass
+  slew for the brake (slewing an exact-stop value bang-bangs), halve the
+  idle-brake clamp (exact-stop + contact in the same tick overshoots past
+  zero and ping-pongs), restore real 0.9/0.7 hub friction with the
+  analytic lateral parked (one tangential model at a time, never
+  double-counted past the cone). Driven operation is byte-for-byte the
+  validated model (strafe 2.2872 m identical).
+- **Tilt** was the joints telling the truth about churn: 40:1 mass ratio
+  needs the 128 iterations every MFS test pins (default 64 wobbled axles
+  to 15°). Live spawn paths now auto-raise to 128, loudly. Post-fix
+  probe: full stop <1 s after release, tilt ≤1.4° and flat.
 - Locked by the new `release_settle` gate (drive ≥ 0.5 m, then chassis
   < 0.1 m/s, wheels < 2 rad/s, axles < 3°). MOTOR-III above is untouched:
   the observer still runs (and still limit-cycles) on the DRIVEN path;
@@ -274,9 +280,14 @@ ticks of sustained full mixed drive (0.5 fwd + 0.5 strafe + 0.3 rotate)
 walks wheel axles 5° → 69° → 180° (frozen-in-tilt end state, mounts hold,
 never NaN). Gated behaviors (single-mode bursts ≤180 ticks) stay ≤1.4°.
 
-- Pre-existing: fully pre-change tree (pre-friction-fix engine + pre-change
-  MFS) blows up identically (163.8° at the same tick), so no fix above
-  caused it — but none cured it either.
+Recorded 2026-10-04. Sibling of the fixed items above, NOT fixed: ~90+
+ticks of sustained full mixed drive (0.5 fwd + 0.5 strafe + 0.3 rotate)
+walks wheel axles 5° → 69° → 180° (frozen-in-tilt end state, mounts hold,
+never NaN). Gated behaviors (single-mode bursts ≤180 ticks) stay ≤1.4°.
+
+- Pre-existing: pre-change MFS tree blows up identically single-driven
+  (172.8° vs 179.9° current, same session shape), so no fix above caused
+  it — but none cured it either.
 - Six measured negative results (do not re-attempt without new evidence):
   analytic reaction projected to axle (same onset tick); axis-drift beta
   0.1 → 0.3 (same blowup); mount-frame motor axle (earlier: 175°);
