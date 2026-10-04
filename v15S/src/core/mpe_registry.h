@@ -24,17 +24,16 @@ typedef struct {
     char name[64]; /* owned copy: never dangles into .so rodata */
 } mpe_pair_entry_t;
 
-void mpe_register_builtins(void);
+void mpe_register_builtins (void);
 /* Explicit lock for multi-step loader transactions (snapshot + dlopen +
  * rollback). Dispatch-time find/register calls lock internally; do NOT
  * hold this across a physics step. */
-void mpe_registry_lock(void);
-void mpe_registry_unlock(void);
-int mpe_register_pair_handler(int type_a, int type_b, int custom_a, int custom_b,
-                              mpe_collide_fn fn, const char *name);
-mpe_collide_fn mpe_find_pair_handler(int type_a, int type_b, int custom_a, int custom_b);
+void mpe_registry_lock (void);
+void mpe_registry_unlock (void);
+int mpe_register_pair_handler (int type_a, int type_b, int custom_a, int custom_b, mpe_collide_fn fn, const char *name);
+mpe_collide_fn mpe_find_pair_handler (int type_a, int type_b, int custom_a, int custom_b);
 /* Truncation rollback for loader failure paths (never below builtins). */
-int mpe_registry_pair_count(void);
+int mpe_registry_pair_count (void);
 /* Capacity of the per-module origin buffer. The loader must refuse a longer
  * path rather than let it truncate: unload matches the origin with strcmp, so
  * a silently truncated origin never matches and the module slot is left LIVE
@@ -44,20 +43,20 @@ int mpe_registry_pair_count(void);
  * that state. */
 #define MPE_MODULE_ORIGIN_MAX 256
 
-void mpe_registry_truncate_pairs(int keep);
+void mpe_registry_truncate_pairs (int keep);
 /* Roll back the module table to `keep` entries, clearing each dropped slot's
  * live flag, hooks and strings. DESPOT-2026-09-29: this was missing, so every
  * load-failure path left live module descriptors pointing into a dlclose'd
  * image. */
-void mpe_registry_truncate_modules(int keep);
-int mpe_registry_broadphase_count(void);
-void mpe_registry_truncate_broadphase(int keep);
-int mpe_registry_solver_count(void);
-void mpe_registry_truncate_solvers(int keep);
+void mpe_registry_truncate_modules (int keep);
+int mpe_registry_broadphase_count (void);
+void mpe_registry_truncate_broadphase (int keep);
+int mpe_registry_solver_count (void);
+void mpe_registry_truncate_solvers (int keep);
 /* Indexed pair-fn snapshot for loader purge walks. 0 + *out set on success. */
-int mpe_registry_pair_fn_at(int idx, mpe_collide_fn *out);
+int mpe_registry_pair_fn_at (int idx, mpe_collide_fn *out);
 /* Human-readable pair-table row for `mod ls`. 0 on success. */
-int mpe_registry_pair_describe(int idx, int *ta, int *tb, int *ca, int *cb, char *name, int namelen);
+int mpe_registry_pair_describe (int idx, int *ta, int *tb, int *ca, int *cb, char *name, int namelen);
 
 /* broadphase / solver actives are per-world (world->broadphase_if etc).
  * Global defaults live here.
@@ -65,22 +64,22 @@ int mpe_registry_pair_describe(int idx, int *ta, int *tb, int *ca, int *cb, char
  * ALSO -1 when refusing a silent takeover of a builtin ("hash",
  * "seq-impulse", the six builtin pairs). Unregister returns 0/-1 and
  * resets every live world that referenced the entry (no dangling). */
-int mpe_register_broadphase(const char *name, const mpe_broadphase_if_t *iface);
-int mpe_register_solver(const char *name, const mpe_solver_if_t *iface);
-int mpe_unregister_broadphase(const char *name);
-int mpe_unregister_solver(const char *name);
-int mpe_unregister_pair_handler(mpe_collide_fn fn);
-const mpe_broadphase_if_t *mpe_find_broadphase(const char *name);
-const mpe_solver_if_t *mpe_find_solver(const char *name);
+int mpe_register_broadphase (const char *name, const mpe_broadphase_if_t *iface);
+int mpe_register_solver (const char *name, const mpe_solver_if_t *iface);
+int mpe_unregister_broadphase (const char *name);
+int mpe_unregister_solver (const char *name);
+int mpe_unregister_pair_handler (mpe_collide_fn fn);
+const mpe_broadphase_if_t *mpe_find_broadphase (const char *name);
+const mpe_solver_if_t *mpe_find_solver (const char *name);
 
 /* generic tick modules */
-int mpe_register_module(const mpe_module_desc_t *desc);
-int mpe_unregister_module(const char *name);
+int mpe_register_module (const mpe_module_desc_t *desc);
+int mpe_unregister_module (const char *name);
 /* Provenance for loader/static disambiguation (same name, two images). */
-int mpe_registry_set_origin(const char *name, const char *path);
-const char *mpe_registry_module_origin(const mpe_module_desc_t *desc);
-int mpe_unregister_module_origin(const char *name, const char *path);
-int mpe_module_count(void);
+int mpe_registry_set_origin (const char *name, const char *path);
+const char *mpe_registry_module_origin (const mpe_module_desc_t *desc);
+int mpe_unregister_module_origin (const char *name, const char *path);
+int mpe_module_count (void);
 /* DESPOT-2026-10-03: the INDEX HIGH-WATER, not the live count.
  * mpe_module_count() counts live entries; mpe_registry_truncate_modules(keep)
  * truncates by index. Those are different numbers whenever a tombstone hole
@@ -88,8 +87,8 @@ int mpe_module_count(void);
  * water 3). Snapshotting the live count and truncating to it silently
  * tombstoned a pre-existing LIVE registration on every failed load. Anything
  * that snapshots the table for rollback MUST use this. */
-int mpe_module_slot_count(void);
-const mpe_module_desc_t *mpe_module_at(int i);
-const mpe_module_desc_t *mpe_find_module(const char *name);
+int mpe_module_slot_count (void);
+const mpe_module_desc_t *mpe_module_at (int i);
+const mpe_module_desc_t *mpe_find_module (const char *name);
 
 #endif

@@ -11,11 +11,8 @@
  * exercise the primary-backed scene layer) keep linking. */
 #include "physics_world.h"
 
-static physics_world mpe_primary_world = {.bodies = NULL,
-                                          .body_count = 0,
-                                          .body_capacity = 0,
-                                          .next_object_id = 1};
+static physics_world mpe_primary_world = {.bodies = NULL, .body_count = 0, .body_capacity = 0, .next_object_id = 1};
 
-physics_world *physics_world_get_primary(void) {
+physics_world *physics_world_get_primary (void) {
     return &mpe_primary_world;
 }

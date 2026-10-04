@@ -19,92 +19,96 @@ _Atomic unsigned long det_fallback_pow_count = 0;
 _Atomic unsigned long det_fallback_trig_count = 0;
 
 #ifdef MPE_HAS_GNUC_ATTR
-#define MPE_ATOMIC_STORE(p, v) __atomic_store_n((p), (v), __ATOMIC_RELAXED)
-#define MPE_ATOMIC_ADD(p, v) __atomic_fetch_add((p), (v), __ATOMIC_RELAXED)
+#define MPE_ATOMIC_STORE(p, v) __atomic_store_n ((p), (v), __ATOMIC_RELAXED)
+#define MPE_ATOMIC_ADD(p, v) __atomic_fetch_add ((p), (v), __ATOMIC_RELAXED)
 #else
-#define MPE_ATOMIC_STORE(p, v) atomic_store((p), (v))
-#define MPE_ATOMIC_ADD(p, v) atomic_fetch_add((p), (v))
+#define MPE_ATOMIC_STORE(p, v) atomic_store ((p), (v))
+#define MPE_ATOMIC_ADD(p, v) atomic_fetch_add ((p), (v))
 #endif
 
-void det_fallback_reset(void) {
-    MPE_ATOMIC_STORE(&det_fallback_pow_count, 0);
-    MPE_ATOMIC_STORE(&det_fallback_trig_count, 0);
+void det_fallback_reset (void) {
+    MPE_ATOMIC_STORE (&det_fallback_pow_count, 0);
+    MPE_ATOMIC_STORE (&det_fallback_trig_count, 0);
 }
 
-void det_pin_fp_state(void) {
+void det_pin_fp_state (void) {
 #ifdef MPE_OS_WINDOWS
 #ifndef __GNUC__
     /* MSVC x86/x64: clear FTZ/DAZ via MXCSR. */
 #if defined(_M_X64) || defined(_M_IX86)
-    unsigned int mxcsr = _mm_getcsr();
+    unsigned int mxcsr = _mm_getcsr ();
     mxcsr &= ~(1u << 15);
     mxcsr &= ~(1u << 6);
-    _mm_setcsr(mxcsr);
+    _mm_setcsr (mxcsr);
 #endif
     return;
 #endif
 #endif
 #ifndef MPE_OS_WINDOWS
-    fesetround(FE_TONEAREST);
+    fesetround (FE_TONEAREST);
 #endif
 
 #if defined(__x86_64__) || defined(__i386__)
-    #ifdef __SSE__
+#ifdef __SSE__
     unsigned int mxcsr = 0;
-    __asm__ volatile("stmxcsr %0" : "=m"(mxcsr));
-    mxcsr &= ~(1u << 15);  // clear FTZ (bit 15)
-    mxcsr &= ~(1u << 6);   // clear DAZ (bit 6; was 1u<<24 reserved — DAZ stayed as-boot)
-    __asm__ volatile("ldmxcsr %0" :: "m"(mxcsr));
-    #endif
+    __asm__ volatile ("stmxcsr %0" : "=m"(mxcsr));
+    mxcsr &= ~(1u << 15); // clear FTZ (bit 15)
+    mxcsr &= ~(1u << 6); // clear DAZ (bit 6; was 1u<<24 reserved — DAZ stayed as-boot)
+    __asm__ volatile ("ldmxcsr %0" ::"m"(mxcsr));
+#endif
 #elif defined(__aarch64__)
     uint64_t fpcr;
-    __asm__ volatile("mrs %0, fpcr" : "=r"(fpcr));
-    fpcr &= ~((1ULL << 24) | (1ULL << 25));  // clear FZ (bit 24), DZ (bit 25)
-    __asm__ volatile("msr fpcr, %0" :: "r"(fpcr));
+    __asm__ volatile ("mrs %0, fpcr" : "=r"(fpcr));
+    fpcr &= ~((1ULL << 24) | (1ULL << 25)); // clear FZ (bit 24), DZ (bit 25)
+    __asm__ volatile ("msr fpcr, %0" ::"r"(fpcr));
 #elif defined(__arm__) && defined(__VFP_FP__)
     uint32_t fpscr;
-    __asm__ volatile("vmrs %0, fpscr" : "=r"(fpscr));
-    fpscr &= ~((1u << 24) | (1u << 25));  // clear FZ, DZ
-    __asm__ volatile("vmsr fpscr, %0" :: "r"(fpscr));
+    __asm__ volatile ("vmrs %0, fpscr" : "=r"(fpscr));
+    fpscr &= ~((1u << 24) | (1u << 25)); // clear FZ, DZ
+    __asm__ volatile ("vmsr fpscr, %0" ::"r"(fpscr));
 #endif
 }
 
 #ifndef NDEBUG
 #ifdef MPE_COMPILER_MSVC
-#define MPE_THREAD_LOCAL __declspec(thread)
+#define MPE_THREAD_LOCAL __declspec (thread)
 #else
 #define MPE_THREAD_LOCAL _Thread_local
 #endif
 static MPE_THREAD_LOCAL bool det_fallback_pow_used = false;
 static MPE_THREAD_LOCAL bool det_fallback_trig_used = false;
 
-void det_assert_no_fallback_pow(void) {
+void det_assert_no_fallback_pow (void) {
     /* TRUTH: old body cleared the flag and returned unconditionally (never
      * fired). A desync tripwire that cannot trip is a lie. */
-    assert(!det_fallback_pow_used);
+    assert (!det_fallback_pow_used);
 }
 
-void det_assert_no_fallback_trig(void) {
-    assert(!det_fallback_trig_used);
+void det_assert_no_fallback_trig (void) {
+    assert (!det_fallback_trig_used);
 }
 
-void det_mark_fallback_pow(void) {
+void det_mark_fallback_pow (void) {
     det_fallback_pow_used = true;
     /* FIX-AUDIT-DESPOT: atomic increment (see header). */
-    MPE_ATOMIC_ADD(&det_fallback_pow_count, 1);
+    MPE_ATOMIC_ADD (&det_fallback_pow_count, 1);
 }
 
-void det_mark_fallback_trig(void) {
+void det_mark_fallback_trig (void) {
     det_fallback_trig_used = true;
     /* FIX-AUDIT-DESPOT: atomic increment (see header). */
-    MPE_ATOMIC_ADD(&det_fallback_trig_count, 1);
+    MPE_ATOMIC_ADD (&det_fallback_trig_count, 1);
 }
 #else
 /* FIX-AUDIT-DESPOT: atomic increments (see header). */
-void det_mark_fallback_pow(void) { MPE_ATOMIC_ADD(&det_fallback_pow_count, 1); }
-void det_mark_fallback_trig(void) { MPE_ATOMIC_ADD(&det_fallback_trig_count, 1); }
+void det_mark_fallback_pow (void) {
+    MPE_ATOMIC_ADD (&det_fallback_pow_count, 1);
+}
+void det_mark_fallback_trig (void) {
+    MPE_ATOMIC_ADD (&det_fallback_trig_count, 1);
+}
 /* Release no-ops so the assert declarations in det_math.h always link.
  * Counters above stay active in release; only the debug tripwire is a no-op. */
-void det_assert_no_fallback_pow(void) { }
-void det_assert_no_fallback_trig(void) { }
+void det_assert_no_fallback_pow (void) {}
+void det_assert_no_fallback_trig (void) {}
 #endif

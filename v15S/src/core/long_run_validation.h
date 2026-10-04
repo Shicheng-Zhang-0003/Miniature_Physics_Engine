@@ -9,8 +9,8 @@ extern int long_run_validation_total_ticks;
 extern int long_run_validation_restore_config; /* MPE_TASK_39_FIX */
 extern int long_run_validation_is_torture; /* TRUTH: F11 mode, corruption gates only */
 
-void long_run_validation_start(int duration_ticks);
-void long_run_validation_tick_update(void);
+void long_run_validation_start (int duration_ticks);
+void long_run_validation_tick_update (void);
 
 /* DESPOT-2026-10-04 (torture-leak closure): the 2026-10-04 live incident
  * proved status/engine.cfg can hold full F11 torture values (gravity -17,
@@ -24,8 +24,8 @@ void long_run_validation_tick_update(void);
  * - cancel_restore: restore clean state NOW (memory first, backup file
  *   second, compiled defaults last; torture never survives). Call from
  *   every exit path before any config save. */
-int long_run_validation_torture_live(void);
-void long_run_validation_snapshot_clean(void);
-void long_run_validation_cancel_restore(void);
+int long_run_validation_torture_live (void);
+void long_run_validation_snapshot_clean (void);
+void long_run_validation_cancel_restore (void);
 
 #endif

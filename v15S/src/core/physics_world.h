@@ -157,84 +157,81 @@ typedef struct physics_world {
     uint64_t id_cache_revision;
 } physics_world;
 
-void physics_world_init(physics_world *world);
-void physics_world_cleanup(physics_world *world);
+void physics_world_init (physics_world *world);
+void physics_world_cleanup (physics_world *world);
 /* Phase-1: bind per-world config (NULL rebinds global g_cfg).
  * Must be called after physics_world_init; safe any time (takes
  * effect next tick; step snapshots cfg at tick start). */
-void physics_world_set_config(physics_world *world, mpe_config_t *cfg);
-mpe_config_t *physics_world_get_config(physics_world *world);
+void physics_world_set_config (physics_world *world, mpe_config_t *cfg);
+mpe_config_t *physics_world_get_config (physics_world *world);
 /* Hot-path accessor: per-world cfg if bound, else global.
  * Never NULL after mpe_config_init() has run once. */
-static inline const mpe_config_t *mpe_world_cfg(const physics_world *world) {
+static inline const mpe_config_t *mpe_world_cfg (const physics_world *world) {
     if (world && world->cfg) return world->cfg;
     return &g_cfg;
 }
-static inline mpe_config_t *mpe_world_cfg_mut(physics_world *world) {
+static inline mpe_config_t *mpe_world_cfg_mut (physics_world *world) {
     if (world && world->cfg) return world->cfg;
     return &g_cfg;
 }
-int physics_world_add_sphere(physics_world *world, float radius, float mass, vector3 position);
-int physics_world_add_cube(physics_world *world, vector3 position, vector3 half_extensions, float mass);
-int physics_world_add_cylinder(physics_world *world, float radius, float half_length, float mass, vector3 position); /* MPE_FTC_090 */
-int physics_world_add_custom(physics_world *world, int custom_shape, vector3 position, float mass, float radius);
-void physics_world_clear(physics_world *world);
-void physics_world_step(physics_world *world, float dt);
+int physics_world_add_sphere (physics_world *world, float radius, float mass, vector3 position);
+int physics_world_add_cube (physics_world *world, vector3 position, vector3 half_extensions, float mass);
+int physics_world_add_cylinder (physics_world *world, float radius, float half_length, float mass,
+                                vector3 position); /* MPE_FTC_090 */
+int physics_world_add_custom (physics_world *world, int custom_shape, vector3 position, float mass, float radius);
+void physics_world_clear (physics_world *world);
+void physics_world_step (physics_world *world, float dt);
 /* Shared pair pipeline (narrowphase dispatch + 3-gate wake + solver prep).
  * Used by both step paths so GUI and headless ticks stay identical. */
-void physics_world_process_pair(physics_world *world, int index_a, int index_b, float dt,
-                                int *manifold_count_ptr);
+void physics_world_process_pair (physics_world *world, int index_a, int index_b, float dt, int *manifold_count_ptr);
 /* Application-owned primary world (defined in core/mpe_primary.c).
  * The kernel holds no simulation globals; this accessor exists for the
  * scene/UI/render layers of a single-world GUI process. Headless and
  * foreign code should own explicit physics_world instances instead. */
-physics_world *physics_world_get_primary(void);
+physics_world *physics_world_get_primary (void);
 /* Phase-2: modular attach/dispatch. */
-int physics_world_attach_module(physics_world *world, const mpe_module_desc_t *desc);
+int physics_world_attach_module (physics_world *world, const mpe_module_desc_t *desc);
 /* Resolve a module's CURRENT mod_state from the live attachment table.
  * Returns false when the module is not attached (e.g. a hook detached it
  * earlier in this tick). Tick-hook dispatch must use this rather than a
  * snapshotted state pointer, which detach frees. */
-bool physics_world_module_live_state(physics_world *world, const mpe_module_desc_t *desc, void **out_state);
-int physics_world_detach_module(physics_world *world, const char *name);
-void physics_world_set_broadphase(physics_world *world, const mpe_broadphase_if_t *iface);
-void physics_world_set_solver(physics_world *world, const mpe_solver_if_t *iface);
-void physics_world_set_broadphase_state(physics_world *world, void *state);
-void physics_world_set_solver_state(physics_world *world, void *state);
+bool physics_world_module_live_state (physics_world *world, const mpe_module_desc_t *desc, void **out_state);
+int physics_world_detach_module (physics_world *world, const char *name);
+void physics_world_set_broadphase (physics_world *world, const mpe_broadphase_if_t *iface);
+void physics_world_set_solver (physics_world *world, const mpe_solver_if_t *iface);
+void physics_world_set_broadphase_state (physics_world *world, void *state);
+void physics_world_set_solver_state (physics_world *world, void *state);
 /* Live-world registry (cap MPE_MAX_LIVE_WORLDS=64; worlds beyond the cap
  * step normally but are invisible to auto-purge — unload then requires
  * manual detach first). Returns pointers copied; n = copied count. */
 #define MPE_MAX_LIVE_WORLDS 64
-int physics_world_live_list(physics_world **out, int cap);
+int physics_world_live_list (physics_world **out, int cap);
 /* Registry/loader unload paths: reset stage slots aliasing dead entries
  * and detach a named tick module in ALL live worlds (hooks run while the
  * .so is still mapped). */
-void physics_world_forget_stage_pointers(const mpe_broadphase_if_t *bi, const mpe_solver_if_t *si);
-void physics_world_detach_module_everywhere(const char *name);
+void physics_world_forget_stage_pointers (const mpe_broadphase_if_t *bi, const mpe_solver_if_t *si);
+void physics_world_detach_module_everywhere (const char *name);
 /* Pool growth (×2 to ceiling). Used by add_* paths and cache save. */
-int physics_world_grow_bodies(physics_world *world);
-int physics_world_grow_contact_cache(physics_world *world);
-int physics_world_grow_manifolds(physics_world *world);
+int physics_world_grow_bodies (physics_world *world);
+int physics_world_grow_contact_cache (physics_world *world);
+int physics_world_grow_manifolds (physics_world *world);
 /* Mutation stamp: bumped by every world-owned body-array mutation
  * (add/clear) and by scene-level mutators (remove/load/clear). */
-void physics_world_bump_revision(physics_world *world);
+void physics_world_bump_revision (physics_world *world);
 /* O(1) id->index via the world cache (linear fallback, always correct).
  * Returns -1 for id 0 / missing. */
-int physics_world_index_by_id(physics_world *world, uint32_t id);
-rigidbody *physics_world_body_by_id(physics_world *world, uint32_t id);
+int physics_world_index_by_id (physics_world *world, uint32_t id);
+rigidbody *physics_world_body_by_id (physics_world *world, uint32_t id);
 /* Shape dispatch: registry-first, built-in fallback. Returns true on contact. */
-bool mpe_shape_dispatch(physics_world *world, rigidbody *a, rigidbody *b, collision_data *out);
+bool mpe_shape_dispatch (physics_world *world, rigidbody *a, rigidbody *b, collision_data *out);
 /* FIX-AUDIT-DESPOT: per-tick deterministic state hash for lockstep desync
  * detection (CRC32 over body pos/vel/orient/ids in index order; see
  * scene/scene_crc.c). NULL world hashes as 0. */
-uint32_t physics_world_hash_state(const struct physics_world *world);
+uint32_t physics_world_hash_state (const struct physics_world *world);
 /* R3-07: Add four static wall bodies around the playable area.
  * half_width and half_depth define the playable half-extents.
  * wall_height and wall_thickness define the wall geometry.
  * Returns 0 on success, -1 on failure. */
-int physics_world_add_boundary_walls(physics_world *world,
-                                     float half_width,
-                                     float half_depth,
-                                     float wall_height,
-                                     float wall_thickness);
+int physics_world_add_boundary_walls (physics_world *world, float half_width, float half_depth, float wall_height,
+                                      float wall_thickness);
 #endif
