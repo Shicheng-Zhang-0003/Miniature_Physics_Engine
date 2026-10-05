@@ -176,15 +176,15 @@ static void mpe_rel_handle_motion (void *data, struct zwp_relative_pointer_v1 *r
 void mouse_lock_diagnostics (unsigned long *events, unsigned long *pos_x, unsigned long *neg_x, unsigned long *pos_y,
                              unsigned long *neg_y) {
     if (events)
-        *events = mpe_rel_events;
+        * events = mpe_rel_events;
     if (pos_x)
-        *pos_x = mpe_rel_pos_x;
+        * pos_x = mpe_rel_pos_x;
     if (neg_x)
-        *neg_x = mpe_rel_neg_x;
+        * neg_x = mpe_rel_neg_x;
     if (pos_y)
-        *pos_y = mpe_rel_pos_y;
+        * pos_y = mpe_rel_pos_y;
     if (neg_y)
-        *neg_y = mpe_rel_neg_y;
+        * neg_y = mpe_rel_neg_y;
 }
 void mouse_lock_diagnostics_reset (void) {
     mpe_rel_events = mpe_rel_pos_x = mpe_rel_neg_x = 0;
@@ -274,9 +274,9 @@ int mouse_lock_take_relative_delta (double *dx, double *dy) {
     if (!mpe_rel_ptr || !mpe_rel_dirty)
         return 0;
     if (dx)
-        *dx = mpe_rel_dx;
+        * dx = mpe_rel_dx;
     if (dy)
-        *dy = mpe_rel_dy;
+        * dy = mpe_rel_dy;
     mpe_rel_dx = 0.0;
     mpe_rel_dy = 0.0;
     mpe_rel_dirty = 0;
@@ -354,15 +354,15 @@ static unsigned long mpe_rel_pos_y = 0, mpe_rel_neg_y = 0;
 void mouse_lock_diagnostics (unsigned long *events, unsigned long *pos_x, unsigned long *neg_x, unsigned long *pos_y,
                              unsigned long *neg_y) {
     if (events)
-        *events = mpe_rel_events;
+        * events = mpe_rel_events;
     if (pos_x)
-        *pos_x = mpe_rel_pos_x;
+        * pos_x = mpe_rel_pos_x;
     if (neg_x)
-        *neg_x = mpe_rel_neg_x;
+        * neg_x = mpe_rel_neg_x;
     if (pos_y)
-        *pos_y = mpe_rel_pos_y;
+        * pos_y = mpe_rel_pos_y;
     if (neg_y)
-        *neg_y = mpe_rel_neg_y;
+        * neg_y = mpe_rel_neg_y;
 }
 void mouse_lock_diagnostics_reset (void) {
     mpe_rel_events = mpe_rel_pos_x = mpe_rel_neg_x = 0;
@@ -386,9 +386,9 @@ int mouse_lock_relative_available (void) {
  * from "motion that happened to be zero on one axis". */
 float mouse_lock_relative_to_camera (double rdx, double rdy, float *out_x, float *out_y) {
     if (out_x)
-        *out_x = (float) rdx;
+        * out_x = (float) rdx;
     if (out_y)
-        *out_y = (float) -rdy;
+        * out_y = (float) -rdy;
     return (float) (rdx * rdx + rdy * rdy);
 }
 /* Non-zero when a real relative-pointer lock is attached. The caller must not

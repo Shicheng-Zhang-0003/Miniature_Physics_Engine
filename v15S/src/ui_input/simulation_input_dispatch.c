@@ -149,7 +149,7 @@ void simulation_input_dispatch (GtkWidget *parent_window) {
                                                                                  g_cfg.spawner.cube_extent + 1.0f));
                 spawner_launch_cube (
                     cube_spawn_position,
-                    (vector3){g_cfg.spawner.cube_extent, g_cfg.spawner.cube_extent, g_cfg.spawner.cube_extent},
+                    (vector3) {g_cfg.spawner.cube_extent, g_cfg.spawner.cube_extent, g_cfg.spawner.cube_extent},
                     g_cfg.spawner.cube_mass);
             } else {
                 spawner_launch_cylinder (g_cfg.spawner.cyl_radius, g_cfg.spawner.cyl_half_length,
@@ -170,7 +170,7 @@ void simulation_input_dispatch (GtkWidget *parent_window) {
                             vector3_scaling (main_camera_fov.forward_vector, g_cfg.spawner.cube_extent + 1.0f));
                         spawner_launch_cube (
                             cube_spawn_position,
-                            (vector3){g_cfg.spawner.cube_extent, g_cfg.spawner.cube_extent, g_cfg.spawner.cube_extent},
+                            (vector3) {g_cfg.spawner.cube_extent, g_cfg.spawner.cube_extent, g_cfg.spawner.cube_extent},
                             g_cfg.spawner.cube_mass);
                     } else {
                         spawner_launch_cylinder (g_cfg.spawner.cyl_radius, g_cfg.spawner.cyl_half_length,

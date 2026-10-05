@@ -74,20 +74,20 @@ void wireframe_render_object (GLuint shader_program, math4 view_matrix, math4 pr
     math4_to_flat_array (projection_matrix, projection_matrix_flat_array);
     glUniformMatrix4fv (a3_wire_uniform_viewframe, 1, GL_FALSE, view_matrix_flat_array);
     glUniformMatrix4fv (a3_wire_uniform_projection, 1, GL_FALSE, projection_matrix_flat_array);
-    math4 translation_matrix = math4_translation (rigid_body->position);
-    math4 rotation_matrix = vector4_to_math4 (rigid_body->orientation);
+    math4 translation_matrix = math4_translation (rigid_body -> position);
+    math4 rotation_matrix = vector4_to_math4 (rigid_body -> orientation);
     math4 scale_matrix;
-    if (rigid_body->type == object_sphere) {
-        float s = rigid_body->radius * 1.01f;
-        scale_matrix = math4_scaling ((vector3){s, s, s});
-    } else if (rigid_body->type == object_cylinder) {
+    if (rigid_body -> type == object_sphere) {
+        float s = rigid_body -> radius * 1.01f;
+        scale_matrix = math4_scaling ((vector3) {s, s, s});
+    } else if (rigid_body -> type == object_cylinder) {
         /* Unit cylinder mesh: axle X half-length 1, radius 1. */
-        scale_matrix = math4_scaling ((vector3){rigid_body->cylinder_half_length * 1.01f, rigid_body->radius * 1.01f,
-                                                rigid_body->radius * 1.01f});
+        scale_matrix = math4_scaling ((vector3) {rigid_body -> cylinder_half_length * 1.01f, rigid_body -> radius * 1.01f,
+                                                rigid_body -> radius * 1.01f});
     } else {
         scale_matrix =
-            math4_scaling ((vector3){rigid_body->half_extensions.x * 1.01f, rigid_body->half_extensions.y * 1.01f,
-                                     rigid_body->half_extensions.z * 1.01f});
+            math4_scaling ((vector3) {rigid_body -> half_extensions.x * 1.01f, rigid_body -> half_extensions.y * 1.01f,
+                                     rigid_body -> half_extensions.z * 1.01f});
     }
     math4 model_matrix =
         math4_multiplication (translation_matrix, math4_multiplication (rotation_matrix, scale_matrix));
@@ -100,27 +100,27 @@ void wireframe_render_object (GLuint shader_program, math4 view_matrix, math4 pr
      * rotated bodies as if unrotated. math3 is ROW-major while GL takes
      * column-major, so upload transposed: flat[col*3+row] = N[row][col]. */
     float a3_wire_scale_xyz [3];
-    if (rigid_body->type == object_sphere) {
-        float s = rigid_body->radius * 1.01f;
+    if (rigid_body -> type == object_sphere) {
+        float s = rigid_body -> radius * 1.01f;
         a3_wire_scale_xyz [0] = s;
         a3_wire_scale_xyz [1] = s;
         a3_wire_scale_xyz [2] = s;
-    } else if (rigid_body->type == object_cylinder) {
-        a3_wire_scale_xyz [0] = rigid_body->cylinder_half_length * 1.01f;
-        a3_wire_scale_xyz [1] = rigid_body->radius * 1.01f;
-        a3_wire_scale_xyz [2] = rigid_body->radius * 1.01f;
+    } else if (rigid_body -> type == object_cylinder) {
+        a3_wire_scale_xyz [0] = rigid_body -> cylinder_half_length * 1.01f;
+        a3_wire_scale_xyz [1] = rigid_body -> radius * 1.01f;
+        a3_wire_scale_xyz [2] = rigid_body -> radius * 1.01f;
     } else {
-        a3_wire_scale_xyz [0] = rigid_body->half_extensions.x * 1.01f;
-        a3_wire_scale_xyz [1] = rigid_body->half_extensions.y * 1.01f;
-        a3_wire_scale_xyz [2] = rigid_body->half_extensions.z * 1.01f;
+        a3_wire_scale_xyz [0] = rigid_body -> half_extensions.x * 1.01f;
+        a3_wire_scale_xyz [1] = rigid_body -> half_extensions.y * 1.01f;
+        a3_wire_scale_xyz [2] = rigid_body -> half_extensions.z * 1.01f;
     }
-    math3 a3_wire_rotation = vector4_to_math3 (rigid_body->orientation);
+    math3 a3_wire_rotation = vector4_to_math3 (rigid_body -> orientation);
     float a3_wire_normal_matrix_flat [9];
     for (int row_index = 0; row_index < 3; row_index++) {
         for (int column_index = 0; column_index < 3; column_index++) {
             float inv_scale = 1.0f / fmaxf (fabsf (a3_wire_scale_xyz [column_index]), 0.0001f);
             a3_wire_normal_matrix_flat [column_index * 3 + row_index] =
-                a3_wire_rotation.matrix [row_index] [column_index] * inv_scale;
+                a3_wire_rotation.matrix [row_index][column_index] * inv_scale;
         }
     }
     glUniformMatrix3fv (a3_wire_uniform_normal_matrix, 1, GL_FALSE, a3_wire_normal_matrix_flat);
@@ -130,12 +130,12 @@ void wireframe_render_object (GLuint shader_program, math4 view_matrix, math4 pr
     glUniform1f (a3_wire_uniform_ambient, g_cfg.render.ambient_strength);
     glUniform1f (a3_wire_uniform_specular_coeff, g_cfg.render.specular_coeff);
     glUniform1f (a3_wire_uniform_specular_exp, g_cfg.render.specular_exponent);
-    if (rigid_body->type == object_sphere) {
+    if (rigid_body -> type == object_sphere) {
         glBindVertexArray (sphere_mesh.vertex_array_object);
         glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, sphere_mesh.wireframe_element_buffer_object);
         glDrawElements (GL_LINES, sphere_mesh.wireframe_index_count, GL_UNSIGNED_INT, 0);
         glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, sphere_mesh.element_buffer_object);
-    } else if (rigid_body->type == object_cylinder) {
+    } else if (rigid_body -> type == object_cylinder) {
         glBindVertexArray (cylinder_mesh.vertex_array_object);
         glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, cylinder_mesh.wireframe_element_buffer_object);
         glDrawElements (GL_LINES, cylinder_mesh.wireframe_index_count, GL_UNSIGNED_INT, 0);
@@ -149,10 +149,10 @@ void wireframe_render_object (GLuint shader_program, math4 view_matrix, math4 pr
     glBindVertexArray (0);
 }
 void wireframe_render_selected_object (GLuint shader_program, math4 view_matrix, math4 projection_matrix) {
-    if ((selected_object < 0) || (selected_object >= (physics_world_get_primary ()->body_count))) {
+    if ((selected_object < 0) || (selected_object >= (physics_world_get_primary () -> body_count))) {
         return;
     }
-    //Yellow outline (Selected Object Visibility)
+    // Yellow outline (Selected Object Visibility)
     wireframe_render_object (shader_program, view_matrix, projection_matrix,
-                             &(physics_world_get_primary ()->bodies) [selected_object], (vector3){1.0f, 1.0f, 0.0f});
+                             &(physics_world_get_primary () -> bodies)[selected_object], (vector3) {1.0f, 1.0f, 0.0f});
 }

@@ -29,8 +29,8 @@ void cmd_mod (int argc, char **argv) {
             const mpe_module_desc_t *d = mpe_module_at (i);
             if (!d)
                 continue;
-            snprintf (buf, sizeof (buf), "  %s-%s [%s]%s\n", d->name, d->version ? d->version : "?",
-                      d->kind ? d->kind : "generic", d->deterministic ? " det" : "");
+            snprintf (buf, sizeof (buf), "  %s-%s [%s]%s\n", d -> name, d -> version ? d -> version : "?",
+                      d -> kind ? d -> kind : "generic", d -> deterministic ? " det" : "");
             term_out (buf);
         }
         snprintf (buf, sizeof (buf), "loaded .so: %d\n", mpe_loader_count ());
@@ -56,16 +56,16 @@ void cmd_mod (int argc, char **argv) {
         if (mpe_find_solver ("seq-impulse"))
             term_out ("solver: seq-impulse (builtin)\n");
         physics_world *w = physics_world_get_primary ();
-        snprintf (buf, sizeof (buf), "attached to primary: %d\n", w ? w->tick_module_count : 0);
+        snprintf (buf, sizeof (buf), "attached to primary: %d\n", w ? w -> tick_module_count : 0);
         term_out (buf);
         if (w)
-            for (int i = 0; i < w->tick_module_count; i++) {
-                snprintf (buf, sizeof (buf), "  %s\n", w->tick_modules [i] ? w->tick_modules [i]->name : "?");
-                term_out (buf);
-            }
+            for (int i = 0; i < w -> tick_module_count; i++) {
+            snprintf (buf, sizeof (buf), "  %s\n", w -> tick_modules [i] ? w -> tick_modules [i] -> name : "?");
+            term_out (buf);
+        }
         if (w) {
             snprintf (buf, sizeof (buf), "primary stages: broadphase=%s solver=%s\n",
-                      w->broadphase_if ? "foreign" : "builtin", w->solver_if ? "foreign" : "builtin");
+                      w -> broadphase_if ? "foreign" : "builtin", w -> solver_if ? "foreign" : "builtin");
             term_out (buf);
         }
         return;
@@ -91,7 +91,7 @@ void cmd_mod (int argc, char **argv) {
         } else if (ur == -3) {
             term_err ("mpe: mod: unload refused (registered name too long to tear down safely)\n");
         } else
-            term_err ("mpe: mod: unload failed (unknown handle)\n");
+        term_err ("mpe: mod: unload failed (unknown handle)\n");
         return;
     }
     if (term_str_eq (argv [1], "attach") && argc >= 3) {
@@ -102,13 +102,13 @@ void cmd_mod (int argc, char **argv) {
         }
         /* Only tick-capable modules attach: shapes/stages have no hooks
          * and would pin the .so while doing nothing. */
-        if (!d->pre_step && !d->post_step && !d->attach && !d->detach) {
+        if (!d -> pre_step && !d -> post_step && !d -> attach && !d -> detach) {
             term_err ("mpe: mod: not a tick module (no hooks; nothing to attach)\n");
             return;
         }
         physics_world *pw = physics_world_get_primary ();
-        for (int i = 0; i < (pw ? pw->tick_module_count : 0); i++) {
-            if (pw->tick_modules [i] && term_str_eq (pw->tick_modules [i]->name, argv [2])) {
+        for (int i = 0; i < (pw ? pw -> tick_module_count : 0); i++) {
+            if (pw -> tick_modules [i] && term_str_eq (pw -> tick_modules [i] -> name, argv [2])) {
                 term_ok ("mpe: mod: already attached\n");
                 return;
             }
@@ -117,14 +117,14 @@ void cmd_mod (int argc, char **argv) {
         if (r >= 0)
             term_ok ("mpe: mod: attached\n");
         else
-            term_err ("mpe: mod: attach failed (table full / attach hook)\n");
+        term_err ("mpe: mod: attach failed (table full / attach hook)\n");
         return;
     }
     if (term_str_eq (argv [1], "detach") && argc >= 3) {
         if (physics_world_detach_module (physics_world_get_primary (), argv [2]) == 0)
             term_ok ("mpe: mod: detached\n");
         else
-            term_err ("mpe: mod: detach failed (not attached)\n");
+        term_err ("mpe: mod: detach failed (not attached)\n");
         return;
     }
     if (term_str_eq (argv [1], "use-broadphase") && argc >= 3) {
@@ -171,33 +171,33 @@ void cmd_modinfo (int argc, char **argv) {
         return;
     }
     char buf [512];
-    snprintf (buf, sizeof (buf), "name:        %s\n", d->name);
+    snprintf (buf, sizeof (buf), "name:        %s\n", d -> name);
     term_out (buf);
-    snprintf (buf, sizeof (buf), "version:     %s\n", d->version ? d->version : "?");
+    snprintf (buf, sizeof (buf), "version:     %s\n", d -> version ? d -> version : "?");
     term_out (buf);
-    snprintf (buf, sizeof (buf), "kind:        %s\n", d->kind ? d->kind : "generic");
+    snprintf (buf, sizeof (buf), "kind:        %s\n", d -> kind ? d -> kind : "generic");
     term_out (buf);
-    snprintf (buf, sizeof (buf), "deterministic: %s\n", d->deterministic ? "yes" : "no");
+    snprintf (buf, sizeof (buf), "deterministic: %s\n", d -> deterministic ? "yes" : "no");
     term_out (buf);
-    snprintf (buf, sizeof (buf), "abi:         %u\n", d->abi);
+    snprintf (buf, sizeof (buf), "abi:         %u\n", d -> abi);
     term_out (buf);
     /* module-specific fields */
-    if (d->kind && term_str_eq (d->kind, "shape")) {
+    if (d -> kind && term_str_eq (d -> kind, "shape")) {
         term_out ("type:        shape (pair handler)\n");
-    } else if (d->kind && term_str_eq (d->kind, "broadphase")) {
+    } else if (d -> kind && term_str_eq (d -> kind, "broadphase")) {
         term_out ("type:        broadphase backend\n");
-    } else if (d->kind && term_str_eq (d->kind, "solver")) {
+    } else if (d -> kind && term_str_eq (d -> kind, "solver")) {
         term_out ("type:        solver backend\n");
-    } else if (d->kind && term_str_eq (d->kind, "generic")) {
-        if (d->pre_step)
+    } else if (d -> kind && term_str_eq (d -> kind, "generic")) {
+        if (d -> pre_step)
             term_out ("hooks:       pre_step\n");
-        if (d->post_step)
+        if (d -> post_step)
             term_out ("hooks:       post_step\n");
     }
     /* check if loaded (compare loader module NAMES, not paths). */
     for (int i = 0; i < mpe_loader_count (); i++) {
         const char *nm = mpe_loader_name_at (i);
-        if (nm && term_str_eq (nm, d->name)) {
+        if (nm && term_str_eq (nm, d -> name)) {
             snprintf (buf, sizeof (buf), "loaded:      yes (%s)\n", mpe_loader_path_at (i));
             term_out (buf);
             return;

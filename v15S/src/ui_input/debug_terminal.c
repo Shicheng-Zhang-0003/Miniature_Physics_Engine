@@ -19,7 +19,7 @@ GtkTextBuffer *terminal_output_buffer = NULL;
 GtkWidget *terminal_entry = NULL;
 GtkWidget *terminal_prompt_label = NULL;
 char term_cwd [256] = "/";
-char term_history [term_history_size] [term_history_length + 1];
+char term_history [term_history_size][term_history_length + 1];
 int term_history_count = 0;
 int term_history_cursor = -1;
 /* ------------------------------------------------------------------ */
@@ -69,8 +69,8 @@ void term_capture_reset (void) {
 }
 /* MPE_TASK_V15R2_OUTPUT_CAPTURE_END */
 /* MPE_TASK_V15R2_PHASE7_ALIAS_STORAGE_BEGIN */
-char term_alias_names [term_alias_max] [term_alias_name_len];
-char term_alias_values [term_alias_max] [term_alias_value_len];
+char term_alias_names [term_alias_max][term_alias_name_len];
+char term_alias_values [term_alias_max][term_alias_value_len];
 int term_alias_count = 0;
 bool term_sudo_active = false;
 int64_t term_engine_start_time = 0; /* FIX_029 */
@@ -163,10 +163,10 @@ static void term_history_push (const char *command_text) {
     }
     for (int history_index = term_history_count - 1; history_index > 0; history_index--) {
         strncpy (term_history [history_index], term_history [history_index - 1], term_history_length);
-        term_history [history_index] [term_history_length] = '\0';
+        term_history [history_index][term_history_length] = '\0';
     }
     strncpy (term_history [0], command_text, term_history_length);
-    term_history [0] [term_history_length] = '\0';
+    term_history [0][term_history_length] = '\0';
 }
 /* ------------------------------------------------------------------ */
 /* String/path helpers                                                 */
@@ -196,7 +196,7 @@ bool term_parse_float (const char *token, float *output_value) {
     if ((endptr == token) || (*endptr != '\0') || (!isfinite (parsed_value))) {
         return false;
     }
-    *output_value = parsed_value;
+    * output_value = parsed_value;
     return true;
 }
 int term_object_from_token (const char *token) {
@@ -204,7 +204,7 @@ int term_object_from_token (const char *token) {
         return -1;
     }
     if (term_str_eq (token, "sel") || term_str_eq (term_last_path_component (token), "sel")) {
-        if ((selected_object >= 0) && (selected_object < (physics_world_get_primary ()->body_count))) {
+        if ((selected_object >= 0) && (selected_object < (physics_world_get_primary () -> body_count))) {
             return selected_object;
         }
         return -1;
@@ -215,7 +215,7 @@ int term_object_from_token (const char *token) {
     if ((endptr == component) || (*endptr != '\0')) {
         return -1;
     }
-    if ((parsed_index < 0) || (parsed_index >= (physics_world_get_primary ()->body_count))) {
+    if ((parsed_index < 0) || (parsed_index >= (physics_world_get_primary () -> body_count))) {
         return -1;
     }
     return (int) parsed_index;
@@ -233,7 +233,7 @@ int term_joint_from_token (const char *token) {
     if ((parsed_index < 0) || (parsed_index >= mpe_max_joints)) {
         return -1;
     }
-    if (!(physics_world_get_primary ()->spring_joints) [parsed_index].is_active) {
+    if (!(physics_world_get_primary () -> spring_joints)[parsed_index].is_active) {
         return -1;
     }
     return (int) parsed_index;
@@ -291,7 +291,7 @@ int term_parse_movement_destination (const char *token, float *x, float *y, floa
             if (!term_parse_float (parts [part_index + 3], &parsed_z)) {
                 break;
             }
-            *x = parsed_x;
+            * x = parsed_x;
             *y = parsed_y;
             *z = parsed_z;
             movement_kind = term_str_eq (parts [part_index], "pos") ? 1 : 2;
@@ -315,38 +315,38 @@ int term_parse_movement_destination (const char *token, float *x, float *y, floa
         term_err ("mpe: " #name ": not yet ported to GTK4\n");                                                         \
     }
 MPE_WEAK_CMD (cmd_help)
-MPE_WEAK_CMD (cmd_man)
-MPE_WEAK_CMD (cmd_clear) MPE_WEAK_CMD (cmd_history) MPE_WEAK_CMD (cmd_pwd) MPE_WEAK_CMD (cmd_cd) MPE_WEAK_CMD (
+    MPE_WEAK_CMD (cmd_man)
+    MPE_WEAK_CMD (cmd_clear) MPE_WEAK_CMD (cmd_history) MPE_WEAK_CMD (cmd_pwd) MPE_WEAK_CMD (cmd_cd) MPE_WEAK_CMD (
     cmd_ls) MPE_WEAK_CMD (cmd_ll) MPE_WEAK_CMD (cmd_cat) MPE_WEAK_CMD (cmd_touch) MPE_WEAK_CMD (cmd_cp)
     MPE_WEAK_CMD (cmd_rm) MPE_WEAK_CMD (cmd_mv) MPE_WEAK_CMD (cmd_ln) MPE_WEAK_CMD (cmd_unlink) MPE_WEAK_CMD (
         cmd_chmod) MPE_WEAK_CMD (cmd_chown) MPE_WEAK_CMD (cmd_kill) MPE_WEAK_CMD (cmd_ps) MPE_WEAK_CMD (cmd_top)
-        MPE_WEAK_CMD (cmd_df) MPE_WEAK_CMD (cmd_du) MPE_WEAK_CMD (cmd_uname) MPE_WEAK_CMD (cmd_whoami) MPE_WEAK_CMD (
+    MPE_WEAK_CMD (cmd_df) MPE_WEAK_CMD (cmd_du) MPE_WEAK_CMD (cmd_uname) MPE_WEAK_CMD (cmd_whoami) MPE_WEAK_CMD (
             cmd_date) MPE_WEAK_CMD (cmd_echo) MPE_WEAK_CMD (cmd_env) MPE_WEAK_CMD (cmd_export) MPE_WEAK_CMD (cmd_config)
-            MPE_WEAK_CMD (cmd_exit) MPE_WEAK_CMD (cmd_logout) MPE_WEAK_CMD (cmd_quit) MPE_WEAK_CMD (cmd_poweroff)
-                MPE_WEAK_CMD (cmd_shutdown) MPE_WEAK_CMD (cmd_reboot) MPE_WEAK_CMD (cmd_halt) MPE_WEAK_CMD (cmd_sleep)
-                    MPE_WEAK_CMD (cmd_sync) MPE_WEAK_CMD (cmd_uptime) MPE_WEAK_CMD (cmd_free) MPE_WEAK_CMD (cmd_w)
-                        MPE_WEAK_CMD (cmd_hostname) MPE_WEAK_CMD (cmd_id) MPE_WEAK_CMD (cmd_which) MPE_WEAK_CMD (
+    MPE_WEAK_CMD (cmd_exit) MPE_WEAK_CMD (cmd_logout) MPE_WEAK_CMD (cmd_quit) MPE_WEAK_CMD (cmd_poweroff)
+    MPE_WEAK_CMD (cmd_shutdown) MPE_WEAK_CMD (cmd_reboot) MPE_WEAK_CMD (cmd_halt) MPE_WEAK_CMD (cmd_sleep)
+    MPE_WEAK_CMD (cmd_sync) MPE_WEAK_CMD (cmd_uptime) MPE_WEAK_CMD (cmd_free) MPE_WEAK_CMD (cmd_w)
+    MPE_WEAK_CMD (cmd_hostname) MPE_WEAK_CMD (cmd_id) MPE_WEAK_CMD (cmd_which) MPE_WEAK_CMD (
                             cmd_true) MPE_WEAK_CMD (cmd_false) MPE_WEAK_CMD (cmd_time) MPE_WEAK_CMD (cmd_stat)
-                            MPE_WEAK_CMD (cmd_find) MPE_WEAK_CMD (cmd_wc) MPE_WEAK_CMD (cmd_file)
-                                MPE_WEAK_CMD (cmd_diff) MPE_WEAK_CMD (cmd_xxd) MPE_WEAK_CMD (cmd_sort)
-                                    MPE_WEAK_CMD (cmd_grep) MPE_WEAK_CMD (cmd_head) MPE_WEAK_CMD (cmd_tail)
-                                        MPE_WEAK_CMD (cmd_less) MPE_WEAK_CMD (cmd_sed) MPE_WEAK_CMD (cmd_nice)
-                                            MPE_WEAK_CMD (cmd_renice) MPE_WEAK_CMD (cmd_ping) MPE_WEAK_CMD (cmd_mount)
-                                                MPE_WEAK_CMD (cmd_umount) MPE_WEAK_CMD (cmd_mkfs)
-                                                    MPE_WEAK_CMD (cmd_fsck) MPE_WEAK_CMD (cmd_netstat)
-                                                        MPE_WEAK_CMD (cmd_ifconfig) MPE_WEAK_CMD (cmd_lsmod)
-                                                            MPE_WEAK_CMD (cmd_alias) MPE_WEAK_CMD (cmd_unalias)
-                                                                MPE_WEAK_CMD (cmd_jobs) MPE_WEAK_CMD (cmd_lsof)
-                                                                    MPE_WEAK_CMD (cmd_seq) MPE_WEAK_CMD (cmd_tee)
-                                                                        MPE_WEAK_CMD (cmd_watch) MPE_WEAK_CMD (cmd_sudo)
-                                                                            MPE_WEAK_CMD (cmd_su)
-                                                                                MPE_WEAK_CMD (cmd_dmesg)
-                                                                                    MPE_WEAK_CMD (cmd_vi)
+    MPE_WEAK_CMD (cmd_find) MPE_WEAK_CMD (cmd_wc) MPE_WEAK_CMD (cmd_file)
+    MPE_WEAK_CMD (cmd_diff) MPE_WEAK_CMD (cmd_xxd) MPE_WEAK_CMD (cmd_sort)
+    MPE_WEAK_CMD (cmd_grep) MPE_WEAK_CMD (cmd_head) MPE_WEAK_CMD (cmd_tail)
+    MPE_WEAK_CMD (cmd_less) MPE_WEAK_CMD (cmd_sed) MPE_WEAK_CMD (cmd_nice)
+    MPE_WEAK_CMD (cmd_renice) MPE_WEAK_CMD (cmd_ping) MPE_WEAK_CMD (cmd_mount)
+    MPE_WEAK_CMD (cmd_umount) MPE_WEAK_CMD (cmd_mkfs)
+    MPE_WEAK_CMD (cmd_fsck) MPE_WEAK_CMD (cmd_netstat)
+    MPE_WEAK_CMD (cmd_ifconfig) MPE_WEAK_CMD (cmd_lsmod)
+    MPE_WEAK_CMD (cmd_alias) MPE_WEAK_CMD (cmd_unalias)
+    MPE_WEAK_CMD (cmd_jobs) MPE_WEAK_CMD (cmd_lsof)
+    MPE_WEAK_CMD (cmd_seq) MPE_WEAK_CMD (cmd_tee)
+    MPE_WEAK_CMD (cmd_watch) MPE_WEAK_CMD (cmd_sudo)
+    MPE_WEAK_CMD (cmd_su)
+    MPE_WEAK_CMD (cmd_dmesg)
+    MPE_WEAK_CMD (cmd_vi)
 #undef MPE_WEAK_CMD
 #endif
     /* Command declarations moved to term_priv.h. */
-    const terminal_command terminal_commands [] = {
-        {"help", false, cmd_help, "help [command]", "show help"},
+const terminal_command terminal_commands [] = {
+    {"help", false, cmd_help, "help [command]", "show help"},
         {"man", false, cmd_man, "man <command>", "manual page"},
         {"clear", false, cmd_clear, "clear", "clear terminal"},
         {"history", false, cmd_history, "history", "command history"},
@@ -519,12 +519,12 @@ void term_execute (char *command_line) {
         term_strfreev (argument_vector);
         return;
     }
-    if ((found_command->mutates) && (!main_inputs.is_debug_mode_active) && (!term_sudo_active)) {
-        term_printf ("term_err", "mpe: %s: Permission denied (switch to debug mode with 0)\n", found_command->name);
+    if ((found_command -> mutates) && (!main_inputs.is_debug_mode_active) && (!term_sudo_active)) {
+        term_printf ("term_err", "mpe: %s: Permission denied (switch to debug mode with 0)\n", found_command -> name);
         term_strfreev (argument_vector);
         return;
     }
-    found_command->handler (argument_count, argument_vector);
+    found_command -> handler (argument_count, argument_vector);
     term_strfreev (argument_vector);
 }
 /* ------------------------------------------------------------------ */

@@ -7,7 +7,7 @@ GLuint compile_shader (const char *shader_source, GLenum shader_type) {
     GLuint shader_object = glCreateShader (shader_type);
     glShaderSource (shader_object, 1, &shader_source, NULL);
     glCompileShader (shader_object);
-    //Error Check
+    // Error Check
     int compilation_success;
     char information_log [512];
     glGetShaderiv (shader_object, GL_COMPILE_STATUS, &compilation_success);

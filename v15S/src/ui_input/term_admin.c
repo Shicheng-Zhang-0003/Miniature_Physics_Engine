@@ -180,40 +180,40 @@ void cmd_sed (int argc, char **argv) {
         const char *target = argv [argument_index];
         bool all_targets = term_is_all_token (target);
         if (all_targets) {
-            for (int object_index = 0; object_index < (physics_world_get_primary ()->body_count); object_index++) {
-                rigidbody *rb = &(physics_world_get_primary ()->bodies) [object_index];
+            for (int object_index = 0; object_index < (physics_world_get_primary () -> body_count); object_index++) {
+                rigidbody *rb = &(physics_world_get_primary () -> bodies)[object_index];
                 if (term_str_eq (field_name, "mass")) {
                     if (!is_numeric) {
                         continue;
                     }
                     term_set_object_mass (object_index, new_value);
                 } else if (term_str_eq (field_name, "radius")) {
-                    if ((!is_numeric) || (rb->type != object_sphere)) {
+                    if ((!is_numeric) || (rb -> type != object_sphere)) {
                         continue;
                     }
-                    rb->radius = new_value;
+                    rb -> radius = new_value;
                     rigidbody_update_inertia_sphere (rb);
                     rigidbody_wake (rb);
                 } else if (term_str_eq (field_name, "friction_static") || term_str_eq (field_name, "fs")) {
                     if (!is_numeric) {
                         continue;
                     }
-                    rb->friction_static = new_value;
+                    rb -> friction_static = new_value;
                 } else if (term_str_eq (field_name, "friction_kinetic") || term_str_eq (field_name, "fk")) {
                     if (!is_numeric) {
                         continue;
                     }
-                    rb->friction_kinetic = new_value;
+                    rb -> friction_kinetic = new_value;
                 } else if (term_str_eq (field_name, "restitution") || term_str_eq (field_name, "rest")) {
                     if (!is_numeric) {
                         continue;
                     }
-                    rb->restitution = new_value;
-                    if (rb->restitution < 0.0f) {
-                        rb->restitution = 0.0f;
+                    rb -> restitution = new_value;
+                    if (rb -> restitution < 0.0f) {
+                        rb -> restitution = 0.0f;
                     }
-                    if (rb->restitution > 1.0f) {
-                        rb->restitution = 1.0f;
+                    if (rb -> restitution > 1.0f) {
+                        rb -> restitution = 1.0f;
                     }
                 } else if (term_str_eq (field_name, "static")) {
                     term_set_object_static (object_index, make_static || (!make_dynamic));
@@ -230,7 +230,7 @@ void cmd_sed (int argc, char **argv) {
                     if (nice_val > 19) {
                         nice_val = 19;
                     }
-                    rb->nice_value = nice_val;
+                    rb -> nice_value = nice_val;
                 }
                 modified_count++;
             }
@@ -242,7 +242,7 @@ void cmd_sed (int argc, char **argv) {
             term_printf ("term_err", "mpe: sed: %s: No such object\n", target);
             continue;
         }
-        rigidbody *rb = &(physics_world_get_primary ()->bodies) [object_index];
+        rigidbody *rb = &(physics_world_get_primary () -> bodies)[object_index];
         if (term_str_eq (field_name, "mass")) {
             if (!is_numeric) {
                 term_err ("mpe: sed: mass requires numeric value\n");
@@ -254,11 +254,11 @@ void cmd_sed (int argc, char **argv) {
                 term_err ("mpe: sed: radius requires numeric value\n");
                 continue;
             }
-            if (rb->type != object_sphere) {
+            if (rb -> type != object_sphere) {
                 term_err ("mpe: sed: radius only applies to spheres\n");
                 continue;
             }
-            rb->radius = new_value;
+            rb -> radius = new_value;
             rigidbody_update_inertia_sphere (rb);
             rigidbody_wake (rb);
         } else if (term_str_eq (field_name, "friction_static") || term_str_eq (field_name, "fs")) {
@@ -266,24 +266,24 @@ void cmd_sed (int argc, char **argv) {
                 term_err ("mpe: sed: friction requires numeric value\n");
                 continue;
             }
-            rb->friction_static = new_value;
+            rb -> friction_static = new_value;
         } else if (term_str_eq (field_name, "friction_kinetic") || term_str_eq (field_name, "fk")) {
             if (!is_numeric) {
                 term_err ("mpe: sed: friction requires numeric value\n");
                 continue;
             }
-            rb->friction_kinetic = new_value;
+            rb -> friction_kinetic = new_value;
         } else if (term_str_eq (field_name, "restitution") || term_str_eq (field_name, "rest")) {
             if (!is_numeric) {
                 term_err ("mpe: sed: restitution requires numeric value\n");
                 continue;
             }
-            rb->restitution = new_value;
-            if (rb->restitution < 0.0f) {
-                rb->restitution = 0.0f;
+            rb -> restitution = new_value;
+            if (rb -> restitution < 0.0f) {
+                rb -> restitution = 0.0f;
             }
-            if (rb->restitution > 1.0f) {
-                rb->restitution = 1.0f;
+            if (rb -> restitution > 1.0f) {
+                rb -> restitution = 1.0f;
             }
         } else if (term_str_eq (field_name, "static")) {
             term_set_object_static (object_index, true);
@@ -301,7 +301,7 @@ void cmd_sed (int argc, char **argv) {
             if (nice_val > 19) {
                 nice_val = 19;
             }
-            rb->nice_value = nice_val;
+            rb -> nice_value = nice_val;
         } else {
             term_printf ("term_err", "mpe: sed: unknown field '%s'\n", field_name);
             continue;
@@ -336,8 +336,8 @@ void cmd_nice (int argc, char **argv) {
         if (object_index < 0) {
             continue;
         }
-        (physics_world_get_primary ()->bodies) [object_index].nice_value = priority;
-        rigidbody_wake (&(physics_world_get_primary ()->bodies) [object_index]);
+        (physics_world_get_primary () -> bodies)[object_index].nice_value = priority;
+        rigidbody_wake (&(physics_world_get_primary () -> bodies)[object_index]);
         term_printf ("term_ok", "/obj/%d nice=%d\n", object_index, priority);
     }
 }
@@ -368,23 +368,23 @@ void cmd_ping (int argc, char **argv) {
     if (object_index < 0) {
         return;
     }
-    rigidbody *rb = &(physics_world_get_primary ()->bodies) [object_index];
-    if (rb->static_state) {
+    rigidbody *rb = &(physics_world_get_primary () -> bodies)[object_index];
+    if (rb -> static_state) {
         term_printf ("term_dim", "PING /obj/%d: no response (static)\n", object_index);
         return;
     }
-    if (rb->is_sleeping) {
+    if (rb -> is_sleeping) {
         term_printf ("term_dim", "PING /obj/%d: no response (sleeping)\n", object_index);
         return;
     }
     for (int ping_index = 0; ping_index < ping_count; ping_index++) {
-        vector3 micro_impulse = vector3_scaling (rb->velocity, 0.0f);
-        micro_impulse = (vector3){0.001f, 0.001f, 0.001f};
-        rb->velocity = vector3_addition (rb->velocity, micro_impulse);
+        vector3 micro_impulse = vector3_scaling (rb -> velocity, 0.0f);
+        micro_impulse = (vector3) {0.001f, 0.001f, 0.001f};
+        rb -> velocity = vector3_addition (rb -> velocity, micro_impulse);
     }
     float speed_delta = 0.001f * sqrtf (3.0f) * (float) ping_count;
     term_printf ("term_ok", "PING /obj/%d: %d ping(s), velocity delta %.6f m/s, state=%s\n", object_index, ping_count,
-                 speed_delta, rb->is_sleeping ? "sleep" : "run");
+                 speed_delta, rb -> is_sleeping ? "sleep" : "run");
 }
 void cmd_mount (int argc, char **argv) {
     if (argc < 2) {
@@ -396,7 +396,7 @@ void cmd_mount (int argc, char **argv) {
         editor_reset ();
         contact_cache_clear (physics_world_get_primary ());
         term_printf ("term_ok", "mounted %s: %d objects loaded\n", scene_path,
-                     (physics_world_get_primary ()->body_count));
+                     (physics_world_get_primary () -> body_count));
         event_log_push (log_info, "Scene mounted via terminal: %s", scene_path);
     } else {
         term_printf ("term_err", "mpe: mount: %s: failed to load\n", scene_path);
@@ -437,39 +437,39 @@ void cmd_fsck (int argc, char **argv) {
     }
     int error_count = 0;
     int warning_count = 0;
-    term_printf ("term_echo", "fsck: checking %d objects...\n", (physics_world_get_primary ()->body_count));
-    for (int object_index = 0; object_index < (physics_world_get_primary ()->body_count); object_index++) {
-        rigidbody *rb = &(physics_world_get_primary ()->bodies) [object_index];
+    term_printf ("term_echo", "fsck: checking %d objects...\n", (physics_world_get_primary () -> body_count));
+    for (int object_index = 0; object_index < (physics_world_get_primary () -> body_count); object_index++) {
+        rigidbody *rb = &(physics_world_get_primary () -> bodies)[object_index];
         bool has_error = false;
-        if ((!isfinite (rb->position.x)) || (!isfinite (rb->position.y)) || (!isfinite (rb->position.z))) {
+        if ((!isfinite (rb -> position.x)) || (!isfinite (rb -> position.y)) || (!isfinite (rb -> position.z))) {
             term_printf ("term_err", "  /obj/%d: position NaN/Inf\n", object_index);
             has_error = true;
         }
-        if ((!isfinite (rb->velocity.x)) || (!isfinite (rb->velocity.y)) || (!isfinite (rb->velocity.z))) {
+        if ((!isfinite (rb -> velocity.x)) || (!isfinite (rb -> velocity.y)) || (!isfinite (rb -> velocity.z))) {
             term_printf ("term_err", "  /obj/%d: velocity NaN/Inf\n", object_index);
             has_error = true;
         }
-        if ((!isfinite (rb->angular_velocity.x)) || (!isfinite (rb->angular_velocity.y)) ||
-            (!isfinite (rb->angular_velocity.z))) {
+        if ((!isfinite (rb -> angular_velocity.x)) || (!isfinite (rb -> angular_velocity.y)) ||
+            (!isfinite (rb -> angular_velocity.z))) {
             term_printf ("term_err", "  /obj/%d: angular_velocity NaN/Inf\n", object_index);
             has_error = true;
         }
-        if ((!isfinite (rb->orientation.w)) || (!isfinite (rb->orientation.x)) || (!isfinite (rb->orientation.y)) ||
-            (!isfinite (rb->orientation.z))) {
+        if ((!isfinite (rb -> orientation.w)) || (!isfinite (rb -> orientation.x)) || (!isfinite (rb -> orientation.y)) ||
+            (!isfinite (rb -> orientation.z))) {
             term_printf ("term_err", "  /obj/%d: orientation NaN/Inf\n", object_index);
             has_error = true;
         }
-        if ((!rb->static_state) && ((rb->mass <= 0.0f) || (!isfinite (rb->mass)))) {
-            term_printf ("term_err", "  /obj/%d: invalid mass %.4f (dynamic)\n", object_index, rb->mass);
+        if ((!rb -> static_state) && ((rb -> mass <= 0.0f) || (!isfinite (rb -> mass)))) {
+            term_printf ("term_err", "  /obj/%d: invalid mass %.4f (dynamic)\n", object_index, rb -> mass);
             has_error = true;
         }
-        if ((!rb->static_state) && (rb->inverse_mass <= 0.0f)) {
+        if ((!rb -> static_state) && (rb -> inverse_mass <= 0.0f)) {
             term_printf ("term_dim", "  /obj/%d: warning: inverse_mass=%.4f (dynamic)\n", object_index,
-                         rb->inverse_mass);
+                         rb -> inverse_mass);
             warning_count++;
         }
-        float orient_len_sq = rb->orientation.w * rb->orientation.w + rb->orientation.x * rb->orientation.x +
-                              rb->orientation.y * rb->orientation.y + rb->orientation.z * rb->orientation.z;
+        float orient_len_sq = rb -> orientation.w * rb -> orientation.w + rb -> orientation.x * rb -> orientation.x +
+                              rb -> orientation.y * rb -> orientation.y + rb -> orientation.z * rb -> orientation.z;
         if ((orient_len_sq < 0.9f) || (orient_len_sq > 1.1f)) {
             term_printf ("term_dim", "  /obj/%d: warning: orientation not normalized (|q|^2=%.4f)\n", object_index,
                          orient_len_sq);
@@ -486,14 +486,14 @@ void cmd_fsck (int argc, char **argv) {
     }
     term_printf ("term_echo", "fsck: checking %d joint slots...\n", mpe_max_joints);
     for (int joint_index = 0; joint_index < mpe_max_joints; joint_index++) {
-        if (!(physics_world_get_primary ()->spring_joints) [joint_index].is_active) {
+        if (!(physics_world_get_primary () -> spring_joints)[joint_index].is_active) {
             continue;
         }
-        spring_joint *j = &(physics_world_get_primary ()->spring_joints) [joint_index];
-        int index_a = scene_find_object_index_by_id (j->object_id_a);
-        int index_b = scene_find_object_index_by_id (j->object_id_b);
+        spring_joint *j = &(physics_world_get_primary () -> spring_joints)[joint_index];
+        int index_a = scene_find_object_index_by_id (j -> object_id_a);
+        int index_b = scene_find_object_index_by_id (j -> object_id_b);
         if (index_a < 0) {
-            term_printf ("term_err", "  /joint/%d: object_a (id=%u) not found\n", joint_index, j->object_id_a);
+            term_printf ("term_err", "  /joint/%d: object_a (id=%u) not found\n", joint_index, j -> object_id_a);
             error_count++;
             if (auto_fix) {
                 remove_joint (physics_world_get_primary (), joint_index);
@@ -502,7 +502,7 @@ void cmd_fsck (int argc, char **argv) {
             continue;
         }
         if (index_b < 0) {
-            term_printf ("term_err", "  /joint/%d: object_b (id=%u) not found\n", joint_index, j->object_id_b);
+            term_printf ("term_err", "  /joint/%d: object_b (id=%u) not found\n", joint_index, j -> object_id_b);
             error_count++;
             if (auto_fix) {
                 remove_joint (physics_world_get_primary (), joint_index);
@@ -510,12 +510,12 @@ void cmd_fsck (int argc, char **argv) {
             }
             continue;
         }
-        if ((j->equilibrium_length < 0.0f) || (!isfinite (j->equilibrium_length))) {
-            term_printf ("term_err", "  /joint/%d: invalid rest length %.4f\n", joint_index, j->equilibrium_length);
+        if ((j -> equilibrium_length < 0.0f) || (!isfinite (j -> equilibrium_length))) {
+            term_printf ("term_err", "  /joint/%d: invalid rest length %.4f\n", joint_index, j -> equilibrium_length);
             error_count++;
         }
-        if ((j->spring_constant <= 0.0f) || (!isfinite (j->spring_constant))) {
-            term_printf ("term_err", "  /joint/%d: invalid spring constant %.4f\n", joint_index, j->spring_constant);
+        if ((j -> spring_constant <= 0.0f) || (!isfinite (j -> spring_constant))) {
+            term_printf ("term_err", "  /joint/%d: invalid spring constant %.4f\n", joint_index, j -> spring_constant);
             error_count++;
         }
     }
@@ -524,7 +524,7 @@ void cmd_fsck (int argc, char **argv) {
     }
     if (error_count == 0) {
         term_printf ("term_ok", "fsck: PASS — %d objects, %d joints, %d warning(s), 0 errors\n",
-                     (physics_world_get_primary ()->body_count), (physics_world_get_primary ()->spring_joint_count),
+                     (physics_world_get_primary () -> body_count), (physics_world_get_primary () -> spring_joint_count),
                      warning_count);
     } else {
         term_printf ("term_err", "fsck: FAIL — %d error(s), %d warning(s)%s\n", error_count, warning_count,
@@ -546,16 +546,16 @@ void cmd_netstat (int argc, char **argv) {
     term_printf (NULL, "Proto  Local        Foreign      State         K        D      Len\n");
     int listed = 0;
     for (int ji = 0; ji < mpe_max_joints; ji++) {
-        if ((!(physics_world_get_primary ()->spring_joints) [ji].is_active) && (!show_all)) {
+        if ((!(physics_world_get_primary () -> spring_joints)[ji].is_active) && (!show_all)) {
             continue;
         }
-        int ia = scene_find_object_index_by_id ((physics_world_get_primary ()->spring_joints) [ji].object_id_a);
-        int ib = scene_find_object_index_by_id ((physics_world_get_primary ()->spring_joints) [ji].object_id_b);
-        const char *state_text = (physics_world_get_primary ()->spring_joints) [ji].is_active ? "ESTABLISHED" : "CLOSED";
+        int ia = scene_find_object_index_by_id ((physics_world_get_primary () -> spring_joints)[ji].object_id_a);
+        int ib = scene_find_object_index_by_id ((physics_world_get_primary () -> spring_joints)[ji].object_id_b);
+        const char *state_text = (physics_world_get_primary () -> spring_joints)[ji].is_active ? "ESTABLISHED" : "CLOSED";
         term_printf (NULL, "spring /obj/%-6d /obj/%-6d %-12s %7.1f %7.1f %7.2f\n", ia, ib, state_text,
-                     (physics_world_get_primary ()->spring_joints) [ji].spring_constant,
-                     (physics_world_get_primary ()->spring_joints) [ji].damping_coefficient,
-                     (physics_world_get_primary ()->spring_joints) [ji].equilibrium_length);
+                     (physics_world_get_primary () -> spring_joints)[ji].spring_constant,
+                     (physics_world_get_primary () -> spring_joints)[ji].damping_coefficient,
+                     (physics_world_get_primary () -> spring_joints)[ji].equilibrium_length);
         listed++;
     }
     if (listed == 0) {
@@ -585,8 +585,8 @@ void cmd_ifconfig (int argc, char **argv) {
     term_printf ("term_echo", "input0:  flags=<%s>\n", main_inputs.is_mouse_locked ? "GRABBED" : "RELEASED");
     term_printf (NULL, "    spawn=%s  selected=%d  marked_joint=%d\n", term_spawn_type_name (), selected_object,
                  main_inputs.marked_joint_object_index);
-    term_printf (NULL, "    objects=%d  joints=%d  sleeping=%d\n", (physics_world_get_primary ()->body_count),
-                 (physics_world_get_primary ()->spring_joint_count), debug_last_sleeping_object_count);
+    term_printf (NULL, "    objects=%d  joints=%d  sleeping=%d\n", (physics_world_get_primary () -> body_count),
+                 (physics_world_get_primary () -> spring_joint_count), debug_last_sleeping_object_count);
 }
 void cmd_lsmod (int argc, char **argv) {
     (void) argc;
@@ -637,14 +637,14 @@ void cmd_alias (int argc, char **argv) {
             }
             continue;
         }
-        *equals_pos = '\0';
+        * equals_pos = '\0';
         const char *alias_name = argv [argument_index];
         const char *alias_value = equals_pos + 1;
         bool updated = false;
         for (int i = 0; i < term_alias_count; i++) {
             if (term_str_eq (alias_name, term_alias_names [i])) {
                 strncpy (term_alias_values [i], alias_value, term_alias_value_len - 1);
-                term_alias_values [i] [term_alias_value_len - 1] = '\0';
+                term_alias_values [i][term_alias_value_len - 1] = '\0';
                 updated = true;
                 break;
             }
@@ -655,9 +655,9 @@ void cmd_alias (int argc, char **argv) {
                 continue;
             }
             strncpy (term_alias_names [term_alias_count], alias_name, term_alias_name_len - 1);
-            term_alias_names [term_alias_count] [term_alias_name_len - 1] = '\0';
+            term_alias_names [term_alias_count][term_alias_name_len - 1] = '\0';
             strncpy (term_alias_values [term_alias_count], alias_value, term_alias_value_len - 1);
-            term_alias_values [term_alias_count] [term_alias_value_len - 1] = '\0';
+            term_alias_values [term_alias_count][term_alias_value_len - 1] = '\0';
             term_alias_count++;
         }
         term_printf ("term_ok", "alias %s='%s'\n", alias_name, alias_value);
@@ -679,8 +679,8 @@ void cmd_unalias (int argc, char **argv) {
                     memmove (term_alias_values [i], term_alias_values [i + 1],
                              (size_t) entries_to_move * sizeof term_alias_values [0]);
                 }
-                term_alias_names [term_alias_count - 1] [0] = '\0';
-                term_alias_values [term_alias_count - 1] [0] = '\0';
+                term_alias_names [term_alias_count - 1][0] = '\0';
+                term_alias_values [term_alias_count - 1][0] = '\0';
                 term_alias_count--;
                 found = true;
                 term_printf ("term_ok", "unalias %s\n", argv [argument_index]);
@@ -712,7 +712,7 @@ void cmd_lsof (int argc, char **argv) {
     term_printf (NULL, "%-11s %-8s %s\n", "terminal", "win", debug_terminal_is_open () ? "open" : "closed");
     term_printf (NULL, "%-11s %-8s %s\n", "mouse", "lock", main_inputs.is_mouse_locked ? "grabbed" : "released");
     term_printf (NULL, "%-11s %-8s %s\n", "mode", "state", main_inputs.is_debug_mode_active ? "debug" : "game");
-    if ((selected_object >= 0) && (selected_object < (physics_world_get_primary ()->body_count))) {
+    if ((selected_object >= 0) && (selected_object < (physics_world_get_primary () -> body_count))) {
         term_printf (NULL, "%-11s %-8s /obj/%d\n", "selection", "obj", selected_object);
     } else {
         term_printf (NULL, "%-11s %-8s %s\n", "selection", "obj", "(none)");
@@ -988,8 +988,8 @@ static const mv_editable_file mv_known_files [] = {{"status/engine.cfg", "Main e
                                                   {"render/shaders/axis_fragment.glsl", "Axis fragment shader"},
                                                   {NULL, NULL}};
 static const char *mv_allowed_extensions [] = {".cfg", ".ini", ".conf", ".txt", ".md", ".glsl",
-                                              ".sh",  ".py",  ".h",    ".c",   NULL};
-static const char *mv_blocked_extensions [] = {".dat", ".o",   ".so",  ".a",     ".bin",
+                                              ".sh", ".py", ".h", ".c", NULL};
+static const char *mv_blocked_extensions [] = {".dat", ".o", ".so", ".a", ".bin",
                                               ".exe", ".obj", ".dll", ".dylib", NULL};
 bool mv_file_is_allowed (const char *filepath) {
     if (!filepath || filepath [0] == '\0') {

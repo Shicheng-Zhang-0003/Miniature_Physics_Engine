@@ -29,9 +29,9 @@
 #include <math.h>
 static inline float mpe_mouse_relative_to_camera (double rdx, double rdy, float *out_x, float *out_y) {
     if (out_x)
-        *out_x = (float) rdx;
+        * out_x = (float) rdx;
     if (out_y)
-        *out_y = (float) -rdy;
+        * out_y = (float) -rdy;
     return (float) sqrt (rdx * rdx + rdy * rdy);
 }
 #endif /* mouse_look_h */

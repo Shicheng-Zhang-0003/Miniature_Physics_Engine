@@ -10,79 +10,79 @@ void camera_update_vectors (camera *camera_object) {
      * steer_sensitivity) poisoned forward/side/vertical forever because
      * every later frame derived from the poisoned vectors. Reset to the
      * spawn basis instead of propagating. */
-    if (!isfinite (camera_object->yaw) || !isfinite (camera_object->pitch)) {
-        camera_object->yaw = -90.0f;
-        camera_object->pitch = 0.0f;
+    if (!isfinite (camera_object -> yaw) || !isfinite (camera_object -> pitch)) {
+        camera_object -> yaw = -90.0f;
+        camera_object -> pitch = 0.0f;
     }
-    //Front Vector --> Pitch and Yaw
-    //Deg to Rad
-    float yaw_radians = camera_object->yaw * degrad;
-    float pitch_radians = camera_object->pitch * degrad;
+    // Front Vector --> Pitch and Yaw
+    // Deg to Rad
+    float yaw_radians = camera_object -> yaw * degrad;
+    float pitch_radians = camera_object -> pitch * degrad;
     vector3 updated_forward_vector;
     updated_forward_vector.x = cosf (yaw_radians) * cosf (pitch_radians);
     updated_forward_vector.y = sinf (pitch_radians);
     updated_forward_vector.z = sinf (yaw_radians) * cosf (pitch_radians);
-    //Normalise Frontal Vector
-    camera_object->forward_vector = vector3_normalisation (updated_forward_vector);
-    if (!isfinite (camera_object->forward_vector.x) || !isfinite (camera_object->forward_vector.y) ||
-        !isfinite (camera_object->forward_vector.z)) {
+    // Normalise Frontal Vector
+    camera_object -> forward_vector = vector3_normalisation (updated_forward_vector);
+    if (!isfinite (camera_object -> forward_vector.x) || !isfinite (camera_object -> forward_vector.y) ||
+        !isfinite (camera_object -> forward_vector.z)) {
         /* FIX-AUDIT-DESPOT: fail-closed basis (spawn look, -Z) when the
          * trig/normalise path still yields non-finite (defensive; the yaw/
          * pitch reset above should already have prevented it). */
-        camera_object->forward_vector = (vector3){0.0f, 0.0f, -1.0f};
+        camera_object -> forward_vector = (vector3) {0.0f, 0.0f, -1.0f};
     }
-    //Calculate Right Side and Vertical Vectors
-    //Cross of Frontal and Up view {0, 1, 0} --> Right Axis
+    // Calculate Right Side and Vertical Vectors
+    // Cross of Frontal and Up view {0, 1, 0} --> Right Axis
     vector3 global_up_vector = {0.0f, 1.0f, 0.0f};
-    camera_object->side_vector =
-        vector3_normalisation (vector3_cross (camera_object->forward_vector, global_up_vector));
-    if (!isfinite (camera_object->side_vector.x) || !isfinite (camera_object->side_vector.y) ||
-        !isfinite (camera_object->side_vector.z)) {
+    camera_object -> side_vector =
+        vector3_normalisation (vector3_cross (camera_object -> forward_vector, global_up_vector));
+    if (!isfinite (camera_object -> side_vector.x) || !isfinite (camera_object -> side_vector.y) ||
+        !isfinite (camera_object -> side_vector.z)) {
         /* FIX-AUDIT-DESPOT: forward was near-parallel to world-up (pitch
          * +-89 clamp keeps this rare but reachable): cross degenerates.
          * Fall back to world +X instead of a NaN strafe axis. */
-        camera_object->side_vector = (vector3){1.0f, 0.0f, 0.0f};
+        camera_object -> side_vector = (vector3) {1.0f, 0.0f, 0.0f};
     }
-    //Cross right and front gives the UP axis
-    camera_object->vertical_vector =
-        vector3_normalisation (vector3_cross (camera_object->side_vector, camera_object->forward_vector));
-    if (!isfinite (camera_object->vertical_vector.x) || !isfinite (camera_object->vertical_vector.y) ||
-        !isfinite (camera_object->vertical_vector.z)) {
+    // Cross right and front gives the UP axis
+    camera_object -> vertical_vector =
+        vector3_normalisation (vector3_cross (camera_object -> side_vector, camera_object -> forward_vector));
+    if (!isfinite (camera_object -> vertical_vector.x) || !isfinite (camera_object -> vertical_vector.y) ||
+        !isfinite (camera_object -> vertical_vector.z)) {
         /* FIX-AUDIT-DESPOT: see above. */
-        camera_object->vertical_vector = (vector3){0.0f, 1.0f, 0.0f};
+        camera_object -> vertical_vector = (vector3) {0.0f, 1.0f, 0.0f};
     }
 }
 void initialize_camera (camera *camera_object, vector3 starting_position) {
-    camera_object->position = starting_position;
-    camera_object->yaw = -90.0f; //Straight Forwards (Negative Z Axis)
-    camera_object->pitch = 0.0f; //Flat Horizon View
-    camera_object->movement_speed = g_cfg.camera.move_speed; /* MPE_TASK_32 */ //25 Units of Movement * s ^ -1
-    camera_object->mouse_sensitivity = g_cfg.camera.mouse_sensitivity; /* MPE_TASK_32 */
-    camera_object->vertical_velocity = 0.0f;
-    camera_object->horizontal_velocity = (vector3){0.0f, 0.0f, 0.0f};
+    camera_object -> position = starting_position;
+    camera_object -> yaw = -90.0f; // Straight Forwards (Negative Z Axis)
+    camera_object -> pitch = 0.0f; // Flat Horizon View
+    camera_object -> movement_speed = g_cfg.camera.move_speed; /* MPE_TASK_32 */ // 25 Units of Movement * s ^ -1
+    camera_object -> mouse_sensitivity = g_cfg.camera.mouse_sensitivity; /* MPE_TASK_32 */
+    camera_object -> vertical_velocity = 0.0f;
+    camera_object -> horizontal_velocity = (vector3) {0.0f, 0.0f, 0.0f};
     camera_update_vectors (camera_object);
-} //Movement Vectoring
+} // Movement Vectoring
 void camera_move_forward (camera *camera_object, float delta_time) {
     vector3 flat_forward =
-        vector3_normalisation ((vector3){camera_object->forward_vector.x, 0.0f, camera_object->forward_vector.z});
-    camera_object->horizontal_velocity =
-        vector3_addition (camera_object->horizontal_velocity,
-                          vector3_scaling (flat_forward, camera_object->movement_speed * 8.0f * delta_time));
+        vector3_normalisation ((vector3) {camera_object -> forward_vector.x, 0.0f, camera_object -> forward_vector.z});
+    camera_object -> horizontal_velocity =
+        vector3_addition (camera_object -> horizontal_velocity,
+                          vector3_scaling (flat_forward, camera_object -> movement_speed * 8.0f * delta_time));
 }
 void camera_move_backward (camera *camera_object, float delta_time) {
     vector3 flat_forward =
-        vector3_normalisation ((vector3){camera_object->forward_vector.x, 0.0f, camera_object->forward_vector.z});
-    camera_object->horizontal_velocity =
-        vector3_subtraction (camera_object->horizontal_velocity,
-                             vector3_scaling (flat_forward, camera_object->movement_speed * 8.0f * delta_time));
-} //Strafe uses the Right/Side Vector
+        vector3_normalisation ((vector3) {camera_object -> forward_vector.x, 0.0f, camera_object -> forward_vector.z});
+    camera_object -> horizontal_velocity =
+        vector3_subtraction (camera_object -> horizontal_velocity,
+                             vector3_scaling (flat_forward, camera_object -> movement_speed * 8.0f * delta_time));
+} // Strafe uses the Right/Side Vector
 void camera_move_left (camera *camera_object, float delta_time) {
-    camera_object->horizontal_velocity = vector3_subtraction (
-        camera_object->horizontal_velocity,
-        vector3_scaling (camera_object->side_vector, camera_object->movement_speed * 8.0f * delta_time));
+    camera_object -> horizontal_velocity = vector3_subtraction (
+        camera_object -> horizontal_velocity,
+        vector3_scaling (camera_object -> side_vector, camera_object -> movement_speed * 8.0f * delta_time));
 }
 void camera_move_right (camera *camera_object, float delta_time) {
-    camera_object->horizontal_velocity = vector3_addition (
-        camera_object->horizontal_velocity,
-        vector3_scaling (camera_object->side_vector, camera_object->movement_speed * 8.0f * delta_time));
+    camera_object -> horizontal_velocity = vector3_addition (
+        camera_object -> horizontal_velocity,
+        vector3_scaling (camera_object -> side_vector, camera_object -> movement_speed * 8.0f * delta_time));
 }

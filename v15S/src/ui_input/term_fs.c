@@ -79,7 +79,7 @@ void cmd_cd (int argc, char **argv) {
 void term_ls_internal (bool long_format, int argc, char **argv) {
     const char *path = term_cwd;
     for (int argument_index = 1; argument_index < argc; argument_index++) {
-        if (argv [argument_index] [0] != '-') {
+        if (argv [argument_index][0] != '-') {
             path = argv [argument_index];
             break;
         }
@@ -101,7 +101,7 @@ void term_ls_internal (bool long_format, int argc, char **argv) {
 void cmd_ls (int argc, char **argv) {
     bool long_format = false;
     for (int argument_index = 1; argument_index < argc; argument_index++) {
-        if ((argv [argument_index] [0] == '-') && (strstr (argv [argument_index], "l"))) {
+        if ((argv [argument_index][0] == '-') && (strstr (argv [argument_index], "l"))) {
             long_format = true;
         }
     }
@@ -149,7 +149,7 @@ void cmd_touch (int argc, char **argv) {
         return;
     }
     for (int argument_index = 1; argument_index < argc; argument_index++) {
-        if (argv [argument_index] [0] == '-') {
+        if (argv [argument_index][0] == '-') {
             continue;
         }
         if ((argc > 1) && (strstr (argv [1], "robot"))) {
@@ -189,7 +189,7 @@ void cmd_rm (int argc, char **argv) {
     }
     int delete_count = 0;
     for (int argument_index = 1; argument_index < argc; argument_index++) {
-        if (argv [argument_index] [0] == '-') {
+        if (argv [argument_index][0] == '-') {
             continue;
         }
         const char *target = argv [argument_index];
@@ -199,7 +199,7 @@ void cmd_rm (int argc, char **argv) {
             if (kind == term_target_joint) {
                 int removed_count = 0;
                 for (int joint_index = 0; joint_index < mpe_max_joints; joint_index++) {
-                    if ((physics_world_get_primary ()->spring_joints) [joint_index].is_active) {
+                    if ((physics_world_get_primary () -> spring_joints)[joint_index].is_active) {
                         remove_joint (physics_world_get_primary (), joint_index);
                         removed_count++;
                     }
@@ -231,7 +231,7 @@ void cmd_rm (int argc, char **argv) {
             int object_index = term_object_from_token (target);
             if (object_index >= 0) {
                 if (delete_count < mpe_max_bodies) {
-                    term_id_buffer [delete_count++] = (physics_world_get_primary ()->bodies) [object_index].object_id;
+                    term_id_buffer [delete_count++] = (physics_world_get_primary () -> bodies)[object_index].object_id;
                 }
             } else {
                 term_printf ("term_err", "mpe: %s: No such object\n", target);
@@ -257,15 +257,15 @@ void cmd_mv (int argc, char **argv) {
     if (object_index < 0) {
         return;
     }
-    rigidbody *rigid_body = &(physics_world_get_primary ()->bodies) [object_index];
+    rigidbody *rigid_body = &(physics_world_get_primary () -> bodies)[object_index];
     float x = 0.0f, y = 0.0f, z = 0.0f;
     int movement_kind = term_parse_movement_destination (argv [2], &x, &y, &z);
     if (movement_kind == 1) {
-        rigid_body->position = (vector3){x, y, z};
+        rigid_body -> position = (vector3) {x, y, z};
         rigidbody_wake (rigid_body);
         term_printf ("term_ok", "/obj/%d moved to (%.2f, %.2f, %.2f)\n", object_index, x, y, z);
     } else if (movement_kind == 2) {
-        rigid_body->velocity = vector3_addition (rigid_body->velocity, (vector3){x, y, z});
+        rigid_body -> velocity = vector3_addition (rigid_body -> velocity, (vector3) {x, y, z});
         rigidbody_wake (rigid_body);
         term_printf ("term_ok", "/obj/%d impulse (%.2f, %.2f, %.2f)\n", object_index, x, y, z);
     } else {
@@ -295,8 +295,8 @@ void cmd_ln (int argc, char **argv) {
         term_err ("mpe: ln: cannot link an object to itself\n");
         return;
     }
-    float rest_length = vector3_length (vector3_subtraction ((physics_world_get_primary ()->bodies) [index_b].position,
-                                                             (physics_world_get_primary ()->bodies) [index_a].position));
+    float rest_length = vector3_length (vector3_subtraction ((physics_world_get_primary () -> bodies)[index_b].position,
+                                                             (physics_world_get_primary () -> bodies)[index_a].position));
     float spring_constant = soft_joint ? g_cfg.joints.soft_spring_k : g_cfg.joints.default_spring_k;
     float damping_coefficient = soft_joint ? g_cfg.joints.soft_damping : g_cfg.joints.default_damping;
     int joint_index =
@@ -369,7 +369,7 @@ void cmd_kill (int argc, char **argv) {
     enum { kill_term, kill_stop, kill_cont };
     int kill_action = kill_term;
     int argument_index = 1;
-    if ((argc > 1) && ((argv [1] [0] == '-') || (term_str_has_prefix (argv [1], "SIG")))) {
+    if ((argc > 1) && ((argv [1][0] == '-') || (term_str_has_prefix (argv [1], "SIG")))) {
         const char *signal_text = argv [1];
         if (signal_text [0] == '-') {
             signal_text++;
@@ -391,16 +391,16 @@ void cmd_kill (int argc, char **argv) {
         const char *target = argv [argument_index];
         if (term_is_all_token (target)) {
             if (kill_action == kill_stop) {
-                for (int object_index = 0; object_index < (physics_world_get_primary ()->body_count); object_index++) {
-                    (physics_world_get_primary ()->bodies) [object_index].velocity = vector3_zero ();
-                    (physics_world_get_primary ()->bodies) [object_index].angular_velocity = vector3_zero ();
-                    (physics_world_get_primary ()->bodies) [object_index].is_sleeping = true;
-                    (physics_world_get_primary ()->bodies) [object_index].sleep_timer = 2.0f;
+                for (int object_index = 0; object_index < (physics_world_get_primary () -> body_count); object_index++) {
+                    (physics_world_get_primary () -> bodies)[object_index].velocity = vector3_zero ();
+                    (physics_world_get_primary () -> bodies)[object_index].angular_velocity = vector3_zero ();
+                    (physics_world_get_primary () -> bodies)[object_index].is_sleeping = true;
+                    (physics_world_get_primary () -> bodies)[object_index].sleep_timer = 2.0f;
                 }
                 term_ok ("stopped all objects\n");
             } else if (kill_action == kill_cont) {
-                for (int object_index = 0; object_index < (physics_world_get_primary ()->body_count); object_index++) {
-                    rigidbody_wake (&(physics_world_get_primary ()->bodies) [object_index]);
+                for (int object_index = 0; object_index < (physics_world_get_primary () -> body_count); object_index++) {
+                    rigidbody_wake (&(physics_world_get_primary () -> bodies)[object_index]);
                 }
                 term_ok ("continued all objects\n");
             } else {
@@ -422,19 +422,19 @@ void cmd_kill (int argc, char **argv) {
             term_printf ("term_err", "mpe: %s: No such object\n", target);
             continue;
         }
-        rigidbody *rigid_body = &(physics_world_get_primary ()->bodies) [object_index];
+        rigidbody *rigid_body = &(physics_world_get_primary () -> bodies)[object_index];
         if (kill_action == kill_stop) {
-            rigid_body->velocity = vector3_zero ();
-            rigid_body->angular_velocity = vector3_zero ();
-            rigid_body->is_sleeping = true;
-            rigid_body->sleep_timer = 2.0f;
+            rigid_body -> velocity = vector3_zero ();
+            rigid_body -> angular_velocity = vector3_zero ();
+            rigid_body -> is_sleeping = true;
+            rigid_body -> sleep_timer = 2.0f;
             term_printf ("term_ok", "stopped /obj/%d\n", object_index);
         } else if (kill_action == kill_cont) {
             rigidbody_wake (rigid_body);
             term_printf ("term_ok", "continued /obj/%d\n", object_index);
         } else {
             if (delete_count < mpe_max_bodies) {
-                term_id_buffer [delete_count++] = rigid_body->object_id;
+                term_id_buffer [delete_count++] = rigid_body -> object_id;
             }
         }
     }

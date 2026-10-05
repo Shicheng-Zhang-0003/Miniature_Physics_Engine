@@ -5,7 +5,7 @@
 #include <string.h>
 #include <gdk/gdkkeysyms.h>
 static bool editor_dialog_active = false;
-static void on_entry_insert_text (GtkEditable *editable, const gchar *new_text, gint new_text_length, gint *position,
+static void on_entry_insert_text (GtkEditable *editable, const gchar * new_text, gint new_text_length, gint * position,
                                   gpointer user_data) {
     (void) position;
     (void) user_data;
@@ -26,33 +26,33 @@ typedef struct {
     gboolean confirmed;
 } EditorDialogState;
 static void editor_dialog_quit_with_result (EditorDialogState *state, float value, gboolean confirmed) {
-    state->result_value = value;
-    state->confirmed = confirmed;
-    if (state->loop && g_main_loop_is_running (state->loop)) {
-        g_main_loop_quit (state->loop);
+    state -> result_value = value;
+    state -> confirmed = confirmed;
+    if (state -> loop && g_main_loop_is_running (state -> loop)) {
+        g_main_loop_quit (state -> loop);
     }
 }
 static void editor_dialog_on_ok (GtkButton *button, gpointer user_data) {
     (void) button;
     EditorDialogState *state = (EditorDialogState *) user_data;
-    const char *text = gtk_editable_get_text (GTK_EDITABLE (state->entry));
+    const char *text = gtk_editable_get_text (GTK_EDITABLE (state -> entry));
     char *endptr = NULL;
     float parsed = strtof (text, &endptr);
     if ((endptr != text) && (*endptr == '\0')) {
         editor_dialog_quit_with_result (state, parsed, TRUE);
     } else {
-        editor_dialog_quit_with_result (state, state->current_value, TRUE);
+        editor_dialog_quit_with_result (state, state -> current_value, TRUE);
     }
 }
 static void editor_dialog_on_cancel (GtkButton *button, gpointer user_data) {
     (void) button;
     EditorDialogState *state = (EditorDialogState *) user_data;
-    editor_dialog_quit_with_result (state, state->current_value, FALSE);
+    editor_dialog_quit_with_result (state, state -> current_value, FALSE);
 }
 static gboolean editor_dialog_on_close_request (GtkWindow *window, gpointer user_data) {
     (void) window;
     EditorDialogState *state = (EditorDialogState *) user_data;
-    editor_dialog_quit_with_result (state, state->current_value, FALSE);
+    editor_dialog_quit_with_result (state, state -> current_value, FALSE);
     return TRUE;
 }
 static void editor_dialog_on_entry_activate (GtkEntry *entry, gpointer user_data) {

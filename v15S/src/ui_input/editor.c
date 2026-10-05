@@ -22,19 +22,19 @@ static void editor_reacquire_mouse (GtkWidget *parent_window) {
     }
 }
 static rigidbody *editor_selected_object_or_null (void) {
-    if ((selected_object < 0) || (selected_object >= (physics_world_get_primary ()->body_count))) {
+    if ((selected_object < 0) || (selected_object >= (physics_world_get_primary () -> body_count))) {
         return NULL;
     }
-    return &(physics_world_get_primary ()->bodies) [selected_object];
+    return &(physics_world_get_primary () -> bodies)[selected_object];
 }
 void editor_update_menus (GtkWidget *parent_window) {
-    if ((selected_object < 0) || (selected_object >= (physics_world_get_primary ()->body_count))) {
+    if ((selected_object < 0) || (selected_object >= (physics_world_get_primary () -> body_count))) {
         if (main_inputs.object_menu_level > 0) {
             main_inputs.object_menu_level = 0;
         }
     }
     if ((main_inputs.marked_joint_object_index < 0) ||
-        (main_inputs.marked_joint_object_index >= (physics_world_get_primary ()->body_count))) {
+        (main_inputs.marked_joint_object_index >= (physics_world_get_primary () -> body_count))) {
         main_inputs.marked_joint_object_index = -1;
     }
     // Spawner Menu Logic
@@ -210,16 +210,16 @@ void editor_update_menus (GtkWidget *parent_window) {
             main_inputs.object_menu_level = 0;
             return;
         }
-        selected_rigid_body->mass =
-            open_numerical_input_dialog (parent_window, "Selected Object Mass", selected_rigid_body->mass);
+        selected_rigid_body -> mass =
+            open_numerical_input_dialog (parent_window, "Selected Object Mass", selected_rigid_body -> mass);
         editor_reacquire_mouse (parent_window);
-        if (selected_rigid_body->mass < 0.01f) {
-            selected_rigid_body->mass = 0.01f;
+        if (selected_rigid_body -> mass < 0.01f) {
+            selected_rigid_body -> mass = 0.01f;
         }
-        selected_rigid_body->inverse_mass = 1.0f / selected_rigid_body->mass;
-        if (selected_rigid_body->type == object_sphere) {
+        selected_rigid_body -> inverse_mass = 1.0f / selected_rigid_body -> mass;
+        if (selected_rigid_body -> type == object_sphere) {
             rigidbody_update_inertia_sphere (selected_rigid_body);
-        } else if (selected_rigid_body->type == object_cylinder) {
+        } else if (selected_rigid_body -> type == object_cylinder) {
             /* Cylinders got cube inertia here before (wrong dynamics post-edit). */
             rigidbody_update_inertia_cylinder (selected_rigid_body);
         } else {
@@ -237,21 +237,21 @@ void editor_update_menus (GtkWidget *parent_window) {
             main_inputs.object_menu_level = 0;
             return;
         }
-        if (selected_rigid_body->type == object_sphere) {
-            selected_rigid_body->radius =
-                open_numerical_input_dialog (parent_window, "Selected Object Radius", selected_rigid_body->radius);
-            if (selected_rigid_body->radius < 0.01f) {
-                selected_rigid_body->radius = 0.01f;
+        if (selected_rigid_body -> type == object_sphere) {
+            selected_rigid_body -> radius =
+                open_numerical_input_dialog (parent_window, "Selected Object Radius", selected_rigid_body -> radius);
+            if (selected_rigid_body -> radius < 0.01f) {
+                selected_rigid_body -> radius = 0.01f;
             }
             editor_reacquire_mouse (parent_window);
             rigidbody_update_inertia_sphere (selected_rigid_body);
-        } else if (selected_rigid_body->type == object_cylinder) {
+        } else if (selected_rigid_body -> type == object_cylinder) {
             /* Cylinder radius is live (see overlay label): same dialog path,
              * cylinder inertia (sanitize re-syncs bounding half-extents). */
-            selected_rigid_body->radius =
-                open_numerical_input_dialog (parent_window, "Selected Object Radius", selected_rigid_body->radius);
-            if (selected_rigid_body->radius < 0.01f) {
-                selected_rigid_body->radius = 0.01f;
+            selected_rigid_body -> radius =
+                open_numerical_input_dialog (parent_window, "Selected Object Radius", selected_rigid_body -> radius);
+            if (selected_rigid_body -> radius < 0.01f) {
+                selected_rigid_body -> radius = 0.01f;
             }
             editor_reacquire_mouse (parent_window);
             rigidbody_update_inertia_cylinder (selected_rigid_body);
@@ -268,13 +268,13 @@ void editor_update_menus (GtkWidget *parent_window) {
             main_inputs.object_menu_level = 0;
             return;
         }
-        selected_rigid_body->friction_kinetic = open_numerical_input_dialog (parent_window, "Selected Object Friction",
-                                                                             selected_rigid_body->friction_kinetic);
+        selected_rigid_body -> friction_kinetic = open_numerical_input_dialog (parent_window, "Selected Object Friction",
+                                                                             selected_rigid_body -> friction_kinetic);
         editor_reacquire_mouse (parent_window);
-        if (selected_rigid_body->friction_kinetic < 0.0f) {
-            selected_rigid_body->friction_kinetic = 0.0f;
+        if (selected_rigid_body -> friction_kinetic < 0.0f) {
+            selected_rigid_body -> friction_kinetic = 0.0f;
         }
-        selected_rigid_body->friction_static = selected_rigid_body->friction_kinetic + 0.1f;
+        selected_rigid_body -> friction_static = selected_rigid_body -> friction_kinetic + 0.1f;
         /* MPE_TASK_06_CACHE_CLEAR_FRICTION */
         contact_cache_clear (physics_world_get_primary ());
         /* MPE_TASK_19_EDITOR_EDIT_WAKE_FRICTION_BEGIN */
@@ -289,7 +289,7 @@ void editor_update_menus (GtkWidget *parent_window) {
             return;
         }
         if ((main_inputs.up_arrow_pressed) || (main_inputs.down_arrow_pressed)) {
-            rigidbody_set_static (selected_rigid_body, !selected_rigid_body->static_state);
+            rigidbody_set_static (selected_rigid_body, !selected_rigid_body -> static_state);
             /* MPE_TASK_06_CACHE_CLEAR_STATIC */
             contact_cache_clear (physics_world_get_primary ());
             main_inputs.up_arrow_pressed = false;
@@ -304,11 +304,11 @@ void editor_update_menus (GtkWidget *parent_window) {
         main_inputs.object_menu_level = 0;
     } else if (main_inputs.object_menu_level == 7) {
         if (main_inputs.marked_joint_object_index != -1 &&
-            main_inputs.marked_joint_object_index < (physics_world_get_primary ()->body_count) &&
+            main_inputs.marked_joint_object_index < (physics_world_get_primary () -> body_count) &&
             main_inputs.marked_joint_object_index != selected_object) {
-            rigidbody *rb_a = &(physics_world_get_primary ()->bodies) [main_inputs.marked_joint_object_index];
-            rigidbody *rb_b = &(physics_world_get_primary ()->bodies) [selected_object];
-            float dist = vector3_length (vector3_subtraction (rb_b->position, rb_a->position));
+            rigidbody *rb_a = &(physics_world_get_primary () -> bodies)[main_inputs.marked_joint_object_index];
+            rigidbody *rb_b = &(physics_world_get_primary () -> bodies)[selected_object];
+            float dist = vector3_length (vector3_subtraction (rb_b -> position, rb_a -> position));
             if (add_joint (physics_world_get_primary (), main_inputs.marked_joint_object_index, selected_object, dist,
                            g_cfg.joints.default_spring_k,
                            g_cfg.joints.default_damping) < 0) { /* MFS_166_JOINT_CHECK */
@@ -324,21 +324,21 @@ void editor_update_menus (GtkWidget *parent_window) {
             return;
         }
         if (main_inputs.object_menu_level == 81) {
-            selected_rigid_body->colour = (vector3){1.0f, 0.0f, 0.0f};
+            selected_rigid_body -> colour = (vector3) {1.0f, 0.0f, 0.0f};
         } else if (main_inputs.object_menu_level == 82) {
-            selected_rigid_body->colour = (vector3){0.0f, 1.0f, 0.0f};
+            selected_rigid_body -> colour = (vector3) {0.0f, 1.0f, 0.0f};
         } else if (main_inputs.object_menu_level == 83) {
-            selected_rigid_body->colour = (vector3){0.0f, 0.0f, 1.0f};
+            selected_rigid_body -> colour = (vector3) {0.0f, 0.0f, 1.0f};
         } else if (main_inputs.object_menu_level == 84) {
-            selected_rigid_body->colour = (vector3){1.0f, 0.4f, 0.2f};
+            selected_rigid_body -> colour = (vector3) {1.0f, 0.4f, 0.2f};
         } else if (main_inputs.object_menu_level == 85) {
-            selected_rigid_body->colour = (vector3){0.0f, 1.0f, 1.0f};
+            selected_rigid_body -> colour = (vector3) {0.0f, 1.0f, 1.0f};
         } else if (main_inputs.object_menu_level == 86) {
-            selected_rigid_body->colour = (vector3){1.0f, 0.0f, 1.0f};
+            selected_rigid_body -> colour = (vector3) {1.0f, 0.0f, 1.0f};
         } else if (main_inputs.object_menu_level == 87) {
-            selected_rigid_body->colour = (vector3){1.0f, 1.0f, 0.0f};
+            selected_rigid_body -> colour = (vector3) {1.0f, 1.0f, 0.0f};
         } else if (main_inputs.object_menu_level == 88) {
-            selected_rigid_body->colour = (vector3){1.0f, 1.0f, 1.0f};
+            selected_rigid_body -> colour = (vector3) {1.0f, 1.0f, 1.0f};
         }
         main_inputs.object_menu_level = 0;
     }
