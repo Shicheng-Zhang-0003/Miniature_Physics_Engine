@@ -34,31 +34,31 @@ enum {
     OBJECT_CUSTOM = object_custom
 };
 typedef struct {
-    //Linear Kinematics
+    // Linear Kinematics
     vector3 position, velocity, acceleration;
-    //Rotational Motion
+    // Rotational Motion
     vector4 orientation;
     vector3 angular_velocity, angular_acceleration;
-    //Dynamics (Properties)
+    // Dynamics (Properties)
     float mass, inverse_mass, restitution;
-    //Inertial Tensor
+    // Inertial Tensor
     math3 inertia_tensor_local, inverse_inertia_tensor_local, inverse_inertia_system;
-    //Force and Torque accumulation
+    // Force and Torque accumulation
     vector3 force_accumulator, torque_accumulator;
-    //Dimensions
+    // Dimensions
     float radius;
     float cylinder_half_length; /* MPE_FTC_090: half-length along axle (X) */
     bool static_state;
     float friction_static, friction_kinetic;
     vector3 colour;
     object_type type;
-    //Cube Specific Variables
+    // Cube Specific Variables
     vector3 half_extensions;
     vector3 cached_axes [3];
     /* MPE_TASK_15_AXIS_CACHE_FIELD_BEGIN */
     vector4 cached_axes_orientation;
     /* MPE_TASK_15_AXIS_CACHE_FIELD_END */
-    //v1.2 Sleeping Bodies
+    // v1.2 Sleeping Bodies
     bool is_sleeping;
     float sleep_timer;
     /* Kinematic bodies: infinite mass like static, but move with a
@@ -179,23 +179,23 @@ static inline float rigidbody_effective_inv_mass (const rigidbody *rb) {
     if (!rb) {
         return 0.0f;
     }
-    if (rb->static_state || rb->is_sleeping || rb->kinematic) {
+    if (rb -> static_state || rb -> is_sleeping || rb -> kinematic) {
         return 0.0f;
     }
-    return rb->inverse_mass;
+    return rb -> inverse_mass;
 }
 static inline bool rigidbody_is_awake_for_solver (const rigidbody *rb) {
     if (!rb) {
         return false;
     }
-    if (rb->static_state) {
+    if (rb -> static_state) {
         return false;
     }
     /* TRUTH: kinematic has eff_inv==0 (infinite mass) but still moves with
      * prescribed velocity. It is "awake" for island purposes (floor stacks
      * on moving platforms must stay awake) while solver treats it as
      * immovable via effective_* helpers. Sleeping is the only solver-skip. */
-    return !rb->is_sleeping;
+    return !rb -> is_sleeping;
 }
 /* Effective inverse inertia: zero matrix for infinite-mass bodies, otherwise
  * the stored world-space inverse. Avoids mutating the stored field. */
@@ -204,10 +204,10 @@ static inline math3 rigidbody_effective_inv_inertia (const rigidbody *rb) {
     if (!rb) {
         return zero;
     }
-    if (rb->static_state || rb->is_sleeping || rb->kinematic) {
+    if (rb -> static_state || rb -> is_sleeping || rb -> kinematic) {
         return zero;
     }
-    return rb->inverse_inertia_system;
+    return rb -> inverse_inertia_system;
 }
 /* DESPOT-2026-10-02: input-clamp observability.
  *

@@ -16,75 +16,75 @@
  * ================================================================== */
 const char *mpe_config_category_name (param_category cat) {
     switch (cat) {
-    case cat_world:
+        case cat_world:
         return "world";
-    case cat_timestep:
+        case cat_timestep:
         return "timestep";
-    case cat_sleep:
+        case cat_sleep:
         return "sleep";
-    case cat_solver:
+        case cat_solver:
         return "solver";
-    case cat_depenetration:
+        case cat_depenetration:
         return "depenetration";
-    case cat_broadphase:
+        case cat_broadphase:
         return "broadphase";
-    case cat_joints:
+        case cat_joints:
         return "joints";
-    case cat_boundary:
+        case cat_boundary:
         return "boundary";
-    case cat_spawner:
+        case cat_spawner:
         return "spawner";
-    case cat_body_defaults:
+        case cat_body_defaults:
         return "body_defaults";
-    case cat_camera:
+        case cat_camera:
         return "camera";
-    case cat_render:
+        case cat_render:
         return "render";
-    case cat_ui:
+        case cat_ui:
         return "ui";
-    default:
+        default:
         return "unknown";
     }
 }
 static double param_read_double (const mpe_param *param) {
-    if ((!param) || (!param->storage)) {
+    if ((!param) || (!param -> storage)) {
         return 0.0;
     }
-    switch (param->type) {
-    case p_float:
-        return (double) (*(float *) param->storage);
-    case p_int:
-        return (double) (*(int *) param->storage);
-    case p_bool:
-        return (*(bool *) param->storage) ? 1.0 : 0.0;
-    default:
+    switch (param -> type) {
+        case p_float:
+        return (double) (*(float *) param -> storage);
+        case p_int:
+        return (double) (*(int *) param -> storage);
+        case p_bool:
+        return (*(bool *) param -> storage) ? 1.0 : 0.0;
+        default:
         return 0.0;
     }
 }
 static bool param_write_double (const mpe_param *param, double value) {
-    if ((!param) || (!param->storage)) {
+    if ((!param) || (!param -> storage)) {
         return false;
     }
     bool clamped = false;
-    if (value < param->min) {
-        value = param->min;
+    if (value < param -> min) {
+        value = param -> min;
         clamped = true;
     }
-    if (value > param->max) {
-        value = param->max;
+    if (value > param -> max) {
+        value = param -> max;
         clamped = true;
     }
-    switch (param->type) {
-    case p_float:
-        *(float *) param->storage = (float) value;
+    switch (param -> type) {
+        case p_float:
+        *(float *) param -> storage = (float) value;
         break;
-    case p_int:
-        *(int *) param->storage = (int) value;
+        case p_int:
+        *(int *) param -> storage = (int) value;
         break;
-    case p_bool:
-        *(bool *) param->storage = (value != 0.0);
+        case p_bool:
+        *(bool *) param -> storage = (value != 0.0);
         break;
-    default:
+        default:
         break;
     }
     return clamped;
@@ -171,31 +171,31 @@ void mpe_config_reset_defaults (void) {
 }
 bool mpe_config_get_float (const char *key, float *out) {
     const mpe_param *param = mpe_config_find (key);
-    if ((!param) || (!out) || param->type != p_float) {
+    if ((!param) || (!out) || param -> type != p_float) {
         return false;
     }
-    *out = (float) param_read_double (param);
+    * out = (float) param_read_double (param);
     return true;
 }
 bool mpe_config_get_int (const char *key, int *out) {
     const mpe_param *param = mpe_config_find (key);
-    if ((!param) || (!out) || param->type != p_int) {
+    if ((!param) || (!out) || param -> type != p_int) {
         return false;
     }
-    *out = (int) param_read_double (param);
+    * out = (int) param_read_double (param);
     return true;
 }
 bool mpe_config_get_bool (const char *key, bool *out) {
     const mpe_param *param = mpe_config_find (key);
-    if ((!param) || (!out) || param->type != p_bool) {
+    if ((!param) || (!out) || param -> type != p_bool) {
         return false;
     }
-    *out = (param_read_double (param) != 0.0);
+    * out = (param_read_double (param) != 0.0);
     return true;
 }
 bool mpe_config_set_float (const char *key, float value) {
     const mpe_param *param = mpe_config_find (key);
-    if (!param || param->type != p_float || !isfinite (value)) {
+    if (!param || param -> type != p_float || !isfinite (value)) {
         return false;
     }
     bool clamped = param_write_double (param, (double) value);
@@ -203,7 +203,7 @@ bool mpe_config_set_float (const char *key, float value) {
 }
 bool mpe_config_set_int (const char *key, int value) {
     const mpe_param *param = mpe_config_find (key);
-    if (!param || param->type != p_int) {
+    if (!param || param -> type != p_int) {
         return false;
     }
     bool clamped = param_write_double (param, (double) value);
@@ -211,7 +211,7 @@ bool mpe_config_set_int (const char *key, int value) {
 }
 bool mpe_config_set_bool (const char *key, bool value) {
     const mpe_param *param = mpe_config_find (key);
-    if (!param || param->type != p_bool) {
+    if (!param || param -> type != p_bool) {
         return false;
     }
     param_write_double (param, value ? 1.0 : 0.0);
@@ -465,7 +465,7 @@ bool mpe_config_load (const char *path) {
         if (!equals) {
             continue;
         }
-        *equals = '\0';
+        * equals = '\0';
         char *key_part = term_trim (cursor);
         char *value_part = term_trim (equals + 1);
         char full_key [128];
@@ -505,7 +505,7 @@ bool mpe_config_load (const char *path) {
         /* FIX-AUDIT-DESPOT: clamping was silent (a hostile/hand-edited file
          * could halve gravity with no trace). Log every clamped load. */
         if (param_write_double (param, parsed)) {
-            fprintf (stderr, "[config] '%s' clamped to [%g, %g] (file had %g)\n", full_key, param->min, param->max,
+            fprintf (stderr, "[config] '%s' clamped to [%g, %g] (file had %g)\n", full_key, param -> min, param -> max,
                      parsed);
         }
     }

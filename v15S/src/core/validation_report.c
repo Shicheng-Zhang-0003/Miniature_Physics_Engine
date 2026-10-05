@@ -25,8 +25,8 @@ extern input_status main_inputs;
 extern int selected_object;
 void validation_report_print (void) {
     printf ("[A3] Validation report %s\n", a3_version_string);
-    printf ("[A3] objects=%d capacity=%d joints=%d selected=%d\n", (physics_world_get_primary ()->body_count),
-            (physics_world_get_primary ()->body_capacity), (physics_world_get_primary ()->spring_joint_count),
+    printf ("[A3] objects=%d capacity=%d joints=%d selected=%d\n", (physics_world_get_primary () -> body_count),
+            (physics_world_get_primary () -> body_capacity), (physics_world_get_primary () -> spring_joint_count),
             selected_object);
     /* MPE_TASK_12_VALIDATION_PRINT_BEGIN */
     /* FIX-AUDIT-DESPOT: sleeping here excludes statics (infinite-mass slabs
@@ -65,14 +65,14 @@ void validation_report_print (void) {
     {
         physics_world *w = physics_world_get_primary ();
         double total_ke = 0.0, total_pe = 0.0;
-        for (int i = 0; i < w->body_count; i++) {
-            rigidbody *rb = &w->bodies [i];
-            if (rb->static_state) {
+        for (int i = 0; i < w -> body_count; i++) {
+            rigidbody *rb = &w -> bodies [i];
+            if (rb -> static_state) {
                 continue;
             }
             total_ke += (double) rb_get_kinetic_energy (rb);
-            if (isfinite (rb->mass) && isfinite (rb->position.y)) {
-                total_pe += (double) rb->mass * (double) mpe_world_cfg (w)->world.gravity * (double) rb->position.y;
+            if (isfinite (rb -> mass) && isfinite (rb -> position.y)) {
+                total_pe += (double) rb -> mass * (double) mpe_world_cfg (w) -> world.gravity * (double) rb -> position.y;
             }
         }
         printf ("[A3] energy: KE=%.4f PE=%.4f total=%.4f J (dynamic bodies)\n", total_ke, total_pe,
@@ -85,13 +85,13 @@ void validation_report_print (void) {
     {
         physics_world *w = physics_world_get_primary ();
         int asleep_islands = 0;
-        for (int i = 0; i < w->island_total; i++) {
-            if (w->island_awake_flags [i] == 0) {
+        for (int i = 0; i < w -> island_total; i++) {
+            if (w -> island_awake_flags [i] == 0) {
                 asleep_islands++;
             }
         }
         printf ("[A3] islands: total=%d asleep=%d awake=%d (islands_count query live)\n", islands_count (w),
-                asleep_islands, w->island_total - asleep_islands);
+                asleep_islands, w -> island_total - asleep_islands);
     }
     printf ("[A3] menus: open=%d spawner=%d velocity=%d object=%d marked_joint=%d\n", main_inputs.is_menu_open,
             main_inputs.spawner_menu_level, main_inputs.velocity_menu_level, main_inputs.object_menu_level,

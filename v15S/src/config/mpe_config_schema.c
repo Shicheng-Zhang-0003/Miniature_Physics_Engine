@@ -32,7 +32,7 @@ static mpe_param s_registry [] = {
      &g_cfg.world.gravity, -9.81, -50.0, 0.0, false},
     {"world.drag", "Air Drag Coefficient",
      "VISCOUS retention base (truth: linear viscous c=-ln(drag), NOT quadratic aero; area/mass-independent; 1.0=truth "
-     "vacuum, off)",
+        "vacuum, off)",
      p_float, cat_world, &g_cfg.world.drag, 0.99, 0.1, 1.0, false},
     {"world.floor_friction_s", "Floor Friction (Static)", "Static friction coefficient for floor contacts", p_float,
      cat_world, &g_cfg.world.floor_friction_s, 0.2, 0.0, 5.0, false},
@@ -43,7 +43,7 @@ static mpe_param s_registry [] = {
      &g_cfg.world.rolling_resistance_coeff, 0.02f, 0.0, 5.0, false},
     {"world.angular_damping_scale", "Angular Damping Scale",
      "NON-PHYSICAL game damping (1.0=truth, off: retention exactly 1.0 even when drag<1 damps translation; air damps "
-     "translation, barely rotation). Extra rotary retention with no fluid basis.",
+        "translation, barely rotation). Extra rotary retention with no fluid basis.",
      p_float, cat_world, &g_cfg.world.angular_damping_scale, 1.0f, 0.5, 1.0, true},
     /* ============================================================
      * cat_timestep
@@ -55,7 +55,7 @@ static mpe_param s_registry [] = {
      cat_timestep, &g_cfg.timestep.max_substeps, 5.0, 1.0, 20.0, true},
     {"timestep.max_linear_speed", "Max Linear Speed",
      "Inform-only overspeed guard (m/s): velocities are never scaled back (no guillotine); CCD owns fast bodies and "
-     "resolves the impact",
+        "resolves the impact",
      p_float, cat_timestep, &g_cfg.timestep.max_linear_speed, 150.0, 10.0, 10000.0, true},
     {"timestep.max_angular_speed", "Max Angular Speed",
      "Inform-only overspeed guard (rad/s): spin is never scaled back; rotors are exact and unconditionally stable",
@@ -65,11 +65,11 @@ static mpe_param s_registry [] = {
      * ============================================================ */
     {"sleep.linear_thresh_sq", "Sleep Linear Threshold^2",
      "Speed^2 below which sleep timer accumulates (0.01^2: Box2D 0.01 m/s; old 0.0025 froze visibly-drifting 0.05 m/s "
-     "bodies, zeroing real creep energy)",
+        "bodies, zeroing real creep energy)",
      p_float, cat_sleep, &g_cfg.sleep.linear_thresh_sq, 0.0001, 0.0, 0.05, true},
     {"sleep.angular_thresh_sq", "Sleep Angular Threshold^2",
      "Angular speed^2 below which sleep timer accumulates (0.035^2: Box2D 2deg/s; old 0.0001 kept 1deg/s spinners "
-     "awake 12x too strictly)",
+        "awake 12x too strictly)",
      p_float, cat_sleep, &g_cfg.sleep.angular_thresh_sq, 0.0012, 0.0, 0.05, true},
     {"sleep.timer_duration", "Sleep Timer (s)",
      "Seconds below threshold before a body sleeps (Box2D 0.5s; 1.0s let micro-motion pump stacks twice as long)",
@@ -94,7 +94,7 @@ static mpe_param s_registry [] = {
      cat_solver, &g_cfg.solver.max_separation_bias, 5.0, 0.5, 10.0, true},
     {"solver.restitution_velocity_thresh", "Restitution Velocity Threshold",
      "Approach speed below which bounce is suppressed (negative = approaching, m/s; Box2D cuts at 1.0: sub-1 m/s "
-     "impacts are inelastic)",
+        "impacts are inelastic)",
      p_float, cat_solver, &g_cfg.solver.restitution_velocity_thresh, -1.0, -10.0, 0.0, true},
     /* TRUTH: solver.max_restitution_bias REMOVED — dead knob (registered and
      * F11-randomized, but the Poisson pass never read it; the Newton bound
@@ -105,7 +105,7 @@ static mpe_param s_registry [] = {
      0.02, 0.0, 1.0, true},
     {"solver.warm_start_match_dist_sq", "Warm-Start Match Dist^2",
      "Max distance^2 for cached contact matching (1cm: violent-contact adoption must be near-steady; 5cm admitted "
-     "tumbling geometry as steady state)",
+        "tumbling geometry as steady state)",
      p_float, cat_solver, &g_cfg.solver.warm_start_match_dist_sq, 0.0001, 0.0, 0.01, true},
     /* ============================================================
      * cat_depenetration
@@ -114,7 +114,7 @@ static mpe_param s_registry [] = {
      cat_depenetration, &g_cfg.depenetration.correction_factor, 0.35, 0.0, 1.0, true},
     {"depenetration.max_correction", "Max Correction",
      "Per-pass positional correction cap (m): 0.2m/teleport per pass was a tunneling-scale jump; 0.02m resolves deep "
-     "overlap over ticks via split+passes without teleporting (CCD/boundary own tunneling)",
+        "overlap over ticks via split+passes without teleporting (CCD/boundary own tunneling)",
      p_float, cat_depenetration, &g_cfg.depenetration.max_correction, 0.02, 0.005, 0.1, true},
     /* TRUTH: depenetration.penetration_slop REMOVED from the registry — dead
      * since the single-slop unification (depenetration honors
@@ -123,8 +123,8 @@ static mpe_param s_registry [] = {
      * removal balances the sleep.enable addition at 77; boundary.safety_net_enabled took it to 79). */
     {"depenetration.wake_depth_thresh", "Wake Depth Threshold",
      "Overlap depth that wakes sleeping pairs (m). TRUTH: kept at 0.02, NOT unified with split wake 0.01: measured "
-     "0.01 re-admits the F10 runaway (runmax 13.07 m/s ejection, sleep churn on resting residual) while 0.02 holds "
-     "runmax 0.00. Resting stacks carry ~0.01 residual; the wake gate must clear it.",
+        "0.01 re-admits the F10 runaway (runmax 13.07 m/s ejection, sleep churn on resting residual) while 0.02 holds "
+        "runmax 0.00. Resting stacks carry ~0.01 residual; the wake gate must clear it.",
      p_float, cat_depenetration, &g_cfg.depenetration.wake_depth_thresh, 0.02, 0.0, 0.1, true},
     {"depenetration.rebuild_iterations", "Rebuild Iterations", "Depenetration iterations after boundary rebuild", p_int,
      cat_depenetration, &g_cfg.depenetration.rebuild_iterations, 3.0, 1.0, 10.0, true},
@@ -173,7 +173,7 @@ static mpe_param s_registry [] = {
      * fail. Default 1 = shipped behaviour unchanged. */
     {"boundary.safety_net_enabled", "World-Edge Safety Net",
      "World-edge emergency clamp. 1 = on (default, unchanged). 0 = OFF: lets a test prove the contact solver alone "
-     "holds bodies up. TRUTH: turning this off in a live session means a body that leaves the +-250 m box is gone.",
+        "holds bodies up. TRUTH: turning this off in a live session means a body that leaves the +-250 m box is gone.",
      p_int, cat_boundary, &g_cfg.boundary.safety_net_enabled, 1.0, 0.0, 1.0, true},
     /* ============================================================
      * cat_spawner

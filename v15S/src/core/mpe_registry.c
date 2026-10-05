@@ -46,13 +46,13 @@ static struct {
 } s_solvers [8];
 static int s_solver_count = 0;
 static mpe_module_desc_t s_modules [MPE_MAX_MODULES];
-static char s_module_names [MPE_MAX_MODULES] [64];
-static char s_module_versions [MPE_MAX_MODULES] [32];
-static char s_module_kinds [MPE_MAX_MODULES] [32];
+static char s_module_names [MPE_MAX_MODULES][64];
+static char s_module_versions [MPE_MAX_MODULES][32];
+static char s_module_kinds [MPE_MAX_MODULES][32];
 /* Provenance: plugin .so path that registered the slot, "" for static or
  * direct registrations. Lets the loader tell a static desc and a .so
  * desc of the SAME module name apart (hotload pattern). */
-static char s_module_origin [MPE_MAX_MODULES] [256];
+static char s_module_origin [MPE_MAX_MODULES][256];
 static int s_module_live [MPE_MAX_MODULES];
 static int s_module_count = 0;
 #define MPE_BUILTIN_BROADPHASE "hash"
@@ -127,28 +127,28 @@ int mpe_unregister_pair_handler (mpe_collide_fn fn) {
             s_pair_count--;
             removed++;
         } else
-            i++;
+        i++;
     }
     pthread_mutex_unlock (&s_reg_lock);
     return removed ? 0 : -1;
 }
 static int match_score (const mpe_pair_entry_t *e, int ta, int tb, int ca, int cb) {
     int s = 0;
-    if (e->type_a == ta)
+    if (e -> type_a == ta)
         s += 4;
-    else if (e->type_a != -1)
+    else if (e -> type_a != -1)
         return -1;
-    if (e->type_b == tb)
+    if (e -> type_b == tb)
         s += 4;
-    else if (e->type_b != -1)
+    else if (e -> type_b != -1)
         return -1;
-    if (e->custom_a == ca)
+    if (e -> custom_a == ca)
         s += 2;
-    else if (e->custom_a != -1)
+    else if (e -> custom_a != -1)
         return -1;
-    if (e->custom_b == cb)
+    if (e -> custom_b == cb)
         s += 2;
-    else if (e->custom_b != -1)
+    else if (e -> custom_b != -1)
         return -1;
     return s;
 }
@@ -160,13 +160,13 @@ int mpe_registry_pair_describe (int idx, int *ta, int *tb, int *ca, int *cb, cha
     int rc = -1;
     if (idx < s_pair_count) {
         if (ta)
-            *ta = s_pairs [idx].type_a;
+            * ta = s_pairs [idx].type_a;
         if (tb)
-            *tb = s_pairs [idx].type_b;
+            * tb = s_pairs [idx].type_b;
         if (ca)
-            *ca = s_pairs [idx].custom_a;
+            * ca = s_pairs [idx].custom_a;
         if (cb)
-            *cb = s_pairs [idx].custom_b;
+            * cb = s_pairs [idx].custom_b;
         if (name && namelen > 0) {
             snprintf (name, (size_t) namelen, "%s", s_pairs [idx].name);
         }
@@ -245,8 +245,8 @@ void mpe_registry_truncate_modules (int keep) {
             s_modules [i].pre_step = NULL;
             s_modules [i].post_step = NULL;
             s_modules [i].stage_detach = NULL;
-            s_module_names [i] [0] = 0;
-            s_module_origin [i] [0] = 0;
+            s_module_names [i][0] = 0;
+            s_module_origin [i][0] = 0;
         }
         s_module_count = keep;
     }
@@ -423,9 +423,9 @@ const mpe_broadphase_if_t *mpe_find_broadphase (const char *name) {
     const mpe_broadphase_if_t *out = 0;
     for (int i = 0; i < s_broad_count; i++)
         if (s_broad [i].live && strcmp (s_broad [i].name, name) == 0) {
-            out = &s_broad [i].iface;
-            break;
-        }
+        out = &s_broad [i].iface;
+        break;
+    }
     pthread_mutex_unlock (&s_reg_lock);
     return out;
 }
@@ -436,9 +436,9 @@ const mpe_solver_if_t *mpe_find_solver (const char *name) {
     const mpe_solver_if_t *out = 0;
     for (int i = 0; i < s_solver_count; i++)
         if (s_solvers [i].live && strcmp (s_solvers [i].name, name) == 0) {
-            out = &s_solvers [i].iface;
-            break;
-        }
+        out = &s_solvers [i].iface;
+        break;
+    }
     pthread_mutex_unlock (&s_reg_lock);
     return out;
 }
@@ -455,7 +455,7 @@ static void module_store (int i, const mpe_module_desc_t *desc, int keep_origin)
     s_modules [i].stage_detach = NULL;
     {
         void (*hook) (mpe_world_t *) = NULL;
-        memcpy (&hook, &desc->stage_detach, sizeof (hook));
+        memcpy (&hook, &desc -> stage_detach, sizeof (hook));
         if (hook) {
             Dl_info hi;
             if (dladdr ((const void *) hook, &hi) != 0 && hi.dli_fname) {
@@ -463,9 +463,9 @@ static void module_store (int i, const mpe_module_desc_t *desc, int keep_origin)
             }
         }
     }
-    snprintf (s_module_names [i], sizeof (s_module_names [i]), "%s", desc->name);
-    snprintf (s_module_versions [i], sizeof (s_module_versions [i]), "%s", desc->version ? desc->version : "?");
-    snprintf (s_module_kinds [i], sizeof (s_module_kinds [i]), "%s", desc->kind ? desc->kind : "?");
+    snprintf (s_module_names [i], sizeof (s_module_names [i]), "%s", desc -> name);
+    snprintf (s_module_versions [i], sizeof (s_module_versions [i]), "%s", desc -> version ? desc -> version : "?");
+    snprintf (s_module_kinds [i], sizeof (s_module_kinds [i]), "%s", desc -> kind ? desc -> kind : "?");
     s_modules [i].name = s_module_names [i];
     s_modules [i].version = s_module_versions [i];
     s_modules [i].kind = s_module_kinds [i];
@@ -497,7 +497,7 @@ const char *mpe_registry_module_origin (const mpe_module_desc_t *desc) {
     const char *out = NULL;
     for (int i = 0; i < s_module_count; i++) {
         if (s_module_live [i] && desc == &s_modules [i]) {
-            out = s_module_origin [i] [0] ? s_module_origin [i] : NULL;
+            out = s_module_origin [i][0] ? s_module_origin [i] : NULL;
             break;
         }
     }
@@ -505,14 +505,14 @@ const char *mpe_registry_module_origin (const mpe_module_desc_t *desc) {
     return out;
 }
 int mpe_register_module (const mpe_module_desc_t *desc) {
-    if (!desc || desc->abi != MPE_MODULE_ABI || !desc->name)
+    if (!desc || desc -> abi != MPE_MODULE_ABI || !desc -> name)
         return -1;
-    if (!name_fits (desc->name, sizeof (s_module_names [0])))
+    if (!name_fits (desc -> name, sizeof (s_module_names [0])))
         return -1;
     pthread_mutex_lock (&s_reg_lock);
     int rc = -1;
     for (int i = 0; i < s_module_count; i++) {
-        if (s_module_live [i] && strcmp (s_module_names [i], desc->name) == 0) {
+        if (s_module_live [i] && strcmp (s_module_names [i], desc -> name) == 0) {
             module_store (i, desc, 1);
             rc = i;
             pthread_mutex_unlock (&s_reg_lock);
@@ -529,7 +529,7 @@ int mpe_register_module (const mpe_module_desc_t *desc) {
     if (s_module_count >= MPE_MAX_MODULES) {
         /* FIX-AUDIT-DESPOT: silent slot-full -> stderr diagnostic. */
         fprintf (stderr, "[registry] module table full (%d); refusing '%s'\n", MPE_MAX_MODULES,
-                 desc && desc->name ? desc->name : "?");
+                 desc && desc -> name ? desc -> name : "?");
         pthread_mutex_unlock (&s_reg_lock);
         return -1;
     }
@@ -613,15 +613,15 @@ const mpe_module_desc_t *mpe_find_module (const char *name) {
     const mpe_module_desc_t *out = 0;
     for (int i = 0; i < s_module_count; i++)
         if (s_module_live [i] && strcmp (s_modules [i].name, name) == 0) {
-            out = &s_modules [i];
-            break;
-        }
+        out = &s_modules [i];
+        break;
+    }
     pthread_mutex_unlock (&s_reg_lock);
     return out;
 }
 /* Built-in pair handlers forward the world's config snapshot. */
 static const mpe_config_t *wrap_cfg (mpe_world_t *w) {
-    return (w && w->cfg) ? w->cfg : &g_cfg;
+    return (w && w -> cfg) ? w -> cfg : &g_cfg;
 }
 static bool wrap_ss (rigidbody *a, rigidbody *b, void *out, mpe_world_t *w) {
     return collision_dual_sphere (a, b, (collision_data *) out, wrap_cfg (w));
