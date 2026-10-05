@@ -6,7 +6,7 @@ Profiles:
            (41 cases incl. 2 informational diags; full suite re-run under 5
            regimes default/light/heavy/brittle/sticky via MPE_TEST_REGIME).
   physics  quick + every isolated legacy case (30) and all paranoia cases (14).
-  full     physics + ASan/UBSan suite, MFS robotics (12 gated), TUI snapshots
+  full     physics + ASan/UBSan suite, MFS robotics (15 gated), TUI snapshots
            (9 files), engine build + check-flags.
 
 All run artifacts are written below the project-local temp/qa_runs directory.
