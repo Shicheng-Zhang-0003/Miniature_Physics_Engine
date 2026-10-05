@@ -14,9 +14,9 @@ int main (void) {
         physics_world world;
         physics_world_init (&world);
         constraint_pool_init (&world);
-        physics_world_add_cube (&world, (vector3){0, 5.0f, 0}, (vector3){0.05f, 5.0f, 5.0f}, 0.0f);
-        int s = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){-5.7f, 5.0f, 0});
-        world.bodies [s].velocity = (vector3){144.0f, 0.0f, 0};
+        physics_world_add_cube (&world, (vector3) {0, 5.0f, 0}, (vector3) {0.05f, 5.0f, 5.0f}, 0.0f);
+        int s = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3) {-5.7f, 5.0f, 0});
+        world.bodies [s].velocity = (vector3) {144.0f, 0.0f, 0};
         world.bodies [s].restitution = 0.0f;
         rigidbody_wake (&world.bodies [s]);
         for (int t = 0; t < 30; t++) {
@@ -55,9 +55,9 @@ int main (void) {
         mpe_config_t no_net_cfg = g_cfg;
         no_net_cfg.boundary.safety_net_enabled = 0;
         physics_world_set_config (&world, &no_net_cfg);
-        physics_world_add_cube (&world, (vector3){0, -0.5f, 0}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
-        int s = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0, 5.0f, 0});
-        world.bodies [s].velocity = (vector3){0, -60.0f, 0};
+        physics_world_add_cube (&world, (vector3) {0, -0.5f, 0}, (vector3) {10.0f, 0.5f, 10.0f}, 0.0f);
+        int s = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3) {0, 5.0f, 0});
+        world.bodies [s].velocity = (vector3) {0, -60.0f, 0};
         world.bodies [s].restitution = 0.0f;
         rigidbody_wake (&world.bodies [s]);
         float min_y = 1e9f;

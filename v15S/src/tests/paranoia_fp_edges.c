@@ -32,8 +32,8 @@ int main (void) {
         constraint_pool_init (&world);
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 1.0f;
-        int a = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0.0f, 2.0f, 0.0f});
-        world.bodies [a].velocity = (vector3){INFINITY, 0.0f, 0.0f}; /* should be sanitized */
+        int a = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3) {0.0f, 2.0f, 0.0f});
+        world.bodies [a].velocity = (vector3) {INFINITY, 0.0f, 0.0f}; /* should be sanitized */
         rigidbody_wake (&world.bodies [a]);
         const float dt = 1.0f / 60.0f;
         physics_world_step (&world, dt);
@@ -58,7 +58,7 @@ int main (void) {
         constraint_pool_init (&world);
         g_cfg.world.gravity = 0.0f;
         g_cfg.world.drag = 1.0f;
-        int a = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0.0f, 0.0f, 0.0f});
+        int a = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3) {0.0f, 0.0f, 0.0f});
         world.bodies [a].position.x = NAN; /* should be sanitized */
         rigidbody_wake (&world.bodies [a]);
         physics_world_step (&world, 1.0f / 60.0f);
@@ -84,9 +84,9 @@ int main (void) {
         constraint_pool_init (&world);
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 0.99f;
-        int s = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0.0f, 5.0f, 0.0f});
-        world.bodies [s].velocity = (vector3){5.0f, 10.0f, 3.0f};
-        world.bodies [s].angular_velocity = (vector3){2.0f, 1.0f, -1.0f};
+        int s = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3) {0.0f, 5.0f, 0.0f});
+        world.bodies [s].velocity = (vector3) {5.0f, 10.0f, 3.0f};
+        world.bodies [s].angular_velocity = (vector3) {2.0f, 1.0f, -1.0f};
         rigidbody_wake (&world.bodies [s]);
         const float dt = 1.0f / 60.0f;
         for (int t = 0; t < 3600; t++)
@@ -118,11 +118,11 @@ int main (void) {
     /* Test 6: Matrix inversion near-singular - should not crash */
     {
         math3 m = {{{0}}};
-        m.matrix [0] [0] = 1e-20f;
-        m.matrix [1] [1] = 1.0f;
-        m.matrix [2] [2] = 1.0f;
+        m.matrix [0][0] = 1e-20f;
+        m.matrix [1][1] = 1.0f;
+        m.matrix [2][2] = 1.0f;
         math3 inv = math3_inverse (m);
-        int ok = isfinite (inv.matrix [0] [0]) && isfinite (inv.matrix [1] [1]) && isfinite (inv.matrix [2] [2]);
+        int ok = isfinite (inv.matrix [0][0]) && isfinite (inv.matrix [1][1]) && isfinite (inv.matrix [2][2]);
         if (!ok) {
             printf ("[FAIL] near-singular matrix inverse crashed\n");
             fail = 1;
@@ -171,12 +171,12 @@ int main (void) {
         math3 m2 = math3_multiplication (m, m);
         for (int i = 0; i < 3; i++)
             for (int j = 0; j < 3; j++) {
-                float expected = (i == j) ? 1.0f : 0.0f;
-                if (fabsf (m2.matrix [i] [j] - expected) > 1e-6f) {
-                    printf ("[FAIL] identity multiply failed\n");
-                    fail = 1;
-                }
+            float expected = (i == j) ? 1.0f : 0.0f;
+            if (fabsf (m2.matrix [i][j] - expected) > 1e-6f) {
+                printf ("[FAIL] identity multiply failed\n");
+                fail = 1;
             }
+        }
         printf ("[PASS] identity matrix multiply correct\n");
     }
     return fail;

@@ -30,11 +30,11 @@ int main (void) {
     no_net_cfg.boundary.safety_net_enabled = 0;
     physics_world_set_config (&world, &no_net_cfg);
     /* Static floor: large flat cube, top surface at y = 0. */
-    int floor_idx = physics_world_add_cube (&world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
+    int floor_idx = physics_world_add_cube (&world, (vector3) {0.0f, -0.5f, 0.0f}, (vector3) {10.0f, 0.5f, 10.0f}, 0.0f);
     /* Cylinder wheel: radius 0.05, half-length 0.02, mass 0.5. */
-    int cyl_idx = physics_world_add_cylinder (&world, 0.05f, 0.02f, 0.5f, (vector3){0.0f, 0.25f, 0.0f});
+    int cyl_idx = physics_world_add_cylinder (&world, 0.05f, 0.02f, 0.5f, (vector3) {0.0f, 0.25f, 0.0f});
     /* Control sphere: same radius and spawn height. */
-    int sph_idx = physics_world_add_sphere (&world, 0.05f, 0.5f, (vector3){1.0f, 0.25f, 0.0f});
+    int sph_idx = physics_world_add_sphere (&world, 0.05f, 0.5f, (vector3) {1.0f, 0.25f, 0.0f});
     if ((floor_idx < 0) || (cyl_idx < 0) || (sph_idx < 0)) {
         printf ("[FAIL] could not create bodies\n");
         physics_world_cleanup (&world);

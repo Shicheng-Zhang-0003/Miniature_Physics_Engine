@@ -18,7 +18,7 @@ int main (void) {
     physics_world_init (&world);
     constraint_pool_init (&world);
     /* Sleeper: still sphere, pinned asleep like the F6 setup. */
-    int sleeper = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){2.0f, 0.5f, 0.0f});
+    int sleeper = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3) {2.0f, 0.5f, 0.0f});
     world.bodies [sleeper].velocity = vector3_zero ();
     world.bodies [sleeper].angular_velocity = vector3_zero ();
     world.bodies [sleeper].is_sleeping = true;
@@ -26,11 +26,11 @@ int main (void) {
     world.bodies [sleeper].restitution = 0.0f;
     /* Slow kinematic pusher: 0.05 m/s toward the sleeper, gap 0.6 m.
      * Touch at ~tick 720; velocity gate (0.1) can never fire. */
-    int pusher = physics_world_add_cube (&world, (vector3){0.4f, 0.5f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
+    int pusher = physics_world_add_cube (&world, (vector3) {0.4f, 0.5f, 0.0f}, (vector3) {0.5f, 0.5f, 0.5f}, 1.0f);
     rigidbody_set_kinematic (&world.bodies [pusher], true);
-    world.bodies [pusher].velocity = (vector3){0.05f, 0.0f, 0.0f};
+    world.bodies [pusher].velocity = (vector3) {0.05f, 0.0f, 0.0f};
     /* Control: lone sleeper far away, floor contact only. */
-    int control = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){10.0f, 0.5f, 0.0f});
+    int control = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3) {10.0f, 0.5f, 0.0f});
     world.bodies [control].velocity = vector3_zero ();
     world.bodies [control].angular_velocity = vector3_zero ();
     world.bodies [control].is_sleeping = true;
@@ -44,7 +44,7 @@ int main (void) {
         rigidbody *s = &world.bodies [sleeper];
         rigidbody *p = &world.bodies [pusher];
         rigidbody *c = &world.bodies [control];
-        if (!isfinite (s->position.x) || !isfinite (p->position.x) || !isfinite (c->position.x)) {
+        if (!isfinite (s -> position.x) || !isfinite (p -> position.x) || !isfinite (c -> position.x)) {
             printf ("[FAIL] NaN at tick %d\n", t);
             fail = 1;
             break;
@@ -53,14 +53,14 @@ int main (void) {
          * contacts within penetration_slop (zero-depth, friction-only), so
          * first engine contact precedes geometric touch by ~slop. The wake
          * must follow ENGINE contact (slop), not geometric coincidence. */
-        float gap = (s->position.x - 0.5f) - (p->position.x + 0.5f);
+        float gap = (s -> position.x - 0.5f) - (p -> position.x + 0.5f);
         if (touch_tick < 0 && gap <= g_cfg.solver.penetration_slop) {
             touch_tick = t;
         }
-        if (wake_tick < 0 && !s->is_sleeping) {
+        if (wake_tick < 0 && !s -> is_sleeping) {
             wake_tick = t;
         }
-        if (control_wake_tick < 0 && !c->is_sleeping) {
+        if (control_wake_tick < 0 && !c -> is_sleeping) {
             control_wake_tick = t;
         }
     }

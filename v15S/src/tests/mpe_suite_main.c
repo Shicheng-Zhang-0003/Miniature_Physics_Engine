@@ -35,18 +35,18 @@ rigidbody *scene_resolve_object_by_id (uint32_t id) {
 }
 uint32_t scene_allocate_object_id (void) {
     physics_world *w = physics_world_get_primary ();
-    if (w->next_object_id == 0) {
-        w->next_object_id = 1;
+    if (w -> next_object_id == 0) {
+        w -> next_object_id = 1;
     }
-    return w->next_object_id++;
+    return w -> next_object_id++;
 }
 void scene_note_loaded_id (uint32_t id) {
     if ((id == 0) || (id == 0xFFFFFFFFu)) {
         return;
     }
     physics_world *w = physics_world_get_primary ();
-    if (id >= w->next_object_id) {
-        w->next_object_id = id + 1;
+    if (id >= w -> next_object_id) {
+        w -> next_object_id = id + 1;
     }
 }
 int scene_ensure_pool_capacity (int n) {
@@ -55,7 +55,7 @@ int scene_ensure_pool_capacity (int n) {
 }
 void scene_clear (void) {
     physics_world *w = physics_world_get_primary ();
-    w->body_count = 0;
+    w -> body_count = 0;
 }
 /* ---- test declarations (suite A/B/C) ---- */
 int mpe_t_two_world (void);
@@ -180,13 +180,13 @@ static const mpe_entry_t mpe_registry [] = {
  * executed nothing (wrong CWD, or a bundle not yet built). Skips are now
  * counted and printed, and excluded from the green count. */
 static int mpe_run_one (const mpe_entry_t *e) {
-    printf ("  Running %s...\n", e->name);
-    int fails = e->fn ();
+    printf ("  Running %s...\n", e -> name);
+    int fails = e -> fn ();
     if (fails == MPE_SKIPPED) {
-        printf ("  [SKIP] %s (coverage did not run)\n", e->name);
+        printf ("  [SKIP] %s (coverage did not run)\n", e -> name);
         return 2;
     }
-    printf ("  [%s] %s (checks failed: %d)\n", fails == 0 ? "PASS" : "FAIL", e->name, fails);
+    printf ("  [%s] %s (checks failed: %d)\n", fails == 0 ? "PASS" : "FAIL", e -> name, fails);
     return fails == 0 ? 0 : 1;
 }
 int main (int argc, char **argv) {
@@ -238,7 +238,7 @@ int main (int argc, char **argv) {
         return 0;
     }
     int include_diag = (argc >= 2 && strcmp (argv [1], "--all") == 0);
-    if (argc >= 3 && argv [1] [0] != '-' && argv [2] [0] != '-') {
+    if (argc >= 3 && argv [1][0] != '-' && argv [2][0] != '-') {
         /* Multi-name sequence in one process (bisection/debugging). */
         int failed = 0;
         for (int a = 1; a < argc; a++) {
@@ -258,7 +258,7 @@ int main (int argc, char **argv) {
         return failed ? 1 : 0;
     }
     const char *only = NULL;
-    if (argc >= 2 && !include_diag && argv [1] [0] != '-') {
+    if (argc >= 2 && !include_diag && argv [1][0] != '-') {
         only = argv [1];
     }
     if (only) {

@@ -18,8 +18,8 @@ int mpe_t_spring (void) {
     mpe_world_begin (&w);
     joint_init_pool (&w);
     const float k = 20.0f;
-    int anchor = physics_world_add_cube (&w, (vector3){0.0f, 50.0f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 0.0f);
-    int mass = physics_world_add_sphere (&w, 0.2f, 1.0f, (vector3){2.5f, 50.0f, 0.0f});
+    int anchor = physics_world_add_cube (&w, (vector3) {0.0f, 50.0f, 0.0f}, (vector3) {0.5f, 0.5f, 0.5f}, 0.0f);
+    int mass = physics_world_add_sphere (&w, 0.2f, 1.0f, (vector3) {2.5f, 50.0f, 0.0f});
     MPE_CHECK (&t, anchor >= 0 && mass >= 0);
     uint32_t ida = w.bodies [anchor].object_id;
     uint32_t idm = w.bodies [mass].object_id;
@@ -32,12 +32,12 @@ int mpe_t_spring (void) {
     for (int kk = 0; kk < 600; kk++) {
         physics_world_step (&w, dt);
         rigidbody *mb = &w.bodies [mass];
-        if (!isfinite (mb->position.x)) {
+        if (!isfinite (mb -> position.x)) {
             printf ("[FAIL] NaN\n");
             t.failures++;
             break;
         }
-        float x = mb->position.x - 2.0f;
+        float x = mb -> position.x - 2.0f;
         if ((prev_x <= 0.0f && x > 0.0f) || (prev_x >= 0.0f && x < 0.0f)) {
             crossings++;
             if (first_cross < 0) {
@@ -46,7 +46,7 @@ int mpe_t_spring (void) {
             last_cross = kk;
         }
         prev_x = x;
-        float e = 0.5f * k * x * x + 0.5f * 1.0f * vector3_length_squared (mb->velocity);
+        float e = 0.5f * k * x * x + 0.5f * 1.0f * vector3_length_squared (mb -> velocity);
         float dev = fabsf (e - e0) / e0;
         if (dev > emax_dev) {
             emax_dev = dev;
@@ -87,8 +87,8 @@ int mpe_t_two_world (void) {
     mpe_config_t cfg_b = g_cfg;
     cfg_b.world.gravity = -1.0f;
     physics_world_set_config (&wb, &cfg_b);
-    physics_world_add_sphere (&wa, 0.5f, 1.0f, (vector3){0.0f, 10.0f, 0.0f});
-    physics_world_add_sphere (&wb, 0.5f, 1.0f, (vector3){0.0f, 10.0f, 0.0f});
+    physics_world_add_sphere (&wa, 0.5f, 1.0f, (vector3) {0.0f, 10.0f, 0.0f});
+    physics_world_add_sphere (&wb, 0.5f, 1.0f, (vector3) {0.0f, 10.0f, 0.0f});
     const float dt = 1.0f / 60.0f;
     float ya_mid = 0.0f, yb_mid = 0.0f;
     for (int k = 0; k < 600; k++) {
@@ -119,29 +119,29 @@ int mpe_t_revolute (void) {
     mpe_test_begin (&t, "revolute");
     physics_world w;
     mpe_world_begin (&w);
-    int pivot = physics_world_add_cube (&w, (vector3){0.0f, 10.0f, 0.0f}, (vector3){0.2f, 0.2f, 0.2f}, 1.0f);
+    int pivot = physics_world_add_cube (&w, (vector3) {0.0f, 10.0f, 0.0f}, (vector3) {0.2f, 0.2f, 0.2f}, 1.0f);
     MPE_CHECK (&t, pivot >= 0);
     rigidbody_set_static (&w.bodies [pivot], true);
     uint32_t pid = w.bodies [pivot].object_id;
-    int bob = physics_world_add_sphere (&w, 0.3f, 2.0f, (vector3){1.0f, 8.0f, 0.0f});
+    int bob = physics_world_add_sphere (&w, 0.3f, 2.0f, (vector3) {1.0f, 8.0f, 0.0f});
     MPE_CHECK (&t, bob >= 0);
     uint32_t bid = w.bodies [bob].object_id;
     vector3 pivot_point = {0.0f, 10.0f, 0.0f};
     float rod_length = vector3_length (vector3_subtraction (pivot_point, w.bodies [bob].position));
     vector3 start_position = w.bodies [bob].position;
-    MPE_CHECK (&t, constraint_add_revolute (&w, pid, bid, (vector3){0.0f, 0.0f, 0.0f}, (vector3){-1.0f, 2.0f, 0.0f},
-                                            (vector3){0.0f, 0.0f, 1.0f}) >= 0);
+    MPE_CHECK (&t, constraint_add_revolute (&w, pid, bid, (vector3) {0.0f, 0.0f, 0.0f}, (vector3) {-1.0f, 2.0f, 0.0f},
+                                            (vector3) {0.0f, 0.0f, 1.0f}) >= 0);
     const float dt = 1.0f / 60.0f;
     float max_drift = 0.0f;
     for (int k = 0; k < 600; k++) {
         physics_world_step (&w, dt);
         rigidbody *bb = &w.bodies [bob];
-        if (!isfinite (bb->position.x) || !isfinite (bb->position.y) || !isfinite (bb->position.z)) {
+        if (!isfinite (bb -> position.x) || !isfinite (bb -> position.y) || !isfinite (bb -> position.z)) {
             printf ("[FAIL] bob went non-finite at tick %d\n", k);
             t.failures++;
             break;
         }
-        float drift = fabsf (vector3_length (vector3_subtraction (pivot_point, bb->position)) - rod_length);
+        float drift = fabsf (vector3_length (vector3_subtraction (pivot_point, bb -> position)) - rod_length);
         if (drift > max_drift) {
             max_drift = drift;
         }
@@ -168,8 +168,8 @@ int mpe_t_cylinder_drop (void) {
     mpe_config_t no_net;
     mpe_world_no_net (&w, &no_net);
     MPE_CHECK (&t, mpe_floor_slab (&w, 0.4f, 0.3f, 0.0f) >= 0);
-    int cyl = physics_world_add_cylinder (&w, 0.05f, 0.02f, 0.5f, (vector3){0.0f, 0.25f, 0.0f});
-    int sph = physics_world_add_sphere (&w, 0.05f, 0.5f, (vector3){1.0f, 0.25f, 0.0f});
+    int cyl = physics_world_add_cylinder (&w, 0.05f, 0.02f, 0.5f, (vector3) {0.0f, 0.25f, 0.0f});
+    int sph = physics_world_add_sphere (&w, 0.05f, 0.5f, (vector3) {1.0f, 0.25f, 0.0f});
     MPE_CHECK (&t, cyl >= 0 && sph >= 0);
     const float dt = 1.0f / 60.0f;
     /* The clamp can produce neither genuine free-fall speed nor a contact
@@ -216,10 +216,10 @@ int mpe_t_cylinder_sphere (void) {
     physics_world w;
     mpe_world_begin (&w);
     MPE_CHECK (&t, mpe_floor_slab (&w, 0.4f, 0.3f, 0.0f) >= 0);
-    int cyl = physics_world_add_cylinder (&w, 0.05f, 0.02f, 0.0f, (vector3){0.0f, 0.06f, 0.0f});
-    int sph = physics_world_add_sphere (&w, 0.08f, 0.3f, (vector3){0.0f, 0.08f, 0.5f});
+    int cyl = physics_world_add_cylinder (&w, 0.05f, 0.02f, 0.0f, (vector3) {0.0f, 0.06f, 0.0f});
+    int sph = physics_world_add_sphere (&w, 0.08f, 0.3f, (vector3) {0.0f, 0.08f, 0.5f});
     MPE_CHECK (&t, cyl >= 0 && sph >= 0);
-    w.bodies [sph].velocity = (vector3){0.0f, 0.0f, -2.0f};
+    w.bodies [sph].velocity = (vector3) {0.0f, 0.0f, -2.0f};
     const float dt = 1.0f / 60.0f;
     if (!mpe_step (&w, 120, dt)) {
         t.failures++;
@@ -240,10 +240,10 @@ int mpe_t_cylinder_cube (void) {
     physics_world w;
     mpe_world_begin (&w);
     MPE_CHECK (&t, mpe_floor_slab (&w, 0.4f, 0.3f, 0.0f) >= 0);
-    MPE_CHECK (&t, physics_world_add_cube (&w, (vector3){0.0f, 0.25f, 0.5f}, (vector3){0.5f, 0.25f, 0.1f}, 0.0f) >= 0);
-    int cyl = physics_world_add_cylinder (&w, 0.05f, 0.02f, 0.5f, (vector3){0.0f, 0.06f, -0.5f});
+    MPE_CHECK (&t, physics_world_add_cube (&w, (vector3) {0.0f, 0.25f, 0.5f}, (vector3) {0.5f, 0.25f, 0.1f}, 0.0f) >= 0);
+    int cyl = physics_world_add_cylinder (&w, 0.05f, 0.02f, 0.5f, (vector3) {0.0f, 0.06f, -0.5f});
     MPE_CHECK (&t, cyl >= 0);
-    w.bodies [cyl].velocity = (vector3){0.0f, 0.0f, 3.0f};
+    w.bodies [cyl].velocity = (vector3) {0.0f, 0.0f, 3.0f};
     const float dt = 1.0f / 60.0f;
     if (!mpe_step (&w, 180, dt)) {
         t.failures++;
@@ -266,10 +266,10 @@ int mpe_t_cylinder_cylinder (void) {
     physics_world w;
     mpe_world_begin (&w);
     MPE_CHECK (&t, mpe_floor_slab (&w, 0.4f, 0.3f, 0.0f) >= 0);
-    int c1 = physics_world_add_cylinder (&w, 0.05f, 0.02f, 0.0f, (vector3){0.0f, 0.06f, 0.0f});
-    int c2 = physics_world_add_cylinder (&w, 0.05f, 0.02f, 0.5f, (vector3){0.0f, 0.06f, 0.5f});
+    int c1 = physics_world_add_cylinder (&w, 0.05f, 0.02f, 0.0f, (vector3) {0.0f, 0.06f, 0.0f});
+    int c2 = physics_world_add_cylinder (&w, 0.05f, 0.02f, 0.5f, (vector3) {0.0f, 0.06f, 0.5f});
     MPE_CHECK (&t, c1 >= 0 && c2 >= 0);
-    w.bodies [c2].velocity = (vector3){0.0f, 0.0f, -2.0f};
+    w.bodies [c2].velocity = (vector3) {0.0f, 0.0f, -2.0f};
     const float dt = 1.0f / 60.0f;
     if (!mpe_step (&w, 180, dt)) {
         t.failures++;
@@ -302,10 +302,10 @@ int mpe_t_list4_cylinder_floor (void) {
         physics_world w;
         mpe_world_begin (&w);
         mpe_floor_plane (&w, 0.4f, 0.3f);
-        int cyl = physics_world_add_cylinder (&w, 0.05f, 0.02f, 0.5f, (vector3){0.0f, 0.25f, 0.0f});
+        int cyl = physics_world_add_cylinder (&w, 0.05f, 0.02f, 0.5f, (vector3) {0.0f, 0.25f, 0.0f});
         MPE_CHECK (&t, cyl >= 0);
         w.bodies [cyl].restitution = 0.3f;
-        w.bodies [cyl].orientation = vector4_from_axis_with_angle ((vector3){0.0f, 0.0f, 1.0f}, math_pi * 0.5f);
+        w.bodies [cyl].orientation = vector4_from_axis_with_angle ((vector3) {0.0f, 0.0f, 1.0f}, math_pi * 0.5f);
         rigidbody_update_axes (&w.bodies [cyl]);
         if (!mpe_step (&w, 600, dt)) {
             t.failures++;
@@ -323,10 +323,10 @@ int mpe_t_list4_cylinder_floor (void) {
         physics_world w;
         mpe_world_begin (&w);
         mpe_floor_plane (&w, 0.4f, 0.3f);
-        int cyl = physics_world_add_cylinder (&w, 0.05f, 0.02f, 0.5f, (vector3){0.0f, 0.25f, 0.0f});
+        int cyl = physics_world_add_cylinder (&w, 0.05f, 0.02f, 0.5f, (vector3) {0.0f, 0.25f, 0.0f});
         MPE_CHECK (&t, cyl >= 0);
         w.bodies [cyl].restitution = 0.3f;
-        w.bodies [cyl].orientation = vector4_from_axis_with_angle ((vector3){0.0f, 1.0f, 0.0f}, math_pi * 0.5f);
+        w.bodies [cyl].orientation = vector4_from_axis_with_angle ((vector3) {0.0f, 1.0f, 0.0f}, math_pi * 0.5f);
         rigidbody_update_axes (&w.bodies [cyl]);
         if (!mpe_step (&w, 600, dt)) {
             t.failures++;
@@ -372,13 +372,13 @@ int mpe_t_cylinder_platform (void) {
     g_cfg.world.gravity = -9.81f;
     g_cfg.world.drag = 1.0f;
     g_cfg.sleep.enable = false;
-    int ip = physics_world_add_cube (&w, (vector3){0.0f, 10.0f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
+    int ip = physics_world_add_cube (&w, (vector3) {0.0f, 10.0f, 0.0f}, (vector3) {10.0f, 0.5f, 10.0f}, 0.0f);
     MPE_CHECK (&t, ip >= 0);
     MPE_CHECK (&t, w.bodies [ip].static_state);
     /* r=0.5 h=0.4 cylinder, 4.6 m below the slab's underside (y=9.5). */
-    int ic = physics_world_add_cylinder (&w, 0.5f, 0.4f, 1.0f, (vector3){0.0f, 5.0f, 0.0f});
+    int ic = physics_world_add_cylinder (&w, 0.5f, 0.4f, 1.0f, (vector3) {0.0f, 5.0f, 0.0f});
     /* Control: an identical cube, same position, offset in z. */
-    int iu = physics_world_add_cube (&w, (vector3){0.0f, 5.0f, 3.0f}, (vector3){0.5f, 0.4f, 0.5f}, 1.0f);
+    int iu = physics_world_add_cube (&w, (vector3) {0.0f, 5.0f, 3.0f}, (vector3) {0.5f, 0.4f, 0.5f}, 1.0f);
     MPE_CHECK (&t, ic >= 0 && iu >= 0);
     rigidbody *cyl = &w.bodies [ic];
     rigidbody *cube = &w.bodies [iu];
@@ -390,13 +390,13 @@ int mpe_t_cylinder_platform (void) {
     }
     /* Free fall: y = y0 - 0.5 g t^2 at t=4/60 s. */
     float expect = 5.0f - 0.5f * 9.81f * (4.0f * dt) * (4.0f * dt);
-    MPE_CHECK_NEAR (&t, cyl->position.y, expect, 0.02f, "cylinder falls freely below platform");
-    MPE_CHECK_NEAR (&t, cyl->position.y, cube->position.y, 0.01f, "cylinder tracks the cube control");
+    MPE_CHECK_NEAR (&t, cyl -> position.y, expect, 0.02f, "cylinder falls freely below platform");
+    MPE_CHECK_NEAR (&t, cyl -> position.y, cube -> position.y, 0.01f, "cylinder tracks the cube control");
     /* The decisive one: it must be FALLING, not levitating. Pre-fix velocity
      * was pinned at exactly 0.0000 because the phantom contact cancelled
      * gravity, and position ROSE by 0.1033 m per tick. */
-    MPE_CHECK (&t, cyl->velocity.y < -0.1f);
-    MPE_CHECK (&t, cyl->position.y < 5.0f);
+    MPE_CHECK (&t, cyl -> velocity.y < -0.1f);
+    MPE_CHECK (&t, cyl -> position.y < 5.0f);
     /* Run longer. Both bodies land on the world's y>=0 boundary backstop
      * (this test world has no floor slab), so past landing the invariant to
      * assert is TRACKING: the cylinder must behave like the free cube
@@ -405,17 +405,17 @@ int mpe_t_cylinder_platform (void) {
     for (int tick = 0; tick < 120; tick++) {
         physics_world_step (&w, dt);
     }
-    MPE_CHECK (&t, cyl->position.y < 1.0f);
-    MPE_CHECK (&t, cyl->position.y < 5.0f);
+    MPE_CHECK (&t, cyl -> position.y < 1.0f);
+    MPE_CHECK (&t, cyl -> position.y < 5.0f);
     /* Each body must come to rest at its OWN geometric support height on the
      * world backstop: the cylinder on its radius (0.5), the cube on its
      * half-height (0.4). Comparing them to each other would be wrong by
      * construction; the point is that both are far below the platform. */
-    MPE_CHECK_NEAR (&t, cyl->position.y, 0.5f, 0.05f, "cylinder rests at its radius on the backstop");
-    MPE_CHECK_NEAR (&t, cube->position.y, 0.4f, 0.05f, "cube control rests at its half-height");
+    MPE_CHECK_NEAR (&t, cyl -> position.y, 0.5f, 0.05f, "cylinder rests at its radius on the backstop");
+    MPE_CHECK_NEAR (&t, cube -> position.y, 0.4f, 0.05f, "cube control rests at its half-height");
     /* speed is physically bounded: no energy injection from a phantom contact */
-    MPE_CHECK (&t, isfinite (cyl->velocity.y) && fabsf (cyl->velocity.y) < 12.0f);
-    MPE_CHECK (&t, isfinite (cyl->position.y) && isfinite (cyl->position.x));
+    MPE_CHECK (&t, isfinite (cyl -> velocity.y) && fabsf (cyl -> velocity.y) < 12.0f);
+    MPE_CHECK (&t, isfinite (cyl -> position.y) && isfinite (cyl -> position.x));
     physics_world_cleanup (&w);
     mpe_test_end (&t);
     return t.failures;
@@ -463,8 +463,8 @@ int mpe_t_cylinder_sphere_inside (void) {
          * with the cylinder clear of the floor, all four sub-cases resolve.
          * The earlier "1 of 4 sub-cases unresolved" note in
          * docs/KNOWN_FAILURES.md was this artifact and has been retracted. */
-        int ic = physics_world_add_cylinder (&ww, 2.0f, 1.0f, 1.0f, (vector3){0, 3, 0});
-        int is = physics_world_add_sphere (&ww, 0.5f, 1.0f, vector3_addition ((vector3){0, 3, 0}, offsets [c]));
+        int ic = physics_world_add_cylinder (&ww, 2.0f, 1.0f, 1.0f, (vector3) {0, 3, 0});
+        int is = physics_world_add_sphere (&ww, 0.5f, 1.0f, vector3_addition ((vector3) {0, 3, 0}, offsets [c]));
         MPE_CHECK (&t, ic >= 0 && is >= 0);
         rigidbody *cyl = &ww.bodies [ic];
         rigidbody *sph = &ww.bodies [is];
@@ -499,7 +499,7 @@ int mpe_t_cylinder_sphere_inside (void) {
             float pen0 = cd.contact_count > 0 ? cd.contacts [0].penetration : 0.0f;
             for (int k = 0; k < 120; k++)
                 physics_world_step (&ww, 1.0f / 60.0f);
-            vector3 off = vector3_subtraction (sph->position, cyl->position);
+            vector3 off = vector3_subtraction (sph -> position, cyl -> position);
             float axial = fabsf (off.x);
             float radial = sqrtf (off.y * off.y + off.z * off.z);
             /* Penetration must be measured with the CYLINDER SDF, not a
@@ -534,7 +534,7 @@ int mpe_t_cylinder_sphere_inside (void) {
              * so the assertion is kept but reported rather than hidden. */
             MPE_INFO ("case %d residual overlap after 2 s: %.4f m", c, pen1);
         }
-        MPE_CHECK (&t, isfinite (sph->position.x) && isfinite (sph->position.y) && isfinite (sph->position.z));
+        MPE_CHECK (&t, isfinite (sph -> position.x) && isfinite (sph -> position.y) && isfinite (sph -> position.z));
         physics_world_cleanup (&ww);
     }
     physics_world_cleanup (&w);
@@ -572,32 +572,32 @@ int mpe_t_mass_properties (void) {
     /* sphere: (2/5) m r^2 */
     {
         const float m = 3.0f, r = 0.7f;
-        int s = physics_world_add_sphere (&w, r, m, (vector3){0.0f, 60.0f, 0.0f});
+        int s = physics_world_add_sphere (&w, r, m, (vector3) {0.0f, 60.0f, 0.0f});
         MPE_CHECK (&t, s >= 0);
         const float ref = 0.4f * m * r * r;
-        MPE_CHECK_NEAR (&t, w.bodies [s].inertia_tensor_local.matrix [0] [0], ref, 1e-5f, "sphere Ixx");
-        MPE_CHECK_NEAR (&t, w.bodies [s].inertia_tensor_local.matrix [1] [1], ref, 1e-5f, "sphere Iyy");
-        MPE_CHECK_NEAR (&t, w.bodies [s].inertia_tensor_local.matrix [2] [2], ref, 1e-5f, "sphere Izz");
+        MPE_CHECK_NEAR (&t, w.bodies [s].inertia_tensor_local.matrix [0][0], ref, 1e-5f, "sphere Ixx");
+        MPE_CHECK_NEAR (&t, w.bodies [s].inertia_tensor_local.matrix [1][1], ref, 1e-5f, "sphere Iyy");
+        MPE_CHECK_NEAR (&t, w.bodies [s].inertia_tensor_local.matrix [2][2], ref, 1e-5f, "sphere Izz");
         MPE_CHECK_NEAR (&t, w.bodies [s].inverse_mass, 1.0f / m, 1e-6f, "sphere inverse_mass");
         /* inverse tensor must actually invert the tensor */
         math3 id = math3_multiplication (w.bodies [s].inverse_inertia_tensor_local, w.bodies [s].inertia_tensor_local);
-        MPE_CHECK_NEAR (&t, id.matrix [0] [0], 1.0f, 1e-5f, "inv(I)*I xx");
-        MPE_CHECK_NEAR (&t, id.matrix [1] [1], 1.0f, 1e-5f, "inv(I)*I yy");
-        MPE_CHECK_NEAR (&t, id.matrix [2] [2], 1.0f, 1e-5f, "inv(I)*I zz");
-        MPE_CHECK_NEAR (&t, id.matrix [0] [1], 0.0f, 1e-6f, "inv(I)*I off-diagonal");
+        MPE_CHECK_NEAR (&t, id.matrix [0][0], 1.0f, 1e-5f, "inv(I)*I xx");
+        MPE_CHECK_NEAR (&t, id.matrix [1][1], 1.0f, 1e-5f, "inv(I)*I yy");
+        MPE_CHECK_NEAR (&t, id.matrix [2][2], 1.0f, 1e-5f, "inv(I)*I zz");
+        MPE_CHECK_NEAR (&t, id.matrix [0][1], 0.0f, 1e-6f, "inv(I)*I off-diagonal");
     }
     /* box: (m/12)(other two squared) */
     {
         const float m = 5.0f;
         const vector3 half = {0.5f, 0.25f, 1.0f};
-        int c = physics_world_add_cube (&w, (vector3){0.0f, 60.0f, 0.0f}, half, m);
+        int c = physics_world_add_cube (&w, (vector3) {0.0f, 60.0f, 0.0f}, half, m);
         MPE_CHECK (&t, c >= 0);
         const float W = half.x * 2.0f, H = half.y * 2.0f, D = half.z * 2.0f;
-        MPE_CHECK_NEAR (&t, w.bodies [c].inertia_tensor_local.matrix [0] [0], (m / 12.0f) * (H * H + D * D), 1e-5f,
+        MPE_CHECK_NEAR (&t, w.bodies [c].inertia_tensor_local.matrix [0][0], (m / 12.0f) * (H * H + D * D), 1e-5f,
                         "box Ixx");
-        MPE_CHECK_NEAR (&t, w.bodies [c].inertia_tensor_local.matrix [1] [1], (m / 12.0f) * (W * W + D * D), 1e-5f,
+        MPE_CHECK_NEAR (&t, w.bodies [c].inertia_tensor_local.matrix [1][1], (m / 12.0f) * (W * W + D * D), 1e-5f,
                         "box Iyy");
-        MPE_CHECK_NEAR (&t, w.bodies [c].inertia_tensor_local.matrix [2] [2], (m / 12.0f) * (W * W + H * H), 1e-5f,
+        MPE_CHECK_NEAR (&t, w.bodies [c].inertia_tensor_local.matrix [2][2], (m / 12.0f) * (W * W + H * H), 1e-5f,
                         "box Izz");
         /* geometry must survive verbatim: a clamped half-extent would change
          * the inertia silently, so this is also a clamp assertion */
@@ -609,14 +609,14 @@ int mpe_t_mass_properties (void) {
      * that had never been covered by any test in either tree */
     {
         const float m = 2.5f, r = 0.3f, hl = 0.9f;
-        int c = physics_world_add_cylinder (&w, r, hl, m, (vector3){0.0f, 60.0f, 0.0f});
+        int c = physics_world_add_cylinder (&w, r, hl, m, (vector3) {0.0f, 60.0f, 0.0f});
         MPE_CHECK (&t, c >= 0);
         const float l = 2.0f * hl;
-        MPE_CHECK_NEAR (&t, w.bodies [c].inertia_tensor_local.matrix [0] [0], 0.5f * m * r * r, 1e-5f,
+        MPE_CHECK_NEAR (&t, w.bodies [c].inertia_tensor_local.matrix [0][0], 0.5f * m * r * r, 1e-5f,
                         "cylinder AXIAL Ixx");
-        MPE_CHECK_NEAR (&t, w.bodies [c].inertia_tensor_local.matrix [1] [1], (m / 12.0f) * (3.0f * r * r + l * l), 1e-5f,
+        MPE_CHECK_NEAR (&t, w.bodies [c].inertia_tensor_local.matrix [1][1], (m / 12.0f) * (3.0f * r * r + l * l), 1e-5f,
                         "cylinder TRANSVERSE Iyy");
-        MPE_CHECK_NEAR (&t, w.bodies [c].inertia_tensor_local.matrix [2] [2], (m / 12.0f) * (3.0f * r * r + l * l), 1e-5f,
+        MPE_CHECK_NEAR (&t, w.bodies [c].inertia_tensor_local.matrix [2][2], (m / 12.0f) * (3.0f * r * r + l * l), 1e-5f,
                         "cylinder TRANSVERSE Izz");
         /* axle is local X, so the half-extent along X is the half-LENGTH */
         MPE_CHECK_NEAR (&t, w.bodies [c].half_extensions.x, hl, 1e-6f, "cylinder half_ext x = half_length");
@@ -634,7 +634,7 @@ int mpe_t_mass_properties (void) {
         physics_world w2;
         mpe_world_begin (&w2);
         mpe_clamp_counters_reset ();
-        int s = physics_world_add_sphere (&w2, 0.5f, 1e-9f, (vector3){0.0f, 60.0f, 0.0f});
+        int s = physics_world_add_sphere (&w2, 0.5f, 1e-9f, (vector3) {0.0f, 60.0f, 0.0f});
         MPE_CHECK (&t, s >= 0);
         MPE_CHECK (&t, mpe_clamp_mass_events > 0);
         /* and the substitution is the documented 1e-4 floor, i.e. 100000x
@@ -682,12 +682,12 @@ static float mpe_ref_proj_r (const vector3 ax [3], vector3 he, vector3 n) {
 }
 static int mpe_ref_obb_overlap (vector3 ca, vector4 qa, vector3 ha, vector3 cb, vector4 qb, vector3 hb) {
     vector3 aa [3], ab [3];
-    aa [0] = vector4_rotate_to_vector3 (qa, (vector3){1, 0, 0});
-    aa [1] = vector4_rotate_to_vector3 (qa, (vector3){0, 1, 0});
-    aa [2] = vector4_rotate_to_vector3 (qa, (vector3){0, 0, 1});
-    ab [0] = vector4_rotate_to_vector3 (qb, (vector3){1, 0, 0});
-    ab [1] = vector4_rotate_to_vector3 (qb, (vector3){0, 1, 0});
-    ab [2] = vector4_rotate_to_vector3 (qb, (vector3){0, 0, 1});
+    aa [0] = vector4_rotate_to_vector3 (qa, (vector3) {1, 0, 0});
+    aa [1] = vector4_rotate_to_vector3 (qa, (vector3) {0, 1, 0});
+    aa [2] = vector4_rotate_to_vector3 (qa, (vector3) {0, 0, 1});
+    ab [0] = vector4_rotate_to_vector3 (qb, (vector3) {1, 0, 0});
+    ab [1] = vector4_rotate_to_vector3 (qb, (vector3) {0, 1, 0});
+    ab [2] = vector4_rotate_to_vector3 (qb, (vector3) {0, 0, 1});
     vector3 t = vector3_subtraction (cb, ca);
     for (int k = 0; k < 15 + 240; k++) {
         vector3 n;
@@ -757,7 +757,7 @@ int mpe_t_reference_math (void) {
             vector3 axis = {(float) ((seed >> 8) & 0xFF) / 255.0f - 0.5f, (float) ((seed >> 16) & 0xFF) / 255.0f - 0.5f,
                             (float) ((seed >> 24) & 0xFF) / 255.0f - 0.5f};
             if (vector3_length_squared (axis) < 1e-4f)
-                axis = (vector3){0, 0, 1};
+                axis = (vector3) {0, 0, 1};
             vector3 pa = {ra, rb, -ra}, pb = {rb, ra, -rb};
             vector4 qq = vector4_from_axis_with_angle (axis, ang);
             int a = physics_world_add_cube (&w, pa, ha, 1.0f);
@@ -791,10 +791,10 @@ int mpe_t_reference_math (void) {
             g_cfg.joints.revolute_beta = betas [c];
             physics_world_init (&w);
             constraint_pool_init (&w);
-            int anchor = physics_world_add_cube (&w, (vector3){0, 50, 0}, (vector3){0.5f, 0.5f, 0.5f}, 0.0f);
-            int child = physics_world_add_cube (&w, (vector3){0.30f, 50, 0}, (vector3){0.25f, 0.25f, 0.25f}, 1.0f);
+            int anchor = physics_world_add_cube (&w, (vector3) {0, 50, 0}, (vector3) {0.5f, 0.5f, 0.5f}, 0.0f);
+            int child = physics_world_add_cube (&w, (vector3) {0.30f, 50, 0}, (vector3) {0.25f, 0.25f, 0.25f}, 1.0f);
             uint32_t ia = w.bodies [anchor].object_id, ib = w.bodies [child].object_id;
-            constraint_add_revolute (&w, ia, ib, (vector3){0, 0, 0}, (vector3){0, 0, 0}, (vector3){0, 1, 0});
+            constraint_add_revolute (&w, ia, ib, (vector3) {0, 0, 0}, (vector3) {0, 0, 0}, (vector3) {0, 1, 0});
             float e0 = fabsf (w.bodies [child].position.x);
             for (int k = 0; k < 60; k++)
                 physics_world_step (&w, MPE_REF_MATH_DT);
@@ -823,18 +823,18 @@ int mpe_t_reference_math (void) {
             g_cfg.sleep.enable = 0;
             g_cfg.world.drag = 1.0f;
             physics_world_init (&w);
-            int fl = physics_world_add_cube (&w, (vector3){0, -0.5f, 0}, (vector3){40, 0.5f, 40}, 0.0f);
+            int fl = physics_world_add_cube (&w, (vector3) {0, -0.5f, 0}, (vector3) {40, 0.5f, 40}, 0.0f);
             w.bodies [fl].friction_static = mus;
             w.bodies [fl].friction_kinetic = muk;
             w.bodies [fl].restitution = 0.0f;
-            int b = physics_world_add_cube (&w, (vector3){0, 0.5f, 0}, (vector3){0.5f, 0.5f, 0.5f}, m);
+            int b = physics_world_add_cube (&w, (vector3) {0, 0.5f, 0}, (vector3) {0.5f, 0.5f, 0.5f}, m);
             w.bodies [b].friction_static = mus;
             w.bodies [b].friction_kinetic = muk;
             w.bodies [b].restitution = 0.0f;
             for (int s = 0; s < 40; s++)
                 physics_world_step (&w, MPE_REF_MATH_DT);
             for (int s = 0; s < 30; s++) {
-                w.bodies [b].force_accumulator = vector3_addition (w.bodies [b].force_accumulator, (vector3){F, 0, 0});
+                w.bodies [b].force_accumulator = vector3_addition (w.bodies [b].force_accumulator, (vector3) {F, 0, 0});
                 rigidbody_wake (&w.bodies [b]);
                 physics_world_step (&w, MPE_REF_MATH_DT);
             }

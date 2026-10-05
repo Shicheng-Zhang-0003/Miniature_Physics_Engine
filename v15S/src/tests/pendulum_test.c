@@ -21,15 +21,15 @@ int main (void) {
      * lives outside both bodies. The pin hangs 0.1 m below the pivot's
      * bottom face so the 0.2 m-wide rod clears the cube through its full
      * 20-degree arc (corner rise is halfwidth*sin(20deg) = 0.034 m). */
-    int pivot = physics_world_add_cube (&world, (vector3){0.0f, 6.0f, 0.0f}, (vector3){0.2f, 0.2f, 0.2f}, 0.0f);
+    int pivot = physics_world_add_cube (&world, (vector3) {0.0f, 6.0f, 0.0f}, (vector3) {0.2f, 0.2f, 0.2f}, 0.0f);
     float swing = 20.0f * 3.14159265f / 180.0f;
     vector3 com = {sinf (swing) * 1.0f, 5.7f - cosf (swing) * 1.0f, 0.0f};
-    int rod = physics_world_add_cube (&world, com, (vector3){0.1f, 1.0f, 0.1f}, 1.0f);
+    int rod = physics_world_add_cube (&world, com, (vector3) {0.1f, 1.0f, 0.1f}, 1.0f);
     uint32_t pivot_id = world.bodies [pivot].object_id;
     uint32_t rod_id = world.bodies [rod].object_id;
     /* Hinge about z, pin 0.1 m below the pivot's bottom face; rod anchor at its top face. */
-    if (constraint_add_revolute (&world, pivot_id, rod_id, (vector3){0.0f, -0.3f, 0.0f}, (vector3){0.0f, 1.0f, 0.0f},
-                                 (vector3){0.0f, 0.0f, 1.0f}) < 0) {
+    if (constraint_add_revolute (&world, pivot_id, rod_id, (vector3) {0.0f, -0.3f, 0.0f}, (vector3) {0.0f, 1.0f, 0.0f},
+                                 (vector3) {0.0f, 0.0f, 1.0f}) < 0) {
         printf ("[FAIL] joint creation\n");
         physics_world_cleanup (&world);
         return 1;

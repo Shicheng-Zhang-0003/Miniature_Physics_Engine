@@ -16,9 +16,9 @@ int main (void) {
      * to the sphere's 0.6 so min-combine measures the sphere's Poisson
      * restitution (the documented e=0.6 assumption), not the floor default.
      * The coplanar infinite plane (restitution-neutral 1.0) defers likewise. */
-    int floor_idx = physics_world_add_cube (&world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
+    int floor_idx = physics_world_add_cube (&world, (vector3) {0.0f, -0.5f, 0.0f}, (vector3) {10.0f, 0.5f, 10.0f}, 0.0f);
     world.bodies [floor_idx].restitution = 0.6f;
-    int s = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0.0f, 4.0f, 0.0f});
+    int s = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3) {0.0f, 4.0f, 0.0f});
     world.bodies [s].restitution = 0.6f;
     rigidbody_wake (&world.bodies [s]);
     const float dt = 1.0f / 60.0f;

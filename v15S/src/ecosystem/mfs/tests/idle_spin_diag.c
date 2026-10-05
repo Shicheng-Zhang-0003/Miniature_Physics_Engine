@@ -17,7 +17,7 @@ int main (void) {
     physics_world_init (&world);
     constraint_pool_init (&world);
     /* floor at y=0 */
-    physics_world_add_cube (&world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
+    physics_world_add_cube (&world, (vector3) {0.0f, -0.5f, 0.0f}, (vector3) {10.0f, 0.5f, 10.0f}, 0.0f);
     ftc_robot robot;
     int rc = ftc_robot_create (&world, &robot, 0.0f, ftc_robot_rest_height (), 0.0f, MOTOR_GB_5203_26_9);
     if (rc != 0) {
@@ -44,17 +44,17 @@ int main (void) {
             for (int w = 0; w < robot.wheel_count; w++) {
                 int wi = robot.wheel_bodies [w];
                 rigidbody *wheel = &world.bodies [wi];
-                vector3 axle = vector4_rotate_to_vector3 (wheel->orientation, (vector3){1.0f, 0.0f, 0.0f});
-                float oa = vector3_dot (wheel->angular_velocity, axle);
+                vector3 axle = vector4_rotate_to_vector3 (wheel -> orientation, (vector3) {1.0f, 0.0f, 0.0f});
+                float oa = vector3_dot (wheel -> angular_velocity, axle);
                 if (fabsf (oa) > max_wheel_omega)
                     max_wheel_omega = fabsf (oa);
                 printf ("%s%.3f", w ? ", " : "", oa);
             }
             rigidbody *ch = &world.bodies [robot.chassis_body];
-            float cs = sqrtf (ch->velocity.x * ch->velocity.x + ch->velocity.z * ch->velocity.z);
+            float cs = sqrtf (ch -> velocity.x * ch -> velocity.x + ch -> velocity.z * ch -> velocity.z);
             if (cs > max_chassis_speed)
                 max_chassis_speed = cs;
-            printf ("] chassis_speed=%.4f pos=(%.3f,%.3f)\n", cs, ch->position.x, ch->position.z);
+            printf ("] chassis_speed=%.4f pos=(%.3f,%.3f)\n", cs, ch -> position.x, ch -> position.z);
         }
     }
     printf ("\nmax |wheel axle omega| over idle = %.4f rad/s\n", max_wheel_omega);

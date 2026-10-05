@@ -29,23 +29,23 @@
 static int capsule_frame (const rigidbody *cap, vector3 *axle_out, float *half_out, float *rad_out) {
     if (!cap || !axle_out || !half_out || !rad_out)
         return -1;
-    if (!isfinite (cap->position.x) || !isfinite (cap->position.y) || !isfinite (cap->position.z))
+    if (!isfinite (cap -> position.x) || !isfinite (cap -> position.y) || !isfinite (cap -> position.z))
         return -1;
-    if (!isfinite (cap->radius) || cap->radius <= 0.0f)
+    if (!isfinite (cap -> radius) || cap -> radius <= 0.0f)
         return -1;
-    vector3 ax = cap->cached_axes [0];
+    vector3 ax = cap -> cached_axes [0];
     if (!isfinite (ax.x) || !isfinite (ax.y) || !isfinite (ax.z))
         return -1;
     float len2 = ax.x * ax.x + ax.y * ax.y + ax.z * ax.z;
     if (!(len2 > 1e-12f) || !isfinite (len2))
         return -1;
     float inv = 1.0f / sqrtf (len2);
-    axle_out->x = ax.x * inv;
-    axle_out->y = ax.y * inv;
-    axle_out->z = ax.z * inv;
-    float R = cap->radius;
+    axle_out -> x = ax.x * inv;
+    axle_out -> y = ax.y * inv;
+    axle_out -> z = ax.z * inv;
+    float R = cap -> radius;
     float h =
-        (isfinite (cap->cylinder_half_length) && cap->cylinder_half_length > 0.0f) ? cap->cylinder_half_length : 0.0f;
+        (isfinite (cap -> cylinder_half_length) && cap -> cylinder_half_length > 0.0f) ? cap -> cylinder_half_length : 0.0f;
     if (h > R)
         h = R; /* malformed body: clamp, never imaginary */
     float rc2 = R * R - h * h;
@@ -56,8 +56,8 @@ static int capsule_frame (const rigidbody *cap, vector3 *axle_out, float *half_o
     return 0;
 }
 static float capsule_slop (mpe_world_t *w) {
-    const mpe_config_t *C = (w && w->cfg) ? w->cfg : &g_cfg;
-    float slop = C->solver.penetration_slop;
+    const mpe_config_t *C = (w && w -> cfg) ? w -> cfg : &g_cfg;
+    float slop = C -> solver.penetration_slop;
     if (!(slop >= 0.0f) || !isfinite (slop))
         slop = 0.01f;
     return slop;
@@ -74,33 +74,33 @@ static vector3 seg_closest (vector3 c, vector3 ax, float h, vector3 p) {
 }
 static bool emit_contact (void *out, rigidbody *a, rigidbody *b, vector3 nrm, vector3 pos, float pen) {
     collision_data *o = (collision_data *) out;
-    *o = (collision_data){0};
-    o->object_a = a;
-    o->object_b = b;
-    o->normal_vector = nrm;
-    o->contact_count = 1;
-    o->contacts [0].position = pos;
-    o->contacts [0].penetration = (pen > 0.0f) ? pen : 0.0f;
+    *o = (collision_data) {0};
+    o -> object_a = a;
+    o -> object_b = b;
+    o -> normal_vector = nrm;
+    o -> contact_count = 1;
+    o -> contacts [0].position = pos;
+    o -> contacts [0].penetration = (pen > 0.0f) ? pen : 0.0f;
     /* Lever-arm locals are rebuilt by collision_prepare_solver from
      * position; still write sane values for direct consumers. */
-    o->contacts [0].local_position_a = vector3_subtraction (pos, a->position);
-    o->contacts [0].local_position_b = vector3_subtraction (pos, b->position);
+    o -> contacts [0].local_position_a = vector3_subtraction (pos, a -> position);
+    o -> contacts [0].local_position_b = vector3_subtraction (pos, b -> position);
     return true;
 }
 /* Exact segment-vs-sphere: closest segment point to the sphere centre. */
 static bool capsule_vs_sphere_exact (rigidbody *cap, vector3 ax, float h, float r, rigidbody *sph, void *out,
                                      float slop) {
-    if (!isfinite (sph->position.x) || !isfinite (sph->position.y) || !isfinite (sph->position.z)) {
+    if (!isfinite (sph -> position.x) || !isfinite (sph -> position.y) || !isfinite (sph -> position.z)) {
         return false;
     }
-    if (!isfinite (sph->radius) || sph->radius <= 0.0f)
+    if (!isfinite (sph -> radius) || sph -> radius <= 0.0f)
         return false;
-    vector3 q = seg_closest (cap->position, ax, h, sph->position);
-    vector3 diff = vector3_subtraction (sph->position, q);
+    vector3 q = seg_closest (cap -> position, ax, h, sph -> position);
+    vector3 diff = vector3_subtraction (sph -> position, q);
     float dist2 = vector3_length_squared (diff);
     if (!isfinite (dist2))
         return false;
-    float rr = r + sph->radius;
+    float rr = r + sph -> radius;
     if (dist2 >= (rr + slop) * (rr + slop))
         return false;
     float dist = sqrtf (dist2);
@@ -112,7 +112,7 @@ static bool capsule_vs_sphere_exact (rigidbody *cap, vector3 ax, float h, float 
     } else {
         /* Centre on the segment: pick a perpendicular (same policy as the
          * engine's coincident-centre fallbacks, but face-derived, never -Y). */
-        vector3 ref = (fabsf (ax.y) < 0.99f) ? (vector3){0.0f, 1.0f, 0.0f} : (vector3){1.0f, 0.0f, 0.0f};
+        vector3 ref = (fabsf (ax.y) < 0.99f) ? (vector3) {0.0f, 1.0f, 0.0f} : (vector3) {1.0f, 0.0f, 0.0f};
         nrm = vector3_cross (ax, ref);
         float l2 = vector3_length_squared (nrm);
         if (!(l2 > 1e-12f))
@@ -127,8 +127,8 @@ static bool capsule_vs_sphere_exact (rigidbody *cap, vector3 ax, float h, float 
  * h=0; for h>0 the sampling error is bounded by (seg_len/(n-1))^2/8r. */
 static bool capsule_vs_cube_sampled (rigidbody *cap, vector3 ax, float h, float r, rigidbody *cube, void *out,
                                      float slop) {
-    if (!isfinite (cube->half_extensions.x) || !isfinite (cube->half_extensions.y) ||
-        !isfinite (cube->half_extensions.z)) {
+    if (!isfinite (cube -> half_extensions.x) || !isfinite (cube -> half_extensions.y) ||
+        !isfinite (cube -> half_extensions.z)) {
         return false;
     }
     /* DESPOT-2026-10-01: guard cast/overflow BEFORE (int)(h/r). */
@@ -142,21 +142,21 @@ static bool capsule_vs_cube_sampled (rigidbody *cap, vector3 ax, float h, float 
         n = 9;
     float best_pen = -1e30f;
     vector3 best_n = {0, 1, 0};
-    vector3 best_p = cap->position;
+    vector3 best_p = cap -> position;
     int hit = 0;
     for (int i = 0; i < n; i++) {
         float s = (n == 1) ? 0.0f : (-h + 2.0f * h * (float) i / (float) (n - 1));
-        vector3 c = vector3_addition (cap->position, vector3_scaling (ax, s));
+        vector3 c = vector3_addition (cap -> position, vector3_scaling (ax, s));
         /* Sphere-vs-OBB closest point (engine narrowphase parity). */
-        vector3 rel = vector3_subtraction (c, cube->position);
-        vector3 closest = cube->position;
+        vector3 rel = vector3_subtraction (c, cube -> position);
+        vector3 closest = cube -> position;
         for (int a3 = 0; a3 < 3; a3++) {
-            vector3 axis = cube->cached_axes [a3];
+            vector3 axis = cube -> cached_axes [a3];
             if (!isfinite (axis.x) || !isfinite (axis.y) || !isfinite (axis.z))
                 return false;
-            float e = (a3 == 0)   ? cube->half_extensions.x
-                      : (a3 == 1) ? cube->half_extensions.y
-                                  : cube->half_extensions.z;
+            float e = (a3 == 0) ? cube -> half_extensions.x
+            : (a3 == 1) ? cube -> half_extensions.y
+            : cube -> half_extensions.z;
             float d = vector3_dot (rel, axis);
             if (d > e)
                 d = e;
@@ -183,10 +183,10 @@ static bool capsule_vs_cube_sampled (rigidbody *cap, vector3 ax, float h, float 
             vector3 best_ax = {0, 1, 0};
             float best_sign = 1.0f;
             for (int a3 = 0; a3 < 3; a3++) {
-                vector3 axis = cube->cached_axes [a3];
-                float e = (a3 == 0)   ? cube->half_extensions.x
-                          : (a3 == 1) ? cube->half_extensions.y
-                                      : cube->half_extensions.z;
+                vector3 axis = cube -> cached_axes [a3];
+                float e = (a3 == 0) ? cube -> half_extensions.x
+                : (a3 == 1) ? cube -> half_extensions.y
+                : cube -> half_extensions.z;
                 float d = vector3_dot (rel, axis);
                 float clear = e - fabsf (d);
                 if (clear < best_clear) {
@@ -215,16 +215,16 @@ static bool capsule_vs_cube_sampled (rigidbody *cap, vector3 ax, float h, float 
  * the same sampling as the cube path. Inside picks min-clearance escape. */
 static bool capsule_vs_cylinder_sampled (rigidbody *cap, vector3 ax, float h, float r, rigidbody *cyl, void *out,
                                          float slop) {
-    if (!isfinite (cyl->radius) || cyl->radius <= 0.0f)
+    if (!isfinite (cyl -> radius) || cyl -> radius <= 0.0f)
         return false;
-    if (!isfinite (cyl->cylinder_half_length) || cyl->cylinder_half_length <= 0.0f)
+    if (!isfinite (cyl -> cylinder_half_length) || cyl -> cylinder_half_length <= 0.0f)
         return false;
-    vector3 cax = cyl->cached_axes [0];
+    vector3 cax = cyl -> cached_axes [0];
     float l2 = vector3_length_squared (cax);
     if (!(l2 > 1e-12f) || !isfinite (l2))
         return false;
     cax = vector3_scaling (cax, 1.0f / sqrtf (l2));
-    float cr = cyl->radius, ch = cyl->cylinder_half_length;
+    float cr = cyl -> radius, ch = cyl -> cylinder_half_length;
     /* DESPOT-2026-10-01: same overflow guard as cube path. */
     if (!isfinite (h) || !isfinite (r) || h < 0.0f || h > 100.0f || r < 1e-6f || r > 100.0f) {
         return false;
@@ -236,12 +236,12 @@ static bool capsule_vs_cylinder_sampled (rigidbody *cap, vector3 ax, float h, fl
         n = 9;
     float best_pen = -1e30f;
     vector3 best_n = {0, 1, 0};
-    vector3 best_p = cap->position;
+    vector3 best_p = cap -> position;
     int hit = 0;
     for (int i = 0; i < n; i++) {
         float s = (n == 1) ? 0.0f : (-h + 2.0f * h * (float) i / (float) (n - 1));
-        vector3 c = vector3_addition (cap->position, vector3_scaling (ax, s));
-        vector3 d = vector3_subtraction (c, cyl->position);
+        vector3 c = vector3_addition (cap -> position, vector3_scaling (ax, s));
+        vector3 d = vector3_subtraction (c, cyl -> position);
         float xd = vector3_dot (d, cax);
         vector3 radv = vector3_subtraction (d, vector3_scaling (cax, xd));
         float rl = vector3_length (radv);
@@ -260,16 +260,16 @@ static bool capsule_vs_cylinder_sampled (rigidbody *cap, vector3 ax, float h, fl
                 rdir = vector3_scaling (radv, 1.0f / rl);
             }
             if (rl <= 1e-9f) {
-                vector3 ref = (fabsf (cax.y) < 0.99f) ? (vector3){0.0f, 1.0f, 0.0f} : (vector3){1.0f, 0.0f, 0.0f};
+                vector3 ref = (fabsf (cax.y) < 0.99f) ? (vector3) {0.0f, 1.0f, 0.0f} : (vector3) {1.0f, 0.0f, 0.0f};
                 rdir = vector3_normalisation (vector3_subtraction (ref, vector3_scaling (cax, vector3_dot (ref, cax))));
             }
-            vector3 axle_pt = vector3_addition (cyl->position, vector3_scaling (cax, cxd));
+            vector3 axle_pt = vector3_addition (cyl -> position, vector3_scaling (cax, cxd));
             if (fabsf (xd) <= ch) {
                 surf = vector3_addition (axle_pt, vector3_scaling (rdir, cr));
             } else if (rl <= cr) {
                 surf = vector3_addition (axle_pt, radv);
             } else {
-                vector3 cap_c = vector3_addition (cyl->position, vector3_scaling (cax, cxd));
+                vector3 cap_c = vector3_addition (cyl -> position, vector3_scaling (cax, cxd));
                 surf = vector3_addition (cap_c, vector3_scaling (rdir, cr));
             }
             vector3 diff = vector3_subtraction (c, surf);
@@ -287,18 +287,18 @@ static bool capsule_vs_cylinder_sampled (rigidbody *cap, vector3 ax, float h, fl
             if (axial_clear < radial_clear) {
                 float sg = (xd >= 0.0f) ? 1.0f : -1.0f;
                 outw = vector3_scaling (cax, sg);
-                surf = vector3_addition (cyl->position, vector3_scaling (cax, sg * ch));
+                surf = vector3_addition (cyl -> position, vector3_scaling (cax, sg * ch));
                 surf = vector3_addition (surf, radv);
             } else {
                 outw = radv;
                 if (rl <= 1e-9f) {
-                    vector3 ref = (fabsf (cax.y) < 0.99f) ? (vector3){0.0f, 1.0f, 0.0f} : (vector3){1.0f, 0.0f, 0.0f};
+                    vector3 ref = (fabsf (cax.y) < 0.99f) ? (vector3) {0.0f, 1.0f, 0.0f} : (vector3) {1.0f, 0.0f, 0.0f};
                     outw = vector3_normalisation (
                         vector3_subtraction (ref, vector3_scaling (cax, vector3_dot (ref, cax))));
                 } else {
                     outw = vector3_scaling (radv, 1.0f / rl);
                 }
-                vector3 axle_pt = vector3_addition (cyl->position, vector3_scaling (cax, xd));
+                vector3 axle_pt = vector3_addition (cyl -> position, vector3_scaling (cax, xd));
                 surf = vector3_addition (axle_pt, vector3_scaling (outw, cr));
             }
             nrm = vector3_scaling (outw, -1.0f); /* A->B convention */
@@ -327,21 +327,21 @@ static bool capsule_contact (rigidbody *cap, rigidbody *other, void *out, mpe_wo
     if (capsule_frame (cap, &ax, &h, &r) != 0)
         return false;
     float slop = capsule_slop (w);
-    if (other->type == object_sphere) {
+    if (other -> type == object_sphere) {
         return capsule_vs_sphere_exact (cap, ax, h, r, other, out, slop);
     }
-    if (other->type == object_cube) {
+    if (other -> type == object_cube) {
         return capsule_vs_cube_sampled (cap, ax, h, r, other, out, slop);
     }
-    if (other->type == object_cylinder) {
+    if (other -> type == object_cylinder) {
         return capsule_vs_cylinder_sampled (cap, ax, h, r, other, out, slop);
     }
     /* Foreign-vs-foreign: bounding-sphere fallback (documented; exact
      * segment/segment sweep is out of scope for the example plugin). */
-    if (other->type == object_custom) {
-        float orad = (isfinite (other->radius) && other->radius > 0.0f) ? other->radius : 0.5f;
-        vector3 q = seg_closest (cap->position, ax, h, other->position);
-        vector3 diff = vector3_subtraction (other->position, q);
+    if (other -> type == object_custom) {
+        float orad = (isfinite (other -> radius) && other -> radius > 0.0f) ? other -> radius : 0.5f;
+        vector3 q = seg_closest (cap -> position, ax, h, other -> position);
+        vector3 diff = vector3_subtraction (other -> position, q);
         float dist2 = vector3_length_squared (diff);
         if (!isfinite (dist2))
             return false;
@@ -349,7 +349,7 @@ static bool capsule_contact (rigidbody *cap, rigidbody *other, void *out, mpe_wo
         if (dist2 >= (rr + slop) * (rr + slop))
             return false;
         float dist = sqrtf (dist2);
-        vector3 nrm = (dist > CAP_EPS) ? vector3_scaling (diff, 1.0f / dist) : (vector3){0.0f, 1.0f, 0.0f};
+        vector3 nrm = (dist > CAP_EPS) ? vector3_scaling (diff, 1.0f / dist) : (vector3) {0.0f, 1.0f, 0.0f};
         vector3 pos = vector3_addition (q, vector3_scaling (nrm, r));
         return emit_contact (out, cap, other, nrm, pos, rr - dist);
     }

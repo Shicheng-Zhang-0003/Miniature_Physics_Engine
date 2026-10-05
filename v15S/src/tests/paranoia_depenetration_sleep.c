@@ -18,8 +18,8 @@ int main (void) {
         constraint_pool_init (&world);
         /* Create a 5-cube tower with 1cm overlaps, all initially asleep */
         for (int i = 0; i < 5; i++) {
-            int idx = physics_world_add_cube (&world, (vector3){0.0f, 0.5f + (float) i * 0.99f, 0.0f},
-                                              (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
+            int idx = physics_world_add_cube (&world, (vector3) {0.0f, 0.5f + (float) i * 0.99f, 0.0f},
+                                              (vector3) {0.5f, 0.5f, 0.5f}, 1.0f);
             world.bodies [idx].restitution = 0.0f;
             world.bodies [idx].friction_static = 0.8f;
             world.bodies [idx].friction_kinetic = 0.7f;
@@ -56,14 +56,14 @@ int main (void) {
         physics_world_init (&world);
         constraint_pool_init (&world);
         /* Sleeping cube on floor */
-        int sleeping = physics_world_add_cube (&world, (vector3){0.0f, 0.5f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
+        int sleeping = physics_world_add_cube (&world, (vector3) {0.0f, 0.5f, 0.0f}, (vector3) {0.5f, 0.5f, 0.5f}, 1.0f);
         world.bodies [sleeping].restitution = 0.0f;
         world.bodies [sleeping].friction_static = 0.8f;
         world.bodies [sleeping].friction_kinetic = 0.7f;
         world.bodies [sleeping].is_sleeping = true;
         world.bodies [sleeping].sleep_timer = 1.0f;
         /* Awake sphere falling on top */
-        int awake = physics_world_add_sphere (&world, 0.3f, 1.0f, (vector3){0.0f, 2.0f, 0.0f});
+        int awake = physics_world_add_sphere (&world, 0.3f, 1.0f, (vector3) {0.0f, 2.0f, 0.0f});
         world.bodies [awake].restitution = 0.0f;
         world.bodies [awake].friction_static = 0.8f;
         world.bodies [awake].friction_kinetic = 0.7f;
@@ -99,8 +99,8 @@ int main (void) {
         physics_world_init (&world);
         constraint_pool_init (&world);
         /* Two cubes spawned with 50% overlap */
-        int a = physics_world_add_cube (&world, (vector3){0.0f, 0.5f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
-        int b = physics_world_add_cube (&world, (vector3){0.0f, 0.5f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
+        int a = physics_world_add_cube (&world, (vector3) {0.0f, 0.5f, 0.0f}, (vector3) {0.5f, 0.5f, 0.5f}, 1.0f);
+        int b = physics_world_add_cube (&world, (vector3) {0.0f, 0.5f, 0.0f}, (vector3) {0.5f, 0.5f, 0.5f}, 1.0f);
         world.bodies [a].restitution = 0.0f;
         world.bodies [b].restitution = 0.0f;
         world.bodies [a].friction_static = 0.8f;
@@ -114,16 +114,16 @@ int main (void) {
             physics_world_step (&world, dt);
             rigidbody *ba = &world.bodies [a];
             rigidbody *bb = &world.bodies [b];
-            float sep = fabsf (ba->position.y - bb->position.y);
-            float vel_a = vector3_length (ba->velocity);
-            float vel_b = vector3_length (bb->velocity);
+            float sep = fabsf (ba -> position.y - bb -> position.y);
+            float vel_a = vector3_length (ba -> velocity);
+            float vel_b = vector3_length (bb -> velocity);
             if (sep > max_sep)
                 max_sep = sep;
             if (vel_a > max_vel)
                 max_vel = vel_a;
             if (vel_b > max_vel)
                 max_vel = vel_b;
-            if (!isfinite (ba->position.y) || !isfinite (bb->position.y))
+            if (!isfinite (ba -> position.y) || !isfinite (bb -> position.y))
                 nan_count++;
         }
         printf ("[INFO] deep_overlap max_sep=%.3f max_vel=%.3f nan=%d\n", max_sep, max_vel, nan_count);

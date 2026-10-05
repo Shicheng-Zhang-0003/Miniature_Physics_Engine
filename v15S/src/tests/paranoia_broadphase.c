@@ -20,11 +20,11 @@ int main (void) {
         g_cfg.world.gravity = 0.0f;
         g_cfg.world.drag = 1.0f;
         /* Thin wall: 0.1m thick */
-        int wall = physics_world_add_cube (&world, (vector3){0.0f, 0.0f, 0.0f}, (vector3){0.05f, 10.0f, 10.0f}, 0.0f);
+        int wall = physics_world_add_cube (&world, (vector3) {0.0f, 0.0f, 0.0f}, (vector3) {0.05f, 10.0f, 10.0f}, 0.0f);
         world.bodies [wall].restitution = 0.0f;
         /* Fast sphere: 100 m/s toward wall */
-        int sphere = physics_world_add_sphere (&world, 0.1f, 1.0f, (vector3){-5.0f, 0.0f, 0.0f});
-        world.bodies [sphere].velocity = (vector3){100.0f, 0.0f, 0.0f};
+        int sphere = physics_world_add_sphere (&world, 0.1f, 1.0f, (vector3) {-5.0f, 0.0f, 0.0f});
+        world.bodies [sphere].velocity = (vector3) {100.0f, 0.0f, 0.0f};
         world.bodies [sphere].restitution = 0.0f;
         rigidbody_wake (&world.bodies [sphere]);
         const float dt = 1.0f / 60.0f;
@@ -55,7 +55,7 @@ int main (void) {
         g_cfg.world.drag = 1.0f;
         /* Huge floor */
         int floor =
-            physics_world_add_cube (&world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){100.0f, 0.5f, 100.0f}, 0.0f);
+            physics_world_add_cube (&world, (vector3) {0.0f, -0.5f, 0.0f}, (vector3) {100.0f, 0.5f, 100.0f}, 0.0f);
         if (floor < 0) {
             printf ("[FAIL] broadphase_large_object could not create floor\n");
             fail = 1;
@@ -65,7 +65,7 @@ int main (void) {
             world.bodies [floor].friction_kinetic = 0.6f;
         }
         /* Small sphere falling */
-        int sphere = physics_world_add_sphere (&world, 0.1f, 1.0f, (vector3){50.0f, 10.0f, 50.0f});
+        int sphere = physics_world_add_sphere (&world, 0.1f, 1.0f, (vector3) {50.0f, 10.0f, 50.0f});
         world.bodies [sphere].restitution = 0.0f;
         rigidbody_wake (&world.bodies [sphere]);
         const float dt = 1.0f / 60.0f;
@@ -97,12 +97,12 @@ int main (void) {
         g_cfg.world.gravity = 0.0f;
         g_cfg.world.drag = 1.0f;
         /* Spinning long cylinder */
-        int cyl = physics_world_add_cylinder (&world, 0.5f, 5.0f, 1.0f, (vector3){0.0f, 0.0f, 0.0f});
-        world.bodies [cyl].angular_velocity = (vector3){0.0f, 0.0f, 50.0f}; /* 50 rad/s spin */
+        int cyl = physics_world_add_cylinder (&world, 0.5f, 5.0f, 1.0f, (vector3) {0.0f, 0.0f, 0.0f});
+        world.bodies [cyl].angular_velocity = (vector3) {0.0f, 0.0f, 50.0f}; /* 50 rad/s spin */
         world.bodies [cyl].restitution = 0.0f;
         rigidbody_wake (&world.bodies [cyl]);
         /* Stationary sphere at edge of swept path */
-        int sphere = physics_world_add_sphere (&world, 0.2f, 1.0f, (vector3){6.0f, 0.0f, 0.0f});
+        int sphere = physics_world_add_sphere (&world, 0.2f, 1.0f, (vector3) {6.0f, 0.0f, 0.0f});
         world.bodies [sphere].restitution = 0.0f;
         rigidbody_wake (&world.bodies [sphere]);
         const float dt = 1.0f / 60.0f;
@@ -135,7 +135,7 @@ int main (void) {
         g_cfg.world.drag = 1.0f;
         /* 10 spheres in a line - all should pair with neighbors */
         for (int i = 0; i < 10; i++) {
-            physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){(float) i * 1.2f, 0.0f, 0.0f});
+            physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3) {(float) i * 1.2f, 0.0f, 0.0f});
             world.bodies [i].restitution = 0.0f;
             rigidbody_wake (&world.bodies [i]);
         }
@@ -149,7 +149,7 @@ int main (void) {
         int max_pairs = 0;
         for (int t = 0; t < 60; t++)
             if (pair_counts [t] > max_pairs)
-                max_pairs = pair_counts [t];
+            max_pairs = pair_counts [t];
         printf ("[INFO] pair_dedup max_overflow=%d\n", max_pairs);
         if (max_pairs > 0) {
             printf ("[FAIL] pair overflow detected\n");
@@ -176,7 +176,7 @@ int main (void) {
         g_cfg.world.drag = 1.0f;
         /* Start with small spheres */
         for (int i = 0; i < 5; i++) {
-            physics_world_add_sphere (&world, 0.1f, 1.0f, (vector3){(float) i * 0.5f, 0.0f, 0.0f});
+            physics_world_add_sphere (&world, 0.1f, 1.0f, (vector3) {(float) i * 0.5f, 0.0f, 0.0f});
             rigidbody_wake (&world.bodies [i]);
         }
         const float dt = 1.0f / 60.0f;
@@ -186,7 +186,7 @@ int main (void) {
             cell_sizes [t] = broadphase_get_current_cell_size (&world);
         }
         /* Add large object - cell size should grow */
-        physics_world_add_cube (&world, (vector3){0.0f, 0.0f, 10.0f}, (vector3){25.0f, 25.0f, 25.0f}, 0.0f);
+        physics_world_add_cube (&world, (vector3) {0.0f, 0.0f, 10.0f}, (vector3) {25.0f, 25.0f, 25.0f}, 0.0f);
         for (int t = 0; t < 60; t++) {
             physics_world_step (&world, dt);
         }

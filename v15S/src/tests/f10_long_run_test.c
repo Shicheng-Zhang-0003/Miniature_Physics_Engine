@@ -22,11 +22,11 @@
 #define F10_TICKS 1500
 #define F10_TRANSIENT 120
 static void f10_add_cube (physics_world *w, vector3 p) {
-    int idx = physics_world_add_cube (w, p, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
+    int idx = physics_world_add_cube (w, p, (vector3) {0.5f, 0.5f, 0.5f}, 1.0f);
     if (idx >= 0) {
-        w->bodies [idx].restitution = 0.0f;
-        w->bodies [idx].friction_static = 0.8f;
-        w->bodies [idx].friction_kinetic = 0.7f;
+        w -> bodies [idx].restitution = 0.0f;
+        w -> bodies [idx].friction_static = 0.8f;
+        w -> bodies [idx].friction_kinetic = 0.7f;
     }
 }
 int main (void) {
@@ -39,7 +39,7 @@ int main (void) {
      * 60 s) while loose gates still pass — the same setup-bug family as
      * stack/driven_wheel/list4. With floor: 27/27 asleep, KE=0, runmax 0. */
     {
-        int f = physics_world_add_cube (&world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){30.0f, 0.5f, 30.0f}, 0.0f);
+        int f = physics_world_add_cube (&world, (vector3) {0.0f, -0.5f, 0.0f}, (vector3) {30.0f, 0.5f, 30.0f}, 0.0f);
         if (f >= 0) {
             world.bodies [f].friction_static = 0.8f;
             world.bodies [f].friction_kinetic = 0.7f;
@@ -47,21 +47,21 @@ int main (void) {
         }
     }
     for (int i = 0; i < 10; i++) {
-        f10_add_cube (&world, (vector3){20.0f, 0.5f + (float) i * 0.99f, 0.0f});
+        f10_add_cube (&world, (vector3) {20.0f, 0.5f + (float) i * 0.99f, 0.0f});
     }
     for (int gx = 0; gx < 3; gx++) {
         for (int gz = 0; gz < 3; gz++) {
-            f10_add_cube (&world, (vector3){-20.0f + ((float) gx - 1.0f) * 1.1f, 0.5f, ((float) gz - 1.0f) * 1.1f});
+            f10_add_cube (&world, (vector3) {-20.0f + ((float) gx - 1.0f) * 1.1f, 0.5f, ((float) gz - 1.0f) * 1.1f});
         }
     }
     for (int gx = 0; gx < 2; gx++) {
         for (int gz = 0; gz < 2; gz++) {
-            f10_add_cube (&world, (vector3){-20.0f + ((float) gx - 0.5f) * 1.1f, 1.49f, ((float) gz - 0.5f) * 1.1f});
+            f10_add_cube (&world, (vector3) {-20.0f + ((float) gx - 0.5f) * 1.1f, 1.49f, ((float) gz - 0.5f) * 1.1f});
         }
     }
-    f10_add_cube (&world, (vector3){-20.0f, 2.48f, 0.0f});
+    f10_add_cube (&world, (vector3) {-20.0f, 2.48f, 0.0f});
     for (int i = 0; i < 3; i++) {
-        int idx = physics_world_add_sphere (&world, 0.35f, 1.0f, (vector3){-30.0f + (float) i * 3.0f, 0.35f, 8.0f});
+        int idx = physics_world_add_sphere (&world, 0.35f, 1.0f, (vector3) {-30.0f + (float) i * 3.0f, 0.35f, 8.0f});
         if (idx >= 0) {
             world.bodies [idx].restitution = 0.0f;
             world.bodies [idx].friction_static = 0.8f;
@@ -78,18 +78,18 @@ int main (void) {
         float mx_lin = 0.0f, mx_ang = 0.0f;
         for (int i = 0; i < world.body_count; i++) {
             rigidbody *rb = &world.bodies [i];
-            if (!isfinite (rb->position.x) || !isfinite (rb->position.y) || !isfinite (rb->position.z) ||
-                !isfinite (rb->velocity.x) || !isfinite (rb->velocity.y) || !isfinite (rb->velocity.z) ||
-                !isfinite (rb->angular_velocity.x) || !isfinite (rb->angular_velocity.y) ||
-                !isfinite (rb->angular_velocity.z)) {
+            if (!isfinite (rb -> position.x) || !isfinite (rb -> position.y) || !isfinite (rb -> position.z) ||
+                !isfinite (rb -> velocity.x) || !isfinite (rb -> velocity.y) || !isfinite (rb -> velocity.z) ||
+                !isfinite (rb -> angular_velocity.x) || !isfinite (rb -> angular_velocity.y) ||
+                !isfinite (rb -> angular_velocity.z)) {
                 nan_ticks++;
                 continue;
             }
-            if (!rb->static_state && rb->position.y < -0.2f) {
+            if (!rb -> static_state && rb -> position.y < -0.2f) {
                 fallen_ticks++;
             }
-            float l = vector3_length (rb->velocity);
-            float a = vector3_length (rb->angular_velocity);
+            float l = vector3_length (rb -> velocity);
+            float a = vector3_length (rb -> angular_velocity);
             if (l > mx_lin) {
                 mx_lin = l;
             }

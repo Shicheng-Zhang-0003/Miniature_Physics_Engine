@@ -60,11 +60,11 @@ static int meta_build (physics_world *w, int with_floor) {
     physics_world_init (w);
     constraint_pool_init (w);
     if (with_floor) {
-        int f = physics_world_add_cube (w, (vector3){0.0f, -0.5f, 0.0f}, (vector3){6.0f, 0.5f, 6.0f}, 0.0f);
+        int f = physics_world_add_cube (w, (vector3) {0.0f, -0.5f, 0.0f}, (vector3) {6.0f, 0.5f, 6.0f}, 0.0f);
         if (f >= 0) {
-            w->bodies [f].friction_static = 0.8f;
-            w->bodies [f].friction_kinetic = 0.6f;
-            w->bodies [f].restitution = 0.2f;
+            w -> bodies [f].friction_static = 0.8f;
+            w -> bodies [f].friction_kinetic = 0.6f;
+            w -> bodies [f].restitution = 0.2f;
         }
     }
     /* DESPOT-2026-09-29: the first version of this fixture was a pile of five
@@ -79,23 +79,23 @@ static int meta_build (physics_world *w, int with_floor) {
      *     genuinely different problem.
      * Equivariance needs a well-conditioned probe: bodies clearly separated,
      * gentle approach, and a floor that stays put. */
-    const int d0 = physics_world_add_sphere (w, 0.30f, 1.0f, (vector3){-0.30f, 0.60f, 0.00f});
-    const int d1 = physics_world_add_sphere (w, 0.25f, 2.0f, (vector3){0.30f, 0.60f, 0.00f});
+    const int d0 = physics_world_add_sphere (w, 0.30f, 1.0f, (vector3) {-0.30f, 0.60f, 0.00f});
+    const int d1 = physics_world_add_sphere (w, 0.25f, 2.0f, (vector3) {0.30f, 0.60f, 0.00f});
     /* Head-on, closing at 2.2 m/s from 0.6 m apart with combined radii 0.55:
      * they meet in ~0.02 s and then interact for the rest of the run, so both
      * the equivariance and convergence probes exercise real contact rather
      * than watching two spheres sail past each other (which is what the first
      * version did -- it reported exactly 0.0000 error because nothing collided). */
     if (d0 >= 0) {
-        w->bodies [d0].velocity = (vector3){1.20f, 0.00f, 0.00f};
-        w->bodies [d0].angular_velocity = (vector3){1.30f, -0.40f, 0.70f};
+        w -> bodies [d0].velocity = (vector3) {1.20f, 0.00f, 0.00f};
+        w -> bodies [d0].angular_velocity = (vector3) {1.30f, -0.40f, 0.70f};
     }
     if (d1 >= 0) {
-        w->bodies [d1].velocity = (vector3){-1.00f, 0.00f, 0.00f};
-        w->bodies [d1].angular_velocity = (vector3){-0.20f, 0.90f, 1.10f};
+        w -> bodies [d1].velocity = (vector3) {-1.00f, 0.00f, 0.00f};
+        w -> bodies [d1].angular_velocity = (vector3) {-0.20f, 0.90f, 1.10f};
     }
-    for (int i = 0; i < w->body_count; i++)
-        rigidbody_update_axes (&w->bodies [i]);
+    for (int i = 0; i < w -> body_count; i++)
+        rigidbody_update_axes (&w -> bodies [i]);
     return (d0 >= 0) ? d0 : 0;
 }
 /* Rotate every body's pose and velocity by quaternion q (a pure rotation
@@ -110,24 +110,24 @@ static void meta_rotate_world (physics_world *w, quaternion q, int first_dyn) {
      * being rotated too, giving the rotated run a TILTED floor -- a genuinely
      * different problem, not a test of equivariance. The index returned by
      * meta_build is the honest control. */
-    for (int i = first_dyn; i < w->body_count; i++) {
-        rigidbody *b = &w->bodies [i];
-        b->position = vector4_rotate_to_vector3 (q, b->position);
-        b->velocity = vector4_rotate_to_vector3 (q, b->velocity);
-        b->angular_velocity = vector4_rotate_to_vector3 (q, b->angular_velocity);
-        b->orientation = vector4_multiplication (q, b->orientation);
+    for (int i = first_dyn; i < w -> body_count; i++) {
+        rigidbody *b = &w -> bodies [i];
+        b -> position = vector4_rotate_to_vector3 (q, b -> position);
+        b -> velocity = vector4_rotate_to_vector3 (q, b -> velocity);
+        b -> angular_velocity = vector4_rotate_to_vector3 (q, b -> angular_velocity);
+        b -> orientation = vector4_multiplication (q, b -> orientation);
         rigidbody_update_axes (b);
     }
 }
 static int meta_step (physics_world *w, int n, float dt) {
     for (int i = 0; i < n; i++) {
         physics_world_step (w, dt);
-        for (int b = 0; b < w->body_count; b++) {
-            const rigidbody *rb = &w->bodies [b];
-            if (!isfinite (rb->position.x) || !isfinite (rb->position.y) || !isfinite (rb->position.z) ||
-                !isfinite (rb->velocity.x) || !isfinite (rb->velocity.y) || !isfinite (rb->velocity.z) ||
-                !isfinite (rb->angular_velocity.x) || !isfinite (rb->angular_velocity.y) ||
-                !isfinite (rb->angular_velocity.z)) {
+        for (int b = 0; b < w -> body_count; b++) {
+            const rigidbody *rb = &w -> bodies [b];
+            if (!isfinite (rb -> position.x) || !isfinite (rb -> position.y) || !isfinite (rb -> position.z) ||
+                !isfinite (rb -> velocity.x) || !isfinite (rb -> velocity.y) || !isfinite (rb -> velocity.z) ||
+                !isfinite (rb -> angular_velocity.x) || !isfinite (rb -> angular_velocity.y) ||
+                !isfinite (rb -> angular_velocity.z)) {
                 return 0;
             }
         }
@@ -136,9 +136,9 @@ static int meta_step (physics_world *w, int n, float dt) {
 }
 static double meta_max_pos_err (const physics_world *a, const physics_world *b) {
     double worst = 0.0;
-    const int n = (a->body_count < b->body_count) ? a->body_count : b->body_count;
+    const int n = (a -> body_count < b -> body_count) ? a -> body_count : b -> body_count;
     for (int i = 0; i < n; i++) {
-        vector3 d = vector3_subtraction (a->bodies [i].position, b->bodies [i].position);
+        vector3 d = vector3_subtraction (a -> bodies [i].position, b -> bodies [i].position);
         double m = (double) vector3_length (d);
         if (m > worst)
             worst = m;
@@ -147,9 +147,9 @@ static double meta_max_pos_err (const physics_world *a, const physics_world *b) 
 }
 static double meta_max_vel_err (const physics_world *a, const physics_world *b) {
     double worst = 0.0;
-    const int n = (a->body_count < b->body_count) ? a->body_count : b->body_count;
+    const int n = (a -> body_count < b -> body_count) ? a -> body_count : b -> body_count;
     for (int i = 0; i < n; i++) {
-        vector3 d = vector3_subtraction (a->bodies [i].velocity, b->bodies [i].velocity);
+        vector3 d = vector3_subtraction (a -> bodies [i].velocity, b -> bodies [i].velocity);
         double m = (double) vector3_length (d);
         if (m > worst)
             worst = m;
@@ -213,7 +213,7 @@ int mpe_t_meta_rotation (void) {
         physics_world_cleanup (&wa);
         physics_world_cleanup (&wb);
         mpe_test_end (tp);
-        return tp->failures;
+        return tp -> failures;
     }
     /* Rotate only B, then run both. Rotating B back afterwards must reproduce
      * A exactly, because rotation equivariance says the engine does not care
@@ -297,7 +297,7 @@ int mpe_t_meta_rotation (void) {
     physics_world_cleanup (&wa);
     physics_world_cleanup (&wb);
     mpe_test_end (tp);
-    return tp->failures;
+    return tp -> failures;
 }
 /* ------------------------------------- 2. solver convergence monotonicity */
 /* DESPOT-2026-10-03: meta_convergence WAS VACUOUS. Rewritten.
@@ -344,32 +344,32 @@ int mpe_t_meta_rotation (void) {
 static void meta_build_stack (physics_world *w) {
     physics_world_init (w);
     constraint_pool_init (w);
-    int f = physics_world_add_cube (w, (vector3){0.0f, -0.5f, 0.0f}, (vector3){8.0f, 0.5f, 8.0f}, 0.0f);
+    int f = physics_world_add_cube (w, (vector3) {0.0f, -0.5f, 0.0f}, (vector3) {8.0f, 0.5f, 8.0f}, 0.0f);
     if (f >= 0) {
-        w->bodies [f].friction_static = 0.9f;
-        w->bodies [f].friction_kinetic = 0.7f;
-        w->bodies [f].restitution = 0.0f;
+        w -> bodies [f].friction_static = 0.9f;
+        w -> bodies [f].friction_kinetic = 0.7f;
+        w -> bodies [f].restitution = 0.0f;
     }
     for (int i = 0; i < META_CONV_STACK_H; i++) {
         /* 0.5 m cubes resting exactly on each other: half-height 0.25, pitch 0.5 */
         float y = 0.25f + 0.5f * (float) i;
-        int b = physics_world_add_cube (w, (vector3){0.0f, y, 0.0f}, (vector3){0.25f, 0.25f, 0.25f}, 1.0f);
+        int b = physics_world_add_cube (w, (vector3) {0.0f, y, 0.0f}, (vector3) {0.25f, 0.25f, 0.25f}, 1.0f);
         if (b >= 0) {
-            w->bodies [b].friction_static = 0.9f;
-            w->bodies [b].friction_kinetic = 0.7f;
-            w->bodies [b].restitution = 0.0f;
+            w -> bodies [b].friction_static = 0.9f;
+            w -> bodies [b].friction_kinetic = 0.7f;
+            w -> bodies [b].restitution = 0.0f;
         }
     }
-    for (int i = 0; i < w->body_count; i++)
-        rigidbody_update_axes (&w->bodies [i]);
+    for (int i = 0; i < w -> body_count; i++)
+        rigidbody_update_axes (&w -> bodies [i]);
 }
 /* max position difference over the dynamic stack bodies only (index 1..H) */
 static double meta_stack_pos_err (const physics_world *a, const physics_world *b) {
     double worst = 0.0;
     for (int i = 1; i <= META_CONV_STACK_H; i++) {
-        if (i >= a->body_count || i >= b->body_count)
+        if (i >= a -> body_count || i >= b -> body_count)
             continue;
-        vector3 d = vector3_subtraction (a->bodies [i].position, b->bodies [i].position);
+        vector3 d = vector3_subtraction (a -> bodies [i].position, b -> bodies [i].position);
         double m = (double) vector3_length (d);
         if (m > worst)
             worst = m;
@@ -498,7 +498,7 @@ int mpe_t_meta_convergence (void) {
          *
          * Recorded in docs/VALIDATION.md -> [SOLVER-NON-MONOTONIC]. */
         MPE_CHECK (tp, err [n - 1] <= err [0] * 2.0 + 1e-6);
-        if (tp->failures == 0) {
+        if (tp -> failures == 0) {
             printf ("[PASS] solver error is bounded and does not diverge with "
                     "iteration count on a load-bearing stack, and the knob is "
                     "demonstrably live (NOTE: not monotonic -- see the comment)\n");
@@ -506,7 +506,7 @@ int mpe_t_meta_convergence (void) {
     }
     physics_world_cleanup (&ref);
     mpe_test_end (tp);
-    return tp->failures;
+    return tp -> failures;
 }
 /* ------------------------------------------------ 3. sleep honesty, both ways */
 /* DESPOT-2026-09-29: mpe_t_meta_sleep was WRITTEN AND THEN REMOVED. Recorded
@@ -575,11 +575,11 @@ int mpe_t_meta_config_wiring (void) {
      * catches. The direction is not asserted (that would be a golden value);
      * only that friction is REACHABLE. */
     MPE_CHECK (tp, fabs (results [0] - results [1]) > 1e-3);
-    if (tp->failures == 0) {
+    if (tp -> failures == 0) {
         printf ("[PASS] solver parameters demonstrably reach the simulation\n");
     }
     mpe_test_end (tp);
-    return tp->failures;
+    return tp -> failures;
 }
 /* ------------------------------- 5. sleep honesty, three states (SLEEP-H1) */
 /* DESPOT-2026-10-01: this is the test SLEEP-H1 asked for. The withdrawn
@@ -601,9 +601,9 @@ int mpe_t_sleep_settle (void) {
     physics_world w;
     mpe_world_begin (&w);
     MPE_CHECK (tp, mpe_floor_slab (&w, 0.8f, 0.6f, 0.2f) >= 0);
-    int b = physics_world_add_sphere (&w, 0.3f, 1.0f, (vector3){0.0f, 0.31f, 0.0f});
+    int b = physics_world_add_sphere (&w, 0.3f, 1.0f, (vector3) {0.0f, 0.31f, 0.0f});
     MPE_CHECK (tp, b >= 0);
-    w.bodies [b].velocity = (vector3){0.0f, 3.0f, 0.0f};
+    w.bodies [b].velocity = (vector3) {0.0f, 3.0f, 0.0f};
     vector3 p0 = w.bodies [b].position;
     const float dt = 1.0f / 60.0f;
     /* Max displacement over the opening (not position at one instant: under
@@ -617,13 +617,13 @@ int mpe_t_sleep_settle (void) {
             travel15 = d;
         }
     }
-    MPE_INFO ("sleep_settle: 15-tick max travel = %.4f m (regime %s)", travel15, tp->regime);
+    MPE_INFO ("sleep_settle: 15-tick max travel = %.4f m (regime %s)", travel15, tp -> regime);
     MPE_CHECK (tp, travel15 > 1e-3);
     MPE_CHECK (tp, mpe_step (&w, 585, dt));
     float vend = vector3_length (w.bodies [b].velocity);
     float yend = w.bodies [b].position.y;
     MPE_INFO ("sleep_settle: settled v = %.4f m/s y = %.4f m sleep = %d timer = %.2f (regime %s)", vend, yend,
-              w.bodies [b].is_sleeping, w.bodies [b].sleep_timer, tp->regime);
+              w.bodies [b].is_sleeping, w.bodies [b].sleep_timer, tp -> regime);
     MPE_CHECK (tp, vend < 0.05f);
     MPE_CHECK (tp, yend > 0.2f && yend < 0.6f);
     if (g_cfg.sleep.enable) {
@@ -632,12 +632,12 @@ int mpe_t_sleep_settle (void) {
         MPE_CHECK (tp, !w.bodies [b].is_sleeping);
         MPE_CHECK (tp, w.bodies [b].sleep_timer == 0.0f);
     }
-    if (tp->failures == 0) {
+    if (tp -> failures == 0) {
         printf ("[PASS] launch settles then sleeps iff enabled (three-state honesty)\n");
     }
     physics_world_cleanup (&w);
     mpe_test_end (tp);
-    return tp->failures;
+    return tp -> failures;
 }
 /* ---------------------------------- 6. mouse-look sign convention, 4 axes */
 /* DESPOT-2026-09-29 (user report: "flick right or down locks properly, left and
@@ -664,9 +664,9 @@ int mpe_t_mouse_look_axes (void) {
         double dx, dy;
         int ex, ey;
     } cases [] = {
-        {"flick RIGHT (+x)", 10.0, 0.0, +1, 0},    {"flick LEFT  (-x)", -10.0, 0.0, -1, 0},
-        {"flick DOWN  (+y)", 0.0, 10.0, 0, -1},    {"flick UP    (-y)", 0.0, -10.0, 0, +1},
-        {"diagonal (+x,+y)", 10.0, 10.0, +1, -1},  {"diagonal (-x,-y)", -10.0, -10.0, -1, +1},
+        {"flick RIGHT (+x)", 10.0, 0.0, +1, 0}, {"flick LEFT  (-x)", -10.0, 0.0, -1, 0},
+        {"flick DOWN  (+y)", 0.0, 10.0, 0, -1}, {"flick UP    (-y)", 0.0, -10.0, 0, +1},
+        {"diagonal (+x,+y)", 10.0, 10.0, +1, -1}, {"diagonal (-x,-y)", -10.0, -10.0, -1, +1},
         {"diagonal (+x,-y)", 10.0, -10.0, +1, +1}, {"diagonal (-x,+y)", -10.0, 10.0, -1, -1},
     };
     const int n = (int) (sizeof (cases) / sizeof (cases [0]));
@@ -707,11 +707,11 @@ int mpe_t_mouse_look_axes (void) {
         MPE_CHECK_NEAR (tp, acc_x, 20.0f, 1e-4, "accumulated x over 5 events");
         MPE_CHECK_NEAR (tp, acc_y, 10.0f, 1e-4, "accumulated y over 5 events");
     }
-    if (tp->failures == 0) {
+    if (tp -> failures == 0) {
         printf ("[PASS] mouse-look convention correct in all four directions\n");
     }
     mpe_test_end (tp);
-    return tp->failures;
+    return tp -> failures;
 }
 /* ------------------- 6. body materials are live at construction time */
 /* DESPOT-2026-09-29 -- THE GAME-WORLD CONFIG-ORDER BUG.
@@ -750,7 +750,7 @@ int mpe_t_body_materials_live (void) {
     mpe_config_force_unready_for_test ();
     MPE_CHECK (tp, !mpe_config_is_ready ());
     rigidbody cube;
-    rigidbody_initialisation_cube (&cube, (vector3){0, 0, 0}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
+    rigidbody_initialisation_cube (&cube, (vector3) {0, 0, 0}, (vector3) {0.5f, 0.5f, 0.5f}, 1.0f);
     MPE_INFO ("cube built now: friction_static=%.3f friction_kinetic=%.3f "
               "restitution=%.3f (zeroed config would give 0/0/0)",
               (double) cube.friction_static, (double) cube.friction_kinetic, (double) cube.restitution);
@@ -760,7 +760,7 @@ int mpe_t_body_materials_live (void) {
     /* The constructor must have repaired readiness on the way past. */
     MPE_CHECK (tp, mpe_config_is_ready ());
     rigidbody cyl;
-    rigidbody_initialisation_cylinder (&cyl, 0.3f, 0.2f, 1.0f, (vector3){0, 0, 0});
+    rigidbody_initialisation_cylinder (&cyl, 0.3f, 0.2f, 1.0f, (vector3) {0, 0, 0});
     MPE_INFO ("cylinder built now: friction_static=%.3f restitution=%.3f", (double) cyl.friction_static,
               (double) cyl.restitution);
     MPE_CHECK (tp, cyl.friction_static > 0.0f);
@@ -777,10 +777,10 @@ int mpe_t_body_materials_live (void) {
         MPE_CHECK_NEAR (tp, g_cfg.body_defaults.cube_fric_s, 0.777f, 1e-6, "second ensure_ready is a no-op");
         g_cfg.body_defaults.cube_fric_s = saved;
     }
-    if (tp->failures == 0) {
+    if (tp -> failures == 0) {
         printf ("[PASS] bodies are constructed with live materials "
                 "(no zero-friction objects)\n");
     }
     mpe_test_end (tp);
-    return tp->failures;
+    return tp -> failures;
 }

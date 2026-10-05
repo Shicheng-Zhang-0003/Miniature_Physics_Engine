@@ -48,12 +48,12 @@ typedef struct {
 static int eco_track_world (mfs_ecosystem_state_t *state, mpe_world_t *world) {
     if (!state || !world)
         return -1;
-    for (int i = 0; i < state->nworlds; i++) {
-        if (state->worlds [i] == world)
+    for (int i = 0; i < state -> nworlds; i++) {
+        if (state -> worlds [i] == world)
             return 0;
     }
-    if (state->nworlds < MFS_ECO_MAX_WORLDS) {
-        state->worlds [state->nworlds++] = world;
+    if (state -> nworlds < MFS_ECO_MAX_WORLDS) {
+        state -> worlds [state -> nworlds++] = world;
         return 0;
     }
     fprintf (stderr, "mfs_ecosystem: world table full (%d); extra world not tracked\n", MFS_ECO_MAX_WORLDS);
@@ -67,13 +67,13 @@ static void eco_untrack_world (mfs_ecosystem_state_t *state, mpe_world_t *world)
      * that slid into slot i and leaking one tracked world. Decrement i after
      * a clear-all removal so every slot is visited. Single-world removal
      * keeps the early break. */
-    for (int i = 0; i < state->nworlds; i++) {
-        if (state->worlds [i] == world || !world) {
-            for (int j = i; j + 1 < state->nworlds; j++) {
-                state->worlds [j] = state->worlds [j + 1];
+    for (int i = 0; i < state -> nworlds; i++) {
+        if (state -> worlds [i] == world || !world) {
+            for (int j = i; j + 1 < state -> nworlds; j++) {
+                state -> worlds [j] = state -> worlds [j + 1];
             }
-            state->worlds [state->nworlds - 1] = NULL;
-            state->nworlds--;
+            state -> worlds [state -> nworlds - 1] = NULL;
+            state -> nworlds--;
             if (world)
                 break;
             i--; /* re-examine the slot that just slid in (clear-all only) */
@@ -81,9 +81,9 @@ static void eco_untrack_world (mfs_ecosystem_state_t *state, mpe_world_t *world)
     }
 }
 static mpe_world_t *eco_primary_world (mfs_ecosystem_state_t *state) {
-    if (!state || state->nworlds <= 0 || !state->worlds [0])
+    if (!state || state -> nworlds <= 0 || !state -> worlds [0])
         return NULL;
-    return state->worlds [0];
+    return state -> worlds [0];
 }
 /* ================================================================
  * Ecosystem Lifecycle
@@ -149,8 +149,8 @@ static int mfs_ecosystem_attach (mpe_world_t *world, void **eco_state) {
         free (state);
         return -1;
     }
-    state->modules_initialized = true;
-    state->modules_attached = true;
+    state -> modules_initialized = true;
+    state -> modules_attached = true;
     /* Tracking is best-effort for the terminal surface; the attach itself
      * already succeeded, so a full table only warns (see eco_track_world). */
     eco_track_world (state, world);
@@ -189,14 +189,14 @@ static int mfs_ecosystem_config_get (void *eco_state, const char *key, char *out
          * ambiguous when several worlds hold the module). Terminal commands
          * operate on worlds[0], so read that world's attachment. */
         mfs_ecosystem_state_t *state = (mfs_ecosystem_state_t *) eco_state;
-        mpe_world_t *primary = (state && state->nworlds > 0) ? state->worlds [0] : NULL;
+        mpe_world_t *primary = (state && state -> nworlds > 0) ? state -> worlds [0] : NULL;
         if (!primary)
             return -1;
         mfs_module_1_state *ms =
             (mfs_module_1_state *) mfs_internal_module_state_for ((const void *) primary, MFS_MODULE_1_NAME);
         if (!ms)
             return -1;
-        snprintf (out, (size_t) maxlen, "%.1f", (double) ms->shooter_rpm);
+        snprintf (out, (size_t) maxlen, "%.1f", (double) ms -> shooter_rpm);
         return 0;
     }
     return -1; /* unsupported key (honest: no silent default) */
@@ -253,26 +253,26 @@ static void eco_ensure_iterations (void) {
 static int eco_ensure_floor (physics_world *w) {
     if (!w)
         return -1;
-    for (int i = 0; i < w->body_count; i++) {
-        rigidbody *b = &w->bodies [i];
+    for (int i = 0; i < w -> body_count; i++) {
+        rigidbody *b = &w -> bodies [i];
         /* FIX-AUDIT-DESPOT: was a two-clause predicate
          * (`!static_state && mass != 0`) that second-guessed the engine's
          * own static flag. Canonical check is the flag alone: mass-0 slabs
          * are static by construction. */
-        if (!b->static_state)
+        if (!b -> static_state)
             continue;
-        float top = b->position.y + b->half_extensions.y;
-        if (top > -0.05f && top < 0.05f && fabsf (b->position.x) < 5.0f && fabsf (b->position.z) < 5.0f &&
-            b->half_extensions.x >= 5.0f && b->half_extensions.z >= 5.0f) {
+        float top = b -> position.y + b -> half_extensions.y;
+        if (top > -0.05f && top < 0.05f && fabsf (b -> position.x) < 5.0f && fabsf (b -> position.z) < 5.0f &&
+            b -> half_extensions.x >= 5.0f && b -> half_extensions.z >= 5.0f) {
             return 0;
         }
     }
-    int f = physics_world_add_cube (w, (vector3){0.0f, -0.5f, 0.0f}, (vector3){30.0f, 0.5f, 30.0f}, 0.0f);
+    int f = physics_world_add_cube (w, (vector3) {0.0f, -0.5f, 0.0f}, (vector3) {30.0f, 0.5f, 30.0f}, 0.0f);
     if (f < 0)
         return -1;
-    w->bodies [f].friction_static = 1.0f;
-    w->bodies [f].friction_kinetic = 0.8f;
-    w->bodies [f].restitution = 0.0f;
+    w -> bodies [f].friction_static = 1.0f;
+    w -> bodies [f].friction_kinetic = 0.8f;
+    w -> bodies [f].restitution = 0.0f;
     printf ("mfs: tile floor added (robots need frictional contact)\n");
     return 1;
 }
@@ -411,8 +411,8 @@ static int mfs_ecosystem_command (void *eco_state, int argc, char **argv) {
             float px = 0, py = 0, pz = 0;
             ftc_robot_get_position (w, r, &px, &py, &pz);
             printf ("  [%d] %s at (%.2f,%.2f,%.2f) odom=(%.2f,%.2f,%.2f)%s\n", i,
-                    r->drivetrain_type == FTC_DRIVETRAIN_MECANUM ? "mecanum" : "tank", px, py, pz, r->odom_x, r->odom_z,
-                    r->odom_theta, r->odom_slip ? " SLIP" : "");
+                    r -> drivetrain_type == FTC_DRIVETRAIN_MECANUM ? "mecanum" : "tank", px, py, pz, r -> odom_x, r -> odom_z,
+                    r -> odom_theta, r -> odom_slip ? " SLIP" : "");
         }
         return 0;
     }
@@ -426,15 +426,15 @@ static int mfs_ecosystem_command (void *eco_state, int argc, char **argv) {
         float px = 0, py = 0, pz = 0;
         ftc_robot_get_position (w, r, &px, &py, &pz);
         float isum = 0.0f;
-        for (int k = 0; k < r->wheel_count; k++)
-            isum += r->wheel_motors [k].current;
-        printf ("mfs: robot %d pos=(%.3f,%.3f,%.3f) odom=(%.3f,%.3f,%.3f)%s\n", idx, px, py, pz, r->odom_x, r->odom_z,
-                r->odom_theta, r->odom_slip ? " SLIP" : "");
-        printf ("mfs: battery %.2fV (%.0f%%)%s\n", battery_get_voltage (&r->battery, isum),
-                r->battery.charge_fraction * 100.0f, battery_fuse_tripped (&r->battery) ? " FUSE-TRIPPED" : "");
-        for (int k = 0; k < r->wheel_count; k++) {
-            printf ("mfs: wheel %d cmd=%+.2f rpm=%+.0f I=%+.2fA\n", k, r->wheel_motors [k].command,
-                    r->wheel_motors [k].rpm, r->wheel_motors [k].current);
+        for (int k = 0; k < r -> wheel_count; k++)
+            isum += r -> wheel_motors [k].current;
+        printf ("mfs: robot %d pos=(%.3f,%.3f,%.3f) odom=(%.3f,%.3f,%.3f)%s\n", idx, px, py, pz, r -> odom_x, r -> odom_z,
+                r -> odom_theta, r -> odom_slip ? " SLIP" : "");
+        printf ("mfs: battery %.2fV (%.0f%%)%s\n", battery_get_voltage (&r -> battery, isum),
+                r -> battery.charge_fraction * 100.0f, battery_fuse_tripped (&r -> battery) ? " FUSE-TRIPPED" : "");
+        for (int k = 0; k < r -> wheel_count; k++) {
+            printf ("mfs: wheel %d cmd=%+.2f rpm=%+.0f I=%+.2fA\n", k, r -> wheel_motors [k].command,
+                    r -> wheel_motors [k].rpm, r -> wheel_motors [k].current);
         }
         return 0;
     }
@@ -450,7 +450,7 @@ MPE_USED const mpe_ecosystem_desc_t mpe_ecosystem_desc = {
     .version = "1.0",
     .author = "MFS Team",
     .description = "MFS overarching ecosystem: ftc-fleet drive module attached by default; BioBuzz game module "
-                   "(module_1) registered but parked, attach explicitly",
+    "(module_1) registered but parked, attach explicitly",
     /* PHYSICS-TRUTH: bundles a non-deterministic module (see above). */
     .deterministic = false,
     .attach = mfs_ecosystem_attach,

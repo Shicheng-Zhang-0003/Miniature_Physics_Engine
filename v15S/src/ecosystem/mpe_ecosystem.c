@@ -34,12 +34,12 @@ struct attached_eco {
  *    unlock anywhere else. */
 static struct attached_eco s_attached [8];
 int mpe_ecosystem_register (const mpe_ecosystem_desc_t *desc) {
-    if (!desc || desc->abi != MPE_ECOSYSTEM_ABI || !desc->name)
+    if (!desc || desc -> abi != MPE_ECOSYSTEM_ABI || !desc -> name)
         return -1;
     pthread_mutex_lock (&s_eco_lock);
     int rc = -1;
     for (int i = 0; i < 16; i++) {
-        if (s_eco_live [i] && s_ecosystems [i].name && strcmp (s_ecosystems [i].name, desc->name) == 0) {
+        if (s_eco_live [i] && s_ecosystems [i].name && strcmp (s_ecosystems [i].name, desc -> name) == 0) {
             s_ecosystems [i] = *desc;
             rc = i;
             pthread_mutex_unlock (&s_eco_lock);
@@ -56,7 +56,7 @@ int mpe_ecosystem_register (const mpe_ecosystem_desc_t *desc) {
     }
     if (rc < 0) {
         /* FIX-AUDIT-DESPOT: slot-full was a silent -1. */
-        fprintf (stderr, "[ecosystem] registry full (16); refusing '%s'\n", desc && desc->name ? desc->name : "?");
+        fprintf (stderr, "[ecosystem] registry full (16); refusing '%s'\n", desc && desc -> name ? desc -> name : "?");
     }
     pthread_mutex_unlock (&s_eco_lock);
     return rc;
@@ -87,9 +87,9 @@ const mpe_ecosystem_desc_t *mpe_ecosystem_find (const char *name) {
     const mpe_ecosystem_desc_t *out = 0;
     for (int i = 0; i < 16; i++)
         if (s_eco_live [i] && s_ecosystems [i].name && strcmp (s_ecosystems [i].name, name) == 0) {
-            out = &s_ecosystems [i];
-            break;
-        }
+        out = &s_ecosystems [i];
+        break;
+    }
     pthread_mutex_unlock (&s_eco_lock);
     return out;
 }
@@ -98,7 +98,7 @@ int mpe_ecosystem_count (void) {
     int c = 0;
     for (int i = 0; i < 16; i++)
         if (s_eco_live [i])
-            c++;
+        c++;
     pthread_mutex_unlock (&s_eco_lock);
     return c;
 }
@@ -126,7 +126,7 @@ int mpe_ecosystem_attach (mpe_world_t *world, const char *eco_name) {
     int rc = -1;
     for (int i = 0; i < 8; i++) {
         if (s_attached [i].desc && s_attached [i].world == (const void *) world &&
-            strcmp (s_attached [i].desc->name, eco_name) == 0) {
+            strcmp (s_attached [i].desc -> name, eco_name) == 0) {
             rc = 0;
             pthread_mutex_unlock (&s_eco_lock);
             return rc;
@@ -150,9 +150,9 @@ int mpe_ecosystem_attach (mpe_world_t *world, const char *eco_name) {
             s_attached [i].state = 0;
             mpe_ecosystem_desc_t *d = s_attached [i].desc;
             pthread_mutex_unlock (&s_eco_lock);
-            if (d->attach) {
+            if (d -> attach) {
                 void *st = 0;
-                int r = d->attach ((mpe_world_t *) world, &st);
+                int r = d -> attach ((mpe_world_t *) world, &st);
                 pthread_mutex_lock (&s_eco_lock);
                 /* DESPOT-2026-10-01 ABA close: attach ran unlocked, so an
                  * unregister+register could have swapped the descriptor.
@@ -161,8 +161,8 @@ int mpe_ecosystem_attach (mpe_world_t *world, const char *eco_name) {
                  * dead .so. */
                 if (s_attached [i].desc != d) {
                     pthread_mutex_unlock (&s_eco_lock);
-                    if (r == 0 && d->detach) {
-                        d->detach ((mpe_world_t *) world, st);
+                    if (r == 0 && d -> detach) {
+                        d -> detach ((mpe_world_t *) world, st);
                     }
                     return -1;
                 }
@@ -192,15 +192,15 @@ int mpe_ecosystem_detach (mpe_world_t *world, const char *eco_name) {
     int rc = -1;
     for (int i = 0; i < 8; i++) {
         if (s_attached [i].desc && s_attached [i].world == (const void *) world &&
-            strcmp (s_attached [i].desc->name, eco_name) == 0) {
+            strcmp (s_attached [i].desc -> name, eco_name) == 0) {
             mpe_ecosystem_desc_t *d = s_attached [i].desc;
             void *st = s_attached [i].state;
             s_attached [i].desc = 0;
             s_attached [i].state = 0;
             s_attached [i].world = 0;
             pthread_mutex_unlock (&s_eco_lock);
-            if (d->detach)
-                d->detach ((mpe_world_t *) world, st);
+            if (d -> detach)
+                d -> detach ((mpe_world_t *) world, st);
             return 0;
         }
     }
@@ -216,7 +216,7 @@ void *mpe_ecosystem_state (mpe_world_t *world, const char *eco_name) {
     void *out = NULL;
     for (int i = 0; i < 8; i++) {
         if (s_attached [i].desc && s_attached [i].world == (const void *) world &&
-            strcmp (s_attached [i].desc->name, eco_name) == 0) {
+            strcmp (s_attached [i].desc -> name, eco_name) == 0) {
             out = s_attached [i].state;
             break;
         }
@@ -232,7 +232,7 @@ void mpe_ecosystem_detach_everywhere (const char *eco_name) {
         pthread_mutex_lock (&s_eco_lock);
         int idx = -1;
         for (int i = 0; i < 8; i++) {
-            if (s_attached [i].desc && strcmp (s_attached [i].desc->name, eco_name) == 0) {
+            if (s_attached [i].desc && strcmp (s_attached [i].desc -> name, eco_name) == 0) {
                 idx = i;
                 break;
             }
@@ -248,8 +248,8 @@ void mpe_ecosystem_detach_everywhere (const char *eco_name) {
         s_attached [idx].state = 0;
         s_attached [idx].world = 0;
         pthread_mutex_unlock (&s_eco_lock);
-        if (d->detach)
-            d->detach ((mpe_world_t *) w, st);
+        if (d -> detach)
+            d -> detach ((mpe_world_t *) w, st);
     }
 }
 void mpe_ecosystem_pre_step (mpe_world_t *world, float dt) {
@@ -258,7 +258,7 @@ void mpe_ecosystem_pre_step (mpe_world_t *world, float dt) {
     int n = 0;
     pthread_mutex_lock (&s_eco_lock);
     for (int i = 0; i < 8; i++) {
-        if (s_attached [i].desc && s_attached [i].world == (const void *) world && s_attached [i].desc->pre_step) {
+        if (s_attached [i].desc && s_attached [i].world == (const void *) world && s_attached [i].desc -> pre_step) {
             ds [n] = s_attached [i].desc;
             sts [n] = s_attached [i].state;
             n++;
@@ -266,7 +266,7 @@ void mpe_ecosystem_pre_step (mpe_world_t *world, float dt) {
     }
     pthread_mutex_unlock (&s_eco_lock);
     for (int i = 0; i < n; i++)
-        ds [i]->pre_step ((mpe_world_t *) world, dt, sts [i]);
+        ds [i] -> pre_step ((mpe_world_t *) world, dt, sts [i]);
 }
 void mpe_ecosystem_post_step (mpe_world_t *world, float dt) {
     mpe_ecosystem_desc_t *ds [8];
@@ -274,7 +274,7 @@ void mpe_ecosystem_post_step (mpe_world_t *world, float dt) {
     int n = 0;
     pthread_mutex_lock (&s_eco_lock);
     for (int i = 0; i < 8; i++) {
-        if (s_attached [i].desc && s_attached [i].world == (const void *) world && s_attached [i].desc->post_step) {
+        if (s_attached [i].desc && s_attached [i].world == (const void *) world && s_attached [i].desc -> post_step) {
             ds [n] = s_attached [i].desc;
             sts [n] = s_attached [i].state;
             n++;
@@ -282,7 +282,7 @@ void mpe_ecosystem_post_step (mpe_world_t *world, float dt) {
     }
     pthread_mutex_unlock (&s_eco_lock);
     for (int i = 0; i < n; i++)
-        ds [i]->post_step ((mpe_world_t *) world, dt, sts [i]);
+        ds [i] -> post_step ((mpe_world_t *) world, dt, sts [i]);
 }
 /* Register built-in ecosystems */
 void mpe_register_ecosystems (void) {

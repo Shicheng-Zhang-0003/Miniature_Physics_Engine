@@ -50,7 +50,7 @@ static void test_free_fall_gravity (void) {
     physics_world_init (&world);
     constraint_pool_init (&world); /* MFS_139_ISOLATION: clear stale constraints */
     float h = 10.0f;
-    int idx = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0.0f, h, 0.0f});
+    int idx = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3) {0.0f, h, 0.0f});
     (void) idx;
     for (int i = 0; i < 60; i++) {
         physics_world_step (&world, DT);
@@ -75,7 +75,7 @@ static void test_cylinder_inertia (void) {
     physics_world_init (&world);
     constraint_pool_init (&world); /* MFS_139_ISOLATION: clear stale constraints */
     float m = 0.5f, r = 0.05f, half_len = 0.02f;
-    int idx = physics_world_add_cylinder (&world, r, half_len, m, (vector3){0.0f, 5.0f, 0.0f});
+    int idx = physics_world_add_cylinder (&world, r, half_len, m, (vector3) {0.0f, 5.0f, 0.0f});
     (void) idx;
     /* Apply known torque about axle (X axis) */
     float torque = 0.01f;
@@ -101,7 +101,7 @@ static void test_restitution_bounce (void) {
     /* Floor with MATCHED restitution (min-combined): without it the sphere
      * falls through the void and `bounced` can never fire (engine innocent). */
     mfs_test_floor_e (&world, 0.4f, 0.3f, e);
-    int idx = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0.0f, h, 0.0f});
+    int idx = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3) {0.0f, h, 0.0f});
     world.bodies [idx].restitution = e;
     /* Simulate until sphere bounces (up to 3 seconds) */
     float max_height_after_bounce = 0.0f;
@@ -133,11 +133,11 @@ static void test_rolling_kinematics (void) {
     physics_world_init (&world);
     constraint_pool_init (&world); /* MFS_139_ISOLATION: clear stale constraints */
     /* Add a static floor */
-    int floor_idx = physics_world_add_cube (&world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
+    int floor_idx = physics_world_add_cube (&world, (vector3) {0.0f, -0.5f, 0.0f}, (vector3) {10.0f, 0.5f, 10.0f}, 0.0f);
     (void) floor_idx;
     /* Add a cylinder on the floor */
     float r = 0.05f;
-    int cyl_idx = physics_world_add_cylinder (&world, r, 0.02f, 0.5f, (vector3){0.0f, r + 0.01f, 0.0f});
+    int cyl_idx = physics_world_add_cylinder (&world, r, 0.02f, 0.5f, (vector3) {0.0f, r + 0.01f, 0.0f});
     /* Apply torque to make it roll */
     for (int i = 0; i < 120; i++) {
         world.bodies [cyl_idx].torque_accumulator.x += 0.005f;
@@ -216,27 +216,27 @@ static void test_motor_free_speed (void) {
     {
         const vector3 lift = {0.0f, 1.9f, 0.0f};
         rigidbody *chassis0 = &world.bodies [robot.chassis_body];
-        chassis0->position = vector3_addition (chassis0->position, lift);
-        chassis0->velocity = vector3_zero ();
-        chassis0->angular_velocity = vector3_zero ();
+        chassis0 -> position = vector3_addition (chassis0 -> position, lift);
+        chassis0 -> velocity = vector3_zero ();
+        chassis0 -> angular_velocity = vector3_zero ();
         for (int w = 0; w < robot.wheel_count; w++) {
             int wi = robot.wheel_bodies [w];
             if (wi < 0 || wi >= world.body_count)
                 continue;
             rigidbody *wb = &world.bodies [wi];
-            wb->position = vector3_addition (wb->position, lift);
-            wb->velocity = vector3_zero ();
-            wb->angular_velocity = vector3_zero ();
+            wb -> position = vector3_addition (wb -> position, lift);
+            wb -> velocity = vector3_zero ();
+            wb -> angular_velocity = vector3_zero ();
             rigidbody_update_axes (wb);
             motor_reset_observer (&robot.wheel_motors [w]);
             for (int k = 0; k < robot.roller_count [w]; k++) {
-                int rb = robot.roller_bodies [w] [k];
+                int rb = robot.roller_bodies [w][k];
                 if (rb < 0 || rb >= world.body_count)
                     continue;
                 rigidbody *rbb = &world.bodies [rb];
-                rbb->position = vector3_addition (rbb->position, lift);
-                rbb->velocity = vector3_zero ();
-                rbb->angular_velocity = vector3_zero ();
+                rbb -> position = vector3_addition (rbb -> position, lift);
+                rbb -> velocity = vector3_zero ();
+                rbb -> angular_velocity = vector3_zero ();
                 rigidbody_update_axes (rbb);
             }
         }
@@ -244,7 +244,7 @@ static void test_motor_free_speed (void) {
     }
     rigidbody *chassis = &world.bodies [robot.chassis_body];
     rigidbody_set_kinematic (chassis, true);
-    chassis->velocity = vector3_zero ();
+    chassis -> velocity = vector3_zero ();
     /* Drive at full power for 3 seconds (wheels spin free) */
     for (int i = 0; i < 180; i++) {
         drivetrain_tank (&robot, 1.0f, 1.0f);
@@ -281,12 +281,12 @@ static void test_motor_stall_torque (void) {
             int wi = robot.wheel_bodies [w];
             if (wi >= 0 && wi < world.body_count) {
                 rigidbody *wheel = &world.bodies [wi];
-                vector3 axle = wheel->cached_axes [0];
+                vector3 axle = wheel -> cached_axes [0];
                 if (vector3_length_squared (axle) < 0.0001f) {
-                    axle = vector4_rotate_to_vector3 (wheel->orientation, (vector3){1.0f, 0.0f, 0.0f});
+                    axle = vector4_rotate_to_vector3 (wheel -> orientation, (vector3) {1.0f, 0.0f, 0.0f});
                 }
-                float spin = vector3_dot (wheel->angular_velocity, axle);
-                wheel->angular_velocity = vector3_subtraction (wheel->angular_velocity, vector3_scaling (axle, spin));
+                float spin = vector3_dot (wheel -> angular_velocity, axle);
+                wheel -> angular_velocity = vector3_subtraction (wheel -> angular_velocity, vector3_scaling (axle, spin));
             }
         }
         drivetrain_update (&world, &robot, DT);
@@ -347,13 +347,13 @@ static void test_static_friction_threshold (void) {
     physics_world_init (&world);
     constraint_pool_init (&world); /* MFS_139_ISOLATION: clear stale constraints */
     /* Static floor, top surface at y = 0 */
-    physics_world_add_cube (&world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
+    physics_world_add_cube (&world, (vector3) {0.0f, -0.5f, 0.0f}, (vector3) {10.0f, 0.5f, 10.0f}, 0.0f);
     /* MFS_137_TEST9: spawn slightly ABOVE the floor and let it settle.
      * The original test spawned with the bottom face exactly coplanar
      * with the floor top — a degenerate contact that produced solver
      * artifacts (vx=-4.32 from a single step). */
     float m = 1.0f;
-    int idx = physics_world_add_cube (&world, (vector3){0.0f, 0.55f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, m);
+    int idx = physics_world_add_cube (&world, (vector3) {0.0f, 0.55f, 0.0f}, (vector3) {0.5f, 0.5f, 0.5f}, m);
     for (int i = 0; i < 120; i++) {
         physics_world_step (&world, DT);
     }
@@ -365,8 +365,8 @@ static void test_static_friction_threshold (void) {
      * If it does, the friction solver itself is lying. */
     TEST_ASSERT (fabsf (settled_x) < 0.05f, "TRUTH PROBE: cube under gravity alone does not slide");
     /* Zero any residual velocity before the friction test */
-    world.bodies [idx].velocity = (vector3){0.0f, 0.0f, 0.0f};
-    world.bodies [idx].angular_velocity = (vector3){0.0f, 0.0f, 0.0f};
+    world.bodies [idx].velocity = (vector3) {0.0f, 0.0f, 0.0f};
+    world.bodies [idx].angular_velocity = (vector3) {0.0f, 0.0f, 0.0f};
     /* Apply a force at 50% of the static friction threshold, held for
      * 30 steps. Static friction must fully resist it. */
     float mu_s = world.bodies [idx].friction_static;
@@ -389,17 +389,17 @@ static void test_kinetic_friction_deceleration (void) {
     physics_world_init (&world);
     constraint_pool_init (&world); /* MFS_139_ISOLATION: clear stale constraints */
     /* Static floor, top surface at y = 0 */
-    physics_world_add_cube (&world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
+    physics_world_add_cube (&world, (vector3) {0.0f, -0.5f, 0.0f}, (vector3) {10.0f, 0.5f, 10.0f}, 0.0f);
     /* MFS_137_TEST10: spawn settled (0.55 then 120 steps), then push.
      * Measure decel over the first 10 steps — the cube is provably
      * still sliding there (2.0 - 0.3*9.81*0.167 = 1.51 m/s > 0), which
      * avoids the original bug of dividing by time-after-stop. */
     float m = 1.0f;
-    int idx = physics_world_add_cube (&world, (vector3){0.0f, 0.55f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, m);
+    int idx = physics_world_add_cube (&world, (vector3) {0.0f, 0.55f, 0.0f}, (vector3) {0.5f, 0.5f, 0.5f}, m);
     for (int i = 0; i < 120; i++) {
         physics_world_step (&world, DT);
     }
-    world.bodies [idx].velocity = (vector3){2.0f, 0.0f, 0.0f};
+    world.bodies [idx].velocity = (vector3) {2.0f, 0.0f, 0.0f};
     rigidbody_wake (
         &world.bodies
              [idx]); /* MFS_140_WAKE: imparting velocity wakes the body (a real push). Without this the settled cube stays asleep and the solver skips it, so no kinetic friction is applied. */
@@ -427,9 +427,9 @@ static void test_numerical_stability_no_nan (void) {
     physics_world_init (&world);
     constraint_pool_init (&world); /* MFS_139_ISOLATION: clear stale constraints */
     /* Add mixed objects */
-    physics_world_add_cube (&world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
-    physics_world_add_sphere (&world, 0.3f, 1.0f, (vector3){0.0f, 5.0f, 0.0f});
-    physics_world_add_cube (&world, (vector3){1.0f, 5.0f, 0.0f}, (vector3){0.3f, 0.3f, 0.3f}, 1.5f);
+    physics_world_add_cube (&world, (vector3) {0.0f, -0.5f, 0.0f}, (vector3) {10.0f, 0.5f, 10.0f}, 0.0f);
+    physics_world_add_sphere (&world, 0.3f, 1.0f, (vector3) {0.0f, 5.0f, 0.0f});
+    physics_world_add_cube (&world, (vector3) {1.0f, 5.0f, 0.0f}, (vector3) {0.3f, 0.3f, 0.3f}, 1.5f);
     ftc_robot robot;
     ftc_robot_create (&world, &robot, 2.0f, ftc_robot_rest_height (), 0.0f, MOTOR_GB_5203_26_9);
     /* Drive and coast for 3000 ticks */
@@ -445,8 +445,8 @@ static void test_numerical_stability_no_nan (void) {
         physics_world_step (&world, DT);
         for (int j = 0; j < world.body_count; j++) {
             rigidbody *rb = &world.bodies [j];
-            if (!isfinite (rb->position.x) || !isfinite (rb->position.y) || !isfinite (rb->position.z) ||
-                !isfinite (rb->velocity.x) || !isfinite (rb->velocity.y) || !isfinite (rb->velocity.z)) {
+            if (!isfinite (rb -> position.x) || !isfinite (rb -> position.y) || !isfinite (rb -> position.z) ||
+                !isfinite (rb -> velocity.x) || !isfinite (rb -> velocity.y) || !isfinite (rb -> velocity.z)) {
                 has_nan = true;
                 break;
             }
@@ -498,7 +498,7 @@ static void test_energy_conservation_free_fall (void) {
     constraint_pool_init (&world); /* MFS_139_ISOLATION: clear stale constraints */
     float h = 10.0f;
     float m = 1.0f;
-    int idx = physics_world_add_sphere (&world, 0.5f, m, (vector3){0.0f, h, 0.0f});
+    int idx = physics_world_add_sphere (&world, 0.5f, m, (vector3) {0.0f, h, 0.0f});
     float g = 9.81f;
     float E_initial = m * g * h; /* potential energy */
     /* Simulate for 1 second */
@@ -521,9 +521,9 @@ static void test_cylinder_floor_rest (void) {
     physics_world_init (&world);
     constraint_pool_init (&world); /* MFS_139_ISOLATION: clear stale constraints */
     /* Static floor, top surface at y = 0 */
-    physics_world_add_cube (&world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
+    physics_world_add_cube (&world, (vector3) {0.0f, -0.5f, 0.0f}, (vector3) {10.0f, 0.5f, 10.0f}, 0.0f);
     float r = 0.05f;
-    int idx = physics_world_add_cylinder (&world, r, 0.02f, 0.5f, (vector3){0.0f, 1.0f, 0.0f});
+    int idx = physics_world_add_cylinder (&world, r, 0.02f, 0.5f, (vector3) {0.0f, 1.0f, 0.0f});
     /* MFS_137_TEST14: per-step trace. The cylinder previously ended at
      * y=-0.615 (INSIDE the floor). This trace reveals exactly when and
      * how it gets there — the sign of vy at step 1 tells us whether the
@@ -563,11 +563,11 @@ static void test_revolute_anchor_holds (void) {
     physics_world_init (&world);
     constraint_pool_init (&world); /* MFS_139_ISOLATION: clear stale constraints */
     /* Add a static pivot */
-    int pivot_idx = physics_world_add_cube (&world, (vector3){0.0f, 5.0f, 0.0f}, (vector3){0.2f, 0.2f, 0.2f}, 0.0f);
+    int pivot_idx = physics_world_add_cube (&world, (vector3) {0.0f, 5.0f, 0.0f}, (vector3) {0.2f, 0.2f, 0.2f}, 0.0f);
     rigidbody_set_static (&world.bodies [pivot_idx], true);
     uint32_t pivot_id = world.bodies [pivot_idx].object_id;
     /* Add a hanging bob */
-    int bob_idx = physics_world_add_sphere (&world, 0.3f, 2.0f, (vector3){1.0f, 3.0f, 0.0f});
+    int bob_idx = physics_world_add_sphere (&world, 0.3f, 2.0f, (vector3) {1.0f, 3.0f, 0.0f});
     uint32_t bob_id = world.bodies [bob_idx].object_id;
     /* Create revolute joint */
     vector3 anchor_a = {0.0f, 0.0f, 0.0f};

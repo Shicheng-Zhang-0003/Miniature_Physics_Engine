@@ -34,8 +34,8 @@ int main (void) {
     /* Static anchor + unit mass, k=20, c=0, L0=2, amplitude 0.5 along x.
      * T = 2*pi*sqrt(1/20) = 1.40496 s. High in the air: no contacts. */
     const float k = 20.0f;
-    int anchor = physics_world_add_cube (&world, (vector3){0.0f, 50.0f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 0.0f);
-    int mass = physics_world_add_sphere (&world, 0.2f, 1.0f, (vector3){2.5f, 50.0f, 0.0f});
+    int anchor = physics_world_add_cube (&world, (vector3) {0.0f, 50.0f, 0.0f}, (vector3) {0.5f, 0.5f, 0.5f}, 0.0f);
+    int mass = physics_world_add_sphere (&world, 0.2f, 1.0f, (vector3) {2.5f, 50.0f, 0.0f});
     uint32_t ida = world.bodies [anchor].object_id;
     uint32_t idm = world.bodies [mass].object_id;
     if (add_joint_by_ids (&world, ida, idm, 2.0f, k, 0.0f) < 0) {
@@ -52,12 +52,12 @@ int main (void) {
     for (int t = 0; t < 600; t++) {
         physics_world_step (&world, dt);
         rigidbody *mb = &world.bodies [mass];
-        if (!isfinite (mb->position.x)) {
+        if (!isfinite (mb -> position.x)) {
             printf ("[FAIL] NaN\n");
             physics_world_cleanup (&world);
             return 1;
         }
-        float x = mb->position.x - 2.0f;
+        float x = mb -> position.x - 2.0f;
         if ((prev_x <= 0.0f && x > 0.0f) || (prev_x >= 0.0f && x < 0.0f)) {
             crossings++;
             if (first_cross < 0) {
@@ -66,7 +66,7 @@ int main (void) {
             last_cross = t;
         }
         prev_x = x;
-        float e = 0.5f * k * x * x + 0.5f * 1.0f * vector3_length_squared (mb->velocity);
+        float e = 0.5f * k * x * x + 0.5f * 1.0f * vector3_length_squared (mb -> velocity);
         float dev = fabsf (e - e0) / e0;
         if (dev > emax_dev) {
             emax_dev = dev;

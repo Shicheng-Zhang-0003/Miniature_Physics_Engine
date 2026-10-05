@@ -17,8 +17,8 @@ int main (void) {
     mpe_config_t cfg_b = g_cfg;
     cfg_b.world.gravity = -1.0f;
     physics_world_set_config (&world_b, &cfg_b);
-    physics_world_add_sphere (&world_a, 0.5f, 1.0f, (vector3){0.0f, 10.0f, 0.0f});
-    physics_world_add_sphere (&world_b, 0.5f, 1.0f, (vector3){0.0f, 10.0f, 0.0f});
+    physics_world_add_sphere (&world_a, 0.5f, 1.0f, (vector3) {0.0f, 10.0f, 0.0f});
+    physics_world_add_sphere (&world_b, 0.5f, 1.0f, (vector3) {0.0f, 10.0f, 0.0f});
     const float dt = 1.0f / 60.0f;
     int fail = 0;
     float ya_mid = 0.0f, yb_mid = 0.0f;
@@ -27,8 +27,8 @@ int main (void) {
         physics_world_step (&world_b, dt);
         rigidbody *ra = &world_a.bodies [0];
         rigidbody *rb = &world_b.bodies [0];
-        if ((!isfinite (rb->position.x)) || (!isfinite (rb->position.y)) || (!isfinite (rb->position.z)) ||
-            (!isfinite (ra->position.x)) || (!isfinite (ra->position.y)) || (!isfinite (ra->position.z))) {
+        if ((!isfinite (rb -> position.x)) || (!isfinite (rb -> position.y)) || (!isfinite (rb -> position.z)) ||
+            (!isfinite (ra -> position.x)) || (!isfinite (ra -> position.y)) || (!isfinite (ra -> position.z))) {
             printf ("[FAIL] non-finite state on tick %d\n", t);
             fail = 1;
             break;
@@ -37,8 +37,8 @@ int main (void) {
          * Same start + different gravity MUST separate: proves per-world
          * config isolation (a shared-global gravity would move together). */
         if (t == 60) {
-            ya_mid = ra->position.y;
-            yb_mid = rb->position.y;
+            ya_mid = ra -> position.y;
+            yb_mid = rb -> position.y;
             printf ("[info] t=1s: y_a=%.3f (g=-9.81) y_b=%.3f (g=-1.0)\n", ya_mid, yb_mid);
         }
     }

@@ -32,8 +32,8 @@ int main (void) {
         /* Check for NaN */
         for (int i = 0; i < world.body_count; i++) {
             rigidbody *rb = &world.bodies [i];
-            if ((!isfinite (rb->position.x)) || (!isfinite (rb->position.y)) || (!isfinite (rb->position.z)) ||
-                (!isfinite (rb->velocity.x)) || (!isfinite (rb->velocity.y)) || (!isfinite (rb->velocity.z))) {
+            if ((!isfinite (rb -> position.x)) || (!isfinite (rb -> position.y)) || (!isfinite (rb -> position.z)) ||
+                (!isfinite (rb -> velocity.x)) || (!isfinite (rb -> velocity.y)) || (!isfinite (rb -> velocity.z))) {
                 printf ("[FAIL] NaN detected in body %d at tick %d\n", i, t);
                 fail = 1;
                 break;

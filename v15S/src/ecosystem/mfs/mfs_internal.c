@@ -35,15 +35,15 @@ static int s_inflight = 0; /* global sum of in_flight, for tests/telemetry */
 static pthread_mutex_t s_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t s_cv = PTHREAD_COND_INITIALIZER;
 static int name_matches (const mfs_slot *s, const char *name) {
-    return s->desc && s->desc->name && strcmp (s->desc->name, name) == 0;
+    return s -> desc && s -> desc -> name && strcmp (s -> desc -> name, name) == 0;
 }
 static void slot_clear (mfs_slot *s) {
-    s->desc = NULL;
-    s->state = NULL;
-    s->attached = false;
-    s->world = NULL;
-    s->in_flight = 0;
-    s->detaching = false;
+    s -> desc = NULL;
+    s -> state = NULL;
+    s -> attached = false;
+    s -> world = NULL;
+    s -> in_flight = 0;
+    s -> detaching = false;
 }
 static void wake_all (void) {
     pthread_cond_broadcast (&s_cv);
@@ -81,11 +81,11 @@ int mfs_internal_module_registered (const char *name) {
     return found;
 }
 int mfs_internal_module_register (const mpe_module_desc_t *desc) {
-    if (!desc || !desc->name || desc->abi != MPE_MODULE_ABI)
+    if (!desc || !desc -> name || desc -> abi != MPE_MODULE_ABI)
         return MFS_REG_BAD_ARG;
     pthread_mutex_lock (&s_lock);
     for (int i = 0; i < MFS_MAX_INTERNAL_MODULES; i++) {
-        if (name_matches (&s_slots [i], desc->name)) {
+        if (name_matches (&s_slots [i], desc -> name)) {
             pthread_mutex_unlock (&s_lock);
             return MFS_REG_DUPLICATE;
         }
@@ -199,7 +199,7 @@ int mfs_internal_module_attach (const char *name, physics_world *world) {
             made_alias = 1;
         }
         const mpe_module_desc_t *d = s_slots [reg].desc;
-        if (!d || !d->attach) {
+        if (!d || !d -> attach) {
             if (made_alias) {
                 slot_clear (&s_slots [reg]);
                 s_slot_count--;
@@ -213,7 +213,7 @@ int mfs_internal_module_attach (const char *name, physics_world *world) {
         s_inflight++;
         pthread_mutex_unlock (&s_lock);
         void *state = NULL;
-        int r = d->attach ((physics_world *) world, &state);
+        int r = d -> attach ((physics_world *) world, &state);
         pthread_mutex_lock (&s_lock);
         s_slots [reg].in_flight--;
         s_inflight--;
@@ -273,7 +273,7 @@ int mfs_internal_module_detach (const char *name, physics_world *world) {
         const mpe_module_desc_t *d = s_slots [reg].desc;
         void *st = s_slots [reg].state;
         s_slots [reg].detaching = true; /* no new callbacks from here on */
-        if (!d || !d->detach) {
+        if (!d || !d -> detach) {
             s_slots [reg].attached = false;
             s_slots [reg].state = NULL;
             s_slots [reg].world = NULL;
@@ -285,7 +285,7 @@ int mfs_internal_module_detach (const char *name, physics_world *world) {
         s_slots [reg].in_flight++;
         s_inflight++;
         pthread_mutex_unlock (&s_lock);
-        d->detach ((physics_world *) world, st);
+        d -> detach ((physics_world *) world, st);
         pthread_mutex_lock (&s_lock);
         s_slots [reg].in_flight--;
         s_inflight--;
@@ -348,7 +348,7 @@ static void mfs_dispatch (physics_world *world, float dt, bool pre) {
             continue;
         if (s_slots [i].world != (const void *) world)
             continue;
-        if (!(pre ? s_slots [i].desc->pre_step : s_slots [i].desc->post_step))
+        if (!(pre ? s_slots [i].desc -> pre_step : s_slots [i].desc -> post_step))
             continue;
         ds [n] = s_slots [i].desc;
         sts [n] = s_slots [i].state;
@@ -360,9 +360,9 @@ static void mfs_dispatch (physics_world *world, float dt, bool pre) {
     pthread_mutex_unlock (&s_lock);
     for (int k = 0; k < n; k++) {
         if (pre) {
-            ds [k]->pre_step ((physics_world *) world, dt, sts [k]);
+            ds [k] -> pre_step ((physics_world *) world, dt, sts [k]);
         } else {
-            ds [k]->post_step ((physics_world *) world, dt, sts [k]);
+            ds [k] -> post_step ((physics_world *) world, dt, sts [k]);
         }
         pthread_mutex_lock (&s_lock);
         int i = slot_of [k];
@@ -406,11 +406,11 @@ void mfs_internal_modules_detach_all (physics_world *world) {
         const mpe_module_desc_t *d = s_slots [reg].desc;
         void *st = s_slots [reg].state;
         s_slots [reg].detaching = true;
-        if (d && d->detach) {
+        if (d && d -> detach) {
             s_slots [reg].in_flight++;
             s_inflight++;
             pthread_mutex_unlock (&s_lock);
-            d->detach ((physics_world *) world, st);
+            d -> detach ((physics_world *) world, st);
             pthread_mutex_lock (&s_lock);
             s_slots [reg].in_flight--;
             s_inflight--;

@@ -66,10 +66,10 @@ static int failures = 0;
         }                                                                                                              \
     } while (0)
 static int finite_world (physics_world *w) {
-    for (int i = 0; i < w->body_count; i++) {
-        rigidbody *rb = &w->bodies [i];
-        if (!isfinite (rb->position.x) || !isfinite (rb->position.y) || !isfinite (rb->position.z) ||
-            !isfinite (rb->velocity.x) || !isfinite (rb->velocity.y) || !isfinite (rb->velocity.z)) {
+    for (int i = 0; i < w -> body_count; i++) {
+        rigidbody *rb = &w -> bodies [i];
+        if (!isfinite (rb -> position.x) || !isfinite (rb -> position.y) || !isfinite (rb -> position.z) ||
+            !isfinite (rb -> velocity.x) || !isfinite (rb -> velocity.y) || !isfinite (rb -> velocity.z)) {
             return 0;
         }
     }
@@ -80,7 +80,7 @@ static void setup_world (physics_world *w) {
 }
 /* dlsym'd dynamic API surface (full import: descriptor + fleet + drive) */
 typedef int (*spawn_fn_t) (struct physics_world *, float, float, float, motor_preset_id, ftc_drivetrain_type);
-typedef ftc_robot *(*get_fn_t) (struct physics_world *, int);
+typedef ftc_robot * (*get_fn_t) (struct physics_world *, int);
 typedef void (*tank_fn_t) (ftc_robot *, float, float);
 static void print_bits (const char *tag, float a, float b) {
     uint32_t ua, ub;
@@ -104,7 +104,7 @@ int main (int argc, char **argv) {
     CHECK (dyn != NULL, "registry lists ftc-fleet after load");
     if (!dyn)
         return 1;
-    CHECK (dyn->abi == MPE_MODULE_ABI, "dynamic desc ABI match");
+    CHECK (dyn -> abi == MPE_MODULE_ABI, "dynamic desc ABI match");
     void *h = dlopen (so, RTLD_NOW | RTLD_NOLOAD);
     CHECK (h != NULL, "handle re-acquired for dlsym");
     spawn_fn_t dyn_spawn = h ? (spawn_fn_t) dlsym (h, "ftc_fleet_spawn") : NULL;
@@ -175,13 +175,13 @@ int main (int argc, char **argv) {
     CHECK (disp2 >= 0.5f, "dynamic module path drives (%.4f m)", disp2);
     /* ---- 3. bitwise equivalence static vs dynamic ---- */
     int same = (memcmp (&ex, &fx, 4) == 0) && (memcmp (&ey, &fy, 4) == 0) && (memcmp (&ez, &fz, 4) == 0) &&
-               (memcmp (&r1->odom_x, &r2->odom_x, 4) == 0) && (memcmp (&r1->odom_z, &r2->odom_z, 4) == 0) &&
-               (memcmp (&r1->odom_theta, &r2->odom_theta, 4) == 0);
+               (memcmp (&r1 -> odom_x, &r2 -> odom_x, 4) == 0) && (memcmp (&r1 -> odom_z, &r2 -> odom_z, 4) == 0) &&
+               (memcmp (&r1 -> odom_theta, &r2 -> odom_theta, 4) == 0);
     if (!same) {
         print_bits ("pos.x", ex, fx);
         print_bits ("pos.y", ey, fy);
         print_bits ("pos.z", ez, fz);
-        print_bits ("odom_x", r1->odom_x, r2->odom_x);
+        print_bits ("odom_x", r1 -> odom_x, r2 -> odom_x);
     }
     CHECK (same, "static vs dynamic bitwise-identical pose+odometry");
     /* ---- 4. detach lifecycle: torques stop, re-attach works ----
@@ -190,7 +190,7 @@ int main (int argc, char **argv) {
      * only the body INDEX (stable: detach never touches bodies) may be
      * reused afterwards. The detached coast below issues NO commands at
      * all: with the module gone nothing can drive. */
-    int w2chassis = r2->chassis_body;
+    int w2chassis = r2 -> chassis_body;
     CHECK (physics_world_detach_module (&w2, "ftc-fleet") == 0, "detach dynamic");
     CHECK (ftc_fleet_count (&w1) == 1, "static world unaffected by dynamic detach");
     for (int t = 0; t < 60; t++) {
@@ -223,7 +223,7 @@ int main (int argc, char **argv) {
         printf ("[FAIL] dlclose\n");
         failures++;
     } else
-        printf ("[PASS] dlclose\n");
+    printf ("[PASS] dlclose\n");
     if (failures) {
         /* DESPOT-2026-09-29: the summary line used to be the ONLY thing
          * printed on failure -- the individual [FAIL] <reason> lines above went

@@ -15,10 +15,10 @@ int main (void) {
         constraint_pool_init (&world);
         g_cfg.world.gravity = 0.0f;
         g_cfg.world.drag = 1.0f;
-        int a = physics_world_add_cylinder (&world, 0.5f, 1.0f, 1.0f, (vector3){-2.0f, 10.0f, 0.0f});
-        int b = physics_world_add_cylinder (&world, 0.5f, 1.0f, 1.0f, (vector3){2.0f, 10.0f, 0.0f});
-        world.bodies [a].velocity = (vector3){2.0f, 0.0f, 0.0f};
-        world.bodies [b].velocity = (vector3){-2.0f, 0.0f, 0.0f};
+        int a = physics_world_add_cylinder (&world, 0.5f, 1.0f, 1.0f, (vector3) {-2.0f, 10.0f, 0.0f});
+        int b = physics_world_add_cylinder (&world, 0.5f, 1.0f, 1.0f, (vector3) {2.0f, 10.0f, 0.0f});
+        world.bodies [a].velocity = (vector3) {2.0f, 0.0f, 0.0f};
+        world.bodies [b].velocity = (vector3) {-2.0f, 0.0f, 0.0f};
         world.bodies [a].restitution = 0.0f;
         world.bodies [b].restitution = 0.0f;
         rigidbody_wake (&world.bodies [a]);
@@ -56,9 +56,9 @@ int main (void) {
         constraint_pool_init (&world);
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 1.0f;
-        int a = physics_world_add_cylinder (&world, 0.3f, 2.0f, 1.0f, (vector3){0.0f, 1.0f, 0.0f});
+        int a = physics_world_add_cylinder (&world, 0.3f, 2.0f, 1.0f, (vector3) {0.0f, 1.0f, 0.0f});
         int b =
-            physics_world_add_cylinder (&world, 0.3f, 2.0f, 1.0f, (vector3){0.0f, 0.65f, 0.0f}); /* touching barrels */
+            physics_world_add_cylinder (&world, 0.3f, 2.0f, 1.0f, (vector3) {0.0f, 0.65f, 0.0f}); /* touching barrels */
         world.bodies [a].restitution = 0.0f;
         world.bodies [b].restitution = 0.0f;
         world.bodies [a].friction_static = 0.8f;
@@ -92,15 +92,15 @@ int main (void) {
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 1.0f;
         /* Create tilted floor using rotated static cube */
-        int floor = physics_world_add_cube (&world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
+        int floor = physics_world_add_cube (&world, (vector3) {0.0f, -0.5f, 0.0f}, (vector3) {10.0f, 0.5f, 10.0f}, 0.0f);
         if (floor < 0) {
             printf ("[FAIL] tilted floor creation failed\n");
             fail = 1;
         }
         world.bodies [floor].orientation =
-            vector4_from_axis_with_angle ((vector3){1.0f, 0.0f, 0.0f}, -0.3f); /* 17 deg tilt */
+            vector4_from_axis_with_angle ((vector3) {1.0f, 0.0f, 0.0f}, -0.3f); /* 17 deg tilt */
         rigidbody_sanitize (&world.bodies [floor]);
-        int cyl = physics_world_add_cylinder (&world, 0.5f, 0.5f, 1.0f, (vector3){0.0f, 1.0f, 0.0f});
+        int cyl = physics_world_add_cylinder (&world, 0.5f, 0.5f, 1.0f, (vector3) {0.0f, 1.0f, 0.0f});
         if (cyl < 0) {
             printf ("[FAIL] tilted-floor cylinder creation failed\n");
             physics_world_cleanup (&world);
@@ -116,7 +116,7 @@ int main (void) {
         for (int t = 0; t < 1200; t++) {
             physics_world_step (&world, dt);
             rigidbody *b = &world.bodies [cyl];
-            float v = vector3_length (b->velocity);
+            float v = vector3_length (b -> velocity);
             if (v > max_vel)
                 max_vel = v;
             if (v > 0.5f)
@@ -140,14 +140,14 @@ int main (void) {
         constraint_pool_init (&world);
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 1.0f;
-        int floor = physics_world_add_cube (&world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
-        int cyl = physics_world_add_cylinder (&world, 0.5f, 2.0f, 1.0f, (vector3){0.0f, 2.5f, 0.0f});
+        int floor = physics_world_add_cube (&world, (vector3) {0.0f, -0.5f, 0.0f}, (vector3) {10.0f, 0.5f, 10.0f}, 0.0f);
+        int cyl = physics_world_add_cylinder (&world, 0.5f, 2.0f, 1.0f, (vector3) {0.0f, 2.5f, 0.0f});
         if (floor < 0 || cyl < 0) {
             printf ("[FAIL] upright cylinder fixture creation failed\n");
             physics_world_cleanup (&world);
             return 1;
         }
-        world.bodies [cyl].orientation = vector4_from_axis_with_angle ((vector3){0.0f, 0.0f, 1.0f}, 1.57079632679f);
+        world.bodies [cyl].orientation = vector4_from_axis_with_angle ((vector3) {0.0f, 0.0f, 1.0f}, 1.57079632679f);
         rigidbody_sanitize (&world.bodies [cyl]);
         world.bodies [cyl].restitution = 0.0f;
         world.bodies [cyl].friction_static = 0.8f;
@@ -157,7 +157,7 @@ int main (void) {
         for (int t = 0; t < 600; t++) {
             physics_world_step (&world, dt);
             rigidbody *b = &world.bodies [cyl];
-            float axis_y = fabsf (vector3_dot (b->cached_axes [0], (vector3){0.0f, 1.0f, 0.0f}));
+            float axis_y = fabsf (vector3_dot (b -> cached_axes [0], (vector3) {0.0f, 1.0f, 0.0f}));
             if (axis_y > 1.0f)
                 axis_y = 1.0f;
             float tilt = acosf (axis_y);
@@ -182,10 +182,10 @@ int main (void) {
         constraint_pool_init (&world);
         g_cfg.world.gravity = 0.0f;
         g_cfg.world.drag = 1.0f;
-        int cyl = physics_world_add_cylinder (&world, 0.5f, 1.0f, 0.0f, (vector3){0.0f, 0.0f, 0.0f});
+        int cyl = physics_world_add_cylinder (&world, 0.5f, 1.0f, 0.0f, (vector3) {0.0f, 0.0f, 0.0f});
         world.bodies [cyl].restitution = 1.0f;
-        int sph = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0.0f, 0.0f, 3.0f});
-        world.bodies [sph].velocity = (vector3){0.0f, 0.0f, -5.0f};
+        int sph = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3) {0.0f, 0.0f, 3.0f});
+        world.bodies [sph].velocity = (vector3) {0.0f, 0.0f, -5.0f};
         world.bodies [sph].restitution = 1.0f;
         rigidbody_wake (&world.bodies [sph]);
         const float dt = 1.0f / 60.0f;
@@ -214,8 +214,8 @@ int main (void) {
         constraint_pool_init (&world);
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 1.0f;
-        int floor = physics_world_add_cube (&world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){5.0f, 0.5f, 5.0f}, 0.0f);
-        int cyl = physics_world_add_cylinder (&world, 0.3f, 0.5f, 1.0f, (vector3){0.0f, 1.0f, 0.0f});
+        int floor = physics_world_add_cube (&world, (vector3) {0.0f, -0.5f, 0.0f}, (vector3) {5.0f, 0.5f, 5.0f}, 0.0f);
+        int cyl = physics_world_add_cylinder (&world, 0.3f, 0.5f, 1.0f, (vector3) {0.0f, 1.0f, 0.0f});
         if (floor < 0 || cyl < 0) {
             printf ("[FAIL] cylinder-cube fixture creation failed\n");
             physics_world_cleanup (&world);
@@ -224,7 +224,7 @@ int main (void) {
         world.bodies [cyl].restitution = 0.0f;
         world.bodies [cyl].friction_static = 0.8f;
         rigidbody_wake (&world.bodies [cyl]);
-        int cube = physics_world_add_cube (&world, (vector3){2.0f, 1.0f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
+        int cube = physics_world_add_cube (&world, (vector3) {2.0f, 1.0f, 0.0f}, (vector3) {0.5f, 0.5f, 0.5f}, 1.0f);
         if (cube < 0) {
             printf ("[FAIL] edge cube creation failed\n");
             physics_world_cleanup (&world);
@@ -257,14 +257,14 @@ int main (void) {
         constraint_pool_init (&world);
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 1.0f;
-        int floor = physics_world_add_cube (&world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
-        int coin = physics_world_add_cylinder (&world, 1.0f, 0.02f, 1.0f, (vector3){0.0f, 0.02f, 0.0f});
+        int floor = physics_world_add_cube (&world, (vector3) {0.0f, -0.5f, 0.0f}, (vector3) {10.0f, 0.5f, 10.0f}, 0.0f);
+        int coin = physics_world_add_cylinder (&world, 1.0f, 0.02f, 1.0f, (vector3) {0.0f, 0.02f, 0.0f});
         if (floor < 0 || coin < 0) {
             printf ("[FAIL] thin-cylinder fixture creation failed\n");
             physics_world_cleanup (&world);
             return 1;
         }
-        world.bodies [coin].orientation = vector4_from_axis_with_angle ((vector3){0.0f, 0.0f, 1.0f}, 1.57079632679f);
+        world.bodies [coin].orientation = vector4_from_axis_with_angle ((vector3) {0.0f, 0.0f, 1.0f}, 1.57079632679f);
         rigidbody_sanitize (&world.bodies [coin]);
         world.bodies [coin].restitution = 0.0f;
         world.bodies [coin].friction_static = 0.8f;
@@ -274,7 +274,7 @@ int main (void) {
         for (int t = 0; t < 1200; t++) {
             physics_world_step (&world, dt);
             rigidbody *b = &world.bodies [coin];
-            float axis_y = fabsf (vector3_dot (b->cached_axes [0], (vector3){0.0f, 1.0f, 0.0f}));
+            float axis_y = fabsf (vector3_dot (b -> cached_axes [0], (vector3) {0.0f, 1.0f, 0.0f}));
             if (axis_y > 1.0f)
                 axis_y = 1.0f;
             float tilt = acosf (axis_y);

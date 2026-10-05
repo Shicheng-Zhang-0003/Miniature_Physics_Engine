@@ -206,7 +206,7 @@ static inline void mpe_mutex_unlock (mpe_mutex_t *m) {
 #endif
 typedef struct {
     HMODULE h;
-} *mpe_dl_handle_inner;
+} * mpe_dl_handle_inner;
 #ifndef _MPE_DLFCN_SHIM_DEFINED
 #define _MPE_DLFCN_SHIM_DEFINED 1
 #include <stdlib.h>
@@ -286,10 +286,10 @@ static inline int mpe_win_dladdr (const void *addr, Dl_info *info) {
     DWORD n = GetModuleFileNameA (h, fname, sizeof (fname));
     if (n == 0 || n >= sizeof (fname))
         return 0;
-    info->dli_fname = fname;
-    info->dli_fbase = (void *) h;
-    info->dli_sname = NULL;
-    info->dli_saddr = NULL;
+    info -> dli_fname = fname;
+    info -> dli_fbase = (void *) h;
+    info -> dli_sname = NULL;
+    info -> dli_saddr = NULL;
     return 1;
 }
 #define dlopen mpe_win_dlopen
@@ -501,7 +501,7 @@ static inline char *mpe_realpath (const char *path, char *resolved) {
     /* Normalise separators to '/' for internal comparisons (loader jail). */
     for (char *p = resolved; *p; ++p)
         if (*p == '\\')
-            *p = '/';
+        * p = '/';
     (void) tmp;
     return resolved;
 }
@@ -578,8 +578,8 @@ static inline int mpe_clock_gettime (int clk, struct timespec *ts) {
         if (freq.QuadPart == 0) {
             /* fallback: GetTickCount64 ms resolution */
             ms = GetTickCount64 ();
-            ts->tv_sec = (time_t) (ms / 1000ULL);
-            ts->tv_nsec = (long) ((ms % 1000ULL) * 1000000ULL);
+            ts -> tv_sec = (time_t) (ms / 1000ULL);
+            ts -> tv_nsec = (long) ((ms % 1000ULL) * 1000000ULL);
             return 0;
         }
     }
@@ -594,12 +594,12 @@ static inline int mpe_clock_gettime (int clk, struct timespec *ts) {
         u.HighPart = ft.dwHighDateTime;
         /* 100ns since 1601-01-01 -> seconds since 1970-01-01 */
         u.QuadPart -= 116444736000000000ULL;
-        ts->tv_sec = (time_t) (u.QuadPart / 10000000ULL);
-        ts->tv_nsec = (long) ((u.QuadPart % 10000000ULL) * 100LL);
+        ts -> tv_sec = (time_t) (u.QuadPart / 10000000ULL);
+        ts -> tv_nsec = (long) ((u.QuadPart % 10000000ULL) * 100LL);
         return 0;
     }
-    ts->tv_sec = (time_t) (cnt.QuadPart / freq.QuadPart);
-    ts->tv_nsec = (long) (((cnt.QuadPart % freq.QuadPart) * 1000000000LL) / freq.QuadPart);
+    ts -> tv_sec = (time_t) (cnt.QuadPart / freq.QuadPart);
+    ts -> tv_nsec = (long) (((cnt.QuadPart % freq.QuadPart) * 1000000000LL) / freq.QuadPart);
     return 0;
 }
 #ifdef clock_gettime
