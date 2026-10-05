@@ -34,7 +34,7 @@ int main (void) {
         physics_world_step (&world, dt);
         for (int i = 0; i < world.body_count; i++) {
             rigidbody *rb = &world.bodies [i];
-            if (!isfinite (rb->position.x) || !isfinite (rb->position.y) || !isfinite (rb->position.z)) {
+            if (!isfinite (rb -> position.x) || !isfinite (rb -> position.y) || !isfinite (rb -> position.z)) {
                 printf ("[FAIL] NaN in body %d at tick %d\n", i, t);
                 fail = 1;
                 break;

@@ -44,17 +44,17 @@ typedef struct {
     int cfg_active;
 } mfs_test_t;
 static inline void mfs_test_begin (mfs_test_t *t, const char *name) {
-    t->name = name;
-    t->failures = 0;
-    t->checks = 0;
-    t->cfg_saved = g_cfg;
-    t->cfg_active = 1;
+    t -> name = name;
+    t -> failures = 0;
+    t -> checks = 0;
+    t -> cfg_saved = g_cfg;
+    t -> cfg_active = 1;
     det_fallback_reset ();
 }
 static inline void mfs_test_end (mfs_test_t *t) {
-    if (t->cfg_active) {
-        g_cfg = t->cfg_saved;
-        t->cfg_active = 0;
+    if (t -> cfg_active) {
+        g_cfg = t -> cfg_saved;
+        t -> cfg_active = 0;
     }
     /* DESPOT-2026-09-28 (programming: reset-but-never-asserted): the v2
      * header promises "determinism counters asserted zero" — now they are.
@@ -63,10 +63,10 @@ static inline void mfs_test_end (mfs_test_t *t) {
     {
         unsigned long fp = det_fallback_pow_total ();
         unsigned long ft = det_fallback_trig_total ();
-        t->checks++;
+        t -> checks++;
         if (fp != 0 || ft != 0) {
-            t->failures++;
-            printf ("[FAIL] %s: det fallbacks pow=%lu trig=%lu (want 0)\n", t->name, fp, ft);
+            t -> failures++;
+            printf ("[FAIL] %s: det fallbacks pow=%lu trig=%lu (want 0)\n", t -> name, fp, ft);
         }
     }
 }
@@ -118,39 +118,39 @@ static inline void mfs_test_world (physics_world *w) {
     g_cfg.sleep.enable = 0;
     physics_world_init (w);
     constraint_pool_init (w);
-    int f = physics_world_add_cube (w, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
+    int f = physics_world_add_cube (w, (vector3) {0.0f, -0.5f, 0.0f}, (vector3) {10.0f, 0.5f, 10.0f}, 0.0f);
     if (f >= 0) {
-        w->bodies [f].friction_static = 1.0f;
-        w->bodies [f].friction_kinetic = 0.8f;
-        w->bodies [f].restitution = 0.0f;
+        w -> bodies [f].friction_static = 1.0f;
+        w -> bodies [f].friction_kinetic = 0.8f;
+        w -> bodies [f].restitution = 0.0f;
     }
 }
 /* Floor slab only (no config touch): for subtests that manage their own
  * envelope (physics_truth FTC_ITERS macros). Top y=0, e matched by caller
  * (contact restitution is min-combined). */
 static inline int mfs_test_floor_e (physics_world *w, float mus, float muk, float e) {
-    int f = physics_world_add_cube (w, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
+    int f = physics_world_add_cube (w, (vector3) {0.0f, -0.5f, 0.0f}, (vector3) {10.0f, 0.5f, 10.0f}, 0.0f);
     if (f < 0)
         return -1;
-    w->bodies [f].friction_static = mus;
-    w->bodies [f].friction_kinetic = muk;
-    w->bodies [f].restitution = e;
+    w -> bodies [f].friction_static = mus;
+    w -> bodies [f].friction_kinetic = muk;
+    w -> bodies [f].restitution = e;
     return f;
 }
 static inline int mfs_test_finite (physics_world *w) {
-    for (int i = 0; i < w->body_count; i++) {
-        rigidbody *rb = &w->bodies [i];
-        if (!isfinite (rb->position.x) || !isfinite (rb->position.y) || !isfinite (rb->position.z) ||
-            !isfinite (rb->velocity.x) || !isfinite (rb->velocity.y) || !isfinite (rb->velocity.z) ||
-            !isfinite (rb->angular_velocity.x) || !isfinite (rb->angular_velocity.y) ||
-            !isfinite (rb->angular_velocity.z)) {
+    for (int i = 0; i < w -> body_count; i++) {
+        rigidbody *rb = &w -> bodies [i];
+        if (!isfinite (rb -> position.x) || !isfinite (rb -> position.y) || !isfinite (rb -> position.z) ||
+            !isfinite (rb -> velocity.x) || !isfinite (rb -> velocity.y) || !isfinite (rb -> velocity.z) ||
+            !isfinite (rb -> angular_velocity.x) || !isfinite (rb -> angular_velocity.y) ||
+            !isfinite (rb -> angular_velocity.z)) {
             return 0;
         }
         /* DESPOT-2026-09-28 (programming: orientation/current/SoC/odom
          * unchecked): a NaN quaternion poisons every contact lever in the
          * next tick while pos/vel stay finite — watch it too. */
-        if (!isfinite (rb->orientation.w) || !isfinite (rb->orientation.x) || !isfinite (rb->orientation.y) ||
-            !isfinite (rb->orientation.z)) {
+        if (!isfinite (rb -> orientation.w) || !isfinite (rb -> orientation.x) || !isfinite (rb -> orientation.y) ||
+            !isfinite (rb -> orientation.z)) {
             return 0;
         }
     }
@@ -162,10 +162,10 @@ static inline int mfs_test_finite (physics_world *w) {
 static inline rigidbody *mfs_chassis_or_null (physics_world *w, ftc_robot *robot) {
     if (!w || !robot)
         return NULL;
-    int idx = robot->chassis_body;
-    if (idx < 0 || idx >= w->body_count)
+    int idx = robot -> chassis_body;
+    if (idx < 0 || idx >= w -> body_count)
         return NULL;
-    return &w->bodies [idx];
+    return &w -> bodies [idx];
 }
 static inline int mfs_step (physics_world *w, int n, float dt) {
     for (int t = 0; t < n; t++) {
@@ -184,32 +184,32 @@ static inline void mfs_lift_whole_robot (physics_world *w, ftc_robot *robot, con
     rigidbody *chassis = mfs_chassis_or_null (w, robot);
     if (!chassis)
         return;
-    chassis->position = vector3_addition (chassis->position, *lift);
-    chassis->velocity = vector3_zero ();
-    chassis->angular_velocity = vector3_zero ();
-    for (int wi_idx = 0; wi_idx < robot->wheel_count; wi_idx++) {
-        int wi = robot->wheel_bodies [wi_idx];
-        if (wi < 0 || wi >= w->body_count)
+    chassis -> position = vector3_addition (chassis -> position, *lift);
+    chassis -> velocity = vector3_zero ();
+    chassis -> angular_velocity = vector3_zero ();
+    for (int wi_idx = 0; wi_idx < robot -> wheel_count; wi_idx++) {
+        int wi = robot -> wheel_bodies [wi_idx];
+        if (wi < 0 || wi >= w -> body_count)
             continue;
-        rigidbody *wb = &w->bodies [wi];
-        wb->position = vector3_addition (wb->position, *lift);
-        wb->velocity = vector3_zero ();
-        wb->angular_velocity = vector3_zero ();
+        rigidbody *wb = &w -> bodies [wi];
+        wb -> position = vector3_addition (wb -> position, *lift);
+        wb -> velocity = vector3_zero ();
+        wb -> angular_velocity = vector3_zero ();
         rigidbody_update_axes (wb);
-        for (int k = 0; k < robot->roller_count [wi_idx]; k++) {
-            int rb = robot->roller_bodies [wi_idx] [k];
-            if (rb < 0 || rb >= w->body_count)
+        for (int k = 0; k < robot -> roller_count [wi_idx]; k++) {
+            int rb = robot -> roller_bodies [wi_idx][k];
+            if (rb < 0 || rb >= w -> body_count)
                 continue;
-            rigidbody *rbb = &w->bodies [rb];
-            rbb->position = vector3_addition (rbb->position, *lift);
-            rbb->velocity = vector3_zero ();
-            rbb->angular_velocity = vector3_zero ();
+            rigidbody *rbb = &w -> bodies [rb];
+            rbb -> position = vector3_addition (rbb -> position, *lift);
+            rbb -> velocity = vector3_zero ();
+            rbb -> angular_velocity = vector3_zero ();
             rigidbody_update_axes (rbb);
         }
     }
     rigidbody_update_axes (chassis);
-    for (int wi_idx = 0; wi_idx < robot->wheel_count; wi_idx++) {
-        motor_reset_observer (&robot->wheel_motors [wi_idx]);
+    for (int wi_idx = 0; wi_idx < robot -> wheel_count; wi_idx++) {
+        motor_reset_observer (&robot -> wheel_motors [wi_idx]);
     }
 }
 /* Lift robot to true free-spin height (1.9m above floor). */
@@ -220,7 +220,7 @@ static inline void mfs_lift_robot_for_free_spin (physics_world *w, ftc_robot *ro
     if (!chassis)
         return;
     rigidbody_set_kinematic (chassis, true);
-    chassis->velocity = vector3_zero ();
+    chassis -> velocity = vector3_zero ();
 }
 /* Common robot creation with guaranteed floor. */
 static inline ftc_robot *mfs_create_robot (physics_world *w, float x, float y, float z, motor_preset_id preset,

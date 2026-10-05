@@ -25,7 +25,7 @@ typedef struct {
      * exists; the overwrite kills wobble too, INTENTIONALLY per robot.c),
      * because 60Hz explicit integration of the ~1ms roller mode is
      * unconditionally unstable. */
-/* FIX-AUDIT-DESPOT: was MFS_ROLLERS_PER_Wheel (lowercase 'heel' typo).
+    /* FIX-AUDIT-DESPOT: was MFS_ROLLERS_PER_Wheel (lowercase 'heel' typo).
  * Renamed to MFS_ROLLERS_PER_WHEEL; the old spelling is kept as a
  * backward-compatible alias so out-of-tree code keeps compiling.
  * DESPOT-FIX: was hard-coded (8*2)=16 while the builder makes
@@ -34,8 +34,8 @@ typedef struct {
  * to the true build count; static assert in robot.c locks them together. */
 #define MFS_ROLLERS_PER_WHEEL 8
 #define MFS_ROLLERS_PER_Wheel MFS_ROLLERS_PER_WHEEL /* compat alias */
-    int roller_bodies [FTC_MAX_WHEELS] [MFS_ROLLERS_PER_WHEEL];
-    int roller_joints [FTC_MAX_WHEELS] [MFS_ROLLERS_PER_WHEEL];
+    int roller_bodies [FTC_MAX_WHEELS][MFS_ROLLERS_PER_WHEEL];
+    int roller_joints [FTC_MAX_WHEELS][MFS_ROLLERS_PER_WHEEL];
     int roller_count [FTC_MAX_WHEELS];
     /* Radius of the running surface: the roller pitch + roller radius for a
      * mecanum wheel, the tyre radius for a tank wheel. Everything that needs

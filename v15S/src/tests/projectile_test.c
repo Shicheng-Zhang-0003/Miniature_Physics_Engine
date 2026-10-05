@@ -21,25 +21,25 @@ int main (void) {
         printf ("[FAIL] gravity not pinned (g=%.6f)\n", g);
         return 1;
     }
-    int s = physics_world_add_sphere (&world, 0.2f, 1.0f, (vector3){0.0f, 1.0f, 0.0f});
-    world.bodies [s].velocity = (vector3){vx, vy, 0.0f};
+    int s = physics_world_add_sphere (&world, 0.2f, 1.0f, (vector3) {0.0f, 1.0f, 0.0f});
+    world.bodies [s].velocity = (vector3) {vx, vy, 0.0f};
     rigidbody_wake (&world.bodies [s]);
     const float dt = 1.0f / 60.0f;
     float apex = 0.0f, t_apex = 0.0f, x_apex = 0.0f;
     for (int t = 0; t < 400; t++) {
         physics_world_step (&world, dt);
         rigidbody *b = &world.bodies [s];
-        if (!isfinite (b->position.x)) {
+        if (!isfinite (b -> position.x)) {
             printf ("[FAIL] NaN\n");
             physics_world_cleanup (&world);
             return 1;
         }
-        if (b->position.y > apex) {
-            apex = b->position.y;
+        if (b -> position.y > apex) {
+            apex = b -> position.y;
             t_apex = (float) (t + 1) * dt;
-            x_apex = b->position.x;
+            x_apex = b -> position.x;
         }
-        if (b->position.y < 0.25f) {
+        if (b -> position.y < 0.25f) {
             break; /* landed */
         }
     }

@@ -11,12 +11,12 @@ int main (void) {
     physics_world world;
     physics_world_init (&world);
     /* Static floor */
-    physics_world_add_cube (&world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
+    physics_world_add_cube (&world, (vector3) {0.0f, -0.5f, 0.0f}, (vector3) {10.0f, 0.5f, 10.0f}, 0.0f);
     /* Two cylinders approaching along Z */
-    int c1 = physics_world_add_cylinder (&world, 0.05f, 0.02f, 0.5f, (vector3){0.0f, 0.06f, -0.3f});
-    int c2 = physics_world_add_cylinder (&world, 0.05f, 0.02f, 0.5f, (vector3){0.0f, 0.06f, 0.3f});
-    world.bodies [c1].velocity = (vector3){0.0f, 0.0f, 2.0f};
-    world.bodies [c2].velocity = (vector3){0.0f, 0.0f, -2.0f};
+    int c1 = physics_world_add_cylinder (&world, 0.05f, 0.02f, 0.5f, (vector3) {0.0f, 0.06f, -0.3f});
+    int c2 = physics_world_add_cylinder (&world, 0.05f, 0.02f, 0.5f, (vector3) {0.0f, 0.06f, 0.3f});
+    world.bodies [c1].velocity = (vector3) {0.0f, 0.0f, 2.0f};
+    world.bodies [c2].velocity = (vector3) {0.0f, 0.0f, -2.0f};
     const float dt = 1.0f / 60.0f;
     int fail = 0;
     for (int t = 0; t < 120 && !fail; t++) {

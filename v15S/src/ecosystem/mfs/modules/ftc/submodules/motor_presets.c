@@ -159,8 +159,8 @@ void motor_preset_apply (motor *m, motor_preset_id id) {
     /* PHYSICS-FIX: derive at the 12.0 V spec voltage, not the 12.8 V fresh
      * pack voltage. R/Kv biased +6.7% when derived at 12.8 V; the battery
      * model supplies the fresh-pack voltage at runtime. */
-    motor_from_spec (m, spec->stall_torque, spec->free_speed_rpm, spec->stall_current, 12.0f, spec->gear_ratio,
-                     spec->efficiency);
+    motor_from_spec (m, spec -> stall_torque, spec -> free_speed_rpm, spec -> stall_current, 12.0f, spec -> gear_ratio,
+                     spec -> efficiency);
 }
 const char *motor_preset_name (motor_preset_id id) {
     if ((id < 0) || (id >= MOTOR_COUNT)) {

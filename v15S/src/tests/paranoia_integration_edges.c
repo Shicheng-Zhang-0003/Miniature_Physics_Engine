@@ -16,11 +16,11 @@ int main (void) {
         constraint_pool_init (&world);
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 1.0f;
-        int a = physics_world_add_sphere (&world, 0.5f, 0.0f, (vector3){0.0f, 2.0f, 0.0f}); /* mass=0 */
-        int b = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0.0f, 5.0f, 0.0f});
+        int a = physics_world_add_sphere (&world, 0.5f, 0.0f, (vector3) {0.0f, 2.0f, 0.0f}); /* mass=0 */
+        int b = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3) {0.0f, 5.0f, 0.0f});
         world.bodies [a].restitution = 0.0f;
         world.bodies [b].restitution = 0.0f;
-        world.bodies [b].velocity = (vector3){0.0f, -5.0f, 0.0f};
+        world.bodies [b].velocity = (vector3) {0.0f, -5.0f, 0.0f};
         rigidbody_wake (&world.bodies [b]);
         const float dt = 1.0f / 60.0f;
         int nan_count = 0;
@@ -47,8 +47,8 @@ int main (void) {
         constraint_pool_init (&world);
         g_cfg.world.gravity = 0.0f;
         g_cfg.world.drag = 1.0f;
-        int a = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0.0f, 0.0f, 0.0f});
-        world.bodies [a].angular_velocity = (vector3){1000.0f, 0.0f, 0.0f};
+        int a = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3) {0.0f, 0.0f, 0.0f});
+        world.bodies [a].angular_velocity = (vector3) {1000.0f, 0.0f, 0.0f};
         rigidbody_wake (&world.bodies [a]);
         const float dt = 1.0f / 60.0f;
         int nan_count = 0;
@@ -77,7 +77,7 @@ int main (void) {
         constraint_pool_init (&world);
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 1.0f;
-        int a = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0.0f, 2.0f, 0.0f});
+        int a = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3) {0.0f, 2.0f, 0.0f});
         rigidbody_wake (&world.bodies [a]);
         int nan_count = 0;
         for (int t = 0; t < 6000; t++) {
@@ -101,7 +101,7 @@ int main (void) {
         constraint_pool_init (&world);
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 1.0f;
-        int a = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0.0f, 10.0f, 0.0f});
+        int a = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3) {0.0f, 10.0f, 0.0f});
         rigidbody_wake (&world.bodies [a]);
         int nan_count = 0;
         physics_world_step (&world, 1000.0f); /* huge dt - should be clamped to 0.1f */
@@ -123,7 +123,7 @@ int main (void) {
         constraint_pool_init (&world);
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 1.0f;
-        int a = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0.0f, 5.0f, 0.0f});
+        int a = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3) {0.0f, 5.0f, 0.0f});
         rigidbody_wake (&world.bodies [a]);
         int nan_count = 0;
         physics_world_step (&world, -1.0f); /* negative dt */
@@ -145,8 +145,8 @@ int main (void) {
         constraint_pool_init (&world);
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 1.0f;
-        int a = physics_world_add_sphere (&world, 0.1f, 1e-4f, (vector3){0.0f, 2.0f, 0.0f}); /* 0.1g */
-        int b = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0.0f, 5.0f, 0.0f});
+        int a = physics_world_add_sphere (&world, 0.1f, 1e-4f, (vector3) {0.0f, 2.0f, 0.0f}); /* 0.1g */
+        int b = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3) {0.0f, 5.0f, 0.0f});
         world.bodies [a].restitution = 1.0f;
         world.bodies [b].restitution = 1.0f;
         rigidbody_wake (&world.bodies [a]);
@@ -176,8 +176,8 @@ int main (void) {
         constraint_pool_init (&world);
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 1.0f;
-        int a = physics_world_add_sphere (&world, 10.0f, 1e6f, (vector3){0.0f, 10.0f, 0.0f});
-        int b = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0.0f, 2.0f, 0.0f});
+        int a = physics_world_add_sphere (&world, 10.0f, 1e6f, (vector3) {0.0f, 10.0f, 0.0f});
+        int b = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3) {0.0f, 2.0f, 0.0f});
         world.bodies [a].restitution = 1.0f;
         world.bodies [b].restitution = 1.0f;
         rigidbody_wake (&world.bodies [a]);
@@ -207,8 +207,8 @@ int main (void) {
         constraint_pool_init (&world);
         g_cfg.world.gravity = 0.0f;
         g_cfg.world.drag = 1.0f;
-        int a = physics_world_add_cylinder (&world, 0.01f, 5.0f, 1.0f, (vector3){0.0f, 0.0f, 0.0f}); /* very thin rod */
-        world.bodies [a].angular_velocity = (vector3){10.0f, 0.0f, 0.0f};
+        int a = physics_world_add_cylinder (&world, 0.01f, 5.0f, 1.0f, (vector3) {0.0f, 0.0f, 0.0f}); /* very thin rod */
+        world.bodies [a].angular_velocity = (vector3) {10.0f, 0.0f, 0.0f};
         rigidbody_wake (&world.bodies [a]);
         const float dt = 1.0f / 60.0f;
         int nan_count = 0;
@@ -233,8 +233,8 @@ int main (void) {
         constraint_pool_init (&world);
         g_cfg.world.gravity = 0.0f;
         g_cfg.world.drag = 1.0f;
-        int a = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0.0f, 0.0f, 0.0f});
-        world.bodies [a].orientation = (vector4){1e-10f, 1e-10f, 1e-10f, 1e-10f}; /* near zero */
+        int a = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3) {0.0f, 0.0f, 0.0f});
+        world.bodies [a].orientation = (vector4) {1e-10f, 1e-10f, 1e-10f, 1e-10f}; /* near zero */
         rigidbody_wake (&world.bodies [a]);
         const float dt = 1.0f / 60.0f;
         int nan_count = 0;

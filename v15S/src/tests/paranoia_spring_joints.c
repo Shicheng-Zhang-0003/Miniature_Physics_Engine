@@ -16,8 +16,8 @@ int main (void) {
         constraint_pool_init (&world);
         g_cfg.world.gravity = 0.0f;
         g_cfg.world.drag = 1.0f;
-        int a = physics_world_add_sphere (&world, 0.2f, 1.0f, (vector3){0.0f, 100.0f, 0.0f});
-        int b = physics_world_add_sphere (&world, 0.2f, 1.0f, (vector3){4.0f, 100.0f, 0.0f});
+        int a = physics_world_add_sphere (&world, 0.2f, 1.0f, (vector3) {0.0f, 100.0f, 0.0f});
+        int b = physics_world_add_sphere (&world, 0.2f, 1.0f, (vector3) {4.0f, 100.0f, 0.0f});
         world.bodies [a].restitution = 0.0f;
         world.bodies [b].restitution = 0.0f;
         int joint = add_joint_by_ids (&world, world.bodies [a].object_id, world.bodies [b].object_id, 3.0f, 100.0f, 1.0f);
@@ -67,8 +67,8 @@ int main (void) {
         constraint_pool_init (&world);
         g_cfg.world.gravity = 0.0f;
         g_cfg.world.drag = 1.0f;
-        int a = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0.0f, 0.0f, 0.0f});
-        int b = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){1.0f, 0.0f, 0.0f});
+        int a = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3) {0.0f, 0.0f, 0.0f});
+        int b = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3) {1.0f, 0.0f, 0.0f});
         world.bodies [a].restitution = 0.0f;
         world.bodies [b].restitution = 0.0f;
         int joint = add_joint_by_ids (&world, world.bodies [a].object_id, world.bodies [b].object_id, 0.5f, 10000.0f,
@@ -84,9 +84,9 @@ int main (void) {
             physics_world_step (&world, dt);
             for (int i = 0; i < world.body_count; i++) {
                 rigidbody *rb = &world.bodies [i];
-                if (!isfinite (rb->position.x) || !isfinite (rb->velocity.x))
+                if (!isfinite (rb -> position.x) || !isfinite (rb -> velocity.x))
                     nan_count++;
-                float v = vector3_length (rb->velocity);
+                float v = vector3_length (rb -> velocity);
                 if (v > max_vel)
                     max_vel = v;
             }
@@ -111,8 +111,8 @@ int main (void) {
         constraint_pool_init (&world);
         g_cfg.world.gravity = 0.0f;
         g_cfg.world.drag = 1.0f;
-        int a = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0.0f, 0.0f, 0.0f});
-        int b = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0.0f, 0.0f, 0.0f}); /* exact same position */
+        int a = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3) {0.0f, 0.0f, 0.0f});
+        int b = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3) {0.0f, 0.0f, 0.0f}); /* exact same position */
         int joint = add_joint_by_ids (&world, world.bodies [a].object_id, world.bodies [b].object_id, 1.0f, 100.0f, 0.0f);
         if (joint < 0) {
             printf ("[FAIL] coincident spring creation failed\n");
@@ -143,8 +143,8 @@ int main (void) {
         constraint_pool_init (&world);
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 1.0f;
-        int a = physics_world_add_sphere (&world, 0.2f, 1.0f, (vector3){0.0f, 2.0f, 0.0f});
-        int b = physics_world_add_sphere (&world, 0.2f, 1.0f, (vector3){0.0f, 5.0f, 0.0f});
+        int a = physics_world_add_sphere (&world, 0.2f, 1.0f, (vector3) {0.0f, 2.0f, 0.0f});
+        int b = physics_world_add_sphere (&world, 0.2f, 1.0f, (vector3) {0.0f, 5.0f, 0.0f});
         int joint = add_joint_by_ids (&world, world.bodies [a].object_id, world.bodies [b].object_id, 3.0f, 100.0f, 1.0f);
         if (joint < 0) {
             printf ("[FAIL] removable spring creation failed\n");
@@ -176,10 +176,10 @@ int main (void) {
         constraint_pool_init (&world);
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 1.0f;
-        int a = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0.0f, 0.5f, 0.0f});
+        int a = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3) {0.0f, 0.5f, 0.0f});
         world.bodies [a].is_sleeping = true;
         world.bodies [a].sleep_timer = 1.0f;
-        int b = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0.0f, 3.0f, 0.0f});
+        int b = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3) {0.0f, 3.0f, 0.0f});
         int joint = add_joint_by_ids (&world, world.bodies [a].object_id, world.bodies [b].object_id, 2.0f, 50.0f, 1.0f);
         if (joint < 0) {
             printf ("[FAIL] waking spring creation failed\n");

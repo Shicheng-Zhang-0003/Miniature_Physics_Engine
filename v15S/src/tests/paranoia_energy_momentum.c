@@ -6,11 +6,11 @@
 #include "physics/constraint.h"
 #include "config/mpe_config.h"
 static inline vector3 body_angular_momentum (rigidbody *rb) {
-    math3 R = vector4_to_math3 (rb->orientation);
+    math3 R = vector4_to_math3 (rb -> orientation);
     math3 RT = math3_transposition (R);
-    math3 tmp = math3_multiplication (R, rb->inertia_tensor_local);
+    math3 tmp = math3_multiplication (R, rb -> inertia_tensor_local);
     math3 I_world = math3_multiplication (tmp, RT);
-    return math3_multiplication_vector3 (I_world, rb->angular_velocity);
+    return math3_multiplication_vector3 (I_world, rb -> angular_velocity);
 }
 int main (void) {
     mpe_config_init ();
@@ -26,10 +26,10 @@ int main (void) {
         g_cfg.world.gravity = 0.0f;
         g_cfg.world.drag = 1.0f;
         /* Place bodies at center with velocities for collision within 2s */
-        int a = physics_world_add_sphere (&world, 0.5f, 2.0f, (vector3){-6.0f, 100.0f, 0.0f});
-        int b = physics_world_add_sphere (&world, 0.3f, 1.0f, (vector3){6.0f, 100.0f, 0.0f});
-        world.bodies [a].velocity = (vector3){5.0f, 0.0f, 0.0f};
-        world.bodies [b].velocity = (vector3){-3.0f, 0.0f, 0.0f};
+        int a = physics_world_add_sphere (&world, 0.5f, 2.0f, (vector3) {-6.0f, 100.0f, 0.0f});
+        int b = physics_world_add_sphere (&world, 0.3f, 1.0f, (vector3) {6.0f, 100.0f, 0.0f});
+        world.bodies [a].velocity = (vector3) {5.0f, 0.0f, 0.0f};
+        world.bodies [b].velocity = (vector3) {-3.0f, 0.0f, 0.0f};
         world.bodies [a].restitution = 1.0f;
         world.bodies [b].restitution = 1.0f;
         rigidbody_wake (&world.bodies [a]);
@@ -84,8 +84,8 @@ int main (void) {
         g_cfg.world.gravity = 0.0f;
         g_cfg.world.drag = 1.0f;
         g_cfg.world.angular_damping_scale = 1.0f;
-        int b = physics_world_add_cube (&world, (vector3){0.0f, 100.0f, 0.0f}, (vector3){1.0f, 0.5f, 0.2f}, 1.0f);
-        world.bodies [b].angular_velocity = (vector3){2.0f, 1.5f, 3.0f};
+        int b = physics_world_add_cube (&world, (vector3) {0.0f, 100.0f, 0.0f}, (vector3) {1.0f, 0.5f, 0.2f}, 1.0f);
+        world.bodies [b].angular_velocity = (vector3) {2.0f, 1.5f, 3.0f};
         rigidbody_wake (&world.bodies [b]);
         const float dt = 1.0f / 60.0f;
         /* Compute L0 BEFORE any integration */
@@ -118,18 +118,18 @@ int main (void) {
         constraint_pool_init (&world);
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 1.0f;
-        int s = physics_world_add_sphere (&world, 0.5f, 2.0f, (vector3){0.0f, 5.0f, 0.0f});
-        world.bodies [s].velocity = (vector3){3.0f, 8.0f, -2.0f};
-        world.bodies [s].angular_velocity = (vector3){4.0f, -1.0f, 2.0f};
+        int s = physics_world_add_sphere (&world, 0.5f, 2.0f, (vector3) {0.0f, 5.0f, 0.0f});
+        world.bodies [s].velocity = (vector3) {3.0f, 8.0f, -2.0f};
+        world.bodies [s].angular_velocity = (vector3) {4.0f, -1.0f, 2.0f};
         rigidbody_wake (&world.bodies [s]);
         const float dt = 1.0f / 60.0f;
         float E0 = -1.0f, E_max = 0.0f, E_min = 1e9f;
         for (int t = 0; t < 120; t++) {
             physics_world_step (&world, dt);
             rigidbody *b = &world.bodies [0];
-            if (b->position.y < 0.6f)
+            if (b -> position.y < 0.6f)
                 break;
-            float E = rb_get_kinetic_energy (b) + b->mass * 9.81f * b->position.y;
+            float E = rb_get_kinetic_energy (b) + b -> mass * 9.81f * b -> position.y;
             if (E0 < 0.0f)
                 E0 = E;
             if (E > E_max)
@@ -155,16 +155,16 @@ int main (void) {
         constraint_pool_init (&world);
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 0.99f;
-        int s = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0.0f, 10.0f, 0.0f});
-        world.bodies [s].velocity = (vector3){5.0f, 10.0f, 3.0f};
-        world.bodies [s].angular_velocity = (vector3){2.0f, 1.0f, -1.0f};
+        int s = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3) {0.0f, 10.0f, 0.0f});
+        world.bodies [s].velocity = (vector3) {5.0f, 10.0f, 3.0f};
+        world.bodies [s].angular_velocity = (vector3) {2.0f, 1.0f, -1.0f};
         rigidbody_wake (&world.bodies [s]);
         const float dt = 1.0f / 60.0f;
         float E0 = -1.0f, E_max = 0.0f;
         for (int t = 0; t < 120; t++) {
             physics_world_step (&world, dt);
             rigidbody *b = &world.bodies [0];
-            float E = rb_get_kinetic_energy (b) + b->mass * 9.81f * b->position.y;
+            float E = rb_get_kinetic_energy (b) + b -> mass * 9.81f * b -> position.y;
             if (E0 < 0.0f)
                 E0 = E;
             if (E > E_max)
@@ -192,12 +192,12 @@ int main (void) {
         g_cfg.world.gravity = 0.0f;
         g_cfg.world.drag = 1.0f;
         /* Start at rest length + 1m displacement */
-        int a = physics_world_add_sphere (&world, 0.2f, 1.0f, (vector3){-50.0f, 100.0f, 0.0f});
-        int b = physics_world_add_sphere (&world, 0.2f, 1.0f, (vector3){-46.0f, 100.0f, 0.0f}); /* 4m apart, rest=3m */
+        int a = physics_world_add_sphere (&world, 0.2f, 1.0f, (vector3) {-50.0f, 100.0f, 0.0f});
+        int b = physics_world_add_sphere (&world, 0.2f, 1.0f, (vector3) {-46.0f, 100.0f, 0.0f}); /* 4m apart, rest=3m */
         world.bodies [a].restitution = 0.0f;
         world.bodies [b].restitution = 0.0f;
-        world.bodies [a].velocity = (vector3){0, 0, 0};
-        world.bodies [b].velocity = (vector3){0, 0, 0};
+        world.bodies [a].velocity = (vector3) {0, 0, 0};
+        world.bodies [b].velocity = (vector3) {0, 0, 0};
         uint32_t id_a = world.bodies [a].object_id;
         uint32_t id_b = world.bodies [b].object_id;
         int joint = add_joint_by_ids (&world, id_a, id_b, 3.0f, 100.0f, 1.0f); /* k=100, c=1 */
@@ -255,10 +255,10 @@ int main (void) {
         constraint_pool_init (&world);
         g_cfg.world.gravity = 0.0f;
         g_cfg.world.drag = 1.0f;
-        int a = physics_world_add_sphere (&world, 0.5f, 2.0f, (vector3){-50.0f, 100.0f, 0.0f});
-        int b = physics_world_add_sphere (&world, 0.3f, 1.0f, (vector3){50.0f, 100.0f, 0.0f});
-        world.bodies [a].velocity = (vector3){2.0f, 0.0f, 0.0f};
-        world.bodies [b].velocity = (vector3){-1.0f, 0.0f, 0.0f};
+        int a = physics_world_add_sphere (&world, 0.5f, 2.0f, (vector3) {-50.0f, 100.0f, 0.0f});
+        int b = physics_world_add_sphere (&world, 0.3f, 1.0f, (vector3) {50.0f, 100.0f, 0.0f});
+        world.bodies [a].velocity = (vector3) {2.0f, 0.0f, 0.0f};
+        world.bodies [b].velocity = (vector3) {-1.0f, 0.0f, 0.0f};
         world.bodies [a].restitution = 1.0f;
         world.bodies [b].restitution = 1.0f;
         rigidbody_wake (&world.bodies [a]);

@@ -17,15 +17,15 @@ int mfs_t_freefall (void) {
     mfs_test_t *t_ptr = &t;
     physics_world w;
     mfs_test_world (&w);
-    int s = physics_world_add_sphere (&w, 0.5f, 1.0f, (vector3){0.0f, 10.0f, 0.0f});
+    int s = physics_world_add_sphere (&w, 0.5f, 1.0f, (vector3) {0.0f, 10.0f, 0.0f});
     /* DESPOT-2026-09-28: early return leaked the world + saved config. */
     if (s < 0) {
-        t_ptr->failures++;
+        t_ptr -> failures++;
         physics_world_cleanup (&w);
         mfs_test_end (t_ptr);
-        return t_ptr->failures;
+        return t_ptr -> failures;
     }
-    w.bodies [s].velocity = (vector3){0.0f, 0.0f, 0.0f};
+    w.bodies [s].velocity = (vector3) {0.0f, 0.0f, 0.0f};
     w.bodies [s].restitution = 0.0f;
     const float dt = 1.0f / 60.0f;
     for (int k = 0; k < 60; k++)
@@ -33,24 +33,24 @@ int mfs_t_freefall (void) {
     rigidbody *b = &w.bodies [s];
     float y_exact = 10.0f - 0.5f * 9.81f * 1.0f;
     float v_exact = -9.81f * 1.0f;
-    if (fabsf (b->position.y - y_exact) > 0.5f) {
-        t_ptr->failures++;
+    if (fabsf (b -> position.y - y_exact) > 0.5f) {
+        t_ptr -> failures++;
         printf ("[FAIL] freefall position\n");
     }
-    if (fabsf (b->velocity.y - v_exact) > 0.5f) {
-        t_ptr->failures++;
+    if (fabsf (b -> velocity.y - v_exact) > 0.5f) {
+        t_ptr -> failures++;
         printf ("[FAIL] freefall velocity\n");
     }
-    if (t_ptr->failures == 0)
+    if (t_ptr -> failures == 0)
         printf ("[PASS] freefall\n");
     physics_world_cleanup (&w);
-    return t_ptr->failures;
+    return t_ptr -> failures;
 }
 /* T2: Inertia alpha = tau/(0.5*m*r^2) ±10% */
 int mfs_t_inertia (void) {
     physics_world w;
     mfs_test_world (&w);
-    int cyl = physics_world_add_cylinder (&w, 0.1f, 0.5f, 2.0f, (vector3){0, 5, 0});
+    int cyl = physics_world_add_cylinder (&w, 0.1f, 0.5f, 2.0f, (vector3) {0, 5, 0});
     if (cyl < 0) {
         physics_world_cleanup (&w);
         return 1;
@@ -65,11 +65,11 @@ int mfs_t_inertia (void) {
     float torque = 10.0f;
     const float dt = 1.0f / 60.0f;
     for (int k = 0; k < 60; k++) {
-        b->torque_accumulator = vector3_addition (b->torque_accumulator, vector3_scaling (axle, torque));
+        b -> torque_accumulator = vector3_addition (b -> torque_accumulator, vector3_scaling (axle, torque));
         physics_world_step (&w, dt);
     }
-    float omega = vector3_dot (b->angular_velocity, axle);
-    float I = 0.5f * b->mass * b->radius * b->radius;
+    float omega = vector3_dot (b -> angular_velocity, axle);
+    float I = 0.5f * b -> mass * b -> radius * b -> radius;
     float alpha_exact = torque / I;
     float alpha_meas = omega / (60.0f * DT);
     float err = fabsf (alpha_meas - alpha_exact) / alpha_exact;
@@ -88,7 +88,7 @@ int mfs_t_bounce (void) {
     g_cfg.sleep.enable = 0;
     physics_world_init (&w);
     constraint_pool_init (&w);
-    int f = physics_world_add_cube (&w, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
+    int f = physics_world_add_cube (&w, (vector3) {0.0f, -0.5f, 0.0f}, (vector3) {10.0f, 0.5f, 10.0f}, 0.0f);
     if (f < 0) {
         physics_world_cleanup (&w);
         return 1;
@@ -96,13 +96,13 @@ int mfs_t_bounce (void) {
     w.bodies [f].friction_static = 1.0f;
     w.bodies [f].friction_kinetic = 0.8f;
     w.bodies [f].restitution = 0.6f;
-    int s = physics_world_add_sphere (&w, 0.5f, 1.0f, (vector3){0, 5.0f, 0});
+    int s = physics_world_add_sphere (&w, 0.5f, 1.0f, (vector3) {0, 5.0f, 0});
     if (s < 0) {
         physics_world_cleanup (&w);
         return 1;
     }
     w.bodies [s].restitution = 0.6f;
-    w.bodies [s].velocity = (vector3){0, 0, 0};
+    w.bodies [s].velocity = (vector3) {0, 0, 0};
     const float dt = DT;
     /* DESPOT-2026-09-26: track the POST-bounce apex, not the drop height.
      * The old global-max rig compared the 5.0 m release against the 2.1 m
@@ -150,7 +150,7 @@ int mfs_t_rolling (void) {
     g_cfg.sleep.enable = 0;
     physics_world_init (&w);
     constraint_pool_init (&w);
-    int f = physics_world_add_cube (&w, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
+    int f = physics_world_add_cube (&w, (vector3) {0.0f, -0.5f, 0.0f}, (vector3) {10.0f, 0.5f, 10.0f}, 0.0f);
     if (f < 0) {
         physics_world_cleanup (&w);
         return 1;
@@ -158,20 +158,20 @@ int mfs_t_rolling (void) {
     w.bodies [f].friction_static = 1.0f;
     w.bodies [f].friction_kinetic = 0.8f;
     w.bodies [f].restitution = 0.0f;
-    int s = physics_world_add_sphere (&w, 0.5f, 1.0f, (vector3){-5, 0.5, 0});
+    int s = physics_world_add_sphere (&w, 0.5f, 1.0f, (vector3) {-5, 0.5, 0});
     if (s < 0) {
         physics_world_cleanup (&w);
         return 1;
     }
-    w.bodies [s].velocity = (vector3){5, 0, 0};
-    w.bodies [s].angular_velocity = (vector3){0, 0, -10};
+    w.bodies [s].velocity = (vector3) {5, 0, 0};
+    w.bodies [s].angular_velocity = (vector3) {0, 0, -10};
     w.bodies [s].restitution = 0.0f;
     const float dt = DT;
     for (int k = 0; k < 60; k++)
         physics_world_step (&w, dt);
     rigidbody *b = &w.bodies [s];
-    float vx = b->velocity.x;
-    float omega = -b->angular_velocity.z;
+    float vx = b -> velocity.x;
+    float omega = -b -> angular_velocity.z;
     float v_exact = omega * 0.5f;
     float err = fabsf (vx - v_exact) / v_exact;
     if (err > 0.3f) {
@@ -190,7 +190,7 @@ int mfs_t_rolling_resistance (void) {
     g_cfg.world.rolling_resistance_coeff = 0.02f;
     physics_world_init (&w);
     constraint_pool_init (&w);
-    int f = physics_world_add_cube (&w, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
+    int f = physics_world_add_cube (&w, (vector3) {0.0f, -0.5f, 0.0f}, (vector3) {10.0f, 0.5f, 10.0f}, 0.0f);
     if (f < 0) {
         physics_world_cleanup (&w);
         return 1;
@@ -198,13 +198,13 @@ int mfs_t_rolling_resistance (void) {
     w.bodies [f].friction_static = 1.0f;
     w.bodies [f].friction_kinetic = 0.8f;
     w.bodies [f].restitution = 0.0f;
-    int s = physics_world_add_sphere (&w, 0.5f, 1.0f, (vector3){0, 0.5, 0});
+    int s = physics_world_add_sphere (&w, 0.5f, 1.0f, (vector3) {0, 0.5, 0});
     if (s < 0) {
         physics_world_cleanup (&w);
         return 1;
     }
-    w.bodies [s].velocity = (vector3){10, 0, 0};
-    w.bodies [s].angular_velocity = (vector3){0, 0, -20};
+    w.bodies [s].velocity = (vector3) {10, 0, 0};
+    w.bodies [s].angular_velocity = (vector3) {0, 0, -20};
     w.bodies [s].restitution = 0.0f;
     const float dt = DT;
     for (int k = 0; k < 60; k++)
@@ -349,7 +349,7 @@ int mfs_t_motor_stall (void) {
         for (int w_idx = 0; w_idx < robot.wheel_count; w_idx++) {
             int wi = robot.wheel_bodies [w_idx];
             if (wi >= 0 && wi < w.body_count) {
-                w.bodies [wi].angular_velocity = (vector3){0, 0, 0};
+                w.bodies [wi].angular_velocity = (vector3) {0, 0, 0};
             }
         }
         drivetrain_tank (&robot, 1.0f, 1.0f);
@@ -419,7 +419,7 @@ int mfs_t_static_friction (void) {
     g_cfg.sleep.enable = 0;
     physics_world_init (&w);
     constraint_pool_init (&w);
-    int f = physics_world_add_cube (&w, (vector3){0, -0.5f, 0}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
+    int f = physics_world_add_cube (&w, (vector3) {0, -0.5f, 0}, (vector3) {10.0f, 0.5f, 10.0f}, 0.0f);
     if (f < 0) {
         physics_world_cleanup (&w);
         return 1;
@@ -434,7 +434,7 @@ int mfs_t_static_friction (void) {
         physics_world_cleanup (&w);
         return 1;
     }
-    int s = physics_world_add_cube (&w, (vector3){0, -0.5f, 0}, (vector3){10, 0.5, 10}, 0);
+    int s = physics_world_add_cube (&w, (vector3) {0, -0.5f, 0}, (vector3) {10, 0.5, 10}, 0);
     w.bodies [s].friction_static = 1.0f;
     w.bodies [s].friction_kinetic = 0.8f;
     w.bodies [s].restitution = 0.0f;
@@ -444,11 +444,11 @@ int mfs_t_static_friction (void) {
         physics_world_step (&w, DT);
     }
     rigidbody *ch = &w.bodies [robot.chassis_body];
-    if (fabsf (ch->position.x) >= 0.05f) {
+    if (fabsf (ch -> position.x) >= 0.05f) {
         physics_world_cleanup (&w);
         return 1;
     }
-    if (fabsf (ch->velocity.x) >= 0.2f) {
+    if (fabsf (ch -> velocity.x) >= 0.2f) {
         physics_world_cleanup (&w);
         return 1;
     }
@@ -470,7 +470,7 @@ int mfs_t_kinetic_friction (void) {
     g_cfg.sleep.enable = 0;
     physics_world_init (&w);
     constraint_pool_init (&w);
-    int s = physics_world_add_cube (&w, (vector3){-10, -0.5f, 0}, (vector3){10, 0.5, 10}, 0);
+    int s = physics_world_add_cube (&w, (vector3) {-10, -0.5f, 0}, (vector3) {10, 0.5, 10}, 0);
     if (s < 0) {
         physics_world_cleanup (&w);
         return 1;
@@ -478,12 +478,12 @@ int mfs_t_kinetic_friction (void) {
     w.bodies [s].friction_static = 0.3f;
     w.bodies [s].friction_kinetic = 0.3f;
     w.bodies [s].restitution = 0.0f;
-    int b = physics_world_add_cube (&w, (vector3){-6.0f, 0.55f, 0}, (vector3){0.5, 0.5, 0.5}, 1.0f);
+    int b = physics_world_add_cube (&w, (vector3) {-6.0f, 0.55f, 0}, (vector3) {0.5, 0.5, 0.5}, 1.0f);
     if (b < 0) {
         physics_world_cleanup (&w);
         return 1;
     }
-    w.bodies [b].velocity = (vector3){4, 0, 0};
+    w.bodies [b].velocity = (vector3) {4, 0, 0};
     w.bodies [b].friction_static = 0.3f;
     w.bodies [b].friction_kinetic = 0.3f;
     w.bodies [b].restitution = 0.0f;
@@ -578,7 +578,7 @@ int mfs_t_coast_down (void) {
 int mfs_t_energy (void) {
     physics_world w;
     mfs_test_world (&w);
-    int s = physics_world_add_sphere (&w, 0.5f, 1.0f, (vector3){0, 10.0f, 0});
+    int s = physics_world_add_sphere (&w, 0.5f, 1.0f, (vector3) {0, 10.0f, 0});
     if (s < 0) {
         physics_world_cleanup (&w);
         return 1;
@@ -589,10 +589,10 @@ int mfs_t_energy (void) {
     for (int k = 0; k < 60; k++)
         physics_world_step (&w, dt);
     rigidbody *b = &w.bodies [s];
-    float PE = b->mass * 9.81f * b->position.y;
-    float KE = 0.5f * b->mass * vector3_length_squared (b->velocity) +
-               0.5f * vector3_dot (b->angular_velocity,
-                                   math3_multiplication_vector3 (b->inertia_tensor_local, b->angular_velocity));
+    float PE = b -> mass * 9.81f * b -> position.y;
+    float KE = 0.5f * b -> mass * vector3_length_squared (b -> velocity) +
+               0.5f * vector3_dot (b -> angular_velocity,
+                                   math3_multiplication_vector3 (b -> inertia_tensor_local, b -> angular_velocity));
     float E = PE + KE;
     float err = fabsf (E - E0) / E0;
     if (err > 0.1f) {
@@ -606,7 +606,7 @@ int mfs_t_energy (void) {
 int mfs_t_cylinder_rest (void) {
     physics_world w;
     mfs_test_world (&w);
-    int c = physics_world_add_cylinder (&w, 0.05f, 0.5f, 1.0f, (vector3){0, 0.55f, 0});
+    int c = physics_world_add_cylinder (&w, 0.05f, 0.5f, 1.0f, (vector3) {0, 0.55f, 0});
     if (c < 0) {
         physics_world_cleanup (&w);
         return 1;
@@ -615,12 +615,12 @@ int mfs_t_cylinder_rest (void) {
     for (int k = 0; k < 300; k++)
         physics_world_step (&w, dt);
     rigidbody *b = &w.bodies [c];
-    float y_err = fabsf (b->position.y - 0.05f);
+    float y_err = fabsf (b -> position.y - 0.05f);
     if (y_err >= 0.03f) {
         physics_world_cleanup (&w);
         return 1;
     }
-    if (fabsf (b->velocity.y) >= 0.1f) {
+    if (fabsf (b -> velocity.y) >= 0.1f) {
         physics_world_cleanup (&w);
         return 1;
     }
@@ -635,12 +635,12 @@ int mfs_t_revolute_anchor (void) {
     g_cfg.sleep.enable = 0;
     physics_world_init (&w);
     constraint_pool_init (&w);
-    int a = physics_world_add_cube (&w, (vector3){0, 3, 0}, (vector3){0.1, 0.1, 0.1}, 0);
-    int b = physics_world_add_cylinder (&w, 0.05f, 0.5f, 1.0f, (vector3){0, 1.5f, 0});
+    int a = physics_world_add_cube (&w, (vector3) {0, 3, 0}, (vector3) {0.1, 0.1, 0.1}, 0);
+    int b = physics_world_add_cylinder (&w, 0.05f, 0.5f, 1.0f, (vector3) {0, 1.5f, 0});
     w.bodies [b].restitution = 0.0f;
     uint32_t ida = w.bodies [a].object_id;
     uint32_t idb = w.bodies [b].object_id;
-    int j = constraint_add_revolute (&w, ida, idb, (vector3){0, -1.5f, 0}, (vector3){0, 0, 0}, (vector3){1, 0, 0});
+    int j = constraint_add_revolute (&w, ida, idb, (vector3) {0, -1.5f, 0}, (vector3) {0, 0, 0}, (vector3) {1, 0, 0});
     if (j < 0) {
         physics_world_cleanup (&w);
         return 1;
@@ -713,23 +713,23 @@ int mfs_t_external_truth (void) {
     {
         physics_world w;
         mfs_test_world (&w);
-        int s = physics_world_add_sphere (&w, 0.5f, 1.0f, (vector3){0, 100.0f, 0});
+        int s = physics_world_add_sphere (&w, 0.5f, 1.0f, (vector3) {0, 100.0f, 0});
         w.bodies [s].restitution = 0.0f;
         if (s < 0) {
-            t_ptr->failures++;
+            t_ptr -> failures++;
             physics_world_cleanup (&w);
-            return t_ptr->failures;
+            return t_ptr -> failures;
         }
         for (int k = 0; k < 120; k++)
             physics_world_step (&w, DT);
         rigidbody *b = &w.bodies [s];
         /* drag-free closed form, tolerance covers the engine's -9.81 vs
          * g_n (+0.034%) plus first-order integration error */
-        MFS_CHECK_NEAR (t_ptr, b->position.y, 100.0f - 0.5f * G_N * 4.0f, 0.20f, "freefall y vs g_n");
+        MFS_CHECK_NEAR (t_ptr, b -> position.y, 100.0f - 0.5f * G_N * 4.0f, 0.20f, "freefall y vs g_n");
         /* the engine's viscous retention: c = -ln(drag) per second */
         float c =
             (g_cfg.world.drag > 0.0f && g_cfg.world.drag < 1.0f) ? (float) -log ((double) g_cfg.world.drag) : 0.0f;
-        MFS_CHECK_NEAR (t_ptr, b->velocity.y, mfs_ref_visc_v (0.0f, c, (float) G_N, 2.0f), 0.05f,
+        MFS_CHECK_NEAR (t_ptr, b -> velocity.y, mfs_ref_visc_v (0.0f, c, (float) G_N, 2.0f), 0.05f,
                         "freefall vy vs viscous ODE (c=-ln drag)");
         physics_world_cleanup (&w);
     }
@@ -737,22 +737,22 @@ int mfs_t_external_truth (void) {
     {
         physics_world w;
         mfs_test_world (&w);
-        int c = physics_world_add_cylinder (&w, 0.1f, 0.5f, 2.0f, (vector3){0, 5, 0});
+        int c = physics_world_add_cylinder (&w, 0.1f, 0.5f, 2.0f, (vector3) {0, 5, 0});
         if (c < 0) {
-            t_ptr->failures++;
+            t_ptr -> failures++;
             physics_world_cleanup (&w);
-            return t_ptr->failures;
+            return t_ptr -> failures;
         }
         rigidbody *b = &w.bodies [c];
-        MFS_CHECK_NEAR (t_ptr, b->inertia_tensor_local.matrix [0] [0], 0.5f * 2.0f * 0.1f * 0.1f, 1e-5f,
+        MFS_CHECK_NEAR (t_ptr, b -> inertia_tensor_local.matrix [0][0], 0.5f * 2.0f * 0.1f * 0.1f, 1e-5f,
                         "cylinder I_xx = m r^2/2 (solid)");
         const float tau = 10.0f;
         for (int k = 0; k < 60; k++) {
-            b->torque_accumulator = vector3_addition (b->torque_accumulator, vector3_scaling ((vector3){1, 0, 0}, tau));
+            b -> torque_accumulator = vector3_addition (b -> torque_accumulator, vector3_scaling ((vector3) {1, 0, 0}, tau));
             physics_world_step (&w, DT);
         }
-        float I = b->inertia_tensor_local.matrix [0] [0];
-        MFS_CHECK_NEAR (t_ptr, vector3_dot (b->angular_velocity, (vector3){1, 0, 0}), (tau / I) * 1.0f,
+        float I = b -> inertia_tensor_local.matrix [0][0];
+        MFS_CHECK_NEAR (t_ptr, vector3_dot (b -> angular_velocity, (vector3) {1, 0, 0}), (tau / I) * 1.0f,
                         0.02f * (tau / I), "omega = (tau/I) t after 1 s");
         physics_world_cleanup (&w);
     }
@@ -760,13 +760,13 @@ int mfs_t_external_truth (void) {
     {
         physics_world w;
         mfs_test_world (&w);
-        int s = physics_world_add_sphere (&w, 0.5f, 1.0f, (vector3){0, 50, 0});
+        int s = physics_world_add_sphere (&w, 0.5f, 1.0f, (vector3) {0, 50, 0});
         if (s < 0) {
-            t_ptr->failures++;
+            t_ptr -> failures++;
             physics_world_cleanup (&w);
-            return t_ptr->failures;
+            return t_ptr -> failures;
         }
-        MFS_CHECK_NEAR (t_ptr, w.bodies [s].inertia_tensor_local.matrix [0] [0], 0.4f * 1.0f * 0.25f, 1e-4f,
+        MFS_CHECK_NEAR (t_ptr, w.bodies [s].inertia_tensor_local.matrix [0][0], 0.4f * 1.0f * 0.25f, 1e-4f,
                         "sphere I_xx = 2/5 m r^2");
         physics_world_cleanup (&w);
     }
@@ -786,20 +786,20 @@ int mfs_t_external_truth (void) {
              * plastic boundary backstop at y=0, which would otherwise
              * dominate a restitution measurement (validated separately:
              * with no material floor the boundary returns e = 0). */
-            int f = physics_world_add_cube (&w, (vector3){0, 0, 0}, (vector3){60, 1.0f, 60}, 0);
+            int f = physics_world_add_cube (&w, (vector3) {0, 0, 0}, (vector3) {60, 1.0f, 60}, 0);
             if (f < 0) {
-                t_ptr->failures++;
+                t_ptr -> failures++;
                 physics_world_cleanup (&w);
-                return t_ptr->failures;
+                return t_ptr -> failures;
             }
             w.bodies [f].friction_static = 1.0f;
             w.bodies [f].friction_kinetic = 0.8f;
             w.bodies [f].restitution = e;
-            int s = physics_world_add_sphere (&w, r, 1.0f, (vector3){0, 6.0f, 0});
+            int s = physics_world_add_sphere (&w, r, 1.0f, (vector3) {0, 6.0f, 0});
             if (s < 0) {
-                t_ptr->failures++;
+                t_ptr -> failures++;
                 physics_world_cleanup (&w);
-                return t_ptr->failures;
+                return t_ptr -> failures;
             }
             w.bodies [s].restitution = e;
             w.bodies [s].velocity = vector3_zero ();
@@ -826,31 +826,31 @@ int mfs_t_external_truth (void) {
     {
         physics_world w;
         mfs_test_world (&w);
-        int f = physics_world_add_cube (&w, (vector3){0, -0.5f, 0}, (vector3){20, 0.5f, 20}, 0);
+        int f = physics_world_add_cube (&w, (vector3) {0, -0.5f, 0}, (vector3) {20, 0.5f, 20}, 0);
         if (f < 0) {
-            t_ptr->failures++;
+            t_ptr -> failures++;
             physics_world_cleanup (&w);
-            return t_ptr->failures;
+            return t_ptr -> failures;
         }
         w.bodies [f].friction_static = 1.0f;
         w.bodies [f].friction_kinetic = 0.8f;
         w.bodies [f].restitution = 0.0f;
         const float rr = 0.5f;
-        int s = physics_world_add_sphere (&w, rr, 1.0f, (vector3){-5, rr, 0});
+        int s = physics_world_add_sphere (&w, rr, 1.0f, (vector3) {-5, rr, 0});
         if (s < 0) {
-            t_ptr->failures++;
+            t_ptr -> failures++;
             physics_world_cleanup (&w);
-            return t_ptr->failures;
+            return t_ptr -> failures;
         }
-        w.bodies [s].velocity = (vector3){5, 0, 0};
-        w.bodies [s].angular_velocity = (vector3){0, 0, -5.0f / rr};
+        w.bodies [s].velocity = (vector3) {5, 0, 0};
+        w.bodies [s].angular_velocity = (vector3) {0, 0, -5.0f / rr};
         w.bodies [s].restitution = 0.0f;
         for (int k = 0; k < 60; k++)
             physics_world_step (&w, DT);
         rigidbody *b = &w.bodies [s];
-        float slip = b->velocity.x + vector3_dot (b->angular_velocity, (vector3){0, 0, 1}) * rr;
-        MFS_INFO ("rolling v=%.6f w*r=%.6f slip=%.2e", (double) b->velocity.x,
-                  (double) (vector3_dot (b->angular_velocity, (vector3){0, 0, 1}) * rr), (double) slip);
+        float slip = b -> velocity.x + vector3_dot (b -> angular_velocity, (vector3) {0, 0, 1}) * rr;
+        MFS_INFO ("rolling v=%.6f w*r=%.6f slip=%.2e", (double) b -> velocity.x,
+                  (double) (vector3_dot (b -> angular_velocity, (vector3) {0, 0, 1}) * rr), (double) slip);
         MFS_CHECK_NEAR (t_ptr, slip, 0.0f, 0.02f, "rolling no-slip residual");
         physics_world_cleanup (&w);
     }
@@ -858,18 +858,18 @@ int mfs_t_external_truth (void) {
     {
         physics_world w;
         mfs_test_world (&w);
-        int s = physics_world_add_sphere (&w, 0.5f, 1.0f, (vector3){0, 10.0f, 0});
+        int s = physics_world_add_sphere (&w, 0.5f, 1.0f, (vector3) {0, 10.0f, 0});
         if (s < 0) {
-            t_ptr->failures++;
+            t_ptr -> failures++;
             physics_world_cleanup (&w);
-            return t_ptr->failures;
+            return t_ptr -> failures;
         }
         w.bodies [s].restitution = 0.0f;
         float E0 = 1.0f * G_N * 10.0f;
         for (int k = 0; k < 60; k++)
             physics_world_step (&w, DT);
         rigidbody *b = &w.bodies [s];
-        float E = b->mass * G_N * b->position.y + 0.5f * b->mass * vector3_length_squared (b->velocity);
+        float E = b -> mass * G_N * b -> position.y + 0.5f * b -> mass * vector3_length_squared (b -> velocity);
         MFS_CHECK_REL (t_ptr, E, E0, 0.01f, "energy conservation (1% over a 4.9 m drop)");
         physics_world_cleanup (&w);
     }
@@ -894,7 +894,7 @@ int mfs_t_external_truth (void) {
                 if (I_ref > m.stall_current)
                     I_ref = m.stall_current;
                 MFS_CHECK_NEAR (t_ptr, m.current, I_ref, 0.02f * (I_ref > 0 ? I_ref : 1.0f), "motor I = (V - Ke w)/R");
-                MFS_CHECK_NEAR (t_ptr, m.output_torque, m.kt * I_ref * m.gear_ratio * m.efficiency,
+                MFS_CHECK_NEAR (t_ptr, m.output_torque, m.kt * I_ref *m.gear_ratio * m.efficiency,
                                 0.02f * m.output_torque, "motor tau = Kt I");
             }
             /* free speed reached at 12.8 V from rest must be the V-line
@@ -928,7 +928,7 @@ int mfs_t_external_truth (void) {
                     float Vb = battery_get_voltage (&bb, mm.current);
                     motor_update_load (&mm, w, DT, Vb, Ia);
                     if (!isfinite (mm.output_torque)) {
-                        t_ptr->failures++;
+                        t_ptr -> failures++;
                         break;
                     }
                     w += (mm.output_torque / Ia) * DT;
@@ -971,25 +971,25 @@ int mfs_t_external_truth (void) {
     {
         physics_world w;
         mfs_test_world (&w);
-        int f = physics_world_add_cube (&w, (vector3){-10, -0.5f, 0}, (vector3){10, 0.5f, 10}, 0);
+        int f = physics_world_add_cube (&w, (vector3) {-10, -0.5f, 0}, (vector3) {10, 0.5f, 10}, 0);
         if (f < 0) {
-            t_ptr->failures++;
+            t_ptr -> failures++;
             physics_world_cleanup (&w);
-            return t_ptr->failures;
+            return t_ptr -> failures;
         }
         w.bodies [f].friction_static = 0.3f;
         w.bodies [f].friction_kinetic = 0.3f;
         w.bodies [f].restitution = 0.0f;
-        int b2 = physics_world_add_cube (&w, (vector3){-6.0f, 0.55f, 0}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
+        int b2 = physics_world_add_cube (&w, (vector3) {-6.0f, 0.55f, 0}, (vector3) {0.5f, 0.5f, 0.5f}, 1.0f);
         if (b2 < 0) {
-            t_ptr->failures++;
+            t_ptr -> failures++;
             physics_world_cleanup (&w);
-            return t_ptr->failures;
+            return t_ptr -> failures;
         }
         w.bodies [b2].friction_static = 0.3f;
         w.bodies [b2].friction_kinetic = 0.3f;
         w.bodies [b2].restitution = 0.0f;
-        w.bodies [b2].velocity = (vector3){4, 0, 0};
+        w.bodies [b2].velocity = (vector3) {4, 0, 0};
         rigidbody_wake (&w.bodies [b2]);
         for (int k = 0; k < 60; k++)
             physics_world_step (&w, DT);
@@ -1012,5 +1012,5 @@ int mfs_t_external_truth (void) {
                   (double) (100.0f * ((float) g_cfg.world.gravity / -G_N - 1.0f)));
     }
     mfs_test_end (t_ptr);
-    return t_ptr->failures;
+    return t_ptr -> failures;
 }

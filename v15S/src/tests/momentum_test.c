@@ -17,9 +17,9 @@ int main (void) {
     physics_world_init (&world);
     constraint_pool_init (&world);
     /* High above the floor: no gravity-torque/contact interference. */
-    int a = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){-3.0f, 20.0f, 0.0f});
-    int b = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0.0f, 20.0f, 0.0f});
-    world.bodies [a].velocity = (vector3){3.0f, 0.0f, 0.0f};
+    int a = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3) {-3.0f, 20.0f, 0.0f});
+    int b = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3) {0.0f, 20.0f, 0.0f});
+    world.bodies [a].velocity = (vector3) {3.0f, 0.0f, 0.0f};
     world.bodies [a].restitution = 1.0f;
     world.bodies [b].restitution = 1.0f;
     rigidbody_wake (&world.bodies [a]);

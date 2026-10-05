@@ -19,9 +19,9 @@ int mpe_t_projectile (void) {
     const float vx = 8.0f, vy = 12.0f;
     const float g = fabsf (g_cfg.world.gravity);
     MPE_CHECK (&t, fabsf (g - 9.81f) < 1e-6f);
-    int s = physics_world_add_sphere (&w, 0.2f, 1.0f, (vector3){0.0f, 1.0f, 0.0f});
+    int s = physics_world_add_sphere (&w, 0.2f, 1.0f, (vector3) {0.0f, 1.0f, 0.0f});
     MPE_CHECK (&t, s >= 0);
-    w.bodies [s].velocity = (vector3){vx, vy, 0.0f};
+    w.bodies [s].velocity = (vector3) {vx, vy, 0.0f};
     rigidbody_wake (&w.bodies [s]);
     const float dt = 1.0f / 60.0f;
     float apex = 0.0f, t_apex = 0.0f, x_apex = 0.0f;
@@ -32,12 +32,12 @@ int mpe_t_projectile (void) {
             break;
         }
         rigidbody *b = &w.bodies [s];
-        if (b->position.y > apex) {
-            apex = b->position.y;
+        if (b -> position.y > apex) {
+            apex = b -> position.y;
             t_apex = (float) (k + 1) * dt;
-            x_apex = b->position.x;
+            x_apex = b -> position.x;
         }
-        if (b->position.y < 0.25f) {
+        if (b -> position.y < 0.25f) {
             break;
         }
     }
@@ -72,11 +72,11 @@ int mpe_t_friction_stop (void) {
     physics_world w;
     mpe_world_begin (&w);
     MPE_CHECK (&t, mpe_floor_slab (&w, 0.3f, 0.3f, 0.0f) >= 0);
-    int box = physics_world_add_cube (&w, (vector3){-6.0f, 0.55f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
+    int box = physics_world_add_cube (&w, (vector3) {-6.0f, 0.55f, 0.0f}, (vector3) {0.5f, 0.5f, 0.5f}, 1.0f);
     MPE_CHECK (&t, box >= 0);
     w.bodies [box].friction_static = 0.3f;
     w.bodies [box].friction_kinetic = 0.3f;
-    w.bodies [box].velocity = (vector3){4.0f, 0.0f, 0.0f};
+    w.bodies [box].velocity = (vector3) {4.0f, 0.0f, 0.0f};
     rigidbody_wake (&w.bodies [box]);
     const float dt = 1.0f / 60.0f;
     MPE_CHECK (&t, mpe_step (&w, 60, dt));
@@ -117,23 +117,23 @@ int mpe_t_incline_accel (void) {
     vector3 n = {-sinf (ang), cosf (ang), 0.0f};
     vector3 surf = {0.0f, 6.0f, 0.0f};
     vector3 rc = {surf.x - n.x * 0.5f, surf.y - n.y * 0.5f, 0.0f};
-    int ramp = physics_world_add_cube (&w, rc, (vector3){10.0f, 0.5f, 5.0f}, 0.0f);
+    int ramp = physics_world_add_cube (&w, rc, (vector3) {10.0f, 0.5f, 5.0f}, 0.0f);
     MPE_CHECK (&t, ramp >= 0);
     rigidbody *rb = &w.bodies [ramp];
-    rb->orientation = vector4_from_axis_with_angle ((vector3){0, 0, 1}, ang);
+    rb -> orientation = vector4_from_axis_with_angle ((vector3) {0, 0, 1}, ang);
     rigidbody_update_axes (rb);
     rigidbody_sanitize (rb);
     float h = 0.25f;
     float drop = (fabsf (n.x) + fabsf (n.y) + fabsf (n.z)) * h;
     vector3 p0 = {surf.x + n.x * (drop + 0.01f), surf.y + n.y * (drop + 0.01f), 0.0f};
-    int box = physics_world_add_cube (&w, p0, (vector3){h, h, h}, 1.0f);
+    int box = physics_world_add_cube (&w, p0, (vector3) {h, h, h}, 1.0f);
     MPE_CHECK (&t, box >= 0);
     w.bodies [box].friction_static = 0.0f;
     w.bodies [box].friction_kinetic = 0.0f;
     w.bodies [box].restitution = 0.0f;
     g_cfg.sleep.enable = 0;
-    rb->friction_static = 0.0f;
-    rb->friction_kinetic = 0.0f;
+    rb -> friction_static = 0.0f;
+    rb -> friction_kinetic = 0.0f;
     const float dt = 1.0f / 60.0f;
     vector3 d = {cosf (ang), sinf (ang), 0.0f};
     MPE_CHECK (&t, mpe_step (&w, 30, dt));
@@ -171,15 +171,15 @@ int mpe_t_pendulum (void) {
     g_cfg.world.gravity = -9.81f;
     physics_world w;
     mpe_world_begin (&w);
-    int pivot = physics_world_add_cube (&w, (vector3){0.0f, 6.0f, 0.0f}, (vector3){0.2f, 0.2f, 0.2f}, 0.0f);
+    int pivot = physics_world_add_cube (&w, (vector3) {0.0f, 6.0f, 0.0f}, (vector3) {0.2f, 0.2f, 0.2f}, 0.0f);
     float swing = 20.0f * 3.14159265f / 180.0f;
     vector3 com = {sinf (swing) * 1.0f, 5.7f - cosf (swing) * 1.0f, 0.0f};
-    int rod = physics_world_add_cube (&w, com, (vector3){0.1f, 1.0f, 0.1f}, 1.0f);
+    int rod = physics_world_add_cube (&w, com, (vector3) {0.1f, 1.0f, 0.1f}, 1.0f);
     MPE_CHECK (&t, pivot >= 0 && rod >= 0);
     uint32_t pid = w.bodies [pivot].object_id;
     uint32_t rid = w.bodies [rod].object_id;
-    MPE_CHECK (&t, constraint_add_revolute (&w, pid, rid, (vector3){0.0f, -0.3f, 0.0f}, (vector3){0.0f, 1.0f, 0.0f},
-                                            (vector3){0.0f, 0.0f, 1.0f}) >= 0);
+    MPE_CHECK (&t, constraint_add_revolute (&w, pid, rid, (vector3) {0.0f, -0.3f, 0.0f}, (vector3) {0.0f, 1.0f, 0.0f},
+                                            (vector3) {0.0f, 0.0f, 1.0f}) >= 0);
     /* I = 1/12*m*(L^2+w^2) + m*d^2 with m=1, d=1, L=2, w=0.2. */
     float ii = (1.0f / 12.0f) * (4.0f + 0.04f) + 1.0f;
     float t_exact = 2.0f * 3.14159265f * sqrtf (ii / 9.81f);
@@ -234,7 +234,7 @@ int mpe_t_bounce_series (void) {
     mpe_world_begin (&w);
     mpe_floor_plane (&w, 0.4f, 0.3f);
     MPE_CHECK (&t, mpe_floor_slab (&w, 0.4f, 0.3f, 0.6f) >= 0);
-    int s = physics_world_add_sphere (&w, 0.5f, 1.0f, (vector3){0.0f, 4.0f, 0.0f});
+    int s = physics_world_add_sphere (&w, 0.5f, 1.0f, (vector3) {0.0f, 4.0f, 0.0f});
     MPE_CHECK (&t, s >= 0);
     w.bodies [s].restitution = 0.6f;
     rigidbody_wake (&w.bodies [s]);
@@ -323,12 +323,12 @@ int mpe_t_momentum (void) {
     g_cfg.sleep.enable = 0;
     physics_world w;
     mpe_world_begin (&w);
-    int a = physics_world_add_sphere (&w, 0.5f, 1.0f, (vector3){-3.0f, 20.0f, 0.0f});
-    int b = physics_world_add_sphere (&w, 0.5f, 1.0f, (vector3){0.0f, 20.0f, 0.0f});
+    int a = physics_world_add_sphere (&w, 0.5f, 1.0f, (vector3) {-3.0f, 20.0f, 0.0f});
+    int b = physics_world_add_sphere (&w, 0.5f, 1.0f, (vector3) {0.0f, 20.0f, 0.0f});
     MPE_CHECK (&t, a >= 0 && b >= 0);
     w.bodies [a].restitution = 1.0f;
     w.bodies [b].restitution = 1.0f;
-    w.bodies [a].velocity = (vector3){3.0f, 0.0f, 0.0f};
+    w.bodies [a].velocity = (vector3) {3.0f, 0.0f, 0.0f};
     w.bodies [b].velocity = vector3_zero ();
     float p0 = 3.0f;
     const float dt = 1.0f / 60.0f;
@@ -380,10 +380,10 @@ int mpe_t_angmom (void) {
     g_cfg.sleep.enable = 0;
     physics_world w;
     mpe_world_begin (&w);
-    int b = physics_world_add_cube (&w, (vector3){0.0f, 50.0f, 0.0f}, (vector3){0.3f, 0.5f, 0.7f}, 2.0f);
+    int b = physics_world_add_cube (&w, (vector3) {0.0f, 50.0f, 0.0f}, (vector3) {0.3f, 0.5f, 0.7f}, 2.0f);
     MPE_CHECK (&t, b >= 0);
     w.bodies [b].velocity = vector3_zero ();
-    w.bodies [b].angular_velocity = (vector3){1.0f, 2.0f, 3.0f};
+    w.bodies [b].angular_velocity = (vector3) {1.0f, 2.0f, 3.0f};
     math3 R0 = vector4_to_math3 (w.bodies [b].orientation);
     vector3 L0 = math3_multiplication_vector3 (
         math3_multiplication (R0, math3_multiplication (w.bodies [b].inertia_tensor_local, math3_transposition (R0))),
@@ -437,26 +437,26 @@ static float mpe_slope_drift (mpe_test_t *t, float slope_deg, float mus, float m
     vector3 n = {-sinf (ang), cosf (ang), 0.0f};
     vector3 surf = {0.0f, 4.0f, 0.0f};
     vector3 rc = {surf.x - n.x * 0.5f, surf.y - n.y * 0.5f, 0.0f};
-    int ramp = physics_world_add_cube (&w, rc, (vector3){8.0f, 0.5f, 5.0f}, 0.0f);
+    int ramp = physics_world_add_cube (&w, rc, (vector3) {8.0f, 0.5f, 5.0f}, 0.0f);
     rigidbody *rb = &w.bodies [ramp];
-    rb->orientation = vector4_from_axis_with_angle ((vector3){0, 0, 1}, ang);
+    rb -> orientation = vector4_from_axis_with_angle ((vector3) {0, 0, 1}, ang);
     rigidbody_update_axes (rb);
     rigidbody_sanitize (rb);
-    rb->friction_static = mus;
-    rb->friction_kinetic = muk;
+    rb -> friction_static = mus;
+    rb -> friction_kinetic = muk;
     float h = 0.25f;
     float drop = (fabsf (n.x) + fabsf (n.y) + fabsf (n.z)) * h;
     vector3 p0 = {surf.x + n.x * (drop + 0.005f), surf.y + n.y * (drop + 0.005f), 0.0f};
-    int box = physics_world_add_cube (&w, p0, (vector3){h, h, h}, 1.0f);
+    int box = physics_world_add_cube (&w, p0, (vector3) {h, h, h}, 1.0f);
     w.bodies [box].friction_static = mus;
     w.bodies [box].friction_kinetic = muk;
     const float dt = 1.0f / 60.0f;
     if (!mpe_step (&w, 120, dt)) {
-        t->failures++;
+        t -> failures++;
     }
     vector3 s0 = w.bodies [box].position;
     if (!mpe_step (&w, 300, dt)) {
-        t->failures++;
+        t -> failures++;
     }
     vector3 s1 = w.bodies [box].position;
     vector3 d = {cosf (ang), sinf (ang), 0.0f};
@@ -511,10 +511,10 @@ int mpe_t_rolling_decay (void) {
     physics_world w;
     mpe_world_begin (&w);
     w.static_plane_enabled = true;
-    int s = physics_world_add_sphere (&w, 0.5f, 1.0f, (vector3){-8.0f, 0.5f, 0.0f});
+    int s = physics_world_add_sphere (&w, 0.5f, 1.0f, (vector3) {-8.0f, 0.5f, 0.0f});
     MPE_CHECK (&t, s >= 0);
-    w.bodies [s].velocity = (vector3){2.0f, 0.0f, 0.0f};
-    w.bodies [s].angular_velocity = (vector3){0.0f, 0.0f, -4.0f};
+    w.bodies [s].velocity = (vector3) {2.0f, 0.0f, 0.0f};
+    w.bodies [s].angular_velocity = (vector3) {0.0f, 0.0f, -4.0f};
     rigidbody_wake (&w.bodies [s]);
     const float dt = 1.0f / 60.0f;
     for (int k = 0; k < 480; k++) {
@@ -555,16 +555,16 @@ int mpe_t_kinematic (void) {
     g_cfg.world.gravity = -9.81f;
     physics_world w;
     mpe_world_begin (&w);
-    int p = physics_world_add_cube (&w, (vector3){0, 0.5f, 0}, (vector3){2.0f, 0.5f, 2.0f}, 5.0f);
+    int p = physics_world_add_cube (&w, (vector3) {0, 0.5f, 0}, (vector3) {2.0f, 0.5f, 2.0f}, 5.0f);
     MPE_CHECK (&t, p >= 0);
     rigidbody_set_kinematic (&w.bodies [p], true);
-    w.bodies [p].velocity = (vector3){2.0f, 0.0f, 0.0f};
-    int c = physics_world_add_cube (&w, (vector3){0, 1.26f, 0}, (vector3){0.25f, 0.25f, 0.25f}, 1.0f);
+    w.bodies [p].velocity = (vector3) {2.0f, 0.0f, 0.0f};
+    int c = physics_world_add_cube (&w, (vector3) {0, 1.26f, 0}, (vector3) {0.25f, 0.25f, 0.25f}, 1.0f);
     MPE_CHECK (&t, c >= 0);
     const float dt = 1.0f / 60.0f;
     for (int k = 0; k < 120; k++) {
         /* Drive re-asserted every tick (contact must not slow the drive). */
-        w.bodies [p].velocity = (vector3){2.0f, 0.0f, 0.0f};
+        w.bodies [p].velocity = (vector3) {2.0f, 0.0f, 0.0f};
         physics_world_step (&w, dt);
         if (!isfinite (w.bodies [c].position.x)) {
             printf ("[FAIL] NaN\n");
@@ -599,11 +599,11 @@ int mpe_t_ccd_sweep (void) {
     mpe_test_begin (&t, "ccd_sweep");
     physics_world w;
     mpe_world_begin (&w);
-    MPE_CHECK (&t, physics_world_add_cube (&w, (vector3){0, 5.0f, 0}, (vector3){0.05f, 5.0f, 5.0f}, 0.0f) >= 0);
-    int s = physics_world_add_sphere (&w, 0.5f, 1.0f, (vector3){-5.7f, 5.0f, 0});
+    MPE_CHECK (&t, physics_world_add_cube (&w, (vector3) {0, 5.0f, 0}, (vector3) {0.05f, 5.0f, 5.0f}, 0.0f) >= 0);
+    int s = physics_world_add_sphere (&w, 0.5f, 1.0f, (vector3) {-5.7f, 5.0f, 0});
     MPE_CHECK (&t, s >= 0);
     w.bodies [s].restitution = 0.0f;
-    w.bodies [s].velocity = (vector3){144.0f, 0.0f, 0.0f};
+    w.bodies [s].velocity = (vector3) {144.0f, 0.0f, 0.0f};
     rigidbody_wake (&w.bodies [s]);
     const float dt = 1.0f / 60.0f;
     MPE_CHECK (&t, mpe_step (&w, 60, dt));
@@ -622,9 +622,9 @@ int mpe_t_ccd_sweep (void) {
     mpe_config_t no_net2;
     mpe_world_no_net (&w, &no_net2);
     MPE_CHECK (&t, mpe_floor_slab (&w, 0.4f, 0.3f, 0.0f) >= 0);
-    int d = physics_world_add_sphere (&w, 0.5f, 1.0f, (vector3){0, 5.0f, 0});
+    int d = physics_world_add_sphere (&w, 0.5f, 1.0f, (vector3) {0, 5.0f, 0});
     MPE_CHECK (&t, d >= 0);
-    w.bodies [d].velocity = (vector3){0, -60.0f, 0};
+    w.bodies [d].velocity = (vector3) {0, -60.0f, 0};
     w.bodies [d].restitution = 0.0f;
     rigidbody_wake (&w.bodies [d]);
     float min_y = 1e9f;

@@ -28,17 +28,17 @@ int main (void) {
     drivetrain_update (&world, &robot, dt);
     printf ("=== Motor 0 electrical/mechanical state after 1 tick ===\n");
     motor *m = &robot.wheel_motors [0];
-    printf ("  command          = %.3f\n", m->command);
-    printf ("  current          = %.3f A\n", m->current);
-    printf ("  torque (shaft)   = %.4f N*m\n", m->torque);
-    printf ("  output_torque    = %.4f N*m   <-- WATCH THIS\n", m->output_torque);
-    printf ("  gear_ratio       = %.2f\n", m->gear_ratio);
-    printf ("  efficiency       = %.3f\n", m->efficiency);
-    printf ("  rpm              = %.1f\n", m->rpm);
-    printf ("  free_speed_rad_s = %.2f\n", m->free_speed_rad_s);
+    printf ("  command          = %.3f\n", m -> command);
+    printf ("  current          = %.3f A\n", m -> current);
+    printf ("  torque (shaft)   = %.4f N*m\n", m -> torque);
+    printf ("  output_torque    = %.4f N*m   <-- WATCH THIS\n", m -> output_torque);
+    printf ("  gear_ratio       = %.2f\n", m -> gear_ratio);
+    printf ("  efficiency       = %.3f\n", m -> efficiency);
+    printf ("  rpm              = %.1f\n", m -> rpm);
+    printf ("  free_speed_rad_s = %.2f\n", m -> free_speed_rad_s);
     float wheel_I = 0.5f * 0.2f * 0.05f * 0.05f; /* 0.5*m*r^2 for the 0.2kg wheel */
     printf ("  wheel inertia    = %.6f kg*m^2\n", wheel_I);
-    printf ("  implied ang accel= %.1f rad/s^2 (output_torque / I)\n", m->output_torque / wheel_I);
+    printf ("  implied ang accel= %.1f rad/s^2 (output_torque / I)\n", m -> output_torque / wheel_I);
     physics_world_step (&world, dt);
     printf ("\n=== After physics step ===\n");
     for (int i = 0; i < 4; i++) {
@@ -52,11 +52,11 @@ int main (void) {
     printf ("  Chassis: lin_vel=(%.3f,%.3f,%.3f) pos.y=%.4f\n", world.bodies [cb].velocity.x,
             world.bodies [cb].velocity.y, world.bodies [cb].velocity.z, world.bodies [cb].position.y);
     printf ("\n=== Verdict heuristics ===\n");
-    if (m->output_torque > 5.0f)
+    if (m -> output_torque > 5.0f)
         printf ("  [SUSPECT] output_torque %.2f N*m is HUGE for a 100mm wheel -> gear ratio likely double-applied\n",
-                m->output_torque);
+                m -> output_torque);
     else
-        printf ("  [OK] output_torque %.2f N*m looks plausible\n", m->output_torque);
+    printf ("  [OK] output_torque %.2f N*m looks plausible\n", m -> output_torque);
     return 0;
 }
 #endif /* MPE_FTC_DEBUG_TEST */

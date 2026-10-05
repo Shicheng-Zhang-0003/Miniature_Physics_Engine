@@ -47,7 +47,7 @@ static const char *mpe_pick_plugin (const char *so_path, char *buf, size_t n) {
 #endif
 }
 typedef int (*spawn_fn_t) (struct physics_world *, float, float, float, motor_preset_id, ftc_drivetrain_type);
-typedef ftc_robot *(*get_fn_t) (struct physics_world *, int);
+typedef ftc_robot * (*get_fn_t) (struct physics_world *, int);
 typedef void (*tank_fn_t) (ftc_robot *, float, float);
 int mpe_t_ftc_ecosystem (void) {
     mpe_test_t t;
@@ -72,16 +72,16 @@ int mpe_t_ftc_ecosystem (void) {
     void *st = mpe_ecosystem_state (&w, "mfs-simulator");
     MPE_CHECK (&t, st != NULL);
     const mpe_ecosystem_desc_t *ed = mpe_ecosystem_find ("mfs-simulator");
-    MPE_CHECK (&t, ed != NULL && ed->command != NULL);
-    if (!st || !ed || !ed->command) {
+    MPE_CHECK (&t, ed != NULL && ed -> command != NULL);
+    if (!st || !ed || !ed -> command) {
         physics_world_cleanup (&w);
         mpe_test_end (&t);
         return t.failures + 1;
     }
     char *sp [] = {"spawn"};
-    MPE_CHECK (&t, ed->command (st, 1, sp) == 0);
+    MPE_CHECK (&t, ed -> command (st, 1, sp) == 0);
     char *dv [] = {"drive", "0", "tank", "1.0", "1.0"};
-    MPE_CHECK (&t, ed->command (st, 5, dv) == 0);
+    MPE_CHECK (&t, ed -> command (st, 5, dv) == 0);
     /* Pose reader resolves exactly like the terminal does. */
     spawn_fn_t p_spawn = NULL;
     get_fn_t p_get = NULL;
@@ -96,9 +96,9 @@ int mpe_t_ftc_ecosystem (void) {
     float x0 = 0, z0 = 0;
     ftc_robot *r0 = p_get ? p_get (&w, 0) : NULL;
     MPE_CHECK (&t, r0 != NULL);
-    if (r0 && r0->chassis_body >= 0) {
-        x0 = w.bodies [r0->chassis_body].position.x;
-        z0 = w.bodies [r0->chassis_body].position.z;
+    if (r0 && r0 -> chassis_body >= 0) {
+        x0 = w.bodies [r0 -> chassis_body].position.x;
+        z0 = w.bodies [r0 -> chassis_body].position.z;
     }
     const float dt = 1.0f / 60.0f;
     for (int k = 0; k < 180; k++) {
@@ -112,9 +112,9 @@ int mpe_t_ftc_ecosystem (void) {
         }
     }
     char *tl [] = {"telemetry", "0"};
-    MPE_CHECK (&t, ed->command (st, 2, tl) == 0);
+    MPE_CHECK (&t, ed -> command (st, 2, tl) == 0);
     char *li [] = {"list"};
-    MPE_CHECK (&t, ed->command (st, 1, li) == 0);
+    MPE_CHECK (&t, ed -> command (st, 1, li) == 0);
     ftc_robot *r1 = p_get ? p_get (&w, 0) : NULL;
     MPE_CHECK (&t, r1 != NULL);
     /* DESPOT-2026-09-29: both motion assertions were wrapped in
@@ -124,17 +124,17 @@ int mpe_t_ftc_ecosystem (void) {
      * verified nothing about motion. An unconditional index here is also an
      * out-of-bounds read, so this is the MFS fix applied to the engine side. */
     MPE_CHECK (&t, r1 != NULL);
-    MPE_CHECK (&t, r1 && r1->chassis_body >= 0);
-    MPE_CHECK (&t, r1 && r1->chassis_body < w.body_count);
-    if (r1 && r1->chassis_body >= 0 && r1->chassis_body < w.body_count) {
-        float dx = w.bodies [r1->chassis_body].position.x - x0;
-        float dz = w.bodies [r1->chassis_body].position.z - z0;
+    MPE_CHECK (&t, r1 && r1 -> chassis_body >= 0);
+    MPE_CHECK (&t, r1 && r1 -> chassis_body < w.body_count);
+    if (r1 && r1 -> chassis_body >= 0 && r1 -> chassis_body < w.body_count) {
+        float dx = w.bodies [r1 -> chassis_body].position.x - x0;
+        float dz = w.bodies [r1 -> chassis_body].position.z - z0;
         float disp = sqrtf (dx * dx + dz * dz);
         MPE_INFO ("ecosystem drive displacement=%.4f m", disp);
         MPE_CHECK (&t, disp >= 0.5f);
         /* +/- 1 m on an 18 cm rest height was a +/-1 m band; tighten to a
          * value that would actually notice a robot at the wrong height. */
-        MPE_CHECK (&t, fabsf (w.bodies [r1->chassis_body].position.y - 0.18f) < 0.25f);
+        MPE_CHECK (&t, fabsf (w.bodies [r1 -> chassis_body].position.y - 0.18f) < 0.25f);
     }
     MPE_CHECK (&t, mpe_ecosystem_detach (&w, "mfs-simulator") == 0);
     MPE_CHECK (&t, mpe_loader_unload (eco_path) == 0);

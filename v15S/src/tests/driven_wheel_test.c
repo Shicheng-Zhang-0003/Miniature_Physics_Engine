@@ -13,7 +13,7 @@ int main (void) {
     world.next_object_id = 1;
     /* physics_world_init leaves the virtual backstop frictionless. Use a
      * real material surface so this test measures wheel/floor traction. */
-    int floor = physics_world_add_cube (&world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
+    int floor = physics_world_add_cube (&world, (vector3) {0.0f, -0.5f, 0.0f}, (vector3) {10.0f, 0.5f, 10.0f}, 0.0f);
     if (floor < 0) {
         printf ("[FAIL] could not create floor\n");
         physics_world_cleanup (&world);
@@ -24,7 +24,7 @@ int main (void) {
     world.bodies [floor].friction_kinetic = g_cfg.world.floor_friction_k;
     /* Cylinder wheel resting on a real frictional floor. Spawn slightly above
        (y=0.06) so it drops, settles, and establishes solid contact manifolds. */
-    int w = physics_world_add_cylinder (&world, 0.05f, 0.02f, 0.5f, (vector3){0.0f, 0.06f, 0.0f});
+    int w = physics_world_add_cylinder (&world, 0.05f, 0.02f, 0.5f, (vector3) {0.0f, 0.06f, 0.0f});
     if (w < 0) {
         printf ("[FAIL] could not create wheel\n");
         physics_world_cleanup (&world);

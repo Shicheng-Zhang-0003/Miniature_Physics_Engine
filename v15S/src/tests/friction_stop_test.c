@@ -19,13 +19,13 @@ int main (void) {
     physics_world_init (&world);
     constraint_pool_init (&world);
     /* Static floor slab, top at y=0, body friction 0.3. */
-    int floor = physics_world_add_cube (&world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
+    int floor = physics_world_add_cube (&world, (vector3) {0.0f, -0.5f, 0.0f}, (vector3) {10.0f, 0.5f, 10.0f}, 0.0f);
     world.bodies [floor].friction_static = 0.3f;
     world.bodies [floor].friction_kinetic = 0.3f;
-    int box = physics_world_add_cube (&world, (vector3){-6.0f, 0.55f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
+    int box = physics_world_add_cube (&world, (vector3) {-6.0f, 0.55f, 0.0f}, (vector3) {0.5f, 0.5f, 0.5f}, 1.0f);
     world.bodies [box].friction_static = 0.3f;
     world.bodies [box].friction_kinetic = 0.3f;
-    world.bodies [box].velocity = (vector3){4.0f, 0.0f, 0.0f};
+    world.bodies [box].velocity = (vector3) {4.0f, 0.0f, 0.0f};
     rigidbody_wake (&world.bodies [box]);
     const float dt = 1.0f / 60.0f;
     for (int t = 0; t < 60; t++) {

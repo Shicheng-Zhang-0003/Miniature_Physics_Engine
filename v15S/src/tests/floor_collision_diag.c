@@ -15,9 +15,9 @@ int main (void) {
     no_net_cfg.boundary.safety_net_enabled = 0;
     physics_world_set_config (&world, &no_net_cfg);
     /* Static floor, top surface at y=0 */
-    int floor_idx = physics_world_add_cube (&world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
+    int floor_idx = physics_world_add_cube (&world, (vector3) {0.0f, -0.5f, 0.0f}, (vector3) {10.0f, 0.5f, 10.0f}, 0.0f);
     float r = 0.05f;
-    int cyl_idx = physics_world_add_cylinder (&world, r, 0.02f, 0.5f, (vector3){0.0f, 1.0f, 0.0f});
+    int cyl_idx = physics_world_add_cylinder (&world, r, 0.02f, 0.5f, (vector3) {0.0f, 1.0f, 0.0f});
     printf ("floor_idx=%d cyl_idx=%d\n", floor_idx, cyl_idx);
     printf ("cylinder initial: pos=(%.4f,%.4f,%.4f) vel=(%.4f,%.4f,%.4f)\n", world.bodies [cyl_idx].position.x,
             world.bodies [cyl_idx].position.y, world.bodies [cyl_idx].position.z, world.bodies [cyl_idx].velocity.x,

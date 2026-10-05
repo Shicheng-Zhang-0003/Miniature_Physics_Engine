@@ -33,10 +33,10 @@ int main (void) {
         const mpe_param *drag_p = mpe_config_find ("world.drag");
         const mpe_param *iters_p = mpe_config_find ("timestep.solver_iterations");
         const mpe_param *slop_p = mpe_config_find ("solver.penetration_slop");
-        int bounded = gravity_p && drag_p && iters_p && slop_p && gravity >= gravity_p->min &&
-                      gravity <= gravity_p->max && drag >= drag_p->min && drag <= drag_p->max &&
-                      iters >= (int) iters_p->min && iters <= (int) iters_p->max && slop >= slop_p->min &&
-                      slop <= slop_p->max;
+        int bounded = gravity_p && drag_p && iters_p && slop_p && gravity >= gravity_p -> min &&
+                      gravity <= gravity_p -> max && drag >= drag_p -> min && drag <= drag_p -> max &&
+                      iters >= (int) iters_p -> min && iters <= (int) iters_p -> max && slop >= slop_p -> min &&
+                      slop <= slop_p -> max;
         printf ("[INFO] config_clamping rejected_or_clamped=%d bounded=%d\n", rejected_or_clamped, bounded);
         if (rejected_or_clamped != 8 || !bounded) {
             printf ("[FAIL] config bounds not enforced\n");

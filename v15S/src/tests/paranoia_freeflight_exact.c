@@ -34,8 +34,8 @@ int main (void) {
         physics_world_init (&w1);
         constraint_pool_init (&w1);
         const float vx = 10.0f, vy = 15.0f, g = 9.81f;
-        int s = physics_world_add_sphere (&w1, 0.1f, 1.0f, (vector3){0.0f, 1.0f, 0.0f});
-        w1.bodies [s].velocity = (vector3){vx, vy, 0.0f};
+        int s = physics_world_add_sphere (&w1, 0.1f, 1.0f, (vector3) {0.0f, 1.0f, 0.0f});
+        w1.bodies [s].velocity = (vector3) {vx, vy, 0.0f};
         rigidbody_wake (&w1.bodies [s]);
         const float dt = 1.0f / 60.0f;
         float apex = 0.0f, t_apex = 0.0f, x_apex = 0.0f;
@@ -43,33 +43,33 @@ int main (void) {
         for (int t = 0; t < 500; t++) {
             physics_world_step (&w1, dt);
             rigidbody *b = &w1.bodies [s];
-            fail |= check_finite ("projectile_drag1", b->position);
-            if (b->position.y > apex) {
-                apex = b->position.y;
+            fail |= check_finite ("projectile_drag1", b -> position);
+            if (b -> position.y > apex) {
+                apex = b -> position.y;
                 t_apex = (float) (t + 1) * dt;
-                x_apex = b->position.x;
+                x_apex = b -> position.x;
             }
             /* Exact parabola at this time */
             float texact = (float) (t + 1) * dt;
             float y_exact = 1.0f + vy * texact - 0.5f * g * texact * texact;
             float x_exact = vx * texact;
-            float y_error = fabsf (b->position.y - y_exact);
-            float x_error = fabsf (b->position.x - x_exact);
+            float y_error = fabsf (b -> position.y - y_exact);
+            float x_error = fabsf (b -> position.x - x_exact);
             if (y_error > max_height_error)
                 max_height_error = y_error;
             /* x error tolerance: dt=1/60, vx=10 -> ~0.17m per tick discretization.
              * The exact integration is exact for the ODE, but t_apex is quantized to dt. */
             if (x_error > 0.2f) {
-                printf ("[FAIL] drag=1 x drift: t=%.3f pos=%.6f exact=%.6f err=%.6f\n", texact, b->position.x, x_exact,
+                printf ("[FAIL] drag=1 x drift: t=%.3f pos=%.6f exact=%.6f err=%.6f\n", texact, b -> position.x, x_exact,
                         x_error);
                 fail = 1;
             }
             if (y_error > 0.01f) {
-                printf ("[FAIL] drag=1 y drift: t=%.3f pos=%.6f exact=%.6f err=%.6f\n", texact, b->position.y, y_exact,
+                printf ("[FAIL] drag=1 y drift: t=%.3f pos=%.6f exact=%.6f err=%.6f\n", texact, b -> position.y, y_exact,
                         y_error);
                 fail = 1;
             }
-            if (b->position.y < 0.15f)
+            if (b -> position.y < 0.15f)
                 break;
         }
         float apex_e = 1.0f + vy * vy / (2.0f * g);
@@ -114,8 +114,8 @@ int main (void) {
         physics_world_init (&w2);
         constraint_pool_init (&w2);
         const float vx = 10.0f, vy = 15.0f, g = 9.81f;
-        int s = physics_world_add_sphere (&w2, 0.1f, 1.0f, (vector3){0.0f, 1.0f, 0.0f});
-        w2.bodies [s].velocity = (vector3){vx, vy, 0.0f};
+        int s = physics_world_add_sphere (&w2, 0.1f, 1.0f, (vector3) {0.0f, 1.0f, 0.0f});
+        w2.bodies [s].velocity = (vector3) {vx, vy, 0.0f};
         rigidbody_wake (&w2.bodies [s]);
         const float dt = 1.0f / 60.0f;
         float apex = 0.0f;
@@ -123,18 +123,18 @@ int main (void) {
         for (int t = 0; t < 500; t++) {
             physics_world_step (&w2, dt);
             rigidbody *b = &w2.bodies [s];
-            fail |= check_finite ("projectile_drag099", b->position);
-            if (b->position.y > apex) {
-                apex = b->position.y;
+            fail |= check_finite ("projectile_drag099", b -> position);
+            if (b -> position.y > apex) {
+                apex = b -> position.y;
             }
             float texact = (float) (t + 1) * dt;
             /* For drag=0.99, compare against drag=1 exact parabola as reference.
              * The trajectory should be LOWER (damped) but smooth. */
             float y_drag1 = 1.0f + vy * texact - 0.5f * g * texact * texact;
-            float y_error = fabsf (b->position.y - y_drag1);
+            float y_error = fabsf (b -> position.y - y_drag1);
             if (y_error > max_y_error)
                 max_y_error = y_error;
-            if (b->position.y < 0.15f)
+            if (b -> position.y < 0.15f)
                 break;
         }
         float apex_e = 1.0f + vy * vy / (2.0f * g);
@@ -165,15 +165,15 @@ int main (void) {
         physics_world w3;
         physics_world_init (&w3);
         constraint_pool_init (&w3);
-        int s = physics_world_add_sphere (&w3, 0.5f, 1.0f, (vector3){0.0f, 10.0f, 0.0f});
-        w3.bodies [s].velocity = (vector3){0.0f, 0.0f, 0.0f};
+        int s = physics_world_add_sphere (&w3, 0.5f, 1.0f, (vector3) {0.0f, 10.0f, 0.0f});
+        w3.bodies [s].velocity = (vector3) {0.0f, 0.0f, 0.0f};
         rigidbody_wake (&w3.bodies [s]);
         const float dt = 1.0f / 60.0f;
         float t_land = 0.0f;
         for (int t = 0; t < 800; t++) {
             physics_world_step (&w3, dt);
             rigidbody *b = &w3.bodies [s];
-            if (b->position.y <= 0.55f) { /* radius = 0.5, floor at y=0 */
+            if (b -> position.y <= 0.55f) { /* radius = 0.5, floor at y=0 */
                 t_land = (float) (t + 1) * dt;
                 break;
             }
@@ -199,8 +199,8 @@ int main (void) {
         physics_world w4;
         physics_world_init (&w4);
         constraint_pool_init (&w4);
-        int s = physics_world_add_sphere (&w4, 0.1f, 1.0f, (vector3){0.0f, 5.0f, 0.0f});
-        w4.bodies [s].velocity = (vector3){7.0f, 0.0f, 3.0f};
+        int s = physics_world_add_sphere (&w4, 0.1f, 1.0f, (vector3) {0.0f, 5.0f, 0.0f});
+        w4.bodies [s].velocity = (vector3) {7.0f, 0.0f, 3.0f};
         rigidbody_wake (&w4.bodies [s]);
         const float dt = 1.0f / 60.0f;
         float max_x_err = 0.0f, max_z_err = 0.0f;
@@ -210,8 +210,8 @@ int main (void) {
             double texact = (double) (t + 1) / 60.0;
             double x_exact = 7.0 * texact;
             double z_exact = 3.0 * texact;
-            float x_err = (float) fabs ((double) b->position.x - x_exact);
-            float z_err = (float) fabs ((double) b->position.z - z_exact);
+            float x_err = (float) fabs ((double) b -> position.x - x_exact);
+            float z_err = (float) fabs ((double) b -> position.z - z_exact);
             if (x_err > max_x_err)
                 max_x_err = x_err;
             if (z_err > max_z_err)
@@ -236,18 +236,18 @@ int main (void) {
         physics_world w5;
         physics_world_init (&w5);
         constraint_pool_init (&w5);
-        int s = physics_world_add_sphere (&w5, 0.5f, 2.0f, (vector3){0.0f, 5.0f, 0.0f});
-        w5.bodies [s].velocity = (vector3){3.0f, 8.0f, -2.0f};
-        w5.bodies [s].angular_velocity = (vector3){4.0f, -1.0f, 2.0f};
+        int s = physics_world_add_sphere (&w5, 0.5f, 2.0f, (vector3) {0.0f, 5.0f, 0.0f});
+        w5.bodies [s].velocity = (vector3) {3.0f, 8.0f, -2.0f};
+        w5.bodies [s].angular_velocity = (vector3) {4.0f, -1.0f, 2.0f};
         rigidbody_wake (&w5.bodies [s]);
         const float dt = 1.0f / 60.0f;
         float E0 = -1.0f, E_max = 0.0f, E_min = 1e9f;
         for (int t = 0; t < 3600; t++) { /* 60 seconds */
             physics_world_step (&w5, dt);
             rigidbody *b = &w5.bodies [s];
-            if (b->position.y < 0.6f)
+            if (b -> position.y < 0.6f)
                 break; /* landed */
-            float E = rb_get_kinetic_energy (b) + b->mass * 9.81f * b->position.y;
+            float E = rb_get_kinetic_energy (b) + b -> mass * 9.81f * b -> position.y;
             if (E0 < 0.0f)
                 E0 = E;
             E_max = fmaxf (E_max, E);

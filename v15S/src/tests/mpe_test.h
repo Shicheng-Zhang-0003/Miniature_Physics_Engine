@@ -64,9 +64,9 @@ typedef struct {
 /* Non-degenerate config = a config with a working solver in it. These are the
  * fields whose zero value silently disables physics rather than failing. */
 static inline int mpe_cfg_is_degenerate (const mpe_config_t *c) {
-    return (c == NULL) || (c->timestep.solver_iterations < 1) || !(c->solver.penetration_slop > 0.0f) ||
-           !(c->solver.bias_factor > 0.0f) || !(c->timestep.max_substeps >= 1) ||
-           !(c->body_defaults.sphere_restitution > 0.0f) || !(c->body_defaults.sphere_fric_s > 0.0f);
+    return (c == NULL) || (c -> timestep.solver_iterations < 1) || !(c -> solver.penetration_slop > 0.0f) ||
+           !(c -> solver.bias_factor > 0.0f) || !(c -> timestep.max_substeps >= 1) ||
+           !(c -> body_defaults.sphere_restitution > 0.0f) || !(c -> body_defaults.sphere_fric_s > 0.0f);
 }
 /* Apply a named regime. Regimes exist so the suite can be run across a spread
  * of configurations: a physics invariant that holds at one setting and not
@@ -84,7 +84,7 @@ typedef struct {
 static inline const mpe_regime_t *mpe_regime_lookup (const char *name) {
     static const mpe_regime_t regimes [] = {
         {"default", -1, 1.00f, 1.00f, -1.0f, -1}, {"light", 8, 0.25f, 0.50f, 0.10f, 0},
-        {"heavy", 128, 3.00f, 2.00f, 0.80f, 1},   {"brittle", 64, 1.00f, 0.25f, 0.00f, 0},
+        {"heavy", 128, 3.00f, 2.00f, 0.80f, 1}, {"brittle", 64, 1.00f, 0.25f, 0.00f, 0},
         {"sticky", 64, 1.00f, 4.00f, 0.95f, 1},
     };
     const int n = (int) (sizeof (regimes) / sizeof (regimes [0]));
@@ -99,29 +99,29 @@ static inline const mpe_regime_t *mpe_regime_lookup (const char *name) {
 static inline int mpe_regime_apply (const mpe_regime_t *r) {
     if (!r)
         return 0;
-    if (r->iterations >= 0)
-        g_cfg.timestep.solver_iterations = (float) r->iterations;
+    if (r -> iterations >= 0)
+        g_cfg.timestep.solver_iterations = (float) r -> iterations;
     if (g_cfg.world.gravity != 0.0f)
-        g_cfg.world.gravity *= r->gravity_mult;
+        g_cfg.world.gravity *= r -> gravity_mult;
     if (g_cfg.body_defaults.sphere_fric_s > 0.0f) {
-        g_cfg.body_defaults.sphere_fric_s *= r->friction_mult;
-        g_cfg.body_defaults.cube_fric_s *= r->friction_mult;
-        g_cfg.body_defaults.cylinder_fric_s *= r->friction_mult;
-        g_cfg.world.floor_friction_s *= r->friction_mult;
+        g_cfg.body_defaults.sphere_fric_s *= r -> friction_mult;
+        g_cfg.body_defaults.cube_fric_s *= r -> friction_mult;
+        g_cfg.body_defaults.cylinder_fric_s *= r -> friction_mult;
+        g_cfg.world.floor_friction_s *= r -> friction_mult;
     }
-    if (r->restitution >= 0.0f) {
-        g_cfg.body_defaults.sphere_restitution = r->restitution;
-        g_cfg.body_defaults.cube_restitution = r->restitution;
-        g_cfg.body_defaults.cylinder_restitution = r->restitution;
+    if (r -> restitution >= 0.0f) {
+        g_cfg.body_defaults.sphere_restitution = r -> restitution;
+        g_cfg.body_defaults.cube_restitution = r -> restitution;
+        g_cfg.body_defaults.cylinder_restitution = r -> restitution;
     }
-    if (r->sleep >= 0)
-        g_cfg.sleep.enable = r->sleep;
+    if (r -> sleep >= 0)
+        g_cfg.sleep.enable = r -> sleep;
     return 1;
 }
 static inline void mpe_test_begin (mpe_test_t *t, const char *name) {
-    t->name = name;
-    t->failures = 0;
-    t->checks = 0;
+    t -> name = name;
+    t -> failures = 0;
+    t -> checks = 0;
     /* Establish, then apply the requested regime, THEN save. Saving before
      * establishing is what let a zeroed g_cfg survive every test. */
     mpe_config_init ();
@@ -130,12 +130,12 @@ static inline void mpe_test_begin (mpe_test_t *t, const char *name) {
         const mpe_regime_t *r = mpe_regime_lookup (regime);
         if (r)
             mpe_regime_apply (r);
-        t->regime = r ? r->name : "INVALID";
+        t -> regime = r ? r -> name : "INVALID";
     } else {
-        t->regime = "default";
+        t -> regime = "default";
     }
-    t->cfg_saved = g_cfg;
-    t->cfg_active = 1;
+    t -> cfg_saved = g_cfg;
+    t -> cfg_active = 1;
     det_fallback_reset ();
 }
 /* DESPOT-2026-09-29: the header claimed "determinism counters asserted zero"
@@ -146,16 +146,16 @@ static inline int mpe_det_fallbacks_used (void) {
     return (int) (det_fallback_pow_total () + det_fallback_trig_total ());
 }
 static inline void mpe_test_end (mpe_test_t *t) {
-    if (t->cfg_active) {
+    if (t -> cfg_active) {
         if (mpe_det_fallbacks_used () != 0) {
-            t->failures++;
+            t -> failures++;
             printf ("[FAIL] %s: %d libm determinism fallback(s) during test "
                     "(pow=%lu trig=%lu); results are no longer bit-deterministic\n",
-                    t->name ? t->name : "?", mpe_det_fallbacks_used (), (unsigned long) det_fallback_pow_total (),
+                    t -> name ? t -> name : "?", mpe_det_fallbacks_used (), (unsigned long) det_fallback_pow_total (),
                     (unsigned long) det_fallback_trig_total ());
         }
-        g_cfg = t->cfg_saved;
-        t->cfg_active = 0;
+        g_cfg = t -> cfg_saved;
+        t -> cfg_active = 0;
     }
 }
 /* Return value for a case that could not run. Distinct from any possible
@@ -215,18 +215,18 @@ static inline void mpe_world_begin (physics_world *w) {
     constraint_pool_init (w);
 }
 static inline int mpe_world_finite (physics_world *w) {
-    for (int i = 0; i < w->body_count; i++) {
-        rigidbody *b = &w->bodies [i];
+    for (int i = 0; i < w -> body_count; i++) {
+        rigidbody *b = &w -> bodies [i];
         /* DESPOT-2026-09-29: the ORIENTATION was not checked. A NaN quaternion
          * poisons every contact lever arm in the next tick while position and
          * velocity stay perfectly finite, so this whole function reported a
          * corrupted world as clean. The MFS harness (mfs_test.h) already had
          * the check; the MPE harness was the un-fixed copy. */
-        if (!isfinite (b->position.x) || !isfinite (b->position.y) || !isfinite (b->position.z) ||
-            !isfinite (b->velocity.x) || !isfinite (b->velocity.y) || !isfinite (b->velocity.z) ||
-            !isfinite (b->angular_velocity.x) || !isfinite (b->angular_velocity.y) ||
-            !isfinite (b->angular_velocity.z) || !isfinite (b->orientation.w) || !isfinite (b->orientation.x) ||
-            !isfinite (b->orientation.y) || !isfinite (b->orientation.z)) {
+        if (!isfinite (b -> position.x) || !isfinite (b -> position.y) || !isfinite (b -> position.z) ||
+            !isfinite (b -> velocity.x) || !isfinite (b -> velocity.y) || !isfinite (b -> velocity.z) ||
+            !isfinite (b -> angular_velocity.x) || !isfinite (b -> angular_velocity.y) ||
+            !isfinite (b -> angular_velocity.z) || !isfinite (b -> orientation.w) || !isfinite (b -> orientation.x) ||
+            !isfinite (b -> orientation.y) || !isfinite (b -> orientation.z)) {
             return 0;
         }
     }
@@ -248,13 +248,13 @@ static inline int mpe_step (physics_world *w, int n, float dt) {
  * with per-body material combine (this is what friction_stop,
  * static_hold and determinism already used). */
 static inline int mpe_floor_slab (physics_world *w, float mus, float muk, float e) {
-    int f = physics_world_add_cube (w, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
+    int f = physics_world_add_cube (w, (vector3) {0.0f, -0.5f, 0.0f}, (vector3) {10.0f, 0.5f, 10.0f}, 0.0f);
     if (f < 0) {
         return -1;
     }
-    w->bodies [f].friction_static = mus;
-    w->bodies [f].friction_kinetic = muk;
-    w->bodies [f].restitution = e;
+    w -> bodies [f].friction_static = mus;
+    w -> bodies [f].friction_kinetic = muk;
+    w -> bodies [f].restitution = e;
     return f;
 }
 /* Infinite solver plane at y=0 with synced friction. The plane body reads
@@ -263,9 +263,9 @@ static inline int mpe_floor_slab (physics_world *w, float mus, float muk, float 
 static inline void mpe_floor_plane (physics_world *w, float mus, float muk) {
     g_cfg.world.floor_friction_s = mus;
     g_cfg.world.floor_friction_k = muk;
-    w->static_plane_enabled = true;
-    w->static_plane_body.friction_static = mus;
-    w->static_plane_body.friction_kinetic = muk;
+    w -> static_plane_enabled = true;
+    w -> static_plane_body.friction_static = mus;
+    w -> static_plane_body.friction_kinetic = muk;
 }
 /* DESPOT-2026-10-04 [CLAMP-TAUTOLOGY closure]: bind a per-world config copy
  * with the world-edge safety net OFF. With the net on, a rest-height gate is
@@ -276,13 +276,13 @@ static inline void mpe_floor_plane (physics_world *w, float mus, float muk) {
  * caller's mpe_config_t slot must outlive the stepping loop. */
 static inline void mpe_world_no_net (physics_world *w, mpe_config_t *slot) {
     *slot = g_cfg;
-    slot->boundary.safety_net_enabled = 0;
+    slot -> boundary.safety_net_enabled = 0;
     physics_world_set_config (w, slot);
 }
 /* Contact evidence: world.has_contact[i] flags bodies that generated a
  * manifold on the CURRENT tick. A clamp-held body never flags. */
 static inline int mpe_body_in_contact (const physics_world *w, int idx) {
-    return (w && w->has_contact && idx >= 0 && idx < w->body_count) ? (w->has_contact [idx] != 0) : 0;
+    return (w && w -> has_contact && idx >= 0 && idx < w -> body_count) ? (w -> has_contact [idx] != 0) : 0;
 }
 static inline float mpe_vlen (vector3 v) {
     return vector3_length (v);

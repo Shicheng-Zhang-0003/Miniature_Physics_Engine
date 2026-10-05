@@ -17,9 +17,9 @@ int main (void) {
     physics_world_init (&world);
     world.static_plane_enabled = true;
     constraint_pool_init (&world);
-    int s = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){-8.0f, 0.5f, 0.0f});
-    world.bodies [s].velocity = (vector3){2.0f, 0.0f, 0.0f};
-    world.bodies [s].angular_velocity = (vector3){0.0f, 0.0f, -4.0f};
+    int s = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3) {-8.0f, 0.5f, 0.0f});
+    world.bodies [s].velocity = (vector3) {2.0f, 0.0f, 0.0f};
+    world.bodies [s].angular_velocity = (vector3) {0.0f, 0.0f, -4.0f};
     rigidbody_wake (&world.bodies [s]);
     const float dt = 1.0f / 60.0f;
     for (int t = 0; t < 480; t++) {

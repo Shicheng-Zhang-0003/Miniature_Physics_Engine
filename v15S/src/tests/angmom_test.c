@@ -8,10 +8,10 @@
 #include "physics/constraint.h"
 #include "config/mpe_config.h"
 static vector3 body_l (rigidbody *rb) {
-    math3 r = vector4_to_math3 (rb->orientation);
+    math3 r = vector4_to_math3 (rb -> orientation);
     math3 rt = math3_transposition (r);
-    math3 iw = math3_multiplication (r, math3_multiplication (rb->inertia_tensor_local, rt));
-    return math3_multiplication_vector3 (iw, rb->angular_velocity);
+    math3 iw = math3_multiplication (r, math3_multiplication (rb -> inertia_tensor_local, rt));
+    return math3_multiplication_vector3 (iw, rb -> angular_velocity);
 }
 int main (void) {
     mpe_config_init ();
@@ -21,8 +21,8 @@ int main (void) {
     physics_world_init (&world);
     constraint_pool_init (&world);
     /* Distinct half extents => fully populated inertia tensor. */
-    int b = physics_world_add_cube (&world, (vector3){0.0f, 50.0f, 0.0f}, (vector3){0.3f, 0.5f, 0.7f}, 2.0f);
-    world.bodies [b].angular_velocity = (vector3){1.0f, 3.0f, 2.0f};
+    int b = physics_world_add_cube (&world, (vector3) {0.0f, 50.0f, 0.0f}, (vector3) {0.3f, 0.5f, 0.7f}, 2.0f);
+    world.bodies [b].angular_velocity = (vector3) {1.0f, 3.0f, 2.0f};
     rigidbody_wake (&world.bodies [b]);
     vector3 l0 = body_l (&world.bodies [b]);
     float l0n = vector3_length (l0);

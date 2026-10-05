@@ -59,7 +59,7 @@ static void *saw_bp_state = NULL;
 static int fake_generate (mpe_world_t *world, broadphase_pair *pairs_out, int max_pairs, float dt, void *mod_state) {
     saw_bp_state = mod_state;
     /* Delegate to the real backend so manifolds exist for resolve. */
-    extern int broadphase_generate_pairing (mpe_world_t * world, broadphase_pair * out, int max, float dt);
+    extern int broadphase_generate_pairing (mpe_world_t *world, broadphase_pair *out, int max, float dt);
     return broadphase_generate_pairing (world, pairs_out, max_pairs, dt);
 }
 static bool fake_sphere (rigidbody *a, rigidbody *b, void *out, mpe_world_t *w) {
@@ -103,7 +103,7 @@ int mpe_t_loader_lifecycle (void) {
         physics_world_set_solver_state (&w, &sentinel);
         /* Resting contact -> manifold -> foreign resolve runs with state. */
         MPE_CHECK (&t, mpe_floor_slab (&w, 0.4f, 0.3f, 0.0f) >= 0);
-        MPE_CHECK (&t, physics_world_add_sphere (&w, 0.3f, 1.0f, (vector3){0.0f, 0.3f, 0.0f}) >= 0);
+        MPE_CHECK (&t, physics_world_add_sphere (&w, 0.3f, 1.0f, (vector3) {0.0f, 0.3f, 0.0f}) >= 0);
         saw_state = 0;
         saw_ptr = NULL;
         saw_bp_state = NULL;
@@ -147,20 +147,20 @@ int mpe_t_loader_lifecycle (void) {
             if (capfn) {
                 physics_world cw;
                 mpe_world_begin (&cw);
-                int ci = physics_world_add_custom (&cw, 100, (vector3){0.0f, 0.0f, 0.0f}, 1.0f, 0.2236068f);
+                int ci = physics_world_add_custom (&cw, 100, (vector3) {0.0f, 0.0f, 0.0f}, 1.0f, 0.2236068f);
                 MPE_CHECK (&t, ci >= 0);
                 MPE_CHECK_NEAR (&t, cw.bodies [ci].radius, 0.2236068f, 1e-6f, "bounding-kept");
                 cw.bodies [ci].cylinder_half_length = 0.2f;
                 cw.bodies [ci].orientation = vector4_identity ();
                 rigidbody_update_axes (&cw.bodies [ci]);
-                int si = physics_world_add_sphere (&cw, 0.1f, 1.0f, (vector3){0.0f, 0.15f, 0.0f});
+                int si = physics_world_add_sphere (&cw, 0.1f, 1.0f, (vector3) {0.0f, 0.15f, 0.0f});
                 MPE_CHECK (&t, si >= 0);
                 collision_data cd = {0};
                 MPE_CHECK (&t, capfn (&cw.bodies [ci], &cw.bodies [si], &cd, &cw));
                 MPE_CHECK_NEAR (&t, cd.contacts [0].penetration, 0.05f, 1e-5f, "capsule-pen");
                 MPE_CHECK_NEAR (&t, cd.normal_vector.y, 1.0f, 1e-5f, "capsule-normal");
                 MPE_CHECK_NEAR (&t, cd.contacts [0].position.y, 0.1f, 1e-5f, "capsule-pos");
-                cw.bodies [si].position = (vector3){0.0f, 0.25f, 0.0f};
+                cw.bodies [si].position = (vector3) {0.0f, 0.25f, 0.0f};
                 memset (&cd, 0, sizeof (cd));
                 MPE_CHECK (&t, !capfn (&cw.bodies [ci], &cw.bodies [si], &cd, &cw));
                 physics_world_cleanup (&cw);

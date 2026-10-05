@@ -32,10 +32,10 @@ static bool probe_custom_fn (rigidbody *a, rigidbody *b, void *out, mpe_world_t 
     (void) b;
     (void) w;
     collision_data *cd = (collision_data *) out;
-    cd->object_a = a;
-    cd->object_b = a;
-    cd->normal_vector = (vector3){0.0f, 0.0f, 1.0f};
-    cd->contact_count = 0;
+    cd -> object_a = a;
+    cd -> object_b = a;
+    cd -> normal_vector = (vector3) {0.0f, 0.0f, 1.0f};
+    cd -> contact_count = 0;
     probe_custom_hit = true;
     return true;
 }
@@ -46,7 +46,7 @@ static float test_count_resolve (mpe_world_t *world, void *manifold, float dt, b
     if (test_counting_solver_calls) {
         (*test_counting_solver_calls)++;
     }
-    const mpe_config_t *C = (world && world->cfg) ? world->cfg : &g_cfg;
+    const mpe_config_t *C = (world && world -> cfg) ? world -> cfg : &g_cfg;
     return collision_resolve_iterative ((collision_data *) manifold, dt, friction_only, iter, C);
 }
 static const mpe_solver_if_t test_counting_solver = {test_count_resolve, NULL, NULL, NULL};
@@ -64,11 +64,11 @@ int mpe_module_test_main (void) {
     cfgB.world.gravity = -20.0f;
     physics_world_set_config (&A, &cfgA);
     physics_world_set_config (&B, &cfgB);
-    if (mpe_world_cfg (&A)->world.gravity != -1.0f) {
+    if (mpe_world_cfg (&A) -> world.gravity != -1.0f) {
         printf ("[FAIL] cfg A\n");
         return 1;
     }
-    if (mpe_world_cfg (&B)->world.gravity != -20.0f) {
+    if (mpe_world_cfg (&B) -> world.gravity != -20.0f) {
         printf ("[FAIL] cfg B\n");
         return 1;
     }
@@ -92,8 +92,8 @@ int mpe_module_test_main (void) {
     }
     printf ("[PASS] builtin pair/broadphase/solver registry\n");
     /* 3. shape dispatch equivalence: sphere-sphere via registry == direct */
-    int ia = physics_world_add_sphere (&A, 0.5f, 1.0f, (vector3){0, 2, 0});
-    int ib = physics_world_add_sphere (&A, 0.5f, 1.0f, (vector3){0, 2.4f, 0});
+    int ia = physics_world_add_sphere (&A, 0.5f, 1.0f, (vector3) {0, 2, 0});
+    int ib = physics_world_add_sphere (&A, 0.5f, 1.0f, (vector3) {0, 2.4f, 0});
     (void) ia;
     (void) ib;
     collision_data d1 = {0}, d2 = {0};
@@ -115,13 +115,13 @@ int mpe_module_test_main (void) {
     }
     printf ("[PASS] shape dispatch matches builtin\n");
     /* 4. custom shape add + dispatch (bounding-sphere fallback) */
-    int ic = physics_world_add_custom (&A, 100, (vector3){5, 2, 0}, 1.0f, 0.5f);
+    int ic = physics_world_add_custom (&A, 100, (vector3) {5, 2, 0}, 1.0f, 0.5f);
     if (ic < 0 || A.bodies [ic].type != object_custom) {
         printf ("[FAIL] add_custom\n");
         return 1;
     }
     /* place overlapping a sphere to force contact */
-    A.bodies [ic].position = (vector3){0, 2.2f, 0};
+    A.bodies [ic].position = (vector3) {0, 2.2f, 0};
     rigidbody_sanitize (&A.bodies [ic]);
     if (A.bodies [ic].type != object_custom) {
         printf ("[FAIL] sanitize reset custom\n");
@@ -167,7 +167,7 @@ int mpe_module_test_main (void) {
         physics_world W;
         physics_world_init (&W);
         for (int i = 0; i < 600; i++) {
-            physics_world_add_sphere (&W, 0.3f, 1.0f, (vector3){(float) (i % 20), 2.0f + (float) (i / 20), 0});
+            physics_world_add_sphere (&W, 0.3f, 1.0f, (vector3) {(float) (i % 20), 2.0f + (float) (i / 20), 0});
         }
         if (W.body_capacity < 600 || W.body_count != 600) {
             printf ("[FAIL] pool growth cap=%d count=%d\n", W.body_capacity, W.body_count);
@@ -199,7 +199,7 @@ int mpe_module_test_main (void) {
         det_fallback_reset ();
         physics_world W;
         physics_world_init (&W);
-        physics_world_add_sphere (&W, 0.5f, 1.0f, (vector3){0, 5, 0});
+        physics_world_add_sphere (&W, 0.5f, 1.0f, (vector3) {0, 5, 0});
         for (int t = 0; t < 600; t++)
             physics_world_step (&W, 1.0f / 60.0f);
         if (det_fallback_pow_total () != 0 || det_fallback_trig_total () != 0) {
@@ -216,8 +216,8 @@ int mpe_module_test_main (void) {
         physics_world_init (&W);
         static mpe_config_t cfgW;
         cfgW = g_cfg;
-        physics_world_add_sphere (&W, 0.5f, 1.0f, (vector3){0, 2, 0});
-        physics_world_add_sphere (&W, 0.5f, 1.0f, (vector3){0, 3.005f, 0}); /* 5mm gap */
+        physics_world_add_sphere (&W, 0.5f, 1.0f, (vector3) {0, 2, 0});
+        physics_world_add_sphere (&W, 0.5f, 1.0f, (vector3) {0, 3.005f, 0}); /* 5mm gap */
         collision_data dd = {0};
         cfgW.solver.penetration_slop = 0.01f;
         bool hit_slop = collision_dual_sphere (&W.bodies [0], &W.bodies [1], &dd, &cfgW);
@@ -237,8 +237,8 @@ int mpe_module_test_main (void) {
         int resolve_calls = 0;
         physics_world W;
         physics_world_init (&W);
-        physics_world_add_cube (&W, (vector3){0, 0.5f, 0}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
-        physics_world_add_cube (&W, (vector3){0, 1.5f, 0}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
+        physics_world_add_cube (&W, (vector3) {0, 0.5f, 0}, (vector3) {0.5f, 0.5f, 0.5f}, 1.0f);
+        physics_world_add_cube (&W, (vector3) {0, 1.5f, 0}, (vector3) {0.5f, 0.5f, 0.5f}, 1.0f);
         physics_world_set_solver (&W, &test_counting_solver);
         resolve_calls = 0;
         test_counting_solver_calls = &resolve_calls;

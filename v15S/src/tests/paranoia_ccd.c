@@ -18,10 +18,10 @@ int main (void) {
         g_cfg.world.gravity = 0.0f;
         g_cfg.world.drag = 1.0f;
         /* Thin wall: 0.05m thick */
-        int wall = physics_world_add_cube (&world, (vector3){0.0f, 0.0f, 0.0f}, (vector3){0.025f, 5.0f, 5.0f}, 0.0f);
+        int wall = physics_world_add_cube (&world, (vector3) {0.0f, 0.0f, 0.0f}, (vector3) {0.025f, 5.0f, 5.0f}, 0.0f);
         world.bodies [wall].restitution = 0.0f;
-        int sphere = physics_world_add_sphere (&world, 0.1f, 1.0f, (vector3){-2.0f, 0.0f, 0.0f});
-        world.bodies [sphere].velocity = (vector3){144.0f, 0.0f, 0.0f};
+        int sphere = physics_world_add_sphere (&world, 0.1f, 1.0f, (vector3) {-2.0f, 0.0f, 0.0f});
+        world.bodies [sphere].velocity = (vector3) {144.0f, 0.0f, 0.0f};
         world.bodies [sphere].restitution = 0.0f;
         rigidbody_wake (&world.bodies [sphere]);
         const float dt = 1.0f / 60.0f;
@@ -49,10 +49,10 @@ int main (void) {
         constraint_pool_init (&world);
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 1.0f;
-        int floor = physics_world_add_cube (&world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
+        int floor = physics_world_add_cube (&world, (vector3) {0.0f, -0.5f, 0.0f}, (vector3) {10.0f, 0.5f, 10.0f}, 0.0f);
         world.bodies [floor].restitution = 0.0f;
-        int sphere = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0.0f, 50.0f, 0.0f});
-        world.bodies [sphere].velocity = (vector3){0.0f, -60.0f, 0.0f};
+        int sphere = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3) {0.0f, 50.0f, 0.0f});
+        world.bodies [sphere].velocity = (vector3) {0.0f, -60.0f, 0.0f};
         world.bodies [sphere].restitution = 0.0f;
         rigidbody_wake (&world.bodies [sphere]);
         const float dt = 1.0f / 60.0f;
@@ -84,10 +84,10 @@ int main (void) {
         constraint_pool_init (&world);
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 1.0f;
-        int floor = physics_world_add_cube (&world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){5.0f, 0.5f, 5.0f}, 0.0f);
+        int floor = physics_world_add_cube (&world, (vector3) {0.0f, -0.5f, 0.0f}, (vector3) {5.0f, 0.5f, 5.0f}, 0.0f);
         world.bodies [floor].restitution = 0.0f;
-        int cyl = physics_world_add_cylinder (&world, 0.3f, 0.5f, 1.0f, (vector3){0.0f, 2.0f, 0.0f});
-        world.bodies [cyl].angular_velocity = (vector3){0.0f, 0.0f, 100.0f}; /* fast spin */
+        int cyl = physics_world_add_cylinder (&world, 0.3f, 0.5f, 1.0f, (vector3) {0.0f, 2.0f, 0.0f});
+        world.bodies [cyl].angular_velocity = (vector3) {0.0f, 0.0f, 100.0f}; /* fast spin */
         world.bodies [cyl].restitution = 0.0f;
         rigidbody_wake (&world.bodies [cyl]);
         const float dt = 1.0f / 60.0f;
@@ -115,10 +115,10 @@ int main (void) {
         constraint_pool_init (&world);
         g_cfg.world.gravity = 0.0f;
         g_cfg.world.drag = 1.0f;
-        int a = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){-5.0f, 0.0f, 0.0f});
-        int b = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){5.0f, 0.0f, 0.0f});
-        world.bodies [a].velocity = (vector3){80.0f, 0.0f, 0.0f};
-        world.bodies [b].velocity = (vector3){-80.0f, 0.0f, 0.0f};
+        int a = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3) {-5.0f, 0.0f, 0.0f});
+        int b = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3) {5.0f, 0.0f, 0.0f});
+        world.bodies [a].velocity = (vector3) {80.0f, 0.0f, 0.0f};
+        world.bodies [b].velocity = (vector3) {-80.0f, 0.0f, 0.0f};
         world.bodies [a].restitution = 1.0f;
         world.bodies [b].restitution = 1.0f;
         world.bodies [a].friction_static = world.bodies [b].friction_static = 0.0f;
@@ -158,9 +158,9 @@ int main (void) {
         constraint_pool_init (&world);
         g_cfg.world.gravity = -9.81f;
         g_cfg.world.drag = 1.0f;
-        int wall = physics_world_add_cube (&world, (vector3){0.0f, 0.0f, 0.0f}, (vector3){0.025f, 20.0f, 5.0f}, 0.0f);
-        int sphere = physics_world_add_sphere (&world, 0.1f, 1.0f, (vector3){-0.2f, 10.0f, 0.0f});
-        world.bodies [sphere].velocity = (vector3){20.0f, -3.0f, 0.0f};
+        int wall = physics_world_add_cube (&world, (vector3) {0.0f, 0.0f, 0.0f}, (vector3) {0.025f, 20.0f, 5.0f}, 0.0f);
+        int sphere = physics_world_add_sphere (&world, 0.1f, 1.0f, (vector3) {-0.2f, 10.0f, 0.0f});
+        world.bodies [sphere].velocity = (vector3) {20.0f, -3.0f, 0.0f};
         world.bodies [sphere].restitution = 0.0f;
         rigidbody_wake (&world.bodies [sphere]);
         const float dt = 1.0f / 60.0f;
