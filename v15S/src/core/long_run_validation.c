@@ -88,20 +88,20 @@ void long_run_validation_cancel_restore (void) {
     long_run_validation_is_torture = 0;
 }
 static int a3_task13_body_is_invalid (rigidbody *rigid_body) {
-    if ((!isfinite (rigid_body->position.x)) || (!isfinite (rigid_body->position.y)) ||
-        (!isfinite (rigid_body->position.z))) {
+    if ((!isfinite (rigid_body -> position.x)) || (!isfinite (rigid_body -> position.y)) ||
+        (!isfinite (rigid_body -> position.z))) {
         return 1;
     }
-    if ((!isfinite (rigid_body->velocity.x)) || (!isfinite (rigid_body->velocity.y)) ||
-        (!isfinite (rigid_body->velocity.z))) {
+    if ((!isfinite (rigid_body -> velocity.x)) || (!isfinite (rigid_body -> velocity.y)) ||
+        (!isfinite (rigid_body -> velocity.z))) {
         return 1;
     }
-    if ((!isfinite (rigid_body->angular_velocity.x)) || (!isfinite (rigid_body->angular_velocity.y)) ||
-        (!isfinite (rigid_body->angular_velocity.z))) {
+    if ((!isfinite (rigid_body -> angular_velocity.x)) || (!isfinite (rigid_body -> angular_velocity.y)) ||
+        (!isfinite (rigid_body -> angular_velocity.z))) {
         return 1;
     }
-    if ((!isfinite (rigid_body->orientation.w)) || (!isfinite (rigid_body->orientation.x)) ||
-        (!isfinite (rigid_body->orientation.y)) || (!isfinite (rigid_body->orientation.z))) {
+    if ((!isfinite (rigid_body -> orientation.w)) || (!isfinite (rigid_body -> orientation.x)) ||
+        (!isfinite (rigid_body -> orientation.y)) || (!isfinite (rigid_body -> orientation.z))) {
         return 1;
     }
     return 0;
@@ -115,11 +115,11 @@ static void long_run_validation_report (void) {
     if (long_run_validation_is_torture) {
         /* F11 robustness: survived extremes without corruption. Speeds
          * reported above for the operator, never gated. */
-        pass = ((physics_world_get_primary ()->body_count) > 0) && (long_run_validation_nan_count == 0) &&
+        pass = ((physics_world_get_primary () -> body_count) > 0) && (long_run_validation_nan_count == 0) &&
                (long_run_validation_fallen_count == 0);
     } else {
         /* F10 stability at defaults: must settle and stay calm. */
-        pass = ((physics_world_get_primary ()->body_count) > 0) && (long_run_validation_nan_count == 0) &&
+        pass = ((physics_world_get_primary () -> body_count) > 0) && (long_run_validation_nan_count == 0) &&
                (long_run_validation_fallen_count == 0) && (long_run_validation_last_max_linear_speed < 0.25f) &&
                (long_run_validation_last_max_angular_speed < 0.5f) && (long_run_validation_max_linear_speed < 2.0f) &&
                (long_run_validation_max_angular_speed < 4.0f);
@@ -128,7 +128,7 @@ static void long_run_validation_report (void) {
     printf ("[A3] mode: %s\n",
             long_run_validation_is_torture ? "torture (corruption gates only)" : "validation (full settle gates)");
     printf ("[A3] duration_ticks=%d objects=%d sleeping=%d awake=%d\n", long_run_validation_total_ticks,
-            (physics_world_get_primary ()->body_count), long_run_validation_final_sleeping_count,
+            (physics_world_get_primary () -> body_count), long_run_validation_final_sleeping_count,
             long_run_validation_final_awake_count);
     printf ("[A3] final max speed: linear=%.6f angular=%.6f\n", long_run_validation_last_max_linear_speed,
             long_run_validation_last_max_angular_speed);
@@ -193,8 +193,8 @@ static void long_run_validation_evaluate (void) {
     int current_awake_count = 0;
     int current_fallen_count = 0;
     int current_nan_count = 0;
-    for (int object_index = 0; object_index < (physics_world_get_primary ()->body_count); object_index++) {
-        rigidbody *rigid_body = &(physics_world_get_primary ()->bodies) [object_index];
+    for (int object_index = 0; object_index < (physics_world_get_primary () -> body_count); object_index++) {
+        rigidbody *rigid_body = &(physics_world_get_primary () -> bodies)[object_index];
         if (a3_task13_body_is_invalid (rigid_body)) {
             current_nan_count++;
             continue;
@@ -205,7 +205,7 @@ static void long_run_validation_evaluate (void) {
          * floor_y - 1m (a full meter of free fall past the safety net, past
          * any floor_emergency_slop tolerance). */
         const float floor_y = 0.0f;
-        if (rigid_body->position.y < floor_y - 1.0f) {
+        if (rigid_body -> position.y < floor_y - 1.0f) {
             current_fallen_count++;
         }
         /* FIX-AUDIT-DESPOT: sleeping/awake asymmetry. The awake branch
@@ -213,13 +213,13 @@ static void long_run_validation_evaluate (void) {
          * nor asleep) but the sleeping branch counted every is_sleeping
          * body including statics, so sleeping+awake != dynamic bodies.
          * Exclude statics here too, mirroring the awake branch. */
-        if (rigid_body->is_sleeping && !rigid_body->static_state) {
+        if (rigid_body -> is_sleeping && !rigid_body -> static_state) {
             current_sleeping_count++;
-        } else if (!rigid_body->static_state) {
+        } else if (!rigid_body -> static_state) {
             current_awake_count++;
         }
-        float linear_speed = vector3_length (rigid_body->velocity);
-        float angular_speed = vector3_length (rigid_body->angular_velocity);
+        float linear_speed = vector3_length (rigid_body -> velocity);
+        float angular_speed = vector3_length (rigid_body -> angular_velocity);
         if (linear_speed > current_max_linear_speed) {
             current_max_linear_speed = linear_speed;
         }

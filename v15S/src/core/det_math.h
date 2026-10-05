@@ -292,13 +292,13 @@ static inline double det_sin (double x) {
     double xr = det_reduce_pi4 (x, &quadrant);
     /* Compute only the needed branch so an out-of-contract xr marks once. */
     switch (quadrant) {
-    case 0:
+        case 0:
         return det_sin_small (xr); /* sin(x) */
-    case 1:
+        case 1:
         return det_cos_small (xr); /* sin(x + pi/2) = cos(x) */
-    case 2:
+        case 2:
         return -det_sin_small (xr); /* sin(x + pi) = -sin(x) */
-    case 3:
+        case 3:
         return -det_cos_small (xr); /* sin(x + 3pi/2) = -cos(x) */
     }
     return det_sin_small (xr); /* unreachable */
@@ -311,13 +311,13 @@ static inline double det_cos (double x) {
     int quadrant = 0;
     double xr = det_reduce_pi4 (x, &quadrant);
     switch (quadrant) {
-    case 0:
+        case 0:
         return det_cos_small (xr); /* cos(x) */
-    case 1:
+        case 1:
         return -det_sin_small (xr); /* cos(x + pi/2) = -sin(x) */
-    case 2:
+        case 2:
         return -det_cos_small (xr); /* cos(x + pi) = -cos(x) */
-    case 3:
+        case 3:
         return det_sin_small (xr); /* cos(x + 3pi/2) = sin(x) */
     }
     return det_cos_small (xr); /* unreachable */
