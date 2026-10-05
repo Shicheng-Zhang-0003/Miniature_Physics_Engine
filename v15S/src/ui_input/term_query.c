@@ -23,8 +23,8 @@ void cmd_stat (int argc, char **argv) {
         term_printf (NULL, "  Size: %zu params    Blocks: 13    IO Block: config\n", g_registry_count);
         term_printf (NULL, "  Mode: (0644/-rw-r--r--)  Uid: 0  Gid: 0\n");
         term_printf (NULL, "  Gravity: %.4f  Drag: %.4f\n", g_cfg.world.gravity, g_cfg.world.drag);
-        term_printf (NULL, "  Objects: %d  Joints: %d  Mode: %s\n", (physics_world_get_primary ()->body_count),
-                     (physics_world_get_primary ()->spring_joint_count),
+        term_printf (NULL, "  Objects: %d  Joints: %d  Mode: %s\n", (physics_world_get_primary () -> body_count),
+                     (physics_world_get_primary () -> spring_joint_count),
                      main_inputs.is_debug_mode_active ? "debug" : "game");
         return;
     }
@@ -51,40 +51,40 @@ void cmd_stat (int argc, char **argv) {
         term_printf ("term_err", "mpe: stat: %s: No such object\n", target);
         return;
     }
-    rigidbody *rb = &(physics_world_get_primary ()->bodies) [object_index];
+    rigidbody *rb = &(physics_world_get_primary () -> bodies)[object_index];
     int joint_count_for_obj = 0;
     for (int ji = 0; ji < mpe_max_joints; ji++) {
-        if (!(physics_world_get_primary ()->spring_joints) [ji].is_active) {
+        if (!(physics_world_get_primary () -> spring_joints)[ji].is_active) {
             continue;
         }
-        int ia = scene_find_object_index_by_id ((physics_world_get_primary ()->spring_joints) [ji].object_id_a);
-        int ib = scene_find_object_index_by_id ((physics_world_get_primary ()->spring_joints) [ji].object_id_b);
+        int ia = scene_find_object_index_by_id ((physics_world_get_primary () -> spring_joints)[ji].object_id_a);
+        int ib = scene_find_object_index_by_id ((physics_world_get_primary () -> spring_joints)[ji].object_id_b);
         if ((ia == object_index) || (ib == object_index)) {
             joint_count_for_obj++;
         }
     }
     term_printf ("term_echo", "  File: /obj/%d\n", object_index);
-    term_printf (NULL, "  Size: %.4f kg    Links: %d    Inode: %u\n", rb->mass, joint_count_for_obj, rb->object_id);
-    term_printf (NULL, "  Access: %s/%s  Mode: %s\n", rb->static_state ? "static" : "dynamic",
-                 rb->is_sleeping ? "sleeping" : "awake", term_object_mode (rb));
+    term_printf (NULL, "  Size: %.4f kg    Links: %d    Inode: %u\n", rb -> mass, joint_count_for_obj, rb -> object_id);
+    term_printf (NULL, "  Access: %s/%s  Mode: %s\n", rb -> static_state ? "static" : "dynamic",
+                 rb -> is_sleeping ? "sleeping" : "awake", term_object_mode (rb));
     term_printf (NULL, "  Type: %s\n", term_object_type_name (rb));
-    if (rb->type == object_sphere) {
-        term_printf (NULL, "  Radius: %.4f\n", rb->radius);
+    if (rb -> type == object_sphere) {
+        term_printf (NULL, "  Radius: %.4f\n", rb -> radius);
     } else {
-        term_printf (NULL, "  HalfExt: (%.4f, %.4f, %.4f)\n", rb->half_extensions.x, rb->half_extensions.y,
-                     rb->half_extensions.z);
+        term_printf (NULL, "  HalfExt: (%.4f, %.4f, %.4f)\n", rb -> half_extensions.x, rb -> half_extensions.y,
+                     rb -> half_extensions.z);
     }
-    term_printf (NULL, "  Position: (%.4f, %.4f, %.4f)\n", rb->position.x, rb->position.y, rb->position.z);
-    term_printf (NULL, "  Velocity: (%.4f, %.4f, %.4f)  |v|=%.4f\n", rb->velocity.x, rb->velocity.y, rb->velocity.z,
-                 vector3_length (rb->velocity));
-    term_printf (NULL, "  AngVel: (%.4f, %.4f, %.4f)  |w|=%.4f\n", rb->angular_velocity.x, rb->angular_velocity.y,
-                 rb->angular_velocity.z, vector3_length (rb->angular_velocity));
-    term_printf (NULL, "  Orient: (%.4f, %.4f, %.4f, %.4f)\n", rb->orientation.w, rb->orientation.x, rb->orientation.y,
-                 rb->orientation.z);
-    term_printf (NULL, "  Friction: s=%.3f k=%.3f  Restitution: %.3f\n", rb->friction_static, rb->friction_kinetic,
-                 rb->restitution);
-    term_printf (NULL, "  Colour: (%.2f, %.2f, %.2f)\n", rb->colour.x, rb->colour.y, rb->colour.z);
-    term_printf (NULL, "  SleepTimer: %.2f  Nice: %d\n", rb->sleep_timer, rb->nice_value);
+    term_printf (NULL, "  Position: (%.4f, %.4f, %.4f)\n", rb -> position.x, rb -> position.y, rb -> position.z);
+    term_printf (NULL, "  Velocity: (%.4f, %.4f, %.4f)  |v|=%.4f\n", rb -> velocity.x, rb -> velocity.y, rb -> velocity.z,
+                 vector3_length (rb -> velocity));
+    term_printf (NULL, "  AngVel: (%.4f, %.4f, %.4f)  |w|=%.4f\n", rb -> angular_velocity.x, rb -> angular_velocity.y,
+                 rb -> angular_velocity.z, vector3_length (rb -> angular_velocity));
+    term_printf (NULL, "  Orient: (%.4f, %.4f, %.4f, %.4f)\n", rb -> orientation.w, rb -> orientation.x, rb -> orientation.y,
+                 rb -> orientation.z);
+    term_printf (NULL, "  Friction: s=%.3f k=%.3f  Restitution: %.3f\n", rb -> friction_static, rb -> friction_kinetic,
+                 rb -> restitution);
+    term_printf (NULL, "  Colour: (%.2f, %.2f, %.2f)\n", rb -> colour.x, rb -> colour.y, rb -> colour.z);
+    term_printf (NULL, "  SleepTimer: %.2f  Nice: %d\n", rb -> sleep_timer, rb -> nice_value);
 }
 void cmd_find (int argc, char **argv) {
     if (argc < 2) {
@@ -128,33 +128,33 @@ void cmd_find (int argc, char **argv) {
         }
     }
     int match_count = 0;
-    for (int object_index = 0; object_index < (physics_world_get_primary ()->body_count); object_index++) {
-        rigidbody *rb = &(physics_world_get_primary ()->bodies) [object_index];
-        if ((filter_type == 0) && (rb->type != object_sphere)) {
+    for (int object_index = 0; object_index < (physics_world_get_primary () -> body_count); object_index++) {
+        rigidbody *rb = &(physics_world_get_primary () -> bodies)[object_index];
+        if ((filter_type == 0) && (rb -> type != object_sphere)) {
             continue;
         }
-        if ((filter_type == 1) && (rb->type != object_cube)) {
+        if ((filter_type == 1) && (rb -> type != object_cube)) {
             continue;
         }
-        if ((mass_exact >= 0.0f) && (fabsf (rb->mass - mass_exact) > 0.001f)) {
+        if ((mass_exact >= 0.0f) && (fabsf (rb -> mass - mass_exact) > 0.001f)) {
             continue;
         }
-        if ((mass_greater >= 0.0f) && (rb->mass <= mass_greater)) {
+        if ((mass_greater >= 0.0f) && (rb -> mass <= mass_greater)) {
             continue;
         }
-        if ((mass_less >= 0.0f) && (rb->mass >= mass_less)) {
+        if ((mass_less >= 0.0f) && (rb -> mass >= mass_less)) {
             continue;
         }
-        if (filter_sleeping && (!rb->is_sleeping)) {
+        if (filter_sleeping && (!rb -> is_sleeping)) {
             continue;
         }
-        if (filter_awake && (rb->is_sleeping)) {
+        if (filter_awake && (rb -> is_sleeping)) {
             continue;
         }
-        if (filter_static && (!rb->static_state)) {
+        if (filter_static && (!rb -> static_state)) {
             continue;
         }
-        if (filter_dynamic && (rb->static_state)) {
+        if (filter_dynamic && (rb -> static_state)) {
             continue;
         }
         term_printf (NULL, "/obj/%d\n", object_index);
@@ -168,27 +168,27 @@ void cmd_find (int argc, char **argv) {
 }
 void cmd_wc (int argc, char **argv) {
     if (argc < 2) {
-        term_printf (NULL, "%d objects, %d joints\n", (physics_world_get_primary ()->body_count),
-                     (physics_world_get_primary ()->spring_joint_count));
+        term_printf (NULL, "%d objects, %d joints\n", (physics_world_get_primary () -> body_count),
+                     (physics_world_get_primary () -> spring_joint_count));
         return;
     }
     for (int i = 1; i < argc; i++) {
-        if (argv [i] [0] == '-') {
+        if (argv [i][0] == '-') {
             continue;
         }
         if (strstr (argv [i], "joint")) {
             int active_joints = 0;
             for (int ji = 0; ji < mpe_max_joints; ji++) {
-                if ((physics_world_get_primary ()->spring_joints) [ji].is_active) {
+                if ((physics_world_get_primary () -> spring_joints)[ji].is_active) {
                     active_joints++;
                 }
             }
             term_printf (NULL, "%d /joint\n", active_joints);
         } else if (strstr (argv [i], "obj")) {
-            term_printf (NULL, "%d /obj\n", (physics_world_get_primary ()->body_count));
+            term_printf (NULL, "%d /obj\n", (physics_world_get_primary () -> body_count));
         } else {
-            term_printf (NULL, "%d objects, %d joints\n", (physics_world_get_primary ()->body_count),
-                         (physics_world_get_primary ()->spring_joint_count));
+            term_printf (NULL, "%d objects, %d joints\n", (physics_world_get_primary () -> body_count),
+                         (physics_world_get_primary () -> spring_joint_count));
         }
     }
 }
@@ -213,9 +213,9 @@ void cmd_file (int argc, char **argv) {
     if (term_classify_token (target) == term_target_joint) {
         int joint_index = term_joint_from_token (target);
         if (joint_index >= 0) {
-            spring_joint *j = &(physics_world_get_primary ()->spring_joints) [joint_index];
-            term_printf (NULL, "/joint/%d: spring joint, k=%.1f d=%.1f len=%.2f\n", joint_index, j->spring_constant,
-                         j->damping_coefficient, j->equilibrium_length);
+            spring_joint *j = &(physics_world_get_primary () -> spring_joints)[joint_index];
+            term_printf (NULL, "/joint/%d: spring joint, k=%.1f d=%.1f len=%.2f\n", joint_index, j -> spring_constant,
+                         j -> damping_coefficient, j -> equilibrium_length);
         } else {
             term_printf ("term_err", "mpe: file: %s: No such joint\n", target);
         }
@@ -226,9 +226,9 @@ void cmd_file (int argc, char **argv) {
         term_printf ("term_err", "mpe: file: %s: No such object\n", target);
         return;
     }
-    rigidbody *rb = &(physics_world_get_primary ()->bodies) [object_index];
-    term_printf (NULL, "/obj/%d: rigid body, %s, %.2f kg, %s%s\n", object_index, term_object_type_name (rb), rb->mass,
-                 rb->static_state ? "static" : "dynamic", rb->is_sleeping ? ", sleeping" : "");
+    rigidbody *rb = &(physics_world_get_primary () -> bodies)[object_index];
+    term_printf (NULL, "/obj/%d: rigid body, %s, %.2f kg, %s%s\n", object_index, term_object_type_name (rb), rb -> mass,
+                 rb -> static_state ? "static" : "dynamic", rb -> is_sleeping ? ", sleeping" : "");
 }
 void cmd_diff (int argc, char **argv) {
     if (argc < 3) {
@@ -247,56 +247,56 @@ void cmd_diff (int argc, char **argv) {
         term_ok ("Objects are identical (same object)\n");
         return;
     }
-    rigidbody *a = &(physics_world_get_primary ()->bodies) [index_a];
-    rigidbody *b = &(physics_world_get_primary ()->bodies) [index_b];
+    rigidbody *a = &(physics_world_get_primary () -> bodies)[index_a];
+    rigidbody *b = &(physics_world_get_primary () -> bodies)[index_b];
     int diff_count = 0;
     term_printf ("term_echo", "--- /obj/%d\n", index_a);
     term_printf ("term_echo", "+++ /obj/%d\n", index_b);
-    if (a->type != b->type) {
+    if (a -> type != b -> type) {
         term_printf ("term_err", "  type:       %s -> %s\n", term_object_type_name (a), term_object_type_name (b));
         diff_count++;
     }
-    if (fabsf (a->mass - b->mass) > 0.001f) {
-        term_printf ("term_err", "  mass:       %.4f -> %.4f\n", a->mass, b->mass);
+    if (fabsf (a -> mass - b -> mass) > 0.001f) {
+        term_printf ("term_err", "  mass:       %.4f -> %.4f\n", a -> mass, b -> mass);
         diff_count++;
     }
-    if ((a->type == object_sphere) && (b->type == object_sphere)) {
-        if (fabsf (a->radius - b->radius) > 0.001f) {
-            term_printf ("term_err", "  radius:     %.4f -> %.4f\n", a->radius, b->radius);
+    if ((a -> type == object_sphere) && (b -> type == object_sphere)) {
+        if (fabsf (a -> radius - b -> radius) > 0.001f) {
+            term_printf ("term_err", "  radius:     %.4f -> %.4f\n", a -> radius, b -> radius);
             diff_count++;
         }
     }
-    if (vector3_length_squared (vector3_subtraction (a->position, b->position)) > 0.001f) {
-        term_printf (NULL, "  position:   (%.2f,%.2f,%.2f) -> (%.2f,%.2f,%.2f)\n", a->position.x, a->position.y,
-                     a->position.z, b->position.x, b->position.y, b->position.z);
+    if (vector3_length_squared (vector3_subtraction (a -> position, b -> position)) > 0.001f) {
+        term_printf (NULL, "  position:   (%.2f,%.2f,%.2f) -> (%.2f,%.2f,%.2f)\n", a -> position.x, a -> position.y,
+                     a -> position.z, b -> position.x, b -> position.y, b -> position.z);
         diff_count++;
     }
-    if (vector3_length_squared (vector3_subtraction (a->velocity, b->velocity)) > 0.001f) {
-        term_printf (NULL, "  velocity:   |%.3f| -> |%.3f|\n", vector3_length (a->velocity),
-                     vector3_length (b->velocity));
+    if (vector3_length_squared (vector3_subtraction (a -> velocity, b -> velocity)) > 0.001f) {
+        term_printf (NULL, "  velocity:   |%.3f| -> |%.3f|\n", vector3_length (a -> velocity),
+                     vector3_length (b -> velocity));
         diff_count++;
     }
-    if (a->static_state != b->static_state) {
-        term_printf ("term_err", "  static:     %s -> %s\n", a->static_state ? "yes" : "no",
-                     b->static_state ? "yes" : "no");
+    if (a -> static_state != b -> static_state) {
+        term_printf ("term_err", "  static:     %s -> %s\n", a -> static_state ? "yes" : "no",
+                     b -> static_state ? "yes" : "no");
         diff_count++;
     }
-    if (a->is_sleeping != b->is_sleeping) {
-        term_printf (NULL, "  sleeping:   %s -> %s\n", a->is_sleeping ? "yes" : "no", b->is_sleeping ? "yes" : "no");
+    if (a -> is_sleeping != b -> is_sleeping) {
+        term_printf (NULL, "  sleeping:   %s -> %s\n", a -> is_sleeping ? "yes" : "no", b -> is_sleeping ? "yes" : "no");
         diff_count++;
     }
-    if ((fabsf (a->friction_static - b->friction_static) > 0.001f) ||
-        (fabsf (a->friction_kinetic - b->friction_kinetic) > 0.001f)) {
-        term_printf (NULL, "  friction:   s=%.3f k=%.3f -> s=%.3f k=%.3f\n", a->friction_static, a->friction_kinetic,
-                     b->friction_static, b->friction_kinetic);
+    if ((fabsf (a -> friction_static - b -> friction_static) > 0.001f) ||
+        (fabsf (a -> friction_kinetic - b -> friction_kinetic) > 0.001f)) {
+        term_printf (NULL, "  friction:   s=%.3f k=%.3f -> s=%.3f k=%.3f\n", a -> friction_static, a -> friction_kinetic,
+                     b -> friction_static, b -> friction_kinetic);
         diff_count++;
     }
-    if (fabsf (a->restitution - b->restitution) > 0.001f) {
-        term_printf (NULL, "  restitution:%.3f -> %.3f\n", a->restitution, b->restitution);
+    if (fabsf (a -> restitution - b -> restitution) > 0.001f) {
+        term_printf (NULL, "  restitution:%.3f -> %.3f\n", a -> restitution, b -> restitution);
         diff_count++;
     }
-    if (a->nice_value != b->nice_value) {
-        term_printf (NULL, "  nice:       %d -> %d\n", a->nice_value, b->nice_value);
+    if (a -> nice_value != b -> nice_value) {
+        term_printf (NULL, "  nice:       %d -> %d\n", a -> nice_value, b -> nice_value);
         diff_count++;
     }
     if (diff_count == 0) {
@@ -342,7 +342,7 @@ void cmd_xxd (int argc, char **argv) {
     if (dump_length <= 0) {
         dump_length = struct_size - dump_offset;
     }
-    const unsigned char *raw = (const unsigned char *) &(physics_world_get_primary ()->bodies) [object_index];
+    const unsigned char *raw = (const unsigned char *) &(physics_world_get_primary () -> bodies)[object_index];
     term_printf ("term_echo", "xxd /obj/%d  (%d bytes at offset %d of %d)\n", object_index, dump_length, dump_offset,
                  struct_size);
     for (int row = 0; row < dump_length; row += 16) {
@@ -375,27 +375,27 @@ static bool a3_sort_reverse = false;
 int a3_sort_compare (const void *pa, const void *pb) {
     int ia = *(const int *) pa;
     int ib = *(const int *) pb;
-    rigidbody *ra = &(physics_world_get_primary ()->bodies) [ia];
-    rigidbody *rb = &(physics_world_get_primary ()->bodies) [ib];
+    rigidbody *ra = &(physics_world_get_primary () -> bodies)[ia];
+    rigidbody *rb = &(physics_world_get_primary () -> bodies)[ib];
     float va = 0.0f, vb = 0.0f;
     switch (a3_sort_key) {
-    case 1:
-        va = ra->mass;
-        vb = rb->mass;
+        case 1:
+        va = ra -> mass;
+        vb = rb -> mass;
         break;
-    case 2:
-        va = vector3_length (ra->velocity);
-        vb = vector3_length (rb->velocity);
+        case 2:
+        va = vector3_length (ra -> velocity);
+        vb = vector3_length (rb -> velocity);
         break;
-    case 3:
-        va = (float) ra->type;
-        vb = (float) rb->type;
+        case 3:
+        va = (float) ra -> type;
+        vb = (float) rb -> type;
         break;
-    case 4:
-        va = ra->position.y;
-        vb = rb->position.y;
+        case 4:
+        va = ra -> position.y;
+        vb = rb -> position.y;
         break;
-    default:
+        default:
         va = (float) ia;
         vb = (float) ib;
         break;
@@ -431,17 +431,17 @@ void cmd_sort (int argc, char **argv) {
         term_list_joints (true);
         return;
     }
-    if ((physics_world_get_primary ()->body_count) == 0) {
+    if ((physics_world_get_primary () -> body_count) == 0) {
         term_dim ("(no objects)\n");
         return;
     }
     static int sort_indices [mpe_max_bodies];
-    for (int i = 0; i < (physics_world_get_primary ()->body_count); i++) {
+    for (int i = 0; i < (physics_world_get_primary () -> body_count); i++) {
         sort_indices [i] = i;
     }
-    qsort (sort_indices, (size_t) (physics_world_get_primary ()->body_count), sizeof (int), a3_sort_compare);
+    qsort (sort_indices, (size_t) (physics_world_get_primary () -> body_count), sizeof (int), a3_sort_compare);
     term_printf (NULL, "%-10s %4s %8s %-4s %-6s %s\n", "MODE", "PID", "MASS", "TYPE", "STATE", "INFO");
-    for (int i = 0; i < (physics_world_get_primary ()->body_count); i++) {
+    for (int i = 0; i < (physics_world_get_primary () -> body_count); i++) {
         term_print_object_long (sort_indices [i]);
     }
 }

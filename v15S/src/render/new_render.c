@@ -160,29 +160,29 @@ void render_init () {
 static void render_delete_mesh (mesh *mesh_object) {
     if (!mesh_object)
         return;
-    if (mesh_object->vertex_array_object) {
-        glDeleteVertexArrays (1, &mesh_object->vertex_array_object);
-        mesh_object->vertex_array_object = 0;
+    if (mesh_object -> vertex_array_object) {
+        glDeleteVertexArrays (1, &mesh_object -> vertex_array_object);
+        mesh_object -> vertex_array_object = 0;
     }
-    if (mesh_object->vertex_buffer_object) {
-        glDeleteBuffers (1, &mesh_object->vertex_buffer_object);
-        mesh_object->vertex_buffer_object = 0;
+    if (mesh_object -> vertex_buffer_object) {
+        glDeleteBuffers (1, &mesh_object -> vertex_buffer_object);
+        mesh_object -> vertex_buffer_object = 0;
     }
-    if (mesh_object->element_buffer_object) {
-        glDeleteBuffers (1, &mesh_object->element_buffer_object);
-        mesh_object->element_buffer_object = 0;
+    if (mesh_object -> element_buffer_object) {
+        glDeleteBuffers (1, &mesh_object -> element_buffer_object);
+        mesh_object -> element_buffer_object = 0;
     }
-    if (mesh_object->wireframe_element_buffer_object) {
-        glDeleteBuffers (1, &mesh_object->wireframe_element_buffer_object);
-        mesh_object->wireframe_element_buffer_object = 0;
+    if (mesh_object -> wireframe_element_buffer_object) {
+        glDeleteBuffers (1, &mesh_object -> wireframe_element_buffer_object);
+        mesh_object -> wireframe_element_buffer_object = 0;
     }
-    if (mesh_object->instance_vbo) {
-        glDeleteBuffers (1, &mesh_object->instance_vbo);
-        mesh_object->instance_vbo = 0;
+    if (mesh_object -> instance_vbo) {
+        glDeleteBuffers (1, &mesh_object -> instance_vbo);
+        mesh_object -> instance_vbo = 0;
     }
-    mesh_object->index_count = 0;
-    mesh_object->wireframe_index_count = 0;
-    mesh_object->instance_capacity = 0;
+    mesh_object -> index_count = 0;
+    mesh_object -> wireframe_index_count = 0;
+    mesh_object -> instance_capacity = 0;
 }
 /* Unconditional GL teardown shared by render_cleanup and the mid-init
  * failure paths (which run with a current context but a not-yet-ok
@@ -286,29 +286,29 @@ void render_scene_current (int widget_width, int widget_height) {
      * math4_special.h so the shipped culler is reachable from a headless test
      * (mpe_t_frustum_culler). Previously it was inline here, in a GL function
      * nothing could call, so no gate ever executed the real culler. */
-    float frustum_planes [6] [4];
+    float frustum_planes [6][4];
     math4_frustum_planes (view_projection, frustum_planes);
     int sphere_inst_count = 0;
     int cube_inst_count = 0;
     int cylinder_inst_count = 0;
-    for (int object_index = 0; object_index < (physics_world_get_primary ()->body_count); object_index++) {
-        rigidbody *rigid_body = &(physics_world_get_primary ()->bodies) [object_index];
+    for (int object_index = 0; object_index < (physics_world_get_primary () -> body_count); object_index++) {
+        rigidbody *rigid_body = &(physics_world_get_primary () -> bodies)[object_index];
         /* DESPOT-2026-10-04: a NaN body used to poison the instance buffer
          * (NaN model matrix → NaN vertices → driver-dependent garbage or
          * worse). Skip non-finite bodies loudly; the physics side already
          * counts them and the save path refuses to persist them. */
-        if ((!isfinite (rigid_body->position.x)) || (!isfinite (rigid_body->position.y)) ||
-            (!isfinite (rigid_body->position.z)) || (!isfinite (rigid_body->orientation.w)) ||
-            (!isfinite (rigid_body->orientation.x)) || (!isfinite (rigid_body->orientation.y)) ||
-            (!isfinite (rigid_body->orientation.z))) {
+        if ((!isfinite (rigid_body -> position.x)) || (!isfinite (rigid_body -> position.y)) ||
+            (!isfinite (rigid_body -> position.z)) || (!isfinite (rigid_body -> orientation.w)) ||
+            (!isfinite (rigid_body -> orientation.x)) || (!isfinite (rigid_body -> orientation.y)) ||
+            (!isfinite (rigid_body -> orientation.z))) {
             fprintf (stderr, "[render] WARNING: skipping non-finite body %d\n", object_index);
             continue;
         }
         /* Sphere-vs-frustum: culled only when fully outside one plane. */
         {
             float bound = broadphase_bounding_radius (rigid_body);
-            if (!math4_frustum_sphere_visible (frustum_planes, rigid_body->position.x, rigid_body->position.y,
-                                               rigid_body->position.z, bound)) {
+            if (!math4_frustum_sphere_visible (frustum_planes, rigid_body -> position.x, rigid_body -> position.y,
+                                               rigid_body -> position.z, bound)) {
                 continue;
             }
         }
@@ -319,35 +319,35 @@ void render_scene_current (int widget_width, int widget_height) {
          * bit-determinism discipline (-ffp-contract=off, fixed op order)
          * outranks single-digit-% CPU gains. See ENABLE_NATIVE for the
          * opt-in auto-vectorized build. */
-        math4 rotation_matrix = vector4_to_math4 (rigid_body->orientation);
+        math4 rotation_matrix = vector4_to_math4 (rigid_body -> orientation);
         vector3 model_scale;
-        if (rigid_body->type == object_sphere) {
-            model_scale = (vector3){rigid_body->radius, rigid_body->radius, rigid_body->radius};
-        } else if (rigid_body->type == object_cylinder) {
+        if (rigid_body -> type == object_sphere) {
+            model_scale = (vector3) {rigid_body -> radius, rigid_body -> radius, rigid_body -> radius};
+        } else if (rigid_body -> type == object_cylinder) {
             /* Unit mesh: axle X half-length 1, radius 1 (see
              * cylinder_meshing.h): scale columns to (h, r, r). */
-            model_scale = (vector3){rigid_body->cylinder_half_length, rigid_body->radius, rigid_body->radius};
+            model_scale = (vector3) {rigid_body -> cylinder_half_length, rigid_body -> radius, rigid_body -> radius};
         } else {
-            model_scale = rigid_body->half_extensions;
+            model_scale = rigid_body -> half_extensions;
         }
         float scale_comp [3] = {model_scale.x, model_scale.y, model_scale.z};
         math4 model_matrix = {{{0}}};
         for (int mc = 0; mc < 3; mc++) {
             for (int mr = 0; mr < 3; mr++) {
-                model_matrix.matrix [mc] [mr] = rotation_matrix.matrix [mc] [mr] * scale_comp [mc];
+                model_matrix.matrix [mc][mr] = rotation_matrix.matrix [mc][mr] * scale_comp [mc];
             }
-            model_matrix.matrix [mc] [3] = 0.0f;
-            model_matrix.matrix [3] [mc] = (mc == 0)   ? rigid_body->position.x
-                                         : (mc == 1) ? rigid_body->position.y
-                                                     : rigid_body->position.z;
+            model_matrix.matrix [mc][3] = 0.0f;
+            model_matrix.matrix [3][mc] = (mc == 0) ? rigid_body -> position.x
+            : (mc == 1) ? rigid_body -> position.y
+            : rigid_body -> position.z;
         }
-        model_matrix.matrix [3] [3] = 1.0f;
+        model_matrix.matrix [3][3] = 1.0f;
         float *target_array;
         int *target_count;
-        if (rigid_body->type == object_sphere) {
+        if (rigid_body -> type == object_sphere) {
             target_array = sphere_instances;
             target_count = &sphere_inst_count;
-        } else if (rigid_body->type == object_cylinder) {
+        } else if (rigid_body -> type == object_cylinder) {
             target_array = cylinder_instances;
             target_count = &cylinder_inst_count;
         } else {
@@ -357,9 +357,9 @@ void render_scene_current (int widget_width, int widget_height) {
         if ((*target_count) < mpe_max_bodies) {
             int idx = (*target_count) * 19;
             math4_to_flat_array (model_matrix, &target_array [idx]);
-            target_array [idx + 16] = rigid_body->colour.x;
-            target_array [idx + 17] = rigid_body->colour.y;
-            target_array [idx + 18] = rigid_body->colour.z;
+            target_array [idx + 16] = rigid_body -> colour.x;
+            target_array [idx + 17] = rigid_body -> colour.y;
+            target_array [idx + 18] = rigid_body -> colour.z;
             (*target_count)++;
         }
     }

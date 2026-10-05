@@ -8,8 +8,8 @@
 void init_cylinder_system (mesh *mesh_object, int radial_segments) {
     if (!mesh_object)
         return;
-    mesh_object->index_count = 0;
-    mesh_object->wireframe_index_count = 0;
+    mesh_object -> index_count = 0;
+    mesh_object -> wireframe_index_count = 0;
     if (radial_segments < 8) {
         radial_segments = 8;
     }
@@ -60,11 +60,11 @@ void init_cylinder_system (mesh *mesh_object, int radial_segments) {
     int ring0 = 0, ring1 = ring_verts, ring2 = ring_verts * 2, ring3 = ring_verts * 3;
     int center_neg = ring_verts * 4, center_pos = ring_verts * 4 + 1;
     /* Side quads + two cap fans. */
-    mesh_object->index_count = radial_segments * 6 + radial_segments * 3 * 2;
-    unsigned int *element_indices = malloc ((size_t) mesh_object->index_count * sizeof (unsigned int));
+    mesh_object -> index_count = radial_segments * 6 + radial_segments * 3 * 2;
+    unsigned int *element_indices = malloc ((size_t) mesh_object -> index_count * sizeof (unsigned int));
     if (!element_indices) {
         free (vertex_data);
-        mesh_object->index_count = 0;
+        mesh_object -> index_count = 0;
         return;
     }
     int ei = 0;
@@ -94,13 +94,13 @@ void init_cylinder_system (mesh *mesh_object, int radial_segments) {
         element_indices [ei++] = ring3 + s + 1;
     }
     /* Wireframe: two rim loops + 4 axial rails. */
-    mesh_object->wireframe_index_count = radial_segments * 2 * 2 + 4 * 2;
-    unsigned int *wireframe_indices = malloc ((size_t) mesh_object->wireframe_index_count * sizeof (unsigned int));
+    mesh_object -> wireframe_index_count = radial_segments * 2 * 2 + 4 * 2;
+    unsigned int *wireframe_indices = malloc ((size_t) mesh_object -> wireframe_index_count * sizeof (unsigned int));
     if (!wireframe_indices) {
         free (element_indices);
         free (vertex_data);
-        mesh_object->index_count = 0;
-        mesh_object->wireframe_index_count = 0;
+        mesh_object -> index_count = 0;
+        mesh_object -> wireframe_index_count = 0;
         return;
     }
     int wi = 0;
@@ -115,25 +115,25 @@ void init_cylinder_system (mesh *mesh_object, int radial_segments) {
         wireframe_indices [wi++] = ring0 + s;
         wireframe_indices [wi++] = ring1 + s;
     }
-    glGenVertexArrays (1, &mesh_object->vertex_array_object);
-    glGenBuffers (1, &mesh_object->vertex_buffer_object);
-    glGenBuffers (1, &mesh_object->element_buffer_object);
-    glBindVertexArray (mesh_object->vertex_array_object);
-    glBindBuffer (GL_ARRAY_BUFFER, mesh_object->vertex_buffer_object);
+    glGenVertexArrays (1, &mesh_object -> vertex_array_object);
+    glGenBuffers (1, &mesh_object -> vertex_buffer_object);
+    glGenBuffers (1, &mesh_object -> element_buffer_object);
+    glBindVertexArray (mesh_object -> vertex_array_object);
+    glBindBuffer (GL_ARRAY_BUFFER, mesh_object -> vertex_buffer_object);
     glBufferData (GL_ARRAY_BUFFER, vertex_count * 6 * sizeof (float), vertex_data, GL_STATIC_DRAW);
-    glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, mesh_object->element_buffer_object);
-    glBufferData (GL_ELEMENT_ARRAY_BUFFER, mesh_object->index_count * sizeof (unsigned int), element_indices,
+    glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, mesh_object -> element_buffer_object);
+    glBufferData (GL_ELEMENT_ARRAY_BUFFER, mesh_object -> index_count * sizeof (unsigned int), element_indices,
                   GL_STATIC_DRAW);
     glVertexAttribPointer (0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof (float), (void *) 0);
     glEnableVertexAttribArray (0);
     glVertexAttribPointer (1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof (float), (void *) (3 * sizeof (float)));
     glEnableVertexAttribArray (1);
-    glGenBuffers (1, &mesh_object->wireframe_element_buffer_object);
-    glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, mesh_object->wireframe_element_buffer_object);
-    glBufferData (GL_ELEMENT_ARRAY_BUFFER, mesh_object->wireframe_index_count * sizeof (unsigned int),
+    glGenBuffers (1, &mesh_object -> wireframe_element_buffer_object);
+    glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, mesh_object -> wireframe_element_buffer_object);
+    glBufferData (GL_ELEMENT_ARRAY_BUFFER, mesh_object -> wireframe_index_count * sizeof (unsigned int),
                   wireframe_indices, GL_STATIC_DRAW);
-    glGenBuffers (1, &mesh_object->instance_vbo);
-    glBindBuffer (GL_ARRAY_BUFFER, mesh_object->instance_vbo);
+    glGenBuffers (1, &mesh_object -> instance_vbo);
+    glBindBuffer (GL_ARRAY_BUFFER, mesh_object -> instance_vbo);
     glBufferData (GL_ARRAY_BUFFER, mpe_max_bodies * 19 * sizeof (float), NULL, GL_DYNAMIC_DRAW);
     for (int i = 0; i < 4; i++) {
         glVertexAttribPointer (2 + i, 4, GL_FLOAT, GL_FALSE, 19 * sizeof (float), (void *) (i * 4 * sizeof (float)));
@@ -143,7 +143,7 @@ void init_cylinder_system (mesh *mesh_object, int radial_segments) {
     glVertexAttribPointer (6, 3, GL_FLOAT, GL_FALSE, 19 * sizeof (float), (void *) (16 * sizeof (float)));
     glEnableVertexAttribArray (6);
     glVertexAttribDivisor (6, 1);
-    glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, mesh_object->element_buffer_object);
+    glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, mesh_object -> element_buffer_object);
     glBindVertexArray (0);
     free (wireframe_indices);
     free (element_indices);

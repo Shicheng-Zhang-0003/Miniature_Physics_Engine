@@ -21,7 +21,7 @@ static void *gpd_sym (const char *sym) {
     return mpe_loader_symbol (GPD_HANDLE_MODULE, sym);
 }
 /* Cached bundle entry points (resolved lazily; NULL = bundle absent). */
-static ftc_robot *(*s_fleet_get) (struct physics_world *, int) = NULL;
+static ftc_robot * (*s_fleet_get) (struct physics_world *, int) = NULL;
 static void (*s_mecanum) (ftc_robot *, float, float, float) = NULL;
 static bool (*s_pad_init) (gamepad_state *, const char *) = NULL;
 static void (*s_pad_poll) (gamepad_state *) = NULL;
@@ -45,20 +45,20 @@ static void gpd_report_stage (int stage) {
         return;
     s_reported_stage = stage;
     switch (stage) {
-    case 0:
+        case 0:
         fprintf (stderr, "[gamepad] no bundle (mod load ecosystem/mfs/mfs_ecosystem.so first)\n");
         break;
-    case 1:
+        case 1:
         fprintf (stderr,
                  "[gamepad] bundle loaded, waiting for pad (F310 switch X, /dev/input/js0) and robot (ftc spawn)\n");
         break;
-    case 2:
+        case 2:
         fprintf (stderr, "[gamepad] pad connected, waiting for robot (ftc spawn)\n");
         break;
-    case 3:
+        case 3:
         fprintf (stderr, "[gamepad] driving robot 0 (START toggles, LB+RB e-stop)\n");
         break;
-    default:
+        default:
         break;
     }
     fflush (stderr);
@@ -72,7 +72,7 @@ static void gpd_resolve (void) {
      * NULL only when the bundle is absent (checked per-tick below). */
     if (s_syms_resolved && s_fleet_get && s_mecanum)
         return;
-    s_fleet_get = (ftc_robot * (*) (struct physics_world *, int) ) gpd_sym ("ftc_fleet_get");
+    s_fleet_get = (ftc_robot * (*) (struct physics_world *, int)) gpd_sym ("ftc_fleet_get");
     s_mecanum = (void (*) (ftc_robot *, float, float, float)) gpd_sym ("drivetrain_mecanum");
     s_pad_init = (bool (*) (gamepad_state *, const char *)) gpd_sym ("gamepad_init");
     s_pad_poll = (void (*) (gamepad_state *)) gpd_sym ("gamepad_poll");
@@ -189,34 +189,34 @@ void ftc_watchdog_tick (void) {
             wc = mpe_world_cfg (pw0);
         }
         fprintf (stderr, "[ftc-watchdog] build %s (%s %s) iters=%d sleep=%d (primary cfg)\n", a3_version_string,
-                 __DATE__, __TIME__, wc ? wc->timestep.solver_iterations : -1, wc ? wc->sleep.enable : -1);
+                 __DATE__, __TIME__, wc ? wc -> timestep.solver_iterations : -1, wc ? wc -> sleep.enable : -1);
         fflush (stderr);
     }
     physics_world *w = physics_world_get_primary ();
     ftc_robot *r = (w && s_fleet_get) ? s_fleet_get (w, 0) : NULL;
-    if (!r || r->chassis_body < 0 || r->chassis_body >= w->body_count) {
+    if (!r || r -> chassis_body < 0 || r -> chassis_body >= w -> body_count) {
         return;
     }
-    rigidbody *ch = &w->bodies [r->chassis_body];
-    vector3 chx = ch->cached_axes [0];
-    for (int i = 0; i < r->wheel_count && i < FTC_WD_MAXW; i++) {
-        int bi = r->wheel_bodies [i];
-        if (bi < 0 || bi >= w->body_count) {
+    rigidbody *ch = &w -> bodies [r -> chassis_body];
+    vector3 chx = ch -> cached_axes [0];
+    for (int i = 0; i < r -> wheel_count && i < FTC_WD_MAXW; i++) {
+        int bi = r -> wheel_bodies [i];
+        if (bi < 0 || bi >= w -> body_count) {
             continue;
         }
-        rigidbody *wh = &w->bodies [bi];
-        int bad = (!isfinite (wh->position.x)) || (!isfinite (wh->position.y)) || (!isfinite (wh->position.z)) ||
-                  (!isfinite (wh->orientation.w)) || (!isfinite (wh->orientation.x)) ||
-                  (!isfinite (wh->orientation.y)) || (!isfinite (wh->orientation.z)) ||
-                  (!isfinite (wh->angular_velocity.x)) || (!isfinite (wh->angular_velocity.y)) ||
-                  (!isfinite (wh->angular_velocity.z));
-        vector3 d = vector3_subtraction (wh->position, ch->position);
+        rigidbody *wh = &w -> bodies [bi];
+        int bad = (!isfinite (wh -> position.x)) || (!isfinite (wh -> position.y)) || (!isfinite (wh -> position.z)) ||
+                  (!isfinite (wh -> orientation.w)) || (!isfinite (wh -> orientation.x)) ||
+                  (!isfinite (wh -> orientation.y)) || (!isfinite (wh -> orientation.z)) ||
+                  (!isfinite (wh -> angular_velocity.x)) || (!isfinite (wh -> angular_velocity.y)) ||
+                  (!isfinite (wh -> angular_velocity.z));
+        vector3 d = vector3_subtraction (wh -> position, ch -> position);
         float md = vector3_length (d);
         if (!s_wd_mount_seen [i] && isfinite (md)) {
             s_wd_mount_seen [i] = 1;
             s_wd_mount [i] = md;
         }
-        float dot = vector3_dot (wh->cached_axes [0], chx);
+        float dot = vector3_dot (wh -> cached_axes [0], chx);
         if (dot > 1.0f) {
             dot = 1.0f;
         }
@@ -224,7 +224,7 @@ void ftc_watchdog_tick (void) {
             dot = -1.0f;
         }
         float tilt = acosf (dot) * 57.29578f;
-        float wsp = vector3_dot (wh->angular_velocity, wh->cached_axes [0]);
+        float wsp = vector3_dot (wh -> angular_velocity, wh -> cached_axes [0]);
         if (bad) {
             fprintf (stderr, "[ftc-watchdog] wheel %d NON-FINITE state (pos/ori/vel)\n", i);
             fflush (stderr);
@@ -234,7 +234,7 @@ void ftc_watchdog_tick (void) {
             fprintf (stderr,
                      "[ftc-watchdog] wheel %d MOUNT JUMP mount=%.3f base=%.3f tilt=%.1f w=%+.1f "
                      "chpos=(%+.2f,%+.2f,%+.2f)\n",
-                     i, md, s_wd_mount [i], tilt, wsp, ch->position.x, ch->position.y, ch->position.z);
+                     i, md, s_wd_mount [i], tilt, wsp, ch -> position.x, ch -> position.y, ch -> position.z);
             fflush (stderr);
         } else if (s_wd_jump_hot [i] && fabsf (md - s_wd_mount [i]) < 0.025f) {
             s_wd_jump_hot [i] = 0;

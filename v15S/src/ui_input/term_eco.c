@@ -44,7 +44,7 @@ void cmd_eco (int argc, char **argv) {
             term_err ("mpe: eco: unknown ecosystem\n");
             return;
         }
-        if (!d->command) {
+        if (!d -> command) {
             term_err ("mpe: eco: bundle has no command interface\n");
             return;
         }
@@ -53,7 +53,7 @@ void cmd_eco (int argc, char **argv) {
             term_err ("mpe: eco: not attached (eco attach first)\n");
             return;
         }
-        if (d->command (st, argc - 3, &argv [3]) == 0) {
+        if (d -> command (st, argc - 3, &argv [3]) == 0) {
             term_ok ("mpe: eco: ok\n");
         } else {
             term_err ("mpe: eco: command failed (try: eco command <name> help)\n");

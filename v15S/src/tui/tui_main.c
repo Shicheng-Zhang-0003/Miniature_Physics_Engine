@@ -79,23 +79,23 @@ static void print_help (const char *prog) {
 /* Demo scenes (deterministic; exercise every body + joint type)        */
 /* ------------------------------------------------------------------ */
 static void scene_floor (physics_world *world) {
-    physics_world_add_cube (world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){10.0f, 0.5f, 10.0f}, 0.0f);
+    physics_world_add_cube (world, (vector3) {0.0f, -0.5f, 0.0f}, (vector3) {10.0f, 0.5f, 10.0f}, 0.0f);
 }
 static void scene_tower_only (physics_world *world) {
     scene_floor (world);
     const float h = 0.4f;
     for (int i = 0; i < 6; i++) {
-        physics_world_add_cube (world, (vector3){0.0f, h + (float) i * 2.0f * h, 0.0f}, (vector3){h, h, h}, 1.0f);
+        physics_world_add_cube (world, (vector3) {0.0f, h + (float) i * 2.0f * h, 0.0f}, (vector3) {h, h, h}, 1.0f);
     }
 }
 static void scene_pendulum_only (physics_world *world) {
     scene_floor (world);
     constraint_pool_init (world);
-    int pivot = physics_world_add_cube (world, (vector3){0.0f, 10.0f, 0.0f}, (vector3){0.2f, 0.2f, 0.2f}, 1.0f);
-    rigidbody_set_static (&world->bodies [pivot], true);
-    int bob = physics_world_add_sphere (world, 0.3f, 2.0f, (vector3){1.0f, 8.0f, 0.0f});
-    constraint_add_revolute (world, world->bodies [pivot].object_id, world->bodies [bob].object_id,
-                             (vector3){0.0f, 0.0f, 0.0f}, (vector3){-1.0f, 2.0f, 0.0f}, (vector3){0.0f, 0.0f, 1.0f});
+    int pivot = physics_world_add_cube (world, (vector3) {0.0f, 10.0f, 0.0f}, (vector3) {0.2f, 0.2f, 0.2f}, 1.0f);
+    rigidbody_set_static (&world -> bodies [pivot], true);
+    int bob = physics_world_add_sphere (world, 0.3f, 2.0f, (vector3) {1.0f, 8.0f, 0.0f});
+    constraint_add_revolute (world, world -> bodies [pivot].object_id, world -> bodies [bob].object_id,
+                             (vector3) {0.0f, 0.0f, 0.0f}, (vector3) {-1.0f, 2.0f, 0.0f}, (vector3) {0.0f, 0.0f, 1.0f});
 }
 /* F10 long-run validation scene replica (exact geometry/props from
  * scene_spawn_long_run_validation; spawn-overlap resolution NOT applied so
@@ -108,58 +108,58 @@ static void scene_f10_only (physics_world *world) {
      * settling (measured 2026-09-23: 0/27 asleep, KE=30, spread 235 m at
      * 60 s). With it: 27/27 asleep, KE=0, run-max 0.0. */
     {
-        int f = physics_world_add_cube (world, (vector3){0.0f, -0.5f, 0.0f}, (vector3){30.0f, 0.5f, 30.0f}, 0.0f);
+        int f = physics_world_add_cube (world, (vector3) {0.0f, -0.5f, 0.0f}, (vector3) {30.0f, 0.5f, 30.0f}, 0.0f);
         if (f >= 0) {
-            world->bodies [f].friction_static = 0.8f;
-            world->bodies [f].friction_kinetic = 0.7f;
-            world->bodies [f].restitution = 0.0f;
+            world -> bodies [f].friction_static = 0.8f;
+            world -> bodies [f].friction_kinetic = 0.7f;
+            world -> bodies [f].restitution = 0.0f;
         }
     }
     for (int i = 0; i < 10; i++) {
-        int idx = physics_world_add_cube (world, (vector3){20.0f, 0.5f + (float) i * 0.99f, 0.0f},
-                                          (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
+        int idx = physics_world_add_cube (world, (vector3) {20.0f, 0.5f + (float) i * 0.99f, 0.0f},
+                                          (vector3) {0.5f, 0.5f, 0.5f}, 1.0f);
         if (idx >= 0) {
-            world->bodies [idx].restitution = 0.0f;
-            world->bodies [idx].friction_static = 0.8f;
-            world->bodies [idx].friction_kinetic = 0.7f;
+            world -> bodies [idx].restitution = 0.0f;
+            world -> bodies [idx].friction_static = 0.8f;
+            world -> bodies [idx].friction_kinetic = 0.7f;
         }
     }
     for (int gx = 0; gx < 3; gx++) {
         for (int gz = 0; gz < 3; gz++) {
             int idx = physics_world_add_cube (
-                world, (vector3){-20.0f + ((float) gx - 1.0f) * 1.1f, 0.5f, ((float) gz - 1.0f) * 1.1f},
-                (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
+                world, (vector3) {-20.0f + ((float) gx - 1.0f) * 1.1f, 0.5f, ((float) gz - 1.0f) * 1.1f},
+                (vector3) {0.5f, 0.5f, 0.5f}, 1.0f);
             if (idx >= 0) {
-                world->bodies [idx].restitution = 0.0f;
-                world->bodies [idx].friction_static = 0.8f;
-                world->bodies [idx].friction_kinetic = 0.7f;
+                world -> bodies [idx].restitution = 0.0f;
+                world -> bodies [idx].friction_static = 0.8f;
+                world -> bodies [idx].friction_kinetic = 0.7f;
             }
         }
     }
     for (int gx = 0; gx < 2; gx++) {
         for (int gz = 0; gz < 2; gz++) {
             int idx = physics_world_add_cube (
-                world, (vector3){-20.0f + ((float) gx - 0.5f) * 1.1f, 1.49f, ((float) gz - 0.5f) * 1.1f},
-                (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
+                world, (vector3) {-20.0f + ((float) gx - 0.5f) * 1.1f, 1.49f, ((float) gz - 0.5f) * 1.1f},
+                (vector3) {0.5f, 0.5f, 0.5f}, 1.0f);
             if (idx >= 0) {
-                world->bodies [idx].restitution = 0.0f;
-                world->bodies [idx].friction_static = 0.8f;
-                world->bodies [idx].friction_kinetic = 0.7f;
+                world -> bodies [idx].restitution = 0.0f;
+                world -> bodies [idx].friction_static = 0.8f;
+                world -> bodies [idx].friction_kinetic = 0.7f;
             }
         }
     }
-    int top = physics_world_add_cube (world, (vector3){-20.0f, 2.48f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 1.0f);
+    int top = physics_world_add_cube (world, (vector3) {-20.0f, 2.48f, 0.0f}, (vector3) {0.5f, 0.5f, 0.5f}, 1.0f);
     if (top >= 0) {
-        world->bodies [top].restitution = 0.0f;
-        world->bodies [top].friction_static = 0.8f;
-        world->bodies [top].friction_kinetic = 0.7f;
+        world -> bodies [top].restitution = 0.0f;
+        world -> bodies [top].friction_static = 0.8f;
+        world -> bodies [top].friction_kinetic = 0.7f;
     }
     for (int i = 0; i < 3; i++) {
-        int idx = physics_world_add_sphere (world, 0.35f, 1.0f, (vector3){-30.0f + (float) i * 3.0f, 0.35f, 8.0f});
+        int idx = physics_world_add_sphere (world, 0.35f, 1.0f, (vector3) {-30.0f + (float) i * 3.0f, 0.35f, 8.0f});
         if (idx >= 0) {
-            world->bodies [idx].restitution = 0.0f;
-            world->bodies [idx].friction_static = 0.8f;
-            world->bodies [idx].friction_kinetic = 0.7f;
+            world -> bodies [idx].restitution = 0.0f;
+            world -> bodies [idx].friction_static = 0.8f;
+            world -> bodies [idx].friction_kinetic = 0.7f;
         }
     }
 }
@@ -172,51 +172,51 @@ static void scene_stress_only (physics_world *world) {
         float x = (float) (i % 10) * 1.2f - 5.0f;
         float z = (float) ((i / 10) % 10) * 1.2f - 5.0f;
         float y = 2.0f + (float) (i / 100);
-        physics_world_add_sphere (world, 0.35f, 1.0f, (vector3){x, y, z});
-        physics_world_add_cube (world, (vector3){x + 0.5f, y + 2.0f, z}, (vector3){0.35f, 0.35f, 0.35f}, 1.0f);
-        physics_world_add_cylinder (world, 0.3f, 0.4f, 1.0f, (vector3){x, y + 4.0f, z + 0.5f});
+        physics_world_add_sphere (world, 0.35f, 1.0f, (vector3) {x, y, z});
+        physics_world_add_cube (world, (vector3) {x + 0.5f, y + 2.0f, z}, (vector3) {0.35f, 0.35f, 0.35f}, 1.0f);
+        physics_world_add_cylinder (world, 0.3f, 0.4f, 1.0f, (vector3) {x, y + 4.0f, z + 0.5f});
     }
-    int anchor = physics_world_add_cube (world, (vector3){0.0f, 50.0f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 0.0f);
-    int smass = physics_world_add_sphere (world, 0.2f, 1.0f, (vector3){2.5f, 50.0f, 0.0f});
-    add_joint_by_ids (world, world->bodies [anchor].object_id, world->bodies [smass].object_id, 2.0f, 20.0f, 0.0f);
-    int pivot = physics_world_add_cube (world, (vector3){8.0f, 10.0f, 0.0f}, (vector3){0.2f, 0.2f, 0.2f}, 1.0f);
-    rigidbody_set_static (&world->bodies [pivot], true);
-    int bob = physics_world_add_sphere (world, 0.3f, 2.0f, (vector3){9.0f, 8.0f, 0.0f});
-    constraint_add_revolute (world, world->bodies [pivot].object_id, world->bodies [bob].object_id,
-                             (vector3){0.0f, 0.0f, 0.0f}, (vector3){-1.0f, 2.0f, 0.0f}, (vector3){0.0f, 0.0f, 1.0f});
-    int plat = physics_world_add_cube (world, (vector3){0.0f, 0.25f, -8.0f}, (vector3){1.0f, 0.25f, 1.0f}, 1.0f);
-    rigidbody_set_kinematic (&world->bodies [plat], true);
-    world->bodies [plat].velocity = (vector3){1.5f, 0.0f, 0.0f};
-    physics_world_add_cube (world, (vector3){0.0f, 0.75f, -8.0f}, (vector3){0.25f, 0.25f, 0.25f}, 1.0f);
-    int fast = physics_world_add_sphere (world, 0.5f, 1.0f, (vector3){-30.0f, 5.0f, 8.0f});
-    world->bodies [fast].velocity = (vector3){144.0f, 0.0f, 0.0f};
-    world->bodies [fast].restitution = 0.0f;
-    rigidbody_wake (&world->bodies [fast]);
+    int anchor = physics_world_add_cube (world, (vector3) {0.0f, 50.0f, 0.0f}, (vector3) {0.5f, 0.5f, 0.5f}, 0.0f);
+    int smass = physics_world_add_sphere (world, 0.2f, 1.0f, (vector3) {2.5f, 50.0f, 0.0f});
+    add_joint_by_ids (world, world -> bodies [anchor].object_id, world -> bodies [smass].object_id, 2.0f, 20.0f, 0.0f);
+    int pivot = physics_world_add_cube (world, (vector3) {8.0f, 10.0f, 0.0f}, (vector3) {0.2f, 0.2f, 0.2f}, 1.0f);
+    rigidbody_set_static (&world -> bodies [pivot], true);
+    int bob = physics_world_add_sphere (world, 0.3f, 2.0f, (vector3) {9.0f, 8.0f, 0.0f});
+    constraint_add_revolute (world, world -> bodies [pivot].object_id, world -> bodies [bob].object_id,
+                             (vector3) {0.0f, 0.0f, 0.0f}, (vector3) {-1.0f, 2.0f, 0.0f}, (vector3) {0.0f, 0.0f, 1.0f});
+    int plat = physics_world_add_cube (world, (vector3) {0.0f, 0.25f, -8.0f}, (vector3) {1.0f, 0.25f, 1.0f}, 1.0f);
+    rigidbody_set_kinematic (&world -> bodies [plat], true);
+    world -> bodies [plat].velocity = (vector3) {1.5f, 0.0f, 0.0f};
+    physics_world_add_cube (world, (vector3) {0.0f, 0.75f, -8.0f}, (vector3) {0.25f, 0.25f, 0.25f}, 1.0f);
+    int fast = physics_world_add_sphere (world, 0.5f, 1.0f, (vector3) {-30.0f, 5.0f, 8.0f});
+    world -> bodies [fast].velocity = (vector3) {144.0f, 0.0f, 0.0f};
+    world -> bodies [fast].restitution = 0.0f;
+    rigidbody_wake (&world -> bodies [fast]);
 }
 /* CCD battery: thin static wall + three restitution-0 balls at
  * 60/144/300 m/s in separate z lanes. */
 static void scene_ccd_only (physics_world *world) {
-    physics_world_add_cube (world, (vector3){0.0f, 5.0f, 0.0f}, (vector3){0.05f, 5.0f, 8.0f}, 0.0f);
+    physics_world_add_cube (world, (vector3) {0.0f, 5.0f, 0.0f}, (vector3) {0.05f, 5.0f, 8.0f}, 0.0f);
     float speeds [3] = {60.0f, 144.0f, 300.0f};
     for (int k = 0; k < 3; k++) {
-        int s = physics_world_add_sphere (world, 0.5f, 1.0f, (vector3){-5.7f, 5.0f, -5.0f + 5.0f * k});
-        world->bodies [s].velocity = (vector3){speeds [k], 0.0f, 0.0f};
-        world->bodies [s].restitution = 0.0f;
-        rigidbody_wake (&world->bodies [s]);
+        int s = physics_world_add_sphere (world, 0.5f, 1.0f, (vector3) {-5.7f, 5.0f, -5.0f + 5.0f * k});
+        world -> bodies [s].velocity = (vector3) {speeds [k], 0.0f, 0.0f};
+        world -> bodies [s].restitution = 0.0f;
+        rigidbody_wake (&world -> bodies [s]);
     }
 }
 static void scene_springlab_only (physics_world *world) {
     /* Per-scene config: zero-g vacuum WITHOUT touching the global g_cfg,
      * so other scenes/runs in this process are unaffected. */
     mpe_config_t *sc = mpe_world_cfg_mut (world);
-    sc->world.gravity = 0.0f;
-    sc->world.drag = 1.0f;
-    sc->world.angular_damping_scale = 1.0f;
+    sc -> world.gravity = 0.0f;
+    sc -> world.drag = 1.0f;
+    sc -> world.angular_damping_scale = 1.0f;
     constraint_pool_init (world);
     joint_init_pool (world);
-    int anchor = physics_world_add_cube (world, (vector3){0.0f, 50.0f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 0.0f);
-    int mass = physics_world_add_sphere (world, 0.2f, 1.0f, (vector3){2.5f, 50.0f, 0.0f});
-    add_joint_by_ids (world, world->bodies [anchor].object_id, world->bodies [mass].object_id, 2.0f, 20.0f, 0.0f);
+    int anchor = physics_world_add_cube (world, (vector3) {0.0f, 50.0f, 0.0f}, (vector3) {0.5f, 0.5f, 0.5f}, 0.0f);
+    int mass = physics_world_add_sphere (world, 0.2f, 1.0f, (vector3) {2.5f, 50.0f, 0.0f});
+    add_joint_by_ids (world, world -> bodies [anchor].object_id, world -> bodies [mass].object_id, 2.0f, 20.0f, 0.0f);
 }
 static void scene_demo (physics_world *world) {
     scene_floor (world);
@@ -225,56 +225,56 @@ static void scene_demo (physics_world *world) {
     /* 3-cube tower (stacking truth). */
     const float h = 0.4f;
     for (int i = 0; i < 3; i++) {
-        physics_world_add_cube (world, (vector3){-3.0f, h + (float) i * 2.0f * h, 0.0f}, (vector3){h, h, h}, 1.0f);
+        physics_world_add_cube (world, (vector3) {-3.0f, h + (float) i * 2.0f * h, 0.0f}, (vector3) {h, h, h}, 1.0f);
     }
     /* Pure-rolling sphere (rolling-resistance truth). */
-    int roller = physics_world_add_sphere (world, 0.5f, 1.0f, (vector3){3.0f, 0.5f, 0.0f});
-    world->bodies [roller].velocity = (vector3){2.0f, 0.0f, 0.0f};
-    world->bodies [roller].angular_velocity = (vector3){0.0f, 0.0f, -4.0f};
-    rigidbody_wake (&world->bodies [roller]);
+    int roller = physics_world_add_sphere (world, 0.5f, 1.0f, (vector3) {3.0f, 0.5f, 0.0f});
+    world -> bodies [roller].velocity = (vector3) {2.0f, 0.0f, 0.0f};
+    world -> bodies [roller].angular_velocity = (vector3) {0.0f, 0.0f, -4.0f};
+    rigidbody_wake (&world -> bodies [roller]);
     /* Cylinder wheel. */
-    int wheel = physics_world_add_cylinder (world, 0.3f, 0.15f, 2.0f, (vector3){5.0f, 0.6f, 2.0f});
-    world->bodies [wheel].velocity = (vector3){1.0f, 0.0f, 0.0f};
-    rigidbody_wake (&world->bodies [wheel]);
+    int wheel = physics_world_add_cylinder (world, 0.3f, 0.15f, 2.0f, (vector3) {5.0f, 0.6f, 2.0f});
+    world -> bodies [wheel].velocity = (vector3) {1.0f, 0.0f, 0.0f};
+    rigidbody_wake (&world -> bodies [wheel]);
     /* Spring lab, high above contacts. */
-    int anchor = physics_world_add_cube (world, (vector3){0.0f, 50.0f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 0.0f);
-    int smass = physics_world_add_sphere (world, 0.2f, 1.0f, (vector3){2.5f, 50.0f, 0.0f});
-    add_joint_by_ids (world, world->bodies [anchor].object_id, world->bodies [smass].object_id, 2.0f, 20.0f, 0.0f);
+    int anchor = physics_world_add_cube (world, (vector3) {0.0f, 50.0f, 0.0f}, (vector3) {0.5f, 0.5f, 0.5f}, 0.0f);
+    int smass = physics_world_add_sphere (world, 0.2f, 1.0f, (vector3) {2.5f, 50.0f, 0.0f});
+    add_joint_by_ids (world, world -> bodies [anchor].object_id, world -> bodies [smass].object_id, 2.0f, 20.0f, 0.0f);
     /* Revolute pendulum. */
-    int pivot = physics_world_add_cube (world, (vector3){8.0f, 10.0f, 0.0f}, (vector3){0.2f, 0.2f, 0.2f}, 1.0f);
-    rigidbody_set_static (&world->bodies [pivot], true);
-    int bob = physics_world_add_sphere (world, 0.3f, 2.0f, (vector3){9.0f, 8.0f, 0.0f});
-    int rev = constraint_add_revolute (world, world->bodies [pivot].object_id, world->bodies [bob].object_id,
-                                       (vector3){0.0f, 0.0f, 0.0f}, (vector3){-1.0f, 2.0f, 0.0f},
-                                       (vector3){0.0f, 0.0f, 1.0f});
+    int pivot = physics_world_add_cube (world, (vector3) {8.0f, 10.0f, 0.0f}, (vector3) {0.2f, 0.2f, 0.2f}, 1.0f);
+    rigidbody_set_static (&world -> bodies [pivot], true);
+    int bob = physics_world_add_sphere (world, 0.3f, 2.0f, (vector3) {9.0f, 8.0f, 0.0f});
+    int rev = constraint_add_revolute (world, world -> bodies [pivot].object_id, world -> bodies [bob].object_id,
+                                       (vector3) {0.0f, 0.0f, 0.0f}, (vector3) {-1.0f, 2.0f, 0.0f},
+                                       (vector3) {0.0f, 0.0f, 1.0f});
     (void) rev;
     /* Prismatic slider (free vertical slide, limited). */
-    int pa = physics_world_add_cube (world, (vector3){-8.0f, 20.0f, 0.0f}, (vector3){0.3f, 0.3f, 0.3f}, 1.0f);
-    int pb = physics_world_add_cube (world, (vector3){-8.0f, 21.0f, 0.0f}, (vector3){0.3f, 0.3f, 0.3f}, 1.0f);
-    int pri = constraint_add_prismatic (world, world->bodies [pa].object_id, world->bodies [pb].object_id,
-                                        (vector3){0.0f, 0.0f, 0.0f}, (vector3){0.0f, -1.0f, 0.0f},
-                                        (vector3){0.0f, 1.0f, 0.0f});
+    int pa = physics_world_add_cube (world, (vector3) {-8.0f, 20.0f, 0.0f}, (vector3) {0.3f, 0.3f, 0.3f}, 1.0f);
+    int pb = physics_world_add_cube (world, (vector3) {-8.0f, 21.0f, 0.0f}, (vector3) {0.3f, 0.3f, 0.3f}, 1.0f);
+    int pri = constraint_add_prismatic (world, world -> bodies [pa].object_id, world -> bodies [pb].object_id,
+                                        (vector3) {0.0f, 0.0f, 0.0f}, (vector3) {0.0f, -1.0f, 0.0f},
+                                        (vector3) {0.0f, 1.0f, 0.0f});
     if (pri >= 0) {
         constraint_set_prismatic_limits (world, pri, true, -0.5f, 0.5f);
     }
     /* Rope (slack) + distance rod + fixed weld, all free-falling groups. */
-    int r1 = physics_world_add_sphere (world, 0.25f, 1.0f, (vector3){2.0f, 30.0f, 0.0f});
-    int r2 = physics_world_add_sphere (world, 0.25f, 1.0f, (vector3){3.2f, 30.0f, 0.0f});
-    constraint_add_rope (world, world->bodies [r1].object_id, world->bodies [r2].object_id, (vector3){0.0f, 0.0f, 0.0f},
-                         (vector3){0.0f, 0.0f, 0.0f}, 2.0f);
-    int d1 = physics_world_add_sphere (world, 0.25f, 1.0f, (vector3){-2.0f, 35.0f, 0.0f});
-    int d2 = physics_world_add_sphere (world, 0.25f, 1.0f, (vector3){-1.0f, 35.0f, 0.0f});
-    constraint_add_distance (world, world->bodies [d1].object_id, world->bodies [d2].object_id,
-                             (vector3){0.0f, 0.0f, 0.0f}, (vector3){0.0f, 0.0f, 0.0f}, 1.0f);
-    int f1 = physics_world_add_cube (world, (vector3){2.0f, 40.0f, 0.0f}, (vector3){0.25f, 0.25f, 0.25f}, 1.0f);
-    int f2 = physics_world_add_cube (world, (vector3){2.0f, 40.5f, 0.0f}, (vector3){0.25f, 0.25f, 0.25f}, 1.0f);
-    constraint_add_fixed (world, world->bodies [f1].object_id, world->bodies [f2].object_id, (vector3){0.0f, 0.25f, 0.0f},
-                          (vector3){0.0f, -0.25f, 0.0f});
+    int r1 = physics_world_add_sphere (world, 0.25f, 1.0f, (vector3) {2.0f, 30.0f, 0.0f});
+    int r2 = physics_world_add_sphere (world, 0.25f, 1.0f, (vector3) {3.2f, 30.0f, 0.0f});
+    constraint_add_rope (world, world -> bodies [r1].object_id, world -> bodies [r2].object_id, (vector3) {0.0f, 0.0f, 0.0f},
+                         (vector3) {0.0f, 0.0f, 0.0f}, 2.0f);
+    int d1 = physics_world_add_sphere (world, 0.25f, 1.0f, (vector3) {-2.0f, 35.0f, 0.0f});
+    int d2 = physics_world_add_sphere (world, 0.25f, 1.0f, (vector3) {-1.0f, 35.0f, 0.0f});
+    constraint_add_distance (world, world -> bodies [d1].object_id, world -> bodies [d2].object_id,
+                             (vector3) {0.0f, 0.0f, 0.0f}, (vector3) {0.0f, 0.0f, 0.0f}, 1.0f);
+    int f1 = physics_world_add_cube (world, (vector3) {2.0f, 40.0f, 0.0f}, (vector3) {0.25f, 0.25f, 0.25f}, 1.0f);
+    int f2 = physics_world_add_cube (world, (vector3) {2.0f, 40.5f, 0.0f}, (vector3) {0.25f, 0.25f, 0.25f}, 1.0f);
+    constraint_add_fixed (world, world -> bodies [f1].object_id, world -> bodies [f2].object_id, (vector3) {0.0f, 0.25f, 0.0f},
+                          (vector3) {0.0f, -0.25f, 0.0f});
     /* Kinematic conveyor + rider (prescribed velocity truth). */
-    int plat = physics_world_add_cube (world, (vector3){0.0f, 0.25f, -5.0f}, (vector3){1.0f, 0.25f, 1.0f}, 1.0f);
-    rigidbody_set_kinematic (&world->bodies [plat], true);
-    world->bodies [plat].velocity = (vector3){1.5f, 0.0f, 0.0f};
-    physics_world_add_cube (world, (vector3){0.0f, 0.75f, -5.0f}, (vector3){0.25f, 0.25f, 0.25f}, 1.0f);
+    int plat = physics_world_add_cube (world, (vector3) {0.0f, 0.25f, -5.0f}, (vector3) {1.0f, 0.25f, 1.0f}, 1.0f);
+    rigidbody_set_kinematic (&world -> bodies [plat], true);
+    world -> bodies [plat].velocity = (vector3) {1.5f, 0.0f, 0.0f};
+    physics_world_add_cube (world, (vector3) {0.0f, 0.75f, -5.0f}, (vector3) {0.25f, 0.25f, 0.25f}, 1.0f);
 }
 static int build_scene (physics_world *world, const char *name) {
     if (!name || strcmp (name, "demo") == 0) {
@@ -345,12 +345,12 @@ int main (int argc, char *argv []) {
             return 0;
         } else if (strcmp (argv [i], "--snapshot") == 0) {
             want_snapshot = true;
-            if (i + 1 < argc && argv [i + 1] [0] != '-') {
+            if (i + 1 < argc && argv [i + 1][0] != '-') {
                 ticks = tui_parse_count (argv [++i], 600);
             }
         } else if (strcmp (argv [i], "--stream") == 0) {
             want_stream = true;
-            if (i + 1 < argc && argv [i + 1] [0] != '-') {
+            if (i + 1 < argc && argv [i + 1][0] != '-') {
                 ticks = tui_parse_count (argv [++i], 600);
             }
         } else if (strcmp (argv [i], "--every") == 0 && i + 1 < argc) {

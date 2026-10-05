@@ -118,31 +118,31 @@ void config_menu_update (GtkWidget *parent_window) {
         return;
     }
     const mpe_param *param = category_params [config_menu_selected_param];
-    if ((param->debug_only) && (!main_inputs.is_debug_mode_active)) {
+    if ((param -> debug_only) && (!main_inputs.is_debug_mode_active)) {
         config_menu_selected_param = -1;
         return;
     }
     float current_value = 0.0f;
-    if (param->type == p_float) {
-        current_value = *(float *) param->storage;
-    } else if (param->type == p_int) {
-        current_value = (float) (*(int *) param->storage);
-    } else if (param->type == p_bool) {
-        current_value = (*(bool *) param->storage) ? 1.0f : 0.0f;
+    if (param -> type == p_float) {
+        current_value = *(float *) param -> storage;
+    } else if (param -> type == p_int) {
+        current_value = (float) (*(int *) param -> storage);
+    } else if (param -> type == p_bool) {
+        current_value = (*(bool *) param -> storage) ? 1.0f : 0.0f;
     }
-    float new_value = open_numerical_input_dialog (parent_window, param->display, current_value);
-    if (new_value < (float) param->min) {
-        new_value = (float) param->min;
+    float new_value = open_numerical_input_dialog (parent_window, param -> display, current_value);
+    if (new_value < (float) param -> min) {
+        new_value = (float) param -> min;
     }
-    if (new_value > (float) param->max) {
-        new_value = (float) param->max;
+    if (new_value > (float) param -> max) {
+        new_value = (float) param -> max;
     }
-    if (param->type == p_float) {
-        *(float *) param->storage = new_value;
-    } else if (param->type == p_int) {
-        *(int *) param->storage = (int) new_value;
-    } else if (param->type == p_bool) {
-        *(bool *) param->storage = (new_value != 0.0f);
+    if (param -> type == p_float) {
+        *(float *) param -> storage = new_value;
+    } else if (param -> type == p_int) {
+        *(int *) param -> storage = (int) new_value;
+    } else if (param -> type == p_bool) {
+        *(bool *) param -> storage = (new_value != 0.0f);
     }
     if ((category == cat_solver) || (category == cat_timestep) || (category == cat_depenetration)) {
         contact_cache_clear (physics_world_get_primary ());
@@ -197,19 +197,19 @@ void config_menu_render (char *buffer, size_t buffer_size) {
         for (size_t i = 0; (i < param_count) && (offset < buffer_size - 64); i++) {
             const mpe_param *p = category_params [i];
             float val = 0.0f;
-            if (p->type == p_float) {
-                val = *(float *) p->storage;
-            } else if (p->type == p_int) {
-                val = (float) (*(int *) p->storage);
-            } else if (p->type == p_bool) {
-                val = (*(bool *) p->storage) ? 1.0f : 0.0f;
+            if (p -> type == p_float) {
+                val = *(float *) p -> storage;
+            } else if (p -> type == p_int) {
+                val = (float) (*(int *) p -> storage);
+            } else if (p -> type == p_bool) {
+                val = (*(bool *) p -> storage) ? 1.0f : 0.0f;
             }
-            const char *debug_tag = (p->debug_only) ? " [D]" : "";
-            if (p->type == p_int) {
-                offset += snprintf (buffer + offset, buffer_size - offset, "%zu: %s = %d%s\n", i + 1, p->display,
+            const char *debug_tag = (p -> debug_only) ? " [D]" : "";
+            if (p -> type == p_int) {
+                offset += snprintf (buffer + offset, buffer_size - offset, "%zu: %s = %d%s\n", i + 1, p -> display,
                                     (int) val, debug_tag);
             } else {
-                offset += snprintf (buffer + offset, buffer_size - offset, "%zu: %s = %.4f%s\n", i + 1, p->display, val,
+                offset += snprintf (buffer + offset, buffer_size - offset, "%zu: %s = %.4f%s\n", i + 1, p -> display, val,
                                     debug_tag);
             }
         }

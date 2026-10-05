@@ -86,7 +86,7 @@ static bool mv_set_line (int index, const char *text) {
     if (index < 0)
         return false;
     char *replacement = text && strlen (text) >= (size_t) mv_max_line_len ? term_strndup (text, mv_max_line_len - 1)
-                                                                          : term_strdup (text ? text : "");
+        : term_strdup (text ? text : "");
     if (!replacement || !mv_ensure_capacity (index + 1)) {
         free (replacement);
         return false;
@@ -101,7 +101,7 @@ static bool mv_insert_line (int index, const char *text) {
     if (index < 0 || index > mv.line_count || mv.line_count == INT_MAX)
         return false;
     char *replacement = text && strlen (text) >= (size_t) mv_max_line_len ? term_strndup (text, mv_max_line_len - 1)
-                                                                          : term_strdup (text ? text : "");
+        : term_strdup (text ? text : "");
     if (!replacement || !mv_ensure_capacity (mv.line_count + 1)) {
         free (replacement);
         return false;
@@ -160,12 +160,12 @@ static void mv_clamp_cursor (void) {
 static void mv_snapshot_clear (mv_snapshot *snap) {
     if (!snap)
         return;
-    if (snap->lines) {
-        for (int i = 0; i < snap->line_count; i++)
-            free (snap->lines [i]);
-        free (snap->lines);
+    if (snap -> lines) {
+        for (int i = 0; i < snap -> line_count; i++)
+            free (snap -> lines [i]);
+        free (snap -> lines);
     }
-    *snap = (mv_snapshot){0};
+    * snap = (mv_snapshot) {0};
 }
 static void mv_clear_undo_history (void) {
     for (int i = 0; i < mv_undo_depth; i++)
@@ -195,7 +195,7 @@ static bool mv_undo_push (void) {
         mv_snapshot_clear (&mv.undo_stack [0]);
         for (int i = 1; i < mv_undo_depth; i++)
             mv.undo_stack [i - 1] = mv.undo_stack [i];
-        mv.undo_stack [mv_undo_depth - 1] = (mv_snapshot){0};
+        mv.undo_stack [mv_undo_depth - 1] = (mv_snapshot) {0};
         mv.undo_top = mv_undo_depth - 1;
         mv.redo_top = mv.undo_top;
     }
@@ -207,28 +207,28 @@ static bool mv_undo_push (void) {
     return true;
 }
 static bool mv_restore_snapshot (const mv_snapshot *snap) {
-    if (!snap || snap->line_count <= 0 || !snap->lines)
+    if (!snap || snap -> line_count <= 0 || !snap -> lines)
         return false;
-    char **restored = (char **) calloc ((size_t) snap->line_count, sizeof (*restored));
+    char **restored = (char **) calloc ((size_t) snap -> line_count, sizeof (*restored));
     if (!restored)
         return false;
-    for (int i = 0; i < snap->line_count; i++) {
-        if (!snap->lines [i] || !(restored [i] = term_strdup (snap->lines [i]))) {
+    for (int i = 0; i < snap -> line_count; i++) {
+        if (!snap -> lines [i] || !(restored [i] = term_strdup (snap -> lines [i]))) {
             for (int j = 0; j < i; j++)
                 free (restored [j]);
             free (restored);
             return false;
         }
     }
-    if (!mv_ensure_capacity (snap->line_count)) {
-        for (int i = 0; i < snap->line_count; i++)
+    if (!mv_ensure_capacity (snap -> line_count)) {
+        for (int i = 0; i < snap -> line_count; i++)
             free (restored [i]);
         free (restored);
         return false;
     }
     mv_clear_lines ();
-    memcpy (mv.lines, restored, (size_t) snap->line_count * sizeof (*restored));
-    mv.line_count = snap->line_count;
+    memcpy (mv.lines, restored, (size_t) snap -> line_count * sizeof (*restored));
+    mv.line_count = snap -> line_count;
     free (restored);
     return true;
 }
@@ -358,13 +358,13 @@ static void mv_word_forward (void) {
     int row = mv.cursor_row;
     int col = mv.cursor_col;
     int len = mv_line_len (row);
-    while (col < len && mv_is_word_char (mv.lines [row] [col])) {
+    while (col < len && mv_is_word_char (mv.lines [row][col])) {
         col++;
     }
-    while (col < len && !mv_is_word_char (mv.lines [row] [col]) && mv.lines [row] [col] != ' ') {
+    while (col < len && !mv_is_word_char (mv.lines [row][col]) && mv.lines [row][col] != ' ') {
         col++;
     }
-    while (col < len && mv.lines [row] [col] == ' ') {
+    while (col < len && mv.lines [row][col] == ' ') {
         col++;
     }
     if (col >= len) {
@@ -383,15 +383,15 @@ static void mv_word_backward (void) {
     if (col > 0) {
         col--;
     }
-    while (col > 0 && mv.lines [row] [col] == ' ') {
+    while (col > 0 && mv.lines [row][col] == ' ') {
         col--;
     }
-    if (col > 0 && mv_is_word_char (mv.lines [row] [col])) {
-        while (col > 0 && mv_is_word_char (mv.lines [row] [col - 1])) {
+    if (col > 0 && mv_is_word_char (mv.lines [row][col])) {
+        while (col > 0 && mv_is_word_char (mv.lines [row][col - 1])) {
             col--;
         }
     } else if (col > 0) {
-        while (col > 0 && !mv_is_word_char (mv.lines [row] [col - 1]) && mv.lines [row] [col - 1] != ' ') {
+        while (col > 0 && !mv_is_word_char (mv.lines [row][col - 1]) && mv.lines [row][col - 1] != ' ') {
             col--;
         }
     }
@@ -406,15 +406,15 @@ static void mv_word_end (void) {
     if (col < len) {
         col++;
     }
-    while (col < len && mv.lines [row] [col] == ' ') {
+    while (col < len && mv.lines [row][col] == ' ') {
         col++;
     }
-    if (col < len && mv_is_word_char (mv.lines [row] [col])) {
-        while (col < len && mv_is_word_char (mv.lines [row] [col])) {
+    if (col < len && mv_is_word_char (mv.lines [row][col])) {
+        while (col < len && mv_is_word_char (mv.lines [row][col])) {
             col++;
         }
     } else {
-        while (col < len && !mv_is_word_char (mv.lines [row] [col]) && mv.lines [row] [col] != ' ') {
+        while (col < len && !mv_is_word_char (mv.lines [row][col]) && mv.lines [row][col] != ' ') {
             col++;
         }
     }
@@ -556,7 +556,7 @@ static void mv_delete_to_end (void) {
     }
     mv.yank_text = term_strdup (mv.lines [row] + col);
     mv.yank_is_linewise = false;
-    mv.lines [row] [col] = '\0';
+    mv.lines [row][col] = '\0';
     mv.modified = true;
     mv_clamp_cursor ();
 }
@@ -665,7 +665,7 @@ static void mv_insert_newline (void) {
         free (second_half);
         return;
     }
-    mv.lines [row] [col] = '\0';
+    mv.lines [row][col] = '\0';
     free (second_half);
     mv.cursor_row++;
     mv.cursor_col = 0;
@@ -940,91 +940,91 @@ static void mv_handle_normal_key (guint keyval, guint keycode, GdkModifierType s
         return;
     }
     switch (key) {
-    case GDK_KEY_h:
+        case GDK_KEY_h:
     case GDK_KEY_Left:
         mv.cursor_col--;
         mv_clamp_cursor ();
         break;
-    case GDK_KEY_j:
+        case GDK_KEY_j:
     case GDK_KEY_Down:
         mv.cursor_row++;
         mv_clamp_cursor ();
         break;
-    case GDK_KEY_k:
+        case GDK_KEY_k:
     case GDK_KEY_Up:
         mv.cursor_row--;
         mv_clamp_cursor ();
         break;
-    case GDK_KEY_l:
+        case GDK_KEY_l:
     case GDK_KEY_Right:
         mv.cursor_col++;
         mv_clamp_cursor ();
         break;
-    case GDK_KEY_w:
+        case GDK_KEY_w:
         mv_word_forward ();
         break;
-    case GDK_KEY_b:
+        case GDK_KEY_b:
         mv_word_backward ();
         break;
-    case GDK_KEY_e:
+        case GDK_KEY_e:
         mv_word_end ();
         break;
-    case GDK_KEY_0:
+        case GDK_KEY_0:
     case GDK_KEY_Home:
         mv.cursor_col = 0;
         break;
-    case GDK_KEY_dollar:
+        case GDK_KEY_dollar:
     case GDK_KEY_End:
         mv.cursor_col = mv_line_len (mv.cursor_row);
         break;
-    case GDK_KEY_g:
+        case GDK_KEY_g:
         mv.pending_op = 'g';
         break;
-    case GDK_KEY_G:
+        case GDK_KEY_G:
         mv.cursor_row = mv.line_count - 1;
         mv.cursor_col = 0;
         break;
-    case GDK_KEY_braceleft: {
-        mv.cursor_row--;
-        while (mv.cursor_row > 0 && mv_line_len (mv.cursor_row) > 0) {
+        case GDK_KEY_braceleft: {
             mv.cursor_row--;
+            while (mv.cursor_row > 0 && mv_line_len (mv.cursor_row) > 0) {
+                mv.cursor_row--;
+            }
+            mv.cursor_col = 0;
+            break;
         }
-        mv.cursor_col = 0;
-        break;
-    }
-    case GDK_KEY_braceright: {
-        mv.cursor_row++;
-        while (mv.cursor_row < mv.line_count - 1 && mv_line_len (mv.cursor_row) > 0) {
+        case GDK_KEY_braceright: {
             mv.cursor_row++;
+            while (mv.cursor_row < mv.line_count - 1 && mv_line_len (mv.cursor_row) > 0) {
+                mv.cursor_row++;
+            }
+            mv.cursor_col = 0;
+            break;
         }
-        mv.cursor_col = 0;
-        break;
-    }
-    case GDK_KEY_i:
+        case GDK_KEY_i:
         if (!mv_undo_push ())
             break;
         mv.mode = mv_insert;
         break;
-    case GDK_KEY_I:
+        case GDK_KEY_I:
         if (!mv_undo_push ())
             break;
         mv.cursor_col = 0;
         mv.mode = mv_insert;
         break;
-    case GDK_KEY_a:
+        case GDK_KEY_a:
         if (!mv_undo_push ())
             break;
         mv.cursor_col++;
         mv_clamp_cursor ();
         mv.mode = mv_insert;
         break;
-    case GDK_KEY_A:
+        case GDK_KEY_A:
         if (!mv_undo_push ())
             break;
         mv.cursor_col = mv_line_len (mv.cursor_row);
         mv.mode = mv_insert;
         break;
-    case GDK_KEY_o:
+        case GDK_KEY_o:
         if (!mv_undo_push ())
             return;
         if (!mv_insert_line (mv.cursor_row + 1, ""))
@@ -1034,7 +1034,7 @@ static void mv_handle_normal_key (guint keyval, guint keycode, GdkModifierType s
         mv.mode = mv_insert;
         mv.modified = true;
         break;
-    case GDK_KEY_O:
+        case GDK_KEY_O:
         if (!mv_undo_push ())
             return;
         if (!mv_insert_line (mv.cursor_row, ""))
@@ -1043,110 +1043,110 @@ static void mv_handle_normal_key (guint keyval, guint keycode, GdkModifierType s
         mv.mode = mv_insert;
         mv.modified = true;
         break;
-    case GDK_KEY_x:
+        case GDK_KEY_x:
         mv_delete_char_under_cursor ();
         break;
-    case GDK_KEY_X:
+        case GDK_KEY_X:
         mv_delete_char_before_cursor ();
         break;
-    case GDK_KEY_d:
+        case GDK_KEY_d:
         mv.pending_op = 'd';
         break;
-    case GDK_KEY_c:
+        case GDK_KEY_c:
         mv.pending_op = 'c';
         break;
-    case GDK_KEY_y:
+        case GDK_KEY_y:
         mv.pending_op = 'y';
         break;
-    case GDK_KEY_p:
+        case GDK_KEY_p:
         mv_paste (true);
         break;
-    case GDK_KEY_P:
+        case GDK_KEY_P:
         mv_paste (false);
         break;
-    case GDK_KEY_u:
+        case GDK_KEY_u:
         mv_undo_perform ();
         break;
-    case GDK_KEY_J:
+        case GDK_KEY_J:
         mv_join_lines ();
         break;
-    case GDK_KEY_D:
+        case GDK_KEY_D:
         mv_delete_to_end ();
         break;
-    case GDK_KEY_C:
+        case GDK_KEY_C:
         mv_delete_to_end ();
         mv.mode = mv_insert;
         break;
-    case GDK_KEY_S:
+        case GDK_KEY_S:
         mv_delete_line_op ();
         mv.mode = mv_insert;
         break;
-    case GDK_KEY_asciitilde: {
-        int row = mv.cursor_row;
-        int col = mv.cursor_col;
-        int len = mv_line_len (row);
-        if (col < len) {
-            if (!mv_undo_push ())
-                return;
-            char c = mv.lines [row] [col];
-            mv.lines [row] [col] =
+        case GDK_KEY_asciitilde: {
+            int row = mv.cursor_row;
+            int col = mv.cursor_col;
+            int len = mv_line_len (row);
+            if (col < len) {
+                if (!mv_undo_push ())
+                    return;
+                char c = mv.lines [row][col];
+                mv.lines [row][col] =
                 isupper ((unsigned char) c) ? tolower ((unsigned char) c) : toupper ((unsigned char) c);
-            mv.cursor_col++;
-            mv.modified = true;
-            mv_clamp_cursor ();
+                mv.cursor_col++;
+                mv.modified = true;
+                mv_clamp_cursor ();
+            }
+            break;
         }
-        break;
-    }
-    case GDK_KEY_slash:
+        case GDK_KEY_slash:
         mv.mode = mv_search;
         mv.search_forward = true;
         mv.search_len = 0;
         mv.search_buf [0] = '\0';
         break;
-    case GDK_KEY_question:
+        case GDK_KEY_question:
         mv.mode = mv_search;
         mv.search_forward = false;
         mv.search_len = 0;
         mv.search_buf [0] = '\0';
         break;
-    case GDK_KEY_n:
+        case GDK_KEY_n:
         mv_search_execute (mv.search_forward);
         break;
-    case GDK_KEY_N:
+        case GDK_KEY_N:
         mv_search_execute (!mv.search_forward);
         break;
-    case GDK_KEY_asterisk: {
-        int row = mv.cursor_row;
-        int col = mv.cursor_col;
-        int len = mv_line_len (row);
-        int start = col;
-        while (start > 0 && mv_is_word_char (mv.lines [row] [start - 1])) {
-            start--;
-        }
-        int end = col;
-        while (end < len && mv_is_word_char (mv.lines [row] [end])) {
-            end++;
-        }
-        if (end > start) {
-            int wlen = end - start;
-            if (wlen < 255) {
-                strncpy (mv.search_buf, mv.lines [row] + start, (size_t) wlen);
-                mv.search_buf [wlen] = '\0';
-                mv.search_len = wlen;
-                mv.search_forward = true;
-                mv_search_execute (true);
+        case GDK_KEY_asterisk: {
+            int row = mv.cursor_row;
+            int col = mv.cursor_col;
+            int len = mv_line_len (row);
+            int start = col;
+            while (start > 0 && mv_is_word_char (mv.lines [row][start - 1])) {
+                start--;
             }
+            int end = col;
+            while (end < len && mv_is_word_char (mv.lines [row][end])) {
+                end++;
+            }
+            if (end > start) {
+                int wlen = end - start;
+                if (wlen < 255) {
+                    strncpy (mv.search_buf, mv.lines [row] + start, (size_t) wlen);
+                    mv.search_buf [wlen] = '\0';
+                    mv.search_len = wlen;
+                    mv.search_forward = true;
+                    mv_search_execute (true);
+                }
+            }
+            break;
         }
-        break;
-    }
-    case GDK_KEY_colon:
+        case GDK_KEY_colon:
         mv.mode = mv_command;
         mv.command_len = 0;
         mv.command_buf [0] = '\0';
         break;
-    case GDK_KEY_Escape:
+        case GDK_KEY_Escape:
         break;
-    default:
+        default:
         break;
     }
 }
@@ -1206,10 +1206,10 @@ static void mv_handle_insert_key (guint keyval, guint keycode, GdkModifierType s
         if (!mv_undo_push ())
             return;
         int col = mv.cursor_col;
-        while (col > 0 && mv.lines [mv.cursor_row] [col - 1] == ' ') {
+        while (col > 0 && mv.lines [mv.cursor_row][col - 1] == ' ') {
             col--;
         }
-        while (col > 0 && mv_is_word_char (mv.lines [mv.cursor_row] [col - 1])) {
+        while (col > 0 && mv_is_word_char (mv.lines [mv.cursor_row][col - 1])) {
             col--;
         }
         int deleted = mv.cursor_col - col;
@@ -1458,12 +1458,12 @@ void microvim_close (void) {
     }
     for (int i = 0; i < mv_undo_depth; i++) {
         mv_snapshot *s = &mv.undo_stack [i];
-        if (s->lines) {
-            for (int j = 0; j < s->line_count; j++) {
-                free (s->lines [j]);
+        if (s -> lines) {
+            for (int j = 0; j < s -> line_count; j++) {
+                free (s -> lines [j]);
             }
-            free (s->lines);
-            s->lines = NULL;
+            free (s -> lines);
+            s -> lines = NULL;
         }
     }
     mv.active = false;
@@ -1474,16 +1474,16 @@ void microvim_handle_key (guint keyval, guint keycode, GdkModifierType state) {
         return;
     }
     switch (mv.mode) {
-    case mv_normal:
+        case mv_normal:
         mv_handle_normal_key (keyval, keycode, state);
         break;
-    case mv_insert:
+        case mv_insert:
         mv_handle_insert_key (keyval, keycode, state);
         break;
-    case mv_command:
+        case mv_command:
         mv_handle_command_key (keyval, keycode, state);
         break;
-    case mv_search:
+        case mv_search:
         mv_handle_search_key (keyval, keycode, state);
         break;
     }

@@ -46,7 +46,7 @@ static void overlay_append_overflow_text (char *buffer, size_t buffer_size) {
     }
 }
 static bool overlay_has_valid_selection (void) {
-    return (selected_object >= 0) && (selected_object < (physics_world_get_primary ()->body_count));
+    return (selected_object >= 0) && (selected_object < (physics_world_get_primary () -> body_count));
 }
 GtkWidget *overlay_initialise (GtkWidget *gl_drawing_area_widget) {
     GtkWidget *ui_overlay_container = gtk_overlay_new ();
@@ -126,11 +126,11 @@ void overlay_update (void) {
             snprintf (buf, sizeof (buf),
                       "-- Scene Menu --\nObjects: %d | Joints: %d\n\n1: Save Scene\n2: Load Scene\n3: Clear Scene\n4: "
                       "Save Config\n5: Reset Config\n6: Exit",
-                      (physics_world_get_primary ()->body_count), (physics_world_get_primary ()->spring_joint_count));
+                      (physics_world_get_primary () -> body_count), (physics_world_get_primary () -> spring_joint_count));
             gtk_label_set_text (GTK_LABEL (menu_label), buf);
             gtk_widget_set_visible (menu_label, TRUE);
         } else
-            gtk_widget_set_visible (menu_label, FALSE);
+        gtk_widget_set_visible (menu_label, FALSE);
     }
     if (spawner_menu_label) {
         if (main_inputs.spawner_menu_level == 0)
@@ -138,9 +138,9 @@ void overlay_update (void) {
         else {
             char buf [512];
             if (main_inputs.spawner_menu_level == 1) {
-                const char *t = main_inputs.current_spawn_type == 0   ? "Sphere"
-                                : main_inputs.current_spawn_type == 1 ? "Cube"
-                                                                      : "Cylinder";
+                const char *t = main_inputs.current_spawn_type == 0 ? "Sphere"
+                : main_inputs.current_spawn_type == 1 ? "Cube"
+                : "Cylinder";
                 snprintf (buf, sizeof (buf), "-- Spawner Menu --\n1: Sphere\n2: Cube\n3: Current Type: %s\n4: Cylinder",
                           t);
             } else if (main_inputs.spawner_menu_level == 2)
@@ -163,9 +163,9 @@ void overlay_update (void) {
                 snprintf (buf, sizeof (buf), "-- Cube Size --\nCurrent Size: %.2f m\n\nValue dialog active (step %.2f)",
                           g_cfg.spawner.cube_extent, adj);
             else if (main_inputs.spawner_menu_level == 8) {
-                const char *t = main_inputs.current_spawn_type == 0   ? "Sphere"
-                                : main_inputs.current_spawn_type == 1 ? "Cube"
-                                                                      : "Cylinder";
+                const char *t = main_inputs.current_spawn_type == 0 ? "Sphere"
+                : main_inputs.current_spawn_type == 1 ? "Cube"
+                : "Cylinder";
                 snprintf (buf, sizeof (buf),
                           "-- Toggle Spawn Type --\nCurrent: %s\n\nUp/Down: Cycle\nEnter: Save and Close", t);
             } else if (main_inputs.spawner_menu_level == 9)
@@ -183,7 +183,7 @@ void overlay_update (void) {
                           "-- Cylinder Half-Length --\nCurrent: %.2f m\n\nValue dialog active (step %.2f)",
                           g_cfg.spawner.cyl_half_length, adj);
             else
-                buf [0] = 0;
+            buf [0] = 0;
             gtk_label_set_text (GTK_LABEL (spawner_menu_label), buf);
             gtk_widget_set_visible (spawner_menu_label, TRUE);
         }
@@ -241,23 +241,23 @@ void overlay_update (void) {
                           "-- Solver Iterations --\nCurrent: %d passes/tick\n\nValue dialog active (step %.2f)",
                           g_cfg.timestep.solver_iterations, adj);
             else
-                buf [0] = 0;
+            buf [0] = 0;
             gtk_label_set_text (GTK_LABEL (velocity_menu_label), buf);
             gtk_widget_set_visible (velocity_menu_label, TRUE);
         }
     }
     if (object_menu_label) {
         if ((main_inputs.object_menu_level == 0) || (selected_object < 0) ||
-            (selected_object >= (physics_world_get_primary ()->body_count))) {
+            (selected_object >= (physics_world_get_primary () -> body_count))) {
             if (!overlay_has_valid_selection ())
                 main_inputs.object_menu_level = 0;
             gtk_widget_set_visible (object_menu_label, FALSE);
         } else {
             char buf [512];
-            rigidbody *t = &(physics_world_get_primary ()->bodies) [selected_object];
+            rigidbody *t = &(physics_world_get_primary () -> bodies)[selected_object];
             if (main_inputs.object_menu_level == 1) {
-                const char *tn = t->type == object_sphere ? "Sphere" : t->type == object_cylinder ? "Cylinder" : "Cube";
-                const char *rl = t->type == object_cube ? "Radius (N/A)" : "Radius";
+                const char *tn = t -> type == object_sphere ? "Sphere" : t -> type == object_cylinder ? "Cylinder" : "Cube";
+                const char *rl = t -> type == object_cube ? "Radius (N/A)" : "Radius";
                 int len = snprintf (
                     buf, sizeof (buf),
                     "-- Object %d (%s) --\n1: Mass\n2: %s\n3: Friction\n4: Immovable Toggle\n5: Mark for Joint\n",
@@ -267,28 +267,28 @@ void overlay_update (void) {
                     snprintf (buf + len, sizeof (buf) - len, "6: Link Joint (from Obj %d)\n7: Colour Selection",
                               main_inputs.marked_joint_object_index);
                 else
-                    snprintf (buf + len, sizeof (buf) - len, "6: Colour Selection");
+                snprintf (buf + len, sizeof (buf) - len, "6: Colour Selection");
             } else if (main_inputs.object_menu_level == 2)
                 snprintf (buf, sizeof (buf),
-                          "-- Mass Adjustment --\nCurrent: %.2f kg\n\nValue dialog active (step %.2f)", t->mass, adj);
+                          "-- Mass Adjustment --\nCurrent: %.2f kg\n\nValue dialog active (step %.2f)", t -> mass, adj);
             else if (main_inputs.object_menu_level == 3)
                 snprintf (buf, sizeof (buf),
-                          "-- Radius Adjustment --\nCurrent: %.2f m\n\nValue dialog active (step %.2f)", t->radius,
+                          "-- Radius Adjustment --\nCurrent: %.2f m\n\nValue dialog active (step %.2f)", t -> radius,
                           adj);
             else if (main_inputs.object_menu_level == 4)
                 snprintf (buf, sizeof (buf),
                           "-- Friction Adjustment --\nStatic (u_s): %.2f | Kinetic (u_k): %.2f\n\nValue dialog active "
                           "(step %.2f)",
-                          t->friction_static, t->friction_kinetic, adj);
+                          t -> friction_static, t -> friction_kinetic, adj);
             else if (main_inputs.object_menu_level == 5) {
-                const char *s = t->static_state ? "YES" : "NO";
+                const char *s = t -> static_state ? "YES" : "NO";
                 snprintf (buf, sizeof (buf), "-- Immovable Status --\nCurrent: %s\n\nUp/Down: Toggle\nEnter: Save", s);
             } else if (main_inputs.object_menu_level == 8)
                 snprintf (buf, sizeof (buf),
                           "-- Preset Colours --\n1: Red\n2: Green\n3: Blue\n4: Orange\n5: Cyan\n6: Magenta\n7: "
                           "Yellow\n8: White");
             else
-                buf [0] = 0;
+            buf [0] = 0;
             gtk_label_set_text (GTK_LABEL (object_menu_label), buf);
             gtk_widget_set_visible (object_menu_label, TRUE);
         }
@@ -299,7 +299,7 @@ void overlay_update (void) {
                 gtk_label_set_text (GTK_LABEL (config_menu_label), cb);
                 gtk_widget_set_visible (config_menu_label, TRUE);
             } else
-                gtk_widget_set_visible (config_menu_label, FALSE);
+            gtk_widget_set_visible (config_menu_label, FALSE);
         }
     }
     if (!debug_information_label)
@@ -307,10 +307,10 @@ void overlay_update (void) {
     char ibuf [1024];
     char mode [32];
     snprintf (mode, sizeof (mode), "%s", main_inputs.is_debug_mode_active ? "DEBUG MODE" : "GAME MODE");
-    if ((selected_object < 0) || (selected_object >= (physics_world_get_primary ()->body_count))) {
-        const char *st = main_inputs.current_spawn_type == 0   ? "sphere"
-                         : main_inputs.current_spawn_type == 1 ? "cube"
-                                                               : "cylinder";
+    if ((selected_object < 0) || (selected_object >= (physics_world_get_primary () -> body_count))) {
+        const char *st = main_inputs.current_spawn_type == 0 ? "sphere"
+        : main_inputs.current_spawn_type == 1 ? "cube"
+        : "cylinder";
         snprintf (ibuf, sizeof (ibuf), "[%s] | No object selected | Enter: spawn %s | R-Click: select | 0: Toggle Mode",
                   mode, st);
         overlay_append_stats_text (ibuf, sizeof (ibuf));
@@ -318,13 +318,13 @@ void overlay_update (void) {
         gtk_label_set_text (GTK_LABEL (debug_information_label), ibuf);
         return;
     }
-    rigidbody *rb = &(physics_world_get_primary ()->bodies) [selected_object];
-    float spd = vector3_length (rb->velocity);
-    const char *ot = rb->type == object_sphere ? "Sphere" : rb->type == object_cylinder ? "Cylinder" : "Cube";
-    const char *stt = rb->static_state ? "(Static)" : "(Dynamic)";
+    rigidbody *rb = &(physics_world_get_primary () -> bodies)[selected_object];
+    float spd = vector3_length (rb -> velocity);
+    const char *ot = rb -> type == object_sphere ? "Sphere" : rb -> type == object_cylinder ? "Cylinder" : "Cube";
+    const char *stt = rb -> static_state ? "(Static)" : "(Dynamic)";
     snprintf (ibuf, sizeof (ibuf),
               "[%s] | %s [%d] %s | Pos: (%.1f, %.1f, %.1f) | Speed: %.2f | E: Menu | F: Impulse | M-Click: remove",
-              mode, ot, selected_object, stt, rb->position.x, rb->position.y, rb->position.z, spd);
+              mode, ot, selected_object, stt, rb -> position.x, rb -> position.y, rb -> position.z, spd);
     overlay_append_stats_text (ibuf, sizeof (ibuf));
     overlay_append_overflow_text (ibuf, sizeof (ibuf));
     gtk_label_set_text (GTK_LABEL (debug_information_label), ibuf);

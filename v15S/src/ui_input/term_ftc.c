@@ -63,22 +63,22 @@ static float ftc_argf (char **argv, int i, int argc, float dflt) {
 static int ftc_ensure_floor (physics_world *w) {
     if (!w)
         return -1;
-    for (int i = 0; i < w->body_count; i++) {
-        rigidbody *b = &w->bodies [i];
-        if (!b->static_state && !(b->mass == 0.0f))
+    for (int i = 0; i < w -> body_count; i++) {
+        rigidbody *b = &w -> bodies [i];
+        if (!b -> static_state && !(b -> mass == 0.0f))
             continue;
-        float top = b->position.y + b->half_extensions.y;
-        if (top > -0.05f && top < 0.05f && fabsf (b->position.x) < 5.0f && fabsf (b->position.z) < 5.0f &&
-            b->half_extensions.x >= 5.0f && b->half_extensions.z >= 5.0f) {
+        float top = b -> position.y + b -> half_extensions.y;
+        if (top > -0.05f && top < 0.05f && fabsf (b -> position.x) < 5.0f && fabsf (b -> position.z) < 5.0f &&
+            b -> half_extensions.x >= 5.0f && b -> half_extensions.z >= 5.0f) {
             return 0;
         }
     }
-    int f = physics_world_add_cube (w, (vector3){0.0f, -0.5f, 0.0f}, (vector3){30.0f, 0.5f, 30.0f}, 0.0f);
+    int f = physics_world_add_cube (w, (vector3) {0.0f, -0.5f, 0.0f}, (vector3) {30.0f, 0.5f, 30.0f}, 0.0f);
     if (f < 0)
         return -1;
-    w->bodies [f].friction_static = 1.0f;
-    w->bodies [f].friction_kinetic = 0.8f;
-    w->bodies [f].restitution = 0.0f;
+    w -> bodies [f].friction_static = 1.0f;
+    w -> bodies [f].friction_kinetic = 0.8f;
+    w -> bodies [f].restitution = 0.0f;
     term_out ("mpe: ftc: tile floor added (robots need frictional contact)\n");
     return 1;
 }
@@ -102,8 +102,8 @@ static int ftc_ensure_driving (void) {
         term_err ("mpe: ftc: no primary world\n");
         return -1;
     }
-    for (int i = 0; i < w->tick_module_count; i++) {
-        if (w->tick_modules [i] == dmod)
+    for (int i = 0; i < w -> tick_module_count; i++) {
+        if (w -> tick_modules [i] == dmod)
             return 0;
     }
     if (physics_world_attach_module (w, dmod) < 0) {
@@ -131,8 +131,8 @@ void cmd_ftc (int argc, char **argv) {
     }
     physics_world *w = physics_world_get_primary ();
     /* Single-robot accessors (index 0 implied; bundle API keeps indices). */
-    ftc_robot *(*p_get) (struct physics_world *, int) =
-        (ftc_robot * (*) (struct physics_world *, int) ) ftc_sym ("ftc_fleet_get");
+    ftc_robot * (*p_get) (struct physics_world *, int) =
+        (ftc_robot * (*) (struct physics_world *, int)) ftc_sym ("ftc_fleet_get");
     int (*p_count) (struct physics_world *) = (int (*) (struct physics_world *)) ftc_sym ("ftc_fleet_count");
     if (term_str_eq (argv [1], "spawn")) {
         if (ftc_ensure_driving () != 0)
@@ -141,7 +141,7 @@ void cmd_ftc (int argc, char **argv) {
             (int (*) (struct physics_world *, float, float, float, motor_preset_id, ftc_drivetrain_type)) ftc_sym (
                 "ftc_fleet_spawn");
         float (*p_rest) (void) = (float (*) (void)) ftc_sym ("ftc_robot_rest_height");
-        const char *(*p_name) (motor_preset_id) = (const char *(*) (motor_preset_id)) ftc_sym ("motor_preset_name");
+        const char * (*p_name) (motor_preset_id) = (const char * (*) (motor_preset_id)) ftc_sym ("motor_preset_name");
         if (!p_spawn || !p_rest || !p_name || !p_count || !w) {
             term_err ("mpe: ftc: bundle API incomplete\n");
             return;
@@ -196,25 +196,25 @@ void cmd_ftc (int argc, char **argv) {
         }
         char buf [256];
         float px = 0, py = 0, pz = 0;
-        if (r->chassis_body >= 0 && r->chassis_body < w->body_count) {
-            px = w->bodies [r->chassis_body].position.x;
-            py = w->bodies [r->chassis_body].position.y;
-            pz = w->bodies [r->chassis_body].position.z;
+        if (r -> chassis_body >= 0 && r -> chassis_body < w -> body_count) {
+            px = w -> bodies [r -> chassis_body].position.x;
+            py = w -> bodies [r -> chassis_body].position.y;
+            pz = w -> bodies [r -> chassis_body].position.z;
         }
         snprintf (buf, sizeof (buf), "mpe: ftc: robot pos=(%.3f,%.3f,%.3f) odom=(%.3f,%.3f,%.3f)%s\n", px, py, pz,
-                  r->odom_x, r->odom_z, r->odom_theta, r->odom_slip ? " SLIP" : "");
+                  r -> odom_x, r -> odom_z, r -> odom_theta, r -> odom_slip ? " SLIP" : "");
         term_out (buf);
         if (p_volt && p_fuse) {
             float isum = 0.0f;
-            for (int k = 0; k < r->wheel_count; k++)
-                isum += r->wheel_motors [k].current;
-            snprintf (buf, sizeof (buf), "mpe: ftc: battery %.2fV (%.0f%%)%s\n", p_volt (&r->battery, isum),
-                      r->battery.charge_fraction * 100.0f, p_fuse (&r->battery) ? " FUSE-TRIPPED" : "");
+            for (int k = 0; k < r -> wheel_count; k++)
+                isum += r -> wheel_motors [k].current;
+            snprintf (buf, sizeof (buf), "mpe: ftc: battery %.2fV (%.0f%%)%s\n", p_volt (&r -> battery, isum),
+                      r -> battery.charge_fraction * 100.0f, p_fuse (&r -> battery) ? " FUSE-TRIPPED" : "");
             term_out (buf);
         }
-        for (int k = 0; k < r->wheel_count; k++) {
+        for (int k = 0; k < r -> wheel_count; k++) {
             snprintf (buf, sizeof (buf), "mpe: ftc: wheel %d cmd=%+.2f rpm=%+.0f I=%+.2fA\n", k,
-                      r->wheel_motors [k].command, r->wheel_motors [k].rpm, r->wheel_motors [k].current);
+                      r -> wheel_motors [k].command, r -> wheel_motors [k].rpm, r -> wheel_motors [k].current);
             term_out (buf);
         }
         return;

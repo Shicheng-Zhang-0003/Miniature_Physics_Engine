@@ -4,7 +4,7 @@
 #include "input_state.h"
 #include <gtk/gtk.h>
 #include <stdbool.h>
-//Initialise input state to zeroing
+// Initialise input state to zeroing
 void initialize_input (input_status *input_state);
 void input_control_attach_controllers (GtkWidget *widget, gpointer user_data);
 gboolean on_keypress (GtkEventControllerKey *ctrl, guint keyval, guint keycode, GdkModifierType state,
