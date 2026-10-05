@@ -1,5 +1,20 @@
 # MFS — overarching module ecosystem ("mfs-simulator")
 
+> **Audit state (2026-10-05).** The 2026-10-02 drift recurred with the
+> guard working correctly and nobody reading it. This tree had again fallen
+> behind its twin at `475-MPE/v15S/src/ecosystem/mfs`, now by 19 files of
+> real content: the idle-tire hold and hysteretic wheel brake, the motor
+> explicit-path load fix, the 128-iteration spawn floor and 30 m field, and
+> the fifteenth gate. Byte drift was reported on 47 files, but 28 of those
+> were the engine tree's tree-wide clang-format pass and nothing else — a
+> reformat larger than the change. Normalising comments and whitespace and
+> comparing token streams showed every one of the 19 was an insertion on the
+> twin's side and none ran the other way, so the twin was a strict superset
+> and the direction was unambiguous rather than guessed. Mirrored all 54
+> shared files twin → this tree; no file added, none removed. Suite **15
+> gated, 15/15**, and 15/15 again under ASan+UBSan with leak detection on.
+> `docs/SYNC_CONTRACT.md` records the method and adds a clause for it.
+
 > **Audit state (2026-10-02).** This tree had silently drifted 11 files behind
 > its twin at `475-MPE/v15S/src/ecosystem/mfs`, including four gated tests it
 > did not contain, because `sync_mfs_check.sh` — advertised in

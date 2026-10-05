@@ -85,3 +85,68 @@ this contract guards:
   never copy them across).
 - "Temporary" local tweaks during debugging that never get mirrored —
   either commit them to both sides or revert before leaving.
+- Fixing a bug in the engine tree's copy and not in the standalone one.
+  This is the direction the drift actually runs in. The embedded copy is
+  built and exercised by the engine's own verification runs, so it is
+  where work lands; the standalone copy is only built when someone
+  remembers to. Every drift recorded above was twin -> standalone, never
+  the reverse.
+
+## Second recurrence: 2026-10-05
+
+The 2026-10-02 drift happened again, and this time the guard was working
+and nobody acted on it. It is recorded here because the mechanism
+differs from the first one and the contract needed a new clause for it.
+
+WHAT THE CHECKER SAID. Byte-level drift on 47 files, exit 1.
+
+WHAT THE DRIFT ACTUALLY WAS. 19 files. The other 28 were the engine
+tree's tree-wide clang-format pass (space before paren, stacked if-else,
+blank lines removed, bracket spacing), which had been applied to the
+embedded copy on 2026-10-04 and never to the standalone one. A byte
+comparison cannot tell a reformat from a rewrite, and on this
+codebase the reformat was larger than the change.
+
+DIRECTION. Established rather than assumed. Comments and whitespace were
+normalised away and the token streams compared: every one of the 19
+files differed only by insertions on the embedded side. Not one hunk
+added content in the standalone direction. The embedded copy was
+therefore a strict superset, the mirror direction was unambiguous, and
+mirroring could not lose work.
+
+WHAT WAS MIRRORED. All 54 shared source and doc files, embedded ->
+standalone. No file was added and none removed; the two file sets were
+already identical apart from \`sync_mfs_check.sh\`, which this contract
+excludes because it lives at the root here and in \`tools/\` there.
+461-only metadata (\`.gitignore\`, \`temp/\`) was left alone.
+
+VERIFICATION, so the green result is attributable rather than assumed:
+
+- \`sync_mfs_check.sh\` exits 0 from both roots.
+- Standalone suite 15/15, up from 14; the fifteenth gate is
+  \`release_settle\`, which is the gate for the idle-tire work.
+- Standalone suite 15/15 again under ASan+UBSan with \`detect_leaks=1\`,
+  run through the existing \`MFS_TEST_CFLAGS\` hook, which the standalone
+  tree did not previously have a mode for.
+- Engine \`--profile full\`: 234 checks, 0 failed, 2 xfailed,
+  0 blocking.
+- A git worktree at the pre-mirror tag reproduced the ASan ODR abort
+  identically, establishing that abort as an artifact of instrumenting
+  both the suite binary and the plugin rather than anything the mirror
+  introduced.
+
+CLAUSE ADDED. A reformat sweeping one tree makes byte drift useless as a
+signal, so a large byte count is not by itself evidence of large
+behavioural drift. On this pair of trees, resolve the count before
+reporting it: normalise, compare tokens, and state which direction the
+insertions run. A drift report that says "47 files" when 28 of them are
+formatting trains the reader to ignore drift reports.
+
+KNOWN LIMIT OF THE GUARD, recorded rather than fixed. Path resolution
+ends in a shallow glob over \`*/v15S/src/ecosystem/mfs\`, which will bind
+to any stale scratch tree that happens to match. At least seven exist
+under \`/tmp/opencode\` (\`orig/\`, \`mpe/\`, \`v15base/\`, \`v15chk/\`,
+\`v15fmt/\`, \`v9a/\`, \`v9b/\`, \`v9fmt/\`). The explicit sibling candidate
+is tried first, so the real pair resolves correctly in both layouts
+today — this is a latent trap, not a live fault. Worth pinning the
+candidate list or requiring an explicit override.
