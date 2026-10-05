@@ -95,8 +95,8 @@ int save_scene (const char *file_destination_path) {
         return 0;
     }
     physics_world *world = physics_world_get_primary ();
-    if ((!world) || (world->body_count < 0) || (world->body_count > mpe_max_bodies) ||
-        ((world->body_count > 0) && (!world->bodies))) {
+    if ((!world) || (world -> body_count < 0) || (world -> body_count > mpe_max_bodies) ||
+        ((world -> body_count > 0) && (!world -> bodies))) {
         fprintf (stderr, "Error SVF01: invalid primary world\n");
         return 0;
     }
@@ -104,23 +104,23 @@ int save_scene (const char *file_destination_path) {
      * faithfully written today is a file the loader will (correctly) veto
      * tomorrow — fail at save time with the live scene still intact, not at
      * load time with the only copy poisoned. */
-    for (int svf_i = 0; svf_i < world->body_count; svf_i++) {
-        rigidbody *svf_rb = &world->bodies [svf_i];
-        float svf_vals [] = {svf_rb->mass,
-                            svf_rb->radius,
-                            svf_rb->position.x,
-                            svf_rb->position.y,
-                            svf_rb->position.z,
-                            svf_rb->velocity.x,
-                            svf_rb->velocity.y,
-                            svf_rb->velocity.z,
-                            svf_rb->angular_velocity.x,
-                            svf_rb->angular_velocity.y,
-                            svf_rb->angular_velocity.z,
-                            svf_rb->orientation.w,
-                            svf_rb->orientation.x,
-                            svf_rb->orientation.y,
-                            svf_rb->orientation.z};
+    for (int svf_i = 0; svf_i < world -> body_count; svf_i++) {
+        rigidbody *svf_rb = &world -> bodies [svf_i];
+        float svf_vals [] = {svf_rb -> mass,
+                            svf_rb -> radius,
+                            svf_rb -> position.x,
+                            svf_rb -> position.y,
+                            svf_rb -> position.z,
+                            svf_rb -> velocity.x,
+                            svf_rb -> velocity.y,
+                            svf_rb -> velocity.z,
+                            svf_rb -> angular_velocity.x,
+                            svf_rb -> angular_velocity.y,
+                            svf_rb -> angular_velocity.z,
+                            svf_rb -> orientation.w,
+                            svf_rb -> orientation.x,
+                            svf_rb -> orientation.y,
+                            svf_rb -> orientation.z};
         for (size_t svf_vi = 0; svf_vi < sizeof (svf_vals) / sizeof (svf_vals [0]); svf_vi++) {
             if (!isfinite (svf_vals [svf_vi])) {
                 fprintf (stderr, "Error SVF05: body %d has non-finite state; scene NOT saved\n", svf_i);
@@ -156,146 +156,146 @@ int save_scene (const char *file_destination_path) {
     int ok = 1;
     ok = ok && scene_w32 (f, &crc, (uint32_t) mpe_magic);
     ok = ok && scene_w32 (f, &crc, (uint32_t) mpe_version);
-    ok = ok && scene_w32 (f, &crc, (uint32_t) (physics_world_get_primary ()->body_count));
-    for (int i = 0; ok && (i < (physics_world_get_primary ()->body_count)); i++) {
-        rigidbody *rb = &(physics_world_get_primary ()->bodies) [i];
-        ok = ok && scene_w32 (f, &crc, (uint32_t) rb->type);
-        ok = ok && scene_wfloat (f, &crc, rb->mass);
-        ok = ok && scene_wfloat (f, &crc, rb->radius);
-        ok = ok && scene_wfloat (f, &crc, rb->cylinder_half_length);
-        ok = ok && save_vec3 (f, &crc, rb->half_extensions);
-        ok = ok && save_vec3 (f, &crc, rb->position);
-        ok = ok && save_vec3 (f, &crc, rb->velocity);
-        ok = ok && save_vec3 (f, &crc, rb->angular_velocity);
-        ok = ok && save_quat (f, &crc, rb->orientation);
-        ok = ok && save_vec3 (f, &crc, rb->colour);
-        ok = ok && scene_wfloat (f, &crc, rb->restitution);
-        ok = ok && scene_wfloat (f, &crc, rb->friction_static);
-        ok = ok && scene_wfloat (f, &crc, rb->friction_kinetic);
-        ok = ok && scene_w32 (f, &crc, rb->static_state ? 1u : 0u);
-        ok = ok && scene_w32 (f, &crc, rb->object_id); /* MPE_FTC_058 */
-        ok = ok && scene_w32 (f, &crc, (uint32_t) rb->nice_value);
-        ok = ok && scene_w32 (f, &crc, rb->is_sleeping ? 1u : 0u);
-        ok = ok && scene_wfloat (f, &crc, rb->sleep_timer);
-        ok = ok && scene_w32 (f, &crc, rb->kinematic ? 1u : 0u);
-        ok = ok && scene_w32 (f, &crc, rb->object_generation);
+    ok = ok && scene_w32 (f, &crc, (uint32_t) (physics_world_get_primary () -> body_count));
+    for (int i = 0; ok && (i < (physics_world_get_primary () -> body_count)); i++) {
+        rigidbody *rb = &(physics_world_get_primary () -> bodies)[i];
+        ok = ok && scene_w32 (f, &crc, (uint32_t) rb -> type);
+        ok = ok && scene_wfloat (f, &crc, rb -> mass);
+        ok = ok && scene_wfloat (f, &crc, rb -> radius);
+        ok = ok && scene_wfloat (f, &crc, rb -> cylinder_half_length);
+        ok = ok && save_vec3 (f, &crc, rb -> half_extensions);
+        ok = ok && save_vec3 (f, &crc, rb -> position);
+        ok = ok && save_vec3 (f, &crc, rb -> velocity);
+        ok = ok && save_vec3 (f, &crc, rb -> angular_velocity);
+        ok = ok && save_quat (f, &crc, rb -> orientation);
+        ok = ok && save_vec3 (f, &crc, rb -> colour);
+        ok = ok && scene_wfloat (f, &crc, rb -> restitution);
+        ok = ok && scene_wfloat (f, &crc, rb -> friction_static);
+        ok = ok && scene_wfloat (f, &crc, rb -> friction_kinetic);
+        ok = ok && scene_w32 (f, &crc, rb -> static_state ? 1u : 0u);
+        ok = ok && scene_w32 (f, &crc, rb -> object_id); /* MPE_FTC_058 */
+        ok = ok && scene_w32 (f, &crc, (uint32_t) rb -> nice_value);
+        ok = ok && scene_w32 (f, &crc, rb -> is_sleeping ? 1u : 0u);
+        ok = ok && scene_wfloat (f, &crc, rb -> sleep_timer);
+        ok = ok && scene_w32 (f, &crc, rb -> kinematic ? 1u : 0u);
+        ok = ok && scene_w32 (f, &crc, rb -> object_generation);
     }
     /* FIX-AUDIT: scan the FULL pool, not 0..(physics_world_get_primary()->spring_joint_count). Removal
      * leaves holes (active joints above a removed index), which the old
      * bound silently dropped from saves. */
     int active_springs = 0;
     for (int j = 0; j < mpe_max_joints; j++) {
-        if ((physics_world_get_primary ()->spring_joints) [j].is_active) {
+        if ((physics_world_get_primary () -> spring_joints)[j].is_active) {
             active_springs++;
         }
     }
     ok = ok && scene_w32 (f, &crc, (uint32_t) active_springs);
     for (int j = 0; ok && (j < mpe_max_joints); j++) {
-        if (!(physics_world_get_primary ()->spring_joints) [j].is_active) {
+        if (!(physics_world_get_primary () -> spring_joints)[j].is_active) {
             continue;
         }
-        ok = ok && scene_w32 (f, &crc, (physics_world_get_primary ()->spring_joints) [j].object_id_a);
-        ok = ok && scene_w32 (f, &crc, (physics_world_get_primary ()->spring_joints) [j].object_id_b);
-        ok = ok && scene_wfloat (f, &crc, (physics_world_get_primary ()->spring_joints) [j].equilibrium_length);
-        ok = ok && scene_wfloat (f, &crc, (physics_world_get_primary ()->spring_joints) [j].spring_constant);
-        ok = ok && scene_wfloat (f, &crc, (physics_world_get_primary ()->spring_joints) [j].damping_coefficient);
+        ok = ok && scene_w32 (f, &crc, (physics_world_get_primary () -> spring_joints)[j].object_id_a);
+        ok = ok && scene_w32 (f, &crc, (physics_world_get_primary () -> spring_joints)[j].object_id_b);
+        ok = ok && scene_wfloat (f, &crc, (physics_world_get_primary () -> spring_joints)[j].equilibrium_length);
+        ok = ok && scene_wfloat (f, &crc, (physics_world_get_primary () -> spring_joints)[j].spring_constant);
+        ok = ok && scene_wfloat (f, &crc, (physics_world_get_primary () -> spring_joints)[j].damping_coefficient);
     }
     /* Save all constraint types from the unified constraint pool. */
     int constraint_counts [5] = {0}; /* fixed, distance, prismatic, rope (revolute handled separately) */
     for (int j = 0; j < constraint_pool_capacity (); j++) {
         const constraint *c = constraint_pool_at (physics_world_get_primary (), j);
-        if ((c) && (c->type != constraint_revolute) && (c->type != constraint_spring)) {
-            if (c->type < constraint_fixed || c->type > constraint_rope) {
+        if ((c) && (c -> type != constraint_revolute) && (c -> type != constraint_spring)) {
+            if (c -> type < constraint_fixed || c -> type > constraint_rope) {
                 continue;
             }
-            constraint_counts [c->type - constraint_fixed]++;
+            constraint_counts [c -> type - constraint_fixed]++;
         }
     }
     /* Fixed constraints */
     ok = ok && scene_w32 (f, &crc, (uint32_t) constraint_counts [constraint_fixed - constraint_fixed]);
     for (int j = 0; ok && (j < constraint_pool_capacity ()); j++) {
         const constraint *c = constraint_pool_at (physics_world_get_primary (), j);
-        if ((!c) || (c->type != constraint_fixed))
+        if ((!c) || (c -> type != constraint_fixed))
             continue;
-        ok = ok && scene_w32 (f, &crc, (uint32_t) c->type);
-        ok = ok && scene_w32 (f, &crc, c->body_id_a);
-        ok = ok && scene_w32 (f, &crc, c->body_id_b);
-        ok = ok && save_vec3 (f, &crc, c->p.fixed.anchor_a);
-        ok = ok && save_vec3 (f, &crc, c->p.fixed.anchor_b);
+        ok = ok && scene_w32 (f, &crc, (uint32_t) c -> type);
+        ok = ok && scene_w32 (f, &crc, c -> body_id_a);
+        ok = ok && scene_w32 (f, &crc, c -> body_id_b);
+        ok = ok && save_vec3 (f, &crc, c -> p.fixed.anchor_a);
+        ok = ok && save_vec3 (f, &crc, c -> p.fixed.anchor_b);
     }
     /* Distance constraints */
     ok = ok && scene_w32 (f, &crc, (uint32_t) constraint_counts [constraint_distance - constraint_fixed]);
     for (int j = 0; ok && (j < constraint_pool_capacity ()); j++) {
         const constraint *c = constraint_pool_at (physics_world_get_primary (), j);
-        if ((!c) || (c->type != constraint_distance))
+        if ((!c) || (c -> type != constraint_distance))
             continue;
-        ok = ok && scene_w32 (f, &crc, (uint32_t) c->type);
-        ok = ok && scene_w32 (f, &crc, c->body_id_a);
-        ok = ok && scene_w32 (f, &crc, c->body_id_b);
-        ok = ok && save_vec3 (f, &crc, c->p.distance.anchor_a);
-        ok = ok && save_vec3 (f, &crc, c->p.distance.anchor_b);
-        ok = ok && scene_wfloat (f, &crc, c->p.distance.rest_length);
+        ok = ok && scene_w32 (f, &crc, (uint32_t) c -> type);
+        ok = ok && scene_w32 (f, &crc, c -> body_id_a);
+        ok = ok && scene_w32 (f, &crc, c -> body_id_b);
+        ok = ok && save_vec3 (f, &crc, c -> p.distance.anchor_a);
+        ok = ok && save_vec3 (f, &crc, c -> p.distance.anchor_b);
+        ok = ok && scene_wfloat (f, &crc, c -> p.distance.rest_length);
     }
     /* Prismatic constraints */
     ok = ok && scene_w32 (f, &crc, (uint32_t) constraint_counts [constraint_prismatic - constraint_fixed]);
     for (int j = 0; ok && (j < constraint_pool_capacity ()); j++) {
         const constraint *c = constraint_pool_at (physics_world_get_primary (), j);
-        if ((!c) || (c->type != constraint_prismatic))
+        if ((!c) || (c -> type != constraint_prismatic))
             continue;
-        ok = ok && scene_w32 (f, &crc, (uint32_t) c->type);
-        ok = ok && scene_w32 (f, &crc, c->body_id_a);
-        ok = ok && scene_w32 (f, &crc, c->body_id_b);
-        ok = ok && save_vec3 (f, &crc, c->p.prismatic.anchor_a);
-        ok = ok && save_vec3 (f, &crc, c->p.prismatic.anchor_b);
-        ok = ok && save_vec3 (f, &crc, c->p.prismatic.axis_a);
-        ok = ok && save_vec3 (f, &crc, c->p.prismatic.axis_b);
-        ok = ok && scene_w32 (f, &crc, c->p.prismatic.motor_enabled ? 1u : 0u);
-        ok = ok && scene_wfloat (f, &crc, c->p.prismatic.motor_target_speed);
-        ok = ok && scene_wfloat (f, &crc, c->p.prismatic.motor_max_force);
-        ok = ok && scene_w32 (f, &crc, c->p.prismatic.limits_enabled ? 1u : 0u);
-        ok = ok && scene_wfloat (f, &crc, c->p.prismatic.limit_min);
-        ok = ok && scene_wfloat (f, &crc, c->p.prismatic.limit_max);
+        ok = ok && scene_w32 (f, &crc, (uint32_t) c -> type);
+        ok = ok && scene_w32 (f, &crc, c -> body_id_a);
+        ok = ok && scene_w32 (f, &crc, c -> body_id_b);
+        ok = ok && save_vec3 (f, &crc, c -> p.prismatic.anchor_a);
+        ok = ok && save_vec3 (f, &crc, c -> p.prismatic.anchor_b);
+        ok = ok && save_vec3 (f, &crc, c -> p.prismatic.axis_a);
+        ok = ok && save_vec3 (f, &crc, c -> p.prismatic.axis_b);
+        ok = ok && scene_w32 (f, &crc, c -> p.prismatic.motor_enabled ? 1u : 0u);
+        ok = ok && scene_wfloat (f, &crc, c -> p.prismatic.motor_target_speed);
+        ok = ok && scene_wfloat (f, &crc, c -> p.prismatic.motor_max_force);
+        ok = ok && scene_w32 (f, &crc, c -> p.prismatic.limits_enabled ? 1u : 0u);
+        ok = ok && scene_wfloat (f, &crc, c -> p.prismatic.limit_min);
+        ok = ok && scene_wfloat (f, &crc, c -> p.prismatic.limit_max);
     }
     /* Rope constraints */
     ok = ok && scene_w32 (f, &crc, (uint32_t) constraint_counts [constraint_rope - constraint_fixed]);
     for (int j = 0; ok && (j < constraint_pool_capacity ()); j++) {
         const constraint *c = constraint_pool_at (physics_world_get_primary (), j);
-        if ((!c) || (c->type != constraint_rope))
+        if ((!c) || (c -> type != constraint_rope))
             continue;
-        ok = ok && scene_w32 (f, &crc, (uint32_t) c->type);
-        ok = ok && scene_w32 (f, &crc, c->body_id_a);
-        ok = ok && scene_w32 (f, &crc, c->body_id_b);
-        ok = ok && save_vec3 (f, &crc, c->p.rope.anchor_a);
-        ok = ok && save_vec3 (f, &crc, c->p.rope.anchor_b);
-        ok = ok && scene_wfloat (f, &crc, c->p.rope.rest_length);
+        ok = ok && scene_w32 (f, &crc, (uint32_t) c -> type);
+        ok = ok && scene_w32 (f, &crc, c -> body_id_a);
+        ok = ok && scene_w32 (f, &crc, c -> body_id_b);
+        ok = ok && save_vec3 (f, &crc, c -> p.rope.anchor_a);
+        ok = ok && save_vec3 (f, &crc, c -> p.rope.anchor_b);
+        ok = ok && scene_wfloat (f, &crc, c -> p.rope.rest_length);
     }
     /* Revolute constraints (kept for backward compatibility) */
     int active_revolutes = 0;
     for (int j = 0; j < constraint_pool_capacity (); j++) {
         const constraint *c = constraint_pool_at (physics_world_get_primary (), j);
-        if ((c) && (c->type == constraint_revolute)) {
+        if ((c) && (c -> type == constraint_revolute)) {
             active_revolutes++;
         }
     }
     ok = ok && scene_w32 (f, &crc, (uint32_t) active_revolutes);
     for (int j = 0; ok && (j < constraint_pool_capacity ()); j++) {
         const constraint *c = constraint_pool_at (physics_world_get_primary (), j);
-        if ((!c) || (c->type != constraint_revolute)) {
+        if ((!c) || (c -> type != constraint_revolute)) {
             continue;
         }
-        ok = ok && scene_w32 (f, &crc, (uint32_t) c->type);
-        ok = ok && scene_w32 (f, &crc, c->body_id_a);
-        ok = ok && scene_w32 (f, &crc, c->body_id_b);
-        ok = ok && save_vec3 (f, &crc, c->p.revolute.anchor_a);
-        ok = ok && save_vec3 (f, &crc, c->p.revolute.anchor_b);
-        ok = ok && save_vec3 (f, &crc, c->p.revolute.axis_a);
-        ok = ok && save_vec3 (f, &crc, c->p.revolute.axis_b);
-        ok = ok && scene_w32 (f, &crc, c->p.revolute.motor_enabled ? 1u : 0u);
-        ok = ok && scene_wfloat (f, &crc, c->p.revolute.motor_target_speed);
-        ok = ok && scene_wfloat (f, &crc, c->p.revolute.motor_max_torque);
-        ok = ok && scene_w32 (f, &crc, c->p.revolute.limits_enabled ? 1u : 0u);
-        ok = ok && scene_wfloat (f, &crc, c->p.revolute.limit_min_rad);
-        ok = ok && scene_wfloat (f, &crc, c->p.revolute.limit_max_rad);
+        ok = ok && scene_w32 (f, &crc, (uint32_t) c -> type);
+        ok = ok && scene_w32 (f, &crc, c -> body_id_a);
+        ok = ok && scene_w32 (f, &crc, c -> body_id_b);
+        ok = ok && save_vec3 (f, &crc, c -> p.revolute.anchor_a);
+        ok = ok && save_vec3 (f, &crc, c -> p.revolute.anchor_b);
+        ok = ok && save_vec3 (f, &crc, c -> p.revolute.axis_a);
+        ok = ok && save_vec3 (f, &crc, c -> p.revolute.axis_b);
+        ok = ok && scene_w32 (f, &crc, c -> p.revolute.motor_enabled ? 1u : 0u);
+        ok = ok && scene_wfloat (f, &crc, c -> p.revolute.motor_target_speed);
+        ok = ok && scene_wfloat (f, &crc, c -> p.revolute.motor_max_torque);
+        ok = ok && scene_w32 (f, &crc, c -> p.revolute.limits_enabled ? 1u : 0u);
+        ok = ok && scene_wfloat (f, &crc, c -> p.revolute.limit_min_rad);
+        ok = ok && scene_wfloat (f, &crc, c -> p.revolute.limit_max_rad);
     }
     /* Footer CRC over every preceding byte (finalize + raw LE append). */
     uint32_t final_crc = crc ^ 0xFFFFFFFFu;

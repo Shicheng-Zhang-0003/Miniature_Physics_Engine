@@ -59,7 +59,7 @@ int scene_r32 (FILE *f, uint32_t *crc, uint32_t *v) {
     if (crc) {
         *crc = scene_crc32_update (*crc, buf, 4);
     }
-    *v = decode_le32 (buf);
+    * v = decode_le32 (buf);
     return 1;
 }
 int scene_rfloat (FILE *f, uint32_t *crc, float *v) {
@@ -97,26 +97,26 @@ static uint32_t hash_float_le (uint32_t crc, float f) {
     return hash_u32_le (crc, u);
 }
 uint32_t physics_world_hash_state (const struct physics_world *world) {
-    if (!world || !world->bodies || world->body_count <= 0) {
+    if (!world || !world -> bodies || world -> body_count <= 0) {
         return 0u;
     }
     uint32_t crc = 0xFFFFFFFFu;
-    crc = hash_u32_le (crc, (uint32_t) world->body_count);
-    for (int i = 0; i < world->body_count; i++) {
-        const rigidbody *rb = &world->bodies [i];
-        crc = hash_u32_le (crc, rb->object_id);
-        crc = hash_u32_le (crc, rb->object_generation);
-        crc = hash_u32_le (crc, (uint32_t) rb->type);
-        crc = hash_float_le (crc, rb->position.x);
-        crc = hash_float_le (crc, rb->position.y);
-        crc = hash_float_le (crc, rb->position.z);
-        crc = hash_float_le (crc, rb->velocity.x);
-        crc = hash_float_le (crc, rb->velocity.y);
-        crc = hash_float_le (crc, rb->velocity.z);
-        crc = hash_float_le (crc, rb->orientation.w);
-        crc = hash_float_le (crc, rb->orientation.x);
-        crc = hash_float_le (crc, rb->orientation.y);
-        crc = hash_float_le (crc, rb->orientation.z);
+    crc = hash_u32_le (crc, (uint32_t) world -> body_count);
+    for (int i = 0; i < world -> body_count; i++) {
+        const rigidbody *rb = &world -> bodies [i];
+        crc = hash_u32_le (crc, rb -> object_id);
+        crc = hash_u32_le (crc, rb -> object_generation);
+        crc = hash_u32_le (crc, (uint32_t) rb -> type);
+        crc = hash_float_le (crc, rb -> position.x);
+        crc = hash_float_le (crc, rb -> position.y);
+        crc = hash_float_le (crc, rb -> position.z);
+        crc = hash_float_le (crc, rb -> velocity.x);
+        crc = hash_float_le (crc, rb -> velocity.y);
+        crc = hash_float_le (crc, rb -> velocity.z);
+        crc = hash_float_le (crc, rb -> orientation.w);
+        crc = hash_float_le (crc, rb -> orientation.x);
+        crc = hash_float_le (crc, rb -> orientation.y);
+        crc = hash_float_le (crc, rb -> orientation.z);
     }
     return crc ^ 0xFFFFFFFFu;
 }

@@ -14,40 +14,40 @@
 #include <float.h>
 static float ccd_support_depth (const rigidbody *body) {
     /* Lowest-point offset below the center along world -Y. */
-    if (body->type == object_sphere) {
-        return body->radius;
+    if (body -> type == object_sphere) {
+        return body -> radius;
     }
-    if (body->type == object_custom) {
+    if (body -> type == object_custom) {
         /* The core's documented fallback geometry for custom shapes is a
          * bounding sphere until a CCD stage override is attached. */
-        return body->radius;
+        return body -> radius;
     }
-    if (body->type == object_cylinder) {
-        float ay = body->cached_axes [0].y;
+    if (body -> type == object_cylinder) {
+        float ay = body -> cached_axes [0].y;
         if (ay > 1.0f) {
             ay = 1.0f;
         }
         if (ay < -1.0f) {
             ay = -1.0f;
         }
-        return body->radius * sqrtf (fmaxf (0.0f, 1.0f - ay * ay)) + body->cylinder_half_length * fabsf (ay);
+        return body -> radius * sqrtf (fmaxf (0.0f, 1.0f - ay * ay)) + body -> cylinder_half_length * fabsf (ay);
     }
     vector3 down = {0.0f, -1.0f, 0.0f};
-    return body->half_extensions.x * fabsf (vector3_dot (body->cached_axes [0], down)) +
-           body->half_extensions.y * fabsf (vector3_dot (body->cached_axes [1], down)) +
-           body->half_extensions.z * fabsf (vector3_dot (body->cached_axes [2], down));
+    return body -> half_extensions.x * fabsf (vector3_dot (body -> cached_axes [0], down)) +
+           body -> half_extensions.y * fabsf (vector3_dot (body -> cached_axes [1], down)) +
+           body -> half_extensions.z * fabsf (vector3_dot (body -> cached_axes [2], down));
 }
 static float ccd_min_thickness (const rigidbody *body) {
-    if (body->type == object_sphere) {
-        return body->radius;
+    if (body -> type == object_sphere) {
+        return body -> radius;
     }
-    if (body->type == object_custom) {
-        return body->radius;
+    if (body -> type == object_custom) {
+        return body -> radius;
     }
-    if (body->type == object_cylinder) {
-        return fminf (body->radius, body->cylinder_half_length);
+    if (body -> type == object_cylinder) {
+        return fminf (body -> radius, body -> cylinder_half_length);
     }
-    return fminf (body->half_extensions.x, fminf (body->half_extensions.y, body->half_extensions.z));
+    return fminf (body -> half_extensions.x, fminf (body -> half_extensions.y, body -> half_extensions.z));
 }
 /* Earliest positive time at which |dp + dv*t| reaches radius. Compute the
  * quadratic in double and use the cancellation-resistant q formulation; the
@@ -142,13 +142,13 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
     }
     for (int i = 0; i < body_count; i++) {
         rigidbody *mover = &bodies [i];
-        if ((mover->static_state) || (mover->is_sleeping) || (mover->no_collide)) {
+        if ((mover -> static_state) || (mover -> is_sleeping) || (mover -> no_collide)) {
             continue;
         }
         /* TRUTH P1-19: angular sweep bound. Tip speed |w x r| <= |w|*R sweeps
          * a disc; linear-only bound tunnels for fast spinners. */
-        float lin_speed = vector3_length (mover->velocity);
-        float ang_speed = vector3_length (mover->angular_velocity);
+        float lin_speed = vector3_length (mover -> velocity);
+        float ang_speed = vector3_length (mover -> angular_velocity);
         float bound_r = broadphase_bounding_radius (mover);
         if ((!isfinite (bound_r)) || (bound_r < 0.0f)) {
             bound_r = 0.0f;
@@ -170,7 +170,7 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
          * a thin 0.1m wall. Gate on min(mover, 0.2m) so fast large bodies
          * still sweep. */
         bool do_volumes = displacement > fminf (thickness, 0.2f);
-        if ((displacement <= C->solver.penetration_slop) && (!do_volumes)) {
+        if ((displacement <= C -> solver.penetration_slop) && (!do_volumes)) {
             continue; /* discrete sampling suffices */
         }
         float best_toi = dt;
@@ -183,7 +183,7 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
          * contact geometry for boxes/cylinders; the TOI itself is
          * translational — see below). */
         float r_lowest_y = ccd_support_depth (mover);
-        float lowest = mover->position.y - r_lowest_y;
+        float lowest = mover -> position.y - r_lowest_y;
         /* Floor TOI uses the CENTER (translational) velocity, never the
          * lowest-point velocity v_center + omega x r. Rotation alone cannot
          * translate the center through the plane: a pure spinner reports a
@@ -192,7 +192,7 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
          * rolling contact into levitation and spin pump (driven_wheel
          * disease). Dipping corners are bounded oscillation the discrete
          * solver re-seats; CCD owns translation tunneling only. */
-        float v0 = mover->velocity.y;
+        float v0 = mover -> velocity.y;
         /* Exact quadratic CCD for floor plane under constant gravity.
          * Equation: 0.5*g*t^2 + v0*t + y0 = 0
          * where g = gravity (negative), y0 = lowest-point height above plane.
@@ -203,7 +203,7 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
          * sleeping movers are skipped above, so resting sleepers never churn.
          * Micro-hop artifacts stay sub-tick scale. */
         {
-            float gravity = C->world.gravity; /* negative */
+            float gravity = C -> world.gravity; /* negative */
             float y0 = lowest;
             /* Linear fallback whenever |a| is degenerate: |g|<2e-9 gives
              * a<1e-9, where float disc rounds sqrt(b^2-4ac)->|b| and the
@@ -259,23 +259,23 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
                     continue;
                 }
                 rigidbody *other = &bodies [j];
-                if (other->no_collide) {
+                if (other -> no_collide) {
                     continue; /* render-only proxies: never obstacles */
                 }
-                vector3 other_v = ((other->static_state) || (other->is_sleeping)) ? vector3_zero () : other->velocity;
-                if ((other->type == object_sphere) || (other->type == object_custom)) {
-                    vector3 dp = vector3_subtraction (other->position, mover->position);
-                    vector3 dv = vector3_subtraction (other_v, mover->velocity);
+                vector3 other_v = ((other -> static_state) || (other -> is_sleeping)) ? vector3_zero () : other -> velocity;
+                if ((other -> type == object_sphere) || (other -> type == object_custom)) {
+                    vector3 dp = vector3_subtraction (other -> position, mover -> position);
+                    vector3 dv = vector3_subtraction (other_v, mover -> velocity);
                     float mover_radius =
-                        (mover->type == object_sphere) ? mover->radius : broadphase_bounding_radius (mover);
+                        (mover -> type == object_sphere) ? mover -> radius : broadphase_bounding_radius (mover);
                     float other_radius =
-                        (other->type == object_sphere) ? other->radius : broadphase_bounding_radius (other);
+                        (other -> type == object_sphere) ? other -> radius : broadphase_bounding_radius (other);
                     float toi = ccd_sphere_sweep_toi (dp, dv, mover_radius + other_radius, dt);
                     if ((toi > 0.0f) && (toi < best_toi)) {
                         best_toi = toi;
                         hit = true;
                     }
-                } else if (other->type == object_cylinder) {
+                } else if (other -> type == object_cylinder) {
                     /* Exact segment-vs-sphere sweep for cylinder obstacles.
                  * Cylinder = segment (axle) + radius. Sweep the mover's bounding
                  * sphere against the cylinder's swept capsule.
@@ -290,26 +290,26 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
                  * Full segment-segment sweep is complex; fall back to bounding
                  * sphere for cylinder-vs-cylinder (conservative, never misses).
                  */
-                    if (mover->type == object_sphere) {
+                    if (mover -> type == object_sphere) {
                         /* Sphere vs cylinder: exact segment-sphere sweep. */
-                        vector3 ax = other->cached_axes [0];
+                        vector3 ax = other -> cached_axes [0];
                         float ax_len = vector3_length (ax);
                         if (ax_len < 1e-6f) {
-                            ax = (vector3){1.0f, 0.0f, 0.0f};
+                            ax = (vector3) {1.0f, 0.0f, 0.0f};
                         } else {
                             ax = vector3_scaling (ax, 1.0f / ax_len);
                         }
-                        float h = other->cylinder_half_length;
-                        float r_cyl = other->radius;
-                        float r_sph = mover->radius;
+                        float h = other -> cylinder_half_length;
+                        float r_cyl = other -> radius;
+                        float r_sph = mover -> radius;
                         float rr = r_cyl + r_sph;
                         /* Cylinder endpoints in world space. */
-                        vector3 ep1 = vector3_addition (other->position, vector3_scaling (ax, -h));
-                        vector3 ep2 = vector3_addition (other->position, vector3_scaling (ax, h));
+                        vector3 ep1 = vector3_addition (other -> position, vector3_scaling (ax, -h));
+                        vector3 ep2 = vector3_addition (other -> position, vector3_scaling (ax, h));
                         /* Relative motion. */
-                        vector3 dp1 = vector3_subtraction (ep1, mover->position);
-                        vector3 dp2 = vector3_subtraction (ep2, mover->position);
-                        vector3 dv = vector3_subtraction (other_v, mover->velocity);
+                        vector3 dp1 = vector3_subtraction (ep1, mover -> position);
+                        vector3 dp2 = vector3_subtraction (ep2, mover -> position);
+                        vector3 dv = vector3_subtraction (other_v, mover -> velocity);
                         /* Sweep against both endpoint spheres. */
                         float best_cyl_toi = dt;
                         for (int ep = 0; ep < 2; ep++) {
@@ -328,7 +328,7 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
                             /* Relative motion has perpendicular component - capsule sweep.
                          * The capsule is the segment extruded along dv_perp.
                          * Find closest approach of sphere to swept capsule. */
-                            vector3 dp_mid = vector3_subtraction (other->position, mover->position);
+                            vector3 dp_mid = vector3_subtraction (other -> position, mover -> position);
                             float dp_ax = vector3_dot (dp_mid, ax);
                             vector3 dp_perp = vector3_subtraction (dp_mid, vector3_scaling (ax, dp_ax));
                             /* Quadratic for perpendicular distance == rr.
@@ -359,8 +359,8 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
                         /* Non-sphere mover vs cylinder: conservative bounding sphere sweep.
                      * (Exact segment-segment sweep for cylinder-vs-cylinder is complex;
                      * bounding sphere is conservative and never misses.) */
-                        vector3 dp = vector3_subtraction (other->position, mover->position);
-                        vector3 dv = vector3_subtraction (other_v, mover->velocity);
+                        vector3 dp = vector3_subtraction (other -> position, mover -> position);
+                        vector3 dv = vector3_subtraction (other_v, mover -> velocity);
                         float rr = broadphase_bounding_radius (mover) + broadphase_bounding_radius (other);
                         float toi = ccd_sphere_sweep_toi (dp, dv, rr, dt);
                         if ((toi > 0.0f) && (toi < best_toi)) {
@@ -368,19 +368,19 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
                             hit = true;
                         }
                     }
-                } else if (other->type == object_cube) {
+                } else if (other -> type == object_cube) {
                     /* Swept sphere-vs-OBB via slab test in box space, with
                  * RELATIVE velocity so dynamic boxes sweep correctly. */
-                    float sr = (mover->type == object_sphere) ? mover->radius : broadphase_bounding_radius (mover);
-                    vector3 rel = vector3_subtraction (mover->position, other->position);
-                    vector3 rel_v = vector3_subtraction (mover->velocity, other_v);
-                    vector3 ax0 = other->cached_axes [0];
-                    vector3 ax1 = other->cached_axes [1];
-                    vector3 ax2 = other->cached_axes [2];
+                    float sr = (mover -> type == object_sphere) ? mover -> radius : broadphase_bounding_radius (mover);
+                    vector3 rel = vector3_subtraction (mover -> position, other -> position);
+                    vector3 rel_v = vector3_subtraction (mover -> velocity, other_v);
+                    vector3 ax0 = other -> cached_axes [0];
+                    vector3 ax1 = other -> cached_axes [1];
+                    vector3 ax2 = other -> cached_axes [2];
                     float pl [3] = {vector3_dot (rel, ax0), vector3_dot (rel, ax1), vector3_dot (rel, ax2)};
                     float vl [3] = {vector3_dot (rel_v, ax0), vector3_dot (rel_v, ax1), vector3_dot (rel_v, ax2)};
-                    float ex [3] = {other->half_extensions.x + sr, other->half_extensions.y + sr,
-                                   other->half_extensions.z + sr};
+                    float ex [3] = {other -> half_extensions.x + sr, other -> half_extensions.y + sr,
+                                   other -> half_extensions.z + sr};
                     float tmin = 0.0f, tmax = dt;
                     bool miss = false;
                     for (int a3 = 0; a3 < 3; a3++) {
@@ -439,8 +439,8 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
     int clamped = 0;
     if (record_remainder) {
         const mpe_config_t *CC = C;
-        float drag_c = CC->world.drag;
-        float grav_c = CC->world.gravity;
+        float drag_c = CC -> world.drag;
+        float grav_c = CC -> world.gravity;
         if (!isfinite (drag_c) || drag_c <= 0.0f)
             drag_c = 1.0f;
         if (drag_c > 1.0f)
@@ -453,7 +453,7 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
                 continue;
             }
             rigidbody *mover = &bodies [i];
-            if ((mover->static_state) || (mover->is_sleeping)) {
+            if ((mover -> static_state) || (mover -> is_sleeping)) {
                 continue;
             }
             float toi = best_tois [i];
@@ -462,7 +462,7 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
             }
             /* Exact flow to toi from v_pre (velocity untouched since tick
              * start: CCD runs before force integration). */
-            vector3 v_pre = mover->velocity;
+            vector3 v_pre = mover -> velocity;
             if (!isfinite (v_pre.x) || !isfinite (v_pre.y) || !isfinite (v_pre.z)) {
                 continue;
             }
@@ -487,12 +487,12 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
                 v_toi_k = (1.0 - e) / cdr;
             }
             vector3 grav_vec = {0.0f, grav_c, 0.0f};
-            mover->position =
-                vector3_addition (mover->position, vector3_addition (vector3_scaling (v_pre, (float) a_pos),
+            mover -> position =
+                vector3_addition (mover -> position, vector3_addition (vector3_scaling (v_pre, (float) a_pos),
                                                                      vector3_scaling (grav_vec, (float) g_pos)));
-            mover->velocity =
+            mover -> velocity =
                 vector3_addition (vector3_scaling (v_pre, (float) e_toi), vector3_scaling (grav_vec, (float) v_toi_k));
-            float spin = vector3_length (mover->angular_velocity);
+            float spin = vector3_length (mover -> angular_velocity);
             if (spin > 1e-6f && isfinite (spin)) {
                 /* TRUTH: full-range det sin/cos (bit-identical), never libm
                  * from_axis_with_angle in the tick path (|w|*toi routinely
@@ -501,10 +501,10 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
                 double s = det_sin (half);
                 double c = det_cos (half);
                 double inv = 1.0 / (double) spin;
-                vector4 rotor = {(float) c, (float) (mover->angular_velocity.x * inv * s),
-                                 (float) (mover->angular_velocity.y * inv * s),
-                                 (float) (mover->angular_velocity.z * inv * s)};
-                mover->orientation = vector4_normalisation (vector4_multiplication (rotor, mover->orientation));
+                vector4 rotor = {(float) c, (float) (mover -> angular_velocity.x * inv * s),
+                                 (float) (mover -> angular_velocity.y * inv * s),
+                                 (float) (mover -> angular_velocity.z * inv * s)};
+                mover -> orientation = vector4_normalisation (vector4_multiplication (rotor, mover -> orientation));
             }
             rigidbody_wake (mover);
             rigidbody_update_axes (mover);
@@ -530,13 +530,13 @@ int collision_ccd_sweep_clamp (rigidbody *bodies, int body_count, float dt) {
     return collision_ccd_sweep_clamp_full (bodies, body_count, dt, NULL, NULL, NULL, NULL);
 }
 int collision_ccd_sweep_clamp_world (struct physics_world *world, float dt) {
-    if (!world || !world->bodies || world->body_count <= 0) {
+    if (!world || !world -> bodies || world -> body_count <= 0) {
         return 0;
     }
-    const mpe_config_t *C = world->cfg ? world->cfg : &g_cfg;
-    if (world->ccd_time_remaining) {
-        return collision_ccd_sweep_clamp_full (world->bodies, world->body_count, dt, world->ccd_time_remaining, C,
-                                               world->ccd_best_tois, world->ccd_hit_flags);
+    const mpe_config_t *C = world -> cfg ? world -> cfg : &g_cfg;
+    if (world -> ccd_time_remaining) {
+        return collision_ccd_sweep_clamp_full (world -> bodies, world -> body_count, dt, world -> ccd_time_remaining, C,
+                                               world -> ccd_best_tois, world -> ccd_hit_flags);
     }
-    return collision_ccd_sweep_clamp_full (world->bodies, world->body_count, dt, NULL, C, NULL, NULL);
+    return collision_ccd_sweep_clamp_full (world -> bodies, world -> body_count, dt, NULL, C, NULL, NULL);
 }
