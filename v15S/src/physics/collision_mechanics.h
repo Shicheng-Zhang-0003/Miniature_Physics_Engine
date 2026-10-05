@@ -195,22 +195,22 @@ static inline void a3_contact_friction_cone (const rigidbody *body_a, const rigi
                                              float *out_roll, float *out_lateral, vector3 *out_axis) {
     *out_roll = mu_iso;
     *out_lateral = mu_iso;
-    *out_axis = (vector3){0.0f, 0.0f, 1.0f};
+    *out_axis = (vector3) {0.0f, 0.0f, 1.0f};
     bool have_axis = false;
     for (int side = 0; side < 2; side++) {
         const rigidbody *rb = (side == 0) ? body_a : body_b;
-        if (!rb || !rb->friction_anisotropic) {
+        if (!rb || !rb -> friction_anisotropic) {
             continue;
         }
         if (!have_axis) {
-            *out_axis = vector4_rotate_to_vector3 (rb->orientation, rb->friction_anisotropy_axis);
+            *out_axis = vector4_rotate_to_vector3 (rb -> orientation, rb -> friction_anisotropy_axis);
             have_axis = true;
         }
-        if (rb->friction_along_axis < *out_roll) {
-            *out_roll = rb->friction_along_axis;
+        if (rb -> friction_along_axis < *out_roll) {
+            *out_roll = rb -> friction_along_axis;
         }
-        if (rb->friction_across_axis < *out_lateral) {
-            *out_lateral = rb->friction_across_axis;
+        if (rb -> friction_across_axis < *out_lateral) {
+            *out_lateral = rb -> friction_across_axis;
         }
     }
 }
@@ -244,29 +244,29 @@ static inline uint32_t a3_contact_cache_body_stamp (const rigidbody *rigid_body)
         return 0;
     }
     uint32_t stamp = 2166136261u;
-    stamp = a3_contact_cache_mix_u32 (stamp, (uint32_t) rigid_body->type);
-    stamp = a3_contact_cache_mix_u32 (stamp, rigid_body->static_state ? 1u : 0u);
-    stamp = a3_contact_cache_mix_u32 (stamp, a3_contact_cache_float_bits (rigid_body->mass));
-    stamp = a3_contact_cache_mix_u32 (stamp, a3_contact_cache_float_bits (rigid_body->inverse_mass));
-    stamp = a3_contact_cache_mix_u32 (stamp, a3_contact_cache_float_bits (rigid_body->radius));
-    stamp = a3_contact_cache_mix_u32 (stamp, a3_contact_cache_float_bits (rigid_body->half_extensions.x));
-    stamp = a3_contact_cache_mix_u32 (stamp, a3_contact_cache_float_bits (rigid_body->half_extensions.y));
-    stamp = a3_contact_cache_mix_u32 (stamp, a3_contact_cache_float_bits (rigid_body->half_extensions.z));
-    stamp = a3_contact_cache_mix_u32 (stamp, a3_contact_cache_float_bits (rigid_body->friction_static));
-    stamp = a3_contact_cache_mix_u32 (stamp, a3_contact_cache_float_bits (rigid_body->friction_kinetic));
-    stamp = a3_contact_cache_mix_u32 (stamp, a3_contact_cache_float_bits (rigid_body->restitution));
-    stamp = a3_contact_cache_mix_u32 (stamp, a3_contact_cache_float_bits (rigid_body->cylinder_half_length));
-    stamp = a3_contact_cache_mix_u32 (stamp, (uint32_t) rigid_body->custom_shape);
-    stamp = a3_contact_cache_mix_u32 (stamp, rigid_body->kinematic ? 2u : 0u);
-    stamp = a3_contact_cache_mix_u32 (stamp, rigid_body->is_sleeping ? 4u : 0u);
+    stamp = a3_contact_cache_mix_u32 (stamp, (uint32_t) rigid_body -> type);
+    stamp = a3_contact_cache_mix_u32 (stamp, rigid_body -> static_state ? 1u : 0u);
+    stamp = a3_contact_cache_mix_u32 (stamp, a3_contact_cache_float_bits (rigid_body -> mass));
+    stamp = a3_contact_cache_mix_u32 (stamp, a3_contact_cache_float_bits (rigid_body -> inverse_mass));
+    stamp = a3_contact_cache_mix_u32 (stamp, a3_contact_cache_float_bits (rigid_body -> radius));
+    stamp = a3_contact_cache_mix_u32 (stamp, a3_contact_cache_float_bits (rigid_body -> half_extensions.x));
+    stamp = a3_contact_cache_mix_u32 (stamp, a3_contact_cache_float_bits (rigid_body -> half_extensions.y));
+    stamp = a3_contact_cache_mix_u32 (stamp, a3_contact_cache_float_bits (rigid_body -> half_extensions.z));
+    stamp = a3_contact_cache_mix_u32 (stamp, a3_contact_cache_float_bits (rigid_body -> friction_static));
+    stamp = a3_contact_cache_mix_u32 (stamp, a3_contact_cache_float_bits (rigid_body -> friction_kinetic));
+    stamp = a3_contact_cache_mix_u32 (stamp, a3_contact_cache_float_bits (rigid_body -> restitution));
+    stamp = a3_contact_cache_mix_u32 (stamp, a3_contact_cache_float_bits (rigid_body -> cylinder_half_length));
+    stamp = a3_contact_cache_mix_u32 (stamp, (uint32_t) rigid_body -> custom_shape);
+    stamp = a3_contact_cache_mix_u32 (stamp, rigid_body -> kinematic ? 2u : 0u);
+    stamp = a3_contact_cache_mix_u32 (stamp, rigid_body -> is_sleeping ? 4u : 0u);
     stamp = a3_contact_cache_mix_u32 (
-        stamp, a3_contact_cache_float_bits (roundf (rigid_body->orientation.w * 1000.0f) / 1000.0f));
+        stamp, a3_contact_cache_float_bits (roundf (rigid_body -> orientation.w * 1000.0f) / 1000.0f));
     stamp = a3_contact_cache_mix_u32 (
-        stamp, a3_contact_cache_float_bits (roundf (rigid_body->orientation.x * 1000.0f) / 1000.0f));
+        stamp, a3_contact_cache_float_bits (roundf (rigid_body -> orientation.x * 1000.0f) / 1000.0f));
     stamp = a3_contact_cache_mix_u32 (
-        stamp, a3_contact_cache_float_bits (roundf (rigid_body->orientation.y * 1000.0f) / 1000.0f));
+        stamp, a3_contact_cache_float_bits (roundf (rigid_body -> orientation.y * 1000.0f) / 1000.0f));
     stamp = a3_contact_cache_mix_u32 (
-        stamp, a3_contact_cache_float_bits (roundf (rigid_body->orientation.z * 1000.0f) / 1000.0f));
+        stamp, a3_contact_cache_float_bits (roundf (rigid_body -> orientation.z * 1000.0f) / 1000.0f));
     return stamp;
 }
 /* Capacity of collision_data::contacts. DESPOT-2026-09-29: this was a bare

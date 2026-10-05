@@ -17,14 +17,14 @@
  * the "erratic cylinder" instability). Cylinders use their exact support
  * S_cyl(d) = r*|d-(d.ax)ax| + h*|d.ax| (same form as the CCD support). */
 static float body_support_along_axis (rigidbody *rigid_body, vector3 axis) {
-    if (rigid_body->type == object_sphere) {
-        return rigid_body->radius;
+    if (rigid_body -> type == object_sphere) {
+        return rigid_body -> radius;
     }
-    if (rigid_body->type == object_cylinder) {
+    if (rigid_body -> type == object_cylinder) {
         /* TRUTH: never trust cached_axes blindly (zero/NaN axle from corrupt
          * state). Degraded axle degrades to the bounding radius (conservative
          * clamp: may hold slightly high, never lets escape). */
-        vector3 axle = rigid_body->cached_axes [0];
+        vector3 axle = rigid_body -> cached_axes [0];
         float l2 = vector3_length_squared (axle);
         if (!isfinite (l2) || l2 < 1e-8f || l2 > 4.0f) {
             return broadphase_bounding_radius (rigid_body);
@@ -32,24 +32,24 @@ static float body_support_along_axis (rigidbody *rigid_body, vector3 axis) {
         axle = vector3_scaling (axle, 1.0f / sqrtf (l2));
         float along = vector3_dot (axle, axis);
         vector3 radial_vec = vector3_subtraction (axis, vector3_scaling (axle, along));
-        return rigid_body->radius * vector3_length (radial_vec) + rigid_body->cylinder_half_length * fabsf (along);
+        return rigid_body -> radius * vector3_length (radial_vec) + rigid_body -> cylinder_half_length * fabsf (along);
     }
-    vector3 *axes = rigid_body->cached_axes;
-    return rigid_body->half_extensions.x * fabsf (vector3_dot (axes [0], axis)) +
-           rigid_body->half_extensions.y * fabsf (vector3_dot (axes [1], axis)) +
-           rigid_body->half_extensions.z * fabsf (vector3_dot (axes [2], axis));
+    vector3 *axes = rigid_body -> cached_axes;
+    return rigid_body -> half_extensions.x * fabsf (vector3_dot (axes [0], axis)) +
+           rigid_body -> half_extensions.y * fabsf (vector3_dot (axes [1], axis)) +
+           rigid_body -> half_extensions.z * fabsf (vector3_dot (axes [2], axis));
 }
 static float get_obb_min_along_axis (rigidbody *rigid_body, vector3 axis) {
     /* MPE_TASK_16_BOUNDARY_CACHED_AXES_MIN_BEGIN */
     float projection = body_support_along_axis (rigid_body, axis);
     /* MPE_TASK_16_BOUNDARY_CACHED_AXES_MIN_END */
-    return vector3_dot (rigid_body->position, axis) - projection;
+    return vector3_dot (rigid_body -> position, axis) - projection;
 } // Helper: Get highest point of OBB along an axis
 static float get_obb_max_along_axis (rigidbody *rigid_body, vector3 axis) {
     /* MPE_TASK_16_BOUNDARY_CACHED_AXES_MAX_BEGIN */
     float projection = body_support_along_axis (rigid_body, axis);
     /* MPE_TASK_16_BOUNDARY_CACHED_AXES_MAX_END */
-    return vector3_dot (rigid_body->position, axis) + projection;
+    return vector3_dot (rigid_body -> position, axis) + projection;
 }
 /* World-edge safety net: PERFECTLY PLASTIC positional clamp.
  *
@@ -65,15 +65,15 @@ void boundary_apply_floor_cfg (rigidbody *rigid_body, float floor_y_level, const
     if (!rigid_body) {
         return;
     }
-    if (rigid_body->static_state || rigid_body->kinematic) {
+    if (rigid_body -> static_state || rigid_body -> kinematic) {
         return;
     }
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
-    float min_y = get_obb_min_along_axis (rigid_body, (vector3){0, 1, 0});
-    if (min_y < (floor_y_level - C->boundary.floor_emergency_slop)) {
-        rigid_body->position.y += (floor_y_level - min_y);
-        if (rigid_body->velocity.y < 0.0f) {
-            rigid_body->velocity.y = 0.0f;
+    float min_y = get_obb_min_along_axis (rigid_body, (vector3) {0, 1, 0});
+    if (min_y < (floor_y_level - C -> boundary.floor_emergency_slop)) {
+        rigid_body -> position.y += (floor_y_level - min_y);
+        if (rigid_body -> velocity.y < 0.0f) {
+            rigid_body -> velocity.y = 0.0f;
         }
         rigidbody_wake (rigid_body);
     }
@@ -88,61 +88,61 @@ void boundary_apply_box_cfg (rigidbody *rigid_body, vector3 min_bounds, vector3 
     if (!rigid_body) {
         return;
     }
-    if (rigid_body->static_state || rigid_body->kinematic) {
+    if (rigid_body -> static_state || rigid_body -> kinematic) {
         return;
     }
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
-    float es = C->boundary.floor_emergency_slop;
+    float es = C -> boundary.floor_emergency_slop;
     if (!isfinite (es) || es < 0.0f) {
         es = 0.0f;
     }
     // X axis (uniform emergency slop on every face)
-    float min_x = get_obb_min_along_axis (rigid_body, (vector3){1, 0, 0});
+    float min_x = get_obb_min_along_axis (rigid_body, (vector3) {1, 0, 0});
     if (min_x < min_bounds.x - es) {
-        rigid_body->position.x += (min_bounds.x - min_x);
+        rigid_body -> position.x += (min_bounds.x - min_x);
         rigidbody_wake (rigid_body);
-        if (rigid_body->velocity.x < 0) {
-            rigid_body->velocity.x = 0.0f;
+        if (rigid_body -> velocity.x < 0) {
+            rigid_body -> velocity.x = 0.0f;
         }
     }
-    float max_x = get_obb_max_along_axis (rigid_body, (vector3){1, 0, 0});
+    float max_x = get_obb_max_along_axis (rigid_body, (vector3) {1, 0, 0});
     if (max_x > max_bounds.x + es) {
-        rigid_body->position.x -= (max_x - max_bounds.x);
+        rigid_body -> position.x -= (max_x - max_bounds.x);
         rigidbody_wake (rigid_body);
-        if (rigid_body->velocity.x > 0) {
-            rigid_body->velocity.x = 0.0f;
+        if (rigid_body -> velocity.x > 0) {
+            rigid_body -> velocity.x = 0.0f;
         }
     } // Y axis
-    float min_y = get_obb_min_along_axis (rigid_body, (vector3){0, 1, 0});
+    float min_y = get_obb_min_along_axis (rigid_body, (vector3) {0, 1, 0});
     if (min_y < (min_bounds.y - es)) {
-        rigid_body->position.y += (min_bounds.y - min_y);
+        rigid_body -> position.y += (min_bounds.y - min_y);
         rigidbody_wake (rigid_body);
-        if (rigid_body->velocity.y < 0.0f) {
-            rigid_body->velocity.y = 0.0f;
+        if (rigid_body -> velocity.y < 0.0f) {
+            rigid_body -> velocity.y = 0.0f;
         }
     }
-    float max_y = get_obb_max_along_axis (rigid_body, (vector3){0, 1, 0});
+    float max_y = get_obb_max_along_axis (rigid_body, (vector3) {0, 1, 0});
     if (max_y > max_bounds.y + es) {
-        rigid_body->position.y -= (max_y - max_bounds.y);
+        rigid_body -> position.y -= (max_y - max_bounds.y);
         rigidbody_wake (rigid_body);
-        if (rigid_body->velocity.y > 0) {
-            rigid_body->velocity.y = 0.0f;
+        if (rigid_body -> velocity.y > 0) {
+            rigid_body -> velocity.y = 0.0f;
         }
     } // Z axis
-    float min_z = get_obb_min_along_axis (rigid_body, (vector3){0, 0, 1});
+    float min_z = get_obb_min_along_axis (rigid_body, (vector3) {0, 0, 1});
     if (min_z < min_bounds.z - es) {
-        rigid_body->position.z += (min_bounds.z - min_z);
+        rigid_body -> position.z += (min_bounds.z - min_z);
         rigidbody_wake (rigid_body);
-        if (rigid_body->velocity.z < 0) {
-            rigid_body->velocity.z = 0.0f;
+        if (rigid_body -> velocity.z < 0) {
+            rigid_body -> velocity.z = 0.0f;
         }
     }
-    float max_z = get_obb_max_along_axis (rigid_body, (vector3){0, 0, 1});
+    float max_z = get_obb_max_along_axis (rigid_body, (vector3) {0, 0, 1});
     if (max_z > max_bounds.z + es) {
-        rigid_body->position.z -= (max_z - max_bounds.z);
+        rigid_body -> position.z -= (max_z - max_bounds.z);
         rigidbody_wake (rigid_body);
-        if (rigid_body->velocity.z > 0) {
-            rigid_body->velocity.z = 0.0f;
+        if (rigid_body -> velocity.z > 0) {
+            rigid_body -> velocity.z = 0.0f;
         }
     }
 }

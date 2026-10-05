@@ -14,7 +14,7 @@
 #ifndef MPE_OS_WINDOWS
 #include <unistd.h>
 #endif /* MPE_TASK_39 access() */
-//World Status right now
+// World Status right now
 frame_timer main_timer;
 /* RETIRED: obj_per_scene/object_count/object_capacity lived here.
  * Body storage is owned by the primary physics_world now; see
@@ -93,18 +93,18 @@ gboolean physics_step_increment (gpointer user_data_pointer) {
     /* Post-physics bookkeeping */
     gtk_widget_queue_draw (GTK_WIDGET (user_data_pointer));
     int a3_sleeping_object_count = 0;
-    for (int sleep_count_index = 0; sleep_count_index < (physics_world_get_primary ()->body_count);
+    for (int sleep_count_index = 0; sleep_count_index < (physics_world_get_primary () -> body_count);
          sleep_count_index++) {
         /* FIX-AUDIT-DESPOT: exclude statics (mirrors the awake branch in
          * long_run_validation_evaluate): floor slabs are neither awake nor
          * asleep, and counting them here inflated sleeping vs the report. */
-        if ((physics_world_get_primary ()->bodies) [sleep_count_index].is_sleeping &&
-            !(physics_world_get_primary ()->bodies) [sleep_count_index].static_state) {
+        if ((physics_world_get_primary () -> bodies)[sleep_count_index].is_sleeping &&
+            !(physics_world_get_primary () -> bodies)[sleep_count_index].static_state) {
             a3_sleeping_object_count++;
         }
     }
     debug_last_sleeping_object_count = a3_sleeping_object_count;
-    debug_last_object_count = (physics_world_get_primary ()->body_count);
+    debug_last_object_count = (physics_world_get_primary () -> body_count);
     long_run_validation_tick_update ();
     overlay_update ();
     return TRUE;

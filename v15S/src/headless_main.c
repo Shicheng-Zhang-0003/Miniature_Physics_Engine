@@ -17,8 +17,8 @@ int main (int argc, char *argv []) {
     det_fallback_reset ();
     physics_world world;
     physics_world_init (&world);
-    physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3){0.0f, 5.0f, 0.0f});
-    physics_world_add_cube (&world, (vector3){2.0f, 5.0f, 0.0f}, (vector3){0.5f, 0.5f, 0.5f}, 2.0f);
+    physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3) {0.0f, 5.0f, 0.0f});
+    physics_world_add_cube (&world, (vector3) {2.0f, 5.0f, 0.0f}, (vector3) {0.5f, 0.5f, 0.5f}, 2.0f);
     const float dt = 1.0f / 60.0f;
     for (int t = 0; t < ticks; t++) {
         physics_world_step (&world, dt);
@@ -26,7 +26,7 @@ int main (int argc, char *argv []) {
     int invalid = 0;
     for (int i = 0; i < world.body_count; i++) {
         rigidbody *rb = &world.bodies [i];
-        if ((!isfinite (rb->position.x)) || (!isfinite (rb->position.y)) || (!isfinite (rb->position.z))) {
+        if ((!isfinite (rb -> position.x)) || (!isfinite (rb -> position.y)) || (!isfinite (rb -> position.z))) {
             invalid++;
         }
     }

@@ -108,11 +108,11 @@ typedef struct {
     float rest_length;
 } staged_rope;
 static int scene_load_vec3 (FILE *f, uint32_t *crc, vector3 *v) {
-    return scene_rfloat (f, crc, &v->x) && scene_rfloat (f, crc, &v->y) && scene_rfloat (f, crc, &v->z);
+    return scene_rfloat (f, crc, &v -> x) && scene_rfloat (f, crc, &v -> y) && scene_rfloat (f, crc, &v -> z);
 }
 static int scene_load_quat (FILE *f, uint32_t *crc, vector4 *q) {
-    return scene_rfloat (f, crc, &q->w) && scene_rfloat (f, crc, &q->x) && scene_rfloat (f, crc, &q->y) &&
-           scene_rfloat (f, crc, &q->z);
+    return scene_rfloat (f, crc, &q -> w) && scene_rfloat (f, crc, &q -> x) && scene_rfloat (f, crc, &q -> y) &&
+           scene_rfloat (f, crc, &q -> z);
 }
 static bool scene_vec3_finite (vector3 v) {
     return isfinite (v.x) && isfinite (v.y) && isfinite (v.z);
@@ -212,9 +212,9 @@ static int scene_loading_v200 (FILE *f, uint32_t header_crc) {
          * must veto the file, never poison the live world. Zero-quat vetoed
          * (normalisation would yield identity, hiding corruption). */
         {
-            float vals [] = {pos.x,    pos.y,      pos.z,      vel.x,     vel.y,    vel.z,         ang.x,
-                            ang.y,    ang.z,      orient.w,   orient.x,  orient.y, orient.z,      colour.x,
-                            colour.y, colour.z,   rest,       fs,        fk,       sleep_timer_f, radius,
+            float vals [] = {pos.x, pos.y, pos.z, vel.x, vel.y, vel.z, ang.x,
+                            ang.y, ang.z, orient.w, orient.x, orient.y, orient.z, colour.x,
+                            colour.y, colour.z, rest, fs, fk, sleep_timer_f, radius,
                             half_len, half_ext.x, half_ext.y, half_ext.z};
             bool all_fin = true;
             for (size_t vi = 0; vi < sizeof (vals) / sizeof (vals [0]); vi++) {
@@ -277,7 +277,7 @@ static int scene_loading_v200 (FILE *f, uint32_t header_crc) {
             staged_bodies [i].position = pos;
             staged_bodies [i].orientation = vector4_identity ();
             staged_bodies [i].half_extensions =
-                (vector3){staged_bodies [i].radius, staged_bodies [i].radius, staged_bodies [i].radius};
+                (vector3) {staged_bodies [i].radius, staged_bodies [i].radius, staged_bodies [i].radius};
         } else {
             rigidbody_initialisation_sphere (&staged_bodies [i], radius, mass, pos);
         }
@@ -599,7 +599,7 @@ static int scene_loading_v200 (FILE *f, uint32_t header_crc) {
         fprintf (stderr, "[scene] v200 load: dropped %d dangling/invalid staged joint entries\n", dropped_staged);
     }
     physics_world *primary = physics_world_get_primary ();
-    if ((!primary) || (!scene_ensure_pool_capacity (count)) || (count > primary->body_capacity)) {
+    if ((!primary) || (!scene_ensure_pool_capacity (count)) || (count > primary -> body_capacity)) {
         free (staged_bodies);
         free (staged_ids);
         free (staged_springs);
@@ -616,25 +616,25 @@ static int scene_loading_v200 (FILE *f, uint32_t header_crc) {
     scene_id_remap_reset ();
     contact_cache_clear (physics_world_get_primary ());
     joint_init_pool (physics_world_get_primary ());
-    (physics_world_get_primary ()->body_count) = staged_body_count;
+    (physics_world_get_primary () -> body_count) = staged_body_count;
     for (int i = 0; i < staged_body_count; i++) {
         int staged_cs = staged_bodies [i].custom_shape;
-        (physics_world_get_primary ()->bodies) [i] = staged_bodies [i];
-        (physics_world_get_primary ()->bodies) [i].body_index = i;
+        (physics_world_get_primary () -> bodies)[i] = staged_bodies [i];
+        (physics_world_get_primary () -> bodies)[i].body_index = i;
         /* Preserve foreign custom identity (staged); non-custom bodies
          * keep custom_shape=-1. Clobbering customs to -1 broke dispatch
          * (100/-1 mismatch rejects the capsule handler). */
-        if ((physics_world_get_primary ()->bodies) [i].type == object_custom) {
+        if ((physics_world_get_primary () -> bodies)[i].type == object_custom) {
             if (staged_cs < 100) {
                 staged_cs = 100;
             }
-            (physics_world_get_primary ()->bodies) [i].custom_shape = staged_cs;
+            (physics_world_get_primary () -> bodies)[i].custom_shape = staged_cs;
         } else {
-            (physics_world_get_primary ()->bodies) [i].custom_shape = -1;
+            (physics_world_get_primary () -> bodies)[i].custom_shape = -1;
         }
-        (physics_world_get_primary ()->bodies) [i].max_relative_speed_sq = 0.0f;
-        rigidbody_update_axes (&(physics_world_get_primary ()->bodies) [i]);
-        scene_note_loaded_id ((physics_world_get_primary ()->bodies) [i].object_id);
+        (physics_world_get_primary () -> bodies)[i].max_relative_speed_sq = 0.0f;
+        rigidbody_update_axes (&(physics_world_get_primary () -> bodies)[i]);
+        scene_note_loaded_id ((physics_world_get_primary () -> bodies)[i].object_id);
     }
     physics_world_bump_revision (physics_world_get_primary ());
     for (int j = 0; j < staged_spring_count; j++) {
@@ -643,47 +643,47 @@ static int scene_loading_v200 (FILE *f, uint32_t header_crc) {
     }
     for (int j = 0; j < staged_rev_count; j++) {
         staged_revolute *r = &staged_revs [j];
-        int index = constraint_add_revolute (physics_world_get_primary (), r->id_a, r->id_b, r->anchor_a, r->anchor_b,
-                                             r->axis_a);
+        int index = constraint_add_revolute (physics_world_get_primary (), r -> id_a, r -> id_b, r -> anchor_a, r -> anchor_b,
+                                             r -> axis_a);
         if (index >= 0) {
-            constraint_set_revolute_axes (physics_world_get_primary (), index, r->axis_a, r->axis_b);
-            constraint_set_revolute_motor (physics_world_get_primary (), index, r->motor_enabled != 0, r->motor_target,
-                                           r->motor_max_torque);
-            constraint_set_revolute_limits (physics_world_get_primary (), index, r->limits_enabled != 0, r->limit_min,
-                                            r->limit_max);
+            constraint_set_revolute_axes (physics_world_get_primary (), index, r -> axis_a, r -> axis_b);
+            constraint_set_revolute_motor (physics_world_get_primary (), index, r -> motor_enabled != 0, r -> motor_target,
+                                           r -> motor_max_torque);
+            constraint_set_revolute_limits (physics_world_get_primary (), index, r -> limits_enabled != 0, r -> limit_min,
+                                            r -> limit_max);
         }
     }
     /* Install fixed constraints. */
     for (int j = 0; j < staged_fixed_count; j++) {
         staged_fixed *fc = &staged_fixeds [j];
-        constraint_add_fixed (physics_world_get_primary (), scene_id_remap_resolve (fc->id_a),
-                              scene_id_remap_resolve (fc->id_b), fc->anchor_a, fc->anchor_b);
+        constraint_add_fixed (physics_world_get_primary (), scene_id_remap_resolve (fc -> id_a),
+                              scene_id_remap_resolve (fc -> id_b), fc -> anchor_a, fc -> anchor_b);
     }
     /* Install distance constraints. */
     for (int j = 0; j < staged_dist_count; j++) {
         staged_distance *dc = &staged_dists [j];
-        constraint_add_distance (physics_world_get_primary (), scene_id_remap_resolve (dc->id_a),
-                                 scene_id_remap_resolve (dc->id_b), dc->anchor_a, dc->anchor_b, dc->rest_length);
+        constraint_add_distance (physics_world_get_primary (), scene_id_remap_resolve (dc -> id_a),
+                                 scene_id_remap_resolve (dc -> id_b), dc -> anchor_a, dc -> anchor_b, dc -> rest_length);
     }
     /* Install prismatic constraints. */
     for (int j = 0; j < staged_prism_count; j++) {
         staged_prismatic *pc = &staged_prisms [j];
         int index =
-            constraint_add_prismatic (physics_world_get_primary (), scene_id_remap_resolve (pc->id_a),
-                                      scene_id_remap_resolve (pc->id_b), pc->anchor_a, pc->anchor_b, pc->axis_a);
+            constraint_add_prismatic (physics_world_get_primary (), scene_id_remap_resolve (pc -> id_a),
+                                      scene_id_remap_resolve (pc -> id_b), pc -> anchor_a, pc -> anchor_b, pc -> axis_a);
         if (index >= 0) {
-            constraint_set_prismatic_axes (physics_world_get_primary (), index, pc->axis_a, pc->axis_b);
-            constraint_set_prismatic_motor (physics_world_get_primary (), index, pc->motor_enabled != 0,
-                                            pc->motor_target_speed, pc->motor_max_force);
-            constraint_set_prismatic_limits (physics_world_get_primary (), index, pc->limits_enabled != 0,
-                                             pc->limit_min, pc->limit_max);
+            constraint_set_prismatic_axes (physics_world_get_primary (), index, pc -> axis_a, pc -> axis_b);
+            constraint_set_prismatic_motor (physics_world_get_primary (), index, pc -> motor_enabled != 0,
+                                            pc -> motor_target_speed, pc -> motor_max_force);
+            constraint_set_prismatic_limits (physics_world_get_primary (), index, pc -> limits_enabled != 0,
+                                             pc -> limit_min, pc -> limit_max);
         }
     }
     /* Install rope constraints. */
     for (int j = 0; j < staged_rope_count; j++) {
         staged_rope *rc = &staged_ropes [j];
-        constraint_add_rope (physics_world_get_primary (), scene_id_remap_resolve (rc->id_a),
-                             scene_id_remap_resolve (rc->id_b), rc->anchor_a, rc->anchor_b, rc->rest_length);
+        constraint_add_rope (physics_world_get_primary (), scene_id_remap_resolve (rc -> id_a),
+                             scene_id_remap_resolve (rc -> id_b), rc -> anchor_a, rc -> anchor_b, rc -> rest_length);
     }
     free (staged_bodies);
     free (staged_ids);
@@ -1036,16 +1036,16 @@ int scene_loading (const char *file_source_path) {
     scene_id_remap_reset ();
     contact_cache_clear (physics_world_get_primary ());
     joint_init_pool (physics_world_get_primary ());
-    (physics_world_get_primary ()->body_count) = staged_body_count;
+    (physics_world_get_primary () -> body_count) = staged_body_count;
     for (int i = 0; i < staged_body_count; i++) {
-        (physics_world_get_primary ()->bodies) [i] = staged_bodies [i];
+        (physics_world_get_primary () -> bodies)[i] = staged_bodies [i];
         /* Recover the saved object ID from staging (v150+). */
         int32_t saved_id = staged_ids [i];
-        (physics_world_get_primary ()->bodies) [i].object_id = scene_allocate_object_id ();
+        (physics_world_get_primary () -> bodies)[i].object_id = scene_allocate_object_id ();
         if ((version >= 150) && (saved_id > 0)) {
-            scene_id_remap_add ((uint32_t) saved_id, (physics_world_get_primary ()->bodies) [i].object_id);
+            scene_id_remap_add ((uint32_t) saved_id, (physics_world_get_primary () -> bodies)[i].object_id);
         }
-        (physics_world_get_primary ()->bodies) [i].object_generation = 1;
+        (physics_world_get_primary () -> bodies)[i].object_generation = 1;
     }
     /* Install staged joints */
     for (int j = 0; j < staged_joint_count; j++) {

@@ -42,7 +42,7 @@ static rigidbody *spring_find_body_cached (physics_world *world, rigidbody *bodi
     if (object_id == 0) {
         return NULL;
     }
-    if (world && bodies && bodies == world->bodies) {
+    if (world && bodies && bodies == world -> bodies) {
         return physics_world_body_by_id (world, object_id);
     }
     return spring_find_body (bodies, body_count, object_id);
@@ -52,15 +52,15 @@ void joint_init_pool (physics_world *world) {
         return;
     }
     for (int joint_index = 0; joint_index < mpe_max_joints; joint_index++) {
-        world->spring_joints [joint_index].is_active = false;
+        world -> spring_joints [joint_index].is_active = false;
     }
-    world->spring_joint_count = 0;
+    world -> spring_joint_count = 0;
 }
 int spring_joint_count (const physics_world *world) {
     if (!world) {
         return 0;
     }
-    return world->spring_joint_count;
+    return world -> spring_joint_count;
 }
 int add_joint_by_ids (physics_world *world, uint32_t object_id_a, uint32_t object_id_b, float equilibrium_length,
                       float spring_constant, float damping_coefficient) {
@@ -71,14 +71,14 @@ int add_joint_by_ids (physics_world *world, uint32_t object_id_a, uint32_t objec
         return -1;
     }
     for (int joint_index = 0; joint_index < mpe_max_joints; joint_index++) {
-        if (!world->spring_joints [joint_index].is_active) {
-            world->spring_joints [joint_index].object_id_a = object_id_a;
-            world->spring_joints [joint_index].object_id_b = object_id_b;
-            world->spring_joints [joint_index].equilibrium_length = equilibrium_length;
-            world->spring_joints [joint_index].spring_constant = spring_constant;
-            world->spring_joints [joint_index].damping_coefficient = damping_coefficient;
-            world->spring_joints [joint_index].is_active = true;
-            world->spring_joint_count += 1;
+        if (!world -> spring_joints [joint_index].is_active) {
+            world -> spring_joints [joint_index].object_id_a = object_id_a;
+            world -> spring_joints [joint_index].object_id_b = object_id_b;
+            world -> spring_joints [joint_index].equilibrium_length = equilibrium_length;
+            world -> spring_joints [joint_index].spring_constant = spring_constant;
+            world -> spring_joints [joint_index].damping_coefficient = damping_coefficient;
+            world -> spring_joints [joint_index].is_active = true;
+            world -> spring_joint_count += 1;
             return joint_index;
         }
     }
@@ -90,13 +90,13 @@ int add_joint (physics_world *world, int object_index_a, int object_index_b, flo
     if (!world) {
         return -1;
     }
-    if ((object_index_a < 0) || (object_index_a >= world->body_count) || (object_index_b < 0) ||
-        (object_index_b >= world->body_count)) {
+    if ((object_index_a < 0) || (object_index_a >= world -> body_count) || (object_index_b < 0) ||
+        (object_index_b >= world -> body_count)) {
         fprintf (stderr, "Error SJA002: Invalid joint object index\n");
         return -1;
     }
-    uint32_t object_id_a = world->bodies [object_index_a].object_id;
-    uint32_t object_id_b = world->bodies [object_index_b].object_id;
+    uint32_t object_id_a = world -> bodies [object_index_a].object_id;
+    uint32_t object_id_b = world -> bodies [object_index_b].object_id;
     return add_joint_by_ids (world, object_id_a, object_id_b, equilibrium_length, spring_constant, damping_coefficient);
 }
 void remove_joint (physics_world *world, int joint_pool_index) {
@@ -106,11 +106,11 @@ void remove_joint (physics_world *world, int joint_pool_index) {
     if ((joint_pool_index < 0) || (joint_pool_index >= mpe_max_joints)) {
         return;
     }
-    if (!world->spring_joints [joint_pool_index].is_active) {
+    if (!world -> spring_joints [joint_pool_index].is_active) {
         return;
     }
-    world->spring_joints [joint_pool_index].is_active = false;
-    world->spring_joint_count -= 1;
+    world -> spring_joints [joint_pool_index].is_active = false;
+    world -> spring_joint_count -= 1;
 }
 /* Shared Hooke+damping+limit core over an explicit body array. Both step
  * paths funnel through here (legacy passes the primary world's bodies). */
@@ -119,43 +119,43 @@ static void spring_apply_core_dt (physics_world *world, rigidbody *bodies, int b
         dt = 1.0f / 60.0f;
     }
     for (int joint_index = 0; joint_index < mpe_max_joints; joint_index++) {
-        if (!world->spring_joints [joint_index].is_active) {
+        if (!world -> spring_joints [joint_index].is_active) {
             continue;
         }
-        spring_joint *current_spring_joint = &world->spring_joints [joint_index];
+        spring_joint *current_spring_joint = &world -> spring_joints [joint_index];
         rigidbody *rigid_body_a =
-            spring_find_body_cached (world, bodies, body_count, current_spring_joint->object_id_a);
+            spring_find_body_cached (world, bodies, body_count, current_spring_joint -> object_id_a);
         rigidbody *rigid_body_b =
-            spring_find_body_cached (world, bodies, body_count, current_spring_joint->object_id_b);
+            spring_find_body_cached (world, bodies, body_count, current_spring_joint -> object_id_b);
         if ((!rigid_body_a) || (!rigid_body_b)) {
             remove_joint (world, joint_index);
             continue;
         }
-        vector3 displacement_vector = vector3_subtraction (rigid_body_b->position, rigid_body_a->position);
+        vector3 displacement_vector = vector3_subtraction (rigid_body_b -> position, rigid_body_a -> position);
         float current_separation_distance = vector3_length (displacement_vector);
         /* FIX-AUDIT: coincident bodies with L0>0 need maximal repulsion,
          * not skip. Pick an arbitrary axis. */
         vector3 spring_axis_direction;
         if (current_separation_distance < math_epsilon) {
-            spring_axis_direction = (vector3){1.0f, 0.0f, 0.0f};
+            spring_axis_direction = (vector3) {1.0f, 0.0f, 0.0f};
             current_separation_distance = 0.0f;
         } else {
             spring_axis_direction = vector3_scaling (displacement_vector, 1.0f / current_separation_distance);
         }
-        float spring_extension = current_separation_distance - current_spring_joint->equilibrium_length;
+        float spring_extension = current_separation_distance - current_spring_joint -> equilibrium_length;
         /* TRUTH: Courant stability guard (loud, not silent). Explicit Euler
          * is stable iff w*dt=sqrt(k/m_red)*dt<2. Above that the TRUE Hooke
          * force would explode; softening k to the stable limit preserves
          * bounded energy and reports the deviation (stderr, rate-limited).
          * TRUTH: use effective masses (sleeping/static infinite) and actual
          * dt (not hardcoded 60Hz), plus damping guard c*dt/m<2. */
-        float k_eff = current_spring_joint->spring_constant;
+        float k_eff = current_spring_joint -> spring_constant;
         if (!isfinite (k_eff) || k_eff < 0.0f) {
             k_eff = 0.0f;
         }
         /* TRUTH: c_eff is function-scope: the softened damping must survive
          * past the stability block to the force computation below. */
-        float c_eff = current_spring_joint->damping_coefficient;
+        float c_eff = current_spring_joint -> damping_coefficient;
         if (!isfinite (c_eff) || c_eff < 0.0f) {
             c_eff = 0.0f;
         }
@@ -193,7 +193,7 @@ static void spring_apply_core_dt (physics_world *world, rigidbody *bodies, int b
             }
         }
         vector3 restoration_force = vector3_scaling (spring_axis_direction, k_eff * spring_extension);
-        vector3 relative_velocity = vector3_subtraction (rigid_body_b->velocity, rigid_body_a->velocity);
+        vector3 relative_velocity = vector3_subtraction (rigid_body_b -> velocity, rigid_body_a -> velocity);
         float velocity_along_spring_axis = vector3_dot (relative_velocity, spring_axis_direction);
         vector3 damping_force = vector3_scaling (spring_axis_direction, c_eff * velocity_along_spring_axis);
         vector3 net_joint_force = vector3_addition (restoration_force, damping_force);
@@ -204,7 +204,7 @@ static void spring_apply_core_dt (physics_world *world, rigidbody *bodies, int b
              * loudly-bounded instead of NaN. For pure Hooke set
              * joints.max_acceleration to its 10000 max. */
             float a3_reduced_mass = 1.0f / a3_inverse_mass_sum;
-            float a3_max_joint_force = a3_reduced_mass * mpe_world_cfg (world)->joints.max_acceleration;
+            float a3_max_joint_force = a3_reduced_mass * mpe_world_cfg (world) -> joints.max_acceleration;
             float a3_force_length = vector3_length (net_joint_force);
             if ((a3_force_length > a3_max_joint_force) && (a3_force_length > math_epsilon)) {
                 net_joint_force = vector3_scaling (net_joint_force, a3_max_joint_force / a3_force_length);
@@ -216,10 +216,10 @@ static void spring_apply_core_dt (physics_world *world, rigidbody *bodies, int b
 }
 /* Canonical per-tick spring entry: both step paths call exactly this. */
 void mpe_springs_apply (physics_world *world, float dt) {
-    if ((!world) || (!world->bodies) || (world->body_count <= 0)) {
+    if ((!world) || (!world -> bodies) || (world -> body_count <= 0)) {
         return;
     }
-    spring_apply_core_dt (world, world->bodies, world->body_count, dt);
+    spring_apply_core_dt (world, world -> bodies, world -> body_count, dt);
 }
 /* Legacy entry points: thin wrappers over the canonical pass. */
 void apply_force_all_joints (physics_world *world) {
@@ -247,20 +247,20 @@ void remove_joints_from_object_id (physics_world *world, uint32_t object_id) {
         return;
     }
     for (int joint_index = 0; joint_index < mpe_max_joints; joint_index++) {
-        if (!world->spring_joints [joint_index].is_active) {
+        if (!world -> spring_joints [joint_index].is_active) {
             continue;
         }
-        if ((world->spring_joints [joint_index].object_id_a == object_id) ||
-            (world->spring_joints [joint_index].object_id_b == object_id)) {
+        if ((world -> spring_joints [joint_index].object_id_a == object_id) ||
+            (world -> spring_joints [joint_index].object_id_b == object_id)) {
             remove_joint (world, joint_index);
         }
     }
 }
 void remove_joints_from_object (physics_world *world, int object_index) {
-    if ((!world) || (object_index < 0) || (object_index >= world->body_count)) {
+    if ((!world) || (object_index < 0) || (object_index >= world -> body_count)) {
         return;
     }
-    remove_joints_from_object_id (world, world->bodies [object_index].object_id);
+    remove_joints_from_object_id (world, world -> bodies [object_index].object_id);
 }
 #ifndef MPE_HEADLESS
 static GLuint joint_vao = 0;
@@ -307,11 +307,11 @@ void spring_joint_render (GLuint shader_program, math4 view_matrix, math4 projec
     }
     int active_count = 0;
     for (int i = 0; i < mpe_max_joints; i++) {
-        if (!world->spring_joints [i].is_active) {
+        if (!world -> spring_joints [i].is_active) {
             continue;
         }
-        rigidbody *rb_a = scene_resolve_object_by_id (world->spring_joints [i].object_id_a);
-        rigidbody *rb_b = scene_resolve_object_by_id (world->spring_joints [i].object_id_b);
+        rigidbody *rb_a = scene_resolve_object_by_id (world -> spring_joints [i].object_id_a);
+        rigidbody *rb_b = scene_resolve_object_by_id (world -> spring_joints [i].object_id_b);
         if ((rb_a) && (rb_b)) {
             active_count++;
         }
@@ -325,18 +325,18 @@ void spring_joint_render (GLuint shader_program, math4 view_matrix, math4 projec
     static float vertices [mpe_max_joints * 2 * 3]; /* A3_PATCH_28_PERSISTENT_JOINT_BUFFER */
     int v_idx = 0;
     for (int i = 0; i < mpe_max_joints; i++) {
-        if (!world->spring_joints [i].is_active) {
+        if (!world -> spring_joints [i].is_active) {
             continue;
         }
-        rigidbody *rb_a = scene_resolve_object_by_id (world->spring_joints [i].object_id_a);
-        rigidbody *rb_b = scene_resolve_object_by_id (world->spring_joints [i].object_id_b);
+        rigidbody *rb_a = scene_resolve_object_by_id (world -> spring_joints [i].object_id_a);
+        rigidbody *rb_b = scene_resolve_object_by_id (world -> spring_joints [i].object_id_b);
         if ((rb_a) && (rb_b)) {
-            vertices [v_idx++] = rb_a->position.x;
-            vertices [v_idx++] = rb_a->position.y;
-            vertices [v_idx++] = rb_a->position.z;
-            vertices [v_idx++] = rb_b->position.x;
-            vertices [v_idx++] = rb_b->position.y;
-            vertices [v_idx++] = rb_b->position.z;
+            vertices [v_idx++] = rb_a -> position.x;
+            vertices [v_idx++] = rb_a -> position.y;
+            vertices [v_idx++] = rb_a -> position.z;
+            vertices [v_idx++] = rb_b -> position.x;
+            vertices [v_idx++] = rb_b -> position.y;
+            vertices [v_idx++] = rb_b -> position.z;
         }
     }
     if (joint_vao == 0) {
@@ -368,7 +368,7 @@ void spring_joint_render (GLuint shader_program, math4 view_matrix, math4 projec
     for (int row_index = 0; row_index < 3; row_index++) {
         for (int column_index = 0; column_index < 3; column_index++) {
             normal_matrix_flat_array [row_index * 3 + column_index] =
-                identity_normal_matrix.matrix [row_index] [column_index];
+                identity_normal_matrix.matrix [row_index][column_index];
         }
     }
     glUniformMatrix3fv (a3_spring_uniform_normal_matrix, 1, GL_FALSE, normal_matrix_flat_array);
