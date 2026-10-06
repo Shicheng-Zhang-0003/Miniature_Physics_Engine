@@ -10,7 +10,7 @@
 #include "config/mpe_config.h"
 #include "modules/ftc/submodules/robot.h"
 #include "modules/ftc/submodules/drivetrain.h"
-#include "ecosystem/mfs/tests/mfs_test_common.h"
+#include "mfs_test_common.h"
 int main (void) {
     physics_world world;
     mfs_test_world (&world); /* 128 iters + tile floor (see header) */
