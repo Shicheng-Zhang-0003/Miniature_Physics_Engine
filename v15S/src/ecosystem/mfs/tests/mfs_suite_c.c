@@ -8,6 +8,8 @@
 #include "ecosystem/mpe_ecosystem.h"
 #include "modules/ftc/ftc_fleet.h"
 #include "modules/module_1/mfs_module_1.h"
+#include "mfs_internal.h"
+#include <stdlib.h>
 /* Windows-aware plugin path: pick existing .so/.dll variant. */
 static const char *mpe_pick_plugin (const char *so_path, char *buf, size_t n) {
 #ifdef MPE_OS_WINDOWS
@@ -699,6 +701,128 @@ int mfs_t_ball_spin (void) {
     }
     mfs_module_1_detach (&w, state);
     physics_world_cleanup (&w);
+    mfs_test_end (t_ptr);
+    return t_ptr -> failures;
+}
+
+/* ---------------------------------------------------------------------
+ * mfs_t_registry: the internal registry's own guarantees.
+ *
+ * DESPOT-2026-10-06. The self-detach deadlock this gates was found by a
+ * standalone probe, not by the suite: a module calling
+ * mfs_internal_module_detach on ITSELF from inside its own pre_step drained
+ * on in_flight>0, which is the caller's own reference, and hung forever
+ * (reproduced: exit 124 on a 10 s timeout). mfs_internal.h explicitly
+ * promises the opposite -- "callbacks run outside the lock so module code may
+ * re-enter the registry" -- so the code contradicted its own documented
+ * contract, and nothing gated it.
+ *
+ * A hang is its own regression guard here: if the deferral is removed this
+ * case stops the suite dead rather than failing an assertion, which is
+ * exactly the signal that must not be missed. The post-conditions are
+ * asserted too, because "did not hang" alone would also be satisfied by a
+ * deferral that silently never ran the module's detach callback.
+ * --------------------------------------------------------------------- */
+static int s_reg_hooked = 0;
+static int s_reg_detach_calls = 0;
+static int s_reg_attach_calls = 0;
+static int s_reg_pre_calls = 0;
+static int mfs_reg_attach (physics_world *w, void **state) {
+    /* Allocate REAL state: mfs_internal_module_state_for returns the stored
+     * pointer verbatim, so a module that attaches with *state = NULL reads
+     * back NULL even though the attachment is live. That is correct behaviour
+     * and it is exactly what the first version of this test got wrong -- the
+     * state_for assertions below are only meaningful with non-NULL state. */
+    s_reg_attach_calls++;
+    int *st = (int *) calloc (1, sizeof (int));
+    if (!st)
+        return -1;
+    *st = 0x5eed;
+    *state = st;
+    return 0;
+}
+static int mfs_reg_detach (physics_world *w, void *state) {
+    s_reg_detach_calls++;
+    /* The registry owns this state and must release it exactly once. Leak
+     * detection runs in the ASan profile, so a double-free or a missed free
+     * here is caught without any explicit assertion. */
+    free (state);
+    return 0;
+}
+static int mfs_reg_pre (physics_world *w, float dt, void *state) {
+    s_reg_pre_calls++;
+    if (state) *(int *) state += 1;
+    if (!s_reg_hooked) {
+        s_reg_hooked = 1;
+        /* The regression itself: detach this module from inside its own tick. */
+        int rc = mfs_internal_module_detach ("mfs-registry-probe", w);
+        MFS_INFO ("self-detach from own pre_step returned %d (0 = deferred)", rc);
+    }
+    return 0;
+}
+static const mpe_module_desc_t mfs_reg_desc = {
+    .abi = MPE_MODULE_ABI,
+    .name = "mfs-registry-probe",
+    .version = "1.0",
+    .attach = mfs_reg_attach,
+    .detach = mfs_reg_detach,
+    .pre_step = mfs_reg_pre,
+};
+int mfs_t_registry (void) {
+    mfs_test_t t;
+    mfs_test_begin (&t, "registry");
+    mfs_test_t *t_ptr = &t;
+    s_reg_hooked = 0;
+    s_reg_detach_calls = 0;
+    s_reg_attach_calls = 0;
+    s_reg_pre_calls = 0;
+    physics_world w;
+    mfs_test_world (&w);
+    MFS_CHECK (t_ptr, mfs_internal_module_registered ("mfs-registry-probe") == 0);
+    MFS_CHECK (t_ptr, mfs_internal_module_register (&mfs_reg_desc) == MFS_REG_OK);
+    /* Attach to TWO worlds: exercises the alias-slot path too. */
+    MFS_CHECK (t_ptr, mfs_internal_module_attach ("mfs-registry-probe", &w) == MFS_REG_OK);
+    physics_world w2;
+    mfs_test_world (&w2);
+    MFS_CHECK (t_ptr, mfs_internal_module_attach ("mfs-registry-probe", &w2) == MFS_REG_OK);
+    MFS_CHECK (t_ptr, s_reg_attach_calls == 2);
+    /* Idempotent re-attach must NOT run attach again. */
+    MFS_CHECK (t_ptr, mfs_internal_module_attach ("mfs-registry-probe", &w) == MFS_REG_OK);
+    MFS_CHECK (t_ptr, s_reg_attach_calls == 2);
+    /* Per-world state lookup is unambiguous. */
+    MFS_CHECK (t_ptr, mfs_internal_module_state_for (&w, "mfs-registry-probe") != NULL);
+    MFS_CHECK (t_ptr, mfs_internal_module_state_for (&w2, "mfs-registry-probe") != NULL);
+    MFS_CHECK (t_ptr, mfs_internal_module_state_for (&w, "nope") == NULL);
+    /* per-world attachments must be DISTINCT state, not one shared pointer */
+    MFS_CHECK (t_ptr, mfs_internal_module_state_for (&w, "mfs-registry-probe") !=
+                          mfs_internal_module_state_for (&w2, "mfs-registry-probe"));
+    /* THE regression: dispatch on world 1, whose module detaches itself. */
+    mfs_internal_modules_pre_step (&w, 1.0f / 60.0f);
+    MFS_CHECK (t_ptr, s_reg_pre_calls == 1);
+    MFS_CHECK (t_ptr, s_reg_detach_calls == 1);
+    /* State for the self-detached world is released; the OTHER world's
+     * attachment is untouched (deferral must not detach by name). */
+    MFS_CHECK (t_ptr, mfs_internal_module_state_for (&w, "mfs-registry-probe") == NULL);
+    MFS_CHECK (t_ptr, mfs_internal_module_state_for (&w2, "mfs-registry-probe") != NULL);
+    MFS_CHECK (t_ptr, mfs_internal_modules_inflight () == 0);
+    /* Dispatch on world 2 must still run it, and must not run it twice. */
+    mfs_internal_modules_pre_step (&w2, 1.0f / 60.0f);
+    MFS_CHECK (t_ptr, s_reg_pre_calls == 2);
+    MFS_CHECK (t_ptr, s_reg_detach_calls == 1);
+    /* Explicit detach of the survivor, then idempotency and unregister. */
+    MFS_CHECK (t_ptr, mfs_internal_module_detach ("mfs-registry-probe", &w2) == MFS_DET_OK);
+    MFS_CHECK (t_ptr, s_reg_detach_calls == 2);
+    MFS_CHECK (t_ptr, mfs_internal_module_detach ("mfs-registry-probe", &w2) == MFS_DET_OK);
+    MFS_CHECK (t_ptr, s_reg_detach_calls == 2);
+    MFS_CHECK (t_ptr, mfs_internal_module_detach ("no-such-module", &w2) == MFS_DET_NOT_FOUND);
+    MFS_CHECK (t_ptr, mfs_internal_module_unregister ("mfs-registry-probe") == MFS_UNREG_OK);
+    MFS_CHECK (t_ptr, mfs_internal_module_registered ("mfs-registry-probe") == 0);
+    MFS_CHECK (t_ptr, mfs_internal_module_attach ("mfs-registry-probe", &w) == MFS_REG_NOT_FOUND);
+    physics_world_cleanup (&w);
+    physics_world_cleanup (&w2);
+    if (t_ptr -> failures == 0) {
+        printf ("[PASS] registry: self-detach defers safely, per-world state, idempotence\n");
+    }
     mfs_test_end (t_ptr);
     return t_ptr -> failures;
 }

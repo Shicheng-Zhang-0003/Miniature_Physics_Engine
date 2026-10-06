@@ -20,6 +20,8 @@ extern int mfs_t_ftc_hotload (void);
 extern int mfs_t_module_1 (void);
 extern int mfs_t_physics_truth (void);
 extern int mfs_t_drive_directions (void);
+extern int mfs_t_odometry_yaw (void);
+extern int mfs_t_registry (void);
 extern int mfs_t_external_truth (void);
 extern int mfs_t_stall_endpoint (void);
 extern int mfs_t_intake_stop (void);
@@ -36,6 +38,8 @@ static const mfs_test_entry_t registry [] = {
     {"module_1", mfs_t_module_1, false},
     {"physics_truth", mfs_t_physics_truth, false},
     {"drive_directions", mfs_t_drive_directions, false},
+    {"odometry_yaw", mfs_t_odometry_yaw, false},
+    {"registry", mfs_t_registry, false},
     {"external_truth", mfs_t_external_truth, false},
     {"stall_endpoint", mfs_t_stall_endpoint, false},
     {"intake_stop", mfs_t_intake_stop, false},
