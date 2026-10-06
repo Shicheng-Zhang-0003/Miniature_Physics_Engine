@@ -280,11 +280,6 @@ ticks of sustained full mixed drive (0.5 fwd + 0.5 strafe + 0.3 rotate)
 walks wheel axles 5° → 69° → 180° (frozen-in-tilt end state, mounts hold,
 never NaN). Gated behaviors (single-mode bursts ≤180 ticks) stay ≤1.4°.
 
-Recorded 2026-10-04. Sibling of the fixed items above, NOT fixed: ~90+
-ticks of sustained full mixed drive (0.5 fwd + 0.5 strafe + 0.3 rotate)
-walks wheel axles 5° → 69° → 180° (frozen-in-tilt end state, mounts hold,
-never NaN). Gated behaviors (single-mode bursts ≤180 ticks) stay ≤1.4°.
-
 - Pre-existing: pre-change MFS tree blows up identically single-driven
   (172.8° vs 179.9° current, same session shape), so no fix above caused
   it — but none cured it either.
@@ -1374,3 +1369,247 @@ are different claims, and only one of them was ever being checked.
 
 Verification: 39/39 green in the suite, and in all five regimes; engine builds
 with zero warnings. The three visual symptoms are the user's to confirm.
+
+---
+
+# DESPOT-2026-10-06 — audit of the yaw axis, and of the gate that hid it
+
+Found by writing probes that test the claims instead of reading them. Every
+number below was measured on this tree; nothing is inferred from algebra.
+
+The headline: **the suite was 15/15 green with ASan+UBSan clean while the yaw
+axis was wrong in two independent ways, and no test in the tree read
+`odom_theta`, `odom_slip` or `clamp_events` at all.** That coverage hole is
+the actual defect. The two bugs are now fixed and gated; one deeper frontier
+is now open and ticketed.
+
+## [YAW-ODOM-SIGN] Odometry heading had the OPPOSITE sign to the chassis (FIXED 2026-10-06)
+
+`drivetrain_odometry_update` computed yaw from `(-wfl+wfr-wbl+wbr)` on both
+drivetrains. That returns the opposite sign to the chassis' actual rotation
+about +Y.
+
+Measured with **two independent yaw measures that cannot both be wrong the
+same way** — `atan2` off the chassis quaternion, and a running sum of
+`chassis.angular_velocity.y * dt`, which never wraps — over windows short
+enough that neither can alias:
+
+| command | true (quat atan2) | true (Σ om_y·dt) | odom_theta | verdict |
+|---|---|---|---|---|
+| mecanum rotate +1 | −0.1850 rad | −0.1850 rad | **+0.1909 rad** | opposite sign |
+| mecanum rotate −1 | +0.1855 rad | +0.1855 rad | **−0.1756 rad** | opposite sign |
+| tank L+0.5 R−0.5 | +0.1293 rad | +0.1293 rad | **−0.3993 rad** | opposite sign |
+| tank L−0.5 R+0.5 | −0.1273 rad | −0.1273 rad | **+0.3682 rad** | opposite sign |
+
+The two truth measures agreed to four decimals every time. Flat-plane odometry
+(x/z) was measured separately and is correct — only the heading combination
+was wrong.
+
+**Why it stayed invisible.** Two independent reasons, and either alone was
+enough:
+
+1. Nothing gated it. Grep for `odom_theta` across `tests/` returned
+   *assertions*: zero. Every mecanum gate measured a planar magnitude on a
+   single axis, and on a straight drive `odom_theta` never leaves 0 — so the
+   planar path looked perfectly healthy.
+2. `odom_theta` is also the **heading frame** that rotates every subsequent
+   planar integration (`odom_x += v_lat·c + v_fwd·s`). A wrong-signed heading
+   therefore mirrored the world axis for every lateral command issued after a
+   turn. The suite only ever measured a strafe on a robot that had not turned,
+   so this was never exercised either.
+
+**Also fixed here:** the moment arm had been changed 0.44 → 0.45 on
+2026-10-05, justified in-code with `CHASSIS_HALF_X = 0.225, CHASSIS_HALF_Z =
+0.225`. Those are the chassis **collision box** half-extents and have nothing
+to do with where the wheels are. The arm is the **wheel** track:
+`WHEEL_OFFSET_X (0.24) + WHEEL_OFFSET_Z (0.20) = 0.44 m`. The original value
+was right; the change was a 2.27% yaw-rate bias layered on the sign bug.
+Reverted. `docs/MODELS.md` already said 0.44 throughout, so code and doc now
+agree.
+
+**Gate added:** `mfs_t_odometry_yaw` (tests/mfs_suite_a.c). It hard-gates the
+**sign** on both drivetrains — convention-independent, battery-independent,
+and simply wrong before. Verified as a real guard, not a rubber stamp: with
+both original defects reintroduced it produces **4 failures**; with the fix it
+produces **0**.
+
+## [MEASURE-ALIAS] The only yaw measurement in the suite was aliasing (FIXED 2026-10-06)
+
+`mfs_measure_rates` differenced two `atan2(quaternion)` values and wrapped the
+delta into `[−π, π]`. `atan2` is only defined on `[−π, π]`, so **any real yaw
+rate above π rad/s over the 60-tick window has that delta folded** to a small
+number that looks like a perfectly plausible rate.
+
+This is not a theoretical objection — it was actively hiding the sign bug.
+At the rotate +1 window:
+
+```
+suite reported (wrapped)  : +0.6001 rad/s   <- what drive_directions gated on
+TRUE unwrapped yaw rate  : -5.6831 rad/s
+chassis.angular_velocity.y : -6.1332 rad/s  (no wrapping involved anywhere)
+```
+
+The fold **inverted the sign**, so gate 7 — *"rotate and its reverse must have
+opposite yaw signs"*, the gate written specifically to catch rotate
+directionality — passed on an artefact. It now prints the truth (`om=−5.6830`)
+and still passes, but for the right reason.
+
+Fixed by never forming a difference of wrapped angles: the measurement now
+integrates `chassis.angular_velocity.y * dt`, which is continuous and cannot
+alias. The steady-state window itself (the ~2 s spin-up allowance) was correct
+and is kept — the docstring's warning about judging directionality on a
+short-horizon average was right, and the measurement then violated it.
+
+## [REGISTRY-SELF-DETACH] A module detaching itself from its own tick hung the dispatcher (FIXED 2026-10-06)
+
+`mfs_internal.h` promises that callbacks run outside the lock precisely so
+"module code may re-enter the registry". It did not honour that: a module
+calling `mfs_internal_module_detach` on **its own name** from inside its own
+`pre_step` drains on `in_flight > 0` — which is the caller's own reference — so
+it waited on itself forever. Reproduced as a hard hang (exit 124 on a 10 s
+timeout).
+
+Not reachable from `ftc` or `module_1` as shipped, so this was latent rather
+than live. Fixed by never draining on *our own* reference: the thread inside a
+slot's callback records the request and returns `MFS_DET_OK`, and the
+dispatcher performs the deferred detach once the callback has returned and
+released the reference — so the state is still freed by the thread that owns
+it, and the snapshot-then-invoke use-after-free guarantee is unchanged.
+
+**Gate added:** `mfs_t_registry` (tests/mfs_suite_c.c), which also covers
+per-world alias slots, attach/detach idempotence and unregister. This required
+linking `mfs_internal.c` into the suite — **it had never been linked into the
+suite at all**, so the file had zero test coverage and its defect was only
+findable with a standalone probe.
+
+## [MECANUM-PIVOT] Mecanum pivot yaw runs ~3.5x past the kinematic ceiling (OPEN, pre-existing)
+
+**Not fixed.** Recorded with its diagnosis because the obvious fixes make the
+drivetrain worse, and that is worth more than a bad patch.
+
+A full-power `rotate +1` on a level chassis does not converge to a steady
+yaw rate. It accelerates indefinitely:
+
+```
+k= 120 (2 s)   true omega_y = −2.816 rad/s
+k= 600 (10 s)  true omega_y = −8.760 rad/s
+k=1200 (20 s)  true omega_y = −10.515 rad/s   (8.6 full turns in the first 10 s)
+kinematic ceiling from wheel no-load speed = 23.35 * 0.05 / 0.44 = 2.654 rad/s
+```
+
+Final value is ~9–10 rad/s, about **3.5× what the wheels can physically
+produce**, and the chassis stays level throughout (y ≈ 0.19) so it is not a
+tumble. Reproduced on the 475 twin too, so it is pre-existing and not from
+the 2026-10-05 midrefactor.
+
+**Diagnosis — it is not the motor, and not `v_ref`.** Four hypotheses tested
+and eliminated, so nobody repeats them:
+
+| hypothesis | result |
+|---|---|
+| `MFS_MECANUM_ANALYTIC_VREF` too small | **flat.** 0.005→5.66, 0.05→5.84, 0.2→5.68 rad/s. Cannot reach it. |
+| the `r × F` reaction torque pumps the wheel | **no.** Removing it entirely made it *worse* (peak wheel 148 vs 61 rad/s). |
+| wheels exceed no-load speed, so [MOTOR-III] drives it | **no.** Hard-clamping every wheel's spin to ±23.35 rad/s after each step still reached −9.3 rad/s. Not downstream of motor overspeed. |
+| bound the reaction torque with the free-speed governor | **no effect at all** (bit-identical to baseline). |
+
+**Actual cause.** In analytic mode the hub ships **zero friction** (0.0/0.0,
+deliberately, so the analytic lateral force is the sole tangential model). So
+the engine's contact solver contributes *no* tangential force, and the
+drivetrain has **no longitudinal traction path whatsoever** — the analytic
+lateral force is the only tangential channel. That force is a saturating law
+(`|F| ≤ μN`, sign of contact slip) applied at the wheel, and its reaction
+torque is a ±0.75 N·m hammer on a wheel whose inertia is 0.5·0.2·0.05² =
+**2.5e-4 kg·m²** — about ±35 rad/s in a single tick. Observed: wheel spin
+oscillating ±50 rad/s tick-to-tick while motor torque is correctly 0.000
+(governor doing its job). The pivot excess and the wheel limit cycle are the
+same instability seen from two ends.
+
+**Why the obvious patch was rejected.** Gating the analytic force off once a
+wheel passes its own no-load speed does bound the pivot (peak 9.19 → 3.54
+rad/s) — but it **destroys the F1 strafe**, which is a hard-gated behaviour:
+strafe dx collapses **2.3742 m → 0.3951 m** (−83%), because strafe wheels
+legitimately peak at 49 rad/s. Gating on the existing traction scale instead
+(`vcd` variant E) keeps strafe but still leaves the pivot above the ceiling.
+Neither is shippable, and shipping either would trade a visible red frontier
+for an invisible one on validated behaviour — the exact failure this ledger
+exists to prevent.
+
+**What it would actually take.** The proper fix is a per-wheel torque budget
+capped at the contact cone, so the motor can never demand more than the ground
+can transmit. That is the "next honest measurement, not yet taken" already
+noted under [ABUSE-TILT], and the reason it was deferred is still correct:
+it retunes all drive authority, and the surrounding gates are calibrated to
+the current numbers. It needs its own task and a full re-baseline.
+
+**How it is surfaced now instead of hidden.** The pivot is no longer masked by
+an aliasing measurement: `drive_directions` prints the true `om=−5.6830`
+instead of a folded `+0.6001`, and `odometry_yaw` emits
+`[XFAIL][MECANUM-PIVOT]` with the percentage error whenever odometry yaw
+disagrees with the chassis by more than 30%. Loud, ticketed, non-blocking —
+the correct shape for a known-red frontier.
+
+
+### External-authority verification of the two fixed items (2026-10-06)
+
+**Where the sign bug actually came from.** The textbook mecanum forward
+kinematics, for `l_x` = half wheelbase, `l_y` = half track, `r` = wheel radius,
+is (identical in three independent published derivations):
+
+```
+v_lat = (-w_fl + w_fr + w_rl - w_rr) * r / 4
+yaw   = (-w_fl + w_fr - w_rl + w_rr) * r / (4 * (l_x + l_y))
+```
+
+The shipped code used **exactly** that yaw combination -- and it was wrong, by
+a sign, on both drivetrains. The textbook assumes a **right-handed** frame
+(x forward, y left, z up). The engine's frame is **X = right, Y = up,
+Z = forward**, and that triple is **LEFT-handed**: verified numerically against
+an unambiguous ENU reference world, `X x Y = -Z`, at every heading (handedness
+is a convention, not a pose property).
+
+Under a handedness flip:
+
+- **polar** vectors (v, F, r) map component-wise across unchanged;
+- **axial** vectors (omega, tau) gain one extra minus sign.
+
+That is the entire explanation, and it is why the two axes failed differently:
+
+```
+v_lat is POLAR -> keeps the textbook sign -> was always correct, never noticed
+yaw   is AXIAL -> must be NEGATED         -> was silently inverted
+```
+
+So the correct shipped forms are both the negation of the textbook, which is
+exactly what `drivetrain.c` now computes:
+
+```
+v_lat = ((wfl - wfr - wbl + wbr) * 0.25) * r        == -(textbook)
+yaw   = (((wfl - wfr + wbl - wbr) * 0.25) * r) / 0.44 == -(textbook)
+tank yaw = ((wl - wr) * r) / 0.48                     == -(textbook differential)
+```
+
+This is now asserted by `mfs_t_odometry_yaw`, which pins the handedness so that
+anyone who ever corrects the frame to right-handed gets a failing gate telling
+them to revisit both signs together.
+
+**Published motor constants, checked against vendor sources.** Every preset's
+endpoints reproduce **exactly** from its derived Kt/R/Kv (stall error and
+no-load speed error 0.0000% on all 57; `R = V/I_stall` exact; the 12.8 V fresh-pack
+speed ratio exact to 1e-6). Spot-checks against the manufacturers:
+
+| preset | published | code | source |
+|---|---|---|---|
+| goBILDA 5203 26.9:1 | 223 RPM, 9.2 A stall, 38.0 kg.cm, 28 x 26.9 = 753.2 PPR output | 223, 9.2, 3.7265 N.m (= 38.0 x 0.0980665), 28 x 26.9 | goBILDA 5203 series sheet, SKU 5203-2402-0027 |
+| REV Core Hex | 125 RPM, 3.2 N.m, 4.4 A, 72:1, 4 counts/motor-rev -> 288 at output | identical, base ppr 4 | REV-41-1300 datasheet + REV encoder docs |
+| Pitsco TorqueNADO 60:1 | 100 RPM, 700 oz-in, 8.7 A, 1440 counts at 60:1 -> base 24 | 100, 4.9431 N.m, 8.7, base ppr 24 | Pitsco product + FTC motor reference |
+
+Unit conversions re-derived: `1 kgf.cm = 0.01 * 9.80665 = 0.0980665 N.m`;
+`1 ozf.in = 0.028349523125 kg * 9.80665 * 0.0254 m = 0.00706155 N.m`, so
+233 oz-in = 1.64534 (table 1.6453, exact) and 700 oz-in = 4.94309 (table
+4.9431, exact).
+
+One published figure was **rejected as impossible**: a secondary FTC reference
+lists TorqueNADO 40:1 stall as 594.7 oz-in. Ideal is `700 x 40/60 = 466.7
+oz-in`, and a reducer cannot exceed its ideal output torque. The table's
+ideal-derived 466 oz-in is correct and the external figure belongs to a
+different product.
