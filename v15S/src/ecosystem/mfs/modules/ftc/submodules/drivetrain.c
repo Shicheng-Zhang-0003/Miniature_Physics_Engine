@@ -538,8 +538,36 @@ static void drivetrain_odometry_update (physics_world *world, ftc_robot *robot, 
         const float wbl = w_rad [2], wbr = w_rad [3];
         v_fwd = ((wfl + wfr + wbl + wbr) * 0.25f) * r;
         v_lat = ((wfl - wfr - wbl + wbr) * 0.25f) * r;
-        /* Mecanum yaw moment arm is (Lx + Lz), not the differential 2*Lx. */
-        yaw_rate = (((-wfl + wfr - wbl + wbr) * 0.25f) * r) / 0.44f;
+        /* DESPOT-2026-10-06 (odometry yaw was SIGN-INVERTED; measured, not
+         * inferred). The old combination was (-wfl+wfr-wbl+wbr), which returns
+         * the OPPOSITE sign to the chassis' actual rotation about +Y.
+         * Measured with two independent yaw measures that cannot both be
+         * wrong the same way -- atan2 off the chassis quaternion, and a running
+         * sum of chassis.angular_velocity.y*dt (which never wraps) -- over
+         * windows short enough that neither can alias:
+         *     mecanum rotate +1 : true -0.1850 rad   odom +0.1909 rad
+         *     mecanum rotate -1 : true +0.1855 rad   odom -0.1756 rad
+         *     tank  L+0.5 R-0.5 : true +0.1293 rad   odom -0.3993 rad
+         * The two truth measures agreed with each other to 4 decimals and
+         * disagreed with odom_theta in sign every time. Flat-plane odometry
+         * (x/z) is unaffected by this and was measured correct independently.
+         *
+         * CONSEQUENCE, and why this hid so well: this fed odom_theta, which is
+         * the heading FRAME used to rotate every subsequent planar
+         * integration. A lateral command issued after a turn therefore
+         * integrated along the MIRRORED world axis. Planar agreement looks
+         * perfect on a straight drive (theta never leaves 0), which is the only
+         * case the suite measured -- no test gated theta, odom_slip or heading
+         * at all.
+         *
+         * Mecanum yaw moment arm is (Lx + Lz) -- the WHEEL track, not the
+         * chassis box: WHEEL_OFFSET_X (0.24) + WHEEL_OFFSET_Z (0.20) = 0.44 m
+         * (robot.c). The 0.45 introduced 2026-10-05 was justified with
+         * CHASSIS_HALF_X/Z (0.225), which are the chassis COLLISION BOX
+         * half-extents and have nothing to do with where the wheels sit; it was
+         * a 2.27% yaw-rate bias layered on the wrong-sign bug. Reverted here.
+         * docs/MODELS.md already documented 0.44 throughout. */
+        yaw_rate = (((wfl - wfr + wbl - wbr) * 0.25f) * r) / 0.44f;
     } else if (robot -> wheel_count >= 2) {
         float wl = 0.0f, wr = 0.0f;
         for (int i = 0; i < robot -> wheel_count; i++) {
@@ -554,7 +582,13 @@ static void drivetrain_odometry_update (physics_world *world, ftc_robot *robot, 
         wl = (nl > 0) ? (wl / (float) nl) : 0.0f;
         wr = (nr > 0) ? (wr / (float) nr) : 0.0f;
         v_fwd = ((wl + wr) * 0.5f) * r;
-        yaw_rate = ((wr - wl) * r) / 0.48f;
+        /* DESPOT-2026-10-06: same sign inversion as the mecanum branch above.
+         * Measured: tank L+0.5/R-0.5 gives true yaw +0.1293 rad over 20 ticks
+         * while odom_theta read -0.3993. Corrected to (wl - wr): a positive
+         * left-minus-right wheel-speed difference is a positive rotation about
+         * +Y. Arm is 2*Lx = 2*WHEEL_OFFSET_X = 0.48 m, unchanged and already
+         * correct (it uses the wheel offset, not the chassis box). */
+        yaw_rate = ((wl - wr) * r) / 0.48f;
     }
     robot -> odom_theta += yaw_rate * dt;
     /* DESPOT-FIX (math lie): odom_theta grew unbounded and cosf/sinf lost
