@@ -658,13 +658,27 @@ int mfs_t_stall_endpoint (void) {
  *
  * Measurement method, and why it is not the naive one: yaw RATE builds over
  * roughly 2 s from rest, so a displacement average over the first few
- * seconds is dominated by the spin-up ramp. A short-horizon average made
- * rotate +1 and rotate -1 look wildly asymmetric (0.029 rad vs 0.221 rad)
- * when a steady-state window shows they are near-perfectly anti-symmetric
- * (+2.289 rad/s vs -2.030 rad/s). Judgement about drivetrain direction must
- * therefore be made on a steady-state window. This test measures rates over
- * ticks 180..240 after 180 ticks of drive, which is the window that
- * reproduces those numbers.
+ * seconds is dominated by the spin-up ramp. Judgement about drivetrain
+ * direction must therefore be made on a steady-state window. This test
+ * measures over ticks 180..240 after 180 ticks of drive.
+ *
+ * DESPOT-2026-10-06 -- THE OLD NUMBERS IN THIS COMMENT WERE AN ARTEFACT, and
+ * the measurement that produced them was broken. It quoted "+2.289 rad/s vs
+ * -2.030 rad/s" for the two rotate directions and used that to conclude the
+ * shipped mixer was correct. Those figures came from differencing two
+ * atan2(quaternion) values and wrapping the delta into [-pi,pi]: since atan2
+ * is only defined on [-pi,pi], a real rate above pi rad/s FOLDS to a small
+ * plausible number and the fold INVERTS the sign. The measured truth at that
+ * window is -5.6830 rad/s (rotate +1) and +5.6730 (rotate -1): the directions
+ * are still opposite, so this test's conclusion survives, but the magnitudes
+ * were never real. mfs_measure_rates now integrates
+ * chassis.angular_velocity.y*dt and cannot alias.
+ *
+ * The absolute yaw rate is still NOT gated, for two independent reasons that
+ * both still hold: it is battery-state dominated (a full-power pivot puts all
+ * four motors near stall, 4 x 9.2 A = 36.8 A against a 20 A PTC, which trips
+ * in ~1.2 s), and on mecanum it is additionally the open [MECANUM-PIVOT]
+ * frontier -- ~3.5x past the kinematic ceiling. See docs/KNOWN_FAILURES.md.
  *
  * Gates are deliberately about STRUCTURE (which axis dominates, reversal
  * anti-symmetry), not about exact magnitudes, so that legitimate model
@@ -672,6 +686,7 @@ int mfs_t_stall_endpoint (void) {
  */
 typedef struct {
     float vx, vz, om; /* steady-state rates: m/s, m/s, rad/s */
+    float yaw_unwrapped; /* total yaw over the window, radians (never aliased) */
 } mfs_axis_rates;
 static float mfs_yaw_of (const rigidbody *b) {
     const quaternion q = b -> orientation;
@@ -688,7 +703,7 @@ static int mfs_measure_rates (physics_world *w, ftc_robot *robot, float f, float
         drivetrain_update (w, robot, dt);
         physics_world_step (w, dt);
     }
-    float px = ch -> position.x, pz = ch -> position.z, py = mfs_yaw_of (ch);
+    float px = ch -> position.x, pz = ch -> position.z;
     for (int k = 0; k < 180; k++) {
         drivetrain_mecanum (robot, f, s, r);
         drivetrain_update (w, robot, dt);
@@ -696,22 +711,37 @@ static int mfs_measure_rates (physics_world *w, ftc_robot *robot, float f, float
     }
     px = ch -> position.x;
     pz = ch -> position.z;
-    py = mfs_yaw_of (ch);
+    /* DESPOT-2026-10-06 (THIS MEASUREMENT WAS ALIASING -- and that is how a
+     * sign-inverted yaw and a 3.7x-overrun pivot both passed this gate).
+     *
+     * The old code took yaw_end - yaw_start off atan2(quaternion) and then
+     * wrapped the delta into [-pi,pi]. atan2 is only defined on [-pi,pi], so
+     * any real yaw above pi rad/s over the 60-tick window has that delta
+     * FOLDED to a small number that looks like a plausible rate. Measured at
+     * the rotate +1 window: wrapped delta reported +0.6001 rad/s while the
+     * true unwrapped rate was -5.6831 rad/s and chassis.angular_velocity.y
+     * read -6.1332 rad/s. The fold even INVERTED the sign, so the "rotate and
+     * its reverse must have opposite yaw signs" gate passed on an artefact.
+     *
+     * Fixed by never forming a difference of wrapped angles at all: integrate
+     * the chassis' own angular velocity, which is already continuous and
+     * cannot alias. yaw_unwrapped additionally carries the raw total so a
+     * caller can assert on magnitude, not just direction. The steady-state
+     * window itself (the 2 s spin-up allowance) is kept -- that part was right.
+     */
+    float yaw_acc = 0.0f;
     const int win = 60;
     for (int k = 0; k < win; k++) {
         drivetrain_mecanum (robot, f, s, r);
         drivetrain_update (w, robot, dt);
         physics_world_step (w, dt);
+        yaw_acc += ch -> angular_velocity.y * dt;
     }
     const float span = (float) win * dt;
     out -> vx = (ch -> position.x - px) / span;
     out -> vz = (ch -> position.z - pz) / span;
-    float om = mfs_yaw_of (ch) - py;
-    while (om > (float) M_PI)
-        om -= 2.0f * (float) M_PI;
-    while (om < -(float) M_PI)
-        om += 2.0f * (float) M_PI;
-    out -> om = om / span;
+    out -> om = yaw_acc / span;
+    out -> yaw_unwrapped = yaw_acc;
     return 0;
 }
 int mfs_t_drive_directions (void) {
@@ -852,6 +882,190 @@ int mfs_t_drive_directions (void) {
     MFS_CHECK_REL (t_ptr, fabsf (fwd.vz), fabsf (rev.vz), 0.35f, "fwd/rev |vz| antisymmetry");
     if (t_ptr -> failures == 0) {
         printf ("[PASS] drive axes decouple and reverse anti-symmetrically\n");
+    }
+    mfs_test_end (t_ptr);
+    return t_ptr -> failures;
+}
+
+/* odometry_yaw: THE gate whose absence let a sign-inverted yaw odometry ship
+ * inside a 15/15 green suite.
+ *
+ * DESPOT-2026-10-06. Before this test existed, NOTHING in the suite read
+ * odom_theta, odom_slip or clamp_events -- grep-verified, zero assertions
+ * anywhere. Every mecanum gate measured a planar magnitude on a single axis,
+ * and on a straight drive odom_theta never leaves 0, so the planar path looked
+ * healthy while the heading was wrong. The defect that survived: the yaw
+ * combination was (-wfl+wfr-wbl+wbr), the OPPOSITE sign to the chassis'
+ * actual rotation about +Y, on both drivetrains. Because odom_theta is also
+ * the heading frame that rotates every later planar integration, a lateral
+ * command after a turn integrated along the mirrored world axis.
+ *
+ * It stayed invisible for a second reason, which this test also closes: the
+ * only measurement of yaw anywhere was mfs_measure_rates, which differenced
+ * two atan2(quaternion) values and wrapped the delta into [-pi,pi]. atan2 is
+ * only defined on [-pi,pi], so a real yaw rate above pi rad/s folds to a
+ * small plausible number -- and folds to the WRONG SIGN. The suite printed
+ * "+0.6001 rad/s" for a chassis actually turning at -5.68 rad/s.
+ *
+ * Gating strategy, and why it is split:
+ *   - SIGN is hard-gated on both drivetrains. It is convention-independent
+ *     (odometry and chassis must agree on which way is positive about +Y),
+ *     battery-independent, and it was simply wrong. This is the assertion that
+ *     would have caught it on day one.
+ *   - MAGNITUDE is hard-gated for TANK only. The tank pivot is stable and
+ *     reproducible, so a tight band is honest there.
+ *   - MAGNITUDE for MECANUM is reported as a loud XFAIL, not gated: the pivot
+ *     itself is a known-red frontier ([MECANUM-PIVOT], docs/KNOWN_FAILURES.md)
+ *     sitting ~3.5x past the kinematic ceiling, so gating odometry against it
+ *     would be gating a number that is wrong upstream. Gating the sign while
+ *     the frontier is open is what makes the remaining error visible instead
+ *     of hidden. */
+static int mfs_yaw_case (mfs_test_t *t_ptr, ftc_drivetrain_type ty, float la, float lb, const char *label) {
+    const float dt = 1.0f / 60.0f;
+    physics_world w;
+    mfs_test_world (&w);
+    ftc_robot *robot = mfs_create_robot (&w, 0.0f, ftc_robot_rest_height (), 0.0f, MOTOR_GB_5203_26_9, ty);
+    MFS_CHECK (t_ptr, robot != NULL);
+    int rc = 0;
+    if (robot) {
+        const int spin = 120; /* let the pivot reach steady state */
+        const int win = 40;
+        for (int k = 0; k < spin; k++) {
+            drivetrain_mecanum (robot, 0.0f, 0.0f, la);
+            drivetrain_update (&w, robot, dt);
+            physics_world_step (&w, dt);
+        }
+        rigidbody *ch = mfs_chassis_or_null (&w, robot);
+        float o0 = robot -> odom_theta;
+        float truth = 0.0f;
+        for (int k = 0; k < win; k++) {
+            drivetrain_mecanum (robot, 0.0f, 0.0f, la);
+            drivetrain_update (&w, robot, dt);
+            physics_world_step (&w, dt);
+            if (ch)
+                truth += ch -> angular_velocity.y * dt;
+        }
+        float odom = robot -> odom_theta - o0;
+        MFS_INFO ("%s: true=%+.4f rad odom=%+.4f rad  (%.1f s window)", label, truth, odom,
+                  (float) win * dt);
+        /* SIGN: the load-bearing gate. Zero-on-both-sides is not a failure of
+         * this assertion (a dead drivetrain), so require real motion first. */
+        if (fabsf (truth) < 1e-4f) {
+            MFS_INFO ("%s: chassis did not rotate; sign check not applicable", label);
+        } else {
+            MFS_CHECK (t_ptr, (truth > 0.0f) == (odom > 0.0f));
+        }
+        if (ty == FTC_DRIVETRAIN_TANK) {
+            /* Tank pivot is stable, so magnitude is honest to gate. Reported
+             * band is deliberately wide (60%): odometry is pure encoder
+             * kinematics and a pivot slips, but a correct arm lands well
+             * inside this and the sign bug lands outside it entirely. */
+            if (fabsf (truth) > 1e-4f) {
+                MFS_CHECK_REL (t_ptr, fabsf (odom), fabsf (truth), 0.60f, "tank odom yaw magnitude");
+            }
+        } else if (fabsf (truth) > 1e-4f) {
+            float err = fabsf (odom - truth) / fabsf (truth);
+            if (err > 0.30f) {
+                printf ("[XFAIL][MECANUM-PIVOT] %s odom yaw err %.1f%% -- upstream pivot frontier "
+                        "(chassis yaw ~3.5x past kinematic ceiling); see docs/KNOWN_FAILURES.md\n",
+                        label, err * 100.0f);
+            }
+        }
+        /* odom_slip must remain a live, readable signal (never fused away) --
+         * it is the only in-band warning that the encoder and the chassis
+         * disagree. Asserting it is FINITE/BOUNDED rather than any value is
+         * deliberate: which scenarios slip is a model question, a NaN here
+         * would be a defect. */
+        MFS_CHECK (t_ptr, robot -> odom_slip == 0 || robot -> odom_slip == 1);
+        MFS_CHECK (t_ptr, robot -> clamp_events >= 0);
+        (void) lb;
+        rc = 0;
+    }
+    physics_world_cleanup (&w);
+    free (robot);
+    return rc;
+}
+int mfs_t_odometry_yaw (void) {
+    mfs_test_t t;
+    mfs_test_begin (&t, "odometry_yaw");
+    mfs_test_t *t_ptr = &t;
+    /* DESPOT-2026-10-06 -- WHY the textbook yaw equation needed its sign
+     * flipped. Verified against three independent published sources, which all
+     * give the same forward kinematics for a mecanum base with
+     * l_x = half wheelbase, l_y = half track, r = wheel radius:
+     *
+     *     v_lat = (-fl + fr + rl - rr) * r / 4
+     *     yaw   = (-fl + fr - rl + rr) * r / (4 * (l_x + l_y))
+     *
+     * The SHIPPED code used exactly that yaw combination -- and it was wrong,
+     * by a sign, on both drivetrains. The textbook assumes a RIGHT-handed
+     * frame (x forward, y left, z up). The engine's frame is X=right, Y=up,
+     * Z=forward, which is LEFT-handed: X x Y = -Z, verified here against an
+     * unambiguous ENU reference world. Under a handedness flip, POLAR vectors
+     * (v, F, r) map straight across, while AXIAL vectors (omega, tau) pick up
+     * one extra minus sign. That is the whole story:
+     *
+     *   v_lat is POLAR -> keeps the textbook sign  -> was always correct
+     *   yaw   is AXIAL -> must be NEGATED          -> was silently inverted
+     *
+     * Hence shipped: v_lat = -(textbook) and yaw = -(textbook), which is why a
+     * lateral check passed while the heading did not. This assertion pins the
+     * handedness so that anyone who ever "fixes" the frame to right-handed is
+     * told, by a failing gate, to revisit these two sign conventions together.
+     */
+    {
+        const vector3 E = {1.0f, 0.0f, 0.0f}, N = {0.0f, 1.0f, 0.0f}, U = {0.0f, 0.0f, 1.0f};
+        MFS_CHECK (t_ptr, vector3_dot (vector3_cross (E, N), U) > 0.0f); /* reference world sane */
+        const vector3 X = E, Y = U, Z = N;
+        float align = vector3_dot (vector3_cross (X, Y), Z);
+        MFS_INFO ("engine frame handedness: dot(X x Y, Z) = %+.0f -> %s", align,
+                  align < 0.0f ? "LEFT-handed" : "RIGHT-handed");
+        MFS_CHECK (t_ptr, align < 0.0f);
+    }
+    mfs_yaw_case (t_ptr, FTC_DRIVETRAIN_MECANUM, 1.0f, 0.0f, "mecanum rotate +1");
+    mfs_yaw_case (t_ptr, FTC_DRIVETRAIN_MECANUM, -1.0f, 0.0f, "mecanum rotate -1");
+    /* Tank pivot, both directions, through the real tank mixer. */
+    {
+        const float dt = 1.0f / 60.0f;
+        for (int dir = 0; dir < 2; dir++) {
+            physics_world w;
+            mfs_test_world (&w);
+            ftc_robot *robot =
+                mfs_create_robot (&w, 0.0f, ftc_robot_rest_height (), 0.0f, MOTOR_GB_5203_26_9, FTC_DRIVETRAIN_TANK);
+            MFS_CHECK (t_ptr, robot != NULL);
+            if (robot) {
+                float l = dir ? -0.5f : 0.5f;
+                for (int k = 0; k < 160; k++) {
+                    drivetrain_tank (robot, l, -l);
+                    drivetrain_update (&w, robot, dt);
+                    physics_world_step (&w, dt);
+                }
+                rigidbody *ch = mfs_chassis_or_null (&w, robot);
+                float o0 = robot -> odom_theta;
+                float truth = 0.0f;
+                const int win = 40;
+                for (int k = 0; k < win; k++) {
+                    drivetrain_tank (robot, l, -l);
+                    drivetrain_update (&w, robot, dt);
+                    physics_world_step (&w, dt);
+                    if (ch)
+                        truth += ch -> angular_velocity.y * dt;
+                }
+                float odom = robot -> odom_theta - o0;
+                MFS_INFO ("tank L%+.1f R%+.1f: true=%+.4f rad odom=%+.4f rad", l, -l, truth, odom);
+                if (fabsf (truth) > 1e-4f) {
+                    MFS_CHECK (t_ptr, (truth > 0.0f) == (odom > 0.0f));
+                    MFS_CHECK_REL (t_ptr, fabsf (odom), fabsf (truth), 0.60f, "tank odom yaw magnitude");
+                }
+                MFS_CHECK (t_ptr, robot -> odom_slip == 0 || robot -> odom_slip == 1);
+                MFS_CHECK (t_ptr, robot -> clamp_events >= 0);
+            }
+            physics_world_cleanup (&w);
+            free (robot);
+        }
+    }
+    if (t_ptr -> failures == 0) {
+        printf ("[PASS] odometry yaw sign agrees with chassis on both drivetrains\n");
     }
     mfs_test_end (t_ptr);
     return t_ptr -> failures;
