@@ -71,6 +71,13 @@ temp/
 # Keep the Python test harness itself versioned despite the broad C artifact
 # pattern above; discard only interpreter cache files.
 !tools/tests/*.py
+# Same reasoning for the MFS suite, which `test_*` above silently excluded:
+# tests/test_bounce_debug.c is a real source file, tracked by the standalone
+# tree, and present here only as an untracked working-tree copy. A fresh clone
+# of 475 lost it while 461 kept it -- a drift `sync_mfs_check.sh` cannot see,
+# because it compares working trees and both had the file. It is part of the
+# shared set the sync contract governs, so it must be versioned on both sides.
+!v15S/src/ecosystem/mfs/tests/test_*.c
 __pycache__/
 *.py[cod]
 
