@@ -28,12 +28,33 @@ typedef struct {
     const void *world;
     unsigned in_flight; /* callbacks running outside the lock */
     bool detaching; /* detach owns the slot; no new callbacks */
+    bool detach_deferred; /* self-detach requested from inside the slot's own callback */
 } mfs_slot;
 static mfs_slot s_slots [MFS_MAX_INTERNAL_MODULES];
 static int s_slot_count = 0; /* live slots (primary + aliases) */
 static int s_inflight = 0; /* global sum of in_flight, for tests/telemetry */
 static pthread_mutex_t s_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t s_cv = PTHREAD_COND_INITIALIZER;
+/* DESPOT-2026-10-06 (self-detach deadlock). Which slot's callback THIS thread
+ * is currently executing, or -1. Callbacks run outside the lock precisely so
+ * module code may re-enter the registry -- and the documented contract in
+ * mfs_internal.h says so -- but detach() drains on in_flight, and a module
+ * detaching ITSELF held that very reference, so it waited on itself forever.
+ * Reproduced: a module calling mfs_internal_module_detach on its own name from
+ * inside its own pre_step never returned.
+ *
+ * Fix: a thread inside slot i's callback never DRAINS slot i. It records the
+ * request and returns MFS_DET_OK; the dispatcher performs the deferred detach
+ * once the callback has actually returned and released its reference, so the
+ * state is still freed by the thread that owns the reference and the
+ * snapshot-then-invoke use-after-free guarantee is unchanged. Every OTHER
+ * wait/detach ordering is untouched. */
+#if defined(_MSC_VER)
+#define MFS_THREAD_LOCAL __declspec (thread)
+#else
+#define MFS_THREAD_LOCAL _Thread_local
+#endif
+static MFS_THREAD_LOCAL int t_callback_slot = -1;
 static int name_matches (const mfs_slot *s, const char *name) {
     return s -> desc && s -> desc -> name && strcmp (s -> desc -> name, name) == 0;
 }
@@ -44,6 +65,7 @@ static void slot_clear (mfs_slot *s) {
     s -> world = NULL;
     s -> in_flight = 0;
     s -> detaching = false;
+    s -> detach_deferred = false;
 }
 static void wake_all (void) {
     pthread_cond_broadcast (&s_cv);
@@ -265,8 +287,18 @@ int mfs_internal_module_detach (const char *name, physics_world *world) {
             pthread_mutex_unlock (&s_lock);
             return MFS_DET_NOT_FOUND;
         }
-        /* Drain: block until no callback holds a reference to this state. */
+        /* Drain: block until no callback holds a reference to this state.
+         * DESPOT-2026-10-06: EXCEPT our own. A module detaching itself from
+         * inside its own callback holds that reference itself, so draining
+         * here waits on the caller forever (reproduced as a hard hang).
+         * Record the request and let the dispatcher retire it once the
+         * callback returns and releases the reference. */
         if (s_slots [reg].in_flight > 0) {
+            if (t_callback_slot == reg) {
+                s_slots [reg].detach_deferred = true;
+                pthread_mutex_unlock (&s_lock);
+                return MFS_DET_OK; /* deferred: real detach runs post-callback */
+            }
             pthread_cond_wait (&s_cv, &s_lock);
             continue;
         }
@@ -360,9 +392,18 @@ static void mfs_dispatch (physics_world *world, float dt, bool pre) {
     pthread_mutex_unlock (&s_lock);
     for (int k = 0; k < n; k++) {
         if (pre) {
+            /* DESPOT-2026-10-06: publish which slot this thread is inside so a
+             * self-detach can be deferred instead of deadlocking (see
+             * t_callback_slot). */
+            int prev_slot = t_callback_slot;
+            t_callback_slot = slot_of [k];
             ds [k] -> pre_step ((physics_world *) world, dt, sts [k]);
+            t_callback_slot = prev_slot;
         } else {
+            int prev_slot = t_callback_slot;
+            t_callback_slot = slot_of [k];
             ds [k] -> post_step ((physics_world *) world, dt, sts [k]);
+            t_callback_slot = prev_slot;
         }
         pthread_mutex_lock (&s_lock);
         int i = slot_of [k];
@@ -373,8 +414,39 @@ static void mfs_dispatch (physics_world *world, float dt, bool pre) {
             s_slots [i].in_flight--;
             s_inflight--;
         }
+        /* DESPOT-2026-10-06: honour a detach this callback requested on itself.
+         * We now hold the only remaining reference, so running the module's
+         * detach callback here (outside the lock) is exactly as safe as any
+         * other detach, and it is the only thread that may free this state. */
+        int run_deferred = 0;
+        const mpe_module_desc_t *dd = NULL;
+        void *dst = NULL;
+        if (s_slots [i].detach_deferred && s_slots [i].in_flight == 0 && s_slots [i].attached) {
+            s_slots [i].detach_deferred = false;
+            s_slots [i].detaching = true;
+            dd = s_slots [i].desc;
+            dst = s_slots [i].state;
+            if (dd && dd -> detach) {
+                s_slots [i].in_flight++;
+                s_inflight++;
+                run_deferred = 1;
+            }
+        }
         wake_all ();
         pthread_mutex_unlock (&s_lock);
+        if (run_deferred) {
+            dd -> detach ((physics_world *) world, dst);
+            pthread_mutex_lock (&s_lock);
+            s_slots [i].in_flight--;
+            s_inflight--;
+            s_slots [i].state = NULL;
+            s_slots [i].attached = false;
+            s_slots [i].world = NULL;
+            s_slots [i].detaching = false;
+            s_slots [i].detach_deferred = false;
+            wake_all ();
+            pthread_mutex_unlock (&s_lock);
+        }
     }
 }
 void mfs_internal_modules_pre_step (physics_world *world, float dt) {
@@ -400,6 +472,13 @@ void mfs_internal_modules_detach_all (physics_world *world) {
             return;
         }
         if (s_slots [reg].in_flight > 0) {
+            /* DESPOT-2026-10-06: same self-detach deferral as
+             * mfs_internal_module_detach -- see the note there. */
+            if (t_callback_slot == reg) {
+                s_slots [reg].detach_deferred = true;
+                pthread_mutex_unlock (&s_lock);
+                return;
+            }
             pthread_cond_wait (&s_cv, &s_lock);
             continue;
         }
