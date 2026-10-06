@@ -237,8 +237,21 @@ Pure encoder forward kinematics, no fusion — honest:
 ```
 v_fwd = mean(w)·R
 v_lat = (FL-FR-BL+BR)/4·R
-yaw   = ((-FL+FR-BL+BR)/4·R) / 0.44        (mecanum; 0.44 = Lx+Lz, correct arm)
-yaw   = ((wr-wl)·R) / 0.48                  (tank; 0.48 = 2×0.24 track)
+yaw   = ((FL-FR+BL-BR)/4·R) / 0.44          (mecanum; 0.44 = Lx+Lz, wheel track)
+yaw   = ((wl-wr)·R) / 0.48                  (tank; 0.48 = 2×0.24 track)
+
+SIGN CONVENTION — read before changing either line. The textbook mecanum
+forward kinematics is v_lat = (-FL+FR+BL-BR)·R/4 and
+yaw = (-FL+FR-BL+BR)·R/(4(Lx+Ly)). Both of the above are the NEGATION of that.
+This is not a typo. The textbook assumes a right-handed frame (x fwd, y left,
+z up); this engine's frame is X=right, Y=up, Z=forward, which is LEFT-handed
+(X×Y = −Z, asserted by `mfs_t_odometry_yaw`). Under a handedness flip, polar
+vectors (v, F, r) keep their sign and axial vectors (ω, τ) gain one minus sign —
+so v_lat matches the textbook and yaw is its negation. The shipped code had
+the textbook yaw combination unchanged, i.e. yaw was inverted on BOTH
+drivetrains. Arm 0.44 is WHEEL_OFFSET_X (0.24) + WHEEL_OFFSET_Z (0.20); it is
+the WHEEL track, not CHASSIS_HALF_X/Z (0.225), which are the chassis collision
+box.
 ```
 
 `R` = first `wheel_effective_radius > 1 mm`, else 0.05. Heading wrapped to

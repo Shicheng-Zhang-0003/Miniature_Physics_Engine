@@ -89,8 +89,17 @@ this contract guards:
   This is the direction the drift actually runs in. The embedded copy is
   built and exercised by the engine's own verification runs, so it is
   where work lands; the standalone copy is only built when someone
-  remembers to. Every drift recorded above was twin -> standalone, never
-  the reverse.
+  remembers to.
+
+  **SUPERSEDED 2026-10-06.** "Every drift recorded above was twin ->
+  standalone, never the reverse" held for both prior recurrences and is now
+  false. The third recurrence ran the OTHER way: 461 was *ahead* of the twin
+  on `drivetrain.c` and `robot.h`, carrying a commit literally titled
+  "UNSTABLE: Midrefactor ... DO NOT USE". A direction rule inferred from two
+  observations is not a rule. The rule is the one at the top of this file:
+  fix wherever you are, mirror immediately, prove it. A tree that commits
+  "DO NOT USE" state and does not mirror is the failure this contract is
+  for, and it happened in the direction the contract claimed was impossible.
 
 ## Second recurrence: 2026-10-05
 
@@ -141,6 +150,35 @@ behavioural drift. On this pair of trees, resolve the count before
 reporting it: normalise, compare tokens, and state which direction the
 insertions run. A drift report that says "47 files" when 28 of them are
 formatting trains the reader to ignore drift reports.
+
+## Third recurrence: 2026-10-06
+
+**A RENAME BROKE THE CONTRACT'S CENTRAL INVARIANT, and the drift guard
+caught it correctly.** The 2026-10-06 commits renamed `Makefile` ->
+`makefile` and `README_MFS.md` -> `readme.md` in the standalone tree ONLY.
+Renaming is not an in-place edit: it makes each file "Only in" one side, so
+the checker reported drift on four paths at once -- two content diffs plus two
+pure renames -- and the contract's promise of source identity was simply no
+longer true. The guard was right and the tree was wrong.
+
+Resolution, and the reasoning, since both halves were defensible:
+
+- **`README_MFS.md` -> `readme.md` was kept** in the standalone tree and
+  mirrored to the twin. It is a pure documentation rename, every in-tree
+  reference was updated in the same pass, and it matches the lowercase
+  convention the rest of this project's docs already use.
+- **`Makefile` -> `makefile` was REVERTED.** Lowercase `makefile` is found by
+  GNU make on Linux but NOT by every `make` on a case-insensitive filesystem,
+  and it diverges from the engine tree's documented entry point. A cosmetic
+  rename that can break the build on macOS/Windows is a bad trade for the
+  contract's sake, and the contract is not worth that. Restored in the
+  standalone tree, no reference churn.
+
+CLAUSE ADDED. A rename is a contract event, not a local edit. Before renaming
+anything that both sides share, mirror the rename in the same commit that
+makes it, or the guard will (correctly) report drift on paths that have no
+content difference at all -- which is a confusing report and trains people to
+ignore it.
 
 KNOWN LIMIT OF THE GUARD, recorded rather than fixed. Path resolution
 ends in a shallow glob over \`*/v15S/src/ecosystem/mfs\`, which will bind
