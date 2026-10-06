@@ -94,6 +94,11 @@ CFLAGS="-I$SRC -I$MFS -O2 -Wall -Wextra -ffp-contract=off ${MFS_TEST_CFLAGS:-}"
 # survives any CWD and both modes).
 CORE="$SRC/core/physics_world.c $SRC/core/rigidbody.c $SRC/core/mpe_registry.c $SRC/core/mpe_loader.c $SRC/core/det_math.c $SRC/core/mpe_primary.c $SRC/physics/collision_narrowphase.c $SRC/physics/collision_cache.c $SRC/physics/collision_solver.c $SRC/physics/collision_ccd.c $SRC/physics/collision_cylinder.c $SRC/physics/broadphase.c $SRC/physics/constraint.c $SRC/physics/revolute_joint.c $SRC/physics/depenetration.c $SRC/physics/islands.c $SRC/config/mpe_config.c $SRC/config/mpe_config_schema.c $SRC/scene/boundary.c $SRC/ecosystem/mpe_ecosystem.c"
 # MFS sources: absolute under $MFS (identical layout in both trees).
+# DESPOT-2026-10-06: mfs_internal.c is now linked into the SUITE as well as
+# the bundle -- tests/mfs_suite_c.c gained mfs_t_registry, which gates the
+# registry's own concurrency contract (a module self-detaching from inside its
+# own tick used to hang the dispatcher forever; the suite had no coverage of
+# that file at all, so the bug was only findable with a standalone probe).
 FTC="$MFS/modules/ftc/ftc_module.c $MFS/modules/ftc/ftc_fleet.c $MFS/modules/ftc/submodules/robot.c $MFS/modules/ftc/submodules/drivetrain.c $MFS/modules/ftc/submodules/motor.c $MFS/modules/ftc/submodules/motor_presets.c $MFS/modules/ftc/submodules/battery.c"
 MOD1_SRCS="$MFS/modules/module_1/mfs_module_1.c $MFS/modules/module_1/submodules/gamepad/gamepad.c"
 
@@ -128,7 +133,7 @@ if [ "$MPE_WINDOWS" = "1" ]; then
   GAMEPAD_OBJ="$OUT/gamepad.o"
   "$TEST_CC" $CFLAGS -c "$MFS/modules/module_1/mfs_module_1.c" -o "$MOD1_OBJ" 2>"$OUT/mfs_module_1.build.log" || { echo "[BUILD-FAIL] mfs_module_1.o"; fail=$((fail+1)); head -n 10 "$OUT/mfs_module_1.build.log"; }
   "$TEST_CC" $CFLAGS -c "$MFS/modules/module_1/submodules/gamepad/gamepad.c" -o "$GAMEPAD_OBJ" 2>"$OUT/gamepad.build.log" || { echo "[BUILD-FAIL] gamepad.o"; fail=$((fail+1)); head -n 10 "$OUT/gamepad.build.log"; }
-  if "$TEST_CC" $CFLAGS "$RB_T/mfs_suite_main.c" "$RB_T/mfs_suite_a.c" "$RB_T/mfs_suite_b.c" "$RB_T/mfs_suite_c.c" $FTC $CORE "$MOD1_OBJ" "$GAMEPAD_OBJ" -lm $PTHREAD $WIN_LIBS -Wl,--export-all-symbols -Wl,--out-implib,"$OUT/libmfs_suite.a" -o "$OUT/mfs_suite$EXE_EXT" 2>"$OUT/mfs_suite.build.log"; then
+  if "$TEST_CC" $CFLAGS "$RB_T/mfs_suite_main.c" "$RB_T/mfs_suite_a.c" "$RB_T/mfs_suite_b.c" "$RB_T/mfs_suite_c.c" $FTC "$MFS/mfs_internal.c" $CORE "$MOD1_OBJ" "$GAMEPAD_OBJ" -lm $PTHREAD $WIN_LIBS -Wl,--export-all-symbols -Wl,--out-implib,"$OUT/libmfs_suite.a" -o "$OUT/mfs_suite$EXE_EXT" 2>"$OUT/mfs_suite.build.log"; then
       echo "[BUILD-OK] mfs_suite (unified)"; pass=$((pass+1));
   else
       echo "[BUILD-FAIL] mfs_suite"; fail=$((fail+1)); head -n 20 "$OUT/mfs_suite.build.log";
@@ -173,7 +178,7 @@ MOD1_OBJ="$OUT/mfs_module_1.o"
 GAMEPAD_OBJ="$OUT/gamepad.o"
 "$TEST_CC" $CFLAGS -c "$MFS/modules/module_1/mfs_module_1.c" -o "$MOD1_OBJ" 2>"$OUT/mfs_module_1.build.log" || { echo "[BUILD-FAIL] mfs_module_1.o"; fail=$((fail+1)); head -n 10 "$OUT/mfs_module_1.build.log"; }
 "$TEST_CC" $CFLAGS -c "$MFS/modules/module_1/submodules/gamepad/gamepad.c" -o "$GAMEPAD_OBJ" 2>"$OUT/gamepad.build.log" || { echo "[BUILD-FAIL] gamepad.o"; fail=$((fail+1)); head -n 10 "$OUT/gamepad.build.log"; }
-"$TEST_CC" $CFLAGS "$RB_T/mfs_suite_main.c" "$RB_T/mfs_suite_a.c" "$RB_T/mfs_suite_b.c" "$RB_T/mfs_suite_c.c" $FTC $CORE "$MOD1_OBJ" "$GAMEPAD_OBJ" -lm $DL_LIBS $RDYNAMIC $PTHREAD $WIN_LIBS -o "$OUT/mfs_suite$EXE_EXT" 2>"$OUT/mfs_suite.build.log" && {
+"$TEST_CC" $CFLAGS "$RB_T/mfs_suite_main.c" "$RB_T/mfs_suite_a.c" "$RB_T/mfs_suite_b.c" "$RB_T/mfs_suite_c.c" $FTC "$MFS/mfs_internal.c" $CORE "$MOD1_OBJ" "$GAMEPAD_OBJ" -lm $DL_LIBS $RDYNAMIC $PTHREAD $WIN_LIBS -o "$OUT/mfs_suite$EXE_EXT" 2>"$OUT/mfs_suite.build.log" && {
     echo "[BUILD-OK] mfs_suite (unified)"; pass=$((pass+1));
 } || { echo "[BUILD-FAIL] mfs_suite"; fail=$((fail+1)); head -n 20 "$OUT/mfs_suite.build.log"; }
 # Alias for runner expecting extensionless name on Windows
@@ -257,6 +262,60 @@ for u in "$MFS/modules/ftc/gui_robot_registry.c" "$MFS/modules/module_1/submodul
         echo "[BUILD-FAIL] $n"; fail=$((fail+1)); head -n 10 "$OUT/$n.build.log";
     fi
 done
+
+# ---------------------------------------------------------------------
+# Legacy per-test mains + ungated diags (DESPOT-2026-10-06).
+#
+# These files were compiled by NOTHING: not build_tests.sh, not the makefile,
+# not mfs_sources.mk. They were also broken in a way nothing would have
+# reported -- each includes "ecosystem/mfs/tests/mfs_test_common.h", an
+# ENGINE-RELATIVE path. Built from the standalone tree that resolves through
+# -I$SRC against the 475 TWIN's copy of the header, not this tree's (confirmed
+# with gcc -H: it picked
+# ../475-MPE/v15S/src/ecosystem/mfs/tests/mfs_test_common.h). Benign only
+# because the two files are byte-identical today -- exactly the cross-tree
+# coupling SYNC_CONTRACT.md exists to prevent, waiting for the trees to
+# diverge. Includes are now same-directory.
+#
+# They are compiled (not deleted) because TESTING.md calls them the reference
+# implementations the unified ports were checked against, and that claim is
+# only meaningful while they still build. Each is behind its own -D guard.
+# mfs_suite_*.c are excluded (they are the unified suite itself).
+# ---------------------------------------------------------------------
+if [ "${1:-}" != "--build-only" ]; then
+  LEGACY_PAIRS="teleop_drive_test:MPE_TELEOP_DRIVE_TEST
+mecanum_drive_test:MPE_MECANUM_DRIVE_TEST
+tank_turn_test:MFS_TANK_TURN_TEST
+odometry_accuracy_test:MFS_ODOMETRY_ACCURACY_TEST
+ftc_integration_test:MPE_FTC_INTEGRATION_TEST
+ftc_hotload_test:MPE_FTC_HOTLOAD_TEST
+physics_truth_test:MPE_PHYSICS_TRUTH_TEST
+ftc_debug_test:MPE_FTC_DEBUG_TEST
+idle_spin_diag:MFS_IDLE_DIAG
+idle_rootcause_diag:MFS_IDLE_ROOTCAUSE_DIAG
+idle_spin_deep_diag:MFS_IDLE_DEEP_DIAG
+odometry_diag:MFS_ODOM_DIAG"
+  OLDIFS="$IFS"
+  IFS='
+'
+  for pair in $LEGACY_PAIRS; do
+    IFS="$OLDIFS"
+    base="${pair%%:*}"; def="${pair##*:}"
+    src="$MFS/tests/$base.c"
+    if [ ! -f "$src" ]; then echo "[SKIP] $base (missing)"; IFS='
+'; continue; fi
+    if "$TEST_CC" $CFLAGS -I"$MFS/tests" -D"$def" "$src" $FTC "$MFS/mfs_internal.c" $CORE "$MOD1_OBJ" "$GAMEPAD_OBJ" \
+         -lm $DL_LIBS $RDYNAMIC $PTHREAD $WIN_LIBS -o "$OUT/$base$EXE_EXT" 2>"$OUT/$base.build.log"; then
+      echo "[BUILD-OK] $base"; pass=$((pass+1))
+    else
+      echo "[BUILD-FAIL] $base"; fail=$((fail+1)); head -n 10 "$OUT/$base.build.log"
+    fi
+    IFS='
+'
+  done
+  IFS="$OLDIFS"
+  info_pass=$((info_pass + 12))
+fi
 
 echo "FTC RESULT: gated pass=$pass fail=$fail info-diags=$info_pass (ungated)"
 [ "$fail" -eq 0 ]
