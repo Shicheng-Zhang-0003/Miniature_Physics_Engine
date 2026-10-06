@@ -8,7 +8,7 @@
 #   projects/461-MFS + projects/475-MPE (same parent folder).
 #
 # Location (embedded): v15S/src/ecosystem/mfs/  (under the kernel MEI tree)
-# Full map: see README_MFS.md
+# Full map: see readme.md
 #
 # Include convention (location-independent, do not use ../ crosses):
 #   engine headers -> "core/...", "physics/...", "config/..."  (-I$(MPE_SRC))
@@ -70,7 +70,7 @@ endif
 # header left mfs_ecosystem.so "up to date" with a stale sizeof(rigidbody),
 # so the plugin read the bodies array at the wrong stride and robot spawn
 # failed with "no fleet attached". Append-only fields do NOT save you here:
-# the struct SIZE still changes. See README_MFS.md build-invariants.
+# the struct SIZE still changes. See readme.md build-invariants.
 CFLAGS = -I$(MPE_SRC) -I$(MFS) -O3 -Wall -Wextra -ffp-contract=off $(MPE_FPIC) -fno-inline -fno-lto -fno-inline-functions-called-once -fvisibility=default \
          -DMPE_MODULE_ABI=1 -DMPE_ECOSYSTEM_ABI=1 -DMPE_GTK4=1 -MMD -MP
 
