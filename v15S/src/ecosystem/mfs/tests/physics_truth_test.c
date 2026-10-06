@@ -11,7 +11,7 @@
 #include "config/mpe_config.h"
 #include "modules/ftc/submodules/robot.h"
 #include "modules/ftc/submodules/drivetrain.h"
-#include "ecosystem/mfs/tests/mfs_test_common.h"
+#include "mfs_test_common.h"
 static int tests_run = 0;
 static int tests_passed = 0;
 static int tests_failed = 0;

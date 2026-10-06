@@ -26,7 +26,7 @@
 #include "modules/ftc/submodules/robot.h"
 #include "modules/ftc/submodules/drivetrain.h"
 #include "modules/ftc/ftc_fleet.h"
-#include "ecosystem/mfs/tests/mfs_test_common.h"
+#include "mfs_test_common.h"
 /* Windows-aware plugin path: pick existing .so/.dll variant. */
 static const char *mpe_pick_plugin (const char *so_path, char *buf, size_t n) {
 #ifdef MPE_OS_WINDOWS
