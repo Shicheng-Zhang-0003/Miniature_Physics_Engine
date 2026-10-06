@@ -1105,7 +1105,7 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
          * does not converge in GS-128 (measured 0.002-0.014 m across an
          * axis sweep), so strafe magnitude is a SOLVER frontier, not a
          * prescription-source question. Command-based stays (sign-correct,
-         * feedback-free); see KNOWN FAILURE note in README_MFS. */
+         * feedback-free); see KNOWN FAILURE note in readme.md. */
         for (int k = 0; k < robot -> roller_count [i]; k++) {
             int rb = robot -> roller_bodies [i][k];
             if (rb < 0 || rb >= world -> body_count)

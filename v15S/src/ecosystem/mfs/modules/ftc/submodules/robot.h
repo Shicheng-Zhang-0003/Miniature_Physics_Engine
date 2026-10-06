@@ -102,12 +102,37 @@ typedef struct {
  * coefficient for roller-axle slip on tile (wheel-rubber kinetic class;
  * tile muk 0.8 binds, so the wheel is the limiting material) and the
  * Coulomb smoothing speed (linear viscous region below it kills sign
- * chatter; saturated Coulomb above it). */
+ * chatter; saturated Coulomb above it).
+ *
+ * DESPOT-2026-10-05: v_ref reduced from 0.05 to 0.005 to increase effective
+ * stiffness (k = f_max / v_ref) and reduce slip velocity during strafe
+ * transients.
+ *
+ * DESPOT-2026-10-06 CORRECTION -- the 2026-10-05 comment here claimed this
+ * "brings odometry tracking error from +43.7% to within the 30% gate". THAT
+ * WAS FALSE, and it is the third time a claim of this exact shape has shipped
+ * in this file. Measured on this tree, same gate that prints the marker:
+ *
+ *     v_ref = 0.05  (twin) : physics dx=0.6318  odometry dx=0.9075   = +43.7%  XFAIL
+ *     v_ref = 0.005 (here) : physics dx=0.6422  odometry dx=0.8463   = +31.8%  XFAIL
+ *
+ * 31.8% is still OUTSIDE the 30% band, so the gate is still RED and still
+ * prints [XFAIL][MFS-STRAFE-F2]. The change moved the error from 43.7% to
+ * 31.8%; it did not close anything. Read the suite log, not this comment.
+ *
+ * ALSO MEASURED, so nobody re-attempts it: v_ref is NOT the cause of the
+ * mecanum pivot runaway ([MECANUM-PIVOT]). A sweep of this constant, pivot
+ * held for 300 ticks, chassis |omega_y| at the end:
+ *     v_ref 0.005 -> 5.66 rad/s     v_ref 0.05 -> 5.84 rad/s
+ *     v_ref 0.01  -> 5.77 rad/s     v_ref 0.2  -> 5.68 rad/s
+ * The overrun is flat in v_ref, so tuning the smoothing speed cannot reach
+ * it. The cause is structural -- see [MECANUM-PIVOT] in
+ * docs/KNOWN_FAILURES.md. */
 #ifndef MFS_MECANUM_ANALYTIC_MU
 #define MFS_MECANUM_ANALYTIC_MU 0.7f
 #endif
 #ifndef MFS_MECANUM_ANALYTIC_VREF
-#define MFS_MECANUM_ANALYTIC_VREF 0.05f
+#define MFS_MECANUM_ANALYTIC_VREF 0.005f
 #endif
 /* Default: ON for mecanum builds, OFF for tank (plain cylinders). */
 #define MFS_MECANUM_ANALYTIC_DEFAULT 1
