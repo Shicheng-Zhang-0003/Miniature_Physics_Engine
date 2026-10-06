@@ -6,7 +6,7 @@
  * The BioBuzz game module (module_1: intake/shooter/balls/gamepad) stays
  * registered but parked — attach it explicitly if a game session is wanted.
  * Modules live in modules/<name>/, their support libs in
- * modules/<name>/submodules/ (see README_MFS.md for the map).
+ * modules/<name>/submodules/ (see readme.md for the map).
  *
  * Architecture:
  * - MFS Ecosystem (this file) manages internal modules
