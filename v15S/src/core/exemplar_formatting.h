@@ -2,8 +2,14 @@
 #include <math.h>
 #include <stdbool.h>
 #include <float.h>
-#ifndef math3d_h
-#define math3d_h
+#ifndef exemplar_formatting_h
+#define exemplar_formatting_h
+/* STYLE REFERENCE ONLY — never #include this file. It records spacing rules
+ * (space-before-paren, name [i][j], spaced ->, // notes), not content: live
+ * math3d.h has since gained degrad_f/double-degrad (LIE-13) and expanded
+ * structs, deliberately not mirrored in layout (see .clang-format delta).
+ * Guard renamed from math3d_h (which would have silently skipped this file
+ * had anyone ever included both). */
 #ifndef math_pi
 #define math_pi 3.14159265358979323846f
 #endif
@@ -14,6 +20,9 @@
 #define MATH_PI 3.14159265358979323846
 #endif
 // Define Radians and Degree Calculation converter
+/* Live math3d.h adds degrad_f/raddeg_f (float) and double degrad/raddeg via
+ * MATH_PI (LIE-13); exemplar keeps the original two lines as the spacing
+ * record. */
 #define degrad (math_pi / 180.0f)
 #define raddeg (180.0f / math_pi)
 #define math_epsilon 0.000001f
