@@ -198,7 +198,7 @@ void cmd_sed (int argc, char **argv) {
         bool all_targets = term_is_all_token (target);
         if (all_targets) {
             for (int object_index = 0; object_index < (physics_world_get_primary () -> body_count); object_index++) {
-                rigidbody *rb = &(physics_world_get_primary () -> bodies)[object_index];
+                rigidbody *rb = &(physics_world_get_primary () -> bodies) [object_index];
                 if (term_str_eq (field_name, "mass")) {
                     if (!is_numeric) {
                         continue;
@@ -259,7 +259,7 @@ void cmd_sed (int argc, char **argv) {
             term_printf ("term_err", "mpe: sed: %s: No such object\n", target);
             continue;
         }
-        rigidbody *rb = &(physics_world_get_primary () -> bodies)[object_index];
+        rigidbody *rb = &(physics_world_get_primary () -> bodies) [object_index];
         if (term_str_eq (field_name, "mass")) {
             if (!is_numeric) {
                 term_err ("mpe: sed: mass requires numeric value\n");
@@ -353,14 +353,12 @@ void cmd_nice (int argc, char **argv) {
         if (object_index < 0) {
             continue;
         }
-        (physics_world_get_primary () -> bodies)[object_index].nice_value = priority;
-        rigidbody_wake (&(physics_world_get_primary () -> bodies)[object_index]);
+        (physics_world_get_primary () -> bodies) [object_index].nice_value = priority;
+        rigidbody_wake (&(physics_world_get_primary () -> bodies) [object_index]);
         term_printf ("term_ok", "/obj/%d nice=%d\n", object_index, priority);
     }
 }
-void cmd_renice (int argc, char **argv) {
-    cmd_nice (argc, argv);
-}
+void cmd_renice (int argc, char **argv) {cmd_nice (argc, argv);}
 void cmd_ping (int argc, char **argv) {
     int ping_count = 1;
     int argument_index = 1;
@@ -385,7 +383,7 @@ void cmd_ping (int argc, char **argv) {
     if (object_index < 0) {
         return;
     }
-    rigidbody *rb = &(physics_world_get_primary () -> bodies)[object_index];
+    rigidbody *rb = &(physics_world_get_primary () -> bodies) [object_index];
     if (rb -> static_state) {
         term_printf ("term_dim", "PING /obj/%d: no response (static)\n", object_index);
         return;
@@ -465,7 +463,7 @@ void cmd_fsck (int argc, char **argv) {
     int warning_count = 0;
     term_printf ("term_echo", "fsck: checking %d objects...\n", (physics_world_get_primary () -> body_count));
     for (int object_index = 0; object_index < (physics_world_get_primary () -> body_count); object_index++) {
-        rigidbody *rb = &(physics_world_get_primary () -> bodies)[object_index];
+        rigidbody *rb = &(physics_world_get_primary () -> bodies) [object_index];
         bool has_error = false;
         if ((!isfinite (rb -> position.x)) || (!isfinite (rb -> position.y)) || (!isfinite (rb -> position.z))) {
             term_printf ("term_err", "  /obj/%d: position NaN/Inf\n", object_index);
@@ -512,10 +510,10 @@ void cmd_fsck (int argc, char **argv) {
     }
     term_printf ("term_echo", "fsck: checking %d joint slots...\n", mpe_max_joints);
     for (int joint_index = 0; joint_index < mpe_max_joints; joint_index++) {
-        if (!(physics_world_get_primary () -> spring_joints)[joint_index].is_active) {
+        if (!(physics_world_get_primary () -> spring_joints) [joint_index].is_active) {
             continue;
         }
-        spring_joint *j = &(physics_world_get_primary () -> spring_joints)[joint_index];
+        spring_joint *j = &(physics_world_get_primary () -> spring_joints) [joint_index];
         int index_a = scene_find_object_index_by_id (j -> object_id_a);
         int index_b = scene_find_object_index_by_id (j -> object_id_b);
         if (index_a < 0) {
@@ -558,8 +556,7 @@ void cmd_fsck (int argc, char **argv) {
     }
     event_log_push (error_count == 0 ? log_info : log_warn, "fsck: %d errors, %d warnings%s", error_count,
                     warning_count, auto_fix ? " (fixed)" : "");
-}
-/* MPE_TASK_V15R2_PHASE5_IMPL_END */
+} /* MPE_TASK_V15R2_PHASE5_IMPL_END */
 /* MPE_TASK_V15R2_PHASE6_IMPL_BEGIN */
 void cmd_netstat (int argc, char **argv) {
     bool show_all = false;
@@ -572,16 +569,16 @@ void cmd_netstat (int argc, char **argv) {
     term_printf (NULL, "Proto  Local        Foreign      State         K        D      Len\n");
     int listed = 0;
     for (int ji = 0; ji < mpe_max_joints; ji++) {
-        if ((!(physics_world_get_primary () -> spring_joints)[ji].is_active) && (!show_all)) {
+        if ((!(physics_world_get_primary () -> spring_joints) [ji].is_active) && (!show_all)) {
             continue;
         }
-        int ia = scene_find_object_index_by_id ((physics_world_get_primary () -> spring_joints)[ji].object_id_a);
-        int ib = scene_find_object_index_by_id ((physics_world_get_primary () -> spring_joints)[ji].object_id_b);
-        const char *state_text = (physics_world_get_primary () -> spring_joints)[ji].is_active ? "ESTABLISHED" : "CLOSED";
+        int ia = scene_find_object_index_by_id ((physics_world_get_primary () -> spring_joints) [ji].object_id_a);
+        int ib = scene_find_object_index_by_id ((physics_world_get_primary () -> spring_joints) [ji].object_id_b);
+        const char *state_text = (physics_world_get_primary () -> spring_joints) [ji].is_active ? "ESTABLISHED" : "CLOSED";
         term_printf (NULL, "spring /obj/%-6d /obj/%-6d %-12s %7.1f %7.1f %7.2f\n", ia, ib, state_text,
-                     (physics_world_get_primary () -> spring_joints)[ji].spring_constant,
-                     (physics_world_get_primary () -> spring_joints)[ji].damping_coefficient,
-                     (physics_world_get_primary () -> spring_joints)[ji].equilibrium_length);
+                     (physics_world_get_primary () -> spring_joints) [ji].spring_constant,
+                     (physics_world_get_primary () -> spring_joints) [ji].damping_coefficient,
+                     (physics_world_get_primary () -> spring_joints) [ji].equilibrium_length);
         listed++;
     }
     if (listed == 0) {
@@ -633,8 +630,7 @@ void cmd_lsmod (int argc, char **argv) {
     term_printf (NULL, "%-24s %6s  %s\n", "config_registry", "1", "config_menu, terminal, F9");
     term_printf (NULL, "%-24s %6s  %s\n", "event_log", "1", "dmesg (pending)");
     term_printf (NULL, "%-24s %6s  %s\n", "debug_terminal", "1", "input_control");
-}
-/* MPE_TASK_V15R2_PHASE6_IMPL_END */
+} /* MPE_TASK_V15R2_PHASE6_IMPL_END */
 /* MPE_TASK_V15R2_PHASE7_IMPL_BEGIN */
 void cmd_alias (int argc, char **argv) {
     if (argc < 2) {
@@ -968,8 +964,7 @@ void cmd_dmesg (int argc, char **argv) {
     } else {
         term_printf ("term_dim", "%d event(s) shown\n", printed);
     }
-}
-/* MPE_TASK_V15R2_PHASE7_IMPL_END */
+} /* MPE_TASK_V15R2_PHASE7_IMPL_END */
 /* MPE_TASK_V15R2_PHASE8_IMPL_BEGIN */
 /* MPE_TASK_V15R2_MICROVIM_FILE_WHITELIST_BEGIN */
 typedef struct {
@@ -1068,8 +1063,7 @@ bool mv_file_is_allowed (const char *filepath) {
         }
     }
     return false;
-}
-/* MPE_TASK_V15R2_MICROVIM_FILE_WHITELIST_END */
+} /* MPE_TASK_V15R2_MICROVIM_FILE_WHITELIST_END */
 void cmd_vi (int argc, char **argv) {
     /* Handle --list / -l flag */
     if ((argc > 1) && (term_str_eq (argv [1], "--list") || term_str_eq (argv [1], "-l"))) {
@@ -1128,5 +1122,4 @@ void cmd_vi (int argc, char **argv) {
     if (terminal_output_buffer) {
         microvim_render (terminal_output_buffer);
     }
-}
-/* MPE_TASK_V15R2_PHASE8_IMPL_END */
+} /* MPE_TASK_V15R2_PHASE8_IMPL_END */

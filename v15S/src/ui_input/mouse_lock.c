@@ -79,8 +79,7 @@ static GdkSurface *mpe_surface_for_widget (GtkWidget *widget) {
     if (!native)
         return NULL;
     return gtk_native_get_surface (native);
-}
-/* Available on every build; the GTK4 Wayland type check needs the GDK
+} /* Available on every build; the GTK4 Wayland type check needs the GDK
  * wayland backend header, which we only include where it exists. */
 static int mpe_display_is_wayland (GdkDisplay *display) {
     if (!display)
@@ -148,8 +147,7 @@ static int mpe_surface_is_wayland (GdkSurface *surface) {
     if (!surface)
         return 0;
     return mpe_display_is_wayland (gdk_surface_get_display (surface));
-}
-/* zwp_relative_pointer_v1 has exactly one event. */
+} /* zwp_relative_pointer_v1 has exactly one event. */
 static void mpe_rel_handle_motion (void *data, struct zwp_relative_pointer_v1 *rp, uint32_t utime_hi, uint32_t utime_lo,
                                    wl_fixed_t dx, wl_fixed_t dy, wl_fixed_t dx_unacc, wl_fixed_t dy_unacc) {
     (void) data;
@@ -224,8 +222,7 @@ void mouse_lock_init (void) {
     if (!display || !GDK_IS_WAYLAND_DISPLAY (display))
         return;
     (void) mpe_get_rel_manager (gdk_wayland_display_get_wl_display (display));
-}
-/* Bind the global once and cache it: it is a compositor capability, so it
+} /* Bind the global once and cache it: it is a compositor capability, so it
  * cannot change for the lifetime of the display. */
 static struct zwp_relative_pointer_manager_v1 *mpe_get_rel_manager (struct wl_display *wl_display) {
     if (mpe_rel_manager_searched)
@@ -248,28 +245,21 @@ int mouse_lock_relative_available (void) {
     if (!display || !GDK_IS_WAYLAND_DISPLAY (display))
         return 0;
     return mpe_get_rel_manager (gdk_wayland_display_get_wl_display (display)) != NULL;
-}
-/* Non-zero when a real relative-pointer lock is attached. The caller must not
+} /* Non-zero when a real relative-pointer lock is attached. The caller must not
  * fall back to absolute cursor coordinates while this is true: with a live
  * relative pointer the cursor is unconstrained and free to travel anywhere, so
  * its position carries no information about how far the hand moved. */
-int mouse_lock_relative_active (void) {
-    return mpe_rel_ptr != NULL;
-}
+int mouse_lock_relative_active (void) {return mpe_rel_ptr != NULL;}
 /* Non-zero when the pointer is genuinely CONFINED to the surface. Reported
  * separately from relative_active() because they are different capabilities and
  * can fail independently: a compositor may offer relative motion without
  * pointer constraints. */
-int mouse_lock_confined (void) {
-    return mpe_locked_active;
-}
+int mouse_lock_confined (void) {return mpe_locked_active;}
 /* DESPOT-2026-09-29: the sign convention lives in ui_input/mouse_look.h, as a
  * pure function with no GTK dependency, so the headless suite can assert all
  * four directions. Duplicating it here is what let it be wrong in one
  * direction and right in the other with nothing able to notice. */
-float mouse_lock_relative_to_camera (double rdx, double rdy, float *out_x, float *out_y) {
-    return mpe_mouse_relative_to_camera (rdx, rdy, out_x, out_y);
-}
+float mouse_lock_relative_to_camera (double rdx, double rdy, float *out_x, float *out_y) {return mpe_mouse_relative_to_camera (rdx, rdy, out_x, out_y);}
 int mouse_lock_take_relative_delta (double *dx, double *dy) {
     if (!mpe_rel_ptr || !mpe_rel_dirty)
         return 0;
@@ -294,8 +284,7 @@ static void mpe_rel_pointer_destroy (void) {
     }
     mpe_rel_dx = mpe_rel_dy = 0.0;
     mpe_rel_dirty = 0;
-}
-/* Start receiving unbounded relative motion on this surface's pointer. */
+} /* Start receiving unbounded relative motion on this surface's pointer. */
 static int mpe_rel_pointer_acquire (GdkSurface *surface) {
     if (mpe_rel_ptr)
         return 1;
@@ -368,9 +357,7 @@ void mouse_lock_diagnostics_reset (void) {
     mpe_rel_events = mpe_rel_pos_x = mpe_rel_neg_x = 0;
     mpe_rel_pos_y = mpe_rel_neg_y = 0;
 }
-int mouse_lock_relative_available (void) {
-    return 0;
-}
+int mouse_lock_relative_available (void) {return 0;}
 /* DESPOT-2026-09-29: the ONE place the sign convention lives.
  *
  * Previously the conversion was inlined in on_mouse_movements(), which made it
@@ -390,21 +377,16 @@ float mouse_lock_relative_to_camera (double rdx, double rdy, float *out_x, float
     if (out_y)
         * out_y = (float) -rdy;
     return (float) (rdx * rdx + rdy * rdy);
-}
-/* Non-zero when a real relative-pointer lock is attached. The caller must not
+} /* Non-zero when a real relative-pointer lock is attached. The caller must not
  * fall back to absolute cursor coordinates while this is true: with a live
  * relative pointer the cursor is free to travel anywhere and carries no
  * information about intent. */
-int mouse_lock_relative_active (void) {
-    return mpe_rel_ptr != NULL;
-}
+int mouse_lock_relative_active (void) {return mpe_rel_ptr != NULL;}
 /* Non-zero when the pointer is genuinely CONFINED to the surface. Reported
  * separately from relative_active() because they are different capabilities and
  * can fail independently: a compositor may offer relative motion without
  * pointer constraints. */
-int mouse_lock_confined (void) {
-    return mpe_locked_active;
-}
+int mouse_lock_confined (void) {return mpe_locked_active;}
 int mouse_lock_take_relative_delta (double *dx, double *dy) {
     (void) dx;
     (void) dy;

@@ -87,13 +87,11 @@ static const char *tui_constraint_str (constraint_type t) {
         default:
         return "unknown";
     }
-}
-/* World-space position of a body-local anchor. */
+} /* World-space position of a body-local anchor. */
 static vector3 tui_anchor_world (const rigidbody *rb, vector3 local) {
     vector3 off = vector4_rotate_to_vector3 (rb -> orientation, local);
     return vector3_addition (rb -> position, off);
-}
-/* Linear index of a body id, or -1.
+} /* Linear index of a body id, or -1.
  * FIX-AUDIT-DESPOT: O(1) id->index cache first (like tui_dump.c), linear
  * fallback for stale-cache gaps; linear alone would still be OK for
  * <100 bodies but the cache keeps joint lookups cheap in stress scenes. */
@@ -111,14 +109,12 @@ static int tui_index_by_id (physics_world *world, uint32_t id) {
         }
     }
     return -1;
-}
-/* Full world-space inertia tensor W = R * I_local * R^T. */
+} /* Full world-space inertia tensor W = R * I_local * R^T. */
 static math3 tui_inertia_world (const rigidbody *rb) {
     math3 r = vector4_to_math3 (rb -> orientation);
     math3 rt = math3_transposition (r);
     return math3_multiplication (r, math3_multiplication (rb -> inertia_tensor_local, rt));
-}
-/* Extract inspection-only XYZ euler angles (radians) from R.
+} /* Extract inspection-only XYZ euler angles (radians) from R.
  * ex = rot about X, ey = rot about Y, ez = rot about Z. */
 static void tui_euler_xyz (math3 r, float *ex, float *ey, float *ez) {
     float sy = -(r.matrix [2][0]);
@@ -178,8 +174,7 @@ float tui_quat_to_roll (vector4 q) {
     float ex, ey, ez;
     tui_euler_xyz (r, &ex, &ey, &ez);
     return ez;
-}
-/* One-line body summary for tables. */
+} /* One-line body summary for tables. */
 static void tui_body_line (physics_world *world, int idx, char *buf, size_t sz) {
     if (!buf || sz == 0) {
         return;
@@ -219,8 +214,7 @@ static bool tui_body_visible (const tui_debugger_t *dbg, const rigidbody *rb) {
     }
     needle [n] = '\0';
     return strstr (line, needle) != NULL;
-}
-/* ------------------------------------------------------------------ */
+} /* ------------------------------------------------------------------ */
 /* Lifecycle                                                           */
 /* ------------------------------------------------------------------ */
 void tui_debugger_init (tui_debugger_t *dbg, physics_world *world) {
@@ -259,8 +253,7 @@ void tui_debugger_step (tui_debugger_t *dbg, float dt) {
     }
     physics_world_step (dbg -> world, dt);
     dbg -> frame_count++;
-}
-/* ------------------------------------------------------------------ */
+} /* ------------------------------------------------------------------ */
 /* Input                                                               */
 /* ------------------------------------------------------------------ */
 void tui_debugger_handle_input (tui_debugger_t *dbg, int ch) {
@@ -390,8 +383,7 @@ void tui_debugger_handle_input (tui_debugger_t *dbg, int ch) {
     if (dbg -> selected_joint < 0) {
         dbg -> selected_joint = 0;
     }
-}
-/* ------------------------------------------------------------------ */
+} /* ------------------------------------------------------------------ */
 /* Render helpers                                                      */
 /* ------------------------------------------------------------------ */
 static void tui_draw_header (tui_debugger_t *dbg) {
@@ -411,8 +403,7 @@ static void tui_draw_header (tui_debugger_t *dbg) {
     if (w > 0) {
         mvchgat (0, 0, w, A_REVERSE, 0, NULL);
     }
-}
-/* Engine/math truth strip shared by sidebar + snapshot. */
+} /* Engine/math truth strip shared by sidebar + snapshot. */
 static int tui_engine_lines (physics_world *world, unsigned long long tick, char out [][128], int cap) {
     int n = 0;
     if (!world || cap <= 0) {
@@ -506,8 +497,7 @@ void tui_render_status (tui_debugger_t *dbg) {
                "[1]Overview [2]Object [3]Joints [4]Graph [5]Help  j/k/Up/Dn select  Space pause  s step  +/-speed  "
                "/filter c-clear  q quit");
     wrefresh (dbg -> status_win);
-}
-/* ------------------------------------------------------------------ */
+} /* ------------------------------------------------------------------ */
 /* Screens                                                             */
 /* ------------------------------------------------------------------ */
 void tui_render_overview (tui_debugger_t *dbg) {
@@ -639,8 +629,7 @@ void tui_render_object_detail (tui_debugger_t *dbg) {
     }
     (void) h;
     wrefresh (dbg -> main_win);
-}
-/* Count active joints of both pools. */
+} /* Count active joints of both pools. */
 static int tui_joint_total (physics_world *world) {
     if (!world) {
         return 0;
@@ -657,8 +646,7 @@ static int tui_joint_total (physics_world *world) {
         }
     }
     return n;
-}
-/* Describe joint #sel (springs first, then constraints). kind: 0=spring,1=constraint. */
+} /* Describe joint #sel (springs first, then constraints). kind: 0=spring,1=constraint. */
 static bool tui_joint_at (physics_world *world, int sel, int *kind, int *slot) {
     if (!world || sel < 0) {
         return false;
@@ -965,8 +953,7 @@ void tui_render_help (tui_debugger_t *dbg) {
         mvwprintw (dbg -> main_win, i, 0, "%.*s", w - 1, lines [i]);
     }
     wrefresh (dbg -> main_win);
-}
-/* ------------------------------------------------------------------ */
+} /* ------------------------------------------------------------------ */
 /* Frame                                                               */
 /* ------------------------------------------------------------------ */
 void tui_debugger_render (tui_debugger_t *dbg) {
@@ -1060,9 +1047,6 @@ void tui_debugger_render (tui_debugger_t *dbg) {
          * Overview keeps the table; stats live in snapshot/dump. */
     }
     tui_render_status (dbg);
-}
-/* Plain-text helpers shared with tui_dump.c (no curses here). */
+} /* Plain-text helpers shared with tui_dump.c (no curses here). */
 void tui_describe_body (physics_world *world, int idx, char *buf, size_t sz);
-void tui_describe_body (physics_world *world, int idx, char *buf, size_t sz) {
-    tui_body_line (world, idx, buf, sz);
-}
+void tui_describe_body (physics_world *world, int idx, char *buf, size_t sz) {tui_body_line (world, idx, buf, sz);}

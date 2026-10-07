@@ -51,14 +51,14 @@ void cmd_stat (int argc, char **argv) {
         term_printf ("term_err", "mpe: stat: %s: No such object\n", target);
         return;
     }
-    rigidbody *rb = &(physics_world_get_primary () -> bodies)[object_index];
+    rigidbody *rb = &(physics_world_get_primary () -> bodies) [object_index];
     int joint_count_for_obj = 0;
     for (int ji = 0; ji < mpe_max_joints; ji++) {
-        if (!(physics_world_get_primary () -> spring_joints)[ji].is_active) {
+        if (!(physics_world_get_primary () -> spring_joints) [ji].is_active) {
             continue;
         }
-        int ia = scene_find_object_index_by_id ((physics_world_get_primary () -> spring_joints)[ji].object_id_a);
-        int ib = scene_find_object_index_by_id ((physics_world_get_primary () -> spring_joints)[ji].object_id_b);
+        int ia = scene_find_object_index_by_id ((physics_world_get_primary () -> spring_joints) [ji].object_id_a);
+        int ib = scene_find_object_index_by_id ((physics_world_get_primary () -> spring_joints) [ji].object_id_b);
         if ((ia == object_index) || (ib == object_index)) {
             joint_count_for_obj++;
         }
@@ -129,7 +129,7 @@ void cmd_find (int argc, char **argv) {
     }
     int match_count = 0;
     for (int object_index = 0; object_index < (physics_world_get_primary () -> body_count); object_index++) {
-        rigidbody *rb = &(physics_world_get_primary () -> bodies)[object_index];
+        rigidbody *rb = &(physics_world_get_primary () -> bodies) [object_index];
         if ((filter_type == 0) && (rb -> type != object_sphere)) {
             continue;
         }
@@ -179,7 +179,7 @@ void cmd_wc (int argc, char **argv) {
         if (strstr (argv [i], "joint")) {
             int active_joints = 0;
             for (int ji = 0; ji < mpe_max_joints; ji++) {
-                if ((physics_world_get_primary () -> spring_joints)[ji].is_active) {
+                if ((physics_world_get_primary () -> spring_joints) [ji].is_active) {
                     active_joints++;
                 }
             }
@@ -213,7 +213,7 @@ void cmd_file (int argc, char **argv) {
     if (term_classify_token (target) == term_target_joint) {
         int joint_index = term_joint_from_token (target);
         if (joint_index >= 0) {
-            spring_joint *j = &(physics_world_get_primary () -> spring_joints)[joint_index];
+            spring_joint *j = &(physics_world_get_primary () -> spring_joints) [joint_index];
             term_printf (NULL, "/joint/%d: spring joint, k=%.1f d=%.1f len=%.2f\n", joint_index, j -> spring_constant,
                          j -> damping_coefficient, j -> equilibrium_length);
         } else {
@@ -226,7 +226,7 @@ void cmd_file (int argc, char **argv) {
         term_printf ("term_err", "mpe: file: %s: No such object\n", target);
         return;
     }
-    rigidbody *rb = &(physics_world_get_primary () -> bodies)[object_index];
+    rigidbody *rb = &(physics_world_get_primary () -> bodies) [object_index];
     term_printf (NULL, "/obj/%d: rigid body, %s, %.2f kg, %s%s\n", object_index, term_object_type_name (rb), rb -> mass,
                  rb -> static_state ? "static" : "dynamic", rb -> is_sleeping ? ", sleeping" : "");
 }
@@ -247,8 +247,8 @@ void cmd_diff (int argc, char **argv) {
         term_ok ("Objects are identical (same object)\n");
         return;
     }
-    rigidbody *a = &(physics_world_get_primary () -> bodies)[index_a];
-    rigidbody *b = &(physics_world_get_primary () -> bodies)[index_b];
+    rigidbody *a = &(physics_world_get_primary () -> bodies) [index_a];
+    rigidbody *b = &(physics_world_get_primary () -> bodies) [index_b];
     int diff_count = 0;
     term_printf ("term_echo", "--- /obj/%d\n", index_a);
     term_printf ("term_echo", "+++ /obj/%d\n", index_b);
@@ -342,7 +342,7 @@ void cmd_xxd (int argc, char **argv) {
     if (dump_length <= 0) {
         dump_length = struct_size - dump_offset;
     }
-    const unsigned char *raw = (const unsigned char *) &(physics_world_get_primary () -> bodies)[object_index];
+    const unsigned char *raw = (const unsigned char *) &(physics_world_get_primary () -> bodies) [object_index];
     term_printf ("term_echo", "xxd /obj/%d  (%d bytes at offset %d of %d)\n", object_index, dump_length, dump_offset,
                  struct_size);
     for (int row = 0; row < dump_length; row += 16) {
@@ -366,8 +366,7 @@ void cmd_xxd (int argc, char **argv) {
         ascii_part [row_len] = '\0';
         term_printf (NULL, "%08x: %-48s  |%s|\n", dump_offset + row, hex_part, ascii_part);
     }
-}
-/* MPE_TASK_V15R2_PHASE3_IMPL_END */
+} /* MPE_TASK_V15R2_PHASE3_IMPL_END */
 /* MPE_TASK_V15R2_PHASE4_IMPL_BEGIN */
 /* --- sort helpers --- */
 static int a3_sort_key = 0; /* 0=index 1=mass 2=speed 3=type 4=pos.y */
@@ -375,8 +374,8 @@ static bool a3_sort_reverse = false;
 int a3_sort_compare (const void *pa, const void *pb) {
     int ia = *(const int *) pa;
     int ib = *(const int *) pb;
-    rigidbody *ra = &(physics_world_get_primary () -> bodies)[ia];
-    rigidbody *rb = &(physics_world_get_primary () -> bodies)[ib];
+    rigidbody *ra = &(physics_world_get_primary () -> bodies) [ia];
+    rigidbody *rb = &(physics_world_get_primary () -> bodies) [ib];
     float va = 0.0f, vb = 0.0f;
     switch (a3_sort_key) {
         case 1:
@@ -650,6 +649,5 @@ void cmd_less (int argc, char **argv) {
         term_printf ("term_dim", "-- %d more lines (use head/tail/grep to filter) --\n", total_lines - printed);
     }
     term_capture_reset ();
-}
-/* MPE_TASK_V15R2_PHASE4_IMPL_END */
+} /* MPE_TASK_V15R2_PHASE4_IMPL_END */
 /* MPE_TASK_V15R2_PHASE5_IMPL_BEGIN */

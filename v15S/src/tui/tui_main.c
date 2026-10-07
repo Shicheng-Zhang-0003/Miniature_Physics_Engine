@@ -74,8 +74,7 @@ static void print_help (const char *prog) {
     printf ("  +/- speed, / filter, c clear filter, q quit.\n");
     printf ("\nSnapshot sections: [engine] [body i] [springs] [constraints] [pairs]\n");
     printf ("[islands] [stats] [result] — fixed format, diffable.\n");
-}
-/* ------------------------------------------------------------------ */
+} /* ------------------------------------------------------------------ */
 /* Demo scenes (deterministic; exercise every body + joint type)        */
 /* ------------------------------------------------------------------ */
 static void scene_floor (physics_world *world) {
@@ -96,8 +95,7 @@ static void scene_pendulum_only (physics_world *world) {
     int bob = physics_world_add_sphere (world, 0.3f, 2.0f, (vector3) {1.0f, 8.0f, 0.0f});
     constraint_add_revolute (world, world -> bodies [pivot].object_id, world -> bodies [bob].object_id,
                              (vector3) {0.0f, 0.0f, 0.0f}, (vector3) {-1.0f, 2.0f, 0.0f}, (vector3) {0.0f, 0.0f, 1.0f});
-}
-/* F10 long-run validation scene replica (exact geometry/props from
+} /* F10 long-run validation scene replica (exact geometry/props from
  * scene_spawn_long_run_validation; spawn-overlap resolution NOT applied so
  * the opening transient is, if anything, harsher than in-engine). */
 static void scene_f10_only (physics_world *world) {
@@ -162,8 +160,7 @@ static void scene_f10_only (physics_world *world) {
             world -> bodies [idx].friction_kinetic = 0.7f;
         }
     }
-}
-/* Spawn-stress scene: 300 mixed bodies in a grid + one of every joint
+} /* Spawn-stress scene: 300 mixed bodies in a grid + one of every joint
  * type + a kinematic conveyor + a fast CCD ball. Deterministic. */
 static void scene_stress_only (physics_world *world) {
     constraint_pool_init (world);
@@ -192,8 +189,7 @@ static void scene_stress_only (physics_world *world) {
     world -> bodies [fast].velocity = (vector3) {144.0f, 0.0f, 0.0f};
     world -> bodies [fast].restitution = 0.0f;
     rigidbody_wake (&world -> bodies [fast]);
-}
-/* CCD battery: thin static wall + three restitution-0 balls at
+} /* CCD battery: thin static wall + three restitution-0 balls at
  * 60/144/300 m/s in separate z lanes. */
 static void scene_ccd_only (physics_world *world) {
     physics_world_add_cube (world, (vector3) {0.0f, 5.0f, 0.0f}, (vector3) {0.05f, 5.0f, 8.0f}, 0.0f);
@@ -307,14 +303,12 @@ static int build_scene (physics_world *world, const char *name) {
     }
     fprintf (stderr, "mpe-tui: unknown scene '%s' (demo|tower|pendulum|springlab|f10|stress|ccd)\n", name);
     return -1;
-}
-/* ------------------------------------------------------------------ */
+} /* ------------------------------------------------------------------ */
 static double now_seconds (void) {
     struct timespec ts;
     clock_gettime (CLOCK_MONOTONIC, &ts);
     return (double) ts.tv_sec + (double) ts.tv_nsec * 1e-9;
-}
-/* DESPOT-2026-10-01: atol() on CLI counts is unchecked (non-numeric -> 0,
+} /* DESPOT-2026-10-01: atol() on CLI counts is unchecked (non-numeric -> 0,
  * LONG_MAX overflow UB, huge ticks -> hang). Strict strtol with fallback. */
 static long tui_parse_count (const char *s, long fallback) {
     if (!s || !*s) {

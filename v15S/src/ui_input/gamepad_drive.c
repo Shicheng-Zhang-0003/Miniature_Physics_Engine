@@ -19,8 +19,7 @@ static void *gpd_sym (const char *sym) {
     if (p)
         return p;
     return mpe_loader_symbol (GPD_HANDLE_MODULE, sym);
-}
-/* Cached bundle entry points (resolved lazily; NULL = bundle absent). */
+} /* Cached bundle entry points (resolved lazily; NULL = bundle absent). */
 static ftc_robot * (*s_fleet_get) (struct physics_world *, int) = NULL;
 static void (*s_mecanum) (ftc_robot *, float, float, float) = NULL;
 static bool (*s_pad_init) (gamepad_state *, const char *) = NULL;
@@ -87,8 +86,7 @@ static void gpd_resolve (void) {
         s_syms_resolved = 1;
     else
         s_syms_resolved = 0;
-}
-/* DESPOT-2026-10-07 P0-2: explicit invalidation for unload paths.
+} /* DESPOT-2026-10-07 P0-2: explicit invalidation for unload paths.
  * Loader/terminal unload hooks call this BEFORE dlclose so no stale
  * pointer survives even one tick. Re-resolve above makes this redundant
  * but harmless — defence in depth. */
@@ -188,9 +186,7 @@ void gamepad_drive_tick (void) {
     s_active = 1;
     gpd_report_stage (3);
 }
-int gamepad_drive_active (void) {
-    return s_active;
-}
+int gamepad_drive_active (void) {return s_active;}
 /* ---- joint watchdog (see header) ---- */
 #define FTC_WD_MAXW 8
 static int s_wd_tagged = 0;
