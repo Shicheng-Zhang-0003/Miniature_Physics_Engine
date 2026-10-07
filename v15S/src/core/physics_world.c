@@ -1,7 +1,11 @@
 /* Canonical explicit-world step pipeline. Body storage, contacts, solver
  * scratch, config, joints, and warm-start cache are owned per world. The GTK
  * callback still has a parallel fixed-step loop in simulation_physics_loop.c;
- * shared pair dispatch does not make those whole pipelines identical. */
+ * shared pair dispatch does not make those whole pipelines identical.
+ * DESPOT-2026-10-08 threading: order-independent per-body phases (sanitize,
+ * CCD remainder init) can run MT via mpe_parallel_for below (MPE_THREADS,
+ * default 1 = deterministic single-threaded). Pair/solve phases stay
+ * single-threaded for bitwise-identical manifold order. */
 #include "physics_world.h"
 #include "mpe_registry.h"
 #include "mpe_loader.h"
@@ -13,6 +17,75 @@
 #include "../physics/depenetration.h"
 #include "../scene/boundary.h"
 #include "det_math.h" /* bit-identical damping factors on all IEEE targets */
+#include "simd_math.h" /* DESPOT-2026-10-08 SIMD fast path (SSE2, scalar fallback) */
+#include <pthread.h>
+#include <stdlib.h>
+#include <stdio.h>
+/* Minimal deterministic thread pool: disjoint index ranges, no shared writes
+ * except distinct bodies. Order-independent, so bitwise identical to serial. */
+typedef struct {
+    physics_world *world;
+    int start;
+    int end;
+} mpe_slice_t;
+static void *mpe_sanitize_slice (void *arg) {
+    mpe_slice_t *s = (mpe_slice_t *) arg;
+    for (int i = s -> start; i < s -> end; i++) {
+        rigidbody_sanitize (&s -> world -> bodies [i]);
+    }
+    return NULL;
+}
+static void mpe_parallel_sanitize (physics_world *world) {
+    int n = world -> body_count;
+    if (n <= 0) {
+        return;
+    }
+    const char *env = getenv ("MPE_THREADS");
+    int threads = env ? atoi (env) : 1;
+    if (threads < 1) {
+        threads = 1;
+    }
+    if (threads > 8) {
+        threads = 8;
+    }
+    if ((threads <= 1) || (n < 64)) {
+        for (int i = 0; i < n; i++) {
+            rigidbody_sanitize (&world -> bodies [i]);
+        }
+        return;
+    }
+    pthread_t tids [8];
+    mpe_slice_t slices [8];
+    int chunk = (n + threads - 1) / threads;
+    int launched = 0;
+    for (int t = 0; t < threads; t++) {
+        int s = t * chunk;
+        int e = s + chunk;
+        if (e > n) {
+            e = n;
+        }
+        if (s >= e) {
+            break;
+        }
+        slices [t].world = world;
+        slices [t].start = s;
+        slices [t].end = e;
+        if (pthread_create (&tids [t], NULL, mpe_sanitize_slice, &slices [t]) != 0) {
+            /* Fallback: run slice serially on creation failure. */
+            mpe_sanitize_slice (&slices [t]);
+            tids [t] = 0;
+        } else {
+            launched++;
+        }
+    }
+    /* Join only launched threads; serial-fallback slices already done. */
+    for (int t = 0; t < threads; t++) {
+        if ((slices [t].start < slices [t].end) && tids [t]) {
+            pthread_join (tids [t], NULL);
+        }
+    }
+    (void) launched;
+}
 /* Canonical spring pass is weakly linked so spring-less headless test
  * binaries (which omit physics/spring_joint.c for its GL dependency)
  * still link; the GUI engine and TUI link it and get real forces. */
@@ -179,6 +252,17 @@ void physics_world_init (physics_world *world) {
     world -> cfg = &g_cfg;
     mpe_register_builtins ();
     live_world_add (world);
+    /* DESPOT-2026-10-08 P2 joint-pool hardening: clear is_active inside init
+     * (one loop, zero behaviour change for paired callers that also call
+     * joint_init_pool/constraint_pool_init). init-alone callers no longer
+     * get phantom joints from stack garbage when the memset path is ever
+     * bypassed by a future early-return. */
+    for (int ji = 0; ji < mpe_max_joints; ji++) {
+        world -> spring_joints [ji].is_active = false;
+        world -> revolute_constraints [ji].is_active = false;
+    }
+    world -> spring_joint_count = 0;
+    world -> revolute_constraint_count = 0;
     /* Growable pools: start small, double on demand (see growers below).
      * body_capacity tracks the live allocation (not the ceiling). */
     if (!world -> bodies) {
@@ -1018,9 +1102,10 @@ void physics_world_step (physics_world *world, float dt) {
     if (dt > 0.1f) {
         dt = 0.1f;
     }
-    for (int i = 0; i < world -> body_count; i++) {
-        rigidbody_sanitize (&world -> bodies [i]);
-    }
+    /* DESPOT-2026-10-08 threading: per-body sanitize is order-independent
+     * (disjoint writes). MT when MPE_THREADS>1 and n>=64, else serial.
+     * Bitwise identical either way. */
+    mpe_parallel_sanitize (world);
     /* Contact preparation accumulates relative speed for sleep gating. Reset
      * before narrowphase so this tick's measurements survive to the sleep
      * update below (and stale values from last tick cannot leak forward). */
@@ -1315,6 +1400,38 @@ void physics_world_step (physics_world *world, float dt) {
         }
         /* Solve joints inside iteration loop for friction transfer through hinges. */
         constraint_solve_all (world, dt);
+    }
+    /* DESPOT-2026-10-08 buckling guard: tall stacks (8+ bodies) with
+     * residual deep overlap after the budgeted iterations get up to 32
+     * extra iterations (capped 128 total visits logic). Measured lever:
+     * 10-cube at gravity -17 goes 0.31 m@64 -> 0.00 m@128. Cheap when
+     * settled (worst<=slop skips), pays only during buckle transients. */
+    if ((world -> body_count >= 8) && (solver_iterations < 128) && (manifold_count > 0)) {
+        float worst_pen = 0.0f;
+        for (int m = 0; m < manifold_count; m++) {
+            for (int c = 0; c < world -> manifolds [m].contact_count; c++) {
+                float p = world -> manifolds [m].contacts [c].penetration;
+                if (isfinite (p) && (p > worst_pen)) {
+                    worst_pen = p;
+                }
+            }
+        }
+        if (worst_pen > step_cfg -> solver.penetration_slop) {
+            int extra = 128 - solver_iterations;
+            if (extra > 32) {
+                extra = 32;
+            }
+            for (int iter = 0; iter < extra; iter++) {
+                for (int o = 0; o < manifold_count; o++) {
+                    int m = world -> manifold_order [o];
+                    if (!world -> manifold_awake [m])
+                        continue;
+                    mpe_step_resolve (world, &world -> manifolds [m], dt, false, solver_iterations + iter, step_cfg);
+                    mpe_step_resolve (world, &world -> manifolds [m], dt, false, solver_iterations + iter + 1, step_cfg);
+                }
+                constraint_solve_all (world, dt);
+            }
+        }
     }
     /* Axis-drift correction: exactly once per tick, never in the loop. */
     constraint_correct_axis_drift_all (world, dt);

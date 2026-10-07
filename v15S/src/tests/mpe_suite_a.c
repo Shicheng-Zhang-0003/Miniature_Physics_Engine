@@ -419,6 +419,37 @@ int mpe_t_angmom (void) {
      * being 10x tighter than the band it replaced. */
     MPE_CHECK (&t, max_err <= 0.005f);
     MPE_INFO ("angmom max relative drift over 2 s: %.6f (gate 0.5%%, was 3%%)", max_err);
+    /* DESPOT-2026-10-08 sphere control: cube |L| vs sphere |L| on the same
+     * rig settles the VALIDATION.md tension (cube I^-1 w retracted as
+     * meaningless, cube |L| kept as defensible). Sphere inertia isotropic
+     * so L||w; both must meet 0.5%. */
+    {
+        physics_world ws;
+        mpe_world_begin (&ws);
+        int bs = physics_world_add_sphere (&ws, 0.5f, 2.0f, (vector3) {0.0f, 50.0f, 0.0f});
+        MPE_CHECK (&t, bs >= 0);
+        ws.bodies [bs].angular_velocity = (vector3) {1.0f, 2.0f, 3.0f};
+        vector3 Ls0 = vector3_scaling (ws.bodies [bs].angular_velocity,
+                                       ws.bodies [bs].inertia_tensor_local.matrix [0][0]);
+        float dden = vector3_length (Ls0);
+        float smax = 0.0f;
+        for (int k = 0; k < 120; k++) {
+            physics_world_step (&ws, dt);
+            if (!mpe_world_finite (&ws)) {
+                t.failures++;
+                break;
+            }
+            vector3 Lsk = vector3_scaling (ws.bodies [bs].angular_velocity,
+                                           ws.bodies [bs].inertia_tensor_local.matrix [0][0]);
+            float e = vector3_length (vector3_subtraction (Lsk, Ls0)) / (dden + 1e-9f);
+            if (e > smax) {
+                smax = e;
+            }
+        }
+        MPE_INFO ("angmom sphere control drift: %.6f", smax);
+        MPE_CHECK (&t, smax <= 0.005f);
+        physics_world_cleanup (&ws);
+    }
     if (t.failures == 0) {
         printf ("[PASS] angular momentum conserved\n");
     }

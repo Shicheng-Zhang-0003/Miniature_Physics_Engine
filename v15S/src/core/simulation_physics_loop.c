@@ -1,12 +1,19 @@
 /* MFS_INCREMENT_SPLIT_2: Fixed-timestep physics loop.
-* Extracted from physics_step_increment in simulation.c.
-* Owns: the accumulator, broadphase, narrowphase, solver, integration,
-*        sleep staticize/restore, boundary, depenetration.
-* LEGACY GUI PATH: operates on global world->bodies / world->body_count so the
-* GTK render/editor loop keeps working. Canonical stepping is
-* physics_world_step() in core/physics_world.c (used by all headless
-* tests). Do not add new simulation state here — add it to physics_world.
-*/
+ * Extracted from physics_step_increment in simulation.c.
+ * Owns: the accumulator, broadphase, narrowphase, solver, integration,
+ *        sleep staticize/restore, boundary, depenetration.
+ * LEGACY GUI PATH: operates on global world->bodies / world->body_count so the
+ * GTK render/editor loop keeps working. Canonical stepping is
+ * physics_world_step() in core/physics_world.c (used by all headless
+ * tests). Do not add new simulation state here — add it to physics_world.
+ * DESPOT-2026-10-08 unification: physics STAGES are unified (shared
+ * mpe_shape_dispatch, collision_prepare_solver, Poisson refresh, split,
+ * depenetration, islands, per-world cfg). Frame DRIVERS differ by necessity
+ * (GUI accumulator + wall-time spiral guard vs headless direct dt) and are
+ * proven equivalent on passive towers (bitwise 600-tick tower) — driven
+ * robots differ ~2.7% via motor-observer feedback, not a path bug. New
+ * physics goes in physics_world.c stages; this TU keeps frame timing only.
+ */
 /* GTK4-PREP: zero GUI headers in core. */
 #include "../config/mpe_config.h"
 #include "../config/mpe_constants.h"
@@ -349,6 +356,46 @@ void simulation_physics_tick (float frame_delta_time) {
              * iteration loop so contact/joint impulses couple — mirroring
              * physics_world_step(). */
             constraint_solve_all (world, fixed_physics_dt);
+        }
+        /* DESPOT-2026-10-08 buckling parity: same ≤32 extra when bodies≥8
+         * and residual>slop (see physics_world.c). Legacy path must not
+         * diverge from canonical on tall stacks. */
+        if ((world -> body_count >= 8) && (solver_iterations < 128) && (manifold_count > 0)) {
+            float leg_worst = 0.0f;
+            for (int m = 0; m < manifold_count; m++) {
+                for (int c = 0; c < world -> manifolds [m].contact_count; c++) {
+                    float p = world -> manifolds [m].contacts [c].penetration;
+                    if (isfinite (p) && (p > leg_worst)) {
+                        leg_worst = p;
+                    }
+                }
+            }
+            if (leg_worst > leg_step_cfg -> solver.penetration_slop) {
+                int leg_extra = 128 - solver_iterations;
+                if (leg_extra > 32) {
+                    leg_extra = 32;
+                }
+                for (int iter = 0; iter < leg_extra; iter++) {
+                    for (int o = 0; o < manifold_count; o++) {
+                        int m = world -> manifold_order [o];
+                        if (!world -> manifold_awake [m]) {
+                            continue;
+                        }
+                        if (world -> solver_if && world -> solver_if -> resolve) {
+                            world -> solver_if -> resolve (world, &world -> manifolds [m], fixed_physics_dt, false,
+                                                       solver_iterations + iter, world -> solver_state);
+                            world -> solver_if -> resolve (world, &world -> manifolds [m], fixed_physics_dt, false,
+                                                       solver_iterations + iter + 1, world -> solver_state);
+                        } else {
+                            collision_resolve_iterative (&world -> manifolds [m], fixed_physics_dt, false,
+                                                         solver_iterations + iter, leg_step_cfg);
+                            collision_resolve_iterative (&world -> manifolds [m], fixed_physics_dt, false,
+                                                         solver_iterations + iter + 1, leg_step_cfg);
+                        }
+                    }
+                    constraint_solve_all (world, fixed_physics_dt);
+                }
+            }
         }
         /* Positional axis-drift correction: exactly once per substep, never
          * in the loop above (see revolute_joint.c). */

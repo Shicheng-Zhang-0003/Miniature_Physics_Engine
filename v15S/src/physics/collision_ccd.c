@@ -12,6 +12,10 @@
 #include "collision_cylinder.h"
 #include "broadphase.h"
 #include <float.h>
+/* DESPOT-2026-10-08 rotational CCD: worst obstacle tip speed in this tick.
+ * File-scope (not per-call static) so the mover loop below can read the
+ * precomputed max. Single-threaded step only; MT step recomputes per tick. */
+float g_ccd_obstacle_margin = 0.0f;
 static float ccd_support_depth (const rigidbody *body) {
     /* Lowest-point offset below the center along world -Y. */
     if (body -> type == object_sphere) {
@@ -109,6 +113,30 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
             time_remaining_out [k] = dt;
         }
     }
+    /* DESPOT-2026-10-08: obstacle-spin margin = max over all bodies of
+     * |w|*R (tip speed). Slow mover vs fast blade gets the blade's tip
+     * speed added to its sweep (see use site below). O(n), deterministic
+     * (max reduction, order-independent). */
+    float obstacle_margin = 0.0f;
+    for (int k = 0; k < body_count; k++) {
+        rigidbody *ob = &bodies [k];
+        if ((ob -> static_state) || (ob -> is_sleeping) || (ob -> no_collide)) {
+            continue;
+        }
+        float ow = vector3_length (ob -> angular_velocity);
+        float orad = broadphase_bounding_radius (ob);
+        if ((!isfinite (ow)) || (!isfinite (orad)) || (orad < 0.0f)) {
+            continue;
+        }
+        float tip = ow * orad;
+        if (isfinite (tip) && (tip > obstacle_margin)) {
+            obstacle_margin = tip;
+        }
+    }
+    if (obstacle_margin > 2.0f) {
+        obstacle_margin = 2.0f;
+    }
+    g_ccd_obstacle_margin = obstacle_margin;
     /* TRUTH: symmetric two-phase clamp. Old sequential per-body move vs
      * already-moved positions let B tunnel through A (A clamps to contact
      * vs B_old, moves; B sees c<=0 vs A_new, skips, then integrates full dt
@@ -154,6 +182,11 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
             bound_r = 0.0f;
         }
         float sweep_speed = lin_speed + ang_speed * bound_r;
+        /* DESPOT-2026-10-08 rotational CCD: obstacle spin unswept (LIE-09).
+         * Add the worst obstacle tip speed in this world as a margin so a
+         * fast propeller vs slow mover cannot tunnel rotationally with no
+         * clamp. Computed once per tick above. */
+        sweep_speed += g_ccd_obstacle_margin;
         if (sweep_speed <= 0.0001f) {
             continue;
         }
