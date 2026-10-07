@@ -20,29 +20,18 @@ static bool ray_obb_intersection (vector3 ray_origin, vector3 ray_dir, rigidbody
                 t1 = t2;
                 t2 = temp;
             }
-            if (t1 > tmin) {
-                tmin = t1;
-            }
-            if (t2 < tmax) {
-                tmax = t2;
-            }
-            if (tmin > tmax) {
-                return false;
-            }
-        } else if ((-e > extents [i]) || (-e < -extents [i])) {
-            return false;
-        }
-    }
-    * t_hit = tmin > 0 ? tmin : tmax;
+            if (t1 > tmin) { tmin = t1; }
+            if (t2 < tmax) { tmax = t2; }
+            if (tmin > tmax) { return false; }
+        } else if ((-e > extents [i]) || (-e < -extents [i])) { return false; }
+    } * t_hit = tmin > 0 ? tmin : tmax;
     return *t_hit > 0;
 } /* Exact solid-cylinder raycast (axle = local X, flat caps). Side quadric in
  * cylinder-local space plus two cap discs; nearest positive t wins. */
 static bool ray_cylinder_intersection (vector3 ray_origin, vector3 ray_dir, rigidbody *cyl, float *t_hit) {
     vector3 ax = cyl -> cached_axes [0];
     float ax_len_sq = vector3_length_squared (ax);
-    if (ax_len_sq < 1e-8f) {
-        return false;
-    }
+    if (ax_len_sq < 1e-8f) { return false; }
     ax = vector3_scaling (ax, 1.0f / sqrtf (ax_len_sq));
     float r = cyl -> radius;
     float h = cyl -> cylinder_half_length;
@@ -85,30 +74,25 @@ static bool ray_cylinder_intersection (vector3 ray_origin, vector3 ray_dir, rigi
             }
         }
     }
-    if (hit) {
-        *t_hit = best_t;
-    }
+    if (hit) { *t_hit = best_t; }
     return hit;
 }
 void select_object_by_index (int object_index) {
     if ((object_index < 0) || (object_index >= (physics_world_get_primary () -> body_count))) {
         clear_selection ();
         return;
-    }
-    selected_object = object_index;
+    } selected_object = object_index;
     selected_object_id = (physics_world_get_primary () -> bodies) [object_index].object_id;
 }
 void selection_validate (void) {
     if (selected_object_id == 0) {
         clear_selection ();
         return;
-    }
-    int object_index = scene_find_object_index_by_id (selected_object_id);
+    } int object_index = scene_find_object_index_by_id (selected_object_id);
     if (object_index < 0) {
         clear_selection ();
         return;
-    }
-    selected_object = object_index;
+    } selected_object = object_index;
 }
 uint32_t selection_get_id (void) {return selected_object_id;}
 int selector_ray_tracing (void) {
@@ -123,9 +107,7 @@ int selector_ray_tracing (void) {
         if (rigid_body_pointer -> type == object_sphere) {
             vector3 origin_to_center_vector = vector3_subtraction (rigid_body_pointer -> position, ray_origin_position);
             float projection_length_along_ray = vector3_dot (origin_to_center_vector, ray_direction_vector);
-            if (projection_length_along_ray < 0) {
-                continue;
-            }
+            if (projection_length_along_ray < 0) { continue; }
             vector3 closest_point_on_ray_vector = vector3_scaling (ray_direction_vector, projection_length_along_ray);
             vector3 perpendicular_displacement_vector =
                 vector3_subtraction (origin_to_center_vector, closest_point_on_ray_vector);
@@ -136,17 +118,14 @@ int selector_ray_tracing (void) {
             }
         } else if (rigid_body_pointer -> type == object_cylinder) {
             hit = ray_cylinder_intersection (ray_origin_position, ray_direction_vector, rigid_body_pointer, &t_hit);
-        } else {
-            hit = ray_obb_intersection (ray_origin_position, ray_direction_vector, rigid_body_pointer, &t_hit);
-        }
+        } else { hit = ray_obb_intersection (ray_origin_position, ray_direction_vector, rigid_body_pointer, &t_hit); }
         if (hit) {
             if (t_hit < closest_hit_distance) {
                 closest_hit_distance = t_hit;
                 closest_object_index = object_index;
             }
         }
-    }
-    select_object_by_index (closest_object_index);
+    } select_object_by_index (closest_object_index);
     return closest_object_index;
 }
 void clear_selection (void) {
@@ -155,9 +134,7 @@ void clear_selection (void) {
 }
 void selector_apply_force_impulse (float impulse_magnitude) {
     selection_validate ();
-    if ((selected_object < 0) || (selected_object >= (physics_world_get_primary () -> body_count))) {
-        return;
-    }
+    if ((selected_object < 0) || (selected_object >= (physics_world_get_primary () -> body_count))) { return; }
     rigidbody *selected_rigid_body = &(physics_world_get_primary () -> bodies) [selected_object];
     vector3 applied_impulse_vector = vector3_scaling (main_camera_fov.forward_vector, impulse_magnitude);
     rb_apply_forces_perfect (selected_rigid_body, applied_impulse_vector);

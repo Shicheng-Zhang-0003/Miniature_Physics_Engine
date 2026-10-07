@@ -3,35 +3,21 @@
 #include "../mpe_engine.h"
 #include "editor.h"
 static void editor_reacquire_mouse (GtkWidget *parent_window) {
-    if (!parent_window) {
-        return;
-    }
+    if (!parent_window) { return; }
     GtkWidget *toplevel = NULL;
     if (GTK_IS_WIDGET (parent_window)) {
         GtkRoot *root = gtk_widget_get_root (GTK_WIDGET (parent_window));
-        if (root && GTK_IS_WIDGET (root)) {
-            toplevel = GTK_WIDGET (root);
-        } else if (GTK_IS_WINDOW (parent_window)) {
-            toplevel = parent_window;
-        }
+        if (root && GTK_IS_WIDGET (root)) { toplevel = GTK_WIDGET (root); } else if (GTK_IS_WINDOW (parent_window)) { toplevel = parent_window; }
     }
-    if (toplevel) {
-        mouse_lock_reacquire (toplevel);
-    } else {
-        mouse_lock_reacquire (parent_window);
-    }
+    if (toplevel) { mouse_lock_reacquire (toplevel); } else { mouse_lock_reacquire (parent_window); }
 }
 static rigidbody *editor_selected_object_or_null (void) {
-    if ((selected_object < 0) || (selected_object >= (physics_world_get_primary () -> body_count))) {
-        return NULL;
-    }
+    if ((selected_object < 0) || (selected_object >= (physics_world_get_primary () -> body_count))) { return NULL; }
     return &(physics_world_get_primary () -> bodies) [selected_object];
 }
 void editor_update_menus (GtkWidget *parent_window) {
     if ((selected_object < 0) || (selected_object >= (physics_world_get_primary () -> body_count))) {
-        if (main_inputs.object_menu_level > 0) {
-            main_inputs.object_menu_level = 0;
-        }
+        if (main_inputs.object_menu_level > 0) { main_inputs.object_menu_level = 0; }
     }
     if ((main_inputs.marked_joint_object_index < 0) ||
         (main_inputs.marked_joint_object_index >= (physics_world_get_primary () -> body_count))) {
@@ -41,56 +27,42 @@ void editor_update_menus (GtkWidget *parent_window) {
     if (main_inputs.spawner_menu_level == 3) {
         g_cfg.spawner.mass = open_numerical_input_dialog (parent_window, "Sphere Mass (kg)", g_cfg.spawner.mass);
         editor_reacquire_mouse (parent_window);
-        if (g_cfg.spawner.mass < 0.01f) {
-            g_cfg.spawner.mass = 0.01f;
-        }
+        if (g_cfg.spawner.mass < 0.01f) { g_cfg.spawner.mass = 0.01f; }
         main_inputs.spawner_menu_level = 0;
     } else if (main_inputs.spawner_menu_level == 4) {
         g_cfg.spawner.radius = open_numerical_input_dialog (parent_window, "Sphere Radius (m)", g_cfg.spawner.radius);
         editor_reacquire_mouse (parent_window);
-        if (g_cfg.spawner.radius < 0.01f) {
-            g_cfg.spawner.radius = 0.01f;
-        }
+        if (g_cfg.spawner.radius < 0.01f) { g_cfg.spawner.radius = 0.01f; }
         main_inputs.spawner_menu_level = 0;
     } else if (main_inputs.spawner_menu_level == 6) {
         g_cfg.spawner.cube_mass =
             open_numerical_input_dialog (parent_window, "Cube Mass (kg)", g_cfg.spawner.cube_mass);
         editor_reacquire_mouse (parent_window);
-        if (g_cfg.spawner.cube_mass < 0.01f) {
-            g_cfg.spawner.cube_mass = 0.01f;
-        }
+        if (g_cfg.spawner.cube_mass < 0.01f) { g_cfg.spawner.cube_mass = 0.01f; }
         main_inputs.spawner_menu_level = 0;
     } else if (main_inputs.spawner_menu_level == 7) {
         g_cfg.spawner.cube_extent =
             open_numerical_input_dialog (parent_window, "Cube Size (m)", g_cfg.spawner.cube_extent);
         editor_reacquire_mouse (parent_window);
-        if (g_cfg.spawner.cube_extent < 0.01f) {
-            g_cfg.spawner.cube_extent = 0.01f;
-        }
+        if (g_cfg.spawner.cube_extent < 0.01f) { g_cfg.spawner.cube_extent = 0.01f; }
         main_inputs.spawner_menu_level = 0;
     } else if (main_inputs.spawner_menu_level == 10) {
         g_cfg.spawner.cyl_mass =
             open_numerical_input_dialog (parent_window, "Cylinder Mass (kg)", g_cfg.spawner.cyl_mass);
         editor_reacquire_mouse (parent_window);
-        if (g_cfg.spawner.cyl_mass < 0.01f) {
-            g_cfg.spawner.cyl_mass = 0.01f;
-        }
+        if (g_cfg.spawner.cyl_mass < 0.01f) { g_cfg.spawner.cyl_mass = 0.01f; }
         main_inputs.spawner_menu_level = 0;
     } else if (main_inputs.spawner_menu_level == 11) {
         g_cfg.spawner.cyl_radius =
             open_numerical_input_dialog (parent_window, "Cylinder Radius (m)", g_cfg.spawner.cyl_radius);
         editor_reacquire_mouse (parent_window);
-        if (g_cfg.spawner.cyl_radius < 0.01f) {
-            g_cfg.spawner.cyl_radius = 0.01f;
-        }
+        if (g_cfg.spawner.cyl_radius < 0.01f) { g_cfg.spawner.cyl_radius = 0.01f; }
         main_inputs.spawner_menu_level = 0;
     } else if (main_inputs.spawner_menu_level == 12) {
         g_cfg.spawner.cyl_half_length =
             open_numerical_input_dialog (parent_window, "Cylinder Half-Length (m)", g_cfg.spawner.cyl_half_length);
         editor_reacquire_mouse (parent_window);
-        if (g_cfg.spawner.cyl_half_length < 0.01f) {
-            g_cfg.spawner.cyl_half_length = 0.01f;
-        }
+        if (g_cfg.spawner.cyl_half_length < 0.01f) { g_cfg.spawner.cyl_half_length = 0.01f; }
         main_inputs.spawner_menu_level = 0;
     }
     if (main_inputs.spawner_menu_level == 8) {
@@ -113,9 +85,7 @@ void editor_update_menus (GtkWidget *parent_window) {
     if (main_inputs.velocity_menu_level == 3) {
         g_cfg.spawner.speed = open_numerical_input_dialog (parent_window, "Spawn Speed (m/s)", g_cfg.spawner.speed);
         editor_reacquire_mouse (parent_window);
-        if (g_cfg.spawner.speed < 0.0f) {
-            g_cfg.spawner.speed = 0.0f;
-        }
+        if (g_cfg.spawner.speed < 0.0f) { g_cfg.spawner.speed = 0.0f; }
         main_inputs.velocity_menu_level = 0;
     } else if (main_inputs.velocity_menu_level == 4) {
         /* TRUTH: this menu is labeled (overlay + user guide) "spawn/object
@@ -127,32 +97,22 @@ void editor_update_menus (GtkWidget *parent_window) {
         g_cfg.spawner.friction_k =
             open_numerical_input_dialog (parent_window, "Spawn Friction (Kinetic)", g_cfg.spawner.friction_k);
         editor_reacquire_mouse (parent_window);
-        if (g_cfg.spawner.friction_k < 0.0f) {
-            g_cfg.spawner.friction_k = 0.0f;
-        }
-        if (g_cfg.spawner.friction_k > 5.0f) {
-            g_cfg.spawner.friction_k = 5.0f;
-        }
+        if (g_cfg.spawner.friction_k < 0.0f) { g_cfg.spawner.friction_k = 0.0f; }
+        if (g_cfg.spawner.friction_k > 5.0f) { g_cfg.spawner.friction_k = 5.0f; }
         g_cfg.spawner.friction_s = g_cfg.spawner.friction_k + 0.1f;
-        if (g_cfg.spawner.friction_s > 5.0f) {
-            g_cfg.spawner.friction_s = 5.0f;
-        }
+        if (g_cfg.spawner.friction_s > 5.0f) { g_cfg.spawner.friction_s = 5.0f; }
         main_inputs.velocity_menu_level = 0;
     } else if (main_inputs.velocity_menu_level == 11) {
         main_camera_fov.movement_speed =
             open_numerical_input_dialog (parent_window, "Camera Speed", main_camera_fov.movement_speed);
         editor_reacquire_mouse (parent_window);
-        if (main_camera_fov.movement_speed < 0.01f) {
-            main_camera_fov.movement_speed = 0.01f;
-        }
+        if (main_camera_fov.movement_speed < 0.01f) { main_camera_fov.movement_speed = 0.01f; }
         main_inputs.velocity_menu_level = 0;
     } else if (main_inputs.velocity_menu_level == 12) {
         g_cfg.camera.jump_height =
             open_numerical_input_dialog (parent_window, "Jump Height (m)", g_cfg.camera.jump_height);
         editor_reacquire_mouse (parent_window);
-        if (g_cfg.camera.jump_height < 0.1f) {
-            g_cfg.camera.jump_height = 0.1f;
-        }
+        if (g_cfg.camera.jump_height < 0.1f) { g_cfg.camera.jump_height = 0.1f; }
         main_inputs.velocity_menu_level = 0;
     } else if (main_inputs.velocity_menu_level == 21) {
         g_cfg.world.gravity = open_numerical_input_dialog (parent_window, "World Gravity (m/s^2)", g_cfg.world.gravity);
@@ -161,20 +121,14 @@ void editor_update_menus (GtkWidget *parent_window) {
     } else if (main_inputs.velocity_menu_level == 22) {
         g_cfg.world.drag = open_numerical_input_dialog (parent_window, "World Drag Coefficient", g_cfg.world.drag);
         editor_reacquire_mouse (parent_window);
-        if (g_cfg.world.drag > 1.0f) {
-            g_cfg.world.drag = 1.0f;
-        }
-        if (g_cfg.world.drag < 0.1f) {
-            g_cfg.world.drag = 0.1f;
-        }
+        if (g_cfg.world.drag > 1.0f) { g_cfg.world.drag = 1.0f; }
+        if (g_cfg.world.drag < 0.1f) { g_cfg.world.drag = 0.1f; }
         main_inputs.velocity_menu_level = 0;
     } else if (main_inputs.velocity_menu_level == 23) {
         g_cfg.world.floor_friction_k =
             open_numerical_input_dialog (parent_window, "World Surface Friction", g_cfg.world.floor_friction_k);
         editor_reacquire_mouse (parent_window);
-        if (g_cfg.world.floor_friction_k < 0.0f) {
-            g_cfg.world.floor_friction_k = 0.0f;
-        }
+        if (g_cfg.world.floor_friction_k < 0.0f) { g_cfg.world.floor_friction_k = 0.0f; }
         g_cfg.world.floor_friction_s = g_cfg.world.floor_friction_k + 0.1f;
         main_inputs.velocity_menu_level = 0;
     } else if (main_inputs.velocity_menu_level == 24) {
@@ -182,24 +136,16 @@ void editor_update_menus (GtkWidget *parent_window) {
         g_cfg.world.rolling_resistance_coeff = open_numerical_input_dialog (parent_window, "Rolling Resistance Coeff",
                                                                             g_cfg.world.rolling_resistance_coeff);
         editor_reacquire_mouse (parent_window);
-        if (g_cfg.world.rolling_resistance_coeff < 0.0f) {
-            g_cfg.world.rolling_resistance_coeff = 0.0f;
-        }
-        if (g_cfg.world.rolling_resistance_coeff > 5.0f) {
-            g_cfg.world.rolling_resistance_coeff = 5.0f;
-        }
+        if (g_cfg.world.rolling_resistance_coeff < 0.0f) { g_cfg.world.rolling_resistance_coeff = 0.0f; }
+        if (g_cfg.world.rolling_resistance_coeff > 5.0f) { g_cfg.world.rolling_resistance_coeff = 5.0f; }
         main_inputs.velocity_menu_level = 0;
     } else if (main_inputs.velocity_menu_level == 25) {
         /* Imported from menu 6: solver iterations (registry int 1..128). */
         float iters =
             open_numerical_input_dialog (parent_window, "Solver Iterations", (float) g_cfg.timestep.solver_iterations);
         editor_reacquire_mouse (parent_window);
-        if (iters < 1.0f) {
-            iters = 1.0f;
-        }
-        if (iters > 128.0f) {
-            iters = 128.0f;
-        }
+        if (iters < 1.0f) { iters = 1.0f; }
+        if (iters > 128.0f) { iters = 128.0f; }
         g_cfg.timestep.solver_iterations = (int) iters;
         main_inputs.velocity_menu_level = 0;
     }
@@ -213,18 +159,12 @@ void editor_update_menus (GtkWidget *parent_window) {
         selected_rigid_body -> mass =
             open_numerical_input_dialog (parent_window, "Selected Object Mass", selected_rigid_body -> mass);
         editor_reacquire_mouse (parent_window);
-        if (selected_rigid_body -> mass < 0.01f) {
-            selected_rigid_body -> mass = 0.01f;
-        }
+        if (selected_rigid_body -> mass < 0.01f) { selected_rigid_body -> mass = 0.01f; }
         selected_rigid_body -> inverse_mass = 1.0f / selected_rigid_body -> mass;
-        if (selected_rigid_body -> type == object_sphere) {
-            rigidbody_update_inertia_sphere (selected_rigid_body);
-        } else if (selected_rigid_body -> type == object_cylinder) {
+        if (selected_rigid_body -> type == object_sphere) { rigidbody_update_inertia_sphere (selected_rigid_body); } else if (selected_rigid_body -> type == object_cylinder) {
             /* Cylinders got cube inertia here before (wrong dynamics post-edit). */
             rigidbody_update_inertia_cylinder (selected_rigid_body);
-        } else {
-            rigidbody_update_inertia_cube (selected_rigid_body);
-        }
+        } else { rigidbody_update_inertia_cube (selected_rigid_body); }
         /* MPE_TASK_06_CACHE_CLEAR_MASS */
         contact_cache_clear (physics_world_get_primary ());
         /* MPE_TASK_19_EDITOR_EDIT_WAKE_MASS_BEGIN */
@@ -240,9 +180,7 @@ void editor_update_menus (GtkWidget *parent_window) {
         if (selected_rigid_body -> type == object_sphere) {
             selected_rigid_body -> radius =
                 open_numerical_input_dialog (parent_window, "Selected Object Radius", selected_rigid_body -> radius);
-            if (selected_rigid_body -> radius < 0.01f) {
-                selected_rigid_body -> radius = 0.01f;
-            }
+            if (selected_rigid_body -> radius < 0.01f) { selected_rigid_body -> radius = 0.01f; }
             editor_reacquire_mouse (parent_window);
             rigidbody_update_inertia_sphere (selected_rigid_body);
         } else if (selected_rigid_body -> type == object_cylinder) {
@@ -250,9 +188,7 @@ void editor_update_menus (GtkWidget *parent_window) {
              * cylinder inertia (sanitize re-syncs bounding half-extents). */
             selected_rigid_body -> radius =
                 open_numerical_input_dialog (parent_window, "Selected Object Radius", selected_rigid_body -> radius);
-            if (selected_rigid_body -> radius < 0.01f) {
-                selected_rigid_body -> radius = 0.01f;
-            }
+            if (selected_rigid_body -> radius < 0.01f) { selected_rigid_body -> radius = 0.01f; }
             editor_reacquire_mouse (parent_window);
             rigidbody_update_inertia_cylinder (selected_rigid_body);
         }
@@ -271,9 +207,7 @@ void editor_update_menus (GtkWidget *parent_window) {
         selected_rigid_body -> friction_kinetic = open_numerical_input_dialog (parent_window, "Selected Object Friction",
                                                                              selected_rigid_body -> friction_kinetic);
         editor_reacquire_mouse (parent_window);
-        if (selected_rigid_body -> friction_kinetic < 0.0f) {
-            selected_rigid_body -> friction_kinetic = 0.0f;
-        }
+        if (selected_rigid_body -> friction_kinetic < 0.0f) { selected_rigid_body -> friction_kinetic = 0.0f; }
         selected_rigid_body -> friction_static = selected_rigid_body -> friction_kinetic + 0.1f;
         /* MPE_TASK_06_CACHE_CLEAR_FRICTION */
         contact_cache_clear (physics_world_get_primary ());
@@ -314,8 +248,7 @@ void editor_update_menus (GtkWidget *parent_window) {
                            g_cfg.joints.default_damping) < 0) { /* MFS_166_JOINT_CHECK */
                 printf ("[editor] warning: could not create joint (pool full?)\n");
             } /* MPE_TASK_31 */
-        }
-        main_inputs.marked_joint_object_index = -1;
+        } main_inputs.marked_joint_object_index = -1;
         main_inputs.object_menu_level = 0;
     } else if (main_inputs.object_menu_level >= 81 && main_inputs.object_menu_level <= 88) {
         rigidbody *selected_rigid_body = editor_selected_object_or_null ();
@@ -339,7 +272,6 @@ void editor_update_menus (GtkWidget *parent_window) {
             selected_rigid_body -> colour = (vector3) {1.0f, 1.0f, 0.0f};
         } else if (main_inputs.object_menu_level == 88) {
             selected_rigid_body -> colour = (vector3) {1.0f, 1.0f, 1.0f};
-        }
-        main_inputs.object_menu_level = 0;
+        } main_inputs.object_menu_level = 0;
     }
 }

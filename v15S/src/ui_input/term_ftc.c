@@ -49,8 +49,7 @@ static float ftc_argf (char **argv, int i, int argc, float dflt) {
         double v = strtod (argv [i], &end);
         if (end != argv [i] && isfinite (v))
             return (float) v;
-    }
-    return dflt;
+    } return dflt;
 } /* Tile floor guarantee: robots need frictional contact (the frictionless
  * emergency backstop yields slip-regime artifacts). Adds a 60x60 tile
  * slab (top y=0, mu 1.0/0.8) only when no static floor-like body already
@@ -94,8 +93,7 @@ static int ftc_ensure_driving (void) {
         term_err ("mpe: ftc: bundle not loaded (from v15S/src: mod load ecosystem/mfs/mfs_ecosystem.so, or mod load "
                   "plugins/mpe_ftc.so)\n");
         return -1;
-    }
-    physics_world *w = physics_world_get_primary ();
+    } physics_world *w = physics_world_get_primary ();
     if (!w) {
         term_err ("mpe: ftc: no primary world\n");
         return -1;
@@ -107,8 +105,7 @@ static int ftc_ensure_driving (void) {
     if (physics_world_attach_module (w, dmod) < 0) {
         term_err ("mpe: ftc: attach failed\n");
         return -1;
-    }
-    return 0;
+    } return 0;
 } /* Iteration guarantee: the 40:1 chassis/wheel stacked mass ratio cannot
  * converge below 128 sequential-impulse iterations (every MFS test pins
  * 128; the MFS suite documents that default 64 cannot converge it). A
@@ -125,8 +122,7 @@ void cmd_ftc (int argc, char **argv) {
     if (argc < 2) {
         term_err ("mpe: ftc: usage: ftc spawn [x y z] | telemetry\n");
         return;
-    }
-    physics_world *w = physics_world_get_primary ();
+    } physics_world *w = physics_world_get_primary ();
     /* Single-robot accessors (index 0 implied; bundle API keeps indices). */
     ftc_robot * (*p_get) (struct physics_world *, int) =
         (ftc_robot * (*) (struct physics_world *, int)) ftc_sym ("ftc_fleet_get");
@@ -159,21 +155,18 @@ void cmd_ftc (int argc, char **argv) {
                 preset = id;
                 break;
             }
-        }
-        float x = ftc_argf (argv, 2, argc, 0.0f);
+        } float x = ftc_argf (argv, 2, argc, 0.0f);
         float y = ftc_argf (argv, 3, argc, p_rest ());
         float z = ftc_argf (argv, 4, argc, 0.0f);
         if (ftc_ensure_floor (w) < 0) {
             term_err ("mpe: ftc: could not ensure floor\n");
             return;
-        }
-        ftc_ensure_iterations ();
+        } ftc_ensure_iterations ();
         int idx = p_spawn (w, x, y, z, (motor_preset_id) preset, FTC_DRIVETRAIN_MECANUM);
         if (idx < 0) {
             term_err ("mpe: ftc: spawn failed\n");
             return;
-        }
-        char buf [224];
+        } char buf [224];
         snprintf (buf, sizeof (buf), "mpe: ftc: robot at (%.2f,%.2f,%.2f) %s mecanum\n", x, y, z,
                   p_name ((motor_preset_id) preset));
         term_ok (buf);
@@ -183,15 +176,13 @@ void cmd_ftc (int argc, char **argv) {
         if (!p_get) {
             term_err ("mpe: ftc: bundle not loaded\n");
             return;
-        }
-        float (*p_volt) (const battery *, float) = (float (*) (const battery *, float)) ftc_sym ("battery_get_voltage");
+        } float (*p_volt) (const battery *, float) = (float (*) (const battery *, float)) ftc_sym ("battery_get_voltage");
         int (*p_fuse) (const battery *) = (int (*) (const battery *)) ftc_sym ("battery_fuse_tripped");
         ftc_robot *r = p_get (w, 0);
         if (!r) {
             term_err ("mpe: ftc: no robot (ftc spawn first)\n");
             return;
-        }
-        char buf [256];
+        } char buf [256];
         float px = 0, py = 0, pz = 0;
         if (r -> chassis_body >= 0 && r -> chassis_body < w -> body_count) {
             px = w -> bodies [r -> chassis_body].position.x;
@@ -213,8 +204,6 @@ void cmd_ftc (int argc, char **argv) {
             snprintf (buf, sizeof (buf), "mpe: ftc: wheel %d cmd=%+.2f rpm=%+.0f I=%+.2fA\n", k,
                       r -> wheel_motors [k].command, r -> wheel_motors [k].rpm, r -> wheel_motors [k].current);
             term_out (buf);
-        }
-        return;
-    }
-    term_err ("mpe: ftc: unknown subcommand (spawn|telemetry)\n");
+        } return;
+    } term_err ("mpe: ftc: unknown subcommand (spawn|telemetry)\n");
 }

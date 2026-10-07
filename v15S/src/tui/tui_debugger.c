@@ -56,18 +56,10 @@ static const char *tui_type_str (object_type t) {
     }
 }
 static const char *tui_state_str (const rigidbody *rb) {
-    if (!rb) {
-        return "----";
-    }
-    if (rb -> static_state) {
-        return "STATIC";
-    }
-    if (rb -> kinematic) {
-        return "KINEMA";
-    }
-    if (rb -> is_sleeping) {
-        return "SLEEP";
-    }
+    if (!rb) { return "----"; }
+    if (rb -> static_state) { return "STATIC"; }
+    if (rb -> kinematic) { return "KINEMA"; }
+    if (rb -> is_sleeping) { return "SLEEP"; }
     return "AWAKE";
 }
 static const char *tui_constraint_str (constraint_type t) {
@@ -96,19 +88,12 @@ static vector3 tui_anchor_world (const rigidbody *rb, vector3 local) {
  * fallback for stale-cache gaps; linear alone would still be OK for
  * <100 bodies but the cache keeps joint lookups cheap in stress scenes. */
 static int tui_index_by_id (physics_world *world, uint32_t id) {
-    if (!world || id == 0) {
-        return -1;
-    }
+    if (!world || id == 0) { return -1; }
     int hit = physics_world_index_by_id (world, id);
-    if (hit >= 0) {
-        return hit;
-    }
+    if (hit >= 0) { return hit; }
     for (int i = 0; i < world -> body_count; i++) {
-        if (world -> bodies [i].object_id == id) {
-            return i;
-        }
-    }
-    return -1;
+        if (world -> bodies [i].object_id == id) { return i; }
+    } return -1;
 } /* Full world-space inertia tensor W = R * I_local * R^T. */
 static math3 tui_inertia_world (const rigidbody *rb) {
     math3 r = vector4_to_math3 (rb -> orientation);
@@ -118,31 +103,22 @@ static math3 tui_inertia_world (const rigidbody *rb) {
  * ex = rot about X, ey = rot about Y, ez = rot about Z. */
 static void tui_euler_xyz (math3 r, float *ex, float *ey, float *ez) {
     float sy = -(r.matrix [2][0]);
-    if (sy > 1.0f) {
-        sy = 1.0f;
-    } else if (sy < -1.0f) {
+    if (sy > 1.0f) { sy = 1.0f; } else if (sy < -1.0f) {
         sy = -1.0f;
-    }
-    * ey = asinf (sy);
+    } * ey = asinf (sy);
     *ex = atan2f (r.matrix [2][1], r.matrix [2][2]);
     *ez = atan2f (r.matrix [1][0], r.matrix [0][0]);
 }
 void tui_format_vector3 (char *buf, size_t sz, vector3 v, const char *label) {
-    if (!buf || sz == 0) {
-        return;
-    }
+    if (!buf || sz == 0) { return; }
     snprintf (buf, sz, "%s(%+.4f,%+.4f,%+.4f)", label ? label : "", v.x, v.y, v.z);
 }
 void tui_format_vector4 (char *buf, size_t sz, vector4 q, const char *label) {
-    if (!buf || sz == 0) {
-        return;
-    }
+    if (!buf || sz == 0) { return; }
     snprintf (buf, sz, "%s(%+.4f,%+.4f,%+.4f,%+.4f)", label ? label : "", q.w, q.x, q.y, q.z);
 }
 void tui_format_euler (char *buf, size_t sz, vector4 q, const char *label) {
-    if (!buf || sz == 0) {
-        return;
-    }
+    if (!buf || sz == 0) { return; }
     math3 r = vector4_to_math3 (q);
     float ex, ey, ez;
     tui_euler_xyz (r, &ex, &ey, &ez);
@@ -150,9 +126,7 @@ void tui_format_euler (char *buf, size_t sz, vector4 q, const char *label) {
     snprintf (buf, sz, "%sXYZ(%+.2f,%+.2f,%+.2f)deg", label ? label : "", ex * d, ey * d, ez * d);
 }
 void tui_format_matrix3 (char *buf, size_t sz, math3 m, const char *label) {
-    if (!buf || sz == 0) {
-        return;
-    }
+    if (!buf || sz == 0) { return; }
     snprintf (buf, sz, "%s[%.3f %.3f %.3f; %.3f %.3f %.3f; %.3f %.3f %.3f]", label ? label : "", m.matrix [0][0],
               m.matrix [0][1], m.matrix [0][2], m.matrix [1][0], m.matrix [1][1], m.matrix [1][2], m.matrix [2][0],
               m.matrix [2][1], m.matrix [2][2]);
@@ -176,14 +150,11 @@ float tui_quat_to_roll (vector4 q) {
     return ez;
 } /* One-line body summary for tables. */
 static void tui_body_line (physics_world *world, int idx, char *buf, size_t sz) {
-    if (!buf || sz == 0) {
-        return;
-    }
+    if (!buf || sz == 0) { return; }
     if (!world || idx < 0 || idx >= world -> body_count) {
         snprintf (buf, sz, "--");
         return;
-    }
-    rigidbody *rb = &world -> bodies [idx];
+    } rigidbody *rb = &world -> bodies [idx];
     float sp = vector3_length (rb -> velocity);
     float ws = vector3_length (rb -> angular_velocity);
     float ke = rb_get_kinetic_energy (rb);
@@ -192,44 +163,32 @@ static void tui_body_line (physics_world *world, int idx, char *buf, size_t sz) 
               tui_state_str (rb), ke);
 }
 static bool tui_body_visible (const tui_debugger_t *dbg, const rigidbody *rb) {
-    if (!dbg || !rb) {
-        return false;
-    }
-    if (dbg -> filter_len <= 0) {
-        return true;
-    }
+    if (!dbg || !rb) { return false; }
+    if (dbg -> filter_len <= 0) { return true; }
     char line [256];
     /* Match against "id type state" text. */
     snprintf (line, sizeof (line), "%u %s %s", rb -> object_id, tui_type_str (rb -> type), tui_state_str (rb));
     for (char *p = line; *p; p++) {
-        if (*p >= 'A' && *p <= 'Z') {
-            *p = (char) (*p + 32);
-        }
-    }
-    char needle [64];
+        if (*p >= 'A' && *p <= 'Z') { *p = (char) (*p + 32); }
+    } char needle [64];
     size_t n = (size_t) dbg -> filter_len < sizeof (needle) - 1 ? (size_t) dbg -> filter_len : sizeof (needle) - 1;
     for (size_t i = 0; i < n; i++) {
         char c = dbg -> filter_text [i];
         needle [i] = (char) ((c >= 'A' && c <= 'Z') ? c + 32 : c);
-    }
-    needle [n] = '\0';
+    } needle [n] = '\0';
     return strstr (line, needle) != NULL;
 } /* ------------------------------------------------------------------ */
 /* Lifecycle                                                           */
 /* ------------------------------------------------------------------ */
 void tui_debugger_init (tui_debugger_t *dbg, physics_world *world) {
-    if (!dbg) {
-        return;
-    }
+    if (!dbg) { return; }
     memset (dbg, 0, sizeof (*dbg));
     dbg -> world = world;
     dbg -> mode = TUI_MODE_OVERVIEW;
     dbg -> time_scale = 1.0f;
 }
 void tui_debugger_cleanup (tui_debugger_t *dbg) {
-    if (!dbg) {
-        return;
-    }
+    if (!dbg) { return; }
     if (dbg -> main_win) {
         delwin (dbg -> main_win);
         dbg -> main_win = NULL;
@@ -248,18 +207,14 @@ void tui_debugger_cleanup (tui_debugger_t *dbg) {
     }
 }
 void tui_debugger_step (tui_debugger_t *dbg, float dt) {
-    if (!dbg || !dbg -> world || dbg -> paused || !(dt > 0.0f)) {
-        return;
-    }
+    if (!dbg || !dbg -> world || dbg -> paused || !(dt > 0.0f)) { return; }
     physics_world_step (dbg -> world, dt);
     dbg -> frame_count++;
 } /* ------------------------------------------------------------------ */
 /* Input                                                               */
 /* ------------------------------------------------------------------ */
 void tui_debugger_handle_input (tui_debugger_t *dbg, int ch) {
-    if (!dbg) {
-        return;
-    }
+    if (!dbg) { return; }
     physics_world *world = dbg -> world;
     int n = world ? world -> body_count : 0;
     /* Text filter entry takes precedence. */
@@ -269,8 +224,7 @@ void tui_debugger_handle_input (tui_debugger_t *dbg, int ch) {
             if (ch == 27) {
                 dbg -> filter_len = 0;
                 dbg -> filter_text [0] = '\0';
-            }
-            return;
+            } return;
         }
         if ((ch == KEY_BACKSPACE || ch == 127 || ch == 8) && dbg -> filter_len > 0) {
             dbg -> filter_len--;
@@ -280,8 +234,7 @@ void tui_debugger_handle_input (tui_debugger_t *dbg, int ch) {
         if (ch >= 32 && ch < 127 && dbg -> filter_len < (int) sizeof (dbg -> filter_text) - 1) {
             dbg -> filter_text [dbg -> filter_len++] = (char) ch;
             dbg -> filter_text [dbg -> filter_len] = '\0';
-        }
-        return;
+        } return;
     }
     switch (ch) {
         case '1':
@@ -311,21 +264,16 @@ void tui_debugger_handle_input (tui_debugger_t *dbg, int ch) {
         if (world) {
             physics_world_step (world, 1.0f / 60.0f);
             dbg -> frame_count++;
-        }
-        break;
+        } break;
         case '+':
     case '=':
         dbg -> time_scale *= 2.0f;
-        if (dbg -> time_scale > 4.0f) {
-            dbg -> time_scale = 4.0f;
-        }
+        if (dbg -> time_scale > 4.0f) { dbg -> time_scale = 4.0f; }
         break;
         case '-':
     case '_':
         dbg -> time_scale *= 0.5f;
-        if (dbg -> time_scale < 0.125f) {
-            dbg -> time_scale = 0.125f;
-        }
+        if (dbg -> time_scale < 0.125f) { dbg -> time_scale = 0.125f; }
         break;
         case '/':
         dbg -> filter_active = true;
@@ -336,33 +284,21 @@ void tui_debugger_handle_input (tui_debugger_t *dbg, int ch) {
         break;
         case KEY_UP:
     case 'k':
-        if (dbg -> selected_object > 0) {
-            dbg -> selected_object--;
-        }
-        if (dbg -> selected_joint > 0) {
-            dbg -> selected_joint--;
-        }
+        if (dbg -> selected_object > 0) { dbg -> selected_object--; }
+        if (dbg -> selected_joint > 0) { dbg -> selected_joint--; }
         break;
         case KEY_DOWN:
     case 'j':
-        if (dbg -> selected_object < n - 1) {
-            dbg -> selected_object++;
-        }
-        if (dbg -> selected_joint < 4096) {
-            dbg -> selected_joint++;
-        }
+        if (dbg -> selected_object < n - 1) { dbg -> selected_object++; }
+        if (dbg -> selected_joint < 4096) { dbg -> selected_joint++; }
         break;
         case KEY_PPAGE:
         dbg -> selected_object -= 10;
-        if (dbg -> selected_object < 0) {
-            dbg -> selected_object = 0;
-        }
+        if (dbg -> selected_object < 0) { dbg -> selected_object = 0; }
         break;
         case KEY_NPAGE:
         dbg -> selected_object += 10;
-        if (dbg -> selected_object > n - 1) {
-            dbg -> selected_object = n - 1;
-        }
+        if (dbg -> selected_object > n - 1) { dbg -> selected_object = n - 1; }
         break;
         case KEY_HOME:
         dbg -> selected_object = 0;
@@ -374,15 +310,9 @@ void tui_debugger_handle_input (tui_debugger_t *dbg, int ch) {
         default:
         break;
     }
-    if (dbg -> selected_object < 0) {
-        dbg -> selected_object = 0;
-    }
-    if (n > 0 && dbg -> selected_object > n - 1) {
-        dbg -> selected_object = n - 1;
-    }
-    if (dbg -> selected_joint < 0) {
-        dbg -> selected_joint = 0;
-    }
+    if (dbg -> selected_object < 0) { dbg -> selected_object = 0; }
+    if (n > 0 && dbg -> selected_object > n - 1) { dbg -> selected_object = n - 1; }
+    if (dbg -> selected_joint < 0) { dbg -> selected_joint = 0; }
 } /* ------------------------------------------------------------------ */
 /* Render helpers                                                      */
 /* ------------------------------------------------------------------ */
@@ -400,15 +330,11 @@ static void tui_draw_header (tui_debugger_t *dbg) {
               (unsigned long long) dbg -> frame_count, n, dbg -> paused ? "PAUSED" : "LIVE", dbg -> time_scale,
               dbg -> filter_text, dbg -> filter_active ? "<typing>" : "");
     clrtoeol ();
-    if (w > 0) {
-        mvchgat (0, 0, w, A_REVERSE, 0, NULL);
-    }
+    if (w > 0) { mvchgat (0, 0, w, A_REVERSE, 0, NULL); }
 } /* Engine/math truth strip shared by sidebar + snapshot. */
 static int tui_engine_lines (physics_world *world, unsigned long long tick, char out [][128], int cap) {
     int n = 0;
-    if (!world || cap <= 0) {
-        return 0;
-    }
+    if (!world || cap <= 0) { return 0; }
     double ke = 0.0;
     vector3 mom = {0.0f, 0.0f, 0.0f};
     int awake = 0, sleeping = 0;
@@ -416,11 +342,7 @@ static int tui_engine_lines (physics_world *world, unsigned long long tick, char
         rigidbody *rb = &world -> bodies [i];
         ke += (double) rb_get_kinetic_energy (rb);
         mom = vector3_addition (mom, vector3_scaling (rb -> velocity, rb -> mass));
-        if (rb -> is_sleeping) {
-            sleeping++;
-        } else if (!rb -> static_state) {
-            awake++;
-        }
+        if (rb -> is_sleeping) { sleeping++; } else if (!rb -> static_state) { awake++; }
     }
     snprintf (out [n++], 128, "tick=%llu bodies=%d awake=%d sleep=%d", tick, world ? world -> body_count : 0, awake,
               sleeping);
@@ -450,19 +372,14 @@ static int tui_engine_lines (physics_world *world, unsigned long long tick, char
                   world && world -> broadphase ? world -> broadphase -> node_pool_capacity : 0,
                   broadphase_get_pair_overflow_count (world), broadphase_get_pair_dedupe_overflow_count (world),
                   broadphase_get_large_object_clamp_count (world));
-    }
-    return n;
+    } return n;
 }
 void tui_render_sidebar (tui_debugger_t *dbg) {
-    if (!dbg || !dbg -> sidebar_win) {
-        return;
-    }
+    if (!dbg || !dbg -> sidebar_win) { return; }
     werase (dbg -> sidebar_win);
     int h, w;
     getmaxyx (dbg -> sidebar_win, h, w);
-    if (w < 20 || h < 6) {
-        return;
-    }
+    if (w < 20 || h < 6) { return; }
     wmove (dbg -> sidebar_win, 0, 0);
     wattron (dbg -> sidebar_win, A_BOLD);
     wprintw (dbg -> sidebar_win, "ENGINE/TRUTH");
@@ -477,21 +394,16 @@ void tui_render_sidebar (tui_debugger_t *dbg) {
     if (dbg -> world && row + 3 < h) {
         int springs = 0;
         for (int i = 0; i < mpe_max_joints; i++) {
-            if (dbg -> world -> spring_joints [i].is_active) {
-                springs++;
-            }
+            if (dbg -> world -> spring_joints [i].is_active) { springs++; }
         }
         mvwprintw (dbg -> sidebar_win, row++, 0, "springs=%d constr=%d", springs,
                    dbg -> world ? dbg -> world -> revolute_constraint_count : 0);
         const mpe_config_t *dc = mpe_world_cfg (dbg -> world);
         mvwprintw (dbg -> sidebar_win, row++, 0, "sleepEn=%d slop=%.3f", dc -> sleep.enable, dc -> solver.penetration_slop);
-    }
-    wrefresh (dbg -> sidebar_win);
+    } wrefresh (dbg -> sidebar_win);
 }
 void tui_render_status (tui_debugger_t *dbg) {
-    if (!dbg || !dbg -> status_win) {
-        return;
-    }
+    if (!dbg || !dbg -> status_win) { return; }
     werase (dbg -> status_win);
     mvwprintw (dbg -> status_win, 0, 0,
                "[1]Overview [2]Object [3]Joints [4]Graph [5]Help  j/k/Up/Dn select  Space pause  s step  +/-speed  "
@@ -501,9 +413,7 @@ void tui_render_status (tui_debugger_t *dbg) {
 /* Screens                                                             */
 /* ------------------------------------------------------------------ */
 void tui_render_overview (tui_debugger_t *dbg) {
-    if (!dbg || !dbg -> main_win) {
-        return;
-    }
+    if (!dbg || !dbg -> main_win) { return; }
     werase (dbg -> main_win);
     int h, w;
     getmaxyx (dbg -> main_win, h, w);
@@ -519,41 +429,27 @@ void tui_render_overview (tui_debugger_t *dbg) {
     char line [256];
     for (int i = 0; i < (dbg -> world ? dbg -> world -> body_count : 0) && row < h; i++) {
         rigidbody *rb = &dbg -> world -> bodies [i];
-        if (!tui_body_visible (dbg, rb)) {
-            continue;
-        }
+        if (!tui_body_visible (dbg, rb)) { continue; }
         if (row - 1 < dbg -> scroll_offset) {
             row++;
             continue;
-        }
-        tui_body_line (dbg -> world, i, line, sizeof (line));
-        if (i == dbg -> selected_object) {
-            wattron (dbg -> main_win, A_REVERSE);
-        }
+        } tui_body_line (dbg -> world, i, line, sizeof (line));
+        if (i == dbg -> selected_object) { wattron (dbg -> main_win, A_REVERSE); }
         mvwprintw (dbg -> main_win, row, 0, "%.*s", w - 1, line);
-        if (i == dbg -> selected_object) {
-            wattroff (dbg -> main_win, A_REVERSE);
-        }
+        if (i == dbg -> selected_object) { wattroff (dbg -> main_win, A_REVERSE); }
         row++;
     }
     /* Keep selection on screen. */
     int vis = row - 1;
-    if (dbg -> selected_object < dbg -> scroll_offset) {
-        dbg -> scroll_offset = dbg -> selected_object;
-    }
+    if (dbg -> selected_object < dbg -> scroll_offset) { dbg -> scroll_offset = dbg -> selected_object; }
     if (vis >= h && dbg -> scroll_offset < dbg -> selected_object) {
         dbg -> scroll_offset = dbg -> selected_object - h + 2;
-        if (dbg -> scroll_offset < 0) {
-            dbg -> scroll_offset = 0;
-        }
-    }
-    (void) vis;
+        if (dbg -> scroll_offset < 0) { dbg -> scroll_offset = 0; }
+    } (void) vis;
     wrefresh (dbg -> main_win);
 }
 void tui_render_object_detail (tui_debugger_t *dbg) {
-    if (!dbg || !dbg -> main_win) {
-        return;
-    }
+    if (!dbg || !dbg -> main_win) { return; }
     werase (dbg -> main_win);
     int h, w;
     getmaxyx (dbg -> main_win, h, w);
@@ -562,14 +458,9 @@ void tui_render_object_detail (tui_debugger_t *dbg) {
         mvwprintw (dbg -> main_win, 0, 0, "no bodies");
         wrefresh (dbg -> main_win);
         return;
-    }
-    int idx = dbg -> selected_object;
-    if (idx < 0) {
-        idx = 0;
-    }
-    if (idx >= world -> body_count) {
-        idx = world -> body_count - 1;
-    }
+    } int idx = dbg -> selected_object;
+    if (idx < 0) { idx = 0; }
+    if (idx >= world -> body_count) { idx = world -> body_count - 1; }
     rigidbody *rb = &world -> bodies [idx];
     char b0 [128], b1 [160], b2 [256];
     int r = 0;
@@ -599,58 +490,41 @@ void tui_render_object_detail (tui_debugger_t *dbg) {
     mvwprintw (dbg -> main_win, r++, 0, "I_world=diag(%.5f,%.5f,%.5f)", ww.matrix [0][0], ww.matrix [1][1],
                ww.matrix [2][2]);
     tui_format_matrix3 (b2, sizeof (b2), ww, "Iw=");
-    if (r < h) {
-        mvwprintw (dbg -> main_win, r++, 0, "%.*s", w - 1, b2);
-    }
+    if (r < h) { mvwprintw (dbg -> main_win, r++, 0, "%.*s", w - 1, b2); }
     tui_format_vector3 (b0, sizeof (b0), rb -> force_accumulator, "Facc=");
     tui_format_vector3 (b1, sizeof (b1), rb -> torque_accumulator, "Tacc=");
-    if (r < h) {
-        mvwprintw (dbg -> main_win, r++, 0, "%.*s %.*s", w - 1, b0, (int) (w - 1), b1);
-    }
+    if (r < h) { mvwprintw (dbg -> main_win, r++, 0, "%.*s %.*s", w - 1, b0, (int) (w - 1), b1); }
     vector3 mom = vector3_scaling (rb -> velocity, rb -> mass);
     vector3 am = math3_multiplication_vector3 (ww, rb -> angular_velocity);
     if (r < h) {
         mvwprintw (dbg -> main_win, r++, 0, "P=(%+.3f,%+.3f,%+.3f)|P|=%.4f L=(%+.4f,%+.4f,%+.4f)|L|=%.5f KE=%.5f", mom.x,
                    mom.y, mom.z, vector3_length (mom), am.x, am.y, am.z, vector3_length (am),
                    rb_get_kinetic_energy (rb));
-    }
-    int isl = islands_body_island (world, rb);
+    } int isl = islands_body_island (world, rb);
     int has = (world -> has_contact && idx < mpe_max_bodies) ? world -> has_contact [idx] : -1;
     float rem = (world -> ccd_time_remaining && idx < mpe_max_bodies) ? world -> ccd_time_remaining [idx] : -1.0f;
     if (r < h) {
         mvwprintw (dbg -> main_win, r++, 0, "sleepT=%.2f island=%d awake=%d hasContact=%d ccdRem=%.5f effInvM=%.6f",
                    rb -> sleep_timer, isl, islands_body_awake (world, rb) ? 1 : 0, has, rem,
                    rigidbody_effective_inv_mass (rb));
-    }
-    tui_format_vector3 (b0, sizeof (b0), rb -> cached_axes [0], "axX=");
+    } tui_format_vector3 (b0, sizeof (b0), rb -> cached_axes [0], "axX=");
     tui_format_vector3 (b1, sizeof (b1), rb -> cached_axes [1], "axY=");
-    if (r < h) {
-        mvwprintw (dbg -> main_win, r++, 0, "%.*s %.*s", w - 1, b0, (int) (w - 1), b1);
-    }
+    if (r < h) { mvwprintw (dbg -> main_win, r++, 0, "%.*s %.*s", w - 1, b0, (int) (w - 1), b1); }
     (void) h;
     wrefresh (dbg -> main_win);
 } /* Count active joints of both pools. */
 static int tui_joint_total (physics_world *world) {
-    if (!world) {
-        return 0;
-    }
+    if (!world) { return 0; }
     int n = 0;
     for (int i = 0; i < mpe_max_joints; i++) {
-        if (world -> spring_joints [i].is_active) {
-            n++;
-        }
+        if (world -> spring_joints [i].is_active) { n++; }
     }
     for (int i = 0; i < mpe_max_joints; i++) {
-        if (world -> revolute_constraints [i].is_active) {
-            n++;
-        }
-    }
-    return n;
+        if (world -> revolute_constraints [i].is_active) { n++; }
+    } return n;
 } /* Describe joint #sel (springs first, then constraints). kind: 0=spring,1=constraint. */
 static bool tui_joint_at (physics_world *world, int sel, int *kind, int *slot) {
-    if (!world || sel < 0) {
-        return false;
-    }
+    if (!world || sel < 0) { return false; }
     int n = 0;
     for (int i = 0; i < mpe_max_joints; i++) {
         if (world -> spring_joints [i].is_active) {
@@ -658,8 +532,7 @@ static bool tui_joint_at (physics_world *world, int sel, int *kind, int *slot) {
                 *kind = 0;
                 *slot = i;
                 return true;
-            }
-            n++;
+            } n++;
         }
     }
     for (int i = 0; i < mpe_max_joints; i++) {
@@ -668,11 +541,9 @@ static bool tui_joint_at (physics_world *world, int sel, int *kind, int *slot) {
                 *kind = 1;
                 *slot = i;
                 return true;
-            }
-            n++;
+            } n++;
         }
-    }
-    return false;
+    } return false;
 }
 static void tui_joint_line (physics_world *world, int n, char *buf, size_t sz) {
     int kind, slot;
@@ -685,9 +556,7 @@ static void tui_joint_line (physics_world *world, int n, char *buf, size_t sz) {
         int ia = tui_index_by_id (world, sj -> object_id_a);
         int ib = tui_index_by_id (world, sj -> object_id_b);
         float len = -1.0f;
-        if (ia >= 0 && ib >= 0) {
-            len = vector3_length (vector3_subtraction (world -> bodies [ib].position, world -> bodies [ia].position));
-        }
+        if (ia >= 0 && ib >= 0) { len = vector3_length (vector3_subtraction (world -> bodies [ib].position, world -> bodies [ia].position)); }
         snprintf (buf, sz, "SPR [%d] A=%d(id%u) B=%d(id%u) L0=%.3f len=%.3f ext=%+.3f k=%.2f c=%.2f", slot, ia,
                   sj -> object_id_a, ib, sj -> object_id_b, sj -> equilibrium_length, len, len - sj -> equilibrium_length,
                   sj -> spring_constant, sj -> damping_coefficient);
@@ -700,39 +569,26 @@ static void tui_joint_line (physics_world *world, int n, char *buf, size_t sz) {
     }
 }
 void tui_render_joint_detail (tui_debugger_t *dbg) {
-    if (!dbg || !dbg -> main_win) {
-        return;
-    }
+    if (!dbg || !dbg -> main_win) { return; }
     werase (dbg -> main_win);
     int h, w;
     getmaxyx (dbg -> main_win, h, w);
     physics_world *world = dbg -> world;
     int total = tui_joint_total (world);
-    if (dbg -> selected_joint >= total && total > 0) {
-        dbg -> selected_joint = total - 1;
-    }
+    if (dbg -> selected_joint >= total && total > 0) { dbg -> selected_joint = total - 1; }
     int list_h = dbg -> detail_win ? h - 9 : h - 1;
-    if (list_h < 2) {
-        list_h = h - 1;
-    }
+    if (list_h < 2) { list_h = h - 1; }
     mvwprintw (dbg -> main_win, 0, 0, "JOINTS total=%d (springs + revolute/fixed/prismatic/distance/rope)", total);
     char line [256];
     int row = 1;
     for (int n = 0; n < total && row < list_h; n++) {
         tui_joint_line (world, n, line, sizeof (line));
-        if (n == dbg -> selected_joint) {
-            wattron (dbg -> main_win, A_REVERSE);
-        }
+        if (n == dbg -> selected_joint) { wattron (dbg -> main_win, A_REVERSE); }
         mvwprintw (dbg -> main_win, row++, 0, "%.*s", w - 1, line);
-        if (n == dbg -> selected_joint) {
-            wattroff (dbg -> main_win, A_REVERSE);
-        }
-    }
-    wrefresh (dbg -> main_win);
+        if (n == dbg -> selected_joint) { wattroff (dbg -> main_win, A_REVERSE); }
+    } wrefresh (dbg -> main_win);
     /* Selected joint full characteristics in the detail window. */
-    if (!dbg -> detail_win || !world) {
-        return;
-    }
+    if (!dbg -> detail_win || !world) { return; }
     werase (dbg -> detail_win);
     int dh, dw;
     getmaxyx (dbg -> detail_win, dh, dw);
@@ -741,8 +597,7 @@ void tui_render_joint_detail (tui_debugger_t *dbg) {
         mvwprintw (dbg -> detail_win, 0, 0, "no joint selected");
         wrefresh (dbg -> detail_win);
         return;
-    }
-    int r = 0;
+    } int r = 0;
     if (kind == 0) {
         spring_joint *sj = &world -> spring_joints [slot];
         int ia = tui_index_by_id (world, sj -> object_id_a);
@@ -768,18 +623,14 @@ void tui_render_joint_detail (tui_debugger_t *dbg) {
                 mvwprintw (dbg -> detail_win, r++, 0, "Hooke(raw)=%+.4f damp(raw)=%+.4f [unsaturated estimate]",
                            ext * sj -> spring_constant, vr * sj -> damping_coefficient);
             }
-        } else if (r < dh) {
-            mvwprintw (dbg -> detail_win, r++, 0, "endpoint missing (transient gap)");
-        }
+        } else if (r < dh) { mvwprintw (dbg -> detail_win, r++, 0, "endpoint missing (transient gap)"); }
     } else {
         constraint *c = &world -> revolute_constraints [slot];
         int ia = tui_index_by_id (world, c -> body_id_a);
         int ib = tui_index_by_id (world, c -> body_id_b);
         mvwprintw (dbg -> detail_win, r++, 0, "%s slot=%d A=%d B=%d", tui_constraint_str (c -> type), slot, ia, ib);
         if (ia < 0 || ib < 0) {
-            if (r < dh) {
-                mvwprintw (dbg -> detail_win, r++, 0, "endpoint missing");
-            }
+            if (r < dh) { mvwprintw (dbg -> detail_win, r++, 0, "endpoint missing"); }
         } else {
             rigidbody *a = &world -> bodies [ia];
             rigidbody *b = &world -> bodies [ib];
@@ -792,12 +643,8 @@ void tui_render_joint_detail (tui_debugger_t *dbg) {
                 vector3 relw = vector3_subtraction (b -> angular_velocity, a -> angular_velocity);
                 tui_format_vector3 (b0, sizeof (b0), wa, "wA=");
                 tui_format_vector3 (b1, sizeof (b1), wb, "wB=");
-                if (r < dh) {
-                    mvwprintw (dbg -> detail_win, r++, 0, "%.*s", dw - 1, b0);
-                }
-                if (r < dh) {
-                    mvwprintw (dbg -> detail_win, r++, 0, "%.*s", dw - 1, b1);
-                }
+                if (r < dh) { mvwprintw (dbg -> detail_win, r++, 0, "%.*s", dw - 1, b0); }
+                if (r < dh) { mvwprintw (dbg -> detail_win, r++, 0, "%.*s", dw - 1, b1); }
                 if (r < dh) {
                     mvwprintw (dbg -> detail_win, r++, 0, "err=|%.5f| axis=(%+.3f,%+.3f,%+.3f) wAx=%+.4f",
                                vector3_length (err), axw.x, axw.y, axw.z, vector3_dot (relw, axw));
@@ -853,14 +700,11 @@ void tui_render_joint_detail (tui_debugger_t *dbg) {
                 }
             }
         }
-    }
-    (void) dw;
+    } (void) dw;
     wrefresh (dbg -> detail_win);
 }
 void tui_render_scene_graph (tui_debugger_t *dbg) {
-    if (!dbg || !dbg -> main_win) {
-        return;
-    }
+    if (!dbg || !dbg -> main_win) { return; }
     werase (dbg -> main_win);
     int h, w;
     getmaxyx (dbg -> main_win, h, w);
@@ -869,8 +713,7 @@ void tui_render_scene_graph (tui_debugger_t *dbg) {
         mvwprintw (dbg -> main_win, 0, 0, "no bodies");
         wrefresh (dbg -> main_win);
         return;
-    }
-    int n = world -> body_count;
+    } int n = world -> body_count;
     int r = 0;
     mvwprintw (dbg -> main_win, r++, 0, "RELATIVE POSITIONS (pairwise distances, showing up to %d pairs)",
                h > 4 ? h - 4 : 0);
@@ -900,9 +743,7 @@ void tui_render_scene_graph (tui_debugger_t *dbg) {
         mvwprintw (dbg -> main_win, r++, 0, "closest: [%d]<->[%d] d=%.4f   farthest: [%d]<->[%d] d=%.4f%s", cmini, cminj,
                    cmin, cmaxi, cmaxj, cmax, n > cap ? " (first 96 bodies)" : "");
     }
-    if (r < h) {
-        mvwprintw (dbg -> main_win, r++, 0, "  A   B      dist        dx        dy        dz   islA islB");
-    }
+    if (r < h) { mvwprintw (dbg -> main_win, r++, 0, "  A   B      dist        dx        dy        dz   islA islB"); }
     int shown = 0;
     for (int i = 0; i < cap && r < h; i++) {
         for (int j = i + 1; j < cap && r < h; j++) {
@@ -913,18 +754,13 @@ void tui_render_scene_graph (tui_debugger_t *dbg) {
             mvwprintw (dbg -> main_win, r++, 0, "%3d %3d %9.4f %+.4f %+.4f %+.4f %4d %4d", i, j, dist, d.x, d.y, d.z, ia,
                        ib);
             shown++;
-            if (shown >= h - 4 && h > 4) {
-                break;
-            }
+            if (shown >= h - 4 && h > 4) { break; }
         }
-    }
-    (void) w;
+    } (void) w;
     wrefresh (dbg -> main_win);
 }
 void tui_render_help (tui_debugger_t *dbg) {
-    if (!dbg || !dbg -> main_win) {
-        return;
-    }
+    if (!dbg || !dbg -> main_win) { return; }
     werase (dbg -> main_win);
     const char *lines [] = {
         "MPE-TUI — terminal debugger and debug-output suite",
@@ -951,15 +787,12 @@ void tui_render_help (tui_debugger_t *dbg) {
     getmaxyx (dbg -> main_win, h, w);
     for (int i = 0; lines [i] && i < h; i++) {
         mvwprintw (dbg -> main_win, i, 0, "%.*s", w - 1, lines [i]);
-    }
-    wrefresh (dbg -> main_win);
+    } wrefresh (dbg -> main_win);
 } /* ------------------------------------------------------------------ */
 /* Frame                                                               */
 /* ------------------------------------------------------------------ */
 void tui_debugger_render (tui_debugger_t *dbg) {
-    if (!dbg) {
-        return;
-    }
+    if (!dbg) { return; }
     int H, W;
     getmaxyx (stdscr, H, W);
     dbg -> term_height = H;
@@ -970,8 +803,7 @@ void tui_debugger_render (tui_debugger_t *dbg) {
         clrtoeol ();
         refresh ();
         return;
-    }
-    tui_draw_header (dbg);
+    } tui_draw_header (dbg);
     /* Layout: header(1) + body + status(1). Body splits into main/sidebar
      * when wide, plus a detail strip in joint mode. */
     int body_y = 1, body_h = H - 2, side_w = (W >= 110) ? 38 : 0;
@@ -988,9 +820,7 @@ void tui_debugger_render (tui_debugger_t *dbg) {
         wresize (dbg -> main_win, main_h, main_w);
         mvwin (dbg -> main_win, body_y, 0);
         if (side_w) {
-            if (!dbg -> sidebar_win) {
-                dbg -> sidebar_win = newwin (main_h, side_w, body_y, main_w);
-            } else {
+            if (!dbg -> sidebar_win) { dbg -> sidebar_win = newwin (main_h, side_w, body_y, main_w); } else {
                 wresize (dbg -> sidebar_win, main_h, side_w);
                 mvwin (dbg -> sidebar_win, body_y, main_w);
             }
@@ -999,17 +829,14 @@ void tui_debugger_render (tui_debugger_t *dbg) {
             dbg -> sidebar_win = NULL;
         }
         if (detail_h) {
-            if (!dbg -> detail_win) {
-                dbg -> detail_win = newwin (detail_h, W, body_y + main_h, 0);
-            } else {
+            if (!dbg -> detail_win) { dbg -> detail_win = newwin (detail_h, W, body_y + main_h, 0); } else {
                 wresize (dbg -> detail_win, detail_h, W);
                 mvwin (dbg -> detail_win, body_y + main_h, 0);
             }
         } else if (dbg -> detail_win) {
             delwin (dbg -> detail_win);
             dbg -> detail_win = NULL;
-        }
-        wresize (dbg -> status_win, 1, W);
+        } wresize (dbg -> status_win, 1, W);
         mvwin (dbg -> status_win, H - 1, 0);
     }
     /* Separators. */
@@ -1018,9 +845,7 @@ void tui_debugger_render (tui_debugger_t *dbg) {
             mvaddch (y, main_w - 1, ACS_VLINE);
         }
     }
-    if (detail_h) {
-        mvhline (body_y + main_h, 0, ACS_HLINE, W);
-    }
+    if (detail_h) { mvhline (body_y + main_h, 0, ACS_HLINE, W); }
     refresh ();
     switch (dbg -> mode) {
         case TUI_MODE_OVERVIEW:
@@ -1040,13 +865,10 @@ void tui_debugger_render (tui_debugger_t *dbg) {
         tui_render_help (dbg);
         break;
     }
-    if (dbg -> sidebar_win) {
-        tui_render_sidebar (dbg);
-    } else if (dbg -> mode == TUI_MODE_OVERVIEW) {
+    if (dbg -> sidebar_win) { tui_render_sidebar (dbg); } else if (dbg -> mode == TUI_MODE_OVERVIEW) {
         /* Narrow terminal: stats already visible? No — sidebar hidden.
          * Overview keeps the table; stats live in snapshot/dump. */
-    }
-    tui_render_status (dbg);
+    } tui_render_status (dbg);
 } /* Plain-text helpers shared with tui_dump.c (no curses here). */
 void tui_describe_body (physics_world *world, int idx, char *buf, size_t sz);
 void tui_describe_body (physics_world *world, int idx, char *buf, size_t sz) {tui_body_line (world, idx, buf, sz);}

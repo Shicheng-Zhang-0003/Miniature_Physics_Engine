@@ -10,9 +10,7 @@ void init_cylinder_system (mesh *mesh_object, int radial_segments) {
         return;
     mesh_object -> index_count = 0;
     mesh_object -> wireframe_index_count = 0;
-    if (radial_segments < 8) {
-        radial_segments = 8;
-    }
+    if (radial_segments < 8) { radial_segments = 8; }
     if (radial_segments > 4096)
         return;
     int ring_verts = radial_segments + 1;
@@ -66,8 +64,7 @@ void init_cylinder_system (mesh *mesh_object, int radial_segments) {
         free (vertex_data);
         mesh_object -> index_count = 0;
         return;
-    }
-    int ei = 0;
+    } int ei = 0;
     for (int s = 0; s < radial_segments; s++) {
         /* DESPOT-2026-09-29 WINDING FIX. This quad was wound so the geometric
          * face normal points INWARD (verified: for the first quad the triangle
@@ -102,8 +99,7 @@ void init_cylinder_system (mesh *mesh_object, int radial_segments) {
         mesh_object -> index_count = 0;
         mesh_object -> wireframe_index_count = 0;
         return;
-    }
-    int wi = 0;
+    } int wi = 0;
     for (int s = 0; s < radial_segments; s++) {
         wireframe_indices [wi++] = ring0 + s;
         wireframe_indices [wi++] = ring0 + s + 1;
@@ -114,8 +110,7 @@ void init_cylinder_system (mesh *mesh_object, int radial_segments) {
         int s = k * radial_segments / 4;
         wireframe_indices [wi++] = ring0 + s;
         wireframe_indices [wi++] = ring1 + s;
-    }
-    glGenVertexArrays (1, &mesh_object -> vertex_array_object);
+    } glGenVertexArrays (1, &mesh_object -> vertex_array_object);
     glGenBuffers (1, &mesh_object -> vertex_buffer_object);
     glGenBuffers (1, &mesh_object -> element_buffer_object);
     glBindVertexArray (mesh_object -> vertex_array_object);
@@ -139,8 +134,7 @@ void init_cylinder_system (mesh *mesh_object, int radial_segments) {
         glVertexAttribPointer (2 + i, 4, GL_FLOAT, GL_FALSE, 19 * sizeof (float), (void *) (i * 4 * sizeof (float)));
         glEnableVertexAttribArray (2 + i);
         glVertexAttribDivisor (2 + i, 1);
-    }
-    glVertexAttribPointer (6, 3, GL_FLOAT, GL_FALSE, 19 * sizeof (float), (void *) (16 * sizeof (float)));
+    } glVertexAttribPointer (6, 3, GL_FLOAT, GL_FALSE, 19 * sizeof (float), (void *) (16 * sizeof (float)));
     glEnableVertexAttribArray (6);
     glVertexAttribDivisor (6, 1);
     glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, mesh_object -> element_buffer_object);

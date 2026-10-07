@@ -60,9 +60,7 @@ void render_init () {
      * creation) or wedge on stale state (early return). Tear down the
      * previous GL + CPU state first so re-init is a clean rebuild. A
      * previous failure simply retries. */
-    if (render_init_status == render_ok) {
-        render_cleanup ();
-    }
+    if (render_init_status == render_ok) { render_cleanup (); }
     render_init_status = render_uninitialized;
     const char *shader_dir = getenv ("MPE_SHADER_DIR");
     char vs_path [512], fs_path [512], uvs_path [512], ufs_path [512];
@@ -87,8 +85,7 @@ void render_init () {
             snprintf (alt_fs, sizeof (alt_fs), "%s/.local/share/mpe/shaders/fragment_shader.glsl", home);
             instanced_shader_program = create_shader_program (alt_vs, alt_fs);
         }
-    }
-    utility_shader_program = create_shader_program (uvs_path, ufs_path);
+    } utility_shader_program = create_shader_program (uvs_path, ufs_path);
     if ((utility_shader_program == 0) && (instanced_shader_program != 0)) {
         /* DESPOT-2026-10-04: the utility shader had no ~/.local fallback
          * while the instanced one did — a missing utility file red-screened
@@ -152,8 +149,7 @@ void render_init () {
         render_delete_gl_objects ();
         render_init_status = render_failed;
         return;
-    }
-    render_init_status = render_ok;
+    } render_init_status = render_ok;
 } /* Delete one instanced mesh's GL objects (all ids zero-guarded so a
  * context-less or repeated cleanup is a safe no-op). */
 static void render_delete_mesh (mesh *mesh_object) {
@@ -178,8 +174,7 @@ static void render_delete_mesh (mesh *mesh_object) {
     if (mesh_object -> instance_vbo) {
         glDeleteBuffers (1, &mesh_object -> instance_vbo);
         mesh_object -> instance_vbo = 0;
-    }
-    mesh_object -> index_count = 0;
+    } mesh_object -> index_count = 0;
     mesh_object -> wireframe_index_count = 0;
     mesh_object -> instance_capacity = 0;
 } /* Unconditional GL teardown shared by render_cleanup and the mid-init
@@ -193,8 +188,7 @@ static void render_delete_gl_objects (void) {
     if (utility_shader_program) {
         glDeleteProgram (utility_shader_program);
         utility_shader_program = 0;
-    }
-    render_delete_mesh (&sphere_mesh);
+    } render_delete_mesh (&sphere_mesh);
     render_delete_mesh (&cube_mesh);
     render_delete_mesh (&cylinder_mesh);
     if (main_grid.vertex_array_object) {
@@ -204,8 +198,7 @@ static void render_delete_gl_objects (void) {
     if (main_grid.vertex_buffer_object) {
         glDeleteBuffers (1, &main_grid.vertex_buffer_object);
         main_grid.vertex_buffer_object = 0;
-    }
-    main_grid.line_vertex_count = 0;
+    } main_grid.line_vertex_count = 0;
     wireframe_invalidate_cache ();
     grid_invalidate_cache ();
 }
@@ -217,9 +210,7 @@ void render_cleanup (void) {
      * repeated cleanup never issues GL calls for objects that were never
      * created; every id is additionally zero-guarded. Uniform caches in
      * wireframe/grid are invalidated because GL reuses deleted ids. */
-    if (render_init_status == render_ok) {
-        render_delete_gl_objects ();
-    }
+    if (render_init_status == render_ok) { render_delete_gl_objects (); }
     if (sphere_instances) {
         free (sphere_instances);
         sphere_instances = NULL;
@@ -231,15 +222,12 @@ void render_cleanup (void) {
     if (cylinder_instances) {
         free (cylinder_instances);
         cylinder_instances = NULL;
-    }
-    render_init_status = render_uninitialized;
+    } render_init_status = render_uninitialized;
 } /* Primary-world-only renderer: draws physics_world_get_primary().
  * TODO(world-param): take an explicit physics_world* so headless/secondary
  * worlds can render without relying on the app-owned primary. */
 void render_scene_current (int widget_width, int widget_height) {
-    if (widget_width <= 0 || widget_height <= 0) {
-        return;
-    }
+    if (widget_width <= 0 || widget_height <= 0) { return; }
     /* DESPOT-2026-09-29: this guarded only render_failed. render_uninitialized
      * fell through, and the three instance buffers are NULL until render_init()
      * mallocs them, so the body loop wrote through a null pointer:
@@ -260,8 +248,7 @@ void render_scene_current (int widget_width, int widget_height) {
         glClearColor (0.5f, 0.0f, 0.0f, 1.0f);
         glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         return;
-    }
-    glViewport (0, 0, widget_width, widget_height);
+    } glViewport (0, 0, widget_width, widget_height);
     glClearColor (0.05f, 0.05f, 0.1f, 1.0f);
     glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     float window_aspect_ratio = (float) (widget_width) / (float) (widget_height);
@@ -324,21 +311,17 @@ void render_scene_current (int widget_width, int widget_height) {
             /* Unit mesh: axle X half-length 1, radius 1 (see
              * cylinder_meshing.h): scale columns to (h, r, r). */
             model_scale = (vector3) {rigid_body -> cylinder_half_length, rigid_body -> radius, rigid_body -> radius};
-        } else {
-            model_scale = rigid_body -> half_extensions;
-        }
+        } else { model_scale = rigid_body -> half_extensions; }
         float scale_comp [3] = {model_scale.x, model_scale.y, model_scale.z};
         math4 model_matrix = {{{0}}};
         for (int mc = 0; mc < 3; mc++) {
             for (int mr = 0; mr < 3; mr++) {
                 model_matrix.matrix [mc][mr] = rotation_matrix.matrix [mc][mr] * scale_comp [mc];
-            }
-            model_matrix.matrix [mc][3] = 0.0f;
+            } model_matrix.matrix [mc][3] = 0.0f;
             model_matrix.matrix [3][mc] = (mc == 0) ? rigid_body -> position.x
             : (mc == 1) ? rigid_body -> position.y
             : rigid_body -> position.z;
-        }
-        model_matrix.matrix [3][3] = 1.0f;
+        } model_matrix.matrix [3][3] = 1.0f;
         float *target_array;
         int *target_count;
         if (rigid_body -> type == object_sphere) {
@@ -359,8 +342,7 @@ void render_scene_current (int widget_width, int widget_height) {
             target_array [idx + 18] = rigid_body -> colour.z;
             (*target_count)++;
         }
-    }
-    glUseProgram (instanced_shader_program);
+    } glUseProgram (instanced_shader_program);
     glUniformMatrix4fv (instanced_uniforms.projection_matrix_location, 1, GL_FALSE, projection_matrix_flat_array);
     glUniformMatrix4fv (instanced_uniforms.view_matrix_location, 1, GL_FALSE, view_matrix_flat_array);
     glUniform3f (instanced_uniforms.camera_position_location, main_camera_fov.position.x, main_camera_fov.position.y,
@@ -387,8 +369,7 @@ void render_scene_current (int widget_width, int widget_height) {
         glBufferSubData (GL_ARRAY_BUFFER, 0, cylinder_inst_count * 19 * sizeof (float), cylinder_instances);
         glBindVertexArray (cylinder_mesh.vertex_array_object);
         glDrawElementsInstanced (GL_TRIANGLES, cylinder_mesh.index_count, GL_UNSIGNED_INT, 0, cylinder_inst_count);
-    }
-    glBindVertexArray (0);
+    } glBindVertexArray (0);
     spring_joint_render (utility_shader_program, view_matrix, projection_matrix);
     wireframe_render_selected_object (utility_shader_program, view_matrix, projection_matrix);
     /* DESPOT-2026-10-04: zero glGetError coverage meant every GL misuse

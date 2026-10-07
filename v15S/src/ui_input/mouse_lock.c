@@ -276,13 +276,11 @@ static void mpe_rel_pointer_destroy (void) {
     if (mpe_locked_ptr) {
         zwp_locked_pointer_v1_destroy (mpe_locked_ptr);
         mpe_locked_ptr = NULL;
-    }
-    mpe_locked_active = 0;
+    } mpe_locked_active = 0;
     if (mpe_rel_ptr) {
         zwp_relative_pointer_v1_destroy (mpe_rel_ptr);
         mpe_rel_ptr = NULL;
-    }
-    mpe_rel_dx = mpe_rel_dy = 0.0;
+    } mpe_rel_dx = mpe_rel_dy = 0.0;
     mpe_rel_dirty = 0;
 } /* Start receiving unbounded relative motion on this surface's pointer. */
 static int mpe_rel_pointer_acquire (GdkSurface *surface) {
@@ -316,9 +314,7 @@ static int mpe_rel_pointer_acquire (GdkSurface *surface) {
      * real fragility, so this is the ONE place the dependency is paid and the
      * result is used immediately. */
     struct wl_surface *wl_surf = NULL;
-    if (mpe_pc_manager && GDK_IS_WAYLAND_SURFACE (surface)) {
-        wl_surf = gdk_wayland_surface_get_wl_surface (surface);
-    }
+    if (mpe_pc_manager && GDK_IS_WAYLAND_SURFACE (surface)) { wl_surf = gdk_wayland_surface_get_wl_surface (surface); }
     if (wl_surf) {
         {
             mpe_locked_ptr = zwp_pointer_constraints_v1_lock_pointer (mpe_pc_manager, wl_surf, wl_pointer, NULL,
@@ -326,8 +322,7 @@ static int mpe_rel_pointer_acquire (GdkSurface *surface) {
             if (mpe_locked_ptr)
                 mpe_locked_active = 1;
         }
-    }
-    return 1;
+    } return 1;
 }
 #else /* !MPE_WAYLAND_RELATIVE_POINTER */
 /* No Wayland relative-pointer support compiled in (e.g. Windows): lock falls
@@ -408,8 +403,7 @@ void mouse_lock_enable (GtkWidget *widget) {
         g_object_unref (blank);
     } else {
         gtk_widget_set_cursor_from_name (widget, "none");
-    }
-    GdkSurface *surface = mpe_surface_for_widget (widget);
+    } GdkSurface *surface = mpe_surface_for_widget (widget);
     if (surface) {
         GdkCursor *blank2 = mpe_blank_cursor_new ();
         if (blank2) {
@@ -479,7 +473,6 @@ void mouse_lock_reacquire (GtkWidget *window_widget) {
         g_object_unref (blank);
     } else {
         gtk_widget_set_cursor_from_name (window_widget, "none");
-    }
-    main_inputs.suppress_mouse_delta = false;
+    } main_inputs.suppress_mouse_delta = false;
     mouse_lock_reset_centre (window_widget);
 }

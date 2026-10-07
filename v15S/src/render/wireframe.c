@@ -27,20 +27,15 @@ static GLint a3_wire_uniform_ambient = -1;
 static GLint a3_wire_uniform_specular_coeff = -1;
 static GLint a3_wire_uniform_specular_exp = -1;
 static void a3_wire_cache_uniforms (GLuint shader_program) {
-    if (shader_program == a3_wire_cached_program) {
-        return;
-    }
+    if (shader_program == a3_wire_cached_program) { return; }
     a3_wire_cached_program = shader_program;
     a3_wire_uniform_viewframe = glGetUniformLocation (shader_program, "viewframe");
     a3_wire_uniform_projection = glGetUniformLocation (shader_program, "projection");
     a3_wire_uniform_model = glGetUniformLocation (shader_program, "model");
     a3_wire_uniform_object_colour = glGetUniformLocation (shader_program, "object_colour");
-}
-static GLuint a3_wire_missing_cached_program = 0;
+} static GLuint a3_wire_missing_cached_program = 0;
 static void a3_wire_cache_missing_uniforms (GLuint shader_program) {
-    if (shader_program == a3_wire_missing_cached_program) {
-        return;
-    }
+    if (shader_program == a3_wire_missing_cached_program) { return; }
     a3_wire_missing_cached_program = shader_program;
     a3_wire_uniform_normal_matrix = glGetUniformLocation (shader_program, "normal_matrix");
     a3_wire_uniform_camera_position = glGetUniformLocation (shader_program, "camera_position");
@@ -113,8 +108,7 @@ void wireframe_render_object (GLuint shader_program, math4 view_matrix, math4 pr
         a3_wire_scale_xyz [0] = rigid_body -> half_extensions.x * 1.01f;
         a3_wire_scale_xyz [1] = rigid_body -> half_extensions.y * 1.01f;
         a3_wire_scale_xyz [2] = rigid_body -> half_extensions.z * 1.01f;
-    }
-    math3 a3_wire_rotation = vector4_to_math3 (rigid_body -> orientation);
+    } math3 a3_wire_rotation = vector4_to_math3 (rigid_body -> orientation);
     float a3_wire_normal_matrix_flat [9];
     for (int row_index = 0; row_index < 3; row_index++) {
         for (int column_index = 0; column_index < 3; column_index++) {
@@ -122,8 +116,7 @@ void wireframe_render_object (GLuint shader_program, math4 view_matrix, math4 pr
             a3_wire_normal_matrix_flat [column_index * 3 + row_index] =
                 a3_wire_rotation.matrix [row_index][column_index] * inv_scale;
         }
-    }
-    glUniformMatrix3fv (a3_wire_uniform_normal_matrix, 1, GL_FALSE, a3_wire_normal_matrix_flat);
+    } glUniformMatrix3fv (a3_wire_uniform_normal_matrix, 1, GL_FALSE, a3_wire_normal_matrix_flat);
     glUniform3f (a3_wire_uniform_camera_position, main_camera_fov.position.x, main_camera_fov.position.y,
                  main_camera_fov.position.z);
     glUniform3f (a3_wire_uniform_light_position, g_cfg.render.light_x, g_cfg.render.light_y, g_cfg.render.light_z);
@@ -145,13 +138,10 @@ void wireframe_render_object (GLuint shader_program, math4 view_matrix, math4 pr
         glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, cube_mesh.wireframe_element_buffer_object);
         glDrawElements (GL_LINES, cube_mesh.wireframe_index_count, GL_UNSIGNED_INT, 0);
         glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, cube_mesh.element_buffer_object);
-    }
-    glBindVertexArray (0);
+    } glBindVertexArray (0);
 }
 void wireframe_render_selected_object (GLuint shader_program, math4 view_matrix, math4 projection_matrix) {
-    if ((selected_object < 0) || (selected_object >= (physics_world_get_primary () -> body_count))) {
-        return;
-    }
+    if ((selected_object < 0) || (selected_object >= (physics_world_get_primary () -> body_count))) { return; }
     // Yellow outline (Selected Object Visibility)
     wireframe_render_object (shader_program, view_matrix, projection_matrix,
                              &(physics_world_get_primary () -> bodies) [selected_object], (vector3) {1.0f, 1.0f, 0.0f});

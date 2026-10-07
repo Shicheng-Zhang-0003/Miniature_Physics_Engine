@@ -26,9 +26,7 @@ int term_history_cursor = -1;
 /* Output helpers                                                      */
 /* ------------------------------------------------------------------ */
 static void term_scroll_to_bottom (void) {
-    if (!terminal_output_buffer) {
-        return;
-    }
+    if (!terminal_output_buffer) { return; }
     GtkTextIter end_iter;
     gtk_text_buffer_get_end_iter (terminal_output_buffer, &end_iter);
     gtk_text_view_scroll_to_iter (GTK_TEXT_VIEW (terminal_output_view), &end_iter, 0.0, FALSE, 0.0, 0.0);
@@ -47,8 +45,7 @@ void term_capture_begin (void) {
             term_capturing = false;
             return;
         }
-    }
-    term_capturing = true;
+    } term_capturing = true;
     term_capture_buffer [0] = '\0';
 }
 void term_capture_end (void) {term_capturing = false;}
@@ -59,8 +56,7 @@ void term_capture_reset (void) {
     if (term_capture_buffer) {
         free (term_capture_buffer);
         term_capture_buffer = NULL;
-    }
-    term_capture_length = 0;
+    } term_capture_length = 0;
     term_capture_capacity = 0;
     term_capturing = false;
 } /* MPE_TASK_V15R2_OUTPUT_CAPTURE_END */
@@ -73,45 +69,33 @@ int64_t term_engine_start_time = 0; /* FIX_029 */
 /* MPE_TASK_V15R2_PHASE7_ALIAS_STORAGE_END */
 static void term_append_with_tag (const char *tag_name, const char *text) {
     /* MPE_TASK_V15R2_OUTPUT_CAPTURE_INTERCEPT */
-    if (!text) {
-        return;
-    }
+    if (!text) { return; }
     if (term_capturing) {
         size_t text_len = strlen (text);
         /* 1MB cap: capture is for tests, never unbounded. */
-        if (text_len > (1u << 20)) {
-            text_len = (1u << 20);
-        }
+        if (text_len > (1u << 20)) { text_len = (1u << 20); }
         while (term_capture_length + text_len + 1 > term_capture_capacity) {
             size_t next = term_capture_capacity ? term_capture_capacity * 2 : 8192;
             if (next > (1u << 20) + 1024) {
                 term_capturing = false;
                 return;
-            }
-            char *nb = realloc (term_capture_buffer, next);
+            } char *nb = realloc (term_capture_buffer, next);
             if (!nb) {
                 term_capturing = false;
                 return;
-            }
-            term_capture_buffer = nb;
+            } term_capture_buffer = nb;
             term_capture_capacity = next;
-        }
-        memcpy (term_capture_buffer + term_capture_length, text, text_len);
+        } memcpy (term_capture_buffer + term_capture_length, text, text_len);
         term_capture_length += text_len;
         term_capture_buffer [term_capture_length] = '\0';
         return;
     }
-    if (!terminal_output_buffer) {
-        return;
-    }
+    if (!terminal_output_buffer) { return; }
     GtkTextIter end_iter;
     gtk_text_buffer_get_end_iter (terminal_output_buffer, &end_iter);
-    if (tag_name) {
-        gtk_text_buffer_insert_with_tags_by_name (terminal_output_buffer, &end_iter, text, -1, tag_name, NULL);
-    } else {
+    if (tag_name) { gtk_text_buffer_insert_with_tags_by_name (terminal_output_buffer, &end_iter, text, -1, tag_name, NULL); } else {
         gtk_text_buffer_insert (terminal_output_buffer, &end_iter, text, -1);
-    }
-    term_scroll_to_bottom ();
+    } term_scroll_to_bottom ();
 }
 void term_out (const char *text) {term_append_with_tag (NULL, text);}
 void term_ok (const char *text) {term_append_with_tag ("term_ok", text);}
@@ -127,9 +111,7 @@ void term_printf (const char *tag_name, const char *format, ...) {
     term_append_with_tag (tag_name, line_buffer);
 }
 void term_update_prompt (void) {
-    if (!terminal_prompt_label) {
-        return;
-    }
+    if (!terminal_prompt_label) { return; }
     char prompt_buffer [320];
     snprintf (prompt_buffer, sizeof (prompt_buffer), "mpe:%s>", term_cwd);
     gtk_label_set_text (GTK_LABEL (terminal_prompt_label), prompt_buffer);
@@ -137,150 +119,93 @@ void term_update_prompt (void) {
 /* History                                                             */
 /* ------------------------------------------------------------------ */
 static void term_history_push (const char *command_text) {
-    if (command_text [0] == '\0') {
-        return;
-    }
-    if ((term_history_count > 0) && (strcmp (term_history [0], command_text) == 0)) {
-        return;
-    }
-    if (term_history_count < term_history_size) {
-        term_history_count++;
-    }
+    if (command_text [0] == '\0') { return; }
+    if ((term_history_count > 0) && (strcmp (term_history [0], command_text) == 0)) { return; }
+    if (term_history_count < term_history_size) { term_history_count++; }
     for (int history_index = term_history_count - 1; history_index > 0; history_index--) {
         strncpy (term_history [history_index], term_history [history_index - 1], term_history_length);
         term_history [history_index][term_history_length] = '\0';
-    }
-    strncpy (term_history [0], command_text, term_history_length);
+    } strncpy (term_history [0], command_text, term_history_length);
     term_history [0][term_history_length] = '\0';
 } /* ------------------------------------------------------------------ */
 /* String/path helpers                                                 */
 /* ------------------------------------------------------------------ */
 bool term_str_eq (const char *string_a, const char *string_b) {
-    if ((!string_a) || (!string_b)) {
-        return false;
-    }
+    if ((!string_a) || (!string_b)) { return false; }
     return term_ascii_strcasecmp (string_a, string_b) == 0;
 }
 const char *term_last_path_component (const char *token) {
-    if (!token) {
-        return "";
-    }
+    if (!token) { return ""; }
     const char *slash = strrchr (token, '/');
     return slash ? (slash + 1) : token;
 }
 bool term_is_all_token (const char *token) {return term_str_eq (term_last_path_component (token), "all");}
 bool term_parse_float (const char *token, float *output_value) {
-    if (!token) {
-        return false;
-    }
+    if (!token) { return false; }
     char *endptr = NULL;
     float parsed_value = strtof (token, &endptr);
-    if ((endptr == token) || (*endptr != '\0') || (!isfinite (parsed_value))) {
-        return false;
-    }
+    if ((endptr == token) || (*endptr != '\0') || (!isfinite (parsed_value))) { return false; }
     * output_value = parsed_value;
     return true;
 }
 int term_object_from_token (const char *token) {
-    if (!token) {
-        return -1;
-    }
+    if (!token) { return -1; }
     if (term_str_eq (token, "sel") || term_str_eq (term_last_path_component (token), "sel")) {
-        if ((selected_object >= 0) && (selected_object < (physics_world_get_primary () -> body_count))) {
-            return selected_object;
-        }
+        if ((selected_object >= 0) && (selected_object < (physics_world_get_primary () -> body_count))) { return selected_object; }
         return -1;
-    }
-    const char *component = term_last_path_component (token);
+    } const char *component = term_last_path_component (token);
     char *endptr = NULL;
     long parsed_index = strtol (component, &endptr, 10);
-    if ((endptr == component) || (*endptr != '\0')) {
-        return -1;
-    }
-    if ((parsed_index < 0) || (parsed_index >= (physics_world_get_primary () -> body_count))) {
-        return -1;
-    }
+    if ((endptr == component) || (*endptr != '\0')) { return -1; }
+    if ((parsed_index < 0) || (parsed_index >= (physics_world_get_primary () -> body_count))) { return -1; }
     return (int) parsed_index;
 }
 int term_joint_from_token (const char *token) {
-    if (!token) {
-        return -1;
-    }
+    if (!token) { return -1; }
     const char *component = term_last_path_component (token);
     char *endptr = NULL;
     long parsed_index = strtol (component, &endptr, 10);
-    if ((endptr == component) || (*endptr != '\0')) {
-        return -1;
-    }
-    if ((parsed_index < 0) || (parsed_index >= mpe_max_joints)) {
-        return -1;
-    }
-    if (!(physics_world_get_primary () -> spring_joints) [parsed_index].is_active) {
-        return -1;
-    }
+    if ((endptr == component) || (*endptr != '\0')) { return -1; }
+    if ((parsed_index < 0) || (parsed_index >= mpe_max_joints)) { return -1; }
+    if (!(physics_world_get_primary () -> spring_joints) [parsed_index].is_active) { return -1; }
     return (int) parsed_index;
 }
 term_target_kind term_classify_token (const char *token) {
-    if (!token) {
-        return term_target_object;
-    }
-    if (strstr (token, "joint")) {
-        return term_target_joint;
-    }
-    if (strstr (token, "obj")) {
-        return term_target_object;
-    }
-    if (strstr (term_cwd, "joint")) {
-        return term_target_joint;
-    }
+    if (!token) { return term_target_object; }
+    if (strstr (token, "joint")) { return term_target_joint; }
+    if (strstr (token, "obj")) { return term_target_object; }
+    if (strstr (term_cwd, "joint")) { return term_target_joint; }
     return term_target_object;
 }
 int term_require_object (const char *token) {
     int object_index = term_object_from_token (token);
-    if (object_index < 0) {
-        term_printf ("term_err", "mpe: %s: No such object\n", token ? token : "(null)");
-    }
+    if (object_index < 0) { term_printf ("term_err", "mpe: %s: No such object\n", token ? token : "(null)"); }
     return object_index;
 }
 int term_require_joint (const char *token) {
     int joint_index = term_joint_from_token (token);
-    if (joint_index < 0) {
-        term_printf ("term_err", "mpe: %s: No such joint\n", token ? token : "(null)");
-    }
+    if (joint_index < 0) { term_printf ("term_err", "mpe: %s: No such joint\n", token ? token : "(null)"); }
     return joint_index;
 }
 int term_parse_movement_destination (const char *token, float *x, float *y, float *z) {
-    if (!token) {
-        return 0;
-    }
+    if (!token) { return 0; }
     char **parts = term_strsplit (token, '/');
     int movement_kind = 0;
-    if (!parts) {
-        return 0;
-    }
+    if (!parts) { return 0; }
     for (int part_index = 0; parts [part_index]; part_index++) {
         if (term_str_eq (parts [part_index], "pos") || term_str_eq (parts [part_index], "vel")) {
-            if ((!parts [part_index + 1]) || (!parts [part_index + 2]) || (!parts [part_index + 3])) {
-                break;
-            }
+            if ((!parts [part_index + 1]) || (!parts [part_index + 2]) || (!parts [part_index + 3])) { break; }
             float parsed_x, parsed_y, parsed_z;
-            if (!term_parse_float (parts [part_index + 1], &parsed_x)) {
-                break;
-            }
-            if (!term_parse_float (parts [part_index + 2], &parsed_y)) {
-                break;
-            }
-            if (!term_parse_float (parts [part_index + 3], &parsed_z)) {
-                break;
-            }
+            if (!term_parse_float (parts [part_index + 1], &parsed_x)) { break; }
+            if (!term_parse_float (parts [part_index + 2], &parsed_y)) { break; }
+            if (!term_parse_float (parts [part_index + 3], &parsed_z)) { break; }
             * x = parsed_x;
             *y = parsed_y;
             *z = parsed_z;
             movement_kind = term_str_eq (parts [part_index], "pos") ? 1 : 2;
             break;
         }
-    }
-    term_strfreev (parts);
+    } term_strfreev (parts);
     return movement_kind;
 } /* GTK4: weak fallback command handlers — real implementations live in
  * term_*.c when those TUs are ported to GTK4. Weak linkage allows the
@@ -439,9 +364,7 @@ void term_execute (char *command_line) {
     while (*command_line == ' ') {
         command_line++;
     }
-    if (*command_line == '\0') {
-        return;
-    }
+    if (*command_line == '\0') { return; }
     /* MPE_TASK_V15R2_PHASE7_ALIAS_EXPANSION_BEGIN */
     {
         char first_word [term_alias_name_len];
@@ -449,8 +372,7 @@ void term_execute (char *command_line) {
         const char *scan = command_line;
         while ((*scan) && (*scan != ' ') && (word_index < term_alias_name_len - 1)) {
             first_word [word_index++] = *scan++;
-        }
-        first_word [word_index] = '\0';
+        } first_word [word_index] = '\0';
         for (int alias_index = 0; alias_index < term_alias_count; alias_index++) {
             if (term_ascii_strcasecmp (first_word, term_alias_names [alias_index]) == 0) {
                 static char expanded_command [2048];
@@ -459,8 +381,7 @@ void term_execute (char *command_line) {
                 if (ew < 0 || (size_t) ew >= sizeof (expanded_command)) {
                     term_err ("mpe: alias expansion too long, refused\n");
                     break;
-                }
-                command_line = expanded_command;
+                } command_line = expanded_command;
                 break;
             }
         }
@@ -475,20 +396,14 @@ void term_execute (char *command_line) {
     char **argument_vector = NULL;
     char parse_errbuf [256] = {0};
     if (!term_parse_argv (command_line, &argument_count, &argument_vector, parse_errbuf, sizeof (parse_errbuf))) {
-        if (parse_errbuf [0]) {
-            term_printf ("term_err", "mpe: %s\n", parse_errbuf);
-        } else {
+        if (parse_errbuf [0]) { term_printf ("term_err", "mpe: %s\n", parse_errbuf); } else {
             term_err ("mpe: parse error\n");
-        }
-        return;
+        } return;
     }
     if (argument_count <= 0) {
-        if (argument_vector) {
-            term_strfreev (argument_vector);
-        }
+        if (argument_vector) { term_strfreev (argument_vector); }
         return;
-    }
-    const terminal_command *found_command = NULL;
+    } const terminal_command *found_command = NULL;
     for (size_t command_index = 0; command_index < terminal_command_count; command_index++) {
         if (term_str_eq (argument_vector [0], terminal_commands [command_index].name)) {
             found_command = &terminal_commands [command_index];
@@ -504,8 +419,7 @@ void term_execute (char *command_line) {
         term_printf ("term_err", "mpe: %s: Permission denied (switch to debug mode with 0)\n", found_command -> name);
         term_strfreev (argument_vector);
         return;
-    }
-    found_command -> handler (argument_count, argument_vector);
+    } found_command -> handler (argument_count, argument_vector);
     term_strfreev (argument_vector);
 } /* ------------------------------------------------------------------ */
 /* GTK signals — GTK4 (GtkEventControllerKey)                          */
@@ -527,18 +441,13 @@ static gboolean on_terminal_entry_key_pressed (GtkEventControllerKey *controller
     (void) keycode;
     (void) user_data;
     /* MPE_TASK_V15R2_MICROVIM_ENTRY_BLOCK */
-    if (microvim_is_active ()) {
-        return TRUE;
-    }
+    if (microvim_is_active ()) { return TRUE; }
     if (keyval == GDK_KEY_Up) {
         if (term_history_count > 0) {
-            if (term_history_cursor < term_history_count - 1) {
-                term_history_cursor++;
-            }
+            if (term_history_cursor < term_history_count - 1) { term_history_cursor++; }
             gtk_editable_set_text (GTK_EDITABLE (terminal_entry), term_history [term_history_cursor]);
             gtk_editable_set_position (GTK_EDITABLE (terminal_entry), -1);
-        }
-        return TRUE;
+        } return TRUE;
     }
     if (keyval == GDK_KEY_Down) {
         if (term_history_cursor > 0) {
@@ -547,17 +456,13 @@ static gboolean on_terminal_entry_key_pressed (GtkEventControllerKey *controller
         } else {
             term_history_cursor = -1;
             gtk_editable_set_text (GTK_EDITABLE (terminal_entry), "");
-        }
-        gtk_editable_set_position (GTK_EDITABLE (terminal_entry), -1);
+        } gtk_editable_set_position (GTK_EDITABLE (terminal_entry), -1);
         return TRUE;
     }
     if ((state & GDK_CONTROL_MASK) && ((keyval == GDK_KEY_l) || (keyval == GDK_KEY_L))) {
-        if (terminal_output_buffer) {
-            gtk_text_buffer_set_text (terminal_output_buffer, "", -1);
-        }
+        if (terminal_output_buffer) { gtk_text_buffer_set_text (terminal_output_buffer, "", -1); }
         return TRUE;
-    }
-    return FALSE;
+    } return FALSE;
 }
 static gboolean on_terminal_window_key_pressed (GtkEventControllerKey *controller, guint keyval, guint keycode,
                                                 GdkModifierType state, gpointer user_data) {
@@ -573,54 +478,33 @@ static gboolean on_terminal_window_key_pressed (GtkEventControllerKey *controlle
             int64_t now = term_monotonic_us ();
             if ((now - last_escape_time) < 500000) {
                 microvim_close ();
-                if (terminal_entry) {
-                    gtk_widget_set_visible (terminal_entry, TRUE);
-                }
-                if (terminal_prompt_label) {
-                    gtk_widget_set_visible (terminal_prompt_label, TRUE);
-                }
+                if (terminal_entry) { gtk_widget_set_visible (terminal_entry, TRUE); }
+                if (terminal_prompt_label) { gtk_widget_set_visible (terminal_prompt_label, TRUE); }
                 term_ok ("MicroVim exited.\n");
-                if (terminal_entry) {
-                    gtk_widget_grab_focus (terminal_entry);
-                }
+                if (terminal_entry) { gtk_widget_grab_focus (terminal_entry); }
                 last_escape_time = 0;
                 return TRUE;
-            }
-            last_escape_time = now;
-        }
-        microvim_handle_key (keyval, keycode, state);
+            } last_escape_time = now;
+        } microvim_handle_key (keyval, keycode, state);
         /* MPE_TASK_V15R2_MICROVIM_EXIT_FIX_BEGIN */
         if (microvim_is_active ()) {
-            if (terminal_output_buffer) {
-                microvim_render (terminal_output_buffer);
-            }
+            if (terminal_output_buffer) { microvim_render (terminal_output_buffer); }
         } else {
             /* MicroVim closed itself via :q, :wq, :q!, or :x */
-            if (terminal_output_buffer) {
-                gtk_text_buffer_set_text (terminal_output_buffer, "", -1);
-            }
-            if (terminal_entry) {
-                gtk_widget_set_visible (terminal_entry, TRUE);
-            }
-            if (terminal_prompt_label) {
-                gtk_widget_set_visible (terminal_prompt_label, TRUE);
-            }
+            if (terminal_output_buffer) { gtk_text_buffer_set_text (terminal_output_buffer, "", -1); }
+            if (terminal_entry) { gtk_widget_set_visible (terminal_entry, TRUE); }
+            if (terminal_prompt_label) { gtk_widget_set_visible (terminal_prompt_label, TRUE); }
             term_ok ("MicroVim exited.\n");
-            if (terminal_entry) {
-                gtk_widget_grab_focus (terminal_entry);
-            }
+            if (terminal_entry) { gtk_widget_grab_focus (terminal_entry); }
         }
         /* MPE_TASK_V15R2_MICROVIM_EXIT_FIX_END */
         return TRUE;
     }
     /* MPE_TASK_V15R2_MICROVIM_KEY_ROUTING_END */
     if (keyval == GDK_KEY_Escape) {
-        if (terminal_window) {
-            gtk_window_destroy (GTK_WINDOW (terminal_window));
-        }
+        if (terminal_window) { gtk_window_destroy (GTK_WINDOW (terminal_window)); }
         return TRUE;
-    }
-    return FALSE;
+    } return FALSE;
 }
 static void on_terminal_window_destroy (GtkWidget *widget, gpointer user_data) {
     (void) widget;
@@ -644,16 +528,12 @@ static gboolean on_terminal_window_close_request (GtkWindow *window, gpointer us
 /* ------------------------------------------------------------------ */
 bool debug_terminal_is_open (void) {return terminal_window != NULL;}
 void debug_terminal_focus_entry (void) {
-    if ((!terminal_window) || (!terminal_entry)) {
-        return;
-    }
+    if ((!terminal_window) || (!terminal_entry)) { return; }
     gtk_window_present (GTK_WINDOW (terminal_window));
     gtk_widget_grab_focus (terminal_entry);
 }
 void debug_terminal_sync_mode (void) {
-    if (!terminal_window) {
-        return;
-    }
+    if (!terminal_window) { return; }
     if (main_inputs.is_debug_mode_active) {
         gtk_window_set_title (GTK_WINDOW (terminal_window), "MPE POSIX Debug Terminal - debug mode");
         term_ok ("[terminal unlocked] debug mode active\n");
@@ -663,33 +543,24 @@ void debug_terminal_sync_mode (void) {
     }
 }
 void debug_terminal_open (GtkWidget *parent_window) {
-    if (!main_inputs.is_debug_mode_active) {
-        return;
-    }
+    if (!main_inputs.is_debug_mode_active) { return; }
     if (terminal_window) {
         debug_terminal_focus_entry ();
         return;
-    }
-    terminal_window = gtk_window_new ();
+    } terminal_window = gtk_window_new ();
     gtk_widget_set_name (terminal_window, "mpe-debug-terminal");
     gtk_window_set_default_size (GTK_WINDOW (terminal_window), 820, 560);
     if ((parent_window) && (GTK_IS_WIDGET (parent_window))) {
         GtkWidget *toplevel = GTK_WIDGET (gtk_widget_get_root (parent_window));
-        if (toplevel && GTK_IS_WINDOW (toplevel)) {
-            gtk_window_set_transient_for (GTK_WINDOW (terminal_window), GTK_WINDOW (toplevel));
-        } else if (GTK_IS_WINDOW (parent_window)) {
-            gtk_window_set_transient_for (GTK_WINDOW (terminal_window), GTK_WINDOW (parent_window));
-        }
-    }
-    g_signal_connect (terminal_window, "destroy", G_CALLBACK (on_terminal_window_destroy), NULL);
+        if (toplevel && GTK_IS_WINDOW (toplevel)) { gtk_window_set_transient_for (GTK_WINDOW (terminal_window), GTK_WINDOW (toplevel)); } else if (GTK_IS_WINDOW (parent_window)) { gtk_window_set_transient_for (GTK_WINDOW (terminal_window), GTK_WINDOW (parent_window)); }
+    } g_signal_connect (terminal_window, "destroy", G_CALLBACK (on_terminal_window_destroy), NULL);
     g_signal_connect (terminal_window, "close-request", G_CALLBACK (on_terminal_window_close_request), NULL);
     /* Window-level key controller (Esc, MicroVim routing) */
     {
         GtkEventController *window_key_controller = gtk_event_controller_key_new ();
         g_signal_connect (window_key_controller, "key-pressed", G_CALLBACK (on_terminal_window_key_pressed), NULL);
         gtk_widget_add_controller (terminal_window, window_key_controller);
-    }
-    static bool terminal_css_installed = false;
+    } static bool terminal_css_installed = false;
     if (!terminal_css_installed) {
         GtkCssProvider *css_provider = gtk_css_provider_new ();
         gtk_css_provider_load_from_string (
@@ -705,11 +576,9 @@ void debug_terminal_open (GtkWidget *parent_window) {
         if (display) {
             gtk_style_context_add_provider_for_display (display, GTK_STYLE_PROVIDER (css_provider),
                                                         GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
-        }
-        g_object_unref (css_provider);
+        } g_object_unref (css_provider);
         terminal_css_installed = true;
-    }
-    GtkWidget *root_box = gtk_box_new (GTK_ORIENTATION_VERTICAL, 0);
+    } GtkWidget *root_box = gtk_box_new (GTK_ORIENTATION_VERTICAL, 0);
     gtk_window_set_child (GTK_WINDOW (terminal_window), root_box);
     GtkWidget *scrolled_window = gtk_scrolled_window_new ();
     gtk_widget_set_hexpand (scrolled_window, TRUE);
@@ -750,15 +619,9 @@ void debug_terminal_open (GtkWidget *parent_window) {
     if (main_inputs.is_mouse_locked) {
         if ((parent_window) && (GTK_IS_WIDGET (parent_window))) {
             GtkWidget *toplevel = GTK_WIDGET (gtk_widget_get_root (parent_window));
-            if (toplevel) {
-                mouse_lock_disable (toplevel);
-            } else {
-                mouse_lock_disable (parent_window);
-            }
-        }
-        main_inputs.is_mouse_locked = false;
-    }
-    gtk_window_present (GTK_WINDOW (terminal_window));
+            if (toplevel) { mouse_lock_disable (toplevel); } else { mouse_lock_disable (parent_window); }
+        } main_inputs.is_mouse_locked = false;
+    } gtk_window_present (GTK_WINDOW (terminal_window));
     term_update_prompt ();
     debug_terminal_sync_mode ();
     if (term_engine_start_time == 0) {
@@ -767,7 +630,5 @@ void debug_terminal_open (GtkWidget *parent_window) {
     term_printf ("term_echo", "MPE POSIX Debug Terminal %s\n", a3_version_string);
     term_out ("Virtual root: /obj /joint /world /camera /spawner\n");
     term_dim ("Type 'help' or 'man <command>'. Ctrl+L clears. Esc closes.\n");
-    if (terminal_entry) {
-        gtk_widget_grab_focus (terminal_entry);
-    }
+    if (terminal_entry) { gtk_widget_grab_focus (terminal_entry); }
 }

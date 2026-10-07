@@ -376,8 +376,7 @@ gboolean on_mouse_movements (GtkEventControllerMotion *ctrl, double x, double y,
         last_x = -1;
         last_y = -1;
         return FALSE;
-    }
-    GtkWidget *w = gtk_event_controller_get_widget (GTK_EVENT_CONTROLLER (ctrl));
+    } GtkWidget *w = gtk_event_controller_get_widget (GTK_EVENT_CONTROLLER (ctrl));
     int ww = w ? gtk_widget_get_width (w) : 800;
     int wh = w ? gtk_widget_get_height (w) : 600;
     if (ww <= 0 || wh <= 0) {
@@ -391,8 +390,7 @@ gboolean on_mouse_movements (GtkEventControllerMotion *ctrl, double x, double y,
         last_x = x;
         last_y = y;
         return FALSE;
-    }
-    double dx = x - last_x;
+    } double dx = x - last_x;
     double dy = y - last_y;
     if (dx > ww / 2)
         dx = ww / 2;
@@ -446,15 +444,13 @@ gboolean on_button_press (GtkGestureClick *gest, int n_press, double x, double y
             st -> mouse_delta_x = 0;
             st -> mouse_delta_y = 0;
             return FALSE;
-        }
-        st -> mouse_delta_x = 0;
+        } st -> mouse_delta_x = 0;
         st -> mouse_delta_y = 0;
         st -> is_mouse_locked = true;
         /* Both now Wayland-safe no-ops off-X11; must never segfault. */
         mouse_lock_enable (target);
         mouse_lock_reset_centre (target);
-    }
-    return FALSE;
+    } return FALSE;
 }
 gboolean on_button_release (GtkGestureClick *gest, int n_press, double x, double y, gpointer user_data_stored) {
     input_status *st = (input_status *) user_data_stored;
@@ -467,8 +463,7 @@ gboolean on_button_release (GtkGestureClick *gest, int n_press, double x, double
         st -> middle_mouse_button_clicked = false;
         st -> right_mouse_button_clicked = false;
         return FALSE;
-    }
-    guint btn = gtk_gesture_single_get_current_button (GTK_GESTURE_SINGLE (gest));
+    } guint btn = gtk_gesture_single_get_current_button (GTK_GESTURE_SINGLE (gest));
     /* During "released" current_button is often 0 (no button held).
      * Clear the matching flag, or both on 0 so single-clicks can't
      * leave a stuck right/middle flag that raycasts/deletes forever. */

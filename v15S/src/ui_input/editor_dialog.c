@@ -27,9 +27,7 @@ static void on_entry_insert_text (GtkEditable *editable, const gchar * new_text,
 static void editor_dialog_quit_with_result (EditorDialogState *state, float value, gboolean confirmed) {
     state -> result_value = value;
     state -> confirmed = confirmed;
-    if (state -> loop && g_main_loop_is_running (state -> loop)) {
-        g_main_loop_quit (state -> loop);
-    }
+    if (state -> loop && g_main_loop_is_running (state -> loop)) { g_main_loop_quit (state -> loop); }
 }
 static void editor_dialog_on_ok (GtkButton *button, gpointer user_data) {
     (void) button;
@@ -37,11 +35,7 @@ static void editor_dialog_on_ok (GtkButton *button, gpointer user_data) {
     const char *text = gtk_editable_get_text (GTK_EDITABLE (state -> entry));
     char *endptr = NULL;
     float parsed = strtof (text, &endptr);
-    if ((endptr != text) && (*endptr == '\0')) {
-        editor_dialog_quit_with_result (state, parsed, TRUE);
-    } else {
-        editor_dialog_quit_with_result (state, state -> current_value, TRUE);
-    }
+    if ((endptr != text) && (*endptr == '\0')) { editor_dialog_quit_with_result (state, parsed, TRUE); } else { editor_dialog_quit_with_result (state, state -> current_value, TRUE); }
 }
 static void editor_dialog_on_cancel (GtkButton *button, gpointer user_data) {
     (void) button;
@@ -67,8 +61,7 @@ static gboolean editor_dialog_on_key_pressed (GtkEventControllerKey *ctrl, guint
     if (keyval == GDK_KEY_Escape) {
         editor_dialog_on_cancel (NULL, state);
         return TRUE;
-    }
-    return FALSE;
+    } return FALSE;
 }
 float open_numerical_input_dialog (GtkWidget *parent, const char *title, float current_value) {
     main_inputs.suppress_mouse_delta = true;
@@ -81,29 +74,21 @@ float open_numerical_input_dialog (GtkWidget *parent, const char *title, float c
     GtkWindow *transient_parent = NULL;
     if ((parent) && (GTK_IS_WIDGET (parent))) {
         GtkRoot *root = gtk_widget_get_root (GTK_WIDGET (parent));
-        if ((root) && (GTK_IS_WINDOW (root))) {
-            transient_parent = GTK_WINDOW (root);
-        } else if (GTK_IS_WINDOW (parent)) {
-            transient_parent = GTK_WINDOW (parent);
-        }
-    }
-    GtkWidget *dialog = gtk_window_new ();
+        if ((root) && (GTK_IS_WINDOW (root))) { transient_parent = GTK_WINDOW (root); } else if (GTK_IS_WINDOW (parent)) { transient_parent = GTK_WINDOW (parent); }
+    } GtkWidget *dialog = gtk_window_new ();
     state.dialog = dialog;
     state.entry = NULL;
     gtk_window_set_title (GTK_WINDOW (dialog), title ? title : "Input");
     gtk_window_set_default_size (GTK_WINDOW (dialog), 300, 150);
     gtk_window_set_modal (GTK_WINDOW (dialog), TRUE);
     gtk_window_set_resizable (GTK_WINDOW (dialog), FALSE);
-    if (transient_parent) {
-        gtk_window_set_transient_for (GTK_WINDOW (dialog), transient_parent);
-    }
+    if (transient_parent) { gtk_window_set_transient_for (GTK_WINDOW (dialog), transient_parent); }
     g_signal_connect (dialog, "close-request", G_CALLBACK (editor_dialog_on_close_request), &state);
     {
         GtkEventController *key_ctrl = gtk_event_controller_key_new ();
         g_signal_connect (key_ctrl, "key-pressed", G_CALLBACK (editor_dialog_on_key_pressed), &state);
         gtk_widget_add_controller (dialog, key_ctrl);
-    }
-    GtkWidget *box = gtk_box_new (GTK_ORIENTATION_VERTICAL, 10);
+    } GtkWidget *box = gtk_box_new (GTK_ORIENTATION_VERTICAL, 10);
     gtk_widget_set_margin_top (box, 15);
     gtk_widget_set_margin_bottom (box, 15);
     gtk_widget_set_margin_start (box, 15);
@@ -142,13 +127,10 @@ float open_numerical_input_dialog (GtkWidget *parent, const char *title, float c
     g_main_loop_run (state.loop);
     g_main_loop_unref (state.loop);
     state.loop = NULL;
-    if (GTK_IS_WINDOW (dialog)) {
-        gtk_window_destroy (GTK_WINDOW (dialog));
-    }
+    if (GTK_IS_WINDOW (dialog)) { gtk_window_destroy (GTK_WINDOW (dialog)); }
     while (g_main_context_pending (NULL)) {
         g_main_context_iteration (NULL, FALSE);
-    }
-    main_inputs.suppress_mouse_delta = false;
+    } main_inputs.suppress_mouse_delta = false;
     editor_dialog_active = false;
     main_inputs.enter_spawn_held = false;
     return state.result_value;

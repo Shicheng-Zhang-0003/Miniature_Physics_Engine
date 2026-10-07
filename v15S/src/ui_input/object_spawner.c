@@ -22,8 +22,7 @@ static vector3 get_viewpoint_velocity (void) {
             player_velocity = vector3_addition (
                 player_velocity, vector3_scaling (main_camera_fov.side_vector, main_camera_fov.movement_speed));
         }
-    }
-    return player_velocity;
+    } return player_velocity;
 }
 void spawner_launch_sphere (float spherical_radius, float physical_mass, float launch_speed) {
     // Spawn the object just very slightly in front of the camera (no collision)
@@ -102,8 +101,7 @@ void spawner_launch_cylinder (float radius, float half_length, float physical_ma
         event_log_push (2, "spawn failed: object pool full (%d/%d)", physics_world_get_primary () -> body_count,
                         mpe_max_bodies);
         return;
-    }
-    vector3 launch_vel = vector3_scaling (main_camera_fov.forward_vector, launch_speed);
+    } vector3 launch_vel = vector3_scaling (main_camera_fov.forward_vector, launch_speed);
     (physics_world_get_primary () -> bodies) [newly_spawned_object_index].velocity =
         vector3_addition (launch_vel, get_viewpoint_velocity ());
     (physics_world_get_primary () -> bodies) [newly_spawned_object_index].friction_static = g_cfg.spawner.friction_s;
@@ -115,9 +113,7 @@ void spawner_launch_cylinder (float radius, float half_length, float physical_ma
 }
 void spawner_static_cylinder (float radius, float half_length, float physical_mass, vector3 static_position) {
     int newly_spawned_object_index = scene_add_cylinder (radius, half_length, physical_mass, static_position);
-    if (newly_spawned_object_index < 0) {
-        return;
-    }
+    if (newly_spawned_object_index < 0) { return; }
     (physics_world_get_primary () -> bodies) [newly_spawned_object_index].friction_static = g_cfg.spawner.friction_s;
     (physics_world_get_primary () -> bodies) [newly_spawned_object_index].friction_kinetic = g_cfg.spawner.friction_k;
     (physics_world_get_primary () -> bodies) [newly_spawned_object_index].colour = (vector3) {0.8f, 0.8f, 0.8f};
