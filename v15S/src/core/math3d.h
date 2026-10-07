@@ -54,45 +54,31 @@ static inline vector3 vector3_cross (vector3 vector_a, vector3 vector_b) {
                      (vector_a.z * vector_b.x - vector_a.x * vector_b.z),
                      (vector_a.x * vector_b.y - vector_a.y * vector_b.x)};
 } static inline float vector3_length_squared (vector3 vector) {
-    if (!isfinite (vector.x) || !isfinite (vector.y) || !isfinite (vector.z)) {
-        return INFINITY;
-    }
+    if (!isfinite (vector.x) || !isfinite (vector.y) || !isfinite (vector.z)) { return INFINITY; }
     double dx = (double) vector.x, dy = (double) vector.y, dz = (double) vector.z;
     double s = dx * dx + dy * dy + dz * dz;
-    if (s > (double) FLT_MAX) {
-        return INFINITY;
-    }
+    if (s > (double) FLT_MAX) { return INFINITY; }
     return (float) s;
 } static inline float vector3_length (vector3 vector) {
     float s2 = vector3_length_squared (vector);
-    if (!isfinite (s2)) {
-        return INFINITY;
-    }
+    if (!isfinite (s2)) { return INFINITY; }
     return sqrtf (s2);
 } static inline vector3 vector3_normalisation (vector3 vector) {
-    if (!isfinite (vector.x) || !isfinite (vector.y) || !isfinite (vector.z)) {
-        return vector3_zero ();
-    }
+    if (!isfinite (vector.x) || !isfinite (vector.y) || !isfinite (vector.z)) { return vector3_zero (); }
     float length = vector3_length (vector);
-    if ((!isfinite (length)) || (length < math_epsilon)) {
-        return vector3_zero ();
-    }
+    if ((!isfinite (length)) || (length < math_epsilon)) { return vector3_zero (); }
     return vector3_scaling (vector, 1.0f / length);
 } // Quarternion (4D) Functions
 // orientation in rotational w-axis w/o gimbal in any axis
 static inline vector4 vector4_identity () {
     return (vector4) {1.0f, 0.0f, 0.0f, 0.0f};
 } static inline vector4 vector4_normalisation (vector4 quaternion) {
-    if (!isfinite (quaternion.w) || !isfinite (quaternion.x) || !isfinite (quaternion.y) || !isfinite (quaternion.z)) {
-        return vector4_identity ();
-    }
+    if (!isfinite (quaternion.w) || !isfinite (quaternion.x) || !isfinite (quaternion.y) || !isfinite (quaternion.z)) { return vector4_identity (); }
     /* TRUTH: accumulate in double. float accumulation overflows to Inf for
      * large components (1e20^2), returning identity instead of direction. */
     double w = (double) quaternion.w, x = (double) quaternion.x, y = (double) quaternion.y, z = (double) quaternion.z;
     double n2 = w * w + x * x + y * y + z * z;
-    if (!isfinite (n2) || n2 < (double) math_epsilon * (double) math_epsilon) {
-        return vector4_identity ();
-    }
+    if (!isfinite (n2) || n2 < (double) math_epsilon * (double) math_epsilon) { return vector4_identity (); }
     float inverse_length = (float) (1.0 / sqrt (n2));
     return (vector4) {quaternion.w * inverse_length, quaternion.x * inverse_length, quaternion.y * inverse_length,
                      quaternion.z * inverse_length};
@@ -128,28 +114,20 @@ static inline vector4 vector4_from_axis_with_angle (vector3 rotation_axis, float
     /* COLD PATH ONLY: uses libm sinf/cosf, which is not bit-deterministic
      * across platforms. Per-tick rotors must use det_sin/det_cos
      * (see rigidbody.c rotor); this helper is for setup/tests only. */
-    if (!isfinite (angle_radians)) {
-        return vector4_identity ();
-    }
+    if (!isfinite (angle_radians)) { return vector4_identity (); }
     /* TRUTH: accumulate axis length in double; float overflows for huge
      * axis components (1e20 -> Inf -> identity instead of the axis). */
     double axis_len_sq_d = (double) rotation_axis.x * (double) rotation_axis.x +
                            (double) rotation_axis.y * (double) rotation_axis.y +
                            (double) rotation_axis.z * (double) rotation_axis.z;
-    if ((!isfinite (axis_len_sq_d)) || (axis_len_sq_d < (double) math_epsilon * (double) math_epsilon)) {
-        return vector4_identity ();
-    }
+    if ((!isfinite (axis_len_sq_d)) || (axis_len_sq_d < (double) math_epsilon * (double) math_epsilon)) { return vector4_identity (); }
     float half_angle = angle_radians * 0.5f;
-    if (!isfinite (half_angle)) {
-        return vector4_identity ();
-    }
+    if (!isfinite (half_angle)) { return vector4_identity (); }
     float sine_half_angle = sinf (half_angle);
     vector3 normalized_axis = vector3_normalisation (rotation_axis);
     float nlen_sq = normalized_axis.x * normalized_axis.x + normalized_axis.y * normalized_axis.y +
                     normalized_axis.z * normalized_axis.z;
-    if ((!isfinite (nlen_sq)) || (nlen_sq < 0.5f)) {
-        return vector4_identity ();
-    }
+    if ((!isfinite (nlen_sq)) || (nlen_sq < 0.5f)) { return vector4_identity (); }
     return (vector4) {cosf (half_angle), normalized_axis.x * sine_half_angle, normalized_axis.y * sine_half_angle,
                      normalized_axis.z * sine_half_angle};
 } // 3 ^ 3 matrix Functions
@@ -187,8 +165,7 @@ static inline math3 vector4_to_math3 (vector4 quaternion) {
         quaternion.z *= inv;
     } else {
         quaternion = vector4_identity ();
-    }
-    math3 result_matrix;
+    } math3 result_matrix;
     // Defining actual plug in values
     float x_double = quaternion.x + quaternion.x, y_double = quaternion.y + quaternion.y,
           z_double = quaternion.z + quaternion.z;
@@ -213,16 +190,14 @@ static inline math3 math3_multiplication (math3 matrix_a, math3 matrix_b) {
                 (matrix_a.matrix [row_index][1] * matrix_b.matrix [1][column_index]) +
                 (matrix_a.matrix [row_index][2] * matrix_b.matrix [2][column_index]);
         }
-    }
-    return result_matrix;
+    } return result_matrix;
 } static inline math3 math3_transposition (math3 matrix) {
     math3 result_matrix;
     for (int row_index = 0; row_index < 3; row_index++) {
         for (int column_index = 0; column_index < 3; column_index++) {
             result_matrix.matrix [row_index][column_index] = matrix.matrix [column_index][row_index];
         }
-    }
-    return result_matrix;
+    } return result_matrix;
 } // Matrix inversion (3 ^ 3 specific)
 // Angular Constraint Calculation (change_p = J * M ^ -1 * J_transposed)
 static inline math3 math3_inverse (math3 matrix) {
@@ -234,8 +209,7 @@ static inline math3 math3_inverse (math3 matrix) {
         if (!isfinite (v)) {
             math3 nan_out = {{{0.0f}}};
             return nan_out;
-        }
-        frob_sq_d += v * v;
+        } frob_sq_d += v * v;
     }
     double det_d =
         (double) matrix.matrix [0][0] *
@@ -254,9 +228,7 @@ static inline math3 math3_inverse (math3 matrix) {
      * live paths use the _d doubles.) */
     double frob_norm_cubed_d = frob_sq_d * sqrt (fmax (frob_sq_d, 1e-24));
     double eps_d = 1e-12 * frob_norm_cubed_d;
-    if (!(frob_sq_d > 0.0)) {
-        eps_d = 1e-24;
-    }
+    if (!(frob_sq_d > 0.0)) { eps_d = 1e-24; }
     if ((!isfinite (det_d)) || (fabs (det_d) < eps_d)) {
         /* TRUTH: adjugate of a singular matrix is zero everywhere, which
          * locks ALL rotation even when only one axis is degenerate
@@ -284,9 +256,7 @@ static inline math3 math3_inverse (math3 matrix) {
             d.matrix [0][0] = (d0 != 0.0f) ? (1.0f / d0) : 0.0f;
             d.matrix [1][1] = (d1 != 0.0f) ? (1.0f / d1) : 0.0f;
             d.matrix [2][2] = (d2 != 0.0f) ? (1.0f / d2) : 0.0f;
-            if (isfinite (d.matrix [0][0]) && isfinite (d.matrix [1][1]) && isfinite (d.matrix [2][2])) {
-                return d;
-            }
+            if (isfinite (d.matrix [0][0]) && isfinite (d.matrix [1][1]) && isfinite (d.matrix [2][2])) { return d; }
         }
         math3 singular_matrix = {{{0.0f}}};
         return singular_matrix;

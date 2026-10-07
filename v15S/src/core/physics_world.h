@@ -177,8 +177,7 @@ static inline const mpe_config_t *mpe_world_cfg (const physics_world *world) {
     if (world && world -> cfg)
         return world -> cfg;
     return &g_cfg;
-}
-int physics_world_add_sphere (physics_world *world, float radius, float mass, vector3 position);
+} int physics_world_add_sphere (physics_world *world, float radius, float mass, vector3 position);
 int physics_world_add_cube (physics_world *world, vector3 position, vector3 half_extensions, float mass);
 int physics_world_add_cylinder (physics_world *world, float radius, float half_length, float mass,
                                 vector3 position); /* MPE_FTC_090 */

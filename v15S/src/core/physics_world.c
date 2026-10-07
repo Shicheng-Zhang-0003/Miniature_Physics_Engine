@@ -32,41 +32,28 @@ static void *mpe_sanitize_slice (void *arg) {
     mpe_slice_t *s = (mpe_slice_t *) arg;
     for (int i = s -> start; i < s -> end; i++) {
         rigidbody_sanitize (&s -> world -> bodies [i]);
-    }
-    return NULL;
+    } return NULL;
 }
 static void mpe_parallel_sanitize (physics_world *world) {
     int n = world -> body_count;
-    if (n <= 0) {
-        return;
-    }
+    if (n <= 0) { return; }
     const char *env = getenv ("MPE_THREADS");
     int threads = env ? atoi (env) : 1;
-    if (threads < 1) {
-        threads = 1;
-    }
-    if (threads > 8) {
-        threads = 8;
-    }
+    if (threads < 1) { threads = 1; }
+    if (threads > 8) { threads = 8; }
     if ((threads <= 1) || (n < 64)) {
         for (int i = 0; i < n; i++) {
             rigidbody_sanitize (&world -> bodies [i]);
-        }
-        return;
-    }
-    pthread_t tids [8];
+        } return;
+    } pthread_t tids [8];
     mpe_slice_t slices [8];
     int chunk = (n + threads - 1) / threads;
     int launched = 0;
     for (int t = 0; t < threads; t++) {
         int s = t * chunk;
         int e = s + chunk;
-        if (e > n) {
-            e = n;
-        }
-        if (s >= e) {
-            break;
-        }
+        if (e > n) { e = n; }
+        if (s >= e) { break; }
         slices [t].world = world;
         slices [t].start = s;
         slices [t].end = e;
@@ -74,17 +61,12 @@ static void mpe_parallel_sanitize (physics_world *world) {
             /* Fallback: run slice serially on creation failure. */
             mpe_sanitize_slice (&slices [t]);
             tids [t] = 0;
-        } else {
-            launched++;
-        }
+        } else { launched++; }
     }
     /* Join only launched threads; serial-fallback slices already done. */
     for (int t = 0; t < threads; t++) {
-        if ((slices [t].start < slices [t].end) && tids [t]) {
-            pthread_join (tids [t], NULL);
-        }
-    }
-    (void) launched;
+        if ((slices [t].start < slices [t].end) && tids [t]) { pthread_join (tids [t], NULL); }
+    } (void) launched;
 } /* Canonical spring pass is weakly linked so spring-less headless test
  * binaries (which omit physics/spring_joint.c for its GL dependency)
  * still link; the GUI engine and TUI link it and get real forces. */
@@ -120,8 +102,7 @@ static void live_world_add (physics_world *world) {
         fprintf (stderr, "[mpe] LIVE-WORLD cap %d reached; world %p steps but is invisible to auto-purge (detach manually before unload)\n",
                  MPE_MAX_LIVE_WORLDS, (const void *) world);
         fflush (stderr);
-    }
-    pthread_mutex_unlock (&s_live_lock);
+    } pthread_mutex_unlock (&s_live_lock);
 } /* `physics_world` is commonly a stack object whose bytes are indeterminate
  * before its first init. Detect re-init by address in the registry instead
  * of probing fields in that uninitialized object. */
@@ -133,8 +114,7 @@ static bool live_world_contains (const physics_world *world) {
             found = true;
             break;
         }
-    }
-    pthread_mutex_unlock (&s_live_lock);
+    } pthread_mutex_unlock (&s_live_lock);
     return found;
 }
 static void live_world_remove (physics_world *world) {
@@ -146,8 +126,7 @@ static void live_world_remove (physics_world *world) {
             s_live_count--;
             break;
         }
-    }
-    pthread_mutex_unlock (&s_live_lock);
+    } pthread_mutex_unlock (&s_live_lock);
 }
 int physics_world_live_list (physics_world **out, int cap) {
     if (!out || cap <= 0)
@@ -210,9 +189,7 @@ static void physics_world_free_ptr (void **slot) {
     }
 }
 void physics_world_init (physics_world *world) {
-    if (!world) {
-        return;
-    }
+    if (!world) { return; }
     /* MPE_FTC_076a (upheld DESPOT-2026-09-26, amended DESPOT-2026-10-07 P1-2):
      * live_world_contains compares only the ADDRESS, so it is safe on
      * uninitialized stack bytes. Check BEFORE memset: if this address is
@@ -223,9 +200,7 @@ void physics_world_init (physics_world *world) {
      * is ever probed on garbage. Re-init without cleanup still requires
      * caller discipline, but re-init WITH a live entry no longer leaks. */
     bool was_live = live_world_contains (world);
-    if (was_live) {
-        physics_world_cleanup (world);
-    }
+    if (was_live) { physics_world_cleanup (world); }
     memset (world, 0, sizeof (physics_world));
     det_pin_fp_state ();
     /* Static plane body (floor at y=0) - disabled by default. */
@@ -255,8 +230,7 @@ void physics_world_init (physics_world *world) {
     for (int ji = 0; ji < mpe_max_joints; ji++) {
         world -> spring_joints [ji].is_active = false;
         world -> revolute_constraints [ji].is_active = false;
-    }
-    world -> spring_joint_count = 0;
+    } world -> spring_joint_count = 0;
     world -> revolute_constraint_count = 0;
     /* Growable pools: start small, double on demand (see growers below).
      * body_capacity tracks the live allocation (not the ceiling). */
@@ -283,50 +257,24 @@ void physics_world_init (physics_world *world) {
      * compile-time caps from mpe_constants.h; pages fault on first touch. */
     if (!world -> broadphase) {
         world -> broadphase = (broadphase_workspace *) calloc (1, sizeof (broadphase_workspace));
-        if (world -> broadphase) {
-            world -> broadphase -> current_cell_size = 5.0f;
-        }
+        if (world -> broadphase) { world -> broadphase -> current_cell_size = 5.0f; }
     }
-    if (!world -> pair_buffer) {
-        world -> pair_buffer = (broadphase_pair *) malloc ((size_t) mpe_max_broadphase_pairs * sizeof (broadphase_pair));
-    }
+    if (!world -> pair_buffer) { world -> pair_buffer = (broadphase_pair *) malloc ((size_t) mpe_max_broadphase_pairs * sizeof (broadphase_pair)); }
     if (!world -> manifolds) {
         world -> manifold_capacity = a3_max_manifolds / 8; /* start at 1024, grow to 8192 */
         world -> manifolds = (collision_data *) malloc ((size_t) world -> manifold_capacity * sizeof (collision_data));
     }
-    if (!world -> manifold_awake) {
-        world -> manifold_awake = (unsigned char *) malloc ((size_t) world -> manifold_capacity * sizeof (unsigned char));
-    }
-    if (!world -> manifold_order) {
-        world -> manifold_order = (int *) malloc ((size_t) world -> manifold_capacity * sizeof (int));
-    }
-    if (!world -> manifold_sort_keys) {
-        world -> manifold_sort_keys = (float *) malloc ((size_t) world -> manifold_capacity * sizeof (float));
-    }
-    if (!world -> pair_skipped) {
-        world -> pair_skipped = (unsigned char *) malloc ((size_t) mpe_max_broadphase_pairs * sizeof (unsigned char));
-    }
-    if (!world -> island_parent) {
-        world -> island_parent = (int *) malloc ((size_t) mpe_max_bodies * sizeof (int));
-    }
-    if (!world -> island_label) {
-        world -> island_label = (int *) malloc ((size_t) mpe_max_bodies * sizeof (int));
-    }
-    if (!world -> island_awake_flags) {
-        world -> island_awake_flags = (unsigned char *) malloc ((size_t) mpe_max_bodies * sizeof (unsigned char));
-    }
-    if (!world -> ccd_time_remaining) {
-        world -> ccd_time_remaining = (float *) malloc ((size_t) mpe_max_bodies * sizeof (float));
-    }
-    if (!world -> ccd_best_tois) {
-        world -> ccd_best_tois = (float *) malloc ((size_t) mpe_max_bodies * sizeof (float));
-    }
-    if (!world -> ccd_hit_flags) {
-        world -> ccd_hit_flags = (unsigned char *) malloc ((size_t) mpe_max_bodies * sizeof (unsigned char));
-    }
-    if (!world -> has_contact) {
-        world -> has_contact = (unsigned char *) malloc ((size_t) mpe_max_bodies * sizeof (unsigned char));
-    }
+    if (!world -> manifold_awake) { world -> manifold_awake = (unsigned char *) malloc ((size_t) world -> manifold_capacity * sizeof (unsigned char)); }
+    if (!world -> manifold_order) { world -> manifold_order = (int *) malloc ((size_t) world -> manifold_capacity * sizeof (int)); }
+    if (!world -> manifold_sort_keys) { world -> manifold_sort_keys = (float *) malloc ((size_t) world -> manifold_capacity * sizeof (float)); }
+    if (!world -> pair_skipped) { world -> pair_skipped = (unsigned char *) malloc ((size_t) mpe_max_broadphase_pairs * sizeof (unsigned char)); }
+    if (!world -> island_parent) { world -> island_parent = (int *) malloc ((size_t) mpe_max_bodies * sizeof (int)); }
+    if (!world -> island_label) { world -> island_label = (int *) malloc ((size_t) mpe_max_bodies * sizeof (int)); }
+    if (!world -> island_awake_flags) { world -> island_awake_flags = (unsigned char *) malloc ((size_t) mpe_max_bodies * sizeof (unsigned char)); }
+    if (!world -> ccd_time_remaining) { world -> ccd_time_remaining = (float *) malloc ((size_t) mpe_max_bodies * sizeof (float)); }
+    if (!world -> ccd_best_tois) { world -> ccd_best_tois = (float *) malloc ((size_t) mpe_max_bodies * sizeof (float)); }
+    if (!world -> ccd_hit_flags) { world -> ccd_hit_flags = (unsigned char *) malloc ((size_t) mpe_max_bodies * sizeof (unsigned char)); }
+    if (!world -> has_contact) { world -> has_contact = (unsigned char *) malloc ((size_t) mpe_max_bodies * sizeof (unsigned char)); }
     if (!world -> tick_v0) {
         world -> tick_v0 = (vector3 *) malloc ((size_t) mpe_max_bodies * sizeof (vector3));
         world -> tick_v0_capacity = world -> tick_v0 ? mpe_max_bodies : 0;
@@ -342,18 +290,12 @@ void physics_world_init (physics_world *world) {
             physics_world_free_ptr ((void **) &world -> id_cache_vals);
             physics_world_free_ptr ((void **) &world -> id_cache_valid);
             world -> id_cache_size = 0;
-        }
-        world -> id_cache_revision = 0;
-    }
-    world -> body_count = 0;
-    if (world -> next_object_id == 0) {
-        world -> next_object_id = 1;
-    }
+        } world -> id_cache_revision = 0;
+    } world -> body_count = 0;
+    if (world -> next_object_id == 0) { world -> next_object_id = 1; }
 }
 void physics_world_cleanup (physics_world *world) {
-    if (!world) {
-        return;
-    }
+    if (!world) { return; }
     /* DESPOT-2026-10-01: never trust a wild count from a never-init world.
      * Clamp to the static slot ceiling before walking the table.
      * DESPOT-2026-10-03: that ceiling was 8, but tick_modules[] is [16] and
@@ -364,14 +306,10 @@ void physics_world_cleanup (physics_world *world) {
      * attachments > 0 and every later mpe_loader_unload returned -2 busy
      * forever. One constant, total loss of a safety constraint. The ceiling
      * must be the array size; better, the single place that knows it. */
-    if (world -> tick_module_count < 0 || world -> tick_module_count > MPE_MAX_TICK_MODULES) {
-        world -> tick_module_count = 0;
-    }
+    if (world -> tick_module_count < 0 || world -> tick_module_count > MPE_MAX_TICK_MODULES) { world -> tick_module_count = 0; }
     /* Detach modules first: plugin attach() may own per-world state. */
     for (int i = world -> tick_module_count - 1; i >= 0; i--) {
-        if (world -> tick_modules [i] && world -> tick_modules [i] -> detach) {
-            world -> tick_modules [i] -> detach (world, world -> tick_module_state [i]);
-        }
+        if (world -> tick_modules [i] && world -> tick_modules [i] -> detach) { world -> tick_modules [i] -> detach (world, world -> tick_module_state [i]); }
         mpe_loader_release_module (world -> tick_modules [i]);
         world -> tick_modules [i] = NULL;
         world -> tick_module_state [i] = NULL;
@@ -422,55 +360,33 @@ void physics_world_set_config (physics_world *world, mpe_config_t *cfg) {
  * into bodies[] are rebuilt every tick, and caches store ids (never
  * pointers), so relocation during add_* (outside any step) is safe. */
 int physics_world_grow_bodies (physics_world *world) {
-    if (!world || !world -> bodies) {
-        return -1;
-    }
-    if (world -> body_capacity >= mpe_max_bodies) {
-        return -1;
-    }
+    if (!world || !world -> bodies) { return -1; }
+    if (world -> body_capacity >= mpe_max_bodies) { return -1; }
     int want = world -> body_capacity > 0 ? world -> body_capacity * 2 : mpe_initial_bodies;
-    if (want > mpe_max_bodies) {
-        want = mpe_max_bodies;
-    }
+    if (want > mpe_max_bodies) { want = mpe_max_bodies; }
     rigidbody *grown = (rigidbody *) realloc (world -> bodies, (size_t) want * sizeof (rigidbody));
-    if (!grown) {
-        return -1;
-    }
+    if (!grown) { return -1; }
     world -> bodies = grown;
     world -> body_capacity = want;
     return 0;
 }
 int physics_world_grow_contact_cache (physics_world *world) {
-    if (!world || !world -> world_contact_cache) {
-        return -1;
-    }
-    if (world -> world_contact_cache_capacity >= max_cached_contacts) {
-        return -1;
-    }
+    if (!world || !world -> world_contact_cache) { return -1; }
+    if (world -> world_contact_cache_capacity >= max_cached_contacts) { return -1; }
     int want = world -> world_contact_cache_capacity > 0 ? world -> world_contact_cache_capacity * 2 : mpe_initial_contacts;
-    if (want > max_cached_contacts) {
-        want = max_cached_contacts;
-    }
+    if (want > max_cached_contacts) { want = max_cached_contacts; }
     cached_contact *grown =
         (cached_contact *) realloc (world -> world_contact_cache, (size_t) want * sizeof (cached_contact));
-    if (!grown) {
-        return -1;
-    }
+    if (!grown) { return -1; }
     world -> world_contact_cache = grown;
     world -> world_contact_cache_capacity = want;
     return 0;
 }
 int physics_world_grow_manifolds (physics_world *world) {
-    if (!world || !world -> manifolds || !world -> manifold_awake || !world -> manifold_order || !world -> manifold_sort_keys) {
-        return -1;
-    }
-    if (world -> manifold_capacity >= a3_max_manifolds) {
-        return -1;
-    }
+    if (!world || !world -> manifolds || !world -> manifold_awake || !world -> manifold_order || !world -> manifold_sort_keys) { return -1; }
+    if (world -> manifold_capacity >= a3_max_manifolds) { return -1; }
     int want = world -> manifold_capacity > 0 ? world -> manifold_capacity * 2 : a3_max_manifolds / 8;
-    if (want > a3_max_manifolds) {
-        want = a3_max_manifolds;
-    }
+    if (want > a3_max_manifolds) { want = a3_max_manifolds; }
     /* Atomic: allocate all to temporaries, commit only if all succeed. */
     collision_data *grown = (collision_data *) malloc ((size_t) want * sizeof (collision_data));
     unsigned char *grown_awake = (unsigned char *) malloc ((size_t) want * sizeof (unsigned char));
@@ -482,8 +398,7 @@ int physics_world_grow_manifolds (physics_world *world) {
         free (grown_order);
         free (grown_keys);
         return -1;
-    }
-    memcpy (grown, world -> manifolds, (size_t) world -> manifold_capacity * sizeof (collision_data));
+    } memcpy (grown, world -> manifolds, (size_t) world -> manifold_capacity * sizeof (collision_data));
     memcpy (grown_awake, world -> manifold_awake, (size_t) world -> manifold_capacity);
     memcpy (grown_order, world -> manifold_order, (size_t) world -> manifold_capacity * sizeof (int));
     memcpy (grown_keys, world -> manifold_sort_keys, (size_t) world -> manifold_capacity * sizeof (float));
@@ -515,13 +430,10 @@ static void physics_world_id_cache_rebuild (physics_world *world) {
     if (!world -> bodies || world -> body_count <= 0) {
         world -> id_cache_revision = world -> body_revision;
         return;
-    }
-    uint32_t mask = (uint32_t) (world -> id_cache_size - 1);
+    } uint32_t mask = (uint32_t) (world -> id_cache_size - 1);
     for (int i = 0; i < world -> body_count; i++) {
         uint32_t id = world -> bodies [i].object_id;
-        if (id == 0 || id == 0xFFFFFFFFu) {
-            continue;
-        }
+        if (id == 0 || id == 0xFFFFFFFFu) { continue; }
         uint32_t h = (id * 2654435761u) & mask;
         for (int probe = 0; probe < 32; probe++) {
             uint32_t s = (h + (uint32_t) probe) & mask;
@@ -532,45 +444,31 @@ static void physics_world_id_cache_rebuild (physics_world *world) {
                 break;
             }
         }
-    }
-    world -> id_cache_revision = world -> body_revision;
+    } world -> id_cache_revision = world -> body_revision;
 }
 int physics_world_index_by_id (physics_world *world, uint32_t id) {
-    if (!world || !world -> bodies || world -> body_count <= 0 || id == 0) {
-        return -1;
-    }
+    if (!world || !world -> bodies || world -> body_count <= 0 || id == 0) { return -1; }
     if (world -> id_cache_size > 0 && world -> id_cache_keys && world -> id_cache_vals && world -> id_cache_valid) {
-        if (world -> id_cache_revision != world -> body_revision) {
-            physics_world_id_cache_rebuild (world);
-        }
+        if (world -> id_cache_revision != world -> body_revision) { physics_world_id_cache_rebuild (world); }
         uint32_t mask = (uint32_t) (world -> id_cache_size - 1);
         uint32_t h = (id * 2654435761u) & mask;
         for (int probe = 0; probe < 32; probe++) {
             uint32_t s = (h + (uint32_t) probe) & mask;
-            if (!world -> id_cache_valid [s]) {
-                break;
-            }
+            if (!world -> id_cache_valid [s]) { break; }
             if (world -> id_cache_keys [s] == id) {
                 int idx = world -> id_cache_vals [s];
-                if (idx >= 0 && idx < world -> body_count && world -> bodies [idx].object_id == id) {
-                    return idx;
-                }
+                if (idx >= 0 && idx < world -> body_count && world -> bodies [idx].object_id == id) { return idx; }
                 break;
             }
         }
     }
     for (int i = 0; i < world -> body_count; i++) {
-        if (world -> bodies [i].object_id == id) {
-            return i;
-        }
-    }
-    return -1;
+        if (world -> bodies [i].object_id == id) { return i; }
+    } return -1;
 }
 rigidbody *physics_world_body_by_id (physics_world *world, uint32_t id) {
     int idx = physics_world_index_by_id (world, id);
-    if (idx < 0) {
-        return NULL;
-    }
+    if (idx < 0) { return NULL; }
     return &world -> bodies [idx];
 }
 void physics_world_set_broadphase (physics_world *world, const mpe_broadphase_if_t *iface) {
@@ -623,8 +521,7 @@ bool physics_world_module_live_state (physics_world *world, const mpe_module_des
                 * out_state = world -> tick_module_state [i];
             return true;
         }
-    }
-    return false;
+    } return false;
 }
 int physics_world_attach_module (physics_world *world, const mpe_module_desc_t *desc) {
     if (!world || !desc || desc -> abi != MPE_MODULE_ABI)
@@ -654,14 +551,12 @@ int physics_world_detach_module (physics_world *world, const char *name) {
             for (int j = i; j + 1 < world -> tick_module_count; j++) {
                 world -> tick_modules [j] = world -> tick_modules [j + 1];
                 world -> tick_module_state [j] = world -> tick_module_state [j + 1];
-            }
-            world -> tick_module_count--;
+            } world -> tick_module_count--;
             world -> tick_modules [world -> tick_module_count] = NULL;
             world -> tick_module_state [world -> tick_module_count] = NULL;
             return 0;
         }
-    }
-    return -1;
+    } return -1;
 } /* Registry-first shape dispatch with built-in fallback.
  * Handles swapped (cube,sphere)/(cyl,sphere)/(cyl,cube) by trying the
  * registered orientation first, then the swapped orientation with a
@@ -685,9 +580,7 @@ int physics_world_detach_module (physics_world *world, const char *name) {
 static bool a3_sanitize_plugin_manifold (collision_data *out, const rigidbody *a, const rigidbody *b) {
     if (!out)
         return false;
-    if (out -> contact_count < 0 || out -> contact_count > MPE_MAX_MANIFOLD_CONTACTS) {
-        out -> contact_count = MPE_MAX_MANIFOLD_CONTACTS;
-    }
+    if (out -> contact_count < 0 || out -> contact_count > MPE_MAX_MANIFOLD_CONTACTS) { out -> contact_count = MPE_MAX_MANIFOLD_CONTACTS; }
     /* The pipeline is dispatching the pair (a,b); that is what the solver
      * must act on, so the dispatcher asserts it rather than trusting the
      * handler. A handler that leaves these NULL would NULL-deref two lines
@@ -739,8 +632,7 @@ static bool a3_sanitize_plugin_manifold (collision_data *out, const rigidbody *a
                 return false;
             }
         }
-    }
-    return true;
+    } return true;
 }
 bool mpe_shape_dispatch (physics_world *world, rigidbody *a, rigidbody *b, collision_data *out) {
     if (!a || !b || !out)
@@ -784,18 +676,12 @@ bool mpe_shape_dispatch (physics_world *world, rigidbody *a, rigidbody *b, colli
             vector3 r = out -> contacts [i].ra;
             out -> contacts [i].ra = out -> contacts [i].rb;
             out -> contacts [i].rb = r;
-        }
-        return true;
-    }
-    return false;
+        } return true;
+    } return false;
 }
 int physics_world_add_sphere (physics_world *world, float radius, float mass, vector3 position) {
-    if ((!world) || (!world -> bodies)) {
-        return -1;
-    }
-    if (world -> body_count >= world -> body_capacity && physics_world_grow_bodies (world) != 0) {
-        return -1;
-    }
+    if ((!world) || (!world -> bodies)) { return -1; }
+    if (world -> body_count >= world -> body_capacity && physics_world_grow_bodies (world) != 0) { return -1; }
     rigidbody *rb = &world -> bodies [world -> body_count];
     rigidbody_initialisation_sphere (rb, radius, mass, position);
     /* DESPOT-2026-10-07 P1-3: initialisers stamp from global g_cfg. Two
@@ -808,13 +694,9 @@ int physics_world_add_sphere (physics_world *world, float radius, float mass, ve
         rb -> friction_kinetic = wcfg -> body_defaults.sphere_fric_k;
         rb -> restitution = wcfg -> body_defaults.sphere_restitution;
     }
-    if (world -> next_object_id == 0 || world -> next_object_id == 0xFFFFFFFFu) {
-        world -> next_object_id = 1;
-    }
+    if (world -> next_object_id == 0 || world -> next_object_id == 0xFFFFFFFFu) { world -> next_object_id = 1; }
     rb -> object_id = world -> next_object_id++;
-    if (world -> next_object_id == 0 || world -> next_object_id == 0xFFFFFFFFu) {
-        world -> next_object_id = 1;
-    }
+    if (world -> next_object_id == 0 || world -> next_object_id == 0xFFFFFFFFu) { world -> next_object_id = 1; }
     rb -> object_generation = 1;
     rb -> body_index = world -> body_count;
     rigidbody_sanitize (rb);
@@ -822,12 +704,8 @@ int physics_world_add_sphere (physics_world *world, float radius, float mass, ve
     return world -> body_count++;
 }
 int physics_world_add_cube (physics_world *world, vector3 position, vector3 half_extensions, float mass) {
-    if ((!world) || (!world -> bodies)) {
-        return -1;
-    }
-    if (world -> body_count >= world -> body_capacity && physics_world_grow_bodies (world) != 0) {
-        return -1;
-    }
+    if ((!world) || (!world -> bodies)) { return -1; }
+    if (world -> body_count >= world -> body_capacity && physics_world_grow_bodies (world) != 0) { return -1; }
     rigidbody *rb = &world -> bodies [world -> body_count];
     rigidbody_initialisation_cube (rb, position, half_extensions, mass);
     /* DESPOT-2026-10-07 P1-3: per-world material stamp (see add_sphere). */
@@ -837,13 +715,9 @@ int physics_world_add_cube (physics_world *world, vector3 position, vector3 half
         rb -> friction_kinetic = wcfg -> body_defaults.cube_fric_k;
         rb -> restitution = wcfg -> body_defaults.cube_restitution;
     }
-    if (world -> next_object_id == 0 || world -> next_object_id == 0xFFFFFFFFu) {
-        world -> next_object_id = 1;
-    }
+    if (world -> next_object_id == 0 || world -> next_object_id == 0xFFFFFFFFu) { world -> next_object_id = 1; }
     rb -> object_id = world -> next_object_id++;
-    if (world -> next_object_id == 0 || world -> next_object_id == 0xFFFFFFFFu) {
-        world -> next_object_id = 1;
-    }
+    if (world -> next_object_id == 0 || world -> next_object_id == 0xFFFFFFFFu) { world -> next_object_id = 1; }
     rb -> object_generation = 1;
     rb -> body_index = world -> body_count;
     rigidbody_sanitize (rb);
@@ -851,12 +725,8 @@ int physics_world_add_cube (physics_world *world, vector3 position, vector3 half
     return world -> body_count++;
 } /* MPE_FTC_091 */
 int physics_world_add_cylinder (physics_world *world, float radius, float half_length, float mass, vector3 position) {
-    if ((!world) || (!world -> bodies)) {
-        return -1;
-    }
-    if (world -> body_count >= world -> body_capacity && physics_world_grow_bodies (world) != 0) {
-        return -1;
-    }
+    if ((!world) || (!world -> bodies)) { return -1; }
+    if (world -> body_count >= world -> body_capacity && physics_world_grow_bodies (world) != 0) { return -1; }
     rigidbody *rb = &world -> bodies [world -> body_count];
     rigidbody_initialisation_cylinder (rb, radius, half_length, mass, position);
     /* DESPOT-2026-10-07 P1-3: per-world material stamp (see add_sphere). */
@@ -866,13 +736,9 @@ int physics_world_add_cylinder (physics_world *world, float radius, float half_l
         rb -> friction_kinetic = wcfg -> body_defaults.cylinder_fric_k;
         rb -> restitution = wcfg -> body_defaults.cylinder_restitution;
     }
-    if (world -> next_object_id == 0 || world -> next_object_id == 0xFFFFFFFFu) {
-        world -> next_object_id = 1;
-    }
+    if (world -> next_object_id == 0 || world -> next_object_id == 0xFFFFFFFFu) { world -> next_object_id = 1; }
     rb -> object_id = world -> next_object_id++;
-    if (world -> next_object_id == 0 || world -> next_object_id == 0xFFFFFFFFu) {
-        world -> next_object_id = 1;
-    }
+    if (world -> next_object_id == 0 || world -> next_object_id == 0xFFFFFFFFu) { world -> next_object_id = 1; }
     rb -> object_generation = 1;
     rb -> body_index = world -> body_count;
     rigidbody_sanitize (rb);
@@ -906,9 +772,7 @@ int physics_world_add_custom (physics_world *world, int custom_shape, vector3 po
     return world -> body_count++;
 }
 void physics_world_clear (physics_world *world) {
-    if (!world) {
-        return;
-    }
+    if (!world) { return; }
     world -> body_count = 0;
     world -> world_contact_cache_count = 0; /* MFS_131A */
     world -> manifold_overflow_count = 0;
@@ -921,32 +785,23 @@ void physics_world_clear (physics_world *world) {
     for (int i = 0; i < mpe_max_joints; i++) {
         world -> spring_joints [i].is_active = false;
         world -> revolute_constraints [i].is_active = false;
-    }
-    world -> spring_joint_count = 0;
+    } world -> spring_joint_count = 0;
     world -> revolute_constraint_count = 0;
     physics_world_bump_revision (world);
     /* TRUTH: next_object_id monotonic wraps at 4G to 0, colliding with
      * cache sentinel id==0 (no match) + floor 0xFFFFFFFF. Skip 0/0xFFFFFFFF
      * on wrap. clear() does NOT reset IDs (stable across clears would alias
      * old cache entries); instead ensure wrap skips sentinels. */
-    if (world -> next_object_id == 0 || world -> next_object_id == 0xFFFFFFFFu) {
-        world -> next_object_id = 1;
-    }
+    if (world -> next_object_id == 0 || world -> next_object_id == 0xFFFFFFFFu) { world -> next_object_id = 1; }
 } /* One broadphase pair through narrowphase + wake-on-contact + solver
  * prep. Shared by the main pair loop and the sleep-wake revisit pass
  * below (extracted verbatim from the former single loop). Non-static:
  * the legacy GUI tick reuses it so both step paths share one wake +
  * dispatch implementation (registry-routed, per-world config). */
 void physics_world_process_pair (physics_world *world, int index_a, int index_b, float dt, int *manifold_count_ptr) {
-    if (!world || !world -> bodies || !manifold_count_ptr || !world -> manifolds) {
-        return;
-    }
-    if ((index_a < 0) || (index_a >= world -> body_count)) {
-        return;
-    }
-    if ((index_b < 0) || (index_b >= world -> body_count)) {
-        return;
-    }
+    if (!world || !world -> bodies || !manifold_count_ptr || !world -> manifolds) { return; }
+    if ((index_a < 0) || (index_a >= world -> body_count)) { return; }
+    if ((index_b < 0) || (index_b >= world -> body_count)) { return; }
     rigidbody *body_a = &world -> bodies [index_a];
     rigidbody *body_b = &world -> bodies [index_b];
     collision_data narrowphase_collision = {0};
@@ -981,24 +836,16 @@ void physics_world_process_pair (physics_world *world, int index_a, int index_b,
                  * applies via the revisit/split/depen paths). */
         } else {
             bool new_edge = !contact_cache_has_pair (world, body_a -> object_id, body_b -> object_id);
-            if ((a_was_sleeping) && (!body_b -> static_state) && new_edge) {
-                rigidbody_wake (body_a);
-            }
-            if ((b_was_sleeping) && (!body_a -> static_state) && new_edge) {
-                rigidbody_wake (body_b);
-            }
+            if ((a_was_sleeping) && (!body_b -> static_state) && new_edge) { rigidbody_wake (body_a); }
+            if ((b_was_sleeping) && (!body_a -> static_state) && new_edge) { rigidbody_wake (body_b); }
             float wake_lin_sq = mpe_world_cfg (world) -> sleep.wake_linear_thresh_sq;
             float wake_ang_sq = mpe_world_cfg (world) -> sleep.wake_angular_thresh_sq;
             bool a_fast = (!a_was_sleeping) && ((vector3_length_squared (body_a -> velocity) > wake_lin_sq) ||
                                                 (vector3_length_squared (body_a -> angular_velocity) > wake_ang_sq));
             bool b_fast = (!b_was_sleeping) && ((vector3_length_squared (body_b -> velocity) > wake_lin_sq) ||
                                                 (vector3_length_squared (body_b -> angular_velocity) > wake_ang_sq));
-            if ((a_was_sleeping) && (!body_b -> static_state) && b_fast) {
-                rigidbody_wake (body_a);
-            }
-            if ((b_was_sleeping) && (!body_a -> static_state) && a_fast) {
-                rigidbody_wake (body_b);
-            }
+            if ((a_was_sleeping) && (!body_b -> static_state) && b_fast) { rigidbody_wake (body_a); }
+            if ((b_was_sleeping) && (!body_a -> static_state) && a_fast) { rigidbody_wake (body_b); }
             /* Wake on significant overlap growth, even against static
                  * geometry: a sleeper ground into a static surface by a new
                  * persistent force (e.g. a spawned overlap, a tilted stack
@@ -1007,29 +854,18 @@ void physics_world_process_pair (physics_world *world, int index_a, int index_b,
             {
                 float deepest = 0.0f;
                 for (int wi = 0; wi < narrowphase_collision.contact_count; wi++) {
-                    if (narrowphase_collision.contacts [wi].penetration > deepest) {
-                        deepest = narrowphase_collision.contacts [wi].penetration;
-                    }
+                    if (narrowphase_collision.contacts [wi].penetration > deepest) { deepest = narrowphase_collision.contacts [wi].penetration; }
                 }
                 if (deepest > mpe_world_cfg (world) -> depenetration.wake_depth_thresh) {
-                    if (a_was_sleeping) {
-                        rigidbody_wake (body_a);
-                    }
-                    if (b_was_sleeping) {
-                        rigidbody_wake (body_b);
-                    }
+                    if (a_was_sleeping) { rigidbody_wake (body_a); }
+                    if (b_was_sleeping) { rigidbody_wake (body_b); }
                 }
-            }
-            collision_prepare_solver (world, &narrowphase_collision, &world -> manifolds [(*manifold_count_ptr)], dt);
+            } collision_prepare_solver (world, &narrowphase_collision, &world -> manifolds [(*manifold_count_ptr)], dt);
             (*manifold_count_ptr)++;
             /* TRUTH P0-1: contact flag for gravity-exactness gating. */
             if (world -> has_contact) {
-                if ((index_a >= 0) && (index_a < world -> body_count)) {
-                    world -> has_contact [index_a] = 1;
-                }
-                if ((index_b >= 0) && (index_b < world -> body_count)) {
-                    world -> has_contact [index_b] = 1;
-                }
+                if ((index_a >= 0) && (index_a < world -> body_count)) { world -> has_contact [index_a] = 1; }
+                if ((index_b >= 0) && (index_b < world -> body_count)) { world -> has_contact [index_b] = 1; }
             }
         }
     }
@@ -1038,37 +874,30 @@ void physics_world_process_pair (physics_world *world, int index_a, int index_b,
  * readable while making every stage hot-swappable. */
 static float mpe_step_resolve (physics_world *world, collision_data *m, float dt, bool friction_only, int iter,
                                const mpe_config_t *cfg) {
-    if (world -> solver_if && world -> solver_if -> resolve) {
-        return world -> solver_if -> resolve (world, m, dt, friction_only, iter, world -> solver_state);
-    }
+    if (world -> solver_if && world -> solver_if -> resolve) { return world -> solver_if -> resolve (world, m, dt, friction_only, iter, world -> solver_state); }
     return collision_resolve_iterative (m, dt, friction_only, iter, cfg);
 }
 static void mpe_step_poisson (physics_world *world, collision_data *manifolds, int n, const mpe_config_t *cfg) {
     if (world -> solver_if && world -> solver_if -> poisson) {
         world -> solver_if -> poisson (world, manifolds, n, world -> solver_state);
         return;
-    }
-    collision_apply_poisson_restitution (manifolds, n, cfg);
+    } collision_apply_poisson_restitution (manifolds, n, cfg);
 }
 static void mpe_step_rolling (physics_world *world, collision_data *manifolds, int n, float dt,
                               const mpe_config_t *cfg) {
     if (world -> solver_if && world -> solver_if -> rolling) {
         world -> solver_if -> rolling (world, manifolds, n, dt, world -> solver_state);
         return;
-    }
-    collision_apply_rolling_resistance (manifolds, n, dt, cfg);
+    } collision_apply_rolling_resistance (manifolds, n, dt, cfg);
 }
 static void mpe_step_split (physics_world *world, collision_data *manifolds, int n, float dt, const mpe_config_t *cfg) {
     if (world -> solver_if && world -> solver_if -> split) {
         world -> solver_if -> split (world, manifolds, n, dt, world -> solver_state);
         return;
-    }
-    collision_apply_split_impulse (manifolds, n, dt, cfg);
+    } collision_apply_split_impulse (manifolds, n, dt, cfg);
 }
 void physics_world_step (physics_world *world, float dt) {
-    if ((!world) || (!world -> bodies) || (!(dt > 0.0f)) || (!isfinite (dt)) || (world -> body_count <= 0)) {
-        return;
-    }
+    if ((!world) || (!world -> bodies) || (!(dt > 0.0f)) || (!isfinite (dt)) || (world -> body_count <= 0)) { return; }
     /* DESPOT-2026-10-07 LIE-05: fixed-dt is caller discipline. Bitwise
      * determinism requires identical dt sequences; variable-dt callers
      * silently desync (damping pow(drag,dt), CCD sweep*dt, rotor |w|*dt/2).
@@ -1088,9 +917,7 @@ void physics_world_step (physics_world *world, float dt) {
      * cost of unbounded catch-up work; clamping bounds work and keeps every
      * tick at fixed dt (determinism's first requirement). Time dilation
      * under extreme lag is documented behavior, not hidden. */
-    if (dt > 0.1f) {
-        dt = 0.1f;
-    }
+    if (dt > 0.1f) { dt = 0.1f; }
     /* DESPOT-2026-10-08 threading: per-body sanitize is order-independent
      * (disjoint writes). MT when MPE_THREADS>1 and n>=64, else serial.
      * Bitwise identical either way. */
@@ -1146,27 +973,21 @@ void physics_world_step (physics_world *world, float dt) {
         if ((s_degraded_ticks <= 8) || ((s_degraded_ticks % 1000) == 0)) {
             fprintf (stderr, "[mpe] DEGRADED tick %lu: scratch missing (low-mem); solving pairless, islands/ccd/contact flags stale\n",
                      s_degraded_ticks);
-        }
-        return;
-    }
-    int manifold_count = 0;
+        } return;
+    } int manifold_count = 0;
     for (int q = 0; q < pair_count; q++) {
         world -> pair_skipped [q] = 0;
-    }
-    contact_cache_stats_reset (world);
+    } contact_cache_stats_reset (world);
     for (int p = 0; p < pair_count; p++) {
         int index_a = world -> pair_buffer [p].object_index_a;
         int index_b = world -> pair_buffer [p].object_index_b;
-        if ((index_a < 0) || (index_a >= world -> body_count) || (index_b < 0) || (index_b >= world -> body_count)) {
-            continue;
-        }
+        if ((index_a < 0) || (index_a >= world -> body_count) || (index_b < 0) || (index_b >= world -> body_count)) { continue; }
         rigidbody *body_a = &world -> bodies [index_a];
         rigidbody *body_b = &world -> bodies [index_b];
         if ((body_a -> is_sleeping) && (body_b -> is_sleeping)) {
             world -> pair_skipped [p] = 1;
             continue;
-        }
-        physics_world_process_pair (world, index_a, index_b, dt, &manifold_count);
+        } physics_world_process_pair (world, index_a, index_b, dt, &manifold_count);
     }
     /* Sleep-wake revisit fixpoint: pairs skipped above as both-asleep get
      * re-processed if either endpoint woke during the main loop (a woken
@@ -1176,37 +997,26 @@ void physics_world_step (physics_world *world, float dt) {
     for (int revisit_pass = 0; revisit_pass < 16; revisit_pass++) {
         bool revisit_woke = false;
         for (int p = 0; p < pair_count; p++) {
-            if (!world -> pair_skipped [p]) {
-                continue;
-            }
+            if (!world -> pair_skipped [p]) { continue; }
             int index_a = world -> pair_buffer [p].object_index_a;
             int index_b = world -> pair_buffer [p].object_index_b;
             if ((index_a < 0) || (index_a >= world -> body_count) || (index_b < 0) || (index_b >= world -> body_count)) {
                 world -> pair_skipped [p] = 0;
                 continue;
-            }
-            rigidbody *body_a = &world -> bodies [index_a];
+            } rigidbody *body_a = &world -> bodies [index_a];
             rigidbody *body_b = &world -> bodies [index_b];
-            if ((body_a -> is_sleeping) && (body_b -> is_sleeping)) {
-                continue;
-            }
+            if ((body_a -> is_sleeping) && (body_b -> is_sleeping)) { continue; }
             bool slept_a = body_a -> is_sleeping;
             bool slept_b = body_b -> is_sleeping;
             physics_world_process_pair (world, index_a, index_b, dt, &manifold_count);
             world -> pair_skipped [p] = 0;
-            if ((slept_a && !body_a -> is_sleeping) || (slept_b && !body_b -> is_sleeping)) {
-                revisit_woke = true;
-            }
+            if ((slept_a && !body_a -> is_sleeping) || (slept_b && !body_b -> is_sleeping)) { revisit_woke = true; }
         }
-        if (!revisit_woke) {
-            break;
-        }
+        if (!revisit_woke) { break; }
     }
     for (int i = 0; i < world -> body_count; i++) {
         rigidbody *rb = &world -> bodies [i];
-        if (rb -> static_state) {
-            continue;
-        }
+        if (rb -> static_state) { continue; }
         if (rb -> no_collide) {
             continue; /* render-only proxies: no floor contact */
         }
@@ -1230,21 +1040,14 @@ void physics_world_step (physics_world *world, float dt) {
                         world -> manifold_overflow_count++;
                         continue;
                     }
-                }
-                float deepest = 0.0f;
+                } float deepest = 0.0f;
                 for (int fi = 0; fi < floor_collision.contact_count; fi++) {
-                    if (floor_collision.contacts [fi].penetration > deepest) {
-                        deepest = floor_collision.contacts [fi].penetration;
-                    }
+                    if (floor_collision.contacts [fi].penetration > deepest) { deepest = floor_collision.contacts [fi].penetration; }
                 }
-                if (was_sleeping && deepest > step_cfg -> depenetration.wake_depth_thresh) {
-                    rigidbody_wake (rb);
-                }
+                if (was_sleeping && deepest > step_cfg -> depenetration.wake_depth_thresh) { rigidbody_wake (rb); }
                 collision_prepare_solver (world, &floor_collision, &world -> manifolds [manifold_count], dt);
                 manifold_count++;
-                if (world -> has_contact) {
-                    world -> has_contact [i] = 1;
-                }
+                if (world -> has_contact) { world -> has_contact [i] = 1; }
             }
         }
     }
@@ -1256,8 +1059,7 @@ void physics_world_step (physics_world *world, float dt) {
         rigidbody *ma = world -> manifolds [m].object_a;
         rigidbody *mb = world -> manifolds [m].object_b;
         world -> manifold_awake [m] = (unsigned char) (islands_body_awake (world, ma) || islands_body_awake (world, mb));
-    }
-    collision_manifold_solve_order (world, world -> manifolds, manifold_count, world -> manifold_order);
+    } collision_manifold_solve_order (world, world -> manifolds, manifold_count, world -> manifold_order);
     vector3 gravity = {0.0f, step_gravity, 0.0f};
     /* Snapshot start-of-tick velocities for exact free-flight. The analytic
      * position/velocity solution must start from v_pre; live velocity after
@@ -1273,9 +1075,7 @@ void physics_world_step (physics_world *world, float dt) {
     }
     for (int i = 0; i < world -> body_count; i++) {
         rigidbody *rb = &world -> bodies [i];
-        if ((rb -> static_state) || (rb -> is_sleeping) || (rb -> kinematic)) {
-            continue;
-        }
+        if ((rb -> static_state) || (rb -> is_sleeping) || (rb -> kinematic)) { continue; }
         rb_apply_forces_perfect (rb, vector3_scaling (gravity, rb -> mass));
     }
     /* Deterministic retention factors (never libm pow: see det_math.h).
@@ -1307,9 +1107,7 @@ void physics_world_step (physics_world *world, float dt) {
     float angular_damping =
         (step_ang_scale >= 1.0f) ? 1.0f : (float) det_pow_retention ((double) ang_base, (double) dt);
     /* Springs before integration (weak-linked canonical entry). */
-    if (mpe_springs_apply) {
-        mpe_springs_apply (world, dt);
-    }
+    if (mpe_springs_apply) { mpe_springs_apply (world, dt); }
     constraint_apply_motors (world, dt); /* MPE_FTC_067 */
     /* Phase-2: foreign forcefield / motor modules (pre-integration).
      * Snapshot the table: a hook may attach/detach (structural change
@@ -1400,16 +1198,12 @@ void physics_world_step (physics_world *world, float dt) {
         for (int m = 0; m < manifold_count; m++) {
             for (int c = 0; c < world -> manifolds [m].contact_count; c++) {
                 float p = world -> manifolds [m].contacts [c].penetration;
-                if (isfinite (p) && (p > worst_pen)) {
-                    worst_pen = p;
-                }
+                if (isfinite (p) && (p > worst_pen)) { worst_pen = p; }
             }
         }
         if (worst_pen > step_cfg -> solver.penetration_slop) {
             int extra = 128 - solver_iterations;
-            if (extra > 32) {
-                extra = 32;
-            }
+            if (extra > 32) { extra = 32; }
             for (int iter = 0; iter < extra; iter++) {
                 for (int o = 0; o < manifold_count; o++) {
                     int m = world -> manifold_order [o];
@@ -1417,8 +1211,7 @@ void physics_world_step (physics_world *world, float dt) {
                         continue;
                     mpe_step_resolve (world, &world -> manifolds [m], dt, false, solver_iterations + iter, step_cfg);
                     mpe_step_resolve (world, &world -> manifolds [m], dt, false, solver_iterations + iter + 1, step_cfg);
-                }
-                constraint_solve_all (world, dt);
+                } constraint_solve_all (world, dt);
             }
         }
     }
@@ -1454,18 +1247,14 @@ void physics_world_step (physics_world *world, float dt) {
      * gravity gate stays honest). Rolling below then sees their normals. */
     int late_manifold_start = manifold_count;
     for (int p = 0; p < pair_count; p++) {
-        if (!world -> pair_skipped [p]) {
-            continue;
-        }
+        if (!world -> pair_skipped [p]) { continue; }
         int ia = world -> pair_buffer [p].object_index_a;
         int ib = world -> pair_buffer [p].object_index_b;
         if (ia < 0 || ia >= world -> body_count || ib < 0 || ib >= world -> body_count) {
             world -> pair_skipped [p] = 0;
             continue;
         }
-        if (world -> bodies [ia].is_sleeping && world -> bodies [ib].is_sleeping) {
-            continue;
-        }
+        if (world -> bodies [ia].is_sleeping && world -> bodies [ib].is_sleeping) { continue; }
         physics_world_process_pair (world, ia, ib, dt, &manifold_count);
         world -> pair_skipped [p] = 0;
     }
@@ -1492,8 +1281,7 @@ void physics_world_step (physics_world *world, float dt) {
             sleep_restore_body -> velocity = vector3_zero ();
             sleep_restore_body -> angular_velocity = vector3_zero ();
         }
-    }
-    contact_cache_save (world, world -> manifolds, manifold_count);
+    } contact_cache_save (world, world -> manifolds, manifold_count);
     /* TRUTH P0-1+P0-3: integrate CCD remainder with exact free-flight
      * for contact-free AND joint-free bodies (analytic gravity+drag solution),
      * original symplectic Euler for constrained bodies.
@@ -1505,9 +1293,7 @@ void physics_world_step (physics_world *world, float dt) {
     static _Thread_local unsigned char joint_membership [mpe_max_bodies];
     {
         int n = world -> body_count;
-        if (n > mpe_max_bodies) {
-            n = mpe_max_bodies;
-        }
+        if (n > mpe_max_bodies) { n = mpe_max_bodies; }
         /* FIX-AUDIT-DESPOT tail safety: was memset(..., n) — a tick with
          * FEWER bodies than the last tick left stale 1s past n, so removed
          * bodies' indices kept other bodies "jointed" (wrong symplectic
@@ -1515,30 +1301,18 @@ void physics_world_step (physics_world *world, float dt) {
          * size: always clear the whole thing. */
         memset (joint_membership, 0, sizeof (joint_membership));
         for (int ji = 0; ji < mpe_max_joints; ji++) {
-            if (!world -> revolute_constraints [ji].is_active) {
-                continue;
-            }
+            if (!world -> revolute_constraints [ji].is_active) { continue; }
             int ia = physics_world_index_by_id (world, world -> revolute_constraints [ji].body_id_a);
             int ib = physics_world_index_by_id (world, world -> revolute_constraints [ji].body_id_b);
-            if (ia >= 0 && ia < n) {
-                joint_membership [ia] = 1;
-            }
-            if (ib >= 0 && ib < n) {
-                joint_membership [ib] = 1;
-            }
+            if (ia >= 0 && ia < n) { joint_membership [ia] = 1; }
+            if (ib >= 0 && ib < n) { joint_membership [ib] = 1; }
         }
         for (int ji = 0; ji < mpe_max_joints; ji++) {
-            if (!world -> spring_joints [ji].is_active) {
-                continue;
-            }
+            if (!world -> spring_joints [ji].is_active) { continue; }
             int ia = physics_world_index_by_id (world, world -> spring_joints [ji].object_id_a);
             int ib = physics_world_index_by_id (world, world -> spring_joints [ji].object_id_b);
-            if (ia >= 0 && ia < n) {
-                joint_membership [ia] = 1;
-            }
-            if (ib >= 0 && ib < n) {
-                joint_membership [ib] = 1;
-            }
+            if (ia >= 0 && ia < n) { joint_membership [ia] = 1; }
+            if (ib >= 0 && ib < n) { joint_membership [ib] = 1; }
         }
     }
     for (int i = 0; i < world -> body_count; i++) {
@@ -1546,8 +1320,7 @@ void physics_world_step (physics_world *world, float dt) {
         if ((world -> ccd_time_remaining) && (world -> ccd_time_remaining [i] < step_dt) &&
             (world -> ccd_time_remaining [i] > 0.0f)) {
             step_dt = world -> ccd_time_remaining [i];
-        }
-        rigidbody *ib = &world -> bodies [i];
+        } rigidbody *ib = &world -> bodies [i];
         bool has_joint = (i < mpe_max_bodies) ? (joint_membership [i] != 0) : false;
         bool contact_free = ((world -> has_contact) ? (world -> has_contact [i] == 0) : false);
         /* DESPOT-2026-10-07 LIE-04: free_flight must be FALSE unless the
@@ -1557,17 +1330,14 @@ void physics_world_step (physics_world *world, float dt) {
          * Degraded/low-mem ticks now take the safe symplectic path. */
         bool free_flight = contact_free && !has_joint;
         bool have_v0 = (world -> tick_v0 && (world -> tick_v0_capacity >= world -> body_count));
-        if (free_flight && !have_v0) {
-            free_flight = false;
-        }
+        if (free_flight && !have_v0) { free_flight = false; }
         /* FIX-AUDIT-DESPOT: capacity gate matches the snapshot gate above
          * (>= live body_count, not >= mpe_max_bodies). */
         if (free_flight && have_v0) {
             /* Restore start-of-tick velocity so the analytic solution starts
              * from v_pre (Euler already applied gravity+damping to live). */
             ib -> velocity = world -> tick_v0 [i];
-        }
-        rb_integrate_position_exact (ib, step_dt, step_cfg, free_flight);
+        } rb_integrate_position_exact (ib, step_dt, step_cfg, free_flight);
         /* Exact integration now handles gravity correctly for all drag values.
          * No correction needed. */
         rigidbody_sanitize (&world -> bodies [i]);
@@ -1644,12 +1414,8 @@ void physics_world_step (physics_world *world, float dt) {
  */
 int physics_world_add_boundary_walls (physics_world *world, float half_width, float half_depth, float wall_height,
                                       float wall_thickness) {
-    if (!world) {
-        return -1;
-    }
-    if ((half_width <= 0.0f) || (half_depth <= 0.0f) || (wall_height <= 0.0f) || (wall_thickness <= 0.0f)) {
-        return -1;
-    }
+    if (!world) { return -1; }
+    if ((half_width <= 0.0f) || (half_depth <= 0.0f) || (wall_height <= 0.0f) || (wall_thickness <= 0.0f)) { return -1; }
     float hy = wall_height * 0.5f;
     float ht = wall_thickness * 0.5f;
     /* PHYSICS-NOTE: long axes overshoot by the full wall_thickness so
@@ -1668,8 +1434,6 @@ int physics_world_add_boundary_walls (physics_world *world, float half_width, fl
     /* West wall: -X side */
     int west = physics_world_add_cube (world, (vector3) {-(half_width + ht), hy, 0.0f},
                                        (vector3) {ht, hy, half_depth + wall_thickness}, 0.0f);
-    if ((north < 0) || (south < 0) || (east < 0) || (west < 0)) {
-        return -1;
-    }
+    if ((north < 0) || (south < 0) || (east < 0) || (west < 0)) { return -1; }
     return 0;
 }

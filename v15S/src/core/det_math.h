@@ -63,15 +63,11 @@ extern void det_assert_no_fallback_pow (void);
 extern void det_assert_no_fallback_trig (void);
 /* Natural logarithm for x > 0. |err| < 1e-12 on [0.1, 10]. */
 static inline double det_ln_pos (double x) {
-    if (x == 0.0) {
-        return -INFINITY;
-    }
+    if (x == 0.0) { return -INFINITY; }
     if (isinf (x) && x > 0.0) {
         return INFINITY; /* ln(+INF) = +INF, not NaN */
     }
-    if (!(x > 0.0)) {
-        return NAN;
-    }
+    if (!(x > 0.0)) { return NAN; }
     int exponent = 0;
     double mantissa = frexp (x, &exponent); /* exact; m in [0.5, 1) */
     /* ln(m), m in [0.5,1): u=(m-1)/(m+1) in [-1/3,0), atanh series. */
@@ -90,8 +86,7 @@ static inline double det_ln_pos (double x) {
     for (int k = 1; k <= 13; k++) {
         term *= u2;
         sum += term / (double) (2 * k + 1);
-    }
-    sum *= 2.0;
+    } sum *= 2.0;
     /* ln(2) to 36 digits; double stores the same bits everywhere. */
     const double ln2 = 0.693147180559945309417232121458176568;
     return sum + (double) exponent * ln2;
@@ -106,14 +101,12 @@ static inline double det_exp_small (double x) {
     if (x < -0.5 || x > 0.5) {
         det_mark_fallback_pow ();
         return exp (x);
-    }
-    double term = 1.0;
+    } double term = 1.0;
     double sum = 1.0;
     for (int k = 1; k <= 12; k++) {
         term *= x / (double) k;
         sum += term;
-    }
-    return sum;
+    } return sum;
 } /* base^ex for base in (0, 1.1] (covers damping retention bases).
  * TRUTH: never desyncs via libm in-tick. If |product|>0.5, chunk into
  * n pieces each within [-0.5,0.5] and multiply exact powers: r=exp(p/n),
@@ -127,9 +120,7 @@ static inline double det_pow_retention (double base, double ex) {
         det_mark_fallback_pow ();
         return pow (base, ex); /* out of contract: libm fallback */
     }
-    if (ex == 0.0) {
-        return 1.0;
-    }
+    if (ex == 0.0) { return 1.0; }
     double product = ex * det_ln_pos (base);
     if (!isfinite (product)) {
         det_mark_fallback_pow ();
@@ -139,23 +130,18 @@ static inline double det_pow_retention (double base, double ex) {
         /* Chunk to stay in det_exp_small contract without libm. */
         double ap = (product < 0.0) ? -product : product;
         long n = (long) (ap / 0.5) + 1L;
-        if (n < 1L) {
-            n = 1L;
-        }
+        if (n < 1L) { n = 1L; }
         if (n > 64L) {
             /* Absurd exponent (e.g. dt corruption): libm + count. */
             det_mark_fallback_pow ();
             return pow (base, ex);
-        }
-        double sub = product / (double) n;
+        } double sub = product / (double) n;
         double r = det_exp_small (sub);
         double out = 1.0;
         for (long k = 0; k < n; k++) {
             out *= r;
-        }
-        return out;
-    }
-    return det_exp_small (product);
+        } return out;
+    } return det_exp_small (product);
 } /* Taylor series for sin/cos on [-pi/4, pi/4] (|x| <= 0.7854).
  * Error bounds: |err| < 1e-15 for |x| <= pi/4. */
 static inline double det_sin_small (double x) {
@@ -164,13 +150,11 @@ static inline double det_sin_small (double x) {
          * into rotors (later normalized to identity, hiding poison). */
         det_mark_fallback_trig ();
         return NAN;
-    }
-    const double pi_quarter = 0.78539816339744830961566084581987572104929234984378;
+    } const double pi_quarter = 0.78539816339744830961566084581987572104929234984378;
     if (x < -pi_quarter || x > pi_quarter) {
         det_mark_fallback_trig ();
         return sin (x); /* out of contract: libm fallback */
-    }
-    double x2 = x * x;
+    } double x2 = x * x;
     double term = x;
     double sum = x;
     /* Terms up to x^17: 18 terms total for 1e-15 accuracy at pi/4 */
@@ -196,13 +180,11 @@ static inline double det_sin_small (double x) {
         /* TRUTH: cos(non-finite) is NaN (libm). See det_sin_small. */
         det_mark_fallback_trig ();
         return NAN;
-    }
-    const double pi_quarter = 0.78539816339744830961566084581987572104929234984378;
+    } const double pi_quarter = 0.78539816339744830961566084581987572104929234984378;
     if (x < -pi_quarter || x > pi_quarter) {
         det_mark_fallback_trig ();
         return cos (x); /* out of contract: libm fallback */
-    }
-    double x2 = x * x;
+    } double x2 = x * x;
     double term = 1.0;
     double sum = 1.0;
     /* Terms up to x^16: 17 terms total for 1e-15 accuracy at pi/4 */
@@ -251,8 +233,7 @@ static inline double det_reduce_pi4 (double x, int *quadrant) {
         /* No mark here: caller det_sin/cos small-path marks once, so the
          * fallback is counted exactly once per call. */
         return x; /* out of contract: caller falls back */
-    }
-    long long k = (long long) (k_d >= 0.0 ? k_d + 0.5 : k_d - 0.5);
+    } long long k = (long long) (k_d >= 0.0 ? k_d + 0.5 : k_d - 0.5);
     *quadrant = (int) ((k % 4 + 4) % 4); /* defined for negatives */
     /* Cody-Waite: r = (x - k*C1) - k*C2 in double, in this order. */
     double kd = (double) k; /* exact: |k| < 1e15 < 2^53 */
@@ -266,8 +247,7 @@ static inline double det_reduce_pi4 (double x, int *quadrant) {
     } else if (x_red < -pi_quarter) {
         x_red += pi_half;
         *quadrant = (*quadrant + 3) & 3;
-    }
-    return x_red;
+    } return x_red;
 } /* Full-range sin/cos via argument reduction. Bounds per header contract
  * (|x|<=pi/4 exact; <5e-13 below 1e4; out of contract beyond 1e15).
  * PHYSICS-TRUTH: non-finite input is NaN (libm/IEEE) and marks the trig
@@ -276,8 +256,7 @@ static inline double det_sin (double x) {
     if (!isfinite (x)) {
         det_mark_fallback_trig ();
         return NAN;
-    }
-    int quadrant = 0;
+    } int quadrant = 0;
     double xr = det_reduce_pi4 (x, &quadrant);
     /* Compute only the needed branch so an out-of-contract xr marks once. */
     switch (quadrant) {
@@ -295,8 +274,7 @@ static inline double det_sin (double x) {
     if (!isfinite (x)) {
         det_mark_fallback_trig ();
         return NAN;
-    }
-    int quadrant = 0;
+    } int quadrant = 0;
     double xr = det_reduce_pi4 (x, &quadrant);
     switch (quadrant) {
         case 0:

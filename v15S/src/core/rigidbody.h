@@ -176,20 +176,12 @@ void rb_integrate_position_exact (rigidbody *rigid_body, float delta_time, const
  * (the old staticize hack corrupted observable state mid-tick and blocked
  * multithreading). */
 static inline float rigidbody_effective_inv_mass (const rigidbody *rb) {
-    if (!rb) {
-        return 0.0f;
-    }
-    if (rb -> static_state || rb -> is_sleeping || rb -> kinematic) {
-        return 0.0f;
-    }
+    if (!rb) { return 0.0f; }
+    if (rb -> static_state || rb -> is_sleeping || rb -> kinematic) { return 0.0f; }
     return rb -> inverse_mass;
 } static inline bool rigidbody_is_awake_for_solver (const rigidbody *rb) {
-    if (!rb) {
-        return false;
-    }
-    if (rb -> static_state) {
-        return false;
-    }
+    if (!rb) { return false; }
+    if (rb -> static_state) { return false; }
     /* TRUTH: kinematic has eff_inv==0 (infinite mass) but still moves with
      * prescribed velocity. It is "awake" for island purposes (floor stacks
      * on moving platforms must stay awake) while solver treats it as
@@ -199,12 +191,8 @@ static inline float rigidbody_effective_inv_mass (const rigidbody *rb) {
  * the stored world-space inverse. Avoids mutating the stored field. */
 static inline math3 rigidbody_effective_inv_inertia (const rigidbody *rb) {
     math3 zero = {{{0.0f}}};
-    if (!rb) {
-        return zero;
-    }
-    if (rb -> static_state || rb -> is_sleeping || rb -> kinematic) {
-        return zero;
-    }
+    if (!rb) { return zero; }
+    if (rb -> static_state || rb -> is_sleeping || rb -> kinematic) { return zero; }
     return rb -> inverse_inertia_system;
 } /* DESPOT-2026-10-02: input-clamp observability.
  *

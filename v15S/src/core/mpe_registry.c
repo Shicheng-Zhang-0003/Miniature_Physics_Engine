@@ -70,8 +70,7 @@ int mpe_register_pair_handler (int ta, int tb, int ca, int cb, mpe_collide_fn fn
                 s_pairs [i].fn = fn;
                 snprintf (s_pairs [i].name, sizeof (s_pairs [i].name), "%s", name ? name : "?");
                 rc = i;
-            }
-            pthread_mutex_unlock (&s_reg_lock);
+            } pthread_mutex_unlock (&s_reg_lock);
             return rc;
         }
     }
@@ -81,8 +80,7 @@ int mpe_register_pair_handler (int ta, int tb, int ca, int cb, mpe_collide_fn fn
         fprintf (stderr, "[registry] pair table full (%d); refusing '%s'\n", MPE_MAX_PAIR_HANDLERS, name ? name : "?");
         pthread_mutex_unlock (&s_reg_lock);
         return -1;
-    }
-    s_pairs [s_pair_count].type_a = ta;
+    } s_pairs [s_pair_count].type_a = ta;
     s_pairs [s_pair_count].type_b = tb;
     s_pairs [s_pair_count].custom_a = ca;
     s_pairs [s_pair_count].custom_b = cb;
@@ -122,8 +120,7 @@ int mpe_unregister_pair_handler (mpe_collide_fn fn) {
             removed++;
         } else
         i++;
-    }
-    pthread_mutex_unlock (&s_reg_lock);
+    } pthread_mutex_unlock (&s_reg_lock);
     return removed ? 0 : -1;
 }
 static int match_score (const mpe_pair_entry_t *e, int ta, int tb, int ca, int cb) {
@@ -160,12 +157,9 @@ int mpe_registry_pair_describe (int idx, int *ta, int *tb, int *ca, int *cb, cha
             * ca = s_pairs [idx].custom_a;
         if (cb)
             * cb = s_pairs [idx].custom_b;
-        if (name && namelen > 0) {
-            snprintf (name, (size_t) namelen, "%s", s_pairs [idx].name);
-        }
+        if (name && namelen > 0) { snprintf (name, (size_t) namelen, "%s", s_pairs [idx].name); }
         rc = 0;
-    }
-    pthread_mutex_unlock (&s_reg_lock);
+    } pthread_mutex_unlock (&s_reg_lock);
     return rc;
 } /* Indexed snapshot for loader purge walks (skips tombstone-free table:
  * pairs have no tombstones; memmove under lock is safe). */
@@ -177,8 +171,7 @@ int mpe_registry_pair_fn_at (int idx, mpe_collide_fn *out) {
     if (idx >= 0 && idx < s_pair_count) {
         *out = s_pairs [idx].fn;
         rc = 0;
-    }
-    pthread_mutex_unlock (&s_reg_lock);
+    } pthread_mutex_unlock (&s_reg_lock);
     return rc;
 }
 mpe_collide_fn mpe_find_pair_handler (int ta, int tb, int ca, int cb) {
@@ -190,8 +183,7 @@ mpe_collide_fn mpe_find_pair_handler (int ta, int tb, int ca, int cb) {
             best_score = sc;
             best = i;
         }
-    }
-    mpe_collide_fn fn = (best < 0) ? 0 : s_pairs [best].fn;
+    } mpe_collide_fn fn = (best < 0) ? 0 : s_pairs [best].fn;
     pthread_mutex_unlock (&s_reg_lock);
     return fn;
 } /* Rollback support for loader failure paths: counts are only ever
@@ -237,10 +229,8 @@ void mpe_registry_truncate_modules (int keep) {
             s_modules [i].stage_detach = NULL;
             s_module_names [i][0] = 0;
             s_module_origin [i][0] = 0;
-        }
-        s_module_count = keep;
-    }
-    pthread_mutex_unlock (&s_reg_lock);
+        } s_module_count = keep;
+    } pthread_mutex_unlock (&s_reg_lock);
 }
 int mpe_registry_broadphase_count (void) {
     pthread_mutex_lock (&s_reg_lock);
@@ -287,8 +277,7 @@ int mpe_register_broadphase (const char *name, const mpe_broadphase_if_t *iface)
             } else {
                 s_broad [i].iface = *iface;
                 rc = i;
-            }
-            pthread_mutex_unlock (&s_reg_lock);
+            } pthread_mutex_unlock (&s_reg_lock);
             return rc;
         }
     }
@@ -310,8 +299,7 @@ int mpe_register_broadphase (const char *name, const mpe_broadphase_if_t *iface)
         fprintf (stderr, "[registry] broadphase table full (8); refusing '%s'\n", name ? name : "?");
         pthread_mutex_unlock (&s_reg_lock);
         return -1;
-    }
-    snprintf (s_broad [s_broad_count].name, sizeof (s_broad [s_broad_count].name), "%s", name);
+    } snprintf (s_broad [s_broad_count].name, sizeof (s_broad [s_broad_count].name), "%s", name);
     s_broad [s_broad_count].iface = *iface;
     s_broad [s_broad_count].live = 1;
     rc = s_broad_count++;
@@ -331,8 +319,7 @@ int mpe_unregister_broadphase (const char *name) {
             rc = 0;
             break;
         }
-    }
-    pthread_mutex_unlock (&s_reg_lock);
+    } pthread_mutex_unlock (&s_reg_lock);
     /* Worlds aliasing the interior pointer must reset to builtin (NULL)
      * before the caller can dlclose. Slot memory stays put (tombstone),
      * so no other world's pointer shifts meaning. */
@@ -354,8 +341,7 @@ int mpe_register_solver (const char *name, const mpe_solver_if_t *iface) {
             } else {
                 s_solvers [i].iface = *iface;
                 rc = i;
-            }
-            pthread_mutex_unlock (&s_reg_lock);
+            } pthread_mutex_unlock (&s_reg_lock);
             return rc;
         }
     }
@@ -373,8 +359,7 @@ int mpe_register_solver (const char *name, const mpe_solver_if_t *iface) {
         fprintf (stderr, "[registry] solver table full (8); refusing '%s'\n", name ? name : "?");
         pthread_mutex_unlock (&s_reg_lock);
         return -1;
-    }
-    snprintf (s_solvers [s_solver_count].name, sizeof (s_solvers [s_solver_count].name), "%s", name);
+    } snprintf (s_solvers [s_solver_count].name, sizeof (s_solvers [s_solver_count].name), "%s", name);
     s_solvers [s_solver_count].iface = *iface;
     s_solvers [s_solver_count].live = 1;
     rc = s_solver_count++;
@@ -394,8 +379,7 @@ int mpe_unregister_solver (const char *name) {
             rc = 0;
             break;
         }
-    }
-    pthread_mutex_unlock (&s_reg_lock);
+    } pthread_mutex_unlock (&s_reg_lock);
     if (deadp)
         physics_world_forget_stage_pointers (NULL, deadp);
     return rc;
@@ -409,8 +393,7 @@ const mpe_broadphase_if_t *mpe_find_broadphase (const char *name) {
         if (s_broad [i].live && strcmp (s_broad [i].name, name) == 0) {
         out = &s_broad [i].iface;
         break;
-    }
-    pthread_mutex_unlock (&s_reg_lock);
+    } pthread_mutex_unlock (&s_reg_lock);
     return out;
 }
 const mpe_solver_if_t *mpe_find_solver (const char *name) {
@@ -422,8 +405,7 @@ const mpe_solver_if_t *mpe_find_solver (const char *name) {
         if (s_solvers [i].live && strcmp (s_solvers [i].name, name) == 0) {
         out = &s_solvers [i].iface;
         break;
-    }
-    pthread_mutex_unlock (&s_reg_lock);
+    } pthread_mutex_unlock (&s_reg_lock);
     return out;
 }
 static void module_store (int i, const mpe_module_desc_t *desc, int keep_origin) {
@@ -442,12 +424,9 @@ static void module_store (int i, const mpe_module_desc_t *desc, int keep_origin)
         memcpy (&hook, &desc -> stage_detach, sizeof (hook));
         if (hook) {
             Dl_info hi;
-            if (dladdr ((const void *) hook, &hi) != 0 && hi.dli_fname) {
-                s_modules [i].stage_detach = hook;
-            }
+            if (dladdr ((const void *) hook, &hi) != 0 && hi.dli_fname) { s_modules [i].stage_detach = hook; }
         }
-    }
-    snprintf (s_module_names [i], sizeof (s_module_names [i]), "%s", desc -> name);
+    } snprintf (s_module_names [i], sizeof (s_module_names [i]), "%s", desc -> name);
     snprintf (s_module_versions [i], sizeof (s_module_versions [i]), "%s", desc -> version ? desc -> version : "?");
     snprintf (s_module_kinds [i], sizeof (s_module_kinds [i]), "%s", desc -> kind ? desc -> kind : "?");
     s_modules [i].name = s_module_names [i];
@@ -467,8 +446,7 @@ int mpe_registry_set_origin (const char *name, const char *path) {
             rc = 0;
             break;
         }
-    }
-    pthread_mutex_unlock (&s_reg_lock);
+    } pthread_mutex_unlock (&s_reg_lock);
     return rc;
 } /* Origin of the slot this desc pointer aliases, or NULL (static desc,
  * unknown pointer, or dead slot). */
@@ -482,8 +460,7 @@ const char *mpe_registry_module_origin (const mpe_module_desc_t *desc) {
             out = s_module_origin [i][0] ? s_module_origin [i] : NULL;
             break;
         }
-    }
-    pthread_mutex_unlock (&s_reg_lock);
+    } pthread_mutex_unlock (&s_reg_lock);
     return out;
 }
 int mpe_register_module (const mpe_module_desc_t *desc) {
@@ -514,8 +491,7 @@ int mpe_register_module (const mpe_module_desc_t *desc) {
                  desc && desc -> name ? desc -> name : "?");
         pthread_mutex_unlock (&s_reg_lock);
         return -1;
-    }
-    module_store (s_module_count, desc, 0);
+    } module_store (s_module_count, desc, 0);
     rc = s_module_count++;
     pthread_mutex_unlock (&s_reg_lock);
     return rc;
@@ -531,8 +507,7 @@ int mpe_unregister_module (const char *name) {
             rc = 0;
             break;
         }
-    }
-    pthread_mutex_unlock (&s_reg_lock);
+    } pthread_mutex_unlock (&s_reg_lock);
     /* Attached worlds hold &s_modules[i]: tombstone keeps the address
      * stable; detach everywhere so no world calls a dead module. */
     if (rc == 0)
@@ -552,8 +527,7 @@ int mpe_unregister_module_origin (const char *name, const char *path) {
             rc = 0;
             break;
         }
-    }
-    pthread_mutex_unlock (&s_reg_lock);
+    } pthread_mutex_unlock (&s_reg_lock);
     return rc;
 }
 int mpe_module_count (void) {
@@ -582,8 +556,7 @@ const mpe_module_desc_t *mpe_module_at (int i) {
             out = &s_modules [k];
             break;
         }
-    }
-    pthread_mutex_unlock (&s_reg_lock);
+    } pthread_mutex_unlock (&s_reg_lock);
     return out;
 }
 const mpe_module_desc_t *mpe_find_module (const char *name) {
@@ -595,8 +568,7 @@ const mpe_module_desc_t *mpe_find_module (const char *name) {
         if (s_module_live [i] && strcmp (s_modules [i].name, name) == 0) {
         out = &s_modules [i];
         break;
-    }
-    pthread_mutex_unlock (&s_reg_lock);
+    } pthread_mutex_unlock (&s_reg_lock);
     return out;
 } /* Built-in pair handlers forward the world's config snapshot. */
 static const mpe_config_t *wrap_cfg (mpe_world_t *w) {

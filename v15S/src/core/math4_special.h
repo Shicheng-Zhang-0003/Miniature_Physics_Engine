@@ -25,15 +25,13 @@ static inline math4 math4_look_view (vector3 camera_position, vector3 camera_fro
      * side vector. Fall back to -Z forward and Y up. */
     if (vector3_length_squared (forward_vector) < 1e-12f) {
         forward_vector = (vector3) {0.0f, 0.0f, -1.0f};
-    }
-    vector3 side_raw = vector3_cross (forward_vector, camera_up);
+    } vector3 side_raw = vector3_cross (forward_vector, camera_up);
     if (vector3_length_squared (side_raw) < 1e-12f) {
         /* camera_up parallel to forward (e.g. looking straight up): pick
          * an orthogonal reference so the basis stays valid. */
         vector3 alt_up = (fabsf (forward_vector.y) < 0.99f) ? (vector3) {0.0f, 1.0f, 0.0f} : (vector3) {1.0f, 0.0f, 0.0f};
         side_raw = vector3_cross (forward_vector, alt_up);
-    }
-    vector3 side_vector = vector3_normalisation (side_raw);
+    } vector3 side_vector = vector3_normalisation (side_raw);
     /* TRUTH: second degeneracy must be re-checked. If still degenerate
      * (NaN input), side is zero -> zero rows silently. Fall back to identity
      * basis instead. */
@@ -51,13 +49,10 @@ static inline math4 math4_look_view (vector3 camera_position, vector3 camera_fro
         float rl2 = vector3_length_squared (up_vector);
         if ((!isfinite (rl2)) || (rl2 < 1e-12f)) {
             up_vector = (vector3) {0.0f, 1.0f, 0.0f};
-        } else {
-            up_vector = vector3_scaling (up_vector, 1.0f / sqrtf (rl2));
-        }
+        } else { up_vector = vector3_scaling (up_vector, 1.0f / sqrtf (rl2)); }
     } else {
         up_vector = vector3_scaling (up_vector, 1.0f / sqrtf (up_len_sq));
-    }
-    result_matrix.matrix [0][0] = side_vector.x;
+    } result_matrix.matrix [0][0] = side_vector.x;
     result_matrix.matrix [1][0] = side_vector.y;
     result_matrix.matrix [2][0] = side_vector.z;
     result_matrix.matrix [0][1] = up_vector.x;
@@ -74,18 +69,10 @@ static inline math4 math4_look_view (vector3 camera_position, vector3 camera_fro
 static inline math4 math4_perspective_fov (float field_of_view, float aspect_ratio, float near_plane, float far_plane) {
     math4 result_matrix = {{{0}}};
     /* Clamp degenerate inputs so a bad config can never produce NaN/Inf. */
-    if (!(field_of_view > 0.01f && field_of_view < 3.14159265f)) {
-        field_of_view = 45.0f * 3.14159265358979323846f / 180.0f;
-    }
-    if (!(aspect_ratio > 1e-6f && aspect_ratio < 1e6f)) {
-        aspect_ratio = 16.0f / 9.0f;
-    }
-    if (!(near_plane > 1e-6f)) {
-        near_plane = 0.1f;
-    }
-    if (!(far_plane > near_plane + 1e-4f)) {
-        far_plane = near_plane + 1000.0f;
-    }
+    if (!(field_of_view > 0.01f && field_of_view < 3.14159265f)) { field_of_view = 45.0f * 3.14159265358979323846f / 180.0f; }
+    if (!(aspect_ratio > 1e-6f && aspect_ratio < 1e6f)) { aspect_ratio = 16.0f / 9.0f; }
+    if (!(near_plane > 1e-6f)) { near_plane = 0.1f; }
+    if (!(far_plane > near_plane + 1e-4f)) { far_plane = near_plane + 1000.0f; }
     float focal_length = 1.0f / tanf (field_of_view / 2.0f);
     result_matrix.matrix [0][0] = focal_length / aspect_ratio;
     result_matrix.matrix [1][1] = focal_length;
@@ -118,8 +105,7 @@ static inline math4 math4_multiplication (math4 matrix_a, math4 matrix_b) {
                 (matrix_a.matrix [2][row_index] * matrix_b.matrix [column_index][2]) +
                 (matrix_a.matrix [3][row_index] * matrix_b.matrix [column_index][3]);
         }
-    }
-    return result_matrix;
+    } return result_matrix;
 } // Quaternion to Matrix Interface
 /* TRUTH: column-major storage (math3 is row-major). Normalize input like
  * vector4_to_math3 so non-unit quats never scale the render matrix. */
@@ -138,8 +124,7 @@ static inline math4 vector4_to_math4 (vector4 quaternion) {
         quaternion.z *= inv;
     } else {
         quaternion = vector4_identity ();
-    }
-    math4 result_matrix = math4_identity ();
+    } math4 result_matrix = math4_identity ();
     float x_double = quaternion.x + quaternion.x, y_double = quaternion.y + quaternion.y,
           z_double = quaternion.z + quaternion.z;
     float x_x = quaternion.x * x_double, x_y = quaternion.x * y_double, x_z = quaternion.x * z_double;
@@ -158,9 +143,7 @@ static inline math4 vector4_to_math4 (vector4 quaternion) {
 } // GPU flat array interface
 /* TRUTH: NULL/short buffer was heap overflow. Require non-NULL; caller owns 16 floats. */
 static inline void math4_to_flat_array (math4 matrix, float *output_array) {
-    if (!output_array) {
-        return;
-    }
+    if (!output_array) { return; }
     for (int column_index = 0; column_index < 4; column_index++) {
         for (int row_index = 0; row_index < 4; row_index++) {
             output_array [column_index * 4 + row_index] = matrix.matrix [column_index][row_index];
@@ -210,9 +193,7 @@ static inline void math4_frustum_planes (math4 view_projection, float planes [6]
     };
     for (int p = 0; p < 6; p++) {
         float len = sqrtf (combos [p][0] * combos [p][0] + combos [p][1] * combos [p][1] + combos [p][2] * combos [p][2]);
-        if (len < 0.000001f) {
-            len = 1.0f;
-        }
+        if (len < 0.000001f) { len = 1.0f; }
         planes [p][0] = combos [p][0] / len; /* a */
         planes [p][1] = combos [p][1] / len; /* b */
         planes [p][2] = combos [p][2] / len; /* c */
@@ -224,10 +205,7 @@ static inline void math4_frustum_planes (math4 view_projection, float planes [6]
 static inline int math4_frustum_sphere_visible (const float planes [6][4], float cx, float cy, float cz, float radius) {
     for (int p = 0; p < 6; p++) {
         float dist = planes [p][0] * cx + planes [p][1] * cy + planes [p][2] * cz + planes [p][3];
-        if (dist < -radius) {
-            return 0;
-        }
-    }
-    return 1;
+        if (dist < -radius) { return 0; }
+    } return 1;
 }
 #endif
