@@ -4,6 +4,24 @@
 > `docs/DESPOT_AUDIT_2026-10-07.md` (44/42; 232+2 xfail/234). The 2026-10-01
 > audit's 41/42 denominators are superseded.
 
+## Despot 2026-10-08 — Tandem-Helix: everything open, solved or bounded
+
+- [x] Joint pools cleared inside `physics_world_init` (was memset-only).
+- [x] MSVC `/fp:strict` auto-flag + scope note (twins GCC/Clang-only until CI proves Windows).
+- [x] SIMD SSE2 `core/simd_math.h` (scalar fallback, bitwise-identical self-check in broadphase).
+- [x] Threading `MPE_THREADS` (1-8, default 1): parallel per-body sanitize, disjoint writes, bitwise identical; pairs/solve stay serial for order.
+- [x] `make tsan` target added; container TSan aborts on mapping (env, not code — recorded; TSan proof remains future on a TSan-capable host).
+- [x] Rotational CCD obstacle margin (world max tip speed, capped 2 m/s); blade regime documented.
+- [x] Deep-containment (>0.30 m) moves lighter body only (fixes +Y inversion).
+- [x] Buckling guard ≤32 extra iters (both step paths, capped 128) for bodies≥8 with residual>slop.
+- [x] Air-spin bearing damping `c=1e-6` (c·dt/I≈0.067) for airborne wheels; grounded thrust unchanged.
+- [x] `angmom` sphere control (settles cube/sphere tension).
+- [x] `v15S/docs/NUMERICAL_GUARANTEES.md` (precise budgets, unsupported list).
+- [x] `v15S/validation/property_sweep.py` (seeded collision/constraint/config laws, 0 failures).
+- [x] Step-path unification: stages shared, frame drivers separate by design (bitwise passive proof); legacy parity guards (buckling, free-flight, dt).
+- [x] Verified: `build_suite` clean, `test_mpe_suite --all` 44/42 green, `--profile quick` 58/58 green, oracle 10/10 + sweep laws green.
+- [ ] Remaining open (bounded, not solved): normal warm-start with proof (cold stays; naive restore regresses F10/F11), full Gottschalk distance numeric, oblique multi-body L oracle, TSan on capable host, MSVC proof, multithreaded solve (serial by design).
+
 ## Despot 2026-10-07 — closed this audit
 
 - [x] P0-1 world-clear joint `is_active`; P0-2 dlsym re-resolve + invalidate;
