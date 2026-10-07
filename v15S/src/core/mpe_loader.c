@@ -95,8 +95,7 @@ static int plugin_path_is_confined (const char *path, char resolved [PATH_MAX]) 
         return 0;
     for (size_t i = 0; path [i] && pi + 1 < sizeof (norm); i++) {
         norm [pi++] = (path [i] == '\\') ? '/' : path [i];
-    }
-    norm [pi] = '\0';
+    } norm [pi] = '\0';
     path = norm;
 #endif
     const char *prefix_a = "plugins/";
@@ -120,8 +119,7 @@ static int plugin_path_is_confined (const char *path, char resolved [PATH_MAX]) 
         base = path + strlen (prefix_d);
     } else {
         return 0;
-    }
-    (void) prefix_e;
+    } (void) prefix_e;
     if (!*base || strchr (base, '/') ||
 #ifdef MPE_OS_WINDOWS
         strchr (base, '\\') ||
@@ -139,8 +137,7 @@ int mpe_loader_load (const char *path, char *errbuf, int errlen) {
         if (errbuf && errlen > 0)
             snprintf (errbuf, (size_t) errlen, "empty path");
         return -1;
-    }
-    char resolved [PATH_MAX];
+    } char resolved [PATH_MAX];
     if (!plugin_path_is_confined (path, resolved)) {
         /* Distinguish "file missing / wrong working directory" (the common
          * MFS stumble: engine must run from v15S/src) from a genuine jail
@@ -160,8 +157,7 @@ int mpe_loader_load (const char *path, char *errbuf, int errlen) {
                           "ecosystem/mfs/<name>%s)",
                           path, MPE_PLUGIN_EXT, MPE_PLUGIN_EXT);
             }
-        }
-        return -1;
+        } return -1;
     }
     /* Length validated BEFORE any registration (a late failure used to
      * dlclose while the module stayed registered -> dangling dispatch). */
@@ -200,8 +196,7 @@ int mpe_loader_load (const char *path, char *errbuf, int errlen) {
                               path);
             loader_unlock ();
             return -3;
-        }
-        loader_unlock ();
+        } loader_unlock ();
         return 0;
     } /* already loaded */
     if (s_n >= MPE_MAX_HANDLES) {
@@ -209,8 +204,7 @@ int mpe_loader_load (const char *path, char *errbuf, int errlen) {
             snprintf (errbuf, (size_t) errlen, "handle table full");
         loader_unlock ();
         return -1;
-    }
-    loader_unlock ();
+    } loader_unlock ();
     /* Snapshot registry counts so constructor registrations can be rolled
      * back if anything below fails. The registry lock is NOT held across
      * dlopen: plugin constructors register (locking internally), so
@@ -246,8 +240,7 @@ int mpe_loader_load (const char *path, char *errbuf, int errlen) {
         void (*p_init) (void) = (void (*) (void)) dlsym (h, "mpe_capsule_init");
         if (dlerror () == NULL && p_init)
             p_init ();
-    }
-    loader_lock ();
+    } loader_lock ();
     /* Re-validate under lock: a concurrent load may have won the race. */
     for (int i = 0; i < s_n; i++) {
         if (strcmp (s_h [i].path, resolved) == 0) {
@@ -300,8 +293,7 @@ int mpe_loader_load (const char *path, char *errbuf, int errlen) {
             mpe_registry_truncate_broadphase (snap_broad);
             mpe_registry_truncate_solvers (snap_solvers);
             return -1;
-        }
-        s_h [s_n].h = h;
+        } s_h [s_n].h = h;
         snprintf (s_h [s_n].path, sizeof (s_h [s_n].path), "%s", resolved);
         s_h [s_n].desc = NULL;
         s_h [s_n].eco = eco_first;
@@ -311,8 +303,7 @@ int mpe_loader_load (const char *path, char *errbuf, int errlen) {
         s_n++;
         loader_unlock ();
         return 0;
-    }
-    dlerror ();
+    } dlerror ();
     const mpe_module_desc_t *desc = (const mpe_module_desc_t *) dlsym (h, "mpe_module_desc");
     sym_err = dlerror ();
     if (!sym_err && desc) {
@@ -390,8 +381,7 @@ static int handle_by_path_locked (const char *path) {
     for (int i = 0; i < s_n; i++) {
         if (same_path (s_h [i].path, path))
             return i;
-    }
-    return -1;
+    } return -1;
 } /* NOTE: every *_locked helper below requires s_loader_lock held. Public
  * entry points take it; unload-time sweeps already hold it throughout. */
 /* Which loaded handle owns this desc? Registry-slot origin first (exact
@@ -405,11 +395,8 @@ static int handle_for_desc_locked (const mpe_module_desc_t *d) {
         char obuf [MPE_MODULE_ORIGIN_MAX];
         snprintf (obuf, sizeof (obuf), "%s", origin);
         return handle_by_path_locked (obuf);
-    }
-    Dl_info info;
-    if (dladdr ((const void *) d, &info) && info.dli_fname) {
-        return handle_by_path_locked (info.dli_fname);
-    }
+    } Dl_info info;
+    if (dladdr ((const void *) d, &info) && info.dli_fname) { return handle_by_path_locked (info.dli_fname); }
     return -1;
 } /* Validated stage_detach read: the hook is an append-only tail field, so a
  * .so built against the older header has no such pointer and the word past
@@ -435,9 +422,7 @@ static void call_stage_detach_validated (const mpe_module_desc_t *desc, const ch
         if (dladdr ((const void *) desc, &di) && di.dli_fname) {
             snprintf (dbuf, sizeof (dbuf), "%s", di.dli_fname);
             dpath = dbuf;
-        } else {
-            return;
-        }
+        } else { return; }
     }
     if (!same_path (hi.dli_fname, dpath))
         return; /* foreign/garbage: refuse */
@@ -517,9 +502,7 @@ static int fn_in_plugin (mpe_collide_fn fn, const char *resolved) {
  * Requires s_loader_lock. */
 static int desc_busy_in_world (physics_world *w, int hi) {
     for (int k = 0; k < w -> tick_module_count; k++) {
-        if (w -> tick_modules [k] && handle_for_desc_locked (w -> tick_modules [k]) == hi) {
-            return 1;
-        }
+        if (w -> tick_modules [k] && handle_for_desc_locked (w -> tick_modules [k]) == hi) { return 1; }
     }
     if (w -> broadphase_if && w -> broadphase_if -> generate &&
         fn_in_plugin ((mpe_collide_fn) (void *) w -> broadphase_if -> generate, s_h [hi].path)) {
@@ -529,12 +512,9 @@ static int desc_busy_in_world (physics_world *w, int hi) {
         const void *hooks [4] = {(const void *) w -> solver_if -> resolve, (const void *) w -> solver_if -> poisson,
                                 (const void *) w -> solver_if -> rolling, (const void *) w -> solver_if -> split};
         for (int k = 0; k < 4; k++) {
-            if (hooks [k] && fn_in_plugin ((mpe_collide_fn) hooks [k], s_h [hi].path)) {
-                return 1;
-            }
+            if (hooks [k] && fn_in_plugin ((mpe_collide_fn) hooks [k], s_h [hi].path)) { return 1; }
         }
-    }
-    return 0;
+    } return 0;
 }
 static int handle_busy (int hi) {
     if (s_h [hi].attachments > 0)
@@ -544,8 +524,7 @@ static int handle_busy (int hi) {
     for (int i = 0; i < n; i++) {
         if (desc_busy_in_world (ws [i], hi))
             return 1;
-    }
-    return 0;
+    } return 0;
 } /* Detach only tick modules owned by this handle (origin-aware: static
  * same-named attachments are left alone). Hooks run pre-dlclose.
  * Requires s_loader_lock. */
@@ -561,9 +540,7 @@ static void detach_handle_modules (int hi) {
                 char nm [128];
                 snprintf (nm, sizeof (nm), "%s", d -> name);
                 physics_world_detach_module (w, nm);
-            } else {
-                k++;
-            }
+            } else { k++; }
         }
         /* Stage slots owned by this handle revert to builtin. Foreign
          * stage state is owned by the module (physics_world.h:133-137:
@@ -626,8 +603,7 @@ int mpe_loader_unload (const char *path_or_name) {
             if (!plugin_path_is_confined (path_or_name, resolved))
                 return -1;
             identity = resolved;
-        }
-        loader_lock ();
+        } loader_lock ();
         for (int i = 0; i < s_n; i++) {
             const char *n = s_h [i].is_ecosystem ? (s_h [i].eco && s_h [i].eco -> name ? s_h [i].eco -> name : "")
                 : (s_h [i].desc ? s_h [i].desc -> name : "");
@@ -700,8 +676,7 @@ int mpe_loader_unload (const char *path_or_name) {
                 if (handle_busy (i)) {
                     loader_unlock ();
                     return -2;
-                }
-                char modname [128];
+                } char modname [128];
                 snprintf (modname, sizeof (modname), "%s", n ? n : "");
                 /* Targeted teardown, all pre-dlclose: detach only this
              * handle's tick modules (static same-named ones stay),
@@ -713,23 +688,20 @@ int mpe_loader_unload (const char *path_or_name) {
                     mpe_unregister_broadphase (modname);
                     mpe_unregister_solver (modname);
                     mpe_unregister_module_origin (modname, s_h [i].path);
-                }
-                purge_plugin_pairs (i);
+                } purge_plugin_pairs (i);
                 dlerror ();
                 {
                     void (*p_fini) (void) = (void (*) (void)) dlsym (s_h [i].h, "mpe_capsule_fini");
                     if (dlerror () == NULL && p_fini)
                         p_fini ();
-                }
-                dlclose (s_h [i].h);
+                } dlclose (s_h [i].h);
                 for (int j = i; j + 1 < s_n; j++)
                     s_h [j] = s_h [j + 1];
                 s_n--;
                 loader_unlock ();
                 return 0;
             }
-        }
-        loader_unlock ();
+        } loader_unlock ();
         return -1;
     }
     int mpe_loader_count (void) {
@@ -752,8 +724,7 @@ int mpe_loader_unload (const char *path_or_name) {
             snprintf (snaps [next], sizeof (snaps [next]), "%s", src);
             out = snaps [next];
             next = (next + 1) & 3;
-        }
-        loader_unlock ();
+        } loader_unlock ();
         return out;
     }
     const char *mpe_loader_name_at (int i) {
@@ -764,18 +735,13 @@ int mpe_loader_unload (const char *path_or_name) {
         const char *src = NULL;
         const char *out = NULL;
         if (i >= 0 && i < s_n) {
-            if (s_h [i].is_ecosystem) {
-                src = (s_h [i].eco && s_h [i].eco -> name) ? s_h [i].eco -> name : NULL;
-            } else if (s_h [i].desc && s_h [i].desc -> name) {
-                src = s_h [i].desc -> name;
-            }
+            if (s_h [i].is_ecosystem) { src = (s_h [i].eco && s_h [i].eco -> name) ? s_h [i].eco -> name : NULL; } else if (s_h [i].desc && s_h [i].desc -> name) { src = s_h [i].desc -> name; }
         }
         if (src) {
             snprintf (snaps [next], sizeof (snaps [next]), "%s", src);
             out = snaps [next];
             next = (next + 1) & 3;
-        }
-        loader_unlock ();
+        } loader_unlock ();
         return out;
     }
     /* Resolve a symbol from a loaded handle (by path, module name, or
@@ -796,8 +762,7 @@ int mpe_loader_unload (const char *path_or_name) {
             if (!plugin_path_is_confined (path_or_name, resolved))
                 return NULL;
             identity = resolved;
-        }
-        loader_lock ();
+        } loader_lock ();
         void *out = NULL;
         for (int i = 0; i < s_n; i++) {
             const char *n = s_h [i].is_ecosystem ? ((s_h [i].eco && s_h [i].eco -> name) ? s_h [i].eco -> name : "")
@@ -811,11 +776,9 @@ int mpe_loader_unload (const char *path_or_name) {
             if (dlerror () != NULL) {
                 out = NULL;
                 break;
-            }
-            out = p;
+            } out = p;
             break;
-        }
-        loader_unlock ();
+        } loader_unlock ();
         return out;
     }
     /* Retain/release resolve the OWNING handle (origin-aware): attach may

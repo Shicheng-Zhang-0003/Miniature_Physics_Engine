@@ -203,14 +203,11 @@ static char mpe_dl_errbuf [1024];
 static inline const char *mpe_dl_strerror_win (DWORD e, char *buf, size_t n) {
     DWORD f =
         FormatMessageA (FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, e, 0, buf, (DWORD) n, NULL);
-    if (f == 0 || f >= n) {
-        snprintf (buf, n, "Win32 error %lu", (unsigned long) e);
-    } else {
+    if (f == 0 || f >= n) { snprintf (buf, n, "Win32 error %lu", (unsigned long) e); } else {
         /* strip trailing CRLF */
         while (f > 0 && (buf [f - 1] == '\n' || buf [f - 1] == '\r'))
             buf [--f] = '\0';
-    }
-    return buf;
+    } return buf;
 } static inline void *mpe_win_dlopen (const char *path, int flags) {
     (void) flags;
     if (!path || !*path)
@@ -226,11 +223,8 @@ static inline const char *mpe_dl_strerror_win (DWORD e, char *buf, size_t n) {
         SetLastError (ERROR_MOD_NOT_FOUND);
         snprintf (mpe_dl_errbuf, sizeof (mpe_dl_errbuf), "module not loaded: %s", path);
         return NULL;
-    }
-    HMODULE h = LoadLibraryA (path);
-    if (!h) {
-        mpe_dl_strerror_win (GetLastError (), mpe_dl_errbuf, sizeof (mpe_dl_errbuf));
-    }
+    } HMODULE h = LoadLibraryA (path);
+    if (!h) { mpe_dl_strerror_win (GetLastError (), mpe_dl_errbuf, sizeof (mpe_dl_errbuf)); }
     return (void *) h;
 } static inline void *mpe_win_dlsym (void *h, const char *sym) {
     if (!h || !sym)
@@ -239,8 +233,7 @@ static inline const char *mpe_dl_strerror_win (DWORD e, char *buf, size_t n) {
     if (!p) {
         mpe_dl_strerror_win (GetLastError (), mpe_dl_errbuf, sizeof (mpe_dl_errbuf));
         return NULL;
-    }
-    return (void *) p;
+    } return (void *) p;
 } static inline int mpe_win_dlclose (void *h) {
     if (!h)
         return -1;
@@ -430,8 +423,7 @@ static inline int mpe_mkstemp (char *tmpl) {
     if (!tmpl) {
         errno = EINVAL;
         return -1;
-    }
-    size_t n = strlen (tmpl);
+    } size_t n = strlen (tmpl);
     if (n < 6 || strcmp (tmpl + n - 6, "XXXXXX") != 0) {
         errno = EINVAL;
         return -1;
@@ -441,12 +433,9 @@ static inline int mpe_mkstemp (char *tmpl) {
     if (e != 0) {
         errno = EEXIST;
         return -1;
-    }
-    int fd = -1;
+    } int fd = -1;
     errno_t oe = _sopen_s (&fd, tmpl, _O_CREAT | _O_EXCL | _O_RDWR | _O_BINARY, _SH_DENYRW, _S_IREAD | _S_IWRITE);
-    if (oe != 0 || fd < 0) {
-        return -1;
-    }
+    if (oe != 0 || fd < 0) { return -1; }
     return fd;
 }
 #ifdef mkstemp
@@ -467,8 +456,7 @@ static inline char *mpe_realpath (const char *path, char *resolved) {
         if (!resolved)
             return NULL;
         need_free = 1;
-    }
-    n = GetFullPathNameA (path, PATH_MAX * 2, resolved, NULL);
+    } n = GetFullPathNameA (path, PATH_MAX * 2, resolved, NULL);
     if (n == 0 || n >= (DWORD) (PATH_MAX * 2)) {
         if (need_free)
             free (resolved);
@@ -555,8 +543,7 @@ static inline int mpe_clock_gettime (int clk, struct timespec *ts) {
             ts -> tv_nsec = (long) ((ms % 1000ULL) * 1000000ULL);
             return 0;
         }
-    }
-    QueryPerformanceCounter (&cnt);
+    } QueryPerformanceCounter (&cnt);
     /* QPC epoch is boot, not Unix epoch — fine for MONOTONIC. For REALTIME
      * callers (rare), add Unix-time offset via GetSystemTimeAsFileTime. */
     if (clk == CLOCK_REALTIME) {
@@ -570,8 +557,7 @@ static inline int mpe_clock_gettime (int clk, struct timespec *ts) {
         ts -> tv_sec = (time_t) (u.QuadPart / 10000000ULL);
         ts -> tv_nsec = (long) ((u.QuadPart % 10000000ULL) * 100LL);
         return 0;
-    }
-    ts -> tv_sec = (time_t) (cnt.QuadPart / freq.QuadPart);
+    } ts -> tv_sec = (time_t) (cnt.QuadPart / freq.QuadPart);
     ts -> tv_nsec = (long) (((cnt.QuadPart % freq.QuadPart) * 1000000000LL) / freq.QuadPart);
     return 0;
 }
@@ -621,13 +607,10 @@ static inline int mpe_mkdir_p (const char *path) {
         if (tmp [i] == '/' || tmp [i] == '\\' || tmp [i] == '\0') {
             char c = tmp [i];
             tmp [i] = '\0';
-            if (tmp [0] != '\0') {
-                _mkdir (tmp);
-            }
+            if (tmp [0] != '\0') { _mkdir (tmp); }
             tmp [i] = c;
         }
-    }
-    return 0;
+    } return 0;
 #else
     (void) path;
     return 0; /* shell mkdir -p used by make/scripts on POSIX */

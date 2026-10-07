@@ -69,9 +69,7 @@ void long_run_validation_snapshot_clean (void) {
     s_clean_cfg_valid = 1;
 }
 void long_run_validation_cancel_restore (void) {
-    if (!long_run_validation_torture_live ()) {
-        return;
-    }
+    if (!long_run_validation_torture_live ()) { return; }
     if (s_clean_cfg_valid) {
         g_cfg = s_clean_cfg;
         fprintf (stderr, "[A3] torture state cancelled: clean config restored from memory snapshot\n");
@@ -81,8 +79,7 @@ void long_run_validation_cancel_restore (void) {
         mpe_config_reset_defaults ();
     } else {
         fprintf (stderr, "[A3] torture state cancelled: clean config restored from backup file\n");
-    }
-    s_clean_cfg_valid = 0;
+    } s_clean_cfg_valid = 0;
     long_run_validation_active = 0;
     long_run_validation_restore_config = 0;
     long_run_validation_is_torture = 0;
@@ -103,8 +100,7 @@ static int a3_task13_body_is_invalid (rigidbody *rigid_body) {
     if ((!isfinite (rigid_body -> orientation.w)) || (!isfinite (rigid_body -> orientation.x)) ||
         (!isfinite (rigid_body -> orientation.y)) || (!isfinite (rigid_body -> orientation.z))) {
         return 1;
-    }
-    return 0;
+    } return 0;
 }
 static void long_run_validation_report (void) {
     /* FIX-AUDIT: old gate used final-tick speed only, so spike-then-settle
@@ -123,8 +119,7 @@ static void long_run_validation_report (void) {
                (long_run_validation_fallen_count == 0) && (long_run_validation_last_max_linear_speed < 0.25f) &&
                (long_run_validation_last_max_angular_speed < 0.5f) && (long_run_validation_max_linear_speed < 2.0f) &&
                (long_run_validation_max_angular_speed < 4.0f);
-    }
-    printf ("[A3] Long-run validation report %s\n", a3_version_string);
+    } printf ("[A3] Long-run validation report %s\n", a3_version_string);
     printf ("[A3] mode: %s\n",
             long_run_validation_is_torture ? "torture (corruption gates only)" : "validation (full settle gates)");
     printf ("[A3] duration_ticks=%d objects=%d sleeping=%d awake=%d\n", long_run_validation_total_ticks,
@@ -166,22 +161,16 @@ static void long_run_validation_report (void) {
             mpe_config_reset_defaults ();
         } else {
             printf ("[A3] Config restored from backup\n");
-        }
-        long_run_validation_restore_config = 0;
-    }
-    long_run_validation_is_torture = 0;
+        } long_run_validation_restore_config = 0;
+    } long_run_validation_is_torture = 0;
     /* MPE_TASK_39_CONFIG_REPORT_BEGIN */
     printf ("[A3] config file: %s\n", (access ("status/engine.cfg", F_OK) == 0) ? "present" : "absent");
     printf ("[A3] config params: %zu registered\n", g_registry_count);
     for (size_t cfg_i = 0; cfg_i < g_registry_count; cfg_i++) {
-        if (g_registry [cfg_i].type == p_int) {
-            printf ("[A3]   %s = %d\n", g_registry [cfg_i].key, *(int *) g_registry [cfg_i].storage);
-        } else if (g_registry [cfg_i].type == p_bool) {
+        if (g_registry [cfg_i].type == p_int) { printf ("[A3]   %s = %d\n", g_registry [cfg_i].key, *(int *) g_registry [cfg_i].storage); } else if (g_registry [cfg_i].type == p_bool) {
             printf ("[A3]   %s = %s\n", g_registry [cfg_i].key,
                     (*(bool *) g_registry [cfg_i].storage) ? "true" : "false");
-        } else {
-            printf ("[A3]   %s = %.4f\n", g_registry [cfg_i].key, *(float *) g_registry [cfg_i].storage);
-        }
+        } else { printf ("[A3]   %s = %.4f\n", g_registry [cfg_i].key, *(float *) g_registry [cfg_i].storage); }
     }
     /* MPE_TASK_39_CONFIG_REPORT_END */
     fflush (stdout);
@@ -205,73 +194,46 @@ static void long_run_validation_evaluate (void) {
          * floor_y - 1m (a full meter of free fall past the safety net, past
          * any floor_emergency_slop tolerance). */
         const float floor_y = 0.0f;
-        if (rigid_body -> position.y < floor_y - 1.0f) {
-            current_fallen_count++;
-        }
+        if (rigid_body -> position.y < floor_y - 1.0f) { current_fallen_count++; }
         /* FIX-AUDIT-DESPOT: sleeping/awake asymmetry. The awake branch
          * excludes statics (infinite-mass floor slabs are neither awake
          * nor asleep) but the sleeping branch counted every is_sleeping
          * body including statics, so sleeping+awake != dynamic bodies.
          * Exclude statics here too, mirroring the awake branch. */
-        if (rigid_body -> is_sleeping && !rigid_body -> static_state) {
-            current_sleeping_count++;
-        } else if (!rigid_body -> static_state) {
+        if (rigid_body -> is_sleeping && !rigid_body -> static_state) { current_sleeping_count++; } else if (!rigid_body -> static_state) {
             current_awake_count++;
-        }
-        float linear_speed = vector3_length (rigid_body -> velocity);
+        } float linear_speed = vector3_length (rigid_body -> velocity);
         float angular_speed = vector3_length (rigid_body -> angular_velocity);
-        if (linear_speed > current_max_linear_speed) {
-            current_max_linear_speed = linear_speed;
-        }
-        if (angular_speed > current_max_angular_speed) {
-            current_max_angular_speed = angular_speed;
-        }
-    }
-    long_run_validation_last_max_linear_speed = current_max_linear_speed;
+        if (linear_speed > current_max_linear_speed) { current_max_linear_speed = linear_speed; }
+        if (angular_speed > current_max_angular_speed) { current_max_angular_speed = angular_speed; }
+    } long_run_validation_last_max_linear_speed = current_max_linear_speed;
     long_run_validation_last_max_angular_speed = current_max_angular_speed;
     if (long_run_validation_tick_index < LONG_RUN_TRANSIENT_TICKS) {
         /* Opening transient: record peak, don't gate (see note above). */
-        if (current_max_linear_speed > long_run_validation_transient_linear) {
-            long_run_validation_transient_linear = current_max_linear_speed;
-        }
-        if (current_max_angular_speed > long_run_validation_transient_angular) {
-            long_run_validation_transient_angular = current_max_angular_speed;
-        }
+        if (current_max_linear_speed > long_run_validation_transient_linear) { long_run_validation_transient_linear = current_max_linear_speed; }
+        if (current_max_angular_speed > long_run_validation_transient_angular) { long_run_validation_transient_angular = current_max_angular_speed; }
     } else {
         /* Gated window: sustained motion only. */
-        if (current_max_linear_speed > long_run_validation_max_linear_speed) {
-            long_run_validation_max_linear_speed = current_max_linear_speed;
-        }
-        if (current_max_angular_speed > long_run_validation_max_angular_speed) {
-            long_run_validation_max_angular_speed = current_max_angular_speed;
-        }
-    }
-    long_run_validation_final_sleeping_count = current_sleeping_count;
+        if (current_max_linear_speed > long_run_validation_max_linear_speed) { long_run_validation_max_linear_speed = current_max_linear_speed; }
+        if (current_max_angular_speed > long_run_validation_max_angular_speed) { long_run_validation_max_angular_speed = current_max_angular_speed; }
+    } long_run_validation_final_sleeping_count = current_sleeping_count;
     long_run_validation_final_awake_count = current_awake_count;
     long_run_validation_nan_count += current_nan_count;
     long_run_validation_fallen_count += current_fallen_count;
-    if (debug_last_manifold_overflow_count > long_run_validation_max_manifold_overflow) {
-        long_run_validation_max_manifold_overflow = debug_last_manifold_overflow_count;
-    }
+    if (debug_last_manifold_overflow_count > long_run_validation_max_manifold_overflow) { long_run_validation_max_manifold_overflow = debug_last_manifold_overflow_count; }
 }
 void long_run_validation_tick_update (void) {
-    if (!long_run_validation_active) {
-        return;
-    }
+    if (!long_run_validation_active) { return; }
     long_run_validation_evaluate ();
     long_run_validation_tick_index++;
-    if (long_run_validation_ticks_remaining > 0) {
-        long_run_validation_ticks_remaining--;
-    }
+    if (long_run_validation_ticks_remaining > 0) { long_run_validation_ticks_remaining--; }
     if (long_run_validation_ticks_remaining <= 0) {
         long_run_validation_report ();
         long_run_validation_active = 0;
     }
 }
 void long_run_validation_start (int duration_ticks) {
-    if (duration_ticks <= 0) {
-        duration_ticks = 1;
-    }
+    if (duration_ticks <= 0) { duration_ticks = 1; }
     long_run_validation_active = 1;
     long_run_validation_ticks_remaining = duration_ticks;
     long_run_validation_total_ticks = duration_ticks;
@@ -295,14 +257,10 @@ void long_run_validation_start (int duration_ticks) {
     printf ("[A3] config file: %s\n", (access ("status/engine.cfg", F_OK) == 0) ? "present" : "absent");
     printf ("[A3] config params: %zu registered\n", g_registry_count);
     for (size_t cfg_i = 0; cfg_i < g_registry_count; cfg_i++) {
-        if (g_registry [cfg_i].type == p_int) {
-            printf ("[A3]   %s = %d\n", g_registry [cfg_i].key, *(int *) g_registry [cfg_i].storage);
-        } else if (g_registry [cfg_i].type == p_bool) {
+        if (g_registry [cfg_i].type == p_int) { printf ("[A3]   %s = %d\n", g_registry [cfg_i].key, *(int *) g_registry [cfg_i].storage); } else if (g_registry [cfg_i].type == p_bool) {
             printf ("[A3]   %s = %s\n", g_registry [cfg_i].key,
                     (*(bool *) g_registry [cfg_i].storage) ? "true" : "false");
-        } else {
-            printf ("[A3]   %s = %.4f\n", g_registry [cfg_i].key, *(float *) g_registry [cfg_i].storage);
-        }
+        } else { printf ("[A3]   %s = %.4f\n", g_registry [cfg_i].key, *(float *) g_registry [cfg_i].storage); }
     }
     /* MPE_TASK_39_CONFIG_REPORT_END */
     fflush (stdout);

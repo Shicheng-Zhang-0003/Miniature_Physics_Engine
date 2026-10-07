@@ -132,8 +132,7 @@ static inline void rb_integrate_position_exact_free_flight (rigidbody *rb, float
         term2_pos = dt_d * inv_c - one_minus_e_ct * inv_c * inv_c;
         term1_vel = e_ct;
         term2_vel = one_minus_e_ct * inv_c;
-    }
-    vector3 v_term = vector3_scaling (v0, (float) term1_pos);
+    } vector3 v_term = vector3_scaling (v0, (float) term1_pos);
     vector3 g_term = vector3_scaling (g, (float) term2_pos);
     /* TRUTH: double internally, float at the boundary by struct design
      * (position/velocity are float). Casts lose ~1e-7 rel; far bodies
@@ -163,44 +162,28 @@ static bool a3_vector4_is_finite (vector4 v) {return isfinite (v.w) && isfinite 
 static bool a3_math3_is_finite (math3 m) {
     for (int row_index = 0; row_index < 3; row_index++) {
         for (int column_index = 0; column_index < 3; column_index++) {
-            if (!isfinite (m.matrix [row_index][column_index])) {
-                return false;
-            }
+            if (!isfinite (m.matrix [row_index][column_index])) { return false; }
         }
-    }
-    return true;
+    } return true;
 }
 static bool a3_math3_is_zero (math3 m) {
     for (int row_index = 0; row_index < 3; row_index++) {
         for (int column_index = 0; column_index < 3; column_index++) {
-            if (m.matrix [row_index][column_index] != 0.0f) {
-                return false;
-            }
+            if (m.matrix [row_index][column_index] != 0.0f) { return false; }
         }
-    }
-    return true;
+    } return true;
 }
 void rigidbody_sanitize (rigidbody *rigid_body) {
-    if (!rigid_body) {
-        return;
-    }
+    if (!rigid_body) { return; }
     /* TRUTH: normalize boolean garbage from malloc (any nonzero -> true). */
     rigid_body -> static_state = rigid_body -> static_state ? true : false;
     rigid_body -> kinematic = rigid_body -> kinematic ? true : false;
     rigid_body -> is_sleeping = rigid_body -> is_sleeping ? true : false;
-    if (!isfinite (rigid_body -> sleep_timer) || rigid_body -> sleep_timer < 0.0f) {
-        rigid_body -> sleep_timer = 0.0f;
-    }
-    if (rigid_body -> sleep_timer > 100.0f) {
-        rigid_body -> sleep_timer = 100.0f;
-    }
+    if (!isfinite (rigid_body -> sleep_timer) || rigid_body -> sleep_timer < 0.0f) { rigid_body -> sleep_timer = 0.0f; }
+    if (rigid_body -> sleep_timer > 100.0f) { rigid_body -> sleep_timer = 100.0f; }
     /* TRUTH: nice is game-only but must never be unvalidated memory. */
-    if (rigid_body -> nice_value < 0) {
-        rigid_body -> nice_value = 0;
-    }
-    if (rigid_body -> nice_value > 100) {
-        rigid_body -> nice_value = 100;
-    }
+    if (rigid_body -> nice_value < 0) { rigid_body -> nice_value = 0; }
+    if (rigid_body -> nice_value > 100) { rigid_body -> nice_value = 100; }
     if (!isfinite (rigid_body -> colour.x) || !isfinite (rigid_body -> colour.y) || !isfinite (rigid_body -> colour.z)) {
         rigid_body -> colour = (vector3) {1.0f, 1.0f, 1.0f};
     }
@@ -209,9 +192,7 @@ void rigidbody_sanitize (rigidbody *rigid_body) {
         rigid_body -> type != object_custom) {
         rigid_body -> type = object_cube;
     }
-    if (rigid_body -> type == object_custom && rigid_body -> custom_shape < 100) {
-        rigid_body -> custom_shape = 100;
-    }
+    if (rigid_body -> type == object_custom && rigid_body -> custom_shape < 100) { rigid_body -> custom_shape = 100; }
     bool needs_inertia_recalc = false;
     math3 zero_matrix = {{{0.0f}}};
     if (!a3_vector3_is_finite (rigid_body -> position)) {
@@ -223,27 +204,15 @@ void rigidbody_sanitize (rigidbody *rigid_body) {
         rigid_body -> sleep_timer = 0.0f;
         needs_inertia_recalc = true;
     }
-    if (!a3_vector3_is_finite (rigid_body -> velocity)) {
-        rigid_body -> velocity = vector3_zero ();
-    }
-    if (!a3_vector3_is_finite (rigid_body -> angular_velocity)) {
-        rigid_body -> angular_velocity = vector3_zero ();
-    }
+    if (!a3_vector3_is_finite (rigid_body -> velocity)) { rigid_body -> velocity = vector3_zero (); }
+    if (!a3_vector3_is_finite (rigid_body -> angular_velocity)) { rigid_body -> angular_velocity = vector3_zero (); }
     /* FIX-AUDIT: sanitize force/torque accumulators + accelerations. A NaN
      * here otherwise survives velocity zeroing and re-injects NaN via
      * accel=F*invM on the next integrate. */
-    if (!a3_vector3_is_finite (rigid_body -> force_accumulator)) {
-        rigid_body -> force_accumulator = vector3_zero ();
-    }
-    if (!a3_vector3_is_finite (rigid_body -> torque_accumulator)) {
-        rigid_body -> torque_accumulator = vector3_zero ();
-    }
-    if (!a3_vector3_is_finite (rigid_body -> acceleration)) {
-        rigid_body -> acceleration = vector3_zero ();
-    }
-    if (!a3_vector3_is_finite (rigid_body -> angular_acceleration)) {
-        rigid_body -> angular_acceleration = vector3_zero ();
-    }
+    if (!a3_vector3_is_finite (rigid_body -> force_accumulator)) { rigid_body -> force_accumulator = vector3_zero (); }
+    if (!a3_vector3_is_finite (rigid_body -> torque_accumulator)) { rigid_body -> torque_accumulator = vector3_zero (); }
+    if (!a3_vector3_is_finite (rigid_body -> acceleration)) { rigid_body -> acceleration = vector3_zero (); }
+    if (!a3_vector3_is_finite (rigid_body -> angular_acceleration)) { rigid_body -> angular_acceleration = vector3_zero (); }
     if (!a3_vector4_is_finite (rigid_body -> orientation)) {
         rigid_body -> orientation = vector4_identity ();
         needs_inertia_recalc = true;
@@ -258,12 +227,9 @@ void rigidbody_sanitize (rigidbody *rigid_body) {
          * [0.25,4.0] deadband let |q| up to 2.0 through, scaling R by |q|^2
          * and I_world by |q|^4. Normalize on any meaningful drift. */
         if (!isfinite (orientation_length_squared) || (fabs (orientation_length_squared - 1.0) > 1e-6)) {
-            if (orientation_length_squared > 1e-12) {
-                rigid_body -> orientation = vector4_normalisation (rigid_body -> orientation);
-            } else {
+            if (orientation_length_squared > 1e-12) { rigid_body -> orientation = vector4_normalisation (rigid_body -> orientation); } else {
                 rigid_body -> orientation = vector4_identity ();
-            }
-            needs_inertia_recalc = true;
+            } needs_inertia_recalc = true;
         }
     }
     /* DESPOT-2026-10-03: rigidbody_sanitize WAS CLAMPING SILENTLY. The
@@ -344,15 +310,9 @@ void rigidbody_sanitize (rigidbody *rigid_body) {
          * MUST NOT be rewritten to |half_extensions| (that inflated every
          * sphere-backed custom by sqrt(3) and broke capsule cross-sections).
          * Only validate finiteness/ranges here. */
-        if (!isfinite (rigid_body -> half_extensions.x) || (rigid_body -> half_extensions.x <= 0.0f)) {
-            rigid_body -> half_extensions.x = 0.01f;
-        }
-        if (!isfinite (rigid_body -> half_extensions.y) || (rigid_body -> half_extensions.y <= 0.0f)) {
-            rigid_body -> half_extensions.y = 0.01f;
-        }
-        if (!isfinite (rigid_body -> half_extensions.z) || (rigid_body -> half_extensions.z <= 0.0f)) {
-            rigid_body -> half_extensions.z = 0.01f;
-        }
+        if (!isfinite (rigid_body -> half_extensions.x) || (rigid_body -> half_extensions.x <= 0.0f)) { rigid_body -> half_extensions.x = 0.01f; }
+        if (!isfinite (rigid_body -> half_extensions.y) || (rigid_body -> half_extensions.y <= 0.0f)) { rigid_body -> half_extensions.y = 0.01f; }
+        if (!isfinite (rigid_body -> half_extensions.z) || (rigid_body -> half_extensions.z <= 0.0f)) { rigid_body -> half_extensions.z = 0.01f; }
         if (!isfinite (rigid_body -> radius) || (rigid_body -> radius <= 0.0f)) {
             double req = (double) rigid_body -> radius;
             rigid_body -> radius = 0.01f;
@@ -365,15 +325,9 @@ void rigidbody_sanitize (rigidbody *rigid_body) {
             mpe_note_clamp ("sanitize radius", &mpe_clamp_radius_events, req, 100.0);
             needs_inertia_recalc = true;
         }
-        if (rigid_body -> half_extensions.x > 100.0f) {
-            rigid_body -> half_extensions.x = 100.0f;
-        }
-        if (rigid_body -> half_extensions.y > 100.0f) {
-            rigid_body -> half_extensions.y = 100.0f;
-        }
-        if (rigid_body -> half_extensions.z > 100.0f) {
-            rigid_body -> half_extensions.z = 100.0f;
-        }
+        if (rigid_body -> half_extensions.x > 100.0f) { rigid_body -> half_extensions.x = 100.0f; }
+        if (rigid_body -> half_extensions.y > 100.0f) { rigid_body -> half_extensions.y = 100.0f; }
+        if (rigid_body -> half_extensions.z > 100.0f) { rigid_body -> half_extensions.z = 100.0f; }
     } else {
         if (!isfinite (rigid_body -> half_extensions.x) || (rigid_body -> half_extensions.x <= 0.0f)) {
             rigid_body -> half_extensions.x = 0.01f;
@@ -405,26 +359,16 @@ void rigidbody_sanitize (rigidbody *rigid_body) {
             float br = sqrtf (rigid_body -> half_extensions.x * rigid_body -> half_extensions.x +
                               rigid_body -> half_extensions.y * rigid_body -> half_extensions.y +
                               rigid_body -> half_extensions.z * rigid_body -> half_extensions.z);
-            if (isfinite (br) && br > 0.0f) {
-                rigid_body -> radius = br;
-            } else {
+            if (isfinite (br) && br > 0.0f) { rigid_body -> radius = br; } else {
                 rigid_body -> radius = 0.01732f;
                 needs_inertia_recalc = true;
             }
         }
     }
-    if (!isfinite (rigid_body -> friction_static) || (rigid_body -> friction_static < 0.0f)) {
-        rigid_body -> friction_static = 0.3f;
-    }
-    if (rigid_body -> friction_static > 5.0f) {
-        rigid_body -> friction_static = 5.0f;
-    }
-    if (!isfinite (rigid_body -> friction_kinetic) || (rigid_body -> friction_kinetic < 0.0f)) {
-        rigid_body -> friction_kinetic = 0.2f;
-    }
-    if (rigid_body -> friction_kinetic > 5.0f) {
-        rigid_body -> friction_kinetic = 5.0f;
-    }
+    if (!isfinite (rigid_body -> friction_static) || (rigid_body -> friction_static < 0.0f)) { rigid_body -> friction_static = 0.3f; }
+    if (rigid_body -> friction_static > 5.0f) { rigid_body -> friction_static = 5.0f; }
+    if (!isfinite (rigid_body -> friction_kinetic) || (rigid_body -> friction_kinetic < 0.0f)) { rigid_body -> friction_kinetic = 0.2f; }
+    if (rigid_body -> friction_kinetic > 5.0f) { rigid_body -> friction_kinetic = 5.0f; }
     /* Anisotropic friction: a degenerate axis must fall back to the
      * isotropic disc, never to a half-valid ellipse (a zero axis cannot be
      * projected into the contact plane, so the roll direction would be
@@ -439,18 +383,10 @@ void rigidbody_sanitize (rigidbody *rigid_body) {
      * and cleared by ..._clear_..., and every initialisation helper sets it
      * to false. Resetting it here would also wrongly discard a caller's
      * anisotropy on any later sanitize pass. */
-    if (!isfinite (rigid_body -> friction_along_axis) || (rigid_body -> friction_along_axis < 0.0f)) {
-        rigid_body -> friction_along_axis = 0.0f;
-    }
-    if (rigid_body -> friction_along_axis > 5.0f) {
-        rigid_body -> friction_along_axis = 5.0f;
-    }
-    if (!isfinite (rigid_body -> friction_across_axis) || (rigid_body -> friction_across_axis < 0.0f)) {
-        rigid_body -> friction_across_axis = 0.0f;
-    }
-    if (rigid_body -> friction_across_axis > 5.0f) {
-        rigid_body -> friction_across_axis = 5.0f;
-    }
+    if (!isfinite (rigid_body -> friction_along_axis) || (rigid_body -> friction_along_axis < 0.0f)) { rigid_body -> friction_along_axis = 0.0f; }
+    if (rigid_body -> friction_along_axis > 5.0f) { rigid_body -> friction_along_axis = 5.0f; }
+    if (!isfinite (rigid_body -> friction_across_axis) || (rigid_body -> friction_across_axis < 0.0f)) { rigid_body -> friction_across_axis = 0.0f; }
+    if (rigid_body -> friction_across_axis > 5.0f) { rigid_body -> friction_across_axis = 5.0f; }
     if (rigid_body -> friction_anisotropic) {
         if (!a3_vector3_is_finite (rigid_body -> friction_anisotropy_axis) ||
             (vector3_length_squared (rigid_body -> friction_anisotropy_axis) < 1.0e-8f)) {
@@ -458,16 +394,10 @@ void rigidbody_sanitize (rigidbody *rigid_body) {
             rigid_body -> friction_anisotropy_frame = 0;
             rigid_body -> friction_along_axis = 0.0f;
             rigid_body -> friction_across_axis = 0.0f;
-        } else {
-            rigid_body -> friction_anisotropy_axis = vector3_normalisation (rigid_body -> friction_anisotropy_axis);
-        }
+        } else { rigid_body -> friction_anisotropy_axis = vector3_normalisation (rigid_body -> friction_anisotropy_axis); }
     }
-    if (!isfinite (rigid_body -> restitution) || (rigid_body -> restitution < 0.0f)) {
-        rigid_body -> restitution = 0.0f;
-    }
-    if (rigid_body -> restitution > 1.0f) {
-        rigid_body -> restitution = 1.0f;
-    }
+    if (!isfinite (rigid_body -> restitution) || (rigid_body -> restitution < 0.0f)) { rigid_body -> restitution = 0.0f; }
+    if (rigid_body -> restitution > 1.0f) { rigid_body -> restitution = 1.0f; }
     if (rigid_body -> static_state) {
         rigid_body -> kinematic = false;
         rigid_body -> inverse_mass = 0.0f;
@@ -485,12 +415,8 @@ void rigidbody_sanitize (rigidbody *rigid_body) {
         rigid_body -> inverse_inertia_system = zero_matrix;
         rigid_body -> is_sleeping = false;
         rigid_body -> sleep_timer = 0.0f;
-        if (!a3_vector3_is_finite (rigid_body -> velocity)) {
-            rigid_body -> velocity = vector3_zero ();
-        }
-        if (!a3_vector3_is_finite (rigid_body -> angular_velocity)) {
-            rigid_body -> angular_velocity = vector3_zero ();
-        }
+        if (!a3_vector3_is_finite (rigid_body -> velocity)) { rigid_body -> velocity = vector3_zero (); }
+        if (!a3_vector3_is_finite (rigid_body -> angular_velocity)) { rigid_body -> angular_velocity = vector3_zero (); }
     } else {
         /* TRUTH: single mass policy everywhere. Negative/NaN/Inf -> 1.0.
          * Tiny -> 1e-4 floor (else inv=Inf -> 0*Inf=NaN). Huge -> 1e6 cap
@@ -506,8 +432,7 @@ void rigidbody_sanitize (rigidbody *rigid_body) {
         if (rigid_body -> mass > 1e6f) {
             rigid_body -> mass = 1e6f;
             needs_inertia_recalc = true;
-        }
-        rigid_body -> inverse_mass = 1.0f / rigid_body -> mass;
+        } rigid_body -> inverse_mass = 1.0f / rigid_body -> mass;
         if (!isfinite (rigid_body -> inverse_mass)) {
             rigid_body -> mass = 1.0f;
             rigid_body -> inverse_mass = 1.0f;
@@ -520,9 +445,7 @@ void rigidbody_sanitize (rigidbody *rigid_body) {
                 rigidbody_update_inertia_sphere (rigid_body);
             } else if (rigid_body -> type == object_cylinder) { /* MPE_FTC_093d */
                 rigidbody_update_inertia_cylinder (rigid_body);
-            } else {
-                rigidbody_update_inertia_cube (rigid_body);
-            }
+            } else { rigidbody_update_inertia_cube (rigid_body); }
         }
     }
     /* MPE_TASK_15_SANITIZE_AXIS_CACHE_BEGIN */
@@ -538,12 +461,8 @@ void rigidbody_sanitize (rigidbody *rigid_body) {
     /* MPE_TASK_15_SANITIZE_AXIS_CACHE_END */
 }
 void rigidbody_update_axes (rigidbody *rigid_body) {
-    if (!rigid_body) {
-        return;
-    }
-    if (!a3_vector4_is_finite (rigid_body -> orientation)) {
-        rigid_body -> orientation = vector4_identity ();
-    }
+    if (!rigid_body) { return; }
+    if (!a3_vector4_is_finite (rigid_body -> orientation)) { rigid_body -> orientation = vector4_identity (); }
     math3 rotation_matrix = vector4_to_math3 (rigid_body -> orientation);
     rigid_body -> cached_axes [0] =
         (vector3) {rotation_matrix.matrix [0][0], rotation_matrix.matrix [1][0], rotation_matrix.matrix [2][0]};
@@ -564,9 +483,7 @@ void rigidbody_initialisation_sphere (rigidbody *rigid_body, float radius, float
      * exists at the choke point every body passes through, so call ORDER in the
      * caller stops mattering. Idempotent: one branch after the first call. */
     mpe_config_ensure_ready ();
-    if (!rigid_body) {
-        return;
-    }
+    if (!rigid_body) { return; }
     /* DETERMINISM: zero type-foreign + diagnostic fields. malloc'd bodies
      * carry heap garbage; cylinder_half_length was never set for spheres,
      * so twin worlds diverged bitwise depending on heap history (found by
@@ -627,8 +544,7 @@ void rigidbody_initialisation_sphere (rigidbody *rigid_body, float radius, float
         }
     } else {
         rigid_body -> inverse_mass = 0.0f;
-    }
-    rigid_body -> radius = radius;
+    } rigid_body -> radius = radius;
     /* AUDIT: half_extensions must never be indeterminate (malloc'd bodies).
      * Spheres carry their radius on all axes so OBB-style readers
      * (boundary box, save/load) see the true bounding box. */
@@ -669,9 +585,7 @@ void rigidbody_initialisation_sphere (rigidbody *rigid_body, float radius, float
     rigid_body -> torque_accumulator = vector3_zero ();
 } // Helper to update inertia tensor after mass/radius change
 void rigidbody_update_inertia_sphere (rigidbody *rigid_body) {
-    if (!rigid_body) {
-        return;
-    }
+    if (!rigid_body) { return; }
     float inertia_coefficient_sphere = (2.0f / 5.0f) * rigid_body -> mass * rigid_body -> radius * rigid_body -> radius;
     rigid_body -> inertia_tensor_local = (math3) {{{0}}};
     rigid_body -> inertia_tensor_local.matrix [0][0] = inertia_coefficient_sphere;
@@ -686,9 +600,7 @@ void rigidbody_update_inertia_sphere (rigidbody *rigid_body) {
     }
 } // Helper to update inertia tensor after mass/radius change
 void rigidbody_update_inertia_cube (rigidbody *rigid_body) {
-    if (!rigid_body) {
-        return;
-    }
+    if (!rigid_body) { return; }
     float width = rigid_body -> half_extensions.x * 2.0f;
     float height = rigid_body -> half_extensions.y * 2.0f;
     float depth = rigid_body -> half_extensions.z * 2.0f;
@@ -707,16 +619,10 @@ void rigidbody_update_inertia_cube (rigidbody *rigid_body) {
 } // Force application and Torque Dynamics
 // Apply a force at a centre of mass (perfect collision movement, linear movement only defined)
 void rb_apply_forces_perfect (rigidbody *rigid_body, vector3 force_applied) {
-    if (!rigid_body) {
-        return;
-    }
+    if (!rigid_body) { return; }
     /* TRUTH: NaN/Inf force must never be banked. Drop + wake check only on finite. */
-    if (!a3_vector3_is_finite (force_applied)) {
-        return;
-    }
-    if (rigid_body -> static_state) {
-        return;
-    }
+    if (!a3_vector3_is_finite (force_applied)) { return; }
+    if (rigid_body -> static_state) { return; }
     /* MPE_TASK_13_2_FORCE_SLEEP_FIX_BEGIN */
     if ((rigid_body -> is_sleeping) && (vector3_length_squared (force_applied) > 0.000001f)) {
         rigid_body -> is_sleeping = false;
@@ -728,15 +634,9 @@ void rb_apply_forces_perfect (rigidbody *rigid_body, vector3 force_applied) {
 } // Apply force at a point not the centre of mass (which generates rotational motion and torque)
 // locale_impact = impact point on object identified
 void rb_apply_forces_localised (rigidbody *rigid_body, vector3 force_applied, vector3 locale_impact) {
-    if (!rigid_body) {
-        return;
-    }
-    if (!a3_vector3_is_finite (force_applied) || !a3_vector3_is_finite (locale_impact)) {
-        return;
-    }
-    if (rigid_body -> static_state) {
-        return;
-    }
+    if (!rigid_body) { return; }
+    if (!a3_vector3_is_finite (force_applied) || !a3_vector3_is_finite (locale_impact)) { return; }
+    if (rigid_body -> static_state) { return; }
     /* MPE_TASK_13_2_LOCALIZED_SLEEP_FIX_BEGIN */
     if ((rigid_body -> is_sleeping) && (vector3_length_squared (force_applied) > 0.000001f)) {
         rigid_body -> is_sleeping = false;
@@ -752,26 +652,17 @@ void rb_apply_forces_localised (rigidbody *rigid_body, vector3 force_applied, ve
      * corrupt/off-volume impact point scales torque without bound (τ=r×F)
      * and one bad contact detonates the whole island. */
     float lever_sq = vector3_length_squared (relative_contact_vector);
-    if (!isfinite (lever_sq)) {
-        return;
-    }
+    if (!isfinite (lever_sq)) { return; }
     if (lever_sq > 100.0f * 100.0f) {
         float inv = 100.0f / sqrtf (lever_sq);
         relative_contact_vector = vector3_scaling (relative_contact_vector, inv);
-    }
-    vector3 torque_generated = vector3_cross (relative_contact_vector, force_applied);
-    if (!a3_vector3_is_finite (torque_generated)) {
-        return;
-    }
+    } vector3 torque_generated = vector3_cross (relative_contact_vector, force_applied);
+    if (!a3_vector3_is_finite (torque_generated)) { return; }
     rigid_body -> torque_accumulator = vector3_addition (rigid_body -> torque_accumulator, torque_generated);
 } // Energy Computation
 float rb_get_kinetic_energy (rigidbody *rigid_body) {
-    if (!rigid_body) {
-        return 0.0f;
-    }
-    if (!isfinite (rigid_body -> mass) || rigid_body -> mass < 0.0f) {
-        return 0.0f;
-    }
+    if (!rigid_body) { return 0.0f; }
+    if (!isfinite (rigid_body -> mass) || rigid_body -> mass < 0.0f) { return 0.0f; }
     // EK normal = 0.5fmv ^ 2
     float linear_kinetic_energy = 0.5f * rigid_body -> mass * vector3_length_squared (rigid_body -> velocity);
     // EK rotational = 0.5fwIw
@@ -786,9 +677,7 @@ float rb_get_kinetic_energy (rigidbody *rigid_body) {
     return linear_kinetic_energy + rotational_kinetic_energy;
 } // Integration Segmentation (Movement Compute)
 void rb_integrate_velocity (rigidbody *rigid_body, float delta_time, float linear_damping, float angular_damping) {
-    if (!rigid_body) {
-        return;
-    }
+    if (!rigid_body) { return; }
     /* TRUTH: NaN dt must not execute. !(dt>0) catches NaN, <=0, Inf-neg. */
     if (!rigid_body -> static_state && !(delta_time > 0.0f)) {
         rigid_body -> force_accumulator = vector3_zero ();
@@ -797,18 +686,10 @@ void rb_integrate_velocity (rigidbody *rigid_body, float delta_time, float linea
     }
     /* TRUTH: damping params are caller-controlled. NaN/Inf/neg/>1 would inject
      * energy or flip direction. Clamp to [0,1], NaN -> 1 (no damping). */
-    if (!isfinite (linear_damping) || linear_damping > 1.0f) {
-        linear_damping = 1.0f;
-    }
-    if (linear_damping < 0.0f) {
-        linear_damping = 0.0f;
-    }
-    if (!isfinite (angular_damping) || angular_damping > 1.0f) {
-        angular_damping = 1.0f;
-    }
-    if (angular_damping < 0.0f) {
-        angular_damping = 0.0f;
-    }
+    if (!isfinite (linear_damping) || linear_damping > 1.0f) { linear_damping = 1.0f; }
+    if (linear_damping < 0.0f) { linear_damping = 0.0f; }
+    if (!isfinite (angular_damping) || angular_damping > 1.0f) { angular_damping = 1.0f; }
+    if (angular_damping < 0.0f) { angular_damping = 0.0f; }
     /* FIX-AUDIT: old early return banked force/torque into static/sleeping
      * accumulators (-> inf/NaN, kick on wake). Always drain first. */
     if ((rigid_body -> static_state) || (!(delta_time > 0.0f)) || (rigid_body -> is_sleeping)) {
@@ -821,8 +702,7 @@ void rb_integrate_velocity (rigidbody *rigid_body, float delta_time, float linea
         rigid_body -> force_accumulator = vector3_zero ();
         rigid_body -> torque_accumulator = vector3_zero ();
         return;
-    }
-    math3 rotation_matrix_current = vector4_to_math3 (rigid_body -> orientation);
+    } math3 rotation_matrix_current = vector4_to_math3 (rigid_body -> orientation);
     math3 rotation_matrix_transposed = math3_transposition (rotation_matrix_current);
     rigid_body -> inverse_inertia_system =
         math3_multiplication (rotation_matrix_current, math3_multiplication (rigid_body -> inverse_inertia_tensor_local,
@@ -831,18 +711,12 @@ void rb_integrate_velocity (rigidbody *rigid_body, float delta_time, float linea
     /* TRUTH: 0*Inf=NaN guard. If inv is Inf (should never happen after
      * sanitize clamp, but save files predate it) and F is 0, accel is NaN.
      * Zero it instead of poisoning velocity. */
-    if (!a3_vector3_is_finite (rigid_body -> acceleration)) {
-        rigid_body -> acceleration = vector3_zero ();
-    } else if (!isfinite (rigid_body -> inverse_mass)) {
-        rigid_body -> acceleration = vector3_zero ();
-    }
+    if (!a3_vector3_is_finite (rigid_body -> acceleration)) { rigid_body -> acceleration = vector3_zero (); } else if (!isfinite (rigid_body -> inverse_mass)) { rigid_body -> acceleration = vector3_zero (); }
     if (a3_vector3_is_finite (rigid_body -> velocity) && a3_vector3_is_finite (rigid_body -> acceleration)) {
         rigid_body -> velocity =
             vector3_addition (rigid_body -> velocity, vector3_scaling (rigid_body -> acceleration, delta_time));
     }
-    if (!a3_vector3_is_finite (rigid_body -> velocity)) {
-        rigid_body -> velocity = vector3_zero ();
-    }
+    if (!a3_vector3_is_finite (rigid_body -> velocity)) { rigid_body -> velocity = vector3_zero (); }
     rigid_body -> velocity = vector3_scaling (rigid_body -> velocity, linear_damping);
     /* TRUTH: this is symplectic Euler with post-scale damping
      * (v0+a*dt)*ret, first-order with O(c*dt^2) error vs the analytic
@@ -857,12 +731,8 @@ void rb_integrate_velocity (rigidbody *rigid_body, float delta_time, float linea
       * No anti-damping (energy injection) allowed. */
     if (rigid_body -> nice_value > 0) {
         float nice_base = 1.0f - 0.002f * (float) rigid_body -> nice_value;
-        if (nice_base < 0.9f) {
-            nice_base = 0.9f;
-        }
-        if (nice_base > 1.0f) {
-            nice_base = 1.0f;
-        }
+        if (nice_base < 0.9f) { nice_base = 0.9f; }
+        if (nice_base > 1.0f) { nice_base = 1.0f; }
         float nice_factor = (float) det_pow_retention ((double) nice_base, (double) delta_time * 60.0);
         rigid_body -> velocity = vector3_scaling (rigid_body -> velocity, nice_factor);
     }
@@ -875,9 +745,7 @@ void rb_integrate_velocity (rigidbody *rigid_body, float delta_time, float linea
      * source, not to mask with a velocity guillotine. */
     rigid_body -> angular_acceleration =
         math3_multiplication_vector3 (rigid_body -> inverse_inertia_system, rigid_body -> torque_accumulator);
-    if (!a3_vector3_is_finite (rigid_body -> angular_acceleration)) {
-        rigid_body -> angular_acceleration = vector3_zero ();
-    }
+    if (!a3_vector3_is_finite (rigid_body -> angular_acceleration)) { rigid_body -> angular_acceleration = vector3_zero (); }
     /* DESPOT-2026-09-29 TORQUE-FREE L CONSERVATION (exact by construction).
      *
      * For a body with no net external torque, world-frame angular momentum is
@@ -934,8 +802,7 @@ void rb_integrate_velocity (rigidbody *rigid_body, float delta_time, float linea
                         rotor = (vector4) {(float) det_cos (half), (float) ((double) w.x * inv * det_sin (half)),
                                           (float) ((double) w.y * inv * det_sin (half)),
                                           (float) ((double) w.z * inv * det_sin (half))};
-                    }
-                    vector4 Rp = vector4_normalisation (vector4_multiplication (rotor, R0));
+                    } vector4 Rp = vector4_normalisation (vector4_multiplication (rotor, R0));
                     math3 Rn = vector4_to_math3 (Rp);
                     math3 Rnt = math3_transposition (Rn);
                     math3 In = math3_multiplication (Rn, math3_multiplication (Il, Rnt));
@@ -959,9 +826,7 @@ void rb_integrate_velocity (rigidbody *rigid_body, float delta_time, float linea
                         vector3_scaling (vector3_subtraction (w_new, rigid_body -> angular_velocity), 0.0f);
                     rigid_body -> angular_acceleration = vector3_zero ();
                     rigid_body -> angular_velocity = vector3_scaling (rigid_body -> angular_velocity, angular_damping);
-                    if (!a3_vector3_is_finite (rigid_body -> angular_velocity)) {
-                        rigid_body -> angular_velocity = vector3_zero ();
-                    }
+                    if (!a3_vector3_is_finite (rigid_body -> angular_velocity)) { rigid_body -> angular_velocity = vector3_zero (); }
                     goto rotational_done;
                 }
                 /* Not converged in 8 passes: fall through to the explicit
@@ -1061,25 +926,16 @@ void rb_integrate_velocity (rigidbody *rigid_body, float delta_time, float linea
         {
             float wlen = vector3_length (rigid_body -> angular_velocity);
             float alen = vector3_length (list4_gyro_alpha);
-            if (!isfinite (wlen) || !isfinite (alen)) {
-                list4_gyro_alpha = vector3_zero ();
-            } else if (alen > 0.0f && wlen > 0.0f) {
+            if (!isfinite (wlen) || !isfinite (alen)) { list4_gyro_alpha = vector3_zero (); } else if (alen > 0.0f && wlen > 0.0f) {
                 float max_alpha = 4.0f * wlen / delta_time; /* never binds physically */
-                if (alen > max_alpha) {
-                    list4_gyro_alpha = vector3_scaling (list4_gyro_alpha, max_alpha / alen);
-                }
+                if (alen > max_alpha) { list4_gyro_alpha = vector3_scaling (list4_gyro_alpha, max_alpha / alen); }
             }
-            if (!a3_vector3_is_finite (list4_gyro_alpha)) {
-                list4_gyro_alpha = vector3_zero ();
-            }
-        }
-        rigid_body -> angular_acceleration = vector3_addition (rigid_body -> angular_acceleration, list4_gyro_alpha);
+            if (!a3_vector3_is_finite (list4_gyro_alpha)) { list4_gyro_alpha = vector3_zero (); }
+        } rigid_body -> angular_acceleration = vector3_addition (rigid_body -> angular_acceleration, list4_gyro_alpha);
     }
     rigid_body -> angular_velocity =
         vector3_addition (rigid_body -> angular_velocity, vector3_scaling (rigid_body -> angular_acceleration, delta_time));
-    if (!a3_vector3_is_finite (rigid_body -> angular_velocity)) {
-        rigid_body -> angular_velocity = vector3_zero ();
-    }
+    if (!a3_vector3_is_finite (rigid_body -> angular_velocity)) { rigid_body -> angular_velocity = vector3_zero (); }
     rigid_body -> angular_velocity = vector3_scaling (rigid_body -> angular_velocity, angular_damping);
     /* AUDIT: no angular snap either (see above). */
     rotational_done:;
@@ -1115,9 +971,7 @@ void rb_integrate_position (rigidbody *rigid_body, float delta_time) {
  * velocity is prescribed just like their linear velocity. */
 static void rb_integrate_orientation (rigidbody *rigid_body, float delta_time) {
     float spin_sq = vector3_length_squared (rigid_body -> angular_velocity);
-    if (!isfinite (spin_sq) || !(spin_sq > 0.0f)) {
-        rigid_body -> orientation = vector4_normalisation (rigid_body -> orientation);
-    } else {
+    if (!isfinite (spin_sq) || !(spin_sq > 0.0f)) { rigid_body -> orientation = vector4_normalisation (rigid_body -> orientation); } else {
         float spin_rate = sqrtf (spin_sq);
         double half_angle = 0.5 * (double) spin_rate * (double) delta_time;
         double s = det_sin (half_angle);
@@ -1127,22 +981,13 @@ static void rb_integrate_orientation (rigidbody *rigid_body, float delta_time) {
                               (float) (rigid_body -> angular_velocity.y * inv * s),
                               (float) (rigid_body -> angular_velocity.z * inv * s)};
         rigid_body -> orientation = vector4_normalisation (vector4_multiplication (spin_rotor, rigid_body -> orientation));
-    }
-    rigidbody_update_axes (rigid_body);
+    } rigidbody_update_axes (rigid_body);
 }
 void rb_integrate_position_exact (rigidbody *rigid_body, float delta_time, const mpe_config_t *cfg, bool free_flight) {
-    if (!rigid_body) {
-        return;
-    }
-    if ((rigid_body -> static_state) || (!(delta_time > 0.0f)) || (!isfinite (delta_time))) {
-        return;
-    }
-    if (!cfg) {
-        cfg = &g_cfg;
-    }
-    if (rigid_body -> is_sleeping) {
-        return;
-    }
+    if (!rigid_body) { return; }
+    if ((rigid_body -> static_state) || (!(delta_time > 0.0f)) || (!isfinite (delta_time))) { return; }
+    if (!cfg) { cfg = &g_cfg; }
+    if (rigid_body -> is_sleeping) { return; }
     if (rigid_body -> kinematic) {
         /* Kinematic: prescribed velocity, no forces. Position: x += v*dt.
          * Never accrues sleep (prescribed motion contradicts rest); reset
@@ -1154,11 +999,7 @@ void rb_integrate_position_exact (rigidbody *rigid_body, float delta_time, const
         rb_integrate_orientation (rigid_body, delta_time);
         return;
     }
-    if (free_flight) {
-        rb_integrate_position_exact_free_flight (rigid_body, delta_time, cfg);
-    } else {
-        rb_integrate_position_constrained (rigid_body, delta_time);
-    }
+    if (free_flight) { rb_integrate_position_exact_free_flight (rigid_body, delta_time, cfg); } else { rb_integrate_position_constrained (rigid_body, delta_time); }
     /* Exact exponential-map rotation; shared with kinematic integration. */
     rb_integrate_orientation (rigid_body, delta_time);
     float speed_sq = vector3_length_squared (rigid_body -> velocity);
@@ -1175,9 +1016,7 @@ void rb_integrate_position_exact (rigidbody *rigid_body, float delta_time, const
      * Kept as defense-in-depth is wrong here (dead code rots): removed.
      * Kinematic never sleeps by construction (prescribed velocity). */
     if ((!cfg -> sleep.enable) || (linear_calm && angular_calm && relative_calm)) {
-        if (!cfg -> sleep.enable) {
-            rigid_body -> sleep_timer = 0.0f;
-        } else {
+        if (!cfg -> sleep.enable) { rigid_body -> sleep_timer = 0.0f; } else {
             rigid_body -> sleep_timer += delta_time;
             if (rigid_body -> sleep_timer > cfg -> sleep.timer_duration) {
                 /* TRUTH: freeze atomically. Leaving threshold velocity in a
@@ -1190,9 +1029,7 @@ void rb_integrate_position_exact (rigidbody *rigid_body, float delta_time, const
                 rigid_body -> torque_accumulator = vector3_zero ();
             }
         }
-    } else {
-        rigid_body -> sleep_timer = 0.0f;
-    }
+    } else { rigid_body -> sleep_timer = 0.0f; }
 } /* make_half_extents REMOVED (trivial helper, zero callers). */
 // Initialize a cube: Box, OBB
 void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions,
@@ -1205,9 +1042,7 @@ void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_inpu
      * exists at the choke point every body passes through, so call ORDER in the
      * caller stops mattering. Idempotent: one branch after the first call. */
     mpe_config_ensure_ready ();
-    if (!rigid_body) {
-        return;
-    }
+    if (!rigid_body) { return; }
     /* DETERMINISM: see sphere init — cubes never set cylinder_half_length. */
     rigid_body -> cylinder_half_length = 0.0f;
     rigid_body -> custom_shape = -1;
@@ -1221,30 +1056,14 @@ void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_inpu
     rigid_body -> friction_along_axis = 0.0f;
     rigid_body -> friction_across_axis = 0.0f;
     rigid_body -> friction_anisotropy_axis = (vector3) {0.0f, 0.0f, 0.0f};
-    if (!isfinite (half_extensions.x) || half_extensions.x <= 0.0f) {
-        half_extensions.x = 0.5f;
-    }
-    if (!isfinite (half_extensions.y) || half_extensions.y <= 0.0f) {
-        half_extensions.y = 0.5f;
-    }
-    if (!isfinite (half_extensions.z) || half_extensions.z <= 0.0f) {
-        half_extensions.z = 0.5f;
-    }
-    if (half_extensions.x > 100.0f) {
-        half_extensions.x = 100.0f;
-    }
-    if (half_extensions.y > 100.0f) {
-        half_extensions.y = 100.0f;
-    }
-    if (half_extensions.z > 100.0f) {
-        half_extensions.z = 100.0f;
-    }
-    if (!isfinite (mass) || mass < 0.0f) {
-        mass = 1.0f;
-    }
-    if (mass > 0.0f && mass < 1e-4f) {
-        mass = 1e-4f;
-    }
+    if (!isfinite (half_extensions.x) || half_extensions.x <= 0.0f) { half_extensions.x = 0.5f; }
+    if (!isfinite (half_extensions.y) || half_extensions.y <= 0.0f) { half_extensions.y = 0.5f; }
+    if (!isfinite (half_extensions.z) || half_extensions.z <= 0.0f) { half_extensions.z = 0.5f; }
+    if (half_extensions.x > 100.0f) { half_extensions.x = 100.0f; }
+    if (half_extensions.y > 100.0f) { half_extensions.y = 100.0f; }
+    if (half_extensions.z > 100.0f) { half_extensions.z = 100.0f; }
+    if (!isfinite (mass) || mass < 0.0f) { mass = 1.0f; }
+    if (mass > 0.0f && mass < 1e-4f) { mass = 1e-4f; }
     if (mass > 1e6f) {
         mpe_note_clamp ("sphere mass", &mpe_clamp_mass_events, (double) mass, 1e6);
         mass = 1e6f;
@@ -1269,8 +1088,7 @@ void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_inpu
         }
     } else {
         rigid_body -> inverse_mass = 0.0f;
-    }
-    rigid_body -> half_extensions = half_extensions;
+    } rigid_body -> half_extensions = half_extensions;
     rigid_body -> radius = vector3_length (half_extensions); // Bounding radius for broadphase
     rigid_body -> restitution = g_cfg.body_defaults.cube_restitution; /* MPE_TASK_32 */
     rigid_body -> static_state = (mass == 0);
@@ -1302,9 +1120,7 @@ void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_inpu
     rigid_body -> torque_accumulator = vector3_zero ();
 }
 void rigidbody_wake (rigidbody *rigid_body) {
-    if (!rigid_body) {
-        return;
-    }
+    if (!rigid_body) { return; }
     if (rigid_body -> is_sleeping) {
         rigid_body -> is_sleeping = false;
         rigid_body -> sleep_timer = 0.0f;
@@ -1314,35 +1130,25 @@ void rigidbody_wake (rigidbody *rigid_body) {
      * Restore real inverses on wake (no-op for static bodies). */
     if (!rigid_body -> static_state && !rigid_body -> kinematic && rigid_body -> mass > 0.0f && isfinite (rigid_body -> mass)) {
         rigid_body -> inverse_mass = 1.0f / rigid_body -> mass;
-        if (!isfinite (rigid_body -> inverse_mass)) {
-            rigid_body -> inverse_mass = 0.0f;
-        } else {
+        if (!isfinite (rigid_body -> inverse_mass)) { rigid_body -> inverse_mass = 0.0f; } else {
             math3 rot = vector4_to_math3 (rigid_body -> orientation);
             math3 rot_t = math3_transposition (rot);
             if (a3_math3_is_finite (rigid_body -> inverse_inertia_tensor_local) &&
                 !a3_math3_is_zero (rigid_body -> inverse_inertia_tensor_local)) {
                 math3 sys =
                     math3_multiplication (rot, math3_multiplication (rigid_body -> inverse_inertia_tensor_local, rot_t));
-                if (a3_math3_is_finite (sys)) {
-                    rigid_body -> inverse_inertia_system = sys;
-                }
+                if (a3_math3_is_finite (sys)) { rigid_body -> inverse_inertia_system = sys; }
             } else {
                 /* TRUTH: stale zero/NaN local must be rebuilt, not reused. */
-                if (rigid_body -> type == object_sphere) {
-                    rigidbody_update_inertia_sphere (rigid_body);
-                } else if (rigid_body -> type == object_cylinder) {
+                if (rigid_body -> type == object_sphere) { rigidbody_update_inertia_sphere (rigid_body); } else if (rigid_body -> type == object_cylinder) {
                     rigidbody_update_inertia_cylinder (rigid_body);
-                } else {
-                    rigidbody_update_inertia_cube (rigid_body);
-                }
+                } else { rigidbody_update_inertia_cube (rigid_body); }
             }
         }
     }
 }
 void rigidbody_set_static (rigidbody *rigid_body, bool make_static) {
-    if (!rigid_body) {
-        return;
-    }
+    if (!rigid_body) { return; }
     math3 zero_matrix = {{{0.0f}}};
     rigid_body -> static_state = make_static;
     /* MPE_TASK_07_ACCUMULATOR_CLEAR_BEGIN */
@@ -1358,15 +1164,9 @@ void rigidbody_set_static (rigidbody *rigid_body, bool make_static) {
         rigid_body -> is_sleeping = false;
         rigid_body -> sleep_timer = 0.0f;
     } else {
-        if ((rigid_body -> mass <= 0.0f) || (!isfinite (rigid_body -> mass))) {
-            rigid_body -> mass = 1.0f;
-        }
-        if (rigid_body -> mass < 0.0001f) {
-            rigid_body -> mass = 0.0001f;
-        }
-        if (rigid_body -> mass > 1e6f) {
-            rigid_body -> mass = 1e6f;
-        }
+        if ((rigid_body -> mass <= 0.0f) || (!isfinite (rigid_body -> mass))) { rigid_body -> mass = 1.0f; }
+        if (rigid_body -> mass < 0.0001f) { rigid_body -> mass = 0.0001f; }
+        if (rigid_body -> mass > 1e6f) { rigid_body -> mass = 1e6f; }
         rigid_body -> inverse_mass = 1.0f / rigid_body -> mass;
         if (!isfinite (rigid_body -> inverse_mass)) {
             rigid_body -> mass = 1.0f;
@@ -1381,15 +1181,11 @@ void rigidbody_set_static (rigidbody *rigid_body, bool make_static) {
             rigidbody_update_inertia_cylinder (rigid_body); /* R3-001 dedupe */
         } else {
             rigidbody_update_inertia_cube (rigid_body);
-        }
-        rigidbody_wake (rigid_body);
-    }
-    rigidbody_update_axes (rigid_body);
+        } rigidbody_wake (rigid_body);
+    } rigidbody_update_axes (rigid_body);
 }
 void rigidbody_set_kinematic (rigidbody *rigid_body, bool make_kinematic) {
-    if (!rigid_body) {
-        return;
-    }
+    if (!rigid_body) { return; }
     if (make_kinematic) {
         rigid_body -> static_state = false;
         rigid_body -> kinematic = true;
@@ -1401,8 +1197,7 @@ void rigidbody_set_kinematic (rigidbody *rigid_body, bool make_kinematic) {
         rigid_body -> kinematic = false;
         rigidbody_set_static (rigid_body, false);
         return;
-    }
-    rigidbody_sanitize (rigid_body);
+    } rigidbody_sanitize (rigid_body);
     rigidbody_update_axes (rigid_body);
 } /* Anisotropic friction control. See rigidbody.h for the model: the contact
  * Coulomb cone becomes an ellipse whose semi-axes are friction_along_axis along
@@ -1412,17 +1207,11 @@ void rigidbody_set_kinematic (rigidbody *rigid_body, bool make_kinematic) {
  * field poke is cleaned by the same path as everything else; these setters
  * only reject inputs and then defer to sanitize for the actual bounds. */
 void rigidbody_set_friction_anisotropic (rigidbody *rigid_body, vector3 axis_local, float mu_along, float mu_across) {
-    if (!rigid_body) {
-        return;
-    }
+    if (!rigid_body) { return; }
     /* A zero-length or non-finite axis cannot define a roll direction, so
      * refuse rather than hand the solver an arbitrary plane. */
-    if (!a3_vector3_is_finite (axis_local) || (vector3_length_squared (axis_local) < 1.0e-8f)) {
-        return;
-    }
-    if (!isfinite (mu_along) || !isfinite (mu_across)) {
-        return;
-    }
+    if (!a3_vector3_is_finite (axis_local) || (vector3_length_squared (axis_local) < 1.0e-8f)) { return; }
+    if (!isfinite (mu_along) || !isfinite (mu_across)) { return; }
     rigid_body -> friction_anisotropic = true;
     rigid_body -> friction_anisotropy_axis = vector3_normalisation (axis_local);
     rigid_body -> friction_along_axis = mu_along;
@@ -1432,15 +1221,9 @@ void rigidbody_set_friction_anisotropic (rigidbody *rigid_body, vector3 axis_loc
 }
 void rigidbody_set_friction_anisotropic_in_frame (rigidbody *rigid_body, uint32_t frame_id, vector3 axis_local,
                                                   float mu_along, float mu_across) {
-    if (!rigid_body) {
-        return;
-    }
-    if (!a3_vector3_is_finite (axis_local) || (vector3_length_squared (axis_local) < 1.0e-8f)) {
-        return;
-    }
-    if (!isfinite (mu_along) || !isfinite (mu_across)) {
-        return;
-    }
+    if (!rigid_body) { return; }
+    if (!a3_vector3_is_finite (axis_local) || (vector3_length_squared (axis_local) < 1.0e-8f)) { return; }
+    if (!isfinite (mu_along) || !isfinite (mu_across)) { return; }
     rigid_body -> friction_anisotropic = true;
     rigid_body -> friction_anisotropy_axis = vector3_normalisation (axis_local);
     rigid_body -> friction_along_axis = mu_along;
@@ -1449,9 +1232,7 @@ void rigidbody_set_friction_anisotropic_in_frame (rigidbody *rigid_body, uint32_
     rigidbody_sanitize (rigid_body);
 }
 void rigidbody_clear_friction_anisotropic (rigidbody *rigid_body) {
-    if (!rigid_body) {
-        return;
-    }
+    if (!rigid_body) { return; }
     rigid_body -> friction_anisotropic = false;
     rigid_body -> friction_anisotropy_frame = 0;
     rigid_body -> friction_along_axis = 0.0f;
@@ -1459,9 +1240,7 @@ void rigidbody_clear_friction_anisotropic (rigidbody *rigid_body) {
     rigid_body -> friction_anisotropy_axis = vector3_zero ();
 } /* MPE_FTC_090: Cylinder inertia and initialization */
 void rigidbody_update_inertia_cylinder (rigidbody *rigid_body) {
-    if (!rigid_body) {
-        return;
-    }
+    if (!rigid_body) { return; }
     float r = rigid_body -> radius;
     float h = rigid_body -> cylinder_half_length;
     float mass = rigid_body -> mass;
@@ -1489,9 +1268,7 @@ void rigidbody_initialisation_cylinder (rigidbody *rigid_body, float radius, flo
      * exists at the choke point every body passes through, so call ORDER in the
      * caller stops mattering. Idempotent: one branch after the first call. */
     mpe_config_ensure_ready ();
-    if (!rigid_body) {
-        return;
-    }
+    if (!rigid_body) { return; }
     /* DETERMINISM: foreign-shape + diagnostic fields zeroed (see sphere). */
     rigid_body -> custom_shape = -1;
     rigid_body -> max_relative_speed_sq = 0.0f;
@@ -1520,17 +1297,12 @@ void rigidbody_initialisation_cylinder (rigidbody *rigid_body, float radius, flo
         mpe_note_clamp ("cylinder half_length", &mpe_clamp_half_length_events, (double) half_length, 100.0);
         half_length = 100.0f;
     }
-    if (!isfinite (mass) || mass < 0.0f) {
-        mass = 1.0f;
-    }
-    if (mass > 0.0f && mass < 1e-4f) {
-        mass = 1e-4f;
-    }
+    if (!isfinite (mass) || mass < 0.0f) { mass = 1.0f; }
+    if (mass > 0.0f && mass < 1e-4f) { mass = 1e-4f; }
     if (mass > 1e6f) {
         mpe_note_clamp ("sphere mass", &mpe_clamp_mass_events, (double) mass, 1e6);
         mass = 1e6f;
-    }
-    rigid_body -> position = position_input;
+    } rigid_body -> position = position_input;
     rigid_body -> velocity = vector3_zero ();
     rigid_body -> acceleration = vector3_zero ();
     rigid_body -> orientation = vector4_identity ();
@@ -1548,8 +1320,7 @@ void rigidbody_initialisation_cylinder (rigidbody *rigid_body, float radius, flo
         }
     } else {
         rigid_body -> inverse_mass = 0.0f;
-    }
-    rigid_body -> radius = radius;
+    } rigid_body -> radius = radius;
     rigid_body -> cylinder_half_length = half_length;
     /* AUDIT: axle is local X, so the bounding half-extents are
      * (half_length, radius, radius). Keeps OBB-style readers honest. */

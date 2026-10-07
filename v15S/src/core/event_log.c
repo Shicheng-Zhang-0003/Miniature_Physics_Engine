@@ -26,9 +26,7 @@ void event_log_init (void) {
     pthread_mutex_unlock (&event_log_lock);
 }
 void event_log_push (log_level level, const char *format, ...) {
-    if (!format) {
-        return;
-    }
+    if (!format) { return; }
     pthread_mutex_lock (&event_log_lock);
     va_list args;
     va_start (args, format);
@@ -38,9 +36,7 @@ void event_log_push (log_level level, const char *format, ...) {
     event_log_ring [event_log_head].timestamp = time (NULL);
     event_log_ring [event_log_head].level = level;
     event_log_head = (event_log_head + 1) % event_log_capacity;
-    if (event_log_count < event_log_capacity) {
-        event_log_count++;
-    }
+    if (event_log_count < event_log_capacity) { event_log_count++; }
     pthread_mutex_unlock (&event_log_lock);
 }
 int event_log_get_count (void) {
@@ -58,19 +54,10 @@ const char *event_log_get_message (int index, log_level *level, time_t *timestam
     if ((index < 0) || (index >= event_log_count)) {
         pthread_mutex_unlock (&event_log_lock);
         return NULL;
-    }
-    int actual_index;
-    if (event_log_count < event_log_capacity) {
-        actual_index = index;
-    } else {
-        actual_index = (event_log_head + index) % event_log_capacity;
-    }
-    if (level) {
-        *level = event_log_ring [actual_index].level;
-    }
-    if (timestamp) {
-        *timestamp = event_log_ring [actual_index].timestamp;
-    }
+    } int actual_index;
+    if (event_log_count < event_log_capacity) { actual_index = index; } else { actual_index = (event_log_head + index) % event_log_capacity; }
+    if (level) { *level = event_log_ring [actual_index].level; }
+    if (timestamp) { *timestamp = event_log_ring [actual_index].timestamp; }
     const char *msg = event_log_ring [actual_index].message;
     pthread_mutex_unlock (&event_log_lock);
     return msg;
