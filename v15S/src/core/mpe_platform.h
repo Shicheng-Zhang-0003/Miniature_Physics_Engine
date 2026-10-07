@@ -95,8 +95,7 @@ static inline int mpe_is_path_sep (char c) {
 #else
     return c == '/';
 #endif
-}
-/* ------------------------------------------------------------------ */
+} /* ------------------------------------------------------------------ */
 /* 3. Symbol visibility / attribute macros (Linux unchanged)           */
 /* ------------------------------------------------------------------ */
 #ifdef MPE_HAS_GNUC_ATTR
@@ -134,9 +133,7 @@ static inline int mpe_is_path_sep (char c) {
 /* ------------------------------------------------------------------ */
 #if defined(MPE_OS_WINDOWS) && defined(MPE_COMPILER_MSVC) && !defined(__GNUC__)
 /* ---- Minimal MSVC pthread replacement (mutex + cond + once) ---- */
-typedef struct {
-    CRITICAL_SECTION cs;
-} mpe_pthread_mutex_t_shim;
+typedef struct {CRITICAL_SECTION cs;} mpe_pthread_mutex_t_shim;
 #define pthread_mutex_t mpe_pthread_mutex_t_shim
 #define PTHREAD_MUTEX_INITIALIZER                                                                                      \
     { 0 }
@@ -150,17 +147,13 @@ typedef struct {
 /* NOTE: static initializers need runtime init; call mpe_platform_init()
  * once at startup on MSVC to InitializeCriticalSection all statics.
  * Simpler robust path: use SRWLOCK-based mpe_mutex_* API below. */
-typedef struct {
-    CONDITION_VARIABLE cv;
-} mpe_pthread_cond_t_shim;
+typedef struct {CONDITION_VARIABLE cv;} mpe_pthread_cond_t_shim;
 #define pthread_cond_t mpe_pthread_cond_t_shim
 #define PTHREAD_COND_INITIALIZER                                                                                       \
     { 0 }
 #define pthread_cond_wait(c, m) SleepConditionVariableCS (&(c)->cv, &(m)->cs, INFINITE)
 #define pthread_cond_broadcast(c) WakeAllConditionVariable (&(c)->cv)
-typedef struct {
-    INIT_ONCE once;
-} mpe_pthread_once_t_shim;
+typedef struct {INIT_ONCE once;} mpe_pthread_once_t_shim;
 #define pthread_once_t mpe_pthread_once_t_shim
 #define PTHREAD_ONCE_INIT                                                                                              \
     { 0 }
@@ -179,12 +172,8 @@ typedef pthread_mutex_t mpe_mutex_t;
 typedef pthread_cond_t mpe_cond_t;
 #define MPE_MUTEX_INITIALIZER PTHREAD_MUTEX_INITIALIZER
 #define MPE_COND_INITIALIZER PTHREAD_COND_INITIALIZER
-static inline void mpe_mutex_lock (mpe_mutex_t *m) {
-    pthread_mutex_lock (m);
-}
-static inline void mpe_mutex_unlock (mpe_mutex_t *m) {
-    pthread_mutex_unlock (m);
-}
+static inline void mpe_mutex_lock (mpe_mutex_t *m) {pthread_mutex_lock (m);}
+static inline void mpe_mutex_unlock (mpe_mutex_t *m) {pthread_mutex_unlock (m);}
 /* ------------------------------------------------------------------ */
 /* 5. Dynamic loading: dlfcn.h on POSIX, Win32 shim on Windows         */
 /* ------------------------------------------------------------------ */
@@ -222,8 +211,7 @@ static inline const char *mpe_dl_strerror_win (DWORD e, char *buf, size_t n) {
             buf [--f] = '\0';
     }
     return buf;
-}
-static inline void *mpe_win_dlopen (const char *path, int flags) {
+} static inline void *mpe_win_dlopen (const char *path, int flags) {
     (void) flags;
     if (!path || !*path)
         return NULL;
@@ -244,8 +232,7 @@ static inline void *mpe_win_dlopen (const char *path, int flags) {
         mpe_dl_strerror_win (GetLastError (), mpe_dl_errbuf, sizeof (mpe_dl_errbuf));
     }
     return (void *) h;
-}
-static inline void *mpe_win_dlsym (void *h, const char *sym) {
+} static inline void *mpe_win_dlsym (void *h, const char *sym) {
     if (!h || !sym)
         return NULL;
     FARPROC p = GetProcAddress ((HMODULE) h, sym);
@@ -254,13 +241,11 @@ static inline void *mpe_win_dlsym (void *h, const char *sym) {
         return NULL;
     }
     return (void *) p;
-}
-static inline int mpe_win_dlclose (void *h) {
+} static inline int mpe_win_dlclose (void *h) {
     if (!h)
         return -1;
     return FreeLibrary ((HMODULE) h) ? 0 : -1;
-}
-static inline const char *mpe_win_dlerror (void) {
+} static inline const char *mpe_win_dlerror (void) {
     if (!mpe_dl_errbuf [0])
         return NULL;
     /* dlerror() consumes the error (POSIX semantics). */
@@ -268,8 +253,7 @@ static inline const char *mpe_win_dlerror (void) {
     snprintf (out, sizeof (out), "%s", mpe_dl_errbuf);
     mpe_dl_errbuf [0] = '\0';
     return out;
-}
-typedef struct {
+} typedef struct {
     const char *dli_fname;
     void *dli_fbase;
     const char *dli_sname;
@@ -370,8 +354,7 @@ static inline int mpe_mkdir (const char *path,
 #else
     return mkdir (path);
 #endif
-}
-/* Keep bare mkdir() calls compiling on MinGW (1-arg) and MSVC. */
+} /* Keep bare mkdir() calls compiling on MinGW (1-arg) and MSVC. */
 #ifdef mkdir
 #undef mkdir
 #endif
@@ -390,9 +373,7 @@ static inline int mpe_fsync (int fd) {
 #endif
 #define fsync(fd) mpe_fsync (fd)
 /* access: map to _access. */
-static inline int mpe_access (const char *p, int mode) {
-    return _access (p, mode);
-}
+static inline int mpe_access (const char *p, int mode) {return _access (p, mode);}
 #ifdef access
 #undef access
 #endif
@@ -421,16 +402,12 @@ static inline int mpe_access (const char *p, int mode) {
 #define strdup _strdup
 #endif
 /* getpid / isatty / fileno / fdopen / fchmod / mkstemp / realpath */
-static inline int mpe_getpid (void) {
-    return (int) _getpid ();
-}
+static inline int mpe_getpid (void) {return (int) _getpid ();}
 #ifdef getpid
 #undef getpid
 #endif
 #define getpid() mpe_getpid ()
-static inline int mpe_isatty (int fd) {
-    return _isatty (fd);
-}
+static inline int mpe_isatty (int fd) {return _isatty (fd);}
 #ifdef isatty
 #undef isatty
 #endif
@@ -524,12 +501,8 @@ static inline struct tm *mpe_localtime_r (const time_t *t, struct tm *out) {
 #endif
 #define localtime_r(t, o) mpe_localtime_r ((t), (o))
 /* strcasecmp / strncasecmp -> _stricmp / _strnicmp */
-static inline int mpe_strcasecmp (const char *a, const char *b) {
-    return _stricmp (a, b);
-}
-static inline int mpe_strncasecmp (const char *a, const char *b, size_t n) {
-    return _strnicmp (a, b, n);
-}
+static inline int mpe_strcasecmp (const char *a, const char *b) {return _stricmp (a, b);}
+static inline int mpe_strncasecmp (const char *a, const char *b, size_t n) {return _strnicmp (a, b, n);}
 #ifdef strcasecmp
 #undef strcasecmp
 #endif

@@ -76,9 +76,7 @@ void det_assert_no_fallback_pow (void) {
      * fired). A desync tripwire that cannot trip is a lie. */
     assert (!det_fallback_pow_used);
 }
-void det_assert_no_fallback_trig (void) {
-    assert (!det_fallback_trig_used);
-}
+void det_assert_no_fallback_trig (void) {assert (!det_fallback_trig_used);}
 void det_mark_fallback_pow (void) {
     det_fallback_pow_used = true;
     /* FIX-AUDIT-DESPOT: atomic increment (see header). */
@@ -91,12 +89,8 @@ void det_mark_fallback_trig (void) {
 }
 #else
 /* FIX-AUDIT-DESPOT: atomic increments (see header). */
-void det_mark_fallback_pow (void) {
-    MPE_ATOMIC_ADD (&det_fallback_pow_count, 1);
-}
-void det_mark_fallback_trig (void) {
-    MPE_ATOMIC_ADD (&det_fallback_trig_count, 1);
-}
+void det_mark_fallback_pow (void) {MPE_ATOMIC_ADD (&det_fallback_pow_count, 1);}
+void det_mark_fallback_trig (void) {MPE_ATOMIC_ADD (&det_fallback_trig_count, 1);}
 /* Release no-ops so the assert declarations in det_math.h always link.
  * Counters above stay active in release; only the debug tripwire is a no-op. */
 void det_assert_no_fallback_pow (void) {}

@@ -99,8 +99,7 @@ const mpe_param *mpe_config_find (const char *key) {
         }
     }
     return NULL;
-}
-/* DESPOT-2026-09-29: see mpe_config_ensure_ready(). */
+} /* DESPOT-2026-09-29: see mpe_config_ensure_ready(). */
 static bool g_config_ready = false;
 void mpe_config_init (void) {
     memset (&g_cfg, 0, sizeof (g_cfg));
@@ -120,8 +119,7 @@ void mpe_config_init (void) {
                      g_registry [i].key ? g_registry [i].key : "(null)");
         }
     }
-}
-/* DESPOT-2026-09-29: the init-order guard.
+} /* DESPOT-2026-09-29: the init-order guard.
  *
  * `g_cfg` is a plain global, so it is ALL ZERO until mpe_config_init() runs.
  * Body materials are stamped from it at CONSTRUCTION time
@@ -151,9 +149,7 @@ void mpe_config_ensure_ready (void) {
     mpe_config_init ();
     g_config_ready = true;
 }
-bool mpe_config_is_ready (void) {
-    return g_config_ready;
-}
+bool mpe_config_is_ready (void) {return g_config_ready;}
 /* DESPOT-2026-09-29: test hook ONLY.
  *
  * Pretends the process has not initialised its config yet, so a suite test can
@@ -166,9 +162,7 @@ void mpe_config_force_unready_for_test (void) {
     memset (&g_cfg, 0, sizeof (g_cfg));
     g_config_ready = false;
 }
-void mpe_config_reset_defaults (void) {
-    mpe_config_init ();
-}
+void mpe_config_reset_defaults (void) {mpe_config_init ();}
 bool mpe_config_get_float (const char *key, float *out) {
     const mpe_param *param = mpe_config_find (key);
     if ((!param) || (!out) || param -> type != p_float) {
@@ -225,8 +219,7 @@ size_t mpe_config_count_by_category (param_category cat) {
         }
     }
     return count;
-}
-/* Fill a caller-provided buffer with params of a category.
+} /* Fill a caller-provided buffer with params of a category.
  * Matches header: size_t get_by_category(cat, out_params, max_params). */
 size_t mpe_config_get_by_category (param_category cat, const mpe_param **out_params, size_t max_params) {
     if ((!out_params) || (max_params == 0)) {
@@ -385,8 +378,7 @@ static char *term_trim (char *str) {
         end--;
     }
     return str;
-}
-/* DESPOT-2026-10-04: torture-live probe without an include cycle.
+} /* DESPOT-2026-10-04: torture-live probe without an include cycle.
  * long_run_validation.c includes mpe_config.h; including its header back
  * here would cycle. The three ints are plain globals — declare, don't
  * include. If the validation TU is ever not linked (unit harnesses that
@@ -414,9 +406,7 @@ static int mpe_config_torture_live_probe (void) {
            (long_run_validation_restore_config != 0);
 }
 static unsigned long s_torture_save_blocked = 0;
-unsigned long mpe_config_torture_save_blocked_total (void) {
-    return s_torture_save_blocked;
-}
+unsigned long mpe_config_torture_save_blocked_total (void) {return s_torture_save_blocked;}
 bool mpe_config_save_guarded (const char *path) {
     if (mpe_config_torture_live_probe ()) {
         s_torture_save_blocked++;
@@ -511,13 +501,8 @@ bool mpe_config_load (const char *path) {
     }
     fclose (file);
     return true;
-}
-/* MPE_TASK_28_CONFIG_IMPL_END */
+} /* MPE_TASK_28_CONFIG_IMPL_END */
 /* MPE_TASK_39_FIX_BACKUP_HELPERS_BEGIN */
-bool mpe_config_save_backup (const char *path) {
-    return mpe_config_save (path);
-}
-bool mpe_config_load_backup (const char *path) {
-    return mpe_config_load (path);
-}
+bool mpe_config_save_backup (const char *path) {return mpe_config_save (path);}
+bool mpe_config_load_backup (const char *path) {return mpe_config_load (path);}
 /* MPE_TASK_39_FIX_BACKUP_HELPERS_END */

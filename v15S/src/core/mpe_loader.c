@@ -41,8 +41,7 @@ static int mpe_has_plugin_ext (const char *base) {
         return 0;
     return strcmp (base + n - 3, ".so") == 0;
 #endif
-}
-/* On-disk identity for stale-.so detection (despot trap: `mod load` on an
+} /* On-disk identity for stale-.so detection (despot trap: `mod load` on an
  * already-loaded path used to return 0/“loaded” while running the OLD
  * in-memory image — e.g. articulated rollers after the analytic rebuild.
  * Changed files now fail with -3 instead of silently lying). */
@@ -61,8 +60,7 @@ static int file_identity (const char *path, long long *mt, long long *sz) {
     if (sz)
         * sz = (long long) st.st_size;
     return 0;
-}
-/* Loader-table lock: serialises every s_h[]/s_n read and mutation plus the
+} /* Loader-table lock: serialises every s_h[]/s_n read and mutation plus the
  * attachments accounting (retain/release run on step-adjacent threads while
  * unload runs at the tick boundary). Recursive: detach paths call back into
  * retain/release (physics_world_detach_module) while the unload path holds
@@ -80,15 +78,12 @@ static void s_loader_lock_init (void) {
     pthread_mutexattr_settype (&at, PTHREAD_MUTEX_RECURSIVE);
     pthread_mutex_init (&s_loader_lock, &at);
     pthread_mutexattr_destroy (&at);
-}
-static inline void loader_lock (void) {
+} static inline void loader_lock (void) {
     pthread_once (&s_loader_lock_once, s_loader_lock_init);
     pthread_mutex_lock (&s_loader_lock);
-}
-static inline void loader_unlock (void) {
+} static inline void loader_unlock (void) {
     pthread_mutex_unlock (&s_loader_lock);
-}
-/* Jail: plugins/<name>.so for modules, ecosystem/mfs/<name>.so for
+} /* Jail: plugins/<name>.so for modules, ecosystem/mfs/<name>.so for
  * ecosystem bundles (both CWD-relative, normally v15S/src). Same
  * traversal-proofing in both roots. */
 static int plugin_path_is_confined (const char *path, char resolved [PATH_MAX]) {
@@ -366,8 +361,7 @@ int mpe_loader_load (const char *path, char *errbuf, int errlen) {
     mpe_registry_truncate_broadphase (snap_broad);
     mpe_registry_truncate_solvers (snap_solvers);
     return -1;
-}
-/* Path equality: exact match or realpath-canonicalised match ONLY.
+} /* Path equality: exact match or realpath-canonicalised match ONLY.
  * DESPOT-2026-10-01: the old basename fallback made different dirs with the
  * same filename compare equal, so unload/detach/handle_for_desc could tear
  * down the wrong handle and dlclose a still-referenced image. Exact paths. */
@@ -398,8 +392,7 @@ static int handle_by_path_locked (const char *path) {
             return i;
     }
     return -1;
-}
-/* NOTE: every *_locked helper below requires s_loader_lock held. Public
+} /* NOTE: every *_locked helper below requires s_loader_lock held. Public
  * entry points take it; unload-time sweeps already hold it throughout. */
 /* Which loaded handle owns this desc? Registry-slot origin first (exact
  * for registry copies handed out by find), else the desc's own image.
@@ -418,8 +411,7 @@ static int handle_for_desc_locked (const mpe_module_desc_t *d) {
         return handle_by_path_locked (info.dli_fname);
     }
     return -1;
-}
-/* Validated stage_detach read: the hook is an append-only tail field, so a
+} /* Validated stage_detach read: the hook is an append-only tail field, so a
  * .so built against the older header has no such pointer and the word past
  * its struct is unowned image data. Read exactly one function pointer
  * (benign: same mapped page), require non-NULL, then require dladdr to
@@ -450,8 +442,7 @@ static void call_stage_detach_validated (const mpe_module_desc_t *desc, const ch
     if (!same_path (hi.dli_fname, dpath))
         return; /* foreign/garbage: refuse */
     hook (w);
-}
-/* Code-address variant (locked): stage slots keep the iface, not the desc. */
+} /* Code-address variant (locked): stage slots keep the iface, not the desc. */
 static void call_stage_detach_for_fn_locked (const void *fn, physics_world *w) {
     if (!fn || !w)
         return;
@@ -483,8 +474,7 @@ void mpe_loader_call_stage_detach_for_fn (const void *fn, struct physics_world *
     loader_lock ();
     call_stage_detach_for_fn_locked (fn, world);
     loader_unlock ();
-}
-/* True when fn's code lives inside the plugin at path `resolved`.
+} /* True when fn's code lives inside the plugin at path `resolved`.
  * Well-behaved plugins self-unregister in their destructor; this is the
  * backstop for the rest. dli_fname may be relative — resolve it when
  * possible, else fall back to basename comparison. */
@@ -521,8 +511,7 @@ static int fn_in_plugin (mpe_collide_fn fn, const char *resolved) {
     b = b ? b + 1 : resolved;
     return strcmp (a, b) == 0;
 #endif
-}
-/* Does any live world reference this handle's code? Tick attachments by
+} /* Does any live world reference this handle's code? Tick attachments by
  * owning handle (origin-aware: a static same-named desc does NOT pin the
  * .so), stage hooks by code address, plus the retain counter.
  * Requires s_loader_lock. */
@@ -557,8 +546,7 @@ static int handle_busy (int hi) {
             return 1;
     }
     return 0;
-}
-/* Detach only tick modules owned by this handle (origin-aware: static
+} /* Detach only tick modules owned by this handle (origin-aware: static
  * same-named attachments are left alone). Hooks run pre-dlclose.
  * Requires s_loader_lock. */
 static void detach_handle_modules (int hi) {
@@ -602,8 +590,7 @@ static void detach_handle_modules (int hi) {
             }
         }
     }
-}
-/* Purge pair handlers whose code lives in this .so (backstop for plugins
+} /* Purge pair handlers whose code lives in this .so (backstop for plugins
  * without a destructor; capsule-style destructors run first via dlclose
  * ordering — purge runs BEFORE dlclose so dladdr still resolves). */
 static void purge_plugin_pairs (int hi) {

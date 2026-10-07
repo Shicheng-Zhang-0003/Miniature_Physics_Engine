@@ -56,9 +56,7 @@ typedef struct {
 typedef bool (*mpe_collide_fn) (rigidbody *a, rigidbody *b, void *manifold_out, mpe_world_t *world);
 /* Broadphase interface: typed pair buffer, world for config/scratch.
  * Return value: pair count (0 = degraded tick). NULL entry = builtin. */
-typedef struct {
-    int (*generate) (mpe_world_t *world, broadphase_pair *pairs_out, int max_pairs, float dt, void *mod_state);
-} mpe_broadphase_if_t;
+typedef struct {int (*generate) (mpe_world_t *world, broadphase_pair *pairs_out, int max_pairs, float dt, void *mod_state);} mpe_broadphase_if_t;
 /* Solver stage interface: every hook optional (NULL = builtin).
  * Hooks receive the owning world (per-world config + scratch) and the
  * module state pointer from attach. Builtin semantics: sequential

@@ -4,9 +4,7 @@
  * m[col][row]; translation lives in m[3][0..2]. math3 (math3d.h) is
  * ROW-major. Do not mix indexing across the two types. */
 #include "math3d.h"
-typedef struct {
-    float matrix [4][4];
-} math4;
+typedef struct {float matrix [4][4];} math4;
 // Zero Init
 static inline math4 math4_init () {
     math4 result_matrix = {{{0}}};
@@ -168,8 +166,7 @@ static inline void math4_to_flat_array (math4 matrix, float *output_array) {
             output_array [column_index * 4 + row_index] = matrix.matrix [column_index][row_index];
         }
     }
-}
-/* ---------------------------------------------------------------------------
+} /* ---------------------------------------------------------------------------
  * Frustum culling (Gribb/Hartmann), extracted so the shipped renderer and a
  * test exercise the SAME code.
  *
@@ -221,8 +218,7 @@ static inline void math4_frustum_planes (math4 view_projection, float planes [6]
         planes [p][2] = combos [p][2] / len; /* c */
         planes [p][3] = combos [p][3] / len; /* d */
     }
-}
-/* Conservative sphere-vs-frustum: a sphere is culled only if it is fully
+} /* Conservative sphere-vs-frustum: a sphere is culled only if it is fully
  * outside one plane by more than its own radius, so a sphere straddling a
  * plane is always kept. Returns 1 = visible, 0 = culled. */
 static inline int math4_frustum_sphere_visible (const float planes [6][4], float cx, float cy, float cz, float radius) {

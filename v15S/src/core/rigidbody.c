@@ -60,8 +60,7 @@ static void mpe_note_clamp (const char *kind, unsigned long *counter, double req
                  "(occurrence %lu)\n",
                  kind, requested, stored, stored / requested, *counter);
     }
-}
-/* Exact free-flight integration under constant gravity + linear viscous drag.
+} /* Exact free-flight integration under constant gravity + linear viscous drag.
  * The config 'drag' is a VELOCITY RETENTION FACTOR per second (0 to 1).
  * Continuous ODE: dv/dt = -c*v + g, where c = -ln(drag) [1/s], g = gravity vector.
  * Exact solution:
@@ -146,8 +145,7 @@ static inline void rb_integrate_position_exact_free_flight (rigidbody *rb, float
     vector3 v_exact =
         vector3_addition (vector3_scaling (v0, (float) term1_vel), vector3_scaling (g, (float) term2_vel));
     rb -> velocity = v_exact;
-}
-/* Symplectic Euler position integration for constrained bodies (original, stable).
+} /* Symplectic Euler position integration for constrained bodies (original, stable).
  * Velocity has already been updated by rb_integrate_velocity with forces + gravity.
  * Position: x += v_new * dt.
  * This matches the original stable behavior. */
@@ -155,18 +153,13 @@ static inline void rb_integrate_position_constrained (rigidbody *rb, float dt) {
     if (!rb || rb -> static_state || rb -> is_sleeping || rb -> kinematic || !(dt > 0.0f))
         return;
     rb -> position = vector3_addition (rb -> position, vector3_scaling (rb -> velocity, dt));
-}
-/* rb_integrate_position_free_flight_original REMOVED (dead: zero callers;
+} /* rb_integrate_position_free_flight_original REMOVED (dead: zero callers;
  * its contract (x+=v_post*dt, caller fixes gravity) invited double-counts).
  * Use rb_integrate_position (constrained, safe) or
  * rb_integrate_position_exact (explicit v_pre + free flag). */
 /* Helper to update axes from orientation */
-static bool a3_vector3_is_finite (vector3 v) {
-    return isfinite (v.x) && isfinite (v.y) && isfinite (v.z);
-}
-static bool a3_vector4_is_finite (vector4 v) {
-    return isfinite (v.w) && isfinite (v.x) && isfinite (v.y) && isfinite (v.z);
-}
+static bool a3_vector3_is_finite (vector3 v) {return isfinite (v.x) && isfinite (v.y) && isfinite (v.z);}
+static bool a3_vector4_is_finite (vector4 v) {return isfinite (v.w) && isfinite (v.x) && isfinite (v.y) && isfinite (v.z);}
 static bool a3_math3_is_finite (math3 m) {
     for (int row_index = 0; row_index < 3; row_index++) {
         for (int column_index = 0; column_index < 3; column_index++) {
@@ -1106,8 +1099,7 @@ void rb_integrate_velocity (rigidbody *rigid_body, float delta_time, float linea
      * This drain was deleted on 26/09/26 and broke 12/29 physics gates. */
     rigid_body -> force_accumulator = vector3_zero ();
     rigid_body -> torque_accumulator = vector3_zero ();
-}
-/* File-scope (NOT nested): GCC nested functions use trampolines, break
+} /* File-scope (NOT nested): GCC nested functions use trampolines, break
  * strict-C/Clang/MSVC, and hide the global symbol the header promises.
  * DESPOT-2026-09-26: this was accidentally nested inside
  * rb_integrate_velocity on 26/09/26, leaving the global undefined. */
@@ -1118,8 +1110,7 @@ void rb_integrate_position (rigidbody *rigid_body, float delta_time) {
      * Exact free-flight needs v_pre: restore tick_v0 first, then call
      * rb_integrate_position_exact(..., free_flight=true) explicitly. */
     rb_integrate_position_exact (rigid_body, delta_time, &g_cfg, false);
-}
-/* Integrate the prescribed/current world-frame angular velocity as an exact
+} /* Integrate the prescribed/current world-frame angular velocity as an exact
  * exponential-map rotor. Kinematic bodies use this too: their angular
  * velocity is prescribed just like their linear velocity. */
 static void rb_integrate_orientation (rigidbody *rigid_body, float delta_time) {
@@ -1202,8 +1193,7 @@ void rb_integrate_position_exact (rigidbody *rigid_body, float delta_time, const
     } else {
         rigid_body -> sleep_timer = 0.0f;
     }
-}
-/* make_half_extents REMOVED (trivial helper, zero callers). */
+} /* make_half_extents REMOVED (trivial helper, zero callers). */
 // Initialize a cube: Box, OBB
 void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_input, vector3 half_extensions,
                                     float mass) {
@@ -1414,8 +1404,7 @@ void rigidbody_set_kinematic (rigidbody *rigid_body, bool make_kinematic) {
     }
     rigidbody_sanitize (rigid_body);
     rigidbody_update_axes (rigid_body);
-}
-/* Anisotropic friction control. See rigidbody.h for the model: the contact
+} /* Anisotropic friction control. See rigidbody.h for the model: the contact
  * Coulomb cone becomes an ellipse whose semi-axes are friction_along_axis along
  * friction_anisotropy_axis and friction_across_axis perpendicular to it.
  *
@@ -1468,8 +1457,7 @@ void rigidbody_clear_friction_anisotropic (rigidbody *rigid_body) {
     rigid_body -> friction_along_axis = 0.0f;
     rigid_body -> friction_across_axis = 0.0f;
     rigid_body -> friction_anisotropy_axis = vector3_zero ();
-}
-/* MPE_FTC_090: Cylinder inertia and initialization */
+} /* MPE_FTC_090: Cylinder inertia and initialization */
 void rigidbody_update_inertia_cylinder (rigidbody *rigid_body) {
     if (!rigid_body) {
         return;
@@ -1580,8 +1568,7 @@ void rigidbody_initialisation_cylinder (rigidbody *rigid_body, float radius, flo
     rigidbody_update_inertia_cylinder (rigid_body);
     rigid_body -> force_accumulator = vector3_zero ();
     rigid_body -> torque_accumulator = vector3_zero ();
-}
-/* DESPOT-2026-10-02: reset helper for the input-clamp counters (see the
+} /* DESPOT-2026-10-02: reset helper for the input-clamp counters (see the
  * declarations in rigidbody.h). Lets a test or a scene loader isolate its
  * own setup from whatever ran before it. */
 void mpe_clamp_counters_reset (void) {

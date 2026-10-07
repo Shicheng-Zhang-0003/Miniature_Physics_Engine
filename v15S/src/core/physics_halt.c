@@ -27,9 +27,7 @@ void physics_halt_for_ticks (int ticks) {
     physics_halt_ticks_remaining = ticks;
     physics_halted = true;
 }
-bool physics_is_halted (void) {
-    return physics_halted;
-}
+bool physics_is_halted (void) {return physics_halted;}
 /* MPE_TASK_V15R2_PHYSICS_HALT_END */
 /* MFS_PHASE_A: per-tick halt bookkeeping. Returns true if physics should be
  * skipped this tick (timed halt counting down, or indefinite halt). */

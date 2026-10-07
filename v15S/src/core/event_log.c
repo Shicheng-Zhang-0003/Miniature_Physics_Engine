@@ -80,5 +80,4 @@ void event_log_clear (void) {
     event_log_head = 0;
     event_log_count = 0;
     pthread_mutex_unlock (&event_log_lock);
-}
-/* MPE_TASK_V15R2_EVENT_LOG_IMPL_END */
+} /* MPE_TASK_V15R2_EVENT_LOG_IMPL_END */

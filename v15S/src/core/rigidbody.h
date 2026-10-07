@@ -183,8 +183,7 @@ static inline float rigidbody_effective_inv_mass (const rigidbody *rb) {
         return 0.0f;
     }
     return rb -> inverse_mass;
-}
-static inline bool rigidbody_is_awake_for_solver (const rigidbody *rb) {
+} static inline bool rigidbody_is_awake_for_solver (const rigidbody *rb) {
     if (!rb) {
         return false;
     }
@@ -196,8 +195,7 @@ static inline bool rigidbody_is_awake_for_solver (const rigidbody *rb) {
      * on moving platforms must stay awake) while solver treats it as
      * immovable via effective_* helpers. Sleeping is the only solver-skip. */
     return !rb -> is_sleeping;
-}
-/* Effective inverse inertia: zero matrix for infinite-mass bodies, otherwise
+} /* Effective inverse inertia: zero matrix for infinite-mass bodies, otherwise
  * the stored world-space inverse. Avoids mutating the stored field. */
 static inline math3 rigidbody_effective_inv_inertia (const rigidbody *rb) {
     math3 zero = {{{0.0f}}};
@@ -208,8 +206,7 @@ static inline math3 rigidbody_effective_inv_inertia (const rigidbody *rb) {
         return zero;
     }
     return rb -> inverse_inertia_system;
-}
-/* DESPOT-2026-10-02: input-clamp observability.
+} /* DESPOT-2026-10-02: input-clamp observability.
  *
  * The engine guards mass / radius / cylinder half-length into finite,
  * physically sane ranges before they reach the inertia tensors (a NaN

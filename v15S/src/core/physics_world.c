@@ -85,8 +85,7 @@ static void mpe_parallel_sanitize (physics_world *world) {
         }
     }
     (void) launched;
-}
-/* Canonical spring pass is weakly linked so spring-less headless test
+} /* Canonical spring pass is weakly linked so spring-less headless test
  * binaries (which omit physics/spring_joint.c for its GL dependency)
  * still link; the GUI engine and TUI link it and get real forces. */
 MPE_WEAK void mpe_springs_apply (physics_world *world, float dt);
@@ -123,8 +122,7 @@ static void live_world_add (physics_world *world) {
         fflush (stderr);
     }
     pthread_mutex_unlock (&s_live_lock);
-}
-/* `physics_world` is commonly a stack object whose bytes are indeterminate
+} /* `physics_world` is commonly a stack object whose bytes are indeterminate
  * before its first init. Detect re-init by address in the registry instead
  * of probing fields in that uninitialized object. */
 static bool live_world_contains (const physics_world *world) {
@@ -162,8 +160,7 @@ int physics_world_live_list (physics_world **out, int cap) {
     pthread_mutex_unlock (&s_live_lock);
     (void) total;
     return n;
-}
-/* Reset stage slots aliasing dead registry entries (called by registry
+} /* Reset stage slots aliasing dead registry entries (called by registry
  * unregister paths while the old code is still mapped). Foreign stage
  * state is owned by the module (header: never freed by the world), so the
  * module's stage_detach hook runs first (resolved by code address — stage
@@ -191,8 +188,7 @@ void physics_world_forget_stage_pointers (const mpe_broadphase_if_t *bi, const m
             ws [i] -> solver_state = NULL;
         }
     }
-}
-/* Detach a named tick module from every live world (registry unregister
+} /* Detach a named tick module from every live world (registry unregister
  * path). Detach hooks run while the .so is still mapped. */
 void physics_world_detach_module_everywhere (const char *name) {
     if (!name)
@@ -201,8 +197,7 @@ void physics_world_detach_module_everywhere (const char *name) {
     int n = physics_world_live_list (ws, MPE_MAX_LIVE_WORLDS);
     for (int i = 0; i < n; i++)
         physics_world_detach_module (ws [i], name);
-}
-/* NOTE: no file-scope simulation state in this TU. The application
+} /* NOTE: no file-scope simulation state in this TU. The application
  * primary lives in core/mpe_primary.c; all stepping takes explicit
  * worlds (see physics_world_get_primary contract in the header). */
 /* Helper: malloc-or-NULL (leaves member NULL on failure; users degrade
@@ -423,8 +418,7 @@ void physics_world_set_config (physics_world *world, mpe_config_t *cfg) {
     if (!world)
         return;
     world -> cfg = cfg ? cfg : &g_cfg;
-}
-/* Pool growers: ×2 up to the compile-time ceilings. Manifold pointers
+} /* Pool growers: ×2 up to the compile-time ceilings. Manifold pointers
  * into bodies[] are rebuilt every tick, and caches store ids (never
  * pointers), so relocation during add_* (outside any step) is safe. */
 int physics_world_grow_bodies (physics_world *world) {
@@ -598,8 +592,7 @@ void physics_world_set_solver_state (physics_world *world, void *state) {
     if (!world)
         return;
     world -> solver_state = state;
-}
-/* DESPOT-2026-09-29: re-resolve a snapshotted module's live state.
+} /* DESPOT-2026-09-29: re-resolve a snapshotted module's live state.
  *
  * physics_world_step snapshots {desc, state} and then invokes each hook,
  * which the header and readme both describe as safe ("a hook may
@@ -669,8 +662,7 @@ int physics_world_detach_module (physics_world *world, const char *name) {
         }
     }
     return -1;
-}
-/* Registry-first shape dispatch with built-in fallback.
+} /* Registry-first shape dispatch with built-in fallback.
  * Handles swapped (cube,sphere)/(cyl,sphere)/(cyl,cube) by trying the
  * registered orientation first, then the swapped orientation with a
  * normal flip — mirroring the legacy inline chains. Custom shapes
@@ -857,8 +849,7 @@ int physics_world_add_cube (physics_world *world, vector3 position, vector3 half
     rigidbody_sanitize (rb);
     physics_world_bump_revision (world);
     return world -> body_count++;
-}
-/* MPE_FTC_091 */
+} /* MPE_FTC_091 */
 int physics_world_add_cylinder (physics_world *world, float radius, float half_length, float mass, vector3 position) {
     if ((!world) || (!world -> bodies)) {
         return -1;
@@ -941,8 +932,7 @@ void physics_world_clear (physics_world *world) {
     if (world -> next_object_id == 0 || world -> next_object_id == 0xFFFFFFFFu) {
         world -> next_object_id = 1;
     }
-}
-/* One broadphase pair through narrowphase + wake-on-contact + solver
+} /* One broadphase pair through narrowphase + wake-on-contact + solver
  * prep. Shared by the main pair loop and the sleep-wake revisit pass
  * below (extracted verbatim from the former single loop). Non-static:
  * the legacy GUI tick reuses it so both step paths share one wake +
@@ -1043,8 +1033,7 @@ void physics_world_process_pair (physics_world *world, int index_a, int index_b,
             }
         }
     }
-}
-/* Solver stage dispatch: foreign solver_if hooks override per stage,
+} /* Solver stage dispatch: foreign solver_if hooks override per stage,
  * builtins run on the tick's config snapshot. Keeps the iteration loop
  * readable while making every stage hot-swappable. */
 static float mpe_step_resolve (physics_world *world, collision_data *m, float dt, bool friction_only, int iter,
@@ -1635,8 +1624,7 @@ void physics_world_step (physics_world *world, float dt) {
      * Rotation-driven contact migration still misses naturally via the
      * match distance, which is the correct invalidation path. Scene loads
      * (pool invalidation) keep their explicit clears. */
-}
-/* R3-07: Containment walls.
+} /* R3-07: Containment walls.
  *
  * Adds four static cube bodies around the playable area.
  * The walls are placed just outside the half-extents so the
