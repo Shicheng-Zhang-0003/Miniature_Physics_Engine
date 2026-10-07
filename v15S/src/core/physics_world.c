@@ -661,7 +661,7 @@ bool mpe_shape_dispatch (physics_world *world, rigidbody *a, rigidbody *b, colli
         if (!a3_sanitize_plugin_manifold (&tmp, b, a))
             return false;
         *out = tmp;
-        out -> normal_vector = vector3_scaling (tmp.normal_vector, -1.0f);
+        out -> normal_vector = simd_scale (tmp.normal_vector, -1.0f);
         out -> object_a = a;
         out -> object_b = b;
         /* Swap body-local frames: contacts were solved in (b,a) space. */
@@ -669,7 +669,7 @@ bool mpe_shape_dispatch (physics_world *world, rigidbody *a, rigidbody *b, colli
             vector3 t = out -> contacts [i].local_position_a;
             out -> contacts [i].local_position_a = out -> contacts [i].local_position_b;
             out -> contacts [i].local_position_b = t;
-            out -> contacts [i].tangent_vector = vector3_scaling (out -> contacts [i].tangent_vector, -1.0f);
+            out -> contacts [i].tangent_vector = simd_scale (out -> contacts [i].tangent_vector, -1.0f);
             /* tangent2 intentionally NOT negated: t2 = n×t1 is invariant
              * under the double flip, and prepare rebuilds it from
              * position+normal anyway (collision_solver.c). */
@@ -1076,7 +1076,7 @@ void physics_world_step (physics_world *world, float dt) {
     for (int i = 0; i < world -> body_count; i++) {
         rigidbody *rb = &world -> bodies [i];
         if ((rb -> static_state) || (rb -> is_sleeping) || (rb -> kinematic)) { continue; }
-        rb_apply_forces_perfect (rb, vector3_scaling (gravity, rb -> mass));
+        rb_apply_forces_perfect (rb, simd_scale (gravity, rb -> mass));
     }
     /* Deterministic retention factors (never libm pow: see det_math.h).
      *
@@ -1355,7 +1355,7 @@ void physics_world_step (physics_world *world, float dt) {
         for (int i = 0; i < world -> body_count; i++) {
             vector3 a3_pre_boundary_position = world -> bodies [i].position;
             boundary_apply_box_cfg (&world -> bodies [i], (vector3) {-250, 0, -250}, (vector3) {250, 500, 250}, step_cfg);
-            if (vector3_length_squared (vector3_subtraction (world -> bodies [i].position, a3_pre_boundary_position)) >
+            if (vector3_length_squared (simd_sub (world -> bodies [i].position, a3_pre_boundary_position)) >
                 0.000001f) {
                 a3_boundary_moved_any = true;
             }

@@ -85,6 +85,14 @@ BASE_CFLAGS += $(WERROR_FLAG)
 # so environment CFLAGS can never silently drop -ffp-contract=off (bitwise
 # twins depend on it). NATIVE builds emit a portability warning (see below).
 DETERMINISM_FLAGS = -ffp-contract=off -fno-fast-math
+# DESPOT-2026-10-07 SIMD: MPE_SIMD=0 forces the scalar fallback (defines
+# MPE_SIMD_OFF) even on SSE2 hosts, proving the fallback path stays green.
+# Default 1 = accelerate where the header supports it. Bitwise twins hold
+# either way (lane ops are exactly rounded; reductions stay scalar).
+MPE_SIMD ?= 1
+ifeq ($(MPE_SIMD),0)
+override CFLAGS += -DMPE_SIMD_OFF
+endif
 # DESPOT-2026-10-08 MSVC scope (LIE-06): GCC/Clang pin above. MSVC (cl) needs
 # /fp:strict (no FMA contraction) + /Oi- guard for the same guarantee.
 # Bitwise twins are GCC/Clang-only until MSVC flags land in CI. When CC is
@@ -444,6 +452,10 @@ MPE_SUITE_DEPS := $(MPE_TEST_CORE) $(SPRING_TEST_SRCS) $(SCENE_TEST_SRCS)
 # The ftc_ecosystem test needs the bundle fixture: build it first.
 build_suite: $(MPE_SUITE_SRCS) $(MPE_SUITE_DEPS) ecosystem/mfs/mfs_ecosystem$(PLUGIN_EXT) plugins/mpe_capsule$(PLUGIN_EXT)
 	$(CC) $(CFLAGS) $(MPE_RDYNAMIC) $(MPE_SUITE_SRCS) $(MPE_TEST_CORE) $(SPRING_TEST_SRCS) $(SCENE_TEST_SRCS) $(MPE_TEST_LIBS) $(shell pkg-config --libs epoxy) -o test_mpe_suite$(EXE_EXT)
+# DESPOT-2026-10-07 SIMD fallback proof: same suite forced scalar. Green here
+# proves the MPE_SIMD_OFF path (ARM/RISC-V shape) holds every gate.
+build_suite_scalar: $(MPE_SUITE_SRCS) $(MPE_SUITE_DEPS) ecosystem/mfs/mfs_ecosystem$(PLUGIN_EXT) plugins/mpe_capsule$(PLUGIN_EXT)
+	$(CC) $(CFLAGS) -DMPE_SIMD_OFF $(MPE_RDYNAMIC) $(MPE_SUITE_SRCS) $(MPE_TEST_CORE) $(SPRING_TEST_SRCS) $(SCENE_TEST_SRCS) $(MPE_TEST_LIBS) $(shell pkg-config --libs epoxy) -o test_mpe_suite_scalar$(EXE_EXT)
 
 ecosystem/mfs/mfs_ecosystem$(PLUGIN_EXT):
 	$(MAKE) -C ecosystem/mfs mfs_ecosystem$(PLUGIN_EXT)

@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <math.h>
+#include "../core/simd_math.h"
 /* World-space anisotropy (MATERIAL) axis for a contact, honouring each body's
  * optional reference frame (friction_anisotropy_frame).
  *
@@ -72,7 +73,7 @@ static bool a3_anisotropic_tangent_frame (const physics_world *world, const rigi
     if (!isfinite (axis.x) || !isfinite (axis.y) || !isfinite (axis.z) || (vector3_length_squared (axis) < 1.0e-8f)) { return false; }
     /* Project into the contact plane; an axis normal to the contact describes
      * no in-plane direction, so it is not a usable tangent frame. */
-    vector3 t1 = vector3_subtraction (axis, vector3_scaling (normal, vector3_dot (axis, normal)));
+    vector3 t1 = simd_sub (axis, simd_scale (normal, vector3_dot (axis, normal)));
     if (vector3_length_squared (t1) < 1.0e-6f) { return false; }
     t1 = vector3_normalisation (t1);
     vector3 t2 = vector3_cross (normal, t1);
@@ -122,8 +123,8 @@ static int contact_cache_match_role (const cached_contact *cc, uint32_t id_a, ui
          * bodies sharing an A anchor within 5cm (wrong impulse injection).
          * Both material points must coincide; resting contacts satisfy this
          * exactly (body-local storage survives rigid translation). */
-        float dist_a_sq = vector3_length_squared (vector3_subtraction (cc -> local_position_a, local_a));
-        float dist_b_sq = vector3_length_squared (vector3_subtraction (cc -> local_position_b, local_b));
+        float dist_a_sq = vector3_length_squared (simd_sub (cc -> local_position_a, local_a));
+        float dist_b_sq = vector3_length_squared (simd_sub (cc -> local_position_b, local_b));
         if ((dist_a_sq < match_dist_sq) && (dist_b_sq < match_dist_sq) &&
             (a3_task05_cached_impulses_are_usable (cc -> accumulated_normal_impulse, cc -> accumulated_tangent_impulse))) {
             return 1;
@@ -131,8 +132,8 @@ static int contact_cache_match_role (const cached_contact *cc, uint32_t id_a, ui
     }
     if ((cc -> object_id_a == id_b) && (cc -> object_id_b == id_a) && (cc -> property_stamp_a == stamp_b) &&
         (cc -> property_stamp_b == stamp_a)) {
-        float dist_sq_ab = vector3_length_squared (vector3_subtraction (cc -> local_position_a, local_b));
-        float dist_sq_ba = vector3_length_squared (vector3_subtraction (cc -> local_position_b, local_a));
+        float dist_sq_ab = vector3_length_squared (simd_sub (cc -> local_position_a, local_b));
+        float dist_sq_ba = vector3_length_squared (simd_sub (cc -> local_position_b, local_a));
         if ((dist_sq_ab < match_dist_sq) && (dist_sq_ba < match_dist_sq) &&
             (a3_task05_cached_impulses_are_usable (cc -> accumulated_normal_impulse, cc -> accumulated_tangent_impulse))) {
             return 2;
@@ -148,9 +149,9 @@ static bool contact_cache_adoptable (const cached_contact *cc, uint32_t id_a, ui
     }
     /* TRUTH: require BOTH sides like match_role. Side-A-only matching let
      * two B bodies sharing one A (within 5cm) share tangent memory. */
-    float dist_a_sq = vector3_length_squared (vector3_subtraction (cc -> local_position_a, local_a));
+    float dist_a_sq = vector3_length_squared (simd_sub (cc -> local_position_a, local_a));
     if (dist_a_sq >= match_dist_sq) { return false; }
-    float dist_b_sq = vector3_length_squared (vector3_subtraction (cc -> local_position_b, local_b));
+    float dist_b_sq = vector3_length_squared (simd_sub (cc -> local_position_b, local_b));
     if (dist_b_sq >= match_dist_sq) { return false; }
     return vector3_length_squared (cc -> tangent_dir) > 0.0001f;
 } /* Forward: defined beside the other per-phase passes below; called from
@@ -181,8 +182,8 @@ void collision_prepare_solver (struct physics_world *world, collision_data *sour
     if (!cache_array) { cache_count = 0; }
     for (int i = 0; i < m -> contact_count; i++) {
         contact_point_data *cp = &m -> contacts [i];
-        cp -> ra = vector3_subtraction (cp -> position, m -> object_a -> position);
-        cp -> rb = vector3_subtraction (cp -> position, m -> object_b -> position);
+        cp -> ra = simd_sub (cp -> position, m -> object_a -> position);
+        cp -> rb = simd_sub (cp -> position, m -> object_b -> position);
         cp -> local_position_a =
             collision_world_offset_to_body_local (m -> object_a, cp -> ra); /* A3_PATCH_19_BODY_LOCAL_WARM_START */
         cp -> local_position_b = collision_world_offset_to_body_local (m -> object_b, cp -> rb);
@@ -356,9 +357,9 @@ void collision_prepare_solver (struct physics_world *world, collision_data *sour
                 cp -> accumulated_normal_impulse *= damp;
                 if (world) { world -> contact_cache_hits_applied++; }
             } else { cp -> accumulated_normal_impulse = 0.0f; }
-        } vector3 va = vector3_addition (m -> object_a -> velocity, vector3_cross (m -> object_a -> angular_velocity, cp -> ra));
-        vector3 vb = vector3_addition (m -> object_b -> velocity, vector3_cross (m -> object_b -> angular_velocity, cp -> rb));
-        vector3 rel_vel = vector3_subtraction (vb, va);
+        } vector3 va = simd_add (m -> object_a -> velocity, vector3_cross (m -> object_a -> angular_velocity, cp -> ra));
+        vector3 vb = simd_add (m -> object_b -> velocity, vector3_cross (m -> object_b -> angular_velocity, cp -> rb));
+        vector3 rel_vel = simd_sub (vb, va);
         float vn_initial = vector3_dot (rel_vel, m -> normal_vector);
         /* TRUTH: feed sleep gating. max_relative_speed_sq is reset each tick
          * by the step and MUST be written here (contact processing); without
@@ -382,9 +383,9 @@ void collision_prepare_solver (struct physics_world *world, collision_data *sour
         vector3 ang_b = vector3_cross (
             math3_multiplication_vector3 (rigidbody_effective_inv_inertia (m -> object_b), rb_cross_n), cp -> rb);
         float k_normal = rigidbody_effective_inv_mass (m -> object_a) + rigidbody_effective_inv_mass (m -> object_b) +
-                         vector3_dot (vector3_addition (ang_a, ang_b), m -> normal_vector);
+                         vector3_dot (simd_add (ang_a, ang_b), m -> normal_vector);
         cp -> effective_mass_normal = (k_normal > 0.0f) ? (1.0f / k_normal) : 0.0f;
-        vector3 rel_vel_tangent = vector3_subtraction (rel_vel, vector3_scaling (m -> normal_vector, vn_initial));
+        vector3 rel_vel_tangent = simd_sub (rel_vel, simd_scale (m -> normal_vector, vn_initial));
         float tangent_speed = vector3_length (rel_vel_tangent);
         /* Coulomb tangent frame. Stick/slip select mirrors the sweep
          * (static below thresh, kinetic above): below thresh the slip
@@ -426,9 +427,9 @@ void collision_prepare_solver (struct physics_world *world, collision_data *sour
             }
             if (vector3_length_squared (adopted_tangent) > 0.0001f) {
                 /* Re-orthogonalize against the current normal. */
-                adopted_tangent = vector3_subtraction (
+                adopted_tangent = simd_sub (
                     adopted_tangent,
-                    vector3_scaling (m -> normal_vector, vector3_dot (adopted_tangent, m -> normal_vector)));
+                    simd_scale (m -> normal_vector, vector3_dot (adopted_tangent, m -> normal_vector)));
                 if (vector3_length_squared (adopted_tangent) > 0.0001f) { adopted_tangent = vector3_normalisation (adopted_tangent); } else { adopted_tangent = vector3_zero (); }
             }
         }
@@ -457,7 +458,7 @@ void collision_prepare_solver (struct physics_world *world, collision_data *sour
              * then derive from it consistently. */
             cp -> tangent_vector = aniso_t1;
         } else {
-            if (tangent_speed > 0.0001f) { cp -> tangent_vector = vector3_scaling (rel_vel_tangent, -1.0f / tangent_speed); } else { cp -> tangent_vector = adopted_tangent; }
+            if (tangent_speed > 0.0001f) { cp -> tangent_vector = simd_scale (rel_vel_tangent, -1.0f / tangent_speed); } else { cp -> tangent_vector = adopted_tangent; }
         }
         if (vector3_length_squared (cp -> tangent_vector) > 0.0001f) {
             /* Second tangent completes the Coulomb disc: t2 = n x t1. */
@@ -471,7 +472,7 @@ void collision_prepare_solver (struct physics_world *world, collision_data *sour
             vector3 ang_b_t = vector3_cross (
                 math3_multiplication_vector3 (rigidbody_effective_inv_inertia (m -> object_b), rb_cross_t), cp -> rb);
             float k_tangent = rigidbody_effective_inv_mass (m -> object_a) + rigidbody_effective_inv_mass (m -> object_b) +
-                              vector3_dot (vector3_addition (ang_a_t, ang_b_t), cp -> tangent_vector);
+                              vector3_dot (simd_add (ang_a_t, ang_b_t), cp -> tangent_vector);
             cp -> effective_mass_tangent = (k_tangent > 0.0f) ? (1.0f / k_tangent) : 0.0f;
             if (vector3_length_squared (cp -> tangent2) > 0.0001f) {
                 vector3 ra_cross_t2 = vector3_cross (cp -> ra, cp -> tangent2);
@@ -482,7 +483,7 @@ void collision_prepare_solver (struct physics_world *world, collision_data *sour
                     math3_multiplication_vector3 (rigidbody_effective_inv_inertia (m -> object_b), rb_cross_t2), cp -> rb);
                 float k_tangent2 = rigidbody_effective_inv_mass (m -> object_a) +
                                    rigidbody_effective_inv_mass (m -> object_b) +
-                                   vector3_dot (vector3_addition (ang_a_t2, ang_b_t2), cp -> tangent2);
+                                   vector3_dot (simd_add (ang_a_t2, ang_b_t2), cp -> tangent2);
                 cp -> effective_mass_tangent2 = (k_tangent2 > 0.0f) ? (1.0f / k_tangent2) : 0.0f;
             } else { cp -> effective_mass_tangent2 = 0.0f; }
         } else {
@@ -511,10 +512,10 @@ void collision_prepare_solver (struct physics_world *world, collision_data *sour
              * bigger, restore bigger) turns it exponential. A separating
              * contact starts cold; the sweeps below converge it. */
             vector3 va_now =
-                vector3_addition (m -> object_a -> velocity, vector3_cross (m -> object_a -> angular_velocity, cp -> ra));
+                simd_add (m -> object_a -> velocity, vector3_cross (m -> object_a -> angular_velocity, cp -> ra));
             vector3 vb_now =
-                vector3_addition (m -> object_b -> velocity, vector3_cross (m -> object_b -> angular_velocity, cp -> rb));
-            float vn_now = vector3_dot (vector3_subtraction (vb_now, va_now), m -> normal_vector);
+                simd_add (m -> object_b -> velocity, vector3_cross (m -> object_b -> angular_velocity, cp -> rb));
+            float vn_now = vector3_dot (simd_sub (vb_now, va_now), m -> normal_vector);
             if (vn_now >= 0.0f) {
                 cp -> accumulated_normal_impulse = 0.0f;
                 cp -> accumulated_tangent_impulse = 0.0f;
@@ -571,23 +572,23 @@ void collision_prepare_solver (struct physics_world *world, collision_data *sour
                                                   cp -> tangent_vector, &cp -> accumulated_tangent_impulse,
                                                   &cp -> accumulated_tangent2_impulse);
                 }
-                vector3 impulse = vector3_addition (
-                    vector3_scaling (m -> normal_vector, cp -> accumulated_normal_impulse),
-                    vector3_addition (vector3_scaling (cp -> tangent_vector, cp -> accumulated_tangent_impulse),
-                                      vector3_scaling (cp -> tangent2, cp -> accumulated_tangent2_impulse)));
+                vector3 impulse = simd_add (
+                    simd_scale (m -> normal_vector, cp -> accumulated_normal_impulse),
+                    simd_add (simd_scale (cp -> tangent_vector, cp -> accumulated_tangent_impulse),
+                                      simd_scale (cp -> tangent2, cp -> accumulated_tangent2_impulse)));
                 if (rigidbody_effective_inv_mass (m -> object_a) > 0.0f) {
-                    m -> object_a -> velocity = vector3_subtraction (
-                        m -> object_a -> velocity, vector3_scaling (impulse, rigidbody_effective_inv_mass (m -> object_a)));
-                    m -> object_a -> angular_velocity = vector3_subtraction (
+                    m -> object_a -> velocity = simd_sub (
+                        m -> object_a -> velocity, simd_scale (impulse, rigidbody_effective_inv_mass (m -> object_a)));
+                    m -> object_a -> angular_velocity = simd_sub (
                         m -> object_a -> angular_velocity,
                         math3_multiplication_vector3 (rigidbody_effective_inv_inertia (m -> object_a),
                                                       vector3_cross (cp -> ra, impulse)));
                 }
                 if (rigidbody_effective_inv_mass (m -> object_b) > 0.0f) {
-                    m -> object_b -> velocity = vector3_addition (
-                        m -> object_b -> velocity, vector3_scaling (impulse, rigidbody_effective_inv_mass (m -> object_b)));
+                    m -> object_b -> velocity = simd_add (
+                        m -> object_b -> velocity, simd_scale (impulse, rigidbody_effective_inv_mass (m -> object_b)));
                     m -> object_b -> angular_velocity =
-                        vector3_addition (m -> object_b -> angular_velocity,
+                        simd_add (m -> object_b -> angular_velocity,
                                           math3_multiplication_vector3 (rigidbody_effective_inv_inertia (m -> object_b),
                                                                         vector3_cross (cp -> rb, impulse)));
                 }
@@ -701,9 +702,9 @@ float collision_resolve_iterative (collision_data *m, float dt, bool friction_on
     for (int k = 0; k < m -> contact_count; k++) {
         int i = k;
         contact_point_data *cp = &m -> contacts [i];
-        vector3 va = vector3_addition (m -> object_a -> velocity, vector3_cross (m -> object_a -> angular_velocity, cp -> ra));
-        vector3 vb = vector3_addition (m -> object_b -> velocity, vector3_cross (m -> object_b -> angular_velocity, cp -> rb));
-        vector3 rel_vel = vector3_subtraction (vb, va);
+        vector3 va = simd_add (m -> object_a -> velocity, vector3_cross (m -> object_a -> angular_velocity, cp -> ra));
+        vector3 vb = simd_add (m -> object_b -> velocity, vector3_cross (m -> object_b -> angular_velocity, cp -> rb));
+        vector3 rel_vel = simd_sub (vb, va);
         float vn = vector3_dot (rel_vel, m -> normal_vector);
         /* Pure compression: no restitution bias here (Poisson pass later). */
         if (!friction_only) {
@@ -722,38 +723,38 @@ float collision_resolve_iterative (collision_data *m, float dt, bool friction_on
             if (lambda_n != 0.0f) {
                 float applied_n = fabsf (lambda_n);
                 if (applied_n > max_applied) { max_applied = applied_n; }
-                vector3 impulse = vector3_scaling (m -> normal_vector, lambda_n);
+                vector3 impulse = simd_scale (m -> normal_vector, lambda_n);
                 if (rigidbody_effective_inv_mass (m -> object_a) > 0.0f) {
-                    m -> object_a -> velocity = vector3_subtraction (
-                        m -> object_a -> velocity, vector3_scaling (impulse, rigidbody_effective_inv_mass (m -> object_a)));
-                    m -> object_a -> angular_velocity = vector3_subtraction (
+                    m -> object_a -> velocity = simd_sub (
+                        m -> object_a -> velocity, simd_scale (impulse, rigidbody_effective_inv_mass (m -> object_a)));
+                    m -> object_a -> angular_velocity = simd_sub (
                         m -> object_a -> angular_velocity,
                         math3_multiplication_vector3 (rigidbody_effective_inv_inertia (m -> object_a),
                                                       vector3_cross (cp -> ra, impulse)));
                 }
                 if (rigidbody_effective_inv_mass (m -> object_b) > 0.0f) {
-                    m -> object_b -> velocity = vector3_addition (
-                        m -> object_b -> velocity, vector3_scaling (impulse, rigidbody_effective_inv_mass (m -> object_b)));
+                    m -> object_b -> velocity = simd_add (
+                        m -> object_b -> velocity, simd_scale (impulse, rigidbody_effective_inv_mass (m -> object_b)));
                     m -> object_b -> angular_velocity =
-                        vector3_addition (m -> object_b -> angular_velocity,
+                        simd_add (m -> object_b -> angular_velocity,
                                           math3_multiplication_vector3 (rigidbody_effective_inv_inertia (m -> object_b),
                                                                         vector3_cross (cp -> rb, impulse)));
                 }
             }
         } /* !friction_only: normal solve skipped in relaxation so the
              Poisson bounce is never subtracted back out. */
-        va = vector3_addition (m -> object_a -> velocity, vector3_cross (m -> object_a -> angular_velocity, cp -> ra));
-        vb = vector3_addition (m -> object_b -> velocity, vector3_cross (m -> object_b -> angular_velocity, cp -> rb));
-        rel_vel = vector3_subtraction (vb, va);
+        va = simd_add (m -> object_a -> velocity, vector3_cross (m -> object_a -> angular_velocity, cp -> ra));
+        vb = simd_add (m -> object_b -> velocity, vector3_cross (m -> object_b -> angular_velocity, cp -> rb));
+        rel_vel = simd_sub (vb, va);
         /* Ensure a complete orthonormal tangent frame: rebuild from current
          * slip when the stored frame is missing, refresh t2 otherwise. */
         vector3 tangent = cp -> tangent_vector;
         if (vector3_length_squared (tangent) < 0.0001f) {
-            vector3 rel_vel_tangent = vector3_subtraction (
-                rel_vel, vector3_scaling (m -> normal_vector, vector3_dot (rel_vel, m -> normal_vector)));
+            vector3 rel_vel_tangent = simd_sub (
+                rel_vel, simd_scale (m -> normal_vector, vector3_dot (rel_vel, m -> normal_vector)));
             float tangent_length = vector3_length (rel_vel_tangent);
             if (tangent_length > 0.0001f) {
-                tangent = vector3_scaling (rel_vel_tangent, -1.0f / tangent_length);
+                tangent = simd_scale (rel_vel_tangent, -1.0f / tangent_length);
                 cp -> tangent_vector = tangent;
                 cp -> tangent2 = vector3_normalisation (vector3_cross (m -> normal_vector, tangent));
             }
@@ -774,7 +775,7 @@ float collision_resolve_iterative (collision_data *m, float dt, bool friction_on
                 vector3 rb_c = vector3_cross (cp -> rb, tangent);
                 float k = rigidbody_effective_inv_mass (m -> object_a) + rigidbody_effective_inv_mass (m -> object_b) +
                           vector3_dot (
-                              vector3_addition (vector3_cross (math3_multiplication_vector3 (
+                              simd_add (vector3_cross (math3_multiplication_vector3 (
                                                                    rigidbody_effective_inv_inertia (m -> object_a), ra_c),
                                                                cp -> ra),
                                                 vector3_cross (math3_multiplication_vector3 (
@@ -788,7 +789,7 @@ float collision_resolve_iterative (collision_data *m, float dt, bool friction_on
                 vector3 ra_c2 = vector3_cross (cp -> ra, tangent2);
                 vector3 rb_c2 = vector3_cross (cp -> rb, tangent2);
                 float k2 = rigidbody_effective_inv_mass (m -> object_a) + rigidbody_effective_inv_mass (m -> object_b) +
-                           vector3_dot (vector3_addition (
+                           vector3_dot (simd_add (
                                             vector3_cross (math3_multiplication_vector3 (
                                                                rigidbody_effective_inv_inertia (m -> object_a), ra_c2),
                                                            cp -> ra),
@@ -849,28 +850,28 @@ float collision_resolve_iterative (collision_data *m, float dt, bool friction_on
             float step2 = new_acc2 - cp -> accumulated_tangent2_impulse;
             cp -> accumulated_tangent_impulse += step1;
             cp -> accumulated_tangent2_impulse += step2;
-            vector3 friction_delta = vector3_addition (vector3_scaling (tangent, step1),
-                                                       has_t2 ? vector3_scaling (tangent2, step2) : vector3_zero ());
+            vector3 friction_delta = simd_add (simd_scale (tangent, step1),
+                                                       has_t2 ? simd_scale (tangent2, step2) : vector3_zero ());
             {
                 float applied_t = sqrtf (vector3_length_squared (friction_delta));
                 if (applied_t > max_applied) { max_applied = applied_t; }
             }
             if (vector3_length_squared (friction_delta) > 0.0f) {
                 if (rigidbody_effective_inv_mass (m -> object_a) > 0.0f) {
-                    m -> object_a -> velocity = vector3_subtraction (
+                    m -> object_a -> velocity = simd_sub (
                         m -> object_a -> velocity,
-                        vector3_scaling (friction_delta, rigidbody_effective_inv_mass (m -> object_a)));
-                    m -> object_a -> angular_velocity = vector3_subtraction (
+                        simd_scale (friction_delta, rigidbody_effective_inv_mass (m -> object_a)));
+                    m -> object_a -> angular_velocity = simd_sub (
                         m -> object_a -> angular_velocity,
                         math3_multiplication_vector3 (rigidbody_effective_inv_inertia (m -> object_a),
                                                       vector3_cross (cp -> ra, friction_delta)));
                 }
                 if (rigidbody_effective_inv_mass (m -> object_b) > 0.0f) {
                     m -> object_b -> velocity =
-                        vector3_addition (m -> object_b -> velocity,
-                                          vector3_scaling (friction_delta, rigidbody_effective_inv_mass (m -> object_b)));
+                        simd_add (m -> object_b -> velocity,
+                                          simd_scale (friction_delta, rigidbody_effective_inv_mass (m -> object_b)));
                     m -> object_b -> angular_velocity =
-                        vector3_addition (m -> object_b -> angular_velocity,
+                        simd_add (m -> object_b -> angular_velocity,
                                           math3_multiplication_vector3 (rigidbody_effective_inv_inertia (m -> object_b),
                                                                         vector3_cross (cp -> rb, friction_delta)));
                 }
@@ -886,10 +887,10 @@ void collision_refresh_impact_velocities (collision_data *manifolds, int manifol
         for (int i = 0; i < man -> contact_count; i++) {
             contact_point_data *cp = &man -> contacts [i];
             vector3 va =
-                vector3_addition (man -> object_a -> velocity, vector3_cross (man -> object_a -> angular_velocity, cp -> ra));
+                simd_add (man -> object_a -> velocity, vector3_cross (man -> object_a -> angular_velocity, cp -> ra));
             vector3 vb =
-                vector3_addition (man -> object_b -> velocity, vector3_cross (man -> object_b -> angular_velocity, cp -> rb));
-            cp -> impact_velocity = vector3_dot (vector3_subtraction (vb, va), man -> normal_vector);
+                simd_add (man -> object_b -> velocity, vector3_cross (man -> object_b -> angular_velocity, cp -> rb));
+            cp -> impact_velocity = vector3_dot (simd_sub (vb, va), man -> normal_vector);
         }
     }
 }
@@ -920,12 +921,12 @@ void collision_snapshot_friction_mu (collision_data *manifolds, int manifold_cou
              * sqrt(vt1^2+vt2^2) once its frame exists, but valid before any
              * iteration has run (no frame needed). */
             vector3 va =
-                vector3_addition (man -> object_a -> velocity, vector3_cross (man -> object_a -> angular_velocity, cp -> ra));
+                simd_add (man -> object_a -> velocity, vector3_cross (man -> object_a -> angular_velocity, cp -> ra));
             vector3 vb =
-                vector3_addition (man -> object_b -> velocity, vector3_cross (man -> object_b -> angular_velocity, cp -> rb));
-            vector3 rel = vector3_subtraction (vb, va);
+                simd_add (man -> object_b -> velocity, vector3_cross (man -> object_b -> angular_velocity, cp -> rb));
+            vector3 rel = simd_sub (vb, va);
             float vn = vector3_dot (rel, man -> normal_vector);
-            vector3 rel_t = vector3_subtraction (rel, vector3_scaling (man -> normal_vector, vn));
+            vector3 rel_t = simd_sub (rel, simd_scale (man -> normal_vector, vn));
             float slip = vector3_length (rel_t);
             cp -> snap_friction_mu = (slip < sth) ? mus : muk;
         }
@@ -970,20 +971,20 @@ void collision_apply_poisson_restitution (collision_data *manifolds, int manifol
             }
             if (lambda_r <= 0.0f) { continue; }
             cp -> accumulated_normal_impulse += lambda_r;
-            vector3 impulse = vector3_scaling (man -> normal_vector, lambda_r);
+            vector3 impulse = simd_scale (man -> normal_vector, lambda_r);
             if (rigidbody_effective_inv_mass (man -> object_a) > 0.0f) {
-                man -> object_a -> velocity = vector3_subtraction (
-                    man -> object_a -> velocity, vector3_scaling (impulse, rigidbody_effective_inv_mass (man -> object_a)));
+                man -> object_a -> velocity = simd_sub (
+                    man -> object_a -> velocity, simd_scale (impulse, rigidbody_effective_inv_mass (man -> object_a)));
                 man -> object_a -> angular_velocity =
-                    vector3_subtraction (man -> object_a -> angular_velocity,
+                    simd_sub (man -> object_a -> angular_velocity,
                                          math3_multiplication_vector3 (rigidbody_effective_inv_inertia (man -> object_a),
                                                                        vector3_cross (cp -> ra, impulse)));
             }
             if (rigidbody_effective_inv_mass (man -> object_b) > 0.0f) {
-                man -> object_b -> velocity = vector3_addition (
-                    man -> object_b -> velocity, vector3_scaling (impulse, rigidbody_effective_inv_mass (man -> object_b)));
+                man -> object_b -> velocity = simd_add (
+                    man -> object_b -> velocity, simd_scale (impulse, rigidbody_effective_inv_mass (man -> object_b)));
                 man -> object_b -> angular_velocity =
-                    vector3_addition (man -> object_b -> angular_velocity,
+                    simd_add (man -> object_b -> angular_velocity,
                                       math3_multiplication_vector3 (rigidbody_effective_inv_inertia (man -> object_b),
                                                                     vector3_cross (cp -> rb, impulse)));
             }
@@ -1060,11 +1061,11 @@ void collision_apply_rolling_resistance (collision_data *manifolds, int manifold
                      * (verified: F10 10-stack calm, 6-cube holds). Spin
                      * below uses the Hertz patch. */
                     vector3 spin_n =
-                        vector3_scaling (man -> normal_vector, vector3_dot (bd -> angular_velocity, man -> normal_vector));
-                    vector3 roll_w = vector3_subtraction (bd -> angular_velocity, spin_n);
+                        simd_scale (man -> normal_vector, vector3_dot (bd -> angular_velocity, man -> normal_vector));
+                    vector3 roll_w = simd_sub (bd -> angular_velocity, spin_n);
                     float roll_speed = vector3_length (roll_w);
                     if (roll_speed > 0.0001f) {
-                        vector3 roll_axis = vector3_scaling (roll_w, 1.0f / roll_speed);
+                        vector3 roll_axis = simd_scale (roll_w, 1.0f / roll_speed);
                         float inertia_axis =
                             1.0f / fmaxf (vector3_dot (roll_axis, math3_multiplication_vector3 (
                                                                       rigidbody_effective_inv_inertia (bd), roll_axis)),
@@ -1075,12 +1076,12 @@ void collision_apply_rolling_resistance (collision_data *manifolds, int manifold
                         if (!isfinite (dw) || dw < 0.0f) { continue; }
                         if (dw > roll_speed) { dw = roll_speed; }
                         bd -> angular_velocity =
-                            vector3_subtraction (bd -> angular_velocity, vector3_scaling (roll_axis, dw));
+                            simd_sub (bd -> angular_velocity, simd_scale (roll_axis, dw));
                     }
                     /* Spin part: same patch. */
                     float spin_speed = vector3_length (spin_n);
                     if (spin_speed > 0.0001f) {
-                        vector3 spin_axis = vector3_scaling (spin_n, 1.0f / spin_speed);
+                        vector3 spin_axis = simd_scale (spin_n, 1.0f / spin_speed);
                         float inertia_spin =
                             1.0f / fmaxf (vector3_dot (spin_axis, math3_multiplication_vector3 (
                                                                       rigidbody_effective_inv_inertia (bd), spin_axis)),
@@ -1091,7 +1092,7 @@ void collision_apply_rolling_resistance (collision_data *manifolds, int manifold
                         if (!isfinite (dw_spin) || dw_spin < 0.0f) { continue; }
                         if (dw_spin > spin_speed) { dw_spin = spin_speed; }
                         bd -> angular_velocity =
-                            vector3_subtraction (bd -> angular_velocity, vector3_scaling (spin_axis, dw_spin));
+                            simd_sub (bd -> angular_velocity, simd_scale (spin_axis, dw_spin));
                     }
                 }
             }
@@ -1204,12 +1205,12 @@ void collision_apply_split_impulse (collision_data *manifolds, int manifold_coun
         } float corr = beta * fmaxf (deepest - slop, 0.0f);
         if (corr > max_corr) { corr = max_corr; }
         if (corr <= 0.0f) { continue; }
-        vector3 shift = vector3_scaling (man -> normal_vector, corr / inv_sum);
+        vector3 shift = simd_scale (man -> normal_vector, corr / inv_sum);
         /* TRUTH: kinematic has stored inv!=0 but effective 0. Old
          * !static_state moved kinematics, corrupting prescribed motion.
          * Gate on effective inv (zero for kinematic/sleeping/static). */
-        if (inv_a > 0.0f) { body_a -> position = vector3_subtraction (body_a -> position, vector3_scaling (shift, inv_a)); }
-        if (inv_b > 0.0f) { body_b -> position = vector3_addition (body_b -> position, vector3_scaling (shift, inv_b)); }
+        if (inv_a > 0.0f) { body_a -> position = simd_sub (body_a -> position, simd_scale (shift, inv_a)); }
+        if (inv_b > 0.0f) { body_b -> position = simd_add (body_b -> position, simd_scale (shift, inv_b)); }
         /* Wake depth now reads the config knob (see note above). */
         if (corr > wake_depth) {
             if (!body_a -> static_state) { rigidbody_wake (body_a); }

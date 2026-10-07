@@ -1,54 +1,52 @@
 #ifndef simd_math_h
 #define simd_math_h
-/* SIMD fast path (DESPOT-2026-10-08): SSE2 vector3 ops, deterministic.
+/* SIMD lane-wise vector3 ops (DESPOT-2026-10-08, full since 2026-10-07).
  *
- * Contract:
- * - IEEE-exact same results as scalar math3d.h (add/sub/mul are correctly
- *   rounded in both SSE2 and scalar-SSE; no FMA anywhere; -ffp-contract=off
- *   required). Bitwise twins hold with or without this header.
- * - Order of operations identical to scalar (x,y,z lanes independent;
- *   dot uses x*x + y*y + z*z left-to-right in double, same as scalar
- *   length_squared; callers needing float-dot use vector3_dot directly).
- * - Fallback scalar when __SSE2__ absent (ARM/RISC-V/MSVC without SSE).
- * - No unaligned loads: vector3 is 12 bytes, NOT 16; SIMD path uses
- *   _mm_set_ps (register shuffles, no memory alignment requirement).
- *
- * Use in hot loops (broadphase AABB, narrowphase deltas) via
- * simd_add/sub/scale; scalar code remains canonical for audits.
- */
+ * Covered: add, sub, scale, cross — every lane computes EXACTLY the scalar
+ * op sequence (one correctly-rounded mul/add/sub per lane, no FMA;
+ * -ffp-contract=off required), so results are bitwise identical to
+ * math3d.h on every IEEE target. cross uses lane shuffles only (no
+ * reduction), hence exact too. vector3 is 12 bytes (not 16): operands are
+ * built with _mm_set_ps (register-only, no alignment requirement).
+ * NOT covered, by proof: dot/length/normalize are REDUCTIONS — lane-sum
+ * order changes rounding, so no SIMD order matches scalar left-to-right.
+ * They stay scalar in math3d.h; this is completeness, not a gap.
+ * Backends: SSE2 (x86_64, tested here) / MSVC <intrin.h> (same SSE2
+ * intrinsics) / scalar fallback (MPE_SIMD_OFF, ARM, RISC-V — tested via
+ * the scalar suite binary). NEON is future work, not a silent fallback. */
 #include <math.h>
 #include <float.h>
 #include "math3d.h"
-#ifdef __SSE2__
+#if defined(__SSE2__) && !defined(MPE_SIMD_OFF)
+#if defined(_MSC_VER)
+#include <intrin.h>
+#else
 #include <emmintrin.h>
-static inline vector3 simd_add (vector3 a, vector3 b) {
-    __m128 va = _mm_set_ps (0.0f, a.z, a.y, a.x);
-    __m128 vb = _mm_set_ps (0.0f, b.z, b.y, b.x);
-    __m128 vc = _mm_add_ps (va, vb);
-    float out [4];
-    _mm_storeu_ps (out, vc);
-    return (vector3) {out [0], out [1], out [2]};
-} static inline vector3 simd_sub (vector3 a, vector3 b) {
-    __m128 va = _mm_set_ps (0.0f, a.z, a.y, a.x);
-    __m128 vb = _mm_set_ps (0.0f, b.z, b.y, b.x);
-    __m128 vc = _mm_sub_ps (va, vb);
-    float out [4];
-    _mm_storeu_ps (out, vc);
-    return (vector3) {out [0], out [1], out [2]};
-} static inline vector3 simd_scale (vector3 a, float s) {
-    __m128 va = _mm_set_ps (0.0f, a.z, a.y, a.x);
-    __m128 vs = _mm_set1_ps (s);
-    __m128 vc = _mm_mul_ps (va, vs);
-    float out [4];
-    _mm_storeu_ps (out, vc);
-    return (vector3) {out [0], out [1], out [2]};
-} static inline int simd_available (void) {
-    return 1;
-}
+#endif
+static inline __m128 simd_pack (vector3 a) {return _mm_set_ps (0.0f, a.z, a.y, a.x);}
+static inline vector3 simd_unpack (__m128 v) {float out [4]; _mm_storeu_ps (out, v); return (vector3) {out [0], out [1], out [2]};}
+static inline vector3 simd_add (vector3 a, vector3 b) {return simd_unpack (_mm_add_ps (simd_pack (a), simd_pack (b)));}
+static inline vector3 simd_sub (vector3 a, vector3 b) {return simd_unpack (_mm_sub_ps (simd_pack (a), simd_pack (b)));}
+static inline vector3 simd_scale (vector3 a, float s) {return simd_unpack (_mm_mul_ps (simd_pack (a), _mm_set1_ps (s)));}
+static inline vector3 simd_cross (vector3 a, vector3 b) {
+    /* Lane-exact cross: a1=[ay,az,ax], b1=[bz,bx,by] -> t1=[aybz,azbx,axby];
+     * a2=[az,ax,ay], b2=[by,bz,bx] -> t2=[azby,axb z,aybx]; c=t1-t2. Each lane
+     * repeats the scalar op sequence exactly (mul,mul,sub). NOTE the pairing:
+     * mul(a1,b2)-mul(a2,b1) — same-mask pairing computes dot-like garbage
+     * (caught by the suite going 22/42 red, DESPOT-2026-10-07). */
+    __m128 va = simd_pack (a);
+    __m128 vb = simd_pack (b);
+    __m128 a1 = _mm_shuffle_ps (va, va, _MM_SHUFFLE (3, 0, 2, 1));
+    __m128 b2 = _mm_shuffle_ps (vb, vb, _MM_SHUFFLE (3, 1, 0, 2));
+    __m128 a2 = _mm_shuffle_ps (va, va, _MM_SHUFFLE (3, 1, 0, 2));
+    __m128 b1 = _mm_shuffle_ps (vb, vb, _MM_SHUFFLE (3, 0, 2, 1));
+    return simd_unpack (_mm_sub_ps (_mm_mul_ps (a1, b2), _mm_mul_ps (a2, b1)));
+} static inline int simd_available (void) {return 1;}
 #else
 static inline vector3 simd_add (vector3 a, vector3 b) {return vector3_addition (a, b);}
 static inline vector3 simd_sub (vector3 a, vector3 b) {return vector3_subtraction (a, b);}
 static inline vector3 simd_scale (vector3 a, float s) {return vector3_scaling (a, s);}
+static inline vector3 simd_cross (vector3 a, vector3 b) {return vector3_cross (a, b);}
 static inline int simd_available (void) {return 0;}
 #endif
 #endif

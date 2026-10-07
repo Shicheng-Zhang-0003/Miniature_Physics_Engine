@@ -6,6 +6,7 @@
 #include "islands.h"
 #include "../core/physics_world.h"
 #include "../config/mpe_constants.h"
+#include "../core/simd_math.h"
 void constraint_pool_init (struct physics_world *world) {
     if (!world) { return; }
     for (int i = 0; i < mpe_max_joints; i++) {

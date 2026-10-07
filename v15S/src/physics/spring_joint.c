@@ -14,6 +14,7 @@
 #include "../scene/scene_init.h"
 #include "../ui_input/camera.h"
 #include <epoxy/gl.h>
+#include "../core/simd_math.h"
 extern camera main_camera_fov;
 rigidbody *scene_resolve_object_by_id (uint32_t id);
 #endif
@@ -96,7 +97,7 @@ static void spring_apply_core_dt (physics_world *world, rigidbody *bodies, int b
         if ((!rigid_body_a) || (!rigid_body_b)) {
             remove_joint (world, joint_index);
             continue;
-        } vector3 displacement_vector = vector3_subtraction (rigid_body_b -> position, rigid_body_a -> position);
+        } vector3 displacement_vector = simd_sub (rigid_body_b -> position, rigid_body_a -> position);
         float current_separation_distance = vector3_length (displacement_vector);
         /* FIX-AUDIT: coincident bodies with L0>0 need maximal repulsion,
          * not skip. Pick an arbitrary axis. */
@@ -105,7 +106,7 @@ static void spring_apply_core_dt (physics_world *world, rigidbody *bodies, int b
             spring_axis_direction = (vector3) {1.0f, 0.0f, 0.0f};
             current_separation_distance = 0.0f;
         } else {
-            spring_axis_direction = vector3_scaling (displacement_vector, 1.0f / current_separation_distance);
+            spring_axis_direction = simd_scale (displacement_vector, 1.0f / current_separation_distance);
         } float spring_extension = current_separation_distance - current_spring_joint -> equilibrium_length;
         /* TRUTH: Courant stability guard (loud, not silent). Explicit Euler
          * is stable iff w*dt=sqrt(k/m_red)*dt<2. Above that the TRUE Hooke
@@ -149,11 +150,11 @@ static void spring_apply_core_dt (physics_world *world, rigidbody *bodies, int b
                     damp_warn_count++;
                 } c_eff = c_stable;
             }
-        } vector3 restoration_force = vector3_scaling (spring_axis_direction, k_eff * spring_extension);
-        vector3 relative_velocity = vector3_subtraction (rigid_body_b -> velocity, rigid_body_a -> velocity);
+        } vector3 restoration_force = simd_scale (spring_axis_direction, k_eff * spring_extension);
+        vector3 relative_velocity = simd_sub (rigid_body_b -> velocity, rigid_body_a -> velocity);
         float velocity_along_spring_axis = vector3_dot (relative_velocity, spring_axis_direction);
-        vector3 damping_force = vector3_scaling (spring_axis_direction, c_eff * velocity_along_spring_axis);
-        vector3 net_joint_force = vector3_addition (restoration_force, damping_force);
+        vector3 damping_force = simd_scale (spring_axis_direction, c_eff * velocity_along_spring_axis);
+        vector3 net_joint_force = simd_add (restoration_force, damping_force);
         if (a3_inverse_mass_sum > 0.0f) {
             /* Actuator saturation (documented NON-Hookean): caps force to
              * m_red*max_acceleration (default 200 m/s^2). Truth paths never
@@ -163,9 +164,9 @@ static void spring_apply_core_dt (physics_world *world, rigidbody *bodies, int b
             float a3_reduced_mass = 1.0f / a3_inverse_mass_sum;
             float a3_max_joint_force = a3_reduced_mass * mpe_world_cfg (world) -> joints.max_acceleration;
             float a3_force_length = vector3_length (net_joint_force);
-            if ((a3_force_length > a3_max_joint_force) && (a3_force_length > math_epsilon)) { net_joint_force = vector3_scaling (net_joint_force, a3_max_joint_force / a3_force_length); }
+            if ((a3_force_length > a3_max_joint_force) && (a3_force_length > math_epsilon)) { net_joint_force = simd_scale (net_joint_force, a3_max_joint_force / a3_force_length); }
         } rb_apply_forces_perfect (rigid_body_a, net_joint_force);
-        rb_apply_forces_perfect (rigid_body_b, vector3_scaling (net_joint_force, -1.0f));
+        rb_apply_forces_perfect (rigid_body_b, simd_scale (net_joint_force, -1.0f));
     }
 } /* Canonical per-tick spring entry: both step paths call exactly this. */
 void mpe_springs_apply (physics_world *world, float dt) {

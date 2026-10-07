@@ -8,6 +8,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include "simd_math.h"
 /* ============================================================================
  * SILENT INPUT CLAMPS — made loud (DESPOT-2026-10-02)
  *
@@ -96,11 +97,11 @@ static inline void rb_integrate_position_exact_free_flight (rigidbody *rb, float
     if (drag_retention >= 1.0f - 1e-6f) {
         /* c ≈ 0: exact Verlet (drag == 1, conservative).
          * x = x0 + v0*dt + 0.5*g*dt^2, v = v0 + g*dt. */
-        vector3 g_half_dt2 = vector3_scaling (g, 0.5f * dt * dt);
-        rb -> position = vector3_addition (rb -> position, vector3_scaling (v0, dt));
-        rb -> position = vector3_addition (rb -> position, g_half_dt2);
+        vector3 g_half_dt2 = simd_scale (g, 0.5f * dt * dt);
+        rb -> position = simd_add (rb -> position, simd_scale (v0, dt));
+        rb -> position = simd_add (rb -> position, g_half_dt2);
         /* Exact velocity for c=0: v(dt) = v0 + g*dt */
-        rb -> velocity = vector3_addition (v0, vector3_scaling (g, dt));
+        rb -> velocity = simd_add (v0, simd_scale (g, dt));
         return;
     }
     /* c > 0: exact analytic integration of linear viscous drag + gravity.
@@ -132,17 +133,17 @@ static inline void rb_integrate_position_exact_free_flight (rigidbody *rb, float
         term2_pos = dt_d * inv_c - one_minus_e_ct * inv_c * inv_c;
         term1_vel = e_ct;
         term2_vel = one_minus_e_ct * inv_c;
-    } vector3 v_term = vector3_scaling (v0, (float) term1_pos);
-    vector3 g_term = vector3_scaling (g, (float) term2_pos);
+    } vector3 v_term = simd_scale (v0, (float) term1_pos);
+    vector3 g_term = simd_scale (g, (float) term2_pos);
     /* TRUTH: double internally, float at the boundary by struct design
      * (position/velocity are float). Casts lose ~1e-7 rel; far bodies
      * (|x|>250) additionally suffer float-ulp error (~3e-5m at 500m).
      * Deterministic (same bits), but imprecise far-field: use double
      * storage if far-field accuracy is ever required. */
-    rb -> position = vector3_addition (rb -> position, vector3_addition (v_term, g_term));
+    rb -> position = simd_add (rb -> position, simd_add (v_term, g_term));
     /* Exact velocity: v(dt) = v0 * e^(-c*dt) + (g/c) * (1 - e^(-c*dt)) */
     vector3 v_exact =
-        vector3_addition (vector3_scaling (v0, (float) term1_vel), vector3_scaling (g, (float) term2_vel));
+        simd_add (simd_scale (v0, (float) term1_vel), simd_scale (g, (float) term2_vel));
     rb -> velocity = v_exact;
 } /* Symplectic Euler position integration for constrained bodies (original, stable).
  * Velocity has already been updated by rb_integrate_velocity with forces + gravity.
@@ -151,7 +152,7 @@ static inline void rb_integrate_position_exact_free_flight (rigidbody *rb, float
 static inline void rb_integrate_position_constrained (rigidbody *rb, float dt) {
     if (!rb || rb -> static_state || rb -> is_sleeping || rb -> kinematic || !(dt > 0.0f))
         return;
-    rb -> position = vector3_addition (rb -> position, vector3_scaling (rb -> velocity, dt));
+    rb -> position = simd_add (rb -> position, simd_scale (rb -> velocity, dt));
 } /* rb_integrate_position_free_flight_original REMOVED (dead: zero callers;
  * its contract (x+=v_post*dt, caller fixes gravity) invited double-counts).
  * Use rb_integrate_position (constrained, safe) or
@@ -630,7 +631,7 @@ void rb_apply_forces_perfect (rigidbody *rigid_body, vector3 force_applied) {
     }
     /* MPE_TASK_13_2_FORCE_SLEEP_FIX_END */
     rigid_body -> force_accumulator =
-        vector3_addition (rigid_body -> force_accumulator, force_applied); // Force applied to torque and circular momentum
+        simd_add (rigid_body -> force_accumulator, force_applied); // Force applied to torque and circular momentum
 } // Apply force at a point not the centre of mass (which generates rotational motion and torque)
 // locale_impact = impact point on object identified
 void rb_apply_forces_localised (rigidbody *rigid_body, vector3 force_applied, vector3 locale_impact) {
@@ -645,7 +646,7 @@ void rb_apply_forces_localised (rigidbody *rigid_body, vector3 force_applied, ve
     /* MPE_TASK_13_2_LOCALIZED_SLEEP_FIX_END */
     rb_apply_forces_perfect (rigid_body, force_applied);
     // Torque = r * F (r = vector from Centre of Mass to the point of actual contact between objects)
-    vector3 relative_contact_vector = vector3_subtraction (locale_impact, rigid_body -> position);
+    vector3 relative_contact_vector = simd_sub (locale_impact, rigid_body -> position);
     /* TRUTH: clamp lever arm. 1e10m off -> torque explosion. 100m is already
      * far beyond the ±250m playable volume contact geometry.
      * FIX-AUDIT-DESPOT: clamp verified present (100m sphere). Without it a
@@ -655,10 +656,10 @@ void rb_apply_forces_localised (rigidbody *rigid_body, vector3 force_applied, ve
     if (!isfinite (lever_sq)) { return; }
     if (lever_sq > 100.0f * 100.0f) {
         float inv = 100.0f / sqrtf (lever_sq);
-        relative_contact_vector = vector3_scaling (relative_contact_vector, inv);
+        relative_contact_vector = simd_scale (relative_contact_vector, inv);
     } vector3 torque_generated = vector3_cross (relative_contact_vector, force_applied);
     if (!a3_vector3_is_finite (torque_generated)) { return; }
-    rigid_body -> torque_accumulator = vector3_addition (rigid_body -> torque_accumulator, torque_generated);
+    rigid_body -> torque_accumulator = simd_add (rigid_body -> torque_accumulator, torque_generated);
 } // Energy Computation
 float rb_get_kinetic_energy (rigidbody *rigid_body) {
     if (!rigid_body) { return 0.0f; }
@@ -707,17 +708,17 @@ void rb_integrate_velocity (rigidbody *rigid_body, float delta_time, float linea
     rigid_body -> inverse_inertia_system =
         math3_multiplication (rotation_matrix_current, math3_multiplication (rigid_body -> inverse_inertia_tensor_local,
                                                                              rotation_matrix_transposed));
-    rigid_body -> acceleration = vector3_scaling (rigid_body -> force_accumulator, rigid_body -> inverse_mass);
+    rigid_body -> acceleration = simd_scale (rigid_body -> force_accumulator, rigid_body -> inverse_mass);
     /* TRUTH: 0*Inf=NaN guard. If inv is Inf (should never happen after
      * sanitize clamp, but save files predate it) and F is 0, accel is NaN.
      * Zero it instead of poisoning velocity. */
     if (!a3_vector3_is_finite (rigid_body -> acceleration)) { rigid_body -> acceleration = vector3_zero (); } else if (!isfinite (rigid_body -> inverse_mass)) { rigid_body -> acceleration = vector3_zero (); }
     if (a3_vector3_is_finite (rigid_body -> velocity) && a3_vector3_is_finite (rigid_body -> acceleration)) {
         rigid_body -> velocity =
-            vector3_addition (rigid_body -> velocity, vector3_scaling (rigid_body -> acceleration, delta_time));
+            simd_add (rigid_body -> velocity, simd_scale (rigid_body -> acceleration, delta_time));
     }
     if (!a3_vector3_is_finite (rigid_body -> velocity)) { rigid_body -> velocity = vector3_zero (); }
-    rigid_body -> velocity = vector3_scaling (rigid_body -> velocity, linear_damping);
+    rigid_body -> velocity = simd_scale (rigid_body -> velocity, linear_damping);
     /* TRUTH: this is symplectic Euler with post-scale damping
      * (v0+a*dt)*ret, first-order with O(c*dt^2) error vs the analytic
      * v0*ret+a*(1-ret)/c for drag<1. Exact only for drag=1. Free-flight
@@ -734,7 +735,7 @@ void rb_integrate_velocity (rigidbody *rigid_body, float delta_time, float linea
         if (nice_base < 0.9f) { nice_base = 0.9f; }
         if (nice_base > 1.0f) { nice_base = 1.0f; }
         float nice_factor = (float) det_pow_retention ((double) nice_base, (double) delta_time * 60.0);
-        rigid_body -> velocity = vector3_scaling (rigid_body -> velocity, nice_factor);
+        rigid_body -> velocity = simd_scale (rigid_body -> velocity, nice_factor);
     }
     /* MPE_TASK_V15R2_NICE_DAMPING_END */
     /* AUDIT: no snap-to-zero dead zone here. Zeroing sub-threshold
@@ -809,7 +810,7 @@ void rb_integrate_velocity (rigidbody *rigid_body, float delta_time, float linea
                     vector3 cand = math3_multiplication_vector3 (math3_inverse (In), L);
                     if (!a3_vector3_is_finite (cand))
                         break;
-                    float step = vector3_length (vector3_subtraction (cand, w));
+                    float step = vector3_length (simd_sub (cand, w));
                     w_new = cand;
                     w = cand;
                     /* The rotor for this dt is tiny (|w|*dt ~ 0.06 rad), so
@@ -823,9 +824,9 @@ void rb_integrate_velocity (rigidbody *rigid_body, float delta_time, float linea
                 if (converged) {
                     rigid_body -> angular_velocity = w_new;
                     rigid_body -> angular_acceleration =
-                        vector3_scaling (vector3_subtraction (w_new, rigid_body -> angular_velocity), 0.0f);
+                        simd_scale (simd_sub (w_new, rigid_body -> angular_velocity), 0.0f);
                     rigid_body -> angular_acceleration = vector3_zero ();
-                    rigid_body -> angular_velocity = vector3_scaling (rigid_body -> angular_velocity, angular_damping);
+                    rigid_body -> angular_velocity = simd_scale (rigid_body -> angular_velocity, angular_damping);
                     if (!a3_vector3_is_finite (rigid_body -> angular_velocity)) { rigid_body -> angular_velocity = vector3_zero (); }
                     goto rotational_done;
                 }
@@ -903,14 +904,14 @@ void rb_integrate_velocity (rigidbody *rigid_body, float delta_time, float linea
         vector3 alpha_ext = rigid_body -> angular_acceleration;
         /* Midpoint angular velocity: the implicit step is what makes the
          * stiff case stable, and it costs one extra cross product. */
-        vector3 w_mid = vector3_addition (rigid_body -> angular_velocity, vector3_scaling (alpha_ext, 0.5f * delta_time));
+        vector3 w_mid = simd_add (rigid_body -> angular_velocity, simd_scale (alpha_ext, 0.5f * delta_time));
         math3 list4_gyro_rotation = vector4_to_math3 (rigid_body -> orientation);
         math3 list4_gyro_rotation_t = math3_transposition (list4_gyro_rotation);
         vector3 list4_gyro_omega_local = math3_multiplication_vector3 (list4_gyro_rotation_t, w_mid);
         vector3 list4_gyro_angular_momentum_local =
             math3_multiplication_vector3 (rigid_body -> inertia_tensor_local, list4_gyro_omega_local);
         vector3 list4_gyro_torque_local = vector3_cross (list4_gyro_omega_local, list4_gyro_angular_momentum_local);
-        list4_gyro_torque_local = vector3_scaling (list4_gyro_torque_local, -1.0f);
+        list4_gyro_torque_local = simd_scale (list4_gyro_torque_local, -1.0f);
         vector3 list4_gyro_torque_world = math3_multiplication_vector3 (list4_gyro_rotation, list4_gyro_torque_local);
         vector3 list4_gyro_alpha =
             math3_multiplication_vector3 (rigid_body -> inverse_inertia_system, list4_gyro_torque_world);
@@ -928,15 +929,15 @@ void rb_integrate_velocity (rigidbody *rigid_body, float delta_time, float linea
             float alen = vector3_length (list4_gyro_alpha);
             if (!isfinite (wlen) || !isfinite (alen)) { list4_gyro_alpha = vector3_zero (); } else if (alen > 0.0f && wlen > 0.0f) {
                 float max_alpha = 4.0f * wlen / delta_time; /* never binds physically */
-                if (alen > max_alpha) { list4_gyro_alpha = vector3_scaling (list4_gyro_alpha, max_alpha / alen); }
+                if (alen > max_alpha) { list4_gyro_alpha = simd_scale (list4_gyro_alpha, max_alpha / alen); }
             }
             if (!a3_vector3_is_finite (list4_gyro_alpha)) { list4_gyro_alpha = vector3_zero (); }
-        } rigid_body -> angular_acceleration = vector3_addition (rigid_body -> angular_acceleration, list4_gyro_alpha);
+        } rigid_body -> angular_acceleration = simd_add (rigid_body -> angular_acceleration, list4_gyro_alpha);
     }
     rigid_body -> angular_velocity =
-        vector3_addition (rigid_body -> angular_velocity, vector3_scaling (rigid_body -> angular_acceleration, delta_time));
+        simd_add (rigid_body -> angular_velocity, simd_scale (rigid_body -> angular_acceleration, delta_time));
     if (!a3_vector3_is_finite (rigid_body -> angular_velocity)) { rigid_body -> angular_velocity = vector3_zero (); }
-    rigid_body -> angular_velocity = vector3_scaling (rigid_body -> angular_velocity, angular_damping);
+    rigid_body -> angular_velocity = simd_scale (rigid_body -> angular_velocity, angular_damping);
     /* AUDIT: no angular snap either (see above). */
     rotational_done:;
     /* TRUTH P0-8: NO velocity guillotine. Real physics has no speed limit;
@@ -995,7 +996,7 @@ void rb_integrate_position_exact (rigidbody *rigid_body, float delta_time, const
          * bypassing sanitize cannot strand a stale timer. */
         rigid_body -> sleep_timer = 0.0f;
         rigid_body -> position =
-            vector3_addition (rigid_body -> position, vector3_scaling (rigid_body -> velocity, delta_time));
+            simd_add (rigid_body -> position, simd_scale (rigid_body -> velocity, delta_time));
         rb_integrate_orientation (rigid_body, delta_time);
         return;
     }
