@@ -107,6 +107,9 @@ static mpe_param s_registry [] = {
      "Max distance^2 for cached contact matching (1cm: violent-contact adoption must be near-steady; 5cm admitted "
         "tumbling geometry as steady state)",
      p_float, cat_solver, &g_cfg.solver.warm_start_match_dist_sq, 0.0001, 0.0, 0.01, true},
+    {"solver.warm_start_damping", "Warm-Start Damping",
+     "Damped normal seed scale (0=cold proven, 1=full restore regresses F10/F11). Experiment only; default 0.",
+     p_float, cat_solver, &g_cfg.solver.warm_start_damping, 0.0, 0.0, 1.0, true},
     /* ============================================================
      * cat_depenetration
      * ============================================================ */
@@ -119,7 +122,8 @@ static mpe_param s_registry [] = {
     /* TRUTH: depenetration.penetration_slop REMOVED from the registry — dead
      * since the single-slop unification (depenetration honors
      * solver.penetration_slop). The struct field remains for save-file
-     * forward-compat but nothing reads it. Registry count 78 -> 79 (boundary.safety_net_enabled) (this
+     * forward-compat but nothing reads it. Registry count 78 -> 79 (boundary.safety_net_enabled) -> 80
+     * (solver.warm_start_damping experiment, default 0=cold). (this
      * removal balances the sleep.enable addition at 77; boundary.safety_net_enabled took it to 79). */
     {"depenetration.wake_depth_thresh", "Wake Depth Threshold",
      "Overlap depth that wakes sleeping pairs (m). TRUTH: kept at 0.02, NOT unified with split wake 0.01: measured "

@@ -231,7 +231,7 @@ In the debug terminal:
 
 ### F11 Config Torture Test
 
-Press `F11` to randomise all 79 tunables to extreme bounded values and run
+Press `F11` to randomise all 80 tunables to extreme bounded values and run
 a 60-second long-run validation. This stress-tests the engine under
 adversarial parameter combinations (each press uses the next seed, printed
 for bisection). F11 is a robustness verdict: PASS means no NaN and that no two
