@@ -24,8 +24,7 @@ static inline void mfs_test_world (physics_world *w) {
         w -> bodies [f].friction_kinetic = MFS_TEST_TILE_MU_K;
         w -> bodies [f].restitution = 0.0f;
     }
-}
-/* Floor slab only (no config touch): for subtests that manage their own
+} /* Floor slab only (no config touch): for subtests that manage their own
  * envelope (physics_truth FTC_ITERS macros). Top y=0, e matched by caller
  * (contact restitution is min-combined). */
 static inline int mfs_test_floor_e (physics_world *w, float mus, float muk, float e) {
@@ -36,8 +35,7 @@ static inline int mfs_test_floor_e (physics_world *w, float mus, float muk, floa
     w -> bodies [f].friction_kinetic = muk;
     w -> bodies [f].restitution = e;
     return f;
-}
-static inline int mfs_test_finite (physics_world *w) {
+} static inline int mfs_test_finite (physics_world *w) {
     for (int i = 0; i < w -> body_count; i++) {
         rigidbody *rb = &w -> bodies [i];
         if (!isfinite (rb -> position.x) || !isfinite (rb -> position.y) || !isfinite (rb -> position.z) ||

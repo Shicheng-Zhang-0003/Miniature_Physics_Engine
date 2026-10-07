@@ -84,8 +84,7 @@ static mpe_world_t *eco_primary_world (mfs_ecosystem_state_t *state) {
     if (!state || state -> nworlds <= 0 || !state -> worlds [0])
         return NULL;
     return state -> worlds [0];
-}
-/* ================================================================
+} /* ================================================================
  * Ecosystem Lifecycle
  * ================================================================ */
 /* FIX-AUDIT-DESPOT: was `static int s_registry_initialized` (racy under
@@ -165,8 +164,7 @@ static void mfs_ecosystem_detach (mpe_world_t *world, void *eco_state) {
     mfs_internal_modules_detach_all ((mpe_world_t *) world);
     eco_untrack_world (state, world);
     free (state);
-}
-/* ================================================================
+} /* ================================================================
  * Ecosystem Step Hooks
  * ================================================================ */
 static void mfs_ecosystem_pre_step (mpe_world_t *world, float dt, void *eco_state) {
@@ -177,8 +175,7 @@ static void mfs_ecosystem_pre_step (mpe_world_t *world, float dt, void *eco_stat
 static void mfs_ecosystem_post_step (mpe_world_t *world, float dt, void *eco_state) {
     (void) eco_state;
     mfs_internal_modules_post_step ((mpe_world_t *) world, dt);
-}
-/* ================================================================
+} /* ================================================================
  * Configuration Interface
  * ================================================================ */
 static int mfs_ecosystem_config_get (void *eco_state, const char *key, char *out, int maxlen) {
@@ -210,8 +207,7 @@ static int mfs_ecosystem_config_set (void *eco_state, const char *key, const cha
     (void) key;
     (void) value;
     return -1;
-}
-/* Preset lookup by name. Exact match wins; otherwise substring match.
+} /* Preset lookup by name. Exact match wins; otherwise substring match.
  * Returns -1 when unknown. On ambiguous substring (several presets contain
  * `want`, e.g. "26.9"), the first match wins AND a stderr warning names the
  * ambiguity so a mistyped spawn is visible instead of silently picking one.
@@ -238,8 +234,7 @@ static int eco_preset_by_name (const char *want) {
                  motor_preset_name ((motor_preset_id) found));
     }
     return found;
-}
-/* Iteration guarantee (same contract as the terminal spawn path: the
+} /* Iteration guarantee (same contract as the terminal spawn path: the
  * 40:1 chassis/wheel mass ratio needs 128 iterations; 64 wobbles axles
  * loose). Loud, never silent; adequate configs untouched. */
 static void eco_ensure_iterations (void) {
@@ -247,8 +242,7 @@ static void eco_ensure_iterations (void) {
         g_cfg.timestep.solver_iterations = 128;
         printf ("mfs: solver iterations raised to 128 (robot joints need it; was lower)\n");
     }
-}
-/* Tile floor guarantee (same contract as the terminal spawn path:
+} /* Tile floor guarantee (same contract as the terminal spawn path:
  * robots need frictional contact; reported, never silent). */
 static int eco_ensure_floor (physics_world *w) {
     if (!w)
@@ -284,8 +278,7 @@ static float eco_argf (char **argv, int i, int argc, float dflt) {
             return (float) v;
     }
     return dflt;
-}
-/* Bundle command surface (drives the terminal `eco command` path):
+} /* Bundle command surface (drives the terminal `eco command` path):
  *   help
  *   spawn [preset-substr] [mecanum|tank] [x y z]
  *   drive <i> tank <l> <r> | mecanum <f> <s> <r> | stop
@@ -440,8 +433,7 @@ static int mfs_ecosystem_command (void *eco_state, int argc, char **argv) {
     }
     printf ("mfs: unknown command '%s' (try help)\n", argv [0]);
     return -1;
-}
-/* ================================================================
+} /* ================================================================
  * Ecosystem Descriptor
  * ================================================================ */
 MPE_USED const mpe_ecosystem_desc_t mpe_ecosystem_desc = {

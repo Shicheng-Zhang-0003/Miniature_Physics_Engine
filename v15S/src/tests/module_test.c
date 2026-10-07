@@ -38,8 +38,7 @@ static bool probe_custom_fn (rigidbody *a, rigidbody *b, void *out, mpe_world_t 
     cd -> contact_count = 0;
     probe_custom_hit = true;
     return true;
-}
-/* Counting solver_if: delegates to the builtin with the world's config. */
+} /* Counting solver_if: delegates to the builtin with the world's config. */
 static int *test_counting_solver_calls = NULL;
 static float test_count_resolve (mpe_world_t *world, void *manifold, float dt, bool friction_only, int iter, void *s) {
     (void) s;
@@ -258,7 +257,5 @@ int mpe_module_test_main (void) {
     return 0;
 }
 #ifdef mpe_module_test
-int main (void) {
-    return mpe_module_test_main ();
-}
+int main (void) {return mpe_module_test_main ();}
 #endif

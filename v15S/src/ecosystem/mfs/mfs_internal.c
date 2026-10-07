@@ -55,9 +55,7 @@ static pthread_cond_t s_cv = PTHREAD_COND_INITIALIZER;
 #define MFS_THREAD_LOCAL _Thread_local
 #endif
 static MFS_THREAD_LOCAL int t_callback_slot = -1;
-static int name_matches (const mfs_slot *s, const char *name) {
-    return s -> desc && s -> desc -> name && strcmp (s -> desc -> name, name) == 0;
-}
+static int name_matches (const mfs_slot *s, const char *name) {return s -> desc && s -> desc -> name && strcmp (s -> desc -> name, name) == 0;}
 static void slot_clear (mfs_slot *s) {
     s -> desc = NULL;
     s -> state = NULL;
@@ -67,9 +65,7 @@ static void slot_clear (mfs_slot *s) {
     s -> detaching = false;
     s -> detach_deferred = false;
 }
-static void wake_all (void) {
-    pthread_cond_broadcast (&s_cv);
-}
+static void wake_all (void) {pthread_cond_broadcast (&s_cv);}
 int mfs_internal_registry_init (void) {
     pthread_mutex_lock (&s_lock);
     /* FIX-AUDIT-DESPOT: refuse to clear under live attachments instead of
@@ -363,8 +359,7 @@ void *mfs_internal_module_state (const char *name) {
     }
     pthread_mutex_unlock (&s_lock);
     return out;
-}
-/* Shared dispatch for pre_step/post_step. The snapshot is taken under the
+} /* Shared dispatch for pre_step/post_step. The snapshot is taken under the
  * lock WITH a reference per slot, so a concurrent detach drains instead of
  * freeing state we are about to call. */
 static void mfs_dispatch (physics_world *world, float dt, bool pre) {
@@ -449,12 +444,8 @@ static void mfs_dispatch (physics_world *world, float dt, bool pre) {
         }
     }
 }
-void mfs_internal_modules_pre_step (physics_world *world, float dt) {
-    mfs_dispatch (world, dt, true);
-}
-void mfs_internal_modules_post_step (physics_world *world, float dt) {
-    mfs_dispatch (world, dt, false);
-}
+void mfs_internal_modules_pre_step (physics_world *world, float dt) {mfs_dispatch (world, dt, true);}
+void mfs_internal_modules_post_step (physics_world *world, float dt) {mfs_dispatch (world, dt, false);}
 void mfs_internal_modules_detach_all (physics_world *world) {
     if (!world)
         return;

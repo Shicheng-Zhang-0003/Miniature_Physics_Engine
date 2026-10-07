@@ -254,8 +254,7 @@ int mfs_t_ftc_hotload (void) {
      * checked det counters) — end restores + asserts zero fallbacks. */
     mfs_test_end (t_ptr);
     return t_ptr -> failures;
-}
-/* module_1: BioBuzz attach/tick/detach.
+} /* module_1: BioBuzz attach/tick/detach.
  * DESPOT-2026-09-26: faithful port of modules/module_1/mfs_module_1_test.c.
  * The prior unified version never issued drive/shooter/fire commands and
  * never staged a ball at the flywheel, then gated on balls having moved and
@@ -331,8 +330,7 @@ int mfs_t_module_1 (void) {
     /* DESPOT-2026-09-28: begin without end (see hotload). */
     mfs_test_end (t_ptr);
     return t_ptr -> failures;
-}
-/* physics_truth: re-exported from suite_b for unified run */
+} /* physics_truth: re-exported from suite_b for unified run */
 int mfs_t_physics_truth (void) {
     /* DESPOT-2026-09-28 (programming: suite_b raw tests never reset/check
      * det counters — only freefall uses begin/end). Aggregate gate over all
@@ -354,8 +352,7 @@ int mfs_t_physics_truth (void) {
         }
     }
     return rc;
-}
-/* mfs_t_intake_stop: GATED regression for MFS H5 (DESPOT-2026-09-29).
+} /* mfs_t_intake_stop: GATED regression for MFS H5 (DESPOT-2026-09-29).
  *
  * The intake roller had two actuators: a revolute joint motor enabled once at
  * creation and never touched again, plus a P-control applying torque straight
@@ -525,8 +522,7 @@ int mfs_t_intake_stop (void) {
     physics_world_cleanup (&w);
     mfs_test_end (t_ptr);
     return t_ptr -> failures;
-}
-/* mfs_t_shooter_axis: GATED regression for MFS H6 (DESPOT-2026-09-29).
+} /* mfs_t_shooter_axis: GATED regression for MFS H6 (DESPOT-2026-09-29).
  *
  * The flywheel had three disagreeing spin axes:
  *   - the disc's own symmetry axis, which the engine defines as
@@ -619,8 +615,7 @@ int mfs_t_shooter_axis (void) {
     physics_world_cleanup (&w);
     mfs_test_end (t_ptr);
     return t_ptr -> failures;
-}
-/* mfs_t_ball_spin: GATED regression for MFS H7 (DESPOT-2026-09-29).
+} /* mfs_t_ball_spin: GATED regression for MFS H7 (DESPOT-2026-09-29).
  *
  * The launch transferred linear velocity only, so a fired ball left with
  * angular_velocity == 0. The Magnus model in ball_physics_step is gated on

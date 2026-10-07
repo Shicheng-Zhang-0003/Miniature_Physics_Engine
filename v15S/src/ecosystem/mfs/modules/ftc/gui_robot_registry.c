@@ -104,8 +104,7 @@ Its bodies array is NULL. We MUST init before adding bodies. */
     }
     mfs_gui_robot_count++;
     return idx;
-}
-/* gui_robot_tick OWNS stepping mfs_gui_robot_world (fixed 60 Hz
+} /* gui_robot_tick OWNS stepping mfs_gui_robot_world (fixed 60 Hz
  * accumulator). Do NOT step that world from the engine loop as well:
  * double-stepping integrates forces twice per tick. Use this tick OR
  * the engine loop, never both, for any bound world. */
@@ -189,8 +188,7 @@ void gui_robot_apply_drive (float forward, float strafe, float rotate) {
             drivetrain_mecanum (&mfs_gui_robots [i], forward, strafe, rotate);
         }
     }
-}
-/* Release a registry slot. Bodies persist until scene_clear (no
+} /* Release a registry slot. Bodies persist until scene_clear (no
  * mid-array removal exists); proxies are already non-colliding so the
  * leftovers are render-only. */
 void gui_robot_despawn (int index) {
@@ -211,9 +209,7 @@ void gui_robot_clear (void) {
  * a reset that the next tick consumes. */
     s_tick_accumulator_reset = 1;
 }
-int gui_robot_get_count (void) {
-    return mfs_gui_robot_count;
-}
+int gui_robot_get_count (void) {return mfs_gui_robot_count;}
 ftc_robot *gui_robot_get (int index) {
     if ((index < 0) || (index >= mfs_gui_robot_count)) {
         return NULL;

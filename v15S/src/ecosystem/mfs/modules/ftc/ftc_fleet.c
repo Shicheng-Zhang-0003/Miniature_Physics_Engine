@@ -37,8 +37,7 @@ void ftc_fleet_destroy (void *fleet_state) {
         return;
     free (f -> robots);
     free (f);
-}
-/* Weak link into the bundle's internal registry (defined by
+} /* Weak link into the bundle's internal registry (defined by
  * mfs_internal.c, ABSENT from standalone mpe_ftc builds). Lets fleet
  * lookup work through bundle attachments without linking bundle code:
  * when weak-unresolved the pointer is NULL and only the tick-table path

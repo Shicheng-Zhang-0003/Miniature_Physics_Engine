@@ -283,8 +283,7 @@ int mpe_t_cylinder_cylinder (void) {
     physics_world_cleanup (&w);
     mpe_test_end (&t);
     return t.failures;
-}
-/* list4 FIXED: v1 rotated about Y (axle X->Z, still horizontal) yet asserted
+} /* list4 FIXED: v1 rotated about Y (axle X->Z, still horizontal) yet asserted
  * the vertical rest height h=0.02. v2 tests BOTH poses with the frictional
  * floor enabled (v1 measured free-fall through the frictionless clamp):
  *   face  (Z-rot, axle X->Y vertical): rest = half_length = 0.02
@@ -344,8 +343,7 @@ int mpe_t_list4_cylinder_floor (void) {
     }
     mpe_test_end (&t);
     return t.failures;
-}
-/* ---------------------------------------------------------------------------
+} /* ---------------------------------------------------------------------------
  * cylinder_platform: a cylinder must not collide with a static slab it is
  * nowhere near.
  *
@@ -419,8 +417,7 @@ int mpe_t_cylinder_platform (void) {
     physics_world_cleanup (&w);
     mpe_test_end (&t);
     return t.failures;
-}
-/* ---------------------------------------------------------------------------
+} /* ---------------------------------------------------------------------------
  * cylinder_sphere_inside: when the sphere's CENTRE is inside the cylinder, the
  * contact normal must eject it, not drive it deeper.
  *
@@ -540,8 +537,7 @@ int mpe_t_cylinder_sphere_inside (void) {
     physics_world_cleanup (&w);
     mpe_test_end (&t);
     return t.failures;
-}
-/* ======================================================================
+} /* ======================================================================
  * EXTERNAL-TRUTH MASS PROPERTIES  (DESPOT-2026-10-02)
  *
  * The engine's inertia formulas were asserted correct in a code comment
@@ -650,8 +646,7 @@ int mpe_t_mass_properties (void) {
     }
     mpe_test_end (&t);
     return t.failures;
-}
-/* ======================================================================
+} /* ======================================================================
  * REFERENCE MATH GATE  (DESPOT-2026-10-02)
  *
  * Closes three of the coverage gaps declared in docs/VALIDATION.md, each

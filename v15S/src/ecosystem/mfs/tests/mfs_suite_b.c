@@ -45,8 +45,7 @@ int mfs_t_freefall (void) {
         printf ("[PASS] freefall\n");
     physics_world_cleanup (&w);
     return t_ptr -> failures;
-}
-/* T2: Inertia alpha = tau/(0.5*m*r^2) ±10% */
+} /* T2: Inertia alpha = tau/(0.5*m*r^2) ±10% */
 int mfs_t_inertia (void) {
     physics_world w;
     mfs_test_world (&w);
@@ -79,8 +78,7 @@ int mfs_t_inertia (void) {
     }
     physics_world_cleanup (&w);
     return 0;
-}
-/* T3: Bounce restitution h_bounce = e^2*(h-r) + r ±30% */
+} /* T3: Bounce restitution h_bounce = e^2*(h-r) + r ±30% */
 int mfs_t_bounce (void) {
     physics_world w;
     mpe_config_init ();
@@ -141,8 +139,7 @@ int mfs_t_bounce (void) {
     }
     physics_world_cleanup (&w);
     return 0;
-}
-/* T4: Rolling v = omega*r ±30% */
+} /* T4: Rolling v = omega*r ±30% */
 int mfs_t_rolling (void) {
     physics_world w;
     mpe_config_init ();
@@ -180,8 +177,7 @@ int mfs_t_rolling (void) {
     }
     physics_world_cleanup (&w);
     return 0;
-}
-/* T5: Rolling resistance coast ±30% */
+} /* T5: Rolling resistance coast ±30% */
 int mfs_t_rolling_resistance (void) {
     physics_world w;
     mpe_config_init ();
@@ -228,8 +224,7 @@ int mfs_t_rolling_resistance (void) {
     }
     physics_world_cleanup (&w);
     return 0;
-}
-/* T6: Motor free speed (ISOLATED motor model, no joints/world).
+} /* T6: Motor free speed (ISOLATED motor model, no joints/world).
  *
  * DESPOT-2026-09-26: the old rig spun a jointed robot in air and gated the
  * endpoint sample. The jointed air-spin plant is a documented limit cycle
@@ -332,8 +327,7 @@ int mfs_t_motor_free_speed (void) {
             rc = 1;
     }
     return rc;
-}
-/* T7: Motor stall torque ±30% */
+} /* T7: Motor stall torque ±30% */
 int mfs_t_motor_stall (void) {
     physics_world w;
     mfs_test_world (&w);
@@ -365,8 +359,7 @@ int mfs_t_motor_stall (void) {
     }
     physics_world_cleanup (&w);
     return 0;
-}
-/* T8: Back-EMF braking to rest (ISOLATED motor model).
+} /* T8: Back-EMF braking to rest (ISOLATED motor model).
  * DESPOT-2026-09-26: the old rig cut power on a jointed robot after 60
  * ticks and gated coast torque < 50% of drive torque after 10 ticks. That
  * expectation is backwards for regen: at speed, cutting the command leaves
@@ -410,8 +403,7 @@ int mfs_t_back_emf (void) {
     if (fabsf (m.output_torque) >= 0.2f)
         return 1;
     return 0;
-}
-/* T9: Static friction hold */
+} /* T9: Static friction hold */
 int mfs_t_static_friction (void) {
     physics_world w;
     mpe_config_init ();
@@ -454,8 +446,7 @@ int mfs_t_static_friction (void) {
     }
     physics_world_cleanup (&w);
     return 0;
-}
-/* T10: Kinetic friction stopping distance d = v0^2/(2*mu*g) ±35%.
+} /* T10: Kinetic friction stopping distance d = v0^2/(2*mu*g) ±35%.
  * DESPOT-2026-09-26: rig ported VERBATIM from the canonical engine
  * friction_stop (which passes ±15%): 0.05-drop start (y=0.55, lands flat),
  * 60-tick settle, post-settle v0/x0, run to rest, distance gate. Earlier
@@ -519,8 +510,7 @@ int mfs_t_kinetic_friction (void) {
     }
     physics_world_cleanup (&w);
     return 0;
-}
-/* T11: 3000 ticks no NaN */
+} /* T11: 3000 ticks no NaN */
 int mfs_t_stability (void) {
     physics_world w;
     mfs_test_world (&w);
@@ -543,8 +533,7 @@ int mfs_t_stability (void) {
     }
     physics_world_cleanup (&w);
     return 0;
-}
-/* T12: Coast-down after power cut */
+} /* T12: Coast-down after power cut */
 int mfs_t_coast_down (void) {
     physics_world w;
     mfs_test_world (&w);
@@ -573,8 +562,7 @@ int mfs_t_coast_down (void) {
     }
     physics_world_cleanup (&w);
     return 0;
-}
-/* T13: Energy conservation ±10% */
+} /* T13: Energy conservation ±10% */
 int mfs_t_energy (void) {
     physics_world w;
     mfs_test_world (&w);
@@ -601,8 +589,7 @@ int mfs_t_energy (void) {
     }
     physics_world_cleanup (&w);
     return 0;
-}
-/* T14: Cylinder rests on floor ±0.03m, v<0.1 */
+} /* T14: Cylinder rests on floor ±0.03m, v<0.1 */
 int mfs_t_cylinder_rest (void) {
     physics_world w;
     mfs_test_world (&w);
@@ -626,8 +613,7 @@ int mfs_t_cylinder_rest (void) {
     }
     physics_world_cleanup (&w);
     return 0;
-}
-/* T15: Revolute anchor holds under gravity */
+} /* T15: Revolute anchor holds under gravity */
 int mfs_t_revolute_anchor (void) {
     physics_world w;
     mpe_config_init ();
@@ -659,8 +645,7 @@ int mfs_t_revolute_anchor (void) {
     }
     physics_world_cleanup (&w);
     return 0;
-}
-/* ======================================================================
+} /* ======================================================================
  * EXTERNAL-TRUTH GATE  (DESPOT-2026-10-02)
  *
  * Every other test in this file checks the engine against ITSELF: it

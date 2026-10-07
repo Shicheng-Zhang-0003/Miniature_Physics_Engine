@@ -67,8 +67,7 @@ static inline int mpe_cfg_is_degenerate (const mpe_config_t *c) {
     return (c == NULL) || (c -> timestep.solver_iterations < 1) || !(c -> solver.penetration_slop > 0.0f) ||
            !(c -> solver.bias_factor > 0.0f) || !(c -> timestep.max_substeps >= 1) ||
            !(c -> body_defaults.sphere_restitution > 0.0f) || !(c -> body_defaults.sphere_fric_s > 0.0f);
-}
-/* Apply a named regime. Regimes exist so the suite can be run across a spread
+} /* Apply a named regime. Regimes exist so the suite can be run across a spread
  * of configurations: a physics invariant that holds at one setting and not
  * another is a bug that a single golden number cannot see. The defaults are
  * chosen to stay inside the engine's documented parameter ranges so we are
@@ -95,8 +94,7 @@ static inline const mpe_regime_t *mpe_regime_lookup (const char *name) {
             return &regimes [i];
     }
     return NULL; /* unknown regime: caller must fail loudly */
-}
-static inline int mpe_regime_apply (const mpe_regime_t *r) {
+} static inline int mpe_regime_apply (const mpe_regime_t *r) {
     if (!r)
         return 0;
     if (r -> iterations >= 0)
@@ -117,8 +115,7 @@ static inline int mpe_regime_apply (const mpe_regime_t *r) {
     if (r -> sleep >= 0)
         g_cfg.sleep.enable = r -> sleep;
     return 1;
-}
-static inline void mpe_test_begin (mpe_test_t *t, const char *name) {
+} static inline void mpe_test_begin (mpe_test_t *t, const char *name) {
     t -> name = name;
     t -> failures = 0;
     t -> checks = 0;
@@ -137,14 +134,11 @@ static inline void mpe_test_begin (mpe_test_t *t, const char *name) {
     t -> cfg_saved = g_cfg;
     t -> cfg_active = 1;
     det_fallback_reset ();
-}
-/* DESPOT-2026-09-29: the header claimed "determinism counters asserted zero"
+} /* DESPOT-2026-09-29: the header claimed "determinism counters asserted zero"
  * and mpe_test_end did not assert them -- only 1 of 32 tests did, by hand. A
  * libm fallback inside a test is a silent cross-platform determinism escape,
  * and nothing was watching. Assert here, where every test already passes. */
-static inline int mpe_det_fallbacks_used (void) {
-    return (int) (det_fallback_pow_total () + det_fallback_trig_total ());
-}
+static inline int mpe_det_fallbacks_used (void) {return (int) (det_fallback_pow_total () + det_fallback_trig_total ());}
 static inline void mpe_test_end (mpe_test_t *t) {
     if (t -> cfg_active) {
         if (mpe_det_fallbacks_used () != 0) {
@@ -157,8 +151,7 @@ static inline void mpe_test_end (mpe_test_t *t) {
         g_cfg = t -> cfg_saved;
         t -> cfg_active = 0;
     }
-}
-/* Return value for a case that could not run. Distinct from any possible
+} /* Return value for a case that could not run. Distinct from any possible
  * failure count (which is >= 0), so a test with failing checks can never be
  * mistaken for a skip.
  * DESPOT-2026-10-04: this used to be 2 — and mpe_run_one compared the raw
@@ -213,8 +206,7 @@ static inline void mpe_test_end (mpe_test_t *t) {
 static inline void mpe_world_begin (physics_world *w) {
     physics_world_init (w);
     constraint_pool_init (w);
-}
-static inline int mpe_world_finite (physics_world *w) {
+} static inline int mpe_world_finite (physics_world *w) {
     for (int i = 0; i < w -> body_count; i++) {
         rigidbody *b = &w -> bodies [i];
         /* DESPOT-2026-09-29: the ORIENTATION was not checked. A NaN quaternion
@@ -231,8 +223,7 @@ static inline int mpe_world_finite (physics_world *w) {
         }
     }
     return 1;
-}
-/* Step n ticks; returns 0 if any NaN/Inf appears (prints tick). */
+} /* Step n ticks; returns 0 if any NaN/Inf appears (prints tick). */
 static inline int mpe_step (physics_world *w, int n, float dt) {
     for (int t = 0; t < n; t++) {
         physics_world_step (w, dt);
@@ -242,8 +233,7 @@ static inline int mpe_step (physics_world *w, int n, float dt) {
         }
     }
     return 1;
-}
-/* Explicit mass-0 floor slab, top surface exactly y=0, with matched
+} /* Explicit mass-0 floor slab, top surface exactly y=0, with matched
  * Coulomb friction and restitution. Preferred floor: a true manifold
  * with per-body material combine (this is what friction_stop,
  * static_hold and determinism already used). */
@@ -256,8 +246,7 @@ static inline int mpe_floor_slab (physics_world *w, float mus, float muk, float 
     w -> bodies [f].friction_kinetic = muk;
     w -> bodies [f].restitution = e;
     return f;
-}
-/* Infinite solver plane at y=0 with synced friction. The plane body reads
+} /* Infinite solver plane at y=0 with synced friction. The plane body reads
  * step_cfg->world.floor_friction_* every tick, so sync the globals AND the
  * cached body copy (covers worlds initialised before the sync). */
 static inline void mpe_floor_plane (physics_world *w, float mus, float muk) {
@@ -266,8 +255,7 @@ static inline void mpe_floor_plane (physics_world *w, float mus, float muk) {
     w -> static_plane_enabled = true;
     w -> static_plane_body.friction_static = mus;
     w -> static_plane_body.friction_kinetic = muk;
-}
-/* DESPOT-2026-10-04 [CLAMP-TAUTOLOGY closure]: bind a per-world config copy
+} /* DESPOT-2026-10-04 [CLAMP-TAUTOLOGY closure]: bind a per-world config copy
  * with the world-edge safety net OFF. With the net on, a rest-height gate is
  * satisfiable by the emergency clamp alone (a no-op solver still reports
  * y=support and passes). With it off, only genuine contact manifolds can
@@ -278,13 +266,8 @@ static inline void mpe_world_no_net (physics_world *w, mpe_config_t *slot) {
     *slot = g_cfg;
     slot -> boundary.safety_net_enabled = 0;
     physics_world_set_config (w, slot);
-}
-/* Contact evidence: world.has_contact[i] flags bodies that generated a
+} /* Contact evidence: world.has_contact[i] flags bodies that generated a
  * manifold on the CURRENT tick. A clamp-held body never flags. */
-static inline int mpe_body_in_contact (const physics_world *w, int idx) {
-    return (w && w -> has_contact && idx >= 0 && idx < w -> body_count) ? (w -> has_contact [idx] != 0) : 0;
-}
-static inline float mpe_vlen (vector3 v) {
-    return vector3_length (v);
-}
+static inline int mpe_body_in_contact (const physics_world *w, int idx) {return (w && w -> has_contact && idx >= 0 && idx < w -> body_count) ? (w -> has_contact [idx] != 0) : 0;}
+static inline float mpe_vlen (vector3 v) {return vector3_length (v);}
 #endif /* mpe_test_h */

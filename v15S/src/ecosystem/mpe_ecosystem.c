@@ -60,8 +60,7 @@ int mpe_ecosystem_register (const mpe_ecosystem_desc_t *desc) {
     }
     pthread_mutex_unlock (&s_eco_lock);
     return rc;
-}
-/* Unregister + detach everywhere first (interior pointers in s_attached
+} /* Unregister + detach everywhere first (interior pointers in s_attached
  * must not survive the removal). */
 int mpe_ecosystem_unregister (const char *name) {
     if (!name)
@@ -116,8 +115,7 @@ const mpe_ecosystem_desc_t *mpe_ecosystem_at (int i) {
     }
     pthread_mutex_unlock (&s_eco_lock);
     return out;
-}
-/* Attach ecosystem to a world (per-world: the same ecosystem may attach
+} /* Attach ecosystem to a world (per-world: the same ecosystem may attach
  * to several worlds with independent state). */
 int mpe_ecosystem_attach (mpe_world_t *world, const char *eco_name) {
     if (!world || !eco_name)
@@ -206,8 +204,7 @@ int mpe_ecosystem_detach (mpe_world_t *world, const char *eco_name) {
     }
     pthread_mutex_unlock (&s_eco_lock);
     return rc;
-}
-/* Per-world state lookup for terminal-driven commands (eco command/
+} /* Per-world state lookup for terminal-driven commands (eco command/
  * config forward to these states on the primary world). */
 void *mpe_ecosystem_state (mpe_world_t *world, const char *eco_name) {
     if (!world || !eco_name)
@@ -223,8 +220,7 @@ void *mpe_ecosystem_state (mpe_world_t *world, const char *eco_name) {
     }
     pthread_mutex_unlock (&s_eco_lock);
     return out;
-}
-/* Detach everywhere (unload path): hooks run while the .so is mapped. */
+} /* Detach everywhere (unload path): hooks run while the .so is mapped. */
 void mpe_ecosystem_detach_everywhere (const char *eco_name) {
     if (!eco_name)
         return;
@@ -283,8 +279,7 @@ void mpe_ecosystem_post_step (mpe_world_t *world, float dt) {
     pthread_mutex_unlock (&s_eco_lock);
     for (int i = 0; i < n; i++)
         ds [i] -> post_step ((mpe_world_t *) world, dt, sts [i]);
-}
-/* Register built-in ecosystems */
+} /* Register built-in ecosystems */
 void mpe_register_ecosystems (void) {
     // Ecosystems loaded as .so files via mpe_loader
 }

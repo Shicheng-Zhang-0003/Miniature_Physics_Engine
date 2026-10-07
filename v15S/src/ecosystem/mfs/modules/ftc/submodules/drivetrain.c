@@ -30,8 +30,7 @@ void drivetrain_tank (ftc_robot *robot, float left_power, float right_power) {
     }
     ftc_robot_set_wheel_commands (robot, commands, robot -> wheel_count);
     /* MFS_162_DEAD_FIELD: mecanum_active removed */
-}
-/* MPE_FTC_075 + MPE_FTC_082: Mecanum drive with inverse kinematics
+} /* MPE_FTC_075 + MPE_FTC_082: Mecanum drive with inverse kinematics
  *
  * Since the wheel model uses spheres (no natural rolling direction),
  * mecanum strafe cannot work through wheel friction alone. We set
@@ -128,8 +127,7 @@ void drivetrain_mecanum (ftc_robot *robot, float forward, float strafe, float ro
     }
     /* Set motor commands (forward component uses wheel traction) */
     ftc_robot_set_wheel_commands (robot, wheel_targets, 4);
-}
-/* ---------------------------------------------------------------------
+} /* ---------------------------------------------------------------------
  * DRIVETRAIN: no force model at all.
  *
  * Everything that used to live here has been deleted, because none of it was
@@ -458,8 +456,7 @@ void drivetrain_update (physics_world *world, ftc_robot *robot, float dt) {
         }
     }
     drivetrain_odometry_update (world, robot, dt);
-}
-/* ---------------------------------------------------------------------
+} /* ---------------------------------------------------------------------
  * Encoder odometry: forward kinematics from the wheel encoders.
  *
  * This is what a real robot reports, so it is what is integrated here:

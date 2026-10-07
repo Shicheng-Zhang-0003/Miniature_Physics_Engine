@@ -24,8 +24,7 @@
 static gamepad_state g_primary_gamepad;
 gamepad_state *gamepad_get_primary (void) {
     return &g_primary_gamepad;
-}
-/* Parse controller index from device_path / env.
+} /* Parse controller index from device_path / env.
  * Accepted: NULL (use env/default), "disabled", "xinput:N", "N", anything
  * else -> 0. Returns -2 for disabled, else 0..3 (clamped). */
 static int win_parse_index (const char *device_path) {

@@ -50,8 +50,7 @@ static inline void mfs_test_begin (mfs_test_t *t, const char *name) {
     t -> cfg_saved = g_cfg;
     t -> cfg_active = 1;
     det_fallback_reset ();
-}
-static inline void mfs_test_end (mfs_test_t *t) {
+} static inline void mfs_test_end (mfs_test_t *t) {
     if (t -> cfg_active) {
         g_cfg = t -> cfg_saved;
         t -> cfg_active = 0;
@@ -124,8 +123,7 @@ static inline void mfs_test_world (physics_world *w) {
         w -> bodies [f].friction_kinetic = 0.8f;
         w -> bodies [f].restitution = 0.0f;
     }
-}
-/* Floor slab only (no config touch): for subtests that manage their own
+} /* Floor slab only (no config touch): for subtests that manage their own
  * envelope (physics_truth FTC_ITERS macros). Top y=0, e matched by caller
  * (contact restitution is min-combined). */
 static inline int mfs_test_floor_e (physics_world *w, float mus, float muk, float e) {
@@ -136,8 +134,7 @@ static inline int mfs_test_floor_e (physics_world *w, float mus, float muk, floa
     w -> bodies [f].friction_kinetic = muk;
     w -> bodies [f].restitution = e;
     return f;
-}
-static inline int mfs_test_finite (physics_world *w) {
+} static inline int mfs_test_finite (physics_world *w) {
     for (int i = 0; i < w -> body_count; i++) {
         rigidbody *rb = &w -> bodies [i];
         if (!isfinite (rb -> position.x) || !isfinite (rb -> position.y) || !isfinite (rb -> position.z) ||
@@ -155,8 +152,7 @@ static inline int mfs_test_finite (physics_world *w) {
         }
     }
     return 1;
-}
-/* DESPOT-2026-09-28 (programming: direct w.bodies[chassis_body] with no
+} /* DESPOT-2026-09-28 (programming: direct w.bodies[chassis_body] with no
  * bounds check — OOB read if chassis_body == -1). Single checked accessor;
  * NULL means unset-or-gone, uniformly. */
 static inline rigidbody *mfs_chassis_or_null (physics_world *w, ftc_robot *robot) {
@@ -166,8 +162,7 @@ static inline rigidbody *mfs_chassis_or_null (physics_world *w, ftc_robot *robot
     if (idx < 0 || idx >= w -> body_count)
         return NULL;
     return &w -> bodies [idx];
-}
-static inline int mfs_step (physics_world *w, int n, float dt) {
+} static inline int mfs_step (physics_world *w, int n, float dt) {
     for (int t = 0; t < n; t++) {
         physics_world_step (w, dt);
         if (!mfs_test_finite (w)) {
@@ -176,8 +171,7 @@ static inline int mfs_step (physics_world *w, int n, float dt) {
         }
     }
     return 1;
-}
-/* Lift WHOLE robot (chassis + wheels + rollers) to true free-spin height.
+} /* Lift WHOLE robot (chassis + wheels + rollers) to true free-spin height.
  * Fixes the old rig bug where only chassis was lifted, winching wheels up
  * through pendulum chaos. */
 static inline void mfs_lift_whole_robot (physics_world *w, ftc_robot *robot, const vector3 *lift) {
@@ -211,8 +205,7 @@ static inline void mfs_lift_whole_robot (physics_world *w, ftc_robot *robot, con
     for (int wi_idx = 0; wi_idx < robot -> wheel_count; wi_idx++) {
         motor_reset_observer (&robot -> wheel_motors [wi_idx]);
     }
-}
-/* Lift robot to true free-spin height (1.9m above floor). */
+} /* Lift robot to true free-spin height (1.9m above floor). */
 static inline void mfs_lift_robot_for_free_spin (physics_world *w, ftc_robot *robot) {
     const vector3 lift = {0.0f, 1.9f, 0.0f};
     mfs_lift_whole_robot (w, robot, &lift);
@@ -221,8 +214,7 @@ static inline void mfs_lift_robot_for_free_spin (physics_world *w, ftc_robot *ro
         return;
     rigidbody_set_kinematic (chassis, true);
     chassis -> velocity = vector3_zero ();
-}
-/* Common robot creation with guaranteed floor. */
+} /* Common robot creation with guaranteed floor. */
 static inline ftc_robot *mfs_create_robot (physics_world *w, float x, float y, float z, motor_preset_id preset,
                                            ftc_drivetrain_type dtype) {
     ftc_robot *robot = (ftc_robot *) calloc (1, sizeof (ftc_robot));
@@ -234,19 +226,13 @@ static inline ftc_robot *mfs_create_robot (physics_world *w, float x, float y, f
         return NULL;
     }
     return robot;
-}
-/* Drive helpers. */
-static inline void mfs_drive_tank (ftc_robot *robot, float left, float right) {
-    drivetrain_tank (robot, left, right);
-}
-static inline void mfs_drive_mecanum (ftc_robot *robot, float fwd, float strafe, float rotate) {
-    drivetrain_mecanum (robot, fwd, strafe, rotate);
-}
+} /* Drive helpers. */
+static inline void mfs_drive_tank (ftc_robot *robot, float left, float right) {drivetrain_tank (robot, left, right);}
+static inline void mfs_drive_mecanum (ftc_robot *robot, float fwd, float strafe, float rotate) {drivetrain_mecanum (robot, fwd, strafe, rotate);}
 static inline void mfs_drive_stop (ftc_robot *robot) {
     float z [4] = {0, 0, 0, 0};
     ftc_robot_set_wheel_commands (robot, z, 4);
-}
-static inline void mfs_get_pos (physics_world *w, ftc_robot *robot, float *x, float *y, float *z) {
+} static inline void mfs_get_pos (physics_world *w, ftc_robot *robot, float *x, float *y, float *z) {
     ftc_robot_get_position (w, robot, x, y, z);
 }
 #endif /* mfs_test_h */

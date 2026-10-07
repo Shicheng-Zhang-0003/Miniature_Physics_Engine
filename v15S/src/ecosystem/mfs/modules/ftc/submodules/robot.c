@@ -196,14 +196,11 @@ static vector4 rb_orient_from_axis (vector3 axis) {
      * (1+d, c) which is already unit up to a scale of sqrt(2(1+d)). */
     vector3 c = vector3_cross (from, a);
     return vector4_normalisation ((vector4) {1.0f + d, c.x, c.y, c.z});
-}
-/* MFS-STRAFE-A forensics default (1 = analytic, 0 = articulated).
+} /* MFS-STRAFE-A forensics default (1 = analytic, 0 = articulated).
  * Declared early: creation reads it. */
 static int s_mecanum_analytic_default = MFS_MECANUM_ANALYTIC_DEFAULT;
 /* MPE_FTC_095: chassis-centre height where the wheels just touch floor y=0 */
-float ftc_robot_rest_height (void) {
-    return WHEEL_RADIUS - WHEEL_Y_OFFSET;
-}
+float ftc_robot_rest_height (void) {return WHEEL_RADIUS - WHEEL_Y_OFFSET;}
 int ftc_world_setup_field (physics_world *world, float mus, float muk) {
     /* DESPOT-FIX: was `return 1` on bad args — the only `1`-on-error in the
      * tree (everyone else uses 0 ok / -1 fail, and callers test `!= 0`).
@@ -626,9 +623,7 @@ int ftc_robot_create_with_drive (physics_world *world, ftc_robot *robot, float x
     robot -> wheel_count = 0;
     return -1;
 }
-int ftc_robot_create (physics_world *world, ftc_robot *robot, float x, float y, float z, motor_preset_id preset) {
-    return ftc_robot_create_with_drive (world, robot, x, y, z, preset, FTC_DRIVETRAIN_MECANUM);
-}
+int ftc_robot_create (physics_world *world, ftc_robot *robot, float x, float y, float z, motor_preset_id preset) {return ftc_robot_create_with_drive (world, robot, x, y, z, preset, FTC_DRIVETRAIN_MECANUM);}
 void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
     if ((!world) || (!robot) || (dt <= 0.0f)) {
         return;
@@ -1168,9 +1163,7 @@ void ftc_robot_set_wheel_commands (ftc_robot *robot, const float *commands, int 
         robot -> wheel_motors [i].command = cmd;
     }
 }
-void ftc_robot_set_mecanum_analytic_default (int on) {
-    s_mecanum_analytic_default = (on != 0) ? 1 : 0;
-}
+void ftc_robot_set_mecanum_analytic_default (int on) {s_mecanum_analytic_default = (on != 0) ? 1 : 0;}
 void ftc_robot_get_position (physics_world *world, ftc_robot *robot, float *px, float *py, float *pz) {
     if ((!world) || (!robot)) {
         return;
