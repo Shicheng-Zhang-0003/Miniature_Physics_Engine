@@ -51,8 +51,7 @@ static float ftc_argf (char **argv, int i, int argc, float dflt) {
             return (float) v;
     }
     return dflt;
-}
-/* Tile floor guarantee: robots need frictional contact (the frictionless
+} /* Tile floor guarantee: robots need frictional contact (the frictionless
  * emergency backstop yields slip-regime artifacts). Adds a 60x60 tile
  * slab (top y=0, mu 1.0/0.8) only when no static floor-like body already
  * covers the origin. Reported, never silent.
@@ -81,8 +80,7 @@ static int ftc_ensure_floor (physics_world *w) {
     w -> bodies [f].restitution = 0.0f;
     term_out ("mpe: ftc: tile floor added (robots need frictional contact)\n");
     return 1;
-}
-/* Ensure the ftc-fleet tick module drives the primary world (idempotent).
+} /* Ensure the ftc-fleet tick module drives the primary world (idempotent).
  * Returns 0 when driving, -1 when the bundle is missing. Engine APIs
  * (registry, attach) are called directly — this TU links into the
  * engine; only FTC APIs resolve through the bundle handle. */
@@ -111,8 +109,7 @@ static int ftc_ensure_driving (void) {
         return -1;
     }
     return 0;
-}
-/* Iteration guarantee: the 40:1 chassis/wheel stacked mass ratio cannot
+} /* Iteration guarantee: the 40:1 chassis/wheel stacked mass ratio cannot
  * converge below 128 sequential-impulse iterations (every MFS test pins
  * 128; the MFS suite documents that default 64 cannot converge it). A
  * robot spawned into a 64-iteration world wobbles its revolute axles

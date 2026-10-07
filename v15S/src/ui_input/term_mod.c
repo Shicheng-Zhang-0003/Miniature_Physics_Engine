@@ -158,8 +158,7 @@ void cmd_mod (int argc, char **argv) {
         return;
     }
     term_err ("mpe: mod: unknown subcommand\n");
-}
-/* modinfo command — show detailed info about a module */
+} /* modinfo command — show detailed info about a module */
 void cmd_modinfo (int argc, char **argv) {
     if (argc < 2) {
         term_err ("mpe: modinfo: usage: modinfo <module-name>\n");

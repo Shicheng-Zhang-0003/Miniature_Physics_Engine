@@ -6,9 +6,7 @@
 static int config_menu_level = 0;
 static int config_menu_active_category = -1;
 static int config_menu_selected_param = -1;
-bool config_menu_is_open (void) {
-    return config_menu_level > 0;
-}
+bool config_menu_is_open (void) {return config_menu_level > 0;}
 void config_menu_level_force_open (void) {
     config_menu_level = 1;
     config_menu_active_category = -1;

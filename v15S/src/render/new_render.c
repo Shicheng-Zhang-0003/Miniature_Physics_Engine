@@ -154,8 +154,7 @@ void render_init () {
         return;
     }
     render_init_status = render_ok;
-}
-/* Delete one instanced mesh's GL objects (all ids zero-guarded so a
+} /* Delete one instanced mesh's GL objects (all ids zero-guarded so a
  * context-less or repeated cleanup is a safe no-op). */
 static void render_delete_mesh (mesh *mesh_object) {
     if (!mesh_object)
@@ -183,8 +182,7 @@ static void render_delete_mesh (mesh *mesh_object) {
     mesh_object -> index_count = 0;
     mesh_object -> wireframe_index_count = 0;
     mesh_object -> instance_capacity = 0;
-}
-/* Unconditional GL teardown shared by render_cleanup and the mid-init
+} /* Unconditional GL teardown shared by render_cleanup and the mid-init
  * failure paths (which run with a current context but a not-yet-ok
  * status). All ids are zero-guarded. */
 static void render_delete_gl_objects (void) {
@@ -235,8 +233,7 @@ void render_cleanup (void) {
         cylinder_instances = NULL;
     }
     render_init_status = render_uninitialized;
-}
-/* Primary-world-only renderer: draws physics_world_get_primary().
+} /* Primary-world-only renderer: draws physics_world_get_primary().
  * TODO(world-param): take an explicit physics_world* so headless/secondary
  * worlds can render without relying on the app-owned primary. */
 void render_scene_current (int widget_width, int widget_height) {
@@ -292,7 +289,7 @@ void render_scene_current (int widget_width, int widget_height) {
     int cube_inst_count = 0;
     int cylinder_inst_count = 0;
     for (int object_index = 0; object_index < (physics_world_get_primary () -> body_count); object_index++) {
-        rigidbody *rigid_body = &(physics_world_get_primary () -> bodies)[object_index];
+        rigidbody *rigid_body = &(physics_world_get_primary () -> bodies) [object_index];
         /* DESPOT-2026-10-04: a NaN body used to poison the instance buffer
          * (NaN model matrix → NaN vertices → driver-dependent garbage or
          * worse). Skip non-finite bodies loudly; the physics side already

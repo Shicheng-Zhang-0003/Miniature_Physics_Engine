@@ -45,9 +45,7 @@ static void overlay_append_overflow_text (char *buffer, size_t buffer_size) {
                       pair_overflow_count);
     }
 }
-static bool overlay_has_valid_selection (void) {
-    return (selected_object >= 0) && (selected_object < (physics_world_get_primary () -> body_count));
-}
+static bool overlay_has_valid_selection (void) {return (selected_object >= 0) && (selected_object < (physics_world_get_primary () -> body_count));}
 GtkWidget *overlay_initialise (GtkWidget *gl_drawing_area_widget) {
     GtkWidget *ui_overlay_container = gtk_overlay_new ();
     gtk_widget_set_hexpand (ui_overlay_container, TRUE);
@@ -254,7 +252,7 @@ void overlay_update (void) {
             gtk_widget_set_visible (object_menu_label, FALSE);
         } else {
             char buf [512];
-            rigidbody *t = &(physics_world_get_primary () -> bodies)[selected_object];
+            rigidbody *t = &(physics_world_get_primary () -> bodies) [selected_object];
             if (main_inputs.object_menu_level == 1) {
                 const char *tn = t -> type == object_sphere ? "Sphere" : t -> type == object_cylinder ? "Cylinder" : "Cube";
                 const char *rl = t -> type == object_cube ? "Radius (N/A)" : "Radius";
@@ -318,7 +316,7 @@ void overlay_update (void) {
         gtk_label_set_text (GTK_LABEL (debug_information_label), ibuf);
         return;
     }
-    rigidbody *rb = &(physics_world_get_primary () -> bodies)[selected_object];
+    rigidbody *rb = &(physics_world_get_primary () -> bodies) [selected_object];
     float spd = vector3_length (rb -> velocity);
     const char *ot = rb -> type == object_sphere ? "Sphere" : rb -> type == object_cylinder ? "Cylinder" : "Cube";
     const char *stt = rb -> static_state ? "(Static)" : "(Dynamic)";

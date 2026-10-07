@@ -16,8 +16,7 @@ static void on_entry_insert_text (GtkEditable *editable, const gchar * new_text,
             return;
         }
     }
-}
-typedef struct {
+} typedef struct {
     GMainLoop *loop;
     GtkWidget *entry;
     GtkWidget *dialog;
@@ -203,6 +202,4 @@ void editor_reset (void) {
     main_inputs.config_torture_pressed = false;
     config_menu_close ();
 }
-bool editor_dialog_is_active (void) {
-    return editor_dialog_active;
-}
+bool editor_dialog_is_active (void) {return editor_dialog_active;}

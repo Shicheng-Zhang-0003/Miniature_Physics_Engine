@@ -154,8 +154,7 @@ static void mv_clamp_cursor (void) {
     if (mv.cursor_col < 0) {
         mv.cursor_col = 0;
     }
-}
-/* ------------------------------------------------------------------ */
+} /* ------------------------------------------------------------------ */
 /* Undo                                                                 */
 /* ------------------------------------------------------------------ */
 static void mv_snapshot_clear (mv_snapshot *snap) {
@@ -254,8 +253,7 @@ static void mv_redo_perform (void) {
     mv.undo_top++;
     mv.modified = true;
     mv_clamp_cursor ();
-}
-/* ------------------------------------------------------------------ */
+} /* ------------------------------------------------------------------ */
 /* File I/O                                                             */
 /* ------------------------------------------------------------------ */
 static bool mv_load_file (const char *filename) {
@@ -365,13 +363,10 @@ static bool mv_save_file (void) {
         return false;
     mv.modified = false;
     return true;
-}
-/* ------------------------------------------------------------------ */
+} /* ------------------------------------------------------------------ */
 /* Word motion                                                          */
 /* ------------------------------------------------------------------ */
-static bool mv_is_word_char (char c) {
-    return isalnum ((unsigned char) c) || (c == '_');
-}
+static bool mv_is_word_char (char c) {return isalnum ((unsigned char) c) || (c == '_');}
 static void mv_word_forward (void) {
     int row = mv.cursor_row;
     int col = mv.cursor_col;
@@ -442,8 +437,7 @@ static void mv_word_end (void) {
     mv.cursor_row = row;
     mv.cursor_col = col;
     mv_clamp_cursor ();
-}
-/* ------------------------------------------------------------------ */
+} /* ------------------------------------------------------------------ */
 /* Search                                                               */
 /* ------------------------------------------------------------------ */
 static void mv_search_execute (bool forward) {
@@ -517,8 +511,7 @@ static void mv_search_execute (bool forward) {
         }
     }
     free (pattern_lower);
-}
-/* ------------------------------------------------------------------ */
+} /* ------------------------------------------------------------------ */
 /* Editing operations                                                   */
 /* ------------------------------------------------------------------ */
 static void mv_delete_char_under_cursor (void) {
@@ -707,8 +700,7 @@ static void mv_backspace (void) {
         mv.cursor_col = prev_len;
         mv.modified = true;
     }
-}
-/* ------------------------------------------------------------------ */
+} /* ------------------------------------------------------------------ */
 /* Command mode execution                                               */
 /* ------------------------------------------------------------------ */
 static void mv_execute_command (void) {
@@ -856,8 +848,7 @@ setting a flag that microvim_render will pick up */
     }
     mv.command_len = 0;
     mv.command_buf [0] = '\0';
-}
-/* ------------------------------------------------------------------ */
+} /* ------------------------------------------------------------------ */
 /* Key handling                                                         */
 /* ------------------------------------------------------------------ */
 static void mv_handle_normal_key (guint keyval, guint keycode, GdkModifierType state) {
@@ -1298,8 +1289,7 @@ static void mv_handle_search_key (guint keyval, guint keycode, GdkModifierType s
         mv.search_buf [mv.search_len++] = (char) key;
         mv.search_buf [mv.search_len] = '\0';
     }
-}
-/* ------------------------------------------------------------------ */
+} /* ------------------------------------------------------------------ */
 /* Rendering                                                            */
 /* ------------------------------------------------------------------ */
 void microvim_ensure_tags (GtkTextBuffer *buffer) {
@@ -1419,16 +1409,11 @@ void microvim_render (GtkTextBuffer *buffer) {
     int col_offset = mv.cursor_col + (mv.show_line_numbers ? 5 : 0);
     gtk_text_buffer_get_iter_at_line_offset (buffer, &cursor_iter, target_line, col_offset);
     gtk_text_buffer_place_cursor (buffer, &cursor_iter);
-}
-/* ------------------------------------------------------------------ */
+} /* ------------------------------------------------------------------ */
 /* Public API                                                           */
 /* ------------------------------------------------------------------ */
-mv_mode microvim_get_mode (void) {
-    return mv.mode;
-}
-bool microvim_is_active (void) {
-    return mv.active;
-}
+mv_mode microvim_get_mode (void) {return mv.mode;}
+bool microvim_is_active (void) {return mv.active;}
 void microvim_open (const char *filename) {
     microvim_close ();
     memset (&mv, 0, sizeof (mv));
@@ -1508,5 +1493,4 @@ void microvim_handle_key (guint keyval, guint keycode, GdkModifierType state) {
     if (mv.quit_requested) {
         microvim_close ();
     }
-}
-/* MPE_TASK_V15R2_MICROVIM_IMPL_END */
+} /* MPE_TASK_V15R2_MICROVIM_IMPL_END */

@@ -32,8 +32,7 @@ static void term_scroll_to_bottom (void) {
     GtkTextIter end_iter;
     gtk_text_buffer_get_end_iter (terminal_output_buffer, &end_iter);
     gtk_text_view_scroll_to_iter (GTK_TEXT_VIEW (terminal_output_view), &end_iter, 0.0, FALSE, 0.0, 0.0);
-}
-/* MPE_TASK_V15R2_OUTPUT_CAPTURE_BEGIN */
+} /* MPE_TASK_V15R2_OUTPUT_CAPTURE_BEGIN */
 static char *term_capture_buffer = NULL;
 static size_t term_capture_length = 0;
 static size_t term_capture_capacity = 0;
@@ -52,9 +51,7 @@ void term_capture_begin (void) {
     term_capturing = true;
     term_capture_buffer [0] = '\0';
 }
-void term_capture_end (void) {
-    term_capturing = false;
-}
+void term_capture_end (void) {term_capturing = false;}
 char *term_capture_get (void) {
     return term_capture_buffer ? term_capture_buffer : "";
 }
@@ -66,8 +63,7 @@ void term_capture_reset (void) {
     term_capture_length = 0;
     term_capture_capacity = 0;
     term_capturing = false;
-}
-/* MPE_TASK_V15R2_OUTPUT_CAPTURE_END */
+} /* MPE_TASK_V15R2_OUTPUT_CAPTURE_END */
 /* MPE_TASK_V15R2_PHASE7_ALIAS_STORAGE_BEGIN */
 char term_alias_names [term_alias_max][term_alias_name_len];
 char term_alias_values [term_alias_max][term_alias_value_len];
@@ -117,21 +113,11 @@ static void term_append_with_tag (const char *tag_name, const char *text) {
     }
     term_scroll_to_bottom ();
 }
-void term_out (const char *text) {
-    term_append_with_tag (NULL, text);
-}
-void term_ok (const char *text) {
-    term_append_with_tag ("term_ok", text);
-}
-void term_err (const char *text) {
-    term_append_with_tag ("term_err", text);
-}
-void term_echo (const char *text) {
-    term_append_with_tag ("term_echo", text);
-}
-void term_dim (const char *text) {
-    term_append_with_tag ("term_dim", text);
-}
+void term_out (const char *text) {term_append_with_tag (NULL, text);}
+void term_ok (const char *text) {term_append_with_tag ("term_ok", text);}
+void term_err (const char *text) {term_append_with_tag ("term_err", text);}
+void term_echo (const char *text) {term_append_with_tag ("term_echo", text);}
+void term_dim (const char *text) {term_append_with_tag ("term_dim", text);}
 void term_printf (const char *tag_name, const char *format, ...) {
     char line_buffer [2048];
     va_list argument_list;
@@ -147,8 +133,7 @@ void term_update_prompt (void) {
     char prompt_buffer [320];
     snprintf (prompt_buffer, sizeof (prompt_buffer), "mpe:%s>", term_cwd);
     gtk_label_set_text (GTK_LABEL (terminal_prompt_label), prompt_buffer);
-}
-/* ------------------------------------------------------------------ */
+} /* ------------------------------------------------------------------ */
 /* History                                                             */
 /* ------------------------------------------------------------------ */
 static void term_history_push (const char *command_text) {
@@ -167,8 +152,7 @@ static void term_history_push (const char *command_text) {
     }
     strncpy (term_history [0], command_text, term_history_length);
     term_history [0][term_history_length] = '\0';
-}
-/* ------------------------------------------------------------------ */
+} /* ------------------------------------------------------------------ */
 /* String/path helpers                                                 */
 /* ------------------------------------------------------------------ */
 bool term_str_eq (const char *string_a, const char *string_b) {
@@ -184,9 +168,7 @@ const char *term_last_path_component (const char *token) {
     const char *slash = strrchr (token, '/');
     return slash ? (slash + 1) : token;
 }
-bool term_is_all_token (const char *token) {
-    return term_str_eq (term_last_path_component (token), "all");
-}
+bool term_is_all_token (const char *token) {return term_str_eq (term_last_path_component (token), "all");}
 bool term_parse_float (const char *token, float *output_value) {
     if (!token) {
         return false;
@@ -233,7 +215,7 @@ int term_joint_from_token (const char *token) {
     if ((parsed_index < 0) || (parsed_index >= mpe_max_joints)) {
         return -1;
     }
-    if (!(physics_world_get_primary () -> spring_joints)[parsed_index].is_active) {
+    if (!(physics_world_get_primary () -> spring_joints) [parsed_index].is_active) {
         return -1;
     }
     return (int) parsed_index;
@@ -300,8 +282,7 @@ int term_parse_movement_destination (const char *token, float *x, float *y, floa
     }
     term_strfreev (parts);
     return movement_kind;
-}
-/* GTK4: weak fallback command handlers — real implementations live in
+} /* GTK4: weak fallback command handlers — real implementations live in
  * term_*.c when those TUs are ported to GTK4. Weak linkage allows the
  * debug terminal to link even when term_*.c remain stubs (empty #ifdef
  * MPE_GTK4 blocks). Once term_*.c provide strong symbols, the linker
@@ -526,8 +507,7 @@ void term_execute (char *command_line) {
     }
     found_command -> handler (argument_count, argument_vector);
     term_strfreev (argument_vector);
-}
-/* ------------------------------------------------------------------ */
+} /* ------------------------------------------------------------------ */
 /* GTK signals — GTK4 (GtkEventControllerKey)                          */
 /* ------------------------------------------------------------------ */
 static void on_terminal_entry_activate (GtkEntry *entry, gpointer user_data) {
@@ -652,21 +632,17 @@ static void on_terminal_window_destroy (GtkWidget *widget, gpointer user_data) {
     terminal_prompt_label = NULL;
     term_history_cursor = -1;
     term_capture_reset (); /* FIX_030: free capture buffer on close */
-}
-/* GTK4 uses close-request in addition to destroy; keep both for robustness. */
+} /* GTK4 uses close-request in addition to destroy; keep both for robustness. */
 static gboolean on_terminal_window_close_request (GtkWindow *window, gpointer user_data) {
     (void) window;
     (void) user_data;
     /* Reuse destroy logic to clear globals before the window is disposed. */
     on_terminal_window_destroy (NULL, NULL);
     return FALSE; /* allow close to proceed */
-}
-/* ------------------------------------------------------------------ */
+} /* ------------------------------------------------------------------ */
 /* Public interface                                                    */
 /* ------------------------------------------------------------------ */
-bool debug_terminal_is_open (void) {
-    return terminal_window != NULL;
-}
+bool debug_terminal_is_open (void) {return terminal_window != NULL;}
 void debug_terminal_focus_entry (void) {
     if ((!terminal_window) || (!terminal_entry)) {
         return;

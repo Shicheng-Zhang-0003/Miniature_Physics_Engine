@@ -154,5 +154,5 @@ void wireframe_render_selected_object (GLuint shader_program, math4 view_matrix,
     }
     // Yellow outline (Selected Object Visibility)
     wireframe_render_object (shader_program, view_matrix, projection_matrix,
-                             &(physics_world_get_primary () -> bodies)[selected_object], (vector3) {1.0f, 1.0f, 0.0f});
+                             &(physics_world_get_primary () -> bodies) [selected_object], (vector3) {1.0f, 1.0f, 0.0f});
 }

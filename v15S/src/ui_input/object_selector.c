@@ -35,8 +35,7 @@ static bool ray_obb_intersection (vector3 ray_origin, vector3 ray_dir, rigidbody
     }
     * t_hit = tmin > 0 ? tmin : tmax;
     return *t_hit > 0;
-}
-/* Exact solid-cylinder raycast (axle = local X, flat caps). Side quadric in
+} /* Exact solid-cylinder raycast (axle = local X, flat caps). Side quadric in
  * cylinder-local space plus two cap discs; nearest positive t wins. */
 static bool ray_cylinder_intersection (vector3 ray_origin, vector3 ray_dir, rigidbody *cyl, float *t_hit) {
     vector3 ax = cyl -> cached_axes [0];
@@ -97,7 +96,7 @@ void select_object_by_index (int object_index) {
         return;
     }
     selected_object = object_index;
-    selected_object_id = (physics_world_get_primary () -> bodies)[object_index].object_id;
+    selected_object_id = (physics_world_get_primary () -> bodies) [object_index].object_id;
 }
 void selection_validate (void) {
     if (selected_object_id == 0) {
@@ -111,16 +110,14 @@ void selection_validate (void) {
     }
     selected_object = object_index;
 }
-uint32_t selection_get_id (void) {
-    return selected_object_id;
-}
+uint32_t selection_get_id (void) {return selected_object_id;}
 int selector_ray_tracing (void) {
     vector3 ray_origin_position = main_camera_fov.position;
     vector3 ray_direction_vector = vector3_normalisation (main_camera_fov.forward_vector);
     float closest_hit_distance = 1e30f;
     int closest_object_index = -1;
     for (int object_index = 0; object_index < (physics_world_get_primary () -> body_count); object_index++) {
-        rigidbody *rigid_body_pointer = &(physics_world_get_primary () -> bodies)[object_index];
+        rigidbody *rigid_body_pointer = &(physics_world_get_primary () -> bodies) [object_index];
         float t_hit = 0.0f;
         bool hit = false;
         if (rigid_body_pointer -> type == object_sphere) {
@@ -161,7 +158,7 @@ void selector_apply_force_impulse (float impulse_magnitude) {
     if ((selected_object < 0) || (selected_object >= (physics_world_get_primary () -> body_count))) {
         return;
     }
-    rigidbody *selected_rigid_body = &(physics_world_get_primary () -> bodies)[selected_object];
+    rigidbody *selected_rigid_body = &(physics_world_get_primary () -> bodies) [selected_object];
     vector3 applied_impulse_vector = vector3_scaling (main_camera_fov.forward_vector, impulse_magnitude);
     rb_apply_forces_perfect (selected_rigid_body, applied_impulse_vector);
 }

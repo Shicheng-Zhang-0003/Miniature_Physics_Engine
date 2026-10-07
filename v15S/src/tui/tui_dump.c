@@ -78,9 +78,7 @@ static int dump_index_by_id (physics_world *world, uint32_t id) {
     }
     return -1;
 }
-static vector3 dump_anchor_world (const rigidbody *rb, vector3 local) {
-    return vector3_addition (rb -> position, vector4_rotate_to_vector3 (rb -> orientation, local));
-}
+static vector3 dump_anchor_world (const rigidbody *rb, vector3 local) {return vector3_addition (rb -> position, vector4_rotate_to_vector3 (rb -> orientation, local));}
 int tui_dump_snapshot (FILE *out, physics_world *world, unsigned long tick, float dt) {
     if (!out || !world || !world -> bodies) {
         return 1;
