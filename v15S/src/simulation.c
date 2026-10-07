@@ -43,9 +43,7 @@ gboolean physics_step_increment (gpointer user_data_pointer) {
 #endif
     }
     /* Guard checks */
-    if (editor_dialog_is_active ()) {
-        return TRUE;
-    }
+    if (editor_dialog_is_active ()) { return TRUE; }
     if (physics_halt_tick_update ()) {
         gtk_widget_queue_draw (GTK_WIDGET (user_data_pointer));
         overlay_update ();
@@ -68,8 +66,7 @@ gboolean physics_step_increment (gpointer user_data_pointer) {
     if (!status_dir_checked) {
         mkdir ("status", 0755);
         status_dir_checked = 1;
-    }
-    frame_timer_update (&main_timer);
+    } frame_timer_update (&main_timer);
     float frame_delta_time = main_timer.delta_time;
     debug_last_frame_time = frame_delta_time;
     /* Camera + character */
@@ -102,8 +99,7 @@ gboolean physics_step_increment (gpointer user_data_pointer) {
             !(physics_world_get_primary () -> bodies) [sleep_count_index].static_state) {
             a3_sleeping_object_count++;
         }
-    }
-    debug_last_sleeping_object_count = a3_sleeping_object_count;
+    } debug_last_sleeping_object_count = a3_sleeping_object_count;
     debug_last_object_count = (physics_world_get_primary () -> body_count);
     long_run_validation_tick_update ();
     overlay_update ();

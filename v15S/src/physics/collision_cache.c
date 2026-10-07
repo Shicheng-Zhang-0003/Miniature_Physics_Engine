@@ -38,36 +38,26 @@ static inline uint32_t contact_pair_key (uint32_t id_a, uint32_t id_b) {
     return vector4_rotate_to_vector3 (body -> orientation, local_offset);
 }
 void contact_cache_stats_reset (struct physics_world *world) {
-    if (!world) {
-        return;
-    }
+    if (!world) { return; }
     world -> contact_cache_hits = 0;
     world -> contact_cache_misses = 0;
     world -> contact_cache_hits_applied = 0;
 }
 int contact_cache_get_hits (const struct physics_world *world) {
-    if (!world) {
-        return 0;
-    }
+    if (!world) { return 0; }
     return world -> contact_cache_hits;
 }
 int contact_cache_get_misses (const struct physics_world *world) {
-    if (!world) {
-        return 0;
-    }
+    if (!world) { return 0; }
     return world -> contact_cache_misses;
 }
 bool contact_cache_has_pair (struct physics_world *world, uint32_t id_a, uint32_t id_b) {
     /* TRUTH: zero ids mean "unknown", not "seen". Returning true suppressed
      * first-touch wake for id-0 bodies (they never woke sleepers). */
-    if (!world || id_a == 0 || id_b == 0) {
-        return false;
-    }
+    if (!world || id_a == 0 || id_b == 0) { return false; }
     cached_contact *cache = world -> world_contact_cache;
     int count = world -> world_contact_cache_count;
-    if (!cache || count <= 0) {
-        return false;
-    }
+    if (!cache || count <= 0) { return false; }
     /* O(chain) hash walk over the chains rebuilt by contact_cache_save
      * (same entries, same order semantics as the old O(n) scan; boolean
      * result identical). Degrades to linear only if heads are missing. */
@@ -78,23 +68,15 @@ bool contact_cache_has_pair (struct physics_world *world, uint32_t id_a, uint32_
              s = cache [s].hash_next, guard++) {
             uint32_t ca = cache [s].object_id_a;
             uint32_t cb = cache [s].object_id_b;
-            if (((ca == id_a) && (cb == id_b)) || ((ca == id_b) && (cb == id_a))) {
-                return true;
-            }
-        }
-        return false;
+            if (((ca == id_a) && (cb == id_b)) || ((ca == id_b) && (cb == id_a))) { return true; }
+        } return false;
     }
-    if (count > world -> world_contact_cache_capacity) {
-        count = world -> world_contact_cache_capacity;
-    }
+    if (count > world -> world_contact_cache_capacity) { count = world -> world_contact_cache_capacity; }
     for (int i = 0; i < count; i++) {
         uint32_t ca = cache [i].object_id_a;
         uint32_t cb = cache [i].object_id_b;
-        if (((ca == id_a) && (cb == id_b)) || ((ca == id_b) && (cb == id_a))) {
-            return true;
-        }
-    }
-    return false;
+        if (((ca == id_a) && (cb == id_b)) || ((ca == id_b) && (cb == id_a))) { return true; }
+    } return false;
 } /* FIX-AUDIT-DESPOT: thin wrapper over the shared stamp in
  * collision_mechanics.h (single source of truth with the solver's match
  * side). See the header note for why match-role predicates stay in the
@@ -103,9 +85,7 @@ static uint32_t a3_task05_body_property_stamp (const rigidbody *rigid_body) {ret
 void contact_cache_save (struct physics_world *world, collision_data *manifolds, int count) {
     /* Per-world warm-start cache (no global fallback remains). A missing
      * cache degrades to no warm start for the next tick. */
-    if ((!world) || (!world -> world_contact_cache)) {
-        return;
-    }
+    if ((!world) || (!world -> world_contact_cache)) { return; }
     int *cache_count = &world -> world_contact_cache_count;
     cached_contact *cache_array = world -> world_contact_cache;
     int32_t *hash_head = world -> contact_hash_head;
@@ -114,12 +94,9 @@ void contact_cache_save (struct physics_world *world, collision_data *manifolds,
         collision_data *manifold = &manifolds [m];
         for (int i = 0; i < manifold -> contact_count; i++) {
             if (*cache_count >= world -> world_contact_cache_capacity) {
-                if (physics_world_grow_contact_cache (world) != 0) {
-                    break;
-                }
+                if (physics_world_grow_contact_cache (world) != 0) { break; }
                 cache_array = world -> world_contact_cache;
-            }
-            contact_point_data *cp = &manifold -> contacts [i];
+            } contact_point_data *cp = &manifold -> contacts [i];
             cached_contact *cc = &cache_array [(*cache_count)++];
             cc -> object_id_a = (manifold -> object_a) ? manifold -> object_a -> object_id : 0;
             cc -> object_id_b = (manifold -> object_b) ? manifold -> object_b -> object_id : 0;
@@ -136,9 +113,7 @@ void contact_cache_save (struct physics_world *world, collision_data *manifolds,
             /* Remember the stick frame for resting contacts next tick. */
             cc -> tangent_dir = cp -> tangent_vector;
         }
-        if (*cache_count >= world -> world_contact_cache_capacity) {
-            break;
-        }
+        if (*cache_count >= world -> world_contact_cache_capacity) { break; }
     }
     /* Rebuild the lookup chains in array order (reverse-prepend), so a
      * lookup walk visits candidates in exactly the order the legacy linear
@@ -153,16 +128,13 @@ void contact_cache_save (struct physics_world *world, collision_data *manifolds,
             if ((cc -> object_id_a == 0) || (cc -> object_id_b == 0)) {
                 cc -> hash_next = -1;
                 continue;
-            }
-            uint32_t slot = contact_pair_key (cc -> object_id_a, cc -> object_id_b);
+            } uint32_t slot = contact_pair_key (cc -> object_id_a, cc -> object_id_b);
             cc -> hash_next = hash_head [slot];
             hash_head [slot] = c;
         }
     }
 }
 void contact_cache_clear (struct physics_world *world) {
-    if (!world) {
-        return;
-    }
+    if (!world) { return; }
     world -> world_contact_cache_count = 0;
 }

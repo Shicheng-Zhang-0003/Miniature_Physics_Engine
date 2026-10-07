@@ -25,41 +25,29 @@ extern input_status main_inputs;
  * callers keep working during and after the migration. */
 static void scene_ensure_primary (void) {
     physics_world *world = physics_world_get_primary ();
-    if (!world -> bodies) {
-        physics_world_init (world);
-    }
+    if (!world -> bodies) { physics_world_init (world); }
 }
 void scene_allocate_pool (void) {scene_ensure_primary ();}
 uint32_t scene_allocate_object_id (void) {
     physics_world *world = physics_world_get_primary ();
     scene_ensure_primary ();
-    if (world -> next_object_id == 0) {
-        world -> next_object_id = 1;
-    }
+    if (world -> next_object_id == 0) { world -> next_object_id = 1; }
     return world -> next_object_id++;
 }
 void scene_note_loaded_id (uint32_t object_id) {
     /* 0 is never a valid body id; UINT32_MAX cannot advance further. */
-    if ((object_id == 0) || (object_id == 0xFFFFFFFFu)) {
-        return;
-    }
+    if ((object_id == 0) || (object_id == 0xFFFFFFFFu)) { return; }
     physics_world *world = physics_world_get_primary ();
-    if (object_id >= world -> next_object_id) {
-        world -> next_object_id = object_id + 1;
-    }
+    if (object_id >= world -> next_object_id) { world -> next_object_id = object_id + 1; }
 }
 void scene_assign_new_identity (int object_index) {
-    if ((object_index < 0) || (object_index >= (physics_world_get_primary () -> body_count))) {
-        return;
-    }
+    if ((object_index < 0) || (object_index >= (physics_world_get_primary () -> body_count))) { return; }
     (physics_world_get_primary () -> bodies) [object_index].object_id = scene_allocate_object_id ();
     (physics_world_get_primary () -> bodies) [object_index].object_generation = 1;
 }
 int scene_ensure_pool_capacity (int required_capacity) {
     /* Growable pools: grow on demand to the compile-time ceiling. */
-    if (required_capacity <= 0) {
-        return 1;
-    }
+    if (required_capacity <= 0) { return 1; }
     scene_ensure_primary ();
     physics_world *world = physics_world_get_primary ();
     if (!world -> bodies) {
@@ -71,8 +59,7 @@ int scene_ensure_pool_capacity (int required_capacity) {
             fprintf (stderr, "Error POOL23: Physics heap unavailable.\n");
             return 0;
         }
-    }
-    return 1;
+    } return 1;
 } /* Spawn-overlap probe: routed through the shape registry so custom
  * shapes separate correctly too (replaces the 3x3 inline chain). */
 static bool a3_spawn_collision_dispatch (rigidbody *rigid_body_a, rigidbody *rigid_body_b,
@@ -80,36 +67,24 @@ static bool a3_spawn_collision_dispatch (rigidbody *rigid_body_a, rigidbody *rig
     return mpe_shape_dispatch (physics_world_get_primary (), rigid_body_a, rigid_body_b, collision_output);
 }
 static void scene_resolve_spawn_overlap (int new_object_index) {
-    if ((new_object_index < 0) || (new_object_index >= (physics_world_get_primary () -> body_count))) {
-        return;
-    }
+    if ((new_object_index < 0) || (new_object_index >= (physics_world_get_primary () -> body_count))) { return; }
     rigidbody *new_body = &(physics_world_get_primary () -> bodies) [new_object_index];
-    if (new_body -> static_state) {
-        return;
-    }
+    if (new_body -> static_state) { return; }
     const int max_attempts = g_cfg.spawner.overlap_max_attempts; /* MPE_TASK_32 */
     const float overlap_threshold = g_cfg.spawner.overlap_thresh; /* MPE_TASK_32 */
     for (int attempt = 0; attempt < max_attempts; attempt++) {
         bool overlap_found = false;
         for (int other_index = 0; other_index < (physics_world_get_primary () -> body_count); other_index++) {
-            if (other_index == new_object_index) {
-                continue;
-            }
+            if (other_index == new_object_index) { continue; }
             rigidbody *other_body = &(physics_world_get_primary () -> bodies) [other_index];
             collision_data overlap_collision = {0};
-            if (!a3_spawn_collision_dispatch (new_body, other_body, &overlap_collision)) {
-                continue;
-            }
+            if (!a3_spawn_collision_dispatch (new_body, other_body, &overlap_collision)) { continue; }
             float max_depth = 0.0f;
             for (int contact_index = 0; contact_index < overlap_collision.contact_count; contact_index++) {
                 float depth = overlap_collision.contacts [contact_index].penetration;
-                if (depth > max_depth) {
-                    max_depth = depth;
-                }
+                if (depth > max_depth) { max_depth = depth; }
             }
-            if (max_depth <= overlap_threshold) {
-                continue;
-            }
+            if (max_depth <= overlap_threshold) { continue; }
             overlap_found = true;
             float normal_length_squared = vector3_length_squared (overlap_collision.normal_vector);
             vector3 separation_normal;
@@ -118,23 +93,17 @@ static void scene_resolve_spawn_overlap (int new_object_index) {
             } else {
                 separation_normal =
                     vector3_scaling (overlap_collision.normal_vector, 1.0f / sqrtf (normal_length_squared));
-            }
-            float move_distance = (max_depth - overlap_threshold) + 0.005f;
-            if (move_distance > 1.0f) {
-                move_distance = 1.0f;
-            }
+            } float move_distance = (max_depth - overlap_threshold) + 0.005f;
+            if (move_distance > 1.0f) { move_distance = 1.0f; }
             if (overlap_collision.object_a == new_body) {
                 new_body -> position =
                     vector3_subtraction (new_body -> position, vector3_scaling (separation_normal, move_distance));
             } else {
                 new_body -> position =
                     vector3_addition (new_body -> position, vector3_scaling (separation_normal, move_distance));
-            }
-            rigidbody_wake (new_body);
+            } rigidbody_wake (new_body);
         }
-        if (!overlap_found) {
-            break;
-        }
+        if (!overlap_found) { break; }
     }
 } /* MPE_TASK_20B_SPAWN_SEPARATION_END */
 int scene_add_object (float radius, float mass, vector3 initial_position) {
@@ -236,9 +205,7 @@ void scene_init_default (void) {
     (physics_world_get_primary () -> bodies) [object_grey_index].colour = (vector3) {0.8f, 0.8f, 0.8f};
 }
 void scene_remove_object_by_index (int object_index) {
-    if ((object_index < 0) || (object_index >= (physics_world_get_primary () -> body_count))) {
-        return;
-    }
+    if ((object_index < 0) || (object_index >= (physics_world_get_primary () -> body_count))) { return; }
     uint32_t previous_selected_id = selected_object_id; /* A3_PATCH_08_SELECTION_ID */
     physics_world *world = physics_world_get_primary ();
     /* FIX-AUDIT-DESPOT: capture the doomed id BEFORE the memmove below.
@@ -249,21 +216,15 @@ void scene_remove_object_by_index (int object_index) {
     if (removed_id != 0) {
         for (int ci = constraint_pool_capacity () - 1; ci >= 0; ci--) {
             const constraint *c = constraint_pool_at (world, ci);
-            if (c && c -> is_active && (c -> body_id_a == removed_id || c -> body_id_b == removed_id)) {
-                constraint_remove (world, ci);
-            }
+            if (c && c -> is_active && (c -> body_id_a == removed_id || c -> body_id_b == removed_id)) { constraint_remove (world, ci); }
         }
-    }
-    contact_cache_clear (world);
+    } contact_cache_clear (world);
     for (int i = object_index; i < (physics_world_get_primary () -> body_count) - 1; i++) {
         (physics_world_get_primary () -> bodies) [i] = (physics_world_get_primary () -> bodies) [i + 1];
         (physics_world_get_primary () -> bodies) [i].body_index = i;
-    }
-    (physics_world_get_primary () -> body_count) -= 1;
+    } (physics_world_get_primary () -> body_count) -= 1;
     physics_world_bump_revision (physics_world_get_primary ());
-    if (previous_selected_id == 0) {
-        clear_selection ();
-    } else {
+    if (previous_selected_id == 0) { clear_selection (); } else {
         int refreshed_selection_index = scene_find_object_index_by_id (previous_selected_id);
         if (refreshed_selection_index < 0) {
             clear_selection ();
@@ -273,38 +234,23 @@ void scene_remove_object_by_index (int object_index) {
             selected_object_id = previous_selected_id;
         }
     }
-    if (main_inputs.marked_joint_object_index == object_index) {
-        main_inputs.marked_joint_object_index = -1;
-    } else if (main_inputs.marked_joint_object_index > object_index) {
-        main_inputs.marked_joint_object_index -= 1;
-    }
-    if ((selected_object < 0) || (selected_object >= (physics_world_get_primary () -> body_count))) {
-        main_inputs.object_menu_level = 0;
-    }
+    if (main_inputs.marked_joint_object_index == object_index) { main_inputs.marked_joint_object_index = -1; } else if (main_inputs.marked_joint_object_index > object_index) { main_inputs.marked_joint_object_index -= 1; }
+    if ((selected_object < 0) || (selected_object >= (physics_world_get_primary () -> body_count))) { main_inputs.object_menu_level = 0; }
 }
 int scene_find_object_index_by_id (uint32_t object_id) {
-    if (object_id == 0) {
-        return -1;
-    }
+    if (object_id == 0) { return -1; }
     for (int i = 0; i < (physics_world_get_primary () -> body_count); i++) {
-        if ((physics_world_get_primary () -> bodies) [i].object_id == object_id) {
-            return i;
-        }
-    }
-    return -1;
+        if ((physics_world_get_primary () -> bodies) [i].object_id == object_id) { return i; }
+    } return -1;
 }
 bool scene_object_id_exists (uint32_t object_id) {return scene_find_object_index_by_id (object_id) >= 0;}
 rigidbody *scene_resolve_object_by_id (uint32_t object_id) {
     int object_index = scene_find_object_index_by_id (object_id);
-    if (object_index < 0) {
-        return NULL;
-    }
+    if (object_index < 0) { return NULL; }
     return &(physics_world_get_primary () -> bodies) [object_index];
 }
 uint32_t scene_get_object_id_at_index (int object_index) {
-    if ((object_index < 0) || (object_index >= (physics_world_get_primary () -> body_count))) {
-        return 0;
-    }
+    if ((object_index < 0) || (object_index >= (physics_world_get_primary () -> body_count))) { return 0; }
     return (physics_world_get_primary () -> bodies) [object_index].object_id;
 }
 void scene_ensure_friction_floor (void) {
@@ -380,8 +326,7 @@ void scene_editor_torture_test (void) {
     if ((object_a_index < 0) || (object_b_index < 0) || (object_c_index < 0)) {
         printf ("[A3] Editor torture test failed: could not spawn test objects.\n");
         return;
-    }
-    (physics_world_get_primary () -> bodies) [object_a_index].restitution = 0.0f;
+    } (physics_world_get_primary () -> bodies) [object_a_index].restitution = 0.0f;
     (physics_world_get_primary () -> bodies) [object_b_index].restitution = 0.0f;
     (physics_world_get_primary () -> bodies) [object_c_index].restitution = 0.0f;
     selected_object = object_b_index;
@@ -394,9 +339,7 @@ void scene_editor_torture_test (void) {
                g_cfg.joints.default_spring_k, g_cfg.joints.default_damping); /* MPE_TASK_31 */
     scene_remove_object_by_index (object_b_index);
     int shifted_object_c_index = object_c_index;
-    if (shifted_object_c_index > object_b_index) {
-        shifted_object_c_index--;
-    }
+    if (shifted_object_c_index > object_b_index) { shifted_object_c_index--; }
     selected_object = object_a_index;
     main_inputs.object_menu_level = 1;
     main_inputs.marked_joint_object_index = shifted_object_c_index;
@@ -410,8 +353,7 @@ void scene_editor_torture_test (void) {
     }
     if ((object_a_index >= 0) && (object_a_index < (physics_world_get_primary () -> body_count))) {
         (physics_world_get_primary () -> bodies) [object_a_index].colour = (vector3) {0.2f, 1.0f, 0.2f};
-    }
-    clear_selection ();
+    } clear_selection ();
     main_inputs.object_menu_level = 0;
     main_inputs.marked_joint_object_index = -1;
     main_inputs.is_menu_open = false;
@@ -424,12 +366,8 @@ void scene_spawn_stress_test (void) {
     scene_ensure_friction_floor ();
     broadphase_reset_overflow_counts (physics_world_get_primary ());
     int objects_to_spawn = 300;
-    if ((physics_world_get_primary () -> body_count) + objects_to_spawn > mpe_max_bodies) {
-        objects_to_spawn = mpe_max_bodies - (physics_world_get_primary () -> body_count);
-    }
-    if (objects_to_spawn <= 0) {
-        return;
-    }
+    if ((physics_world_get_primary () -> body_count) + objects_to_spawn > mpe_max_bodies) { objects_to_spawn = mpe_max_bodies - (physics_world_get_primary () -> body_count); }
+    if (objects_to_spawn <= 0) { return; }
     /* RESPONSIVENESS: stack each F8 batch ABOVE existing content. Pressing
      * F8 twice used to spawn the second 10x10x3 grid at the identical
      * y=5..10 coordinates while the first batch was still falling through
@@ -446,15 +384,10 @@ void scene_spawn_stress_test (void) {
         for (int b = 0; b < (physics_world_get_primary () -> body_count); b++) {
             float y = (physics_world_get_primary () -> bodies) [b].position.y +
                       broadphase_bounding_radius (&(physics_world_get_primary () -> bodies) [b]);
-            if (y > top_y) {
-                top_y = y;
-            }
+            if (y > top_y) { top_y = y; }
         }
-        if (top_y > batch_base_y - 3.0f) {
-            batch_base_y = top_y + 3.0f;
-        }
-    }
-    int grid_width = 10;
+        if (top_y > batch_base_y - 3.0f) { batch_base_y = top_y + 3.0f; }
+    } int grid_width = 10;
     int grid_depth = 10;
     for (int i = 0; i < objects_to_spawn; i++) {
         int grid_x = i % grid_width;
@@ -586,9 +519,7 @@ void scene_spawn_config_torture_test (void) {
             int range = (int) (p -> max - p -> min);
             int random_value = (int) p -> min + (int) (TORTURE_NEXT () % (uint32_t) ((range > 0) ? range : 1));
             *(int *) p -> storage = random_value;
-        } else if (p -> type == p_bool) {
-            *(bool *) p -> storage = (TORTURE_NEXT () & 1u) != 0;
-        }
+        } else if (p -> type == p_bool) { *(bool *) p -> storage = (TORTURE_NEXT () & 1u) != 0; }
     }
     /* TRUTH guardrails (proven by headless bisection, see note below).
      * Torture randomizes everything, but two knobs are RESOLUTION/LOAD, not
@@ -602,29 +533,13 @@ void scene_spawn_config_torture_test (void) {
      *   level per tick; measured falls at 16/32/64 (even perfect seating),
      *   stands at 96/128. Material/world extremes (friction, drag, slop,
      *   bias, warm-match, damping, sleep, joints...) stay fully random. */
-    if (g_cfg.world.gravity > -1.0f) {
-        g_cfg.world.gravity = -1.0f - ((float) (TORTURE_NEXT () >> 8) / 16777216.0f) * 16.0f;
-    } else if (g_cfg.world.gravity < -17.0f) {
-        g_cfg.world.gravity = -17.0f;
-    }
-    if (g_cfg.timestep.solver_iterations < 96) {
-        g_cfg.timestep.solver_iterations = 96;
-    }
-    if (g_cfg.solver.penetration_slop > 0.02f) {
-        g_cfg.solver.penetration_slop = 0.010f;
-    }
-    if (g_cfg.solver.bias_factor < 0.05f) {
-        g_cfg.solver.bias_factor = 0.10f;
-    }
-    if (g_cfg.depenetration.correction_factor < 0.1f) {
-        g_cfg.depenetration.correction_factor = 0.35f;
-    }
-    if (g_cfg.sleep.linear_thresh_sq > 0.01f) {
-        g_cfg.sleep.linear_thresh_sq = 0.0025f;
-    }
-    if (g_cfg.sleep.angular_thresh_sq > 0.01f) {
-        g_cfg.sleep.angular_thresh_sq = 0.0001f;
-    }
+    if (g_cfg.world.gravity > -1.0f) { g_cfg.world.gravity = -1.0f - ((float) (TORTURE_NEXT () >> 8) / 16777216.0f) * 16.0f; } else if (g_cfg.world.gravity < -17.0f) { g_cfg.world.gravity = -17.0f; }
+    if (g_cfg.timestep.solver_iterations < 96) { g_cfg.timestep.solver_iterations = 96; }
+    if (g_cfg.solver.penetration_slop > 0.02f) { g_cfg.solver.penetration_slop = 0.010f; }
+    if (g_cfg.solver.bias_factor < 0.05f) { g_cfg.solver.bias_factor = 0.10f; }
+    if (g_cfg.depenetration.correction_factor < 0.1f) { g_cfg.depenetration.correction_factor = 0.35f; }
+    if (g_cfg.sleep.linear_thresh_sq > 0.01f) { g_cfg.sleep.linear_thresh_sq = 0.0025f; }
+    if (g_cfg.sleep.angular_thresh_sq > 0.01f) { g_cfg.sleep.angular_thresh_sq = 0.0001f; }
     /* Spawn the standard long-run validation scene */
     scene_spawn_long_run_validation ();
     printf (

@@ -18,9 +18,7 @@
 float g_ccd_obstacle_margin = 0.0f;
 static float ccd_support_depth (const rigidbody *body) {
     /* Lowest-point offset below the center along world -Y. */
-    if (body -> type == object_sphere) {
-        return body -> radius;
-    }
+    if (body -> type == object_sphere) { return body -> radius; }
     if (body -> type == object_custom) {
         /* The core's documented fallback geometry for custom shapes is a
          * bounding sphere until a CCD stage override is attached. */
@@ -28,12 +26,8 @@ static float ccd_support_depth (const rigidbody *body) {
     }
     if (body -> type == object_cylinder) {
         float ay = body -> cached_axes [0].y;
-        if (ay > 1.0f) {
-            ay = 1.0f;
-        }
-        if (ay < -1.0f) {
-            ay = -1.0f;
-        }
+        if (ay > 1.0f) { ay = 1.0f; }
+        if (ay < -1.0f) { ay = -1.0f; }
         return body -> radius * sqrtf (fmaxf (0.0f, 1.0f - ay * ay)) + body -> cylinder_half_length * fabsf (ay);
     }
     vector3 down = {0.0f, -1.0f, 0.0f};
@@ -42,15 +36,9 @@ static float ccd_support_depth (const rigidbody *body) {
            body -> half_extensions.z * fabsf (vector3_dot (body -> cached_axes [2], down));
 }
 static float ccd_min_thickness (const rigidbody *body) {
-    if (body -> type == object_sphere) {
-        return body -> radius;
-    }
-    if (body -> type == object_custom) {
-        return body -> radius;
-    }
-    if (body -> type == object_cylinder) {
-        return fminf (body -> radius, body -> cylinder_half_length);
-    }
+    if (body -> type == object_sphere) { return body -> radius; }
+    if (body -> type == object_custom) { return body -> radius; }
+    if (body -> type == object_cylinder) { return fminf (body -> radius, body -> cylinder_half_length); }
     return fminf (body -> half_extensions.x, fminf (body -> half_extensions.y, body -> half_extensions.z));
 } /* Earliest positive time at which |dp + dv*t| reaches radius. Compute the
  * quadratic in double and use the cancellation-resistant q formulation; the
@@ -60,49 +48,38 @@ static float ccd_sphere_sweep_toi (vector3 dp, vector3 dv, float radius, float d
     if (!isfinite (dp.x) || !isfinite (dp.y) || !isfinite (dp.z) || !isfinite (dv.x) || !isfinite (dv.y) ||
         !isfinite (dv.z) || !isfinite (radius) || !(radius > 0.0f) || !isfinite (dt) || !(dt > 0.0f)) {
         return -1.0f;
-    }
-    double dx = (double) dp.x, dy = (double) dp.y, dz = (double) dp.z;
+    } double dx = (double) dp.x, dy = (double) dp.y, dz = (double) dp.z;
     double vx = (double) dv.x, vy = (double) dv.y, vz = (double) dv.z;
     double r = (double) radius;
     double a = vx * vx + vy * vy + vz * vz;
     double c = dx * dx + dy * dy + dz * dz - r * r;
     if (!(a > 0.0) || !(c > 0.0)) {
         return -1.0f; /* no relative motion, or already overlapping */
-    }
-    double b = 2.0 * (dx * vx + dy * vy + dz * vz);
+    } double b = 2.0 * (dx * vx + dy * vy + dz * vz);
     /* DESPOT-2026-10-01: fma(b,b,-4*a*c) is a libm/hardware-FMA op, not an
      * IEEE-exact +,-,*,/,sqrt sequence. Cross-target contraction differs,
      * so the TOI clamp/no-clamp bifurcation desyncs. Plain double mults
      * are bit-identical under -ffp-contract=off (see det_math.h). */
     double discriminant = b * b - 4.0 * a * c;
-    if (!(discriminant >= 0.0)) {
-        return -1.0f;
-    }
+    if (!(discriminant >= 0.0)) { return -1.0f; }
     double root = sqrt (discriminant);
     double q = -0.5 * (b + copysign (root, b));
     double t0, t1;
-    if (q == 0.0) {
-        t0 = t1 = -b / (2.0 * a);
-    } else {
+    if (q == 0.0) { t0 = t1 = -b / (2.0 * a); } else {
         t0 = q / a;
         t1 = c / q;
-    }
-    double toi = INFINITY;
+    } double toi = INFINITY;
     if (t0 > 0.0 && t0 < toi)
         toi = t0;
     if (t1 > 0.0 && t1 < toi)
         toi = t1;
-    if (!(toi < (double) dt)) {
-        return -1.0f;
-    }
+    if (!(toi < (double) dt)) { return -1.0f; }
     return (float) toi;
 }
 int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt, float *time_remaining_out,
                                     const mpe_config_t *cfg, float *best_tois_out, unsigned char *hit_flags_out) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
-    if ((!bodies) || (body_count <= 0) || (!(dt > 0.0f)) || !isfinite (dt)) {
-        return 0;
-    }
+    if ((!bodies) || (body_count <= 0) || (!(dt > 0.0f)) || !isfinite (dt)) { return 0; }
     /* TRUTH: low-memory NULL path must NOT pre-move. Old code did
      * pos+=v*toi with no remainder recorded, then caller integrated full dt
      * => toi+dt double-count overshoot. Degraded mode: discrete only. */
@@ -119,22 +96,14 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
     float obstacle_margin = 0.0f;
     for (int k = 0; k < body_count; k++) {
         rigidbody *ob = &bodies [k];
-        if ((ob -> static_state) || (ob -> is_sleeping) || (ob -> no_collide)) {
-            continue;
-        }
+        if ((ob -> static_state) || (ob -> is_sleeping) || (ob -> no_collide)) { continue; }
         float ow = vector3_length (ob -> angular_velocity);
         float orad = broadphase_bounding_radius (ob);
-        if ((!isfinite (ow)) || (!isfinite (orad)) || (orad < 0.0f)) {
-            continue;
-        }
+        if ((!isfinite (ow)) || (!isfinite (orad)) || (orad < 0.0f)) { continue; }
         float tip = ow * orad;
-        if (isfinite (tip) && (tip > obstacle_margin)) {
-            obstacle_margin = tip;
-        }
+        if (isfinite (tip) && (tip > obstacle_margin)) { obstacle_margin = tip; }
     }
-    if (obstacle_margin > 2.0f) {
-        obstacle_margin = 2.0f;
-    }
+    if (obstacle_margin > 2.0f) { obstacle_margin = 2.0f; }
     g_ccd_obstacle_margin = obstacle_margin;
     /* TRUTH: symmetric two-phase clamp. Old sequential per-body move vs
      * already-moved positions let B tunnel through A (A clamps to contact
@@ -169,30 +138,22 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
     }
     for (int i = 0; i < body_count; i++) {
         rigidbody *mover = &bodies [i];
-        if ((mover -> static_state) || (mover -> is_sleeping) || (mover -> no_collide)) {
-            continue;
-        }
+        if ((mover -> static_state) || (mover -> is_sleeping) || (mover -> no_collide)) { continue; }
         /* TRUTH P1-19: angular sweep bound. Tip speed |w x r| <= |w|*R sweeps
          * a disc; linear-only bound tunnels for fast spinners. */
         float lin_speed = vector3_length (mover -> velocity);
         float ang_speed = vector3_length (mover -> angular_velocity);
         float bound_r = broadphase_bounding_radius (mover);
-        if ((!isfinite (bound_r)) || (bound_r < 0.0f)) {
-            bound_r = 0.0f;
-        }
+        if ((!isfinite (bound_r)) || (bound_r < 0.0f)) { bound_r = 0.0f; }
         float sweep_speed = lin_speed + ang_speed * bound_r;
         /* DESPOT-2026-10-08 rotational CCD: obstacle spin unswept (LIE-09).
          * Add the worst obstacle tip speed in this world as a margin so a
          * fast propeller vs slow mover cannot tunnel rotationally with no
          * clamp. Computed once per tick above. */
         sweep_speed += g_ccd_obstacle_margin;
-        if (sweep_speed <= 0.0001f) {
-            continue;
-        }
+        if (sweep_speed <= 0.0001f) { continue; }
         float thickness = ccd_min_thickness (mover);
-        if ((thickness <= 0.0f) || (!isfinite (thickness))) {
-            continue;
-        }
+        if ((thickness <= 0.0f) || (!isfinite (thickness))) { continue; }
         float displacement = sweep_speed * dt;
         /* Plane sweep is O(1) per body: run it whenever the tick motion
          * exceeds slop, so impacts never fall in the gap between slop-band
@@ -204,8 +165,7 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
         bool do_volumes = displacement > fminf (thickness, 0.2f);
         if ((displacement <= C -> solver.penetration_slop) && (!do_volumes)) {
             continue; /* discrete sampling suffices */
-        }
-        float best_toi = dt;
+        } float best_toi = dt;
         bool hit = false;
         /* 1. Floor plane y = 0. Exact quadratic CCD under constant gravity.
          * Equation: 0.5*g*t^2 + v0*t + y0 = 0, with v0 the CENTER vertical
@@ -287,14 +247,11 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
          * available). */
         if (do_volumes) {
             for (int j = 0; j < body_count; j++) {
-                if (j == i) {
-                    continue;
-                }
+                if (j == i) { continue; }
                 rigidbody *other = &bodies [j];
                 if (other -> no_collide) {
                     continue; /* render-only proxies: never obstacles */
-                }
-                vector3 other_v = ((other -> static_state) || (other -> is_sleeping)) ? vector3_zero () : other -> velocity;
+                } vector3 other_v = ((other -> static_state) || (other -> is_sleeping)) ? vector3_zero () : other -> velocity;
                 if ((other -> type == object_sphere) || (other -> type == object_custom)) {
                     vector3 dp = vector3_subtraction (other -> position, mover -> position);
                     vector3 dv = vector3_subtraction (other_v, mover -> velocity);
@@ -330,8 +287,7 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
                             ax = (vector3) {1.0f, 0.0f, 0.0f};
                         } else {
                             ax = vector3_scaling (ax, 1.0f / ax_len);
-                        }
-                        float h = other -> cylinder_half_length;
+                        } float h = other -> cylinder_half_length;
                         float r_cyl = other -> radius;
                         float r_sph = mover -> radius;
                         float rr = r_cyl + r_sph;
@@ -347,9 +303,7 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
                         for (int ep = 0; ep < 2; ep++) {
                             vector3 dp = (ep == 0) ? dp1 : dp2;
                             float toi = ccd_sphere_sweep_toi (dp, dv, rr, dt);
-                            if ((toi > 0.0f) && (toi < best_cyl_toi)) {
-                                best_cyl_toi = toi;
-                            }
+                            if ((toi > 0.0f) && (toi < best_cyl_toi)) { best_cyl_toi = toi; }
                         }
                         /* Sweep against barrel (capsule segment).
                      * Project relative velocity onto plane perpendicular to axle. */
@@ -377,9 +331,7 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
                                  * early (wrong-side) clamps. */
                                     vector3 rel_pos = vector3_addition (dp_mid, vector3_scaling (dv, toi));
                                     float rel_ax = vector3_dot (rel_pos, ax);
-                                    if (fabsf (rel_ax) <= h) {
-                                        best_cyl_toi = toi;
-                                    }
+                                    if (fabsf (rel_ax) <= h) { best_cyl_toi = toi; }
                                 }
                             }
                         }
@@ -430,12 +382,8 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
                                 t1 = t2;
                                 t2 = tmp;
                             }
-                            if (t1 > tmin) {
-                                tmin = t1;
-                            }
-                            if (t2 < tmax) {
-                                tmax = t2;
-                            }
+                            if (t1 > tmin) { tmin = t1; }
+                            if (t2 < tmax) { tmax = t2; }
                             if (tmin > tmax) {
                                 miss = true;
                                 break;
@@ -481,23 +429,15 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
             grav_c = 0.0f;
         double cdr = (drag_c >= 1.0f - 1e-6f) ? 0.0 : -det_ln_pos ((double) drag_c);
         for (int i = 0; i < body_count; i++) {
-            if (!hit_flags [i]) {
-                continue;
-            }
+            if (!hit_flags [i]) { continue; }
             rigidbody *mover = &bodies [i];
-            if ((mover -> static_state) || (mover -> is_sleeping)) {
-                continue;
-            }
+            if ((mover -> static_state) || (mover -> is_sleeping)) { continue; }
             float toi = best_tois [i];
-            if (!(toi > 0.0f) || !(toi < dt)) {
-                continue;
-            }
+            if (!(toi > 0.0f) || !(toi < dt)) { continue; }
             /* Exact flow to toi from v_pre (velocity untouched since tick
              * start: CCD runs before force integration). */
             vector3 v_pre = mover -> velocity;
-            if (!isfinite (v_pre.x) || !isfinite (v_pre.y) || !isfinite (v_pre.z)) {
-                continue;
-            }
+            if (!isfinite (v_pre.x) || !isfinite (v_pre.y) || !isfinite (v_pre.z)) { continue; }
             double e_toi, a_pos, g_pos, v_toi_k;
             if (cdr == 0.0) {
                 double t = (double) toi;
@@ -508,12 +448,9 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
             } else {
                 double cdt = cdr * (double) toi;
                 double e;
-                if (cdt < 1e-4) {
-                    e = 1.0 - cdt + 0.5 * cdt * cdt - cdt * cdt * cdt / 6.0;
-                } else {
+                if (cdt < 1e-4) { e = 1.0 - cdt + 0.5 * cdt * cdt - cdt * cdt * cdt / 6.0; } else {
                     e = det_exp_small (-cdt);
-                }
-                e_toi = e;
+                } e_toi = e;
                 a_pos = (1.0 - e) / cdr;
                 g_pos = (double) toi / cdr - (1.0 - e) / (cdr * cdr);
                 v_toi_k = (1.0 - e) / cdr;
@@ -537,8 +474,7 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
                                  (float) (mover -> angular_velocity.y * inv * s),
                                  (float) (mover -> angular_velocity.z * inv * s)};
                 mover -> orientation = vector4_normalisation (vector4_multiplication (rotor, mover -> orientation));
-            }
-            rigidbody_wake (mover);
+            } rigidbody_wake (mover);
             rigidbody_update_axes (mover);
             clamped++;
             float rem = dt - toi;
@@ -547,26 +483,20 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
     } else {
         /* Degraded NULL mode: no pre-move (would double-count). Count only. */
         for (int i = 0; i < body_count; i++) {
-            if (hit_flags [i]) {
-                clamped++;
-            }
+            if (hit_flags [i]) { clamped++; }
         }
     }
     if (use_heap) {
         free (best_tois);
         free (hit_flags);
-    }
-    return clamped;
+    } return clamped;
 }
 int collision_ccd_sweep_clamp (rigidbody *bodies, int body_count, float dt) {return collision_ccd_sweep_clamp_full (bodies, body_count, dt, NULL, NULL, NULL, NULL);}
 int collision_ccd_sweep_clamp_world (struct physics_world *world, float dt) {
-    if (!world || !world -> bodies || world -> body_count <= 0) {
-        return 0;
-    }
+    if (!world || !world -> bodies || world -> body_count <= 0) { return 0; }
     const mpe_config_t *C = world -> cfg ? world -> cfg : &g_cfg;
     if (world -> ccd_time_remaining) {
         return collision_ccd_sweep_clamp_full (world -> bodies, world -> body_count, dt, world -> ccd_time_remaining, C,
                                                world -> ccd_best_tois, world -> ccd_hit_flags);
-    }
-    return collision_ccd_sweep_clamp_full (world -> bodies, world -> body_count, dt, NULL, C, NULL, NULL);
+    } return collision_ccd_sweep_clamp_full (world -> bodies, world -> body_count, dt, NULL, C, NULL, NULL);
 }

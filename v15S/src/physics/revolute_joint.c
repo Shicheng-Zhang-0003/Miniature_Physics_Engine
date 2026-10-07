@@ -43,8 +43,7 @@ static math3 math3_addition (math3 a, math3 b) {
         for (int j = 0; j < 3; j++) {
             r.matrix [i][j] = a.matrix [i][j] + b.matrix [i][j];
         }
-    }
-    return r;
+    } return r;
 } /* 6x6 matrix operations for coupled hinge solve + motor.
  * TRUTH: K spans invM (~1e-6..1e4) plus Iinv*r^2 (up to ~1e15 for tiny
  * masses with long anchors). float (23-bit, ~1e7) cannot hold cond(K)>1e10:
@@ -97,8 +96,7 @@ static int mat6_is_positive_definite (double m [6][6]) {
             if (!isfinite (L [i][j]))
                 return 0;
         }
-    }
-    return 1;
+    } return 1;
 }
 static void mat6_zero (double m [6][6]) {
     for (int i = 0; i < 6; i++)
@@ -121,20 +119,12 @@ static int mat6_invert (double m [6][6], double out [6][6]) {
             dg = 0.0;
             for (int j = 0; j < 6; j++) {
                 double v = m [i][j];
-                if (isfinite (v)) {
-                    dg += v * v;
-                }
-            }
-            dg = (dg > 0.0) ? sqrt (dg) : 1.0;
+                if (isfinite (v)) { dg += v * v; }
+            } dg = (dg > 0.0) ? sqrt (dg) : 1.0;
             d [i] = dg;
-        } else {
-            d [i] = sqrt (dg);
-        }
-        if (!(d [i] > 1e-18) || !isfinite (d [i])) {
-            d [i] = 1.0;
-        }
-    }
-    double aug [6][12];
+        } else { d [i] = sqrt (dg); }
+        if (!(d [i] > 1e-18) || !isfinite (d [i])) { d [i] = 1.0; }
+    } double aug [6][12];
     for (int i = 0; i < 6; i++) {
         for (int j = 0; j < 6; j++) {
             double s = d [i] * d [j];
@@ -160,8 +150,7 @@ static int mat6_invert (double m [6][6], double out [6][6]) {
                 aug [col][j] = aug [pivot][j];
                 aug [pivot][j] = tmp;
             }
-        }
-        double piv_val = aug [col][col];
+        } double piv_val = aug [col][col];
         for (int j = 0; j < 12; j++)
             aug [col][j] /= piv_val;
         for (int row = 0; row < 6; row++) {
@@ -177,8 +166,7 @@ static int mat6_invert (double m [6][6], double out [6][6]) {
             double s = d [i] * d [j];
             out [i][j] = aug [i][6 + j] / s;
         }
-    }
-    return 1;
+    } return 1;
 } /* DESPOT-2026-09-29: shared sleep guard for every joint solver.
  *
  * The joint solvers used to wake BOTH partners unconditionally, on every
@@ -199,22 +187,16 @@ static int mat6_invert (double m [6][6], double out [6][6]) {
  * The motor's own force path (rb_apply_forces_*) wakes via the torque
  * accumulator, so this is belt-and-braces rather than the only mechanism. */
 static int a3_joint_solve_may_skip (int sleeping_a, int sleeping_b, int active_drive) {
-    if (active_drive) {
-        return 0;
-    }
+    if (active_drive) { return 0; }
     return sleeping_a && sleeping_b;
 }
 static int a3_revolute_active_drive (const revolute_params *p) {
-    if (p -> motor_enabled && fabsf (p -> motor_target_speed) > 1e-9f) {
-        return 1;
-    }
+    if (p -> motor_enabled && fabsf (p -> motor_target_speed) > 1e-9f) { return 1; }
     return 0;
 }
 void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, float dt, const mpe_config_t *cfg) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
-    if ((!p) || (!body_a) || (!body_b) || (dt <= 0.0f)) {
-        return;
-    }
+    if ((!p) || (!body_a) || (!body_b) || (dt <= 0.0f)) { return; }
     /* FIX-AUDIT-DESPOT: jointed bodies are force-woken here INTENTIONALLY
      * (FTC robots are always active; a sleeping hinge partner would freeze
      * the constraint). Sleep is still allowed when the joint is passive
@@ -223,18 +205,14 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
      * drift corrections above are gated on effective inv mass so they never
      * kick a sleeper back awake by themselves. */
     /* Jointed bodies stay awake so the constraint always acts. */
-    if (a3_joint_solve_may_skip (body_a -> is_sleeping, body_b -> is_sleeping, a3_revolute_active_drive (p))) {
-        return;
-    }
+    if (a3_joint_solve_may_skip (body_a -> is_sleeping, body_b -> is_sleeping, a3_revolute_active_drive (p))) { return; }
     if (body_a -> is_sleeping)
         rigidbody_wake (body_a);
     if (body_b -> is_sleeping)
         rigidbody_wake (body_b);
     float inv_mass_a = rigidbody_effective_inv_mass (body_a);
     float inv_mass_b = rigidbody_effective_inv_mass (body_b);
-    if ((inv_mass_a <= 0.0f) && (inv_mass_b <= 0.0f)) {
-        return;
-    }
+    if ((inv_mass_a <= 0.0f) && (inv_mass_b <= 0.0f)) { return; }
     vector3 r_a = vector4_rotate_to_vector3 (body_a -> orientation, p -> anchor_a);
     vector3 r_b = vector4_rotate_to_vector3 (body_b -> orientation, p -> anchor_b);
     /* Anchor positions and velocities. */
@@ -259,8 +237,7 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
         ref = (vector3) {1.0f, 0.0f, 0.0f};
         u = vector3_cross (axis_world, ref);
         u_len = sqrtf (vector3_length_squared (u));
-    }
-    u = vector3_scaling (u, 1.0f / u_len);
+    } u = vector3_scaling (u, 1.0f / u_len);
     vector3 v = vector3_cross (axis_world, u); /* already unit length */
     /* Baumgarte bias for position error (point-to-point only; axis alignment is velocity-only).
      * TRUTH: velocity-level P2P bias solved INSIDE the iteration loop is
@@ -352,8 +329,7 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
             nwa [r2] = vector3_zero ();
             nb [r2] = vector3_zero ();
             nwb [r2] = vector3_zero ();
-        }
-        vector3 rows_a [3], rows_b [3];
+        } vector3 rows_a [3], rows_b [3];
         rows_a [0] = (vector3) {0.0f, -r_a.z, r_a.y};
         rows_a [1] = (vector3) {r_a.z, 0.0f, -r_a.x};
         rows_a [2] = (vector3) {-r_a.y, r_a.x, 0.0f};
@@ -368,8 +344,7 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
             nwa [i] = rows_a [i];
             nb [i] = (vector3) {e [0], e [1], e [2]};
             nwb [i] = vector3_scaling (rows_b [i], -1.0f);
-        }
-        nwa [3] = vector3_scaling (u, -1.0f);
+        } nwa [3] = vector3_scaling (u, -1.0f);
         nwb [3] = u;
         nwa [4] = vector3_scaling (v, -1.0f);
         nwb [4] = v;
@@ -412,9 +387,7 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
      * inverting it anyway yields plausible garbage impulses (that is exactly
      * how the cross-block sign error stayed invisible). Fall through to the
      * sequential solver, which is slower but stays correct. */
-    if (!mat6_is_positive_definite (K)) {
-        goto fallback_sequential;
-    }
+    if (!mat6_is_positive_definite (K)) { goto fallback_sequential; }
     /* RHS = -(J*v + bias). Bias only on P2P (first 3 rows). */
     double rhs [6];
     /* P2P rows: -(relative_velocity + bias_p2p) */
@@ -429,18 +402,13 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
     /* Motor row: -(along_axis_velocity - motor_target_speed), or 0 when
      * disabled (free spin: no constraint on the hinge axis). */
     float along_axis = vector3_dot (rel_ang, axis_world);
-    if (p -> motor_enabled) {
-        rhs [5] = -(along_axis - p -> motor_target_speed);
-    } else {
-        rhs [5] = 0.0f;
-    }
+    if (p -> motor_enabled) { rhs [5] = -(along_axis - p -> motor_target_speed); } else { rhs [5] = 0.0f; }
     /* Solve K * lambda = rhs (double). */
     double K_inv [6][6];
     if (!mat6_invert (K, K_inv)) {
         /* Singular - fall back to sequential solve. */
         goto fallback_sequential;
-    }
-    double lambda [6];
+    } double lambda [6];
     mat6_vec_mul_d (lambda, K_inv, rhs);
     if (!p -> motor_enabled) {
         lambda [5] = 0.0f; /* free hinge: never apply axis torque */
@@ -497,8 +465,7 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
                 q_rel.x = -q_rel.x;
                 q_rel.y = -q_rel.y;
                 q_rel.z = -q_rel.z;
-            }
-            float half_angle = atan2f (sqrtf (q_rel.x * q_rel.x + q_rel.y * q_rel.y + q_rel.z * q_rel.z), q_rel.w);
+            } float half_angle = atan2f (sqrtf (q_rel.x * q_rel.x + q_rel.y * q_rel.y + q_rel.z * q_rel.z), q_rel.w);
             vector3 rot_axis = {q_rel.x, q_rel.y, q_rel.z};
             float rot_axis_len = sqrtf (vector3_length_squared (rot_axis));
             if (rot_axis_len > 1e-6f)
@@ -519,8 +486,7 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
                 body_b -> orientation, (vector3_length_squared (p -> axis_b) > 1e-12f) ? vector3_normalisation (p -> axis_b)
                                                                                    : vector3_normalisation (p -> axis_a));
             p -> angle_initialized = true;
-        }
-        float min_limit = p -> limit_min_rad;
+        } float min_limit = p -> limit_min_rad;
         float max_limit = p -> limit_max_rad;
         float along_axis =
             vector3_dot (vector3_subtraction (body_b -> angular_velocity, body_a -> angular_velocity), axis_world);
@@ -547,8 +513,7 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
                  * over. The velocity kill above is the enforcement. */
             }
         }
-    }
-    return;
+    } return;
     fallback_sequential:
     /* Fallback to original sequential solve if the 6x6 solve fails. */
     /* ---- point-to-point ---- */
@@ -634,38 +599,25 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
  * violent motion is honest and documented, not hidden. */
 void revolute_pre_step (revolute_params *p, rigidbody *body_a, rigidbody *body_b, float dt, const mpe_config_t *cfg) {
     (void) cfg;
-    if ((!p) || (!body_a) || (!body_b) || (!(dt > 0.0f))) {
-        return;
-    }
-    if (!p -> limits_enabled || !p -> angle_initialized) {
-        return;
-    }
+    if ((!p) || (!body_a) || (!body_b) || (!(dt > 0.0f))) { return; }
+    if (!p -> limits_enabled || !p -> angle_initialized) { return; }
     vector3 axis_world = vector4_rotate_to_vector3 (body_a -> orientation, vector3_normalisation (p -> axis_a));
     vector3 rel_ang = vector3_subtraction (body_b -> angular_velocity, body_a -> angular_velocity);
     float along = vector3_dot (rel_ang, axis_world);
-    if (!isfinite (along)) {
-        return;
-    }
+    if (!isfinite (along)) { return; }
     /* Clamp per-tick delta to avoid explosion on NaN/spike (max 1 rad/tick). */
     float d = along * dt;
-    if (d > 1.0f) {
-        d = 1.0f;
-    } else if (d < -1.0f) {
+    if (d > 1.0f) { d = 1.0f; } else if (d < -1.0f) {
         d = -1.0f;
-    }
-    p -> accumulated_angle += d;
+    } p -> accumulated_angle += d;
     /* TRUTH: no wrap (see init site): the joint coordinate stays unwrapped
      * so multi-turn limits work. (The per-solve limit clamps that used to
      * rebase the books here were removed: see the 6x6 path note.) */
 } /* Prismatic: single-axis slide with optional limits and motor. */
 void prismatic_solve (prismatic_params *p, rigidbody *body_a, rigidbody *body_b, float dt, const mpe_config_t *cfg) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
-    if ((!p) || (!body_a) || (!body_b) || (dt <= 0.0f)) {
-        return;
-    }
-    if (a3_joint_solve_may_skip (body_a -> is_sleeping, body_b -> is_sleeping, 0)) {
-        return;
-    }
+    if ((!p) || (!body_a) || (!body_b) || (dt <= 0.0f)) { return; }
+    if (a3_joint_solve_may_skip (body_a -> is_sleeping, body_b -> is_sleeping, 0)) { return; }
     if (body_a -> is_sleeping)
         rigidbody_wake (body_a);
     if (body_b -> is_sleeping)
@@ -717,12 +669,9 @@ void prismatic_solve (prismatic_params *p, rigidbody *body_a, rigidbody *body_b,
                 float err_d = vector3_dot (delta, dir);
                 float bias_d = C -> joints.revolute_beta * err_d / dt;
                 float max_b = C -> joints.revolute_max_bias;
-                if (bias_d > max_b) {
-                    bias_d = max_b;
-                } else if (bias_d < -max_b) {
+                if (bias_d > max_b) { bias_d = max_b; } else if (bias_d < -max_b) {
                     bias_d = -max_b;
-                }
-                vector3 ra_d = vector3_cross (r_a, dir);
+                } vector3 ra_d = vector3_cross (r_a, dir);
                 vector3 rb_d = vector3_cross (r_b, dir);
                 float k_d =
                     inv_a + inv_b +
@@ -781,18 +730,14 @@ void prismatic_solve (prismatic_params *p, rigidbody *body_a, rigidbody *body_b,
 } /* TRUTH: once-per-tick slide tracking (called before the solver loop). */
 void prismatic_pre_step (prismatic_params *p, rigidbody *body_a, rigidbody *body_b, float dt, const mpe_config_t *cfg) {
     (void) cfg;
-    if ((!p) || (!body_a) || (!body_b) || (!(dt > 0.0f))) {
-        return;
-    }
+    if ((!p) || (!body_a) || (!body_b) || (!(dt > 0.0f))) { return; }
     vector3 r_a = vector4_rotate_to_vector3 (body_a -> orientation, p -> anchor_a);
     vector3 r_b = vector4_rotate_to_vector3 (body_b -> orientation, p -> anchor_b);
     vector3 world_a = vector3_addition (body_a -> position, r_a);
     vector3 world_b = vector3_addition (body_b -> position, r_b);
     vector3 axis_w = vector4_rotate_to_vector3 (body_a -> orientation, vector3_normalisation (p -> axis_a));
     float cur = vector3_dot (vector3_subtraction (world_b, world_a), axis_w);
-    if (!isfinite (cur)) {
-        return;
-    }
+    if (!isfinite (cur)) { return; }
     if (!p -> position_initialized) {
         p -> accumulated_position = cur;
         p -> position_initialized = true;
@@ -803,12 +748,9 @@ void prismatic_pre_step (prismatic_params *p, rigidbody *body_a, rigidbody *body
         float rel = vector3_dot (vector3_subtraction (vel_b, vel_a), axis_w);
         if (isfinite (rel)) {
             float d = rel * dt;
-            if (d > 1.0f) {
-                d = 1.0f;
-            } else if (d < -1.0f) {
+            if (d > 1.0f) { d = 1.0f; } else if (d < -1.0f) {
                 d = -1.0f;
-            }
-            p -> accumulated_position += d;
+            } p -> accumulated_position += d;
         }
     }
 } /* Rope: inequality distance constraint (pulls only, no push). */
@@ -818,9 +760,7 @@ void rope_solve (rope_params *p, rigidbody *body_a, rigidbody *body_b, float dt,
         return;
     if (!isfinite (p -> rest_length) || p -> rest_length < 0.0f)
         return;
-    if (a3_joint_solve_may_skip (body_a -> is_sleeping, body_b -> is_sleeping, 0)) {
-        return;
-    }
+    if (a3_joint_solve_may_skip (body_a -> is_sleeping, body_b -> is_sleeping, 0)) { return; }
     if (body_a -> is_sleeping)
         rigidbody_wake (body_a);
     if (body_b -> is_sleeping)
@@ -863,8 +803,7 @@ void rope_solve (rope_params *p, rigidbody *body_a, rigidbody *body_b, float dt,
      * (negative), kill push (positive). */
     if (lambda > 0.0f) {
         lambda = 0.0f; /* Only pull, never push. */
-    }
-    vector3 impulse = vector3_scaling (n, lambda);
+    } vector3 impulse = vector3_scaling (n, lambda);
     body_a -> velocity = vector3_subtraction (body_a -> velocity, vector3_scaling (impulse, inv_a));
     body_b -> velocity = vector3_addition (body_b -> velocity, vector3_scaling (impulse, inv_b));
     body_a -> angular_velocity = vector3_subtraction (
@@ -877,12 +816,8 @@ void rope_solve (rope_params *p, rigidbody *body_a, rigidbody *body_b, float dt,
 void prismatic_apply_motor (prismatic_params *p, rigidbody *body_a, rigidbody *body_b, float dt,
                             const mpe_config_t *cfg) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
-    if ((!p) || (!p -> motor_enabled) || (!body_a) || (!body_b) || (!(dt > 0.0f))) {
-        return;
-    }
-    if (!isfinite (p -> motor_target_speed) || !isfinite (p -> motor_max_force) || p -> motor_max_force <= 0.0f) {
-        return;
-    }
+    if ((!p) || (!p -> motor_enabled) || (!body_a) || (!body_b) || (!(dt > 0.0f))) { return; }
+    if (!isfinite (p -> motor_target_speed) || !isfinite (p -> motor_max_force) || p -> motor_max_force <= 0.0f) { return; }
     /* TRUTH: respect slide limits. */
     if (p -> limits_enabled && p -> position_initialized) {
         vector3 axw0 = vector4_rotate_to_vector3 (body_a -> orientation, vector3_normalisation (p -> axis_a));
@@ -895,11 +830,8 @@ void prismatic_apply_motor (prismatic_params *p, rigidbody *body_a, rigidbody *b
             (cur0 >= p -> limit_max - 1e-4f && p -> motor_target_speed > 0.0f)) {
             return;
         }
-    }
-    vector3 axis_world = vector4_rotate_to_vector3 (body_a -> orientation, vector3_normalisation (p -> axis_a));
-    if (vector3_length_squared (axis_world) < 1e-12f) {
-        return;
-    }
+    } vector3 axis_world = vector4_rotate_to_vector3 (body_a -> orientation, vector3_normalisation (p -> axis_a));
+    if (vector3_length_squared (axis_world) < 1e-12f) { return; }
     axis_world = vector3_normalisation (axis_world);
     vector3 vel_a = vector3_addition (
         body_a -> velocity,
@@ -911,12 +843,8 @@ void prismatic_apply_motor (prismatic_params *p, rigidbody *body_a, rigidbody *b
     float speed_error = p -> motor_target_speed - current_speed;
     float motor_gain = C -> joints.revolute_motor_gain;
     float desired_force = speed_error * motor_gain;
-    if (desired_force > p -> motor_max_force) {
-        desired_force = p -> motor_max_force;
-    }
-    if (desired_force < -p -> motor_max_force) {
-        desired_force = -p -> motor_max_force;
-    }
+    if (desired_force > p -> motor_max_force) { desired_force = p -> motor_max_force; }
+    if (desired_force < -p -> motor_max_force) { desired_force = -p -> motor_max_force; }
     vector3 drive_force = vector3_scaling (axis_world, desired_force);
     body_a -> force_accumulator = vector3_subtraction (body_a -> force_accumulator, drive_force);
     body_b -> force_accumulator = vector3_addition (body_b -> force_accumulator, drive_force);
@@ -925,23 +853,13 @@ void prismatic_apply_motor (prismatic_params *p, rigidbody *body_a, rigidbody *b
  * beyond the shared Baumgarte cap. */
 void fixed_solve (fixed_params *p, rigidbody *body_a, rigidbody *body_b, float dt, const mpe_config_t *cfg) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
-    if ((!p) || (!body_a) || (!body_b) || (dt <= 0.0f)) {
-        return;
-    }
-    if (a3_joint_solve_may_skip (body_a -> is_sleeping, body_b -> is_sleeping, 0)) {
-        return;
-    }
-    if (body_a -> is_sleeping) {
-        rigidbody_wake (body_a);
-    }
-    if (body_b -> is_sleeping) {
-        rigidbody_wake (body_b);
-    }
+    if ((!p) || (!body_a) || (!body_b) || (dt <= 0.0f)) { return; }
+    if (a3_joint_solve_may_skip (body_a -> is_sleeping, body_b -> is_sleeping, 0)) { return; }
+    if (body_a -> is_sleeping) { rigidbody_wake (body_a); }
+    if (body_b -> is_sleeping) { rigidbody_wake (body_b); }
     float inv_a = rigidbody_effective_inv_mass (body_a);
     float inv_b = rigidbody_effective_inv_mass (body_b);
-    if ((inv_a <= 0.0f) && (inv_b <= 0.0f)) {
-        return;
-    }
+    if ((inv_a <= 0.0f) && (inv_b <= 0.0f)) { return; }
     vector3 r_a = vector4_rotate_to_vector3 (body_a -> orientation, p -> anchor_a);
     vector3 r_b = vector4_rotate_to_vector3 (body_b -> orientation, p -> anchor_b);
     vector3 world_a = vector3_addition (body_a -> position, r_a);
@@ -971,8 +889,7 @@ void fixed_solve (fixed_params *p, rigidbody *body_a, rigidbody *body_b, float d
         for (int r = 0; r < 3; r++) {
             k.matrix [c][r] -= term_a.matrix [c][r] + term_b.matrix [c][r];
         }
-    }
-    math3 k_inv = math3_inverse (k);
+    } math3 k_inv = math3_inverse (k);
     vector3 rhs = vector3_scaling (vector3_addition (rel, bias), -1.0f);
     vector3 impulse = math3_multiplication_vector3 (k_inv, rhs);
     body_a -> velocity = vector3_subtraction (body_a -> velocity, vector3_scaling (impulse, inv_a));
@@ -997,12 +914,8 @@ void revolute_apply_motor (revolute_params *p, rigidbody *body_a, rigidbody *bod
                            const mpe_config_t *cfg) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
     (void) dt;
-    if ((!p) || (!p -> motor_enabled) || (!body_a) || (!body_b)) {
-        return;
-    }
-    if (!isfinite (p -> motor_target_speed) || !isfinite (p -> motor_max_torque) || p -> motor_max_torque <= 0.0f) {
-        return;
-    }
+    if ((!p) || (!p -> motor_enabled) || (!body_a) || (!body_b)) { return; }
+    if (!isfinite (p -> motor_target_speed) || !isfinite (p -> motor_max_torque) || p -> motor_max_torque <= 0.0f) { return; }
     /* TRUTH: respect angle limits — driving into a limit fights the limit
      * impulse every tick (jitter + energy). Refuse to drive past stops. */
     if (p -> limits_enabled && p -> angle_initialized) {
@@ -1011,51 +924,33 @@ void revolute_apply_motor (revolute_params *p, rigidbody *body_a, rigidbody *bod
             vector3 axw = vector4_rotate_to_vector3 (body_a -> orientation, vector3_normalisation (p -> axis_a));
             vector3 relw = vector3_subtraction (body_b -> angular_velocity, body_a -> angular_velocity);
             along_probe = vector3_dot (relw, axw);
-        }
-        bool at_min = (p -> accumulated_angle <= p -> limit_min_rad + 1e-4f) && (p -> motor_target_speed < 0.0f);
+        } bool at_min = (p -> accumulated_angle <= p -> limit_min_rad + 1e-4f) && (p -> motor_target_speed < 0.0f);
         bool at_max = (p -> accumulated_angle >= p -> limit_max_rad - 1e-4f) && (p -> motor_target_speed > 0.0f);
         if ((at_min && along_probe <= 0.0f) || (at_max && along_probe >= 0.0f)) {
             /* At stop and driving further out: hold, don't push. Allow
              * driving back inward (opposite sign passes through). */
-            if ((at_min && p -> motor_target_speed < 0.0f) || (at_max && p -> motor_target_speed > 0.0f)) {
-                return;
-            }
+            if ((at_min && p -> motor_target_speed < 0.0f) || (at_max && p -> motor_target_speed > 0.0f)) { return; }
         }
-    }
-    vector3 axis_world = vector4_rotate_to_vector3 (body_a -> orientation, vector3_normalisation (p -> axis_a));
-    if (vector3_length_squared (axis_world) < 1e-12f) {
-        return;
-    }
+    } vector3 axis_world = vector4_rotate_to_vector3 (body_a -> orientation, vector3_normalisation (p -> axis_a));
+    if (vector3_length_squared (axis_world) < 1e-12f) { return; }
     axis_world = vector3_normalisation (axis_world);
     vector3 relative_angular = vector3_subtraction (body_b -> angular_velocity, body_a -> angular_velocity);
     float current_speed = vector3_dot (relative_angular, axis_world);
-    if (!isfinite (current_speed)) {
-        return;
-    }
+    if (!isfinite (current_speed)) { return; }
     float speed_error = p -> motor_target_speed - current_speed;
-    if (!isfinite (speed_error)) {
-        return;
-    }
+    if (!isfinite (speed_error)) { return; }
     float motor_gain = C -> joints.revolute_motor_gain;
-    if (!isfinite (motor_gain) || motor_gain < 0.0f) {
-        motor_gain = 8.0f;
-    }
+    if (!isfinite (motor_gain) || motor_gain < 0.0f) { motor_gain = 8.0f; }
     /* TRUTH: P-only with shared gain goes explicit-Euler unstable at
      * gain*dt/I >> 2 (gain=100, I=0.1, dt=1/60 => 16). Clamp torque so the
      * per-tick velocity change cannot exceed the remaining error (no
      * overshoot): |Δw| <= |err|. Δw = torque*dt*inv_eff. */
-    if (motor_gain > 50.0f) {
-        motor_gain = 50.0f;
-    }
+    if (motor_gain > 50.0f) { motor_gain = 50.0f; }
     float desired_torque = speed_error * motor_gain;
     /* Half-budget here, half in the constraint row (see note above). */
     float half_max = 0.5f * p -> motor_max_torque;
-    if (desired_torque > half_max) {
-        desired_torque = half_max;
-    }
-    if (desired_torque < -half_max) {
-        desired_torque = -half_max;
-    }
+    if (desired_torque > half_max) { desired_torque = half_max; }
+    if (desired_torque < -half_max) { desired_torque = -half_max; }
     /* Stability: no overshoot in one tick. */
     {
         float inv_sum = vector3_dot (
@@ -1064,16 +959,10 @@ void revolute_apply_motor (revolute_params *p, rigidbody *body_a, rigidbody *bod
                                                       axis_world));
         if (inv_sum > 1e-12f && dt > 0.0f) {
             float max_no_overshoot = fabsf (speed_error) / (dt * inv_sum);
-            if (desired_torque > max_no_overshoot) {
-                desired_torque = max_no_overshoot;
-            } else if (desired_torque < -max_no_overshoot) {
-                desired_torque = -max_no_overshoot;
-            }
+            if (desired_torque > max_no_overshoot) { desired_torque = max_no_overshoot; } else if (desired_torque < -max_no_overshoot) { desired_torque = -max_no_overshoot; }
         }
     }
-    if (!isfinite (desired_torque)) {
-        return;
-    }
+    if (!isfinite (desired_torque)) { return; }
     vector3 drive_torque = vector3_scaling (axis_world, desired_torque);
     body_a -> torque_accumulator = vector3_subtraction (body_a -> torque_accumulator, drive_torque);
     body_b -> torque_accumulator = vector3_addition (body_b -> torque_accumulator, drive_torque);
@@ -1081,21 +970,11 @@ void revolute_apply_motor (revolute_params *p, rigidbody *body_a, rigidbody *bod
  * tangential motion; only the separation error is corrected. */
 void distance_solve (distance_params *p, rigidbody *body_a, rigidbody *body_b, float dt, const mpe_config_t *cfg) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
-    if ((!p) || (!body_a) || (!body_b) || (dt <= 0.0f)) {
-        return;
-    }
-    if (!isfinite (p -> rest_length) || p -> rest_length < 0.0f) {
-        return;
-    }
-    if (a3_joint_solve_may_skip (body_a -> is_sleeping, body_b -> is_sleeping, 0)) {
-        return;
-    }
-    if (body_a -> is_sleeping) {
-        rigidbody_wake (body_a);
-    }
-    if (body_b -> is_sleeping) {
-        rigidbody_wake (body_b);
-    }
+    if ((!p) || (!body_a) || (!body_b) || (dt <= 0.0f)) { return; }
+    if (!isfinite (p -> rest_length) || p -> rest_length < 0.0f) { return; }
+    if (a3_joint_solve_may_skip (body_a -> is_sleeping, body_b -> is_sleeping, 0)) { return; }
+    if (body_a -> is_sleeping) { rigidbody_wake (body_a); }
+    if (body_b -> is_sleeping) { rigidbody_wake (body_b); }
     float inv_a = rigidbody_effective_inv_mass (body_a);
     float inv_b = rigidbody_effective_inv_mass (body_b);
     vector3 r_a = vector4_rotate_to_vector3 (body_a -> orientation, p -> anchor_a);
@@ -1104,9 +983,7 @@ void distance_solve (distance_params *p, rigidbody *body_a, rigidbody *body_b, f
     vector3 world_b = vector3_addition (body_b -> position, r_b);
     vector3 delta = vector3_subtraction (world_b, world_a);
     float dist = vector3_length (delta);
-    if (dist < 1e-9f) {
-        return;
-    }
+    if (dist < 1e-9f) { return; }
     vector3 n = vector3_scaling (delta, 1.0f / dist);
     float err = dist - p -> rest_length;
     vector3 vel_a = vector3_addition (body_a -> velocity, vector3_cross (body_a -> angular_velocity, r_a));
@@ -1114,19 +991,14 @@ void distance_solve (distance_params *p, rigidbody *body_a, rigidbody *body_b, f
     float rel_n = vector3_dot (vector3_subtraction (vel_b, vel_a), n);
     float bias = C -> joints.revolute_beta * err / dt;
     float max_b = C -> joints.revolute_max_bias;
-    if (bias > max_b) {
-        bias = max_b;
-    } else if (bias < -max_b) {
+    if (bias > max_b) { bias = max_b; } else if (bias < -max_b) {
         bias = -max_b;
-    }
-    vector3 ra_n = vector3_cross (r_a, n);
+    } vector3 ra_n = vector3_cross (r_a, n);
     vector3 rb_n = vector3_cross (r_b, n);
     float k = inv_a + inv_b +
               vector3_dot (ra_n, math3_multiplication_vector3 (rigidbody_effective_inv_inertia (body_a), ra_n)) +
               vector3_dot (rb_n, math3_multiplication_vector3 (rigidbody_effective_inv_inertia (body_b), rb_n));
-    if (k <= 1e-12f) {
-        return;
-    }
+    if (k <= 1e-12f) { return; }
     float lambda = -(rel_n + bias) / k;
     vector3 impulse = vector3_scaling (n, lambda);
     body_a -> velocity = vector3_subtraction (body_a -> velocity, vector3_scaling (impulse, inv_a));
@@ -1147,9 +1019,7 @@ void fixed_correct_angular_drift (fixed_params *p, rigidbody *body_a, rigidbody 
                                   const mpe_config_t *cfg) {
     (void) cfg;
     (void) p;
-    if ((!body_a) || (!body_b) || (dt <= 0.0f)) {
-        return;
-    }
+    if ((!body_a) || (!body_b) || (dt <= 0.0f)) { return; }
     vector4 q_a_inv =
         (vector4) {body_a -> orientation.w, -body_a -> orientation.x, -body_a -> orientation.y, -body_a -> orientation.z};
     vector4 q_err = vector4_multiplication (q_a_inv, body_b -> orientation);
@@ -1162,9 +1032,7 @@ void fixed_correct_angular_drift (fixed_params *p, rigidbody *body_a, rigidbody 
         q_err.z = -q_err.z;
     }
     vector3 err_vec = {q_err.x, q_err.y, q_err.z};
-    if (vector3_length_squared (err_vec) < 1e-12f) {
-        return;
-    }
+    if (vector3_length_squared (err_vec) < 1e-12f) { return; }
     const float beta = 0.1f;
     /* Correction angular velocity in A-frame, rotated to world via A. */
     vector3 corr_local = vector3_scaling (err_vec, 2.0f * beta / dt);
@@ -1195,9 +1063,7 @@ void fixed_correct_angular_drift (fixed_params *p, rigidbody *body_a, rigidbody 
 void revolute_correct_axis_drift (revolute_params *p, rigidbody *body_a, rigidbody *body_b, float dt,
                                   const mpe_config_t *cfg) {
     (void) cfg;
-    if ((!p) || (!body_a) || (!body_b) || (dt <= 0.0f)) {
-        return;
-    }
+    if ((!p) || (!body_a) || (!body_b) || (dt <= 0.0f)) { return; }
     vector3 hinge_b = (vector3_length_squared (p -> axis_b) > 1e-12f) ? vector3_normalisation (p -> axis_b)
         : vector3_normalisation (p -> axis_a);
     /* ---- axis drift correction: positional Baumgarte to keep hinge axes aligned ---- */

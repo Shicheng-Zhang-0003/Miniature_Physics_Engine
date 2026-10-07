@@ -104,12 +104,8 @@ static inline void a3_anisotropic_coulomb_clamp (vector3 normal, vector3 t1, vec
         *out2 = 0.0f;
         return;
     }
-    if (!isfinite (mu_a) || mu_a < 0.0f) {
-        mu_a = 0.0f;
-    }
-    if (!isfinite (mu_b) || mu_b < 0.0f) {
-        mu_b = 0.0f;
-    }
+    if (!isfinite (mu_a) || mu_a < 0.0f) { mu_a = 0.0f; }
+    if (!isfinite (mu_b) || mu_b < 0.0f) { mu_b = 0.0f; }
     float radius_a = mu_a * fn;
     float radius_b = mu_b * fn;
     /* A ZERO semi-axis is a RAIL, not "no friction". A free roller transmits
@@ -131,8 +127,7 @@ static inline void a3_anisotropic_coulomb_clamp (vector3 normal, vector3 t1, vec
             float scale = radius_a / sqrtf (combo_sq);
             *out1 = p1 * scale;
             *out2 = p2 * scale;
-        }
-        return;
+        } return;
     }
     /* Project the roll axis into the contact plane. */
     float axial = vector3_dot (axis_world, normal);
@@ -144,16 +139,14 @@ static inline void a3_anisotropic_coulomb_clamp (vector3 normal, vector3 t1, vec
         float mu_min = (mu_a < mu_b) ? mu_a : mu_b;
         a3_anisotropic_coulomb_clamp (normal, t1, t2, p1, p2, fn, mu_min, mu_min, axis_world, out1, out2);
         return;
-    }
-    a = vector3_scaling (a, 1.0f / sqrtf (len_a_sq));
+    } a = vector3_scaling (a, 1.0f / sqrtf (len_a_sq));
     vector3 b = vector3_cross (normal, a);
     float b_len_sq = vector3_length_squared (b);
     if (!isfinite (b_len_sq) || (b_len_sq < 1.0e-8f)) {
         float mu_min = (mu_a < mu_b) ? mu_a : mu_b;
         a3_anisotropic_coulomb_clamp (normal, t1, t2, p1, p2, fn, mu_min, mu_min, axis_world, out1, out2);
         return;
-    }
-    b = vector3_scaling (b, 1.0f / sqrtf (b_len_sq));
+    } b = vector3_scaling (b, 1.0f / sqrtf (b_len_sq));
     float comp_a = p1 * vector3_dot (a, t1) + p2 * vector3_dot (a, t2);
     float comp_b = p1 * vector3_dot (b, t1) + p2 * vector3_dot (b, t2);
     /* Degenerate ellipse = line segment. Project onto the surviving axis and
@@ -165,16 +158,13 @@ static inline void a3_anisotropic_coulomb_clamp (vector3 normal, vector3 t1, vec
         const vector3 live = (radius_a > 0.0f) ? a : b;
         const float live_radius = (radius_a > 0.0f) ? radius_a : radius_b;
         float cl = (radius_a > 0.0f) ? comp_a : comp_b;
-        if (fabsf (cl) > live_radius) {
-            cl = (cl > 0.0f) ? live_radius : -live_radius;
-        }
+        if (fabsf (cl) > live_radius) { cl = (cl > 0.0f) ? live_radius : -live_radius; }
         const float at1 = vector3_dot (live, t1);
         const float at2 = vector3_dot (live, t2);
         *out1 = cl * at1;
         *out2 = cl * at2;
         return;
-    }
-    float u = comp_a / radius_a;
+    } float u = comp_a / radius_a;
     float v = comp_b / radius_b;
     float q = u * u + v * v;
     if ((q > 1.0f) && isfinite (q) && (q > 0.0f)) {
@@ -198,19 +188,13 @@ static inline void a3_contact_friction_cone (const rigidbody *body_a, const rigi
     bool have_axis = false;
     for (int side = 0; side < 2; side++) {
         const rigidbody *rb = (side == 0) ? body_a : body_b;
-        if (!rb || !rb -> friction_anisotropic) {
-            continue;
-        }
+        if (!rb || !rb -> friction_anisotropic) { continue; }
         if (!have_axis) {
             *out_axis = vector4_rotate_to_vector3 (rb -> orientation, rb -> friction_anisotropy_axis);
             have_axis = true;
         }
-        if (rb -> friction_along_axis < *out_roll) {
-            *out_roll = rb -> friction_along_axis;
-        }
-        if (rb -> friction_across_axis < *out_lateral) {
-            *out_lateral = rb -> friction_across_axis;
-        }
+        if (rb -> friction_along_axis < *out_roll) { *out_roll = rb -> friction_along_axis; }
+        if (rb -> friction_across_axis < *out_lateral) { *out_lateral = rb -> friction_across_axis; }
     }
 } /* ---- Shared warm-start stamp (single source of truth) --------------------
  * FIX-AUDIT-DESPOT: collision_solver.c and collision_cache.c each carried a
@@ -236,9 +220,7 @@ static inline uint32_t a3_contact_cache_mix_u32 (uint32_t hash_value, uint32_t i
     converter.float_value = value;
     return converter.integer_value;
 } static inline uint32_t a3_contact_cache_body_stamp (const rigidbody *rigid_body) {
-    if (!rigid_body) {
-        return 0;
-    }
+    if (!rigid_body) { return 0; }
     uint32_t stamp = 2166136261u;
     stamp = a3_contact_cache_mix_u32 (stamp, (uint32_t) rigid_body -> type);
     stamp = a3_contact_cache_mix_u32 (stamp, rigid_body -> static_state ? 1u : 0u);
