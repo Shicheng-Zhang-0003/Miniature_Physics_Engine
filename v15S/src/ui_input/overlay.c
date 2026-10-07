@@ -26,8 +26,7 @@ static void overlay_append_overflow_text (char *buffer, size_t buffer_size) {
         size_t l = strlen (buffer);
         if (l < buffer_size)
             snprintf (buffer + l, buffer_size - l, " | BP large clamps:%d", large_clamp_count);
-    }
-    int dedupe_overflow_count = broadphase_get_pair_dedupe_overflow_count (physics_world_get_primary ());
+    } int dedupe_overflow_count = broadphase_get_pair_dedupe_overflow_count (physics_world_get_primary ());
     if (dedupe_overflow_count > 0) {
         size_t l = strlen (buffer);
         if (l < buffer_size)
@@ -63,8 +62,7 @@ GtkWidget *overlay_initialise (GtkWidget *gl_drawing_area_widget) {
         char version_header [64];
         snprintf (version_header, sizeof (version_header), "- Miniature Physics Engine %s -", a3_version_string);
         gtk_label_set_text (GTK_LABEL (debug_information_label), version_header);
-    }
-    gtk_widget_set_halign (debug_information_label, GTK_ALIGN_START);
+    } gtk_widget_set_halign (debug_information_label, GTK_ALIGN_START);
     gtk_widget_set_valign (debug_information_label, GTK_ALIGN_START);
     gtk_overlay_add_overlay (GTK_OVERLAY (ui_overlay_container), debug_information_label);
     crosshair_label = gtk_label_new ("+");
@@ -110,8 +108,7 @@ static void overlay_append_stats_text (char *buffer, size_t buffer_size) {
             size_t ll = strlen (buffer);
             if (ll < buffer_size)
                 snprintf (buffer + ll, buffer_size - ll, " | LR:%ds", long_run_validation_ticks_remaining / 60);
-        }
-        size_t sl = strlen (buffer);
+        } size_t sl = strlen (buffer);
         if (sl < buffer_size)
             snprintf (buffer + sl, buffer_size - sl, " | Sleep:%d", debug_last_sleeping_object_count);
     }
@@ -315,8 +312,7 @@ void overlay_update (void) {
         overlay_append_overflow_text (ibuf, sizeof (ibuf));
         gtk_label_set_text (GTK_LABEL (debug_information_label), ibuf);
         return;
-    }
-    rigidbody *rb = &(physics_world_get_primary () -> bodies) [selected_object];
+    } rigidbody *rb = &(physics_world_get_primary () -> bodies) [selected_object];
     float spd = vector3_length (rb -> velocity);
     const char *ot = rb -> type == object_sphere ? "Sphere" : rb -> type == object_cylinder ? "Cylinder" : "Cube";
     const char *stt = rb -> static_state ? "(Static)" : "(Dynamic)";

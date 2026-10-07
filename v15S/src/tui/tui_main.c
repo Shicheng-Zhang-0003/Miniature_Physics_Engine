@@ -250,9 +250,7 @@ static void scene_demo (physics_world *world) {
     int pri = constraint_add_prismatic (world, world -> bodies [pa].object_id, world -> bodies [pb].object_id,
                                         (vector3) {0.0f, 0.0f, 0.0f}, (vector3) {0.0f, -1.0f, 0.0f},
                                         (vector3) {0.0f, 1.0f, 0.0f});
-    if (pri >= 0) {
-        constraint_set_prismatic_limits (world, pri, true, -0.5f, 0.5f);
-    }
+    if (pri >= 0) { constraint_set_prismatic_limits (world, pri, true, -0.5f, 0.5f); }
     /* Rope (slack) + distance rod + fixed weld, all free-falling groups. */
     int r1 = physics_world_add_sphere (world, 0.25f, 1.0f, (vector3) {2.0f, 30.0f, 0.0f});
     int r2 = physics_world_add_sphere (world, 0.25f, 1.0f, (vector3) {3.2f, 30.0f, 0.0f});
@@ -300,8 +298,7 @@ static int build_scene (physics_world *world, const char *name) {
     if (strcmp (name, "ccd") == 0) {
         scene_ccd_only (world);
         return 0;
-    }
-    fprintf (stderr, "mpe-tui: unknown scene '%s' (demo|tower|pendulum|springlab|f10|stress|ccd)\n", name);
+    } fprintf (stderr, "mpe-tui: unknown scene '%s' (demo|tower|pendulum|springlab|f10|stress|ccd)\n", name);
     return -1;
 } /* ------------------------------------------------------------------ */
 static double now_seconds (void) {
@@ -311,17 +308,14 @@ static double now_seconds (void) {
 } /* DESPOT-2026-10-01: atol() on CLI counts is unchecked (non-numeric -> 0,
  * LONG_MAX overflow UB, huge ticks -> hang). Strict strtol with fallback. */
 static long tui_parse_count (const char *s, long fallback) {
-    if (!s || !*s) {
-        return fallback;
-    }
+    if (!s || !*s) { return fallback; }
     errno = 0;
     char *end = NULL;
     long v = strtol (s, &end, 10);
     if (errno != 0 || end == s || *end != '\0' || v < 0 || v > 100000) {
         fprintf (stderr, "mpe-tui: invalid count '%s', using %ld\n", s, fallback);
         return fallback;
-    }
-    return v;
+    } return v;
 }
 int main (int argc, char *argv []) {
     const float dt = 1.0f / 60.0f;
@@ -339,14 +333,10 @@ int main (int argc, char *argv []) {
             return 0;
         } else if (strcmp (argv [i], "--snapshot") == 0) {
             want_snapshot = true;
-            if (i + 1 < argc && argv [i + 1][0] != '-') {
-                ticks = tui_parse_count (argv [++i], 600);
-            }
+            if (i + 1 < argc && argv [i + 1][0] != '-') { ticks = tui_parse_count (argv [++i], 600); }
         } else if (strcmp (argv [i], "--stream") == 0) {
             want_stream = true;
-            if (i + 1 < argc && argv [i + 1][0] != '-') {
-                ticks = tui_parse_count (argv [++i], 600);
-            }
+            if (i + 1 < argc && argv [i + 1][0] != '-') { ticks = tui_parse_count (argv [++i], 600); }
         } else if (strcmp (argv [i], "--every") == 0 && i + 1 < argc) {
             every = tui_parse_count (argv [++i], 60);
         } else if (strcmp (argv [i], "--scene") == 0 && i + 1 < argc) {
@@ -362,17 +352,11 @@ int main (int argc, char *argv []) {
             return 2;
         }
     }
-    if (ticks < 0) {
-        ticks = 0;
-    }
-    if (every <= 0) {
-        every = 1;
-    }
+    if (ticks < 0) { ticks = 0; }
+    if (every <= 0) { every = 1; }
     /* Non-TTY stdout without an explicit live request becomes the suite. */
     bool tty = isatty (STDOUT_FILENO) != 0;
-    if (!want_snapshot && !want_stream && !tty) {
-        want_snapshot = true;
-    }
+    if (!want_snapshot && !want_stream && !tty) { want_snapshot = true; }
     mpe_config_init ();
     if (want_snapshot || want_stream) {
         physics_world world;
@@ -389,8 +373,7 @@ int main (int argc, char *argv []) {
                 fprintf (stderr, "mpe-tui: unknown broadphase '%s'\n", want_broadphase);
                 physics_world_cleanup (&world);
                 return 2;
-            }
-            physics_world_set_broadphase (&world, b);
+            } physics_world_set_broadphase (&world, b);
         }
         if (want_solver) {
             const mpe_solver_if_t *s = mpe_find_solver (want_solver);
@@ -398,42 +381,33 @@ int main (int argc, char *argv []) {
                 fprintf (stderr, "mpe-tui: unknown solver '%s'\n", want_solver);
                 physics_world_cleanup (&world);
                 return 2;
-            }
-            physics_world_set_solver (&world, s);
+            } physics_world_set_solver (&world, s);
         }
         if (build_scene (&world, scene) != 0) {
             physics_world_cleanup (&world);
             return 2;
-        }
-        int rc = 0;
+        } int rc = 0;
         if (want_stream) {
-            if (tui_dump_snapshot (stdout, &world, 0, dt) != 0) {
-                rc = 1;
-            }
+            if (tui_dump_snapshot (stdout, &world, 0, dt) != 0) { rc = 1; }
             for (long t = 1; t <= ticks; t++) {
                 physics_world_step (&world, dt);
                 if (t % every == 0 || t == ticks) {
                     printf ("\n");
-                    if (tui_dump_snapshot (stdout, &world, (unsigned long) t, dt) != 0) {
-                        rc = 1;
-                    }
+                    if (tui_dump_snapshot (stdout, &world, (unsigned long) t, dt) != 0) { rc = 1; }
                 }
             }
         } else {
             for (long t = 0; t < ticks; t++) {
                 physics_world_step (&world, dt);
-            }
-            rc = tui_dump_snapshot (stdout, &world, (unsigned long) ticks, dt);
-        }
-        physics_world_cleanup (&world);
+            } rc = tui_dump_snapshot (stdout, &world, (unsigned long) ticks, dt);
+        } physics_world_cleanup (&world);
         return rc;
     }
     /* ---------------- live ncurses inspector ---------------- */
     if (!isatty (STDIN_FILENO)) {
         fprintf (stderr, "mpe-tui: live mode needs a terminal; use --snapshot/--stream without one.\n");
         return 2;
-    }
-    physics_world world;
+    } physics_world world;
     physics_world_init (&world);
     mpe_config_t tui_live_cfg;
     tui_live_cfg = g_cfg;
@@ -441,8 +415,7 @@ int main (int argc, char *argv []) {
     if (build_scene (&world, scene) != 0) {
         physics_world_cleanup (&world);
         return 2;
-    }
-    tui_debugger_t dbg;
+    } tui_debugger_t dbg;
     tui_debugger_init (&dbg, &world);
     initscr ();
     cbreak ();
@@ -450,26 +423,19 @@ int main (int argc, char *argv []) {
     keypad (stdscr, TRUE);
     curs_set (0);
     timeout (50);
-    if (has_colors ()) {
-        start_color ();
-    }
+    if (has_colors ()) { start_color (); }
     double acc = 0.0;
     double last = now_seconds ();
     unsigned long tick = 0;
     bool quit = false;
     while (!quit) {
         int ch = getch ();
-        if (ch == 'q' || ch == 'Q') {
-            quit = true;
-        } else if (ch != ERR) {
+        if (ch == 'q' || ch == 'Q') { quit = true; } else if (ch != ERR) {
             tui_debugger_handle_input (&dbg, ch);
-        }
-        double now = now_seconds ();
+        } double now = now_seconds ();
         double frame = now - last;
         last = now;
-        if (frame > 0.5) {
-            frame = 0.5;
-        }
+        if (frame > 0.5) { frame = 0.5; }
         if (!dbg.paused) {
             acc += frame * (double) dbg.time_scale;
             int sub = 0;
@@ -489,10 +455,8 @@ int main (int argc, char *argv []) {
             }
         } else if (live_ticks > 0 && tick >= (unsigned long) live_ticks) {
             quit = true;
-        }
-        tui_debugger_render (&dbg);
-    }
-    tui_debugger_cleanup (&dbg);
+        } tui_debugger_render (&dbg);
+    } tui_debugger_cleanup (&dbg);
     endwin ();
     int final_bodies = world.body_count;
     physics_world_cleanup (&world);

@@ -31,28 +31,24 @@ void init_sm_system (mesh *mesh_object, int horizontal_sections, int vertical_st
             vertex_data [vertex_index++] = position_y;
             vertex_data [vertex_index++] = position_z;
         }
-    }
-    int wireframe_indices_size = (horizontal_sections + 2 * vertical_stacks + 2 * vertical_stacks) * 2;
+    } int wireframe_indices_size = (horizontal_sections + 2 * vertical_stacks + 2 * vertical_stacks) * 2;
     unsigned int *wireframe_indices = malloc (wireframe_indices_size * sizeof (unsigned int));
     if (!wireframe_indices) {
         free (vertex_data);
         return;
-    }
-    int wireframe_index = 0;
+    } int wireframe_index = 0;
     int middle_stack_index = vertical_stacks / 2;
     for (int section_index = 0; section_index < horizontal_sections; section_index++) {
         wireframe_indices [wireframe_index++] = middle_stack_index * (horizontal_sections + 1) + section_index;
         wireframe_indices [wireframe_index++] = middle_stack_index * (horizontal_sections + 1) + section_index + 1;
-    }
-    int theta_0_index = 0;
+    } int theta_0_index = 0;
     int theta_pi_index = horizontal_sections / 2;
     for (int stack_index = 0; stack_index < vertical_stacks; stack_index++) {
         wireframe_indices [wireframe_index++] = stack_index * (horizontal_sections + 1) + theta_0_index;
         wireframe_indices [wireframe_index++] = (stack_index + 1) * (horizontal_sections + 1) + theta_0_index;
         wireframe_indices [wireframe_index++] = stack_index * (horizontal_sections + 1) + theta_pi_index;
         wireframe_indices [wireframe_index++] = (stack_index + 1) * (horizontal_sections + 1) + theta_pi_index;
-    }
-    int theta_pi_half_index = horizontal_sections / 4;
+    } int theta_pi_half_index = horizontal_sections / 4;
     int theta_three_pi_half_index = 3 * horizontal_sections / 4;
     for (int stack_index = 0; stack_index < vertical_stacks; stack_index++) {
         wireframe_indices [wireframe_index++] = stack_index * (horizontal_sections + 1) + theta_pi_half_index;
@@ -60,8 +56,7 @@ void init_sm_system (mesh *mesh_object, int horizontal_sections, int vertical_st
         wireframe_indices [wireframe_index++] = stack_index * (horizontal_sections + 1) + theta_three_pi_half_index;
         wireframe_indices [wireframe_index++] =
             (stack_index + 1) * (horizontal_sections + 1) + theta_three_pi_half_index;
-    }
-    mesh_object -> wireframe_index_count = wireframe_index;
+    } mesh_object -> wireframe_index_count = wireframe_index;
     mesh_object -> index_count = vertical_stacks * horizontal_sections * 6;
     unsigned int *element_indices = malloc (mesh_object -> index_count * sizeof (unsigned int));
     if (!element_indices) {
@@ -70,8 +65,7 @@ void init_sm_system (mesh *mesh_object, int horizontal_sections, int vertical_st
         mesh_object -> wireframe_index_count = 0;
         mesh_object -> index_count = 0;
         return;
-    }
-    int element_index = 0;
+    } int element_index = 0;
     for (int stack_index = 0; stack_index < vertical_stacks; stack_index++) {
         int current_row_start = stack_index * (horizontal_sections + 1);
         int next_row_start = current_row_start + horizontal_sections + 1;
@@ -89,8 +83,7 @@ void init_sm_system (mesh *mesh_object, int horizontal_sections, int vertical_st
             element_indices [element_index++] = next_row_start + 1;
             element_indices [element_index++] = next_row_start;
         }
-    }
-    glGenVertexArrays (1, &mesh_object -> vertex_array_object);
+    } glGenVertexArrays (1, &mesh_object -> vertex_array_object);
     glGenBuffers (1, &mesh_object -> vertex_buffer_object);
     glGenBuffers (1, &mesh_object -> element_buffer_object);
     glBindVertexArray (mesh_object -> vertex_array_object);
@@ -115,8 +108,7 @@ void init_sm_system (mesh *mesh_object, int horizontal_sections, int vertical_st
         glVertexAttribPointer (2 + i, 4, GL_FLOAT, GL_FALSE, 19 * sizeof (float), (void *) (i * 4 * sizeof (float)));
         glEnableVertexAttribArray (2 + i);
         glVertexAttribDivisor (2 + i, 1);
-    }
-    glVertexAttribPointer (6, 3, GL_FLOAT, GL_FALSE, 19 * sizeof (float), (void *) (16 * sizeof (float)));
+    } glVertexAttribPointer (6, 3, GL_FLOAT, GL_FALSE, 19 * sizeof (float), (void *) (16 * sizeof (float)));
     glEnableVertexAttribArray (6);
     glVertexAttribDivisor (6, 1);
     glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, mesh_object -> element_buffer_object);

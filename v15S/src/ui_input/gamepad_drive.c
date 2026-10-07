@@ -59,8 +59,7 @@ static void gpd_report_stage (int stage) {
         break;
         default:
         break;
-    }
-    fflush (stderr);
+    } fflush (stderr);
 }
 static void gpd_resolve (void) {
     /* DESPOT-FIX 2026-10-04: this ran once and cached NULLs when the first
@@ -149,10 +148,8 @@ void gamepad_drive_tick (void) {
         if (++s_frames_since_retry > 300) {
             s_frames_since_retry = 0;
             s_pad_open_attempted = 0; /* re-run init/open next tick */
-        }
-        return;
-    }
-    s_frames_since_retry = 0;
+        } return;
+    } s_frames_since_retry = 0;
     s_pad_poll (&s_pad);
     /* START toggles control even while disabled (else latch-dead). */
     int start_now = s_pad_button (&s_pad, gamepad_button_start) ? 1 : 0;
@@ -172,16 +169,13 @@ void gamepad_drive_tick (void) {
         if (s_was_commanding) {
             gpd_stop_robot (r);
             s_was_commanding = 0;
-        }
-        return;
-    }
-    float fwd = -s_pad_axis (&s_pad, gamepad_axis_left_y);
+        } return;
+    } float fwd = -s_pad_axis (&s_pad, gamepad_axis_left_y);
     float str = s_pad_axis (&s_pad, gamepad_axis_left_x);
     float rot = s_pad_axis (&s_pad, gamepad_axis_right_x);
     if (s_pad_button (&s_pad, gamepad_button_lb) && s_pad_button (&s_pad, gamepad_button_rb)) {
         fwd = str = rot = 0.0f; /* LB+RB e-stop */
-    }
-    s_mecanum (r, fwd, str, rot);
+    } s_mecanum (r, fwd, str, rot);
     s_was_commanding = 1;
     s_active = 1;
     gpd_report_stage (3);
@@ -202,25 +196,18 @@ void ftc_watchdog_tick (void) {
         s_wd_tagged = 1;
         const mpe_config_t *wc = NULL;
         physics_world *pw0 = physics_world_get_primary ();
-        if (pw0) {
-            wc = mpe_world_cfg (pw0);
-        }
+        if (pw0) { wc = mpe_world_cfg (pw0); }
         fprintf (stderr, "[ftc-watchdog] build %s (%s %s) iters=%d sleep=%d (primary cfg)\n", a3_version_string,
                  __DATE__, __TIME__, wc ? wc -> timestep.solver_iterations : -1, wc ? wc -> sleep.enable : -1);
         fflush (stderr);
-    }
-    physics_world *w = physics_world_get_primary ();
+    } physics_world *w = physics_world_get_primary ();
     ftc_robot *r = (w && s_fleet_get) ? s_fleet_get (w, 0) : NULL;
-    if (!r || r -> chassis_body < 0 || r -> chassis_body >= w -> body_count) {
-        return;
-    }
+    if (!r || r -> chassis_body < 0 || r -> chassis_body >= w -> body_count) { return; }
     rigidbody *ch = &w -> bodies [r -> chassis_body];
     vector3 chx = ch -> cached_axes [0];
     for (int i = 0; i < r -> wheel_count && i < FTC_WD_MAXW; i++) {
         int bi = r -> wheel_bodies [i];
-        if (bi < 0 || bi >= w -> body_count) {
-            continue;
-        }
+        if (bi < 0 || bi >= w -> body_count) { continue; }
         rigidbody *wh = &w -> bodies [bi];
         int bad = (!isfinite (wh -> position.x)) || (!isfinite (wh -> position.y)) || (!isfinite (wh -> position.z)) ||
                   (!isfinite (wh -> orientation.w)) || (!isfinite (wh -> orientation.x)) ||
@@ -232,14 +219,9 @@ void ftc_watchdog_tick (void) {
         if (!s_wd_mount_seen [i] && isfinite (md)) {
             s_wd_mount_seen [i] = 1;
             s_wd_mount [i] = md;
-        }
-        float dot = vector3_dot (wh -> cached_axes [0], chx);
-        if (dot > 1.0f) {
-            dot = 1.0f;
-        }
-        if (dot < -1.0f) {
-            dot = -1.0f;
-        }
+        } float dot = vector3_dot (wh -> cached_axes [0], chx);
+        if (dot > 1.0f) { dot = 1.0f; }
+        if (dot < -1.0f) { dot = -1.0f; }
         float tilt = acosf (dot) * 57.29578f;
         float wsp = vector3_dot (wh -> angular_velocity, wh -> cached_axes [0]);
         if (bad) {
@@ -253,16 +235,12 @@ void ftc_watchdog_tick (void) {
                      "chpos=(%+.2f,%+.2f,%+.2f)\n",
                      i, md, s_wd_mount [i], tilt, wsp, ch -> position.x, ch -> position.y, ch -> position.z);
             fflush (stderr);
-        } else if (s_wd_jump_hot [i] && fabsf (md - s_wd_mount [i]) < 0.025f) {
-            s_wd_jump_hot [i] = 0;
-        }
+        } else if (s_wd_jump_hot [i] && fabsf (md - s_wd_mount [i]) < 0.025f) { s_wd_jump_hot [i] = 0; }
         if (tilt > 10.0f && !s_wd_tilt_hot [i]) {
             s_wd_tilt_hot [i] = 1;
             fprintf (stderr, "[ftc-watchdog] wheel %d TILT %.1f deg (mount=%.3f base=%.3f w=%+.1f)\n", i, tilt, md,
                      s_wd_mount [i], wsp);
             fflush (stderr);
-        } else if (s_wd_tilt_hot [i] && tilt < 5.0f) {
-            s_wd_tilt_hot [i] = 0;
-        }
+        } else if (s_wd_tilt_hot [i] && tilt < 5.0f) { s_wd_tilt_hot [i] = 0; }
     }
 }

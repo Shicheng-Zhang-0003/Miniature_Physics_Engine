@@ -32,8 +32,7 @@ void cmd_mod (int argc, char **argv) {
             snprintf (buf, sizeof (buf), "  %s-%s [%s]%s\n", d -> name, d -> version ? d -> version : "?",
                       d -> kind ? d -> kind : "generic", d -> deterministic ? " det" : "");
             term_out (buf);
-        }
-        snprintf (buf, sizeof (buf), "loaded .so: %d\n", mpe_loader_count ());
+        } snprintf (buf, sizeof (buf), "loaded .so: %d\n", mpe_loader_count ());
         term_out (buf);
         for (int i = 0; i < mpe_loader_count (); i++) {
             const char *nm = mpe_loader_name_at (i);
@@ -67,8 +66,7 @@ void cmd_mod (int argc, char **argv) {
             snprintf (buf, sizeof (buf), "primary stages: broadphase=%s solver=%s\n",
                       w -> broadphase_if ? "foreign" : "builtin", w -> solver_if ? "foreign" : "builtin");
             term_out (buf);
-        }
-        return;
+        } return;
     }
     if (term_str_eq (argv [1], "load") && argc >= 3) {
         char err [512] = {0};
@@ -78,8 +76,7 @@ void cmd_mod (int argc, char **argv) {
             char b [600];
             snprintf (b, sizeof (b), "mpe: mod: load failed: %s\n", err);
             term_err (b);
-        }
-        return;
+        } return;
     }
     if (term_str_eq (argv [1], "unload") && argc >= 3) {
         int ur = mpe_loader_unload (argv [2]);
@@ -105,15 +102,13 @@ void cmd_mod (int argc, char **argv) {
         if (!d -> pre_step && !d -> post_step && !d -> attach && !d -> detach) {
             term_err ("mpe: mod: not a tick module (no hooks; nothing to attach)\n");
             return;
-        }
-        physics_world *pw = physics_world_get_primary ();
+        } physics_world *pw = physics_world_get_primary ();
         for (int i = 0; i < (pw ? pw -> tick_module_count : 0); i++) {
             if (pw -> tick_modules [i] && term_str_eq (pw -> tick_modules [i] -> name, argv [2])) {
                 term_ok ("mpe: mod: already attached\n");
                 return;
             }
-        }
-        int r = physics_world_attach_module (pw, d);
+        } int r = physics_world_attach_module (pw, d);
         if (r >= 0)
             term_ok ("mpe: mod: attached\n");
         else
@@ -132,13 +127,11 @@ void cmd_mod (int argc, char **argv) {
             physics_world_set_broadphase (physics_world_get_primary (), NULL);
             term_ok ("mpe: mod: broadphase=builtin\n");
             return;
-        }
-        const mpe_broadphase_if_t *b = mpe_find_broadphase (argv [2]);
+        } const mpe_broadphase_if_t *b = mpe_find_broadphase (argv [2]);
         if (!b) {
             term_err ("mpe: mod: unknown broadphase\n");
             return;
-        }
-        physics_world_set_broadphase (physics_world_get_primary (), b);
+        } physics_world_set_broadphase (physics_world_get_primary (), b);
         term_ok ("mpe: mod: broadphase swapped\n");
         return;
     }
@@ -147,29 +140,24 @@ void cmd_mod (int argc, char **argv) {
             physics_world_set_solver (physics_world_get_primary (), NULL);
             term_ok ("mpe: mod: solver=builtin\n");
             return;
-        }
-        const mpe_solver_if_t *s = mpe_find_solver (argv [2]);
+        } const mpe_solver_if_t *s = mpe_find_solver (argv [2]);
         if (!s) {
             term_err ("mpe: mod: unknown solver\n");
             return;
-        }
-        physics_world_set_solver (physics_world_get_primary (), s);
+        } physics_world_set_solver (physics_world_get_primary (), s);
         term_ok ("mpe: mod: solver swapped\n");
         return;
-    }
-    term_err ("mpe: mod: unknown subcommand\n");
+    } term_err ("mpe: mod: unknown subcommand\n");
 } /* modinfo command — show detailed info about a module */
 void cmd_modinfo (int argc, char **argv) {
     if (argc < 2) {
         term_err ("mpe: modinfo: usage: modinfo <module-name>\n");
         return;
-    }
-    const mpe_module_desc_t *d = mpe_find_module (argv [1]);
+    } const mpe_module_desc_t *d = mpe_find_module (argv [1]);
     if (!d) {
         term_err ("mpe: modinfo: module not found\n");
         return;
-    }
-    char buf [512];
+    } char buf [512];
     snprintf (buf, sizeof (buf), "name:        %s\n", d -> name);
     term_out (buf);
     snprintf (buf, sizeof (buf), "version:     %s\n", d -> version ? d -> version : "?");
@@ -181,9 +169,7 @@ void cmd_modinfo (int argc, char **argv) {
     snprintf (buf, sizeof (buf), "abi:         %u\n", d -> abi);
     term_out (buf);
     /* module-specific fields */
-    if (d -> kind && term_str_eq (d -> kind, "shape")) {
-        term_out ("type:        shape (pair handler)\n");
-    } else if (d -> kind && term_str_eq (d -> kind, "broadphase")) {
+    if (d -> kind && term_str_eq (d -> kind, "shape")) { term_out ("type:        shape (pair handler)\n"); } else if (d -> kind && term_str_eq (d -> kind, "broadphase")) {
         term_out ("type:        broadphase backend\n");
     } else if (d -> kind && term_str_eq (d -> kind, "solver")) {
         term_out ("type:        solver backend\n");
@@ -201,7 +187,6 @@ void cmd_modinfo (int argc, char **argv) {
             term_out (buf);
             return;
         }
-    }
-    snprintf (buf, sizeof (buf), "loaded:      no\n");
+    } snprintf (buf, sizeof (buf), "loaded:      no\n");
     term_out (buf);
 }

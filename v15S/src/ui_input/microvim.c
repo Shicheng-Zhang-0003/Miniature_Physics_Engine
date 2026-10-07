@@ -58,19 +58,14 @@ static void mv_clear_lines (void) {
             free (mv.lines [i]);
             mv.lines [i] = NULL;
         }
-    }
-    mv.line_count = 0;
+    } mv.line_count = 0;
 }
 static bool mv_ensure_capacity (int needed) {
     if (needed < 0 || (size_t) needed > SIZE_MAX / sizeof (*mv.lines))
         return false;
-    if (needed <= mv.line_capacity) {
-        return true;
-    }
+    if (needed <= mv.line_capacity) { return true; }
     int new_cap = mv.line_capacity < 64 ? 64 : mv.line_capacity <= INT_MAX / 2 ? mv.line_capacity * 2 : needed;
-    if (new_cap < needed) {
-        new_cap = needed;
-    }
+    if (new_cap < needed) { new_cap = needed; }
     if ((size_t) new_cap > SIZE_MAX / sizeof (*mv.lines))
         return false;
     char **new_lines = (char **) realloc (mv.lines, (size_t) new_cap * sizeof (*mv.lines));
@@ -78,8 +73,7 @@ static bool mv_ensure_capacity (int needed) {
         return false;
     for (int i = mv.line_capacity; i < new_cap; i++) {
         new_lines [i] = NULL;
-    }
-    mv.lines = new_lines;
+    } mv.lines = new_lines;
     mv.line_capacity = new_cap;
     return true;
 }
@@ -92,9 +86,7 @@ static bool mv_set_line (int index, const char *text) {
         free (replacement);
         return false;
     }
-    if (mv.lines [index]) {
-        free (mv.lines [index]);
-    }
+    if (mv.lines [index]) { free (mv.lines [index]); }
     mv.lines [index] = replacement;
     return true;
 }
@@ -109,20 +101,16 @@ static bool mv_insert_line (int index, const char *text) {
     }
     for (int i = mv.line_count; i > index; i--) {
         mv.lines [i] = mv.lines [i - 1];
-    }
-    mv.lines [index] = replacement;
+    } mv.lines [index] = replacement;
     mv.line_count++;
     return true;
 }
 static void mv_delete_line (int index) {
-    if ((index < 0) || (index >= mv.line_count)) {
-        return;
-    }
+    if ((index < 0) || (index >= mv.line_count)) { return; }
     free (mv.lines [index]);
     for (int i = index; i < mv.line_count - 1; i++) {
         mv.lines [i] = mv.lines [i + 1];
-    }
-    mv.lines [mv.line_count - 1] = NULL;
+    } mv.lines [mv.line_count - 1] = NULL;
     mv.line_count--;
     if (mv.line_count == 0) {
         if (!mv_insert_line (0, ""))
@@ -130,9 +118,7 @@ static void mv_delete_line (int index) {
     }
 }
 static int mv_line_len (int row) {
-    if ((row < 0) || (row >= mv.line_count) || !mv.lines || !mv.lines [row]) {
-        return 0;
-    }
+    if ((row < 0) || (row >= mv.line_count) || !mv.lines || !mv.lines [row]) { return 0; }
     return (int) strlen (mv.lines [row]);
 }
 static void mv_clamp_cursor (void) {
@@ -141,19 +127,11 @@ static void mv_clamp_cursor (void) {
         mv.cursor_col = 0;
         return;
     }
-    if (mv.cursor_row < 0) {
-        mv.cursor_row = 0;
-    }
-    if (mv.cursor_row >= mv.line_count) {
-        mv.cursor_row = mv.line_count - 1;
-    }
+    if (mv.cursor_row < 0) { mv.cursor_row = 0; }
+    if (mv.cursor_row >= mv.line_count) { mv.cursor_row = mv.line_count - 1; }
     int len = mv_line_len (mv.cursor_row);
-    if (mv.cursor_col > len) {
-        mv.cursor_col = len;
-    }
-    if (mv.cursor_col < 0) {
-        mv.cursor_col = 0;
-    }
+    if (mv.cursor_col > len) { mv.cursor_col = len; }
+    if (mv.cursor_col < 0) { mv.cursor_col = 0; }
 } /* ------------------------------------------------------------------ */
 /* Undo                                                                 */
 /* ------------------------------------------------------------------ */
@@ -198,8 +176,7 @@ static bool mv_undo_push (void) {
         mv.undo_stack [mv_undo_depth - 1] = (mv_snapshot) {0};
         mv.undo_top = mv_undo_depth - 1;
         mv.redo_top = mv.undo_top;
-    }
-    mv.undo_stack [mv.undo_top].lines = snapshot_lines;
+    } mv.undo_stack [mv.undo_top].lines = snapshot_lines;
     mv.undo_stack [mv.undo_top].line_count = snapshot_count;
     mv.undo_stack [mv.undo_top].line_capacity = snapshot_count;
     mv.undo_top++;
@@ -225,17 +202,14 @@ static bool mv_restore_snapshot (const mv_snapshot *snap) {
             free (restored [i]);
         free (restored);
         return false;
-    }
-    mv_clear_lines ();
+    } mv_clear_lines ();
     memcpy (mv.lines, restored, (size_t) snap -> line_count * sizeof (*restored));
     mv.line_count = snap -> line_count;
     free (restored);
     return true;
 }
 static void mv_undo_perform (void) {
-    if (mv.undo_top <= 0) {
-        return;
-    }
+    if (mv.undo_top <= 0) { return; }
     mv_snapshot *snap = &mv.undo_stack [mv.undo_top - 1];
     if (!mv_restore_snapshot (snap))
         return;
@@ -244,9 +218,7 @@ static void mv_undo_perform (void) {
     mv_clamp_cursor ();
 }
 static void mv_redo_perform (void) {
-    if (mv.undo_top >= mv.redo_top) {
-        return;
-    }
+    if (mv.undo_top >= mv.redo_top) { return; }
     mv_snapshot *snap = &mv.undo_stack [mv.undo_top];
     if (!mv_restore_snapshot (snap))
         return;
@@ -265,8 +237,7 @@ static bool mv_load_file (const char *filename) {
         if (!mv_insert_line (0, ""))
             return false;
         return false;
-    }
-    char line_buf [mv_max_line_len];
+    } char line_buf [mv_max_line_len];
     bool truncated = false;
     while (fgets (line_buf, sizeof (line_buf), f)) {
         size_t len = strlen (line_buf);
@@ -276,8 +247,7 @@ static bool mv_load_file (const char *filename) {
             /* Line exceeds buffer: consume rest, report truncation. */
             int c;
             while ((c = fgetc (f)) != '\n' && c != EOF) {
-            }
-            truncated = true;
+            } truncated = true;
             break;
         }
         while ((len > 0) && ((line_buf [len - 1] == '\n') || (line_buf [len - 1] == '\r'))) {
@@ -288,8 +258,7 @@ static bool mv_load_file (const char *filename) {
             mv_clear_lines ();
             return false;
         }
-    }
-    bool read_err = ferror (f) != 0;
+    } bool read_err = ferror (f) != 0;
     fclose (f);
     if (read_err || truncated) {
         mv_clear_lines ();
@@ -299,8 +268,7 @@ static bool mv_load_file (const char *filename) {
     if (mv.line_count == 0) {
         if (!mv_insert_line (0, ""))
             return false;
-    }
-    return true;
+    } return true;
 }
 static bool mv_save_file (void) {
     char backup_path [560];
@@ -322,24 +290,13 @@ static bool mv_save_file (void) {
             }
             /* DESPOT-2026-10-01: short-write/ferror unchecked = silent backup
              * loss. Check errors + fsync before truncating the target. */
-            if (ferror (src) || ferror (dst)) {
-                copy_ok = false;
-            }
+            if (ferror (src) || ferror (dst)) { copy_ok = false; }
         }
-        if (src) {
-            fclose (src);
-        }
-        if (dst) {
-            fclose (dst);
-        }
-        if (!copy_ok) {
-            return false;
-        }
-    }
-    FILE *f = fopen (mv.filename, "w");
-    if (!f) {
-        return false;
-    }
+        if (src) { fclose (src); }
+        if (dst) { fclose (dst); }
+        if (!copy_ok) { return false; }
+    } FILE *f = fopen (mv.filename, "w");
+    if (!f) { return false; }
     bool write_ok = true;
     for (int i = 0; i < mv.line_count; i++) {
         if (fprintf (f, "%s\n", mv.lines [i]) < 0) {
@@ -385,17 +342,14 @@ static void mv_word_forward (void) {
             row++;
             col = 0;
         }
-    }
-    mv.cursor_row = row;
+    } mv.cursor_row = row;
     mv.cursor_col = col;
     mv_clamp_cursor ();
 }
 static void mv_word_backward (void) {
     int row = mv.cursor_row;
     int col = mv.cursor_col;
-    if (col > 0) {
-        col--;
-    }
+    if (col > 0) { col--; }
     while (col > 0 && mv.lines [row][col] == ' ') {
         col--;
     }
@@ -407,8 +361,7 @@ static void mv_word_backward (void) {
         while (col > 0 && !mv_is_word_char (mv.lines [row][col - 1]) && mv.lines [row][col - 1] != ' ') {
             col--;
         }
-    }
-    mv.cursor_row = row;
+    } mv.cursor_row = row;
     mv.cursor_col = col;
     mv_clamp_cursor ();
 }
@@ -416,9 +369,7 @@ static void mv_word_end (void) {
     int row = mv.cursor_row;
     int col = mv.cursor_col;
     int len = mv_line_len (row);
-    if (col < len) {
-        col++;
-    }
+    if (col < len) { col++; }
     while (col < len && mv.lines [row][col] == ' ') {
         col++;
     }
@@ -431,9 +382,7 @@ static void mv_word_end (void) {
             col++;
         }
     }
-    if (col > 0) {
-        col--;
-    }
+    if (col > 0) { col--; }
     mv.cursor_row = row;
     mv.cursor_col = col;
     mv_clamp_cursor ();
@@ -441,23 +390,17 @@ static void mv_word_end (void) {
 /* Search                                                               */
 /* ------------------------------------------------------------------ */
 static void mv_search_execute (bool forward) {
-    if (mv.search_len == 0 || mv.line_count <= 0) {
-        return;
-    }
+    if (mv.search_len == 0 || mv.line_count <= 0) { return; }
     /* Lower pattern once instead of per-line per-attempt (old code allocated
      * two strings per line scanned). */
     char *pattern_lower = term_ascii_strdown (mv.search_buf);
-    if (!pattern_lower) {
-        return;
-    }
+    if (!pattern_lower) { return; }
     size_t pat_len = strlen (pattern_lower);
     int start_row = mv.cursor_row;
     for (int attempt = 0; attempt < mv.line_count * 2; attempt++) {
         int row = (forward ? (start_row + attempt) : (start_row - attempt + mv.line_count * 2)) % mv.line_count;
         const char *line = mv.lines [row];
-        if (!line) {
-            continue;
-        }
+        if (!line) { continue; }
         /* Case-insensitive substring search without per-line allocation. */
         const char *match = NULL;
         size_t line_len = strlen (line);
@@ -493,15 +436,9 @@ static void mv_search_execute (bool forward) {
                                 break;
                             }
                         }
-                        if (later) {
-                            match = later;
-                        } else {
-                            continue;
-                        }
+                        if (later) { match = later; } else { continue; }
                     }
-                    if ((row == start_row) && !forward && ((int) (match - line) >= mv.cursor_col)) {
-                        continue;
-                    }
+                    if ((row == start_row) && !forward && ((int) (match - line) >= mv.cursor_col)) { continue; }
                     mv.cursor_row = row;
                     mv.cursor_col = (int) (match - line);
                     free (pattern_lower);
@@ -509,8 +446,7 @@ static void mv_search_execute (bool forward) {
                 }
             }
         }
-    }
-    free (pattern_lower);
+    } free (pattern_lower);
 } /* ------------------------------------------------------------------ */
 /* Editing operations                                                   */
 /* ------------------------------------------------------------------ */
@@ -518,9 +454,7 @@ static void mv_delete_char_under_cursor (void) {
     int row = mv.cursor_row;
     int col = mv.cursor_col;
     int len = mv_line_len (row);
-    if (col >= len) {
-        return;
-    }
+    if (col >= len) { return; }
     if (!mv_undo_push ())
         return;
     char *line = mv.lines [row];
@@ -530,9 +464,7 @@ static void mv_delete_char_under_cursor (void) {
 }
 static void mv_delete_char_before_cursor (void) {
     int col = mv.cursor_col;
-    if (col <= 0) {
-        return;
-    }
+    if (col <= 0) { return; }
     if (!mv_undo_push ())
         return;
     char *line = mv.lines [mv.cursor_row];
@@ -544,9 +476,7 @@ static void mv_delete_char_before_cursor (void) {
 static void mv_delete_line_op (void) {
     if (!mv_undo_push ())
         return;
-    if (mv.yank_text) {
-        free (mv.yank_text);
-    }
+    if (mv.yank_text) { free (mv.yank_text); }
     mv.yank_text = term_strdup (mv.lines [mv.cursor_row]);
     mv.yank_is_linewise = true;
     mv_delete_line (mv.cursor_row);
@@ -557,14 +487,10 @@ static void mv_delete_to_end (void) {
     int row = mv.cursor_row;
     int col = mv.cursor_col;
     int len = mv_line_len (row);
-    if (col >= len) {
-        return;
-    }
+    if (col >= len) { return; }
     if (!mv_undo_push ())
         return;
-    if (mv.yank_text) {
-        free (mv.yank_text);
-    }
+    if (mv.yank_text) { free (mv.yank_text); }
     mv.yank_text = term_strdup (mv.lines [row] + col);
     mv.yank_is_linewise = false;
     mv.lines [row][col] = '\0';
@@ -574,14 +500,10 @@ static void mv_delete_to_end (void) {
 static void mv_delete_to_start (void) {
     int row = mv.cursor_row;
     int col = mv.cursor_col;
-    if (col <= 0) {
-        return;
-    }
+    if (col <= 0) { return; }
     if (!mv_undo_push ())
         return;
-    if (mv.yank_text) {
-        free (mv.yank_text);
-    }
+    if (mv.yank_text) { free (mv.yank_text); }
     mv.yank_text = term_strndup (mv.lines [row], col);
     mv.yank_is_linewise = false;
     char *new_line = term_strdup (mv.lines [row] + col);
@@ -591,16 +513,12 @@ static void mv_delete_to_start (void) {
     mv.modified = true;
 }
 static void mv_yank_line (void) {
-    if (mv.yank_text) {
-        free (mv.yank_text);
-    }
+    if (mv.yank_text) { free (mv.yank_text); }
     mv.yank_text = term_strdup (mv.lines [mv.cursor_row]);
     mv.yank_is_linewise = true;
 }
 static void mv_paste (bool after) {
-    if (!mv.yank_text) {
-        return;
-    }
+    if (!mv.yank_text) { return; }
     if (!mv_undo_push ())
         return;
     if (mv.yank_is_linewise) {
@@ -613,28 +531,22 @@ static void mv_paste (bool after) {
         int row = mv.cursor_row;
         int col = after ? mv.cursor_col + 1 : mv.cursor_col;
         int len = mv_line_len (row);
-        if (col > len) {
-            col = len;
-        }
+        if (col > len) { col = len; }
         int yank_len = (int) strlen (mv.yank_text);
         char *new_line = (char *) malloc ((size_t) (len + yank_len + 1));
         if (!new_line) {
             return; /* OOM: undo already pushed, line untouched — no SEGV */
-        }
-        memcpy (new_line, mv.lines [row], (size_t) col);
+        } memcpy (new_line, mv.lines [row], (size_t) col);
         memcpy (new_line + col, mv.yank_text, (size_t) yank_len);
         memcpy (new_line + col + yank_len, mv.lines [row] + col, (size_t) (len - col + 1));
         free (mv.lines [row]);
         mv.lines [row] = new_line;
         mv.cursor_col = col + yank_len - 1;
-    }
-    mv.modified = true;
+    } mv.modified = true;
     mv_clamp_cursor ();
 }
 static void mv_join_lines (void) {
-    if (mv.cursor_row >= mv.line_count - 1) {
-        return;
-    }
+    if (mv.cursor_row >= mv.line_count - 1) { return; }
     if (!mv_undo_push ())
         return;
     int len_a = mv_line_len (mv.cursor_row);
@@ -642,8 +554,7 @@ static void mv_join_lines (void) {
     if (!joined || !mv_set_line (mv.cursor_row, joined)) {
         free (joined);
         return;
-    }
-    free (joined);
+    } free (joined);
     mv_delete_line (mv.cursor_row + 1);
     mv.cursor_col = len_a;
     mv.modified = true;
@@ -675,17 +586,14 @@ static void mv_insert_newline (void) {
     if (!second_half || !mv_insert_line (row + 1, second_half)) {
         free (second_half);
         return;
-    }
-    mv.lines [row][col] = '\0';
+    } mv.lines [row][col] = '\0';
     free (second_half);
     mv.cursor_row++;
     mv.cursor_col = 0;
     mv.modified = true;
 }
 static void mv_backspace (void) {
-    if (mv.cursor_col > 0) {
-        mv_delete_char_before_cursor ();
-    } else if (mv.cursor_row > 0) {
+    if (mv.cursor_col > 0) { mv_delete_char_before_cursor (); } else if (mv.cursor_row > 0) {
         if (!mv_undo_push ())
             return;
         int prev_len = mv_line_len (mv.cursor_row - 1);
@@ -693,8 +601,7 @@ static void mv_backspace (void) {
         if (!joined || !mv_set_line (mv.cursor_row - 1, joined)) {
             free (joined);
             return;
-        }
-        free (joined);
+        } free (joined);
         mv_delete_line (mv.cursor_row);
         mv.cursor_row--;
         mv.cursor_col = prev_len;
@@ -712,16 +619,13 @@ static void mv_execute_command (void) {
         mv.file_exists = true; /* MPE_TASK_V15R2_WQ_SETS_EXISTS */
         mv.quit_requested = true;
     } else if (cmd [0] == 'w' && cmd [1] == '\0') {
-        if (!mv_save_file ()) {
-            return;
-        }
+        if (!mv_save_file ()) { return; }
         mv.file_exists = true; /* MPE_TASK_V15R2_SAVE_SETS_EXISTS */
         /* Config integration: reload if editing engine.cfg */
         if (strstr (mv.filename, "engine.cfg")) {
             mpe_config_load ("status/engine.cfg");
             contact_cache_clear (physics_world_get_primary ());
-        }
-        mv.mode = mv_normal;
+        } mv.mode = mv_normal;
     } else if (cmd [0] == 'q' && cmd [1] == '!') {
         mv.quit_requested = true;
     } else if (cmd [0] == 'q' && cmd [1] == '\0') {
@@ -737,12 +641,9 @@ setting a flag that microvim_render will pick up */
             mv.mode = mv_command; /* Show error in command line area */
             return;
             /* MPE_TASK_V15R2_QUIT_MODIFIED_ERROR_END */
-        }
-        mv.quit_requested = true;
+        } mv.quit_requested = true;
     } else if (cmd [0] == 'x') {
-        if (!mv_save_file ()) {
-            return;
-        }
+        if (!mv_save_file ()) { return; }
         mv.quit_requested = true;
     } else if (cmd [0] == 'e' && cmd [1] == ' ') {
         if (!mv.modified || (cmd [2] == '!')) {
@@ -750,13 +651,11 @@ setting a flag that microvim_render will pick up */
             if (mv.line_count == 0) {
                 microvim_close ();
                 return;
-            }
-            mv.cursor_row = 0;
+            } mv.cursor_row = 0;
             mv.cursor_col = 0;
             mv.modified = false;
             mv_clear_undo_history ();
-        }
-        mv.mode = mv_normal;
+        } mv.mode = mv_normal;
     } else if (strncmp (cmd, "set number", 10) == 0 || strncmp (cmd, "set nu", 6) == 0) {
         mv.show_line_numbers = true;
         mv.mode = mv_normal;
@@ -774,30 +673,25 @@ setting a flag that microvim_render will pick up */
             bool global_replace = false;
             if (p4) {
                 *p4 = '\0';
-                if (*(p4 + 1) == 'g') {
-                    global_replace = true;
-                }
+                if (*(p4 + 1) == 'g') { global_replace = true; }
             }
             if (!p1 [0]) {
                 mv.command_len = snprintf (mv.command_buf, sizeof (mv.command_buf), "E486: empty substitute pattern");
                 return;
-            }
-            char *line = mv.lines [mv.cursor_row];
+            } char *line = mv.lines [mv.cursor_row];
             char *lower_line = term_ascii_strdown (line);
             char *lower_old = term_ascii_strdown (p1);
             if (!lower_line || !lower_old) {
                 free (lower_line);
                 free (lower_old);
                 return;
-            }
-            char *match = strstr (lower_line, lower_old);
+            } char *match = strstr (lower_line, lower_old);
             if (match) {
                 if (!mv_undo_push ()) {
                     free (lower_line);
                     free (lower_old);
                     return;
-                }
-                int old_len = (int) strlen (p1);
+                } int old_len = (int) strlen (p1);
                 int new_len = (int) strlen (p3);
                 int pos = (int) (match - lower_line);
                 do {
@@ -814,39 +708,28 @@ setting a flag that microvim_render will pick up */
                     free (mv.lines [mv.cursor_row]);
                     mv.lines [mv.cursor_row] = new_line;
                     mv.modified = true;
-                    if (!global_replace) {
-                        break;
-                    }
+                    if (!global_replace) { break; }
                     free (lower_line);
                     lower_line = term_ascii_strdown (mv.lines [mv.cursor_row]);
                     if (!lower_line)
                         break;
                     pos += new_len;
                     match = strstr (lower_line + pos, lower_old);
-                    if (match) {
-                        pos = (int) (match - lower_line);
-                    }
+                    if (match) { pos = (int) (match - lower_line); }
                 } while (match);
-            }
-            free (lower_line);
+            } free (lower_line);
             free (lower_old);
-        }
-        mv.mode = mv_normal;
+        } mv.mode = mv_normal;
     } else if (isdigit ((unsigned char) cmd [0])) {
         int target_line = atoi (cmd) - 1;
-        if (target_line < 0) {
-            target_line = 0;
-        }
-        if (target_line >= mv.line_count) {
-            target_line = mv.line_count - 1;
-        }
+        if (target_line < 0) { target_line = 0; }
+        if (target_line >= mv.line_count) { target_line = mv.line_count - 1; }
         mv.cursor_row = target_line;
         mv.cursor_col = 0;
         mv.mode = mv_normal;
     } else {
         mv.mode = mv_normal;
-    }
-    mv.command_len = 0;
+    } mv.command_len = 0;
     mv.command_buf [0] = '\0';
 } /* ------------------------------------------------------------------ */
 /* Key handling                                                         */
@@ -879,8 +762,7 @@ static void mv_handle_normal_key (guint keyval, guint keycode, GdkModifierType s
         if (key == GDK_KEY_r) {
             mv_redo_perform ();
             return;
-        }
-        return;
+        } return;
     }
     if (mv.pending_op) {
         char op = mv.pending_op;
@@ -936,17 +818,14 @@ static void mv_handle_normal_key (guint keyval, guint keycode, GdkModifierType s
                     return;
                 while (mv.line_count > mv.cursor_row + 1) {
                     mv_delete_line (mv.line_count - 1);
-                }
-                mv.modified = true;
-            }
-            return;
+                } mv.modified = true;
+            } return;
         }
         if (key == GDK_KEY_g && op == 'g') {
             mv.cursor_row = 0;
             mv.cursor_col = 0;
             return;
-        }
-        return;
+        } return;
     }
     switch (key) {
         case GDK_KEY_h:
@@ -997,16 +876,14 @@ static void mv_handle_normal_key (guint keyval, guint keycode, GdkModifierType s
             mv.cursor_row--;
             while (mv.cursor_row > 0 && mv_line_len (mv.cursor_row) > 0) {
                 mv.cursor_row--;
-            }
-            mv.cursor_col = 0;
+            } mv.cursor_col = 0;
             break;
         }
         case GDK_KEY_braceright: {
             mv.cursor_row++;
             while (mv.cursor_row < mv.line_count - 1 && mv_line_len (mv.cursor_row) > 0) {
                 mv.cursor_row++;
-            }
-            mv.cursor_col = 0;
+            } mv.cursor_col = 0;
             break;
         }
         case GDK_KEY_i:
@@ -1103,8 +980,7 @@ static void mv_handle_normal_key (guint keyval, guint keycode, GdkModifierType s
                 mv.cursor_col++;
                 mv.modified = true;
                 mv_clamp_cursor ();
-            }
-            break;
+            } break;
         }
         case GDK_KEY_slash:
         mv.mode = mv_search;
@@ -1131,8 +1007,7 @@ static void mv_handle_normal_key (guint keyval, guint keycode, GdkModifierType s
             int start = col;
             while (start > 0 && mv_is_word_char (mv.lines [row][start - 1])) {
                 start--;
-            }
-            int end = col;
+            } int end = col;
             while (end < len && mv_is_word_char (mv.lines [row][end])) {
                 end++;
             }
@@ -1145,8 +1020,7 @@ static void mv_handle_normal_key (guint keyval, guint keycode, GdkModifierType s
                     mv.search_forward = true;
                     mv_search_execute (true);
                 }
-            }
-            break;
+            } break;
         }
         case GDK_KEY_colon:
         mv.mode = mv_command;
@@ -1165,9 +1039,7 @@ static void mv_handle_insert_key (guint keyval, guint keycode, GdkModifierType s
     unsigned key = keyval;
     if (key == GDK_KEY_Escape) {
         mv.mode = mv_normal;
-        if (mv.cursor_col > 0) {
-            mv.cursor_col--;
-        }
+        if (mv.cursor_col > 0) { mv.cursor_col--; }
         return;
     }
     if (key == GDK_KEY_BackSpace) {
@@ -1220,24 +1092,20 @@ static void mv_handle_insert_key (guint keyval, guint keycode, GdkModifierType s
         }
         while (col > 0 && mv_is_word_char (mv.lines [mv.cursor_row][col - 1])) {
             col--;
-        }
-        int deleted = mv.cursor_col - col;
+        } int deleted = mv.cursor_col - col;
         if (deleted > 0) {
             char *line = mv.lines [mv.cursor_row];
             int len = mv_line_len (mv.cursor_row);
             memmove (line + col, line + mv.cursor_col, (size_t) (len - mv.cursor_col + 1));
             mv.cursor_col = col;
             mv.modified = true;
-        }
-        return;
+        } return;
     }
     if (key >= 32 && key < 127) {
         mv_insert_char ((char) key);
         return;
     }
-    if (key >= GDK_KEY_space && key <= GDK_KEY_asciitilde) {
-        mv_insert_char ((char) key);
-    }
+    if (key >= GDK_KEY_space && key <= GDK_KEY_asciitilde) { mv_insert_char ((char) key); }
 }
 static void mv_handle_command_key (guint keyval, guint keycode, GdkModifierType state) {
     (void) keycode;
@@ -1253,8 +1121,7 @@ static void mv_handle_command_key (guint keyval, guint keycode, GdkModifierType 
         if (mv.command_len > 0) {
             mv.command_len--;
             mv.command_buf [mv.command_len] = '\0';
-        }
-        return;
+        } return;
     }
     if (key == GDK_KEY_Return || key == GDK_KEY_KP_Enter) {
         mv_execute_command ();
@@ -1277,8 +1144,7 @@ static void mv_handle_search_key (guint keyval, guint keycode, GdkModifierType s
         if (mv.search_len > 0) {
             mv.search_len--;
             mv.search_buf [mv.search_len] = '\0';
-        }
-        return;
+        } return;
     }
     if (key == GDK_KEY_Return || key == GDK_KEY_KP_Enter) {
         mv_search_execute (mv.search_forward);
@@ -1308,21 +1174,13 @@ void microvim_ensure_tags (GtkTextBuffer *buffer) {
     }
 }
 void microvim_render (GtkTextBuffer *buffer) {
-    if (!buffer) {
-        return;
-    }
+    if (!buffer) { return; }
     microvim_ensure_tags (buffer);
     gtk_text_buffer_set_text (buffer, "", -1);
     /* Adjust scroll */
-    if (mv.cursor_row < mv.scroll_offset) {
-        mv.scroll_offset = mv.cursor_row;
-    }
-    if (mv.cursor_row >= mv.scroll_offset + mv_view_height - 2) {
-        mv.scroll_offset = mv.cursor_row - mv_view_height + 3;
-    }
-    if (mv.scroll_offset < 0) {
-        mv.scroll_offset = 0;
-    }
+    if (mv.cursor_row < mv.scroll_offset) { mv.scroll_offset = mv.cursor_row; }
+    if (mv.cursor_row >= mv.scroll_offset + mv_view_height - 2) { mv.scroll_offset = mv.cursor_row - mv_view_height + 3; }
+    if (mv.scroll_offset < 0) { mv.scroll_offset = 0; }
     GtkTextIter end_iter;
     char line_buf [mv_max_line_len + 64];
     for (int view_line = 0; view_line < mv_view_height - 2; view_line++) {
@@ -1332,12 +1190,9 @@ void microvim_render (GtkTextBuffer *buffer) {
                 snprintf (line_buf, sizeof (line_buf), "%4d ", row + 1);
                 gtk_text_buffer_get_end_iter (buffer, &end_iter);
                 gtk_text_buffer_insert_with_tags_by_name (buffer, &end_iter, line_buf, -1, "mv_linenum", NULL);
-            }
-            const char *line = mv.lines [row];
+            } const char *line = mv.lines [row];
             const char *tag = "mv_normal";
-            if (line [0] == '#') {
-                tag = "mv_comment";
-            } else if (line [0] == '[') {
+            if (line [0] == '#') { tag = "mv_comment"; } else if (line [0] == '[') {
                 tag = "mv_section";
             } else {
                 char *eq = strchr (line, '=');
@@ -1358,54 +1213,37 @@ void microvim_render (GtkTextBuffer *buffer) {
             if (mv.show_line_numbers) {
                 gtk_text_buffer_get_end_iter (buffer, &end_iter);
                 gtk_text_buffer_insert_with_tags_by_name (buffer, &end_iter, "     ", -1, "mv_linenum", NULL);
-            }
-            gtk_text_buffer_get_end_iter (buffer, &end_iter);
+            } gtk_text_buffer_get_end_iter (buffer, &end_iter);
             gtk_text_buffer_insert_with_tags_by_name (buffer, &end_iter, "~", -1, "mv_tilde", NULL);
-        }
-        gtk_text_buffer_get_end_iter (buffer, &end_iter);
+        } gtk_text_buffer_get_end_iter (buffer, &end_iter);
         gtk_text_buffer_insert (buffer, &end_iter, "\n", -1);
     }
     /* Status bar */
     char status_buf [1024];
     const char *mode_text = "";
-    if (mv.mode == mv_insert) {
-        mode_text = "-- INSERT -- ";
-    } else if (mv.mode == mv_command) {
+    if (mv.mode == mv_insert) { mode_text = "-- INSERT -- "; } else if (mv.mode == mv_command) {
         mode_text = ":";
-    } else if (mv.mode == mv_search) {
-        mode_text = mv.search_forward ? "/" : "?";
-    }
-    if (mv.mode == mv_command) {
-        snprintf (status_buf, sizeof (status_buf), ":%s", mv.command_buf);
-    } else if (mv.mode == mv_search) {
+    } else if (mv.mode == mv_search) { mode_text = mv.search_forward ? "/" : "?"; }
+    if (mv.mode == mv_command) { snprintf (status_buf, sizeof (status_buf), ":%s", mv.command_buf); } else if (mv.mode == mv_search) {
         snprintf (status_buf, sizeof (status_buf), "%s%s", mv.search_forward ? "/" : "?", mv.search_buf);
     } else {
         int pct = (mv.line_count > 1) ? ((mv.cursor_row + 1) * 100 / mv.line_count) : 100;
         const char *pos_text = (mv.cursor_row == 0) ? "Top" : (mv.cursor_row == mv.line_count - 1) ? "Bot" : "";
         /* MPE_TASK_V15R2_STATUS_NEW_FILE_BEGIN */
         const char *file_status_text = "";
-        if (!mv.file_exists && !mv.modified) {
-            file_status_text = " [New]";
-        } else if (mv.modified) {
-            file_status_text = " [Modified]";
-        }
+        if (!mv.file_exists && !mv.modified) { file_status_text = " [New]"; } else if (mv.modified) { file_status_text = " [Modified]"; }
         snprintf (status_buf, sizeof (status_buf), "%s\"%s\" %dL%s%s%s%d,%d %s %d%%", mode_text, mv.filename,
                   mv.line_count, file_status_text, mode_text [0] ? "" : "   ", pos_text [0] ? "" : "", mv.cursor_row + 1,
                   mv.cursor_col + 1, pos_text [0] ? pos_text : "", pct);
         /* MPE_TASK_V15R2_STATUS_NEW_FILE_END */
-    }
-    gtk_text_buffer_get_end_iter (buffer, &end_iter);
+    } gtk_text_buffer_get_end_iter (buffer, &end_iter);
     gtk_text_buffer_insert_with_tags_by_name (buffer, &end_iter, status_buf, -1,
                                               (mv.mode == mv_insert) ? "mv_insert_label" : "mv_status", NULL);
     /* Place cursor */
     GtkTextIter cursor_iter;
     int target_line = mv.cursor_row - mv.scroll_offset;
-    if (target_line < 0) {
-        target_line = 0;
-    }
-    if (target_line >= mv_view_height - 2) {
-        target_line = mv_view_height - 3;
-    }
+    if (target_line < 0) { target_line = 0; }
+    if (target_line >= mv_view_height - 2) { target_line = mv_view_height - 3; }
     int col_offset = mv.cursor_col + (mv.show_line_numbers ? 5 : 0);
     gtk_text_buffer_get_iter_at_line_offset (buffer, &cursor_iter, target_line, col_offset);
     gtk_text_buffer_place_cursor (buffer, &cursor_iter);
@@ -1428,8 +1266,7 @@ void microvim_open (const char *filename) {
     if (mv.line_count == 0 && !mv_insert_line (0, "")) {
         microvim_close ();
         return;
-    }
-    mv.cursor_row = 0;
+    } mv.cursor_row = 0;
     mv.cursor_col = 0;
     mv.mode = mv_normal;
     mv.modified = false;
@@ -1445,9 +1282,7 @@ void microvim_open (const char *filename) {
     mv.search_len = 0;
     /* Default to showing line numbers for config files */
     const char *ext = strrchr (filename, '.');
-    if (ext && (strcmp (ext, ".cfg") == 0 || strcmp (ext, ".ini") == 0)) {
-        mv.show_line_numbers = true;
-    }
+    if (ext && (strcmp (ext, ".cfg") == 0 || strcmp (ext, ".ini") == 0)) { mv.show_line_numbers = true; }
 }
 void microvim_close (void) {
     mv_clear_lines ();
@@ -1464,18 +1299,14 @@ void microvim_close (void) {
         if (s -> lines) {
             for (int j = 0; j < s -> line_count; j++) {
                 free (s -> lines [j]);
-            }
-            free (s -> lines);
+            } free (s -> lines);
             s -> lines = NULL;
         }
-    }
-    mv.active = false;
+    } mv.active = false;
     mv.quit_requested = false;
 }
 void microvim_handle_key (guint keyval, guint keycode, GdkModifierType state) {
-    if (!mv.active) {
-        return;
-    }
+    if (!mv.active) { return; }
     switch (mv.mode) {
         case mv_normal:
         mv_handle_normal_key (keyval, keycode, state);
@@ -1490,7 +1321,5 @@ void microvim_handle_key (guint keyval, guint keycode, GdkModifierType state) {
         mv_handle_search_key (keyval, keycode, state);
         break;
     }
-    if (mv.quit_requested) {
-        microvim_close ();
-    }
+    if (mv.quit_requested) { microvim_close (); }
 } /* MPE_TASK_V15R2_MICROVIM_IMPL_END */

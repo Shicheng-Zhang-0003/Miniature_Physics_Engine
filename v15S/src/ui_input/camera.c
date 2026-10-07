@@ -2,9 +2,7 @@
 #include "camera.h"
 #include <math.h>
 void camera_update_vectors (camera *camera_object) {
-    if (!camera_object) {
-        return;
-    }
+    if (!camera_object) { return; }
     /* FIX-AUDIT-DESPOT: NaN guard. yaw/pitch integrate raw mouse deltas and
      * IJKL rates every tick; one NaN (hotplug mouse event, corrupt config
      * steer_sensitivity) poisoned forward/side/vertical forever because

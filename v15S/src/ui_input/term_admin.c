@@ -42,8 +42,7 @@ static int term_tee_write_status (const char *path, const char *text, size_t *by
             if (errno != EEXIST)
                 return -1;
             continue;
-        }
-        size_t length = strlen (text);
+        } size_t length = strlen (text);
         *bytes_written = fwrite (text, 1, length, output);
         int failed = (*bytes_written != length) || ferror (output);
         if (fclose (output) != 0)
@@ -60,8 +59,7 @@ static int term_tee_write_status (const char *path, const char *text, size_t *by
         if (failed)
             DeleteFileA (tmp_path);
         return failed ? -1 : 0;
-    }
-    return -1;
+    } return -1;
 }
 #else
 static int term_tee_write_status (const char *path, const char *text, size_t *bytes_written) {
@@ -86,15 +84,13 @@ static int term_tee_write_status (const char *path, const char *text, size_t *by
     if (fd < 0) {
         close (dirfd);
         return -1;
-    }
-    FILE *output = fdopen (fd, "w");
+    } FILE *output = fdopen (fd, "w");
     if (!output) {
         close (fd);
         unlinkat (dirfd, temporary, 0);
         close (dirfd);
         return -1;
-    }
-    size_t length = strlen (text);
+    } size_t length = strlen (text);
     *bytes_written = fwrite (text, 1, length, output);
     int failed = (*bytes_written != length) || ferror (output);
     /* DESPOT-2026-10-07 P1-4: durability — fsync file before rename so a
@@ -145,33 +141,25 @@ static int64_t posix_monotonic_time (void) {
 }
 bool all_targets_matched_any (int argc, char **argv) {
     for (int i = 2; i < argc; i++) {
-        if (term_is_all_token (argv [i])) {
-            return true;
-        }
-    }
-    return false;
+        if (term_is_all_token (argv [i])) { return true; }
+    } return false;
 }
 void cmd_sed (int argc, char **argv) {
     if (argc < 3) {
         term_err ("usage: sed s/field/value/ <target...>\n");
         return;
-    }
-    const char *expression = argv [1];
+    } const char *expression = argv [1];
     if ((expression [0] != 's') || (expression [1] != '/')) {
         term_err ("mpe: sed: expression must start with s/\n");
         return;
-    }
-    const char *field_start = expression + 2;
+    } const char *field_start = expression + 2;
     const char *field_end = strchr (field_start, '/');
     if (!field_end) {
         term_err ("mpe: sed: malformed expression (missing second /)\n");
         return;
-    }
-    char field_name [64];
+    } char field_name [64];
     int field_len = (int) (field_end - field_start);
-    if (field_len >= 64) {
-        field_len = 63;
-    }
+    if (field_len >= 64) { field_len = 63; }
     strncpy (field_name, field_start, field_len);
     field_name [field_len] = '\0';
     const char *value_start = field_end + 1;
@@ -179,16 +167,13 @@ void cmd_sed (int argc, char **argv) {
     char value_str [64];
     if (value_end) {
         int value_len = (int) (value_end - value_start);
-        if (value_len >= 64) {
-            value_len = 63;
-        }
+        if (value_len >= 64) { value_len = 63; }
         strncpy (value_str, value_start, value_len);
         value_str [value_len] = '\0';
     } else {
         strncpy (value_str, value_start, 63);
         value_str [63] = '\0';
-    }
-    float new_value = 0.0f;
+    } float new_value = 0.0f;
     bool is_numeric = term_parse_float (value_str, &new_value);
     bool make_static = term_str_eq (value_str, "static") || term_str_eq (value_str, "1");
     bool make_dynamic = term_str_eq (value_str, "dynamic") || term_str_eq (value_str, "0");
@@ -200,72 +185,47 @@ void cmd_sed (int argc, char **argv) {
             for (int object_index = 0; object_index < (physics_world_get_primary () -> body_count); object_index++) {
                 rigidbody *rb = &(physics_world_get_primary () -> bodies) [object_index];
                 if (term_str_eq (field_name, "mass")) {
-                    if (!is_numeric) {
-                        continue;
-                    }
+                    if (!is_numeric) { continue; }
                     term_set_object_mass (object_index, new_value);
                 } else if (term_str_eq (field_name, "radius")) {
-                    if ((!is_numeric) || (rb -> type != object_sphere)) {
-                        continue;
-                    }
+                    if ((!is_numeric) || (rb -> type != object_sphere)) { continue; }
                     rb -> radius = new_value;
                     rigidbody_update_inertia_sphere (rb);
                     rigidbody_wake (rb);
                 } else if (term_str_eq (field_name, "friction_static") || term_str_eq (field_name, "fs")) {
-                    if (!is_numeric) {
-                        continue;
-                    }
+                    if (!is_numeric) { continue; }
                     rb -> friction_static = new_value;
                 } else if (term_str_eq (field_name, "friction_kinetic") || term_str_eq (field_name, "fk")) {
-                    if (!is_numeric) {
-                        continue;
-                    }
+                    if (!is_numeric) { continue; }
                     rb -> friction_kinetic = new_value;
                 } else if (term_str_eq (field_name, "restitution") || term_str_eq (field_name, "rest")) {
-                    if (!is_numeric) {
-                        continue;
-                    }
+                    if (!is_numeric) { continue; }
                     rb -> restitution = new_value;
-                    if (rb -> restitution < 0.0f) {
-                        rb -> restitution = 0.0f;
-                    }
-                    if (rb -> restitution > 1.0f) {
-                        rb -> restitution = 1.0f;
-                    }
+                    if (rb -> restitution < 0.0f) { rb -> restitution = 0.0f; }
+                    if (rb -> restitution > 1.0f) { rb -> restitution = 1.0f; }
                 } else if (term_str_eq (field_name, "static")) {
                     term_set_object_static (object_index, make_static || (!make_dynamic));
                 } else if (term_str_eq (field_name, "dynamic")) {
                     term_set_object_static (object_index, !make_dynamic);
                 } else if (term_str_eq (field_name, "nice")) {
-                    if (!is_numeric) {
-                        continue;
-                    }
+                    if (!is_numeric) { continue; }
                     int nice_val = (int) new_value;
-                    if (nice_val < -20) {
-                        nice_val = -20;
-                    }
-                    if (nice_val > 19) {
-                        nice_val = 19;
-                    }
+                    if (nice_val < -20) { nice_val = -20; }
+                    if (nice_val > 19) { nice_val = 19; }
                     rb -> nice_value = nice_val;
-                }
-                modified_count++;
-            }
-            contact_cache_clear (physics_world_get_primary ());
+                } modified_count++;
+            } contact_cache_clear (physics_world_get_primary ());
             continue;
-        }
-        int object_index = term_object_from_token (target);
+        } int object_index = term_object_from_token (target);
         if (object_index < 0) {
             term_printf ("term_err", "mpe: sed: %s: No such object\n", target);
             continue;
-        }
-        rigidbody *rb = &(physics_world_get_primary () -> bodies) [object_index];
+        } rigidbody *rb = &(physics_world_get_primary () -> bodies) [object_index];
         if (term_str_eq (field_name, "mass")) {
             if (!is_numeric) {
                 term_err ("mpe: sed: mass requires numeric value\n");
                 continue;
-            }
-            term_set_object_mass (object_index, new_value);
+            } term_set_object_mass (object_index, new_value);
         } else if (term_str_eq (field_name, "radius")) {
             if (!is_numeric) {
                 term_err ("mpe: sed: radius requires numeric value\n");
@@ -274,34 +234,26 @@ void cmd_sed (int argc, char **argv) {
             if (rb -> type != object_sphere) {
                 term_err ("mpe: sed: radius only applies to spheres\n");
                 continue;
-            }
-            rb -> radius = new_value;
+            } rb -> radius = new_value;
             rigidbody_update_inertia_sphere (rb);
             rigidbody_wake (rb);
         } else if (term_str_eq (field_name, "friction_static") || term_str_eq (field_name, "fs")) {
             if (!is_numeric) {
                 term_err ("mpe: sed: friction requires numeric value\n");
                 continue;
-            }
-            rb -> friction_static = new_value;
+            } rb -> friction_static = new_value;
         } else if (term_str_eq (field_name, "friction_kinetic") || term_str_eq (field_name, "fk")) {
             if (!is_numeric) {
                 term_err ("mpe: sed: friction requires numeric value\n");
                 continue;
-            }
-            rb -> friction_kinetic = new_value;
+            } rb -> friction_kinetic = new_value;
         } else if (term_str_eq (field_name, "restitution") || term_str_eq (field_name, "rest")) {
             if (!is_numeric) {
                 term_err ("mpe: sed: restitution requires numeric value\n");
                 continue;
-            }
-            rb -> restitution = new_value;
-            if (rb -> restitution < 0.0f) {
-                rb -> restitution = 0.0f;
-            }
-            if (rb -> restitution > 1.0f) {
-                rb -> restitution = 1.0f;
-            }
+            } rb -> restitution = new_value;
+            if (rb -> restitution < 0.0f) { rb -> restitution = 0.0f; }
+            if (rb -> restitution > 1.0f) { rb -> restitution = 1.0f; }
         } else if (term_str_eq (field_name, "static")) {
             term_set_object_static (object_index, true);
         } else if (term_str_eq (field_name, "dynamic")) {
@@ -310,49 +262,33 @@ void cmd_sed (int argc, char **argv) {
             if (!is_numeric) {
                 term_err ("mpe: sed: nice requires numeric value\n");
                 continue;
-            }
-            int nice_val = (int) new_value;
-            if (nice_val < -20) {
-                nice_val = -20;
-            }
-            if (nice_val > 19) {
-                nice_val = 19;
-            }
+            } int nice_val = (int) new_value;
+            if (nice_val < -20) { nice_val = -20; }
+            if (nice_val > 19) { nice_val = 19; }
             rb -> nice_value = nice_val;
         } else {
             term_printf ("term_err", "mpe: sed: unknown field '%s'\n", field_name);
             continue;
-        }
-        modified_count++;
+        } modified_count++;
         contact_cache_clear (physics_world_get_primary ());
         term_printf ("term_ok", "/obj/%d: %s=%s\n", object_index, field_name, value_str);
     }
-    if (all_targets_matched_any (argc, argv)) {
-        term_printf ("term_ok", "sed: modified %d object(s)\n", modified_count);
-    }
+    if (all_targets_matched_any (argc, argv)) { term_printf ("term_ok", "sed: modified %d object(s)\n", modified_count); }
 }
 void cmd_nice (int argc, char **argv) {
     if (argc < 3) {
         term_err ("usage: nice <priority> <object...>\n");
         return;
-    }
-    float priority_float = 0.0f;
+    } float priority_float = 0.0f;
     if (!term_parse_float (argv [1], &priority_float)) {
         term_printf ("term_err", "mpe: nice: invalid priority '%s'\n", argv [1]);
         return;
-    }
-    int priority = (int) priority_float;
-    if (priority < -20) {
-        priority = -20;
-    }
-    if (priority > 19) {
-        priority = 19;
-    }
+    } int priority = (int) priority_float;
+    if (priority < -20) { priority = -20; }
+    if (priority > 19) { priority = 19; }
     for (int argument_index = 2; argument_index < argc; argument_index++) {
         int object_index = term_require_object (argv [argument_index]);
-        if (object_index < 0) {
-            continue;
-        }
+        if (object_index < 0) { continue; }
         (physics_world_get_primary () -> bodies) [object_index].nice_value = priority;
         rigidbody_wake (&(physics_world_get_primary () -> bodies) [object_index]);
         term_printf ("term_ok", "/obj/%d nice=%d\n", object_index, priority);
@@ -364,25 +300,16 @@ void cmd_ping (int argc, char **argv) {
     int argument_index = 1;
     if ((argc > 1) && (term_str_eq (argv [1], "-c")) && (argc > 2)) {
         float v = 0.0f;
-        if (term_parse_float (argv [2], &v)) {
-            ping_count = (int) v;
-        }
-        if (ping_count < 1) {
-            ping_count = 1;
-        }
-        if (ping_count > 10) {
-            ping_count = 10;
-        }
+        if (term_parse_float (argv [2], &v)) { ping_count = (int) v; }
+        if (ping_count < 1) { ping_count = 1; }
+        if (ping_count > 10) { ping_count = 10; }
         argument_index = 3;
     }
     if (argument_index >= argc) {
         term_err ("usage: ping [-c count] <object>\n");
         return;
-    }
-    int object_index = term_require_object (argv [argument_index]);
-    if (object_index < 0) {
-        return;
-    }
+    } int object_index = term_require_object (argv [argument_index]);
+    if (object_index < 0) { return; }
     rigidbody *rb = &(physics_world_get_primary () -> bodies) [object_index];
     if (rb -> static_state) {
         term_printf ("term_dim", "PING /obj/%d: no response (static)\n", object_index);
@@ -396,8 +323,7 @@ void cmd_ping (int argc, char **argv) {
         vector3 micro_impulse = vector3_scaling (rb -> velocity, 0.0f);
         micro_impulse = (vector3) {0.001f, 0.001f, 0.001f};
         rb -> velocity = vector3_addition (rb -> velocity, micro_impulse);
-    }
-    float speed_delta = 0.001f * sqrtf (3.0f) * (float) ping_count;
+    } float speed_delta = 0.001f * sqrtf (3.0f) * (float) ping_count;
     term_printf ("term_ok", "PING /obj/%d: %d ping(s), velocity delta %.6f m/s, state=%s\n", object_index, ping_count,
                  speed_delta, rb -> is_sleeping ? "sleep" : "run");
 }
@@ -405,8 +331,7 @@ void cmd_mount (int argc, char **argv) {
     if (argc < 2) {
         term_err ("usage: mount <path>\n");
         return;
-    }
-    const char *scene_path = argv [1];
+    } const char *scene_path = argv [1];
     /* DESPOT-2026-10-07 P0-4: scene_loading() did fopen() on any absolute
      * path with no jail, no size cap. Confine mount to project-local scene
      * files: reject absolute paths and parent traversal. status/ scenes
@@ -422,20 +347,15 @@ void cmd_mount (int argc, char **argv) {
         term_printf ("term_ok", "mounted %s: %d objects loaded\n", scene_path,
                      (physics_world_get_primary () -> body_count));
         event_log_push (log_info, "Scene mounted via terminal: %s", scene_path);
-    } else {
-        term_printf ("term_err", "mpe: mount: %s: failed to load\n", scene_path);
-    }
+    } else { term_printf ("term_err", "mpe: mount: %s: failed to load\n", scene_path); }
 }
 void cmd_umount (int argc, char **argv) {
     (void) argc;
     (void) argv;
     int save_result = save_scene ("status/scene.dat");
-    if (save_result) {
-        term_ok ("umount: scene saved to status/scene.dat\n");
-    } else {
+    if (save_result) { term_ok ("umount: scene saved to status/scene.dat\n"); } else {
         term_err ("mpe: umount: save failed\n");
-    }
-    scene_clear ();
+    } scene_clear ();
     clear_selection ();
     contact_cache_clear (physics_world_get_primary ());
     editor_reset ();
@@ -455,11 +375,8 @@ void cmd_mkfs (int argc, char **argv) {
 void cmd_fsck (int argc, char **argv) {
     bool auto_fix = false;
     for (int i = 1; i < argc; i++) {
-        if (term_str_eq (argv [i], "-y")) {
-            auto_fix = true;
-        }
-    }
-    int error_count = 0;
+        if (term_str_eq (argv [i], "-y")) { auto_fix = true; }
+    } int error_count = 0;
     int warning_count = 0;
     term_printf ("term_echo", "fsck: checking %d objects...\n", (physics_world_get_primary () -> body_count));
     for (int object_index = 0; object_index < (physics_world_get_primary () -> body_count); object_index++) {
@@ -507,12 +424,9 @@ void cmd_fsck (int argc, char **argv) {
                 term_printf ("term_ok", "  /obj/%d: sanitized\n", object_index);
             }
         }
-    }
-    term_printf ("term_echo", "fsck: checking %d joint slots...\n", mpe_max_joints);
+    } term_printf ("term_echo", "fsck: checking %d joint slots...\n", mpe_max_joints);
     for (int joint_index = 0; joint_index < mpe_max_joints; joint_index++) {
-        if (!(physics_world_get_primary () -> spring_joints) [joint_index].is_active) {
-            continue;
-        }
+        if (!(physics_world_get_primary () -> spring_joints) [joint_index].is_active) { continue; }
         spring_joint *j = &(physics_world_get_primary () -> spring_joints) [joint_index];
         int index_a = scene_find_object_index_by_id (j -> object_id_a);
         int index_b = scene_find_object_index_by_id (j -> object_id_b);
@@ -522,8 +436,7 @@ void cmd_fsck (int argc, char **argv) {
             if (auto_fix) {
                 remove_joint (physics_world_get_primary (), joint_index);
                 term_printf ("term_ok", "  /joint/%d: removed\n", joint_index);
-            }
-            continue;
+            } continue;
         }
         if (index_b < 0) {
             term_printf ("term_err", "  /joint/%d: object_b (id=%u) not found\n", joint_index, j -> object_id_b);
@@ -531,8 +444,7 @@ void cmd_fsck (int argc, char **argv) {
             if (auto_fix) {
                 remove_joint (physics_world_get_primary (), joint_index);
                 term_printf ("term_ok", "  /joint/%d: removed\n", joint_index);
-            }
-            continue;
+            } continue;
         }
         if ((j -> equilibrium_length < 0.0f) || (!isfinite (j -> equilibrium_length))) {
             term_printf ("term_err", "  /joint/%d: invalid rest length %.4f\n", joint_index, j -> equilibrium_length);
@@ -543,9 +455,7 @@ void cmd_fsck (int argc, char **argv) {
             error_count++;
         }
     }
-    if (auto_fix) {
-        contact_cache_clear (physics_world_get_primary ());
-    }
+    if (auto_fix) { contact_cache_clear (physics_world_get_primary ()); }
     if (error_count == 0) {
         term_printf ("term_ok", "fsck: PASS — %d objects, %d joints, %d warning(s), 0 errors\n",
                      (physics_world_get_primary () -> body_count), (physics_world_get_primary () -> spring_joint_count),
@@ -561,17 +471,12 @@ void cmd_fsck (int argc, char **argv) {
 void cmd_netstat (int argc, char **argv) {
     bool show_all = false;
     for (int i = 1; i < argc; i++) {
-        if (term_str_eq (argv [i], "-a")) {
-            show_all = true;
-        }
-    }
-    term_printf ("term_echo", "Active Joints (spring connections)\n");
+        if (term_str_eq (argv [i], "-a")) { show_all = true; }
+    } term_printf ("term_echo", "Active Joints (spring connections)\n");
     term_printf (NULL, "Proto  Local        Foreign      State         K        D      Len\n");
     int listed = 0;
     for (int ji = 0; ji < mpe_max_joints; ji++) {
-        if ((!(physics_world_get_primary () -> spring_joints) [ji].is_active) && (!show_all)) {
-            continue;
-        }
+        if ((!(physics_world_get_primary () -> spring_joints) [ji].is_active) && (!show_all)) { continue; }
         int ia = scene_find_object_index_by_id ((physics_world_get_primary () -> spring_joints) [ji].object_id_a);
         int ib = scene_find_object_index_by_id ((physics_world_get_primary () -> spring_joints) [ji].object_id_b);
         const char *state_text = (physics_world_get_primary () -> spring_joints) [ji].is_active ? "ESTABLISHED" : "CLOSED";
@@ -581,11 +486,7 @@ void cmd_netstat (int argc, char **argv) {
                      (physics_world_get_primary () -> spring_joints) [ji].equilibrium_length);
         listed++;
     }
-    if (listed == 0) {
-        term_dim ("(no connections)\n");
-    } else {
-        term_printf ("term_dim", "%d connection(s) active\n", listed);
-    }
+    if (listed == 0) { term_dim ("(no connections)\n"); } else { term_printf ("term_dim", "%d connection(s) active\n", listed); }
 }
 void cmd_ifconfig (int argc, char **argv) {
     (void) argc;
@@ -640,8 +541,7 @@ void cmd_alias (int argc, char **argv) {
         }
         for (int i = 0; i < term_alias_count; i++) {
             term_printf (NULL, "alias %s='%s'\n", term_alias_names [i], term_alias_values [i]);
-        }
-        return;
+        } return;
     }
     for (int argument_index = 1; argument_index < argc; argument_index++) {
         char *equals_pos = strchr (argv [argument_index], '=');
@@ -654,12 +554,9 @@ void cmd_alias (int argc, char **argv) {
                     break;
                 }
             }
-            if (!found) {
-                term_printf ("term_err", "mpe: alias: %s: not found\n", argv [argument_index]);
-            }
+            if (!found) { term_printf ("term_err", "mpe: alias: %s: not found\n", argv [argument_index]); }
             continue;
-        }
-        * equals_pos = '\0';
+        } * equals_pos = '\0';
         const char *alias_name = argv [argument_index];
         const char *alias_value = equals_pos + 1;
         bool updated = false;
@@ -675,14 +572,12 @@ void cmd_alias (int argc, char **argv) {
             if (term_alias_count >= term_alias_max) {
                 term_err ("mpe: alias: alias table full\n");
                 continue;
-            }
-            strncpy (term_alias_names [term_alias_count], alias_name, term_alias_name_len - 1);
+            } strncpy (term_alias_names [term_alias_count], alias_name, term_alias_name_len - 1);
             term_alias_names [term_alias_count][term_alias_name_len - 1] = '\0';
             strncpy (term_alias_values [term_alias_count], alias_value, term_alias_value_len - 1);
             term_alias_values [term_alias_count][term_alias_value_len - 1] = '\0';
             term_alias_count++;
-        }
-        term_printf ("term_ok", "alias %s='%s'\n", alias_name, alias_value);
+        } term_printf ("term_ok", "alias %s='%s'\n", alias_name, alias_value);
     }
 }
 void cmd_unalias (int argc, char **argv) {
@@ -700,8 +595,7 @@ void cmd_unalias (int argc, char **argv) {
                              (size_t) entries_to_move * sizeof term_alias_names [0]);
                     memmove (term_alias_values [i], term_alias_values [i + 1],
                              (size_t) entries_to_move * sizeof term_alias_values [0]);
-                }
-                term_alias_names [term_alias_count - 1][0] = '\0';
+                } term_alias_names [term_alias_count - 1][0] = '\0';
                 term_alias_values [term_alias_count - 1][0] = '\0';
                 term_alias_count--;
                 found = true;
@@ -709,9 +603,7 @@ void cmd_unalias (int argc, char **argv) {
                 break;
             }
         }
-        if (!found) {
-            term_printf ("term_err", "mpe: unalias: %s: not found\n", argv [argument_index]);
-        }
+        if (!found) { term_printf ("term_err", "mpe: unalias: %s: not found\n", argv [argument_index]); }
     }
 }
 void cmd_jobs (int argc, char **argv) {
@@ -723,9 +615,7 @@ void cmd_jobs (int argc, char **argv) {
         term_printf (NULL, "[%d]+ Running    long-run validation (%ds remaining / %d total)\n", ++job_count,
                      seconds_remaining, long_run_validation_total_ticks / 60);
     }
-    if (!long_run_validation_active) {
-        term_dim ("(no active jobs)\n");
-    }
+    if (!long_run_validation_active) { term_dim ("(no active jobs)\n"); }
 }
 void cmd_lsof (int argc, char **argv) {
     (void) argc;
@@ -734,55 +624,30 @@ void cmd_lsof (int argc, char **argv) {
     term_printf (NULL, "%-11s %-8s %s\n", "terminal", "win", debug_terminal_is_open () ? "open" : "closed");
     term_printf (NULL, "%-11s %-8s %s\n", "mouse", "lock", main_inputs.is_mouse_locked ? "grabbed" : "released");
     term_printf (NULL, "%-11s %-8s %s\n", "mode", "state", main_inputs.is_debug_mode_active ? "debug" : "game");
-    if ((selected_object >= 0) && (selected_object < (physics_world_get_primary () -> body_count))) {
-        term_printf (NULL, "%-11s %-8s /obj/%d\n", "selection", "obj", selected_object);
-    } else {
-        term_printf (NULL, "%-11s %-8s %s\n", "selection", "obj", "(none)");
-    }
-    if (main_inputs.marked_joint_object_index >= 0) {
-        term_printf (NULL, "%-11s %-8s /obj/%d\n", "joint_mark", "obj", main_inputs.marked_joint_object_index);
-    }
-    if (main_inputs.is_menu_open) {
-        term_printf (NULL, "%-11s %-8s scene_menu\n", "menu", "open");
-    }
-    if (main_inputs.spawner_menu_level > 0) {
-        term_printf (NULL, "%-11s %-8s spawner_menu (level %d)\n", "menu", "open", main_inputs.spawner_menu_level);
-    }
-    if (main_inputs.velocity_menu_level > 0) {
-        term_printf (NULL, "%-11s %-8s velocity_menu (level %d)\n", "menu", "open", main_inputs.velocity_menu_level);
-    }
-    if (main_inputs.object_menu_level > 0) {
-        term_printf (NULL, "%-11s %-8s object_menu (level %d)\n", "menu", "open", main_inputs.object_menu_level);
-    }
-    if (config_menu_is_open ()) {
-        term_printf (NULL, "%-11s %-8s config_menu\n", "menu", "open");
-    }
-    if (physics_is_halted ()) {
-        term_printf (NULL, "%-11s %-8s HALTED\n", "physics", "state");
-    }
+    if ((selected_object >= 0) && (selected_object < (physics_world_get_primary () -> body_count))) { term_printf (NULL, "%-11s %-8s /obj/%d\n", "selection", "obj", selected_object); } else { term_printf (NULL, "%-11s %-8s %s\n", "selection", "obj", "(none)"); }
+    if (main_inputs.marked_joint_object_index >= 0) { term_printf (NULL, "%-11s %-8s /obj/%d\n", "joint_mark", "obj", main_inputs.marked_joint_object_index); }
+    if (main_inputs.is_menu_open) { term_printf (NULL, "%-11s %-8s scene_menu\n", "menu", "open"); }
+    if (main_inputs.spawner_menu_level > 0) { term_printf (NULL, "%-11s %-8s spawner_menu (level %d)\n", "menu", "open", main_inputs.spawner_menu_level); }
+    if (main_inputs.velocity_menu_level > 0) { term_printf (NULL, "%-11s %-8s velocity_menu (level %d)\n", "menu", "open", main_inputs.velocity_menu_level); }
+    if (main_inputs.object_menu_level > 0) { term_printf (NULL, "%-11s %-8s object_menu (level %d)\n", "menu", "open", main_inputs.object_menu_level); }
+    if (config_menu_is_open ()) { term_printf (NULL, "%-11s %-8s config_menu\n", "menu", "open"); }
+    if (physics_is_halted ()) { term_printf (NULL, "%-11s %-8s HALTED\n", "physics", "state"); }
 }
 void cmd_seq (int argc, char **argv) {
     int first = 1, last = 1;
     if (argc == 2) {
         float v = 0.0f;
-        if (term_parse_float (argv [1], &v)) {
-            last = (int) v;
-        }
+        if (term_parse_float (argv [1], &v)) { last = (int) v; }
     } else if (argc >= 3) {
         float v1 = 0.0f, v2 = 0.0f;
-        if (term_parse_float (argv [1], &v1)) {
-            first = (int) v1;
-        }
-        if (term_parse_float (argv [2], &v2)) {
-            last = (int) v2;
-        }
+        if (term_parse_float (argv [1], &v1)) { first = (int) v1; }
+        if (term_parse_float (argv [2], &v2)) { last = (int) v2; }
     }
     if (last < first) {
         int temp = first;
         first = last;
         last = temp;
-    }
-    int limit = last - first + 1;
+    } int limit = last - first + 1;
     if (limit > 1000) {
         limit = 1000;
         last = first + 999;
@@ -795,23 +660,19 @@ void cmd_tee (int argc, char **argv) {
     if (argc < 3) {
         term_err ("usage: tee <filename> <command...>\n");
         return;
-    }
-    const char *output_filename = argv [1];
+    } const char *output_filename = argv [1];
     char sub_command [2048];
     sub_command [0] = '\0';
     size_t offset = 0;
     for (int i = 2; i < argc; i++) {
-        if (i > 2) {
-            sub_command [offset++] = ' ';
-        }
+        if (i > 2) { sub_command [offset++] = ' '; }
         size_t len = strlen (argv [i]);
         if (offset + len < sizeof (sub_command) - 1) {
             memcpy (sub_command + offset, argv [i], len);
             offset += len;
             sub_command [offset] = '\0';
         }
-    }
-    term_capture_begin ();
+    } term_capture_begin ();
     term_execute (sub_command);
     term_capture_end ();
     char *captured = term_capture_get ();
@@ -820,32 +681,25 @@ void cmd_tee (int argc, char **argv) {
         if (term_tee_write_status (output_filename, captured, &bytes_written) == 0) {
             const char *name = strncmp (output_filename, "status/", 7) == 0 ? output_filename + 7 : output_filename;
             term_printf ("term_ok", "tee: wrote %zu bytes to status/%s\n", bytes_written, name);
-        } else {
-            term_err ("mpe: tee: use a direct filename inside status/; write failed\n");
-        }
-    }
-    term_capture_reset ();
+        } else { term_err ("mpe: tee: use a direct filename inside status/; write failed\n"); }
+    } term_capture_reset ();
 }
 void cmd_watch (int argc, char **argv) {
     if (argc < 2) {
         term_err ("usage: watch <command...>\n");
         return;
-    }
-    char sub_command [2048];
+    } char sub_command [2048];
     sub_command [0] = '\0';
     size_t offset = 0;
     for (int i = 1; i < argc; i++) {
-        if (i > 1) {
-            sub_command [offset++] = ' ';
-        }
+        if (i > 1) { sub_command [offset++] = ' '; }
         size_t len = strlen (argv [i]);
         if (offset + len < sizeof (sub_command) - 1) {
             memcpy (sub_command + offset, argv [i], len);
             offset += len;
             sub_command [offset] = '\0';
         }
-    }
-    term_dim ("-- watch: single execution (periodic mode deferred) --\n");
+    } term_dim ("-- watch: single execution (periodic mode deferred) --\n");
     term_execute (sub_command);
 }
 void cmd_sudo (int argc, char **argv) {
@@ -858,35 +712,28 @@ void cmd_sudo (int argc, char **argv) {
         sub_command [0] = '\0';
         size_t offset = 0;
         for (int i = 1; i < argc; i++) {
-            if (i > 1) {
-                sub_command [offset++] = ' ';
-            }
+            if (i > 1) { sub_command [offset++] = ' '; }
             size_t len = strlen (argv [i]);
             if (offset + len < sizeof (sub_command) - 1) {
                 memcpy (sub_command + offset, argv [i], len);
                 offset += len;
                 sub_command [offset] = '\0';
             }
-        }
-        term_execute (sub_command);
+        } term_execute (sub_command);
         return;
-    }
-    term_dim ("[sudo] bypassing game-mode restriction\n");
+    } term_dim ("[sudo] bypassing game-mode restriction\n");
     char sub_command [2048];
     sub_command [0] = '\0';
     size_t offset = 0;
     for (int i = 1; i < argc; i++) {
-        if (i > 1) {
-            sub_command [offset++] = ' ';
-        }
+        if (i > 1) { sub_command [offset++] = ' '; }
         size_t len = strlen (argv [i]);
         if (offset + len < sizeof (sub_command) - 1) {
             memcpy (sub_command + offset, argv [i], len);
             offset += len;
             sub_command [offset] = '\0';
         }
-    }
-    term_sudo_active = true;
+    } term_sudo_active = true;
     term_execute (sub_command);
     term_sudo_active = false;
 }
@@ -898,11 +745,7 @@ void cmd_su (int argc, char **argv) {
     if (term_engine_start_time == 0) {
         term_engine_start_time = posix_monotonic_time ();
     } /* FIX_029 */
-    if (main_inputs.is_debug_mode_active) {
-        term_ok ("Switched to debug mode.\n");
-    } else {
-        term_ok ("Switched to game mode.\n");
-    }
+    if (main_inputs.is_debug_mode_active) { term_ok ("Switched to debug mode.\n"); } else { term_ok ("Switched to game mode.\n"); }
 }
 void cmd_dmesg (int argc, char **argv) {
     int max_events = 32;
@@ -910,47 +753,30 @@ void cmd_dmesg (int argc, char **argv) {
     for (int i = 1; i < argc; i++) {
         if (term_str_eq (argv [i], "-n") && (i + 1 < argc)) {
             float v = 0.0f;
-            if (term_parse_float (argv [i + 1], &v)) {
-                max_events = (int) v;
-            }
+            if (term_parse_float (argv [i + 1], &v)) { max_events = (int) v; }
             i++;
         } else if (term_str_eq (argv [i], "-l") && (i + 1 < argc)) {
             i++;
-            if (term_str_eq (argv [i], "info")) {
-                filter_level = 0;
-            } else if (term_str_eq (argv [i], "warn")) {
+            if (term_str_eq (argv [i], "info")) { filter_level = 0; } else if (term_str_eq (argv [i], "warn")) {
                 filter_level = 1;
-            } else if (term_str_eq (argv [i], "error")) {
-                filter_level = 2;
-            }
+            } else if (term_str_eq (argv [i], "error")) { filter_level = 2; }
         }
     }
-    if (max_events < 1) {
-        max_events = 1;
-    }
-    if (max_events > 256) {
-        max_events = 256;
-    }
+    if (max_events < 1) { max_events = 1; }
+    if (max_events > 256) { max_events = 256; }
     int total_events = event_log_get_count ();
     if (total_events == 0) {
         term_dim ("(event log empty)\n");
         return;
-    }
-    int start_index = total_events - max_events;
-    if (start_index < 0) {
-        start_index = 0;
-    }
+    } int start_index = total_events - max_events;
+    if (start_index < 0) { start_index = 0; }
     int printed = 0;
     for (int i = start_index; i < total_events; i++) {
         log_level level;
         time_t timestamp;
         const char *message = event_log_get_message (i, &level, &timestamp);
-        if (!message) {
-            continue;
-        }
-        if ((filter_level >= 0) && ((int) level < filter_level)) {
-            continue;
-        }
+        if (!message) { continue; }
+        if ((filter_level >= 0) && ((int) level < filter_level)) { continue; }
         struct tm *local_time = localtime (&timestamp);
         char time_buffer [32];
         strftime (time_buffer, sizeof (time_buffer), "%H:%M:%S", local_time);
@@ -959,11 +785,7 @@ void cmd_dmesg (int argc, char **argv) {
         term_printf (tag_name, "[%s] %s: %s\n", time_buffer, level_text, message);
         printed++;
     }
-    if (printed == 0) {
-        term_dim ("(no matching events)\n");
-    } else {
-        term_printf ("term_dim", "%d event(s) shown\n", printed);
-    }
+    if (printed == 0) { term_dim ("(no matching events)\n"); } else { term_printf ("term_dim", "%d event(s) shown\n", printed); }
 } /* MPE_TASK_V15R2_PHASE7_IMPL_END */
 /* MPE_TASK_V15R2_PHASE8_IMPL_BEGIN */
 /* MPE_TASK_V15R2_MICROVIM_FILE_WHITELIST_BEGIN */
@@ -1013,13 +835,9 @@ static const char *mv_allowed_extensions [] = {".cfg", ".ini", ".conf", ".txt", 
 static const char *mv_blocked_extensions [] = {".dat", ".o", ".so", ".a", ".bin",
                                               ".exe", ".obj", ".dll", ".dylib", NULL};
 bool mv_file_is_allowed (const char *filepath) {
-    if (!filepath || filepath [0] == '\0') {
-        return false;
-    }
+    if (!filepath || filepath [0] == '\0') { return false; }
     /* Reject absolute paths */
-    if (filepath [0] == '/') {
-        return false;
-    }
+    if (filepath [0] == '/') { return false; }
     /* DESPOT-2026-10-07 P0-3: reject parent traversal except for the exact
      * blessed known-files entries (../../readme.md etc). An arbitrary
      * `vi ../../tmp/evil.c` or `vi status/../../etc/x.c` must not pass
@@ -1032,9 +850,7 @@ bool mv_file_is_allowed (const char *filepath) {
         }
     }
     if (!is_known) {
-        if (strstr (filepath, "..") != NULL) {
-            return false;
-        }
+        if (strstr (filepath, "..") != NULL) { return false; }
         /* Confine non-known edits to project-local trees (status/, docs
          * parlance). Absolute jail via realpath happens at save; this is
          * the fast reject. */
@@ -1043,26 +859,19 @@ bool mv_file_is_allowed (const char *filepath) {
     const char *dot = strrchr (filepath, '.');
     if (dot) {
         for (int i = 0; mv_blocked_extensions [i]; i++) {
-            if (strcasecmp (dot, mv_blocked_extensions [i]) == 0) {
-                return false;
-            }
+            if (strcasecmp (dot, mv_blocked_extensions [i]) == 0) { return false; }
         }
     }
     /* Check if it's in the known files list */
     for (int i = 0; mv_known_files [i].path; i++) {
-        if (strcmp (filepath, mv_known_files [i].path) == 0) {
-            return true;
-        }
+        if (strcmp (filepath, mv_known_files [i].path) == 0) { return true; }
     }
     /* Check if it has an allowed extension */
     if (dot) {
         for (int i = 0; mv_allowed_extensions [i]; i++) {
-            if (strcasecmp (dot, mv_allowed_extensions [i]) == 0) {
-                return true;
-            }
+            if (strcasecmp (dot, mv_allowed_extensions [i]) == 0) { return true; }
         }
-    }
-    return false;
+    } return false;
 } /* MPE_TASK_V15R2_MICROVIM_FILE_WHITELIST_END */
 void cmd_vi (int argc, char **argv) {
     /* Handle --list / -l flag */
@@ -1071,8 +880,7 @@ void cmd_vi (int argc, char **argv) {
         term_out ("\n");
         for (int i = 0; mv_known_files [i].path; i++) {
             term_printf (NULL, "  %-40s %s\n", mv_known_files [i].path, mv_known_files [i].description);
-        }
-        term_out ("\n");
+        } term_out ("\n");
         term_dim ("Also allowed: any file with extensions: .cfg .ini .conf .txt .md .glsl .sh .py .h .c\n");
         term_dim ("Blocked: .dat .o .so .a .bin .exe and other binary formats\n");
         term_out ("\n");
@@ -1093,11 +901,8 @@ void cmd_vi (int argc, char **argv) {
         term_out ("  Cmd:   :w :q :q! :wq :x :e <file> :N :set nu :s/o/n/g\n");
         term_out ("  Exit:  :q or :wq or double-Escape in Normal mode\n");
         return;
-    }
-    const char *target_file = "status/engine.cfg";
-    if (argc > 1) {
-        target_file = argv [1];
-    }
+    } const char *target_file = "status/engine.cfg";
+    if (argc > 1) { target_file = argv [1]; }
     /* Validate file against whitelist */
     if (!mv_file_is_allowed (target_file)) {
         term_printf ("term_err", "mpe: vi: %s: not an editable file\n", target_file);
@@ -1108,18 +913,11 @@ void cmd_vi (int argc, char **argv) {
     if (microvim_is_active ()) {
         term_err ("mpe: vi: editor already open (close it first with :q or Esc Esc)\n");
         return;
-    }
-    microvim_open (target_file);
-    if (terminal_entry) {
-        gtk_widget_set_visible (terminal_entry, FALSE);
-    }
-    if (terminal_prompt_label) {
-        gtk_widget_set_visible (terminal_prompt_label, FALSE);
-    }
+    } microvim_open (target_file);
+    if (terminal_entry) { gtk_widget_set_visible (terminal_entry, FALSE); }
+    if (terminal_prompt_label) { gtk_widget_set_visible (terminal_prompt_label, FALSE); }
     term_printf ("term_echo", "MicroVim opened: %s\n", target_file);
     term_dim ("Modes: Normal/Insert/Command. Esc=Normal, i=Insert, :=Command.\n");
     term_dim ("Save: :w  Quit: :q  Save+Quit: :wq  Force quit: :q!  Exit: Esc Esc\n");
-    if (terminal_output_buffer) {
-        microvim_render (terminal_output_buffer);
-    }
+    if (terminal_output_buffer) { microvim_render (terminal_output_buffer); }
 } /* MPE_TASK_V15R2_PHASE8_IMPL_END */

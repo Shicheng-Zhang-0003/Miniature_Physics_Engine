@@ -32,18 +32,10 @@ static const char *dump_type (object_type t) {
     }
 }
 static const char *dump_state (const rigidbody *rb) {
-    if (!rb) {
-        return "invalid";
-    }
-    if (rb -> static_state) {
-        return "static";
-    }
-    if (rb -> kinematic) {
-        return "kinematic";
-    }
-    if (rb -> is_sleeping) {
-        return "sleeping";
-    }
+    if (!rb) { return "invalid"; }
+    if (rb -> static_state) { return "static"; }
+    if (rb -> kinematic) { return "kinematic"; }
+    if (rb -> is_sleeping) { return "sleeping"; }
     return "awake";
 }
 static const char *dump_ctype (constraint_type t) {
@@ -63,34 +55,24 @@ static const char *dump_ctype (constraint_type t) {
     }
 }
 static int dump_index_by_id (physics_world *world, uint32_t id) {
-    if (!world || id == 0) {
-        return -1;
-    }
+    if (!world || id == 0) { return -1; }
     /* Reuse the world id->index cache (O(1)) instead of linear scan. */
     int hit = physics_world_index_by_id (world, id);
-    if (hit >= 0) {
-        return hit;
-    }
+    if (hit >= 0) { return hit; }
     for (int i = 0; i < world -> body_count; i++) {
-        if (world -> bodies [i].object_id == id) {
-            return i;
-        }
-    }
-    return -1;
+        if (world -> bodies [i].object_id == id) { return i; }
+    } return -1;
 }
 static vector3 dump_anchor_world (const rigidbody *rb, vector3 local) {return vector3_addition (rb -> position, vector4_rotate_to_vector3 (rb -> orientation, local));}
 int tui_dump_snapshot (FILE *out, physics_world *world, unsigned long tick, float dt) {
-    if (!out || !world || !world -> bodies) {
-        return 1;
-    }
+    if (!out || !world || !world -> bodies) { return 1; }
     /* DESPOT-2026-10-01: negative/huge body_count printed bodies=-N and drove
      * negative pair headers. Validate against live allocation before dumping. */
     if (world -> body_count < 0 || world -> body_count > world -> body_capacity) {
         fprintf (out, "### MPE-TUI snapshot tick=%lu time=%.4f dt=%.5f bodies=0 result=FAIL(bad-count)\n", tick,
                  tick * (double) dt, dt);
         return 1;
-    }
-    int bad = 0;
+    } int bad = 0;
     for (int i = 0; i < world -> body_count; i++) {
         rigidbody *rb = &world -> bodies [i];
         /* DESPOT-2026-10-04: bad used to cover only pos/vel/angvel while a
@@ -105,8 +87,7 @@ int tui_dump_snapshot (FILE *out, physics_world *world, unsigned long tick, floa
             !isfinite (rb -> restitution) || !isfinite (rb -> friction_static) || !isfinite (rb -> friction_kinetic)) {
             bad = 1;
         }
-    }
-    char b0 [160], b1 [160], b2 [320];
+    } char b0 [160], b1 [160], b2 [320];
     fprintf (out, "### MPE-TUI snapshot tick=%lu time=%.4f dt=%.5f bodies=%d result=%s\n", tick, tick * (double) dt, dt,
              world -> body_count, bad ? "FAIL(non-finite)" : "PASS");
     /* ---- engine truth parameters + totals ---- */
@@ -117,23 +98,17 @@ int tui_dump_snapshot (FILE *out, physics_world *world, unsigned long tick, floa
         rigidbody *rb = &world -> bodies [i];
         ke += (double) rb_get_kinetic_energy (rb);
         mom = vector3_addition (mom, vector3_scaling (rb -> velocity, rb -> mass));
-        if (rb -> static_state) {
-            statics++;
-        } else if (rb -> kinematic) {
+        if (rb -> static_state) { statics++; } else if (rb -> kinematic) {
             kinematics++;
         } else if (rb -> is_sleeping) {
             sleeping++;
-        } else {
-            awake++;
-        }
+        } else { awake++; }
     }
     /* Per-world truth params (a scene-local config may differ from g_cfg). */
     const mpe_config_t *C = mpe_world_cfg (world);
     int ncustom = 0;
     for (int ci = 0; ci < world -> body_count; ci++) {
-        if (world -> bodies [ci].type == object_custom) {
-            ncustom++;
-        }
+        if (world -> bodies [ci].type == object_custom) { ncustom++; }
     }
     fprintf (out, "[engine] gravity=%+.4f drag=%.5f angScale=%.4f iters=%d substeps=%d\n", C -> world.gravity,
              C -> world.drag, C -> world.angular_damping_scale, C -> timestep.solver_iterations, C -> timestep.max_substeps);
@@ -202,24 +177,18 @@ int tui_dump_snapshot (FILE *out, physics_world *world, unsigned long tick, floa
     /* ---- springs ---- */
     int springs = 0;
     for (int i = 0; i < mpe_max_joints; i++) {
-        if (world -> spring_joints [i].is_active) {
-            springs++;
-        }
-    }
-    fprintf (out, "[springs] active=%d\n", springs);
+        if (world -> spring_joints [i].is_active) { springs++; }
+    } fprintf (out, "[springs] active=%d\n", springs);
     for (int i = 0; i < mpe_max_joints; i++) {
         spring_joint *sj = &world -> spring_joints [i];
-        if (!sj -> is_active) {
-            continue;
-        }
+        if (!sj -> is_active) { continue; }
         int ia = dump_index_by_id (world, sj -> object_id_a);
         int ib = dump_index_by_id (world, sj -> object_id_b);
         if (ia < 0 || ib < 0) {
             fprintf (out, "  spring slot=%d endpoint-missing A(id%u->%d) B(id%u->%d)\n", i, sj -> object_id_a, ia,
                      sj -> object_id_b, ib);
             continue;
-        }
-        vector3 d = vector3_subtraction (world -> bodies [ib].position, world -> bodies [ia].position);
+        } vector3 d = vector3_subtraction (world -> bodies [ib].position, world -> bodies [ia].position);
         float len = vector3_length (d);
         vector3 axis = len > 1e-9f ? vector3_scaling (d, 1.0f / len) : (vector3) {1.0f, 0.0f, 0.0f};
         float ext = len - sj -> equilibrium_length;
@@ -236,16 +205,11 @@ int tui_dump_snapshot (FILE *out, physics_world *world, unsigned long tick, floa
     /* ---- generic constraints ---- */
     int constr = 0;
     for (int i = 0; i < mpe_max_joints; i++) {
-        if (world -> revolute_constraints [i].is_active) {
-            constr++;
-        }
-    }
-    fprintf (out, "[constraints] active=%d\n", constr);
+        if (world -> revolute_constraints [i].is_active) { constr++; }
+    } fprintf (out, "[constraints] active=%d\n", constr);
     for (int i = 0; i < mpe_max_joints; i++) {
         constraint *c = &world -> revolute_constraints [i];
-        if (!c -> is_active) {
-            continue;
-        }
+        if (!c -> is_active) { continue; }
         int ia = dump_index_by_id (world, c -> body_id_a);
         int ib = dump_index_by_id (world, c -> body_id_b);
         fprintf (out, "  %s slot=%d A=%d(id%u) B=%d(id%u)", dump_ctype (c -> type), i, ia, c -> body_id_a, ib,
@@ -253,8 +217,7 @@ int tui_dump_snapshot (FILE *out, physics_world *world, unsigned long tick, floa
         if (ia < 0 || ib < 0) {
             fprintf (out, " endpoint-missing\n");
             continue;
-        }
-        rigidbody *a = &world -> bodies [ia];
+        } rigidbody *a = &world -> bodies [ia];
         rigidbody *b = &world -> bodies [ib];
         if (c -> type == constraint_revolute) {
             vector3 wa = dump_anchor_world (a, c -> p.revolute.anchor_a);
@@ -300,9 +263,7 @@ int tui_dump_snapshot (FILE *out, physics_world *world, unsigned long tick, floa
             float d = vector3_length (vector3_subtraction (wb, wa));
             fprintf (out, " dist=%.5f max=%.5f %s\n", d, c -> p.rope.rest_length,
                      d > c -> p.rope.rest_length ? "TAUT" : "slack");
-        } else {
-            fprintf (out, "\n");
-        }
+        } else { fprintf (out, "\n"); }
     }
     /* ---- relative positions: all pairs ----
      * LOSSY SUMMARY: for n>24 only 64 pairs are listed, and the min/max
@@ -334,20 +295,14 @@ int tui_dump_snapshot (FILE *out, physics_world *world, unsigned long tick, floa
     int show_all = n <= 24;
     for (int i = 0; i < cap; i++) {
         for (int j = i + 1; j < cap; j++) {
-            if (!show_all && shown >= 64) {
-                break;
-            }
+            if (!show_all && shown >= 64) { break; }
             vector3 d = vector3_subtraction (world -> bodies [j].position, world -> bodies [i].position);
             fprintf (out, "  pair %d<->%d dist=%.5f d=(%+.4f,%+.4f,%+.4f)\n", i, j, vector3_length (d), d.x, d.y, d.z);
             shown++;
         }
-        if (!show_all && shown >= 64) {
-            break;
-        }
+        if (!show_all && shown >= 64) { break; }
     }
-    if (!show_all) {
-        fprintf (out, "  ... truncated to %d pairs (scan covered first %d bodies)\n", shown, cap);
-    }
+    if (!show_all) { fprintf (out, "  ... truncated to %d pairs (scan covered first %d bodies)\n", shown, cap); }
     /* ---- islands ---- */
     fprintf (out, "[islands] count=%d\n", islands_count (world));
     for (int i = 0; i < n; i++) {
@@ -371,6 +326,5 @@ int tui_dump_snapshot (FILE *out, physics_world *world, unsigned long tick, floa
     if (ferror (out)) {
         fprintf (stderr, "[tui] snapshot stream error after %lu ticks\n", tick);
         return 2;
-    }
-    return bad ? 1 : 0;
+    } return bad ? 1 : 0;
 }

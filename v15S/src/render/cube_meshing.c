@@ -40,8 +40,7 @@ void cube_meshing_init (void) {
         glVertexAttribPointer (2 + i, 4, GL_FLOAT, GL_FALSE, 19 * sizeof (float), (void *) (i * 4 * sizeof (float)));
         glEnableVertexAttribArray (2 + i);
         glVertexAttribDivisor (2 + i, 1);
-    }
-    glVertexAttribPointer (6, 3, GL_FLOAT, GL_FALSE, 19 * sizeof (float), (void *) (16 * sizeof (float)));
+    } glVertexAttribPointer (6, 3, GL_FLOAT, GL_FALSE, 19 * sizeof (float), (void *) (16 * sizeof (float)));
     glEnableVertexAttribArray (6);
     glVertexAttribDivisor (6, 1);
     glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, cube_mesh.element_buffer_object);

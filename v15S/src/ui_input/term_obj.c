@@ -13,34 +13,20 @@
 #include <math.h>
 #include <time.h>
 const char *term_object_type_name (rigidbody *rigid_body) {
-    if (!rigid_body) {
-        return "?";
-    }
-    if (rigid_body -> type == object_sphere) {
-        return "sph";
-    }
-    if (rigid_body -> type == object_cylinder) {
-        return "cyl";
-    }
+    if (!rigid_body) { return "?"; }
+    if (rigid_body -> type == object_sphere) { return "sph"; }
+    if (rigid_body -> type == object_cylinder) { return "cyl"; }
     return "cube";
 } /* Single source of truth for the spawn-gun type label (sphere/cube/cylinder).
  * All terminal + overlay-adjacent displays must use this, never inline. */
 const char *term_spawn_type_name (void) {
-    if (main_inputs.current_spawn_type == 0) {
-        return "sphere";
-    }
-    if (main_inputs.current_spawn_type == 1) {
-        return "cube";
-    }
+    if (main_inputs.current_spawn_type == 0) { return "sphere"; }
+    if (main_inputs.current_spawn_type == 1) { return "cube"; }
     return "cylinder";
 }
 const char *term_object_state_name (rigidbody *rigid_body) {
-    if (rigid_body -> static_state) {
-        return "static";
-    }
-    if (rigid_body -> is_sleeping) {
-        return "sleep";
-    }
+    if (rigid_body -> static_state) { return "static"; }
+    if (rigid_body -> is_sleeping) { return "sleep"; }
     return "run";
 }
 const char *term_object_mode (rigidbody *rigid_body) {
@@ -65,33 +51,20 @@ void term_list_objects (bool long_format) {
         term_dim ("(no objects)\n");
         return;
     }
-    if (long_format) {
-        term_printf (NULL, "%-10s %4s %8s %-4s %-6s %s\n", "MODE", "PID", "MASS", "TYPE", "STATE", "INFO");
-    }
+    if (long_format) { term_printf (NULL, "%-10s %4s %8s %-4s %-6s %s\n", "MODE", "PID", "MASS", "TYPE", "STATE", "INFO"); }
     for (int object_index = 0; object_index < (physics_world_get_primary () -> body_count); object_index++) {
-        if (long_format) {
-            term_print_object_long (object_index);
-        } else {
-            term_printf (NULL, "%d\n", object_index);
-        }
+        if (long_format) { term_print_object_long (object_index); } else { term_printf (NULL, "%d\n", object_index); }
     }
 }
 void term_list_joints (bool long_format) {
     int listed_count = 0;
     for (int joint_index = 0; joint_index < mpe_max_joints; joint_index++) {
-        if (!(physics_world_get_primary () -> spring_joints) [joint_index].is_active) {
-            continue;
-        }
-        if (long_format) {
-            term_print_joint_long (joint_index);
-        } else {
+        if (!(physics_world_get_primary () -> spring_joints) [joint_index].is_active) { continue; }
+        if (long_format) { term_print_joint_long (joint_index); } else {
             term_printf (NULL, "%d\n", joint_index);
-        }
-        listed_count++;
+        } listed_count++;
     }
-    if (listed_count == 0) {
-        term_dim ("(no joints)\n");
-    }
+    if (listed_count == 0) { term_dim ("(no joints)\n"); }
 }
 void term_list_root (bool long_format) {
     if (long_format) {
@@ -100,9 +73,7 @@ void term_list_root (bool long_format) {
         term_out ("-rw-r--r-- 1 root root 0 world\n");
         term_out ("-rw-r--r-- 1 root root 0 camera\n");
         term_out ("-rw-r--r-- 1 root root 0 spawner\n");
-    } else {
-        term_out ("obj/\njoint/\nworld\ncamera\nspawner\n");
-    }
+    } else { term_out ("obj/\njoint/\nworld\ncamera\nspawner\n"); }
 }
 void term_print_object_cat (int object_index) {
     rigidbody *rigid_body = &(physics_world_get_primary () -> bodies) [object_index];
@@ -112,9 +83,7 @@ void term_print_object_cat (int object_index) {
     term_printf (NULL, "  state:      %s\n", term_object_state_name (rigid_body));
     term_printf (NULL, "  mass:       %.4f\n", rigid_body -> mass);
     term_printf (NULL, "  inv_mass:   %.4f\n", rigid_body -> inverse_mass);
-    if (rigid_body -> type == object_sphere) {
-        term_printf (NULL, "  radius:     %.4f\n", rigid_body -> radius);
-    } else {
+    if (rigid_body -> type == object_sphere) { term_printf (NULL, "  radius:     %.4f\n", rigid_body -> radius); } else {
         term_printf (NULL, "  half_ext:   (%.4f, %.4f, %.4f)\n", rigid_body -> half_extensions.x,
                      rigid_body -> half_extensions.y, rigid_body -> half_extensions.z);
     }
@@ -203,8 +172,7 @@ int term_create_object (object_type spawn_type) {
     if (created_index < 0) {
         term_err ("mpe: touch: cannot create object (scene full?)\n");
         return -1;
-    }
-    (physics_world_get_primary () -> bodies) [created_index].friction_static = g_cfg.spawner.friction_s;
+    } (physics_world_get_primary () -> bodies) [created_index].friction_static = g_cfg.spawner.friction_s;
     (physics_world_get_primary () -> bodies) [created_index].friction_kinetic = g_cfg.spawner.friction_k;
     (physics_world_get_primary () -> bodies) [created_index].velocity = vector3_zero ();
     (physics_world_get_primary () -> bodies) [created_index].angular_velocity = vector3_zero ();
@@ -215,97 +183,59 @@ int term_create_object (object_type spawn_type) {
     return created_index;
 }
 int term_duplicate_object (int source_index) {
-    if ((source_index < 0) || (source_index >= (physics_world_get_primary () -> body_count))) {
-        return -1;
-    }
+    if ((source_index < 0) || (source_index >= (physics_world_get_primary () -> body_count))) { return -1; }
     rigidbody snapshot = (physics_world_get_primary () -> bodies) [source_index];
     vector3 copy_position = vector3_addition (snapshot.position, (vector3) {1.0f, 0.0f, 0.0f});
     int created_index = -1;
-    if (snapshot.type == object_sphere) {
-        created_index = scene_add_object (snapshot.radius, snapshot.mass, copy_position);
-    } else if (snapshot.type == object_cylinder) {
+    if (snapshot.type == object_sphere) { created_index = scene_add_object (snapshot.radius, snapshot.mass, copy_position); } else if (snapshot.type == object_cylinder) {
         /* Cylinders duplicate as cylinders (old code fell through to cube,
          * spawning the wrong shape with axle dims as box extents). */
         created_index =
             scene_add_cylinder (snapshot.radius, snapshot.cylinder_half_length, snapshot.mass, copy_position);
-    } else {
-        created_index = scene_add_cube (copy_position, snapshot.half_extensions, snapshot.mass);
-    }
+    } else { created_index = scene_add_cube (copy_position, snapshot.half_extensions, snapshot.mass); }
     if (created_index < 0) {
         term_err ("mpe: cp: cannot duplicate object (scene full?)\n");
         return -1;
-    }
-    rigidbody *created_body = &(physics_world_get_primary () -> bodies) [created_index];
+    } rigidbody *created_body = &(physics_world_get_primary () -> bodies) [created_index];
     created_body -> colour = snapshot.colour;
     created_body -> restitution = snapshot.restitution;
     created_body -> friction_static = snapshot.friction_static;
     created_body -> friction_kinetic = snapshot.friction_kinetic;
     created_body -> velocity = snapshot.velocity;
     created_body -> angular_velocity = snapshot.angular_velocity;
-    if (snapshot.static_state) {
-        rigidbody_set_static (created_body, true);
-    }
+    if (snapshot.static_state) { rigidbody_set_static (created_body, true); }
     return created_index;
 }
 void term_set_object_mass (int object_index, float new_mass) {
-    if ((object_index < 0) || (object_index >= (physics_world_get_primary () -> body_count))) {
-        return;
-    }
+    if ((object_index < 0) || (object_index >= (physics_world_get_primary () -> body_count))) { return; }
     rigidbody *rigid_body = &(physics_world_get_primary () -> bodies) [object_index];
-    if (new_mass < 0.0f) {
-        new_mass = 0.0f;
-    }
-    if (new_mass <= 0.0f) {
-        rigidbody_set_static (rigid_body, true);
-    } else {
-        if (rigid_body -> static_state) {
-            rigidbody_set_static (rigid_body, false);
-        }
+    if (new_mass < 0.0f) { new_mass = 0.0f; }
+    if (new_mass <= 0.0f) { rigidbody_set_static (rigid_body, true); } else {
+        if (rigid_body -> static_state) { rigidbody_set_static (rigid_body, false); }
         rigid_body -> mass = new_mass;
         rigid_body -> inverse_mass = 1.0f / new_mass;
-        if (rigid_body -> type == object_sphere) {
-            rigidbody_update_inertia_sphere (rigid_body);
-        } else {
+        if (rigid_body -> type == object_sphere) { rigidbody_update_inertia_sphere (rigid_body); } else {
             rigidbody_update_inertia_cube (rigid_body);
-        }
-        rigidbody_wake (rigid_body);
-    }
-    contact_cache_clear (physics_world_get_primary ());
+        } rigidbody_wake (rigid_body);
+    } contact_cache_clear (physics_world_get_primary ());
 }
 void term_set_object_static (int object_index, bool make_static) {
-    if ((object_index < 0) || (object_index >= (physics_world_get_primary () -> body_count))) {
-        return;
-    }
+    if ((object_index < 0) || (object_index >= (physics_world_get_primary () -> body_count))) { return; }
     rigidbody *rigid_body = &(physics_world_get_primary () -> bodies) [object_index];
     rigidbody_set_static (rigid_body, make_static);
     contact_cache_clear (physics_world_get_primary ());
 }
 bool term_mode_is_static (const char *mode_text) {
-    if (term_str_eq (mode_text, "static")) {
-        return true;
-    }
-    if (term_str_eq (mode_text, "dynamic")) {
-        return false;
-    }
-    if (term_str_eq (mode_text, "0")) {
-        return true;
-    }
-    if (term_str_eq (mode_text, "000")) {
-        return true;
-    }
-    if (term_str_eq (mode_text, "-x")) {
-        return true;
-    }
-    if (term_str_eq (mode_text, "+x")) {
-        return false;
-    }
+    if (term_str_eq (mode_text, "static")) { return true; }
+    if (term_str_eq (mode_text, "dynamic")) { return false; }
+    if (term_str_eq (mode_text, "0")) { return true; }
+    if (term_str_eq (mode_text, "000")) { return true; }
+    if (term_str_eq (mode_text, "-x")) { return true; }
+    if (term_str_eq (mode_text, "+x")) { return false; }
     char *endptr = NULL;
     long mode_bits = strtol (mode_text, &endptr, 8);
     if ((endptr != mode_text) && (*endptr == '\0')) {
-        if (mode_bits == 0) {
-            return true;
-        }
+        if (mode_bits == 0) { return true; }
         return false;
-    }
-    return false;
+    } return false;
 }

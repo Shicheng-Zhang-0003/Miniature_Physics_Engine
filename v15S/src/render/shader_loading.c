@@ -17,8 +17,7 @@ GLuint compile_shader (const char *shader_source, GLenum shader_type) {
         /* FIX-AUDIT-DESPOT: delete the failed shader object (was leaked). */
         glDeleteShader (shader_object);
         return 0;
-    }
-    return shader_object;
+    } return shader_object;
 }
 GLuint create_shader_program (const char *vertex_shader_path, const char *fragment_shader_path) {
     // Vertex shaders source code file loading
@@ -31,8 +30,7 @@ GLuint create_shader_program (const char *vertex_shader_path, const char *fragme
             fclose (fragment_shader_file);
         fprintf (stderr, "Shader file opening error \n");
         return 0;
-    }
-    fseek (vertex_shader_file, 0, SEEK_END);
+    } fseek (vertex_shader_file, 0, SEEK_END);
     long vertex_file_size = ftell (vertex_shader_file);
     rewind (vertex_shader_file);
     fseek (fragment_shader_file, 0, SEEK_END);
@@ -44,8 +42,7 @@ GLuint create_shader_program (const char *vertex_shader_path, const char *fragme
         fclose (fragment_shader_file);
         fprintf (stderr, "Shader file size invalid\n");
         return 0;
-    }
-    char *vertex_shader_source = malloc (vertex_file_size + 1);
+    } char *vertex_shader_source = malloc (vertex_file_size + 1);
     char *fragment_shader_source = malloc (fragment_file_size + 1);
     if ((!vertex_shader_source) || (!fragment_shader_source)) {
         if (vertex_shader_source)
@@ -64,8 +61,7 @@ GLuint create_shader_program (const char *vertex_shader_path, const char *fragme
         fclose (vertex_shader_file);
         fclose (fragment_shader_file);
         return 0;
-    }
-    vertex_shader_source [vertex_file_size] = '\0';
+    } vertex_shader_source [vertex_file_size] = '\0';
     if (fread (fragment_shader_source, 1, fragment_file_size, fragment_shader_file) != (size_t) fragment_file_size) {
         fprintf (stderr, "Error reading fragment shader\n");
         free (vertex_shader_source);
@@ -73,8 +69,7 @@ GLuint create_shader_program (const char *vertex_shader_path, const char *fragme
         fclose (vertex_shader_file);
         fclose (fragment_shader_file);
         return 0;
-    }
-    fragment_shader_source [fragment_file_size] = '\0';
+    } fragment_shader_source [fragment_file_size] = '\0';
     fclose (vertex_shader_file);
     fclose (fragment_shader_file);
     // Compilation Process
@@ -102,8 +97,7 @@ GLuint create_shader_program (const char *vertex_shader_path, const char *fragme
         fprintf (stderr, "Shader linkage error: %s\n", information_log);
         glDeleteProgram (shader_program);
         shader_program = 0;
-    }
-    glDeleteShader (vertex_shader);
+    } glDeleteShader (vertex_shader);
     glDeleteShader (fragment_shader);
     return shader_program;
 }
