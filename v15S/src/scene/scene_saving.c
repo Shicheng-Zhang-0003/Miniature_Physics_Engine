@@ -44,9 +44,7 @@
  *   u32 crc32 (IEEE, over every preceding byte).
  * Older versions (<=153) keep their native-order legacy reader in
  * scene_load.c; the saver only ever writes v200. */
-static int save_vec3 (FILE *f, uint32_t *crc, vector3 v) {
-    return scene_wfloat (f, crc, v.x) && scene_wfloat (f, crc, v.y) && scene_wfloat (f, crc, v.z);
-}
+static int save_vec3 (FILE *f, uint32_t *crc, vector3 v) {return scene_wfloat (f, crc, v.x) && scene_wfloat (f, crc, v.y) && scene_wfloat (f, crc, v.z);}
 static int save_quat (FILE *f, uint32_t *crc, vector4 q) {
     return scene_wfloat (f, crc, q.w) && scene_wfloat (f, crc, q.x) && scene_wfloat (f, crc, q.y) &&
            scene_wfloat (f, crc, q.z);
@@ -158,7 +156,7 @@ int save_scene (const char *file_destination_path) {
     ok = ok && scene_w32 (f, &crc, (uint32_t) mpe_version);
     ok = ok && scene_w32 (f, &crc, (uint32_t) (physics_world_get_primary () -> body_count));
     for (int i = 0; ok && (i < (physics_world_get_primary () -> body_count)); i++) {
-        rigidbody *rb = &(physics_world_get_primary () -> bodies)[i];
+        rigidbody *rb = &(physics_world_get_primary () -> bodies) [i];
         ok = ok && scene_w32 (f, &crc, (uint32_t) rb -> type);
         ok = ok && scene_wfloat (f, &crc, rb -> mass);
         ok = ok && scene_wfloat (f, &crc, rb -> radius);
@@ -185,20 +183,20 @@ int save_scene (const char *file_destination_path) {
      * bound silently dropped from saves. */
     int active_springs = 0;
     for (int j = 0; j < mpe_max_joints; j++) {
-        if ((physics_world_get_primary () -> spring_joints)[j].is_active) {
+        if ((physics_world_get_primary () -> spring_joints) [j].is_active) {
             active_springs++;
         }
     }
     ok = ok && scene_w32 (f, &crc, (uint32_t) active_springs);
     for (int j = 0; ok && (j < mpe_max_joints); j++) {
-        if (!(physics_world_get_primary () -> spring_joints)[j].is_active) {
+        if (!(physics_world_get_primary () -> spring_joints) [j].is_active) {
             continue;
         }
-        ok = ok && scene_w32 (f, &crc, (physics_world_get_primary () -> spring_joints)[j].object_id_a);
-        ok = ok && scene_w32 (f, &crc, (physics_world_get_primary () -> spring_joints)[j].object_id_b);
-        ok = ok && scene_wfloat (f, &crc, (physics_world_get_primary () -> spring_joints)[j].equilibrium_length);
-        ok = ok && scene_wfloat (f, &crc, (physics_world_get_primary () -> spring_joints)[j].spring_constant);
-        ok = ok && scene_wfloat (f, &crc, (physics_world_get_primary () -> spring_joints)[j].damping_coefficient);
+        ok = ok && scene_w32 (f, &crc, (physics_world_get_primary () -> spring_joints) [j].object_id_a);
+        ok = ok && scene_w32 (f, &crc, (physics_world_get_primary () -> spring_joints) [j].object_id_b);
+        ok = ok && scene_wfloat (f, &crc, (physics_world_get_primary () -> spring_joints) [j].equilibrium_length);
+        ok = ok && scene_wfloat (f, &crc, (physics_world_get_primary () -> spring_joints) [j].spring_constant);
+        ok = ok && scene_wfloat (f, &crc, (physics_world_get_primary () -> spring_joints) [j].damping_coefficient);
     }
     /* Save all constraint types from the unified constraint pool. */
     int constraint_counts [5] = {0}; /* fixed, distance, prismatic, rope (revolute handled separately) */

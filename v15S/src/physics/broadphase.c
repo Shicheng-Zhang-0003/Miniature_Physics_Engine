@@ -25,23 +25,20 @@ int broadphase_get_pair_overflow_count (const struct physics_world *world) {
         return 0;
     }
     return world -> broadphase -> pair_overflow_count;
-}
-/* MPE_TASK_10_PAIR_DEDUPE_GETTER_BEGIN */
+} /* MPE_TASK_10_PAIR_DEDUPE_GETTER_BEGIN */
 int broadphase_get_pair_dedupe_overflow_count (const struct physics_world *world) {
     if ((!world) || (!world -> broadphase)) {
         return 0;
     }
     return world -> broadphase -> pair_dedupe_overflow_count;
-}
-/* MPE_TASK_10_PAIR_DEDUPE_GETTER_END */
+} /* MPE_TASK_10_PAIR_DEDUPE_GETTER_END */
 /* MPE_TASK_11_LARGE_OBJECT_CLAMP_GETTER_BEGIN */
 int broadphase_get_large_object_clamp_count (const struct physics_world *world) {
     if ((!world) || (!world -> broadphase)) {
         return 0;
     }
     return world -> broadphase -> large_object_clamp_count;
-}
-/* MPE_TASK_11_LARGE_OBJECT_CLAMP_GETTER_END */
+} /* MPE_TASK_11_LARGE_OBJECT_CLAMP_GETTER_END */
 void broadphase_reset_overflow_counts (struct physics_world *world) {
     if ((!world) || (!world -> broadphase)) {
         return;
@@ -65,8 +62,7 @@ void broadphase_cleanup (struct physics_world *world) {
         world -> broadphase -> node_pool_capacity = 0;
         world -> broadphase -> node_count = 0;
     }
-}
-/* DESPOT-2026-10-08 SIMD equivalence self-check: simd_add/sub/scale must be
+} /* DESPOT-2026-10-08 SIMD equivalence self-check: simd_add/sub/scale must be
  * bitwise identical to scalar over fixed vectors (SSE2 add/mul are correctly
  * rounded, same as scalar-SSE; no FMA). Runs once per process; loud on
  * mismatch. Proves the SIMD header can replace hot-loop scalar ops without
@@ -89,15 +85,13 @@ static void broadphase_simd_selfcheck (void) {
         (memcmp (&m1, &m2, sizeof (vector3)) != 0)) {
         fprintf (stderr, "[mpe] SIMD MISMATCH: simd_add/sub/scale != scalar (scalar path kept)\n");
     }
-}
-/* MPE_TASK_17_CELL_SIZE_GETTER_BEGIN */
+} /* MPE_TASK_17_CELL_SIZE_GETTER_BEGIN */
 float broadphase_get_current_cell_size (const struct physics_world *world) {
     if ((!world) || (!world -> broadphase)) {
         return 5.0f;
     }
     return world -> broadphase -> current_cell_size;
-}
-/* MPE_TASK_17_CELL_SIZE_GETTER_END */
+} /* MPE_TASK_17_CELL_SIZE_GETTER_END */
 static int hash_coordinate (int x, int y, int z) {
     unsigned int h = ((unsigned int) x) * 73856093u;
     h ^= ((unsigned int) y) * 19349663u;
@@ -202,11 +196,9 @@ float broadphase_bounding_radius (rigidbody *rb) {
         out = 500.0f;
     }
     return out;
-}
-static inline uint64_t a3_broadphase_pair_key (int object_a, int object_b) {
+} static inline uint64_t a3_broadphase_pair_key (int object_a, int object_b) {
     return ((uint64_t) (uint32_t) object_a << 32) | (uint64_t) (uint32_t) object_b;
-}
-static inline uint32_t a3_broadphase_pair_hash (uint64_t key) {
+} static inline uint32_t a3_broadphase_pair_hash (uint64_t key) {
     uint64_t mixed_key = key;
     mixed_key ^= mixed_key >> 33;
     mixed_key *= 0xff51afd7ed558ccdULL;
@@ -214,8 +206,7 @@ static inline uint32_t a3_broadphase_pair_hash (uint64_t key) {
     mixed_key *= 0xc4ceb9fe1a85ec53ULL;
     mixed_key ^= mixed_key >> 33;
     return (uint32_t) (mixed_key & a3_pair_hash_mask);
-}
-/* FIX-AUDIT-DESPOT: total order on canonical (min,max) pairs for the
+} /* FIX-AUDIT-DESPOT: total order on canonical (min,max) pairs for the
  * pre-return sort in broadphase_generate_pairing. */
 static int broadphase_pair_cmp (const void *pa, const void *pb) {
     const broadphase_pair *a = (const broadphase_pair *) pa;
@@ -265,8 +256,7 @@ static bool pair_already_checked (broadphase_workspace *ws, int min_obj, int max
     ws -> pair_dedupe_overflow_count++;
     return false;
     /* MPE_TASK_10_PAIR_DEDUPE_FALLBACK_END */
-}
-/* MPE_TASK_17_CELL_SIZE_FUNCTION_BEGIN */
+} /* MPE_TASK_17_CELL_SIZE_FUNCTION_BEGIN */
 static void broadphase_update_cell_size (struct physics_world *world, rigidbody *bodies,
                                          int body_count) { /* MPE_FTC_059 */
     broadphase_workspace *ws = world ? world -> broadphase : NULL;
@@ -344,8 +334,7 @@ static void broadphase_update_cell_size (struct physics_world *world, rigidbody 
         desired_cell_size = C -> broadphase.cell_size_max;
     }
     ws -> current_cell_size = desired_cell_size;
-}
-/* MPE_TASK_17_CELL_SIZE_FUNCTION_END */
+} /* MPE_TASK_17_CELL_SIZE_FUNCTION_END */
 int broadphase_generate_pairing (struct physics_world *world, broadphase_pair *collision_pairs_output_array,
                                  int maximum_pairs_allowed, float dt) { /* MPE_FTC_059 */
     if ((!world) || (!world -> bodies) || (!world -> broadphase) || (!collision_pairs_output_array) ||

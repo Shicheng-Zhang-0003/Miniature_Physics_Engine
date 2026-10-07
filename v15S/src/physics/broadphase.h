@@ -4,9 +4,7 @@
 #include "../core/rigidbody.h"
 #include "../config/mpe_constants.h"
 #include <stdint.h>
-typedef struct {
-    int object_index_a, object_index_b;
-} broadphase_pair;
+typedef struct {int object_index_a, object_index_b;} broadphase_pair;
 struct physics_world;
 typedef struct {
     int object_index;

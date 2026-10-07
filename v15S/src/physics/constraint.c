@@ -133,8 +133,7 @@ int constraint_add_distance (struct physics_world *world, uint32_t id_a, uint32_
         }
     }
     return -1;
-}
-/* Prismatic (slider) joint: single-axis slide. */
+} /* Prismatic (slider) joint: single-axis slide. */
 int constraint_add_prismatic (struct physics_world *world, uint32_t id_a, uint32_t id_b, vector3 anchor_a,
                               vector3 anchor_b, vector3 axis_a) {
     if (!world) {
@@ -193,8 +192,7 @@ int constraint_add_prismatic (struct physics_world *world, uint32_t id_a, uint32
         }
     }
     return -1;
-}
-/* Rope constraint: inequality distance (pulls only). */
+} /* Rope constraint: inequality distance (pulls only). */
 int constraint_add_rope (struct physics_world *world, uint32_t id_a, uint32_t id_b, vector3 anchor_a, vector3 anchor_b,
                          float max_length) {
     if (!world) {
@@ -297,8 +295,7 @@ void constraint_set_revolute_limits (struct physics_world *world, int index, boo
         world -> revolute_constraints [index].p.revolute.reference_axis_a = vector3_zero ();
         world -> revolute_constraints [index].p.revolute.reference_axis_b = vector3_zero ();
     }
-}
-/* Prismatic joint setters */
+} /* Prismatic joint setters */
 void constraint_set_prismatic_axes (struct physics_world *world, int index, vector3 axis_a, vector3 axis_b) {
     if (!world) {
         return;
@@ -370,9 +367,7 @@ void constraint_set_prismatic_motor (struct physics_world *world, int index, boo
     world -> revolute_constraints [index].p.prismatic.motor_target_speed = target_speed;
     world -> revolute_constraints [index].p.prismatic.motor_max_force = max_force;
 }
-int constraint_pool_capacity (void) {
-    return mpe_max_joints;
-}
+int constraint_pool_capacity (void) {return mpe_max_joints;}
 const constraint *constraint_pool_at (const struct physics_world *world, int index) {
     if (!world) {
         return NULL;
@@ -384,8 +379,7 @@ const constraint *constraint_pool_at (const struct physics_world *world, int ind
         return NULL;
     }
     return &world -> revolute_constraints [index];
-}
-/* Global id cache retired: lookups go through the owning world's
+} /* Global id cache retired: lookups go through the owning world's
  * per-world cache (physics_world_body_by_id), so interleaved worlds
  * and threads can never alias each other's entries. */
 /* Global id cache retired: lookups go through the owning world's

@@ -19,18 +19,10 @@
  * big-endian hosts (#error), so native == LE on every buildable target.
  * v200+ uses explicit-LE field codecs; do not "fix" these to byteswap
  * without also versioning the legacy files (they are LE dumps). */
-static int read_float (FILE *f, float *v) {
-    return fread (v, sizeof (float), 1, f) == 1;
-}
-static int read_int (FILE *f, int32_t *v) {
-    return fread (v, sizeof (int32_t), 1, f) == 1;
-}
-static int read_vec3 (FILE *f, vector3 *v) {
-    return fread (v, sizeof (vector3), 1, f) == 1;
-}
-static int read_vec4 (FILE *f, vector4 *v) {
-    return fread (v, sizeof (vector4), 1, f) == 1;
-}
+static int read_float (FILE *f, float *v) {return fread (v, sizeof (float), 1, f) == 1;}
+static int read_int (FILE *f, int32_t *v) {return fread (v, sizeof (int32_t), 1, f) == 1;}
+static int read_vec3 (FILE *f, vector3 *v) {return fread (v, sizeof (vector3), 1, f) == 1;}
+static int read_vec4 (FILE *f, vector4 *v) {return fread (v, sizeof (vector4), 1, f) == 1;}
 /* R3-02: Staged scene load.
  *
  * The previous implementation called scene_clear() before reading the
@@ -107,16 +99,12 @@ typedef struct {
     vector3 anchor_b;
     float rest_length;
 } staged_rope;
-static int scene_load_vec3 (FILE *f, uint32_t *crc, vector3 *v) {
-    return scene_rfloat (f, crc, &v -> x) && scene_rfloat (f, crc, &v -> y) && scene_rfloat (f, crc, &v -> z);
-}
+static int scene_load_vec3 (FILE *f, uint32_t *crc, vector3 *v) {return scene_rfloat (f, crc, &v -> x) && scene_rfloat (f, crc, &v -> y) && scene_rfloat (f, crc, &v -> z);}
 static int scene_load_quat (FILE *f, uint32_t *crc, vector4 *q) {
     return scene_rfloat (f, crc, &q -> w) && scene_rfloat (f, crc, &q -> x) && scene_rfloat (f, crc, &q -> y) &&
            scene_rfloat (f, crc, &q -> z);
 }
-static bool scene_vec3_finite (vector3 v) {
-    return isfinite (v.x) && isfinite (v.y) && isfinite (v.z);
-}
+static bool scene_vec3_finite (vector3 v) {return isfinite (v.x) && isfinite (v.y) && isfinite (v.z);}
 static bool scene_vec3_axis_valid (vector3 v) {
     float length_squared = vector3_length_squared (v);
     return isfinite (length_squared) && length_squared >= 1e-12f;
@@ -131,8 +119,7 @@ static bool scene_id_in_staged (const int32_t *staged_ids, int staged_count, uin
         }
     }
     return false;
-}
-/* Scene format v200 reader. The caller has consumed magic+version; the file
+} /* Scene format v200 reader. The caller has consumed magic+version; the file
  * position is at body_count. Same staged discipline as the legacy path:
  * everything validates (including the CRC32 footer) before the live scene
  * is touched. IDs are preserved verbatim (no remap); the allocator is
@@ -619,22 +606,22 @@ static int scene_loading_v200 (FILE *f, uint32_t header_crc) {
     (physics_world_get_primary () -> body_count) = staged_body_count;
     for (int i = 0; i < staged_body_count; i++) {
         int staged_cs = staged_bodies [i].custom_shape;
-        (physics_world_get_primary () -> bodies)[i] = staged_bodies [i];
-        (physics_world_get_primary () -> bodies)[i].body_index = i;
+        (physics_world_get_primary () -> bodies) [i] = staged_bodies [i];
+        (physics_world_get_primary () -> bodies) [i].body_index = i;
         /* Preserve foreign custom identity (staged); non-custom bodies
          * keep custom_shape=-1. Clobbering customs to -1 broke dispatch
          * (100/-1 mismatch rejects the capsule handler). */
-        if ((physics_world_get_primary () -> bodies)[i].type == object_custom) {
+        if ((physics_world_get_primary () -> bodies) [i].type == object_custom) {
             if (staged_cs < 100) {
                 staged_cs = 100;
             }
-            (physics_world_get_primary () -> bodies)[i].custom_shape = staged_cs;
+            (physics_world_get_primary () -> bodies) [i].custom_shape = staged_cs;
         } else {
-            (physics_world_get_primary () -> bodies)[i].custom_shape = -1;
+            (physics_world_get_primary () -> bodies) [i].custom_shape = -1;
         }
-        (physics_world_get_primary () -> bodies)[i].max_relative_speed_sq = 0.0f;
-        rigidbody_update_axes (&(physics_world_get_primary () -> bodies)[i]);
-        scene_note_loaded_id ((physics_world_get_primary () -> bodies)[i].object_id);
+        (physics_world_get_primary () -> bodies) [i].max_relative_speed_sq = 0.0f;
+        rigidbody_update_axes (&(physics_world_get_primary () -> bodies) [i]);
+        scene_note_loaded_id ((physics_world_get_primary () -> bodies) [i].object_id);
     }
     physics_world_bump_revision (physics_world_get_primary ());
     for (int j = 0; j < staged_spring_count; j++) {
@@ -1038,14 +1025,14 @@ int scene_loading (const char *file_source_path) {
     joint_init_pool (physics_world_get_primary ());
     (physics_world_get_primary () -> body_count) = staged_body_count;
     for (int i = 0; i < staged_body_count; i++) {
-        (physics_world_get_primary () -> bodies)[i] = staged_bodies [i];
+        (physics_world_get_primary () -> bodies) [i] = staged_bodies [i];
         /* Recover the saved object ID from staging (v150+). */
         int32_t saved_id = staged_ids [i];
-        (physics_world_get_primary () -> bodies)[i].object_id = scene_allocate_object_id ();
+        (physics_world_get_primary () -> bodies) [i].object_id = scene_allocate_object_id ();
         if ((version >= 150) && (saved_id > 0)) {
-            scene_id_remap_add ((uint32_t) saved_id, (physics_world_get_primary () -> bodies)[i].object_id);
+            scene_id_remap_add ((uint32_t) saved_id, (physics_world_get_primary () -> bodies) [i].object_id);
         }
-        (physics_world_get_primary () -> bodies)[i].object_generation = 1;
+        (physics_world_get_primary () -> bodies) [i].object_generation = 1;
     }
     /* Install staged joints */
     for (int j = 0; j < staged_joint_count; j++) {

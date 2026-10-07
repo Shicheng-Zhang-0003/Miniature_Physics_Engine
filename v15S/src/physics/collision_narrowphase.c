@@ -390,8 +390,7 @@ static void clip_obb_faces (rigidbody *ref_body, rigidbody *inc_body, vector3 no
      * carries load the solver needs; thin-quad degeneracy also risked
      * near-collinear support. Keep all clipped points. */
     collision_output_data -> contact_count = manifold_idx;
-}
-static inline float a3_cube_extent_axis (rigidbody *cube, int axis_index) {
+} static inline float a3_cube_extent_axis (rigidbody *cube, int axis_index) {
     if (axis_index == 0) {
         return cube -> half_extensions.x;
     }
@@ -680,8 +679,7 @@ bool collision_dual_cube (rigidbody *cube_a, rigidbody *cube_b, collision_data *
         return false;
     }
     return true;
-}
-/* Fill a caller-provided static plane proxy body.
+} /* Fill a caller-provided static plane proxy body.
      * No thread-local state - caller owns the storage.
      * restitution=1.0 is intentionally neutral: effective bounce is
      * min(body_restitution, 1.0) == body_restitution. */

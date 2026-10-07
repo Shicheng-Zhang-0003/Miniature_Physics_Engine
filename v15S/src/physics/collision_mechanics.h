@@ -182,8 +182,7 @@ static inline void a3_anisotropic_coulomb_clamp (vector3 normal, vector3 t1, vec
         *out1 = p1 * scale;
         *out2 = p2 * scale;
     }
-}
-/* Combine two bodies into one contact cone. mu_iso is the isotropic
+} /* Combine two bodies into one contact cone. mu_iso is the isotropic
  * coefficient the legacy path would have used (already min-of-bodies and
  * already stick/slip selected), and is used directly when neither body is
  * anisotropic. An anisotropic body contributes its own two coefficients under
@@ -213,8 +212,7 @@ static inline void a3_contact_friction_cone (const rigidbody *body_a, const rigi
             *out_lateral = rb -> friction_across_axis;
         }
     }
-}
-/* ---- Shared warm-start stamp (single source of truth) --------------------
+} /* ---- Shared warm-start stamp (single source of truth) --------------------
  * FIX-AUDIT-DESPOT: collision_solver.c and collision_cache.c each carried a
  * private copy of this stamp (a3_task05_body_property_stamp). The solver
  * comment even warned "must match contact_cache_save's stamp exactly" —
@@ -230,16 +228,14 @@ static inline void a3_contact_friction_cone (const rigidbody *body_a, const rigi
 static inline uint32_t a3_contact_cache_mix_u32 (uint32_t hash_value, uint32_t input_value) {
     hash_value ^= input_value + 0x9e3779b9u + (hash_value << 6) + (hash_value >> 2);
     return hash_value;
-}
-static inline uint32_t a3_contact_cache_float_bits (float value) {
+} static inline uint32_t a3_contact_cache_float_bits (float value) {
     union {
         float float_value;
         uint32_t integer_value;
     } converter;
     converter.float_value = value;
     return converter.integer_value;
-}
-static inline uint32_t a3_contact_cache_body_stamp (const rigidbody *rigid_body) {
+} static inline uint32_t a3_contact_cache_body_stamp (const rigidbody *rigid_body) {
     if (!rigid_body) {
         return 0;
     }
@@ -268,8 +264,7 @@ static inline uint32_t a3_contact_cache_body_stamp (const rigidbody *rigid_body)
     stamp = a3_contact_cache_mix_u32 (
         stamp, a3_contact_cache_float_bits (roundf (rigid_body -> orientation.z * 1000.0f) / 1000.0f));
     return stamp;
-}
-/* Capacity of collision_data::contacts. DESPOT-2026-09-29: this was a bare
+} /* Capacity of collision_data::contacts. DESPOT-2026-09-29: this was a bare
  * literal 4, and plugin pair handlers choose contact_count themselves, so the
  * bound was not expressed anywhere the writers could see it. Named now, and
  * the array is sized from it so the two cannot drift. Anything that clamps a

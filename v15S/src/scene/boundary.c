@@ -50,17 +50,14 @@ static float get_obb_max_along_axis (rigidbody *rigid_body, vector3 axis) {
     float projection = body_support_along_axis (rigid_body, axis);
     /* MPE_TASK_16_BOUNDARY_CACHED_AXES_MAX_END */
     return vector3_dot (rigid_body -> position, axis) + projection;
-}
-/* World-edge safety net: PERFECTLY PLASTIC positional clamp.
+} /* World-edge safety net: PERFECTLY PLASTIC positional clamp.
  *
  * Bounce (restitution) belongs to material contacts in the solver, which
  * combines both bodies' properties. The boundary is not a material, so it
  * never reflects velocity and never applies magic damping: it repositions
  * bodies inside the playable volume and kills only the inward (escaping)
  * velocity component. Deep escape still wakes the body so it rejoins. */
-void boundary_apply_floor (rigidbody *rigid_body, float floor_y_level) {
-    boundary_apply_floor_cfg (rigid_body, floor_y_level, NULL);
-}
+void boundary_apply_floor (rigidbody *rigid_body, float floor_y_level) {boundary_apply_floor_cfg (rigid_body, floor_y_level, NULL);}
 void boundary_apply_floor_cfg (rigidbody *rigid_body, float floor_y_level, const mpe_config_t *cfg) {
     if (!rigid_body) {
         return;
@@ -78,9 +75,7 @@ void boundary_apply_floor_cfg (rigidbody *rigid_body, float floor_y_level, const
         rigidbody_wake (rigid_body);
     }
 }
-void boundary_apply_box (rigidbody *rigid_body, vector3 min_bounds, vector3 maximum_bounds) {
-    boundary_apply_box_cfg (rigid_body, min_bounds, maximum_bounds, NULL);
-}
+void boundary_apply_box (rigidbody *rigid_body, vector3 min_bounds, vector3 maximum_bounds) {boundary_apply_box_cfg (rigid_body, min_bounds, maximum_bounds, NULL);}
 /* TRUTH: X/Z walls use the same emergency slop as Y (documented asymmetry
  * removed: a 1cm X-escape used to snap while 1cm Y-penetration was ignored;
  * the safety net must be uniform). */

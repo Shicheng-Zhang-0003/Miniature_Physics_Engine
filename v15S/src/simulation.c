@@ -98,8 +98,8 @@ gboolean physics_step_increment (gpointer user_data_pointer) {
         /* FIX-AUDIT-DESPOT: exclude statics (mirrors the awake branch in
          * long_run_validation_evaluate): floor slabs are neither awake nor
          * asleep, and counting them here inflated sleeping vs the report. */
-        if ((physics_world_get_primary () -> bodies)[sleep_count_index].is_sleeping &&
-            !(physics_world_get_primary () -> bodies)[sleep_count_index].static_state) {
+        if ((physics_world_get_primary () -> bodies) [sleep_count_index].is_sleeping &&
+            !(physics_world_get_primary () -> bodies) [sleep_count_index].static_state) {
             a3_sleeping_object_count++;
         }
     }
@@ -108,5 +108,4 @@ gboolean physics_step_increment (gpointer user_data_pointer) {
     long_run_validation_tick_update ();
     overlay_update ();
     return TRUE;
-}
-/* a3_positional_depenetration_pass now lives in physics/depenetration.c. */
+} /* a3_positional_depenetration_pass now lives in physics/depenetration.c. */

@@ -52,8 +52,7 @@ static bool a3_contact_anisotropy_axis (const physics_world *world, const rigidb
     }
     * out_axis = vector4_rotate_to_vector3 (frame -> orientation, owner -> friction_anisotropy_axis);
     return true;
-}
-/* Tangent basis for an anisotropic contact, built from the MATERIAL axis
+} /* Tangent basis for an anisotropic contact, built from the MATERIAL axis
  * rather than from the slip direction.
  *
  * Why: the elliptical cone is only the anisotropic Coulomb law when its
@@ -109,23 +108,17 @@ static inline uint32_t contact_pair_key (uint32_t id_a, uint32_t id_b) {
     key *= 0x94d049bb133111ebULL;
     key ^= key >> 31;
     return (uint32_t) (key & contact_hash_mask);
-}
-static inline vector4 collision_inverse_orientation (vector4 orientation) {
+} static inline vector4 collision_inverse_orientation (vector4 orientation) {
     return (vector4) {orientation.w, -orientation.x, -orientation.y, -orientation.z};
-}
-static inline vector3 collision_world_offset_to_body_local (rigidbody *body, vector3 world_offset) {
+} static inline vector3 collision_world_offset_to_body_local (rigidbody *body, vector3 world_offset) {
     return vector4_rotate_to_vector3 (collision_inverse_orientation (body -> orientation), world_offset);
-}
-static inline vector3 collision_body_local_to_world_offset (rigidbody *body, vector3 local_offset) {
+} static inline vector3 collision_body_local_to_world_offset (rigidbody *body, vector3 local_offset) {
     return vector4_rotate_to_vector3 (body -> orientation, local_offset);
-}
-/* FIX-AUDIT-DESPOT: thin wrapper over the shared stamp in
+} /* FIX-AUDIT-DESPOT: thin wrapper over the shared stamp in
  * collision_mechanics.h (single source of truth with contact_cache_save).
  * Kept under the legacy a3_task05_ name so call sites below don't churn;
  * bodies must match exactly or warm-start injects stale impulses. */
-static uint32_t a3_task05_body_property_stamp (const rigidbody *rigid_body) {
-    return a3_contact_cache_body_stamp (rigid_body);
-}
+static uint32_t a3_task05_body_property_stamp (const rigidbody *rigid_body) {return a3_contact_cache_body_stamp (rigid_body);}
 static bool a3_task05_cached_impulses_are_usable (float normal_impulse, float tangent_impulse) {
     if ((!isfinite (normal_impulse)) || (!isfinite (tangent_impulse))) {
         return false;
@@ -191,8 +184,7 @@ static bool contact_cache_adoptable (const cached_contact *cc, uint32_t id_a, ui
         return false;
     }
     return vector3_length_squared (cc -> tangent_dir) > 0.0001f;
-}
-/* Forward: defined beside the other per-phase passes below; called from
+} /* Forward: defined beside the other per-phase passes below; called from
  * prepare (pre-force tick-start selection). */
 void collision_snapshot_friction_mu (collision_data *manifolds, int manifold_count, const mpe_config_t *cfg);
 void collision_prepare_solver (struct physics_world *world, collision_data *source, collision_data *m, float dt) {
