@@ -3,7 +3,7 @@
 
 Profiles:
   quick    Python runner-contract tests and the canonical C regression suite
-           (41 cases incl. 2 informational diags; full suite re-run under 5
+           (44 cases incl. 2 informational diags; full suite re-run under 5
            regimes default/light/heavy/brittle/sticky via MPE_TEST_REGIME).
   physics  quick + every isolated legacy case (30) and all paranoia cases (14).
   full     physics + ASan/UBSan suite, MFS robotics (15 gated), TUI snapshots
