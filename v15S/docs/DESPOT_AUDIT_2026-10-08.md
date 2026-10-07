@@ -59,6 +59,28 @@ Method: code read, temp probes, suite green throughout. Scratch under
   MT stays per-body phases only (order-independent, proven identical).
 - TSan container abort recorded as env, not code.
 
+## Addendum 2026-10-07T10:05Z — SIMD full (+ two process scars)
+
+- SIMD is full: add/sub/scale/cross in `core/simd_math.h` (SSE2, MSVC
+  intrin, scalar fallback, `MPE_SIMD_OFF` knob, `build_suite_scalar`
+  target), wired through every physics hot path (~700 sites), runtime
+  self-check over fixed + edge vectors with zero mismatches, both binaries
+  44/42 green. Reductions stay scalar by proof (order-dependent rounding).
+- Scar 1: first cross shuffle pairing was dot-like garbage; suite went
+  22/42 red. The self-check stayed silent because the wiring script had
+  renamed its scalar references too (simd-vs-simd always equal). Fixed the
+  pairing, restored scalar references with a WIRE-EXEMPT marker, proved the
+  op standalone (`temp/simd_proof.c`) before rebuilding.
+- Scar 2: the red persisted after the fix — stale binary. Rebuild commands
+  ran `make -C v15S/src` from inside `v15S/src` (nonexistent path, silent
+  no-op behind the grep), so every "rebuild" re-ran the bad binary. Forced
+  rebuild from the right directory went green. Lesson: verify the compiler
+  actually ran (count the gcc lines), never trust a quiet make.
+- Numbers: op micro-bench (`temp/simd_bench.c`, bounded, 20M x 6op) SSE
+  490 ms vs scalar 235 ms (wrappers lose in synthetic loops); engine suite
+  wired 2.87-2.93 s vs scalar 2.95-3.08 s (neutral, noise). SoA batching
+  ticketed as the real frontier.
+
 ## Verification
 
 - `build_suite` clean (no new warnings).
