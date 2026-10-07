@@ -52,8 +52,7 @@ static float ccd_min_thickness (const rigidbody *body) {
         return fminf (body -> radius, body -> cylinder_half_length);
     }
     return fminf (body -> half_extensions.x, fminf (body -> half_extensions.y, body -> half_extensions.z));
-}
-/* Earliest positive time at which |dp + dv*t| reaches radius. Compute the
+} /* Earliest positive time at which |dp + dv*t| reaches radius. Compute the
  * quadratic in double and use the cancellation-resistant q formulation; the
  * direct (-b-sqrt(D))/(2a) root loses the near root for distant/high-speed
  * pairs and can silently miss a real sweep. */
@@ -559,9 +558,7 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
     }
     return clamped;
 }
-int collision_ccd_sweep_clamp (rigidbody *bodies, int body_count, float dt) {
-    return collision_ccd_sweep_clamp_full (bodies, body_count, dt, NULL, NULL, NULL, NULL);
-}
+int collision_ccd_sweep_clamp (rigidbody *bodies, int body_count, float dt) {return collision_ccd_sweep_clamp_full (bodies, body_count, dt, NULL, NULL, NULL, NULL);}
 int collision_ccd_sweep_clamp_world (struct physics_world *world, float dt) {
     if (!world || !world -> bodies || world -> body_count <= 0) {
         return 0;

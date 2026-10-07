@@ -50,8 +50,7 @@ static gboolean on_rendered (GtkGLArea *gl_area_widget, GdkGLContext *gl_context
     // printf("[GTK4] on_rendered %dx%d\n", w, h);
     render_scene_current (w, h);
     return TRUE;
-}
-/* GTK4: use input_control.c full handlers directly. */
+} /* GTK4: use input_control.c full handlers directly. */
 static void app_activate (GApplication *app, gpointer user_data) {
     (void) user_data;
     setvbuf (stdout, NULL, _IONBF, 0);
@@ -128,8 +127,7 @@ static void app_activate (GApplication *app, gpointer user_data) {
     physics_timeout_id = g_timeout_add (16, physics_step_increment, gl_area_widget);
     frame_timer_init (&main_timer);
     gtk_window_present (GTK_WINDOW (main_window));
-}
-/* Keep old main_algorithm for source compat but route through GApplication. */
+} /* Keep old main_algorithm for source compat but route through GApplication. */
 int main_algorithm (int argc, char *argv []) {
     mpe_app = gtk_application_new ("org.mpe.engine", G_APPLICATION_DEFAULT_FLAGS);
     g_signal_connect (mpe_app, "activate", G_CALLBACK (app_activate), NULL);
@@ -148,9 +146,7 @@ int main_algorithm (int argc, char *argv []) {
     }
     return status;
 }
-int main (int argc, char *argv []) {
-    return main_algorithm (argc, argv);
-}
+int main (int argc, char *argv []) {return main_algorithm (argc, argv);}
 #else /* ====================== GTK3 PATH (unchanged) ====================== */
 static void on_main_window_destroy (GtkWidget *widget, gpointer user_data) {
     (void) widget;
@@ -162,8 +158,7 @@ static void on_main_window_destroy (GtkWidget *widget, gpointer user_data) {
     render_cleanup ();
     physics_world_cleanup (physics_world_get_primary ());
     gtk_main_quit ();
-}
-// On Call
+} // On Call
 static void when_realised_GTK3 (GtkGLArea *gl_area_widget) {
     if (gtk_gl_area_get_error (gl_area_widget) != NULL) {
         return;

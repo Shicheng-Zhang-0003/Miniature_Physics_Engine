@@ -28,8 +28,7 @@ static rigidbody *spring_find_body (rigidbody *bodies, int body_count, uint32_t 
         }
     }
     return NULL;
-}
-/* FIX-AUDIT-DESPOT: O(J*B) killer. spring_apply_core_dt called the linear
+} /* FIX-AUDIT-DESPOT: O(J*B) killer. spring_apply_core_dt called the linear
  * scan above twice per joint (2*B comparisons per joint, J*B total per
  * tick). Route through the world's id->index cache (O(1) hit, linear
  * fallback inside physics_world_index_by_id so correctness never depends
@@ -111,8 +110,7 @@ void remove_joint (physics_world *world, int joint_pool_index) {
     }
     world -> spring_joints [joint_pool_index].is_active = false;
     world -> spring_joint_count -= 1;
-}
-/* Shared Hooke+damping+limit core over an explicit body array. Both step
+} /* Shared Hooke+damping+limit core over an explicit body array. Both step
  * paths funnel through here (legacy passes the primary world's bodies). */
 static void spring_apply_core_dt (physics_world *world, rigidbody *bodies, int body_count, float dt) {
     if (!(dt > 0.0f) || !isfinite (dt)) {
@@ -213,21 +211,15 @@ static void spring_apply_core_dt (physics_world *world, rigidbody *bodies, int b
         rb_apply_forces_perfect (rigid_body_a, net_joint_force);
         rb_apply_forces_perfect (rigid_body_b, vector3_scaling (net_joint_force, -1.0f));
     }
-}
-/* Canonical per-tick spring entry: both step paths call exactly this. */
+} /* Canonical per-tick spring entry: both step paths call exactly this. */
 void mpe_springs_apply (physics_world *world, float dt) {
     if ((!world) || (!world -> bodies) || (world -> body_count <= 0)) {
         return;
     }
     spring_apply_core_dt (world, world -> bodies, world -> body_count, dt);
-}
-/* Legacy entry points: thin wrappers over the canonical pass. */
-void apply_force_all_joints (physics_world *world) {
-    mpe_springs_apply (world, 1.0f / 60.0f);
-}
-void apply_force_all_joints_dt (physics_world *world, float dt) {
-    mpe_springs_apply (world, dt);
-}
+} /* Legacy entry points: thin wrappers over the canonical pass. */
+void apply_force_all_joints (physics_world *world) {mpe_springs_apply (world, 1.0f / 60.0f);}
+void apply_force_all_joints_dt (physics_world *world, float dt) {mpe_springs_apply (world, dt);}
 /* World-aware spring pass over an explicit body array (headless + world
  * step path). Pool comes from the given world. */
 void apply_spring_forces_world (physics_world *world, rigidbody *bodies, int body_count) {

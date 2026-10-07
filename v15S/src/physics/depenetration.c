@@ -14,9 +14,7 @@
 /* Narrowphase dispatch relic removed: all pair routing goes through the
  * shape registry (mpe_shape_dispatch), so foreign shapes get positional
  * correction too. This symbol remains as a NULL-world wrapper. */
-bool a3_depenetration_dispatch (rigidbody *rigid_body_a, rigidbody *rigid_body_b, collision_data *collision_output) {
-    return mpe_shape_dispatch (NULL, rigid_body_a, rigid_body_b, collision_output);
-}
+bool a3_depenetration_dispatch (rigidbody *rigid_body_a, rigidbody *rigid_body_b, collision_data *collision_output) {return mpe_shape_dispatch (NULL, rigid_body_a, rigid_body_b, collision_output);}
 /* Single depenetration implementation (see header).
  * TRUTH note: sequential with split impulse, NOT double-correction of the
  * same penetration. Split impulse corrects pre-integration penetration at
@@ -76,9 +74,7 @@ void a3_positional_depenetration_pass_dt (struct physics_world *world, broadphas
         }
     }
 }
-void a3_positional_depenetrate_manifold (collision_data *manifold) {
-    a3_positional_depenetrate_manifold_w (NULL, manifold);
-}
+void a3_positional_depenetrate_manifold (collision_data *manifold) {a3_positional_depenetrate_manifold_w (NULL, manifold);}
 void a3_positional_depenetrate_manifold_w (struct physics_world *world, collision_data *manifold) {
     const mpe_config_t *C = (world && world -> cfg) ? world -> cfg : &g_cfg;
     if ((!manifold) || (manifold -> contact_count <= 0)) {

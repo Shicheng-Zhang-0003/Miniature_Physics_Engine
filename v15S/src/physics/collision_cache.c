@@ -30,14 +30,11 @@ static inline uint32_t contact_pair_key (uint32_t id_a, uint32_t id_b) {
     key *= 0x94d049bb133111ebULL;
     key ^= key >> 31;
     return (uint32_t) (key & contact_hash_mask);
-}
-static inline vector4 collision_inverse_orientation (vector4 orientation) {
+} static inline vector4 collision_inverse_orientation (vector4 orientation) {
     return (vector4) {orientation.w, -orientation.x, -orientation.y, -orientation.z};
-}
-static inline vector3 collision_world_offset_to_body_local (rigidbody *body, vector3 world_offset) {
+} static inline vector3 collision_world_offset_to_body_local (rigidbody *body, vector3 world_offset) {
     return vector4_rotate_to_vector3 (collision_inverse_orientation (body -> orientation), world_offset);
-}
-static inline vector3 collision_body_local_to_world_offset (rigidbody *body, vector3 local_offset) {
+} static inline vector3 collision_body_local_to_world_offset (rigidbody *body, vector3 local_offset) {
     return vector4_rotate_to_vector3 (body -> orientation, local_offset);
 }
 void contact_cache_stats_reset (struct physics_world *world) {
@@ -98,14 +95,11 @@ bool contact_cache_has_pair (struct physics_world *world, uint32_t id_a, uint32_
         }
     }
     return false;
-}
-/* FIX-AUDIT-DESPOT: thin wrapper over the shared stamp in
+} /* FIX-AUDIT-DESPOT: thin wrapper over the shared stamp in
  * collision_mechanics.h (single source of truth with the solver's match
  * side). See the header note for why match-role predicates stay in the
  * solver TU. */
-static uint32_t a3_task05_body_property_stamp (const rigidbody *rigid_body) {
-    return a3_contact_cache_body_stamp (rigid_body);
-}
+static uint32_t a3_task05_body_property_stamp (const rigidbody *rigid_body) {return a3_contact_cache_body_stamp (rigid_body);}
 void contact_cache_save (struct physics_world *world, collision_data *manifolds, int count) {
     /* Per-world warm-start cache (no global fallback remains). A missing
      * cache degrades to no warm start for the next tick. */

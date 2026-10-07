@@ -181,8 +181,7 @@ bool collision_static_plane_cylinder (rigidbody *plane_body, rigidbody *cyl, flo
         }
     }
     return collision_output_data -> contact_count > 0;
-}
-/* ================================================================
+} /* ================================================================
  * MFS_172: Cylinder-vs-object narrowphase
  * ================================================================ */
 /* Cylinder vs Sphere — TRUE solid cylinder SDF (flat caps, exact).
@@ -327,8 +326,7 @@ bool collision_cylinder_sphere (rigidbody *cyl, rigidbody *sph, collision_data *
     cp -> penetration = (gap2 < 0.0f) ? -gap2 : 0.0f;
     cp -> position = closest;
     return true;
-}
-/* Cylinder vs Cube (OBB).
+} /* Cylinder vs Cube (OBB).
  * Sample N points along the axle, find the one closest to the OBB
  * surface, then do a sphere-OBB test at that point with the
  * cylinder radius. 5 samples is enough for short axles (wheels). */
@@ -789,8 +787,7 @@ bool collision_cylinder_cube (rigidbody *cyl, rigidbody *cube, collision_data *o
         return false;
     }
     return true;
-}
-/* Cylinder vs Cylinder — TRUE flat-cap handling + parallel 2-point support.
+} /* Cylinder vs Cylinder — TRUE flat-cap handling + parallel 2-point support.
  * TRUTH P1-6: old segment+radius capsule failed coaxially (face-face gap
  * compared against r_a+r_b instead of 0) and gave single-point support for
  * parallel logs (rocks). Barrel-side uses segment closest (exact); coaxial

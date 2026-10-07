@@ -45,8 +45,7 @@ static math3 math3_addition (math3 a, math3 b) {
         }
     }
     return r;
-}
-/* 6x6 matrix operations for coupled hinge solve + motor.
+} /* 6x6 matrix operations for coupled hinge solve + motor.
  * TRUTH: K spans invM (~1e-6..1e4) plus Iinv*r^2 (up to ~1e15 for tiny
  * masses with long anchors). float (23-bit, ~1e7) cannot hold cond(K)>1e10:
  * pivot test is meaningless and lambda is garbage. Solve in double with
@@ -180,8 +179,7 @@ static int mat6_invert (double m [6][6], double out [6][6]) {
         }
     }
     return 1;
-}
-/* DESPOT-2026-09-29: shared sleep guard for every joint solver.
+} /* DESPOT-2026-09-29: shared sleep guard for every joint solver.
  *
  * The joint solvers used to wake BOTH partners unconditionally, on every
  * iteration, on the stated grounds that "a sleeping hinge partner would
@@ -617,8 +615,7 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
             }
         }
     }
-}
-/* TRUTH: once-per-tick angle integration (called before the solver loop).
+} /* TRUTH: once-per-tick angle integration (called before the solver loop).
  * DESPOT-2026-10-01: a measured-twist replacement (quaternion-delta
  * accumulation, exact ops) was tried here and REVERTED. It tracked settled
  * stops better (0.04 vs 0.085 residual) but was worse in transients, added a
@@ -660,8 +657,7 @@ void revolute_pre_step (revolute_params *p, rigidbody *body_a, rigidbody *body_b
     /* TRUTH: no wrap (see init site): the joint coordinate stays unwrapped
      * so multi-turn limits work. (The per-solve limit clamps that used to
      * rebase the books here were removed: see the 6x6 path note.) */
-}
-/* Prismatic: single-axis slide with optional limits and motor. */
+} /* Prismatic: single-axis slide with optional limits and motor. */
 void prismatic_solve (prismatic_params *p, rigidbody *body_a, rigidbody *body_b, float dt, const mpe_config_t *cfg) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
     if ((!p) || (!body_a) || (!body_b) || (dt <= 0.0f)) {
@@ -782,8 +778,7 @@ void prismatic_solve (prismatic_params *p, rigidbody *body_a, rigidbody *body_b,
             }
         }
     }
-}
-/* TRUTH: once-per-tick slide tracking (called before the solver loop). */
+} /* TRUTH: once-per-tick slide tracking (called before the solver loop). */
 void prismatic_pre_step (prismatic_params *p, rigidbody *body_a, rigidbody *body_b, float dt, const mpe_config_t *cfg) {
     (void) cfg;
     if ((!p) || (!body_a) || (!body_b) || (!(dt > 0.0f))) {
@@ -816,8 +811,7 @@ void prismatic_pre_step (prismatic_params *p, rigidbody *body_a, rigidbody *body
             p -> accumulated_position += d;
         }
     }
-}
-/* Rope: inequality distance constraint (pulls only, no push). */
+} /* Rope: inequality distance constraint (pulls only, no push). */
 void rope_solve (rope_params *p, rigidbody *body_a, rigidbody *body_b, float dt, const mpe_config_t *cfg) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
     if ((!p) || (!body_a) || (!body_b) || (dt <= 0.0f))
@@ -879,8 +873,7 @@ void rope_solve (rope_params *p, rigidbody *body_a, rigidbody *body_b, float dt,
     body_b -> angular_velocity = vector3_addition (
         body_b -> angular_velocity,
         math3_multiplication_vector3 (rigidbody_effective_inv_inertia (body_b), vector3_cross (r_b, impulse)));
-}
-/* Prismatic motor: adds drive force to the force accumulator (call once per tick). */
+} /* Prismatic motor: adds drive force to the force accumulator (call once per tick). */
 void prismatic_apply_motor (prismatic_params *p, rigidbody *body_a, rigidbody *body_b, float dt,
                             const mpe_config_t *cfg) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
@@ -927,8 +920,7 @@ void prismatic_apply_motor (prismatic_params *p, rigidbody *body_a, rigidbody *b
     vector3 drive_force = vector3_scaling (axis_world, desired_force);
     body_a -> force_accumulator = vector3_subtraction (body_a -> force_accumulator, drive_force);
     body_b -> force_accumulator = vector3_addition (body_b -> force_accumulator, drive_force);
-}
-/* Fixed weld: point-to-point (same K-matrix as revolute) plus full angular
+} /* Fixed weld: point-to-point (same K-matrix as revolute) plus full angular
  * lock (kill all relative spin, not just off-axis). Deterministic, no bias
  * beyond the shared Baumgarte cap. */
 void fixed_solve (fixed_params *p, rigidbody *body_a, rigidbody *body_b, float dt, const mpe_config_t *cfg) {
@@ -1085,8 +1077,7 @@ void revolute_apply_motor (revolute_params *p, rigidbody *body_a, rigidbody *bod
     vector3 drive_torque = vector3_scaling (axis_world, desired_torque);
     body_a -> torque_accumulator = vector3_subtraction (body_a -> torque_accumulator, drive_torque);
     body_b -> torque_accumulator = vector3_addition (body_b -> torque_accumulator, drive_torque);
-}
-/* Distance: 1D constraint along the anchor axis. Preserves free rotation and
+} /* Distance: 1D constraint along the anchor axis. Preserves free rotation and
  * tangential motion; only the separation error is corrected. */
 void distance_solve (distance_params *p, rigidbody *body_a, rigidbody *body_b, float dt, const mpe_config_t *cfg) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
@@ -1146,8 +1137,7 @@ void distance_solve (distance_params *p, rigidbody *body_a, rigidbody *body_b, f
     body_b -> angular_velocity = vector3_addition (
         body_b -> angular_velocity,
         math3_multiplication_vector3 (rigidbody_effective_inv_inertia (body_b), vector3_cross (r_b, impulse)));
-}
-/* TRUTH: fixed-weld angular positional correction (once per tick, AFTER the
+} /* TRUTH: fixed-weld angular positional correction (once per tick, AFTER the
  * velocity loop — never inside, same energy-pump rule as revolute axis
  * drift). Velocity-only lock kills relative spin but lets orientation error
  * integrate (weld flexes over seconds). This Baumgarte drives the relative
@@ -1196,8 +1186,7 @@ void fixed_correct_angular_drift (fixed_params *p, rigidbody *body_a, rigidbody 
         body_b -> angular_velocity = vector3_addition (
             body_b -> angular_velocity, math3_multiplication_vector3 (rigidbody_effective_inv_inertia (body_b), impulse));
     }
-}
-/* Positional axis-drift correction: MUST be called exactly once per tick,
+} /* Positional axis-drift correction: MUST be called exactly once per tick,
  * AFTER the velocity iteration loop — never inside it. The error term is
  * positional (orientation difference, unchanged by velocity iterations),
  * so per-iteration application multiplies the correction by the iteration

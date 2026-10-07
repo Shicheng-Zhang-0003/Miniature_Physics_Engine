@@ -47,9 +47,7 @@ static int island_index_of (rigidbody *bodies, rigidbody *body, int body_count) 
     }
     return idx;
 }
-static bool islands_ready (const struct physics_world *world) {
-    return (world) && (world -> bodies) && (world -> island_parent) && (world -> island_label) && (world -> island_awake_flags);
-}
+static bool islands_ready (const struct physics_world *world) {return (world) && (world -> bodies) && (world -> island_parent) && (world -> island_label) && (world -> island_awake_flags);}
 void islands_build (struct physics_world *world, broadphase_pair *pairs, int pair_count) {
     if (!islands_ready (world)) {
         return;

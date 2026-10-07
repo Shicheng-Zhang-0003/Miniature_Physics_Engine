@@ -29,9 +29,7 @@ static void encode_le32 (unsigned char out [4], uint32_t v) {
     out [2] = (unsigned char) ((v >> 16) & 0xFFu);
     out [3] = (unsigned char) ((v >> 24) & 0xFFu);
 }
-static uint32_t decode_le32 (const unsigned char in [4]) {
-    return ((uint32_t) in [0]) | (((uint32_t) in [1]) << 8) | (((uint32_t) in [2]) << 16) | (((uint32_t) in [3]) << 24);
-}
+static uint32_t decode_le32 (const unsigned char in [4]) {return ((uint32_t) in [0]) | (((uint32_t) in [1]) << 8) | (((uint32_t) in [2]) << 16) | (((uint32_t) in [3]) << 24);}
 int scene_w32 (FILE *f, uint32_t *crc, uint32_t v) {
     unsigned char buf [4];
     encode_le32 (buf, v);
@@ -74,8 +72,7 @@ int scene_rfloat (FILE *f, uint32_t *crc, float *v) {
     converter.u = u;
     *v = converter.f;
     return 1;
-}
-/* FIX-AUDIT-DESPOT: lockstep state hash (see header). Deferred include of
+} /* FIX-AUDIT-DESPOT: lockstep state hash (see header). Deferred include of
  * physics_world.h keeps scene_crc.h light; the hash feeds CRC32 over LE
  * bytes so it is bit-identical on every LE host (v200's LE contract).
  * +0/-0 canonicalized: bitwise twins must not desync on sign-of-zero. */
