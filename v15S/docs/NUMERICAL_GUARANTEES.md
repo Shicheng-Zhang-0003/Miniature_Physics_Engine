@@ -37,8 +37,15 @@ exact IEEE `+ - * / sqrt` + fixed-coefficient polynomials (`det_math.h`) +
 - Sleep: three-gate wake (pair novelty + fast-other + deep); settled stacks
   sleep, slow pushers wake at any speed.
 - Broadphase O(n) hash, swept AABB + tip-speed, 1M node cap + overflow
-  telemetry (nonzero = do not trust the tick). SIMD SSE2 fast path is
-  bitwise identical (self-checked); scalar canonical.
+  telemetry (nonzero = do not trust the tick). SIMD: full lane-wise op set
+  (add/sub/scale/cross, SSE2/MSVC-intrin/scalar-fallback) wired through all
+  physics hot paths; bitwise identical by construction (lane-exact, no FMA;
+  reductions stay scalar by proof) and by runtime self-check (fixed + edge
+  vectors incl. Inf/NaN) with zero mismatches; both SSE and scalar-fallback
+  binaries pass every gate (`build_suite_scalar`). Measured: op micro-bench
+  wrappers 2.1x slower than scalar in a synthetic tight loop (round-trips),
+  engine suite neutral (wired ~3% ahead, in noise). True 4-wide SoA batching
+  is the remaining speedup frontier, not per-op wrapping.
 - Threading: `MPE_THREADS` (1-8, default 1) parallelises order-independent
   per-body sanitize only; pairs/solve single-threaded for identical order.
   Bitwise identical MT vs serial.
