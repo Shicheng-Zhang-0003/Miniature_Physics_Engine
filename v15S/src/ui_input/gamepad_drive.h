@@ -28,6 +28,9 @@ void gamepad_drive_init (void);
 void gamepad_drive_tick (void);
 /* True while the pad holds live commands (for status/telemetry honesty). */
 int gamepad_drive_active (void);
+/* DESPOT-2026-10-07 P0-2: drop all cached dlsym pointers before dlclose.
+ * Called by mod-unload paths; gpd_resolve() re-resolves every tick anyway. */
+void gamepad_drive_invalidate (void);
 /* Joint watchdog: watches fleet robot 0 wheel mounts every GUI frame and
  * reports discontinuities (mount jump = anchor integrity, tilt spikes,
  * NaN) with a build tag, so a live "wheel snapped" report arrives with

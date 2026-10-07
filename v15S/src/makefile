@@ -21,7 +21,12 @@ else
   MPE_WIN_LIBS :=
 endif
 MPE_TEMP := $(abspath ../../temp)
+# DESPOT-2026-10-07 ops #5: runner sets per-run TMPDIR=qa_runs/<id> for
+# isolation, but this export overwrote it for everything make spawns and
+# scene .dat files landed in shared temp/. Only default when unset.
+ifeq ($(origin TMPDIR), undefined)
 export TMPDIR := $(MPE_TEMP)
+endif
 ENABLE_NATIVE ?= 0
 NATIVE_FLAG := $(if $(filter 1,$(ENABLE_NATIVE)),-march=native,)
 # GTK4 only. The GTK3 code path was removed from the tree on 2026-09-29:
@@ -439,10 +444,16 @@ ecosystem/mfs/mfs_ecosystem$(PLUGIN_EXT):
 	$(MAKE) -C ecosystem/mfs mfs_ecosystem$(PLUGIN_EXT)
 test_suite: build_suite
 	mkdir -p ../../temp
+	@echo "NOTE: test_suite runs 42 physics only (no --all); use test_suite_all / runner --profile quick for the 44 registry (42 blocking + 2 diag)."
 	./test_mpe_suite$(EXE_EXT)
 test_suite_all: build_suite
 	mkdir -p ../../temp
 	./test_mpe_suite$(EXE_EXT) --all
+# DESPOT-2026-10-07 P2-1: static analysis + sanitizer gates (CI should run these).
+analyze:
+	$(CC) -fanalyzer $(CFLAGS) -fsyntax-only $(MPE_SUITE_SRCS) $(MPE_TEST_CORE) 2>&1 | head -n 100
+asan: build_suite
+	$(CC) $(CFLAGS) -fsanitize=address,undefined -fno-omit-frame-pointer $(MPE_SUITE_SRCS) $(MPE_TEST_CORE) $(SPRING_TEST_SRCS) $(SCENE_TEST_SRCS) $(MPE_TEST_LIBS) $(shell pkg-config --libs epoxy) -o test_mpe_suite_asan$(EXE_EXT)
 
 plugins: plugins/mpe_capsule$(PLUGIN_EXT)
 

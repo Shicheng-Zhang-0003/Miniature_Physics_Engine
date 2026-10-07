@@ -86,9 +86,16 @@ typedef struct physics_world {
     rigidbody *island_base;
     int island_body_count;
     int island_total;
-    /* Contact-cache diagnostics (per-world; was global). */
+    /* Contact-cache diagnostics (per-world; was global).
+     * hits = hash coincidence (a prior entry matched this material point).
+     * hits_applied = restored impulse actually survived the Coulomb cone.
+     * DESPOT-2026-10-07 LIE-02: hits counts matches discarded at
+     * collision_solver.c:382 (normal zeroed, tangent cone-killed with fn=0),
+     * so hits>0 with hits_applied==0 proves the warm start is dead.
+     * Gate hits_applied, not hits. */
     int contact_cache_hits;
     int contact_cache_misses;
+    int contact_cache_hits_applied;
     /* TRUTH: manifold overflow (pairs dropped when manifolds full) must be
      * visible, not silent. Legacy path counted via debug counter; world path
      * dropped silently and gave false free-flight gravity. */

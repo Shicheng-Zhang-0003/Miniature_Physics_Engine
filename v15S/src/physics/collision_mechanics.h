@@ -344,7 +344,10 @@ void collision_snapshot_friction_mu (collision_data *manifolds, int manifold_cou
  * TRUTH P0-3: fills time_remaining_out[i] = dt - toi (dt if unclamped).
  * Post-solve integration MUST advance only the remainder, else toi+dt
  * double-counts. TOI geometry uses linear translation and a conservative
- * angular speed gate; obstacle rotation during the tick is not swept. */
+ * angular speed gate; obstacle rotation during the tick is not swept
+ * (DESPOT-2026-10-07 LIE-09: a fast propeller/blade vs slow mover tunnels
+ * rotationally with no clamp — mover-only |w|*R does not cover it. Blade
+ * regime unsupported: substep or bound relative tip speed externally). */
 int collision_ccd_sweep_clamp (rigidbody *bodies, int body_count, float dt);
 int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt, float *time_remaining_out,
                                     const mpe_config_t *cfg, float *best_tois_out, unsigned char *hit_flags_out);

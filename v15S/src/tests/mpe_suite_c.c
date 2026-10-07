@@ -807,7 +807,16 @@ int mpe_t_scene_roundtrip (void) {
     uint32_t idb = w -> bodies [b].object_id;
     float px = w -> bodies [a].position.x, py = w -> bodies [a].position.y;
     int n_body = w -> body_count;
-    const char *path = "../../temp/mpe_suite_roundtrip.dat";
+    /* DESPOT-2026-10-07 ops #5: honour $TMPDIR (runner per-run dir) so two
+     * concurrent runs do not clobber shared temp dat files. Falls back to the
+     * legacy shared path when TMPDIR is unset (direct `make test_suite`). */
+    char rt_path [512];
+    const char *tmpd = getenv ("TMPDIR");
+    if (tmpd && tmpd [0])
+        snprintf (rt_path, sizeof (rt_path), "%s/mpe_suite_roundtrip.dat", tmpd);
+    else
+        snprintf (rt_path, sizeof (rt_path), "../../temp/mpe_suite_roundtrip.dat");
+    const char *path = rt_path;
     MPE_CHECK (&t, save_scene (path) != 0);
     /* Mutate, then reload and compare. */
     w -> bodies [a].position = (vector3) {99.0f, 99.0f, 99.0f};

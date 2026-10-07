@@ -303,6 +303,17 @@ void collision_prepare_solver (struct physics_world *world, collision_data *sour
         if (world) {
             if (cache_match_found) {
                 world -> contact_cache_hits++;
+                /* DESPOT-2026-10-07 LIE-02: hits_applied counts only a seed
+                 * that survives the cone below. The normal is zeroed at :382
+                 * so fn==0 and a3_anisotropic_coulomb_clamp() returns both
+                 * tangents as zero — applied stays 0 while hits grows.
+                 * That divergence IS the dead-warm-start proof. */
+                if ((cp -> accumulated_normal_impulse > 0.0f) && (cp -> accumulated_tangent_impulse != 0.0f)) {
+                    /* Pre-zero snapshot: would survive only if normal kept.
+                     * Normal is discarded below, so this branch documents
+                     * intent and stays 0 until a normal-seeding formulation
+                     * lands with a stability proof. */
+                }
             } else {
                 world -> contact_cache_misses++;
             }
@@ -868,6 +879,11 @@ float collision_resolve_iterative (collision_data *m, float dt, bool friction_on
              * collision_snapshot_friction_mu); unset (<0) keeps the legacy
              * live behaviour for direct resolve callers. */
             const float static_friction_threshold = C -> solver.static_friction_thresh; /* MPE_TASK_30 */
+            /* DESPOT-2026-10-07 LIE-10: combined mu = min(mu_a,mu_b), NOT
+             * Box2D sqrt(mu_a*mu_b). min<=sqrt, up to 42% lower grip (0.30
+             * vs 0.52 for 0.9/0.3). Conservative and stable, consistently
+             * applied here and in the snapshot path. Friction thresholds
+             * calibrated here cannot be compared to Box2D tables. */
             float static_friction_coeff = fminf (m -> object_a -> friction_static, m -> object_b -> friction_static);
             float kinetic_friction_coeff = fminf (m -> object_a -> friction_kinetic, m -> object_b -> friction_kinetic);
             if (static_friction_coeff < kinetic_friction_coeff) {
@@ -1100,13 +1116,13 @@ void collision_apply_rolling_resistance (collision_data *manifolds, int manifold
         collision_data *man = &manifolds [m];
         /* Shared patch: split total dissipation across sides when BOTH bodies
          * are dynamic (floor/static bodies take the full single-sided rate).
-         * TRUTH: fixed 0.5 was an admitted tune, not derived. Mass-weighted
-         * (I-normalized) split: share_a = I_b/(I_a+I_b) ~= m_b/(m_a+m_b)
-         * = inv_a/(inv_a+inv_b) for similar geometry; lighter body carries
-         * the larger share, heavy slab ~0, equal masses recover 0.5 exactly.
-         * Shares sum to 1.0 so total dynamic-dynamic dissipation is preserved
-         * (rolling_decay band unchanged: that test is sphere-vs-static,
-         * share=1.0 path). Dissipative clamps below (dw<=speed) untouched. */
+         * TRUTH (DESPOT-2026-10-07 LIE-12): mass-weighted split is a TUNE,
+         * not a derivation. Fixed 0.5 was an admitted tune; inv_a/(inv_a+
+         * inv_b) inverts it into another tune (I-normalization approximated
+         * by mass: I~=m holds for similar geometry only, false for
+         * sphere-vs-rod). Recovers 0.5 for equal mass, preserves total.
+         * Warrant is the rolling_decay 4-14 m band ONLY. Do not cite as
+         * derived Coulomb/Hertz. */
         bool b_dynamic = (man -> object_b) && (!man -> object_b -> static_state) && (!man -> object_b -> is_sleeping);
         bool a_dynamic = (man -> object_a) && (!man -> object_a -> static_state) && (!man -> object_a -> is_sleeping);
         float share_a = 1.0f, share_b = 1.0f;

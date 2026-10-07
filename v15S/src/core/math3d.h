@@ -16,8 +16,13 @@
 #define MATH_PI 3.14159265358979323846
 #endif
 // Define Radians and Degree Calculation converter
-#define degrad (math_pi / 180.0f)
-#define raddeg (180.0f / math_pi)
+/* DESPOT-2026-10-07 LIE-13: degrad/raddeg used float math_pi, capping double
+ * paths at 1e-8 rad. Float build keeps float (ABI); double paths must use
+ * MATH_PI directly. degrad_f/raddeg_f are the float converters. */
+#define degrad_f (math_pi / 180.0f)
+#define raddeg_f (180.0f / math_pi)
+#define degrad (MATH_PI / 180.0)
+#define raddeg (180.0 / MATH_PI)
 #define math_epsilon 0.000001f
 // Structures for use as typedefs
 // Vector in 3D for objects in motion

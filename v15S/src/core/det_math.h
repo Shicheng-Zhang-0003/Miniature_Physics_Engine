@@ -7,8 +7,11 @@
  * A single per-tick powf (air damping runs on every body every tick) is
  * enough to desynchronize long runs across machines. Everything here uses
  * only exact operations with FIXED polynomial coefficients, so results are
- * bit-identical everywhere IEEE holds (enable -ffp-contract=off so the
- * compiler may not fuse multiply-adds differently per target).
+ * bit-identical on GCC/Clang IEEE targets with -ffp-contract=off (makefile
+ * pins via override + check-flags; ENABLE_NATIVE=0 required). MSVC needs
+ * /fp:strict (no FMA contraction) for the same guarantee — unproven on
+ * Windows (DESPOT-2026-10-07 LIE-06). Scope bitwise-twin claims to
+ * GCC/Clang until MSVC flags land.
  *
  * Error bounds (double internally, float at the boundary):
  *   det_ln_pos:    |err| < 1e-12 for x in [0.1, 10]

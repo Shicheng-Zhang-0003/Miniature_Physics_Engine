@@ -46,6 +46,7 @@ void contact_cache_stats_reset (struct physics_world *world) {
     }
     world -> contact_cache_hits = 0;
     world -> contact_cache_misses = 0;
+    world -> contact_cache_hits_applied = 0;
 }
 int contact_cache_get_hits (const struct physics_world *world) {
     if (!world) {
