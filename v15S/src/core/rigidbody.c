@@ -896,10 +896,12 @@ void rb_integrate_velocity (rigidbody *rigid_body, float delta_time, float linea
      *     w' = I_world(rotor(w, dt) * R)^-1 * L    (omega consistent with the
      *                                               orientation it produces)
      *
-     * Iterating w' -> w converges because the map is a contraction at
-     * dt = 1/60 for any physical inertia ratio. Because omega is then DERIVED
-     * from the conserved L, |L| is conserved to float round-off rather than to
-     * first order.
+     * Iterating w' -> w converges for the tested tumblers at dt = 1/60
+     * (DESPOT-2026-10-07 LIE-11: "any physical inertia ratio" unproven —
+     * needle Ixx<<Iyy + high |w| may not contract in 8 passes; code falls
+     * through on non-convergence, so safe but not universal). Because omega
+     * is then DERIVED from the conserved L, |L| is conserved to float
+     * round-off rather than to first order on the converged path.
      *
      * An earlier attempt at this measured 48% drift (far worse than the 2.7%
      * it was meant to fix). The cause was ordering: it computed L from
@@ -1017,8 +1019,19 @@ void rb_integrate_velocity (rigidbody *rigid_body, float delta_time, float linea
      *    zero, so w_mid == w and the scheme degenerates to the explicit one.
      *  - A torque-free L-conservation update (omega recovered from the exactly
      *    conserved world-frame L at the predicted orientation, via a midpoint
-     *    fixed point). MEASURED WORSE -- 48% drift versus 2.7% -- because the
-     *    iteration does not contract for this body. Reverted; not in the tree.
+     *    fixed point). SHIPPED ABOVE (8 passes, falls through on
+     *    non-convergence). DESPOT-2026-10-07: the "MEASURED WORSE -- 48%
+     *    drift, Reverted; not in the tree" sentence below was stale — it
+     *    described the OLD ordering bug (L captured AFTER the explicit step).
+     *    Current code captures PRE-tick L and measures 0.0028% on the
+     *    converged path (angmom gate 0.5%); the ~2.7%/2s residual is the
+     *    FALLBACK path only. Do NOT delete the L path on the basis of the
+     *    stale paragraph.
+     *
+     *  - [STALE, KEPT FOR FORENSICS] The pre-2026-10-01 experiment note below
+     *    claimed the L path measured worse and was reverted. That ordering is
+     *    inverted relative to the shipped code; the numbers below are the OLD
+     *    post-step capture, not the current pre-tick capture.
      *
      * HONEST LIMIT: a torque-free tumbling box still loses ~2.7% of |L| in
      * 2 s. That drift is inherent to the first-order rotational integrator,

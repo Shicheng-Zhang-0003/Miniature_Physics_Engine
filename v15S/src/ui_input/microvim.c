@@ -9,6 +9,7 @@
 #include <limits.h>
 #include <stdint.h>
 #include <ctype.h>
+#include <unistd.h>
 #include <gdk/gdkkeysyms.h>
 #define mv_view_height 40
 #define mv_undo_depth 64
@@ -341,10 +342,27 @@ static bool mv_save_file (void) {
     if (!f) {
         return false;
     }
+    bool write_ok = true;
     for (int i = 0; i < mv.line_count; i++) {
-        fprintf (f, "%s\n", mv.lines [i]);
+        if (fprintf (f, "%s\n", mv.lines [i]) < 0) {
+            write_ok = false;
+            break;
+        }
     }
-    fclose (f);
+    /* DESPOT-2026-10-07 P1-4: check fprintf/fflush/fclose errors and fsync
+     * before close so :w cannot silently tear status/engine.cfg on ENOSPC
+     * or power loss. Backup fsync already handled above. */
+    if (write_ok && (fflush (f) != 0))
+        write_ok = false;
+    if (write_ok) {
+        int fd = fileno (f);
+        if ((fd >= 0) && (fsync (fd) != 0))
+            write_ok = false;
+    }
+    if (fclose (f) != 0)
+        write_ok = false;
+    if (!write_ok)
+        return false;
     mv.modified = false;
     return true;
 }

@@ -1,8 +1,9 @@
 /* Scene v2 codec implementation. See scene_crc.h. */
 #include "scene_crc.h"
 #include <string.h>
+#include <pthread.h>
 static uint32_t crc_table [256];
-static int crc_table_ready = 0;
+static pthread_once_t crc_once = PTHREAD_ONCE_INIT;
 static void crc_make_table (void) {
     for (uint32_t n = 0; n < 256; n++) {
         uint32_t c = n;
@@ -11,12 +12,11 @@ static void crc_make_table (void) {
         }
         crc_table [n] = c;
     }
-    crc_table_ready = 1;
 }
 uint32_t scene_crc32_update (uint32_t crc, const void *data, unsigned long length) {
-    if (!crc_table_ready) {
-        crc_make_table ();
-    }
+    /* DESPOT-2026-10-07 P2-2: lazy init raced under threaded hash use.
+     * pthread_once makes first-hash thread-safe. */
+    pthread_once (&crc_once, crc_make_table);
     const unsigned char *bytes = (const unsigned char *) data;
     for (unsigned long i = 0; i < length; i++) {
         crc = crc_table [(crc ^ bytes [i]) & 0xFFu] ^ (crc >> 8);
@@ -97,6 +97,12 @@ static uint32_t hash_float_le (uint32_t crc, float f) {
     return hash_u32_le (crc, u);
 }
 uint32_t physics_world_hash_state (const struct physics_world *world) {
+    /* DESPOT-2026-10-07 P2-2: hashes pos/vel/orient/ids ONLY. Omits angular
+     * velocity, mass/inverse_mass, sleep/kinematic/static flags, force
+     * accumulators, joints/constraints, next_object_id/revision. Two worlds
+     * differing only in spin, mass or hinge state hash EQUAL — the lockstep
+     * desync detector is blind to those classes. Documented, not widened:
+     * widening changes every golden hash. Use for translation lockstep only. */
     if (!world || !world -> bodies || world -> body_count <= 0) {
         return 0u;
     }

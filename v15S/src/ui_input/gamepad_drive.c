@@ -69,9 +69,12 @@ static void gpd_resolve (void) {
      * no-op'd with a bundle loaded, a pad plugged and a robot spawned. The
      * controller was dead until engine restart, with no diagnostic. Retry
      * until the fleet entry points resolve; the rest may legitimately stay
-     * NULL only when the bundle is absent (checked per-tick below). */
-    if (s_syms_resolved && s_fleet_get && s_mecanum)
-        return;
+     * NULL only when the bundle is absent (checked per-tick below).
+     * DESPOT-2026-10-07 P0-2: cached dlsym pointers were never invalidated
+     * on `mod unload` — next tick called into unmapped code (use-after-
+     * dlclose). Fix: re-resolve EVERY tick (cheap: two hash lookups) and
+     * treat NULL as "bundle absent". Never hold a function pointer across
+     * an unload boundary. */
     s_fleet_get = (ftc_robot * (*) (struct physics_world *, int)) gpd_sym ("ftc_fleet_get");
     s_mecanum = (void (*) (ftc_robot *, float, float, float)) gpd_sym ("drivetrain_mecanum");
     s_pad_init = (bool (*) (gamepad_state *, const char *)) gpd_sym ("gamepad_init");
@@ -82,6 +85,24 @@ static void gpd_resolve (void) {
     s_pad_deadzone = (void (*) (gamepad_state *, float)) gpd_sym ("gamepad_set_deadzone");
     if (s_fleet_get && s_mecanum)
         s_syms_resolved = 1;
+    else
+        s_syms_resolved = 0;
+}
+/* DESPOT-2026-10-07 P0-2: explicit invalidation for unload paths.
+ * Loader/terminal unload hooks call this BEFORE dlclose so no stale
+ * pointer survives even one tick. Re-resolve above makes this redundant
+ * but harmless — defence in depth. */
+void gamepad_drive_invalidate (void) {
+    s_fleet_get = NULL;
+    s_mecanum = NULL;
+    s_pad_init = NULL;
+    s_pad_poll = NULL;
+    s_pad_axis = NULL;
+    s_pad_button = NULL;
+    s_pad_connected = NULL;
+    s_pad_deadzone = NULL;
+    s_syms_resolved = 0;
+    s_active = 0;
 }
 void gamepad_drive_init (void) {
     gpd_resolve ();

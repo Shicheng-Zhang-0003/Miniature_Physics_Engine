@@ -484,12 +484,15 @@ bool collision_cylinder_cube (rigidbody *cyl, rigidbody *cube, collision_data *o
      * rods and shared one normal across faces). dist²(t) is convex;
      * 28 iterations pin t* to ~1e-6 (0.02mm on a 10m axle, 500x below
      * slop). Deterministic, no RNG.
-     * FIX-AUDIT-DESPOT convexity TRUTH: dist²(t)=|p(t)-closest_OBB(p(t))|²
-     * with p(t) affine. Inside a single Voronoi region of the box the
-     * clamp is fixed, so dist² is a convex quadratic there; across regions
-     * the pointwise minimum of convex pieces stays convex (each region's
-     * quadratic extended). Ternary search therefore converges to the true
-     * segment minimum — no sampling, no RNG, bit-deterministic. */
+     * FIX-AUDIT-DESPOT convexity TRUTH (corrected DESPOT-2026-10-07):
+     * dist²(t)=|p(t)-closest_OBB(p(t))|² with p(t) affine. The distance
+     * from a point moving affinely to a FIXED convex set (the OBB) along a
+     * line is convex (Ericson RTCD). The old note claimed "pointwise minimum
+     * of convex pieces stays convex" — FALSE in general (maximum preserves
+     * convexity, minimum does not). The true warrant is narrower:
+     * distance-to-a-convex-set, not min-of-convex. Ternary search therefore
+     * converges to the true segment minimum — no sampling, no RNG,
+     * bit-deterministic. */
     float lo = 0.0f, hi = 1.0f;
     for (int it = 0; it < 28; it++) {
         /* FIX-AUDIT-DESPOT early-exit: once the bracket is below 1e-7 of

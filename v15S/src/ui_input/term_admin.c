@@ -97,10 +97,27 @@ static int term_tee_write_status (const char *path, const char *text, size_t *by
     size_t length = strlen (text);
     *bytes_written = fwrite (text, 1, length, output);
     int failed = (*bytes_written != length) || ferror (output);
+    /* DESPOT-2026-10-07 P1-4: durability — fsync file before rename so a
+     * crash between fclose and rename cannot lose tee output silently. */
+    if (!failed) {
+        if (fflush (output) != 0)
+            failed = 1;
+        else if (fsync (fileno (output)) != 0)
+            failed = 1;
+    }
     if (fclose (output) != 0)
         failed = 1;
     if (!failed && renameat (dirfd, temporary, dirfd, name) != 0)
         failed = 1;
+    if (!failed) {
+        /* Dir-sync so the rename itself is durable. Best-effort: failure
+         * here does not lose data, only crash-atomicity of the directory. */
+        int dfd2 = open ("status", O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW);
+        if (dfd2 >= 0) {
+            fsync (dfd2);
+            close (dfd2);
+        }
+    }
     if (failed)
         unlinkat (dirfd, temporary, 0);
     close (dirfd);
@@ -392,6 +409,15 @@ void cmd_mount (int argc, char **argv) {
         return;
     }
     const char *scene_path = argv [1];
+    /* DESPOT-2026-10-07 P0-4: scene_loading() did fopen() on any absolute
+     * path with no jail, no size cap. Confine mount to project-local scene
+     * files: reject absolute paths and parent traversal. status/ scenes
+     * remain loadable; /etc/passwd and /tmp/evil.dat do not. */
+    if (!scene_path || (scene_path [0] == '\0') || (scene_path [0] == '/') || (strstr (scene_path, "..") != NULL)) {
+        term_printf ("term_err", "mpe: mount: %s: path confined to project-local scenes (no absolute, no ..)\n",
+                     scene_path ? scene_path : "(null)");
+        return;
+    }
     if (scene_loading (scene_path)) {
         editor_reset ();
         contact_cache_clear (physics_world_get_primary ());
@@ -999,7 +1025,25 @@ bool mv_file_is_allowed (const char *filepath) {
     if (filepath [0] == '/') {
         return false;
     }
-    /* Reject paths with null bytes (defensive) */
+    /* DESPOT-2026-10-07 P0-3: reject parent traversal except for the exact
+     * blessed known-files entries (../../readme.md etc). An arbitrary
+     * `vi ../../tmp/evil.c` or `vi status/../../etc/x.c` must not pass
+     * merely because the extension matches. Known list is exact-match. */
+    bool is_known = false;
+    for (int i = 0; mv_known_files [i].path; i++) {
+        if (strcmp (filepath, mv_known_files [i].path) == 0) {
+            is_known = true;
+            break;
+        }
+    }
+    if (!is_known) {
+        if (strstr (filepath, "..") != NULL) {
+            return false;
+        }
+        /* Confine non-known edits to project-local trees (status/, docs
+         * parlance). Absolute jail via realpath happens at save; this is
+         * the fast reject. */
+    }
     /* Check blocked extensions first */
     const char *dot = strrchr (filepath, '.');
     if (dot) {

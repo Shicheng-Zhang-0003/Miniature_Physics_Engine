@@ -41,6 +41,14 @@ static void live_world_add (physics_world *world) {
     }
     if (s_live_count < MPE_MAX_LIVE_WORLDS)
         s_live_worlds [s_live_count++] = world;
+    else {
+        /* DESPOT-2026-10-07 P1-2: overflow used to silently skip registration
+         * while stepping continued — the world became invisible to
+         * auto-purge and unload required manual detach. Loud now. */
+        fprintf (stderr, "[mpe] LIVE-WORLD cap %d reached; world %p steps but is invisible to auto-purge (detach manually before unload)\n",
+                 MPE_MAX_LIVE_WORLDS, (const void *) world);
+        fflush (stderr);
+    }
     pthread_mutex_unlock (&s_live_lock);
 }
 /* `physics_world` is commonly a stack object whose bytes are indeterminate
@@ -137,22 +145,20 @@ void physics_world_init (physics_world *world) {
     if (!world) {
         return;
     }
-    /* MPE_FTC_076a (upheld DESPOT-2026-09-26): zero BEFORE the liveness
-     * check. live_world_contains compares only the ADDRESS, but a true
-     * result on REUSED stack garbage (a leaked live world at the same slot
-     * from an earlier test that never cleaned up) would run cleanup over
-     * indeterminate bytes — garbage tick_module_count reads OOB and SEGVs
-     * (ASan-proven in mfs_suite). Zero-first makes cleanup a safe no-op on
-     * garbage AND on valid-but-empty worlds.
-     * The re-init leak this ordering implies (pools orphaned when re-init
-     * without cleanup) is fixed at the CALLERS, not here: every re-init
-     * site must physics_world_cleanup first (reset_primary does; MFS suite
-     * tests clean up every world on every exit path). An init that guesses
-     * liveness from garbage is worse than one that requires discipline. */
-    memset (world, 0, sizeof (physics_world));
-    if (live_world_contains (world)) {
+    /* MPE_FTC_076a (upheld DESPOT-2026-09-26, amended DESPOT-2026-10-07 P1-2):
+     * live_world_contains compares only the ADDRESS, so it is safe on
+     * uninitialized stack bytes. Check BEFORE memset: if this address is
+     * already live, cleanup FIRST (valid contents) then zero. The old
+     * zero-first order made cleanup a no-op (tick_modules already wiped)
+     * and orphaned loader attachments forever (unload -2 forever).
+     * Fresh stack garbage that is NOT live takes the memset path; no field
+     * is ever probed on garbage. Re-init without cleanup still requires
+     * caller discipline, but re-init WITH a live entry no longer leaks. */
+    bool was_live = live_world_contains (world);
+    if (was_live) {
         physics_world_cleanup (world);
     }
+    memset (world, 0, sizeof (physics_world));
     det_pin_fp_state ();
     /* Static plane body (floor at y=0) - disabled by default. */
     world -> static_plane_enabled = false;
@@ -621,6 +627,42 @@ static bool a3_sanitize_plugin_manifold (collision_data *out, const rigidbody *a
             out -> contact_count = 0;
             return false;
         }
+        /* DESPOT-2026-10-07 P1-1: a buggy/hostile mpe_collide_fn could return
+         * penetration=NaN, position=1e30 and the solver would ingest it into
+         * velocities of two bodies per tick. Validate every contact field
+         * at this choke point; zero-count the manifold on violation. */
+        for (int i = 0; i < out -> contact_count; i++) {
+            contact_point_data *cp = &out -> contacts [i];
+            if (!isfinite (cp -> penetration) || (cp -> penetration < -10.0f) || (cp -> penetration > 10.0f)) {
+                out -> contact_count = 0;
+                return false;
+            }
+            if (!isfinite (cp -> position.x) || !isfinite (cp -> position.y) || !isfinite (cp -> position.z)) {
+                out -> contact_count = 0;
+                return false;
+            }
+            if ((cp -> position.x < -500.0f) || (cp -> position.x > 500.0f) || (cp -> position.y < -500.0f) ||
+                (cp -> position.y > 1000.0f) || (cp -> position.z < -500.0f) || (cp -> position.z > 500.0f)) {
+                out -> contact_count = 0;
+                return false;
+            }
+            if (!isfinite (cp -> local_position_a.x) || !isfinite (cp -> local_position_a.y) ||
+                !isfinite (cp -> local_position_a.z) || !isfinite (cp -> local_position_b.x) ||
+                !isfinite (cp -> local_position_b.y) || !isfinite (cp -> local_position_b.z)) {
+                out -> contact_count = 0;
+                return false;
+            }
+            if (!isfinite (cp -> ra.x) || !isfinite (cp -> ra.y) || !isfinite (cp -> ra.z) || !isfinite (cp -> rb.x) ||
+                !isfinite (cp -> rb.y) || !isfinite (cp -> rb.z)) {
+                out -> contact_count = 0;
+                return false;
+            }
+            if (!isfinite (cp -> tangent_vector.x) || !isfinite (cp -> tangent_vector.y) ||
+                !isfinite (cp -> tangent_vector.z)) {
+                out -> contact_count = 0;
+                return false;
+            }
+        }
     }
     return true;
 }
@@ -680,6 +722,16 @@ int physics_world_add_sphere (physics_world *world, float radius, float mass, ve
     }
     rigidbody *rb = &world -> bodies [world -> body_count];
     rigidbody_initialisation_sphere (rb, radius, mass, position);
+    /* DESPOT-2026-10-07 P1-3: initialisers stamp from global g_cfg. Two
+     * worlds with different physics_world_set_config() still built
+     * identical-friction bodies. Re-stamp from the owning world's cfg so
+     * per-world config is authoritative at construction, not just at step. */
+    {
+        const mpe_config_t *wcfg = mpe_world_cfg (world);
+        rb -> friction_static = wcfg -> body_defaults.sphere_fric_s;
+        rb -> friction_kinetic = wcfg -> body_defaults.sphere_fric_k;
+        rb -> restitution = wcfg -> body_defaults.sphere_restitution;
+    }
     if (world -> next_object_id == 0 || world -> next_object_id == 0xFFFFFFFFu) {
         world -> next_object_id = 1;
     }
@@ -702,6 +754,13 @@ int physics_world_add_cube (physics_world *world, vector3 position, vector3 half
     }
     rigidbody *rb = &world -> bodies [world -> body_count];
     rigidbody_initialisation_cube (rb, position, half_extensions, mass);
+    /* DESPOT-2026-10-07 P1-3: per-world material stamp (see add_sphere). */
+    {
+        const mpe_config_t *wcfg = mpe_world_cfg (world);
+        rb -> friction_static = wcfg -> body_defaults.cube_fric_s;
+        rb -> friction_kinetic = wcfg -> body_defaults.cube_fric_k;
+        rb -> restitution = wcfg -> body_defaults.cube_restitution;
+    }
     if (world -> next_object_id == 0 || world -> next_object_id == 0xFFFFFFFFu) {
         world -> next_object_id = 1;
     }
@@ -725,6 +784,13 @@ int physics_world_add_cylinder (physics_world *world, float radius, float half_l
     }
     rigidbody *rb = &world -> bodies [world -> body_count];
     rigidbody_initialisation_cylinder (rb, radius, half_length, mass, position);
+    /* DESPOT-2026-10-07 P1-3: per-world material stamp (see add_sphere). */
+    {
+        const mpe_config_t *wcfg = mpe_world_cfg (world);
+        rb -> friction_static = wcfg -> body_defaults.cylinder_fric_s;
+        rb -> friction_kinetic = wcfg -> body_defaults.cylinder_fric_k;
+        rb -> restitution = wcfg -> body_defaults.cylinder_restitution;
+    }
     if (world -> next_object_id == 0 || world -> next_object_id == 0xFFFFFFFFu) {
         world -> next_object_id = 1;
     }
@@ -773,7 +839,14 @@ void physics_world_clear (physics_world *world) {
     world -> manifold_overflow_count = 0;
     world -> contact_cache_hits = 0;
     world -> contact_cache_misses = 0;
-    /* Clear joints: stale body_id_a/b would alias recycled IDs after respawn. */
+    world -> contact_cache_hits_applied = 0;
+    /* Clear joints: stale body_id_a/b would alias recycled IDs after respawn.
+     * DESPOT-2026-10-07 P0-1: counts alone are not enough — spring/constraint
+     * solvers loop over is_active, not the count. Zero both. */
+    for (int i = 0; i < mpe_max_joints; i++) {
+        world -> spring_joints [i].is_active = false;
+        world -> revolute_constraints [i].is_active = false;
+    }
     world -> spring_joint_count = 0;
     world -> revolute_constraint_count = 0;
     physics_world_bump_revision (world);
@@ -923,6 +996,20 @@ void physics_world_step (physics_world *world, float dt) {
     if ((!world) || (!world -> bodies) || (!(dt > 0.0f)) || (!isfinite (dt)) || (world -> body_count <= 0)) {
         return;
     }
+    /* DESPOT-2026-10-07 LIE-05: fixed-dt is caller discipline. Bitwise
+     * determinism requires identical dt sequences; variable-dt callers
+     * silently desync (damping pow(drag,dt), CCD sweep*dt, rotor |w|*dt/2).
+     * The GUI loop is fixed 1/60; headless callers must pin dt=1/60.
+     * Non-1/60 dt still steps (no breakage) but is LOUD so a variable-dt
+     * harness cannot claim determinism. */
+    if ((dt < 0.016666f) || (dt > 0.016668f)) {
+        static int s_dt_warned = 0;
+        if (!s_dt_warned) {
+            s_dt_warned = 1;
+            fprintf (stderr, "[mpe] NON-CANONICAL dt=%.6f (canonical 1/60=0.016667); determinism twins must use identical dt\n",
+                     (double) dt);
+        }
+    }
     /* TRUTH: spiral-of-death guard rescales time (dt>0.1s clamped, sim lags
      * wall) instead of substepping. Substepping would preserve time at the
      * cost of unbounded catch-up work; clamping bounds work and keeps every
@@ -971,9 +1058,21 @@ void physics_world_step (physics_world *world, float dt) {
     int broadphase_pair_count = pair_count; /* saved for depenetration pass */
     /* Low-memory contract: degraded (pairless) tick instead of a crash when
      * scratch failed to allocate. TRUTH: sort_keys missing left order_out
-     * uninitialized -> OOB solve. Check it too. */
+     * uninitialized -> OOB solve. Check it too.
+     * DESPOT-2026-10-07 P1-6: island/ccd/has_contact/id_cache/tick_v0 gaps
+     * were individually NULL-tolerant but silently solved with stale flags
+     * and no counter. Count degraded ticks loudly; twins with different OOM
+     * histories must not diverge silently. */
     if ((!world -> pair_buffer) || (!world -> manifolds) || (!world -> manifold_awake) || (!world -> manifold_order) ||
-        (!world -> manifold_sort_keys) || (!world -> pair_skipped) || (!world -> broadphase)) {
+        (!world -> manifold_sort_keys) || (!world -> pair_skipped) || (!world -> broadphase) || (!world -> island_parent) ||
+        (!world -> island_label) || (!world -> island_awake_flags) || (!world -> ccd_time_remaining) ||
+        (!world -> has_contact) || (!world -> tick_v0)) {
+        static unsigned long s_degraded_ticks = 0;
+        s_degraded_ticks++;
+        if ((s_degraded_ticks <= 8) || ((s_degraded_ticks % 1000) == 0)) {
+            fprintf (stderr, "[mpe] DEGRADED tick %lu: scratch missing (low-mem); solving pairless, islands/ccd/contact flags stale\n",
+                     s_degraded_ticks);
+        }
         return;
     }
     int manifold_count = 0;
@@ -1344,10 +1443,20 @@ void physics_world_step (physics_world *world, float dt) {
         }
         rigidbody *ib = &world -> bodies [i];
         bool has_joint = (i < mpe_max_bodies) ? (joint_membership [i] != 0) : false;
-        bool free_flight = ((world -> has_contact) ? (world -> has_contact [i] == 0) : true) && !has_joint;
+        bool contact_free = ((world -> has_contact) ? (world -> has_contact [i] == 0) : false);
+        /* DESPOT-2026-10-07 LIE-04: free_flight must be FALSE unless the
+         * tick_v0 restore actually ran. The old default (has_contact NULL
+         * -> true) treated post-force v_post as v(0) in the analytic path,
+         * double-applying gravity (v error g*dt ~0.08 m/s per tick).
+         * Degraded/low-mem ticks now take the safe symplectic path. */
+        bool free_flight = contact_free && !has_joint;
+        bool have_v0 = (world -> tick_v0 && (world -> tick_v0_capacity >= world -> body_count));
+        if (free_flight && !have_v0) {
+            free_flight = false;
+        }
         /* FIX-AUDIT-DESPOT: capacity gate matches the snapshot gate above
          * (>= live body_count, not >= mpe_max_bodies). */
-        if (free_flight && world -> tick_v0 && world -> tick_v0_capacity >= world -> body_count) {
+        if (free_flight && have_v0) {
             /* Restore start-of-tick velocity so the analytic solution starts
              * from v_pre (Euler already applied gravity+damping to live). */
             ib -> velocity = world -> tick_v0 [i];

@@ -473,12 +473,16 @@ void simulation_physics_tick (float frame_delta_time) {
             /* Contact-free AND joint-free bodies take analytic free-flight
              * from v_pre; constrained bodies keep post-solve velocity
              * (solver/joints own them). Per-world cfg (was &g_cfg global):
-             * multi-world gravity/drag diverge from canonical otherwise. */
-            bool leg_contact_free = (world -> has_contact) ? (world -> has_contact [object_iterator_index] == 0) : true;
+             * multi-world gravity/drag diverge from canonical otherwise.
+             * DESPOT-2026-10-07 LIE-04: degraded path must NOT default
+             * contact-free TRUE when has_contact is NULL — that treated
+             * post-force v_post as v(0) and double-applied gravity. */
+            bool leg_contact_free = (world -> has_contact) ? (world -> has_contact [object_iterator_index] == 0) : false;
             bool leg_joint_free =
                 (object_iterator_index < mpe_max_bodies) ? (leg_joint [object_iterator_index] == 0) : false;
-            bool leg_free = leg_contact_free && leg_joint_free;
-            if (leg_free && world -> tick_v0 && world -> tick_v0_capacity >= mpe_max_bodies) {
+            bool leg_have_v0 = (world -> tick_v0 && (world -> tick_v0_capacity >= world -> body_count));
+            bool leg_free = leg_contact_free && leg_joint_free && leg_have_v0;
+            if (leg_free) {
                 rigid_body -> velocity = world -> tick_v0 [object_iterator_index];
             }
             rb_integrate_position_exact (rigid_body, step_dt, leg_pos_cfg, leg_free);
