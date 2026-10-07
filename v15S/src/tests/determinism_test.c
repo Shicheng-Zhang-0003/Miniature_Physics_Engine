@@ -111,8 +111,7 @@ static int caches_equal (const physics_world *a, const physics_world *b) {
             return 0;
         if (ca -> hash_next != cb -> hash_next)
             return 0;
-    }
-    return 1;
+    } return 1;
 }
 int main (void) {
     mpe_config_init ();
@@ -123,8 +122,7 @@ int main (void) {
     for (int t = 0; t < 600; t++) {
         physics_world_step (&w1, dt);
         physics_world_step (&w2, dt);
-    }
-    int fail = 0;
+    } int fail = 0;
     if (w1.body_count != w2.body_count) {
         printf ("[FAIL] body count diverged\n");
         return 1;
@@ -142,9 +140,7 @@ int main (void) {
         printf ("[FAIL] warm cache contents diverged\n");
         fail = 1;
     }
-    if (fail == 0) {
-        printf ("[PASS] determinism: 600 ticks bitwise identical across twin worlds\n");
-    }
+    if (fail == 0) { printf ("[PASS] determinism: 600 ticks bitwise identical across twin worlds\n"); }
     physics_world_cleanup (&w1);
     physics_world_cleanup (&w2);
     return fail;

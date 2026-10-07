@@ -47,12 +47,10 @@ int main (void) {
             vector3 P = {0, 0, 0};
             for (int i = 0; i < world.body_count; i++) {
                 P = vector3_addition (P, vector3_scaling (world.bodies [i].velocity, world.bodies [i].mass));
-            }
-            float err = vector3_length (vector3_subtraction (P, P0));
+            } float err = vector3_length (vector3_subtraction (P, P0));
             if (err > max_err)
                 max_err = err;
-        }
-        printf ("[INFO] momentum_conservation max_err=%.6f (initial |P|=%.6f, 2s)\n", max_err, vector3_length (P0));
+        } printf ("[INFO] momentum_conservation max_err=%.6f (initial |P|=%.6f, 2s)\n", max_err, vector3_length (P0));
         if (!collided) {
             printf ("[FAIL] momentum case never collided\n");
             fail = 1;
@@ -70,8 +68,7 @@ int main (void) {
             fail = 1;
         } else {
             printf ("[PASS] linear momentum conserved (err < 1mm/s momentum)\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
     /* Test 2: Angular momentum conservation (torque-free tumble, 2s).
      * Explicit Euler gyro integration: O(w^3*dt^2) energy error per step.
@@ -99,16 +96,14 @@ int main (void) {
             float rel_err = fabsf (Lmag - L0) / L0;
             if (rel_err > max_rel_err)
                 max_rel_err = rel_err;
-        }
-        printf ("[INFO] angmom_conservation max_rel_err=%.6f (2s, matches test_angmom)\n", max_rel_err);
+        } printf ("[INFO] angmom_conservation max_rel_err=%.6f (2s, matches test_angmom)\n", max_rel_err);
         /* Explicit Euler gyro: ~2.5% over 2s (see test_angmom). Tolerance 3%. */
         if (max_rel_err > 0.03f) {
             printf ("[FAIL] angular momentum drift %.6f\n", max_rel_err);
             fail = 1;
         } else {
             printf ("[PASS] angular momentum drift within explicit Euler bounds (2s)\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
     /* Test 3: Energy conservation in free flight (drag=1, 2s).
      * Exact free-flight integration: exact for gravity + linear drag. */
@@ -136,16 +131,14 @@ int main (void) {
                 E_max = E;
             if (E < E_min)
                 E_min = E;
-        }
-        float rel_err = fabsf (E_max - E_min) / E0;
+        } float rel_err = fabsf (E_max - E_min) / E0;
         printf ("[INFO] energy_freeflight rel_range=%.6f\n", rel_err);
         if (rel_err > 1e-4f) {
             printf ("[FAIL] energy drift %.6f\n", rel_err);
             fail = 1;
         } else {
             printf ("[PASS] energy conserved in free flight\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
     /* Test 4: Energy bounded with drag < 1 (2s).
      * Linear viscous drag dissipates energy monotonically. */
@@ -169,16 +162,14 @@ int main (void) {
                 E0 = E;
             if (E > E_max)
                 E_max = E;
-        }
-        float ratio = E_max / E0;
+        } float ratio = E_max / E0;
         printf ("[INFO] energy_with_drag E0=%.2f E_max=%.2f ratio=%.4f (expected < 1)\n", E0, E_max, ratio);
         if (ratio > 1.001f) {
             printf ("[FAIL] energy increased with drag (anti-damping)\n");
             fail = 1;
         } else {
             printf ("[PASS] energy monotonically decreases with drag\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
     /* Test 5: Spring energy - bounded oscillation (2s).
      * Explicit Euler spring integration: energy grows for underdamped springs.
@@ -204,8 +195,7 @@ int main (void) {
         if (joint < 0) {
             printf ("[FAIL] spring joint creation failed\n");
             fail = 1;
-        }
-        const float dt = 1.0f / 60.0f;
+        } const float dt = 1.0f / 60.0f;
         const float E_initial = 50.0f; /* 0.5*k*(4m-3m)^2 */
         float E_max = 0.0f, E_min = 1e9f;
         float max_speed = 0.0f;
@@ -221,16 +211,14 @@ int main (void) {
                 printf ("[FAIL] spring energy became non-finite\n");
                 fail = 1;
                 break;
-            }
-            float speed = fmaxf (vector3_length (world.bodies [a].velocity), vector3_length (world.bodies [b].velocity));
+            } float speed = fmaxf (vector3_length (world.bodies [a].velocity), vector3_length (world.bodies [b].velocity));
             if (speed > max_speed)
                 max_speed = speed;
             if (E > E_max)
                 E_max = E;
             if (E < E_min)
                 E_min = E;
-        }
-        float rel_range = (E_max - E_min) / E_max;
+        } float rel_range = (E_max - E_min) / E_max;
         float peak_ratio = E_max / E_initial;
         printf ("[INFO] spring_energy range=%.6f peak/E0=%.4f max_speed=%.4f (2s, explicit Euler)\n", rel_range,
                 peak_ratio, max_speed);
@@ -243,8 +231,7 @@ int main (void) {
             fail = 1;
         } else {
             printf ("[PASS] spring energy remains bounded near its initial value\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
     /* Test 6: Center of mass motion - external forces only (10s).
      * No external forces -> COM velocity constant. Symplectic Euler preserves this exactly. */
@@ -273,8 +260,7 @@ int main (void) {
         for (int i = 0; i < world.body_count; i++) {
             P = vector3_addition (P, vector3_scaling (world.bodies [i].velocity, world.bodies [i].mass));
             M += world.bodies [i].mass;
-        }
-        float com_vx = P.x / M;
+        } float com_vx = P.x / M;
         float err = fabsf (com_vx - com_v0);
         printf ("[INFO] com_velocity initial=%.6f final=%.6f err=%.6f\n", com_v0, com_vx, err);
         if (err > 1e-5f) {
@@ -282,9 +268,7 @@ int main (void) {
             fail = 1;
         } else {
             printf ("[PASS] COM velocity conserved\n");
-        }
-        physics_world_cleanup (&world);
-    }
-    return fail;
+        } physics_world_cleanup (&world);
+    } return fail;
 }
 #endif

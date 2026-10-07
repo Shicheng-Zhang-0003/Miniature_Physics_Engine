@@ -34,8 +34,7 @@ int main (void) {
     for (int i = 0; i < 120; i++) {
         drivetrain_update (&world, &robot, DT);
         physics_world_step (&world, DT);
-    }
-    printf ("after 120-frame settle, per wheel:\n");
+    } printf ("after 120-frame settle, per wheel:\n");
     printf ("  %-6s %-7s %-8s %-11s %-10s %-11s\n", "wheel", "asleep", "cmd", "out_torque", "current", "axle_omega");
     for (int w = 0; w < robot.wheel_count; w++) {
         int wi = robot.wheel_bodies [w];
@@ -54,8 +53,7 @@ int main (void) {
     for (int w = 0; w < robot.wheel_count; w++) {
         float after = axle_omega (&world, robot.wheel_bodies [w]);
         printf ("  wheel[%d]: %.3f -> %.3f  (delta=%+.4f)\n", w, before [w], after, after - before [w]);
-    }
-    rigidbody *ch = &world.bodies [robot.chassis_body];
+    } rigidbody *ch = &world.bodies [robot.chassis_body];
     printf ("chassis: asleep=%d lin_speed=%.4f ang_vel_y=%.4f\n", (int) ch -> is_sleeping,
             sqrtf (ch -> velocity.x * ch -> velocity.x + ch -> velocity.z * ch -> velocity.z), ch -> angular_velocity.y);
     /* verdict */
@@ -66,8 +64,7 @@ int main (void) {
             any_asleep = 1;
         else
         all_asleep = 0;
-    }
-    printf ("\nVERDICT: ");
+    } printf ("\nVERDICT: ");
     if (all_asleep)
         printf ("ALL wheels ASLEEP -> sleep-system bug (linear-only sleep check)\n");
     else if (any_asleep)

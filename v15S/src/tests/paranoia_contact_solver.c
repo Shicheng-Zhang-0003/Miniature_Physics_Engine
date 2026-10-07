@@ -45,12 +45,10 @@ int main (void) {
             if (previous_vy > 0.0f && b -> velocity.y <= 0.0f && apex_count < 4) {
                 apex_heights [apex_count] = b -> position.y - b -> radius;
                 apex_count++;
-            }
-            previous_vy = b -> velocity.y;
+            } previous_vy = b -> velocity.y;
             if (apex_count >= 4)
                 break;
-        }
-        float e = 0.8f;
+        } float e = 0.8f;
         if (apex_count < 3) {
             printf ("[FAIL] only %d measurable restitution apexes\n", apex_count);
             fail = 1;
@@ -99,15 +97,13 @@ int main (void) {
             rigidbody *b = &world.bodies [cube];
             if (fabsf (b -> position.x) > max_x)
                 max_x = fabsf (b -> position.x);
-        }
-        printf ("[INFO] static_friction drift=%.6f (10s, mu=1.0, initial vx=0.05m/s)\n", max_x);
+        } printf ("[INFO] static_friction drift=%.6f (10s, mu=1.0, initial vx=0.05m/s)\n", max_x);
         if (max_x > 0.05f) {
             printf ("[FAIL] static friction excessive drift %.4f\n", max_x);
             fail = 1;
         } else {
             printf ("[PASS] static friction arrests low-speed slip\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
     /* Test 3: Sliding-block stopping distance - d = v0^2/(2*mu_k*g). */
     {
@@ -140,8 +136,7 @@ int main (void) {
                 stopped = 1;
                 x_end = b -> position.x;
             }
-        }
-        float expected = v_start * v_start / (2.0f * 0.3f * 9.81f);
+        } float expected = v_start * v_start / (2.0f * 0.3f * 9.81f);
         float actual = fabsf (x_end - x_start);
         float err = fabsf (actual - expected) / expected;
         printf ("[INFO] friction_stop expected=%.4f actual=%.4f err=%.2f%%\n", expected, actual, err * 100);
@@ -151,8 +146,7 @@ int main (void) {
             fail = 1;
         } else {
             printf ("[PASS] Coulomb stopping distance within solver tolerance\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
     /* Test 4: Split impulse - no velocity change from penetration correction */
     {
@@ -178,15 +172,13 @@ int main (void) {
             rigidbody *b = &world.bodies [cube];
             if (b -> velocity.y > max_vy)
                 max_vy = b -> velocity.y;
-        }
-        printf ("[INFO] split_impulse max_vy_after_impact=%.4f (expected 0)\n", max_vy);
+        } printf ("[INFO] split_impulse max_vy_after_impact=%.4f (expected 0)\n", max_vy);
         if (max_vy > 0.01f) {
             printf ("[FAIL] split impulse created upward velocity\n");
             fail = 1;
         } else {
             printf ("[PASS] split impulse produces no velocity change\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
     /* Test 5: Rolling resistance - sphere on horizontal plane should decelerate.
      * Rolling resistance torque: M = mu_r * N * R (contact radius).
@@ -223,12 +215,9 @@ int main (void) {
         for (int t = 0; t < 6000; t++) {
             physics_world_step (&world, dt);
             rigidbody *b = &world.bodies [s];
-            if (!stopped && vector3_length (b -> velocity) < 0.01f) {
-                stopped = 1;
-            }
+            if (!stopped && vector3_length (b -> velocity) < 0.01f) { stopped = 1; }
             x_end = b -> position.x;
-        }
-        float dist = fabsf (x_end - x_start);
+        } float dist = fabsf (x_end - x_start);
         float final_speed = vector3_length (world.bodies [s].velocity);
         float final_spin = vector3_length (world.bodies [s].angular_velocity);
         printf ("[INFO] rolling_resistance distance=%.2f m final_speed=%.4f final_spin=%.4f stopped=%d\n", dist,
@@ -240,9 +229,7 @@ int main (void) {
             fail = 1;
         } else {
             printf ("[PASS] rolling resistance decelerates the sphere within the rigid-body model\n");
-        }
-        physics_world_cleanup (&world);
-    }
-    return fail;
+        } physics_world_cleanup (&world);
+    } return fail;
 }
 #endif

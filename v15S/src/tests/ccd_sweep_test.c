@@ -21,8 +21,7 @@ int main (void) {
         rigidbody_wake (&world.bodies [s]);
         for (int t = 0; t < 30; t++) {
             physics_world_step (&world, dt);
-        }
-        float x = world.bodies [s].position.x;
+        } float x = world.bodies [s].position.x;
         float vx = world.bodies [s].velocity.x;
         printf ("[info] wall case: final_x=%.3f (face contact at -0.55)\n", x);
         /* TRUTH: two-sided. A frozen body at -5.7 or a 0.09m penetration
@@ -39,8 +38,7 @@ int main (void) {
             fail = 1;
         } else {
             printf ("[PASS] 144 m/s sphere stopped at thin wall\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
     /* Case 2: 60 m/s sphere straight down at the floor.
      * DESPOT-2026-10-04 [CLAMP-TAUTOLOGY closure]: this case had NO floor
@@ -64,12 +62,8 @@ int main (void) {
         int ever_contact = 0;
         for (int t = 0; t < 120; t++) {
             physics_world_step (&world, dt);
-            if (world.bodies [s].position.y < min_y) {
-                min_y = world.bodies [s].position.y;
-            }
-            if ((world.has_contact) && (world.has_contact [s])) {
-                ever_contact = 1;
-            }
+            if (world.bodies [s].position.y < min_y) { min_y = world.bodies [s].position.y; }
+            if ((world.has_contact) && (world.has_contact [s])) { ever_contact = 1; }
         }
         printf ("[info] floor case: min_center_y=%.4f rest_y=%.3f ever_contact=%d (net OFF, real slab)\n", min_y,
                 world.bodies [s].position.y, ever_contact);
@@ -88,12 +82,9 @@ int main (void) {
             fail = 1;
         } else {
             printf ("[PASS] 60 m/s sphere lands on floor\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
-    if (fail == 0) {
-        printf ("[PASS] ccd sweep truth complete\n");
-    }
+    if (fail == 0) { printf ("[PASS] ccd sweep truth complete\n"); }
     return fail;
 }
 #endif /* mpe_ccd_sweep_test */

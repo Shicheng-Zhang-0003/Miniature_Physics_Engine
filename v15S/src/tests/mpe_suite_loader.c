@@ -42,8 +42,7 @@ static const char *mpe_pick_plugin (const char *so_path, char *buf, size_t n) {
     (void) n;
     return so_path;
 #endif
-}
-static int saw_state = 0;
+} static int saw_state = 0;
 static void *saw_ptr = NULL;
 static float rec_resolve (mpe_world_t *world, void *manifold, float dt, bool friction_only, int iter, void *mod_state) {
     (void) world;
@@ -54,8 +53,7 @@ static float rec_resolve (mpe_world_t *world, void *manifold, float dt, bool fri
     saw_state = 1;
     saw_ptr = mod_state;
     return 0.0f;
-}
-static void *saw_bp_state = NULL;
+} static void *saw_bp_state = NULL;
 static int fake_generate (mpe_world_t *world, broadphase_pair *pairs_out, int max_pairs, float dt, void *mod_state) {
     saw_bp_state = mod_state;
     /* Delegate to the real backend so manifolds exist for resolve. */
@@ -165,8 +163,7 @@ int mpe_t_loader_lifecycle (void) {
                 MPE_CHECK (&t, !capfn (&cw.bodies [ci], &cw.bodies [si], &cd, &cw));
                 physics_world_cleanup (&cw);
             }
-        }
-        physics_world w;
+        } physics_world w;
         mpe_world_begin (&w);
         const mpe_module_desc_t *d = mpe_find_module ("capsule-shape");
         MPE_CHECK (&t, d != NULL);
@@ -188,9 +185,7 @@ int mpe_t_loader_lifecycle (void) {
         MPE_CHECK (&t, mpe_loader_unload (cap_path) == 0);
         MPE_CHECK (&t, mpe_find_pair_handler (3, 0, 100, -1) == NULL);
     }
-    if (t.failures == 0) {
-        printf ("[PASS] loader lifecycle green\n");
-    }
+    if (t.failures == 0) { printf ("[PASS] loader lifecycle green\n"); }
     mpe_test_end (&t);
     return t.failures;
 }

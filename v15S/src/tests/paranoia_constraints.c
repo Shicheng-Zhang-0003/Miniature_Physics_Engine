@@ -50,8 +50,7 @@ int main (void) {
             printf ("[FAIL] could not create revolute joint\n");
             physics_world_cleanup (&world);
             return 1;
-        }
-        const float dt = 1.0f / 60.0f;
+        } const float dt = 1.0f / 60.0f;
         float periods [64];
         int period_count = 0;
         int last_cross = 0;
@@ -60,14 +59,11 @@ int main (void) {
             physics_world_step (&world, dt);
             rigidbody *bob = &world.bodies [1];
             if (t > 60 && last_x * bob -> position.x < 0) { /* zero crossing */
-                if (period_count > 0 && period_count - 1 < (int) (sizeof (periods) / sizeof (periods [0]))) {
-                    periods [period_count - 1] = (t - last_cross) * (1.0f / 60.0f);
-                }
+                if (period_count > 0 && period_count - 1 < (int) (sizeof (periods) / sizeof (periods [0]))) { periods [period_count - 1] = (t - last_cross) * (1.0f / 60.0f); }
                 if (period_count < (int) (sizeof (periods) / sizeof (periods [0])))
                     period_count++;
                 last_cross = t;
-            }
-            last_x = bob -> position.x;
+            } last_x = bob -> position.x;
         }
         float angle = atan2f (fabsf (world.bodies [bob].position.x - pivot_point.x),
                               fabsf (pivot_point.y - world.bodies [bob].position.y));
@@ -90,11 +86,8 @@ int main (void) {
             if (err > 0.05f) {
                 printf ("[FAIL] pendulum period error %.2f%%\n", err * 100);
                 fail = 1;
-            } else {
-                printf ("[PASS] revolute pendulum period matches finite-amplitude rigid-bob model\n");
-            }
-        }
-        physics_world_cleanup (&world);
+            } else { printf ("[PASS] revolute pendulum period matches finite-amplitude rigid-bob model\n"); }
+        } physics_world_cleanup (&world);
     }
     /* Test 2: Revolute motor - target velocity tracking */
     {
@@ -108,16 +101,14 @@ int main (void) {
             printf ("[FAIL] could not create motor base\n");
             physics_world_cleanup (&world);
             return 1;
-        }
-        rigidbody_set_static (&world.bodies [base], true);
+        } rigidbody_set_static (&world.bodies [base], true);
         uint32_t base_id = world.bodies [base].object_id;
         int wheel = physics_world_add_cylinder (&world, 0.5f, 0.2f, 10.0f, (vector3) {0.0f, 0.0f, 5.0f});
         if (wheel < 0) {
             printf ("[FAIL] could not create motor wheel\n");
             physics_world_cleanup (&world);
             return 1;
-        }
-        world.bodies [wheel].restitution = 0.0f;
+        } world.bodies [wheel].restitution = 0.0f;
         world.bodies [wheel].friction_static = 0.0f;
         world.bodies [wheel].friction_kinetic = 0.0f;
         uint32_t wheel_id = world.bodies [wheel].object_id;
@@ -127,13 +118,11 @@ int main (void) {
             printf ("[FAIL] could not create motor joint\n");
             physics_world_cleanup (&world);
             return 1;
-        }
-        constraint_set_revolute_motor (&world, joint, true, 10.0f, 100.0f);
+        } constraint_set_revolute_motor (&world, joint, true, 10.0f, 100.0f);
         const float dt = 1.0f / 60.0f;
         for (int t = 0; t < 180; t++) {
             physics_world_step (&world, dt);
-        }
-        rigidbody *w = &world.bodies [wheel];
+        } rigidbody *w = &world.bodies [wheel];
         float actual_w = fabsf (w -> angular_velocity.x);
         float target_w = 10.0f;
         float err = fabsf (actual_w - target_w) / target_w;
@@ -144,8 +133,7 @@ int main (void) {
             fail = 1;
         } else {
             printf ("[PASS] revolute motor tracks target velocity\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
     /* Test 3: Prismatic joint - linear slider */
     {
@@ -169,15 +157,13 @@ int main (void) {
             physics_world_step (&world, dt);
             /* Push slider */
             world.bodies [1].force_accumulator.x += 10.0f;
-        }
-        float pos = world.bodies [1].position.x;
+        } float pos = world.bodies [1].position.x;
         if (pos > 2.0f || pos < -2.0f) {
             printf ("[FAIL] prismatic limits violated: pos=%.3f\n", pos);
             fail = 1;
         } else {
             printf ("[PASS] prismatic limits enforced\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
     /* Test 4: Distance constraint - preserves distance */
     {
@@ -197,8 +183,7 @@ int main (void) {
             printf ("[FAIL] could not create distance constraint\n");
             physics_world_cleanup (&world);
             return 1;
-        }
-        const float dt = 1.0f / 60.0f;
+        } const float dt = 1.0f / 60.0f;
         float max_err = 0.0f;
         for (int t = 0; t < 1200; t++) {
             physics_world_step (&world, dt);
@@ -206,15 +191,13 @@ int main (void) {
             float err = fabsf (d - 1.0f);
             if (err > max_err)
                 max_err = err;
-        }
-        printf ("[INFO] distance_constraint max_err=%.6f\n", max_err);
+        } printf ("[INFO] distance_constraint max_err=%.6f\n", max_err);
         if (max_err > 0.001f) {
             printf ("[FAIL] distance constraint drift %.6f\n", max_err);
             fail = 1;
         } else {
             printf ("[PASS] distance constraint maintains exact separation\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
     /* Test 5: Fixed weld keeps its two local anchor points coincident. */
     {
@@ -239,8 +222,7 @@ int main (void) {
             printf ("[FAIL] could not create fixed joint\n");
             physics_world_cleanup (&world);
             return 1;
-        }
-        const float dt = 1.0f / 60.0f;
+        } const float dt = 1.0f / 60.0f;
         float max_gap = 0.0f;
         for (int t = 0; t < 600; t++) {
             physics_world_step (&world, dt);
@@ -249,15 +231,13 @@ int main (void) {
             float gap = vector3_length (vector3_subtraction (pa, pb));
             if (gap > max_gap)
                 max_gap = gap;
-        }
-        printf ("[INFO] fixed_weld max_anchor_gap=%.6f m\n", max_gap);
+        } printf ("[INFO] fixed_weld max_anchor_gap=%.6f m\n", max_gap);
         if (max_gap > 0.02f) {
             printf ("[FAIL] fixed weld anchor drift %.6f m\n", max_gap);
             fail = 1;
         } else {
             printf ("[PASS] fixed weld keeps world anchors coincident\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
     /* Test 6: Rope constraint - inequality distance */
     {
@@ -277,8 +257,7 @@ int main (void) {
             printf ("[FAIL] could not create rope constraint\n");
             physics_world_cleanup (&world);
             return 1;
-        }
-        const float dt = 1.0f / 60.0f;
+        } const float dt = 1.0f / 60.0f;
         world.bodies [b].velocity.x = 2.0f;
         rigidbody_wake (&world.bodies [b]);
         float max_dist = 0.0f;
@@ -289,14 +268,12 @@ int main (void) {
             float d = vector3_length (vector3_subtraction (world.bodies [a].position, world.bodies [b].position));
             if (d > max_dist)
                 max_dist = d;
-        }
-        float taut_dist = vector3_length (vector3_subtraction (world.bodies [a].position, world.bodies [b].position));
+        } float taut_dist = vector3_length (vector3_subtraction (world.bodies [a].position, world.bodies [b].position));
         world.bodies [b].velocity.x = -1.0f; /* an inward impulse should create slack */
         rigidbody_wake (&world.bodies [b]);
         for (int t = 0; t < 60; t++) {
             physics_world_step (&world, dt);
-        }
-        float slack_dist = vector3_length (vector3_subtraction (world.bodies [a].position, world.bodies [b].position));
+        } float slack_dist = vector3_length (vector3_subtraction (world.bodies [a].position, world.bodies [b].position));
         printf ("[INFO] rope max_dist=%.3f taut=%.3f after_inward_impulse=%.3f\n", max_dist, taut_dist, slack_dist);
         if (max_dist > 1.10f || taut_dist > 1.10f) {
             printf ("[FAIL] rope exceeded its maximum length\n");
@@ -306,9 +283,7 @@ int main (void) {
             fail = 1;
         } else {
             printf ("[PASS] rope enforces maximum length and permits slack\n");
-        }
-        physics_world_cleanup (&world);
-    }
-    return fail;
+        } physics_world_cleanup (&world);
+    } return fail;
 }
 #endif

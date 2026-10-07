@@ -85,8 +85,7 @@ int mfs_t_ftc_hotload (void) {
         MFS_CHECK (t_ptr, ftc_fleet_count (&w0) == 0);
         MFS_CHECK (t_ptr, ftc_fleet_get (&w0, 0) == NULL);
         physics_world_cleanup (&w0);
-    }
-    int s0 = ftc_fleet_spawn (&w1, 0.0f, ftc_robot_rest_height (), 0.0f, MOTOR_GB_5203_26_9, FTC_DRIVETRAIN_MECANUM);
+    } int s0 = ftc_fleet_spawn (&w1, 0.0f, ftc_robot_rest_height (), 0.0f, MOTOR_GB_5203_26_9, FTC_DRIVETRAIN_MECANUM);
     MFS_CHECK (t_ptr, s0 == 0);
     ftc_robot *r1 = ftc_fleet_get (&w1, 0);
     MFS_CHECK (t_ptr, r1 != NULL);
@@ -98,11 +97,8 @@ int mfs_t_ftc_hotload (void) {
         if (r1)
             drivetrain_mecanum (r1, 1.0f, 0.0f, 0.0f);
         physics_world_step (&w1, dt); /* pre_step drives the fleet */
-        if (!mfs_test_finite (&w1)) {
-            ok1 = 0;
-        }
-    }
-    MFS_CHECK (t_ptr, ok1);
+        if (!mfs_test_finite (&w1)) { ok1 = 0; }
+    } MFS_CHECK (t_ptr, ok1);
     float ex = sx, ey = sy, ez = sz;
     if (r1)
         ftc_robot_get_position (&w1, r1, &ex, &ey, &ez);
@@ -143,8 +139,7 @@ int mfs_t_ftc_hotload (void) {
     {
         const char *env = getenv ("MPE_FTC_PLUGIN");
         ftc_candidates [0] = env;
-    }
-    const char *ftc_path = NULL;
+    } const char *ftc_path = NULL;
     for (size_t ci = 0; ci < sizeof (ftc_candidates) / sizeof (ftc_candidates [0]); ci++) {
         if (!ftc_candidates [ci])
             continue;
@@ -164,8 +159,7 @@ int mfs_t_ftc_hotload (void) {
         physics_world_cleanup (&w1);
         mfs_test_end (t_ptr);
         return t_ptr -> failures;
-    }
-    MFS_INFO ("FTC plugin resolved: %s", ftc_path);
+    } MFS_INFO ("FTC plugin resolved: %s", ftc_path);
     void *handle = dlopen (ftc_path, RTLD_NOW);
     /* DESPOT-2026-09-28: early return leaked saved config (no end). */
     if (!handle) {
@@ -175,8 +169,7 @@ int mfs_t_ftc_hotload (void) {
         physics_world_cleanup (&w1);
         mfs_test_end (t_ptr);
         return t_ptr -> failures;
-    }
-    const mpe_module_desc_t *dyn_desc = dlsym (handle, "mpe_module_desc");
+    } const mpe_module_desc_t *dyn_desc = dlsym (handle, "mpe_module_desc");
     typedef int (*spawn_fn_t) (struct physics_world *, float, float, float, int, int);
     typedef ftc_robot * (*get_fn_t) (struct physics_world *, int);
     typedef void (*mec_fn_t) (ftc_robot *, float, float, float);
@@ -205,11 +198,8 @@ int mfs_t_ftc_hotload (void) {
         if (r2 && dyn_mec)
             dyn_mec (r2, 1.0f, 0.0f, 0.0f);
         physics_world_step (&w2, dt);
-        if (!mfs_test_finite (&w2)) {
-            ok2 = 0;
-        }
-    }
-    MFS_CHECK (t_ptr, ok2);
+        if (!mfs_test_finite (&w2)) { ok2 = 0; }
+    } MFS_CHECK (t_ptr, ok2);
     float fx = tx, fy = ty, fz = tz;
     if (r2)
         ftc_robot_get_position (&w2, r2, &fx, &fy, &fz);
@@ -223,9 +213,7 @@ int mfs_t_ftc_hotload (void) {
                    (memcmp (&r1 -> odom_x, &r2 -> odom_x, 4) == 0) && (memcmp (&r1 -> odom_z, &r2 -> odom_z, 4) == 0) &&
                    (memcmp (&r1 -> odom_theta, &r2 -> odom_theta, 4) == 0);
         MFS_CHECK (t_ptr, same);
-    } else {
-        MFS_CHECK (t_ptr, 0);
-    }
+    } else { MFS_CHECK (t_ptr, 0); }
     /* Detach lifecycle on the dynamic world (r2 dangles after detach). */
     int w2chassis = (r2) ? r2 -> chassis_body : -1;
     if (dyn_desc)
@@ -234,11 +222,8 @@ int mfs_t_ftc_hotload (void) {
     int okc = 1;
     for (int k = 0; k < 60 && okc; k++) {
         physics_world_step (&w2, dt);
-        if (!mfs_test_finite (&w2)) {
-            okc = 0;
-        }
-    }
-    MFS_CHECK (t_ptr, okc);
+        if (!mfs_test_finite (&w2)) { okc = 0; }
+    } MFS_CHECK (t_ptr, okc);
     if (w2chassis >= 0 && w2chassis < w2.body_count) {
         float gx = w2.bodies [w2chassis].position.x;
         float gz = w2.bodies [w2chassis].position.z;
@@ -284,8 +269,7 @@ int mfs_t_module_1 (void) {
         physics_world_cleanup (&w);
         mfs_test_end (t_ptr);
         return t_ptr -> failures;
-    }
-    mfs_module_1_state *ms = (mfs_module_1_state *) state;
+    } mfs_module_1_state *ms = (mfs_module_1_state *) state;
     const float dt = DT;
     int fail = 0;
     for (int tick = 0; tick < 100 && !fail; tick++) {
@@ -293,19 +277,15 @@ int mfs_t_module_1 (void) {
             mfs_module_1_set_drive_commands (ms, 1.0f, 0.0f, 0.0f);
             mfs_module_1_set_intake (ms, true);
         }
-        if (tick == 50) {
-            mfs_module_1_set_shooter (ms, true, false);
-        }
+        if (tick == 50) { mfs_module_1_set_shooter (ms, true, false); }
         if (tick == 80 && ms -> ball_count > 0) {
             int fw = physics_world_index_by_id (&w, ms -> shooter_flywheel_body);
             int b0 = physics_world_index_by_id (&w, ms -> ball_body_ids [0]);
             if (fw >= 0 && b0 >= 0) {
                 w.bodies [b0].position = vector3_addition (w.bodies [fw].position, (vector3) {0.05f, 0.0f, 0.0f});
                 w.bodies [b0].velocity = vector3_zero ();
-            }
-            mfs_module_1_set_shooter (ms, true, true);
-        }
-        mfs_module_1_pre_step (&w, dt, state);
+            } mfs_module_1_set_shooter (ms, true, true);
+        } mfs_module_1_pre_step (&w, dt, state);
         physics_world_step (&w, dt);
         mfs_module_1_post_step (&w, dt, state);
         if (!mfs_test_finite (&w)) {
@@ -313,19 +293,15 @@ int mfs_t_module_1 (void) {
             break;
         }
     }
-    if (fail) {
-        t_ptr -> failures++;
-    } else {
+    if (fail) { t_ptr -> failures++; } else {
         rigidbody *chassis = mfs_get_chassis (ms);
         MFS_CHECK (t_ptr, chassis != NULL);
         if (chassis) {
             float dist = sqrtf (chassis -> position.x * chassis -> position.x + chassis -> position.z * chassis -> position.z);
             MFS_CHECK (t_ptr, dist >= 0.5f);
-        }
-        MFS_CHECK (t_ptr, ms -> shooter_rpm >= 3000.0f);
+        } MFS_CHECK (t_ptr, ms -> shooter_rpm >= 3000.0f);
         MFS_CHECK (t_ptr, ms -> balls_fired >= 1);
-    }
-    mfs_module_1_detach (&w, state);
+    } mfs_module_1_detach (&w, state);
     physics_world_cleanup (&w);
     /* DESPOT-2026-09-28: begin without end (see hotload). */
     mfs_test_end (t_ptr);
@@ -350,8 +326,7 @@ int mfs_t_physics_truth (void) {
             printf ("[FAIL] physics_truth: det fallbacks pow=%lu trig=%lu (want 0)\n", fp, ft);
             rc++;
         }
-    }
-    return rc;
+    } return rc;
 } /* mfs_t_intake_stop: GATED regression for MFS H5 (DESPOT-2026-09-29).
  *
  * The intake roller had two actuators: a revolute joint motor enabled once at
@@ -380,8 +355,7 @@ int mfs_t_intake_stop (void) {
         physics_world_cleanup (&w);
         mfs_test_end (t_ptr);
         return t_ptr -> failures;
-    }
-    mfs_module_1_state *ms = (mfs_module_1_state *) state;
+    } mfs_module_1_state *ms = (mfs_module_1_state *) state;
     const float dt = DT;
     int fail = 0;
     /* Resolve the roller once, by id, the way the module does. */
@@ -391,8 +365,7 @@ int mfs_t_intake_stop (void) {
         physics_world_cleanup (&w);
         mfs_test_end (t_ptr);
         return t_ptr -> failures;
-    }
-    float omega_on = 0.0f;
+    } float omega_on = 0.0f;
     /* Phase 1: intake ON, let it spin up. */
     mfs_module_1_set_intake (ms, true);
     for (int tick = 0; tick < 120 && !fail; tick++) {
@@ -405,9 +378,7 @@ int mfs_t_intake_stop (void) {
     if (!fail) {
         rigidbody *roller = physics_world_body_by_id (&w, (uint32_t) ms -> intake_roller_body);
         MFS_CHECK (t_ptr, roller != NULL);
-        if (roller) {
-            omega_on = vector3_dot (roller -> angular_velocity, roller -> cached_axes [0]);
-        }
+        if (roller) { omega_on = vector3_dot (roller -> angular_velocity, roller -> cached_axes [0]); }
         MFS_INFO ("intake ON: axial omega=%.3f rad/s", omega_on);
         /* It must actually be spinning, or "it stopped later" proves nothing. */
         MFS_CHECK (t_ptr, fabsf (omega_on) > 1.0f);
@@ -421,8 +392,7 @@ int mfs_t_intake_stop (void) {
             physics_world_step (&w, dt);
             if (!mfs_test_finite (&w))
                 fail = 1;
-        }
-        rigidbody *roller = physics_world_body_by_id (&w, (uint32_t) ms -> intake_roller_body);
+        } rigidbody *roller = physics_world_body_by_id (&w, (uint32_t) ms -> intake_roller_body);
         MFS_CHECK (t_ptr, roller != NULL);
         if (roller) {
             float omega_off = vector3_dot (roller -> angular_velocity, roller -> cached_axes [0]);
@@ -430,9 +400,7 @@ int mfs_t_intake_stop (void) {
             /* Pre-fix the joint motor held the full creation-time speed here
              * forever, so this is the assertion that actually pins H5. */
             MFS_CHECK (t_ptr, fabsf (omega_off) < 0.25f * fabsf (omega_on));
-            if (t_ptr -> failures == 0) {
-                printf ("[PASS] intake stops when disabled\n");
-            }
+            if (t_ptr -> failures == 0) { printf ("[PASS] intake stops when disabled\n"); }
         }
     }
     /* Phase 3: momentary reverse must actually reverse (intake_power was
@@ -504,17 +472,14 @@ int mfs_t_intake_stop (void) {
             physics_world_step (&w, dt);
             if (!mfs_test_finite (&w))
                 fail = 1;
-        }
-        ms -> intake_power = 0.0f;
+        } ms -> intake_power = 0.0f;
         rigidbody *roller = physics_world_body_by_id (&w, (uint32_t) ms -> intake_roller_body);
         MFS_CHECK (t_ptr, roller != NULL);
         if (roller) {
             float omega_rev = vector3_dot (roller -> angular_velocity, roller -> cached_axes [0]);
             MFS_INFO ("intake REVERSE: axial omega=%.3f rad/s", omega_rev);
             MFS_CHECK (t_ptr, omega_rev < -0.5f);
-            if (t_ptr -> failures == 0) {
-                printf ("[PASS] intake reverses on intake_power < 0\n");
-            }
+            if (t_ptr -> failures == 0) { printf ("[PASS] intake reverses on intake_power < 0\n"); }
         }
     }
     if (state)
@@ -555,8 +520,7 @@ int mfs_t_shooter_axis (void) {
         physics_world_cleanup (&w);
         mfs_test_end (t_ptr);
         return t_ptr -> failures;
-    }
-    mfs_module_1_state *ms = (mfs_module_1_state *) state;
+    } mfs_module_1_state *ms = (mfs_module_1_state *) state;
     MFS_CHECK (t_ptr, ms -> shooter_flywheel_body >= 0);
     MFS_CHECK (t_ptr, ms -> shooter_pivot_joint >= 0);
     if (ms -> shooter_flywheel_body < 0 || ms -> shooter_pivot_joint < 0) {
@@ -564,8 +528,7 @@ int mfs_t_shooter_axis (void) {
         physics_world_cleanup (&w);
         mfs_test_end (t_ptr);
         return t_ptr -> failures;
-    }
-    rigidbody *fw = physics_world_body_by_id (&w, (uint32_t) ms -> shooter_flywheel_body);
+    } rigidbody *fw = physics_world_body_by_id (&w, (uint32_t) ms -> shooter_flywheel_body);
     rigidbody *ch = mfs_get_chassis (ms);
     MFS_CHECK (t_ptr, fw != NULL);
     MFS_CHECK (t_ptr, ch != NULL);
@@ -574,18 +537,14 @@ int mfs_t_shooter_axis (void) {
         vector3 disc_axis = fw -> cached_axes [0];
         float dl = sqrtf (vector3_length_squared (disc_axis));
         MFS_CHECK (t_ptr, dl > 0.5f);
-        if (dl > 0.5f) {
-            disc_axis = vector3_scaling (disc_axis, 1.0f / dl);
-        }
+        if (dl > 0.5f) { disc_axis = vector3_scaling (disc_axis, 1.0f / dl); }
         /* The joint's axis, in world space (axis_a is in body A = chassis). */
         const constraint *jc = constraint_pool_at (&w, ms -> shooter_pivot_joint);
         MFS_CHECK (t_ptr, jc != NULL);
         vector3 joint_axis = jc ? jc -> p.revolute.axis_a : (vector3) {0.0f, 1.0f, 0.0f};
         float jl = sqrtf (vector3_length_squared (joint_axis));
         MFS_CHECK (t_ptr, jl > 0.5f);
-        if (jl > 0.5f) {
-            joint_axis = vector3_scaling (joint_axis, 1.0f / jl);
-        }
+        if (jl > 0.5f) { joint_axis = vector3_scaling (joint_axis, 1.0f / jl); }
         /* The axis the step function applies torque about. */
         float tilt = MFS_SHOOTER_LAUNCH_ANGLE_DEG * (float) M_PI / 180.0f;
         vector3 torque_axis = vector4_rotate_to_vector3 (ch -> orientation, (vector3) {0.0f, cosf (tilt), sinf (tilt)});
@@ -607,11 +566,8 @@ int mfs_t_shooter_axis (void) {
         float launch_deg = 90.0f - axis_pitch * 180.0f / (float) M_PI;
         MFS_INFO ("launch angle from disc axis: %.2f deg (target %.2f)", launch_deg, MFS_SHOOTER_LAUNCH_ANGLE_DEG);
         MFS_CHECK_NEAR (t_ptr, launch_deg, MFS_SHOOTER_LAUNCH_ANGLE_DEG, 1.0f, "launch angle above horizontal");
-        if (t_ptr -> failures == 0) {
-            printf ("[PASS] flywheel symmetry axis, joint axis and torque axis agree\n");
-        }
-    }
-    mfs_module_1_detach (&w, state);
+        if (t_ptr -> failures == 0) { printf ("[PASS] flywheel symmetry axis, joint axis and torque axis agree\n"); }
+    } mfs_module_1_detach (&w, state);
     physics_world_cleanup (&w);
     mfs_test_end (t_ptr);
     return t_ptr -> failures;
@@ -637,8 +593,7 @@ int mfs_t_ball_spin (void) {
         physics_world_cleanup (&w);
         mfs_test_end (t_ptr);
         return t_ptr -> failures;
-    }
-    mfs_module_1_state *ms = (mfs_module_1_state *) state;
+    } mfs_module_1_state *ms = (mfs_module_1_state *) state;
     const float dt = DT;
     int fail = 0;
     MFS_CHECK (t_ptr, ms -> ball_count > 0);
@@ -658,8 +613,7 @@ int mfs_t_ball_spin (void) {
         mfs_module_1_post_step (&w, dt, state);
         if (!mfs_test_finite (&w))
             fail = 1;
-    }
-    int fw = physics_world_index_by_id (&w, ms -> shooter_flywheel_body);
+    } int fw = physics_world_index_by_id (&w, ms -> shooter_flywheel_body);
     int b0 = physics_world_index_by_id (&w, ms -> ball_body_ids [0]);
     MFS_CHECK (t_ptr, fw >= 0);
     MFS_CHECK (t_ptr, b0 >= 0);
@@ -680,8 +634,7 @@ int mfs_t_ball_spin (void) {
             mfs_module_1_post_step (&w, dt, state);
             if (!mfs_test_finite (&w))
                 fail = 1;
-        }
-        MFS_CHECK (t_ptr, ms -> balls_fired > fired_before);
+        } MFS_CHECK (t_ptr, ms -> balls_fired > fired_before);
         float spin = vector3_length (ball -> angular_velocity);
         float speed = vector3_length (ball -> velocity);
         MFS_INFO ("fired ball: |v|=%.3f m/s, |omega|=%.1f rad/s, Magnus gate is 10.0", speed, spin);
@@ -693,8 +646,7 @@ int mfs_t_ball_spin (void) {
                     "10.0 rad/s Magnus gate)\n",
                     spin);
         }
-    }
-    mfs_module_1_detach (&w, state);
+    } mfs_module_1_detach (&w, state);
     physics_world_cleanup (&w);
     mfs_test_end (t_ptr);
     return t_ptr -> failures;
@@ -752,8 +704,7 @@ static int mfs_reg_pre (physics_world *w, float dt, void *state) {
         /* The regression itself: detach this module from inside its own tick. */
         int rc = mfs_internal_module_detach ("mfs-registry-probe", w);
         MFS_INFO ("self-detach from own pre_step returned %d (0 = deferred)", rc);
-    }
-    return 0;
+    } return 0;
 }
 static const mpe_module_desc_t mfs_reg_desc = {
     .abi = MPE_MODULE_ABI,
@@ -815,9 +766,7 @@ int mfs_t_registry (void) {
     MFS_CHECK (t_ptr, mfs_internal_module_attach ("mfs-registry-probe", &w) == MFS_REG_NOT_FOUND);
     physics_world_cleanup (&w);
     physics_world_cleanup (&w2);
-    if (t_ptr -> failures == 0) {
-        printf ("[PASS] registry: self-detach defers safely, per-world state, idempotence\n");
-    }
+    if (t_ptr -> failures == 0) { printf ("[PASS] registry: self-detach defers safely, per-world state, idempotence\n"); }
     mfs_test_end (t_ptr);
     return t_ptr -> failures;
 }

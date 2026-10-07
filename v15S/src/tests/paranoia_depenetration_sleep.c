@@ -25,8 +25,7 @@ int main (void) {
             world.bodies [idx].friction_kinetic = 0.7f;
             world.bodies [idx].is_sleeping = true;
             world.bodies [idx].sleep_timer = 1.0f;
-        }
-        const float dt = 1.0f / 60.0f;
+        } const float dt = 1.0f / 60.0f;
         int max_wake = 0;
         for (int t = 0; t < 1200; t++) {
             physics_world_step (&world, dt);
@@ -37,15 +36,13 @@ int main (void) {
             }
             if (awake_count > max_wake)
                 max_wake = awake_count;
-        }
-        printf ("[INFO] sleeping_stack max_awake=%d (expected 0)\n", max_wake);
+        } printf ("[INFO] sleeping_stack max_awake=%d (expected 0)\n", max_wake);
         if (max_wake > 0) {
             printf ("[FAIL] depenetration woke sleeping bodies\n");
             fail = 1;
         } else {
             printf ("[PASS] depenetration respects sleep state\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
     /* Test 2: Mixed awake/sleeping - awake body falls on sleeping body.
      * Three-gate wake system SHOULD wake the sleeping body on first-touch novelty.
@@ -72,11 +69,8 @@ int main (void) {
         int sleeping_woke = 0;
         for (int t = 0; t < 600; t++) {
             physics_world_step (&world, dt);
-            if (world.bodies [sleeping].is_sleeping == false) {
-                sleeping_woke = 1;
-            }
-        }
-        float sleeping_y_final = world.bodies [sleeping].position.y;
+            if (world.bodies [sleeping].is_sleeping == false) { sleeping_woke = 1; }
+        } float sleeping_y_final = world.bodies [sleeping].position.y;
         float y_drift = fabsf (sleeping_y_final - sleeping_y_initial);
         printf ("[INFO] mixed_awake_sleep sleeping_woke=%d y_drift=%.6f\n", sleeping_woke, y_drift);
         /* Three-gate wake SHOULD wake sleeping body on first touch (new edge).
@@ -90,8 +84,7 @@ int main (void) {
             fail = 1;
         } else {
             printf ("[PASS] three-gate wake + depenetration work correctly\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
     /* Test 3: Deep spawn overlap - depenetration must resolve without exploding */
     {
@@ -125,8 +118,7 @@ int main (void) {
                 max_vel = vel_b;
             if (!isfinite (ba -> position.y) || !isfinite (bb -> position.y))
                 nan_count++;
-        }
-        printf ("[INFO] deep_overlap max_sep=%.3f max_vel=%.3f nan=%d\n", max_sep, max_vel, nan_count);
+        } printf ("[INFO] deep_overlap max_sep=%.3f max_vel=%.3f nan=%d\n", max_sep, max_vel, nan_count);
         if (nan_count > 0) {
             printf ("[FAIL] deep overlap produced NaN\n");
             fail = 1;
@@ -140,9 +132,7 @@ int main (void) {
             fail = 1;
         } else {
             printf ("[PASS] deep overlap resolved smoothly\n");
-        }
-        physics_world_cleanup (&world);
-    }
-    return fail;
+        } physics_world_cleanup (&world);
+    } return fail;
 }
 #endif

@@ -66,8 +66,7 @@ int main (void) {
         if (joint1 < 0 || joint2 < 0 || joint3 < 0) {
             printf ("[FAIL] could not create all scene-persistence joints\n");
             fail = 1;
-        }
-        const float dt = 1.0f / 60.0f;
+        } const float dt = 1.0f / 60.0f;
         for (int t = 0; t < 600; t++)
             physics_world_step (world, dt);
         /* Capture exact state */
@@ -134,14 +133,11 @@ int main (void) {
         if (mismatch) {
             printf ("[FAIL] scene roundtrip state mismatch\n");
             fail = 1;
-        } else {
-            printf ("[PASS] scene exact roundtrip (bitwise identical)\n");
-        }
+        } else { printf ("[PASS] scene exact roundtrip (bitwise identical)\n"); }
         if (constraint_get_count (loaded) != 2 || loaded -> spring_joint_count != 1) {
             printf ("[FAIL] revolute, distance, or spring joints missing after load\n");
             fail = 1;
-        }
-        int revolute_found = 0, distance_found = 0;
+        } int revolute_found = 0, distance_found = 0;
         for (int ji = 0; ji < mpe_max_joints; ji++) {
             const constraint *saved_joint = constraint_pool_at (loaded, ji);
             if (!saved_joint || !saved_joint -> is_active)
@@ -149,15 +145,12 @@ int main (void) {
             if (saved_joint -> type == constraint_revolute) {
                 revolute_found = saved_joint -> p.revolute.motor_enabled &&
                                  fabsf (saved_joint -> p.revolute.motor_target_speed - 5.0f) < 1e-5f;
-            } else if (saved_joint -> type == constraint_distance) {
-                distance_found = fabsf (saved_joint -> p.distance.rest_length - 2.0f) < 1e-5f;
-            }
+            } else if (saved_joint -> type == constraint_distance) { distance_found = fabsf (saved_joint -> p.distance.rest_length - 2.0f) < 1e-5f; }
         }
         if (!revolute_found || !distance_found) {
             printf ("[FAIL] revolute motor or distance parameters lost during load\n");
             fail = 1;
-        }
-        remove (path);
+        } remove (path);
     }
     /* Test 2: CRC validation - tampered file rejected */
     { printf ("[INFO] CRC validation path tested in scene_roundtrip_test\n"); }
@@ -193,8 +186,7 @@ int main (void) {
         if (fabsf (loaded -> bodies [0].sleep_timer - 5.0f) > 0.01f) {
             printf ("[FAIL] sleep_timer not exact\n");
             fail = 1;
-        }
-        printf ("[PASS] sleep state exact roundtrip\n");
+        } printf ("[PASS] sleep state exact roundtrip\n");
         remove (path);
     }
     /* Test 5: Scene with springs - spring state preserved */
@@ -212,8 +204,7 @@ int main (void) {
         if (joint < 0) {
             printf ("[FAIL] spring fixture creation failed\n");
             fail = 1;
-        }
-        const float dt = 1.0f / 60.0f;
+        } const float dt = 1.0f / 60.0f;
         for (int t = 0; t < 300; t++)
             physics_world_step (world, dt);
         char path [256] = "../../temp/paranoia_spring.mpe";
@@ -224,15 +215,13 @@ int main (void) {
         if (save_result == 0) {
             printf ("[FAIL] spring scene save failed\n");
             fail = 1;
-        }
-        reset_primary ();
+        } reset_primary ();
         constraint_pool_init (physics_world_get_primary ());
         int load_result = scene_loading (path);
         if (load_result == 0) {
             printf ("[FAIL] spring scene load failed\n");
             fail = 1;
-        }
-        physics_world *loaded = physics_world_get_primary ();
+        } physics_world *loaded = physics_world_get_primary ();
         if (loaded -> spring_joint_count != 1) {
             printf ("[FAIL] spring not saved\n");
             fail = 1;
@@ -244,13 +233,9 @@ int main (void) {
             if (L0_orig != L0_load || k_orig != k_load || c_orig != c_load) {
                 printf ("[FAIL] spring params not exact\n");
                 fail = 1;
-            } else {
-                printf ("[PASS] spring state exact roundtrip\n");
-            }
-        }
-        remove (path);
-    }
-    physics_world_cleanup (physics_world_get_primary ());
+            } else { printf ("[PASS] spring state exact roundtrip\n"); }
+        } remove (path);
+    } physics_world_cleanup (physics_world_get_primary ());
     return fail;
 }
 #endif

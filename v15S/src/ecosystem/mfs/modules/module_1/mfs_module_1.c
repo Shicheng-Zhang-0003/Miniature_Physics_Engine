@@ -66,9 +66,7 @@ MPE_USED int mfs_module_1_attach (mpe_world_t *world, void **mod_state) {
      * free to drift without changing behaviour. Bound the array and the
      * spawner from the same constant. */
     state -> max_balls = MFS_ROBOT_MAX_BALLS;
-    if (state -> max_balls > (int) (sizeof (state -> ball_body_ids) / sizeof (state -> ball_body_ids [0]))) {
-        state -> max_balls = (int) (sizeof (state -> ball_body_ids) / sizeof (state -> ball_body_ids [0]));
-    }
+    if (state -> max_balls > (int) (sizeof (state -> ball_body_ids) / sizeof (state -> ball_body_ids [0]))) { state -> max_balls = (int) (sizeof (state -> ball_body_ids) / sizeof (state -> ball_body_ids [0])); }
     state -> shooter_target_rpm = MFS_SHOOTER_TARGET_RPM;
     state -> intake_speed_rpm = MFS_INTAKE_ROLLER_SPEED_RPM;
     state -> gamepad_control_enabled = true;
@@ -113,8 +111,7 @@ MPE_USED int mfs_module_1_attach (mpe_world_t *world, void **mod_state) {
     for (int i = 0; i < 5; i++) {
         vector3 pos = {-4.0f + (i % 3) * 0.5f, MFS_BIOBUZZ_BALL_RADIUS, -2.0f + (i / 3) * 0.5f};
         mfs_module_1_ball_spawn (state, pos);
-    }
-    * mod_state = state;
+    } * mod_state = state;
     return 0;
 }
 MPE_USED void mfs_module_1_detach (mpe_world_t *world, void *mod_state) {
@@ -122,14 +119,11 @@ MPE_USED void mfs_module_1_detach (mpe_world_t *world, void *mod_state) {
     if (!mod_state)
         return;
     mfs_module_1_state *state = (mfs_module_1_state *) mod_state;
-    if (state -> gamepad_initialized) {
-        gamepad_close (&state -> gamepad);
-    }
+    if (state -> gamepad_initialized) { gamepad_close (&state -> gamepad); }
     /* Clean up balls - world cleanup handles bodies */
     for (int i = 0; i < state -> ball_count; i++) {
         /* Body cleanup handled by world cleanup */
-    }
-    free (state);
+    } free (state);
 } /* ================================================================
  * Gamepad Control Step (F310 mapping)
  * ================================================================ */
@@ -177,9 +171,7 @@ MPE_USED void mfs_module_1_gamepad_step (mfs_module_1_state *state, float dt) {
     /* Toggle gamepad control with Start button. Processed BEFORE the
      * enabled check: otherwise a disabled pad can never re-enable
      * (latch-dead — the toggle lived behind its own gate). */
-    if (start_pressed) {
-        state -> gamepad_control_enabled = !state -> gamepad_control_enabled;
-    }
+    if (start_pressed) { state -> gamepad_control_enabled = !state -> gamepad_control_enabled; }
     if (!state -> gamepad_control_enabled)
         return;
     /* Drive mapping (mecanum):
@@ -194,32 +186,20 @@ MPE_USED void mfs_module_1_gamepad_step (mfs_module_1_state *state, float dt) {
      * releases back to the mode power. (The old chain double-toggled on
      * A and latched reverse forever after any B-hold: the release path
      * was unreachable.) */
-    if (a_pressed) {
-        state -> intake_active = !state -> intake_active;
-    }
+    if (a_pressed) { state -> intake_active = !state -> intake_active; }
     if (btn_b) {
         state -> intake_power = -1.0f; /* momentary reverse */
-    } else {
-        state -> intake_power = state -> intake_active ? 1.0f : 0.0f;
-    }
+    } else { state -> intake_power = state -> intake_active ? 1.0f : 0.0f; }
     /* Shooter spin-up (X button toggle) */
-    if (x_pressed) {
-        state -> shooter_spinup_cmd = !state -> shooter_spinup_cmd;
-    }
+    if (x_pressed) { state -> shooter_spinup_cmd = !state -> shooter_spinup_cmd; }
     /* Shooter fire (Y button) */
-    if (y_pressed) {
-        state -> shooter_fire_cmd = true;
-    }
+    if (y_pressed) { state -> shooter_fire_cmd = true; }
     /* Quick fire with right trigger */
-    if (rt > 0.5f && state -> shooter_ready) {
-        state -> shooter_fire_cmd = true;
-    }
+    if (rt > 0.5f && state -> shooter_ready) { state -> shooter_fire_cmd = true; }
     /* Intake speed control with left trigger */
     if (lt > 0.1f) {
         state -> intake_speed_rpm = 600.0f + lt * 600.0f; /* 600-1200 RPM */
-    } else {
-        state -> intake_speed_rpm = 600.0f;
-    }
+    } else { state -> intake_speed_rpm = 600.0f; }
     /* LB + RB = emergency stop (zero all commands) */
     if (btn_lb && btn_rb) {
         state -> drive_forward = 0.0f;
@@ -278,8 +258,7 @@ MPE_USED void mfs_module_1_gamepad_step (mfs_module_1_state *state, float dt) {
                     ro -> angular_velocity = vector3_zero ();
                     ro -> is_sleeping = false;
                     ro -> sleep_timer = 0.0f;
-                }
-                motor_reset_observer (&state -> robot.wheel_motors [i]);
+                } motor_reset_observer (&state -> robot.wheel_motors [i]);
             }
             {
                 int fw = physics_world_index_by_id (world, (uint32_t) state -> shooter_flywheel_body);
@@ -290,8 +269,7 @@ MPE_USED void mfs_module_1_gamepad_step (mfs_module_1_state *state, float dt) {
                     f -> angular_velocity = vector3_zero ();
                     f -> is_sleeping = false;
                     f -> sleep_timer = 0.0f;
-                }
-                int ir = physics_world_index_by_id (world, (uint32_t) state -> intake_roller_body);
+                } int ir = physics_world_index_by_id (world, (uint32_t) state -> intake_roller_body);
                 if (ir >= 0) {
                     rigidbody *rr = &world -> bodies [ir];
                     rr -> position = vector3_addition (rr -> position, delta);
@@ -300,8 +278,7 @@ MPE_USED void mfs_module_1_gamepad_step (mfs_module_1_state *state, float dt) {
                     rr -> is_sleeping = false;
                     rr -> sleep_timer = 0.0f;
                 }
-            }
-            chassis -> position = target;
+            } chassis -> position = target;
             chassis -> velocity = vector3_zero ();
             chassis -> angular_velocity = vector3_zero ();
             chassis -> is_sleeping = false;
@@ -322,8 +299,7 @@ MPE_USED void mfs_module_1_pre_step (mpe_world_t *world, float dt, void *mod_sta
     if (state -> gamepad_initialized) {
         gamepad_poll (&state -> gamepad);
         mfs_module_1_gamepad_step (state, dt);
-    }
-    state -> match_time += dt;
+    } state -> match_time += dt;
     /* Robot drive */
     mfs_module_1_robot_drive_step (state, dt);
     /* Intake logic */
@@ -371,9 +347,7 @@ MPE_USED void mfs_module_1_field_create (mfs_module_1_state *state) {
      * on pool exhaustion). A wall-less field still attaches (walls are
      * not load-bearing for the module test), but the failure is now loud
      * instead of silent. */
-    if (physics_world_add_boundary_walls (world, half_w, half_l, wall_h, wall_t) != 0) {
-        fprintf (stderr, "[mfs-module-1] field_create: boundary walls failed (pool exhausted?)\n");
-    }
+    if (physics_world_add_boundary_walls (world, half_w, half_l, wall_h, wall_t) != 0) { fprintf (stderr, "[mfs-module-1] field_create: boundary walls failed (pool exhausted?)\n"); }
     /* Goal frame - two vertical posts + crossbar */
     const float goal_w = MFS_BIOBUZZ_GOAL_WIDTH;
     const float goal_h = MFS_BIOBUZZ_GOAL_HEIGHT;
@@ -462,8 +436,7 @@ MPE_USED void mfs_module_1_intake_create (mfs_module_1_state *state) {
              * of silent. Joint stays -1 (attach poison). */
             fprintf (stderr, "[mfs-module-1] intake_create: revolute joint failed (pool exhausted?)\n");
         }
-    }
-    state -> intake_deployed = true;
+    } state -> intake_deployed = true;
 } /* ================================================================
  * Shooter Creation (Flywheel-based)
  * ================================================================ */
@@ -513,9 +486,7 @@ MPE_USED void mfs_module_1_shooter_create (mfs_module_1_state *state) {
             world, chassis -> object_id, flywheel -> object_id,
             (vector3) {0.0f, MFS_ROBOT_CHASSIS_HEIGHT * 1.0f, -MFS_ROBOT_CHASSIS_LENGTH * 0.5f - 0.05f},
             (vector3) {0.0f, 0.0f, 0.0f}, spin_axis_chassis);
-        if (joint_idx >= 0) {
-            state -> shooter_pivot_joint = joint_idx;
-        } else {
+        if (joint_idx >= 0) { state -> shooter_pivot_joint = joint_idx; } else {
             /* DESPOT-2026-09-28: same loud-degraded treatment as intake
              * (no removal API; steps stay id-resolved and NULL-safe). */
             fprintf (stderr, "[mfs-module-1] shooter_create: revolute joint failed (pool exhausted?)\n");
@@ -528,8 +499,7 @@ MPE_USED void mfs_module_1_shooter_create (mfs_module_1_state *state) {
         flywheel_body -> orientation =
             vector4_from_axis_with_angle ((vector3) {0.0f, -sp_sin, sp_cos}, (float) M_PI * 0.5f);
         rigidbody_update_axes (flywheel_body);
-    }
-    state -> shooter_rpm = 0.0f;
+    } state -> shooter_rpm = 0.0f;
     state -> shooter_spinning_up = false;
     state -> shooter_ready = false;
 } /* ================================================================
@@ -670,9 +640,7 @@ MPE_USED void mfs_module_1_intake_step (mfs_module_1_state *state, float dt) {
                 continue;
             rigidbody *b = &world -> bodies [ball_idx];
             vector3 d = vector3_subtraction (b -> position, roller -> position);
-            if (vector3_length (d) < MFS_INTAKE_ROLLER_RADIUS + MFS_BIOBUZZ_BALL_RADIUS + MFS_INTAKE_COMPLIANCE) {
-                carried++;
-            }
+            if (vector3_length (d) < MFS_INTAKE_ROLLER_RADIUS + MFS_BIOBUZZ_BALL_RADIUS + MFS_INTAKE_COMPLIANCE) { carried++; }
         }
         if (carried >= MFS_ROBOT_MAX_CARRIED_BALLS) {
             return; /* hopper full: hold station, do not draw more in */
@@ -735,11 +703,8 @@ MPE_USED void mfs_module_1_shooter_step (mfs_module_1_state *state, float dt) {
     vector3 sax = {0.0f, cosf (tilt), sinf (tilt)};
     {
         rigidbody *chassis = mfs_get_chassis (state);
-        if (chassis) {
-            sax = vector4_rotate_to_vector3 (chassis -> orientation, sax);
-        }
-    }
-    float current_omega_y = vector3_dot (flywheel -> angular_velocity, sax);
+        if (chassis) { sax = vector4_rotate_to_vector3 (chassis -> orientation, sax); }
+    } float current_omega_y = vector3_dot (flywheel -> angular_velocity, sax);
     state -> shooter_rpm = fabsf (current_omega_y) * 30.0f / M_PI;
     /* Spin-up logic */
     if (state -> shooter_spinup_cmd && !state -> shooter_ready) {

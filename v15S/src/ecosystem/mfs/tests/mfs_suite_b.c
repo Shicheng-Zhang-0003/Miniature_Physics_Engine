@@ -53,8 +53,7 @@ int mfs_t_inertia (void) {
     if (cyl < 0) {
         physics_world_cleanup (&w);
         return 1;
-    }
-    rigidbody *b = &w.bodies [cyl];
+    } rigidbody *b = &w.bodies [cyl];
     /* Torque along cylinder's axis (X) to test axial moment of inertia I = 0.5*m*r^2.
      * DESPOT-2026-09-26: re-applied EVERY tick (like a motor). Accumulators
      * are per-tick (consumed+drained by rb_integrate_velocity); the old
@@ -66,8 +65,7 @@ int mfs_t_inertia (void) {
     for (int k = 0; k < 60; k++) {
         b -> torque_accumulator = vector3_addition (b -> torque_accumulator, vector3_scaling (axle, torque));
         physics_world_step (&w, dt);
-    }
-    float omega = vector3_dot (b -> angular_velocity, axle);
+    } float omega = vector3_dot (b -> angular_velocity, axle);
     float I = 0.5f * b -> mass * b -> radius * b -> radius;
     float alpha_exact = torque / I;
     float alpha_meas = omega / (60.0f * DT);
@@ -75,8 +73,7 @@ int mfs_t_inertia (void) {
     if (err > 0.1f) {
         physics_world_cleanup (&w);
         return 1;
-    }
-    physics_world_cleanup (&w);
+    } physics_world_cleanup (&w);
     return 0;
 } /* T3: Bounce restitution h_bounce = e^2*(h-r) + r ±30% */
 int mfs_t_bounce (void) {
@@ -90,16 +87,14 @@ int mfs_t_bounce (void) {
     if (f < 0) {
         physics_world_cleanup (&w);
         return 1;
-    }
-    w.bodies [f].friction_static = 1.0f;
+    } w.bodies [f].friction_static = 1.0f;
     w.bodies [f].friction_kinetic = 0.8f;
     w.bodies [f].restitution = 0.6f;
     int s = physics_world_add_sphere (&w, 0.5f, 1.0f, (vector3) {0, 5.0f, 0});
     if (s < 0) {
         physics_world_cleanup (&w);
         return 1;
-    }
-    w.bodies [s].restitution = 0.6f;
+    } w.bodies [s].restitution = 0.6f;
     w.bodies [s].velocity = (vector3) {0, 0, 0};
     const float dt = DT;
     /* DESPOT-2026-09-26: track the POST-bounce apex, not the drop height.
@@ -114,15 +109,12 @@ int mfs_t_bounce (void) {
         if (!bounced && y < 1.0f) {
             bounced = 1;
             max_y = y;
-        } else if (bounced && y > max_y) {
-            max_y = y;
-        }
+        } else if (bounced && y > max_y) { max_y = y; }
     }
     if (!bounced) {
         physics_world_cleanup (&w);
         return 1;
-    }
-    float h0 = 5.0f;
+    } float h0 = 5.0f;
     float e = 0.6f;
     float r = 0.5f;
     /* DESPOT-2026-10-02: the bounce formula was written with bare 0.5f
@@ -136,8 +128,7 @@ int mfs_t_bounce (void) {
     if (err > 0.3f) {
         physics_world_cleanup (&w);
         return 1;
-    }
-    physics_world_cleanup (&w);
+    } physics_world_cleanup (&w);
     return 0;
 } /* T4: Rolling v = omega*r ±30% */
 int mfs_t_rolling (void) {
@@ -151,8 +142,7 @@ int mfs_t_rolling (void) {
     if (f < 0) {
         physics_world_cleanup (&w);
         return 1;
-    }
-    w.bodies [f].friction_static = 1.0f;
+    } w.bodies [f].friction_static = 1.0f;
     w.bodies [f].friction_kinetic = 0.8f;
     w.bodies [f].restitution = 0.0f;
     int s = physics_world_add_sphere (&w, 0.5f, 1.0f, (vector3) {-5, 0.5, 0});
@@ -174,8 +164,7 @@ int mfs_t_rolling (void) {
     if (err > 0.3f) {
         physics_world_cleanup (&w);
         return 1;
-    }
-    physics_world_cleanup (&w);
+    } physics_world_cleanup (&w);
     return 0;
 } /* T5: Rolling resistance coast ±30% */
 int mfs_t_rolling_resistance (void) {
@@ -190,8 +179,7 @@ int mfs_t_rolling_resistance (void) {
     if (f < 0) {
         physics_world_cleanup (&w);
         return 1;
-    }
-    w.bodies [f].friction_static = 1.0f;
+    } w.bodies [f].friction_static = 1.0f;
     w.bodies [f].friction_kinetic = 0.8f;
     w.bodies [f].restitution = 0.0f;
     int s = physics_world_add_sphere (&w, 0.5f, 1.0f, (vector3) {0, 0.5, 0});
@@ -221,8 +209,7 @@ int mfs_t_rolling_resistance (void) {
     if (!(v_end > 0.0f) || !(v_end < v_mid) || !(v_end >= 0.80f * v_mid)) {
         physics_world_cleanup (&w);
         return 1;
-    }
-    physics_world_cleanup (&w);
+    } physics_world_cleanup (&w);
     return 0;
 } /* T6: Motor free speed (ISOLATED motor model, no joints/world).
  *
@@ -282,8 +269,7 @@ int mfs_t_motor_free_speed (void) {
             w += (m.output_torque / axle_I) * dt;
             battery_fuse_step (&b, fabsf (m.current), dt);
             battery_drain (&b, m.current, dt);
-        }
-        float spec_rpm = 223.0f * (12.8f / 12.0f);
+        } float spec_rpm = 223.0f * (12.8f / 12.0f);
         float rpm_error = fabsf (m.rpm - spec_rpm) / spec_rpm;
         printf ("[info] open-loop no-load line: %.4f rpm vs spec %.4f (%+.4f%%)\n", m.rpm, spec_rpm,
                 100.0f * (m.rpm - spec_rpm) / spec_rpm);
@@ -308,12 +294,10 @@ int mfs_t_motor_free_speed (void) {
             if (!isfinite (w) || !isfinite (m.output_torque)) {
                 finite = 0;
                 break;
-            }
-            w += (m.output_torque / axle_I) * dt;
+            } w += (m.output_torque / axle_I) * dt;
             battery_fuse_step (&b, fabsf (m.current), dt);
             battery_drain (&b, m.current, dt);
-        }
-        float spec_rpm = 223.0f * (12.8f / 12.0f);
+        } float spec_rpm = 223.0f * (12.8f / 12.0f);
         printf ("[info] observer-armed (as robot.c): %.4f rpm vs no-load %.4f (%+.4f%%) "
                 "-- NOT the no-load line; this is the air-spin/MOTOR-III limit "
                 "cycle, tracked in KNOWN_FAILURES.md, not a motor-model error\n",
@@ -325,8 +309,7 @@ int mfs_t_motor_free_speed (void) {
             rc = 1;
         if (fabsf (m.rpm) > 4.0f * spec_rpm)
             rc = 1;
-    }
-    return rc;
+    } return rc;
 } /* T7: Motor stall torque ±30% */
 int mfs_t_motor_stall (void) {
     physics_world w;
@@ -337,27 +320,23 @@ int mfs_t_motor_stall (void) {
     if (rc != 0) {
         physics_world_cleanup (&w);
         return 1;
-    }
-    drivetrain_tank (&robot, 1.0f, 1.0f);
+    } drivetrain_tank (&robot, 1.0f, 1.0f);
     for (int t = 0; t < 10; t++) {
         for (int w_idx = 0; w_idx < robot.wheel_count; w_idx++) {
             int wi = robot.wheel_bodies [w_idx];
             if (wi >= 0 && wi < w.body_count) {
                 w.bodies [wi].angular_velocity = (vector3) {0, 0, 0};
             }
-        }
-        drivetrain_tank (&robot, 1.0f, 1.0f);
+        } drivetrain_tank (&robot, 1.0f, 1.0f);
         drivetrain_update (&w, &robot, DT);
         physics_world_step (&w, DT);
-    }
-    float stall_spec = 3.7265f;
+    } float stall_spec = 3.7265f;
     float actual = robot.wheel_motors [0].output_torque;
     float err = fabsf (actual - stall_spec) / stall_spec;
     if (err > 0.3f) {
         physics_world_cleanup (&w);
         return 1;
-    }
-    physics_world_cleanup (&w);
+    } physics_world_cleanup (&w);
     return 0;
 } /* T8: Back-EMF braking to rest (ISOLATED motor model).
  * DESPOT-2026-09-26: the old rig cut power on a jointed robot after 60
@@ -415,8 +394,7 @@ int mfs_t_static_friction (void) {
     if (f < 0) {
         physics_world_cleanup (&w);
         return 1;
-    }
-    w.bodies [f].friction_static = 1.0f;
+    } w.bodies [f].friction_static = 1.0f;
     w.bodies [f].friction_kinetic = 0.8f;
     w.bodies [f].restitution = 0.0f;
     ftc_robot robot;
@@ -434,8 +412,7 @@ int mfs_t_static_friction (void) {
     for (int t = 0; t < 300; t++) {
         drivetrain_update (&w, &robot, DT);
         physics_world_step (&w, DT);
-    }
-    rigidbody *ch = &w.bodies [robot.chassis_body];
+    } rigidbody *ch = &w.bodies [robot.chassis_body];
     if (fabsf (ch -> position.x) >= 0.05f) {
         physics_world_cleanup (&w);
         return 1;
@@ -443,8 +420,7 @@ int mfs_t_static_friction (void) {
     if (fabsf (ch -> velocity.x) >= 0.2f) {
         physics_world_cleanup (&w);
         return 1;
-    }
-    physics_world_cleanup (&w);
+    } physics_world_cleanup (&w);
     return 0;
 } /* T10: Kinetic friction stopping distance d = v0^2/(2*mu*g) ±35%.
  * DESPOT-2026-09-26: rig ported VERBATIM from the canonical engine
@@ -465,8 +441,7 @@ int mfs_t_kinetic_friction (void) {
     if (s < 0) {
         physics_world_cleanup (&w);
         return 1;
-    }
-    w.bodies [s].friction_static = 0.3f;
+    } w.bodies [s].friction_static = 0.3f;
     w.bodies [s].friction_kinetic = 0.3f;
     w.bodies [s].restitution = 0.0f;
     int b = physics_world_add_cube (&w, (vector3) {-6.0f, 0.55f, 0}, (vector3) {0.5, 0.5, 0.5}, 1.0f);
@@ -496,19 +471,16 @@ int mfs_t_kinetic_friction (void) {
         }
         if (vector3_length (w.bodies [b].velocity) < 0.005f)
             break;
-    }
-    float dist = w.bodies [b].position.x - x0;
+    } float dist = w.bodies [b].position.x - x0;
     float analytic = v0 * v0 / (2.0f * 0.3f * 9.81f);
     if (!(dist > 0.0f)) {
         physics_world_cleanup (&w);
         return 1;
-    }
-    float err = fabsf (dist - analytic) / analytic;
+    } float err = fabsf (dist - analytic) / analytic;
     if (err > 0.35f) {
         physics_world_cleanup (&w);
         return 1;
-    }
-    physics_world_cleanup (&w);
+    } physics_world_cleanup (&w);
     return 0;
 } /* T11: 3000 ticks no NaN */
 int mfs_t_stability (void) {
@@ -520,8 +492,7 @@ int mfs_t_stability (void) {
     if (rc != 0) {
         physics_world_cleanup (&w);
         return 1;
-    }
-    const float dt = 1.0f / 60.0f;
+    } const float dt = 1.0f / 60.0f;
     for (int t = 0; t < 3000; t++) {
         drivetrain_tank (&robot, 0.5f, 0.5f);
         drivetrain_update (&w, &robot, dt);
@@ -530,8 +501,7 @@ int mfs_t_stability (void) {
             physics_world_cleanup (&w);
             return 1;
         }
-    }
-    physics_world_cleanup (&w);
+    } physics_world_cleanup (&w);
     return 0;
 } /* T12: Coast-down after power cut */
 int mfs_t_coast_down (void) {
@@ -543,24 +513,20 @@ int mfs_t_coast_down (void) {
     if (rc != 0) {
         physics_world_cleanup (&w);
         return 1;
-    }
-    drivetrain_tank (&robot, 1.0f, 1.0f);
+    } drivetrain_tank (&robot, 1.0f, 1.0f);
     for (int t = 0; t < 60; t++) {
         drivetrain_update (&w, &robot, DT);
         physics_world_step (&w, DT);
-    }
-    float v_before = w.bodies [robot.chassis_body].velocity.x;
+    } float v_before = w.bodies [robot.chassis_body].velocity.x;
     drivetrain_tank (&robot, 0.0f, 0.0f);
     for (int t = 0; t < 300; t++) {
         drivetrain_update (&w, &robot, DT);
         physics_world_step (&w, DT);
-    }
-    float v_after = w.bodies [robot.chassis_body].velocity.x;
+    } float v_after = w.bodies [robot.chassis_body].velocity.x;
     if (v_after >= 0.3f * v_before) {
         physics_world_cleanup (&w);
         return 1;
-    }
-    physics_world_cleanup (&w);
+    } physics_world_cleanup (&w);
     return 0;
 } /* T13: Energy conservation ±10% */
 int mfs_t_energy (void) {
@@ -570,8 +536,7 @@ int mfs_t_energy (void) {
     if (s < 0) {
         physics_world_cleanup (&w);
         return 1;
-    }
-    w.bodies [s].restitution = 0.0f;
+    } w.bodies [s].restitution = 0.0f;
     const float dt = 1.0f / 60.0f;
     float E0 = 1.0f * 9.81f * 10.0f;
     for (int k = 0; k < 60; k++)
@@ -586,8 +551,7 @@ int mfs_t_energy (void) {
     if (err > 0.1f) {
         physics_world_cleanup (&w);
         return 1;
-    }
-    physics_world_cleanup (&w);
+    } physics_world_cleanup (&w);
     return 0;
 } /* T14: Cylinder rests on floor ±0.03m, v<0.1 */
 int mfs_t_cylinder_rest (void) {
@@ -597,8 +561,7 @@ int mfs_t_cylinder_rest (void) {
     if (c < 0) {
         physics_world_cleanup (&w);
         return 1;
-    }
-    const float dt = 1.0f / 60.0f;
+    } const float dt = 1.0f / 60.0f;
     for (int k = 0; k < 300; k++)
         physics_world_step (&w, dt);
     rigidbody *b = &w.bodies [c];
@@ -610,8 +573,7 @@ int mfs_t_cylinder_rest (void) {
     if (fabsf (b -> velocity.y) >= 0.1f) {
         physics_world_cleanup (&w);
         return 1;
-    }
-    physics_world_cleanup (&w);
+    } physics_world_cleanup (&w);
     return 0;
 } /* T15: Revolute anchor holds under gravity */
 int mfs_t_revolute_anchor (void) {
@@ -630,8 +592,7 @@ int mfs_t_revolute_anchor (void) {
     if (j < 0) {
         physics_world_cleanup (&w);
         return 1;
-    }
-    const float dt = 1.0f / 60.0f;
+    } const float dt = 1.0f / 60.0f;
     for (int k = 0; k < 300; k++)
         physics_world_step (&w, dt);
     /* DESPOT-2026-09-26: sign. Body 0 is the static cube (y=3), body 1 the
@@ -642,8 +603,7 @@ int mfs_t_revolute_anchor (void) {
     if (fabsf (len - len0) >= 0.01f) {
         physics_world_cleanup (&w);
         return 1;
-    }
-    physics_world_cleanup (&w);
+    } physics_world_cleanup (&w);
     return 0;
 } /* ======================================================================
  * EXTERNAL-TRUTH GATE  (DESPOT-2026-10-02)
@@ -686,8 +646,7 @@ static float mfs_ref_visc_v (float v0, float c, float g, float T) {
         float k3 = -g - c * (v + k2 * dt * 0.5f);
         float k4 = -g - c * (v + k3 * dt);
         v += (k1 + 2.0f * k2 + 2.0f * k3 + k4) * dt * (1.0f / 6.0f);
-    }
-    return v;
+    } return v;
 }
 int mfs_t_external_truth (void) {
     mfs_test_t t;
@@ -727,16 +686,14 @@ int mfs_t_external_truth (void) {
             t_ptr -> failures++;
             physics_world_cleanup (&w);
             return t_ptr -> failures;
-        }
-        rigidbody *b = &w.bodies [c];
+        } rigidbody *b = &w.bodies [c];
         MFS_CHECK_NEAR (t_ptr, b -> inertia_tensor_local.matrix [0][0], 0.5f * 2.0f * 0.1f * 0.1f, 1e-5f,
                         "cylinder I_xx = m r^2/2 (solid)");
         const float tau = 10.0f;
         for (int k = 0; k < 60; k++) {
             b -> torque_accumulator = vector3_addition (b -> torque_accumulator, vector3_scaling ((vector3) {1, 0, 0}, tau));
             physics_world_step (&w, DT);
-        }
-        float I = b -> inertia_tensor_local.matrix [0][0];
+        } float I = b -> inertia_tensor_local.matrix [0][0];
         MFS_CHECK_NEAR (t_ptr, vector3_dot (b -> angular_velocity, (vector3) {1, 0, 0}), (tau / I) * 1.0f,
                         0.02f * (tau / I), "omega = (tau/I) t after 1 s");
         physics_world_cleanup (&w);
@@ -776,8 +733,7 @@ int mfs_t_external_truth (void) {
                 t_ptr -> failures++;
                 physics_world_cleanup (&w);
                 return t_ptr -> failures;
-            }
-            w.bodies [f].friction_static = 1.0f;
+            } w.bodies [f].friction_static = 1.0f;
             w.bodies [f].friction_kinetic = 0.8f;
             w.bodies [f].restitution = e;
             int s = physics_world_add_sphere (&w, r, 1.0f, (vector3) {0, 6.0f, 0});
@@ -785,8 +741,7 @@ int mfs_t_external_truth (void) {
                 t_ptr -> failures++;
                 physics_world_cleanup (&w);
                 return t_ptr -> failures;
-            }
-            w.bodies [s].restitution = e;
+            } w.bodies [s].restitution = e;
             w.bodies [s].velocity = vector3_zero ();
             float vin = 0.0f, vout = 0.0f;
             int contacted = 0;
@@ -816,8 +771,7 @@ int mfs_t_external_truth (void) {
             t_ptr -> failures++;
             physics_world_cleanup (&w);
             return t_ptr -> failures;
-        }
-        w.bodies [f].friction_static = 1.0f;
+        } w.bodies [f].friction_static = 1.0f;
         w.bodies [f].friction_kinetic = 0.8f;
         w.bodies [f].restitution = 0.0f;
         const float rr = 0.5f;
@@ -848,8 +802,7 @@ int mfs_t_external_truth (void) {
             t_ptr -> failures++;
             physics_world_cleanup (&w);
             return t_ptr -> failures;
-        }
-        w.bodies [s].restitution = 0.0f;
+        } w.bodies [s].restitution = 0.0f;
         float E0 = 1.0f * G_N * 10.0f;
         for (int k = 0; k < 60; k++)
             physics_world_step (&w, DT);
@@ -915,8 +868,7 @@ int mfs_t_external_truth (void) {
                     if (!isfinite (mm.output_torque)) {
                         t_ptr -> failures++;
                         break;
-                    }
-                    w += (mm.output_torque / Ia) * DT;
+                    } w += (mm.output_torque / Ia) * DT;
                 }
                 MFS_CHECK_REL (t_ptr, w / mm.free_speed_rad_s, 12.8f / 12.0f, 0.01f,
                                "motor free speed scales 12.8/12.0 (open-loop V-line)");
@@ -961,8 +913,7 @@ int mfs_t_external_truth (void) {
             t_ptr -> failures++;
             physics_world_cleanup (&w);
             return t_ptr -> failures;
-        }
-        w.bodies [f].friction_static = 0.3f;
+        } w.bodies [f].friction_static = 0.3f;
         w.bodies [f].friction_kinetic = 0.3f;
         w.bodies [f].restitution = 0.0f;
         int b2 = physics_world_add_cube (&w, (vector3) {-6.0f, 0.55f, 0}, (vector3) {0.5f, 0.5f, 0.5f}, 1.0f);
@@ -970,8 +921,7 @@ int mfs_t_external_truth (void) {
             t_ptr -> failures++;
             physics_world_cleanup (&w);
             return t_ptr -> failures;
-        }
-        w.bodies [b2].friction_static = 0.3f;
+        } w.bodies [b2].friction_static = 0.3f;
         w.bodies [b2].friction_kinetic = 0.3f;
         w.bodies [b2].restitution = 0.0f;
         w.bodies [b2].velocity = (vector3) {4, 0, 0};
@@ -984,8 +934,7 @@ int mfs_t_external_truth (void) {
             physics_world_step (&w, DT);
             if (vector3_length (w.bodies [b2].velocity) < 0.005f)
                 break;
-        }
-        float d = w.bodies [b2].position.x - x0;
+        } float d = w.bodies [b2].position.x - x0;
         MFS_INFO ("sliding: v0=%.4f measured d=%.4f analytic=%.4f", (double) v0, (double) d,
                   (double) (v0 * v0 / (2.0f * 0.3f * G_N)));
         MFS_CHECK_REL (t_ptr, d, v0 * v0 / (2.0f * 0.3f * G_N), 0.10f, "sliding distance = v0^2/(2 mu g_n)");
@@ -995,7 +944,6 @@ int mfs_t_external_truth (void) {
     {
         MFS_INFO ("engine gravity=%.6f vs g_n=%.5f (bias %+.4f%%)", (double) g_cfg.world.gravity, (double) G_N,
                   (double) (100.0f * ((float) g_cfg.world.gravity / -G_N - 1.0f)));
-    }
-    mfs_test_end (t_ptr);
+    } mfs_test_end (t_ptr);
     return t_ptr -> failures;
 }

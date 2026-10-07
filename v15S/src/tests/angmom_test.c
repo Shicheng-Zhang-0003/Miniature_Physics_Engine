@@ -32,16 +32,13 @@ int main (void) {
         physics_world_step (&world, dt);
         vector3 l = body_l (&world.bodies [b]);
         float err = vector3_length (vector3_subtraction (l, l0)) / l0n;
-        if (err > max_err) {
-            max_err = err;
-        }
+        if (err > max_err) { max_err = err; }
         if (!isfinite (err)) {
             printf ("[FAIL] NaN in angular momentum\n");
             physics_world_cleanup (&world);
             return 1;
         }
-    }
-    printf ("[info] max |L-L0|/|L0| over 2 s tumble: %.5f\n", max_err);
+    } printf ("[info] max |L-L0|/|L0| over 2 s tumble: %.5f\n", max_err);
     /* DESPOT-2026-09-29: gate tightened 3% -> 0.5%. The old comment blamed
      * the first-order gyroscopic integrator and noted 1% "was measured to
      * RED". That integrator is fixed: torque-free rotation now derives omega
@@ -53,8 +50,7 @@ int main (void) {
         fail = 1;
     } else {
         printf ("[PASS] torque-free angular momentum conserved\n");
-    }
-    physics_world_cleanup (&world);
+    } physics_world_cleanup (&world);
     return fail;
 }
 #endif /* mpe_angmom_test */

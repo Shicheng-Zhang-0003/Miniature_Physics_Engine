@@ -26,8 +26,7 @@ void *ftc_fleet_create (void) {
     if (!f -> robots) {
         free (f);
         return NULL;
-    }
-    f -> cap = FTC_FLEET_INIT_CAP;
+    } f -> cap = FTC_FLEET_INIT_CAP;
     f -> count = 0;
     return f;
 }
@@ -68,8 +67,7 @@ static void *mfs_bundle_lookup_runtime (const void *world, const char *name) {
             if (h)
                 fn = (mfs_internal_lookup_fn) GetProcAddress (h, "mfs_internal_module_state_for");
         }
-    }
-    return fn ? fn (world, name) : NULL;
+    } return fn ? fn (world, name) : NULL;
 }
 #endif
 /* Locate the fleet attached to a world by module name (no side table:
@@ -87,9 +85,7 @@ static ftc_fleet_t *fleet_of (struct physics_world *world) {
         }
     }
 #if MPE_WEAK_SUPPORTED
-    if (mfs_internal_module_state_for) {
-        return (ftc_fleet_t *) mfs_internal_module_state_for ((const void *) world, FTC_FLEET_MODULE_NAME);
-    }
+    if (mfs_internal_module_state_for) { return (ftc_fleet_t *) mfs_internal_module_state_for ((const void *) world, FTC_FLEET_MODULE_NAME); }
 #else
     {
         void *p = mfs_bundle_lookup_runtime ((const void *) world, FTC_FLEET_MODULE_NAME);
@@ -121,9 +117,7 @@ int ftc_fleet_spawn (struct physics_world *world, float x, float y, float z, mot
         f -> robots = nr;
         f -> cap = ncap;
     }
-    if (ftc_robot_create_with_drive (world, &f -> robots [f -> count], x, y, z, preset, drivetrain_type) != 0) {
-        return -1;
-    }
+    if (ftc_robot_create_with_drive (world, &f -> robots [f -> count], x, y, z, preset, drivetrain_type) != 0) { return -1; }
     return f -> count++;
 }
 int ftc_fleet_count (struct physics_world *world) {

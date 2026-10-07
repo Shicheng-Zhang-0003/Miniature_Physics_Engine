@@ -67,8 +67,7 @@ int main (void) {
             world.bodies [idx].friction_static = 0.8f;
             world.bodies [idx].friction_kinetic = 0.7f;
         }
-    }
-    const float dt = 1.0f / 60.0f;
+    } const float dt = 1.0f / 60.0f;
     float run_max_lin = 0.0f, run_max_ang = 0.0f;
     float trans_lin = 0.0f, trans_ang = 0.0f;
     float fin_lin = 0.0f, fin_ang = 0.0f;
@@ -85,34 +84,19 @@ int main (void) {
                 nan_ticks++;
                 continue;
             }
-            if (!rb -> static_state && rb -> position.y < -0.2f) {
-                fallen_ticks++;
-            }
+            if (!rb -> static_state && rb -> position.y < -0.2f) { fallen_ticks++; }
             float l = vector3_length (rb -> velocity);
             float a = vector3_length (rb -> angular_velocity);
-            if (l > mx_lin) {
-                mx_lin = l;
-            }
-            if (a > mx_ang) {
-                mx_ang = a;
-            }
-        }
-        fin_lin = mx_lin;
+            if (l > mx_lin) { mx_lin = l; }
+            if (a > mx_ang) { mx_ang = a; }
+        } fin_lin = mx_lin;
         fin_ang = mx_ang;
         if (t < F10_TRANSIENT) {
-            if (mx_lin > trans_lin) {
-                trans_lin = mx_lin;
-            }
-            if (mx_ang > trans_ang) {
-                trans_ang = mx_ang;
-            }
+            if (mx_lin > trans_lin) { trans_lin = mx_lin; }
+            if (mx_ang > trans_ang) { trans_ang = mx_ang; }
         } else {
-            if (mx_lin > run_max_lin) {
-                run_max_lin = mx_lin;
-            }
-            if (mx_ang > run_max_ang) {
-                run_max_ang = mx_ang;
-            }
+            if (mx_lin > run_max_lin) { run_max_lin = mx_lin; }
+            if (mx_ang > run_max_ang) { run_max_ang = mx_ang; }
         }
     }
     printf ("[info] final lin=%.5f ang=%.5f runmax lin=%.5f ang=%.5f transient lin=%.5f ang=%.5f nan=%ld fallen=%ld\n",
@@ -128,20 +112,14 @@ int main (void) {
     for (int i = 0; i < world.body_count; i++) {
         if (!world.bodies [i].static_state) {
             dynamic_n++;
-            if (world.bodies [i].is_sleeping) {
-                asleep++;
-            }
+            if (world.bodies [i].is_sleeping) { asleep++; }
         }
-    }
-    printf ("[info] asleep=%d/%d\n", asleep, dynamic_n);
+    } printf ("[info] asleep=%d/%d\n", asleep, dynamic_n);
     int pass = world.body_count > 0 && nan_ticks == 0 && fallen_ticks == 0 && fin_lin < 0.25f && fin_ang < 0.5f &&
                run_max_lin < 2.0f && run_max_ang < 2.0f && asleep == dynamic_n && dynamic_n > 0;
-    if (pass) {
-        printf ("[PASS] long-run 10-stack+pile settles and stays calm\n");
-    } else {
+    if (pass) { printf ("[PASS] long-run 10-stack+pile settles and stays calm\n"); } else {
         printf ("[FAIL] long-run instability (see runmax/final above)\n");
-    }
-    physics_world_cleanup (&world);
+    } physics_world_cleanup (&world);
     return pass ? 0 : 1;
 }
 #endif /* mpe_f10_long_run_test */

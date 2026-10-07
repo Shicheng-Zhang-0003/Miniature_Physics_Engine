@@ -30,15 +30,13 @@ int main (void) {
                 if (!isfinite (world.bodies [i].position.x))
                     nan_count++;
             }
-        }
-        printf ("[INFO] zero_mass nan=%d\n", nan_count);
+        } printf ("[INFO] zero_mass nan=%d\n", nan_count);
         if (nan_count > 0) {
             printf ("[FAIL] zero mass produced NaN\n");
             fail = 1;
         } else {
             printf ("[PASS] zero mass handled as static\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
     /* Test 2: Extreme rotation - 1000 rad/s */
     {
@@ -60,15 +58,13 @@ int main (void) {
             float angle = 2.0f * acosf (fabsf (world.bodies [0].orientation.w));
             if (angle > max_angle)
                 max_angle = angle;
-        }
-        printf ("[INFO] extreme_rotation nan=%d max_angle=%.1f rad\n", nan_count, max_angle);
+        } printf ("[INFO] extreme_rotation nan=%d max_angle=%.1f rad\n", nan_count, max_angle);
         if (nan_count > 0) {
             printf ("[FAIL] extreme rotation produced NaN\n");
             fail = 1;
         } else {
             printf ("[PASS] extreme rotation stable\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
     /* Test 3: Tiny dt - numerical stability */
     {
@@ -84,15 +80,13 @@ int main (void) {
             physics_world_step (&world, 1e-6f); /* 1 microsecond steps */
             if (!isfinite (world.bodies [0].position.y))
                 nan_count++;
-        }
-        printf ("[INFO] tiny_dt nan=%d\n", nan_count);
+        } printf ("[INFO] tiny_dt nan=%d\n", nan_count);
         if (nan_count > 0) {
             printf ("[FAIL] tiny dt produced NaN\n");
             fail = 1;
         } else {
             printf ("[PASS] tiny dt stable\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
     /* Test 4: Huge dt - should be clamped */
     {
@@ -113,8 +107,7 @@ int main (void) {
             fail = 1;
         } else {
             printf ("[PASS] huge dt clamped safely\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
     /* Test 5: Negative dt - should be rejected */
     {
@@ -135,8 +128,7 @@ int main (void) {
             fail = 1;
         } else {
             printf ("[PASS] negative dt rejected safely\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
     /* Test 6: Very small mass - 1e-4 kg minimum */
     {
@@ -159,15 +151,13 @@ int main (void) {
                 if (!isfinite (world.bodies [i].position.x))
                     nan_count++;
             }
-        }
-        printf ("[INFO] tiny_mass nan=%d\n", nan_count);
+        } printf ("[INFO] tiny_mass nan=%d\n", nan_count);
         if (nan_count > 0) {
             printf ("[FAIL] tiny mass produced NaN\n");
             fail = 1;
         } else {
             printf ("[PASS] tiny mass handled\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
     /* Test 6: Huge mass - 1e6 kg maximum */
     {
@@ -190,15 +180,13 @@ int main (void) {
                 if (!isfinite (world.bodies [i].position.x))
                     nan_count++;
             }
-        }
-        printf ("[INFO] huge_mass nan=%d\n", nan_count);
+        } printf ("[INFO] huge_mass nan=%d\n", nan_count);
         if (nan_count > 0) {
             printf ("[FAIL] huge mass produced NaN\n");
             fail = 1;
         } else {
             printf ("[PASS] huge mass handled\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
     /* Test 7: Degenerate inertia tensor - thin rod */
     {
@@ -216,15 +204,13 @@ int main (void) {
             physics_world_step (&world, dt);
             if (!isfinite (world.bodies [0].orientation.w))
                 nan_count++;
-        }
-        printf ("[INFO] thin_rod nan=%d\n", nan_count);
+        } printf ("[INFO] thin_rod nan=%d\n", nan_count);
         if (nan_count > 0) {
             printf ("[FAIL] thin rod NaN\n");
             fail = 1;
         } else {
             printf ("[PASS] thin rod stable\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
     /* Test 8: Near-zero quaternion - sanitization */
     {
@@ -242,16 +228,13 @@ int main (void) {
             physics_world_step (&world, dt);
             if (!isfinite (world.bodies [0].orientation.w))
                 nan_count++;
-        }
-        printf ("[INFO] near_zero_quat nan=%d\n", nan_count);
+        } printf ("[INFO] near_zero_quat nan=%d\n", nan_count);
         if (nan_count > 0) {
             printf ("[FAIL] near-zero quat caused NaN\n");
             fail = 1;
         } else {
             printf ("[PASS] sanitization handles near-zero quat\n");
-        }
-        physics_world_cleanup (&world);
-    }
-    return fail;
+        } physics_world_cleanup (&world);
+    } return fail;
 }
 #endif

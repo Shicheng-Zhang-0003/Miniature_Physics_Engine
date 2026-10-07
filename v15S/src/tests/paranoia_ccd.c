@@ -32,15 +32,13 @@ int main (void) {
                 tunneled = 1;
                 break;
             }
-        }
-        printf ("[INFO] ccd_144mps_tunnel=%d\n", tunneled);
+        } printf ("[INFO] ccd_144mps_tunnel=%d\n", tunneled);
         if (tunneled) {
             printf ("[FAIL] CCD failed at 144 m/s\n");
             fail = 1;
         } else {
             printf ("[PASS] CCD stops 144 m/s sphere\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
     /* Test 2: Sphere at 60 m/s onto floor - must land exactly */
     {
@@ -67,15 +65,13 @@ int main (void) {
                 hit_floor = 1;
                 break;
             }
-        }
-        printf ("[INFO] ccd_floor_60mps hit=%d min_y=%.4f\n", hit_floor, min_y);
+        } printf ("[INFO] ccd_floor_60mps hit=%d min_y=%.4f\n", hit_floor, min_y);
         if (!hit_floor || min_y < 0.45f) {
             printf ("[FAIL] CCD floor penetration\n");
             fail = 1;
         } else {
             printf ("[PASS] CCD floor collision exact\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
     /* Test 3: Fast spinning cylinder - corner must not tunnel through floor */
     {
@@ -96,15 +92,13 @@ int main (void) {
             physics_world_step (&world, dt);
             if (world.bodies [cyl].position.y < min_y)
                 min_y = world.bodies [cyl].position.y;
-        }
-        printf ("[INFO] ccd_spin_cyl min_y=%.4f\n", min_y);
+        } printf ("[INFO] ccd_spin_cyl min_y=%.4f\n", min_y);
         if (min_y < 0.2f) {
             printf ("[FAIL] spinning cylinder tunneled\n");
             fail = 1;
         } else {
             printf ("[PASS] CCD handles spinning cylinder\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
     /* Test 4: Two fast spheres collide head-on. Check the post-impact
      * separating velocity; a post-step distance check can miss a collision
@@ -133,8 +127,7 @@ int main (void) {
                 collided = 1;
                 break;
             }
-        }
-        printf ("[INFO] ccd_fast_spheres collided=%d\n", collided);
+        } printf ("[INFO] ccd_fast_spheres collided=%d\n", collided);
         if (!collided) {
             printf ("[FAIL] CCD missed fast sphere-sphere\n");
             fail = 1;
@@ -144,8 +137,7 @@ int main (void) {
             fail = 1;
         } else {
             printf ("[PASS] CCD catches fast sphere-sphere with momentum and energy conserved\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
     /* Test 5: CCD's gravity+drag advance composes across the TOI split.
      * Clamp a sphere against a wall, then integrate the recorded remainder
@@ -185,13 +177,9 @@ int main (void) {
             if (err > 2e-5) {
                 printf ("[FAIL] CCD split-flight semigroup error %.9g\n", err);
                 fail = 1;
-            } else {
-                printf ("[PASS] CCD TOI and remainder compose to unsplit free flight\n");
-            }
-        }
-        (void) wall;
+            } else { printf ("[PASS] CCD TOI and remainder compose to unsplit free flight\n"); }
+        } (void) wall;
         physics_world_cleanup (&world);
-    }
-    return fail;
+    } return fail;
 }
 #endif

@@ -18,8 +18,7 @@ int main (void) {
         printf ("[FAIL] could not create floor\n");
         physics_world_cleanup (&world);
         return 1;
-    }
-    world.bodies [floor].restitution = 0.0f;
+    } world.bodies [floor].restitution = 0.0f;
     world.bodies [floor].friction_static = 0.8f;
     world.bodies [floor].friction_kinetic = 0.6f;
     const float h = 0.4f;
@@ -31,12 +30,10 @@ int main (void) {
             printf ("[FAIL] could not create cube %d\n", i);
             physics_world_cleanup (&world);
             return 1;
-        }
-        world.bodies [cubes [i]].restitution = 0.0f;
+        } world.bodies [cubes [i]].restitution = 0.0f;
         world.bodies [cubes [i]].friction_static = 0.8f;
         world.bodies [cubes [i]].friction_kinetic = 0.6f;
-    }
-    const float dt = 1.0f / 60.0f;
+    } const float dt = 1.0f / 60.0f;
     for (int t = 0; t < 600; t++) {
         physics_world_step (&world, dt);
         for (int i = 0; i < world.body_count; i++) {
@@ -46,17 +43,14 @@ int main (void) {
                 return 1;
             }
         }
-    }
-    int fail = 0;
+    } int fail = 0;
     rigidbody *top = &world.bodies [cubes [5]];
     float top_drift = sqrtf (top -> position.x * top -> position.x + top -> position.z * top -> position.z);
     printf ("[info] top drift=%.4f (limit 0.05)\n", top_drift);
     if (top_drift > 0.05f) {
         printf ("[FAIL] tower leans/falls\n");
         fail = 1;
-    } else {
-        printf ("[PASS] tower stands\n");
-    }
+    } else { printf ("[PASS] tower stands\n"); }
     for (int i = 0; i < 6; i++) {
         float y_e = h + (float) i * 2.0f * h;
         rigidbody *cube = &world.bodies [cubes [i]];
@@ -73,9 +67,7 @@ int main (void) {
             fail = 1;
         }
     }
-    if (fail == 0) {
-        printf ("[PASS] all levels hold height\n");
-    }
+    if (fail == 0) { printf ("[PASS] all levels hold height\n"); }
     physics_world_cleanup (&world);
     return fail;
 }

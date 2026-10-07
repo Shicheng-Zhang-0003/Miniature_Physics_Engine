@@ -30,18 +30,14 @@ int mpe_t_projectile (void) {
         if (!mpe_world_finite (&w)) {
             t.failures++;
             break;
-        }
-        rigidbody *b = &w.bodies [s];
+        } rigidbody *b = &w.bodies [s];
         if (b -> position.y > apex) {
             apex = b -> position.y;
             t_apex = (float) (k + 1) * dt;
             x_apex = b -> position.x;
         }
-        if (b -> position.y < 0.25f) {
-            break;
-        }
-    }
-    float apex_e = 1.0f + vy * vy / (2.0f * g);
+        if (b -> position.y < 0.25f) { break; }
+    } float apex_e = 1.0f + vy * vy / (2.0f * g);
     float t_e = vy / g;
     float x_e = vx * t_e;
     MPE_INFO ("apex=%.4f (expect %.4f) t=%.4f (expect %.4f) x=%.4f (expect %.4f)", apex, apex_e, t_apex, t_e, x_apex,
@@ -50,9 +46,7 @@ int mpe_t_projectile (void) {
     MPE_CHECK_REL (&t, apex, apex_e, 0.02f, "apex");
     MPE_CHECK_REL (&t, t_apex, t_e, 0.02f, "time-to-apex");
     MPE_CHECK_REL (&t, x_apex, x_e, 0.02f, "range");
-    if (t.failures == 0) {
-        printf ("[PASS] ballistic apex exact\n");
-    }
+    if (t.failures == 0) { printf ("[PASS] ballistic apex exact\n"); }
     physics_world_cleanup (&w);
     mpe_test_end (&t);
     return t.failures;
@@ -87,17 +81,12 @@ int mpe_t_friction_stop (void) {
             t.failures++;
             break;
         }
-        if (mpe_vlen (w.bodies [box].velocity) < 0.005f) {
-            break;
-        }
-    }
-    float dist = w.bodies [box].position.x - x0;
+        if (mpe_vlen (w.bodies [box].velocity) < 0.005f) { break; }
+    } float dist = w.bodies [box].position.x - x0;
     float analytic = v0 * v0 / (2.0f * 0.3f * 9.81f);
     MPE_INFO ("stop distance=%.4f (expect %.4f from v0=%.3f)", dist, analytic, v0);
     MPE_CHECK_REL (&t, dist, analytic, 0.15f, "stop-distance");
-    if (t.failures == 0) {
-        printf ("[PASS] Coulomb friction stops at v^2/(2*mu*g)\n");
-    }
+    if (t.failures == 0) { printf ("[PASS] Coulomb friction stops at v^2/(2*mu*g)\n"); }
     physics_world_cleanup (&w);
     mpe_test_end (&t);
     return t.failures;
@@ -151,9 +140,7 @@ int mpe_t_incline_accel (void) {
     const float t_window = 1.0f; /* 60 ticks * dt */
     float s_exact = v_a * t_window + 0.5f * a_exact * t_window * t_window;
     MPE_CHECK_REL (&t, s_meas, s_exact, 0.03f, "slide-displacement");
-    if (t.failures == 0) {
-        printf ("[PASS] frictionless slide accelerates at g*sin(theta)\n");
-    }
+    if (t.failures == 0) { printf ("[PASS] frictionless slide accelerates at g*sin(theta)\n"); }
     physics_world_cleanup (&w);
     mpe_test_end (&t);
     return t.failures;
@@ -193,25 +180,15 @@ int mpe_t_pendulum (void) {
         }
         if ((prev_x <= 0.0f && x > 0.0f) || (prev_x >= 0.0f && x < 0.0f)) {
             crossings++;
-            if (first < 0) {
-                first = k;
-            }
+            if (first < 0) { first = k; }
             last = k;
-        }
-        prev_x = x;
-    }
-    float t_meas = 0.0f;
-    if (crossings >= 4) {
-        t_meas = 2.0f * (float) (last - first) * dt / (float) (crossings - 1);
-    }
+        } prev_x = x;
+    } float t_meas = 0.0f;
+    if (crossings >= 4) { t_meas = 2.0f * (float) (last - first) * dt / (float) (crossings - 1); }
     MPE_INFO ("period: measured=%.4f analytic=%.4f crossings=%d", t_meas, t_exact, crossings);
     MPE_CHECK (&t, crossings >= 6);
-    if (crossings >= 4) {
-        MPE_CHECK_REL (&t, t_meas, t_exact, 0.03f, "period");
-    }
-    if (t.failures == 0) {
-        printf ("[PASS] compound pendulum period exact\n");
-    }
+    if (crossings >= 4) { MPE_CHECK_REL (&t, t_meas, t_exact, 0.03f, "period"); }
+    if (t.failures == 0) { printf ("[PASS] compound pendulum period exact\n"); }
     physics_world_cleanup (&w);
     mpe_test_end (&t);
     return t.failures;
@@ -265,27 +242,18 @@ int mpe_t_bounce_series (void) {
             printf ("[FAIL] NaN\n");
             t.failures++;
             break;
-        }
-        float vy = w.bodies [s].velocity.y;
+        } float vy = w.bodies [s].velocity.y;
         if (prev_vy < 0.0f && vy > 0.0f && newton_n < 4) {
             /* (1) measured from the trajectory: prev_vy is the speed on the
              * tick BEFORE the bounce, vy the speed after. No solver
              * bookkeeping involved. */
             float incoming = -prev_vy;
-            if (incoming > 0.0f) {
-                newton_samples [newton_n++] = vy / incoming;
-            }
-        }
-        prev_vy = vy;
+            if (incoming > 0.0f) { newton_samples [newton_n++] = vy / incoming; }
+        } prev_vy = vy;
         float time = (float) (k + 1) * dt;
-        if ((time > 1.0f) && (time < 1.7f) && (y > apex1)) {
-            apex1 = y;
-        }
-        if ((time > 1.9f) && (time < 2.6f) && (y > apex2)) {
-            apex2 = y;
-        }
-    }
-    float e1 = 0.5f + 3.5f * 0.36f;
+        if ((time > 1.0f) && (time < 1.7f) && (y > apex1)) { apex1 = y; }
+        if ((time > 1.9f) && (time < 2.6f) && (y > apex2)) { apex2 = y; }
+    } float e1 = 0.5f + 3.5f * 0.36f;
     float e2 = 0.5f + (e1 - 0.5f) * 0.36f;
     MPE_INFO ("apex1=%.4f (expect %.4f) apex2=%.4f (expect %.4f)", apex1, e1, apex2, e2);
     MPE_CHECK_REL (&t, apex1, e1, 0.12f, "apex1");
@@ -293,8 +261,7 @@ int mpe_t_bounce_series (void) {
     for (int i = 0; i < newton_n; i++) {
         MPE_INFO ("bounce %d: measured restitution e=%.4f (expect 0.60)", i + 1, newton_samples [i]);
         MPE_CHECK_NEAR (&t, newton_samples [i], 0.6f, 0.10f, "trajectory restitution ratio");
-    }
-    MPE_CHECK (&t, newton_n >= 1);
+    } MPE_CHECK (&t, newton_n >= 1);
     /* (2) Energy prediction: the bounce HEIGHT scales as e^2, and the apex is
      * measured as an absolute y, so the sphere's rest height above the plane
      * (its radius) has to come off first -- the same offset the absolute
@@ -304,9 +271,7 @@ int mpe_t_bounce_series (void) {
     float h2 = apex2 - rest_h;
     MPE_CHECK (&t, h1 > 0.05f && h2 > 0.02f);
     MPE_CHECK_REL (&t, h2, h1 * 0.6f * 0.6f, 0.20f, "bounce height ratio = e^2 (energy law)");
-    if (t.failures == 0) {
-        printf ("[PASS] bounce series decays geometrically\n");
-    }
+    if (t.failures == 0) { printf ("[PASS] bounce series decays geometrically\n"); }
     physics_world_cleanup (&w);
     mpe_test_end (&t);
     return t.failures;
@@ -338,8 +303,7 @@ int mpe_t_momentum (void) {
             (w.bodies [a].velocity.x < w.bodies [b].velocity.x)) {
             break;
         }
-    }
-    float va = w.bodies [a].velocity.x;
+    } float va = w.bodies [a].velocity.x;
     float vb = w.bodies [b].velocity.x;
     float p1 = va + vb;
     MPE_INFO ("post-hit va=%.4f vb=%.4f (expect 0 / 3)", va, vb);
@@ -351,17 +315,10 @@ int mpe_t_momentum (void) {
     for (int i = 0; i < w.body_count; i++) {
         float ty = fabsf (w.bodies [i].velocity.y);
         float tz = fabsf (w.bodies [i].velocity.z);
-        if (ty > tmax) {
-            tmax = ty;
-        }
-        if (tz > tmax) {
-            tmax = tz;
-        }
-    }
-    MPE_CHECK (&t, tmax <= 0.05f);
-    if (t.failures == 0) {
-        printf ("[PASS] linear momentum conserved\n");
-    }
+        if (ty > tmax) { tmax = ty; }
+        if (tz > tmax) { tmax = tz; }
+    } MPE_CHECK (&t, tmax <= 0.05f);
+    if (t.failures == 0) { printf ("[PASS] linear momentum conserved\n"); }
     physics_world_cleanup (&w);
     mpe_test_end (&t);
     return t.failures;
@@ -391,18 +348,14 @@ int mpe_t_angmom (void) {
         if (!mpe_world_finite (&w)) {
             t.failures++;
             break;
-        }
-        math3 Rk = vector4_to_math3 (w.bodies [b].orientation);
+        } math3 Rk = vector4_to_math3 (w.bodies [b].orientation);
         vector3 Lk = math3_multiplication_vector3 (
             math3_multiplication (Rk,
                                   math3_multiplication (w.bodies [b].inertia_tensor_local, math3_transposition (Rk))),
             w.bodies [b].angular_velocity);
         float err = vector3_length (vector3_subtraction (Lk, L0)) / (denom + 1e-9f);
-        if (err > max_err) {
-            max_err = err;
-        }
-    }
-    MPE_INFO ("max |L-L0|/|L0| over 2 s tumble: %.5f", max_err);
+        if (err > max_err) { max_err = err; }
+    } MPE_INFO ("max |L-L0|/|L0| over 2 s tumble: %.5f", max_err);
     /* DESPOT-2026-09-29: tightened from 3% to 0.5%. The old comment here
      * admitted that "tightening to 1% was measured to RED" and blamed the
      * first-order gyroscopic integrator. That is now fixed: torque-free
@@ -436,17 +389,12 @@ int mpe_t_angmom (void) {
             vector3 Lsk = vector3_scaling (ws.bodies [bs].angular_velocity,
                                            ws.bodies [bs].inertia_tensor_local.matrix [0][0]);
             float e = vector3_length (vector3_subtraction (Lsk, Ls0)) / (dden + 1e-9f);
-            if (e > smax) {
-                smax = e;
-            }
-        }
-        MPE_INFO ("angmom sphere control drift: %.6f", smax);
+            if (e > smax) { smax = e; }
+        } MPE_INFO ("angmom sphere control drift: %.6f", smax);
         MPE_CHECK (&t, smax <= 0.005f);
         physics_world_cleanup (&ws);
     }
-    if (t.failures == 0) {
-        printf ("[PASS] angular momentum conserved\n");
-    }
+    if (t.failures == 0) { printf ("[PASS] angular momentum conserved\n"); }
     physics_world_cleanup (&w);
     mpe_test_end (&t);
     return t.failures;
@@ -475,13 +423,9 @@ static float mpe_slope_drift (mpe_test_t *t, float slope_deg, float mus, float m
     w.bodies [box].friction_static = mus;
     w.bodies [box].friction_kinetic = muk;
     const float dt = 1.0f / 60.0f;
-    if (!mpe_step (&w, 120, dt)) {
-        t -> failures++;
-    }
+    if (!mpe_step (&w, 120, dt)) { t -> failures++; }
     vector3 s0 = w.bodies [box].position;
-    if (!mpe_step (&w, 300, dt)) {
-        t -> failures++;
-    }
+    if (!mpe_step (&w, 300, dt)) { t -> failures++; }
     vector3 s1 = w.bodies [box].position;
     vector3 d = {cosf (ang), sinf (ang), 0.0f};
     *asleep_out = w.bodies [box].is_sleeping;
@@ -504,9 +448,7 @@ int mpe_t_static_hold (void) {
     MPE_INFO ("slide case: drift=%.4f m awake=%d", slide_drift, !asleep);
     MPE_CHECK (&t, slide_drift >= 8.0f);
     MPE_CHECK (&t, !asleep);
-    if (t.failures == 0) {
-        printf ("[PASS] static-hold truth complete\n");
-    }
+    if (t.failures == 0) { printf ("[PASS] static-hold truth complete\n"); }
     mpe_test_end (&t);
     return t.failures;
 } /* rolling_decay: rolling ball (v=2 + backspin w=(0,0,-4)) decays at the
@@ -546,16 +488,13 @@ int mpe_t_rolling_decay (void) {
             t.failures++;
             break;
         }
-    }
-    float dist = w.bodies [s].position.x - (-8.0f);
+    } float dist = w.bodies [s].position.x - (-8.0f);
     float vh =
         sqrtf (w.bodies [s].velocity.x * w.bodies [s].velocity.x + w.bodies [s].velocity.z * w.bodies [s].velocity.z);
     MPE_INFO ("rolled %.3f m in 8 s, end horizontal speed %.3f", dist, vh);
     MPE_CHECK (&t, dist <= 13.5f);
     MPE_CHECK (&t, dist >= 9.5f);
-    if (t.failures == 0) {
-        printf ("[PASS] rolling decays at contact-patch rate (%.3f m)\n", dist);
-    }
+    if (t.failures == 0) { printf ("[PASS] rolling decays at contact-patch rate (%.3f m)\n", dist); }
     physics_world_cleanup (&w);
     mpe_test_end (&t);
     return t.failures;
@@ -592,8 +531,7 @@ int mpe_t_kinematic (void) {
             t.failures++;
             break;
         }
-    }
-    float plat_y = w.bodies [p].position.y;
+    } float plat_y = w.bodies [p].position.y;
     float plat_x = w.bodies [p].position.x;
     float crate_x = w.bodies [c].position.x;
     float crate_y = w.bodies [c].position.y;
@@ -602,9 +540,7 @@ int mpe_t_kinematic (void) {
     MPE_CHECK (&t, plat_x >= 3.8f && plat_x <= 4.2f);
     MPE_CHECK (&t, fabsf (crate_x - plat_x) <= 1.0f);
     MPE_CHECK (&t, crate_y >= 0.8f);
-    if (t.failures == 0) {
-        printf ("[PASS] kinematic platform carries bodies\n");
-    }
+    if (t.failures == 0) { printf ("[PASS] kinematic platform carries bodies\n"); }
     physics_world_cleanup (&w);
     mpe_test_end (&t);
     return t.failures;
@@ -655,22 +591,15 @@ int mpe_t_ccd_sweep (void) {
             t.failures++;
             break;
         }
-        if (w.bodies [d].position.y < min_y) {
-            min_y = w.bodies [d].position.y;
-        }
-        if (mpe_body_in_contact (&w, d)) {
-            ever_contact2 = 1;
-        }
-    }
-    float rest_y = w.bodies [d].position.y;
+        if (w.bodies [d].position.y < min_y) { min_y = w.bodies [d].position.y; }
+        if (mpe_body_in_contact (&w, d)) { ever_contact2 = 1; }
+    } float rest_y = w.bodies [d].position.y;
     MPE_INFO ("floor case: min_center_y=%.4f rest_y=%.3f ever_contact=%d (net OFF, real slab)", min_y, rest_y,
               ever_contact2);
     MPE_CHECK (&t, ever_contact2);
     MPE_CHECK (&t, min_y >= 0.40f);
     MPE_CHECK (&t, rest_y >= 0.45f && rest_y <= 0.55f);
-    if (t.failures == 0) {
-        printf ("[PASS] swept TOI: no tunneling\n");
-    }
+    if (t.failures == 0) { printf ("[PASS] swept TOI: no tunneling\n"); }
     physics_world_cleanup (&w);
     mpe_test_end (&t);
     return t.failures;

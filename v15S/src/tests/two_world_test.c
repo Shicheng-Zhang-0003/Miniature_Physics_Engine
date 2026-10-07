@@ -51,11 +51,8 @@ int main (void) {
         } else if (world_a.bodies [0].position.y > 9.0f) {
             printf ("[FAIL] world A sphere did not fall (y=%.3f)\n", world_a.bodies [0].position.y);
             fail = 1;
-        } else {
-            printf ("[PASS] two worlds independent: separated %.3f m at t=1s by per-world gravity\n", yb_mid - ya_mid);
-        }
-    }
-    physics_world_cleanup (&world_a);
+        } else { printf ("[PASS] two worlds independent: separated %.3f m at t=1s by per-world gravity\n", yb_mid - ya_mid); }
+    } physics_world_cleanup (&world_a);
     physics_world_cleanup (&world_b);
     return fail;
 }

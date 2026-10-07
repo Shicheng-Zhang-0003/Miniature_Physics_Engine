@@ -90,16 +90,14 @@ int mpe_t_ftc_ecosystem (void) {
             p_spawn = (spawn_fn_t) dlsym (h, "ftc_fleet_spawn");
             p_get = (get_fn_t) dlsym (h, "ftc_fleet_get");
         }
-    }
-    MPE_CHECK (&t, p_spawn != NULL && p_get != NULL);
+    } MPE_CHECK (&t, p_spawn != NULL && p_get != NULL);
     float x0 = 0, z0 = 0;
     ftc_robot *r0 = p_get ? p_get (&w, 0) : NULL;
     MPE_CHECK (&t, r0 != NULL);
     if (r0 && r0 -> chassis_body >= 0) {
         x0 = w.bodies [r0 -> chassis_body].position.x;
         z0 = w.bodies [r0 -> chassis_body].position.z;
-    }
-    const float dt = 1.0f / 60.0f;
+    } const float dt = 1.0f / 60.0f;
     for (int k = 0; k < 180; k++) {
         mpe_ecosystem_pre_step (&w, dt);
         physics_world_step (&w, dt);
@@ -134,14 +132,11 @@ int mpe_t_ftc_ecosystem (void) {
         /* +/- 1 m on an 18 cm rest height was a +/-1 m band; tighten to a
          * value that would actually notice a robot at the wrong height. */
         MPE_CHECK (&t, fabsf (w.bodies [r1 -> chassis_body].position.y - 0.18f) < 0.25f);
-    }
-    MPE_CHECK (&t, mpe_ecosystem_detach (&w, "mfs-simulator") == 0);
+    } MPE_CHECK (&t, mpe_ecosystem_detach (&w, "mfs-simulator") == 0);
     MPE_CHECK (&t, mpe_loader_unload (eco_path) == 0);
     MPE_CHECK (&t, mpe_ecosystem_find ("mfs-simulator") == NULL);
     physics_world_cleanup (&w);
-    if (t.failures == 0) {
-        printf ("[PASS] ftc ecosystem drive green\n");
-    }
+    if (t.failures == 0) { printf ("[PASS] ftc ecosystem drive green\n"); }
     mpe_test_end (&t);
     return t.failures;
 }

@@ -22,19 +22,13 @@
 /* --- Stubs for TU-bound symbols (operate on the primary world) --- */
 uint32_t scene_allocate_object_id (void) {
     physics_world *world = physics_world_get_primary ();
-    if (world -> next_object_id == 0) {
-        world -> next_object_id = 1;
-    }
+    if (world -> next_object_id == 0) { world -> next_object_id = 1; }
     return world -> next_object_id++;
 }
 void scene_note_loaded_id (uint32_t object_id) {
-    if ((object_id == 0) || (object_id == 0xFFFFFFFFu)) {
-        return;
-    }
+    if ((object_id == 0) || (object_id == 0xFFFFFFFFu)) { return; }
     physics_world *world = physics_world_get_primary ();
-    if (object_id >= world -> next_object_id) {
-        world -> next_object_id = object_id + 1;
-    }
+    if (object_id >= world -> next_object_id) { world -> next_object_id = object_id + 1; }
 }
 int scene_ensure_pool_capacity (int required_capacity) {
     (void) required_capacity;
@@ -46,21 +40,14 @@ void scene_clear (void) {
     joint_init_pool (world);
 }
 void joint_init_pool (physics_world *world) {
-    if (!world) {
-        return;
-    }
+    if (!world) { return; }
     for (int i = 0; i < mpe_max_joints; i++) {
         world -> spring_joints [i].is_active = false;
-    }
-    world -> spring_joint_count = 0;
+    } world -> spring_joint_count = 0;
 }
 int add_joint_by_ids (physics_world *world, uint32_t id_a, uint32_t id_b, float eq, float k, float c) {
-    if (!world) {
-        return -1;
-    }
-    if ((id_a == 0) || (id_b == 0) || (id_a == id_b)) {
-        return -1;
-    }
+    if (!world) { return -1; }
+    if ((id_a == 0) || (id_b == 0) || (id_a == id_b)) { return -1; }
     for (int i = 0; i < mpe_max_joints; i++) {
         if (!world -> spring_joints [i].is_active) {
             world -> spring_joints [i].object_id_a = id_a;
@@ -72,10 +59,8 @@ int add_joint_by_ids (physics_world *world, uint32_t id_a, uint32_t id_b, float 
             world -> spring_joint_count++;
             return i;
         }
-    }
-    return -1;
-}
-static int failures = 0;
+    } return -1;
+} static int failures = 0;
 #define check(cond, label)                                                                                             \
     do {                                                                                                               \
         if (cond) {                                                                                                    \
@@ -161,8 +146,7 @@ int main (void) {
         uint32_t i1 = world -> bodies [1].object_id;
         check (((ja == i0) && (jb == i1)) || ((ja == i1) && (jb == i0)), "joint endpoints remapped to loaded bodies");
         checkf (world -> spring_joints [0].spring_constant, 20.0f, 1e-5f, "joint params round-trip");
-    }
-    check (constraint_get_count (world) == 1, "one revolute restored");
+    } check (constraint_get_count (world) == 1, "one revolute restored");
     if (constraint_get_count (world) == 1) {
         const constraint *rc = constraint_pool_at (world, 0);
         check ((rc != NULL) && (rc -> type == constraint_revolute), "restored joint is revolute");
@@ -202,8 +186,7 @@ int main (void) {
         check (world -> body_count == count_before, "live scene untouched by failed load");
         check (world -> bodies [0].object_id == 1, "live IDs untouched by failed load");
         remove (tamper_path);
-    }
-    remove (path);
+    } remove (path);
     physics_world_cleanup (world);
     if (failures == 0)
         printf ("[PASS] scene round-trip complete\n");

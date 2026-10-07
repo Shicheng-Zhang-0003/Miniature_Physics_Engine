@@ -17,8 +17,7 @@ static int check_finite (const char *ctx, vector3 v) {
     if (!isfinite (v.x) || !isfinite (v.y) || !isfinite (v.z)) {
         printf ("[FAIL] %s: non-finite vector (%.6f, %.6f, %.6f)\n", ctx, v.x, v.y, v.z);
         return 1;
-    }
-    return 0;
+    } return 0;
 }
 int main (void) {
     mpe_config_init ();
@@ -71,8 +70,7 @@ int main (void) {
             }
             if (b -> position.y < 0.15f)
                 break;
-        }
-        float apex_e = 1.0f + vy * vy / (2.0f * g);
+        } float apex_e = 1.0f + vy * vy / (2.0f * g);
         float t_e = vy / g;
         float x_e = vx * t_e;
         printf ("[INFO] drag=1 apex=%.6f (exact=%.6f) err=%.6f t_apex=%.6f (exact=%.6f) err=%.6f x_apex=%.6f "
@@ -100,8 +98,7 @@ int main (void) {
             fail = 1;
         } else {
             printf ("[PASS] drag=1 exact parabola (max err < 1cm)\n");
-        }
-        physics_world_cleanup (&w1);
+        } physics_world_cleanup (&w1);
     }
     /* Test 2: drag=0.99 (default) - corrected semi-implicit should be very close
      * For drag<1, the engine uses exact analytic solution of dv/dt = -c*v + g
@@ -124,9 +121,7 @@ int main (void) {
             physics_world_step (&w2, dt);
             rigidbody *b = &w2.bodies [s];
             fail |= check_finite ("projectile_drag099", b -> position);
-            if (b -> position.y > apex) {
-                apex = b -> position.y;
-            }
+            if (b -> position.y > apex) { apex = b -> position.y; }
             float texact = (float) (t + 1) * dt;
             /* For drag=0.99, compare against drag=1 exact parabola as reference.
              * The trajectory should be LOWER (damped) but smooth. */
@@ -136,8 +131,7 @@ int main (void) {
                 max_y_error = y_error;
             if (b -> position.y < 0.15f)
                 break;
-        }
-        float apex_e = 1.0f + vy * vy / (2.0f * g);
+        } float apex_e = 1.0f + vy * vy / (2.0f * g);
         printf ("[INFO] drag=0.99 apex=%.6f (drag1_exact=%.6f) err=%.6f max_y_err_vs_drag1=%.6f\n", apex, apex_e,
                 fabsf (apex - apex_e), max_y_error);
         /* drag=0.99 apex should be LOWER than drag=1 exact parabola (damping).
@@ -152,8 +146,7 @@ int main (void) {
             fail = 1;
         } else {
             printf ("[PASS] drag=0.99 trajectory physically plausible\n");
-        }
-        physics_world_cleanup (&w2);
+        } physics_world_cleanup (&w2);
     }
     /* Test 3: Zero-velocity free fall - should land exactly at predicted time
      * Exact free-flight: y = y0 - 0.5*g*t^2. Landing when y = radius (0.5).
@@ -177,8 +170,7 @@ int main (void) {
                 t_land = (float) (t + 1) * dt;
                 break;
             }
-        }
-        float t_exact = sqrtf (2.0f * (10.0f - 0.5f) / 9.81f);
+        } float t_exact = sqrtf (2.0f * (10.0f - 0.5f) / 9.81f);
         printf ("[INFO] free_fall t_land=%.6f exact=%.6f err=%.6f\n", t_land, t_exact, fabsf (t_land - t_exact));
         /* Landing time error: up to dt=16ms (discrete detection).
          * Tolerance: 20ms. */
@@ -187,8 +179,7 @@ int main (void) {
             fail = 1;
         } else {
             printf ("[PASS] zero-velocity free fall exact within dt tolerance\n");
-        }
-        physics_world_cleanup (&w3);
+        } physics_world_cleanup (&w3);
     }
     /* Test 4: Horizontal motion with drag=1 is uniform. The built-in world
      * safety bounds are +/-250m, so stop before they can clamp the body; this
@@ -216,8 +207,7 @@ int main (void) {
                 max_x_err = x_err;
             if (z_err > max_z_err)
                 max_z_err = z_err;
-        }
-        printf ("[INFO] horizontal drag=1 max_x_err=%.6f max_z_err=%.6f\n", max_x_err, max_z_err);
+        } printf ("[INFO] horizontal drag=1 max_x_err=%.6f max_z_err=%.6f\n", max_x_err, max_z_err);
         /* Float world state accumulates small roundoff over 1500 ticks; a
          * 1cm bound is generous relative to that error and far below the old
          * 170m boundary-clamp artifact. */
@@ -226,8 +216,7 @@ int main (void) {
             fail = 1;
         } else {
             printf ("[PASS] horizontal motion matches analytic free flight\n");
-        }
-        physics_world_cleanup (&w4);
+        } physics_world_cleanup (&w4);
     }
     /* Test 5: Energy conservation in free flight (drag=1) */
     {
@@ -252,17 +241,14 @@ int main (void) {
                 E0 = E;
             E_max = fmaxf (E_max, E);
             E_min = fminf (E_min, E);
-        }
-        float rel_err = fabsf (E_max - E_min) / E0;
+        } float rel_err = fabsf (E_max - E_min) / E0;
         printf ("[INFO] energy E0=%.6f E_max=%.6f E_min=%.6f rel_range=%.6f\n", E0, E_max, E_min, rel_err);
         if (rel_err > 1e-4f) {
             printf ("[FAIL] energy drift %.6f\n", rel_err);
             fail = 1;
         } else {
             printf ("[PASS] energy conserved in free flight (drag=1)\n");
-        }
-        physics_world_cleanup (&w5);
-    }
-    return fail;
+        } physics_world_cleanup (&w5);
+    } return fail;
 }
 #endif

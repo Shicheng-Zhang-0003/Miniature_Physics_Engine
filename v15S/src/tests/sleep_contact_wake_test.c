@@ -54,15 +54,9 @@ int main (void) {
          * first engine contact precedes geometric touch by ~slop. The wake
          * must follow ENGINE contact (slop), not geometric coincidence. */
         float gap = (s -> position.x - 0.5f) - (p -> position.x + 0.5f);
-        if (touch_tick < 0 && gap <= g_cfg.solver.penetration_slop) {
-            touch_tick = t;
-        }
-        if (wake_tick < 0 && !s -> is_sleeping) {
-            wake_tick = t;
-        }
-        if (control_wake_tick < 0 && !c -> is_sleeping) {
-            control_wake_tick = t;
-        }
+        if (touch_tick < 0 && gap <= g_cfg.solver.penetration_slop) { touch_tick = t; }
+        if (wake_tick < 0 && !s -> is_sleeping) { wake_tick = t; }
+        if (control_wake_tick < 0 && !c -> is_sleeping) { control_wake_tick = t; }
     }
     /* No tunneling: never deeply interpenetrated (slop riding is by design:
      * slop-band normal impulses carry the sleeper just outside touch). */
@@ -80,15 +74,11 @@ int main (void) {
         printf ("[FAIL] wake lag %d ticks after first touch (sank %d ticks as ghost)\n", wake_tick - touch_tick,
                 wake_tick - touch_tick);
         fail = 1;
-    } else {
-        printf ("[PASS] first-touch wake in %d ticks at 0.05 m/s (velocity gate is 0.1)\n", wake_tick - touch_tick);
-    }
+    } else { printf ("[PASS] first-touch wake in %d ticks at 0.05 m/s (velocity gate is 0.1)\n", wake_tick - touch_tick); }
     if (control_wake_tick >= 0) {
         printf ("[FAIL] lone sleeper woken at tick %d by persistent floor contact (wake churn)\n", control_wake_tick);
         fail = 1;
-    } else {
-        printf ("[PASS] lone sleeper undisturbed by resting contact\n");
-    }
+    } else { printf ("[PASS] lone sleeper undisturbed by resting contact\n"); }
     /* TRUTH: control must also be WHERE it slept (position, not just flag):
      * a sleeper that fell through the floor asleep still passes the flag
      * check. And the woken sleeper must have been PUSHED (momentum
@@ -110,9 +100,7 @@ int main (void) {
         printf ("[FAIL] pusher tunneled into the sleeper (gap=%.4f)\n", end_gap);
         fail = 1;
     }
-    if (!fail) {
-        printf ("[PASS] sleep contact-wake truth holds\n");
-    }
+    if (!fail) { printf ("[PASS] sleep contact-wake truth holds\n"); }
     physics_world_cleanup (&world);
     return fail ? 1 : 0;
 }

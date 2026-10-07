@@ -18,8 +18,7 @@ int main () {
     if (s < 0) {
         printf ("Failed to create sphere\n");
         return 1;
-    }
-    w.bodies [s].restitution = 0.6f;
+    } w.bodies [s].restitution = 0.6f;
     w.bodies [s].velocity = (vector3) {0, 0, 0};
     w.bodies [s].restitution = 0.6f;
     printf ("body_count=%d, sphere_idx=%d\n", w.body_count, s);
@@ -34,8 +33,7 @@ int main () {
             printf ("Tick %d: pos=(%.3f,%.3f,%.3f) vel=(%.3f,%.3f,%.3f)\n", k, sph -> position.x, sph -> position.y,
                     sph -> position.z, sph -> velocity.x, sph -> velocity.y, sph -> velocity.z);
         }
-    }
-    rigidbody *sph2 = &w.bodies [s];
+    } rigidbody *sph2 = &w.bodies [s];
     float max_y = sph2 -> position.y;
     printf ("Final pos=(%.3f,%.3f,%.3f) vel=(%.3f,%.3f,%.3f)\n", w.bodies [s].position.x, w.bodies [s].position.y,
             w.bodies [s].position.z, w.bodies [s].velocity.x, w.bodies [s].velocity.y, w.bodies [s].velocity.z);

@@ -24,8 +24,7 @@ int main (void) {
         if (joint < 0) {
             printf ("[FAIL] spring joint creation failed\n");
             fail = 1;
-        }
-        const float dt = 1.0f / 60.0f;
+        } const float dt = 1.0f / 60.0f;
         const float E_initial = 50.0f; /* 0.5*k*(4m-3m)^2 */
         float E_max = 0.0f, E_min = 1e9f;
         float max_speed = 0.0f;
@@ -43,8 +42,7 @@ int main (void) {
                 E_max = E;
             if (E < E_min)
                 E_min = E;
-        }
-        float rel_range = (E_max - E_min) / E_max;
+        } float rel_range = (E_max - E_min) / E_max;
         float peak_ratio = E_max / E_initial;
         printf ("[INFO] spring_energy range=%.6f peak/E0=%.4f max_speed=%.4f (60s, zeta=0.07)\n", rel_range, peak_ratio,
                 max_speed);
@@ -57,8 +55,7 @@ int main (void) {
             fail = 1;
         } else {
             printf ("[PASS] spring energy remains bounded near its initial value\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
     /* Test 2: Courant stability guard - spring softened only when necessary, never silently */
     {
@@ -76,8 +73,7 @@ int main (void) {
         if (joint < 0) {
             printf ("[FAIL] stiff spring creation failed\n");
             fail = 1;
-        }
-        const float dt = 1.0f / 60.0f;
+        } const float dt = 1.0f / 60.0f;
         int nan_count = 0;
         float max_vel = 0.0f;
         for (int t = 0; t < 600; t++) {
@@ -90,8 +86,7 @@ int main (void) {
                 if (v > max_vel)
                     max_vel = v;
             }
-        }
-        printf ("[INFO] stiff_spring nan=%d max_vel=%.2f\n", nan_count, max_vel);
+        } printf ("[INFO] stiff_spring nan=%d max_vel=%.2f\n", nan_count, max_vel);
         if (nan_count > 0) {
             printf ("[FAIL] stiff spring produced NaN\n");
             fail = 1;
@@ -101,8 +96,7 @@ int main (void) {
             fail = 1;
         } else {
             printf ("[PASS] Courant guard prevents explosion\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
     /* Test 3: Coincident bodies with L0 > 0 - maximal repulsion */
     {
@@ -117,8 +111,7 @@ int main (void) {
         if (joint < 0) {
             printf ("[FAIL] coincident spring creation failed\n");
             fail = 1;
-        }
-        const float dt = 1.0f / 60.0f;
+        } const float dt = 1.0f / 60.0f;
         int nan_count = 0;
         for (int t = 0; t < 60; t++) {
             physics_world_step (&world, dt);
@@ -126,15 +119,13 @@ int main (void) {
                 if (!isfinite (world.bodies [i].position.x))
                     nan_count++;
             }
-        }
-        printf ("[INFO] coincident_bodies nan=%d\n", nan_count);
+        } printf ("[INFO] coincident_bodies nan=%d\n", nan_count);
         if (nan_count > 0) {
             printf ("[FAIL] coincident bodies produced NaN\n");
             fail = 1;
         } else {
             printf ("[PASS] coincident bodies handled\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
     /* Test 4: Spring removed mid-simulation - no dangling references */
     {
@@ -149,8 +140,7 @@ int main (void) {
         if (joint < 0) {
             printf ("[FAIL] removable spring creation failed\n");
             fail = 1;
-        }
-        const float dt = 1.0f / 60.0f;
+        } const float dt = 1.0f / 60.0f;
         for (int t = 0; t < 60; t++)
             physics_world_step (&world, dt);
         remove_joint (&world, joint);
@@ -166,8 +156,7 @@ int main (void) {
             fail = 1;
         } else {
             printf ("[PASS] spring removal clean\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
     /* Test 5: Spring on sleeping body - should wake or skip correctly */
     {
@@ -184,8 +173,7 @@ int main (void) {
         if (joint < 0) {
             printf ("[FAIL] waking spring creation failed\n");
             fail = 1;
-        }
-        const float dt = 1.0f / 60.0f;
+        } const float dt = 1.0f / 60.0f;
         for (int t = 0; t < 600; t++)
             physics_world_step (&world, dt);
         /* Sleeping body should have been woken by spring force */
@@ -194,9 +182,7 @@ int main (void) {
             fail = 1;
         } else {
             printf ("[PASS] spring wakes sleeping bodies\n");
-        }
-        physics_world_cleanup (&world);
-    }
-    return fail;
+        } physics_world_cleanup (&world);
+    } return fail;
 }
 #endif

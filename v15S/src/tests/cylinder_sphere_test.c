@@ -45,8 +45,7 @@ int main (void) {
     if (sph_z < -0.05f) {
         printf ("[FAIL] sphere passed through cylinder\n");
         return 1;
-    }
-    printf ("[PASS] cylinder-sphere collision works\n");
+    } printf ("[PASS] cylinder-sphere collision works\n");
     physics_world_cleanup (&world);
     return 0;
 }

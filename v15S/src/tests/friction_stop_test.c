@@ -30,8 +30,7 @@ int main (void) {
     const float dt = 1.0f / 60.0f;
     for (int t = 0; t < 60; t++) {
         physics_world_step (&world, dt); /* settle onto the slab */
-    }
-    float x0 = world.bodies [box].position.x;
+    } float x0 = world.bodies [box].position.x;
     float v0 = vector3_length (world.bodies [box].velocity);
     for (int t = 0; t < 600; t++) {
         physics_world_step (&world, dt);
@@ -40,11 +39,8 @@ int main (void) {
             physics_world_cleanup (&world);
             return 1;
         }
-        if (vector3_length (world.bodies [box].velocity) < 0.005f) {
-            break;
-        }
-    }
-    float dist = world.bodies [box].position.x - x0;
+        if (vector3_length (world.bodies [box].velocity) < 0.005f) { break; }
+    } float dist = world.bodies [box].position.x - x0;
     float analytic = v0 * v0 / (2.0f * 0.3f * 9.81f);
     printf ("[info] stop distance=%.4f (expect %.4f from v0=%.3f)\n", dist, analytic, v0);
     int fail = 0;
@@ -53,8 +49,7 @@ int main (void) {
         fail = 1;
     } else {
         printf ("[PASS] Coulomb friction stops at v^2/(2*mu*g)\n");
-    }
-    physics_world_cleanup (&world);
+    } physics_world_cleanup (&world);
     return fail;
 }
 #endif /* mpe_friction_stop_test */

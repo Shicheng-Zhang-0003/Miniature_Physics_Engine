@@ -49,8 +49,7 @@ int main (void) {
         fail = 1;
     } else {
         printf ("[PASS] rolling decays at contact-patch rate (%.3f m)\n", dist);
-    }
-    physics_world_cleanup (&world);
+    } physics_world_cleanup (&world);
     return fail;
 }
 #endif /* mpe_rolling_decay_test */

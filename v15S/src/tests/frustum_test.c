@@ -35,9 +35,7 @@ static void extract_planes (math4 vp, vector4 planes [6]) {
     }
     for (int p = 0; p < 6; p++) {
         float len = sqrtf (combos [p][0] * combos [p][0] + combos [p][1] * combos [p][1] + combos [p][2] * combos [p][2]);
-        if (len < 0.000001f) {
-            len = 1.0f;
-        }
+        if (len < 0.000001f) { len = 1.0f; }
         /* vector4 packs {w,x,y,z}: store (d,a,b,c). Mirrors new_render.c. */
         planes [p] = (vector4) {combos [p][3] / len, combos [p][0] / len, combos [p][1] / len, combos [p][2] / len};
     }
@@ -45,11 +43,8 @@ static void extract_planes (math4 vp, vector4 planes [6]) {
 static bool planes_inside (vector4 planes [6], vector3 p) {
     for (int i = 0; i < 6; i++) {
         float d = planes [i].x * p.x + planes [i].y * p.y + planes [i].z * p.z + planes [i].w;
-        if (d < 0.0f) {
-            return false;
-        }
-    }
-    return true;
+        if (d < 0.0f) { return false; }
+    } return true;
 }
 int main (void) {
     int fail = 0;
@@ -86,19 +81,14 @@ int main (void) {
                               (nz > 1.5f) || (w < 0.0f);
             } else {
                 clearly_out = true;
-            }
-            bool kept = planes_inside (planes, p);
+            } bool kept = planes_inside (planes, p);
             if (in_clip) {
                 inside_clip++;
-                if (!kept) {
-                    false_out++;
-                }
+                if (!kept) { false_out++; }
             }
             if (clearly_out) {
                 culled++;
-                if (kept) {
-                    far_kept++;
-                }
+                if (kept) { far_kept++; }
             }
         }
         printf ("[info] pose %d: clip-inside=%d false-excluded=%d far-outside=%d far-kept=%d\n", pose, inside_clip,
@@ -118,9 +108,7 @@ int main (void) {
             fail = 1;
         }
     }
-    if (!fail) {
-        printf ("[PASS] frustum planes agree with clip space; no false exclusion\n");
-    }
+    if (!fail) { printf ("[PASS] frustum planes agree with clip space; no false exclusion\n"); }
     return fail;
 }
 #endif /* mpe_frustum_test */

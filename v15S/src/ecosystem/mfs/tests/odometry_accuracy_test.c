@@ -19,8 +19,7 @@ int main (void) {
     if (rc != 0) {
         printf ("[FAIL] could not create robot\n");
         return 1;
-    }
-    const float dt = 1.0f / 60.0f;
+    } const float dt = 1.0f / 60.0f;
     int fail = 0;
     /* Phase 0: Let robot settle for 120 ticks */
     for (int t = 0; t < 120; t++) {
@@ -61,8 +60,7 @@ int main (void) {
     if (physics_dist < 0.2f) {
         printf ("[FAIL] robot barely moved (%.4f m)\n", physics_dist);
         return 1;
-    }
-    printf ("[PASS] robot moved %.4f m\n", physics_dist);
+    } printf ("[PASS] robot moved %.4f m\n", physics_dist);
     /* Odometry should track physics within 30% error */
     float odom_dist = sqrtf (robot.odom_z * robot.odom_z + robot.odom_x * robot.odom_x);
     float dist_error = fabsf (odom_dist - physics_dist) / (physics_dist + 0.001f);
@@ -70,8 +68,7 @@ int main (void) {
     if (dist_error > 0.3f) {
         printf ("[FAIL] odometry drift too large (%.1f%%)\n", dist_error * 100.0f);
         return 1;
-    }
-    printf ("[PASS] odometry tracks physics (error=%.1f%%)\n", dist_error * 100.0f);
+    } printf ("[PASS] odometry tracks physics (error=%.1f%%)\n", dist_error * 100.0f);
     /* Phase 2: Strafe test — verify odometry X sign matches physics X */
     printf ("[info] Phase 2: strafe test\n");
     robot.odom_x = robot.odom_z = robot.odom_theta = 0.0f;
@@ -83,8 +80,7 @@ int main (void) {
         drivetrain_mecanum (&robot, 0.0f, 1.0f, 0.0f);
         drivetrain_update (&world, &robot, dt);
         physics_world_step (&world, dt);
-    }
-    end_x = world.bodies [robot.chassis_body].position.x;
+    } end_x = world.bodies [robot.chassis_body].position.x;
     float strafe_dx = end_x - start_x;
     printf ("[info] strafe: physics dx=%.4f odometry dx=%.4f\n", strafe_dx, robot.odom_x);
     /* FIX-AUDIT: old minima gate silently skipped when strafe was small.
@@ -96,8 +92,7 @@ int main (void) {
     if ((strafe_dx > 0 && robot.odom_x < 0) || (strafe_dx < 0 && robot.odom_x > 0)) {
         printf ("[FAIL] odometry strafe sign disagrees with physics\n");
         return 1;
-    }
-    printf ("[PASS] odometry strafe sign matches physics\n");
+    } printf ("[PASS] odometry strafe sign matches physics\n");
     printf ("[PASS] odometry accuracy test complete\n");
     physics_world_cleanup (&world);
     return 0;

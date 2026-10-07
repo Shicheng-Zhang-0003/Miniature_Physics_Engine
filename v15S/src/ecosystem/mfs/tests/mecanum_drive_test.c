@@ -19,14 +19,12 @@ int main (void) {
         world.bodies [f].friction_static = 1.0f;
         world.bodies [f].friction_kinetic = 0.8f;
         world.bodies [f].restitution = 0.0f;
-    }
-    ftc_robot robot;
+    } ftc_robot robot;
     int rc = ftc_robot_create (&world, &robot, 0.0f, ftc_robot_rest_height (), 0.0f, MOTOR_GB_5203_26_9);
     if (rc != 0) {
         printf ("[FAIL] could not create robot\n");
         return 1;
-    }
-    float start_x, start_y, start_z;
+    } float start_x, start_y, start_z;
     ftc_robot_get_position (&world, &robot, &start_x, &start_y, &start_z);
     const float dt = 1.0f / 60.0f;
     int fail = 0;
@@ -44,9 +42,7 @@ int main (void) {
                 break;
             }
         }
-        if (fail) {
-            break;
-        }
+        if (fail) { break; }
     }
     if (!fail) {
         float end_x, end_y, end_z;
@@ -62,11 +58,8 @@ int main (void) {
         if (lateral_displacement < 0.3f) {
             printf ("[FAIL] robot did not strafe far enough in +X (dx=%.4f, expected >0.3)\n", dx);
             fail = 1;
-        } else {
-            printf ("[PASS] robot strafed in +X on emergent roller contacts (dx=%.4f)\n", dx);
-        }
-    }
-    physics_world_cleanup (&world);
+        } else { printf ("[PASS] robot strafed in +X on emergent roller contacts (dx=%.4f)\n", dx); }
+    } physics_world_cleanup (&world);
     return fail;
 }
 #endif /* MPE_MECANUM_DRIVE_TEST */

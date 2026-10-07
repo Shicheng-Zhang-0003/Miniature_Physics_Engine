@@ -18,8 +18,7 @@ int main (void) {
         printf ("[FAIL] could not create floor\n");
         physics_world_cleanup (&world);
         return 1;
-    }
-    world.bodies [floor].restitution = 0.0f;
+    } world.bodies [floor].restitution = 0.0f;
     world.bodies [floor].friction_static = 0.8f;
     world.bodies [floor].friction_kinetic = g_cfg.world.floor_friction_k;
     /* Cylinder wheel resting on a real frictional floor. Spawn slightly above
@@ -29,8 +28,7 @@ int main (void) {
         printf ("[FAIL] could not create wheel\n");
         physics_world_cleanup (&world);
         return 1;
-    }
-    const float dt = 1.0f / 60.0f;
+    } const float dt = 1.0f / 60.0f;
     /* TRUTH: torque sized INSIDE the traction envelope. Max traction torque
      * is mu_k*N*r = 0.1*4.905*0.05 = 0.0245 N·m (kinetic floor friction
      * 0.1, weight 0.5 kg, radius 0.05 m). Above it traction saturates and
@@ -54,15 +52,13 @@ int main (void) {
     /* Let it settle for 1 second before applying drive torque */
     for (int t = 0; t < 60; t++) {
         physics_world_step (&world, dt);
-    }
-    float start_z = world.bodies [w].position.z;
+    } float start_z = world.bodies [w].position.z;
     /* Apply torque for 3 seconds */
     for (int t = 0; t < 180; t++) {
         rigidbody_wake (&world.bodies [w]);
         world.bodies [w].torque_accumulator.x += drive_torque;
         physics_world_step (&world, dt);
-    }
-    float dz = world.bodies [w].position.z - start_z;
+    } float dz = world.bodies [w].position.z - start_z;
     float vz = world.bodies [w].velocity.z;
     float wx = world.bodies [w].angular_velocity.x;
     float y = world.bodies [w].position.y;
@@ -103,14 +99,12 @@ int main (void) {
         printf ("[FAIL] translation opposes spin (vz=%.4f, wx=%.4f) — wrong propulsion direction\n", vz, wx);
         physics_world_cleanup (&world);
         return 1;
-    }
-    float coupling = fabsf (vz) / (fabsf (expected_vz) + 1e-6f);
+    } float coupling = fabsf (vz) / (fabsf (expected_vz) + 1e-6f);
     if (coupling < 0.70f || coupling > 1.10f) {
         printf ("[FAIL] unphysical slip (vz/wr=%.3f, need 0.70..1.10)\n", coupling);
         physics_world_cleanup (&world);
         return 1;
-    }
-    printf ("[PASS] grounded wheel rolled %.4f m via real floor friction\n", dz);
+    } printf ("[PASS] grounded wheel rolled %.4f m via real floor friction\n", dz);
     physics_world_cleanup (&world);
     return 0;
 }

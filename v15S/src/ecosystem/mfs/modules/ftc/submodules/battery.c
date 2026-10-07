@@ -3,9 +3,7 @@
 #include <math.h>
 #include <stdio.h>
 void battery_init (battery *b) {
-    if (!b) {
-        return;
-    }
+    if (!b) { return; }
     b -> fuse_heat = 0.0f;
     b -> nominal_voltage = 12.8f;
     /* FIX-AUDIT-DESPOT: was 0.015 ohm (LiPo-class, and the header still said
@@ -33,12 +31,8 @@ float battery_get_voltage (const battery *b, float total_current_draw) {
     /* FIX-AUDIT: OCV was linear in SoC (6.4V at 50% - non-physical).
      * LiPo OCV is flat ~12.4-12.8V then cliff. Quadratic shoulder. */
     float soc = b -> charge_fraction;
-    if (soc < 0.0f) {
-        soc = 0.0f;
-    }
-    if (soc > 1.0f) {
-        soc = 1.0f;
-    }
+    if (soc < 0.0f) { soc = 0.0f; }
+    if (soc > 1.0f) { soc = 1.0f; }
     /* PHYSICS-FIX: NiMH 10-cell swing is ~4 V fresh->cutoff (14 V fresh,
      * 12 V nominal, ~10 V cutoff), not 0.8 V. The old 0.8 V shoulder kept
      * a dead pack at 12.0 V OCV, hiding brownout in long runs. Floored at
@@ -47,18 +41,12 @@ float battery_get_voltage (const battery *b, float total_current_draw) {
      * fit, not a measured OCV table — labelled as such so nobody cites it
      * as cell data. */
     float open_circuit = b -> nominal_voltage - 4.0f * (1.0f - soc) * (1.0f - soc);
-    if (open_circuit < MPE_BATTERY_OCV_FLOOR_V) {
-        open_circuit = MPE_BATTERY_OCV_FLOOR_V;
-    }
+    if (open_circuit < MPE_BATTERY_OCV_FLOOR_V) { open_circuit = MPE_BATTERY_OCV_FLOOR_V; }
     /* Tripped PTC passes brownout voltage, not zero (resettable fuse). */
-    if (b -> fuse_heat >= 1.0f) {
-        return 1.2f;
-    }
+    if (b -> fuse_heat >= 1.0f) { return 1.2f; }
     float sag = b -> internal_resistance * total_current_draw;
     float terminal = open_circuit - sag;
-    if (terminal < 0.0f) {
-        terminal = 0.0f;
-    }
+    if (terminal < 0.0f) { terminal = 0.0f; }
     return terminal;
 }
 void battery_fuse_step (battery *b, float total_current_draw, float dt) {
@@ -89,9 +77,7 @@ void battery_reset_fuse (battery *b) {
         b -> fuse_heat = 0.0f;
 }
 void battery_drain (battery *b, float total_current_draw, float dt) {
-    if ((!b) || (dt <= 0.0f)) {
-        return;
-    }
+    if ((!b) || (dt <= 0.0f)) { return; }
     /* DESPOT-FIX: NaN current drained SoC to NaN and bricked the pack for the
      * run; negative spikes over-charged past physics. Reject non-finite,
      * allow negative (regen, credited upstream at 50%) but keep SoC in
@@ -102,10 +88,6 @@ void battery_drain (battery *b, float total_current_draw, float dt) {
         b -> charge_fraction = 1.0f;
     float amp_hours_used = (total_current_draw * dt) / 3600.0f;
     b -> charge_fraction -= amp_hours_used / b -> capacity_ah;
-    if (b -> charge_fraction < 0.0f) {
-        b -> charge_fraction = 0.0f;
-    }
-    if (b -> charge_fraction > 1.0f) {
-        b -> charge_fraction = 1.0f;
-    }
+    if (b -> charge_fraction < 0.0f) { b -> charge_fraction = 0.0f; }
+    if (b -> charge_fraction > 1.0f) { b -> charge_fraction = 1.0f; }
 }

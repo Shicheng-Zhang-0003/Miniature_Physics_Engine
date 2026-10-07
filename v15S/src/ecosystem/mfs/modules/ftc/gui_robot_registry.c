@@ -18,34 +18,24 @@ gui_robot_proxy mfs_gui_proxies [MFS_MAX_GUI_ROBOTS];
 #define MFS_NOSE_OFFSET_Z -0.28f
 #define MFS_NOSE_RADIUS 0.03f
 int gui_robot_spawn (float x, float y, float z, motor_preset_id preset) {
-    if (mfs_gui_robot_count >= MFS_MAX_GUI_ROBOTS) {
-        return -1;
-    }
+    if (mfs_gui_robot_count >= MFS_MAX_GUI_ROBOTS) { return -1; }
     /* DESPOT-FIX: old code bound the primary world once and never re-checked —
  * if the host swapped primary worlds, robots spawned into the stale world
  * while rendering read the new one (silent split-brain). Pin to the first
  * bound world and refuse cross-world spawns loudly instead of mixing. */
     physics_world *primary = physics_world_get_primary ();
-    if (!mfs_gui_robot_world) {
-        mfs_gui_robot_world = primary;
-    } else if (primary && primary != mfs_gui_robot_world) {
+    if (!mfs_gui_robot_world) { mfs_gui_robot_world = primary; } else if (primary && primary != mfs_gui_robot_world) {
         fprintf (stderr,
                  "gui_robot_registry: already bound to a different primary world; refusing spawn (clear first)\n");
         return -1;
     }
-    if (!mfs_gui_robot_world) {
-        return -1;
-    }
+    if (!mfs_gui_robot_world) { return -1; }
     /* FIX 105: The legacy GUI never initializes the physics_world.
 Its bodies array is NULL. We MUST init before adding bodies. */
-    if (!mfs_gui_robot_world -> bodies) {
-        physics_world_init (mfs_gui_robot_world);
-    }
+    if (!mfs_gui_robot_world -> bodies) { physics_world_init (mfs_gui_robot_world); }
     ftc_robot *robot = &mfs_gui_robots [mfs_gui_robot_count];
     int rc = ftc_robot_create (mfs_gui_robot_world, robot, x, y, z, preset);
-    if (rc != 0) {
-        return -1;
-    }
+    if (rc != 0) { return -1; }
     int idx = mfs_gui_robot_count;
     /* --- Create visual proxies in obj_per_scene --- */
     gui_robot_proxy *proxy = &mfs_gui_proxies [idx];
@@ -101,8 +91,7 @@ Its bodies array is NULL. We MUST init before adding bodies. */
                 proxy -> wheel_proxies [i] = proxy_idx;
             }
         }
-    }
-    mfs_gui_robot_count++;
+    } mfs_gui_robot_count++;
     return idx;
 } /* gui_robot_tick OWNS stepping mfs_gui_robot_world (fixed 60 Hz
  * accumulator). Do NOT step that world from the engine loop as well:
@@ -112,26 +101,20 @@ Its bodies array is NULL. We MUST init before adding bodies. */
  * stale time debt instead of burst-stepping freshly spawned robots. */
 static int s_tick_accumulator_reset = 0;
 void gui_robot_tick (float dt) {
-    if ((mfs_gui_robot_count <= 0) || (!mfs_gui_robot_world)) {
-        return;
-    }
+    if ((mfs_gui_robot_count <= 0) || (!mfs_gui_robot_world)) { return; }
     /* MFS_122: Fixed-timestep accumulator for deterministic robot physics. */
     static float robot_accumulator = 0.0f;
     if (s_tick_accumulator_reset) {
         s_tick_accumulator_reset = 0;
         robot_accumulator = 0.0f;
-    }
-    const float fixed_robot_dt = 1.0f / 60.0f;
+    } const float fixed_robot_dt = 1.0f / 60.0f;
     const float max_frame_time = fixed_robot_dt * 5.0f;
     robot_accumulator += dt;
-    if (robot_accumulator > max_frame_time) {
-        robot_accumulator = max_frame_time;
-    }
+    if (robot_accumulator > max_frame_time) { robot_accumulator = max_frame_time; }
     while (robot_accumulator >= fixed_robot_dt) {
         for (int i = 0; i < mfs_gui_robot_count; i++) {
             drivetrain_update (mfs_gui_robot_world, &mfs_gui_robots [i], fixed_robot_dt);
-        }
-        physics_world_step (mfs_gui_robot_world, fixed_robot_dt);
+        } physics_world_step (mfs_gui_robot_world, fixed_robot_dt);
         robot_accumulator -= fixed_robot_dt;
     }
     /* --- Sync visual proxies from physics world --- */
@@ -177,29 +160,20 @@ void gui_robot_tick (float dt) {
     }
 }
 void gui_robot_apply_drive (float forward, float strafe, float rotate) {
-    if ((mfs_gui_robot_count <= 0) || (!mfs_gui_robot_world)) {
-        return;
-    }
+    if ((mfs_gui_robot_count <= 0) || (!mfs_gui_robot_world)) { return; }
     for (int i = 0; i < mfs_gui_robot_count; i++) {
         /* MFS_164_DRIVE_DISPATCH: dispatch based on drivetrain type */
-        if (mfs_gui_robots [i].drivetrain_type == FTC_DRIVETRAIN_TANK) {
-            drivetrain_tank (&mfs_gui_robots [i], forward - rotate, forward + rotate);
-        } else {
-            drivetrain_mecanum (&mfs_gui_robots [i], forward, strafe, rotate);
-        }
+        if (mfs_gui_robots [i].drivetrain_type == FTC_DRIVETRAIN_TANK) { drivetrain_tank (&mfs_gui_robots [i], forward - rotate, forward + rotate); } else { drivetrain_mecanum (&mfs_gui_robots [i], forward, strafe, rotate); }
     }
 } /* Release a registry slot. Bodies persist until scene_clear (no
  * mid-array removal exists); proxies are already non-colliding so the
  * leftovers are render-only. */
 void gui_robot_despawn (int index) {
-    if ((index < 0) || (index >= mfs_gui_robot_count)) {
-        return;
-    }
+    if ((index < 0) || (index >= mfs_gui_robot_count)) { return; }
     for (int i = index; i + 1 < mfs_gui_robot_count; i++) {
         mfs_gui_robots [i] = mfs_gui_robots [i + 1];
         mfs_gui_proxies [i] = mfs_gui_proxies [i + 1];
-    }
-    mfs_gui_robot_count--;
+    } mfs_gui_robot_count--;
 }
 void gui_robot_clear (void) {
     mfs_gui_robot_count = 0;
@@ -211,8 +185,6 @@ void gui_robot_clear (void) {
 }
 int gui_robot_get_count (void) {return mfs_gui_robot_count;}
 ftc_robot *gui_robot_get (int index) {
-    if ((index < 0) || (index >= mfs_gui_robot_count)) {
-        return NULL;
-    }
+    if ((index < 0) || (index >= mfs_gui_robot_count)) { return NULL; }
     return &mfs_gui_robots [index];
 }

@@ -48,11 +48,8 @@ int mpe_t_stack (void) {
         cube [i] =
             physics_world_add_cube (&w, (vector3) {0.0f, h + (float) i * 2.0f * h, 0.0f}, (vector3) {h, h, h}, 1.0f);
         MPE_CHECK (&t, cube [i] >= 0);
-    }
-    const float dt = 1.0f / 60.0f;
-    if (!mpe_step (&w, 600, dt)) {
-        t.failures++;
-    }
+    } const float dt = 1.0f / 60.0f;
+    if (!mpe_step (&w, 600, dt)) { t.failures++; }
     float top_drift = sqrtf (w.bodies [cube [5]].position.x * w.bodies [cube [5]].position.x +
                              w.bodies [cube [5]].position.z * w.bodies [cube [5]].position.z);
     MPE_INFO ("top drift=%.4f (limit 0.05)", top_drift);
@@ -64,9 +61,7 @@ int mpe_t_stack (void) {
         float av = mpe_vlen (w.bodies [cube [i]].angular_velocity);
         MPE_CHECK (&t, lv <= 0.05f && av <= 0.05f);
     }
-    if (t.failures == 0) {
-        printf ("[PASS] tower stands\n");
-    }
+    if (t.failures == 0) { printf ("[PASS] tower stands\n"); }
     physics_world_cleanup (&w);
     mpe_test_end (&t);
     return t.failures;
@@ -98,9 +93,7 @@ int mpe_t_driven_wheel (void) {
         float traction_limit = g_cfg.world.floor_friction_k * (0.5f * 9.81f) * 0.05f;
         MPE_CHECK (&t, drive_torque < traction_limit);
     }
-    if (!mpe_step (&w, 60, dt)) {
-        t.failures++;
-    }
+    if (!mpe_step (&w, 60, dt)) { t.failures++; }
     float start_z = w.bodies [wh].position.z;
     for (int k = 0; k < 180; k++) {
         rigidbody_wake (&w.bodies [wh]);
@@ -111,8 +104,7 @@ int mpe_t_driven_wheel (void) {
             t.failures++;
             break;
         }
-    }
-    float dz = w.bodies [wh].position.z - start_z;
+    } float dz = w.bodies [wh].position.z - start_z;
     float vz = w.bodies [wh].velocity.z;
     float wx = w.bodies [wh].angular_velocity.x;
     float y = w.bodies [wh].position.y;
@@ -127,9 +119,7 @@ int mpe_t_driven_wheel (void) {
     MPE_CHECK (&t, (vz * wx) >= 0.0f);
     float coupling = fabsf (vz) / (fabsf (expected_vz) + 1e-6f);
     MPE_CHECK (&t, coupling >= 0.70f && coupling <= 1.10f);
-    if (t.failures == 0) {
-        printf ("[PASS] grounded wheel rolled %.4f m via real floor friction\n", dz);
-    }
+    if (t.failures == 0) { printf ("[PASS] grounded wheel rolled %.4f m via real floor friction\n", dz); }
     physics_world_cleanup (&w);
     mpe_test_end (&t);
     return t.failures;
@@ -143,60 +133,24 @@ static int mpe_vec4_eq (vector4 a, vector4 b) {
            isfinite (a.y) && isfinite (a.z) && isfinite (b.w) && isfinite (b.x) && isfinite (b.y) && isfinite (b.z);
 }
 static int mpe_bodies_equal (const rigidbody *a, const rigidbody *b) {
-    if (!mpe_vec3_eq (a -> position, b -> position)) {
-        return 0;
-    }
-    if (!mpe_vec3_eq (a -> velocity, b -> velocity)) {
-        return 0;
-    }
-    if (!mpe_vec3_eq (a -> acceleration, b -> acceleration)) {
-        return 0;
-    }
-    if (!mpe_vec4_eq (a -> orientation, b -> orientation)) {
-        return 0;
-    }
-    if (!mpe_vec3_eq (a -> angular_velocity, b -> angular_velocity)) {
-        return 0;
-    }
-    if (!mpe_vec3_eq (a -> angular_acceleration, b -> angular_acceleration)) {
-        return 0;
-    }
-    if (!mpe_vec3_eq (a -> force_accumulator, b -> force_accumulator)) {
-        return 0;
-    }
-    if (!mpe_vec3_eq (a -> torque_accumulator, b -> torque_accumulator)) {
-        return 0;
-    }
-    if (a -> mass != b -> mass || a -> inverse_mass != b -> inverse_mass) {
-        return 0;
-    }
-    if (a -> friction_static != b -> friction_static || a -> friction_kinetic != b -> friction_kinetic) {
-        return 0;
-    }
-    if (a -> restitution != b -> restitution) {
-        return 0;
-    }
-    if (a -> radius != b -> radius || a -> cylinder_half_length != b -> cylinder_half_length) {
-        return 0;
-    }
-    if (!mpe_vec3_eq (a -> half_extensions, b -> half_extensions)) {
-        return 0;
-    }
-    if (!mpe_vec3_eq (a -> cached_axes [0], b -> cached_axes [0])) {
-        return 0;
-    }
-    if (!mpe_vec3_eq (a -> cached_axes [1], b -> cached_axes [1])) {
-        return 0;
-    }
-    if (!mpe_vec3_eq (a -> cached_axes [2], b -> cached_axes [2])) {
-        return 0;
-    }
-    if (a -> object_id != b -> object_id || a -> object_generation != b -> object_generation) {
-        return 0;
-    }
-    if (a -> type != b -> type || a -> custom_shape != b -> custom_shape) {
-        return 0;
-    }
+    if (!mpe_vec3_eq (a -> position, b -> position)) { return 0; }
+    if (!mpe_vec3_eq (a -> velocity, b -> velocity)) { return 0; }
+    if (!mpe_vec3_eq (a -> acceleration, b -> acceleration)) { return 0; }
+    if (!mpe_vec4_eq (a -> orientation, b -> orientation)) { return 0; }
+    if (!mpe_vec3_eq (a -> angular_velocity, b -> angular_velocity)) { return 0; }
+    if (!mpe_vec3_eq (a -> angular_acceleration, b -> angular_acceleration)) { return 0; }
+    if (!mpe_vec3_eq (a -> force_accumulator, b -> force_accumulator)) { return 0; }
+    if (!mpe_vec3_eq (a -> torque_accumulator, b -> torque_accumulator)) { return 0; }
+    if (a -> mass != b -> mass || a -> inverse_mass != b -> inverse_mass) { return 0; }
+    if (a -> friction_static != b -> friction_static || a -> friction_kinetic != b -> friction_kinetic) { return 0; }
+    if (a -> restitution != b -> restitution) { return 0; }
+    if (a -> radius != b -> radius || a -> cylinder_half_length != b -> cylinder_half_length) { return 0; }
+    if (!mpe_vec3_eq (a -> half_extensions, b -> half_extensions)) { return 0; }
+    if (!mpe_vec3_eq (a -> cached_axes [0], b -> cached_axes [0])) { return 0; }
+    if (!mpe_vec3_eq (a -> cached_axes [1], b -> cached_axes [1])) { return 0; }
+    if (!mpe_vec3_eq (a -> cached_axes [2], b -> cached_axes [2])) { return 0; }
+    if (a -> object_id != b -> object_id || a -> object_generation != b -> object_generation) { return 0; }
+    if (a -> type != b -> type || a -> custom_shape != b -> custom_shape) { return 0; }
     return (a -> is_sleeping == b -> is_sleeping) && (a -> sleep_timer == b -> sleep_timer) &&
            (a -> static_state == b -> static_state) && (a -> kinematic == b -> kinematic);
 }
@@ -230,20 +184,14 @@ int mpe_t_determinism (void) {
     for (int k = 0; k < 600; k++) {
         physics_world_step (&w1, dt);
         physics_world_step (&w2, dt);
-    }
-    MPE_CHECK (&t, w1.body_count == w2.body_count);
+    } MPE_CHECK (&t, w1.body_count == w2.body_count);
     for (int i = 0; i < w1.body_count; i++) {
         if (!mpe_bodies_equal (&w1.bodies [i], &w2.bodies [i])) {
             printf ("[FAIL] body %d diverged bitwise\n", i);
             t.failures++;
-        } else {
-            t.checks++;
-        }
-    }
-    MPE_CHECK (&t, w1.world_contact_cache_count == w2.world_contact_cache_count);
-    if (t.failures == 0) {
-        printf ("[PASS] determinism: 600 ticks bitwise identical across twin worlds\n");
-    }
+        } else { t.checks++; }
+    } MPE_CHECK (&t, w1.world_contact_cache_count == w2.world_contact_cache_count);
+    if (t.failures == 0) { printf ("[PASS] determinism: 600 ticks bitwise identical across twin worlds\n"); }
     physics_world_cleanup (&w1);
     physics_world_cleanup (&w2);
     mpe_test_end (&t);
@@ -302,8 +250,7 @@ static void mpe_settle_scene (physics_world *w) {
         w -> bodies [f].friction_static = 0.8f;
         w -> bodies [f].friction_kinetic = 0.7f;
         w -> bodies [f].restitution = 0.0f;
-    }
-    mpe_pile_bodies (w);
+    } mpe_pile_bodies (w);
 } /* f11 torture scene.
  *
  * DESPOT-2026-10-03: THIS HAD NO FLOOR, AND THAT MADE IT A SCENARIO THE GUI
@@ -333,8 +280,7 @@ static void mpe_torture_scene (physics_world *w) {
         w -> bodies [f].friction_static = 0.8f;
         w -> bodies [f].friction_kinetic = 0.7f;
         w -> bodies [f].restitution = 0.0f;
-    }
-    mpe_pile_bodies (w);
+    } mpe_pile_bodies (w);
 }
 int mpe_t_f10_long_run (void) {
     mpe_test_t t;
@@ -388,25 +334,15 @@ int mpe_t_f10_long_run (void) {
                     fabsf (rb -> position.z) > 250.5f) {
                     fallen_ticks++;
                 }
-            }
-            float l = mpe_vlen (rb -> velocity);
+            } float l = mpe_vlen (rb -> velocity);
             float a = mpe_vlen (rb -> angular_velocity);
-            if (l > mx_lin) {
-                mx_lin = l;
-            }
-            if (a > mx_ang) {
-                mx_ang = a;
-            }
-        }
-        fin_lin = mx_lin;
+            if (l > mx_lin) { mx_lin = l; }
+            if (a > mx_ang) { mx_ang = a; }
+        } fin_lin = mx_lin;
         fin_ang = mx_ang;
         if (k >= F10_TRANSIENT) {
-            if (mx_lin > run_max_lin) {
-                run_max_lin = mx_lin;
-            }
-            if (mx_ang > run_max_ang) {
-                run_max_ang = mx_ang;
-            }
+            if (mx_lin > run_max_lin) { run_max_lin = mx_lin; }
+            if (mx_ang > run_max_ang) { run_max_ang = mx_ang; }
         }
     }
     MPE_INFO ("final lin=%.5f ang=%.5f runmax lin=%.5f ang=%.5f nan=%ld fallen=%ld", fin_lin, fin_ang, run_max_lin,
@@ -415,12 +351,9 @@ int mpe_t_f10_long_run (void) {
     for (int i = 0; i < w.body_count; i++) {
         if (!w.bodies [i].static_state) {
             dynamic_n++;
-            if (w.bodies [i].is_sleeping) {
-                asleep++;
-            }
+            if (w.bodies [i].is_sleeping) { asleep++; }
         }
-    }
-    MPE_INFO ("asleep=%d/%d", asleep, dynamic_n);
+    } MPE_INFO ("asleep=%d/%d", asleep, dynamic_n);
     MPE_CHECK (&t, w.body_count > 0 && nan_ticks == 0 && fallen_ticks == 0);
     MPE_CHECK (&t, fin_lin < 0.25f && fin_ang < 0.5f);
     MPE_CHECK (&t, run_max_lin < 2.0f && run_max_ang < 2.0f);
@@ -477,8 +410,7 @@ int mpe_t_f10_long_run (void) {
                 if (fabsf (rb -> position.x) > 250.0f || fabsf (rb -> position.z) > 250.0f)
                     fell++;
             }
-        }
-        MPE_INFO ("safety net OFF: fell=%ld nan=%ld lowest_centre_y=%.4f (slab top y=0)", fell, nan2, lowest);
+        } MPE_INFO ("safety net OFF: fell=%ld nan=%ld lowest_centre_y=%.4f (slab top y=0)", fell, nan2, lowest);
         MPE_CHECK (&t, nan2 == 0);
         MPE_CHECK (&t, fell == 0);
         physics_world_cleanup (&w2);
@@ -486,8 +418,7 @@ int mpe_t_f10_long_run (void) {
     if (t.failures == 0) {
         printf ("[PASS] long-run 10-stack+pile settles and stays calm; and with "
                 "the world-edge safety net OFF nothing falls through the floor\n");
-    }
-    mpe_test_end (&t);
+    } mpe_test_end (&t);
     return t.failures;
 }
 int mpe_t_sleep_contact_wake (void) {
@@ -524,36 +455,22 @@ int mpe_t_sleep_contact_wake (void) {
             printf ("[FAIL] NaN at tick %d\n", k);
             t.failures++;
             break;
-        }
-        float gap = (s -> position.x - 0.5f) - (p -> position.x + 0.5f);
-        if (touch_tick < 0 && gap <= g_cfg.solver.penetration_slop) {
-            touch_tick = k;
-        }
-        if (wake_tick < 0 && !s -> is_sleeping) {
-            wake_tick = k;
-        }
-        if (control_wake_tick < 0 && !c -> is_sleeping) {
-            control_wake_tick = k;
-        }
-    }
-    float end_gap = (w.bodies [sleeper].position.x - 0.5f) - (w.bodies [pusher].position.x + 0.5f);
+        } float gap = (s -> position.x - 0.5f) - (p -> position.x + 0.5f);
+        if (touch_tick < 0 && gap <= g_cfg.solver.penetration_slop) { touch_tick = k; }
+        if (wake_tick < 0 && !s -> is_sleeping) { wake_tick = k; }
+        if (control_wake_tick < 0 && !c -> is_sleeping) { control_wake_tick = k; }
+    } float end_gap = (w.bodies [sleeper].position.x - 0.5f) - (w.bodies [pusher].position.x + 0.5f);
     MPE_INFO ("touch=%d wake=%d control_wake=%d sleeper_x=%.4f pusher_x=%.4f control_y=%.4f end_gap=%.4f", touch_tick,
               wake_tick, control_wake_tick, w.bodies [sleeper].position.x, w.bodies [pusher].position.x,
               w.bodies [control].position.y, end_gap);
     MPE_CHECK (&t, touch_tick >= 0);
     MPE_CHECK (&t, wake_tick >= 0);
-    if (touch_tick >= 0 && wake_tick >= 0) {
-        MPE_CHECK (&t, wake_tick - touch_tick <= 5);
-    }
+    if (touch_tick >= 0 && wake_tick >= 0) { MPE_CHECK (&t, wake_tick - touch_tick <= 5); }
     MPE_CHECK (&t, control_wake_tick < 0);
     MPE_CHECK (&t, w.bodies [control].position.y >= 0.4f && w.bodies [control].position.y <= 0.6f);
-    if (wake_tick >= 0) {
-        MPE_CHECK (&t, w.bodies [sleeper].position.x >= 2.1f);
-    }
+    if (wake_tick >= 0) { MPE_CHECK (&t, w.bodies [sleeper].position.x >= 2.1f); }
     MPE_CHECK (&t, end_gap >= -0.02f);
-    if (t.failures == 0) {
-        printf ("[PASS] sleep contact-wake truth holds\n");
-    }
+    if (t.failures == 0) { printf ("[PASS] sleep contact-wake truth holds\n"); }
     physics_world_cleanup (&w);
     mpe_test_end (&t);
     return t.failures;
@@ -578,23 +495,15 @@ static float mpe_worst_cube_overlap (physics_world *w, int first, int count) {
         for (int j = i + 1; j < count; j++) {
             const rigidbody *A = &w -> bodies [first + i];
             const rigidbody *B = &w -> bodies [first + j];
-            if (A -> static_state && B -> static_state) {
-                continue;
-            }
+            if (A -> static_state && B -> static_state) { continue; }
             memset (&cd, 0, sizeof cd);
-            if (!collision_dual_cube (&w -> bodies [first + i], &w -> bodies [first + j], &cd, &g_cfg)) {
-                continue;
-            }
+            if (!collision_dual_cube (&w -> bodies [first + i], &w -> bodies [first + j], &cd, &g_cfg)) { continue; }
             for (int c = 0; c < cd.contact_count; c++) {
-                if (cd.contacts [c].penetration > worst) {
-                    worst = cd.contacts [c].penetration;
-                }
+                if (cd.contacts [c].penetration > worst) { worst = cd.contacts [c].penetration; }
             }
         }
-    }
-    return worst;
-}
-static uint32_t mpe_rng = 0xC0FFEEu;
+    } return worst;
+} static uint32_t mpe_rng = 0xC0FFEEu;
 static uint32_t mpe_next (void) {
     mpe_rng ^= mpe_rng << 13;
     mpe_rng ^= mpe_rng >> 17;
@@ -617,39 +526,21 @@ int mpe_t_f11_torture (void) {
             int range = (int) (g_registry [i].max - g_registry [i].min);
             *(int *) g_registry [i].storage =
                 (int) g_registry [i].min + (int) (mpe_next () % (uint32_t) (range >= 0 ? range + 1 : 1));
-        } else if (g_registry [i].type == p_bool) {
-            *(bool *) g_registry [i].storage = (mpe_next () & 1u) != 0;
-        }
+        } else if (g_registry [i].type == p_bool) { *(bool *) g_registry [i].storage = (mpe_next () & 1u) != 0; }
     }
-    if (g_cfg.world.gravity > -1.0f) {
-        g_cfg.world.gravity = -1.0f - ((float) (mpe_next () >> 8) / 16777216.0f) * 16.0f;
-    } else if (g_cfg.world.gravity < -17.0f) {
-        g_cfg.world.gravity = -17.0f;
-    }
-    if (g_cfg.timestep.solver_iterations < 96) {
-        g_cfg.timestep.solver_iterations = 96;
-    }
+    if (g_cfg.world.gravity > -1.0f) { g_cfg.world.gravity = -1.0f - ((float) (mpe_next () >> 8) / 16777216.0f) * 16.0f; } else if (g_cfg.world.gravity < -17.0f) { g_cfg.world.gravity = -17.0f; }
+    if (g_cfg.timestep.solver_iterations < 96) { g_cfg.timestep.solver_iterations = 96; }
     /* DESPOT-2026-10-08: warm-start damping is an experiment knob (default
      * 0=cold proven). Torture randomizes the whole registry including it;
      * pin to 0 here to preserve the proven resolution envelope (like
      * iters>=96). Damped-seed experiments set it explicitly via temp
      * harnesses, never via torture. */
     g_cfg.solver.warm_start_damping = 0.0f;
-    if (g_cfg.solver.penetration_slop > 0.02f) {
-        g_cfg.solver.penetration_slop = 0.010f;
-    }
-    if (g_cfg.solver.bias_factor < 0.05f) {
-        g_cfg.solver.bias_factor = 0.10f;
-    }
-    if (g_cfg.depenetration.correction_factor < 0.1f) {
-        g_cfg.depenetration.correction_factor = 0.35f;
-    }
-    if (g_cfg.sleep.linear_thresh_sq > 0.01f) {
-        g_cfg.sleep.linear_thresh_sq = 0.0025f;
-    }
-    if (g_cfg.sleep.angular_thresh_sq > 0.01f) {
-        g_cfg.sleep.angular_thresh_sq = 0.0001f;
-    }
+    if (g_cfg.solver.penetration_slop > 0.02f) { g_cfg.solver.penetration_slop = 0.010f; }
+    if (g_cfg.solver.bias_factor < 0.05f) { g_cfg.solver.bias_factor = 0.10f; }
+    if (g_cfg.depenetration.correction_factor < 0.1f) { g_cfg.depenetration.correction_factor = 0.35f; }
+    if (g_cfg.sleep.linear_thresh_sq > 0.01f) { g_cfg.sleep.linear_thresh_sq = 0.0025f; }
+    if (g_cfg.sleep.angular_thresh_sq > 0.01f) { g_cfg.sleep.angular_thresh_sq = 0.0001f; }
     MPE_INFO ("torture: gravity=%.2f iters=%d slop=%.3f", g_cfg.world.gravity, g_cfg.timestep.solver_iterations,
               g_cfg.solver.penetration_slop);
     physics_world w;
@@ -674,8 +565,7 @@ int mpe_t_f11_torture (void) {
                 worst_overlap = o;
                 worst_overlap_tick = k;
             }
-        }
-        float mx_lin = 0.0f, mx_ang = 0.0f;
+        } float mx_lin = 0.0f, mx_ang = 0.0f;
         for (int i = 0; i < w.body_count; i++) {
             rigidbody *rb = &w.bodies [i];
             if (!isfinite (rb -> position.x) || !isfinite (rb -> position.y) || !isfinite (rb -> position.z) ||
@@ -713,17 +603,11 @@ int mpe_t_f11_torture (void) {
                     fabsf (rb -> position.z) > 250.5f) {
                     fallen_ticks++;
                 }
-            }
-            float l = mpe_vlen (rb -> velocity);
+            } float l = mpe_vlen (rb -> velocity);
             float a = mpe_vlen (rb -> angular_velocity);
-            if (l > mx_lin) {
-                mx_lin = l;
-            }
-            if (a > mx_ang) {
-                mx_ang = a;
-            }
-        }
-        end_lin = mx_lin;
+            if (l > mx_lin) { mx_lin = l; }
+            if (a > mx_ang) { mx_ang = a; }
+        } end_lin = mx_lin;
         end_ang = mx_ang;
     }
     MPE_INFO ("torture end speeds (reported, never gated): lin=%.3f ang=%.3f nan=%ld fallen=%ld", end_lin, end_ang,
@@ -784,9 +668,7 @@ int mpe_t_f11_torture (void) {
      * "nothing fell through the world" property is gated for real in
      * f10_long_run phase 2. */
     MPE_CHECK (&t, nan_ticks == 0);
-    if (t.failures == 0) {
-        printf ("[PASS] torture survived extremes without corruption\n");
-    }
+    if (t.failures == 0) { printf ("[PASS] torture survived extremes without corruption\n"); }
     physics_world_cleanup (&w);
     mpe_test_end (&t);
     return t.failures;
@@ -831,13 +713,9 @@ int mpe_t_scene_roundtrip (void) {
         MPE_CHECK_NEAR (&t, ra -> velocity.x, 1.0f, 1e-4f, "roundtrip-v");
         MPE_CHECK_NEAR (&t, ra -> restitution, 0.3f, 1e-5f, "roundtrip-e");
     }
-    if (rb2) {
-        MPE_CHECK_NEAR (&t, rb2 -> friction_static, 0.5f, 1e-5f, "roundtrip-mu");
-    }
+    if (rb2) { MPE_CHECK_NEAR (&t, rb2 -> friction_static, 0.5f, 1e-5f, "roundtrip-mu"); }
     remove (path);
-    if (t.failures == 0) {
-        printf ("[PASS] scene round-trip complete\n");
-    }
+    if (t.failures == 0) { printf ("[PASS] scene round-trip complete\n"); }
     physics_world_cleanup (w);
     mpe_test_end (&t);
     return t.failures;
@@ -895,27 +773,21 @@ int mpe_t_module (void) {
         int cap0 = W.body_capacity;
         for (int i = 0; i < cap0 + 4; i++) {
             physics_world_add_sphere (&W, 0.2f, 1.0f, (vector3) {(float) i, 5.0f, 0.0f});
-        }
-        MPE_CHECK (&t, W.body_capacity > cap0);
+        } MPE_CHECK (&t, W.body_capacity > cap0);
         uint32_t mid = W.bodies [W.body_count / 2].object_id;
         MPE_CHECK (&t, physics_world_index_by_id (&W, mid) >= 0);
         MPE_CHECK (&t, physics_world_index_by_id (&W, 0xFFFFFFu) < 0);
         physics_world_cleanup (&W);
-    }
-    det_fallback_reset ();
+    } det_fallback_reset ();
     {
         physics_world W;
         physics_world_init (&W);
         physics_world_add_sphere (&W, 0.5f, 1.0f, (vector3) {0.0f, 3.0f, 0.0f});
         for (int k = 0; k < 60; k++) {
             physics_world_step (&W, 1.0f / 60.0f);
-        }
-        physics_world_cleanup (&W);
-    }
-    MPE_CHECK (&t, det_fallback_pow_total () == 0 && det_fallback_trig_total () == 0);
-    if (t.failures == 0) {
-        printf ("[PASS] module system green\n");
-    }
+        } physics_world_cleanup (&W);
+    } MPE_CHECK (&t, det_fallback_pow_total () == 0 && det_fallback_trig_total () == 0);
+    if (t.failures == 0) { printf ("[PASS] module system green\n"); }
     physics_world_cleanup (&A);
     physics_world_cleanup (&B);
     mpe_test_end (&t);
@@ -968,11 +840,9 @@ int mpe_t_math3_inverse (void) {
                 double sum = 0.0;
                 for (int k = 0; k < 3; ++k) {
                     sum += (double) lower [row][k] * (double) lower [col][k];
-                }
-                candidate.matrix [row][col] = (float) (sum * (double) scale);
+                } candidate.matrix [row][col] = (float) (sum * (double) scale);
             }
-        }
-        math3 candidate_inverse = math3_inverse (candidate);
+        } math3 candidate_inverse = math3_inverse (candidate);
         math3 product = math3_multiplication (candidate, candidate_inverse);
         for (int row = 0; row < 3; ++row) {
             for (int col = 0; col < 3; ++col) {
@@ -992,9 +862,7 @@ int mpe_t_math3_inverse (void) {
     MPE_CHECK (&t, invalid_inverse.matrix [0][0] == 0.0f && invalid_inverse.matrix [1][1] == 0.0f &&
                        invalid_inverse.matrix [2][2] == 0.0f);
     MPE_INFO ("matrix inverse property sweep: 256 fixed-seed SPD matrices, exponent range [-24, 24]");
-    if (t.failures == 0) {
-        printf ("[PASS] matrix inverse analytic, scaled, singular-axis, and non-finite cases\n");
-    }
+    if (t.failures == 0) { printf ("[PASS] matrix inverse analytic, scaled, singular-axis, and non-finite cases\n"); }
     mpe_test_end (&t);
     return t.failures;
 } /* frustum: Gribb/Hartmann extraction culls outside, keeps inside. */
@@ -1009,14 +877,11 @@ int mpe_t_frustum (void) {
     float v [4] = {0};
     for (int r = 0; r < 4; r++) {
         v [r] = vp.matrix [0][r] * p.x + vp.matrix [1][r] * p.y + vp.matrix [2][r] * p.z + vp.matrix [3][r] * p.w;
-    }
-    MPE_CHECK (&t, fabsf (v [3]) > 1e-6f);
+    } MPE_CHECK (&t, fabsf (v [3]) > 1e-6f);
     float nx = v [0] / v [3], ny = v [1] / v [3], nz = v [2] / v [3];
     MPE_INFO ("ndc=(%.3f,%.3f,%.3f)", nx, ny, nz);
     MPE_CHECK (&t, fabsf (nx) <= 1.0f && fabsf (ny) <= 1.0f && nz >= -1.0f && nz <= 1.0f);
-    if (t.failures == 0) {
-        printf ("[PASS] frustum math culls correctly\n");
-    }
+    if (t.failures == 0) { printf ("[PASS] frustum math culls correctly\n"); }
     mpe_test_end (&t);
     return t.failures;
 } /* floor_collision_diag: cylinder drops 1m onto slab, settles at r, calms. */
@@ -1044,16 +909,10 @@ int mpe_t_floor_collision_diag (void) {
             printf ("[FAIL] non-finite state at tick %d\n", k);
             t.failures++;
             break;
-        }
-        float av = fabsf (w.bodies [cyl].velocity.y);
-        if (av > diag_fall) {
-            diag_fall = av;
-        }
-        if (mpe_body_in_contact (&w, cyl)) {
-            diag_contact = 1;
-        }
-    }
-    float fy = w.bodies [cyl].position.y;
+        } float av = fabsf (w.bodies [cyl].velocity.y);
+        if (av > diag_fall) { diag_fall = av; }
+        if (mpe_body_in_contact (&w, cyl)) { diag_contact = 1; }
+    } float fy = w.bodies [cyl].position.y;
     float fvy = w.bodies [cyl].velocity.y;
     MPE_INFO ("floor state y=%.4f vy=%.4f max_fall=%.3f ever_contact=%d (net OFF)", fy, fvy, diag_fall, diag_contact);
     MPE_CHECK (&t, isfinite (fy) && isfinite (fvy));
@@ -1062,9 +921,7 @@ int mpe_t_floor_collision_diag (void) {
     MPE_CHECK (&t, fabsf (fvy) <= 0.5f);
     MPE_CHECK (&t, diag_fall > 0.5f);
     MPE_CHECK (&t, diag_contact);
-    if (t.failures == 0) {
-        printf ("[PASS] floor contact holds and settles\n");
-    }
+    if (t.failures == 0) { printf ("[PASS] floor contact holds and settles\n"); }
     physics_world_cleanup (&w);
     mpe_test_end (&t);
     return t.failures;
@@ -1139,8 +996,7 @@ int mpe_t_revolute_matrix (void) {
         ref = (vector3) {1, 0, 0};
         u = vector3_cross (axis, ref);
         ul = sqrtf (vector3_length_squared (u));
-    }
-    u = vector3_scaling (u, 1.0f / ul);
+    } u = vector3_scaling (u, 1.0f / ul);
     vector3 v = vector3_cross (axis, u);
     float ima = rigidbody_effective_inv_mass (A);
     float imb = rigidbody_effective_inv_mass (B);
@@ -1292,14 +1148,11 @@ int mpe_t_frustum_culler (void) {
                     if (!(fabsf (d [2]) <= d [3]))
                         continue;
                     checked++;
-                    if (!visible) {
-                        false_exclusions++;
-                    }
+                    if (!visible) { false_exclusions++; }
                 }
             }
         }
-    }
-    MPE_INFO ("frustum_culler: %d reference-inside samples, %d false exclusions", checked, false_exclusions);
+    } MPE_INFO ("frustum_culler: %d reference-inside samples, %d false exclusions", checked, false_exclusions);
     MPE_CHECK (&t, checked > 1000);
     MPE_CHECK (&t, false_exclusions == 0);
     /* Explicit cases. math4_look_view(eye, front, up) orients the camera so
@@ -1319,7 +1172,6 @@ int mpe_t_frustum_culler (void) {
         MPE_CHECK (&t, math4_frustum_sphere_visible (planes, 0.0f, 0.0f, 1000.0f, 5.0f) == 1);
         /* And one just outside the near plane with a large radius is KEPT. */
         MPE_CHECK (&t, math4_frustum_sphere_visible (planes, 0.0f, 0.0f, -0.05f, 0.5f) == 1);
-    }
-    mpe_test_end (&t);
+    } mpe_test_end (&t);
     return t.failures;
 }

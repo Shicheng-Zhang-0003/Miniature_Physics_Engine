@@ -42,7 +42,6 @@ static inline int mfs_test_floor_e (physics_world *w, float mus, float muk, floa
             !isfinite (rb -> velocity.x) || !isfinite (rb -> velocity.y) || !isfinite (rb -> velocity.z)) {
             return 0;
         }
-    }
-    return 1;
+    } return 1;
 }
 #endif /* mfs_test_common_h */

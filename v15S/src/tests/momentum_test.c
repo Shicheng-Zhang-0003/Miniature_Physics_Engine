@@ -39,8 +39,7 @@ int main (void) {
             (world.bodies [a].velocity.x < world.bodies [b].velocity.x)) {
             break;
         }
-    }
-    float va = world.bodies [a].velocity.x;
+    } float va = world.bodies [a].velocity.x;
     float vb = world.bodies [b].velocity.x;
     float p1 = va + vb;
     printf ("[info] post-hit va=%.4f vb=%.4f (expect 0 / 3)\n", va, vb);
@@ -51,28 +50,21 @@ int main (void) {
     if (fabsf (va) > 0.05f) {
         printf ("[FAIL] striker did not stop (va=%.4f)\n", va);
         fail = 1;
-    } else {
-        printf ("[PASS] striker stops dead\n");
-    }
+    } else { printf ("[PASS] striker stops dead\n"); }
     if (fabsf (vb - 3.0f) > 0.05f) {
         printf ("[FAIL] target did not inherit velocity (vb=%.4f)\n", vb);
         fail = 1;
-    } else {
-        printf ("[PASS] target inherits velocity\n");
-    }
+    } else { printf ("[PASS] target inherits velocity\n"); }
     if (fabsf (p1 - p0) > 0.05f) {
         printf ("[FAIL] momentum not conserved (%.4f vs %.4f)\n", p1, p0);
         fail = 1;
-    } else {
-        printf ("[PASS] total momentum conserved\n");
-    }
+    } else { printf ("[PASS] total momentum conserved\n"); }
     {
         float ke1 = va * va + vb * vb;
         if (fabsf (ke1 - 9.0f) > 0.3f) {
             printf ("[FAIL] kinetic energy not conserved (%.4f vs 9.0)\n", ke1);
             fail = 1;
-        }
-        float tmax = 0.0f;
+        } float tmax = 0.0f;
         for (int i = 0; i < world.body_count; i++) {
             float ty = fabsf (world.bodies [i].velocity.y);
             float tz = fabsf (world.bodies [i].velocity.z);
@@ -85,8 +77,7 @@ int main (void) {
             printf ("[FAIL] spurious transverse motion (%.4f)\n", tmax);
             fail = 1;
         }
-    }
-    physics_world_cleanup (&world);
+    } physics_world_cleanup (&world);
     return fail;
 }
 #endif /* mpe_momentum_test */

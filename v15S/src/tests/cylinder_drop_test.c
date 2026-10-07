@@ -39,8 +39,7 @@ int main (void) {
         printf ("[FAIL] could not create bodies\n");
         physics_world_cleanup (&world);
         return 1;
-    }
-    const float dt = 1.0f / 60.0f;
+    } const float dt = 1.0f / 60.0f;
     float cyl_y = 0.25f, cyl_vy = 0.0f, sph_y = 0.25f;
     int nan_seen = 0;
     float max_fall_speed = 0.0f;
@@ -57,14 +56,9 @@ int main (void) {
         /* Drop is 0.20 m: impact at sqrt(2*9.81*0.2) ~= 1.98 m/s. Anything
          * far below proves the body never truly fell (spawn-at-rest would
          * also "rest" at 0.05 without exercising contact at all). */
-        if (fabsf (cyl_vy) > max_fall_speed) {
-            max_fall_speed = fabsf (cyl_vy);
-        }
-        if ((world.has_contact) && ((world.has_contact [cyl_idx]) || (world.has_contact [sph_idx]))) {
-            ever_contact = 1;
-        }
-    }
-    printf ("[info] sphere   final y=%.4f\n", sph_y);
+        if (fabsf (cyl_vy) > max_fall_speed) { max_fall_speed = fabsf (cyl_vy); }
+        if ((world.has_contact) && ((world.has_contact [cyl_idx]) || (world.has_contact [sph_idx]))) { ever_contact = 1; }
+    } printf ("[info] sphere   final y=%.4f\n", sph_y);
     printf ("[info] cylinder final y=%.4f vy=%.4f max_fall=%.3f ever_contact=%d (net OFF)\n", cyl_y, cyl_vy,
             max_fall_speed, ever_contact);
     if (nan_seen) {
@@ -109,8 +103,7 @@ int main (void) {
         printf ("[FAIL] cylinder did not settle at rest height (y=%.4f, expect ~0.05)\n", cyl_y);
         physics_world_cleanup (&world);
         return 1;
-    }
-    printf ("[PASS] cylinder rested on the floor (y=%.4f)\n", cyl_y);
+    } printf ("[PASS] cylinder rested on the floor (y=%.4f)\n", cyl_y);
     physics_world_cleanup (&world);
     return 0;
 }

@@ -36,38 +36,25 @@ int mpe_t_spring (void) {
             printf ("[FAIL] NaN\n");
             t.failures++;
             break;
-        }
-        float x = mb -> position.x - 2.0f;
+        } float x = mb -> position.x - 2.0f;
         if ((prev_x <= 0.0f && x > 0.0f) || (prev_x >= 0.0f && x < 0.0f)) {
             crossings++;
-            if (first_cross < 0) {
-                first_cross = kk;
-            }
+            if (first_cross < 0) { first_cross = kk; }
             last_cross = kk;
-        }
-        prev_x = x;
+        } prev_x = x;
         float e = 0.5f * k * x * x + 0.5f * 1.0f * vector3_length_squared (mb -> velocity);
         float dev = fabsf (e - e0) / e0;
-        if (dev > emax_dev) {
-            emax_dev = dev;
-        }
-    }
-    float measured_t = 0.0f;
-    if (crossings >= 4) {
-        measured_t = 2.0f * (float) (last_cross - first_cross) * dt / (float) (crossings - 1);
-    }
+        if (dev > emax_dev) { emax_dev = dev; }
+    } float measured_t = 0.0f;
+    if (crossings >= 4) { measured_t = 2.0f * (float) (last_cross - first_cross) * dt / (float) (crossings - 1); }
     /* T = 2*pi*sqrt(m/k) with m=1, k=20. */
     float analytic_t = 2.0f * 3.14159265f * sqrtf (1.0f / k);
     MPE_INFO ("period: measured=%.4f analytic=%.4f crossings=%d", measured_t, analytic_t, crossings);
     MPE_CHECK (&t, crossings >= 4);
-    if (crossings >= 4) {
-        MPE_CHECK_REL (&t, measured_t, analytic_t, 0.02f, "spring-period");
-    }
+    if (crossings >= 4) { MPE_CHECK_REL (&t, measured_t, analytic_t, 0.02f, "spring-period"); }
     MPE_INFO ("max energy deviation: %.3f", emax_dev);
     MPE_CHECK (&t, emax_dev <= 0.05f);
-    if (t.failures == 0) {
-        printf ("[PASS] spring period matches 2*pi*sqrt(m/k)\n");
-    }
+    if (t.failures == 0) { printf ("[PASS] spring period matches 2*pi*sqrt(m/k)\n"); }
     physics_world_cleanup (&w);
     mpe_test_end (&t);
     return t.failures;
@@ -103,12 +90,9 @@ int mpe_t_two_world (void) {
             yb_mid = wb.bodies [0].position.y;
             MPE_INFO ("t=1s: y_a=%.3f (g=-9.81) y_b=%.3f (g=-1.0)", ya_mid, yb_mid);
         }
-    }
-    MPE_CHECK (&t, (yb_mid - ya_mid) >= 2.0f);
+    } MPE_CHECK (&t, (yb_mid - ya_mid) >= 2.0f);
     MPE_CHECK (&t, wa.bodies [0].position.y <= 9.0f);
-    if (t.failures == 0) {
-        printf ("[PASS] two worlds independent: separated %.3f m at t=1s by per-world gravity\n", yb_mid - ya_mid);
-    }
+    if (t.failures == 0) { printf ("[PASS] two worlds independent: separated %.3f m at t=1s by per-world gravity\n", yb_mid - ya_mid); }
     physics_world_cleanup (&wa);
     physics_world_cleanup (&wb);
     mpe_test_end (&t);
@@ -140,19 +124,13 @@ int mpe_t_revolute (void) {
             printf ("[FAIL] bob went non-finite at tick %d\n", k);
             t.failures++;
             break;
-        }
-        float drift = fabsf (vector3_length (vector3_subtraction (pivot_point, bb -> position)) - rod_length);
-        if (drift > max_drift) {
-            max_drift = drift;
-        }
-    }
-    float moved = vector3_length (vector3_subtraction (w.bodies [bob].position, start_position));
+        } float drift = fabsf (vector3_length (vector3_subtraction (pivot_point, bb -> position)) - rod_length);
+        if (drift > max_drift) { max_drift = drift; }
+    } float moved = vector3_length (vector3_subtraction (w.bodies [bob].position, start_position));
     MPE_INFO ("rod=%.4f max_drift=%.4f moved=%.4f", rod_length, max_drift, moved);
     MPE_CHECK (&t, max_drift <= 0.02f);
     MPE_CHECK (&t, moved >= 0.05f);
-    if (t.failures == 0) {
-        printf ("[PASS] revolute pendulum holds (max drift %.4f) and swings under gravity\n", max_drift);
-    }
+    if (t.failures == 0) { printf ("[PASS] revolute pendulum holds (max drift %.4f) and swings under gravity\n", max_drift); }
     physics_world_cleanup (&w);
     mpe_test_end (&t);
     return t.failures;
@@ -182,16 +160,10 @@ int mpe_t_cylinder_drop (void) {
             printf ("[FAIL] non-finite state at tick %d\n", k);
             t.failures++;
             break;
-        }
-        float av = fabsf (w.bodies [cyl].velocity.y);
-        if (av > max_fall) {
-            max_fall = av;
-        }
-        if (mpe_body_in_contact (&w, cyl) || mpe_body_in_contact (&w, sph)) {
-            ever_contact = 1;
-        }
-    }
-    float cyl_y = w.bodies [cyl].position.y;
+        } float av = fabsf (w.bodies [cyl].velocity.y);
+        if (av > max_fall) { max_fall = av; }
+        if (mpe_body_in_contact (&w, cyl) || mpe_body_in_contact (&w, sph)) { ever_contact = 1; }
+    } float cyl_y = w.bodies [cyl].position.y;
     float cyl_vy = w.bodies [cyl].velocity.y;
     float sph_y = w.bodies [sph].position.y;
     MPE_INFO ("sphere y=%.4f cylinder y=%.4f vy=%.4f max_fall=%.3f ever_contact=%d (net OFF)", sph_y, cyl_y, cyl_vy,
@@ -203,9 +175,7 @@ int mpe_t_cylinder_drop (void) {
     MPE_CHECK_NEAR (&t, sph_y, 0.05f, 0.02f, "sphere-rest");
     MPE_CHECK (&t, cyl_y >= -0.05f);
     MPE_CHECK_NEAR (&t, cyl_y, 0.05f, 0.02f, "cylinder-rest");
-    if (t.failures == 0) {
-        printf ("[PASS] cylinder rested on the floor (y=%.4f)\n", cyl_y);
-    }
+    if (t.failures == 0) { printf ("[PASS] cylinder rested on the floor (y=%.4f)\n", cyl_y); }
     physics_world_cleanup (&w);
     mpe_test_end (&t);
     return t.failures;
@@ -221,15 +191,11 @@ int mpe_t_cylinder_sphere (void) {
     MPE_CHECK (&t, cyl >= 0 && sph >= 0);
     w.bodies [sph].velocity = (vector3) {0.0f, 0.0f, -2.0f};
     const float dt = 1.0f / 60.0f;
-    if (!mpe_step (&w, 120, dt)) {
-        t.failures++;
-    }
+    if (!mpe_step (&w, 120, dt)) { t.failures++; }
     float sph_z = w.bodies [sph].position.z;
     MPE_INFO ("sphere final z=%.4f (started at 0.5)", sph_z);
     MPE_CHECK (&t, sph_z >= -0.05f);
-    if (t.failures == 0) {
-        printf ("[PASS] cylinder-sphere collision works\n");
-    }
+    if (t.failures == 0) { printf ("[PASS] cylinder-sphere collision works\n"); }
     physics_world_cleanup (&w);
     mpe_test_end (&t);
     return t.failures;
@@ -245,17 +211,13 @@ int mpe_t_cylinder_cube (void) {
     MPE_CHECK (&t, cyl >= 0);
     w.bodies [cyl].velocity = (vector3) {0.0f, 0.0f, 3.0f};
     const float dt = 1.0f / 60.0f;
-    if (!mpe_step (&w, 180, dt)) {
-        t.failures++;
-    }
+    if (!mpe_step (&w, 180, dt)) { t.failures++; }
     float cyl_z = w.bodies [cyl].position.z;
     float cyl_vz = w.bodies [cyl].velocity.z;
     MPE_INFO ("cylinder final z=%.4f vz=%.4f (wall face at z=0.4)", cyl_z, cyl_vz);
     MPE_CHECK (&t, cyl_z <= 0.40f);
     MPE_CHECK (&t, fabsf (cyl_vz) <= 1.0f);
-    if (t.failures == 0) {
-        printf ("[PASS] cylinder-cube wall holds\n");
-    }
+    if (t.failures == 0) { printf ("[PASS] cylinder-cube wall holds\n"); }
     physics_world_cleanup (&w);
     mpe_test_end (&t);
     return t.failures;
@@ -271,15 +233,11 @@ int mpe_t_cylinder_cylinder (void) {
     MPE_CHECK (&t, c1 >= 0 && c2 >= 0);
     w.bodies [c2].velocity = (vector3) {0.0f, 0.0f, -2.0f};
     const float dt = 1.0f / 60.0f;
-    if (!mpe_step (&w, 180, dt)) {
-        t.failures++;
-    }
+    if (!mpe_step (&w, 180, dt)) { t.failures++; }
     float z2 = w.bodies [c2].position.z;
     MPE_INFO ("moving cylinder final z=%.4f (started 0.5, other at 0)", z2);
     MPE_CHECK (&t, isfinite (z2) && z2 >= -0.05f);
-    if (t.failures == 0) {
-        printf ("[PASS] cylinder-cylinder collision works\n");
-    }
+    if (t.failures == 0) { printf ("[PASS] cylinder-cylinder collision works\n"); }
     physics_world_cleanup (&w);
     mpe_test_end (&t);
     return t.failures;
@@ -306,9 +264,7 @@ int mpe_t_list4_cylinder_floor (void) {
         w.bodies [cyl].restitution = 0.3f;
         w.bodies [cyl].orientation = vector4_from_axis_with_angle ((vector3) {0.0f, 0.0f, 1.0f}, math_pi * 0.5f);
         rigidbody_update_axes (&w.bodies [cyl]);
-        if (!mpe_step (&w, 600, dt)) {
-            t.failures++;
-        }
+        if (!mpe_step (&w, 600, dt)) { t.failures++; }
         float y = w.bodies [cyl].position.y;
         float vy = w.bodies [cyl].velocity.y;
         MPE_INFO ("face: y=%.4f vy=%.4f (rest 0.02)", y, vy);
@@ -327,9 +283,7 @@ int mpe_t_list4_cylinder_floor (void) {
         w.bodies [cyl].restitution = 0.3f;
         w.bodies [cyl].orientation = vector4_from_axis_with_angle ((vector3) {0.0f, 1.0f, 0.0f}, math_pi * 0.5f);
         rigidbody_update_axes (&w.bodies [cyl]);
-        if (!mpe_step (&w, 600, dt)) {
-            t.failures++;
-        }
+        if (!mpe_step (&w, 600, dt)) { t.failures++; }
         float y = w.bodies [cyl].position.y;
         float vy = w.bodies [cyl].velocity.y;
         MPE_INFO ("barrel: y=%.4f vy=%.4f (rest 0.05)", y, vy);
@@ -338,9 +292,7 @@ int mpe_t_list4_cylinder_floor (void) {
         MPE_CHECK (&t, fabsf (vy) <= 0.1f);
         physics_world_cleanup (&w);
     }
-    if (t.failures == 0) {
-        printf ("[PASS] LIST4 cylinder floor contact holds (face + barrel)\n");
-    }
+    if (t.failures == 0) { printf ("[PASS] LIST4 cylinder floor contact holds (face + barrel)\n"); }
     mpe_test_end (&t);
     return t.failures;
 } /* ---------------------------------------------------------------------------
@@ -402,8 +354,7 @@ int mpe_t_cylinder_platform (void) {
      * and went to sleep on top of the slab. */
     for (int tick = 0; tick < 120; tick++) {
         physics_world_step (&w, dt);
-    }
-    MPE_CHECK (&t, cyl -> position.y < 1.0f);
+    } MPE_CHECK (&t, cyl -> position.y < 1.0f);
     MPE_CHECK (&t, cyl -> position.y < 5.0f);
     /* Each body must come to rest at its OWN geometric support height on the
      * world backstop: the cylinder on its radius (0.5), the cube on its
@@ -530,11 +481,9 @@ int mpe_t_cylinder_sphere_inside (void) {
              * reach pen1 <= 0. This canonical world does not pin iterations,
              * so the assertion is kept but reported rather than hidden. */
             MPE_INFO ("case %d residual overlap after 2 s: %.4f m", c, pen1);
-        }
-        MPE_CHECK (&t, isfinite (sph -> position.x) && isfinite (sph -> position.y) && isfinite (sph -> position.z));
+        } MPE_CHECK (&t, isfinite (sph -> position.x) && isfinite (sph -> position.y) && isfinite (sph -> position.z));
         physics_world_cleanup (&ww);
-    }
-    physics_world_cleanup (&w);
+    } physics_world_cleanup (&w);
     mpe_test_end (&t);
     return t.failures;
 } /* ======================================================================
@@ -639,11 +588,8 @@ int mpe_t_mass_properties (void) {
                   mpe_clamp_mass_events);
         MPE_CHECK_NEAR (&t, w2.bodies [s].mass, 1e-4f, 1e-9f, "clamped mass floor");
         physics_world_cleanup (&w2);
-    }
-    mpe_clamp_counters_reset ();
-    if (t.failures == 0) {
-        printf ("[PASS] mass properties match closed-form rigid-body mechanics\n");
-    }
+    } mpe_clamp_counters_reset ();
+    if (t.failures == 0) { printf ("[PASS] mass properties match closed-form rigid-body mechanics\n"); }
     mpe_test_end (&t);
     return t.failures;
 } /* ======================================================================
@@ -709,16 +655,14 @@ static int mpe_ref_obb_overlap (vector3 ca, vector4 qa, vector3 ha, vector3 cb, 
             n = vector3_addition (
                 vector3_addition (vector3_scaling (e0, cosf (u) * cosf (v)), vector3_scaling (e1, sinf (u))),
                 vector3_scaling (e2, cosf (u) * sinf (v)));
-        }
-        float L2 = vector3_length_squared (n);
+        } float L2 = vector3_length_squared (n);
         if (L2 < 1e-8f)
             continue;
         n = vector3_scaling (n, 1.0f / sqrtf (L2));
         if (fabsf (vector3_dot (t, n)) > mpe_ref_proj_r (aa, ha, n) + mpe_ref_proj_r (ab, hb, n)) {
             return 0; /* a separating axis exists -> disjoint */
         }
-    }
-    return 1;
+    } return 1;
 }
 int mpe_t_reference_math (void) {
     mpe_test_t t;
@@ -767,8 +711,7 @@ int mpe_t_reference_math (void) {
             tested++;
             if ((hit != 0) == (ref != 0))
                 agree++;
-        }
-        MPE_INFO ("SAT vs independent dense reference: %d/%d configurations agree", agree, tested);
+        } MPE_INFO ("SAT vs independent dense reference: %d/%d configurations agree", agree, tested);
         MPE_CHECK (&t, agree == tested);
         physics_world_cleanup (&w);
     }
@@ -832,17 +775,14 @@ int mpe_t_reference_math (void) {
                 w.bodies [b].force_accumulator = vector3_addition (w.bodies [b].force_accumulator, (vector3) {F, 0, 0});
                 rigidbody_wake (&w.bodies [b]);
                 physics_world_step (&w, MPE_REF_MATH_DT);
-            }
-            float pred = ((F - muk * N) / m) * (30.0f * MPE_REF_MATH_DT);
+            } float pred = ((F - muk * N) / m) * (30.0f * MPE_REF_MATH_DT);
             MPE_INFO ("Coulomb slide F/(mu_s*N)=%.2f: measured v=%.5f predicted %.5f", (double) fracs [k],
                       (double) w.bodies [b].velocity.x, (double) pred);
             MPE_CHECK_REL (&t, w.bodies [b].velocity.x, pred, 0.05f, "Coulomb sliding branch (F - mu_k N)/m");
             physics_world_cleanup (&w);
         }
     }
-    if (t.failures == 0) {
-        printf ("[PASS] SAT/Gottschalk, ERP/Catto and Coulomb match their references\n");
-    }
+    if (t.failures == 0) { printf ("[PASS] SAT/Gottschalk, ERP/Catto and Coulomb match their references\n"); }
     mpe_test_end (&t);
     return t.failures;
 }

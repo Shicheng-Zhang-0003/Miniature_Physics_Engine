@@ -34,13 +34,10 @@ int main (void) {
     for (int i = 0; i < 60; i++) { /* MFS_139_EXTEND: run longer to reach floor */
         physics_world_step (&world, time_step);
         printf ("step=%2d y=%.6f vy=%.6f\n", i + 1, world.bodies [cyl_idx].position.y, world.bodies [cyl_idx].velocity.y);
-    }
-    int diag_contact = 0;
+    } int diag_contact = 0;
     /* has_contact reflects the last tick only; re-step-free check: a settled
      * body in real contact still flags on the final tick. */
-    if ((world.has_contact) && (world.has_contact [cyl_idx])) {
-        diag_contact = 1;
-    }
+    if ((world.has_contact) && (world.has_contact [cyl_idx])) { diag_contact = 1; }
     printf ("contact_on_final_tick=%d (net OFF)\n", diag_contact);
     printf ("\n=== DIAG COMPLETE ===\n");
     /* TRUTH: a diagnostic that cannot fail is decoration. Gate the physical
@@ -66,9 +63,7 @@ int main (void) {
             printf ("[FAIL] cylinder still moving fast after 60 ticks (vy=%.4f)\n", fvy);
             fail = 1;
         }
-        if (!fail) {
-            printf ("[PASS] floor contact holds and settles\n");
-        }
+        if (!fail) { printf ("[PASS] floor contact holds and settles\n"); }
         physics_world_cleanup (&world);
         return fail;
     }
