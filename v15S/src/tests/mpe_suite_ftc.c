@@ -45,8 +45,7 @@ static const char *mpe_pick_plugin (const char *so_path, char *buf, size_t n) {
     (void) n;
     return so_path;
 #endif
-}
-typedef int (*spawn_fn_t) (struct physics_world *, float, float, float, motor_preset_id, ftc_drivetrain_type);
+} typedef int (*spawn_fn_t) (struct physics_world *, float, float, float, motor_preset_id, ftc_drivetrain_type);
 typedef ftc_robot * (*get_fn_t) (struct physics_world *, int);
 typedef void (*tank_fn_t) (ftc_robot *, float, float);
 int mpe_t_ftc_ecosystem (void) {

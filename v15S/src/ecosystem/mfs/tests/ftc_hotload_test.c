@@ -75,9 +75,7 @@ static int finite_world (physics_world *w) {
     }
     return 1;
 }
-static void setup_world (physics_world *w) {
-    mfs_test_world (w); /* 128 iters + tile floor (see header) */
-}
+static void setup_world (physics_world *w) {mfs_test_world (w); /* 128 iters + tile floor (see header) */}
 /* dlsym'd dynamic API surface (full import: descriptor + fleet + drive) */
 typedef int (*spawn_fn_t) (struct physics_world *, float, float, float, motor_preset_id, ftc_drivetrain_type);
 typedef ftc_robot * (*get_fn_t) (struct physics_world *, int);

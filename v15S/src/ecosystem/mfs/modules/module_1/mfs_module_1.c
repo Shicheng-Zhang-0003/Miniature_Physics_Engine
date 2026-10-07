@@ -130,8 +130,7 @@ MPE_USED void mfs_module_1_detach (mpe_world_t *world, void *mod_state) {
         /* Body cleanup handled by world cleanup */
     }
     free (state);
-}
-/* ================================================================
+} /* ================================================================
  * Gamepad Control Step (F310 mapping)
  * ================================================================ */
 MPE_USED void mfs_module_1_gamepad_step (mfs_module_1_state *state, float dt) {
@@ -312,8 +311,7 @@ MPE_USED void mfs_module_1_gamepad_step (mfs_module_1_state *state, float dt) {
             state -> robot.odom_theta = 0.0f;
         }
     }
-}
-/* ================================================================
+} /* ================================================================
  * Pre-step: Main simulation tick
  * ================================================================ */
 MPE_USED void mfs_module_1_pre_step (mpe_world_t *world, float dt, void *mod_state) {
@@ -345,8 +343,7 @@ MPE_USED void mfs_module_1_post_step (mpe_world_t *world, float dt, void *mod_st
     (void) dt;
     (void) mod_state;
     /* No post-step work needed for Module 1 */
-}
-/* ================================================================
+} /* ================================================================
  * Field Creation
  * ================================================================ */
 MPE_USED void mfs_module_1_field_create (mfs_module_1_state *state) {
@@ -391,8 +388,7 @@ MPE_USED void mfs_module_1_field_create (mfs_module_1_state *state) {
     /* Crossbar */
     physics_world_add_cube (world, (vector3) {0.0f, goal_h + post_t * 0.5f, goal_z - post_t * 0.5f},
                             (vector3) {goal_w * 0.5f + post_t, post_t * 0.5f, post_t * 0.5f}, 0.0f);
-}
-/* ================================================================
+} /* ================================================================
  * Robot Creation
  * ================================================================ */
 MPE_USED void mfs_module_1_robot_create (mfs_module_1_state *state) {
@@ -422,8 +418,7 @@ MPE_USED void mfs_module_1_robot_create (mfs_module_1_state *state) {
         state -> robot.odom_z = -3.0f;
         state -> robot.odom_theta = 0.0f;
     }
-}
-/* ================================================================
+} /* ================================================================
  * Helper: get chassis body
  * ================================================================ */
 /* ================================================================
@@ -469,8 +464,7 @@ MPE_USED void mfs_module_1_intake_create (mfs_module_1_state *state) {
         }
     }
     state -> intake_deployed = true;
-}
-/* ================================================================
+} /* ================================================================
  * Shooter Creation (Flywheel-based)
  * ================================================================ */
 MPE_USED void mfs_module_1_shooter_create (mfs_module_1_state *state) {
@@ -538,8 +532,7 @@ MPE_USED void mfs_module_1_shooter_create (mfs_module_1_state *state) {
     state -> shooter_rpm = 0.0f;
     state -> shooter_spinning_up = false;
     state -> shooter_ready = false;
-}
-/* ================================================================
+} /* ================================================================
  * Ball Spawning & Physics
  * ================================================================ */
 MPE_USED void mfs_module_1_ball_spawn (mfs_module_1_state *state, vector3 pos) {
@@ -601,8 +594,7 @@ MPE_USED void mfs_module_1_ball_physics_step (mfs_module_1_state *state, float d
             rb_apply_forces_perfect (ball, magnus);
         }
     }
-}
-/* ================================================================
+} /* ================================================================
  * Intake Step
  * ================================================================ */
 MPE_USED void mfs_module_1_intake_step (mfs_module_1_state *state, float dt) {
@@ -724,8 +716,7 @@ MPE_USED void mfs_module_1_intake_step (mfs_module_1_state *state, float dt) {
             }
         }
     }
-}
-/* ================================================================
+} /* ================================================================
  * Shooter Step
  * ================================================================ */
 MPE_USED void mfs_module_1_shooter_step (mfs_module_1_state *state, float dt) {
@@ -852,8 +843,7 @@ MPE_USED void mfs_module_1_shooter_step (mfs_module_1_state *state, float dt) {
             }
         }
     }
-}
-/* ================================================================
+} /* ================================================================
  * Robot Drive Step
  * ================================================================ */
 MPE_USED void mfs_module_1_robot_drive_step (mfs_module_1_state *state, float dt) {
@@ -865,8 +855,7 @@ MPE_USED void mfs_module_1_robot_drive_step (mfs_module_1_state *state, float dt
      * clamped per-wheel without normalization, distorting combined
      * inputs. Single source of truth now. */
     drivetrain_mecanum (&state -> robot, state -> drive_forward, state -> drive_strafe, state -> drive_rotate);
-}
-/* ================================================================
+} /* ================================================================
  * Public API
  * ================================================================ */
 MPE_USED void mfs_module_1_set_drive_commands (mfs_module_1_state *state, float forward, float strafe, float rotate) {
@@ -899,7 +888,6 @@ MPE_USED void mfs_module_1_get_stats (const mfs_module_1_state *state, int *ball
         * shooter_rpm = state -> shooter_rpm;
     if (shooter_ready)
         * shooter_ready = state -> shooter_ready;
-}
-/* ================================================================
+} /* ================================================================
  * Helper: get chassis body
  * ================================================================ */

@@ -65,8 +65,7 @@ static void test_free_fall_gravity (void) {
     float vel_error = fabsf (actual_vy - expected_vy);
     TEST_ASSERT (vel_error < 0.5f, "sphere velocity vy ≈ -g*t");
     physics_world_cleanup (&world);
-}
-/* ------------------------------------------------------------------
+} /* ------------------------------------------------------------------
 * Test 2: Cylinder inertia — I_axle = 0.5 * m * r^2
 * ------------------------------------------------------------------ */
 static void test_cylinder_inertia (void) {
@@ -87,8 +86,7 @@ static void test_cylinder_inertia (void) {
     float alpha_error = fabsf (actual_alpha - expected_alpha) / expected_alpha;
     TEST_ASSERT (alpha_error < 0.1f, "angular accel ≈ torque / (0.5*m*r^2)");
     physics_world_cleanup (&world);
-}
-/* ------------------------------------------------------------------
+} /* ------------------------------------------------------------------
 * Test 3: Restitution bounce — bounce height ≈ e^2 * h
 * ------------------------------------------------------------------ */
 static void test_restitution_bounce (void) {
@@ -123,8 +121,7 @@ static void test_restitution_bounce (void) {
     TEST_ASSERT (bounced, "sphere bounces after impact");
     TEST_ASSERT (bounce_error < 0.3f, "bounce height ≈ e^2*(h-r)+r");
     physics_world_cleanup (&world);
-}
-/* ------------------------------------------------------------------
+} /* ------------------------------------------------------------------
 * Test 4: Rolling kinematics — v ≈ ω * r
 * ------------------------------------------------------------------ */
 static void test_rolling_kinematics (void) {
@@ -149,8 +146,7 @@ static void test_rolling_kinematics (void) {
     float kinematic_error = fabsf (v - v_expected) / (fabsf (v_expected) + 0.001f);
     TEST_ASSERT (kinematic_error < 0.3f, "rolling v ≈ omega * r");
     physics_world_cleanup (&world);
-}
-/* ------------------------------------------------------------------
+} /* ------------------------------------------------------------------
 * Test 5: Rolling resistance — robot coasts to stop
 * ------------------------------------------------------------------ */
 static void test_rolling_resistance_stopping (void) {
@@ -184,8 +180,7 @@ static void test_rolling_resistance_stopping (void) {
     TEST_ASSERT (final_speed < 0.5f,
                  "robot coasts to near-stop after 5s coast"); /* MFS_134_TEST_FIX: relaxed threshold */
     physics_world_cleanup (&world);
-}
-/* ------------------------------------------------------------------
+} /* ------------------------------------------------------------------
 * Test 6: Motor free speed — unloaded wheel RPM approaches spec
 * ------------------------------------------------------------------ */
 static void test_motor_free_speed (void) {
@@ -258,8 +253,7 @@ static void test_motor_free_speed (void) {
     printf ("    [DIAG] free-spin rpm=%.1f spec=%.1f\n", actual_rpm, spec_rpm);
     TEST_ASSERT (rpm_error < 0.3f, "motor RPM approaches spec free speed (223 RPM)");
     physics_world_cleanup (&world);
-}
-/* ------------------------------------------------------------------
+} /* ------------------------------------------------------------------
 * Test 7: Motor stall torque — motor reaches stall torque
 * ------------------------------------------------------------------ */
 static void test_motor_stall_torque (void) {
@@ -298,8 +292,7 @@ static void test_motor_stall_torque (void) {
     float torque_error = fabsf (actual_torque - spec_stall_torque) / spec_stall_torque;
     TEST_ASSERT (torque_error < 0.3f, "motor output torque ≈ spec stall torque (3.73 N·m)");
     physics_world_cleanup (&world);
-}
-/* ------------------------------------------------------------------
+} /* ------------------------------------------------------------------
 * Test 8: Motor back-EMF braking — spinning wheel decelerates
 * ------------------------------------------------------------------ */
 static void test_motor_back_emf_braking (void) {
@@ -337,8 +330,7 @@ static void test_motor_back_emf_braking (void) {
     TEST_ASSERT (chassis_v_after < chassis_v_before * 0.5f,
                  "back-EMF braking + rolling resistance decelerate the chassis");
     physics_world_cleanup (&world);
-}
-/* ------------------------------------------------------------------
+} /* ------------------------------------------------------------------
 * Test 9: Static friction threshold — no sliding below μ_s * m * g
 * ------------------------------------------------------------------ */
 static void test_static_friction_threshold (void) {
@@ -379,8 +371,7 @@ static void test_static_friction_threshold (void) {
     printf ("    [DIAG] after 50%%-threshold push: vx=%.6f\n", vx_after);
     TEST_ASSERT (fabsf (vx_after) < 0.2f, "static friction holds below mu_s*m*g threshold");
     physics_world_cleanup (&world);
-}
-/* ------------------------------------------------------------------
+} /* ------------------------------------------------------------------
 * Test 10: Kinetic friction deceleration — decel ≈ μ_k * g
 * ------------------------------------------------------------------ */
 static void test_kinetic_friction_deceleration (void) {
@@ -417,8 +408,7 @@ static void test_kinetic_friction_deceleration (void) {
             actual_decel, vx_before, vx_after);
     TEST_ASSERT (decel_error < 0.35f, "kinetic friction deceleration ≈ mu_k * g");
     physics_world_cleanup (&world);
-}
-/* ------------------------------------------------------------------
+} /* ------------------------------------------------------------------
 * Test 11: Numerical stability — no NaN over 3000 ticks
 * ------------------------------------------------------------------ */
 static void test_numerical_stability_no_nan (void) {
@@ -456,8 +446,7 @@ static void test_numerical_stability_no_nan (void) {
     }
     TEST_ASSERT (!has_nan, "no NaN/Inf over 3000 ticks with mixed objects");
     physics_world_cleanup (&world);
-}
-/* ------------------------------------------------------------------
+} /* ------------------------------------------------------------------
 * Test 12: Robot coast-down — robot decelerates after power cut
 * ------------------------------------------------------------------ */
 static void test_robot_coast_down (void) {
@@ -487,8 +476,7 @@ static void test_robot_coast_down (void) {
     float speed_after = fabsf (world.bodies [robot.chassis_body].velocity.z);
     TEST_ASSERT (speed_after < speed_before * 0.3f, "robot decelerates significantly after power cut");
     physics_world_cleanup (&world);
-}
-/* ------------------------------------------------------------------
+} /* ------------------------------------------------------------------
 * Test 13: Energy conservation in free fall
 * ------------------------------------------------------------------ */
 static void test_energy_conservation_free_fall (void) {
@@ -511,8 +499,7 @@ static void test_energy_conservation_free_fall (void) {
     float energy_error = fabsf (E_final - E_initial) / E_initial;
     TEST_ASSERT (energy_error < 0.1f, "energy conserved in free fall (PE + KE = const)");
     physics_world_cleanup (&world);
-}
-/* ------------------------------------------------------------------
+} /* ------------------------------------------------------------------
 * Test 14: Cylinder rests on floor
 * ------------------------------------------------------------------ */
 static void test_cylinder_floor_rest (void) {
@@ -553,8 +540,7 @@ static void test_cylinder_floor_rest (void) {
     float vm = sqrtf (vx * vx + vz * vz);
     TEST_ASSERT (vm < 0.1f, "cylinder settled (position held, no runaway)");
     physics_world_cleanup (&world);
-}
-/* ------------------------------------------------------------------
+} /* ------------------------------------------------------------------
 * Test 15: Revolute anchor holds under gravity
 * ------------------------------------------------------------------ */
 static void test_revolute_anchor_holds (void) {
@@ -586,8 +572,7 @@ static void test_revolute_anchor_holds (void) {
     float rod_error = fabsf (rod_length_after - rod_length);
     TEST_ASSERT (rod_error < 0.1f, "revolute anchor holds (rod length preserved)");
     physics_world_cleanup (&world);
-}
-/* ------------------------------------------------------------------
+} /* ------------------------------------------------------------------
 * Main
 * ------------------------------------------------------------------ */
 int main (void) {

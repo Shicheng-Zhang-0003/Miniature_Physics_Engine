@@ -70,8 +70,7 @@ int mpe_t_stack (void) {
     physics_world_cleanup (&w);
     mpe_test_end (&t);
     return t.failures;
-}
-/* driven_wheel FIXED: v1 never enabled the solver plane, so torque spun
+} /* driven_wheel FIXED: v1 never enabled the solver plane, so torque spun
  * the wheel to wx=96 with dz=0 (no Coulomb manifold exists without the
  * plane/slab). v2 enables the plane with synced floor friction. Same
  * traction-envelope torque (0.020 < 0.0245 limit) and coupling gates. */
@@ -259,8 +258,7 @@ static void mpe_f10_cube (physics_world *w, vector3 p) {
         w -> bodies [idx].friction_static = 0.8f;
         w -> bodies [idx].friction_kinetic = 0.7f;
     }
-}
-/* Adversarial pile bodies (shared by f10 settle + f11 torture builders). */
+} /* Adversarial pile bodies (shared by f10 settle + f11 torture builders). */
 /* Adversarial pile bodies (shared by f10 settle + f11 torture builders).
  *
  * DESPOT-2026-10-03: THE STACK PITCH WAS 0.99 FOR 1.0 m CUBES, SO THE COLUMN
@@ -297,8 +295,7 @@ static void mpe_pile_bodies (physics_world *w) {
             w -> bodies [idx].friction_kinetic = 0.7f;
         }
     }
-}
-/* f10 settle scene: pile + Coulomb floor (see scene_init.c note). */
+} /* f10 settle scene: pile + Coulomb floor (see scene_init.c note). */
 static void mpe_settle_scene (physics_world *w) {
     int f = physics_world_add_cube (w, (vector3) {0.0f, -0.5f, 0.0f}, (vector3) {30.0f, 0.5f, 30.0f}, 0.0f);
     if (f >= 0) {
@@ -307,8 +304,7 @@ static void mpe_settle_scene (physics_world *w) {
         w -> bodies [f].restitution = 0.0f;
     }
     mpe_pile_bodies (w);
-}
-/* f11 torture scene.
+} /* f11 torture scene.
  *
  * DESPOT-2026-10-03: THIS HAD NO FLOOR, AND THAT MADE IT A SCENARIO THE GUI
  * NEVER RUNS. "Unchanged legacy geometry" was the comment; the problem is that
@@ -561,8 +557,7 @@ int mpe_t_sleep_contact_wake (void) {
     physics_world_cleanup (&w);
     mpe_test_end (&t);
     return t.failures;
-}
-/* DESPOT-2026-10-03: worst PAIRWISE cube-cube overlap, measured with the
+} /* DESPOT-2026-10-03: worst PAIRWISE cube-cube overlap, measured with the
  * engine's own SAT + face clip so the number is the same quantity the solver
  * works against, not an AABB approximation.
  *
@@ -795,8 +790,7 @@ int mpe_t_f11_torture (void) {
     physics_world_cleanup (&w);
     mpe_test_end (&t);
     return t.failures;
-}
-/* scene_roundtrip: bodies + springs + revolute survive save/load on primary. */
+} /* scene_roundtrip: bodies + springs + revolute survive save/load on primary. */
 int mpe_t_scene_roundtrip (void) {
     mpe_test_t t;
     mpe_test_begin (&t, "scene_roundtrip");
@@ -847,8 +841,7 @@ int mpe_t_scene_roundtrip (void) {
     physics_world_cleanup (w);
     mpe_test_end (&t);
     return t.failures;
-}
-/* module: per-world cfg, registry dispatch, custom shapes, hooks, id cache,
+} /* module: per-world cfg, registry dispatch, custom shapes, hooks, id cache,
  * pool growth, det counters. Condensed port of module_test.c. */
 static int mpe_mod_pre_calls = 0;
 static void mpe_mod_pre (mpe_world_t *world, float dt, void *st) {
@@ -927,8 +920,7 @@ int mpe_t_module (void) {
     physics_world_cleanup (&B);
     mpe_test_end (&t);
     return t.failures;
-}
-/* math3_inverse: analytic inverse at small inertia tensors. */
+} /* math3_inverse: analytic inverse at small inertia tensors. */
 static uint32_t mpe_inverse_rng (uint32_t *state) {
     /* xorshift32: fixed seed, no libc/global RNG state and identical inputs. */
     uint32_t x = *state;
@@ -938,9 +930,7 @@ static uint32_t mpe_inverse_rng (uint32_t *state) {
     *state = x;
     return x;
 }
-static float mpe_inverse_rand_signed (uint32_t *state) {
-    return (float) (mpe_inverse_rng (state) >> 8) * (1.0f / 16777216.0f) * 2.0f - 1.0f;
-}
+static float mpe_inverse_rand_signed (uint32_t *state) {return (float) (mpe_inverse_rng (state) >> 8) * (1.0f / 16777216.0f) * 2.0f - 1.0f;}
 int mpe_t_math3_inverse (void) {
     mpe_test_t t;
     mpe_test_begin (&t, "math3_inverse");
@@ -1007,8 +997,7 @@ int mpe_t_math3_inverse (void) {
     }
     mpe_test_end (&t);
     return t.failures;
-}
-/* frustum: Gribb/Hartmann extraction culls outside, keeps inside. */
+} /* frustum: Gribb/Hartmann extraction culls outside, keeps inside. */
 int mpe_t_frustum (void) {
     mpe_test_t t;
     mpe_test_begin (&t, "frustum");
@@ -1030,8 +1019,7 @@ int mpe_t_frustum (void) {
     }
     mpe_test_end (&t);
     return t.failures;
-}
-/* floor_collision_diag: cylinder drops 1m onto slab, settles at r, calms. */
+} /* floor_collision_diag: cylinder drops 1m onto slab, settles at r, calms. */
 int mpe_t_floor_collision_diag (void) {
     mpe_test_t t;
     mpe_test_begin (&t, "floor_collision_diag");
@@ -1080,8 +1068,7 @@ int mpe_t_floor_collision_diag (void) {
     physics_world_cleanup (&w);
     mpe_test_end (&t);
     return t.failures;
-}
-/* ---------------------------------------------------------------------------
+} /* ---------------------------------------------------------------------------
  * revolute_matrix: prove the hinge effective-mass matrix IS J M^-1 J^T.
  *
  * DESPOT-2026-09-29. The revolute 6x6 K carried a sign error in its
@@ -1242,8 +1229,7 @@ int mpe_t_revolute_matrix (void) {
     physics_world_cleanup (&w);
     mpe_test_end (&t);
     return t.failures;
-}
-/* ---------------------------------------------------------------------------
+} /* ---------------------------------------------------------------------------
  * frustum_culler: exercise the SHIPPED culler.
  *
  * DESPOT-2026-09-29. The engine's real culling code lived inline inside

@@ -56,8 +56,7 @@ int scene_ensure_pool_capacity (int n) {
 void scene_clear (void) {
     physics_world *w = physics_world_get_primary ();
     w -> body_count = 0;
-}
-/* ---- test declarations (suite A/B/C) ---- */
+} /* ---- test declarations (suite A/B/C) ---- */
 int mpe_t_two_world (void);
 int mpe_t_revolute (void);
 int mpe_t_revolute_matrix (void);

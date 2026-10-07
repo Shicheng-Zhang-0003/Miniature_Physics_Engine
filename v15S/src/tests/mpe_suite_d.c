@@ -97,8 +97,7 @@ static int meta_build (physics_world *w, int with_floor) {
     for (int i = 0; i < w -> body_count; i++)
         rigidbody_update_axes (&w -> bodies [i]);
     return (d0 >= 0) ? d0 : 0;
-}
-/* Rotate every body's pose and velocity by quaternion q (a pure rotation
+} /* Rotate every body's pose and velocity by quaternion q (a pure rotation
  * about a fixed axis, so the whole configuration is rigidly rotated). */
 /* Rotate ONLY the dynamic bodies. Rotating the floor box would tilt the
  * surface and turn the rotated run into a different problem, which is not a
@@ -155,8 +154,7 @@ static double meta_max_vel_err (const physics_world *a, const physics_world *b) 
             worst = m;
     }
     return worst;
-}
-/* ------------------------------------------- 1. rotation equivariance */
+} /* ------------------------------------------- 1. rotation equivariance */
 int mpe_t_meta_rotation (void) {
     mpe_test_t t;
     mpe_test_begin (&t, "meta_rotation");
@@ -298,8 +296,7 @@ int mpe_t_meta_rotation (void) {
     physics_world_cleanup (&wb);
     mpe_test_end (tp);
     return tp -> failures;
-}
-/* ------------------------------------- 2. solver convergence monotonicity */
+} /* ------------------------------------- 2. solver convergence monotonicity */
 /* DESPOT-2026-10-03: meta_convergence WAS VACUOUS. Rewritten.
  *
  * The old fixture was a head-on sphere-sphere pair on a floor. Measured on the
@@ -362,8 +359,7 @@ static void meta_build_stack (physics_world *w) {
     }
     for (int i = 0; i < w -> body_count; i++)
         rigidbody_update_axes (&w -> bodies [i]);
-}
-/* max position difference over the dynamic stack bodies only (index 1..H) */
+} /* max position difference over the dynamic stack bodies only (index 1..H) */
 static double meta_stack_pos_err (const physics_world *a, const physics_world *b) {
     double worst = 0.0;
     for (int i = 1; i <= META_CONV_STACK_H; i++) {
@@ -507,8 +503,7 @@ int mpe_t_meta_convergence (void) {
     physics_world_cleanup (&ref);
     mpe_test_end (tp);
     return tp -> failures;
-}
-/* ------------------------------------------------ 3. sleep honesty, both ways */
+} /* ------------------------------------------------ 3. sleep honesty, both ways */
 /* DESPOT-2026-09-29: mpe_t_meta_sleep was WRITTEN AND THEN REMOVED. Recorded
  * here rather than deleted silently, because the reason it did not survive is
  * itself information.
@@ -580,8 +575,7 @@ int mpe_t_meta_config_wiring (void) {
     }
     mpe_test_end (tp);
     return tp -> failures;
-}
-/* ------------------------------- 5. sleep honesty, three states (SLEEP-H1) */
+} /* ------------------------------- 5. sleep honesty, three states (SLEEP-H1) */
 /* DESPOT-2026-10-01: this is the test SLEEP-H1 asked for. The withdrawn
  * meta_sleep demanded (moving XOR asleep) 0.5 s after launch and met a third
  * state it had no name for: SETTLED with the sleep timer still pending
@@ -638,8 +632,7 @@ int mpe_t_sleep_settle (void) {
     physics_world_cleanup (&w);
     mpe_test_end (tp);
     return tp -> failures;
-}
-/* ---------------------------------- 6. mouse-look sign convention, 4 axes */
+} /* ---------------------------------- 6. mouse-look sign convention, 4 axes */
 /* DESPOT-2026-09-29 (user report: "flick right or down locks properly, left and
  * up do not"). The convention itself turned out to be CORRECT in all four
  * directions -- this test is what established that, cheaply, instead of by
@@ -712,8 +705,7 @@ int mpe_t_mouse_look_axes (void) {
     }
     mpe_test_end (tp);
     return tp -> failures;
-}
-/* ------------------- 6. body materials are live at construction time */
+} /* ------------------- 6. body materials are live at construction time */
 /* DESPOT-2026-09-29 -- THE GAME-WORLD CONFIG-ORDER BUG.
  *
  * `g_cfg` is a plain global: all zero until mpe_config_init() runs. Body

@@ -240,8 +240,7 @@ void motor_update_load (motor *m, float wheel_angular_vel, float dt, float batte
     if (m -> temperature > 150.0f) {
         m -> temperature = 150.0f; /* magnet ceiling (see derating note) */
     }
-}
-/* FIX-AUDIT-DESPOT: teleport/back-button paths move bodies discontinuously,
+} /* FIX-AUDIT-DESPOT: teleport/back-button paths move bodies discontinuously,
  * which the disturbance observer reads as an infinite load spike
  * (I*dw/dt across a warp). Reset the observer on every teleport so the
  * next tick starts from "no load information" instead of a phantom stall. */

@@ -52,8 +52,7 @@ int mfs_t_teleop (void) {
     free (robot);
     mfs_test_end (t_ptr);
     return t_ptr -> failures;
-}
-/* mecanum: strafe right >0.3m in +X. */
+} /* mecanum: strafe right >0.3m in +X. */
 int mfs_t_mecanum (void) {
     mfs_test_t t;
     mfs_test_begin (&t, "mecanum");
@@ -106,8 +105,7 @@ int mfs_t_mecanum (void) {
     free (robot);
     mfs_test_end (t_ptr);
     return t_ptr -> failures;
-}
-/* release_settle: drive forward, then release to zero command. The robot
+} /* release_settle: drive forward, then release to zero command. The robot
  * must come to rest (vehicle stops, wheels stop, axles stay aligned).
  * DESPOT-2026-10-04: two live-session defects, both unmeasured by the
  * suite until now —
@@ -208,8 +206,7 @@ int mfs_t_release_settle (void) {
     free (robot);
     mfs_test_end (t_ptr);
     return t_ptr -> failures;
-}
-/* tank: differential turn in place. */
+} /* tank: differential turn in place. */
 int mfs_t_tank (void) {
     mfs_test_t t;
     mfs_test_begin (&t, "tank");
@@ -324,8 +321,7 @@ int mfs_t_tank (void) {
     free (robot);
     mfs_test_end (t_ptr);
     return t_ptr -> failures;
-}
-/* odometry: forward + strafe accuracy. */
+} /* odometry: forward + strafe accuracy. */
 int mfs_t_odometry (void) {
     mfs_test_t t;
     mfs_test_begin (&t, "odometry");
@@ -423,8 +419,7 @@ int mfs_t_odometry (void) {
     free (robot);
     mfs_test_end (t_ptr);
     return t_ptr -> failures;
-}
-/* ftc_integration: combined drive test. */
+} /* ftc_integration: combined drive test. */
 int mfs_t_ftc_integration (void) {
     mfs_test_t t;
     mfs_test_begin (&t, "ftc_integration");
@@ -467,8 +462,7 @@ int mfs_t_ftc_integration (void) {
     free (robot);
     mfs_test_end (t_ptr);
     return t_ptr -> failures;
-}
-/* mfs_t_stall_endpoint: GATED locked-rotor torque test.
+} /* mfs_t_stall_endpoint: GATED locked-rotor torque test.
  *
  * DESPOT-2026-09-29 ([MOTOR-III] step 1). This is the test whose absence made
  * the whole motor chain unverifiable.
@@ -641,8 +635,7 @@ int mfs_t_stall_endpoint (void) {
     }
     mfs_test_end (t_ptr);
     return t_ptr -> failures;
-}
-/* drive_directions: pin the AXIS each pure command actually drives, and pin
+} /* drive_directions: pin the AXIS each pure command actually drives, and pin
  * anti-symmetry under sign reversal.
  *
  * DESPOT-2026-10-02 (the gate that was missing): every existing mecanum gate

@@ -83,9 +83,7 @@ void battery_fuse_step (battery *b, float total_current_draw, float dt) {
             b -> fuse_heat = 0.0f;
     }
 }
-int battery_fuse_tripped (const battery *b) {
-    return (b && b -> fuse_heat >= 1.0f) ? 1 : 0;
-}
+int battery_fuse_tripped (const battery *b) {return (b && b -> fuse_heat >= 1.0f) ? 1 : 0;}
 void battery_reset_fuse (battery *b) {
     if (b)
         b -> fuse_heat = 0.0f;

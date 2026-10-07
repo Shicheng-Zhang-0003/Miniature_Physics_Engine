@@ -41,9 +41,7 @@ static void ftc_fleet_detach (mpe_world_t *world, void *mod_state) {
     (void) world;
     ftc_fleet_destroy (mod_state);
 }
-static void ftc_fleet_pre_step (mpe_world_t *world, float dt, void *mod_state) {
-    ftc_fleet_step_all (world, mod_state, dt);
-}
+static void ftc_fleet_pre_step (mpe_world_t *world, float dt, void *mod_state) {ftc_fleet_step_all (world, mod_state, dt);}
 const mpe_module_desc_t mpe_module_desc = {
     .abi = MPE_MODULE_ABI,
     .name = "ftc-fleet",
