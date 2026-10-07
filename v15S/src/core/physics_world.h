@@ -173,8 +173,7 @@ static inline const mpe_config_t *mpe_world_cfg (const physics_world *world) {
     if (world && world -> cfg)
         return world -> cfg;
     return &g_cfg;
-}
-static inline mpe_config_t *mpe_world_cfg_mut (physics_world *world) {
+} static inline mpe_config_t *mpe_world_cfg_mut (physics_world *world) {
     if (world && world -> cfg)
         return world -> cfg;
     return &g_cfg;

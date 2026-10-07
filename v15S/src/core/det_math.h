@@ -46,20 +46,12 @@ extern _Atomic unsigned long det_fallback_pow_count;
 extern _Atomic unsigned long det_fallback_trig_count;
 void det_fallback_reset (void);
 #ifdef MPE_HAS_GNUC_ATTR
-static inline unsigned long det_fallback_pow_total (void) {
-    return __atomic_load_n (&det_fallback_pow_count, __ATOMIC_RELAXED);
-}
-static inline unsigned long det_fallback_trig_total (void) {
-    return __atomic_load_n (&det_fallback_trig_count, __ATOMIC_RELAXED);
-}
+static inline unsigned long det_fallback_pow_total (void) {return __atomic_load_n (&det_fallback_pow_count, __ATOMIC_RELAXED);}
+static inline unsigned long det_fallback_trig_total (void) {return __atomic_load_n (&det_fallback_trig_count, __ATOMIC_RELAXED);}
 #else
 /* MSVC: C11 atomics (no __atomic builtins). */
-static inline unsigned long det_fallback_pow_total (void) {
-    return atomic_load (&det_fallback_pow_count);
-}
-static inline unsigned long det_fallback_trig_total (void) {
-    return atomic_load (&det_fallback_trig_count);
-}
+static inline unsigned long det_fallback_pow_total (void) {return atomic_load (&det_fallback_pow_count);}
+static inline unsigned long det_fallback_trig_total (void) {return atomic_load (&det_fallback_trig_count);}
 #endif
 /* TRUTH: pin FP state for cross-platform determinism. Portable subset:
  * round-to-nearest (fesetround). x86/ARM denormal-flush differences (FTZ/DAZ/FZ/DZ)
@@ -103,8 +95,7 @@ static inline double det_ln_pos (double x) {
     /* ln(2) to 36 digits; double stores the same bits everywhere. */
     const double ln2 = 0.693147180559945309417232121458176568;
     return sum + (double) exponent * ln2;
-}
-/* Exponential for |x| <= 0.5. |err| < 1e-13. */
+} /* Exponential for |x| <= 0.5. |err| < 1e-13. */
 static inline double det_exp_small (double x) {
     if (!isfinite (x)) {
         /* TRUTH: exp(-INF)=0, exp(+INF)=+INF, exp(NaN)=NaN. Returning x
@@ -123,8 +114,7 @@ static inline double det_exp_small (double x) {
         sum += term;
     }
     return sum;
-}
-/* base^ex for base in (0, 1.1] (covers damping retention bases).
+} /* base^ex for base in (0, 1.1] (covers damping retention bases).
  * TRUTH: never desyncs via libm in-tick. If |product|>0.5, chunk into
  * n pieces each within [-0.5,0.5] and multiply exact powers: r=exp(p/n),
  * result=r^n via exact mults. Only non-finite/out-of-range bases use libm. */
@@ -166,8 +156,7 @@ static inline double det_pow_retention (double base, double ex) {
         return out;
     }
     return det_exp_small (product);
-}
-/* Taylor series for sin/cos on [-pi/4, pi/4] (|x| <= 0.7854).
+} /* Taylor series for sin/cos on [-pi/4, pi/4] (|x| <= 0.7854).
  * Error bounds: |err| < 1e-15 for |x| <= pi/4. */
 static inline double det_sin_small (double x) {
     if (!isfinite (x)) {
@@ -202,8 +191,7 @@ static inline double det_sin_small (double x) {
     term *= -x2 / (16.0 * 17.0);
     sum += term; /* x^17/17! */
     return sum;
-}
-static inline double det_cos_small (double x) {
+} static inline double det_cos_small (double x) {
     if (!isfinite (x)) {
         /* TRUTH: cos(non-finite) is NaN (libm). See det_sin_small. */
         det_mark_fallback_trig ();
@@ -235,8 +223,7 @@ static inline double det_cos_small (double x) {
     term *= -x2 / (15.0 * 16.0);
     sum += term; /* x^16/16! */
     return sum;
-}
-/* Argument reduction for sin/cos: reduce x to [-pi/4, pi/4] using
+} /* Argument reduction for sin/cos: reduce x to [-pi/4, pi/4] using
  * exact rational approximations of pi. Returns reduced x and quadrant. */
 static inline double det_reduce_pi4 (double x, int *quadrant) {
     /* TRUTH (Cody-Waite two-stage): pi/2 = C1+C2 with C1 low bits removed
@@ -281,8 +268,7 @@ static inline double det_reduce_pi4 (double x, int *quadrant) {
         *quadrant = (*quadrant + 3) & 3;
     }
     return x_red;
-}
-/* Full-range sin/cos via argument reduction. Bounds per header contract
+} /* Full-range sin/cos via argument reduction. Bounds per header contract
  * (|x|<=pi/4 exact; <5e-13 below 1e4; out of contract beyond 1e15).
  * PHYSICS-TRUTH: non-finite input is NaN (libm/IEEE) and marks the trig
  * fallback counter, matching det_sin_small/det_cos_small. */
@@ -305,8 +291,7 @@ static inline double det_sin (double x) {
         return -det_cos_small (xr); /* sin(x + 3pi/2) = -cos(x) */
     }
     return det_sin_small (xr); /* unreachable */
-}
-static inline double det_cos (double x) {
+} static inline double det_cos (double x) {
     if (!isfinite (x)) {
         det_mark_fallback_trig ();
         return NAN;

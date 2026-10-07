@@ -26,17 +26,11 @@
 #define math_epsilon 0.000001f
 // Structures for use as typedefs
 // Vector in 3D for objects in motion
-typedef struct {
-    float x, y, z;
-} vector3;
+typedef struct {float x, y, z;} vector3;
 // 3 ^ 3 matrix for computing Inertia tensoring
-typedef struct {
-    float matrix [3][3];
-} math3;
+typedef struct {float matrix [3][3];} math3;
 // 4D axial rotational matrix motion (w + xi + yj + zk)
-typedef struct {
-    float w, x, y, z;
-} vector4;
+typedef struct {float w, x, y, z;} vector4;
 /* Canonical aliases: quaternions are vector4 storage, but deserve a distinct
  * name for readability. mat3 is the descriptive alias for math3. */
 typedef vector4 quaternion;
@@ -44,30 +38,22 @@ typedef math3 mat3;
 // Functions for computing different vector3
 static inline vector3 vector3_new (float x_coordinate, float y_coordinate, float z_coordinate) {
     return (vector3) {x_coordinate, y_coordinate, z_coordinate};
-}
-static inline vector3 vector3_zero (void) {
+} static inline vector3 vector3_zero (void) {
     return (vector3) {0.0f, 0.0f, 0.0f};
-}
-static inline vector3 vector3_addition (vector3 vector_a, vector3 vector_b) {
+} static inline vector3 vector3_addition (vector3 vector_a, vector3 vector_b) {
     return (vector3) {vector_a.x + vector_b.x, vector_a.y + vector_b.y, vector_a.z + vector_b.z};
-}
-static inline vector3 vector3_subtraction (vector3 vector_a, vector3 vector_b) {
+} static inline vector3 vector3_subtraction (vector3 vector_a, vector3 vector_b) {
     return (vector3) {vector_a.x - vector_b.x, vector_a.y - vector_b.y, vector_a.z - vector_b.z};
-}
-static inline vector3 vector3_scaling (vector3 vector, float scale_factor) {
+} static inline vector3 vector3_scaling (vector3 vector, float scale_factor) {
     return (vector3) {vector.x * scale_factor, vector.y * scale_factor, vector.z * scale_factor};
-}
-// Dot: work and projection of vectors
-static inline float vector3_dot (vector3 vector_a, vector3 vector_b) {
-    return (float) (vector_a.x * vector_b.x + vector_a.y * vector_b.y + vector_a.z * vector_b.z);
-}
+} // Dot: work and projection of vectors
+static inline float vector3_dot (vector3 vector_a, vector3 vector_b) {return (float) (vector_a.x * vector_b.x + vector_a.y * vector_b.y + vector_a.z * vector_b.z);}
 // Cross: Torque conversion and computation
 static inline vector3 vector3_cross (vector3 vector_a, vector3 vector_b) {
     return (vector3) {(vector_a.y * vector_b.z - vector_a.z * vector_b.y),
                      (vector_a.z * vector_b.x - vector_a.x * vector_b.z),
                      (vector_a.x * vector_b.y - vector_a.y * vector_b.x)};
-}
-static inline float vector3_length_squared (vector3 vector) {
+} static inline float vector3_length_squared (vector3 vector) {
     if (!isfinite (vector.x) || !isfinite (vector.y) || !isfinite (vector.z)) {
         return INFINITY;
     }
@@ -77,15 +63,13 @@ static inline float vector3_length_squared (vector3 vector) {
         return INFINITY;
     }
     return (float) s;
-}
-static inline float vector3_length (vector3 vector) {
+} static inline float vector3_length (vector3 vector) {
     float s2 = vector3_length_squared (vector);
     if (!isfinite (s2)) {
         return INFINITY;
     }
     return sqrtf (s2);
-}
-static inline vector3 vector3_normalisation (vector3 vector) {
+} static inline vector3 vector3_normalisation (vector3 vector) {
     if (!isfinite (vector.x) || !isfinite (vector.y) || !isfinite (vector.z)) {
         return vector3_zero ();
     }
@@ -98,8 +82,7 @@ static inline vector3 vector3_normalisation (vector3 vector) {
 // orientation in rotational w-axis w/o gimbal in any axis
 static inline vector4 vector4_identity () {
     return (vector4) {1.0f, 0.0f, 0.0f, 0.0f};
-}
-static inline vector4 vector4_normalisation (vector4 quaternion) {
+} static inline vector4 vector4_normalisation (vector4 quaternion) {
     if (!isfinite (quaternion.w) || !isfinite (quaternion.x) || !isfinite (quaternion.y) || !isfinite (quaternion.z)) {
         return vector4_identity ();
     }
@@ -232,8 +215,7 @@ static inline math3 math3_multiplication (math3 matrix_a, math3 matrix_b) {
         }
     }
     return result_matrix;
-}
-static inline math3 math3_transposition (math3 matrix) {
+} static inline math3 math3_transposition (math3 matrix) {
     math3 result_matrix;
     for (int row_index = 0; row_index < 3; row_index++) {
         for (int column_index = 0; column_index < 3; column_index++) {

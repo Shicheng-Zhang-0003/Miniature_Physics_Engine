@@ -194,7 +194,7 @@ static void long_run_validation_evaluate (void) {
     int current_fallen_count = 0;
     int current_nan_count = 0;
     for (int object_index = 0; object_index < (physics_world_get_primary () -> body_count); object_index++) {
-        rigidbody *rigid_body = &(physics_world_get_primary () -> bodies)[object_index];
+        rigidbody *rigid_body = &(physics_world_get_primary () -> bodies) [object_index];
         if (a3_task13_body_is_invalid (rigid_body)) {
             current_nan_count++;
             continue;
@@ -306,5 +306,4 @@ void long_run_validation_start (int duration_ticks) {
     }
     /* MPE_TASK_39_CONFIG_REPORT_END */
     fflush (stdout);
-}
-/* MPE_TASK_13_LONG_RUN_HELPERS_END */
+} /* MPE_TASK_13_LONG_RUN_HELPERS_END */

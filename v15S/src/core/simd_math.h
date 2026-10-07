@@ -28,38 +28,27 @@ static inline vector3 simd_add (vector3 a, vector3 b) {
     float out [4];
     _mm_storeu_ps (out, vc);
     return (vector3) {out [0], out [1], out [2]};
-}
-static inline vector3 simd_sub (vector3 a, vector3 b) {
+} static inline vector3 simd_sub (vector3 a, vector3 b) {
     __m128 va = _mm_set_ps (0.0f, a.z, a.y, a.x);
     __m128 vb = _mm_set_ps (0.0f, b.z, b.y, b.x);
     __m128 vc = _mm_sub_ps (va, vb);
     float out [4];
     _mm_storeu_ps (out, vc);
     return (vector3) {out [0], out [1], out [2]};
-}
-static inline vector3 simd_scale (vector3 a, float s) {
+} static inline vector3 simd_scale (vector3 a, float s) {
     __m128 va = _mm_set_ps (0.0f, a.z, a.y, a.x);
     __m128 vs = _mm_set1_ps (s);
     __m128 vc = _mm_mul_ps (va, vs);
     float out [4];
     _mm_storeu_ps (out, vc);
     return (vector3) {out [0], out [1], out [2]};
-}
-static inline int simd_available (void) {
+} static inline int simd_available (void) {
     return 1;
 }
 #else
-static inline vector3 simd_add (vector3 a, vector3 b) {
-    return vector3_addition (a, b);
-}
-static inline vector3 simd_sub (vector3 a, vector3 b) {
-    return vector3_subtraction (a, b);
-}
-static inline vector3 simd_scale (vector3 a, float s) {
-    return vector3_scaling (a, s);
-}
-static inline int simd_available (void) {
-    return 0;
-}
+static inline vector3 simd_add (vector3 a, vector3 b) {return vector3_addition (a, b);}
+static inline vector3 simd_sub (vector3 a, vector3 b) {return vector3_subtraction (a, b);}
+static inline vector3 simd_scale (vector3 a, float s) {return vector3_scaling (a, s);}
+static inline int simd_available (void) {return 0;}
 #endif
 #endif

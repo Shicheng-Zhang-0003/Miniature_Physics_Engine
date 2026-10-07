@@ -4,12 +4,13 @@
 #include <float.h>
 #ifndef exemplar_formatting_h
 #define exemplar_formatting_h
-/* STYLE REFERENCE ONLY — never #include this file. It records spacing rules
- * (space-before-paren, name [i][j], spaced ->, // notes), not content: live
- * math3d.h has since gained degrad_f/double-degrad (LIE-13) and expanded
- * structs, deliberately not mirrored in layout (see .clang-format delta).
- * Guard renamed from math3d_h (which would have silently skipped this file
- * had anyone ever included both). */
+/* STYLE REFERENCE ONLY — never #include this file. It is the sole formatting
+ * authority (space-before-paren, name [i][j], spaced ->, // notes, packed
+ * single-line short functions, chained `} next-def`, stacked if/else bodies,
+ * zero blank lines save the one before #endif). Live headers have since
+ * gained content (e.g. degrad_f/double-degrad, LIE-13) deliberately not
+ * mirrored in layout here. Guard renamed from math3d_h (which would have
+ * silently skipped this file had anyone ever included both). */
 #ifndef math_pi
 #define math_pi 3.14159265358979323846f
 #endif
