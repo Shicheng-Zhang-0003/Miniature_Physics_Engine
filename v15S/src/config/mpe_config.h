@@ -78,6 +78,13 @@ typedef struct {
         /* max_restitution_bias REMOVED (dead knob; Newton bound is physical). */
         float static_friction_thresh;
         float warm_start_match_dist_sq;
+        /* DESPOT-2026-10-08 damped warm-start experiment: scales cached
+         * normal seed (0.0 = cold, current proven behaviour; 1.0 = full
+         * restore, measured regression F10 4/27 + f11 0.28 m). Default 0.0
+         * so shipped behaviour is byte-identical. Temp harnesses may set
+         * 0.1/0.2/0.5 to test the damped hypothesis against f10/f11 gates;
+         * promotion requires stability proof, not a knob flip. */
+        float warm_start_damping;
     } solver;
     struct {
         float correction_factor;

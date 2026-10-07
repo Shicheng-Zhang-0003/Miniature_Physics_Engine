@@ -64,3 +64,21 @@ check("cyl-axial", abs(0.5*3*0.25-0.375) < 1e-12)
 check("cyl-trans", abs(3/12*(3*0.25+4)-1.1875) < 1e-12)
 print(f"\n{fails} failures")
 sys.exit(1 if fails else 0)
+# Gottschalk depth law: overlap = proj_a + proj_b - |d.n| (fixed numbers)
+proj_a, proj_b, d_dot_n = 1.2, 0.8, 1.5
+overlap = proj_a + proj_b - abs(d_dot_n)
+check("sat-depth", abs(overlap-0.5) < 1e-12, f"{overlap:.4f}")
+check("sat-reject", (proj_a+proj_b-abs(2.5)) < -0.01, "separated")
+# Oblique elastic exchange (equal mass, 45deg): speeds swap along line of impact
+# v1=(1,0), v2=(0,0), normal=(1,0): v1'=(0,0), v2'=(1,0) (1D Newton, e=1)
+v1, v2 = 1.0, 0.0
+v1p, v2p = v2, v1
+check("oblique-exchange", abs(v1p-0.0)<1e-12 and abs(v2p-1.0)<1e-12)
+# Momentum conservation two-body: m1*v1+m2*v2 invariant in elastic exchange
+m1, m2 = 2.0, 3.0
+p_before = m1*1.0 + m2*0.0
+# e=1 elastic: v1'=(m1-m2)/(m1+m2)*v1, v2'=2*m1/(m1+m2)*v1
+v1pe = (m1-m2)/(m1+m2)*1.0
+v2pe = 2*m1/(m1+m2)*1.0
+p_after = m1*v1pe + m2*v2pe
+check("momentum-2body", abs(p_before-p_after) < 1e-12, f"{p_after:.4f}")

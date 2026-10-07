@@ -389,8 +389,25 @@ void collision_prepare_solver (struct physics_world *world, collision_data *sour
          * the TANGENT impulses are warm-started; the normal — which carries
          * the large majority of the impulse — is cold every tick. The docs
          * have been corrected to say so. Re-enable normal warm-start only
-         * with a stability proof on f10_long_run. */
-        cp -> accumulated_normal_impulse = 0.0f;
+         * with a stability proof on f10_long_run.
+         * DESPOT-2026-10-08 damped experiment: solver.warm_start_damping
+         * scales the cached normal (0=cold proven default, 1=full restore
+         * known regression). Nonzero is EXPERIMENT ONLY; torture pins 0. */
+        {
+            const mpe_config_t *wcfg = world ? mpe_world_cfg (world) : &g_cfg;
+            float damp = wcfg -> solver.warm_start_damping;
+            if ((damp > 0.0f) && isfinite (damp)) {
+                if (damp > 1.0f) {
+                    damp = 1.0f;
+                }
+                cp -> accumulated_normal_impulse *= damp;
+                if (world) {
+                    world -> contact_cache_hits_applied++;
+                }
+            } else {
+                cp -> accumulated_normal_impulse = 0.0f;
+            }
+        }
         vector3 va = vector3_addition (m -> object_a -> velocity, vector3_cross (m -> object_a -> angular_velocity, cp -> ra));
         vector3 vb = vector3_addition (m -> object_b -> velocity, vector3_cross (m -> object_b -> angular_velocity, cp -> rb));
         vector3 rel_vel = vector3_subtraction (vb, va);

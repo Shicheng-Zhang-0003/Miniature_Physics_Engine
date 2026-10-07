@@ -277,7 +277,7 @@ MPE ships with built-in stability tests:
 | `F8` | Spawn stress: up to 300 mixed objects |
 | `F9` | Print validation report |
 | `F10` | Long-run validation: 3600 ticks (60 s) of idle stability |
-| `F11` | Config torture: 79 tunables randomised to extremes, then 3600 ticks |
+| `F11` | Config torture: 80 tunables randomised to extremes, then 3600 ticks |
 
 `F10` monitors for NaN values, fallen objects, and residual motion, printing `PASS`/`FAIL` at the end. `F11` is a robustness verdict — `PASS` means no NaN and nothing fell through the world (speeds reported, never gated; under extremes, perpetual fall/creep can be the true outcome). Each F11 press uses the next printed seed. Torture pins solver resolution (gravity −17…−1, ≥96 iterations — proven envelope for the 10:1 validation column) while material/world extremes stay fully random.
 

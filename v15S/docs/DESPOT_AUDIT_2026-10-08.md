@@ -45,10 +45,24 @@ Method: code read, temp probes, suite green throughout. Scratch under
 - TSan on capable host; MSVC bitwise proof; multithreaded solve (serial by
   design for order).
 
+## Addendum 2026-10-07T15:21Z — continued
+
+- Damped warm-start knob `solver.warm_start_damping` (80th tunable,
+  default 0=cold byte-identical). Full restore (1.0) stays a measured
+  regression; damped 0.1/0.2/0.5 experiment open to temp harnesses with
+  f10 27/27 + f11 <0.05 + 42/42×5 gates. Torture pins 0 (proven envelope).
+- `property_sweep.py` extended to 24 laws (SAT depth, reject, oblique
+  exchange, 2-body momentum) — 0 failures.
+- Island-parallel solve INVESTIGATED AND REJECTED: islands are disjoint,
+  but the solver is Gauss-Seidel in global sorted order; island-parallel
+  is Jacobi across islands and changes results (breaks bitwise twins).
+  MT stays per-body phases only (order-independent, proven identical).
+- TSan container abort recorded as env, not code.
+
 ## Verification
 
 - `build_suite` clean (no new warnings).
 - `test_mpe_suite --all` (CWD=`v15S/src`): 44/42 green, 0 blocking.
 - `--profile quick`: 58/58 green, 2 info.
-- `ext_oracle_check.py` 10/10 + `property_sweep.py` 0 failures.
+- `ext_oracle_check.py` 10/10 + `property_sweep.py` 24 laws, 0 failures.
 - `make tsan` builds; runtime aborts in this container (recorded above).

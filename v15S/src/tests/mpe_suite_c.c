@@ -634,6 +634,12 @@ int mpe_t_f11_torture (void) {
     if (g_cfg.timestep.solver_iterations < 96) {
         g_cfg.timestep.solver_iterations = 96;
     }
+    /* DESPOT-2026-10-08: warm-start damping is an experiment knob (default
+     * 0=cold proven). Torture randomizes the whole registry including it;
+     * pin to 0 here to preserve the proven resolution envelope (like
+     * iters>=96). Damped-seed experiments set it explicitly via temp
+     * harnesses, never via torture. */
+    g_cfg.solver.warm_start_damping = 0.0f;
     if (g_cfg.solver.penetration_slop > 0.02f) {
         g_cfg.solver.penetration_slop = 0.010f;
     }
