@@ -8,9 +8,11 @@
 > defaults).
 >
 > **Headless truth: 44 registered / 42 blocking green + 2 diagnostic, 0 blocking
-> failures**, and 234/234 verification checks pass under AddressSanitizer +
-> UndefinedBehaviorSanitizer (`--profile full`, 2026-10-03). Two known-red
-> markers surface as non-blocking `xfail`, never as green.
+> failures**, and 232 verification checks pass + 2 xfailed (1 distinct
+> red frontier × plain+sanitizer runs) + 6 informational under
+> AddressSanitizer + UndefinedBehaviorSanitizer (`--profile full`,
+> 2026-10-07; total 234). The single known-red frontier is `MFS-STRAFE-F2`
+> (phys 0.63 vs odom 0.91), surfaced as non-blocking `xfail`, never as green.
 >
 > What is *not* yet claimed: the live-window all-clear is still pending user
 > confirmation, so until this notice is lifted, prefer the last known proper
@@ -24,7 +26,7 @@
 
 ## 📋 Overview
 
-MPE is a custom-built **3D rigid-body physics engine and real-time rendering pipeline**, written entirely in **C**. It runs on a **zero-dependency core** — engine needs **GTK4** (windowing/UI) + **OpenGL via libepoxy** + **X11**; `mpe-tui` additionally needs **ncurses**. Headless tests need only libc+libm+libdl.
+MPE is a custom-built **3D rigid-body physics engine and real-time rendering pipeline**, written entirely in **C**. It runs on a **zero-dependency core** — engine needs **GTK4** (windowing/UI) + **OpenGL via libepoxy** + **X11**; `mpe-tui` additionally needs **ncurses**. The bare `MPE_TEST_CORE` link needs only libc+libm+libdl, but the shipped `--profile full` ritual (engine build + TUI smoke) needs GTK4/epoxy/ncurses — see Verification suite below. P0 gates F5–F8 need a live window + human eye; headless `f10_long_run`/`f11_torture` stand in where noted.
 
 MPE is built around four priorities:
 
@@ -313,7 +315,7 @@ make
 
 ## 📜 Version History
 
-- **v15S (current head)** — GTK4 port, module system (MPI hot-plug), per-world config, data-structure upgrades (growable pools, O(1) caches), kernel global-state removal, TUI stress suite (`stress`/`ccd` scenes, backend flags), 44 registered / 42 blocking green (the 2 diag-informational cases are additional and are excluded from the blocking 42) plus a 234-check verification profile green under ASan+UBSan; DESPOT-2026-10-03: floor raised 42 -> 44 and the meta_rotation / meta_convergence gates made genuinely blocking after both were found unable to fail. DESPOT-2026-10-04: F11 torture-leak recurrence closed (`engine.cfg` restored from backup and guarded on every save/exit path, in-memory snapshot, config-mutation runner contract); every physics formula re-verified against textbook statements (no errors — the Tom-and-Jerry physics was configuration, not mathematics); `[CLAMP-TAUTOLOGY]` closed (net-OFF + fall-speed + ever-contact gates); regime matrix revived (33 blinding re-inits removed, 13 premise pins, `MPE_SKIPPED` −1; all five regimes 42/42); `[FRICTION-THRESH]` root-caused (memoryless per-iteration selection) and fixed (tick-start snapshot: breakaway 0.999–1.005 of μ_s·N); `meta_convergence` arm-ratio withdrawn for measured chaos with calm-top-arm gates kept; MFS tank pivot re-baselined 0.0530 → 0.0642 m with cause chain. DESPOT-2026-10-04b: FTC streamlined to one field / one robot / one controller (terminal `ftc` is spawn/drive/stop/telemetry mecanum-only; `eco` is attach/detach/command; bundle attaches ftc-fleet only with the BioBuzz game parked but registered; full profile still 234 green incl. all 14 MFS gates).
+- **v15S (current head)** — GTK4 port, module system (MPI hot-plug), per-world config, data-structure upgrades (growable pools, O(1) caches), kernel global-state removal, TUI stress suite (`stress`/`ccd` scenes, backend flags), 44 registered / 42 blocking green (the 2 diag-informational cases are additional and are excluded from the blocking 42) plus a 234-check verification profile (232 pass + 2 xfail + 6 info) green under ASan+UBSan; DESPOT-2026-10-03: floor raised 42 -> 44 and the meta_rotation / meta_convergence gates made genuinely blocking after both were found unable to fail. DESPOT-2026-10-04: F11 torture-leak recurrence closed (`engine.cfg` restored from backup and guarded on every save/exit path, in-memory snapshot, config-mutation runner contract); every physics formula re-verified against textbook statements (no errors — the Tom-and-Jerry physics was configuration, not mathematics); `[CLAMP-TAUTOLOGY]` closed (net-OFF + fall-speed + ever-contact gates); regime matrix revived (33 blinding re-inits removed, 13 premise pins, `MPE_SKIPPED` −1; all five regimes 42/42 on unpinned dimensions; 13 premise pins run identical config by design (oracle measures its law, not the regime) — see docs/VALIDATION.md regime-pin list); `[FRICTION-THRESH]` root-caused (memoryless per-iteration selection) and fixed (tick-start snapshot: breakaway 0.999–1.005 of μ_s·N); `meta_convergence` arm-ratio withdrawn for measured chaos with calm-top-arm gates kept; MFS tank pivot re-baselined 0.0530 → 0.0642 m with cause chain. DESPOT-2026-10-04b: FTC streamlined to one field / one robot / one controller (terminal `ftc` is spawn/drive/stop/telemetry mecanum-only; `eco` is attach/detach/command; bundle attaches ftc-fleet only with the BioBuzz game parked but registered; full profile still 232 pass + 2 xfail (total 234) incl. 15 inner MFS tests (5 outer wrappers), 1 distinct F2 frontier).
 - **v15R3 (release)** — configuration system, physics-truth pass, full constraint framework, TUI debugger + snapshot suite, 29/29 headless green. Release notes: [`release_notes_v15R3.md`](release_notes_v15R3.md).
 - **v15R2** — config-system hardening + MFS robotics (prior RC, parked (now consolidated in `v15S/src/ecosystem/mfs/`)).
 - **v1.4 Alpha RC3** — domain-driven restructure, spatial-hash broadphase, physics-world encapsulation.

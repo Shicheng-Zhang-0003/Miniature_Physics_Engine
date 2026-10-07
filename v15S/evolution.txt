@@ -64,7 +64,7 @@ Despot-1004: torture-leak recurrence closed (engine.cfg restored+guarded,
   13 pins, MPE_SKIPPED -1, all 5 regimes 42/42); [FRICTION-THRESH] root
   caused (per-iteration selection) and fixed (tick-start snapshot:
   0.999-1.005 of mu_s*N); meta (b) withdrawn for measured chaos with
-  calm-top gates; MFS tank re-baselined 0.0530->0.0642; full 234 green.
+  calm-top gates; MFS tank re-baselined 0.0530->0.0642; 232 pass + 2 xfail (total 234) green.
 
 Despot-1004b: FTC streamlined (v15S release blocker): one field, one robot,
   one controller. `ftc` terminal command is spawn/drive/stop/telemetry,
@@ -74,14 +74,14 @@ Despot-1004b: FTC streamlined (v15S release blocker): one field, one robot,
   Bundle `eco attach` brings up ftc-fleet only; BioBuzz game module
   (intake/shooter/balls/gamepad) registered but parked, explicitly
   attachable; GTK robot registry noted parked (already build-excluded).
-  Full profile still 234 green incl. all 14 MFS gates.
+  Full profile still 232 pass + 2 xfail (total 234) incl. 15 inner MFS tests (5 outer wrappers).
 
 Despot-1004c: F310 gamepad is the single robot controller
   (ui_input/gamepad_drive.c: dlsym'd pad+fleet symbols, START toggle,
   LB+RB e-stop, stop-once on disconnect/vanish, hot-plug retry; hooked
   pre-physics in the GUI frame only). Terminal `ftc drive`/`stop` removed
   (spawn/telemetry remain); tank stays in engine/tests/bundle API.
-  Full profile still 234 green incl. all 14 MFS gates.
+  Full profile still 232 pass + 2 xfail (total 234) incl. 15 inner MFS tests (5 outer wrappers).
 
 Despot-1004d: live robot physics fixed (release storm + glide + tilt).
   Idle runs explicit regen (observer storm gone), slew bypassed at idle,
@@ -89,14 +89,14 @@ Despot-1004d: live robot physics fixed (release storm + glide + tilt).
   real 0.9/0.7 hub friction (longitudinal coupling restored, one cone),
   spawn paths auto-raise to 128 iters (40:1 joints converge, tilt flat).
   Mecanum strafe byte-identical. New release_settle gate (15/15 MFS).
-  Full profile still 234 green.
+  Full profile still 232 pass + 2 xfail (total 234).
 
 Despot-1004e: abuse-tilt frontier recorded (pre-existing, not a regression:
   identical blowup on fully pre-change tree). Hysteretic idle switch (mode
   in hub fields, all four consumers switch together), observer handshake
   (explicit publishes tau_exp_prev; post-idle strafe 0.24->1.85m),
   proportional-cut + axle-projection tried and REVERTED with numbers
-  (cut moves tank/baselines; projection changes nothing). Full 234 green.
+  (cut moves tank/baselines; projection changes nothing). Full 232 pass + 2 xfail (total 234).
 
 Despot-1004f: live wheel-snap triage (watchdog + floor).
   ftc_watchdog_tick reports mount jumps/tilt/NaN with build tag every
@@ -110,9 +110,9 @@ Despot-1004g: snap-triage follow-through (hysteresis + handshake kept,
   Proportional cut + axle projection tried and REVERTED with gate proof
   (cut moves tank/drive baselines; projection changes nothing).
   Abuse tilt blowup proven pre-existing (identical on fully pre-change
-  tree). Full 234 green.
+  tree). Full 232 pass + 2 xfail (total 234).
 
 Despot-1004h: external cross-ref (Box2D position pass, Bullet hinge ERP)
   for axis alignment; in-loop axis bias tried at 0.3 and 0.1, both move
   MFS drive baselines non-monotonically -> REVERTED with record; joint
-  position-correction pass budgeted as its own task. Full 234 green.
+  position-correction pass budgeted as its own task. Full 232 pass + 2 xfail (total 234).
