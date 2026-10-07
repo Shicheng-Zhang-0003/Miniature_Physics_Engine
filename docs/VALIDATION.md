@@ -304,27 +304,29 @@ reason, calm-top-arm gates kept). The MFS tank pivot translates 0.0530 →
 mecanum strafe byte-identical). Full profile stays 232 pass + 2 xfail (total 234), all five
 solver regimes 42/42.
 
-## Declared coverage gaps
+## Declared coverage gaps (updated DESPOT-2026-10-08)
 
-These are **not** validated by this pass and are stated rather than assumed:
-
-- **Contact manifold generation** for non-trivial shape pairs beyond the
-  existing cylinder/sphere, cylinder/cube, cylinder/cylinder and
-  sphere/box cases. (The OBB/OBB decision *is* now gated against Gottschalk;
-  the contact *points* it generates are not.)
-- **The static-friction breakaway threshold** — see [FRICTION-THRESH] above:
-  closed 2026-10-04 (0.999–1.005 of μ_s·N across dt, iterations, μ).
-- **Angular momentum in oblique and multi-body contacts** — linear momentum
-  is gated, this is not.
-- **The revolute constraint's axis-alignment** budget: β (ERP) semantics are
-  now gated against Catto, but the axis-alignment rows carry no bias at all
-  (velocity-only) and that choice is not gated against the paper.
-- **Narrow-phase feature-pair distance functions** against Gottschalk's
-  *distance* algorithm (the paper's closest-point computation): the
-  separating-axis OVERLAP DECISION is now cross-checked 400/400, but the
-  reported penetration DEPTH and the closest-point pair are not.
-- **CCD** against Coumans/Schmidl: swept tests exist; agreement with the
-  reference discriminant is not asserted numerically.
+- **Contact manifold generation** for non-trivial pairs: OBB/OBB decision
+  gated 400/400 vs Gottschalk; contact *points* now covered by
+  `v15S/validation/property_sweep.py` laws (SAT symmetry, slop admission)
+  + `reference_math` depth spot-checks. Full closest-point-pair vs
+  Gottschalk distance algorithm remains differential-future.
+- **The static-friction breakaway threshold** — closed 2026-10-04.
+- **Angular momentum in oblique and multi-body contacts**: single-body
+  torque-free now gated 0.5% + sphere control (`angmom`); linear momentum
+  gated (`momentum`). Oblique two-body L-transfer remains open (needs an
+  analytic oblique oracle, not just conservation).
+- **Revolute axis-alignment**: β (ERP) gated; axis rows velocity-only by
+  design (drift corrected once per tick post-loop). No-bias choice
+  documented in `v15S/docs/NUMERICAL_GUARANTEES.md`; external hinge-ERP
+  cross-ref (Bullet) tried at 0.1/0.3 and reverted (moved MFS baselines).
+- **Narrow-phase depth/closest-point vs Gottschalk distance**: overlap
+  decision 400/400; depth now spot-checked in `property_sweep.py` laws.
+  Full numeric agreement still open.
+- **CCD vs Coumans/Schmidl**: q-form TOI + floor quadratic + slab sweep
+  gated (`ccd_sweep` no-tunnel at 144 m/s); obstacle-spin margin added
+  2026-10-08 (world max tip speed). Reference-discriminant numeric
+  agreement still open.
 
 ## Reproducing
 
