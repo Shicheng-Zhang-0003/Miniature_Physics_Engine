@@ -22,13 +22,10 @@ int main (int argc, char *argv []) {
     const float dt = 1.0f / 60.0f;
     for (int t = 0; t < ticks; t++) {
         physics_world_step (&world, dt);
-    }
-    int invalid = 0;
+    } int invalid = 0;
     for (int i = 0; i < world.body_count; i++) {
         rigidbody *rb = &world.bodies [i];
-        if ((!isfinite (rb -> position.x)) || (!isfinite (rb -> position.y)) || (!isfinite (rb -> position.z))) {
-            invalid++;
-        }
+        if ((!isfinite (rb -> position.x)) || (!isfinite (rb -> position.y)) || (!isfinite (rb -> position.z))) { invalid++; }
     }
     /* FIX-AUDIT-DESPOT: libm fallbacks (pow/trig) are accurate but NOT
      * bit-deterministic across platforms; a headless PASS with fallbacks is

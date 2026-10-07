@@ -59,26 +59,17 @@ static int scene_sync_parent_directory (const char *path) {
 #else
     char parent [520];
     size_t length = strlen (path);
-    if (length >= sizeof (parent)) {
-        return 0;
-    }
+    if (length >= sizeof (parent)) { return 0; }
     memcpy (parent, path, length + 1);
     char *slash = strrchr (parent, '/');
-    if (!slash) {
-        memcpy (parent, ".", 2);
-    } else if (slash == parent) {
+    if (!slash) { memcpy (parent, ".", 2); } else if (slash == parent) {
         slash [1] = '\0';
     } else {
         *slash = '\0';
-    }
-    int dir_fd = open (parent, O_RDONLY);
-    if (dir_fd < 0) {
-        return 0;
-    }
+    } int dir_fd = open (parent, O_RDONLY);
+    if (dir_fd < 0) { return 0; }
     int ok = (fsync (dir_fd) == 0);
-    if (close (dir_fd) != 0) {
-        ok = 0;
-    }
+    if (close (dir_fd) != 0) { ok = 0; }
     return ok;
 #endif
 }
@@ -91,8 +82,7 @@ int save_scene (const char *file_destination_path) {
     if (!file_destination_path || !*file_destination_path) {
         fprintf (stderr, "Error SVF01: null/empty path\n");
         return 0;
-    }
-    physics_world *world = physics_world_get_primary ();
+    } physics_world *world = physics_world_get_primary ();
     if ((!world) || (world -> body_count < 0) || (world -> body_count > mpe_max_bodies) ||
         ((world -> body_count > 0) && (!world -> bodies))) {
         fprintf (stderr, "Error SVF01: invalid primary world\n");
@@ -125,14 +115,12 @@ int save_scene (const char *file_destination_path) {
                 return 0;
             }
         }
-    }
-    char tmp_template [520];
+    } char tmp_template [520];
     if (snprintf (tmp_template, sizeof (tmp_template), "%s.XXXXXX", file_destination_path) >=
         (int) sizeof (tmp_template)) {
         fprintf (stderr, "Error SVF01: path too long\n");
         return 0;
-    }
-    int tmp_fd = mkstemp (tmp_template);
+    } int tmp_fd = mkstemp (tmp_template);
     if (tmp_fd < 0) {
         fprintf (stderr, "Error SVF01: Could not create temp file\n");
         return 0;
@@ -142,15 +130,13 @@ int save_scene (const char *file_destination_path) {
         remove (tmp_template);
         fprintf (stderr, "Error SVF03: Could not secure temp file\n");
         return 0;
-    }
-    FILE *f = fdopen (tmp_fd, "wb");
+    } FILE *f = fdopen (tmp_fd, "wb");
     if (!f) {
         close (tmp_fd);
         remove (tmp_template);
         fprintf (stderr, "Error SVF01: Could not open temp file\n");
         return 0;
-    }
-    uint32_t crc = 0xFFFFFFFFu;
+    } uint32_t crc = 0xFFFFFFFFu;
     int ok = 1;
     ok = ok && scene_w32 (f, &crc, (uint32_t) mpe_magic);
     ok = ok && scene_w32 (f, &crc, (uint32_t) mpe_version);
@@ -183,15 +169,10 @@ int save_scene (const char *file_destination_path) {
      * bound silently dropped from saves. */
     int active_springs = 0;
     for (int j = 0; j < mpe_max_joints; j++) {
-        if ((physics_world_get_primary () -> spring_joints) [j].is_active) {
-            active_springs++;
-        }
-    }
-    ok = ok && scene_w32 (f, &crc, (uint32_t) active_springs);
+        if ((physics_world_get_primary () -> spring_joints) [j].is_active) { active_springs++; }
+    } ok = ok && scene_w32 (f, &crc, (uint32_t) active_springs);
     for (int j = 0; ok && (j < mpe_max_joints); j++) {
-        if (!(physics_world_get_primary () -> spring_joints) [j].is_active) {
-            continue;
-        }
+        if (!(physics_world_get_primary () -> spring_joints) [j].is_active) { continue; }
         ok = ok && scene_w32 (f, &crc, (physics_world_get_primary () -> spring_joints) [j].object_id_a);
         ok = ok && scene_w32 (f, &crc, (physics_world_get_primary () -> spring_joints) [j].object_id_b);
         ok = ok && scene_wfloat (f, &crc, (physics_world_get_primary () -> spring_joints) [j].equilibrium_length);
@@ -203,9 +184,7 @@ int save_scene (const char *file_destination_path) {
     for (int j = 0; j < constraint_pool_capacity (); j++) {
         const constraint *c = constraint_pool_at (physics_world_get_primary (), j);
         if ((c) && (c -> type != constraint_revolute) && (c -> type != constraint_spring)) {
-            if (c -> type < constraint_fixed || c -> type > constraint_rope) {
-                continue;
-            }
+            if (c -> type < constraint_fixed || c -> type > constraint_rope) { continue; }
             constraint_counts [c -> type - constraint_fixed]++;
         }
     }
@@ -271,16 +250,11 @@ int save_scene (const char *file_destination_path) {
     int active_revolutes = 0;
     for (int j = 0; j < constraint_pool_capacity (); j++) {
         const constraint *c = constraint_pool_at (physics_world_get_primary (), j);
-        if ((c) && (c -> type == constraint_revolute)) {
-            active_revolutes++;
-        }
-    }
-    ok = ok && scene_w32 (f, &crc, (uint32_t) active_revolutes);
+        if ((c) && (c -> type == constraint_revolute)) { active_revolutes++; }
+    } ok = ok && scene_w32 (f, &crc, (uint32_t) active_revolutes);
     for (int j = 0; ok && (j < constraint_pool_capacity ()); j++) {
         const constraint *c = constraint_pool_at (physics_world_get_primary (), j);
-        if ((!c) || (c -> type != constraint_revolute)) {
-            continue;
-        }
+        if ((!c) || (c -> type != constraint_revolute)) { continue; }
         ok = ok && scene_w32 (f, &crc, (uint32_t) c -> type);
         ok = ok && scene_w32 (f, &crc, c -> body_id_a);
         ok = ok && scene_w32 (f, &crc, c -> body_id_b);
@@ -311,16 +285,10 @@ int save_scene (const char *file_destination_path) {
         return 0;
     }
     /* Surface delayed filesystem failures before publishing the staged file. */
-    if ((fflush (f) != 0) || ferror (f)) {
-        ok = 0;
-    }
+    if ((fflush (f) != 0) || ferror (f)) { ok = 0; }
     int fsync_fd = fileno (f);
-    if ((fsync_fd < 0) || (fsync (fsync_fd) != 0)) {
-        ok = 0;
-    }
-    if (fclose (f) != 0) {
-        ok = 0;
-    }
+    if ((fsync_fd < 0) || (fsync (fsync_fd) != 0)) { ok = 0; }
+    if (fclose (f) != 0) { ok = 0; }
     if (!ok) {
         fprintf (stderr, "Error SVF03: Flush or sync failure\n");
         remove (tmp_template);
@@ -340,6 +308,5 @@ int save_scene (const char *file_destination_path) {
         fprintf (stderr,
                  "Error SVF04: Scene replaced, but parent-directory sync failed; crash durability is uncertain\n");
         return 2;
-    }
-    return 1;
+    } return 1;
 }

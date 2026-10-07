@@ -17,20 +17,16 @@ static void on_main_window_destroy_gtk4 (GtkWidget *widget, gpointer user_data) 
     if (physics_timeout_id) {
         g_source_remove (physics_timeout_id);
         physics_timeout_id = 0;
-    }
-    render_cleanup ();
+    } render_cleanup ();
     physics_world_cleanup (physics_world_get_primary ());
-    if (mpe_app) {
-        g_application_quit (G_APPLICATION (mpe_app));
-    }
+    if (mpe_app) { g_application_quit (G_APPLICATION (mpe_app)); }
 }
 static void when_realised (GtkGLArea *gl_area_widget) {
     printf ("[GTK4] when_realised called\n");
     if (gtk_gl_area_get_error (gl_area_widget) != NULL) {
         printf ("[GTK4] gl_area error: %s\n", gtk_gl_area_get_error (gl_area_widget) -> message);
         return;
-    }
-    gtk_gl_area_make_current (gl_area_widget);
+    } gtk_gl_area_make_current (gl_area_widget);
     printf ("[GTK4] glMakeCurrent ok, init GL\n");
     glEnable (GL_DEPTH_TEST);
     render_init ();
@@ -44,9 +40,7 @@ static gboolean on_rendered (GtkGLArea *gl_area_widget, GdkGLContext *gl_context
     int scale = gtk_widget_get_scale_factor (GTK_WIDGET (gl_area_widget));
     int w = gtk_widget_get_width (GTK_WIDGET (gl_area_widget)) * scale;
     int h = gtk_widget_get_height (GTK_WIDGET (gl_area_widget)) * scale;
-    if ((w <= 0) || (h <= 0)) {
-        return TRUE;
-    }
+    if ((w <= 0) || (h <= 0)) { return TRUE; }
     // printf("[GTK4] on_rendered %dx%d\n", w, h);
     render_scene_current (w, h);
     return TRUE;
@@ -79,8 +73,7 @@ static void app_activate (GApplication *app, gpointer user_data) {
     } else {
         printf ("[config] defaults active (no saved config)\n");
         fflush (stdout);
-    }
-    printf ("MPE %s (GTK4)\n", a3_version_string);
+    } printf ("MPE %s (GTK4)\n", a3_version_string);
     fflush (stdout);
     physics_world_init (physics_world_get_primary ());
     initialize_camera (&main_camera_fov, (vector3) {0.0f, 20.0f, 50.0f});
@@ -92,8 +85,7 @@ static void app_activate (GApplication *app, gpointer user_data) {
         char mpe_window_title [128];
         snprintf (mpe_window_title, sizeof (mpe_window_title), "MPE %s — GTK4", a3_version_string);
         gtk_window_set_title (GTK_WINDOW (main_window), mpe_window_title);
-    }
-    gtk_window_set_default_size (GTK_WINDOW (main_window), 1280, 720);
+    } gtk_window_set_default_size (GTK_WINDOW (main_window), 1280, 720);
     g_signal_connect (main_window, "destroy", G_CALLBACK (on_main_window_destroy_gtk4), NULL);
     GtkWidget *gl_area_widget = gtk_gl_area_new ();
     g_gl_area = gl_area_widget;
@@ -139,12 +131,9 @@ int main_algorithm (int argc, char *argv []) {
      * the clean engine.cfg (the 2026-10-04 Tom-and-Jerry incident). Restore
      * first, save guarded second, and report a failed save honestly. */
     long_run_validation_cancel_restore ();
-    if (mpe_config_save_guarded ("status/engine.cfg")) {
-        printf ("[config] saved status/engine.cfg\n");
-    } else {
+    if (mpe_config_save_guarded ("status/engine.cfg")) { printf ("[config] saved status/engine.cfg\n"); } else {
         fprintf (stderr, "[config] exit save FAILED or refused (torture live); clean file untouched\n");
-    }
-    return status;
+    } return status;
 }
 int main (int argc, char *argv []) {return main_algorithm (argc, argv);}
 #else /* ====================== GTK3 PATH (unchanged) ====================== */
@@ -154,15 +143,12 @@ static void on_main_window_destroy (GtkWidget *widget, gpointer user_data) {
     if (physics_timeout_id) {
         g_source_remove (physics_timeout_id);
         physics_timeout_id = 0;
-    }
-    render_cleanup ();
+    } render_cleanup ();
     physics_world_cleanup (physics_world_get_primary ());
     gtk_main_quit ();
 } // On Call
 static void when_realised_GTK3 (GtkGLArea *gl_area_widget) {
-    if (gtk_gl_area_get_error (gl_area_widget) != NULL) {
-        return;
-    }
+    if (gtk_gl_area_get_error (gl_area_widget) != NULL) { return; }
     gtk_gl_area_make_current (gl_area_widget);
     // Init OpenGL Status
     glEnable (GL_DEPTH_TEST); // Test Depth Signal
@@ -175,13 +161,10 @@ static gboolean on_rendered_GTK3 (GtkGLArea *gl_area_widget, GdkGLContext *gl_co
     int screen_scale_factor = gtk_widget_get_scale_factor (GTK_WIDGET (gl_area_widget));
     int widget_width = gtk_widget_get_allocated_width (GTK_WIDGET (gl_area_widget)) * screen_scale_factor;
     int widget_height = gtk_widget_get_allocated_height (GTK_WIDGET (gl_area_widget)) * screen_scale_factor;
-    if ((widget_width <= 0) || (widget_height <= 0)) {
-        return TRUE;
-    }
+    if ((widget_width <= 0) || (widget_height <= 0)) { return TRUE; }
     render_scene_current (widget_width, widget_height);
     return TRUE;
-}
-int main_algorithm (int argc, char *argv []);
+} int main_algorithm (int argc, char *argv []);
 int main_algorithm (int argc, char *argv []) {
     /* DESPOT-2026-09-29: THIS LINE WAS THE MOUSE LOCK BUG.
      *
@@ -215,11 +198,7 @@ int main_algorithm (int argc, char *argv []) {
     mpe_config_ensure_ready (); /* was mpe_config_init(): must precede the scene */
     event_log_init (); /* MPE_TASK_V15R2_EVENT_LOG_INIT */
     /* MPE_TASK_34_CONFIG_LOAD_BEGIN */
-    if (mpe_config_load ("status/engine.cfg")) {
-        printf ("[config] loaded status/engine.cfg\n");
-    } else {
-        printf ("[config] defaults active (no saved config)\n");
-    }
+    if (mpe_config_load ("status/engine.cfg")) { printf ("[config] loaded status/engine.cfg\n"); } else { printf ("[config] defaults active (no saved config)\n"); }
     /* MPE_TASK_34_CONFIG_LOAD_END */
     printf ("MPE %s\n", a3_version_string); /* A3_PATCH_41_FINAL_VALIDATION */
     /* Primary simulation world owns all sim state (bodies, joints,
@@ -236,8 +215,7 @@ int main_algorithm (int argc, char *argv []) {
         char mpe_window_title [128];
         snprintf (mpe_window_title, sizeof (mpe_window_title), "MPE %s", a3_version_string);
         gtk_window_set_title (GTK_WINDOW (main_window), mpe_window_title);
-    }
-    g_signal_connect (main_window, "destroy", G_CALLBACK (on_main_window_destroy), NULL);
+    } g_signal_connect (main_window, "destroy", G_CALLBACK (on_main_window_destroy), NULL);
     GtkWidget *gl_area_widget = gtk_gl_area_new ();
     gtk_gl_area_set_has_depth_buffer (GTK_GL_AREA (gl_area_widget), TRUE);
     // Keyboard and Mouse Events
@@ -269,11 +247,7 @@ int main_algorithm (int argc, char *argv []) {
     /* MPE_TASK_34_CONFIG_SAVE_BEGIN */
     /* DESPOT-2026-10-04: same torture guard as the GTK4 exit (see above). */
     long_run_validation_cancel_restore ();
-    if (mpe_config_save_guarded ("status/engine.cfg")) {
-        printf ("[config] saved status/engine.cfg\n");
-    } else {
-        fprintf (stderr, "[config] exit save FAILED or refused (torture live); clean file untouched\n");
-    }
+    if (mpe_config_save_guarded ("status/engine.cfg")) { printf ("[config] saved status/engine.cfg\n"); } else { fprintf (stderr, "[config] exit save FAILED or refused (torture live); clean file untouched\n"); }
     /* MPE_TASK_34_CONFIG_SAVE_END */
     return 0;
 }

@@ -9,8 +9,7 @@ static void crc_make_table (void) {
         uint32_t c = n;
         for (int k = 0; k < 8; k++) {
             c = (c & 1u) ? (0xEDB88320u ^ (c >> 1)) : (c >> 1);
-        }
-        crc_table [n] = c;
+        } crc_table [n] = c;
     }
 }
 uint32_t scene_crc32_update (uint32_t crc, const void *data, unsigned long length) {
@@ -20,8 +19,7 @@ uint32_t scene_crc32_update (uint32_t crc, const void *data, unsigned long lengt
     const unsigned char *bytes = (const unsigned char *) data;
     for (unsigned long i = 0; i < length; i++) {
         crc = crc_table [(crc ^ bytes [i]) & 0xFFu] ^ (crc >> 8);
-    }
-    return crc;
+    } return crc;
 }
 static void encode_le32 (unsigned char out [4], uint32_t v) {
     out [0] = (unsigned char) (v & 0xFFu);
@@ -33,12 +31,8 @@ static uint32_t decode_le32 (const unsigned char in [4]) {return ((uint32_t) in 
 int scene_w32 (FILE *f, uint32_t *crc, uint32_t v) {
     unsigned char buf [4];
     encode_le32 (buf, v);
-    if (fwrite (buf, 1, 4, f) != 4) {
-        return 0;
-    }
-    if (crc) {
-        *crc = scene_crc32_update (*crc, buf, 4);
-    }
+    if (fwrite (buf, 1, 4, f) != 4) { return 0; }
+    if (crc) { *crc = scene_crc32_update (*crc, buf, 4); }
     return 1;
 }
 int scene_wfloat (FILE *f, uint32_t *crc, float v) {
@@ -51,12 +45,8 @@ int scene_wfloat (FILE *f, uint32_t *crc, float v) {
 }
 int scene_r32 (FILE *f, uint32_t *crc, uint32_t *v) {
     unsigned char buf [4];
-    if (fread (buf, 1, 4, f) != 4) {
-        return 0;
-    }
-    if (crc) {
-        *crc = scene_crc32_update (*crc, buf, 4);
-    }
+    if (fread (buf, 1, 4, f) != 4) { return 0; }
+    if (crc) { *crc = scene_crc32_update (*crc, buf, 4); }
     * v = decode_le32 (buf);
     return 1;
 }
@@ -66,9 +56,7 @@ int scene_rfloat (FILE *f, uint32_t *crc, float *v) {
         float f;
         uint32_t u;
     } converter;
-    if (!scene_r32 (f, crc, &u)) {
-        return 0;
-    }
+    if (!scene_r32 (f, crc, &u)) { return 0; }
     converter.u = u;
     *v = converter.f;
     return 1;
@@ -90,8 +78,7 @@ static uint32_t hash_float_le (uint32_t crc, float f) {
     memcpy (&u, &f, sizeof (u));
     if (f == 0.0f) {
         u = 0u; /* canonicalize +/-0 */
-    }
-    return hash_u32_le (crc, u);
+    } return hash_u32_le (crc, u);
 }
 uint32_t physics_world_hash_state (const struct physics_world *world) {
     /* DESPOT-2026-10-07 P2-2: hashes pos/vel/orient/ids ONLY. Omits angular
@@ -100,9 +87,7 @@ uint32_t physics_world_hash_state (const struct physics_world *world) {
      * differing only in spin, mass or hinge state hash EQUAL — the lockstep
      * desync detector is blind to those classes. Documented, not widened:
      * widening changes every golden hash. Use for translation lockstep only. */
-    if (!world || !world -> bodies || world -> body_count <= 0) {
-        return 0u;
-    }
+    if (!world || !world -> bodies || world -> body_count <= 0) { return 0u; }
     uint32_t crc = 0xFFFFFFFFu;
     crc = hash_u32_le (crc, (uint32_t) world -> body_count);
     for (int i = 0; i < world -> body_count; i++) {
@@ -120,6 +105,5 @@ uint32_t physics_world_hash_state (const struct physics_world *world) {
         crc = hash_float_le (crc, rb -> orientation.x);
         crc = hash_float_le (crc, rb -> orientation.y);
         crc = hash_float_le (crc, rb -> orientation.z);
-    }
-    return crc ^ 0xFFFFFFFFu;
+    } return crc ^ 0xFFFFFFFFu;
 }

@@ -35,9 +35,7 @@ static bool a3_contact_anisotropy_axis (const physics_world *world, const rigidb
             break;
         }
     }
-    if (!owner) {
-        return false;
-    }
+    if (!owner) { return false; }
     const rigidbody *frame = owner;
     if (world && (owner -> friction_anisotropy_frame != 0)) {
         /* FIX-AUDIT-DESPOT: was an O(n) id scan per CONTACT (prepare runs
@@ -46,11 +44,8 @@ static bool a3_contact_anisotropy_axis (const physics_world *world, const rigidb
          * the live array and misses safely, so stale frames degrade to the
          * owner's own frame, never to a wrong body). */
         int frame_idx = physics_world_index_by_id ((physics_world *) world, owner -> friction_anisotropy_frame);
-        if ((frame_idx >= 0) && (frame_idx < world -> body_count)) {
-            frame = &world -> bodies [frame_idx];
-        }
-    }
-    * out_axis = vector4_rotate_to_vector3 (frame -> orientation, owner -> friction_anisotropy_axis);
+        if ((frame_idx >= 0) && (frame_idx < world -> body_count)) { frame = &world -> bodies [frame_idx]; }
+    } * out_axis = vector4_rotate_to_vector3 (frame -> orientation, owner -> friction_anisotropy_axis);
     return true;
 } /* Tangent basis for an anisotropic contact, built from the MATERIAL axis
  * rather than from the slip direction.
@@ -73,23 +68,15 @@ static bool a3_contact_anisotropy_axis (const physics_world *world, const rigidb
 static bool a3_anisotropic_tangent_frame (const physics_world *world, const rigidbody *body_a, const rigidbody *body_b,
                                           vector3 normal, vector3 *out_t1, vector3 *out_t2) {
     vector3 axis;
-    if (!a3_contact_anisotropy_axis (world, body_a, body_b, &axis)) {
-        return false;
-    }
-    if (!isfinite (axis.x) || !isfinite (axis.y) || !isfinite (axis.z) || (vector3_length_squared (axis) < 1.0e-8f)) {
-        return false;
-    }
+    if (!a3_contact_anisotropy_axis (world, body_a, body_b, &axis)) { return false; }
+    if (!isfinite (axis.x) || !isfinite (axis.y) || !isfinite (axis.z) || (vector3_length_squared (axis) < 1.0e-8f)) { return false; }
     /* Project into the contact plane; an axis normal to the contact describes
      * no in-plane direction, so it is not a usable tangent frame. */
     vector3 t1 = vector3_subtraction (axis, vector3_scaling (normal, vector3_dot (axis, normal)));
-    if (vector3_length_squared (t1) < 1.0e-6f) {
-        return false;
-    }
+    if (vector3_length_squared (t1) < 1.0e-6f) { return false; }
     t1 = vector3_normalisation (t1);
     vector3 t2 = vector3_cross (normal, t1);
-    if (vector3_length_squared (t2) < 1.0e-6f) {
-        return false;
-    }
+    if (vector3_length_squared (t2) < 1.0e-6f) { return false; }
     * out_t1 = t1;
     *out_t2 = vector3_normalisation (t2);
     return true;
@@ -120,25 +107,15 @@ static inline uint32_t contact_pair_key (uint32_t id_a, uint32_t id_b) {
  * bodies must match exactly or warm-start injects stale impulses. */
 static uint32_t a3_task05_body_property_stamp (const rigidbody *rigid_body) {return a3_contact_cache_body_stamp (rigid_body);}
 static bool a3_task05_cached_impulses_are_usable (float normal_impulse, float tangent_impulse) {
-    if ((!isfinite (normal_impulse)) || (!isfinite (tangent_impulse))) {
-        return false;
-    }
-    if (normal_impulse < 0.0f) {
-        return false;
-    }
-    if (fabsf (normal_impulse) > 1000000.0f) {
-        return false;
-    }
-    if (fabsf (tangent_impulse) > 1000000.0f) {
-        return false;
-    }
+    if ((!isfinite (normal_impulse)) || (!isfinite (tangent_impulse))) { return false; }
+    if (normal_impulse < 0.0f) { return false; }
+    if (fabsf (normal_impulse) > 1000000.0f) { return false; }
+    if (fabsf (tangent_impulse) > 1000000.0f) { return false; }
     return true;
 }
 static int contact_cache_match_role (const cached_contact *cc, uint32_t id_a, uint32_t id_b, uint32_t stamp_a,
                                      uint32_t stamp_b, vector3 local_a, vector3 local_b, float match_dist_sq) {
-    if ((!cc) || (id_a == 0) || (id_b == 0)) {
-        return 0;
-    }
+    if ((!cc) || (id_a == 0) || (id_b == 0)) { return 0; }
     if ((cc -> object_id_a == id_a) && (cc -> object_id_b == id_b) && (cc -> property_stamp_a == stamp_a) &&
         (cc -> property_stamp_b == stamp_b)) {
         /* TRUTH: strict both-side matching. Old side-A-only aliased two B
@@ -150,8 +127,7 @@ static int contact_cache_match_role (const cached_contact *cc, uint32_t id_a, ui
         if ((dist_a_sq < match_dist_sq) && (dist_b_sq < match_dist_sq) &&
             (a3_task05_cached_impulses_are_usable (cc -> accumulated_normal_impulse, cc -> accumulated_tangent_impulse))) {
             return 1;
-        }
-        return 0;
+        } return 0;
     }
     if ((cc -> object_id_a == id_b) && (cc -> object_id_b == id_a) && (cc -> property_stamp_a == stamp_b) &&
         (cc -> property_stamp_b == stamp_a)) {
@@ -161,14 +137,11 @@ static int contact_cache_match_role (const cached_contact *cc, uint32_t id_a, ui
             (a3_task05_cached_impulses_are_usable (cc -> accumulated_normal_impulse, cc -> accumulated_tangent_impulse))) {
             return 2;
         }
-    }
-    return 0;
+    } return 0;
 }
 static bool contact_cache_adoptable (const cached_contact *cc, uint32_t id_a, uint32_t id_b, uint32_t stamp_a,
                                      uint32_t stamp_b, vector3 local_a, vector3 local_b, float match_dist_sq) {
-    if ((!cc) || (id_a == 0) || (id_b == 0)) {
-        return false;
-    }
+    if ((!cc) || (id_a == 0) || (id_b == 0)) { return false; }
     if (!((cc -> object_id_a == id_a) && (cc -> object_id_b == id_b) && (cc -> property_stamp_a == stamp_a) &&
           (cc -> property_stamp_b == stamp_b))) {
         return false;
@@ -176,22 +149,16 @@ static bool contact_cache_adoptable (const cached_contact *cc, uint32_t id_a, ui
     /* TRUTH: require BOTH sides like match_role. Side-A-only matching let
      * two B bodies sharing one A (within 5cm) share tangent memory. */
     float dist_a_sq = vector3_length_squared (vector3_subtraction (cc -> local_position_a, local_a));
-    if (dist_a_sq >= match_dist_sq) {
-        return false;
-    }
+    if (dist_a_sq >= match_dist_sq) { return false; }
     float dist_b_sq = vector3_length_squared (vector3_subtraction (cc -> local_position_b, local_b));
-    if (dist_b_sq >= match_dist_sq) {
-        return false;
-    }
+    if (dist_b_sq >= match_dist_sq) { return false; }
     return vector3_length_squared (cc -> tangent_dir) > 0.0001f;
 } /* Forward: defined beside the other per-phase passes below; called from
  * prepare (pre-force tick-start selection). */
 void collision_snapshot_friction_mu (collision_data *manifolds, int manifold_count, const mpe_config_t *cfg);
 void collision_prepare_solver (struct physics_world *world, collision_data *source, collision_data *m, float dt) {
     *m = *source;
-    if (dt <= 0.0f) {
-        dt = 1.0f / 60.0f;
-    }
+    if (dt <= 0.0f) { dt = 1.0f / 60.0f; }
     /* DESPOT-2026-10-01: refresh world inertia from CURRENT orientation.
      * inverse_inertia_system was last written by rb_integrate_velocity at the
      * START of the previous tick; orientation has since advanced, so k built
@@ -211,9 +178,7 @@ void collision_prepare_solver (struct physics_world *world, collision_data *sour
     cached_contact *cache_array = (world) ? world -> world_contact_cache : NULL;
     int cache_count = (world) ? world -> world_contact_cache_count : 0;
     int32_t *hash_head = (world) ? world -> contact_hash_head : NULL;
-    if (!cache_array) {
-        cache_count = 0;
-    }
+    if (!cache_array) { cache_count = 0; }
     for (int i = 0; i < m -> contact_count; i++) {
         contact_point_data *cp = &m -> contacts [i];
         cp -> ra = vector3_subtraction (cp -> position, m -> object_a -> position);
@@ -306,9 +271,7 @@ void collision_prepare_solver (struct physics_world *world, collision_data *sour
                      * intent and stays 0 until a normal-seeding formulation
                      * lands with a stability proof. */
                 }
-            } else {
-                world -> contact_cache_misses++;
-            }
+            } else { world -> contact_cache_misses++; }
         }
         /* PHYSICS-TRUTH (F10 10-stack): NORMAL warm-start is DISABLED here.
          *
@@ -389,18 +352,11 @@ void collision_prepare_solver (struct physics_world *world, collision_data *sour
             const mpe_config_t *wcfg = world ? mpe_world_cfg (world) : &g_cfg;
             float damp = wcfg -> solver.warm_start_damping;
             if ((damp > 0.0f) && isfinite (damp)) {
-                if (damp > 1.0f) {
-                    damp = 1.0f;
-                }
+                if (damp > 1.0f) { damp = 1.0f; }
                 cp -> accumulated_normal_impulse *= damp;
-                if (world) {
-                    world -> contact_cache_hits_applied++;
-                }
-            } else {
-                cp -> accumulated_normal_impulse = 0.0f;
-            }
-        }
-        vector3 va = vector3_addition (m -> object_a -> velocity, vector3_cross (m -> object_a -> angular_velocity, cp -> ra));
+                if (world) { world -> contact_cache_hits_applied++; }
+            } else { cp -> accumulated_normal_impulse = 0.0f; }
+        } vector3 va = vector3_addition (m -> object_a -> velocity, vector3_cross (m -> object_a -> angular_velocity, cp -> ra));
         vector3 vb = vector3_addition (m -> object_b -> velocity, vector3_cross (m -> object_b -> angular_velocity, cp -> rb));
         vector3 rel_vel = vector3_subtraction (vb, va);
         float vn_initial = vector3_dot (rel_vel, m -> normal_vector);
@@ -439,9 +395,7 @@ void collision_prepare_solver (struct physics_world *world, collision_data *sour
          * adopted-or-zero). True sliding keeps the slip direction. */
         const mpe_config_t *frame_cfg = world ? mpe_world_cfg (world) : &g_cfg;
         float stick_thresh = frame_cfg -> solver.static_friction_thresh;
-        if (!(stick_thresh > 0.0f) || !isfinite (stick_thresh)) {
-            stick_thresh = 0.02f;
-        }
+        if (!(stick_thresh > 0.0f) || !isfinite (stick_thresh)) { stick_thresh = 0.02f; }
         bool frame_sliding = (tangent_speed >= stick_thresh);
         vector3 adopted_tangent = vector3_zero ();
         if (!frame_sliding) {
@@ -475,11 +429,7 @@ void collision_prepare_solver (struct physics_world *world, collision_data *sour
                 adopted_tangent = vector3_subtraction (
                     adopted_tangent,
                     vector3_scaling (m -> normal_vector, vector3_dot (adopted_tangent, m -> normal_vector)));
-                if (vector3_length_squared (adopted_tangent) > 0.0001f) {
-                    adopted_tangent = vector3_normalisation (adopted_tangent);
-                } else {
-                    adopted_tangent = vector3_zero ();
-                }
+                if (vector3_length_squared (adopted_tangent) > 0.0001f) { adopted_tangent = vector3_normalisation (adopted_tangent); } else { adopted_tangent = vector3_zero (); }
             }
         }
         /* Frame select: true sliding keeps the slip direction
@@ -507,21 +457,14 @@ void collision_prepare_solver (struct physics_world *world, collision_data *sour
              * then derive from it consistently. */
             cp -> tangent_vector = aniso_t1;
         } else {
-            if (tangent_speed > 0.0001f) {
-                cp -> tangent_vector = vector3_scaling (rel_vel_tangent, -1.0f / tangent_speed);
-            } else {
-                cp -> tangent_vector = adopted_tangent;
-            }
+            if (tangent_speed > 0.0001f) { cp -> tangent_vector = vector3_scaling (rel_vel_tangent, -1.0f / tangent_speed); } else { cp -> tangent_vector = adopted_tangent; }
         }
         if (vector3_length_squared (cp -> tangent_vector) > 0.0001f) {
             /* Second tangent completes the Coulomb disc: t2 = n x t1. */
             cp -> tangent2 = vector3_cross (m -> normal_vector, cp -> tangent_vector);
-            if (vector3_length_squared (cp -> tangent2) > 0.0001f) {
-                cp -> tangent2 = vector3_normalisation (cp -> tangent2);
-            } else {
+            if (vector3_length_squared (cp -> tangent2) > 0.0001f) { cp -> tangent2 = vector3_normalisation (cp -> tangent2); } else {
                 cp -> tangent2 = vector3_zero ();
-            }
-            vector3 ra_cross_t = vector3_cross (cp -> ra, cp -> tangent_vector);
+            } vector3 ra_cross_t = vector3_cross (cp -> ra, cp -> tangent_vector);
             vector3 rb_cross_t = vector3_cross (cp -> rb, cp -> tangent_vector);
             vector3 ang_a_t = vector3_cross (
                 math3_multiplication_vector3 (rigidbody_effective_inv_inertia (m -> object_a), ra_cross_t), cp -> ra);
@@ -541,9 +484,7 @@ void collision_prepare_solver (struct physics_world *world, collision_data *sour
                                    rigidbody_effective_inv_mass (m -> object_b) +
                                    vector3_dot (vector3_addition (ang_a_t2, ang_b_t2), cp -> tangent2);
                 cp -> effective_mass_tangent2 = (k_tangent2 > 0.0f) ? (1.0f / k_tangent2) : 0.0f;
-            } else {
-                cp -> effective_mass_tangent2 = 0.0f;
-            }
+            } else { cp -> effective_mass_tangent2 = 0.0f; }
         } else {
             /* No slip and no remembered direction: nothing to hold against. */
             cp -> tangent_vector = vector3_zero ();
@@ -667,8 +608,7 @@ void collision_prepare_solver (struct physics_world *world, collision_data *sour
 static void collision_manifold_merge_sort (const float *keys, int *order, int *scratch, int n) {
     for (int i = 0; i < n; i++) {
         order [i] = i;
-    }
-    int *src = order;
+    } int *src = order;
     int *dst = scratch;
     for (int width = 1; width < n; width *= 2) {
         for (int lo = 0; lo < n; lo += 2 * width) {
@@ -679,14 +619,11 @@ static void collision_manifold_merge_sort (const float *keys, int *order, int *s
                 float ka = keys [src [a]];
                 float kb = keys [src [b]];
                 bool take_a;
-                if (ka < kb) {
-                    take_a = true;
-                } else if (ka > kb) {
+                if (ka < kb) { take_a = true; } else if (ka > kb) {
                     take_a = false;
                 } else {
                     take_a = src [a] < src [b];
-                }
-                dst [o++] = take_a ? src [a++] : src [b++];
+                } dst [o++] = take_a ? src [a++] : src [b++];
             }
             while (a < mid) {
                 dst [o++] = src [a++];
@@ -694,8 +631,7 @@ static void collision_manifold_merge_sort (const float *keys, int *order, int *s
             while (b < hi) {
                 dst [o++] = src [b++];
             }
-        }
-        int *tmp = src;
+        } int *tmp = src;
         src = dst;
         dst = tmp;
     }
@@ -707,21 +643,14 @@ static void collision_manifold_merge_sort (const float *keys, int *order, int *s
 }
 void collision_manifold_solve_order (struct physics_world *world, collision_data *manifolds, int manifold_count,
                                      int *order_out) {
-    if ((!world) || (!world -> manifold_sort_keys) || (!manifolds) || (!order_out) || (manifold_count <= 0)) {
-        return;
-    }
-    if (manifold_count > a3_max_manifolds) {
-        manifold_count = a3_max_manifolds;
-    }
+    if ((!world) || (!world -> manifold_sort_keys) || (!manifolds) || (!order_out) || (manifold_count <= 0)) { return; }
+    if (manifold_count > a3_max_manifolds) { manifold_count = a3_max_manifolds; }
     for (int m = 0; m < manifold_count; m++) {
         float lowest = 1000000.0f;
         for (int i = 0; i < manifolds [m].contact_count; i++) {
             float y = manifolds [m].contacts [i].position.y;
-            if (y < lowest) {
-                lowest = y;
-            }
-        }
-        world -> manifold_sort_keys [m] = lowest;
+            if (y < lowest) { lowest = y; }
+        } world -> manifold_sort_keys [m] = lowest;
         order_out [m] = m;
     }
     /* TRUTH: mergesort with thread-local scratch (no malloc, no globals).
@@ -742,21 +671,16 @@ void collision_manifold_solve_order (struct physics_world *world, collision_data
             int cur_idx = order_out [j];
             float cur_val = world -> manifold_sort_keys [cur_idx];
             bool shift = (cur_val > key_val) || (cur_val == key_val && cur_idx > key_idx);
-            if (!shift) {
-                break;
-            }
+            if (!shift) { break; }
             order_out [j + 1] = order_out [j];
             j--;
-        }
-        order_out [j + 1] = key_idx;
+        } order_out [j + 1] = key_idx;
     }
 }
 float collision_resolve_iterative (collision_data *m, float dt, bool friction_only, int start_index,
                                    const mpe_config_t *cfg) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
-    if (dt <= 0.0f) {
-        dt = 1.0f / 60.0f;
-    }
+    if (dt <= 0.0f) { dt = 1.0f / 60.0f; }
     /* FIX-AUDIT-DESPOT cost TRUTH: callers visit every manifold TWICE per
      * iteration (see physics_world_step: resolve(...,iter) +
      * resolve(...,iter+1)), so the "64 iterations" knob is really 128
@@ -797,9 +721,7 @@ float collision_resolve_iterative (collision_data *m, float dt, bool friction_on
              * re-assign was identity — dead write.) */
             if (lambda_n != 0.0f) {
                 float applied_n = fabsf (lambda_n);
-                if (applied_n > max_applied) {
-                    max_applied = applied_n;
-                }
+                if (applied_n > max_applied) { max_applied = applied_n; }
                 vector3 impulse = vector3_scaling (m -> normal_vector, lambda_n);
                 if (rigidbody_effective_inv_mass (m -> object_a) > 0.0f) {
                     m -> object_a -> velocity = vector3_subtraction (
@@ -837,9 +759,7 @@ float collision_resolve_iterative (collision_data *m, float dt, bool friction_on
             }
         } else {
             vector3 t2_check = vector3_cross (m -> normal_vector, tangent);
-            if (vector3_length_squared (t2_check) > 0.0001f) {
-                cp -> tangent2 = vector3_normalisation (t2_check);
-            }
+            if (vector3_length_squared (t2_check) > 0.0001f) { cp -> tangent2 = vector3_normalisation (t2_check); }
         }
         if (vector3_length_squared (tangent) > 0.0001f) {
             vector3 tangent2 = cp -> tangent2;
@@ -895,13 +815,9 @@ float collision_resolve_iterative (collision_data *m, float dt, bool friction_on
              * calibrated here cannot be compared to Box2D tables. */
             float static_friction_coeff = fminf (m -> object_a -> friction_static, m -> object_b -> friction_static);
             float kinetic_friction_coeff = fminf (m -> object_a -> friction_kinetic, m -> object_b -> friction_kinetic);
-            if (static_friction_coeff < kinetic_friction_coeff) {
-                static_friction_coeff = kinetic_friction_coeff;
-            }
+            if (static_friction_coeff < kinetic_friction_coeff) { static_friction_coeff = kinetic_friction_coeff; }
             float friction_coeff;
-            if (cp -> snap_friction_mu >= 0.0f) {
-                friction_coeff = cp -> snap_friction_mu;
-            } else {
+            if (cp -> snap_friction_mu >= 0.0f) { friction_coeff = cp -> snap_friction_mu; } else {
                 friction_coeff =
                     (slip_speed < static_friction_threshold) ? static_friction_coeff : kinetic_friction_coeff;
             }
@@ -937,9 +853,7 @@ float collision_resolve_iterative (collision_data *m, float dt, bool friction_on
                                                        has_t2 ? vector3_scaling (tangent2, step2) : vector3_zero ());
             {
                 float applied_t = sqrtf (vector3_length_squared (friction_delta));
-                if (applied_t > max_applied) {
-                    max_applied = applied_t;
-                }
+                if (applied_t > max_applied) { max_applied = applied_t; }
             }
             if (vector3_length_squared (friction_delta) > 0.0f) {
                 if (rigidbody_effective_inv_mass (m -> object_a) > 0.0f) {
@@ -962,18 +876,13 @@ float collision_resolve_iterative (collision_data *m, float dt, bool friction_on
                 }
             }
         }
-    }
-    return max_applied;
+    } return max_applied;
 }
 void collision_refresh_impact_velocities (collision_data *manifolds, int manifold_count) {
-    if ((!manifolds) || (manifold_count <= 0)) {
-        return;
-    }
+    if ((!manifolds) || (manifold_count <= 0)) { return; }
     for (int m = 0; m < manifold_count; m++) {
         collision_data *man = &manifolds [m];
-        if ((!man -> object_a) || (!man -> object_b)) {
-            continue;
-        }
+        if ((!man -> object_a) || (!man -> object_b)) { continue; }
         for (int i = 0; i < man -> contact_count; i++) {
             contact_point_data *cp = &man -> contacts [i];
             vector3 va =
@@ -986,34 +895,20 @@ void collision_refresh_impact_velocities (collision_data *manifolds, int manifol
 }
 void collision_snapshot_friction_mu (collision_data *manifolds, int manifold_count, const mpe_config_t *cfg) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
-    if ((!manifolds) || (manifold_count <= 0)) {
-        return;
-    }
+    if ((!manifolds) || (manifold_count <= 0)) { return; }
     float sth = C -> solver.static_friction_thresh;
-    if (!(sth > 0.0f) || !isfinite (sth)) {
-        sth = 0.02f;
-    }
+    if (!(sth > 0.0f) || !isfinite (sth)) { sth = 0.02f; }
     for (int m = 0; m < manifold_count; m++) {
         collision_data *man = &manifolds [m];
         float mus = (man -> object_a) ? man -> object_a -> friction_static : 0.0f;
         float muk = (man -> object_a) ? man -> object_a -> friction_kinetic : 0.0f;
         if (man -> object_b) {
-            if (man -> object_b -> friction_static < mus) {
-                mus = man -> object_b -> friction_static;
-            }
-            if (man -> object_b -> friction_kinetic < muk) {
-                muk = man -> object_b -> friction_kinetic;
-            }
+            if (man -> object_b -> friction_static < mus) { mus = man -> object_b -> friction_static; }
+            if (man -> object_b -> friction_kinetic < muk) { muk = man -> object_b -> friction_kinetic; }
         }
-        if (!(mus >= 0.0f) || !isfinite (mus)) {
-            mus = 0.0f;
-        }
-        if (!(muk >= 0.0f) || !isfinite (muk)) {
-            muk = 0.0f;
-        }
-        if (mus < muk) {
-            mus = muk;
-        }
+        if (!(mus >= 0.0f) || !isfinite (mus)) { mus = 0.0f; }
+        if (!(muk >= 0.0f) || !isfinite (muk)) { muk = 0.0f; }
+        if (mus < muk) { mus = muk; }
         for (int i = 0; i < man -> contact_count; i++) {
             contact_point_data *cp = &man -> contacts [i];
             if ((!man -> object_a) || (!man -> object_b)) {
@@ -1038,28 +933,20 @@ void collision_snapshot_friction_mu (collision_data *manifolds, int manifold_cou
 }
 void collision_apply_poisson_restitution (collision_data *manifolds, int manifold_count, const mpe_config_t *cfg) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
-    if ((!manifolds) || (manifold_count <= 0)) {
-        return;
-    }
+    if ((!manifolds) || (manifold_count <= 0)) { return; }
     for (int m = 0; m < manifold_count; m++) {
         collision_data *man = &manifolds [m];
         for (int i = 0; i < man -> contact_count; i++) {
             contact_point_data *cp = &man -> contacts [i];
             float e = fminf (man -> object_a -> restitution, man -> object_b -> restitution);
-            if (e <= 0.0f) {
-                continue;
-            }
+            if (e <= 0.0f) { continue; }
             /* Threshold is a speed (approach magnitude). Enforce negative
              * sign so a misconfigured +1.0 cannot make resting contacts
              * bounce: gate is impact_vn >= -|thresh] skip. */
             float rest_th = -fabsf (C -> solver.restitution_velocity_thresh);
-            if (cp -> impact_velocity >= rest_th) {
-                continue;
-            }
+            if (cp -> impact_velocity >= rest_th) { continue; }
             float compression = cp -> accumulated_normal_impulse - cp -> base_normal_impulse;
-            if (compression <= 0.0f) {
-                continue;
-            }
+            if (compression <= 0.0f) { continue; }
             float lambda_r = e * compression;
             /* Newton bound: restitution reverses the RECORDED approach, not
              * the accumulated sum. Interleaved joint bias can re-inject
@@ -1067,13 +954,9 @@ void collision_apply_poisson_restitution (collision_data *manifolds, int manifol
              * the accumulator exceeds true compression (measured 7x). The
              * Newtonian payment e*(-vn_impact)*m_eff is immune to that. */
             float approach = -cp -> impact_velocity;
-            if (approach < 0.0f) {
-                approach = 0.0f;
-            }
+            if (approach < 0.0f) { approach = 0.0f; }
             float newton_bound = e * approach * cp -> effective_mass_normal;
-            if (lambda_r > newton_bound) {
-                lambda_r = newton_bound;
-            }
+            if (lambda_r > newton_bound) { lambda_r = newton_bound; }
             /* TRUTH P0-9: NO artificial restitution cap. The Newton bound
              * above IS the physical bound (e reverses recorded approach).
              * Capping at max_restitution_bias*m_eff (default 20 m/s) deadens
@@ -1083,13 +966,9 @@ void collision_apply_poisson_restitution (collision_data *manifolds, int manifol
              * impacts and reintroduce the deadening — rejected with cause). */
             {
                 float emergency_cap = 1.0e6f * cp -> effective_mass_normal;
-                if (lambda_r > emergency_cap) {
-                    lambda_r = emergency_cap;
-                }
+                if (lambda_r > emergency_cap) { lambda_r = emergency_cap; }
             }
-            if (lambda_r <= 0.0f) {
-                continue;
-            }
+            if (lambda_r <= 0.0f) { continue; }
             cp -> accumulated_normal_impulse += lambda_r;
             vector3 impulse = vector3_scaling (man -> normal_vector, lambda_r);
             if (rigidbody_effective_inv_mass (man -> object_a) > 0.0f) {
@@ -1114,13 +993,9 @@ void collision_apply_poisson_restitution (collision_data *manifolds, int manifol
 void collision_apply_rolling_resistance (collision_data *manifolds, int manifold_count, float dt,
                                          const mpe_config_t *cfg) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
-    if ((!manifolds) || (manifold_count <= 0) || (dt <= 0.0f)) {
-        return;
-    }
+    if ((!manifolds) || (manifold_count <= 0) || (dt <= 0.0f)) { return; }
     float rolling_mu = C -> world.rolling_resistance_coeff;
-    if (rolling_mu <= 0.0f) {
-        return;
-    }
+    if (rolling_mu <= 0.0f) { return; }
     for (int m = 0; m < manifold_count; m++) {
         collision_data *man = &manifolds [m];
         /* Shared patch: split total dissipation across sides when BOTH bodies
@@ -1150,24 +1025,18 @@ void collision_apply_rolling_resistance (collision_data *manifolds, int manifold
                     share_a = 1.0f;
                 if (share_b > 1.0f)
                     share_b = 1.0f;
-            } else {
-                share_a = share_b = 0.5f;
-            }
+            } else { share_a = share_b = 0.5f; }
         }
         for (int i = 0; i < man -> contact_count; i++) {
             contact_point_data *cp = &man -> contacts [i];
-            if (cp -> accumulated_normal_impulse <= 0.0f) {
-                continue;
-            }
+            if (cp -> accumulated_normal_impulse <= 0.0f) { continue; }
             {
                 float normal_force = cp -> accumulated_normal_impulse / dt;
                 rigidbody *bodies [2] = {man -> object_a, man -> object_b};
                 vector3 rlev [2] = {cp -> ra, cp -> rb};
                 for (int bi = 0; bi < 2; bi++) {
                     rigidbody *bd = bodies [bi];
-                    if ((!bd) || (bd -> static_state) || (bd -> is_sleeping) || (bd -> kinematic)) {
-                        continue;
-                    }
+                    if ((!bd) || (bd -> static_state) || (bd -> is_sleeping) || (bd -> kinematic)) { continue; }
                     /* TRUTH: roll lever = |r| (contact radius, =R for spheres:
                      * M=mu*N*R, standard Coulomb rolling resistance). Spin
                      * lever = Hertz patch a=sqrt(R*pen_eff), capped 0.3R.
@@ -1180,14 +1049,10 @@ void collision_apply_rolling_resistance (collision_data *manifolds, int manifold
                     float pen_raw = (cp -> penetration > 0.0f) ? cp -> penetration : 0.0f;
                     float pen_eff = (pen_raw > 0.0005f) ? pen_raw : 0.0005f;
                     float r_eff = sqrtf (vector3_length_squared (rlev [bi]));
-                    if ((!isfinite (r_eff)) || (r_eff < 1e-6f)) {
-                        continue;
-                    }
+                    if ((!isfinite (r_eff)) || (r_eff < 1e-6f)) { continue; }
                     float patch = sqrtf (fmaxf (r_eff * pen_eff, 0.0f));
                     float patch_cap = 0.3f * r_eff;
-                    if (patch > patch_cap) {
-                        patch = patch_cap;
-                    }
+                    if (patch > patch_cap) { patch = patch_cap; }
                     /* Rolling part: oppose tangential-plane spin, lever=|r|
                      * (contact radius: M=mu*N*R, standard Coulomb rolling
                      * resistance). Applies to all shapes; boxes in face
@@ -1204,17 +1069,11 @@ void collision_apply_rolling_resistance (collision_data *manifolds, int manifold
                             1.0f / fmaxf (vector3_dot (roll_axis, math3_multiplication_vector3 (
                                                                       rigidbody_effective_inv_inertia (bd), roll_axis)),
                                           1e-9f);
-                        if (!isfinite (inertia_axis) || inertia_axis <= 0.0f) {
-                            continue;
-                        }
+                        if (!isfinite (inertia_axis) || inertia_axis <= 0.0f) { continue; }
                         float share = (bi == 0) ? share_a : share_b;
                         float dw = share * rolling_mu * normal_force * r_eff * dt / inertia_axis;
-                        if (!isfinite (dw) || dw < 0.0f) {
-                            continue;
-                        }
-                        if (dw > roll_speed) {
-                            dw = roll_speed;
-                        }
+                        if (!isfinite (dw) || dw < 0.0f) { continue; }
+                        if (dw > roll_speed) { dw = roll_speed; }
                         bd -> angular_velocity =
                             vector3_subtraction (bd -> angular_velocity, vector3_scaling (roll_axis, dw));
                     }
@@ -1226,17 +1085,11 @@ void collision_apply_rolling_resistance (collision_data *manifolds, int manifold
                             1.0f / fmaxf (vector3_dot (spin_axis, math3_multiplication_vector3 (
                                                                       rigidbody_effective_inv_inertia (bd), spin_axis)),
                                           1e-9f);
-                        if (!isfinite (inertia_spin) || inertia_spin <= 0.0f) {
-                            continue;
-                        }
+                        if (!isfinite (inertia_spin) || inertia_spin <= 0.0f) { continue; }
                         float share_sp = (bi == 0) ? share_a : share_b;
                         float dw_spin = share_sp * rolling_mu * normal_force * patch * dt / inertia_spin;
-                        if (!isfinite (dw_spin) || dw_spin < 0.0f) {
-                            continue;
-                        }
-                        if (dw_spin > spin_speed) {
-                            dw_spin = spin_speed;
-                        }
+                        if (!isfinite (dw_spin) || dw_spin < 0.0f) { continue; }
+                        if (dw_spin > spin_speed) { dw_spin = spin_speed; }
                         bd -> angular_velocity =
                             vector3_subtraction (bd -> angular_velocity, vector3_scaling (spin_axis, dw_spin));
                     }
@@ -1247,49 +1100,29 @@ void collision_apply_rolling_resistance (collision_data *manifolds, int manifold
 }
 void collision_apply_split_impulse (collision_data *manifolds, int manifold_count, float dt, const mpe_config_t *cfg) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
-    if ((!manifolds) || (manifold_count <= 0) || (!(dt > 0.0f))) {
-        return;
-    }
+    if ((!manifolds) || (manifold_count <= 0) || (!(dt > 0.0f))) { return; }
     float slop = C -> solver.penetration_slop;
     float beta = C -> solver.bias_factor;
     float max_bias_vel = C -> solver.max_separation_bias;
     /* TRUTH: runtime clamps survive old config files with huge caps.
      * slop 0..5cm, beta 0..1, bias vel <=10 m/s. */
-    if (!isfinite (slop) || slop < 0.0f) {
-        slop = 0.01f;
-    }
-    if (slop > 0.05f) {
-        slop = 0.05f;
-    }
-    if (!isfinite (beta) || beta < 0.0f) {
-        beta = 0.0f;
-    }
-    if (beta > 1.0f) {
-        beta = 1.0f;
-    }
-    if (!isfinite (max_bias_vel) || max_bias_vel < 0.0f) {
-        max_bias_vel = 5.0f;
-    }
-    if (max_bias_vel > 10.0f) {
-        max_bias_vel = 10.0f;
-    }
+    if (!isfinite (slop) || slop < 0.0f) { slop = 0.01f; }
+    if (slop > 0.05f) { slop = 0.05f; }
+    if (!isfinite (beta) || beta < 0.0f) { beta = 0.0f; }
+    if (beta > 1.0f) { beta = 1.0f; }
+    if (!isfinite (max_bias_vel) || max_bias_vel < 0.0f) { max_bias_vel = 5.0f; }
+    if (max_bias_vel > 10.0f) { max_bias_vel = 10.0f; }
     const float max_corr = max_bias_vel * dt;
     /* Shared wake depth (see the wake site below). Clamped to the same
      * [0, 0.1] the schema registers it with. */
     float wake_depth = C -> depenetration.wake_depth_thresh;
-    if (!isfinite (wake_depth) || wake_depth < 0.0f) {
-        wake_depth = 0.02f;
-    }
-    if (wake_depth > 0.1f) {
-        wake_depth = 0.1f;
-    }
+    if (!isfinite (wake_depth) || wake_depth < 0.0f) { wake_depth = 0.02f; }
+    if (wake_depth > 0.1f) { wake_depth = 0.1f; }
     for (int m = 0; m < manifold_count; m++) {
         collision_data *man = &manifolds [m];
         rigidbody *body_a = man -> object_a;
         rigidbody *body_b = man -> object_b;
-        if ((!body_a) || (!body_b)) {
-            continue;
-        }
+        if ((!body_a) || (!body_b)) { continue; }
         float inv_a = rigidbody_effective_inv_mass (body_a);
         float inv_b = rigidbody_effective_inv_mass (body_b);
         /* Sleeping bodies hold infinite mass (undisturbed rest) unless the
@@ -1300,19 +1133,12 @@ void collision_apply_split_impulse (collision_data *manifolds, int manifold_coun
              * enough to wake the dynamic sleepers. */
             float deepest_check = 0.0f;
             for (int i = 0; i < man -> contact_count; i++) {
-                if (man -> contacts [i].penetration > deepest_check) {
-                    deepest_check = man -> contacts [i].penetration;
-                }
+                if (man -> contacts [i].penetration > deepest_check) { deepest_check = man -> contacts [i].penetration; }
             }
             if (deepest_check > C -> depenetration.wake_depth_thresh) {
-                if (!body_a -> static_state) {
-                    rigidbody_wake (body_a);
-                }
-                if (!body_b -> static_state) {
-                    rigidbody_wake (body_b);
-                }
-            }
-            continue;
+                if (!body_a -> static_state) { rigidbody_wake (body_a); }
+                if (!body_b -> static_state) { rigidbody_wake (body_b); }
+            } continue;
         }
         /* DESPOT-2026-10-03: THE PER-CONTACT EXPERIMENT WAS TRIED, MEASURED,
          * AND REVERTED. Kept here because the negative result is the useful
@@ -1374,35 +1200,20 @@ void collision_apply_split_impulse (collision_data *manifolds, int manifold_coun
          * mode is a bug in one of the two; it was the literal. */
         float deepest = 0.0f;
         for (int i = 0; i < man -> contact_count; i++) {
-            if (man -> contacts [i].penetration > deepest) {
-                deepest = man -> contacts [i].penetration;
-            }
-        }
-        float corr = beta * fmaxf (deepest - slop, 0.0f);
-        if (corr > max_corr) {
-            corr = max_corr;
-        }
-        if (corr <= 0.0f) {
-            continue;
-        }
+            if (man -> contacts [i].penetration > deepest) { deepest = man -> contacts [i].penetration; }
+        } float corr = beta * fmaxf (deepest - slop, 0.0f);
+        if (corr > max_corr) { corr = max_corr; }
+        if (corr <= 0.0f) { continue; }
         vector3 shift = vector3_scaling (man -> normal_vector, corr / inv_sum);
         /* TRUTH: kinematic has stored inv!=0 but effective 0. Old
          * !static_state moved kinematics, corrupting prescribed motion.
          * Gate on effective inv (zero for kinematic/sleeping/static). */
-        if (inv_a > 0.0f) {
-            body_a -> position = vector3_subtraction (body_a -> position, vector3_scaling (shift, inv_a));
-        }
-        if (inv_b > 0.0f) {
-            body_b -> position = vector3_addition (body_b -> position, vector3_scaling (shift, inv_b));
-        }
+        if (inv_a > 0.0f) { body_a -> position = vector3_subtraction (body_a -> position, vector3_scaling (shift, inv_a)); }
+        if (inv_b > 0.0f) { body_b -> position = vector3_addition (body_b -> position, vector3_scaling (shift, inv_b)); }
         /* Wake depth now reads the config knob (see note above). */
         if (corr > wake_depth) {
-            if (!body_a -> static_state) {
-                rigidbody_wake (body_a);
-            }
-            if (!body_b -> static_state) {
-                rigidbody_wake (body_b);
-            }
+            if (!body_a -> static_state) { rigidbody_wake (body_a); }
+            if (!body_b -> static_state) { rigidbody_wake (body_b); }
         }
     }
 }
