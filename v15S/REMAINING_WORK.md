@@ -1,5 +1,27 @@
 # Remaining Work
 
+> Live TODO. Dated history below is preserved; current counts/gates are in
+> `docs/DESPOT_AUDIT_2026-10-07.md` (44/42; 232+2 xfail/234). The 2026-10-01
+> audit's 41/42 denominators are superseded.
+
+## Despot 2026-10-07 — closed this audit
+
+- [x] P0-1 world-clear joint `is_active`; P0-2 dlsym re-resolve + invalidate;
+  P0-3 microvim `..` jail + fsync save; P0-4 mount confinement.
+- [x] P1-1 plugin manifold full validation; P1-2 init order + 64-cap loud;
+  P1-3 per-world material stamp; P1-4 tee/microvim fsync; P1-6 degraded-tick
+  guard + counter; P2-2 CRC `pthread_once` + blind-class docs.
+- [x] LIE-02 `hits_applied`; LIE-03 stale L comment; LIE-04 free-flight guard
+  (both step paths); LIE-05 non-1/60 loud; LIE-06 MSVC scope; LIE-07 convex
+  proof; LIE-10 min-vs-sqrt; LIE-11 contraction scope; LIE-12 rolling tune
+  label; LIE-13 double pi; LIE-09 blade regime docs.
+- [x] Ops: 234/234->232+2 xfail, two-markers->one frontier, docstring 41->44,
+  TMPDIR isolation (`makefile` + suite `.dat`), headless-deps line, MFS
+  15-inner/5-outer, `test_suite` 42-only warning, `make analyze`/`make asan`,
+  vendored `temp/despot-20261007/oracle_check.py` (10/10).
+- [x] Verified: `build_suite` clean, `test_mpe_suite --all` 44/42 green
+  (CWD=`v15S/src`), `--profile quick` 58/58 green, oracle 10/10 green.
+
 ## Verification suite upgrade (2026-09-25)
 
 - [x] Unified runner profiles: `quick`, `physics`, and `full`; dynamic C and

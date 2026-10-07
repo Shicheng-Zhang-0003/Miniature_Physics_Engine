@@ -237,7 +237,7 @@ If any mandatory gate fails, the correct action is:
 
 ### Release verdict (v15R3, tagged)
 
-All P0 gates pass: clean build with zero new errors, 44 registered / 42 blocking headless green on the v15S head (44 registered, +2 diag-informational), and 234/234 verification checks green under AddressSanitizer + UndefinedBehaviorSanitizer at this HEAD (29/29 on the frozen v15R3 tag),
+All P0 gates pass: clean build with zero new errors, 44 registered / 42 blocking headless green on the v15S head (44 registered, +2 diag-informational), and 232 verification checks pass + 2 xfailed (1 distinct F2 frontier ×2 runs) + 6 informational (total 234) under AddressSanitizer + UndefinedBehaviorSanitizer at this HEAD (29/29 on the frozen v15R3 tag),
 `tui-smoke` green, F10 settle verdict green (headless 3600-tick equivalent
 plus committed `f10_long_run`), F11 robustness green in-engine and headless
 (`f11_torture`). P1 known limitations are documented in

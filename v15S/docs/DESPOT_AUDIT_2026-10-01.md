@@ -1,5 +1,9 @@
 # Despot Audit 2026-10-01 — Math, Programming, Operational
 
+> SUPERSEDED for counts by DESPOT_AUDIT_2026-10-07.md (41/42 era -> 44/42;
+> 234/234 -> 232+2 xfail). History below is preserved; live truth is in
+> the 2026-10-07 audit + docs/VALIDATION.md.
+
 Scope: full `v15S` tree (kernel, physics, render, scene, config, ui_input, tui,
 plugins, ecosystem/mfs), `tools/test_runner.py`, validation scripts, all
 user docs. Method: three independent audits (math/physics, programming,

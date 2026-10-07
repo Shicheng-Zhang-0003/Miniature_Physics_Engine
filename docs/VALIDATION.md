@@ -301,7 +301,7 @@ while 16 stands and 64 converges to 0.06 — a different valid trajectory of a
 chaotic pile, recorded in-gate (arm-over-arm ratio withdrawn for the measured
 reason, calm-top-arm gates kept). The MFS tank pivot translates 0.0530 →
 0.0642 m (+21%, re-baselined with cause chain; heading +2.3%, in band;
-mecanum strafe byte-identical). Full profile stays 234 green, all five
+mecanum strafe byte-identical). Full profile stays 232 pass + 2 xfail (total 234), all five
 solver regimes 42/42.
 
 ## Declared coverage gaps
