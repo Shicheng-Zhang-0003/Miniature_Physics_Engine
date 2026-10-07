@@ -42,8 +42,7 @@ int main (void) {
         printf ("[FAIL] joint creation\n");
         physics_world_cleanup (&world);
         return 1;
-    }
-    const float dt = 1.0f / 60.0f;
+    } const float dt = 1.0f / 60.0f;
     float prev_x = world.bodies [mass].position.x - 2.0f; /* extension */
     int crossings = 0;
     int first_cross = -1, last_cross = -1;
@@ -56,28 +55,19 @@ int main (void) {
             printf ("[FAIL] NaN\n");
             physics_world_cleanup (&world);
             return 1;
-        }
-        float x = mb -> position.x - 2.0f;
+        } float x = mb -> position.x - 2.0f;
         if ((prev_x <= 0.0f && x > 0.0f) || (prev_x >= 0.0f && x < 0.0f)) {
             crossings++;
-            if (first_cross < 0) {
-                first_cross = t;
-            }
+            if (first_cross < 0) { first_cross = t; }
             last_cross = t;
-        }
-        prev_x = x;
+        } prev_x = x;
         float e = 0.5f * k * x * x + 0.5f * 1.0f * vector3_length_squared (mb -> velocity);
         float dev = fabsf (e - e0) / e0;
-        if (dev > emax_dev) {
-            emax_dev = dev;
-        }
-    }
-    int fail = 0;
+        if (dev > emax_dev) { emax_dev = dev; }
+    } int fail = 0;
     /* Half-periods between first and last crossing. */
     float measured_t = 0.0f;
-    if (crossings >= 4) {
-        measured_t = 2.0f * (float) (last_cross - first_cross) * dt / (float) (crossings - 1);
-    }
+    if (crossings >= 4) { measured_t = 2.0f * (float) (last_cross - first_cross) * dt / (float) (crossings - 1); }
     float analytic_t = 2.0f * 3.14159265f * sqrtf (1.0f / k);
     printf ("[info] period: measured=%.4f analytic=%.4f crossings=%d\n", measured_t, analytic_t, crossings);
     /* TRUTH: 5% is 35x the expected w*dt error (~0.14%); a 10%-off k passes.
@@ -88,15 +78,13 @@ int main (void) {
         fail = 1;
     } else {
         printf ("[PASS] spring period matches 2*pi*sqrt(m/k)\n");
-    }
-    printf ("[info] max energy deviation: %.3f\n", emax_dev);
+    } printf ("[info] max energy deviation: %.3f\n", emax_dev);
     if (emax_dev > 0.05f) {
         printf ("[FAIL] spring energy drifts\n");
         fail = 1;
     } else {
         printf ("[PASS] spring energy bounded (symplectic)\n");
-    }
-    physics_world_cleanup (&world);
+    } physics_world_cleanup (&world);
     return fail;
 }
 #endif /* mpe_spring_test */

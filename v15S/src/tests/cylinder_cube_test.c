@@ -44,8 +44,7 @@ int main (void) {
     if (fabsf (cyl_vz) > 1.0f) {
         printf ("[FAIL] cylinder still flying after wall interaction (vz=%.4f)\n", cyl_vz);
         return 1;
-    }
-    printf ("[PASS] cylinder-cube collision works\n");
+    } printf ("[PASS] cylinder-cube collision works\n");
     physics_world_cleanup (&world);
     return 0;
 }

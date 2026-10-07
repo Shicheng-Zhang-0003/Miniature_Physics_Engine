@@ -30,15 +30,11 @@ static float slope_drift (float slope_deg, float mus, float muk, int *asleep_out
     const float dt = 1.0f / 60.0f;
     for (int t = 0; t < 120; t++) {
         physics_world_step (&world, dt);
-    }
-    vector3 s0 = world.bodies [box].position;
+    } vector3 s0 = world.bodies [box].position;
     for (int t = 0; t < 300; t++) {
         physics_world_step (&world, dt);
-        if (!isfinite (world.bodies [box].position.x)) {
-            break;
-        }
-    }
-    vector3 s1 = world.bodies [box].position;
+        if (!isfinite (world.bodies [box].position.x)) { break; }
+    } vector3 s1 = world.bodies [box].position;
     vector3 d = {cosf (ang), sinf (ang), 0.0f};
     *asleep_out = world.bodies [box].is_sleeping;
     float drift = (s1.x - s0.x) * d.x + (s1.y - s0.y) * d.y;
@@ -55,9 +51,7 @@ int main (void) {
     if (fabsf (hold_drift) > 0.05f) {
         printf ("[FAIL] static hold: box crept %.4f m on a slope it must hold\n", hold_drift);
         fail = 1;
-    } else {
-        printf ("[PASS] static hold: box stands on 20deg slope at mu_s=0.9\n");
-    }
+    } else { printf ("[PASS] static hold: box stands on 20deg slope at mu_s=0.9\n"); }
     /* 10 deg, mu 0.1 (friction angle 5.7 deg): must slide freely, stay awake.
      * TRUTH: analytic slide is ~21 m (a=g(sin10-mu*cos10)); the old >2.0 m
      * gate passed 90%-overdamped friction. Demand substantial travel.
@@ -72,12 +66,8 @@ int main (void) {
     } else if (asleep) {
         printf ("[FAIL] slide: box fell asleep mid-slope\n");
         fail = 1;
-    } else {
-        printf ("[PASS] past-angle slide stays free (%.4f m, awake)\n", slide_drift);
-    }
-    if (fail == 0) {
-        printf ("[PASS] static-hold truth complete\n");
-    }
+    } else { printf ("[PASS] past-angle slide stays free (%.4f m, awake)\n", slide_drift); }
+    if (fail == 0) { printf ("[PASS] static-hold truth complete\n"); }
     return fail;
 }
 #endif /* mpe_static_hold_test */

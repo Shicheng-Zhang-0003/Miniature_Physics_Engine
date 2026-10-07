@@ -64,11 +64,8 @@ int main (void) {
         for (int t = 0; t < 1200; t++) {
             physics_world_step (&w1, dt);
             physics_world_step (&w2, dt);
-        }
-        int mismatch = 0;
-        if (w1.body_count != w2.body_count) {
-            mismatch = 1;
-        }
+        } int mismatch = 0;
+        if (w1.body_count != w2.body_count) { mismatch = 1; }
         for (int i = 0; i < w1.body_count && !mismatch; i++) {
             if (!bodies_bitwise_equal (&w1.bodies [i], &w2.bodies [i])) {
                 mismatch = 1;
@@ -80,8 +77,7 @@ int main (void) {
             fail = 1;
         } else {
             printf ("[PASS] twin worlds bitwise identical for 1200 ticks\n");
-        }
-        physics_world_cleanup (&w1);
+        } physics_world_cleanup (&w1);
         physics_world_cleanup (&w2);
     }
     /* Test 2: Deterministic across re-initialization (same initial conditions, same ticks) */
@@ -121,8 +117,7 @@ int main (void) {
             fail = 1;
         } else {
             printf ("[PASS] re-initialization deterministic\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
         physics_world_cleanup (&world2);
     }
     /* Test 3: Deterministic across 10 independent runs (compare to reference run) */
@@ -162,15 +157,11 @@ int main (void) {
             if (pos_diff > 0.0f || vel_diff > 0.0f) {
                 printf ("[FAIL] run %d diverged (pos_diff=%.6f vel_diff=%.6f)\n", run, pos_diff, vel_diff);
                 sub_fail = 1;
-            }
-            physics_world_cleanup (&world2);
+            } physics_world_cleanup (&world2);
         }
-        if (sub_fail) {
-            fail = 1;
-        } else {
+        if (sub_fail) { fail = 1; } else {
             printf ("[PASS] 10 independent runs bitwise identical to reference\n");
-        }
-        physics_world_cleanup (&world_ref);
+        } physics_world_cleanup (&world_ref);
     }
     /* Test 4: Floating point determinism - no NaN/Inf propagation */
     {
@@ -193,16 +184,13 @@ int main (void) {
                 if (!isfinite (rb -> position.x) || !isfinite (rb -> velocity.x))
                     nan_count++;
             }
-        }
-        printf ("[INFO] sanitization_nan_test nan_count=%d\n", nan_count);
+        } printf ("[INFO] sanitization_nan_test nan_count=%d\n", nan_count);
         if (nan_count > 0) {
             printf ("[FAIL] NaN propagated\n");
             fail = 1;
         } else {
             printf ("[PASS] sanitization prevents NaN propagation\n");
-        }
-        physics_world_cleanup (&world);
-    }
-    return fail;
+        } physics_world_cleanup (&world);
+    } return fail;
 }
 #endif

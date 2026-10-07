@@ -35,19 +35,13 @@ rigidbody *scene_resolve_object_by_id (uint32_t id) {
 }
 uint32_t scene_allocate_object_id (void) {
     physics_world *w = physics_world_get_primary ();
-    if (w -> next_object_id == 0) {
-        w -> next_object_id = 1;
-    }
+    if (w -> next_object_id == 0) { w -> next_object_id = 1; }
     return w -> next_object_id++;
 }
 void scene_note_loaded_id (uint32_t id) {
-    if ((id == 0) || (id == 0xFFFFFFFFu)) {
-        return;
-    }
+    if ((id == 0) || (id == 0xFFFFFFFFu)) { return; }
     physics_world *w = physics_world_get_primary ();
-    if (id >= w -> next_object_id) {
-        w -> next_object_id = id + 1;
-    }
+    if (id >= w -> next_object_id) { w -> next_object_id = id + 1; }
 }
 int scene_ensure_pool_capacity (int n) {
     (void) n;
@@ -184,8 +178,7 @@ static int mpe_run_one (const mpe_entry_t *e) {
     if (fails == MPE_SKIPPED) {
         printf ("  [SKIP] %s (coverage did not run)\n", e -> name);
         return 2;
-    }
-    printf ("  [%s] %s (checks failed: %d)\n", fails == 0 ? "PASS" : "FAIL", e -> name, fails);
+    } printf ("  [%s] %s (checks failed: %d)\n", fails == 0 ? "PASS" : "FAIL", e -> name, fails);
     return fails == 0 ? 0 : 1;
 }
 int main (int argc, char **argv) {
@@ -222,21 +215,18 @@ int main (int argc, char **argv) {
     {
         const char *regime = getenv ("MPE_TEST_REGIME");
         printf ("regime: %s\n", (regime && *regime) ? regime : "default");
-    }
-    printf ("MPE Suite v2 — src: v15S (single binary, exact dispatch)\n");
+    } printf ("MPE Suite v2 — src: v15S (single binary, exact dispatch)\n");
     printf ("============================================================\n");
     if (argc >= 2 && strcmp (argv [1], "--list") == 0) {
         printf ("Available tests:\n");
         for (int i = 0; i < MPE_NTESTS; i++) {
             printf ("  %s%s\n", mpe_registry [i].name, mpe_registry [i].diag ? " (diag)" : "");
-        }
-        return 0;
+        } return 0;
     }
     if (argc >= 2 && strcmp (argv [1], "--help") == 0) {
         printf ("usage: test_mpe_suite [--list] [--all] [<exact-name>]\n");
         return 0;
-    }
-    int include_diag = (argc >= 2 && strcmp (argv [1], "--all") == 0);
+    } int include_diag = (argc >= 2 && strcmp (argv [1], "--all") == 0);
     if (argc >= 3 && argv [1][0] != '-' && argv [2][0] != '-') {
         /* Multi-name sequence in one process (bisection/debugging). */
         int failed = 0;
@@ -253,28 +243,18 @@ int main (int argc, char **argv) {
                 printf ("No tests matching '%s'\n", argv [a]);
                 failed++;
             }
-        }
-        return failed ? 1 : 0;
-    }
-    const char *only = NULL;
-    if (argc >= 2 && !include_diag && argv [1][0] != '-') {
-        only = argv [1];
-    }
+        } return failed ? 1 : 0;
+    } const char *only = NULL;
+    if (argc >= 2 && !include_diag && argv [1][0] != '-') { only = argv [1]; }
     if (only) {
         for (int i = 0; i < MPE_NTESTS; i++) {
-            if (strcmp (mpe_registry [i].name, only) == 0) {
-                return mpe_run_one (&mpe_registry [i]);
-            }
-        }
-        printf ("No tests matching '%s'\n", only);
+            if (strcmp (mpe_registry [i].name, only) == 0) { return mpe_run_one (&mpe_registry [i]); }
+        } printf ("No tests matching '%s'\n", only);
         return 1;
-    }
-    int phys_pass = 0, phys_total = 0, diag_pass = 0, diag_total = 0, failed = 0;
+    } int phys_pass = 0, phys_total = 0, diag_pass = 0, diag_total = 0, failed = 0;
     int skipped = 0;
     for (int i = 0; i < MPE_NTESTS; i++) {
-        if (mpe_registry [i].diag && !include_diag) {
-            continue;
-        }
+        if (mpe_registry [i].diag && !include_diag) { continue; }
         int rc = mpe_run_one (&mpe_registry [i]);
         if (rc == 2) {
             /* Not a pass. Counted separately and reported, never green. */
@@ -287,16 +267,12 @@ int main (int argc, char **argv) {
         } else {
             phys_total++;
             phys_pass += (rc == 0);
-        }
-        failed += rc;
-    }
-    printf ("\n============================================================\n");
+        } failed += rc;
+    } printf ("\n============================================================\n");
     printf ("TEST SUMMARY\n");
     printf ("============================================================\n");
     printf ("Physics: %d/%d green | Diag/math: %d/%d (informational)\n", phys_pass, phys_total, diag_pass, diag_total);
-    if (skipped) {
-        printf ("SKIPPED (coverage did not run, NOT counted green): %d\n", skipped);
-    }
+    if (skipped) { printf ("SKIPPED (coverage did not run, NOT counted green): %d\n", skipped); }
     printf ("Total: %d | Blocking failures: %d\n", phys_total + diag_total, failed);
     return failed ? 1 : 0;
 }

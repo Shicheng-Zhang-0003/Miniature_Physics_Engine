@@ -27,8 +27,7 @@ int main (void) {
             physics_world_cleanup (&world);
             return 1;
         }
-    }
-    float plat_y = world.bodies [p].position.y;
+    } float plat_y = world.bodies [p].position.y;
     float plat_x = world.bodies [p].position.x;
     float crate_x = world.bodies [c].position.x;
     float crate_y = world.bodies [c].position.y;
@@ -37,15 +36,11 @@ int main (void) {
     if (fabsf (plat_y - 0.5f) > 0.01f) {
         printf ("[FAIL] kinematic platform fell under gravity (y=%.4f)\n", plat_y);
         fail = 1;
-    } else {
-        printf ("[PASS] kinematic platform ignores gravity\n");
-    }
+    } else { printf ("[PASS] kinematic platform ignores gravity\n"); }
     if (plat_x < 3.8f || plat_x > 4.2f) {
         printf ("[FAIL] platform did not advance at drive velocity (x=%.3f, expect 4.0)\n", plat_x);
         fail = 1;
-    } else {
-        printf ("[PASS] kinematic platform advances at drive velocity\n");
-    }
+    } else { printf ("[PASS] kinematic platform advances at drive velocity\n"); }
     /* TRUTH: two-sided carry proof. Old crate_x<1.0 allowed 75% slip. The
      * measured slip is 0.67 (carried, with rolling lag); <1.0 keeps meaning
      * (0.5 would red a working carry). crate_y>0.8 proves it rode ON TOP
@@ -54,14 +49,11 @@ int main (void) {
     if (fabsf (crate_x - plat_x) > 1.0f) {
         printf ("[FAIL] crate not carried (crate_x=%.3f plat_x=%.3f)\n", crate_x, plat_x);
         fail = 1;
-    } else {
-        printf ("[PASS] contact carries the crate (x=%.3f)\n", crate_x);
-    }
+    } else { printf ("[PASS] contact carries the crate (x=%.3f)\n", crate_x); }
     if (crate_y < 0.8f) {
         printf ("[FAIL] crate fell through the platform (y=%.4f)\n", crate_y);
         fail = 1;
-    }
-    physics_world_cleanup (&world);
+    } physics_world_cleanup (&world);
     return fail;
 }
 #endif /* mpe_kinematic_test */

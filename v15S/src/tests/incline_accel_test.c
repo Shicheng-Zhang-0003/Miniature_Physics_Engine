@@ -35,8 +35,7 @@ int main (void) {
     /* Measure acceleration over the middle second (settled sliding). */
     for (int t = 0; t < 30; t++) {
         physics_world_step (&world, dt);
-    }
-    vector3 p_a = world.bodies [box].position;
+    } vector3 p_a = world.bodies [box].position;
     float v_a = vector3_dot (world.bodies [box].velocity, d);
     for (int t = 0; t < 60; t++) {
         physics_world_step (&world, dt);
@@ -45,8 +44,7 @@ int main (void) {
             physics_world_cleanup (&world);
             return 1;
         }
-    }
-    vector3 p_b = world.bodies [box].position;
+    } vector3 p_b = world.bodies [box].position;
     float v_b = vector3_dot (world.bodies [box].velocity, d);
     float a_meas = (v_b - v_a) / 1.0f;
     float a_exact = 9.81f * sinf (-ang); /* downhill magnitude */
@@ -55,9 +53,7 @@ int main (void) {
     if (fabsf (a_meas - a_exact) / a_exact > 0.04f) {
         printf ("[FAIL] incline acceleration off\n");
         fail = 1;
-    } else {
-        printf ("[PASS] frictionless slide accelerates at g*sin(theta)\n");
-    }
+    } else { printf ("[PASS] frictionless slide accelerates at g*sin(theta)\n"); }
     /* TRUTH: velocity-only passes while x+=v*dt position is wrong. Assert
      * the displacement matches v_a*1+0.5*a*1^2 along the slope. */
     {
@@ -67,11 +63,8 @@ int main (void) {
         if (fabsf (s_meas - s_exact) / fabsf (s_exact) > 0.03f) {
             printf ("[FAIL] incline displacement off (%.4f vs %.4f)\n", s_meas, s_exact);
             fail = 1;
-        } else {
-            printf ("[PASS] incline displacement matches kinematics\n");
-        }
-    }
-    physics_world_cleanup (&world);
+        } else { printf ("[PASS] incline displacement matches kinematics\n"); }
+    } physics_world_cleanup (&world);
     return fail;
 }
 #endif /* mpe_incline_accel_test */

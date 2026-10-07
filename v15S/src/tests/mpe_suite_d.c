@@ -130,8 +130,7 @@ static int meta_step (physics_world *w, int n, float dt) {
                 return 0;
             }
         }
-    }
-    return 1;
+    } return 1;
 }
 static double meta_max_pos_err (const physics_world *a, const physics_world *b) {
     double worst = 0.0;
@@ -141,8 +140,7 @@ static double meta_max_pos_err (const physics_world *a, const physics_world *b) 
         double m = (double) vector3_length (d);
         if (m > worst)
             worst = m;
-    }
-    return worst;
+    } return worst;
 }
 static double meta_max_vel_err (const physics_world *a, const physics_world *b) {
     double worst = 0.0;
@@ -152,8 +150,7 @@ static double meta_max_vel_err (const physics_world *a, const physics_world *b) 
         double m = (double) vector3_length (d);
         if (m > worst)
             worst = m;
-    }
-    return worst;
+    } return worst;
 } /* ------------------------------------------- 1. rotation equivariance */
 int mpe_t_meta_rotation (void) {
     mpe_test_t t;
@@ -291,8 +288,7 @@ int mpe_t_meta_rotation (void) {
                     "See KNOWN_FAILURES.md META-ROTATION-2026-09-29\n",
                     pos_err, vel_err);
         }
-    }
-    physics_world_cleanup (&wa);
+    } physics_world_cleanup (&wa);
     physics_world_cleanup (&wb);
     mpe_test_end (tp);
     return tp -> failures;
@@ -369,8 +365,7 @@ static double meta_stack_pos_err (const physics_world *a, const physics_world *b
         double m = (double) vector3_length (d);
         if (m > worst)
             worst = m;
-    }
-    return worst;
+    } return worst;
 }
 int mpe_t_meta_convergence (void) {
     mpe_test_t t;
@@ -410,33 +405,21 @@ int mpe_t_meta_convergence (void) {
                 for (int bi = 1; bi <= META_CONV_STACK_H && bi < w.body_count; bi++) {
                     double lv = (double) vector3_length (w.bodies [bi].velocity);
                     double av = (double) vector3_length (w.bodies [bi].angular_velocity);
-                    if (lv > mr) {
-                        mr = lv;
-                    }
-                    if (av > mr) {
-                        mr = av;
-                    }
-                }
-                res [k] = mr;
+                    if (lv > mr) { mr = lv; }
+                    if (av > mr) { mr = av; }
+                } res [k] = mr;
                 measured++;
                 MPE_INFO ("solver iters=%3d: max |dpos| vs 128-iter reference = %.4e m, residual %.4f m/s", iters [k],
                           err [k], mr);
-            }
-            physics_world_cleanup (&w);
+            } physics_world_cleanup (&w);
         }
-    }
-    double ref_res = 0.0;
+    } double ref_res = 0.0;
     for (int bi = 1; bi <= META_CONV_STACK_H && bi < ref.body_count; bi++) {
         double lv = (double) vector3_length (ref.bodies [bi].velocity);
         double av = (double) vector3_length (ref.bodies [bi].angular_velocity);
-        if (lv > ref_res) {
-            ref_res = lv;
-        }
-        if (av > ref_res) {
-            ref_res = av;
-        }
-    }
-    MPE_INFO ("reference (128 iters) residual %.4f m/s", ref_res);
+        if (lv > ref_res) { ref_res = lv; }
+        if (av > ref_res) { ref_res = av; }
+    } MPE_INFO ("reference (128 iters) residual %.4f m/s", ref_res);
     if (measured == n && ok) {
         /* (a) ANTI-VACUITY. If every arm matches the reference the fixture is
          * trivially converged and every other gate here is vacuous. Require the
@@ -499,8 +482,7 @@ int mpe_t_meta_convergence (void) {
                     "iteration count on a load-bearing stack, and the knob is "
                     "demonstrably live (NOTE: not monotonic -- see the comment)\n");
         }
-    }
-    physics_world_cleanup (&ref);
+    } physics_world_cleanup (&ref);
     mpe_test_end (tp);
     return tp -> failures;
 } /* ------------------------------------------------ 3. sleep honesty, both ways */
@@ -559,20 +541,16 @@ int mpe_t_meta_config_wiring (void) {
         double travel = 0.0;
         for (int i = 0; i < w.body_count; i++) {
             travel += (double) vector3_length (w.bodies [i].position);
-        }
-        results [arm] = ok ? travel : 0.0;
+        } results [arm] = ok ? travel : 0.0;
         physics_world_cleanup (&w);
-    }
-    MPE_INFO ("config wiring: slick travel sum = %.4f, grippy travel sum = %.4f", results [0], results [1]);
+    } MPE_INFO ("config wiring: slick travel sum = %.4f, grippy travel sum = %.4f", results [0], results [1]);
     /* Friction is combined with min() against the floor, so the arm with 0.05
      * everywhere is the low-friction one. If the engine ignored friction
      * entirely the two arms would be bit-identical -- which is the bug this
      * catches. The direction is not asserted (that would be a golden value);
      * only that friction is REACHABLE. */
     MPE_CHECK (tp, fabs (results [0] - results [1]) > 1e-3);
-    if (tp -> failures == 0) {
-        printf ("[PASS] solver parameters demonstrably reach the simulation\n");
-    }
+    if (tp -> failures == 0) { printf ("[PASS] solver parameters demonstrably reach the simulation\n"); }
     mpe_test_end (tp);
     return tp -> failures;
 } /* ------------------------------- 5. sleep honesty, three states (SLEEP-H1) */
@@ -607,11 +585,8 @@ int mpe_t_sleep_settle (void) {
     for (int k = 0; k < 15; k++) {
         MPE_CHECK (tp, mpe_step (&w, 1, dt));
         double d = (double) vector3_length (vector3_subtraction (w.bodies [b].position, p0));
-        if (d > travel15) {
-            travel15 = d;
-        }
-    }
-    MPE_INFO ("sleep_settle: 15-tick max travel = %.4f m (regime %s)", travel15, tp -> regime);
+        if (d > travel15) { travel15 = d; }
+    } MPE_INFO ("sleep_settle: 15-tick max travel = %.4f m (regime %s)", travel15, tp -> regime);
     MPE_CHECK (tp, travel15 > 1e-3);
     MPE_CHECK (tp, mpe_step (&w, 585, dt));
     float vend = vector3_length (w.bodies [b].velocity);
@@ -620,15 +595,11 @@ int mpe_t_sleep_settle (void) {
               w.bodies [b].is_sleeping, w.bodies [b].sleep_timer, tp -> regime);
     MPE_CHECK (tp, vend < 0.05f);
     MPE_CHECK (tp, yend > 0.2f && yend < 0.6f);
-    if (g_cfg.sleep.enable) {
-        MPE_CHECK (tp, w.bodies [b].is_sleeping);
-    } else {
+    if (g_cfg.sleep.enable) { MPE_CHECK (tp, w.bodies [b].is_sleeping); } else {
         MPE_CHECK (tp, !w.bodies [b].is_sleeping);
         MPE_CHECK (tp, w.bodies [b].sleep_timer == 0.0f);
     }
-    if (tp -> failures == 0) {
-        printf ("[PASS] launch settles then sleeps iff enabled (three-state honesty)\n");
-    }
+    if (tp -> failures == 0) { printf ("[PASS] launch settles then sleeps iff enabled (three-state honesty)\n"); }
     physics_world_cleanup (&w);
     mpe_test_end (tp);
     return tp -> failures;
@@ -700,9 +671,7 @@ int mpe_t_mouse_look_axes (void) {
         MPE_CHECK_NEAR (tp, acc_x, 20.0f, 1e-4, "accumulated x over 5 events");
         MPE_CHECK_NEAR (tp, acc_y, 10.0f, 1e-4, "accumulated y over 5 events");
     }
-    if (tp -> failures == 0) {
-        printf ("[PASS] mouse-look convention correct in all four directions\n");
-    }
+    if (tp -> failures == 0) { printf ("[PASS] mouse-look convention correct in all four directions\n"); }
     mpe_test_end (tp);
     return tp -> failures;
 } /* ------------------- 6. body materials are live at construction time */
@@ -772,7 +741,6 @@ int mpe_t_body_materials_live (void) {
     if (tp -> failures == 0) {
         printf ("[PASS] bodies are constructed with live materials "
                 "(no zero-friction objects)\n");
-    }
-    mpe_test_end (tp);
+    } mpe_test_end (tp);
     return tp -> failures;
 }

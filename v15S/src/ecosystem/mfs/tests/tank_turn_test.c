@@ -19,8 +19,7 @@ int main (void) {
     if (rc != 0) {
         printf ("[FAIL] could not create robot\n");
         return 1;
-    }
-    float start_x, start_y, start_z;
+    } float start_x, start_y, start_z;
     ftc_robot_get_position (&world, &robot, &start_x, &start_y, &start_z);
     const float dt = 1.0f / 60.0f;
     int fail = 0;

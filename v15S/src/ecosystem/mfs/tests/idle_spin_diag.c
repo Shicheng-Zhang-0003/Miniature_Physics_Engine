@@ -31,8 +31,7 @@ int main (void) {
     for (int i = 0; i < 120; i++) {
         drivetrain_update (&world, &robot, DT);
         physics_world_step (&world, DT);
-    }
-    printf ("settled. now monitoring 300 frames of ZERO input:\n");
+    } printf ("settled. now monitoring 300 frames of ZERO input:\n");
     float max_wheel_omega = 0.0f;
     float max_chassis_speed = 0.0f;
     for (int i = 0; i < 300; i++) {
@@ -49,24 +48,19 @@ int main (void) {
                 if (fabsf (oa) > max_wheel_omega)
                     max_wheel_omega = fabsf (oa);
                 printf ("%s%.3f", w ? ", " : "", oa);
-            }
-            rigidbody *ch = &world.bodies [robot.chassis_body];
+            } rigidbody *ch = &world.bodies [robot.chassis_body];
             float cs = sqrtf (ch -> velocity.x * ch -> velocity.x + ch -> velocity.z * ch -> velocity.z);
             if (cs > max_chassis_speed)
                 max_chassis_speed = cs;
             printf ("] chassis_speed=%.4f pos=(%.3f,%.3f)\n", cs, ch -> position.x, ch -> position.z);
         }
-    }
-    printf ("\nmax |wheel axle omega| over idle = %.4f rad/s\n", max_wheel_omega);
+    } printf ("\nmax |wheel axle omega| over idle = %.4f rad/s\n", max_wheel_omega);
     printf ("max chassis speed over idle     = %.4f m/s\n", max_chassis_speed);
-    if (max_wheel_omega > 0.5f) {
-        printf ("VERDICT: wheels SPIN at idle -> real bug, see pattern above\n");
-    } else if (max_wheel_omega > 0.05f) {
+    if (max_wheel_omega > 0.5f) { printf ("VERDICT: wheels SPIN at idle -> real bug, see pattern above\n"); } else if (max_wheel_omega > 0.05f) {
         printf ("VERDICT: mild jitter at idle (contact solver)\n");
     } else {
         printf ("VERDICT: idle is stable in headless -> bug may be GUI-side\n");
-    }
-    physics_world_cleanup (&world);
+    } physics_world_cleanup (&world);
     return 0;
 }
 #endif

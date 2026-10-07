@@ -50,18 +50,12 @@ int main (void) {
         }
         if ((prev_x <= 0.0f && x > 0.0f) || (prev_x >= 0.0f && x < 0.0f)) {
             crossings++;
-            if (first < 0) {
-                first = t;
-            }
+            if (first < 0) { first = t; }
             last = t;
-        }
-        prev_x = x;
-    }
-    int fail = 0;
+        } prev_x = x;
+    } int fail = 0;
     float t_meas = 0.0f;
-    if (crossings >= 4) {
-        t_meas = 2.0f * (float) (last - first) * dt / (float) (crossings - 1);
-    }
+    if (crossings >= 4) { t_meas = 2.0f * (float) (last - first) * dt / (float) (crossings - 1); }
     printf ("[info] period: measured=%.4f analytic=%.4f crossings=%d\n", t_meas, t_exact, crossings);
     /* TRUTH: 8% is 10x the nonlinear correction (0.8%) and hides joint
      * compliance, contact fight, damping and g error. Band at 3% with a
@@ -71,8 +65,7 @@ int main (void) {
         fail = 1;
     } else {
         printf ("[PASS] compound pendulum period exact\n");
-    }
-    physics_world_cleanup (&world);
+    } physics_world_cleanup (&world);
     return fail;
 }
 #endif /* mpe_pendulum_test */

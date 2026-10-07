@@ -32,14 +32,9 @@ int main (void) {
             printf ("[FAIL] NaN\n");
             physics_world_cleanup (&world);
             return 1;
-        }
-        float time = (float) (t + 1) * dt;
-        if ((time > 1.0f) && (time < 1.7f) && (y > apex1)) {
-            apex1 = y;
-        }
-        if ((time > 1.9f) && (time < 2.6f) && (y > apex2)) {
-            apex2 = y;
-        }
+        } float time = (float) (t + 1) * dt;
+        if ((time > 1.0f) && (time < 1.7f) && (y > apex1)) { apex1 = y; }
+        if ((time > 1.9f) && (time < 2.6f) && (y > apex2)) { apex2 = y; }
     }
     float e1 = 0.5f + 3.5f * 0.36f; /* 1.76 */
     float e2 = 0.5f + (e1 - 0.5f) * 0.36f; /* 0.954 */
@@ -48,16 +43,13 @@ int main (void) {
     if (fabsf (apex1 - e1) / e1 > 0.12f) {
         printf ("[FAIL] first bounce height off\n");
         fail = 1;
-    } else {
-        printf ("[PASS] first bounce follows e^2\n");
-    }
+    } else { printf ("[PASS] first bounce follows e^2\n"); }
     if (fabsf (apex2 - e2) / e2 > 0.15f) {
         printf ("[FAIL] second bounce height off\n");
         fail = 1;
     } else {
         printf ("[PASS] bounce series decays geometrically\n");
-    }
-    physics_world_cleanup (&world);
+    } physics_world_cleanup (&world);
     return fail;
 }
 #endif /* mpe_bounce_series_test */

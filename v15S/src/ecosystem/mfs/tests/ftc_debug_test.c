@@ -21,8 +21,7 @@ int main (void) {
     if (rc != 0) {
         printf ("[FAIL] could not create robot\n");
         return 1;
-    }
-    const float dt = 1.0f / 60.0f;
+    } const float dt = 1.0f / 60.0f;
     /* One tick of full forward */
     drivetrain_tank (&robot, 1.0f, 1.0f);
     drivetrain_update (&world, &robot, dt);
@@ -47,8 +46,7 @@ int main (void) {
                 world.bodies [wb].angular_velocity.x, world.bodies [wb].angular_velocity.y,
                 world.bodies [wb].angular_velocity.z, world.bodies [wb].velocity.x, world.bodies [wb].velocity.y,
                 world.bodies [wb].velocity.z, world.bodies [wb].position.y);
-    }
-    int cb = robot.chassis_body;
+    } int cb = robot.chassis_body;
     printf ("  Chassis: lin_vel=(%.3f,%.3f,%.3f) pos.y=%.4f\n", world.bodies [cb].velocity.x,
             world.bodies [cb].velocity.y, world.bodies [cb].velocity.z, world.bodies [cb].position.y);
     printf ("\n=== Verdict heuristics ===\n");

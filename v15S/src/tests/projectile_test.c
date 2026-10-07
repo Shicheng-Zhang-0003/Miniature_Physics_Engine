@@ -42,8 +42,7 @@ int main (void) {
         if (b -> position.y < 0.25f) {
             break; /* landed */
         }
-    }
-    float apex_e = 1.0f + vy * vy / (2.0f * g);
+    } float apex_e = 1.0f + vy * vy / (2.0f * g);
     float t_e = vy / g;
     float x_e = vx * t_e;
     printf ("[info] apex=%.4f (expect %.4f) t=%.4f (expect %.4f) x=%.4f (expect %.4f)\n", apex, apex_e, t_apex, t_e,
@@ -60,22 +59,17 @@ int main (void) {
     if (fabsf (apex - apex_e) / apex_e > 0.02f) {
         printf ("[FAIL] apex height off\n");
         fail = 1;
-    } else {
-        printf ("[PASS] ballistic apex exact\n");
-    }
+    } else { printf ("[PASS] ballistic apex exact\n"); }
     if (fabsf (t_apex - t_e) / t_e > 0.02f) {
         printf ("[FAIL] time-to-apex off\n");
         fail = 1;
-    } else {
-        printf ("[PASS] time-to-apex exact\n");
-    }
+    } else { printf ("[PASS] time-to-apex exact\n"); }
     if (fabsf (x_apex - x_e) / x_e > 0.02f) {
         printf ("[FAIL] horizontal range off (spurious forces?)\n");
         fail = 1;
     } else {
         printf ("[PASS] horizontal motion force-free\n");
-    }
-    physics_world_cleanup (&world);
+    } physics_world_cleanup (&world);
     return fail;
 }
 #endif /* mpe_projectile_test */

@@ -51,8 +51,7 @@ int main (int argc, char **argv) {
         printf ("Blocking tests (%zu):\n", sizeof (registry) / sizeof (registry [0]));
         for (size_t i = 0; i < sizeof (registry) / sizeof (registry [0]); i++) {
             printf ("  %s\n", registry [i].name);
-        }
-        return 0;
+        } return 0;
     }
     if (argc > 1 && strcmp (argv [1], "--all") == 0) {
         int total = 0, pass = 0, fail = 0;
@@ -66,10 +65,8 @@ int main (int argc, char **argv) {
             } else {
                 printf ("[FAIL] %s (failures=%d)\n", registry [i].name, rc);
                 fail++;
-            }
-            total++;
-        }
-        printf ("\n=== SUMMARY ===\n");
+            } total++;
+        } printf ("\n=== SUMMARY ===\n");
         printf ("Total: %d\n", total);
         printf ("Pass:  %d\n", pass);
         printf ("Fail:  %d\n", fail);
@@ -84,7 +81,6 @@ int main (int argc, char **argv) {
             int rc = registry [i].fn ();
             return rc > 0 ? 1 : 0;
         }
-    }
-    fprintf (stderr, "Unknown test: %s\n", argv [1]);
+    } fprintf (stderr, "Unknown test: %s\n", argv [1]);
     return 1;
 }

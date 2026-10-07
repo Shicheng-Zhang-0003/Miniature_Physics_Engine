@@ -78,8 +78,7 @@ int mfs_internal_registry_init (void) {
     }
     for (int i = 0; i < MFS_MAX_INTERNAL_MODULES; i++) {
         slot_clear (&s_slots [i]);
-    }
-    s_slot_count = 0;
+    } s_slot_count = 0;
     s_inflight = 0;
     pthread_mutex_unlock (&s_lock);
     return MFS_REG_OK;
@@ -94,8 +93,7 @@ int mfs_internal_module_registered (const char *name) {
             found = 1;
             break;
         }
-    }
-    pthread_mutex_unlock (&s_lock);
+    } pthread_mutex_unlock (&s_lock);
     return found;
 }
 int mfs_internal_module_register (const mpe_module_desc_t *desc) {
@@ -116,8 +114,7 @@ int mfs_internal_module_register (const mpe_module_desc_t *desc) {
             pthread_mutex_unlock (&s_lock);
             return MFS_REG_OK;
         }
-    }
-    pthread_mutex_unlock (&s_lock);
+    } pthread_mutex_unlock (&s_lock);
     return MFS_REG_FULL;
 }
 int mfs_internal_module_unregister (const char *name) {
@@ -136,16 +133,14 @@ int mfs_internal_module_unregister (const char *name) {
     if (live) {
         pthread_mutex_unlock (&s_lock);
         return MFS_UNREG_STILL_ATTACHED;
-    }
-    int freed = 0;
+    } int freed = 0;
     for (int i = 0; i < MFS_MAX_INTERNAL_MODULES; i++) {
         if (name_matches (&s_slots [i], name)) {
             slot_clear (&s_slots [i]);
             s_slot_count--;
             freed++;
         }
-    }
-    wake_all ();
+    } wake_all ();
     pthread_mutex_unlock (&s_lock);
     return freed > 0 ? MFS_UNREG_OK : MFS_UNREG_NOT_FOUND;
 }
@@ -170,8 +165,7 @@ int mfs_internal_module_attach (const char *name, physics_world *world) {
                 reg = i;
                 break;
             }
-        }
-        int made_alias = 0;
+        } int made_alias = 0;
         if (reg < 0) {
             /* No idle slot: either every matching slot is busy (wait for it
              * to settle, then re-evaluate) or the table is full. */
@@ -196,8 +190,7 @@ int mfs_internal_module_attach (const char *name, physics_world *world) {
                 /* FIX-AUDIT-DESPOT: was MFS_REG_DUPLICATE ("already
                  * registered") for the NOT-registered case. */
                 return MFS_REG_NOT_FOUND; /* not registered */
-            }
-            int free_slot = -1;
+            } int free_slot = -1;
             for (int i = 0; i < MFS_MAX_INTERNAL_MODULES; i++) {
                 if (!s_slots [i].desc) {
                     free_slot = i;
@@ -215,14 +208,12 @@ int mfs_internal_module_attach (const char *name, physics_world *world) {
             s_slot_count++;
             reg = free_slot;
             made_alias = 1;
-        }
-        const mpe_module_desc_t *d = s_slots [reg].desc;
+        } const mpe_module_desc_t *d = s_slots [reg].desc;
         if (!d || !d -> attach) {
             if (made_alias) {
                 slot_clear (&s_slots [reg]);
                 s_slot_count--;
-            }
-            pthread_mutex_unlock (&s_lock);
+            } pthread_mutex_unlock (&s_lock);
             return MFS_REG_BAD_ARG;
         }
         /* Reserve: the in_flight bump both blocks a second attach on this
@@ -241,12 +232,10 @@ int mfs_internal_module_attach (const char *name, physics_world *world) {
             if (made_alias) {
                 slot_clear (&s_slots [reg]);
                 s_slot_count--;
-            }
-            wake_all ();
+            } wake_all ();
             pthread_mutex_unlock (&s_lock);
             return (r < 0) ? r : MFS_REG_BAD_ARG;
-        }
-        s_slots [reg].state = state;
+        } s_slots [reg].state = state;
         s_slots [reg].attached = true;
         s_slots [reg].world = (const void *) world;
         wake_all ();
@@ -279,8 +268,7 @@ int mfs_internal_module_detach (const char *name, physics_world *world) {
                     pthread_mutex_unlock (&s_lock);
                     return MFS_DET_OK;
                 }
-            }
-            pthread_mutex_unlock (&s_lock);
+            } pthread_mutex_unlock (&s_lock);
             return MFS_DET_NOT_FOUND;
         }
         /* Drain: block until no callback holds a reference to this state.
@@ -294,11 +282,9 @@ int mfs_internal_module_detach (const char *name, physics_world *world) {
                 s_slots [reg].detach_deferred = true;
                 pthread_mutex_unlock (&s_lock);
                 return MFS_DET_OK; /* deferred: real detach runs post-callback */
-            }
-            pthread_cond_wait (&s_cv, &s_lock);
+            } pthread_cond_wait (&s_cv, &s_lock);
             continue;
-        }
-        const mpe_module_desc_t *d = s_slots [reg].desc;
+        } const mpe_module_desc_t *d = s_slots [reg].desc;
         void *st = s_slots [reg].state;
         s_slots [reg].detaching = true; /* no new callbacks from here on */
         if (!d || !d -> detach) {
@@ -309,8 +295,7 @@ int mfs_internal_module_detach (const char *name, physics_world *world) {
             wake_all ();
             pthread_mutex_unlock (&s_lock);
             return MFS_DET_NO_CALLBACK;
-        }
-        s_slots [reg].in_flight++;
+        } s_slots [reg].in_flight++;
         s_inflight++;
         pthread_mutex_unlock (&s_lock);
         d -> detach ((physics_world *) world, st);
@@ -339,8 +324,7 @@ void *mfs_internal_module_state_for (const void *world, const char *name) {
             out = s_slots [i].state;
             break;
         }
-    }
-    pthread_mutex_unlock (&s_lock);
+    } pthread_mutex_unlock (&s_lock);
     return out;
 }
 void *mfs_internal_module_state (const char *name) {
@@ -356,8 +340,7 @@ void *mfs_internal_module_state (const char *name) {
             out = s_slots [i].state;
             break;
         }
-    }
-    pthread_mutex_unlock (&s_lock);
+    } pthread_mutex_unlock (&s_lock);
     return out;
 } /* Shared dispatch for pre_step/post_step. The snapshot is taken under the
  * lock WITH a reference per slot, so a concurrent detach drains instead of
@@ -383,8 +366,7 @@ static void mfs_dispatch (physics_world *world, float dt, bool pre) {
         n++;
         s_slots [i].in_flight++;
         s_inflight++;
-    }
-    pthread_mutex_unlock (&s_lock);
+    } pthread_mutex_unlock (&s_lock);
     for (int k = 0; k < n; k++) {
         if (pre) {
             /* DESPOT-2026-10-06: publish which slot this thread is inside so a
@@ -399,8 +381,7 @@ static void mfs_dispatch (physics_world *world, float dt, bool pre) {
             t_callback_slot = slot_of [k];
             ds [k] -> post_step ((physics_world *) world, dt, sts [k]);
             t_callback_slot = prev_slot;
-        }
-        pthread_mutex_lock (&s_lock);
+        } pthread_mutex_lock (&s_lock);
         int i = slot_of [k];
         /* The slot cannot have been detached or unregistered while we held
          * a reference, but match on state anyway so a logic error degrades
@@ -426,8 +407,7 @@ static void mfs_dispatch (physics_world *world, float dt, bool pre) {
                 s_inflight++;
                 run_deferred = 1;
             }
-        }
-        wake_all ();
+        } wake_all ();
         pthread_mutex_unlock (&s_lock);
         if (run_deferred) {
             dd -> detach ((physics_world *) world, dst);
@@ -469,11 +449,9 @@ void mfs_internal_modules_detach_all (physics_world *world) {
                 s_slots [reg].detach_deferred = true;
                 pthread_mutex_unlock (&s_lock);
                 return;
-            }
-            pthread_cond_wait (&s_cv, &s_lock);
+            } pthread_cond_wait (&s_cv, &s_lock);
             continue;
-        }
-        const mpe_module_desc_t *d = s_slots [reg].desc;
+        } const mpe_module_desc_t *d = s_slots [reg].desc;
         void *st = s_slots [reg].state;
         s_slots [reg].detaching = true;
         if (d && d -> detach) {
@@ -484,8 +462,7 @@ void mfs_internal_modules_detach_all (physics_world *world) {
             pthread_mutex_lock (&s_lock);
             s_slots [reg].in_flight--;
             s_inflight--;
-        }
-        s_slots [reg].state = NULL;
+        } s_slots [reg].state = NULL;
         s_slots [reg].attached = false;
         s_slots [reg].world = NULL;
         s_slots [reg].detaching = false;

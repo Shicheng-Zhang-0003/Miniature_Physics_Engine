@@ -20,8 +20,7 @@ int main (void) {
         printf ("[FAIL] could not create robot\n");
         physics_world_cleanup (&world);
         return 1;
-    }
-    float start_x, start_y, start_z;
+    } float start_x, start_y, start_z;
     ftc_robot_get_position (&world, &robot, &start_x, &start_y, &start_z);
     printf ("[info] start pos: (%.3f, %.3f, %.3f)\n", start_x, start_y, start_z);
     const float dt = 1.0f / 60.0f;
@@ -40,8 +39,7 @@ int main (void) {
                 break;
             }
         }
-    }
-    float p1_x, p1_y, p1_z;
+    } float p1_x, p1_y, p1_z;
     ftc_robot_get_position (&world, &robot, &p1_x, &p1_y, &p1_z);
     printf ("[info] after forward: (%.3f, %.3f, %.3f)\n", p1_x, p1_y, p1_z);
     /* Phase 2: Turn right for 1 second (60 ticks) */
@@ -50,8 +48,7 @@ int main (void) {
         drivetrain_tank (&robot, 0.5f, -0.5f);
         drivetrain_update (&world, &robot, dt);
         physics_world_step (&world, dt);
-    }
-    float p2_x, p2_y, p2_z;
+    } float p2_x, p2_y, p2_z;
     ftc_robot_get_position (&world, &robot, &p2_x, &p2_y, &p2_z);
     printf ("[info] after turn: (%.3f, %.3f, %.3f)\n", p2_x, p2_y, p2_z);
     /* Phase 3: Strafe right for 1 second (60 ticks) */
@@ -60,8 +57,7 @@ int main (void) {
         drivetrain_mecanum (&robot, 0.0f, 1.0f, 0.0f);
         drivetrain_update (&world, &robot, dt);
         physics_world_step (&world, dt);
-    }
-    float end_x, end_y, end_z;
+    } float end_x, end_y, end_z;
     ftc_robot_get_position (&world, &robot, &end_x, &end_y, &end_z);
     printf ("[info] final pos: (%.3f, %.3f, %.3f)\n", end_x, end_y, end_z);
     if (fail) {
@@ -82,8 +78,7 @@ int main (void) {
         printf ("[FAIL] robot flipped or fell (dy=%.4f)\n", dy);
         physics_world_cleanup (&world);
         return 1;
-    }
-    printf ("[PASS] FTC integration: robot drove, turned, strafed, stayed upright\n");
+    } printf ("[PASS] FTC integration: robot drove, turned, strafed, stayed upright\n");
     physics_world_cleanup (&world);
     return 0;
 }

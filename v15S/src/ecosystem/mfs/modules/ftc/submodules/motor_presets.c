@@ -152,9 +152,7 @@ void motor_preset_apply (motor *m, motor_preset_id id) {
      * motor + NULL name). Fail the build, not the robot, on drift. */
     _Static_assert (sizeof (presets) / sizeof (presets [0]) == MOTOR_COUNT,
                     "motor preset table length must equal MOTOR_COUNT");
-    if ((!m) || (id < 0) || (id >= MOTOR_COUNT)) {
-        return;
-    }
+    if ((!m) || (id < 0) || (id >= MOTOR_COUNT)) { return; }
     const motor_preset_spec *spec = &presets [id];
     /* PHYSICS-FIX: derive at the 12.0 V spec voltage, not the 12.8 V fresh
      * pack voltage. R/Kv biased +6.7% when derived at 12.8 V; the battery
@@ -163,20 +161,14 @@ void motor_preset_apply (motor *m, motor_preset_id id) {
                      spec -> efficiency);
 }
 const char *motor_preset_name (motor_preset_id id) {
-    if ((id < 0) || (id >= MOTOR_COUNT)) {
-        return "unknown";
-    }
+    if ((id < 0) || (id >= MOTOR_COUNT)) { return "unknown"; }
     return presets [id].name;
 }
 float motor_preset_gear_ratio (motor_preset_id id) {
-    if ((id < 0) || (id >= MOTOR_COUNT)) {
-        return 1.0f;
-    }
+    if ((id < 0) || (id >= MOTOR_COUNT)) { return 1.0f; }
     return presets [id].gear_ratio;
 }
 int motor_preset_base_encoder_ppr (motor_preset_id id) {
-    if ((id < 0) || (id >= MOTOR_COUNT)) {
-        return 0;
-    }
+    if ((id < 0) || (id >= MOTOR_COUNT)) { return 0; }
     return presets [id].base_encoder_ppr;
 }

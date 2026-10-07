@@ -41,9 +41,7 @@ int main (void) {
         if (rejected_or_clamped != 8 || !bounded) {
             printf ("[FAIL] config bounds not enforced\n");
             fail = 1;
-        } else {
-            printf ("[PASS] config bounds clamping works\n");
-        }
+        } else { printf ("[PASS] config bounds clamping works\n"); }
     }
     /* Test 2: Config persistence - save/load roundtrip */
     {
@@ -57,14 +55,12 @@ int main (void) {
         if (!save_result) {
             printf ("[FAIL] config save failed\n");
             fail = 1;
-        }
-        mpe_config_reset_defaults ();
+        } mpe_config_reset_defaults ();
         bool load_result = mpe_config_load (path);
         if (!load_result) {
             printf ("[FAIL] config load failed\n");
             fail = 1;
-        }
-        float g, d;
+        } float g, d;
         int iters;
         float slop;
         mpe_config_get_float ("world.gravity", &g);
@@ -79,8 +75,7 @@ int main (void) {
             fail = 1;
         } else {
             printf ("[PASS] config exact roundtrip\n");
-        }
-        remove (path);
+        } remove (path);
     }
     /* Test 3: Debug-only params - cannot be set in game mode */
     {
@@ -108,14 +103,11 @@ int main (void) {
             fail = 1;
         } else {
             printf ("[PASS] cat_world has %zu params\n", count);
-        }
-        count = mpe_config_count_by_category (cat_solver);
+        } count = mpe_config_count_by_category (cat_solver);
         if (count == 0) {
             printf ("[FAIL] cat_solver empty\n");
             fail = 1;
-        } else {
-            printf ("[PASS] cat_solver has %zu params\n", count);
-        }
+        } else { printf ("[PASS] cat_solver has %zu params\n", count); }
     }
     /* Test 6: Invalid key handling */
     {
@@ -124,9 +116,7 @@ int main (void) {
         if (result) {
             printf ("[FAIL] invalid key should return false\n");
             fail = 1;
-        } else {
-            printf ("[PASS] invalid key returns false\n");
-        }
+        } else { printf ("[PASS] invalid key returns false\n"); }
     }
     /* Test 7: Type mismatch handling */
     {
@@ -135,10 +125,7 @@ int main (void) {
         if (result) {
             printf ("[FAIL] type mismatch should return false\n");
             fail = 1;
-        } else {
-            printf ("[PASS] type mismatch returns false\n");
-        }
-    }
-    return fail;
+        } else { printf ("[PASS] type mismatch returns false\n"); }
+    } return fail;
 }
 #endif

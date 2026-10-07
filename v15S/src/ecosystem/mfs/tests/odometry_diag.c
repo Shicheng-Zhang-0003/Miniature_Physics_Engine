@@ -24,8 +24,7 @@ int main (void) {
     for (int i = 0; i < 120; i++) {
         drivetrain_update (&world, &robot, DT);
         physics_world_step (&world, DT);
-    }
-    robot.odom_x = robot.odom_z = robot.odom_theta = 0.0f;
+    } robot.odom_x = robot.odom_z = robot.odom_theta = 0.0f;
     for (int i = 0; i < 4; i++)
         robot.wheel_radians [i] = 0.0f;
     rigidbody *ch = &world.bodies [robot.chassis_body];
@@ -36,8 +35,7 @@ int main (void) {
     for (int i = 0; i < 120; i++) {
         drivetrain_update (&world, &robot, DT);
         physics_world_step (&world, DT);
-    }
-    printf ("  Physics: dx=%.4f dz=%.4f\n", ch -> position.x - start_pos.x, ch -> position.z - start_pos.z);
+    } printf ("  Physics: dx=%.4f dz=%.4f\n", ch -> position.x - start_pos.x, ch -> position.z - start_pos.z);
     printf ("  Odom:    dx=%.4f dz=%.4f theta=%.4f\n", robot.odom_x, robot.odom_z, robot.odom_theta);
     physics_world_cleanup (&world);
     return 0;

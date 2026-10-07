@@ -130,8 +130,7 @@ static inline const mpe_regime_t *mpe_regime_lookup (const char *name) {
         t -> regime = r ? r -> name : "INVALID";
     } else {
         t -> regime = "default";
-    }
-    t -> cfg_saved = g_cfg;
+    } t -> cfg_saved = g_cfg;
     t -> cfg_active = 1;
     det_fallback_reset ();
 } /* DESPOT-2026-09-29: the header claimed "determinism counters asserted zero"
@@ -147,8 +146,7 @@ static inline void mpe_test_end (mpe_test_t *t) {
                     "(pow=%lu trig=%lu); results are no longer bit-deterministic\n",
                     t -> name ? t -> name : "?", mpe_det_fallbacks_used (), (unsigned long) det_fallback_pow_total (),
                     (unsigned long) det_fallback_trig_total ());
-        }
-        g_cfg = t -> cfg_saved;
+        } g_cfg = t -> cfg_saved;
         t -> cfg_active = 0;
     }
 } /* Return value for a case that could not run. Distinct from any possible
@@ -221,8 +219,7 @@ static inline void mpe_world_begin (physics_world *w) {
             !isfinite (b -> orientation.y) || !isfinite (b -> orientation.z)) {
             return 0;
         }
-    }
-    return 1;
+    } return 1;
 } /* Step n ticks; returns 0 if any NaN/Inf appears (prints tick). */
 static inline int mpe_step (physics_world *w, int n, float dt) {
     for (int t = 0; t < n; t++) {
@@ -231,17 +228,14 @@ static inline int mpe_step (physics_world *w, int n, float dt) {
             printf ("[FAIL] non-finite state at tick %d\n", t);
             return 0;
         }
-    }
-    return 1;
+    } return 1;
 } /* Explicit mass-0 floor slab, top surface exactly y=0, with matched
  * Coulomb friction and restitution. Preferred floor: a true manifold
  * with per-body material combine (this is what friction_stop,
  * static_hold and determinism already used). */
 static inline int mpe_floor_slab (physics_world *w, float mus, float muk, float e) {
     int f = physics_world_add_cube (w, (vector3) {0.0f, -0.5f, 0.0f}, (vector3) {10.0f, 0.5f, 10.0f}, 0.0f);
-    if (f < 0) {
-        return -1;
-    }
+    if (f < 0) { return -1; }
     w -> bodies [f].friction_static = mus;
     w -> bodies [f].friction_kinetic = muk;
     w -> bodies [f].restitution = e;

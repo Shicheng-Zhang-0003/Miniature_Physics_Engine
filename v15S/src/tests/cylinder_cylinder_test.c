@@ -45,8 +45,7 @@ int main (void) {
     if (gap > 1.0f) {
         printf ("[FAIL] cylinders never interacted (gap=%.4f)\n", gap);
         return 1;
-    }
-    printf ("[PASS] cylinder-cylinder collision works\n");
+    } printf ("[PASS] cylinder-cylinder collision works\n");
     physics_world_cleanup (&world);
     return 0;
 }

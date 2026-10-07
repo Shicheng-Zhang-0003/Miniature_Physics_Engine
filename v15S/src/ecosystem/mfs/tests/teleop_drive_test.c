@@ -17,8 +17,7 @@ int main (void) {
     if (rc != 0) {
         printf ("[FAIL] could not create robot\n");
         return 1;
-    }
-    float start_x, start_y, start_z;
+    } float start_x, start_y, start_z;
     ftc_robot_get_position (&world, &robot, &start_x, &start_y, &start_z);
     const float dt = 1.0f / 60.0f;
     int fail = 0;
@@ -39,9 +38,7 @@ int main (void) {
                 break;
             }
         }
-        if (fail) {
-            break;
-        }
+        if (fail) { break; }
     }
     if (!fail) {
         float end_x, end_y, end_z;
@@ -70,11 +67,8 @@ int main (void) {
         } else if (heading > 0.3f) {
             printf ("[FAIL] straight drive yawed (%.4f rad)\n", heading);
             fail = 1;
-        } else {
-            printf ("[PASS] robot drove under motor power (displacement=%.4f, dy=%.4f)\n", total_displacement, dy);
-        }
-    }
-    physics_world_cleanup (&world);
+        } else { printf ("[PASS] robot drove under motor power (displacement=%.4f, dy=%.4f)\n", total_displacement, dy); }
+    } physics_world_cleanup (&world);
     return fail;
 }
 #endif /* MPE_TELEOP_DRIVE_TEST */

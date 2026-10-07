@@ -36,15 +36,13 @@ int main (void) {
                 collided = 1;
                 break;
             }
-        }
-        printf ("[INFO] broadphase_fast_thin collided=%d\n", collided);
+        } printf ("[INFO] broadphase_fast_thin collided=%d\n", collided);
         if (!collided) {
             printf ("[FAIL] broadphase/CCD missed fast thin collision\n");
             fail = 1;
         } else {
             printf ("[PASS] broadphase catches fast thin collisions\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
     /* Test 2: Large object spanning many cells - no false negatives */
     {
@@ -76,15 +74,13 @@ int main (void) {
                 hit_floor = 1;
                 break;
             }
-        }
-        printf ("[INFO] broadphase_large_object hit_floor=%d\n", hit_floor);
+        } printf ("[INFO] broadphase_large_object hit_floor=%d\n", hit_floor);
         if (!hit_floor) {
             printf ("[FAIL] broadphase missed large object collision\n");
             fail = 1;
         } else {
             printf ("[PASS] broadphase handles large objects\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
     /* Test 3: Rotating object - angular sweep must be included in broadphase
      * 50 rad/s * 5m half-length = 250 m/s tip speed. Swept expansion = 250*dt = 4.16m.
@@ -114,17 +110,13 @@ int main (void) {
                 collided = 1;
                 break;
             }
-        }
-        printf ("[INFO] broadphase_angular_sweep collided=%d\n", collided);
+        } printf ("[INFO] broadphase_angular_sweep collided=%d\n", collided);
         /* Angular sweep broadphase includes tip-speed expansion but CCD for rotation
          * only checks floor plane. Volume sweep uses linear relative velocity only.
          * This is a known limitation - angular sweep in broadphase is conservative. */
-        if (!collided) {
-            printf ("[INFO] broadphase missed angular sweep collision (known limitation)\n");
-        } else {
+        if (!collided) { printf ("[INFO] broadphase missed angular sweep collision (known limitation)\n"); } else {
             printf ("[PASS] broadphase includes angular sweep\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
     /* Test 4: Pair dedup - no duplicate pairs, no missed pairs */
     {
@@ -138,15 +130,13 @@ int main (void) {
             physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3) {(float) i * 1.2f, 0.0f, 0.0f});
             world.bodies [i].restitution = 0.0f;
             rigidbody_wake (&world.bodies [i]);
-        }
-        const float dt = 1.0f / 60.0f;
+        } const float dt = 1.0f / 60.0f;
         int pair_counts [100];
         for (int t = 0; t < 60; t++) {
             physics_world_step (&world, dt);
             int bp_count = broadphase_get_pair_overflow_count (&world);
             pair_counts [t] = bp_count;
-        }
-        int max_pairs = 0;
+        } int max_pairs = 0;
         for (int t = 0; t < 60; t++)
             if (pair_counts [t] > max_pairs)
             max_pairs = pair_counts [t];
@@ -154,9 +144,7 @@ int main (void) {
         if (max_pairs > 0) {
             printf ("[FAIL] pair overflow detected\n");
             fail = 1;
-        } else {
-            printf ("[PASS] pair dedup no overflow\n");
-        }
+        } else { printf ("[PASS] pair dedup no overflow\n"); }
         /* Check dedupe overflow counter */
         int dedup_ovfl = broadphase_get_pair_dedupe_overflow_count (&world);
         if (dedup_ovfl > 0) {
@@ -164,8 +152,7 @@ int main (void) {
             fail = 1;
         } else {
             printf ("[PASS] pair dedupe no overflow\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
     /* Test 5: Cell size adaptation - should adapt to object sizes */
     {
@@ -178,8 +165,7 @@ int main (void) {
         for (int i = 0; i < 5; i++) {
             physics_world_add_sphere (&world, 0.1f, 1.0f, (vector3) {(float) i * 0.5f, 0.0f, 0.0f});
             rigidbody_wake (&world.bodies [i]);
-        }
-        const float dt = 1.0f / 60.0f;
+        } const float dt = 1.0f / 60.0f;
         float cell_sizes [10];
         for (int t = 0; t < 10; t++) {
             physics_world_step (&world, dt);
@@ -189,8 +175,7 @@ int main (void) {
         physics_world_add_cube (&world, (vector3) {0.0f, 0.0f, 10.0f}, (vector3) {25.0f, 25.0f, 25.0f}, 0.0f);
         for (int t = 0; t < 60; t++) {
             physics_world_step (&world, dt);
-        }
-        float cell_after_large = broadphase_get_current_cell_size (&world);
+        } float cell_after_large = broadphase_get_current_cell_size (&world);
         float initial_cell = cell_sizes [0];
         printf ("[INFO] cell_size initial=%.3f after_large=%.3f\n", initial_cell, cell_after_large);
         if (cell_after_large < initial_cell) {
@@ -198,9 +183,7 @@ int main (void) {
             fail = 1;
         } else {
             printf ("[PASS] cell size adapts to object sizes\n");
-        }
-        physics_world_cleanup (&world);
-    }
-    return fail;
+        } physics_world_cleanup (&world);
+    } return fail;
 }
 #endif

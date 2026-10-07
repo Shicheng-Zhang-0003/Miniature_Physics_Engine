@@ -57,8 +57,7 @@ int mpe_ecosystem_register (const mpe_ecosystem_desc_t *desc) {
     if (rc < 0) {
         /* FIX-AUDIT-DESPOT: slot-full was a silent -1. */
         fprintf (stderr, "[ecosystem] registry full (16); refusing '%s'\n", desc && desc -> name ? desc -> name : "?");
-    }
-    pthread_mutex_unlock (&s_eco_lock);
+    } pthread_mutex_unlock (&s_eco_lock);
     return rc;
 } /* Unregister + detach everywhere first (interior pointers in s_attached
  * must not survive the removal). */
@@ -75,8 +74,7 @@ int mpe_ecosystem_unregister (const char *name) {
             rc = 0;
             break;
         }
-    }
-    pthread_mutex_unlock (&s_eco_lock);
+    } pthread_mutex_unlock (&s_eco_lock);
     return rc;
 }
 const mpe_ecosystem_desc_t *mpe_ecosystem_find (const char *name) {
@@ -88,8 +86,7 @@ const mpe_ecosystem_desc_t *mpe_ecosystem_find (const char *name) {
         if (s_eco_live [i] && s_ecosystems [i].name && strcmp (s_ecosystems [i].name, name) == 0) {
         out = &s_ecosystems [i];
         break;
-    }
-    pthread_mutex_unlock (&s_eco_lock);
+    } pthread_mutex_unlock (&s_eco_lock);
     return out;
 }
 int mpe_ecosystem_count (void) {
@@ -112,8 +109,7 @@ const mpe_ecosystem_desc_t *mpe_ecosystem_at (int i) {
             out = &s_ecosystems [k];
             break;
         }
-    }
-    pthread_mutex_unlock (&s_eco_lock);
+    } pthread_mutex_unlock (&s_eco_lock);
     return out;
 } /* Attach ecosystem to a world (per-world: the same ecosystem may attach
  * to several worlds with independent state). */
@@ -142,8 +138,7 @@ int mpe_ecosystem_attach (mpe_world_t *world, const char *eco_name) {
             if (!found) {
                 pthread_mutex_unlock (&s_eco_lock);
                 return -1;
-            }
-            s_attached [i].desc = (mpe_ecosystem_desc_t *) found;
+            } s_attached [i].desc = (mpe_ecosystem_desc_t *) found;
             s_attached [i].world = (const void *) world;
             s_attached [i].state = 0;
             mpe_ecosystem_desc_t *d = s_attached [i].desc;
@@ -159,9 +154,7 @@ int mpe_ecosystem_attach (mpe_world_t *world, const char *eco_name) {
                  * dead .so. */
                 if (s_attached [i].desc != d) {
                     pthread_mutex_unlock (&s_eco_lock);
-                    if (r == 0 && d -> detach) {
-                        d -> detach ((mpe_world_t *) world, st);
-                    }
+                    if (r == 0 && d -> detach) { d -> detach ((mpe_world_t *) world, st); }
                     return -1;
                 }
                 if (r < 0) {
@@ -170,11 +163,9 @@ int mpe_ecosystem_attach (mpe_world_t *world, const char *eco_name) {
                     s_attached [i].world = 0;
                     pthread_mutex_unlock (&s_eco_lock);
                     return -1;
-                }
-                s_attached [i].state = st;
+                } s_attached [i].state = st;
                 pthread_mutex_unlock (&s_eco_lock);
-            }
-            return 0;
+            } return 0;
         }
     }
     /* FIX-AUDIT-DESPOT: attach-table-full was a silent -1 (world ran without
@@ -201,8 +192,7 @@ int mpe_ecosystem_detach (mpe_world_t *world, const char *eco_name) {
                 d -> detach ((mpe_world_t *) world, st);
             return 0;
         }
-    }
-    pthread_mutex_unlock (&s_eco_lock);
+    } pthread_mutex_unlock (&s_eco_lock);
     return rc;
 } /* Per-world state lookup for terminal-driven commands (eco command/
  * config forward to these states on the primary world). */
@@ -217,8 +207,7 @@ void *mpe_ecosystem_state (mpe_world_t *world, const char *eco_name) {
             out = s_attached [i].state;
             break;
         }
-    }
-    pthread_mutex_unlock (&s_eco_lock);
+    } pthread_mutex_unlock (&s_eco_lock);
     return out;
 } /* Detach everywhere (unload path): hooks run while the .so is mapped. */
 void mpe_ecosystem_detach_everywhere (const char *eco_name) {
@@ -236,8 +225,7 @@ void mpe_ecosystem_detach_everywhere (const char *eco_name) {
         if (idx < 0) {
             pthread_mutex_unlock (&s_eco_lock);
             return;
-        }
-        mpe_ecosystem_desc_t *d = s_attached [idx].desc;
+        } mpe_ecosystem_desc_t *d = s_attached [idx].desc;
         void *st = s_attached [idx].state;
         void *w = (void *) s_attached [idx].world;
         s_attached [idx].desc = 0;
@@ -259,8 +247,7 @@ void mpe_ecosystem_pre_step (mpe_world_t *world, float dt) {
             sts [n] = s_attached [i].state;
             n++;
         }
-    }
-    pthread_mutex_unlock (&s_eco_lock);
+    } pthread_mutex_unlock (&s_eco_lock);
     for (int i = 0; i < n; i++)
         ds [i] -> pre_step ((mpe_world_t *) world, dt, sts [i]);
 }
@@ -275,8 +262,7 @@ void mpe_ecosystem_post_step (mpe_world_t *world, float dt) {
             sts [n] = s_attached [i].state;
             n++;
         }
-    }
-    pthread_mutex_unlock (&s_eco_lock);
+    } pthread_mutex_unlock (&s_eco_lock);
     for (int i = 0; i < n; i++)
         ds [i] -> post_step ((mpe_world_t *) world, dt, sts [i]);
 } /* Register built-in ecosystems */

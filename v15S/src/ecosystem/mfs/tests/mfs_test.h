@@ -150,8 +150,7 @@ static inline int mfs_test_floor_e (physics_world *w, float mus, float muk, floa
             !isfinite (rb -> orientation.z)) {
             return 0;
         }
-    }
-    return 1;
+    } return 1;
 } /* DESPOT-2026-09-28 (programming: direct w.bodies[chassis_body] with no
  * bounds check — OOB read if chassis_body == -1). Single checked accessor;
  * NULL means unset-or-gone, uniformly. */
@@ -169,8 +168,7 @@ static inline rigidbody *mfs_chassis_or_null (physics_world *w, ftc_robot *robot
             printf ("[FAIL] non-finite state at tick %d\n", t);
             return 0;
         }
-    }
-    return 1;
+    } return 1;
 } /* Lift WHOLE robot (chassis + wheels + rollers) to true free-spin height.
  * Fixes the old rig bug where only chassis was lifted, winching wheels up
  * through pendulum chaos. */
@@ -200,8 +198,7 @@ static inline void mfs_lift_whole_robot (physics_world *w, ftc_robot *robot, con
             rbb -> angular_velocity = vector3_zero ();
             rigidbody_update_axes (rbb);
         }
-    }
-    rigidbody_update_axes (chassis);
+    } rigidbody_update_axes (chassis);
     for (int wi_idx = 0; wi_idx < robot -> wheel_count; wi_idx++) {
         motor_reset_observer (&robot -> wheel_motors [wi_idx]);
     }
@@ -224,8 +221,7 @@ static inline ftc_robot *mfs_create_robot (physics_world *w, float x, float y, f
     if (rc != 0) {
         free (robot);
         return NULL;
-    }
-    return robot;
+    } return robot;
 } /* Drive helpers. */
 static inline void mfs_drive_tank (ftc_robot *robot, float left, float right) {drivetrain_tank (robot, left, right);}
 static inline void mfs_drive_mecanum (ftc_robot *robot, float fwd, float strafe, float rotate) {drivetrain_mecanum (robot, fwd, strafe, rotate);}

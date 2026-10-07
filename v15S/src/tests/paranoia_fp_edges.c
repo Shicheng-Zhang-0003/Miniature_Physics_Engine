@@ -21,9 +21,7 @@ int main (void) {
         if (ftz || daz) {
             printf ("[FAIL] FTZ/DAZ enabled - denormals flushed\n");
             fail = 1;
-        } else {
-            printf ("[PASS] denormals preserved\n");
-        }
+        } else { printf ("[PASS] denormals preserved\n"); }
     }
     /* Test 2: Inf propagation - should never occur */
     {
@@ -41,15 +39,13 @@ int main (void) {
         for (int i = 0; i < world.body_count; i++) {
             if (isinf (world.bodies [i].position.x) || isinf (world.bodies [i].velocity.x))
                 inf_count++;
-        }
-        printf ("[INFO] inf_sanitization inf_count=%d\n", inf_count);
+        } printf ("[INFO] inf_sanitization inf_count=%d\n", inf_count);
         if (inf_count > 0) {
             printf ("[FAIL] Inf propagated\n");
             fail = 1;
         } else {
             printf ("[PASS] Inf sanitized\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
     /* Test 3: NaN propagation - should never occur */
     {
@@ -66,15 +62,13 @@ int main (void) {
         for (int i = 0; i < world.body_count; i++) {
             if (isnan (world.bodies [i].position.x))
                 nan_count++;
-        }
-        printf ("[INFO] nan_sanitization nan_count=%d\n", nan_count);
+        } printf ("[INFO] nan_sanitization nan_count=%d\n", nan_count);
         if (nan_count > 0) {
             printf ("[FAIL] NaN propagated\n");
             fail = 1;
         } else {
             printf ("[PASS] NaN sanitized\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
     /* Test 4: det_math fallback counters - should be zero in-contract */
     {
@@ -99,8 +93,7 @@ int main (void) {
             fail = 1;
         } else {
             printf ("[PASS] det_math zero fallbacks in-contract\n");
-        }
-        physics_world_cleanup (&world);
+        } physics_world_cleanup (&world);
     }
     /* Test 5: Verify real subnormal arithmetic, independent of sleep gates. */
     {
@@ -111,9 +104,7 @@ int main (void) {
         if (!preserved) {
             printf ("[FAIL] subnormal addition flushed or changed\n");
             fail = 1;
-        } else {
-            printf ("[PASS] subnormal addition preserved\n");
-        }
+        } else { printf ("[PASS] subnormal addition preserved\n"); }
     }
     /* Test 6: Matrix inversion near-singular - should not crash */
     {
@@ -126,9 +117,7 @@ int main (void) {
         if (!ok) {
             printf ("[FAIL] near-singular matrix inverse crashed\n");
             fail = 1;
-        } else {
-            printf ("[PASS] near-singular matrix handled\n");
-        }
+        } else { printf ("[PASS] near-singular matrix handled\n"); }
     }
     /* Test 7: Quaternion normalization - exactly zero quat */
     {
@@ -137,9 +126,7 @@ int main (void) {
         if (qn.w != 1.0f || qn.x != 0.0f || qn.y != 0.0f || qn.z != 0.0f) {
             printf ("[FAIL] zero quat normalization failed\n");
             fail = 1;
-        } else {
-            printf ("[PASS] zero quat normalized to identity\n");
-        }
+        } else { printf ("[PASS] zero quat normalized to identity\n"); }
     }
     /* Test 8: Vector normalization - zero vector */
     {
@@ -148,9 +135,7 @@ int main (void) {
         if (vn.x != 0.0f || vn.y != 0.0f || vn.z != 0.0f) {
             printf ("[FAIL] zero vector normalization failed\n");
             fail = 1;
-        } else {
-            printf ("[PASS] zero vector normalized to zero\n");
-        }
+        } else { printf ("[PASS] zero vector normalized to zero\n"); }
     }
     /* Test 9: Cross product - parallel vectors */
     {
@@ -161,9 +146,7 @@ int main (void) {
         if (len2 > 1e-10f) {
             printf ("[FAIL] parallel cross not zero: %.2e\n", len2);
             fail = 1;
-        } else {
-            printf ("[PASS] parallel cross is zero\n");
-        }
+        } else { printf ("[PASS] parallel cross is zero\n"); }
     }
     /* Test 10: Matrix multiplication - identity */
     {
@@ -176,9 +159,7 @@ int main (void) {
                 printf ("[FAIL] identity multiply failed\n");
                 fail = 1;
             }
-        }
-        printf ("[PASS] identity matrix multiply correct\n");
-    }
-    return fail;
+        } printf ("[PASS] identity matrix multiply correct\n");
+    } return fail;
 }
 #endif

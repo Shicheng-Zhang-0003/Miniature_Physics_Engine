@@ -42,9 +42,7 @@ static bool probe_custom_fn (rigidbody *a, rigidbody *b, void *out, mpe_world_t 
 static int *test_counting_solver_calls = NULL;
 static float test_count_resolve (mpe_world_t *world, void *manifold, float dt, bool friction_only, int iter, void *s) {
     (void) s;
-    if (test_counting_solver_calls) {
-        (*test_counting_solver_calls)++;
-    }
+    if (test_counting_solver_calls) { (*test_counting_solver_calls)++; }
     const mpe_config_t *C = (world && world -> cfg) ? world -> cfg : &g_cfg;
     return collision_resolve_iterative ((collision_data *) manifold, dt, friction_only, iter, C);
 }
@@ -70,8 +68,7 @@ int mpe_module_test_main (void) {
     if (mpe_world_cfg (&B) -> world.gravity != -20.0f) {
         printf ("[FAIL] cfg B\n");
         return 1;
-    }
-    printf ("[PASS] per-world cfg isolation\n");
+    } printf ("[PASS] per-world cfg isolation\n");
     /* 2. registry has built-ins */
     if (!mpe_find_pair_handler (0, 0, -1, -1)) {
         printf ("[FAIL] registry sphere-sphere\n");
@@ -88,8 +85,7 @@ int mpe_module_test_main (void) {
     if (!mpe_find_solver ("seq-impulse")) {
         printf ("[FAIL] registry solver seq-impulse\n");
         return 1;
-    }
-    printf ("[PASS] builtin pair/broadphase/solver registry\n");
+    } printf ("[PASS] builtin pair/broadphase/solver registry\n");
     /* 3. shape dispatch equivalence: sphere-sphere via registry == direct */
     int ia = physics_world_add_sphere (&A, 0.5f, 1.0f, (vector3) {0, 2, 0});
     int ib = physics_world_add_sphere (&A, 0.5f, 1.0f, (vector3) {0, 2.4f, 0});
@@ -111,8 +107,7 @@ int mpe_module_test_main (void) {
             printf ("[FAIL] dispatch manifold differs (dn=%.6f dp=%.6f)\n", dn, dp);
             return 1;
         }
-    }
-    printf ("[PASS] shape dispatch matches builtin\n");
+    } printf ("[PASS] shape dispatch matches builtin\n");
     /* 4. custom shape add + dispatch (bounding-sphere fallback) */
     int ic = physics_world_add_custom (&A, 100, (vector3) {5, 2, 0}, 1.0f, 0.5f);
     if (ic < 0 || A.bodies [ic].type != object_custom) {
@@ -125,8 +120,7 @@ int mpe_module_test_main (void) {
     if (A.bodies [ic].type != object_custom) {
         printf ("[FAIL] sanitize reset custom\n");
         return 1;
-    }
-    printf ("[PASS] custom shape survives sanitize\n");
+    } printf ("[PASS] custom shape survives sanitize\n");
     /* TRUTH: custom dispatch was never exercised (fallback unproven).
      * Register a stub for (custom:100 vs sphere) and prove routing. */
     mpe_register_pair_handler (3, 0, 100, -1, probe_custom_fn, "test-custom-probe");
@@ -142,8 +136,7 @@ int mpe_module_test_main (void) {
             printf ("[FAIL] custom sentinel normal lost\n");
             return 1;
         }
-    }
-    mpe_unregister_pair_handler (probe_custom_fn);
+    } mpe_unregister_pair_handler (probe_custom_fn);
     printf ("[PASS] custom shape dispatches through registry\n");
     /* 5. tick-module hook fires once per step */
     physics_world_attach_module (&A, &my_mod);
@@ -152,15 +145,13 @@ int mpe_module_test_main (void) {
     if (pre_calls != 1) {
         printf ("[FAIL] pre_step calls=%d\n", pre_calls);
         return 1;
-    }
-    printf ("[PASS] tick-module pre_step hook\n");
+    } printf ("[PASS] tick-module pre_step hook\n");
     physics_world_detach_module (&A, "test-hook");
     physics_world_step (&A, 1.0f / 60.0f);
     if (pre_calls != 1) {
         printf ("[FAIL] detach did not stop calls\n");
         return 1;
-    }
-    printf ("[PASS] detach stops hooks\n");
+    } printf ("[PASS] detach stops hooks\n");
     /* 6. id cache: lookups correct, survives pool growth + revision bumps */
     {
         physics_world W;
@@ -171,8 +162,7 @@ int mpe_module_test_main (void) {
         if (W.body_capacity < 600 || W.body_count != 600) {
             printf ("[FAIL] pool growth cap=%d count=%d\n", W.body_capacity, W.body_count);
             return 1;
-        }
-        printf ("[PASS] pool grows on demand (cap=%d)\n", W.body_capacity);
+        } printf ("[PASS] pool grows on demand (cap=%d)\n", W.body_capacity);
         uint32_t mid_id = W.bodies [300].object_id;
         if (physics_world_index_by_id (&W, mid_id) != 300) {
             printf ("[FAIL] id lookup cap=%d\n", physics_world_index_by_id (&W, mid_id));
@@ -181,16 +171,14 @@ int mpe_module_test_main (void) {
         if (physics_world_index_by_id (&W, 0xDEADBEEFu) != -1) {
             printf ("[FAIL] missing id should be -1\n");
             return 1;
-        }
-        printf ("[PASS] id->index cache correct\n");
+        } printf ("[PASS] id->index cache correct\n");
         for (int t = 0; t < 120; t++)
             physics_world_step (&W, 1.0f / 60.0f);
         if (physics_world_index_by_id (&W, mid_id) < 0 && W.body_count == 600) {
             /* bodies may legitimately still all exist; index must resolve */
             printf ("[FAIL] id lost after steps\n");
             return 1;
-        }
-        printf ("[PASS] id cache stable across steps\n");
+        } printf ("[PASS] id cache stable across steps\n");
         physics_world_cleanup (&W);
     }
     /* 7. det fallback counters observable process-wide, zero in-contract */
@@ -226,8 +214,7 @@ int mpe_module_test_main (void) {
         if (!hit_slop || hit_zero) {
             printf ("[FAIL] per-world slop routing\n");
             return 1;
-        }
-        printf ("[PASS] per-world narrowphase config\n");
+        } printf ("[PASS] per-world narrowphase config\n");
         /* solver_if override: counting resolve hook observes iterations */
         physics_world_cleanup (&W);
     }
@@ -246,12 +233,10 @@ int mpe_module_test_main (void) {
         if (resolve_calls <= 0) {
             printf ("[FAIL] solver_if resolve never called\n");
             return 1;
-        }
-        printf ("[PASS] solver_if override observes %d resolves\n", resolve_calls);
+        } printf ("[PASS] solver_if override observes %d resolves\n", resolve_calls);
         physics_world_set_solver (&W, NULL);
         physics_world_cleanup (&W);
-    }
-    physics_world_cleanup (&A);
+    } physics_world_cleanup (&A);
     physics_world_cleanup (&B);
     printf ("[PASS] module system smoke complete\n");
     return 0;

@@ -25,8 +25,7 @@ int main (void) {
     if (joint_index < 0) {
         printf ("[FAIL] could not add revolute joint\n");
         return 1;
-    }
-    const float dt = 1.0f / 60.0f;
+    } const float dt = 1.0f / 60.0f;
     int fail = 0;
     float max_drift = 0.0f;
     for (int t = 0; t < 600; t++) {
@@ -36,12 +35,9 @@ int main (void) {
             printf ("[FAIL] bob went non-finite at tick %d\n", t);
             fail = 1;
             break;
-        }
-        float dist = vector3_length (vector3_subtraction (pivot_point, bob -> position));
+        } float dist = vector3_length (vector3_subtraction (pivot_point, bob -> position));
         float drift = fabsf (dist - rod_length);
-        if (drift > max_drift) {
-            max_drift = drift;
-        }
+        if (drift > max_drift) { max_drift = drift; }
     }
     if (!fail) {
         rigidbody *bob = &world.bodies [bob_index];
@@ -57,11 +53,8 @@ int main (void) {
              * period-gated). */
             printf ("[FAIL] bob did not move — gravity or joint not acting\n");
             fail = 1;
-        } else {
-            printf ("[PASS] revolute pendulum holds (max drift %.4f) and swings under gravity\n", max_drift);
-        }
-    }
-    physics_world_cleanup (&world);
+        } else { printf ("[PASS] revolute pendulum holds (max drift %.4f) and swings under gravity\n", max_drift); }
+    } physics_world_cleanup (&world);
     return fail;
 }
 #endif /* mpe_revolute_test */

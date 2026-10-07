@@ -55,8 +55,7 @@ static int eco_track_world (mfs_ecosystem_state_t *state, mpe_world_t *world) {
     if (state -> nworlds < MFS_ECO_MAX_WORLDS) {
         state -> worlds [state -> nworlds++] = world;
         return 0;
-    }
-    fprintf (stderr, "mfs_ecosystem: world table full (%d); extra world not tracked\n", MFS_ECO_MAX_WORLDS);
+    } fprintf (stderr, "mfs_ecosystem: world table full (%d); extra world not tracked\n", MFS_ECO_MAX_WORLDS);
     return -1;
 }
 static void eco_untrack_world (mfs_ecosystem_state_t *state, mpe_world_t *world) {
@@ -71,8 +70,7 @@ static void eco_untrack_world (mfs_ecosystem_state_t *state, mpe_world_t *world)
         if (state -> worlds [i] == world || !world) {
             for (int j = i; j + 1 < state -> nworlds; j++) {
                 state -> worlds [j] = state -> worlds [j + 1];
-            }
-            state -> worlds [state -> nworlds - 1] = NULL;
+            } state -> worlds [state -> nworlds - 1] = NULL;
             state -> nworlds--;
             if (world)
                 break;
@@ -147,8 +145,7 @@ static int mfs_ecosystem_attach (mpe_world_t *world, void **eco_state) {
         fprintf (stderr, "mfs_ecosystem: attach(ftc-fleet) failed\n");
         free (state);
         return -1;
-    }
-    state -> modules_initialized = true;
+    } state -> modules_initialized = true;
     state -> modules_attached = true;
     /* Tracking is best-effort for the terminal surface; the attach itself
      * already succeeded, so a full table only warns (see eco_track_world). */
@@ -219,8 +216,7 @@ static int eco_preset_by_name (const char *want) {
         const char *nm = motor_preset_name ((motor_preset_id) id);
         if (nm && strcmp (nm, want) == 0)
             return id;
-    }
-    int found = -1, matches = 0;
+    } int found = -1, matches = 0;
     for (int id = 0; id < MOTOR_COUNT; id++) {
         const char *nm = motor_preset_name ((motor_preset_id) id);
         if (nm && strstr (nm, want)) {
@@ -232,8 +228,7 @@ static int eco_preset_by_name (const char *want) {
     if (matches > 1) {
         fprintf (stderr, "mfs: preset '%s' is ambiguous (%d matches); using '%s'\n", want, matches,
                  motor_preset_name ((motor_preset_id) found));
-    }
-    return found;
+    } return found;
 } /* Iteration guarantee (same contract as the terminal spawn path: the
  * 40:1 chassis/wheel mass ratio needs 128 iterations; 64 wobbles axles
  * loose). Loud, never silent; adequate configs untouched. */
@@ -276,8 +271,7 @@ static float eco_argf (char **argv, int i, int argc, float dflt) {
         double v = strtod (argv [i], &end);
         if (end != argv [i] && isfinite (v))
             return (float) v;
-    }
-    return dflt;
+    } return dflt;
 } /* Bundle command surface (drives the terminal `eco command` path):
  *   help
  *   spawn [preset-substr] [mecanum|tank] [x y z]
@@ -294,8 +288,7 @@ static int mfs_ecosystem_command (void *eco_state, int argc, char **argv) {
     if (!world) {
         printf ("mfs: not attached to any world\n");
         return -1;
-    }
-    physics_world *w = (physics_world *) world;
+    } physics_world *w = (physics_world *) world;
     if (strcmp (argv [0], "help") == 0) {
         printf ("mfs commands: spawn [preset] [mecanum|tank] [x y z] | "
                 "drive <i> tank <l> <r> | drive <i> mecanum <f> <s> <r> | "
@@ -318,8 +311,7 @@ static int mfs_ecosystem_command (void *eco_state, int argc, char **argv) {
                 if (p < 0) {
                     printf ("mfs: unknown preset '%s'\n", argv [ai]);
                     return -1;
-                }
-                preset = p;
+                } preset = p;
                 ai++;
                 if (ai < argc && argv [ai]) {
                     if (strcmp (argv [ai], "tank") == 0)
@@ -327,19 +319,16 @@ static int mfs_ecosystem_command (void *eco_state, int argc, char **argv) {
                     else if (strcmp (argv [ai], "mecanum") != 0) {
                         printf ("mfs: drive type must be mecanum|tank\n");
                         return -1;
-                    }
-                    ai++;
+                    } ai++;
                 }
             }
-        }
-        float x = eco_argf (argv, ai, argc, 0.0f);
+        } float x = eco_argf (argv, ai, argc, 0.0f);
         float y = eco_argf (argv, ai + 1, argc, ftc_robot_rest_height ());
         float z = eco_argf (argv, ai + 2, argc, 0.0f);
         if (eco_ensure_floor (w) < 0) {
             printf ("mfs: could not ensure floor\n");
             return -1;
-        }
-        eco_ensure_iterations ();
+        } eco_ensure_iterations ();
         int idx = ftc_fleet_spawn (w, x, y, z, (motor_preset_id) preset, dtype);
         if (idx < 0) {
             printf ("mfs: spawn failed (no fleet attached? attach the bundle first)\n");
@@ -353,8 +342,7 @@ static int mfs_ecosystem_command (void *eco_state, int argc, char **argv) {
         if (argc < 3) {
             printf ("mfs: usage: drive <i> tank <l> <r> | mecanum <f> <s> <r> | stop\n");
             return -1;
-        }
-        int idx = (int) eco_argf (argv, 1, argc, -1.0f);
+        } int idx = (int) eco_argf (argv, 1, argc, -1.0f);
         ftc_robot *r = ftc_fleet_get (w, idx);
         if (!r) {
             printf ("mfs: no robot %d\n", idx);
@@ -383,15 +371,13 @@ static int mfs_ecosystem_command (void *eco_state, int argc, char **argv) {
             if (argc < 6) {
                 printf ("mfs: usage: drive <i> mecanum <f> <s> <r>\n");
                 return -1;
-            }
-            float mf = eco_argf (argv, 3, argc, 0);
+            } float mf = eco_argf (argv, 3, argc, 0);
             float ms = eco_argf (argv, 4, argc, 0);
             float mr = eco_argf (argv, 5, argc, 0);
             drivetrain_mecanum (r, mf, ms, mr);
             printf ("mfs: robot %d mecanum f=%.2f s=%.2f r=%.2f\n", idx, mf, ms, mr);
             return 0;
-        }
-        printf ("mfs: drive mode must be tank|mecanum|stop\n");
+        } printf ("mfs: drive mode must be tank|mecanum|stop\n");
         return -1;
     }
     if (strcmp (argv [0], "list") == 0) {
@@ -406,8 +392,7 @@ static int mfs_ecosystem_command (void *eco_state, int argc, char **argv) {
             printf ("  [%d] %s at (%.2f,%.2f,%.2f) odom=(%.2f,%.2f,%.2f)%s\n", i,
                     r -> drivetrain_type == FTC_DRIVETRAIN_MECANUM ? "mecanum" : "tank", px, py, pz, r -> odom_x, r -> odom_z,
                     r -> odom_theta, r -> odom_slip ? " SLIP" : "");
-        }
-        return 0;
+        } return 0;
     }
     if (strcmp (argv [0], "telemetry") == 0) {
         int idx = (argc > 1) ? (int) eco_argf (argv, 1, argc, 0.0f) : 0;
@@ -415,8 +400,7 @@ static int mfs_ecosystem_command (void *eco_state, int argc, char **argv) {
         if (!r) {
             printf ("mfs: no robot %d\n", idx);
             return -1;
-        }
-        float px = 0, py = 0, pz = 0;
+        } float px = 0, py = 0, pz = 0;
         ftc_robot_get_position (w, r, &px, &py, &pz);
         float isum = 0.0f;
         for (int k = 0; k < r -> wheel_count; k++)
@@ -428,10 +412,8 @@ static int mfs_ecosystem_command (void *eco_state, int argc, char **argv) {
         for (int k = 0; k < r -> wheel_count; k++) {
             printf ("mfs: wheel %d cmd=%+.2f rpm=%+.0f I=%+.2fA\n", k, r -> wheel_motors [k].command,
                     r -> wheel_motors [k].rpm, r -> wheel_motors [k].current);
-        }
-        return 0;
-    }
-    printf ("mfs: unknown command '%s' (try help)\n", argv [0]);
+        } return 0;
+    } printf ("mfs: unknown command '%s' (try help)\n", argv [0]);
     return -1;
 } /* ================================================================
  * Ecosystem Descriptor

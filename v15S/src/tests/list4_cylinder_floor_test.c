@@ -20,8 +20,7 @@ int main (void) {
         printf ("[FAIL] could not create floor\n");
         physics_world_cleanup (&world);
         return 1;
-    }
-    world.bodies [floor].restitution = 0.0f;
+    } world.bodies [floor].restitution = 0.0f;
     world.bodies [floor].friction_static = 0.8f;
     world.bodies [floor].friction_kinetic = 0.6f;
     /*
@@ -53,8 +52,7 @@ int main (void) {
     if (fail) {
         physics_world_cleanup (&world);
         return 1;
-    }
-    rigidbody *body = &world.bodies [cyl];
+    } rigidbody *body = &world.bodies [cyl];
     float final_y = body -> position.y;
     float final_vy = body -> velocity.y;
     float axis_y = fabsf (body -> cached_axes [0].y);
@@ -77,8 +75,7 @@ int main (void) {
         printf ("[FAIL] tipped cylinder still moving (vy=%.4f)\n", final_vy);
         physics_world_cleanup (&world);
         return 1;
-    }
-    printf ("[PASS] LIST4 cylinder floor contact holds\n");
+    } printf ("[PASS] LIST4 cylinder floor contact holds\n");
     physics_world_cleanup (&world);
     return 0;
 }

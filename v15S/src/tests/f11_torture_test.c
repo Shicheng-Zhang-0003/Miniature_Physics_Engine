@@ -46,34 +46,16 @@ int main (void) {
             int range = (int) (g_registry [i].max - g_registry [i].min);
             *(int *) g_registry [i].storage =
                 (int) g_registry [i].min + (int) (t_next () % (uint32_t) (range >= 0 ? range + 1 : 1));
-        } else if (g_registry [i].type == p_bool) {
-            *(bool *) g_registry [i].storage = (t_next () & 1u) != 0;
-        }
+        } else if (g_registry [i].type == p_bool) { *(bool *) g_registry [i].storage = (t_next () & 1u) != 0; }
     }
     /* Same guardrails as the engine torture (resolution, not physics). */
-    if (g_cfg.world.gravity > -1.0f) {
-        g_cfg.world.gravity = -1.0f - ((float) (t_next () >> 8) / 16777216.0f) * 16.0f;
-    } else if (g_cfg.world.gravity < -17.0f) {
-        g_cfg.world.gravity = -17.0f;
-    }
-    if (g_cfg.timestep.solver_iterations < 96) {
-        g_cfg.timestep.solver_iterations = 96;
-    }
-    if (g_cfg.solver.penetration_slop > 0.02f) {
-        g_cfg.solver.penetration_slop = 0.010f;
-    }
-    if (g_cfg.solver.bias_factor < 0.05f) {
-        g_cfg.solver.bias_factor = 0.10f;
-    }
-    if (g_cfg.depenetration.correction_factor < 0.1f) {
-        g_cfg.depenetration.correction_factor = 0.35f;
-    }
-    if (g_cfg.sleep.linear_thresh_sq > 0.01f) {
-        g_cfg.sleep.linear_thresh_sq = 0.0025f;
-    }
-    if (g_cfg.sleep.angular_thresh_sq > 0.01f) {
-        g_cfg.sleep.angular_thresh_sq = 0.0001f;
-    }
+    if (g_cfg.world.gravity > -1.0f) { g_cfg.world.gravity = -1.0f - ((float) (t_next () >> 8) / 16777216.0f) * 16.0f; } else if (g_cfg.world.gravity < -17.0f) { g_cfg.world.gravity = -17.0f; }
+    if (g_cfg.timestep.solver_iterations < 96) { g_cfg.timestep.solver_iterations = 96; }
+    if (g_cfg.solver.penetration_slop > 0.02f) { g_cfg.solver.penetration_slop = 0.010f; }
+    if (g_cfg.solver.bias_factor < 0.05f) { g_cfg.solver.bias_factor = 0.10f; }
+    if (g_cfg.depenetration.correction_factor < 0.1f) { g_cfg.depenetration.correction_factor = 0.35f; }
+    if (g_cfg.sleep.linear_thresh_sq > 0.01f) { g_cfg.sleep.linear_thresh_sq = 0.0025f; }
+    if (g_cfg.sleep.angular_thresh_sq > 0.01f) { g_cfg.sleep.angular_thresh_sq = 0.0001f; }
     printf ("[info] torture: gravity=%.2f iters=%d slop=%.3f\n", g_cfg.world.gravity, g_cfg.timestep.solver_iterations,
             g_cfg.solver.penetration_slop);
     physics_world world;
@@ -100,8 +82,7 @@ int main (void) {
             world.bodies [idx].friction_static = 0.8f;
             world.bodies [idx].friction_kinetic = 0.7f;
         }
-    }
-    const float dt = 1.0f / 60.0f;
+    } const float dt = 1.0f / 60.0f;
     long nan_ticks = 0, fallen_ticks = 0;
     float end_lin = 0.0f, end_ang = 0.0f;
     for (int t = 0; t < 1500; t++) {
@@ -124,19 +105,12 @@ int main (void) {
                 nan_ticks++;
                 continue;
             }
-            if (rb -> position.y < -1.0f) {
-                fallen_ticks++;
-            }
+            if (rb -> position.y < -1.0f) { fallen_ticks++; }
             float l = vector3_length (rb -> velocity);
             float a = vector3_length (rb -> angular_velocity);
-            if (l > mx_lin) {
-                mx_lin = l;
-            }
-            if (a > mx_ang) {
-                mx_ang = a;
-            }
-        }
-        end_lin = mx_lin;
+            if (l > mx_lin) { mx_lin = l; }
+            if (a > mx_ang) { mx_ang = a; }
+        } end_lin = mx_lin;
         end_ang = mx_ang;
     }
     printf ("[info] torture end speeds (reported, never gated): lin=%.3f ang=%.3f nan=%ld fallen=%ld\n", end_lin,
@@ -146,12 +120,9 @@ int main (void) {
      * are reported, never gated. PASS = no corruption (finite state, world
      * intact), not stability. Do not cite as a stability proof. */
     int pass = world.body_count > 0 && nan_ticks == 0 && fallen_ticks == 0;
-    if (pass) {
-        printf ("[PASS] torture survived extremes without corruption\n");
-    } else {
+    if (pass) { printf ("[PASS] torture survived extremes without corruption\n"); } else {
         printf ("[FAIL] corruption under torture\n");
-    }
-    physics_world_cleanup (&world);
+    } physics_world_cleanup (&world);
     return pass ? 0 : 1;
 }
 #endif /* mpe_f11_torture_test */
