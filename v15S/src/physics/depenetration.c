@@ -165,6 +165,22 @@ void a3_positional_depenetrate_manifold_w (struct physics_world *world, collisio
     if (inverse_mass_sum <= 0.0f) {
         return;
     }
+    /* DESPOT-2026-10-08 deep-containment: enclosed sphere at +Y drove deeper
+     * because the mass-weighted split moved BOTH bodies and the pair COM
+     * crossed the cylinder axis first (narrowphase correct, depenetration
+     * not). For deep overlap move ONLY the lighter body so the exit
+     * direction cannot invert mid-pass. Threshold 0.30 m (30× slop). */
+    if ((max_depth > 0.30f) && (inverse_mass_a > 0.0f) && (inverse_mass_b > 0.0f)) {
+        if (inverse_mass_a > inverse_mass_b) {
+            inverse_mass_b = 0.0f;
+        } else {
+            inverse_mass_a = 0.0f;
+        }
+        inverse_mass_sum = inverse_mass_a + inverse_mass_b;
+        if (inverse_mass_sum <= 0.0f) {
+            return;
+        }
+    }
     if (depth_count == 0) {
         depth_sum = max_depth;
         depth_count = 1;

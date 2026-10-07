@@ -301,8 +301,24 @@ static void drivetrain_mecanum_analytic (physics_world *world, ftc_robot *robot)
         }
         /* DESPOT-2026-09-28: was 0.05 m — hover force. True-contact scale. */
         if (wheel -> position.y - r_run > 0.01f) {
+            /* DESPOT-2026-10-08 air-spin bearing damping: free-spinning
+             * jointed wheels limit-cycled (motor 86 rpm vs true 799 rpm)
+             * via revolute-to-kinematic impulses vs slew/governor. Apply a
+             * tiny dissipative bearing torque in air ONLY:
+             * tau = -c*w with c=1e-6 N·m·s. Stability: c*dt/I =
+             * 1e-6*0.0167/2.5e-7 ≈ 0.067 < 1, so no runaway (±1900 rpm
+             * bypass tried and reverted). Grounded path below unchanged. */
+            float wx = wheel -> angular_velocity.x;
+            float wy = wheel -> angular_velocity.y;
+            float wz = wheel -> angular_velocity.z;
+            if (isfinite (wx) && isfinite (wy) && isfinite (wz)) {
+                const float c_bear = 1e-6f;
+                wheel -> torque_accumulator.x -= c_bear * wx;
+                wheel -> torque_accumulator.y -= c_bear * wy;
+                wheel -> torque_accumulator.z -= c_bear * wz;
+            }
             continue;
-        } /* airborne */
+        } /* airborne (bearing-damped, no contact thrust) */
         float theta = robot -> wheel_roller_angle [i];
         if (!isfinite (theta)) {
             continue;

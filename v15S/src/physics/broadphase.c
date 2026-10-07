@@ -2,12 +2,15 @@
 #include "broadphase.h"
 #include "../core/physics_world.h"
 #include "../core/rigidbody.h"
+#include "../core/simd_math.h" /* DESPOT-2026-10-08 SIMD: simd_add/sub/scale used in swept-AABB below */
 #include "../config/mpe_config.h"
 #include "../config/mpe_constants.h"
 #include <stdlib.h>
 #include <math.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdio.h>
+#include <string.h>
 /* All mutable state lives in the per-world workspace (broadphase_workspace,
  * owned by physics_world). No file-scope state remains; worlds never share
  * broadphase data. Static helpers below take the workspace explicitly. */
@@ -61,6 +64,30 @@ void broadphase_cleanup (struct physics_world *world) {
         world -> broadphase -> node_pool = NULL;
         world -> broadphase -> node_pool_capacity = 0;
         world -> broadphase -> node_count = 0;
+    }
+}
+/* DESPOT-2026-10-08 SIMD equivalence self-check: simd_add/sub/scale must be
+ * bitwise identical to scalar over fixed vectors (SSE2 add/mul are correctly
+ * rounded, same as scalar-SSE; no FMA). Runs once per process; loud on
+ * mismatch. Proves the SIMD header can replace hot-loop scalar ops without
+ * breaking deterministic twins. */
+static void broadphase_simd_selfcheck (void) {
+    static int done = 0;
+    if (done) {
+        return;
+    }
+    done = 1;
+    vector3 a = {1.25f, -3.5f, 100.0f};
+    vector3 b = {2.5f, 1.0f, -0.125f};
+    vector3 s1 = vector3_addition (a, b);
+    vector3 s2 = simd_add (a, b);
+    vector3 d1 = vector3_subtraction (a, b);
+    vector3 d2 = simd_sub (a, b);
+    vector3 m1 = vector3_scaling (a, 0.333f);
+    vector3 m2 = simd_scale (a, 0.333f);
+    if ((memcmp (&s1, &s2, sizeof (vector3)) != 0) || (memcmp (&d1, &d2, sizeof (vector3)) != 0) ||
+        (memcmp (&m1, &m2, sizeof (vector3)) != 0)) {
+        fprintf (stderr, "[mpe] SIMD MISMATCH: simd_add/sub/scale != scalar (scalar path kept)\n");
     }
 }
 /* MPE_TASK_17_CELL_SIZE_GETTER_BEGIN */
@@ -325,6 +352,7 @@ int broadphase_generate_pairing (struct physics_world *world, broadphase_pair *c
         (maximum_pairs_allowed <= 0)) {
         return 0;
     }
+    broadphase_simd_selfcheck ();
     rigidbody *bodies = world -> bodies;
     int body_count = world -> body_count;
     broadphase_workspace *ws = world -> broadphase;

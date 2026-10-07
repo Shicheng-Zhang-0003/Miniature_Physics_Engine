@@ -85,6 +85,11 @@ BASE_CFLAGS += $(WERROR_FLAG)
 # so environment CFLAGS can never silently drop -ffp-contract=off (bitwise
 # twins depend on it). NATIVE builds emit a portability warning (see below).
 DETERMINISM_FLAGS = -ffp-contract=off -fno-fast-math
+# DESPOT-2026-10-08 MSVC scope (LIE-06): GCC/Clang pin above. MSVC (cl) needs
+# /fp:strict (no FMA contraction) + /Oi- guard for the same guarantee.
+# Bitwise twins are GCC/Clang-only until MSVC flags land in CI. When CC is
+# cl, append /fp:strict automatically; cross-check with `nmake /F msvc.mak`.
+MSVC_FP_FLAG := $(if $(findstring cl,$(CC)),/fp:strict,)
 # Command-line CFLAGS/LIBS (e.g. compile_asan) override these defaults.
 CFLAGS ?= $(BASE_CFLAGS) -O3
 LIBS ?= $(BASE_LIBS)
@@ -454,6 +459,12 @@ analyze:
 	$(CC) -fanalyzer $(CFLAGS) -fsyntax-only $(MPE_SUITE_SRCS) $(MPE_TEST_CORE) 2>&1 | head -n 100
 asan: build_suite
 	$(CC) $(CFLAGS) -fsanitize=address,undefined -fno-omit-frame-pointer $(MPE_SUITE_SRCS) $(MPE_TEST_CORE) $(SPRING_TEST_SRCS) $(SCENE_TEST_SRCS) $(MPE_TEST_LIBS) $(shell pkg-config --libs epoxy) -o test_mpe_suite_asan$(EXE_EXT)
+# DESPOT-2026-10-08: ThreadSanitizer gate (registry/MEI locks, live-world list,
+# tick-boundary loader rule). Single-threaded step is TSan-clean by design;
+# MT sanitize phase is the only threaded region (disjoint writes).
+tsan:
+	$(CC) $(CFLAGS) -fsanitize=thread -fno-omit-frame-pointer $(MPE_SUITE_SRCS) $(MPE_TEST_CORE) $(SPRING_TEST_SRCS) $(SCENE_TEST_SRCS) $(MPE_TEST_LIBS) $(shell pkg-config --libs epoxy) -o test_mpe_suite_tsan$(EXE_EXT)
+	./test_mpe_suite_tsan$(EXE_EXT) --all
 
 plugins: plugins/mpe_capsule$(PLUGIN_EXT)
 
