@@ -12,6 +12,7 @@
 #include "collision_cylinder.h"
 #include "broadphase.h"
 #include <float.h>
+#include "../core/simd_math.h"
 /* DESPOT-2026-10-08 rotational CCD: worst obstacle tip speed in this tick.
  * File-scope (not per-call static) so the mover loop below can read the
  * precomputed max. Single-threaded step only; MT step recomputes per tick. */
@@ -253,8 +254,8 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
                     continue; /* render-only proxies: never obstacles */
                 } vector3 other_v = ((other -> static_state) || (other -> is_sleeping)) ? vector3_zero () : other -> velocity;
                 if ((other -> type == object_sphere) || (other -> type == object_custom)) {
-                    vector3 dp = vector3_subtraction (other -> position, mover -> position);
-                    vector3 dv = vector3_subtraction (other_v, mover -> velocity);
+                    vector3 dp = simd_sub (other -> position, mover -> position);
+                    vector3 dv = simd_sub (other_v, mover -> velocity);
                     float mover_radius =
                         (mover -> type == object_sphere) ? mover -> radius : broadphase_bounding_radius (mover);
                     float other_radius =
@@ -286,18 +287,18 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
                         if (ax_len < 1e-6f) {
                             ax = (vector3) {1.0f, 0.0f, 0.0f};
                         } else {
-                            ax = vector3_scaling (ax, 1.0f / ax_len);
+                            ax = simd_scale (ax, 1.0f / ax_len);
                         } float h = other -> cylinder_half_length;
                         float r_cyl = other -> radius;
                         float r_sph = mover -> radius;
                         float rr = r_cyl + r_sph;
                         /* Cylinder endpoints in world space. */
-                        vector3 ep1 = vector3_addition (other -> position, vector3_scaling (ax, -h));
-                        vector3 ep2 = vector3_addition (other -> position, vector3_scaling (ax, h));
+                        vector3 ep1 = simd_add (other -> position, simd_scale (ax, -h));
+                        vector3 ep2 = simd_add (other -> position, simd_scale (ax, h));
                         /* Relative motion. */
-                        vector3 dp1 = vector3_subtraction (ep1, mover -> position);
-                        vector3 dp2 = vector3_subtraction (ep2, mover -> position);
-                        vector3 dv = vector3_subtraction (other_v, mover -> velocity);
+                        vector3 dp1 = simd_sub (ep1, mover -> position);
+                        vector3 dp2 = simd_sub (ep2, mover -> position);
+                        vector3 dv = simd_sub (other_v, mover -> velocity);
                         /* Sweep against both endpoint spheres. */
                         float best_cyl_toi = dt;
                         for (int ep = 0; ep < 2; ep++) {
@@ -308,15 +309,15 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
                         /* Sweep against barrel (capsule segment).
                      * Project relative velocity onto plane perpendicular to axle. */
                         float dv_ax = vector3_dot (dv, ax);
-                        vector3 dv_perp = vector3_subtraction (dv, vector3_scaling (ax, dv_ax));
+                        vector3 dv_perp = simd_sub (dv, simd_scale (ax, dv_ax));
                         float dv_perp_len_sq = vector3_length_squared (dv_perp);
                         if (dv_perp_len_sq > 1e-12f) {
                             /* Relative motion has perpendicular component - capsule sweep.
                          * The capsule is the segment extruded along dv_perp.
                          * Find closest approach of sphere to swept capsule. */
-                            vector3 dp_mid = vector3_subtraction (other -> position, mover -> position);
+                            vector3 dp_mid = simd_sub (other -> position, mover -> position);
                             float dp_ax = vector3_dot (dp_mid, ax);
-                            vector3 dp_perp = vector3_subtraction (dp_mid, vector3_scaling (ax, dp_ax));
+                            vector3 dp_perp = simd_sub (dp_mid, simd_scale (ax, dp_ax));
                             /* Quadratic for perpendicular distance == rr.
                          * |dp_perp + t*dv_perp|^2 = rr^2 */
                             {
@@ -329,7 +330,7 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
                                  * barrel hits rr beyond the segment end, where the
                                  * true distance sqrt(rr^2+(axial-h)^2)>rr:
                                  * early (wrong-side) clamps. */
-                                    vector3 rel_pos = vector3_addition (dp_mid, vector3_scaling (dv, toi));
+                                    vector3 rel_pos = simd_add (dp_mid, simd_scale (dv, toi));
                                     float rel_ax = vector3_dot (rel_pos, ax);
                                     if (fabsf (rel_ax) <= h) { best_cyl_toi = toi; }
                                 }
@@ -343,8 +344,8 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
                         /* Non-sphere mover vs cylinder: conservative bounding sphere sweep.
                      * (Exact segment-segment sweep for cylinder-vs-cylinder is complex;
                      * bounding sphere is conservative and never misses.) */
-                        vector3 dp = vector3_subtraction (other -> position, mover -> position);
-                        vector3 dv = vector3_subtraction (other_v, mover -> velocity);
+                        vector3 dp = simd_sub (other -> position, mover -> position);
+                        vector3 dv = simd_sub (other_v, mover -> velocity);
                         float rr = broadphase_bounding_radius (mover) + broadphase_bounding_radius (other);
                         float toi = ccd_sphere_sweep_toi (dp, dv, rr, dt);
                         if ((toi > 0.0f) && (toi < best_toi)) {
@@ -356,8 +357,8 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
                     /* Swept sphere-vs-OBB via slab test in box space, with
                  * RELATIVE velocity so dynamic boxes sweep correctly. */
                     float sr = (mover -> type == object_sphere) ? mover -> radius : broadphase_bounding_radius (mover);
-                    vector3 rel = vector3_subtraction (mover -> position, other -> position);
-                    vector3 rel_v = vector3_subtraction (mover -> velocity, other_v);
+                    vector3 rel = simd_sub (mover -> position, other -> position);
+                    vector3 rel_v = simd_sub (mover -> velocity, other_v);
                     vector3 ax0 = other -> cached_axes [0];
                     vector3 ax1 = other -> cached_axes [1];
                     vector3 ax2 = other -> cached_axes [2];
@@ -457,10 +458,10 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
             }
             vector3 grav_vec = {0.0f, grav_c, 0.0f};
             mover -> position =
-                vector3_addition (mover -> position, vector3_addition (vector3_scaling (v_pre, (float) a_pos),
-                                                                     vector3_scaling (grav_vec, (float) g_pos)));
+                simd_add (mover -> position, simd_add (simd_scale (v_pre, (float) a_pos),
+                                                                     simd_scale (grav_vec, (float) g_pos)));
             mover -> velocity =
-                vector3_addition (vector3_scaling (v_pre, (float) e_toi), vector3_scaling (grav_vec, (float) v_toi_k));
+                simd_add (simd_scale (v_pre, (float) e_toi), simd_scale (grav_vec, (float) v_toi_k));
             float spin = vector3_length (mover -> angular_velocity);
             if (spin > 1e-6f && isfinite (spin)) {
                 /* TRUTH: full-range det sin/cos (bit-identical), never libm

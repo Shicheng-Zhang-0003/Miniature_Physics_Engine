@@ -37,6 +37,7 @@
 #ifndef MPE_OS_WINDOWS
 #include <sys/stat.h>
 #include <unistd.h>
+#include "simd_math.h"
 #endif
 extern input_status main_inputs;
 extern camera main_camera_fov;
@@ -239,7 +240,7 @@ void simulation_physics_tick (float frame_delta_time) {
             vector3 grav_a = {0, mpe_world_cfg (world) -> world.gravity, 0};
             rigidbody *rb = &world -> bodies [gi];
             if ((rb -> is_sleeping) || (rb -> kinematic) || (rb -> static_state)) { continue; }
-            rb_apply_forces_perfect (rb, vector3_scaling (grav_a, rb -> mass));
+            rb_apply_forces_perfect (rb, simd_scale (grav_a, rb -> mass));
         } constraint_apply_motors (world, fixed_physics_dt);
         /* Foreign forcefield / motor modules (same hook as world path). */
         { /* Snapshot hook table: hooks may attach/detach (see world path). */
@@ -457,7 +458,7 @@ void simulation_physics_tick (float frame_delta_time) {
             if (mpe_world_cfg (world) -> boundary.safety_net_enabled) {
                 boundary_apply_box_cfg (rigid_body, (vector3) {-250, 0, -250}, (vector3) {250, 500, 250},
                                         mpe_world_cfg (world));
-                if (vector3_length_squared (vector3_subtraction (rigid_body -> position, a3_pre_boundary_position)) >
+                if (vector3_length_squared (simd_sub (rigid_body -> position, a3_pre_boundary_position)) >
                     0.000001f) {
                     a3_boundary_moved_any = true;
                 }

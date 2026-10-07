@@ -11,6 +11,7 @@
 #include "broadphase.h"
 #include <stdbool.h>
 #include <math.h>
+#include "../core/simd_math.h"
 /* Narrowphase dispatch relic removed: all pair routing goes through the
  * shape registry (mpe_shape_dispatch), so foreign shapes get positional
  * correction too. This symbol remains as a NULL-world wrapper. */
@@ -154,13 +155,13 @@ void a3_positional_depenetrate_manifold_w (struct physics_world *world, collisio
         (max_depth - penetration_slop) * C -> depenetration.correction_factor / inverse_mass_sum; /* MPE_TASK_30 */
     if (correction_magnitude <= 0.0f) { return; }
     if (correction_magnitude > C -> depenetration.max_correction) { correction_magnitude = C -> depenetration.max_correction; }
-    vector3 correction_vector = vector3_scaling (manifold -> normal_vector, correction_magnitude);
+    vector3 correction_vector = simd_scale (manifold -> normal_vector, correction_magnitude);
     if (inverse_mass_a > 0.0f) {
-        body_a -> position = vector3_subtraction (body_a -> position, vector3_scaling (correction_vector, inverse_mass_a));
+        body_a -> position = simd_sub (body_a -> position, simd_scale (correction_vector, inverse_mass_a));
         if (correction_magnitude > 0.01f) { rigidbody_wake (body_a); }
     }
     if (inverse_mass_b > 0.0f) {
-        body_b -> position = vector3_addition (body_b -> position, vector3_scaling (correction_vector, inverse_mass_b));
+        body_b -> position = simd_add (body_b -> position, simd_scale (correction_vector, inverse_mass_b));
         if (correction_magnitude > 0.01f) { rigidbody_wake (body_b); }
     }
 }

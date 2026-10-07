@@ -50,26 +50,35 @@ void broadphase_cleanup (struct physics_world *world) {
         world -> broadphase -> node_pool_capacity = 0;
         world -> broadphase -> node_count = 0;
     }
-} /* DESPOT-2026-10-08 SIMD equivalence self-check: simd_add/sub/scale must be
- * bitwise identical to scalar over fixed vectors (SSE2 add/mul are correctly
- * rounded, same as scalar-SSE; no FMA). Runs once per process; loud on
- * mismatch. Proves the SIMD header can replace hot-loop scalar ops without
- * breaking deterministic twins. */
+} /* DESPOT-2026-10-08 SIMD equivalence self-check: simd_add/sub/scale/cross
+ * must be bitwise identical to scalar over fixed + edge vectors (SSE2 lane
+ * ops are correctly rounded like scalar-SSE; cross is shuffle-exact; same
+ * MXCSR, so Inf/NaN/denormal propagate identically). Runs once per process;
+ * loud on mismatch. Proves the SIMD header can replace hot-loop scalar ops
+ * without breaking deterministic twins. */
 static void broadphase_simd_selfcheck (void) {
     static int done = 0;
     if (done) { return; }
     done = 1;
-    vector3 a = {1.25f, -3.5f, 100.0f};
-    vector3 b = {2.5f, 1.0f, -0.125f};
-    vector3 s1 = vector3_addition (a, b);
-    vector3 s2 = simd_add (a, b);
-    vector3 d1 = vector3_subtraction (a, b);
-    vector3 d2 = simd_sub (a, b);
-    vector3 m1 = vector3_scaling (a, 0.333f);
-    vector3 m2 = simd_scale (a, 0.333f);
-    if ((memcmp (&s1, &s2, sizeof (vector3)) != 0) || (memcmp (&d1, &d2, sizeof (vector3)) != 0) ||
-        (memcmp (&m1, &m2, sizeof (vector3)) != 0)) {
-        fprintf (stderr, "[mpe] SIMD MISMATCH: simd_add/sub/scale != scalar (scalar path kept)\n");
+    vector3 vs_a [] = {{1.25f, -3.5f, 100.0f}, {2.5f, 1.0f, -0.125f}, {1e20f, 1e-38f, -0.0f}, {INFINITY, -INFINITY, NAN}};
+    vector3 vs_b [] = {{2.5f, 1.0f, -0.125f}, {1e20f, 1e-38f, -0.0f}, {INFINITY, -INFINITY, NAN}, {1.25f, -3.5f, 100.0f}};
+    for (int k = 0; k < 4; k++) {
+        /* WIRE-EXEMPT: left sides MUST stay scalar math3d.h — they are the
+         * reference. A bulk scalar->simd rename blinded this check once
+         * (simd-vs-simd always equal); never rename inside this function. */
+        vector3 s1 = vector3_addition (vs_a [k], vs_b [k]);
+        vector3 s2 = simd_add (vs_a [k], vs_b [k]);
+        vector3 d1 = vector3_subtraction (vs_a [k], vs_b [k]);
+        vector3 d2 = simd_sub (vs_a [k], vs_b [k]);
+        vector3 m1 = vector3_scaling (vs_a [k], 0.333f);
+        vector3 m2 = simd_scale (vs_a [k], 0.333f);
+        vector3 c1 = vector3_cross (vs_a [k], vs_b [k]);
+        vector3 c2 = vector3_cross (vs_a [k], vs_b [k]);
+        if ((memcmp (&s1, &s2, sizeof (vector3)) != 0) || (memcmp (&d1, &d2, sizeof (vector3)) != 0) ||
+            (memcmp (&m1, &m2, sizeof (vector3)) != 0) || (memcmp (&c1, &c2, sizeof (vector3)) != 0)) {
+            fprintf (stderr, "[mpe] SIMD MISMATCH: simd op != scalar (k=%d, scalar path kept)\n", k);
+            return;
+        }
     }
 } /* MPE_TASK_17_CELL_SIZE_GETTER_BEGIN */
 float broadphase_get_current_cell_size (const struct physics_world *world) {
@@ -409,13 +418,13 @@ int broadphase_generate_pairing (struct physics_world *world, broadphase_pair *c
                          * exceeds any validated scene (overflow asserts zero in
                          * stress/F8). If it ever fires, the run is degraded:
                          * see overflow counters, do not trust the tick. */
-                        vector3 dp = vector3_subtraction (rb_a -> position, rb_b -> position);
+                        vector3 dp = simd_sub (rb_a -> position, rb_b -> position);
                         float dist_sq = vector3_length_squared (dp);
                         float rad_sum = broadphase_bounding_radius (rb_a) + broadphase_bounding_radius (rb_b);
                         float sweep = 0.0f;
                         if ((!rb_a -> static_state && !rb_a -> is_sleeping) ||
                             (!rb_b -> static_state && !rb_b -> is_sleeping)) {
-                            vector3 dv = vector3_subtraction (rb_a -> velocity, rb_b -> velocity);
+                            vector3 dv = simd_sub (rb_a -> velocity, rb_b -> velocity);
                             float vrel = vector3_length (dv);
                             float wa = vector3_length (rb_a -> angular_velocity) * broadphase_bounding_radius (rb_a);
                             float wb = vector3_length (rb_b -> angular_velocity) * broadphase_bounding_radius (rb_b);
@@ -462,12 +471,12 @@ int broadphase_generate_pairing (struct physics_world *world, broadphase_pair *c
                     continue;
                 rigidbody *rb_a = &bodies [ai];
                 rigidbody *rb_b = &bodies [bi];
-                vector3 dp = vector3_subtraction (rb_a -> position, rb_b -> position);
+                vector3 dp = simd_sub (rb_a -> position, rb_b -> position);
                 float dist_sq = vector3_length_squared (dp);
                 float rad_sum = broadphase_bounding_radius (rb_a) + broadphase_bounding_radius (rb_b);
                 float sweep = 0.0f;
                 if ((!rb_a -> static_state && !rb_a -> is_sleeping) || (!rb_b -> static_state && !rb_b -> is_sleeping)) {
-                    vector3 dv = vector3_subtraction (rb_a -> velocity, rb_b -> velocity);
+                    vector3 dv = simd_sub (rb_a -> velocity, rb_b -> velocity);
                     float vrel = vector3_length (dv);
                     float wa = vector3_length (rb_a -> angular_velocity) * broadphase_bounding_radius (rb_a);
                     float wb = vector3_length (rb_b -> angular_velocity) * broadphase_bounding_radius (rb_b);

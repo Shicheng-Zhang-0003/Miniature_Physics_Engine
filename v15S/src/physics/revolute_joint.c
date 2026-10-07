@@ -27,6 +27,7 @@
 #include "../core/det_math.h"
 #include <math.h>
 #include <stdio.h>
+#include "../core/simd_math.h"
 static math3 skew_symmetric (vector3 v) {
     math3 m = {{{0.0f}}};
     m.matrix [0][1] = -v.z;
@@ -216,18 +217,18 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
     vector3 r_a = vector4_rotate_to_vector3 (body_a -> orientation, p -> anchor_a);
     vector3 r_b = vector4_rotate_to_vector3 (body_b -> orientation, p -> anchor_b);
     /* Anchor positions and velocities. */
-    vector3 anchor_a_world = vector3_addition (body_a -> position, r_a);
-    vector3 anchor_b_world = vector3_addition (body_b -> position, r_b);
-    vector3 position_error = vector3_subtraction (anchor_b_world, anchor_a_world);
-    vector3 vel_a_at_anchor = vector3_addition (body_a -> velocity, vector3_cross (body_a -> angular_velocity, r_a));
-    vector3 vel_b_at_anchor = vector3_addition (body_b -> velocity, vector3_cross (body_b -> angular_velocity, r_b));
-    vector3 relative_velocity = vector3_subtraction (vel_b_at_anchor, vel_a_at_anchor);
+    vector3 anchor_a_world = simd_add (body_a -> position, r_a);
+    vector3 anchor_b_world = simd_add (body_b -> position, r_b);
+    vector3 position_error = simd_sub (anchor_b_world, anchor_a_world);
+    vector3 vel_a_at_anchor = simd_add (body_a -> velocity, vector3_cross (body_a -> angular_velocity, r_a));
+    vector3 vel_b_at_anchor = simd_add (body_b -> velocity, vector3_cross (body_b -> angular_velocity, r_b));
+    vector3 relative_velocity = simd_sub (vel_b_at_anchor, vel_a_at_anchor);
     /* Hinge axis in world space (from body A). */
     vector3 axis_world = vector4_rotate_to_vector3 (body_a -> orientation, vector3_normalisation (p -> axis_a));
     float axis_len_sq = vector3_length_squared (axis_world);
     if (axis_len_sq < 1e-12f)
         return;
-    axis_world = vector3_scaling (axis_world, 1.0f / sqrtf (axis_len_sq));
+    axis_world = simd_scale (axis_world, 1.0f / sqrtf (axis_len_sq));
     /* Build orthonormal basis (u, v) perpendicular to axis for axis alignment constraints.
      * u = normalize(axis × ref), v = axis × u. */
     vector3 ref = (fabsf (axis_world.y) < 0.99f) ? (vector3) {0.0f, 1.0f, 0.0f} : (vector3) {1.0f, 0.0f, 0.0f};
@@ -237,7 +238,7 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
         ref = (vector3) {1.0f, 0.0f, 0.0f};
         u = vector3_cross (axis_world, ref);
         u_len = sqrtf (vector3_length_squared (u));
-    } u = vector3_scaling (u, 1.0f / u_len);
+    } u = simd_scale (u, 1.0f / u_len);
     vector3 v = vector3_cross (axis_world, u); /* already unit length */
     /* Baumgarte bias for position error (point-to-point only; axis alignment is velocity-only).
      * TRUTH: velocity-level P2P bias solved INSIDE the iteration loop is
@@ -258,8 +259,8 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
     float bias_speed = baumgarte_beta * vector3_length (position_error) / dt;
     float max_bias_speed = C -> joints.revolute_max_bias;
     vector3 bias_p2p = (bias_speed > max_bias_speed && bias_speed > 0.0f)
-        ? vector3_scaling (position_error, (baumgarte_beta / dt) * (max_bias_speed / bias_speed))
-        : vector3_scaling (position_error, baumgarte_beta / dt);
+        ? simd_scale (position_error, (baumgarte_beta / dt) * (max_bias_speed / bias_speed))
+        : simd_scale (position_error, baumgarte_beta / dt);
     /* Effective mass/inertia. */
     math3 I_inv_a = rigidbody_effective_inv_inertia (body_a);
     math3 I_inv_b = rigidbody_effective_inv_inertia (body_b);
@@ -340,15 +341,15 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
             /* p2p row i: na = -e_i, nwa = +(S_a row i), nb = +e_i, nwb = -(S_b row i) */
             float e [3] = {0.0f, 0.0f, 0.0f};
             e [i] = 1.0f;
-            na [i] = vector3_scaling ((vector3) {e [0], e [1], e [2]}, -1.0f);
+            na [i] = simd_scale ((vector3) {e [0], e [1], e [2]}, -1.0f);
             nwa [i] = rows_a [i];
             nb [i] = (vector3) {e [0], e [1], e [2]};
-            nwb [i] = vector3_scaling (rows_b [i], -1.0f);
-        } nwa [3] = vector3_scaling (u, -1.0f);
+            nwb [i] = simd_scale (rows_b [i], -1.0f);
+        } nwa [3] = simd_scale (u, -1.0f);
         nwb [3] = u;
-        nwa [4] = vector3_scaling (v, -1.0f);
+        nwa [4] = simd_scale (v, -1.0f);
         nwb [4] = v;
-        nwa [5] = vector3_scaling (axis_world, -1.0f);
+        nwa [5] = simd_scale (axis_world, -1.0f);
         nwb [5] = axis_world;
         for (int r2 = 0; r2 < 6; r2++) {
             for (int c = 0; c < 6; c++) {
@@ -391,12 +392,12 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
     /* RHS = -(J*v + bias). Bias only on P2P (first 3 rows). */
     double rhs [6];
     /* P2P rows: -(relative_velocity + bias_p2p) */
-    vector3 rhs_p2p = vector3_scaling (vector3_addition (relative_velocity, bias_p2p), -1.0f);
+    vector3 rhs_p2p = simd_scale (simd_add (relative_velocity, bias_p2p), -1.0f);
     rhs [0] = rhs_p2p.x;
     rhs [1] = rhs_p2p.y;
     rhs [2] = rhs_p2p.z;
     /* Axis rows: -perpendicular_angular_velocity (no bias for axis alignment). */
-    vector3 rel_ang = vector3_subtraction (body_b -> angular_velocity, body_a -> angular_velocity);
+    vector3 rel_ang = simd_sub (body_b -> angular_velocity, body_a -> angular_velocity);
     rhs [3] = -vector3_dot (rel_ang, u);
     rhs [4] = -vector3_dot (rel_ang, v);
     /* Motor row: -(along_axis_velocity - motor_target_speed), or 0 when
@@ -432,21 +433,21 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
      * Motor impulse (1D): angular impulse along axis_world. */
     vector3 impulse_p2p = {(float) lambda [0], (float) lambda [1], (float) lambda [2]};
     vector3 axis_impulse =
-        vector3_addition (vector3_scaling (u, (float) lambda [3]), vector3_scaling (v, (float) lambda [4]));
+        simd_add (simd_scale (u, (float) lambda [3]), simd_scale (v, (float) lambda [4]));
     float motor_lambda = (float) lambda [5];
-    vector3 motor_impulse = vector3_scaling (axis_world, motor_lambda);
-    body_a -> velocity = vector3_subtraction (body_a -> velocity, vector3_scaling (impulse_p2p, inv_mass_a));
-    body_b -> velocity = vector3_addition (body_b -> velocity, vector3_scaling (impulse_p2p, inv_mass_b));
-    body_a -> angular_velocity = vector3_subtraction (
+    vector3 motor_impulse = simd_scale (axis_world, motor_lambda);
+    body_a -> velocity = simd_sub (body_a -> velocity, simd_scale (impulse_p2p, inv_mass_a));
+    body_b -> velocity = simd_add (body_b -> velocity, simd_scale (impulse_p2p, inv_mass_b));
+    body_a -> angular_velocity = simd_sub (
         body_a -> angular_velocity,
         math3_multiplication_vector3 (
             I_inv_a,
-            vector3_addition (vector3_addition (vector3_cross (r_a, impulse_p2p), axis_impulse), motor_impulse)));
-    body_b -> angular_velocity = vector3_addition (
+            simd_add (simd_add (vector3_cross (r_a, impulse_p2p), axis_impulse), motor_impulse)));
+    body_b -> angular_velocity = simd_add (
         body_b -> angular_velocity,
         math3_multiplication_vector3 (
             I_inv_b,
-            vector3_addition (vector3_addition (vector3_cross (r_b, impulse_p2p), axis_impulse), motor_impulse)));
+            simd_add (simd_add (vector3_cross (r_b, impulse_p2p), axis_impulse), motor_impulse)));
     /* ---- angle limits: persistent relative-angle tracking + velocity-level enforcement ---- */
     if (p -> limits_enabled) {
         if (!p -> angle_initialized) {
@@ -469,7 +470,7 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
             vector3 rot_axis = {q_rel.x, q_rel.y, q_rel.z};
             float rot_axis_len = sqrtf (vector3_length_squared (rot_axis));
             if (rot_axis_len > 1e-6f)
-                rot_axis = vector3_scaling (rot_axis, 1.0f / rot_axis_len);
+                rot_axis = simd_scale (rot_axis, 1.0f / rot_axis_len);
             else
             rot_axis = axis_world;
             float axis_dot = vector3_dot (rot_axis, axis_world);
@@ -489,7 +490,7 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
         } float min_limit = p -> limit_min_rad;
         float max_limit = p -> limit_max_rad;
         float along_axis =
-            vector3_dot (vector3_subtraction (body_b -> angular_velocity, body_a -> angular_velocity), axis_world);
+            vector3_dot (simd_sub (body_b -> angular_velocity, body_a -> angular_velocity), axis_world);
         bool at_min = (p -> accumulated_angle <= min_limit + 1e-4f) && (along_axis < 0.0f);
         bool at_max = (p -> accumulated_angle >= max_limit - 1e-4f) && (along_axis > 0.0f);
         if (at_min || at_max) {
@@ -497,11 +498,11 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
             float axis_mass = (axis_mass_inv > 1e-12f) ? (1.0f / axis_mass_inv) : 0.0f;
             if (axis_mass > 0.0f) {
                 float limit_lambda = -along_axis * axis_mass;
-                vector3 limit_impulse = vector3_scaling (axis_world, limit_lambda);
-                body_a -> angular_velocity = vector3_subtraction (body_a -> angular_velocity,
+                vector3 limit_impulse = simd_scale (axis_world, limit_lambda);
+                body_a -> angular_velocity = simd_sub (body_a -> angular_velocity,
                                                                 math3_multiplication_vector3 (I_inv_a, limit_impulse));
                 body_b -> angular_velocity =
-                    vector3_addition (body_b -> angular_velocity, math3_multiplication_vector3 (I_inv_b, limit_impulse));
+                    simd_add (body_b -> angular_velocity, math3_multiplication_vector3 (I_inv_b, limit_impulse));
                 /* DESPOT-2026-10-01: NO accumulated_angle = limit clamp here.
                  * That clamp existed to stop dead-reckoning windup into the
                  * stop, but it PINNED the books at the limit while the true
@@ -536,34 +537,34 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
             for (int j = 0; j < 3; j++)
             k.matrix [i][j] -= term_a.matrix [i][j] + term_b.matrix [i][j];
         math3 k_inv = math3_inverse (k);
-        vector3 rhs_vec = vector3_scaling (vector3_addition (relative_velocity, bias_p2p), -1.0f);
+        vector3 rhs_vec = simd_scale (simd_add (relative_velocity, bias_p2p), -1.0f);
         vector3 impulse = math3_multiplication_vector3 (k_inv, rhs_vec);
-        body_a -> velocity = vector3_subtraction (body_a -> velocity, vector3_scaling (impulse, inv_mass_a));
-        body_b -> velocity = vector3_addition (body_b -> velocity, vector3_scaling (impulse, inv_mass_b));
-        body_a -> angular_velocity = vector3_subtraction (
+        body_a -> velocity = simd_sub (body_a -> velocity, simd_scale (impulse, inv_mass_a));
+        body_b -> velocity = simd_add (body_b -> velocity, simd_scale (impulse, inv_mass_b));
+        body_a -> angular_velocity = simd_sub (
             body_a -> angular_velocity, math3_multiplication_vector3 (I_inv_a, vector3_cross (r_a, impulse)));
-        body_b -> angular_velocity = vector3_addition (
+        body_b -> angular_velocity = simd_add (
             body_b -> angular_velocity, math3_multiplication_vector3 (I_inv_b, vector3_cross (r_b, impulse)));
     }
     /* ---- axis alignment ---- */
     {
-        vector3 rel_ang = vector3_subtraction (body_b -> angular_velocity, body_a -> angular_velocity);
+        vector3 rel_ang = simd_sub (body_b -> angular_velocity, body_a -> angular_velocity);
         vector3 perp_ang =
-            vector3_subtraction (rel_ang, vector3_scaling (axis_world, vector3_dot (rel_ang, axis_world)));
+            simd_sub (rel_ang, simd_scale (axis_world, vector3_dot (rel_ang, axis_world)));
         math3 ang_mass = math3_addition (I_inv_a, I_inv_b);
         math3 ang_mass_inv = math3_inverse (ang_mass);
-        vector3 ang_imp = vector3_scaling (math3_multiplication_vector3 (ang_mass_inv, perp_ang), -1.0f);
+        vector3 ang_imp = simd_scale (math3_multiplication_vector3 (ang_mass_inv, perp_ang), -1.0f);
         body_a -> angular_velocity =
-            vector3_subtraction (body_a -> angular_velocity, math3_multiplication_vector3 (I_inv_a, ang_imp));
+            simd_sub (body_a -> angular_velocity, math3_multiplication_vector3 (I_inv_a, ang_imp));
         body_b -> angular_velocity =
-            vector3_addition (body_b -> angular_velocity, math3_multiplication_vector3 (I_inv_b, ang_imp));
+            simd_add (body_b -> angular_velocity, math3_multiplication_vector3 (I_inv_b, ang_imp));
     }
     /* ---- limits ---- (same as above) */
     if (p -> limits_enabled) {
         float min_limit = p -> limit_min_rad;
         float max_limit = p -> limit_max_rad;
         float along_axis =
-            vector3_dot (vector3_subtraction (body_b -> angular_velocity, body_a -> angular_velocity), axis_world);
+            vector3_dot (simd_sub (body_b -> angular_velocity, body_a -> angular_velocity), axis_world);
         bool at_min = (p -> accumulated_angle <= min_limit + 1e-4f) && (along_axis < 0.0f);
         bool at_max = (p -> accumulated_angle >= max_limit - 1e-4f) && (along_axis > 0.0f);
         if (at_min || at_max) {
@@ -571,11 +572,11 @@ void revolute_solve (revolute_params *p, rigidbody *body_a, rigidbody *body_b, f
             float axis_mass = (axis_mass_inv > 1e-12f) ? (1.0f / axis_mass_inv) : 0.0f;
             if (axis_mass > 0.0f) {
                 float limit_lambda = -along_axis * axis_mass;
-                vector3 limit_impulse = vector3_scaling (axis_world, limit_lambda);
-                body_a -> angular_velocity = vector3_subtraction (body_a -> angular_velocity,
+                vector3 limit_impulse = simd_scale (axis_world, limit_lambda);
+                body_a -> angular_velocity = simd_sub (body_a -> angular_velocity,
                                                                 math3_multiplication_vector3 (I_inv_a, limit_impulse));
                 body_b -> angular_velocity =
-                    vector3_addition (body_b -> angular_velocity, math3_multiplication_vector3 (I_inv_b, limit_impulse));
+                    simd_add (body_b -> angular_velocity, math3_multiplication_vector3 (I_inv_b, limit_impulse));
                 /* DESPOT-2026-10-01: no books clamp (see 6x6 path above). */
             }
         }
@@ -602,7 +603,7 @@ void revolute_pre_step (revolute_params *p, rigidbody *body_a, rigidbody *body_b
     if ((!p) || (!body_a) || (!body_b) || (!(dt > 0.0f))) { return; }
     if (!p -> limits_enabled || !p -> angle_initialized) { return; }
     vector3 axis_world = vector4_rotate_to_vector3 (body_a -> orientation, vector3_normalisation (p -> axis_a));
-    vector3 rel_ang = vector3_subtraction (body_b -> angular_velocity, body_a -> angular_velocity);
+    vector3 rel_ang = simd_sub (body_b -> angular_velocity, body_a -> angular_velocity);
     float along = vector3_dot (rel_ang, axis_world);
     if (!isfinite (along)) { return; }
     /* Clamp per-tick delta to avoid explosion on NaN/spike (max 1 rad/tick). */
@@ -628,20 +629,20 @@ void prismatic_solve (prismatic_params *p, rigidbody *body_a, rigidbody *body_b,
         return;
     vector3 r_a = vector4_rotate_to_vector3 (body_a -> orientation, p -> anchor_a);
     vector3 r_b = vector4_rotate_to_vector3 (body_b -> orientation, p -> anchor_b);
-    vector3 world_a = vector3_addition (body_a -> position, r_a);
-    vector3 world_b = vector3_addition (body_b -> position, r_b);
+    vector3 world_a = simd_add (body_a -> position, r_a);
+    vector3 world_b = simd_add (body_b -> position, r_b);
     /* Slide axis in world space (from body A). */
     vector3 axis_a_world = vector4_rotate_to_vector3 (body_a -> orientation, vector3_normalisation (p -> axis_a));
     vector3 axis_b_world = (vector3_length_squared (p -> axis_b) > 1e-12f)
         ? vector4_rotate_to_vector3 (body_b -> orientation, vector3_normalisation (p -> axis_b))
         : axis_a_world;
     /* Relative velocity along slide axis. */
-    vector3 vel_a = vector3_addition (body_a -> velocity, vector3_cross (body_a -> angular_velocity, r_a));
-    vector3 vel_b = vector3_addition (body_b -> velocity, vector3_cross (body_b -> angular_velocity, r_b));
-    vector3 rel_vel = vector3_subtraction (vel_b, vel_a);
+    vector3 vel_a = simd_add (body_a -> velocity, vector3_cross (body_a -> angular_velocity, r_a));
+    vector3 vel_b = simd_add (body_b -> velocity, vector3_cross (body_b -> angular_velocity, r_b));
+    vector3 rel_vel = simd_sub (vel_b, vel_a);
     float rel_n = vector3_dot (rel_vel, axis_a_world);
     /* Current position along axis (measured, not dead-reckoned). */
-    vector3 delta = vector3_subtraction (world_b, world_a);
+    vector3 delta = simd_sub (world_b, world_a);
     float current_pos = vector3_dot (delta, axis_a_world);
     /* Initialize position tracking once (reference = initial slide pos). */
     if (!p -> position_initialized) {
@@ -656,10 +657,10 @@ void prismatic_solve (prismatic_params *p, rigidbody *body_a, rigidbody *body_b,
      * Build orthonormal basis (u,v) ⊥ axis and solve both. */
     {
         vector3 ref = (fabsf (axis_a_world.y) < 0.99f) ? (vector3) {0.0f, 1.0f, 0.0f} : (vector3) {1.0f, 0.0f, 0.0f};
-        vector3 bu = vector3_subtraction (ref, vector3_scaling (axis_a_world, vector3_dot (ref, axis_a_world)));
+        vector3 bu = simd_sub (ref, simd_scale (axis_a_world, vector3_dot (ref, axis_a_world)));
         float bu_len_sq = vector3_length_squared (bu);
         if (bu_len_sq > 1e-12f) {
-            bu = vector3_scaling (bu, 1.0f / sqrtf (bu_len_sq));
+            bu = simd_scale (bu, 1.0f / sqrtf (bu_len_sq));
             vector3 bv = vector3_cross (axis_a_world, bu);
             vector3 basis [2] = {bu, bv};
             for (int bi = 0; bi < 2; bi++) {
@@ -679,15 +680,15 @@ void prismatic_solve (prismatic_params *p, rigidbody *body_a, rigidbody *body_b,
                     vector3_dot (rb_d, math3_multiplication_vector3 (rigidbody_effective_inv_inertia (body_b), rb_d));
                 if (k_d > 1e-12f) {
                     float lambda_d = -(rel_d + bias_d) / k_d;
-                    vector3 imp = vector3_scaling (dir, lambda_d);
-                    body_a -> velocity = vector3_subtraction (body_a -> velocity, vector3_scaling (imp, inv_a));
-                    body_b -> velocity = vector3_addition (body_b -> velocity, vector3_scaling (imp, inv_b));
+                    vector3 imp = simd_scale (dir, lambda_d);
+                    body_a -> velocity = simd_sub (body_a -> velocity, simd_scale (imp, inv_a));
+                    body_b -> velocity = simd_add (body_b -> velocity, simd_scale (imp, inv_b));
                     body_a -> angular_velocity =
-                        vector3_subtraction (body_a -> angular_velocity,
+                        simd_sub (body_a -> angular_velocity,
                                              math3_multiplication_vector3 (rigidbody_effective_inv_inertia (body_a),
                                                                            vector3_cross (r_a, imp)));
                     body_b -> angular_velocity =
-                        vector3_addition (body_b -> angular_velocity,
+                        simd_add (body_b -> angular_velocity,
                                           math3_multiplication_vector3 (rigidbody_effective_inv_inertia (body_b),
                                                                         vector3_cross (r_b, imp)));
                 }
@@ -715,13 +716,13 @@ void prismatic_solve (prismatic_params *p, rigidbody *body_a, rigidbody *body_b,
                 vector3_dot (rb_axis, math3_multiplication_vector3 (rigidbody_effective_inv_inertia (body_b), rb_axis));
             if (k_axis > 1e-12f) {
                 float lambda_limit = -rel_n / k_axis;
-                vector3 limit_impulse = vector3_scaling (axis_a_world, lambda_limit);
-                body_a -> velocity = vector3_subtraction (body_a -> velocity, vector3_scaling (limit_impulse, inv_a));
-                body_b -> velocity = vector3_addition (body_b -> velocity, vector3_scaling (limit_impulse, inv_b));
-                body_a -> angular_velocity = vector3_subtraction (
+                vector3 limit_impulse = simd_scale (axis_a_world, lambda_limit);
+                body_a -> velocity = simd_sub (body_a -> velocity, simd_scale (limit_impulse, inv_a));
+                body_b -> velocity = simd_add (body_b -> velocity, simd_scale (limit_impulse, inv_b));
+                body_a -> angular_velocity = simd_sub (
                     body_a -> angular_velocity, math3_multiplication_vector3 (rigidbody_effective_inv_inertia (body_a),
                                                                             vector3_cross (r_a, limit_impulse)));
-                body_b -> angular_velocity = vector3_addition (
+                body_b -> angular_velocity = simd_add (
                     body_b -> angular_velocity, math3_multiplication_vector3 (rigidbody_effective_inv_inertia (body_b),
                                                                             vector3_cross (r_b, limit_impulse)));
             }
@@ -733,19 +734,19 @@ void prismatic_pre_step (prismatic_params *p, rigidbody *body_a, rigidbody *body
     if ((!p) || (!body_a) || (!body_b) || (!(dt > 0.0f))) { return; }
     vector3 r_a = vector4_rotate_to_vector3 (body_a -> orientation, p -> anchor_a);
     vector3 r_b = vector4_rotate_to_vector3 (body_b -> orientation, p -> anchor_b);
-    vector3 world_a = vector3_addition (body_a -> position, r_a);
-    vector3 world_b = vector3_addition (body_b -> position, r_b);
+    vector3 world_a = simd_add (body_a -> position, r_a);
+    vector3 world_b = simd_add (body_b -> position, r_b);
     vector3 axis_w = vector4_rotate_to_vector3 (body_a -> orientation, vector3_normalisation (p -> axis_a));
-    float cur = vector3_dot (vector3_subtraction (world_b, world_a), axis_w);
+    float cur = vector3_dot (simd_sub (world_b, world_a), axis_w);
     if (!isfinite (cur)) { return; }
     if (!p -> position_initialized) {
         p -> accumulated_position = cur;
         p -> position_initialized = true;
     } else {
         /* Track for readout; enforcement uses measured cur (see solve). */
-        vector3 vel_a = vector3_addition (body_a -> velocity, vector3_cross (body_a -> angular_velocity, r_a));
-        vector3 vel_b = vector3_addition (body_b -> velocity, vector3_cross (body_b -> angular_velocity, r_b));
-        float rel = vector3_dot (vector3_subtraction (vel_b, vel_a), axis_w);
+        vector3 vel_a = simd_add (body_a -> velocity, vector3_cross (body_a -> angular_velocity, r_a));
+        vector3 vel_b = simd_add (body_b -> velocity, vector3_cross (body_b -> angular_velocity, r_b));
+        float rel = vector3_dot (simd_sub (vel_b, vel_a), axis_w);
         if (isfinite (rel)) {
             float d = rel * dt;
             if (d > 1.0f) { d = 1.0f; } else if (d < -1.0f) {
@@ -769,20 +770,20 @@ void rope_solve (rope_params *p, rigidbody *body_a, rigidbody *body_b, float dt,
     float inv_b = rigidbody_effective_inv_mass (body_b);
     vector3 r_a = vector4_rotate_to_vector3 (body_a -> orientation, p -> anchor_a);
     vector3 r_b = vector4_rotate_to_vector3 (body_b -> orientation, p -> anchor_b);
-    vector3 world_a = vector3_addition (body_a -> position, r_a);
-    vector3 world_b = vector3_addition (body_b -> position, r_b);
-    vector3 delta = vector3_subtraction (world_b, world_a);
+    vector3 world_a = simd_add (body_a -> position, r_a);
+    vector3 world_b = simd_add (body_b -> position, r_b);
+    vector3 delta = simd_sub (world_b, world_a);
     float dist = vector3_length (delta);
     if (dist < 1e-9f)
         return;
     /* Only pull when stretched beyond rest_length (inequality). */
     if (dist <= p -> rest_length)
         return;
-    vector3 n = vector3_scaling (delta, 1.0f / dist);
+    vector3 n = simd_scale (delta, 1.0f / dist);
     float err = dist - p -> rest_length;
-    vector3 vel_a = vector3_addition (body_a -> velocity, vector3_cross (body_a -> angular_velocity, r_a));
-    vector3 vel_b = vector3_addition (body_b -> velocity, vector3_cross (body_b -> angular_velocity, r_b));
-    float rel_n = vector3_dot (vector3_subtraction (vel_b, vel_a), n);
+    vector3 vel_a = simd_add (body_a -> velocity, vector3_cross (body_a -> angular_velocity, r_a));
+    vector3 vel_b = simd_add (body_b -> velocity, vector3_cross (body_b -> angular_velocity, r_b));
+    float rel_n = vector3_dot (simd_sub (vel_b, vel_a), n);
     float bias = C -> joints.revolute_beta * err / dt;
     float max_b = C -> joints.revolute_max_bias;
     if (bias > max_b)
@@ -803,13 +804,13 @@ void rope_solve (rope_params *p, rigidbody *body_a, rigidbody *body_b, float dt,
      * (negative), kill push (positive). */
     if (lambda > 0.0f) {
         lambda = 0.0f; /* Only pull, never push. */
-    } vector3 impulse = vector3_scaling (n, lambda);
-    body_a -> velocity = vector3_subtraction (body_a -> velocity, vector3_scaling (impulse, inv_a));
-    body_b -> velocity = vector3_addition (body_b -> velocity, vector3_scaling (impulse, inv_b));
-    body_a -> angular_velocity = vector3_subtraction (
+    } vector3 impulse = simd_scale (n, lambda);
+    body_a -> velocity = simd_sub (body_a -> velocity, simd_scale (impulse, inv_a));
+    body_b -> velocity = simd_add (body_b -> velocity, simd_scale (impulse, inv_b));
+    body_a -> angular_velocity = simd_sub (
         body_a -> angular_velocity,
         math3_multiplication_vector3 (rigidbody_effective_inv_inertia (body_a), vector3_cross (r_a, impulse)));
-    body_b -> angular_velocity = vector3_addition (
+    body_b -> angular_velocity = simd_add (
         body_b -> angular_velocity,
         math3_multiplication_vector3 (rigidbody_effective_inv_inertia (body_b), vector3_cross (r_b, impulse)));
 } /* Prismatic motor: adds drive force to the force accumulator (call once per tick). */
@@ -824,7 +825,7 @@ void prismatic_apply_motor (prismatic_params *p, rigidbody *body_a, rigidbody *b
         vector3 r_a0 = vector4_rotate_to_vector3 (body_a -> orientation, p -> anchor_a);
         vector3 r_b0 = vector4_rotate_to_vector3 (body_b -> orientation, p -> anchor_b);
         float cur0 = vector3_dot (
-            vector3_subtraction (vector3_addition (body_b -> position, r_b0), vector3_addition (body_a -> position, r_a0)),
+            simd_sub (simd_add (body_b -> position, r_b0), simd_add (body_a -> position, r_a0)),
             axw0);
         if ((cur0 <= p -> limit_min + 1e-4f && p -> motor_target_speed < 0.0f) ||
             (cur0 >= p -> limit_max - 1e-4f && p -> motor_target_speed > 0.0f)) {
@@ -833,21 +834,21 @@ void prismatic_apply_motor (prismatic_params *p, rigidbody *body_a, rigidbody *b
     } vector3 axis_world = vector4_rotate_to_vector3 (body_a -> orientation, vector3_normalisation (p -> axis_a));
     if (vector3_length_squared (axis_world) < 1e-12f) { return; }
     axis_world = vector3_normalisation (axis_world);
-    vector3 vel_a = vector3_addition (
+    vector3 vel_a = simd_add (
         body_a -> velocity,
         vector3_cross (body_a -> angular_velocity, vector4_rotate_to_vector3 (body_a -> orientation, p -> anchor_a)));
-    vector3 vel_b = vector3_addition (
+    vector3 vel_b = simd_add (
         body_b -> velocity,
         vector3_cross (body_b -> angular_velocity, vector4_rotate_to_vector3 (body_b -> orientation, p -> anchor_b)));
-    float current_speed = vector3_dot (vector3_subtraction (vel_b, vel_a), axis_world);
+    float current_speed = vector3_dot (simd_sub (vel_b, vel_a), axis_world);
     float speed_error = p -> motor_target_speed - current_speed;
     float motor_gain = C -> joints.revolute_motor_gain;
     float desired_force = speed_error * motor_gain;
     if (desired_force > p -> motor_max_force) { desired_force = p -> motor_max_force; }
     if (desired_force < -p -> motor_max_force) { desired_force = -p -> motor_max_force; }
-    vector3 drive_force = vector3_scaling (axis_world, desired_force);
-    body_a -> force_accumulator = vector3_subtraction (body_a -> force_accumulator, drive_force);
-    body_b -> force_accumulator = vector3_addition (body_b -> force_accumulator, drive_force);
+    vector3 drive_force = simd_scale (axis_world, desired_force);
+    body_a -> force_accumulator = simd_sub (body_a -> force_accumulator, drive_force);
+    body_b -> force_accumulator = simd_add (body_b -> force_accumulator, drive_force);
 } /* Fixed weld: point-to-point (same K-matrix as revolute) plus full angular
  * lock (kill all relative spin, not just off-axis). Deterministic, no bias
  * beyond the shared Baumgarte cap. */
@@ -862,16 +863,16 @@ void fixed_solve (fixed_params *p, rigidbody *body_a, rigidbody *body_b, float d
     if ((inv_a <= 0.0f) && (inv_b <= 0.0f)) { return; }
     vector3 r_a = vector4_rotate_to_vector3 (body_a -> orientation, p -> anchor_a);
     vector3 r_b = vector4_rotate_to_vector3 (body_b -> orientation, p -> anchor_b);
-    vector3 world_a = vector3_addition (body_a -> position, r_a);
-    vector3 world_b = vector3_addition (body_b -> position, r_b);
-    vector3 err = vector3_subtraction (world_b, world_a);
-    vector3 vel_a = vector3_addition (body_a -> velocity, vector3_cross (body_a -> angular_velocity, r_a));
-    vector3 vel_b = vector3_addition (body_b -> velocity, vector3_cross (body_b -> angular_velocity, r_b));
-    vector3 rel = vector3_subtraction (vel_b, vel_a);
+    vector3 world_a = simd_add (body_a -> position, r_a);
+    vector3 world_b = simd_add (body_b -> position, r_b);
+    vector3 err = simd_sub (world_b, world_a);
+    vector3 vel_a = simd_add (body_a -> velocity, vector3_cross (body_a -> angular_velocity, r_a));
+    vector3 vel_b = simd_add (body_b -> velocity, vector3_cross (body_b -> angular_velocity, r_b));
+    vector3 rel = simd_sub (vel_b, vel_a);
     const float beta = C -> joints.revolute_beta;
     float err_len = vector3_length (err);
     vector3 bias = (err_len > 1e-9f)
-        ? vector3_scaling (err, fminf (beta / dt, C -> joints.revolute_max_bias / fmaxf (err_len, 1e-9f)))
+        ? simd_scale (err, fminf (beta / dt, C -> joints.revolute_max_bias / fmaxf (err_len, 1e-9f)))
         : vector3_zero ();
     math3 skew_a = skew_symmetric (r_a);
     math3 skew_b = skew_symmetric (r_b);
@@ -890,24 +891,24 @@ void fixed_solve (fixed_params *p, rigidbody *body_a, rigidbody *body_b, float d
             k.matrix [c][r] -= term_a.matrix [c][r] + term_b.matrix [c][r];
         }
     } math3 k_inv = math3_inverse (k);
-    vector3 rhs = vector3_scaling (vector3_addition (rel, bias), -1.0f);
+    vector3 rhs = simd_scale (simd_add (rel, bias), -1.0f);
     vector3 impulse = math3_multiplication_vector3 (k_inv, rhs);
-    body_a -> velocity = vector3_subtraction (body_a -> velocity, vector3_scaling (impulse, inv_a));
-    body_b -> velocity = vector3_addition (body_b -> velocity, vector3_scaling (impulse, inv_b));
-    body_a -> angular_velocity = vector3_subtraction (
+    body_a -> velocity = simd_sub (body_a -> velocity, simd_scale (impulse, inv_a));
+    body_b -> velocity = simd_add (body_b -> velocity, simd_scale (impulse, inv_b));
+    body_a -> angular_velocity = simd_sub (
         body_a -> angular_velocity,
         math3_multiplication_vector3 (rigidbody_effective_inv_inertia (body_a), vector3_cross (r_a, impulse)));
-    body_b -> angular_velocity = vector3_addition (
+    body_b -> angular_velocity = simd_add (
         body_b -> angular_velocity,
         math3_multiplication_vector3 (rigidbody_effective_inv_inertia (body_b), vector3_cross (r_b, impulse)));
     /* Full angular lock: remove all relative spin. */
-    vector3 rel_w = vector3_subtraction (body_b -> angular_velocity, body_a -> angular_velocity);
+    vector3 rel_w = simd_sub (body_b -> angular_velocity, body_a -> angular_velocity);
     math3 m = math3_addition (rigidbody_effective_inv_inertia (body_a), rigidbody_effective_inv_inertia (body_b));
     math3 m_inv = math3_inverse (m);
-    vector3 ang_imp = vector3_scaling (math3_multiplication_vector3 (m_inv, rel_w), -1.0f);
-    body_a -> angular_velocity = vector3_subtraction (
+    vector3 ang_imp = simd_scale (math3_multiplication_vector3 (m_inv, rel_w), -1.0f);
+    body_a -> angular_velocity = simd_sub (
         body_a -> angular_velocity, math3_multiplication_vector3 (rigidbody_effective_inv_inertia (body_a), ang_imp));
-    body_b -> angular_velocity = vector3_addition (
+    body_b -> angular_velocity = simd_add (
         body_b -> angular_velocity, math3_multiplication_vector3 (rigidbody_effective_inv_inertia (body_b), ang_imp));
 }
 void revolute_apply_motor (revolute_params *p, rigidbody *body_a, rigidbody *body_b, float dt,
@@ -922,7 +923,7 @@ void revolute_apply_motor (revolute_params *p, rigidbody *body_a, rigidbody *bod
         float along_probe;
         {
             vector3 axw = vector4_rotate_to_vector3 (body_a -> orientation, vector3_normalisation (p -> axis_a));
-            vector3 relw = vector3_subtraction (body_b -> angular_velocity, body_a -> angular_velocity);
+            vector3 relw = simd_sub (body_b -> angular_velocity, body_a -> angular_velocity);
             along_probe = vector3_dot (relw, axw);
         } bool at_min = (p -> accumulated_angle <= p -> limit_min_rad + 1e-4f) && (p -> motor_target_speed < 0.0f);
         bool at_max = (p -> accumulated_angle >= p -> limit_max_rad - 1e-4f) && (p -> motor_target_speed > 0.0f);
@@ -934,7 +935,7 @@ void revolute_apply_motor (revolute_params *p, rigidbody *body_a, rigidbody *bod
     } vector3 axis_world = vector4_rotate_to_vector3 (body_a -> orientation, vector3_normalisation (p -> axis_a));
     if (vector3_length_squared (axis_world) < 1e-12f) { return; }
     axis_world = vector3_normalisation (axis_world);
-    vector3 relative_angular = vector3_subtraction (body_b -> angular_velocity, body_a -> angular_velocity);
+    vector3 relative_angular = simd_sub (body_b -> angular_velocity, body_a -> angular_velocity);
     float current_speed = vector3_dot (relative_angular, axis_world);
     if (!isfinite (current_speed)) { return; }
     float speed_error = p -> motor_target_speed - current_speed;
@@ -963,9 +964,9 @@ void revolute_apply_motor (revolute_params *p, rigidbody *body_a, rigidbody *bod
         }
     }
     if (!isfinite (desired_torque)) { return; }
-    vector3 drive_torque = vector3_scaling (axis_world, desired_torque);
-    body_a -> torque_accumulator = vector3_subtraction (body_a -> torque_accumulator, drive_torque);
-    body_b -> torque_accumulator = vector3_addition (body_b -> torque_accumulator, drive_torque);
+    vector3 drive_torque = simd_scale (axis_world, desired_torque);
+    body_a -> torque_accumulator = simd_sub (body_a -> torque_accumulator, drive_torque);
+    body_b -> torque_accumulator = simd_add (body_b -> torque_accumulator, drive_torque);
 } /* Distance: 1D constraint along the anchor axis. Preserves free rotation and
  * tangential motion; only the separation error is corrected. */
 void distance_solve (distance_params *p, rigidbody *body_a, rigidbody *body_b, float dt, const mpe_config_t *cfg) {
@@ -979,16 +980,16 @@ void distance_solve (distance_params *p, rigidbody *body_a, rigidbody *body_b, f
     float inv_b = rigidbody_effective_inv_mass (body_b);
     vector3 r_a = vector4_rotate_to_vector3 (body_a -> orientation, p -> anchor_a);
     vector3 r_b = vector4_rotate_to_vector3 (body_b -> orientation, p -> anchor_b);
-    vector3 world_a = vector3_addition (body_a -> position, r_a);
-    vector3 world_b = vector3_addition (body_b -> position, r_b);
-    vector3 delta = vector3_subtraction (world_b, world_a);
+    vector3 world_a = simd_add (body_a -> position, r_a);
+    vector3 world_b = simd_add (body_b -> position, r_b);
+    vector3 delta = simd_sub (world_b, world_a);
     float dist = vector3_length (delta);
     if (dist < 1e-9f) { return; }
-    vector3 n = vector3_scaling (delta, 1.0f / dist);
+    vector3 n = simd_scale (delta, 1.0f / dist);
     float err = dist - p -> rest_length;
-    vector3 vel_a = vector3_addition (body_a -> velocity, vector3_cross (body_a -> angular_velocity, r_a));
-    vector3 vel_b = vector3_addition (body_b -> velocity, vector3_cross (body_b -> angular_velocity, r_b));
-    float rel_n = vector3_dot (vector3_subtraction (vel_b, vel_a), n);
+    vector3 vel_a = simd_add (body_a -> velocity, vector3_cross (body_a -> angular_velocity, r_a));
+    vector3 vel_b = simd_add (body_b -> velocity, vector3_cross (body_b -> angular_velocity, r_b));
+    float rel_n = vector3_dot (simd_sub (vel_b, vel_a), n);
     float bias = C -> joints.revolute_beta * err / dt;
     float max_b = C -> joints.revolute_max_bias;
     if (bias > max_b) { bias = max_b; } else if (bias < -max_b) {
@@ -1000,13 +1001,13 @@ void distance_solve (distance_params *p, rigidbody *body_a, rigidbody *body_b, f
               vector3_dot (rb_n, math3_multiplication_vector3 (rigidbody_effective_inv_inertia (body_b), rb_n));
     if (k <= 1e-12f) { return; }
     float lambda = -(rel_n + bias) / k;
-    vector3 impulse = vector3_scaling (n, lambda);
-    body_a -> velocity = vector3_subtraction (body_a -> velocity, vector3_scaling (impulse, inv_a));
-    body_b -> velocity = vector3_addition (body_b -> velocity, vector3_scaling (impulse, inv_b));
-    body_a -> angular_velocity = vector3_subtraction (
+    vector3 impulse = simd_scale (n, lambda);
+    body_a -> velocity = simd_sub (body_a -> velocity, simd_scale (impulse, inv_a));
+    body_b -> velocity = simd_add (body_b -> velocity, simd_scale (impulse, inv_b));
+    body_a -> angular_velocity = simd_sub (
         body_a -> angular_velocity,
         math3_multiplication_vector3 (rigidbody_effective_inv_inertia (body_a), vector3_cross (r_a, impulse)));
-    body_b -> angular_velocity = vector3_addition (
+    body_b -> angular_velocity = simd_add (
         body_b -> angular_velocity,
         math3_multiplication_vector3 (rigidbody_effective_inv_inertia (body_b), vector3_cross (r_b, impulse)));
 } /* TRUTH: fixed-weld angular positional correction (once per tick, AFTER the
@@ -1035,23 +1036,23 @@ void fixed_correct_angular_drift (fixed_params *p, rigidbody *body_a, rigidbody 
     if (vector3_length_squared (err_vec) < 1e-12f) { return; }
     const float beta = 0.1f;
     /* Correction angular velocity in A-frame, rotated to world via A. */
-    vector3 corr_local = vector3_scaling (err_vec, 2.0f * beta / dt);
+    vector3 corr_local = simd_scale (err_vec, 2.0f * beta / dt);
     vector3 corr_world = vector4_rotate_to_vector3 (body_a -> orientation, corr_local);
     math3 m = math3_addition (rigidbody_effective_inv_inertia (body_a), rigidbody_effective_inv_inertia (body_b));
     /* Guard near-singular (both infinite mass): nothing to correct. */
     math3 m_inv = math3_inverse (m);
-    vector3 impulse = vector3_scaling (math3_multiplication_vector3 (m_inv, corr_world), -1.0f);
+    vector3 impulse = simd_scale (math3_multiplication_vector3 (m_inv, corr_world), -1.0f);
     /* FIX-AUDIT-DESPOT: gate on EFFECTIVE inv inertia (>0), not just
      * !static_state. static_state misses sleeping/kinematic (effective 0):
      * the old gate applied drift impulses to bodies the velocity solve
      * treats as immovable, waking sleepers every tick and fighting
      * prescribed kinematic motion. Zero-effective sides skip. */
     if (rigidbody_effective_inv_mass (body_a) > 0.0f) {
-        body_a -> angular_velocity = vector3_subtraction (
+        body_a -> angular_velocity = simd_sub (
             body_a -> angular_velocity, math3_multiplication_vector3 (rigidbody_effective_inv_inertia (body_a), impulse));
     }
     if (rigidbody_effective_inv_mass (body_b) > 0.0f) {
-        body_b -> angular_velocity = vector3_addition (
+        body_b -> angular_velocity = simd_add (
             body_b -> angular_velocity, math3_multiplication_vector3 (rigidbody_effective_inv_inertia (body_b), impulse));
     }
 } /* Positional axis-drift correction: MUST be called exactly once per tick,
@@ -1076,25 +1077,25 @@ void revolute_correct_axis_drift (revolute_params *p, rigidbody *body_a, rigidbo
     if (axis_error_len_sq > 0.000001f) {
         /* Baumgarte stabilization: apply angular velocity correction proportional to axis_error */
         const float axis_baumgarte_beta = 0.1f; /* MFS_127: reduced from 0.2 to reduce oscillation */
-        vector3 axis_correction = vector3_scaling (axis_error, axis_baumgarte_beta / dt);
+        vector3 axis_correction = simd_scale (axis_error, axis_baumgarte_beta / dt);
         /* Compute effective angular mass for the correction */
         math3 drift_angular_mass =
             math3_addition (rigidbody_effective_inv_inertia (body_a), rigidbody_effective_inv_inertia (body_b));
         math3 drift_angular_mass_inv = math3_inverse (drift_angular_mass);
         vector3 axis_impulse =
-            vector3_scaling (math3_multiplication_vector3 (drift_angular_mass_inv, axis_correction), -1.0f);
+            simd_scale (math3_multiplication_vector3 (drift_angular_mass_inv, axis_correction), -1.0f);
         /* Apply angular impulse to both bodies.
          * FIX-AUDIT-DESPOT: gate on EFFECTIVE inv mass (>0), not just
          * !static_state (same sleeping/kinematic hole as the fixed-weld
          * drift above: effective helpers already zero those sides, so the
          * impulse application must skip them or sleepers get kicked). */
         if (rigidbody_effective_inv_mass (body_a) > 0.0f) {
-            body_a -> angular_velocity = vector3_subtraction (
+            body_a -> angular_velocity = simd_sub (
                 body_a -> angular_velocity,
                 math3_multiplication_vector3 (rigidbody_effective_inv_inertia (body_a), axis_impulse));
         }
         if (rigidbody_effective_inv_mass (body_b) > 0.0f) {
-            body_b -> angular_velocity = vector3_addition (
+            body_b -> angular_velocity = simd_add (
                 body_b -> angular_velocity,
                 math3_multiplication_vector3 (rigidbody_effective_inv_inertia (body_b), axis_impulse));
         }

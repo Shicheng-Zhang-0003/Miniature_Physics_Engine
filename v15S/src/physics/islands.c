@@ -6,6 +6,7 @@
 #include "../config/mpe_constants.h"
 #include <stddef.h>
 #include <stdint.h>
+#include "../core/simd_math.h"
 /* Union-find scratch lives in the world (heap members); the module keeps
  * no state of its own. Queries take the world explicitly. */
 static int island_find (struct physics_world *world, int x) {
