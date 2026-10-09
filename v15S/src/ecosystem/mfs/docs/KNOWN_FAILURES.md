@@ -4,6 +4,35 @@ Defects and limits that are measured, ticketed, and NOT hidden by gates.
 Suite marks are XFAIL (loud + ticketed) or documented observations — never
 silent passes. Measurements from the 2026-09-26 audit on this tree.
 
+## [CCD-OBSTACLE-MARGIN] Tank suite red: heading, pivot and odometry yaw (OPEN, regression)
+
+- **Status 2026-10-09: the MFS suite is 14/17.** `tank`, `drive_directions`
+  and `odometry_yaw` are red. This is the current truth; any document saying
+  "15/15 green" describes an earlier tree.
+- **Root cause:** commit `41bcc0b` introduced a **global** CCD obstacle
+  margin. It is applied to every swept pair rather than per colliding pair,
+  so it perturbs motion that never touches an obstacle. The failing gates are
+  all heading/yaw magnitudes, i.e. rotational perturbation — consistent with
+  an over-large margin on a pivoting chassis.
+- **Measured failures:** `tank` pivot heading 1.318356 vs 1.874100 (rel 0.08)
+  and pivot translation 0.091524 vs 0.064200 (rel 0.20);
+  `drive_directions` `fabs(rot_p.vz) < 0.15` unsatisfied; `odometry_yaw` tank
+  yaw magnitude 0.461179 vs 0.282539 and 0.432977 vs 0.255088 (rel 0.60).
+- **Proof of attribution:** zeroing the global obstacle margin restores
+  **17/17**. The candidate fix is a per-pair margin (scale the margin by the
+  actual contact geometry instead of applying one constant everywhere).
+- **Harness note (fixed 2026-10-09):** `build_tests.sh` ran under
+  `set -euo pipefail` and invoked the suite one line *above* `suite_rc=$?`, so
+  a single failing test aborted the script before it could print
+  `Total/Pass/Fail`, scan for sanitizer errors, or emit
+  `FTC RESULT: gated pass=.. fail=..`. A red suite therefore produced **no
+  counts at all**, and the runner reported the missing summary as a contract
+  violation — blaming the harness instead of naming the three failing tests.
+  Errexit is now scoped off around the suite run.
+- **Not caused by** the 2026-10-09 engine diagnostics work: the numbers above
+  are unchanged by it, and reproducing from a pristine `HEAD` worktree gives
+  the identical output.
+
 ## [MFS-STRAFE-F1] Mecanum strafe did not transmit (FIXED 2026-09-28)
 
 - **Was:** pure strafe developed ~0.01 m in 3 s vs 0.30 m gated
