@@ -7,12 +7,25 @@
 > stacks spawn overlap-free, and F11 always restores (backup, else compiled
 > defaults).
 >
-> **Headless truth: 44 registered / 42 blocking green + 2 diagnostic, 0 blocking
-> failures**, and 232 verification checks pass + 2 xfailed (1 distinct
-> red frontier × plain+sanitizer runs) + 6 informational under
-> AddressSanitizer + UndefinedBehaviorSanitizer (`--profile full`,
-> 2026-10-07; total 234). The single known-red frontier is `MFS-STRAFE-F2`
-> (phys 0.63 vs odom 0.91), surfaced as non-blocking `xfail`, never as green.
+> **Headless truth (2026-10-09): 45 registered / 43 blocking green + 2
+> diagnostic**, runner `--profile quick` **59/59**, and `--profile full`
+> **226 checks: 220 passed, 6 blocking failures, 4 informational**. The 6
+> failures are **3 root causes, each run twice** (plain + ASan/UBSan), all
+> pre-existing and none caused by the 2026-10-09 diagnostics work:
+>
+> 1. `legacy-f11_torture` — extreme-parameter torture case, reproduced
+>    bit-identically from a pristine `HEAD` worktree. Not a regression.
+> 2. `mfs-suite` — the known CCD obstacle-margin regression (`41bcc0b`):
+>    14/17 inner tests green; `tank`, `drive_directions`, `odometry_yaw` red.
+>    Zeroing the global margin restores 17/17.
+> 3. `mfs-summary-contract` — a consequence of (2), and now reporting it
+>    accurately. It previously blamed itself ("did not emit its summary")
+>    because `build_tests.sh` ran under `set -e` and aborted one line above
+>    `suite_rc=$?`, destroying its own failure evidence.
+>
+> Earlier headlines on this line (2026-10-07: 44/42, 232 pass + 2 xfail +
+> 6 info, total 234, with `MFS-STRAFE-F2` as the only red) described an
+> earlier tree. Do not read them as current.
 >
 > What is *not* yet claimed: the live-window all-clear is still pending user
 > confirmation, so until this notice is lifted, prefer the last known proper
@@ -49,6 +62,9 @@ The kernel is fully modular: every pipeline stage (broadphase, narrowphase shape
 - **Upgraded data structures** — growable body/contact pools (512→16384, 4K→64K ceilings), O(1) contact-pair hash probes, per-world id→index cache (islands O(J+B)), small-first broadphase node pool, process-wide determinism counters.
 - **No kernel globals** — the last old-series global (`g_physics_world`) moved to an app-ownership TU (`core/mpe_primary.c`); the kernel holds zero simulation state. The type/plugin registry stays process-global by design (documented in `core/mpe_registry.h`).
 - **TUI stress suite** — new `stress` (300 bodies + every joint type) and `ccd` (60/144/300 m/s battery) scenes, `--broadphase/--solver` backend flags, per-scene configs, pool visibility in dumps.
+- **Self-reported failures** — `core/mpe_diag.h` names every error with a subsystem, a stable code, the engine `file:line`, and the values that caused it; records land on stderr, the event log and (live) the debug terminal, and `diag` replays them. Replaces error paths that collapsed into a bare `-1` and a guessed message. Full reference: [`v15S/docs/DIAGNOSTICS.md`](v15S/docs/DIAGNOSTICS.md).
+- **Everything modular lives under `ecosystem/`** — the former top-level `plugins/` is gone. The loader jails paths to `ecosystem/` (any nesting depth), and a plain `.so` must export `mpe_module_desc`.
+- **S2 molecular bridge** (`ecosystem/mgb`) — spawns a live `s2tui`, drives its existing shell over three pipes, reads strict `S2SAVE1` frames from `sync`, and stages them as MPE bodies and zero-force bond lines. Display-only and one-way: positions flow S2 → MPE, never back. `mod load ecosystem/mgb/build/mgb_bridge.so` then `mod attach s2-bridge`. **Phase 0 stages a single snapshot — the dish renders but does not move or vibrate** (static bodies, `k=0` bonds, stage-once cadence); see [`v15S/docs/DIAGNOSTICS.md`](v15S/docs/DIAGNOSTICS.md) §4 and `v15S/REMAINING_WORK.md`.
 
 Inherited from `v15R3`:
 
@@ -137,11 +153,44 @@ physics_world_set_solver(world, mpe_find_solver("seq-impulse"));
 physics_world_attach_module(world, desc);   // pre_step / post_step hooks
 ```
 
-- Shapes: `object_custom` bodies (id ≥ 100) dispatch through the registry; see `plugins/mpe_capsule.c` (true segment capsule; bounding invariant `R = √(h²+rc²)`).
+- Shapes: `object_custom` bodies (id ≥ 100) dispatch through the registry; see `ecosystem/capsule/mpe_capsule.c` (true segment capsule; bounding invariant `R = √(h²+rc²)`).
 - Backends: `mpe_register_broadphase` / `mpe_register_solver`; builtins `hash` + `seq-impulse` (takeover refused; per-stage `mod_state` threaded through both step paths).
-- Loading: `mpe_loader_load("plugins/mpe_capsule.so")` (ABI-checked `dlopen`, CWD-jailed), or live in the debug terminal: `mod load|unload|attach|detach|use-broadphase|use-solver|ls`, or in TUI: `--solver NAME --broadphase NAME`. Ecosystem bundles (`mpe_ecosystem_desc`) load from `ecosystem/mfs/*.so`.
+- Loading: `mpe_loader_load("ecosystem/capsule/mpe_capsule.so")` (ABI-checked `dlopen`, path-jailed), or live in the debug terminal: `mod load|unload|attach|detach|use-broadphase|use-solver|ls`, or in TUI: `--solver NAME --broadphase NAME`. Ecosystem bundles (`mpe_ecosystem_desc`) load from `ecosystem/mfs/*.so`.
+- **Layout and jail**: every modular artifact lives under `v15S/src/ecosystem/<member>/…`; the old top-level `plugins/` no longer exists. `mpe_loader_load` accepts any path that resolves inside `ecosystem/` and rejects one that escapes it (`E_JAIL`) or does not exist (`E_NOFILE`). A plain `.so` must export `mpe_module_desc`; an ecosystem bundle exports `mpe_ecosystem_desc` and takes precedence, because a bundle links its inner modules' objects and therefore exports their descriptors too.
+- **Symbol interposition warning**: several plugins export a global named `mpe_module_desc`. A library that locates *itself* with `dladdr(&mpe_module_desc)` can be handed another plugin's address once more than one is loaded. Use a `static` symbol as the `dladdr` anchor instead — a local binding cannot be interposed.
+- **Self-reported failures**: every rejection carries a distinct return code and a diagnostics record naming the source, a stable code, the engine `file:line`, and the runtime values that caused it (`core/mpe_diag.h`). Records go to stderr, the event log, and — live — the debug terminal. `diag`, `diag tail N`, `diag sources`, `diag on|off`, `diag clear`. Attach returns `-1..-6` for null/ABI/corrupt-count/table-full/hook-refused/no-name (`MPE_ATTACH_E_*`); loader rejections are named `E_NOFILE`, `E_JAIL`, `E_STALE`, `E_TABLE`, `E_DLOPEN`, `E_ABI`, `E_NODESC`, `E_BUSY`.
 - Lifetime rules: unload refuses `-2` (busy) while any live world references the code — detach/reset first, then retry. Unregister detaches every live world pre-`dlclose`; pair handlers self-unregister via destructor with a `dladdr` purge backstop. Tick hook tables are snapshotted, so hooks may attach/detach mid-tick.
 - Modules never touch globals: per-world config via `mpe_world_cfg(world)`, per-module per-world state via `attach`.
+
+### S2 molecular bridge (`ecosystem/mgb`, registry name `s2-bridge`)
+
+Display-only, one-way. `s2tui` remains the simulation; MPE renders it. Nothing
+is ever written back into S2, and there is no physics coupling.
+
+```bash
+# from v15S/src
+./engine
+# in the debug terminal:
+mod load ecosystem/mgb/build/mgb_bridge.so
+mod attach s2-bridge
+diag            # anything that failed is named here
+```
+
+- Spawns a live `s2tui`, configures it through the shell S2 already has, then
+  reads strict `S2SAVE1` frames produced by `sync` and maps them to bodies and
+  bonds.
+- The staged bodies are **static** and the bonds carry `k = 0, c = 0`, so the
+  dish is rendered but not simulated. **Phase 0 stages once: no motion, no
+  vibration.** Open work is tracked in [`v15S/REMAINING_WORK.md`](v15S/REMAINING_WORK.md).
+- Placement matters: the renderer frustum-culls silently. The default stage
+  offset `(0,20,-60)` puts the dish centre on the default camera axis
+  (`(0,20,50)`, looking down −Z, 45° vertical FOV). Attach logs
+  `STAGED_BOUNDS` with the real centre, extent and radius range — read it
+  first when the screen looks empty. `$MGB_OX` / `$MGB_OY` / `$MGB_OZ`
+  override it live; `$MGB_S2TUI_BIN` pins the `s2tui` executable and, if set
+  to something unusable, fails loudly rather than falling back.
+- See [`v15S/docs/DIAGNOSTICS.md`](v15S/docs/DIAGNOSTICS.md) for spawn
+  failure naming, path resolution order, and the gates that pin all of it.
 
 ---
 
@@ -258,7 +307,7 @@ kill -STOP 3             # put it to sleep
 ps aux                   # list every body with state
 export GRAVITY=-2.0      # change world gravity
 mod ls                   # list loaded physics modules
-mod load ./plugins/mpe_capsule.so   # hot-plug a foreign shape
+mod load ./ecosystem/capsule/mpe_capsule.so   # hot-plug a foreign shape
 ```
 
 Type `help` for the full command list, `man <command>` for usage. `Ctrl+L` clears, `Esc` closes. Mutating commands require Debug Mode; in Game Mode the terminal is read-only.
@@ -315,7 +364,29 @@ make
 
 ## 📜 Version History
 
-- **v15S (current head)** — GTK4 port, module system (MPI hot-plug), per-world config, data-structure upgrades (growable pools, O(1) caches), kernel global-state removal, TUI stress suite (`stress`/`ccd` scenes, backend flags), 44 registered / 42 blocking green (the 2 diag-informational cases are additional and are excluded from the blocking 42) plus a 234-check verification profile (232 pass + 2 xfail + 6 info) green under ASan+UBSan; DESPOT-2026-10-03: floor raised 42 -> 44 and the meta_rotation / meta_convergence gates made genuinely blocking after both were found unable to fail. DESPOT-2026-10-04: F11 torture-leak recurrence closed (`engine.cfg` restored from backup and guarded on every save/exit path, in-memory snapshot, config-mutation runner contract); every physics formula re-verified against textbook statements (no errors — the Tom-and-Jerry physics was configuration, not mathematics); `[CLAMP-TAUTOLOGY]` closed (net-OFF + fall-speed + ever-contact gates); regime matrix revived (33 blinding re-inits removed, 13 premise pins, `MPE_SKIPPED` −1; all five regimes 42/42 on unpinned dimensions; 13 premise pins run identical config by design (oracle measures its law, not the regime) — see docs/VALIDATION.md regime-pin list); `[FRICTION-THRESH]` root-caused (memoryless per-iteration selection) and fixed (tick-start snapshot: breakaway 0.999–1.005 of μ_s·N); `meta_convergence` arm-ratio withdrawn for measured chaos with calm-top-arm gates kept; MFS tank pivot re-baselined 0.0530 → 0.0642 m with cause chain. DESPOT-2026-10-04b: FTC streamlined to one field / one robot / one controller (terminal `ftc` is spawn/drive/stop/telemetry mecanum-only; `eco` is attach/detach/command; bundle attaches ftc-fleet only with the BioBuzz game parked but registered; full profile still 232 pass + 2 xfail (total 234) incl. 15 inner MFS tests (5 outer wrappers), 1 distinct F2 frontier).
+- **v15S (current head) — 2026-10-09: diagnostics + S2 bridge.** `core/mpe_diag.h`
+  makes every rejection name itself (subsystem, stable code, engine
+  `file:line`, runtime values), fanned out to stderr, the event log and the
+  debug terminal; `diag` replays the ring. Distinct return codes for every
+  attach/detach/loader rejection — all still `< 0`, so no existing caller
+  changes. Everything modular now lives under `ecosystem/` (top-level
+  `plugins/` removed) and the loader jails paths there. S2 molecular bridge
+  (`ecosystem/mgb`, `s2-bridge`) renders a live petri dish: it spawns `s2tui`,
+  configures it through the existing shell, and stages strict `S2SAVE1` frames
+  as static bodies with zero-force bond lines — **display-only and stage-once,
+  so no motion or vibration yet**. Suite 45 registered / 43 blocking green
+  (added `diag_naming`, floor 44 → 45); runner quick 59/59; runner full 226
+  checks with 3 known pre-existing reds documented above. Also fixed: an
+  implicit `localtime_r`/`fileno` in `mpe_config.c` (pointer truncated through
+  an `int`-typed assumption under `-fno-builtin`); `simd_math.h` included
+  inside an `#ifndef MPE_HEADLESS` guard, which broke three paranoia targets
+  outright; the MFS harness aborting under `set -e` before it could print its
+  own summary; a fixed-7-component path strip in the bridge resolver that
+  emitted an unresolvable `..` path; stage offset targeting the scene origin
+  instead of the camera axis and the frame's bounding-box centre (all 776
+  atoms were being frustum-culled). Reference:
+  [`v15S/docs/DIAGNOSTICS.md`](v15S/docs/DIAGNOSTICS.md).
+- **v15S (through 2026-10-07) —** GTK4 port, module system (MPI hot-plug), per-world config, data-structure upgrades (growable pools, O(1) caches), kernel global-state removal, TUI stress suite (`stress`/`ccd` scenes, backend flags), 44 registered / 42 blocking green (the 2 diag-informational cases are additional and are excluded from the blocking 42) plus a 234-check verification profile (232 pass + 2 xfail + 6 info) green under ASan+UBSan; DESPOT-2026-10-03: floor raised 42 -> 44 and the meta_rotation / meta_convergence gates made genuinely blocking after both were found unable to fail. DESPOT-2026-10-04: F11 torture-leak recurrence closed (`engine.cfg` restored from backup and guarded on every save/exit path, in-memory snapshot, config-mutation runner contract); every physics formula re-verified against textbook statements (no errors — the Tom-and-Jerry physics was configuration, not mathematics); `[CLAMP-TAUTOLOGY]` closed (net-OFF + fall-speed + ever-contact gates); regime matrix revived (33 blinding re-inits removed, 13 premise pins, `MPE_SKIPPED` −1; all five regimes 42/42 on unpinned dimensions; 13 premise pins run identical config by design (oracle measures its law, not the regime) — see docs/VALIDATION.md regime-pin list); `[FRICTION-THRESH]` root-caused (memoryless per-iteration selection) and fixed (tick-start snapshot: breakaway 0.999–1.005 of μ_s·N); `meta_convergence` arm-ratio withdrawn for measured chaos with calm-top-arm gates kept; MFS tank pivot re-baselined 0.0530 → 0.0642 m with cause chain. DESPOT-2026-10-04b: FTC streamlined to one field / one robot / one controller (terminal `ftc` is spawn/drive/stop/telemetry mecanum-only; `eco` is attach/detach/command; bundle attaches ftc-fleet only with the BioBuzz game parked but registered; full profile still 232 pass + 2 xfail (total 234) incl. 15 inner MFS tests (5 outer wrappers), 1 distinct F2 frontier).
 - **v15R3 (release)** — configuration system, physics-truth pass, full constraint framework, TUI debugger + snapshot suite, 29/29 headless green. Release notes: [`release_notes_v15R3.md`](release_notes_v15R3.md).
 - **v15R2** — config-system hardening + MFS robotics (prior RC, parked (now consolidated in `v15S/src/ecosystem/mfs/`)).
 - **v1.4 Alpha RC3** — domain-driven restructure, spatial-hash broadphase, physics-world encapsulation.
@@ -337,10 +408,10 @@ See [`v15S/evolution.txt`](v15S/evolution.txt) for the full lineage back to stag
 ## 🧪 Verification suite
 
 The unified test runner provides quick, physics, and full profiles. The full
-profile builds the active engine, checks the canonical 44-case C suite (42
-blocking), runs
-all 30 isolated legacy cases and 14 paranoia cases, then repeats the physics,
-MFS, and TUI suites under AddressSanitizer and UndefinedBehaviorSanitizer. It
+profile builds the active engine, checks the canonical **45-case C suite (43
+blocking)**, runs all **30** isolated legacy cases and **14** paranoia cases,
+then repeats the physics, MFS, and TUI suites under AddressSanitizer and
+UndefinedBehaviorSanitizer. It
 also checks generated TUI snapshots and writes JSON and JUnit reports, snapshots,
 and per-command logs below each run's directory in `temp/qa_runs/`.
 
@@ -428,7 +499,7 @@ micro-jitter, documented); bounce-height oracles carry slop-scale error.
 
 ### MFS robotics (`v15S/src/ecosystem/mfs/`)
 - **FTC stack**: motor presets (spec-sheet derived, decoded-count encoder convention), back-EMF electrical model with implicit-in-speed solve + disturbance observer (the **open-loop** no-load line is exact at any bus voltage via V-line bounds — `R` cancels from `w_free` by construction; the **observer-armed** driven path is a documented limit cycle at −61.3%, tracked as `[MOTOR-III]`), traction budgeting against wheel materials, analytic mecanum roller-kinematics lateral force (Coulomb-capped, dissipative, contact-gated at the wheel — no chassis-force cheat; the articulated 32-roller build is kept for forensics), pure-encoder odometry with `odom_slip` flag, tile-friction test floors.
-- **Suite**: `build_tests.sh` — **15/15** inner tests via unified mfs_suite --all (script reports suite+build gates) + build checks + ungated diags, all green and CWD-independent (2026-10-03: 12 -> 14; two gates were red at the prior HEAD from fixture defects, not engine ones).
+- **Suite**: `build_tests.sh` — unified `mfs_suite --all` plus build gates and ungated diags; CWD-independent. **Status 2026-10-09: 14/17 inner tests green** — `tank`, `drive_directions` and `odometry_yaw` are red from the known CCD obstacle-margin regression (`41bcc0b`); zeroing the global margin restores 17/17. The script runs with errexit scoped off around the suite so a failure still produces its full summary (`FTC RESULT: gated pass=.. fail=..`); see `v15S/REMAINING_WORK.md`.
 - **Modules**: `ftc-fleet` tick module (hot-pluggable, bitwise-identical static vs `.so`), `mfs-simulator` ecosystem bundle (loadable via `mod load ecosystem/mfs/mfs_ecosystem.so`; attaches ftc-fleet only — the `mfs_module_1` BioBuzz game module stays registered but parked). Live robot flow is one field, one mecanum robot, one controller: `mod load ecosystem/mfs/mfs_ecosystem.so`, `eco attach mfs-simulator`, `ftc spawn`, then drive with the Logitech F310 pad (left stick forward/strafe, right X rotate, START toggles, LB+RB e-stop); `ftc telemetry` inspects.
 
 ### Determinism and precision
