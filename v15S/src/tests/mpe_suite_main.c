@@ -86,6 +86,7 @@ int mpe_t_frustum (void);
 int mpe_t_frustum_culler (void);
 int mpe_t_module (void);
 int mpe_t_loader_lifecycle (void);
+int mpe_t_diag_naming (void);
 int mpe_t_ftc_ecosystem (void);
 typedef struct {
     const char *name;
@@ -165,6 +166,9 @@ static const mpe_entry_t mpe_registry [] = {
     {"module", mpe_t_module, 0},
     {"loader_lifecycle", mpe_t_loader_lifecycle, 0},
     {"ftc_ecosystem", mpe_t_ftc_ecosystem, 0},
+    /* Every rejection names itself: distinct codes, source + call site, hook
+     * invoked exactly once. See mpe_suite_loader.c mpe_t_diag_naming. */
+    {"diag_naming", mpe_t_diag_naming, 0},
 };
 #define MPE_NTESTS ((int) (sizeof (mpe_registry) / sizeof (mpe_registry [0])))
 /* Returns 0 pass, 1 fail, 2 skipped.

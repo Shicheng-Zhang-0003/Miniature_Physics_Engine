@@ -110,11 +110,13 @@ MPE_TEST_REGIMES = ("default", "light", "heavy", "brittle", "sticky")
 # 44 = 42 blocking (physics) + 2 informational (diagnostic).
 #   36 pre-existing + 3 metamorphic (meta_rotation, meta_convergence,
 #   meta_config_wiring) + mouse_look_axes + body_materials_live +
-#   sleep_settle + mass_properties + reference_math
+#   sleep_settle + mass_properties + reference_math + diag_naming
 # meta_sleep was written and withdrawn, so the floor only ever moves by
 # deliberate addition, and this comment says so rather than being quietly
-# edited. History: 41 -> 42 (2026-10-01, sleep_settle) -> 44 (2026-10-03).
-MIN_SUITE_ENTRIES = 44
+# edited. History: 41 -> 42 (2026-10-01, sleep_settle) -> 44 (2026-10-03)
+# -> 45 (2026-10-09, diag_naming: every rejection names its own source/code/call
+# site, and an attach hook with side effects must run exactly once).
+MIN_SUITE_ENTRIES = 45
 # DESPOT-2026-10-01: pin per-suite floors so deleting a legacy/paranoia target
 # + its make target together cannot shrink the headline silently (the 220->204
 # drift). Canonical floor above; legacy 30 + paranoia 14 pinned here.
