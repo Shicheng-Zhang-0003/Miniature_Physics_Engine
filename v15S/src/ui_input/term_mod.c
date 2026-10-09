@@ -2,8 +2,8 @@
  * Usage:
  *   mod ls                        list registry modules + loaded .so
  *   mod load <path.so>            dlopen plugin (run from v15S/src;
- *                                 modules: plugins/<name>.so,
- *                                 bundles: ecosystem/mfs/<name>.so)
+ *                                 any member path under ecosystem/,
+ *                                 e.g. ecosystem/mgb/build/mgb_bridge.so)
  *   mod unload <path|name>        dlclose (quiesce between ticks)
  *   mod attach <name>             attach tick module to primary world
  *   mod detach <name>             detach tick module
@@ -14,6 +14,7 @@
 #include "term_priv.h"
 #include "../core/mpe_registry.h"
 #include "../core/mpe_loader.h"
+#include "../core/mpe_diag.h"
 #include "../core/physics_world.h"
 #include <stdio.h>
 #include <string.h>
@@ -87,8 +88,12 @@ void cmd_mod (int argc, char **argv) {
                       "detach the tick module / reset the stage slot first)\n");
         } else if (ur == -3) {
             term_err ("mpe: mod: unload refused (registered name too long to tear down safely)\n");
-        } else
-        term_err ("mpe: mod: unload failed (unknown handle)\n");
+        } else {
+            char b [256];
+            snprintf (b, sizeof (b),
+                      "mpe: mod: unload FAILED: code=%d (unknown handle; `mod ls` lists what is loaded)\n", ur);
+            term_err (b);
+        }
         return;
     }
     if (term_str_eq (argv [1], "attach") && argc >= 3) {
@@ -109,17 +114,38 @@ void cmd_mod (int argc, char **argv) {
                 return;
             }
         } int r = physics_world_attach_module (pw, d);
-        if (r >= 0)
-            term_ok ("mpe: mod: attached\n");
-        else
-        term_err ("mpe: mod: attach failed (table full / attach hook)\n");
+        if (r >= 0) {
+            char b [256];
+            snprintf (b, sizeof (b), "mpe: mod: attached '%s' at slot %d\n", argv [2], r);
+            term_ok (b);
+        } else {
+            /* Exact cause and code. The old text guessed "table full /
+             * attach hook" for every rejection, which sent the operator
+             * hunting in the wrong subsystem entirely. */
+            char b [600];
+            snprintf (b, sizeof (b),
+                      "mpe: mod: attach FAILED: %s\n"
+                      "  code=%d reason=%s\n"
+                      "  full cause already in the diagnostics log; see `diag` (source=attach)\n",
+                      argv [2], r, physics_world_attach_strerror (r));
+            term_err (b);
+        }
         return;
     }
     if (term_str_eq (argv [1], "detach") && argc >= 3) {
-        if (physics_world_detach_module (physics_world_get_primary (), argv [2]) == 0)
-            term_ok ("mpe: mod: detached\n");
-        else
-        term_err ("mpe: mod: detach failed (not attached)\n");
+        int dr = physics_world_detach_module (physics_world_get_primary (), argv [2]);
+        if (dr == 0) {
+            char b [256];
+            snprintf (b, sizeof (b), "mpe: mod: detached '%s'\n", argv [2]);
+            term_ok (b);
+        } else {
+            char b [600];
+            snprintf (b, sizeof (b),
+                      "mpe: mod: detach FAILED: '%s' code=%d (%s)\n"
+                      "  what IS attached is in the diagnostics log (source=detach) and in `mod ls`\n",
+                      argv [2], dr, dr == MPE_DETACH_E_NULL ? "null argument" : "not attached under that name");
+            term_err (b);
+        }
         return;
     }
     if (term_str_eq (argv [1], "use-broadphase") && argc >= 3) {

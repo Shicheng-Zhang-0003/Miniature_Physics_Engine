@@ -9,6 +9,7 @@
 #include "physics_world.h"
 #include "mpe_registry.h"
 #include "mpe_loader.h"
+#include "mpe_diag.h"
 #include "mpe_platform.h"
 #include "../physics/collision_mechanics.h"
 #include "../physics/broadphase.h"
@@ -523,26 +524,83 @@ bool physics_world_module_live_state (physics_world *world, const mpe_module_des
         }
     } return false;
 }
+const char *physics_world_attach_strerror (int code) {
+    switch (code) {
+        case 0: return ("ok");
+        case MPE_ATTACH_E_NULL: return ("null world or module descriptor");
+        case MPE_ATTACH_E_ABI: return ("module ABI does not match the engine (rebuild the plugin against this tree)");
+        case MPE_ATTACH_E_COUNT: return ("world tick-module count is corrupt (cleanup reset it; re-init the world)");
+        case MPE_ATTACH_E_TABLE: return ("module table full (detach another module first)");
+        case MPE_ATTACH_E_HOOK: return ("the module's own attach hook refused (see its message above)");
+        case MPE_ATTACH_E_NAME: return ("module has no name");
+        default: return ("unknown attach failure");
+    }
+}
 int physics_world_attach_module (physics_world *world, const mpe_module_desc_t *desc) {
-    if (!world || !desc || desc -> abi != MPE_MODULE_ABI)
-        return -1;
-    for (int i = 0; i < world -> tick_module_count; i++)
-        if (world -> tick_modules [i] == desc)
-        return i;
-    if (world -> tick_module_count >= MPE_MAX_TICK_MODULES)
-        return -1;
-    void *st = NULL;
-    if (desc -> attach && desc -> attach (world, &st) != 0)
-        return -1;
+    /* Every rejection is a DISTINCT negative code and a diag record. These
+     * used to collapse into a bare -1, which forced the UI to print a guess
+     * ("table full / attach hook") that was wrong more often than right.
+     * All codes stay < 0 so every existing `>= 0` / `< 0` caller is
+     * unaffected — only the ability to name the cause is new. */
+    if (!world || !desc) {
+        MPE_DIAG_ERROR ("attach", "E_NULL", "attach rejected: %s (world=%p desc=%p)", world ? "descriptor is NULL" : "world is NULL",
+                        (const void *) world, (const void *) desc);
+        return MPE_ATTACH_E_NULL;
+    }
+    if (desc->abi != MPE_MODULE_ABI) {
+        MPE_DIAG_ERROR ("attach", "E_ABI", "attach rejected: '%s' has ABI %u, engine expects %u", desc->name ? desc->name : "(unnamed)",
+                        desc->abi, (unsigned) MPE_MODULE_ABI);
+        return MPE_ATTACH_E_ABI;
+    }
+    for (int i = 0; i < world->tick_module_count; i++)
+        if (world->tick_modules [i] == desc)
+            return i;
+    if (world->tick_module_count < 0 || world->tick_module_count > MPE_MAX_TICK_MODULES) {
+        MPE_DIAG_ERROR ("attach", "E_COUNT", "attach rejected: tick_module_count=%d outside [0,%d] for '%s'",
+                        world->tick_module_count, MPE_MAX_TICK_MODULES, desc->name ? desc->name : "(unnamed)");
+        return MPE_ATTACH_E_COUNT;
+    }
+    if (world->tick_module_count >= MPE_MAX_TICK_MODULES) {
+        MPE_DIAG_ERROR ("attach", "E_TABLE", "attach rejected: table full (%d/%d slots in use); attached: ", world->tick_module_count,
+                        MPE_MAX_TICK_MODULES);
+        for (int i = 0; i < world->tick_module_count; i++) {
+            MPE_DIAG_INFO ("attach", "E_TABLE_LIST", "  slot %d: '%s'", i,
+                           world->tick_modules [i] && world->tick_modules [i]->name ? world->tick_modules [i]->name : "?");
+        }
+        return MPE_ATTACH_E_TABLE;
+    }
+    if (!desc->name || !*desc->name) {
+        /* Only the null case is a guard: a missing name makes every later
+         * strcmp and the registry's owned 64-byte copy undefined. Length is
+         * NOT enforced here — the registry already truncates safely, and
+         * adding a second, different limit is how a valid module would end
+         * up rejected for no stated reason. */
+        MPE_DIAG_ERROR ("attach", "E_NAME", "attach rejected: module name is missing");
+        return MPE_ATTACH_E_NAME;
+    }
+void *st = NULL;
+if (desc->attach) {
+        /* Call the hook EXACTLY once: it owns side effects (spawning a
+         * child process, allocating pools). Capturing the code once and
+         * reporting that value is the whole point — the module knows why
+         * it refused, and guessing on its behalf is what cost days. */
+        int hook_rc = desc->attach (world, &st);
+        if (hook_rc != 0) {
+            MPE_DIAG_ERROR ("attach", "E_HOOK", "attach rejected: '%s' attach hook returned %d (state=%p)", desc->name, hook_rc, st);
+            return MPE_ATTACH_E_HOOK;
+        }
+    }
     world -> tick_modules [world -> tick_module_count] = desc;
     world -> tick_module_state [world -> tick_module_count] = st;
     mpe_loader_retain_module (desc);
     return world -> tick_module_count++;
 }
 int physics_world_detach_module (physics_world *world, const char *name) {
-    if (!world || !name)
-        return -1;
-    for (int i = 0; i < world -> tick_module_count; i++) {
+    if (!world || !name) {
+        MPE_DIAG_ERROR ("detach", "E_NULL", "detach rejected: %s", world ? "name is NULL" : "world is NULL");
+        return MPE_DETACH_E_NULL;
+    }
+    for (int i = 0; i < world->tick_module_count; i++) {
         if (world -> tick_modules [i] && world -> tick_modules [i] -> name &&
             strcmp (world -> tick_modules [i] -> name, name) == 0) {
             if (world -> tick_modules [i] -> detach)
@@ -554,9 +612,20 @@ int physics_world_detach_module (physics_world *world, const char *name) {
             } world -> tick_module_count--;
             world -> tick_modules [world -> tick_module_count] = NULL;
             world -> tick_module_state [world -> tick_module_count] = NULL;
+            MPE_DIAG_INFO ("detach", "OK", "detached '%s' from slot %d (%d remaining)", name, i, world->tick_module_count);
             return 0;
         }
-    } return -1;
+    }
+    /* Name the real situation: not attached, vs attached under a DIFFERENT
+     * name (usually a wrong argument or a name collision). */
+    MPE_DIAG_ERROR ("detach", "E_NOTFOUND", "detach rejected: no module named '%s' is attached; attached now: ", name);
+    if (world->tick_module_count == 0) {
+        MPE_DIAG_INFO ("detach", "E_NOTFOUND_LIST", "  (none — the world has zero attached modules)");
+    }
+    for (int i = 0; i < world->tick_module_count; i++)
+        MPE_DIAG_INFO ("detach", "E_NOTFOUND_LIST", "  slot %d: '%s'", i,
+                       world->tick_modules [i] && world->tick_modules [i] -> name ? world->tick_modules [i] -> name : "?");
+    return MPE_DETACH_E_NOTFOUND;
 } /* Registry-first shape dispatch with built-in fallback.
  * Handles swapped (cube,sphere)/(cyl,sphere)/(cyl,cube) by trying the
  * registered orientation first, then the swapped orientation with a
