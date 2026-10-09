@@ -4,6 +4,7 @@
 #include "../mpe_engine.h"
 #include "debug_terminal.h"
 #include "term_priv.h"
+#include "../core/mpe_diag.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -350,6 +351,7 @@ const terminal_command terminal_commands [] = {
         {"microvim", true, cmd_vi, "microvim [filename]", "open microvim editor"},
         /* MPE_TASK_V15R2_PHASE8_TABLE_END */
         {"mod", true, cmd_mod, "mod ls|load|unload|attach|detach|use-*", "hot plug physics modules"},
+        {"diag", false, cmd_diag, "diag [tail N|sources|on|off|clear|status]", "engine self-report: every error source"},
         {"eco", true, cmd_eco, "eco attach|detach|command", "drive ecosystem bundles"},
         {"ftc", true, cmd_ftc, "ftc spawn [x y z]|telemetry", "spawn/inspect the robot (F310 drives)"},
 };
@@ -506,9 +508,19 @@ static gboolean on_terminal_window_key_pressed (GtkEventControllerKey *controlle
         return TRUE;
     } return FALSE;
 }
+/* Live diagnostics sink. core/ cannot call term_err (ui_input must not be
+ * linked into the kernel), so the engine pushes records here instead: with
+ * the terminal open, every error the engine raises appears in it at once,
+ * tagged, in emission order — the operator never has to go looking. */
+static void diag_sink_into_terminal (const char *line, void *user_data) {
+    (void) user_data;
+    term_err (line);
+}
 static void on_terminal_window_destroy (GtkWidget *widget, gpointer user_data) {
     (void) widget;
     (void) user_data;
+    /* Stop pushing: the buffer this writes into is about to be NULL. */
+    mpe_diag_set_sink (NULL, NULL);
     terminal_window = NULL;
     terminal_output_view = NULL;
     terminal_output_buffer = NULL;
@@ -610,6 +622,7 @@ void debug_terminal_open (GtkWidget *parent_window) {
     gtk_widget_set_margin_top (terminal_entry, 4);
     gtk_widget_set_margin_bottom (terminal_entry, 4);
     gtk_box_append (GTK_BOX (input_box), terminal_entry);
+    mpe_diag_set_sink (diag_sink_into_terminal, NULL); /* live mirror ON */
     g_signal_connect (terminal_entry, "activate", G_CALLBACK (on_terminal_entry_activate), NULL);
     {
         GtkEventController *entry_key_controller = gtk_event_controller_key_new ();
