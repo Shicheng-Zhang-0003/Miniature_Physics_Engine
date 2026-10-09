@@ -137,8 +137,13 @@ Common commands:
 | `df` | Show capacity usage |
 | `export GRAVITY=-2.0` | Change world gravity |
 | `mod ls` | List loaded physics modules |
-| `mod load ./plugins/mpe_capsule.so` | Hot-plug a foreign shape |
+| `mod load ./ecosystem/capsule/mpe_capsule.so` | Hot-plug a foreign shape |
 | `mod attach capsule-shape` | Attach a module to the world |
+| `diag` | Engine self-report: every error source, with counts and recent records |
+| `diag tail 50` | Last 50 diagnostic records only |
+| `diag sources` | Per-source error/warn totals |
+| `diag on` / `diag off` | Live mirror: echo each new error here as it happens (on when the terminal opens) |
+| `diag clear` / `diag status` | Forget all records / show mirror + ring state |
 | `mod use-solver seq-impulse` | Swap the solver backend |
 | `mod load ecosystem/mfs/mfs_ecosystem.so` | Load the MFS robotics bundle |
 | `eco attach mfs-simulator` | Attach the bundle to the primary world |
@@ -263,7 +268,7 @@ Every pipeline stage is swappable at runtime through the Module
 Interface (`src/core/mpe_module.h`, ABI v1):
 
 - **Shapes** — custom bodies (`object_custom`, id ≥ 100) dispatch via the
-  pair registry. Example: `plugins/mpe_capsule.c`.
+  pair registry. Example: `ecosystem/capsule/mpe_capsule.c`.
 - **Backends** — `hash` broadphase and `seq-impulse` solver are the
   builtins; foreign ones register under their own names.
 - **Tick modules** — `pre_step`/`post_step` hooks (force fields, motors,
@@ -276,9 +281,8 @@ In the debug terminal: `mod ls`, `mod load <file.so>`,
 so two worlds can run different physics side by side.
 
 Lifetime rules (all enforced, all tested by `loader_lifecycle`):
-- Paths are jailed to `plugins/<name>.so` (modules) or
-  `ecosystem/mfs/<name>.so` (ecosystem bundles), relative to the
-  process working directory (normally `v15S/src`).
+- Paths are jailed under `ecosystem/<member>/.../<name>.so`, relative
+  to the process working directory (normally `v15S/src`).
 - `mod unload` refuses with "busy" while any live world still references
   the code (attached tick module, active stage backend). Detach/reset
   first, then retry. Unload otherwise detaches every live world,
@@ -287,10 +291,66 @@ Lifetime rules (all enforced, all tested by `loader_lifecycle`):
 - Builtins (`hash`, `seq-impulse`, the six collision pairs) refuse
   silent takeover; foreign stages register under their own names.
 - Pair handlers must self-unregister in a destructor (see
-  `plugins/mpe_capsule.c`); tick hook tables are snapshotted, so hooks
+  `ecosystem/capsule/mpe_capsule.c`); tick hook tables are snapshotted, so hooks
   may attach/detach mid-tick.
 - Ecosystem bundles export `mpe_ecosystem_desc` (loader precedence over
   any inner `mpe_module_desc`): `mod load ecosystem/mfs/mfs_ecosystem.so`.
+
+### Reading failures
+
+Nothing reports a bare "something went wrong". Every rejection is named,
+coded, and traced to the engine line that decided it — on stderr, in the
+event log, and live in the debug terminal:
+
+| Command | Effect |
+|---|---|
+| `diag` | per-source totals + the last 25 records |
+| `diag tail 50` | last 50 records |
+| `diag sources` | totals only |
+| `diag on` / `diag off` | live mirror (on automatically when the terminal opens) |
+| `diag clear` / `diag status` | reset / show state |
+
+Attach failures are distinct codes, not one `-1`: `-2` = plugin built against
+a different ABI (**rebuild the plugin**), `-4` = all 16 module slots in use
+(the record lists the occupants), `-5` = the module's own attach hook
+refused (its code is passed through), `-6` = module has no name. Loader
+failures distinguish `no such file`, a path outside `ecosystem/`, a stale
+`.so` already loaded, `dlopen` failure, and a missing descriptor.
+Full table: [`docs/DIAGNOSTICS.md`](docs/DIAGNOSTICS.md).
+
+---
+
+## S2 Molecular Bridge (`s2-bridge`)
+
+> Linux/POSIX only — the bridge spawns `s2tui` with `fork`/`exec` and has no
+> Windows build. Not available under MSYS2/MSVC.
+
+Displays a live S2 petri dish inside MPE. Display-only and one-way: `s2tui`
+is the simulation, positions flow S2 → MPE only, and nothing is written back.
+
+```bash
+# run the engine from v15S/src, then in the debug terminal:
+mod load ecosystem/mgb/build/mgb_bridge.so
+mod attach s2-bridge
+```
+
+Configuration:
+
+| Variable | Meaning |
+|---|---|
+| `MGB_S2TUI_BIN` | absolute path to `s2tui`. If set but unusable, attach **fails loudly** — it never silently falls back to a different binary |
+| `MGB_OX` / `MGB_OY` / `MGB_OZ` | stage offset, default `0 20 -60`, changeable live without a rebuild |
+
+**The dish does not move or vibrate.** Phase 0 stages one snapshot: bodies
+are static, bonds are zero-force render lines, and the refresh cadence is not
+wired yet. Treat it as a live snapshot viewer.
+
+**If the screen is empty:** the renderer frustum-culls silently, so a
+successful attach can still place everything off-screen. Run `diag` and read
+the `STAGED_BOUNDS` line — it gives the real centre, extent and radius range.
+The default `(0,20,-60)` sits on the default camera axis (camera at
+`(0,20,50)`, looking down −Z, 45° vertical FOV, so anything more than 22.5°
+off that axis is culled). If you have moved the dish elsewhere, set `MGB_O*`.
 
 ---
 
@@ -432,6 +492,10 @@ Broadphase collision detection uses a 3D spatial hash grid and runs once per phy
 
 ## Known Limitations
 
+**S2 bridge:** `s2-bridge` stages a single snapshot — no motion or
+vibration — because staged bodies are static and bonds carry `k = 0`. See
+[S2 Molecular Bridge](#s2-molecular-bridge-s2-bridge).
+
 **Wayland:** supported. The GTK4 port uses Wayland-safe input (no X11
 pointer warping); the mouse locks via cursor capture and works under both
 Wayland and X11 sessions.
@@ -445,7 +509,7 @@ The engine supports four object types:
 - **Sphere** — spawned via `touch new.sph`, spawner menu, or `Enter`
 - **Cube** — spawned via `touch new.cube`, spawner menu, or `Enter`
 - **Cylinder** — spawned via `touch new.cyl`, spawner menu, or `Enter`; axle along local X, correct `I = ½·m·r²` inertia, exact flat-cap contacts, dedicated instanced mesh
-- **Custom** (`object_custom`, id ≥ 100) — foreign shapes via hot-plugged pair handlers. Example: capsule (`plugins/mpe_capsule.c`): segment + radius with the bounding invariant `radius = √(h²+rc²)` (the engine owns `radius` as the bounding radius for broadphase; `sanitize` preserves it). Custom bodies render as cubes.
+- **Custom** (`object_custom`, id ≥ 100) — foreign shapes via hot-plugged pair handlers. Example: capsule (`ecosystem/capsule/mpe_capsule.c`): segment + radius with the bounding invariant `radius = √(h²+rc²)` (the engine owns `radius` as the bounding radius for broadphase; `sanitize` preserves it). Custom bodies render as cubes.
 
 
 
