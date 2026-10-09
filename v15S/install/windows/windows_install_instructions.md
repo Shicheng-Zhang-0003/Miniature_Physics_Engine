@@ -71,8 +71,16 @@ Linux builds are unchanged; Windows paths are additive (#ifdef _WIN32).
    - `libwinpthread-1.dll missing` under wine -> our makefiles static-link
      it; if you built manually without those flags, copy
      /usr/x86_64-w64-mingw32/lib/libwinpthread-1.dll next to the .exe.
-   - `path must resolve inside plugins/<name>.dll` -> run from v15S/src
-     (loader jail is CWD-relative, same as Linux).
+   - `path must resolve inside ecosystem/<member>/.../<name>.dll` -> run from v15S/src.
+     The jail is absolute, not textual: both the candidate and the `ecosystem`
+     root are passed through `realpath` and compared with a `/` boundary
+     check, so `..` segments and symlinks cannot escape it. Any nesting depth
+     under `ecosystem/` is accepted; a rejection is reported as `E_JAIL`
+     (escapes) or `E_NOFILE` (does not exist) — see `v15S/docs/DIAGNOSTICS.md`.
+   - S2 bridge (`ecosystem/mgb`, `mod attach s2-bridge`): **POSIX only, not
+     built or supported on Windows.** It needs `fork`/`exec`/`pipe` and has no
+     MPE_WINDOWS branch. On Windows, load only the capsule/MFS DLLs; the
+     bridge's diagnostics and gates do not apply there.
    - Gamepad: default xinput:0; set MPE_GAMEPAD_DEVICE=disabled on headless
      (scripts do this). F310 switch must be on X for XInput mode.
 

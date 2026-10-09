@@ -789,7 +789,7 @@ was withdrawn for the measured chaotic reason with calm-top-arm gates kept.
 
 ## Verification record, 2026-10-04
 
-- Canonical suite 42/42 blocking (+2 diag) in **all five** regimes
+- Canonical suite 43/43 blocking (+2 diag) in **all five** regimes (45 registered as of 2026-10-09; was 44/42 through 2026-10-07)
   (default/light/heavy/brittle/sticky), ASan/UBSan included.
 - Full profile: **234 checks, 232 passed, 0 failed, 2 xfailed, 6
   informational, 0 blocking failures** (`temp/qa_runs/20261004T162513Z-456158/`).

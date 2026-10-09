@@ -3,6 +3,60 @@
 > Live TODO. Dated history below is preserved; current counts/gates are in
 > `docs/DESPOT_AUDIT_2026-10-07.md` (44/42; 232+2 xfail/234). The 2026-10-01
 > audit's 41/42 denominators are superseded.
+>
+> **Superseded 2026-10-09 by the counts in `RELEASE_GATES.md`:** 45 registered
+> / 43 blocking; runner quick 59/59; runner full 226 total, 220 passed,
+> **6 blocking failures**, 4 informational.
+
+## Open 2026-10-09 — S2 bridge, diagnostics, and three known reds
+
+### Follow mode for `s2-bridge` (the display is static by design)
+The dish renders but does not move or vibrate. Phase 0 stages a single
+snapshot; this is not a regression.
+
+- [ ] **Refresh cadence.** `cfg->every` exists (0 = stage-once) but is not
+      wired into `pre_step`. Default must stay 0 until (1) lands: the current
+      `bridge_stage` *adds* bodies rather than moving existing ones, so
+      enabling a cadence naively would duplicate the dish every tick.
+- [ ] **Move, do not re-add.** Restaging needs an update path: bodies created
+      once, then repositioned. Static bodies cannot be moved by the solver, so
+      this is a direct `rigid_body_set_static(false)` + force/integrate
+      design question, or an explicit position write on the existing body.
+- [ ] **Per-frame mapper reuse.** `mgb_snapshot` + `mgb_frame_parse` per
+      refresh; confirm the child keeps answering prompts at cadence.
+- [ ] **Bond lines follow.** The zero-force joint skeleton is built once;
+      refreshed bond sets need the joint graph rebuilt or rewritten in place.
+- [ ] **TUI health surface.** `s2_bridge_stats` still returns −1 for frame
+      and error counts; expose them in the terminal.
+- [ ] Decide whether bonds stay `k=0` (display-only) forever. Physical
+      coupling remains out of scope: positions flow one way, always.
+
+### Diagnostics — done this pass, follow-ups
+- [x] `core/mpe_diag` self-report: source + stable code + engine `file:line` +
+      runtime values, fanned out to stderr, event log, debug terminal, and a
+      128-record ring with per-source totals. See `docs/DIAGNOSTICS.md`.
+- [x] Distinct codes for every attach/detach/loader rejection (all still
+      `< 0`, so existing callers are unaffected).
+- [x] `diag` command; live mirror into the debug terminal on open.
+- [x] `diag_naming` canonical gate; spawn-naming and resolver tiers in the
+      MGB suite (43/43).
+- [ ] Consider engine-wide `-Werror`. 4179 enforces it; 475 does not. The
+      case for it is now on record: an implicit declaration of `localtime_r`
+      in `mpe_config.c` survived because nothing treated a warning as fatal,
+      and it truncated a returned pointer through an `int`-typed assumption.
+
+### Three known reds (all pre-existing, none from the diagnostics work)
+- [ ] **`legacy-f11_torture`** — extreme-parameter torture case. Reproduced
+      bit-identically from a pristine `HEAD` worktree, so it is not a
+      regression. Green at the v15R3 tag under its then-current parameters.
+- [ ] **MFS CCD obstacle margin** (`41bcc0b`) — 14/17; `tank`,
+      `drive_directions`, `odometry_yaw`. Root-caused: a global CCD obstacle
+      margin. Zeroing it restores 17/17. Candidate fix is a per-pair margin.
+- [ ] **MFS harness summary contract** — fixed 2026-10-09. `build_tests.sh`
+      ran under `set -e` and aborted one line above `suite_rc=$?`, so any
+      failing test destroyed the script's own summary and the runner reported
+      a misleading "did not emit its summary". Errexit is now scoped off
+      around the suite run, and the contract reports the real cause.
 
 ## Despot 2026-10-08 — Tandem-Helix: everything open, solved or bounded
 

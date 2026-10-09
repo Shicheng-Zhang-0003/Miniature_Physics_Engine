@@ -106,7 +106,7 @@ They should be recorded as post-stable work items.
 - [X] F11 config torture test runs without crash.
 - [X] F11 verdict is robustness-only: no NaN, plus a **cube-cube interpenetration bound** (worst pairwise overlap < 0.05 m, sampled every 5th tick of the whole run). NOTE the history, because this line was wrong twice: the original "nothing fallen" gate (`position.y < -0.2`) was **unreachable** — `physics_world_step` clamps every body to `y >= 0 - slop` unconditionally; replacing it 2026-09-29 with a "volume invariant" did NOT fix that, because the clamp enforces every sub-condition of the volume invariant too, so it was equally unfireable. **DESPOT-2026-10-03:** the counter is now report-only with the reasoning recorded in source, and the property is gated for real in `f10_long_run` phase 2, which re-runs the same scene with the world-edge safety net switched OFF so the contact solver alone has to hold the bodies up. The interpenetration bound was added after "the cubes phase into each other like they are hollow" proved nothing in the suite measured cube overlap at all.
 - [X] F11 pins solver resolution (gravity −17…−1, ≥96 iterations — proven envelope for the 10:1 column); material/world extremes stay fully random.
-- [X] Headless suite green (Suite v2 `test_mpe_suite --all` — **44 registered / 42 blocking** (the 2 diag-informational cases are additional and excluded from the blocking 42) as of 2026-10-03; was 42 as of 2026-10-01, stale 33+2 before that; `MIN_SUITE_ENTRIES` raised 42 -> 44 so the drift guard now covers the two newest gates), including `f10_long_run`, `sleep_contact_wake`, `f11_torture`, `loader_lifecycle`, `ftc_ecosystem`, plus 2026-09-29 regressions (`revolute_matrix`, `cylinder_platform`, `cylinder_sphere_inside`) and metamorphics (`meta_rotation`, `meta_convergence`, `meta_config_wiring`) + `mouse_look_axes` + `body_materials_live`.
+- [X] Headless suite green (Suite v2 `test_mpe_suite --all` — **45 registered / 43 blocking** (the 2 diag-informational cases are `frustum` and `floor_collision_diag`, additional and excluded from the blocking 43) as of 2026-10-09; was 44/42 as of 2026-10-03, 42 as of 2026-10-01, stale 33+2 before that; `MIN_SUITE_ENTRIES` raised 42 -> 44 -> 45 so the drift guard covers the newest gates). 2026-10-09 added `diag_naming`, which pins that every attach/detach/loader rejection names its own source, code and engine call site, and that an attach hook with side effects is invoked exactly once — see [`docs/DIAGNOSTICS.md`](docs/DIAGNOSTICS.md)), including `f10_long_run`, `sleep_contact_wake`, `f11_torture`, `loader_lifecycle`, `ftc_ecosystem`, plus 2026-09-29 regressions (`revolute_matrix`, `cylinder_platform`, `cylinder_sphere_inside`) and metamorphics (`meta_rotation`, `meta_convergence`, `meta_config_wiring`) + `mouse_look_axes` + `body_materials_live`.
 - [X] A case that cannot run now reports SKIP and is **excluded from the green count** (2026-09-29). It previously returned 0, so `make test_suite` could report "29/29 green" with two cases having executed nothing.
 - [X] `mpe-tui` snapshot suite green for all scenes (`make tui-smoke`: demo/tower/pendulum/springlab/f10/stress/ccd).
 - [X] The engine can idle for several minutes without explosion.
@@ -133,6 +133,15 @@ They should be recorded as post-stable work items.
 - [X] Physics timestep description matches the implementation.
 - [X] Config system is documented.
 - [X] Known limitations are documented.
+- [X] Error reporting is documented: [`docs/DIAGNOSTICS.md`](docs/DIAGNOSTICS.md)
+      covers the `mpe_diag` self-report, every attach/detach/loader code, the
+      `diag` command, and the S2 bridge (`MGB_S2TUI_BIN` / `MGB_O*`, spawn
+      naming, staging placement vs the default camera frustum).
+- [X] Open failures are documented as failures. The static-display
+      limitation of `s2-bridge` (staged once; no motion or vibration, because
+      bodies are static and bonds are `k=0`) is recorded in
+      [`REMAINING_WORK.md`](REMAINING_WORK.md) and in `DIAGNOSTICS.md`, rather
+      than left for a user to infer from an empty screen.
 
 ### 12. Repository Hygiene
 - [X] Build artifacts are not tracked.
@@ -237,10 +246,35 @@ If any mandatory gate fails, the correct action is:
 
 ### Release verdict (v15R3, tagged)
 
-All P0 gates pass: clean build with zero new errors, 44 registered / 42 blocking headless green on the v15S head (44 registered, +2 diag-informational), and 232 verification checks pass + 2 xfailed (1 distinct F2 frontier ×2 runs) + 6 informational (total 234) under AddressSanitizer + UndefinedBehaviorSanitizer at this HEAD (29/29 on the frozen v15R3 tag),
-`tui-smoke` green, F10 settle verdict green (headless 3600-tick equivalent
-plus committed `f10_long_run`), F11 robustness green in-engine and headless
-(`f11_torture`). P1 known limitations are documented in
+At the **frozen v15R3 tag** all P0 gates passed: clean build with zero new
+errors, 44 registered / 42 blocking headless green, and 232 verification
+checks pass + 2 xfailed + 6 informational (total 234) under
+AddressSanitizer + UndefinedBehaviorSanitizer; `tui-smoke` green, F10 settle
+verdict green, F11 robustness green in-engine and headless
+(`f11_torture`).
+
+> **Superseded — the v15S head is NOT fully green as of 2026-10-09.** Do not
+> read the v15R3 verdict as a current claim. Measured on the v15S head today:
+> **45 registered / 43 blocking headless green**; runner `--profile quick`
+> **59/59**; runner `--profile full` **226 checks, 220 passed, 6 blocking
+> failures, 4 informational**. The 6 failures are 3 root causes, each run
+> twice (plain + ASan/UBsan):
+>
+> 1. `legacy-f11_torture` — **pre-existing and unrelated to any recent
+>    change.** Reproduced bit-identically from a pristine `HEAD` worktree
+>    (`lin=2.175 ang=0.000 nan=0 fallen=29022`). It passed at the v15R3 tag
+>    under its then-current parameters.
+> 2. `mfs-suite` — the known CCD obstacle-margin regression (17 cases,
+>    14 pass / 3 fail: `tank`, `drive_directions`, `odometry_yaw`), traced
+>    to commit `41bcc0b`. Zeroing the global margin restores 17/17; the
+>    candidate fix is a per-pair margin.
+> 3. `mfs-summary-contract` — a *consequence* of #2, now reporting it
+>    accurately. It used to report a misleading "runner did not emit its
+>    summary" because `build_tests.sh` ran under `set -e` and aborted one
+>    line above `suite_rc=$?`, destroying its own failure evidence.
+>
+> `test_f11_torture` is an extreme-parameter torture case; it is not part of
+> the canonical `f11_torture` suite case, which is green. P1 known limitations are documented in
 [`release_notes_v15R3.md`](../release_notes_v15R3.md) and
 [`how_to_use.md`](how_to_use.md) (joint creation UI +
 persistence scope, SIMD/multithreading). Tree frozen (`a3_release_freeze = 1`):
