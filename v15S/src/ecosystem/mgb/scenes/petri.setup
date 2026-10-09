@@ -1,0 +1,5 @@
+# petri.setup — configure transcript for the Phase-0 dish scene.
+# The probe sends exactly these lines (documented here so the transcript
+# is reviewable and golden-testable, not buried in C).
+dd if=petri of=world
+# then: sync <tmpfile>  (issued by mgb_snapshot per frame)

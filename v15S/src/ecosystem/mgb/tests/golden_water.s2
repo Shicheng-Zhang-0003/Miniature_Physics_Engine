@@ -1,0 +1,11 @@
+S2SAVE1
+seed 7
+dt 0.5 cutoff 12 dielectric 1 temp 300 thermostat 1 tau 100 nu 0.02
+atoms 3
+8 0 0 0 -0.834 0.00659 3.15061 0 0 0
+1 0.9572 0 0 0.417 0 0 0 0 0
+1 -0.4786 0.829 0 0.417 0 0 0 0 0
+bonds 2
+0 1 1 0.9572 34.5
+0 2 1 0.9572 34.5
+restraints 0
