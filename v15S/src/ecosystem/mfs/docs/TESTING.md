@@ -22,6 +22,17 @@ What the suite contains, what each gate proves, and how to run it.
   `tests/mfs_test_common.h` (tile slab top y=0, μ 1.0/0.8, e=0). Robot tests
   pin **128 solver iterations** (40:1 chassis/wheel mass ratio).
 
+## Current status (2026-10-09): 14/17
+
+Three gates are **red**: `tank`, `drive_directions`, `odometry_yaw`. All
+three trace to one root cause — the global CCD obstacle margin introduced in
+commit `41bcc0b`, which perturbs motion on a pivoting chassis. Zeroing that
+margin restores 17/17. Full measurements and the harness fix are in
+[`KNOWN_FAILURES.md`](KNOWN_FAILURES.md) → `[CCD-OBSTACLE-MARGIN]`.
+
+Anyone reading an older claim of "15/15 green" (including the historical
+notes below and in `SYNC_CONTRACT.md`) is reading about an earlier tree.
+
 ## Gate table (unified suite, `--all`)
 
 | Test | Drives | Gates |
