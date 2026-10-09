@@ -10,14 +10,14 @@
  * slop-band negatives clamped to zero penetration (friction-only),
  * degenerate inputs return false (never phantom contacts).
  * Rationale for approximations is documented per branch below.
- * Build: make plugins/mpe_capsule.so ; load via `mod load` or mpe_loader_load.
+ * Build: make ecosystem/capsule/mpe_capsule.so ; load via `mod load` or mpe_loader_load.
  */
-#include "../core/mpe_module.h"
-#include "../core/mpe_platform.h"
-#include "../core/mpe_registry.h"
-#include "../core/rigidbody.h"
-#include "../core/physics_world.h"
-#include "../physics/collision_mechanics.h"
+#include "core/mpe_module.h"
+#include "core/mpe_platform.h"
+#include "core/mpe_registry.h"
+#include "core/rigidbody.h"
+#include "core/physics_world.h"
+#include "physics/collision_mechanics.h"
 #include <math.h>
 #define CAP_EPS 1e-4f /* degenerate epsilon, aligned with engine narrowphase */
 /* Capsule frame + the BOUNDING INVARIANT: the engine owns radius as the

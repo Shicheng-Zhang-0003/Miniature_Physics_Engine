@@ -13,7 +13,7 @@
 /* Bundle identity mirrors term_ftc.c (ecosystem bundle first, then the
  * single-module plugin path). */
 #define GPD_HANDLE_PRIMARY "mfs-simulator"
-#define GPD_HANDLE_MODULE "plugins/mpe_ftc.so"
+#define GPD_HANDLE_MODULE "ecosystem/mfs/plugins/mpe_ftc.so"
 static void *gpd_sym (const char *sym) {
     void *p = mpe_loader_symbol (GPD_HANDLE_PRIMARY, sym);
     if (p)

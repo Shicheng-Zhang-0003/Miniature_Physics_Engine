@@ -30,7 +30,7 @@
 /* Windows-aware plugin path: pick existing .so/.dll variant. */
 static const char *mpe_pick_plugin (const char *so_path, char *buf, size_t n) {
 #ifdef MPE_OS_WINDOWS
-    /* so_path like "plugins/mpe_capsule.so": try as-is, then .dll variant. */
+    /* plugin resolved via MPE_FTC_PLUGIN or the candidate list below. */
     if (access (so_path, R_OK) == 0)
         return so_path;
     size_t L = strlen (so_path);
@@ -90,7 +90,7 @@ int main (int argc, char **argv) {
     if (!so_env && argc > 1)
         so_env = argv [1];
     char so_buf [1024];
-    const char *so_picked = so_env ? so_env : mpe_pick_plugin ("plugins/mpe_ftc.so", so_buf, sizeof (so_buf));
+    const char *so_picked = so_env ? so_env : mpe_pick_plugin ("ecosystem/mfs/plugins/mpe_ftc.so", so_buf, sizeof (so_buf));
     const char *so = so_picked;
     /* ---- 1. dynamic import through the kernel loader ---- */
     char err [512] = {0};

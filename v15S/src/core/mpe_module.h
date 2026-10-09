@@ -9,7 +9,7 @@
  *  - deterministic modules must use det_math.h, never bare sin/cos/pow
  *    (sqrtf/isfinite are IEEE-exact and allowed).
  *  - pair handlers self-unregister in a destructor (see
- *    plugins/mpe_capsule.c); the loader purges leftovers by code address.
+ *    ecosystem/capsule/mpe_capsule.c); the loader purges leftovers by code address.
  *  - ABI VERSIONING: abi must equal MPE_MODULE_ABI (1). The ABI
  *    transitively includes rigidbody/broadphase_pair/collision_data
  *    layouts, which are passed by pointer and NOT frozen: any engine

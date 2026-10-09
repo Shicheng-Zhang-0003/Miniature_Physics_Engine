@@ -36,7 +36,7 @@
 /* Bundle identity for symbol resolution (ecosystem name registered by
  * the loader; falls back to the module .so path scheme). */
 #define FTC_HANDLE_PRIMARY "mfs-simulator"
-#define FTC_HANDLE_MODULE "plugins/mpe_ftc.so"
+#define FTC_HANDLE_MODULE "ecosystem/mfs/plugins/mpe_ftc.so"
 static void *ftc_sym (const char *sym) {
     void *p = mpe_loader_symbol (FTC_HANDLE_PRIMARY, sym);
     if (p)
@@ -91,7 +91,7 @@ static int ftc_ensure_driving (void) {
     }
     if (!dmod) {
         term_err ("mpe: ftc: bundle not loaded (from v15S/src: mod load ecosystem/mfs/mfs_ecosystem.so, or mod load "
-                  "plugins/mpe_ftc.so)\n");
+                  "ecosystem/mfs/plugins/mpe_ftc.so)\n");
         return -1;
     } physics_world *w = physics_world_get_primary ();
     if (!w) {
