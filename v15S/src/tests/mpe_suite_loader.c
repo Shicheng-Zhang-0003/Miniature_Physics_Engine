@@ -1,7 +1,7 @@
 /* MPE Suite v2 — loader/registry lifecycle regression test.
  *
  * Proves the MPI lifetime fixes end to end with a REAL .so
- * (plugins/mpe_capsule.so; needs CWD=v15S/src for confinement —
+ * (ecosystem/capsule/mpe_capsule.so; needs CWD=v15S/src for confinement —
  * skips gracefully elsewhere):
  *   load -> attach (busy: unload refused -2) -> detach -> unload ok ->
  *   pair handlers purged, module gone.
@@ -19,10 +19,11 @@
 #include "mpe_test.h"
 #include "core/mpe_registry.h"
 #include "core/mpe_loader.h"
+#include "core/mpe_diag.h"
 /* Windows-aware plugin path: pick existing .so/.dll variant. */
 static const char *mpe_pick_plugin (const char *so_path, char *buf, size_t n) {
 #ifdef MPE_OS_WINDOWS
-    /* so_path like "plugins/mpe_capsule.so": try as-is, then .dll variant. */
+    /* so_path like "ecosystem/capsule/mpe_capsule.so": try as-is, then .dll variant. */
     if (access (so_path, R_OK) == 0)
         return so_path;
     size_t L = strlen (so_path);
@@ -118,14 +119,14 @@ int mpe_t_loader_lifecycle (void) {
     }
     /* ---- live plugin lifecycle (needs CWD=v15S/src) ---- */
     char cap_buf [1024];
-    const char *cap_path = mpe_pick_plugin ("plugins/mpe_capsule.so", cap_buf, sizeof (cap_buf));
+    const char *cap_path = mpe_pick_plugin ("ecosystem/capsule/mpe_capsule.so", cap_buf, sizeof (cap_buf));
     if (access (cap_path, R_OK) != 0) {
         /* DESPOT-2026-09-29: this returned t.failures == 0, so mpe_run_one
          * printed "[PASS] loader_lifecycle" and the summary read 29/29 green
          * while the case had executed nothing. A case that could not run must
          * not report green. Returns MPE_SKIPPED (distinct from pass and from
          * fail) so the summary can report it separately. */
-        printf ("[SKIP] plugins/mpe_capsule%s not visible (run from v15S/src)\n", MPE_PLUGIN_EXT);
+        printf ("[SKIP] ecosystem/capsule/mpe_capsule%s not visible (run from v15S/src)\n", MPE_PLUGIN_EXT);
         mpe_test_end (&t);
         return MPE_SKIPPED;
     }
@@ -177,7 +178,7 @@ int mpe_t_loader_lifecycle (void) {
         MPE_CHECK (&t, mpe_find_pair_handler (3, 0, 100, -1) == NULL);
         MPE_CHECK (&t, mpe_find_pair_handler (3, 3, 100, 100) == NULL);
         /* Unknown handle still -1 (distinct from busy -2). */
-        MPE_CHECK (&t, mpe_loader_unload ("plugins/does_not_exist" MPE_PLUGIN_EXT) == -1);
+        MPE_CHECK (&t, mpe_loader_unload ("ecosystem/does_not_exist" MPE_PLUGIN_EXT) == -1);
         physics_world_cleanup (&w);
         /* Reload works after full unload (slot reuse path). */
         MPE_CHECK (&t, mpe_loader_load (cap_path, err, sizeof (err)) == 0);
@@ -186,6 +187,116 @@ int mpe_t_loader_lifecycle (void) {
         MPE_CHECK (&t, mpe_find_pair_handler (3, 0, 100, -1) == NULL);
     }
     if (t.failures == 0) { printf ("[PASS] loader lifecycle green\n"); }
+    mpe_test_end (&t);
+    return t.failures;
+}
+
+/* DESPOT-2026-10-09: every rejection above used to collapse into one bare
+ * negative int, so the terminal could only print a guess ("table full /
+ * attach hook"). An operator was told a guess about a subsystem they could
+ * not see, and localising a live failure took days. This gates the contract
+ * that replaced it: DISTINCT codes per cause, and a diagnostics record
+ * naming the source, the code, the engine call site and the runtime values.
+ *
+ * It also gates the one thing that is easy to regress silently: an attach
+ * hook with side effects must be invoked EXACTLY ONCE per attach attempt.
+ * Calling it twice to build a log message would spawn the child process
+ * twice and hand back a half-initialised pointer. */
+static int diag_refuse_calls = 0;
+static int diag_refuse_hook (physics_world *world, void **state) {
+    (void) world;
+    (void) state;
+    diag_refuse_calls++;
+    return 7; /* any non-zero refuses; the value must reach the report */
+}
+int mpe_t_diag_naming (void) {
+    mpe_test_t t;
+    mpe_test_begin (&t, "diag_naming");
+    mpe_diag_clear ();
+
+    physics_world w;
+    physics_world_init (&w);
+
+    /* Distinct code per cause. Every one of these used to be -1. */
+    MPE_CHECK (&t, physics_world_attach_module (NULL, NULL) == MPE_ATTACH_E_NULL);
+    MPE_CHECK (&t, physics_world_detach_module (NULL, "x") == MPE_DETACH_E_NULL);
+
+    mpe_module_desc_t wrong_abi;
+    memset (&wrong_abi, 0, sizeof (wrong_abi));
+    wrong_abi.name = "wrong-abi";
+    wrong_abi.abi = MPE_MODULE_ABI + 7;
+    MPE_CHECK (&t, physics_world_attach_module (&w, &wrong_abi) == MPE_ATTACH_E_ABI);
+
+    mpe_module_desc_t noname;
+    memset (&noname, 0, sizeof (noname));
+    noname.abi = MPE_MODULE_ABI;
+    MPE_CHECK (&t, physics_world_attach_module (&w, &noname) == MPE_ATTACH_E_NAME);
+
+    diag_refuse_calls = 0;
+    mpe_module_desc_t hook;
+    memset (&hook, 0, sizeof (hook));
+    hook.name = "diag-refuser";
+    hook.abi = MPE_MODULE_ABI;
+    hook.attach = diag_refuse_hook;
+    MPE_CHECK (&t, physics_world_attach_module (&w, &hook) == MPE_ATTACH_E_HOOK);
+    /* The hook has side effects; reporting its refusal must not re-run it. */
+    MPE_CHECK (&t, diag_refuse_calls == 1);
+
+    /* Table full, and the report must say WHICH table with WHICH occupants. */
+    mpe_module_desc_t fillers [MPE_MAX_TICK_MODULES + 1];
+    char names [MPE_MAX_TICK_MODULES + 1][16];
+    int full_at = -1;
+    for (int i = 0; i <= MPE_MAX_TICK_MODULES; i++) {
+        memset (&fillers [i], 0, sizeof (mpe_module_desc_t));
+        snprintf (names [i], sizeof (names [i]), "diag-fill-%02d", i);
+        fillers [i].name = names [i];
+        fillers [i].abi = MPE_MODULE_ABI;
+        if (physics_world_attach_module (&w, &fillers [i]) < 0) {
+            full_at = i;
+            break;
+        }
+    }
+    MPE_CHECK (&t, full_at == MPE_MAX_TICK_MODULES);
+    MPE_CHECK (&t, physics_world_detach_module (&w, "not-attached-ever") == MPE_DETACH_E_NOTFOUND);
+
+    /* Loader rejections must name the cause too, and must name a REAL
+     * out-of-jail file as a jail violation (not as "no such file"). */
+    char err [512];
+    MPE_CHECK (&t, mpe_loader_load ("", err, sizeof (err)) != 0);
+    MPE_CHECK (&t, mpe_loader_load ("ecosystem/mgb/build/definitely_absent.so", err, sizeof (err)) != 0);
+    {
+        FILE *outside = fopen ("mpe_diag_outside.so", "wb");
+        if (outside) {
+            fputs ("not a plugin\n", outside);
+            fclose (outside);
+            MPE_CHECK (&t, mpe_loader_load ("mpe_diag_outside.so", err, sizeof (err)) != 0);
+            remove ("mpe_diag_outside.so");
+        }
+    }
+
+    /* Now the report itself: every provoked source named, each with the
+     * engine file:line that raised it. */
+    static char report [16384];
+    mpe_diag_render (report, sizeof (report), 200);
+    const char *must_appear [] = {"E_NULL",   "E_ABI",  "E_NAME", "E_HOOK",       "E_TABLE",
+                                  "E_NOTFOUND", "E_EMPTY", "E_NOFILE", "physics_world.c:", "mpe_loader.c:"};
+    for (size_t i = 0; i < sizeof (must_appear) / sizeof (must_appear [0]); i++)
+        MPE_CHECK (&t, strstr (report, must_appear [i]) != NULL);
+    /* strerror must be specific, never the old two-guess text. */
+    MPE_CHECK (&t, strstr (physics_world_attach_strerror (MPE_ATTACH_E_HOOK), "hook") != NULL);
+    MPE_CHECK (&t, strstr (physics_world_attach_strerror (MPE_ATTACH_E_TABLE), "full") != NULL);
+    MPE_CHECK (&t, strcmp (physics_world_attach_strerror (MPE_ATTACH_E_ABI), physics_world_attach_strerror (MPE_ATTACH_E_TABLE)) != 0);
+    /* Per-source totals must exist and be non-zero for the sources raised. */
+    int src_seen = 0;
+    for (int i = 0; i < mpe_diag_source_total_count (); i++) {
+        const mpe_diag_source_total *st = mpe_diag_source_total_at (i);
+        if (st && (strcmp (st->source, "attach") == 0 || strcmp (st->source, "loader") == 0) && st->error > 0) { src_seen++; }
+    }
+    MPE_CHECK (&t, src_seen == 2);
+
+    physics_world_cleanup (&w);
+    mpe_diag_clear ();
+    if (t.failures == 0) { printf ("[PASS] diagnostics name every provoked failure source\n"); }
     mpe_test_end (&t);
     return t.failures;
 }
