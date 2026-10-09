@@ -192,14 +192,31 @@ void physics_world_process_pair (physics_world *world, int index_a, int index_b,
  * scene/UI/render layers of a single-world GUI process. Headless and
  * foreign code should own explicit physics_world instances instead. */
 physics_world *physics_world_get_primary (void);
-/* Phase-2: modular attach/dispatch. */
+/* Phase-2: modular attach/dispatch.
+ *
+ * Attach rejects with a DISTINCT negative code per cause (all < 0, so
+ * `>= 0` success checks are unchanged). The codes used to collapse to -1,
+ * which left the terminal guessing between "table full" and "attach hook"
+ * — the two are unrelated and the guess was usually wrong. Never widen a
+ * code into a range: the UI switches on these values verbatim. */
+#define MPE_ATTACH_E_NULL (-1)  /* null world or descriptor */
+#define MPE_ATTACH_E_ABI (-2)   /* descriptor built against another ABI */
+#define MPE_ATTACH_E_COUNT (-3) /* world tick-module count out of range */
+#define MPE_ATTACH_E_TABLE (-4) /* MPE_MAX_TICK_MODULES slots all in use */
+#define MPE_ATTACH_E_HOOK (-5)  /* the module's own attach hook refused */
+#define MPE_ATTACH_E_NAME (-6)  /* module name missing (NULL/empty) */
 int physics_world_attach_module (physics_world *world, const mpe_module_desc_t *desc);
+/* Human, exact text for an attach code — never a guess. */
+const char *physics_world_attach_strerror (int code);
 /* Resolve a module's CURRENT mod_state from the live attachment table.
  * Returns false when the module is not attached (e.g. a hook detached it
  * earlier in this tick). Tick-hook dispatch must use this rather than a
  * snapshotted state pointer, which detach frees. */
 bool physics_world_module_live_state (physics_world *world, const mpe_module_desc_t *desc, void **out_state);
 int physics_world_detach_module (physics_world *world, const char *name);
+/* Same contract as attach: distinct negative code per cause, zero = ok. */
+#define MPE_DETACH_E_NULL (-1)     /* null world or name */
+#define MPE_DETACH_E_NOTFOUND (-2) /* nothing with that name is attached */
 void physics_world_set_broadphase (physics_world *world, const mpe_broadphase_if_t *iface);
 void physics_world_set_solver (physics_world *world, const mpe_solver_if_t *iface);
 void physics_world_set_broadphase_state (physics_world *world, void *state);
