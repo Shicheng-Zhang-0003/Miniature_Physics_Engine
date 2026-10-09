@@ -10,11 +10,20 @@
 #include <stdlib.h>
 #include <math.h>
 #include <stdbool.h>
+/* DESPOT-2026-10-09: this include used to sit INSIDE the MPE_HEADLESS guard
+ * below, which is wrong twice over. simd_math.h is pure math (math3d.h +
+ * intrinsics, no GL, no camera), and spring_apply_core_dt calls simd_sub /
+ * simd_scale / simd_add unconditionally. Every -DMPE_HEADLESS build that
+ * compiles this file therefore lost the declarations and failed with
+ * implicit-declaration + "invalid initializer" errors — which is exactly
+ * the three paranoia targets (paranoia_energy_momentum,
+ * paranoia_scene_persistence, paranoia_spring_joints). The guard belongs on
+ * the rendering dependencies, not on the math this file computes with. */
+#include "../core/simd_math.h"
 #ifndef MPE_HEADLESS
 #include "../scene/scene_init.h"
 #include "../ui_input/camera.h"
 #include <epoxy/gl.h>
-#include "../core/simd_math.h"
 extern camera main_camera_fov;
 rigidbody *scene_resolve_object_by_id (uint32_t id);
 #endif
