@@ -2,12 +2,14 @@
 #define _GNU_SOURCE /* dladdr */
 #endif
 #include "mpe_loader.h"
+#include "mpe_diag.h"
 #include "mpe_platform.h"
 #include "mpe_registry.h"
 #include "physics_world.h"
 #include "../ecosystem/mpe_ecosystem.h"
 #include <string.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <pthread.h>
 #include <sys/stat.h>
@@ -23,10 +25,12 @@ static struct {
     long long f_size; /* must NOT silently keep stale code (despot trap) */
 } s_h [MPE_MAX_HANDLES];
 static int s_n = 0;
-/* Jail: plugins/<name>.so|.dll for modules, ecosystem/mfs/<name>.so|.dll
- * for ecosystem bundles (both CWD-relative, normally v15S/src). Same
- * traversal-proofing in both roots. Windows accepts '/' and '\\', both
- * extensions, case-insensitively; Linux keeps exact '.so' behaviour. */
+/* Jail: every modular artifact lives under ecosystem/ (CWD-relative,
+ * normally v15S/src): ecosystem/<member>/.../<name>.so|.dll, nested paths
+ * allowed (e.g. ecosystem/mgb/build/mgb_bridge.so). The old top-level
+ * plugins/ root is gone (consolidated 2026-10-09: mfs, mgb, capsule all
+ * live in ecosystem/). Windows accepts '/' and '\\', both extensions,
+ * case-insensitively; Linux keeps exact '.so' behaviour. */
 static int mpe_has_plugin_ext (const char *base) {
     size_t n = strlen (base);
 #ifdef MPE_OS_WINDOWS
@@ -83,9 +87,8 @@ static void s_loader_lock_init (void) {
     pthread_mutex_lock (&s_loader_lock);
 } static inline void loader_unlock (void) {
     pthread_mutex_unlock (&s_loader_lock);
-} /* Jail: plugins/<name>.so for modules, ecosystem/mfs/<name>.so for
- * ecosystem bundles (both CWD-relative, normally v15S/src). Same
- * traversal-proofing in both roots. */
+} /* Jail: ecosystem/<member>/... (CWD-relative, normally v15S/src).
+ * One root, same traversal-proofing for every member. */
 static int plugin_path_is_confined (const char *path, char resolved [PATH_MAX]) {
 #ifdef MPE_OS_WINDOWS
     /* Normalise backslashes to slashes for prefix matching. */
@@ -98,44 +101,54 @@ static int plugin_path_is_confined (const char *path, char resolved [PATH_MAX]) 
     } norm [pi] = '\0';
     path = norm;
 #endif
-    const char *prefix_a = "plugins/";
-    const char *prefix_b = "./plugins/";
-    const char *prefix_c = "ecosystem/mfs/";
-    const char *prefix_d = "./ecosystem/mfs/";
-    const char *prefix_e = ".\\plugins\\";
-    const char *dir = NULL;
-    const char *base = NULL;
+    const char *prefix_a = "ecosystem/";
+    const char *prefix_b = "./ecosystem/";
+    const char *rest = NULL;
     if (path && strncmp (path, prefix_a, strlen (prefix_a)) == 0) {
-        dir = "plugins";
-        base = path + strlen (prefix_a);
+        rest = path + strlen (prefix_a);
     } else if (path && strncmp (path, prefix_b, strlen (prefix_b)) == 0) {
-        dir = "plugins";
-        base = path + strlen (prefix_b);
-    } else if (path && strncmp (path, prefix_c, strlen (prefix_c)) == 0) {
-        dir = "ecosystem/mfs";
-        base = path + strlen (prefix_c);
-    } else if (path && strncmp (path, prefix_d, strlen (prefix_d)) == 0) {
-        dir = "ecosystem/mfs";
-        base = path + strlen (prefix_d);
+        rest = path + strlen (prefix_b);
     } else {
         return 0;
-    } (void) prefix_e;
-    if (!*base || strchr (base, '/') ||
-#ifdef MPE_OS_WINDOWS
-        strchr (base, '\\') ||
-#endif
-        strstr (base, "..") || !mpe_has_plugin_ext (base))
+    }
+    /* Nested member paths allowed; every '..' segment refused (leading,
+     * trailing, or interior). The realpath containment below is the real
+     * guard; this rejects the obvious escapes before touching the FS. */
+    if (!rest || !*rest || !mpe_has_plugin_ext (rest))
         return 0;
+    if (strcmp (rest, "..") == 0 || strncmp (rest, "../", 3) == 0 ||
+        strstr (rest, "/../") || (strlen (rest) >= 3 &&
+        strcmp (rest + strlen (rest) - 3, "/..") == 0))
+        return 0;
+#ifdef MPE_OS_WINDOWS
+    if (strstr (rest, "..\\"))
+        return 0;
+#endif
     char root [PATH_MAX];
-    if (!realpath (dir, root) || !realpath (path, resolved))
+    if (!realpath ("ecosystem", root) || !realpath (path, resolved))
         return 0;
     size_t root_len = strlen (root);
     return strncmp (resolved, root, root_len) == 0 && resolved [root_len] == '/';
 }
+/* One place where a loader rejection is BOTH handed back to the caller and
+ * recorded in the diagnostics ring. Generating both from one call is the
+ * point: the two texts used to be written separately and drifted, which is
+ * how an operator could be told one reason while the ring showed another.
+ * The return value is passed in so callers keep their own control flow. */
+static void loader_report (char *errbuf, int errlen, const char *code, const char *fmt, ...) {
+    char msg [512];
+    va_list args;
+    va_start (args, fmt);
+    vsnprintf (msg, sizeof (msg), fmt, args);
+    va_end (args);
+    msg [sizeof (msg) - 1] = '\0';
+    if (errbuf && errlen > 0)
+        snprintf (errbuf, (size_t) errlen, "%s", msg);
+    MPE_DIAG_ERROR ("loader", code, "%s", msg);
+}
 int mpe_loader_load (const char *path, char *errbuf, int errlen) {
     if (!path || !*path) {
-        if (errbuf && errlen > 0)
-            snprintf (errbuf, (size_t) errlen, "empty path");
+        loader_report (errbuf, errlen, "E_EMPTY", "load rejected: empty path");
         return -1;
     } char resolved [PATH_MAX];
     if (!plugin_path_is_confined (path, resolved)) {
@@ -147,15 +160,15 @@ int mpe_loader_load (const char *path, char *errbuf, int errlen) {
             FILE *probe = fopen (path, "rb");
             if (probe) {
                 fclose (probe);
-                snprintf (
-                    errbuf, (size_t) errlen,
-                    "path escapes module jail (run from v15S/src; use plugins/<name>%s or ecosystem/mfs/<name>%s)",
-                    MPE_PLUGIN_EXT, MPE_PLUGIN_EXT);
+                loader_report (errbuf, errlen, "E_JAIL",
+                               "load rejected: '%s' resolves OUTSIDE the ecosystem/ jail (run the engine from v15S/src; "
+                               "modular artifacts live under ecosystem/<member>/.../<name>%s)",
+                               path, MPE_PLUGIN_EXT);
             } else {
-                snprintf (errbuf, (size_t) errlen,
-                          "no such file '%s' (run from v15S/src; modules live at plugins/<name>%s, bundles at "
-                          "ecosystem/mfs/<name>%s)",
-                          path, MPE_PLUGIN_EXT, MPE_PLUGIN_EXT);
+                loader_report (errbuf, errlen, "E_NOFILE",
+                               "load rejected: no such file '%s' (run the engine from v15S/src; modular artifacts live under "
+                               "ecosystem/<member>/.../<name>%s)",
+                               path, MPE_PLUGIN_EXT);
             }
         } return -1;
     }
@@ -167,8 +180,9 @@ int mpe_loader_load (const char *path, char *errbuf, int errlen) {
      * origin-scoped unregister never matched and the module slot survived
      * the dlclose still live. Bound the load by what the registry can store. */
     if (strlen (resolved) >= MPE_MODULE_ORIGIN_MAX - 1) {
-        if (errbuf && errlen > 0)
-            snprintf (errbuf, (size_t) errlen, "path too long");
+        loader_report (errbuf, errlen, "E_PATHLONG",
+                       "load rejected: resolved path is %zu bytes, registry origin holds %d (max %d)", strlen (resolved),
+                       MPE_MODULE_ORIGIN_MAX, MPE_MODULE_ORIGIN_MAX - 2);
         return -1;
     }
     /* Table pre-check under lock; the lock is dropped across dlopen below
@@ -182,26 +196,25 @@ int mpe_loader_load (const char *path, char *errbuf, int errlen) {
              * is the stale-.so despot trap — refuse with -3 and a fix. */
         long long mt_now = 0, sz_now = 0;
         if (file_identity (resolved, &mt_now, &sz_now) != 0) {
-            if (errbuf && errlen > 0)
-                snprintf (errbuf, (size_t) errlen,
-                              "already loaded but file vanished '%s' (restart engine to clear)", path);
+            loader_report (errbuf, errlen, "E_STALE_GONE",
+                           "load rejected: '%s' is already loaded but the file vanished (restart the engine to clear the handle)",
+                           path);
             loader_unlock ();
             return -1;
         }
         if (mt_now != s_h [i].f_mtime || sz_now != s_h [i].f_size) {
-            if (errbuf && errlen > 0)
-                snprintf (errbuf, (size_t) errlen,
-                              "already loaded but file changed on disk (stale code running): unload '%s', then load "
-                              "again — or restart the engine",
-                              path);
+            loader_report (errbuf, errlen, "E_STALE",
+                           "load rejected: '%s' is already loaded and the file CHANGED on disk, so stale code is still "
+                           "running: unload it, then load again — or restart the engine",
+                           path);
             loader_unlock ();
             return -3;
         } loader_unlock ();
         return 0;
     } /* already loaded */
     if (s_n >= MPE_MAX_HANDLES) {
-        if (errbuf && errlen > 0)
-            snprintf (errbuf, (size_t) errlen, "handle table full");
+        loader_report (errbuf, errlen, "E_TABLE", "load rejected: handle table full (%d/%d slots in use)", s_n,
+                       MPE_MAX_HANDLES);
         loader_unlock ();
         return -1;
     } loader_unlock ();
@@ -229,8 +242,8 @@ int mpe_loader_load (const char *path, char *errbuf, int errlen) {
     dlerror ();
     void *h = dlopen (resolved, RTLD_NOW | RTLD_LOCAL);
     if (!h) {
-        if (errbuf && errlen > 0)
-            snprintf (errbuf, (size_t) errlen, "%s", dlerror ());
+        loader_report (errbuf, errlen, "E_DLOPEN", "load rejected: dlopen('%s') failed: %s", resolved,
+                       dlerror () ? dlerror () : "(no dlerror)");
         return -1;
     }
     /* MSVC has no constructor/destructor: call explicit init if exported.
@@ -255,8 +268,8 @@ int mpe_loader_load (const char *path, char *errbuf, int errlen) {
     }
     if (s_n >= MPE_MAX_HANDLES) {
         loader_unlock ();
-        if (errbuf && errlen > 0)
-            snprintf (errbuf, (size_t) errlen, "handle table full");
+        loader_report (errbuf, errlen, "E_TABLE", "load rejected: handle table full after dlopen (%d/%d slots in use)", s_n,
+                       MPE_MAX_HANDLES);
         dlclose (h);
         mpe_registry_truncate_pairs (snap_pairs);
         mpe_registry_truncate_modules (snap_modules);
@@ -273,8 +286,9 @@ int mpe_loader_load (const char *path, char *errbuf, int errlen) {
     const char *sym_err = dlerror ();
     if (!sym_err && eco_first) {
         if (eco_first -> abi != MPE_ECOSYSTEM_ABI || !eco_first -> name) {
-            if (errbuf && errlen > 0)
-                snprintf (errbuf, (size_t) errlen, "ecosystem ABI/name mismatch");
+            loader_report (errbuf, errlen, "E_ECO_ABI",
+                           "load rejected: '%s' exports an ecosystem descriptor with ABI %u (engine expects %u) or no name",
+                           resolved, eco_first->abi, (unsigned) MPE_ECOSYSTEM_ABI);
             loader_unlock ();
             dlclose (h);
             mpe_registry_truncate_pairs (snap_pairs);
@@ -284,8 +298,9 @@ int mpe_loader_load (const char *path, char *errbuf, int errlen) {
             return -1;
         }
         if (mpe_ecosystem_register (eco_first) < 0) {
-            if (errbuf && errlen > 0)
-                snprintf (errbuf, (size_t) errlen, "ecosystem registry full/dup");
+            loader_report (errbuf, errlen, "E_ECO_REG", "load rejected: ecosystem '%s' could not register (registry full or "
+                           "duplicate name '%s')",
+                           resolved, eco_first->name ? eco_first->name : "?");
             loader_unlock ();
             dlclose (h);
             mpe_registry_truncate_pairs (snap_pairs);
@@ -308,8 +323,9 @@ int mpe_loader_load (const char *path, char *errbuf, int errlen) {
     sym_err = dlerror ();
     if (!sym_err && desc) {
         if (desc -> abi != MPE_MODULE_ABI || !desc -> name) {
-            if (errbuf && errlen > 0)
-                snprintf (errbuf, (size_t) errlen, "ABI/name mismatch");
+            loader_report (errbuf, errlen, "E_ABI",
+                           "load rejected: '%s' descriptor has ABI %u (engine expects %u) or no name", resolved,
+                           desc->abi, (unsigned) MPE_MODULE_ABI);
             loader_unlock ();
             dlclose (h);
             mpe_registry_truncate_pairs (snap_pairs);
@@ -319,8 +335,9 @@ int mpe_loader_load (const char *path, char *errbuf, int errlen) {
             return -1;
         }
         if (mpe_register_module (desc) < 0) {
-            if (errbuf && errlen > 0)
-                snprintf (errbuf, (size_t) errlen, "registry full/dup");
+            loader_report (errbuf, errlen, "E_REG", "load rejected: module '%s' could not register (registry full or "
+                           "duplicate name)",
+                           desc->name ? desc->name : "?");
             loader_unlock ();
             dlclose (h);
             mpe_registry_truncate_pairs (snap_pairs);
@@ -343,8 +360,9 @@ int mpe_loader_load (const char *path, char *errbuf, int errlen) {
         mpe_registry_set_origin (desc -> name, resolved);
         return 0;
     }
-    if (errbuf && errlen > 0)
-        snprintf (errbuf, (size_t) errlen, "missing mpe_module_desc: %s", sym_err ? sym_err : "null");
+    loader_report (errbuf, errlen, "E_NODESC",
+                   "load rejected: '%s' exports neither mpe_ecosystem_desc nor mpe_module_desc (dlsym said: %s)", resolved,
+                   sym_err ? sym_err : "symbol present but NULL");
     loader_unlock ();
     dlclose (h); /* destructor self-unregisters well-behaved plugins */
     mpe_registry_truncate_pairs (snap_pairs);
@@ -591,8 +609,10 @@ static void purge_plugin_pairs (int hi) {
     }
 }
 int mpe_loader_unload (const char *path_or_name) {
-    if (!path_or_name)
+    if (!path_or_name) {
+        MPE_DIAG_ERROR ("loader", "E_EMPTY", "unload rejected: NULL path/name");
         return -1;
+    }
     char resolved [PATH_MAX];
     const char *identity = path_or_name;
 #ifdef MPE_OS_WINDOWS
@@ -600,8 +620,12 @@ int mpe_loader_unload (const char *path_or_name) {
 #else
         if (strchr (path_or_name, '/')) {
 #endif
-            if (!plugin_path_is_confined (path_or_name, resolved))
+            if (!plugin_path_is_confined (path_or_name, resolved)) {
+                MPE_DIAG_ERROR ("loader", "E_JAIL",
+                                "unload rejected: '%s' does not resolve inside the ecosystem/ jail (run the engine from v15S/src)",
+                                path_or_name);
                 return -1;
+            }
             identity = resolved;
         } loader_lock ();
         for (int i = 0; i < s_n; i++) {
@@ -628,6 +652,9 @@ int mpe_loader_unload (const char *path_or_name) {
              * for ecosystem handles -- they were simply never called here. */
                 if (s_h [i].attachments > 0) {
                     loader_unlock ();
+                    MPE_DIAG_ERROR ("loader", "E_BUSY",
+                                    "unload refused: '%s' has %d live attachment(s); a world still calls into this image",
+                                    identity, s_h [i].attachments);
                     return -2;
                 }
                 {
@@ -636,6 +663,9 @@ int mpe_loader_unload (const char *path_or_name) {
                     for (int wi2 = 0; wi2 < nw; wi2++) {
                         if (desc_busy_in_world (ws [wi2], i)) {
                             loader_unlock ();
+                            MPE_DIAG_ERROR ("loader", "E_BUSY",
+                                            "unload refused: '%s' is still referenced by a live world descriptor (detach it first)",
+                                            identity);
                             return -2;
                         }
                     }
@@ -649,6 +679,9 @@ int mpe_loader_unload (const char *path_or_name) {
                      * entries aliasing a dead slot. Refuse rather than
                      * half-tear-down. */
                         loader_unlock ();
+                        MPE_DIAG_ERROR ("loader", "E_LONGNAME",
+                                        "unload refused: '%s' registered name does not fit %zu bytes; refusing a half-teardown",
+                                        identity, sizeof (enm) - 1);
                         return -3;
                     }
                     if (enm [0]) {
@@ -675,6 +708,7 @@ int mpe_loader_unload (const char *path_or_name) {
              * first, then retry. -1 = unknown handle. */
                 if (handle_busy (i)) {
                     loader_unlock ();
+                    MPE_DIAG_ERROR ("loader", "E_BUSY", "unload refused: '%s' is busy in a live world (detach first)", identity);
                     return -2;
                 } char modname [128];
                 snprintf (modname, sizeof (modname), "%s", n ? n : "");
@@ -702,6 +736,7 @@ int mpe_loader_unload (const char *path_or_name) {
                 return 0;
             }
         } loader_unlock ();
+        MPE_DIAG_ERROR ("loader", "E_NOTFOUND", "unload rejected: no loaded image matches path or name '%s'", path_or_name);
         return -1;
     }
     int mpe_loader_count (void) {

@@ -25,7 +25,7 @@
 /* Windows-aware plugin path: pick existing .so/.dll variant. */
 static const char *mpe_pick_plugin (const char *so_path, char *buf, size_t n) {
 #ifdef MPE_OS_WINDOWS
-    /* so_path like "plugins/mpe_capsule.so": try as-is, then .dll variant. */
+    /* so_path like "ecosystem/mfs/plugins/mpe_ftc.so": try as-is, then .dll variant. */
     if (access (so_path, R_OK) == 0)
         return so_path;
     size_t L = strlen (so_path);

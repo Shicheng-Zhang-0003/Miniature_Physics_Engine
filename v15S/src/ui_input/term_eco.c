@@ -3,7 +3,7 @@
  *   eco attach <name>                   attach ecosystem to the primary world
  *   eco detach <name>                   detach ecosystem from the primary world
  *   eco command <name> <cmd> [args...]  run a bundle command (see `eco command <name> help`)
- * Bundles load via `mod load ecosystem/mfs/<name>.so` (or plugins/<name>.so).
+ * Bundles load via `mod load ecosystem/<member>/.../<name>.so`.
  *
  * PARKED (not deleted): `eco ls` (use `mod ls` for loaded handles) and
  * `eco config` (the only bundle key read parked game state). The C API

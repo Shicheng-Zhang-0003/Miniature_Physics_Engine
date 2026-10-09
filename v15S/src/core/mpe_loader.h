@@ -7,8 +7,8 @@
  *    or between steps). Concurrent loader use from step threads is misuse:
  *    rollback on load failure truncates to a pre-dlopen snapshot, which
  *    assumes no other loader transaction is in flight.
- *  - Paths must resolve inside plugins/<name>.so (Linux) or
- *    plugins/<name>.dll (Windows) RELATIVE TO THE PROCESS WORKING
+ *  - Paths must resolve inside ecosystem/<member>/.../<name>.so (Linux)
+ *    or equivalent .dll (Windows) RELATIVE TO THE PROCESS WORKING
  *    DIRECTORY (normally v15S/src). Windows accepts '/' and '\\' and both
  *    extensions (MSYS2 .so + native .dll). Launches from elsewhere fail
  *    closed with "path must resolve inside...". TOCTOU between realpath
