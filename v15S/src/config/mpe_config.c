@@ -1,4 +1,5 @@
 /* MPE_TASK_28_CONFIG_IMPL_BEGIN */
+#define _POSIX_C_SOURCE 200809L /* localtime_r, fileno prototypes */
 #include "mpe_config.h"
 #include "core/mpe_platform.h"
 #include <stdio.h>
