@@ -8,8 +8,9 @@ documentation, and hygiene only — no new features.
 system (MPI hot-plug), per-world config, data-structure upgrades
 (growable pools, O(1) caches), kernel global-state removal, and the TUI
 stress suite. It keeps the v15R3 physics-truth contract (defaults
-bit-identical unless noted) and extends the suite to 44 registered / 42 blocking
-green (40 physics + 2 diag-informational; DESPOT-2026-10-03: floor raised 42 -> 44;
+bit-identical unless noted) and extends the suite to 45 registered / 43 blocking
+green (41 physics + 2 diag-informational; 2026-10-09 added `diag_naming` and
+raised the floor 44 -> 45; DESPOT-2026-10-03: floor raised 42 -> 44;
 DESPOT-2026-10-01: was stale 32/32). The "29 physics + 3 diag" split that used to
 appear here was a v15R3-era figure contradicting the total in the same sentence;
 it is gone rather than restated.
@@ -28,7 +29,7 @@ The v15 series introduced the centralised configuration system:
 Under the v15R3 freeze:
 
 1. Correctness fixes with headless proof (new or extended tests).
-2. Stability fixes required by validation (F5–F11, 44-case suite (42 blocking)).
+2. Stability fixes required by validation (F5–F11, 45-case suite (43 blocking)).
 3. Build and repository hygiene.
 4. Documentation updates to match the architecture.
 5. Validation improvements (tests, TUI snapshot scenes, gates).
@@ -72,8 +73,11 @@ Under the v15R3 freeze:
   inspector plus deterministic pipeable state dumps; `make tui-smoke`.
 - Adversarial headless tests: `f10_long_run` (settle gates incl. run-max),
   `sleep_contact_wake` (first-touch wake + no-churn control), `f11_torture`
-  (fixed-seed config extremes, corruption gates). Suite total: 44 registered / 42 blocking
-  green on the v15S head; 29/29 on the frozen v15R3 tag.
+  (fixed-seed config extremes, corruption gates). Suite total: 45 registered / 43 blocking
+  green on the v15S head; 29/29 on the frozen v15R3 tag. The v15S head is NOT
+  fully green across the *whole* runner — see the superseded notice in
+  `RELEASE_GATES.md` for the three known reds (f11 torture, MFS CCD margin,
+  and the MFS summary contract that reports it).
 - Driven-wheel truth: test moved into the resolvable spin regime with
   load-bearing gates (grounded height, rolling coupling, spin cap).
 
