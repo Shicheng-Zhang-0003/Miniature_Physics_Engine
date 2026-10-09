@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "mpe_engine.h"
 #include "core/long_run_validation.h"
+#include "core/mpe_diag.h"
 #include "ui_input/mouse_lock.h"
 camera main_camera_fov;
 input_status main_inputs;
@@ -197,6 +198,7 @@ int main_algorithm (int argc, char *argv []) {
     mouse_lock_init ();
     mpe_config_ensure_ready (); /* was mpe_config_init(): must precede the scene */
     event_log_init (); /* MPE_TASK_V15R2_EVENT_LOG_INIT */
+    mpe_diag_init (); /* diagnostics ring + per-source totals; must precede the first emit */
     /* MPE_TASK_34_CONFIG_LOAD_BEGIN */
     if (mpe_config_load ("status/engine.cfg")) { printf ("[config] loaded status/engine.cfg\n"); } else { printf ("[config] defaults active (no saved config)\n"); }
     /* MPE_TASK_34_CONFIG_LOAD_END */

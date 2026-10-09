@@ -161,8 +161,12 @@ install: engine mpe-tui plugins/mpe_capsule$(PLUGIN_EXT)
 	install -m 0755 mpe-tui$(EXE_EXT) $(DESTDIR)$(PREFIX)/bin/mpe-tui$(EXE_EXT)
 	install -d $(DESTDIR)$(PREFIX)/share/mpe/shaders
 	install -m 0644 render/shaders/*.glsl $(DESTDIR)$(PREFIX)/share/mpe/shaders/ || true
-	install -d $(DESTDIR)$(PREFIX)/lib/mpe/plugins
-	install -m 0644 plugins/*$(PLUGIN_EXT) $(DESTDIR)$(PREFIX)/lib/mpe/plugins/ || true
+	install -d $(DESTDIR)$(PREFIX)/lib/mpe/ecosystem
+	for m in mfs mgb capsule; do \
+	  for f in $$(find ecosystem/$$m -name '*$(PLUGIN_EXT)'); do \
+	    install -D -m 0644 $$f $(DESTDIR)$(PREFIX)/lib/mpe/ecosystem/$$f; \
+	  done; \
+	done; true
 	install -d $(DESTDIR)$(PREFIX)/share/mpe/status
 	@echo "NOTE: run from v15S/src or set MPE_SHADER_DIR=$(PREFIX)/share/mpe/shaders"
 
@@ -201,8 +205,9 @@ help:
 	@echo "         test_runner.py --profile quick|physics|full (runner default: full; make default: engine)"
 	@echo "           --list | --test NAME | --allow-skip (strict SKIP fails without it)"
 	@echo "           MPE_TEST_REGIME=default|light|heavy|brittle|sticky (quick re-runs full suite x5)"
-	@echo "         build_suite | test_suite | test_suite_all (canonical C suite: 44 registered / 42 blocking, MIN_SUITE_ENTRIES=44)"
-	@echo "         mpe-tui (terminal debugger + snapshot suite) | tui-smoke TUI_OUT=<dir> | plugins/*.so"
+	@echo "         build_suite | build_suite_scalar | headless | test_suite | test_suite_all"
+	@echo "           (canonical C suite: 45 registered / 43 blocking, MIN_SUITE_ENTRIES=45)"
+	@echo "         mpe-tui (terminal debugger + snapshot suite) | tui-smoke TUI_OUT=<dir> | ecosystem/*/*.so"
 	@echo "         mfs_ecosystem.so (delegates to ecosystem/mfs/Makefile; OUTDIR=<dir> for build_tests.sh)"
 	@echo "         check-deps | check-deps-tui | check-flags | check-new-files (wildcard guard)"
 	@echo "         WARNINGS_AS_ERRORS=1 for -Werror"
@@ -217,7 +222,7 @@ $(BUILD_DIR)/%.o: %.c
 	$(CC) $(CFLAGS) $(DETERMINISM_FLAGS) -c $< -o $@
 
 clean:
-	rm -rf build build-debug build-release engine engine.exe test_* mpe-tui mpe-tui.exe *.so *.dll *.a *.lib plugins/*.so plugins/*.dll
+	rm -rf build build-debug build-release engine engine.exe test_* mpe-tui mpe-tui.exe *.so *.dll *.a *.lib ecosystem/capsule/*.so ecosystem/capsule/*.dll
 	find . -name '*.d' -delete
 	@echo "NOTE: user data status/engine.cfg preserved (use distclean to remove)"
 
@@ -274,7 +279,7 @@ tui-smoke: build_tui
 # failing test is never misreported as a build failure); test_<name> builds
 # and runs (human use).
 # TRUE god file split: collision_mechanics.c (2305 lines) → 4 focused TUs
-MPE_TEST_CORE := core/physics_world.c core/rigidbody.c core/mpe_registry.c core/mpe_loader.c core/det_math.c core/mpe_primary.c \
+MPE_TEST_CORE := core/physics_world.c core/rigidbody.c core/mpe_registry.c core/mpe_loader.c core/mpe_diag.c core/event_log.c core/det_math.c core/mpe_primary.c \
 	physics/collision_narrowphase.c physics/collision_cache.c physics/collision_solver.c physics/collision_ccd.c physics/collision_cylinder.c physics/broadphase.c physics/constraint.c physics/revolute_joint.c physics/depenetration.c physics/islands.c \
 	config/mpe_config.c config/mpe_config_schema.c scene/boundary.c ecosystem/mpe_ecosystem.c
 ifeq ($(MPE_WINDOWS),1)
@@ -440,9 +445,9 @@ test_module: build_module
 # NOTE: plugins use the engine's registry (no registry objects linked in);
 # engine exports symbols via $(MPE_RDYNAMIC) so dlopened .so resolves
 # mpe_register_pair_handler at load time.
-plugins/mpe_capsule$(PLUGIN_EXT): plugins/mpe_capsule.c core/mpe_module.h core/mpe_registry.h
-	mkdir -p plugins
-	$(CC) $(BASE_CFLAGS) -fPIC -shared plugins/mpe_capsule.c -o plugins/mpe_capsule$(PLUGIN_EXT)
+ecosystem/capsule/mpe_capsule$(PLUGIN_EXT): ecosystem/capsule/mpe_capsule.c core/mpe_module.h core/mpe_registry.h
+	mkdir -p ecosystem/capsule
+	$(CC) $(BASE_CFLAGS) -I. -fPIC -shared ecosystem/capsule/mpe_capsule.c -o ecosystem/capsule/mpe_capsule$(PLUGIN_EXT)
 # ---- Suite v2: single-binary C regression suite (from-scratch rewrite) ----
 # One binary, exact-name dispatch, shared builders (no 30x core recompile).
 # Links core + spring physics + scene I/O (stubs for scene_init/camera live
@@ -450,11 +455,11 @@ plugins/mpe_capsule$(PLUGIN_EXT): plugins/mpe_capsule.c core/mpe_module.h core/m
 MPE_SUITE_SRCS := tests/mpe_suite_main.c tests/mpe_suite_a.c tests/mpe_suite_b.c tests/mpe_suite_c.c tests/mpe_suite_d.c tests/mpe_suite_loader.c tests/mpe_suite_ftc.c
 MPE_SUITE_DEPS := $(MPE_TEST_CORE) $(SPRING_TEST_SRCS) $(SCENE_TEST_SRCS)
 # The ftc_ecosystem test needs the bundle fixture: build it first.
-build_suite: $(MPE_SUITE_SRCS) $(MPE_SUITE_DEPS) ecosystem/mfs/mfs_ecosystem$(PLUGIN_EXT) plugins/mpe_capsule$(PLUGIN_EXT)
+build_suite: $(MPE_SUITE_SRCS) $(MPE_SUITE_DEPS) ecosystem/mfs/mfs_ecosystem$(PLUGIN_EXT) ecosystem/capsule/mpe_capsule$(PLUGIN_EXT)
 	$(CC) $(CFLAGS) $(MPE_RDYNAMIC) $(MPE_SUITE_SRCS) $(MPE_TEST_CORE) $(SPRING_TEST_SRCS) $(SCENE_TEST_SRCS) $(MPE_TEST_LIBS) $(shell pkg-config --libs epoxy) -o test_mpe_suite$(EXE_EXT)
 # DESPOT-2026-10-07 SIMD fallback proof: same suite forced scalar. Green here
 # proves the MPE_SIMD_OFF path (ARM/RISC-V shape) holds every gate.
-build_suite_scalar: $(MPE_SUITE_SRCS) $(MPE_SUITE_DEPS) ecosystem/mfs/mfs_ecosystem$(PLUGIN_EXT) plugins/mpe_capsule$(PLUGIN_EXT)
+build_suite_scalar: $(MPE_SUITE_SRCS) $(MPE_SUITE_DEPS) ecosystem/mfs/mfs_ecosystem$(PLUGIN_EXT) ecosystem/capsule/mpe_capsule$(PLUGIN_EXT)
 	$(CC) $(CFLAGS) -DMPE_SIMD_OFF $(MPE_RDYNAMIC) $(MPE_SUITE_SRCS) $(MPE_TEST_CORE) $(SPRING_TEST_SRCS) $(SCENE_TEST_SRCS) $(MPE_TEST_LIBS) $(shell pkg-config --libs epoxy) -o test_mpe_suite_scalar$(EXE_EXT)
 
 ecosystem/mfs/mfs_ecosystem$(PLUGIN_EXT):
