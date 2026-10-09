@@ -92,7 +92,7 @@ fi
 CFLAGS="-I$SRC -I$MFS -O2 -Wall -Wextra -ffp-contract=off ${MFS_TEST_CFLAGS:-}"
 # Engine CORE: absolute engine paths (was engine-relative + cd; absolute
 # survives any CWD and both modes).
-CORE="$SRC/core/physics_world.c $SRC/core/rigidbody.c $SRC/core/mpe_registry.c $SRC/core/mpe_loader.c $SRC/core/det_math.c $SRC/core/mpe_primary.c $SRC/physics/collision_narrowphase.c $SRC/physics/collision_cache.c $SRC/physics/collision_solver.c $SRC/physics/collision_ccd.c $SRC/physics/collision_cylinder.c $SRC/physics/broadphase.c $SRC/physics/constraint.c $SRC/physics/revolute_joint.c $SRC/physics/depenetration.c $SRC/physics/islands.c $SRC/config/mpe_config.c $SRC/config/mpe_config_schema.c $SRC/scene/boundary.c $SRC/ecosystem/mpe_ecosystem.c"
+CORE="$SRC/core/physics_world.c $SRC/core/rigidbody.c $SRC/core/mpe_registry.c $SRC/core/mpe_loader.c $SRC/core/mpe_diag.c $SRC/core/event_log.c $SRC/core/det_math.c $SRC/core/mpe_primary.c $SRC/physics/collision_narrowphase.c $SRC/physics/collision_cache.c $SRC/physics/collision_solver.c $SRC/physics/collision_ccd.c $SRC/physics/collision_cylinder.c $SRC/physics/broadphase.c $SRC/physics/constraint.c $SRC/physics/revolute_joint.c $SRC/physics/depenetration.c $SRC/physics/islands.c $SRC/config/mpe_config.c $SRC/config/mpe_config_schema.c $SRC/scene/boundary.c $SRC/ecosystem/mpe_ecosystem.c"
 # MFS sources: absolute under $MFS (identical layout in both trees).
 # DESPOT-2026-10-06: mfs_internal.c is now linked into the SUITE as well as
 # the bundle -- tests/mfs_suite_c.c gained mfs_t_registry, which gates the
@@ -127,7 +127,7 @@ if [ "$MPE_WINDOWS" = "1" ]; then
   # ---- Windows: thin DLL must link against host import lib ----
   # Build suite first (exports engine symbols), then plugin against it.
   echo "--- MFS suite (Windows: host exports first) ---"
-  mkdir -p "$MFS/plugins" "$SRC/plugins"
+  mkdir -p "$MFS/plugins"
   RB_T="$MFS/tests"
   MOD1_OBJ="$OUT/mfs_module_1.o"
   GAMEPAD_OBJ="$OUT/gamepad.o"
@@ -148,25 +148,23 @@ if [ "$MPE_WINDOWS" = "1" ]; then
   else
       echo "[BUILD-FAIL] mfs/plugins/mpe_ftc$PLUGIN_EXT"; fail=$((fail+1)); head -n 20 "$OUT/mpe_ftc.build.log";
   fi
-  cp "$MFS/plugins/mpe_ftc$PLUGIN_EXT" "$SRC/plugins/mpe_ftc$PLUGIN_EXT" 2>/dev/null || true
+  # Consolidated 2026-10-09: no $SRC/plugins copy (top-level plugins/ deleted).
   if [ "$PLUGIN_EXT" != ".so" ]; then
     cp "$MFS/plugins/mpe_ftc$PLUGIN_EXT" "$MFS/plugins/mpe_ftc.so" 2>/dev/null || true
-    cp "$SRC/plugins/mpe_ftc$PLUGIN_EXT" "$SRC/plugins/mpe_ftc.so" 2>/dev/null || true
   fi
 else
   echo "--- FTC module plugin (hot-plug $PLUGIN_EXT; must precede ftc_hotload) [$MODE] ---"
-  mkdir -p "$MFS/plugins" "$SRC/plugins"
+  mkdir -p "$MFS/plugins"
   FTC_MOD="$FTC"
   if "$TEST_CC" $CFLAGS $FPIC -shared $FTC_MOD -lm $WIN_LIBS -o "$MFS/plugins/mpe_ftc$PLUGIN_EXT" 2>"$OUT/mpe_ftc.build.log"; then
       echo "[BUILD-OK] mfs/plugins/mpe_ftc$PLUGIN_EXT"; pass=$((pass+1));
   else
       echo "[BUILD-FAIL] mfs/plugins/mpe_ftc$PLUGIN_EXT"; fail=$((fail+1)); head -n 10 "$OUT/mpe_ftc.build.log";
   fi
-  cp "$MFS/plugins/mpe_ftc$PLUGIN_EXT" "$SRC/plugins/mpe_ftc$PLUGIN_EXT"
-  # Keep .so alias on Windows so both loader paths resolve (loader accepts both).
+  # Keep .so alias on Windows so the loader path resolves (loader accepts both).
+  # Consolidated 2026-10-09: no $SRC/plugins copy.
   if [ "$PLUGIN_EXT" != ".so" ]; then
     cp "$MFS/plugins/mpe_ftc$PLUGIN_EXT" "$MFS/plugins/mpe_ftc.so" 2>/dev/null || true
-    cp "$SRC/plugins/mpe_ftc$PLUGIN_EXT" "$SRC/plugins/mpe_ftc.so" 2>/dev/null || true
   fi
 fi
 
@@ -214,12 +212,24 @@ if [ "${BUILD_ONLY:-0}" != "1" ] && [ "${1:-}" != "--build-only" ]; then
     fi
     # Cross from Linux: prefix with wine (empty on native Windows/MSYS2).
     # shellcheck disable=SC2086
+    # DESPOT-2026-10-09: errexit must be OFF around the suite run. Under
+    # `set -e` a single failing test aborted the WHOLE script one line above
+    # `suite_rc=$?`, so every line after it was unreachable: the per-run log
+    # pointer, the Total/Pass/Fail echo, the sanitizer scan, the
+    # "[FAIL] mfs_suite --all (exit N)" branch, and finally the
+    # "FTC RESULT: gated pass=.. fail=.." summary itself. A red suite
+    # therefore printed NO counts and exited silently -- the harness
+    # destroyed the exact evidence it exists to produce, and the runner
+    # surfaced the missing summary as a confusing contract violation instead
+    # of the real test failures. Capture the code, then restore strict mode.
+    set +e
     if [ "${MFS_ASAN_HOTLOAD_ODR_SUPPRESS:-0}" = "1" ]; then
         ASAN_OPTIONS="${ASAN_OPTIONS:-detect_leaks=1:halt_on_error=1}:detect_odr_violation=0" ${WINE_RUN:-} "$SUITE_BIN" --all >"$OUT/mfs_suite.run.log" 2>&1
     else
         ${WINE_RUN:-} "$SUITE_BIN" --all >"$OUT/mfs_suite.run.log" 2>&1
     fi
     suite_rc=$?
+    set -e
     # Pointer only (never inline suite [PASS] lines: the runner counts
     # script-level bracket lines against the script summary).
     echo "(full suite output: $OUT/mfs_suite.run.log)"
