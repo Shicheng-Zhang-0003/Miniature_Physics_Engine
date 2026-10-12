@@ -1040,7 +1040,10 @@ void collision_apply_rolling_resistance (collision_data *manifolds, int manifold
                     if ((!bd) || (bd -> static_state) || (bd -> is_sleeping) || (bd -> kinematic)) { continue; }
                     /* TRUTH: roll lever = |r| (contact radius, =R for spheres:
                      * M=mu*N*R, standard Coulomb rolling resistance). Spin
-                     * lever = Hertz patch a=sqrt(R*pen_eff), capped 0.3R.
+                     * lever = geometric overlap patch a=sqrt(R*pen_eff),
+                     * capped 0.3R (NOT Hertz: Hertz a^3=3NR/4E* needs elastic
+                     * moduli this engine does not model; the name was
+                     * mislabelled and is corrected here).
                      * An earlier revision used patch for roll too, which
                      * under-damped 28x (R=0.5,pen=0.5mm: R/patch~32) and
                      * failed rolling_decay (15.8m vs 4-14m). Roll and spin

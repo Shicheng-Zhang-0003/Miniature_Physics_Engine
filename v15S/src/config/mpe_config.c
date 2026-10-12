@@ -226,12 +226,27 @@ bool mpe_config_save (const char *path) {
     if (!path) { return false; }
     ensure_parent_dir (path);
     /* R3-03: Atomic write. Write to a temporary file first, then
-     * atomically rename over the target. */
+     * atomically rename over the target.
+     * DESPOT-2026-10-12 P2: mkstemp + 0600 + O_NOFOLLOW semantics, mirroring
+     * scene_saving. The old "%s.tmp" + fopen followed a pre-planted symlink
+     * (config tmp -> victim), writing engine config over an arbitrary file
+     * as the engine uid. mkstemp O_EXCL|O_NOFOLLOW refuses the plant. */
     char tmp_path [512];
-    int tmp_len = snprintf (tmp_path, sizeof (tmp_path), "%s.tmp", path);
+    int tmp_len = snprintf (tmp_path, sizeof (tmp_path), "%s.XXXXXX", path);
     if (tmp_len < 0 || (size_t) tmp_len >= sizeof (tmp_path)) { return false; }
-    FILE *file = fopen (tmp_path, "w");
-    if (!file) { return false; }
+    int tmp_fd = mkstemp (tmp_path);
+    if (tmp_fd < 0) { return false; }
+    if (fchmod (tmp_fd, 0600) != 0) {
+        close (tmp_fd);
+        remove (tmp_path);
+        return false;
+    }
+    FILE *file = fdopen (tmp_fd, "w");
+    if (!file) {
+        close (tmp_fd);
+        remove (tmp_path);
+        return false;
+    }
     time_t now = time (NULL);
     struct tm tm_buf;
     struct tm *local_time = localtime_r (&now, &tm_buf);

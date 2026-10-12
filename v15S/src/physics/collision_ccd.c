@@ -14,8 +14,11 @@
 #include <float.h>
 #include "../core/simd_math.h"
 /* DESPOT-2026-10-08 rotational CCD: worst obstacle tip speed in this tick.
- * File-scope (not per-call static) so the mover loop below can read the
- * precomputed max. Single-threaded step only; MT step recomputes per tick. */
+ * DESPOT-2026-10-12 P6: this global was written then re-read in the same
+ * call, which races when two worlds step on two threads (A writes, B
+ * overwrites before A reads). The sweep below now uses the call-local
+ * `obstacle_margin`; the global is retained only as last-tick telemetry for
+ * debuggers and is never read by physics. */
 float g_ccd_obstacle_margin = 0.0f;
 static float ccd_support_depth (const rigidbody *body) {
     /* Lowest-point offset below the center along world -Y. */
@@ -150,8 +153,9 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
         /* DESPOT-2026-10-08 rotational CCD: obstacle spin unswept (LIE-09).
          * Add the worst obstacle tip speed in this world as a margin so a
          * fast propeller vs slow mover cannot tunnel rotationally with no
-         * clamp. Computed once per tick above. */
-        sweep_speed += g_ccd_obstacle_margin;
+         * clamp. Computed once per tick above. P6: use the call-local value,
+         * never the shared global (thread race). */
+        sweep_speed += obstacle_margin;
         if (sweep_speed <= 0.0001f) { continue; }
         float thickness = ccd_min_thickness (mover);
         if ((thickness <= 0.0f) || (!isfinite (thickness))) { continue; }

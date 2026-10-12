@@ -849,8 +849,12 @@ int scene_loading (const char *file_source_path) {
     /* DESPOT-2026-10-01: bound raw int32 from file before malloc/volume loop.
      * Unbounded count = huge alloc / DoS; negative = signed confusion. */
     if (read_int (f, &staged_joint_count) && (staged_joint_count > 0)) {
-        if (staged_joint_count > 4096) {
-            fprintf (stderr, "Error LDF: joint count %d exceeds 4096\n", staged_joint_count);
+        /* DESPOT-2026-10-12 P8: bound is the live pool (mpe_max_joints=1024),
+         * not 4096. The old 4096 admitted 3072 joints that add_joint_by_ids
+         * could never install; the commit loop below ignored its return and
+         * reported success with joints silently missing. */
+        if (staged_joint_count > mpe_max_joints) {
+            fprintf (stderr, "Error LDF: joint count %d exceeds live pool %d\n", staged_joint_count, mpe_max_joints);
             free (staged_bodies);
             free (staged_ids);
             fclose (f);
@@ -928,10 +932,23 @@ int scene_loading (const char *file_source_path) {
         (physics_world_get_primary () -> bodies) [i].object_generation = 1;
     }
     /* Install staged joints */
-    for (int j = 0; j < staged_joint_count; j++) {
-        add_joint_by_ids (physics_world_get_primary (), scene_id_remap_resolve (staged_joints [j].id_a),
-                          scene_id_remap_resolve (staged_joints [j].id_b), staged_joints [j].eq, staged_joints [j].k,
-                          staged_joints [j].c);
+    {
+        int dropped_joints = 0;
+        for (int j = 0; j < staged_joint_count; j++) {
+            int rc = add_joint_by_ids (physics_world_get_primary (), scene_id_remap_resolve (staged_joints [j].id_a),
+                                       scene_id_remap_resolve (staged_joints [j].id_b), staged_joints [j].eq,
+                                       staged_joints [j].k, staged_joints [j].c);
+            if (rc < 0)
+                dropped_joints++;
+        }
+        /* P8: count drops loudly (v200 already counts dropped_staged) and
+         * bump the id-cache revision — legacy commit never did, leaving
+         * id_cache_revision stale so every lookup silently fell back to
+         * linear scan and masked stale-cache bugs. */
+        if (dropped_joints > 0)
+            fprintf (stderr, "Error LDF: legacy load dropped %d/%d joints (pool full or bad ids)\n", dropped_joints,
+                     staged_joint_count);
+        physics_world_bump_revision (physics_world_get_primary ());
     } free (staged_bodies);
     if (staged_ids)
         free (staged_ids);

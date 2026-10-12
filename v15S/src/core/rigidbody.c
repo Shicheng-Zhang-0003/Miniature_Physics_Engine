@@ -47,19 +47,19 @@
  * an interactive session without turning a mass-sweep benchmark into a
  * million-line log.
  * ========================================================================== */
-unsigned long mpe_clamp_mass_events = 0;
-unsigned long mpe_clamp_radius_events = 0;
-unsigned long mpe_clamp_half_length_events = 0;
-static void mpe_note_clamp (const char *kind, unsigned long *counter, double requested, double stored) {
-    (*counter)++;
+_Atomic unsigned long mpe_clamp_mass_events = 0;
+_Atomic unsigned long mpe_clamp_radius_events = 0;
+_Atomic unsigned long mpe_clamp_half_length_events = 0;
+static void mpe_note_clamp (const char *kind, _Atomic unsigned long *counter, double requested, double stored) {
+    unsigned long n = __atomic_fetch_add (counter, 1ul, __ATOMIC_RELAXED) + 1ul;
     /* Bounded: first 8 occurrences, then every 1000th. Enough to be seen
      * in a session, not enough to drown a headless sweep. */
-    if ((*counter <= 8u) || ((*counter % 1000u) == 0u)) {
+    if ((n <= 8u) || ((n % 1000u) == 0u)) {
         fprintf (stderr,
                  "[mpe] INPUT CLAMPED: %s requested %.9g, using %.9g "
                  "(x%.6g). The body is NOT the one you asked for. "
                  "(occurrence %lu)\n",
-                 kind, requested, stored, stored / requested, *counter);
+                 kind, requested, stored, stored / requested, n);
     }
 } /* Exact free-flight integration under constant gravity + linear viscous drag.
  * The config 'drag' is a VELOCITY RETENTION FACTOR per second (0 to 1).
@@ -1344,7 +1344,7 @@ void rigidbody_initialisation_cylinder (rigidbody *rigid_body, float radius, flo
  * declarations in rigidbody.h). Lets a test or a scene loader isolate its
  * own setup from whatever ran before it. */
 void mpe_clamp_counters_reset (void) {
-    mpe_clamp_mass_events = 0;
-    mpe_clamp_radius_events = 0;
-    mpe_clamp_half_length_events = 0;
+    __atomic_store_n (&mpe_clamp_mass_events, 0ul, __ATOMIC_RELAXED);
+    __atomic_store_n (&mpe_clamp_radius_events, 0ul, __ATOMIC_RELAXED);
+    __atomic_store_n (&mpe_clamp_half_length_events, 0ul, __ATOMIC_RELAXED);
 }

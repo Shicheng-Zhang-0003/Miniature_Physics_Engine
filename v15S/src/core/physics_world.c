@@ -20,6 +20,7 @@
 #include "det_math.h" /* bit-identical damping factors on all IEEE targets */
 #include "simd_math.h" /* DESPOT-2026-10-08 SIMD fast path (SSE2, scalar fallback) */
 #include <pthread.h>
+#include <stdatomic.h>
 #include <stdlib.h>
 #include <stdio.h>
 /* Minimal deterministic thread pool: disjoint index ranges, no shared writes
@@ -552,14 +553,18 @@ int physics_world_attach_module (physics_world *world, const mpe_module_desc_t *
                         desc->abi, (unsigned) MPE_MODULE_ABI);
         return MPE_ATTACH_E_ABI;
     }
-    for (int i = 0; i < world->tick_module_count; i++)
-        if (world->tick_modules [i] == desc)
-            return i;
+    /* DESPOT-2026-10-12 P1: validate count BEFORE any indexed read. A
+     * never-init'ed stack world holds an indeterminate count; the old order
+     * iterated tick_modules[] first (OOB read + NULL-deref in the E_TABLE
+     * listing path). Corrupt count is refused before it is used as a bound. */
     if (world->tick_module_count < 0 || world->tick_module_count > MPE_MAX_TICK_MODULES) {
         MPE_DIAG_ERROR ("attach", "E_COUNT", "attach rejected: tick_module_count=%d outside [0,%d] for '%s'",
                         world->tick_module_count, MPE_MAX_TICK_MODULES, desc->name ? desc->name : "(unnamed)");
         return MPE_ATTACH_E_COUNT;
     }
+    for (int i = 0; i < world->tick_module_count; i++)
+        if (world->tick_modules [i] == desc)
+            return i;
     if (world->tick_module_count >= MPE_MAX_TICK_MODULES) {
         MPE_DIAG_ERROR ("attach", "E_TABLE", "attach rejected: table full (%d/%d slots in use); attached: ", world->tick_module_count,
                         MPE_MAX_TICK_MODULES);
@@ -599,6 +604,14 @@ int physics_world_detach_module (physics_world *world, const char *name) {
     if (!world || !name) {
         MPE_DIAG_ERROR ("detach", "E_NULL", "detach rejected: %s", world ? "name is NULL" : "world is NULL");
         return MPE_DETACH_E_NULL;
+    }
+    /* DESPOT-2026-10-12 P1: same corrupt-count guard as attach. Detach had
+     * no clamp at all; a garbage count drove OOB reads in both the search
+     * loop and the not-found listing loop below. */
+    if (world->tick_module_count < 0 || world->tick_module_count > MPE_MAX_TICK_MODULES) {
+        MPE_DIAG_ERROR ("detach", "E_COUNT", "detach rejected: tick_module_count=%d outside [0,%d] for '%s'",
+                        world->tick_module_count, MPE_MAX_TICK_MODULES, name);
+        return MPE_DETACH_E_COUNT;
     }
     for (int i = 0; i < world->tick_module_count; i++) {
         if (world -> tick_modules [i] && world -> tick_modules [i] -> name &&
@@ -974,9 +987,11 @@ void physics_world_step (physics_world *world, float dt) {
      * Non-1/60 dt still steps (no breakage) but is LOUD so a variable-dt
      * harness cannot claim determinism. */
     if ((dt < 0.016666f) || (dt > 0.016668f)) {
-        static int s_dt_warned = 0;
-        if (!s_dt_warned) {
-            s_dt_warned = 1;
+        /* P7: _Atomic — two worlds stepping on two threads raced the plain
+         * int (UB). Telemetry limit stands: first regime consumes the budget. */
+        static _Atomic int s_dt_warned = 0;
+        if (!__atomic_load_n (&s_dt_warned, __ATOMIC_RELAXED)) {
+            __atomic_store_n (&s_dt_warned, 1, __ATOMIC_RELAXED);
             fprintf (stderr, "[mpe] NON-CANONICAL dt=%.6f (canonical 1/60=0.016667); determinism twins must use identical dt\n",
                      (double) dt);
         }
@@ -1037,11 +1052,11 @@ void physics_world_step (physics_world *world, float dt) {
         (!world -> manifold_sort_keys) || (!world -> pair_skipped) || (!world -> broadphase) || (!world -> island_parent) ||
         (!world -> island_label) || (!world -> island_awake_flags) || (!world -> ccd_time_remaining) ||
         (!world -> has_contact) || (!world -> tick_v0)) {
-        static unsigned long s_degraded_ticks = 0;
-        s_degraded_ticks++;
-        if ((s_degraded_ticks <= 8) || ((s_degraded_ticks % 1000) == 0)) {
+        static _Atomic unsigned long s_degraded_ticks = 0;
+        unsigned long ndeg = __atomic_fetch_add (&s_degraded_ticks, 1ul, __ATOMIC_RELAXED) + 1ul;
+        if ((ndeg <= 8) || ((ndeg % 1000) == 0)) {
             fprintf (stderr, "[mpe] DEGRADED tick %lu: scratch missing (low-mem); solving pairless, islands/ccd/contact flags stale\n",
-                     s_degraded_ticks);
+                     ndeg);
         } return;
     } int manifold_count = 0;
     for (int q = 0; q < pair_count; q++) {

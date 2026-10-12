@@ -297,8 +297,12 @@ static void clip_obb_faces (rigidbody *ref_body, rigidbody *inc_body, vector3 no
         } keep [keep_count++] = deepest;
         /* 2. Greedily add the candidate that grows the enclosed area most, so
          *    the manifold spans the contact patch instead of clustering. Area
-         *    is measured in the contact plane via the ref normal. */
-        vector3 t1 = vector3_cross (ref_normal, cand [keep [0]]);
+         *    is measured in the contact plane via the ref normal.
+         *    DESPOT-2026-10-12 M3: the old metric dotted cross(e1,e2) with
+         *    t1=cross(ref_normal,cand[0]) (perp to the normal), which is ~0
+         *    for near-planar clips and made max-area selection arbitrary.
+         *    Ericson RTCD / Box2D: fan area about centroid in the contact
+         *    plane is dot(cross(e1,e2), ref_normal). fabs: winding-agnostic. */
         while (keep_count < MPE_MAX_MANIFOLD_CONTACTS) {
             int best = -1;
             float best_area = -1.0f;
@@ -319,7 +323,7 @@ static void clip_obb_faces (rigidbody *ref_body, rigidbody *inc_body, vector3 no
                 } vector3 centroid = simd_scale (sum, 1.0f / (float) keep_count);
                 vector3 e1 = simd_sub (cand [i], centroid);
                 vector3 e2 = simd_sub (cand [keep [0]], centroid);
-                float area = vector3_dot (vector3_cross (e1, e2), t1);
+                float area = fabsf (vector3_dot (vector3_cross (e1, e2), ref_normal));
                 if (area > best_area) {
                     best_area = area;
                     best = i;

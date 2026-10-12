@@ -65,6 +65,14 @@ int long_run_validation_torture_live (void) {
            (long_run_validation_restore_config != 0);
 }
 void long_run_validation_snapshot_clean (void) {
+    /* DESPOT-2026-10-12 P16: never snapshot torture as clean. A second F11
+     * without cancel/restore would overwrite s_clean_cfg with tortured g_cfg,
+     * and the exit-save would then publish torture as next boot defaults —
+     * the 2026-10-04 engine.cfg incident repeating through memory. */
+    if (long_run_validation_torture_live ()) {
+        fprintf (stderr, "[A3] snapshot_clean refused: torture is live; clean snapshot kept\n");
+        return;
+    }
     s_clean_cfg = g_cfg;
     s_clean_cfg_valid = 1;
 }

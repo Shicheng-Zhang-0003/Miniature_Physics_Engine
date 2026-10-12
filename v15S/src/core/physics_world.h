@@ -217,6 +217,7 @@ int physics_world_detach_module (physics_world *world, const char *name);
 /* Same contract as attach: distinct negative code per cause, zero = ok. */
 #define MPE_DETACH_E_NULL (-1)     /* null world or name */
 #define MPE_DETACH_E_NOTFOUND (-2) /* nothing with that name is attached */
+#define MPE_DETACH_E_COUNT (-3)    /* tick-module count corrupt (DESPOT-2026-10-12 P1) */
 void physics_world_set_broadphase (physics_world *world, const mpe_broadphase_if_t *iface);
 void physics_world_set_solver (physics_world *world, const mpe_solver_if_t *iface);
 void physics_world_set_broadphase_state (physics_world *world, void *state);

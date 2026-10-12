@@ -88,8 +88,9 @@ static mpe_param s_registry [] = {
      "Allowed overlap before bias correction (m) — TRUTH: 0.001 ideal, 0.010 stable (truth selectable)", p_float,
      cat_solver, &g_cfg.solver.penetration_slop, 0.010, 0.0, 0.05, true},
     {"solver.bias_factor", "Bias Factor",
-     "Baumgarte positional correction aggressiveness — TRUTH: 0.02 minimal, 0.10 stable", p_float, cat_solver,
-     &g_cfg.solver.bias_factor, 0.10, 0.0, 1.0, true},
+     "Split-impulse positional aggressiveness (NOT velocity Baumgarte: no velocity bias exists anywhere; "
+         "this scales the slop-gated positional correction only) — TRUTH: 0.02 minimal, 0.10 stable",
+     p_float, cat_solver, &g_cfg.solver.bias_factor, 0.10, 0.0, 1.0, true},
     {"solver.max_separation_bias", "Max Separation Bias", "Upper cap on positional bias velocity (m/s)", p_float,
      cat_solver, &g_cfg.solver.max_separation_bias, 5.0, 0.5, 10.0, true},
     {"solver.restitution_velocity_thresh", "Restitution Velocity Threshold",

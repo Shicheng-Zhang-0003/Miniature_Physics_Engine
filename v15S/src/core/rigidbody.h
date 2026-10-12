@@ -2,6 +2,7 @@
 #define rigidbody_h
 #include <stdio.h>
 #include <math.h>
+#include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include "math3d.h"
@@ -209,9 +210,20 @@ static inline math3 rigidbody_effective_inv_inertia (const rigidbody *rb) {
  * assert that its own setup clamped nothing; a scene loader can detect a
  * corrupt file; an interactive session gets a bounded stderr warning (see
  * mpe_note_clamp in rigidbody.c). Reset them with
- * mpe_clamp_counters_reset() between phases. */
-extern unsigned long mpe_clamp_mass_events;
-extern unsigned long mpe_clamp_radius_events;
-extern unsigned long mpe_clamp_half_length_events;
+ * mpe_clamp_counters_reset() between phases.
+ * DESPOT-2026-10-12 M4: _Atomic — sanitize runs on worker threads under
+ * MPE_THREADS>1, and plain ++ is a data race (UB + lost counts). All
+ * mutation uses __atomic_fetch_add / store (RELAXED, telemetry); read via
+ * mpe_clamp_*_total() or __atomic_load_n. Direct reads still compile (legacy
+ * tests) but new code must use the accessors. */
+extern _Atomic unsigned long mpe_clamp_mass_events;
+extern _Atomic unsigned long mpe_clamp_radius_events;
+extern _Atomic unsigned long mpe_clamp_half_length_events;
 void mpe_clamp_counters_reset (void);
+static inline unsigned long mpe_clamp_mass_total (void)
+    { return __atomic_load_n (&mpe_clamp_mass_events, __ATOMIC_RELAXED); }
+static inline unsigned long mpe_clamp_radius_total (void)
+    { return __atomic_load_n (&mpe_clamp_radius_events, __ATOMIC_RELAXED); }
+static inline unsigned long mpe_clamp_half_length_total (void)
+    { return __atomic_load_n (&mpe_clamp_half_length_events, __ATOMIC_RELAXED); }
 #endif
