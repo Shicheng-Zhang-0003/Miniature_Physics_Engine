@@ -974,6 +974,21 @@ int mfs_t_odometry_yaw (void) {
                     if (ch)
                         truth += ch -> angular_velocity.y * dt;
                 } float odom = robot -> odom_theta - o0;
+                /* DESPOT-2026-10-12 (ABUSE-TILT fallout, test bug): odom_theta
+                 * is WRAPPED to [-pi,pi] every tick (see drivetrain.c), while
+                 * truth above is an unwrapped running sum. Once the pivot got
+                 * clean enough to accumulate past +pi inside the 40-tick
+                 * window, this raw difference read -5.5 for a true +0.8
+                 * (wrap artifact, not physics — sign flip plus 21x). Take
+                 * the wrapped delta so the comparison is in the same space. */
+                {
+                    const float pi = 3.14159265358979323846f;
+                    const float two_pi = 6.28318530717958647692f;
+                    float wd = fmodf (odom + pi, two_pi);
+                    if (wd < 0.0f)
+                        wd += two_pi;
+                    odom = wd - pi;
+                }
                 MFS_INFO ("tank L%+.1f R%+.1f: true=%+.4f rad odom=%+.4f rad", l, -l, truth, odom);
                 if (fabsf (truth) > 1e-4f) {
                     MFS_CHECK (t_ptr, (truth > 0.0f) == (odom > 0.0f));

@@ -513,17 +513,38 @@ int mfs_t_coast_down (void) {
     if (rc != 0) {
         physics_world_cleanup (&w);
         return 1;
-    } drivetrain_tank (&robot, 1.0f, 1.0f);
+    }     drivetrain_tank (&robot, 1.0f, 1.0f);
     for (int t = 0; t < 60; t++) {
         drivetrain_update (&w, &robot, DT);
         physics_world_step (&w, DT);
-    } float v_before = w.bodies [robot.chassis_body].velocity.x;
+    } /* DESPOT-2026-10-12 (ABUSE-TILT fallout, vacuous gate): tank forward is
+     * +Z (drive_directions: fwd vz=+0.99), so velocity.X here was always
+     * 4th-decimal lateral jitter in both trees (0.0006 vs 0.0028) and the
+     * 0.3-ratio gate compared noise — a passing grade that never tested
+     * coast-down, until jitter drifted across the line and failed it. Gate
+     * on planar speed (drive axis with veer tolerance), and print the
+     * values: a silent return-1 is how this hid. Truth is unchanged on the
+     * drive axis (Z coast stops dead clamped ~0.2 m in both trees). */
+    float v_before =
+        sqrtf (w.bodies [robot.chassis_body].velocity.x * w.bodies [robot.chassis_body].velocity.x +
+               w.bodies [robot.chassis_body].velocity.z * w.bodies [robot.chassis_body].velocity.z);
     drivetrain_tank (&robot, 0.0f, 0.0f);
     for (int t = 0; t < 300; t++) {
         drivetrain_update (&w, &robot, DT);
         physics_world_step (&w, DT);
-    } float v_after = w.bodies [robot.chassis_body].velocity.x;
+    }
+    float v_after =
+        sqrtf (w.bodies [robot.chassis_body].velocity.x * w.bodies [robot.chassis_body].velocity.x +
+               w.bodies [robot.chassis_body].velocity.z * w.bodies [robot.chassis_body].velocity.z);
+    printf ("[info] coast_down: v_before=%.4f v_after=%.4f ratio=%.4f\n", v_before, v_after,
+            (v_before > 1e-6f) ? v_after / v_before : 0.0f);
+    if (v_before < 0.1f) {
+        printf ("[FAIL] coast_down: drive phase never moved (v_before=%.4f) — vacuous gate\n", v_before);
+        physics_world_cleanup (&w);
+        return 1;
+    }
     if (v_after >= 0.3f * v_before) {
+        printf ("[FAIL] coast_down: still coasting (v_after=%.4f >= 0.3*v_before)\n", v_after);
         physics_world_cleanup (&w);
         return 1;
     } physics_world_cleanup (&w);
