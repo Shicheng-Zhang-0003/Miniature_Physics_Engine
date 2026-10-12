@@ -200,7 +200,9 @@ check-new-files:
 	@git status --porcelain -- '*.c' '*.h' | grep -q '^??' && { echo "new untracked sources (review ENGINE_SRCS wildcard):"; git status --porcelain -- '*.c' '*.h' | grep '^??'; exit 1; } || echo "no untracked sources"
 
 help:
-	@echo "targets: engine (default) | debug | release | install | installcheck | installcheck-v1 | clean | distclean"
+	@echo "targets: engine (default) | everything (full build-only rebuild: engine, mpe-tui, headless,"
+	@echo "         suite+scalar, all 30 legacy + 14 paranoia binaries, capsule/MFS/MGB modules; runs nothing)"
+	@echo "         debug | release | install | installcheck | installcheck-v1 | clean | distclean"
 	@echo "         test_<name> (build+run) | build_<name> (build only) | paranoia_*"
 	@echo "         test_runner.py --profile quick|physics|full (runner default: full; make default: engine)"
 	@echo "           --list | --test NAME | --allow-skip (strict SKIP fails without it)"
@@ -224,6 +226,8 @@ $(BUILD_DIR)/%.o: %.c
 clean:
 	rm -rf build build-debug build-release engine engine.exe test_* mpe-tui mpe-tui.exe *.so *.dll *.a *.lib ecosystem/capsule/*.so ecosystem/capsule/*.dll
 	find . -name '*.d' -delete
+	$(MAKE) -C ecosystem/mfs clean
+	$(MAKE) -C ecosystem/mgb clean
 	@echo "NOTE: user data status/engine.cfg preserved (use distclean to remove)"
 
 distclean: clean
@@ -231,11 +235,13 @@ distclean: clean
 
 # ---- MFS overarching ecosystem (v15S/src/ecosystem/mfs/) ----
 # Single build lives in ecosystem/mfs/Makefile (thin .so files, build/ objs).
-# This target only delegates and stages the artifact here; do NOT duplicate
-# the recipe (a duplicated recipe already drifted once: GUI registry linked
-# here, excluded there).
+# This target delegates the FULL `all` (module_1 + ecosystem bundle + ftc
+# plugin — partial delegation once left two of the three stale after clean)
+# and stages the bundle artifact here; do NOT duplicate the recipe (a
+# duplicated recipe already drifted once: GUI registry linked here,
+# excluded there).
 mfs_ecosystem$(PLUGIN_EXT):
-	$(MAKE) -C ecosystem/mfs mfs_ecosystem$(PLUGIN_EXT)
+	$(MAKE) -C ecosystem/mfs all
 	cp ecosystem/mfs/mfs_ecosystem$(PLUGIN_EXT) ./mfs_ecosystem$(PLUGIN_EXT)
 
 # ---- MPE terminal debugger + snapshot suite (TUI) ----
@@ -586,7 +592,34 @@ test_paranoia_fp_edges: build_paranoia_fp_edges
 	./test_paranoia_fp_edges$(EXE_EXT)
 
 build_paranoia_config: tests/paranoia_config.c $(PARANOIA_TEST_CORE)
-	$(CC) $(PARANOIA_CFLAGS) -Dmpe_paranoia_config tests/paranoia_config.c $(PARANOIA_TEST_CORE) $(MPE_TEST_LIBS) -o test_paranoia_config$(EXE_EXT)
+	$(CC) $(CFLAGS) -Dmpe_paranoia_config tests/paranoia_config.c $(PARANOIA_TEST_CORE) $(MPE_TEST_LIBS) -o test_paranoia_config$(EXE_EXT)
 test_paranoia_config: build_paranoia_config
 	mkdir -p ../../temp
 	./test_paranoia_config$(EXE_EXT)
+
+# ---- Full from-scratch rebuild (see ./compile) ----
+# BUILD-ONLY: compiles every shippable/testable artifact, runs nothing.
+# No test_*, tui-smoke, mgb test/loadtest, asan/tsan-run, or build_tests.sh
+# suite invocation lives below: compile must never execute code, only
+# produce it. (asan/tsan binaries and temp/ MFS verification binaries
+# stay runner-owned: the runner rebuilds them with its own flags/OUTDIR.)
+# Drift guard: keep these lists in sync with the build_* rules above AND
+# with tools/test_runner.py MIN_LEGACY_ENTRIES=30 / MIN_PARANOIA_ENTRIES=14.
+build_all_legacy: build_two_world build_revolute build_cylinder_drop build_driven_wheel build_math3_inverse \
+	build_floor_collision_diag build_cylinder_sphere build_cylinder_cube build_cylinder_cylinder \
+	build_list4_cylinder_floor build_scene_roundtrip build_static_hold build_rolling_decay build_ccd_sweep \
+	build_kinematic build_determinism build_momentum build_angmom build_spring build_projectile \
+	build_incline_accel build_pendulum build_bounce_series build_friction_stop build_stack build_f10_long_run \
+	build_sleep_contact_wake build_f11_torture build_frustum build_module
+build_all_paranoia: build_paranoia_freeflight_exact build_paranoia_depenetration_sleep build_paranoia_contact_solver \
+	build_paranoia_constraints build_paranoia_broadphase build_paranoia_energy_momentum build_paranoia_ccd \
+	build_paranoia_cylinder_collision build_paranoia_determinism build_paranoia_scene_persistence \
+	build_paranoia_spring_joints build_paranoia_integration_edges build_paranoia_fp_edges build_paranoia_config
+# MGB bridge (build-only `all`: build dir + mgb_mpe_test + mgb_bridge.so; the
+# `test`/`loadtest` targets run code and are never invoked from here).
+mgb_bridge:
+	$(MAKE) -C ecosystem/mgb
+everything: engine mpe-tui headless build_suite build_suite_scalar build_all_legacy build_all_paranoia \
+	ecosystem/capsule/mpe_capsule$(PLUGIN_EXT) mfs_ecosystem$(PLUGIN_EXT) mgb_bridge
+
+.PHONY: everything build_all_legacy build_all_paranoia mgb_bridge
