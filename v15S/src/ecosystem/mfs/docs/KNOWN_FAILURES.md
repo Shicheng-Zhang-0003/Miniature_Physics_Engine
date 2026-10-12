@@ -372,6 +372,46 @@ Collateral, all measured pre/post on identical harnesses:
   recovered on release. Realistic driving (modulated sticks + releases)
   never accumulates: see the 0.05° release number.
 
+## [SKATE] Combined-drive slide + weakest-wheel cut-trap (PARTIAL 2026-10-12)
+
+Live report that surfaced once flips were gone: under both-sticks
+(asymmetric) commands the robot pirouettes/slides instead of tracking
+(single-stick modes track fine). Headless fleet-identical probes
+(temp/tilt_grip.c, temp/tilt_glide.c, temp/tilt_tank.c; temp-only):
+combined (0.5,0.5,0.3) holds all wheels saturated (slip 0.6-1.2 m/s ≫
+VREF 5 mm/s, analytic at full 15.1 N cone) yet the chassis spins in place
+instead of translating — and the weakest wheel (FR, +0.23 cmd) ends up
+spinning BACKWARD (-11 to -15 mean) with its thrust flipped.
+
+- **Cut-trap mechanism (measured, fixed):** traction cut slams to 0.15 on
+  overspeed>4 and climbs back +0.2/tick below 2.0 — but on a 2.5e-4
+  featherweight wheel even strangled torque peels in one tick, so spool
+  attempts re-slam faster than the climb recovers: FR pinned at 0.15 from
+  tick 40 with scale mean 0.45, contributing nothing while drag back-drives
+  it. A slow wheel is stuck, not peeling, so the cut now releases outright
+  below 2 rad/s (slew still feathers delivery, genuine overspeed re-slams
+  next tick; tank pivots spin fast, idle bypasses, standstill starts at 1
+  — the load-bearing slam regimes never touch the slow case). Unpins scale
+  (0.45 → 0.74 on FR); tank headline maneuver bit-identical (2.3728/
+  0.0434 to 4 decimals), drive_directions stays green.
+- **Back-drive lock (OPEN):** with the cut released the motor still cannot
+  recover FR (delivery 0.74 → 1.00, spin unchanged at -11.5). A back-drive
+  bypass (full authority whenever spin opposes command) was tried and
+  REVERTED for zero benefit — which pointed at the plan, not the cut: the
+  implicit solve evaluates current at PLANNED speed (w_end ≈ target, where
+  back-EMF ≈ applied voltage and current ≈ trickle) instead of MEASURED
+  speed (far away, back-EMF screaming, stall current available). Far from
+  target at low command voltage the model therefore plans holding torque,
+  never recovery torque — recovery is structurally unavailable no matter
+  what the cut passes through. Fixing that is the MOTOR-II landing unit
+  (observer/planner rework with stall-endpoint re-validation), not a cut
+  tweak. Bounded today: at most the dragged wheel flips thrust, mounts/P2P
+  hold, nothing NaNs, release recovers to 0.05°.
+- **Determinism note:** same binary twice and rebuild-twice from identical
+  sources are bit-identical (incl. chaotic pivot windows); the pivot regime
+  itself is chaotic-sensitive (tiny formulation changes move late-window
+  truth), which is why baselines here are regression bands, not oracles.
+
 Original record preserved below (it earned its keep: six negatives that
 must not be re-attempted blind, and the authorities cross-ref that
 pointed at joint authority in the first place).
