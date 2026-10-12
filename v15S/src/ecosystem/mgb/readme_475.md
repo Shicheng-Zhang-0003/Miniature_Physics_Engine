@@ -24,7 +24,8 @@ rendered).
 ### Staging placement (revised 2026-10-09)
 
 The stage default is **`(0,20,-60)`**, not `(0,120,0)`. Two reasons, both
-learned the hard way:
+learned the hard way (the old default is retained in the stub contract text
+below for history):
 
 - **The renderer frustum-culls silently.** The engine's default camera sits
   at `(0,20,50)`, yaw −90° (forward `0,0,-1`), pitch 0, through a 45°
@@ -76,8 +77,10 @@ existing; a miss stays a miss.
 
 ### Gates
 
-`make test` → `mgb-mpe: PASS 43 FAIL 0`. Tiers: parser/mapper policy, static
-+ zero-force staging, live petri through a real `s2tui`, **spawn-failure
-naming** (each mode distinct, with its errno), and **resolver** (hit/miss
-contract, override honoured and normalised). `make loadtest` checks the
-exported `mpe_module_desc`.
+`make test` → `mgb-mpe: PASS 32 FAIL 0` (tier B live petri skipped when no
+s2tui is available). Tiers: parser/mapper policy, static + zero-force
+staging, live petri through a real `s2tui`, **spawn-failure naming** (each
+mode distinct, with its errno), **resolver** (hit/miss contract, override
+honoured and normalised), and **physical validation** (dt<=0, cutoff<=0,
+temp<0, tau<=0, nu<0 all rejected). `make loadtest` checks the exported
+`mpe_module_desc`.
