@@ -52,17 +52,15 @@ int intake_update (physics_world *world, vector3 chassis_pos, vector4 chassis_or
         got++;
     } return got;
 }
-int intake_shoot (physics_world *world, vector3 chassis_pos, vector4 chassis_ori, vector3 chassis_vel,
-                  int carried [INTAKE_MAX_CARRIED], int *carried_n) {
-    if (!world || !world -> bodies || !carried || !carried_n || *carried_n <= 0) { return -1; }
-    int id = carried [0];
-    for (int i = 1; i < *carried_n; i++) { carried [i - 1] = carried [i]; }
-    (*carried_n)--;
-    int bi = physics_world_index_by_id (world, (uint32_t) id);
-    if (bi < 0 || bi >= world -> body_count) { return -1; }
-    rigidbody *ball = &world -> bodies [bi];
+/* Single source of truth for the shot: muzzle pose, launch direction, initial
+ * velocity (chassis velocity inherited) and backspin. intake_shoot() applies
+ * it to the real ball; the trajectory predictor (ftc_traj.c) simulates a copy
+ * through the identical state so the purple preview line cannot drift from the
+ * shot that actually fires. No side effects, no world access. */
+void intake_launch_state_compute (vector3 chassis_pos, vector4 chassis_ori, vector3 chassis_vel,
+                                  intake_launch_state *out) {
+    if (!out) { return; }
     vector3 fwd = vector4_rotate_to_vector3 (chassis_ori, (vector3) {0.0f, 0.0f, 1.0f});
-    vector3 up = vector4_rotate_to_vector3 (chassis_ori, (vector3) {0.0f, 1.0f, 0.0f});
     /* Launch dir: chassis-forward tilted up by elevation. det_cos/det_sin
      * (fixed-coefficient, bit-identical) — shots stay inside the
      * determinism contract. */
@@ -83,20 +81,32 @@ int intake_shoot (physics_world *world, vector3 chassis_pos, vector4 chassis_ori
     if (dl > 1e-6f && isfinite (dl)) { dir = vector3_scaling (dir, 1.0f / dl); } else { dir = (vector3) {0.0f, 1.0f, 0.0f}; }
     vector3 muzzle = vector3_addition (chassis_pos, vector3_scaling (yawfwd, INTAKE_MUZZLE_FWD));
     muzzle = vector3_addition (muzzle, (vector3) {0.0f, INTAKE_MUZZLE_UP, 0.0f});
-    rigidbody_set_kinematic (ball, false);
-    rigidbody_wake (ball);
-    ball -> position = muzzle;
-    ball -> velocity = vector3_addition (chassis_vel, vector3_scaling (dir, INTAKE_LAUNCH_SPEED));
+    out->muzzle = muzzle;
+    out->dir = dir;
+    out->velocity = vector3_addition (chassis_vel, vector3_scaling (dir, INTAKE_LAUNCH_SPEED));
     /* Backspin about the chassis lateral axis for Magnus lift (yaw-projected
      * like the launch dir, so roll/pitch never tilt it). */
     vector3 lat = vector4_rotate_to_vector3 (chassis_ori, (vector3) {1.0f, 0.0f, 0.0f});
     lat.y = 0.0f;
     float ll = sqrtf (vector3_length_squared (lat));
-    if (ll > 1e-6f && isfinite (ll)) {
-        ball -> angular_velocity = vector3_scaling (lat, -INTAKE_LAUNCH_SPIN / ll);
-    } else {
-        ball -> angular_velocity = vector3_zero ();
-    }
+    if (ll > 1e-6f && isfinite (ll)) { out->spin = vector3_scaling (lat, -INTAKE_LAUNCH_SPIN / ll); } else { out->spin = vector3_zero (); }
+}
+int intake_shoot (physics_world *world, vector3 chassis_pos, vector4 chassis_ori, vector3 chassis_vel,
+                  int carried [INTAKE_MAX_CARRIED], int *carried_n) {
+    if (!world || !world -> bodies || !carried || !carried_n || *carried_n <= 0) { return -1; }
+    int id = carried [0];
+    for (int i = 1; i < *carried_n; i++) { carried [i - 1] = carried [i]; }
+    (*carried_n)--;
+    int bi = physics_world_index_by_id (world, (uint32_t) id);
+    if (bi < 0 || bi >= world -> body_count) { return -1; }
+    rigidbody *ball = &world -> bodies [bi];
+    intake_launch_state st;
+    intake_launch_state_compute (chassis_pos, chassis_ori, chassis_vel, &st);
+    rigidbody_set_kinematic (ball, false);
+    rigidbody_wake (ball);
+    ball -> position = st.muzzle;
+    ball -> velocity = st.velocity;
+    ball -> angular_velocity = st.spin;
     rigidbody_update_axes (ball);
     return id;
 }

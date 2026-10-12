@@ -8,6 +8,7 @@
 #include "ui_input/simulation_dispatch.h"
 #include "ui_input/gamepad_drive.h"
 #include "ui_input/ftc_view.h"
+#include "ui_input/ftc_traj.h"
 #include <gtk/gtk.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -82,6 +83,10 @@ gboolean physics_step_increment (gpointer user_data_pointer) {
     /* FTC chase/robot-centric camera: re-targets the free camera onto
      * robot 0 while `ftc view 1|2` is active (no-op otherwise). */
     ftc_view_tick (frame_delta_time);
+    /* Purple predicted-shot polyline: forward-simulates the carried ball's
+     * flight (bounces included) on a private world. CPU only — the renderer
+     * uploads/draws the points. No-op with no robot, no ball or no bundle. */
+    ftc_traj_update (frame_delta_time);
     /* Joint watchdog: event-driven mount/tilt/NaN evidence for live
      * "wheel snapped" reports (see gamepad_drive.h). */
     ftc_watchdog_tick ();

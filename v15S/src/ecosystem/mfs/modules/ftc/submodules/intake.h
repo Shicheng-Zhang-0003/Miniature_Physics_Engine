@@ -86,6 +86,19 @@ int intake_update (physics_world *world, vector3 chassis_pos, vector4 chassis_or
  * Returns the body id, or -1 when empty/gone. */
 int intake_shoot (physics_world *world, vector3 chassis_pos, vector4 chassis_ori, vector3 chassis_vel,
                   int carried [INTAKE_MAX_CARRIED], int *carried_n);
+/* Pure launch state from a chassis pose — the SINGLE source of truth for the
+ * shot, shared by intake_shoot() (applies it to the real ball) and the
+ * trajectory predictor (ftc_traj.c, which simulates a copy through it), so
+ * the predicted line cannot drift from the shot that actually fires. No side
+ * effects, no world access. */
+typedef struct {
+    vector3 muzzle;   /* world start position */
+    vector3 dir;      /* unit launch direction (yaw-projected, world-up elevation) */
+    vector3 velocity; /* muzzle velocity = inherited chassis vel + speed*dir */
+    vector3 spin;     /* angular velocity (backspin about the lateral axis) */
+} intake_launch_state;
+void intake_launch_state_compute (vector3 chassis_pos, vector4 chassis_ori, vector3 chassis_vel,
+                                  intake_launch_state *out);
 /* Drop all carried balls: dynamic, kept at chassis velocity + small forward
  * nudge. Returns dropped count. */
 int intake_eject (physics_world *world, vector3 chassis_vel, vector3 chassis_fwd, int carried [INTAKE_MAX_CARRIED],

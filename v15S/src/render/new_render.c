@@ -13,6 +13,8 @@
 #include "cube_meshing.h"
 #include "cylinder_meshing.h"
 #include "grid.h"
+#include "traj_line.h"
+#include "../ui_input/ftc_traj.h"
 #include "wireframe.h"
 #include "../physics/spring_joint.h"
 #include <sys/types.h>
@@ -50,6 +52,9 @@ mesh cylinder_mesh;
 typedef enum { render_uninitialized = 0, render_ok = 1, render_failed = -1 } render_status;
 static render_status render_init_status = render_uninitialized;
 static grid_mesh main_grid;
+/* Purple predicted-trajectory polyline (ftc_traj.c fills the CPU points in
+ * the tick; upload+draw happen here so every GL call is on the draw path). */
+static traj_line_mesh main_traj;
 static float *sphere_instances = NULL;
 static float *cube_instances = NULL;
 static float *cylinder_instances = NULL;
@@ -132,6 +137,7 @@ void render_init () {
     MPE_CHECK_UNIFORM (utility_uniforms.light_position_location, utility_shader_program, "light_position");
 #undef MPE_CHECK_UNIFORM
     grid_init (&main_grid, 250, 5);
+    traj_line_init (&main_traj);
     init_sm_system (&sphere_mesh, 32, 32);
     cube_meshing_init ();
     init_cylinder_system (&cylinder_mesh, 24);
@@ -199,6 +205,7 @@ static void render_delete_gl_objects (void) {
         glDeleteBuffers (1, &main_grid.vertex_buffer_object);
         main_grid.vertex_buffer_object = 0;
     } main_grid.line_vertex_count = 0;
+    traj_line_cleanup (&main_traj);
     wireframe_invalidate_cache ();
     grid_invalidate_cache ();
 }
@@ -260,6 +267,16 @@ void render_scene_current (int widget_width, int widget_height) {
     float view_matrix_flat_array [16];
     math4_to_flat_array (view_matrix, view_matrix_flat_array);
     grid_render (&main_grid, utility_shader_program, view_matrix, projection_matrix);
+    /* Purple predicted shot path (ftc_traj.c). Upload here, not in the tick,
+     * so the GL context is current; ftc_traj.c only fills CPU points. */
+    {
+        const vector3 *tpts = NULL;
+        int tn = ftc_traj_points (&tpts);
+        if (tn >= 2) {
+            traj_line_update (&main_traj, tpts, tn);
+            traj_line_render (&main_traj, utility_shader_program, view_matrix, projection_matrix);
+        }
+    }
     /* Frustum culling: extract the six inward-facing planes from the
      * column-major view-projection matrix (Gribb/Hartmann) and skip
      * packing/uploading/drawing fully-outside bodies. Bounding spheres
