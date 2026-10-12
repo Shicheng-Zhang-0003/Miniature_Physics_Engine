@@ -5,7 +5,9 @@
  *    zeroed by rigidbody_set_static — display-only is architectural fact).
  *  - positions: mapped mm used numerically as MPE metres ("1 unit = 1 mm
  *    S2-display", labeled in dumps) plus the stage offset (quarantine from
- *    play bodies; default (0,120,0), inside the +/-250 m boundary box).
+ *    play bodies; default (0,20,-60), on the engine's default camera axis;
+ *    the offset targets the frame's bounding-box centre, not raw S2
+ *    coordinates). Override with $MGB_OX / $MGB_OY / $MGB_OZ.
  *  - bonds: spring joints with k=0, c=0, L0 = current length. Hooke and
  *    damping are both exactly zero, so the solver is untouched AND the
  *    renderer still draws the magenta joint lines. Never physical springs.
