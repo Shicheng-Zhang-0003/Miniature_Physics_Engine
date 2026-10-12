@@ -569,9 +569,9 @@ int mpe_t_mass_properties (void) {
         MPE_CHECK_NEAR (&t, w.bodies [c].half_extensions.z, r, 1e-6f, "cylinder half_ext z = radius");
     }
     /* THE FINDING: this fixture clamped nothing, so nothing was rewritten. */
-    MPE_INFO ("fixture clamped nothing: mass=%lu radius=%lu half_length=%lu", mpe_clamp_mass_events,
-              mpe_clamp_radius_events, mpe_clamp_half_length_events);
-    MPE_CHECK (&t, mpe_clamp_mass_events == 0 && mpe_clamp_radius_events == 0 && mpe_clamp_half_length_events == 0);
+    MPE_INFO ("fixture clamped nothing: mass=%lu radius=%lu half_length=%lu", mpe_clamp_mass_total (),
+              mpe_clamp_radius_total (), mpe_clamp_half_length_total ());
+    MPE_CHECK (&t, mpe_clamp_mass_total () == 0 && mpe_clamp_radius_total () == 0 && mpe_clamp_half_length_total () == 0);
     physics_world_cleanup (&w);
     /* And the counters must actually FIRE when the input is out of range --
      * an observability mechanism that never triggers is not one. */
@@ -581,11 +581,11 @@ int mpe_t_mass_properties (void) {
         mpe_clamp_counters_reset ();
         int s = physics_world_add_sphere (&w2, 0.5f, 1e-9f, (vector3) {0.0f, 60.0f, 0.0f});
         MPE_CHECK (&t, s >= 0);
-        MPE_CHECK (&t, mpe_clamp_mass_events > 0);
+        MPE_CHECK (&t, mpe_clamp_mass_total () > 0);
         /* and the substitution is the documented 1e-4 floor, i.e. 100000x
          * heavier than asked -- the number that makes this worth reporting */
         MPE_INFO ("1e-9 kg requested -> %g kg stored (clamp events=%lu)", (double) w2.bodies [s].mass,
-                  mpe_clamp_mass_events);
+                  mpe_clamp_mass_total ());
         MPE_CHECK_NEAR (&t, w2.bodies [s].mass, 1e-4f, 1e-9f, "clamped mass floor");
         physics_world_cleanup (&w2);
     } mpe_clamp_counters_reset ();

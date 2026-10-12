@@ -102,7 +102,7 @@ CORE="$SRC/core/physics_world.c $SRC/core/rigidbody.c $SRC/core/mpe_registry.c $
 FTC="$MFS/modules/ftc/ftc_module.c $MFS/modules/ftc/ftc_fleet.c $MFS/modules/ftc/submodules/robot.c $MFS/modules/ftc/submodules/drivetrain.c $MFS/modules/ftc/submodules/motor.c $MFS/modules/ftc/submodules/motor_presets.c $MFS/modules/ftc/submodules/battery.c"
 MOD1_SRCS="$MFS/modules/module_1/mfs_module_1.c $MFS/modules/module_1/submodules/gamepad/gamepad.c"
 
-cd "$SRC"
+cd "$SRC" || { echo "[BUILD-FAIL] cannot cd to engine SRC=$SRC" >&2; exit 2; }
 # Engine-tree guard (embedded already proven above; standalone proven by
 # discovery): fail fast with the fix, not a gcc wall.
 if [ ! -f "$SRC/core/physics_world.c" ] || [ ! -d "$MFS/modules/ftc" ]; then

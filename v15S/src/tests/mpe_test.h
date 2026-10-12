@@ -62,11 +62,13 @@ typedef struct {
  *      instead of reporting a confident green.
  */
 /* Non-degenerate config = a config with a working solver in it. These are the
- * fields whose zero value silently disables physics rather than failing. */
+ * fields whose zero value silently disables physics rather than failing.
+ * DESPOT-2026-10-12 P17 fix: restitution==0 (brittle regime, inelastic) and
+ * friction extremes are legitimate material choices, NOT solver-off. The
+ * CONFIG-2026-09-29 class was iters=0/slop=0/bias=0 — gate only those. */
 static inline int mpe_cfg_is_degenerate (const mpe_config_t *c) {
     return (c == NULL) || (c -> timestep.solver_iterations < 1) || !(c -> solver.penetration_slop > 0.0f) ||
-           !(c -> solver.bias_factor > 0.0f) || !(c -> timestep.max_substeps >= 1) ||
-           !(c -> body_defaults.sphere_restitution > 0.0f) || !(c -> body_defaults.sphere_fric_s > 0.0f);
+           !(c -> solver.bias_factor > 0.0f) || !(c -> timestep.max_substeps >= 1);
 } /* Apply a named regime. Regimes exist so the suite can be run across a spread
  * of configurations: a physics invariant that holds at one setting and not
  * another is a bug that a single golden number cannot see. The defaults are
@@ -98,7 +100,7 @@ static inline const mpe_regime_t *mpe_regime_lookup (const char *name) {
     if (!r)
         return 0;
     if (r -> iterations >= 0)
-        g_cfg.timestep.solver_iterations = (float) r -> iterations;
+        g_cfg.timestep.solver_iterations = r -> iterations;
     if (g_cfg.world.gravity != 0.0f)
         g_cfg.world.gravity *= r -> gravity_mult;
     if (g_cfg.body_defaults.sphere_fric_s > 0.0f) {
@@ -133,6 +135,17 @@ static inline const mpe_regime_t *mpe_regime_lookup (const char *name) {
     } t -> cfg_saved = g_cfg;
     t -> cfg_active = 1;
     det_fallback_reset ();
+    /* DESPOT-2026-10-12 P17: refuse to certify a degenerate config. A zeroed
+     * g_cfg (iters=0, slop=0) steps the solver zero times and still reports
+     * green — the CONFIG-2026-09-29 class. mpe_cfg_is_degenerate existed but
+     * was never called here. Now it fails the case before any measurement. */
+    if (mpe_cfg_is_degenerate (&g_cfg)) {
+        t -> failures++;
+        printf ("[FAIL] %s: degenerate config at test begin (iters=%d slop=%.6g bias=%.6g) — "
+                "solver is off, measurement would be fiction\n",
+                name, g_cfg.timestep.solver_iterations, (double) g_cfg.solver.penetration_slop,
+                (double) g_cfg.solver.bias_factor);
+    }
 } /* DESPOT-2026-09-29: the header claimed "determinism counters asserted zero"
  * and mpe_test_end did not assert them -- only 1 of 32 tests did, by hand. A
  * libm fallback inside a test is a silent cross-platform determinism escape,

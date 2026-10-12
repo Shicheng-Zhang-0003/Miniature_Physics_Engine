@@ -18,6 +18,7 @@
 #include "mpe_test.h"
 #include "core/mpe_registry.h"
 #include "core/mpe_loader.h"
+#include "physics/broadphase.h"
 #include "scene/scene_load.h"
 #include "scene/scene_saving.h"
 /* stack FIXED: v1 placed 6 cubes on the frictionless emergency clamp, so
@@ -358,6 +359,15 @@ int mpe_t_f10_long_run (void) {
     MPE_CHECK (&t, fin_lin < 0.25f && fin_ang < 0.5f);
     MPE_CHECK (&t, run_max_lin < 2.0f && run_max_ang < 2.0f);
     MPE_CHECK (&t, asleep == dynamic_n && dynamic_n > 0);
+    /* DESPOT-2026-10-12 P5: pair-buffer exhaustion drops pairs silently with
+     * no fail-closed fallback (nodes have one; pairs do not). A dropped pair
+     * is a missed collision — false free-flight. Gate zero overflow here so
+     * the calm above is proven to come from solved contacts, not skipped ones. */
+    MPE_INFO ("overflow: nodes=%d pairs=%d dedupe=%d manifolds=%d", broadphase_get_node_overflow_count (&w),
+              broadphase_get_pair_overflow_count (&w), broadphase_get_pair_dedupe_overflow_count (&w),
+              w.manifold_overflow_count);
+    MPE_CHECK (&t, broadphase_get_pair_overflow_count (&w) == 0);
+    MPE_CHECK (&t, w.manifold_overflow_count == 0);
     physics_world_cleanup (&w);
     /* ---- Phase 2 (DESPOT-2026-10-03): THE `fallen` GATE, MADE REAL.
      *
@@ -477,6 +487,16 @@ int mpe_t_sleep_contact_wake (void) {
 } /* DESPOT-2026-10-03: worst PAIRWISE cube-cube overlap, measured with the
  * engine's own SAT + face clip so the number is the same quantity the solver
  * works against, not an AABB approximation.
+ *
+ * DESPOT-2026-10-12 M2 HONESTY NOTE: this is SUT-measures-SUT — a SAT
+ * false-negative (missed axis, overlap<-slop early-out) reports no manifold
+ * and contributes 0 to "worst", so a narrowphase hole hides inside the green.
+ * Bounded, not closed: the overlap DECISION is independently gated 400/400
+ * vs a dense Gottschalk reference (mpe_t_reference_math §1), so a broad SAT
+ * hole would fire there; what remains open is DEPTH agreement on hits. Full
+ * fix is an independent brute-force vertex-face depth in this probe. Until
+ * then the gate is scoped to the fixed seed it can certify (0xC0FFEE,
+ * 0.0100 m vs 0.8409 m pre-fix, bound 0.05 m), not a distribution claim.
  *
  * This exists because "cubes phasing into each other like they are hollow" was
  * a REAL, VISIBLE defect with NO gate anywhere: f10_long_run and f11_torture

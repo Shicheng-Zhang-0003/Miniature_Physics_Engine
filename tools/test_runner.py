@@ -625,6 +625,17 @@ class Runner:
         for _test, _message in _mfs_skips:
             self.add(f"mfs-skip/{_test}", "mfs", "SKIP", kind="skip-marker", severity="skip",
                      log=result.log, detail=_message or "MFS case self-skipped its coverage")
+        # DESPOT-2026-10-12 P4: MFS SKIPs were always green. Suite-v2 fails the
+        # strict contract on any self-skip unless --allow-skip; MFS must match,
+        # or a CWD-dependent [SKIP] (e.g. loader_lifecycle off-SRC_DIR) hides
+        # missing coverage inside a green line — the 220->204 drift class.
+        if _mfs_skips and not self.allow_skip:
+            self.add("mfs-skip-contract", "mfs", "FAIL", kind="contract", return_code=None,
+                     log=result.log,
+                     detail=f"{len(_mfs_skips)} MFS case(s) self-skipped "
+                            f"({', '.join(sorted({t for t, _ in _mfs_skips}))}); "
+                            f"strict contract requires --allow-skip to accept skips")
+            return False
         if _mfs_xfails:
             _shown = "; ".join(_mfs_xfails[:5])
             if len(_mfs_xfails) > 5:

@@ -11,7 +11,15 @@ int main (void) {
     /* Test 1: Poisson restitution - bounce series follows Newton-bound e*compression.
      * Sequential impulse with Poisson restitution: each bounce pays e over
      * the compression impulse, not e^2 per apex. Apex ratio approaches e (not e^2)
-     * due to energy loss in solver iterations and discrete time stepping. */
+     * due to energy loss in solver iterations and discrete time stepping.
+     * DESPOT-2026-10-12 M1: the old oracle read
+     *   incoming=-manifolds[0].contacts[0].impact_velocity; sample=vy/incoming
+     * but collision_apply_poisson_restitution computes
+     *   newton_bound=e*(-impact_velocity)*m_eff, so it divided the solver's
+     * output by the solver's own recorded input — an algebraic identity,
+     * exactly e to 6 decimals for every e, failing only if plumbing vanished.
+     * Fixed to the suite_a trajectory oracle: rebound/impact ratio from the
+     * body's OWN velocity history, plus the e^2 apex-energy cross-check. */
     {
         physics_world world;
         physics_world_init (&world);
@@ -37,9 +45,9 @@ int main (void) {
             physics_world_step (&world, dt);
             rigidbody *b = &world.bodies [s];
             if (previous_vy < 0.0f && b -> velocity.y > 0.0f && restitution_count < 4) {
-                float incoming = (world.manifolds && world.manifolds [0].contact_count > 0)
-                    ? -world.manifolds [0].contacts [0].impact_velocity
-                : 0.0f;
+                /* Body-measured: pre-bounce speed from trajectory history, not
+                 * manifold bookkeeping (see M1 note above). */
+                float incoming = -previous_vy;
                 restitution_samples [restitution_count++] = (incoming > 0.0f) ? b -> velocity.y / incoming : 0.0f;
             }
             if (previous_vy > 0.0f && b -> velocity.y <= 0.0f && apex_count < 4) {
@@ -57,10 +65,10 @@ int main (void) {
             float error = fabsf (restitution_samples [i] - e);
             printf ("[INFO] bounce %d: apex=%.4f measured_e=%.5f expected_e=%.2f\n", i + 1, apex_heights [i],
                     restitution_samples [i], e);
-            /* Measure Newton restitution at the contact itself. Apex heights
-             * include CCD's substep position and are not a valid per-impact
-             * oracle when the solver advances only the remaining fraction. */
-            if (error > 0.03f) {
+            /* Body-measured ratio carries discrete-sampling spread (suite_a
+             * gates 0.10); the old 0.03 was the identity oracle's precision,
+             * not physics. */
+            if (error > 0.10f) {
                 printf ("[FAIL] bounce %d: measured restitution error %.4f\n", i + 1, error);
                 fail = 1;
             }

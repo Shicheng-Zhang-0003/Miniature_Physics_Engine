@@ -87,6 +87,14 @@ int tui_dump_snapshot (FILE *out, physics_world *world, unsigned long tick, floa
             !isfinite (rb -> restitution) || !isfinite (rb -> friction_static) || !isfinite (rb -> friction_kinetic)) {
             bad = 1;
         }
+    }
+    /* DESPOT-2026-10-12 P15: a finite dump with dropped pairs is not a PASS.
+     * Pair exhaustion drops collisions silently (no fail-closed fallback);
+     * the old [result] ignored it, so degraded physics printed PASS. Any
+     * overflow fails the dump. */
+    if (broadphase_get_pair_overflow_count (world) > 0 || broadphase_get_pair_dedupe_overflow_count (world) > 0 ||
+        broadphase_get_node_overflow_count (world) > 0 || world -> manifold_overflow_count > 0) {
+        bad = 1;
     } char b0 [160], b1 [160], b2 [320];
     fprintf (out, "### MPE-TUI snapshot tick=%lu time=%.4f dt=%.5f bodies=%d result=%s\n", tick, tick * (double) dt, dt,
              world -> body_count, bad ? "FAIL(non-finite)" : "PASS");

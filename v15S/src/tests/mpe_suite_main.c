@@ -18,6 +18,10 @@
 #include "core/rigidbody.h"
 #include "config/mpe_config.h"
 #include "config/mpe_constants.h"
+#include "physics/constraint.h"
+#include "physics/spring_joint.h"
+#include "physics/collision_mechanics.h"
+#include "scene/scene_id_remap.h"
 #include "ui_input/camera.h"
 #include "mpe_test.h" /* MPE_SKIPPED and the shared harness contract */
 /* ---- link stubs (same contract as v1 spring/scene tests) ---- */
@@ -44,12 +48,27 @@ void scene_note_loaded_id (uint32_t id) {
     if (id >= w -> next_object_id) { w -> next_object_id = id + 1; }
 }
 int scene_ensure_pool_capacity (int n) {
+    /* P3 note: stub always succeeds (real scene_init.c grows the pool and can
+     * fail). Suite bodies are added via physics_world_add_* (which grows),
+     * never via this stub, so the growth-failure path is covered by
+     * scene_roundtrip save/load, not here. Do not route suite growth here. */
     (void) n;
     return 1;
 }
 void scene_clear (void) {
+    /* DESPOT-2026-10-12 P3: the old stub zeroed body_count only, leaving
+     * spring/constraint pools, contact cache, id-remap and next_object_id
+     * stale across 45 in-process tests. Faithful subset of scene_init.c:553:
+     * clear both joint pools, contact cache, remap, and bump revision so the
+     * id-cache cannot serve a previous test's entries. Pool growth path
+     * (scene_load.c:514) is exercised via scene_roundtrip, not here. */
     physics_world *w = physics_world_get_primary ();
     w -> body_count = 0;
+    constraint_pool_init (w);
+    joint_init_pool (w);
+    contact_cache_clear (w);
+    scene_id_remap_reset ();
+    physics_world_bump_revision (w);
 } /* ---- test declarations (suite A/B/C) ---- */
 int mpe_t_two_world (void);
 int mpe_t_revolute (void);
