@@ -411,6 +411,20 @@ spinning BACKWARD (-11 to -15 mean) with its thrust flipped.
   sources are bit-identical (incl. chaotic pivot windows); the pivot regime
   itself is chaotic-sensitive (tiny formulation changes move late-window
   truth), which is why baselines here are regression bands, not oracles.
+- **BR lockup (intermittent, analyzed):** never reproduced sustained in
+  1200+ modulated ticks (longest stall-like run 1-3 ticks), but the
+  mechanism is on record: peel bursts fling wheels to 4x free speed
+  (measured peaks 100-116 rad/s, overspeed 36-47% of the time), the
+  governor diode then zeroes drive torque, and static grip grabs the wheel
+  to ~0 — the grab dwell reads as lockup. Design (over-torqued plant +
+  bang regulators), induced by peel: finer slew (0.6 -> 0.2) was tried for
+  the chatter and REVERTED (worst burst 116 -> 77 but overspeed fraction
+  unchanged 0.36 -> 0.37 — bursts are contact stick-slip snaps on
+  featherweight wheels, offset-contact normal torques up to ~28 rad/s per
+  tick at 3° tilt, not motor steps, so delivery granularity cannot calm
+  them; meanwhile drive authority starved: drive_directions fwd/str red,
+  tank blown further to 3.04/0.127, heavy-regime ftc_ecosystem red).
+  The 0.6 step reaching stall in ~7 ticks stays load-bearing for launches.
 
 Original record preserved below (it earned its keep: six negatives that
 must not be re-attempted blind, and the authorities cross-ref that
