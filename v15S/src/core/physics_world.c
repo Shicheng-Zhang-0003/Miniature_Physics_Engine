@@ -1299,8 +1299,11 @@ void physics_world_step (physics_world *world, float dt) {
             }
         }
     }
-    /* Axis-drift correction: exactly once per tick, never in the loop. */
-    constraint_correct_axis_drift_all (world, dt);
+    /* Axis-drift correction lives at end-of-step (after the final joint
+     * pass): the correction is a velocity tweak that must survive into
+     * integration. Placed here it was eaten by the post-Poisson joint solve
+     * (which kills ALL perp relative velocity, including the correction),
+     * so it never acted — see the post-rolling pass below. */
     /* Poisson restitution: one e-over-compression payment per fresh impact,
      * then short relaxation so friction sees post-bounce velocities. */
     /* TRUTH: joints must see post-bounce velocities too. Poisson without a
@@ -1315,6 +1318,12 @@ void physics_world_step (physics_world *world, float dt) {
             mpe_step_resolve (world, &world -> manifolds [m], dt, true, relax_iter, step_cfg);
         }
     }
+    /* DESPOT-2026-10-12 (ABUSE-TILT): joints re-equalize after the
+     * relaxation passes (see the post-rolling pass below for the mechanism);
+     * this one covers the relax->split window, the later one the
+     * rolling->integrate window. Both are velocity-only re-equalizations
+     * (no drift, no pre-step). */
+    constraint_solve_all (world, dt);
     /* Split impulse: positional depenetration with zero velocity change.
      * The velocity solve above is compression-only, so contact impulses
      * (and the Coulomb clamp) stay honest. */
@@ -1357,6 +1366,30 @@ void physics_world_step (physics_world *world, float dt) {
     }
     /* Rolling resistance once per tick (uses solved normal impulses). */
     mpe_step_rolling (world, world -> manifolds, manifold_count, dt, step_cfg);
+    /* DESPOT-2026-10-12 (ABUSE-TILT root cause): rolling's spin-decay about
+     * the contact normal cannot distinguish rigid co-rotation from slip, so
+     * on a hinge-driven wheel it strips the co-yaw the joint just gave it
+     * (measured post-final relperp 0.000 -> post-rolling 0.92 on a sustained
+     * combined drive; the chassis keeps yawing, the wheel does not follow,
+     * integration bakes the difference into hinge tilt at the chassis yaw
+     * rate). Same single-principle pass as above: re-equalize after every
+     * out-of-loop velocity stage, so the joints — not contacts, not rolling —
+     * have the final word going into integration. Velocity-only solve, no
+     * drift, no pre-step. Hinge-parallel spin rolling legitimately removed
+     * is untouched by axis/P2P rows (parallel component is not constrained);
+     * co-rotation the joint owns is restored. */
+    constraint_solve_all (world, dt);
+    /* Axis-drift correction, relocated end-of-step (DESPOT-2026-10-12,
+     * ABUSE-TILT): exactly once per tick, after every velocity-touching
+     * stage, so the corrective velocity survives into integration. In its
+     * old slot (pre-Poisson) the very next joint solve removed the
+     * correction as "spin error" and orientation error never decayed
+     * (measured: drift injected 1.5 rad/s at 14° tilt, post-joint read
+     * 0.001 — full erasure). With joints holding per-tick equality AND
+     * drift decaying residual angle, tilt is bounded with recovery:
+     * error *= (1-beta) per tick plus only fresh injection. Still never
+     * inside the iteration loop (pendulum-9x energy pump rule stands). */
+    constraint_correct_axis_drift_all (world, dt);
     /* Sleeping bodies already hold real mass (no staticize was applied),
      * so no restore is needed. Keep velocities pinned at zero. */
     for (int sleep_restore_index = 0; sleep_restore_index < world -> body_count; sleep_restore_index++) {

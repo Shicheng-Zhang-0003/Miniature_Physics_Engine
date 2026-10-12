@@ -345,9 +345,9 @@ void simulation_physics_tick (float frame_delta_time) {
                 }
             }
         }
-        /* Positional axis-drift correction: exactly once per substep, never
-         * in the loop above (see revolute_joint.c). */
-        constraint_correct_axis_drift_all (world, fixed_physics_dt);
+        /* Axis-drift correction lives at end-of-substep (parity with
+         * physics_world.c): the pre-Poisson slot let the next joint solve
+         * erase the correction before integration. */
         /* Poisson restitution + joint relaxation + friction relaxation
          * (see physics_world.c). */
         if (world -> solver_if && world -> solver_if -> poisson) { world -> solver_if -> poisson (world, world -> manifolds, manifold_count, world -> solver_state); } else {
@@ -366,6 +366,11 @@ void simulation_physics_tick (float frame_delta_time) {
                 }
             }
         }
+        /* DESPOT-2026-10-12 (ABUSE-TILT root cause, parity with
+         * physics_world.c): joints must see post-relaxation velocities too —
+         * relaxation contacts otherwise re-separate what the joints
+         * equalized and integration bakes it into hinge tilt. */
+        constraint_solve_all (world, fixed_physics_dt);
         /* TRUTH: split was missing on legacy (sank to slop). Add it + the
          * post-split wake revisit (see physics_world.c). */
         if (world -> solver_if && world -> solver_if -> split) { world -> solver_if -> split (world, world -> manifolds, manifold_count, fixed_physics_dt, world -> solver_state); } else { collision_apply_split_impulse (world -> manifolds, manifold_count, fixed_physics_dt, leg_step_cfg); }
@@ -383,6 +388,15 @@ void simulation_physics_tick (float frame_delta_time) {
         }
         /* Rolling resistance once per tick (uses solved normal impulses). */
         if (world -> solver_if && world -> solver_if -> rolling) { world -> solver_if -> rolling (world, world -> manifolds, manifold_count, fixed_physics_dt, world -> solver_state); } else { collision_apply_rolling_resistance (world -> manifolds, manifold_count, fixed_physics_dt, leg_step_cfg); }
+        /* DESPOT-2026-10-12 (ABUSE-TILT parity with physics_world.c):
+         * rolling strips hinge co-rotation; re-equalize so joints have the
+         * final word going into integration. */
+        constraint_solve_all (world, fixed_physics_dt);
+        /* Axis-drift correction, relocated end-of-substep (parity with
+         * physics_world.c): exactly once per substep, after every
+         * velocity-touching stage, so the corrective velocity survives
+         * into integration. Still never inside the iteration loop. */
+        constraint_correct_axis_drift_all (world, fixed_physics_dt);
         contact_cache_save (world, world -> manifolds, manifold_count); /* MFS_131A: legacy global fallback cache */
         /* No sleep restore needed (no staticize was applied). Pin velocities. */
         for (int sleep_restore_index = 0; sleep_restore_index < world -> body_count; sleep_restore_index++) {
