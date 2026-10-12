@@ -1,12 +1,26 @@
 # Remaining Work
 
 > Live TODO. Dated history below is preserved; current counts/gates are in
-> `docs/DESPOT_AUDIT_2026-10-07.md` (44/42; 232+2 xfail/234). The 2026-10-01
-> audit's 41/42 denominators are superseded.
+> `docs/DESPOT_AUDIT_2026-10-12.md` (quick 59/59; physics 104/105 with the
+> single red the pre-existing `legacy-f11_torture`; TUI smoke PASS with the
+> new overflow gate). Prior notes: 2026-10-09 counts in `RELEASE_GATES.md`
+> (45 registered / 43 blocking; full 226 total, 220 passed, 6 blocking, 4
+> informational); 2026-10-07 (44/42; 232+2 xfail/234); 2026-10-01 (41/42).
 >
-> **Superseded 2026-10-09 by the counts in `RELEASE_GATES.md`:** 45 registered
-> / 43 blocking; runner quick 59/59; runner full 226 total, 220 passed,
-> **6 blocking failures**, 4 informational.
+> **2026-10-12 despot sweep closed:** P1 OOB attach/detach, P2 config
+> `mkstemp`, P3 suite scene stubs, P4 MFS SKIP contract, P5 pair-overflow
+> gates (F10 + TUI), P6 CCD margin race, P7 step-counter atomics, P8 legacy
+> joint bound + revision bump, P11 terminal safe int casts, P13 Windows batch,
+> P15 TUI overflow FAIL, P16 torture-snapshot guard, P17 degenerate-config
+> assert (narrowed to solver-off after brittle caught the over-gate), P20 MGB
+> `mkstemp` + symlink refusal, P21 `cd` guard; M1 restitution oracle, M3
+> manifold area metric, M4 clamp-counter atomics, M10 bias-factor help, M12
+> Hertz label. Open/bounded items are ticketed in
+> `docs/DESPOT_AUDIT_2026-10-12.md` (warm-start carry, Gottschalk depth,
+> oblique-L oracle, per-phase friction, TSan, MSVC, MT solve, jail, joint
+> codes, state hash, `MATH_G_N`, drag oracle, angmom vector, ellipse,
+> `-Werror` CI). Twin drift (`461-MFS`, `472-MGB`) pre-exists and is tracked
+> there, not fixed here.
 
 ## Open 2026-10-09 — S2 bridge, diagnostics, and three known reds
 
