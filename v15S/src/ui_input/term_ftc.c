@@ -84,7 +84,13 @@ static int ftc_ensure_floor (physics_world *w) {
         return -1;
     w -> bodies [f].friction_static = 1.0f;
     w -> bodies [f].friction_kinetic = 0.8f;
-    w -> bodies [f].restitution = 0.0f;
+    /* NEUTRAL restitution (min-combine => body e), matching the engine's
+     * infinite static plane (physics_world.c: static_plane_body.restitution
+     * = 1.0, "neutral"). A hard e=0 slab here overrode every ball's own
+     * bounce via the fminf combine in collision_solver.c:942, so arcade
+     * pieces (e=0.65) landed dead. Robots carry e=0 themselves, so min()
+     * still kills their bounce — only pieces rebound. */
+    w -> bodies [f].restitution = 1.0f;
     term_out ("mpe: ftc: tile floor added (robots need frictional contact)\n");
     return 1;
 } /* Perimeter walls: static thin boxes on the four edges of the tile field
@@ -116,7 +122,10 @@ static int ftc_ensure_walls (physics_world *w, float half, float height) {
             return -1;
         w -> bodies [wall].friction_static = 1.0f;
         w -> bodies [wall].friction_kinetic = 0.8f;
-        w -> bodies [wall].restitution = 0.0f;
+        /* Neutral restitution: pieces bounce off the perimeter like off the
+         * floor (min-combine => body e). e=0 here made every wall a dead
+         * stop; robots still lose their bounce via their own e=0. */
+        w -> bodies [wall].restitution = 1.0f;
     } return 0;
 } /* Ensure the ftc-fleet tick module drives the primary world (idempotent).
  * Returns 0 when driving, -1 when the bundle is missing. Engine APIs
