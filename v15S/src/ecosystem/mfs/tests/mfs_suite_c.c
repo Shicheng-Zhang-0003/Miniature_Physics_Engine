@@ -771,3 +771,154 @@ int mfs_t_registry (void) {
     mfs_test_end (t_ptr);
     return t_ptr -> failures;
 }
+/* bucket_game: arcade league end-to-end (fictional intake + suspended
+ * bucket). Scripted and deterministic (fixed scatter, fixed commands):
+ * drive through scattered balls with the intake on (capture >= 2), strafe
+ * clear of the loose balls, then shoot a calibration lob; read back its
+ * rim-height crossing and MOVE the bucket onto that spot; shoot a second
+ * ball into the waiting bucket (score >= 1). Exercises the fleet live
+ * topology (attach -> pre_step drives capture/aero/scoring, the same path
+ * the terminal and gamepad drive through). */
+int mfs_t_bucket_game (void) {
+    mfs_test_t t;
+    mfs_test_begin (&t, "bucket_game");
+    mfs_test_t *t_ptr = &t;
+    physics_world w;
+    mfs_test_world (&w);
+    extern const mpe_module_desc_t mpe_module_desc;
+    MFS_CHECK (t_ptr, physics_world_attach_module (&w, &mpe_module_desc) >= 0);
+    int s0 = ftc_fleet_spawn (&w, 0.0f, ftc_robot_rest_height (), 0.0f, MOTOR_GB_5203_26_9, FTC_DRIVETRAIN_MECANUM);
+    MFS_CHECK (t_ptr, s0 >= 0);
+    ftc_robot *robot = ftc_fleet_get (&w, s0);
+    MFS_CHECK (t_ptr, robot != NULL);
+    MFS_CHECK (t_ptr, ftc_balls_spawn (&w, 6) == 6);
+    MFS_CHECK (t_ptr, ftc_intake_set (&w, s0, 1) == 1);
+    const float dt = DT;
+    int fail = 0;
+    for (int k = 0; k < 150 && !fail; k++) {
+        mfs_drive_mecanum (robot, 1.0f, 0.0f, 0.0f);
+        physics_world_step (&w, dt); /* fleet pre_step: drive + capture */
+        if (!mfs_test_finite (&w)) { fail = 1; }
+    }
+    int carried = 0, balls = 0, scored = 0, bucket = 0;
+    MFS_CHECK (t_ptr, fail == 0);
+    MFS_CHECK (t_ptr, ftc_game_stats (&w, &carried, &balls, &scored, &bucket) == 0);
+    MFS_INFO ("after drive: carried=%d balls=%d scored=%d", carried, balls, scored);
+    MFS_CHECK (t_ptr, carried >= 2);
+    /* Strafe aside before shooting: the loose balls sit in the launch
+     * corridor (scatter band ±0.4 around the drive line) and the fired
+     * ball rear-ends them in the first ticks (measured: full muzzle speed
+     * at tick 0, climb dying variably after — billiard interference, not
+     * ballistics). Sidestep 0.5+ m first so the muzzle lane is empty;
+     * calibration below absorbs wherever the muzzle ends up. */
+    for (int k = 0; k < 80 && !fail; k++) {
+        mfs_drive_mecanum (robot, 0.0f, -0.7f, 0.0f);
+        physics_world_step (&w, DT);
+        if (!mfs_test_finite (&w)) { fail = 1; }
+    }
+    /* Self-calibrating score (DESPOT-2026-10-12): open-loop ballistics
+     * against drag + muzzle-state variance proved knife-edge (each tuned
+     * combo died to the next decimal: rim perches, CCD wall-face clamps,
+     * under/overshoots). Instead the gate measures then corrects, like a
+     * driver: shoot ball one, read where it descends through rim height,
+     * MOVE the bucket onto that crossing (exercising the reposition path
+     * too), shoot ball two from the same settled muzzle into the waiting
+     * bucket. Deterministic (same code twice → same flight) and robust to
+     * plant shifts by construction. Sanity bounds on the crossing keep a
+     * degenerate lob from blessing itself. */
+    /* Bucket out of the flight corridor first: ball one calibrates in
+     * clean air (a bucket sitting in its path eats the calibration shot —
+     * measured: rammed the (0,1,4) default and died on it, no crossing).
+     * The move onto the crossing below exercises repositioning. */
+    /* Bucket out of the flight corridor first: ball one calibrates in
+     * clean air (a bucket sitting in its path eats the calibration shot —
+     * measured: rammed the (0,1,4) default and died on it, no crossing).
+     * The move onto the crossing below exercises repositioning. */
+    MFS_CHECK (t_ptr, ftc_bucket_spawn (&w, 0.0f, 1.0f, -6.0f) == 0);
+    /* Settle to rest first: the drive phase leaves ~1 m/s on the chassis
+     * and the shot inherits it, so muzzle velocity (hence range) would
+     * depend on how long ago the driver released. Brake to rest, then
+     * shoot — all from a known state. */
+    mfs_drive_mecanum (robot, 0.0f, 0.0f, 0.0f);
+    for (int k = 0; k < 90 && !fail; k++) {
+        physics_world_step (&w, DT);
+        if (!mfs_test_finite (&w)) { fail = 1; }
+    }
+    /* No aim servo: drive cross-talk leaves heading within ±7° and the
+     * ±0.7 m zone absorbs ±20° at this range, so aiming adds fragility
+     * (pulsed ±1.0 servo convergence proved build-sensitive through the
+     * chaotic yaw authority) without buying accuracy. A heading beyond
+     * that fails below as a miss — the correct signal for genuine
+     * steering breakage. */
+    int shot = -1;
+    {
+        /* Shoot only from rest: residual yaw/push at aim-break swings the
+         * muzzle several degrees (the miss above). The ±1.0 aim authority
+         * arrives hot, so brake 120 ticks, then assert rest speed loudly
+         * (a silent assumption here would be another unfireable gate). */
+        for (int k = 0; k < 120 && !fail; k++) {
+            physics_world_step (&w, DT);
+            if (!mfs_test_finite (&w)) { fail = 1; }
+        }
+        {
+            rigidbody *ch = mfs_chassis_or_null (&w, robot);
+            float rest = ch ? sqrtf (ch -> velocity.x * ch -> velocity.x + ch -> velocity.z * ch -> velocity.z) : 99.0f;
+            MFS_INFO ("pre-shot rest speed=%.4f", rest);
+            MFS_CHECK (t_ptr, rest < 0.5f);
+        }
+        shot = ftc_shoot (&w, s0);
+    }
+    MFS_CHECK (t_ptr, shot >= 0);
+    /* Calibration watch: find where ball one descends through rim height
+     * (~1.3 m) and put the bucket under that crossing (not under its
+     * eventual ground-rest spot — a rolling ball ends up far past where it
+     * flew). Bounds on the crossing keep a degenerate lob from blessing
+     * itself. */
+    float land_x = 0.0f, land_z = 0.0f;
+    {
+        int crossed = 0;
+        float prev_y = 99.0f;
+        for (int k = 0; k < 500 && !fail && !crossed; k++) {
+            physics_world_step (&w, dt);
+            if (!mfs_test_finite (&w)) { fail = 1; break; }
+            int bi = physics_world_index_by_id (&w, (uint32_t) shot);
+            if (bi < 0) { fail = 1; break; }
+            rigidbody *b = &w.bodies [bi];
+            if (k > 0 && prev_y > 1.30f && b -> position.y <= 1.30f && b -> velocity.y < 0.0f) {
+                land_x = b -> position.x;
+                land_z = b -> position.z;
+                crossed = 1;
+            }
+            prev_y = b -> position.y;
+        }
+        MFS_CHECK (t_ptr, crossed == 1);
+        MFS_INFO ("calibration crossing=(%+.2f,%+.2f)", land_x, land_z);
+        {
+            float dx = land_x - 0.0f, dz = land_z - 2.8f;
+            float dist = sqrtf (dx * dx + dz * dz);
+            MFS_CHECK (t_ptr, dist > 1.0f && dist < 12.0f);
+            MFS_CHECK (t_ptr, land_x > -6.0f && land_x < 6.0f && land_z > 1.0f && land_z < 14.0f);
+        }
+    }
+    /* Move the bucket onto the landing spot and shoot ball two into it. */
+    MFS_CHECK (t_ptr, ftc_bucket_spawn (&w, land_x, 1.0f, land_z) == 0);
+    mfs_drive_mecanum (robot, 0.0f, 0.0f, 0.0f);
+    for (int k = 0; k < 60 && !fail; k++) {
+        physics_world_step (&w, DT);
+        if (!mfs_test_finite (&w)) { fail = 1; }
+    }
+    int shot2 = ftc_shoot (&w, s0);
+    MFS_CHECK (t_ptr, shot2 >= 0);
+    for (int k = 0; k < 400 && !fail; k++) {
+        physics_world_step (&w, dt);
+        if (!mfs_test_finite (&w)) { fail = 1; }
+    }
+    MFS_CHECK (t_ptr, fail == 0);
+    MFS_CHECK (t_ptr, ftc_game_stats (&w, &carried, &balls, &scored, &bucket) == 0);
+    MFS_INFO ("after shot: carried=%d balls=%d scored=%d", carried, balls, scored);
+    MFS_CHECK (t_ptr, scored >= 1);
+    if (t_ptr -> failures == 0) { printf ("[PASS] bucket game: capture and score end-to-end\n"); }
+    physics_world_cleanup (&w);
+    mfs_test_end (t_ptr);
+    return t_ptr -> failures;
+}

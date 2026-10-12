@@ -27,6 +27,7 @@ extern int mfs_t_stall_endpoint (void);
 extern int mfs_t_intake_stop (void);
 extern int mfs_t_shooter_axis (void);
 extern int mfs_t_ball_spin (void);
+extern int mfs_t_bucket_game (void);
 static const mfs_test_entry_t registry [] = {
     {"teleop", mfs_t_teleop, false},
     {"mecanum", mfs_t_mecanum, false},
@@ -45,6 +46,7 @@ static const mfs_test_entry_t registry [] = {
     {"intake_stop", mfs_t_intake_stop, false},
     {"shooter_axis", mfs_t_shooter_axis, false},
     {"ball_spin", mfs_t_ball_spin, false},
+    {"bucket_game", mfs_t_bucket_game, false},
 };
 int main (int argc, char **argv) {
     if (argc > 1 && strcmp (argv [1], "--list") == 0) {
