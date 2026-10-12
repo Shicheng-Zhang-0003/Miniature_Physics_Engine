@@ -881,6 +881,17 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
                     prev = 0.0f;
                 float want = torque;
                 float dl = want - prev;
+                /* DESPOT-2026-10-12 (SKATE chatter granularity TRIED AND
+                 * REVERTED): 0.2 still clears the cone but kicks 3x softer
+                 * was the theory; measured it starves drive authority
+                 * instead (drive_directions fwd.vz/str.vx < 0.5 red, tank
+                 * pivot blown further to 3.04/0.127) while barely denting
+                 * chatter (overspeed fraction 0.36 -> 0.37 — the bursts are
+                 * contact stick-slip snaps on featherweight wheels, not
+                 * motor steps, so finer delivery cannot calm them). The 0.6
+                 * step that reaches stall in ~7 ticks is load-bearing for
+                 * launches; chatter amplitude stays an open plant item
+                 * (cone-budget feedforward, MOTOR-II). */
                 const float max_slew = 0.6f;
                 if (dl > max_slew)
                     want = prev + max_slew;
