@@ -124,7 +124,7 @@ static int dladdr_failed = 0;
  * any checkout name, and it can never hand back a non-existent path. */
 #define S2_REL_MAX_UP 14
 static int find_s2tui_upward (const char *from_dir, char *out, size_t out_cap) {
-    const char *rel = "4179-Magi/S2/biological/v9R4/s2tui";
+    const char *rel = "4179-Magi/s2tui";
     char dir [PATH_MAX];
     if (!from_dir || !*from_dir) { return 0; }
     snprintf (dir, sizeof (dir), "%s", from_dir);
