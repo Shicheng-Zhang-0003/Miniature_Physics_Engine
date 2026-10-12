@@ -34,6 +34,9 @@ static int s_pad_open_attempted = 0;
 static int s_frames_since_retry = 0;
 static int s_control_enabled = 1; /* START toggles; default ON like module_1 */
 static int s_prev_start = 0;
+static int s_prev_a = 0;
+static int s_prev_y = 0;
+static int s_prev_b = 0;
 static int s_was_commanding = 0;
 static int s_active = 0;
 static int s_reported_stage = -1;
@@ -156,6 +159,29 @@ void gamepad_drive_tick (void) {
     if (start_now && !s_prev_start)
         s_control_enabled = !s_control_enabled;
     s_prev_start = start_now;
+    /* Arcade game buttons (mirror module_1: A intake toggle, B eject, Y
+     * shoot). Edge-triggered; symbols resolve from the bundle and may be
+     * NULL on older builds — then the buttons quietly do nothing. */
+    {
+        int a_now = s_pad_button (&s_pad, gamepad_button_a) ? 1 : 0;
+        int y_now = s_pad_button (&s_pad, gamepad_button_y) ? 1 : 0;
+        int b_now = s_pad_button (&s_pad, gamepad_button_b) ? 1 : 0;
+        /* Re-resolved every tick (P0-2: never hold dlsym'd pointers across
+         * an unload boundary). */
+        int (*s_toggle) (struct physics_world *, int) =
+            (int (*) (struct physics_world *, int)) gpd_sym ("ftc_intake_toggle");
+        int (*s_shoot) (struct physics_world *, int) =
+            (int (*) (struct physics_world *, int)) gpd_sym ("ftc_shoot");
+        int (*s_eject) (struct physics_world *, int) =
+            (int (*) (struct physics_world *, int)) gpd_sym ("ftc_eject");
+        physics_world *wg = physics_world_get_primary ();
+        if (a_now && !s_prev_a && s_toggle && wg) { s_toggle (wg, 0); }
+        if (y_now && !s_prev_y && s_shoot && wg) { s_shoot (wg, 0); }
+        if (b_now && !s_prev_b && s_eject && wg) { s_eject (wg, 0); }
+        s_prev_a = a_now;
+        s_prev_y = y_now;
+        s_prev_b = b_now;
+    }
     physics_world *w = physics_world_get_primary ();
     ftc_robot *r = (w && s_fleet_get) ? s_fleet_get (w, 0) : NULL;
     if (!r) {

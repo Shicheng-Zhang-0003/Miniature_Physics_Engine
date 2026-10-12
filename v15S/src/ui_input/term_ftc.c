@@ -1,11 +1,17 @@
-/* `ftc` terminal command — spawn and inspect the single robot.
+/* `ftc` terminal command — spawn and inspect the single robot, plus the
+ * arcade game league (fictional intake, balls, suspended bucket).
  *
  * Streamlined 2026-10-04 (v15S release blocker): one field, one robot, one
  * controller, full mecanum drive — and the controller is the physical F310
- * gamepad (see ui_input/gamepad_drive.c), NOT the terminal. Exactly two
- * verbs remain:
+ * gamepad (see ui_input/gamepad_drive.c), NOT the terminal. Verbs:
  *   ftc spawn [x y z]          spawn THE mecanum robot (refuses when one exists)
- *   ftc telemetry               pose, odometry, battery, wheels
+ *   ftc telemetry               pose, odometry, battery, wheels, game state
+ *   ftc intake on|off           fictional intake capture on/off
+ *   ftc eject                   drop carried balls (no launch)
+ *   ftc shoot                   launch oldest carried ball at the bucket arc
+ *   ftc balls [n]               scatter n arcade balls ahead (default 3)
+ *   ftc bucket [x y z]          spawn/move the suspended bucket (default 0 1.0 4.0)
+ *   ftc score                   carried / balls / scored / bucket readout
  * Requires the bundle: `mod load ecosystem/mfs/mfs_ecosystem.so` first
  * (symbols resolve from the loaded handle; the engine never links FTC).
  * Spawn auto-attaches the ftc-fleet module to the primary world and ensures
@@ -120,7 +126,7 @@ static void ftc_ensure_iterations (void) {
 }
 void cmd_ftc (int argc, char **argv) {
     if (argc < 2) {
-        term_err ("mpe: ftc: usage: ftc spawn [x y z] | telemetry\n");
+        term_err ("mpe: ftc: usage: ftc spawn [x y z] | telemetry | intake on|off | eject | shoot | balls [n] | bucket [x y z] | score\n");
         return;
     } physics_world *w = physics_world_get_primary ();
     /* Single-robot accessors (index 0 implied; bundle API keeps indices). */
@@ -204,6 +210,126 @@ void cmd_ftc (int argc, char **argv) {
             snprintf (buf, sizeof (buf), "mpe: ftc: wheel %d cmd=%+.2f rpm=%+.0f I=%+.2fA\n", k,
                       r -> wheel_motors [k].command, r -> wheel_motors [k].rpm, r -> wheel_motors [k].current);
             term_out (buf);
-        } return;
-    } term_err ("mpe: ftc: unknown subcommand (spawn|telemetry)\n");
+        }
+        {
+            int (*p_stats) (struct physics_world *, int *, int *, int *, int *) =
+                (int (*) (struct physics_world *, int *, int *, int *, int *)) ftc_sym ("ftc_game_stats");
+            if (p_stats) {
+                int carried = 0, balls = 0, scored = 0, bucket = 0;
+                if (p_stats (w, &carried, &balls, &scored, &bucket) == 0) {
+                    snprintf (buf, sizeof (buf), "mpe: ftc: game carried=%d balls=%d scored=%d bucket=%s intake=%s\n",
+                              carried, balls, scored, bucket ? "up" : "--",
+                              r -> intake_on ? "on" : "off");
+                    term_out (buf);
+                }
+            }
+        }
+        return;
+    }
+    /* Arcade game verbs: all dlsym'd (bundle holds the implementation). */
+    if (term_str_eq (argv [1], "intake")) {
+        int (*p_set) (struct physics_world *, int, int) =
+            (int (*) (struct physics_world *, int, int)) ftc_sym ("ftc_intake_set");
+        if (!p_set || !w) {
+            term_err ("mpe: ftc: bundle API incomplete\n");
+            return;
+        }
+        int on = (argc > 2 && (term_str_eq (argv [2], "off") || term_str_eq (argv [2], "0"))) ? 0 : 1;
+        int rc = p_set (w, 0, on);
+        if (rc < 0) {
+            term_err ("mpe: ftc: no robot (ftc spawn first)\n");
+            return;
+        }
+        char buf [128];
+        snprintf (buf, sizeof (buf), "mpe: ftc: intake %s\n", on ? "on" : "off");
+        term_ok (buf);
+        return;
+    }
+    if (term_str_eq (argv [1], "eject")) {
+        int (*p_ej) (struct physics_world *, int) = (int (*) (struct physics_world *, int)) ftc_sym ("ftc_eject");
+        if (!p_ej || !w) {
+            term_err ("mpe: ftc: bundle API incomplete\n");
+            return;
+        }
+        int n = p_ej (w, 0);
+        if (n < 0) {
+            term_err ("mpe: ftc: no robot (ftc spawn first)\n");
+            return;
+        }
+        char buf [128];
+        snprintf (buf, sizeof (buf), "mpe: ftc: ejected %d ball(s)\n", n);
+        term_ok (buf);
+        return;
+    }
+    if (term_str_eq (argv [1], "shoot")) {
+        int (*p_sh) (struct physics_world *, int) = (int (*) (struct physics_world *, int)) ftc_sym ("ftc_shoot");
+        if (!p_sh || !w) {
+            term_err ("mpe: ftc: bundle API incomplete\n");
+            return;
+        }
+        int id = p_sh (w, 0);
+        if (id < 0) {
+            term_err ("mpe: ftc: nothing carried (intake balls first)\n");
+            return;
+        }
+        char buf [128];
+        snprintf (buf, sizeof (buf), "mpe: ftc: fired ball id=%d\n", id);
+        term_ok (buf);
+        return;
+    }
+    if (term_str_eq (argv [1], "balls")) {
+        int (*p_b) (struct physics_world *, int) = (int (*) (struct physics_world *, int)) ftc_sym ("ftc_balls_spawn");
+        if (!p_b || !w) {
+            term_err ("mpe: ftc: bundle API incomplete\n");
+            return;
+        }
+        int n = (argc > 2) ? (int) ftc_argf (argv, 2, argc, 3.0f) : 3;
+        int made = p_b (w, n);
+        if (made < 0) {
+            term_err ("mpe: ftc: balls failed (no fleet: eco attach mfs-simulator first)\n");
+            return;
+        }
+        char buf [128];
+        snprintf (buf, sizeof (buf), "mpe: ftc: %d ball(s) on the field\n", made);
+        term_ok (buf);
+        return;
+    }
+    if (term_str_eq (argv [1], "bucket")) {
+        int (*p_bk) (struct physics_world *, float, float, float) =
+            (int (*) (struct physics_world *, float, float, float)) ftc_sym ("ftc_bucket_spawn");
+        if (!p_bk || !w) {
+            term_err ("mpe: ftc: bundle API incomplete\n");
+            return;
+        }
+        float x = ftc_argf (argv, 2, argc, 0.0f);
+        float y = ftc_argf (argv, 3, argc, 1.0f);
+        float z = ftc_argf (argv, 4, argc, 4.0f);
+        if (p_bk (w, x, y, z) != 0) {
+            term_err ("mpe: ftc: bucket failed (no fleet: eco attach mfs-simulator first)\n");
+            return;
+        }
+        char buf [160];
+        snprintf (buf, sizeof (buf), "mpe: ftc: bucket at (%.2f,%.2f,%.2f) — shoot into it\n", x, y, z);
+        term_ok (buf);
+        return;
+    }
+    if (term_str_eq (argv [1], "score")) {
+        int (*p_stats) (struct physics_world *, int *, int *, int *, int *) =
+            (int (*) (struct physics_world *, int *, int *, int *, int *)) ftc_sym ("ftc_game_stats");
+        if (!p_stats || !w) {
+            term_err ("mpe: ftc: bundle API incomplete\n");
+            return;
+        }
+        int carried = 0, balls = 0, scored = 0, bucket = 0;
+        if (p_stats (w, &carried, &balls, &scored, &bucket) != 0) {
+            term_err ("mpe: ftc: no fleet (eco attach mfs-simulator first)\n");
+            return;
+        }
+        char buf [160];
+        snprintf (buf, sizeof (buf), "mpe: ftc: carried=%d balls=%d SCORED=%d bucket=%s\n", carried, balls, scored,
+                  bucket ? "up" : "--");
+        term_out (buf);
+        return;
+    }
+    term_err ("mpe: ftc: unknown subcommand (spawn|telemetry|intake|eject|shoot|balls|bucket|score)\n");
 }
