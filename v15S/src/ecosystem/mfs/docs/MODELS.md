@@ -322,3 +322,34 @@ conventions (0-rest and -1-rest; linear in transit, 0.05 press gate).
 `MPE_GAMEPAD_DEVICE=disabled` skips hardware silently (headless). `Back`
 resets the **full assembly** (chassis + wheels + rollers + flywheel +
 intake by one delta, velocities zeroed, observers + odometry reset).
+
+## 8. Fictional intake + arcade ball/bucket league (`submodules/intake.c`, `ftc_fleet.c`)
+
+Stated arcade (fictional) seam over the FTC fleet — nothing touches robot
+mechanics; balls are world bodies and possession lives in `ftc_robot`.
+All deterministic: no transcendentals (fixed-coefficient `det_sin/det_cos`,
+`sqrtf`-only lengths), inert when unused (intake off / nothing staged).
+
+- Balls: same BioBuzz spec (r 21 mm, m 2.6 g, e 0.65, μ 0.45/0.35), 16 max.
+  Scatter on `ftc balls`: three lanes ±0.3 m, rows 0.4 m apart ahead of the
+  robot so a straight drive through the 0.32 m mouth catches ≥ 2.
+- Intake (fictional): capture is a **zone predicate** — any unpossessed
+  dynamic ball whose centre enters the mouth box (FWD 0.34, UP −0.12, half
+  0.16/0.10/0.14 m) and is slow relative to the chassis (`< 1.5 m/s`) becomes
+  kinematic and is possessed. Carrying is kinematic slot-follow (4 max,
+  2r+4 mm spacing across the mouth), so carried balls ride jumps/turns.
+- Launch (fictional): `intake_shoot` frees the oldest carried ball at the
+  muzzle (FWD 0.48, UP 0.12 m — ahead of the chassis CCD bubble that ate
+  ~2–3 m/s on tick 0) with `INTAKE_LAUNCH_SPEED` 9 m/s at
+  `INTAKE_LAUNCH_ELEV_DEG` 50° **world-frame** (yaw-only forward; braking
+  pitch never swings the shot), plus Magnus backspin `INTAKE_LAUNCH_SPIN`
+  15 rad/s about the yaw-projected lateral axis.
+- Aero for flying balls: same drag + Magnus formulas as module_1 (see §6),
+  separately owned.
+- Bucket (suspended miniature field): pad 1.6×1.6 m at world `y` with four
+  0.35 m walls flared 20° outward (hardcoded quaternion rolls, `e=0` walls)
+  so a rim strike slides in. Reposition by re-spawning moves the live
+  assembly; `clear` parks parts as `no_collide`. **Scoring is mouth-entry
+  counting**: any dynamic ball whose centre enters the interior volume above
+  the pad scores (no speed gate); scored balls freeze kinematic. Carried
+  balls can't false-score (kinematic at the mouth).

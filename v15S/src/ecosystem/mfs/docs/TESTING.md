@@ -4,7 +4,7 @@ What the suite contains, what each gate proves, and how to run it.
 
 ## Suite layout
 
-- **Unified suite** (`tests/mfs_suite_main.c` + `mfs_suite_a/b/c.c`, 17 gated
+- **Unified suite** (`tests/mfs_suite_main.c` + `mfs_suite_a/b/c.c`, 18 gated
   tests, registry with exact-name dispatch, config save/restore, NaN
   watchdog). This is what `build_tests.sh` runs and what the release gates
   count.
@@ -22,16 +22,15 @@ What the suite contains, what each gate proves, and how to run it.
   `tests/mfs_test_common.h` (tile slab top y=0, μ 1.0/0.8, e=0). Robot tests
   pin **128 solver iterations** (40:1 chassis/wheel mass ratio).
 
-## Current status (2026-10-09): 14/17
+## Current status (2026-10-12): 16/18
 
-Three gates are **red**: `tank`, `drive_directions`, `odometry_yaw`. All
-three trace to one root cause — the global CCD obstacle margin introduced in
-commit `41bcc0b`, which perturbs motion on a pivoting chassis. Zeroing that
-margin restores 17/17. Full measurements and the harness fix are in
-[`KNOWN_FAILURES.md`](KNOWN_FAILURES.md) → `[CCD-OBSTACLE-MARGIN]`.
-
-Anyone reading an older claim of "15/15 green" (including the historical
-notes below and in `SYNC_CONTRACT.md`) is reading about an earlier tree.
+Two gates are **red**: `tank` and `odometry_yaw` (the tank-pivot heading/translation
+baseline and mecanum odom-yaw magnitude frontiers). The earlier `drive_directions`
+red resolved; the 2026-10-09 "14/17" line and the CCD-margin narrative below it
+are historical. Full measurements and the root-cause write-ups are in
+[`KNOWN_FAILURES.md`](KNOWN_FAILURES.md) → `[TANK-PIVOT-*]` /
+`[ODOMETRY-YAW]` (search the archives for `[CCD-OBSTACLE-MARGIN]` for the older
+set).
 
 ## Gate table (unified suite, `--all`)
 
@@ -49,6 +48,8 @@ notes below and in `SYNC_CONTRACT.md`) is reading about an earlier tree.
 | `odometry_yaw` | rotate ± on mecanum, L/R pivot ± on tank | **odom_theta sign must match the chassis** on both drivetrains (hard; convention- and battery-independent — this is the gate whose absence let a sign-inverted heading ship inside 15/15 green), tank yaw magnitude within 60%, mecanum magnitude as `[XFAIL][MECANUM-PIVOT]`, `odom_slip`/`clamp_events` well-formed (DESPOT-2026-10-06) |
 | `registry` | internal module registry, two worlds | self-detach from inside own `pre_step` defers and never hangs, module detach callback fires exactly once, state released for the detached world only, per-world alias slots distinct, attach/detach idempotence, unregister (DESPOT-2026-10-06) |
 | `drive_directions` | pure fwd / rev / strafe / rotate ±, steady-state window | axis dominance (fwd→+Z, strafe→-X/robot-right, rotate→yaw), planar cross-talk ceilings (fwd 25%, strafe 35%), **rotate vs rotate⁻ must have opposite yaw sign**, yaw/planar dominance ratio, fwd/rev antisymmetry (DESPOT-2026-10-02) |
+| `ball_spin` | ball spin/wake corner | finite, ball never goes through the floor |
+| `bucket_game` | drive@1.0 150 ticks w/ intake (capture ≥ 2), strafe clear 80 ticks, brake 210 ticks, shoot a calibration lob, read its rim crossing (bounds: 1–12 m out, in −6..6 × 1..14), **move** the bucket onto it, shoot the second ball | scored ≥ 1 within 400 ticks (DESPOT-2026-10-12: self-calibrating score — open-loop ballistics died build-to-build; measuring then correcting is robust by construction) |
 | `physics_truth` | 15 subtests (T1–T15) | freefall, inertia, bounce `e²(h-r)+r`, rolling, rolling-resistance decay band, **isolated** motor free-speed/stall/back-EMF, static hold, stopping distance `v²/2μg`, 3000-tick stability, coast-down, energy, cylinder rest, revolute anchor |
 
 Physics-truth notes: T6/T8 test the **motor model isolated** (no

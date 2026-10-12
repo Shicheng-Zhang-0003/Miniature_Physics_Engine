@@ -1771,3 +1771,32 @@ lists TorqueNADO 40:1 stall as 594.7 oz-in. Ideal is `700 x 40/60 = 466.7
 oz-in`, and a reducer cannot exceed its ideal output torque. The table's
 ideal-derived 466 oz-in is correct and the external figure belongs to a
 different product.
+
+## [OPEN-LOOP-BALLISTICS] Open-loop lob scoring is build-sensitive (2026-10-12)
+
+**Recorded as closed**: the fictional launch (see `intake.h`, `bucket_game`
+gate) cannot be aimed open-loop with body confidence; every fixed
+speed/elevation that worked to five decimals died to the *next* decimal on
+rebuild (rim perches, CCD wall-face clamps, under/overshoots). Root causes
+measured, in order of impact:
+
+- **Billiard interference at the muzzle.** Loose balls helplessly scattered
+  in the launch corridor get rear-ended by the fired ball in the first
+  ticks: full muzzle speed at tick 0, then tempo-varying climb loss. Fixed
+  by strafing clear before shooting (the gate does it; a live driver does
+  it naturally).
+- **CCD bubble eating muzzle speed.** The chassis conservative CCD bubble
+  (~bounding R 0.33) swallowed 2–3 m/s on tick 0 when the launch started at
+  the mouth (FWD ~0.34). Fixed by `INTAKE_MUZZLE_FWD` 0.48 (ahead of the
+  chassis centre) + muzzle UP 0.12.
+- **Pitch swinging the elevation.** Braking dips the nose several degrees;
+  a chassis-frame elevation through `sin()` moved apex ±1 m run to run.
+  Fixed by world-frame elevation with yaw-only forward.
+- **A staged bucket eats the calibration shot.** The league's own geometry
+  in the flight path is a test artefact, not physics.
+
+Resolution: the gate is **self-calibrating** — shoot once, read the
+rim-height crossing, move the bucket under it, shoot again. Deterministic
+(same code twice → same flight) and robust to plant drift by construction.
+Anyone re-tuning launch constants should change the gate's expectations
+with them.
