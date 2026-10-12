@@ -262,6 +262,32 @@ problem. Recorded 2026-09-29.
   re-applied; doing it in the other order destabilises the stall endpoint, and
   doing both at once zeroes drive entirely (measured: strafe transmit 0.00 m).
 
+## [MOTOR-PARTIAL] Off-full-throttle driven-path limit cycle (FIXED 2026-10-12)
+
+Distinct from [MOTOR-III] (the observer still books shaping as load; that deeper
+coupling is untouched). This was a **clamp-domain bug** in `motor_update_load`:
+
+- **Symptom:** driving straight with a *partial* stick (live "robot twitches while
+  driving forward"). Measured single-driven on the MFS rig: cmd=0.25/0.35/0.5
+  netted the robot **BACKWARD** (displacement −0.10/−0.36/−0.21 m over 8 s) with
+  yaw-rate std up to 0.39 rad/s; wheel 0 alternated +230/−125 rpm every tick and
+  the delivered torque slammed between −1.8 and +stall. cmd=1.0 was perfectly
+  clean (dist 7.93 m, std 0.059).
+- **Cause:** the implicit solve's predicted-speed clamp used the **BUS** voltage,
+  i.e. the no-load point at FULL throttle w_free = V_term/(kv·gear), at *every*
+  command. At |command|<1 the true applied voltage — hence the true powered
+  no-load ceiling — is V_term·|command|, so the clamp let the solve over-predict
+  `w_end` toward a ceiling up to 2× too high; the inflated back-EMF then drove a
+  braking slam the next tick, a positive-feedback limit cycle that could only
+  exist off full throttle (bus·1 == bus, so full command was bit-identical).
+- **Fix:** clamp to `|V_applied|/(kv·gear)` (`motor.c`). The one-sided guard
+  (never clamp below |w_measured|, preserving regen braking authority) is kept.
+  Full-command behaviour is unchanged by construction; partial throttle now
+  drives forward monotonically (0.25→0.69 m, 0.5→2.08 m, 0.75→4.06 m; yaw-rate
+  std ≤ 0.002 rad/s).
+- Locked by the `partial_throttle` gate (finite + std<0.02 + forward + monotone;
+  confirmed red on the pre-fix tree).
+
 ## [RELEASE-STORM] Zero-command motor limit cycle + glide equilibrium (FIXED 2026-10-04)
 
 Live-session report: wheels tilt/pivot off their shafts, and motor speeds

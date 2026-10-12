@@ -984,3 +984,59 @@ int mfs_t_brake_mode (void) {
     mfs_test_end (t_ptr);
     return t_ptr -> failures;
 }
+
+/* partial_throttle: sticks between the deadzone and full scale must still
+ * drive the robot FORWARD and hold heading. Pre-fix (motor.c clamped the
+ * implicit solve's predicted speed to the no-load point at the BUS voltage,
+ * i.e. the full-throttle free speed, at every command) the driven-path
+ * disturbance-observer limit cycle engaged only off full throttle: measured
+ * straight drive at cmd=0.25..0.65 netted the robot BACKWARD with yaw-rate
+ * std up to 0.39 rad/s, while full command was clean. The clamp now uses the
+ * command-scaled (applied) voltage, so the powered no-load ceiling shrinks
+ * with the stick; full command is bit-identical (bus*1 == bus).
+ * DESPOT-2026-10-12. */
+static void partial_throttle_case (float cmd, float *dist, float *ysd, int *finite) {
+    physics_world w;
+    mfs_test_world (&w);
+    extern const mpe_module_desc_t mpe_module_desc;
+    if (physics_world_attach_module (&w, &mpe_module_desc) < 0) { *finite = 0; *dist = 0.0f; *ysd = 0.0f; physics_world_cleanup (&w); return; }
+    int si = ftc_fleet_spawn (&w, 0.0f, ftc_robot_rest_height (), 0.0f, MOTOR_GB_5203_26_9, FTC_DRIVETRAIN_MECANUM);
+    ftc_robot *robot = ftc_fleet_get (&w, si);
+    if (!robot) { *finite = 0; *dist = 0.0f; *ysd = 0.0f; physics_world_cleanup (&w); return; }
+    const float dt = DT;
+    double ys = 0.0, ysq = 0.0; int n = 0; float z0 = 0.0f; *finite = 1; *dist = 0.0f; *ysd = 0.0f;
+    for (int k = 0; k < 480; k++) {
+        mfs_drive_mecanum (robot, cmd, 0.0f, 0.0f);
+        physics_world_step (&w, dt);
+        if (!mfs_test_finite (&w)) { *finite = 0; break; }
+        rigidbody *ch = mfs_chassis_or_null (&w, robot);
+        if (k == 120) z0 = ch -> position.z;
+        if (k > 120) { double y = ch -> angular_velocity.y; ys += y; ysq += y * y; n++; }
+    }
+    rigidbody *ch = mfs_chassis_or_null (&w, robot);
+    if (n > 0 && ch) {
+        double ym = ys / n;
+        *dist = ch -> position.z - z0;
+        *ysd = sqrtf ((float) (ysq / n - ym * ym));
+    }
+    physics_world_cleanup (&w);
+}
+int mfs_t_partial_throttle (void) {
+    mfs_test_t t;
+    mfs_test_begin (&t, "partial_throttle");
+    mfs_test_t *t_ptr = &t;
+    float cmds [3] = {0.25f, 0.5f, 0.75f};
+    float dist [3], ysd [3];
+    int finite [3];
+    for (int i = 0; i < 3; i++) {
+        partial_throttle_case (cmds [i], &dist [i], &ysd [i], &finite [i]);
+        MFS_CHECK (t_ptr, finite [i] == 1);
+        MFS_INFO ("cmd=%.2f dist=%.3f yawrate_std=%.4f", cmds [i], dist [i], ysd [i]);
+        MFS_CHECK (t_ptr, ysd [i] < 0.02f);   /* holds heading, no partial-throttle limit cycle */
+        MFS_CHECK (t_ptr, dist [i] > 0.5f);   /* drives FORWARD, not the pre-fix backward net */
+    }
+    MFS_CHECK (t_ptr, dist [0] < dist [1] && dist [1] < dist [2]); /* monotone throttle -> speed */
+    if (t_ptr -> failures == 0) { printf ("[PASS] partial_throttle: sub-full stick drives forward, holds heading\n"); }
+    mfs_test_end (t_ptr);
+    return t_ptr -> failures;
+}

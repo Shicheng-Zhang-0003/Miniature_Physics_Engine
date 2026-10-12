@@ -137,7 +137,7 @@ void motor_update_load (motor *m, float wheel_angular_vel, float dt, float batte
         return;
     }
     /* Clamp the predicted end-of-tick speed to the motor's own no-load speed
-     * AT THE CURRENT BUS VOLTAGE.
+     * AT THE COMMANDED VOLTAGE (V_applied = bus * command).
      *
      * The implicit solve above linearises back-EMF, so on a lightly loaded
      * wheel it badly OVER-predicts: at 26.9:1 with I=2.5e-4 kg.m^2 it
@@ -170,10 +170,25 @@ void motor_update_load (motor *m, float wheel_angular_vel, float dt, float batte
      * free speed would see less back-EMF than it should, regenerative
      * braking would silently switch off, and the wheel would run away
      * instead of being pulled back down.
+     *
+     * DESPOT-2026-10-12 (partial-throttle limit cycle FIXED): the bound used
+     * the BUS voltage, i.e. the no-load point at FULL throttle, regardless of
+     * command. At |command| < 1 the true applied voltage - and so the true
+     * powered no-load point - is bus*|command|, but the clamp permitted the
+     * solve to predict up to the FULL-throttle free speed. Any observer load
+     * spike then over-predicted w_end toward that too-high ceiling, inflated
+     * back-EMF, and drove a braking slam the next tick - a positive-feedback
+     * limit cycle that only engaged off full throttle (full command is
+     * bit-identical: bus*1 == bus). Measured straight drive, cmd=0.5: wheel 0
+     * alternated +230/-125 rpm every tick and the robot netted BACKWARD
+     * (yaw-rate std 0.19 rad/s, displacement -0.21 m over 8 s); cmd=0.25/0.35
+     * also netted backward. With the applied-voltage bound: cmd>=0.15 drives
+     * forward monotonically (0.5 -> 2.74 m, yaw-rate std 0.002), full command
+     * unchanged (7.928 m, std 0.0591). Gated by `partial_throttle`.
      */
     {
         float w_lim = m -> free_speed_rad_s; /* 12 V spec point: fallback only */
-        if (m -> kv > 0.0f && m -> gear_ratio > 0.0f && isfinite (battery_voltage) && battery_voltage > 0.0f) { w_lim = battery_voltage / (m -> kv * m -> gear_ratio); }
+        if (m -> kv > 0.0f && m -> gear_ratio > 0.0f && isfinite (applied_voltage)) { w_lim = fabsf (applied_voltage) / (m -> kv * m -> gear_ratio); }
         if (!isfinite (w_lim) || (w_lim < 0.0f)) { w_lim = m -> free_speed_rad_s; }
         if (fabsf (wheel_angular_vel) > w_lim) {
             w_lim = fabsf (wheel_angular_vel); /* keep full braking authority */
