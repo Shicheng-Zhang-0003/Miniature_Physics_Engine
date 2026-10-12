@@ -302,7 +302,79 @@ retracted measurement (honesty first):
   tau_exp_prev now (stale drive reference poisoned post-idle re-drive:
   measured strafe 10x dead until the handshake).
 
-## [ABUSE-TILT] Sustained harsh mixed drive walks axles to flip (OPEN frontier, pre-existing)
+## [ABUSE-TILT] Sustained harsh mixed drive walks axles to flip (FIXED 2026-10-12)
+
+Was OPEN frontier, pre-existing. Now: sustained full triple-command
+(0.5 fwd + 0.5 strafe + 0.3 rotate) holds ≤2° for 900 ticks with transient
+spikes ≤10° that recover, and a 600-tick abuse + 600-tick release ends at
+0.05° on all wheels (was: 5° → 69° → 180° frozen-in-tilt by ~240 ticks).
+Single-mode bursts stay ≤1.4° as before. Pure rotate (±1 sustained, the
+harshest yaw case) creeps to ~7° over 1200 ticks, still recovering — bounded,
+not flipped. Live symptom cured: both-sticks driving no longer snaps shafts.
+
+Root causes, both measured per-tick per solver stage on a headless
+fleet-identical probe (temp/tilt_abuse.c, retained in temp/ only):
+
+1. **Rolling-resistance spin-decay strips hinge co-rotation (the pump).**
+   Stage trace (relperp wheel-vs-chassis): post-loop 0.00 → post-relax 0.00
+   → post-rolling 0.92. `collision_apply_rolling_resistance` decays spin
+   about the contact normal and cannot distinguish rigid co-rotation from
+   slip — on a hinge-driven wheel it deletes the co-yaw the joint just gave
+   it (measured -0.90 → -0.38 in one pass). The chassis keeps yawing, the
+   wheel does not follow, integration bakes the difference into hinge tilt
+   at exactly the chassis yaw rate (0.675°/tick vs 0.7 rad/s chassis).
+   Single-stick drive yaws ~nothing, so nothing walks; combined drive yaws
+   continuously, so axles walk to flip.
+2. **Axis-drift correction was dead on arrival (no recovery).** Drift injects
+   beta*err/dt corrective velocity pre-Poisson; the very next joint solve
+   kills ALL perp relative velocity including the correction (measured 1.5
+   rad/s injected at 14° tilt, 0.001 surviving). Orientation error therefore
+   never decayed — the corrector existed only on paper.
+3. **Accomplice (not root): parasitic CHASS-WHEEL contact.** Wheel rim
+   x-footprint overlaps the chassis box edge by ~5 mm with 5 mm vertical
+   clearance inside 10 mm slop, so a slop-admitted manifold exists from tick
+   0 (Nimp 0.08 at 0.6° tilt, 0.52 at 13°) and wedges harder as tilt grows.
+   Secondary: it only matters once tilt exists. Geometry untouched (moving
+   the track retunes odometry arms + mixer + every drive gate — budgeted
+   follow-up, not this fix).
+
+Fix (core/physics_world.c + simulation_physics_loop.c, mirrored):
+joints re-equalize after the relaxation passes AND after rolling (velocity
+only, no drift, no pre-step — joints get the final word over every
+velocity-touching stage), and drift relocated end-of-step so its correction
+survives into integration (still once per tick, never in-loop: the
+pendulum-9x rule stands). Hinge-parallel spin rolling legitimately removes
+is untouched by axis/P2P rows. No formulation change to any row, no new
+bias, no retune: engine quick 59/59 all regimes, physics 104/105 (sole red
+the pre-existing legacy-f11_torture), tui-smoke green.
+
+Collateral, all measured pre/post on identical harnesses:
+- drive_directions red → GREEN (spurious rotate vz-coupling gone: tighter
+  joints stop feeding yaw into translation).
+- physics_truth silent coast failure → GREEN: the failure was a vacuous
+  X-velocity gate (tank travels +Z; X held 4th-decimal jitter in both
+  trees) exposed by jitter drift, not physics — Z-coast truth is identical
+  both trees (1.27 → 0.00, stops dead ~0.2 m). Gate now on planar speed
+  with a vacuity floor and printed values.
+- odometry_yaw tank: sign-flip artifact cured (odom_theta is wrapped to
+  [-pi,pi]; the test differenced across a wrap once the pivot got fast
+  enough — wrap-aware delta now; same sign both directions). Magnitude
+  still red (2.9x vs 1.6x pre): faster rigid pivot peels more; stays open
+  beside the MECANUM-PIVOT frontier below.
+- tank pivot values moved (heading 1.32 → 2.37, disp 0.0915 → 0.0434):
+  pre-fix pivot stuttered on joint churn (±47 rad/s wheel chatter, 2-8°
+  tilts); post-fix it pivots smooth and rigid (spins ±3, tilts 0.4°,
+  slip-free odometry until wrap). NOT re-baselined here: tank is red in
+  the CCD-margin era either way, and baselines are blessed on green, not
+  on red. Re-baseline rides with the margin fix.
+- Residual: slow creep under hundreds of ticks of uninterrupted full
+  triple-command (rim-wedging feedback, see accomplice above), fully
+  recovered on release. Realistic driving (modulated sticks + releases)
+  never accumulates: see the 0.05° release number.
+
+Original record preserved below (it earned its keep: six negatives that
+must not be re-attempted blind, and the authorities cross-ref that
+pointed at joint authority in the first place).
 
 Recorded 2026-10-04. Sibling of the fixed items above, NOT fixed: ~90+
 ticks of sustained full mixed drive (0.5 fwd + 0.5 strafe + 0.3 rotate)
