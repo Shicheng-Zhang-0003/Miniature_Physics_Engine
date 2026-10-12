@@ -143,7 +143,8 @@ void cmd_mod (int argc, char **argv) {
             snprintf (b, sizeof (b),
                       "mpe: mod: detach FAILED: '%s' code=%d (%s)\n"
                       "  what IS attached is in the diagnostics log (source=detach) and in `mod ls`\n",
-                      argv [2], dr, dr == MPE_DETACH_E_NULL ? "null argument" : "not attached under that name");
+                      argv [2], dr, dr == MPE_DETACH_E_NULL ? "null argument" : dr == MPE_DETACH_E_COUNT ?
+                      "tick-module count corrupt (re-init the world)" : "not attached under that name");
             term_err (b);
         }
         return;

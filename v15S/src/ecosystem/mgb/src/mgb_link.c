@@ -44,6 +44,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/select.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <time.h>
@@ -236,13 +237,26 @@ mgb_session_t *mgb_spawn (const char *s2tui_path, int timeout_sec) {
      * silently into unintended paths. Reject, don't truncate. */
     if (!td || !*td || strlen (td) > 200 || strchr (td, '\n')) td = "/tmp";
     snprintf (s->tmpdir, sizeof s->tmpdir, "%s", td);
-    if (snprintf (s->transcript, sizeof s->transcript,
-                  "%s/mgb_transcript_%d.log", s->tmpdir,
-                  (int)pid) >= (int)sizeof s->transcript) {
+    /* DESPOT-2026-10-12 P20: predictable pid paths in shared /tmp + fopen
+     * follow symlinks (plant transcript_X -> victim, engine appends as uid).
+     * Reserve the transcript with O_CREAT|O_EXCL|O_NOFOLLOW 0600 via mkstemp
+     * (unique, not pid-predictable); snapshot path below carries a random
+     * suffix and is lstat-verified non-symlink before it is read. */
+    char tplt [300];
+    if (snprintf (tplt, sizeof tplt, "%s/mgb_transcript_%d_XXXXXX.log", s->tmpdir, (int) pid) >= (int) sizeof tplt) {
         mgb_close (s);
         fail_spawn (mgb_spawn_e_alloc, 0);
         return NULL;
     }
+    int tfd = mkstemp (tplt);
+    if (tfd < 0) {
+        mgb_close (s);
+        fail_spawn (mgb_spawn_e_alloc, 0);
+        return NULL;
+    }
+    fchmod (tfd, 0600);
+    close (tfd);
+    snprintf (s->transcript, sizeof s->transcript, "%s", tplt);
     FILE *log = fopen (s->transcript, "w");
     /* Did exec actually succeed? The CLOEXEC pipe closes with EOF on a good
      * exec and carries the real errno on a bad one. Non-blocking so a
@@ -315,14 +329,21 @@ int mgb_cmd (mgb_session_t *s, const char *line, int timeout_sec) {
 char *mgb_snapshot (mgb_session_t *s, int timeout_sec) {
     if (!s || s->dead) return NULL;
     if (timeout_sec <= 0) timeout_sec = 60;
+    /* P20: random suffix so the frame path is not pid+seq predictable; the
+     * reader below refuses symlinks (lstat) before fopen, closing the
+     * plant-a-link-at-the-expected-path write/read redirect. */
+    unsigned rnd = (unsigned) rand () ^ ((unsigned) getpid () << 16) ^ (unsigned) s->seq;
     char path[300];
-    snprintf (path, sizeof path, "%s/mgb_frame_%d_%lu.s2",
-              s->tmpdir, (int)s->pid, s->seq);
-    char cmd[340];
+    snprintf (path, sizeof path, "%s/mgb_frame_%d_%lu_%08x.s2",
+              s->tmpdir, (int)s->pid, s->seq, rnd);
+    char cmd[360];
     snprintf (cmd, sizeof cmd, "sync %s", path);
     if (mgb_cmd (s, cmd, timeout_sec) != 0) return NULL;
     /* `sync` prints `saved N atoms`; completion already framed. Verify
-     * the file exists and is non-empty before handing out. */
+     * the file exists, is a regular file (not a symlink), and is non-empty
+     * before handing out. */
+    struct stat st;
+    if (lstat (path, &st) != 0 || !S_ISREG (st.st_mode)) { mgb_mark_dead (s); return NULL; }
     FILE *f = fopen (path, "r");
     if (!f) { mgb_mark_dead (s); return NULL; }
     int c = fgetc (f);

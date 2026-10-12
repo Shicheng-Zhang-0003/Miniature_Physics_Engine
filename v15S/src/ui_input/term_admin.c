@@ -139,6 +139,18 @@ static int64_t posix_monotonic_time (void) {
     clock_gettime (CLOCK_MONOTONIC, &ts);
     return (int64_t) ts.tv_sec * 1000000LL + ts.tv_nsec / 1000LL;
 }
+/* DESPOT-2026-10-12 P11: (int)float is UB on overflow (NaN/1e30). All
+ * terminal integer verbs go through here: non-finite -> default, then clamp
+ * to [lo,hi] BEFORE the narrowing cast, so the cast itself is in-range. */
+static int term_float_to_int_safe (float v, int dflt, int lo, int hi) {
+    if (!isfinite (v))
+        return dflt;
+    if (v < (float) lo)
+        return lo;
+    if (v > (float) hi)
+        return hi;
+    return (int) v;
+}
 bool all_targets_matched_any (int argc, char **argv) {
     for (int i = 2; i < argc; i++) {
         if (term_is_all_token (argv [i])) { return true; }
@@ -209,7 +221,7 @@ void cmd_sed (int argc, char **argv) {
                     term_set_object_static (object_index, !make_dynamic);
                 } else if (term_str_eq (field_name, "nice")) {
                     if (!is_numeric) { continue; }
-                    int nice_val = (int) new_value;
+                    int nice_val = term_float_to_int_safe (new_value, 0, -20, 19);
                     if (nice_val < -20) { nice_val = -20; }
                     if (nice_val > 19) { nice_val = 19; }
                     rb -> nice_value = nice_val;
@@ -283,7 +295,7 @@ void cmd_nice (int argc, char **argv) {
     if (!term_parse_float (argv [1], &priority_float)) {
         term_printf ("term_err", "mpe: nice: invalid priority '%s'\n", argv [1]);
         return;
-    } int priority = (int) priority_float;
+    } int priority = term_float_to_int_safe (priority_float, 0, -20, 19);
     if (priority < -20) { priority = -20; }
     if (priority > 19) { priority = 19; }
     for (int argument_index = 2; argument_index < argc; argument_index++) {
@@ -300,7 +312,7 @@ void cmd_ping (int argc, char **argv) {
     int argument_index = 1;
     if ((argc > 1) && (term_str_eq (argv [1], "-c")) && (argc > 2)) {
         float v = 0.0f;
-        if (term_parse_float (argv [2], &v)) { ping_count = (int) v; }
+        if (term_parse_float (argv [2], &v)) { ping_count = term_float_to_int_safe (v, 1, 1, 10); }
         if (ping_count < 1) { ping_count = 1; }
         if (ping_count > 10) { ping_count = 10; }
         argument_index = 3;
@@ -637,11 +649,11 @@ void cmd_seq (int argc, char **argv) {
     int first = 1, last = 1;
     if (argc == 2) {
         float v = 0.0f;
-        if (term_parse_float (argv [1], &v)) { last = (int) v; }
+        if (term_parse_float (argv [1], &v)) { last = term_float_to_int_safe (v, 1, -1000000, 1000000); }
     } else if (argc >= 3) {
         float v1 = 0.0f, v2 = 0.0f;
-        if (term_parse_float (argv [1], &v1)) { first = (int) v1; }
-        if (term_parse_float (argv [2], &v2)) { last = (int) v2; }
+        if (term_parse_float (argv [1], &v1)) { first = term_float_to_int_safe (v1, 1, -1000000, 1000000); }
+        if (term_parse_float (argv [2], &v2)) { last = term_float_to_int_safe (v2, 1, -1000000, 1000000); }
     }
     if (last < first) {
         int temp = first;
@@ -753,7 +765,7 @@ void cmd_dmesg (int argc, char **argv) {
     for (int i = 1; i < argc; i++) {
         if (term_str_eq (argv [i], "-n") && (i + 1 < argc)) {
             float v = 0.0f;
-            if (term_parse_float (argv [i + 1], &v)) { max_events = (int) v; }
+            if (term_parse_float (argv [i + 1], &v)) { max_events = term_float_to_int_safe (v, 32, 1, 256); }
             i++;
         } else if (term_str_eq (argv [i], "-l") && (i + 1 < argc)) {
             i++;
