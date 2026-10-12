@@ -13,19 +13,28 @@ void grid_init (grid_mesh *grid_mesh_object, int half_extent, int cell_spacing) 
     if (!grid_mesh_object)
         return;
     grid_mesh_object -> line_vertex_count = 0;
+    grid_mesh_object -> minor_start = grid_mesh_object -> minor_count = 0;
+    grid_mesh_object -> major_start = grid_mesh_object -> major_count = 0;
+    grid_mesh_object -> axis_start = grid_mesh_object -> axis_count = 0;
     if (half_extent < 0 || half_extent > 1000000 || cell_spacing <= 0 || cell_spacing > 1000000)
         return;
     // Count the lines: one iteration per X axis, one along Z axis
     int grid_line_steps = (half_extent * 2) / cell_spacing + 1;
     if (grid_line_steps > 100000)
         return;
+    // Batches share one VBO: minor lines, then major lines (every
+    // GRID_MAJOR_EVERY-th, skipping the origin axes), then the two axes.
     // Each line (2 vertices, 3 floats)
-    int vertex_float_count = grid_line_steps * 4 * 3; // (* 2 * 2 iteration per axis)
+    int vertex_float_count = (grid_line_steps * 4 + 4) * 3;
     float *vertex_data = malloc (vertex_float_count * sizeof (float));
     if (!vertex_data)
         return;
     int vertex_index = 0;
-    for (int step_coordinate = -half_extent; step_coordinate <= half_extent; step_coordinate += cell_spacing) {
+    grid_mesh_object -> minor_start = 0;
+    for (int step_coordinate = -half_extent, k = 0; step_coordinate <= half_extent;
+         step_coordinate += cell_spacing, k++) {
+        if ((k % GRID_MAJOR_EVERY) == 0 || step_coordinate == 0)
+            continue; /* major/axis batches below */
         // Line along the Z axis at X = step_coordinate;
         vertex_data [vertex_index++] = (float) step_coordinate;
         vertex_data [vertex_index++] = 0.0f;
@@ -40,7 +49,43 @@ void grid_init (grid_mesh *grid_mesh_object, int half_extent, int cell_spacing) 
         vertex_data [vertex_index++] = (float) half_extent;
         vertex_data [vertex_index++] = 0.0f;
         vertex_data [vertex_index++] = (float) step_coordinate;
-    } grid_mesh_object -> line_vertex_count = vertex_index / 3;
+    }
+    grid_mesh_object -> minor_count = vertex_index / 3 - grid_mesh_object -> minor_start;
+    grid_mesh_object -> major_start = vertex_index / 3;
+    for (int step_coordinate = -half_extent, k = 0; step_coordinate <= half_extent;
+         step_coordinate += cell_spacing, k++) {
+        if (step_coordinate == 0 || (k % GRID_MAJOR_EVERY) != 0)
+            continue;
+        vertex_data [vertex_index++] = (float) step_coordinate;
+        vertex_data [vertex_index++] = 0.0f;
+        vertex_data [vertex_index++] = (float) -half_extent;
+        vertex_data [vertex_index++] = (float) step_coordinate;
+        vertex_data [vertex_index++] = 0.0f;
+        vertex_data [vertex_index++] = (float) half_extent;
+        vertex_data [vertex_index++] = (float) -half_extent;
+        vertex_data [vertex_index++] = 0.0f;
+        vertex_data [vertex_index++] = (float) step_coordinate;
+        vertex_data [vertex_index++] = (float) half_extent;
+        vertex_data [vertex_index++] = 0.0f;
+        vertex_data [vertex_index++] = (float) step_coordinate;
+    }
+    grid_mesh_object -> major_count = vertex_index / 3 - grid_mesh_object -> major_start;
+    grid_mesh_object -> axis_start = vertex_index / 3;
+    /* X axis (red) and Z axis (blue) through the origin. */
+    vertex_data [vertex_index++] = (float) -half_extent;
+    vertex_data [vertex_index++] = 0.0f;
+    vertex_data [vertex_index++] = 0.0f;
+    vertex_data [vertex_index++] = (float) half_extent;
+    vertex_data [vertex_index++] = 0.0f;
+    vertex_data [vertex_index++] = 0.0f;
+    vertex_data [vertex_index++] = 0.0f;
+    vertex_data [vertex_index++] = 0.0f;
+    vertex_data [vertex_index++] = (float) -half_extent;
+    vertex_data [vertex_index++] = 0.0f;
+    vertex_data [vertex_index++] = 0.0f;
+    vertex_data [vertex_index++] = (float) half_extent;
+    grid_mesh_object -> axis_count = vertex_index / 3 - grid_mesh_object -> axis_start;
+    grid_mesh_object -> line_vertex_count = vertex_index / 3;
     glGenVertexArrays (1, &grid_mesh_object -> vertex_array_object);
     glGenBuffers (1, &grid_mesh_object -> vertex_buffer_object);
     glBindVertexArray (grid_mesh_object -> vertex_array_object);
@@ -132,6 +177,19 @@ void grid_render (grid_mesh *grid_mesh_object, GLuint shader_program, math4 view
     glBindVertexArray (grid_mesh_object -> vertex_array_object);
     glVertexAttrib3f (1, grid_surface_normal_x, grid_surface_normal_y,
                       grid_surface_normal_z); // Constant normal pointing up for the grid
-    glDrawArrays (GL_LINES, 0, grid_mesh_object -> line_vertex_count);
+    /* Enhanced batches (DESPOT-2026-10-12): dim minor lines, brighter major
+     * lines, red X axis, blue Z axis — same shader, per-batch colour. */
+    if (a3_grid_uniform_object_colour >= 0) {
+        glUniform3f (a3_grid_uniform_object_colour, 0.3f, 0.3f, 0.3f);
+        glDrawArrays (GL_LINES, grid_mesh_object -> minor_start, grid_mesh_object -> minor_count);
+        glUniform3f (a3_grid_uniform_object_colour, 0.55f, 0.55f, 0.55f);
+        glDrawArrays (GL_LINES, grid_mesh_object -> major_start, grid_mesh_object -> major_count);
+        glUniform3f (a3_grid_uniform_object_colour, 0.8f, 0.2f, 0.2f);
+        glDrawArrays (GL_LINES, grid_mesh_object -> axis_start, 2);
+        glUniform3f (a3_grid_uniform_object_colour, 0.2f, 0.4f, 0.9f);
+        glDrawArrays (GL_LINES, grid_mesh_object -> axis_start + 2, 2);
+    } else {
+        glDrawArrays (GL_LINES, 0, grid_mesh_object -> line_vertex_count);
+    }
     glBindVertexArray (0);
 }

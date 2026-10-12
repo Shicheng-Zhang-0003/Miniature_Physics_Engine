@@ -6,7 +6,14 @@
 typedef struct {
     GLuint vertex_array_object, vertex_buffer_object;
     int line_vertex_count;
+    /* Enhanced batches (offsets in vertices into the single VBO): dim minor
+     * lines, brighter major lines every GRID_MAJOR_EVERY cells, and the two
+     * world axes (X red, Z blue). grid_render draws each with its colour. */
+    int minor_start, minor_count;
+    int major_start, major_count;
+    int axis_start, axis_count;
 } grid_mesh;
+#define GRID_MAJOR_EVERY 5
 void grid_init (grid_mesh *grid_mesh_object, int half_extent, int cell_spacing);
 void grid_render (grid_mesh *grid_mesh_object, GLuint shader_program, math4 view_matrix, math4 projection_matrix);
 /* Drop cached program/uniform locations after GL programs are deleted
