@@ -36,6 +36,21 @@ int ftc_fleet_count (struct physics_world *world);
 /* Mutable robot access for commanding (drivetrain_tank/mecanum) and
  * inspection (odometry, battery). NULL on bad world/index. */
 ftc_robot *ftc_fleet_get (struct physics_world *world, int index);
+/* ---- arcade game league: balls, fictional intake, suspended bucket ----
+ * (see submodules/intake.h for the abstraction). All dlsym-safe plain-C
+ * entry points (the debug terminal and gamepad resolve these by name;
+ * the engine never links FTC). Balls/bucket bodies belong to the world
+ * (persist until scene clear, like robots); ids dangle safely (pruned). */
+int ftc_balls_spawn (struct physics_world *world, int n);
+int ftc_intake_set (struct physics_world *world, int index, int on);
+int ftc_intake_toggle (struct physics_world *world, int index);
+int ftc_eject (struct physics_world *world, int index);
+int ftc_shoot (struct physics_world *world, int index);
+int ftc_bucket_spawn (struct physics_world *world, float x, float y, float z);
+int ftc_bucket_clear (struct physics_world *world);
+/* Totals: carried (robot 0), tracked balls, scored, bucket active. Any out
+ * pointer may be NULL. Returns 0 ok, -1 no fleet. */
+int ftc_game_stats (struct physics_world *world, int *carried, int *balls, int *scored, int *bucket_on);
 /* ---- module plumbing (used by ftc_module.c; not application API) ---- */
 void *ftc_fleet_create (void);
 void ftc_fleet_destroy (void *fleet_state);

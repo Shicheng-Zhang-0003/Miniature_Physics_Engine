@@ -16,6 +16,7 @@ MFS_FTC_SRCS = ecosystem/mfs/modules/ftc/ftc_module.c \
     ecosystem/mfs/modules/ftc/ftc_fleet.c \
     ecosystem/mfs/modules/ftc/submodules/robot.c \
     ecosystem/mfs/modules/ftc/submodules/drivetrain.c \
+    ecosystem/mfs/modules/ftc/submodules/intake.c \
     ecosystem/mfs/modules/ftc/submodules/motor.c \
     ecosystem/mfs/modules/ftc/submodules/motor_presets.c \
     ecosystem/mfs/modules/ftc/submodules/battery.c

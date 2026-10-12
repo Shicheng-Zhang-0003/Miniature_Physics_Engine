@@ -4,6 +4,7 @@
 #include "motor.h"
 #include "motor_presets.h"
 #include "battery.h"
+#include "intake.h"
 #include "core/physics_world.h"
 #define FTC_MAX_WHEELS 8
 /* MFS_DRIVETRAIN_TYPE: explicit wheel/traction model selection. */
@@ -97,6 +98,15 @@ typedef struct {
      * on free revolute bearings) for forensics. Tank robots always read
      * false: plain cylinders, engine friction only. */
     bool mecanum_analytic;
+    /* Fictional intake (arcade league, see submodules/intake.h): possession
+     * lives here so it rides with the robot (memcpy-safe plain ints, zero
+     * is off-and-empty — create() memsets, so drive behavior with the
+     * intake off is bit-identical to before). Balls themselves are world
+     * bodies owned by whoever spawned them (fleet game state); these are
+     * body ids into that registry. */
+    int intake_on;
+    int intake_balls [INTAKE_MAX_CARRIED];
+    int intake_count;
 } ftc_robot;
 /* MFS-STRAFE-A analytic constants (shared with drivetrain.c): slide
  * coefficient for roller-axle slip on tile (wheel-rubber kinetic class;
