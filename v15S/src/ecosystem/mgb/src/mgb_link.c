@@ -18,6 +18,21 @@
  * Any timeout, EOF without prompt, or missing frame file marks the
  * session dead: further calls fail immediately, mgb_close kills + reaps.
  * A dead child can never yield half a frame.
+ *
+ * Failure naming: every spawn failure mode calls fail_spawn() so that
+ * mgb_spawn_reason() reports the true cause. Previously fork() failure,
+ * calloc() failure, and transcript-path failure returned NULL without
+ * naming themselves, so callers had to guess between "fork failed",
+ * "out of memory", and "transcript path too long" — three unrelated
+ * problems with one indistinguishable result. All eight failure modes
+ * are now named: no_path, pipe, fork, notfound, noexec, noexecbit,
+ * handshake, alloc.
+ *
+ * Pipe hygiene: when pipe(to_c) succeeds but pipe(out_c) or pipe(err_c)
+ * fails, the to_c pipes are closed before returning. When fork() fails,
+ * all four pipe pairs (to_c, out_c, err_c, exec_err) are closed. A
+ * resource leak in a failure path is a bug even if the process exits
+ * shortly after — it is a correctness issue in any long-running caller.
  */
 #define _POSIX_C_SOURCE 200809L
 #include "mgb.h"
@@ -164,18 +179,31 @@ mgb_session_t *mgb_spawn (const char *s2tui_path, int timeout_sec) {
     g_spawn_status = mgb_spawn_ok;
     g_spawn_errno = 0;
     int to_c[2], out_c[2], err_c[2];
-    if (pipe (to_c) != 0 || pipe (out_c) != 0 || pipe (err_c) != 0)
-        { fail_spawn (mgb_spawn_e_pipe, errno); return NULL; }
+    if (pipe (to_c) != 0 || pipe (out_c) != 0 || pipe (err_c) != 0) {
+        if (to_c[0] || to_c[1]) { close (to_c[0]); close (to_c[1]); }
+        if (out_c[0] || out_c[1]) { close (out_c[0]); close (out_c[1]); }
+        if (err_c[0] || err_c[1]) { close (err_c[0]); close (err_c[1]); }
+        fail_spawn (mgb_spawn_e_pipe, errno);
+        return NULL;
+    }
     /* Exec-status channel: the child writes errno here if execl fails, so
      * "exec failed: ENOENT" is reported instead of the child vanishing. */
     int exec_err[2];
-    if (pipe (exec_err) != 0) { fail_spawn (mgb_spawn_e_pipe, errno); return NULL; }
+    if (pipe (exec_err) != 0) {
+        close (to_c[0]); close (to_c[1]);
+        close (out_c[0]); close (out_c[1]);
+        close (err_c[0]); close (err_c[1]);
+        fail_spawn (mgb_spawn_e_pipe, errno);
+        return NULL;
+    }
     fcntl (exec_err[1], F_SETFD, FD_CLOEXEC);
     pid_t pid = fork ();
     if (pid < 0) {
         close (to_c[0]); close (to_c[1]);
         close (out_c[0]); close (out_c[1]);
         close (err_c[0]); close (err_c[1]);
+        close (exec_err[0]); close (exec_err[1]);
+        fail_spawn (mgb_spawn_e_fork, errno);
         return NULL;
     }
     if (pid == 0) {
@@ -196,6 +224,7 @@ mgb_session_t *mgb_spawn (const char *s2tui_path, int timeout_sec) {
         close (to_c[1]); close (out_c[0]); close (err_c[0]);
         kill (pid, SIGKILL);
         waitpid (pid, NULL, 0);
+        fail_spawn (mgb_spawn_e_alloc, 0);
         return NULL;
     }
     s->pid = pid;
@@ -211,6 +240,7 @@ mgb_session_t *mgb_spawn (const char *s2tui_path, int timeout_sec) {
                   "%s/mgb_transcript_%d.log", s->tmpdir,
                   (int)pid) >= (int)sizeof s->transcript) {
         mgb_close (s);
+        fail_spawn (mgb_spawn_e_alloc, 0);
         return NULL;
     }
     FILE *log = fopen (s->transcript, "w");

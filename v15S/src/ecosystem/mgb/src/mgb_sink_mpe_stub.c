@@ -9,9 +9,11 @@
  * CONTRACT (MPE sink):
  *  MUST create one STATIC body per mapped body() call (static => the
  *    solver skips it; display-only becomes architectural fact, not a
- *    promise). Position = mapped mm as metres (1 mm display == 1e-3 m;
- *    the stage volume sits at a quarantined offset, e.g. y+=500, so S2
- *    content can never touch MPE play bodies).
+ *    promise). Position = mapped mm used numerically as MPE metres
+ *    ("1 unit = 1 mm S2-display") plus the stage offset (default
+ *    (0,20,-60), on the engine's default camera axis; the offset targets
+ *    the frame's bounding-box centre, not raw S2 coordinates). Override
+ *    with $MGB_OX / $MGB_OY / $MGB_OZ.
  *  MUST reuse stable body ids across frames: S2 atom index i maps to the
  *    same MPE body every frame (move, never respawn). Added/removed atoms
  *    create/destroy bodies explicitly.

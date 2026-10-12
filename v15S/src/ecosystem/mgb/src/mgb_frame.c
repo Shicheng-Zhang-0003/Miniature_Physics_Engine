@@ -110,6 +110,16 @@ int mgb_frame_parse (const char *path, mgb_frame_t *f) {
             if (parse_double (t2[vi[i]], &v[i]) != 0) goto done;
         long th;
         if (parse_long (t2[9], &th) != 0 || th < 0 || th > 3) goto done;
+        /* Physical validation: these are not formatting preferences but
+         * physical quantities with hard constraints. A non-positive dt or
+         * cutoff, or a negative temperature, is not a valid simulation
+         * state — accepting it would let a corrupt or malicious frame
+         * describe an impossible world. */
+        if (v[0] <= 0.0) goto done;   /* dt must be positive (fs) */
+        if (v[1] <= 0.0) goto done;   /* cutoff must be positive (A) */
+        if (v[3] < 0.0) goto done;    /* temp must be non-negative (K) */
+        if (v[4] <= 0.0) goto done;   /* tau must be positive (fs) */
+        if (v[5] < 0.0) goto done;    /* nu must be non-negative (1/fs) */
         f->dt = v[0]; f->cutoff = v[1]; f->dielectric = v[2];
         f->temp = v[3]; f->thermostat = (int)th; f->tau = v[4]; f->nu = v[5];
     }
