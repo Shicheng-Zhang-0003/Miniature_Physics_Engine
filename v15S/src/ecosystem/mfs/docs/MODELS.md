@@ -147,11 +147,11 @@ Shipped mixer kept. Measured steady-state response of the shipped mixer
 |---|---|---|---|
 | forward +1 | +0.243 | **+1.173** | -0.029 |
 | reverse -1 | -0.240 | **-0.979** | -0.134 |
-| strafe +X | **+0.869** | -0.244 | +0.245 |
+| strafe right (+1) | **-0.771** | +0.077 | -0.043 |
 | rotate +1 | -0.029 | -0.004 | **+0.388** |
 
-Forward leaks 21% laterally and 2.5% into yaw; strafe leaks 28% into forward
-and 28% into yaw (real mecanum cross-talk — the X roller pattern is not
+Forward leaks 21% laterally and 2.5% into yaw; strafe leaks 10% into forward
+and 6% into yaw in this window (real mecanum cross-talk — the X roller pattern is not
 symmetric under a pure lateral command, which is why teams re-zero heading
 against the field mid-strafe). Pinned by `mfs_t_drive_directions`.
 

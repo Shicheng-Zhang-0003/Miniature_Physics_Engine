@@ -51,8 +51,11 @@ silent passes. Measurements from the 2026-09-26 audit on this tree.
   Analytic-mode hubs ship zero isotropic friction so engine contact
   supplies the normal only: a single tangential model, never
   double-counted past the cone.
-- **Measured (128 iters, tile floor):** strafe +X 3.40 m / -X 3.66 m in
-  3 s (gate 0.30 m); mecanum forward 2.52 m, reverse 3.09 m; diagonal
+- **Measured (128 iters, tile floor):** strafe right (−X) ≈3.40 m /
+  +X ≈3.66 m in 3 s for commands +1/−1 (DESPOT-2026-10-12: directions swapped
+  with the mixer fix — pre-fix these read +X/−X; magnitudes re-pinned by the
+  suite at dx=−2.2282 vs +2.1596 pre, within chaotic noise); mecanum forward
+  2.52 m, reverse 3.09 m; diagonal
   (0.5, 0.5) → (1.19, 1.20) m; yaw in strafe <= 0.13 rad; iteration sweep
   64–512 flat at 3.40–3.64 m. Suite hard-gates F1 now.
 - **Approaches measured and parked:** (b) wheel-level anisotropic rail
@@ -533,7 +536,7 @@ an unrelated question exposed this, and the first conclusion drawn from it was
   so a short-horizon displacement average measures the spin-up ramp, not the
   drivetrain.
 - **`mfs_t_drive_directions` added** to close the gap. It pins axis dominance
-  (forward→+Z, strafe→+X, rotate→yaw), cross-talk ceilings, and — the gate
+  (forward→+Z, strafe→−X/robot-right, rotate→yaw), cross-talk ceilings, and — the gate
   that would have caught the sign question — that `rotate` and its reverse
   produce **opposite yaw signs**. Suite 12 → 13.
 

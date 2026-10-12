@@ -256,7 +256,7 @@ physics_world_detach_module(world, "ftc-fleet");
   bodies/joints are built (6 bodies / 4 joints). This replaces the
   retired chassis-force era AND the articulated 32-roller build (kept
   behind `ftc_robot_set_mecanum_analytic_default(0)` for forensics):
-  strafe +X 2.2250 m in 3 s vs 0.30 m gated; diagonal (0.5,0.5) composes
+  strafe right (−X, the robot's right) 2.2282 m in 180 ticks vs 0.30 m gated; diagonal (0.5,0.5) composes
   (DESPOT-2026-10-06: this figure has now been documented three times and
   drifted twice. It was 3.40 m (a stale source comment), then 2.2872 m
   (measured), and is 2.2250 m as of the v_ref change. `mfs_suite mecanum`
