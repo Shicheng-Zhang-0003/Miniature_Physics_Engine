@@ -4,7 +4,7 @@
  * Streamlined 2026-10-04 (v15S release blocker): one field, one robot, one
  * controller, full mecanum drive — and the controller is the physical F310
  * gamepad (see ui_input/gamepad_drive.c), NOT the terminal. Verbs:
- *   ftc spawn [x y z]          spawn THE mecanum robot (refuses when one exists)
+ *   ftc spawn [x y z]          spawn THE mecanum robot + game bucket (refuses when one exists)
  *   ftc telemetry               pose, odometry, battery, wheels, game state
  *   ftc intake on|off           fictional intake capture on/off
  *   ftc eject                   drop carried balls (no launch)
@@ -14,8 +14,9 @@
  *   ftc score                   carried / balls / scored / bucket readout
  * Requires the bundle: `mod load ecosystem/mfs/mfs_ecosystem.so` first
  * (symbols resolve from the loaded handle; the engine never links FTC).
- * Spawn auto-attaches the ftc-fleet module to the primary world and ensures
- * the tile field.
+ * Spawn auto-attaches the ftc-fleet module to the primary world, ensures the
+ * tile field with perimeter walls (balls can't roll off the grid), and drops
+ * the game bucket.
  *
  * PARKED (not deleted): `drive`/`stop` (the gamepad owns all motion now),
  * `list`/`preset` inventory, tank drive, preset selection, multi-robot
@@ -85,6 +86,37 @@ static int ftc_ensure_floor (physics_world *w) {
     w -> bodies [f].restitution = 0.0f;
     term_out ("mpe: ftc: tile floor added (robots need frictional contact)\n");
     return 1;
+} /* Perimeter walls: static thin boxes on the four edges of the tile field
+ * (user config — "grid with walls") so arcade balls (pollen/nectar) and the
+ * robot cannot roll off. Idempotent: skips if a long thin static box already
+ * sits near an edge. Returns 0 ok, -1 error. */
+static int ftc_ensure_walls (physics_world *w, float half, float height) {
+    if (!w || half <= 0.0f || height <= 0.0f)
+        return -1;
+    float hh = 0.5f * height;
+    const vector3 plan [4] = {{half, hh, 0.0f}, {-half, hh, 0.0f}, {0.0f, hh, half}, {0.0f, hh, -half}};
+    const vector3 size [4] = {{0.2f, hh, half}, {0.2f, hh, half}, {half, hh, 0.2f}, {half, hh, 0.2f}};
+    for (int p = 0; p < 4; p++) {
+        int have = 0;
+        for (int i = 0; i < w -> body_count; i++) {
+            rigidbody *b = &w -> bodies [i];
+            if (!b -> static_state && !(b -> mass == 0.0f))
+                continue;
+            if (fabsf (b -> position.x - plan [p].x) < 0.5f && fabsf (b -> position.z - plan [p].z) < 0.5f &&
+                (b -> half_extensions.x < 1.0f || b -> half_extensions.z < 1.0f)) {
+                have = 1;
+                break;
+            }
+        }
+        if (have)
+            continue;
+        int wall = physics_world_add_cube (w, plan [p], size [p], 0.0f);
+        if (wall < 0)
+            return -1;
+        w -> bodies [wall].friction_static = 1.0f;
+        w -> bodies [wall].friction_kinetic = 0.8f;
+        w -> bodies [wall].restitution = 0.0f;
+    } return 0;
 } /* Ensure the ftc-fleet tick module drives the primary world (idempotent).
  * Returns 0 when driving, -1 when the bundle is missing. Engine APIs
  * (registry, attach) are called directly — this TU links into the
@@ -126,7 +158,7 @@ static void ftc_ensure_iterations (void) {
 }
 void cmd_ftc (int argc, char **argv) {
     if (argc < 2) {
-        term_err ("mpe: ftc: usage: ftc spawn [x y z] | telemetry | intake on|off | eject | shoot | balls [n] | bucket [x y z] | score\n");
+        term_err ("mpe: ftc: usage: ftc spawn [x y z] (spawns bucket too) | telemetry | intake on|off | eject | shoot | balls [n] | bucket [x y z] | score\n");
         return;
     } physics_world *w = physics_world_get_primary ();
     /* Single-robot accessors (index 0 implied; bundle API keeps indices). */
@@ -168,11 +200,25 @@ void cmd_ftc (int argc, char **argv) {
             term_err ("mpe: ftc: could not ensure floor\n");
             return;
         } ftc_ensure_iterations ();
+        if (ftc_ensure_walls (w, 30.0f, 1.0f) < 0) {
+            term_err ("mpe: ftc: could not ensure perimeter walls\n");
+            return;
+        }
         int idx = p_spawn (w, x, y, z, (motor_preset_id) preset, FTC_DRIVETRAIN_MECANUM);
         if (idx < 0) {
             term_err ("mpe: ftc: spawn failed\n");
             return;
-        } char buf [224];
+        }
+        /* Spawn the default suspended bucket with the robot so the game is
+         * playable immediately (user config: `ftc spawn` = full field). */
+        int (*p_bk) (struct physics_world *, float, float, float) =
+            (int (*) (struct physics_world *, float, float, float)) ftc_sym ("ftc_bucket_spawn");
+        if (p_bk && p_bk (w, 0.0f, 1.0f, 4.0f) == 0) {
+            term_out ("mpe: ftc: bucket at (0.00,1.00,4.00) (ftc bucket [x y z] to move)\n");
+        } else if (p_bk) {
+            term_err ("mpe: ftc: bucket spawn failed\n");
+        }
+        char buf [224];
         snprintf (buf, sizeof (buf), "mpe: ftc: robot at (%.2f,%.2f,%.2f) %s mecanum\n", x, y, z,
                   p_name ((motor_preset_id) preset));
         term_ok (buf);
