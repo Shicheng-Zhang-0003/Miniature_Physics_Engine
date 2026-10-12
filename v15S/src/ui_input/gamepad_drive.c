@@ -25,6 +25,7 @@ static void (*s_mecanum) (ftc_robot *, float, float, float) = NULL;
 static bool (*s_pad_init) (gamepad_state *, const char *) = NULL;
 static void (*s_pad_poll) (gamepad_state *) = NULL;
 static float (*s_pad_axis) (const gamepad_state *, int) = NULL;
+static float (*s_pad_trigger) (const gamepad_state *, int) = NULL;
 static bool (*s_pad_button) (const gamepad_state *, int) = NULL;
 static bool (*s_pad_connected) (const gamepad_state *) = NULL;
 static void (*s_pad_deadzone) (gamepad_state *, float) = NULL;
@@ -37,6 +38,8 @@ static int s_prev_start = 0;
 static int s_prev_a = 0;
 static int s_prev_y = 0;
 static int s_prev_b = 0;
+static int s_prev_lt = 0;
+static int s_prev_rt = 0;
 static int s_was_commanding = 0;
 static int s_active = 0;
 static int s_reported_stage = -1;
@@ -58,7 +61,8 @@ static void gpd_report_stage (int stage) {
         fprintf (stderr, "[gamepad] pad connected, waiting for robot (ftc spawn)\n");
         break;
         case 3:
-        fprintf (stderr, "[gamepad] driving robot 0 (START toggles, LB+RB e-stop)\n");
+        fprintf (stderr,
+                 "[gamepad] driving robot 0 (START toggles, LB+RB e-stop, LT intake RT shoot)\n");
         break;
         default:
         break;
@@ -81,6 +85,7 @@ static void gpd_resolve (void) {
     s_pad_init = (bool (*) (gamepad_state *, const char *)) gpd_sym ("gamepad_init");
     s_pad_poll = (void (*) (gamepad_state *)) gpd_sym ("gamepad_poll");
     s_pad_axis = (float (*) (const gamepad_state *, int)) gpd_sym ("gamepad_get_axis");
+    s_pad_trigger = (float (*) (const gamepad_state *, int)) gpd_sym ("gamepad_get_trigger");
     s_pad_button = (bool (*) (const gamepad_state *, int)) gpd_sym ("gamepad_get_button");
     s_pad_connected = (bool (*) (const gamepad_state *)) gpd_sym ("gamepad_is_connected");
     s_pad_deadzone = (void (*) (gamepad_state *, float)) gpd_sym ("gamepad_set_deadzone");
@@ -98,6 +103,7 @@ void gamepad_drive_invalidate (void) {
     s_pad_init = NULL;
     s_pad_poll = NULL;
     s_pad_axis = NULL;
+    s_pad_trigger = NULL;
     s_pad_button = NULL;
     s_pad_connected = NULL;
     s_pad_deadzone = NULL;
@@ -123,6 +129,14 @@ void gamepad_drive_init (void) {
 static void gpd_stop_robot (ftc_robot *r) {
     if (s_mecanum && r)
         s_mecanum (r, 0.0f, 0.0f, 0.0f);
+} /* Release-brake: brake command proportional to a velocity component,
+ * dead-zoned under 0.05 m/s and capped at 0.2 power units. */
+static float gpd_brake (float v, float k) {
+    if (fabsf (v) < 0.05f) return 0.0f;
+    float b = -k * v;
+    if (b > 0.2f) { b = 0.2f; }
+    if (b < -0.2f) { b = -0.2f; }
+    return b;
 }
 void gamepad_drive_tick (void) {
     gpd_resolve ();
@@ -159,10 +173,13 @@ void gamepad_drive_tick (void) {
     if (start_now && !s_prev_start)
         s_control_enabled = !s_control_enabled;
     s_prev_start = start_now;
-    /* Arcade game buttons (mirror module_1: A intake toggle, B eject, Y
-     * shoot). Edge-triggered; symbols resolve from the bundle and may be
-     * NULL on older builds — then the buttons quietly do nothing. */
+    /* F310 arcade profile (user config): left trigger = intake (hold),
+     * right trigger = shoot (press). A/Y/B kept as toggles/fallback.
+     * Edge/level-triggered; symbols resolve from the bundle and may be NULL
+     * on older builds — then the buttons quietly do nothing. */
     {
+        float lt = s_pad_trigger ? s_pad_trigger (&s_pad, gamepad_axis_left_trigger) : 0.0f;
+        float rt = s_pad_trigger ? s_pad_trigger (&s_pad, gamepad_axis_right_trigger) : 0.0f;
         int a_now = s_pad_button (&s_pad, gamepad_button_a) ? 1 : 0;
         int y_now = s_pad_button (&s_pad, gamepad_button_y) ? 1 : 0;
         int b_now = s_pad_button (&s_pad, gamepad_button_b) ? 1 : 0;
@@ -170,14 +187,22 @@ void gamepad_drive_tick (void) {
          * an unload boundary). */
         int (*s_toggle) (struct physics_world *, int) =
             (int (*) (struct physics_world *, int)) gpd_sym ("ftc_intake_toggle");
+        int (*s_set) (struct physics_world *, int, int) =
+            (int (*) (struct physics_world *, int, int)) gpd_sym ("ftc_intake_set");
         int (*s_shoot) (struct physics_world *, int) =
             (int (*) (struct physics_world *, int)) gpd_sym ("ftc_shoot");
         int (*s_eject) (struct physics_world *, int) =
             (int (*) (struct physics_world *, int)) gpd_sym ("ftc_eject");
         physics_world *wg = physics_world_get_primary ();
+        int lt_now = (lt > 0.3f) ? 1 : 0; /* LT: hold = intake, release = off */
+        if (lt_now && !s_prev_lt && s_set && wg) { s_set (wg, 0, 1); }
+        if (!lt_now && s_prev_lt && s_set && wg) { s_set (wg, 0, 0); }
+        if (rt > 0.5f && !s_prev_rt && s_shoot && wg) { s_shoot (wg, 0); } /* RT: launch on press */
         if (a_now && !s_prev_a && s_toggle && wg) { s_toggle (wg, 0); }
         if (y_now && !s_prev_y && s_shoot && wg) { s_shoot (wg, 0); }
         if (b_now && !s_prev_b && s_eject && wg) { s_eject (wg, 0); }
+        s_prev_lt = lt_now;
+        s_prev_rt = (rt > 0.5f) ? 1 : 0;
         s_prev_a = a_now;
         s_prev_y = y_now;
         s_prev_b = b_now;
@@ -201,7 +226,34 @@ void gamepad_drive_tick (void) {
     float rot = s_pad_axis (&s_pad, gamepad_axis_right_x);
     if (s_pad_button (&s_pad, gamepad_button_lb) && s_pad_button (&s_pad, gamepad_button_rb)) {
         fwd = str = rot = 0.0f; /* LB+RB e-stop */
-    } s_mecanum (r, fwd, str, rot);
+    } else {
+        /* RELEASE-BRAKE: a released axis still coasts for seconds because
+         * the held axis keeps every wheel "commanded", so the idle regen
+         * never engages (measured: forward 1.0 -> 0.15 in ~2.8 s under pure
+         * rotate; full release snaps to a stop in ~0.5 s). When an axis is
+         * at rest, command a brake proportional to the chassis body-frame
+         * velocity along that axis: common-mode command (real motor torque,
+         * not an injected force) that rides the held axis without fighting
+         * it. +strafe -> robot right (-X); +rotate -> omega_y negative
+         * (drive_directions steady-state -5.68 rad/s per unit). */
+        rigidbody *ch = (r && r->chassis_body >= 0 && r->chassis_body < w->body_count)
+                            ? &w->bodies[r->chassis_body]: NULL;
+        if (ch) {
+            if (fabsf (fwd) < 0.05f) {
+                float vf = vector3_dot (ch->velocity, ch->cached_axes[2]);
+                fwd += gpd_brake (vf, 0.15f);
+            }
+            if (fabsf (str) < 0.05f) {
+                float vs = -vector3_dot (ch->velocity, ch->cached_axes[0]);
+                str += gpd_brake (vs, 0.15f);
+            }
+            if (fabsf (rot) < 0.05f) {
+                float vr = -ch->angular_velocity.y / 5.68f;
+                rot += gpd_brake (vr, 0.9f);
+            }
+        }
+    }
+    s_mecanum (r, fwd, str, rot);
     s_was_commanding = 1;
     s_active = 1;
     gpd_report_stage (3);

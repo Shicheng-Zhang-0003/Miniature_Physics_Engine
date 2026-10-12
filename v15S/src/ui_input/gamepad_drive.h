@@ -7,9 +7,14 @@
  *   left Y  -> forward/backward (forward = -Y, up on stick)
  *   left X  -> strafe left/right
  *   right X -> rotate
+ *   LT      -> intake (hold)
+ *   RT      -> shoot/launch (press); Y is kept as a button fallback
+ *   A       -> intake toggle (fallback), B -> eject
  *   START   -> toggle control enable (works while disabled, else latch-dead)
  *   LB + RB -> e-stop (zero drive)
- * Deadzone 0.15. Intake/shooter/buttons are NOT mapped (game layer parked).
+ * Deadzone 0.15. RELEASE-BRAKE: an axis at rest brakes the chassis velocity
+ * along that axis (common-mode motor command), so releasing one stick stops
+ * that motion instead of coasting while another stick is held.
  *
  * Linking discipline (same as term_ftc.c): the engine never links FTC.
  * Every FTC/gamepad symbol resolves through the loaded bundle handle and
