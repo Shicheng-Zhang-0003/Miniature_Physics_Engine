@@ -51,14 +51,17 @@ int main (void) {
         float dz = end_z - start_z;
         printf ("[info] start=(%.3f,%.3f,%.3f) end=(%.3f,%.3f,%.3f)\n", start_x, start_y, start_z, end_x, end_y, end_z);
         printf ("[info] displacement x=%.4f  z=%.4f\n", dx, dz);
-        /* Robot should have moved sideways (+X for strafe=1). Signed check:
+        /* Robot should have moved sideways (-X/robot-right for strafe=1:
+         * forward is +Z so right is -X. DESPOT-2026-10-12: the mixer used to
+         * send +strafe to +X/robot-left; fixed in drivetrain_mecanum, gate
+         * mirrored here.) Signed check:
          * FIX-AUDIT: old fabs() passed for -X too, leaving the strafe-sign
          * fix untested. */
         float lateral_displacement = dx;
-        if (lateral_displacement < 0.3f) {
-            printf ("[FAIL] robot did not strafe far enough in +X (dx=%.4f, expected >0.3)\n", dx);
+        if (lateral_displacement > -0.3f) {
+            printf ("[FAIL] robot did not strafe far enough in -X (dx=%.4f, expected <-0.3)\n", dx);
             fail = 1;
-        } else { printf ("[PASS] robot strafed in +X on emergent roller contacts (dx=%.4f)\n", dx); }
+        } else { printf ("[PASS] robot strafed right in -X on emergent roller contacts (dx=%.4f)\n", dx); }
     } physics_world_cleanup (&world);
     return fail;
 }

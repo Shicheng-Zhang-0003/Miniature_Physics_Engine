@@ -46,7 +46,10 @@ int mfs_t_teleop (void) {
     free (robot);
     mfs_test_end (t_ptr);
     return t_ptr -> failures;
-} /* mecanum: strafe right >0.3m in +X. */
+} /* mecanum: strafe right >0.3m in -X (the robot's right: forward is +Z,
+ * so facing +Z with up +Y, right is -X. DESPOT-2026-10-12: the mixer used
+ * to send +strafe to +X — the robot's left — while forward stayed
+ * robot-relative; fixed in drivetrain_mecanum, gate mirrored here). */
 int mfs_t_mecanum (void) {
     mfs_test_t t;
     mfs_test_begin (&t, "mecanum");
@@ -86,8 +89,8 @@ int mfs_t_mecanum (void) {
          * under-convergence — solver-frontier writeup kept in
          * docs/KNOWN_FAILURES.md). Hard gate now. */
         float lateral_displacement = dx;
-        MFS_CHECK (t_ptr, lateral_displacement >= 0.3f);
-        if (lateral_displacement >= 0.3f) { printf ("[PASS] mecanum strafe in +X (dx=%.4f)\n", dx); } else { printf ("[FAIL][MFS-STRAFE-F1] mecanum strafe dx=%.4f < 0.30\n", dx); }
+        MFS_CHECK (t_ptr, lateral_displacement <= -0.3f);
+        if (lateral_displacement <= -0.3f) { printf ("[PASS] mecanum strafe right in -X (dx=%.4f)\n", dx); } else { printf ("[FAIL][MFS-STRAFE-F1] mecanum strafe dx=%.4f > -0.30 (want robot-right -X)\n", dx); }
     } physics_world_cleanup (&w);
     free (robot);
     mfs_test_end (t_ptr);
@@ -758,7 +761,9 @@ int mfs_t_drive_directions (void) {
     MFS_CHECK (t_ptr, fabsf (fwd.om) < 0.25f * fabsf (fwd.vz));
     /* 4. Forward/reverse anti-symmetry in magnitude. */
     MFS_CHECK_REL (t_ptr, fabsf (fwd.vz), fabsf (rev.vz), 0.35f, "fwd/rev |vz| antisymmetry");
-    /* 5. Strafe must drive +X and must NOT be a disguised forward.
+    /* 5. Strafe must drive -X (the robot's right: forward +Z, up +Y, so
+     *    right is -X — DESPOT-2026-10-12 mirrored the mixer, which used to
+     *    send +strafe to +X/robot-left) and must NOT be a disguised forward.
      *
      * Ceiling 0.35, set from measurement, not chosen for comfort: a sustained
      * strafe after the drive has been running leaks 28% of the lateral rate
@@ -771,7 +776,7 @@ int mfs_t_drive_directions (void) {
      * command-free settle), so the figure is state dependent; 0.35 holds under
      * both. A transposed mixer fails gate 5 outright (vx -> 0, vz -> 1.1), so
      * the slack here costs no coverage of the failure this test exists for. */
-    MFS_CHECK (t_ptr, str.vx > 0.5f);
+    MFS_CHECK (t_ptr, str.vx < -0.5f);
     MFS_CHECK (t_ptr, fabsf (str.vz) < 0.35f * fabsf (str.vx));
     MFS_CHECK (t_ptr, fabsf (str.om) < 0.35f * fabsf (str.vx));
     /* 6. Rotate must rotate, and mostly about yaw.

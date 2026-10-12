@@ -54,24 +54,32 @@ void drivetrain_mecanum (ftc_robot *robot, float forward, float strafe, float ro
     }
     /* Mecanum IK: per-wheel velocity targets.
        Wheel layout: [0]=FL, [1]=FR, [2]=BL, [3]=BR
-       FL: forward + strafe - rotate
-       FR: forward - strafe + rotate
-       BL: forward - strafe - rotate
-       BR: forward + strafe + rotate
-       DESPOT-2026-10-02 (audited; signs CONFIRMED CORRECT by measurement,
-       not by the algebra that first appeared to indict them):
-       the anti-diagonal pairing (FL=f+s-R, FR=f-s+R, BL=f-s-R, BR=f+s+R)
-       was A/B tested against the diagonal pairing over a steady-state
-       window (ticks 180..240, after 180 ticks of drive). Pure rotate, the
-       shipped mixer gives +2.289 rad/s for r=+1 and -2.030 rad/s for r=-1:
-       correct sign, correct anti-symmetry, ~131 deg/s — a healthy mecanum
-       turn. The diagonal pairing (FL=f+s+R, FR=f-s-R, BL=f-s+R, BR=f+s-R)
-       gives -2.030 for r=+1 and +2.289 for r=-1: the same magnitude,
-       INVERTED. Both pairings produce equal-and-opposite pure torque on
-       paper (each is a zero-net-force, nonzero-torque combination of the
-       four rail forces), which is exactly why algebra alone cannot choose
-       between them: the sign is fixed by the convention, and the
-       convention is fixed by measurement.
+       FL: forward - strafe - rotate
+       FR: forward + strafe + rotate
+       BL: forward + strafe - rotate
+       BR: forward - strafe + rotate
+       DESPOT-2026-10-12 (strafe mirrored — live report "left/right
+       inverted", confirmed against the tree's own frame): forward +Z is
+       the tree's forward convention (drive_directions gate 1: +fwd drives
+       +Z; odometry v_fwd integrates into +Z). Facing +Z with up +Y, the
+       robot's right hand points at -X, so +strafe (right) must move -X.
+       The mapping above sent +strafe to +X — the robot's LEFT — while
+       forward stayed robot-relative: the mixer disagreed with itself (and
+       with every chase-view driver). Fix is a pure strafe negation; the
+       anti-diagonal structure is unchanged, only mirrored, so the engine
+       sees mirrored loads (same magnitudes) and odometry v_lat needs no
+       change (it reports measured motion, which flips with the physics).
+       DESPOT-2026-10-02 (audited; ANTI-DIAGONAL STRUCTURE + ROTATE signs
+       confirmed correct by measurement — that result stands and is why
+       only the strafe sign moves here, not the pairing): the anti-diagonal
+       pairing was A/B tested against the diagonal pairing over a
+       steady-state window (ticks 180..240, after 180 ticks of drive).
+       Pure rotate gives +2.289 rad/s for r=+1 and -2.030 rad/s for r=-1:
+       correct sign, correct anti-symmetry — a healthy mecanum turn. The
+       diagonal pairing gives the same magnitudes INVERTED. Both pairings
+       produce equal-and-opposite pure torque on paper, which is exactly
+       why algebra alone cannot choose between them: the sign is fixed by
+       the convention, and the convention is fixed by measurement.
        Recorded because the first pass got this backwards. A 3.0 s
        end-to-end average reported r=+1 producing +0.029 rad and r=-1
        producing +0.221 rad, which looks like a sign error; it is not. It
@@ -83,10 +91,10 @@ void drivetrain_mecanum (ftc_robot *robot, float forward, float strafe, float ro
        — the same trap made 'rotate barely works' look true when it does
        not. Pinned by mfs_t_drive_directions in tests/mfs_suite_a.c. */
     float wheel_targets [4];
-    wheel_targets [0] = forward + strafe - rotate;
-    wheel_targets [1] = forward - strafe + rotate;
-    wheel_targets [2] = forward - strafe - rotate;
-    wheel_targets [3] = forward + strafe + rotate;
+    wheel_targets [0] = forward - strafe - rotate;
+    wheel_targets [1] = forward + strafe + rotate;
+    wheel_targets [2] = forward + strafe - rotate;
+    wheel_targets [3] = forward - strafe + rotate;
     /* Normalize if any target exceeds 1.0 */
     float max_mag = 0.0f;
     for (int i = 0; i < 4; i++) {
