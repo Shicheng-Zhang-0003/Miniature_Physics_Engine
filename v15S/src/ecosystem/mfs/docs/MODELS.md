@@ -304,6 +304,7 @@ gamepad drive, intake + shooter + balls:
 - Balls: r = 21 mm, m = 2.6 g, e = 0.65, μ 0.45/0.35; max 16, carry 3.
   Aero: drag `½·ρ·Cd·A·v²` (Cd 0.47 sphere); Magnus `½·ρ·A·S·ω·r·v`,
   S = 0.1, gate `spin > 10`. No spin decay (declared Module-2 scope).
+  Ball radius is read per-body (BIOBUZZ nectar/pollen are larger).
 - Intake: front-lower roller r25 mm/L200 mm/0.05 kg, P-gain 0.2 cap 0.5 N·m
   about the axle; pickup within `R+r+5 mm` compliance + 2 N pull + entrain
   `0.3·dt` surface velocity (magnitudes are picks).
@@ -322,6 +323,11 @@ conventions (0-rest and -1-rest; linear in transit, 0.05 press gate).
 `MPE_GAMEPAD_DEVICE=disabled` skips hardware silently (headless). `Back`
 resets the **full assembly** (chassis + wheels + rollers + flywheel +
 intake by one delta, velocities zeroed, observers + odometry reset).
+**Brake on no input:** every frame with all three drive axes at rest (or the
+LB+RB e-stop) calls `ftc_robot_set_brake(1)` — motor power = BRAKE, i.e. all
+wheel commands zeroed *and* the regenerative idle brake forced on regardless
+of the analytic-tire hysteresis — so released wheels stop and hold instead of
+running on. Any stick input calls `ftc_robot_set_brake(0)` and resumes drive.
 
 ## 8. Fictional intake + arcade ball/bucket league (`submodules/intake.c`, `ftc_fleet.c`)
 
@@ -333,6 +339,13 @@ All deterministic: no transcendentals (fixed-coefficient `det_sin/det_cos`,
 - Balls: same BioBuzz spec (r 21 mm, m 2.6 g, e 0.65, μ 0.45/0.35), 16 max.
   Scatter on `ftc balls`: three lanes ±0.3 m, rows 0.4 m apart ahead of the
   robot so a straight drive through the 0.32 m mouth catches ≥ 2.
+- BIOBUZZ league pieces (regulation sizes, `ftc pieces` / default on
+  `ftc spawn`): NECTAR r 45.5 mm (9.1 cm dia, m 26.4 g) and POLLEN r 35.5 mm
+  (7.1 cm dia, m 12.6 g) — same e/μ, mass scaled as r³ from the arcade spec.
+  Staged in three lanes so a lane drive mouths them. Carry slot pitch and
+  flying-ball aero read the **radius from the body** (`half_extensions.x`), so
+  the small-ball league (bodies still r 21 mm) stays bit-identical while the
+  larger pieces fly with their real frontal area.
 - Intake (fictional): capture is a **zone predicate** — any unpossessed
   dynamic ball whose centre enters the mouth box (FWD 0.34, UP −0.12, half
   0.16/0.10/0.14 m) and is slow relative to the chassis (`< 1.5 m/s`) becomes

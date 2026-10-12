@@ -30,6 +30,19 @@
 #define INTAKE_BALL_RESTITUTION 0.65f
 #define INTAKE_BALL_FRICTION_S 0.45f
 #define INTAKE_BALL_FRICTION_K 0.35f
+/* ---- BIOBUZZ 2026-27 scoring elements (FTC Competition Manual v1 §9.8) ----
+ * POLLEN: ~2.8 in (7.1 cm) diameter polyethylene ball, yellow (am-5851).
+ * NECTAR: ~3.6 in (9.1 cm) diameter polyethylene ball, red/blue (am-5852).
+ * The league spawns per-piece sphere bodies at these radii; intake carry
+ * spacing and ball aero read the RADIUS FROM THE BODY (half_extensions.x)
+ * where it matters, so the larger regulation pieces play with their real
+ * frontal area/drag without retuning the small-ball league (whose bodies
+ * carry the old radius and stay bit-identical). Mass scales as r^3 from the
+ * arcade spec (2.6 g at 21 mm): pollen ~12.6 g, nectar ~26.4 g. */
+#define BIOBUZZ_POLLEN_RADIUS 0.0355f
+#define BIOBUZZ_NECTAR_RADIUS 0.0455f
+#define BIOBUZZ_POLLEN_MASS 0.0126f
+#define BIOBUZZ_NECTAR_MASS 0.0264f
 /* ---- registry bounds ---- */
 #define INTAKE_MAX_BALLS 16
 #define INTAKE_MAX_CARRIED 4

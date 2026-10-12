@@ -42,6 +42,10 @@ ftc_robot *ftc_fleet_get (struct physics_world *world, int index);
  * the engine never links FTC). Balls/bucket bodies belong to the world
  * (persist until scene clear, like robots); ids dangle safely (pruned). */
 int ftc_balls_spawn (struct physics_world *world, int n);
+/* BIOBUZZ scoring elements: spawn nectar_n nectar (9.1 cm dia) and pollen_n
+ * pollen (7.1 cm dia) spheres ahead in lanes. Returns pieces made, -1 no
+ * fleet. */
+int ftc_biobuzz_spawn (struct physics_world *world, int nectar_n, int pollen_n);
 int ftc_intake_set (struct physics_world *world, int index, int on);
 int ftc_intake_toggle (struct physics_world *world, int index);
 int ftc_eject (struct physics_world *world, int index);

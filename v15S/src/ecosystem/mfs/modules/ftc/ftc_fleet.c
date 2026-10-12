@@ -192,6 +192,40 @@ int ftc_balls_spawn (struct physics_world *world, int n) {
         made++;
     } return made;
 }
+/* BIOBUZZ league pieces: regulation-size NECTAR (~9.1 cm dia) and POLLEN
+ * (~7.1 cm dia) spheres, staged ahead in three lanes like the small-ball
+ * scatter so a straight drive scoops a lane through the mouth. Colours per
+ * regulation (pollen yellow, nectar red), mass r^3 from the arcade spec.
+ * Registered in the same ball registry, so intake capture/carry/launch,
+ * ball aero and bucket scoring all apply unchanged. */
+int ftc_biobuzz_spawn (struct physics_world *world, int nectar_n, int pollen_n) {
+    ftc_fleet_t *f = fleet_of (world);
+    if (!world || !f) { return -1; }
+    if (nectar_n < 0) { nectar_n = 0; }
+    if (pollen_n < 0) { pollen_n = 0; }
+    int made = 0;
+    int total = nectar_n + pollen_n;
+    for (int k = 0; k < total && f -> ball_count < INTAKE_MAX_BALLS; k++) {
+        int is_nectar = (k < nectar_n) ? 1 : 0;
+        float radius = is_nectar ? BIOBUZZ_NECTAR_RADIUS : BIOBUZZ_POLLEN_RADIUS;
+        float mass = is_nectar ? BIOBUZZ_NECTAR_MASS : BIOBUZZ_POLLEN_MASS;
+        /* Three lanes (left/centre/right); nectar staged a touch further
+         * than pollen so both kinds sit in the drive path and the intake
+         * mouths a lane. */
+        float x = ((float) (k % 3) - 1.0f) * 0.3f;
+        float z = (is_nectar ? 2.6f : 1.8f) + 0.4f * (float) (k / 3);
+        int bi = physics_world_add_sphere (world, radius, mass, (vector3) {x, radius + 0.001f, z});
+        if (bi < 0) { break; }
+        rigidbody *b = &world -> bodies [bi];
+        b -> restitution = INTAKE_BALL_RESTITUTION;
+        b -> friction_static = INTAKE_BALL_FRICTION_S;
+        b -> friction_kinetic = INTAKE_BALL_FRICTION_K;
+        b -> colour = is_nectar ? (vector3) {0.95f, 0.25f, 0.25f} : (vector3) {1.0f, 0.9f, 0.2f};
+        rigidbody_wake (b);
+        f -> ball_ids [f -> ball_count++] = (int) b -> object_id;
+        made++;
+    } return made;
+}
 int ftc_intake_set (struct physics_world *world, int index, int on) {
     ftc_fleet_t *f = fleet_of (world);
     ftc_robot *r = fleet_robot_at (f, index);

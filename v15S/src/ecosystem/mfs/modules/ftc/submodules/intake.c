@@ -137,11 +137,18 @@ void intake_carry_step (physics_world *world, vector3 chassis_pos, vector4 chass
     if (!(ll > 1e-6f) || !isfinite (ll)) { lat = (vector3) {1.0f, 0.0f, 0.0f}; } else {
         lat = vector3_scaling (lat, 1.0f / ll);
     }
-    float spacing = 2.0f * INTAKE_BALL_RADIUS + 0.004f;
+    float spacing_default = 2.0f * INTAKE_BALL_RADIUS + 0.004f;
     for (int i = 0; i < carried_n && i < INTAKE_MAX_CARRIED; i++) {
         int bi = physics_world_index_by_id (world, (uint32_t) carried [i]);
         if (bi < 0 || bi >= world -> body_count) { continue; }
         rigidbody *ball = &world -> bodies [bi];
+        /* Slot pitch follows the piece radius (BIOBUZZ nectar/pollen are
+         * larger than the arcade ball): read it from the body so mixed
+         * loads do not overlap. */
+        float radius = (isfinite (ball -> half_extensions.x) && ball -> half_extensions.x > 0.001f)
+                           ? ball -> half_extensions.x : INTAKE_BALL_RADIUS;
+        float spacing = 2.0f * radius + 0.004f;
+        if (!(spacing > 0.0f)) { spacing = spacing_default; }
         vector3 slot = vector3_addition (mc, vector3_scaling (lat, ((float) i - (float) (carried_n - 1) * 0.5f) * spacing));
         ball -> position = slot;
         ball -> velocity = chassis_vel;
@@ -153,12 +160,16 @@ void intake_balls_aero_step (physics_world *world, const int *ball_ids, int ball
     /* Same air as module_1's ball step (1.225 kg/m^3, sphere Cd 0.47,
      * Magnus S = 0.1, spin gate 10 rad/s) — cited, separate owner. */
     const float rho = 1.225f, cd = 0.47f;
-    const float area = 3.14159265f * INTAKE_BALL_RADIUS * INTAKE_BALL_RADIUS;
     for (int b = 0; b < ball_n; b++) {
         int bi = physics_world_index_by_id (world, (uint32_t) ball_ids [b]);
         if (bi < 0 || bi >= world -> body_count) { continue; }
         rigidbody *ball = &world -> bodies [bi];
         if (ball -> kinematic || ball -> static_state || ball -> is_sleeping) { continue; }
+        /* Frontal area from the body's own radius (BIOBUZZ nectar/pollen
+         * are larger than the arcade ball). */
+        float radius = (isfinite (ball -> half_extensions.x) && ball -> half_extensions.x > 0.001f)
+                           ? ball -> half_extensions.x : INTAKE_BALL_RADIUS;
+        const float area = 3.14159265f * radius * radius;
         float speed = sqrtf (vector3_length_squared (ball -> velocity));
         if (speed > 0.1f && isfinite (speed)) {
             float f = 0.5f * rho * cd * area * speed * speed;
@@ -169,7 +180,7 @@ void intake_balls_aero_step (physics_world *world, const int *ball_ids, int ball
         if (spin > 10.0f && isfinite (spin) && speed > 0.001f) {
             vector3 sd = vector3_scaling (ball -> angular_velocity, 1.0f / spin);
             vector3 vd = vector3_scaling (ball -> velocity, 1.0f / speed);
-            float m = 0.5f * rho * area * spin * INTAKE_BALL_RADIUS * speed * 0.1f;
+            float m = 0.5f * rho * area * spin * radius * speed * 0.1f;
             if (isfinite (m)) {
                 ball -> force_accumulator =
                     vector3_addition (ball -> force_accumulator, vector3_scaling (vector3_cross (sd, vd), m));

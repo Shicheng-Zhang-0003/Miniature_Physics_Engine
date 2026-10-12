@@ -10,13 +10,14 @@
  *   ftc eject                   drop carried balls (no launch)
  *   ftc shoot                   launch oldest carried ball at the bucket arc
  *   ftc balls [n]               scatter n arcade balls ahead (default 3)
+ *   ftc pieces [nectar pollen]  stage BIOBUZZ pieces (default 4 nectar + 4 pollen)
  *   ftc bucket [x y z]          spawn/move the suspended bucket (default 0 1.0 4.0)
  *   ftc score                   carried / balls / scored / bucket readout
  * Requires the bundle: `mod load ecosystem/mfs/mfs_ecosystem.so` first
  * (symbols resolve from the loaded handle; the engine never links FTC).
  * Spawn auto-attaches the ftc-fleet module to the primary world, ensures the
- * tile field with perimeter walls (balls can't roll off the grid), and drops
- * the game bucket.
+ * tile field with perimeter walls (balls can't roll off the grid), drops the
+ * game bucket, and stages regulation-size BIOBUZZ nectar and pollen pieces.
  *
  * PARKED (not deleted): `drive`/`stop` (the gamepad owns all motion now),
  * `list`/`preset` inventory, tank drive, preset selection, multi-robot
@@ -158,7 +159,7 @@ static void ftc_ensure_iterations (void) {
 }
 void cmd_ftc (int argc, char **argv) {
     if (argc < 2) {
-        term_err ("mpe: ftc: usage: ftc spawn [x y z] (spawns bucket too) | telemetry | intake on|off | eject | shoot | balls [n] | bucket [x y z] | score\n");
+        term_err ("mpe: ftc: usage: ftc spawn [x y z] (spawns bucket + BIOBUZZ pieces) | telemetry | intake on|off | eject | shoot | balls [n] | pieces [nectar pollen] | bucket [x y z] | score\n");
         return;
     } physics_world *w = physics_world_get_primary ();
     /* Single-robot accessors (index 0 implied; bundle API keeps indices). */
@@ -209,6 +210,7 @@ void cmd_ftc (int argc, char **argv) {
             term_err ("mpe: ftc: spawn failed\n");
             return;
         }
+        char buf [224];
         /* Spawn the default suspended bucket with the robot so the game is
          * playable immediately (user config: `ftc spawn` = full field). */
         int (*p_bk) (struct physics_world *, float, float, float) =
@@ -218,7 +220,16 @@ void cmd_ftc (int argc, char **argv) {
         } else if (p_bk) {
             term_err ("mpe: ftc: bucket spawn failed\n");
         }
-        char buf [224];
+        /* Stage BIOBUZZ scoring elements by default (regulation sizes) so
+         * the driver can intake and launch immediately. */
+        int (*p_piece) (struct physics_world *, int, int) =
+            (int (*) (struct physics_world *, int, int)) ftc_sym ("ftc_biobuzz_spawn");
+        if (p_piece) {
+            int np = p_piece (w, 4, 4);
+            snprintf (buf, sizeof (buf),
+                      "mpe: ftc: %d BIOBUZZ piece(s) staged (nectar 9.1cm, pollen 7.1cm)\n", np);
+            term_out (buf);
+        }
         snprintf (buf, sizeof (buf), "mpe: ftc: robot at (%.2f,%.2f,%.2f) %s mecanum\n", x, y, z,
                   p_name ((motor_preset_id) preset));
         term_ok (buf);
@@ -340,6 +351,25 @@ void cmd_ftc (int argc, char **argv) {
         term_ok (buf);
         return;
     }
+    if (term_str_eq (argv [1], "pieces")) {
+        int (*p_piece) (struct physics_world *, int, int) =
+            (int (*) (struct physics_world *, int, int)) ftc_sym ("ftc_biobuzz_spawn");
+        if (!p_piece || !w) {
+            term_err ("mpe: ftc: bundle API incomplete\n");
+            return;
+        }
+        int nectar_n = (argc > 2) ? (int) ftc_argf (argv, 2, argc, 4.0f) : 4;
+        int pollen_n = (argc > 3) ? (int) ftc_argf (argv, 3, argc, 4.0f) : 4;
+        int made = p_piece (w, nectar_n, pollen_n);
+        if (made < 0) {
+            term_err ("mpe: ftc: pieces failed (no fleet: eco attach mfs-simulator first)\n");
+            return;
+        }
+        char buf [160];
+        snprintf (buf, sizeof (buf), "mpe: ftc: staged %d BIOBUZZ piece(s) (nectar 9.1cm, pollen 7.1cm)\n", made);
+        term_ok (buf);
+        return;
+    }
     if (term_str_eq (argv [1], "bucket")) {
         int (*p_bk) (struct physics_world *, float, float, float) =
             (int (*) (struct physics_world *, float, float, float)) ftc_sym ("ftc_bucket_spawn");
@@ -377,5 +407,5 @@ void cmd_ftc (int argc, char **argv) {
         term_out (buf);
         return;
     }
-    term_err ("mpe: ftc: unknown subcommand (spawn|telemetry|intake|eject|shoot|balls|bucket|score)\n");
+    term_err ("mpe: ftc: unknown subcommand (spawn|telemetry|intake|eject|shoot|balls|pieces|bucket|score)\n");
 }
