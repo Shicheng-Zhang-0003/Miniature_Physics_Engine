@@ -13,6 +13,7 @@
  *   ftc pieces [nectar pollen]  stage BIOBUZZ pieces (default 4 nectar + 4 pollen)
  *   ftc bucket [x y z]          spawn/move the suspended bucket (default 0 1.0 4.0)
  *   ftc score                   carried / balls / scored / bucket readout
+ *   ftc view [0|1|2]            camera: 0 free, 1 field-centric follow, 2 robot-centric
  * Requires the bundle: `mod load ecosystem/mfs/mfs_ecosystem.so` first
  * (symbols resolve from the loaded handle; the engine never links FTC).
  * Spawn auto-attaches the ftc-fleet module to the primary world, ensures the
@@ -32,6 +33,7 @@
 #include "../core/mpe_loader.h"
 #include "../core/mpe_registry.h"
 #include "../core/physics_world.h"
+#include "ftc_view.h"
 #include "../ecosystem/mfs/modules/ftc/ftc_fleet.h"
 #include "../ecosystem/mfs/modules/ftc/submodules/robot.h"
 #include "../ecosystem/mfs/modules/ftc/submodules/drivetrain.h"
@@ -168,7 +170,7 @@ static void ftc_ensure_iterations (void) {
 }
 void cmd_ftc (int argc, char **argv) {
     if (argc < 2) {
-        term_err ("mpe: ftc: usage: ftc spawn [x y z] (spawns bucket + BIOBUZZ pieces) | telemetry | intake on|off | eject | shoot | balls [n] | pieces [nectar pollen] | bucket [x y z] | score\n");
+        term_err ("mpe: ftc: usage: ftc spawn [x y z] (spawns bucket + BIOBUZZ pieces) | telemetry | intake on|off | eject | shoot | balls [n] | pieces [nectar pollen] | bucket [x y z] | score | view [0|1|2]\n");
         return;
     } physics_world *w = physics_world_get_primary ();
     /* Single-robot accessors (index 0 implied; bundle API keeps indices). */
@@ -416,5 +418,18 @@ void cmd_ftc (int argc, char **argv) {
         term_out (buf);
         return;
     }
-    term_err ("mpe: ftc: unknown subcommand (spawn|telemetry|intake|eject|shoot|balls|pieces|bucket|score)\n");
+    if (term_str_eq (argv [1], "view")) {
+        int mode = (argc > 2) ? (int) ftc_argf (argv, 2, argc, 1.0f) : 1;
+        if (mode < 0)
+            mode = 0;
+        if (mode > 2)
+            mode = 2;
+        ftc_view_set (mode);
+        char buf [160];
+        const char *nm = (mode == 0) ? "free" : (mode == 1) ? "field-centric (follows robot, fixed field yaw)" : "robot-centric (chase behind robot)";
+        snprintf (buf, sizeof (buf), "mpe: ftc: view %d = %s\n", mode, nm);
+        term_ok (buf);
+        return;
+    }
+    term_err ("mpe: ftc: unknown subcommand (spawn|telemetry|intake|eject|shoot|balls|pieces|bucket|score|view)\n");
 }

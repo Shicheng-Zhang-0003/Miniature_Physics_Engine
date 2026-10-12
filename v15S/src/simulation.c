@@ -7,6 +7,7 @@
 #include "core/long_run_validation.h"
 #include "ui_input/simulation_dispatch.h"
 #include "ui_input/gamepad_drive.h"
+#include "ui_input/ftc_view.h"
 #include <gtk/gtk.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -78,6 +79,9 @@ gboolean physics_step_increment (gpointer user_data_pointer) {
      * ftc-fleet robot 0 mecanum before the tick (commands persist through
      * the fleet pre_step). Silent no-op without bundle, pad, or robot. */
     gamepad_drive_tick ();
+    /* FTC chase/robot-centric camera: re-targets the free camera onto
+     * robot 0 while `ftc view 1|2` is active (no-op otherwise). */
+    ftc_view_tick (frame_delta_time);
     /* Joint watchdog: event-driven mount/tilt/NaN evidence for live
      * "wheel snapped" reports (see gamepad_drive.h). */
     ftc_watchdog_tick ();

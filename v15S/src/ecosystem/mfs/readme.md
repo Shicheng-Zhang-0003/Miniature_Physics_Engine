@@ -201,6 +201,10 @@ START toggles control, LB+RB e-stop; sticks-centered is stopped. There is
 no terminal drive — `ftc drive`/`stop` were removed when the pad took over
 (all motion is `drivetrain_mecanum`).
 
+Camera: `ftc view 0` = free camera (default), `ftc view 1` = field-centric
+follow (tracks the robot's position, view keeps the field's orientation),
+`ftc view 2` = robot-centric chase (sits behind the robot and yaws with it).
+
 Lower level (single module instead of the bundle):
 
 ```
