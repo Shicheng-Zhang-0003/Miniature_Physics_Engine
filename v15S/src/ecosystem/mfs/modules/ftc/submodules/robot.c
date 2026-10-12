@@ -771,7 +771,31 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
              * without re-baselining tank + drive_directions first. */
             float *scale = &robot -> wheel_traction_scale [i];
             float over = slip * dir;
-            if (dir != 0.0f && over > 4.0f) { *scale = 0.15f; } else if (*scale < 1.0f && over < 2.0f) {
+            /* DESPOT-2026-10-12 (SKATE cut-trap): the cut regulates overspeed,
+             * but a wheel it has strangled sits near zero WITH the cut still
+             * engaged, and any torque that can break it away (needs ~cone)
+             * also peels a 2.5e-4 featherweight in one tick — so spool
+             * attempts re-slam faster than the +0.2 climb recovers, and the
+             * weakest wheel in an asymmetric (both-sticks) drive locks at
+             * 0.15 indefinitely (measured FR +0.23 cmd pinned 0.15 from tick
+             * 40 while drag back-drives it). A slow wheel is stuck, not
+             * peeling: release the cut outright below 2 rad/s surface-0.1
+             * m/s (slew still feathers delivery at 0.6/tick, so no step;
+             * genuine overspeed re-slams next tick by the rule below). Tank
+             * pivots spin fast, idle bypasses the cut, standstill starts at
+             * scale 1 already — none of the load-bearing slam regimes touch
+             * the slow case. NOTE: a further back-drive bypass (full
+             * authority whenever spin opposes command) was tried and
+             * REVERTED: delivery rose 0.74->1.00 with zero recovery (the
+             * implicit plan evaluates current at planned, not measured,
+             * speed, so far-from-target recovery torque never materializes
+             * — MOTOR-II territory, needs the bigger landing unit, not a
+             * cut tweak). The residual back-drive lock under extreme
+             * command spread stays open (bounded: thrust flips on at most
+             * the dragged wheel, mounts/P2P hold, nothing flips). */
+            if (*scale < 1.0f && fabsf (wheel_speed) < 2.0f) { *scale = 1.0f; } else if (dir != 0.0f && over > 4.0f) {
+                *scale = 0.15f;
+            } else if (*scale < 1.0f && over < 2.0f) {
                 *scale += 0.2f;
                 if (*scale > 1.0f) { *scale = 1.0f; }
             }
