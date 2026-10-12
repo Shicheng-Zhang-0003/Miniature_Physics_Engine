@@ -816,7 +816,9 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
          * mecanum (all four switch together); other builds keep the
          * command threshold (their behavior is already green). */
         int idle_coast;
-        if (robot -> drivetrain_type == FTC_DRIVETRAIN_MECANUM && robot -> mecanum_analytic) { idle_coast = idle_tires; } else { idle_coast = (fabsf (robot -> wheel_motors [i].command) < 0.05f) ? 1 : 0; }
+        if (robot -> brake) { idle_coast = 1; /* motor power = BRAKE: forced idle/regen regardless of the tire hysteresis */ }
+        else if (robot -> drivetrain_type == FTC_DRIVETRAIN_MECANUM && robot -> mecanum_analytic) { idle_coast = idle_tires; }
+        else { idle_coast = (fabsf (robot -> wheel_motors [i].command) < 0.05f) ? 1 : 0; }
         if (idle_coast) { motor_update (&robot -> wheel_motors [i], wheel_speed, dt, terminal_voltage); } else { motor_update_load (&robot -> wheel_motors [i], wheel_speed, dt, terminal_voltage, axle_inertia); }
         /* Traction cut applies to delivered torque (both the axle drive
          * below and the traction loop in drivetrain_update read
@@ -1105,6 +1107,15 @@ void ftc_robot_set_wheel_commands (ftc_robot *robot, const float *commands, int 
         if (cmd > 1.0f) { cmd = 1.0f; }
         if (cmd < -1.0f) { cmd = -1.0f; }
         robot -> wheel_motors [i].command = cmd;
+    }
+}
+void ftc_robot_set_brake (ftc_robot *robot, int on) {
+    if (!robot) { return; }
+    robot -> brake = (on != 0) ? 1 : 0;
+    if (robot -> brake) {
+        for (int i = 0; i < robot -> wheel_count; i++) {
+            robot -> wheel_motors [i].command = 0.0f;
+        }
     }
 }
 void ftc_robot_set_mecanum_analytic_default (int on) {s_mecanum_analytic_default = (on != 0) ? 1 : 0;}

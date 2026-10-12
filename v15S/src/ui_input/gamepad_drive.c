@@ -217,15 +217,26 @@ void gamepad_drive_tick (void) {
     }
     if (!s_control_enabled) {
         s_active = 0;
-        if (s_was_commanding) {
-            gpd_stop_robot (r);
-            s_was_commanding = 0;
-        } return;
+        /* Control disabled: motor power to BRAKE (not just a command zero). */
+        void (*s_brk) (ftc_robot *, int) = (void (*) (ftc_robot *, int)) gpd_sym ("ftc_robot_set_brake");
+        if (s_brk) { s_brk (r, 1); } else { gpd_stop_robot (r); }
+        s_was_commanding = 0;
+        return;
     } float fwd = -s_pad_axis (&s_pad, gamepad_axis_left_y);
     float str = s_pad_axis (&s_pad, gamepad_axis_left_x);
     float rot = s_pad_axis (&s_pad, gamepad_axis_right_x);
-    if (s_pad_button (&s_pad, gamepad_button_lb) && s_pad_button (&s_pad, gamepad_button_rb)) {
-        fwd = str = rot = 0.0f; /* LB+RB e-stop */
+    /* BRAKE on no stick input (user rule): with every drive axis at rest
+     * (or LB+RB e-stop), motor power is BRAKE — command 0 + forced regen
+     * idle brake — so the wheels stop and hold instead of running on. */
+    int estop = (s_pad_button (&s_pad, gamepad_button_lb) && s_pad_button (&s_pad, gamepad_button_rb)) ? 1 : 0;
+    int no_input = estop || (fabsf (fwd) < 0.05f && fabsf (str) < 0.05f && fabsf (rot) < 0.05f);
+    void (*s_brk) (ftc_robot *, int) = (void (*) (ftc_robot *, int)) gpd_sym ("ftc_robot_set_brake");
+    if (s_brk) {
+        s_brk (r, no_input ? 1 : 0);
+    }
+    if (no_input) {
+        fwd = str = rot = 0.0f;
+        if (!s_brk) { s_mecanum (r, 0.0f, 0.0f, 0.0f); } /* fallback with an older bundle */
     } else {
         /* RELEASE-BRAKE: a released axis still coasts for seconds because
          * the held axis keeps every wheel "commanded", so the idle regen
@@ -252,8 +263,8 @@ void gamepad_drive_tick (void) {
                 rot += gpd_brake (vr, 0.9f);
             }
         }
+        s_mecanum (r, fwd, str, rot);
     }
-    s_mecanum (r, fwd, str, rot);
     s_was_commanding = 1;
     s_active = 1;
     gpd_report_stage (3);

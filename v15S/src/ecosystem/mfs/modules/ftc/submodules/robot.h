@@ -107,6 +107,13 @@ typedef struct {
     int intake_on;
     int intake_balls [INTAKE_MAX_CARRIED];
     int intake_count;
+    /* BRAKE mode (gamepad maps "no stick input" to this): motor power is
+     * BRAKE — every wheel commanded 0 and the regenerative idle brake is
+     * forced on regardless of the analytic tire hysteresis, so released
+     * wheels decelerate to an exact stop and hold (they do not coast or
+     * creep while the driver's hands are off). Zero-init off; driving code
+     * that never sets it is bit-identical. */
+    int brake;
 } ftc_robot;
 /* MFS-STRAFE-A analytic constants (shared with drivetrain.c): slide
  * coefficient for roller-axle slip on tile (wheel-rubber kinetic class;
@@ -184,6 +191,9 @@ int ftc_world_setup_field (physics_world *world, float mus, float muk);
 void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt);
 /* Set wheel motor commands (-1..1). */
 void ftc_robot_set_wheel_commands (ftc_robot *robot, const float *commands, int count);
+/* BRAKE: command every wheel to 0 and force the regenerative idle brake
+ * (motor power = BRAKE; on=1 engages, 0 resumes normal drive). */
+void ftc_robot_set_brake (ftc_robot *robot, int on);
 /* Get the chassis body's position (for validation). */
 void ftc_robot_get_position (physics_world *world, ftc_robot *robot, float *px, float *py, float *pz);
 #endif /* robot_h */

@@ -4,7 +4,7 @@ What the suite contains, what each gate proves, and how to run it.
 
 ## Suite layout
 
-- **Unified suite** (`tests/mfs_suite_main.c` + `mfs_suite_a/b/c.c`, 18 gated
+- **Unified suite** (`tests/mfs_suite_main.c` + `mfs_suite_a/b/c.c`, 19 gated
   tests, registry with exact-name dispatch, config save/restore, NaN
   watchdog). This is what `build_tests.sh` runs and what the release gates
   count.
@@ -50,6 +50,7 @@ set).
 | `drive_directions` | pure fwd / rev / strafe / rotate ±, steady-state window | axis dominance (fwd→+Z, strafe→-X/robot-right, rotate→yaw), planar cross-talk ceilings (fwd 25%, strafe 35%), **rotate vs rotate⁻ must have opposite yaw sign**, yaw/planar dominance ratio, fwd/rev antisymmetry (DESPOT-2026-10-02) |
 | `ball_spin` | ball spin/wake corner | finite, ball never goes through the floor |
 | `bucket_game` | drive@1.0 150 ticks w/ intake (capture ≥ 2), strafe clear 80 ticks, brake 210 ticks, shoot a calibration lob, read its rim crossing (bounds: 1–12 m out, in −6..6 × 1..14), **move** the bucket onto it, shoot the second ball | scored ≥ 1 within 400 ticks (DESPOT-2026-10-12: self-calibrating score — open-loop ballistics died build-to-build; measuring then correcting is robust by construction) |
+| `brake_mode` | drive@1.0 120 ticks, then `ftc_robot_set_brake(1)` — what the gamepad maps every no-stick-input frame to — and hold 90 ticks, then release + redrive 90 | commands zero on brake, `sum|rpm|` < 5 and chassis `|v|` < 0.2 after brake, `sum|rpm|` > 100 on release (no latching) — pins the "motors keep running when sticks are released" fix (BRAKE-2026-10-12) |
 | `physics_truth` | 15 subtests (T1–T15) | freefall, inertia, bounce `e²(h-r)+r`, rolling, rolling-resistance decay band, **isolated** motor free-speed/stall/back-EMF, static hold, stopping distance `v²/2μg`, 3000-tick stability, coast-down, energy, cylinder rest, revolute anchor |
 
 Physics-truth notes: T6/T8 test the **motor model isolated** (no

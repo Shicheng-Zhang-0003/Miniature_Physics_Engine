@@ -922,3 +922,65 @@ int mfs_t_bucket_game (void) {
     mfs_test_end (t_ptr);
     return t_ptr -> failures;
 }
+/* brake_mode: "motors stop when the driver releases all sticks." Drives the
+ * wheels up to speed, then engages BRAKE mode (ftc_robot_set_brake — what the
+ * gamepad maps every no-stick-input frame to) and asserts the wheels decel to
+ * rest and the chassis settles within a short horizon, then that releasing
+ * the brake resumes normal drive. Pins the live "wheels keep running" fix. */
+int mfs_t_brake_mode (void) {
+    mfs_test_t t;
+    mfs_test_begin (&t, "brake_mode");
+    mfs_test_t *t_ptr = &t;
+    physics_world w;
+    mfs_test_world (&w);
+    extern const mpe_module_desc_t mpe_module_desc;
+    MFS_CHECK (t_ptr, physics_world_attach_module (&w, &mpe_module_desc) >= 0);
+    int s0 = ftc_fleet_spawn (&w, 0.0f, ftc_robot_rest_height (), 0.0f, MOTOR_GB_5203_26_9, FTC_DRIVETRAIN_MECANUM);
+    MFS_CHECK (t_ptr, s0 >= 0);
+    ftc_robot *robot = ftc_fleet_get (&w, s0);
+    MFS_CHECK (t_ptr, robot != NULL);
+    const float dt = DT;
+    int fail = 0;
+    for (int k = 0; k < 120 && !fail; k++) {
+        mfs_drive_mecanum (robot, 1.0f, 0.0f, 0.0f);
+        physics_world_step (&w, dt);
+        if (!mfs_test_finite (&w)) { fail = 1; }
+    }
+    float rpm_before = 0.0f;
+    for (int i = 0; i < robot -> wheel_count; i++) { rpm_before += fabsf (robot -> wheel_motors [i].rpm); }
+    MFS_INFO ("pre-brake sum|rpm|=%.0f", rpm_before);
+    MFS_CHECK (t_ptr, rpm_before > 100.0f);
+    ftc_robot_set_brake (robot, 1);
+    int cmds_zero = 1;
+    for (int i = 0; i < robot -> wheel_count; i++) {
+        if (fabsf (robot -> wheel_motors [i].command) > 0.001f) { cmds_zero = 0; }
+    }
+    MFS_CHECK (t_ptr, cmds_zero == 1); /* motor power = BRAKE => command 0 + regen */
+    for (int k = 0; k < 90 && !fail; k++) {
+        physics_world_step (&w, dt);
+        if (!mfs_test_finite (&w)) { fail = 1; }
+    }
+    MFS_CHECK (t_ptr, fail == 0);
+    float rpm_after = 0.0f;
+    for (int i = 0; i < robot -> wheel_count; i++) { rpm_after += fabsf (robot -> wheel_motors [i].rpm); }
+    rigidbody *ch = mfs_chassis_or_null (&w, robot);
+    float spd = ch ? sqrtf (ch -> velocity.x * ch -> velocity.x + ch -> velocity.z * ch -> velocity.z) : 99.0f;
+    MFS_INFO ("post-brake sum|rpm|=%.1f chassis|v|=%.3f", rpm_after, spd);
+    MFS_CHECK (t_ptr, rpm_after < 5.0f);
+    MFS_CHECK (t_ptr, spd < 0.2f);
+    /* Brake release resumes drive (no latching). */
+    ftc_robot_set_brake (robot, 0);
+    for (int k = 0; k < 90 && !fail; k++) {
+        mfs_drive_mecanum (robot, 1.0f, 0.0f, 0.0f);
+        physics_world_step (&w, dt);
+        if (!mfs_test_finite (&w)) { fail = 1; }
+    }
+    float rpm_resume = 0.0f;
+    for (int i = 0; i < robot -> wheel_count; i++) { rpm_resume += fabsf (robot -> wheel_motors [i].rpm); }
+    MFS_INFO ("resume sum|rpm|=%.0f", rpm_resume);
+    MFS_CHECK (t_ptr, rpm_resume > 100.0f);
+    if (t_ptr -> failures == 0) { printf ("[PASS] brake_mode: motor power to BRAKE on no stick input\n"); }
+    physics_world_cleanup (&w);
+    mfs_test_end (t_ptr);
+    return t_ptr -> failures;
+}
