@@ -36,6 +36,13 @@
 > with `XXXXXX.log` + `0600` + `lstat` refusal + truncation guard + errno
 > preservation). Do NOT copy the bare-`mkstemp` form (that was the bug).
 > The 472 `test_mgb` noexec gates will prove it.
+>
+> **Twin league note (2026-10-13):** the BIOBUZZ league (`biobuzz.c`,
+> fleet registry/state, 5 gates, `mfs_sources.mk` + `build_tests.sh` lines)
+> is 475-only. `461-MFS` builds without it (its `FTC` list lacks the file);
+> forward-port = copy `submodules/biobuzz.[ch]`, add the one build line in
+> both files, mirror the 5 tests. `sync_mfs_check.sh` drift (already red)
+> grows by exactly these until then.
 
 ## Open 2026-10-09 — S2 bridge, diagnostics, and three known reds
 

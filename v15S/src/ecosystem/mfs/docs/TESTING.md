@@ -4,7 +4,7 @@ What the suite contains, what each gate proves, and how to run it.
 
 ## Suite layout
 
-- **Unified suite** (`tests/mfs_suite_main.c` + `mfs_suite_a/b/c.c`, 20 gated
+- **Unified suite** (`tests/mfs_suite_main.c` + `mfs_suite_a/b/c.c`, 25 gated
   tests, registry with exact-name dispatch, config save/restore, NaN
   watchdog). This is what `build_tests.sh` runs and what the release gates
   count.
@@ -22,12 +22,15 @@ What the suite contains, what each gate proves, and how to run it.
   `tests/mfs_test_common.h` (tile slab top y=0, μ 1.0/0.8, e=0). Robot tests
   pin **128 solver iterations** (40:1 chassis/wheel mass ratio).
 
-## Current status (2026-10-12): 18/20
+## Current status (2026-10-13): 23/25
 
 Two gates are **red**: `tank` and `odometry_yaw` (the tank-pivot heading/translation
-baseline and mecanum odom-yaw magnitude frontiers). The earlier `drive_directions`
-red resolved; the 2026-10-09 "14/17" line and the CCD-margin narrative below it
-are historical. Full measurements and the root-cause write-ups are in
+baseline and mecanum odom-yaw magnitude frontiers — verified bit-identical on
+pristine `HEAD`, pre-existing, not the BIOBUZZ work). Five new BIOBUZZ league
+gates (`biobuzz_field/stage/tip/flower/table`) are green. The earlier
+`drive_directions` red resolved; the 2026-10-09 "14/17" line and the CCD-margin
+narrative below it are historical. Full measurements and the root-cause
+write-ups are in
 [`KNOWN_FAILURES.md`](KNOWN_FAILURES.md) → `[TANK-PIVOT-*]` /
 `[ODOMETRY-YAW]` (search the archives for `[CCD-OBSTACLE-MARGIN]` for the older
 set).
@@ -53,6 +56,11 @@ set).
 | `brake_mode` | drive@1.0 120 ticks, then `ftc_robot_set_brake(1)` — what the gamepad maps every no-stick-input frame to — and hold 90 ticks, then release + redrive 90 | commands zero on brake, `sum|rpm|` < 5 and chassis `|v|` < 0.2 after brake, `sum|rpm|` > 100 on release (no latching) — pins the "motors keep running when sticks are released" fix (BRAKE-2026-10-12) |
 | `partial_throttle` | straight drive at cmd 0.25 / 0.5 / 0.75, 480 ticks each (single-driven via the fleet pre_step) | finite; yaw-rate std < 0.02 rad/s at every command; forward displacement > 0.5 m and strictly increasing with command — pins the applied-voltage no-load clamp fix that ended the off-full-throttle driven-path limit cycle (MOTOR-PARTIAL-2026-10-12) |
 | `physics_truth` | 15 subtests (T1–T15) | freefall, inertia, bounce `e²(h-r)+r`, rolling, rolling-resistance decay band, **isolated** motor free-speed/stall/back-EMF, static hold, stopping distance `v²/2μg`, 3000-tick stability, coast-down, energy, cylinder rest, revolute anchor |
+| `biobuzz_field` | build regulation field twice (idempotency) + 60 settle ticks | floor half 1.8288/top 0; 4 wall inner faces ±1.8288, height 0.3048; pivot bar 1.1165; 2×11 hive bodies live; beam midpoints mirror-symmetric; 4 flower top rings at 0.5461 near nominal stations; ≥6 tape proxies; finite |
+| `biobuzz_stage` | build + stage + preload (no robots) + 120 ticks | 40 staged (16 flower + 8 garden + 6 cell + 10 tray) + 16 preload = 40 pollen / 8+8 nectar at regulation radii/colours; stations split 16/8/6/10/16; finite |
+| `biobuzz_tip` | teleport 8 pollen into red up-cell, 240 ticks | exactly 1 red tip (edge-triggered), blue quiet (3 nectar = 5.1 < 8); recorded wall moved > 0.10 (mirrored re-pose); unlock +1; score carries 20 |
+| `biobuzz_flower` | constructed stack (bottom red nectar, 2 pollen, top blue nectar) + red-garden pieces, 90 ticks | red: owned 0 + bottom 5 + garden 3 = 8; blue: owned 4×2=8 + bottom 5 = 13 (Table 10-2 ownership/colours) |
+| `biobuzz_table` | pure predicates, no world | Table 10-2 values (3/5/20/20/2/5/2/1), RP thresholds (swarm 16, P1 4, P2 7), piece spec (40/16, radii), start poses (walls/yaw/zones) |
 
 Physics-truth notes: T6/T8 test the **motor model isolated** (no
 joints/world) because the jointed air-spin plant is a documented limit

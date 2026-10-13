@@ -1826,3 +1826,36 @@ rim-height crossing, move the bucket under it, shoot again. Deterministic
 (same code twice → same flight) and robust to plant drift by construction.
 Anyone re-tuning launch constants should change the gate's expectations
 with them.
+
+## [BIOBUZZ-LIMITS] Regulation-league honest boundaries (2026-10-13, OPEN by design)
+
+The league (`submodules/biobuzz.c`) is regulation on every number the
+manual states exactly, nominal where the manual is nominal, and loud about
+the difference. Five gates (`biobuzz_field/stage/tip/flower/table`) pin
+the split: anchors asserted as spec, repose/symmetry as self-consistency.
+
+- **Flower wall stations nominal.** The manual places 4 flowers "around
+  the perimeter" with down-cells "pointing at" audience/far flowers; exact
+  wall stations live in figures, not text. Built: 2 + 2 on audience/far
+  walls at x=±36 in. If a figure-derived station contradicts this, move
+  the four `fx/fz` constants (build + stage + score read the same
+  anchors — single source).
+- **Kinematic tip, not a damper solve.** The bi-stable pivot + damper is
+  an event (weight ≥ 8.0 → mirrored re-pose + deterministic spill). Exact
+  on the manual's stated thresholds, deterministic, edge-triggered; it is
+  NOT a weight-vs-damper dynamics solve. A revolute-joint dynamic hive is
+  the ticketed follow-up — do not mistake the event's cleanliness for it.
+- **No match clock, no fouls.** LEAVE/PARK are live predicates; AUTO vs
+  TELEOP labelling, G410 enforcement and fouls are human-ref territory.
+  `biobuzz score` reports predicates + points, never a period verdict.
+- **No AprilTag vision.** Tag cluster IDs (30–45) are recorded per cell
+  for autonomy use; rendering has no decal system, so cells carry no
+  visible tags. Do not write an autonomy gate against visible tags.
+- **Tray staging neglects the tile step.** Alliance trays sit outside the
+  walls at ground level; the 0.59 in tile step is not modelled (tray balls
+  rest on the pad plane). Garden/loading/flower/cell staging is exact.
+- **Orientation convention is ours.** −Z audience / +Z scoring / −X red /
+  +X blue is documented nominal (manual figures ±1 in, not
+  machine-readable). Mirroring the field (red/blue swapped) is a
+  four-constant change; the gates assert internal consistency, so a mirror
+  stays green.

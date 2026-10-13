@@ -124,6 +124,52 @@ Self-consistent line: 4.9431/60×20 = 1.6477 ≈ 1.6453 ✓. Encoder:
   against the current season's Game Manual. Sim robot ≈ 8.8 kg total,
   well inside it.
 
+## BIOBUZZ 2026-2027 regulation field (Competition Manual V1, §9–§10)
+
+Sourced reference for the regulation league (`submodules/biobuzz.c`).
+Field walkthrough + Event/Initial Setup Guides + field-reset guide agree;
+third-party sim derivations are marked DERIVED and never cited as spec.
+
+- **Field (§9.2):** 144 × 144 in (3.6576 m) inside the perimeter walls;
+  36 foam tiles in a 6×6 grid (24 in / 0.6096 m, 0.59 in thick); 12 in
+  (0.3048 m) perimeter walls (AndyMark am-0481 primary; versions vary —
+  INSIDE faces are the controlled dimension). Nominal tolerance ±1 in.
+- **Hive structure (§9.6):** centre frame 49.46 in wide × 38.95 in deep,
+  pivots 43.95 in (1.1165 m) above tiles; 2 hives (red: up-cell on the
+  audience side; blue: up-cell on the scoring/far side — "in reverse").
+  Each hive: 2 cells 18.8 in apart, opening 20 W × 14 H × 12 D in;
+  bi-stable with damper (no bounce-back). AprilTags 3.25 in 36h11, one
+  4-cluster per cell underside: red-far 30–33, red-audience 34–37,
+  blue-audience 38–41, blue-far 42–45.
+- **Flowers ×4 (§9.7):** top opening 4 in dia at 21.5 in (0.5461 m);
+  1.25 in backstop; retrieval opening 3.55 × 3.57 in at the bottom;
+  lower ring 0.4 in with a 2.79 in seat hole; top–middle rings 17.5 in
+  apart. Pollen flows through the middle ring to the seat; nectar
+  (3.6 in) cannot pass it and stays. Scoring volume = between top and
+  middle rings; scores when at least partially inside.
+- **Pieces (§9.8):** 40 POLLEN (yellow, ~2.8 in / 0.0711 m, Gopher
+  ResisDent) + 8 red + 8 blue NECTAR (~3.6 in / 0.0914 m). Staged (§10.3):
+  4 pollen per flower (16), 4 per garden (8, line along the wall biased
+  to the alliance area), 4 preloaded per robot (16; absent robots' sets
+  go to the loading-zone centre vs the wall), 3 nectar per up-cell (6,
+  back wall biased alliance-side), 5 nectar per alliance tray (10).
+- **Zones (§9.3/§9.5):** alliance areas 97 × 54 in outside the field;
+  loading zones 23 × 11 in (red tile A5, blue F2 — park here);
+  gardens 23 × 2 in (red A1, blue F6 — alliance-specific, unprotected).
+  Robots start touching the perimeter wall, 4 pollen preloaded, never in
+  the loading zone or touching a flower; 18 in starting cube (sim
+  chassis 0.45 m fits).
+- **Tips (walkthrough):** ~8 pollen / ~5 nectar / combos (3+3) tip a
+  hive; load spills to the floor, other cell rises. Each tip unlocks one
+  tray nectar (all remaining enter at 1:00 left).
+- **Scoring (Table 10-2):** LEAVE 3 (auto) · PARK 5/5 · TIP 20/20 ·
+  cell contents 2 · flower bottom-most nectar 5 · owned-flower pieces 2
+  (owner = top-most nectar, scores ALL pieces inside either colour) ·
+  garden pieces 1. NECTAR in flowers only in the last 60 s (G410, major
+  foul per piece). RP: SWARM ≥ 16 leave+park · POLLINATOR 1 ≥ 4 tips ·
+  POLLINATOR 2 ≥ 7 tips · WIN 3 · TIE 1. Match: 0:30 auto + 0:08
+  transition + 2:00 teleop.
+
 ## What was wrong before (2026-09 audit)
 
 The previous preset table mixed NeveRest-class RPMs with invented

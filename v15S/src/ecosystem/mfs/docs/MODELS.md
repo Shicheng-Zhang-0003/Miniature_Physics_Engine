@@ -366,3 +366,46 @@ All deterministic: no transcendentals (fixed-coefficient `det_sin/det_cos`,
   counting**: any dynamic ball whose centre enters the interior volume above
   the pad scores (no speed gate); scored balls freeze kinematic. Carried
   balls can't false-score (kinematic at the mouth).
+
+## 9. BIOBUZZ regulation league (`submodules/biobuzz.c`, fleet-integrated)
+
+Regulation geometry + staging per `FTC_SPECS.md` → BIOBUZZ §9/§10; all
+dimensions in SI in `biobuzz.h` with manual citations. Additive: the arcade
+league (§8) is untouched; BIOBUZZ owns a separate 64-slot piece registry so
+arcade behavior is bit-identical.
+
+- **Orientation convention** (documented nominal — manual figures are not
+  machine-readable): origin at field centre, y=0 tile top; −Z audience,
+  +Z scoring/far; −X RED wall, +X BLUE wall. Red garden A1 (−X,−Z corner),
+  blue F6 (+X,+Z); red loading A5, blue F2; 2 flowers on each of the
+  audience/far walls at x=±36 in (nominal stations).
+- **Hive pose:** beam through the pivot (43.95 in) with cells mirrored
+  about it (up +0.30 m / out 9.4 in, down mirrored — cells 18.8 in apart
+  horizontally, manual-exact). Mouth normals at 30° elevation outboard
+  (hardcoded Tilt quats; build-time libm only, never per-tick). Red
+  cellA(−Z) up, blue cellB(+Z) up (§11.1 setup).
+- **Tip events (not a damper solve):** per-tick weight census inside the
+  up-cell interior (cell frame, not world box — cells are tilted):
+  pollen 1.0 + nectar 1.7 ≥ 8.0 fires exactly once (8 pollen / 5 nectar /
+  3+3 all cross; manual "approximately" disclosed). Re-pose teleports the
+  11 static bodies mirrored (statics teleport cleanly, bucket precedent);
+  the tipping load gets a deterministic outboard+down spill nudge, then
+  the walls move away under it. Unlock +1 per own-hive tip; entry is a
+  verb (`biobuzz_enter_nectar` → loading-zone edge), not automatic.
+  Hysteresis is structural (new up-cell starts empty).
+- **Census/scoring (`biobuzz_score`):** flowers bottom-first sort inside
+  the top–middle volume (partial-inside counts); owner = top-most nectar
+  (scores every piece ×2 either colour); bottom-most nectar per colour
+  +5; gardens = resting pieces partially in the rect ×1 for the zone
+  alliance (either colour); up-cell contents ×2 at assess time.
+  Kinematic/static balls never census (carried balls can't score).
+  Leave/park are live predicates (5 mm wall gap / loading-zone overlap);
+  the caller labels AUTO vs TELEOP (no match clock). RP + table values
+  are pure functions pinned by `biobuzz_table`.
+- **Starts:** 2 slots per side touching the own wall (wheel outer + 2 mm),
+  z=±0.35 (clear of loading/garden), yaw ±90° facing centre; rigid yaw
+  of chassis+wheels+rollers + odometry set (`biobuzz_place_robot`).
+- **Honest limits** (see also KNOWN_FAILURES → [BIOBUZZ-LIMITS]): flower
+  wall stations nominal; no AprilTag vision (IDs recorded per cell);
+  tray nectar staged at ground level outside the walls (the 15 mm tile
+  step neglected); no clock/fouls; kinematic (not dynamic) tip.

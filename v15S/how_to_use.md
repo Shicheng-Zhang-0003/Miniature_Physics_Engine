@@ -388,6 +388,34 @@ Notes:
 - Detach with `eco detach mfs-simulator`, unload with
   `mod unload ecosystem/mfs/mfs_ecosystem.so` (refused while referenced).
 
+## BIOBUZZ Regulation Field
+
+The 2026-2027 game field in regulation dimensions (Competition Manual V1
+§9–§10; see `ecosystem/mfs/docs/FTC_SPECS.md` → BIOBUZZ section for the
+sourced numbers). From the debug terminal (bundle loaded + attached):
+
+```
+ftc biobuzz          # build 144 in field + hive/flowers/zones, stage 40+16
+ftc biobuzz spawn    # 4 robots at regulation starts (red -X, blue +X) + preloads
+ftc biobuzz score    # Table 10-2 breakdown: tips, cells, flowers, gardens, leave/park
+ftc biobuzz enter red   # spend a tip unlock: tray nectar into play at the loading zone
+```
+
+Notes:
+- `ftc biobuzz` builds the regulation field *inside* the arcade practice
+  pad (regulation walls at ±1.83 m; the pad surface is the outside ground
+  for alliance areas and trays). Re-running is a no-op (state-verified).
+  `scene_clear` first for a fresh field.
+- Staging follows §10.3 exactly: 4 pollen per flower, 4 per garden, 4
+  preloaded per robot (absent robots' sets go to their loading zone),
+  3 nectar per up-cell, 5 per alliance tray.
+- Hive tips are weight-census events (~8 pollen / ~5 nectar per the field
+  walkthrough): the hive re-poses mirrored, the load spills, the alliance
+  unlocks one tray nectar. No match clock and no fouls (human refs);
+  `score` reports live predicates — you label AUTO vs TELEOP.
+- The arcade league (`ftc spawn` + bucket, intake/shoot) is untouched and
+  coexists on the same pad.
+
 ## Validation Tests
 
 The engine includes built-in test keys for stability validation:
