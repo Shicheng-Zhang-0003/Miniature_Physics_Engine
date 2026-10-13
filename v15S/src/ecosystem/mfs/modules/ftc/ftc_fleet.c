@@ -21,6 +21,9 @@ typedef struct {
     ftc_robot *robots;
     int count;
     int cap;
+    int selected; /* controlled robot (terminal `ftc select`, gamepad BACK
+                   * cycles 0..count-1; default 0 via calloc). count never
+                   * shrinks (no removal), so the stored index stays valid. */
     /* Arcade game league (fictional intake + suspended bucket). Balls are
      * world bodies (persist until scene clear); ids prune on lookup miss.
      * Bucket parts are static bodies; clear parks them non-colliding
@@ -143,6 +146,23 @@ int ftc_fleet_spawn (struct physics_world *world, float x, float y, float z, mot
 int ftc_fleet_count (struct physics_world *world) {
     ftc_fleet_t *f = fleet_of (world);
     return f ? f -> count : 0;
+}
+/* Controlled-robot selection (per world; terminal `ftc select`, gamepad
+ * BACK). select: 0<=index<count sets and returns index, else -1 leaving
+ * the stored value untouched. selected: stored index, defensively
+ * re-based to 0 when out of range (count never shrinks, so this is
+ * unreachable in practice), -1 when no fleet/robots. */
+int ftc_fleet_select (struct physics_world *world, int index) {
+    ftc_fleet_t *f = fleet_of (world);
+    if (!f || index < 0 || index >= f -> count) { return -1; }
+    f -> selected = index;
+    return index;
+}
+int ftc_fleet_selected (struct physics_world *world) {
+    ftc_fleet_t *f = fleet_of (world);
+    if (!f || f -> count <= 0) { return -1; }
+    if (f -> selected < 0 || f -> selected >= f -> count) { return 0; }
+    return f -> selected;
 }
 ftc_robot *ftc_fleet_get (struct physics_world *world, int index) {
     ftc_fleet_t *f = fleet_of (world);
@@ -362,9 +382,13 @@ int ftc_bucket_clear (struct physics_world *world) {
     f -> bucket_active = 0;
     return 0;
 }
-int ftc_game_stats (struct physics_world *world, int *carried, int *balls, int *scored, int *bucket_on) {    ftc_fleet_t *f = fleet_of (world);
+int ftc_game_stats (struct physics_world *world, int *carried, int *balls, int *scored, int *bucket_on) {
+    ftc_fleet_t *f = fleet_of (world);
     if (!world || !f) { return -1; }
-    ftc_robot *r = fleet_robot_at (f, 0);
+    /* carried reads the CONTROLLED robot (selection), not robot 0. */
+    int sel = (f -> count > 0) ? f -> selected : 0;
+    if (sel < 0 || sel >= f -> count) { sel = 0; }
+    ftc_robot *r = (f -> count > 0) ? fleet_robot_at (f, sel) : NULL;
     if (carried) { *carried = r ? r -> intake_count : 0; }
     if (balls) { *balls = f -> ball_count; }
     if (scored) { *scored = f -> bucket_scored; }

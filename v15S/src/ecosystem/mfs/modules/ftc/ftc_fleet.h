@@ -34,6 +34,12 @@ int ftc_fleet_spawn (struct physics_world *world, float x, float y, float z, mot
                      ftc_drivetrain_type drivetrain_type);
 /* Live robot count in the world's fleet (0 if none attached). */
 int ftc_fleet_count (struct physics_world *world);
+/* Controlled-robot selection (per world; terminal `ftc select`, gamepad
+ * BACK cycles). select: 0<=index<count sets and returns index, else -1
+ * leaving stored untouched. selected: stored index (0 default), -1 when
+ * no fleet/robots. */
+int ftc_fleet_select (struct physics_world *world, int index);
+int ftc_fleet_selected (struct physics_world *world);
 /* Mutable robot access for commanding (drivetrain_tank/mecanum) and
  * inspection (odometry, battery). NULL on bad world/index. */
 ftc_robot *ftc_fleet_get (struct physics_world *world, int index);
@@ -53,7 +59,7 @@ int ftc_eject (struct physics_world *world, int index);
 int ftc_shoot (struct physics_world *world, int index);
 int ftc_bucket_spawn (struct physics_world *world, float x, float y, float z);
 int ftc_bucket_clear (struct physics_world *world);
-/* Totals: carried (robot 0), tracked balls, scored, bucket active. Any out
+/* Totals: carried (CONTROLLED robot), tracked balls, scored, bucket active. Any out
  * pointer may be NULL. Returns 0 ok, -1 no fleet. */
 int ftc_game_stats (struct physics_world *world, int *carried, int *balls, int *scored, int *bucket_on);
 /* ---- BIOBUZZ regulation league (see submodules/biobuzz.h) ----
