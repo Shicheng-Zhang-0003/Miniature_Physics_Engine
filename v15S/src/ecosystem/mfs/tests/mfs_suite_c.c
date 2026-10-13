@@ -1447,3 +1447,69 @@ int mfs_t_biobuzz_table (void) {
     mfs_test_end (t_ptr);
     return t_ptr -> failures;
 }
+/* select: controlled-robot routing (terminal `ftc select`, gamepad BACK).
+ * Contract: fresh attach with no robots reads -1; default is robot 0 after
+ * first spawn; OOB selects fail -1 leaving stored untouched; selection is
+ * per-world; drive routed through the selection moves THAT robot only. */
+int mfs_t_select (void) {
+    mfs_test_t t;
+    mfs_test_begin (&t, "select");
+    mfs_test_t *t_ptr = &t;
+    physics_world w;
+    mfs_test_world (&w);
+    extern const mpe_module_desc_t mpe_module_desc;
+    MFS_CHECK (t_ptr, physics_world_attach_module (&w, &mpe_module_desc) >= 0);
+    MFS_CHECK (t_ptr, ftc_fleet_selected (&w) == -1);
+    int s0 = ftc_fleet_spawn (&w, -1.0f, ftc_robot_rest_height (), 0.0f, MOTOR_GB_5203_26_9, FTC_DRIVETRAIN_MECANUM);
+    int s1 = ftc_fleet_spawn (&w, 1.0f, ftc_robot_rest_height (), 0.0f, MOTOR_GB_5203_26_9, FTC_DRIVETRAIN_MECANUM);
+    MFS_CHECK (t_ptr, s0 == 0 && s1 == 1);
+    MFS_CHECK (t_ptr, ftc_fleet_selected (&w) == 0);
+    MFS_CHECK (t_ptr, ftc_fleet_select (&w, 1) == 1);
+    MFS_CHECK (t_ptr, ftc_fleet_selected (&w) == 1);
+    MFS_CHECK (t_ptr, ftc_fleet_select (&w, 2) == -1);
+    MFS_CHECK (t_ptr, ftc_fleet_select (&w, -1) == -1);
+    MFS_CHECK (t_ptr, ftc_fleet_selected (&w) == 1);
+    /* Per-world independence: a second world starts unselected at default. */
+    physics_world w2;
+    mfs_test_world (&w2);
+    MFS_CHECK (t_ptr, physics_world_attach_module (&w2, &mpe_module_desc) >= 0);
+    MFS_CHECK (t_ptr, ftc_fleet_selected (&w2) == -1);
+    MFS_CHECK (t_ptr, ftc_fleet_spawn (&w2, 0.0f, ftc_robot_rest_height (), 0.0f, MOTOR_GB_5203_26_9,
+                                       FTC_DRIVETRAIN_MECANUM) == 0);
+    MFS_CHECK (t_ptr, ftc_fleet_selected (&w2) == 0);
+    MFS_CHECK (t_ptr, ftc_fleet_selected (&w) == 1);
+    /* Routing: drive the selection (robot 1); it moves, robot 0 holds. */
+    ftc_robot *r1 = ftc_fleet_get (&w, ftc_fleet_selected (&w));
+    ftc_robot *r0 = ftc_fleet_get (&w, 0);
+    MFS_CHECK (t_ptr, r1 != NULL && r0 != NULL && r1 != r0);
+    float x1_0 = 0.0f, z1_0 = 0.0f, x0_0 = 0.0f, z0_0 = 0.0f;
+    if (r1 && r0 && r1 -> chassis_body >= 0 && r0 -> chassis_body >= 0) {
+        x1_0 = w.bodies [r1 -> chassis_body].position.x;
+        z1_0 = w.bodies [r1 -> chassis_body].position.z;
+        x0_0 = w.bodies [r0 -> chassis_body].position.x;
+        z0_0 = w.bodies [r0 -> chassis_body].position.z;
+    }
+    int fail = 0;
+    for (int k = 0; k < 150 && !fail; k++) {
+        mfs_drive_mecanum (r1, 1.0f, 0.0f, 0.0f);
+        physics_world_step (&w, DT);
+        if (!mfs_test_finite (&w)) { fail = 1; }
+    }
+    MFS_CHECK (t_ptr, fail == 0);
+    if (r1 && r0 && r1 -> chassis_body >= 0 && r0 -> chassis_body >= 0) {
+        float dx1 = w.bodies [r1 -> chassis_body].position.x - x1_0;
+        float dz1 = w.bodies [r1 -> chassis_body].position.z - z1_0;
+        float dx0 = w.bodies [r0 -> chassis_body].position.x - x0_0;
+        float dz0 = w.bodies [r0 -> chassis_body].position.z - z0_0;
+        float d1 = sqrtf (dx1 * dx1 + dz1 * dz1);
+        float d0 = sqrtf (dx0 * dx0 + dz0 * dz0);
+        MFS_INFO ("selected disp=%.3f unselected disp=%.3f", d1, d0);
+        MFS_CHECK (t_ptr, d1 > 0.30f);
+        MFS_CHECK (t_ptr, d0 < 0.20f);
+    }
+    physics_world_cleanup (&w);
+    physics_world_cleanup (&w2);
+    if (t_ptr -> failures == 0) { printf ("[PASS] select: controlled-robot routing is per-world and moves\n"); }
+    mfs_test_end (t_ptr);
+    return t_ptr -> failures;
+}
