@@ -77,6 +77,10 @@ typedef struct {
      * forever (kinetic friction alone can never re-capture a wheel whose
      * stall torque exceeds the kinetic cone). */
     float wheel_traction_scale [FTC_MAX_WHEELS];
+    /* Traction-cut debounce (DESPOT-2026-10-14): consecutive ticks with
+     * overspeed past the slam line. The slam needs SUSTAINED burnout, not
+     * a breakaway transient. Zero-init via memset; memcpy-safe. */
+    int wheel_cut_hold [FTC_MAX_WHEELS];
     /* DESPOT-FIX (torque slew state): previously applied axle torque per
      * wheel (N.m). The driver feathers standing starts in reality (ESC
      * current-slew limits); a 0->stall step in one tick outruns the

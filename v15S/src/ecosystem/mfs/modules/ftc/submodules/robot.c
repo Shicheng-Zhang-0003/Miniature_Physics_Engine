@@ -770,7 +770,34 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
              * calibrated drive behaviour, ugly or not. Do not re-attempt
              * without re-baselining tank + drive_directions first. */
             float *scale = &robot -> wheel_traction_scale [i];
+            int *hold = &robot -> wheel_cut_hold [i];
             float over = slip * dir;
+            /* DESPOT-2026-10-14 (accuracy, anti-lock pulse): the slam fires
+             * immediately on over > 4.0 (directional purity depends on it —
+             * debouncing to 3 ticks broke drive_directions cross-talk and
+             * partial_throttle heading hold, reverted with cause). The
+             * companion defect is the latch: recovery needs over < 2.0, but
+             * cut torque itself sustains the spin it condemns, so over never
+             * dips and the wheel crawls at 0.15 forever (measured identical
+             * 0.690 m at cmd 0.25 and 0.50 — a deadlock, not a tune).
+             * hold counts ticks-since-slam while cut; every 20th tick the
+             * cut probes +0.2 regardless (re-slams next tick on genuine
+             * burnout, climbs out of the trap otherwise). Genuine burnout
+             * sees a 1/20 probe duty; the trap escapes in ~5 probes. */
+            if (*scale < 1.0f && fabsf (wheel_speed) < 2.0f) {
+                *scale = 1.0f;
+                *hold = 0;
+            } else if (dir != 0.0f && over > 4.0f) {
+                *scale = 0.15f;
+                *hold = 0;
+            } else if (*scale < 1.0f) {
+                (*hold)++;
+                if (over < 2.0f || *hold >= 20) {
+                    *scale += 0.2f;
+                    if (*scale > 1.0f) { *scale = 1.0f; }
+                    if (*hold >= 20) { *hold = 0; }
+                }
+            }
             /* DESPOT-2026-10-12 (SKATE cut-trap): the cut regulates overspeed,
              * but a wheel it has strangled sits near zero WITH the cut still
              * engaged, and any torque that can break it away (needs ~cone)
@@ -792,13 +819,9 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
              * — MOTOR-II territory, needs the bigger landing unit, not a
              * cut tweak). The residual back-drive lock under extreme
              * command spread stays open (bounded: thrust flips on at most
-             * the dragged wheel, mounts/P2P hold, nothing flips). */
-            if (*scale < 1.0f && fabsf (wheel_speed) < 2.0f) { *scale = 1.0f; } else if (dir != 0.0f && over > 4.0f) {
-                *scale = 0.15f;
-            } else if (*scale < 1.0f && over < 2.0f) {
-                *scale += 0.2f;
-                if (*scale > 1.0f) { *scale = 1.0f; }
-            }
+             * the dragged wheel, mounts/P2P hold, nothing flips). The *scale
+             * release below 2 rad/s and the instant slam above 4.0 live in
+             * the pulse block above (with the 20-tick probe escape). */
         }
         /* Update motor electrical state.
          * DESPOT-2026-10-04 (idle/coast split): at ~zero command the wheel
