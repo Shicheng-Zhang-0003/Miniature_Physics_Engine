@@ -203,7 +203,12 @@ void ftc_traj_update (float frame_delta_time) {
         (ftc_robot * (*) (struct physics_world *, int)) ftrj_sym ("ftc_fleet_get");
     void (*p_aero) (physics_world *, const int *, int) =
         (void (*) (physics_world *, const int *, int)) ftrj_sym ("intake_balls_aero_step");
-    ftc_robot *r = (w && p_get) ? p_get (w, 0) : NULL;
+    /* Preview the CONTROLLED robot's shot (falls back to robot 0 when the
+     * bundle predates selection). */
+    int (*p_sel) (struct physics_world *) = (int (*) (struct physics_world *)) ftrj_sym ("ftc_fleet_selected");
+    int tsel = (w && p_sel) ? p_sel (w) : 0;
+    if (tsel < 0) { tsel = 0; }
+    ftc_robot *r = (w && p_get) ? p_get (w, tsel) : NULL;
     /* Nothing to preview without a robot that is actually carrying a ball. */
     if (!w || !p_aero || !r || r -> chassis_body < 0 || r -> chassis_body >= w -> body_count ||
         r -> intake_count <= 0) {

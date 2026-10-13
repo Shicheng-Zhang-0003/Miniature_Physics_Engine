@@ -1,8 +1,8 @@
 /* See ftc_view.h. Keeps the FTC-specific camera logic out of core: the
  * free-camera tick (core/simulation_camera.c) stays generic, and this TU
- * re-targets main_camera_fov onto robot 0 while a follow mode is active.
- * Robot access goes through the bundle (the engine never links FTC); the
- * chassis body index in ftc_robot is all we need, so robot.h is included
+ * re-targets main_camera_fov onto the SELECTED robot while a follow mode is
+ * active. Robot access goes through the bundle (the engine never links FTC);
+ * the chassis body index in ftc_robot is all we need, so robot.h is included
  * for its layout only (same as ui_input/gamepad_drive.c). */
 #include "ftc_view.h"
 #include "../mpe_engine.h"
@@ -42,9 +42,12 @@ void ftc_view_tick (float frame_delta_time) {
     physics_world *w = physics_world_get_primary ();
     ftc_robot * (*p_get) (struct physics_world *, int) =
         (ftc_robot * (*) (struct physics_world *, int)) ftcv_sym ("ftc_fleet_get");
+    int (*p_sel) (struct physics_world *) = (int (*) (struct physics_world *)) ftcv_sym ("ftc_fleet_selected");
     if (!w || !p_get)
         return; /* no world/bundle: nothing to follow, stay on free camera */
-    ftc_robot *r = p_get (w, 0);
+    int sel = (p_sel) ? p_sel (w) : 0;
+    if (sel < 0) { sel = 0; }
+    ftc_robot *r = p_get (w, sel);
     if (!r || r -> chassis_body < 0 || r -> chassis_body >= w -> body_count)
         return; /* no robot spawned yet */
     rigidbody *ch = &w -> bodies [r -> chassis_body];

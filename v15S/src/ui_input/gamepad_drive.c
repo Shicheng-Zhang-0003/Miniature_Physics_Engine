@@ -35,6 +35,7 @@ static int s_pad_open_attempted = 0;
 static int s_frames_since_retry = 0;
 static int s_control_enabled = 1; /* START toggles; default ON like module_1 */
 static int s_prev_start = 0;
+static int s_prev_back = 0;
 static int s_prev_a = 0;
 static int s_prev_y = 0;
 static int s_prev_b = 0;
@@ -62,7 +63,7 @@ static void gpd_report_stage (int stage) {
         break;
         case 3:
         fprintf (stderr,
-                 "[gamepad] driving robot 0 (START toggles, LB+RB e-stop, LT intake RT shoot)\n");
+                 "[gamepad] driving selected robot (START toggles, BACK cycles robots, LB+RB e-stop, LT intake RT shoot)\n");
         break;
         default:
         break;
@@ -109,6 +110,7 @@ void gamepad_drive_invalidate (void) {
     s_pad_deadzone = NULL;
     s_syms_resolved = 0;
     s_active = 0;
+    s_prev_back = 0;
 }
 void gamepad_drive_init (void) {
     gpd_resolve ();
@@ -145,6 +147,14 @@ void gamepad_drive_tick (void) {
         gpd_report_stage (0);
         return; /* no bundle: silent except the one-time hint above */
     }
+    /* Controlled-robot resolution (fleet selection when the bundle has it,
+     * else robot 0 — the pre-selection behavior). -1 (no robots) flows
+     * into the existing no-robot paths via fleet_get NULL. Declared up
+     * here so the disconnect-stop path below already follows selection. */
+    int (*s_sel) (struct physics_world *) =
+        (int (*) (struct physics_world *)) gpd_sym ("ftc_fleet_selected");
+    physics_world *wg_sel = physics_world_get_primary ();
+    int sel = (s_sel && wg_sel) ? s_sel (wg_sel) : 0;
     if (!s_pad_open_attempted) {
         gamepad_drive_init ();
         if (!s_pad_open_attempted) {
@@ -158,7 +168,7 @@ void gamepad_drive_tick (void) {
         gpd_report_stage (1);
         if (s_was_commanding) {
             physics_world *w = physics_world_get_primary ();
-            ftc_robot *r = (w && s_fleet_get) ? s_fleet_get (w, 0) : NULL;
+            ftc_robot *r = (w && s_fleet_get) ? s_fleet_get (w, sel) : NULL;
             gpd_stop_robot (r);
             s_was_commanding = 0;
         }
@@ -173,6 +183,32 @@ void gamepad_drive_tick (void) {
     if (start_now && !s_prev_start)
         s_control_enabled = !s_control_enabled;
     s_prev_start = start_now;
+    /* BACK cycles the controlled robot (edge-triggered). The deselected
+     * robot is commanded to stop FIRST: drive commands persist until
+     * changed, so switching without stopping strands a runaway. */
+    int back_now = s_pad_button (&s_pad, gamepad_button_back) ? 1 : 0;
+    if (back_now && !s_prev_back) {
+        int (*s_count) (struct physics_world *) = (int (*) (struct physics_world *)) gpd_sym ("ftc_fleet_count");
+        int (*s_select) (struct physics_world *, int) =
+            (int (*) (struct physics_world *, int)) gpd_sym ("ftc_fleet_select");
+        if (s_count && s_select && wg_sel) {
+            int n = s_count (wg_sel);
+            int cur = (s_sel) ? s_sel (wg_sel) : 0;
+            if (n > 1 && cur >= 0) {
+                int nxt = (cur + 1) % n;
+                if (s_fleet_get && s_mecanum) {
+                    ftc_robot *old = s_fleet_get (wg_sel, cur);
+                    if (old) { s_mecanum (old, 0.0f, 0.0f, 0.0f); }
+                }
+                if (s_select (wg_sel, nxt) == nxt) {
+                    sel = nxt;
+                    fprintf (stderr, "[gamepad] control -> robot %d/%d\n", nxt, n);
+                    fflush (stderr);
+                }
+            }
+        }
+    }
+    s_prev_back = back_now;
     /* F310 arcade profile (user config): left trigger = intake (hold),
      * right trigger = shoot (press). A/Y/B kept as toggles/fallback.
      * Edge/level-triggered; symbols resolve from the bundle and may be NULL
@@ -195,12 +231,12 @@ void gamepad_drive_tick (void) {
             (int (*) (struct physics_world *, int)) gpd_sym ("ftc_eject");
         physics_world *wg = physics_world_get_primary ();
         int lt_now = (lt > 0.3f) ? 1 : 0; /* LT: hold = intake, release = off */
-        if (lt_now && !s_prev_lt && s_set && wg) { s_set (wg, 0, 1); }
-        if (!lt_now && s_prev_lt && s_set && wg) { s_set (wg, 0, 0); }
-        if (rt > 0.5f && !s_prev_rt && s_shoot && wg) { s_shoot (wg, 0); } /* RT: launch on press */
-        if (a_now && !s_prev_a && s_toggle && wg) { s_toggle (wg, 0); }
-        if (y_now && !s_prev_y && s_shoot && wg) { s_shoot (wg, 0); }
-        if (b_now && !s_prev_b && s_eject && wg) { s_eject (wg, 0); }
+        if (lt_now && !s_prev_lt && s_set && wg) { s_set (wg, sel, 1); }
+        if (!lt_now && s_prev_lt && s_set && wg) { s_set (wg, sel, 0); }
+        if (rt > 0.5f && !s_prev_rt && s_shoot && wg) { s_shoot (wg, sel); } /* RT: launch on press */
+        if (a_now && !s_prev_a && s_toggle && wg) { s_toggle (wg, sel); }
+        if (y_now && !s_prev_y && s_shoot && wg) { s_shoot (wg, sel); }
+        if (b_now && !s_prev_b && s_eject && wg) { s_eject (wg, sel); }
         s_prev_lt = lt_now;
         s_prev_rt = (rt > 0.5f) ? 1 : 0;
         s_prev_a = a_now;
@@ -208,7 +244,7 @@ void gamepad_drive_tick (void) {
         s_prev_b = b_now;
     }
     physics_world *w = physics_world_get_primary ();
-    ftc_robot *r = (w && s_fleet_get) ? s_fleet_get (w, 0) : NULL;
+    ftc_robot *r = (w && s_fleet_get) ? s_fleet_get (w, sel) : NULL;
     if (!r) {
         s_active = 0;
         s_was_commanding = 0;
@@ -290,7 +326,10 @@ void ftc_watchdog_tick (void) {
                  __DATE__, __TIME__, wc ? wc -> timestep.solver_iterations : -1, wc ? wc -> sleep.enable : -1);
         fflush (stderr);
     } physics_world *w = physics_world_get_primary ();
-    ftc_robot *r = (w && s_fleet_get) ? s_fleet_get (w, 0) : NULL;
+    /* Watch the controlled robot (re-resolved per call; never held). */
+    int (*w_sel) (struct physics_world *) = (int (*) (struct physics_world *)) gpd_sym ("ftc_fleet_selected");
+    int ws = (w_sel && w) ? w_sel (w) : 0;
+    ftc_robot *r = (w && s_fleet_get) ? s_fleet_get (w, ws) : NULL;
     if (!r || r -> chassis_body < 0 || r -> chassis_body >= w -> body_count) { return; }
     rigidbody *ch = &w -> bodies [r -> chassis_body];
     vector3 chx = ch -> cached_axes [0];

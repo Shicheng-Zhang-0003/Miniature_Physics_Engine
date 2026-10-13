@@ -14,6 +14,9 @@
  *   ftc bucket [x y z]          spawn/move the suspended bucket (default 0 1.0 4.0)
  *   ftc score                   carried / balls / scored / bucket readout
  *   ftc view [0|1|2]            camera: 0 free, 1 field-centric follow, 2 robot-centric
+ *   ftc select [i]              show/set the CONTROLLED robot (gamepad BACK
+ *                               cycles too; drive/intake/shoot/telemetry act
+ *                               on the selection, default robot 0)
  *   ftc biobuzz                 build the BIOBUZZ regulation field + stage the
  *                               match (40 pollen + 16 nectar, Manual V1 S10.3)
  *   ftc biobuzz spawn           spawn 4 robots at regulation starts + preload
@@ -175,10 +178,19 @@ static void ftc_ensure_iterations (void) {
 }
 void cmd_ftc (int argc, char **argv) {
     if (argc < 2) {
-        term_err ("mpe: ftc: usage: ftc spawn [x y z] (spawns bucket + BIOBUZZ pieces) | telemetry | intake on|off | eject | shoot | balls [n] | pieces [nectar pollen] | bucket [x y z] | score | view [0|1|2] | biobuzz [build|spawn] | biobuzz enter red|blue | biobuzz score\n");
+        term_err ("mpe: ftc: usage: ftc spawn [x y z] (spawns bucket + BIOBUZZ pieces) | telemetry | intake on|off | eject | shoot | balls [n] | pieces [nectar pollen] | bucket [x y z] | score | view [0|1|2] | select [i] | biobuzz [build|spawn] | biobuzz enter red|blue | biobuzz score\n");
         return;
     } physics_world *w = physics_world_get_primary ();
-    /* Single-robot accessors (index 0 implied; bundle API keeps indices). */
+    /* Controlled-robot accessors (fleet selection; default robot 0).
+     * Bundle API keeps indices; every verb below acts on the selection. */
+    int sel = 0;
+    {
+        int (*p_sel) (struct physics_world *) = (int (*) (struct physics_world *)) ftc_sym ("ftc_fleet_selected");
+        if (p_sel && w) {
+            int s = p_sel (w);
+            if (s >= 0) { sel = s; }
+        }
+    }
     ftc_robot * (*p_get) (struct physics_world *, int) =
         (ftc_robot * (*) (struct physics_world *, int)) ftc_sym ("ftc_fleet_get");
     int (*p_count) (struct physics_world *) = (int (*) (struct physics_world *)) ftc_sym ("ftc_fleet_count");
@@ -257,7 +269,7 @@ void cmd_ftc (int argc, char **argv) {
             return;
         } float (*p_volt) (const battery *, float) = (float (*) (const battery *, float)) ftc_sym ("battery_get_voltage");
         int (*p_fuse) (const battery *) = (int (*) (const battery *)) ftc_sym ("battery_fuse_tripped");
-        ftc_robot *r = p_get (w, 0);
+        ftc_robot *r = p_get (w, sel);
         if (!r) {
             term_err ("mpe: ftc: no robot (ftc spawn first)\n");
             return;
@@ -290,8 +302,8 @@ void cmd_ftc (int argc, char **argv) {
             if (p_stats) {
                 int carried = 0, balls = 0, scored = 0, bucket = 0;
                 if (p_stats (w, &carried, &balls, &scored, &bucket) == 0) {
-                    snprintf (buf, sizeof (buf), "mpe: ftc: game carried=%d balls=%d scored=%d bucket=%s intake=%s\n",
-                              carried, balls, scored, bucket ? "up" : "--",
+                    snprintf (buf, sizeof (buf), "mpe: ftc: robot %d game carried=%d balls=%d scored=%d bucket=%s intake=%s\n",
+                              sel, carried, balls, scored, bucket ? "up" : "--",
                               r -> intake_on ? "on" : "off");
                     term_out (buf);
                 }
@@ -308,13 +320,13 @@ void cmd_ftc (int argc, char **argv) {
             return;
         }
         int on = (argc > 2 && (term_str_eq (argv [2], "off") || term_str_eq (argv [2], "0"))) ? 0 : 1;
-        int rc = p_set (w, 0, on);
+        int rc = p_set (w, sel, on);
         if (rc < 0) {
             term_err ("mpe: ftc: no robot (ftc spawn first)\n");
             return;
         }
         char buf [128];
-        snprintf (buf, sizeof (buf), "mpe: ftc: intake %s\n", on ? "on" : "off");
+        snprintf (buf, sizeof (buf), "mpe: ftc: robot %d intake %s\n", sel, on ? "on" : "off");
         term_ok (buf);
         return;
     }
@@ -324,13 +336,13 @@ void cmd_ftc (int argc, char **argv) {
             term_err ("mpe: ftc: bundle API incomplete\n");
             return;
         }
-        int n = p_ej (w, 0);
+        int n = p_ej (w, sel);
         if (n < 0) {
             term_err ("mpe: ftc: no robot (ftc spawn first)\n");
             return;
         }
         char buf [128];
-        snprintf (buf, sizeof (buf), "mpe: ftc: ejected %d ball(s)\n", n);
+        snprintf (buf, sizeof (buf), "mpe: ftc: robot %d ejected %d ball(s)\n", sel, n);
         term_ok (buf);
         return;
     }
@@ -340,13 +352,13 @@ void cmd_ftc (int argc, char **argv) {
             term_err ("mpe: ftc: bundle API incomplete\n");
             return;
         }
-        int id = p_sh (w, 0);
+        int id = p_sh (w, sel);
         if (id < 0) {
             term_err ("mpe: ftc: nothing carried (intake balls first)\n");
             return;
         }
         char buf [128];
-        snprintf (buf, sizeof (buf), "mpe: ftc: fired ball id=%d\n", id);
+        snprintf (buf, sizeof (buf), "mpe: ftc: robot %d fired ball id=%d\n", sel, id);
         term_ok (buf);
         return;
     }
@@ -433,6 +445,41 @@ void cmd_ftc (int argc, char **argv) {
         char buf [160];
         const char *nm = (mode == 0) ? "free" : (mode == 1) ? "field-centric (follows robot, fixed field yaw)" : "robot-centric (chase behind robot)";
         snprintf (buf, sizeof (buf), "mpe: ftc: view %d = %s\n", mode, nm);
+        term_ok (buf);
+        return;
+    }
+    /* Controlled-robot selection (gamepad BACK cycles the same state).
+     * `ftc select` shows the current robot + fleet size; `ftc select i`
+     * makes i the robot that drive/intake/shoot/telemetry act on. */
+    if (term_str_eq (argv [1], "select")) {
+        int (*p_select) (struct physics_world *, int) =
+            (int (*) (struct physics_world *, int)) ftc_sym ("ftc_fleet_select");
+        if (!p_select || !p_count || !w) {
+            term_err ("mpe: ftc: bundle API incomplete (need fleet selection)\n");
+            return;
+        }
+        int n = p_count (w);
+        if (argc < 3) {
+            char buf [128];
+            snprintf (buf, sizeof (buf), "mpe: ftc: controlled robot %d of %d (ftc select <i>, gamepad BACK cycles)\n",
+                      sel, n);
+            term_out (buf);
+            return;
+        }
+        char *end = NULL;
+        long want = strtol (argv [2], &end, 10);
+        if (end == argv [2] || *end != '\0' || want < 0 || want > 1000000) {
+            term_err ("mpe: ftc: select needs an integer index\n");
+            return;
+        }
+        if (p_select (w, (int) want) < 0) {
+            char buf [128];
+            snprintf (buf, sizeof (buf), "mpe: ftc: no robot %ld (%d robot(s))\n", want, n);
+            term_err (buf);
+            return;
+        }
+        char buf [128];
+        snprintf (buf, sizeof (buf), "mpe: ftc: control -> robot %ld/%d\n", want, n);
         term_ok (buf);
         return;
     }
@@ -534,7 +581,7 @@ void cmd_ftc (int argc, char **argv) {
             snprintf (buf, sizeof (buf), "mpe: ftc: %d robots at regulation starts (red -X, blue +X) + %d preloaded\n",
                       made, pre);
             term_ok (buf);
-            term_out ("mpe: ftc: gamepad drives robot 0; telemetry/score read the match\n");
+            term_out ("mpe: ftc: gamepad drives the selected robot (BACK cycles); telemetry/score read the match\n");
             return;
         }
         if (term_str_eq (sub, "enter")) {
@@ -597,5 +644,5 @@ void cmd_ftc (int argc, char **argv) {
         term_err ("mpe: ftc: usage: ftc biobuzz [build|spawn] | ftc biobuzz enter red|blue | ftc biobuzz score\n");
         return;
     }
-    term_err ("mpe: ftc: unknown subcommand (spawn|telemetry|intake|eject|shoot|balls|pieces|bucket|score|view|biobuzz)\n");
+    term_err ("mpe: ftc: unknown subcommand (spawn|telemetry|intake|eject|shoot|balls|pieces|bucket|score|view|select|biobuzz)\n");
 }
