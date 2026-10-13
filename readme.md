@@ -17,9 +17,9 @@
 >    bit-identically from a pristine `HEAD` worktree. Not a regression.
 > 2. `mfs-suite` — two pre-existing reds, both verified bit-identical on
 >    pristine `HEAD` (not regressions): `tank` (pivot heading/translation
->    baselines) and `odometry_yaw` (magnitude). MFS stands 23/25 with the 5
->    BIOBUZZ regulation gates green; `drive_directions` (red in the 10-09
->    notes) has since resolved.
+>    baselines) and `odometry_yaw` (magnitude). MFS stands 24/26 with the 5
+>    BIOBUZZ regulation gates and the controlled-robot `select` gate green;
+>    `drive_directions` (red in the 10-09 notes) has since resolved.
 > 3. `mfs-summary-contract` — a consequence of (2), and now reporting it
 >    accurately. It previously blamed itself ("did not emit its summary")
 >    because `build_tests.sh` ran under `set -e` and aborted one line above
@@ -518,9 +518,9 @@ micro-jitter, documented); bounce-height oracles carry slop-scale error.
 
 ### MFS robotics (`v15S/src/ecosystem/mfs/`)
 - **FTC stack**: motor presets (spec-sheet derived, decoded-count encoder convention), back-EMF electrical model with implicit-in-speed solve + disturbance observer (the **open-loop** no-load line is exact at any bus voltage via V-line bounds — `R` cancels from `w_free` by construction; the **observer-armed** driven path is a documented limit cycle at −61.3%, tracked as `[MOTOR-III]`), traction budgeting against wheel materials, analytic mecanum roller-kinematics lateral force (Coulomb-capped, dissipative, contact-gated at the wheel — no chassis-force cheat; the articulated 32-roller build is kept for forensics), pure-encoder odometry with `odom_slip` flag, tile-friction test floors.
-- **Suite**: `build_tests.sh` — unified `mfs_suite --all` (25 gated) plus build gates and ungated diags; CWD-independent. **Status 2026-10-13: 23/25 green** — `tank` and `odometry_yaw` are red, verified bit-identical on pristine `HEAD` (pre-existing, not regressions). The 5 BIOBUZZ regulation gates (`biobuzz_field/stage/tip/flower/table`) are green. The script runs with errexit scoped off around the suite so a failure still produces its full summary (`FTC RESULT: gated pass=.. fail=..`); see `v15S/REMAINING_WORK.md`.
+- **Suite**: `build_tests.sh` — unified `mfs_suite --all` (26 gated) plus build gates and ungated diags; CWD-independent. **Status 2026-10-13: 24/26 green** — `tank` and `odometry_yaw` are red, verified bit-identical on pristine `HEAD` (pre-existing, not regressions). The 5 BIOBUZZ regulation gates (`biobuzz_field/stage/tip/flower/table`) and the controlled-robot `select` gate are green. The script runs with errexit scoped off around the suite so a failure still produces its full summary (`FTC RESULT: gated pass=.. fail=..`); see `v15S/REMAINING_WORK.md`.
 - **BIOBUZZ regulation league** (`modules/ftc/submodules/biobuzz.c`): the full 2026-2027 field in SI — 144 in floor, 12 in walls, centre hive frame (pivots 43.95 in) with 2 tipping hives × 2 cells, 4 flowers, zone tapes, AprilTag IDs recorded — plus §10.3 staging (40 pollen + 16 nectar) and Table 10-2 scoring (tips, cells, flower ownership/bottom, gardens, leave/park predicates, RP). Tips are weight-census events (not a damper solve — disclosed). Terminal: `ftc biobuzz [build|spawn]`, `ftc biobuzz enter red|blue`, `ftc biobuzz score`.
-- **Modules**: `ftc-fleet` tick module (hot-pluggable, bitwise-identical static vs `.so`), `mfs-simulator` ecosystem bundle (loadable via `mod load ecosystem/mfs/mfs_ecosystem.so`; attaches ftc-fleet only — the `mfs_module_1` BioBuzz game module stays registered but parked). Live robot flow is one field, one mecanum robot, one controller: `mod load ecosystem/mfs/mfs_ecosystem.so`, `eco attach mfs-simulator`, `ftc spawn`, then drive with the Logitech F310 pad (left stick forward/strafe, right X rotate, START toggles, LB+RB e-stop); `ftc telemetry` inspects.
+- **Modules**: `ftc-fleet` tick module (hot-pluggable, bitwise-identical static vs `.so`), `mfs-simulator` ecosystem bundle (loadable via `mod load ecosystem/mfs/mfs_ecosystem.so`; attaches ftc-fleet only — the `mfs_module_1` BioBuzz game module stays registered but parked). Live robot flow is one field, one controller: `mod load ecosystem/mfs/mfs_ecosystem.so`, `eco attach mfs-simulator`, `ftc spawn` (or `ftc biobuzz spawn` for a regulation 2v2), then drive with the Logitech F310 pad (left stick forward/strafe, right X rotate, START toggles, BACK cycles the controlled robot, LB+RB e-stop); `ftc telemetry` inspects (the selected robot); `ftc select <i>` switches control explicitly.
 
 ### Determinism and precision
 - Fixed 1/60 s timestep, fixed solver iteration order, exact IEEE `+ - * / sqrt`.

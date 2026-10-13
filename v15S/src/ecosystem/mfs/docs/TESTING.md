@@ -22,15 +22,15 @@ What the suite contains, what each gate proves, and how to run it.
   `tests/mfs_test_common.h` (tile slab top y=0, μ 1.0/0.8, e=0). Robot tests
   pin **128 solver iterations** (40:1 chassis/wheel mass ratio).
 
-## Current status (2026-10-13): 23/25
+## Current status (2026-10-13): 24/26
 
 Two gates are **red**: `tank` and `odometry_yaw` (the tank-pivot heading/translation
 baseline and mecanum odom-yaw magnitude frontiers — verified bit-identical on
-pristine `HEAD`, pre-existing, not the BIOBUZZ work). Five new BIOBUZZ league
-gates (`biobuzz_field/stage/tip/flower/table`) are green. The earlier
-`drive_directions` red resolved; the 2026-10-09 "14/17" line and the CCD-margin
-narrative below it are historical. Full measurements and the root-cause
-write-ups are in
+pristine `HEAD`, pre-existing, not the BIOBUZZ/selection work). Five BIOBUZZ
+league gates (`biobuzz_field/stage/tip/flower/table`) plus the controlled-robot
+`select` gate are green. The earlier `drive_directions` red resolved; the
+2026-10-09 "14/17" line and the CCD-margin narrative below it are historical.
+Full measurements and the root-cause write-ups are in
 [`KNOWN_FAILURES.md`](KNOWN_FAILURES.md) → `[TANK-PIVOT-*]` /
 `[ODOMETRY-YAW]` (search the archives for `[CCD-OBSTACLE-MARGIN]` for the older
 set).
@@ -61,6 +61,7 @@ set).
 | `biobuzz_tip` | teleport 8 pollen into red up-cell, 240 ticks | exactly 1 red tip (edge-triggered), blue quiet (3 nectar = 5.1 < 8); recorded wall moved > 0.10 (mirrored re-pose); unlock +1; score carries 20 |
 | `biobuzz_flower` | constructed stack (bottom red nectar, 2 pollen, top blue nectar) + red-garden pieces, 90 ticks | red: owned 0 + bottom 5 + garden 3 = 8; blue: owned 4×2=8 + bottom 5 = 13 (Table 10-2 ownership/colours) |
 | `biobuzz_table` | pure predicates, no world | Table 10-2 values (3/5/20/20/2/5/2/1), RP thresholds (swarm 16, P1 4, P2 7), piece spec (40/16, radii), start poses (walls/yaw/zones) |
+| `select` | two worlds, two robots in the first | fresh attach reads −1; default 0 after first spawn; OOB selects fail −1 leaving stored untouched; second world independent; drive routed through the selection moves robot 1 (> 0.30 m) while robot 0 holds (< 0.20 m) — pins the terminal/gamepad controlled-robot routing |
 
 Physics-truth notes: T6/T8 test the **motor model isolated** (no
 joints/world) because the jointed air-spin plant is a documented limit

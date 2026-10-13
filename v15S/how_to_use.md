@@ -149,6 +149,7 @@ Common commands:
 | `eco attach mfs-simulator` | Attach the bundle to the primary world |
 | `eco command mfs-simulator help` | List bundle commands |
 | `ftc spawn` | Spawn an FTC robot (5203 26.9 mecanum, at origin) |
+| `ftc select [i]` | Show/set the CONTROLLED robot (drive/intake/shoot/telemetry act on it; gamepad BACK cycles the same selection) |
 | `ftc drive 0 tank 1 1` | Drive robot 0 forward (persists until changed) |
 | `ftc drive 0 mecanum 0 1 0` | Strafe robot 0 right |
 | `ftc drive 0 stop` | Stop robot 0 |
@@ -413,6 +414,12 @@ Notes:
   walkthrough): the hive re-poses mirrored, the load spills, the alliance
   unlocks one tray nectar. No match clock and no fouls (human refs);
   `score` reports live predicates — you label AUTO vs TELEOP.
+- `ftc biobuzz spawn` stages a full 2v2 (red1/red2 on −X, blue1/blue2 on
+  +X) at regulation starts with preloads. One controller drives one robot
+  at a time: `ftc select <i>` (or the gamepad BACK button) switches which
+  robot the sticks, intake/shoot/eject, telemetry, follow-camera and shot
+  predictor act on. Switching stops the deselected robot first (drive
+  commands persist, so a silent switch would strand a runaway).
 - The arcade league (`ftc spawn` + bucket, intake/shoot) is untouched and
   coexists on the same pad.
 
