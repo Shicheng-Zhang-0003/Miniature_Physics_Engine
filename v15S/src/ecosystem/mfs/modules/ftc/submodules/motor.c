@@ -259,13 +259,30 @@ void motor_observe (motor *m, float wheel_angular_vel, float dt, float axle_iner
         m -> load_torque = 0.0f;
         m -> wprev_valid = 1;
         return;
-    } float stall_out = m -> stall_current * m -> kt * m -> gear_ratio * m -> efficiency;
+    }     float stall_out = m -> stall_current * m -> kt * m -> gear_ratio * m -> efficiency;
     if (!(stall_out > 0.5f) || !isfinite (stall_out)) { stall_out = 1.0f; }
     float tau_cap = 2.0f * stall_out;
     float tau_l = axle_inertia * (wheel_angular_vel - m -> w_prev) / dt - m -> tau_exp_prev;
     if (!isfinite (tau_l)) { tau_l = 0.0f; } else if (tau_l > tau_cap) {
         tau_l = tau_cap;
     } else if (tau_l < -tau_cap) { tau_l = -tau_cap; }
+    /* DESPOT-2026-10-14 Q-filter (accuracy): the raw difference above is
+     * unfiltered 60 Hz differencing — any per-tick speed ripple (joint
+     * impulses, the implicit clamp, quantization) returns next tick as a
+     * phantom load of INERTIA-scale, and the solve slams back: measured
+     * ±stall current alternation with w swinging ±200 rad/s around a 92
+     * rpm mean (free-speed rig, observer armed). Textbook DOBs low-pass
+     * the observation (Q-filter); this one did not. First-order lag with
+     * TAU = 5 ticks (alpha = dt/(TAU*dt+dt) = 1/6): chatter at 1-3-tick
+     * periods attenuates ~6x while sustained loads (stall, grade, tow)
+     * converge through in ~5 ticks. The implicit solve consumes the
+     * filtered value; the blocked-rotor gate below sees it too. */
+    {
+        const float alpha = 1.0f / 6.0f;
+        float prev = (isfinite (m -> load_torque_filt)) ? m -> load_torque_filt : 0.0f;
+        m -> load_torque_filt = prev + alpha * (tau_l - prev);
+        tau_l = m -> load_torque_filt;
+    }
     /* Blocked-rotor gate: a motor at its torque limit whose shaft is not
      * turning is, by definition, transmitting its full stall torque. This
      * evaluates the model where its answer is known rather than inventing a
@@ -286,6 +303,7 @@ void motor_reset_observer (motor *m) {
     if (!m) { return; }
     m -> wprev_valid = 0;
     m -> load_torque = 0.0f;
+    m -> load_torque_filt = 0.0f;
     m -> w_prev = 0.0f;
     m -> tau_exp_prev = 0.0f;
 }

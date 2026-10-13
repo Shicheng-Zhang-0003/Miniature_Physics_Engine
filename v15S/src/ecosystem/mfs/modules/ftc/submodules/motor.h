@@ -61,6 +61,14 @@ typedef struct {
      * w_prev directly: they used to, which meant a caller that forgot left a
      * silently dead observer (tau_L == 0) with no diagnostic. */
     float load_torque;
+    /* Q-filtered load (DESPOT-2026-10-14): first-order low-pass of the raw
+     * differenced observation below, alpha = dt/(TAU+dt) with TAU = 5
+     * ticks. The raw difference is bang-bang at 60 Hz (measured: ±stall
+     * alternation feeding itself into a ±200 rad/s limit cycle); the
+     * implicit solve consumes the FILTERED value. Blocked-rotor and caps
+     * apply to the filtered value (sustained conditions converge through
+     * the filter in ~TAU). Zero-init via memset/from_spec. */
+    float load_torque_filt;
     float w_prev;
     float tau_exp_prev;
     int wprev_valid;
