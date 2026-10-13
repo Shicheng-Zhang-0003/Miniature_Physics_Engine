@@ -1,6 +1,8 @@
 /* PARANOIA TEST: Configuration validation - all params in range, no silent corruption */
 #ifdef mpe_paranoia_config
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <math.h>
 #include "core/physics_world.h"
 #include "physics/constraint.h"
@@ -50,7 +52,15 @@ int main (void) {
         mpe_config_set_float ("world.drag", 0.95f);
         mpe_config_set_int ("timestep.solver_iterations", 32);
         mpe_config_set_float ("solver.penetration_slop", 0.02f);
-        char path [256] = "../../temp/paranoia_config.cfg";
+        char path [512] = "../../temp/paranoia_config.cfg";
+        /* DESPOT-2026-10-13: honor runner TMPDIR isolation (parallel runs
+         * share ../../temp/ and race; the runner snapshots only
+         * status/engine.cfg*). TMPDIR/TMP/TEMP set by test_runner.py point
+         * at the per-run dir; fall back to the legacy shared path. */
+        const char *run_tmp = getenv ("TMPDIR");
+        if (!run_tmp) { run_tmp = getenv ("TMP"); }
+        if (!run_tmp) { run_tmp = getenv ("TEMP"); }
+        if (run_tmp && run_tmp [0]) { snprintf (path, sizeof (path), "%s/paranoia_config.cfg", run_tmp); }
         bool save_result = mpe_config_save (path);
         if (!save_result) {
             printf ("[FAIL] config save failed\n");

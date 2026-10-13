@@ -31,8 +31,14 @@ void scene_allocate_pool (void) {scene_ensure_primary ();}
 uint32_t scene_allocate_object_id (void) {
     physics_world *world = physics_world_get_primary ();
     scene_ensure_primary ();
-    if (world -> next_object_id == 0) { world -> next_object_id = 1; }
-    return world -> next_object_id++;
+    /* DESPOT-2026-10-13: 0 AND 0xFFFFFFFF are both sentinels (floor-body id,
+     * cache/test marker, scene_note_loaded_id early-return). The old code
+     * skipped only 0, so the allocator could hand out 0xFFFFFFFF and alias
+     * the floor/cache through the legacy load path. Mirror add_* skip both. */
+    if ((world -> next_object_id == 0) || (world -> next_object_id == 0xFFFFFFFFu)) { world -> next_object_id = 1; }
+    uint32_t out = world -> next_object_id++;
+    if ((world -> next_object_id == 0) || (world -> next_object_id == 0xFFFFFFFFu)) { world -> next_object_id = 1; }
+    return out;
 }
 void scene_note_loaded_id (uint32_t object_id) {
     /* 0 is never a valid body id; UINT32_MAX cannot advance further. */

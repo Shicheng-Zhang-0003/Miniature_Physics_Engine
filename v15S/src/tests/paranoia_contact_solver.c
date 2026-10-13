@@ -144,7 +144,14 @@ int main (void) {
                 stopped = 1;
                 x_end = b -> position.x;
             }
-        } float expected = v_start * v_start / (2.0f * 0.3f * 9.81f);
+        } float expected = v_start * v_start / (2.0f * 0.3f * 9.80665f);
+        /* DESPOT-2026-10-13: g pinned to CODATA g_n=9.80665 (not the engine's
+         * -9.81 default) so the oracle no longer restates the engine's own
+         * gravity input. Residual circularity disclosed: v_start is read
+         * from the engine after settling and μ=0.3 is the engine's input, so
+         * a uniformly mis-scaled μ still passes inside 15% — the independent
+         * form (from-scratch reference) lives in docs/VALIDATION.md's Coulomb
+         * branch and the canonical friction_stop gate. This stays a smoke. */
         float actual = fabsf (x_end - x_start);
         float err = fabsf (actual - expected) / expected;
         printf ("[INFO] friction_stop expected=%.4f actual=%.4f err=%.2f%%\n", expected, actual, err * 100);
@@ -231,7 +238,11 @@ int main (void) {
         printf ("[INFO] rolling_resistance distance=%.2f m final_speed=%.4f final_spin=%.4f stopped=%d\n", dist,
                 final_speed, final_spin, stopped);
         /* For a solid sphere rolling without slip, a = mu_r*g/(1+I/(mR^2))
-         * = 5/7*mu_r*g; the ideal stop distance here is about 28.6 m. */
+         * = 5/7*mu_r*g; the ideal stop distance here is about 28.6 m.
+         * DESPOT-2026-10-13: the 5-45m band admits ~5x error — smoke, not
+         * law (same class as the ticketed M15 drag oracle). Do not tighten
+         * this smoke to the canonical band (see mpe_suite_a.c
+         * rolling_decay, which gates 4-14m for real). */
         if (!stopped || dist < 5.0f || dist > 45.0f || final_speed > 0.01f) {
             printf ("[FAIL] rolling resistance violates sphere decay model\n");
             fail = 1;

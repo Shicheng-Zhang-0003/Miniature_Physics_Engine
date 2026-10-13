@@ -490,9 +490,16 @@ static int scene_loading_v200 (FILE *f, uint32_t header_crc) {
          * trailing bytes instead of accepting an ambiguous scene. */
         crc_ok = (fgetc (f) == EOF) && !ferror (f);
     }
+    /* DESPOT-2026-10-13: springs and constraints live in SEPARATE pools
+     * (each mpe_max_joints), so veto each against its own cap. The old check
+     * omitted springs entirely: 1024 staged springs filled the spring pool
+     * and the excess vanished silently at commit (return ignored below). */
+    if (crc_ok && ((uint64_t) staged_spring_count > (uint64_t) mpe_max_joints)) {
+        crc_ok = 0;
+    }
     if (crc_ok && ((uint64_t) fixed_count_u + (uint64_t) dist_count_u + (uint64_t) prism_count_u +
-                       (uint64_t) rope_count_u + (uint64_t) rev_count_u >
-                   (uint64_t) mpe_max_joints)) {
+                        (uint64_t) rope_count_u + (uint64_t) rev_count_u >
+                    (uint64_t) mpe_max_joints)) {
         crc_ok = 0;
     }
     if (!crc_ok) {
@@ -546,9 +553,15 @@ static int scene_loading_v200 (FILE *f, uint32_t header_crc) {
         rigidbody_update_axes (&(physics_world_get_primary () -> bodies) [i]);
         scene_note_loaded_id ((physics_world_get_primary () -> bodies) [i].object_id);
     } physics_world_bump_revision (physics_world_get_primary ());
+    /* DESPOT-2026-10-13: every commit return is checked. The old code ignored
+     * spring/fixed/distance/rope returns (only rev/prism checked index>=0,
+     * still silent), so a full pool silently dropped joints with return 1.
+     * Drops are counted loudly and bump the revision like the legacy path. */
+    int commit_dropped = 0;
     for (int j = 0; j < staged_spring_count; j++) {
-        add_joint_by_ids (physics_world_get_primary (), staged_springs [j].id_a, staged_springs [j].id_b,
-                          staged_springs [j].eq, staged_springs [j].k, staged_springs [j].c);
+        int si = add_joint_by_ids (physics_world_get_primary (), staged_springs [j].id_a, staged_springs [j].id_b,
+                                   staged_springs [j].eq, staged_springs [j].k, staged_springs [j].c);
+        if (si < 0) { commit_dropped++; }
     }
     for (int j = 0; j < staged_rev_count; j++) {
         staged_revolute *r = &staged_revs [j];
@@ -560,19 +573,21 @@ static int scene_loading_v200 (FILE *f, uint32_t header_crc) {
                                            r -> motor_max_torque);
             constraint_set_revolute_limits (physics_world_get_primary (), index, r -> limits_enabled != 0, r -> limit_min,
                                             r -> limit_max);
-        }
+        } else { commit_dropped++; }
     }
     /* Install fixed constraints. */
     for (int j = 0; j < staged_fixed_count; j++) {
         staged_fixed *fc = &staged_fixeds [j];
-        constraint_add_fixed (physics_world_get_primary (), scene_id_remap_resolve (fc -> id_a),
-                              scene_id_remap_resolve (fc -> id_b), fc -> anchor_a, fc -> anchor_b);
+        int fi = constraint_add_fixed (physics_world_get_primary (), scene_id_remap_resolve (fc -> id_a),
+                                       scene_id_remap_resolve (fc -> id_b), fc -> anchor_a, fc -> anchor_b);
+        if (fi < 0) { commit_dropped++; }
     }
     /* Install distance constraints. */
     for (int j = 0; j < staged_dist_count; j++) {
         staged_distance *dc = &staged_dists [j];
-        constraint_add_distance (physics_world_get_primary (), scene_id_remap_resolve (dc -> id_a),
-                                 scene_id_remap_resolve (dc -> id_b), dc -> anchor_a, dc -> anchor_b, dc -> rest_length);
+        int di = constraint_add_distance (physics_world_get_primary (), scene_id_remap_resolve (dc -> id_a),
+                                          scene_id_remap_resolve (dc -> id_b), dc -> anchor_a, dc -> anchor_b, dc -> rest_length);
+        if (di < 0) { commit_dropped++; }
     }
     /* Install prismatic constraints. */
     for (int j = 0; j < staged_prism_count; j++) {
@@ -586,13 +601,18 @@ static int scene_loading_v200 (FILE *f, uint32_t header_crc) {
                                             pc -> motor_target_speed, pc -> motor_max_force);
             constraint_set_prismatic_limits (physics_world_get_primary (), index, pc -> limits_enabled != 0,
                                              pc -> limit_min, pc -> limit_max);
-        }
+        } else { commit_dropped++; }
     }
     /* Install rope constraints. */
     for (int j = 0; j < staged_rope_count; j++) {
         staged_rope *rc = &staged_ropes [j];
-        constraint_add_rope (physics_world_get_primary (), scene_id_remap_resolve (rc -> id_a),
-                             scene_id_remap_resolve (rc -> id_b), rc -> anchor_a, rc -> anchor_b, rc -> rest_length);
+        int ri = constraint_add_rope (physics_world_get_primary (), scene_id_remap_resolve (rc -> id_a),
+                                      scene_id_remap_resolve (rc -> id_b), rc -> anchor_a, rc -> anchor_b, rc -> rest_length);
+        if (ri < 0) { commit_dropped++; }
+    }
+    if (commit_dropped > 0) {
+        fprintf (stderr, "[scene] v200 load: dropped %d joint(s) at commit (pool full or dangling id)\n", commit_dropped);
+        physics_world_bump_revision (physics_world_get_primary ());
     } free (staged_bodies);
     free (staged_ids);
     free (staged_springs);

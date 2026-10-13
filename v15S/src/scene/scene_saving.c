@@ -66,7 +66,9 @@ static int scene_sync_parent_directory (const char *path) {
         slash [1] = '\0';
     } else {
         *slash = '\0';
-    } int dir_fd = open (parent, O_RDONLY);
+    } int dir_fd = open (parent, O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+    /* DESPOT-2026-10-13: O_DIRECTORY|O_NOFOLLOW (mirrors mpe_config.c) — a
+     * symlinked dir fails loudly instead of syncing the wrong target. */
     if (dir_fd < 0) { return 0; }
     int ok = (fsync (dir_fd) == 0);
     if (close (dir_fd) != 0) { ok = 0; }
