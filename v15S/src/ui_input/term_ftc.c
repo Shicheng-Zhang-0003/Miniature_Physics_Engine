@@ -14,6 +14,11 @@
  *   ftc bucket [x y z]          spawn/move the suspended bucket (default 0 1.0 4.0)
  *   ftc score                   carried / balls / scored / bucket readout
  *   ftc view [0|1|2]            camera: 0 free, 1 field-centric follow, 2 robot-centric
+ *   ftc biobuzz                 build the BIOBUZZ regulation field + stage the
+ *                               match (40 pollen + 16 nectar, Manual V1 S10.3)
+ *   ftc biobuzz spawn           spawn 4 robots at regulation starts + preload
+ *   ftc biobuzz enter red|blue  spend a tip unlock: tray nectar into play
+ *   ftc biobuzz score           Table 10-2 breakdown + tips/unlocks
  * Requires the bundle: `mod load ecosystem/mfs/mfs_ecosystem.so` first
  * (symbols resolve from the loaded handle; the engine never links FTC).
  * Spawn auto-attaches the ftc-fleet module to the primary world, ensures the
@@ -170,7 +175,7 @@ static void ftc_ensure_iterations (void) {
 }
 void cmd_ftc (int argc, char **argv) {
     if (argc < 2) {
-        term_err ("mpe: ftc: usage: ftc spawn [x y z] (spawns bucket + BIOBUZZ pieces) | telemetry | intake on|off | eject | shoot | balls [n] | pieces [nectar pollen] | bucket [x y z] | score | view [0|1|2]\n");
+        term_err ("mpe: ftc: usage: ftc spawn [x y z] (spawns bucket + BIOBUZZ pieces) | telemetry | intake on|off | eject | shoot | balls [n] | pieces [nectar pollen] | bucket [x y z] | score | view [0|1|2] | biobuzz [build|spawn] | biobuzz enter red|blue | biobuzz score\n");
         return;
     } physics_world *w = physics_world_get_primary ();
     /* Single-robot accessors (index 0 implied; bundle API keeps indices). */
@@ -431,5 +436,166 @@ void cmd_ftc (int argc, char **argv) {
         term_ok (buf);
         return;
     }
-    term_err ("mpe: ftc: unknown subcommand (spawn|telemetry|intake|eject|shoot|balls|pieces|bucket|score|view)\n");
+    /* BIOBUZZ regulation league (Manual V1 S9/S10; see submodules/biobuzz.h).
+     * All implementation resolves from the bundle; this command only
+     * orchestrates + reports. Coexists with the arcade pad (regulation
+     * walls at ±1.83 m sit inside the 60 m practice pad, whose surface
+     * doubles as the outside ground for alliance areas/trays). */
+    if (term_str_eq (argv [1], "biobuzz")) {
+        const char *sub = (argc > 2) ? argv [2] : "";
+        if (term_str_eq (sub, "") || term_str_eq (sub, "build")) {
+            if (ftc_ensure_driving () != 0)
+                return;
+            ftc_ensure_iterations ();
+            int (*p_field) (struct physics_world *) =
+                (int (*) (struct physics_world *)) ftc_sym ("ftc_biobuzz_field");
+            int (*p_match) (struct physics_world *) =
+                (int (*) (struct physics_world *)) ftc_sym ("ftc_biobuzz_match");
+            int (*p_pre) (struct physics_world *) = (int (*) (struct physics_world *)) ftc_sym ("ftc_biobuzz_preload");
+            if (!p_field || !p_match || !p_pre || !w) {
+                term_err ("mpe: ftc: bundle API incomplete (need biobuzz league)\n");
+                return;
+            }
+            if (p_field (w) != 0) {
+                term_err ("mpe: ftc: biobuzz field build failed\n");
+                return;
+            }
+            int made = p_match (w);
+            int pre = p_pre (w);
+            char buf [256];
+            snprintf (buf, sizeof (buf),
+                      "mpe: ftc: BIOBUZZ regulation field built (144 in, hive + 4 flowers) + %d staged + %d preloaded\n",
+                      made, pre);
+            term_ok (buf);
+            term_out ("mpe: ftc: Manual V1 S10.3: 16 flower + 8 garden + 16 preload + 6 cell + 10 tray (40 pollen, 16 nectar)\n");
+            return;
+        }
+        if (term_str_eq (sub, "spawn")) {
+            if (ftc_ensure_driving () != 0)
+                return;
+            int (*p_spawn) (struct physics_world *, float, float, float, motor_preset_id, ftc_drivetrain_type) =
+                (int (*) (struct physics_world *, float, float, float, motor_preset_id, ftc_drivetrain_type)) ftc_sym (
+                    "ftc_fleet_spawn");
+            int (*p_place) (struct physics_world *, int, float) =
+                (int (*) (struct physics_world *, int, float)) ftc_sym ("ftc_biobuzz_place");
+            int (*p_pre) (struct physics_world *) = (int (*) (struct physics_world *)) ftc_sym ("ftc_biobuzz_preload");
+            void (*p_pose) (int, int, float *, float *) = NULL;
+            /* biobuzz_start_pose(alliance, slot, xyz, yaw) via generic pointer. */
+            *(void **) (&p_pose) = ftc_sym ("biobuzz_start_pose");
+            float (*p_rest) (void) = (float (*) (void)) ftc_sym ("ftc_robot_rest_height");
+            if (!p_spawn || !p_place || !p_pre || !p_pose || !p_rest || !p_count || !w) {
+                term_err ("mpe: ftc: bundle API incomplete (need biobuzz league)\n");
+                return;
+            }
+            if (p_count (w) > 0) {
+                term_err ("mpe: ftc: robots already exist (scene_clear to reset the field)\n");
+                return;
+            }
+            ftc_ensure_iterations ();
+            int preset = 0;
+            const char * (*p_name) (motor_preset_id) = (const char * (*) (motor_preset_id)) ftc_sym ("motor_preset_name");
+            if (p_name) {
+                for (int id = 0; id < 512; id++) {
+                    const char *nm = p_name ((motor_preset_id) id);
+                    if (!nm || strcmp (nm, "unknown") == 0)
+                        break;
+                    if (strstr (nm, "5203") && strstr (nm, "26.9")) {
+                        preset = id;
+                        break;
+                    }
+                }
+            }
+            int made = 0;
+            for (int a = 0; a < 2 && made >= 0; a++) {
+                for (int s = 0; s < 2 && made >= 0; s++) {
+                    float xyz [3];
+                    float yaw = 0.0f;
+                    p_pose (a, s, xyz, &yaw);
+                    xyz [1] = p_rest ();
+                    int idx = p_spawn (w, xyz [0], xyz [1], xyz [2], (motor_preset_id) preset,
+                                       FTC_DRIVETRAIN_MECANUM);
+                    if (idx < 0) {
+                        made = -1;
+                        break;
+                    }
+                    if (p_place (w, idx, yaw) != 0) {
+                        made = -1;
+                        break;
+                    }
+                    made++;
+                }
+            }
+            if (made < 0) {
+                term_err ("mpe: ftc: biobuzz spawn failed\n");
+                return;
+            }
+            int pre = p_pre (w);
+            char buf [224];
+            snprintf (buf, sizeof (buf), "mpe: ftc: %d robots at regulation starts (red -X, blue +X) + %d preloaded\n",
+                      made, pre);
+            term_ok (buf);
+            term_out ("mpe: ftc: gamepad drives robot 0; telemetry/score read the match\n");
+            return;
+        }
+        if (term_str_eq (sub, "enter")) {
+            int (*p_enter) (struct physics_world *, int) =
+                (int (*) (struct physics_world *, int)) ftc_sym ("ftc_biobuzz_enter");
+            if (!p_enter || !w) {
+                term_err ("mpe: ftc: bundle API incomplete (need biobuzz league)\n");
+                return;
+            }
+            int a = (argc > 3 && (term_str_eq (argv [3], "blue") || term_str_eq (argv [3], "1"))) ? 1 : 0;
+            if (p_enter (w, a) != 0) {
+                term_err ("mpe: ftc: nothing to enter (tip first: each tip unlocks one tray nectar)\n");
+                return;
+            }
+            char buf [128];
+            snprintf (buf, sizeof (buf), "mpe: ftc: %s nectar entered at the loading zone\n", a ? "blue" : "red");
+            term_ok (buf);
+            return;
+        }
+        if (term_str_eq (sub, "score")) {
+            int (*p_score) (struct physics_world *, int, void *) =
+                (int (*) (struct physics_world *, int, void *)) ftc_sym ("ftc_biobuzz_score");
+            int (*p_tips) (struct physics_world *, int *, int *, int *, int *) =
+                (int (*) (struct physics_world *, int *, int *, int *, int *)) ftc_sym ("ftc_biobuzz_tips");
+            if (!p_score || !p_tips || !w) {
+                term_err ("mpe: ftc: bundle API incomplete (need biobuzz league)\n");
+                return;
+            }
+            int tr = 0, tb = 0, ur = 0, ub = 0;
+            if (p_tips (w, &tr, &tb, &ur, &ub) != 0) {
+                term_err ("mpe: ftc: no league state (ftc biobuzz first)\n");
+                return;
+            }
+            char buf [320];
+            snprintf (buf, sizeof (buf), "mpe: ftc: BIOBUZZ tips red=%d blue=%d | unlocked red=%d blue=%d\n", tr, tb,
+                      ur, ub);
+            term_out (buf);
+            const char *anm [2] = {"red", "blue"};
+            for (int a = 0; a < 2; a++) {
+                biobuzz_alliance_score sc;
+                memset (&sc, 0, sizeof (sc));
+                if (p_score (w, a, &sc) != 0) {
+                    term_err ("mpe: ftc: score failed\n");
+                    return;
+                }
+                snprintf (buf, sizeof (buf),
+                          "mpe: ftc: %-4s total=%3d = tips %dx20=%d + cell %dx2=%d + flower owned %dx2=%d + bottom %d + "
+                          "garden %dx1=%d + leave %d + park %d\n",
+                          anm [a], sc.total, sc.tips, sc.tip_points, sc.cell_pieces, sc.cell_points,
+                          sc.flower_owned_pieces, sc.flower_owned_points, sc.flower_bottom_bonus, sc.garden_pieces,
+                          sc.garden_points, sc.leave, sc.park);
+                term_out (buf);
+            }
+            int tips_total = tr + tb;
+            snprintf (buf, sizeof (buf), "mpe: ftc: RP pace: swarm needs leave+park>=16 | pollinator1 tips>=4 (%d) | pollinator2 tips>=7\n",
+                      tips_total);
+            term_out (buf);
+            return;
+        }
+        term_err ("mpe: ftc: usage: ftc biobuzz [build|spawn] | ftc biobuzz enter red|blue | ftc biobuzz score\n");
+        return;
+    }
+    term_err ("mpe: ftc: unknown subcommand (spawn|telemetry|intake|eject|shoot|balls|pieces|bucket|score|view|biobuzz)\n");
 }
