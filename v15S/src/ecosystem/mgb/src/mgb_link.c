@@ -34,6 +34,9 @@
  * resource leak in a failure path is a bug even if the process exits
  * shortly after — it is a correctness issue in any long-running caller.
  */
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE /* mkstemps (suffixed mkstemp) */
+#endif
 #define _POSIX_C_SOURCE 200809L
 #include "mgb.h"
 #include <errno.h>
@@ -245,18 +248,32 @@ mgb_session_t *mgb_spawn (const char *s2tui_path, int timeout_sec) {
     char tplt [300];
     if (snprintf (tplt, sizeof tplt, "%s/mgb_transcript_%d_XXXXXX.log", s->tmpdir, (int) pid) >= (int) sizeof tplt) {
         mgb_close (s);
-        fail_spawn (mgb_spawn_e_alloc, 0);
+        fail_spawn (mgb_spawn_e_alloc, ENAMETOOLONG);
         return NULL;
     }
-    int tfd = mkstemp (tplt);
+    /* DESPOT-2026-10-13: the P20 mkstemp call used mkstemp() on a template
+     * ending in ".log" — mkstemp requires XXXXXX LAST, so EVERY spawn died
+     * here with EINVAL (misreported as e_alloc), and the spawn-naming gates
+     * (noexec/ENOEXEC) could never pass. mkstemps(tplt, 4) keeps the .log
+     * suffix honestly. */
+    int tfd = mkstemps (tplt, 4);
     if (tfd < 0) {
+        int e = errno;
         mgb_close (s);
-        fail_spawn (mgb_spawn_e_alloc, 0);
+        fail_spawn (mgb_spawn_e_alloc, e);
         return NULL;
     }
     fchmod (tfd, 0600);
     close (tfd);
-    snprintf (s->transcript, sizeof s->transcript, "%s", tplt);
+    /* DESPOT-2026-10-13: tplt is 300B, transcript 256B — snprintf truncation
+     * would detach the unlink path from the real file (leak + wrong tail).
+     * Refuse loudly instead of truncating silently. */
+    if (snprintf (s->transcript, sizeof s->transcript, "%s", tplt) >= (int) sizeof s->transcript) {
+        unlink (tplt);
+        mgb_close (s);
+        fail_spawn (mgb_spawn_e_alloc, 0);
+        return NULL;
+    }
     FILE *log = fopen (s->transcript, "w");
     /* Did exec actually succeed? The CLOEXEC pipe closes with EOF on a good
      * exec and carries the real errno on a bad one. Non-blocking so a

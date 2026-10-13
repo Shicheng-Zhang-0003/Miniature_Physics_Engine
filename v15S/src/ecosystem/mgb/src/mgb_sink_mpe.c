@@ -18,6 +18,7 @@
 #include "core/physics_world.h"
 #include "core/rigidbody.h"
 #include "physics/spring_joint.h"
+#include "physics/constraint.h"
 #include <math.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -143,6 +144,10 @@ int mgb_sink_mpe_stage (physics_world *world, const mgb_frame_t *frame,
         c.oz = oz;
     }
     joint_init_pool (world);
+    /* DESPOT-2026-10-13: a re-stage without a full clear kept hinges from the
+     * previous stage referencing recycled ids (springs were reset, the
+     * constraint pool was not). Reset both so a second stage starts clean. */
+    constraint_pool_init (world);
     if (mgb_map (frame, &MPE_SINK, &c, mm_per_a) != 0 || c.failed) return -1;
     return c.nbodies;
 }
