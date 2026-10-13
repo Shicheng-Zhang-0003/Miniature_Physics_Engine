@@ -3,10 +3,10 @@
 
 Profiles:
   quick    Python runner-contract tests and the canonical C regression suite
-           (44 cases incl. 2 informational diags; full suite re-run under 5
+           (45 cases incl. 2 informational diags; full suite re-run under 5
            regimes default/light/heavy/brittle/sticky via MPE_TEST_REGIME).
   physics  quick + every isolated legacy case (30) and all paranoia cases (14).
-  full     physics + ASan/UBSan suite, MFS robotics (15 gated), TUI snapshots
+  full     physics + ASan/UBSan suite, MFS robotics (20 gated), TUI snapshots
            (9 files), engine build + check-flags.
 
 All run artifacts are written below the project-local temp/qa_runs directory.
@@ -14,7 +14,7 @@ This module uses only the Python standard library.
 
 Strict contract: suite cases that print [SKIP] (self-skipped coverage) fail
 the run unless --allow-skip is given; [XFAIL] markers are surfaced in the
-summary counts but never block. Registry floors: MIN_SUITE_ENTRIES=44,
+summary counts but never block. Registry floors: MIN_SUITE_ENTRIES=45,
 MIN_LEGACY_ENTRIES=30, MIN_PARANOIA_ENTRIES=14; summary contract requires
 Total == registry size and Blocking failures == 0.
 """
@@ -99,6 +99,9 @@ class Result:
 MPE_TEST_REGIMES = ("default", "light", "heavy", "brittle", "sticky")
 
 # DESPOT-2026-10-03: RAISED 42 -> 44, AND THE FLOOR IS NOW EXACT.
+# DESPOT-2026-10-13: header docstring said 44 while the floor was 45 —
+# the same drift class (docs quoting a different total than code enforces).
+# Fixed here; the floor comment below is the authority, not the docstring.
 #
 # The floor existed to stop coverage being deleted silently, but it sat BELOW
 # the real registry size, so it was blind for the two newest gates: deleting
@@ -107,7 +110,7 @@ MPE_TEST_REGIMES = ("default", "light", "heavy", "brittle", "sticky")
 # makefile help text and this file all went on quoting different totals. That
 # is the exact failure the floor was added to prevent, reproduced anyway.
 #
-# 44 = 42 blocking (physics) + 2 informational (diagnostic).
+# 45 = 43 blocking (physics) + 2 informational (diagnostic).
 #   36 pre-existing + 3 metamorphic (meta_rotation, meta_convergence,
 #   meta_config_wiring) + mouse_look_axes + body_materials_live +
 #   sleep_settle + mass_properties + reference_math + diag_naming

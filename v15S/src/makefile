@@ -472,7 +472,7 @@ ecosystem/mfs/mfs_ecosystem$(PLUGIN_EXT):
 	$(MAKE) -C ecosystem/mfs mfs_ecosystem$(PLUGIN_EXT)
 test_suite: build_suite
 	mkdir -p ../../temp
-	@echo "NOTE: test_suite runs 42 physics only (no --all); use test_suite_all / runner --profile quick for the 44 registry (42 blocking + 2 diag)."
+	@echo "NOTE: test_suite runs 43 physics only (no --all); use test_suite_all / runner --profile quick for the 45 registry (43 blocking + 2 diag)."
 	./test_mpe_suite$(EXE_EXT)
 test_suite_all: build_suite
 	mkdir -p ../../temp
