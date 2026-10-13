@@ -21,6 +21,7 @@
 #ifndef ftc_fleet_h
 #define ftc_fleet_h
 #include "submodules/robot.h"
+#include "submodules/biobuzz.h"
 struct physics_world;
 /* Spawn a robot into the fleet attached to `world`. Returns the fleet
  * index (>= 0), or -1 if no ftc-fleet module is attached, the fleet is
@@ -55,6 +56,17 @@ int ftc_bucket_clear (struct physics_world *world);
 /* Totals: carried (robot 0), tracked balls, scored, bucket active. Any out
  * pointer may be NULL. Returns 0 ok, -1 no fleet. */
 int ftc_game_stats (struct physics_world *world, int *carried, int *balls, int *scored, int *bucket_on);
+/* ---- BIOBUZZ regulation league (see submodules/biobuzz.h) ----
+ * Field/robots/balls bodies belong to the world (persist until scene
+ * clear); ids prune safely. All dlsym-safe plain-C entry points. */
+int ftc_biobuzz_field (struct physics_world *world);
+int ftc_biobuzz_match (struct physics_world *world);
+int ftc_biobuzz_preload (struct physics_world *world);
+int ftc_biobuzz_enter (struct physics_world *world, int alliance);
+int ftc_biobuzz_score (struct physics_world *world, int alliance, biobuzz_alliance_score *out);
+int ftc_biobuzz_place (struct physics_world *world, int index, float yaw);
+int ftc_biobuzz_tips (struct physics_world *world, int *red, int *blue, int *unlocked_red, int *unlocked_blue);
+int ftc_biobuzz_hive (struct physics_world *world, int hive, int out_ids [11]);
 /* ---- module plumbing (used by ftc_module.c; not application API) ---- */
 void *ftc_fleet_create (void);
 void ftc_fleet_destroy (void *fleet_state);

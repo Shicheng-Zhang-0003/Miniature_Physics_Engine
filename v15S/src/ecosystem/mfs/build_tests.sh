@@ -99,7 +99,7 @@ CORE="$SRC/core/physics_world.c $SRC/core/rigidbody.c $SRC/core/mpe_registry.c $
 # registry's own concurrency contract (a module self-detaching from inside its
 # own tick used to hang the dispatcher forever; the suite had no coverage of
 # that file at all, so the bug was only findable with a standalone probe).
-FTC="$MFS/modules/ftc/ftc_module.c $MFS/modules/ftc/ftc_fleet.c $MFS/modules/ftc/submodules/robot.c $MFS/modules/ftc/submodules/drivetrain.c $MFS/modules/ftc/submodules/intake.c $MFS/modules/ftc/submodules/motor.c $MFS/modules/ftc/submodules/motor_presets.c $MFS/modules/ftc/submodules/battery.c"
+FTC="$MFS/modules/ftc/ftc_module.c $MFS/modules/ftc/ftc_fleet.c $MFS/modules/ftc/submodules/robot.c $MFS/modules/ftc/submodules/drivetrain.c $MFS/modules/ftc/submodules/intake.c $MFS/modules/ftc/submodules/biobuzz.c $MFS/modules/ftc/submodules/motor.c $MFS/modules/ftc/submodules/motor_presets.c $MFS/modules/ftc/submodules/battery.c"
 MOD1_SRCS="$MFS/modules/module_1/mfs_module_1.c $MFS/modules/module_1/submodules/gamepad/gamepad.c"
 
 cd "$SRC" || { echo "[BUILD-FAIL] cannot cd to engine SRC=$SRC" >&2; exit 2; }

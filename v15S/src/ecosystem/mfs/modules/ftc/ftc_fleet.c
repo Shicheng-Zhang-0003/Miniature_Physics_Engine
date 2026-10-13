@@ -2,6 +2,7 @@
 #include "ftc_fleet.h"
 #include "submodules/drivetrain.h"
 #include "submodules/intake.h"
+#include "submodules/biobuzz.h"
 #include "mfs_platform.h"
 #include <stdlib.h>
 #include <string.h>
@@ -30,6 +31,10 @@ typedef struct {
     int bucket_active;
     float bucket_cx, bucket_cy, bucket_cz;
     int bucket_scored;
+    /* BIOBUZZ regulation league (see submodules/biobuzz.h): own piece
+     * registry (56 staged + headroom; the arcade 16-slot registry is
+     * untouched) + league state. Zero-init via calloc; ids prune on miss. */
+    biobuzz_state_t bb;
 } ftc_fleet_t;
 void *ftc_fleet_create (void) {
     ftc_fleet_t *f = (ftc_fleet_t *) calloc (1, sizeof (ftc_fleet_t));
@@ -357,8 +362,7 @@ int ftc_bucket_clear (struct physics_world *world) {
     f -> bucket_active = 0;
     return 0;
 }
-int ftc_game_stats (struct physics_world *world, int *carried, int *balls, int *scored, int *bucket_on) {
-    ftc_fleet_t *f = fleet_of (world);
+int ftc_game_stats (struct physics_world *world, int *carried, int *balls, int *scored, int *bucket_on) {    ftc_fleet_t *f = fleet_of (world);
     if (!world || !f) { return -1; }
     ftc_robot *r = fleet_robot_at (f, 0);
     if (carried) { *carried = r ? r -> intake_count : 0; }
@@ -366,6 +370,62 @@ int ftc_game_stats (struct physics_world *world, int *carried, int *balls, int *
     if (scored) { *scored = f -> bucket_scored; }
     if (bucket_on) { *bucket_on = f -> bucket_active; }
     return 0;
+}
+/* ---- BIOBUZZ regulation league verbs (fleet-resolved state) ---- */
+int ftc_biobuzz_field (struct physics_world *world) {
+    ftc_fleet_t *f = fleet_of (world);
+    if (!world || !f) { return -1; }
+    return biobuzz_build_field (world, &f -> bb);
+}
+int ftc_biobuzz_match (struct physics_world *world) {
+    ftc_fleet_t *f = fleet_of (world);
+    if (!world || !f) { return -1; }
+    return biobuzz_stage_match (world, &f -> bb);
+}
+int ftc_biobuzz_preload (struct physics_world *world) {
+    ftc_fleet_t *f = fleet_of (world);
+    if (!world || !f) { return -1; }
+    int chassis [32];
+    int n = (f -> count < 32) ? f -> count : 32;
+    for (int i = 0; i < n; i++) {
+        ftc_robot *r = &f -> robots [i];
+        chassis [i] = r->chassis_body;
+    }
+    return biobuzz_preload (world, &f -> bb, chassis, n);
+}
+int ftc_biobuzz_enter (struct physics_world *world, int alliance) {
+    ftc_fleet_t *f = fleet_of (world);
+    if (!world || !f) { return -1; }
+    return biobuzz_enter_nectar (world, &f -> bb, alliance);
+}
+int ftc_biobuzz_score (struct physics_world *world, int alliance, biobuzz_alliance_score *out) {
+    ftc_fleet_t *f = fleet_of (world);
+    if (!world || !f || !out) { return -1; }
+    int chassis [32];
+    int n = (f -> count < 32) ? f -> count : 32;
+    for (int i = 0; i < n; i++) { chassis [i] = f -> robots [i].chassis_body; }
+    return biobuzz_score (world, &f -> bb, f -> bb.piece_ids, f -> bb.piece_count, f -> bb.piece_is_nectar,
+                          f -> bb.piece_alliance, (biobuzz_alliance) alliance, chassis, n, out);
+}
+int ftc_biobuzz_place (struct physics_world *world, int index, float yaw) {
+    ftc_fleet_t *f = fleet_of (world);
+    ftc_robot *r = fleet_robot_at (f, index);
+    if (!world || !r) { return -1; }
+    biobuzz_place_robot (world, r, yaw);
+    return 0;
+}
+int ftc_biobuzz_tips (struct physics_world *world, int *red, int *blue, int *unlocked_red, int *unlocked_blue) {    ftc_fleet_t *f = fleet_of (world);
+    if (!world || !f) { return -1; }
+    if (red) { *red = f -> bb.tips [0]; }
+    if (blue) { *blue = f -> bb.tips [1]; }
+    if (unlocked_red) { *unlocked_red = f -> bb.unlocked [0]; }
+    if (unlocked_blue) { *unlocked_blue = f -> bb.unlocked [1]; }
+    return 0;
+}
+int ftc_biobuzz_hive (struct physics_world *world, int hive, int out_ids [11]) {
+    ftc_fleet_t *f = fleet_of (world);
+    if (!world || !f || !out_ids) { return -1; }
+    return biobuzz_hive_ids (&f -> bb, hive, out_ids);
 }
 /* Per-tick game update: intake capture/carry per robot, ball aero, bucket
  * scoring. Same pre-integration tick position as motor forces. Inert when
@@ -380,6 +440,12 @@ static void ftc_game_update (struct physics_world *world, ftc_fleet_t *f, float 
         if (r -> intake_on || r -> intake_count > 0) {
             intake_update (world, ch -> position, ch -> orientation, ch -> velocity, r -> intake_on,
                            r -> intake_balls, &r -> intake_count, f -> ball_ids, f -> ball_count);
+            /* BIOBUZZ registry: same mouth, same possession (carried cap 4
+             * == regulation preload max). Arcade registry untouched. */
+            if (f -> bb.piece_count > 0) {
+                intake_update (world, ch -> position, ch -> orientation, ch -> velocity, r -> intake_on,
+                               r -> intake_balls, &r -> intake_count, f -> bb.piece_ids, f -> bb.piece_count);
+            }
             intake_carry_step (world, ch -> position, ch -> orientation, ch -> velocity, r -> intake_balls,
                                r -> intake_count);
         } else {
@@ -387,6 +453,7 @@ static void ftc_game_update (struct physics_world *world, ftc_fleet_t *f, float 
         }
     }
     if (f -> ball_count > 0) { intake_balls_aero_step (world, f -> ball_ids, f -> ball_count); }
+    if (f -> bb.piece_count > 0) { intake_balls_aero_step (world, f -> bb.piece_ids, f -> bb.piece_count); }
     /* Prune dangling ball ids (scene cleared under us): compact live. */
     {
         int w = 0;
@@ -397,6 +464,27 @@ static void ftc_game_update (struct physics_world *world, ftc_fleet_t *f, float 
         for (int i = w; i < INTAKE_MAX_BALLS; i++) { f -> ball_ids [i] = -1; }
         f -> ball_count = w;
     }
+    /* BIOBUZZ registry prune (parallel arrays compact together). */
+    {
+        int w = 0;
+        for (int i = 0; i < f -> bb.piece_count; i++) {
+            int id = f -> bb.piece_ids [i];
+            if (id >= 0 && physics_world_index_by_id (world, (uint32_t) id) >= 0) {
+                f -> bb.piece_ids [w] = id;
+                f -> bb.piece_is_nectar [w] = f -> bb.piece_is_nectar [i];
+                f -> bb.piece_alliance [w] = f -> bb.piece_alliance [i];
+                w++;
+            }
+        }
+        for (int i = w; i < BIOBUZZ_MAX_PIECES; i++) {
+            f -> bb.piece_ids [i] = -1;
+            f -> bb.piece_is_nectar [i] = 0;
+            f -> bb.piece_alliance [i] = -1;
+        }
+        f -> bb.piece_count = w;
+    }
+    /* BIOBUZZ league tick: tip census (re-pose + spill + unlock). */
+    biobuzz_tick (world, &f -> bb, f -> bb.piece_ids, f -> bb.piece_count, f -> bb.piece_is_nectar, dt);
     /* Bucket scoring: mouth-entry counting. Any tracked dynamic ball whose
      * centre enters the zone volume SCORES (no speed gate: a swish at speed
      * is still a basket, and dead walls (e=0) stop it anyway; the gate that
