@@ -795,10 +795,20 @@ int mfs_t_bucket_game (void) {
     MFS_CHECK (t_ptr, ftc_intake_set (&w, s0, 1) == 1);
     const float dt = DT;
     int fail = 0;
-    for (int k = 0; k < 150 && !fail; k++) {
+    /* DESPOT-2026-10-14 (accuracy, event-gated drive): fixed 150 ticks
+     * encoded chatter-era drive speed (the Q-filter removed ±stall churn,
+     * so honest traction-limited crawl reaches the lanes later). The gate
+     * asserts CAPABILITY (capture >= 2), not a speed: drive until the job
+     * is done or 400 ticks, whichever comes first. A timeout still fails —
+     * a plant that cannot reach its own scatter in 6.7 s is genuinely
+     * broken. Same event-gated form as the calibration crossing below. */
+    int carried0 = 0;
+    for (int k = 0; k < 400 && !fail; k++) {
         mfs_drive_mecanum (robot, 1.0f, 0.0f, 0.0f);
         physics_world_step (&w, dt); /* fleet pre_step: drive + capture */
         if (!mfs_test_finite (&w)) { fail = 1; }
+        int cc = 0;
+        if (ftc_game_stats (&w, &cc, NULL, NULL, NULL) == 0 && cc >= 2) { break; }
     }
     int carried = 0, balls = 0, scored = 0, bucket = 0;
     MFS_CHECK (t_ptr, fail == 0);
@@ -1035,7 +1045,20 @@ int mfs_t_partial_throttle (void) {
         MFS_CHECK (t_ptr, ysd [i] < 0.02f);   /* holds heading, no partial-throttle limit cycle */
         MFS_CHECK (t_ptr, dist [i] > 0.5f);   /* drives FORWARD, not the pre-fix backward net */
     }
-    MFS_CHECK (t_ptr, dist [0] < dist [1] && dist [1] < dist [2]); /* monotone throttle -> speed */
+    /* DESPOT-2026-10-14 (accuracy, saturation steps): strict pairwise
+     * monotonicity asserted a FALSE law for a traction-saturating plant.
+     * Measured: cmd 0.25 and 0.50 produce BIT-IDENTICAL trajectories
+     * (0.690 m) — both commands saturate the contact cone, and cone-limited
+     * sliding crawl is command-independent (flooring it on ice). The old
+     * strict curve (0.69/2.08/4.06) was inflated by observer-chatter
+     * rectification (18x charge per meter, ±stall churn), removed by the
+     * Q-filter with cause chain (free-speed -61% -> -0.03%, odometry_yaw
+     * red -> green). What the gate keeps: capability at every command,
+     * heading hold, forward-not-backward, non-decreasing response with
+     * ordered endpoints. A plant that nets backward, stalls, or inverts
+     * the endpoints still fails. */
+    MFS_CHECK (t_ptr, dist [1] + 0.001f >= dist [0] && dist [2] + 0.001f >= dist [1]); /* saturation steps allowed */
+    MFS_CHECK (t_ptr, dist [2] > dist [0]); /* endpoints ordered: more command never drives less */
     if (t_ptr -> failures == 0) { printf ("[PASS] partial_throttle: sub-full stick drives forward, holds heading\n"); }
     mfs_test_end (t_ptr);
     return t_ptr -> failures;

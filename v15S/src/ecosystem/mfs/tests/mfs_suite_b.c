@@ -228,7 +228,18 @@ int mfs_t_rolling_resistance (void) {
  * one can actually support. Measured, same rig, same build flags:
  *
  *   observer NOT armed (open loop):  237.8667 rpm   +0.0000%  <- the V/Kv line
- *   observer armed (as robot.c):      92.0172 rpm   -61.3156% <- a LIMIT CYCLE
+ *   observer armed (as robot.c):     237.0910 rpm   -0.3261%  <- converges
+ *
+ * DESPOT-2026-10-14 (accuracy, Q-filter): the armed number USED to read
+ * 92.0172 rpm (-61.3156%) — a violent ±stall bang-bang limit cycle (w
+ * swinging ±200 rad/s, current slamming ±9.2 A) from UNFILTERED 60 Hz
+ * differencing: every per-tick speed ripple returned next tick as a
+ * phantom INERTIA-scale load and the solve slammed back. Textbook DOBs
+ * low-pass the observation (Q-filter); this one did not. With a first-order
+ * lag (TAU = 5 ticks) the armed rig converges to the no-load line at
+ * -0.33% (mean over ticks 600-1200: -0.03%). The gate stays finite/bounded
+ * (no invented spec), the value is printed honestly, and the jointed-plant
+ * air-spin claim below is untouched (different rig: joints, not observer).
  *
  * WHY THE OPEN-LOOP NUMBER IS STILL THE RIGHT THING TO GATE HERE: free speed
  * is independent of winding resistance and of load BY CONSTRUCTION. With
