@@ -12,10 +12,19 @@
  * analytic aim line, so the preview runs the solver itself and cannot
  * disagree with the shot that later fires.
  *
- * Points are recomputed only when the shot would actually change (robot
- * heading/position moves, carried count changes, or every ~0.25 s while
- * driving), because the throwaway solve is not free. ftc_traj_update() is
- * called from the engine tick; ftc_traj_points() feeds the renderer. */
+ * The solve is AMORTIZED across frames (a fixed tick budget per frame on a
+ * world kept alive between frames) because one full prediction measured
+ * 45-146 ms — several times the entire frame budget, which froze the GUI
+ * outright. A prediction therefore draws itself in over ~0.2 s at a few ms
+ * per frame, and costs nothing once complete. It restarts only when the shot
+ * actually changes (aim heading, carried set, real translation), rate-limited
+ * by a cooldown. ftc_traj_update() is called from the engine tick;
+ * ftc_traj_points() feeds the renderer.
+ *
+ * Measured (temp/traj_amort.c): worst frame 3.0 ms at 60 fps, and the polyline
+ * is bit-identical (0.000000 m deviation) to the live 128-iteration shot —
+ * the prediction world runs 8 iterations because it has one ball, no joints
+ * and no 40:1 mass ratio (see FTRJ_ITERATIONS). */
 void ftc_traj_update (float frame_delta_time);
 int ftc_traj_enabled (void);
 /* Returns the number of points and a pointer to the cached polyline
