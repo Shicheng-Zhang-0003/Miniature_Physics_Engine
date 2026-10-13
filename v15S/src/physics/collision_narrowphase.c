@@ -317,20 +317,30 @@ static void clip_obb_faces (rigidbody *ref_body, rigidbody *inc_body, vector3 no
                 if (taken)
                     continue;
                 /* Fan area about the current centroid of kept points.
-                 * DESPOT-2026-10-13 degeneracy: with keep_count==1 the
-                 * centroid IS keep[0], so e2==0 and every candidate scores
-                 * area 0 — the second pick is first-untaken in clip order,
-                 * not farthest/max-area, and picks 3-4 maximize against that
-                 * arbitrary pair. Support-polygon order dependence; affects
-                 * stack rocking at the margin. Disclosed here, not fixed:
-                 * the farthest-point reseed (Ericson/Box2D) is ticketed. */
+                 * FIXED 2026-10-14 (was DESPOT-2026-10-13 ticketed): with
+                 * keep_count==1 the centroid IS keep[0], so e2==0 and every
+                 * candidate scored area 0 — first-untaken clip-order pick.
+                 * The keep_count<2 branch above reseeds by farthest point. */
                 vector3 sum = vector3_zero ();
                 for (int k = 0; k < keep_count; k++) {
                     sum = simd_add (sum, cand [keep [k]]);
                 } vector3 centroid = simd_scale (sum, 1.0f / (float) keep_count);
-                vector3 e1 = simd_sub (cand [i], centroid);
-                vector3 e2 = simd_sub (cand [keep [0]], centroid);
-                float area = fabsf (vector3_dot (vector3_cross (e1, e2), ref_normal));
+                float area = 0.0f;
+                if (keep_count < 2) {
+                    /* FIX-AUDIT 2026-10-14 (accuracy): reseed the pair by
+                     * farthest point (Ericson RTCD 7.3.4 / Box2D 2-point
+                     * reduction spirit): the second kept point is the
+                     * candidate farthest from keep[0], so picks 3-4 maximize
+                     * fan area against a spanning pair instead of an
+                     * arbitrary clip-order neighbor. Near-planar clips make
+                     * 3D distance equivalent to in-plane distance. */
+                    vector3 d = simd_sub (cand [i], cand [keep [0]]);
+                    area = vector3_dot (d, d);
+                } else {
+                    vector3 e1 = simd_sub (cand [i], centroid);
+                    vector3 e2 = simd_sub (cand [keep [0]], centroid);
+                    area = fabsf (vector3_dot (vector3_cross (e1, e2), ref_normal));
+                }
                 if (area > best_area) {
                     best_area = area;
                     best = i;
