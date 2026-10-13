@@ -156,12 +156,15 @@ void a3_positional_depenetrate_manifold_w (struct physics_world *world, collisio
     if (correction_magnitude <= 0.0f) { return; }
     if (correction_magnitude > C -> depenetration.max_correction) { correction_magnitude = C -> depenetration.max_correction; }
     vector3 correction_vector = simd_scale (manifold -> normal_vector, correction_magnitude);
+    /* DESPOT-2026-10-13: the post-correction wake used a literal 0.01 while
+     * the pre-wake gates on C->depenetration.wake_depth_thresh, so setting
+     * the knob to 0.1 still woke at 0.01 (knob lie). One knob, one meaning. */
     if (inverse_mass_a > 0.0f) {
         body_a -> position = simd_sub (body_a -> position, simd_scale (correction_vector, inverse_mass_a));
-        if (correction_magnitude > 0.01f) { rigidbody_wake (body_a); }
+        if (correction_magnitude > C -> depenetration.wake_depth_thresh) { rigidbody_wake (body_a); }
     }
     if (inverse_mass_b > 0.0f) {
         body_b -> position = simd_add (body_b -> position, simd_scale (correction_vector, inverse_mass_b));
-        if (correction_magnitude > 0.01f) { rigidbody_wake (body_b); }
+        if (correction_magnitude > C -> depenetration.wake_depth_thresh) { rigidbody_wake (body_b); }
     }
 }

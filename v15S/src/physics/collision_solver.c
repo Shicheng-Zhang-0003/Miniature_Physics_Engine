@@ -1032,6 +1032,11 @@ void collision_apply_rolling_resistance (collision_data *manifolds, int manifold
             contact_point_data *cp = &man -> contacts [i];
             if (cp -> accumulated_normal_impulse <= 0.0f) { continue; }
             {
+                /* DESPOT-2026-10-13: N is read AFTER Poisson, so bouncing
+                 * contacts (e>0) draw rolling torque from the restitution
+                 * impulse — Coulomb rolling M=μNR should use compression N
+                 * only. Resting contacts (the gated regime) are unaffected;
+                 * bouncers get extra spin decay for one tick. Ticketed. */
                 float normal_force = cp -> accumulated_normal_impulse / dt;
                 rigidbody *bodies [2] = {man -> object_a, man -> object_b};
                 vector3 rlev [2] = {cp -> ra, cp -> rb};
@@ -1049,7 +1054,12 @@ void collision_apply_rolling_resistance (collision_data *manifolds, int manifold
                      * failed rolling_decay (15.8m vs 4-14m). Roll and spin
                      * are different physics: roll resists translation via
                      * R, spin resists yaw via patch. Slop zero-depth gets
-                     * pen_eff=0.5mm floor so resting spin still decays. */
+                     * pen_eff=0.5mm floor so resting spin still decays.
+                     * DESPOT-2026-10-13: that 0.5mm floor MANUFACTURES
+                     * overlap for zero-depth contacts (non-conservative,
+                     * silent) and uses pre-solve penetration, not the
+                     * post-split residual. Kept: without it resting yaw
+                     * never decays. Bounded, not derived. */
                     float pen_raw = (cp -> penetration > 0.0f) ? cp -> penetration : 0.0f;
                     float pen_eff = (pen_raw > 0.0005f) ? pen_raw : 0.0005f;
                     float r_eff = sqrtf (vector3_length_squared (rlev [bi]));
@@ -1109,19 +1119,28 @@ void collision_apply_split_impulse (collision_data *manifolds, int manifold_coun
     float beta = C -> solver.bias_factor;
     float max_bias_vel = C -> solver.max_separation_bias;
     /* TRUTH: runtime clamps survive old config files with huge caps.
-     * slop 0..5cm, beta 0..1, bias vel <=10 m/s. */
-    if (!isfinite (slop) || slop < 0.0f) { slop = 0.01f; }
-    if (slop > 0.05f) { slop = 0.05f; }
-    if (!isfinite (beta) || beta < 0.0f) { beta = 0.0f; }
-    if (beta > 1.0f) { beta = 1.0f; }
-    if (!isfinite (max_bias_vel) || max_bias_vel < 0.0f) { max_bias_vel = 5.0f; }
-    if (max_bias_vel > 10.0f) { max_bias_vel = 10.0f; }
+     * slop 0..5cm, beta 0..1, bias vel <=10 m/s.
+     * DESPOT-2026-10-13: counted (mpe_clamp_solver_events) — a clamp that
+     * rewrites the physics silently is indistinguishable from one that did
+     * not happen. E.g. slop=0.1->0.05 halves tolerance non-conservatively. */
+    if (!isfinite (slop) || slop < 0.0f) { mpe_note_solver_clamp ("split slop", (double) slop, 0.01); slop = 0.01f; }
+    if (slop > 0.05f) { mpe_note_solver_clamp ("split slop", (double) slop, 0.05); slop = 0.05f; }
+    if (!isfinite (beta) || beta < 0.0f) { mpe_note_solver_clamp ("split beta", (double) beta, 0.0); beta = 0.0f; }
+    if (beta > 1.0f) { mpe_note_solver_clamp ("split beta", (double) beta, 1.0); beta = 1.0f; }
+    if (!isfinite (max_bias_vel) || max_bias_vel < 0.0f) {
+        mpe_note_solver_clamp ("split max_bias_vel", (double) max_bias_vel, 5.0);
+        max_bias_vel = 5.0f;
+    }
+    if (max_bias_vel > 10.0f) { mpe_note_solver_clamp ("split max_bias_vel", (double) max_bias_vel, 10.0); max_bias_vel = 10.0f; }
     const float max_corr = max_bias_vel * dt;
     /* Shared wake depth (see the wake site below). Clamped to the same
      * [0, 0.1] the schema registers it with. */
     float wake_depth = C -> depenetration.wake_depth_thresh;
-    if (!isfinite (wake_depth) || wake_depth < 0.0f) { wake_depth = 0.02f; }
-    if (wake_depth > 0.1f) { wake_depth = 0.1f; }
+    if (!isfinite (wake_depth) || wake_depth < 0.0f) {
+        mpe_note_solver_clamp ("split wake_depth", (double) wake_depth, 0.02);
+        wake_depth = 0.02f;
+    }
+    if (wake_depth > 0.1f) { mpe_note_solver_clamp ("split wake_depth", (double) wake_depth, 0.1); wake_depth = 0.1f; }
     for (int m = 0; m < manifold_count; m++) {
         collision_data *man = &manifolds [m];
         rigidbody *body_a = man -> object_a;

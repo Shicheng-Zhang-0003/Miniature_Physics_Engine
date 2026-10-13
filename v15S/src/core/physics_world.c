@@ -40,15 +40,25 @@ static void mpe_parallel_sanitize (physics_world *world) {
     int n = world -> body_count;
     if (n <= 0) { return; }
     const char *env = getenv ("MPE_THREADS");
-    int threads = env ? atoi (env) : 1;
+    /* DESPOT-2026-10-13: atoi() is UB-adjacent on overflow garbage and gives
+     * no error signal. strtol + clamp; unparseable -> 1 (serial). */
+    int threads = 1;
+    if (env) {
+        char *end = NULL;
+        long tv = strtol (env, &end, 10);
+        if ((end != env) && (*end == '\0') && (tv >= 1) && (tv <= 8)) { threads = (int) tv; } else if ((end != env) && (*end == '\0')) {
+            threads = (tv < 1) ? 1 : 8;
+        }
+    }
     if (threads < 1) { threads = 1; }
     if (threads > 8) { threads = 8; }
     if ((threads <= 1) || (n < 64)) {
         for (int i = 0; i < n; i++) {
             rigidbody_sanitize (&world -> bodies [i]);
         } return;
-    } pthread_t tids [8];
+    } pthread_t tids [8] = {0};
     mpe_slice_t slices [8];
+    memset (slices, 0, sizeof (slices));
     int chunk = (n + threads - 1) / threads;
     int launched = 0;
     for (int t = 0; t < threads; t++) {
@@ -1000,8 +1010,13 @@ void physics_world_step (physics_world *world, float dt) {
      * wall) instead of substepping. Substepping would preserve time at the
      * cost of unbounded catch-up work; clamping bounds work and keeps every
      * tick at fixed dt (determinism's first requirement). Time dilation
-     * under extreme lag is documented behavior, not hidden. */
-    if (dt > 0.1f) { dt = 0.1f; }
+     * under extreme lag is documented behavior, not hidden.
+     * DESPOT-2026-10-13: counted — twins with different lag histories used
+     * to diverge silently with no budget anywhere. */
+    if (dt > 0.1f) {
+        mpe_note_solver_clamp ("step dt", (double) dt, 0.1);
+        dt = 0.1f;
+    }
     /* DESPOT-2026-10-08 threading: per-body sanitize is order-independent
      * (disjoint writes). MT when MPE_THREADS>1 and n>=64, else serial.
      * Bitwise identical either way. */

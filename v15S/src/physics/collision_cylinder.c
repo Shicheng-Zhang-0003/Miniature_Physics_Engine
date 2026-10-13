@@ -430,6 +430,14 @@ bool collision_cylinder_cube (rigidbody *cyl, rigidbody *cube, collision_data *o
                  * primary use case and broke list4_cylinder_floor and
                  * paranoia_cylinder_collision. One condition is correct. */
                 (void) far_y;
+                /* DESPOT-2026-10-13 minimal-exit exception: an EMBEDDED
+                 * cylinder (centre between the faces) is always pushed out
+                 * the near face, even when the far exit is the minimal
+                 * translation (Gottschalk/Ericson minimal-exit). The generic
+                 * segment-OBB path would pick the true closest face; this
+                 * shortcut hijacks it whenever the near face is reached.
+                 * Resting/impacting contacts (the gated regime) are
+                 * unaffected — only deep embedment takes the long way out. */
                 int reaches_near_face = (up_sign >= 0.0f) ? (cyl_high >= plane_y - slop) : (cyl_low <= plane_y + slop);
                 if (reaches_near_face) { return collision_static_plane_cylinder (cube, cyl, plane_y, out, C); }
             }
@@ -763,7 +771,12 @@ bool collision_cylinder_cylinder (rigidbody *cyl_a, rigidbody *cyl_b, collision_
             contact_point_data *cp0 = &out -> contacts [0];
             cp0 -> penetration = (axial_gap < 0.0f) ? -axial_gap : 0.0f;
             cp0 -> position = mid;
-            /* Second point for stable face support (offset toward rim). */
+            /* Second point for stable face support (offset toward rim).
+             * DESPOT-2026-10-13: copies cp0 depth unchecked against the
+             * overlap disc — for laterally-offset near-coaxial pairs the
+             * mid+perp·min_r·0.5 point can lie outside the smaller cap, a
+             * phantom support at full depth. No disc-containment clamp.
+             * Coaxial stacks (the gated regime) are centred and unaffected. */
             float min_r = (cyl_a -> radius < cyl_b -> radius) ? cyl_a -> radius : cyl_b -> radius;
             if ((min_r > 0.05f) && (out -> contact_count < 4)) {
                 vector3 perp =

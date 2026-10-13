@@ -311,7 +311,15 @@ bool mpe_config_save (const char *path) {
             slash [1] = '\0';
         } else {
             *slash = '\0';
-        } int dir_fd = open (parent, O_RDONLY);
+        } int dir_fd =
+#ifdef MPE_OS_WINDOWS
+            open (parent, O_RDONLY);
+#else
+            open (parent, O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+#endif
+        /* DESPOT-2026-10-13: O_DIRECTORY|O_NOFOLLOW so a symlinked status/
+         * dir fsyncs loudly-failed instead of the wrong directory (rename
+         * itself is unaffected; durability warn preserved best-effort). */
         if (dir_fd >= 0) {
             if (fsync (dir_fd) != 0) { fprintf (stderr, "[config] warning: parent-directory sync failed for '%s'\n", path); }
             if (close (dir_fd) != 0) { fprintf (stderr, "[config] warning: parent-directory close failed for '%s'\n", path); }

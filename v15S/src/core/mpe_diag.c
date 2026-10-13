@@ -6,6 +6,7 @@
 #include "event_log.h"
 #include "mpe_platform.h"
 #include <pthread.h>
+#include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
@@ -177,9 +178,11 @@ const mpe_diag_record *mpe_diag_ring_at (int index) {
 }
 int mpe_diag_total (void) {
     pthread_mutex_lock (&g_lock);
-    int n = (int) g_seq;
+    /* DESPOT-2026-10-13: (int)g_seq is UB past 2^31 records. Saturate —
+     * practically unreachable, but a counter must not be the UB. */
+    long n = (g_seq > (uint64_t) INT_MAX) ? INT_MAX : (long) g_seq;
     pthread_mutex_unlock (&g_lock);
-    return (n);
+    return ((int) n);
 }
 int mpe_diag_count_level (mpe_diag_level level) {
     int n = 0;

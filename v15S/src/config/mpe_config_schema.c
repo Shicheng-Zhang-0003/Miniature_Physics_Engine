@@ -159,7 +159,7 @@ static mpe_param s_registry [] = {
      &g_cfg.joints.soft_spring_k, 20.0, 1.0, 5000.0, false},
     {"joints.soft_damping", "Soft Damping", "Damping coefficient for soft joints", p_float, cat_joints,
      &g_cfg.joints.soft_damping, 1.0, 0.0, 100.0, false},
-    {"joints.revolute_beta", "Revolute Beta", "Baumgarte beta for revolute point-to-point", p_float, cat_joints,
+    {"joints.revolute_beta", "Revolute Beta", "Shared joint anchor bias (revolute P2P + prismatic-perp + rope + distance; axis/fixed drift use fixed 0.1 by design)", p_float, cat_joints,
      &g_cfg.joints.revolute_beta, 0.3, 0.0, 1.0, true},
     {"joints.revolute_max_bias", "Revolute Max Bias",
      "Cap on revolute anchor bias speed (m/s); bounds per-tick energy injection on large gaps", p_float, cat_joints,

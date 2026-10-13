@@ -50,6 +50,9 @@
 _Atomic unsigned long mpe_clamp_mass_events = 0;
 _Atomic unsigned long mpe_clamp_radius_events = 0;
 _Atomic unsigned long mpe_clamp_half_length_events = 0;
+/* DESPOT-2026-10-13: solver-runtime substitution counter (split-impulse
+ * slop/beta/bias caps, step dt>0.1 clamp). Same bounded discipline. */
+_Atomic unsigned long mpe_clamp_solver_events = 0;
 static void mpe_note_clamp (const char *kind, _Atomic unsigned long *counter, double requested, double stored) {
     unsigned long n = __atomic_fetch_add (counter, 1ul, __ATOMIC_RELAXED) + 1ul;
     /* Bounded: first 8 occurrences, then every 1000th. Enough to be seen
@@ -61,6 +64,9 @@ static void mpe_note_clamp (const char *kind, _Atomic unsigned long *counter, do
                  "(occurrence %lu)\n",
                  kind, requested, stored, stored / requested, n);
     }
+}
+void mpe_note_solver_clamp (const char *kind, double requested, double stored) {
+    mpe_note_clamp (kind, &mpe_clamp_solver_events, requested, stored);
 } /* Exact free-flight integration under constant gravity + linear viscous drag.
  * The config 'drag' is a VELOCITY RETENTION FACTOR per second (0 to 1).
  * Continuous ODE: dv/dt = -c*v + g, where c = -ln(drag) [1/s], g = gravity vector.
@@ -815,7 +821,12 @@ void rb_integrate_velocity (rigidbody *rigid_body, float delta_time, float linea
                     w = cand;
                     /* The rotor for this dt is tiny (|w|*dt ~ 0.06 rad), so
                      * 1e-4 relative is far below float resolution of the
-                     * orientation and is reached in a few passes. */
+                     * orientation and is reached in a few passes.
+                     * DESPOT-2026-10-13: the scale is |L|, not the iterated
+                     * |Δw|/|w| — heavy/slow bodies (large L, tiny Δw) pass
+                     * early, light/fast converge late. Silent tolerance with
+                     * no gate; bounded here rather than fixed because the
+                     * live plant converges in a few passes either way. */
                     if (step < 1e-4f * (vector3_length (L) + 1.0f)) {
                         converged = 1;
                         break;
@@ -902,8 +913,14 @@ void rb_integrate_velocity (rigidbody *rigid_body, float delta_time, float linea
  */
     {
         vector3 alpha_ext = rigid_body -> angular_acceleration;
-        /* Midpoint angular velocity: the implicit step is what makes the
-         * stiff case stable, and it costs one extra cross product. */
+        /* Midpoint angular velocity.
+         * DESPOT-2026-10-13 wording correction: this is an EXPLICIT
+         * midpoint (RK2-split), not implicit — w_mid advances by the
+         * external torque only (w+α_ext·dt/2) and the gyro term is
+         * evaluated once at w_mid. A true implicit midpoint would solve
+         * w'=w+dt·f((w+w')/2) by iteration (Press). For torque-free
+         * bodies α_ext=0 so w_mid==w and it degenerates to explicit Euler
+         * (the L fixed-point path above is what actually conserves). */
         vector3 w_mid = simd_add (rigid_body -> angular_velocity, simd_scale (alpha_ext, 0.5f * delta_time));
         math3 list4_gyro_rotation = vector4_to_math3 (rigid_body -> orientation);
         math3 list4_gyro_rotation_t = math3_transposition (list4_gyro_rotation);
@@ -923,7 +940,14 @@ void rb_integrate_velocity (rigidbody *rigid_body, float delta_time, float linea
          * -- a per-tick 20% perturbation that broke angular-momentum
          * conservation (2.7% drift in 2 s on a torque-free tumbling box).
          * The implicit midpoint step above is what actually makes stiff
-         * needles (Ixx << Iyy) stable; this only catches a corrupt state. */
+         * needles (Ixx << Iyy) stable; this only catches a corrupt state.
+         *
+         * DESPOT-2026-10-13 bound on "never binds": |α_gyro|~|w|^2·ΔI/I_small,
+         * so a needle (Ixx<<Iyy) at high |w| CAN exceed 4|w|/dt and be
+         * truncated non-conservatively with no counter (e.g. |w|=100,
+         * ΔI/I~10 → α~1e5 vs max 2.4e4 at 1/60). Benign tumblers measure
+         * 0.0000% movement. Treat 4·|w|/dt as a guard with a known extreme-
+         * regime exception, not a proof. */
         {
             float wlen = vector3_length (rigid_body -> angular_velocity);
             float alen = vector3_length (list4_gyro_alpha);
@@ -1347,4 +1371,5 @@ void mpe_clamp_counters_reset (void) {
     __atomic_store_n (&mpe_clamp_mass_events, 0ul, __ATOMIC_RELAXED);
     __atomic_store_n (&mpe_clamp_radius_events, 0ul, __ATOMIC_RELAXED);
     __atomic_store_n (&mpe_clamp_half_length_events, 0ul, __ATOMIC_RELAXED);
+    __atomic_store_n (&mpe_clamp_solver_events, 0ul, __ATOMIC_RELAXED);
 }

@@ -219,6 +219,12 @@ static inline math3 rigidbody_effective_inv_inertia (const rigidbody *rb) {
 extern _Atomic unsigned long mpe_clamp_mass_events;
 extern _Atomic unsigned long mpe_clamp_radius_events;
 extern _Atomic unsigned long mpe_clamp_half_length_events;
+/* DESPOT-2026-10-13: runtime solver clamps (split-impulse slop/beta/bias,
+ * step dt>0.1) used to rewrite config silently with only a code comment.
+ * They now count here too, with the same bounded-stderr discipline, so a
+ * fixture can assert zero and an operator can see the substitution. */
+extern _Atomic unsigned long mpe_clamp_solver_events;
+void mpe_note_solver_clamp (const char *kind, double requested, double stored);
 void mpe_clamp_counters_reset (void);
 static inline unsigned long mpe_clamp_mass_total (void)
     { return __atomic_load_n (&mpe_clamp_mass_events, __ATOMIC_RELAXED); }
@@ -226,4 +232,6 @@ static inline unsigned long mpe_clamp_radius_total (void)
     { return __atomic_load_n (&mpe_clamp_radius_events, __ATOMIC_RELAXED); }
 static inline unsigned long mpe_clamp_half_length_total (void)
     { return __atomic_load_n (&mpe_clamp_half_length_events, __ATOMIC_RELAXED); }
+static inline unsigned long mpe_clamp_solver_total (void)
+    { return __atomic_load_n (&mpe_clamp_solver_events, __ATOMIC_RELAXED); }
 #endif

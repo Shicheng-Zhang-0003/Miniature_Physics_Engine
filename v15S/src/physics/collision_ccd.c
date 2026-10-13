@@ -420,7 +420,12 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
      * remainder analytic (from v_toi, via the tick_v0 snapshot taken after
      * CCD) composes to exactly analytic(dt) from v_pre. Rotation already
      * composes (w*toi + w*rem); this makes translation match. Volume TOIs
-     * (derived linearly) overshoot by <=0.5*g*toi^2 < slop: absorbed. */
+     * (derived linearly) overshoot by <=0.5*g*toi^2 < slop: absorbed.
+     * DESPOT-2026-10-13 bound: that inequality holds at canonical dt=1/60
+     * (1.4mm < 10mm slop). At clamped dt=0.1 with torture g~50 it is 0.25m
+     * >> slop — linear-derived volume TOIs + analytic chaining mismatch
+     * unbounded in the degraded regime. Documented corner (CCD + high-g +
+     * lag-clamp), not solved. */
     int clamped = 0;
     if (record_remainder) {
         const mpe_config_t *CC = C;

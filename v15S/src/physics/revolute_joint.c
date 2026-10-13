@@ -1034,6 +1034,11 @@ void fixed_correct_angular_drift (fixed_params *p, rigidbody *body_a, rigidbody 
     }
     vector3 err_vec = {q_err.x, q_err.y, q_err.z};
     if (vector3_length_squared (err_vec) < 1e-12f) { return; }
+    /* DESPOT-2026-10-13: hard 0.1, deliberately NOT joints.revolute_beta.
+     * revolute_beta already drives 5 joint types (revolute P2P, prismatic-
+     * perp, rope, distance + limits); wiring the drift passes to it couples
+     * every hinge's axis stiffness to the anchor bias. Separate knob by
+     * design; the shared-key naming is the honest wart (see schema help). */
     const float beta = 0.1f;
     /* Correction angular velocity in A-frame, rotated to world via A. */
     vector3 corr_local = simd_scale (err_vec, 2.0f * beta / dt);
@@ -1076,6 +1081,8 @@ void revolute_correct_axis_drift (revolute_params *p, rigidbody *body_a, rigidbo
     float axis_error_len_sq = vector3_length_squared (axis_error);
     if (axis_error_len_sq > 0.000001f) {
         /* Baumgarte stabilization: apply angular velocity correction proportional to axis_error */
+        /* DESPOT-2026-10-13: hard 0.1 like the fixed-weld drift above —
+         * same reason (decoupled from the shared joints.revolute_beta). */
         const float axis_baumgarte_beta = 0.1f; /* MFS_127: reduced from 0.2 to reduce oscillation */
         vector3 axis_correction = simd_scale (axis_error, axis_baumgarte_beta / dt);
         /* Compute effective angular mass for the correction */

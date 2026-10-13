@@ -316,7 +316,14 @@ static void clip_obb_faces (rigidbody *ref_body, rigidbody *inc_body, vector3 no
                 }
                 if (taken)
                     continue;
-                /* Fan area about the current centroid of kept points. */
+                /* Fan area about the current centroid of kept points.
+                 * DESPOT-2026-10-13 degeneracy: with keep_count==1 the
+                 * centroid IS keep[0], so e2==0 and every candidate scores
+                 * area 0 — the second pick is first-untaken in clip order,
+                 * not farthest/max-area, and picks 3-4 maximize against that
+                 * arbitrary pair. Support-polygon order dependence; affects
+                 * stack rocking at the margin. Disclosed here, not fixed:
+                 * the farthest-point reseed (Ericson/Box2D) is ticketed. */
                 vector3 sum = vector3_zero ();
                 for (int k = 0; k < keep_count; k++) {
                     sum = simd_add (sum, cand [keep [k]]);
@@ -522,6 +529,11 @@ bool collision_dual_cube (rigidbody *cube_a, rigidbody *cube_b, collision_data *
         float parallel_alignment = fabsf (bb);
         float contact_spread = fminf (edge_extent_a, edge_extent_b) * 0.5f;
         if ((parallel_alignment > 0.95f) && (contact_spread > 0.05f)) {
+            /* DESPOT-2026-10-13: the 0.05 spread gate means boxes with
+             * min(half-extent)<=0.1 never earn the 2nd parallel-edge contact
+             * — single-point support, zero lever arm, scale-dependent
+             * tipping. Silent, no telemetry. Small-box piles are the regime
+             * that pays. Ticketed, not silently re-tuned. */
             float t_offsets [2];
             t_offsets [0] = t_a - contact_spread;
             t_offsets [1] = t_a + contact_spread;
