@@ -116,3 +116,15 @@ Despot-1004h: external cross-ref (Box2D position pass, Bullet hinge ERP)
   for axis alignment; in-loop axis bias tried at 0.3 and 0.1, both move
   MFS drive baselines non-monotonically -> REVERTED with record; joint
   position-correction pass budgeted as its own task. Full 232 pass + 2 xfail (total 234).
+
+Despot-1013: full math/programming/operational sweep + regression A/B
+  (pristine-HEAD stash for every behavioral change). MGB-MKSTEMPS: P20's own
+  mkstemp broke every spawn (XXXXXX not last -> EINVAL always, misnamed
+  e_alloc) — fixed with mkstemps, mgb_mpe_test 30/2 -> 32/32. P11 cast class
+  re-closed x4 via shared helper (was static in one TU). v200 joint drops now
+  loud (per-pool veto + counted commits). :e jailed + loud; TUI builders
+  guarded; solver/dt clamps counted; depenetration single-knob wake; 14 math
+  honesty notes at source. Self-inflicted paranoia_config SIGSEGV (missing
+  stdlib.h) caught by the profile. MFS tank/odom + ASan loader reds proven
+  pre-existing by stash A/B. Quick 59/59, physics 104/105 (legacy-f11 only),
+  tui-smoke PASS. Docs: DESPOT_AUDIT_2026-10-13, guarantees extended.

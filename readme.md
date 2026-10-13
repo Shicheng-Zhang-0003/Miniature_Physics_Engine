@@ -364,7 +364,24 @@ make
 
 ## 📜 Version History
 
-- **v15S (current head) — 2026-10-09: diagnostics + S2 bridge.** `core/mpe_diag.h`
+- **v15S (current head) — 2026-10-13: despot sweep (truth + hardening).**
+  Headline: the 2026-10-12 P20 `mkstemp` hardening broke every S2 bridge
+  spawn (`mkstemp` on a template ending in `.log` fails `EINVAL` always,
+  misreported as out-of-memory) — fixed with `mkstemps`, `mgb_mpe_test`
+  32/32 (was 30/2). Solver-runtime clamps (split-impulse slop/beta/bias,
+  step `dt>0.1`) are now counted (`mpe_clamp_solver_events`) like input
+  clamps instead of comment-only. Terminal integer-verb hardening completed
+  (shared safe-narrow helper; `xxd`/display-path OOB closed), v200 joint
+  commits count drops loudly, microvim `:e` jailed + failure-loud, TUI
+  builders guard pool exhaustion, depenetration wakes on one knob, and every
+  audit finding carries a source honesty note (gyro explicit-midpoint
+  wording, clip-pick degeneracy, rolling-N + patch bounds, CCD corner,
+  oracle circularity). Suite still 45/43 green; quick 59/59; physics 104/105
+  (`legacy-f11_torture` pre-existing); tui-smoke PASS. MFS `tank` +
+  `odometry_yaw` red verified bit-identical on pristine `HEAD` (pre-existing,
+  not this sweep). Full record:
+  [`v15S/docs/DESPOT_AUDIT_2026-10-13.md`](v15S/docs/DESPOT_AUDIT_2026-10-13.md).
+- **v15S — 2026-10-09: diagnostics + S2 bridge.** `core/mpe_diag.h`
   makes every rejection name itself (subsystem, stable code, engine
   `file:line`, runtime values), fanned out to stderr, the event log and the
   debug terminal; `diag` replays the ring. Distinct return codes for every

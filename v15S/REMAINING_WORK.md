@@ -1,26 +1,41 @@
 # Remaining Work
 
 > Live TODO. Dated history below is preserved; current counts/gates are in
-> `docs/DESPOT_AUDIT_2026-10-12.md` (quick 59/59; physics 104/105 with the
-> single red the pre-existing `legacy-f11_torture`; TUI smoke PASS with the
-> new overflow gate). Prior notes: 2026-10-09 counts in `RELEASE_GATES.md`
-> (45 registered / 43 blocking; full 226 total, 220 passed, 6 blocking, 4
-> informational); 2026-10-07 (44/42; 232+2 xfail/234); 2026-10-01 (41/42).
+> `docs/DESPOT_AUDIT_2026-10-13.md` (quick 59/59; physics 104/105 with the
+> single red the pre-existing `legacy-f11_torture`; TUI smoke PASS; MGB
+> 32/32; MFS 16/20 gated bit-identical to pristine). Prior notes: 2026-10-12
+> counts in `docs/DESPOT_AUDIT_2026-10-12.md` (same headlines; MGB was 30/2
+> there — the mkstemp bug below had not been found); 2026-10-09 counts in
+> `RELEASE_GATES.md` (45 registered / 43 blocking; full 226 total, 220 passed,
+> 6 blocking, 4 informational); 2026-10-07 (44/42; 232+2 xfail/234);
+> 2026-10-01 (41/42).
 >
-> **2026-10-12 despot sweep closed:** P1 OOB attach/detach, P2 config
-> `mkstemp`, P3 suite scene stubs, P4 MFS SKIP contract, P5 pair-overflow
-> gates (F10 + TUI), P6 CCD margin race, P7 step-counter atomics, P8 legacy
-> joint bound + revision bump, P11 terminal safe int casts, P13 Windows batch,
-> P15 TUI overflow FAIL, P16 torture-snapshot guard, P17 degenerate-config
-> assert (narrowed to solver-off after brittle caught the over-gate), P20 MGB
-> `mkstemp` + symlink refusal, P21 `cd` guard; M1 restitution oracle, M3
-> manifold area metric, M4 clamp-counter atomics, M10 bias-factor help, M12
-> Hertz label. Open/bounded items are ticketed in
-> `docs/DESPOT_AUDIT_2026-10-12.md` (warm-start carry, Gottschalk depth,
-> oblique-L oracle, per-phase friction, TSan, MSVC, MT solve, jail, joint
-> codes, state hash, `MATH_G_N`, drag oracle, angmom vector, ellipse,
-> `-Werror` CI). Twin drift (`461-MFS`, `472-MGB`) pre-exists and is tracked
-> there, not fixed here.
+> **2026-10-13 despot sweep closed:** MGB-MKSTEMPS (P20's own `mkstemp` broke
+> every spawn with EINVAL — 32/32 now); P11 cast recurrence ×4 (shared helper
+> promoted to `term_priv.h`); `mod ls` count guard; v200 joint-commit
+> accounting (per-pool veto + loud drops); microvim `:e` whitelist + failure
+> propagation; TUI builder guards; `ftc_traj` narrowing; `term_id_buffer`
+> heap-local; dir-fsync `O_NOFOLLOW`; `paranoia_config` TMPDIR isolation;
+> MGB dual-pool stage reset; `MPE_THREADS` strtol; `mpe_diag_total`
+> saturation; solver-clamp + dt-clamp counters; depenetration single-knob
+> wake; joint-beta help truth; N1/N2/N3/N4/N5/N6/N7/N9/N10/N11/N12 honesty
+> notes; runner docstring + makefile NOTE counts; Windows batch TMPDIR.
+> Self-inflicted `paranoia_config` SIGSEGV (missing `<stdlib.h>`) caught by
+> the profile and fixed. Open/bounded items are ticketed in
+> `docs/DESPOT_AUDIT_2026-10-13.md` (clip reseed, compression-N rolling,
+> per-phase friction, warm-start carry, Gottschalk depth, oblique-L oracle,
+> TSan, MSVC, MT solve, jail, joint codes, state hash, `MATH_G_N` (halfway:
+> paranoia T3 pins `g_n`), drag oracle, angmom vector, ellipse, `-Werror` CI,
+> `vi` CWD-confinement, `:e` staged load, 472 P20+mkstemps forward-port).
+> Twin drift (`461-MFS`, `472-MGB`) pre-exists and is tracked there, not
+> fixed here — except the documented 472 patch sketch below.
+>
+> **472 forward-port sketch (P20 + MKSTEMPS, separate repo — apply there):**
+> in `472-MGB/src/mgb_link.c`, replace the predictable
+> `snprintf(.../mgb_transcript_%d.log)+fopen` with the 475 form (`mkstemps`
+> with `XXXXXX.log` + `0600` + `lstat` refusal + truncation guard + errno
+> preservation). Do NOT copy the bare-`mkstemp` form (that was the bug).
+> The 472 `test_mgb` noexec gates will prove it.
 
 ## Open 2026-10-09 — S2 bridge, diagnostics, and three known reds
 

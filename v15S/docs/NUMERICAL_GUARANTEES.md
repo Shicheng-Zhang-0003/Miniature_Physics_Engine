@@ -13,11 +13,18 @@ exact IEEE `+ - * / sqrt` + fixed-coefficient polynomials (`det_math.h`) +
 - Rotation: exp-map rotor `q(dt)=[cos(|w|dt/2), w/|w|·sin]⊗q`, renormalized.
   Torque-free: L fixed-point (8 passes, falls through); converged 0.0028%/2 s
   (gate 0.5%), fallback ~2.7%/2 s. Sphere control in `angmom` settles the
-  cube tension.
+  cube tension. Gyro is EXPLICIT-midpoint (RK2-split: midpoint in external
+  torque, Euler in gyro — not implicit despite the old comment); torque-free
+  degenerates to explicit (the L path is what conserves). Gyro clamp
+  `4·|w|/dt` binds for needles at high spin (non-conservative cut there).
+  L-tolerance scales with `|L|`, not `|Δw|` (heavy/slow pass early).
 - Inertias exact: sphere `(2/5)mr²`, box `(m/12)(h²+d²)`, cylinder axial
   `½mr²` + transverse `(m/12)(3r²+L²)`, axle X.
 - SAT-15 + S-H clip exact; slop admission `pen≥-slop→0` (Box2D linearSlop).
-  Candidate 4-point max-area greedy is heuristic (keeps 4, measured).
+  Candidate 4-point max-area greedy is heuristic (keeps 4, measured) AND
+  degenerate at keep_count==1 (centroid==keep[0] → all areas 0 → clip-order
+  pick; farthest-point reseed ticketed). Parallel-edge 2nd contact gated by
+  `spread>0.05` (small boxes ≤0.1 stay single-point — scale-dependent tip).
 - Sequential impulse exact per Catto; every manifold visited 2× per iteration
   (knob undercounts 2×). No warm start on any row (cold normal, cone-killed
   tangent); 96-128 iters for 10-high stack (12-30× Catto 4-8). Buckling guard
@@ -25,17 +32,30 @@ exact IEEE `+ - * / sqrt` + fixed-coefficient polynomials (`det_math.h`) +
 - Coulomb: isotropic disc exact; ellipse strict generalisation; rail exact
   zero-set. Combined `min(μa,μb)` (NOT Box2D `√`), up to 42% lower. Tick-start
   `snap_friction_mu`; breakaway 0.999-1.005 μs·N across dt/iters/μ.
+  In-tick stick/slip transitions mis-solve by up to `(μs−μk)·Fn` (whole-tick
+  freeze is the documented hack; per-phase re-snapshot ticketed).
 - Poisson `e·C` + Newton bound, impact-refresh post-integration, paid once.
 - Split impulse translational-only (deepest-only, mass-weighted, slop-gated,
   β-scaled, capped, no velocity touch). Per-contact angular tried twice,
   measured worse, reverted. Deep containment (>0.30 m) moves lighter only.
+  Runtime caps (slop 0..0.05, beta 0..1, bias ≤10) are COUNTED
+  (`mpe_clamp_solver_events`, bounded stderr) — a substitution you can see.
+  Step `dt>0.1` clamp likewise counted (time dilation under lag, documented).
 - CCD: q-form TOI + floor quadratic + slab sweep + symmetric two-phase +
   analytic chaining. Mover tip `|w|·R` + world obstacle margin
   `max|w|·R` (capped 2 m/s). Obstacle rotation beyond the margin (fast blade)
-  unsupported: substep or bound tip speed externally.
+  unsupported: substep or bound tip speed externally. Overshoot bound
+  `≤0.5·g·toi²<slop` holds at canonical dt only (0.25m at dt=0.1+g≈50).
 - Rolling: Hertz-patch + spin, mass-weighted split is TUNE (band 4-14 m only).
+  N is post-Poisson (bouncers draw from restitution impulse — ticketed);
+  0.5mm `pen_eff` floor manufactures overlap for zero-depth spin decay.
+- Joints: `joints.revolute_beta` is the SHARED anchor bias (revolute P2P +
+  prismatic-perp + rope + distance); axis/fixed drift use fixed 0.1 by design
+  (decoupled). Cyl-slab shortcut exits near-face always (embedded takes the
+  long way — minimal-exit exception); cyl-cyl 2nd point unchecked vs cap disc.
 - Sleep: three-gate wake (pair novelty + fast-other + deep); settled stacks
-  sleep, slow pushers wake at any speed.
+  sleep, slow pushers wake at any speed. Post-correction wake uses the same
+  `wake_depth_thresh` knob as pre-wake (single meaning, since 2026-10-13).
 - Broadphase O(n) hash, swept AABB + tip-speed, 1M node cap + overflow
   telemetry (nonzero = do not trust the tick). SIMD: full lane-wise op set
   (add/sub/scale/cross, SSE2/MSVC-intrin/scalar-fallback) wired through all
