@@ -58,7 +58,12 @@ void cmd_mod (int argc, char **argv) {
         physics_world *w = physics_world_get_primary ();
         snprintf (buf, sizeof (buf), "attached to primary: %d\n", w ? w -> tick_module_count : 0);
         term_out (buf);
-        if (w)
+        /* DESPOT-2026-10-13 (P1 recurrence at display path): validate the
+         * count before indexing. attach/detach refuse E_COUNT, but `mod ls`
+         * runs on any world incl. a never-init one with a garbage count. */
+        if (w && ((w -> tick_module_count < 0) || (w -> tick_module_count > MPE_MAX_TICK_MODULES))) {
+            term_err ("mpe: mod: primary tick_module_count corrupt (refusing to list; re-init the world)\n");
+        } else if (w)
             for (int i = 0; i < w -> tick_module_count; i++) {
             snprintf (buf, sizeof (buf), "  %s\n", w -> tick_modules [i] ? w -> tick_modules [i] -> name : "?");
             term_out (buf);
@@ -108,6 +113,10 @@ void cmd_mod (int argc, char **argv) {
             term_err ("mpe: mod: not a tick module (no hooks; nothing to attach)\n");
             return;
         } physics_world *pw = physics_world_get_primary ();
+        if (pw && ((pw -> tick_module_count < 0) || (pw -> tick_module_count > MPE_MAX_TICK_MODULES))) {
+            term_err ("mpe: mod: primary tick_module_count corrupt (refusing to scan; re-init the world)\n");
+            return;
+        }
         for (int i = 0; i < (pw ? pw -> tick_module_count : 0); i++) {
             if (pw -> tick_modules [i] && term_str_eq (pw -> tick_modules [i] -> name, argv [2])) {
                 term_ok ("mpe: mod: already attached\n");

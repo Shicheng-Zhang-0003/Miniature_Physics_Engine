@@ -52,7 +52,7 @@ void cmd_top (int argc, char **argv) {
     for (int argument_index = 1; argument_index < argc; argument_index++) {
         if (term_str_eq (argv [argument_index], "-n") && (argument_index + 1 < argc)) {
             float parsed_limit = 0.0f;
-            if (term_parse_float (argv [argument_index + 1], &parsed_limit)) { limit = (int) parsed_limit; }
+            if (term_parse_float (argv [argument_index + 1], &parsed_limit)) { limit = term_float_to_int_safe (parsed_limit, 10, 1, 16); }
         }
     }
     if (limit < 1) { limit = 1; }

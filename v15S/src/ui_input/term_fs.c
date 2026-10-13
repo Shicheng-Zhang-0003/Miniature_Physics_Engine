@@ -12,7 +12,9 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
-static uint32_t term_id_buffer [mpe_max_bodies];
+/* DESPOT-2026-10-13: the old file-static term_id_buffer was shared mutable
+ * scratch with no lock (same plain-static shape as P6/P7). Batch deletes now
+ * use a per-invocation heap buffer sized by argc (one id per token max). */
 void cmd_help (int argc, char **argv) {
     (void) argc;
     (void) argv;
@@ -147,6 +149,8 @@ void cmd_rm (int argc, char **argv) {
         term_err ("usage: rm [-rf] <path...>\n");
         return;
     } int delete_count = 0;
+    uint32_t *delete_ids = (argc > 1) ? (uint32_t *) malloc (sizeof (uint32_t) * (size_t) (argc - 1)) : NULL;
+    if ((argc > 1) && (!delete_ids)) { term_err ("mpe: rm: out of memory\n"); return; }
     for (int argument_index = 1; argument_index < argc; argument_index++) {
         if (argv [argument_index][0] == '-') { continue; }
         const char *target = argv [argument_index];
@@ -183,16 +187,17 @@ void cmd_rm (int argc, char **argv) {
         } else {
             int object_index = term_object_from_token (target);
             if (object_index >= 0) {
-                if (delete_count < mpe_max_bodies) { term_id_buffer [delete_count++] = (physics_world_get_primary () -> bodies) [object_index].object_id; }
+                if (delete_count < argc - 1) { delete_ids [delete_count++] = (physics_world_get_primary () -> bodies) [object_index].object_id; }
             } else { term_printf ("term_err", "mpe: %s: No such object\n", target); }
         }
     }
     if (delete_count > 0) {
         for (int delete_index = 0; delete_index < delete_count; delete_index++) {
-            int object_index = scene_find_object_index_by_id (term_id_buffer [delete_index]);
+            int object_index = scene_find_object_index_by_id (delete_ids [delete_index]);
             if (object_index >= 0) { scene_remove_object_by_index (object_index); }
         } term_printf ("term_ok", "removed %d object(s)\n", delete_count);
     }
+    free (delete_ids);
 }
 void cmd_mv (int argc, char **argv) {
     if (argc < 3) {
@@ -307,6 +312,10 @@ void cmd_kill (int argc, char **argv) {
             kill_action = kill_term;
         } argument_index = 2;
     } int delete_count = 0;
+    int kill_cap = argc - argument_index;
+    if (kill_cap < 0) { kill_cap = 0; }
+    uint32_t *kill_ids = (kill_cap > 0) ? (uint32_t *) malloc (sizeof (uint32_t) * (size_t) kill_cap) : NULL;
+    if ((kill_cap > 0) && (!kill_ids)) { term_err ("mpe: kill: out of memory\n"); return; }
     for (; argument_index < argc; argument_index++) {
         const char *target = argv [argument_index];
         if (term_is_all_token (target)) {
@@ -348,13 +357,14 @@ void cmd_kill (int argc, char **argv) {
             rigidbody_wake (rigid_body);
             term_printf ("term_ok", "continued /obj/%d\n", object_index);
         } else {
-            if (delete_count < mpe_max_bodies) { term_id_buffer [delete_count++] = rigid_body -> object_id; }
+            if (delete_count < kill_cap) { kill_ids [delete_count++] = rigid_body -> object_id; }
         }
     }
     if (delete_count > 0) {
         for (int delete_index = 0; delete_index < delete_count; delete_index++) {
-            int object_index = scene_find_object_index_by_id (term_id_buffer [delete_index]);
+            int object_index = scene_find_object_index_by_id (kill_ids [delete_index]);
             if (object_index >= 0) { scene_remove_object_by_index (object_index); }
         } term_printf ("term_ok", "killed %d object(s)\n", delete_count);
     }
+    free (kill_ids);
 }

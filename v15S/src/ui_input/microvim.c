@@ -14,6 +14,10 @@
 #define mv_view_height 40
 #define mv_undo_depth 64
 #define mv_max_line_len 4096
+/* DESPOT-2026-10-13: whitelist lives in term_admin.c (cmd_vi gate). The in-
+ * editor `:e <file>` path must enforce the same gate — otherwise `:e
+ * /etc/passwd` reads arbitrary files past the vi entry check. */
+bool mv_file_is_allowed (const char *filepath);
 /* ------------------------------------------------------------------ */
 /* State                                                                */
 /* ------------------------------------------------------------------ */
@@ -647,7 +651,31 @@ setting a flag that microvim_render will pick up */
         mv.quit_requested = true;
     } else if (cmd [0] == 'e' && cmd [1] == ' ') {
         if (!mv.modified || (cmd [2] == '!')) {
-            mv_load_file (cmd + 2);
+            /* Copy out of mv.command_buf FIRST: cmd aliases it, so a later
+             * snprintf into mv.command_buf while reading cmd+2 would be a
+             * restrict-violating overlapping copy (-Wrestrict). */
+            char new_path [512];
+            strncpy (new_path, cmd + 2 + ((cmd [2] == '!') ? 1 : 0), sizeof (new_path) - 1);
+            new_path [sizeof (new_path) - 1] = '\0';
+            /* DESPOT-2026-10-13: same whitelist as `vi`. The old code called
+             * mv_load_file() unchecked (arbitrary-file read) and ignored its
+             * bool return (failed load masqueraded as empty success, undo
+             * cleared, follow-on :w wrote foreign content over old file). */
+            if (!mv_file_is_allowed (new_path)) {
+                mv.command_len = snprintf (mv.command_buf, sizeof (mv.command_buf), "E492: not an editable file");
+                mv.mode = mv_command;
+                return;
+            }
+            char old_name [sizeof (mv.filename)];
+            memcpy (old_name, mv.filename, sizeof (old_name));
+            if (!mv_load_file (new_path)) {
+                mv.command_len =
+                    snprintf (mv.command_buf, sizeof (mv.command_buf), "E492: could not load '%s' (kept '%s')", new_path, old_name);
+                mv.mode = mv_command;
+                return;
+            }
+            strncpy (mv.filename, new_path, sizeof (mv.filename) - 1);
+            mv.filename [sizeof (mv.filename) - 1] = '\0';
             if (mv.line_count == 0) {
                 microvim_close ();
                 return;

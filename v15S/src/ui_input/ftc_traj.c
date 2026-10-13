@@ -34,6 +34,8 @@
 #include "../ecosystem/mfs/modules/ftc/submodules/intake.h"
 #include "../ecosystem/mfs/modules/ftc/submodules/robot.h"
 #include <math.h>
+#include <limits.h>
+#include <stdio.h>
 #include <string.h>
 /* Bundle identity mirrors term_ftc.c / gamepad_drive.c / ftc_view.c. */
 #define FTRJ_HANDLE_PRIMARY "mfs-simulator"
@@ -246,7 +248,16 @@ void ftc_traj_update (float frame_delta_time) {
     }
     /* Advance the simulation by a fixed tick budget and extend the polyline. */
     const int pi = s_ball_index;
-    int pred_id = (int) s_pred.bodies [pi].object_id;
+    /* DESPOT-2026-10-13: p_aero's ABI takes const int* ids, but object_id is
+     * uint32_t. The old (int) narrow went negative past INT_MAX and stalled
+     * prediction forever via the pred_id<0 return. IDs are allocator-small in
+     * practice; refuse loudly instead of stalling silently. */
+    uint32_t pred_uid = s_pred.bodies [pi].object_id;
+    if (pred_uid > (uint32_t) INT_MAX) {
+        fprintf (stderr, "[ftc_traj] prediction ball id %u exceeds int range (aborting prediction)\n", pred_uid);
+        return;
+    }
+    int pred_id = (int) pred_uid;
     if (pred_id < 0) {
         return;
     }

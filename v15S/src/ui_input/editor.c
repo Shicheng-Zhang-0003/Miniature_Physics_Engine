@@ -144,6 +144,9 @@ void editor_update_menus (GtkWidget *parent_window) {
         float iters =
             open_numerical_input_dialog (parent_window, "Solver Iterations", (float) g_cfg.timestep.solver_iterations);
         editor_reacquire_mouse (parent_window);
+        /* DESPOT-2026-10-13: NaN passes both range checks (all NaN
+         * comparisons false) and (int)NaN is UB. Non-finite keeps current. */
+        if (!isfinite (iters)) { iters = (float) g_cfg.timestep.solver_iterations; }
         if (iters < 1.0f) { iters = 1.0f; }
         if (iters > 128.0f) { iters = 128.0f; }
         g_cfg.timestep.solver_iterations = (int) iters;

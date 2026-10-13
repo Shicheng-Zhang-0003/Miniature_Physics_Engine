@@ -252,18 +252,20 @@ void cmd_xxd (int argc, char **argv) {
     for (int i = 2; i < argc; i++) {
         if (term_str_eq (argv [i], "-l") && (i + 1 < argc)) {
             float v = 0.0f;
-            if (term_parse_float (argv [i + 1], &v)) { dump_length = (int) v; }
+            /* DESPOT-2026-10-13: safe narrow (raw (int)v is UB on 1e30). */
+            if (term_parse_float (argv [i + 1], &v)) { dump_length = term_float_to_int_safe (v, (int) sizeof (rigidbody), 0, (int) sizeof (rigidbody)); }
             i++;
         } else if (term_str_eq (argv [i], "-s") && (i + 1 < argc)) {
             float v = 0.0f;
-            if (term_parse_float (argv [i + 1], &v)) { dump_offset = (int) v; }
+            if (term_parse_float (argv [i + 1], &v)) { dump_offset = term_float_to_int_safe (v, 0, 0, (int) sizeof (rigidbody)); }
             i++;
         }
     } int struct_size = (int) sizeof (rigidbody);
-    if (dump_offset >= struct_size) {
+    if ((dump_offset < 0) || (dump_offset >= struct_size)) {
         term_err ("mpe: xxd: offset beyond struct size\n");
         return;
     }
+    if (dump_length < 0) { dump_length = 0; }
     if (dump_offset + dump_length > struct_size) { dump_length = struct_size - dump_offset; }
     if (dump_length <= 0) { dump_length = struct_size - dump_offset; }
     const unsigned char *raw = (const unsigned char *) &(physics_world_get_primary () -> bodies) [object_index];
@@ -395,7 +397,8 @@ void cmd_head (int argc, char **argv) {
     for (int i = 1; i < argc; i++) {
         if (term_str_eq (argv [i], "-n") && (i + 1 < argc)) {
             float v = 0.0f;
-            if (term_parse_float (argv [i + 1], &v)) { line_count = (int) v; }
+            /* DESPOT-2026-10-13: safe narrow (raw (int)v is UB on 1e30). */
+            if (term_parse_float (argv [i + 1], &v)) { line_count = term_float_to_int_safe (v, 10, 1, 1000000); }
             i++;
         } else if (strstr (argv [i], "joint")) { list_joints = true; }
     }
@@ -427,7 +430,7 @@ void cmd_tail (int argc, char **argv) {
     for (int i = 1; i < argc; i++) {
         if (term_str_eq (argv [i], "-n") && (i + 1 < argc)) {
             float v = 0.0f;
-            if (term_parse_float (argv [i + 1], &v)) { line_count = (int) v; }
+            if (term_parse_float (argv [i + 1], &v)) { line_count = term_float_to_int_safe (v, 10, 1, 1000000); }
             i++;
         } else if (strstr (argv [i], "joint")) { list_joints = true; }
     }

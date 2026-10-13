@@ -149,6 +149,16 @@ bool term_parse_float (const char *token, float *output_value) {
     * output_value = parsed_value;
     return true;
 }
+/* DESPOT-2026-10-13: shared safe float->int narrow (see term_priv.h). */
+int term_float_to_int_safe (float v, int dflt, int lo, int hi) {
+    if (!isfinite (v))
+        return dflt;
+    if (v < (float) lo)
+        return lo;
+    if (v > (float) hi)
+        return hi;
+    return (int) v;
+}
 int term_object_from_token (const char *token) {
     if (!token) { return -1; }
     if (term_str_eq (token, "sel") || term_str_eq (term_last_path_component (token), "sel")) {

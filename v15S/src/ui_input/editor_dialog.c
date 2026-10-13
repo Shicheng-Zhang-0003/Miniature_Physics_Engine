@@ -1,5 +1,6 @@
 /* GTK4-PREP: GTK3 preserved under #else; GTK4 implementation follows. */
 #include "../mpe_engine.h"
+#include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -35,7 +36,10 @@ static void editor_dialog_on_ok (GtkButton *button, gpointer user_data) {
     const char *text = gtk_editable_get_text (GTK_EDITABLE (state -> entry));
     char *endptr = NULL;
     float parsed = strtof (text, &endptr);
-    if ((endptr != text) && (*endptr == '\0')) { editor_dialog_quit_with_result (state, parsed, TRUE); } else { editor_dialog_quit_with_result (state, state -> current_value, TRUE); }
+    /* DESPOT-2026-10-13: strtof overflow yields HUGE_VALF (Inf) with full
+     * match, so a finite check is required here — not just syntax. Non-finite
+     * keeps the current value instead of poisoning g_cfg/bodies. */
+    if ((endptr != text) && (*endptr == '\0') && isfinite (parsed)) { editor_dialog_quit_with_result (state, parsed, TRUE); } else { editor_dialog_quit_with_result (state, state -> current_value, TRUE); }
 }
 static void editor_dialog_on_cancel (GtkButton *button, gpointer user_data) {
     (void) button;

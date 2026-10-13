@@ -59,6 +59,11 @@ bool term_str_eq (const char *string_a, const char *string_b);
 const char *term_last_path_component (const char *token);
 bool term_is_all_token (const char *token);
 bool term_parse_float (const char *token, float *output_value);
+/* DESPOT-2026-10-13: (int)float is UB on overflow (finite 1e30 passes
+ * term_parse_float, which rejects only non-finite). Shared helper: non-finite
+ * -> dflt, then clamp to [lo,hi] BEFORE narrowing so the cast is in-range.
+ * Defined in debug_terminal.c; all terminal integer verbs must use it. */
+int term_float_to_int_safe (float v, int dflt, int lo, int hi);
 int term_object_from_token (const char *token);
 int term_joint_from_token (const char *token);
 term_target_kind term_classify_token (const char *token);

@@ -139,18 +139,9 @@ static int64_t posix_monotonic_time (void) {
     clock_gettime (CLOCK_MONOTONIC, &ts);
     return (int64_t) ts.tv_sec * 1000000LL + ts.tv_nsec / 1000LL;
 }
-/* DESPOT-2026-10-12 P11: (int)float is UB on overflow (NaN/1e30). All
- * terminal integer verbs go through here: non-finite -> default, then clamp
- * to [lo,hi] BEFORE the narrowing cast, so the cast itself is in-range. */
-static int term_float_to_int_safe (float v, int dflt, int lo, int hi) {
-    if (!isfinite (v))
-        return dflt;
-    if (v < (float) lo)
-        return lo;
-    if (v > (float) hi)
-        return hi;
-    return (int) v;
-}
+/* DESPOT-2026-10-12 P11 (+2026-10-13 promotion): terminal integer verbs go
+ * through the shared term_float_to_int_safe() (term_priv.h /
+ * debug_terminal.c) so the narrowing cast is always in-range. */
 bool all_targets_matched_any (int argc, char **argv) {
     for (int i = 2; i < argc; i++) {
         if (term_is_all_token (argv [i])) { return true; }
@@ -274,7 +265,7 @@ void cmd_sed (int argc, char **argv) {
             if (!is_numeric) {
                 term_err ("mpe: sed: nice requires numeric value\n");
                 continue;
-            } int nice_val = (int) new_value;
+            } int nice_val = term_float_to_int_safe (new_value, 0, -20, 19);
             if (nice_val < -20) { nice_val = -20; }
             if (nice_val > 19) { nice_val = 19; }
             rb -> nice_value = nice_val;
