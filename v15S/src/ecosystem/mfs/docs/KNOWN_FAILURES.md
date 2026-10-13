@@ -228,6 +228,16 @@ fabricated-tank-target failure retracted on 2026-09-29.
 This is the blocker for [MOTOR-I]/[MOTOR-II], and fixing it revealed a second
 problem. Recorded 2026-09-29.
 
+> DESPOT-2026-10-14 status note (read first): the free-speed observer-armed
+> number quoted anywhere as "-61.3% limit cycle" is RETIRED for the
+> free-speed rig — with the Q-filter (first-order lag, TAU = 5 ticks, on
+> the differenced observation) the armed rig converges to the no-load line
+> at -0.33% (mean -0.03% over ticks 600-1200), and `odometry_yaw` went red
+> green on the same change. What follows is UNTOUCHED by that fix: the
+> shaping-vs-raw gap below is quasi-steady (passes straight through any
+> low-pass), and the jointed-plant air-spin claim lives in its own entry.
+> Do not conflate them.
+
 - **Defect:** the observer computes
   `tau_L = I*(w - w_prev)/dt - tau_exp_prev`, and `tau_exp_prev` is the RAW
   unshaped `Kt*I*gear*eff` (`motor.c:228`). The torque actually delivered is
@@ -262,8 +272,52 @@ problem. Recorded 2026-09-29.
   re-applied; doing it in the other order destabilises the stall endpoint, and
   doing both at once zeroes drive entirely (measured: strafe transmit 0.00 m).
 
-## [MOTOR-PARTIAL] Off-full-throttle driven-path limit cycle (FIXED 2026-10-12)
+## [OBSERVER-Q] Unfiltered disturbance observation was bang-bang (FIXED 2026-10-14)
 
+**Defect:** `motor_observe()` published raw 60 Hz differencing
+(`I*dw/dt - tau_exp`) with no low-pass. Every per-tick speed ripple
+(joint impulses, clamp steps, quantization) returned next tick as a
+phantom INERTIA-scale load; the implicit solve slammed back. Measured on
+the isolated free-speed rig (observer armed, as `robot.c`): ±stall
+current alternation, shaft swinging ±200 rad/s around a 92 rpm mean
+(-61.3% off the 237.87 no-load line). Textbook DOBs carry a Q-filter;
+this one had none.
+
+**Fix:** first-order lag on the observation (TAU = 5 ticks, alpha 1/6) in
+`motor_observe()`; the implicit solve and the blocked-rotor gate consume
+the filtered value (the gate's definitional override stays immediate).
+New state `load_torque_filt` (zero-init; `motor_reset_observer` clears
+it). Measured: armed rig converges to -0.33% (mean -0.03%), currents stay
+within ±1.5 A, and `odometry_yaw` (red on yaw magnitude) went green on
+the same change with nothing else touched.
+
+**Blast radius, adjudicated (not asserted):** `tank` moved (2.37→2.78
+heading, 0.043→0.118 translation) and stays RED — it was red, it is red,
+no baseline touched. `partial_throttle` and `bucket_game` went red
+because their numbers encoded chatter-era interaction (18x charge per
+meter; identical-saturation crawl now reads honestly) — re-derived with
+cause chains in their gate comments, not re-baselined. The traction-cut
+latch the filter exposed is documented below.
+
+## [CUT-LATCH] Traction-cut recovery cannot fire under smooth signals (BOUNDED 2026-10-14)
+
+**Defect:** recovery needs `over < 2.0`, but cut torque itself sustains
+the spin it condemns (wheels hold 5-7 rad/s on 0.15 torque while the
+chassis crawls), so `over` never dips: measured bit-identical 0.690 m
+trajectories at cmd 0.25 and 0.50 (cone-saturated sliding crawl).
+Pre-filter chatter accidentally pumped recovery (oscillation dipped
+`over` regularly). A 3-tick debounce of the slam was tried and REVERTED
+with cause: it broke `drive_directions` cross-talk and heading hold —
+slam immediacy is load-bearing for directional purity.
+
+**Bounded (not solved):** a 20-tick probe (`+0.2` regardless, re-slam on
+genuine burnout) guarantees escape without touching slam immediacy.
+Genuine burnout sees 1/20 probe duty. The cone-saturation identity itself
+(flooring it on ice gives the same slide) is honest plant physics, and
+`partial_throttle` now gates saturation-tolerant laws (capability at
+every command, ordered endpoints) instead of a false strict monotone.
+
+## [MOTOR-PARTIAL] Off-full-throttle driven-path limit cycle (FIXED 2026-10-12)
 Distinct from [MOTOR-III] (the observer still books shaping as load; that deeper
 coupling is untouched). This was a **clamp-domain bug** in `motor_update_load`:
 
