@@ -1040,3 +1040,410 @@ int mfs_t_partial_throttle (void) {
     mfs_test_end (t_ptr);
     return t_ptr -> failures;
 }
+/* biobuzz_field: regulation geometry (Manual V1 §9). Anchors: field half
+ * 1.8288 (144 in), wall height 0.3048 (12 in) with inner faces exact,
+ * pivot 1.1165 (43.95 in), cell gap 18.8 in spacing, openings 20x14x12 in,
+ * flower top 4 in dia at 21.5 in, zones per §9.3/§9.5. Self-consistency
+ * (mirror symmetry, counts) for derived nominals — never asserted as spec. */
+int mfs_t_biobuzz_field (void) {
+    mfs_test_t t;
+    mfs_test_begin (&t, "biobuzz_field");
+    mfs_test_t *t_ptr = &t;
+    physics_world w;
+    mfs_test_world (&w);
+    extern const mpe_module_desc_t mpe_module_desc;
+    MFS_CHECK (t_ptr, physics_world_attach_module (&w, &mpe_module_desc) >= 0);
+    MFS_CHECK (t_ptr, ftc_biobuzz_field (&w) == 0);
+    /* Idempotent rebuild must succeed too. */
+    MFS_CHECK (t_ptr, ftc_biobuzz_field (&w) == 0);
+    int fail = 0;
+    /* Floor: half == 1.8288, top == 0. */
+    {
+        int found = 0;
+        for (int i = 0; i < w.body_count; i++) {
+            rigidbody *b = &w.bodies [i];
+            if (!b -> static_state && !(b -> mass == 0.0f)) { continue; }
+            float top = b -> position.y + b -> half_extensions.y;
+            if (fabsf (top) < 0.01f && fabsf (b -> half_extensions.x - 1.8288f) < 0.02f &&
+                fabsf (b -> half_extensions.z - 1.8288f) < 0.02f) { found = 1; }
+        }
+        MFS_CHECK (t_ptr, found == 1);
+    }
+    /* Walls: inner faces at ±1.8288 (±0.02), height 0.3048 (±0.01). */
+    {
+        int faces [4] = {0, 0, 0, 0};
+        for (int i = 0; i < w.body_count; i++) {
+            rigidbody *b = &w.bodies [i];
+            if (!b -> static_state && !(b -> mass == 0.0f)) { continue; }
+            float h = b -> half_extensions.y * 2.0f;
+            if (fabsf (h - 0.3048f) > 0.012f) { continue; }
+            float ix0 = b -> position.x - b -> half_extensions.x;
+            float ix1 = b -> position.x + b -> half_extensions.x;
+            float iz0 = b -> position.z - b -> half_extensions.z;
+            float iz1 = b -> position.z + b -> half_extensions.z;
+            if (fabsf (ix0 - -1.8288f) < 0.03f) { faces [0] = 1; }
+            if (fabsf (ix1 - 1.8288f) < 0.03f) { faces [1] = 1; }
+            if (fabsf (iz0 - -1.8288f) < 0.03f) { faces [2] = 1; }
+            if (fabsf (iz1 - 1.8288f) < 0.03f) { faces [3] = 1; }
+        }
+        MFS_CHECK (t_ptr, faces [0] && faces [1] && faces [2] && faces [3]);
+    }
+    /* Pivot crossbar at 1.1165 (±0.02). */
+    {
+        int found = 0;
+        for (int i = 0; i < w.body_count; i++) {
+            rigidbody *b = &w.bodies [i];
+            if (!b -> static_state && !(b -> mass == 0.0f)) { continue; }
+            if (fabsf (b -> position.y - 1.1165f) < 0.02f && b -> half_extensions.x > 0.5f) { found = 1; }
+        }
+        MFS_CHECK (t_ptr, found == 1);
+    }
+    /* Hive bodies: 2 hives x 11 recorded ids, all live. */
+    {
+        int ok = 1;
+        for (int h = 0; h < 2; h++) {
+            int ids [11];
+            if (ftc_biobuzz_hive (&w, h, ids) != 0) { ok = 0; break; }
+            for (int k = 0; k < 11; k++) {
+                if (physics_world_index_by_id (&w, (uint32_t) ids [k]) < 0) { ok = 0; }
+            }
+        }
+        MFS_CHECK (t_ptr, ok == 1);
+    }
+    /* Mirror symmetry about the pivot per hive: beam midpoint == pivot. */
+    {
+        int ok = 1;
+        for (int h = 0; h < 2; h++) {
+            int ids [11];
+            ftc_biobuzz_hive (&w, h, ids);
+            int b0 = physics_world_index_by_id (&w, (uint32_t) ids [0]);
+            if (b0 < 0) { ok = 0; continue; }
+            float hx = (h == 0) ? -0.3239f : 0.3239f;
+            vector3 mid = w.bodies [b0].position;
+            if (fabsf (mid.x - hx) > 0.02f || fabsf (mid.y - 1.1165f) > 0.35f || fabsf (mid.z) > 0.02f) { ok = 0; }
+        }
+        MFS_CHECK (t_ptr, ok == 1);
+    }
+    /* Flowers: top-ring boxes at 0.5461 (±0.02) near the 4 nominal stations. */
+    {
+        int near [4] = {0, 0, 0, 0};
+        const float sfx [4] = {-0.9144f, 0.9144f, -0.9144f, 0.9144f};
+        const float sfz [4] = {-1.7288f, -1.7288f, 1.7288f, 1.7288f};
+        for (int i = 0; i < w.body_count; i++) {
+            rigidbody *b = &w.bodies [i];
+            if (!b -> static_state && !(b -> mass == 0.0f)) { continue; }
+            if (fabsf (b -> position.y - 0.5461f) > 0.025f) { continue; }
+            for (int f = 0; f < 4; f++) {
+                if (fabsf (b -> position.x - sfx [f]) < 0.15f && fabsf (b -> position.z - sfz [f]) < 0.15f) {
+                    near [f] = 1;
+                }
+            }
+        }
+        MFS_CHECK (t_ptr, near [0] && near [1] && near [2] && near [3]);
+    }
+    /* Zone tapes: 6 thin no-collide slabs (loading/garden/alliance x red/blue). */
+    {
+        int tapes = 0;
+        for (int i = 0; i < w.body_count; i++) {
+            rigidbody *b = &w.bodies [i];
+            if (!b -> no_collide) { continue; }
+            if (b -> half_extensions.y < 0.005f) { tapes++; }
+        }
+        MFS_INFO ("tape proxies=%d", tapes);
+        MFS_CHECK (t_ptr, tapes >= 6);
+    }
+    for (int k = 0; k < 60 && !fail; k++) {
+        physics_world_step (&w, DT);
+        if (!mfs_test_finite (&w)) { fail = 1; }
+    }
+    MFS_CHECK (t_ptr, fail == 0);
+    if (t_ptr -> failures == 0) { printf ("[PASS] biobuzz_field: regulation geometry staged per Manual V1 S9\n"); }
+    physics_world_cleanup (&w);
+    mfs_test_end (t_ptr);
+    return t_ptr -> failures;
+}
+/* biobuzz_stage: §10.3 setup — 40 pollen + 16 nectar at regulation sizes,
+ * colours and stations (16 flower / 8 garden / 16 preload-at-zones with no
+ * robots / 6 cell / 10 tray). */
+int mfs_t_biobuzz_stage (void) {
+    mfs_test_t t;
+    mfs_test_begin (&t, "biobuzz_stage");
+    mfs_test_t *t_ptr = &t;
+    physics_world w;
+    mfs_test_world (&w);
+    extern const mpe_module_desc_t mpe_module_desc;
+    MFS_CHECK (t_ptr, physics_world_attach_module (&w, &mpe_module_desc) >= 0);
+    MFS_CHECK (t_ptr, ftc_biobuzz_field (&w) == 0);
+    int made = ftc_biobuzz_match (&w);
+    MFS_INFO ("staged=%d", made);
+    MFS_CHECK (t_ptr, made == 40); /* flowers 16 + gardens 8 + cells 6 + trays 10 */
+    int pre = ftc_biobuzz_preload (&w);
+    MFS_INFO ("preload=%d", pre);
+    MFS_CHECK (t_ptr, pre == 16); /* no robots: 4 sets at loading zones */
+    /* Census by size+colour over dynamic spheres. */
+    int pollen = 0, nectar_red = 0, nectar_blue = 0;
+    int fail = 0;
+    for (int i = 0; i < w.body_count; i++) {
+        rigidbody *b = &w.bodies [i];
+        if (b -> static_state || b -> mass == 0.0f) { continue; }
+        if (b -> type != object_sphere) { continue; }
+        if (fabsf (b -> radius - 0.0355f) < 0.002f) {
+            pollen++;
+            if (!(b -> colour.x > 0.9f && b -> colour.y > 0.8f)) { fail = 1; }
+        } else if (fabsf (b -> radius - 0.0455f) < 0.003f) {
+            if (b -> colour.x > 0.9f) { nectar_red++; } else if (b -> colour.z > 0.9f) { nectar_blue++; } else {
+                fail = 1;
+            }
+        }
+    }
+    MFS_INFO ("pollen=%d nectar_red=%d nectar_blue=%d", pollen, nectar_red, nectar_blue);
+    MFS_CHECK (t_ptr, pollen == 40);
+    MFS_CHECK (t_ptr, nectar_red == 8);
+    MFS_CHECK (t_ptr, nectar_blue == 8);
+    MFS_CHECK (t_ptr, fail == 0);
+    /* Stations: flower seats low (16), gardens in rects (8), cells high (6),
+     * trays outside walls (10), preloads at loading zones (16). */
+    {
+        int seat = 0, garden = 0, high = 0, outside = 0, load = 0;
+        for (int i = 0; i < w.body_count; i++) {
+            rigidbody *b = &w.bodies [i];
+            if (b -> static_state || b -> mass == 0.0f || b -> type != object_sphere) { continue; }
+            float ax = fabsf (b -> position.x), az = fabsf (b -> position.z);
+            int is_pollen = (fabsf (b -> radius - 0.0355f) < 0.002f);
+            int is_nectar = (fabsf (b -> radius - 0.0455f) < 0.003f);
+            if (is_pollen && b -> position.y < 0.15f && ax < 1.85f && az < 1.85f) {
+                /* flower seat or garden row or loading row: garden/load
+                 * corners checked first (they sit at the field edge). */
+                int in_garden = (ax > 1.60f && az > 1.30f);
+                int in_load = ((fabsf (b -> position.x + 1.689f) < 0.35f && fabsf (b -> position.z - 0.9144f) < 0.45f) ||
+                               (fabsf (b -> position.x - 1.689f) < 0.35f && fabsf (b -> position.z + 0.9144f) < 0.45f));
+                if (in_garden) { garden++; } else if (in_load) { load++; } else { seat++; }
+            }
+            if (is_nectar && b -> position.y > 0.9f) { high++; }
+            if (is_nectar && ax > 1.85f) { outside++; }
+        }
+        MFS_INFO ("seat=%d garden=%d high=%d outside=%d load=%d", seat, garden, high, outside, load);
+        MFS_CHECK (t_ptr, seat == 16);
+        MFS_CHECK (t_ptr, garden == 8);
+        MFS_CHECK (t_ptr, high == 6);
+        MFS_CHECK (t_ptr, outside == 10);
+        MFS_CHECK (t_ptr, load == 16);
+    }
+    for (int k = 0; k < 120 && !fail; k++) {
+        physics_world_step (&w, DT);
+        if (!mfs_test_finite (&w)) { fail = 1; }
+    }
+    MFS_CHECK (t_ptr, fail == 0);
+    if (t_ptr -> failures == 0) { printf ("[PASS] biobuzz_stage: 40+16 staged per Manual V1 S10.3\n"); }
+    physics_world_cleanup (&w);
+    mfs_test_end (t_ptr);
+    return t_ptr -> failures;
+}
+/* biobuzz_tip: weight census tips the hive (Manual walkthrough ~8 pollen).
+ * Teleport 8 staged pollen into the red up-cell, step: exactly one red tip
+ * fires (edge-triggered), hive re-poses mirrored, unlock +1, score carries
+ * the 20. Blue (3 nectar = 5.1 < 8) must NOT tip. */
+int mfs_t_biobuzz_tip (void) {
+    mfs_test_t t;
+    mfs_test_begin (&t, "biobuzz_tip");
+    mfs_test_t *t_ptr = &t;
+    physics_world w;
+    mfs_test_world (&w);
+    extern const mpe_module_desc_t mpe_module_desc;
+    MFS_CHECK (t_ptr, physics_world_attach_module (&w, &mpe_module_desc) >= 0);
+    MFS_CHECK (t_ptr, ftc_biobuzz_field (&w) == 0);
+    MFS_CHECK (t_ptr, ftc_biobuzz_match (&w) == 40);
+    /* Red up-cell centre from header geometry (pivot + offsets). */
+    float ccx = -BIOBUZZ_HIVE_DX, ccy = BIOBUZZ_PIVOT_H + BIOBUZZ_CELL_UP_DY, ccz = -BIOBUZZ_CELL_END_DZ;
+    /* Record a cell-wall pose before the tip (re-pose proof). */
+    int ids [11];
+    MFS_CHECK (t_ptr, ftc_biobuzz_hive (&w, 0, ids) == 0);
+    int wall0 = physics_world_index_by_id (&w, (uint32_t) ids [1]);
+    MFS_CHECK (t_ptr, wall0 >= 0);
+    vector3 before = w.bodies [wall0].position;
+    /* Teleport 8 staged pollen into the up-cell interior (2 layers of 4,
+     * 0.08 grid: no overlap at 0.071 dia). */
+    {
+        int placed = 0;
+        for (int i = 0; i < w.body_count && placed < 8; i++) {
+            rigidbody *b = &w.bodies [i];
+            if (b -> static_state || b -> mass == 0.0f || b -> type != object_sphere) { continue; }
+            if (fabsf (b -> radius - BIOBUZZ_POLLEN_RADIUS) > 0.002f) { continue; }
+            if (b -> position.y > 0.5f) { continue; } /* keep staged cell/tray pieces out */
+            b -> position = (vector3) {ccx + ((placed % 2 == 0) ? -0.04f : 0.04f), ccy - 0.05f + (float) (placed / 4) * 0.08f,
+                                       ccz + ((placed % 4 < 2) ? -0.04f : 0.04f)};
+            b -> velocity = vector3_zero ();
+            b -> angular_velocity = vector3_zero ();
+            rigidbody_wake (b);
+            placed++;
+        }
+        MFS_CHECK (t_ptr, placed == 8);
+    }
+    int fail = 0;
+    for (int k = 0; k < 240 && !fail; k++) {
+        physics_world_step (&w, DT);
+        if (!mfs_test_finite (&w)) { fail = 1; }
+    }
+    MFS_CHECK (t_ptr, fail == 0);
+    int tr = 0, tb = 0, ur = 0, ub = 0;
+    MFS_CHECK (t_ptr, ftc_biobuzz_tips (&w, &tr, &tb, &ur, &ub) == 0);
+    MFS_INFO ("tips red=%d blue=%d unlocked red=%d blue=%d", tr, tb, ur, ub);
+    MFS_CHECK (t_ptr, tr == 1);
+    MFS_CHECK (t_ptr, tb == 0);
+    MFS_CHECK (t_ptr, ur == 1);
+    MFS_CHECK (t_ptr, ub == 0);
+    /* Re-pose proof: the recorded wall moved (mirrored repose). */
+    {
+        int w0 = physics_world_index_by_id (&w, (uint32_t) ids [1]);
+        MFS_CHECK (t_ptr, w0 >= 0);
+        vector3 after = w.bodies [w0].position;
+        float moved = fabsf (after.x - before.x) + fabsf (after.y - before.y) + fabsf (after.z - before.z);
+        MFS_INFO ("wall moved=%.3f", moved);
+        MFS_CHECK (t_ptr, moved > 0.10f);
+    }
+    /* Score carries the tip (20) for red, 0 tips for blue. */
+    {
+        biobuzz_alliance_score sr, sb;
+        MFS_CHECK (t_ptr, ftc_biobuzz_score (&w, 0, &sr) == 0);
+        MFS_CHECK (t_ptr, ftc_biobuzz_score (&w, 1, &sb) == 0);
+        MFS_INFO ("red total=%d (tips=%d) blue total=%d", sr.total, sr.tips, sb.total);
+        MFS_CHECK (t_ptr, sr.tips == 1 && sr.tip_points == 20);
+        MFS_CHECK (t_ptr, sb.tips == 0);
+    }
+    if (t_ptr -> failures == 0) { printf ("[PASS] biobuzz_tip: weight census tips, re-poses, unlocks, scores\n"); }
+    physics_world_cleanup (&w);
+    mfs_test_end (t_ptr);
+    return t_ptr -> failures;
+}
+/* biobuzz_flower: Table 10-2 flower math — ownership follows the top-most
+ * nectar (scores EVERY piece inside x2 regardless of colour); each alliance
+ * with a nectar takes +5 for its bottom-most. Constructed: bottom red
+ * nectar, 2 pollen, top blue nectar => blue owns 4x2=8 + bottom 5 = 13;
+ * red takes bottom 5 only. */
+int mfs_t_biobuzz_flower (void) {
+    mfs_test_t t;
+    mfs_test_begin (&t, "biobuzz_flower");
+    mfs_test_t *t_ptr = &t;
+    physics_world w;
+    mfs_test_world (&w);
+    extern const mpe_module_desc_t mpe_module_desc;
+    MFS_CHECK (t_ptr, physics_world_attach_module (&w, &mpe_module_desc) >= 0);
+    MFS_CHECK (t_ptr, ftc_biobuzz_field (&w) == 0);
+    /* Flower 0 anchor at (-0.9144, -1.7288); scoring volume spans y
+     * 0.10..0.55. Settled stack: red nectar plugs the middle ring, 2 pollen
+     * pile on it, blue nectar on top (initial drops small, e=0). */
+    int ids [4], isn [4], isa [4];
+    float ys [4] = {0.16f, 0.25f, 0.34f, 0.43f};
+    int kinds [4] = {1, 0, 0, 1};   /* nectar, pollen, pollen, nectar */
+    int cols [4] = {0, -1, -1, 1};  /* red, -, -, blue */
+    for (int k = 0; k < 4; k++) {
+        float r = kinds [k] ? BIOBUZZ_NECTAR_RADIUS : BIOBUZZ_POLLEN_RADIUS;
+        float m = kinds [k] ? BIOBUZZ_NECTAR_MASS : BIOBUZZ_POLLEN_MASS;
+        int bi = physics_world_add_sphere (&w, r, m, (vector3) {-0.9144f, ys [k], -1.7288f});
+        MFS_CHECK (t_ptr, bi >= 0);
+        if (bi < 0) { continue; }
+        w.bodies [bi].restitution = 0.0f;
+        rigidbody_wake (&w.bodies [bi]);
+        ids [k] = (int) w.bodies [bi].object_id;
+        isn [k] = kinds [k];
+        isa [k] = cols [k];
+    }
+    /* Garden: 2 pollen + 1 blue nectar resting in the red garden. */
+    int gids [3], gisn [3], gisa [3];
+    {
+        float H = BIOBUZZ_FIELD_HALF;
+        float gx = -(H - 0.0254f);
+        float gz = -(H - 0.2921f);
+        for (int k = 0; k < 3; k++) {
+            int is_n = (k == 2) ? 1 : 0;
+            float r = is_n ? BIOBUZZ_NECTAR_RADIUS : BIOBUZZ_POLLEN_RADIUS;
+            float m = is_n ? BIOBUZZ_NECTAR_MASS : BIOBUZZ_POLLEN_MASS;
+            int bi = physics_world_add_sphere (&w, r, m, (vector3) {gx, r + 0.001f, gz + (float) k * 0.10f});
+            MFS_CHECK (t_ptr, bi >= 0);
+            if (bi < 0) { continue; }
+            w.bodies [bi].restitution = 0.0f;
+            rigidbody_wake (&w.bodies [bi]);
+            gids [k] = (int) w.bodies [bi].object_id;
+            gisn [k] = is_n;
+            gisa [k] = is_n ? 1 : -1;
+        }
+    }
+    int fail = 0;
+    for (int k = 0; k < 90 && !fail; k++) {
+        physics_world_step (&w, DT);
+        if (!mfs_test_finite (&w)) { fail = 1; }
+    }
+    MFS_CHECK (t_ptr, fail == 0);
+    /* Score over the union registry (flower pieces + garden pieces). */
+    int all_ids [7], all_isn [7], all_isa [7];
+    for (int k = 0; k < 4; k++) {
+        all_ids [k] = ids [k];
+        all_isn [k] = isn [k];
+        all_isa [k] = isa [k];
+    }
+    for (int k = 0; k < 3; k++) {
+        all_ids [4 + k] = gids [k];
+        all_isn [4 + k] = gisn [k];
+        all_isa [4 + k] = gisa [k];
+    }
+    {
+        biobuzz_alliance_score sr, sb;
+        MFS_CHECK (t_ptr, biobuzz_score (&w, NULL, all_ids, 7, all_isn, all_isa, 0, NULL, 0, &sr) == 0);
+        MFS_CHECK (t_ptr, biobuzz_score (&w, NULL, all_ids, 7, all_isn, all_isa, 1, NULL, 0, &sb) == 0);
+        MFS_INFO ("red owned=%d bottom=%d garden=%d total=%d", sr.flower_owned_points, sr.flower_bottom_bonus,
+                  sr.garden_points, sr.total);
+        MFS_INFO ("blue owned=%d bottom=%d garden=%d total=%d", sb.flower_owned_points, sb.flower_bottom_bonus,
+                  sb.garden_points, sb.total);
+        MFS_CHECK (t_ptr, sr.flower_owned_points == 0);
+        MFS_CHECK (t_ptr, sr.flower_bottom_bonus == 5);
+        MFS_CHECK (t_ptr, sr.garden_points == 3);
+        MFS_CHECK (t_ptr, sr.total == 8);
+        MFS_CHECK (t_ptr, sb.flower_owned_points == 8);
+        MFS_CHECK (t_ptr, sb.flower_bottom_bonus == 5);
+        MFS_CHECK (t_ptr, sb.garden_points == 0);
+        MFS_CHECK (t_ptr, sb.total == 13);
+    }
+    if (t_ptr -> failures == 0) { printf ("[PASS] biobuzz_flower: ownership + bottom + garden per Table 10-2\n"); }
+    physics_world_cleanup (&w);
+    mfs_test_end (t_ptr);
+    return t_ptr -> failures;
+}
+/* biobuzz_table: Table 10-2 point values + RP thresholds + piece spec +
+ * start poses as pure predicates (no world needed). */
+int mfs_t_biobuzz_table (void) {
+    mfs_test_t t;
+    mfs_test_begin (&t, "biobuzz_table");
+    mfs_test_t *t_ptr = &t;
+    MFS_CHECK (t_ptr, BIOBUZZ_PTS_LEAVE == 3);
+    MFS_CHECK (t_ptr, BIOBUZZ_PTS_PARK == 5);
+    MFS_CHECK (t_ptr, BIOBUZZ_PTS_TIP == 20);
+    MFS_CHECK (t_ptr, BIOBUZZ_PTS_CELL == 2);
+    MFS_CHECK (t_ptr, BIOBUZZ_PTS_FLOWER_BOTTOM == 5);
+    MFS_CHECK (t_ptr, BIOBUZZ_PTS_FLOWER_OWNED == 2);
+    MFS_CHECK (t_ptr, BIOBUZZ_PTS_GARDEN == 1);
+    MFS_CHECK (t_ptr, biobuzz_rp_swarm (15) == 0 && biobuzz_rp_swarm (16) == 1 && biobuzz_rp_swarm (26) == 1);
+    MFS_CHECK (t_ptr, biobuzz_rp_pollinator1 (3) == 0 && biobuzz_rp_pollinator1 (4) == 1);
+    MFS_CHECK (t_ptr, biobuzz_rp_pollinator2 (6) == 0 && biobuzz_rp_pollinator2 (7) == 1);
+    MFS_CHECK (t_ptr, fabsf (BIOBUZZ_POLLEN_RADIUS - 0.0355f) < 1e-4f);
+    MFS_CHECK (t_ptr, fabsf (BIOBUZZ_NECTAR_RADIUS - 0.0455f) < 1e-4f);
+    MFS_CHECK (t_ptr, BIOBUZZ_POLLEN_TOTAL == 40 && BIOBUZZ_NECTAR_PER_ALLIANCE == 8);
+    MFS_CHECK (t_ptr, fabsf (BIOBUZZ_FIELD_HALF - 1.8288f) < 1e-4f);
+    MFS_CHECK (t_ptr, fabsf (BIOBUZZ_PIVOT_H - 1.1165f) < 1e-4f);
+    /* Start poses: red west wall / blue east wall, facing centre, clear of
+     * loading zones (|z|<=0.64 vs zone edge 0.774) and gardens. */
+    for (int a = 0; a < 2; a++) {
+        for (int s = 0; s < 2; s++) {
+            float xyz [3];
+            float yaw = 0.0f;
+            biobuzz_start_pose ((biobuzz_alliance) a, s, xyz, &yaw);
+            MFS_CHECK (t_ptr, fabsf (fabsf (xyz [0]) - 1.5368f) < 0.01f);
+            MFS_CHECK (t_ptr, (a == 0 && xyz [0] < 0.0f) || (a == 1 && xyz [0] > 0.0f));
+            MFS_CHECK (t_ptr, fabsf (xyz [2]) <= 0.64f);
+            float want_yaw = (a == 0) ? 1.57079633f : -1.57079633f;
+            MFS_CHECK (t_ptr, fabsf (yaw - want_yaw) < 1e-4f);
+        }
+    }
+    if (t_ptr -> failures == 0) { printf ("[PASS] biobuzz_table: Table 10-2 + RP + spec + starts\n"); }
+    mfs_test_end (t_ptr);
+    return t_ptr -> failures;
+}

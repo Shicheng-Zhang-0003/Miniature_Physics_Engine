@@ -30,6 +30,11 @@ extern int mfs_t_ball_spin (void);
 extern int mfs_t_bucket_game (void);
 extern int mfs_t_brake_mode (void);
 extern int mfs_t_partial_throttle (void);
+extern int mfs_t_biobuzz_field (void);
+extern int mfs_t_biobuzz_stage (void);
+extern int mfs_t_biobuzz_tip (void);
+extern int mfs_t_biobuzz_flower (void);
+extern int mfs_t_biobuzz_table (void);
 static const mfs_test_entry_t registry [] = {
     {"teleop", mfs_t_teleop, false},
     {"mecanum", mfs_t_mecanum, false},
@@ -51,6 +56,11 @@ static const mfs_test_entry_t registry [] = {
     {"bucket_game", mfs_t_bucket_game, false},
     {"brake_mode", mfs_t_brake_mode, false},
     {"partial_throttle", mfs_t_partial_throttle, false},
+    {"biobuzz_field", mfs_t_biobuzz_field, false},
+    {"biobuzz_stage", mfs_t_biobuzz_stage, false},
+    {"biobuzz_tip", mfs_t_biobuzz_tip, false},
+    {"biobuzz_flower", mfs_t_biobuzz_flower, false},
+    {"biobuzz_table", mfs_t_biobuzz_table, false},
 };
 int main (int argc, char **argv) {
     if (argc > 1 && strcmp (argv [1], "--list") == 0) {
