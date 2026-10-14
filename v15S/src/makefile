@@ -208,7 +208,7 @@ help:
 	@echo "           --list | --test NAME | --allow-skip (strict SKIP fails without it)"
 	@echo "           MPE_TEST_REGIME=default|light|heavy|brittle|sticky (quick re-runs full suite x5)"
 	@echo "         build_suite | build_suite_scalar | headless | test_suite | test_suite_all"
-	@echo "           (canonical C suite: 45 registered / 43 blocking, MIN_SUITE_ENTRIES=45)"
+	@echo "           (canonical C suite: 46 registered / 44 blocking, MIN_SUITE_ENTRIES=46)"
 	@echo "         mpe-tui (terminal debugger + snapshot suite) | tui-smoke TUI_OUT=<dir> | ecosystem/*/*.so"
 	@echo "         mfs_ecosystem.so (delegates to ecosystem/mfs/Makefile; OUTDIR=<dir> for build_tests.sh)"
 	@echo "         check-deps | check-deps-tui | check-flags | check-new-files (wildcard guard)"
@@ -472,7 +472,7 @@ ecosystem/mfs/mfs_ecosystem$(PLUGIN_EXT):
 	$(MAKE) -C ecosystem/mfs mfs_ecosystem$(PLUGIN_EXT)
 test_suite: build_suite
 	mkdir -p ../../temp
-	@echo "NOTE: test_suite runs 43 physics only (no --all); use test_suite_all / runner --profile quick for the 45 registry (43 blocking + 2 diag)."
+	@echo "NOTE: test_suite runs 44 physics only (no --all); use test_suite_all / runner --profile quick for the 46 registry (44 blocking + 2 diag)."
 	./test_mpe_suite$(EXE_EXT)
 test_suite_all: build_suite
 	mkdir -p ../../temp

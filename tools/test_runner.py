@@ -3,7 +3,7 @@
 
 Profiles:
   quick    Python runner-contract tests and the canonical C regression suite
-           (45 cases incl. 2 informational diags; full suite re-run under 5
+           (46 cases incl. 2 informational diags; full suite re-run under 5
            regimes default/light/heavy/brittle/sticky via MPE_TEST_REGIME).
   physics  quick + every isolated legacy case (30) and all paranoia cases (14).
   full     physics + ASan/UBSan suite, MFS robotics (27 gated), TUI snapshots
@@ -14,7 +14,7 @@ This module uses only the Python standard library.
 
 Strict contract: suite cases that print [SKIP] (self-skipped coverage) fail
 the run unless --allow-skip is given; [XFAIL] markers are surfaced in the
-summary counts but never block. Registry floors: MIN_SUITE_ENTRIES=45,
+summary counts but never block. Registry floors: MIN_SUITE_ENTRIES=46,
 MIN_LEGACY_ENTRIES=30, MIN_PARANOIA_ENTRIES=14; summary contract requires
 Total == registry size and Blocking failures == 0.
 """
@@ -110,16 +110,18 @@ MPE_TEST_REGIMES = ("default", "light", "heavy", "brittle", "sticky")
 # makefile help text and this file all went on quoting different totals. That
 # is the exact failure the floor was added to prevent, reproduced anyway.
 #
-# 45 = 43 blocking (physics) + 2 informational (diagnostic).
+# 46 = 44 blocking (physics) + 2 informational (diagnostic).
 #   36 pre-existing + 3 metamorphic (meta_rotation, meta_convergence,
-#   meta_config_wiring) + mouse_look_axes + body_materials_live +
-#   sleep_settle + mass_properties + reference_math + diag_naming
+#   meta_config_wiring) + mouse_look_axes + keydrive_axes +
+#   body_materials_live + sleep_settle + mass_properties + reference_math +
+#   diag_naming
 # meta_sleep was written and withdrawn, so the floor only ever moves by
 # deliberate addition, and this comment says so rather than being quietly
 # edited. History: 41 -> 42 (2026-10-01, sleep_settle) -> 44 (2026-10-03)
 # -> 45 (2026-10-09, diag_naming: every rejection names its own source/code/call
-# site, and an attach hook with side effects must run exactly once).
-MIN_SUITE_ENTRIES = 45
+# site, and an attach hook with side effects must run exactly once)
+# -> 46 (2026-10-14, keydrive_axes: G V B N C M keyboard-drive convention).
+MIN_SUITE_ENTRIES = 46
 # DESPOT-2026-10-01: pin per-suite floors so deleting a legacy/paranoia target
 # + its make target together cannot shrink the headline silently (the 220->204
 # drift). Canonical floor above; legacy 30 + paranoia 14 pinned here.

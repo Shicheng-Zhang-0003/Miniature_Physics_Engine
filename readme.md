@@ -369,7 +369,15 @@ make
 
 ## 📜 Version History
 
-- **v15S (current head) — 2026-10-13: despot sweep (truth + hardening).**
+- **v15S (current head) — 2026-10-14: handling + keyboard drive.**
+  Yaw runaway tamed (sustained rotate capped ≈ −4.4 rock-steady, was −13.5
+  still creeping: governor + active damper, deadband 3.0–4.5 so green
+  gates never see it; gamepad expo x^1.5); keyboard robot drive on
+  G V B N C M (M verified free globally; pure mapping + `keydrive_axes`
+  gate, pad keeps precedence while connected). Suite 46 registered / 44
+  blocking green (floor 45 → 46); quick 60/60; MFS 26/27 (`tank`
+  pre-existing; `yaw_stability` proven red pre-fix).
+- **v15S — 2026-10-13: despot sweep (truth + hardening).**
   Headline: the 2026-10-12 P20 `mkstemp` hardening broke every S2 bridge
   spawn (`mkstemp` on a template ending in `.log` fails `EINVAL` always,
   misreported as out-of-memory) — fixed with `mkstemps`, `mgb_mpe_test`
@@ -460,6 +468,7 @@ validation, and command-launch failures.
 | `meta_config_wiring` | Config parameters demonstrably reach the simulation |
 | `sleep_settle` | Launch settles then sleeps-iff-enabled (three-state honesty) |
 | `mouse_look_axes` | Mouse-look sign convention on 4 axes + diagonals |
+| `keydrive_axes` | Keyboard-drive convention (G V B N C M) on all six keys + cancels |
 | `body_materials_live` | Bodies stamped with live materials (config-ordering guard) |
 | `two_world` | Independent `physics_world` instances |
 | `revolute` | Hinge joints hold anchor and allow swing |

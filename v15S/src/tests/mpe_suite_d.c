@@ -42,6 +42,7 @@
 #include "mpe_test.h"
 #include "tests/mpe_test.h"
 #include "ui_input/mouse_look.h"
+#include "ui_input/keydrive.h"
 #include "core/rigidbody.h"
 #include "config/mpe_config.h"
 /* --------------------------------------------------------------- helpers */
@@ -672,6 +673,54 @@ int mpe_t_mouse_look_axes (void) {
         MPE_CHECK_NEAR (tp, acc_y, 10.0f, 1e-4, "accumulated y over 5 events");
     }
     if (tp -> failures == 0) { printf ("[PASS] mouse-look convention correct in all four directions\n"); }
+    mpe_test_end (tp);
+    return tp -> failures;
+}
+/* DESPOT-2026-10-14: keyboard robot drive (G V B N C M), same rationale as
+ * mouse_look.h above — the directional mapping must not require a physical
+ * keyboard to verify. Convention: G/B forward/back, V/N strafe left/right
+ * (robot's right is -X, so +strafe moves -X, like the gamepad), C/M rotate
+ * left/right (right key = +1, like gamepad right-stick-right). */
+int mpe_t_keydrive_axes (void) {
+    mpe_test_t t;
+    mpe_test_begin (&t, "keydrive_axes");
+    mpe_test_t *tp = &t;
+    struct {
+        const char *name;
+        int g, v, b, n, c, m;
+        float ef, es, er;
+    } cases [] = {
+        {"G forward", 1, 0, 0, 0, 0, 0, +1, 0, 0},
+        {"B back", 0, 0, 1, 0, 0, 0, -1, 0, 0},
+        {"V strafe-left", 0, 1, 0, 0, 0, 0, 0, -1, 0},
+        {"N strafe-right", 0, 0, 0, 1, 0, 0, 0, +1, 0},
+        {"C rotate-left", 0, 0, 0, 0, 1, 0, 0, 0, -1},
+        {"M rotate-right", 0, 0, 0, 0, 0, 1, 0, 0, +1},
+        {"G+B cancel", 1, 0, 1, 0, 0, 0, 0, 0, 0},
+        {"V+N cancel", 0, 1, 0, 1, 0, 0, 0, 0, 0},
+        {"C+M cancel", 0, 0, 0, 0, 1, 1, 0, 0, 0},
+        {"G+N diagonal", 1, 0, 0, 1, 0, 0, +1, +1, 0},
+        {"B+V+M triple", 0, 1, 1, 0, 0, 1, -1, -1, +1},
+        {"all held", 1, 1, 1, 1, 1, 1, 0, 0, 0},
+        {"none held", 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    };
+    const int n = (int) (sizeof (cases) / sizeof (cases [0]));
+    for (int i = 0; i < n; i++) {
+        float f = 0.0f, s = 0.0f, r = 0.0f;
+        mpe_keydrive_axes (cases [i].g, cases [i].v, cases [i].b, cases [i].n, cases [i].c, cases [i].m, &f, &s, &r);
+        MPE_INFO ("keydrive %-14s -> (fwd %+.1f, strafe %+.1f, rot %+.1f)", cases [i].name, (double) f, (double) s,
+                  (double) r);
+        MPE_CHECK (tp, f == cases [i].ef);
+        MPE_CHECK (tp, s == cases [i].es);
+        MPE_CHECK (tp, r == cases [i].er);
+        /* Idle follows the RESULTANT, not held keys: cancels brake. */
+        MPE_CHECK (tp, mpe_keydrive_idle (cases [i].g, cases [i].v, cases [i].b, cases [i].n, cases [i].c,
+                                          cases [i].m) == ((cases [i].ef == 0.0f && cases [i].es == 0.0f &&
+                                                            cases [i].er == 0.0f)
+                                                               ? 1
+                                                               : 0));
+    }
+    if (tp -> failures == 0) { printf ("[PASS] keydrive convention correct on all six keys\n"); }
     mpe_test_end (tp);
     return tp -> failures;
 } /* ------------------- 6. body materials are live at construction time */

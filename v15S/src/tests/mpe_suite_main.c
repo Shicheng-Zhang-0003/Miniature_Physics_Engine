@@ -125,6 +125,7 @@ extern int mpe_t_meta_convergence (void);
 extern int mpe_t_meta_config_wiring (void);
 extern int mpe_t_sleep_settle (void);
 extern int mpe_t_mouse_look_axes (void);
+extern int mpe_t_keydrive_axes (void);
 extern int mpe_t_body_materials_live (void);
 static const mpe_entry_t mpe_registry [] = {
     {"meta_rotation", mpe_t_meta_rotation, 0},
@@ -132,6 +133,7 @@ static const mpe_entry_t mpe_registry [] = {
     {"meta_config_wiring", mpe_t_meta_config_wiring, 0},
     {"sleep_settle", mpe_t_sleep_settle, 0},
     {"mouse_look_axes", mpe_t_mouse_look_axes, 0},
+    {"keydrive_axes", mpe_t_keydrive_axes, 0},
     {"body_materials_live", mpe_t_body_materials_live, 0},
     {"mass_properties", mpe_t_mass_properties, 0},
     {"reference_math", mpe_t_reference_math, 0},
