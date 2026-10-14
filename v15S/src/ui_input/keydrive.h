@@ -48,4 +48,18 @@ static inline int mpe_keydrive_idle (int g, int v, int b, int n, int c, int m) {
     mpe_keydrive_axes (g, v, b, n, c, m, &fwd, &strafe, &rotate);
     return (fwd == 0.0f && strafe == 0.0f && rotate == 0.0f) ? 1 : 0;
 }
+/* Keyboard intake/shoot (`<` hold, `>` press):
+ * - intake runs while comma is HELD (level, like the gamepad LT hold):
+ *   mpe_keydrive_intake(comma_held) is the commanded on/off state.
+ * - shoot fires once per press (edge, like the gamepad RT press):
+ *   mpe_keydrive_shoot_edge(prev_held, cur_held) is 1 exactly on the
+ *   rising edge. The tick keeps prev_held itself (same s_prev_* pattern
+ *   as the gamepad buttons) and calls ftc_shoot only on the edge, so a
+ *   held `.` cannot machine-gun the whole magazine. */
+static inline int mpe_keydrive_intake (int comma_held) {
+    return comma_held ? 1 : 0;
+}
+static inline int mpe_keydrive_shoot_edge (int prev_held, int cur_held) {
+    return (!prev_held && cur_held) ? 1 : 0;
+}
 #endif /* keydrive_h */

@@ -24,6 +24,8 @@ void initialize_input (input_status *s) {
     s -> n_key_pressed = false;
     s -> c_key_pressed = false;
     s -> m_key_pressed = false;
+    s -> comma_key_pressed = false;
+    s -> period_key_pressed = false;
     s -> r_key_pressed = false;
     s -> i_key_pressed = false;
     s -> j_key_pressed = false;
@@ -100,6 +102,12 @@ gboolean on_keypress (GtkEventControllerKey *w, guint keyval, guint keycode, Gdk
         st -> c_key_pressed = true;
     if (keyval == GDK_KEY_m || keyval == GDK_KEY_M)
         st -> m_key_pressed = true;
+    /* Robot keyboard intake/shoot. Shifted or not (`,`/`<`, `.`/`>`): the
+     * physical key is what matters, not the modifier. */
+    if (keyval == GDK_KEY_comma || keyval == GDK_KEY_less)
+        st -> comma_key_pressed = true;
+    if (keyval == GDK_KEY_period || keyval == GDK_KEY_greater)
+        st -> period_key_pressed = true;
     if (keyval == GDK_KEY_F5)
         st -> stability_test_pressed = true;
     if (keyval == GDK_KEY_F6)
@@ -336,6 +344,10 @@ gboolean on_key_released (GtkEventControllerKey *w, guint keyval, guint keycode,
         st -> c_key_pressed = false;
     if (keyval == GDK_KEY_m || keyval == GDK_KEY_M)
         st -> m_key_pressed = false;
+    if (keyval == GDK_KEY_comma || keyval == GDK_KEY_less)
+        st -> comma_key_pressed = false;
+    if (keyval == GDK_KEY_period || keyval == GDK_KEY_greater)
+        st -> period_key_pressed = false;
     if (keyval == GDK_KEY_i || keyval == GDK_KEY_I)
         st -> i_key_pressed = false;
     if (keyval == GDK_KEY_j || keyval == GDK_KEY_J)
@@ -524,6 +536,8 @@ gboolean on_focus_out (GtkEventControllerFocus *ctrl, gpointer user_data_stored)
     st -> n_key_pressed = false;
     st -> c_key_pressed = false;
     st -> m_key_pressed = false;
+    st -> comma_key_pressed = false;
+    st -> period_key_pressed = false;
     st -> i_key_pressed = false;
     st -> j_key_pressed = false;
     st -> k_key_pressed = false;

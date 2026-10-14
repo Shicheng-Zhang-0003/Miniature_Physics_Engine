@@ -12,6 +12,10 @@ typedef struct {
      * vim-keys are modal-only). G/B = forward/back, V/N = strafe
      * left/right, C/M = rotate left/right. See ui_input/keydrive.h. */
     bool g_key_pressed, v_key_pressed, b_key_pressed, n_key_pressed, c_key_pressed, m_key_pressed;
+    /* Robot keyboard intake/shoot (comma/period — both free globally).
+     * Comma (or shifted `<`) held = intake runs; period (or shifted `>`)
+     * pressed = shoot once (edge). See ui_input/keydrive.h. */
+    bool comma_key_pressed, period_key_pressed;
     bool enter_spawn_held;
     bool r_key_pressed;
     bool i_key_pressed, j_key_pressed, k_key_pressed, l_key_pressed;

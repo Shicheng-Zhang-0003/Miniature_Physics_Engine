@@ -676,11 +676,12 @@ int mpe_t_mouse_look_axes (void) {
     mpe_test_end (tp);
     return tp -> failures;
 }
-/* DESPOT-2026-10-14: keyboard robot drive (G V B N C M), same rationale as
- * mouse_look.h above — the directional mapping must not require a physical
- * keyboard to verify. Convention: G/B forward/back, V/N strafe left/right
- * (robot's right is -X, so +strafe moves -X, like the gamepad), C/M rotate
- * left/right (right key = +1, like gamepad right-stick-right). */
+/* DESPOT-2026-10-14: keyboard robot drive (G V B N C M + comma/period),
+ * same rationale as mouse_look.h above — the directional mapping must not
+ * require a physical keyboard to verify. Convention: G/B forward/back, V/N
+ * strafe left/right (robot's right is -X, so +strafe moves -X, like the
+ * gamepad), C/M rotate left/right (right key = +1, like gamepad
+ * right-stick-right); comma hold = intake, period press-edge = shoot. */
 int mpe_t_keydrive_axes (void) {
     mpe_test_t t;
     mpe_test_begin (&t, "keydrive_axes");
@@ -721,6 +722,18 @@ int mpe_t_keydrive_axes (void) {
                                                                : 0));
     }
     if (tp -> failures == 0) { printf ("[PASS] keydrive convention correct on all six keys\n"); }
+    /* Intake/shoot keys: `<` (comma) hold runs intake (level), `>` (period)
+     * fires once per press (rising edge only — a held `.` must not
+     * machine-gun). Shifted variants (`<`, `>`) are folded at the event
+     * handler, so the pure layer only ever sees held/not-held. */
+    {
+        MPE_CHECK (tp, mpe_keydrive_intake (0) == 0);
+        MPE_CHECK (tp, mpe_keydrive_intake (1) == 1);
+        MPE_CHECK (tp, mpe_keydrive_shoot_edge (0, 0) == 0);
+        MPE_CHECK (tp, mpe_keydrive_shoot_edge (0, 1) == 1);
+        MPE_CHECK (tp, mpe_keydrive_shoot_edge (1, 1) == 0);
+        MPE_CHECK (tp, mpe_keydrive_shoot_edge (1, 0) == 0);
+    }
     mpe_test_end (tp);
     return tp -> failures;
 } /* ------------------- 6. body materials are live at construction time */
