@@ -430,6 +430,11 @@ Notes:
   pad (regulation walls at ±1.83 m; the pad surface is the outside ground
   for alliance areas and trays). Re-running is a no-op (state-verified).
   `scene_clear` first for a fresh field.
+- Clearing the world (scene menu `9 3`, terminal `rm -rf /obj/all`,
+  loading a scene) forgets the WHOLE league — robots, balls, bucket,
+  BIOBUZZ pieces and scores, selection — so `ftc spawn` works immediately
+  after. (Previously the fleet survived the clear and spawn refused with
+  "one robot already".)
 - Staging follows §10.3 exactly: 4 pollen per flower, 4 per garden, 4
   preloaded per robot (absent robots' sets go to their loading zone),
   3 nectar per up-cell, 5 per alliance tray.

@@ -1581,3 +1581,66 @@ int mfs_t_yaw_stability (void) {
     mfs_test_end (t_ptr);
     return t_ptr -> failures;
 }
+/* fleet_clear: scene replacement must forget the league (reported as
+ * "9 3 then ftc spawn says one robot already"). Exercises the API
+ * directly AND the pre_step self-heal: attach, spawn robot + balls +
+ * bucket + BIOBUZZ field pieces, wipe the pool like scene_clear does,
+ * step once (self-heal fires), then assert everything is forgotten and
+ * a fresh spawn works. */
+int mfs_t_fleet_clear (void) {
+    mfs_test_t t;
+    mfs_test_begin (&t, "fleet_clear");
+    mfs_test_t *t_ptr = &t;
+    physics_world w;
+    mfs_test_world (&w);
+    extern const mpe_module_desc_t mpe_module_desc;
+    MFS_CHECK (t_ptr, physics_world_attach_module (&w, &mpe_module_desc) >= 0);
+    int s0 = ftc_fleet_spawn (&w, 0.0f, ftc_robot_rest_height (), 0.0f, MOTOR_GB_5203_26_9, FTC_DRIVETRAIN_MECANUM);
+    MFS_CHECK (t_ptr, s0 >= 0);
+    MFS_CHECK (t_ptr, ftc_balls_spawn (&w, 3) == 3);
+    MFS_CHECK (t_ptr, ftc_bucket_spawn (&w, 0.0f, 1.0f, 4.0f) == 0);
+    MFS_CHECK (t_ptr, ftc_biobuzz_field (&w) == 0);
+    MFS_CHECK (t_ptr, ftc_biobuzz_match (&w) > 0);
+    MFS_CHECK (t_ptr, ftc_fleet_select (&w, 0) == 0);
+    MFS_CHECK (t_ptr, ftc_fleet_count (&w) == 1);
+    /* Direct API: everything forgotten, allocations kept (respawn works). */
+    MFS_CHECK (t_ptr, ftc_fleet_clear (&w) == 0);
+    MFS_CHECK (t_ptr, ftc_fleet_count (&w) == 0);
+    MFS_CHECK (t_ptr, ftc_fleet_selected (&w) == -1);
+    {
+        int carried = -1, balls = -1, scored = -1, bucket = -1;
+        MFS_CHECK (t_ptr, ftc_game_stats (&w, &carried, &balls, &scored, &bucket) == 0);
+        MFS_CHECK (t_ptr, carried == 0 && balls == 0 && scored == 0 && bucket == 0);
+    }
+    {
+        int tr = -1, tb = -1, ur = -1, ub = -1;
+        MFS_CHECK (t_ptr, ftc_biobuzz_tips (&w, &tr, &tb, &ur, &ub) == 0);
+        MFS_CHECK (t_ptr, tr == 0 && tb == 0 && ur == 0 && ub == 0);
+    }
+    int s1 = ftc_fleet_spawn (&w, 0.0f, ftc_robot_rest_height (), 0.0f, MOTOR_GB_5203_26_9, FTC_DRIVETRAIN_MECANUM);
+    MFS_CHECK (t_ptr, s1 == 0);
+    /* Self-heal: wipe the pool behind the fleet's back (what scene_clear
+     * does) leaving one stranger body — an empty pool early-returns from
+     * the step before pre_step runs, so the stranded case is a REPLACED
+     * pool (F-key spawns, loads). Step: the fleet must notice everything
+     * tracked is dead and forget. Fresh ids (monotonic allocator) can
+     * never alias the dead ones. */
+    w.body_count = 0;
+    int stranger = physics_world_add_cube (&w, (vector3) {0.0f, 5.0f, 0.0f}, (vector3) {0.5f, 0.5f, 0.5f}, 1.0f);
+    MFS_CHECK (t_ptr, stranger >= 0);
+    int fail = 0;
+    for (int k = 0; k < 5 && !fail; k++) {
+        physics_world_step (&w, DT);
+        if (!mfs_test_finite (&w)) { fail = 1; }
+    }
+    MFS_CHECK (t_ptr, fail == 0);
+    MFS_CHECK (t_ptr, ftc_fleet_count (&w) == 0);
+    MFS_CHECK (t_ptr, ftc_fleet_selected (&w) == -1);
+    /* And spawning works again immediately (the reported failure mode). */
+    int s2 = ftc_fleet_spawn (&w, 0.0f, ftc_robot_rest_height (), 0.0f, MOTOR_GB_5203_26_9, FTC_DRIVETRAIN_MECANUM);
+    MFS_CHECK (t_ptr, s2 == 0);
+    physics_world_cleanup (&w);
+    if (t_ptr -> failures == 0) { printf ("[PASS] fleet_clear: scene replacement forgets the league\n"); }
+    mfs_test_end (t_ptr);
+    return t_ptr -> failures;
+}
