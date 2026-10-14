@@ -1722,6 +1722,15 @@ findable with a standalone probe.
 
 ## [MECANUM-PIVOT] Mecanum pivot yaw runs ~3.5x past the kinematic ceiling (OPEN, pre-existing)
 
+> DESPOT-2026-10-14 status note: the DRIVER-VISIBLE runaway is now bounded
+> (yaw governor + active damper in `ftc_robot_update`, gamepad expo; sustained
+> full rotate caps at -4.4 rock-steady vs -13.5 still creeping, gated by the
+> new `yaw_stability`). Everything below stands UNCHANGED as the underlying
+> defect analysis: the analytic path still has no longitudinal traction, the
+> damping shortfall is still structural (plus a measured lift feedback), and
+> the rejected patches below stay rejected. Stability control bounds the
+> symptom; it does not fix the tire. Do not close this on the gate.
+
 **Not fixed.** Recorded with its diagnosis because the obvious fixes make the
 drivetrain worse, and that is worth more than a bad patch.
 
@@ -1913,3 +1922,45 @@ the split: anchors asserted as spec, repose/symmetry as self-consistency.
   machine-readable). Mirroring the field (red/blue swapped) is a
   four-constant change; the gates assert internal consistency, so a mirror
   stays green.
+
+## [YAW-HANDLING] No yaw saturation + lift feedback + linear sticks (BOUNDED 2026-10-14)
+
+Driver report: "like trying to control a Ferrari F14T — oversteer then
+understeer all in one go, precarious." Measured, not vibes:
+
+- **Runaway:** step rotate=1.0 climbs -0.64 → -6.25 rad/s over 4 s with no
+  saturation in human timescales (20 s run: -13.5 still creeping). Wheels
+  sit at free speed (~215 rpm) with ~zero motor torque while yaw keeps
+  climbing — self-excited, not motor-driven.
+- **Zero passive decay:** command dropped to 0.04 (no idle switch, no
+  brake): -6.17 → -3.7 over 8 s. Release-to-zero stops dead in 20 ticks
+  only via brake + idle tires — all active, nothing passive.
+- **Lift feedback:** past ~3.5-4 rad/s the chassis rises ~1 cm (0.182 →
+  0.192) and wheel clearance parks at the 1 cm analytic contact gate,
+  flickering the only tangential force path on/off. Spin → lift → less
+  damping → more spin. (At rest the robot sits touching, clearance ±0.000
+  rock-steady — the hover is spin-induced.)
+- **Cut chatter while steering:** traction scale bounces 0.15-0.89
+  throughout (torque pulsing ≈ the surge cycle).
+- **Non-monotone strafe:** 0.4→-0.48, 0.5→-0.36, 0.6→-0.26 m/s (regime
+  jumping; untouched by this fix — deferred, see below).
+- **Linear sticks:** full deflection = instant full rotate into the above.
+
+**Bounded by (not fixed):** (1) yaw governor — delivered motor torque
+scales 1.0→0.15 over yaw 3.0→4.5 rad/s, all wheels equally (mixer
+directionality preserved); alone it only HALVED the growth rate (drive
+persists through contact at 0.15x), (2) active yaw damper — pure
+differential couple opposing spin, same deadband, unscaled authority
+(the governor floor would neuter it; cone-safe ≤6.3 N/wheel), (3) gamepad
+expo x^1.5 (UI-side only, endpoints preserved). Result: sustained full
+rotate caps at -4.4 ±0.03 over 900+ ticks; release still snaps clean.
+`yaw_stability` gates the cap (proven red pre-fix at 11.07/10.81).
+
+**Deliberately NOT touched:** analytic VREF (binary lateral feel;
+F2 margin thin), cut slam immediacy (debounce to 3 ticks broke
+drive_directions cross-talk + heading hold — reverted with cause),
+mixer rotate authority (structural gates pin it), strafe progression
+(separate regime-jump defect, ticketed). The lift mechanism itself
+(joint pump vs gyro ratchet) is un-instrumented — the governor keeps
+drivers out of its regime; the physics stays open alongside
+[MECANUM-PIVOT].

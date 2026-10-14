@@ -22,17 +22,18 @@ What the suite contains, what each gate proves, and how to run it.
   `tests/mfs_test_common.h` (tile slab top y=0, μ 1.0/0.8, e=0). Robot tests
   pin **128 solver iterations** (40:1 chassis/wheel mass ratio).
 
-## Current status (2026-10-14): 25/26
+## Current status (2026-10-14): 26/27
 
 One gate is **red**: `tank` (pivot heading/translation baselines — still
 red after the observer Q-filter moved it 2.37→2.78 / 0.043→0.118 with
-cause chain in [OBSERVER-Q]; no baseline touched). `odometry_yaw` went
-red→GREEN on the Q-filter (tank yaw magnitude now within tolerance).
-`partial_throttle` and `bucket_game` are green after re-derivation to
-saturation-tolerant laws (old numbers proven chatter-inflated, cause
-chains in-gate). The earlier `drive_directions` red resolved; the
-2026-10-09 "14/17" line and the CCD-margin narrative below it are
-historical. Full measurements and the root-cause write-ups are in
+cause chain in [OBSERVER-Q]; the yaw governor/damper left its numbers
+bit-identical — peaks never reach the 3.0 band; no baseline touched).
+`odometry_yaw` went red→GREEN on the Q-filter. `partial_throttle` and
+`bucket_game` are green after re-derivation to saturation-tolerant laws.
+The new `yaw_stability` gate is green (proven red pre-fix). The earlier
+`drive_directions` red resolved; the 2026-10-09 "14/17" line and the
+CCD-margin narrative below it are historical. Full measurements and the
+root-cause write-ups are in
 [`KNOWN_FAILURES.md`](KNOWN_FAILURES.md) → `[TANK-PIVOT-*]` /
 `[ODOMETRY-YAW]` (search the archives for `[CCD-OBSTACLE-MARGIN]` for the older
 set).
@@ -64,6 +65,7 @@ set).
 | `biobuzz_flower` | constructed stack (bottom red nectar, 2 pollen, top blue nectar) + red-garden pieces, 90 ticks | red: owned 0 + bottom 5 + garden 3 = 8; blue: owned 4×2=8 + bottom 5 = 13 (Table 10-2 ownership/colours) |
 | `biobuzz_table` | pure predicates, no world | Table 10-2 values (3/5/20/20/2/5/2/1), RP thresholds (swarm 16, P1 4, P2 7), piece spec (40/16, radii), start poses (walls/yaw/zones) |
 | `select` | two worlds, two robots in the first | fresh attach reads −1; default 0 after first spawn; OOB selects fail −1 leaving stored untouched; second world independent; drive routed through the selection moves robot 1 (> 0.30 m) while robot 0 holds (< 0.20 m) — pins the terminal/gamepad controlled-robot routing |
+| `yaw_stability` | rotate=1.0 for 600 ticks, peak + end yaw | peak < 6.0 rad/s and end < 5.5 (pre-fix: 11.07/10.81 — unbounded spin with ~zero passive decay + lift feedback; post-fix cap ≈ 4.4 rock-steady via governor + active damper). See [YAW-HANDLING] |
 
 Physics-truth notes: T6/T8 test the **motor model isolated** (no
 joints/world) because the jointed air-spin plant is a documented limit

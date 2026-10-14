@@ -74,7 +74,10 @@ void drivetrain_mecanum (ftc_robot *robot, float forward, float strafe, float ro
        only the strafe sign moves here, not the pairing): the anti-diagonal
        pairing was A/B tested against the diagonal pairing over a
        steady-state window (ticks 180..240, after 180 ticks of drive).
-       Pure rotate gives +2.289 rad/s for r=+1 and -2.030 rad/s for r=-1:
+       Pure rotate gives -4.47 rad/s for r=+1 and +4.42 rad/s for r=-1
+       (DESPOT-2026-10-14: the old +2.289/-2.030 were stale twice over —
+       first the atan2-fold artefact corrected to -5.68 in mfs_suite_a.c,
+       now the yaw governor caps the ramp at ~4.5):
        correct sign, correct anti-symmetry — a healthy mecanum turn. The
        diagonal pairing gives the same magnitudes INVERTED. Both pairings
        produce equal-and-opposite pure torque on paper, which is exactly

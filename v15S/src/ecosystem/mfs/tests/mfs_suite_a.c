@@ -788,9 +788,13 @@ int mfs_t_drive_directions (void) {
      * against a 20 A pack PTC, which integrates (36.8-20)/20 per second and
      * trips in about 1.2 s, after which battery_get_voltage() returns the
      * 1.2 V brownout and the drive nearly stops. Measured steady-state yaw
-     * for the same rotate +1 command: +2.29 rad/s after a command-free
-     * settle on a fresh pack, +0.46 rad/s after 330 ticks of continuous
-     * driving on the same fresh pack. That 5x spread is real pack physics,
+     * for the same rotate +1 command: -4.47 rad/s after a command-free
+     * settle on a fresh pack (DESPOT-2026-10-14: was +2.29, stale twice —
+     * atan2-fold artefact, then the yaw governor capping the ramp; sign
+     * corrected with the fold fix), +0.46 rad/s after 330 ticks of
+     * continuous driving on the same fresh pack (pre-governor record; the
+     * spread point stands — brownout physics is untouched by the
+     * governor). That 5x spread is real pack physics,
      * not model instability, and gating it would make this test a
      * measurement of battery state wearing a drivetrain's clothes.
      *

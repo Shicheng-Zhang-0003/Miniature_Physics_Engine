@@ -423,6 +423,19 @@ Notes:
 - The arcade league (`ftc spawn` + bucket, intake/shoot) is untouched and
   coexists on the same pad.
 
+### Gamepad Feel
+
+Sticks run through an expo curve (x^1.5, endpoints preserved) so small
+corrections are fine and full deflection still gives full command —
+linear sticks handed the driver the whole yaw runaway with millimeter
+precision. The plant itself caps sustained yaw ~4.4 rad/s (governor +
+active damper; see `ecosystem/mfs/docs/KNOWN_FAILURES.md` →
+[YAW-HANDLING]) instead of spinning past 13 rad/s, and hard braking on
+release still stops dead. If it still feels darty, drive with smaller
+stick motions: expo rewards that. Button map: START toggles control,
+BACK cycles the controlled robot, LB+RB e-stop, LT hold = intake,
+RT/A = shoot, B = eject.
+
 ## Validation Tests
 
 The engine includes built-in test keys for stability validation:
