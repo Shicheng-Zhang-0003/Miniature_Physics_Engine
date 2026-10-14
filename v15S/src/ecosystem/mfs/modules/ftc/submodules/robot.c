@@ -5,21 +5,7 @@
 #include "config/mpe_config.h"
 #include <math.h>
 #include <string.h>
-/* Robot dimensions (metres, approximate FTC 18" x 18" chassis) */
-#define CHASSIS_HALF_X 0.225f
-#define CHASSIS_HALF_Y 0.075f
-#define CHASSIS_HALF_Z 0.225f
-#define CHASSIS_MASS 8.0f /* ~18 lb robot */
-#define WHEEL_RADIUS 0.05f /* 100mm wheels */
-#define WHEEL_MASS 0.2f
-#define WHEEL_HALF_WIDTH 0.02f /* 40mm wide wheels */
-#define WHEEL_OFFSET_X 0.24f /* slightly outside chassis */
-#define WHEEL_OFFSET_Z 0.20f
-#define WHEEL_Y_OFFSET                                                                                                 \
-    (-CHASSIS_HALF_Y - WHEEL_RADIUS -                                                                                  \
-     0.005f) /* MFS_PORT_V15S: 5mm ground clearance. The old +0.01f tucked wheel tops 10mm INSIDE the chassis box, so the contact solver fought the joint-held pose every tick (sinking, chatter, pitch-unload). Joints hold anchors, not volumes — interpenetrating rest poses are solver poison. */
-#define WHEEL_PRELOAD                                                                                                  \
-    0.002f /* MFS_PORT_V15S: joint anchors sit 2mm BELOW exact touch so P2P preloads wheels into persistent floor contact. Inside slop (10mm): no positional fight, but the manifold never grazes out to a hover-skid (which starves odometry). Real suspensions run droop/preload the same way. */
+/* Robot dimensions live in robot.h (single source of truth). */
 /* ---------------------------------------------------------------------
  * MECANUM ROLLER GEOMETRY (real dimensions, not a force model)
  *

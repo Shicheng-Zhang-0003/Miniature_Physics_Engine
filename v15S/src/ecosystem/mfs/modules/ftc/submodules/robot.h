@@ -7,6 +7,28 @@
 #include "intake.h"
 #include "core/physics_world.h"
 #define FTC_MAX_WHEELS 8
+/* Robot dimensions (metres). Single source of truth — robot.c (builder),
+ * drivetrain.c (odometry yaw arms) and biobuzz.c (start poses) all read
+ * these; no TU keeps a private copy (that is how the 0.44->0.45 arm drift
+ * happened once). Regulation target: the whole footprint fits the FTC
+ * 18 in (0.4572 m) starting cube with margin. */
+#define CHASSIS_HALF_X 0.17f
+#define CHASSIS_HALF_Y 0.075f
+#define CHASSIS_HALF_Z 0.17f
+#define CHASSIS_MASS 8.0f /* ~18 lb robot */
+#define WHEEL_RADIUS 0.05f /* 100mm wheels */
+#define WHEEL_MASS 0.2f
+#define WHEEL_HALF_WIDTH 0.02f /* 40mm wide wheels */
+#define WHEEL_OFFSET_X 0.20f /* wheel-centre stance: outer edge 0.22, 10 mm
+                              * clear of the chassis (zero interpenetration;
+                              * the old 0.24 overlapped the box 5 mm) and
+                              * 17 mm inside the 18 in cube */
+#define WHEEL_OFFSET_Z 0.17f
+#define WHEEL_Y_OFFSET                                                                                                 \
+    (-CHASSIS_HALF_Y - WHEEL_RADIUS -                                                                                  \
+     0.005f) /* MFS_PORT_V15S: 5mm ground clearance. The old +0.01f tucked wheel tops 10mm INSIDE the chassis box, so the contact solver fought the joint-held pose every tick (sinking, chatter, pitch-unload). Joints hold anchors, not volumes — interpenetrating rest poses are solver poison. */
+#define WHEEL_PRELOAD                                                                                                  \
+    0.002f /* MFS_PORT_V15S: joint anchors sit 2mm BELOW exact touch so P2P preloads wheels into persistent floor contact. Inside slop (10mm): no positional fight, but the manifold never grazes out to a hover-skid (which starves odometry). Real suspensions run droop/preload the same way. */
 /* MFS_DRIVETRAIN_TYPE: explicit wheel/traction model selection. */
 typedef enum { FTC_DRIVETRAIN_MECANUM = 0, FTC_DRIVETRAIN_TANK = 1 } ftc_drivetrain_type;
 typedef struct {

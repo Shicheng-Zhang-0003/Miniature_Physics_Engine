@@ -74,10 +74,12 @@ void drivetrain_mecanum (ftc_robot *robot, float forward, float strafe, float ro
        only the strafe sign moves here, not the pairing): the anti-diagonal
        pairing was A/B tested against the diagonal pairing over a
        steady-state window (ticks 180..240, after 180 ticks of drive).
-       Pure rotate gives -4.47 rad/s for r=+1 and +4.42 rad/s for r=-1
+       Pure rotate gives -4.50 rad/s for r=+1 and +4.44 rad/s for r=-1
        (DESPOT-2026-10-14: the old +2.289/-2.030 were stale twice over —
        first the atan2-fold artefact corrected to -5.68 in mfs_suite_a.c,
-       now the yaw governor caps the ramp at ~4.5):
+       now the yaw governor caps the ramp at ~4.5; DESPOT-2026-10-14b: the
+       18-inch footprint resize (track 0.48 -> 0.40) left these essentially
+       unmoved, as expected — the cap, not the track, binds):
        correct sign, correct anti-symmetry — a healthy mecanum turn. The
        diagonal pairing gives the same magnitudes INVERTED. Both pairings
        produce equal-and-opposite pure torque on paper, which is exactly
@@ -496,13 +498,15 @@ static void drivetrain_odometry_update (physics_world *world, ftc_robot *robot, 
          * at all.
          *
          * Mecanum yaw moment arm is (Lx + Lz) -- the WHEEL track, not the
-         * chassis box: WHEEL_OFFSET_X (0.24) + WHEEL_OFFSET_Z (0.20) = 0.44 m
-         * (robot.c). The 0.45 introduced 2026-10-05 was justified with
-         * CHASSIS_HALF_X/Z (0.225), which are the chassis COLLISION BOX
-         * half-extents and have nothing to do with where the wheels sit; it was
-         * a 2.27% yaw-rate bias layered on the wrong-sign bug. Reverted here.
+         * chassis box: WHEEL_OFFSET_X + WHEEL_OFFSET_Z (robot.h -- the 0.45
+         * introduced 2026-10-05 was justified with CHASSIS_HALF_X/Z, which
+         * are the chassis COLLISION BOX half-extents and have nothing to do
+         * with where the wheels sit; it was a 2.27% yaw-rate bias layered
+         * on the wrong-sign bug. Reverted here. Computed from the defines
+         * so a footprint change cannot silently re-bias odometry (the exact
+         * drift class that produced the 0.45 episode).
          * docs/MODELS.md already documented 0.44 throughout. */
-        yaw_rate = (((wfl - wfr + wbl - wbr) * 0.25f) * r) / 0.44f;
+        yaw_rate = (((wfl - wfr + wbl - wbr) * 0.25f) * r) / (WHEEL_OFFSET_X + WHEEL_OFFSET_Z);
     } else if (robot -> wheel_count >= 2) {
         float wl = 0.0f, wr = 0.0f;
         for (int i = 0; i < robot -> wheel_count; i++) {
@@ -516,9 +520,10 @@ static void drivetrain_odometry_update (physics_world *world, ftc_robot *robot, 
          * Measured: tank L+0.5/R-0.5 gives true yaw +0.1293 rad over 20 ticks
          * while odom_theta read -0.3993. Corrected to (wl - wr): a positive
          * left-minus-right wheel-speed difference is a positive rotation about
-         * +Y. Arm is 2*Lx = 2*WHEEL_OFFSET_X = 0.48 m, unchanged and already
-         * correct (it uses the wheel offset, not the chassis box). */
-        yaw_rate = ((wl - wr) * r) / 0.48f;
+         * +Y. Arm is 2*Lx = 2*WHEEL_OFFSET_X (robot.h), unchanged and already
+         * correct (it uses the wheel offset, not the chassis box). Computed
+         * from the define (see mecanum arm note above). */
+        yaw_rate = ((wl - wr) * r) / (2.0f * WHEEL_OFFSET_X);
     } robot -> odom_theta += yaw_rate * dt;
     /* DESPOT-FIX (math lie): odom_theta grew unbounded and cosf/sinf lost
      * precision on long runs (libm trig error grows with |theta|; past ~1e4
