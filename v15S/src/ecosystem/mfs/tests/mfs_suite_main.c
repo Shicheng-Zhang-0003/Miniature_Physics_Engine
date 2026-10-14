@@ -36,6 +36,7 @@ extern int mfs_t_biobuzz_tip (void);
 extern int mfs_t_biobuzz_flower (void);
 extern int mfs_t_biobuzz_table (void);
 extern int mfs_t_select (void);
+extern int mfs_t_yaw_stability (void);
 static const mfs_test_entry_t registry [] = {
     {"teleop", mfs_t_teleop, false},
     {"mecanum", mfs_t_mecanum, false},
@@ -63,6 +64,7 @@ static const mfs_test_entry_t registry [] = {
     {"biobuzz_flower", mfs_t_biobuzz_flower, false},
     {"biobuzz_table", mfs_t_biobuzz_table, false},
     {"select", mfs_t_select, false},
+    {"yaw_stability", mfs_t_yaw_stability, false},
 };
 int main (int argc, char **argv) {
     if (argc > 1 && strcmp (argv [1], "--list") == 0) {

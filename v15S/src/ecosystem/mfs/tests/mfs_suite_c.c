@@ -1536,3 +1536,48 @@ int mfs_t_select (void) {
     mfs_test_end (t_ptr);
     return t_ptr -> failures;
 }
+/* yaw_stability: sustained full rotate must saturate, not run away.
+ * The plant had ~zero passive yaw damping with a lift feedback past
+ * ~3.5-4 rad/s (chassis rises ~1 cm, contacts unload to the slop
+ * boundary): measured -13.5 rad/s over 20 s still creeping. The yaw
+ * governor + active damper cap it ~4.4 rock-steady. Gate: 600 ticks of
+ * rotate=1 peaks below 6.0 and ends bounded (pre-fix: peak 10.8, end
+ * -10.8 — fails both). */
+int mfs_t_yaw_stability (void) {
+    mfs_test_t t;
+    mfs_test_begin (&t, "yaw_stability");
+    mfs_test_t *t_ptr = &t;
+    physics_world w;
+    mfs_test_world (&w);
+    extern const mpe_module_desc_t mpe_module_desc;
+    MFS_CHECK (t_ptr, physics_world_attach_module (&w, &mpe_module_desc) >= 0);
+    int si = ftc_fleet_spawn (&w, 0.0f, ftc_robot_rest_height (), 0.0f, MOTOR_GB_5203_26_9, FTC_DRIVETRAIN_MECANUM);
+    MFS_CHECK (t_ptr, si >= 0);
+    ftc_robot *robot = ftc_fleet_get (&w, si);
+    MFS_CHECK (t_ptr, robot != NULL);
+    float peak = 0.0f;
+    int fail = 0;
+    for (int k = 0; k < 600 && !fail; k++) {
+        mfs_drive_mecanum (robot, 0.0f, 0.0f, 1.0f);
+        physics_world_step (&w, DT);
+        if (!mfs_test_finite (&w)) { fail = 1; break; }
+        rigidbody *ch = mfs_chassis_or_null (&w, robot);
+        if (ch) {
+            float y = fabsf (ch -> angular_velocity.y);
+            if (y > peak) { peak = y; }
+        }
+    }
+    MFS_CHECK (t_ptr, fail == 0);
+    MFS_INFO ("sustained-rotate peak yaw=%.3f", peak);
+    MFS_CHECK (t_ptr, peak < 6.0f);
+    {
+        rigidbody *ch = mfs_chassis_or_null (&w, robot);
+        float end_yaw = ch ? fabsf (ch -> angular_velocity.y) : 99.0f;
+        MFS_INFO ("end yaw=%.3f", end_yaw);
+        MFS_CHECK (t_ptr, end_yaw < 5.5f);
+    }
+    physics_world_cleanup (&w);
+    if (t_ptr -> failures == 0) { printf ("[PASS] yaw_stability: sustained rotate saturates, never runs away\n"); }
+    mfs_test_end (t_ptr);
+    return t_ptr -> failures;
+}
