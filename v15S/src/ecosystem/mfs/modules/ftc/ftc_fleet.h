@@ -34,7 +34,12 @@ int ftc_fleet_spawn (struct physics_world *world, float x, float y, float z, mot
                      ftc_drivetrain_type drivetrain_type);
 /* Live robot count in the world's fleet (0 if none attached). */
 int ftc_fleet_count (struct physics_world *world);
-/* Controlled-robot selection (per world; terminal `ftc select`, gamepad
+/* Full league reset (scene_clear / load / rm -rf replaced the body pool):
+ * forgets robots, balls, bucket, BIOBUZZ state and selection, keeps
+ * allocations. The fleet pre_step self-heals the same way when it finds
+ * nothing tracked alive; UI paths call this synchronously so a paused
+ * engine still clears. Returns 0 ok, -1 no fleet. */
+int ftc_fleet_clear (struct physics_world *world);/* Controlled-robot selection (per world; terminal `ftc select`, gamepad
  * BACK cycles). select: 0<=index<count sets and returns index, else -1
  * leaving stored untouched. selected: stored index (0 default), -1 when
  * no fleet/robots. */

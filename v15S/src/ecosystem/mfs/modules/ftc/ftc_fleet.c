@@ -147,6 +147,44 @@ int ftc_fleet_count (struct physics_world *world) {
     ftc_fleet_t *f = fleet_of (world);
     return f ? f -> count : 0;
 }
+/* Full league reset: forget every robot, ball, bucket part, BIOBUZZ piece,
+ * tip/unlock/score, and the selection — but keep the allocations (robots
+ * array + cap), so a fresh match can spawn without realloc. Bodies already
+ * belong to the world (scene_clear/load removed them); ids dangle safely
+ * and every consumer re-resolves per tick. Returns 0 ok, -1 no fleet. */
+int ftc_fleet_clear (struct physics_world *world) {
+    ftc_fleet_t *f = fleet_of (world);
+    if (!world || !f) { return -1; }
+    if (f -> robots && f -> cap > 0) {
+        memset (f -> robots, 0, (size_t) f -> cap * sizeof (ftc_robot));
+        /* Mirror create-time poisoning: memset zeroes alias live id 0 /
+         * joint 0 (the exact alias bug the create path documents). Slots
+         * are unreachable at count 0, but poison anyway — a reader that
+         * forgets the count gate must see -1, never a valid index. */
+        for (int i = 0; i < f -> cap; i++) {
+            ftc_robot *r = &f -> robots [i];
+            r -> chassis_body = -1;
+            memset (r -> wheel_bodies, 0xFF, sizeof (r -> wheel_bodies));
+            memset (r -> wheel_joints, 0xFF, sizeof (r -> wheel_joints));
+            memset (r -> roller_bodies, 0xFF, sizeof (r -> roller_bodies));
+            memset (r -> roller_joints, 0xFF, sizeof (r -> roller_joints));
+            memset (r -> intake_balls, 0xFF, sizeof (r -> intake_balls));
+            for (int k = 0; k < FTC_MAX_WHEELS; k++) { r -> wheel_traction_scale [k] = 1.0f; }
+        }
+    }
+    f -> count = 0;
+    f -> selected = 0;
+    memset (f -> ball_ids, 0xFF, sizeof (f -> ball_ids));
+    f -> ball_count = 0;
+    memset (f -> bucket_part_ids, 0xFF, sizeof (f -> bucket_part_ids));
+    f -> bucket_active = 0;
+    f -> bucket_scored = 0;
+    f -> bucket_cx = 0.0f;
+    f -> bucket_cy = 0.0f;
+    f -> bucket_cz = 0.0f;
+    memset (&f -> bb, 0, sizeof (f -> bb));
+    return 0;
+}
 /* Controlled-robot selection (per world; terminal `ftc select`, gamepad
  * BACK). select: 0<=index<count sets and returns index, else -1 leaving
  * the stored value untouched. selected: stored index, defensively
@@ -457,6 +495,40 @@ int ftc_biobuzz_hive (struct physics_world *world, int hive, int out_ids [11]) {
 static void ftc_game_update (struct physics_world *world, ftc_fleet_t *f, float dt) {
     (void) dt;
     if (!world || !f) { return; }
+    /* Scene-clear self-heal: scene_clear / rm -rf / scene load replace the
+     * body pool wholesale without telling the fleet (bodies belong to the
+     * world, state belongs to us). If NOTHING tracked is alive anymore —
+     * no live chassis, ball, bucket part, or BIOBUZZ piece — the whole
+     * league is stale: forget it, same as ftc_fleet_clear. This covers
+     * every present and future clear path with no UI call sites to keep in
+     * sync (the menu/terminal paths below also clear synchronously for
+     * the paused-stepping case). Sleeping/kinematic/parked bodies are
+     * still indexed-alive, so settled matches never false-trigger; only
+     * wholesale removal does. */
+    {
+        int live = 0;
+        for (int i = 0; i < f -> count && !live; i++) {
+            int bi = f -> robots [i].chassis_body;
+            if (bi >= 0 && bi < world -> body_count) { live = 1; }
+        }
+        for (int i = 0; i < f -> ball_count && !live; i++) {
+            if (physics_world_index_by_id (world, (uint32_t) f -> ball_ids [i]) >= 0) { live = 1; }
+        }
+        if (f -> bucket_active) {
+            for (int i = 0; i < 5 && !live; i++) {
+                if (physics_world_index_by_id (world, (uint32_t) f -> bucket_part_ids [i]) >= 0) { live = 1; }
+            }
+        }
+        for (int i = 0; i < f -> bb.piece_count && !live; i++) {
+            if (physics_world_index_by_id (world, (uint32_t) f -> bb.piece_ids [i]) >= 0) { live = 1; }
+        }
+        int bb_busy = (f -> bb.field_built || f -> bb.tips [0] || f -> bb.tips [1] || f -> bb.unlocked [0] ||
+                       f -> bb.unlocked [1]);
+        if (!live && (f -> count > 0 || f -> ball_count > 0 || f -> bucket_active || f -> bb.piece_count > 0 ||
+                      bb_busy || f -> selected != 0)) {
+            ftc_fleet_clear (world);
+        }
+    }
     for (int i = 0; i < f -> count; i++) {
         ftc_robot *r = &f -> robots [i];
         rigidbody *ch = fleet_chassis (world, r);
