@@ -4,6 +4,22 @@
 * Owns: scene menu key handling, editor menu update, config menu update.
 */
 #include "../mpe_engine.h"
+#include "../core/mpe_loader.h"
+#include "../core/physics_world.h"
+/* Scene-replacement fleet reset (DESPOT-2026-10-14): scene_clear/load wipe
+ * or replace the body pool without telling the ftc-fleet module, whose
+ * robot count/balls/bucket/BIOBUZZ state would otherwise go stale ("one
+ * robot already" after 9 3; stranger-driving after load). Resolved
+ * dynamically — the engine never links FTC (same pattern as term_ftc.c);
+ * absent bundle = no fleet = nothing to do. The fleet pre_step self-heal
+ * covers any path missed here (e.g. stepping paused). Mirrored in
+ * term_fs.c (rm -rf) and term_admin.c (mount). */
+static void fleet_clear_on_scene_replace (void) {
+    typedef int (*clear_fn) (struct physics_world *);
+    clear_fn fn = (clear_fn) mpe_loader_symbol ("mfs-simulator", "ftc_fleet_clear");
+    if (!fn) { fn = (clear_fn) mpe_loader_symbol ("ecosystem/mfs/plugins/mpe_ftc.so", "ftc_fleet_clear"); }
+    if (fn) { fn (physics_world_get_primary ()); }
+}
 void simulation_menu_dispatch (GtkWidget *parent_window) {
     /* Scene menu: 9 key bindings. All failures are reported via event_log
      * (visible in terminal dmesg) and stdout so save/load never fails
@@ -22,7 +38,10 @@ void simulation_menu_dispatch (GtkWidget *parent_window) {
         main_inputs.is_menu_open = false;
     }
     if (main_inputs.menu_2_pressed) {
-        if (scene_loading ("status/scene.dat")) { event_log_push (0, "scene loaded from status/scene.dat"); } else {
+        if (scene_loading ("status/scene.dat")) {
+            event_log_push (0, "scene loaded from status/scene.dat");
+            fleet_clear_on_scene_replace ();
+        } else {
             event_log_push (2, "scene load FAILED (see stderr LDF*)");
             fprintf (stderr, "[menu] scene load failed\n");
         } editor_reset ();
@@ -33,6 +52,7 @@ void simulation_menu_dispatch (GtkWidget *parent_window) {
         scene_clear ();
         clear_selection ();
         contact_cache_clear (physics_world_get_primary ());
+        fleet_clear_on_scene_replace ();
         editor_reset ();
         main_inputs.menu_3_pressed = false;
         main_inputs.is_menu_open = false;

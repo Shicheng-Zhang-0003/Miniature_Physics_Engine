@@ -5,6 +5,8 @@
  * Shared shell core lives in debug_terminal.c; see term_priv.h. */
 #include "../core/mpe_platform.h"
 #include "../mpe_engine.h"
+#include "../core/mpe_loader.h"
+#include "../core/physics_world.h"
 #include "debug_terminal.h"
 #include "term_priv.h"
 #include <stdio.h>
@@ -144,12 +146,20 @@ void cmd_cp (int argc, char **argv) {
     int created_index = term_duplicate_object (source_index);
     if (created_index >= 0) { term_printf ("term_ok", "/obj/%d\n", created_index); }
 }
+/* Scene-replacement fleet reset — mirrored helper, see
+ * simulation_menu_dispatch.c (menu 9-2/9-3) and term_admin.c (mount).
+ * Engine never links FTC: dynamic resolve, absent bundle = no fleet. */
+static void term_fs_fleet_clear (void) {
+    typedef int (*clear_fn) (struct physics_world *);
+    clear_fn fn = (clear_fn) mpe_loader_symbol ("mfs-simulator", "ftc_fleet_clear");
+    if (!fn) { fn = (clear_fn) mpe_loader_symbol ("ecosystem/mfs/plugins/mpe_ftc.so", "ftc_fleet_clear"); }
+    if (fn) { fn (physics_world_get_primary ()); }
+}
 void cmd_rm (int argc, char **argv) {
     if (argc < 2) {
         term_err ("usage: rm [-rf] <path...>\n");
         return;
-    } int delete_count = 0;
-    uint32_t *delete_ids = (argc > 1) ? (uint32_t *) malloc (sizeof (uint32_t) * (size_t) (argc - 1)) : NULL;
+    } int delete_count = 0;    uint32_t *delete_ids = (argc > 1) ? (uint32_t *) malloc (sizeof (uint32_t) * (size_t) (argc - 1)) : NULL;
     if ((argc > 1) && (!delete_ids)) { term_err ("mpe: rm: out of memory\n"); return; }
     for (int argument_index = 1; argument_index < argc; argument_index++) {
         if (argv [argument_index][0] == '-') { continue; }
@@ -175,6 +185,7 @@ void cmd_rm (int argc, char **argv) {
                 main_inputs.spawner_menu_level = 0;
                 main_inputs.velocity_menu_level = 0;
                 delete_count = 0;
+                term_fs_fleet_clear ();
                 term_ok ("removed all objects\n");
             } continue;
         }

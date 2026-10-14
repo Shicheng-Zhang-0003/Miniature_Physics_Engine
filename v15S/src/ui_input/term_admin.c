@@ -124,6 +124,8 @@ static int term_tee_write_status (const char *path, const char *text, size_t *by
  * Split from debug_terminal.c (pure motion, no behaviour change).
  * Shared shell core lives in debug_terminal.c; see term_priv.h. */
 #include "../mpe_engine.h"
+#include "../core/mpe_loader.h"
+#include "../core/physics_world.h"
 #include "debug_terminal.h"
 #include "term_priv.h"
 #include <stdio.h>
@@ -347,6 +349,17 @@ void cmd_mount (int argc, char **argv) {
     if (scene_loading (scene_path)) {
         editor_reset ();
         contact_cache_clear (physics_world_get_primary ());
+        /* Fleet reset on pool replacement — mirrored helper, see
+         * simulation_menu_dispatch.c. Loaded bodies alias stale fleet
+         * indices otherwise (stranger-driving). */
+        {
+            typedef int (*clear_fn) (struct physics_world *);
+            clear_fn fn = (clear_fn) mpe_loader_symbol ("mfs-simulator", "ftc_fleet_clear");
+            if (!fn) {
+                fn = (clear_fn) mpe_loader_symbol ("ecosystem/mfs/plugins/mpe_ftc.so", "ftc_fleet_clear");
+            }
+            if (fn) { fn (physics_world_get_primary ()); }
+        }
         term_printf ("term_ok", "mounted %s: %d objects loaded\n", scene_path,
                      (physics_world_get_primary () -> body_count));
         event_log_push (log_info, "Scene mounted via terminal: %s", scene_path);
