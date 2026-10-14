@@ -313,15 +313,36 @@ void gamepad_drive_tick (void) {
             (int (*) (struct physics_world *, int, int)) gpd_sym ("ftc_intake_set");
         int (*s_shoot) (struct physics_world *, int) =
             (int (*) (struct physics_world *, int)) gpd_sym ("ftc_shoot");
+        int (*s_shoot_pwr) (struct physics_world *, int, float) =
+            (int (*) (struct physics_world *, int, float)) gpd_sym ("ftc_shoot_power");
+        int (*s_shoot_aim) (struct physics_world *, int, float, float) =
+            (int (*) (struct physics_world *, int, float, float)) gpd_sym ("ftc_shoot_aimed");
         int (*s_eject) (struct physics_world *, int) =
             (int (*) (struct physics_world *, int)) gpd_sym ("ftc_eject");
         physics_world *wg = physics_world_get_primary ();
         int lt_now = (lt > 0.3f) ? 1 : 0; /* LT: hold = intake, release = off */
         if (lt_now && !s_prev_lt && s_set && wg) { s_set (wg, sel, 1); }
         if (!lt_now && s_prev_lt && s_set && wg) { s_set (wg, sel, 0); }
-        if (rt > 0.5f && !s_prev_rt && s_shoot && wg) { s_shoot (wg, sel); } /* RT: launch on press */
+        /* RT: analog power — the trigger value at the press edge scales
+         * the shot (soft lobs for hive mouths, full for range). Elevation
+         * rides the right stick Y (up = steeper, 50 deg centred, 20..80):
+         * right-X still rotates, so aiming is twin-stick. Older bundles
+         * fall back down the chain (aimed -> power -> full). Non-finite
+         * trigger reads never fire (pre-existing s_prev edge semantics
+         * preserved exactly). */
+        float ry = s_pad_axis ? s_pad_axis (&s_pad, gamepad_axis_right_y) : 0.0f;
+        float elev = 50.0f - 30.0f * ry;
+        if (!(elev >= 20.0f) || !(elev <= 80.0f)) { elev = 50.0f; }
+        if (rt > 0.5f && rt <= 1.0f && !s_prev_rt && wg) {
+            if (s_shoot_aim) { s_shoot_aim (wg, sel, rt, elev); }
+            else if (s_shoot_pwr) { s_shoot_pwr (wg, sel, rt); }
+            else if (s_shoot) { s_shoot (wg, sel); }
+        }
         if (a_now && !s_prev_a && s_toggle && wg) { s_toggle (wg, sel); }
-        if (y_now && !s_prev_y && s_shoot && wg) { s_shoot (wg, sel); }
+        if (y_now && !s_prev_y && wg) {
+            if (s_shoot_aim) { s_shoot_aim (wg, sel, 1.0f, elev); }
+            else if (s_shoot) { s_shoot (wg, sel); }
+        }
         if (b_now && !s_prev_b && s_eject && wg) { s_eject (wg, sel); }
         s_prev_lt = lt_now;
         s_prev_rt = (rt > 0.5f) ? 1 : 0;

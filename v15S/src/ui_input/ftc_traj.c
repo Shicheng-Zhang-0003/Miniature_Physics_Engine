@@ -169,18 +169,39 @@ static int ftrj_begin (physics_world *w, ftc_robot *r, rigidbody *ch) {
     pb -> restitution = ball -> restitution;
     pb -> friction_static = ball -> friction_static;
     pb -> friction_kinetic = ball -> friction_kinetic;
-    /* Launch state from the SAME helper the shooter uses (inherit chassis vel). */
+    /* Launch state from the SAME helpers the shooter uses (inherit chassis
+     * vel). Aimed parameters come from the last shot (full-power 50 deg
+     * until aimed shots exist), resolved with fallback so older bundles
+     * keep previewing the stock lob. */
     intake_launch_state st;
     /* Resolved by the caller (ftrj_begin is static; it re-resolves via the
      * symbol so it stays self-contained). */
     void (*p_launch) (vector3, vector4, vector3, intake_launch_state *) =
         (void (*) (vector3, vector4, vector3, intake_launch_state *)) ftrj_sym ("intake_launch_state_compute");
+    void (*p_launch_e) (vector3, vector4, vector3, float, intake_launch_state *) =
+        (void (*) (vector3, vector4, vector3, float, intake_launch_state *)) ftrj_sym (
+            "intake_launch_state_compute_elev");
+    int (*p_params) (struct physics_world *, float *, float *) =
+        (int (*) (struct physics_world *, float *, float *)) ftrj_sym ("ftc_last_shot_params");
     if (!p_launch) {
         physics_world_cleanup (&s_pred);
         s_pred_live = 0;
         return -1;
     }
-    p_launch (ch -> position, ch -> orientation, ch -> velocity, &st);
+    float lp = 1.0f, le = 50.0f;
+    if (p_params && w) { p_params (w, &lp, &le); }
+    if (!(lp >= 0.3f) || !(lp <= 1.0f)) { lp = 1.0f; }
+    if (!(le >= 20.0f) || !(le <= 80.0f)) { le = 50.0f; }
+    if (p_launch_e && (lp != 1.0f || le != 50.0f)) {
+        p_launch_e (ch -> position, ch -> orientation, ch -> velocity, le, &st);
+        /* Power-scale exactly like intake_shoot_aimed (relative component
+         * only; chassis inheritance untouched). */
+        vector3 rel = vector3_subtraction (st.velocity, ch -> velocity);
+        st.velocity = vector3_addition (ch -> velocity, vector3_scaling (rel, lp));
+        st.spin = vector3_scaling (st.spin, lp);
+    } else {
+        p_launch (ch -> position, ch -> orientation, ch -> velocity, &st);
+    }
     pb -> position = st.muzzle;
     pb -> velocity = st.velocity;
     pb -> angular_velocity = st.spin;

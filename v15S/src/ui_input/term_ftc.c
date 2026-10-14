@@ -8,7 +8,9 @@
  *   ftc telemetry               pose, odometry, battery, wheels, game state
  *   ftc intake on|off           fictional intake capture on/off
  *   ftc eject                   drop carried balls (no launch)
- *   ftc shoot                   launch oldest carried ball at the bucket arc
+ *   ftc shoot [power] [elev]    launch oldest carried ball (0.3..1.0 power,
+ *                               20..80 deg elevation; hive mouths need soft
+ *                               steep lobs, e.g. 0.65/70 from wall-adjacent)
  *   ftc balls [n]               scatter n arcade balls ahead (default 3)
  *   ftc pieces [nectar pollen]  stage BIOBUZZ pieces (default 4 nectar + 4 pollen)
  *   ftc bucket [x y z]          spawn/move the suspended bucket (default 0 1.0 4.0)
@@ -178,7 +180,7 @@ static void ftc_ensure_iterations (void) {
 }
 void cmd_ftc (int argc, char **argv) {
     if (argc < 2) {
-        term_err ("mpe: ftc: usage: ftc spawn [x y z] (spawns bucket + BIOBUZZ pieces) | telemetry | intake on|off | eject | shoot | balls [n] | pieces [nectar pollen] | bucket [x y z] | score | view [0|1|2] | select [i] | biobuzz [build|spawn] | biobuzz enter red|blue | biobuzz score\n");
+        term_err ("mpe: ftc: usage: ftc spawn [x y z] (spawns bucket + BIOBUZZ pieces) | telemetry | intake on|off | eject | shoot [power] [elev] | balls [n] | pieces [nectar pollen] | bucket [x y z] | score | view [0|1|2] | select [i] | biobuzz [build|spawn] | biobuzz enter red|blue | biobuzz score\n");
         return;
     } physics_world *w = physics_world_get_primary ();
     /* Controlled-robot accessors (fleet selection; default robot 0).
@@ -348,17 +350,49 @@ void cmd_ftc (int argc, char **argv) {
     }
     if (term_str_eq (argv [1], "shoot")) {
         int (*p_sh) (struct physics_world *, int) = (int (*) (struct physics_world *, int)) ftc_sym ("ftc_shoot");
-        if (!p_sh || !w) {
+        int (*p_shp) (struct physics_world *, int, float) =
+            (int (*) (struct physics_world *, int, float)) ftc_sym ("ftc_shoot_power");
+        int (*p_sha) (struct physics_world *, int, float, float) =
+            (int (*) (struct physics_world *, int, float, float)) ftc_sym ("ftc_shoot_aimed");
+        if ((!p_sh && !p_shp && !p_sha) || !w) {
             term_err ("mpe: ftc: bundle API incomplete\n");
             return;
         }
-        int id = p_sh (w, sel);
+        /* Optional power 0.3..1.0 (default full) + elevation 20..80 deg
+         * (default 50): the stock lob outranges the field, so hive mouths
+         * need soft, steep shots from legal spots. Falls back down the
+         * chain for older bundles (aimed -> power -> full). ftc_argf
+         * already guarantees finite. */
+        float power = ftc_argf (argv, 2, argc, 1.0f);
+        if (power < 0.3f) { power = 0.3f; }
+        if (power > 1.0f) { power = 1.0f; }
+        float elev = ftc_argf (argv, 3, argc, 50.0f);
+        if (elev < 20.0f) { elev = 20.0f; }
+        if (elev > 80.0f) { elev = 80.0f; }
+        int id = -1;
+        float used_elev = 50.0f;
+        if (p_sha) {
+            id = p_sha (w, sel, power, elev);
+            used_elev = elev;
+        } else if (p_shp) {
+            /* Older bundle: power yes, elevation no. Never silently drop
+             * a requested elevation — say so. */
+            if (elev != 50.0f) { term_out ("mpe: ftc: note: bundle predates aimed shots; elevation ignored\n"); }
+            id = p_shp (w, sel, power);
+        } else {
+            if (power != 1.0f || elev != 50.0f) {
+                term_out ("mpe: ftc: note: bundle predates power/aimed shots; firing stock\n");
+            }
+            id = p_sh (w, sel);
+            power = 1.0f;
+        }
         if (id < 0) {
             term_err ("mpe: ftc: nothing carried (intake balls first)\n");
             return;
         }
-        char buf [128];
-        snprintf (buf, sizeof (buf), "mpe: ftc: robot %d fired ball id=%d\n", sel, id);
+        char buf [160];
+        snprintf (buf, sizeof (buf), "mpe: ftc: robot %d fired ball id=%d power=%.2f elev=%.1f\n", sel, id, power,
+                  (double) used_elev);
         term_ok (buf);
         return;
     }
