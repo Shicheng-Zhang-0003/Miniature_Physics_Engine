@@ -261,6 +261,25 @@ void gamepad_drive_tick (void) {
     } float fwd = -s_pad_axis (&s_pad, gamepad_axis_left_y);
     float str = s_pad_axis (&s_pad, gamepad_axis_left_x);
     float rot = s_pad_axis (&s_pad, gamepad_axis_right_x);
+    /* DESPOT-2026-10-14 (handling, expo): linear sticks hand the driver the
+     * full yaw runaway (pre-governor plant spins past 13 rad/s) with
+     * millimeter precision at centre. Expo (x^1.5, endpoints preserved)
+     * gives fine centre control without capping full deflection — the
+     * governor, not the stick, owns the top end. UI-side only: headless
+     * gates drive the API directly and never see this. Buttons untouched. */
+    {
+        float ax [3] = {fwd, str, rot};
+        for (int ai = 0; ai < 3; ai++) {
+            float v = ax [ai];
+            if (isfinite (v)) {
+                float m = (v < 0.0f) ? -v : v;
+                ax [ai] = ((v < 0.0f) ? -1.0f : 1.0f) * m * sqrtf (m);
+            }
+        }
+        fwd = ax [0];
+        str = ax [1];
+        rot = ax [2];
+    }
     /* BRAKE on no stick input (user rule): with every drive axis at rest
      * (or LB+RB e-stop), motor power is BRAKE — command 0 + forced regen
      * idle brake — so the wheels stop and hold instead of running on. */
