@@ -158,7 +158,8 @@ third-party sim derivations are marked DERIVED and never cited as spec.
   gardens 23 × 2 in (red A1, blue F6 — alliance-specific, unprotected).
   Robots start touching the perimeter wall, 4 pollen preloaded, never in
   the loading zone or touching a flower; 18 in starting cube (sim
-  chassis 0.45 m fits).
+  footprint 0.44 m fits with 17 mm margin — the old 0.52 m stance did
+  not).
 - **Tips (walkthrough):** ~8 pollen / ~5 nectar / combos (3+3) tip a
   hive; load spills to the floor, other cell rises. Each tip unlocks one
   tray nectar (all remaining enter at 1:00 left).

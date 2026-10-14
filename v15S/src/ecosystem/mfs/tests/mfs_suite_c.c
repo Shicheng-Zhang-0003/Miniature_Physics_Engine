@@ -1459,7 +1459,7 @@ int mfs_t_biobuzz_table (void) {
             float xyz [3];
             float yaw = 0.0f;
             biobuzz_start_pose ((biobuzz_alliance) a, s, xyz, &yaw);
-            MFS_CHECK (t_ptr, fabsf (fabsf (xyz [0]) - 1.5368f) < 0.01f);
+            MFS_CHECK (t_ptr, fabsf (fabsf (xyz [0]) - 1.6068f) < 0.01f);
             MFS_CHECK (t_ptr, (a == 0 && xyz [0] < 0.0f) || (a == 1 && xyz [0] > 0.0f));
             MFS_CHECK (t_ptr, fabsf (xyz [2]) <= 0.64f);
             float want_yaw = (a == 0) ? 1.57079633f : -1.57079633f;

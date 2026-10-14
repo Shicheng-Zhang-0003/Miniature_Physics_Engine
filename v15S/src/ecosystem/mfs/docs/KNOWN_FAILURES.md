@@ -413,13 +413,16 @@ fleet-identical probe (temp/tilt_abuse.c, retained in temp/ only):
    kills ALL perp relative velocity including the correction (measured 1.5
    rad/s injected at 14° tilt, 0.001 surviving). Orientation error therefore
    never decayed — the corrector existed only on paper.
-3. **Accomplice (not root): parasitic CHASS-WHEEL contact.** Wheel rim
+3. **Accomplice (not root, RETIRED 2026-10-14): parasitic CHASS-WHEEL contact.** Wheel rim
    x-footprint overlaps the chassis box edge by ~5 mm with 5 mm vertical
    clearance inside 10 mm slop, so a slop-admitted manifold exists from tick
    0 (Nimp 0.08 at 0.6° tilt, 0.52 at 13°) and wedges harder as tilt grows.
    Secondary: it only matters once tilt exists. Geometry untouched (moving
    the track retunes odometry arms + mixer + every drive gate — budgeted
-   follow-up, not this fix).
+   follow-up, not this fix). DESPOT-2026-10-14: the budgeted follow-up
+   LANDED (18-inch footprint resize: chassis 0.34, stance 0.40/0.34,
+   wheels 10 mm clear of the box — zero interpenetration by construction).
+   This accomplice is gone; the root-cause fix above stands on its own.
 
 Fix (core/physics_world.c + simulation_physics_loop.c, mirrored):
 joints re-equalize after the relaxation passes AND after rolling (velocity

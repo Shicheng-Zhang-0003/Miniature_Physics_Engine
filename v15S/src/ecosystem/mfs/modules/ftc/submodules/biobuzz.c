@@ -783,7 +783,7 @@ int biobuzz_score (physics_world *world, biobuzz_state_t *st, const int *piece_i
             int bi = robot_body [r];
             if (bi < 0 || bi >= world -> body_count) { continue; }
             rigidbody *ch = &world -> bodies [bi];
-            float hw = 0.29f; /* chassis + wheel outer envelope */
+            float hw = 0.22f; /* chassis + wheel outer envelope (0.20 + 0.02 half-width) */
             /* contacting a wall = surface within 5 mm of an inner face */
             float dx = H - (ch -> position.x < 0 ? -(ch -> position.x) : ch -> position.x);
             float dz = H - (ch -> position.z < 0 ? -(ch -> position.z) : ch -> position.z);
@@ -817,7 +817,7 @@ void biobuzz_start_pose (biobuzz_alliance alliance, int slot, float out_xyz [3],
      * centre (+X for red, -X for blue). Robot forward = chassis +Z, so yaw
      * ±90 deg. 18 in footprint verified vs CHASSIS 0.45 m. */
     float H = BIOBUZZ_FIELD_HALF;
-    float x = (alliance == BIOBUZZ_RED) ? -(H - 0.292f) : (H - 0.292f);
+    float x = (alliance == BIOBUZZ_RED) ? -(H - 0.222f) : (H - 0.222f); /* outer 0.22 + 2 mm to touch */
     float z = (slot == 0) ? -0.35f : 0.35f;
     out_xyz [0] = x;
     out_xyz [1] = 0.30f; /* chassis rest height class (robot sets exact) */

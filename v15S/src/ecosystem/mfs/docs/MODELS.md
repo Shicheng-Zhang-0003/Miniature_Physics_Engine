@@ -237,8 +237,11 @@ Pure encoder forward kinematics, no fusion — honest:
 ```
 v_fwd = mean(w)·R
 v_lat = (FL-FR-BL+BR)/4·R
-yaw   = ((FL-FR+BL-BR)/4·R) / 0.44          (mecanum; 0.44 = Lx+Lz, wheel track)
-yaw   = ((wl-wr)·R) / 0.48                  (tank; 0.48 = 2×0.24 track)
+yaw   = ((FL-FR+BL-BR)/4·R) / (Lx+Lz)       (mecanum; Lx+Lz = wheel track,
+                                            0.37 after the 18-inch resize,
+                                            computed from WHEEL_OFFSET_* —
+                                            never a literal: literals drift)
+yaw   = ((wl-wr)·R) / (2·Lx)                (tank; 0.40 after the resize)
 
 SIGN CONVENTION — read before changing either line. The textbook mecanum
 forward kinematics is v_lat = (-FL+FR+BL-BR)·R/4 and
@@ -249,8 +252,8 @@ z up); this engine's frame is X=right, Y=up, Z=forward, which is LEFT-handed
 vectors (v, F, r) keep their sign and axial vectors (ω, τ) gain one minus sign —
 so v_lat matches the textbook and yaw is its negation. The shipped code had
 the textbook yaw combination unchanged, i.e. yaw was inverted on BOTH
-drivetrains. Arm 0.44 is WHEEL_OFFSET_X (0.24) + WHEEL_OFFSET_Z (0.20); it is
-the WHEEL track, not CHASSIS_HALF_X/Z (0.225), which are the chassis collision
+drivetrains. Arm (Lx+Lz) is WHEEL_OFFSET_X + WHEEL_OFFSET_Z (robot.h); it is
+the WHEEL track, not CHASSIS_HALF_X/Z, which are the chassis collision
 box.
 ```
 
@@ -274,9 +277,12 @@ honestly claimed).
 
 ## 5. Robot assembly (`modules/ftc/submodules/robot.c`)
 
-- Chassis box half (0.225, 0.075, 0.225) m, **8.0 kg** (~18 lb, inside the
-  19.05 kg limit); wheels r = 0.05 m (100 mm class), m = 0.2 kg, offsets
-  X ±0.24 / Z ±0.20 m; rest height 0.18 m (5 mm clearance);
+- Chassis box half (0.17, 0.075, 0.17) m, **8.0 kg** (~18 lb, inside the
+  19.05 kg limit); wheels r = 0.05 m (100 mm class), m = 0.2 kg, stance
+  X ±0.20 / Z ±0.17 m (footprint 0.44 × 0.44, inside the 18 in cube with
+  17 mm margin; wheels 10 mm clear of the box — the old 0.225/0.24 stance
+  overlapped 5 mm and stood 0.52 wide, outside the cube); rest height
+  0.18 m (5 mm clearance);
   `WHEEL_PRELOAD` = 2 mm below touch inside the 10 mm slop (persistent
   contact without positional fight); mass ratio 8/0.2 = **40:1 → tests pin
   128 solver iterations** (engine default 64 cannot converge it).
