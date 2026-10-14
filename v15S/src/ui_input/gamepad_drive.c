@@ -7,6 +7,7 @@
 #include "../ecosystem/mfs/modules/ftc/submodules/robot.h"
 #include "../ecosystem/mfs/modules/ftc/submodules/drivetrain.h"
 #include "../ecosystem/mfs/modules/module_1/submodules/gamepad/gamepad.h"
+#include "keydrive.h"
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -36,6 +37,7 @@ static int s_frames_since_retry = 0;
 static int s_control_enabled = 1; /* START toggles; default ON like module_1 */
 static int s_prev_start = 0;
 static int s_prev_back = 0;
+static int s_kb_reported = 0;
 static int s_prev_a = 0;
 static int s_prev_y = 0;
 static int s_prev_b = 0;
@@ -111,6 +113,7 @@ void gamepad_drive_invalidate (void) {
     s_syms_resolved = 0;
     s_active = 0;
     s_prev_back = 0;
+    s_kb_reported = 0;
 }
 void gamepad_drive_init (void) {
     gpd_resolve ();
@@ -131,6 +134,61 @@ void gamepad_drive_init (void) {
 static void gpd_stop_robot (ftc_robot *r) {
     if (s_mecanum && r)
         s_mecanum (r, 0.0f, 0.0f, 0.0f);
+}
+/* Keyboard fallback drive (G V B N C M): the pad owns motion while
+ * connected; when no pad is present this drives the SELECTED robot from
+ * main_inputs so the game is playable with no controller at all. Text
+ * entry (debug terminal, microvim) suppresses it — typing 'g' must not
+ * drive — and the same no-input brake the pad applies holds here, so
+ * release stops and holds instead of coasting. Returns 1 when it drove
+ * or braked this tick (caller skips the pad-disconnect stop). */
+static int gpd_keyboard_tick (void) {
+    physics_world *w = physics_world_get_primary ();
+    if (!w || !s_fleet_get || !s_mecanum)
+        return 0;
+    if (debug_terminal_is_open ())
+        return 0;
+    if (microvim_is_active ())
+        return 0;
+    int g = main_inputs.g_key_pressed ? 1 : 0;
+    int v = main_inputs.v_key_pressed ? 1 : 0;
+    int b = main_inputs.b_key_pressed ? 1 : 0;
+    int n = main_inputs.n_key_pressed ? 1 : 0;
+    int c = main_inputs.c_key_pressed ? 1 : 0;
+    int m = main_inputs.m_key_pressed ? 1 : 0;
+    int (*s_sel) (struct physics_world *) =
+        (int (*) (struct physics_world *)) gpd_sym ("ftc_fleet_selected");
+    int sel = (s_sel) ? s_sel (w) : 0;
+    if (sel < 0)
+        sel = 0;
+    ftc_robot *r = s_fleet_get (w, sel);
+    if (!r)
+        return 0;
+    void (*s_brk) (ftc_robot *, int) = (void (*) (ftc_robot *, int)) gpd_sym ("ftc_robot_set_brake");
+    /* Brake on resultant-zero (covers release AND opposing-pair cancels —
+     * holding G+B is a finger slip, and must stop-and-hold exactly like a
+     * centered stick, never coast with the brake off). */
+    if (mpe_keydrive_idle (g, v, b, n, c, m)) {
+        /* No keys: brake + zero exactly like pad release, but only if WE
+         * were the ones commanding (never yank a pad-driven robot). */
+        if (s_was_commanding) {
+            if (s_brk) { s_brk (r, 1); } else { gpd_stop_robot (r); }
+            s_was_commanding = 0;
+        }
+        return 0;
+    }
+    if (!s_kb_reported) {
+        s_kb_reported = 1;
+        fprintf (stderr, "[gamepad] no pad — keyboard drive active (G/V/B/N/C/M) on robot %d\n", sel);
+        fflush (stderr);
+    }
+    float fwd = 0.0f, strafe = 0.0f, rot = 0.0f;
+    mpe_keydrive_axes (g, v, b, n, c, m, &fwd, &strafe, &rot);
+    if (s_brk) { s_brk (r, 0); }
+    s_mecanum (r, fwd, strafe, rot);
+    s_was_commanding = 1;
+    s_active = 1;
+    return 1;
 } /* Release-brake: brake command proportional to a velocity component,
  * dead-zoned under 0.05 m/s and capped at 0.2 power units. */
 static float gpd_brake (float v, float k) {
@@ -166,7 +224,12 @@ void gamepad_drive_tick (void) {
     if (!s_pad_connected (&s_pad)) {
         s_active = 0;
         gpd_report_stage (1);
-        if (s_was_commanding) {
+        /* No pad: keyboard fallback owns motion (G V B N C M). It brakes
+         * on release itself; the stop below is the safety net for when
+         * the keyboard path is suppressed (terminal/microvim open) — and
+         * must NOT run on a tick the keyboard just drove. */
+        int kb_drove = gpd_keyboard_tick ();
+        if (!kb_drove && s_was_commanding) {
             physics_world *w = physics_world_get_primary ();
             ftc_robot *r = (w && s_fleet_get) ? s_fleet_get (w, sel) : NULL;
             gpd_stop_robot (r);

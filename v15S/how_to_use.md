@@ -42,6 +42,27 @@ In Game Mode, releasing WASD does not stop instantly — horizontal momentum ble
 
 ---
 
+## Driving Robots (Keyboard)
+
+No controller needed: with the MFS bundle loaded and a robot spawned,
+these keys drive the **currently selected** robot (`ftc select <i>` to
+switch; gamepad BACK cycles the same selection). The gamepad owns motion
+while connected — keys take over when no pad is present.
+
+| Keys | Drive |
+|---|---|
+| `G` / `B` | Forward / back |
+| `V` / `N` | Strafe left / right |
+| `C` / `M` | Rotate left / right |
+
+Opposing pairs cancel (G+B, V+N, C+M); axes combine, so G+N arcs
+forward-right. Releasing all keys brakes to a stop and holds (same as
+the gamepad's no-input brake) — never coasts. Keys are ignored while
+typing in the debug terminal or microvim, and focus loss clears them,
+so no stuck-drive surprises.
+
+---
+
 ## Spawning Objects
 
 **Enter** spawns an object in front of the camera. Hold Enter for 0.3 seconds to begin rapid-fire spawning.
@@ -432,7 +453,8 @@ precision. The plant itself caps sustained yaw ~4.4 rad/s (governor +
 active damper; see `ecosystem/mfs/docs/KNOWN_FAILURES.md` →
 [YAW-HANDLING]) instead of spinning past 13 rad/s, and hard braking on
 release still stops dead. If it still feels darty, drive with smaller
-stick motions: expo rewards that. Button map: START toggles control,
+stick motions: expo rewards that. No pad at all? The G V B N C M keys
+drive the selected robot (see Driving Robots above). Button map: START toggles control,
 BACK cycles the controlled robot, LB+RB e-stop, LT hold = intake,
 RT/A = shoot, B = eject.
 
