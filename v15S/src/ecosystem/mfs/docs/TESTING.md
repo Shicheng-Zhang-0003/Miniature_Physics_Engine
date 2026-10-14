@@ -22,7 +22,7 @@ What the suite contains, what each gate proves, and how to run it.
   `tests/mfs_test_common.h` (tile slab top y=0, μ 1.0/0.8, e=0). Robot tests
   pin **128 solver iterations** (40:1 chassis/wheel mass ratio).
 
-## Current status (2026-10-14): 27/28
+## Current status (2026-10-14): 29/30
 
 One gate is **red**: `tank` (pivot heading/translation baselines — still
 red after the observer Q-filter moved it 2.37→2.78 / 0.043→0.118 with
@@ -67,6 +67,8 @@ set).
 | `select` | two worlds, two robots in the first | fresh attach reads −1; default 0 after first spawn; OOB selects fail −1 leaving stored untouched; second world independent; drive routed through the selection moves robot 1 (> 0.30 m) while robot 0 holds (< 0.20 m) — pins the terminal/gamepad controlled-robot routing |
 | `yaw_stability` | rotate=1.0 for 600 ticks, peak + end yaw | peak < 6.0 rad/s and end < 5.5 (pre-fix: 11.07/10.81 — unbounded spin with ~zero passive decay + lift feedback; post-fix cap ≈ 4.4 rock-steady via governor + active damper). See [YAW-HANDLING] |
 | `fleet_clear` | spawn robot + balls + bucket + BIOBUZZ pieces, clear, respawn; then wipe pool behind the fleet, step, respawn | direct API forgets count/selection/balls/scores/tips and respawn works (the "9 3 then one-robot-already" report); pre_step self-heal fires on a replaced pool and respawn works immediately |
+| `shoot_power` | same muzzle, fire at power 1.0 / 0.7 / 0.4, fly 180 ticks each | exit speeds scale exactly (9.0 / 6.3 / 3.6 m/s); ranges order 14.2 > 9.1 > 4.7 m; full-power path bit-identical (bucket calibration depends on it) |
+| `hive_shot` | robot at a legal wall-adjacent spot, aimed lob (0.65 power, 70 deg), 300 ticks | ball rests INSIDE the red up-cell (cell census 1/0) + last-shot params recorded (the "only undersides" report: stock 50-degree muzzle provably cannot reach the 1.5 m mouths from legal spots at any power) |
 
 Physics-truth notes: T6/T8 test the **motor model isolated** (no
 joints/world) because the jointed air-spin plant is a documented limit

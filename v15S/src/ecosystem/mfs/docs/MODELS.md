@@ -362,7 +362,15 @@ All deterministic: no transcendentals (fixed-coefficient `det_sin/det_cos`,
   ~2–3 m/s on tick 0) with `INTAKE_LAUNCH_SPEED` 9 m/s at
   `INTAKE_LAUNCH_ELEV_DEG` 50° **world-frame** (yaw-only forward; braking
   pitch never swings the shot), plus Magnus backspin `INTAKE_LAUNCH_SPIN`
-  15 rad/s about the yaw-projected lateral axis.
+  15 rad/s about the yaw-projected lateral axis. Aimed variants scale
+  power [0.3, 1.0] (muzzle speed linear, chassis inherited fully, spin
+  proportional) and elevation [20, 80] deg; (1.0, 50°) is the exact legacy
+  path by branch. The stock lob outranges the 3.66 m field and cannot drop
+  into the 1.5 m hive mouths from legal spots at any power (proven by
+  trajectory) — regulation hive play needs soft steep lobs (e.g. 0.65
+  power at 70° from a wall-adjacent spot, gated by `hive_shot`). The
+  predictor previews the last aimed shot (full-power 50° until aimed
+  shots exist).
 - Aero for flying balls: same drag + Magnus formulas as module_1 (see §6),
   separately owned.
 - Bucket (suspended miniature field): pad 1.6×1.6 m at world `y` with four

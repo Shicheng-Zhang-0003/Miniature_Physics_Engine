@@ -374,9 +374,12 @@ make
   still creeping: governor + active damper, deadband 3.0–4.5 so green
   gates never see it; gamepad expo x^1.5); keyboard robot drive on
   G V B N C M (M verified free globally; pure mapping + `keydrive_axes`
-  gate, pad keeps precedence while connected). Suite 46 registered / 44
-  blocking green (floor 45 → 46); quick 60/60; MFS 26/27 (`tank`
-  pre-existing; `yaw_stability` proven red pre-fix).
+  gate, pad keeps precedence while connected); FTC footprint into the 18 in
+  cube (0.44, was 0.52 — centralized geometry, computed odom arms); aimed
+  shots (power + elevation) so hive mouths score from legal spots
+  (`shoot_power`, `hive_shot` gates). Suite 46 registered / 44
+  blocking green (floor 45 → 46); quick 60/60; MFS 29/30 (`tank`
+  pre-existing; `yaw_stability`, `shoot_power`, `hive_shot` all green).
 - **v15S — 2026-10-13: despot sweep (truth + hardening).**
   Headline: the 2026-10-12 P20 `mkstemp` hardening broke every S2 bridge
   spawn (`mkstemp` on a template ending in `.log` fails `EINVAL` always,
@@ -530,7 +533,7 @@ micro-jitter, documented); bounce-height oracles carry slop-scale error.
 
 ### MFS robotics (`v15S/src/ecosystem/mfs/`)
 - **FTC stack**: motor presets (spec-sheet derived, decoded-count encoder convention), back-EMF electrical model with implicit-in-speed solve + disturbance observer (the **open-loop** no-load line is exact at any bus voltage via V-line bounds — `R` cancels from `w_free` by construction; the **observer-armed** driven path is a documented limit cycle at −61.3%, tracked as `[MOTOR-III]`), traction budgeting against wheel materials, analytic mecanum roller-kinematics lateral force (Coulomb-capped, dissipative, contact-gated at the wheel — no chassis-force cheat; the articulated 32-roller build is kept for forensics), pure-encoder odometry with `odom_slip` flag, tile-friction test floors.
-- **Suite**: `build_tests.sh` — unified `mfs_suite --all` (27 gated) plus build gates and ungated diags; CWD-independent. **Status 2026-10-14: 26/27 green** — only `tank` is red (pre-existing baseline, moved with cause by the observer Q-filter, untouched by the handling work). `odometry_yaw` went red→green on the Q-filter; handling is bounded by the yaw governor + active damper (sustained full rotate caps ≈ 4.4 rad/s, gated by `yaw_stability`) with expo sticks. The script runs with errexit scoped off around the suite so a failure still produces its full summary (`FTC RESULT: gated pass=.. fail=..`); see `v15S/REMAINING_WORK.md`.
+- **Suite**: `build_tests.sh` — unified `mfs_suite --all` (30 gated) plus build gates and ungated diags; CWD-independent. **Status 2026-10-14: 29/30 green** — only `tank` is red (pre-existing baseline, moved with cause by the observer Q-filter, untouched by the handling work). `odometry_yaw` went red→green on the Q-filter; handling is bounded by the yaw governor + active damper (sustained full rotate caps ≈ 4.4 rad/s, gated by `yaw_stability`) with expo sticks; hive scoring works via aimed soft lobs (`shoot_power`, `hive_shot`). The script runs with errexit scoped off around the suite so a failure still produces its full summary (`FTC RESULT: gated pass=.. fail=..`); see `v15S/REMAINING_WORK.md`.
 - **BIOBUZZ regulation league** (`modules/ftc/submodules/biobuzz.c`): the full 2026-2027 field in SI — 144 in floor, 12 in walls, centre hive frame (pivots 43.95 in) with 2 tipping hives × 2 cells, 4 flowers, zone tapes, AprilTag IDs recorded — plus §10.3 staging (40 pollen + 16 nectar) and Table 10-2 scoring (tips, cells, flower ownership/bottom, gardens, leave/park predicates, RP). Tips are weight-census events (not a damper solve — disclosed). Terminal: `ftc biobuzz [build|spawn]`, `ftc biobuzz enter red|blue`, `ftc biobuzz score`.
 - **Modules**: `ftc-fleet` tick module (hot-pluggable, bitwise-identical static vs `.so`), `mfs-simulator` ecosystem bundle (loadable via `mod load ecosystem/mfs/mfs_ecosystem.so`; attaches ftc-fleet only — the `mfs_module_1` BioBuzz game module stays registered but parked). Live robot flow is one field, one controller: `mod load ecosystem/mfs/mfs_ecosystem.so`, `eco attach mfs-simulator`, `ftc spawn` (or `ftc biobuzz spawn` for a regulation 2v2), then drive with the Logitech F310 pad (left stick forward/strafe, right X rotate, START toggles, BACK cycles the controlled robot, LB+RB e-stop); `ftc telemetry` inspects (the selected robot); `ftc select <i>` switches control explicitly.
 

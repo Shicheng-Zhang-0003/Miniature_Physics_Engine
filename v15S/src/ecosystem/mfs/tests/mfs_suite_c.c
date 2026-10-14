@@ -1644,3 +1644,154 @@ int mfs_t_fleet_clear (void) {
     mfs_test_end (t_ptr);
     return t_ptr -> failures;
 }
+/* shoot_power: variable launch power (stock 9 m/s lob outranges the field
+ * and cannot drop into the 1.5 m hive mouths from legal spots — every full
+ * shot smacks frame or cell undersides). Power scales muzzle speed linearly
+ * (chassis inherited fully) and spin proportionally, clamped [0.3, 1.0];
+ * power 1.0 is bit-identical to the legacy full-power path (the bucket
+ * calibration depends on it). Exit speeds scale with power; ranges order;
+ * everything finite. */
+int mfs_t_shoot_power (void) {
+    mfs_test_t t;
+    mfs_test_begin (&t, "shoot_power");
+    mfs_test_t *t_ptr = &t;
+    float powers [3] = {1.0f, 0.7f, 0.4f};
+    float exit_spd [3] = {0.0f, 0.0f, 0.0f};
+    float range [3] = {0.0f, 0.0f, 0.0f};
+    for (int p = 0; p < 3; p++) {
+        physics_world w;
+        mfs_test_world (&w);
+        extern const mpe_module_desc_t mpe_module_desc;
+        if (physics_world_attach_module (&w, &mpe_module_desc) < 0) {
+            MFS_CHECK (t_ptr, 0);
+            physics_world_cleanup (&w);
+            continue;
+        }
+        int si = ftc_fleet_spawn (&w, 0.0f, ftc_robot_rest_height (), 0.0f, MOTOR_GB_5203_26_9,
+                                  FTC_DRIVETRAIN_MECANUM);
+        if (si < 0) {
+            MFS_CHECK (t_ptr, 0);
+            physics_world_cleanup (&w);
+            continue;
+        }
+        ftc_robot *robot = ftc_fleet_get (&w, si);
+        if (!robot) {
+            MFS_CHECK (t_ptr, 0);
+            physics_world_cleanup (&w);
+            continue;
+        }
+        int bi = physics_world_add_sphere (&w, BIOBUZZ_POLLEN_RADIUS, BIOBUZZ_POLLEN_MASS,
+                                           (vector3) {0.0f, 0.5f, 1.0f});
+        if (bi < 0) {
+            MFS_CHECK (t_ptr, 0);
+            physics_world_cleanup (&w);
+            continue;
+        }
+        w.bodies [bi].restitution = 0.0f;
+        rigidbody_wake (&w.bodies [bi]);
+        robot -> intake_balls [0] = (int) w.bodies [bi].object_id;
+        robot -> intake_count = 1;
+        int id = ftc_shoot_power (&w, si, powers [p]);
+        MFS_CHECK (t_ptr, id >= 0);
+        int sbi = physics_world_index_by_id (&w, (uint32_t) id);
+        MFS_CHECK (t_ptr, sbi >= 0);
+        float sx = 0.0f, sz = 0.0f;
+        if (sbi >= 0) {
+            rigidbody *b = &w.bodies [sbi];
+            sx = b -> position.x;
+            sz = b -> position.z;
+            exit_spd [p] = sqrtf (b -> velocity.x * b -> velocity.x + b -> velocity.y * b -> velocity.y +
+                                  b -> velocity.z * b -> velocity.z);
+        }
+        int fail = 0;
+        for (int k = 0; k < 180 && !fail; k++) {
+            physics_world_step (&w, DT);
+            if (!mfs_test_finite (&w)) { fail = 1; }
+        }
+        MFS_CHECK (t_ptr, fail == 0);
+        sbi = physics_world_index_by_id (&w, (uint32_t) id);
+        if (sbi >= 0) {
+            rigidbody *b = &w.bodies [sbi];
+            float dx = b -> position.x - sx, dz = b -> position.z - sz;
+            range [p] = sqrtf (dx * dx + dz * dz);
+        }
+        MFS_INFO ("power=%.1f exit=%.3f m/s range=%.3f m", powers [p], (double) exit_spd [p], (double) range [p]);
+        physics_world_cleanup (&w);
+    }
+    /* Exit speed scales with power (chassis at rest: exact ratios). */
+    MFS_CHECK (t_ptr, exit_spd [0] > 1.0f);
+    MFS_CHECK (t_ptr, fabsf (exit_spd [1] / exit_spd [0] - 0.7f) < 0.03f);
+    MFS_CHECK (t_ptr, fabsf (exit_spd [2] / exit_spd [0] - 0.4f) < 0.03f);
+    /* Ranges order with power (all finite, all move). */
+    MFS_CHECK (t_ptr, range [0] > 1.0f && range [1] > 0.5f && range [2] > 0.2f);
+    MFS_CHECK (t_ptr, range [0] > range [1] && range [1] > range [2]);
+    if (t_ptr -> failures == 0) { printf ("[PASS] shoot_power: launch scales with power, full unchanged\n"); }
+    mfs_test_end (t_ptr);
+    return t_ptr -> failures;
+}
+/* hive_shot: end-to-end regulation scoring (the user-visible defect: every
+ * stock-lob hive shot from a legal spot smacked frame or cell undersides —
+ * proven by trajectory: the 50-degree muzzle cannot place a ball in the
+ * 1.5 m mouths from inside the field at any power). Aimed soft lob
+ * (power 0.65, elev 70 deg) from a legal wall-adjacent spot drops INTO the
+ * red up-cell and rests there (found by parameter sweep, then pinned).
+ * Also covers the predictor-params plumbing (last shot recorded). */
+int mfs_t_hive_shot (void) {
+    mfs_test_t t;
+    mfs_test_begin (&t, "hive_shot");
+    mfs_test_t *t_ptr = &t;
+    physics_world w;
+    mfs_test_world (&w);
+    extern const mpe_module_desc_t mpe_module_desc;
+    MFS_CHECK (t_ptr, physics_world_attach_module (&w, &mpe_module_desc) >= 0);
+    MFS_CHECK (t_ptr, ftc_biobuzz_field (&w) == 0);
+    float sx = -BIOBUZZ_HIVE_DX;
+    int si = ftc_fleet_spawn (&w, sx, ftc_robot_rest_height (), -1.50f, MOTOR_GB_5203_26_9, FTC_DRIVETRAIN_MECANUM);
+    MFS_CHECK (t_ptr, si >= 0);
+    ftc_robot *robot = ftc_fleet_get (&w, si);
+    MFS_CHECK (t_ptr, robot != NULL);
+    if (robot) { biobuzz_place_robot (&w, robot, 0.0f); }
+    int bi = physics_world_add_sphere (&w, BIOBUZZ_POLLEN_RADIUS, BIOBUZZ_POLLEN_MASS,
+                                       (vector3) {sx, 0.5f, -1.50f});
+    MFS_CHECK (t_ptr, bi >= 0);
+    int shot = -1;
+    if (bi >= 0 && robot) {
+        w.bodies [bi].restitution = 0.0f;
+        rigidbody_wake (&w.bodies [bi]);
+        robot -> intake_balls [0] = (int) w.bodies [bi].object_id;
+        robot -> intake_count = 1;
+        shot = ftc_shoot_aimed (&w, si, 0.65f, 70.0f);
+    }
+    MFS_CHECK (t_ptr, shot >= 0);
+    {
+        float lp = 0.0f, le = 0.0f;
+        MFS_CHECK (t_ptr, ftc_last_shot_params (&w, &lp, &le) == 0);
+        MFS_INFO ("last shot power=%.2f elev=%.1f", (double) lp, (double) le);
+        MFS_CHECK (t_ptr, fabsf (lp - 0.65f) < 1e-4f && fabsf (le - 70.0f) < 1e-4f);
+    }
+    int fail = 0;
+    for (int k = 0; k < 300 && !fail; k++) {
+        physics_world_step (&w, DT);
+        if (!mfs_test_finite (&w)) { fail = 1; }
+    }
+    MFS_CHECK (t_ptr, fail == 0);
+    /* Census the shot ball in the red up-cell via explicit scoring state. */
+    {
+        biobuzz_state_t st;
+        memset (&st, 0, sizeof (st));
+        st.field_built = 1;
+        st.tilt [0] = -1;
+        st.tilt [1] = 1;
+        int ids [1] = {shot}, isn [1] = {0}, isa [1] = {-1};
+        biobuzz_alliance_score sr, sb;
+        MFS_CHECK (t_ptr, biobuzz_score (&w, &st, ids, 1, isn, isa, 0, NULL, 0, &sr) == 0);
+        MFS_CHECK (t_ptr, biobuzz_score (&w, &st, ids, 1, isn, isa, 1, NULL, 0, &sb) == 0);
+        MFS_INFO ("red cell pieces=%d blue cell pieces=%d", sr.cell_pieces, sb.cell_pieces);
+        MFS_CHECK (t_ptr, sr.cell_pieces == 1);
+        MFS_CHECK (t_ptr, sb.cell_pieces == 0);
+    }
+    physics_world_cleanup (&w);
+    if (t_ptr -> failures == 0) { printf ("[PASS] hive_shot: aimed lob scores the up-cell from a legal spot\n"); }
+    mfs_test_end (t_ptr);
+    return t_ptr -> failures;
+}

@@ -1897,8 +1897,17 @@ with them.
 
 The league (`submodules/biobuzz.c`) is regulation on every number the
 manual states exactly, nominal where the manual is nominal, and loud about
-the difference. Five gates (`biobuzz_field/stage/tip/flower/table`) pin
-the split: anchors asserted as spec, repose/symmetry as self-consistency.
+the difference. Seven gates (`biobuzz_field/stage/tip/flower/table` +
+`shoot_power`/`hive_shot`) pin the split: anchors asserted as spec,
+repose/symmetry as self-consistency.
+
+- **Aimed shots are required, not optional (2026-10-14).** The stock
+  9 m/s 50° muzzle outranges the field and cannot place a ball in the
+  1.5 m mouths from any legal spot at any power (proven by trajectory) —
+  every such shot smacks frame or cell undersides. `ftc shoot [power]
+  [elev]` + gamepad RT/right-Y give the angle and range regulation play
+  needs (`hive_shot` gates a legal-spot entry); the predictor previews the
+  last aimed shot.
 
 - **Flower wall stations nominal.** The manual places 4 flowers "around
   the perimeter" with down-cells "pointing at" audience/far flowers; exact

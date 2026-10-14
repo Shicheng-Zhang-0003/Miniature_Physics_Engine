@@ -29,6 +29,8 @@ extern int mfs_t_shooter_axis (void);
 extern int mfs_t_ball_spin (void);
 extern int mfs_t_bucket_game (void);
 extern int mfs_t_brake_mode (void);
+extern int mfs_t_shoot_power (void);
+extern int mfs_t_hive_shot (void);
 extern int mfs_t_partial_throttle (void);
 extern int mfs_t_biobuzz_field (void);
 extern int mfs_t_biobuzz_stage (void);
@@ -58,6 +60,8 @@ static const mfs_test_entry_t registry [] = {
     {"ball_spin", mfs_t_ball_spin, false},
     {"bucket_game", mfs_t_bucket_game, false},
     {"brake_mode", mfs_t_brake_mode, false},
+    {"shoot_power", mfs_t_shoot_power, false},
+    {"hive_shot", mfs_t_hive_shot, false},
     {"partial_throttle", mfs_t_partial_throttle, false},
     {"biobuzz_field", mfs_t_biobuzz_field, false},
     {"biobuzz_stage", mfs_t_biobuzz_stage, false},

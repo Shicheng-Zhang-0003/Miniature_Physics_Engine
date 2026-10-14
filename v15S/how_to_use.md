@@ -425,6 +425,20 @@ ftc biobuzz score    # Table 10-2 breakdown: tips, cells, flowers, gardens, leav
 ftc biobuzz enter red   # spend a tip unlock: tray nectar into play at the loading zone
 ```
 
+Shooting the hive: the stock full-power lob (9 m/s at 50°) outranges the
+field — from any legal spot it smacks the frame or the cell undersides,
+never drops in. Score the up-cells with soft steep lobs:
+
+```
+ftc shoot 0.65 70   # power 0.3..1.0, elevation 20..80 deg (defaults 1.0, 50)
+```
+
+Park ~1.1 m out from the mouth (wall-adjacent facing it), fire, and watch
+the purple predictor (it previews your last aimed shot — full-power 50°
+until aimed shots exist). On the gamepad the RT trigger value is the
+power and right-stick Y sets elevation (up = steeper, centred = 50°);
+Y fires full-power at stick elevation.
+
 Notes:
 - `ftc biobuzz` builds the regulation field *inside* the arcade practice
   pad (regulation walls at ±1.83 m; the pad surface is the outside ground
@@ -463,7 +477,7 @@ release still stops dead. If it still feels darty, drive with smaller
 stick motions: expo rewards that. No pad at all? The G V B N C M keys
 drive the selected robot (see Driving Robots above). Button map: START toggles control,
 BACK cycles the controlled robot, LB+RB e-stop, LT hold = intake,
-RT/A = shoot, B = eject.
+RT/A = shoot (RT analog = shot power, right-stick Y = elevation, centred = stock 50°), B = eject.
 
 ## Validation Tests
 
