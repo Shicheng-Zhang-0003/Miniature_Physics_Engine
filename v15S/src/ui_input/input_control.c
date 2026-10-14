@@ -18,6 +18,12 @@ void initialize_input (input_status *s) {
     s -> shift_key_pressed = false;
     s -> escape_key_pressed = false;
     s -> f_key_pressed = false;
+    s -> g_key_pressed = false;
+    s -> v_key_pressed = false;
+    s -> b_key_pressed = false;
+    s -> n_key_pressed = false;
+    s -> c_key_pressed = false;
+    s -> m_key_pressed = false;
     s -> r_key_pressed = false;
     s -> i_key_pressed = false;
     s -> j_key_pressed = false;
@@ -80,6 +86,20 @@ gboolean on_keypress (GtkEventControllerKey *w, guint keyval, guint keycode, Gdk
         st -> f_key_pressed = true;
     if (keyval == GDK_KEY_r || keyval == GDK_KEY_R)
         st -> r_key_pressed = true;
+    /* Robot keyboard drive (G V B N C M). Free globally — microvim's
+     * same-letter vim-keys are modal (editor only), so no conflict. */
+    if (keyval == GDK_KEY_g || keyval == GDK_KEY_G)
+        st -> g_key_pressed = true;
+    if (keyval == GDK_KEY_v || keyval == GDK_KEY_V)
+        st -> v_key_pressed = true;
+    if (keyval == GDK_KEY_b || keyval == GDK_KEY_B)
+        st -> b_key_pressed = true;
+    if (keyval == GDK_KEY_n || keyval == GDK_KEY_N)
+        st -> n_key_pressed = true;
+    if (keyval == GDK_KEY_c || keyval == GDK_KEY_C)
+        st -> c_key_pressed = true;
+    if (keyval == GDK_KEY_m || keyval == GDK_KEY_M)
+        st -> m_key_pressed = true;
     if (keyval == GDK_KEY_F5)
         st -> stability_test_pressed = true;
     if (keyval == GDK_KEY_F6)
@@ -304,6 +324,18 @@ gboolean on_key_released (GtkEventControllerKey *w, guint keyval, guint keycode,
         st -> d_key_pressed = false;
     if (keyval == GDK_KEY_r || keyval == GDK_KEY_R)
         st -> r_key_pressed = false;
+    if (keyval == GDK_KEY_g || keyval == GDK_KEY_G)
+        st -> g_key_pressed = false;
+    if (keyval == GDK_KEY_v || keyval == GDK_KEY_V)
+        st -> v_key_pressed = false;
+    if (keyval == GDK_KEY_b || keyval == GDK_KEY_B)
+        st -> b_key_pressed = false;
+    if (keyval == GDK_KEY_n || keyval == GDK_KEY_N)
+        st -> n_key_pressed = false;
+    if (keyval == GDK_KEY_c || keyval == GDK_KEY_C)
+        st -> c_key_pressed = false;
+    if (keyval == GDK_KEY_m || keyval == GDK_KEY_M)
+        st -> m_key_pressed = false;
     if (keyval == GDK_KEY_i || keyval == GDK_KEY_I)
         st -> i_key_pressed = false;
     if (keyval == GDK_KEY_j || keyval == GDK_KEY_J)
@@ -486,6 +518,12 @@ gboolean on_focus_out (GtkEventControllerFocus *ctrl, gpointer user_data_stored)
     st -> shift_key_pressed = false;
     st -> escape_key_pressed = false;
     st -> f_key_pressed = false;
+    st -> g_key_pressed = false;
+    st -> v_key_pressed = false;
+    st -> b_key_pressed = false;
+    st -> n_key_pressed = false;
+    st -> c_key_pressed = false;
+    st -> m_key_pressed = false;
     st -> i_key_pressed = false;
     st -> j_key_pressed = false;
     st -> k_key_pressed = false;
