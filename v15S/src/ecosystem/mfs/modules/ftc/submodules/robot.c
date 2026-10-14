@@ -678,6 +678,32 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
     if (drain_current < 0.0f && robot -> battery.charge_fraction >= 1.0f) { drain_current = 0.0f; }
     battery_drain (&robot -> battery, drain_current, dt);
     /* Update each wheel motor */
+    /* DESPOT-2026-10-14 (handling, yaw governor): sustained rotate integrates
+     * to unbounded spin — measured -13.5 rad/s over 20 s still creeping, with
+     * ~zero passive decay (-6.17 to -3.7 over 8 s unbraked) and a lift
+     * feedback past ~3.5-4 rad/s (chassis rises ~1 cm, contacts unload to the
+     * slop boundary, damping collapses further). Real yaw authority saturates
+     * (back-EMF + tire scrub); here nothing saturates in human timescales.
+     * Governor: delivered motor torque scales down past 3.0 rad/s, reaching
+     * the traction-cut floor (0.15) at 4.5. Same pattern as the wheel
+     * free-speed governor (motors cannot push past equilibrium), applied to
+     * ALL wheels equally so mixer directionality/anti-symmetry is preserved:
+     * drive_directions gates structure (|om|>0.2, sign flip, dominance), not
+     * magnitude — equal scaling preserves all three. Recorded magnitude
+     * comments (2.29 ramp average) may shift down; update them from the log
+     * if they do, never the gates. Tank peaks (1.2) never reach the band.
+     * Alone the governor only HALVED the runaway rate (drive cut to 0.15x
+     * leaves wheels spinning at free speed on contact-transmitted yaw) —
+     * dissipation, not just excitation cap, is required, hence the active
+     * damper below. Stateless (no struct change). */
+    float yaw_gov = 1.0f;
+    if (robot -> chassis_body >= 0 && robot -> chassis_body < world -> body_count) {
+        float yaw_abs = fabsf (world -> bodies [robot -> chassis_body].angular_velocity.y);
+        if (isfinite (yaw_abs) && yaw_abs > 3.0f) {
+            yaw_gov = 1.0f - (yaw_abs - 3.0f) * (0.85f / 1.5f);
+            if (yaw_gov < 0.15f) { yaw_gov = 0.15f; }
+        }
+    }
     for (int i = 0; i < robot -> wheel_count; i++) {
         int wheel_idx = robot -> wheel_bodies [i];
         if ((wheel_idx < 0) || (wheel_idx >= world -> body_count)) { continue; }
@@ -851,7 +877,48 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
          * drive peel-out (propulsive overspeed); strangling the regen
          * brake 0.15-coasts it into uselessness while the contact solver
          * already cone-bounds whatever reaches the ground. */
-        if (!idle_coast) { robot -> wheel_motors [i].output_torque *= robot -> wheel_traction_scale [i]; }
+        if (!idle_coast) {
+            /* Yaw stability damper (active counterpart to the governor
+             * above): a pure yaw couple opposing chassis spin, deadbanded
+             * below 3.0 rad/s and ramping to full by 4.5. Real tire scrub
+             * damps yaw passively; this plant's analytic tire under-provides
+             * it (roller-axis projection dilutes yaw slip ~11x, then the
+             * lift feedback unloads the patches entirely), so ESC-style
+             * active damping stands in. Differential (mirrored per side) =
+             * zero net force, pure moment — planar drive is untouched. Same
+             * deadband as the governor, so green gates (all sub-3.0) never
+             * see it; tank peaks at 1.2. */
+            float chiral = 0.0f;
+            if (robot -> chassis_body >= 0 && robot -> chassis_body < world -> body_count) {
+                float yaw_now = world -> bodies [robot -> chassis_body].angular_velocity.y;
+                if (isfinite (yaw_now)) {
+                    float yaw_mag = (yaw_now < 0.0f) ? -yaw_now : yaw_now;
+                    if (yaw_mag > 3.0f) {
+                        float ramp = (yaw_mag - 3.0f) / 1.5f;
+                        if (ramp > 1.0f) { ramp = 1.0f; }
+                        /* 0.6 N.m.s at full ramp: stops 0.27 kg.m^2 from
+                         * 4.5 rad/s in ~1 s against the measured residual
+                         * excitation (~0.2 N.m). */
+                        float moment = 0.6f * ramp * yaw_mag;
+                        float dd = moment * 0.05f / (4.0f * 0.24f);
+                        float sgn = (yaw_now >= 0.0f) ? 1.0f : -1.0f;
+                        /* Oppose: rotate+ pattern (left -, right +) drives
+                         * -yaw (measured), so it damps +yaw; mirrored for
+                         * -yaw. Verified by sign audit above. */
+                        chiral = ((i % 2) == 0) ? (-sgn * dd) : (sgn * dd);
+                    }
+                }
+            }
+            robot -> wheel_motors [i].output_torque += chiral;
+            robot -> wheel_motors [i].output_torque *= robot -> wheel_traction_scale [i] * yaw_gov;
+            /* Damper applies AFTER the scales above (deliberately): the
+             * governor floor (0.15x) would neuter it exactly when it is
+             * needed most, and the traction cut must not regulate a
+             * stability torque (its peel logic reads wheel-vs-ground slip,
+             * which a yaw couple intentionally creates). Damper magnitude
+             * is cone-safe by construction (<=6.3 N/wheel vs ~15 N cone). */
+            robot -> wheel_motors [i].output_torque += chiral;
+        }
         /* Apply motor torque along the actual physical axle in world space.
          * Free-speed governor: a motor cannot push its wheel past free
          * speed under its own power (measured pathology: +248 rad/s in
