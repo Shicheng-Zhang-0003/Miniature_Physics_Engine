@@ -99,6 +99,34 @@ typedef struct {
 } intake_launch_state;
 void intake_launch_state_compute (vector3 chassis_pos, vector4 chassis_ori, vector3 chassis_vel,
                                   intake_launch_state *out);
+/* Power-scaled shot (DESPOT-2026-10-14): the stock 9 m/s 50 deg muzzle
+ * outranges the 3.66 m field (8 m range) and cannot lob softly into the
+ * 1.5 m hive mouths from legal spots — every full-power hive shot from
+ * inside the field smacks frame or cell undersides. Real launchers vary
+ * wheel speed; power scales muzzle speed linearly (chassis inherited
+ * fully) and backspin proportionally, clamped to [0.3, 1.0] (below 0.3
+ * balls dribble out of the mouth). power == 1.0 takes the exact legacy
+ * path (branch, bit-identical — the bucket_game calibration depends on
+ * it). The trajectory predictor previews the last aimed shot through
+ * intake_launch_state_compute_elev (documented). */
+#define INTAKE_LAUNCH_POWER_MIN 0.3f
+int intake_shoot_power (physics_world *world, vector3 chassis_pos, vector4 chassis_ori, vector3 chassis_vel,
+                        int carried [INTAKE_MAX_CARRIED], int *carried_n, float power);
+/* Aimed shot: power as above plus launch elevation in degrees [20, 80]
+ * (default 50). The stock 50-degree muzzle cannot place a ball in the
+ * 1.5 m hive mouths from any legal field spot at any power (proven by
+ * trajectory: arrival height falls 0.3+ m short of the mouth) — regulation
+ * hive play needs the angle, not just the range. Clamped, non-finite-safe;
+ * (1.0, 50.0) is the exact legacy path. */
+#define INTAKE_LAUNCH_ELEV_MIN 20.0f
+#define INTAKE_LAUNCH_ELEV_MAX 80.0f
+int intake_shoot_aimed (physics_world *world, vector3 chassis_pos, vector4 chassis_ori, vector3 chassis_vel,
+                        int carried [INTAKE_MAX_CARRIED], int *carried_n, float power, float elev_deg);
+/* Elevation-parameterized launch state (exported for the trajectory
+ * predictor, which previews aimed shots through it; intake_launch_state_
+ * compute() is the 50-degree specialization and is unchanged). */
+void intake_launch_state_compute_elev (vector3 chassis_pos, vector4 chassis_ori, vector3 chassis_vel, float elev_deg,
+                                       intake_launch_state *out);
 /* Drop all carried balls: dynamic, kept at chassis velocity + small forward
  * nudge. Returns dropped count. */
 int intake_eject (physics_world *world, vector3 chassis_vel, vector3 chassis_fwd, int carried [INTAKE_MAX_CARRIED],

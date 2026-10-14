@@ -62,6 +62,19 @@ int ftc_intake_set (struct physics_world *world, int index, int on);
 int ftc_intake_toggle (struct physics_world *world, int index);
 int ftc_eject (struct physics_world *world, int index);
 int ftc_shoot (struct physics_world *world, int index);
+/* Power-scaled shot (0.3..1.0, clamped; full power == ftc_shoot exactly).
+ * The stock full-power lob outranges the field and cannot drop into the
+ * hive mouths from legal spots; fractional power gives the soft lobs
+ * regulation play needs. */
+int ftc_shoot_power (struct physics_world *world, int index, float power);
+/* Aimed shot (power 0.3..1.0, elevation 20..80 deg, both clamped): the
+ * stock muzzle cannot place balls in the 1.5 m hive mouths from legal
+ * spots at any power (proven by trajectory), so regulation hive play
+ * needs the angle too. Records params for the trajectory predictor. */
+int ftc_shoot_aimed (struct physics_world *world, int index, float power, float elev_deg);
+/* Last aimed-shot params (defaults 1.0 / 50.0): what the predictor
+ * previews. Returns 0 ok, -1 no fleet. */
+int ftc_last_shot_params (struct physics_world *world, float *power_out, float *elev_out);
 int ftc_bucket_spawn (struct physics_world *world, float x, float y, float z);
 int ftc_bucket_clear (struct physics_world *world);
 /* Totals: carried (CONTROLLED robot), tracked balls, scored, bucket active. Any out

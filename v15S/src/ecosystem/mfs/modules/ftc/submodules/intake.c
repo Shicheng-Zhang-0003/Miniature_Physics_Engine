@@ -59,12 +59,24 @@ int intake_update (physics_world *world, vector3 chassis_pos, vector4 chassis_or
  * shot that actually fires. No side effects, no world access. */
 void intake_launch_state_compute (vector3 chassis_pos, vector4 chassis_ori, vector3 chassis_vel,
                                   intake_launch_state *out) {
+    intake_launch_state_compute_elev (chassis_pos, chassis_ori, chassis_vel, INTAKE_LAUNCH_ELEV_DEG, out);
+}
+/* Elevation-parameterized core. intake_launch_state_compute() above is the
+ * 50-degree specialization, so the predictor's resolved symbol and every
+ * full-power caller are bit-identical to before (same ops, same order,
+ * same values — function boundary changes nothing with FP contraction
+ * off). Aimed shots come through here with their elevation. */
+void intake_launch_state_compute_elev (vector3 chassis_pos, vector4 chassis_ori, vector3 chassis_vel, float elev_deg,
+                                       intake_launch_state *out) {
     if (!out) { return; }
+    if (!isfinite (elev_deg)) { elev_deg = INTAKE_LAUNCH_ELEV_DEG; }
+    if (elev_deg < INTAKE_LAUNCH_ELEV_MIN) { elev_deg = INTAKE_LAUNCH_ELEV_MIN; }
+    if (elev_deg > INTAKE_LAUNCH_ELEV_MAX) { elev_deg = INTAKE_LAUNCH_ELEV_MAX; }
     vector3 fwd = vector4_rotate_to_vector3 (chassis_ori, (vector3) {0.0f, 0.0f, 1.0f});
     /* Launch dir: chassis-forward tilted up by elevation. det_cos/det_sin
      * (fixed-coefficient, bit-identical) — shots stay inside the
      * determinism contract. */
-    float el = INTAKE_LAUNCH_ELEV_DEG * 3.14159265f / 180.0f;
+    float el = elev_deg * 3.14159265f / 180.0f;
     float ce = (float) det_cos ((double) el), se = (float) det_sin ((double) el);
     /* World-frame elevation (DESPOT-2026-10-12): the muzzle inherits
      * chassis pitch (braking dips the nose several degrees), which swung
@@ -93,7 +105,22 @@ void intake_launch_state_compute (vector3 chassis_pos, vector4 chassis_ori, vect
 }
 int intake_shoot (physics_world *world, vector3 chassis_pos, vector4 chassis_ori, vector3 chassis_vel,
                   int carried [INTAKE_MAX_CARRIED], int *carried_n) {
+    return intake_shoot_power (world, chassis_pos, chassis_ori, chassis_vel, carried, carried_n, 1.0f);
+}
+int intake_shoot_power (physics_world *world, vector3 chassis_pos, vector4 chassis_ori, vector3 chassis_vel,
+                        int carried [INTAKE_MAX_CARRIED], int *carried_n, float power) {
+    return intake_shoot_aimed (world, chassis_pos, chassis_ori, chassis_vel, carried, carried_n, power,
+                               INTAKE_LAUNCH_ELEV_DEG);
+}
+int intake_shoot_aimed (physics_world *world, vector3 chassis_pos, vector4 chassis_ori, vector3 chassis_vel,
+                        int carried [INTAKE_MAX_CARRIED], int *carried_n, float power, float elev_deg) {
     if (!world || !world -> bodies || !carried || !carried_n || *carried_n <= 0) { return -1; }
+    if (!isfinite (power)) { power = 1.0f; }
+    if (power < INTAKE_LAUNCH_POWER_MIN) { power = INTAKE_LAUNCH_POWER_MIN; }
+    if (power > 1.0f) { power = 1.0f; }
+    if (!isfinite (elev_deg)) { elev_deg = INTAKE_LAUNCH_ELEV_DEG; }
+    if (elev_deg < INTAKE_LAUNCH_ELEV_MIN) { elev_deg = INTAKE_LAUNCH_ELEV_MIN; }
+    if (elev_deg > INTAKE_LAUNCH_ELEV_MAX) { elev_deg = INTAKE_LAUNCH_ELEV_MAX; }
     int id = carried [0];
     for (int i = 1; i < *carried_n; i++) { carried [i - 1] = carried [i]; }
     (*carried_n)--;
@@ -101,12 +128,21 @@ int intake_shoot (physics_world *world, vector3 chassis_pos, vector4 chassis_ori
     if (bi < 0 || bi >= world -> body_count) { return -1; }
     rigidbody *ball = &world -> bodies [bi];
     intake_launch_state st;
-    intake_launch_state_compute (chassis_pos, chassis_ori, chassis_vel, &st);
+    intake_launch_state_compute_elev (chassis_pos, chassis_ori, chassis_vel, elev_deg, &st);
     rigidbody_set_kinematic (ball, false);
     rigidbody_wake (ball);
     ball -> position = st.muzzle;
-    ball -> velocity = st.velocity;
-    ball -> angular_velocity = st.spin;
+    if (power == 1.0f && elev_deg == INTAKE_LAUNCH_ELEV_DEG) {
+        /* Exact legacy path (see header): no arithmetic on the shot. */
+        ball -> velocity = st.velocity;
+        ball -> angular_velocity = st.spin;
+    } else {
+        /* Scale the robot-relative component only; chassis inheritance is
+         * untouched (a moving robot's throw still carries its velocity). */
+        vector3 rel = vector3_subtraction (st.velocity, chassis_vel);
+        ball -> velocity = vector3_addition (chassis_vel, vector3_scaling (rel, power));
+        ball -> angular_velocity = vector3_scaling (st.spin, power);
+    }
     rigidbody_update_axes (ball);
     return id;
 }

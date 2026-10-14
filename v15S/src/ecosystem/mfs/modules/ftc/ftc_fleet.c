@@ -38,6 +38,11 @@ typedef struct {
      * registry (56 staged + headroom; the arcade 16-slot registry is
      * untouched) + league state. Zero-init via calloc; ids prune on miss. */
     biobuzz_state_t bb;
+    /* Last aimed-shot params for the trajectory predictor (defaults: full
+     * power, stock elevation — the predictor previews those until aimed
+     * shots exist). Set by ftc_shoot_aimed only. */
+    float last_shot_power;
+    float last_shot_elev;
 } ftc_fleet_t;
 void *ftc_fleet_create (void) {
     ftc_fleet_t *f = (ftc_fleet_t *) calloc (1, sizeof (ftc_fleet_t));
@@ -51,6 +56,9 @@ void *ftc_fleet_create (void) {
     /* Poison id slots: 0 must never read as a live body id. */
     memset (f -> ball_ids, 0xFF, sizeof (f -> ball_ids));
     memset (f -> bucket_part_ids, 0xFF, sizeof (f -> bucket_part_ids));
+    /* Predictor defaults: full power, stock elevation. */
+    f -> last_shot_power = 1.0f;
+    f -> last_shot_elev = 50.0f;
     return f;
 }
 void ftc_fleet_destroy (void *fleet_state) {
@@ -183,6 +191,8 @@ int ftc_fleet_clear (struct physics_world *world) {
     f -> bucket_cy = 0.0f;
     f -> bucket_cz = 0.0f;
     memset (&f -> bb, 0, sizeof (f -> bb));
+    f -> last_shot_power = 1.0f;
+    f -> last_shot_elev = 50.0f;
     return 0;
 }
 /* Controlled-robot selection (per world; terminal `ftc select`, gamepad
@@ -320,6 +330,46 @@ int ftc_shoot (struct physics_world *world, int index) {
                            &r -> intake_count);
     if (id >= 0) { fprintf (stderr, "[bucketball] fired ball id=%d\n", id); }
     return id;
+}
+int ftc_shoot_power (struct physics_world *world, int index, float power) {
+    ftc_robot *r = fleet_robot_at (fleet_of (world), index);
+    if (!world || !r) { return -1; }
+    rigidbody *ch = fleet_chassis (world, r);
+    if (!ch) { return -1; }
+    int id = intake_shoot_power (world, ch -> position, ch -> orientation, ch -> velocity, r -> intake_balls,
+                                 &r -> intake_count, power);
+    if (id >= 0) { fprintf (stderr, "[bucketball] fired ball id=%d power=%.2f\n", id, power); }
+    return id;
+}
+int ftc_shoot_aimed (struct physics_world *world, int index, float power, float elev_deg) {
+    ftc_fleet_t *f = fleet_of (world);
+    ftc_robot *r = fleet_robot_at (f, index);
+    if (!world || !r) { return -1; }
+    rigidbody *ch = fleet_chassis (world, r);
+    if (!ch) { return -1; }
+    if (!isfinite (power)) { power = 1.0f; }
+    if (power < 0.3f) { power = 0.3f; }
+    if (power > 1.0f) { power = 1.0f; }
+    if (!isfinite (elev_deg)) { elev_deg = 50.0f; }
+    if (elev_deg < 20.0f) { elev_deg = 20.0f; }
+    if (elev_deg > 80.0f) { elev_deg = 80.0f; }
+    int id = intake_shoot_aimed (world, ch -> position, ch -> orientation, ch -> velocity, r -> intake_balls,
+                                 &r -> intake_count, power, elev_deg);
+    if (id >= 0) {
+        fprintf (stderr, "[bucketball] fired ball id=%d power=%.2f elev=%.1f\n", id, power, (double) elev_deg);
+        if (f) {
+            f -> last_shot_power = power;
+            f -> last_shot_elev = elev_deg;
+        }
+    }
+    return id;
+}
+int ftc_last_shot_params (struct physics_world *world, float *power_out, float *elev_out) {
+    ftc_fleet_t *f = fleet_of (world);
+    if (!world || !f) { return -1; }
+    if (power_out) { *power_out = f -> last_shot_power; }
+    if (elev_out) { *elev_out = f -> last_shot_elev; }
+    return 0;
 }
 /* Suspended bucket: a miniature walled field pad (floor + 4 walls, open
  * top) staged as static bodies. Re-spawning an active bucket MOVES the
