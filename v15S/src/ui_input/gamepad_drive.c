@@ -38,6 +38,8 @@ static int s_control_enabled = 1; /* START toggles; default ON like module_1 */
 static int s_prev_start = 0;
 static int s_prev_back = 0;
 static int s_kb_reported = 0;
+static int s_kb_intake_last = 0;
+static int s_prev_period = 0;
 static int s_prev_a = 0;
 static int s_prev_y = 0;
 static int s_prev_b = 0;
@@ -114,6 +116,8 @@ void gamepad_drive_invalidate (void) {
     s_active = 0;
     s_prev_back = 0;
     s_kb_reported = 0;
+    s_kb_intake_last = 0;
+    s_prev_period = 0;
 }
 void gamepad_drive_init (void) {
     gpd_resolve ();
@@ -164,6 +168,25 @@ static int gpd_keyboard_tick (void) {
     ftc_robot *r = s_fleet_get (w, sel);
     if (!r)
         return 0;
+    /* Intake (`<` hold) + shoot (`>` press edge) on the selected robot.
+     * Runs whenever the keyboard path runs — including standing still
+     * (stationary collection is valid play). State is edge/level driven
+     * with last-sent memory, so holding `.` fires exactly once and a
+     * reopened terminal/microvim cannot leave a stuck intake: release
+     * always lands as off on return. */
+    {
+        int want_in = mpe_keydrive_intake (main_inputs.comma_key_pressed ? 1 : 0);
+        int cur_sh = main_inputs.period_key_pressed ? 1 : 0;
+        int (*k_set) (struct physics_world *, int, int) =
+            (int (*) (struct physics_world *, int, int)) gpd_sym ("ftc_intake_set");
+        int (*k_shoot) (struct physics_world *, int) =
+            (int (*) (struct physics_world *, int)) gpd_sym ("ftc_shoot");
+        if (want_in != s_kb_intake_last && k_set) {
+            if (k_set (w, sel, want_in) >= 0) { s_kb_intake_last = want_in; }
+        }
+        if (mpe_keydrive_shoot_edge (s_prev_period, cur_sh) && k_shoot) { k_shoot (w, sel); }
+        s_prev_period = cur_sh;
+    }
     void (*s_brk) (ftc_robot *, int) = (void (*) (ftc_robot *, int)) gpd_sym ("ftc_robot_set_brake");
     /* Brake on resultant-zero (covers release AND opposing-pair cancels —
      * holding G+B is a finger slip, and must stop-and-hold exactly like a

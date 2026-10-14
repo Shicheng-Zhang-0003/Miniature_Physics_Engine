@@ -54,6 +54,8 @@ while connected — keys take over when no pad is present.
 | `G` / `B` | Forward / back |
 | `V` / `N` | Strafe left / right |
 | `C` / `M` | Rotate left / right |
+| `,` hold (`<`) | Run the intake (release stops it) |
+| `.` press (`>`) | Shoot one carried ball (once per press — holding does not machine-gun) |
 
 Opposing pairs cancel (G+B, V+N, C+M); axes combine, so G+N arcs
 forward-right. Releasing all keys brakes to a stop and holds (same as
