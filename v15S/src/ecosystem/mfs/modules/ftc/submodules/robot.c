@@ -895,14 +895,22 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
                     }
                 }
             }
-            robot -> wheel_motors [i].output_torque += chiral;
             robot -> wheel_motors [i].output_torque *= robot -> wheel_traction_scale [i] * yaw_gov;
             /* Damper applies AFTER the scales above (deliberately): the
              * governor floor (0.15x) would neuter it exactly when it is
              * needed most, and the traction cut must not regulate a
              * stability torque (its peel logic reads wheel-vs-ground slip,
              * which a yaw couple intentionally creates). Damper magnitude
-             * is cone-safe by construction (<=6.3 N/wheel vs ~15 N cone). */
+             * is cone-safe by construction (<=6.3 N/wheel vs ~15 N cone).
+             * DESPOT-FIX 2026-10-15: chiral was added twice — once before
+             * scaling (line above, scaled down by gov exactly when most
+             * needed) and once after. Removed the pre-scale addition; the
+             * post-scale add below is the only one, matching the comment.
+             * Double application over-damped at low yaw (gov/scale near 1:
+             * 2x chiral) and under-damped at high yaw (gov near 0.15: only
+             * 1.15x chiral), so the robot felt sluggish then snap-oversteer
+             * as the governor cut in. Single unscaled add gives consistent
+             * damping. */
             robot -> wheel_motors [i].output_torque += chiral;
         }
         /* Apply motor torque along the actual physical axle in world space.

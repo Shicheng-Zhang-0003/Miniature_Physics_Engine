@@ -172,7 +172,7 @@ typedef struct {
  * it. The cause is structural -- see [MECANUM-PIVOT] in
  * docs/KNOWN_FAILURES.md. */
 #ifndef MFS_MECANUM_ANALYTIC_MU
-#define MFS_MECANUM_ANALYTIC_MU 0.7f
+#define MFS_MECANUM_ANALYTIC_MU 0.9f
 #endif
 #ifndef MFS_MECANUM_ANALYTIC_VREF
 #define MFS_MECANUM_ANALYTIC_VREF 0.005f
