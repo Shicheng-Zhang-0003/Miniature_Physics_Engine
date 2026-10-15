@@ -77,9 +77,13 @@ BASE_LIBS = $(GTK_LIBS) $(X11_LIBS) -lm -pthread $(MPE_WIN_LIBS)
 else
 BASE_LIBS = $(GTK_LIBS) $(X11_LIBS) $(WAYLAND_LIBS) -lm -ldl -rdynamic
 endif
-# Opt-in strict warnings: `make WARNINGS_AS_ERRORS=1` appends -Werror.
-WARNINGS_AS_ERRORS ?= 0
-WERROR_FLAG := $(if $(filter 1,$(WARNINGS_AS_ERRORS)),-Werror,)
+# -Werror on by default: every warning is a bug waiting to hide. The DESPOT
+ # 2026-10-09 audit found an implicit `localtime_r` in mpe_config.c that
+ # survived because warnings were not fatal — it truncated a returned pointer
+ # through an int-typed assumption. `make WARNINGS_AS_ERRORS=0` still opts out
+ # for legacy toolchains, but CI and shipped builds treat warnings as errors.
+ WARNINGS_AS_ERRORS ?= 1
+ WERROR_FLAG := $(if $(filter 1,$(WARNINGS_AS_ERRORS)),-Werror,)
 BASE_CFLAGS += $(WERROR_FLAG)
 # Determinism flags are hard-appended after $(CFLAGS) on every compile/link
 # so environment CFLAGS can never silently drop -ffp-contract=off (bitwise
