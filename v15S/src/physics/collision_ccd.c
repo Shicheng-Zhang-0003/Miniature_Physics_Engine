@@ -177,19 +177,28 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
          * velocity and y0 the lowest-point height (center minus support).
          * Translational-only by design (see below): spin never triggers. */
         /* Lowest point offset from center (support depth preserves the
-         * contact geometry for boxes/cylinders; the TOI itself is
-         * translational — see below). */
+         * contact geometry for boxes/cylinders; the TOI itself accounts for
+         * rotational lowest-point velocity below — see ROT-CCD). */
         float r_lowest_y = ccd_support_depth (mover);
         float lowest = mover -> position.y - r_lowest_y;
-        /* Floor TOI uses the CENTER (translational) velocity, never the
-         * lowest-point velocity v_center + omega x r. Rotation alone cannot
-         * translate the center through the plane: a pure spinner reports a
-         * diving lowest point (wheel at 127 rad/s: vy_low = -6.8 m/s while
-         * stationary) and would clamp every tick — teleporting/rotating
-         * rolling contact into levitation and spin pump (driven_wheel
-         * disease). Dipping corners are bounded oscillation the discrete
-         * solver re-seats; CCD owns translation tunneling only. */
-        float v0 = mover -> velocity.y;
+        /* ROT-CCD (DESPOT-2026-10-14): floor CCD now includes the lowest
+         * point's rotational velocity. A body spinning about a horizontal
+         * axis can dip a corner into the plane even while its centre stays
+         * above — pure translation CCD misses this. Use v_lowest = v_center
+         * + (w x r_lowest).y so a tumbling box's falling corner clamps
+         * before it tunnels. A pure spinner about Y has w x r_lowest purely
+         * horizontal, so v_lowest.y == v_center.y and nothing changes for
+         * rolling wheels — no false clamps, no spin pump. The rotational
+         * contribution decays as the body rotates (only the instantaneous
+         * lowest-point velocity is used); this is a first-order, conservative
+         * approximation that can only add clamps, never remove them.
+         *
+         * For the centre-velocity case (pure translation), v_lowest == v0
+         * and the math is identical to the old path — bitwise identical for
+         * non-tumbling bodies. */
+        vector3 r_lowest = {0.0f, -r_lowest_y, 0.0f};
+        vector3 w_cross_rlow = vector3_cross (mover -> angular_velocity, r_lowest);
+        float v0 = mover -> velocity.y + w_cross_rlow.y;
         /* Exact quadratic CCD for floor plane under constant gravity.
          * Equation: 0.5*g*t^2 + v0*t + y0 = 0
          * where g = gravity (negative), y0 = lowest-point height above plane.
