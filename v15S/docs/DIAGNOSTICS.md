@@ -217,7 +217,7 @@ bodies. Two placement rules follow from this, both enforced by gates:
 If the screen is empty, read `STAGED_BOUNDS` and compare the centre with
 the camera axis before touching anything else.
 
-### Known limitation: static by construction
+### Known limitation: static by construction (Phase 0)
 The dish is **staged once and does not move or vibrate.** This is Phase 0
 by design, not a bug:
 
@@ -227,6 +227,23 @@ by design, not a bug:
 
 Until follow mode lands, treat the bridge as a live *snapshot* viewer. See
 `v15S/REMAINING_WORK.md`.
+
+### Phase 1: per-refresh motion (2026-10-15)
+`cfg->every > 0` now wires into `pre_step`: each refresh tick calls
+`mgb_sink_mpe_move()`, which **repositions existing bodies in place** rather
+than re-spawning them. The stable S2-atom → MPE-body mapping means atom `i`
+always maps to the same body; new atoms create new bodies; removed atoms'
+bodies remain frozen at last position. Zero-force bond lines (`k=0`) are
+updated to the current separation each refresh.
+
+Bodies are **dynamic** (not static) so they participate in collision
+response correctly (other MPE bodies bounce off them), but position is
+overridden from S2 each refresh and velocity is zeroed, so the solver never
+drifts them between updates. Physical coupling (positions flowing back to
+S2) remains out of scope: display-only, one-way, always.
+
+Refresh cadence is gated by `cfg->every` (ticks between refreshes). Default
+0 = stage-once (Phase 0 behavior preserved).
 
 ---
 

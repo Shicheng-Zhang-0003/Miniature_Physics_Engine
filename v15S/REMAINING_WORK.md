@@ -10,25 +10,39 @@
 > 6 blocking, 4 informational); 2026-10-07 (44/42; 232+2 xfail/234);
 > 2026-10-01 (41/42).
 >
-> **2026-10-13 despot sweep closed:** MGB-MKSTEMPS (P20's own `mkstemp` broke
-> every spawn with EINVAL — 32/32 now); P11 cast recurrence ×4 (shared helper
-> promoted to `term_priv.h`); `mod ls` count guard; v200 joint-commit
-> accounting (per-pool veto + loud drops); microvim `:e` whitelist + failure
-> propagation; TUI builder guards; `ftc_traj` narrowing; `term_id_buffer`
-> heap-local; dir-fsync `O_NOFOLLOW`; `paranoia_config` TMPDIR isolation;
-> MGB dual-pool stage reset; `MPE_THREADS` strtol; `mpe_diag_total`
-> saturation; solver-clamp + dt-clamp counters; depenetration single-knob
-> wake; joint-beta help truth; N1/N2/N3/N4/N5/N6/N7/N9/N10/N11/N12 honesty
-> notes; runner docstring + makefile NOTE counts; Windows batch TMPDIR.
-> Self-inflicted `paranoia_config` SIGSEGV (missing `<stdlib.h>`) caught by
-> the profile and fixed. Open/bounded items are ticketed in
-> `docs/DESPOT_AUDIT_2026-10-13.md` (clip reseed, compression-N rolling,
-> per-phase friction, warm-start carry, Gottschalk depth, oblique-L oracle,
-> TSan, MSVC, MT solve, jail, joint codes, state hash, `MATH_G_N` (halfway:
-> paranoia T3 pins `g_n`), drag oracle, angmom vector, ellipse, `-Werror` CI,
-> `vi` CWD-confinement, `:e` staged load, 472 P20+mkstemps forward-port).
-> Twin drift (`461-MFS`, `472-MGB`) pre-exists and is tracked there, not
-> fixed here — except the documented 472 patch sketch below.
+> **2026-10-15 comprehensive audit — CLOSED:**
+> - MULTICORE: island-based parallel solver (`MPE_THREADS` 1–8, default 1).
+>   Each awake island's manifolds dispatched to a dedicated thread; within-island
+>   Gauss-Seidel order preserved; disjoint writes (islands share no bodies).
+>   Bitwise identical to serial at 1/4/8 threads (verified over 600-tick
+>   determinism twins). Per-body integration + sanitize parallelized too.
+>   Joint solve (`constraint_solve_all`) stays serial (O(1024) scan,
+>   measured negligible).
+> - WARM-START: damped normal warm-start implemented
+>   (`solver.warm_start_damping`, default 0.0=cold proven). Nonzero damping
+>   scales cached normal and uses it as cone `fn`; cold is the shipped default.
+>   Damped warm-start verified faster at 32–64 iterations but unstable under
+>   extreme gravity/friction/restitution regimes.
+> - CCD ROTATIONAL: floor plane CCD uses lowest-point velocity
+>   (`v_center + w × r_lowest`) so tumbling corners clamp before tunneling.
+>   Pure spinners about Y unaffected. Rotation-only inter-volume tunneling
+>   remains unsolved.
+> - S2 BRIDGE PHASE 1: `mgb_sink_mpe_move()` repositions existing bodies in
+>   place per refresh tick (`cfg->every > 0`), no respawn, stable atom→body
+>   mapping, zero-force bond lines updated. `bridge_pre_step` uses move
+>   instead of stage to avoid pool resets.
+> - -WERROR BY DEFAULT: `WARNINGS_AS_ERRORS ?= 1`. Engine compiles clean under
+>   `-Wall -Wextra -Werror`.
+>
+> > Self-inflicted `paranoia_config` SIGSEGV (missing `<stdlib.h>`) caught by
+> > the profile and fixed. Open/bounded items are ticketed in
+> > `docs/DESPOT_AUDIT_2026-10-13.md` (clip reseed, compression-N rolling,
+> > per-phase friction, warm-start carry, Gottschalk depth, oblique-L oracle,
+> > TSan, MSVC, MT solve, jail, joint codes, state hash, `MATH_G_N` (halfway:
+> > paranoia T3 pins `g_n`), drag oracle, angmom vector, ellipse, `-Werror` CI,
+> > `vi` CWD-confinement, `:e` staged load, 472 P20+mkstemps forward-port).
+> > Twin drift (`461-MFS`, `472-MGB`) pre-exists and is tracked there, not
+> > fixed here — except the documented 472 patch sketch below.
 >
 > **472 forward-port sketch (P20 + MKSTEMPS, separate repo — apply there):**
 > in `472-MGB/src/mgb_link.c`, replace the predictable

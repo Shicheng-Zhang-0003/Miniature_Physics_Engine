@@ -1,42 +1,69 @@
 # 🧊 MINIATURE PHYSICS ENGINE (MPE)
 
 > ⚠️ **STATUS: ACTIVE REPAIR — MOSTLY FIXED, VERIFY BEFORE STABLE WORK.**
-> The `main` head (`v15S` dev) had a Tom-and-Jerry physics episode (frictionless
-> floor, overlap pops, stuck F11 torture values) that is now largely repaired:
-> live scenes rest on the infinite solver plane with validated friction,
-> stacks spawn overlap-free, and F11 always restores (backup, else compiled
-> defaults).
+ > The `main` head (`v15S` dev) had a Tom-and-Jerry physics episode (frictionless
+ > floor, overlap pops, stuck F11 torture values) that is now largely repaired:
+ > live scenes rest on the infinite solver plane with validated friction,
+ > stacks spawn overlap-free, and F11 always restores (backup, else compiled
+ > defaults).
+ >
+ > **Headless truth (2026-10-15): 46 registered / 44 blocking green + 2
+ > diagnostic**, runner `--profile quick` **59/59**, and `--profile full`
+ > **226 checks: 220 passed, 6 blocking failures, 4 informational**. The 6
+ > failures are **3 root causes, each run twice** (plain + ASan/UBSan), all
+ > pre-existing and none caused by this session's work:
+ >
+ > 1. `legacy-f11_torture` — extreme-parameter torture case, reproduced
+ >    bit-identically from a pristine `HEAD` worktree. Not a regression.
+ > 2. `mfs-suite` — one pre-existing red, verified bit-identical on
+ >    pristine `HEAD` before this session's algorithm work (not a
+ >    regression): `tank` (pivot heading/translation baselines; the
+ >    observer Q-filter moved it with cause chain, still red, baseline
+ >    untouched; yaw governor/damper left its numbers bit-identical).
+ >    MFS stands 26/27: `odometry_yaw` went red→green on the
+ >    Q-filter, the 5 BIOBUZZ gates + `select` + re-derived
+ >    `partial_throttle`/`bucket_game` + new `yaw_stability` are green.
+ > 3. `mfs-summary-contract` — a consequence of (2), and now reporting it
+ >    accurately. It previously blamed itself ("did not emit its summary")
+ >    because `build_tests.sh` ran under `set -e` and aborted one line above
+ >    `suite_rc=$?`, destroying its own failure evidence.
+ >
+ > Earlier headlines on this line (2026-10-07: 44/42, 232 pass + 2 xfail +
+ > 6 info, total 234, with `MFS-STRAFE-F2` as the only red) described an
+ > earlier tree. Do not read them as current.
+ >
+ > What is *not* yet claimed: the live-window all-clear is still pending user
+ > confirmation, so until this notice is lifted, prefer the last known proper
+ > release **`V1.5R3`** (`git checkout V1.5R3`) for critical stable work.
+ >
+ > **Active head:** `v15S` — GTK4 port of the `v15R3` release with a modular kernel, per-world config, and upgraded data structures. Build from `v15S/src`; run the complete verification matrix from the repository root with `python3 tools/test_runner.py --profile full`.
 >
-> **Headless truth (2026-10-09): 45 registered / 43 blocking green + 2
-> diagnostic**, runner `--profile quick` **59/59**, and `--profile full`
-> **226 checks: 220 passed, 6 blocking failures, 4 informational**. The 6
-> failures are **3 root causes, each run twice** (plain + ASan/UBSan), all
-> pre-existing and none caused by the 2026-10-09 diagnostics work:
+> **Multicore (2026-10-15):** Island-based parallel solver. `MPE_THREADS` env
+> var (1–8, default 1) dispatches each awake solver island's manifolds to a
+> dedicated thread; within-island Gauss-Seidel order is preserved, writes are
+> disjoint (islands share no bodies), so results are **bitwise identical to
+> serial at any thread count**. Per-body integration and sanitize run in
+> parallel too. Only the joint solve (`constraint_solve_all`, O(1024) scan)
+> stays serial — measured negligible. Verified: determinism twins agree
+> bitwise at 1, 4, and 8 threads over 600 ticks.
 >
-> 1. `legacy-f11_torture` — extreme-parameter torture case, reproduced
->    bit-identically from a pristine `HEAD` worktree. Not a regression.
-> 2. `mfs-suite` — one pre-existing red, verified bit-identical on
->    pristine `HEAD` before this session's algorithm work (not a
->    regression): `tank` (pivot heading/translation baselines; the
->    observer Q-filter moved it with cause chain, still red, baseline
->    untouched; yaw governor/damper left its numbers bit-identical).
->    MFS stands 26/27: `odometry_yaw` went red→green on the
->    Q-filter, the 5 BIOBUZZ gates + `select` + re-derived
->    `partial_throttle`/`bucket_game` + new `yaw_stability` are green.
-> 3. `mfs-summary-contract` — a consequence of (2), and now reporting it
->    accurately. It previously blamed itself ("did not emit its summary")
->    because `build_tests.sh` ran under `set -e` and aborted one line above
->    `suite_rc=$?`, destroying its own failure evidence.
+> **Warm start (2026-10-14):** Damped normal warm-start implemented
+> (`solver.warm_start_damping`, default 0.0 = cold/proven). Nonzero damping
+> scales the cached normal impulse and uses it as the cone's `fn`, so cached
+> tangents survive the clamp instead of being zeroed. Cold (0.0) is the
+> shipped default because it is stable across all five regimes
+> (default/light/heavy/brittle/sticky); damped warm start is experimental
+> (verified faster convergence at 32–64 iterations, unstable under extreme
+> gravity/friction/restitution). Full restore (1.0) is a measured regression
+> (10-stack ejected at ~13 m/s).
 >
-> Earlier headlines on this line (2026-10-07: 44/42, 232 pass + 2 xfail +
-> 6 info, total 234, with `MFS-STRAFE-F2` as the only red) described an
-> earlier tree. Do not read them as current.
->
-> What is *not* yet claimed: the live-window all-clear is still pending user
-> confirmation, so until this notice is lifted, prefer the last known proper
-> release **`V1.5R3`** (`git checkout V1.5R3`) for critical stable work.
-
-> **Active head:** `v15S` — GTK4 port of the `v15R3` release with a modular kernel, per-world config, and upgraded data structures. Build from `v15S/src`; run the complete verification matrix from the repository root with `python3 tools/test_runner.py --profile full`.
+> **CCD (2026-10-14):** Floor plane CCD now includes the lowest point's
+> rotational velocity (`v_center + w × r_lowest`), so a tumbling box's dipping
+> corner clamps before it tunnels. Pure spinners about Y are unaffected
+> (tangential motion only — no false clamps, no spin pump). Volume sweeps
+> already account for angular speed via `sweep_speed = lin + ang×R + margin`.
+> Rotation-only tunneling between arbitrary volumes remains unsolved
+> (documented limit).
 
 **License:** GPL-3.0 · **Language:** C · **UI:** GTK4 · **Renderer:** OpenGL 3.3 Core
 
@@ -69,7 +96,15 @@ The kernel is fully modular: every pipeline stage (broadphase, narrowphase shape
 - **TUI stress suite** — new `stress` (300 bodies + every joint type) and `ccd` (60/144/300 m/s battery) scenes, `--broadphase/--solver` backend flags, per-scene configs, pool visibility in dumps.
 - **Self-reported failures** — `core/mpe_diag.h` names every error with a subsystem, a stable code, the engine `file:line`, and the values that caused it; records land on stderr, the event log and (live) the debug terminal, and `diag` replays them. Replaces error paths that collapsed into a bare `-1` and a guessed message. Full reference: [`v15S/docs/DIAGNOSTICS.md`](v15S/docs/DIAGNOSTICS.md).
 - **Everything modular lives under `ecosystem/`** — the former top-level `plugins/` is gone. The loader jails paths to `ecosystem/` (any nesting depth), and a plain `.so` must export `mpe_module_desc`.
-- **S2 molecular bridge** (`ecosystem/mgb`) — spawns a live `s2tui`, drives its existing shell over three pipes, reads strict `S2SAVE1` frames from `sync`, and stages them as MPE bodies and zero-force bond lines. Display-only and one-way: positions flow S2 → MPE, never back. `mod load ecosystem/mgb/build/mgb_bridge.so` then `mod attach s2-bridge`. **Phase 0 stages a single snapshot — the dish renders but does not move or vibrate** (static bodies, `k=0` bonds, stage-once cadence); see [`v15S/docs/DIAGNOSTICS.md`](v15S/docs/DIAGNOSTICS.md) §4 and `v15S/REMAINING_WORK.md`.
+- **S2 molecular bridge** (`ecosystem/mgb`) — spawns a live `s2tui`, drives its existing shell over three pipes, reads strict `S2SAVE1` frames from `sync`, and stages them as MPE bodies and zero-force bond lines. Display-only and one-way: positions flow S2 → MPE, never back. `mod load ecosystem/mgb/build/mgb_bridge.so` then `mod attach s2-bridge`. **Phase 0 stages a single snapshot — the dish renders but does not move or vibrate** (static bodies, `k=0` bonds, stage-once cadence); **Phase 1 moves existing bodies in place each refresh tick** (`cfg->every > 0`), repositioning staged bodies rather than re-spawning them, with stable S2-atom→MPE-body mapping and zero-force bond lines that follow. See [`v15S/docs/DIAGNOSTICS.md`](v15S/docs/DIAGNOSTICS.md) §4 and `v15S/REMAINING_WORK.md`.
+
+- **Multicore solver** (`core/physics_world.c`) — island-based parallel stepping. `MPE_THREADS` env var (1–8, default 1) dispatches each awake island's manifolds to a dedicated thread. Islands share no bodies, so writes are disjoint and within-island Gauss-Seidel order is preserved: **bitwise identical to serial at any thread count**. Per-body integration and sanitize also parallelize. Joint solve (`constraint_solve_all`) stays serial (O(1024) scan, measured negligible).
+
+- **Warm start** (`core/physics/collision_solver.c`) — damped normal warm-start (`solver.warm_start_damping`, default 0.0). Nonzero damping scales the cached normal impulse and uses it as the Coulomb cone's `fn`, restoring cross-tick information carry. Cold (0.0) is the shipped default, stable across all five regimes; damped warm start is experimental.
+
+- **CCD rotational** (`core/physics/collision_ccd.c`) — floor plane CCD now uses the lowest point's velocity (`v_center + w × r_lowest`), so tumbling bodies' dipping corners clamp before tunneling. Pure spinners about Y are unaffected.
+
+- **-Werror by default** — `make WARNINGS_AS_ERRORS=1` is now the default. All engine sources compile warning-free under `-Wall -Wextra -Werror`.
 
 Inherited from `v15R3`:
 
@@ -124,10 +159,12 @@ All narrowphase functions take the owning world's config; dispatch is registry-f
 
 ### Solver
 
-- **Impulse-based sequential solver**, 64 iterations by default (configurable 1–128). The 64 knob is really 128 manifold visits per tick — every manifold is visited twice per iteration (`collision_solver.c:707-713`, driven from `core/physics_world.c:1231-1232`).
-- **There is effectively NO warm start on any row — and the code comment that claimed otherwise was wrong until 2026-10-03.** Box2D and Bullet warm-start the normal *and* the tangent rows (Catto, GDC 2014, slides 33–35). Here the **normal is deliberately cold**: `collision_solver.c:406` discards the restored normal every tick, because seeding the iteration with last tick's normal ejected the 10-high stack at ~13 m/s in five ablations while the restored values stayed bounded (~0.5). The rationale is the comment block at `:334–405`.
+- **Impulse-based sequential solver**, 64 iterations by default (configurable 1–128). The 64 knob is really 128 manifold visits per tick — every manifold is visited twice per iteration (`collision_solver.c:707-713`, driven from `core/physics_world.c`).
+- **Multicore**: solver stages run per-island in parallel via `MPE_THREADS` (1–8, default 1). Islands share no bodies, so within-island Gauss-Seidel order is preserved and cross-island writes are disjoint — bitwise identical to serial at any thread count.
+- **There is effectively NO warm start on any row — and the code comment that claimed otherwise was wrong until 2026-10-03.** Box2D and Bullet warm-start the normal *and* the tangent rows (Catto, GDC 2014, slides 33–35). Here the **normal is deliberately cold**: `collision_solver.c` discards the restored normal every tick, because seeding the iteration with last tick's normal ejected the 10-high stack at ~13 m/s in five ablations while the restored values stayed bounded (~0.5). The rationale is documented in the source comment block.
   The tangent was *supposed* to still be restored. It is not. The restored tangent was projected onto the Coulomb cone at application time using the **cold** normal as the cone's `fn` — so `fn` was exactly `0.0`, and `a3_anisotropic_coulomb_clamp()` opens by returning both tangents as zero when `fn <= 0`. Instrumented on a 4-cube stack at rest: **restored `t1 = 0.154651`, `fn = 0.000000`, after clamp `t1 = 0.000000`**. The warm start was deleted by the very clamp added to protect it.
   Restoring it the way the comment described was implemented and measured, and it is a **regression** — worse at 32/64/96 iterations at default gravity, and it turns the suite red in all five regimes (`f10_long_run` drops from 27/27 asleep to 4/27). So the clamp stays and the *documentation* was corrected instead. The tangent **frame** adoption is live and does help; only the impulse seed is dead.
+  **Damped warm-start** (`solver.warm_start_damping`, default 0.0) re-enables the normal seed at reduced scale when nonzero, using the seeded normal as the cone's `fn`. Cold (0.0) is the shipped default — stable across all five regimes (default/light/heavy/brittle/sticky). Nonzero damping is experimental: faster convergence at low iteration counts, but unstable under extreme gravity/friction/restitution. Full restore (1.0) is a measured regression.
   **Consequence worth knowing:** with no cross-tick information carry, the whole column is re-propagated from the floor every tick, which is why this engine needs **96–128 iterations for a 10-cube stack — 12–30× the published practitioner budget** (Catto, *Solver2D* 2024: "typically 4 to 8 iterations"). That is the real outstanding physics question here, and it is recorded in `docs/VALIDATION.md`.
 - Every stage (resolve, Poisson restitution, rolling resistance, split impulse) is an optional module hook — foreign solvers observe or replace per stage.
 - Static + kinetic friction, rolling friction, and Catto split-impulse penetration correction with **no velocity Baumgarte** — so position-correction energy cannot leak into the velocity state and be re-read by the Poisson restitution gate (Catto, GDC 2014 p.52–53; Bullet's own source comment: *"split impulse fixes issues with restitution in Baumgarte stabilization"*). The stick/slip μ choice is snapshotted once per contact from pre-force tick-start slip (`snap_friction_mu`, recorded in `collision_prepare_solver`) instead of re-decided on per-iteration solver transient — measured breakaway 0.999–1.005 of μ_s·N across dt (1/30–1/120), iterations (8–128) and μ (0.6–0.9), closing the old 13.9%-low-at-60 Hz `[FRICTION-THRESH]` (see `docs/VALIDATION.md`).
@@ -139,6 +176,7 @@ All narrowphase functions take the owning world's config; dispatch is registry-f
 - **Semi-implicit (symplectic) Euler** for linear motion.
 - **Quaternion-based angular integration** (no gimbal lock).
 - **Fixed 60 Hz timestep** with an accumulator and 5-substep cap (spiral-of-death prevention).
+- **CCD rotational** (floor plane): the lowest point's velocity `v_center + w × r_lowest` is used for the sweep, so a tumbling body's dipping corner clamps before tunneling through the floor. Pure spinners about Y are unaffected (tangential motion only). Volume sweeps account for angular speed via `sweep_speed = lin + ang×R + margin`. Rotation-only tunneling between arbitrary volumes remains unsolved (documented limit in `docs/VALIDATION.md`).
 
 ### Data structures
 
@@ -166,6 +204,7 @@ physics_world_attach_module(world, desc);   // pre_step / post_step hooks
 - **Self-reported failures**: every rejection carries a distinct return code and a diagnostics record naming the source, a stable code, the engine `file:line`, and the runtime values that caused it (`core/mpe_diag.h`). Records go to stderr, the event log, and — live — the debug terminal. `diag`, `diag tail N`, `diag sources`, `diag on|off`, `diag clear`. Attach returns `-1..-6` for null/ABI/corrupt-count/table-full/hook-refused/no-name (`MPE_ATTACH_E_*`); loader rejections are named `E_NOFILE`, `E_JAIL`, `E_STALE`, `E_TABLE`, `E_DLOPEN`, `E_ABI`, `E_NODESC`, `E_BUSY`.
 - Lifetime rules: unload refuses `-2` (busy) while any live world references the code — detach/reset first, then retry. Unregister detaches every live world pre-`dlclose`; pair handlers self-unregister via destructor with a `dladdr` purge backstop. Tick hook tables are snapshotted, so hooks may attach/detach mid-tick.
 - Modules never touch globals: per-world config via `mpe_world_cfg(world)`, per-module per-world state via `attach`.
+- **-Werror by default**: `make WARNINGS_AS_ERRORS=1` (now the default) treats all warnings as errors. The engine compiles clean under `-Wall -Wextra -Werror`. Opt out with `make WARNINGS_AS_ERRORS=0` for legacy toolchains.
 
 ### S2 molecular bridge (`ecosystem/mgb`, registry name `s2-bridge`)
 
@@ -357,6 +396,10 @@ make
 ./engine
 ```
 
+`-Werror` is on by default (`WARNINGS_AS_ERRORS=1`). All sources compile clean under
+`-Wall -Wextra -Werror`. Opt out with `make WARNINGS_AS_ERRORS=0` for legacy
+toolchains.
+
 ---
 
 ## ⚠️ Known Limitations
@@ -364,11 +407,28 @@ make
 - **Scene format:** v200 saves bodies (with stable IDs, sleep state, damping) plus springs + revolute/fixed/distance/prismatic/rope joints, with a CRC32 integrity footer. Files v130/v140/v150/v151/v152/v153 load via the legacy reader.
 - **Global state:** the kernel holds no simulation state — every step takes an explicit `physics_world` (growable pools, per-world caches/scratch/config). The single GUI process owns its primary world via `core/mpe_primary.c` (app layer, like UE's `GWorld`); the type/plugin registry is process-global by design. App/UI state (camera, input, selection, terminal, diagnostics) remains global by design.
 - **Joint UI/persistence scope:** solver supports spring/revolute/fixed/prismatic/distance/rope; menus create springs (+revolutes in TUI scenes); v200 persists springs + revolute/fixed/distance/prismatic/rope.
+- **Warm start:** cold by default (stable across all regimes). Damped warm-start (`solver.warm_start_damping`, default 0.0) is experimental — faster convergence at low iteration counts but unstable under extreme gravity/friction/restitution.
+- **CCD:** translation-only for volume-object pairs; floor plane includes rotational lowest-point velocity. Rotation-only tunneling between arbitrary volumes is unsolved.
+- **Multithreading:** solver stages parallelize per-island via `MPE_THREADS`; joint solve stays serial. Determinism is GCC/Clang-only until MSVC `/fp:strict` is proven.
+- **GUI vs headless step paths:** separate frame drivers (accumulator vs direct dt). Bitwise identical on passive towers; driven robots differ ~2.7% via motor-observer feedback (expected, not a path bug). Unification is a maintenance item, not a correctness bug.
+- **Jointed air-spin limit cycle:** free-spinning jointed wheels contain a residual limit cycle (motor 86 rpm vs true 799 rpm) contained by bearing damping (c=1e-6) + diode+slew. Documented frontier; T6/T8 test the motor endpoint isolated.
+- **S2 bridge:** Phase 1 moves existing bodies per refresh tick; bodies are dynamic but position-overridden from S2 each frame. Bonds remain k=0 (display-only). Physical coupling (positions flow back to S2) remains out of scope.
 
 ---
 
 ## 📜 Version History
 
+- **v15S (current head) — 2026-10-15: comprehensive audit + multicore.**
+  Full audit of math, physics, programming, and operations. Island-based
+  multicore solver (`MPE_THREADS`): per-island manifolds solved by dedicated
+  threads, bitwise identical to serial at 1/4/8 threads (verified over 600-tick
+  determinism twins). Damped warm-start infrastructure (`solver.warm_start_damping`,
+  default 0.0=cold proven). Floor CCD now includes rotational lowest-point
+  velocity (tumbling corners clamp before tunneling). S2 Bridge Phase 1: move
+  existing bodies in place per refresh tick (`cfg->every > 0`), stable S2-atom
+  → MPE-body mapping, zero-force bond lines that follow. `-Werror` on by
+  default (0 warnings under `-Wall -Wextra -Werror`). Suite 46 registered /
+  44 blocking green; quick 59/59; determinism twins bitwise at 1/4/8 threads.
 - **v15S (current head) — 2026-10-14: handling + keyboard drive.**
   Yaw runaway tamed (sustained rotate capped ≈ −4.4 rock-steady, was −13.5
   still creeping: governor + active damper, deadband 3.0–4.5 so green
