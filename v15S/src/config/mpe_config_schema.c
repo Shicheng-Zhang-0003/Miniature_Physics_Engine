@@ -109,8 +109,10 @@ static mpe_param s_registry [] = {
         "tumbling geometry as steady state)",
      p_float, cat_solver, &g_cfg.solver.warm_start_match_dist_sq, 0.0001, 0.0, 0.01, true},
     {"solver.warm_start_damping", "Warm-Start Damping",
-     "Damped normal seed scale (0=cold proven, 1=full restore regresses F10/F11). Experiment only; default 0.",
-     p_float, cat_solver, &g_cfg.solver.warm_start_damping, 0.0, 0.0, 1.0, true},
+      "Damped normal seed scale (0=cold stable default, 0.1-0.5 experimental, 1=full restore regresses F10/F11). "
+      "Partially carries cached normal+tangent across ticks; damping absorbs geometric drift. "
+      "Cold (0) is the proven-stable default across all regimes; nonzero requires per-regime validation.",
+      p_float, cat_solver, &g_cfg.solver.warm_start_damping, 0.0, 0.0, 1.0, true},
     /* ============================================================
      * cat_depenetration
      * ============================================================ */

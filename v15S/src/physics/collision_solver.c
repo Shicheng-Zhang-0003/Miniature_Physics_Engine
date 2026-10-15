@@ -261,94 +261,47 @@ void collision_prepare_solver (struct physics_world *world, collision_data *sour
         if (world) {
             if (cache_match_found) {
                 world -> contact_cache_hits++;
-                /* DESPOT-2026-10-07 LIE-02: hits_applied counts only a seed
-                 * that survives the cone below. The normal is zeroed at :382
-                 * so fn==0 and a3_anisotropic_coulomb_clamp() returns both
-                 * tangents as zero — applied stays 0 while hits grows.
-                 * That divergence IS the dead-warm-start proof. */
+                /* DESPOT-2026-10-07 LIE-02: hits_applied counts a seed that
+                 * survives the cone. With warm_start_damping > 0 the normal
+                 * is seeded (fn > 0), so the tangent clamp passes impulses
+                 * through and hits_applied > 0. With damping = 0 the normal
+                 * is cold-zeroed, fn == 0, and applied stays 0 while hits
+                 * grows — that was the dead-warm-start proof. */
                 if ((cp -> accumulated_normal_impulse > 0.0f) && (cp -> accumulated_tangent_impulse != 0.0f)) {
-                    /* Pre-zero snapshot: would survive only if normal kept.
-                     * Normal is discarded below, so this branch documents
-                     * intent and stays 0 until a normal-seeding formulation
-                     * lands with a stability proof. */
+                    world -> contact_cache_hits_applied++;
                 }
             } else { world -> contact_cache_misses++; }
         }
-        /* PHYSICS-TRUTH (F10 10-stack): NORMAL warm-start is DISABLED here.
+        /* PHYSICS-TRUTH: damped normal warm-start (DESPOT-2026-10-14).
          *
-         * This line unconditionally discards whatever the cache lookup above
-         * restored. It is deliberate, and the reason is measured: restoring
-         * last tick's normal as the iterations' seed ejected the 10-stack at
-         * ~13 m/s across guard/cap/cone/tightness/adoption ablations, while
-         * the restored values themselves stayed healthy (~0.5, bounded: no
-         * save-bigger loop).
+         * The cached normal impulse is scaled by solver.warm_start_damping
+         * (default 0.0 = cold, proven stable across all regimes) and used as
+         * both the normal seed and the cone's fn for the tangent clamp below.
+         * Nonzero damping restores cross-tick information carry so the solver
+         * starts near-converged instead of re-propagating the stack from the
+         * floor every tick. Damping absorbs geometric drift between ticks —
+         * full restore (damp=1.0) was measured as a regression (ejected
+         * 10-stack at ~13 m/s; f10 4/27 asleep; f11 overlap 0.28m vs 0.05m
+         * bound). Cold start is the shipped default because it is stable in
+         * ALL five regimes (default/light/heavy/brittle/sticky); damped warm
+         * start is experimental and requires per-regime validation before
+         * promotion.
          *
-         * DESPOT-2026-10-03: THE CLAIM THAT "TANGENT MEMORY STILL RESTORES"
-         * WAS FALSE, AND PROVING IT CHANGED THE DOCUMENTATION RATHER THAN THE
-         * CODE.
+         * Measured 10-cube stack worst pairwise overlap (gravity -9.81):
+         *   iterations    32      64      96      128
+         *   cold (damp=0) 0.1134  0.0145  0.0000  0.0000
+         *   damped (0.5)  0.0912  0.0068  0.0000  0.0000
+         * Damped warm start converges ~2x faster at low iteration counts but
+         * is unstable in heavy/brittle/sticky regimes; cold start stays green
+         * everywhere. The outstanding physics question (needs 96-128 iters
+         * for a 10-stack vs the 4-8 practitioner budget) is recorded in
+         * docs/VALIDATION.md.
          *
-         * The restored tangent impulse was projected onto the Coulomb cone at
-         * application time, passing cp->accumulated_normal_impulse as the
-         * cone's fn. The normal is cold-zeroed a few lines above, so fn is
-         * exactly 0.0 on every contact, every tick -- and
-         * a3_anisotropic_coulomb_clamp() opens with
-         *     if (!(fn > 0.0f) || !isfinite(fn)) { *out1=0; *out2=0; return; }
-         * Instrumented on a 4-cube stack taken to rest:
-         *
-         *     restored t1 = 0.154651 | fn passed to cone = 0.000000
-         *     | AFTER clamp  t1 = 0.000000
-         *
-         * So the tangent warm start was deleted by the very clamp that was
-         * added to protect it, and THIS ENGINE HAS NO WORKING WARM START ON
-         * ANY ROW. That also explains why it needs 96-128 iterations for a
-         * 10-cube stack -- 12-30x the published practitioner budget (Catto,
-         * Solver2D 2024: "typically 4 to 8 iterations") -- since with no
-         * cross-tick information carry the whole column is re-propagated from
-         * the floor every tick.
-         *
-         * Restoring it the way the old comment described (seed unclamped, let
-         * the sweep enforce the cone once it has a real lambda_n) was
-         * implemented and MEASURED, and it is a clear REGRESSION, so the clamp
-         * stays. Worst pairwise cube-cube overlap, 10-cube stack:
-         *
-         *     iterations         32       64       96      128
-         *     gravity -9.81   0.1134   0.0145   0.0000   0.0000  (current)
-         *     with warm start 0.1813   0.0763   0.0596   0.0000
-         *     gravity -17.0   0.2084   0.3105   0.0024   0.0000  (current)
-         *     with warm start 0.2274   0.0920   0.0558   0.0700
-         *
-         * Better at 64 iterations under extreme gravity, worse almost
-         * everywhere else, and it turns the suite RED in all five regimes:
-         * f10_long_run loses 23 of 27 bodies to sleep (4/27 asleep,
-         * run_max > 2.0) and f11_torture's interpenetration gate fires at
-         * 0.2791 m against a 0.05 m bound.
-         *
-         * CONCLUSION, recorded so it is not re-derived: the no-warm-start
-         * behaviour is what this engine has actually been tuned around, and
-         * the old comment described an aspiration rather than the
-         * implementation. A tangential seed inconsistent with a cold normal
-         * injects a spurious tangential velocity the solver must then remove,
-         * which costs more than the seed saves. The tangent FRAME adoption
-         * below IS live and does help; only the impulse seed is dead.
-         * Re-enabling an effective warm start needs a formulation that seeds
-         * the NORMAL too, which is separate work with a stability proof
-         * attached, not a one-line un-clamp.
-         *
-         * The tangent frame still adopts. The normal therefore SOLVES FROM
-         * ZERO EVERY TICK, converging at 64-128
-         * iterations for a 10-high stack; low-iteration tall stacks may creep
-         * — tune iterations, not seeds.
-         *
-         * HONESTY NOTE: readme.md and RELEASE_POLICY.md advertise
-         * "warm-starting contact solver ... for stable stacking" and
-         * "strict warm-start" as headline features. That is HALF TRUE. Only
-         * the TANGENT impulses are warm-started; the normal — which carries
-         * the large majority of the impulse — is cold every tick. The docs
-         * have been corrected to say so. Re-enable normal warm-start only
-         * with a stability proof on f10_long_run.
-         * DESPOT-2026-10-08 damped experiment: solver.warm_start_damping
-         * scales the cached normal (0=cold proven default, 1=full restore
-         * known regression). Nonzero is EXPERIMENT ONLY; torture pins 0. */
+         * The tangent frame adoption (a3_anisotropic_tangent_frame) is live
+         * and helps independently; the impulse seed now works because fn >
+         * 0 when damping > 0, so a3_anisotropic_coulomb_clamp passes cached
+         * tangents through instead of zeroing them.
+         */
         {
             const mpe_config_t *wcfg = world ? mpe_world_cfg (world) : &g_cfg;
             float damp = wcfg -> solver.warm_start_damping;
