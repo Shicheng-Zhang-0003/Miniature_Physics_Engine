@@ -45,6 +45,7 @@
 #include "physics/spring_joint.h"
 #include "config/mpe_config.h"
 #include "tui_debugger.h"
+#include "tui_headless.h"
 /* Stubs for legacy-TU symbols referenced by spring_joint.o (render path
  * only; the TUI never calls GL rendering). Same set as the spring test. */
 camera main_camera_fov;
@@ -68,6 +69,7 @@ static void print_help (const char *prog) {
     printf ("  --scene NAME         demo|tower|pendulum|springlab|f10|stress|ccd (default demo)\n");
     printf ("  --broadphase NAME    hash (default) or registered foreign backend\n");
     printf ("  --solver NAME        seq-impulse (default) or registered foreign backend\n");
+    printf ("  --shell              run the headless command shell (the full engine without a display)\n");
     printf ("  --ticks N            ticks to run in live mode before auto-exit (0 = run forever)\n");
     printf ("  --help               this text\n");
     printf ("\nLive keys: 1..5 screens, Tab cycle, j/k select, Space pause, s step,\n");
@@ -363,6 +365,7 @@ int main (int argc, char *argv []) {
     long live_ticks = 0;
     bool want_snapshot = false;
     bool want_stream = false;
+    bool want_shell = false;
     for (int i = 1; i < argc; i++) {
         if (strcmp (argv [i], "--help") == 0 || strcmp (argv [i], "-h") == 0) {
             print_help (argv [0]);
@@ -383,6 +386,8 @@ int main (int argc, char *argv []) {
             want_solver = argv [++i];
         } else if (strcmp (argv [i], "--ticks") == 0 && i + 1 < argc) {
             live_ticks = tui_parse_count (argv [++i], 0);
+        } else if (strcmp (argv [i], "--shell") == 0) {
+            want_shell = true;
         } else {
             fprintf (stderr, "mpe-tui: unknown option '%s' (see --help)\n", argv [i]);
             return 2;
@@ -390,9 +395,10 @@ int main (int argc, char *argv []) {
     }
     if (ticks < 0) { ticks = 0; }
     if (every <= 0) { every = 1; }
-    /* Non-TTY stdout without an explicit live request becomes the suite. */
+    /* Non-TTY stdout without an explicit live request becomes the suite,
+     * unless the shell was requested. */
     bool tty = isatty (STDOUT_FILENO) != 0;
-    if (!want_snapshot && !want_stream && !tty) { want_snapshot = true; }
+    if (!want_shell && !want_snapshot && !want_stream && !tty) { want_snapshot = true; }
     mpe_config_init ();
     if (want_snapshot || want_stream) {
         physics_world world;
@@ -438,6 +444,10 @@ int main (int argc, char *argv []) {
             } rc = tui_dump_snapshot (stdout, &world, (unsigned long) ticks, dt);
         } physics_world_cleanup (&world);
         return rc;
+    }
+    /* ---------------- headless shell (the full engine without a display) ---------------- */
+    if (want_shell) {
+        return tui_shell_run (argc, argv);
     }
     /* ---------------- live ncurses inspector ---------------- */
     if (!isatty (STDIN_FILENO)) {

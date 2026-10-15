@@ -254,7 +254,7 @@ mfs_ecosystem$(PLUGIN_EXT):
 # as the scriptable debugging output suite. Links the headless-tested core
 # plus springs; never calls GTK/GL at runtime (spring GL render is linked
 # for its physics symbols but never invoked — output is terminal only).
-TUI_SRCS := tui/tui_main.c tui/tui_debugger.c tui/tui_dump.c
+TUI_SRCS := tui/tui_main.c tui/tui_debugger.c tui/tui_dump.c tui/tui_shell.c
 TUI_CORE = $(MPE_TEST_CORE) $(SPRING_TEST_SRCS)
 TUI_OUT ?= ../../temp/tui_smoke
 # epoxy kept: spring_joint.o render path references GL symbols even though
@@ -262,7 +262,7 @@ TUI_OUT ?= ../../temp/tui_smoke
 ifeq ($(MPE_WINDOWS),1)
 TUI_LIBS := -lm $(shell pkg-config --libs ncursesw 2>/dev/null || pkg-config --libs ncurses 2>/dev/null || echo -lncurses) $(shell pkg-config --libs epoxy 2>/dev/null || echo "") $(MPE_WIN_LIBS)
 else
-TUI_LIBS := -lm $(shell pkg-config --libs ncurses) $(shell pkg-config --libs epoxy) -ldl
+    TUI_LIBS := -lm $(shell pkg-config --libs ncurses) $(shell pkg-config --libs epoxy) -ldl -rdynamic
 endif
 build_tui: $(TUI_SRCS) $(TUI_CORE)
 	$(CC) $(CFLAGS) -Dmpe_tui_main $(TUI_SRCS) $(TUI_CORE) $(TUI_LIBS) -o mpe-tui$(EXE_EXT)
