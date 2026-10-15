@@ -31,6 +31,9 @@
 int mgb_sink_mpe_stage (physics_world *world, const mgb_frame_t *frame,
                         double mm_per_a, float ox, float oy, float oz,
                         int *index_map, int map_cap);
+int mgb_sink_mpe_move (physics_world *world, const mgb_frame_t *frame,
+                       double mm_per_a, float ox, float oy, float oz,
+                       int *index_map, int map_cap);
 
 typedef struct {
     mgb_session_t *s;
@@ -421,7 +424,7 @@ static void bridge_pre_step (mpe_world_t *world, float dt, void *mod_state) {
     st->tick++;
     if (st->cfg.every <= 0) return;
     if (st->tick % (unsigned long)st->cfg.every != 0) return;
-    if (mgb_dead (st->s) || bridge_stage (world, st) != 0) {
+    if (mgb_dead (st->s)) {
         st->errors++;
         if (!st->dead) {
             st->dead = 1;
@@ -432,7 +435,68 @@ static void bridge_pre_step (mpe_world_t *world, float dt, void *mod_state) {
         }
         return;
     }
+    /* Phase 1: refresh moves existing bodies in place (never respawns).
+     * bridge_stage would call joint_init_pool/constraint_pool_init and
+     * destroy all joints every refresh — that makes k=0 bonds vanish and
+     * the dish flicker. mgb_sink_mpe_move repositions + creates new bodies
+     * for new atoms, preserving existing joints and the stable S2->MPE
+     * mapping. */
+    char *snap = mgb_snapshot (st->s, 60);
+    if (!snap) {
+        st->errors++;
+        if (!st->dead) {
+            st->dead = 1;
+            fprintf (stderr,
+                     "[s2bridge] snapshot failed: freezing last good frame "
+                     "(%d atoms, %d frames staged, errors=%d)\n",
+                     st->atoms, st->frames, st->errors);
+        }
+        return;
+    }
+    mgb_frame_t fr;
+    memset (&fr, 0, sizeof fr);
+    int rc = mgb_frame_parse (snap, &fr);
+    free (snap);
+    if (rc != 0) {
+        st->errors++;
+        if (!st->dead) {
+            st->dead = 1;
+            fprintf (stderr,
+                     "[s2bridge] frame parse failed: freezing last good frame "
+                     "(%d atoms, %d frames staged, errors=%d)\n",
+                     st->atoms, st->frames, st->errors);
+        }
+        return;
+    }
+    if (fr.natoms > st->map_cap) {
+        mgb_frame_free (&fr);
+        st->errors++;
+        if (!st->dead) {
+            st->dead = 1;
+            fprintf (stderr,
+                     "[s2bridge] frame too large (%d > %d cap): freezing "
+                     "last good frame (errors=%d)\n",
+                     fr.natoms, st->map_cap, st->errors);
+        }
+        return;
+    }
+    if (mgb_sink_mpe_move (world, &fr, st->cfg.mm_per_a, st->cfg.ox,
+                           st->cfg.oy, st->cfg.oz, st->index_map,
+                           st->map_cap) != 0) {
+        mgb_frame_free (&fr);
+        st->errors++;
+        if (!st->dead) {
+            st->dead = 1;
+            fprintf (stderr,
+                     "[s2bridge] move failed: freezing last good frame "
+                     "(%d atoms, %d frames staged, errors=%d)\n",
+                     st->atoms, st->frames, st->errors);
+        }
+        return;
+    }
+    st->atoms = fr.natoms;
     st->frames++;
+    mgb_frame_free (&fr);
 }
 
 int s2_bridge_stats (mpe_world_t *world, int *frames, int *errors,
