@@ -19,8 +19,6 @@
 #include "../core/det_math.h"
 #include "../physics/constraint.h"
 #include "../physics/spring_joint.h"
-#include "../scene/scene_load.h"
-#include "../scene/scene_saving.h"
 #include "../ecosystem/mpe_ecosystem.h"
 #include "../ecosystem/mfs/modules/ftc/ftc_fleet.h"
 #include "tui_headless.h"
@@ -522,26 +520,6 @@ static void cmd_ftc (physics_world *w, int argc, char **argv) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Simulation                                                         */
-/* ------------------------------------------------------------------ */
-static void cmd_step (physics_world *w, int argc, char **argv) {
-    int n = (argc > 1) ? atoi(argv[1]) : 1;
-    if (n < 1) n = 1;
-    for (int i=0;i<n;i++) { if (tui_paused) break; physics_world_step(w, tui_dt); tui_tick++; }
-    tui_print_status(w);
-}
-static void cmd_run (physics_world *w, int argc, char **argv) {
-    int n = (argc > 1) ? atoi(argv[1]) : 600;
-    if (n < 1) n = 1;
-    for (int i=0;i<n;i++) { if (tui_paused) break; physics_world_step(w, tui_dt); tui_tick++;
-        if ((i+1) % 60 == 0 || (i+1) == n) { printf ("tick=%lu ", tui_tick); tui_print_status(w); } }
-}
-static void cmd_tick (physics_world *w, int argc, char **argv) { (void)argc;(void)argv; if (!tui_paused) { physics_world_step(w, tui_dt); tui_tick++; } tui_print_status(w); }
-static void cmd_halt (physics_world *w, int argc, char **argv) { (void)w;(void)argc;(void)argv; tui_paused = 1; printf ("sim: paused\n"); }
-static void cmd_resume (physics_world *w, int argc, char **argv) { (void)w;(void)argc;(void)argv; tui_paused = 0; printf ("sim: resumed\n"); }
-static void cmd_status (physics_world *w, int argc, char **argv) { (void)argc;(void)argv; tui_print_status(w); }
-
-/* ------------------------------------------------------------------ */
 /* Diagnostics                                                        */
 /* ------------------------------------------------------------------ */
 static void cmd_diag (physics_world *w, int argc, char **argv) {
@@ -570,6 +548,87 @@ static void cmd_diag (physics_world *w, int argc, char **argv) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Scene (GTK-free: scene_load/scene_saving)                          */
+/* ------------------------------------------------------------------ */
+static void cmd_fsck (physics_world *w, int argc, char **argv) {
+    (void)argc;(void)argv;
+    printf ("fsck: bodies=%d joints=%d (cap %d/%d)\n", w->body_count, w->spring_joint_count, mpe_max_bodies, mpe_max_joints);
+}
+
+/* ------------------------------------------------------------------ */
+/* Camera / render / input state (headless)                           */
+/* ------------------------------------------------------------------ */
+static void cmd_w (physics_world *w, int argc, char **argv) {
+    (void)w;(void)argc;(void)argv;
+    vector3 fwd; tui_camera_forward(&fwd);
+    printf ("camera: pos=(%.3f,%.3f,%.3f) yaw=%.2f pitch=%.2f speed=%.3f\n",
+            tui_cam_pos.x,tui_cam_pos.y,tui_cam_pos.z,tui_cam_yaw,tui_cam_pitch,tui_camera_speed);
+    printf ("  forward=(%.3f,%.3f,%.3f)\n", fwd.x,fwd.y,fwd.z);
+}
+static void cmd_ifconfig (physics_world *w, int argc, char **argv) {
+    (void)w;(void)argc;(void)argv;
+    printf ("input0:  flags=<RELEASED>\n");
+    printf ("  selected=%d\n", tui_selected_object);
+    printf ("objects=%d joints=%d\n", w->body_count, w->spring_joint_count);
+}
+
+/* ------------------------------------------------------------------ */
+/* Module                                                             */
+/* ------------------------------------------------------------------ */
+static void cmd_lsmod (physics_world *w, int argc, char **argv) {
+    (void)w;(void)argc;(void)argv;
+    printf ("loaded modules:\n");
+    printf ("  %-16s %-12s %s\n", "hash", "broadphase", "builtin");
+    printf ("  %-16s %-12s %s\n", "seq-impulse", "solver", "builtin");
+    int n = mpe_ecosystem_count();
+    for (int i=0;i<n;i++) {
+        const mpe_ecosystem_desc_t *d = mpe_ecosystem_at(i);
+        printf ("  %-16s %-12s %s\n", d->name ? d->name : "?", "ecosystem", d->description ? d->description : "");
+    }
+}
+static void cmd_modinfo (physics_world *w, int argc, char **argv) {
+    (void)w;
+    if (argc < 2) { printf ("modinfo: usage: modinfo <name>\n"); return; }
+    const mpe_ecosystem_desc_t *d = mpe_ecosystem_find(argv[1]);
+    if (!d) { printf ("modinfo: no such module '%s'\n", argv[1]); return; }
+    printf ("name=%s version=%s author=%s\n", d->name ? d->name : "?", d->version ? d->version : "?", d->author ? d->author : "?");
+    printf ("description=%s deterministic=%s\n", d->description ? d->description : "", d->deterministic ? "yes" : "no");
+}
+static void cmd_netstat (physics_world *w, int argc, char **argv) {
+    (void)argc;(void)argv;
+    int listed = 0;
+    for (int i=0;i<mpe_max_joints;i++) {
+        if (!w->spring_joints[i].is_active) continue;
+        int ia = physics_world_index_by_id(w, w->spring_joints[i].object_id_a);
+        int ib = physics_world_index_by_id(w, w->spring_joints[i].object_id_b);
+        printf ("joint %-3d obj%-3d<->obj%-3d len=%.3f k=%.3f\n", i,
+            ia, ib, w->spring_joints[i].equilibrium_length, w->spring_joints[i].spring_constant);
+        listed++;
+    }
+    if (listed == 0) printf ("(no active joints)\n");
+}
+
+/* ------------------------------------------------------------------ */
+/* Simulation                                                         */
+/* ------------------------------------------------------------------ */
+static void cmd_step (physics_world *w, int argc, char **argv) {
+    int n = (argc > 1) ? atoi(argv[1]) : 1;
+    if (n < 1) n = 1;
+    for (int i=0;i<n;i++) { if (tui_paused) break; physics_world_step(w, tui_dt); tui_tick++; }
+    tui_print_status(w);
+}
+static void cmd_run (physics_world *w, int argc, char **argv) {
+    int n = (argc > 1) ? atoi(argv[1]) : 600;
+    if (n < 1) n = 1;
+    for (int i=0;i<n;i++) { if (tui_paused) break; physics_world_step(w, tui_dt); tui_tick++;
+        if ((i+1) % 60 == 0 || (i+1) == n) { printf ("tick=%lu ", tui_tick); tui_print_status(w); } }
+}
+static void cmd_tick (physics_world *w, int argc, char **argv) { (void)argc;(void)argv; if (!tui_paused) { physics_world_step(w, tui_dt); tui_tick++; } tui_print_status(w); }
+static void cmd_halt (physics_world *w, int argc, char **argv) { (void)w;(void)argc;(void)argv; tui_paused = 1; printf ("sim: paused\n"); }
+static void cmd_resume (physics_world *w, int argc, char **argv) { (void)w;(void)argc;(void)argv; tui_paused = 0; printf ("sim: resumed\n"); }
+static void cmd_status (physics_world *w, int argc, char **argv) { (void)argc;(void)argv; tui_print_status(w); }
+
+/* ------------------------------------------------------------------ */
 /* Command table                                                      */
 /* ------------------------------------------------------------------ */
 typedef void (*shell_cmd_fn)(physics_world*,int,char**);
@@ -591,6 +650,8 @@ static shell_cmd g_cmds[] = {
     {"touch","touch <sphere|cube|cyl> [x y z]","spawn an object",cmd_touch},
     {"ps","ps","object table",cmd_ps},
     {"stat","stat <obj>","detailed object info",cmd_stat},
+    {"w","w","camera state",cmd_w},
+    {"ifconfig","ifconfig","camera/render/input state",cmd_ifconfig},
     {"rm","rm <obj>","remove object (not supported; use mkfs)",cmd_rm},
     {"mv","mv <obj> [/pos/x/y/z|/vel/x/y/z]","move/apply impulse to object",cmd_mv},
     {"ln","ln <a> <b> [rest]","create spring joint",cmd_ln},
@@ -602,7 +663,11 @@ static shell_cmd g_cmds[] = {
     {"export","export KEY=value","set a config parameter",cmd_export},
     {"config","config save|load|reset [path]","manage config file",cmd_config},
     {"mkfs","mkfs","clear the world",cmd_mkfs},
+    {"fsck","fsck","scene/physics integrity",cmd_fsck},
     {"mod","mod ls|load|unload|attach|detach|use-*","module commands",cmd_mod},
+    {"lsmod","lsmod","list loaded modules",cmd_lsmod},
+    {"modinfo","modinfo <name>","module details",cmd_modinfo},
+    {"netstat","netstat","joint network topology",cmd_netstat},
     {"eco","eco attach|detach|command","ecosystem bundle commands",cmd_eco},
     {"ftc","ftc spawn|telemetry|drive|mec|select","FTC robotics",cmd_ftc},
     {"step","step [N]","advance N ticks (default 1)",cmd_step},
