@@ -25,7 +25,12 @@
 #include <stdio.h>
 #include <alloca.h>
 /* =====================================================================
- * MINIMAL DETERMINISTIC THREAD POOL
+ * PERSISTENT DETERMINISTIC THREAD POOL
+ *
+ * Threads are created ONCE (lazily, on first parallel call when
+ * MPE_THREADS > 1) and sleep on a condition variable between ticks.
+ * This eliminates the pthread_create/destroy overhead that previously
+ * dominated every tick when running with multiple threads.
  *
  * Design rule: every thread writes to a DISJOINT set of bodies. Islands
  * are connected components (no shared bodies between islands), so
@@ -34,20 +39,54 @@
  * Thread scheduling never affects results: disjoint writes + fixed order
  * = bitwise identical to serial, on every thread count.
  * ===================================================================== */
-typedef struct {
-    physics_world *world;
-    int start;
-    int end;
-} mpe_slice_t;
-static void *mpe_sanitize_slice (void *arg) {
-    mpe_slice_t *s = (mpe_slice_t *) arg;
-    for (int i = s -> start; i < s -> end; i++) {
-        rigidbody_sanitize (&s -> world -> bodies [i]);
+#define MPE_MAX_POOL_THREADS 8
+static int s_pool_threads = 0;
+static pthread_t s_pool_tids [MPE_MAX_POOL_THREADS];
+static pthread_mutex_t s_pool_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t s_pool_work_cond = PTHREAD_COND_INITIALIZER;
+static pthread_cond_t s_pool_done_cond = PTHREAD_COND_INITIALIZER;
+static volatile int s_pool_tasks_total = 0;
+static volatile int s_pool_tasks_done = 0;
+static volatile int s_pool_shutdown = 0;
+typedef void (*mpe_pool_func_t)(void *data, int start, int end);
+static mpe_pool_func_t s_pool_func = NULL;
+static void *s_pool_data = NULL;
+static int s_pool_start = 0;
+static int s_pool_end = 0;
+static void *s_pool_worker (void *arg) {
+    (void) arg;
+    for (;;) {
+        pthread_mutex_lock (&s_pool_lock);
+        while (s_pool_tasks_total == 0 && !s_pool_shutdown) {
+            pthread_cond_wait (&s_pool_work_cond, &s_pool_lock);
+        }
+        if (s_pool_shutdown) {
+            pthread_mutex_unlock (&s_pool_lock);
+            return NULL;
+        }
+        /* Claim the next chunk via an atomic counter. Each worker claims
+         * one contiguous chunk at a time, so work distribution is
+         * deterministic (same chunks every tick). */
+        int my_done = __atomic_fetch_add (&s_pool_tasks_done, 1, __ATOMIC_RELAXED);
+        pthread_mutex_unlock (&s_pool_lock);
+        if (my_done >= s_pool_tasks_total) { break; }
+        int total = s_pool_end - s_pool_start;
+        int n = s_pool_threads;
+        int chunk = (total + n - 1) / n;
+        int cs = s_pool_start + my_done * chunk;
+        int ce = cs + chunk;
+        if (ce > s_pool_end) { ce = s_pool_end; }
+        if (cs < ce) {
+            s_pool_func (s_pool_data, cs, ce);
+        }
+        int remaining = __atomic_fetch_sub (&s_pool_tasks_total, 1, __ATOMIC_RELAXED) - 1;
+        if (remaining == 0) {
+            pthread_mutex_lock (&s_pool_lock);
+            pthread_cond_signal (&s_pool_done_cond);
+            pthread_mutex_unlock (&s_pool_lock);
+        }
     } return NULL;
 }
-/* Forward declaration: defined later in this TU (solver stage dispatch). */
-static float mpe_step_resolve (physics_world *world, collision_data *m, float dt, bool friction_only, int iter,
-                               const mpe_config_t *cfg);
 static int mpe_thread_count (void) {
     const char *env = getenv ("MPE_THREADS");
     int threads = 1;
@@ -61,71 +100,120 @@ static int mpe_thread_count (void) {
     if (threads > 8) { threads = 8; }
     return threads;
 }
+static void mpe_pool_init (void) {
+    if (s_pool_threads > 0) { return; }
+    s_pool_threads = mpe_thread_count ();
+    if (s_pool_threads <= 1) { return; }
+    s_pool_shutdown = 0;
+    s_pool_tasks_total = 0;
+    s_pool_tasks_done = 0;
+    for (int t = 0; t < s_pool_threads; t++) {
+        if (pthread_create (&s_pool_tids [t], NULL, s_pool_worker, NULL) != 0) {
+            s_pool_tids [t] = 0;
+            s_pool_threads = t;
+            break;
+        }
+    }
+}
+/* Parallel for-over-range: divides [start, end) into contiguous chunks,
+ * one per thread, runs s_pool_func on each chunk, waits for completion.
+ * Deterministic: same chunk boundaries every call. */
+static void mpe_pool_parallel_for (int start, int end, mpe_pool_func_t func, void *data) {
+    int n = end - start;
+    if (n <= 0) { return; }
+    int threads = s_pool_threads;
+    if ((threads <= 1) || (n < 64)) {
+        func (data, start, end);
+        return;
+    }
+    s_pool_func = func;
+    s_pool_data = data;
+    s_pool_start = start;
+    s_pool_end = end;
+    s_pool_tasks_total = threads;
+    s_pool_tasks_done = 0;
+    pthread_mutex_lock (&s_pool_lock);
+    pthread_cond_broadcast (&s_pool_work_cond);
+    while (s_pool_tasks_total > 0) {
+        pthread_cond_wait (&s_pool_done_cond, &s_pool_lock);
+    }
+    pthread_mutex_unlock (&s_pool_lock);
+}
+/* ---- Parallel slice helpers (operate on disjoint body ranges) ---------- */
+typedef struct {
+    physics_world *world;
+    int start;
+    int end;
+} mpe_slice_t;
+static void mpe_sanitize_range (void *data, int start, int end) {
+    physics_world *w = (physics_world *) data;
+    for (int i = start; i < end; i++) {
+        rigidbody_sanitize (&w -> bodies [i]);
+    }
+}
 static void mpe_parallel_sanitize (physics_world *world) {
     int n = world -> body_count;
     if (n <= 0) { return; }
-    int threads = mpe_thread_count ();
+    mpe_pool_init ();
+    int threads = s_pool_threads;
     if ((threads <= 1) || (n < 64)) {
         for (int i = 0; i < n; i++) {
             rigidbody_sanitize (&world -> bodies [i]);
         } return;
-    } pthread_t tids [8] = {0};
-    mpe_slice_t slices [8];
-    memset (slices, 0, sizeof (slices));
-    int chunk = (n + threads - 1) / threads;
-    int launched = 0;
-    for (int t = 0; t < threads; t++) {
-        int s = t * chunk;
-        int e = s + chunk;
-        if (e > n) { e = n; }
-        if (s >= e) { break; }
-        slices [t].world = world;
-        slices [t].start = s;
-        slices [t].end = e;
-        if (pthread_create (&tids [t], NULL, mpe_sanitize_slice, &slices [t]) != 0) {
-            mpe_sanitize_slice (&slices [t]);
-            tids [t] = 0;
-        } else { launched++; }
     }
-    for (int t = 0; t < threads; t++) {
-        if ((slices [t].start < slices [t].end) && tids [t]) { pthread_join (tids [t], NULL); }
-    } (void) launched;
-} /* ---- Parallel island solve -------------------------------------------
+    mpe_pool_parallel_for (0, n, mpe_sanitize_range, world);
+}
+/* Forward declaration: defined later in this TU (solver stage dispatch). */
+static float mpe_step_resolve (physics_world *world, collision_data *m, float dt, bool friction_only, int iter,
+                               const mpe_config_t *cfg);
+/* ---- Parallel island solve -------------------------------------------
  *
  * Each task solves ONE island's manifolds (2 visits each, preserving the
  * manifold sort order) plus that island's active constraints. Writes only
  * to bodies in that island, so threads are disjoint.
  */
-typedef enum { MPE_TASK_MANIFOLDS } mpe_task_kind_t;
+/* Run one solver "sweep" across all awake islands in parallel: each island's
+ * manifolds are solved by one thread, in sort order. Joined before return
+ * so the next serial phase (constraint_solve_all) sees consistent state. */
 typedef struct {
     physics_world *world;
     int island_id;
-    int *manifold_indices;   /* sorted manifold indices for this island */
+    int *manifold_indices;
     int manifold_count;
     float dt;
     int iter;
     bool friction_only;
 } mpe_island_task_t;
-static void *mpe_solve_island_manifolds (void *arg) {
-    mpe_island_task_t *t = (mpe_island_task_t *) arg;
-    physics_world *w = t -> world;
-    const mpe_config_t *cfg = mpe_world_cfg (w);
-    for (int mi = 0; mi < t -> manifold_count; mi++) {
-        int m = t -> manifold_indices [mi];
-        if (!w -> manifold_awake [m]) { continue; }
-        mpe_step_resolve (w, &w -> manifolds [m], t -> dt, t -> friction_only, t -> iter, cfg);
-        mpe_step_resolve (w, &w -> manifolds [m], t -> dt, t -> friction_only, t -> iter + 1, cfg);
-    } return NULL;
+static void mpe_solve_island_range (void *data, int start, int end) {
+    mpe_island_task_t *tasks = (mpe_island_task_t *) data;
+    for (int i = start; i < end; i++) {
+        mpe_island_task_t *t = &tasks [i];
+        physics_world *w = t -> world;
+        const mpe_config_t *cfg = mpe_world_cfg (w);
+        for (int mi = 0; mi < t -> manifold_count; mi++) {
+            int m = t -> manifold_indices [mi];
+            if (!w -> manifold_awake [m]) { continue; }
+            mpe_step_resolve (w, &w -> manifolds [m], t -> dt, t -> friction_only, t -> iter, cfg);
+            mpe_step_resolve (w, &w -> manifolds [m], t -> dt, t -> friction_only, t -> iter + 1, cfg);
+        }
+    }
 }
-/* Run one solver "sweep" across all awake islands in parallel: each island's
- * manifolds are solved by one thread, in sort order. Joined before return
- * so the next serial phase (constraint_solve_all) sees consistent state. */
 static void mpe_parallel_solve_sweep (physics_world *world, int manifold_count, float dt, int iter,
                                       const mpe_config_t *cfg, bool friction_only) {
-    int threads = mpe_thread_count ();
+    int threads = s_pool_threads;
     int island_total = islands_count (world);
     if ((threads <= 1) || (island_total <= 1) || (manifold_count <= 0)) {
         /* Serial fallback: identical order, identical results. */
+        for (int o = 0; o < manifold_count; o++) {
+            int m = world -> manifold_order [o];
+            if (!world -> manifold_awake [m]) { continue; }
+            mpe_step_resolve (world, &world -> manifolds [m], dt, friction_only, iter, cfg);
+            mpe_step_resolve (world, &world -> manifolds [m], dt, friction_only, iter + 1, cfg);
+        } return;
+    }
+    mpe_pool_init ();
+    threads = s_pool_threads;
+    if ((threads <= 1) || (island_total <= 1) || (manifold_count <= 0)) {
         for (int o = 0; o < manifold_count; o++) {
             int m = world -> manifold_order [o];
             if (!world -> manifold_awake [m]) { continue; }
@@ -160,37 +248,31 @@ static void mpe_parallel_solve_sweep (physics_world *world, int manifold_count, 
         int isl = manifold_island [m];
         if (isl >= 0) { isl_manifold_idx [isl_cursor [isl]++] = m; }
     }
-    /* Dispatch one task per awake island that has manifolds. */
-    pthread_t tids [8];
-    mpe_island_task_t tasks [8];
-    memset (tasks, 0, sizeof (tasks));
-    memset (tids, 0, sizeof (tids));
-    int launched = 0;
-    int t = 0;
-    for (int isl = 0; isl < island_total && t < 8; isl++) {
+    /* Build active-island list (awake islands with manifolds). */
+    static mpe_island_task_t s_tasks [MPE_MAX_POOL_THREADS];
+    int num_active = 0;
+    for (int isl = 0; isl < island_total && num_active < MPE_MAX_POOL_THREADS; isl++) {
         if (!world -> island_awake_flags [isl]) { continue; }
         if (isl_manifold_count [isl] <= 0) { continue; }
-        tasks [t].world = world;
-        tasks [t].island_id = isl;
-        tasks [t].manifold_indices = &isl_manifold_idx [isl_manifold_off [isl]];
-        tasks [t].manifold_count = isl_manifold_count [isl];
-        tasks [t].dt = dt;
-        tasks [t].iter = iter;
-        tasks [t].friction_only = friction_only;
-        if (pthread_create (&tids [t], NULL, mpe_solve_island_manifolds, &tasks [t]) != 0) {
-            /* Fallback: solve this island serially. */
-            for (int k = 0; k < tasks [t].manifold_count; k++) {
-                int m = tasks [t].manifold_indices [k];
-                if (!world -> manifold_awake [m]) { continue; }
-                mpe_step_resolve (world, &world -> manifolds [m], dt, false, iter, mpe_world_cfg (world));
-                mpe_step_resolve (world, &world -> manifolds [m], dt, false, iter + 1, mpe_world_cfg (world));
-            }
-        } else { launched++; t++; }
+        s_tasks [num_active].world = world;
+        s_tasks [num_active].island_id = isl;
+        s_tasks [num_active].manifold_indices = &isl_manifold_idx [isl_manifold_off [isl]];
+        s_tasks [num_active].manifold_count = isl_manifold_count [isl];
+        s_tasks [num_active].dt = dt;
+        s_tasks [num_active].iter = iter;
+        s_tasks [num_active].friction_only = friction_only;
+        num_active++;
     }
-    /* Join launched threads. */
-    for (int i = 0; i < t; i++) {
-        if (tids [i]) { pthread_join (tids [i], NULL); }
-    } (void) launched;
+    if (num_active <= 1) {
+        /* Single island - solve serially. */
+        for (int k = 0; k < s_tasks [0].manifold_count; k++) {
+            int m = s_tasks [0].manifold_indices [k];
+            if (!world -> manifold_awake [m]) { continue; }
+            mpe_step_resolve (world, &world -> manifolds [m], dt, false, iter, mpe_world_cfg (world));
+            mpe_step_resolve (world, &world -> manifolds [m], dt, false, iter + 1, mpe_world_cfg (world));
+        } return;
+    }
+    mpe_pool_parallel_for (0, num_active, mpe_solve_island_range, s_tasks);
 }
 /* Parallel per-body integration (same disjoint-write pattern as sanitize). */
 typedef struct {
@@ -201,15 +283,13 @@ typedef struct {
     const mpe_config_t *cfg;
     unsigned char *joint_membership;
 } mpe_integrate_slice_t;
-static void *mpe_integrate_slice (void *arg) {
-    mpe_integrate_slice_t *s = (mpe_integrate_slice_t *) arg;
-    for (int i = s -> start; i < s -> end; i++) {
+static void mpe_integrate_range (void *data, int start, int end) {
+    mpe_integrate_slice_t *s = (mpe_integrate_slice_t *) data;
+    for (int i = start; i < end; i++) {
         rigidbody *ib = &s -> world -> bodies [i];
         float step_dt = s -> dt;
         if ((s -> world -> ccd_time_remaining) && (s -> world -> ccd_time_remaining [i] < step_dt) &&
-            (s -> world -> ccd_time_remaining [i] > 0.0f)) {
-            step_dt = s -> world -> ccd_time_remaining [i];
-        }
+            (s -> world -> ccd_time_remaining [i] > 0.0f)) { step_dt = s -> world -> ccd_time_remaining [i]; }
         bool has_joint = (i < mpe_max_bodies) ? (s -> joint_membership [i] != 0) : false;
         bool contact_free = ((s -> world -> has_contact) ? (s -> world -> has_contact [i] == 0) : false);
         bool have_v0 = (s -> world -> tick_v0 && (s -> world -> tick_v0_capacity >= s -> world -> body_count));
@@ -218,13 +298,14 @@ static void *mpe_integrate_slice (void *arg) {
         if (free_flight && have_v0) { ib -> velocity = s -> world -> tick_v0 [i]; }
         rb_integrate_position_exact (ib, step_dt, s -> cfg, free_flight);
         rigidbody_sanitize (ib);
-    } return NULL;
+    }
 }
 static void mpe_parallel_integrate (physics_world *world, float dt, const mpe_config_t *cfg,
                                     unsigned char *joint_membership) {
     int n = world -> body_count;
     if (n <= 0) { return; }
-    int threads = mpe_thread_count ();
+    mpe_pool_init ();
+    int threads = s_pool_threads;
     if ((threads <= 1) || (n < 64)) {
         for (int i = 0; i < n; i++) {
             rigidbody *ib = &world -> bodies [i];
@@ -240,32 +321,13 @@ static void mpe_parallel_integrate (physics_world *world, float dt, const mpe_co
             rb_integrate_position_exact (ib, step_dt, cfg, free_flight);
             rigidbody_sanitize (ib);
         } return;
-    } pthread_t tids [8];
-    mpe_integrate_slice_t slices [8];
-    memset (slices, 0, sizeof (slices));
-    memset (tids, 0, sizeof (tids));
-    int chunk = (n + threads - 1) / threads;
-    int launched = 0;
-    int t = 0;
-    for (int i = 0; i < threads && t < 8; i++) {
-        int s = i * chunk;
-        int e = s + chunk;
-        if (e > n) { e = n; }
-        if (s >= e) { break; }
-        slices [t].world = world;
-        slices [t].start = s;
-        slices [t].end = e;
-        slices [t].dt = dt;
-        slices [t].cfg = cfg;
-        slices [t].joint_membership = joint_membership;
-        if (pthread_create (&tids [t], NULL, mpe_integrate_slice, &slices [t]) != 0) {
-            mpe_integrate_slice (&slices [t]);
-            tids [t] = 0;
-        } else { launched++; t++; }
     }
-    for (int i = 0; i < t; i++) {
-        if (tids [i]) { pthread_join (tids [i], NULL); }
-    } (void) launched;
+    static mpe_integrate_slice_t s_slice;
+    s_slice.world = world;
+    s_slice.dt = dt;
+    s_slice.cfg = cfg;
+    s_slice.joint_membership = joint_membership;
+    mpe_pool_parallel_for (0, n, mpe_integrate_range, &s_slice);
 } /* Canonical spring pass is weakly linked so spring-less headless test
  * binaries (which omit physics/spring_joint.c for its GL dependency)
  * still link; the GUI engine and TUI link it and get real forces. */
