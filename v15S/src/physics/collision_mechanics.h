@@ -328,12 +328,13 @@ void collision_snapshot_friction_mu (collision_data *manifolds, int manifold_cou
 int collision_ccd_sweep_clamp (rigidbody *bodies, int body_count, float dt);
 int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt, float *time_remaining_out,
                                     const mpe_config_t *cfg, float *best_tois_out, unsigned char *hit_flags_out);
-/* Range-based CCD: process bodies [start, end) assuming obstacle_margin is
- * pre-computed and outputs are pre-initialized. Each body writes only to its
- * own outputs/position, so disjoint ranges are thread-safe. Used by the
+/* Range-based CCD: process bodies [start, end) assuming outputs are
+ * pre-initialized. Each body writes only to its own outputs/position, so
+ * disjoint ranges are thread-safe. Per-pair margin: each body's sweep uses
+ * only its own motion (no global max over all bodies). Used by the
  * multicore step path. */
 int collision_ccd_sweep_clamp_range (rigidbody *bodies, int body_count, int start, int end,
-                                     float dt, float obstacle_margin, const mpe_config_t *cfg,
+                                     float dt, const mpe_config_t *cfg,
                                      bool record_remainder,
                                      float *time_remaining_out, float *best_tois_out,
                                      unsigned char *hit_flags_out);

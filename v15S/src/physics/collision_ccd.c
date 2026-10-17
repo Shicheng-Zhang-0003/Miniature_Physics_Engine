@@ -86,7 +86,7 @@ static float ccd_sphere_sweep_toi (vector3 dp, vector3 dv, float radius, float d
  * own position/velocity/orientation and its own output slots, so disjoint
  * ranges are thread-safe. Returns the number of bodies clamped. */
 int collision_ccd_sweep_clamp_range (rigidbody *bodies, int body_count, int start, int end,
-                                     float dt, float obstacle_margin, const mpe_config_t *C,
+                                     float dt, const mpe_config_t *C,
                                      bool record_remainder,
                                      float *time_remaining_out, float *best_tois_out,
                                      unsigned char *hit_flags_out) {
@@ -101,12 +101,19 @@ int collision_ccd_sweep_clamp_range (rigidbody *bodies, int body_count, int star
         if (time_remaining_out) { time_remaining_out [i] = dt; }
         rigidbody *mover = &bodies [i];
         if ((mover -> static_state) || (mover -> is_sleeping) || (mover -> no_collide)) { continue; }
+        /* Per-pair margin: a body's CCD sweep is driven by ITS OWN motion
+         * (linear + tip speed), not by a global max over all bodies. A global
+         * margin perturbs pairs that never touch an obstacle (tank pivots,
+         * odometry yaw) by adding unrelated bodies' tip speeds to every sweep.
+         * Per-pair: each colliding pair contributes only its own tip speed,
+         * computed inside the volume loop below. Fast-blade rotation-only
+         * tunneling remains a documented limitation (substep or external
+         * tip-speed bounding required). */
         float lin_speed = vector3_length (mover -> velocity);
         float ang_speed = vector3_length (mover -> angular_velocity);
         float bound_r = broadphase_bounding_radius (mover);
         if ((!isfinite (bound_r)) || (bound_r < 0.0f)) { bound_r = 0.0f; }
         float sweep_speed = lin_speed + ang_speed * bound_r;
-        sweep_speed += obstacle_margin;
         if (sweep_speed <= 0.0001f) { continue; }
         float thickness = ccd_min_thickness (mover);
         if ((thickness <= 0.0f) || (!isfinite (thickness))) { continue; }
@@ -330,20 +337,13 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
     if (time_remaining_out) {
         for (int k = 0; k < body_count; k++) { time_remaining_out [k] = dt; }
     }
-    /* Obstacle margin: max tip speed over ALL bodies (computed serially,
-     * then read-only during the per-body sweep). */
-    float obstacle_margin = 0.0f;
-    for (int k = 0; k < body_count; k++) {
-        rigidbody *ob = &bodies [k];
-        if ((ob -> static_state) || (ob -> is_sleeping) || (ob -> no_collide)) { continue; }
-        float ow = vector3_length (ob -> angular_velocity);
-        float orad = broadphase_bounding_radius (ob);
-        if ((!isfinite (ow)) || (!isfinite (orad)) || (orad < 0.0f)) { continue; }
-        float tip = ow * orad;
-        if (isfinite (tip) && (tip > obstacle_margin)) { obstacle_margin = tip; }
-    }
-    if (obstacle_margin > 2.0f) { obstacle_margin = 2.0f; }
-    g_ccd_obstacle_margin = obstacle_margin;
+    /* No global obstacle margin: each body's CCD sweep uses only its own
+     * motion (linear + tip speed). A global max tip speed over all bodies
+     * perturbed pairs that never touch an obstacle (tank pivots, odometry
+     * yaw). Fast-blade rotation-only tunneling remains a documented
+     * limitation (substep or external tip-speed bounding required).
+     * g_ccd_obstacle_margin is retained as zeroed telemetry only. */
+    g_ccd_obstacle_margin = 0.0f;
     /* Scratch arrays: caller-provided or heap. */
     bool use_heap = false;
     float *best_tois = best_tois_out;
@@ -363,7 +363,7 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
      * best_tois/hit_flags internally and applies clamps with disjoint writes
      * per body. */
     int clamped = collision_ccd_sweep_clamp_range (bodies, body_count, 0, body_count,
-                                                    dt, obstacle_margin, cfg, record_remainder,
+                                                    dt, cfg, record_remainder,
                                                     time_remaining_out, best_tois, hit_flags);
     if (use_heap) {
         free (best_tois);

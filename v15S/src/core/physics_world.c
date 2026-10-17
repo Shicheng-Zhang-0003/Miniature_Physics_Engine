@@ -343,7 +343,6 @@ typedef struct {
     int end;
     float dt;
     const mpe_config_t *cfg;
-    float obstacle_margin;
     bool record_remainder;
     float *time_remaining_out;
     float *best_tois_out;
@@ -352,7 +351,7 @@ typedef struct {
 static void mpe_ccd_range (void *data, int start, int end) {
     mpe_ccd_slice_t *s = (mpe_ccd_slice_t *) data;
     collision_ccd_sweep_clamp_range (s -> world -> bodies, s -> world -> body_count,
-                                      start, end, s -> dt, s -> obstacle_margin, s -> cfg,
+                                      start, end, s -> dt, s -> cfg,
                                       s -> record_remainder,
                                       s -> time_remaining_out, s -> best_tois_out, s -> hit_flags_out);
 }
@@ -369,25 +368,11 @@ static void mpe_parallel_ccd_sweep (physics_world *world, float dt, const mpe_co
         collision_ccd_sweep_clamp_world (world, dt);
         return;
     }
-    /* Obstacle margin: max tip speed over ALL bodies (serial max reduction,
-     * then read-only during the per-body sweep). */
-    float obstacle_margin = 0.0f;
-    for (int k = 0; k < n; k++) {
-        rigidbody *ob = &world -> bodies [k];
-        if ((ob -> static_state) || (ob -> is_sleeping) || (ob -> no_collide)) { continue; }
-        float ow = vector3_length (ob -> angular_velocity);
-        float orad = broadphase_bounding_radius (ob);
-        if ((!isfinite (ow)) || (!isfinite (orad)) || (orad < 0.0f)) { continue; }
-        float tip = ow * orad;
-        if (isfinite (tip) && (tip > obstacle_margin)) { obstacle_margin = tip; }
-    }
-    if (obstacle_margin > 2.0f) { obstacle_margin = 2.0f; }
     bool record_remainder = (world -> ccd_time_remaining != NULL);
     mpe_ccd_slice_t slice;
     slice.world = world;
     slice.dt = dt;
     slice.cfg = cfg;
-    slice.obstacle_margin = obstacle_margin;
     slice.record_remainder = record_remainder;
     slice.time_remaining_out = world -> ccd_time_remaining;
     slice.best_tois_out = world -> ccd_best_tois;
