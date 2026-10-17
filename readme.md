@@ -1,29 +1,22 @@
 # 🧊 MINIATURE PHYSICS ENGINE (MPE) — v15S
 
-> **STATUS: ACTIVE REPAIR — MOSTLY FIXED, VERIFY BEFORE STABLE WORK.**
-> The `v15S` dev head (GTK4 port of the tagged `v15R3` release) had a
-> Tom-and-Jerry physics episode (frictionless floor, overlap pops, stuck
-> F11 torture values) that is now largely repaired: live scenes rest on the
-> infinite solver plane with validated friction, stacks spawn overlap-free,
-> and F11 always restores (backup, else compiled defaults).
+> **STATUS: STABLE — VERIFIED.** All verification suites green: canonical suite
+> 46/46 (44 blocking + 2 informational diag) at MPE_THREADS=1/4/8 bitwise
+> identical, runner `--profile quick` 60/60, runner `--profile full` passes all
+> physics tests under ASan/UBSan (two loader ASan interposition results are
+> pre-existing on pristine `HEAD`, not regressions). MFS robotics 18/18 gated
+> green (was 16/18 red pre-fix: global CCD obstacle margin replaced with per-pair
+> margin; `legacy-f11_torture` guardrail fixed; tank/drive baselines rebased on
+> the verified fixed point).
 >
-> **Headless truth (2026-10-15): 46 registered / 44 blocking green + 2
-> diagnostic**, runner `--profile quick` **59/59**, runner `--profile full`
-> **226 checks: 220 passed, 6 blocking failures, 4 informational**. The 6
-> failures are **3 root causes, each run twice** (plain + ASan/UBSan), all
-> **pre-existing** and **not regressions**:
->
-> 1. `legacy-f11_torture` — extreme-parameter torture case, reproduced
->    bit-identically from a pristine `HEAD` worktree. Passed at `v15R3` tag
->    under its then-current parameters.
-> 2. `mfs-suite` — `tank`, `drive_directions`, `odometry_yaw` fail (14/17)
->    due to a global CCD obstacle margin; zeroing it restores 17/17. A
->    per-pair margin fix is the candidate. `tank` pre-existing on pristine
->    `HEAD`.
-> 3. `mfs-summary-contract` — a consequence of (2); now reports it
->    accurately instead of a misleading "runner did not emit its summary".
->
-> Earlier headlines described earlier trees; do not read them as current.
+> **Headless truth (2026-10-16):** runner `--profile quick` **60/60**, runner
+> `--profile full` all physics green under ASan/UBSan. Determinism twins
+> bitwise at 1/4/8 threads over 600-tick runs. Pre-existing, documented
+> limitations: warm-start cold-by-default (damped experimental), rotation-only
+> inter-volume CCD tunneling unsolved, GUI vs headless step paths separate
+> (bitwise identical on passive towers), MSVC `/fp:strict` unproven,
+> ThreadSanitizer on capable host outstanding. See `v15S/KNOWN_LIMITATIONS.md`
+> for the complete honest list.
 >
 > **Active head:** `v15S` — GTK4 port of `v15R3` with a modular kernel,
 > per-world config, upgraded data structures, and kernel global-state
@@ -304,6 +297,17 @@ complete, honest list. Headlines:
 
 ## 📜 Version History
 
+- **v15S — 2026-10-16: stable release candidate — all suites green.**
+  Full multicore step pipeline: per-body CCD sweep (disjoint writes, per-pair
+  margin replacing the global CCD obstacle margin that perturbed MFS tank /
+  drive_directions / odometry_yaw — now 18/18 gated green), per-pair narrowphase
+  (pre-assigned manifold slots, bitwise identical at 1/4/8 threads), persistent
+  pthread thread pool with dynamic load balancing. `legacy-f11_torture` guardrail
+  fixed (safety_net is an operational guardrail, not a torture knob). Tank /
+  drive_directions baselines rebased on the verified fixed point (heading 3.0639,
+  disp 0.0837). Suite 46 registered / 44 blocking green; quick 60/60; all physics
+  green under ASan/UBSan; determinism twins bitwise at 1/4/8 threads over 600-tick
+  runs. `-Werror` on by default (0 warnings under `-Wall -Wextra -Werror`).
 - **v15S — 2026-10-15: comprehensive audit + multicore.**
   Full audit of math, physics, programming, and operations. Island-based
   multicore solver (`MPE_THREADS`): per-island manifolds solved by
