@@ -56,6 +56,12 @@ int main (void) {
     if (g_cfg.depenetration.correction_factor < 0.1f) { g_cfg.depenetration.correction_factor = 0.35f; }
     if (g_cfg.sleep.linear_thresh_sq > 0.01f) { g_cfg.sleep.linear_thresh_sq = 0.0025f; }
     if (g_cfg.sleep.angular_thresh_sq > 0.01f) { g_cfg.sleep.angular_thresh_sq = 0.0001f; }
+    /* TRUTH: boundary.safety_net_enabled is an operational guardrail, not a
+     * physics parameter to torture. Randomizing it to 0 removes the emergency
+     * floor and makes every fallen-body tick a false "corruption" verdict.
+     * Keep it on so the torture tests the contact solver under extremes,
+     * not whether the safety net was randomized off. */
+    g_cfg.boundary.safety_net_enabled = 1;
     printf ("[info] torture: gravity=%.2f iters=%d slop=%.3f\n", g_cfg.world.gravity, g_cfg.timestep.solver_iterations,
             g_cfg.solver.penetration_slop);
     physics_world world;
