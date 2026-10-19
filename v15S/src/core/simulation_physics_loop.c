@@ -240,7 +240,9 @@ void simulation_physics_tick (float frame_delta_time) {
             vector3 grav_a = {0, mpe_world_cfg (world) -> world.gravity, 0};
             rigidbody *rb = &world -> bodies [gi];
             if ((rb -> is_sleeping) || (rb -> kinematic) || (rb -> static_state)) { continue; }
-            rb_apply_forces_perfect (rb, simd_scale (grav_a, rb -> mass));
+            /* Gravity bypasses rb_apply_forces_perfect (see physics_world_step):
+             * not an external force for the ext_force_this_tick gate. */
+            rb -> force_accumulator = simd_add (rb -> force_accumulator, simd_scale (grav_a, rb -> mass));
         } constraint_apply_motors (world, fixed_physics_dt);
         /* Foreign forcefield / motor modules (same hook as world path). */
         { /* Snapshot hook table: hooks may attach/detach (see world path). */
@@ -459,9 +461,13 @@ void simulation_physics_tick (float frame_delta_time) {
             bool leg_joint_free =
                 (object_iterator_index < mpe_max_bodies) ? (leg_joint [object_iterator_index] == 0) : false;
             bool leg_have_v0 = (world -> tick_v0 && (world -> tick_v0_capacity >= world -> body_count));
-            bool leg_free = leg_contact_free && leg_joint_free && leg_have_v0;
+            /* External force => constrained path: analytic free-flight covers
+             * gravity+drag only and would drop it (see physics_world.c). */
+            bool leg_free = leg_contact_free && leg_joint_free && leg_have_v0 &&
+                            (rigid_body -> ext_force_this_tick == 0);
             if (leg_free) { rigid_body -> velocity = world -> tick_v0 [object_iterator_index]; }
             rb_integrate_position_exact (rigid_body, step_dt, leg_pos_cfg, leg_free);
+            rigid_body -> ext_force_this_tick = 0; /* consumed for this tick */
             rigidbody_sanitize (rigid_body);
             /* TRUTH: unified safety net with world path (box always). Old
              * debug floor-only let bodies escape sideways in debug, diverging

@@ -498,6 +498,7 @@ void rigidbody_initialisation_sphere (rigidbody *rigid_body, float radius, float
     rigid_body -> cylinder_half_length = 0.0f;
     rigid_body -> custom_shape = -1;
     rigid_body -> max_relative_speed_sq = 0.0f;
+    rigid_body -> ext_force_this_tick = 0;
     rigid_body -> no_collide = false;
     /* DETERMINISM: the body pool is malloc'd, so this _Bool would otherwise
      * be read as heap garbage (indeterminate value = UB, and twin worlds
@@ -638,6 +639,11 @@ void rb_apply_forces_perfect (rigidbody *rigid_body, vector3 force_applied) {
     /* MPE_TASK_13_2_FORCE_SLEEP_FIX_END */
     rigid_body -> force_accumulator =
         simd_add (rigid_body -> force_accumulator, force_applied); // Force applied to torque and circular momentum
+    /* TRUTH: this is the external-force choke point (gravity bypasses it,
+     * see physics_world_step). Any body carrying a non-gravity force must
+     * not take the gravity+drag-only analytic free-flight path, which would
+     * discard the force. Cleared by the integration stage after use. */
+    rigid_body -> ext_force_this_tick = 1;
 } // Apply force at a point not the centre of mass (which generates rotational motion and torque)
 // locale_impact = impact point on object identified
 void rb_apply_forces_localised (rigidbody *rigid_body, vector3 force_applied, vector3 locale_impact) {
@@ -1072,6 +1078,7 @@ void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_inpu
     rigid_body -> cylinder_half_length = 0.0f;
     rigid_body -> custom_shape = -1;
     rigid_body -> max_relative_speed_sq = 0.0f;
+    rigid_body -> ext_force_this_tick = 0;
     rigid_body -> no_collide = false;
     /* DETERMINISM: the body pool is malloc'd, so this _Bool would otherwise
      * be read as heap garbage (indeterminate value = UB, and twin worlds
@@ -1297,6 +1304,7 @@ void rigidbody_initialisation_cylinder (rigidbody *rigid_body, float radius, flo
     /* DETERMINISM: foreign-shape + diagnostic fields zeroed (see sphere). */
     rigid_body -> custom_shape = -1;
     rigid_body -> max_relative_speed_sq = 0.0f;
+    rigid_body -> ext_force_this_tick = 0;
     rigid_body -> no_collide = false;
     /* DETERMINISM: the body pool is malloc'd, so this _Bool would otherwise
      * be read as heap garbage (indeterminate value = UB, and twin worlds

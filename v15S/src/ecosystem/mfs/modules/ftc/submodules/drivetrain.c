@@ -295,6 +295,7 @@ static void drivetrain_mecanum_analytic (physics_world *world, ftc_robot *robot)
             u = -1.0f;
         } vector3 F = vector3_scaling (a_world, -f_max * u);
         wheel -> force_accumulator = vector3_addition (wheel -> force_accumulator, F);
+        wheel -> ext_force_this_tick = 1;
         /* DESPOT-2026-10-04 (axle projection TRIED AND REVERTED): keeping
          * only the axle-parallel part of r×F did not move the harsh-drive
          * tilt blowup at all (same onset tick, same 69°+ in 90 ticks), so

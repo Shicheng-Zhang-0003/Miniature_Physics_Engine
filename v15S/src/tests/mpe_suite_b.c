@@ -773,6 +773,7 @@ int mpe_t_reference_math (void) {
                 physics_world_step (&w, MPE_REF_MATH_DT);
             for (int s = 0; s < 30; s++) {
                 w.bodies [b].force_accumulator = vector3_addition (w.bodies [b].force_accumulator, (vector3) {F, 0, 0});
+                w.bodies [b].ext_force_this_tick = 1;
                 rigidbody_wake (&w.bodies [b]);
                 physics_world_step (&w, MPE_REF_MATH_DT);
             } float pred = ((F - muk * N) / m) * (30.0f * MPE_REF_MATH_DT);

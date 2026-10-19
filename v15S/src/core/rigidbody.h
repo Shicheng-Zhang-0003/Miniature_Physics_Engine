@@ -134,6 +134,16 @@ typedef struct {
      * would have no fixed rail at all. Pointing the frame at the chassis keeps
      * the rail where the hardware keeps it. */
     uint32_t friction_anisotropy_frame;
+    /* External-force flag for the exact free-flight gate. Set by every force
+     * source EXCEPT the step's own gravity application (rb_apply_forces_perfect
+     * and the direct accumulator writers: springs, joint motors, module
+     * forcefields). Cleared by the integration stage once consumed.
+     * TRUTH: the analytic free-flight integrator solves gravity+drag only;
+     * running it from tick_v0 on a body that also carries an external force
+     * silently discarded that force (probe: 100 N on 1 kg free sphere gave
+     * dv=0 for a whole tick). With this flag, any body with an external
+     * force takes the constrained Euler path, which keeps it. */
+    unsigned char ext_force_this_tick;
 } rigidbody;
 void rigidbody_update_axes (rigidbody *rigid_body);
 void rigidbody_initialisation_sphere (rigidbody *rigid_body, float radius, float mass, vector3 position_input);

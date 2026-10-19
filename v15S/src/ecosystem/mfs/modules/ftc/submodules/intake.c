@@ -221,6 +221,7 @@ void intake_balls_aero_step (physics_world *world, const int *ball_ids, int ball
             float f = 0.5f * rho * cd * area * speed * speed;
             ball -> force_accumulator = vector3_addition (
                 ball -> force_accumulator, vector3_scaling (ball -> velocity, -f / speed));
+            ball -> ext_force_this_tick = 1;
         }
         float spin = sqrtf (vector3_length_squared (ball -> angular_velocity));
         if (spin > 10.0f && isfinite (spin) && speed > 0.001f) {
@@ -230,6 +231,7 @@ void intake_balls_aero_step (physics_world *world, const int *ball_ids, int ball
             if (isfinite (m)) {
                 ball -> force_accumulator =
                     vector3_addition (ball -> force_accumulator, vector3_scaling (vector3_cross (sd, vd), m));
+                ball -> ext_force_this_tick = 1;
             }
         }
     }
