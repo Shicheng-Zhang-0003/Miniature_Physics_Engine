@@ -11,7 +11,19 @@
  * drivetrain.c (odometry yaw arms) and biobuzz.c (start poses) all read
  * these; no TU keeps a private copy (that is how the 0.44->0.45 arm drift
  * happened once). Regulation target: the whole footprint fits the FTC
- * 18 in (0.4572 m) starting cube with margin. */
+ * 18 in (0.4572 m) starting cube with margin.
+ *
+ * Official anchors (Competition Manual TU04 §12, R102/R103):
+ *   STARTING CONFIGURATION: 18 x 18 x 18 in = 0.4572 m cube.
+ *   EXPANSION LIMIT:        18 x 24 x 29 in = 0.4572 x 0.6096 x 0.7366 m.
+ * Built robot: chassis 0.340 x 0.150 x 0.340 m, wheel envelope 0.440 x
+ * 0.255 x 0.380 m (17.3 x 10.0 x 15.0 in) — inside the start cube with
+ * ~17 mm of side margin. The squat height is a model choice (a real 18 in
+ * robot may be 18 in tall); do NOT shrink the footprint below the pieces
+ * or the 20 in CELL opening expects. */
+#define FTC_START_CUBE 0.4572f      /* 18 in (R102) */
+#define FTC_EXPAND_LONG 0.6096f     /* 24 in */
+#define FTC_EXPAND_HIGH 0.7366f     /* 29 in */
 #define CHASSIS_HALF_X 0.17f
 #define CHASSIS_HALF_Y 0.075f
 #define CHASSIS_HALF_Z 0.17f

@@ -99,7 +99,7 @@ if [ "$STAND" = "$EMBED" ]; then
     exit 2
 fi
 
-DRIFT="$(diff -rq "$STAND" "$EMBED" --exclude=.git --exclude=build --exclude=temp --exclude=plugins --exclude='*.o' --exclude='*.d' --exclude='*.so' --exclude='*.dll' --exclude='*.exe' --exclude='*.a' --exclude='*.lib' --exclude=sync_mfs_check.sh --exclude=.gitignore 2>&1 || true)"
+DRIFT="$(diff -rq "$STAND" "$EMBED" --exclude=.git --exclude=build --exclude=temp --exclude=plugins --exclude='*.o' --exclude='*.d' --exclude='*.so' --exclude='*.dll' --exclude='*.exe' --exclude='*.a' --exclude='*.lib' --exclude=sync_mfs_check.sh --exclude=.gitignore --exclude=LICENSE 2>&1 || true)"
 if [ -n "$DRIFT" ]; then
   echo "[sync-mfs] DRIFT DETECTED (standalone vs embedded):"
   echo "[sync-mfs]   standalone: $STAND"

@@ -1601,9 +1601,35 @@ int mfs_t_fleet_clear (void) {
     mfs_test_world (&w);
     extern const mpe_module_desc_t mpe_module_desc;
     MFS_CHECK (t_ptr, physics_world_attach_module (&w, &mpe_module_desc) >= 0);
+    /* User-report regression: on the 3.66 m regulation field the arcade
+     * scatter must be staged INSIDE the perimeter. The old balls/pieces
+     * defaults put everything at z=1.8..3.4 m, beyond the ±1.83 m wall, so
+     * the driver could neither intake nor shoot them ("can't even shoot
+     * balls into the baskets"). */
+    MFS_CHECK (t_ptr, ftc_biobuzz_field (&w) == 0);
+    MFS_CHECK (t_ptr, ftc_biobuzz_spawn (&w, 4, 4) == 8);
+    MFS_CHECK (t_ptr, ftc_balls_spawn (&w, 3) == 3);
+    {
+        int seen = 0, outside = 0;
+        for (int i = 0; i < w.body_count; i++) {
+            rigidbody *b = &w.bodies [i];
+            if (b -> static_state || b -> mass == 0.0f || b -> type != object_sphere) { continue; }
+            int arcade = (fabsf (b -> radius - 0.021f) < 1e-4f);
+            int pollen = (fabsf (b -> radius - 0.0355f) < 1e-4f);
+            int nectar = (fabsf (b -> radius - 0.0455f) < 1e-4f);
+            if (!arcade && !pollen && !nectar) { continue; }
+            seen++;
+            if (fabsf (b -> position.x) > BIOBUZZ_FIELD_HALF - 0.01f ||
+                fabsf (b -> position.z) > BIOBUZZ_FIELD_HALF - 0.01f) {
+                outside++;
+            }
+        }
+        MFS_INFO ("arcade scatter seen=%d outside=%d", seen, outside);
+        MFS_CHECK (t_ptr, seen == 11);
+        MFS_CHECK (t_ptr, outside == 0);
+    }
     int s0 = ftc_fleet_spawn (&w, 0.0f, ftc_robot_rest_height (), 0.0f, MOTOR_GB_5203_26_9, FTC_DRIVETRAIN_MECANUM);
     MFS_CHECK (t_ptr, s0 >= 0);
-    MFS_CHECK (t_ptr, ftc_balls_spawn (&w, 3) == 3);
     MFS_CHECK (t_ptr, ftc_bucket_spawn (&w, 0.0f, 1.0f, 4.0f) == 0);
     MFS_CHECK (t_ptr, ftc_biobuzz_field (&w) == 0);
     MFS_CHECK (t_ptr, ftc_biobuzz_match (&w) > 0);

@@ -240,18 +240,51 @@ static rigidbody *fleet_chassis (struct physics_world *world, ftc_robot *r) {
     if (!world || !r || r -> chassis_body < 0 || r -> chassis_body >= world -> body_count) { return NULL; }
     return &world -> bodies [r -> chassis_body];
 }
+/* Playable half-extent when a regulation-sized floor slab is present, else 0.
+ * The BIOBUZZ league builds a 144 in (1.8288 m half) slab at y=0; the arcade
+ * practice pad is 30 m half and deliberately ignored. Arcade scatter used to
+ * place balls/pieces/bucket at z=2.2..4.0 m, i.e. OUTSIDE the regulation
+ * perimeter wall (z=±1.83) — unreachable on the league field (user report:
+ * "can't even shoot balls into the baskets"). Callers map their scatter into
+ * this interior when it is available; the 60 m pad keeps its old layout. */
+static float ftc_playable_half (struct physics_world *world) {
+    if (!world || !world -> bodies) { return 0.0f; }
+    for (int i = 0; i < world -> body_count; i++) {
+        rigidbody *b = &world -> bodies [i];
+        if (!b -> static_state && !(b -> mass == 0.0f)) { continue; }
+        float top = b -> position.y + b -> half_extensions.y;
+        if (fabsf (top) < 0.01f && b -> half_extensions.x > 0.5f && b -> half_extensions.x <= 5.0f &&
+            fabsf (b -> half_extensions.x - b -> half_extensions.z) < 0.02f) {
+            return b -> half_extensions.x;
+        }
+    }
+    return 0.0f;
+}
 int ftc_balls_spawn (struct physics_world *world, int n) {
     ftc_fleet_t *f = fleet_of (world);
     if (!world || !f) { return -1; }
     if (n < 1) { n = 3; }
     int made = 0;
-    for (int i = 0; i < n && f -> ball_count < INTAKE_MAX_BALLS; i++) {
+    int room = INTAKE_MAX_BALLS - f -> ball_count;
+    int n_eff = (n < room) ? n : room;
+    int rows = (n_eff + 2) / 3;
+    float lim = ftc_playable_half (world);
+    for (int i = 0; i < n_eff; i++) {
         /* Deterministic scatter ahead: three lanes (left/centre/right) so
          * a straight drive down the middle scoops at least the centre
          * lane through the 0.32 m mouth; tight rows so one pass catches
-         * twice (the drive covers ~2.3 m). */
+         * twice (the drive covers ~2.3 m). On a regulation field the rows
+         * are compressed inside the perimeter instead of being staged
+         * beyond the wall. */
         float x = ((float) (i % 3) - 1.0f) * 0.3f;
-        float z = 2.2f + 0.4f * (float) (i / 3);
+        float z;
+        if (lim > 0.0f) {
+            const float z0 = 0.55f, z1 = (lim - 0.28f > z0) ? (lim - 0.28f) : z0;
+            float t = (rows > 1) ? (float) (i / 3) / (float) (rows - 1) : 0.0f;
+            z = z0 + (z1 - z0) * t;
+        } else {
+            z = 2.2f + 0.4f * (float) (i / 3);
+        }
         int bi = physics_world_add_sphere (world, INTAKE_BALL_RADIUS, INTAKE_BALL_MASS,
                                            (vector3) {x, INTAKE_BALL_RADIUS + 0.001f, z});
         if (bi < 0) { break; }
@@ -278,15 +311,27 @@ int ftc_biobuzz_spawn (struct physics_world *world, int nectar_n, int pollen_n) 
     if (pollen_n < 0) { pollen_n = 0; }
     int made = 0;
     int total = nectar_n + pollen_n;
-    for (int k = 0; k < total && f -> ball_count < INTAKE_MAX_BALLS; k++) {
+    int room = INTAKE_MAX_BALLS - f -> ball_count;
+    int n_eff = (total < room) ? total : room;
+    int rows = (n_eff + 2) / 3;
+    float lim = ftc_playable_half (world);
+    for (int k = 0; k < n_eff; k++) {
         int is_nectar = (k < nectar_n) ? 1 : 0;
         float radius = is_nectar ? BIOBUZZ_NECTAR_RADIUS : BIOBUZZ_POLLEN_RADIUS;
         float mass = is_nectar ? BIOBUZZ_NECTAR_MASS : BIOBUZZ_POLLEN_MASS;
         /* Three lanes (left/centre/right); nectar staged a touch further
          * than pollen so both kinds sit in the drive path and the intake
-         * mouths a lane. */
+         * mouths a lane. Regulation field: compress the rows inside the
+         * walls (the 2.6-3.4 m arcade staging is outside 1.83 m). */
         float x = ((float) (k % 3) - 1.0f) * 0.3f;
-        float z = (is_nectar ? 2.6f : 1.8f) + 0.4f * (float) (k / 3);
+        float z;
+        if (lim > 0.0f) {
+            const float z0 = 0.55f, z1 = (lim - 0.28f > z0) ? (lim - 0.28f) : z0;
+            float t = (rows > 1) ? (float) (k / 3) / (float) (rows - 1) : 0.0f;
+            z = z0 + (z1 - z0) * t;
+        } else {
+            z = (is_nectar ? 2.6f : 1.8f) + 0.4f * (float) (k / 3);
+        }
         int bi = physics_world_add_sphere (world, radius, mass, (vector3) {x, radius + 0.001f, z});
         if (bi < 0) { break; }
         rigidbody *b = &world -> bodies [bi];

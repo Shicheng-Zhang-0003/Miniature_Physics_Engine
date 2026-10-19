@@ -4,16 +4,20 @@
  * Streamlined 2026-10-04 (v15S release blocker): one field, one robot, one
  * controller, full mecanum drive — and the controller is the physical F310
  * gamepad (see ui_input/gamepad_drive.c), NOT the terminal. Verbs:
- *   ftc spawn [x y z]          spawn THE mecanum robot + game bucket (refuses when one exists)
+ *   ftc spawn [x y z]          spawn THE mecanum robot + arcade bucket (refuses
+ *                               when one exists; bucket skipped on a
+ *                               regulation field, where the HIVE is the goal)
  *   ftc telemetry               pose, odometry, battery, wheels, game state
  *   ftc intake on|off           fictional intake capture on/off
  *   ftc eject                   drop carried balls (no launch)
  *   ftc shoot [power] [elev]    launch oldest carried ball (0.3..1.0 power,
- *                               20..80 deg elevation; hive mouths need soft
- *                               steep lobs, e.g. 0.65/70 from wall-adjacent)
+ *                               20..80 deg elevation; on the regulation field
+ *                               no-arg defaults to the 0.65/70 HIVE lob)
  *   ftc balls [n]               scatter n arcade balls ahead (default 3)
  *   ftc pieces [nectar pollen]  stage BIOBUZZ pieces (default 4 nectar + 4 pollen)
- *   ftc bucket [x y z]          spawn/move the suspended bucket (default 0 1.0 4.0)
+ *   ftc bucket [x y z]          spawn/move the suspended bucket (default 0 1.0
+ *                               4.0 on the arcade pad; no default on the
+ *                               regulation field)
  *   ftc score                   carried / balls / scored / bucket readout
  *   ftc view [0|1|2]            camera: 0 free, 1 field-centric follow, 2 robot-centric
  *   ftc select [i]              show/set the CONTROLLED robot (gamepad BACK
@@ -28,7 +32,9 @@
  * (symbols resolve from the loaded handle; the engine never links FTC).
  * Spawn auto-attaches the ftc-fleet module to the primary world, ensures the
  * tile field with perimeter walls (balls can't roll off the grid), drops the
- * game bucket, and stages regulation-size BIOBUZZ nectar and pollen pieces.
+ * game bucket on the arcade pad (BIOBUZZ field: skipped; the HIVE scores),
+ * and stages regulation-size BIOBUZZ nectar and pollen pieces inside the
+ * walls (the arcade z=2.2..4.0 scatter is remapped).
  *
  * PARKED (not deleted): `drive`/`stop` (the gamepad owns all motion now),
  * `list`/`preset` inventory, tank drive, preset selection, multi-robot
@@ -139,6 +145,27 @@ static int ftc_ensure_walls (physics_world *w, float half, float height) {
          * stop; robots still lose their bounce via their own e=0. */
         w -> bodies [wall].restitution = 1.0f;
     } return 0;
+}
+/* Regulation-field probe: half-extent of the BIOBUZZ tile slab (144 in
+ * inside the walls), or 0 when the scene is the 60 m arcade practice pad.
+ * Deliberately the same anchor the league uses: static floor, top y=0, half
+ * 1.8288 (0.5..5 m accepted). The arcade defaults (bucket at z=4 m, balls
+ * and pieces staged at z=1.8..3.4 m) are OUTSIDE this wall; on the league
+ * field they must be remapped inside so the driver can reach them. */
+static float ftc_regulation_half (physics_world *w) {
+    if (!w)
+        return 0.0f;
+    for (int i = 0; i < w -> body_count; i++) {
+        rigidbody *b = &w -> bodies [i];
+        if (!b -> static_state && !(b -> mass == 0.0f))
+            continue;
+        float top = b -> position.y + b -> half_extensions.y;
+        if (fabsf (top) < 0.01f && b -> half_extensions.x > 0.5f && b -> half_extensions.x <= 5.0f &&
+            fabsf (b -> half_extensions.x - b -> half_extensions.z) < 0.02f) {
+            return b -> half_extensions.x;
+        }
+    }
+    return 0.0f;
 } /* Ensure the ftc-fleet tick module drives the primary world (idempotent).
  * Returns 0 when driving, -1 when the bundle is missing. Engine APIs
  * (registry, attach) are called directly — this TU links into the
@@ -241,17 +268,25 @@ void cmd_ftc (int argc, char **argv) {
             return;
         }
         char buf [224];
+        float reg_half = ftc_regulation_half (w);
         /* Spawn the default suspended bucket with the robot so the game is
-         * playable immediately (user config: `ftc spawn` = full field). */
+         * playable immediately (user config: `ftc spawn` = full field).
+         * On the regulation BIOBUZZ field the 1.6 m arcade pad at z=4 m is
+         * outside the 1.83 m perimeter wall and cannot be a target; the HIVE
+         * cells are the goal there, so skip it loudly instead of staging
+         * unreachable geometry. */
         int (*p_bk) (struct physics_world *, float, float, float) =
             (int (*) (struct physics_world *, float, float, float)) ftc_sym ("ftc_bucket_spawn");
-        if (p_bk && p_bk (w, 0.0f, 1.0f, 4.0f) == 0) {
+        if (reg_half > 0.0f) {
+            term_out ("mpe: ftc: regulation field (144 in): arcade bucket skipped — the HIVE cells are the goal\n");
+        } else if (p_bk && p_bk (w, 0.0f, 1.0f, 4.0f) == 0) {
             term_out ("mpe: ftc: bucket at (0.00,1.00,4.00) (ftc bucket [x y z] to move)\n");
         } else if (p_bk) {
             term_err ("mpe: ftc: bucket spawn failed\n");
         }
         /* Stage BIOBUZZ scoring elements by default (regulation sizes) so
-         * the driver can intake and launch immediately. */
+         * the driver can intake and launch immediately. The fleet clamps the
+         * scatter inside a regulation field. */
         int (*p_piece) (struct physics_world *, int, int) =
             (int (*) (struct physics_world *, int, int)) ftc_sym ("ftc_biobuzz_spawn");
         if (p_piece) {
@@ -358,17 +393,24 @@ void cmd_ftc (int argc, char **argv) {
             term_err ("mpe: ftc: bundle API incomplete\n");
             return;
         }
-        /* Optional power 0.3..1.0 (default full) + elevation 20..80 deg
-         * (default 50): the stock lob outranges the field, so hive mouths
-         * need soft, steep shots from legal spots. Falls back down the
-         * chain for older bundles (aimed -> power -> full). ftc_argf
-         * already guarantees finite. */
-        float power = ftc_argf (argv, 2, argc, 1.0f);
+        /* Optional power 0.3..1.0 + elevation 20..80 deg. Arcade defaults are
+         * full power / 50 deg (bucket calibration). On the 3.66 m BIOBUZZ
+         * field that lob outranges the field and cannot enter a 1.4 m HIVE
+         * mouth, so no-arg shots use the measured scoring recipe 0.65 / 70
+         * (soft wall-adjacent lob). Falls back down the chain for older
+         * bundles (aimed -> power -> full). ftc_argf guarantees finite. */
+        float reg_half = ftc_regulation_half (w);
+        int have_power = (argc > 2);
+        int have_elev = (argc > 3);
+        float power = ftc_argf (argv, 2, argc, (reg_half > 0.0f) ? 0.65f : 1.0f);
         if (power < 0.3f) { power = 0.3f; }
         if (power > 1.0f) { power = 1.0f; }
-        float elev = ftc_argf (argv, 3, argc, 50.0f);
+        float elev = ftc_argf (argv, 3, argc, (reg_half > 0.0f) ? 70.0f : 50.0f);
         if (elev < 20.0f) { elev = 20.0f; }
         if (elev > 80.0f) { elev = 80.0f; }
+        if (reg_half > 0.0f && (!have_power || !have_elev)) {
+            term_out ("mpe: ftc: BIOBUZZ default shot 0.65/70 (override: ftc shoot <power> <elev>)\n");
+        }
         int id = -1;
         float used_elev = 50.0f;
         if (p_sha) {
@@ -442,6 +484,11 @@ void cmd_ftc (int argc, char **argv) {
         float x = ftc_argf (argv, 2, argc, 0.0f);
         float y = ftc_argf (argv, 3, argc, 1.0f);
         float z = ftc_argf (argv, 4, argc, 4.0f);
+        if (argc <= 4 && ftc_regulation_half (w) > 0.0f) {
+            term_err ("mpe: ftc: no default bucket on the 3.66 m field (1.6 m pad at z=4 is outside the wall); "
+                      "the HIVE cells are the goal — or pass explicit x y z\n");
+            return;
+        }
         if (p_bk (w, x, y, z) != 0) {
             term_err ("mpe: ftc: bucket failed (no fleet: eco attach mfs-simulator first)\n");
             return;
@@ -549,6 +596,8 @@ void cmd_ftc (int argc, char **argv) {
                       made, pre);
             term_ok (buf);
             term_out ("mpe: ftc: Manual V1 S10.3: 16 flower + 8 garden + 16 preload + 6 cell + 10 tray (40 pollen, 16 nectar)\n");
+            term_out ("mpe: ftc: dims: field 144x144 in (3.6576 m), CELL 20x14x12 in, pivots 43.95 in, robot 18 in start cube\n");
+            term_out ("mpe: ftc: score: stand outside a HIVE mouth (audience/far side) and `ftc shoot` (0.65/70 default)\n");
             return;
         }
         if (term_str_eq (sub, "spawn")) {
@@ -616,6 +665,7 @@ void cmd_ftc (int argc, char **argv) {
                       made, pre);
             term_ok (buf);
             term_out ("mpe: ftc: gamepad drives the selected robot (BACK cycles); telemetry/score read the match\n");
+            term_out ("mpe: ftc: to score, face an up-cell mouth from the audience/far side and `ftc shoot` (0.65/70)\n");
             return;
         }
         if (term_str_eq (sub, "enter")) {

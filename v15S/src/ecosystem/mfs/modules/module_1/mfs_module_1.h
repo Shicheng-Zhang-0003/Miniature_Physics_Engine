@@ -1,8 +1,16 @@
 /* MFS Module 1: True Simulator
  *
- * Core module for building, constructing, and running a robot from scratch
- * on a biobuzz field. Implements accurate drivetrain, intake, and shooter
- * physics for biobuzz-sized balls.
+ * Core module for building, constructing, and running a robot from scratch.
+ * Implements accurate drivetrain, intake, and shooter physics.
+ *
+ * DIMENSIONAL STATUS — LEGACY PRACTICE ARENA, NOT REGULATION BIOBUZZ:
+ * this module predates the 2026-27 league (`submodules/biobuzz.c`) and still
+ * models a 12 m x 12 m sandbox with a 2.5 m goal and 42 mm / 2.6 g balls.
+ * The Competition Manual TU04 field is 144 in (3.6576 m) inside the walls,
+ * POLLEN is 2.8 in (71 mm) and NECTAR 3.6 in (91 mm), and scoring is into
+ * HIVE CELLS (20 x 14 x 12 in), not a goal. Keep the module's calibration
+ * intact for its tests; use the league for regulation play and never cite
+ * the constants below as official.
  *
  * This module follows the MPE Module Interface (MPI) v1 ABI:
  * - Never touches MPE kernel globals directly
@@ -43,16 +51,16 @@
 #include "modules/module_1/submodules/gamepad/gamepad.h"
 #define MFS_MODULE_1_VERSION "1.0"
 #define MFS_MODULE_1_NAME "mfs-simulator"
-/* Biobuzz ball specifications */
+/* LEGACY practice-arena ball spec (42 mm; regulation is 71/91 mm). */
 #define MFS_BIOBUZZ_BALL_DIAMETER 0.042f /* 42mm */
 #define MFS_BIOBUZZ_BALL_RADIUS 0.021f
 #define MFS_BIOBUZZ_BALL_MASS 0.0026f /* 2.6g */
 #define MFS_BIOBUZZ_BALL_RESTITUTION 0.65f
 #define MFS_BIOBUZZ_BALL_FRICTION_S 0.45f
 #define MFS_BIOBUZZ_BALL_FRICTION_K 0.35f
-/* Field dimensions (biobuzz standard) */
-#define MFS_BIOBUZZ_FIELD_WIDTH 12.0f /* 12m x 12m */
-#define MFS_BIOBUZZ_FIELD_LENGTH 12.0f
+/* LEGACY practice-arena field (12 m; regulation is 3.6576 m). */
+#define MFS_BIOBUZZ_FIELD_WIDTH 12.0f /* legacy practice sandbox, not regulation */
+#define MFS_BIOBUZZ_FIELD_LENGTH 12.0f /* legacy practice sandbox, not regulation */
 #define MFS_BIOBUZZ_GOAL_HEIGHT 2.5f
 #define MFS_BIOBUZZ_GOAL_WIDTH 1.5f
 /* Robot configuration */
