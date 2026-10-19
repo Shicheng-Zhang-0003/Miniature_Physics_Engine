@@ -4,7 +4,7 @@
 > 46/46 (44 blocking + 2 informational diag) at MPE_THREADS=1/4/8 bitwise
 > identical, runner `--profile quick` 60/60, runner `--profile full` passes all
 > physics tests under ASan/UBSan (two loader ASan interposition results are
-> pre-existing on pristine `HEAD`, not regressions). MFS robotics 17/17 gated (2026-10-19 audit)
+> pre-existing on pristine `HEAD`, not regressions). MFS unified suite 30/30; build gate 5 gated + 12 diagnostic builds (2026-10-19 audit)
 > green (was 16/18 red pre-fix: global CCD obstacle margin replaced with per-pair
 > margin; `legacy-f11_torture` guardrail fixed; tank/drive baselines rebased on
 > the verified fixed point).
@@ -300,7 +300,7 @@ complete, honest list. Headlines:
 - **v15S — 2026-10-16: stable release candidate — all suites green.**
   Full multicore step pipeline: per-body CCD sweep (disjoint writes, per-pair
   margin replacing the global CCD obstacle margin that perturbed MFS tank /
-  drive_directions / odometry_yaw — now 17/17 gated green (2026-10-19 audit)), per-pair narrowphase
+  drive_directions / odometry_yaw — now unified 30/30 green (2026-10-19 audit)), per-pair narrowphase
   (pre-assigned manifold slots, bitwise identical at 1/4/8 threads), persistent
   pthread thread pool with dynamic load balancing. `legacy-f11_torture` guardrail
   fixed (safety_net is an operational guardrail, not a torture knob). Tank /

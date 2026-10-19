@@ -96,6 +96,74 @@ probe or a failing suite before the fix, and re-verified after.
 
 - `python3 tools/test_runner.py --profile physics`: 106/106 pass, 2 informational, 0 blocking.
 - `test_paranoia_ccd`: PASS at MPE_THREADS=1/2/4/8 (3 runs each).
-- MFS suite (475 + 461): `FTC RESULT: gated pass=17 fail=0 info-diags=12 (ungated)`.
+- MFS suite (475 + 461): unified suite 30/30 pass; build gate `gated pass=5 fail=0 info-diags=12 (ungated)` (12 legacy reference builds are now printed as real `[INFO]` markers instead of being double-counted as gated).
 - MGB (475 ecosystem + 472): `mgb: PASS 38 FAIL 0`.
 - Force-drop probe: vx=1.666667 (100 N, 1 kg, 1 tick). Cylinder probes as in #4/#5.
+
+
+## Update — full verification pass (2026-10-19, later)
+
+Additional defects found by running EVERY executable test at MPE_THREADS=1 and 4:
+
+12. Persistent-pool phase race (hang) — `core/physics_world.c`.
+    Workers claimed a work index while holding the mutex but then read
+    `s_pool_func/data/start/end` AFTER unlocking; the main thread published the
+    next phase's globals outside the lock. A worker descheduled across the
+    boundary could execute the wrong function on the wrong range (UB) and the
+    bookkeeping could deadlock. Reproduced as a >180 s hang of
+    `test_paranoia_determinism` at MPE_THREADS=4 (T1: 163 ms). Fix: claim and
+    snapshot the whole phase under `s_pool_lock`; lazy init is lock-serialized.
+    Verified: 40/40 determinism runs at T4, full T4 sweep 0 issues.
+
+13. ASan/UBSan build failure — `tests/mpe_suite_loader.c`.
+    `char names[...][16]` with `"diag-fill-%02d"`: GCC -O1 format-truncation
+    (warning in the sanitizer profile, -Werror) rejects a region of 6 bytes for
+    a directive that can write 11. Buffer is 32 bytes now. Full ASan/UBSan
+    profile green.
+
+14. MFS summary counter lie — `ecosystem/mfs/build_tests.sh`.
+    The 12 legacy reference builds were `pass++` (gated) AND hardcoded
+    `info_pass += 12`, while no `[INFO]` line was printed; the runner's
+    per-case-vs-summary contract caught it. They are diagnostics: now print
+    `[INFO] name (diagnostic, ungated)` and count once. Failures still gate.
+
+### Online source-of-truth cross-check
+
+- Contact normal / impulse signs: Wikipedia "Collision response" (n̂ points
+  away from body 1 and toward body 2; v_r = v_p2 − v_p1) and RWTH Aachen
+  "Constraint-based collision and contact handling using impulses" (normal
+  from second to first body; u_rel = u_a − u_b). Our pair (n = A→B,
+  vn = (vB−vA)·n, A −= nλ, B += nλ, λ ≥ 0) matches after renaming.
+- Cylinder-inside-cube normal: Ericson, *Real-Time Collision Detection*,
+  §5.1.4 (closest point on OBB by per-axis clamp; interior escape is along the
+  nearest face). The escape direction is outward; the A→B normal is its
+  negation. Matches fix #4.
+- Prismatic DOF: Algoryx AGX constraints table — Prismatic removes 5 DOF
+  (2 translational, 3 rotational); Box2D documents a prismatic joint as
+  translation along one axis with no relative rotation. Confirms open finding
+  A2 (engine currently solves only the 2 translational rows).
+- Free-flight integration / external forces: Wikipedia "Semi-implicit Euler"
+  (v ← v + aΔt from the total acceleration, then x ← x + vΔt) and the drag+gravity
+  ODE m dv/dt = F_g + F_D (arXiv:1305.1283). The analytic gravity+drag solution
+  is only valid when no other force acts; the flag fix restores superposition.
+- Baumgarte stabilization: Box2D solver2d (impulse = −meff(vn + β·separation/dt))
+  and Havok's PGS/Baumgarte description. The engine's bias/slop approach is the
+  standard velocity-level correction.
+- Prismatic motor torque: OpenStax University Physics 10.6 — torque about O for
+  a force at r is τ = r × F; Euler's equations for rigid bodies. Confirms
+  τ = r×F at both anchors (fix #8).
+
+### Performance / output vs pristine baseline (2c52bbd, MPE_THREADS=1, min of 3)
+
+| test | pristine | current | result diff |
+|---|---|---|---|
+| test_mpe_suite | 3106 ms, 80 pass / 5 fail | 3078 ms, 84 pass / 0 fail | +4 entries, 5 truth fixes |
+| test_f10_long_run | 329 ms, pass | 434 ms, pass | transient lin 0.01891→0.01890 (1e-5) |
+| test_f11_torture | 3954 ms, FAIL (29022 fallen) | 1823 ms, PASS (0 fallen) | island batching fix |
+| test_cylinder_cube | 16 ms, pass | 15 ms, pass | identical output |
+| test_paranoia_ccd | 26 ms, 5 pass | 23 ms, 5 pass | identical output |
+| test_paranoia_determinism | 104 ms, 4 pass | 130 ms, 4 pass | identical output |
+
+Full executable sweep: 47 binaries × {MPE_THREADS=1, 4} = 94 runs, 0 failures,
+0 hangs after fix #12. Full profile: 262 checks, 260 pass, 0 blocking failures,
+2 xfail, 30 informational.
