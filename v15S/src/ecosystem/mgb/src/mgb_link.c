@@ -182,11 +182,14 @@ mgb_session_t *mgb_spawn (const char *s2tui_path, int timeout_sec) {
     }
     g_spawn_status = mgb_spawn_ok;
     g_spawn_errno = 0;
-    int to_c[2], out_c[2], err_c[2];
+    /* TRUTH: initialize all pipe fds to -1 before any pipe() runs. If the
+     * first pipe fails, the old cleanup tested the uninitialized arrays with
+     * `if (to_c[0] || to_c[1])` and close()d arbitrary fd numbers. */
+    int to_c[2] = {-1, -1}, out_c[2] = {-1, -1}, err_c[2] = {-1, -1};
     if (pipe (to_c) != 0 || pipe (out_c) != 0 || pipe (err_c) != 0) {
-        if (to_c[0] || to_c[1]) { close (to_c[0]); close (to_c[1]); }
-        if (out_c[0] || out_c[1]) { close (out_c[0]); close (out_c[1]); }
-        if (err_c[0] || err_c[1]) { close (err_c[0]); close (err_c[1]); }
+        if (to_c[0] >= 0) { close (to_c[0]); close (to_c[1]); }
+        if (out_c[0] >= 0) { close (out_c[0]); close (out_c[1]); }
+        if (err_c[0] >= 0) { close (err_c[0]); close (err_c[1]); }
         fail_spawn (mgb_spawn_e_pipe, errno);
         return NULL;
     }
