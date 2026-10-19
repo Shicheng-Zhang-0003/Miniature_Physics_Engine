@@ -69,16 +69,32 @@ static void *s_pool_worker (void *arg) {
             pthread_mutex_unlock (&s_pool_lock);
             return NULL;
         }
-        int my_idx = __atomic_fetch_add (&s_pool_tasks_done, 1, __ATOMIC_RELAXED);
-        pthread_mutex_unlock (&s_pool_lock);
-        if (my_idx >= s_pool_tasks_total) { continue; } /* phase reset under us */
+        /* DESPOT-2026-10-19: claim AND snapshot the phase under the mutex.
+         * Before this fix, s_pool_func/data/start/end were plain globals
+         * written by the main thread outside the lock and read by workers
+         * after unlocking — a worker descheduled between its claim and its
+         * read could execute the NEXT phase's function on THIS phase's
+         * chunk (UB: torn/mismatched dispatch; observed as a rare >180 s
+         * hang of test_paranoia_determinism at MPE_THREADS=4). It also
+         * checked `my_idx >= total` after unlocking, racing the reset. */
+        int my_idx = s_pool_tasks_done++;
+        if (my_idx >= s_pool_tasks_total) {
+            /* Cannot normally happen now that claims are lock-serialized
+             * against the phase reset; kept strictly safe: we were not
+             * counted in `remaining`, so do not decrement it. */
+            pthread_mutex_unlock (&s_pool_lock);
+            continue;
+        }
+        mpe_pool_func_t func = s_pool_func;
+        void *data = s_pool_data;
         int cs = s_pool_start + my_idx;
         int ce = cs + 1;
         if (ce > s_pool_end) { ce = s_pool_end; }
-        if (cs < ce) {
-            s_pool_func (s_pool_data, cs, ce);
+        pthread_mutex_unlock (&s_pool_lock);
+        if (cs < ce && func) {
+            func (data, cs, ce);
         }
-        int remaining = __atomic_fetch_sub (&s_pool_tasks_remaining, 1, __ATOMIC_RELAXED) - 1;
+        int remaining = __atomic_fetch_sub (&s_pool_tasks_remaining, 1, __ATOMIC_ACQ_REL) - 1;
         if (remaining == 0) {
             pthread_mutex_lock (&s_pool_lock);
             pthread_cond_signal (&s_pool_done_cond);
@@ -100,12 +116,18 @@ static int mpe_thread_count (void) {
     return threads;
 }
 static void mpe_pool_init (void) {
-    if (s_pool_threads > 0) { return; }
+    /* DESPOT-2026-10-19: serialize lazy creation. Two threads stepping two
+     * independent worlds could previously both enter here and create two
+     * overlapping teams (or double-set s_pool_threads), which desynced the
+     * worker wait counters. */
+    pthread_mutex_lock (&s_pool_lock);
+    if (s_pool_threads > 0) { pthread_mutex_unlock (&s_pool_lock); return; }
     s_pool_threads = mpe_thread_count ();
-    if (s_pool_threads <= 1) { return; }
+    if (s_pool_threads <= 1) { pthread_mutex_unlock (&s_pool_lock); return; }
     s_pool_shutdown = 0;
     s_pool_tasks_total = 0;
     s_pool_tasks_done = 0;
+    s_pool_tasks_remaining = 0;
     for (int t = 0; t < s_pool_threads; t++) {
         if (pthread_create (&s_pool_tids [t], NULL, s_pool_worker, NULL) != 0) {
             s_pool_tids [t] = 0;
@@ -113,6 +135,7 @@ static void mpe_pool_init (void) {
             break;
         }
     }
+    pthread_mutex_unlock (&s_pool_lock);
 }
 /* Parallel for-over-range: divides [start, end) into contiguous chunks,
  * one per thread, runs s_pool_func on each chunk, waits for completion.
@@ -125,17 +148,19 @@ static void mpe_pool_parallel_for (int start, int end, mpe_pool_func_t func, voi
         func (data, start, end);
         return;
     }
+    /* DESPOT-2026-10-19: publish the whole phase under the mutex. The old
+     * code wrote these globals unlocked, so workers could observe a mix of
+     * the previous phase's func/range and the new phase's counters. */
+    pthread_mutex_lock (&s_pool_lock);
     s_pool_func = func;
     s_pool_data = data;
     s_pool_start = start;
     s_pool_end = end;
-    /* Total units (constant during the phase — workers compare claimed
-     * indices against this). Remaining units (decremented on completion —
-     * main thread waits for this to reach zero). */
+    /* Total units (claimed under the lock). Remaining units (decremented
+     * on completion — main thread waits for this to reach zero). */
     s_pool_tasks_total = n;
     s_pool_tasks_done = 0;
     s_pool_tasks_remaining = n;
-    pthread_mutex_lock (&s_pool_lock);
     pthread_cond_broadcast (&s_pool_work_cond);
     while (s_pool_tasks_remaining > 0) {
         pthread_cond_wait (&s_pool_done_cond, &s_pool_lock);

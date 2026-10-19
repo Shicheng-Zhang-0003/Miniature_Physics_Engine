@@ -244,7 +244,10 @@ int mpe_t_diag_naming (void) {
 
     /* Table full, and the report must say WHICH table with WHICH occupants. */
     mpe_module_desc_t fillers [MPE_MAX_TICK_MODULES + 1];
-    char names [MPE_MAX_TICK_MODULES + 1][16];
+    /* 32 bytes, not 16: "diag-fill-%02d" needs up to 10 + 11 + NUL for a
+     * large int, and GCC's -O1 format-truncation pass (used by the
+     * ASan/UBSan profile) rejects the 16-byte buffer with -Werror. */
+    char names [MPE_MAX_TICK_MODULES + 1][32];
     int full_at = -1;
     for (int i = 0; i <= MPE_MAX_TICK_MODULES; i++) {
         memset (&fillers [i], 0, sizeof (mpe_module_desc_t));
