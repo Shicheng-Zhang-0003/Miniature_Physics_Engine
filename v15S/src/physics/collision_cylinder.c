@@ -414,7 +414,6 @@ bool collision_cylinder_cube (rigidbody *cyl, rigidbody *cube, collision_data *o
                 if (axis_y < -1.0f)
                     axis_y = -1.0f;
                 float v_support = h * fabsf (axis_y) + r * sqrtf (fmaxf (0.0f, 1.0f - axis_y * axis_y));
-                float cyl_low = cyl -> position.y - v_support;
                 float cyl_high = cyl -> position.y + v_support;
                 /* The shortcut models the slab's near face as an infinite
                  * plane, so it is only valid when the cylinder actually
@@ -438,8 +437,21 @@ bool collision_cylinder_cube (rigidbody *cyl, rigidbody *cube, collision_data *o
                  * shortcut hijacks it whenever the near face is reached.
                  * Resting/impacting contacts (the gated regime) are
                  * unaffected — only deep embedment takes the long way out. */
-                int reaches_near_face = (up_sign >= 0.0f) ? (cyl_high >= plane_y - slop) : (cyl_low <= plane_y + slop);
-                if (reaches_near_face) { return collision_static_plane_cylinder (cube, cyl, plane_y, out, C); }
+                /* The shortcut models a SOLID-BELOW floor at the slab's near
+                 * face, which only exists when that axis face's outward
+                 * normal points UP (up_sign >= 0). An inverted slab
+                 * (up_sign < 0) calls the helper with plane_y at its world
+                 * BOTTOM face while the helper still emits normal (0,-1,0)
+                 * and penetration = plane_y - contact.y — a solid-below
+                 * model applied to a solid-above face. A cylinder below the
+                 * slab then matched with unbounded "penetration" and was
+                 * levitated up through the slab (probe: slab center y=10,
+                 * half-height 0.5 rotated 180° about X, cylinder at y=5 →
+                 * pen 5.0 m, y=5.1033 after one tick, vy=0). Inverted slabs
+                 * now fall through to the exact segment-OBB path below,
+                 * which picks the true closest face. */
+                bool top_face_shortcut = (up_sign >= 0.0f) && (cyl_high >= plane_y - slop);
+                if (top_face_shortcut) { return collision_static_plane_cylinder (cube, cyl, plane_y, out, C); }
             }
         }
     } vector3 e1 = simd_sub (cyl -> position, simd_scale (axis, h));
@@ -485,6 +497,9 @@ bool collision_cylinder_cube (rigidbody *cyl, rigidbody *cube, collision_data *o
     vector3 toward = simd_sub (obb_star, pt_star);
     float toward_len = vector3_length (toward);
     vector3 n0;
+    /* Outward escape direction for the interior case; also used below to
+     * place the face contact point. Unused when the axle point is outside. */
+    vector3 outward_escape = vector3_zero ();
     if (toward_len > 0.0001f) { n0 = simd_scale (toward, 1.0f / toward_len); } else {
         vector3 rel0 = simd_sub (pt_star, cube -> position);
         vector3 *axes0 = cube -> cached_axes;
@@ -494,9 +509,20 @@ bool collision_cylinder_cube (rigidbody *cyl, rigidbody *cube, collision_data *o
         float px = cube -> half_extensions.x - fabsf (l0x);
         float py = cube -> half_extensions.y - fabsf (l0y);
         float pz = cube -> half_extensions.z - fabsf (l0z);
-        if ((px < py) && (px < pz)) { n0 = simd_scale (axes0 [0], (l0x >= 0.0f) ? 1.0f : -1.0f); } else if (py < pz) {
-            n0 = simd_scale (axes0 [1], (l0y >= 0.0f) ? 1.0f : -1.0f);
-        } else { n0 = simd_scale (axes0 [2], (l0z >= 0.0f) ? 1.0f : -1.0f); }
+        if ((px < py) && (px < pz)) { outward_escape = simd_scale (axes0 [0], (l0x >= 0.0f) ? 1.0f : -1.0f); } else if (py < pz) {
+            outward_escape = simd_scale (axes0 [1], (l0y >= 0.0f) ? 1.0f : -1.0f);
+        } else { outward_escape = simd_scale (axes0 [2], (l0z >= 0.0f) ? 1.0f : -1.0f); }
+        /* TRUTH: manifold normal convention is A->B (see collision_solver:
+         * vn = dot(vb-va, n); A -= n*lambda). object_a is the cylinder and
+         * object_b the cube, so A->B points INTO the box, i.e. -outward —
+         * exactly as collision_sphere_cube's inside branch documents
+         * (normal = -outward; the 2026-09-26 flip to outward made vn>0 for
+         * approaching pairs and stopped every inside overlap from solving).
+         * The old cylinder code stored the OUTWARD escape direction here,
+         * so the solver drove the cylinder deeper into the cube instead of
+         * out (probe: cylinder at x=0.9 in half-extent-1 box moved to
+         * x=0.821). outward_escape is kept for the contact-position push. */
+        n0 = simd_scale (outward_escape, -1.0f);
     } out -> normal_vector = n0;
     {
         contact_point_data *cp = &out -> contacts [out -> contact_count++];
@@ -555,8 +581,8 @@ bool collision_cylinder_cube (rigidbody *cyl, rigidbody *cube, collision_data *o
                 sgn = (l0zc >= 0.0f) ? 1.0f : -1.0f;
                 loc = l0zc;
                 ext = cube -> half_extensions.z;
-            } float push = ext - sgn * loc;
-            if (isfinite (push)) { cp -> position = simd_add (obb_star, simd_scale (n0, push)); } else { cp -> position = obb_star; }
+            }             float push = ext - sgn * loc;
+            if (isfinite (push)) { cp -> position = simd_add (obb_star, simd_scale (outward_escape, push)); } else { cp -> position = obb_star; }
         } else { cp -> position = obb_star; }
     }
     /* Line support: cylinder lying on a face contacts along an interval,

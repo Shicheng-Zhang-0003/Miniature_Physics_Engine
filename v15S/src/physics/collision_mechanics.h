@@ -328,11 +328,24 @@ void collision_snapshot_friction_mu (collision_data *manifolds, int manifold_cou
 int collision_ccd_sweep_clamp (rigidbody *bodies, int body_count, float dt);
 int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt, float *time_remaining_out,
                                     const mpe_config_t *cfg, float *best_tois_out, unsigned char *hit_flags_out);
-/* Range-based CCD: process bodies [start, end) assuming outputs are
- * pre-initialized. Each body writes only to its own outputs/position, so
- * disjoint ranges are thread-safe. Per-pair margin: each body's sweep uses
- * only its own motion (no global max over all bodies). Used by the
- * multicore step path. */
+/* Symmetric two-phase CCD over bodies [start, end):
+ *   collision_ccd_toi_range  — phase 1: pure TOI search against the
+ *     tick-start snapshot; writes only its own best_tois/hit_flags slots.
+ *     Disjoint ranges may run concurrently (reads only).
+ *   collision_ccd_apply_range — phase 2: applies the recorded clamps;
+ *     must run AFTER phase 1 covered the whole body set (barrier). Reads
+ *     only its own recorded slots; writes only its own body.
+ * Per-pair margin: each body's sweep uses only its own motion (no global
+ * max over all bodies). Used by the multicore step path. */
+int collision_ccd_toi_range (rigidbody *bodies, int body_count, int start, int end,
+                             float dt, const mpe_config_t *cfg,
+                             float *best_tois_out, unsigned char *hit_flags_out);
+int collision_ccd_apply_range (rigidbody *bodies, int body_count, int start, int end,
+                               float dt, const mpe_config_t *cfg,
+                               float *time_remaining_out, const float *best_tois_in,
+                               const unsigned char *hit_flags_in);
+/* Single-range two-phase wrapper (serial). Concurrent use on other ranges
+ * is not safe; use the phase functions with a barrier for multicore. */
 int collision_ccd_sweep_clamp_range (rigidbody *bodies, int body_count, int start, int end,
                                      float dt, const mpe_config_t *cfg,
                                      bool record_remainder,

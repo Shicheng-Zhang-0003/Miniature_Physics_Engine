@@ -80,25 +80,26 @@ static float ccd_sphere_sweep_toi (vector3 dp, vector3 dv, float radius, float d
     if (!(toi < (double) dt)) { return -1.0f; }
     return (float) toi;
 }
-/* Range-based CCD clamp: processes bodies [start, end). Assumes
- * obstacle_margin is pre-computed (max tip speed over ALL bodies) and
- * output arrays are allocated by the caller. Each body writes only to its
- * own position/velocity/orientation and its own output slots, so disjoint
- * ranges are thread-safe. Returns the number of bodies clamped. */
-int collision_ccd_sweep_clamp_range (rigidbody *bodies, int body_count, int start, int end,
-                                     float dt, const mpe_config_t *C,
-                                     bool record_remainder,
-                                     float *time_remaining_out, float *best_tois_out,
-                                     unsigned char *hit_flags_out) {
+/* Phase 1 of the symmetric two-phase CCD sweep: pure time-of-impact search
+ * over bodies [start, end). Reads every body's tick-start pose and velocity;
+ * writes ONLY its own output slots (best_tois_out, hit_flags_out). No body
+ * is modified, so disjoint ranges are trivially thread-safe AND every TOI is
+ * computed against one identical snapshot: whether some body is clamped
+ * later can never change another body's TOI. This is what makes two bodies
+ * closing on each other both stop exactly at contact instead of the
+ * first-clamped body hiding the second's TOI from an interleaved pass.
+ * Returns the number of hits recorded. */
+int collision_ccd_toi_range (rigidbody *bodies, int body_count, int start, int end,
+                             float dt, const mpe_config_t *C,
+                             float *best_tois_out, unsigned char *hit_flags_out) {
     if ((!bodies) || (body_count <= 0) || (start < 0) || (end > body_count) || (start >= end) ||
-        (!(dt > 0.0f)) || !isfinite (dt) || !C) {
+        (!(dt > 0.0f)) || !isfinite (dt) || !C || !best_tois_out || !hit_flags_out) {
         return 0;
     }
-    int clamped = 0;
+    int hits = 0;
     for (int i = start; i < end; i++) {
         best_tois_out [i] = dt;
         hit_flags_out [i] = 0;
-        if (time_remaining_out) { time_remaining_out [i] = dt; }
         rigidbody *mover = &bodies [i];
         if ((mover -> static_state) || (mover -> is_sleeping) || (mover -> no_collide)) { continue; }
         /* Per-pair margin: a body's CCD sweep is driven by ITS OWN motion
@@ -270,14 +271,38 @@ int collision_ccd_sweep_clamp_range (rigidbody *bodies, int body_count, int star
                 }
             }
         } /* do_volumes */
-        /* Phase 1: record only (no move yet — symmetric two-phase). */
+        /* Record only (no move yet — symmetric two-phase). */
         if (hit && best_toi < dt && best_toi > 0.0f) {
             best_tois_out [i] = best_toi;
             hit_flags_out [i] = 1;
+            hits++;
         }
-        /* Phase 2: apply clamp immediately (within-range, disjoint bodies). */
-        if (record_remainder && hit_flags_out [i]) {
-            float toi = best_tois_out [i];
+    }
+    return hits;
+}
+/* Phase 2 of the symmetric two-phase CCD sweep: apply the recorded TOI
+ * clamp for bodies [start, end). MUST run only after phase 1 completed for
+ * the WHOLE body set (barrier): the TOIs were computed from tick-start
+ * poses and the mover's tick-start velocity is used here. Reads only its
+ * own recorded slots; writes only its own body pose/velocity/axes.
+ * Initialises time_remaining_out to dt for every body in range. Returns
+ * the number of bodies clamped. */
+int collision_ccd_apply_range (rigidbody *bodies, int body_count, int start, int end,
+                               float dt, const mpe_config_t *C,
+                               float *time_remaining_out, const float *best_tois_in,
+                               const unsigned char *hit_flags_in) {
+    if ((!bodies) || (body_count <= 0) || (start < 0) || (end > body_count) || (start >= end) ||
+        (!(dt > 0.0f)) || !isfinite (dt) || !C || !best_tois_in || !hit_flags_in) {
+        return 0;
+    }
+    int clamped = 0;
+    for (int i = start; i < end; i++) {
+        if (time_remaining_out) { time_remaining_out [i] = dt; }
+        if (!hit_flags_in [i]) { continue; }
+        rigidbody *mover = &bodies [i];
+        if ((mover -> static_state) || (mover -> is_sleeping) || (mover -> no_collide)) { continue; }
+        {
+            float toi = best_tois_in [i];
             if (!(toi > 0.0f) || !(toi < dt)) { continue; }
             vector3 v_pre = mover -> velocity;
             if (!isfinite (v_pre.x) || !isfinite (v_pre.y) || !isfinite (v_pre.z)) { continue; }
@@ -323,11 +348,37 @@ int collision_ccd_sweep_clamp_range (rigidbody *bodies, int body_count, int star
             } rigidbody_wake (mover);
             rigidbody_update_axes (mover);
             clamped++;
-            float rem = dt - toi;
-            time_remaining_out [i] = (rem > 0.0f) ? rem : 0.0f;
+            if (time_remaining_out) {
+                float rem = dt - toi;
+                time_remaining_out [i] = (rem > 0.0f) ? rem : 0.0f;
+            }
         }
     }
     return clamped;
+}
+/* Single-range compatibility sweep (two-phase within the range). NOT safe
+ * to call concurrently on another range: this range's phase 2 writes would
+ * race the other range's phase 1 reads. The multicore path calls
+ * collision_ccd_toi_range for every range, barrier, then
+ * collision_ccd_apply_range for every range. */
+int collision_ccd_sweep_clamp_range (rigidbody *bodies, int body_count, int start, int end,
+                                     float dt, const mpe_config_t *C,
+                                     bool record_remainder,
+                                     float *time_remaining_out, float *best_tois_out,
+                                     unsigned char *hit_flags_out) {
+    if ((!bodies) || (body_count <= 0) || (start < 0) || (end > body_count) || (start >= end) ||
+        (!(dt > 0.0f)) || !isfinite (dt) || !C || !best_tois_out || !hit_flags_out) {
+        return 0;
+    }
+    collision_ccd_toi_range (bodies, body_count, start, end, dt, C, best_tois_out, hit_flags_out);
+    if (!record_remainder) {
+        if (time_remaining_out) {
+            for (int i = start; i < end; i++) { time_remaining_out [i] = dt; }
+        }
+        return 0;
+    }
+    return collision_ccd_apply_range (bodies, body_count, start, end, dt, C, time_remaining_out,
+                                      best_tois_out, hit_flags_out);
 }
 int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt, float *time_remaining_out,
                                     const mpe_config_t *cfg, float *best_tois_out, unsigned char *hit_flags_out) {
@@ -358,13 +409,19 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
             return 0;
         }
     }
-    /* Delegate the per-body sweep (phase 1 TOI + phase 2 clamp) to the
-     * range function over [0, body_count). The range function initialises
-     * best_tois/hit_flags internally and applies clamps with disjoint writes
-     * per body. */
-    int clamped = collision_ccd_sweep_clamp_range (bodies, body_count, 0, body_count,
-                                                    dt, cfg, record_remainder,
-                                                    time_remaining_out, best_tois, hit_flags);
+    /* Two-phase over the full body set: every TOI is computed against the
+     * tick-start snapshot (phase 1), then every clamp is applied (phase 2).
+     * Symmetric pairs (two bodies closing on each other) both stop exactly
+     * at contact instead of the first-clamped body hiding the second's TOI
+     * from an interleaved pass. */
+    collision_ccd_toi_range (bodies, body_count, 0, body_count, dt, cfg, best_tois, hit_flags);
+    int clamped = 0;
+    if (record_remainder) {
+        clamped = collision_ccd_apply_range (bodies, body_count, 0, body_count, dt, cfg,
+                                             time_remaining_out, best_tois, hit_flags);
+    } else if (time_remaining_out) {
+        for (int k = 0; k < body_count; k++) { time_remaining_out [k] = dt; }
+    }
     if (use_heap) {
         free (best_tois);
         free (hit_flags);

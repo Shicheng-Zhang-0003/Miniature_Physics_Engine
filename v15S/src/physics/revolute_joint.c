@@ -849,6 +849,21 @@ void prismatic_apply_motor (prismatic_params *p, rigidbody *body_a, rigidbody *b
     vector3 drive_force = simd_scale (axis_world, desired_force);
     body_a -> force_accumulator = simd_sub (body_a -> force_accumulator, drive_force);
     body_b -> force_accumulator = simd_add (body_b -> force_accumulator, drive_force);
+    /* A force applied along the axis at an off-centre anchor also generates
+     * torque about each body's COM: tau_a = r_a x (-F), tau_b = r_b x F.
+     * The prismatic limit-impulse path already does this; the motor path
+     * applied the force at the COM only, so an anchored slider motor could
+     * not spin its bodies (the solver had to remove that torque every
+     * iteration as an unsolved error). */
+    vector3 r_a_motor = vector4_rotate_to_vector3 (body_a -> orientation, p -> anchor_a);
+    vector3 r_b_motor = vector4_rotate_to_vector3 (body_b -> orientation, p -> anchor_b);
+    body_a -> torque_accumulator = simd_sub (body_a -> torque_accumulator, vector3_cross (r_a_motor, drive_force));
+    body_b -> torque_accumulator = simd_add (body_b -> torque_accumulator, vector3_cross (r_b_motor, drive_force));
+    /* Direct accumulator writes must set the external-force flag too (see
+     * rb_apply_forces_perfect): the prismatic motor force must not be
+     * dropped by the analytic free-flight path. */
+    body_a -> ext_force_this_tick = 1;
+    body_b -> ext_force_this_tick = 1;
 } /* Fixed weld: point-to-point (same K-matrix as revolute) plus full angular
  * lock (kill all relative spin, not just off-axis). Deterministic, no bias
  * beyond the shared Baumgarte cap. */

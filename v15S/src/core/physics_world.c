@@ -251,10 +251,18 @@ static void mpe_parallel_solve_sweep (physics_world *world, int manifold_count, 
         int isl = manifold_island [m];
         if (isl >= 0) { isl_manifold_idx [isl_cursor [isl]++] = m; }
     }
-    /* Build active-island list (awake islands with manifolds). */
+    /* Build active-island list (awake islands with manifolds) in batches of
+     * MPE_MAX_POOL_THREADS. DESPOT-2026-10-19: the old code stopped filling
+     * at MPE_MAX_POOL_THREADS and solved only that prefix — with more than
+     * 8 independent awake islands (routine: >8 separated bodies on a floor)
+     * every island past the 8th was silently never solved, its bodies
+     * sinking until a lower-index island slept. It also read tasks[0]
+     * uninitialized when there were zero awake islands with manifolds
+     * (wild mpe_island_task_t on the stack -> crash in a settled scene).
+     * Batches keep the disjoint-write property (islands share no bodies). */
     mpe_island_task_t tasks [MPE_MAX_POOL_THREADS];
     int num_active = 0;
-    for (int isl = 0; isl < island_total && num_active < MPE_MAX_POOL_THREADS; isl++) {
+    for (int isl = 0; isl < island_total; isl++) {
         if (!world -> island_awake_flags [isl]) { continue; }
         if (isl_manifold_count [isl] <= 0) { continue; }
         tasks [num_active].world = world;
@@ -265,14 +273,22 @@ static void mpe_parallel_solve_sweep (physics_world *world, int manifold_count, 
         tasks [num_active].iter = iter;
         tasks [num_active].friction_only = friction_only;
         num_active++;
+        if (num_active == MPE_MAX_POOL_THREADS) {
+            mpe_pool_parallel_for (0, num_active, mpe_solve_island_range, tasks);
+            num_active = 0;
+        }
     }
-    if (num_active <= 1) {
-        /* Single island - solve serially. */
+    if (num_active == 0) { return; }
+    if (num_active == 1) {
+        /* Single island - solve serially. friction_only is passed through:
+         * the old hardcoded `false` ran full normal solves on this path
+         * where the multi-island/serial callers requested friction-only
+         * relaxation, over-solving contacts on one shape of scene. */
         for (int k = 0; k < tasks [0].manifold_count; k++) {
             int m = tasks [0].manifold_indices [k];
             if (!world -> manifold_awake [m]) { continue; }
-            mpe_step_resolve (world, &world -> manifolds [m], dt, false, iter, mpe_world_cfg (world));
-            mpe_step_resolve (world, &world -> manifolds [m], dt, false, iter + 1, mpe_world_cfg (world));
+            mpe_step_resolve (world, &world -> manifolds [m], dt, friction_only, iter, mpe_world_cfg (world));
+            mpe_step_resolve (world, &world -> manifolds [m], dt, friction_only, iter + 1, mpe_world_cfg (world));
         } return;
     }
     mpe_pool_parallel_for (0, num_active, mpe_solve_island_range, tasks);
@@ -296,10 +312,13 @@ static void mpe_integrate_range (void *data, int start, int end) {
         bool has_joint = (i < mpe_max_bodies) ? (s -> joint_membership [i] != 0) : false;
         bool contact_free = ((s -> world -> has_contact) ? (s -> world -> has_contact [i] == 0) : false);
         bool have_v0 = (s -> world -> tick_v0 && (s -> world -> tick_v0_capacity >= s -> world -> body_count));
-        bool free_flight = contact_free && !has_joint;
+        /* External force => constrained path: the analytic free-flight
+         * solution covers gravity+drag only and would drop the force. */
+        bool free_flight = contact_free && !has_joint && (ib -> ext_force_this_tick == 0);
         if (free_flight && !have_v0) { free_flight = false; }
         if (free_flight && have_v0) { ib -> velocity = s -> world -> tick_v0 [i]; }
         rb_integrate_position_exact (ib, step_dt, s -> cfg, free_flight);
+        ib -> ext_force_this_tick = 0; /* consumed for this tick */
         rigidbody_sanitize (ib);
     }
 }
@@ -318,10 +337,11 @@ static void mpe_parallel_integrate (physics_world *world, float dt, const mpe_co
             bool has_joint = (i < mpe_max_bodies) ? (joint_membership [i] != 0) : false;
             bool contact_free = ((world -> has_contact) ? (world -> has_contact [i] == 0) : false);
             bool have_v0 = (world -> tick_v0 && (world -> tick_v0_capacity >= world -> body_count));
-            bool free_flight = contact_free && !has_joint;
+            bool free_flight = contact_free && !has_joint && (ib -> ext_force_this_tick == 0);
             if (free_flight && !have_v0) { free_flight = false; }
             if (free_flight && have_v0) { ib -> velocity = world -> tick_v0 [i]; }
             rb_integrate_position_exact (ib, step_dt, cfg, free_flight);
+            ib -> ext_force_this_tick = 0; /* consumed for this tick */
             rigidbody_sanitize (ib);
         } return;
     }
@@ -333,27 +353,31 @@ static void mpe_parallel_integrate (physics_world *world, float dt, const mpe_co
     mpe_pool_parallel_for (0, n, mpe_integrate_range, &slice);
 }
 /* ---- Parallel CCD clamp ------------------------------------------------
- * Per body, disjoint writes to position/velocity/orientation and per-body
- * output arrays. Obstacle margin is computed serially (max reduction,
- * order-independent) then read-only during the sweep. Bitwise identical to
+ * Symmetric two-phase sweep. Phase 1 computes every TOI against the
+ * tick-start snapshot (bodies are read-only), then the pool returns (a
+ * barrier), then phase 2 applies every clamp (disjoint writes to
+ * position/velocity/orientation). Without the barrier, one thread's clamp
+ * (phase 2) raced another thread's TOI read (phase 1), and the
+ * interleaving decided which body stopped — the paranoia_ccd flake, and a
+ * tunneling hole for the body that was not clamped. Bitwise identical to
  * serial at any thread count. */
 typedef struct {
     physics_world *world;
-    int start;
-    int end;
     float dt;
     const mpe_config_t *cfg;
-    bool record_remainder;
-    float *time_remaining_out;
-    float *best_tois_out;
-    unsigned char *hit_flags_out;
 } mpe_ccd_slice_t;
-static void mpe_ccd_range (void *data, int start, int end) {
+static void mpe_ccd_toi_range (void *data, int start, int end) {
     mpe_ccd_slice_t *s = (mpe_ccd_slice_t *) data;
-    collision_ccd_sweep_clamp_range (s -> world -> bodies, s -> world -> body_count,
-                                      start, end, s -> dt, s -> cfg,
-                                      s -> record_remainder,
-                                      s -> time_remaining_out, s -> best_tois_out, s -> hit_flags_out);
+    collision_ccd_toi_range (s -> world -> bodies, s -> world -> body_count, start, end,
+                             s -> dt, s -> cfg,
+                             s -> world -> ccd_best_tois, s -> world -> ccd_hit_flags);
+}
+static void mpe_ccd_apply_range (void *data, int start, int end) {
+    mpe_ccd_slice_t *s = (mpe_ccd_slice_t *) data;
+    collision_ccd_apply_range (s -> world -> bodies, s -> world -> body_count, start, end,
+                               s -> dt, s -> cfg,
+                               s -> world -> ccd_time_remaining, s -> world -> ccd_best_tois,
+                               s -> world -> ccd_hit_flags);
 }
 static void mpe_parallel_ccd_sweep (physics_world *world, float dt, const mpe_config_t *cfg) {
     int n = world -> body_count;
@@ -368,16 +392,12 @@ static void mpe_parallel_ccd_sweep (physics_world *world, float dt, const mpe_co
         collision_ccd_sweep_clamp_world (world, dt);
         return;
     }
-    bool record_remainder = (world -> ccd_time_remaining != NULL);
     mpe_ccd_slice_t slice;
     slice.world = world;
     slice.dt = dt;
     slice.cfg = cfg;
-    slice.record_remainder = record_remainder;
-    slice.time_remaining_out = world -> ccd_time_remaining;
-    slice.best_tois_out = world -> ccd_best_tois;
-    slice.hit_flags_out = world -> ccd_hit_flags;
-    mpe_pool_parallel_for (0, n, mpe_ccd_range, &slice);
+    mpe_pool_parallel_for (0, n, mpe_ccd_toi_range, &slice);
+    mpe_pool_parallel_for (0, n, mpe_ccd_apply_range, &slice);
 } /* ---- Parallel narrowphase --------------------------------------------
  * Per pair, pre-assigned manifold slot (slot == pair index). Each pair
  * writes to manifolds[slot], manifold_awake[slot], and has_contact[a/b]
@@ -453,19 +473,33 @@ static void mpe_narrowphase_range (void *data, int start, int end) {
         }
     }
 }
-static void mpe_parallel_narrowphase (physics_world *world, int pair_count, float dt, const mpe_config_t *cfg) {
-    if ((pair_count <= 0) || (!world) || (!world -> pair_buffer) || (!world -> manifolds) || (!world -> manifold_awake)) {
+/* Grow the manifold arrays (all four, atomically per step) until at least
+ * `needed` slots exist, or the hard ceiling is reached. The step path must
+ * call this BEFORE it memsets/processes pair_count slots: the previous
+ * single grow attempt ran inside the parallel narrowphase, after the
+ * caller had already memset pair_count slots regardless of capacity. */
+static int physics_world_ensure_manifold_capacity (physics_world *world, int needed) {
+    if (!world) { return -1; }
+    while (world -> manifold_capacity < needed) {
+        if (physics_world_grow_manifolds (world) != 0) { return -1; }
+    }
+    return 0;
+}
+static void mpe_parallel_narrowphase (physics_world *world, int pair_count, int slot_count, float dt,
+                                      const mpe_config_t *cfg) {
+    if ((pair_count <= 0) || (slot_count <= 0) || (!world) || (!world -> pair_buffer) || (!world -> manifolds) ||
+        (!world -> manifold_awake)) {
         return;
     }
-    /* Ensure manifold capacity for all pair slots (parallel path writes to
-     * slot == pair index, so every pair needs a slot). */
-    if (pair_count > world -> manifold_capacity) {
-        if (physics_world_grow_manifolds (world) != 0) { return; }
-    }
+    if (slot_count > world -> manifold_capacity) { slot_count = world -> manifold_capacity; }
     mpe_pool_init ();
     int threads = s_pool_threads;
-    if (threads <= 1) {
-        /* Serial path: use the original function for exact behaviour. */
+    /* The parallel path writes each pair's manifold at slot == pair index,
+     * so it is only valid when one zeroed slot exists per pair. When the
+     * pair count exceeds the growable capacity, fall back to the serial
+     * compactor: it grows per collision, counts every collided overflow
+     * pair, and never writes past capacity. */
+    if ((threads <= 1) || (slot_count < pair_count)) {
         int manifold_count = 0;
         for (int p = 0; p < pair_count; p++) {
             int index_a = world -> pair_buffer [p].object_index_a;
@@ -476,13 +510,9 @@ static void mpe_parallel_narrowphase (physics_world *world, int pair_count, floa
             if ((body_a -> is_sleeping) && (body_b -> is_sleeping)) { continue; }
             physics_world_process_pair (world, index_a, index_b, dt, &manifold_count);
         }
-        /* Serial path counts only collided pairs; parallel path below sets
-         * manifold_count = pair_count. The solver checks manifold_awake so
-         * results are identical; only the slot count differs. To keep the
-         * slot count identical across thread counts, the caller sets
-         * manifold_count = pair_count after the parallel call. For the
-         * serial path, manifold_count is whatever physics_world_process_pair
-         * produced — this is the MPE_THREADS=1 baseline. */
+        /* The serial compactor fills [0, k); the caller zeroed every slot
+         * up to slot_count, so slots [k, slot_count) stay empty and are
+         * awake-skipped exactly like non-collided parallel slots. */
         (void) manifold_count;
         return;
     }
@@ -1495,13 +1525,30 @@ void physics_world_step (physics_world *world, float dt) {
      * and object pointers. The parallel range zeroes per-slot; the serial
      * fallback (physics_world_process_pair) does not, so zero up front for
      * both paths. Bitwise identical since only collided pairs are written
-     * afterwards and empty slots are awake-skipped below. */
-    if (pair_count > 0) {
-        memset (world -> manifolds, 0, (size_t) pair_count * sizeof (collision_data));
-        memset (world -> manifold_awake, 0, (size_t) pair_count);
+     * afterwards and empty slots are awake-skipped below.
+     * DESPOT-2026-10-19: capacity is grown to the pair count BEFORE this
+     * memset. The old code memset pair_count slots and set manifold_count =
+     * pair_count regardless of capacity, so a tick with more broadphase
+     * pairs than manifold slots (biobuzz: 1141 pairs, 1024 slots) wrote
+     * 638960 bytes past a 573440-byte heap block inside the step itself —
+     * before mpe_parallel_narrowphase ever attempted a grow. That single
+     * omission was the ASan heap-buffer-overflow and the glibc "free():
+     * invalid pointer" abort in the MFS suite. */
+    int slot_count = pair_count;
+    if (slot_count > 0) {
+        if (physics_world_ensure_manifold_capacity (world, slot_count) != 0) {
+            /* Growable ceiling reached: the serial compactor handles the
+             * tail and counts every collided overflow pair. */
+            slot_count = world -> manifold_capacity;
+            if (slot_count < 0) { slot_count = 0; }
+        }
+        if (slot_count > 0) {
+            memset (world -> manifolds, 0, (size_t) slot_count * sizeof (collision_data));
+            memset (world -> manifold_awake, 0, (size_t) slot_count);
+        }
     }
-    mpe_parallel_narrowphase (world, pair_count, dt, step_cfg);
-    manifold_count = pair_count;
+    mpe_parallel_narrowphase (world, pair_count, slot_count, dt, step_cfg);
+    manifold_count = slot_count;
     /* Sleep-wake revisit fixpoint: pairs skipped above as both-asleep get
      * re-processed if either endpoint woke during the main loop (a woken
      * body with no manifold free-falls the whole tick otherwise). Each
@@ -1597,7 +1644,11 @@ void physics_world_step (physics_world *world, float dt) {
     for (int i = 0; i < world -> body_count; i++) {
         rigidbody *rb = &world -> bodies [i];
         if ((rb -> static_state) || (rb -> is_sleeping) || (rb -> kinematic)) { continue; }
-        rb_apply_forces_perfect (rb, simd_scale (gravity, rb -> mass));
+        /* Gravity bypasses rb_apply_forces_perfect: it is not an external
+         * force for the ext_force_this_tick gate (the analytic free-flight
+         * path already integrates gravity exactly; only non-gravity forces
+         * must force the constrained path). */
+        rb -> force_accumulator = simd_add (rb -> force_accumulator, simd_scale (gravity, rb -> mass));
     }
     /* Deterministic retention factors (never libm pow: see det_math.h).
      *

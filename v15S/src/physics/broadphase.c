@@ -73,7 +73,7 @@ static void broadphase_simd_selfcheck (void) {
         vector3 m1 = vector3_scaling (vs_a [k], 0.333f);
         vector3 m2 = simd_scale (vs_a [k], 0.333f);
         vector3 c1 = vector3_cross (vs_a [k], vs_b [k]);
-        vector3 c2 = vector3_cross (vs_a [k], vs_b [k]);
+        vector3 c2 = simd_cross (vs_a [k], vs_b [k]);
         if ((memcmp (&s1, &s2, sizeof (vector3)) != 0) || (memcmp (&d1, &d2, sizeof (vector3)) != 0) ||
             (memcmp (&m1, &m2, sizeof (vector3)) != 0) || (memcmp (&c1, &c2, sizeof (vector3)) != 0)) {
             fprintf (stderr, "[mpe] SIMD MISMATCH: simd op != scalar (k=%d, scalar path kept)\n", k);
