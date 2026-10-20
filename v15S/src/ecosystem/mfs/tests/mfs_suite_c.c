@@ -1800,6 +1800,18 @@ int mfs_t_hive_shot (void) {
         MFS_CHECK (t_ptr, ftc_last_shot_params (&w, &lp, &le) == 0);
         MFS_INFO ("last shot power=%.2f elev=%.1f", (double) lp, (double) le);
         MFS_CHECK (t_ptr, fabsf (lp - 0.65f) < 1e-4f && fabsf (le - 70.0f) < 1e-4f);
+        /* Live aim mirrors the fired shot (the predictor reads THIS), and
+         * clamps exactly like ftc_shoot_aimed. */
+        float ap = 0.0f, ae = 0.0f;
+        MFS_CHECK (t_ptr, ftc_aim_params_get (&w, &ap, &ae) == 0);
+        MFS_CHECK (t_ptr, fabsf (ap - 0.65f) < 1e-4f && fabsf (ae - 70.0f) < 1e-4f);
+        MFS_CHECK (t_ptr, ftc_aim_params_set (&w, 5.0f, 95.0f) == 0);
+        MFS_CHECK (t_ptr, ftc_aim_params_get (&w, &ap, &ae) == 0);
+        MFS_CHECK (t_ptr, fabsf (ap - 1.0f) < 1e-4f && fabsf (ae - 80.0f) < 1e-4f);
+        MFS_CHECK (t_ptr, ftc_aim_params_set (&w, 0.0f, 0.0f) == 0);
+        MFS_CHECK (t_ptr, ftc_aim_params_get (&w, &ap, &ae) == 0);
+        MFS_CHECK (t_ptr, fabsf (ap - 0.3f) < 1e-4f && fabsf (ae - 20.0f) < 1e-4f);
+        MFS_CHECK (t_ptr, ftc_aim_params_set (&w, 0.65f, 70.0f) == 0);
     }
     int fail = 0;
     for (int k = 0; k < 300 && !fail; k++) {

@@ -38,11 +38,15 @@ typedef struct {
      * registry (56 staged + headroom; the arcade 16-slot registry is
      * untouched) + league state. Zero-init via calloc; ids prune on miss. */
     biobuzz_state_t bb;
-    /* Last aimed-shot params for the trajectory predictor (defaults: full
-     * power, stock elevation — the predictor previews those until aimed
-     * shots exist). Set by ftc_shoot_aimed only. */
+    /* Last aimed-shot params (defaults: full power, stock elevation). */
     float last_shot_power;
     float last_shot_elev;
+    /* Live aim the NEXT shot will use. The gamepad updates this every tick
+     * (trigger charge + right-stick elevation) and the trajectory predictor
+     * reads it, so the purple line tracks the aim instead of the previous
+     * shot. ftc_shoot_* also mirror the fired values here. */
+    float aim_power;
+    float aim_elev;
 } ftc_fleet_t;
 void *ftc_fleet_create (void) {
     ftc_fleet_t *f = (ftc_fleet_t *) calloc (1, sizeof (ftc_fleet_t));
@@ -59,6 +63,8 @@ void *ftc_fleet_create (void) {
     /* Predictor defaults: full power, stock elevation. */
     f -> last_shot_power = 1.0f;
     f -> last_shot_elev = 50.0f;
+    f -> aim_power = 1.0f;
+    f -> aim_elev = 50.0f;
     return f;
 }
 void ftc_fleet_destroy (void *fleet_state) {
@@ -193,6 +199,8 @@ int ftc_fleet_clear (struct physics_world *world) {
     memset (&f -> bb, 0, sizeof (f -> bb));
     f -> last_shot_power = 1.0f;
     f -> last_shot_elev = 50.0f;
+    f -> aim_power = 1.0f;
+    f -> aim_elev = 50.0f;
     return 0;
 }
 /* Controlled-robot selection (per world; terminal `ftc select`, gamepad
@@ -367,23 +375,37 @@ int ftc_eject (struct physics_world *world, int index) {
     return intake_eject (world, ch -> velocity, fwd, r -> intake_balls, &r -> intake_count);
 }
 int ftc_shoot (struct physics_world *world, int index) {
-    ftc_robot *r = fleet_robot_at (fleet_of (world), index);
+    ftc_fleet_t *f = fleet_of (world);
+    ftc_robot *r = fleet_robot_at (f, index);
     if (!world || !r) { return -1; }
     rigidbody *ch = fleet_chassis (world, r);
     if (!ch) { return -1; }
     int id = intake_shoot (world, ch -> position, ch -> orientation, ch -> velocity, r -> intake_balls,
                            &r -> intake_count);
-    if (id >= 0) { fprintf (stderr, "[bucketball] fired ball id=%d\n", id); }
+    if (id >= 0) {
+        fprintf (stderr, "[bucketball] fired ball id=%d\n", id);
+        if (f) { f -> aim_power = 1.0f; f -> aim_elev = 50.0f; }
+    }
     return id;
 }
 int ftc_shoot_power (struct physics_world *world, int index, float power) {
-    ftc_robot *r = fleet_robot_at (fleet_of (world), index);
+    ftc_fleet_t *f = fleet_of (world);
+    ftc_robot *r = fleet_robot_at (f, index);
     if (!world || !r) { return -1; }
     rigidbody *ch = fleet_chassis (world, r);
     if (!ch) { return -1; }
     int id = intake_shoot_power (world, ch -> position, ch -> orientation, ch -> velocity, r -> intake_balls,
                                  &r -> intake_count, power);
-    if (id >= 0) { fprintf (stderr, "[bucketball] fired ball id=%d power=%.2f\n", id, power); }
+    if (id >= 0) {
+        fprintf (stderr, "[bucketball] fired ball id=%d power=%.2f\n", id, power);
+        if (f) {
+            float ap = isfinite (power) ? power : 1.0f;
+            if (ap < 0.3f) { ap = 0.3f; }
+            if (ap > 1.0f) { ap = 1.0f; }
+            f -> aim_power = ap;
+            f -> aim_elev = 50.0f;
+        }
+    }
     return id;
 }
 int ftc_shoot_aimed (struct physics_world *world, int index, float power, float elev_deg) {
@@ -405,6 +427,8 @@ int ftc_shoot_aimed (struct physics_world *world, int index, float power, float 
         if (f) {
             f -> last_shot_power = power;
             f -> last_shot_elev = elev_deg;
+            f -> aim_power = power;
+            f -> aim_elev = elev_deg;
         }
     }
     return id;
@@ -414,6 +438,34 @@ int ftc_last_shot_params (struct physics_world *world, float *power_out, float *
     if (!world || !f) { return -1; }
     if (power_out) { *power_out = f -> last_shot_power; }
     if (elev_out) { *elev_out = f -> last_shot_elev; }
+    return 0;
+}
+/* Live aim (the shot the controls would fire now). The gamepad writes the
+ * trigger charge + stick elevation every tick so the trajectory predictor's
+ * purple line matches the actual shot: before this, the line previewed the
+ * LAST shot while the analog trigger fired a different power ("the motor is
+ * running out of battery"). Clamps exactly like ftc_shoot_aimed; a
+ * non-finite value is ignored (keeps the stored aim). */
+int ftc_aim_params_set (struct physics_world *world, float power, float elev_deg) {
+    ftc_fleet_t *f = fleet_of (world);
+    if (!world || !f) { return -1; }
+    if (isfinite (power)) {
+        if (power < 0.3f) { power = 0.3f; }
+        if (power > 1.0f) { power = 1.0f; }
+        f -> aim_power = power;
+    }
+    if (isfinite (elev_deg)) {
+        if (elev_deg < 20.0f) { elev_deg = 20.0f; }
+        if (elev_deg > 80.0f) { elev_deg = 80.0f; }
+        f -> aim_elev = elev_deg;
+    }
+    return 0;
+}
+int ftc_aim_params_get (struct physics_world *world, float *power_out, float *elev_out) {
+    ftc_fleet_t *f = fleet_of (world);
+    if (!world || !f) { return -1; }
+    if (power_out) { *power_out = f -> aim_power; }
+    if (elev_out) { *elev_out = f -> aim_elev; }
     return 0;
 }
 /* Suspended bucket: a miniature walled field pad (floor + 4 walls, open

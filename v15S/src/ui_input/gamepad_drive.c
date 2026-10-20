@@ -44,7 +44,11 @@ static int s_prev_a = 0;
 static int s_prev_y = 0;
 static int s_prev_b = 0;
 static int s_prev_lt = 0;
-static int s_prev_rt = 0;
+/* RT charge: peak trigger held, fired on release so the analog value the
+ * player chose is the value that fires (press-edge sampling used to fire at
+ * the first frame over 0.5, i.e. ~60% power — the "dying battery" shot). */
+static int s_rt_charging = 0;
+static float s_rt_charge_peak = 1.0f;
 static int s_was_commanding = 0;
 static int s_active = 0;
 static int s_reported_stage = -1;
@@ -317,35 +321,47 @@ void gamepad_drive_tick (void) {
             (int (*) (struct physics_world *, int, float)) gpd_sym ("ftc_shoot_power");
         int (*s_shoot_aim) (struct physics_world *, int, float, float) =
             (int (*) (struct physics_world *, int, float, float)) gpd_sym ("ftc_shoot_aimed");
+        int (*s_aim_set) (struct physics_world *, float, float) =
+            (int (*) (struct physics_world *, float, float)) gpd_sym ("ftc_aim_params_set");
         int (*s_eject) (struct physics_world *, int) =
             (int (*) (struct physics_world *, int)) gpd_sym ("ftc_eject");
         physics_world *wg = physics_world_get_primary ();
         int lt_now = (lt > 0.3f) ? 1 : 0; /* LT: hold = intake, release = off */
         if (lt_now && !s_prev_lt && s_set && wg) { s_set (wg, sel, 1); }
         if (!lt_now && s_prev_lt && s_set && wg) { s_set (wg, sel, 0); }
-        /* RT: analog power — the trigger value at the press edge scales
-         * the shot (soft lobs for hive mouths, full for range). Elevation
+        /* RT: pull to charge, RELEASE to fire (soft lobs for hive mouths,
+         * full for range). The old press-edge fire sampled the trigger at
+         * the first frame over 0.5, so a fast pull fired at ~60% power while
+         * the purple line previewed the previous full-power shot. Charging
+         * holds the PEAK trigger depth and the live aim is published every
+         * tick (ftc_aim_params_set), so the line matches the shot. Elevation
          * rides the right stick Y (up = steeper, 50 deg centred, 20..80):
-         * right-X still rotates, so aiming is twin-stick. Older bundles
-         * fall back down the chain (aimed -> power -> full). Non-finite
-         * trigger reads never fire (pre-existing s_prev edge semantics
-         * preserved exactly). */
+         * right-X still rotates, so aiming is twin-stick. Older bundles fall
+         * back down the chain (aimed -> power -> full). */
         float ry = s_pad_axis ? s_pad_axis (&s_pad, gamepad_axis_right_y) : 0.0f;
         float elev = 50.0f - 30.0f * ry;
         if (!(elev >= 20.0f) || !(elev <= 80.0f)) { elev = 50.0f; }
-        if (rt > 0.5f && rt <= 1.0f && !s_prev_rt && wg) {
-            if (s_shoot_aim) { s_shoot_aim (wg, sel, rt, elev); }
-            else if (s_shoot_pwr) { s_shoot_pwr (wg, sel, rt); }
-            else if (s_shoot) { s_shoot (wg, sel); }
+        if (rt > 0.2f) {
+            if (!s_rt_charging) { s_rt_charging = 1; s_rt_charge_peak = rt; }
+            else if (rt > s_rt_charge_peak) { s_rt_charge_peak = rt; }
+        }
+        if (s_aim_set && wg) { s_aim_set (wg, s_rt_charge_peak, elev); }
+        if (s_rt_charging && rt <= 0.2f) {
+            s_rt_charging = 0;
+            if (s_rt_charge_peak < 0.3f) { s_rt_charge_peak = 0.3f; }
+            if (s_shoot_aim && wg) { s_shoot_aim (wg, sel, s_rt_charge_peak, elev); }
+            else if (s_shoot_pwr && wg) { s_shoot_pwr (wg, sel, s_rt_charge_peak); }
+            else if (s_shoot && wg) { s_shoot (wg, sel); }
         }
         if (a_now && !s_prev_a && s_toggle && wg) { s_toggle (wg, sel); }
         if (y_now && !s_prev_y && wg) {
+            s_rt_charge_peak = 1.0f;
+            if (s_aim_set) { s_aim_set (wg, 1.0f, elev); }
             if (s_shoot_aim) { s_shoot_aim (wg, sel, 1.0f, elev); }
             else if (s_shoot) { s_shoot (wg, sel); }
         }
         if (b_now && !s_prev_b && s_eject && wg) { s_eject (wg, sel); }
         s_prev_lt = lt_now;
-        s_prev_rt = (rt > 0.5f) ? 1 : 0;
         s_prev_a = a_now;
         s_prev_y = y_now;
         s_prev_b = b_now;

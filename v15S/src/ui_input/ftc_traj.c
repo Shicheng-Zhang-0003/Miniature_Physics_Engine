@@ -74,6 +74,8 @@ static int s_npts = 0;
 /* cache key (the aim the CURRENT prediction was started from) */
 static vector3 s_key_pos;
 static float s_key_yaw_deg = 0.0f;
+static float s_key_power = 1.0f;
+static float s_key_elev = 50.0f;
 static int s_key_carried = -1;
 static int s_have_key = 0;
 /* amortisation state */
@@ -121,7 +123,7 @@ static int ftrj_is_static (const rigidbody *b) {
 }
 /* (Re)start a prediction: rebuild the throwaway world from the current aim and
  * reset the tick cursor. Returns the ball body index, or -1. */
-static int ftrj_begin (physics_world *w, ftc_robot *r, rigidbody *ch) {
+static int ftrj_begin (physics_world *w, ftc_robot *r, rigidbody *ch, float lp, float le) {
     if (s_pred_live) { physics_world_cleanup (&s_pred); s_pred_live = 0; }
     physics_world_init (&s_pred);
     constraint_pool_init (&s_pred);
@@ -170,26 +172,20 @@ static int ftrj_begin (physics_world *w, ftc_robot *r, rigidbody *ch) {
     pb -> friction_static = ball -> friction_static;
     pb -> friction_kinetic = ball -> friction_kinetic;
     /* Launch state from the SAME helpers the shooter uses (inherit chassis
-     * vel). Aimed parameters come from the last shot (full-power 50 deg
-     * until aimed shots exist), resolved with fallback so older bundles
-     * keep previewing the stock lob. */
+     * vel), with the live aim (power/elevation) resolved by the caller so
+     * the purple line tracks the gamepad trigger/stick instead of the last
+     * fired shot. */
     intake_launch_state st;
-    /* Resolved by the caller (ftrj_begin is static; it re-resolves via the
-     * symbol so it stays self-contained). */
     void (*p_launch) (vector3, vector4, vector3, intake_launch_state *) =
         (void (*) (vector3, vector4, vector3, intake_launch_state *)) ftrj_sym ("intake_launch_state_compute");
     void (*p_launch_e) (vector3, vector4, vector3, float, intake_launch_state *) =
         (void (*) (vector3, vector4, vector3, float, intake_launch_state *)) ftrj_sym (
             "intake_launch_state_compute_elev");
-    int (*p_params) (struct physics_world *, float *, float *) =
-        (int (*) (struct physics_world *, float *, float *)) ftrj_sym ("ftc_last_shot_params");
     if (!p_launch) {
         physics_world_cleanup (&s_pred);
         s_pred_live = 0;
         return -1;
     }
-    float lp = 1.0f, le = 50.0f;
-    if (p_params && w) { p_params (w, &lp, &le); }
     if (!(lp >= 0.3f) || !(lp <= 1.0f)) { lp = 1.0f; }
     if (!(le >= 20.0f) || !(le <= 80.0f)) { le = 50.0f; }
     if (p_launch_e && (lp != 1.0f || le != 50.0f)) {
@@ -243,26 +239,49 @@ void ftc_traj_update (float frame_delta_time) {
     rigidbody *ch = &w -> bodies [r -> chassis_body];
     vector3 fwd = vector4_rotate_to_vector3 (ch -> orientation, (vector3) {0.0f, 0.0f, 1.0f});
     float yaw_deg = atan2f (fwd.z, fwd.x) * 57.29578f;
+    /* Live aim: the gamepad writes trigger charge + stick elevation every
+     * tick, so the line previews the NEXT shot. Fall back to the last fired
+     * shot for older bundles. */
+    float lp = 1.0f, le = 50.0f;
+    int (*p_aim) (struct physics_world *, float *, float *) =
+        (int (*) (struct physics_world *, float *, float *)) ftrj_sym ("ftc_aim_params_get");
+    int (*p_last) (struct physics_world *, float *, float *) =
+        (int (*) (struct physics_world *, float *, float *)) ftrj_sym ("ftc_last_shot_params");
+    if (p_aim) {
+        if (p_aim (w, &lp, &le) != 0) { lp = 1.0f; le = 50.0f; }
+    } else if (p_last && p_last (w, &lp, &le) != 0) {
+        lp = 1.0f; le = 50.0f;
+    }
+    if (!(lp >= 0.3f) || !(lp <= 1.0f)) { lp = 1.0f; }
+    if (!(le >= 20.0f) || !(le <= 80.0f)) { le = 50.0f; }
     /* Does the current aim differ enough from the one the running prediction
      * was started from to be worth restarting? */
     int want_restart = 1;
+    int aim_changed = 0;
     if (s_have_key && s_pred_live) {
         float dyaw = fabsf (yaw_deg - s_key_yaw_deg);
         if (dyaw > 180.0f)
             dyaw = 360.0f - dyaw;
         float dp = vector3_length (vector3_subtraction (ch -> position, s_key_pos));
-        want_restart = (dyaw > FTRJ_HEADING_EPS_DEG || dp > FTRJ_POS_EPS || s_key_carried != r -> intake_count);
+        int pose_changed =
+            (dyaw > FTRJ_HEADING_EPS_DEG || dp > FTRJ_POS_EPS || s_key_carried != r -> intake_count);
+        aim_changed = (fabsf (lp - s_key_power) > 0.02f || fabsf (le - s_key_elev) > 0.5f);
+        want_restart = (pose_changed || aim_changed);
     }
     if (want_restart) {
         /* Rate-limit restarts: a prediction takes ~0.2 s to draw, so a faster
          * trigger would starve it (this is what made the first version
-         * recompute every single frame). If the cooldown is still running we
-         * KEEP ADVANCING the current prediction instead of freezing it. */
-        if (!s_pred_live || s_since_restart >= FTRJ_RESTART_COOLDOWN) {
-            int pi = ftrj_begin (w, r, ch);
+         * recompute every single frame). Aim changes are user intent, so they
+         * use a shorter cooldown than pose changes. If the cooldown is still
+         * running we KEEP ADVANCING the current prediction. */
+        float cooldown = aim_changed ? 0.12f : FTRJ_RESTART_COOLDOWN;
+        if (!s_pred_live || s_since_restart >= cooldown) {
+            int pi = ftrj_begin (w, r, ch, lp, le);
             s_have_key = (pi >= 0);
             s_key_pos = ch -> position;
             s_key_yaw_deg = yaw_deg;
+            s_key_power = lp;
+            s_key_elev = le;
             s_key_carried = r -> intake_count;
         }
     }

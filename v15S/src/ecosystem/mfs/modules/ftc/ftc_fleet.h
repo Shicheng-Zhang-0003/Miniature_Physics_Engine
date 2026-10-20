@@ -72,9 +72,14 @@ int ftc_shoot_power (struct physics_world *world, int index, float power);
  * spots at any power (proven by trajectory), so regulation hive play
  * needs the angle too. Records params for the trajectory predictor. */
 int ftc_shoot_aimed (struct physics_world *world, int index, float power, float elev_deg);
-/* Last aimed-shot params (defaults 1.0 / 50.0): what the predictor
- * previews. Returns 0 ok, -1 no fleet. */
+/* Last aimed-shot params (defaults 1.0 / 50.0). Returns 0 ok, -1 no fleet. */
 int ftc_last_shot_params (struct physics_world *world, float *power_out, float *elev_out);
+/* Live aim for the NEXT shot (gamepad trigger charge + right-stick
+ * elevation, terminal shot params). The trajectory predictor previews THIS,
+ * not the previous shot, so the purple line cannot disagree with an analog
+ * trigger power. Clamped like ftc_shoot_aimed. 0 ok, -1 no fleet. */
+int ftc_aim_params_set (struct physics_world *world, float power, float elev_deg);
+int ftc_aim_params_get (struct physics_world *world, float *power_out, float *elev_out);
 int ftc_bucket_spawn (struct physics_world *world, float x, float y, float z);
 int ftc_bucket_clear (struct physics_world *world);
 /* Totals: carried (CONTROLLED robot), tracked balls, scored, bucket active. Any out
