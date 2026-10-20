@@ -52,6 +52,11 @@ static void app_activate (GApplication *app, gpointer user_data) {
     setvbuf (stderr, NULL, _IONBF, 0);
     printf ("[GTK4] app_activate\n");
     fflush (stdout);
+    /* Bind the Wayland managers before the event loop starts handling input.
+     * The GTK4 path previously reached this lazily on the first click, which
+     * meant a wl_display_roundtrip() ran inside a GTK pointer handler. The
+     * GTK3 path below already had this call; the live GTK4 path did not. */
+    mouse_lock_init ();
     /* DESPOT-2026-09-29: config first, scene second.
      *
      * when_realised() below calls scene_init_default(), and body materials are

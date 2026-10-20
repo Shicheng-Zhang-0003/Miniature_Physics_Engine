@@ -126,6 +126,10 @@ static struct zwp_relative_pointer_v1 *mpe_rel_ptr = NULL;
  * the unbounded deltas that confinement would otherwise clip. */
 static struct zwp_pointer_constraints_v1 *mpe_pc_manager = NULL;
 static struct zwp_locked_pointer_v1 *mpe_locked_ptr = NULL;
+/* Surface the live lock belongs to. A constraint is per-surface; after a
+ * window rebuild the old object must not be reused (or the new surface
+ * silently gets no lock). */
+static GdkSurface *mpe_lock_surface = NULL;
 static int mpe_locked_active = 0;
 /* Accumulated relative motion since the last drain. Written from the
  * Wayland dispatch (GDK's queue, main thread) and read from the GTK
@@ -191,13 +195,41 @@ void mouse_lock_diagnostics_reset (void) {
 static const struct zwp_relative_pointer_v1_listener mpe_rel_listener = {
     mpe_rel_handle_motion,
 };
+/* The lock is asynchronous: request success only means the object exists.
+ * Track the compositor's locked/unlocked events so diagnostics and
+ * reacquire logic reflect the ACTUAL confinement state. A PERSISTENT lock
+ * may reactivate after unlock; a ONESHOT lock must be recreated. We use
+ * PERSISTENT and recreate only when the object is gone. */
+static void mpe_locked_handle_locked (void *data, struct zwp_locked_pointer_v1 *lp) {
+    (void) data;
+    (void) lp;
+    mpe_locked_active = 1;
+}
+static void mpe_locked_handle_unlocked (void *data, struct zwp_locked_pointer_v1 *lp) {
+    (void) data;
+    (void) lp;
+    mpe_locked_active = 0;
+}
+static const struct zwp_locked_pointer_v1_listener mpe_locked_listener = {
+    mpe_locked_handle_locked,
+    mpe_locked_handle_unlocked,
+};
 static void mpe_rel_reg_global (void *data, struct wl_registry *registry, uint32_t name, const char *interface,
                                 uint32_t version) {
+    (void) data;
     (void) version;
-    struct zwp_relative_pointer_manager_v1 **out = (struct zwp_relative_pointer_manager_v1 **) data;
-    if (out && interface && strcmp (interface, zwp_relative_pointer_manager_v1_interface.name) == 0) {
-        *out = (struct zwp_relative_pointer_manager_v1 *) wl_registry_bind (
+    if (!interface) { return; }
+    /* Bind BOTH managers. This used to bind only the relative-pointer
+     * manager, leaving mpe_pc_manager NULL forever: lock_pointer() was
+     * therefore never called, the cursor was never confined, and it walked
+     * out of the window after enough movement (the reported Wayland bug).
+     * The relative pointer alone is an input source, not a lock. */
+    if (strcmp (interface, zwp_relative_pointer_manager_v1_interface.name) == 0 && !mpe_rel_manager) {
+        mpe_rel_manager = (struct zwp_relative_pointer_manager_v1 *) wl_registry_bind (
             registry, name, &zwp_relative_pointer_manager_v1_interface, 1);
+    } else if (strcmp (interface, zwp_pointer_constraints_v1_interface.name) == 0 && !mpe_pc_manager) {
+        mpe_pc_manager = (struct zwp_pointer_constraints_v1 *) wl_registry_bind (
+            registry, name, &zwp_pointer_constraints_v1_interface, 1);
     }
 }
 static void mpe_rel_reg_global_remove (void *data, struct wl_registry *r, uint32_t name) {
@@ -233,7 +265,7 @@ static struct zwp_relative_pointer_manager_v1 *mpe_get_rel_manager (struct wl_di
     struct wl_registry *registry = wl_display_get_registry (wl_display);
     if (!registry)
         return NULL;
-    wl_registry_add_listener (registry, &mpe_rel_reg_listener, &mpe_rel_manager);
+    wl_registry_add_listener (registry, &mpe_rel_reg_listener, NULL);
     /* One round-trip so the globals are actually delivered. At most once
      * per process, on the first click-to-lock. */
     wl_display_roundtrip (wl_display);
@@ -277,6 +309,7 @@ static void mpe_rel_pointer_destroy (void) {
         zwp_locked_pointer_v1_destroy (mpe_locked_ptr);
         mpe_locked_ptr = NULL;
     } mpe_locked_active = 0;
+    mpe_lock_surface = NULL;
     if (mpe_rel_ptr) {
         zwp_relative_pointer_v1_destroy (mpe_rel_ptr);
         mpe_rel_ptr = NULL;
@@ -284,8 +317,6 @@ static void mpe_rel_pointer_destroy (void) {
     mpe_rel_dirty = 0;
 } /* Start receiving unbounded relative motion on this surface's pointer. */
 static int mpe_rel_pointer_acquire (GdkSurface *surface) {
-    if (mpe_rel_ptr)
-        return 1;
     if (!mpe_surface_is_wayland (surface))
         return 0;
     GdkDisplay *display = gdk_surface_get_display (surface);
@@ -297,32 +328,52 @@ static int mpe_rel_pointer_acquire (GdkSurface *surface) {
     GdkDevice *dev = gdk_seat_get_pointer (seat);
     if (!dev || !GDK_IS_WAYLAND_DEVICE (dev))
         return 0;
-    struct zwp_relative_pointer_manager_v1 *mgr = mpe_get_rel_manager (gdk_wayland_display_get_wl_display (display));
-    if (!mgr)
-        return 0; /* compositor lacks the protocol */
     struct wl_pointer *wl_pointer = gdk_wayland_device_get_wl_pointer (dev);
     if (!wl_pointer)
         return 0;
-    mpe_rel_ptr = zwp_relative_pointer_manager_v1_get_relative_pointer (mgr, wl_pointer);
-    if (!mpe_rel_ptr)
-        return 0;
-    zwp_relative_pointer_v1_add_listener (mpe_rel_ptr, &mpe_rel_listener, NULL);
-    /* Confinement. Best-effort: a compositor may implement one protocol and not
-     * the other, and losing confinement must not lose the deltas. */
+    /* A constraint belongs to one surface. Drop a stale lock from a previous
+     * window before requesting one on this surface. */
+    if (mpe_locked_ptr && mpe_lock_surface != surface) {
+        zwp_locked_pointer_v1_destroy (mpe_locked_ptr);
+        mpe_locked_ptr = NULL;
+        mpe_locked_active = 0;
+        mpe_lock_surface = NULL;
+    }
+    /* Relative input first (unbounded deltas), then confinement. The two
+     * are independent capabilities; a compositor may provide one and not
+     * the other. */
+    if (!mpe_rel_ptr) {
+        struct zwp_relative_pointer_manager_v1 *mgr =
+            mpe_get_rel_manager (gdk_wayland_display_get_wl_display (display));
+        if (mgr) {
+            mpe_rel_ptr = zwp_relative_pointer_manager_v1_get_relative_pointer (mgr, wl_pointer);
+            if (mpe_rel_ptr) {
+                zwp_relative_pointer_v1_add_listener (mpe_rel_ptr, &mpe_rel_listener, NULL);
+            }
+        }
+    }
+    /* Confinement. Without this the cursor leaves the surface and the
+     * compositor stops delivering motion. Create it even when the relative
+     * pointer already exists (previous early return skipped this path on
+     * every reacquire). Best-effort: losing confinement must not lose the
+     * deltas, so failure here is not fatal. */
     /* GTK4 note: there is no gdk_surface_get_wayland_surface(); the accessor
      * takes the GdkSurface directly. It is a private GDK header, which is a
      * real fragility, so this is the ONE place the dependency is paid and the
      * result is used immediately. */
     struct wl_surface *wl_surf = NULL;
-    if (mpe_pc_manager && GDK_IS_WAYLAND_SURFACE (surface)) { wl_surf = gdk_wayland_surface_get_wl_surface (surface); }
+    if (mpe_pc_manager && !mpe_locked_ptr && GDK_IS_WAYLAND_SURFACE (surface)) {
+        wl_surf = gdk_wayland_surface_get_wl_surface (surface);
+    }
     if (wl_surf) {
-        {
-            mpe_locked_ptr = zwp_pointer_constraints_v1_lock_pointer (mpe_pc_manager, wl_surf, wl_pointer, NULL,
-                                                                      ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
-            if (mpe_locked_ptr)
-                mpe_locked_active = 1;
+        mpe_locked_ptr = zwp_pointer_constraints_v1_lock_pointer (mpe_pc_manager, wl_surf, wl_pointer, NULL,
+                                                                  ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
+        if (mpe_locked_ptr) {
+            mpe_lock_surface = surface;
+            zwp_locked_pointer_v1_add_listener (mpe_locked_ptr, &mpe_locked_listener, NULL);
         }
-    } return 1;
+    }
+    return (mpe_rel_ptr != NULL);
 }
 #else /* !MPE_WAYLAND_RELATIVE_POINTER */
 /* No Wayland relative-pointer support compiled in (e.g. Windows): lock falls
@@ -376,12 +427,12 @@ float mouse_lock_relative_to_camera (double rdx, double rdy, float *out_x, float
  * fall back to absolute cursor coordinates while this is true: with a live
  * relative pointer the cursor is free to travel anywhere and carries no
  * information about intent. */
-int mouse_lock_relative_active (void) {return mpe_rel_ptr != NULL;}
+int mouse_lock_relative_active (void) {return 0;}
 /* Non-zero when the pointer is genuinely CONFINED to the surface. Reported
  * separately from relative_active() because they are different capabilities and
  * can fail independently: a compositor may offer relative motion without
  * pointer constraints. */
-int mouse_lock_confined (void) {return mpe_locked_active;}
+int mouse_lock_confined (void) {return 0;}
 int mouse_lock_take_relative_delta (double *dx, double *dy) {
     (void) dx;
     (void) dy;
@@ -460,11 +511,19 @@ void mouse_lock_reacquire (GtkWidget *window_widget) {
     if (!window_widget || !GTK_IS_WIDGET (window_widget))
         return;
     GdkSurface *surface = mpe_surface_for_widget (window_widget);
-    /* Re-establish real lock. If the surface was rebuilt this is required,
-     * otherwise the old relative pointer would be attached to a dead surface
-     * and the camera would silently stop responding. */
-    if (!mpe_rel_ptr)
-        mpe_rel_pointer_acquire (surface);
+    /* Re-establish real lock. Recentre alone is not a lock on Wayland: the
+     * relative pointer supplies deltas and the locked pointer supplies the
+     * confinement. Re-request whenever either is missing, the surface
+     * changed, or the compositor deactivated the lock while we still think
+     * the mouse should be captured (e.g. focus loss). */
+#ifdef MPE_WAYLAND_RELATIVE_POINTER
+    if (mpe_locked_ptr && !mpe_locked_active) {
+        zwp_locked_pointer_v1_destroy (mpe_locked_ptr);
+        mpe_locked_ptr = NULL;
+        mpe_lock_surface = NULL;
+    }
+#endif
+    mpe_rel_pointer_acquire (surface);
     GdkCursor *blank = mpe_blank_cursor_new ();
     if (blank) {
         gtk_widget_set_cursor (window_widget, blank);
