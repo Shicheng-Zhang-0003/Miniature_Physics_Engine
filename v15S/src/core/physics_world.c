@@ -1364,6 +1364,12 @@ void physics_world_process_pair (physics_world *world, int index_a, int index_b,
     if ((index_b < 0) || (index_b >= world -> body_count)) { return; }
     rigidbody *body_a = &world -> bodies [index_a];
     rigidbody *body_b = &world -> bodies [index_b];
+    /* Static-static pairs have no possible response (both inverse masses
+     * zero, neither can wake). The broadphase now culls them; this guard
+     * also protects direct callers (alternative stage implementations,
+     * legacy loops) from paying narrowphase/solver cost for immovable
+     * geometry. */
+    if (body_a -> static_state && body_b -> static_state) { return; }
     collision_data narrowphase_collision = {0};
     /* Phase-2: registry-first dispatch (foreign shapes plug in here),
          * built-in table fallback preserves exact legacy behaviour. */

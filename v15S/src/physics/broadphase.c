@@ -440,6 +440,15 @@ int broadphase_generate_pairing (struct physics_world *world, broadphase_pair *c
                         if (!isfinite (dist_sq) || !isfinite (swept_sum)) {
                             cull_hit = true; /* fail-closed on corrupt input */
                         } else if (dist_sq <= swept_sum * swept_sum) { cull_hit = true; }
+                        /* Static-static pairs can never produce contact
+                         * response (both inverse masses are zero and neither
+                         * can wake), yet the BIOBUZZ field's overlapping
+                         * floor/walls/frame/cells/flowers emitted 773 of
+                         * them EVERY tick — ~2.3 ms of narrowphase for a
+                         * field with no dynamic object on it, and 12x that
+                         * in the trajectory predictor's throwaway world.
+                         * Cull here, before the pair buffer. */
+                        if (rb_a -> static_state && rb_b -> static_state) { cull_hit = false; }
                         if (cull_hit) {
                             if (collision_pair_counter < maximum_pairs_allowed) {
                                 collision_pairs_output_array [collision_pair_counter].object_index_a = min_obj;
@@ -500,6 +509,7 @@ int broadphase_generate_pairing (struct physics_world *world, broadphase_pair *c
                     fb_hit = true;
                 else if (dist_sq <= swept_sum * swept_sum)
                     fb_hit = true;
+                if (rb_a -> static_state && rb_b -> static_state) { fb_hit = false; }
                 if (fb_hit) {
                     collision_pairs_output_array [collision_pair_counter].object_index_a = ai;
                     collision_pairs_output_array [collision_pair_counter].object_index_b = bi;

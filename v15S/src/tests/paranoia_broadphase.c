@@ -184,6 +184,51 @@ int main (void) {
         } else {
             printf ("[PASS] cell size adapts to object sizes\n");
         } physics_world_cleanup (&world);
+    }
+    /* Test 6: static-static pairs are culled. A regulation-sized field is
+     * ~100 static bodies; emitting every static pair flooded the solver
+     * (773 per tick on BIOBUZZ, 16.9 ms/tick) and starved the trajectory
+     * predictor while the intake was active. Broadphase must emit ZERO
+     * pairs when every body is static, and a dynamic body must still pair
+     * with the statics it overlaps. */
+    {
+        physics_world world;
+        physics_world_init (&world);
+        constraint_pool_init (&world);
+        g_cfg.world.gravity = -9.81f;
+        g_cfg.world.drag = 1.0f;
+        for (int i = 0; i < 12; i++) {
+            int b = physics_world_add_cube (&world, (vector3) {(float) (i % 4) * 0.5f, 0.0f, (float) (i / 4) * 0.5f},
+                                            (vector3) {1.0f, 0.1f, 1.0f}, 0.0f);
+            world.bodies [b].static_state = true;
+            world.bodies [b].restitution = 0.0f;
+        } const float dt = 1.0f / 60.0f;
+        broadphase_pair pairs [256];
+        int count = broadphase_generate_pairing (&world, pairs, 256, dt);
+        printf ("[INFO] static_only_pairs=%d\n", count);
+        if (count != 0) {
+            printf ("[FAIL] static-static pairs emitted (%d)\n", count);
+            fail = 1;
+        } else {
+            printf ("[PASS] static-static pairs culled\n");
+        }
+        int dyn = physics_world_add_sphere (&world, 0.2f, 1.0f, (vector3) {0.0f, 0.2f, 0.0f});
+        world.bodies [dyn].restitution = 0.0f;
+        rigidbody_wake (&world.bodies [dyn]);
+        count = broadphase_generate_pairing (&world, pairs, 256, dt);
+        int bad = 0;
+        for (int i = 0; i < count; i++) {
+            if (pairs [i].object_index_a != dyn && pairs [i].object_index_b != dyn) {
+                bad++;
+            }
+        } printf ("[INFO] dynamic_mixed_pairs=%d static_static=%d\n", count, bad);
+        if (count < 1 || bad != 0) {
+            printf ("[FAIL] dynamic-static pairing wrong (count=%d bad=%d)\n", count, bad);
+            fail = 1;
+        } else {
+            printf ("[PASS] dynamic-static pairs preserved\n");
+        }
+        physics_world_cleanup (&world);
     } return fail;
 }
 #endif
