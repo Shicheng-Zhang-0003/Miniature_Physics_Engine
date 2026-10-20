@@ -6,6 +6,7 @@
 #include "core/simulation_physics_loop.h"
 #include "core/long_run_validation.h"
 #include "ui_input/simulation_dispatch.h"
+#include "ui_input/input_control.h"
 #include "ui_input/gamepad_drive.h"
 #include "ui_input/ftc_view.h"
 #include "ui_input/ftc_traj.h"
@@ -71,6 +72,10 @@ gboolean physics_step_increment (gpointer user_data_pointer) {
     } frame_timer_update (&main_timer);
     float frame_delta_time = main_timer.delta_time;
     debug_last_frame_time = frame_delta_time;
+    /* Drain locked-pointer relative deltas before the camera reads them.
+     * The Wayland lock suppresses GTK motion events, so this must not wait
+     * for on_mouse_movements(). */
+    input_control_poll_locked_mouse ();
     /* Camera + character */
     simulation_camera_tick (frame_delta_time);
     /* Input dispatch (mouse/keyboard bindings, menus, spawn) */

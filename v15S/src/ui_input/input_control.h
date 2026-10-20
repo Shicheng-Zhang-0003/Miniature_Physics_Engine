@@ -12,6 +12,10 @@ gboolean on_keypress (GtkEventControllerKey *ctrl, guint keyval, guint keycode, 
 gboolean on_key_released (GtkEventControllerKey *ctrl, guint keyval, guint keycode, GdkModifierType state,
                           gpointer user_data_stored);
 gboolean on_mouse_movements (GtkEventControllerMotion *ctrl, double x, double y, gpointer user_data_stored);
+/* Per-frame drain of Wayland relative deltas into mouse_delta_x/y. Must be
+ * called before simulation_camera_tick(), because a locked pointer produces
+ * no GTK motion events. */
+void input_control_poll_locked_mouse (void);
 gboolean on_button_press (GtkGestureClick *gest, int n_press, double x, double y, gpointer user_data_stored);
 gboolean on_button_release (GtkGestureClick *gest, int n_press, double x, double y, gpointer user_data_stored);
 gboolean on_focus_out (GtkEventControllerFocus *ctrl, gpointer user_data_stored);

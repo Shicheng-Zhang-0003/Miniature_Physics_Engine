@@ -380,43 +380,16 @@ gboolean on_mouse_movements (GtkEventControllerMotion *ctrl, double x, double y,
         last_y = -1;
         return FALSE;
     }
-    /* DESPOT-2026-09-29: on Wayland the real lock is the relative-pointer
-     * protocol, which reports unbounded deltas and never moves the cursor.
-     * When it is active, absolute cursor coordinates are meaningless -- using
-     * them is exactly the bug that let the pointer reach the screen edge and
-     * stall the camera. Prefer the relative delta and ignore x/y entirely. */
-    /* DESPOT-2026-09-29 (user-reported: flick RIGHT/DOWN works, LEFT/UP does
-     * not). Three real defects here, all of which lose or corrupt motion in a
-     * DIRECTIONAL way:
-     *
-     * 1. FALL-THROUGH. When the relative pointer is live but no new relative
-     *    event has been dispatched yet, take_relative_delta() returns 0 and we
-     *    fell straight through to the ABSOLUTE path. With a live relative
-     *    pointer the on-screen cursor is unconstrained and free to travel
-     *    anywhere, so `x - last_x` there is not "how far the user moved their
-     *    hand" -- it is just where the compositor happened to leave the arrow.
-     *    Mixing the two sources is the whole hazard the relative pointer exists
-     *    to remove. Now: if the relative lock is live, the absolute path is
-     *    skipped outright.
-     *
-     * 2. OVERWRITE INSTEAD OF ACCUMULATE. Both paths ASSIGNED
-     *    mouse_delta_x/y. GTK can deliver several motion events per frame and
-     *    the camera consumes the delta once per frame, so every event but the
-     *    last was silently thrown away -- a fast flick lost most of its
-     *    magnitude, and a slow one lost all of it. Now accumulated with +=, so
-     *    the camera sees everything that happened.
-     *
-     * 3. `last_x/last_y = -1` after a relative event forced a re-anchor on the
-     *    next absolute event. Pointless once the absolute path is disabled,
-     *    and it was one more way the two paths could interleave.
-     */
+    /* With the Wayland relative pointer live, absolute cursor coordinates are
+     * meaningless: the cursor is unconstrained (and under a lock, frozen).
+     * Ignore x/y and let the per-frame poll feed mouse_delta_x/y from the
+     * accumulated relative deltas. See input_control_poll_locked_mouse(). */
     if (mouse_lock_relative_active ()) {
-        double rdx = 0.0, rdy = 0.0;
-        (void) mouse_lock_take_relative_delta (&rdx, &rdy);
-        float cx = 0.0f, cy = 0.0f;
-        (void) mouse_lock_relative_to_camera (rdx, rdy, &cx, &cy);
-        st -> mouse_delta_x += cx;
-        st -> mouse_delta_y += cy;
+        /* Do NOT drain here. A locked pointer suppresses wl_pointer.motion
+         * entirely, so this GTK handler never runs while the lock is active.
+         * The deltas are consumed by input_control_poll_locked_mouse() once
+         * per frame; draining here as well would double-count on
+         * compositors that still deliver motion while locked. */
         last_x = -1;
         last_y = -1;
         return FALSE;
@@ -462,6 +435,24 @@ gboolean on_mouse_movements (GtkEventControllerMotion *ctrl, double x, double y,
     last_y = y;
     mouse_lock_reset_centre (w);
     return FALSE;
+}
+/* Drain Wayland relative-pointer deltas once per frame, before the camera
+ * consumes them. The locked pointer intentionally stops wl_pointer.motion
+ * events, so on_mouse_movements() is never called while the lock works --
+ * draining there made the mouse appear completely dead on Wayland. This is
+ * the only consumer of the accumulated deltas. */
+void input_control_poll_locked_mouse (void) {
+    if (!main_inputs.is_mouse_locked)
+        return;
+    if (!mouse_lock_relative_active ())
+        return;
+    double rdx = 0.0, rdy = 0.0;
+    if (!mouse_lock_take_relative_delta (&rdx, &rdy))
+        return;
+    float cx = 0.0f, cy = 0.0f;
+    (void) mouse_lock_relative_to_camera (rdx, rdy, &cx, &cy);
+    main_inputs.mouse_delta_x += cx;
+    main_inputs.mouse_delta_y += cy;
 }
 gboolean on_button_press (GtkGestureClick *gest, int n_press, double x, double y, gpointer user_data_stored) {
     (void) x;

@@ -43,9 +43,12 @@
  * the failure above, and precisely what a first-person camera needs: the
  * on-screen cursor never moves, so screen edges are irrelevant.
  *
- * on_mouse_movements() now asks mouse_lock_take_relative_delta() first;
- * when a relative delta is available it is used and the absolute cursor
- * coordinates are ignored entirely. X11 keeps the warp-and-recentre path.
+ * The frame loop drains the accumulated deltas once per tick
+ * (input_control_poll_locked_mouse): a locked pointer deliberately stops
+ * wl_pointer.motion, so waiting for a GTK motion event would never fire and
+ * the mouse would appear dead. While relative deltas are in use the absolute
+ * cursor coordinates are ignored entirely. X11 keeps the warp-and-recentre
+ * path.
  *
  * If the compositor does not advertise the protocol, we fall back to the
  * previous absolute-delta behaviour so the game still works -- it just
@@ -362,7 +365,9 @@ static int mpe_rel_pointer_acquire (GdkSurface *surface) {
      * real fragility, so this is the ONE place the dependency is paid and the
      * result is used immediately. */
     struct wl_surface *wl_surf = NULL;
-    if (mpe_pc_manager && !mpe_locked_ptr && GDK_IS_WAYLAND_SURFACE (surface)) {
+    /* Only confine when unbounded relative input exists. Locking without it
+     * would suppress the last motion source and make the mouse dead. */
+    if (mpe_pc_manager && mpe_rel_ptr && !mpe_locked_ptr && GDK_IS_WAYLAND_SURFACE (surface)) {
         wl_surf = gdk_wayland_surface_get_wl_surface (surface);
     }
     if (wl_surf) {
