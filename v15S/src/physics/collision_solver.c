@@ -1185,12 +1185,81 @@ void collision_apply_split_impulse (collision_data *manifolds, int manifold_coun
          * runmax 13.07 m/s ejection ... while 0.02 holds runmax 0.00"). A
          * source literal that the documentation records as a measured failure
          * mode is a bug in one of the two; it was the literal. */
-        float deepest = 0.0f;
+        /* DESPOT-2026-10-20 REST-GAP: seed the depth stats from leg 0, not
+         * from 0.0. The old zero-seeded max implicitly floor-flattened the
+         * reported depth at 0 (an all-gap manifold read "deepest = 0" and
+         * the old clamped pen made that indistinguishable from a real
+         * touch); with true-gap pen now stored, an all-gap rest must be
+         * measurable. Overlap semantics are unchanged: corr still only
+         * fires when the max pen exceeds slop. */
+        float deepest = man -> contacts [0].penetration;
+        float pen_sum = 0.0f;
         for (int i = 0; i < man -> contact_count; i++) {
-            if (man -> contacts [i].penetration > deepest) { deepest = man -> contacts [i].penetration; }
+            float pen_i = man -> contacts [i].penetration;
+            if (pen_i > deepest) { deepest = pen_i; }
+            pen_sum += pen_i;
         } float corr = beta * fmaxf (deepest - slop, 0.0f);
         if (corr > max_corr) { corr = max_corr; }
-        if (corr <= 0.0f) { continue; }
+        if (corr <= 0.0f) {
+            /* DESPOT-2026-10-20 REST-GAP CLOSURE (spawn-hover root fix).
+             * Contact admission is slop-gated, so a body whose support is
+             * still a true GAP up to one slop band deep gets held velocity-
+             * stable at that gap forever (stored pen was clamped to 0, so no
+             * passer ever saw the deficit; symptom: a flat-landing cylinder
+             * freezes hovering several mm above the floor and the stack's
+             * top cube rests visibly floating). Close the deficit here: the
+             * dynamic side of a DYNAMIC-vs-STATIC pair whose calm state
+             * (speeds below the sleep thresholds) has parked it creeps
+             * position-only toward touch at 0.5 mm/tick — the same scale
+             * depenetration uses as its early-out. Zero velocity change
+             * (split contract), so restitution/friction never see it;
+             * sleeping bodies are excluded (their deficit froze at spawn
+             * time and waking a parked body for cosmetics would be worse).
+             * Driven by the MEAN admitted-leg depth, not the max: a float-
+             * parked flat cap sits with all four rim legs equally gapped
+             * except microscopic float-noise on one (deepest ~ +1e-9 would
+             * gate the closure off), while a tilted rest translatively
+             * equalizes toward mean-touch without sinking its uphill corner
+             * beyond what the velocity solver holds. Requires the narrowphase
+             * to report the TRUE depth (unclamped gap) — currently only
+             * collision_static_plane_cylinder does. */
+            if ((man -> contact_count > 0) && (deepest < -0.0005f) &&
+                (body_a -> static_state || body_b -> static_state)) {                rigidbody *dyn_a = (!body_a -> static_state) ? body_a : NULL;
+                rigidbody *dyn_b = (!body_b -> static_state) ? body_b : NULL;
+                if (dyn_a && (dyn_a -> is_sleeping ||
+                              (vector3_length_squared (dyn_a -> velocity) >= C -> sleep.linear_thresh_sq) ||
+                              (vector3_length_squared (dyn_a -> angular_velocity) >= C -> sleep.angular_thresh_sq))) {
+                    dyn_a = NULL;
+                }
+                if (dyn_b && (dyn_b -> is_sleeping ||
+                              (vector3_length_squared (dyn_b -> velocity) >= C -> sleep.linear_thresh_sq) ||
+                              (vector3_length_squared (dyn_b -> angular_velocity) >= C -> sleep.angular_thresh_sq))) {
+                    dyn_b = NULL;
+                }
+                if (dyn_a || dyn_b) {
+                    /* Target mean-touch, but never sink the nearest leg
+                     * past touch (deepest = max pen): a tilted rest stops
+                     * at its closest edge instead of over-sinking it
+                     * while chasing an uphill gap. */
+                    float mean_pen = pen_sum / (float) man -> contact_count;
+                    float corr_gap = -mean_pen;
+                    if (corr_gap > -deepest) { corr_gap = -deepest; }
+                    if (corr_gap > 0.0005f) { corr_gap = 0.0005f; }
+                    if (corr_gap > 0.0f) {
+                        /* The dynamic side travels TOWARD the static side:
+                         * the overlap branch translated them APART along n,
+                         * this mirrors it. Normal points A->B, so the A-side
+                         * dynamic moves along +n and the B-side dynamic
+                         * along -n; inv_a / inv_b already carry effective
+                         * mass (0 for the static side) so each dynamic
+                         * body moves its own share of the closure. */
+                        vector3 gap_shift = simd_scale (man -> normal_vector, corr_gap / inv_sum);
+                        if (dyn_a) { dyn_a -> position = simd_add (dyn_a -> position, simd_scale (gap_shift, inv_a)); }
+                        if (dyn_b) { dyn_b -> position = simd_sub (dyn_b -> position, simd_scale (gap_shift, inv_b)); }
+                    }
+                }
+            } continue;
+        }
         vector3 shift = simd_scale (man -> normal_vector, corr / inv_sum);
         /* TRUTH: kinematic has stored inv!=0 but effective 0. Old
          * !static_state moved kinematics, corrupting prescribed motion.

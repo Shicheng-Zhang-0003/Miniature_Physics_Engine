@@ -146,7 +146,13 @@ bool collision_static_plane_cylinder (rigidbody *plane_body, rigidbody *cyl, flo
             if ((leg_pen > -rim_slop) && (collision_output_data -> contact_count < 4)) {
                 contact_point_data *cp = &collision_output_data -> contacts [collision_output_data -> contact_count];
                 cp -> position = rim_point;
-                cp -> penetration = (leg_pen > 0.0f) ? leg_pen : 0.0f;
+                /* DESPOT-2026-10-20 REST-GAP: store the TRUE leg depth, gaps
+                 * included (was clamped to 0). The split pass' rest-gap
+                 * closure reads it to park a calm resting cap at touch; the
+                 * velocity solve never reads pen, so solver semantics are
+                 * unchanged (buckling guard, rolling pen_eff and depenetration
+                 * all re-clamp themselves). */
+                cp -> penetration = leg_pen;
                 collision_output_data -> contact_count++;
             }
         }
@@ -159,7 +165,8 @@ bool collision_static_plane_cylinder (rigidbody *plane_body, rigidbody *cyl, flo
             if (leg_pen > -rim_slop) {
                 contact_point_data *cp = &collision_output_data -> contacts [0];
                 cp -> position = simd_add (cap_center, simd_scale (nhat, r));
-                cp -> penetration = (leg_pen > 0.0f) ? leg_pen : 0.0f;
+                /* DESPOT-2026-10-20 REST-GAP: true depth (gaps included). */
+                cp -> penetration = leg_pen;
                 collision_output_data -> contact_count = 1;
             }
         }

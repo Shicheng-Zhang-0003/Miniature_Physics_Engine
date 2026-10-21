@@ -16,6 +16,16 @@ that decay in measured scenes. Rolling resistance now uses the compression-only
 normal impulse, but spin-patch size and the mass-weighted two-body split remain
 empirical calibrations, not a Hertz-contact derivation.
 
+### Rest-gap closure gates
+The split-stage rest-gap branch (flat-cap float fix, 2026-10-20) closes an
+all-legs-gap static-pair manifold toward mean touch at 0.5 mm/tick and stops
+when the nearest leg is within 0.5 mm of the plane, so a flat-resting body
+parks up to ~0.5 mm above touch instead of inside the whole 10 mm admission
+band. Class asymmetry is accepted: a tilted rest whose legs straddle the
+plane (some legs over, some legs gapped) is mean-touched once, not
+edge-crept, so its uphill legs stay inside the admission band at rest.
+Both are measured trade-offs, not hidden bugs.
+
 ### Warm start
 **Cold by default.** No effective warm start on any row — measured, not
 assumed. The normal is cold every tick (restoring last tick's normal ejected

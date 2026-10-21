@@ -340,3 +340,71 @@ Multicore (see final verification record in
   (1200-tick twin worlds, re-init, 10-run reference, concurrent-vs-
   serial: five PASS lines each). The twin keeps bitwise identical
   results at all three thread counts.
+
+## Third-pass fix: flat-cap rest-gap closure (21:00–04:10 Z session)
+
+A user-report ("spawned cylinder lands flat side down, vibrates and
+wobbles before settling a little too high") was reproduced and
+root-caused to a resting **hover above the floor**, quantified with a
+dt=1/60 mode battery (`/tmp/opencode/wobble_repro.c`, 1800-tick runs):
+
+First, a repro lesson: the early "permanent two-tick hop" trace was an
+artifact of the repro passing `atof("1/60")` = 1.0, which the step
+clamp reduces to dt=0.1. At the canonical 1/60 no hop exists; the
+bounce chain seen on hard slams is the ordinary e=0.3 restitution
+transient. The real defect is below.
+
+Root cause (three facts compounding):
+- The floor manifold admits contacts while the rim leg sits inside the
+  10 mm `penetration_slop` band — i.e. it admits **gaps**,
+  distinguishing "inside the band" from "touching".
+- The narrowphase then stored `penetration = max(leg_pen, 0)`, so an
+  admitted gap froze into "zero depth"; the contact-velocity solve is
+  deliberately penetration-free (no velocity Baumgarte), so it parks
+  the body exactly at whatever gap it entered with — forever.
+- The only standing position correctors (split pass,
+  `a3_positional_depenetrate_manifold_w`) correct over-penetration
+  only; there was no passer that could close an under-touch gap, so a
+  flat-cap-down cylinder could end its bounce chain 0.5–10 mm above
+  the plane and sleep there (e.g. a 20 m/s flat slam parked at
+  y=0.4066, 6.6 mm high; a gentle drop, 9.8 mm high).
+
+Fixes (marked `DESPOT-2026-10-20 REST-GAP` in source):
+- `collision_static_plane_cylinder` now stores the **true unclamped
+  leg pen** (rim-quad loop and analytic fallback). With the solver
+  never consuming pen for velocities and every other pen consumer
+  re-clamping or ignoring negatives (each verified), the negative
+  values are propagation-safe.
+- `collision_apply_split_impulse` depth statistics are now seeded from
+  the first contact instead of 0.0 — the old zero seed made an
+  all-gap manifold report "deepest depth = 0" (indistinguishable from
+  touch once pen was clamped) — and gained a rest-gap branch in the
+  `corr <= 0` path: static-pair only, gated on a calm dynamic side
+  (not sleeping, linear/angular speeds below the sleep thresholds),
+  targeting **mean touch** with the nearest leg's headroom as a hard
+  clamp (a tilted rest stops at its closest edge instead of
+  over-sinking it to chase an uphill gap), 0.5 mm/tick, both bodies
+  moved toward each other along the manifold normal with effective
+  inv-mass weights. Placement at the split stage keeps the fix after
+  the contact solve, so resting contact impulses and the gap creep do
+  not fight.
+
+Behavior (dt=1/60 rest heights after 1800 ticks; before → after):
+- Touching cases exact: modes rim-drop/rim-slam stay 0.400000
+  (unchanged); tilted-wheel rest unchanged (deliberate asymmetry).
+- Hover cases closed: flat slam 0.40660 → 0.40010; gentle flat drop
+  0.40978 → 0.40028; 4 mm-above spawn → 0.40000 exact; 6.6 mm-above
+  spawn → 0.40010. A spawn placed exactly at the 0.5 mm closure gate
+  stays 0.40050 (strict gate, historical value preserved).
+- All modes end with a clean sleep (no wake toggles, zero residual
+  velocity/velocity in the tail window).
+
+Accepted remaining asymmetry: rests whose contact legs straddle the
+plane (tilt > closure gate) still park the uphill legs inside the
+admission band while the downhill legs carry the touch; the body
+rests mean-touched instead of edge-touched. The admission band itself
+remains the `penetration_slop` config knob.
+
+Verification: quick profile 60/60 green immediately after the fix
+(`temp/qa_runs/20261021T040946Z-333170`); full profile, TSan, twins,
+and the MGB kit rerun in the final verification record below.
