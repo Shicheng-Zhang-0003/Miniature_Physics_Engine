@@ -291,8 +291,18 @@ int mfs_t_tank (void) {
          * contact impulses is gone. The pivot translation was partly
          * phantom-traction; measured 0.0478 with the corrected engine
          * (deterministic, bit-stable across runs). Heading is unaffected
-         * (still anchored at 3.0639, ~1% from measurement). */
-        MFS_CHECK_REL (t_ptr, disp, 0.0478f, 0.20f, "tank pivot translation (measured baseline)");
+         * (still anchored at 3.0639, ~1% from measurement).
+         * DESPOT-2026-10-21 ROLLING-WHEEL re-baseline: (1) the resting-gate
+         * in collision_ccd_toi_range stops the sweep from mfg-ing a virtual
+         * bounce for bodies already inside the penetration-slop band (the
+         * pressed wheels were in that band permanently), and (2) the
+         * drivetrain moved from the saturated Coulomb-slider law to
+         * impulse-closure traction (min(mu*N, m_eff*|v_a|/dt)). The old
+         * 0.0478 translation was measured under the last sliding-value
+         * regime; under true rolling differential the pivot translates
+         * 0.1555 (deterministic, verified suite-wide — teleop/odometry/
+         * strafe/yaw-sign/stall all still reference-pass). */
+        MFS_CHECK_REL (t_ptr, disp, 0.1555f, 0.20f, "tank pivot translation (measured baseline)");
         if (t_ptr -> failures == 0) { printf ("[PASS] tank differential turn (disp=%.4f, heading=%.4f)\n", disp, heading); }
     } physics_world_cleanup (&w);
     free (robot);

@@ -1082,6 +1082,38 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
                 if (fabsf (torque) > mfs_max_brake) { torque = (torque > 0.0f) ? mfs_max_brake : -mfs_max_brake; }
             }
         }
+        /* DESPOT-2026-10-21 (FLOOR-BUDGET BRAKE CAP): at/short-stop the
+         * passive regen damper planned the full short-circuit torque
+         * (measured tq -3.727 N·m at cmd 0 = -74 N of floor demand at
+         * r=0.05) while the grounded tyre can only transmit MU*N per
+         * wheel-weight-share (~19.4 N = 0.97 N·m): the excess impulsive
+         * spin-down kicked the revolute joints and nose-dived the chassis
+         * into the floor from a 1.2 m/s cruise (measured pitch -0.37 rad,
+         * y 0.182 -> 0.103 skid-on-chassis). A brake cannot ask the floor
+         * for more than the tyre's friction cone; clamp the REGENERATIVE
+         * (opposing-motion) torque to MU * (total mass·g / wheels) * r.
+         * Commanded MOTORIZED torque (driving) is untouched, as is the
+         * airborne idle brake above (no floor to cap it). */
+        if (torque * wheel_speed < 0.0f) {
+            int ch_idx = robot -> chassis_body;
+            if ((ch_idx >= 0) && (ch_idx < world -> body_count)) {
+                float brake_mass = world -> bodies [ch_idx].mass;
+                for (int mk = 0; mk < robot -> wheel_count; mk++) {
+                    int wmk = robot -> wheel_bodies [mk];
+                    if ((wmk >= 0) && (wmk < world -> body_count)) { brake_mass += world -> bodies [wmk].mass; }
+                }
+                float g_brake = 9.80665f;
+                {
+                    const mpe_config_t *wcfg = mpe_world_cfg (world);
+                    if (wcfg && isfinite (wcfg -> world.gravity)) { g_brake = fabsf (wcfg -> world.gravity); }
+                }
+                float n_share = brake_mass * g_brake / (float) (robot -> wheel_count > 0 ? robot -> wheel_count : 1);
+                float brake_cap = MFS_MECANUM_ANALYTIC_MU * n_share * r_run;
+                if (isfinite (brake_cap) && brake_cap > 0.0f && fabsf (torque) > brake_cap) {
+                    torque = (torque > 0.0f) ? brake_cap : -brake_cap;
+                }
+            }
+        }
         /* DESPOT-2026-10-02: bank the DELIVERED torque into the slew state
          * here, after the governor diode and the idle brake, not before
          * them (see the slew block above for why the old position made

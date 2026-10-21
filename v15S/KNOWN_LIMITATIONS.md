@@ -134,7 +134,8 @@ parallelism remains future work.
 | MFS CCD obstacle-margin regression | Resolved by per-pair margins in the 2026-10-19 audit; the prior red tank/drive/odometry rows are historical, not current open failures |
 | Jointed air-spin limit cycle | Free-spinning jointed wheels oscillate (motor 86 rpm vs true 799 rpm); contained by bearing damping (c=1e-6) + diode+slew |
 | MOTOR-III observer limit cycle | Observer-armed driven path is a documented limit cycle at −61.3%; open-loop no-load line is exact |
-| Encoder odometry over-reports under slip | No slip term in the odometry model; land motor-chain step 2 together with slip term + VREF retune |
+| Odometry over-reports slipping contacts (peel) | Impulse-closure traction (2026-10-21 audit) removed the VREF slip-lock and cut odometry error from 63% to ~14%, but the odometry model still has no slip term; the suite tracks the remaining peel under MFS-STRAFE-F2 (strafe phys −0.5247 vs odom −1.1848) |
+| Cruise wheel-ω micro-cycle | 26.9 preset full-command cruise rides a small period-5 wheel-ω cycle (21↔30 rad/s, mean-zero, below the 4.0 rad/s cut threshold); mean motion is physical — cosmetic only |
 | Mecanum strafe magnitude | Solver frontier (5-link ground→roller→bearing→hub chain doesn't converge in GS-128); analytic mode is the workaround |
 
 ---

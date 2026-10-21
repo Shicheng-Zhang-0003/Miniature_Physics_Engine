@@ -127,6 +127,28 @@ int collision_ccd_toi_range (rigidbody *bodies, int body_count, int start, int e
         /* 1. Floor plane y = 0. */
         float r_lowest_y = ccd_support_depth (mover);
         float lowest = mover -> position.y - r_lowest_y;
+        /* DESPOT-2026-10-21 (RESTING-GATE): a body already resting inside the
+         * solver's penetration-slop band is IN contact with the floor, not
+         * about to tunnel through it. Its gravity root here is not a real
+         * impact but a VIRTUAL BOUNCE: for the robot's preloaded wheels
+         * (2 mm press, lowest = -0.0013 m) the quadratic gives toi ~ 0.0163
+         * s every tick while rolling awake, so every loaded wheel sat
+         * permanently in the clamped set, collected an upward restitution
+         * velocity each tick (the y-root flips vy positive), and the
+         * revolute joints fought back with per-tick impulses — at cruise
+         * the bounce/stall loop destabilised the whole robot (measured:
+         * tank cruise collapse at tick ~471, chvy -0.5..-0.8 sawtoothing,
+         * wheels buried 2 cm, solver dumping ±30 rad/s per tick into the
+         * spin DOF against a positive torque accumulator). The contact
+         * solver owns bodies inside the slop band (that is exactly what
+         * it is for); the sweep now defers to it instead of manufacturing
+         * a bounce. Falling bodies (lowest > slop) are unaffected — their
+         * toi computation is unchanged. */
+        if (lowest <= C -> solver.penetration_slop) {
+            if (do_volumes) { /* volumes still swept: resting bodies can
+                               still tunnel sideways into obstacles */ }
+            else { continue; }
+        } else {
         vector3 r_lowest = {0.0f, -r_lowest_y, 0.0f};
         vector3 w_cross_rlow = vector3_cross (mover -> angular_velocity, r_lowest);
         float v0 = mover -> velocity.y + w_cross_rlow.y;
@@ -163,6 +185,7 @@ int collision_ccd_toi_range (rigidbody *bodies, int body_count, int start, int e
                     }
                 }
             }
+        }
         }
         /* 2. Volumes. */
         if (do_volumes) {

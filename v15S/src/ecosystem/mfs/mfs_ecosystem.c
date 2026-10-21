@@ -119,33 +119,48 @@ static int mfs_ecosystem_attach (mpe_world_t *world, void **eco_state) {
      * mpe_module_desc (dlsym'd by `mod load` for mpe_ftc.so); it IS the
      * ftc-fleet descriptor, so the static bundle references it directly
      * instead of duplicating the struct. */
-    extern const mpe_module_desc_t mpe_module_desc;
     if (!mfs_internal_module_registered ("ftc-fleet")) {
+        extern const mpe_module_desc_t mpe_module_desc;
         int rc = mfs_internal_module_register (&mpe_module_desc);
         if (rc != MFS_REG_OK) {
             fprintf (stderr, "mfs_ecosystem: register(ftc-fleet) failed rc=%d\n", rc);
+            if (!mfs_internal_module_registered (MFS_MODULE_1_NAME)) {
+                mfs_internal_module_unregister (MFS_MODULE_1_NAME);
+            }
             free (state);
             return -1;
         }
     }
-    /* Attach internal modules. Streamlined 2026-10-04 (v15S release
-     * blocker): the bundle attaches ftc-fleet ONLY. The BioBuzz game module
-     * (mfs-simulator: field + robot + intake + shooter + balls + gamepad) is
-     * PARKED by default — it stays registered below so an explicit
-     * `mfs_internal_module_attach("mfs-simulator", world)` (or the module_1
-     * direct API the MFS suite uses) still works, but a plain `eco attach`
-     * no longer drags a second robot, a ball set and a physical-gamepad
-     * probe into every drive session. One field (tile floor on spawn), one
-     * robot (ftc-fleet index 0), one controller (F310 pad mecanum).
-     * On a failure of the attach, roll back: previously a failed second
-     * attach left the first attached to the world while the ecosystem
-     * returned -1 and freed only its own state, leaking the module's
-     * bodies and its slot in the world. */
-    if (mfs_internal_module_attach ("ftc-fleet", (mpe_world_t *) world) != MFS_REG_OK) {
-        fprintf (stderr, "mfs_ecosystem: attach(ftc-fleet) failed\n");
-        free (state);
-        return -1;
-    } state -> modules_initialized = true;
+    /* DESPOT-2026-10-21 (engine-dispatch attach): the fleet is registered
+     * above but its per-world attachment now goes through
+     * physics_world_attach_module so the desc+state land in the ENGINE's
+     * tick_modules table. The previous path (mfs_internal_module_attach →
+     * direct d->attach) stored the state ONLY in the internal registry,
+     * which physics_world_step never sees: the engine's pre_step
+     * dispatch (tick_modules loop) fired nothing, ftc_fleet_step_all
+     * never ran, and every robot commanded through the bundle was a
+     * statue with wheel_ang_vel 0.00 despite a settled chassis (measured
+     * headless shell). The registry's own pre/post dispatch
+     * (mfs_ecosystem_pre_step → mfs_internal_modules_pre_step) still
+     * covers modules that live ONLY in the registry (the suite's probe
+     * module); the fleet is meanwhile stepped by the engine table — via
+     * physics_world_step — exactly like `mod attach` consumers. Ownership:
+     * the engine table owns attach/detach/state (world cleanup detaches
+     * and destroys once); the internal slot never holds the fleet state,
+     * so there is no double-destroy path. */
+    {
+        extern const mpe_module_desc_t mpe_module_desc;
+        if (physics_world_attach_module ((mpe_world_t *) world, &mpe_module_desc) < 0) {
+            fprintf (stderr, "mfs_ecosystem: engine attach(ftc-fleet) failed\n");
+            if (!mfs_internal_module_registered (MFS_MODULE_1_NAME)) {
+                mfs_internal_module_unregister (MFS_MODULE_1_NAME);
+            }
+            mfs_internal_module_unregister ("ftc-fleet");
+            free (state);
+            return -1;
+        }
+    }
+    state -> modules_initialized = true;
     state -> modules_attached = true;
     /* Tracking is best-effort for the terminal surface; the attach itself
      * already succeeded, so a full table only warns (see eco_track_world). */
@@ -157,6 +172,14 @@ static void mfs_ecosystem_detach (mpe_world_t *world, void *eco_state) {
     if (!eco_state)
         return;
     mfs_ecosystem_state_t *state = (mfs_ecosystem_state_t *) eco_state;
+    /* DESPOT-2026-10-21: the fleet's per-world attachment lives in the
+     * ENGINE table now (see the engine-dispatch attach note above), so
+     * removing the bundle must remove it from tick_modules too — the
+     * engine's own detach hook fires ftc_fleet_destroy exactly once and
+     * releases the loader ref. Without this, unloading the bundle while a
+     * world still holds the attachment is refused (loader E_BUSY: "has 1
+     * live attachment(s)", reproduced by the engine ftc_ecosystem test). */
+    physics_world_detach_module ((mpe_world_t *) world, "ftc-fleet");
     /* Detach all internal modules */
     mfs_internal_modules_detach_all ((mpe_world_t *) world);
     eco_untrack_world (state, world);
@@ -272,6 +295,19 @@ static float eco_argf (char **argv, int i, int argc, float dflt) {
         if (end != argv [i] && isfinite (v))
             return (float) v;
     } return dflt;
+} /* DESPOT-2026-10-21: exported for the headless-shell path. The TUI's
+ * bare `ftc spawn` (tui_shell.c) previously called ftc_fleet_spawn
+ * directly and skipped BOTH guarantees (no floor, default 64 iterations)
+ * — a robot wobbled on empty space exactly like the GTK path's doc says.
+ * Same contract as eco_ensure_* privately, declared non-static so the
+ * shell can dlsym it from the bundle. */ int mfs_ecosystem_ensure_env (physics_world *w) {
+    if (!w)
+        return -1;
+    int rc = eco_ensure_floor (w);
+    if (rc < 0)
+        return -1;
+    eco_ensure_iterations ();
+    return 0;
 } /* Bundle command surface (drives the terminal `eco command` path):
  *   help
  *   spawn [preset-substr] [mecanum|tank] [x y z]

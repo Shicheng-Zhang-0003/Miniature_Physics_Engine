@@ -378,8 +378,50 @@ static void cmd_mod (physics_world *w, int argc, char **argv) {
         printf ("mod: unloaded '%s'\n", argv[2]); return;
     }
     if (strcmp(argv[1],"attach")==0 && argc >= 3) {
-        if (physics_world_attach_module(w, NULL) != 0) { /* placeholder */ }
-        printf ("mod: attach needs a descriptor (use load first)\n"); return;
+        /* DESPOT-2026-10-21: mirrors ui_input/term_mod.c attach (the GTK
+         * path) — the headless shell previously stubbed this, so any fleet
+         * attached here never got its pre_step driven and teleop was dead
+         * weight. Same contract: registry lookup, hook check, dedup,
+         * attach. */
+        const mpe_module_desc_t *d = mpe_find_module (argv [2]);
+        if (!d) {
+            /* DESPOT-2026-10-21: the MFS .so is a bundle — the loader
+             * registers its ecosystem (mfs-simulator) instead of the inner
+             * ftc-fleet fragment, so a name-based attach of "ftc-fleet"
+             * falls through to the ecosystem attach path. */
+            const mpe_ecosystem_desc_t *e = mpe_ecosystem_find (argv [2]);
+            if (e && mpe_ecosystem_attach (w, argv [2]) == 0) {
+                printf ("mod: attached ecosystem '%s'\n", argv [2]);
+                return;
+            }
+            printf ("mod: attach — no module or ecosystem named '%s' (mod load first). registered:", argv [2]);
+            for (int i = 0; i < mpe_module_count (); i++) {
+                const mpe_module_desc_t *m = mpe_module_at (i);
+                if (!m || !m -> name) { continue; }
+                printf (" mod:%s%s", m -> name, i < mpe_module_count () - 1 ? "" : "");
+            }
+            for (int i = 0; i < mpe_ecosystem_count (); i++) {
+                const mpe_ecosystem_desc_t *ec = mpe_ecosystem_at (i);
+                if (ec && ec -> name) { printf (" eco:%s", ec -> name); }
+            }
+            printf ("\n");
+            return;
+        }
+        if (!d -> pre_step && !d -> post_step && !d -> attach && !d -> detach) {
+            printf ("mod: attach — '%s' has no tick hooks (nothing to attach)\n", argv [2]); return;
+        }
+        if ((w -> tick_module_count < 0) || (w -> tick_module_count > 16)) {
+            printf ("mod: attach — tick_module_count corrupt (%d; re-init the world)\n", w -> tick_module_count); return;
+        }
+        for (int i = 0; i < w -> tick_module_count; i++) {
+            if (w -> tick_modules [i] && strcmp (w -> tick_modules [i] -> name, argv [2]) == 0) {
+                printf ("mod: attached '%s' already\n", argv [2]); return;
+            }
+        }
+        int r = physics_world_attach_module (w, d);
+        if (r < 0) { printf ("mod: attach failed '%s' (code %d)\n", argv [2], r); return; }
+        printf ("mod: attached '%s' at slot %d\n", argv [2], r);
+        return;
     }
     if (strcmp(argv[1],"use-broadphase")==0 && argc >= 3) {
         /* registry-first: try find pair handler as broadphase name proxy */
@@ -437,10 +479,31 @@ static void cmd_ftc_spawn (physics_world *w, int argc, char **argv) {
     float z = (argc > 4) ? atof(argv[4]) : 0.0f;
     motor_preset_id preset = MOTOR_GB_5203_71_2;
     if (argc > 5) preset = (motor_preset_id)atoi(argv[5]);
+    /* DESPOT-2026-10-21: bare spawn used to skip both spawn guarantees
+     * (tile floor + 128 iterations) that every other spawn path applies —
+     * the robot spawned on its wheels on empty space at 64 iterations and
+     * wobbled its revolute axles loose. Same contract as eco/ftc paths.
+     * If the bundle is not loaded there is nothing to dlsym and nothing
+     * to spawn anyway. */
+    void (*ensure_env) (physics_world *) = (void (*)(physics_world *)) mpe_loader_symbol("mfs-simulator", "mfs_ecosystem_ensure_env");
+    if (!ensure_env) ensure_env = (void (*)(physics_world *)) mpe_loader_symbol("ecosystem/mfs/plugins/mpe_ftc.so", "mfs_ecosystem_ensure_env");
+    if (ensure_env) { ensure_env (w); }
+    else { printf ("ftc: (bundle not loaded — no floor/iteration guarantee; spawn will likely fail)\n"); }
     ftc_fleet_spawn_fn spawn = (ftc_fleet_spawn_fn)ftc_sym("ftc_fleet_spawn");
     if (!spawn) { printf ("ftc: fleet API unavailable (load mfs_ecosystem.so)\n"); return; }
-    if (spawn(w, x, y, z, preset, FTC_DRIVETRAIN_MECANUM) < 0) { printf ("ftc: spawn failed\n"); return; }
-    printf ("ftc: spawned mecanum robot at (%.2f,%.2f,%.2f) preset=%d\n", x,y,z,(int)preset);
+    int si = spawn(w, x, y, z, preset, FTC_DRIVETRAIN_MECANUM);
+    if (si < 0) {
+        /* DESPOT-2026-10-21: bare spawn previously died here when only
+         * `mod load` (no attach) had been done — the fleet has no state
+         * in this world. Self-heal by attaching the bundle ecosystem,
+         * then retry once. */
+        const mpe_ecosystem_desc_t *e = mpe_ecosystem_find ("mfs-simulator");
+        if (e && mpe_ecosystem_attach (w, "mfs-simulator") == 0) {
+            si = spawn(w, x, y, z, preset, FTC_DRIVETRAIN_MECANUM);
+        }
+    }
+    if (si < 0) { printf ("ftc: spawn failed\n"); return; }
+    printf ("ftc: spawned mecanum robot %d at (%.2f,%.2f,%.2f) preset=%d\n", si,x,y,z,(int)preset);
 }
 static void cmd_ftc_telemetry (physics_world *w, int argc, char **argv) {
     (void)argc;(void)argv;
@@ -467,8 +530,11 @@ static void cmd_ftc_telemetry (physics_world *w, int argc, char **argv) {
 }
 static void cmd_ftc_drive (physics_world *w, int argc, char **argv) {
     (void)w;
-    if (argc < 3) { printf ("ftc drive: usage: ftc drive <left> <right>\n"); return; }
-    float l = atof(argv[1]), r = atof(argv[2]);
+    if (argc < 4) { printf ("ftc drive: usage: ftc drive <left> <right>\n"); return; }
+    /* DESPOT-2026-10-21: args were read from argv[1..2] — argv[1] is the
+     * verb "drive" here, so both tanks/both wheels silently went 0/atof-garbage.
+     * Same off-by-one applied in cmd_ftc_mec below. */
+    float l = atof(argv[2]), r = atof(argv[3]);
     ftc_fleet_get_fn get = (ftc_fleet_get_fn)ftc_sym("ftc_fleet_get");
     ftc_robot_set_wheel_commands_fn swc = (ftc_robot_set_wheel_commands_fn)ftc_sym("ftc_robot_set_wheel_commands");
     if (!get || !swc) { printf ("ftc: fleet API unavailable\n"); return; }
@@ -487,8 +553,8 @@ static void cmd_ftc_drive (physics_world *w, int argc, char **argv) {
 }
 static void cmd_ftc_mec (physics_world *w, int argc, char **argv) {
     (void)w;
-    if (argc < 4) { printf ("ftc mec: usage: ftc mec <fwd> <strafe> <rot>\n"); return; }
-    float fwd = atof(argv[1]), strafe = atof(argv[2]), rot = atof(argv[3]);
+    if (argc < 5) { printf ("ftc mec: usage: ftc mec <fwd> <strafe> <rot>\n"); return; }
+    float fwd = atof(argv[2]), strafe = atof(argv[3]), rot = atof(argv[4]);
     float targets[4] = { fwd - strafe - rot, fwd + strafe + rot, fwd + strafe - rot, fwd - strafe + rot };
     float maxm = 0.0f;
     for (int i=0;i<4;i++) { float m = fabsf(targets[i]); if (m > maxm) maxm = m; }
@@ -628,7 +694,7 @@ static void cmd_run (physics_world *w, int argc, char **argv) {
     for (int i=0;i<n;i++) { if (tui_paused) break; physics_world_step(w, tui_dt); tui_tick++;
         if ((i+1) % 60 == 0 || (i+1) == n) { printf ("tick=%lu ", tui_tick); tui_print_status(w); } }
 }
-static void cmd_tick (physics_world *w, int argc, char **argv) { (void)argc;(void)argv; if (!tui_paused) { physics_world_step(w, tui_dt); tui_tick++; } tui_print_status(w); }
+static void cmd_tick (physics_world *w, int argc, char **argv) { if (argc >= 2) { /* DESPOT-2026-10-21: 'tick N' now steps N times (the count was silently discarded — one step per call made every scripted drive be a 2-tick burst). */ int n = atoi (argv [1]); if (n > 0) { for (int i = 0; i < n && !tui_paused; i++) { physics_world_step (w, tui_dt); tui_tick++; } tui_print_status (w); return; } } if (!tui_paused) { physics_world_step(w, tui_dt); tui_tick++; } tui_print_status(w); }
 static void cmd_halt (physics_world *w, int argc, char **argv) { (void)w;(void)argc;(void)argv; tui_paused = 1; printf ("sim: paused\n"); }
 static void cmd_resume (physics_world *w, int argc, char **argv) { (void)w;(void)argc;(void)argv; tui_paused = 0; printf ("sim: resumed\n"); }
 static void cmd_status (physics_world *w, int argc, char **argv) { (void)argc;(void)argv; tui_print_status(w); }

@@ -185,8 +185,9 @@ static void drivetrain_odometry_update (physics_world *world, ftc_robot *robot, 
  *     rail model fixed with its frame id).
  * Deterministic: det_sin/det_cos + arithmetic + sqrtf only.
  * --------------------------------------------------------------------- */
-static void drivetrain_mecanum_analytic (physics_world *world, ftc_robot *robot) {
+static void drivetrain_mecanum_analytic (physics_world *world, ftc_robot *robot, float dt) {
     if ((!world) || (!robot)) { return; }
+    if (dt <= 0.0f) { return; }
     if (!robot -> mecanum_analytic) { return; }
     if (robot -> drivetrain_type != FTC_DRIVETRAIN_MECANUM) { return; }
     if (robot -> wheel_count <= 0) { return; }
@@ -249,6 +250,7 @@ static void drivetrain_mecanum_analytic (physics_world *world, ftc_robot *robot)
     if (!(g_mag >= 0.0f) || !isfinite (g_mag)) { return; }
     float n_per_wheel = total_mass * g_mag / (float) robot -> wheel_count;
     float f_max = MFS_MECANUM_ANALYTIC_MU * n_per_wheel;
+    float m_share = (g_mag > 0.0f) ? (n_per_wheel / g_mag) : 0.0f; /* per-wheel mass share: the chassis side of the contact chain */
     if (!(f_max >= 0.0f) || !isfinite (f_max)) { return; }
     for (int i = 0; i < robot -> wheel_count; i++) {
         int wi = robot -> wheel_bodies [i];
@@ -291,10 +293,65 @@ static void drivetrain_mecanum_analytic (physics_world *world, ftc_robot *robot)
         v_c.y = 0.0f;
         float v_a = vector3_dot (v_c, a_world);
         if (!isfinite (v_a)) { continue; }
-        float u = v_a / MFS_MECANUM_ANALYTIC_VREF;
-        if (u > 1.0f) { u = 1.0f; } else if (u < -1.0f) {
-            u = -1.0f;
-        } vector3 F = vector3_scaling (a_world, -f_max * u);
+        /* DESPOT-2026-10-21 (IMPULSE-CLOSURE traction — replaces the
+         * VREF-smoothed Coulomb slider): the old law u = clamp(v_a/0.005)
+         * offered the full cone at 5 mm/s of slip while the per-tick
+         * friction impulse (µN·dt = 0.324 N·s acting at radius r on a
+         * I = 2.5e-4 kg·m² wheel) can move the wheel's slip by 46 rad/s·
+         * tick — ~500x the slip the motor and chassis build per tick. The
+         * loop overshot zero slip every tick, phase-flipped the traction
+         * sign (measured period-2 limit cycle: wheel ω ping-pong −25..+70
+         * rad/s, |F| constant), and the rectified mean pushed the robot
+         * while wheels burned out at 2-3x their own motor no-load speed
+         * (57 rad/s vs 23.3 free) with regen-negative currents, 63%
+         * odometry error and a traction-cut latch pinning two of the four
+         * wheels. A slider that CANNOT close its own loop within one tick
+         * is numerically wrong, not "aggressive traction".
+         *
+         * New law: apply exactly the impulse that would take the measured
+         * slip to zero within this tick, capped at the Coulomb cone:
+         *     J = m_eff * |v_a|,   F = J/dt,   |F| <= MU*N
+         *     m_eff = 1/(1/m_share + r²/I_spin)
+         * (the series mass of the two gates the impulse opens: the
+         * chassis-anchored translation chain and the wheel's spin inertia
+         * about its own axle, read from the body's actual inverse inertia
+         * so a wheel-mass/radius change cannot re-bias the loop). Below
+         * saturation this is the one-tick zero-slip impulse — the loop
+         * closes EXACTLY, no overshoot by construction, wheels roll at
+         * the motor's load-limited speed; the cone cap only binds at real
+         * burnout (>~3.4 m/s of slip), where the Coulomb model is honest.
+         * Steady-state slip at full motor torque settles at
+         * T*dt/m_eff ≈ 0.09 m/s ≈ 1.8 rad/s, below the traction-cut
+         * engage threshold (4.0 rad/s) so the cut stays silent during
+         * rolling and only fires on genuine burnout. VREF is retired
+         * (robot.h keeps the define only as history). */
+        vector3 axle_spin = wheel -> cached_axes [0];
+        if (vector3_length_squared (axle_spin) < 0.0001f) {
+            axle_spin = vector4_rotate_to_vector3 (wheel -> orientation, (vector3) {1.0f, 0.0f, 0.0f});
+        }
+        float invI_spin = 0.0f;
+        {   /* I^-1 about the hub's own spin axis, from the body's world-frame
+             * inverse tensor (so the tensor source of truth is the engine's,
+             * not a copied constant): invI = a^T (I^-1 a). */
+            float jx = axle_spin.x * wheel -> inverse_inertia_system.matrix [0][0] +
+                       axle_spin.y * wheel -> inverse_inertia_system.matrix [1][0] +
+                       axle_spin.z * wheel -> inverse_inertia_system.matrix [2][0];
+            float jy = axle_spin.x * wheel -> inverse_inertia_system.matrix [0][1] +
+                       axle_spin.y * wheel -> inverse_inertia_system.matrix [1][1] +
+                       axle_spin.z * wheel -> inverse_inertia_system.matrix [2][1];
+            float jz = axle_spin.x * wheel -> inverse_inertia_system.matrix [0][2] +
+                       axle_spin.y * wheel -> inverse_inertia_system.matrix [1][2] +
+                       axle_spin.z * wheel -> inverse_inertia_system.matrix [2][2];
+            float denom = axle_spin.x * jx + axle_spin.y * jy + axle_spin.z * jz;
+            if (denom > 1e-20f && isfinite (denom)) { invI_spin = denom; }
+        }
+        float m_eff = 0.0f;
+        if (invI_spin > 0.0f && m_share > 0.0f) { m_eff = 1.0f / (1.0f / m_share + r_run * r_run * invI_spin); }
+        if (!(m_eff > 0.0f) || !isfinite (m_eff)) { m_eff = 0.0f; }
+        float f_eff = (dt > 0.0f && m_eff > 0.0f) ? (m_eff * fabsf (v_a) / dt) : 0.0f;
+        if (f_eff > f_max) { f_eff = f_max; }
+        if (!isfinite (f_eff)) { continue; }
+        vector3 F = vector3_scaling (a_world, (v_a > 0.0f) ? -f_eff : f_eff);
         wheel -> force_accumulator = vector3_addition (wheel -> force_accumulator, F);
         wheel -> ext_force_this_tick = 1;
         /* DESPOT-2026-10-04 (axle projection TRIED AND REVERTED): keeping
@@ -315,7 +372,7 @@ void drivetrain_update (physics_world *world, ftc_robot *robot, float dt) {
     /* MFS-STRAFE-A analytic lateral (mecanum only, contact-level, cone-
      * capped — see function header). Lands in the accumulators alongside
      * motor torque, pre-integration, same tick. */
-    drivetrain_mecanum_analytic (world, robot);
+    drivetrain_mecanum_analytic (world, robot, dt);
     /* Rolling resistance.
      *
      * A rigid-body contact solver is perfectly elastic, so a real wheel
