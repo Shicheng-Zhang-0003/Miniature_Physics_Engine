@@ -249,10 +249,19 @@ void simulation_physics_tick (float frame_delta_time) {
         /* TRUTH: forces after narrow (unified with world path). Springs via
          * the canonical weak entry (see physics_world.c). */
         if (mpe_springs_apply) { mpe_springs_apply (world, fixed_physics_dt); }
+        /* DESPOT-2026-10-20 CCD-TOI GRAVITY (parity with physics_world.c):
+         * sweep-clamped bodies skip the gravity push — the sweep banked
+         * [0,toi] gravity in v_toi and the post-impulse flight is
+         * constant-velocity, so [toi,dt] gravity has no owned window.
+         * Forces/torques/damping below still integrate the full dt. */
         for (int gi = 0; gi < world -> body_count; gi++) {
             vector3 grav_a = {0, mpe_world_cfg (world) -> world.gravity, 0};
             rigidbody *rb = &world -> bodies [gi];
             if ((rb -> is_sleeping) || (rb -> kinematic) || (rb -> static_state)) { continue; }
+            if (world -> ccd_time_remaining) {
+                float rem = world -> ccd_time_remaining [gi];
+                if ((rem > 0.0f) && (rem < fixed_physics_dt)) { continue; }
+            }
             /* Gravity bypasses rb_apply_forces_perfect (see physics_world_step):
              * not an external force for the ext_force_this_tick gate. */
             rb -> force_accumulator = simd_add (rb -> force_accumulator, simd_scale (grav_a, rb -> mass));
@@ -283,6 +292,12 @@ void simulation_physics_tick (float frame_delta_time) {
                 world -> tick_v0 [si] = world -> bodies [si].velocity;
             }
         }
+        /* DESPOT-2026-10-20 CCD-TOI GRAVITY (parity with physics_world.c):
+         * sweep-clamped bodies carry the exact touch-speed v_toi with
+         * gravity over [0,toi] banked; the gravity increment is excluded at
+         * the accumulator add site above, so this integrate keeps the FULL
+         * dt — motors, springs, damping, the L-conservation rotor advance,
+         * and quat normalisation are preserved verbatim. */
         for (int vi = 0; vi < world -> body_count; vi++) {
             rb_integrate_velocity (&world -> bodies [vi], fixed_physics_dt, linear_damping_factor, angular_damping_factor);
         }
@@ -297,7 +312,10 @@ void simulation_physics_tick (float frame_delta_time) {
                 sleep_staticize_body -> torque_accumulator = vector3_zero ();
             }
         }
-        /* TRUTH P0-2: refresh Poisson gate to post-integration velocities. */
+        /* TRUTH P0-2: refresh Poisson gate to post-integration velocities.
+         * DESPOT-2026-10-20 CCD-TOI GRAVITY (parity with physics_world.c):
+         * clamped-tick gravity was excluded at the accumulator add site, so
+         * the gate measures the touch-speed approach. */
         collision_refresh_impact_velocities (world -> manifolds, manifold_count);
         /* DESPOT-2026-10-20 (PARITY with physics_world.c:1742): islands were
          * built before motors/forces ran; motor wake flips bodies awake

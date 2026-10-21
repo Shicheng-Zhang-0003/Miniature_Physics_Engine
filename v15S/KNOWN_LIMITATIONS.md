@@ -26,6 +26,21 @@ plane (some legs over, some legs gapped) is mean-touched once, not
 edge-crept, so its uphill legs stay inside the admission band at rest.
 Both are measured trade-offs, not hidden bugs.
 
+### CCD-TOI gravity window (flat constant-velocity post-impulse flight)
+A sweep-clamped body's velocity is advanced by the CCD to the exact touch
+speed `v_toi` (gravity and drag over `[0,toi]` banked) and its position is
+teleported to the hit. The remaining `[toi,dt]` window is the post-impulse
+flight, which integrates at **constant velocity — gravity inside it is
+deliberately not applied**: the velocity integrate keeps the full dt for
+forces/torques/damping (motors, springs, L-conservation rotor, quat
+normalization) but the gravity push is skipped for clamped bodies
+(DESPOT-2026-10-20 CCD-TOI GRAVITY, both step paths). Consequence: a
+clamped tick's normal impulse is `m·g·toi`, not `m·g·dt`; a constantly
+re-clamped rolling contact receives slightly less support than a stack
+resting in-place, and locked-rotor drive regimes validate at their own
+pre-baselined numbers (MFS pivot translation 0.0478, fwd/rev antisymmetry
+band 0.45 — see docs/AUDIT_REPORT_2026-10-20.md, fourth finding).
+
 ### Warm start
 **Cold by default.** No effective warm start on any row — measured, not
 assumed. The normal is cold every tick (restoring last tick's normal ejected

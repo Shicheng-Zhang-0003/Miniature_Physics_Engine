@@ -1657,6 +1657,15 @@ void physics_world_step (physics_world *world, float dt) {
     for (int i = 0; i < world -> body_count; i++) {
         rigidbody *rb = &world -> bodies [i];
         if ((rb -> static_state) || (rb -> is_sleeping) || (rb -> kinematic)) { continue; }
+        /* DESPOT-2026-10-20 CCD-TOI GRAVITY: sweep-clamped bodies skip the
+         * gravity push entirely. The sweep banked gravity over [0,toi] in
+         * v_toi, and the post-impulse flight is constant-velocity by
+         * engine convention, so [toi,dt] gravity has no owned window.
+         * Forces/torques/damping below still integrate the full dt. */
+        if (world -> ccd_time_remaining) {
+            float rem = world -> ccd_time_remaining [i];
+            if ((rem > 0.0f) && (rem < dt)) { continue; }
+        }
         /* Gravity bypasses rb_apply_forces_perfect: it is not an external
          * force for the ext_force_this_tick gate (the analytic free-flight
          * path already integrates gravity exactly; only non-gravity forces
@@ -1720,6 +1729,25 @@ void physics_world_step (physics_world *world, float dt) {
             (void) states;
         }
     }
+    /* DESPOT-2026-10-20 CCD-TOI GRAVITY: a sweep-clamped body arrives here
+     * with velocity already advanced to the touch speed (collision_ccd
+     * applies v_toi, gravity over [0,toi] banked) and its position
+     * teleported to the hit. Integrating gravity over the full dt on top of
+     * v_toi double-counts [0,toi] and adds [toi,dt], so the Poisson gate
+     * recorded one extra g*dt on every CCD-bounced impact (flat slam:
+     * approach read 2.96 vs the physical 2.80 touch speed; bounce exits
+     * hot, chains run a bounce long, and marginal sub-threshold impacts
+     * turned into bounces). The gravity increment is therefore excluded
+     * for clamped bodies at the force_accumulator add site above; this
+     * integrate keeps the FULL dt so motors, springs, damping, the
+     * torque-free L-conservation rotor advance, and the per-tick
+     * quaternion normalisation are preserved verbatim (skipping them -
+     * earlier body_dt=0 attempt - stalled MFS motor pivots and left the
+     * quaternion off its normalisation fixed point, which the scene
+     * round-trip's unconditional renormalisation then flagged). The
+     * post-impulse flight stays constant-velocity by engine convention, so
+     * [toi,dt] gravity is deliberately unowned. Non-clamped bodies
+     * (rem == dt) integrate the full tick with gravity as before. */
     for (int i = 0; i < world -> body_count; i++) {
         rb_integrate_velocity (&world -> bodies [i], dt, linear_damping, angular_damping);
     }
@@ -1739,7 +1767,10 @@ void physics_world_step (physics_world *world, float dt) {
     /* Poisson gate must see post-force-integration approach speed (prepare
      * ran pre-gravity, stale by g*dt). Refresh from current velocities
      * BEFORE any iteration touches accumulators. Refreshing after the solve
-     * would read the post-solve residual (~0) and gate every bounce off. */
+     * would read the post-solve residual (~0) and gate every bounce off.
+     * DESPOT-2026-10-20 CCD-TOI GRAVITY: clamped-tick gravity was excluded
+     * at the force_accumulator add site above, so the gate and the Newton
+     * bound measure the touch-speed approach instead of touch + g*dt. */
     collision_refresh_impact_velocities (world -> manifolds, manifold_count);
     /* TRUTH: islands were built before motors/forces ran; motor wake flips
      * bodies awake after the flags were computed, leaving joint+contact

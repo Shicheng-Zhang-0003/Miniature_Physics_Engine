@@ -405,6 +405,68 @@ admission band while the downhill legs carry the touch; the body
 rests mean-touched instead of edge-touched. The admission band itself
 remains the `penetration_slop` config knob.
 
+### Fourth finding in the same session: CCD-TOI double gravity (residual
+"user wobble, now timid" = one phantom late bounce)
+
+User verification reduced the complaint to decaying-bounce chains that
+still carried one half-height late hop. Tick-decode (mode 9, 20 m/s
+scale slam, dt=1/60) exposed the mechanism on the CCD-hit path:
+
+- The CCD sweep advances a clamped body's velocity to the exact
+  touch-speed `v_toi` (`collision_ccd_apply_range`, including drag)
+  and teleports position to the hit — physically correct.
+- The pre-solve velocity integrate then ran over the FULL dt anyway
+  (`rb_integrate_velocity`), adding `g·dt` for time already burned
+  into the teleport — velocities owned `g·(t_hit + dt)` instead of
+  `g·dt`, while positions (which honor the leftover) disagreed.
+- Consequences: the Poisson gate recorded approach = `v_toi + g·dt`
+  (first-bounce impact read 2.96 vs physical 2.80; second-bounce 1.18
+  vs 1.02), the contact compression was built from the inflated
+  velocity, so `e·compression` over-paid restitution (~+5% exit
+  speed), and impacts whose true touch speed sat just under
+  `restitution_velocity_thresh` (1.0) still fired a phantom bounce.
+
+Fix (marked `DESPOT-2026-10-20 CCD-TOI GRAVITY`, both step paths —
+`physics_world.c` and the legacy `simulation_physics_loop.c`): for a
+sweep-clamped body the gravity push into `force_accumulator` is
+SKIPPED at the accumulator-add site (the sweep banked gravity over
+`[0,toi]` in `v_toi`, and the post-impulse flight is constant-velocity
+by engine convention, so `[toi,dt]` gravity has no owned window).
+The velocity integrate itself keeps the FULL dt — motors, springs,
+damping, the torque-free L-conservation rotor advance, and the
+per-tick quaternion normalization are preserved verbatim. Two failed
+attempts are on record: (1) an `_ex` refresh variant that corrected
+the recorded impact by `(rem_a−rem_b)·g·n` was abandoned because the
+Poisson payment `e·compression` still leaked the tail; (2) a
+`body_dt = 0` zero-integrate removed the tail at the source but
+starved clamped bodies of force/torque/damping work and froze the
+L-conservation rotor + normalization (motor pivots stalled, MFS tank
+numbers fell, and the scene round-trip's unconditional
+`vector4_normalisation` flagged the quaternion off its bitwise fixed
+point — parity_scene_persistence FAILED). Skipping only the gravity
+increment fixes the recorded impacts without any of that collateral.
+
+Consequences (all deterministic, bit-stable across runs):
+- Scene persistence is green again (quat stays a normalization
+  fixed point: 3×/3 passes).
+- MFS robotics: the engine's phantom `g·dt` normal load on clamped
+  ticks had chattered fast-moving wheel contacts (`e·phantom` hops
+  every tick) and padded friction caps. Removing it strengthened
+  grip: tank pivot translation 0.0837 → 0.0478 (re-baselined), pivot
+  heading unchanged (3.0639, ~1% from measurement), fwd/rev |vz|
+  antisymmetry measured 0.4953/0.8686 (43%, was chatter-era 14%) —
+  structural band updated 0.35 → 0.45 at both call sites (twin
+  461-MFS mirrored, `bbf39f6`). 461-MFS suite 30/30.
+
+Behavior (mode 9, dt=1/60): one textbook bounce — exit ≈ e·v_toi
+(0.8208 vs the pre-fix hot 0.8884; damping now applies over the full
+tick to the banked touch speed), second touch arrives at ~0.97 m/s,
+under the 1.0 restitution_velocity_thresh, and THUDS without
+bouncing (the recording had said 1.18 and bounced); the body rests
+at 0.400138 and sleeps. Rest battery: all 12 modes ≤0.5 mm, gentle
+drop 0.400055, tilts 0.403475 (1-ulp from pre-fix), sleeps clean.
+
 Verification: quick profile 60/60 green immediately after the fix
-(`temp/qa_runs/20261021T040946Z-333170`); full profile, TSan, twins,
+(`temp/qa_runs/20261021T040946Z-333170` and
+`temp/qa_runs/20261021T144422Z-598230`); full profile, TSan, twins,
 and the MGB kit rerun in the final verification record below.
