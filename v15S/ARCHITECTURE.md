@@ -9,9 +9,9 @@
 
 ## 1. Design Principles
 
-MPE is a **zero-dependency core** (libc + libm + libdl only) wrapped in
-GTK4 + OpenGL 3.3 Core (via libepoxy) for the GUI and ncurses for the
-`mpe-tui` terminal debugger. Four priorities drive every design decision:
+MPE's headless core uses libc, libm, libdl, and pthreads. GTK4 + OpenGL 3.3
+Core (via libepoxy) provide the GUI; ncurses provides the `mpe-tui` terminal
+debugger. Four priorities drive every design decision:
 
 1. **Mathematical transparency** — every integrator, solver, and collision
    test is hand-written and inspectable. No black-box physics library.
@@ -19,8 +19,8 @@ GTK4 + OpenGL 3.3 Core (via libepoxy) for the GUI and ncurses for the
    instance buffers.
 3. **Deterministic simulation** — fixed-timestep physics decoupled from
    render framerate; bitwise-identical twins on GCC/Clang IEEE targets.
-4. **Real-time scaling** — GPU instancing and an O(N) spatial-hash
-   broadphase.
+4. **Real-time scaling** — GPU instancing and a spatial-hash broadphase with
+   expected near-linear behavior for ordinary distributions.
 
 ---
 
@@ -102,7 +102,9 @@ never corrupted mid-tick and the path is thread-safe.
 2. snapshot config once per tick (menu/terminal edits mid-tick can't change behavior halfway through)
 3. CCD sweep clamp (time-of-impact pose, per-body remainder recorded)
 4. broadphase pair generation (spatial hash, adaptive cell size)
-5. narrowphase per pair (registry dispatch + builtins) + 3-gate wake
+5. narrowphase collision detection per pair (registry dispatch + builtins,
+   parallel into disjoint slots); ordered wake/contact bookkeeping and solver
+   preparation after the worker barrier
 6. floor contact (static plane at y=0, gated by static_plane_enabled)
 7. build solver islands (union-find over pairs + joints)
 8. snapshot start-of-tick velocities (tick_v0, for exact free flight)
@@ -210,7 +212,7 @@ plugin's address once more than one is loaded. Use a `static` symbol as the
 
 ## 6. Configuration System
 
-`config/mpe_config.h` + `config/mpe_config_schema.h`. 78 tunables in 13
+`config/mpe_config.h` + `config/mpe_config_schema.h`. 80 tunables in 13
 categories (world, timestep, sleep, solver, depenetration, broadphase,
 joints, boundary, spawner, body_defaults, camera, render, ui). Hot-path code
 reads `g_cfg.<group>.<field>` directly; cold-path code (menu, terminal,

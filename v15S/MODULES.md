@@ -1,15 +1,16 @@
 # MPE Module System (MPI) — v15S
 
-> Hot-plug physics components through a stable C ABI. Every modular artifact
-> lives under `ecosystem/`; the loader jails paths there.
+> Hot-plug supported physics components through a stable C ABI. Every
+> modular artifact lives under `ecosystem/`; the loader jails paths there.
 
 ---
 
 ## 1. Overview
 
-The kernel is fully modular: every pipeline stage (broadphase, narrowphase
-shapes, solver stages, joints, force fields, tick modules) is hot-swappable
-at runtime via `.so` plugins through the stable C ABI in
+The supported extension points are the broadphase, solver interface,
+narrowphase shape-pair handlers, and per-world pre/post-step modules. Force
+fields can be applied by tick modules. Joints are engine-managed and are not
+replaceable pipeline plugins. `.so` modules use the stable C ABI in
 `core/mpe_module.h` (`MPE_MODULE_ABI 1`).
 
 Modules are loaded live via the debug terminal (`mod load|unload|attach|
@@ -65,6 +66,11 @@ field reordering, removal, or semantic change requires bumping
 5. **Registry find results are unowned interior pointers** — copy what you
    keep, never store them across unload.
 6. **Unregistering a module/stage detaches it from every live world first.**
+7. **Pair handlers may run concurrently.** When `MPE_THREADS > 1`, narrowphase
+   dispatch can call a handler from worker threads for different pairs. A
+   handler must be reentrant, read-only with respect to bodies/world state,
+   and write only to its supplied manifold. Shared plugin state needs its own
+   synchronization.
 
 ---
 

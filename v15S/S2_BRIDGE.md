@@ -12,8 +12,8 @@ spawns a live `s2tui` child, configures it through the shell S2 already has,
 reads strict `S2SAVE1` frames produced by `sync`, and maps them to MPE
 bodies and zero-force bond lines.
 
-**Phase 0** stages a single snapshot — the dish renders but does not move or
-vibrate (static bodies, `k=0` bonds, stage-once cadence).
+**Phase 0** stages a single snapshot — the dish renders but does not drift
+under gravity or contact response (kinematic bodies, `k=0` bonds).
 
 **Phase 1** (2026-10-15): `cfg->every > 0` is wired into `pre_step`. Each
 refresh tick calls `mgb_sink_mpe_move()`, which **repositions existing
@@ -22,10 +22,10 @@ mapping means atom `i` always maps to the same body; new atoms create new
 bodies; removed atoms' bodies remain frozen at last position. Zero-force
 bond lines (`k=0`) are updated to the current separation each refresh.
 
-Bodies are **dynamic** (not static) so they participate in collision
-response correctly (other MPE bodies bounce off them), but position is
-overridden from S2 each refresh and velocity is zeroed, so the solver never
-drifts them between updates.
+Bodies are **kinematic** (not static or dynamic): gravity and collision
+impulses do not move them, and other MPE bodies treat them as immovable
+collision obstacles. Refresh ticks apply S2 positions to the same mapped
+bodies in place.
 
 Physical coupling (positions flowing back to S2) remains out of scope:
 **display-only, one-way, always.**

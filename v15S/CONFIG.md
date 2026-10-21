@@ -1,6 +1,6 @@
 # MPE Configuration System — v15S
 
-> 78 tunables in 13 categories, live menu (key `6`), terminal `env`/`export`,
+> 80 tunables in 13 categories, live menu (key `6`), terminal `env`/`export`,
 > round-trip save/load to `status/engine.cfg`, corrupt-safe load.
 
 ---

@@ -1,15 +1,60 @@
 # Remaining Work
 
-> Live TODO. Dated history below is preserved; current counts/gates are in
-> `docs/DESPOT_AUDIT_2026-10-13.md` (quick 59/59; physics 104/105 with the
-> single red the pre-existing `legacy-f11_torture`; TUI smoke PASS; MGB
-> 32/32; MFS 16/20 gated bit-identical to pristine). Prior notes: 2026-10-12
+> Live TODO. Current verification is in `docs/VERIFICATION.md` and the
+> comprehensive audit is in `docs/AUDIT_REPORT_2026-10-20.md`. Earlier dated
+> notes below are historical snapshots. Prior notes: 2026-10-12
 > counts in `docs/DESPOT_AUDIT_2026-10-12.md` (same headlines; MGB was 30/2
 > there — the mkstemp bug below had not been found); 2026-10-09 counts in
 > `RELEASE_GATES.md` (45 registered / 43 blocking; full 226 total, 220 passed,
 > 6 blocking, 4 informational); 2026-10-07 (44/42; 232+2 xfail/234);
 > 2026-10-01 (41/42).
 >
+## Current audit — 2026-10-20
+
+### Second pass (same day, after the first set landed)
+
+- Fixed the GUI/legacy step loop's stage parity with the canonical loop
+  (same drag clamps; islands + awake flags rebuilt after the motor/force
+  stage; late-manifold post-split extra solve pass) — the documented
+  broken-hinge-response behaviour had persisted verbatim on the GUI path.
+- Fixed `LIE-CAPSULE`: the capsule plugin emitted box→cap / cyl→cap normals
+  (engine dispatch swaps + negates, so both orders got the wrong sign);
+  rewritten as A→B with engine-parity inside-solid contacts.
+- Added the address-based `purge_plugin_stages()` loader backstop +
+  indexed registry row accessors (plugin stage ifaces survived unload).
+- Closed the MGB hardening set: session-owned reserved transcript
+  fd (fopen-by-name truncated/raced), append-only `mgb_spawn_e_banner`
+  handshake reason, one `open(O_NOFOLLOW)` snapshot read, per-frame
+  scratch unlink, `make probe` target restored, `readme_475.md` drift
+  (no `tests/mgb_load_test.c` in this copy).
+- Closed the command-line `CFLAGS`/`LIBS` makefile trap: V-01/V-02
+  prototype/gates silently built the removed GTK3 branch; `GTK_DEFINES`
+  and `$(HARD_LIBS)` are hard-appended now (both gates pass green).
+- Fixed `mv` `argc>=5` argv[5], `sleep` cast, unified the `nice` domain
+  to [0, 100] across the three command paths, `vi` known-files gate
+  order (`status/scene.dat` reachable), MicroVim boundary line, legacy
+  joint-count read + remap-presence gating, `scene_init` indices[-1],
+  and the render cube corner wireframe.
+- Fixed MFS: odometer overflow `(int)` cast (hold at ceiling), wheel
+  front/back label truth (front = +Z enforced by suite gate), nose
+  marker towards +Z, `fuse_heat` domain comment, FTC standalone source
+  list update (intake/biobuzz).
+- Fixed engine `nice` domain: renice/nice/sed all declare [0, 100]
+  (engine invariant owns the band, no save-veto roundtrip).
+- Re-ran: build+quick 60/60 (rerun after V01/V02 fixes), external
+  oracles 10/10, V-01/V-02, MPE_THREADS=1/4/8 paranoia twins all
+  md5-identical logs; full 226 suite running in background (this lands
+  separately).
+
+- Still open: empirical 0.5mm rolling spin-patch floor; warm-start impulse
+  carry (cold default); rotation-only CCD between volumes; full-depth and
+  oblique multi-body angular-momentum oracles; analytic drag oracle; ellipse
+  closest point; within-island parallel solving; MicroVim symlink/path-race
+  hardening; MSVC/Windows/macOS/32-bit and Wayland release validation; S2 TUI
+  health stats; 472-MGB forward-port in its separate repository; dedicated
+  regression test for capsule orientation order; nice [0,100] roundtrip
+  bound in paranoia_scene_persistence.
+
 > **2026-10-15 comprehensive audit — CLOSED:**
 > - MULTICORE: island-based parallel solver (`MPE_THREADS` 1–8, default 1).
 >   Each awake island's manifolds dispatched to a dedicated thread; within-island
@@ -60,26 +105,16 @@
 
 ## Open 2026-10-09 — S2 bridge, diagnostics, and three known reds
 
-### Follow mode for `s2-bridge` (the display is static by design)
-The dish renders but does not move or vibrate. Phase 0 stages a single
-snapshot; this is not a regression.
-
-- [ ] **Refresh cadence.** `cfg->every` exists (0 = stage-once) but is not
-      wired into `pre_step`. Default must stay 0 until (1) lands: the current
-      `bridge_stage` *adds* bodies rather than moving existing ones, so
-      enabling a cadence naively would duplicate the dish every tick.
-- [ ] **Move, do not re-add.** Restaging needs an update path: bodies created
-      once, then repositioned. Static bodies cannot be moved by the solver, so
-      this is a direct `rigid_body_set_static(false)` + force/integrate
-      design question, or an explicit position write on the existing body.
-- [ ] **Per-frame mapper reuse.** `mgb_snapshot` + `mgb_frame_parse` per
-      refresh; confirm the child keeps answering prompts at cadence.
-- [ ] **Bond lines follow.** The zero-force joint skeleton is built once;
-      refreshed bond sets need the joint graph rebuilt or rewritten in place.
-- [ ] **TUI health surface.** `s2_bridge_stats` still returns −1 for frame
-      and error counts; expose them in the terminal.
-- [ ] Decide whether bonds stay `k=0` (display-only) forever. Physical
-      coupling remains out of scope: positions flow one way, always.
+### S2 bridge (`s2-bridge`)
+- [x] Refresh cadence (`cfg->every > 0`) wired into `pre_step`.
+- [x] Existing bodies reposition in place; atom-to-body mapping stays stable.
+- [x] Zero-force bond lines update their rest length on refresh.
+- [x] Display bodies are kinematic, so gravity and collision impulses cannot
+      drift the imported frame between refreshes.
+- [ ] **TUI health surface.** `s2_bridge_stats` still returns -1 instead of
+      exposing frame, error, and atom counts.
+- Physical coupling remains outside the bridge contract: positions flow
+  S2 → MPE only.
 
 ### Diagnostics — done this pass, follow-ups
 - [x] `core/mpe_diag` self-report: source + stable code + engine `file:line` +
@@ -89,20 +124,16 @@ snapshot; this is not a regression.
       `< 0`, so existing callers are unaffected).
 - [x] `diag` command; live mirror into the debug terminal on open.
 - [x] `diag_naming` canonical gate; spawn-naming and resolver tiers in the
-      MGB suite (43/43).
-- [ ] Consider engine-wide `-Werror`. 4179 enforces it; 475 does not. The
-      case for it is now on record: an implicit declaration of `localtime_r`
-      in `mpe_config.c` survived because nothing treated a warning as fatal,
-      and it truncated a returned pointer through an `int`-typed assumption.
+      MGB suite.
+- [x] Engine-wide `-Werror` is enabled by default; current builds must remain
+      warning-free under `-Wall -Wextra -Werror`.
 
-### Three known reds (all pre-existing, none from the diagnostics work)
-- [ ] **`legacy-f11_torture`** — extreme-parameter torture case. Reproduced
-      bit-identically from a pristine `HEAD` worktree, so it is not a
-      regression. Green at the v15R3 tag under its then-current parameters.
-- [ ] **MFS CCD obstacle margin** (`41bcc0b`) — 14/17; `tank`,
-      `drive_directions`, `odometry_yaw`. Root-caused: a global CCD obstacle
-      margin. Zeroing it restores 17/17. Candidate fix is a per-pair margin.
-- [ ] **MFS harness summary contract** — fixed 2026-10-09. `build_tests.sh`
+### Historical reds (closed)
+- [x] **`legacy-f11_torture`** — the island batching fix closed the earlier
+      29,022-fallen-body regression; the 2026-10-19 audit records PASS.
+- [x] **MFS CCD obstacle margin** — per-pair margins closed the tank and
+      drive/odometry failures; the 2026-10-19 audit records a unified 30/30.
+- [x] **MFS harness summary contract** — fixed 2026-10-09. `build_tests.sh`
       ran under `set -e` and aborted one line above `suite_rc=$?`, so any
       failing test destroyed the script's own summary and the runner reported
       a misleading "did not emit its summary". Errexit is now scoped off

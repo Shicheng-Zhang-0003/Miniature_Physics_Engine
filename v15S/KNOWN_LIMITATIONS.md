@@ -9,6 +9,13 @@
 
 ## 1. Physics — Unsupported / Documented Frontiers
 
+### Contact-model tuning
+The rolling spin patch uses a 0.5 mm minimum effective penetration so resting
+yaw continues to decay at zero-depth/slop contacts. Removing the floor stopped
+that decay in measured scenes. Rolling resistance now uses the compression-only
+normal impulse, but spin-patch size and the mass-weighted two-body split remain
+empirical calibrations, not a Hertz-contact derivation.
+
 ### Warm start
 **Cold by default.** No effective warm start on any row — measured, not
 assumed. The normal is cold every tick (restoring last tick's normal ejected
@@ -41,16 +48,20 @@ tip-speed bounding. Obstacle rotation beyond the margin (`max|ω|·R`, capped
 2 m/s) is unsupported.
 
 ### Multithreaded solve
-Solver stages parallelize per-island via `MPE_THREADS`; the joint solve
-(`constraint_solve_all`) stays serial. Pairs/solve are single-threaded for
-bitwise-identical order. True multithreaded solve is future work.
+Per-body work, CCD, pair-local collision detection, and solver sweeps across
+independent islands parallelize via `MPE_THREADS`. Shared-body contact
+preparation and the joint solve (`constraint_solve_all`) stay serial. The
+Gauss-Seidel order within each island is preserved; within-island row
+parallelism remains future work.
 
 ---
 
 ## 2. Platform / Toolchain
 
-- **MSVC bitwise twins:** unproven. Needs `/fp:strict` proof + TSan on a
-  TSan-capable host. Container TSan aborts on mapping (env, not code).
+- **MSVC bitwise twins:** unproven. GCC/Linux passes the full suite under
+  ThreadSanitizer with `setarch x86_64 -R`; MSVC still needs its own
+  `/fp:strict` build and determinism comparison. Without the launcher, this
+  container's TSan runtime can fail while mapping shadow memory.
 - **Windows/macOS:** unsupported as release targets (Windows build exists
   via MSYS2/MinGW but is not CI-proven).
 - **Big-endian hosts:** unsupported — little-endian only; big-endian fails
@@ -58,6 +69,9 @@ bitwise-identical order. True multithreaded solve is future work.
 - **Wayland:** mouse lock is Wayland-safe by design (no X11-only lock) but
   P1-unverified until a Weston/Sway matrix is logged. X11 path verified.
 - **32-bit:** untested; `size_t` / pointer arithmetic assumptions may bite.
+- **MicroVim path jail:** non-listed files are confined to direct children of
+  `status/`; the fixed known-file list still includes project-relative paths.
+  Symlink and concurrent path-replacement hardening is not a sandbox boundary.
 
 ---
 
@@ -77,6 +91,14 @@ bitwise-identical order. True multithreaded solve is future work.
   and scene persistence for fixed/distance/prismatic/rope is post-release
   work.
 - **Per-object config persistence:** beyond `nice_value`, not in scene files.
+  The saved `nice` domain is the engine's [0, 100] sanitize invariant — the
+  three engine paths (`nice`, `renice`, `sed nice`) now clamp there, so a
+  saved value can no longer veto the file on reload (2026-10-20 fix).
+- **Capsule plugin scope:** example-module tier. Normal conventions are A→B
+  with engine-parity inside-solid contacts (2026-10-20 fix); outside-cube
+  sampling keeps the per-axis clamped walk segment fidelity the module
+  shipped with; exact segment/OBB distance inside the engine core uses the
+  engine-side ternary sweep (documented in DESPOT_AUDIT_2026-10-19.md).
 
 ---
 
@@ -84,8 +106,7 @@ bitwise-identical order. True multithreaded solve is future work.
 
 | Issue | Detail |
 |---|---|
-| `tank` red (MFS) | Pre-existing CCD obstacle-margin regression (14/17); per-pair fix is the candidate |
-| `drive_directions`, `odometry_yaw` red | Same global margin root cause |
+| MFS CCD obstacle-margin regression | Resolved by per-pair margins in the 2026-10-19 audit; the prior red tank/drive/odometry rows are historical, not current open failures |
 | Jointed air-spin limit cycle | Free-spinning jointed wheels oscillate (motor 86 rpm vs true 799 rpm); contained by bearing damping (c=1e-6) + diode+slew |
 | MOTOR-III observer limit cycle | Observer-armed driven path is a documented limit cycle at −61.3%; open-loop no-load line is exact |
 | Encoder odometry over-reports under slip | No slip term in the odometry model; land motor-chain step 2 together with slip term + VREF retune |
@@ -95,10 +116,10 @@ bitwise-identical order. True multithreaded solve is future work.
 
 ## 5. S2 Bridge (MGB)
 
-- **Phase 0:** static display only — the dish renders but does not move or
-  vibrate (static bodies, `k=0` bonds, stage-once). Not a regression.
-- **Phase 1:** moves existing bodies per refresh tick (`cfg->every > 0`);
-  bonds remain `k = 0` (display-only).
+- **Phase 0:** kinematic display only — gravity and contact impulses do not
+  move the staged dish; `k=0` bonds render without applying force.
+- **Phase 1:** moves existing kinematic bodies per refresh tick
+  (`cfg->every > 0`); bonds remain `k = 0` (display-only).
 - **Physical coupling:** positions flow S2 → MPE, never back. Out of scope
   forever by design.
 

@@ -46,13 +46,17 @@ exact IEEE `+ - * / sqrt` + fixed-coefficient polynomials (`det_math.h`) +
   `max|w|·R` (capped 2 m/s). Obstacle rotation beyond the margin (fast blade)
   unsupported: substep or bound tip speed externally. Overshoot bound
   `≤0.5·g·toi²<slop` holds at canonical dt only (0.25m at dt=0.1+g≈50).
-- Rolling: Hertz-patch + spin, mass-weighted split is TUNE (band 4-14 m only).
-  N is post-Poisson (bouncers draw from restitution impulse — ticketed);
-  0.5mm `pen_eff` floor manufactures overlap for zero-depth spin decay.
+- Rolling: the normal force uses the compression-only impulse snapshot taken
+  before Poisson restitution (fixed 2026-10-20). Hertz-patch naming is avoided:
+  spin patch and mass-weighted sharing are empirical tunes (4-14 m calibration
+  band only); the 0.5mm `pen_eff` floor remains to decay resting spin.
+- Cylinder contacts: slab shortcut falls back to the OBB path when a cylinder
+  spans both slab faces, allowing the shallower exit; cylinder-cap support
+  points are clamped into the common disc lens; parallel-edge contact sampling
+  no longer has a 0.1 m size cutoff (fixed 2026-10-20).
 - Joints: `joints.revolute_beta` is the SHARED anchor bias (revolute P2P +
   prismatic-perp + rope + distance); axis/fixed drift use fixed 0.1 by design
-  (decoupled). Cyl-slab shortcut exits near-face always (embedded takes the
-  long way — minimal-exit exception); cyl-cyl 2nd point unchecked vs cap disc.
+  (decoupled).
 - Sleep: three-gate wake (pair novelty + fast-other + deep); settled stacks
   sleep, slow pushers wake at any speed. Post-correction wake uses the same
   `wake_depth_thresh` knob as pre-wake (single meaning, since 2026-10-13).
@@ -66,9 +70,13 @@ exact IEEE `+ - * / sqrt` + fixed-coefficient polynomials (`det_math.h`) +
   wrappers 2.1x slower than scalar in a synthetic tight loop (round-trips),
   engine suite neutral (wired ~3% ahead, in noise). True 4-wide SoA batching
   is the remaining speedup frontier, not per-op wrapping.
-- Threading: `MPE_THREADS` (1-8, default 1) parallelises order-independent
-  per-body sanitize only; pairs/solve single-threaded for identical order.
-  Bitwise identical MT vs serial.
+- Threading: `MPE_THREADS` (1-8, default 1) parallelises per-body sanitize
+  and integration, the two-phase CCD sweep, pair-local narrowphase detection,
+  and solver sweeps across disjoint islands. Shared-body wake/contact
+  bookkeeping and manifold preparation stay serial in pair order; the
+  Gauss-Seidel solve stays serial within each island. Concurrent world steps
+  share a process-wide pool whose dispatch phases are serialized. Determinism
+  twins have been verified at 1/4/8 threads.
 - Hash `physics_world_hash_state()` covers pos/vel/orient/ids ONLY (spin,
   mass, sleep, joints omitted; translation lockstep only). CRC32 table
   `pthread_once`.
@@ -83,8 +91,11 @@ exact IEEE `+ - * / sqrt` + fixed-coefficient polynomials (`det_math.h`) +
 - `max_linear/angular_speed` clamps (inform-only counters).
 - Slop-band bounce (`pen∈[-slop,0)` friction-only, no bounce).
 - Spring pure-Hooke unless `max_acceleration=10000` + `k<k_stable` + no warn.
-- MSVC bitwise twins (needs `/fp:strict` proof + TSan).
-- Multithreaded solve (pairs/solve serial by design; MT sanitize only).
+- MSVC bitwise twins (needs `/fp:strict` proof).
+- 0.5mm rolling spin-patch floor is empirical; removing it previously stopped
+  resting spin from decaying. Warm-start remains cold by default.
+- Within-island parallel contact solving; current island sweeps preserve
+  serial Gauss-Seidel order inside each island.
 
 ## Budgets (measured, not wished)
 

@@ -138,7 +138,7 @@ and save/load iterate the registry automatically.
 | `PHYSICS.md` | Every equation: integrator, solver, collision, constraints |
 | `MULTICORE.md` | Threading model, determinism guarantees |
 | `MODULES.md` | MPI module system (hot-plug physics) |
-| `CONFIG.md` | Configuration system (78 tunables) |
+| `CONFIG.md` | Configuration system (80 tunables) |
 | `TESTING.md` | Test suite, regime matrix, external oracles |
 | `S2_BRIDGE.md` | S2 molecular bridge |
 | `FTC.md` | FTC robotics / drivetrain |
