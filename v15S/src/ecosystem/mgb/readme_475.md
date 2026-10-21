@@ -4,22 +4,25 @@ Copied verbatim from `4179/.../v9R4/472-MGB` (core: `include/`, `src/mgb_link.c`
 `src/mgb_frame.c`, `src/mgb_map.c`, `src/mgb_sink_file.c`, `tools/`, `tests/test_mgb.c`,
 `scenes/`, `readme.md`, `PROTOCOL.md`), then programmed in:
 
-- `src/mgb_sink_mpe.c` — the real sink (static spheres, zero-force spring
+- `src/mgb_sink_mpe.c` — the real sink (kinematic spheres, zero-force spring
   joints for bond lines, stage offset, double→float once). Replaces the stub
   conceptually; the stub file is NOT copied (contract now implemented).
 - `modules/s2/s2_bridge.{h,c}` — MPI `s2-bridge` descriptor (generic,
   `deterministic=false`): per-world session, spawn/handshake/configure/stage
   on attach, cadence refresh on pre_step, freeze + loud on link loss.
-- `tests/golden_water.s2` + `tests/mgb_mpe_test.c` — headless tiers A (golden,
-  no s2tui) and B (live petri via `MGB_S2TUI_BIN` or the sibling default,
-  skipped gracefully when absent).
-- `tests/mgb_load_test.c` — headless dlopen ABI check of `mgb_bridge.so`.
-- `Makefile` — standalone from the engine build; `make test` runs headless
-  tiers, `make loadtest` checks the .so descriptor.
+- `tests/golden_water.s2` + `tests/mgb_mpe_test.c` — headless tier A (golden,
+  no s2tui) and opt-in tier B (live petri only through an explicit
+  `MGB_S2TUI_BIN`; skipped when absent).
+- `tools/mgb_probe.c` — standalone descriptor/ABI probe binary (not a
+  makefile target; build directly with cc from the repo root makefile's
+  include paths). (DESPOT-2026-10-20: this file replaced the `tests/mgb_load_test.c`
+  dlopen check listed in earlier notes — no such test file ships in this copy.)
+- `makefile` — standalone from the engine build; `make test` runs headless
+  tiers (`test_mgb.c` + `mgb_mpe_test.c`).
 
 Display contract: mapped mm used numerically as MPE metres ("1 unit = 1 mm
-S2-display"), static bodies (solver-skipped) + k=0/c=0 joints (force-free,
-rendered).
+S2-display"), kinematic bodies (gravity and impulses cannot move them) plus
+k=0/c=0 joints (force-free, rendered).
 
 ### Staging placement (revised 2026-10-09)
 
@@ -47,12 +50,10 @@ live with `$MGB_OX` / `$MGB_OY` / `$MGB_OZ`.
 - **Live in the engine.** `mod load ecosystem/mgb/build/mgb_bridge.so` then
   `mod attach s2-bridge`; owner-confirmed rendering the staged dish in the GTK
   view on 2026-10-09.
-- **Stage-once.** The dish renders but does **not move or vibrate**: bodies
-  are static, bonds are zero-force, and the refresh cadence
-  (`cfg->every`, default 0) is not wired into `pre_step`. The current
-  `bridge_stage` *adds* bodies rather than moving existing ones, so enabling a
-  cadence naively would duplicate the dish every tick — follow mode needs a
-  move-don't-re-add refresh path. Tracked in `v15S/REMAINING_WORK.md`.
+- **Refresh mode.** `cfg->every > 0` repositions existing bodies in place;
+  stable atom-to-body mapping prevents duplication. With the default cadence
+  of zero the first frame remains staged. Bodies stay kinematic and bonds
+  remain force-free in either mode.
 - `s2_bridge_stats` still returns −1 for frame/error counts; the TUI health
   surface is not wired.
 
@@ -77,9 +78,9 @@ existing; a miss stays a miss.
 
 ### Gates
 
-`make test` → `mgb-mpe: PASS 32 FAIL 0` (tier B live petri skipped when no
-s2tui is available). Tiers: parser/mapper policy, static + zero-force
-staging, live petri through a real `s2tui`, **spawn-failure naming** (each
+`make test` → `mgb-mpe: PASS 37 FAIL 0` (tier B live petri skipped unless an
+explicit executable is provided). Tiers: parser/mapper policy, kinematic +
+zero-force staging and in-place refresh, live petri through a real `s2tui`, **spawn-failure naming** (each
 mode distinct, with its errno), **resolver** (hit/miss contract, override
 honoured and normalised), and **physical validation** (dt<=0, cutoff<=0,
 temp<0, tau<=0, nu<0 all rejected). `make loadtest` checks the exported

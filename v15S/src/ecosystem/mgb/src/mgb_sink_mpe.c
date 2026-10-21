@@ -1,24 +1,18 @@
 /* mgb_sink_mpe.c — the REAL sink: S2 frames become MPE bodies + joints.
  *
- * Phase 0 (attach): one body per mapped body() call, bodies dynamic
- * (position overridden each frame from S2 — solver never integrates them
- * because they hold zero velocity and no forces act on them: k=0 bonds,
- * no external forces). Phase 1 (refresh): move() repositions existing
+ * Phase 0 (attach): one kinematic body per mapped body() call. Phase 1
+ * (refresh): move() repositions existing
  * bodies in place (never respawns — stable S2 idx -> MPE body mapping).
  *
  * Contract:
- *  - bodies: dynamic (inverse_mass > 0) but position is overwritten from
- *    S2 each refresh tick. The solver skips them because no force acts
- *    (k=0 bonds, zero velocity, no gravity coupling — they sleep after the
- *    first tick and stay put until S2 moves them). Collisions with them
- *    work (immovable display obstacles) because static_state=false but
- *    effective mass path gives them real mass; we set velocity=0 each
- *    refresh so the solver sees a settled body.
+ *  - bodies: kinematic (effective inverse mass 0), so gravity and solver
+ *    impulses cannot move the display objects. MPE bodies can still collide
+ *    with them as immovable obstacles. S2 positions are applied on refresh.
  *  - bonds: spring joints k=0, c=0, L0 = current length. Force-free by
  *    construction, renderer still draws magenta joint lines.
  *  - double->float conversion happens once here (documented rounding).
- *  - no forces, velocities, masses, or determinism counters are written
- *    from S2 into live MPE physics state; the bridge is display-only.
+ *  - the bridge is display-only: it applies positions and clears staged
+ *    velocities/forces, but does not couple MPE state back into S2.
  */
 #include "mgb.h"
 #include "core/physics_world.h"
@@ -75,27 +69,24 @@ static int mpe_body (void *ctx, int idx, int Z, double x, double y,
     int bi = c->index_of [idx];
     if (bi >= 0 && bi < c->world->body_count) {
         rigidbody *rb = &c->world->bodies [bi];
+        rigidbody_set_kinematic (rb, true);
         rb -> position = pos;
-        /* Zero velocity so the solver sees a settled display body between
-         * S2 updates. Position is authoritative; velocity is not integrated
-         * into observable state because we overwrite it next refresh. */
+        /* Kinematic integration is skipped; keep imported display state
+         * free of residual motion and forces as a defensive invariant. */
         rb -> velocity = vector3_zero ();
         rb -> angular_velocity = vector3_zero ();
         rb -> force_accumulator = vector3_zero ();
         rb -> torque_accumulator = vector3_zero ();
         return 0;
     }
-    /* Not yet staged: create a dynamic body (mass 1, not static) so the
-     * solver treats it as a normal object, but k=0 bonds + zero velocity
-     * mean it is never perturbed until S2 moves it. */
+    /* Not yet staged: create a sphere then make it kinematic. This keeps it
+     * visible and collidable while excluding it from gravity and impulses. */
     bi = physics_world_add_sphere (c->world, (float)r, 1.0f, pos);
     if (bi < 0) {
         c->failed = 1;
         return -1;
     }
-    /* Do NOT set static: dynamic bodies participate in collision response
-     * correctly (other MPE bodies bounce off them). Position is overridden
-     * by S2 each refresh, so the solver never gets a chance to drift them. */
+    rigidbody_set_kinematic (&c->world->bodies [bi], true);
     c->index_of [idx] = bi;
     c->nbodies++;
     return 0;
@@ -226,8 +217,8 @@ int mgb_sink_mpe_stage (physics_world *world, const mgb_frame_t *frame,
         c.oy = oy;
         c.oz = oz;
     }
-    joint_init_pool (world);
-    constraint_pool_init (world);
+    /* physics_world_init owns pool initialization. Clearing either pool
+     * here would erase constraints already present in the caller's scene. */
     if (mgb_map (frame, &MPE_SINK, &c, mm_per_a) != 0 || c.failed) return -1;
     return c.nbodies;
 }

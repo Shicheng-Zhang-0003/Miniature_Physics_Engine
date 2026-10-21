@@ -8,7 +8,7 @@ CC      = gcc
 MGB     := $(shell cd "$(dirname $(lastword $(MAKEFILE_LIST)))" && pwd)
 SRC     ?= $(MGB)/../..
 CFLAGS  = -O2 -g -Wall -Wextra -std=c11 -I$(MGB) -I$(MGB)/include \
-          -I$(SRC) -ffp-contract=off
+          -I$(SRC) -ffp-contract=off -pthread
 PIC     = -fPIC
 OUT     = $(MGB)/build
 DL      = -ldl
@@ -34,9 +34,9 @@ MGB_CORE = $(MGB)/src/mgb_link.c $(MGB)/src/mgb_frame.c \
 MGB_MOD = $(MGB)/modules/s2/s2_bridge.c
 MGB_MOD_OBJ = $(OUT)/s2_bridge.o
 
-.PHONY: all test module loadtest clean
+.PHONY: all test module loadtest probe clean
 
-all: $(OUT) $(OUT)/mgb_mpe_test module
+all: $(OUT) $(OUT)/mgb_mpe_test module probe
 
 $(OUT):
 	mkdir -p $(OUT)
@@ -61,6 +61,33 @@ loadtest: all
 	nm -D --defined-only $(OUT)/mgb_bridge.so | grep -q " mpe_module_desc$$" && \
 	    echo "  PASS mpe_module_desc exported" || \
 	    (echo "  FAIL mpe_module_desc missing"; exit 1)
+
+# DESPOT-2026-10-20: readme.md advertises `make probe` (spawn+configure+
+# snapshot+map exerciser writing probe_petri.mgb); the binary existed in
+# tools/ but had no target. Built from the same object set as the module
+# (probe calls init inside the engine sense, so link the thin-engine comm
+# stack it needs; libm/libdl only).
+probe: $(OUT)/mgb_probe
+# Render-path stubs for spring_joint.o — same set as tests/mgb_mpe_test.c
+# (probe is headless; it renders nothing). Kept as a tiny generated c file
+# so the target list stays honest.
+probe_STUBS = $(MGB)/build/mgb_probe_stubs.c
+$(probe_STUBS): $(MGB)/makefile
+	@mkdir -p $(OUT)
+	@printf '%s\n' \
+	  '#include <stdint.h>' \
+	  '#include "ui_input/camera.h"' \
+	  '#include "core/rigidbody.h"' \
+	  'camera main_camera_fov;' \
+	  'rigidbody *obj_per_scene = 0;' 'int object_count = 0;' \
+	  'int object_capacity = 0;' \
+	  'int scene_find_object_index_by_id (uint32_t id) { (void) id; return -1; }' \
+	  'rigidbody *scene_resolve_object_by_id (uint32_t id) { (void) id; return 0; }' \
+	  > $(probe_STUBS)
+$(OUT)/mgb_probe: $(MGB)/tools/mgb_probe.c $(MGB_CORE) $(CORE) $(probe_STUBS) $(OUT)/s2_bridge.o
+	$(CC) $(CFLAGS) $(MGB)/tools/mgb_probe.c $(probe_STUBS) $(MGB_CORE) $(CORE) \
+	    $(OUT)/s2_bridge.o \
+	    -lm $(DL) $(EPOXY) -o $@
 
 # Headless tiers: A always runs; B needs s2tui (MGB_S2TUI_BIN or sibling).
 # Usage: make test [MGB_S2TUI_BIN=/path/to/s2tui] [MGBDIR=/abs/mgb]

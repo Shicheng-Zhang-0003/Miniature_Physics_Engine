@@ -42,6 +42,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -60,6 +61,14 @@ struct mgb_session {
     int from_err;       /* read end: child stderr (framing) */
     char transcript[256];
     char tmpdir[256];
+    FILE *transcript_log; /* DESPOT-2026-10-20: persistent session-owned
+                           * handle on the reserved fd (mkstemp-opened).
+                           * The old fopen-by-name re-opened the already
+                           * reserved file (second fd on same path) —
+                           * "w" during spawn TRUNCATED the reserved
+                           * reservation, and "a" during cmd could race
+                           * an external unlink into a fresh file at the
+                           * predictable path. */
     int dead;
     unsigned long seq;
 };
@@ -71,6 +80,29 @@ static void mgb_mark_dead (mgb_session_t *s) {
 static void set_nonblock (int fd) {
     int fl = fcntl (fd, F_GETFL, 0);
     if (fl >= 0) fcntl (fd, F_SETFL, fl | O_NONBLOCK);
+}
+
+/* Writing to a dead child pipe raises SIGPIPE before write() can return
+ * EPIPE. Block it only in this thread and consume the signal produced by
+ * this write, preserving any SIGPIPE that was already pending. This avoids
+ * changing the embedding engine's process-wide signal policy. */
+static ssize_t write_child_pipe (int fd, const void *buf, size_t len) {
+    sigset_t sigpipe_set, old_set, pending_set;
+    sigemptyset (&sigpipe_set);
+    sigaddset (&sigpipe_set, SIGPIPE);
+    int mask_error = pthread_sigmask (SIG_BLOCK, &sigpipe_set, &old_set);
+    if (mask_error != 0) { errno = mask_error; return -1; }
+    int was_pending = sigpending (&pending_set) == 0 &&
+                      sigismember (&pending_set, SIGPIPE) == 1;
+    ssize_t n = write (fd, buf, len);
+    int write_errno = errno;
+    if (n < 0 && write_errno == EPIPE && !was_pending) {
+        struct timespec no_wait = {0, 0};
+        while (sigtimedwait (&sigpipe_set, NULL, &no_wait) < 0 && errno == EINTR) { }
+    }
+    (void) pthread_sigmask (SIG_SETMASK, &old_set, NULL);
+    errno = write_errno;
+    return n;
 }
 
 /* Drain whatever stdout has available into the transcript (non-blocking). */
@@ -154,6 +186,7 @@ const char *mgb_spawn_strerror (mgb_spawn_status_t st) {
         case mgb_spawn_e_noexec: return ("exec() failed");
         case mgb_spawn_e_noexecbit: return ("file exists but is not executable");
         case mgb_spawn_e_handshake: return ("s2tui started but never sent the expected banner/prompt");
+        case mgb_spawn_e_banner: return ("expected banner/prompt arrived but is not s2tui's (wrong child at that path)");
         case mgb_spawn_e_alloc: return ("out of memory");
         default: return ("unknown spawn failure");
     }
@@ -267,7 +300,21 @@ mgb_session_t *mgb_spawn (const char *s2tui_path, int timeout_sec) {
         return NULL;
     }
     fchmod (tfd, 0600);
-    close (tfd);
+    /* DESPOT-2026-10-20: keep tfd. The old code closed the reserved fd
+     * and then fopen()ed the path by name ("w" here, "a" in mgb_cmd):
+     * "w" truncated on the second fd, and every fopen is a symlink-
+     * following re-lookup of the path — exactly the P20 race the
+     * reservation exists to close. fdopen binds the persistent log to
+     * the reserved fd; mgb_close fcloses + unlinks it. */
+    FILE *tlog = fdopen (tfd, "w+");
+    if (!tlog) {
+        int fe = errno;
+        close (tfd);
+        unlink (tplt);
+        mgb_close (s);
+        fail_spawn (mgb_spawn_e_alloc, fe);
+        return NULL;
+    }
     /* DESPOT-2026-10-13: tplt is 300B, transcript 256B — snprintf truncation
      * would detach the unlink path from the real file (leak + wrong tail).
      * Refuse loudly instead of truncating silently. */
@@ -277,7 +324,9 @@ mgb_session_t *mgb_spawn (const char *s2tui_path, int timeout_sec) {
         fail_spawn (mgb_spawn_e_alloc, 0);
         return NULL;
     }
-    FILE *log = fopen (s->transcript, "w");
+    /* exec-failure accounting: transcript_log already belongs to the
+     * session; mgb_close below fcloses it and unlinks the path. */
+    s->transcript_log = tlog;
     /* Did exec actually succeed? The CLOEXEC pipe closes with EOF on a good
      * exec and carries the real errno on a bad one. Non-blocking so a
      * successful exec (EOF immediately) never stalls the handshake. */
@@ -302,17 +351,24 @@ mgb_session_t *mgb_spawn (const char *s2tui_path, int timeout_sec) {
         close (exec_err[0]);
     }
     if (exec_errno != 0) {
-        if (log) fclose (log);
         fail_spawn (mgb_spawn_e_noexec, exec_errno);
         mgb_close (s);
         return NULL;
     }
     /* handshake: banner (identity) + first prompt, both on stderr */
     char *banner = NULL;
-    long n = mgb_read_prompt (s, log, &banner, timeout_sec);
-    if (log) fclose (log);
+    long n = mgb_read_prompt (s, tlog, &banner, timeout_sec);
     int ok = n > 0 && banner && strstr (banner, "s2tui");
-    if (!ok && banner == NULL && n <= 0) fail_spawn (mgb_spawn_e_handshake, 0);
+    if (!ok) {
+        /* DESPOT-2026-10-20: the old gate reported e_handshake ONLY for
+         * "banner==NULL && n<=0" — a banner that arrived but named some
+         * other program (right prompt, wrong child, e.g. a planted or
+         * stale s2tui-lookalike) stayed SILENT on spawn_reason while
+         * mgb_spawn still returned NULL, so the consumer's diagnostics
+         * showed the PREVIOUS failure on this thread. Both shapes now
+         * report distinctly (banner read but wrong program = e_banner). */
+        fail_spawn ((banner != NULL) ? mgb_spawn_e_banner : mgb_spawn_e_handshake, 0);
+    }
     free (banner);
     if (!ok) { mgb_close (s); return NULL; }
     return s;
@@ -329,7 +385,7 @@ int mgb_cmd (mgb_session_t *s, const char *line, int timeout_sec) {
     msg[n + 1] = '\0';
     size_t off = 0;
     while (off < n + 1) {
-        ssize_t w = write (s->to_child, msg + off, n + 1 - off);
+        ssize_t w = write_child_pipe (s->to_child, msg + off, n + 1 - off);
         if (w <= 0) {
             free (msg);
             mgb_mark_dead (s);
@@ -339,9 +395,7 @@ int mgb_cmd (mgb_session_t *s, const char *line, int timeout_sec) {
     }
     free (msg);
     s->seq++;
-    FILE *log = fopen (s->transcript, "a");
-    long r = mgb_read_prompt (s, log, NULL, timeout_sec);
-    if (log) fclose (log);
+    long r = mgb_read_prompt (s, s->transcript_log, NULL, timeout_sec);
     if (r < 0) { mgb_mark_dead (s); return -1; }
     return 0;
 }
@@ -362,13 +416,20 @@ char *mgb_snapshot (mgb_session_t *s, int timeout_sec) {
     /* `sync` prints `saved N atoms`; completion already framed. Verify
      * the file exists, is a regular file (not a symlink), and is non-empty
      * before handing out. */
+    /* DESPOT-2026-10-20: lstat+fopen is two path lookups — TOCTOU window
+     * between them (swap to a symlink after lstat wins) defeats the
+     * refusal. One open(O_RDONLY|O_NOFOLLOW|O_CLOEXEC) makes "regular
+     * file or fail" atomic; fstat on the opened fd, then non-empty check
+     * via fgetc (same as before). */
+    int fd = open (path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+    if (fd < 0) { mgb_mark_dead (s); return NULL; }
     struct stat st;
-    if (lstat (path, &st) != 0 || !S_ISREG (st.st_mode)) { mgb_mark_dead (s); return NULL; }
-    FILE *f = fopen (path, "r");
-    if (!f) { mgb_mark_dead (s); return NULL; }
-    int c = fgetc (f);
-    fclose (f);
-    if (c == EOF) { mgb_mark_dead (s); return NULL; }
+    if (fstat (fd, &st) != 0 || !S_ISREG (st.st_mode)) { close (fd); mgb_mark_dead (s); return NULL; }
+    char cbuf[2];
+    ssize_t rn = read (fd, cbuf, 1);
+    close (fd);
+    if (rn != 1) { mgb_mark_dead (s); return NULL; }
+    (void) cbuf;
     char *out = malloc (strlen (path) + 1);
     if (!out) { mgb_mark_dead (s); return NULL; }
     strcpy (out, path);
@@ -394,6 +455,14 @@ void mgb_close (mgb_session_t *s) {
     }
     close (s->from_out);
     close (s->from_err);
+    /* DESPOT-2026-10-20: the transcript was leaked on close (reserved by
+     * mkstemp, never unlinked — /tmp files accumulate per session, and a
+     * shared-TMPDIR attacker can post-read every prior session's
+     * transcript). Flush+close the persistent handle, then unlink the
+     * reserved path. */
+    if (s->transcript_log) fclose (s->transcript_log);
+    s->transcript_log = NULL;
+    if (s->transcript[0]) unlink (s->transcript);
     free (s);
 }
 

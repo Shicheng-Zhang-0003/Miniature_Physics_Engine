@@ -55,7 +55,12 @@ typedef enum {
     mgb_spawn_e_noexec,    /* exec failed: see errno (ENOEXEC, ETXTBSY, ...) */
     mgb_spawn_e_noexecbit, /* file is not executable (no exec permission) */
     mgb_spawn_e_handshake, /* s2tui ran but never sent the expected banner/prompt */
-    mgb_spawn_e_alloc      /* out of memory */
+    mgb_spawn_e_alloc,     /* out of memory */
+    /* DESPOT-2026-10-20: appended at the end (append-only enum contract —
+     * the test suite pins naming, and mgb_spawn_strerror must never map
+     * two causes onto one string). One past the documented "eight failure
+     * codes"; a ninth for a wrong-program banner added 2026-10-20. */
+    mgb_spawn_e_banner     /* banner/prompt arrived but identifies some other program */
 } mgb_spawn_status_t;
 const char *mgb_spawn_strerror (mgb_spawn_status_t st);
 /* Last spawn failure on this thread, for diagnostics after a NULL return.

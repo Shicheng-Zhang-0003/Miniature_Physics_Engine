@@ -3,7 +3,7 @@
  *
  * Lifecycle: attach resolves the s2tui binary (cfg > $MGB_S2TUI_BIN >
  * sibling default), spawns + handshakes, configures the scene through the
- * S2 shell, stages the first frame (static bodies + zero-force joints).
+ * S2 shell, stages the first frame (kinematic bodies + zero-force joints).
  * pre_step refreshes every cfg.every ticks (snapshot -> move staged
  * bodies; count change -> restage). detach kills + reaps the child.
  * Child death or parse failure freezes the last good frame, counts the
@@ -65,9 +65,10 @@ void s2_bridge_default_cfg (s2_bridge_cfg_t *cfg) {
      * convenient to put the data.
      *
      * (0, 20, -60) centres the dish on the default view axis, 110 units in
-     * front of the camera. The bodies are static and the bonds are k=0, so
-     * this placement is inert to the simulation and clear of the default
-     * cubes (which sit at z >= 0). Override with MGB_OX/MGB_OY/MGB_OZ. */
+     * front of the camera. The bodies are kinematic and the bonds are k=0,
+     * so this placement is inert to gravity/contact response and clear of
+     * the default cubes (which sit at z >= 0). Override with MGB_OX/MGB_OY/
+     * MGB_OZ. */
     cfg->ox = 0.0f;
     cfg->oy = 20.0f;
     cfg->oz = -60.0f;
@@ -248,13 +249,23 @@ int s2_bridge_resolve_s2tui (char *out, size_t out_cap) {
     snprintf (out, out_cap, "%s", probe.s2tui_path);
     return 1;
 }
+/* DESPOT-2026-10-20: snapshot files are read-once scratch (parsed into
+ * fr, then dead). The old paths freed the name without unlinking, so
+ * every refresh left a fresh mgb_frame_*.s2 in $TMPDIR — unbounded
+ * disk growth for a long-running session and post-hoc read of every
+ * prior frame by any local user. parse is the LAST reader on purpose. */
+static void snap_release (char *snap) {
+    if (!snap) return;
+    unlink (snap);
+    free (snap);
+}
 static int bridge_stage (mpe_world_t *world, bridge_state_t *st) {
     char *snap = mgb_snapshot (st->s, 60);
     if (!snap) return -1;
     mgb_frame_t fr;
     memset (&fr, 0, sizeof fr);
     int rc = mgb_frame_parse (snap, &fr);
-    free (snap);
+    snap_release (snap);
     if (rc != 0) return -1;
     if (fr.natoms > st->map_cap) {
         mgb_frame_free (&fr);
@@ -456,7 +467,7 @@ static void bridge_pre_step (mpe_world_t *world, float dt, void *mod_state) {
     mgb_frame_t fr;
     memset (&fr, 0, sizeof fr);
     int rc = mgb_frame_parse (snap, &fr);
-    free (snap);
+    snap_release (snap);
     if (rc != 0) {
         st->errors++;
         if (!st->dead) {

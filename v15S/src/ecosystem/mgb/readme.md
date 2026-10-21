@@ -12,8 +12,9 @@ is the live one** and has moved ahead of this tree; see
 
 ## Status
 
-The bridge core is complete and gated; the MPE-side integration is live in
-475. Motion is deliberately not implemented yet.
+The standalone parser, mapper, and process-control core is complete and
+gated. The active MPE integration in this checkout is documented in
+[`readme_475.md`](readme_475.md) and includes in-place refresh mode.
 
 ### Core (here)
 - `mgb_spawn/cmd/snapshot/close` own the child with handshake, prompt
@@ -23,8 +24,9 @@ The bridge core is complete and gated; the MPE-side integration is live in
 - `mgb_map` owns the **only** scale (`mm_per_a`, default 1.0: 1 Å → 1 unit —
   large on purpose; a 48 Å dish becomes 48 units). Display-only, labeled on
   every artifact, inverts exactly.
-- Sinks: `file` (standalone verification + goldens) and `mgb_sink_mpe_stub.c`,
-  which documents the copy-time contract (static bodies, stable ids,
+- Sinks: `file` (standalone verification + goldens) and
+  `mgb_sink_mpe_stub.c`, which documents the original copy-time contract
+  (kinematic display bodies, stable ids,
   zero-force joint lines, no physics writes, health section,
   `deterministic=false`).
 
@@ -45,7 +47,7 @@ itself:
   directory, else from the working directory. Every candidate is checked
   with `access(X_OK)` and normalised with `realpath`, so a hit is always an
   absolute, canonical, existing executable. A miss stays a miss.
-- **Gated here, not only in the copy.** `make test` (33 checks) pins the
+- **Gated here, not only in the copy.** `make test` pins the
   parser and mapper contracts *and* the spawn-failure naming: each mode must
   report its own status and errno, and `mgb_spawn_strerror` must never
   collapse two causes onto one string. These gates are POSIX-only, which is
@@ -62,7 +64,7 @@ itself:
 > absolute, is canonical, and contains no unresolved `..`.
 
 ### 475 copy — what it adds
-- `src/mgb_sink_mpe.c`: the real MPE sink. Static spheres, zero-force joints.
+- `src/mgb_sink_mpe.c`: the real MPE sink. Kinematic spheres, zero-force joints.
 - `modules/s2/s2_bridge.c`: the MPI tick module, registry name `s2-bridge`.
 - **Staging placement.** The renderer frustum-culls *silently*, so a
   successful attach can still place every body off-screen. Two rules, both
@@ -105,18 +107,18 @@ make probe        # live petri dish through ../s2tui -> probe_petri.mgb
 tree root first). It never touches the batch record (`./carbonsim`,
 `output.txt`): the bridge only drives the interactive shell.
 
-The 475 copy carries the MPE-side gates too (`v15S/src/ecosystem/mgb`,
-`make test` → `mgb-mpe: PASS 43 FAIL 0`): spawn naming, path resolution, and
-the static/zero-force staging contract.
+The MPE-side gates cover the integration too (`v15S/src/ecosystem/mgb`,
+`make test` → `mgb-mpe: PASS 37 FAIL 0` in the current local run): spawn
+naming, path resolution, kinematic staging, stable mapping, and in-place
+refresh. The live `s2tui` tier is opt-in via an explicit `MGB_S2TUI_BIN`.
 
 ## Roadmap
 
-- **Phase 0 (done):** static frames on demand; file-sink goldens; named
+- **Phase 0 (done):** kinematic frames on demand; file-sink goldens; named
   failures throughout.
-- **Phase 1 (open):** follow mode — the dish renders but does not move or
-  vibrate. Needs a move-don't-re-add refresh path (the current staging
-  *adds* bodies, so a naive cadence would duplicate the dish every tick), a
-  joint-graph refresh, and curated scenes (KcsA filter first).
+- **Phase 1 (475 integration done):** follow mode repositions mapped bodies
+  in place and updates force-free bond lengths. Physical coupling remains
+  outside the bridge contract.
 - **Phase 2:** only if Phase 1 demands it — a `dump` verb on the s2tui side.
 - **Never (until renamed):** physics coupling. Positions flow one way.
 
