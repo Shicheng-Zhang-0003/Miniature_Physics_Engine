@@ -54,15 +54,23 @@ _Atomic unsigned long mpe_clamp_half_length_events = 0;
  * slop/beta/bias caps, step dt>0.1 clamp). Same bounded discipline. */
 _Atomic unsigned long mpe_clamp_solver_events = 0;
 static void mpe_note_clamp (const char *kind, _Atomic unsigned long *counter, double requested, double stored) {
-    unsigned long n = __atomic_fetch_add (counter, 1ul, __ATOMIC_RELAXED) + 1ul;
+    unsigned long n = MPE_ATOMIC_FETCH_ADD (counter, 1ul, MPE_ATOMIC_RELAXED) + 1ul;
     /* Bounded: first 8 occurrences, then every 1000th. Enough to be seen
      * in a session, not enough to drown a headless sweep. */
     if ((n <= 8u) || ((n % 1000u) == 0u)) {
-        fprintf (stderr,
-                 "[mpe] INPUT CLAMPED: %s requested %.9g, using %.9g "
-                 "(x%.6g). The body is NOT the one you asked for. "
-                 "(occurrence %lu)\n",
-                 kind, requested, stored, stored / requested, n);
+        if (requested != 0.0 && isfinite (requested) && isfinite (stored)) {
+            fprintf (stderr,
+                     "[mpe] INPUT CLAMPED: %s requested %.9g, using %.9g "
+                     "(x%.6g). The body is NOT the one you asked for. "
+                     "(occurrence %lu)\n",
+                     kind, requested, stored, stored / requested, n);
+        } else {
+            fprintf (stderr,
+                     "[mpe] INPUT CLAMPED: %s requested %.9g, using %.9g "
+                     "(scale undefined). The body is NOT the one you asked for. "
+                     "(occurrence %lu)\n",
+                     kind, requested, stored, n);
+        }
     }
 }
 void mpe_note_solver_clamp (const char *kind, double requested, double stored) {
@@ -427,22 +435,34 @@ void rigidbody_sanitize (rigidbody *rigid_body) {
     } else {
         /* TRUTH: single mass policy everywhere. Negative/NaN/Inf -> 1.0.
          * Tiny -> 1e-4 floor (else inv=Inf -> 0*Inf=NaN). Huge -> 1e6 cap
-         * (else I=Inf -> locked rotation). */
+         * (else I=Inf -> locked rotation).
+         * DESPOT-2026-10-20: these re-clamps were the LOUD contract's
+         * last silent holes (see the DESPOT-2026-10-03 note above: this
+         * sanitize runs on every body every tick). Only rewrites count:
+         * a body parked exactly on a policy floor does not refire the
+         * counter tick after tick. */
         if (!isfinite (rigid_body -> mass) || (rigid_body -> mass <= 0.0f)) {
+            double req = (double) rigid_body -> mass;
             rigid_body -> mass = 1.0f;
+            mpe_note_clamp ("sanitize mass recovery", &mpe_clamp_mass_events, req, 1.0);
             needs_inertia_recalc = true;
         }
         if (rigid_body -> mass < 1e-4f) {
+            double req = (double) rigid_body -> mass;
             rigid_body -> mass = 1e-4f;
+            mpe_note_clamp ("sanitize mass floor", &mpe_clamp_mass_events, req, 1e-4);
             needs_inertia_recalc = true;
         }
         if (rigid_body -> mass > 1e6f) {
+            double req = (double) rigid_body -> mass;
             rigid_body -> mass = 1e6f;
+            mpe_note_clamp ("sanitize mass cap", &mpe_clamp_mass_events, req, 1e6);
             needs_inertia_recalc = true;
         } rigid_body -> inverse_mass = 1.0f / rigid_body -> mass;
         if (!isfinite (rigid_body -> inverse_mass)) {
             rigid_body -> mass = 1.0f;
             rigid_body -> inverse_mass = 1.0f;
+            mpe_note_clamp ("sanitize inverse mass", &mpe_clamp_mass_events, 0.0, 1.0);
             needs_inertia_recalc = true;
         }
         if (needs_inertia_recalc || (!a3_math3_is_finite (rigid_body -> inverse_inertia_tensor_local)) ||
@@ -1097,7 +1117,7 @@ void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_inpu
     if (!isfinite (mass) || mass < 0.0f) { mass = 1.0f; }
     if (mass > 0.0f && mass < 1e-4f) { mass = 1e-4f; }
     if (mass > 1e6f) {
-        mpe_note_clamp ("sphere mass", &mpe_clamp_mass_events, (double) mass, 1e6);
+        mpe_note_clamp ("cube mass", &mpe_clamp_mass_events, (double) mass, 1e6);
         mass = 1e6f;
     }
     // Kinematic
@@ -1333,7 +1353,7 @@ void rigidbody_initialisation_cylinder (rigidbody *rigid_body, float radius, flo
     if (!isfinite (mass) || mass < 0.0f) { mass = 1.0f; }
     if (mass > 0.0f && mass < 1e-4f) { mass = 1e-4f; }
     if (mass > 1e6f) {
-        mpe_note_clamp ("sphere mass", &mpe_clamp_mass_events, (double) mass, 1e6);
+        mpe_note_clamp ("cylinder mass", &mpe_clamp_mass_events, (double) mass, 1e6);
         mass = 1e6f;
     } rigid_body -> position = position_input;
     rigid_body -> velocity = vector3_zero ();
@@ -1376,8 +1396,8 @@ void rigidbody_initialisation_cylinder (rigidbody *rigid_body, float radius, flo
  * declarations in rigidbody.h). Lets a test or a scene loader isolate its
  * own setup from whatever ran before it. */
 void mpe_clamp_counters_reset (void) {
-    __atomic_store_n (&mpe_clamp_mass_events, 0ul, __ATOMIC_RELAXED);
-    __atomic_store_n (&mpe_clamp_radius_events, 0ul, __ATOMIC_RELAXED);
-    __atomic_store_n (&mpe_clamp_half_length_events, 0ul, __ATOMIC_RELAXED);
-    __atomic_store_n (&mpe_clamp_solver_events, 0ul, __ATOMIC_RELAXED);
+    MPE_ATOMIC_STORE_n (&mpe_clamp_mass_events, 0ul, MPE_ATOMIC_RELAXED);
+    MPE_ATOMIC_STORE_n (&mpe_clamp_radius_events, 0ul, MPE_ATOMIC_RELAXED);
+    MPE_ATOMIC_STORE_n (&mpe_clamp_half_length_events, 0ul, MPE_ATOMIC_RELAXED);
+    MPE_ATOMIC_STORE_n (&mpe_clamp_solver_events, 0ul, MPE_ATOMIC_RELAXED);
 }

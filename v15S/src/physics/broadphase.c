@@ -335,8 +335,18 @@ int broadphase_generate_pairing (struct physics_world *world, broadphase_pair *c
             if ((!isfinite (ang_sweep)) || (ang_sweep < 0.0f)) { ang_sweep = 0.0f; }
             if (ang_sweep > 2.0f) { ang_sweep = 2.0f; }
             /* Linear clamp 10m (not 2m): 150m/s*dt=2.5m must still share a
-             * cell; cull sweep (4m) covers only pairs that exist. Cost is
-             * bounded by max_cell_span/node cap. Angular stays 2m. */
+             * cell; cull sweep (below) uses the same 10m ceiling so an
+             * admission window cannot exceed the cull window. Cost is
+             * bounded by max_cell_span/node cap. Angular stays 2m.
+             * DESPOT-2026-10-20 (truth): the cull sweep clamp used to be
+             * 4m while insertion clamped to 10m per axis — a pair with
+             * vrel*dt in (4m, 10m] was admitted by the hash walk and then
+             * dropped by the cull, and this comment claimed the 4m sweep
+             * "covers only pairs that exist", which was arithmetically
+             * false in exactly the window the 10m clamp was widened for.
+             * Both ceilings are now the same 10m; the divergence window
+             * is gone (CCD continues to pre-clamp genuine fast movers to
+             * touching configuration per tick). */
             float dx = fabsf (rb -> velocity.x) * dt;
             float dy = fabsf (rb -> velocity.y) * dt;
             float dz = fabsf (rb -> velocity.z) * dt;
@@ -432,7 +442,7 @@ int broadphase_generate_pairing (struct physics_world *world, broadphase_pair *c
                             if (!isfinite (wa)) { wa = 0.0f; }
                             if (!isfinite (wb)) { wb = 0.0f; }
                             sweep = (vrel + wa + wb) * dt;
-                            if (!isfinite (sweep) || sweep < 0.0f) { sweep = 0.0f; } else if (sweep > 4.0f) { sweep = 4.0f; }
+                            if (!isfinite (sweep) || sweep < 0.0f) { sweep = 0.0f; } else if (sweep > 10.0f) { sweep = 10.0f; }
                         } float slop_bp = mpe_world_cfg (world) -> solver.penetration_slop;
                         if (!isfinite (slop_bp) || slop_bp < 0.0f) { slop_bp = 0.0f; }
                         float swept_sum = rad_sum + slop_bp + sweep;

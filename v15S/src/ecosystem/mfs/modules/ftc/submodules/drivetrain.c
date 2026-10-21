@@ -4,6 +4,7 @@
 #include "core/math3d.h"
 #include "core/det_math.h"
 #include "config/mpe_config.h"
+#include <limits.h> /* INT_MAX/INT_MIN: encoder count ceiling (DESPOT-2026-10-20) */
 #include <stdio.h>
 #include <math.h>
 void drivetrain_tank (ftc_robot *robot, float left_power, float right_power) {
@@ -448,7 +449,23 @@ static void drivetrain_odometry_update (physics_world *world, ftc_robot *robot, 
              * symmetric). Round-half-away-from-zero. */
             const float revs = robot -> wheel_radians [i] * 0.15915494309189535f; /* /2pi */
             const float exact = revs * counts_per_rev;
-            int new_count = (int) (exact >= 0.0f ? floorf (exact + 0.5f) : ceilf (exact - 0.5f));
+            /* DESPOT-2026-10-20: float exact already exceeds INT_MAX ~2e9
+             * counts (wheel_radians ~1.8e4 rad on an unbraked multi-hour
+             * run) — the (int) cast is then IMPLEMENTATION-DEFINED out of
+             * domain and the NaN/Inf guard below could never see it
+             * through the new_count. Hold the previous count beyond the
+             * representable ceiling; a real odometer counter would long
+             * since have overflowed and wrapped (hardware wraps, we
+             * choose to hold and let every consumer see no motion).
+             * ceiling = 2^31-1 minus a round-off margin. */
+            int new_count = robot -> wheel_encoder_counts [i];
+            if (exact > 2147000000.0f) {
+                new_count = INT_MAX - 1000000;
+            } else if (exact < -2147000000.0f) {
+                new_count = INT_MIN + 1000000;
+            } else {
+                new_count = (int) (exact >= 0.0f ? floorf (exact + 0.5f) : ceilf (exact - 0.5f));
+            }
             if (!isfinite ((float) new_count))
                 new_count = robot -> wheel_encoder_counts [i];
             int old_count = robot -> wheel_encoder_counts [i];

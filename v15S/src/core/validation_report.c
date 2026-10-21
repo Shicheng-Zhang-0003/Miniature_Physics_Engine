@@ -61,7 +61,12 @@ void validation_report_print (void) {
      * Static bodies carry no energy (infinite mass, zeroed velocity).
      * Track across F9 presses: drift means solver/positional passes are
      * creating or destroying energy (split impulse and sleeping aside,
-     * both energy-neutral by construction). */
+     * both energy-neutral by construction).
+     * DESPOT-2026-10-20: PE was m*g*y with world.gravity = -9.81, i.e.
+     * NEGATIVE potential energy that INCREASES as a body falls. Every
+     * free fall then fired the reporter's own "solver creating energy"
+     * warning at 2x the lift rate. PE is m*|g|*y: gravity is stored as a
+     * downward signed vector, so the stored value must be negated. */
     {
         physics_world *w = physics_world_get_primary ();
         double total_ke = 0.0, total_pe = 0.0;
@@ -69,7 +74,8 @@ void validation_report_print (void) {
             rigidbody *rb = &w -> bodies [i];
             if (rb -> static_state) { continue; }
             total_ke += (double) rb_get_kinetic_energy (rb);
-            if (isfinite (rb -> mass) && isfinite (rb -> position.y)) { total_pe += (double) rb -> mass * (double) mpe_world_cfg (w) -> world.gravity * (double) rb -> position.y; }
+            /* PE anchor is y=0 (the friction floor plane). */
+            if (isfinite (rb -> mass) && isfinite (rb -> position.y)) { total_pe += -(double) rb -> mass * (double) mpe_world_cfg (w) -> world.gravity * (double) rb -> position.y; }
         }
         printf ("[A3] energy: KE=%.4f PE=%.4f total=%.4f J (dynamic bodies)\n", total_ke, total_pe,
                 total_ke + total_pe);

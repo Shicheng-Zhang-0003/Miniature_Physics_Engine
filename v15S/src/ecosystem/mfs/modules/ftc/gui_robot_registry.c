@@ -11,11 +11,16 @@ int mfs_gui_robot_count = 0;
 physics_world *mfs_gui_robot_world = NULL;
 gui_robot_proxy mfs_gui_proxies [MFS_MAX_GUI_ROBOTS];
 /* MFS_125: Nose offset in chassis-local space.
- * FIX-AUDIT: front wheels are at -Z (robot.c), so the nose must be -Z too.
- * Was +0.28 (rear), contradicting wheel labels and drive direction. */
+ * DESPOT-2026-10-20 (label truth): MFS forward is +Z (suite gate:
+ * fwd.vz > 0.45 in tests/mfs_suite_a.c) and the front wheel pair is
+ * physically at z + 0.173 (robot.c wheel placement relabel). The nose
+ * marker therefore sits on the +Z end; the old -0.28 put the heading
+ * indicator on the ramp/rear half, pointing the visual at the wheels the
+ * robot drives BACKWARD from. Visual-consistency flip only (no physics
+ * body is built from this marker). */
 #define MFS_NOSE_OFFSET_X 0.0f
 #define MFS_NOSE_OFFSET_Y 0.0f
-#define MFS_NOSE_OFFSET_Z -0.28f
+#define MFS_NOSE_OFFSET_Z 0.28f
 #define MFS_NOSE_RADIUS 0.03f
 int gui_robot_spawn (float x, float y, float z, motor_preset_id preset) {
     if (mfs_gui_robot_count >= MFS_MAX_GUI_ROBOTS) { return -1; }

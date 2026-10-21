@@ -40,6 +40,24 @@ int mpe_ecosystem_register (const mpe_ecosystem_desc_t *desc) {
     int rc = -1;
     for (int i = 0; i < 16; i++) {
         if (s_eco_live [i] && s_ecosystems [i].name && strcmp (s_ecosystems [i].name, desc -> name) == 0) {
+            /* DESPOT-2026-10-20 (ABA): overwriting *desc IN PLACE
+             * contradicted the ABA protocol this file documents ("a later
+             * register reuses only unaliased slots"): any attached
+             * ecosystem still holding the slot's desc pointer would
+             * silently see swapped function tables mid-attachment. Refuse
+             * re-registration while the slot is aliased; the attach path
+             * already snapshots desc+state per step, but pointer identity
+             * must hold across the attach window. */
+            int aliased = 0;
+            for (int a = 0; a < 8; a++) {
+                if (s_attached [a].desc == &s_ecosystems [i]) { aliased = 1; break; }
+            }
+            if (aliased) {
+                fprintf (stderr, "[ecosystem] re-register '%s' refused: slot %d aliased by attachments; detach first\n",
+                         desc -> name, i);
+                pthread_mutex_unlock (&s_eco_lock);
+                return -1;
+            }
             s_ecosystems [i] = *desc;
             rc = i;
             pthread_mutex_unlock (&s_eco_lock);

@@ -208,7 +208,16 @@ void scene_init_default (void) {
      * on friction — the same mismatch that broke F5/F8. */
     scene_ensure_friction_floor ();
     int object_grey_index = scene_add_object (2.0f, 0.0f, (vector3) {0.0f, 2.0f, 0.0f});
-    (physics_world_get_primary () -> bodies) [object_grey_index].colour = (vector3) {0.8f, 0.8f, 0.8f};
+    /* DESPOT-2026-10-20 (GUARD): scene_add_object returns -1 when the pool
+     * is exhausted/init fails — the unchecked index indexed bodies[-1]
+     * (out-of-bounds write into whatever sits before the array). With
+     * mpe_max_bodies at system scale (-b flag) hitting the cap is
+     * reachable. Leave the scene without its sandbox filler + say so. */
+    if (object_grey_index >= 0) {
+        (physics_world_get_primary () -> bodies) [object_grey_index].colour = (vector3) {0.8f, 0.8f, 0.8f};
+    } else {
+        fprintf (stderr, "[scene] init: sandbox filler object rejected (pool cap); scene starts empty\n");
+    }
 }
 void scene_remove_object_by_index (int object_index) {
     if ((object_index < 0) || (object_index >= (physics_world_get_primary () -> body_count))) { return; }

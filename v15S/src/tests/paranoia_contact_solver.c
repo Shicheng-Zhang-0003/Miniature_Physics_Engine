@@ -4,6 +4,7 @@
 #include <math.h>
 #include "core/physics_world.h"
 #include "physics/constraint.h"
+#include "physics/collision_mechanics.h"
 #include "config/mpe_config.h"
 int main (void) {
     mpe_config_init ();
@@ -249,6 +250,54 @@ int main (void) {
         } else {
             printf ("[PASS] rolling resistance decelerates the sphere within the rigid-body model\n");
         } physics_world_cleanup (&world);
-    } return fail;
+    }
+    /* Test 6: Rolling torque uses compression support, not the extra Poisson
+     * restitution impulse of an impact. */
+    {
+        physics_world world;
+        physics_world_init (&world);
+        constraint_pool_init (&world);
+        g_cfg.world.rolling_resistance_coeff = 0.1f;
+        int floor = physics_world_add_cube (&world, (vector3) {0.0f, -0.5f, 0.0f},
+                                            (vector3) {10.0f, 0.5f, 10.0f}, 0.0f);
+        int sphere = physics_world_add_sphere (&world, 0.5f, 1.0f, (vector3) {0.0f, 0.5f, 0.0f});
+        if (floor < 0 || sphere < 0) {
+            printf ("[FAIL] rolling-compression fixture creation failed\n");
+            physics_world_cleanup (&world);
+            return 1;
+        }
+        world.bodies [floor].restitution = 0.5f;
+        world.bodies [sphere].restitution = 0.5f;
+        world.bodies [sphere].angular_velocity = (vector3) {0.0f, 0.0f, 10.0f};
+        collision_data manifold = {0};
+        manifold.object_a = &world.bodies [sphere];
+        manifold.object_b = &world.bodies [floor];
+        manifold.normal_vector = (vector3) {0.0f, -1.0f, 0.0f};
+        manifold.contact_count = 1;
+        contact_point_data *cp = &manifold.contacts [0];
+        cp -> penetration = 0.01f;
+        cp -> ra = (vector3) {0.0f, -0.5f, 0.0f};
+        cp -> rb = (vector3) {0.0f, 0.5f, 0.0f};
+        cp -> impact_velocity = -10.0f;
+        cp -> effective_mass_normal = 100.0f;
+        cp -> base_normal_impulse = 2.0f;
+        cp -> accumulated_normal_impulse = 5.0f;
+        collision_apply_poisson_restitution (&manifold, 1, &g_cfg);
+        collision_apply_rolling_resistance (&manifold, 1, 1.0f, &g_cfg);
+        float expected_spin = 7.5f; /* 10 - (μ * Ncompression * R / I) = 7.5 */
+        float spin_error = fabsf (world.bodies [sphere].angular_velocity.z - expected_spin);
+        printf ("[INFO] rolling_compression base=%.3f post_poisson=%.3f spin=%.4f expected=%.4f\n",
+                cp -> base_compression_impulse, cp -> accumulated_normal_impulse,
+                world.bodies [sphere].angular_velocity.z, expected_spin);
+        if (fabsf (cp -> base_compression_impulse - 5.0f) > 1e-5f ||
+            fabsf (cp -> accumulated_normal_impulse - 6.5f) > 1e-5f || spin_error > 1e-3f) {
+            printf ("[FAIL] restitution impulse contaminated rolling normal force\n");
+            fail = 1;
+        } else {
+            printf ("[PASS] rolling resistance uses compression-only normal impulse\n");
+        }
+        physics_world_cleanup (&world);
+    }
+    return fail;
 }
 #endif

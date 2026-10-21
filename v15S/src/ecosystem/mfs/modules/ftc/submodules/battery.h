@@ -12,7 +12,8 @@ typedef struct {
     float internal_resistance; /* ohms (0.06 NiMH pack-level; see battery.c FIX-AUDIT-DESPOT) */
     float capacity_ah; /* amp-hours */
     float charge_fraction; /* 0..1 */
-    float fuse_heat; /* 0..1+ ; >=1 tripped until load drops */
+    float fuse_heat; /* 0..10 (capped as a flag, battery.c: "flag, not
+                      * accumulator"); >=1 tripped until load drops */
 } battery;
 void battery_init (battery *b);
 /* Returns terminal voltage under load. total_current = sum of all motor currents. */

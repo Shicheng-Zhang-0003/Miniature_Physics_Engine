@@ -4,6 +4,7 @@
 #include <math.h>
 #include "core/physics_world.h"
 #include "physics/constraint.h"
+#include "physics/collision_cylinder.h"
 #include "config/mpe_config.h"
 int main (void) {
     mpe_config_init ();
@@ -273,6 +274,90 @@ int main (void) {
         } else {
             printf ("[PASS] thin cylinder stable on floor\n");
         } physics_world_cleanup (&world);
-    } return fail;
+    }
+    /* Test 8: A cylinder spanning both faces of a slab must use the nearer
+     * exit. A near-face infinite-plane shortcut used to report the long way
+     * out for this center-below-midplane configuration. */
+    {
+        physics_world world;
+        physics_world_init (&world);
+        constraint_pool_init (&world);
+        int slab = physics_world_add_cube (&world, (vector3) {0.0f, 0.0f, 0.0f},
+                                           (vector3) {3.0f, 1.0f, 3.0f}, 0.0f);
+        int cyl = physics_world_add_cylinder (&world, 2.0f, 0.5f, 1.0f, (vector3) {0.0f, -0.9f, 0.0f});
+        collision_data hit = {0};
+        int collided = (slab >= 0 && cyl >= 0) &&
+                       collision_cylinder_cube (&world.bodies [cyl], &world.bodies [slab], &hit, &g_cfg);
+        float depth = collided && hit.contact_count > 0 ? hit.contacts [0].penetration : INFINITY;
+        float normal_y = collided ? hit.normal_vector.y : 0.0f;
+        printf ("[INFO] cyl_slab_min_exit hit=%d depth=%.4f ny=%.4f\n", collided, depth, normal_y);
+        if (!collided || depth > 2.5f || normal_y < 0.9f) {
+            printf ("[FAIL] cylinder slab contact did not select the shallower underside exit\n");
+            fail = 1;
+        } else {
+            printf ("[PASS] cylinder slab contact selects the shallower exit\n");
+        }
+        physics_world_cleanup (&world);
+    }
+    /* Test 9: Both cap contacts of laterally offset cylinders must remain
+     * inside the common cap-disc lens. */
+    {
+        physics_world world;
+        physics_world_init (&world);
+        constraint_pool_init (&world);
+        int a = physics_world_add_cylinder (&world, 1.0f, 1.0f, 1.0f, (vector3) {0.0f, 0.0f, 0.0f});
+        int b = physics_world_add_cylinder (&world, 0.5f, 1.0f, 1.0f, (vector3) {1.8f, 1.2f, 0.0f});
+        if (a < 0 || b < 0) {
+            printf ("[FAIL] cylinder cap-lens fixture creation failed\n");
+            physics_world_cleanup (&world);
+            return 1;
+        }
+        collision_data hit = {0};
+        int collided = (a >= 0 && b >= 0) &&
+                       collision_cylinder_cylinder (&world.bodies [a], &world.bodies [b], &hit, &g_cfg);
+        vector3 ax = world.bodies [a].cached_axes [0];
+        vector3 face_a = vector3_addition (world.bodies [a].position, vector3_scaling (ax, 1.0f));
+        vector3 face_b = vector3_subtraction (world.bodies [b].position, vector3_scaling (ax, 1.0f));
+        int contacts_inside = collided && hit.contact_count == 2;
+        for (int i = 0; contacts_inside && i < hit.contact_count; i++) {
+            vector3 da = vector3_subtraction (hit.contacts [i].position, face_a);
+            vector3 db = vector3_subtraction (hit.contacts [i].position, face_b);
+            da = vector3_subtraction (da, vector3_scaling (ax, vector3_dot (da, ax)));
+            db = vector3_subtraction (db, vector3_scaling (ax, vector3_dot (db, ax)));
+            if (vector3_length (da) > 1.0f + 1e-4f || vector3_length (db) > 0.5f + 1e-4f)
+                contacts_inside = 0;
+        }
+        printf ("[INFO] cyl_cyl_lens hit=%d points=%d inside=%d\n", collided, hit.contact_count, contacts_inside);
+        if (!collided || hit.contact_count != 2 || !contacts_inside) {
+            printf ("[FAIL] cylinder cap manifold escaped the common overlap lens\n");
+            fail = 1;
+        } else {
+            printf ("[PASS] cylinder cap manifold stays within the common overlap lens\n");
+        }
+        physics_world_cleanup (&world);
+    }
+    /* Test 10: Cap discs separated laterally by less than slop may receive a
+     * zero-depth side contact, but never a positive-depth face contact. */
+    {
+        physics_world world;
+        physics_world_init (&world);
+        constraint_pool_init (&world);
+        int a = physics_world_add_cylinder (&world, 1.0f, 1.0f, 1.0f, (vector3) {0.0f, 0.0f, 0.0f});
+        int b = physics_world_add_cylinder (&world, 0.5f, 1.0f, 1.0f, (vector3) {1.8f, 1.501f, 0.0f});
+        collision_data hit = {0};
+        int collided = (a >= 0 && b >= 0) &&
+                       collision_cylinder_cylinder (&world.bodies [a], &world.bodies [b], &hit, &g_cfg);
+        float depth = collided && hit.contact_count > 0 ? hit.contacts [0].penetration : INFINITY;
+        printf ("[INFO] cyl_cyl_slop hit=%d points=%d depth=%.6f ny=%.4f\n", collided,
+                hit.contact_count, depth, collided ? hit.normal_vector.y : 0.0f);
+        if (!collided || hit.contact_count <= 0 || depth != 0.0f || hit.normal_vector.y < 0.9f) {
+            printf ("[FAIL] separated cap discs produced a false face penetration\n");
+            fail = 1;
+        } else {
+            printf ("[PASS] separated cap discs use zero-depth side slop contact\n");
+        }
+        physics_world_cleanup (&world);
+    }
+    return fail;
 }
 #endif

@@ -52,7 +52,10 @@ typedef struct {
     void (*stage_detach) (mpe_world_t *world);
 } mpe_module_desc_t;
 /* Shape pair handler: collide A vs B into manifold_out (collision_data*).
- * Return true on contact (even slop-only friction contact). */
+ * Return true on contact (even slop-only friction contact). With MPE_THREADS
+ * > 1, handlers for different pairs may run concurrently. Handlers must be
+ * reentrant, read-only with respect to bodies/world state, and write only to
+ * the supplied manifold; synchronize any shared plugin-owned state. */
 typedef bool (*mpe_collide_fn) (rigidbody *a, rigidbody *b, void *manifold_out, mpe_world_t *world);
 /* Broadphase interface: typed pair buffer, world for config/scratch.
  * Return value: pair count (0 = degraded tick). NULL entry = builtin. */

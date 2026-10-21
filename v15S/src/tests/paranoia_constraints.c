@@ -145,7 +145,7 @@ int main (void) {
         int base = physics_world_add_cube (&world, (vector3) {0.0f, 0.0f, 0.0f}, (vector3) {1.0f, 1.0f, 1.0f}, 1.0f);
         rigidbody_set_static (&world.bodies [base], true);
         uint32_t base_id = world.bodies [base].object_id;
-        int slider = physics_world_add_cube (&world, (vector3) {2.0f, 0.0f, 0.0f}, (vector3) {0.5f, 0.5f, 0.5f}, 1.0f);
+        int slider = physics_world_add_cube (&world, (vector3) {0.5f, 0.0f, 0.0f}, (vector3) {0.5f, 0.5f, 0.5f}, 1.0f);
         world.bodies [slider].friction_static = 0.0f;
         world.bodies [slider].friction_kinetic = 0.0f;
         uint32_t slider_id = world.bodies [slider].object_id;
@@ -157,12 +157,44 @@ int main (void) {
             physics_world_step (&world, dt);
             /* Push slider */
             world.bodies [1].force_accumulator.x += 10.0f;
+            world.bodies [1].torque_accumulator.y += 1.0f;
+            world.bodies [1].torque_accumulator.z += 0.5f;
+            world.bodies [1].ext_force_this_tick = 1;
         } float pos = world.bodies [1].position.x;
-        if (pos > 2.0f || pos < -2.0f) {
+        vector4 slider_q = world.bodies [1].orientation;
+        float slider_angle = 2.0f * acosf (fminf (1.0f, fabsf (slider_q.w)));
+        float angular_speed = vector3_length (world.bodies [1].angular_velocity);
+        if (pos > 2.05f || pos < -2.05f) {
             printf ("[FAIL] prismatic limits violated: pos=%.3f\n", pos);
             fail = 1;
+        } else if (pos < 1.5f) {
+            printf ("[FAIL] prismatic slide did not move along its free axis: pos=%.3f\n", pos);
+            fail = 1;
+        } else if (slider_angle > 0.05f || angular_speed > 0.05f) {
+            printf ("[FAIL] prismatic joint allowed relative rotation: angle=%.4f omega=%.4f\n", slider_angle,
+                    angular_speed);
+            fail = 1;
         } else {
-            printf ("[PASS] prismatic limits enforced\n");
+            printf ("[PASS] prismatic keeps rotation fixed, allows axial slide, and enforces limits\n");
+            /* A half-turn makes the usual summed-cross SO(3) error exactly
+             * zero. The prismatic solver must choose a deterministic escape
+             * axis and recover the captured relative frame. */
+            world.bodies [slider].force_accumulator = vector3_zero ();
+            world.bodies [slider].torque_accumulator = vector3_zero ();
+            world.bodies [slider].ext_force_this_tick = 0;
+            world.bodies [slider].orientation = (vector4) {0.0f, 1.0f, 0.0f, 0.0f};
+            world.bodies [slider].angular_velocity = vector3_zero ();
+            rigidbody_sanitize (&world.bodies [slider]);
+            rigidbody_wake (&world.bodies [slider]);
+            for (int t = 0; t < 120; t++) { physics_world_step (&world, dt); }
+            slider_q = world.bodies [slider].orientation;
+            slider_angle = 2.0f * acosf (fminf (1.0f, fabsf (slider_q.w)));
+            if (slider_angle > 0.05f) {
+                printf ("[FAIL] prismatic antipodal frame did not recover: angle=%.4f\n", slider_angle);
+                fail = 1;
+            } else {
+                printf ("[PASS] prismatic resolves exact half-turn orientation error\n");
+            }
         } physics_world_cleanup (&world);
     }
     /* Test 4: Distance constraint - preserves distance */

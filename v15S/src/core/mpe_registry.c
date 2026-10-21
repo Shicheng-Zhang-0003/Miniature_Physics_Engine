@@ -232,8 +232,34 @@ void mpe_registry_truncate_modules (int keep) {
         } s_module_count = keep;
     } pthread_mutex_unlock (&s_reg_lock);
 }
-int mpe_registry_broadphase_count (void) {
+/* DESPOT-2026-10-20: indexed stage-row snapshots for the loader's
+ * address-based purge (see mpe_registry.h). Copies under the registry
+ * lock; never hands out interior pointers. */
+int mpe_registry_broadphase_row (int idx, char *name, int namelen, mpe_broadphase_if_t *out) {
+    if (!out)
+        return -1;
     pthread_mutex_lock (&s_reg_lock);
+    int rc = -1;
+    if ((idx >= 0) && (idx < s_broad_count) && s_broad [idx].live) {
+        if (name && namelen > 0) { snprintf (name, (size_t) namelen, "%s", s_broad [idx].name); }
+        *out = s_broad [idx].iface;
+        rc = 0;
+    } pthread_mutex_unlock (&s_reg_lock);
+    return rc;
+}
+int mpe_registry_solver_row (int idx, char *name, int namelen, mpe_solver_if_t *out) {
+    if (!out)
+        return -1;
+    pthread_mutex_lock (&s_reg_lock);
+    int rc = -1;
+    if ((idx >= 0) && (idx < s_solver_count) && s_solvers [idx].live) {
+        if (name && namelen > 0) { snprintf (name, (size_t) namelen, "%s", s_solvers [idx].name); }
+        *out = s_solvers [idx].iface;
+        rc = 0;
+    } pthread_mutex_unlock (&s_reg_lock);
+    return rc;
+}
+int mpe_registry_broadphase_count (void) {    pthread_mutex_lock (&s_reg_lock);
     int n = s_broad_count;
     pthread_mutex_unlock (&s_reg_lock);
     return n;

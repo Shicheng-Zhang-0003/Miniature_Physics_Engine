@@ -214,9 +214,18 @@ void cmd_sed (int argc, char **argv) {
                     term_set_object_static (object_index, !make_dynamic);
                 } else if (term_str_eq (field_name, "nice")) {
                     if (!is_numeric) { continue; }
-                    int nice_val = term_float_to_int_safe (new_value, 0, -20, 19);
-                    if (nice_val < -20) { nice_val = -20; }
-                    if (nice_val > 19) { nice_val = 19; }
+                    /* DESPOT-2026-10-20 (RANGE-MISMATCH): this path declared
+                     * the Unix-style [-20, 19] while the sanitize invariant
+                     * (rigidbody.c) clamps nice_value to [0, 100]: negative
+                     * inputs were accepted, then silently zeroed next tick
+                     * -- and SAVED negatives hit scene_saving's (uint32_t)
+                     * cast; scene_load's nice_u > INT_MAX check then VOETES
+                     * the file, i.e. one 'nice -20' bricks the whole
+                     * scene on next load. The usable band is the engine's
+                     * own domain. */
+                    int nice_val = term_float_to_int_safe (new_value, 0, 0, 100);
+                    if (nice_val < 0) { nice_val = 0; }
+                    if (nice_val > 100) { nice_val = 100; }
                     rb -> nice_value = nice_val;
                 } modified_count++;
             } contact_cache_clear (physics_world_get_primary ());
@@ -267,9 +276,12 @@ void cmd_sed (int argc, char **argv) {
             if (!is_numeric) {
                 term_err ("mpe: sed: nice requires numeric value\n");
                 continue;
-            } int nice_val = term_float_to_int_safe (new_value, 0, -20, 19);
-            if (nice_val < -20) { nice_val = -20; }
-            if (nice_val > 19) { nice_val = 19; }
+            } /* DESPOT-2026-10-20 (RANGE-MISMATCH): [0, 100] sanitize domain
+               * (was Unix nice [-20, 19] -- saved negatives veto the whole
+               * scene on reload; see the batched case above). */
+            int nice_val = term_float_to_int_safe (new_value, 0, 0, 100);
+            if (nice_val < 0) { nice_val = 0; }
+            if (nice_val > 100) { nice_val = 100; }
             rb -> nice_value = nice_val;
         } else {
             term_printf ("term_err", "mpe: sed: unknown field '%s'\n", field_name);
@@ -288,9 +300,12 @@ void cmd_nice (int argc, char **argv) {
     if (!term_parse_float (argv [1], &priority_float)) {
         term_printf ("term_err", "mpe: nice: invalid priority '%s'\n", argv [1]);
         return;
-    } int priority = term_float_to_int_safe (priority_float, 0, -20, 19);
-    if (priority < -20) { priority = -20; }
-    if (priority > 19) { priority = 19; }
+    } /* DESPOT-2026-10-20 (RANGE-MISMATCH): [0, 100] sanitize domain (was
+       * Unix nice [-20, 19]) — the sed path and cmd_nice must agree, and
+       * saved negatives veto the whole scene on reload. */
+    int priority = term_float_to_int_safe (priority_float, 0, 0, 100);
+    if (priority < 0) { priority = 0; }
+    if (priority > 100) { priority = 100; }
     for (int argument_index = 2; argument_index < argc; argument_index++) {
         int object_index = term_require_object (argv [argument_index]);
         if (object_index < 0) { continue; }
@@ -867,22 +882,31 @@ bool mv_file_is_allowed (const char *filepath) {
     }
     if (!is_known) {
         if (strstr (filepath, "..") != NULL) { return false; }
-        /* Confine non-known edits to project-local trees (status/, docs
-         * parlance). Absolute jail via realpath happens at save; this is
-         * the fast reject. */
+        /* Non-listed files are limited to one direct child of status/. The
+         * former extension-only gate also accepted `surprise.c` in the engine
+         * working directory, leaving arbitrary stray files there. */
+        if (strncmp (filepath, "status/", 7) != 0 || !filepath [7] || strchr (filepath + 7, '/') ||
+            strchr (filepath + 7, '\\'))
+            return false;
     }
-    /* Check blocked extensions first */
+    /* DESPOT-2026-10-20 (ORDER): the known-files pass previously ran BELOW
+     * the blocked-extension sweep, so an entry that is both advertised and
+     * blocked was unreachable: `vi status/scene.dat` (printed by --list
+     * verbatim, and written by the sync path at term_admin.c:386) was
+     * refused with "blocked extension". Exact-match known entries are a
+     * reviewed, closed set — explicit allow beats the extension deny for
+     * them. Everything else still falls through to the extension gates. */
+    for (int i = 0; mv_known_files [i].path; i++) {
+        if (strcmp (filepath, mv_known_files [i].path) == 0) { return true; }
+    }
+    /* Check blocked extensions */
     const char *dot = strrchr (filepath, '.');
     if (dot) {
         for (int i = 0; mv_blocked_extensions [i]; i++) {
             if (strcasecmp (dot, mv_blocked_extensions [i]) == 0) { return false; }
         }
     }
-    /* Check if it's in the known files list */
-    for (int i = 0; mv_known_files [i].path; i++) {
-        if (strcmp (filepath, mv_known_files [i].path) == 0) { return true; }
-    }
-    /* Check if it has an allowed extension */
+    /* Check if it has an allowed extension within status/. */
     if (dot) {
         for (int i = 0; mv_allowed_extensions [i]; i++) {
             if (strcasecmp (dot, mv_allowed_extensions [i]) == 0) { return true; }
@@ -897,7 +921,7 @@ void cmd_vi (int argc, char **argv) {
         for (int i = 0; mv_known_files [i].path; i++) {
             term_printf (NULL, "  %-40s %s\n", mv_known_files [i].path, mv_known_files [i].description);
         } term_out ("\n");
-        term_dim ("Also allowed: any file with extensions: .cfg .ini .conf .txt .md .glsl .sh .py .h .c\n");
+        term_dim ("Also allowed: direct files in status/ with extensions: .cfg .ini .conf .txt .md .glsl .sh .py .h .c\n");
         term_dim ("Blocked: .dat .o .so .a .bin .exe and other binary formats\n");
         term_out ("\n");
         term_dim ("Usage: vi <path>  |  vi --list  |  vi --help\n");

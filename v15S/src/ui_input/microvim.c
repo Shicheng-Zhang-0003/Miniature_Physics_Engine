@@ -232,7 +232,7 @@ static void mv_redo_perform (void) {
 } /* ------------------------------------------------------------------ */
 /* File I/O                                                             */
 /* ------------------------------------------------------------------ */
-static bool mv_load_file (const char *filename) {
+static bool mv_load_file_into_current (const char *filename) {
     mv_clear_lines ();
     if (!filename || !mv_ensure_capacity (64))
         return false;
@@ -246,13 +246,27 @@ static bool mv_load_file (const char *filename) {
     while (fgets (line_buf, sizeof (line_buf), f)) {
         size_t len = strlen (line_buf);
         /* DESPOT-2026-10-01: 4KB fgets silently split over-long lines.
-         * Detect missing newline (not EOF) and fail loudly instead. */
+         * Detect missing newline (not EOF) and fail loudly instead.
+         * DESPOT-2026-10-20 (boundary): a COMPLETE line of exactly
+         * mv_max_line_len-1 chars + '\n' fills the buffer, leaves no '\n'
+         * in it, and is not EOF — the old check falsely flagged that
+         * whole line as truncated (break discarded EVERY read line,
+         * not just the long one). One fgetc classifies: newline or EOF
+         * means the buffer held the whole line (the extra char is just
+         * the terminator; insert caps at max-1 which the stripped line
+         * satisfies); a following non-newline byte is real truncation. */
         if (len > 0 && line_buf [len - 1] != '\n' && !feof (f)) {
-            /* Line exceeds buffer: consume rest, report truncation. */
-            int c;
-            while ((c = fgetc (f)) != '\n' && c != EOF) {
-            } truncated = true;
-            break;
+            int c = fgetc (f);
+            if (c != '\n' && c != EOF) {
+                /* Line exceeds buffer: consume rest, report truncation. */
+                while ((c = fgetc (f)) != '\n' && c != EOF) {
+                } truncated = true;
+                break;
+            }
+            /* '\n' or EOF: the buffer held a complete line (the newline
+             * just read IS the terminator — consumed deliberately; the
+             * next iteration starts a fresh line). Insertion caps at
+             * max-1 below, which the stripped 4095-char line satisfies. */
         }
         while ((len > 0) && ((line_buf [len - 1] == '\n') || (line_buf [len - 1] == '\r'))) {
             line_buf [--len] = '\0';
@@ -273,6 +287,29 @@ static bool mv_load_file (const char *filename) {
         if (!mv_insert_line (0, ""))
             return false;
     } return true;
+}
+/* Load transactionally: failed open/read/allocation must preserve the buffer
+ * currently being edited. This matters for :e, where a failed replacement
+ * must not silently discard unsaved content. */
+static bool mv_load_file (const char *filename) {
+    char **old_lines = mv.lines;
+    int old_count = mv.line_count;
+    int old_capacity = mv.line_capacity;
+    mv.lines = NULL;
+    mv.line_count = 0;
+    mv.line_capacity = 0;
+    if (mv_load_file_into_current (filename)) {
+        for (int i = 0; i < old_count; i++)
+            free (old_lines [i]);
+        free (old_lines);
+        return true;
+    }
+    mv_clear_lines ();
+    free (mv.lines);
+    mv.lines = old_lines;
+    mv.line_count = old_count;
+    mv.line_capacity = old_capacity;
+    return false;
 }
 static bool mv_save_file (void) {
     char backup_path [560];

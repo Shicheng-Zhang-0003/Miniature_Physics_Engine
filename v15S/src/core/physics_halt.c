@@ -17,6 +17,17 @@ static _Atomic bool physics_halted = false;
 void physics_halt_set (bool halted) {
     physics_halted = halted;
     if (!halted) { physics_halt_ticks_remaining = 0; }
+    else {
+        /* DESPOT-2026-10-20: an indefinite halt set while a programmatic
+         * countdown is still running left the countdown alive, and its
+         * expiry un-halted the engine: the later manual request was
+         * weaker than the earlier timer it should have superseded
+         * (trigger: halt_for_ticks(N) then halt_set(true) inside the
+         * last N ticks). A manual set is the newest request — clear the
+         * pending count so only a NEW countdown or an explicit resume
+         * can lift it. */
+        physics_halt_ticks_remaining = 0;
+    }
 }
 void physics_halt_for_ticks (int ticks) {
     if (ticks <= 0) { ticks = 1; }

@@ -1,7 +1,10 @@
 /* PARANOIA TEST: Determinism - bitwise reproducibility across runs */
 #ifdef mpe_paranoia_determinism
+#define _POSIX_C_SOURCE 200809L
 #include <stdio.h>
 #include <math.h>
+#include <pthread.h>
+#include <stdlib.h>
 #include "core/physics_world.h"
 #include "physics/constraint.h"
 #include "config/mpe_config.h"
@@ -31,9 +34,107 @@ static int bodies_bitwise_equal (const rigidbody *a, const rigidbody *b) {
         return 0;
     return 1;
 }
+typedef struct {
+    pthread_mutex_t lock;
+    pthread_cond_t ready_cond;
+    int ready;
+    int go;
+} concurrent_start_t;
+typedef struct {
+    physics_world *world;
+    concurrent_start_t *start;
+    int ticks;
+} concurrent_step_t;
+static void *concurrent_step_world (void *arg) {
+    concurrent_step_t *step = (concurrent_step_t *) arg;
+    pthread_mutex_lock (&step->start->lock);
+    step->start->ready++;
+    pthread_cond_broadcast (&step->start->ready_cond);
+    while (!step->start->go) pthread_cond_wait (&step->start->ready_cond, &step->start->lock);
+    pthread_mutex_unlock (&step->start->lock);
+    const float dt = 1.0f / 60.0f;
+    for (int i = 0; i < step->ticks; i++) physics_world_step (step->world, dt);
+    return NULL;
+}
+static int concurrent_worlds_match_serial (void) {
+    enum { BODY_COUNT = 96, TICKS = 180 };
+    mpe_config_t cfg_a = g_cfg, cfg_b = g_cfg;
+    cfg_a.world.gravity = -9.81f;
+    cfg_b.world.gravity = -1.0f;
+    physics_world concurrent_a, concurrent_b, serial_a, serial_b;
+    physics_world *worlds[] = {&concurrent_a, &concurrent_b, &serial_a, &serial_b};
+    mpe_config_t *configs[] = {&cfg_a, &cfg_b, &cfg_a, &cfg_b};
+    int ok = 1;
+    for (int wi = 0; wi < 4; wi++) {
+        physics_world_init (worlds[wi]);
+        constraint_pool_init (worlds[wi]);
+        physics_world_set_config (worlds[wi], configs[wi]);
+        for (int i = 0; i < BODY_COUNT; i++) {
+            /* A close-packed but separated grid produces many simultaneous
+             * contacts sharing bodies, exercising narrowphase shared-state
+             * handling as well as the global worker-pool dispatch. */
+            vector3 p = {(float)(i % 12) * 0.45f, 50.0f + (float)(i / 12) * 0.45f,
+                         (float)(i / 12) * 0.45f};
+            int bi = physics_world_add_sphere (worlds[wi], 0.25f, 1.0f, p);
+            if (bi < 0) { ok = 0; break; }
+            worlds[wi]->bodies[bi].velocity = (vector3) {0.01f * (float)(i % 3), 0.0f, 0.0f};
+        }
+        if (!ok || worlds[wi]->body_count != BODY_COUNT) ok = 0;
+    }
+    if (!ok) goto cleanup;
+
+    concurrent_start_t start = {PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER, 0, 0};
+    concurrent_step_t steps[] = {{&concurrent_a, &start, TICKS}, {&concurrent_b, &start, TICKS}};
+    pthread_t tids[2];
+    int created = 0;
+    for (int i = 0; i < 2; i++) {
+        if (pthread_create (&tids[i], NULL, concurrent_step_world, &steps[i]) != 0) {
+            ok = 0;
+            break;
+        }
+        created++;
+    }
+    if (created == 2) {
+        pthread_mutex_lock (&start.lock);
+        while (start.ready < 2) pthread_cond_wait (&start.ready_cond, &start.lock);
+        start.go = 1;
+        pthread_cond_broadcast (&start.ready_cond);
+        pthread_mutex_unlock (&start.lock);
+    } else {
+        pthread_mutex_lock (&start.lock);
+        start.go = 1;
+        pthread_cond_broadcast (&start.ready_cond);
+        pthread_mutex_unlock (&start.lock);
+    }
+    for (int i = 0; i < created; i++) pthread_join (tids[i], NULL);
+    pthread_cond_destroy (&start.ready_cond);
+    pthread_mutex_destroy (&start.lock);
+    if (created != 2) ok = 0;
+
+    const float dt = 1.0f / 60.0f;
+    for (int i = 0; i < TICKS; i++) {
+        physics_world_step (&serial_a, dt);
+        physics_world_step (&serial_b, dt);
+    }
+    for (int wi = 0; wi < 2; wi++) {
+        physics_world *actual = worlds[wi], *expected = worlds[wi + 2];
+        if (actual->body_count != expected->body_count ||
+            actual->world_contact_cache_count != expected->world_contact_cache_count) ok = 0;
+        for (int i = 0; ok && i < BODY_COUNT; i++) {
+            if (!bodies_bitwise_equal (&actual->bodies[i], &expected->bodies[i])) ok = 0;
+        }
+    }
+cleanup:
+    for (int wi = 0; wi < 4; wi++) physics_world_cleanup (worlds[wi]);
+    return ok;
+}
 int main (void) {
     mpe_config_init ();
     int fail = 0;
+    if (setenv ("MPE_THREADS", "4", 1) != 0) {
+        printf ("[FAIL] could not select four pool workers\n");
+        return 1;
+    }
     /* Test 1: Bitwise identical across twin worlds */
     {
         physics_world w1, w2;
@@ -191,6 +292,14 @@ int main (void) {
         } else {
             printf ("[PASS] sanitization prevents NaN propagation\n");
         } physics_world_cleanup (&world);
-    } return fail;
+    }
+    /* Test 5: concurrent worlds cannot overwrite the process-wide pool phase. */
+    if (concurrent_worlds_match_serial ()) {
+        printf ("[PASS] concurrent worlds match independent serial stepping\n");
+    } else {
+        printf ("[FAIL] concurrent worlds corrupted or diverged from serial stepping\n");
+        fail = 1;
+    }
+    return fail;
 }
 #endif

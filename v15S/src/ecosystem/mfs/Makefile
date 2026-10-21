@@ -93,7 +93,9 @@ MFS_FTC_STANDALONE_SRCS = modules/ftc/ftc_module.c \
     modules/ftc/submodules/drivetrain.c \
     modules/ftc/submodules/motor.c \
     modules/ftc/submodules/motor_presets.c \
-    modules/ftc/submodules/battery.c
+    modules/ftc/submodules/battery.c \
+    modules/ftc/submodules/intake.c \
+    modules/ftc/submodules/biobuzz.c
 MFS_FTC_LOCAL = $(if $(filter ecosystem/mfs/%,$(MFS_FTC_LOCAL_TMP)),$(MFS_FTC_STANDALONE_SRCS),$(MFS_FTC_LOCAL_TMP))
 MFS_FTC_MOD_OBJS = $(patsubst %.c,$(BUILD)/%.o,$(MFS_FTC_LOCAL))
 MFS_ECO_SRCS = mfs_ecosystem.c mfs_internal.c

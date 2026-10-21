@@ -53,6 +53,14 @@ void mpe_registry_truncate_solvers (int keep);
 int mpe_registry_pair_fn_at (int idx, mpe_collide_fn *out);
 /* Human-readable pair-table row for `mod ls`. 0 on success. */
 int mpe_registry_pair_describe (int idx, int *ta, int *tb, int *ca, int *cb, char *name, int namelen);
+/* Indexed stage-table snapshots for the loader's address-based stage purge
+ * (DESPOT-2026-10-20): unload previously unregistered stages by module name
+ * only, so a plugin that registered its broadphase/solver interface under a
+ * FOREIGN name survived dlclose with function pointers into unmapped memory
+ * (the pair-handler path already purged by code address; stages had none).
+ * 0 + copies on a live row, -1 otherwise. */
+int mpe_registry_broadphase_row (int idx, char *name, int namelen, mpe_broadphase_if_t *out);
+int mpe_registry_solver_row (int idx, char *name, int namelen, mpe_solver_if_t *out);
 /* broadphase / solver actives are per-world (world->broadphase_if etc).
  * Global defaults live here.
  * Register returns index on success, -1 on NULL/full/overlong-name, and

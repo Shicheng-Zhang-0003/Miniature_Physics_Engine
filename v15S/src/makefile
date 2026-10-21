@@ -77,6 +77,23 @@ BASE_LIBS = $(GTK_LIBS) $(X11_LIBS) -lm -pthread $(MPE_WIN_LIBS)
 else
 BASE_LIBS = $(GTK_LIBS) $(X11_LIBS) $(WAYLAND_LIBS) -lm -ldl -rdynamic
 endif
+# DESPOT-2026-10-20 (OPERATIONAL): the CFLAGS override below fixed the
+# defines; the exact same trap covers LIBS. V-01/V-02 sanitizer gates pass
+# LIBS on the command line, and the platform extras (X11 flush/warp in
+# ui_input, wayland client protocol stubs, dlopen in the loader, -rdynamic
+# for the symbol export plugins resolve against) dropped out of
+# $(CFLAGS)+$(LIBS) together, so the link failed on mouse_lock.o 'XFlush'
+# with no hint at the real cause. NOTE (learned in the same pass): an
+# `override LIBS += ...` on an otherwise-unset LIBS REPLACES the `LIBS ?=`
+# default below (the append happens first, LIBS stays defined, `?=` no-op)
+# and silently dropped GTK_LIBS on the normal build. So the extras are
+# appended at the engine LINK RECIPE ($(HARD_LIBS) at engine:) instead:
+# no override-var interaction, platform-specific by construction.
+ifeq ($(MPE_WINDOWS),1)
+HARD_LIBS = $(X11_LIBS) $(WAYLAND_LIBS)
+else
+HARD_LIBS = $(X11_LIBS) $(WAYLAND_LIBS) -ldl -rdynamic
+endif
 # -Werror on by default: every warning is a bug waiting to hide. The DESPOT
  # 2026-10-09 audit found an implicit `localtime_r` in mpe_config.c that
  # survived because warnings were not fatal — it truncated a returned pointer
@@ -122,6 +139,16 @@ override CFLAGS += $(DETERMINISM_FLAGS)
 # and header edits stopped triggering rebuilds. Appended with `override` so it
 # survives an environment or command-line CFLAGS.
 override CFLAGS += -MMD -MP
+# DESPOT-2026-10-20 (OPERATIONAL): the same trap bit the V-01 sanitizer gate
+# (validation/V01.sh passes CFLAGS on the command line): GTK_DEFINES carry
+# the build-mode selection for the source tree (-DMPE_GTK4=1,
+# MPE_GTK4_X11_WAYLAND, MPE_WAYLAND_RELATIVE_POINTER) but only reached $(CFLAGS)
+# through BASE_CFLAGS. A command-line override silently demoted the GTK4
+# engine into the removed GTK3 code path (3000+ lines were deleted on
+# 2026-09-29) and users saw gtk3-only link/compile errors with no message.
+# GTK_DEFINES are idempotent defines; double-defining via BASE_CFLAGS is a
+# no-op, and normal builds are untouched.
+override CFLAGS += $(GTK_DEFINES)
 
 BUILD_DIR ?= build
 # ENGINE_SRCS uses a wildcard (not an explicit list) so new engine TUs are
@@ -141,7 +168,7 @@ engine: $(OBJECTS)
 ifeq ($(MPE_WINDOWS),1)
 	$(CC) $(CFLAGS) $(DETERMINISM_FLAGS) $(OBJECTS) $(LIBS) -Wl,--export-all-symbols -Wl,--out-implib,libengine.a -o engine$(EXE_EXT)
 else
-	$(CC) $(CFLAGS) $(DETERMINISM_FLAGS) $(OBJECTS) $(LIBS) -o engine$(EXE_EXT)
+	$(CC) $(CFLAGS) $(DETERMINISM_FLAGS) $(OBJECTS) $(LIBS) $(HARD_LIBS) -o engine$(EXE_EXT)
 endif
 
 # ---- Headless test binary (no GTK/GL deps) ----
@@ -483,19 +510,24 @@ test_suite_all: build_suite
 	./test_mpe_suite$(EXE_EXT) --all
 # DESPOT-2026-10-07 P2-1: static analysis + sanitizer gates (CI should run these).
 analyze:
-	$(CC) -fanalyzer $(CFLAGS) -fsyntax-only $(MPE_SUITE_SRCS) $(MPE_TEST_CORE) 2>&1 | head -n 100
+	$(CC) -fanalyzer $(CFLAGS) -fsyntax-only $(MPE_SUITE_SRCS) $(MPE_TEST_CORE)
 asan: build_suite
 	$(CC) $(CFLAGS) -fsanitize=address,undefined -fno-omit-frame-pointer $(MPE_SUITE_SRCS) $(MPE_TEST_CORE) $(SPRING_TEST_SRCS) $(SCENE_TEST_SRCS) $(MPE_TEST_LIBS) $(shell pkg-config --libs epoxy) -o test_mpe_suite_asan$(EXE_EXT)
-# DESPOT-2026-10-08: ThreadSanitizer gate (registry/MEI locks, live-world list,
-# tick-boundary loader rule). Single-threaded step is TSan-clean by design;
-# MT sanitize phase is the only threaded region (disjoint writes).
-tsan:
-	$(CC) $(CFLAGS) -fsanitize=thread -fno-omit-frame-pointer $(MPE_SUITE_SRCS) $(MPE_TEST_CORE) $(SPRING_TEST_SRCS) $(SCENE_TEST_SRCS) $(MPE_TEST_LIBS) $(shell pkg-config --libs epoxy) -o test_mpe_suite_tsan$(EXE_EXT)
-	./test_mpe_suite_tsan$(EXE_EXT) --all
+# ThreadSanitizer gate for the process-wide worker pool, concurrent-world
+# dispatch, shared-body narrowphase bookkeeping, registry and live-world locks.
+# Linux TSan needs a non-randomized address layout on hosts whose PIE mappings
+# collide with its shadow range; override TSAN_LAUNCHER to choose another runner.
+TSAN_LAUNCHER ?= $(if $(filter Linux,$(shell uname -s)),setarch $(shell uname -m) -R,)
+tsan: ecosystem/mfs/mfs_ecosystem$(PLUGIN_EXT) ecosystem/capsule/mpe_capsule$(PLUGIN_EXT)
+	$(CC) $(CFLAGS) $(MPE_RDYNAMIC) -fsanitize=thread -fno-omit-frame-pointer $(MPE_SUITE_SRCS) $(MPE_TEST_CORE) $(SPRING_TEST_SRCS) $(SCENE_TEST_SRCS) $(MPE_TEST_LIBS) $(shell pkg-config --libs epoxy) -o test_mpe_suite_tsan$(EXE_EXT)
+	$(CC) $(CFLAGS) -DMPE_HEADLESS -Dmpe_paranoia_determinism -fsanitize=thread -fno-omit-frame-pointer tests/paranoia_determinism.c $(PARANOIA_TEST_CORE) $(MPE_TEST_LIBS) -o test_paranoia_determinism_tsan$(EXE_EXT)
+	$(TSAN_LAUNCHER) env MPE_THREADS=4 TSAN_OPTIONS=halt_on_error=1 ./test_paranoia_determinism_tsan$(EXE_EXT)
+	$(TSAN_LAUNCHER) env MPE_THREADS=4 TSAN_OPTIONS=halt_on_error=1 ./test_mpe_suite_tsan$(EXE_EXT) --all
 
 plugins: plugins/mpe_capsule$(PLUGIN_EXT)
 
 .PHONY: clean build_two_world test_two_world build_revolute test_revolute \
+	analyze asan tsan \
 	build_cylinder_drop test_cylinder_drop build_driven_wheel test_driven_wheel \
 	build_math3_inverse test_math3_inverse build_floor_collision_diag test_floor_collision_diag \
 	build_cylinder_sphere test_cylinder_sphere build_cylinder_cube test_cylinder_cube \

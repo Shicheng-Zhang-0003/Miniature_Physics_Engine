@@ -79,17 +79,29 @@ void simulation_physics_tick (float frame_delta_time) {
     if (physics_time_accumulator > (double) fixed_physics_dt * (double) max_substeps_per_frame) {
         /* Anti-spiral: excess wall-clock time is dropped (sim lags wall). */
         physics_time_accumulator = (double) fixed_physics_dt * (double) max_substeps_per_frame;
-    } float linear_damping_factor = (float) det_pow_retention ((double) leg_cfg -> world.drag, (double) fixed_physics_dt);
+    }     /* DESPOT-2026-10-20 (PARITY, see physics_world.c:1675): the leg path fed
+     * `drag` (and drag*scale) to det_pow_retention UNCLAMPED, so an
+     * out-of-contract config (zeroed g_cfg drag=0, NaN from cfg
+     * corruption, or >1.1 anti-damping) silently escaped the
+     * deterministic path in the GUI while the canonical loop self-corrects.
+     * Same clamps, same counted-loudness class. */
+    float leg_drag = leg_cfg -> world.drag;
+    if (!isfinite (leg_drag) || leg_drag <= 0.0f) { leg_drag = 1.0f; }
+    if (leg_drag > 1.0f) { leg_drag = 1.0f; }
+    float linear_damping_factor = (float) det_pow_retention ((double) leg_drag, (double) fixed_physics_dt);
     /* TRUTH: scale=1.0 means no extra rotary damping (matches canonical). */
     /* FIX-AUDIT-DESPOT: computed once per FRAME here, but consumed per
      * SUBSTEP below. fixed_dt is const today so values agree; if it ever
      * varies (variable-step legacy callers), stale damping integrates the
      * wrong drag. Recomputed at the top of each substep iteration (cheap:
      * two det_pow calls); these frame-level values seed the first pass. */
+    float leg_ang_base = leg_drag * leg_cfg -> world.angular_damping_scale;
+    if (!isfinite (leg_ang_base) || leg_ang_base <= 0.0f) { leg_ang_base = 1.0f; }
+    if (leg_ang_base > 1.0f) { leg_ang_base = 1.0f; }
     float angular_damping_factor =
         (leg_cfg -> world.angular_damping_scale >= 1.0f)
         ? 1.0f
-    : (float) det_pow_retention ((double) (leg_cfg -> world.drag * leg_cfg -> world.angular_damping_scale),
+    : (float) det_pow_retention ((double) leg_ang_base,
                                          (double) fixed_physics_dt);
     debug_last_manifold_overflow_count = 0;
     /* All simulation state lives in the primary world; this tick only
@@ -107,11 +119,14 @@ void simulation_physics_tick (float frame_delta_time) {
         /* FIX-AUDIT-DESPOT: refresh damping per substep (see decl note):
          * det_pow_retention is pure, so recompute is exact and keeps a
          * future variable-dt caller honest. */
-        linear_damping_factor = (float) det_pow_retention ((double) leg_cfg -> world.drag, (double) fixed_physics_dt);
+        linear_damping_factor = (float) det_pow_retention ((double) leg_drag, (double) fixed_physics_dt);
+        leg_ang_base = leg_drag * leg_cfg -> world.angular_damping_scale;
+        if (!isfinite (leg_ang_base) || leg_ang_base <= 0.0f) { leg_ang_base = 1.0f; }
+        if (leg_ang_base > 1.0f) { leg_ang_base = 1.0f; }
         angular_damping_factor =
             (leg_cfg -> world.angular_damping_scale >= 1.0f)
             ? 1.0f
-        : (float) det_pow_retention ((double) (leg_cfg -> world.drag * leg_cfg -> world.angular_damping_scale),
+        : (float) det_pow_retention ((double) leg_ang_base,
                                              (double) fixed_physics_dt);
         /* Sanitize all bodies */
         for (int sanitize_index = 0; sanitize_index < world -> body_count; sanitize_index++) {
@@ -225,14 +240,12 @@ void simulation_physics_tick (float frame_delta_time) {
          * the world counter; debug accumulates this substep's delta. */
         debug_last_manifold_overflow_count += world -> manifold_overflow_count - ovfl_sub_mark;
         /* Solver islands (see physics_world.c): skip fully-sleeping islands
-         * in the iteration/relaxation loops below. */
+         * in the iteration/relaxation loops below. The island build runs
+         * here (pre-force, matching the canonical early build) and is
+         * REBUILT after the force stage — see the second build below
+         * (DESPOT-2026-10-20 parity with physics_world.c:1742). */
         islands_build (world, world -> pair_buffer, detected_collision_count);
-        for (int island_mark = 0; island_mark < manifold_count; island_mark++) {
-            rigidbody *ma = world -> manifolds [island_mark].object_a;
-            rigidbody *mb = world -> manifolds [island_mark].object_b;
-            world -> manifold_awake [island_mark] =
-                (unsigned char) (islands_body_awake (world, ma) || islands_body_awake (world, mb));
-        } collision_manifold_solve_order (world, world -> manifolds, manifold_count, world -> manifold_order);
+        collision_manifold_solve_order (world, world -> manifolds, manifold_count, world -> manifold_order);
         /* TRUTH: forces after narrow (unified with world path). Springs via
          * the canonical weak entry (see physics_world.c). */
         if (mpe_springs_apply) { mpe_springs_apply (world, fixed_physics_dt); }
@@ -286,6 +299,23 @@ void simulation_physics_tick (float frame_delta_time) {
         }
         /* TRUTH P0-2: refresh Poisson gate to post-integration velocities. */
         collision_refresh_impact_velocities (world -> manifolds, manifold_count);
+        /* DESPOT-2026-10-20 (PARITY with physics_world.c:1742): islands were
+         * built before motors/forces ran; motor wake flips bodies awake
+         * after the flags were computed, leaving joint+contact solves
+         * skipped for a tick (the documented "broken hinge response" bug
+         * lived on verbatim on the GUI path). Rebuild cheaply
+         * (O(pairs), idempotent) so iteration skips match live sleep state. */
+        islands_build (world, world -> pair_buffer, detected_collision_count);
+        for (int island_mark = 0; island_mark < manifold_count; island_mark++) {
+            rigidbody *ma = world -> manifolds [island_mark].object_a;
+            rigidbody *mb = world -> manifolds [island_mark].object_b;
+            if (!ma || !mb || world -> manifolds [island_mark].contact_count == 0) {
+                world -> manifold_awake [island_mark] = 0;
+                continue;
+            }
+            world -> manifold_awake [island_mark] =
+                (unsigned char) (islands_body_awake (world, ma) || islands_body_awake (world, mb));
+        }
         /* Solver iterations (per-world config). */
         const mpe_config_t *leg_step_cfg = mpe_world_cfg (world);
         int solver_iterations = leg_step_cfg -> timestep.solver_iterations;
@@ -352,6 +382,7 @@ void simulation_physics_tick (float frame_delta_time) {
          * erase the correction before integration. */
         /* Poisson restitution + joint relaxation + friction relaxation
          * (see physics_world.c). */
+        collision_snapshot_compression_impulses (world -> manifolds, manifold_count);
         if (world -> solver_if && world -> solver_if -> poisson) { world -> solver_if -> poisson (world, world -> manifolds, manifold_count, world -> solver_state); } else {
             collision_apply_poisson_restitution (world -> manifolds, manifold_count, leg_step_cfg);
         } constraint_solve_all (world, fixed_physics_dt);
@@ -376,6 +407,16 @@ void simulation_physics_tick (float frame_delta_time) {
         /* TRUTH: split was missing on legacy (sank to slop). Add it + the
          * post-split wake revisit (see physics_world.c). */
         if (world -> solver_if && world -> solver_if -> split) { world -> solver_if -> split (world, world -> manifolds, manifold_count, fixed_physics_dt, world -> solver_state); } else { collision_apply_split_impulse (world -> manifolds, manifold_count, fixed_physics_dt, leg_step_cfg); }
+        /* DESPOT-2026-10-20 (PARITY, physics_world.c:1815 "late-manifold-
+         * after-split"): split can wake sleepers that were pair_skipped.
+         * The revisit below re-processes them, but previously the fresh
+         * manifolds missed iteration/Poisson/split entirely (cold solve
+         * next tick = one-tick-late response + first-tick penetration
+         * souvenir, ON THE GUI PATH ONLY — canonical fixed it, legacy was
+         * left carrying the same bug the canonical fix came out of). Run
+         * the identical extra resolve+Poisson+split pass over exactly the
+         * late range. */
+        int late_manifold_start = manifold_count;
         for (int p = 0; p < detected_collision_count; p++) {
             if (!world -> pair_skipped [p]) { continue; }
             int ia = world -> pair_buffer [p].object_index_a;
@@ -387,6 +428,42 @@ void simulation_physics_tick (float frame_delta_time) {
             if (world -> bodies [ia].is_sleeping && world -> bodies [ib].is_sleeping) { continue; }
             physics_world_process_pair (world, ia, ib, fixed_physics_dt, &manifold_count);
             world -> pair_skipped [p] = 0;
+        }
+        /* Late-range first solve — verbatim assignment from
+         * physics_world.c:1834-1859, expressed with the legacy entry
+         * points (solver_if if live, builtin resolve/poisson/split
+         * otherwise). has_contact was set by process_pair above so the
+         * gravity gate stays honest; rolling below sees their normals. */
+        if (manifold_count > late_manifold_start) {
+            for (int m = late_manifold_start; m < manifold_count; m++) {
+                world -> manifold_awake [m] = 1; /* newly-awake by construction */
+            }
+            for (int m = late_manifold_start; m < manifold_count; m++) {
+                if (world -> solver_if && world -> solver_if -> resolve) {
+                    world -> solver_if -> resolve (world, &world -> manifolds [m], fixed_physics_dt, false, 0,
+                                               world -> solver_state);
+                    world -> solver_if -> resolve (world, &world -> manifolds [m], fixed_physics_dt, false, 1,
+                                               world -> solver_state);
+                } else {
+                    collision_resolve_iterative (&world -> manifolds [m], fixed_physics_dt, false, 0, leg_step_cfg);
+                    collision_resolve_iterative (&world -> manifolds [m], fixed_physics_dt, false, 1, leg_step_cfg);
+                }
+            }
+            int late_count = manifold_count - late_manifold_start;
+            if (world -> solver_if && world -> solver_if -> poisson) {
+                world -> solver_if -> poisson (world, &world -> manifolds [late_manifold_start], late_count,
+                                           world -> solver_state);
+            } else {
+                collision_apply_poisson_restitution (&world -> manifolds [late_manifold_start], late_count,
+                                                     leg_step_cfg);
+            }
+            if (world -> solver_if && world -> solver_if -> split) {
+                world -> solver_if -> split (world, &world -> manifolds [late_manifold_start], late_count,
+                                         fixed_physics_dt, world -> solver_state);
+            } else {
+                collision_apply_split_impulse (&world -> manifolds [late_manifold_start], late_count,
+                                               fixed_physics_dt, leg_step_cfg);
+            }
         }
         /* Rolling resistance once per tick (uses solved normal impulses). */
         if (world -> solver_if && world -> solver_if -> rolling) { world -> solver_if -> rolling (world, world -> manifolds, manifold_count, fixed_physics_dt, world -> solver_state); } else { collision_apply_rolling_resistance (world -> manifolds, manifold_count, fixed_physics_dt, leg_step_cfg); }

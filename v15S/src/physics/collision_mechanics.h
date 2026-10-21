@@ -39,10 +39,13 @@ typedef struct {
      * bounce every tick). */
     float impact_velocity;
     float base_normal_impulse;
-    /* RESERVED (ABI): compression fields predate the normal-minus-base
-     * formulation and are intentionally unwritten/unread. Kept so plugin
-     * struct layouts don't shift. Do not use. */
+    /* ABI-preserving slot reused to capture the solved compression-only
+     * normal impulse immediately before restitution is applied. Rolling
+     * resistance reads this snapshot so a bounce does not increase rolling
+     * torque for the tick. */
     float base_compression_impulse;
+    /* RESERVED (ABI): retained for layout compatibility; intentionally
+     * unwritten/unread. */
     float accumulated_compression_impulse;
     /* warmed REMOVED (dead provenance flag; SOR damping deleted with the
      * strict warm-start match — all contacts solve full steps). */
@@ -298,6 +301,7 @@ void collision_apply_rolling_resistance (collision_data *manifolds, int manifold
  * e * (this tick's compression impulse) once, then a short relaxation lets
  * friction respond. Correct for multi-contact; Newtonian bias over-pays. */
 void collision_apply_poisson_restitution (collision_data *manifolds, int manifold_count, const mpe_config_t *cfg);
+void collision_snapshot_compression_impulses (collision_data *manifolds, int manifold_count);
 /* TRUTH P0-2: refresh Poisson gate to post-force-integration velocities.
  * Prepare() runs before gravity/springs/motors are integrated, so the
  * recorded impact_velocity is stale by g*dt + spring/motor deltas.

@@ -8,6 +8,7 @@
 #include "math3d.h"
 #include "math4_special.h"
 #include "../config/mpe_config.h"
+#include "mpe_platform.h" /* MPE_ATOMIC_* shim (rigidbody.h inline helpers) */
 /* FIX-AUDIT-DESPOT float-precision TRUTH: position/velocity/mass/dimensions
  * are float (23-bit mantissa, ~1e-7 relative). Consequences, documented so
  * callers stop filing them as bugs:
@@ -237,11 +238,11 @@ extern _Atomic unsigned long mpe_clamp_solver_events;
 void mpe_note_solver_clamp (const char *kind, double requested, double stored);
 void mpe_clamp_counters_reset (void);
 static inline unsigned long mpe_clamp_mass_total (void)
-    { return __atomic_load_n (&mpe_clamp_mass_events, __ATOMIC_RELAXED); }
+    { return MPE_ATOMIC_LOAD_n (&mpe_clamp_mass_events, MPE_ATOMIC_RELAXED); }
 static inline unsigned long mpe_clamp_radius_total (void)
-    { return __atomic_load_n (&mpe_clamp_radius_events, __ATOMIC_RELAXED); }
+    { return MPE_ATOMIC_LOAD_n (&mpe_clamp_radius_events, MPE_ATOMIC_RELAXED); }
 static inline unsigned long mpe_clamp_half_length_total (void)
-    { return __atomic_load_n (&mpe_clamp_half_length_events, __ATOMIC_RELAXED); }
+    { return MPE_ATOMIC_LOAD_n (&mpe_clamp_half_length_events, MPE_ATOMIC_RELAXED); }
 static inline unsigned long mpe_clamp_solver_total (void)
-    { return __atomic_load_n (&mpe_clamp_solver_events, __ATOMIC_RELAXED); }
+    { return MPE_ATOMIC_LOAD_n (&mpe_clamp_solver_events, MPE_ATOMIC_RELAXED); }
 #endif

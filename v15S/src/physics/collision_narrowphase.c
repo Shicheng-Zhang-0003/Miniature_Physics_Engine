@@ -538,12 +538,7 @@ bool collision_dual_cube (rigidbody *cube_a, rigidbody *cube_b, collision_data *
         collision_output_data -> contact_count = 1;
         float parallel_alignment = fabsf (bb);
         float contact_spread = fminf (edge_extent_a, edge_extent_b) * 0.5f;
-        if ((parallel_alignment > 0.95f) && (contact_spread > 0.05f)) {
-            /* DESPOT-2026-10-13: the 0.05 spread gate means boxes with
-             * min(half-extent)<=0.1 never earn the 2nd parallel-edge contact
-             * — single-point support, zero lever arm, scale-dependent
-             * tipping. Silent, no telemetry. Small-box piles are the regime
-             * that pays. Ticketed, not silently re-tuned. */
+        if ((parallel_alignment > 0.95f) && (contact_spread > 1e-6f)) {
             float t_offsets [2];
             t_offsets [0] = t_a - contact_spread;
             t_offsets [1] = t_a + contact_spread;
@@ -561,7 +556,7 @@ bool collision_dual_cube (rigidbody *cube_a, rigidbody *cube_b, collision_data *
                 vector3 sample_closest_b = simd_add (anchor_b, simd_scale (edge_dir_b, sample_t_b));
                 vector3 sample_contact_point =
                     simd_scale (simd_add (sample_closest_a, sample_closest_b), 0.5f);
-                if (vector3_length_squared (simd_sub (sample_contact_point, contact_point)) > 0.0001f) {
+                if (vector3_length_squared (simd_sub (sample_contact_point, contact_point)) > 1e-12f) {
                     contact_point_data *extra_cp =
                         &collision_output_data -> contacts [collision_output_data -> contact_count];
                     extra_cp -> position = sample_contact_point;

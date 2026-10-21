@@ -403,8 +403,8 @@ bool collision_cylinder_cube (rigidbody *cyl, rigidbody *cube, collision_data *o
                  * actually needs: the cylinder's vertical extent must reach
                  * the slab's near face. `far_y` is the slab's opposite face;
                  * a cylinder entirely beyond it is not touching anything.
-                 * A cylinder INSIDE the slab still passes (top above the near
-                 * face) and is pushed out, which is the intended resolution.
+                 * A cylinder inside the slab that crosses both faces uses
+                 * the generic segment-OBB path so the shallower exit wins.
                  */
                 float far_y = cube -> position.y - up_sign * box_extents [up_index];
                 /* Vertical half-extent of the cylinder about its own centre. */
@@ -415,6 +415,7 @@ bool collision_cylinder_cube (rigidbody *cyl, rigidbody *cube, collision_data *o
                     axis_y = -1.0f;
                 float v_support = h * fabsf (axis_y) + r * sqrtf (fmaxf (0.0f, 1.0f - axis_y * axis_y));
                 float cyl_high = cyl -> position.y + v_support;
+                float cyl_low = cyl -> position.y - v_support;
                 /* The shortcut models the slab's near face as an infinite
                  * plane, so it is only valid when the cylinder actually
                  * REACHES that face. `far_y` is the slab's opposite face; a
@@ -422,21 +423,9 @@ bool collision_cylinder_cube (rigidbody *cyl, rigidbody *cube, collision_data *o
                  * the generic segment-OBB path, which resolves it by true
                  * closest point rather than pushing it out the top.
                  *
-                 * DESPOT-2026-09-29: an earlier version of this gate ALSO
-                 * required the cylinder to reach the far face. That is wrong
-                 * -- a cylinder resting ON TOP of a slab is entirely on the
-                 * near side by construction, so the condition rejected the
-                 * primary use case and broke list4_cylinder_floor and
-                 * paranoia_cylinder_collision. One condition is correct. */
-                (void) far_y;
-                /* DESPOT-2026-10-13 minimal-exit exception: an EMBEDDED
-                 * cylinder (centre between the faces) is always pushed out
-                 * the near face, even when the far exit is the minimal
-                 * translation (Gottschalk/Ericson minimal-exit). The generic
-                 * segment-OBB path would pick the true closest face; this
-                 * shortcut hijacks it whenever the near face is reached.
-                 * Resting/impacting contacts (the gated regime) are
-                 * unaffected — only deep embedment takes the long way out. */
+                 * A cylinder resting ON TOP is entirely on the near side, so
+                 * it still uses the plane shortcut. A cylinder that crosses
+                 * both faces uses the OBB path below. */
                 /* The shortcut models a SOLID-BELOW floor at the slab's near
                  * face, which only exists when that axis face's outward
                  * normal points UP (up_sign >= 0). An inverted slab
@@ -450,7 +439,9 @@ bool collision_cylinder_cube (rigidbody *cyl, rigidbody *cube, collision_data *o
                  * pen 5.0 m, y=5.1033 after one tick, vy=0). Inverted slabs
                  * now fall through to the exact segment-OBB path below,
                  * which picks the true closest face. */
-                bool top_face_shortcut = (up_sign >= 0.0f) && (cyl_high >= plane_y - slop);
+                bool reaches_near_face = cyl_high >= plane_y - slop;
+                bool crosses_far_face = cyl_low < far_y - slop;
+                bool top_face_shortcut = (up_sign >= 0.0f) && reaches_near_face && !crosses_far_face;
                 if (top_face_shortcut) { return collision_static_plane_cylinder (cube, cyl, plane_y, out, C); }
             }
         }
@@ -781,7 +772,7 @@ bool collision_cylinder_cylinder (rigidbody *cyl_a, rigidbody *cyl_b, collision_
         float lateral = vector3_length (lateral_vec);
         float axial_gap = fabsf (axial) - (ha + hb);
         float side_gap = lateral - (cyl_a -> radius + cyl_b -> radius);
-        bool face_candidate = (axial_gap < slop) && (lateral < cyl_a -> radius + cyl_b -> radius + slop);
+        bool face_candidate = (axial_gap < slop) && (lateral < cyl_a -> radius + cyl_b -> radius);
         if (face_candidate && (axial_gap >= -2.0f * slop || axial_gap > side_gap)) {
             /* Faces overlap laterally and meet axially: flat-cap contact. */
             float s = (axial >= 0.0f) ? 1.0f : -1.0f;
@@ -790,33 +781,44 @@ bool collision_cylinder_cylinder (rigidbody *cyl_a, rigidbody *cyl_b, collision_
             out -> object_b = cyl_b;
             out -> normal_vector = nrm;
             out -> contact_count = 1;
-            /* Contact at midpoint of overlap disc (clamped to smaller cap). */
+            /* Initial axial midpoint; select within the common cap lens below. */
             vector3 face_a = simd_add (cyl_a -> position, simd_scale (ax, s * ha));
             vector3 face_b = simd_sub (cyl_b -> position, simd_scale (ax, s * hb));
             vector3 mid = simd_scale (simd_add (face_a, face_b), 0.5f);
             contact_point_data *cp0 = &out -> contacts [0];
             cp0 -> penetration = (axial_gap < 0.0f) ? -axial_gap : 0.0f;
             cp0 -> position = mid;
-            /* Second point for stable face support (offset toward rim).
-             * DESPOT-2026-10-13: copies cp0 depth unchecked against the
-             * overlap disc — for laterally-offset near-coaxial pairs the
-             * mid+perp·min_r·0.5 point can lie outside the smaller cap, a
-             * phantom support at full depth. No disc-containment clamp.
-             * Coaxial stacks (the gated regime) are centred and unaffected. */
-            float min_r = (cyl_a -> radius < cyl_b -> radius) ? cyl_a -> radius : cyl_b -> radius;
-            if ((min_r > 0.05f) && (out -> contact_count < 4)) {
-                vector3 perp =
-                    (lateral > 1e-6f)
-                    ? simd_scale (lateral_vec, 1.0f / lateral)
-                    : vector3_normalisation (vector3_cross (
-                              ax, (fabsf (ax.y) < 0.99f) ? (vector3) {0.0f, 1.0f, 0.0f} : (vector3) {1.0f, 0.0f, 0.0f}));
-                vector3 off = simd_scale (perp, min_r * 0.5f);
-                contact_point_data *cp1 = &out -> contacts [out -> contact_count++];
-                /* contact_count already 1; append second: */
-                (void) cp1;
-                out -> contacts [1].penetration = cp0 -> penetration;
-                out -> contacts [1].position = simd_add (mid, off);
-                out -> contact_count = 2;
+            /* Keep both support points inside the intersection of the cap
+             * discs. A laterally shifted midpoint can lie outside the smaller
+             * cap and create a phantom full-depth impulse. Find the midpoint
+             * of the common interval along the center line, then limit a second
+             * point's perpendicular offset by both circle radii. */
+            float r_a = cyl_a -> radius;
+            float r_b = cyl_b -> radius;
+            if ((lateral < r_a + r_b) && (out -> contact_count < 4)) {
+                vector3 radial_dir;
+                if (lateral > 1e-6f) {
+                    radial_dir = simd_scale (lateral_vec, 1.0f / lateral);
+                } else {
+                    radial_dir = vector3_normalisation (vector3_cross (
+                        ax, (fabsf (ax.y) < 0.99f) ? (vector3) {0.0f, 1.0f, 0.0f} : (vector3) {1.0f, 0.0f, 0.0f}));
+                }
+                float along_a = 0.5f * (lateral + r_a - r_b);
+                if (along_a < 0.0f) along_a = 0.0f;
+                if (along_a > lateral) along_a = lateral;
+                float along_b = lateral - along_a;
+                float room_a = sqrtf (fmaxf (0.0f, r_a * r_a - along_a * along_a));
+                float room_b = sqrtf (fmaxf (0.0f, r_b * r_b - along_b * along_b));
+                float offset = 0.5f * fminf (room_a, room_b);
+                vector3 base = simd_add (mid, simd_scale (radial_dir, along_a - 0.5f * lateral));
+                cp0 -> position = base;
+                if (offset > 1e-6f) {
+                    vector3 tangent = vector3_normalisation (vector3_cross (ax, radial_dir));
+                    contact_point_data *cp1 = &out -> contacts [1];
+                    cp1 -> penetration = cp0 -> penetration;
+                    cp1 -> position = simd_add (base, simd_scale (tangent, offset));
+                    out -> contact_count = 2;
+                }
             } return true;
         }
         /* The segment-plus-radius fallback below is a capsule approximation.

@@ -1,21 +1,15 @@
 #!/usr/bin/env python3
-"""Seeded property sweep: collision / constraint / config invariants.
+"""Independent mathematical checks for collision, impulse, and model laws.
 
-No engine import: independent math (Python) + engine-measured values pasted
-from the C suite logs are NOT used here. Instead this script checks the LAWS
-the C gates must obey (fixed seeds, deterministic), so a C gate that violates
-these laws is wrong even if green:
-
-- SAT-15 symmetry: overlap(a,b)==overlap(b,a); slop-band admission.
-- Coulomb cone: |Ft|<=mu*Fn; min-combine <= sqrt-combine.
-- Poisson: bounce heights h*e^2 geometric; threshold gate sign.
-- Spring: T=2*pi*sqrt(m/k) within 2%; Courant k_stable bound.
-- Config: 79 keys unique; regime mults applied (no post-begin wipe).
-- Determinism: twin trajectories identical (checked in C; law stated here).
-
-Fixed seeds only (no RNG without seed). Exit 0 = all laws hold.
+This script checks closed-form identities and the uniqueness of the live
+configuration schema. Engine behavior is checked by the C suite and the
+determinism paranoia tests; this file does not pretend to prove those runtime
+paths. Exit 0 means every equation check in this file passed.
 """
-import math, sys
+import math
+import re
+import sys
+from pathlib import Path
 fails = 0
 def check(name, cond, detail=""):
     global fails
@@ -24,11 +18,33 @@ def check(name, cond, detail=""):
         fails += 1
 
 g = 9.80665
+# SAT overlap is symmetric under swapping projected radii and reversing the
+# center displacement. Negative overlap means separation.
+def sat_overlap(proj_a, proj_b, center_projection):
+    return proj_a + proj_b - abs(center_projection)
+
+for pa, pb, d in [(1.2, 0.8, 1.5), (0.2, 0.3, -0.7), (2.0, 1.0, 1.0)]:
+    ab = sat_overlap(pa, pb, d)
+    ba = sat_overlap(pb, pa, -d)
+    check(f"sat-symmetry({pa},{pb},{d})", abs(ab - ba) < 1e-12, f"overlap={ab:.4f}")
+
+slop = 0.01
+for overlap in [0.04, 0.0, -0.005, -0.02]:
+    admitted = overlap >= -slop
+    depth = max(overlap, 0.0) if admitted else None
+    check(f"slop-admission({overlap})", admitted == (overlap >= -slop) and
+          (depth is None or depth >= 0.0), f"admitted={admitted} depth={depth}")
+
 # Coulomb cone + min<=sqrt
 for mu_a, mu_b in [(0.9,0.3),(0.4,0.4),(0.0,0.9),(1.2,0.8)]:
     m = min(mu_a, mu_b)
     s = math.sqrt(mu_a*mu_b)
     check(f"cone-min<=sqrt({mu_a},{mu_b})", m <= s + 1e-12, f"min={m:.4f} sqrt={s:.4f}")
+    normal_impulse = 3.7
+    trial_tangent = 2.4
+    tangent_impulse = min(trial_tangent, m * normal_impulse)
+    check(f"coulomb-bound({mu_a},{mu_b})",
+          0.0 <= tangent_impulse <= m * normal_impulse + 1e-12)
 # Poisson series e=0.5
 h, e = 1.0, 0.5
 for i, exp in enumerate([0.25, 0.0625, 0.015625]):
@@ -62,8 +78,6 @@ check("sphere-I", abs(0.4*2*0.25-0.2) < 1e-12)
 check("box-Ixx", abs(2/12*(16+36)-8.6666667) < 1e-6)
 check("cyl-axial", abs(0.5*3*0.25-0.375) < 1e-12)
 check("cyl-trans", abs(3/12*(3*0.25+4)-1.1875) < 1e-12)
-print(f"\n{fails} failures")
-sys.exit(1 if fails else 0)
 # Gottschalk depth law: overlap = proj_a + proj_b - |d.n| (fixed numbers)
 proj_a, proj_b, d_dot_n = 1.2, 0.8, 1.5
 overlap = proj_a + proj_b - abs(d_dot_n)
@@ -82,3 +96,14 @@ v1pe = (m1-m2)/(m1+m2)*1.0
 v2pe = 2*m1/(m1+m2)*1.0
 p_after = m1*v1pe + m2*v2pe
 check("momentum-2body", abs(p_before-p_after) < 1e-12, f"{p_after:.4f}")
+
+# Read the configuration registry as source data and fail on duplicate keys.
+# This stays current when tunables are added instead of pinning a stale count.
+schema_path = Path(__file__).resolve().parents[1] / "src/config/mpe_config_schema.c"
+schema = schema_path.read_text(encoding="utf-8")
+keys = re.findall(r'^\s*\{"([^\"]+)"\s*,', schema, re.MULTILINE)
+check("config-schema-keys-unique", bool(keys) and len(keys) == len(set(keys)),
+      f"{len(keys)} keys")
+
+print(f"\n{fails} failures")
+sys.exit(1 if fails else 0)

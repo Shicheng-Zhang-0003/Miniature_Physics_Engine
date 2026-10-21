@@ -885,9 +885,21 @@ void collision_snapshot_friction_mu (collision_data *manifolds, int manifold_cou
         }
     }
 }
+void collision_snapshot_compression_impulses (collision_data *manifolds, int manifold_count) {
+    if ((!manifolds) || (manifold_count <= 0)) { return; }
+    for (int m = 0; m < manifold_count; m++) {
+        collision_data *man = &manifolds [m];
+        for (int i = 0; i < man -> contact_count; i++) {
+            contact_point_data *cp = &man -> contacts [i];
+            float impulse = cp -> accumulated_normal_impulse;
+            cp -> base_compression_impulse = (isfinite (impulse) && impulse > 0.0f) ? impulse : 0.0f;
+        }
+    }
+}
 void collision_apply_poisson_restitution (collision_data *manifolds, int manifold_count, const mpe_config_t *cfg) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
     if ((!manifolds) || (manifold_count <= 0)) { return; }
+    collision_snapshot_compression_impulses (manifolds, manifold_count);
     for (int m = 0; m < manifold_count; m++) {
         collision_data *man = &manifolds [m];
         for (int i = 0; i < man -> contact_count; i++) {
@@ -983,14 +995,13 @@ void collision_apply_rolling_resistance (collision_data *manifolds, int manifold
         }
         for (int i = 0; i < man -> contact_count; i++) {
             contact_point_data *cp = &man -> contacts [i];
-            if (cp -> accumulated_normal_impulse <= 0.0f) { continue; }
+            float compression_impulse = cp -> base_compression_impulse;
+            if (!isfinite (compression_impulse) || compression_impulse <= 0.0f) { continue; }
             {
-                /* DESPOT-2026-10-13: N is read AFTER Poisson, so bouncing
-                 * contacts (e>0) draw rolling torque from the restitution
-                 * impulse — Coulomb rolling M=μNR should use compression N
-                 * only. Resting contacts (the gated regime) are unaffected;
-                 * bouncers get extra spin decay for one tick. Ticketed. */
-                float normal_force = cp -> accumulated_normal_impulse / dt;
+                /* Compression-only snapshot is captured just before the
+                 * Poisson pass. Restitution reverses approach velocity but
+                 * does not increase the supporting normal force used here. */
+                float normal_force = compression_impulse / dt;
                 rigidbody *bodies [2] = {man -> object_a, man -> object_b};
                 vector3 rlev [2] = {cp -> ra, cp -> rb};
                 for (int bi = 0; bi < 2; bi++) {
@@ -1111,7 +1122,7 @@ void collision_apply_split_impulse (collision_data *manifolds, int manifold_coun
             for (int i = 0; i < man -> contact_count; i++) {
                 if (man -> contacts [i].penetration > deepest_check) { deepest_check = man -> contacts [i].penetration; }
             }
-            if (deepest_check > C -> depenetration.wake_depth_thresh) {
+            if (deepest_check > wake_depth) { /* DESPOT-2026-10-20: clamped local, not raw config — the comment above promises "[0, 0.1] shared wake depth"; the raw name let a NaN/out-of-schema value make this deep-overlap wake gate diverge from the 1201 gate in the same pass (NaN comparison false = sleepers never wake). */
                 if (!body_a -> static_state) { rigidbody_wake (body_a); }
                 if (!body_b -> static_state) { rigidbody_wake (body_b); }
             } continue;

@@ -113,6 +113,35 @@ static inline int mpe_is_path_sep (char c) {
 #define MPE_DTOR
 #define MPE_WEAK_SUPPORTED 0
 #endif
+/* ------------------------------------------------------------------ */
+/* 3b. Atomics: GNU builtins on GCC/Clang (in-repo fast path), C11      */
+/* <stdatomic.h> otherwise. DESPOT-2026-10-20: rigidbody.h,             */
+/* physics_halt.c and the physics_world pool previously called          */
+/* __atomic_* builtins unconditionally, which contradicts the platform  */
+/* promise (MSVC has no GNU builtins) while det_math.h:40-57 already    */
+/* carried the exact in-repo fix pattern. central macros so every TU    */
+/* uses one mapping, memory orders map 1:1.                            */
+/* ------------------------------------------------------------------ */
+#ifdef MPE_HAS_GNUC_ATTR
+#define MPE_ATOMIC_LOAD_n(p, mo) __atomic_load_n ((p), (mo))
+#define MPE_ATOMIC_STORE_n(p, v, mo) __atomic_store_n ((p), (v), (mo))
+#define MPE_ATOMIC_FETCH_ADD(p, v, mo) __atomic_fetch_add ((p), (v), (mo))
+#define MPE_ATOMIC_FETCH_SUB(p, v, mo) __atomic_fetch_sub ((p), (v), (mo))
+#define MPE_ATOMIC_RELAXED 0
+#define MPE_ATOMIC_ACQUIRE 2
+#define MPE_ATOMIC_RELEASE 3
+#define MPE_ATOMIC_ACQ_REL 4
+#else
+#include <stdatomic.h>
+#define MPE_ATOMIC_LOAD_n(p, mo) atomic_load ((p))
+#define MPE_ATOMIC_STORE_n(p, v, mo) atomic_store ((p), (v))
+#define MPE_ATOMIC_FETCH_ADD(p, v, mo) atomic_fetch_add_explicit ((p), (v), (mo))
+#define MPE_ATOMIC_FETCH_SUB(p, v, mo) atomic_fetch_sub_explicit ((p), (v), (mo))
+#define MPE_ATOMIC_RELAXED memory_order_relaxed
+#define MPE_ATOMIC_ACQUIRE memory_order_acquire
+#define MPE_ATOMIC_RELEASE memory_order_release
+#define MPE_ATOMIC_ACQ_REL memory_order_acq_rel
+#endif
 #ifdef MPE_OS_WINDOWS
 #ifdef MPE_BUILDING_DLL
 #define MPE_EXPORT __declspec (dllexport)

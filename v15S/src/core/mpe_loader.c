@@ -242,8 +242,14 @@ int mpe_loader_load (const char *path, char *errbuf, int errlen) {
     dlerror ();
     void *h = dlopen (resolved, RTLD_NOW | RTLD_LOCAL);
     if (!h) {
+        /* DESPOT-2026-10-20: the message was fetched twice — the first
+         * dlerror() consumed the TLS error state, so the %s branch always
+         * printed "(no dlerror)" and the real dlopen cause (bad ABI,
+         * missing symbol, ENOENT) was blank on every failed load. One
+         * call, into a temp. */
+        const char *dl_reason = dlerror ();
         loader_report (errbuf, errlen, "E_DLOPEN", "load rejected: dlopen('%s') failed: %s", resolved,
-                       dlerror () ? dlerror () : "(no dlerror)");
+                       dl_reason ? dl_reason : "(no dlerror)");
         return -1;
     }
     /* MSVC has no constructor/destructor: call explicit init if exported.
@@ -607,6 +613,51 @@ static void purge_plugin_pairs (int hi) {
         if (done)
             break;
     }
+} /* DESPOT-2026-10-20: address-based stage purge (loader unload). The old
+ * path unregistered stages by module name only, so a plugin that had
+ * registered its broadphase/solver interface under any other name kept a
+ * LIVE registry row pointing into the dlclose'd image — the pair-handler
+ * path already had the address backstop; stages did not. Snapshot the
+ * name+iface rows, match by code address, and unregister by the row's own
+ * name (which drives the world-slot reset + tombstone, same as a named
+ * unregister). Builtin rows never match: their code lives in the engine. */
+static void purge_plugin_stages (int hi) {
+    for (int round = 0; round < 8; round++) {
+        int done = 1;
+        mpe_broadphase_if_t bro [8];
+        char bro_name [8][64];
+        int nbro = 0;
+        for (int i = 0; i < 8 && nbro < 8; i++) {
+            if (mpe_registry_broadphase_row (i, bro_name [nbro], sizeof bro_name [0], &bro [nbro]) == 0)
+                nbro++;
+        }
+        for (int i = 0; i < nbro; i++) {
+            if (bro [i].generate && fn_in_plugin ((mpe_collide_fn) (void *) bro [i].generate, s_h [hi].path)) {
+                mpe_unregister_broadphase (bro_name [i]);
+                done = 0;
+            }
+        }
+        mpe_solver_if_t sol [8];
+        char sol_name [8][64];
+        int nsol = 0;
+        for (int i = 0; i < 8 && nsol < 8; i++) {
+            if (mpe_registry_solver_row (i, sol_name [nsol], sizeof sol_name [0], &sol [nsol]) == 0)
+                nsol++;
+        }
+        for (int i = 0; i < nsol; i++) {
+            int hit =
+                (sol [i].resolve && fn_in_plugin ((mpe_collide_fn) (void *) sol [i].resolve, s_h [hi].path)) ||
+                (sol [i].poisson && fn_in_plugin ((mpe_collide_fn) (void *) sol [i].poisson, s_h [hi].path)) ||
+                (sol [i].rolling && fn_in_plugin ((mpe_collide_fn) (void *) sol [i].rolling, s_h [hi].path)) ||
+                (sol [i].split && fn_in_plugin ((mpe_collide_fn) (void *) sol [i].split, s_h [hi].path));
+            if (hit) {
+                mpe_unregister_solver (sol_name [i]);
+                done = 0;
+            }
+        }
+        if (done)
+            break;
+    }
 }
 int mpe_loader_unload (const char *path_or_name) {
     if (!path_or_name) {
@@ -693,6 +744,7 @@ int mpe_loader_unload (const char *path_or_name) {
                  * pair handlers whose code lives here. */
                     detach_handle_modules (i);
                     purge_plugin_pairs (i);
+                    purge_plugin_stages (i);
                     dlerror ();
                     void (*p_fini) (void) = (void (*) (void)) dlsym (s_h [i].h, "mpe_capsule_fini");
                     if (dlerror () == NULL && p_fini)
@@ -723,6 +775,10 @@ int mpe_loader_unload (const char *path_or_name) {
                     mpe_unregister_solver (modname);
                     mpe_unregister_module_origin (modname, s_h [i].path);
                 } purge_plugin_pairs (i);
+                /* DESPOT-2026-10-20: address backstop for stage ifaces this
+                 * image registered under any name (the named unregister
+                 * above only reaches its own module name). */
+                purge_plugin_stages (i);
                 dlerror ();
                 {
                     void (*p_fini) (void) = (void (*) (void)) dlsym (s_h [i].h, "mpe_capsule_fini");

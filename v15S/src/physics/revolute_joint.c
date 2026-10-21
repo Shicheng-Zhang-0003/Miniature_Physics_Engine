@@ -615,6 +615,74 @@ void revolute_pre_step (revolute_params *p, rigidbody *body_a, rigidbody *body_b
      * so multi-turn limits work. (The per-solve limit clamps that used to
      * rebase the books here were removed: see the 6x6 path note.) */
 } /* Prismatic: single-axis slide with optional limits and motor. */
+/* Capture a body-local tangent pair for the prismatic joint's initial
+ * relative frame. The slide axis alone cannot constrain twist around itself;
+ * these existing reference fields store the missing orientation reference
+ * without changing the public constraint layout. */
+static bool prismatic_capture_rotation_reference (prismatic_params *p, rigidbody *body_a, rigidbody *body_b) {
+    if ((!p) || (!body_a) || (!body_b)) { return false; }
+    float ref_a_len_sq = vector3_length_squared (p->reference_axis_a);
+    float ref_b_len_sq = vector3_length_squared (p->reference_axis_b);
+    if (isfinite (ref_a_len_sq) && isfinite (ref_b_len_sq) && ref_a_len_sq > 0.25f && ref_b_len_sq > 0.25f) {
+        return true;
+    }
+    vector3 axis_local = vector3_normalisation (p->axis_a);
+    vector3 axis_world = vector4_rotate_to_vector3 (body_a->orientation, axis_local);
+    float axis_len_sq = vector3_length_squared (axis_world);
+    if (!(axis_len_sq > 1e-12f) || !isfinite (axis_len_sq)) { return false; }
+    axis_world = simd_scale (axis_world, 1.0f / sqrtf (axis_len_sq));
+    vector3 reference = (fabsf (axis_world.x) < 0.8f) ? (vector3) {1.0f, 0.0f, 0.0f}
+                                                        : (vector3) {0.0f, 1.0f, 0.0f};
+    vector3 tangent_world = vector3_cross (axis_world, reference);
+    float tangent_len_sq = vector3_length_squared (tangent_world);
+    if (!(tangent_len_sq > 1e-12f) || !isfinite (tangent_len_sq)) { return false; }
+    tangent_world = simd_scale (tangent_world, 1.0f / sqrtf (tangent_len_sq));
+    vector4 inv_a = {body_a->orientation.w, -body_a->orientation.x, -body_a->orientation.y,
+                     -body_a->orientation.z};
+    vector4 inv_b = {body_b->orientation.w, -body_b->orientation.x, -body_b->orientation.y,
+                     -body_b->orientation.z};
+    p->reference_axis_a = vector4_rotate_to_vector3 (inv_a, tangent_world);
+    p->reference_axis_b = vector4_rotate_to_vector3 (inv_b, tangent_world);
+    return isfinite (vector3_length_squared (p->reference_axis_a)) &&
+           isfinite (vector3_length_squared (p->reference_axis_b));
+}
+static vector3 prismatic_antipodal_rotation_axis (vector3 a [3], vector3 b [3]) {
+    float av [3][3] = {{a [0].x, a [0].y, a [0].z}, {a [1].x, a [1].y, a [1].z}, {a [2].x, a [2].y, a [2].z}};
+    float bv [3][3] = {{b [0].x, b [0].y, b [0].z}, {b [1].x, b [1].y, b [1].z}, {b [2].x, b [2].y, b [2].z}};
+    float r [3][3] = {{0.0f}};
+    for (int row = 0; row < 3; row++) {
+        for (int col = 0; col < 3; col++) {
+            for (int k = 0; k < 3; k++) { r [row] [col] += bv [k] [row] * av [k] [col]; }
+        }
+    }
+    float d0 = r [0] [0], d1 = r [1] [1], d2 = r [2] [2];
+    vector3 axis;
+    if (d0 >= d1 && d0 >= d2) {
+        axis.x = sqrtf (fmaxf (0.0f, 0.5f * (d0 + 1.0f)));
+        float den = fmaxf (4.0f * axis.x, 1e-6f);
+        axis.y = (r [0] [1] + r [1] [0]) / den;
+        axis.z = (r [0] [2] + r [2] [0]) / den;
+    } else if (d1 >= d2) {
+        axis.y = sqrtf (fmaxf (0.0f, 0.5f * (d1 + 1.0f)));
+        float den = fmaxf (4.0f * axis.y, 1e-6f);
+        axis.x = (r [0] [1] + r [1] [0]) / den;
+        axis.z = (r [1] [2] + r [2] [1]) / den;
+    } else {
+        axis.z = sqrtf (fmaxf (0.0f, 0.5f * (d2 + 1.0f)));
+        float den = fmaxf (4.0f * axis.z, 1e-6f);
+        axis.x = (r [0] [2] + r [2] [0]) / den;
+        axis.y = (r [1] [2] + r [2] [1]) / den;
+    }
+    axis = vector3_normalisation (axis);
+    /* At exactly pi both correction directions are equally short. Choose a
+     * stable sign so an antipodal frame cannot become a zero-error state. */
+    if ((fabsf (axis.x) > 1e-6f && axis.x < 0.0f) ||
+        (fabsf (axis.x) <= 1e-6f && fabsf (axis.y) > 1e-6f && axis.y < 0.0f) ||
+        (fabsf (axis.x) <= 1e-6f && fabsf (axis.y) <= 1e-6f && axis.z < 0.0f)) {
+        axis = simd_scale (axis, -1.0f);
+    }
+    return axis;
+}
 void prismatic_solve (prismatic_params *p, rigidbody *body_a, rigidbody *body_b, float dt, const mpe_config_t *cfg) {
     const mpe_config_t *C = cfg ? cfg : &g_cfg;
     if ((!p) || (!body_a) || (!body_b) || (dt <= 0.0f)) { return; }
@@ -633,9 +701,16 @@ void prismatic_solve (prismatic_params *p, rigidbody *body_a, rigidbody *body_b,
     vector3 world_b = simd_add (body_b -> position, r_b);
     /* Slide axis in world space (from body A). */
     vector3 axis_a_world = vector4_rotate_to_vector3 (body_a -> orientation, vector3_normalisation (p -> axis_a));
+    float axis_a_len_sq = vector3_length_squared (axis_a_world);
+    if (!(axis_a_len_sq > 1e-12f) || !isfinite (axis_a_len_sq)) { return; }
+    axis_a_world = simd_scale (axis_a_world, 1.0f / sqrtf (axis_a_len_sq));
     vector3 axis_b_world = (vector3_length_squared (p -> axis_b) > 1e-12f)
         ? vector4_rotate_to_vector3 (body_b -> orientation, vector3_normalisation (p -> axis_b))
         : axis_a_world;
+    float axis_b_len_sq = vector3_length_squared (axis_b_world);
+    if (!(axis_b_len_sq > 1e-12f) || !isfinite (axis_b_len_sq)) { return; }
+    axis_b_world = simd_scale (axis_b_world, 1.0f / sqrtf (axis_b_len_sq));
+    (void) prismatic_capture_rotation_reference (p, body_a, body_b);
     /* Relative velocity along slide axis. */
     vector3 vel_a = simd_add (body_a -> velocity, vector3_cross (body_a -> angular_velocity, r_a));
     vector3 vel_b = simd_add (body_b -> velocity, vector3_cross (body_b -> angular_velocity, r_b));
@@ -647,8 +722,6 @@ void prismatic_solve (prismatic_params *p, rigidbody *body_a, rigidbody *body_b,
     /* Initialize position tracking once (reference = initial slide pos). */
     if (!p -> position_initialized) {
         p -> accumulated_position = current_pos;
-        p -> reference_axis_a = axis_a_world;
-        p -> reference_axis_b = axis_b_world;
         p -> position_initialized = true;
     }
     /* ---- Perpendicular constraint: full 2-D (not 1-D slip dir).
@@ -665,7 +738,11 @@ void prismatic_solve (prismatic_params *p, rigidbody *body_a, rigidbody *body_b,
             vector3 basis [2] = {bu, bv};
             for (int bi = 0; bi < 2; bi++) {
                 vector3 dir = basis [bi];
-                float rel_d = vector3_dot (rel_vel, dir);
+                vector3 current_vel_a =
+                    simd_add (body_a->velocity, vector3_cross (body_a->angular_velocity, r_a));
+                vector3 current_vel_b =
+                    simd_add (body_b->velocity, vector3_cross (body_b->angular_velocity, r_b));
+                float rel_d = vector3_dot (simd_sub (current_vel_b, current_vel_a), dir);
                 /* Positional bias: keep anchors coincident off-axis. */
                 float err_d = vector3_dot (delta, dir);
                 float bias_d = C -> joints.revolute_beta * err_d / dt;
@@ -695,6 +772,64 @@ void prismatic_solve (prismatic_params *p, rigidbody *body_a, rigidbody *body_b,
             }
         }
     }
+    /* A prismatic joint permits translation along its axis but locks all
+     * three relative rotations. The axes and stored local tangents define
+     * corresponding body frames. Their summed cross error is the small-angle
+     * SO(3) error vector; PGS solves three angular rows and removes drift. */
+    {
+        vector3 tangent_a = vector4_rotate_to_vector3 (body_a->orientation, p->reference_axis_a);
+        vector3 tangent_b = vector4_rotate_to_vector3 (body_b->orientation, p->reference_axis_b);
+        tangent_a = simd_sub (tangent_a, simd_scale (axis_a_world, vector3_dot (tangent_a, axis_a_world)));
+        tangent_b = simd_sub (tangent_b, simd_scale (axis_b_world, vector3_dot (tangent_b, axis_b_world)));
+        float tangent_a_len_sq = vector3_length_squared (tangent_a);
+        float tangent_b_len_sq = vector3_length_squared (tangent_b);
+        if ((tangent_a_len_sq > 1e-12f) && (tangent_b_len_sq > 1e-12f) &&
+            isfinite (tangent_a_len_sq) && isfinite (tangent_b_len_sq)) {
+            tangent_a = simd_scale (tangent_a, 1.0f / sqrtf (tangent_a_len_sq));
+            tangent_b = simd_scale (tangent_b, 1.0f / sqrtf (tangent_b_len_sq));
+            vector3 binormal_a = vector3_cross (axis_a_world, tangent_a);
+            vector3 binormal_b = vector3_cross (axis_b_world, tangent_b);
+            vector3 frame_a [3] = {axis_a_world, tangent_a, binormal_a};
+            vector3 frame_b [3] = {axis_b_world, tangent_b, binormal_b};
+            vector3 rotation_error = simd_scale (
+                simd_add (simd_add (vector3_cross (frame_a [0], frame_b [0]),
+                                    vector3_cross (frame_a [1], frame_b [1])),
+                          vector3_cross (frame_a [2], frame_b [2])),
+                0.5f);
+            float rotation_cos = 0.5f * (vector3_dot (frame_a [0], frame_b [0]) +
+                                         vector3_dot (frame_a [1], frame_b [1]) +
+                                         vector3_dot (frame_a [2], frame_b [2]) - 1.0f);
+            if (rotation_cos < -0.99f) {
+                float sin_sq = vector3_length_squared (rotation_error);
+                vector3 correction_axis = (sin_sq > 1e-8f)
+                    ? simd_scale (rotation_error, 1.0f / sqrtf (sin_sq))
+                    : prismatic_antipodal_rotation_axis (frame_a, frame_b);
+                rotation_error = simd_scale (correction_axis, 3.14159265358979323846f);
+            }
+            vector3 angular_rows [3] = {axis_a_world, tangent_a, binormal_a};
+            math3 inv_inertia_a = rigidbody_effective_inv_inertia (body_a);
+            math3 inv_inertia_b = rigidbody_effective_inv_inertia (body_b);
+            math3 inv_inertia_sum = math3_addition (inv_inertia_a, inv_inertia_b);
+            for (int row = 0; row < 3; row++) {
+                vector3 dir = angular_rows [row];
+                vector3 relative_angular_velocity = simd_sub (body_b->angular_velocity, body_a->angular_velocity);
+                float rel_rotation = vector3_dot (relative_angular_velocity, dir);
+                float bias = C->joints.revolute_beta * vector3_dot (rotation_error, dir) / dt;
+                float max_bias = C->joints.revolute_max_bias;
+                if (bias > max_bias) { bias = max_bias; }
+                else if (bias < -max_bias) { bias = -max_bias; }
+                float effective_mass_inv = vector3_dot (dir, math3_multiplication_vector3 (inv_inertia_sum, dir));
+                if (effective_mass_inv > 1e-12f && isfinite (effective_mass_inv)) {
+                    float lambda = -(rel_rotation + bias) / effective_mass_inv;
+                    vector3 impulse = simd_scale (dir, lambda);
+                    body_a->angular_velocity = simd_sub (
+                        body_a->angular_velocity, math3_multiplication_vector3 (inv_inertia_a, impulse));
+                    body_b->angular_velocity = simd_add (
+                        body_b->angular_velocity, math3_multiplication_vector3 (inv_inertia_b, impulse));
+                }
+            }
+        }
+    }
     /* TRUTH: no axial equality — a slider slides freely. Old
      * err=current-accumulated (≈0 by construction) made the lock vacuous
      * when limits were off (free by accident) and double-paid rel_n when
@@ -704,8 +839,11 @@ void prismatic_solve (prismatic_params *p, rigidbody *body_a, rigidbody *body_b,
         /* TRUTH: limits key off measured current_pos, not dead-reckoned
          * accumulated (which drifted 64x/tick). Accumulated tracks for API
          * readout via pre_step; enforcement uses measurement. */
-        bool at_min = (current_pos <= p -> limit_min + 1e-4f) && (rel_n < 0.0f);
-        bool at_max = (current_pos >= p -> limit_max - 1e-4f) && (rel_n > 0.0f);
+        vector3 current_vel_a = simd_add (body_a->velocity, vector3_cross (body_a->angular_velocity, r_a));
+        vector3 current_vel_b = simd_add (body_b->velocity, vector3_cross (body_b->angular_velocity, r_b));
+        rel_n = vector3_dot (simd_sub (current_vel_b, current_vel_a), axis_a_world);
+        bool at_min = current_pos <= p -> limit_min + 1e-4f;
+        bool at_max = current_pos >= p -> limit_max - 1e-4f;
         if (at_min || at_max) {
             vector3 ra_axis = vector3_cross (r_a, axis_a_world);
             vector3 rb_axis = vector3_cross (r_b, axis_a_world);
@@ -715,7 +853,16 @@ void prismatic_solve (prismatic_params *p, rigidbody *body_a, rigidbody *body_b,
                              math3_multiplication_vector3 (rigidbody_effective_inv_inertia (body_a), ra_axis)) +
                 vector3_dot (rb_axis, math3_multiplication_vector3 (rigidbody_effective_inv_inertia (body_b), rb_axis));
             if (k_axis > 1e-12f) {
-                float lambda_limit = -rel_n / k_axis;
+                float limit_error = at_max ? fmaxf (current_pos - p->limit_max, 0.0f)
+                                           : fminf (current_pos - p->limit_min, 0.0f);
+                float bias_limit = C->joints.revolute_beta * limit_error / dt;
+                float max_bias = C->joints.revolute_max_bias;
+                if (bias_limit > max_bias) { bias_limit = max_bias; }
+                else if (bias_limit < -max_bias) { bias_limit = -max_bias; }
+                float lambda_limit = -(rel_n + bias_limit) / k_axis;
+                /* Inequality stops only push back into the legal interval. */
+                if (at_max && lambda_limit > 0.0f) { lambda_limit = 0.0f; }
+                if (at_min && lambda_limit < 0.0f) { lambda_limit = 0.0f; }
                 vector3 limit_impulse = simd_scale (axis_a_world, lambda_limit);
                 body_a -> velocity = simd_sub (body_a -> velocity, simd_scale (limit_impulse, inv_a));
                 body_b -> velocity = simd_add (body_b -> velocity, simd_scale (limit_impulse, inv_b));
@@ -732,6 +879,7 @@ void prismatic_solve (prismatic_params *p, rigidbody *body_a, rigidbody *body_b,
 void prismatic_pre_step (prismatic_params *p, rigidbody *body_a, rigidbody *body_b, float dt, const mpe_config_t *cfg) {
     (void) cfg;
     if ((!p) || (!body_a) || (!body_b) || (!(dt > 0.0f))) { return; }
+    (void) prismatic_capture_rotation_reference (p, body_a, body_b);
     vector3 r_a = vector4_rotate_to_vector3 (body_a -> orientation, p -> anchor_a);
     vector3 r_b = vector4_rotate_to_vector3 (body_b -> orientation, p -> anchor_b);
     vector3 world_a = simd_add (body_a -> position, r_a);

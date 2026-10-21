@@ -165,7 +165,24 @@ static bool capsule_vs_cube_sampled (rigidbody *cap, vector3 ax, float h, float 
             continue;
         float dist = sqrtf (dist2);
         vector3 nrm;
-        if (dist > CAP_EPS) { nrm = vector3_scaling (diff, 1.0f / dist); } else {
+        vector3 pos;
+        /* DESPOT-2026-10-20 (LIE-CAPSULE): the emitted normal must be
+         * A->B = cap->cube, matching the engine's sphere-vs-cube
+         * (collision_narrowphase.c:117: normal = -(sphere-closest)/dist;
+         * the swap-dispatch in physics_world.c negates ANOTHER time, so
+         * this handler came out inverted in BOTH dispatch orders: direct
+         * hits injected energy, swapped hits injected -energy). diff =
+         * sample - closest is box->cap, so the emitted normal is its
+         * NEGATIVE. Contact point stays the capsule surface toward the
+         * box. Inside keeps the engine's sphere-inside-solid shape: normal
+         * inward (-outward), penetration = r + min_clear, contact ON the
+         * escape face wall (the old position was the capsule surface
+         * facing away from the escape, which paired wrong torques with
+         * the corrected normal). */
+        if (dist > CAP_EPS) {
+            nrm = vector3_scaling (diff, -1.0f / dist);
+            pos = vector3_addition (c, vector3_scaling (nrm, r));
+        } else {
             /* Sample centre inside the box: escape along least-penetration
              * face (unnormalized rel projected on axes, min clearance). */
             float best_clear = 1e30f;
@@ -183,14 +200,15 @@ static bool capsule_vs_cube_sampled (rigidbody *cap, vector3 ax, float h, float 
                     best_ax = axis;
                     best_sign = (d >= 0.0f) ? 1.0f : -1.0f;
                 }
-            } nrm = vector3_scaling (best_ax, best_sign);
+            }
+            vector3 outward = vector3_scaling (best_ax, best_sign);
+            nrm = vector3_scaling (outward, -1.0f); /* A->B: inward, engine parity */
+            pos = vector3_addition (c, vector3_scaling (outward, best_clear)); /* on the wall */
         } float pen = rr - dist;
         if (!hit || pen > best_pen) {
             best_pen = pen;
             best_n = nrm;
-            best_p = vector3_addition (closest, vector3_scaling (nrm, 0.0f));
-            /* contact on the capsule surface toward the box */
-            best_p = vector3_addition (c, vector3_scaling (nrm, -r));
+            best_p = pos;
             hit = 1;
         }
     }
@@ -257,7 +275,11 @@ static bool capsule_vs_cylinder_sampled (rigidbody *cap, vector3 ax, float h, fl
             gap = dist - r;
             if (gap >= slop)
                 continue;
-            nrm = (dist > CAP_EPS) ? vector3_scaling (diff, 1.0f / dist) : rdir;
+            /* diff = c - surf is cyl->cap; A->B (cap->cyl, engine parity
+             * with sphere-vs-cube/cylinder) needs the NEGATIVE. The
+             * degenerate on-surface case falls back to -rdir (radial out
+             * of the wall = cyl->cap; invert for A->B). */
+            nrm = (dist > CAP_EPS) ? vector3_scaling (diff, -1.0f / dist) : vector3_scaling (rdir, -1.0f);
         } else {
             float axial_clear = ch - fabsf (xd);
             float radial_clear = cr - rl;
@@ -306,8 +328,11 @@ static bool capsule_contact (rigidbody *cap, rigidbody *other, void *out, mpe_wo
     if (other -> type == object_sphere) { return capsule_vs_sphere_exact (cap, ax, h, r, other, out, slop); }
     if (other -> type == object_cube) { return capsule_vs_cube_sampled (cap, ax, h, r, other, out, slop); }
     if (other -> type == object_cylinder) { return capsule_vs_cylinder_sampled (cap, ax, h, r, other, out, slop); }
-    /* Foreign-vs-foreign: bounding-sphere fallback (documented; exact
-     * segment/segment sweep is out of scope for the example plugin). */
+        /* Foreign-vs-foreign: bounding-sphere fallback (documented; exact
+         * segment/segment sweep is out of scope for the example plugin).
+         * nrm = other -> q is cap -> other = A -> B (same convention as
+         * the sphere path above; the swap-dispatch negation in
+         * physics_world.c keeps both call orders in range). */
     if (other -> type == object_custom) {
         float orad = (isfinite (other -> radius) && other -> radius > 0.0f) ? other -> radius : 0.5f;
         vector3 q = seg_closest (cap -> position, ax, h, other -> position);

@@ -18,6 +18,15 @@ bool scene_id_remap_add (uint32_t old_id, uint32_t new_id) {
     remap_count++;
     return true;
 }
+bool scene_id_remap_has (uint32_t old_id) {
+    /* DESPOT-2026-10-20: linear-presence probe for the legacy joint
+     * loader — resolve() hands back the RAW key when unmapped (identity
+     * fallback by design), so the caller cannot distinguish "mapped to a
+     * live body" from "never knew this body". Gates joint wiring. */
+    for (int i = 0; i < remap_count; i++) {
+        if (remap_table [i].old_id == old_id) { return true; }
+    } return false;
+}
 uint32_t scene_id_remap_resolve (uint32_t old_id) {
     for (int i = 0; i < remap_count; i++) {
         if (remap_table [i].old_id == old_id) { return remap_table [i].new_id; }

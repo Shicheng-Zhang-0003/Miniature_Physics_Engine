@@ -238,13 +238,16 @@ int mpe_diag_render (char *out, size_t cap, int max_records) {
 
     mpe_diag_source_total totals [MPE_DIAG_SOURCE_CAPACITY];
     mpe_diag_record records [MPE_DIAG_RING_CAPACITY];
-    int source_count = 0, record_count = 0, total_seq = 0, fatals = 0, errors = 0, warns = 0;
+    int source_count = 0, record_count = 0, fatals = 0, errors = 0, warns = 0;
+    long total_seq_raw = 0;
 
     pthread_mutex_lock (&g_lock);
     source_count = g_source_count;
     memcpy (totals, g_sources, sizeof (mpe_diag_source_total) * (size_t) source_count);
     record_count = g_count;
-    total_seq = (int) g_seq;
+    /* DESPOT-2026-10-20: same truncation class as mpe_diag_total (DESPOT-2026-10-13):
+     * (int)g_seq is UB past 2^31 records and rendered negative totals. Saturate. */
+    total_seq_raw = (g_seq > (unsigned long) INT_MAX) ? (long) INT_MAX : (long) g_seq;
     for (int i = 0; i < record_count; i++) {
         records [i] = g_ring [(g_head - g_count + i + MPE_DIAG_RING_CAPACITY * 2) % MPE_DIAG_RING_CAPACITY];
         if (records [i].level == mpe_diag_fatal) fatals++;
@@ -255,7 +258,7 @@ int mpe_diag_render (char *out, size_t cap, int max_records) {
 
     if (source_count > 1) { qsort (totals, (size_t) source_count, sizeof (mpe_diag_source_total), compare_totals); }
 
-    DIAG_APPEND ("mpe diagnostics: %d record(s) total — %d fatal, %d error, %d warn (ring keeps %d/%d)\n", total_seq,
+    DIAG_APPEND ("mpe diagnostics: %ld record(s) total — %d fatal, %d error, %d warn (ring keeps %d/%d)\n", total_seq_raw,
                  fatals, errors, warns, record_count, MPE_DIAG_RING_CAPACITY);
     if (source_count == 0) { DIAG_APPEND ("  no errors or warnings recorded\n"); }
     for (int i = 0; i < source_count; i++) {

@@ -322,7 +322,14 @@ void cmd_sleep (int argc, char **argv) {
     if ((!term_parse_float (argv [1], &seconds)) || (seconds <= 0.0f)) {
         term_err ("mpe: sleep: invalid duration\n");
         return;
-    } int ticks = (int) (seconds * 60.0f);
+    } int ticks = term_float_to_int_safe (seconds * 60.0f, 0, 1, 216000);
+    /* DESPOT-2026-10-20: raw (int) cast of seconds*60: "sleep abc" is
+     * already rejected by term_parse_float, but Infinity/NaN-valued or
+     * >1-hour arguments truncated in the raw cast (INT_MIN/INT_MAX
+     * implementation-defined), then physics_halt_for_ticks spun its
+     * countdown against an unrepresentable budget. 1 -> 216000 ticks
+     * (1 hour) now matches the config-schema ceiling for other tick
+     * inputs. */
     physics_halt_for_ticks (ticks);
     term_printf ("term_ok", "Sleeping for %.1f seconds (%d ticks)...\n", seconds, ticks);
 }

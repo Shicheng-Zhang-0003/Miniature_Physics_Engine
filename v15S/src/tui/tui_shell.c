@@ -231,10 +231,15 @@ static void cmd_mv (physics_world *w, int argc, char **argv) {
     int idx = tui_resolve_object(w, argv[1]);
     if (idx < 0) { printf ("mv: no such object '%s'\n", argv[1]); return; }
     rigidbody *rb = &w->bodies[idx];
-    if (argc >= 5 && strcmp(argv[2],"/pos")==0) {
+    /* DESPOT-2026-10-20: mv /pos x y z has 6 tokens (mv obj /pos X Y Z),
+     * but the guard read argc>=5 while dereferencing argv[5] — argv[5]
+     * lived one past the checked range (read with exactly 5 args; UB).
+     * Bodies with argc==5 (trailing component missing) truncated Z to
+     * argv[4]'s garbage neighbouring token value. */
+    if (argc >= 6 && strcmp(argv[2],"/pos")==0) {
         rb->position = (vector3){atof(argv[3]),atof(argv[4]),atof(argv[5])};
         printf ("mv %d -> pos (%.2f,%.2f,%.2f)\n", idx, rb->position.x,rb->position.y,rb->position.z);
-    } else if (argc >= 5 && strcmp(argv[2],"/vel")==0) {
+    } else if (argc >= 6 && strcmp(argv[2],"/vel")==0) {
         rb->velocity = (vector3){atof(argv[3]),atof(argv[4]),atof(argv[5])};
         printf ("mv %d -> vel (%.2f,%.2f,%.2f)\n", idx, rb->velocity.x,rb->velocity.y,rb->velocity.z);
     } else { printf ("mv: usage: mv <obj> [/pos/x/y/z | /vel/x/y/z]\n"); }

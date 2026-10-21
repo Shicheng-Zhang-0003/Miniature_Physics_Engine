@@ -255,12 +255,20 @@ int ftc_robot_create_with_drive (physics_world *world, ftc_robot *robot, float x
         world, (vector3) {x, y, z}, (vector3) {CHASSIS_HALF_X, CHASSIS_HALF_Y, CHASSIS_HALF_Z}, CHASSIS_MASS);
     if (robot -> chassis_body < 0) { goto fail; }
     uint32_t chassis_id = world -> bodies [robot -> chassis_body].object_id;
-    /* 4 wheels at corners */
+    /* 4 wheels at corners.
+     * DESPOT-2026-10-20 (label truth): MFS forward is +Z — the contract
+     * is enforced by the suite gate (tests/mfs_suite_a.c "Forward must
+     * drive +Z", fwd.vz > 0.45). Indices 0,1 sit at z − 0.173 (the
+     * -Z end) and are therefore the BACK wheels; 2,3 are front. The old
+     * comments labelled them front → the mixer-side "front" naming and
+     * the registry nose offset pointed at the REAR nose. Comment-only
+     * relabel: indices stay put (friction/motor channel mapping below is
+     * ride-height-tuned on the existing arrangement). */
     float wheel_positions [4][3] = {
-        {x - WHEEL_OFFSET_X, y + WHEEL_Y_OFFSET, z - WHEEL_OFFSET_Z}, /* front-left */
-        {x + WHEEL_OFFSET_X, y + WHEEL_Y_OFFSET, z - WHEEL_OFFSET_Z}, /* front-right */
-        {x - WHEEL_OFFSET_X, y + WHEEL_Y_OFFSET, z + WHEEL_OFFSET_Z}, /* back-left */
-        {x + WHEEL_OFFSET_X, y + WHEEL_Y_OFFSET, z + WHEEL_OFFSET_Z}, /* back-right */
+        {x - WHEEL_OFFSET_X, y + WHEEL_Y_OFFSET, z - WHEEL_OFFSET_Z}, /* back-left (0) */
+        {x + WHEEL_OFFSET_X, y + WHEEL_Y_OFFSET, z - WHEEL_OFFSET_Z}, /* back-right (1) */
+        {x - WHEEL_OFFSET_X, y + WHEEL_Y_OFFSET, z + WHEEL_OFFSET_Z}, /* front-left (2) */
+        {x + WHEEL_OFFSET_X, y + WHEEL_Y_OFFSET, z + WHEEL_OFFSET_Z}, /* front-right (3) */
     };
     robot -> wheel_count = 4;
     for (int i = 0; i < robot -> wheel_count; i++) {
@@ -357,13 +365,15 @@ int ftc_robot_create_with_drive (physics_world *world, ftc_robot *robot, float x
             /* M10 GENERALIZATION: was an if/else-if chain hard-coded to
              * i == 0..3, so any 5th+ wheel silently got 0 rad (a plain
              * cylinder inside a mecanum chassis). The X pattern is
-             * "mirrored across left/right AND front/back":
-             *   side = +1 (left wheels 0,2), -1 (right wheels 1,3)
-             *   front_back = +1 (front 0,1), -1 (back 2,3)
+             * "mirrored across left/right AND front/back". DESPOT-2026-10-20
+             * (label truth, no index changes: forward is +Z per the suite
+             * gate, so end labels follow the wheel placement above):
+             *   side       = +1 (left wheels 0,2), -1 (right wheels 1,3)
+             *   end        = i<2 ? +1 (z<0 END = BACK), -1 (z>0 END = FRONT)
              * which reproduces the original +45, -45, -45, +45 for i=0..3
              * and gives every additional wheel a defined, matching roller angle. */
             float side = (i % 2 == 0) ? 1.0f : -1.0f;
-            float front_back = (i < 2) ? 1.0f : -1.0f;
+            float front_back = (i < 2) ? 1.0f : -1.0f; /* name kept: 0,1 = the -Z end */
             roller_angle = 0.785398f * side * front_back;
         } robot -> wheel_roller_angle [i] = roller_angle;
         robot -> wheel_is_mecanum [i] = is_mecanum;
@@ -884,7 +894,15 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
                         if (ramp > 1.0f) { ramp = 1.0f; }
                         /* 0.6 N.m.s at full ramp: stops 0.27 kg.m^2 from
                          * 4.5 rad/s in ~1 s against the measured residual
-                         * excitation (~0.2 N.m). */
+                         * excitation (~0.2 N.m).
+                         * DESPOT-2026-10-20 (constants policy): 0.6 ramp
+                         * ceiling and the 3.0/1.5 band here are EMPIRICALLY
+                         * TUNED A/B values (log-driven; NOT derived from a
+                         * published anti-slip law) standing in for the ESC
+                         * current-regulation loop this sim does not model
+                         * motor-side. Do not "fix" toward a textbook form
+                         * without an A/B run; retune via the same harness
+                         * that produced these (see REMAINING_WORK.md). */
                         float moment = 0.6f * ramp * yaw_mag;
                         float dd = moment * 0.05f / (4.0f * 0.24f);
                         float sgn = (yaw_now >= 0.0f) ? 1.0f : -1.0f;

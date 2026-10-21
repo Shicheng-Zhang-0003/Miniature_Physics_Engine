@@ -2,10 +2,10 @@
  * scratch, config, joints, and warm-start cache are owned per world. The GTK
  * callback still has a parallel fixed-step loop in simulation_physics_loop.c;
  * shared pair dispatch does not make those whole pipelines identical.
- * DESPOT-2026-10-08 threading: order-independent per-body phases (sanitize,
- * CCD remainder init) can run MT via mpe_parallel_for below (MPE_THREADS,
- * default 1 = deterministic single-threaded). Pair/solve phases stay
- * single-threaded for bitwise-identical manifold order. */
+ * DESPOT threading: per-body phases, two-phase CCD, pair-local collision
+ * detection, and independent island sweeps use the persistent pool
+ * (MPE_THREADS, default 1). Shared-body contact preparation remains ordered
+ * to preserve deterministic wake and manifold state. */
 #include "physics_world.h"
 #include "mpe_registry.h"
 #include "mpe_loader.h"
@@ -43,11 +43,18 @@
 static int s_pool_threads = 0;
 static pthread_t s_pool_tids [MPE_MAX_POOL_THREADS];
 static pthread_mutex_t s_pool_lock = PTHREAD_MUTEX_INITIALIZER;
+/* A pool phase is global, so only one world may publish work to it at a
+ * time. Keep this lock across publication and completion; s_pool_lock alone
+ * protects each publication but would still let a second stepping thread
+ * replace the first world's phase while its workers are running. */
+static pthread_mutex_t s_pool_dispatch_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t s_pool_work_cond = PTHREAD_COND_INITIALIZER;
 static pthread_cond_t s_pool_done_cond = PTHREAD_COND_INITIALIZER;
 static volatile int s_pool_tasks_total = 0;
 static volatile int s_pool_tasks_done = 0;
-static volatile int s_pool_tasks_remaining = 0;
+/* _Atomic for the C11-fallback path (MPE_PLATFORM atomic macros);
+ * the GNU path treats it identically. */
+static _Atomic int s_pool_tasks_remaining = 0;
 static volatile int s_pool_shutdown = 0;
 typedef void (*mpe_pool_func_t)(void *data, int start, int end);
 static mpe_pool_func_t s_pool_func = NULL;
@@ -94,7 +101,7 @@ static void *s_pool_worker (void *arg) {
         if (cs < ce && func) {
             func (data, cs, ce);
         }
-        int remaining = __atomic_fetch_sub (&s_pool_tasks_remaining, 1, __ATOMIC_ACQ_REL) - 1;
+        int remaining = MPE_ATOMIC_FETCH_SUB (&s_pool_tasks_remaining, 1, MPE_ATOMIC_ACQ_REL) - 1;
         if (remaining == 0) {
             pthread_mutex_lock (&s_pool_lock);
             pthread_cond_signal (&s_pool_done_cond);
@@ -127,7 +134,7 @@ static void mpe_pool_init (void) {
     s_pool_shutdown = 0;
     s_pool_tasks_total = 0;
     s_pool_tasks_done = 0;
-    s_pool_tasks_remaining = 0;
+    MPE_ATOMIC_STORE_n (&s_pool_tasks_remaining, 0, MPE_ATOMIC_RELEASE);
     for (int t = 0; t < s_pool_threads; t++) {
         if (pthread_create (&s_pool_tids [t], NULL, s_pool_worker, NULL) != 0) {
             s_pool_tids [t] = 0;
@@ -148,6 +155,10 @@ static void mpe_pool_parallel_for (int start, int end, mpe_pool_func_t func, voi
         func (data, start, end);
         return;
     }
+    /* This pool has one process-wide phase descriptor. Serialize whole
+     * dispatches, including the wait, so concurrent physics_world_step calls
+     * cannot publish one world's callback/range over another's active work. */
+    pthread_mutex_lock (&s_pool_dispatch_lock);
     /* DESPOT-2026-10-19: publish the whole phase under the mutex. The old
      * code wrote these globals unlocked, so workers could observe a mix of
      * the previous phase's func/range and the new phase's counters. */
@@ -160,12 +171,13 @@ static void mpe_pool_parallel_for (int start, int end, mpe_pool_func_t func, voi
      * on completion — main thread waits for this to reach zero). */
     s_pool_tasks_total = n;
     s_pool_tasks_done = 0;
-    s_pool_tasks_remaining = n;
+    MPE_ATOMIC_STORE_n (&s_pool_tasks_remaining, n, MPE_ATOMIC_RELEASE);
     pthread_cond_broadcast (&s_pool_work_cond);
-    while (s_pool_tasks_remaining > 0) {
+    while (MPE_ATOMIC_LOAD_n (&s_pool_tasks_remaining, MPE_ATOMIC_ACQUIRE) > 0) {
         pthread_cond_wait (&s_pool_done_cond, &s_pool_lock);
     }
     pthread_mutex_unlock (&s_pool_lock);
+    pthread_mutex_unlock (&s_pool_dispatch_lock);
 }
 /* ---- Parallel slice helpers (operate on disjoint body ranges) ---------- */
 typedef struct {
@@ -423,14 +435,54 @@ static void mpe_parallel_ccd_sweep (physics_world *world, float dt, const mpe_co
     slice.cfg = cfg;
     mpe_pool_parallel_for (0, n, mpe_ccd_toi_range, &slice);
     mpe_pool_parallel_for (0, n, mpe_ccd_apply_range, &slice);
-} /* ---- Parallel narrowphase --------------------------------------------
- * Per pair, pre-assigned manifold slot (slot == pair index). Each pair
- * writes to manifolds[slot], manifold_awake[slot], and has_contact[a/b]
- * (benign shared writes of 1). rigidbody_wake writes is_sleeping=false
- * (benign shared write). Each pair's narrowphase result is independent of
- * other pairs, so results are bitwise identical to serial at any thread
- * count. Non-collided pairs get manifold_awake=0 and are skipped by the
- * solver and contact cache. */
+} /* Apply the stateful half of contact processing in broadphase pair order.
+ * Detection can run in parallel into disjoint manifold slots, but wake state,
+ * contact flags, and inverse inertia are body-owned and may be shared by
+ * several pairs. */
+static void physics_world_prepare_detected_pair (physics_world *world, int index_a, int index_b,
+                                                  float dt, collision_data *source,
+                                                  collision_data *manifold) {
+    if (!world || !source || !manifold || index_a < 0 || index_a >= world->body_count ||
+        index_b < 0 || index_b >= world->body_count) return;
+    rigidbody *body_a = &world->bodies[index_a];
+    rigidbody *body_b = &world->bodies[index_b];
+    bool a_was_sleeping = body_a->is_sleeping;
+    bool b_was_sleeping = body_b->is_sleeping;
+    if (!a_was_sleeping || !b_was_sleeping) {
+        bool new_edge = !contact_cache_has_pair (world, body_a->object_id, body_b->object_id);
+        if (a_was_sleeping && !body_b->static_state && new_edge) rigidbody_wake (body_a);
+        if (b_was_sleeping && !body_a->static_state && new_edge) rigidbody_wake (body_b);
+        const mpe_config_t *cfg = mpe_world_cfg (world);
+        float wake_lin_sq = cfg->sleep.wake_linear_thresh_sq;
+        float wake_ang_sq = cfg->sleep.wake_angular_thresh_sq;
+        bool a_fast = !a_was_sleeping &&
+            (vector3_length_squared (body_a->velocity) > wake_lin_sq ||
+             vector3_length_squared (body_a->angular_velocity) > wake_ang_sq);
+        bool b_fast = !b_was_sleeping &&
+            (vector3_length_squared (body_b->velocity) > wake_lin_sq ||
+             vector3_length_squared (body_b->angular_velocity) > wake_ang_sq);
+        if (a_was_sleeping && !body_b->static_state && b_fast) rigidbody_wake (body_a);
+        if (b_was_sleeping && !body_a->static_state && a_fast) rigidbody_wake (body_b);
+        float deepest = 0.0f;
+        for (int i = 0; i < source->contact_count; i++)
+            if (source->contacts[i].penetration > deepest) deepest = source->contacts[i].penetration;
+        if (deepest > cfg->depenetration.wake_depth_thresh) {
+            if (a_was_sleeping) rigidbody_wake (body_a);
+            if (b_was_sleeping) rigidbody_wake (body_b);
+        }
+        collision_prepare_solver (world, source, manifold, dt);
+        if (world->has_contact) {
+            world->has_contact[index_a] = 1;
+            world->has_contact[index_b] = 1;
+        }
+    }
+}
+
+/* ---- Parallel narrowphase --------------------------------------------
+ * Per pair, pre-assigned manifold slot (slot == pair index). Workers only
+ * write detection results to disjoint slots. Body wake, contact flags, and
+ * solver preparation run serially after the barrier in pair order to avoid
+ * races when several contacts share a body. */
 typedef struct {
     physics_world *world;
     float dt;
@@ -439,9 +491,6 @@ typedef struct {
 static void mpe_narrowphase_range (void *data, int start, int end) {
     mpe_narrowphase_slice_t *s = (mpe_narrowphase_slice_t *) data;
     physics_world *w = s -> world;
-    const mpe_config_t *prep_cfg = w ? mpe_world_cfg (w) : &g_cfg;
-    float prep_match_sq = prep_cfg -> solver.warm_start_match_dist_sq;
-    (void) prep_match_sq;
     for (int p = start; p < end; p++) {
         /* Zero the slot first so non-collided pairs have contact_count=0
          * (slot may contain garbage from a previous tick — malloc'd, not
@@ -466,36 +515,8 @@ static void mpe_narrowphase_range (void *data, int start, int end) {
             w -> manifold_awake [p] = 0;
             continue;
         }
-        /* Three-gate wake (same logic as physics_world_process_pair). */
-        bool a_was_sleeping = body_a -> is_sleeping;
-        bool b_was_sleeping = body_b -> is_sleeping;
-        if (!((a_was_sleeping) && (b_was_sleeping))) {
-            bool new_edge = !contact_cache_has_pair (w, body_a -> object_id, body_b -> object_id);
-            if ((a_was_sleeping) && (!body_b -> static_state) && new_edge) { rigidbody_wake (body_a); }
-            if ((b_was_sleeping) && (!body_a -> static_state) && new_edge) { rigidbody_wake (body_b); }
-            float wake_lin_sq = mpe_world_cfg (w) -> sleep.wake_linear_thresh_sq;
-            float wake_ang_sq = mpe_world_cfg (w) -> sleep.wake_angular_thresh_sq;
-            bool a_fast = (!a_was_sleeping) && ((vector3_length_squared (body_a -> velocity) > wake_lin_sq) ||
-                                                (vector3_length_squared (body_a -> angular_velocity) > wake_ang_sq));
-            bool b_fast = (!b_was_sleeping) && ((vector3_length_squared (body_b -> velocity) > wake_lin_sq) ||
-                                                (vector3_length_squared (body_b -> angular_velocity) > wake_ang_sq));
-            if ((a_was_sleeping) && (!body_b -> static_state) && b_fast) { rigidbody_wake (body_a); }
-            if ((b_was_sleeping) && (!body_a -> static_state) && a_fast) { rigidbody_wake (body_b); }
-            float deepest = 0.0f;
-            for (int wi = 0; wi < narrowphase_collision.contact_count; wi++) {
-                if (narrowphase_collision.contacts [wi].penetration > deepest) { deepest = narrowphase_collision.contacts [wi].penetration; }
-            }
-            if (deepest > mpe_world_cfg (w) -> depenetration.wake_depth_thresh) {
-                if (a_was_sleeping) { rigidbody_wake (body_a); }
-                if (b_was_sleeping) { rigidbody_wake (body_b); }
-            }
-        }
-        collision_prepare_solver (w, &narrowphase_collision, &w -> manifolds [p], s -> dt);
+        w->manifolds[p] = narrowphase_collision;
         w -> manifold_awake [p] = 1;
-        if (w -> has_contact) {
-            w -> has_contact [index_a] = 1;
-            w -> has_contact [index_b] = 1;
-        }
     }
 }
 /* Grow the manifold arrays (all four, atomically per step) until at least
@@ -546,6 +567,14 @@ static void mpe_parallel_narrowphase (physics_world *world, int pair_count, int 
     slice.dt = dt;
     slice.cfg = cfg;
     mpe_pool_parallel_for (0, pair_count, mpe_narrowphase_range, &slice);
+    for (int p = 0; p < pair_count; p++) {
+        if (!world->manifold_awake[p]) continue;
+        int ia = world->pair_buffer[p].object_index_a;
+        int ib = world->pair_buffer[p].object_index_b;
+        if (ia < 0 || ia >= world->body_count || ib < 0 || ib >= world->body_count) continue;
+        collision_data source = world->manifolds[p];
+        physics_world_prepare_detected_pair (world, ia, ib, dt, &source, &world->manifolds[p]);
+    }
 }
 /* Canonical spring pass is weakly linked so spring-less headless test
  * binaries (which omit physics/spring_joint.c for its GL dependency)
@@ -1381,59 +1410,11 @@ void physics_world_process_pair (physics_world *world, int index_a, int index_b,
                 return;
             }
         }
-        /* TRUTH: three-gate wake (any fires).
-             * 1. NEW EDGE (pair novelty via the contact cache): either id
-             *    pair has no entry from a prior tick. First touch wakes at
-             *    ANY speed — this closes the slow-pusher ghost (creeping
-             *    stack partner, 0.05 m/s kinematic platform) that pure
-             *    velocity gates miss, and unlike per-body flags it is not
-             *    blinded by floor contacts every rester holds. Persistent
-             *    resting pairs have entries, so settled stacks proceed to
-             *    sleep instead of being kept awake forever (which pumped
-             *    the F10 10-stack to 13 m/s via never-sleeping micro-motion).
-             * 2. FAST OTHER: original velocity gate (backstop for fast bodies
-             *    that already held contacts, e.g. debris sliding along a
-             *    stack before striking a sleeper).
-             * 3. DEEP: overlap beyond wake_depth_thresh, even vs statics. */
-        bool a_was_sleeping = body_a -> is_sleeping;
-        bool b_was_sleeping = body_b -> is_sleeping;
-        if ((a_was_sleeping) && (b_was_sleeping)) {
-            /* Both sleeping: nothing to wake (depth backstop below still
-                 * applies via the revisit/split/depen paths). */
-        } else {
-            bool new_edge = !contact_cache_has_pair (world, body_a -> object_id, body_b -> object_id);
-            if ((a_was_sleeping) && (!body_b -> static_state) && new_edge) { rigidbody_wake (body_a); }
-            if ((b_was_sleeping) && (!body_a -> static_state) && new_edge) { rigidbody_wake (body_b); }
-            float wake_lin_sq = mpe_world_cfg (world) -> sleep.wake_linear_thresh_sq;
-            float wake_ang_sq = mpe_world_cfg (world) -> sleep.wake_angular_thresh_sq;
-            bool a_fast = (!a_was_sleeping) && ((vector3_length_squared (body_a -> velocity) > wake_lin_sq) ||
-                                                (vector3_length_squared (body_a -> angular_velocity) > wake_ang_sq));
-            bool b_fast = (!b_was_sleeping) && ((vector3_length_squared (body_b -> velocity) > wake_lin_sq) ||
-                                                (vector3_length_squared (body_b -> angular_velocity) > wake_ang_sq));
-            if ((a_was_sleeping) && (!body_b -> static_state) && b_fast) { rigidbody_wake (body_a); }
-            if ((b_was_sleeping) && (!body_a -> static_state) && a_fast) { rigidbody_wake (body_b); }
-            /* Wake on significant overlap growth, even against static
-                 * geometry: a sleeper ground into a static surface by a new
-                 * persistent force (e.g. a spawned overlap, a tilted stack
-                 * settling) must rejoin the solve. Resting contact within
-                 * slop never reaches this bar. */
-            {
-                float deepest = 0.0f;
-                for (int wi = 0; wi < narrowphase_collision.contact_count; wi++) {
-                    if (narrowphase_collision.contacts [wi].penetration > deepest) { deepest = narrowphase_collision.contacts [wi].penetration; }
-                }
-                if (deepest > mpe_world_cfg (world) -> depenetration.wake_depth_thresh) {
-                    if (a_was_sleeping) { rigidbody_wake (body_a); }
-                    if (b_was_sleeping) { rigidbody_wake (body_b); }
-                }
-            } collision_prepare_solver (world, &narrowphase_collision, &world -> manifolds [(*manifold_count_ptr)], dt);
-            (*manifold_count_ptr)++;
-            /* TRUTH P0-1: contact flag for gravity-exactness gating. */
-            if (world -> has_contact) {
-                if ((index_a >= 0) && (index_a < world -> body_count)) { world -> has_contact [index_a] = 1; }
-                if ((index_b >= 0) && (index_b < world -> body_count)) { world -> has_contact [index_b] = 1; }
-            }
-        }
+        if (body_a->is_sleeping && body_b->is_sleeping) return;
+        physics_world_prepare_detected_pair (world, index_a, index_b, dt,
+                                             &narrowphase_collision,
+                                             &world->manifolds[*manifold_count_ptr]);
+        (*manifold_count_ptr)++;
     }
 } /* Solver stage dispatch: foreign solver_if hooks override per stage,
  * builtins run on the tick's config snapshot. Keeps the iteration loop
@@ -1444,6 +1425,7 @@ static float mpe_step_resolve (physics_world *world, collision_data *m, float dt
     return collision_resolve_iterative (m, dt, friction_only, iter, cfg);
 }
 static void mpe_step_poisson (physics_world *world, collision_data *manifolds, int n, const mpe_config_t *cfg) {
+    collision_snapshot_compression_impulses (manifolds, n);
     if (world -> solver_if && world -> solver_if -> poisson) {
         world -> solver_if -> poisson (world, manifolds, n, world -> solver_state);
         return;
@@ -1474,8 +1456,8 @@ void physics_world_step (physics_world *world, float dt) {
         /* P7: _Atomic — two worlds stepping on two threads raced the plain
          * int (UB). Telemetry limit stands: first regime consumes the budget. */
         static _Atomic int s_dt_warned = 0;
-        if (!__atomic_load_n (&s_dt_warned, __ATOMIC_RELAXED)) {
-            __atomic_store_n (&s_dt_warned, 1, __ATOMIC_RELAXED);
+        if (!MPE_ATOMIC_LOAD_n (&s_dt_warned, MPE_ATOMIC_RELAXED)) {
+            MPE_ATOMIC_STORE_n (&s_dt_warned, 1, MPE_ATOMIC_RELAXED);
             fprintf (stderr, "[mpe] NON-CANONICAL dt=%.6f (canonical 1/60=0.016667); determinism twins must use identical dt\n",
                      (double) dt);
         }
@@ -1542,7 +1524,7 @@ void physics_world_step (physics_world *world, float dt) {
         (!world -> island_label) || (!world -> island_awake_flags) || (!world -> ccd_time_remaining) ||
         (!world -> has_contact) || (!world -> tick_v0)) {
         static _Atomic unsigned long s_degraded_ticks = 0;
-        unsigned long ndeg = __atomic_fetch_add (&s_degraded_ticks, 1ul, __ATOMIC_RELAXED) + 1ul;
+        unsigned long ndeg = MPE_ATOMIC_FETCH_ADD (&s_degraded_ticks, 1ul, MPE_ATOMIC_RELAXED) + 1ul;
         if ((ndeg <= 8) || ((ndeg % 1000) == 0)) {
             fprintf (stderr, "[mpe] DEGRADED tick %lu: scratch missing (low-mem); solving pairless, islands/ccd/contact flags stale\n",
                      ndeg);

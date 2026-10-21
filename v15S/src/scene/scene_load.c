@@ -868,7 +868,23 @@ int scene_loading (const char *file_source_path) {
     /* --- Stage all joints --- */
     /* DESPOT-2026-10-01: bound raw int32 from file before malloc/volume loop.
      * Unbounded count = huge alloc / DoS; negative = signed confusion. */
-    if (read_int (f, &staged_joint_count) && (staged_joint_count > 0)) {
+    /* DESPOT-2026-10-20 (VETO): a FAILING count read (truncated file at
+     * the joint count slot) fell into the else and committed ZERO joints
+     * as success — the same "joints truncate -> partial commit" class the
+     * 10-04 fix caught per-JOINT, but at the count header. Negative
+     * counts were discarded equally silently. Body truncation vetoes the
+     * whole file; joint-count truncation must too. count==0 stays
+     * legitimate (no-joints tail is a valid scene). */
+    { int joints_read_ok = read_int (f, &staged_joint_count);
+        if ((!joints_read_ok) || (staged_joint_count < 0)) {
+            fprintf (stderr, "Error LDF: legacy joint count read failed%s\n", staged_joint_count < 0 ? " (negative count)" : "");
+            free (staged_bodies);
+            if (staged_ids) { free (staged_ids); }
+            if (staged_joints) { free (staged_joints); }
+            fclose (f);
+            return 0;
+        } }
+    if (staged_joint_count > 0) {
         /* DESPOT-2026-10-12 P8: bound is the live pool (mpe_max_joints=1024),
          * not 4096. The old 4096 admitted 3072 joints that add_joint_by_ids
          * could never install; the commit loop below ignored its return and
@@ -908,8 +924,6 @@ int scene_loading (const char *file_source_path) {
             staged_joints [j].k = k;
             staged_joints [j].c = c;
         }
-    } else {
-        staged_joint_count = 0;
     } fclose (f);
     /* --- Validate staged data before committing --- */
     if (staged_body_count == 0 || staged_body_count < count) {
@@ -955,6 +969,23 @@ int scene_loading (const char *file_source_path) {
     {
         int dropped_joints = 0;
         for (int j = 0; j < staged_joint_count; j++) {
+            /* DESPOT-2026-10-20 (REMAP-GATE): legacy joints stored RAW SAVED
+             * body IDs. scene_id_remap_resolve() identity-falls back for
+             * unmapped keys, but at commit time the LIVE allocator has
+             * re-assigned ids — an unmapped saved_id collides with a
+             * random unrelated live id and welds two strangers if the pool
+             * happens to contain either (or quietly fails on nothing).
+             * Gate on presence: only wire endpoints that were actually
+             * recovered by the id staging above (v150+ remap entries);
+             * anything else is a loud drop, matching dangling behavior.
+             * Files saved pre-v150 have no saved ids at all (remap empty);
+             * their joints (old ids also worthless at commit) drop loudly
+             * the same way — the v1 allocator never preserved them. */
+            if (!scene_id_remap_has (staged_joints [j].id_a) ||
+                !scene_id_remap_has (staged_joints [j].id_b)) {
+                dropped_joints++;
+                continue;
+            }
             int rc = add_joint_by_ids (physics_world_get_primary (), scene_id_remap_resolve (staged_joints [j].id_a),
                                        scene_id_remap_resolve (staged_joints [j].id_b), staged_joints [j].eq,
                                        staged_joints [j].k, staged_joints [j].c);
