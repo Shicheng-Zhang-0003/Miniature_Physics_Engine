@@ -368,6 +368,21 @@ static void cmd_mod (physics_world *w, int argc, char **argv) {
     (void)w;
     if (argc < 2) { cmd_mod_ls(w); return; }
     if (strcmp(argv[1],"ls")==0) { cmd_mod_ls(w); return; }
+    if (strcmp(argv[1],"detach")==0 && argc >= 3) {
+        /* DESPOT-2026-10-21: mirrors the attach slot — the MFS bundle
+         * registers as ecosystem 'mfs-simulator', not a module, so detach
+         * must fall through to mpe_ecosystem_detach() or the world keeps
+         * a live hook and the loader refuses the unload with E_BUSY. */
+        const mpe_module_desc_t *dm = mpe_find_module (argv [2]);
+        if (dm) {
+            int r = physics_world_detach_module (w, dm -> name);
+            if (r < 0) { printf ("mod: detach failed '%s' (code %d)\n", argv [2], r); return; }
+            printf ("mod: detached '%s'\n", argv [2]); return;
+        }
+        if (mpe_ecosystem_detach (w, argv [2]) != 0) { printf ("mod: detach — nothing named '%s' is attached\n", argv [2]); return; }
+        printf ("mod: detached ecosystem '%s'\n", argv [2]);
+        return;
+    }
     if (strcmp(argv[1],"load")==0 && argc >= 3) {
         char err[256] = {0};
         if (mpe_loader_load(argv[2], err, sizeof(err)) != 0) { printf ("mod: load failed '%s': %s\n", argv[2], err); return; }
@@ -461,6 +476,7 @@ static void cmd_eco (physics_world *w, int argc, char **argv) {
 /* ------------------------------------------------------------------ */
 /* FTC                                                                */
 /* ------------------------------------------------------------------ */
+typedef int (*ftc_fleet_selected_fn)(physics_world*);
 typedef int (*ftc_fleet_spawn_fn)(physics_world*,float,float,float,motor_preset_id,ftc_drivetrain_type);
 typedef int (*ftc_fleet_count_fn)(physics_world*);
 typedef int (*ftc_fleet_select_fn)(physics_world*,int);
@@ -506,7 +522,7 @@ static void cmd_ftc_spawn (physics_world *w, int argc, char **argv) {
     printf ("ftc: spawned mecanum robot %d at (%.2f,%.2f,%.2f) preset=%d\n", si,x,y,z,(int)preset);
 }
 static void cmd_ftc_telemetry (physics_world *w, int argc, char **argv) {
-    (void)argc;(void)argv;
+    int verbose = (argc >= 3 && argv [2] && argv [2][0] == 'v'); /* 'ftc telemetry v': per-wheel spin */
     ftc_fleet_count_fn count = (ftc_fleet_count_fn)ftc_sym("ftc_fleet_count");
     ftc_fleet_get_fn get = (ftc_fleet_get_fn)ftc_sym("ftc_fleet_get");
     ftc_robot_get_position_fn gpos = (ftc_robot_get_position_fn)ftc_sym("ftc_robot_get_position");
@@ -525,31 +541,56 @@ static void cmd_ftc_telemetry (physics_world *w, int argc, char **argv) {
             float wheel_speed = vector3_dot(wh->angular_velocity, wh->cached_axes[0]);
             ws += wheel_speed;
         }
-        printf ("  robot %d: pos=(%.2f,%.2f,%.2f) wheel_ang_vel=%.2f rad/s\n", i, px,py,pz, ws);
+        printf ("  robot %d: pos=(%.2f,%.2f,%.2f) wheel_ang_vel=%.2f rad/s (sum of 4)\n", i, px,py,pz, ws);
+        if (verbose) {
+            for (int k=0;k<r->wheel_count && k<FTC_MAX_WHEELS;k++) {
+                int wi = r->wheel_bodies[k];
+                if (wi<0 || wi>=w->body_count) continue;
+                rigidbody *wh = &w->bodies[wi];
+                float s = vector3_dot(wh->angular_velocity, wh->cached_axes[0]);
+                printf ("    wheel %d: spin=%+.2f rad/s\n", k, s);
+            }
+        }
     }
 }
+static ftc_robot *ftc_selected_robot (physics_world *w, int *out_idx);
 static void cmd_ftc_drive (physics_world *w, int argc, char **argv) {
-    (void)w;
     if (argc < 4) { printf ("ftc drive: usage: ftc drive <left> <right>\n"); return; }
     /* DESPOT-2026-10-21: args were read from argv[1..2] — argv[1] is the
      * verb "drive" here, so both tanks/both wheels silently went 0/atof-garbage.
      * Same off-by-one applied in cmd_ftc_mec below. */
     float l = atof(argv[2]), r = atof(argv[3]);
-    ftc_fleet_get_fn get = (ftc_fleet_get_fn)ftc_sym("ftc_fleet_get");
+    float cmds[FTC_MAX_WHEELS] = {0};
     ftc_robot_set_wheel_commands_fn swc = (ftc_robot_set_wheel_commands_fn)ftc_sym("ftc_robot_set_wheel_commands");
-    if (!get || !swc) { printf ("ftc: fleet API unavailable\n"); return; }
-    ftc_fleet_count_fn count = (ftc_fleet_count_fn)ftc_sym("ftc_fleet_count");
-    int ncnt = count ? count(w) : 0;
-    float cmds[FTC_MAX_WHEELS];
-    for (int i=0;i<ncnt && i<FTC_MAX_WHEELS;i++) {
-        ftc_robot *robot = get(w,i);
-        if (!robot) continue;
-        for (int k=0;k<robot->wheel_count && k<FTC_MAX_WHEELS;k++) {
-            if (k % 2 == 0) cmds[k] = l; else cmds[k] = r;
-        }
-        swc(robot, cmds, robot->wheel_count);
+    if (!swc) { printf ("ftc: fleet API unavailable\n"); return; }
+    /* Terminal contract: drive verbs act on the SELECTED robot. */
+    int idx = -1;
+    ftc_robot *robot = ftc_selected_robot (w, &idx);
+    if (!robot) { printf ("ftc: no robots (spawn first)\n"); return; }
+    for (int k=0;k<robot->wheel_count && k<FTC_MAX_WHEELS;k++) {
+        if (k % 2 == 0) cmds[k] = l; else cmds[k] = r;
     }
-    printf ("ftc: drive left=%.2f right=%.2f\n", l, r);
+    swc(robot, cmds, robot->wheel_count);
+    printf ("ftc: drive left=%.2f right=%.2f -> robot %d (tank)\n", l, r, idx);
+}
+/* DESPOT-2026-10-21: resolve the fleet's selection: hand back the
+ * controlled robot pointer and its index (dlsym; NULL when the bundle is
+ * not loaded or no fleet state exists). The terminal contract: every
+ * drive verb acts on the selection, default robot 0. */
+static ftc_robot *ftc_selected_robot (physics_world *w, int *out_idx);
+static ftc_robot *ftc_selected_robot (physics_world *w, int *out_idx) {
+    ftc_fleet_selected_fn sel = (ftc_fleet_selected_fn)ftc_sym("ftc_fleet_selected");
+    ftc_fleet_get_fn get = (ftc_fleet_get_fn)ftc_sym("ftc_fleet_get");
+    if (out_idx) { *out_idx = -1; }
+    if (!get) { return NULL; }
+    int idx = 0;
+    if (sel) {
+        idx = sel(w);
+        if (idx < 0) { idx = 0; }
+    }
+    ftc_robot *r = get(w, idx);
+    if (r && out_idx) { *out_idx = idx; }
+    return r;
 }
 static void cmd_ftc_mec (physics_world *w, int argc, char **argv) {
     (void)w;
@@ -559,18 +600,19 @@ static void cmd_ftc_mec (physics_world *w, int argc, char **argv) {
     float maxm = 0.0f;
     for (int i=0;i<4;i++) { float m = fabsf(targets[i]); if (m > maxm) maxm = m; }
     if (maxm > 1.0f) for (int i=0;i<4;i++) targets[i] /= maxm;
-    ftc_fleet_get_fn get = (ftc_fleet_get_fn)ftc_sym("ftc_fleet_get");
     ftc_robot_set_wheel_commands_fn swc = (ftc_robot_set_wheel_commands_fn)ftc_sym("ftc_robot_set_wheel_commands");
-    ftc_fleet_count_fn count = (ftc_fleet_count_fn)ftc_sym("ftc_fleet_count");
-    if (!get || !swc || !count) { printf ("ftc: fleet API unavailable\n"); return; }
-    int ncnt = count(w);
-    for (int i=0;i<ncnt && i<FTC_MAX_WHEELS;i++) {
-        ftc_robot *r = get(w,i);
-        if (!r) continue;
-        swc(r, targets, r->wheel_count > 4 ? 4 : r->wheel_count);
-    }
-    printf ("ftc: mec fwd=%.2f strafe=%.2f rot=%.2f -> wheels %.2f %.2f %.2f %.2f\n",
-            fwd, strafe, rot, targets[0],targets[1],targets[2],targets[3]);
+    if (!swc) { printf ("ftc: fleet API unavailable\n"); return; }
+    /* Terminal contract: drive verbs act on the SELECTED robot. */
+    ftc_fleet_selected_fn sel = (ftc_fleet_selected_fn)ftc_sym("ftc_fleet_selected");
+    int idx = sel ? sel(w) : 0;
+    if (idx < 0) { idx = 0; }
+    ftc_fleet_get_fn get = (ftc_fleet_get_fn)ftc_sym("ftc_fleet_get");
+    if (!get) { printf ("ftc: fleet API unavailable\n"); return; }
+    ftc_robot *r = get(w, idx);
+    if (!r) { printf ("ftc: no robot %d (spawn first)\n", idx); return; }
+    swc(r, targets, r->wheel_count > 4 ? 4 : r->wheel_count);
+    printf ("ftc: mec fwd=%.2f strafe=%.2f rot=%.2f -> robot %d wheels %.2f %.2f %.2f %.2f\n",
+            fwd, strafe, rot, idx, targets[0],targets[1],targets[2],targets[3]);
 }
 static void cmd_ftc (physics_world *w, int argc, char **argv) {
     (void)w;
