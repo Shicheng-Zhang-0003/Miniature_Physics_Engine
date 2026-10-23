@@ -127,6 +127,20 @@ int intake_shoot_power (physics_world *world, vector3 chassis_pos, vector4 chass
  * mpe_module_config contract; it survives until the module dies. */
 float intake_launch_elev_default (void);
 void intake_launch_elev_default_set (float deg);
+/* Module-config (5-key) shooter plane: the launch constants behind the
+ * shooter balloon, all runtime-mutable through the module config contract.
+ * Stock values are the INTAKE_LAUNCH_* defines above; the 5-menu stores one
+ * value per axis (applied at the NEXT launch state computation, so the
+ * purple predictor and fired balls stay consistent automatically):
+ *   speed (m/s)   [3, 14]    stocked: INTAKE_LAUNCH_SPEED
+ *   backspin (rad/s) [0, 30] stocked: INTAKE_LAUNCH_SPIN
+ *   power floor [0.05, 0.95] stocked: INTAKE_LAUNCH_POWER_MIN */
+float intake_launch_speed (void);
+void intake_launch_speed_set (float speed);
+float intake_launch_spin (void);
+void intake_launch_spin_set (float spin);
+float intake_launch_power_min (void);
+void intake_launch_power_min_set (float power);
 int intake_shoot_aimed (physics_world *world, vector3 chassis_pos, vector4 chassis_ori, vector3 chassis_vel,
                         int carried [INTAKE_MAX_CARRIED], int *carried_n, float power, float elev_deg);
 /* Elevation-parameterized launch state (exported for the trajectory

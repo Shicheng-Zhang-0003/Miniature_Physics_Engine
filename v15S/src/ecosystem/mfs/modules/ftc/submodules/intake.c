@@ -10,12 +10,36 @@
  * against the INTAKE_LAUNCH_ELEV_DEG constant directly and are NOT routed
  * through this default — bucket_game shot arithmetic is unchanged. */
 static float s_launch_elev_deg = 65.0f;
+static float s_launch_speed = INTAKE_LAUNCH_SPEED;
+static float s_launch_spin = INTAKE_LAUNCH_SPIN;
+static float s_launch_power_min = INTAKE_LAUNCH_POWER_MIN;
 float intake_launch_elev_default (void) { return s_launch_elev_deg; }
 void intake_launch_elev_default_set (float deg) {
     if (!isfinite (deg)) { deg = INTAKE_LAUNCH_ELEV_DEG; }
     if (deg < INTAKE_LAUNCH_ELEV_MIN) { deg = INTAKE_LAUNCH_ELEV_MIN; }
     if (deg > INTAKE_LAUNCH_ELEV_MAX) { deg = INTAKE_LAUNCH_ELEV_MAX; }
     s_launch_elev_deg = deg;
+}
+float intake_launch_speed (void) { return s_launch_speed; }
+void intake_launch_speed_set (float speed) {
+    if (!isfinite (speed)) { speed = INTAKE_LAUNCH_SPEED; }
+    if (speed < 3.0f) { speed = 3.0f; }
+    if (speed > 14.0f) { speed = 14.0f; }
+    s_launch_speed = speed;
+}
+float intake_launch_spin (void) { return s_launch_spin; }
+void intake_launch_spin_set (float spin) {
+    if (!isfinite (spin)) { spin = INTAKE_LAUNCH_SPIN; }
+    if (spin < 0.0f) { spin = 0.0f; }
+    if (spin > 30.0f) { spin = 30.0f; }
+    s_launch_spin = spin;
+}
+float intake_launch_power_min (void) { return s_launch_power_min; }
+void intake_launch_power_min_set (float power) {
+    if (!isfinite (power)) { power = INTAKE_LAUNCH_POWER_MIN; }
+    if (power < 0.05f) { power = 0.05f; }
+    if (power > 0.95f) { power = 0.95f; }
+    s_launch_power_min = power;
 }
 #include "core/det_math.h"
 #include <math.h>
@@ -112,13 +136,13 @@ void intake_launch_state_compute_elev (vector3 chassis_pos, vector4 chassis_ori,
     muzzle = vector3_addition (muzzle, (vector3) {0.0f, INTAKE_MUZZLE_UP, 0.0f});
     out->muzzle = muzzle;
     out->dir = dir;
-    out->velocity = vector3_addition (chassis_vel, vector3_scaling (dir, INTAKE_LAUNCH_SPEED));
+    out->velocity = vector3_addition (chassis_vel, vector3_scaling (dir, intake_launch_speed ()));
     /* Backspin about the chassis lateral axis for Magnus lift (yaw-projected
      * like the launch dir, so roll/pitch never tilt it). */
     vector3 lat = vector4_rotate_to_vector3 (chassis_ori, (vector3) {1.0f, 0.0f, 0.0f});
     lat.y = 0.0f;
     float ll = sqrtf (vector3_length_squared (lat));
-    if (ll > 1e-6f && isfinite (ll)) { out->spin = vector3_scaling (lat, -INTAKE_LAUNCH_SPIN / ll); } else { out->spin = vector3_zero (); }
+    if (ll > 1e-6f && isfinite (ll)) { out->spin = vector3_scaling (lat, -intake_launch_spin () / ll); } else { out->spin = vector3_zero (); }
 }
 int intake_shoot (physics_world *world, vector3 chassis_pos, vector4 chassis_ori, vector3 chassis_vel,
                   int carried [INTAKE_MAX_CARRIED], int *carried_n) {
@@ -133,7 +157,7 @@ int intake_shoot_aimed (physics_world *world, vector3 chassis_pos, vector4 chass
                         int carried [INTAKE_MAX_CARRIED], int *carried_n, float power, float elev_deg) {
     if (!world || !world -> bodies || !carried || !carried_n || *carried_n <= 0) { return -1; }
     if (!isfinite (power)) { power = 1.0f; }
-    if (power < INTAKE_LAUNCH_POWER_MIN) { power = INTAKE_LAUNCH_POWER_MIN; }
+    if (power < intake_launch_power_min ()) { power = intake_launch_power_min (); }
     if (power > 1.0f) { power = 1.0f; }
     if (!isfinite (elev_deg)) { elev_deg = INTAKE_LAUNCH_ELEV_DEG; }
     if (elev_deg < INTAKE_LAUNCH_ELEV_MIN) { elev_deg = INTAKE_LAUNCH_ELEV_MIN; }

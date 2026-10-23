@@ -412,7 +412,7 @@ int ftc_shoot_power (struct physics_world *world, int index, float power) {
         fprintf (stderr, "[bucketball] fired ball id=%d power=%.2f\n", id, power);
         if (f) {
             float ap = isfinite (power) ? power : 1.0f;
-            if (ap < 0.3f) { ap = 0.3f; }
+            if (ap < intake_launch_power_min ()) { ap = intake_launch_power_min (); }
             if (ap > 1.0f) { ap = 1.0f; }
             f -> aim_power = ap;
             f -> aim_elev = intake_launch_elev_default ();
@@ -427,7 +427,7 @@ int ftc_shoot_aimed (struct physics_world *world, int index, float power, float 
     rigidbody *ch = fleet_chassis (world, r);
     if (!ch) { return -1; }
     if (!isfinite (power)) { power = 1.0f; }
-    if (power < 0.3f) { power = 0.3f; }
+    if (power < intake_launch_power_min ()) { power = intake_launch_power_min (); }
     if (power > 1.0f) { power = 1.0f; }
     if (!isfinite (elev_deg)) { elev_deg = intake_launch_elev_default (); }
     if (elev_deg < 20.0f) { elev_deg = 20.0f; }
@@ -462,7 +462,7 @@ int ftc_aim_params_set (struct physics_world *world, float power, float elev_deg
     ftc_fleet_t *f = fleet_of (world);
     if (!world || !f) { return -1; }
     if (isfinite (power)) {
-        if (power < 0.3f) { power = 0.3f; }
+        if (power < intake_launch_power_min ()) { power = intake_launch_power_min (); }
         if (power > 1.0f) { power = 1.0f; }
         f -> aim_power = power;
     }
