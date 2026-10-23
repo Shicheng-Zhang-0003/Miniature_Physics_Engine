@@ -253,13 +253,16 @@ Config is saved to `status/engine.cfg` on exit and loaded on startup.
 
 ## Module Configuration (Key 5)
 
-Press `5` to open the loaded kernel module's own configuration menu — the 6 menu, but per module system. With the `mfs` ecosystem bundle loaded (`mod load ecosystem/mfs/mfs_ecosystem.so`, same bundle the FTC game ships in) the menu is rendered and driven from the bundle itself:
+Press `5` to open the loaded kernel module's own configuration menu — the 6 menu, but per module system. With the `mfs` ecosystem bundle loaded (`mod load ecosystem/mfs/mfs_ecosystem.so`, same bundle the FTC game ships in) the menu offers the whole shooter plane; every value applies to the next launch-state computation, so the purple predictor line and fired balls retune together:
 
-| Parameter | Default | Range | Drives |
+| Parameter | Stock | Range | Drives |
 |---|---|---|---|
 | Shooter launch elevation (deg) | 65 | 20–80 | The gamepad's stick-centred launch angle (right-stick ±30 around it) and the fleet's default aim state; the auto-solve keeps its own search band |
+| Launch speed (m/s) | 9 (≈3550 rpm wheel-equivalent) | 3–14 | Muzzle speed before the trigger's power scaling |
+| Launch backspin (rad/s) | 15 | 0–30 | Ball rotation for Magnus lift (yaw-projected lateral axis) |
+| Launch power floor | 0.30 | 0.05–0.95 | Minimum trigger power registered by any shot |
 
-A module without the `mpe_module_config` contract stays inert on `5`, and the scene-menu `5` (Reset Defaults, key `9` first) is untouched. Navigation mirrors the 6 menu: number to edit, `0`/`6` close. The contract is resolved at call time, so `mod unload`/reload swaps the menu contents immediately.
+A module without the `mpe_module_config` contract stays inert on `5`, and the scene-menu `5` (Reset Defaults, key `9` first) is untouched. Polish keys: `1`–`n` edit a parameter (dialog prefills the live value), `9` resets ALL module parameters to stock, `0`/`6` close. The contract is resolved at call time, so `mod unload`/reload swaps the menu contents immediately.
 
 ### Terminal Config Commands
 
