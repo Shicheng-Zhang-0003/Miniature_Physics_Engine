@@ -196,7 +196,31 @@ static int gpd_keyboard_tick (void) {
         if (want_in != s_kb_intake_last && k_set) {
             if (k_set (w, sel, want_in) >= 0) { s_kb_intake_last = want_in; }
         }
-        if (mpe_keydrive_shoot_edge (s_prev_period, cur_sh) && k_shoot) { k_shoot (w, sel); }
+        /* Fire the PUBLISHED aim, not the fixed-50 keyboard cannon: the
+         * plain ftc_shoot is the (power 1.0, elev 50) calibration path —
+         * the 5-menu shooter angle moved the purple line (it follows the
+         * fleet aim state) while the ball flew stock (DESPOT-2026-10-23
+         * field report). Keyboard fire = full power at aim elevation,
+         * exactly like the gamepad's RT release fallback for pads. */
+        int (*k_aim_get) (struct physics_world *, float *, float *) =
+            (int (*) (struct physics_world *, float *, float *)) gpd_sym ("ftc_aim_params_get");
+        int (*k_shoot_aim) (struct physics_world *, int, float, float) =
+            (int (*) (struct physics_world *, int, float, float)) gpd_sym ("ftc_shoot_aimed");
+        if (mpe_keydrive_shoot_edge (s_prev_period, cur_sh) && w) {
+            if (k_shoot_aim) {
+                float ke = 50.0f;
+                float (*k_elev_def) (void) = (float (*) (void)) gpd_sym ("intake_launch_elev_default");
+                if (k_elev_def) { ke = k_elev_def (); }
+                if (k_aim_get) {
+                    float ka = 0.0f;
+                    if (k_aim_get (w, &ka, &ke) != 0) { ke = k_elev_def ? k_elev_def () : 50.0f; }
+                }
+                if (!(ke >= 20.0f) || !(ke <= 80.0f)) { ke = 50.0f; }
+                k_shoot_aim (w, sel, 1.0f, ke);
+            } else if (k_shoot) {
+                k_shoot (w, sel);
+            }
+        }
         s_prev_period = cur_sh;
     }
     void (*s_brk) (ftc_robot *, int) = (void (*) (ftc_robot *, int)) gpd_sym ("ftc_robot_set_brake");
