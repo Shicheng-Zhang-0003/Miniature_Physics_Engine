@@ -1,5 +1,22 @@
 /* See intake.h: fictional intake + shooter-feed + ball aero. */
 #include "intake.h"
+/* Menu-adjustable default elevation: the stick-centred shooter angle. Stock
+ * 65 deg — flat arcs clip the tilted hive mouth's underside ("belly"), 65
+ * drops inside. Mutable at runtime through the module config menu (5 key:
+ * mpe_module_config contract) so a field day can retune the shooter without
+ * a rebuild; the value survives until the module dies or the engine exits.
+ * Bit-precision note: the deterministic calibration paths (the un-aimed
+ * intake_shoot / the (power 1.0, elev 50.0) exact legacy branch) compare
+ * against the INTAKE_LAUNCH_ELEV_DEG constant directly and are NOT routed
+ * through this default — bucket_game shot arithmetic is unchanged. */
+static float s_launch_elev_deg = 65.0f;
+float intake_launch_elev_default (void) { return s_launch_elev_deg; }
+void intake_launch_elev_default_set (float deg) {
+    if (!isfinite (deg)) { deg = INTAKE_LAUNCH_ELEV_DEG; }
+    if (deg < INTAKE_LAUNCH_ELEV_MIN) { deg = INTAKE_LAUNCH_ELEV_MIN; }
+    if (deg > INTAKE_LAUNCH_ELEV_MAX) { deg = INTAKE_LAUNCH_ELEV_MAX; }
+    s_launch_elev_deg = deg;
+}
 #include "core/det_math.h"
 #include <math.h>
 void intake_mouth_pose (vector3 chassis_pos, vector4 chassis_ori, vector3 *out_center, vector3 *out_half) {

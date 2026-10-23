@@ -163,6 +163,19 @@ gboolean on_keypress (GtkEventControllerKey *w, guint keyval, guint keycode, Gdk
         else
         config_menu_level_force_open ();
     }
+    if (keyval == GDK_KEY_5) {
+        /* Module menu (DESPOT-2026-10-23): with a kernel module loaded, 5
+         * opens that module's own config menu — the 6 menu, but per module
+         * system (parameters come from the bundle's mpe_module_config
+         * contract). Scene menu 5 (config reset) is untouched: it only
+         * surfaces through is_menu_open below. */
+        if (module_config_menu_is_open ()) {
+            module_config_menu_close ();
+        } else if (!st -> is_menu_open && !config_menu_is_open () && st -> object_menu_level == 0 &&
+                   module_config_menu_available ()) {
+            module_config_menu_open ();
+        }
+    }
     if ((keyval == GDK_KEY_1) && !config_menu_is_open () && st -> is_debug_mode_active && !st -> is_menu_open &&
         st -> spawner_menu_level == 0 && st -> velocity_menu_level == 0 && st -> object_menu_level == 0)
         st -> debug_terminal_pressed = true;
@@ -180,7 +193,7 @@ gboolean on_keypress (GtkEventControllerKey *w, guint keyval, guint keycode, Gdk
         if (keyval == GDK_KEY_6)
             st -> menu_6_pressed = true;
     }
-    if (config_menu_is_open ()) {
+    if (config_menu_is_open () && !module_config_menu_is_open ()) {
         if (keyval == GDK_KEY_0)
             config_menu_key_press (0);
         if (keyval == GDK_KEY_1)
@@ -199,6 +212,28 @@ gboolean on_keypress (GtkEventControllerKey *w, guint keyval, guint keycode, Gdk
             config_menu_key_press (8);
         if (keyval == GDK_KEY_9)
             config_menu_key_press (9);
+    }
+    if (module_config_menu_is_open ()) {
+        /* Module menu open: 0-9 drive it (5 handled by the toggle above,
+         * which closes; no fall-through into scene/config spawner keys). */
+        if (keyval == GDK_KEY_0)
+            module_config_menu_key_press (0);
+        if (keyval == GDK_KEY_1)
+            module_config_menu_key_press (1);
+        if (keyval == GDK_KEY_2)
+            module_config_menu_key_press (2);
+        if (keyval == GDK_KEY_3)
+            module_config_menu_key_press (3);
+        if (keyval == GDK_KEY_4)
+            module_config_menu_key_press (4);
+        if (keyval == GDK_KEY_6)
+            module_config_menu_key_press (6);
+        if (keyval == GDK_KEY_7)
+            module_config_menu_key_press (7);
+        if (keyval == GDK_KEY_8)
+            module_config_menu_key_press (8);
+        if (keyval == GDK_KEY_9)
+            module_config_menu_key_press (9);
     }
     if ((st -> spawner_menu_level > 0) || (st -> velocity_menu_level > 0) || (st -> object_menu_level > 0)) {
         if (keyval == GDK_KEY_Up)

@@ -78,4 +78,5 @@ void simulation_menu_dispatch (GtkWidget *parent_window) {
         if (app) { g_application_quit (app); }
     } editor_update_menus (parent_window);
     config_menu_update (parent_window);
+    module_config_menu_update (parent_window);
 }

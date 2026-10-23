@@ -133,7 +133,7 @@ if [ "$MPE_WINDOWS" = "1" ]; then
   GAMEPAD_OBJ="$OUT/gamepad.o"
   "$TEST_CC" $CFLAGS -c "$MFS/modules/module_1/mfs_module_1.c" -o "$MOD1_OBJ" 2>"$OUT/mfs_module_1.build.log" || { echo "[BUILD-FAIL] mfs_module_1.o"; fail=$((fail+1)); head -n 10 "$OUT/mfs_module_1.build.log"; }
   "$TEST_CC" $CFLAGS -c "$MFS/modules/module_1/submodules/gamepad/gamepad.c" -o "$GAMEPAD_OBJ" 2>"$OUT/gamepad.build.log" || { echo "[BUILD-FAIL] gamepad.o"; fail=$((fail+1)); head -n 10 "$OUT/gamepad.build.log"; }
-  if "$TEST_CC" $CFLAGS "$RB_T/mfs_suite_main.c" "$RB_T/mfs_suite_a.c" "$RB_T/mfs_suite_b.c" "$RB_T/mfs_suite_c.c" $FTC "$MFS/mfs_internal.c" $CORE "$MOD1_OBJ" "$GAMEPAD_OBJ" -lm $PTHREAD $WIN_LIBS -Wl,--export-all-symbols -Wl,--out-implib,"$OUT/libmfs_suite.a" -o "$OUT/mfs_suite$EXE_EXT" 2>"$OUT/mfs_suite.build.log"; then
+  if "$TEST_CC" $CFLAGS "$RB_T/mfs_suite_main.c" "$RB_T/mfs_suite_a.c" "$RB_T/mfs_suite_b.c" "$RB_T/mfs_suite_c.c" $FTC "$MFS/mfs_internal.c" "$MFS/module_config.c" $CORE "$MOD1_OBJ" "$GAMEPAD_OBJ" -lm $PTHREAD $WIN_LIBS -Wl,--export-all-symbols -Wl,--out-implib,"$OUT/libmfs_suite.a" -o "$OUT/mfs_suite$EXE_EXT" 2>"$OUT/mfs_suite.build.log"; then
       echo "[BUILD-OK] mfs_suite (unified)"; pass=$((pass+1));
   else
       echo "[BUILD-FAIL] mfs_suite"; fail=$((fail+1)); head -n 20 "$OUT/mfs_suite.build.log";
@@ -176,7 +176,7 @@ MOD1_OBJ="$OUT/mfs_module_1.o"
 GAMEPAD_OBJ="$OUT/gamepad.o"
 "$TEST_CC" $CFLAGS -c "$MFS/modules/module_1/mfs_module_1.c" -o "$MOD1_OBJ" 2>"$OUT/mfs_module_1.build.log" || { echo "[BUILD-FAIL] mfs_module_1.o"; fail=$((fail+1)); head -n 10 "$OUT/mfs_module_1.build.log"; }
 "$TEST_CC" $CFLAGS -c "$MFS/modules/module_1/submodules/gamepad/gamepad.c" -o "$GAMEPAD_OBJ" 2>"$OUT/gamepad.build.log" || { echo "[BUILD-FAIL] gamepad.o"; fail=$((fail+1)); head -n 10 "$OUT/gamepad.build.log"; }
-"$TEST_CC" $CFLAGS "$RB_T/mfs_suite_main.c" "$RB_T/mfs_suite_a.c" "$RB_T/mfs_suite_b.c" "$RB_T/mfs_suite_c.c" $FTC "$MFS/mfs_internal.c" $CORE "$MOD1_OBJ" "$GAMEPAD_OBJ" -lm $DL_LIBS $RDYNAMIC $PTHREAD $WIN_LIBS -o "$OUT/mfs_suite$EXE_EXT" 2>"$OUT/mfs_suite.build.log" && {
+"$TEST_CC" $CFLAGS "$RB_T/mfs_suite_main.c" "$RB_T/mfs_suite_a.c" "$RB_T/mfs_suite_b.c" "$RB_T/mfs_suite_c.c" $FTC "$MFS/mfs_internal.c" "$MFS/module_config.c" $CORE "$MOD1_OBJ" "$GAMEPAD_OBJ" -lm $DL_LIBS $RDYNAMIC $PTHREAD $WIN_LIBS -o "$OUT/mfs_suite$EXE_EXT" 2>"$OUT/mfs_suite.build.log" && {
     echo "[BUILD-OK] mfs_suite (unified)"; pass=$((pass+1));
 } || { echo "[BUILD-FAIL] mfs_suite"; fail=$((fail+1)); head -n 20 "$OUT/mfs_suite.build.log"; }
 # Alias for runner expecting extensionless name on Windows
@@ -323,7 +323,7 @@ odometry_diag:MFS_ODOM_DIAG"
     # not gated coverage: print a real [INFO] marker and count them once.
     # A build failure stays a gated failure -- the reference implementations
     # are only meaningful while they compile.
-    if "$TEST_CC" $CFLAGS -I"$MFS/tests" -D"$def" "$src" $FTC "$MFS/mfs_internal.c" $CORE "$MOD1_OBJ" "$GAMEPAD_OBJ" \
+    if "$TEST_CC" $CFLAGS -I"$MFS/tests" -D"$def" "$src" $FTC "$MFS/mfs_internal.c" "$MFS/module_config.c" $CORE "$MOD1_OBJ" "$GAMEPAD_OBJ" \
          -lm $DL_LIBS $RDYNAMIC $PTHREAD $WIN_LIBS -o "$OUT/$base$EXE_EXT" 2>"$OUT/$base.build.log"; then
       echo "[INFO] $base (diagnostic, ungated)"; info_pass=$((info_pass+1))
     else

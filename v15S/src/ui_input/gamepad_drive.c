@@ -349,11 +349,14 @@ void gamepad_drive_tick (void) {
          * right-X still rotates, so aiming is twin-stick. Older bundles fall
          * back down the chain (aimed -> power -> full). */
         float ry = s_pad_axis ? s_pad_axis (&s_pad, gamepad_axis_right_y) : 0.0f;
-        /* Centred default 65 deg (was 50): flat arcs clip the tilted mouth's
-         * underside (the "belly" shooter); steeper starts drop inside.
-         * Stick deflection still swings 35..95, clamped to the 20..80 band. */
-        float elev = 65.0f - 30.0f * ry;
-        if (!(elev >= 20.0f) || !(elev <= 80.0f)) { elev = 65.0f; }
+        /* Centred default: the configuration angle (module config menu 5
+         * key, intake_launch_elev_default; stock 65 — was 50: flat arcs
+         * clip the tilted mouth's underside, the "belly" shooter). Stick
+         * deflection swings ±30 around it, clamped to the 20..80 band. */
+        float (*s_elev_def) (void) = (float (*) (void)) gpd_sym ("intake_launch_elev_default");
+        float elev_center = s_elev_def ? s_elev_def () : 65.0f;
+        float elev = elev_center - 30.0f * ry;
+        if (!(elev >= 20.0f) || !(elev <= 80.0f)) { elev = elev_center; }
         if (rt > 0.2f) {
             if (!s_rt_charging) { s_rt_charging = 1; s_rt_charge_peak = rt; }
             else if (rt > s_rt_charge_peak) { s_rt_charge_peak = rt; }

@@ -112,14 +112,21 @@ void intake_launch_state_compute (vector3 chassis_pos, vector4 chassis_ori, vect
 #define INTAKE_LAUNCH_POWER_MIN 0.3f
 int intake_shoot_power (physics_world *world, vector3 chassis_pos, vector4 chassis_ori, vector3 chassis_vel,
                         int carried [INTAKE_MAX_CARRIED], int *carried_n, float power);
-/* Aimed shot: power as above plus launch elevation in degrees [20, 80]
- * (default 50). The stock 50-degree muzzle cannot place a ball in the
- * 1.5 m hive mouths from any legal field spot at any power (proven by
- * trajectory: arrival height falls 0.3+ m short of the mouth) — regulation
- * hive play needs the angle, not just the range. Clamped, non-finite-safe;
- * (1.0, 50.0) is the exact legacy path. */
+/* Aimed shot: power as above plus launch elevation in degrees [20, 80] (see
+ * intake_launch_elev_default for the default). The stock 50-degree muzzle
+ * cannot place a ball in the 1.5 m hive mouths from any legal field spot at
+ * any power (proven by trajectory: arrival height falls 0.3+ m short of the
+ * mouth) — regulation hive play needs the angle, not just the range.
+ * Clamped, non-finite-safe. */
 #define INTAKE_LAUNCH_ELEV_MIN 20.0f
 #define INTAKE_LAUNCH_ELEV_MAX 80.0f
+/* Menu-adjustable default launch elevation (deg, clamped [20,80], stock
+ * INTAKE_LAUNCH_ELEV_DEG). Drives the un-aimed fallbacks in the shoot paths,
+ * the fleet's default aim state resets and the gamepad's stick-centred
+ * default. The module config menu (5 key) mutates it through the
+ * mpe_module_config contract; it survives until the module dies. */
+float intake_launch_elev_default (void);
+void intake_launch_elev_default_set (float deg);
 int intake_shoot_aimed (physics_world *world, vector3 chassis_pos, vector4 chassis_ori, vector3 chassis_vel,
                         int carried [INTAKE_MAX_CARRIED], int *carried_n, float power, float elev_deg);
 /* Elevation-parameterized launch state (exported for the trajectory

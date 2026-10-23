@@ -69,11 +69,12 @@ void *ftc_fleet_create (void) {
     /* Poison id slots: 0 must never read as a live body id. */
     memset (f -> ball_ids, 0xFF, sizeof (f -> ball_ids));
     memset (f -> bucket_part_ids, 0xFF, sizeof (f -> bucket_part_ids));
-    /* Predictor defaults: full power, stock elevation. */
+    /* Predictor defaults: full power, configured elevation (menu-tunable,
+     * stock 65). */
     f -> last_shot_power = 1.0f;
-    f -> last_shot_elev = 50.0f;
+    f -> last_shot_elev = intake_launch_elev_default ();
     f -> aim_power = 1.0f;
-    f -> aim_elev = 50.0f;
+    f -> aim_elev = intake_launch_elev_default ();
     f -> solve_ok = 1; /* solve cache cold (calloc zero would read as "cached ok") */
     return f;
 }
@@ -208,9 +209,9 @@ int ftc_fleet_clear (struct physics_world *world) {
     f -> bucket_cz = 0.0f;
     memset (&f -> bb, 0, sizeof (f -> bb));
     f -> last_shot_power = 1.0f;
-    f -> last_shot_elev = 50.0f;
+    f -> last_shot_elev = intake_launch_elev_default ();
     f -> aim_power = 1.0f;
-    f -> aim_elev = 50.0f;
+    f -> aim_elev = intake_launch_elev_default ();
     f -> solve_ok = 1; /* the scene cleared under the solve cache */
     return 0;
 }
@@ -395,7 +396,7 @@ int ftc_shoot (struct physics_world *world, int index) {
                            &r -> intake_count);
     if (id >= 0) {
         fprintf (stderr, "[bucketball] fired ball id=%d\n", id);
-        if (f) { f -> aim_power = 1.0f; f -> aim_elev = 50.0f; }
+        if (f) { f -> aim_power = 1.0f; f -> aim_elev = intake_launch_elev_default (); }
     }
     return id;
 }
@@ -414,7 +415,7 @@ int ftc_shoot_power (struct physics_world *world, int index, float power) {
             if (ap < 0.3f) { ap = 0.3f; }
             if (ap > 1.0f) { ap = 1.0f; }
             f -> aim_power = ap;
-            f -> aim_elev = 50.0f;
+            f -> aim_elev = intake_launch_elev_default ();
         }
     }
     return id;
@@ -428,7 +429,7 @@ int ftc_shoot_aimed (struct physics_world *world, int index, float power, float 
     if (!isfinite (power)) { power = 1.0f; }
     if (power < 0.3f) { power = 0.3f; }
     if (power > 1.0f) { power = 1.0f; }
-    if (!isfinite (elev_deg)) { elev_deg = 50.0f; }
+    if (!isfinite (elev_deg)) { elev_deg = intake_launch_elev_default (); }
     if (elev_deg < 20.0f) { elev_deg = 20.0f; }
     if (elev_deg > 80.0f) { elev_deg = 80.0f; }
     int id = intake_shoot_aimed (world, ch -> position, ch -> orientation, ch -> velocity, r -> intake_balls,

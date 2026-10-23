@@ -288,7 +288,14 @@ void overlay_update (void) {
             gtk_widget_set_visible (object_menu_label, TRUE);
         }
         if (config_menu_label) {
-            if (config_menu_is_open ()) {
+            /* The two numeric menus are mutually exclusive in the input
+             * layer; one centered label renders whichever is open. */
+            if (module_config_menu_is_open ()) {
+                char cb [2048];
+                module_config_menu_render (cb, sizeof (cb));
+                gtk_label_set_text (GTK_LABEL (config_menu_label), cb);
+                gtk_widget_set_visible (config_menu_label, TRUE);
+            } else if (config_menu_is_open ()) {
                 char cb [2048];
                 config_menu_render (cb, sizeof (cb));
                 gtk_label_set_text (GTK_LABEL (config_menu_label), cb);

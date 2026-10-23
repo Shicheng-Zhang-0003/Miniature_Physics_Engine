@@ -9,6 +9,10 @@
 #include "modules/ftc/ftc_fleet.h"
 #include "modules/module_1/mfs_module_1.h"
 #include "mfs_internal.h"
+/* 5-key module menu contract (bundle side, module_config.c). */
+extern int mpe_module_config_count (void);
+extern int mpe_module_config_entry (int index, const char **display, float *value, float *min, float *max);
+extern void mpe_module_config_set (int index, float value);
 #include <stdlib.h>
 /* Windows-aware plugin path: pick existing .so/.dll variant. */
 static const char *mpe_pick_plugin (const char *so_path, char *buf, size_t n) {
@@ -1614,6 +1618,43 @@ int mfs_t_aim_solve (void) {
      * (was_live cleanup runs ftc_fleet_destroy on recycled-state memory:
      * free(1) UAF in the --all run just before select). */
     physics_world_cleanup (&w);
+    mfs_test_end (t_ptr);
+    return t_ptr -> failures;
+}
+/* module_config: the 5-key menu contract (host dlsyms on the bundle).
+ * Round-trip the Calibration-affecting shooter parameter and clamp rules;
+ * restores the stock 65 before returning so later tests see clean state. */
+int mfs_t_module_config (void) {
+    mfs_test_t t;
+    mfs_test_begin (&t, "module_config");
+    mfs_test_t *t_ptr = &t;
+    int (*count) (void) = mpe_module_config_count;
+    int (*entry) (int, const char **, float *, float *, float *) = mpe_module_config_entry;
+    void (*set) (int, float) = mpe_module_config_set;
+    MFS_CHECK (t_ptr, count () >= 1);
+    const char *display = NULL;
+    float v0 = 0.0f, mn = 0.0f, mx = 0.0f;
+    MFS_CHECK (t_ptr, entry (0, &display, &v0, &mn, &mx) == 1);
+    MFS_CHECK (t_ptr, display != NULL);
+    MFS_CHECK_NEAR (t_ptr, mn, INTAKE_LAUNCH_ELEV_MIN, 1e-5f, "menu min");
+    MFS_CHECK_NEAR (t_ptr, mx, INTAKE_LAUNCH_ELEV_MAX, 1e-5f, "menu max");
+    set (0, 70.0f);
+    float v1 = 0.0f;
+    entry (0, NULL, &v1, NULL, NULL);
+    MFS_CHECK_NEAR (t_ptr, v1, 70.0f, 1e-5f, "menu set round-trip");
+    set (0, 200.0f);
+    entry (0, NULL, &v1, NULL, NULL);
+    MFS_CHECK_NEAR (t_ptr, v1, INTAKE_LAUNCH_ELEV_MAX, 1e-5f, "menu clamp high");
+    set (0, -5.0f);
+    entry (0, NULL, &v1, NULL, NULL);
+    MFS_CHECK_NEAR (t_ptr, v1, INTAKE_LAUNCH_ELEV_MIN, 1e-5f, "menu clamp low");
+    entry (0, NULL, &v1, NULL, NULL);
+    MFS_CHECK_NEAR (t_ptr, v1, INTAKE_LAUNCH_ELEV_MIN, 1e-5f, "oob set no-op");
+    MFS_CHECK (t_ptr, entry (7, NULL, NULL, NULL, NULL) == 0);
+    set (0, 65.0f);
+    entry (0, NULL, &v1, NULL, NULL);
+    MFS_CHECK_NEAR (t_ptr, v1, 65.0f, 1e-5f, "stock restore");
+    if (t_ptr -> failures == 0) { printf ("[PASS] module_config: count/entry/set round-trip + clamps\n"); }
     mfs_test_end (t_ptr);
     return t_ptr -> failures;
 }
