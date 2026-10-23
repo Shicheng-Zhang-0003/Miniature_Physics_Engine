@@ -830,6 +830,12 @@ int biobuzz_hive_ids (const biobuzz_state_t *st, int hive, int out_ids [11]) {
     for (int k = 0; k < 11; k++) { out_ids [k] = st -> hive_bodies [hive][k]; }
     return 0;
 }
+int biobuzz_up_cell_frame (int hive, int up_end, vector3 *out_c, vector4 *out_q) {
+    if (!out_c || !out_q || (hive != 0 && hive != 1) || (up_end != -1 && up_end != 1)) { return -1; }
+    bb_up_cell_frame (hive, up_end, out_c, out_q);
+    return 0;
+}
+vector3 biobuzz_unrotate (vector4 q, vector3 v) { return bb_unrotate (q, v); }
 
 /* Rigidly yaw a spawned robot about its chassis centre (spawn API takes no
  * yaw; start poses face the centre per regulation). Rotates chassis, wheels

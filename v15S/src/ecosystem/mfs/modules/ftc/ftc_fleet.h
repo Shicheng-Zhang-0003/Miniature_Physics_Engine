@@ -80,6 +80,26 @@ int ftc_last_shot_params (struct physics_world *world, float *power_out, float *
  * trigger power. Clamped like ftc_shoot_aimed. 0 ok, -1 no fleet. */
 int ftc_aim_params_set (struct physics_world *world, float power, float elev_deg);
 int ftc_aim_params_get (struct physics_world *world, float *power_out, float *elev_out);
+/* Hive-entry aim solve (DESPOT-2026-10-22). The shipped aim space is 13%
+ * entering arcs: elevation 55-75 deg at power 0.62-0.82, invisible to a
+ * player aiming by eye (stick-centred 50 deg never enters — every arc
+ * clips the tilted mouth's underside). This solves (power, elevation) for
+ * an arc that DESCENDS through the nearest up-cell mouth the muzzle can
+ * legally approach (up mouths face outboard, 30 deg tilt: entry needs the
+ * nose within ~50 deg of the mouth's outboard approach yaw — the solve
+ * returns -1 and teaches that when the nose points away).
+ *
+ * Method: a throwaway mini-world mirrors every static the live ball can
+ * strike (same filter rules as ftc_traj's preview), the next carried ball
+ * is re-placed per candidate through the EXACT launch maths the shooter
+ * uses (intake_launch_state_compute_elev + power scaling), marched with
+ * the real aero at the solved-for contract (8 iterations, like ftc_traj:
+ * measured trajectory-neutral), and enters when it crosses the mouth's
+ * interior census volume moving inward. The best entry (max centeredness)
+ * is returned. Results cache on (muzzle, yaw) so repeat calls while
+ * stationary cost nothing. Returns 0 ok and writes power/elev, -1 no
+ * fleet/field/carried ball or no entering arc for this pose. */
+int ftc_aim_params_solve (struct physics_world *world, float *power_out, float *elev_out);
 int ftc_bucket_spawn (struct physics_world *world, float x, float y, float z);
 int ftc_bucket_clear (struct physics_world *world);
 /* Totals: carried (CONTROLLED robot), tracked balls, scored, bucket active. Any out

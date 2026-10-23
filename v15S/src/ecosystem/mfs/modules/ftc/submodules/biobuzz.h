@@ -211,4 +211,12 @@ void biobuzz_place_robot (struct physics_world *world, ftc_robot *robot, float y
 /* Hive body ids for inspection/debug (beam + 10 cell boxes, -1 unset).
  * Returns 0 ok. */
 int biobuzz_hive_ids (const biobuzz_state_t *st, int hive, int out_ids [11]);
+/* Up-cell frame for shooter-aim solves (DESPOT-2026-10-22): world centre +
+ * quaternion of the UP cell of `hive` (0 red, 1 blue) whose up end is
+ * `up_end` (-1 = -Z cellA, +1 = +Z cellB). Same numbers the field builder
+ * and the tip re-poser use. Returns 0 ok, -1 bad args. */
+int biobuzz_up_cell_frame (int hive, int up_end, vector3 *out_c, vector4 *out_q);
+/* World->local by quaternion transpose (unit quats: transpose = inverse).
+ * Exposed for the aim solve's interior test (biobuzz keeps the math). */
+vector3 biobuzz_unrotate (vector4 q, vector3 v);
 #endif /* mfs_biobuzz_h */

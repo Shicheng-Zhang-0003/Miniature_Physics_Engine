@@ -49,6 +49,14 @@ static int s_prev_lt = 0;
  * the first frame over 0.5, i.e. ~60% power — the "dying battery" shot). */
 static int s_rt_charging = 0;
 static float s_rt_charge_peak = 1.0f;
+/* Hive-aim solve state (DESPOT-2026-10-22): last solved pair + when/where
+ * (frame throttle 96 frames + >0.4 m move or a rotate-stick nudge force a
+ * fresh solve; the fleet-side pose cache makes stationary re-asks free). */
+static int s_solved_ok = 0;
+static float s_solvedPower = 0.0f, s_solvedElev = 0.0f;
+static int s_solve_frames = 9999;
+static vector3 s_last_solve_pos;
+static int s_solve_yaw_dirty = 0;
 static int s_was_commanding = 0;
 static int s_active = 0;
 static int s_reported_stage = -1;
@@ -323,6 +331,8 @@ void gamepad_drive_tick (void) {
             (int (*) (struct physics_world *, int, float, float)) gpd_sym ("ftc_shoot_aimed");
         int (*s_aim_set) (struct physics_world *, float, float) =
             (int (*) (struct physics_world *, float, float)) gpd_sym ("ftc_aim_params_set");
+        int (*s_aim_solve) (struct physics_world *, float *, float *) =
+            (int (*) (struct physics_world *, float *, float *)) gpd_sym ("ftc_aim_params_solve");
         int (*s_eject) (struct physics_world *, int) =
             (int (*) (struct physics_world *, int)) gpd_sym ("ftc_eject");
         physics_world *wg = physics_world_get_primary ();
@@ -345,12 +355,60 @@ void gamepad_drive_tick (void) {
             if (!s_rt_charging) { s_rt_charging = 1; s_rt_charge_peak = rt; }
             else if (rt > s_rt_charge_peak) { s_rt_charge_peak = rt; }
         }
-        if (s_aim_set && wg) { s_aim_set (wg, s_rt_charge_peak, elev); }
+        /* DESPOT-2026-10-22 hive-aim: the entering band is elevation 55-75
+         * at power 0.62-0.82 (13% of the shipped aim space) and invisible
+         * to eye-aiming — stick-centred 50 deg always clips the tilted
+         * mouth's underside. While charging with the right stick centred
+         * (|ry| < 0.08), the aim is the fleet's SOLVED (power, elevation)
+         * pair (ftc_aim_params_solve: caches on pose, so re-asks while
+         * stationary are free; solves re-run from the throttle gate below
+         * while moving). Touching the stick returns to raw twin-stick aim
+         * (this block only ever changes the centred-stick default). The
+         * trigger charge still halves as the fire commit — with the stick
+         * centred the solved arc previews and fires as-is; deflected
+         * sticks keep the old charge+elevation semantics. */
+        int stick_centred = fabsf (ry) < 0.08f;
+        float pubPow = s_rt_charge_peak, pubElev = elev;
+        if (rt > 0.2f) {
+            /* chassis pose for the re-solve throttle (second dlsym, same
+             * per-tick pattern: never held across an unload boundary) */
+            ftc_robot *(*p_gg2) (struct physics_world *, int) =
+                (ftc_robot * (*) (struct physics_world *, int)) gpd_sym ("ftc_fleet_get");
+            ftc_robot *cr = (wg && p_gg2) ? p_gg2 (wg, sel) : NULL;
+            vector3 chp = (cr && cr -> chassis_body >= 0) ? wg -> bodies [cr -> chassis_body].position
+                                                              : (vector3) {0.0f, 0.0f, 0.0f};
+            /* re-solve throttle: >=1.6 s (96 frames) or a >0.4 m move or a
+             * rotate-stick nudge; the fleet-side pose cache makes
+             * stationary re-asks free */
+            float pdx = chp.x - s_last_solve_pos.x, pdz = chp.z - s_last_solve_pos.z;
+            int need = (s_solve_frames >= 96) || (pdx * pdx + pdz * pdz > 0.4f * 0.4f) || s_solve_yaw_dirty;
+            if (need && s_aim_solve && wg && stick_centred && cr) {
+                float sp = 0.0f, se = 0.0f;
+                int rv = s_aim_solve (wg, &sp, &se);
+                if (rv == 0) {
+                    s_solved_ok = 1; s_solvedPower = sp; s_solvedElev = se;
+                } else {
+                    s_solved_ok = 0; /* pose is outside the entering corridor */
+                }
+                s_solve_frames = 0;
+                s_last_solve_pos = chp;
+                s_solve_yaw_dirty = 0;
+            }
+            if (stick_centred && s_solved_ok) {
+                pubPow = s_solvedPower;
+                pubElev = s_solvedElev;
+            }
+        } else {
+            s_solve_frames = 9999; /* idle: force a solve at the next charge */
+        }
+        if (s_aim_set && wg) { s_aim_set (wg, pubPow, pubElev); }
         if (s_rt_charging && rt <= 0.2f) {
             s_rt_charging = 0;
             if (s_rt_charge_peak < 0.3f) { s_rt_charge_peak = 0.3f; }
-            if (s_shoot_aim && wg) { s_shoot_aim (wg, sel, s_rt_charge_peak, elev); }
-            else if (s_shoot_pwr && wg) { s_shoot_pwr (wg, sel, s_rt_charge_peak); }
+            /* fire the PUBLISHED aim (solved pair while the stick was
+             * centred, raw charge+stick-elevation otherwise) */
+            if (s_shoot_aim && wg) { s_shoot_aim (wg, sel, pubPow, pubElev); }
+            else if (s_shoot_pwr && wg) { s_shoot_pwr (wg, sel, pubPow); }
             else if (s_shoot && wg) { s_shoot (wg, sel); }
         }
         if (a_now && !s_prev_a && s_toggle && wg) { s_toggle (wg, sel); }
@@ -384,6 +442,7 @@ void gamepad_drive_tick (void) {
     } float fwd = -s_pad_axis (&s_pad, gamepad_axis_left_y);
     float str = s_pad_axis (&s_pad, gamepad_axis_left_x);
     float rot = s_pad_axis (&s_pad, gamepad_axis_right_x);
+    if (fabsf (rot) > 0.1f) { s_solve_yaw_dirty = 1; } /* rotate -> stale solve */
     /* DESPOT-2026-10-14 (handling, expo): linear sticks hand the driver the
      * full yaw runaway (pre-governor plant spins past 13 rad/s) with
      * millimeter precision at centre. Expo (x^1.5, endpoints preserved)

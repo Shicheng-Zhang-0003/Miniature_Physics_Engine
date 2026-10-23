@@ -616,11 +616,86 @@ static void cmd_ftc_mec (physics_world *w, int argc, char **argv) {
 }
 static void cmd_ftc (physics_world *w, int argc, char **argv) {
     (void)w;
-    if (argc < 2) { printf ("ftc: usage: ftc spawn [x y z [preset]] | telemetry | drive <l> <r> | mec <f> <s> <r> | select <i>\n"); return; }
+    if (argc < 2) { printf ("ftc: usage: ftc spawn [x y z [preset]] | telemetry | drive <l> <r> | mec <f> <s> <r> | aim | select <i>\n"); return; }
     if (strcmp(argv[1],"spawn")==0) { cmd_ftc_spawn(w, argc, argv); return; }
     if (strcmp(argv[1],"telemetry")==0) { cmd_ftc_telemetry(w, argc, argv); return; }
     if (strcmp(argv[1],"drive")==0) { cmd_ftc_drive(w, argc, argv); return; }
     if (strcmp(argv[1],"mec")==0) { cmd_ftc_mec(w, argc, argv); return; }
+    if (strcmp(argv[1],"biobuzz")==0) {
+        if (argc >= 3 && strcmp(argv[2],"spawn")==0) {
+            /* DESPOT-2026-10-23: regulation four-robot start (term_ftc's
+             * `ftc biobuzz spawn` path, shell-flavoured): start-pose spawn
+             * + yaw placement per alliance/slot + preload. Gives the aim
+             * solver its regulation start pose to be tested against. */
+            int (*p_spawn) (struct physics_world *, float, float, float, motor_preset_id, ftc_drivetrain_type) =
+                (int (*) (struct physics_world *, float, float, float, motor_preset_id, ftc_drivetrain_type)) ftc_sym ("ftc_fleet_spawn");
+            int (*p_place) (struct physics_world *, int, float) =
+                (int (*) (struct physics_world *, int, float)) ftc_sym ("ftc_biobuzz_place");
+            int (*p_pre) (struct physics_world *) = (int (*) (struct physics_world *)) ftc_sym ("ftc_biobuzz_preload");
+            int (*p_count) (struct physics_world *) =
+                (int (*) (struct physics_world *)) ftc_sym ("ftc_fleet_count");
+            void (*p_env) (physics_world *) = (void (*)(physics_world *)) mpe_loader_symbol("mfs-simulator", "mfs_ecosystem_ensure_env");
+            if (!p_env) p_env = (void (*)(physics_world *)) mpe_loader_symbol("ecosystem/mfs/plugins/mpe_ftc.so", "mfs_ecosystem_ensure_env");
+            void (*p_pose) (int, int, float *, float *) = NULL;
+            *(void **) (&p_pose) = ftc_sym ("biobuzz_start_pose");
+            float (*p_rest) (void) = (float (*) (void)) ftc_sym ("ftc_robot_rest_height");
+            if (!p_spawn || !p_place || !p_pre || !p_pose || !p_rest || !p_count || !p_env || !w) {
+                printf ("ftc: bundle API incomplete (need biobuzz league)\n"); return;
+            }
+            if (p_count (w) > 0) { printf ("ftc: robots already exist (scene_clear to reset)\n"); return; }
+            p_env (w);
+            /* Self-heal like cmd_ftc_spawn: a fresh shell world has no fleet
+             * state — attach the bundle ecosystem so spawn/place have a home. */
+            const mpe_ecosystem_desc_t *e_bz = mpe_ecosystem_find ("mfs-simulator");
+            if (e_bz) { mpe_ecosystem_attach (w, "mfs-simulator"); }
+            /* regulation field first: build the hives + stage the match
+             * (the fleet's bb.field_built gates both shooting and the aim
+             * solve); attached worlds stage on demand, never implicitly.
+             * biobuzz_stage_match requires field_built — build then stage. */
+            int (*p_bfield) (struct physics_world *) =
+                (int (*) (struct physics_world *)) ftc_sym ("ftc_biobuzz_field");
+            int (*p_match) (struct physics_world *) =
+                (int (*) (struct physics_world *)) ftc_sym ("ftc_biobuzz_match");
+            if (p_bfield) { p_bfield (w); }
+            if (p_match) { p_match (w); }
+            int made = 0;
+            for (int a = 0; a < 2 && made >= 0; a++) {
+                for (int s = 0; s < 2 && made >= 0; s++) {
+                    float xyz [3]; float yaw = 0.0f;
+                    p_pose (a, s, xyz, &yaw);
+                    xyz [1] = p_rest ();
+                    int idx = p_spawn (w, xyz [0], xyz [1], xyz [2], MOTOR_GB_5203_26_9, FTC_DRIVETRAIN_MECANUM);
+                    if (idx < 0 || p_place (w, idx, yaw) != 0) { made = -1; break; }
+                    made++;
+                }
+            }
+            if (made < 0) { printf ("ftc: biobuzz spawn failed\n"); return; }
+            int pre = p_pre (w);
+            printf ("ftc: %d robots at regulation starts (red -X, blue +X) + %d preloaded\n", made, pre);
+            return;
+        }
+        printf ("ftc: usage: ftc biobuzz spawn — regulation starts + preload\n");
+        return;
+    }
+    if (strcmp(argv[1],"aim")==0) {
+        /* DESPOT-2026-10-22: print the live aim and the hive-entry solve so
+         * headless tuning can see what the gamepad would publish. Solve
+         * result only (never publishes: the shell is read-only for aim). */
+        int (*a_get) (struct physics_world *, float *, float *) =
+            (int (*) (struct physics_world *, float *, float *)) ftc_sym ("ftc_aim_params_get");
+        int (*a_solve) (struct physics_world *, float *, float *) =
+            (int (*) (struct physics_world *, float *, float *)) ftc_sym ("ftc_aim_params_solve");
+        if (!a_get) { printf ("ftc: fleet API unavailable\n"); return; }
+        float p = 0.0f, e = 0.0f;
+        a_get (w, &p, &e);
+        printf ("ftc: live aim power=%.2f elev=%.1f\n", p, e);
+        if (a_solve) {
+            float sp = 0.0f, se = 0.0f;
+            if (a_solve (w, &sp, &se) == 0) { printf ("ftc: solve power=%.2f elev=%.1f\n", sp, se); }
+            else { printf ("ftc: solve — no entering arc at this pose\n"); }
+        } else { printf ("ftc: solve unavailable (bundle predates hive-aim)\n"); }
+        return;
+    }
     if (strcmp(argv[1],"select")==0 && argc >= 3) {
         ftc_fleet_select_fn sel = (ftc_fleet_select_fn)ftc_sym("ftc_fleet_select");
         if (!sel) { printf ("ftc: fleet API unavailable\n"); return; }
@@ -782,7 +857,7 @@ static shell_cmd g_cmds[] = {
     {"modinfo","modinfo <name>","module details",cmd_modinfo},
     {"netstat","netstat","joint network topology",cmd_netstat},
     {"eco","eco attach|detach|command","ecosystem bundle commands",cmd_eco},
-    {"ftc","ftc spawn|telemetry|drive|mec|select","FTC robotics",cmd_ftc},
+    {"ftc","ftc spawn|telemetry|drive|mec|aim|select","FTC robotics",cmd_ftc},
     {"step","step [N]","advance N ticks (default 1)",cmd_step},
     {"run","run [N]","advance N ticks (default 600)",cmd_run},
     {"tick","tick","advance one tick",cmd_tick},

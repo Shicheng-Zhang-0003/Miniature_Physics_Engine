@@ -1476,6 +1476,124 @@ int mfs_t_biobuzz_table (void) {
     mfs_test_end (t_ptr);
     return t_ptr -> failures;
 }
+/* aim_solve: DESPOT-2026-10-23 hive-entry shot solve. Robot parked on the
+ * red up-cell approach axis (the muzzle 0.9 m out along +Z, nose +Z: the
+ * entry needs the descending outboard -Z approach — the shipped eye-aim
+ * default sticks to 50 deg and can never enter: probe bbshot put the
+ * entering band at ~13% of the aim space), a REAL pollen-spec carry, then
+ * ftc_aim_params_solve -> ftc_shoot_aimed -> the ball settles INSIDE the
+ * tilted up-cell mouth. Solver launch maths + aero are the same as the
+ * shooter's (intake_launch_state_compute_elev), march in a statics mirror
+ * at 8 iterations, so the solved pair must reproduce entry in the real
+ * world. */
+int mfs_t_aim_solve (void) {
+    mfs_test_t t;
+    mfs_test_begin (&t, "aim_solve");
+    mfs_test_t *t_ptr = &t;
+    physics_world w;
+    mfs_test_world (&w);
+    extern const mpe_module_desc_t mpe_module_desc;
+    MFS_CHECK (t_ptr, physics_world_attach_module (&w, &mpe_module_desc) >= 0);
+    MFS_CHECK (t_ptr, ftc_biobuzz_field (&w) == 0);
+    MFS_CHECK (t_ptr, ftc_biobuzz_match (&w) == 40); /* returns the staged piece count */
+    /* Robot on the mouth axis BEFORE staging the carry piece: spawn yaw 0
+     * (nose +Z), muzzle = chassis + 0.48 fwd + 0.12 up. The entry travels
+     * +Z along the mouth's tilted normal (the ball arrives from the −Z
+     * outboard side and descends 30 deg): so the muzzle sits at
+     * cc.z − gap*0.866 (gap 1.0 m keeps the RED mouth the closest up cell
+     * AND everything inside the −Z perimeter wall). */
+    MFS_CHECK (t_ptr, ftc_fleet_spawn (&w, -0.3239f, ftc_robot_rest_height (), -1.585f, MOTOR_GB_5203_26_9,
+                                       FTC_DRIVETRAIN_MECANUM) == 0);
+    void *mod = w.tick_module_state [0];
+    for (int k = 0; k < 90; k++) { ftc_fleet_step_all (&w, mod, DT); physics_world_step (&w, DT); }
+    ftc_robot *r = ftc_fleet_get (&w, 0);
+    MFS_CHECK (t_ptr, r != NULL);
+    if (!r) {
+        mfs_test_end (t_ptr);
+        return t_ptr -> failures;
+    }
+    MFS_CHECK (t_ptr, r -> intake_count == 0);
+    /* One pollen-spec piece in the swept registry, then TELEPORT it into
+     * the intake mouth box (chassis + 0.34 fwd - 0.12 up) so capture is
+     * deterministic without driving. */
+    int bc0 = w.body_count;
+    MFS_CHECK (t_ptr, ftc_biobuzz_spawn (&w, 0, 1) == 1);
+    int bi_piece = w.body_count - 1;
+    MFS_CHECK (t_ptr, bi_piece >= bc0);
+    MFS_CHECK (t_ptr, fabsf (w.bodies [bi_piece].radius - BIOBUZZ_POLLEN_RADIUS) < 1e-5f);
+    {
+        rigidbody *ch = &w.bodies [r -> chassis_body];
+        vector3 fwd = vector4_rotate_to_vector3 (ch -> orientation, (vector3) {0.0f, 0.0f, 1.0f});
+        vector3 up = vector4_rotate_to_vector3 (ch -> orientation, (vector3) {0.0f, 1.0f, 0.0f});
+        vector3 mc = vector3_addition (ch -> position, vector3_scaling (fwd, 0.34f));
+        mc = vector3_addition (mc, vector3_scaling (up, -0.12f));
+        w.bodies [bi_piece].position = mc;
+        w.bodies [bi_piece].velocity = vector3_zero ();
+        rigidbody_set_kinematic (&w.bodies [bi_piece], false);
+        rigidbody_wake (&w.bodies [bi_piece]);
+    }
+    MFS_CHECK (t_ptr, ftc_intake_set (&w, 0, 1) == 1); /* intake setting the state returns the state */
+    for (int k = 0; k < 90; k++) { ftc_fleet_step_all (&w, mod, DT); physics_world_step (&w, DT); }
+    MFS_CHECK (t_ptr, r -> intake_count >= 1);
+    if (r -> intake_count < 1) {
+        printf ("[FAIL] aim_solve: capture failed (piece at mouth not taken)\n");
+        mfs_test_end (t_ptr);
+        return t_ptr -> failures;
+    }
+    /* Pin the chassis pose for the solve+fire pair: the settle leaves a few
+     * degrees of idle drift (mecanum roller contact asymmetry, seen in the
+     * drive batteries) and the entering window is decimal-thin; solve and
+     * fire run against the SAME state, no ticks between them. */
+    {
+        rigidbody *ch = &w.bodies [r -> chassis_body];
+        ch -> position = (vector3) {-0.3239f, ch -> position.y, -1.585f};
+        ch -> orientation = vector4_identity ();
+        ch -> velocity = vector3_zero ();
+        ch -> angular_velocity = vector3_zero ();
+        rigidbody_wake (ch);
+    }
+    /* Solve at this pose against the RED hive (index 0, cellA -Z up). */
+    float sp = 0.0f, se = 0.0f;
+    int rv = ftc_aim_params_solve (&w, &sp, &se);
+    MFS_CHECK (t_ptr, rv == 0);
+    if (rv == 0) {
+        MFS_CHECK (t_ptr, sp >= 0.30f && sp <= 1.0f);
+        MFS_CHECK (t_ptr, se >= 20.0f && se <= 80.0f);
+    } else {
+        printf ("[FAIL] aim_solve: solve rv=%d (muzzle off the approach axis: rotate the nose)\n", rv);
+        mfs_test_end (t_ptr);
+        return t_ptr -> failures;
+    }
+    /* Mouth frame: hive 0 up cell (cellA -Z end up, tilt -1). */
+    vector3 cc; vector4 cq;
+    MFS_CHECK (t_ptr, biobuzz_up_cell_frame (0, -1, &cc, &cq) == 0);
+    MFS_CHECK (t_ptr, fabsf (cc.y - 1.4165f) < 0.02f);
+    MFS_CHECK (t_ptr, ftc_shoot_aimed (&w, 0, sp, se) >= 0);
+    for (int k = 0; k < 300; k++) { ftc_fleet_step_all (&w, mod, DT); physics_world_step (&w, DT); }
+    MFS_CHECK (t_ptr, mfs_test_finite (&w) == 1);
+    /* Entry: local cell coordinates of the resting ball must sit in the
+     * mouth window (ball radius off the walls) and behind the mouth plane
+     * (local z along the outward normal, negative = inside; the ball can
+     * settle deep toward the lower wall — the cell is 15.2 cm deep). */
+    {
+        rigidbody *ball = &w.bodies [bi_piece];
+        vector3 d = vector3_subtraction (ball -> position, cc);
+        vector3 lo = biobuzz_unrotate (cq, d);
+        float mx = BIOBUZZ_CELL_W * 0.5f - BIOBUZZ_POLLEN_RADIUS - 0.008f;
+        float my = BIOBUZZ_CELL_H * 0.5f - BIOBUZZ_POLLEN_RADIUS - 0.008f;
+        printf ("[INFO] aim_solve: ball local=(%.3f,%.3f,%.3f) win=(%.3f,%.3f)\n", (double) lo.x, (double) lo.y,
+                (double) lo.z, (double) mx, (double) my);
+        MFS_CHECK (t_ptr, fabsf (lo.x) <= mx && fabsf (lo.y) <= my && lo.z <= 0.015f && lo.z > -0.145f);
+    }
+    if (t_ptr -> failures == 0) { printf ("[PASS] aim_solve: solve->fire enters the up-cell mouth\n"); }
+    /* Suite convention: detach the module + free the fleet state. A live
+     * world left behind segfaults the NEXT test's physics_world_init
+     * (was_live cleanup runs ftc_fleet_destroy on recycled-state memory:
+     * free(1) UAF in the --all run just before select). */
+    physics_world_cleanup (&w);
+    mfs_test_end (t_ptr);
+    return t_ptr -> failures;
+}
 /* select: controlled-robot routing (terminal `ftc select`, gamepad BACK).
  * Contract: fresh attach with no robots reads -1; default is robot 0 after
  * first spawn; OOB selects fail -1 leaving stored untouched; selection is
