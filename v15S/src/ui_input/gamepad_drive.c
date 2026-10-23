@@ -380,6 +380,9 @@ void gamepad_drive_tick (void) {
             /* re-solve throttle: >=1.6 s (96 frames) or a >0.4 m move or a
              * rotate-stick nudge; the fleet-side pose cache makes
              * stationary re-asks free */
+            s_solve_frames++; /* the timer must tick while charging, or a
+                                 stationary hold never re-asks after the
+                                 first solve (moved mouth on a tip re-pose) */
             float pdx = chp.x - s_last_solve_pos.x, pdz = chp.z - s_last_solve_pos.z;
             int need = (s_solve_frames >= 96) || (pdx * pdx + pdz * pdz > 0.4f * 0.4f) || s_solve_yaw_dirty;
             if (need && s_aim_solve && wg && stick_centred && cr) {
