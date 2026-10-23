@@ -488,10 +488,13 @@ static const float bbm_solve_elev [8] = {45.0f, 50.0f, 55.0f, 60.0f, 65.0f, 70.0
 static const float bbm_solvePow [11] = {0.40f, 0.45f, 0.50f, 0.55f, 0.60f, 0.65f, 0.70f, 0.75f, 0.80f, 0.85f,
                                         0.90f};
 /* One candidate arc: place the carried ball in the throwaway world at
- * (power, elevation) and march it with the real aero; entering = crossing
- * into the up-cell interior census volume moving inward. Scored by how
- * centered the crossing sits (min of the two window margins). Returns the
- * score, or -1 on no entry. march caps at 150 ticks (~2.5 s). */
+ * (power, elevation) and march it with the real aero; entering = the ball
+ * ends the march settled INSIDE the up-cell window (the mouth is LOADED
+ * with 3 match nectar in the full world, staged by biobuzz_stage_match and
+ * mirrored into the march world by the caller: an arc whose ball crosses
+ * the plane but bounces back out on the loaded stack is NOT an entry).
+ * Scored by the settle window margin (min of the two window margins).
+ * Returns the score, or -1 on no settle. march caps at 150 ticks (~2.5 s). */
 static float bbm_march_entry (physics_world *pred, int pi, uint32_t bid, ftc_robot *r, rigidbody *ch, float power,
                               float elev_deg, vector3 cc, vector4 cq, float ball_r) {
     (void) r; /* carried spec picked by the caller; kept for signature symmetry with the shooter */
@@ -505,36 +508,56 @@ static float bbm_march_entry (physics_world *pred, int pi, uint32_t bid, ftc_rob
     rigidbody_wake (pb);
     rigidbody_update_axes (pb);
     vector3 cn = vector4_rotate_to_vector3 (cq, (vector3) {0.0f, 0.0f, 1.0f}); /* outward mouth normal */
-    float best = -1.0f;
+    int dbg = getenv ("MPE_HIVE_AIM_MARCH_DEBUG") != NULL; /* per-candidate trace, opt-in */
+    float tailscore = -1.0f; /* window margin at the most recent inside-window tick */
+    int inside_run = 0;      /* consecutive ticks past the plane AND inside the window */
     for (int t = 0; t < 150; t++) {
         int id = (bid <= (uint32_t) INT_MAX) ? (int) bid : -1;
         if (id < 0) { break; }
-        intake_balls_aero_step (pred, &id, 1);
+        /* Flight parity: a spawned league piece lives in BOTH the fleet's
+         * ball registry and the biobuzz piece registry, and the fleet tick
+         * runs the ball aero over BOTH lists (ftc_fleet_step_all 963+964).
+         * The real game therefore applies drag+Magnus TWICE per tick; the
+         * march must mirror that or solver arcs diverge from fired arcs
+         * (measured: solved (0.65,80) settles inside in the single-aero
+         * march yet bounces past the mouth in the live world). */
+        int ids2 [2] = {id, id};
+        intake_balls_aero_step (pred, ids2, 2);
         physics_world_step (pred, 1.0f / 60.0f);
         vector3 p = pb -> position;
         if (!isfinite (p.x) || !isfinite (p.y) || !isfinite (p.z)) { break; }
+        if (dbg && (t % 10 == 0 || t == 149)) {
+            fprintf (stderr, "  [march] t=%3d pos=(%.3f,%.3f,%.3f) v=(%.2f,%.2f,%.2f)\n", t, (double) p.x, (double) p.y,
+                     (double) p.z, (double) pb -> velocity.x, (double) pb -> velocity.y, (double) pb -> velocity.z);
+        }
         vector3 d2 = vector3_subtraction (p, cc);
         float ala = d2.x * cn.x + d2.y * cn.y + d2.z * cn.z;
-        if (ala <= 0.0f) { /* at or inside the mouth plane: test the window */
+        /* window bookkeeping: at/inside the plane */
+        if (ala <= 0.0f) {
             vector3 lo = biobuzz_unrotate (cq, d2);
             float mx = BIOBUZZ_CELL_W * 0.5f - ball_r - 0.005f;
             float my = BIOBUZZ_CELL_H * 0.5f - ball_r - 0.005f;
-            if (fabsf (lo.x) <= mx && fabsf (lo.y) <= my) {
-                vector3 v3 = pb -> velocity;
-                float into = -(v3.x * cn.x + v3.y * cn.y + v3.z * cn.z);
-                if (into > 1e-6f) {
-                    float score = mx - fabsf (lo.x);
-                    float score2 = my - fabsf (lo.y);
-                    if (score2 < score) { score = score2; }
-                    if (score > best) { best = score; }
-                }
+            int inw = (fabsf (lo.x) <= mx && fabsf (lo.y) <= my);
+            inside_run = inw ? (inside_run + 1) : 0;
+            if (inw) {
+                float score = mx - fabsf (lo.x);
+                float score2 = my - fabsf (lo.y);
+                if (score2 < score) { score = score2; }
+                tailscore = score;
             }
-        }
+        } else { inside_run = 0; }
+        /* early break only for a floor rest: inside the tilted cell the ball
+         * never reaches floor height (the cell sits ~1.4 m up) */
         if (t > 10 && p.y <= ball_r * 0.6f &&
-            vector3_length_squared (pb -> velocity) < 0.05f) { break; /* settled on the floor */
-        }
+            vector3_length_squared (pb -> velocity) < 0.05f) { break; /* settled on the floor */ }
     }
-    return best;
+    if (dbg) {
+        vector3 pe = pb -> position;
+        fprintf (stderr, "  [march] verdict inside_run=%d tailscore=%.3f end=(%.3f,%.3f,%.3f)\n", inside_run,
+                 (double) tailscore, (double) pe.x, (double) pe.y, (double) pe.z);
+    }
+    if (inside_run < 10) { return -1.0f; } /* no half-second persistent settle inside */
+    return tailscore;
 }
 int ftc_aim_params_solve (struct physics_world *world, float *power_out, float *elev_out) {
     ftc_fleet_t *f = fleet_of (world);
@@ -665,8 +688,34 @@ int ftc_aim_params_solve (struct physics_world *world, float *power_out, float *
     }
     float bestscore = -1.0f;
     float bp = 0.0f, be = 0.0f;
+    /* Mouth occupants: the staged match seats 3 nectar against the cell's
+     * back wall (biobuzz_stage_match, Manual §10.3.1). The march must see
+     * the SAME mouth: an arc that would bounce back out on the loaded stack
+     * is not an entry. Same spec as the fleet's own balls. */
+    {
+        int side = (pickh == 0) ? -1 : 1;
+        for (int k = 0; k < BIOBUZZ_CELL_NECTAR; k++) {
+            vector3 loc = {side * 0.10f - side * (float) k * 0.095f, -0.10f,
+                           -BIOBUZZ_CELL_D * 0.5f + BIOBUZZ_NECTAR_RADIUS + 0.005f};
+            vector3 off = vector4_rotate_to_vector3 (cq, loc);
+            vector3 p = {cc.x + off.x, cc.y + off.y, cc.z + off.z};
+            int oi = physics_world_add_sphere (&pred, BIOBUZZ_NECTAR_RADIUS, BIOBUZZ_NECTAR_MASS, p);
+            if (oi >= 0) {
+                rigidbody *ob = &pred.bodies [oi];
+                ob -> restitution = INTAKE_BALL_RESTITUTION;
+                ob -> friction_static = INTAKE_BALL_FRICTION_S;
+                ob -> friction_kinetic = INTAKE_BALL_FRICTION_K;
+                rigidbody_wake (ob);
+                rigidbody_update_axes (ob);
+            }
+        }
+    }
     if (pi >= 0 && pred.bodies [pi].object_id <= (uint32_t) INT_MAX) {
-        for (int ei = 0; ei < 8 && bestscore < 0.0f; ei++) {
+        /* Steepest-first: the first entering arc is the highest elevation
+         * row that drops inside — flat arcs that scrape the mouth's
+         * underside (the "firing at the belly" complaint) are skipped even
+         * if the march accepts them. */
+        for (int ei = 7; ei >= 0 && bestscore < 0.0f; ei--) {
             for (int qi = 0; qi < 11 && bestscore < 0.0f; qi++) {
                 float sc = bbm_march_entry (&pred, pi, pred.bodies [pi].object_id, r, ch, bbm_solvePow [qi],
                                             bbm_solve_elev [ei], cc, cq, brad);

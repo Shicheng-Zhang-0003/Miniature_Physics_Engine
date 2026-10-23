@@ -1569,7 +1569,30 @@ int mfs_t_aim_solve (void) {
     MFS_CHECK (t_ptr, biobuzz_up_cell_frame (0, -1, &cc, &cq) == 0);
     MFS_CHECK (t_ptr, fabsf (cc.y - 1.4165f) < 0.02f);
     MFS_CHECK (t_ptr, ftc_shoot_aimed (&w, 0, sp, se) >= 0);
-    for (int k = 0; k < 300; k++) { ftc_fleet_step_all (&w, mod, DT); physics_world_step (&w, DT); }
+    /* Opt-in flight trace: the fire is the march's twin in the FULL world
+     * (loaded cell, full solver); log the ball every 20 ticks to spot where
+     * the real flight diverges from the mini-world march. */
+    int trace = getenv ("MPE_AIM_TRACE") != NULL;
+    for (int k = 0; k < 300; k++) {
+        ftc_fleet_step_all (&w, mod, DT);
+        if (trace && k < 10) {
+            rigidbody *tb0 = &w.bodies [bi_piece];
+            printf ("  [pre] t=%d v=(%.3f,%.3f,%.3f) F=(%.5f,%.5f,%.5f)%s\n", k, (double) tb0 -> velocity.x,
+                    (double) tb0 -> velocity.y, (double) tb0 -> velocity.z, (double) tb0 -> force_accumulator.x,
+                    (double) tb0 -> force_accumulator.y, (double) tb0 -> force_accumulator.z,
+                    tb0 -> kinematic ? " KIN" : (tb0 -> is_sleeping ? " SLEEP" : ""));
+        }
+        physics_world_step (&w, DT);
+        if (trace && ((k < 40 && k % 2 == 0) || k % 20 == 0)) {
+            rigidbody *tb = &w.bodies [bi_piece];
+            printf ("  [post] t=%d pos=(%.3f,%.3f,%.3f) v=(%.2f,%.2f,%.2f) a=(%.2f,%.2f,%.2f) F=(%.4f,%.4f,%.4f)%s\n", k,
+                    (double) tb -> position.x, (double) tb -> position.y, (double) tb -> position.z,
+                    (double) tb -> velocity.x, (double) tb -> velocity.y, (double) tb -> velocity.z,
+                    (double) tb -> angular_velocity.x, (double) tb -> angular_velocity.y, (double) tb -> angular_velocity.z,
+                    (double) tb -> force_accumulator.x, (double) tb -> force_accumulator.y, (double) tb -> force_accumulator.z,
+                    tb -> is_sleeping ? " SLEEP" : "");
+        }
+    }
     MFS_CHECK (t_ptr, mfs_test_finite (&w) == 1);
     /* Entry: local cell coordinates of the resting ball must sit in the
      * mouth window (ball radius off the walls) and behind the mouth plane
