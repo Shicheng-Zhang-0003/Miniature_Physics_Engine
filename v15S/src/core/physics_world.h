@@ -53,9 +53,13 @@ typedef struct physics_world {
     cached_contact *world_contact_cache;
     int world_contact_cache_count;
     /* Growable pools: bodies start small and double to the compile-time
-     * ceilings (mpe_max_bodies / max_cached_contacts), so an empty world
-     * costs kilobytes instead of megabytes. Caps are ceilings, not
-     * preallocations; overflow still degrades gracefully, never crashes. */
+     * ceilings (mpe_max_bodies / max_cached_contacts). Caps are ceilings,
+     * not preallocations; overflow still degrades gracefully, never crashes.
+     * Do not call the empty world "kilobytes": the fixed scratch below
+     * includes a 65,536-entry pair buffer (512 KB), 16K-body index arrays,
+     * and a 4K-entry initial contact cache (grows to 64K). Pages fault
+     * lazily, but the reserved address footprint is low single-digit MB
+     * per world, not KB. */
     int world_contact_cache_capacity;
     /* Warm-start hash heads (4096 buckets, -1 empty), heap-allocated with
      * the cache. Rebuilt on every save; see collision_mechanics.c. */
@@ -100,6 +104,12 @@ typedef struct physics_world {
      * visible, not silent. Legacy path counted via debug counter; world path
      * dropped silently and gave false free-flight gravity. */
     int manifold_overflow_count;
+    /* Last-step telemetry. The GUI/TUI overlays used to read locals owned by
+     * the duplicated legacy driver; physics_world_step publishes the same
+     * numbers here so there is one step implementation and one source of
+     * truth for the readouts. Not simulation state. */
+    int last_broadphase_pair_count;
+    int last_manifold_count;
     /* Manifold capacity (growable like bodies and contacts). */
     int manifold_capacity;
     /* TRUTH P0-3: per-body CCD remainder (dt - toi). Allocated mpe_max_bodies

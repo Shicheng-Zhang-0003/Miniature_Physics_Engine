@@ -392,8 +392,9 @@ int ftc_shoot (struct physics_world *world, int index) {
     if (!world || !r) { return -1; }
     rigidbody *ch = fleet_chassis (world, r);
     if (!ch) { return -1; }
-    int id = intake_shoot (world, ch -> position, ch -> orientation, ch -> velocity, r -> intake_balls,
-                           &r -> intake_count);
+    float elev = intake_launch_elev_default ();
+    int id = intake_shoot_aimed (world, ch -> position, ch -> orientation, ch -> velocity, r -> intake_balls,
+                                 &r -> intake_count, 1.0f, elev);
     if (id >= 0) {
         fprintf (stderr, "[bucketball] fired ball id=%d\n", id);
         if (f) { f -> aim_power = 1.0f; f -> aim_elev = intake_launch_elev_default (); }
@@ -406,8 +407,9 @@ int ftc_shoot_power (struct physics_world *world, int index, float power) {
     if (!world || !r) { return -1; }
     rigidbody *ch = fleet_chassis (world, r);
     if (!ch) { return -1; }
-    int id = intake_shoot_power (world, ch -> position, ch -> orientation, ch -> velocity, r -> intake_balls,
-                                 &r -> intake_count, power);
+    float elev = intake_launch_elev_default ();
+    int id = intake_shoot_aimed (world, ch -> position, ch -> orientation, ch -> velocity, r -> intake_balls,
+                                 &r -> intake_count, power, elev);
     if (id >= 0) {
         fprintf (stderr, "[bucketball] fired ball id=%d power=%.2f\n", id, power);
         if (f) {
@@ -515,15 +517,8 @@ static float bbm_march_entry (physics_world *pred, int pi, uint32_t bid, ftc_rob
     for (int t = 0; t < 150; t++) {
         int id = (bid <= (uint32_t) INT_MAX) ? (int) bid : -1;
         if (id < 0) { break; }
-        /* Flight parity: a spawned league piece lives in BOTH the fleet's
-         * ball registry and the biobuzz piece registry, and the fleet tick
-         * runs the ball aero over BOTH lists (ftc_fleet_step_all 963+964).
-         * The real game therefore applies drag+Magnus TWICE per tick; the
-         * march must mirror that or solver arcs diverge from fired arcs
-         * (measured: solved (0.65,80) settles inside in the single-aero
-         * march yet bounces past the mouth in the live world). */
-        int ids2 [2] = {id, id};
-        intake_balls_aero_step (pred, ids2, 2);
+        int ids1 [1] = {id};
+        intake_balls_aero_step (pred, ids1, 1);
         physics_world_step (pred, 1.0f / 60.0f);
         vector3 p = pb -> position;
         if (!isfinite (p.x) || !isfinite (p.y) || !isfinite (p.z)) { break; }
@@ -955,14 +950,53 @@ static void ftc_game_update (struct physics_world *world, ftc_fleet_t *f, float 
         rigidbody *ch = fleet_chassis (world, r);
         if (!ch) { continue; }
         if (r -> intake_on || r -> intake_count > 0) {
-            intake_update (world, ch -> position, ch -> orientation, ch -> velocity, r -> intake_on,
-                           r -> intake_balls, &r -> intake_count, f -> ball_ids, f -> ball_count);
-            /* BIOBUZZ registry: same mouth, same possession (carried cap 4
-             * == regulation preload max). Arcade registry untouched. */
-            if (f -> bb.piece_count > 0) {
-                intake_update (world, ch -> position, ch -> orientation, ch -> velocity, r -> intake_on,
-                               r -> intake_balls, &r -> intake_count, f -> bb.piece_ids, f -> bb.piece_count);
+            /* Build one deduplicated candidate list so ordinary balls and
+             * BIOBUZZ pieces compete for the same four possession slots.
+             * Preserve the source registries: they still own their scoring
+             * and lifecycle metadata. */
+            int intake_candidates [INTAKE_MAX_BALLS + BIOBUZZ_MAX_PIECES];
+            int intake_candidate_n = 0;
+            for (int k = 0; k < f -> ball_count && k < INTAKE_MAX_BALLS && intake_candidate_n < INTAKE_MAX_BALLS + BIOBUZZ_MAX_PIECES; k++) {
+                int id = f -> ball_ids [k];
+                if (id < 0) { continue; }
+                int seen = 0;
+                for (int j = 0; j < intake_candidate_n; j++) {
+                    if (intake_candidates [j] == id) { seen = 1; break; }
+                }
+                if (!seen) { intake_candidates [intake_candidate_n++] = id; }
             }
+            for (int k = 0; k < f -> bb.piece_count && k < BIOBUZZ_MAX_PIECES && intake_candidate_n < INTAKE_MAX_BALLS + BIOBUZZ_MAX_PIECES; k++) {
+                int id = f -> bb.piece_ids [k];
+                if (id < 0) { continue; }
+                int seen = 0;
+                for (int j = 0; j < intake_candidate_n; j++) {
+                    if (intake_candidates [j] == id) { seen = 1; break; }
+                }
+                if (!seen) { intake_candidates [intake_candidate_n++] = id; }
+            }
+            /* Stable nearest-first ordering: intake_update captures in list
+             * order, so registry insertion history no longer decides which
+             * nearby pieces win when capacity is limited. */
+            vector3 intake_mc;
+            intake_mouth_pose (ch -> position, ch -> orientation, &intake_mc, NULL);
+            for (int a = 0; a < intake_candidate_n; a++) {
+                int best = a;
+                float best_d2 = INFINITY;
+                for (int b = a; b < intake_candidate_n; b++) {
+                    int bi = physics_world_index_by_id (world, (uint32_t) intake_candidates [b]);
+                    if (bi < 0 || bi >= world -> body_count) { continue; }
+                    vector3 d = vector3_subtraction (world -> bodies [bi].position, intake_mc);
+                    float d2 = vector3_length_squared (d);
+                    if (isfinite (d2) && d2 < best_d2) { best_d2 = d2; best = b; }
+                }
+                if (best != a) {
+                    int tmp = intake_candidates [a];
+                    intake_candidates [a] = intake_candidates [best];
+                    intake_candidates [best] = tmp;
+                }
+            }
+            intake_update (world, ch -> position, ch -> orientation, ch -> velocity, r -> intake_on,
+                           r -> intake_balls, &r -> intake_count, intake_candidates, intake_candidate_n);
             intake_carry_step (world, ch -> position, ch -> orientation, ch -> velocity, r -> intake_balls,
                                r -> intake_count);
         } else {

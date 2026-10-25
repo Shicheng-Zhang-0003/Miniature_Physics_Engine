@@ -503,3 +503,65 @@ Total: 16 | Passed: 16 | Expected failures: 0 | Unexpected passes: 0 | Blocking 
 - Fixed intake toggle logic bug: `else if (a_pressed || !btn_b)` made intake almost always active. Changed to `else if (a_pressed)` with proper power state management
 
 === Previous entry ===
+
+=== MPE+MPE-refactor sweep: 2026-10-25 (dedupe + doc-truth + temp hygiene) ===
+
+--- Fixes to v15S/src/core/physics_world.c (step dedup, behaviour-preserving) ---
+- physics_world_step ran two verbatim block pairs: (a) the manifold awake-flag
+  pass (skip empty pairs -> manifold_awake=0, else OR of island wake) before
+  forces and again pre-solve, and (b) the foreign tick-module snapshot/call
+  loop before integration (pre_step) and at end of step (post_step).
+  Extracted to static helpers mpe_step_flag_manifolds_awake (called twice) and
+  mpe_step_call_foreign_modules(world, dt, pre) (called twice). Pure code
+  motion: no reads or writes changed.
+- Audit: the modules loop snapshotted a parallel states [] array that was
+  copied but never read (dead since re-resolve via _module_live_state landed).
+  The dead copy is not reproduced; the comment trail now lives once in the
+  helper header (snapshot rationale, live-state re-resolution rationale). The
+  old comment named the pre-rename helper a3_module_live_state; corrected.
+- A/B: with the refactor in, `--profile quick` 60/60 blocking green including
+  the 5-regime (default/light/heavy/brittle/sticky) suite matrix and the
+  bitwise determinism twins; engine + mpe-tui build 0 warnings under -Werror.
+  `--profile full` launched for the ASan/UBSan + legacy/paranoia + MFS + TUI
+  gate (result appended below when landed).
+
+--- Docs: suite-count drift corrected (numbers re-measured, not copied) ---
+- RELEASE_GATES.md claimed "45 registered / 43 blocking" while
+  tools/test_runner.py pins MIN_SUITE_ENTRIES=46 and
+  `python3 tools/test_runner.py --list` prints 46 entries (2 informational:
+  frustum, floor_collision_diag -> 44 blocking). Root cause: 9c7f1b1 raised
+  the floor for `keydrive_axes` on 2026-10-14 and this release-gate row was
+  never updated. Now states 46/44 with the --list re-verify and history.
+
+--- External sources of truth: primary-source anchors added ---
+- The "typically 4 to 8 iterations" practitioner-budget quote (PHYSICS.md,
+  KNOWN_LIMITATIONS.md, docs/VALIDATION.md) was verified against the primary
+  source on 2026-10-24: Erin Catto, Solver2D,
+  https://box2d.org/posts/2024/02/solver2d (box2d.org, published 2024-02-05),
+  section "Important concepts that are relevant to all PGS solvers":
+  "iteration count: solvers generally use a fixed number of iterations. The
+  number is generally determined offline. In game physics there are typically
+  4 to 8 iterations." All three docs now carry the URL + publication date +
+  verbatim-quote note.
+- Honesty sharpening: the same post defines warm starting ("feeding the
+  impulses/forces of previous time steps to the next time step") and its PGS
+  reference (Box2D-Lite, 2006) "uses warm starting and Baumgarte
+  Stabilization" -- i.e. the 4-8 budget assumes a warm-started solver. The
+  engine's 96-128 figure is the measured COLD-solver cost, so docs now say
+  the comparison is directional, not like-for-like, and name damped-warm-start
+  promotion (per-regime validation) as the path to close the gap.
+- docs/VERIFICATION.md gains a retention note: cited temp/qa_runs/<id> paths
+  are evidence-as-of-date; the runner retains the newest 10 run dirs
+  (MPE_KEEP_QA_RUNS), so cited paths may have been pruned since.
+
+--- Hygiene: temp/ probes archived, retention applied, strays gone ---
+- temp/ was 407 MB / 309 entries of probe binaries, one-off .c probes, and
+  qa_runs history. Everything not referenced by tests/docs is now preserved
+  at temp/archive/2026-10-25-probes-and-old-qa-runs.tar.gz (+ a full
+  manifest file) and deleted in place. Kept: ext_oracle_check.py,
+  ext_truth{,.c,.log}, audit/, despot-2026-10-20/, qa_runs/ (10 newest run
+  dirs per the runner's retention contract).
+- Deleted stray build artifact v15S/src/core/mpe_primary.o (build outputs
+  belong in build/ only).
+- Added .pytest_cache/ to .gitignore (root cache existed, un-ignored);
+  removed the stale root cache.

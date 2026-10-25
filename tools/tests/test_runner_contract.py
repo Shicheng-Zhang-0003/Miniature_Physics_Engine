@@ -8,6 +8,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from tools import test_runner as runner
 
@@ -139,6 +140,30 @@ class OutputContractTests(unittest.TestCase):
             self.assertEqual(result.status, "FAIL")
             self.assertIsNone(result.return_code)
             self.assertIn("failed to start", output)
+
+
+class QaRunRetentionTests(unittest.TestCase):
+    def test_prune_keeps_newest_runs_and_never_touches_current(self) -> None:
+        with tempfile.TemporaryDirectory(dir=runner.PROJECT_TEMP) as scratch:
+            runs = Path(scratch) / "qa_runs"
+            runs.mkdir()
+            names = [f"2026010{i}T000000Z-{i}" for i in range(1, 5)]
+            for name in names:
+                (runs / name).mkdir()
+            keep_me = runs / "not-a-run-directory"
+            keep_me.mkdir()
+            current = runs / names[-1]
+            runner.prune_run_dirs(current, 2)
+            self.assertEqual(
+                sorted(path.name for path in runs.iterdir()),
+                sorted([names[-2], names[-1], keep_me.name]),
+            )
+
+    def test_retention_floor_is_at_least_one_run(self) -> None:
+        with mock.patch.dict("os.environ", {"MPE_KEEP_QA_RUNS": "0"}):
+            self.assertEqual(runner.keep_qa_runs(), 1)
+        with mock.patch.dict("os.environ", {"MPE_KEEP_QA_RUNS": "nonsense"}):
+            self.assertEqual(runner.keep_qa_runs(), 10)
 
 
 class SkipXfailContractTests(unittest.TestCase):

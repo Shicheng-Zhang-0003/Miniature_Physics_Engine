@@ -24,6 +24,13 @@ report generation, TUI snapshot validation, and command-launch failures.
   full `--profile full` run was launched detached and is recorded in
   `temp/despot-2026-10-20/full_profile_detached.log` (summary.json lands in
   `temp/qa_runs/` per the runner contract).
+  NOTE on cited `temp/qa_runs/<timestamped-id>` paths anywhere in these
+  docs: since 2026-10-24 the runner retains only the newest 10 run
+  directories (`MPE_KEEP_QA_RUNS`, default 10) so full-profile runs do not
+  grow without bound; cited paths are evidence from the date of writing and
+  may have been pruned on disk since. The same applies to
+  `temp/despot-2026-10-20/`, which is explicitly retained as the audit's
+  own artifact directory.
 - `validation/V01.sh` (ASan+UBSan build) and `V02.sh` (clean rebuild, zero
   warnings) now PASS after the makefile define/link hard-append fix
   (previously command-line CFLAGS silently built the removed GTK3 branch).

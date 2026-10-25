@@ -3,8 +3,10 @@
 ```
 Windows Installation Instructions (MSYS2 UCRT64 + native .exe/.dll):
 
-This tree is fully Windows-compatible with NO Linux functionality removed.
-Linux builds are unchanged; Windows paths are additive (#ifdef _WIN32).
+The tree has a Windows-compatible build path (MSYS2 UCRT64 + MinGW) with no
+Linux functionality removed; Linux builds are unchanged and Windows paths are
+additive (#ifdef _WIN32). This is not a CI-proven release target — see
+`KNOWN_LIMITATIONS.md` §2 for the support boundary.
 
 1. Required: MSYS2 (provides bash, make, MinGW-w64 GCC, and UNIX tools)
    - Download from https://www.msys2.org/ and install (default C:\\msys64).

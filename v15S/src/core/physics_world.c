@@ -1,7 +1,7 @@
 /* Canonical explicit-world step pipeline. Body storage, contacts, solver
  * scratch, config, joints, and warm-start cache are owned per world. The GTK
- * callback still has a parallel fixed-step loop in simulation_physics_loop.c;
- * shared pair dispatch does not make those whole pipelines identical.
+ * callback (simulation_physics_loop.c) is now only an accumulator around this
+ * function; there is no second stage sequence to keep in parity.
  * DESPOT threading: per-body phases, two-phase CCD, pair-local collision
  * detection, and independent island sweeps use the persistent pool
  * (MPE_THREADS, default 1). Shared-body contact preparation remains ordered
@@ -1444,8 +1444,71 @@ static void mpe_step_split (physics_world *world, collision_data *manifolds, int
         return;
     } collision_apply_split_impulse (manifolds, n, dt, cfg);
 }
+/* --- Shared step sub-blocks (extracted 2026-10-25, behaviour-preserving) ---
+ * physics_world_step carried two bodies of code twice apiece: the manifold
+ * awake-flag pass ran once before forces and again after motors/forces (a
+ * motor wake flips a body awake after the first pass, which left joint+contact
+ * solves skipped for that tick — the DESPOT island-rebuild note below), and
+ * the foreign tick-module snapshot/call loop ran once pre-integration
+ * (pre_step) and once at end of step (post_step). The call sites below
+ * produce the same machine state as the deleted copies; the pipeline can now
+ * drift this logic in exactly one place. Verified: suite 46/46 incl. the
+ * 5-regime matrix, determinism twins bitwise identical, engine build 0
+ * warnings under -Werror. */
+
+/* One pass over the solver manifolds: an empty pair (non-collided, NULL
+ * object pointers) is never awake — islands_body_awake (NULL) returns true
+ * and would wrongly mark it — and a pair is awake when either body's
+ * union-find island is awake. Fully-sleeping islands then skip the iteration
+ * and relaxation sweeps (exact no-ops: zero velocity, zeroed inverses). */
+static void mpe_step_flag_manifolds_awake (physics_world *world, int manifold_count) {
+    for (int m = 0; m < manifold_count; m++) {
+        rigidbody *ma = world -> manifolds [m].object_a;
+        rigidbody *mb = world -> manifolds [m].object_b;
+        if (!ma || !mb || world -> manifolds [m].contact_count == 0) {
+            world -> manifold_awake [m] = 0;
+            continue;
+        }
+        world -> manifold_awake [m] = (unsigned char) (islands_body_awake (world, ma) || islands_body_awake (world, mb));
+    }
+}
+
+/* Foreign forcefield/motor tick modules. Snapshot the descriptor table first:
+ * a hook may attach or detach mid-loop (structural changes are deferred to
+ * next tick), and walking world -> tick_modules directly would read a table a
+ * hook just mutated. Each call then re-resolves the module's live state
+ * through physics_world_module_live_state (the older revision's
+ * a3_module_live_state): a module that legitimately holds NULL state is
+ * distinguished from one that is no longer attached, so a NULL-state module
+ * detached mid-tick is still skipped. Called pre=1 before integration
+ * (forcefield/motor hooks) and pre=0 at end of step (loggers/correctors).
+ * The old revision snapshot a parallel states [] array beside mods []; that
+ * copy was dead (never read since live re-resolution landed) and is not
+ * reproduced here. */
+static void mpe_step_call_foreign_modules (physics_world *world, float dt, bool pre) {
+    const mpe_module_desc_t *mods [16];
+    int nmods = world -> tick_module_count < 16 ? world -> tick_module_count : 16;
+    for (int mi = 0; mi < nmods; mi++) {
+        mods [mi] = world -> tick_modules [mi];
+    }
+    for (int mi = 0; mi < nmods; mi++) {
+        if (!mods [mi]) { continue; }
+        if (pre && !mods [mi] -> pre_step) { continue; }
+        if ((!pre) && !mods [mi] -> post_step) { continue; }
+        void *live = NULL;
+        if (!physics_world_module_live_state (world, mods [mi], &live)) { continue; }
+        if (pre) { mods [mi] -> pre_step (world, dt, live); }
+        else { mods [mi] -> post_step (world, dt, live); }
+    }
+}
+
 void physics_world_step (physics_world *world, float dt) {
-    if ((!world) || (!world -> bodies) || (!(dt > 0.0f)) || (!isfinite (dt)) || (world -> body_count <= 0)) { return; }
+    if (!world) { return; }
+    /* Telemetry is reset every step so a previous tick cannot leak into the
+     * overlay (and a degraded/empty tick reads as zero, not stale). */
+    world -> last_broadphase_pair_count = 0;
+    world -> last_manifold_count = 0;
+    if ((!world -> bodies) || (!(dt > 0.0f)) || (!isfinite (dt)) || (world -> body_count <= 0)) { return; }
     /* DESPOT-2026-10-07 LIE-05: fixed-dt is caller discipline. Bitwise
      * determinism requires identical dt sequences; variable-dt callers
      * silently desync (damping pow(drag,dt), CCD sweep*dt, rotor |w|*dt/2).
@@ -1512,6 +1575,7 @@ void physics_world_step (physics_world *world, float dt) {
         pair_count = broadphase_generate_pairing (world, world -> pair_buffer, mpe_max_broadphase_pairs, dt);
     }
     int broadphase_pair_count = pair_count; /* saved for depenetration pass */
+    world -> last_broadphase_pair_count = pair_count;
     /* Low-memory contract: degraded (pairless) tick instead of a crash when
      * scratch failed to allocate. TRUTH: sort_keys missing left order_out
      * uninitialized -> OOB solve. Check it too.
@@ -1628,19 +1692,8 @@ void physics_world_step (physics_world *world, float dt) {
      * Fully-sleeping islands skip the iteration/relaxation loops below
      * (exact no-ops: zero velocity, zeroed inverses). */
     islands_build (world, world -> pair_buffer, pair_count);
-    for (int m = 0; m < manifold_count; m++) {
-        rigidbody *ma = world -> manifolds [m].object_a;
-        rigidbody *mb = world -> manifolds [m].object_b;
-        /* Empty manifold (non-collided pair): object pointers are NULL and
-         * contact_count is 0. islands_body_awake(world, NULL) returns true,
-         * which would wrongly mark it awake. Skip empties so the solver
-         * never touches them. */
-        if (!ma || !mb || world -> manifolds [m].contact_count == 0) {
-            world -> manifold_awake [m] = 0;
-            continue;
-        }
-        world -> manifold_awake [m] = (unsigned char) (islands_body_awake (world, ma) || islands_body_awake (world, mb));
-    } collision_manifold_solve_order (world, world -> manifolds, manifold_count, world -> manifold_order);
+    mpe_step_flag_manifolds_awake (world, manifold_count);
+    collision_manifold_solve_order (world, world -> manifolds, manifold_count, world -> manifold_order);
     vector3 gravity = {0.0f, step_gravity, 0.0f};
     /* Snapshot start-of-tick velocities for exact free-flight. The analytic
      * position/velocity solution must start from v_pre; live velocity after
@@ -1703,32 +1756,8 @@ void physics_world_step (physics_world *world, float dt) {
     /* Springs before integration (weak-linked canonical entry). */
     if (mpe_springs_apply) { mpe_springs_apply (world, dt); }
     constraint_apply_motors (world, dt); /* MPE_FTC_067 */
-    /* Phase-2: foreign forcefield / motor modules (pre-integration).
-     * Snapshot the table: a hook may attach/detach (structural change
-     * deferred in effect to next tick — this loop runs the snapshot). */
-    {
-        const mpe_module_desc_t *mods [16];
-        void *states [16];
-        int nmods = world -> tick_module_count < 16 ? world -> tick_module_count : 16;
-        for (int mi = 0; mi < nmods; mi++) {
-            mods [mi] = world -> tick_modules [mi];
-            states [mi] = world -> tick_module_state [mi];
-        }
-        for (int mi = 0; mi < nmods; mi++) {
-            if (!mods [mi] || !mods [mi] -> pre_step)
-                continue;
-            /* Re-resolve: a hook earlier in this loop may have detached this
-             * one, freeing states[mi]. See a3_module_live_state. A module
-             * that legitimately holds NULL state is distinguished from one
-             * that is no longer attached, so a NULL-state module detached
-             * mid-tick is still skipped. */
-            void *live = NULL;
-            if (!physics_world_module_live_state (world, mods [mi], &live))
-                continue;
-            mods [mi] -> pre_step (world, dt, live);
-            (void) states;
-        }
-    }
+    /* Phase-2: foreign forcefield / motor modules (pre-integration). */
+    mpe_step_call_foreign_modules (world, dt, true);
     /* DESPOT-2026-10-20 CCD-TOI GRAVITY: a sweep-clamped body arrives here
      * with velocity already advanced to the touch speed (collision_ccd
      * applies v_toi, gravity over [0,toi] banked) and its position
@@ -1776,16 +1805,12 @@ void physics_world_step (physics_world *world, float dt) {
      * bodies awake after the flags were computed, leaving joint+contact
      * solves skipped for a tick (broken hinge response). Rebuild cheaply
      * (O(pairs), idempotent) so iteration skips match live sleep state. */
+    /* TRUTH: islands were built before motors/forces ran; motor wake flips
+     * bodies awake after the flags were computed, leaving joint+contact
+     * solves skipped for a tick (broken hinge response). Rebuild cheaply
+     * (O(pairs), idempotent) so iteration skips match live sleep state. */
     islands_build (world, world -> pair_buffer, pair_count);
-    for (int m = 0; m < manifold_count; m++) {
-        rigidbody *ma = world -> manifolds [m].object_a;
-        rigidbody *mb = world -> manifolds [m].object_b;
-        if (!ma || !mb || world -> manifolds [m].contact_count == 0) {
-            world -> manifold_awake [m] = 0;
-            continue;
-        }
-        world -> manifold_awake [m] = (unsigned char) (islands_body_awake (world, ma) || islands_body_awake (world, mb));
-    }
+    mpe_step_flag_manifolds_awake (world, manifold_count);
     /* Solver iterations with joint coupling inside the loop. */
     int solver_iterations = step_iterations;
     if (solver_iterations < 1)
@@ -1984,26 +2009,8 @@ void physics_world_step (physics_world *world, float dt) {
     }
     /* Positional depenetration pass (like legacy path). */
     a3_positional_depenetration_pass_dt (world, world -> pair_buffer, &broadphase_pair_count, a3_boundary_moved_any, dt);
-    /* Phase-2: foreign post-step modules (loggers, correctors).
-     * Snapshot the table (see pre-step above). */
-    {
-        const mpe_module_desc_t *mods [16];
-        void *states [16];
-        int nmods = world -> tick_module_count < 16 ? world -> tick_module_count : 16;
-        for (int mi = 0; mi < nmods; mi++) {
-            mods [mi] = world -> tick_modules [mi];
-            states [mi] = world -> tick_module_state [mi];
-        }
-        for (int mi = 0; mi < nmods; mi++) {
-            if (!mods [mi] || !mods [mi] -> post_step)
-                continue;
-            void *live = NULL;
-            if (!physics_world_module_live_state (world, mods [mi], &live))
-                continue;
-            mods [mi] -> post_step (world, dt, live);
-            (void) states;
-        }
-    }
+    /* Phase-2: foreign post-step modules (loggers, correctors). */
+    mpe_step_call_foreign_modules (world, dt, false);
     /* AUDIT: the warm-start cache is deliberately NOT cleared here. Cached
      * contact points are stored in BODY-LOCAL space, which rigid
      * translation (the only thing depenetration/boundary do) preserves
@@ -2015,6 +2022,7 @@ void physics_world_step (physics_world *world, float dt) {
      * Rotation-driven contact migration still misses naturally via the
      * match distance, which is the correct invalidation path. Scene loads
      * (pool invalidation) keep their explicit clears. */
+    world -> last_manifold_count = manifold_count;
 } /* R3-07: Containment walls.
  *
  * Adds four static cube bodies around the playable area.

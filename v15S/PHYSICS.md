@@ -223,6 +223,19 @@ re-propagated from the floor every tick, which is why this engine needs
 budget** (Catto, Solver2D 2024: "typically 4 to 8 iterations"). That is the
 real outstanding physics question, recorded in `docs/VALIDATION.md`.
 
+Primary source (verified 2026-10-24): Erin Catto,
+[Solver2D](https://box2d.org/posts/2024/02/solver2d), box2d.org, published
+2024-02-05 — "iteration count: solvers generally use a fixed number of
+iterations. The number is generally determined offline. In game physics
+there are typically 4 to 8 iterations." The same post defines warm starting
+("feeding the impulses/forces of previous time steps to the next time step")
+and its reference PGS solver (Box2D-Lite, 2006) "uses warm starting and
+Baumgarte Stabilization" — i.e. the 4–8 budget assumes a warm-started
+solver. This engine's 96–128 is the measured COLD-solver cost of the same
+PGS-class algorithm, so the comparison is directional, not like-for-like;
+closing the gap means promoting the damped warm start above through
+per-regime validation, not retuning the iteration ceiling.
+
 ### 4.3 Poisson restitution
 
 One `e`-over-compression payment per fresh impact, then short relaxation so

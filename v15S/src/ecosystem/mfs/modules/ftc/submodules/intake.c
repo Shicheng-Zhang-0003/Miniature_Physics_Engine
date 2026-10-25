@@ -61,6 +61,9 @@ static int intake_ball_owned (const int *carried, int carried_n, int id) {
 int intake_update (physics_world *world, vector3 chassis_pos, vector4 chassis_ori, vector3 chassis_vel, int intake_on,
                    int carried [INTAKE_MAX_CARRIED], int *carried_n, const int *ball_ids, int ball_n) {
     if (!world || !world -> bodies || !carried || !carried_n) { return 0; }
+    /* Reject corrupt possession state before any array access. Do not clear
+     * it here: callers can diagnose/recover without silently orphaning bodies. */
+    if (*carried_n < 0 || *carried_n > INTAKE_MAX_CARRIED) { return 0; }
     intake_prune (world, carried, carried_n);
     if (!intake_on) { return 0; }
     if (*carried_n >= INTAKE_MAX_CARRIED) { return 0; } /* hopper full */
@@ -76,13 +79,24 @@ int intake_update (physics_world *world, vector3 chassis_pos, vector4 chassis_or
         rigidbody *ball = &world -> bodies [bi];
         if (ball -> kinematic || ball -> static_state) { continue; } /* scored/frozen or floor: not ours */
         vector3 d = vector3_subtraction (ball -> position, mc);
-        /* Mouth box is world-axis-aligned (the chassis drives near level;
-         * yaw misalignment at large heading is accepted as arcade — the box
-         * is generous and capture re-checks every tick). */
-        float dx = (d.x > 0.0f) ? d.x : -d.x;
-        float dy = (d.y > 0.0f) ? d.y : -d.y;
-        float dz = (d.z > 0.0f) ? d.z : -d.z;
-        if (dx > mh.x || dy > mh.y || dz > mh.z) { continue; }
+        /* Transform the displacement into the robot-local intake frame. The
+         * capture box now rotates with the chassis instead of remaining
+         * aligned to world X/Y/Z. */
+        vector3 lat = vector4_rotate_to_vector3 (chassis_ori, (vector3) {1.0f, 0.0f, 0.0f});
+        vector3 up = vector4_rotate_to_vector3 (chassis_ori, (vector3) {0.0f, 1.0f, 0.0f});
+        vector3 fwd = vector4_rotate_to_vector3 (chassis_ori, (vector3) {0.0f, 0.0f, 1.0f});
+        float dx = fabsf (d.x * lat.x + d.y * lat.y + d.z * lat.z);
+        float dy = fabsf (d.x * up.x + d.y * up.y + d.z * up.z);
+        float dz = fabsf (d.x * fwd.x + d.y * fwd.y + d.z * fwd.z);
+        /* Treat the configured mouth as a physical aperture: the whole
+         * sphere must fit, not merely its centre. */
+        float capture_radius = ball -> half_extensions.x;
+        if (!isfinite (capture_radius) || capture_radius < 0.0f) { continue; }
+        float fit_x = mh.x - capture_radius;
+        float fit_y = mh.y - capture_radius;
+        float fit_z = mh.z - capture_radius;
+        if (fit_x < 0.0f || fit_y < 0.0f || fit_z < 0.0f ||
+            dx > fit_x || dy > fit_y || dz > fit_z) { continue; }
         vector3 rel = vector3_subtraction (ball -> velocity, chassis_vel);
         float rsp = sqrtf (vector3_length_squared (rel));
         if (!(rsp < INTAKE_CAPTURE_SPEED) || !isfinite (rsp)) { continue; }
@@ -155,7 +169,8 @@ int intake_shoot_power (physics_world *world, vector3 chassis_pos, vector4 chass
 }
 int intake_shoot_aimed (physics_world *world, vector3 chassis_pos, vector4 chassis_ori, vector3 chassis_vel,
                         int carried [INTAKE_MAX_CARRIED], int *carried_n, float power, float elev_deg) {
-    if (!world || !world -> bodies || !carried || !carried_n || *carried_n <= 0) { return -1; }
+    if (!world || !world -> bodies || !carried || !carried_n ||
+        *carried_n <= 0 || *carried_n > INTAKE_MAX_CARRIED) { return -1; }
     if (!isfinite (power)) { power = 1.0f; }
     if (power < intake_launch_power_min ()) { power = intake_launch_power_min (); }
     if (power > 1.0f) { power = 1.0f; }
@@ -163,10 +178,15 @@ int intake_shoot_aimed (physics_world *world, vector3 chassis_pos, vector4 chass
     if (elev_deg < INTAKE_LAUNCH_ELEV_MIN) { elev_deg = INTAKE_LAUNCH_ELEV_MIN; }
     if (elev_deg > INTAKE_LAUNCH_ELEV_MAX) { elev_deg = INTAKE_LAUNCH_ELEV_MAX; }
     int id = carried [0];
+    int bi = physics_world_index_by_id (world, (uint32_t) id);
+    if (bi < 0 || bi >= world -> body_count) {
+        /* Drop only the invalid head entry; don't consume a later valid ID. */
+        for (int i = 1; i < *carried_n; i++) { carried [i - 1] = carried [i]; }
+        (*carried_n)--;
+        return -1;
+    }
     for (int i = 1; i < *carried_n; i++) { carried [i - 1] = carried [i]; }
     (*carried_n)--;
-    int bi = physics_world_index_by_id (world, (uint32_t) id);
-    if (bi < 0 || bi >= world -> body_count) { return -1; }
     rigidbody *ball = &world -> bodies [bi];
     intake_launch_state st;
     intake_launch_state_compute_elev (chassis_pos, chassis_ori, chassis_vel, elev_deg, &st);
@@ -189,7 +209,8 @@ int intake_shoot_aimed (physics_world *world, vector3 chassis_pos, vector4 chass
 }
 int intake_eject (physics_world *world, vector3 chassis_vel, vector3 chassis_fwd, int carried [INTAKE_MAX_CARRIED],
                   int *carried_n) {
-    if (!world || !world -> bodies || !carried || !carried_n) { return 0; }
+    if (!world || !carried || !carried_n) { return 0; }
+    if (*carried_n < 0 || *carried_n > INTAKE_MAX_CARRIED) { return 0; }
     int n = 0;
     while (*carried_n > 0) {
         int id = carried [--(*carried_n)];
@@ -199,11 +220,14 @@ int intake_eject (physics_world *world, vector3 chassis_vel, vector3 chassis_fwd
         rigidbody_set_kinematic (ball, false);
         rigidbody_wake (ball);
         ball -> velocity = vector3_addition (chassis_vel, vector3_scaling (chassis_fwd, 1.0f));
+        /* Ejection has a defined spin state; don't leak stale pre-capture spin. */
+        ball -> angular_velocity = vector3_zero ();
         n++;
     } return n;
 }
 void intake_prune (physics_world *world, int carried [INTAKE_MAX_CARRIED], int *carried_n) {
     if (!world || !carried || !carried_n) { return; }
+    if (*carried_n < 0 || *carried_n > INTAKE_MAX_CARRIED) { return; }
     int w = 0;
     for (int i = 0; i < *carried_n; i++) {
         if (physics_world_index_by_id (world, (uint32_t) carried [i]) >= 0) { carried [w++] = carried [i]; }
@@ -215,30 +239,41 @@ void intake_prune (physics_world *world, int carried [INTAKE_MAX_CARRIED], int *
  * laterally across the mouth in chassis frame. */
 void intake_carry_step (physics_world *world, vector3 chassis_pos, vector4 chassis_ori, vector3 chassis_vel,
                         int carried [INTAKE_MAX_CARRIED], int carried_n) {
-    if (!world || !world -> bodies || !carried || carried_n <= 0) { return; }
+    if (!world || !world -> bodies || !carried || carried_n <= 0 ||
+        carried_n > INTAKE_MAX_CARRIED) { return; }
     vector3 mc, mh;
-    (void) mh;
-    intake_mouth_pose (chassis_pos, chassis_ori, &mc, NULL);
+    intake_mouth_pose (chassis_pos, chassis_ori, &mc, &mh);
     vector3 lat = vector4_rotate_to_vector3 (chassis_ori, (vector3) {1.0f, 0.0f, 0.0f});
-    float ll = sqrtf (vector3_length_squared (lat));
-    if (!(ll > 1e-6f) || !isfinite (ll)) { lat = (vector3) {1.0f, 0.0f, 0.0f}; } else {
-        lat = vector3_scaling (lat, 1.0f / ll);
-    }
-    float spacing_default = 2.0f * INTAKE_BALL_RADIUS + 0.004f;
-    for (int i = 0; i < carried_n && i < INTAKE_MAX_CARRIED; i++) {
+    vector3 fwd = vector4_rotate_to_vector3 (chassis_ori, (vector3) {0.0f, 0.0f, 1.0f});
+    /* Four positions in a 2x2 grid. Spacing uses the maximum supported
+     * nectar diameter plus 4 mm, so every pollen/nectar combination has
+     * clearance. The grid fits within the declared mouth half-extents. */
+    const float pitch = 2.0f * BIOBUZZ_NECTAR_RADIUS + 0.004f;
+    int rows = (carried_n + 1) / 2;
+    for (int i = 0; i < carried_n; i++) {
+        if (carried [i] < 0) { continue; }
         int bi = physics_world_index_by_id (world, (uint32_t) carried [i]);
         if (bi < 0 || bi >= world -> body_count) { continue; }
         rigidbody *ball = &world -> bodies [bi];
-        /* Slot pitch follows the piece radius (BIOBUZZ nectar/pollen are
-         * larger than the arcade ball): read it from the body so mixed
-         * loads do not overlap. */
-        float radius = (isfinite (ball -> half_extensions.x) && ball -> half_extensions.x > 0.001f)
-                           ? ball -> half_extensions.x : INTAKE_BALL_RADIUS;
-        float spacing = 2.0f * radius + 0.004f;
-        if (!(spacing > 0.0f)) { spacing = spacing_default; }
-        vector3 slot = vector3_addition (mc, vector3_scaling (lat, ((float) i - (float) (carried_n - 1) * 0.5f) * spacing));
+        if (ball -> static_state) { continue; }
+        int row = i / 2;
+        int row_start = row * 2;
+        int row_count = carried_n - row_start;
+        if (row_count > 2) { row_count = 2; }
+        float x = ((float) (i - row_start) - (float) (row_count - 1) * 0.5f) * pitch;
+        float z = ((float) row - (float) (rows - 1) * 0.5f) * pitch;
+        vector3 slot = vector3_addition (mc,
+            vector3_addition (vector3_scaling (lat, x), vector3_scaling (fwd, z)));
+        /* Defensive fit check: if the model constants change, don't silently
+         * place a piece whose bounding sphere exceeds the nominal mouth. */
+        float radius = ball -> half_extensions.x;
+        if (!isfinite (radius) || radius < 0.0f ||
+            fabsf (x) + radius > mh.x || fabsf (z) + radius > mh.z || radius > mh.y) {
+            continue;
+        }
         ball -> position = slot;
         ball -> velocity = chassis_vel;
+        rigidbody_set_kinematic (ball, true);
         rigidbody_wake (ball);
     }
 }

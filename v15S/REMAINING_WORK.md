@@ -9,6 +9,25 @@
 > 6 blocking, 4 informational); 2026-10-07 (44/42; 232+2 xfail/234);
 > 2026-10-01 (41/42).
 >
+## 2026-10-24 — F11 honesty fix
+
+- GUI F11 randomizer used `% range`, so binary int params (`sleep.enable`,
+  range 1) were always forced to their minimum. Fixed to `%(range + 1)`;
+  the GUI now actually randomizes them like the headless suite does.
+- Pinned the documented convergence prerequisites before torture: gravity
+  −17…−1, ≥96 iterations (already), plus `sleep.enable = 1`,
+  `solver.warm_start_damping = 0`, `boundary.safety_net_enabled = 1`.
+  The first two are the measured stability envelope for the 10:1 column;
+  the third is an operational guardrail, not physics.
+- The long-run report now tracks the first 10 dynamic cubes and prints
+  `stack column: standing` / `TOPPLED at tick N` with max horizontal drift.
+  PASS is qualified as "robustness only" and, when the column falls, as
+  "column toppled, not a stability proof". Toppling stays report-only:
+  randomized material extremes legitimately topple even inside the pinned
+  envelope (10-seed sweep: 5 stand, 1 marginal at 0.109 m, 4 topple).
+- The 0.05 m cube-overlap gate lives in the fixed-seed headless
+  `f11_torture` case; the GUI F11 never implemented it.
+
 ## Current audit — 2026-10-20
 
 ### Second pass (same day, after the first set landed)
@@ -53,7 +72,9 @@
   hardening; MSVC/Windows/macOS/32-bit and Wayland release validation; S2 TUI
   health stats; 472-MGB forward-port in its separate repository; dedicated
   regression test for capsule orientation order; nice [0,100] roundtrip
-  bound in paranoia_scene_persistence.
+  bound in paranoia_scene_persistence; a soak/stress profile and a published
+  per-scene performance budget (the full profile is a functional gate, not a
+  soak).
 
 > **2026-10-15 comprehensive audit — CLOSED:**
 > - MULTICORE: island-based parallel solver (`MPE_THREADS` 1–8, default 1).
@@ -67,7 +88,7 @@
 >   (`solver.warm_start_damping`, default 0.0=cold proven). Nonzero damping
 >   scales cached normal and uses it as cone `fn`; cold is the shipped default.
 >   Damped warm-start verified faster at 32–64 iterations but unstable under
->   extreme gravity/friction/restitution regimes.
+>   extreme gravity/friction/restitution regimes. F11 pins it to 0.
 > - CCD ROTATIONAL: floor plane CCD uses lowest-point velocity
 >   (`v_center + w × r_lowest`) so tumbling corners clamp before tunneling.
 >   Pure spinners about Y unaffected. Rotation-only inter-volume tunneling
@@ -148,12 +169,12 @@
 - [x] `make tsan` target added; container TSan aborts on mapping (env, not code — recorded; TSan proof remains future on a TSan-capable host).
 - [x] Rotational CCD obstacle margin (world max tip speed, capped 2 m/s); blade regime documented.
 - [x] Deep-containment (>0.30 m) moves lighter body only (fixes +Y inversion).
-- [x] Buckling guard ≤32 extra iters (both step paths, capped 128) for bodies≥8 with residual>slop.
+- [x] Buckling guard ≤32 extra iters (canonical step, capped 128) for bodies≥8 with residual>slop.
 - [x] Air-spin bearing damping `c=1e-6` (c·dt/I≈0.067) for airborne wheels; grounded thrust unchanged.
 - [x] `angmom` sphere control (settles cube/sphere tension).
 - [x] `v15S/docs/NUMERICAL_GUARANTEES.md` (precise budgets, unsupported list).
 - [x] `v15S/validation/property_sweep.py` (seeded collision/constraint/config laws, 0 failures).
-- [x] Step-path unification: stages shared, frame drivers separate by design (bitwise passive proof); legacy parity guards (buckling, free-flight, dt).
+- [x] Step-path unification: stages shared, frame drivers separate by design (bitwise passive proof); legacy parity guards (buckling, free-flight, dt). *Superseded 2026-10-23: the GUI driver now calls `physics_world_step()` directly; the mirrored stage sequence and its parity guards are gone.*
 - [x] Verified: `build_suite` clean, `test_mpe_suite --all` 44/42 green, `--profile quick` 58/58 green, oracle 10/10 + sweep laws green.
 - [ ] Remaining open (bounded, not solved): normal warm-start with proof (cold stays; naive restore regresses F10/F11), full Gottschalk distance numeric, oblique multi-body L oracle, TSan on capable host, MSVC proof, multithreaded solve (serial by design).
 
@@ -165,7 +186,7 @@
   P1-3 per-world material stamp; P1-4 tee/microvim fsync; P1-6 degraded-tick
   guard + counter; P2-2 CRC `pthread_once` + blind-class docs.
 - [x] LIE-02 `hits_applied`; LIE-03 stale L comment; LIE-04 free-flight guard
-  (both step paths); LIE-05 non-1/60 loud; LIE-06 MSVC scope; LIE-07 convex
+  (canonical step); LIE-05 non-1/60 loud; LIE-06 MSVC scope; LIE-07 convex
   proof; LIE-10 min-vs-sqrt; LIE-11 contraction scope; LIE-12 rolling tune
   label; LIE-13 double pi; LIE-09 blade regime docs.
 - [x] Ops: 234/234->232+2 xfail, two-markers->one frontier, docstring 41->44,
@@ -206,11 +227,13 @@
   Galileo, restitution threshold) green in C plus a second Python oracle
   implementation green; harness bugs caught and corrected; poisoned live
   config neutralized; see `docs/DESPOT_AUDIT_2026-10-01.md` §F.
-- [ ] Uninitialized joint pools (P2 hardening, proposed 2026-10-02):
+- [x] Uninitialized joint pools (P2 hardening, proposed 2026-10-02):
   `physics_world_init` zeroes the joint count but not `is_active` flags —
   every in-tree caller pairs it with `constraint_pool_init`, so nothing live
   is affected, but init-alone callers get phantom joints. Clear the pools
   inside init (one loop, zero behavior change for paired callers).
+  **Closed 2026-10-08** — see the joint-pool entry in the Despot 2026-10-08
+  section above.
 - [ ] Expand seeded property coverage from matrix inversion to collision,
   constraint, and configuration invariants; add differential oracles across
   multiple analytic systems and a ThreadSanitizer run.
@@ -270,13 +293,15 @@
   unconditionally. `make GTK_PKG=gtk+-3.0` now `$(error)`s instead of silently
   offering a build that cannot link. Verified: engine builds clean with no
   warnings, suite 34/34, full profile 206/206.
-- [ ] Replace the duplicate GUI and headless physics pipelines with one canonical step path.
+- [x] Replace the duplicate GUI and headless physics pipelines with one canonical step path.
   Evidence 2026-09-28 (despot audit, harness at /tmp/opencode/path_equiv.c):
   passive 6-cube tower, 600 ticks, 64 iters — legacy `simulation_physics_tick`
   vs canonical `physics_world_step` agree BITWISE (max deviation 0.00000 m all
   bodies). Driven-robot runs differ ~2.7% over 180 ticks via motor-observer
-  feedback amplification (expected, not a path bug). Unification stays a
-  maintenance item, not a correctness bug.
+  feedback amplification (expected, not a path bug).
+  **Closed 2026-10-23:** `simulation_physics_tick` is now a thin fixed-timestep
+  accumulator over `physics_world_step()`; the duplicate stage sequence is
+  deleted and a source contract test pins the single-driver invariant.
 - [x] [MFS-STRAFE-F1 FIXED 2026-09-28] Mecanum strafe now transmits 3.40 m
   (was ~0.01 m vs 0.30 m gated) via analytic roller-kinematics lateral force
   at each wheel contact with rollers removed from the solver (no chassis-force
@@ -499,8 +524,8 @@ MFS (suite 11 gated + 5 info, 0 fail; was 13/3 + broken make):
   scratch and logs use the project `temp/` directory.
 - [ ] Run ASan/UBSan, randomized/property tests, differential analytic checks,
   and thread-sanitizer validation.
-- [ ] Complete rotational CCD for rotation-only tunneling and consolidate the
-  GUI/headless simulation step paths.
+- [ ] Complete rotational CCD for rotation-only tunneling. (GUI/headless
+  step-path consolidation is closed — see the 2026-10-23 entry above.)
 - [ ] Audit non-built historical artifacts. **The previous wording here was
   false and is corrected:** it claimed the frozen `v15R3` source tree was
   "absent from this workspace (only its release notes are present)". It was

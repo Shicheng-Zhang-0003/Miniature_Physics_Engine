@@ -532,22 +532,43 @@ void scene_spawn_config_torture_test (void) {
             *(float *) p -> storage = random_value;
         } else if (p -> type == p_int) {
             int range = (int) (p -> max - p -> min);
-            int random_value = (int) p -> min + (int) (TORTURE_NEXT () % (uint32_t) ((range > 0) ? range : 1));
+            /* TRUTH: %(range+1), not %range. %1==0 always, so binary params
+             * (range 1, e.g. sleep.enable) were NEVER randomized here — every
+             * F11 run silently forced them to min. The headless suite fixed
+             * this same copy in mpe_suite_c.c; the GUI randomizer was the
+             * remaining stale copy. */
+            int random_value = (int) p -> min + (int) (TORTURE_NEXT () % (uint32_t) ((range >= 0) ? range + 1 : 1));
             *(int *) p -> storage = random_value;
         } else if (p -> type == p_bool) { *(bool *) p -> storage = (TORTURE_NEXT () & 1u) != 0; }
     }
     /* TRUTH guardrails (proven by headless bisection, see note below).
-     * Torture randomizes everything, but two knobs are RESOLUTION/LOAD, not
-     * physics, and settings below what any sequential-impulse solver can
-     * converge are not a physics verdict:
+     * Torture randomizes everything, but some knobs are RESOLUTION/LOAD or
+     * documented experimental modes, not physics extremes. Settings below
+     * what a sequential-impulse solver can converge — or modes that are
+     * deliberately not the proven default — are not a physics verdict:
      * - gravity clamped to [-17,-1]: the F11 10:1 column provably stands to
      *   -17.12 at 96 sweeps (topdrift 0.008) and buckles beyond -21 even at
      *   128 (0.184 marginal) — past the column's real stability boundary.
      *   Registry allows -50 (centrifuge territory no 10-stack survives).
      * - solver_iterations floored at 96: support needs ~1 sweep per stack
      *   level per tick; measured falls at 16/32/64 (even perfect seating),
-     *   stands at 96/128. Material/world extremes (friction, drag, slop,
-     *   bias, warm-match, damping, sleep, joints...) stay fully random. */
+     *   stands at 96/128.
+     * - sleep.enable pinned ON: tall-tower equilibrium includes the sleep
+     *   optimizer; sleepless towers lean on solver micro-jitter (TESTING.md,
+     *   mpe_suite_c.c), and the -17.12 envelope was measured with sleep on.
+     *   Randomizing it off turns a documented limitation into a false F11
+     *   topple. This is also why the int-modulo fix above matters: the old
+     *   %range bug forced sleep.enable to 0 on every GUI run.
+     * - solver.warm_start_damping pinned to 0 (cold): nonzero damping is an
+     *   experimental knob documented unstable under extreme gravity/
+     *   friction/restitution (KNOWN_LIMITATIONS.md, PHYSICS.md); cold is the
+     *   proven default across all regimes. mpe_suite_c.c already pins it.
+     * - boundary.safety_net_enabled pinned ON: an operational guardrail, not
+     *   a physics parameter; randomizing it off makes a world-edge escape a
+     *   false corruption verdict. f11_torture_test.c pins it for the same
+     *   reason.
+     * Material/world extremes (friction, drag, slop, bias, warm-match,
+     * joints...) stay fully random. */
     if (g_cfg.world.gravity > -1.0f) { g_cfg.world.gravity = -1.0f - ((float) (TORTURE_NEXT () >> 8) / 16777216.0f) * 16.0f; } else if (g_cfg.world.gravity < -17.0f) { g_cfg.world.gravity = -17.0f; }
     if (g_cfg.timestep.solver_iterations < 96) { g_cfg.timestep.solver_iterations = 96; }
     if (g_cfg.solver.penetration_slop > 0.02f) { g_cfg.solver.penetration_slop = 0.010f; }
@@ -555,10 +576,13 @@ void scene_spawn_config_torture_test (void) {
     if (g_cfg.depenetration.correction_factor < 0.1f) { g_cfg.depenetration.correction_factor = 0.35f; }
     if (g_cfg.sleep.linear_thresh_sq > 0.01f) { g_cfg.sleep.linear_thresh_sq = 0.0025f; }
     if (g_cfg.sleep.angular_thresh_sq > 0.01f) { g_cfg.sleep.angular_thresh_sq = 0.0001f; }
+    g_cfg.sleep.enable = 1;
+    g_cfg.solver.warm_start_damping = 0.0f;
+    g_cfg.boundary.safety_net_enabled = 1;
     /* Spawn the standard long-run validation scene */
     scene_spawn_long_run_validation ();
     printf (
-        "[A3] Config torture: tunables randomized to extreme values (seed run %u — press F11 again for next seed)\n",
+        "[A3] Config torture: tunables randomized to bounded extremes (documented guardrails pinned; seed run %u — press F11 again for next seed)\n",
         torture_run);
     fflush (stdout);
 } /* MPE_TASK_39_CONFIG_TORTURE_SCENE_END */

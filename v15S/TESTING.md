@@ -15,7 +15,8 @@ python3 tools/test_runner.py --list            # discover registered test cases
 ```
 
 All run artifacts are written below the project-local `temp/qa_runs/`
-directory. The runner uses only the Python standard library.
+directory. The newest 10 runs are retained by default; set `MPE_KEEP_QA_RUNS`
+to change the limit. The runner uses only the Python standard library.
 
 **Strict contract:**
 - Suite cases that print `[SKIP]` fail the run unless `--allow-skip`.
@@ -43,6 +44,12 @@ plane with synced friction (`mpe_floor_plane`).
 Assertions print `file:line` + values on failure and **keep going**, so one
 run reports every broken oracle instead of aborting at the first. NaN
 watchdog on every step; determinism counters asserted zero.
+
+Adversarial config cases (`f10_long_run`, `f11_torture`) pin the documented
+convergence prerequisites before randomizing (gravity −17…−1, ≥96
+iterations, `sleep.enable = 1`, `solver.warm_start_damping = 0`, safety net
+on). `f11_torture` gates the 0.05 m cube-cube overlap bound; the GUI F11
+reports the 10-cube column state but only gates corruption.
 
 ### Harness Contract (DESPOT-2026-09-29)
 
@@ -145,7 +152,7 @@ then `python3 temp/ext_oracle_check.py`.
 - sliding stop applies to sliding bodies (spheres roll — rolling resistance
   governs them);
 - tall-tower equilibrium includes the sleep optimizer (sleepless towers
-  lean on solver micro-jitter, documented);
+  lean on solver micro-jitter, documented; F11 pins it on);
 - bounce-height oracles carry slop-scale error.
 
 ---

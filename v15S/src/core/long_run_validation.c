@@ -42,6 +42,22 @@ static int long_run_validation_tick_index = 0;
  * Test-artifact launch ejections live here (see note above). */
 static float long_run_validation_transient_linear = 0.0f;
 static float long_run_validation_transient_angular = 0.0f;
+/* F10/F11 stack-column diagnostic. scene_spawn_long_run_validation() spawns
+ * the 10-cube column first, so the first 10 dynamic cubes are that column.
+ * Track horizontal drift from the start pose and print it in every verdict.
+ * This is deliberately REPORT-ONLY: under F11's randomized extremes the
+ * documented outcome can be toppling (gravity -17 is the measured boundary;
+ * materials/world stay random), so gating "the stack stayed up" would assert
+ * a wish. What it does guarantee is that a toppled column can never hide
+ * behind a corruption-only PASS: the report says TOPPLED in the same block
+ * as the verdict. */
+#define LONG_RUN_STACK_CUBES 10
+#define LONG_RUN_STACK_TOPPLE_DRIFT 0.10f
+static int long_run_validation_stack_indices[LONG_RUN_STACK_CUBES];
+static vector3 long_run_validation_stack_start[LONG_RUN_STACK_CUBES];
+static int long_run_validation_stack_count = 0;
+static float long_run_validation_stack_max_drift = 0.0f;
+static int long_run_validation_stack_topple_tick = -1;
 /* MPE_TASK_39_FIX_CONFIG_RESTORE_FLAG */
 int long_run_validation_restore_config = 0;
 /* TRUTH: F11 torture verdict mode. Torture randomizes extremes (gravity to
@@ -116,6 +132,7 @@ static void long_run_validation_report (void) {
      * transients (built-in scene overlaps + torture extremes) are reported
      * separately and never gate. NaN/fallen count from tick 0. */
     int pass;
+    int stack_toppled = (long_run_validation_stack_topple_tick >= 0);
     if (long_run_validation_is_torture) {
         /* F11 robustness: survived extremes without corruption. Speeds
          * reported above for the operator, never gated. */
@@ -129,7 +146,9 @@ static void long_run_validation_report (void) {
                (long_run_validation_max_angular_speed < 4.0f);
     } printf ("[A3] Long-run validation report %s\n", a3_version_string);
     printf ("[A3] mode: %s\n",
-            long_run_validation_is_torture ? "torture (corruption gates only)" : "validation (full settle gates)");
+            long_run_validation_is_torture
+                ? "torture (corruption gates only; column stability reported, not gated)"
+                : "validation (full settle gates)");
     printf ("[A3] duration_ticks=%d objects=%d sleeping=%d awake=%d\n", long_run_validation_total_ticks,
             (physics_world_get_primary () -> body_count), long_run_validation_final_sleeping_count,
             long_run_validation_final_awake_count);
@@ -147,7 +166,24 @@ static void long_run_validation_report (void) {
             broadphase_get_pair_overflow_count (physics_world_get_primary ()),
             broadphase_get_pair_dedupe_overflow_count (physics_world_get_primary ()),
             broadphase_get_large_object_clamp_count (physics_world_get_primary ()));
-    printf ("[A3] result: %s\n", pass ? "PASS" : "FAIL");
+    if (long_run_validation_stack_count == 0) {
+        printf ("[A3] stack column: not tracked (no dynamic cubes at start)\n");
+    } else if (stack_toppled) {
+        printf ("[A3] stack column: TOPPLED at tick %d (max horizontal drift %.4f m)\n",
+                long_run_validation_stack_topple_tick, long_run_validation_stack_max_drift);
+    } else {
+        printf ("[A3] stack column: standing (max horizontal drift %.4f m)\n", long_run_validation_stack_max_drift);
+    }
+    if (long_run_validation_is_torture) {
+        printf ("[A3] result: %s (robustness only%s)\n", pass ? "PASS" : "FAIL",
+                stack_toppled ? "; column toppled, not a stability proof" : "");
+        if (stack_toppled) {
+            printf ("[A3] stack note: toppling is expected near the documented gravity/material boundary; "
+                    "PASS certifies no corruption, not a standing column\n");
+        }
+    } else {
+        printf ("[A3] result: %s\n", pass ? "PASS" : "FAIL");
+    }
     /* MPE_TASK_39_FIX_RESTORE_CONFIG */
     if (long_run_validation_restore_config) {
         /* FIX-AUDIT-DESPOT: the restore path ignored mpe_config_load's
@@ -214,7 +250,20 @@ static void long_run_validation_evaluate (void) {
         float angular_speed = vector3_length (rigid_body -> angular_velocity);
         if (linear_speed > current_max_linear_speed) { current_max_linear_speed = linear_speed; }
         if (angular_speed > current_max_angular_speed) { current_max_angular_speed = angular_speed; }
-    } long_run_validation_last_max_linear_speed = current_max_linear_speed;
+    }
+    for (int stack_slot = 0; stack_slot < long_run_validation_stack_count; stack_slot++) {
+        int body_index = long_run_validation_stack_indices [stack_slot];
+        if ((body_index < 0) || (body_index >= (physics_world_get_primary () -> body_count))) { continue; }
+        const rigidbody *stack_body = &(physics_world_get_primary () -> bodies) [body_index];
+        float drift_x = stack_body -> position.x - long_run_validation_stack_start [stack_slot].x;
+        float drift_z = stack_body -> position.z - long_run_validation_stack_start [stack_slot].z;
+        float drift = sqrtf ((drift_x * drift_x) + (drift_z * drift_z));
+        if (drift > long_run_validation_stack_max_drift) { long_run_validation_stack_max_drift = drift; }
+        if ((long_run_validation_stack_topple_tick < 0) && (drift > LONG_RUN_STACK_TOPPLE_DRIFT)) {
+            long_run_validation_stack_topple_tick = long_run_validation_tick_index;
+        }
+    }
+    long_run_validation_last_max_linear_speed = current_max_linear_speed;
     long_run_validation_last_max_angular_speed = current_max_angular_speed;
     if (long_run_validation_tick_index < LONG_RUN_TRANSIENT_TICKS) {
         /* Opening transient: record peak, don't gate (see note above). */
@@ -257,6 +306,19 @@ void long_run_validation_start (int duration_ticks) {
     long_run_validation_tick_index = 0;
     long_run_validation_transient_linear = 0.0f;
     long_run_validation_transient_angular = 0.0f;
+    long_run_validation_stack_count = 0;
+    long_run_validation_stack_max_drift = 0.0f;
+    long_run_validation_stack_topple_tick = -1;
+    {
+        physics_world *world = physics_world_get_primary ();
+        for (int i = 0; (i < world -> body_count) && (long_run_validation_stack_count < LONG_RUN_STACK_CUBES); i++) {
+            const rigidbody *rb = &world -> bodies [i];
+            if (rb -> static_state || (rb -> type != object_cube)) { continue; }
+            int slot = long_run_validation_stack_count++;
+            long_run_validation_stack_indices [slot] = i;
+            long_run_validation_stack_start [slot] = rb -> position;
+        }
+    }
     broadphase_reset_overflow_counts (physics_world_get_primary ());
     contact_cache_clear (physics_world_get_primary ());
     printf ("[A3] Long-run validation started: %d ticks (%.1f seconds)\n", duration_ticks,

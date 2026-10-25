@@ -720,6 +720,13 @@ overlap by up to ~0.69 m. What *is* established:
   | worst overlap | 0.3105 | **0.0024** | **0.0000** |
 
   127× then exact. `bias_factor` (0.1 → 0.5 → 1.0) changes nothing.
+  Primary source for the "4 to 8" practitioner budget quoted in
+  PHYSICS.md/KNOWN_LIMITATIONS.md (verified 2026-10-24): Erin Catto,
+  [Solver2D](https://box2d.org/posts/2024/02/solver2d), box2d.org,
+  2024-02-05 — "In game physics there are typically 4 to 8 iterations."
+  Its sample setups run 4 primary / 2 secondary iterations at 60 Hz; the
+  budget assumes a warm-started PGS (Box2D-Lite), so this table is the
+  cold-start comparison.
 - Neither the correction budget (`max_separation_bias`, `depenetration.
   max_correction`, `correction_factor`) nor forcing 128 iterations fixes the
   F11 seeds: 128 helps seeds 1/2/6 and *hurts* 3 and 9.

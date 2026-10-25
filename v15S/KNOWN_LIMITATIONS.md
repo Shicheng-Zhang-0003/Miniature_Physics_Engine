@@ -34,7 +34,8 @@ flight, which integrates at **constant velocity — gravity inside it is
 deliberately not applied**: the velocity integrate keeps the full dt for
 forces/torques/damping (motors, springs, L-conservation rotor, quat
 normalization) but the gravity push is skipped for clamped bodies
-(DESPOT-2026-10-20 CCD-TOI GRAVITY, both step paths). Consequence: a
+(DESPOT-2026-10-20 CCD-TOI GRAVITY; the GUI driver shares this canonical
+step). Consequence: a
 clamped tick's normal impulse is `m·g·toi`, not `m·g·dt`; a constantly
 re-clamped rolling contact receives slightly less support than a stack
 resting in-place, and locked-rotor drive regimes validate at their own
@@ -50,12 +51,19 @@ the tangent **frame** adoption is live.
 
 Damped warm-start (`solver.warm_start_damping`, default 0.0) is experimental:
 faster convergence at low iteration counts, unstable under extreme
-gravity/friction/restitution. Full restore (1.0) is a measured regression
-(f10 drops from 27/27 asleep to 4/27; f11 overlap 0.2791 m vs 0.05 m bound).
+gravity/friction/restitution. F11 pins it to 0 for that reason. Full restore
+(1.0) is a measured regression (f10 drops from 27/27 asleep to 4/27; f11
+overlap 0.2791 m vs 0.05 m bound).
 
 **Consequence:** the engine needs **96–128 iterations for a 10-cube stack —
 12–30× the published practitioner budget** (Catto, Solver2D 2024: "typically
 4 to 8 iterations"). That is the real outstanding physics question.
+Primary source verified 2026-10-24: Erin Catto,
+[Solver2D](https://box2d.org/posts/2024/02/solver2d) (box2d.org,
+2024-02-05), §"Important concepts relevant to all PGS solvers" — quote
+verbatim. The same post defines warm starting and documents that its PGS
+reference (Box2D-Lite) "uses warm starting and Baumgarte Stabilization":
+the 4–8 budget assumes warm starting; these are cold-solver costs.
 
 ### Split impulse per-contact with lever arms
 Tried twice (independent per-contact pass; shared Gauss–Seidel with
@@ -102,10 +110,12 @@ parallelism remains future work.
 
 ## 3. Engine Scope
 
-- **GUI vs headless step paths:** separate frame drivers (accumulator vs
-  direct dt). Bitwise identical on passive towers; driven robots differ ~2.7%
-  via motor-observer feedback (expected, not a path bug). Unification is a
-  maintenance item, not a correctness bug.
+- **GUI vs headless frame drivers:** the GUI still accumulates wall time
+  (with an anti-spiral clamp) while headless callers pass dt directly, but
+  both now call the same `physics_world_step()`. Bitwise identical on passive
+  towers; driven robots differ ~2.7% via motor-observer feedback (expected,
+  not a path bug). The former duplicate GUI stage sequence was removed
+  2026-10-23.
 - **Scene format:** v200 saves bodies (stable IDs, sleep state, damping)
   plus springs + revolute/fixed/distance/prismatic/rope joints, with CRC32
   integrity footer. Files v130/v140/v150/v151/v152/v153 load via the legacy
@@ -174,12 +184,17 @@ These are sometimes filed as bugs but are intentional:
 - **No velocity clamps / restitution caps:** game-only damping (`nice_value`,
   angular scale) labeled and defaulted off/vacuum. Under extremes, perpetual
   fall/creep can be the true outcome — F11 is a robustness verdict
-  (no NaN, nothing fallen), speeds reported, never gated.
+  (no NaN, nothing fallen), speeds reported, never gated. The report tracks
+  the 10-cube column and prints `TOPPLED` with its max drift, so a fall is
+  visible even though it does not flip the corruption verdict.
 - **Sleep is non-physical:** `sleep.enable = 0` runs sleepless validation.
-- **F11 "nothing fallen" gate is unreachable:** the world-edge safety net
-  clamps every body unconditionally, so "nothing fell through the world" was
-  vacuous. The real property (contact solver holds bodies up with the net
-  switched off) is gated in `f10_long_run` phase 2.
+  Tall-tower equilibrium depends on the sleep optimizer: the 10:1 column
+  drifts apart under solver micro-jitter without it, so F11 pins sleep ON.
+- **F11 "nothing fallen" gate is belt-and-braces:** the world-edge safety net
+  is pinned ON during torture and clamps every body unconditionally, so
+  "nothing fell through the world" is still effectively unfireable. The real
+  property (contact solver holds bodies up with the net switched off) is
+  gated in `f10_long_run` phase 2.
 - **`max_linear_speed` / `max_angular_speed`:** inform-only counters,
   never scale velocities (CCD owns fast bodies).
 - **Spring pure-Hooke:** only exact when `max_acceleration=10000` +

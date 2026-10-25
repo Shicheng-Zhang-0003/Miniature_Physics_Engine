@@ -355,6 +355,7 @@ void gamepad_drive_tick (void) {
             (int (*) (struct physics_world *, int, float, float)) gpd_sym ("ftc_shoot_aimed");
         int (*s_aim_set) (struct physics_world *, float, float) =
             (int (*) (struct physics_world *, float, float)) gpd_sym ("ftc_aim_params_set");
+        float (*s_power_min) (void) = (float (*) (void)) gpd_sym ("intake_launch_power_min");
         int (*s_aim_solve) (struct physics_world *, float *, float *) =
             (int (*) (struct physics_world *, float *, float *)) gpd_sym ("ftc_aim_params_solve");
         int (*s_eject) (struct physics_world *, int) =
@@ -437,7 +438,9 @@ void gamepad_drive_tick (void) {
         if (s_aim_set && wg) { s_aim_set (wg, pubPow, pubElev); }
         if (s_rt_charging && rt <= 0.2f) {
             s_rt_charging = 0;
-            if (s_rt_charge_peak < 0.3f) { s_rt_charge_peak = 0.3f; }
+            float power_min = s_power_min ? s_power_min () : 0.05f;
+            if (!isfinite (power_min) || power_min < 0.05f || power_min > 0.95f) { power_min = 0.30f; }
+            if (s_rt_charge_peak < power_min) { s_rt_charge_peak = power_min; }
             /* fire the PUBLISHED aim (solved pair while the stick was
              * centred, raw charge+stick-elevation otherwise) */
             if (s_shoot_aim && wg) { s_shoot_aim (wg, sel, pubPow, pubElev); }

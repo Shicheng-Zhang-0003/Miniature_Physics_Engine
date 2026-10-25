@@ -139,7 +139,7 @@ static void cmd_help (physics_world *w, int argc, char **argv) {
     printf ("  object : touch ps stat rm mv ln cp chown chmod kill\n");
     printf ("  config : env export config\n");
     printf ("  scene  : mount umount mkfs fsck\n");
-    printf ("  module : mod ls|load|unload|attach|detach|use-broadphase|use-solver\n");
+    printf ("  module : mod ls|load|unload|attach|detach|use-broadphase|use-solver <name|builtin>\n");
     printf ("  eco    : eco attach|detach|command\n");
     printf ("  ftc    : ftc spawn [x y z [preset]] | telemetry | drive <l> <r> | mec <f> <s> <r> | select <i>\n");
     printf ("  sim    : step [N] | run [N] | tick | halt | resume | status\n");
@@ -362,7 +362,7 @@ static void cmd_mkfs (physics_world *w, int argc, char **argv) {
 static void cmd_mod_ls (physics_world *w) {
     (void)w;
     printf ("builtins: hash broadphase, seq-impulse solver\n");
-    printf ("use: mod use-broadphase <name> | mod use-solver <name>\n");
+    printf ("use: mod use-broadphase <name|builtin> | mod use-solver <name|builtin>\n");
 }
 static void cmd_mod (physics_world *w, int argc, char **argv) {
     (void)w;
@@ -439,13 +439,34 @@ static void cmd_mod (physics_world *w, int argc, char **argv) {
         return;
     }
     if (strcmp(argv[1],"use-broadphase")==0 && argc >= 3) {
-        /* registry-first: try find pair handler as broadphase name proxy */
-        printf ("mod: use-broadphase '%s' (registry-based, stubbed)\n", argv[2]); return;
+        if (strcmp(argv[2],"builtin")==0) {
+            physics_world_set_broadphase (w, NULL);
+            physics_world_set_broadphase_state (w, NULL);
+            printf ("mod: broadphase=builtin\n"); return;
+        }
+        const mpe_broadphase_if_t *b = mpe_find_broadphase (argv[2]);
+        if (!b) {
+            printf ("mod: unknown broadphase '%s' (load its .so first; `mod ls` lists the registry)\n", argv[2]);
+            return;
+        }
+        physics_world_set_broadphase (w, b);
+        printf ("mod: broadphase='%s'\n", argv[2]); return;
     }
     if (strcmp(argv[1],"use-solver")==0 && argc >= 3) {
-        printf ("mod: use-solver '%s' (registry-based, stubbed)\n", argv[2]); return;
+        if (strcmp(argv[2],"builtin")==0) {
+            physics_world_set_solver (w, NULL);
+            physics_world_set_solver_state (w, NULL);
+            printf ("mod: solver=builtin\n"); return;
+        }
+        const mpe_solver_if_t *s = mpe_find_solver (argv[2]);
+        if (!s) {
+            printf ("mod: unknown solver '%s' (load its .so first; `mod ls` lists the registry)\n", argv[2]);
+            return;
+        }
+        physics_world_set_solver (w, s);
+        printf ("mod: solver='%s'\n", argv[2]); return;
     }
-    printf ("mod: usage: mod ls|load <path>|unload <path>|attach|detach|use-broadphase|use-solver\n");
+    printf ("mod: usage: mod ls|load <path>|unload <path>|attach|detach|use-broadphase|use-solver <name|builtin>\n");
 }
 
 /* ------------------------------------------------------------------ */

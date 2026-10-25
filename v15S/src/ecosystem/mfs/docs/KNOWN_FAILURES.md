@@ -424,7 +424,8 @@ fleet-identical probe (temp/tilt_abuse.c, retained in temp/ only):
    wheels 10 mm clear of the box — zero interpenetration by construction).
    This accomplice is gone; the root-cause fix above stands on its own.
 
-Fix (core/physics_world.c + simulation_physics_loop.c, mirrored):
+Fix (core/physics_world.c; the GUI driver now calls this step directly —
+DESPOT-2026-10-23 removed the mirrored copy):
 joints re-equalize after the relaxation passes AND after rolling (velocity
 only, no drift, no pre-step — joints get the final word over every
 velocity-touching stage), and drift relocated end-of-step so its correction
@@ -1325,13 +1326,13 @@ whole of the 0.98 m/s vs 0.82 m/s separation-rate difference measured.
 gate stays as a dormant tripwire.
 
 **Verdict 2026-10-01: ENGINE EXONERATED.** Per-tick reprobe killed the stale
-theory: `has_contact` resets every tick in both step paths, and positions
+theory: `has_contact` resets every tick in the step path, and positions
 agree to ~1e-7 THROUGH the bounce (ticks 0–9). Divergence starts at tick 10
 as a positional-only shove (mm/tick, no velocity change, no contact flag) in
 the rotated world only — the depenetration floor pass and CCD floor sweep
 acting on a B-frame trajectory that crosses y=0, i.e. a phantom floor the
 solver floor never ordered. But that is honest backstop design (boundary box
-min-y=0 exists in both step paths), and it exposes the real error: the probe
+min-y=0 exists in the step path), and it exposes the real error: the probe
 demanded equivariance under an ARBITRARY rotation while the environment (y=0
 backstop + box) is only yaw-symmetric. R^-1 Phi(R x) = Phi(x) is untestable
 outside the environment's symmetry group. Fixture fixed (floorless, yaw-only

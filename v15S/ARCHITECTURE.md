@@ -52,7 +52,10 @@ headless code should declare its own worlds.
 The world owns, per instance:
 
 - **Body pool** — growable `rigidbody[]`, ×2 on demand up to `mpe_max_bodies`
-  (16384). An empty world costs kilobytes.
+  (16384). An empty world still reserves fixed scratch: a 65,536-entry pair
+  buffer (512 KB), 16K-body index arrays, and a 4K-entry initial contact cache
+  (grows to 64K). Most pages fault lazily, but the address footprint is low
+  single-digit MB per world, not kilobytes.
 - **Contact cache** — warm-start impulse cache (`cached_contact[]`), O(1)
   hash probes, per-world.
 - **Solver scratch** — pair buffer, manifolds, island union-find arrays,
@@ -282,3 +285,40 @@ Hardware-instanced OpenGL 3.3 Core:
   visible at a glance.
 - Shader compilation / link / missing-file failures are reported clearly;
   the engine does not silently continue in a broken render state.
+
+---
+
+## 9. Reading Guide and Comment Tags
+
+If you are new to the tree, read in this order:
+
+1. `readme.md` for the supported surface and verification commands.
+2. §2–§3 above for the layer map and the `physics_world` lifetime.
+3. `core/physics_world.c` → `physics_world_step()` for the one canonical
+   stage sequence (sanitize → CCD → broadphase → narrowphase → floor →
+   forces/motors → integrate → islands → solve → Poisson/split → rolling →
+   cache → integrate positions → boundary → depenetration).
+4. `physics/collision_solver.c` for the sequential-impulse math, then
+   `core/det_math.h` for why the transcendentals are hand-written.
+5. `tests/mpe_test.h` and `tools/test_runner.py` for what “green” means.
+
+**One step, one driver.** The GTK callback (`core/simulation_physics_loop.c`)
+is now only a fixed-timestep accumulator plus overlay counters; it calls
+`physics_world_step()` and contains no physics stage. Do not reintroduce a
+second stage sequence there. New simulation state belongs in `physics_world`;
+new physics belongs in the canonical step or a shared `physics/` helper.
+
+**Comment tags.** The source is also an audit log; these prefixes are load-
+bearing:
+
+| Tag | Meaning |
+|---|---|
+| `DESPOT-YYYY-MM-DD` | finding from that dated audit pass; the date is the provenance, not a TODO |
+| `TRUTH` | an invariant the code is deliberately preserving; treat a violation as a bug |
+| `FIX-AUDIT` / `FIX-AUDIT-DESPOT` | a specific defect that was fixed here; the comment explains the failure mode |
+| `LIE-NN` | a previously published claim that was retracted; do not repeat it as fact |
+| `PARITY` | historical marker from the era of two step drivers; now only a cross-reference, not a second implementation |
+| `P0` / `P1` / `P2` | severity used by the audit ledger: correctness/data loss, bounded hardening, cleanup |
+
+When a comment and the code disagree, the code wins. Repair or delete the
+comment in the same change; a stale “truth” label is worse than no label.

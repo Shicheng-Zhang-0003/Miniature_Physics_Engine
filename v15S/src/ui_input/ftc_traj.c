@@ -76,6 +76,8 @@ static vector3 s_key_pos;
 static float s_key_yaw_deg = 0.0f;
 static float s_key_power = 1.0f;
 static float s_key_elev = 50.0f;
+static float s_key_launch_speed = -1.0f;
+static float s_key_launch_spin = -1.0f;
 static int s_key_carried = -1;
 static int s_have_key = 0;
 /* amortisation state */
@@ -186,7 +188,10 @@ static int ftrj_begin (physics_world *w, ftc_robot *r, rigidbody *ch, float lp, 
         s_pred_live = 0;
         return -1;
     }
-    if (!(lp >= 0.3f) || !(lp <= 1.0f)) { lp = 1.0f; }
+    float (*p_min) (void) = (float (*) (void)) ftrj_sym ("intake_launch_power_min");
+    float min_power = p_min ? p_min () : 0.05f;
+    if (!isfinite (min_power) || min_power < 0.05f || min_power > 0.95f) { min_power = 0.30f; }
+    if (!isfinite (lp) || lp < min_power || lp > 1.0f) { lp = 1.0f; }
     if (!(le >= 20.0f) || !(le <= 80.0f)) { le = 50.0f; }
     if (p_launch_e && (lp != 1.0f || le != 50.0f)) {
         p_launch_e (ch -> position, ch -> orientation, ch -> velocity, le, &st);
@@ -252,10 +257,17 @@ void ftc_traj_update (float frame_delta_time) {
     } else if (p_last && p_last (w, &lp, &le) != 0) {
         lp = 1.0f; le = 50.0f;
     }
-    if (!(lp >= 0.3f) || !(lp <= 1.0f)) { lp = 1.0f; }
+    float (*p_min) (void) = (float (*) (void)) ftrj_sym ("intake_launch_power_min");
+    float min_power = p_min ? p_min () : 0.05f;
+    if (!isfinite (min_power) || min_power < 0.05f || min_power > 0.95f) { min_power = 0.30f; }
+    if (!isfinite (lp) || lp < min_power || lp > 1.0f) { lp = 1.0f; }
     if (!(le >= 20.0f) || !(le <= 80.0f)) { le = 50.0f; }
     /* Does the current aim differ enough from the one the running prediction
      * was started from to be worth restarting? */
+    float (*p_speed) (void) = (float (*) (void)) ftrj_sym ("intake_launch_speed");
+    float (*p_spin) (void) = (float (*) (void)) ftrj_sym ("intake_launch_spin");
+    float launch_speed = p_speed ? p_speed () : INTAKE_LAUNCH_SPEED;
+    float launch_spin = p_spin ? p_spin () : INTAKE_LAUNCH_SPIN;
     int want_restart = 1;
     int aim_changed = 0;
     if (s_have_key && s_pred_live) {
@@ -265,7 +277,9 @@ void ftc_traj_update (float frame_delta_time) {
         float dp = vector3_length (vector3_subtraction (ch -> position, s_key_pos));
         int pose_changed =
             (dyaw > FTRJ_HEADING_EPS_DEG || dp > FTRJ_POS_EPS || s_key_carried != r -> intake_count);
-        aim_changed = (fabsf (lp - s_key_power) > 0.02f || fabsf (le - s_key_elev) > 0.5f);
+        int launch_changed = (fabsf (launch_speed - s_key_launch_speed) > 0.001f ||
+                              fabsf (launch_spin - s_key_launch_spin) > 0.001f);
+        aim_changed = (fabsf (lp - s_key_power) > 0.02f || fabsf (le - s_key_elev) > 0.5f || launch_changed);
         want_restart = (pose_changed || aim_changed);
     }
     if (want_restart) {
@@ -282,6 +296,8 @@ void ftc_traj_update (float frame_delta_time) {
             s_key_yaw_deg = yaw_deg;
             s_key_power = lp;
             s_key_elev = le;
+            s_key_launch_speed = launch_speed;
+            s_key_launch_spin = launch_spin;
             s_key_carried = r -> intake_count;
         }
     }

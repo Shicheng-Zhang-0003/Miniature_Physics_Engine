@@ -56,6 +56,14 @@ int main (void) {
     if (g_cfg.depenetration.correction_factor < 0.1f) { g_cfg.depenetration.correction_factor = 0.35f; }
     if (g_cfg.sleep.linear_thresh_sq > 0.01f) { g_cfg.sleep.linear_thresh_sq = 0.0025f; }
     if (g_cfg.sleep.angular_thresh_sq > 0.01f) { g_cfg.sleep.angular_thresh_sq = 0.0001f; }
+    /* TRUTH: the 10:1 column's proven stability envelope requires the sleep
+     * optimizer (sleepless towers lean on solver micro-jitter; TESTING.md)
+     * and cold warm-start (nonzero damping is experimental and documented
+     * unstable under extreme gravity/friction/restitution). Pin both so the
+     * torture tests the contact solver under extremes, not two non-default
+     * modes the envelope was never measured in. mpe_suite_c.c does the same. */
+    g_cfg.sleep.enable = 1;
+    g_cfg.solver.warm_start_damping = 0.0f;
     /* TRUTH: boundary.safety_net_enabled is an operational guardrail, not a
      * physics parameter to torture. Randomizing it to 0 removes the emergency
      * floor and makes every fallen-body tick a false "corruption" verdict.

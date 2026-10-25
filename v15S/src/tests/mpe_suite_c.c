@@ -554,8 +554,12 @@ int mpe_t_f11_torture (void) {
      * 0=cold proven). Torture randomizes the whole registry including it;
      * pin to 0 here to preserve the proven resolution envelope (like
      * iters>=96). Damped-seed experiments set it explicitly via temp
-     * harnesses, never via torture. */
+     * harnesses, never via torture.
+     * 2026-10-24: sleep.enable is the other half of that envelope — the
+     * 10:1 column's equilibrium includes the sleep optimizer (sleepless
+     * towers lean on solver micro-jitter). Pin it ON for the same reason. */
     g_cfg.solver.warm_start_damping = 0.0f;
+    g_cfg.sleep.enable = 1;
     if (g_cfg.solver.penetration_slop > 0.02f) { g_cfg.solver.penetration_slop = 0.010f; }
     if (g_cfg.solver.bias_factor < 0.05f) { g_cfg.solver.bias_factor = 0.10f; }
     if (g_cfg.depenetration.correction_factor < 0.1f) { g_cfg.depenetration.correction_factor = 0.35f; }

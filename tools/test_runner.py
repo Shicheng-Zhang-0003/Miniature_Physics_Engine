@@ -10,7 +10,9 @@ Profiles:
            (9 files), engine build + check-flags.
 
 All run artifacts are written below the project-local temp/qa_runs directory.
-This module uses only the Python standard library.
+The newest MPE_KEEP_QA_RUNS directories are retained (default 10); older ones
+are pruned so full-profile runs do not grow without bound. This module uses
+only the Python standard library.
 
 Strict contract: suite cases that print [SKIP] (self-skipped coverage) fail
 the run unless --allow-skip is given; [XFAIL] markers are surfaced in the
@@ -764,6 +766,45 @@ class Runner:
         return okay
 
 
+def keep_qa_runs() -> int:
+    """How many per-run artifact directories to retain (default 10)."""
+    try:
+        return max(1, int(os.environ.get("MPE_KEEP_QA_RUNS", "10")))
+    except ValueError:
+        return 10
+
+
+def prune_run_dirs(current: Path, keep: int) -> None:
+    """Delete old qa_runs directories, never the current one or a symlink.
+
+    The full profile writes tens of MB per run; 268 historical runs were 1.7 GB
+    of ignored local data. This is retention, not history rewriting: only
+    timestamped run directories are candidates, and deletion failures are
+    ignored so a read-only/partially-owned tree cannot fail a test run.
+    """
+    runs = current.parent
+    if not runs.is_dir():
+        return
+    candidate = re.compile(r"\d{8}T\d{6}Z-\d+")
+    try:
+        entries = list(runs.iterdir())
+    except OSError:
+        return
+    directories = sorted(
+        (path for path in entries
+         if path.is_dir() and not path.is_symlink() and candidate.fullmatch(path.name)),
+        key=lambda path: path.name,
+    )
+    doomed = directories[:-keep] if keep > 0 else directories
+    for old in doomed:
+        if old.resolve() == current.resolve():
+            continue
+        try:
+            shutil.rmtree(old)
+        except OSError:
+            pass
+
+
 def create_run_dir() -> tuple[str, Path]:
     if PROJECT_TEMP.is_symlink():
         raise RuntimeError("project temp directory must not be a symlink")
@@ -774,6 +815,7 @@ def create_run_dir() -> tuple[str, Path]:
     run_dir.mkdir(parents=True, exist_ok=False)
     if not run_dir.resolve().is_relative_to(base):
         raise RuntimeError("refusing to write test artifacts outside the project temp directory")
+    prune_run_dirs(run_dir, keep_qa_runs())
     return run_id, run_dir
 
 

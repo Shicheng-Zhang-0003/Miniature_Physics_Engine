@@ -278,18 +278,27 @@ In the debug terminal:
 Press `F11` to randomise all 80 tunables to extreme bounded values and run
 a 60-second long-run validation. This stress-tests the engine under
 adversarial parameter combinations (each press uses the next seed, printed
-for bisection). F11 is a robustness verdict: PASS means no NaN and that no two
-cubes interpenetrate by more than 0.05 m — speeds are reported, never gated
-(under extremes, perpetual fall/creep and column buckling can be the TRUE
-outcome). "Nothing fell through the world" is deliberately NOT part of it:
-with the world-edge safety net installed that is unfireable, so it is gated
-for real in the F10 long-run case instead, which re-runs the same scene with
-the net switched off. Solver resolution is pinned
-during torture (gravity −17…−1, ≥96 iterations — the proven envelope for the
-10:1 validation column; material/world extremes stay fully random). F10 at
-defaults keeps the full settle verdict (final < 0.25 m/s, run-max < 2.0 m/s
-past the 2 s opening transient). After the test, use
-key 6 → Reset Defaults or terminal `config reset` to restore normal behaviour.
+for bisection). F11 is a **robustness verdict only**: PASS means the run
+completed with no NaN and no body lost below the world floor; speeds are
+reported, never gated (under extremes, perpetual fall/creep and column
+buckling can be the TRUE outcome). Every report also prints the 10-cube
+column state — `stack column: standing`, or `TOPPLED at tick N` with the max
+horizontal drift — so a fallen column can never hide behind the verdict:
+PASS is then qualified as "robustness only; column toppled, not a stability
+proof". The 0.05 m cube-overlap bound is gated by the fixed-seed headless
+suite case `f11_torture` (`make test_suite`), not by the GUI run.
+
+Torture pins the documented convergence prerequisites: gravity −17…−1,
+≥96 solver iterations, `sleep.enable = 1` (the tall-tower equilibrium
+includes the sleep optimizer), `solver.warm_start_damping = 0` (cold;
+nonzero damping is experimental and unstable under extreme regimes), and
+`boundary.safety_net_enabled = 1` (an operational guardrail, not a physics
+knob). Material/world extremes stay fully random. The randomizer covers
+binary int parameters such as `sleep.enable` (an old `% range` bug always
+selected the minimum). F10 at defaults keeps the full settle verdict
+(final < 0.25 m/s, run-max < 2.0 m/s past the 2 s opening transient). After
+the test, use key 6 → Reset Defaults or terminal `config reset` to restore
+normal behaviour.
 
 ### Truth-validation switches
 
@@ -440,18 +449,18 @@ ftc biobuzz score    # Table 10-2 breakdown: tips, cells, flowers, gardens, leav
 ftc biobuzz enter red   # spend a tip unlock: tray nectar into play at the loading zone
 ```
 
-Shooting the hive: the stock full-power lob (9 m/s at 50°) outranges the
+Shooting the hive: the stock full-power lob (9 m/s at 65°) outranges the
 field — from any legal spot it smacks the frame or the cell undersides,
 never drops in. Score the up-cells with soft steep lobs:
 
 ```
-ftc shoot 0.65 70   # power 0.3..1.0, elevation 20..80 deg (defaults 1.0, 50)
+ftc shoot 0.65 70   # power 0.3..1.0, elevation 20..80 deg (defaults 1.0, 65)
 ```
 
 Park ~1.1 m out from the mouth (wall-adjacent facing it), fire, and watch
-the purple predictor (it previews your last aimed shot — full-power 50°
+the purple predictor (it previews your last aimed shot — full-power 65°
 until aimed shots exist). On the gamepad the RT trigger value is the
-power and right-stick Y sets elevation (up = steeper, centred = 50°);
+power and right-stick Y sets elevation (up = steeper, centred = 65°);
 Y fires full-power at stick elevation.
 
 Notes:
@@ -492,7 +501,7 @@ release still stops dead. If it still feels darty, drive with smaller
 stick motions: expo rewards that. No pad at all? The G V B N C M keys
 drive the selected robot (see Driving Robots above). Button map: START toggles control,
 BACK cycles the controlled robot, LB+RB e-stop, LT hold = intake,
-RT/A = shoot (RT analog = shot power, right-stick Y = elevation, centred = stock 50°), B = eject.
+RT/A = shoot (RT analog = shot power, right-stick Y = elevation, centred = stock 65°), B = eject.
 
 ## Validation Tests
 
@@ -651,8 +660,8 @@ python3 tools/test_runner.py --profile full    # engine, MFS, TUI, ASan + UBSan 
 python3 tools/test_runner.py --list            # discovered test inventory
 ```
 
-Every run writes JSON and JUnit summaries and command logs below `temp/qa_runs/`.
+Every run writes JSON and JUnit summaries and command logs below `temp/qa_runs/`; the newest 10 runs are kept (`MPE_KEEP_QA_RUNS` overrides).
 
-The engine has been tested on Ubuntu 24.04.4 LTS. Intel MacOS users may attempt to install the same dependencies via Homebrew, but this is unsupported. Windows is not supported.
+The engine has been tested on Ubuntu 24.04.4 LTS. Intel MacOS users may attempt to install the same dependencies via Homebrew, but this is unsupported. Windows is unsupported as a release target: a build exists via MSYS2/MinGW (see `BUILD.md`) but is not CI-proven.
 
 For release validation, follow [RELEASE_GATES.md](RELEASE_GATES.md) and the scripts in `validation/`.
