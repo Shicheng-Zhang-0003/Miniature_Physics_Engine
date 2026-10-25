@@ -1,5 +1,13 @@
 # 🧊 MINIATURE PHYSICS ENGINE (MPE) — v15S
 
+<img width="4426" height="1820" alt="Screenshot from 2026-10-25 15-16-11" src="https://github.com/user-attachments/assets/84b771cd-dc79-4f86-9b46-ca9b0f26dd4a" />
+<img width="4426" height="1820" alt="Screenshot from 2026-10-25 15-16-42" src="https://github.com/user-attachments/assets/c707edb4-1eb6-4ca6-b53a-7d9c2835803a" />
+<img width="4426" height="1820" alt="Screenshot from 2026-10-25 15-17-02" src="https://github.com/user-attachments/assets/b66b8a59-709d-4b41-94a3-93b8fb868eb0" />
+<img width="4426" height="1820" alt="Screenshot from 2026-10-25 15-22-26" src="https://github.com/user-attachments/assets/fc619976-ed07-4d34-937e-4ec672740c0f" />
+<img width="4426" height="1820" alt="Screenshot from 2026-10-25 15-22-37" src="https://github.com/user-attachments/assets/c29b32bf-f5dd-4b32-b660-e7626913ac23" />
+<img width="4426" height="1820" alt="Screenshot from 2026-10-25 15-23-32" src="https://github.com/user-attachments/assets/a1fb990d-58cb-44e4-ae36-49c5a2d5782b" />
+
+
 > **STATUS: STABLE — VERIFIED.** Quick profile 60/60, canonical C suite 44/44
 > blocking green, MFS unified suite 30/30, determinism twins bitwise identical
 > at `MPE_THREADS=1/4/8`. Full-profile physics tests are green under
