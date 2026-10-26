@@ -10,7 +10,7 @@ sudo apt install libncurses-dev
 ```
 
 ```bash
-cd v15S/src
+cd v16R1/src
 make clean
 make
 ./engine
@@ -39,6 +39,6 @@ clean under `-Wall -Wextra -Werror`. Opt out with
 | Long-run validation (60 s) | `F10` |
 | Config torture test | `F11` |
 
-For all platforms and make targets, see [`BUILD.md`](../v15S/BUILD.md).
+For all platforms and make targets, see [`BUILD.md`](../v16R1/BUILD.md).
 For the full user guide (modes, editor, terminal, robots), see
-[`how_to_use.md`](../v15S/how_to_use.md).
+[`how_to_use.md`](../v16R1/how_to_use.md).

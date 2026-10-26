@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# V-01: Build with AddressSanitizer + UndefinedBehaviorSanitizer.
+# The F5/F6/F7/F8/F10 torture run itself needs the GUI (manual).
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+TEMP="$ROOT/temp"
+mkdir -p "$TEMP"
+export TMPDIR="$TEMP"
+SRC="$ROOT/v16R1/src"
+[[ -d "$SRC" ]] || { echo "ERROR: $SRC not found." >&2; exit 1; }
+
+echo "=== V-01: Sanitizer build (ASan + UBSan) ==="
+cd "$SRC"
+make clean > "$TEMP/v01-clean.log" 2>&1 || true
+
+SAN_CFLAGS="$(pkg-config --cflags gtk4 epoxy) -I. -O1 -g -Wall -Wextra \
+ -fsanitize=address -fsanitize=undefined -fno-omit-frame-pointer"
+SAN_LIBS="$(pkg-config --libs gtk4 epoxy) -lm \
+ -fsanitize=address -fsanitize=undefined"
+# DESPOT-2026-10-01: determinism flags (-ffp-contract=off -MMD -MP) are NOT
+# listed here on purpose: makefile `override CFLAGS +=` appends them even over
+# command-line CFLAGS (see RELEASE_GATES §15). Do not "simplify" that override
+# away; check-flags catches a drop. V01 sanitizer binary must be replaced via
+# V02 before interactive F5-F11 (see RELEASE_GATES §2).
+
+if make CFLAGS="$SAN_CFLAGS" LIBS="$SAN_LIBS" 2>&1 | tee "$TEMP/v01_build.log"; then
+    echo "[PASS] Sanitizer build succeeded -> $SRC/engine"
+else
+    echo "[FAIL] Sanitizer build failed." >&2
+    exit 1
+fi
+
+echo ""
+echo "=== MANUAL STEP: torture test under sanitizers ==="
+echo "  cd $SRC && ./engine"
+echo "  Press F5, F6, F7, F8, F10, and F11, then exercise normal use."
+echo "  ASan/UBSan reports print to stderr the moment they fire."
+echo "Pass criterion: no severe sanitizer errors."
+echo "NOTE: this leaves a sanitizer binary; rerun V-02 to rebuild normal."

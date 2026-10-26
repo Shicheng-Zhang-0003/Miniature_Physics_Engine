@@ -308,7 +308,7 @@ solver regimes 42/42.
 
 - **Contact manifold generation** for non-trivial pairs: OBB/OBB decision
   gated 400/400 vs Gottschalk; contact *points* now covered by
-  `v15S/validation/property_sweep.py` laws (SAT symmetry, slop admission)
+  `v16R1/validation/property_sweep.py` laws (SAT symmetry, slop admission)
   + `reference_math` depth spot-checks. Full closest-point-pair vs
   Gottschalk distance algorithm remains differential-future.
 - **The static-friction breakaway threshold** — closed 2026-10-04.
@@ -318,7 +318,7 @@ solver regimes 42/42.
   analytic oblique oracle, not just conservation).
 - **Revolute axis-alignment**: β (ERP) gated; axis rows velocity-only by
   design (drift corrected once per tick post-loop). No-bias choice
-  documented in `v15S/docs/NUMERICAL_GUARANTEES.md`; external hinge-ERP
+  documented in `v16R1/docs/NUMERICAL_GUARANTEES.md`; external hinge-ERP
   cross-ref (Bullet) tried at 0.1/0.3 and reverted (moved MFS baselines).
 - **Narrow-phase depth/closest-point vs Gottschalk distance**: overlap
   decision 400/400; depth now spot-checked in `property_sweep.py` laws.

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # DESPOT-2026-09-26: MFS twin-tree drift guard.
-# 461-MFS (standalone repo) and v15S/src/ecosystem/mfs (vendored copy) must
+# 461-MFS (standalone repo) and v16R1/src/ecosystem/mfs (vendored copy) must
 # stay source-identical. Build artifacts (*.o/*.d/*.so/*.dll/*.exe/*.a,
 # build/, plugins/), test scratch (temp/), and .git are ignored.
 # Exit 1 on drift, listing files.
@@ -10,18 +10,18 @@
 # copy also lives at this repo's root (./sync_mfs_check.sh) for standalone
 # use". It could never work there. The path resolution was:
 #
-#     HERE="$(dirname "$0")";  ROOT="$HERE/..";  EMBED="$ROOT/v15S/src/..."
+#     HERE="$(dirname "$0")";  ROOT="$HERE/..";  EMBED="$ROOT/v16R1/src/..."
 #
 # That is correct when the script lives at <repo>/tools/sync_mfs_check.sh
-# (the 475 layout: ROOT is the 475 repo root, and v15S/ is under it). But
+# (the 475 layout: ROOT is the 475 repo root, and v16R1/ is under it). But
 # the standalone copy lives at the 461 ROOT, so HERE/.. is the shared
 # *parent* directory (…/projects), and the script went looking for
 #
-#     …/projects/v15S/src/ecosystem/mfs      <- does not exist
+#     …/projects/v16R1/src/ecosystem/mfs      <- does not exist
 #
 # while the real vendored copy is at
 #
-#     …/projects/475-MPE/v15S/src/ecosystem/mfs
+#     …/projects/475-MPE/v16R1/src/ecosystem/mfs
 #
 # Result: every standalone run died with "embedded not found" and exit 1,
 # which reads like a misconfiguration, not like "you have 1.5k lines of
@@ -50,17 +50,17 @@ EMBED=""
 if [ -n "${SYNC_MFS_EMBED:-}" ] && [ -d "${SYNC_MFS_EMBED}" ]; then
     EMBED="$SYNC_MFS_EMBED"
 elif [ -f "$HERE/../../core/physics_world.c" ] && [ -d "$HERE/../../ecosystem/mfs/modules/ftc" ]; then
-    # script at <475>/tools/  ->  <475>/v15S/src/ecosystem/mfs
+    # script at <475>/tools/  ->  <475>/v16R1/src/ecosystem/mfs
     EMBED="$(cd "$HERE/../../ecosystem/mfs" 2>/dev/null && pwd || true)"
-elif [ -d "$HERE/../475-MPE/v15S/src/ecosystem/mfs" ]; then
+elif [ -d "$HERE/../475-MPE/v16R1/src/ecosystem/mfs" ]; then
     # script at the standalone 461 root -> sibling 475-MPE
-    EMBED="$(cd "$HERE/../475-MPE/v15S/src/ecosystem/mfs" && pwd)"
-elif [ -d "$HERE/../v15S/src/ecosystem/mfs" ]; then
+    EMBED="$(cd "$HERE/../475-MPE/v16R1/src/ecosystem/mfs" && pwd)"
+elif [ -d "$HERE/../v16R1/src/ecosystem/mfs" ]; then
     # script at a 461-like root that is itself under a v15S parent
-    EMBED="$(cd "$HERE/../v15S/src/ecosystem/mfs" && pwd)"
+    EMBED="$(cd "$HERE/../v16R1/src/ecosystem/mfs" && pwd)"
 else
     CAND="$(cd "$HERE/../.." 2>/dev/null && pwd || true)"
-    for p in "$CAND"/*/v15S/src/ecosystem/mfs "$CAND"/v15S/src/ecosystem/mfs; do
+    for p in "$CAND"/*/v16R1/src/ecosystem/mfs "$CAND"/v16R1/src/ecosystem/mfs; do
         if [ -d "$p" ] && [ -d "$p/modules/ftc" ]; then EMBED="$(cd "$p" && pwd)"; break; fi
     done
 fi
@@ -83,7 +83,7 @@ if [ -z "$EMBED" ]; then
 [sync-mfs] COULD NOT LOCATE THE EMBEDDED TWIN — drift check did NOT run.
 
   searched relative to: $HERE
-  overrides: SYNC_MFS_EMBED=<path to 475-MPE/v15S/src/ecosystem/mfs>
+  overrides: SYNC_MFS_EMBED=<path to 475-MPE/v16R1/src/ecosystem/mfs>
 
   This is NOT "in sync" and NOT "drift found". It means the guard was
   blind. Exit 2 keeps it distinguishable from exit 1 (drift).
@@ -113,7 +113,7 @@ if [ -n "$DRIFT" ]; then
   echo "[sync-mfs]   standalone: $STAND"
   echo "[sync-mfs]   embedded:   $EMBED"
   echo "$DRIFT"
-  echo "Fix: cp v15S/src/ecosystem/mfs/<file> <461-MFS>/<file> (or reverse if standalone is newer), then re-run."
+  echo "Fix: cp v16R1/src/ecosystem/mfs/<file> <461-MFS>/<file> (or reverse if standalone is newer), then re-run."
   exit 1
 fi
 echo "[sync-mfs] in sync (source-identical, artifacts ignored)"

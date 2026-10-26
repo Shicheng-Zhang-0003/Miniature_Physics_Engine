@@ -20,12 +20,12 @@ MPE is built around four priorities:
 The module system can replace the broadphase and solver, register narrowphase
 shape-pair handlers, and attach per-world tick hooks. Built-in joints remain
 engine-managed, and force fields can be implemented through tick hooks; they
-are not separate replaceable pipeline stages. See [the module guide](../v15S/MODULES.md)
+are not separate replaceable pipeline stages. See [the module guide](../v16R1/MODULES.md)
 for the supported extension points and ABI rules.
 
 The complete step order and data ownership are in
-[the architecture guide](../v15S/ARCHITECTURE.md). Exact model equations,
+[the architecture guide](../v16R1/ARCHITECTURE.md). Exact model equations,
 known approximations, and measured numerical budgets are in
-[the numerical guarantees](../v15S/docs/NUMERICAL_GUARANTEES.md). The audited
+[the numerical guarantees](../v16R1/docs/NUMERICAL_GUARANTEES.md). The audited
 test matrix and current run artifacts are described in
 [verification](VERIFICATION.md).

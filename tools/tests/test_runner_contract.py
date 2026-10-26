@@ -170,10 +170,10 @@ class SkipXfailContractTests(unittest.TestCase):
     def test_parse_skip_xfail_attributes_skips_to_running_case(self) -> None:
         output = (
             "  Running loader_lifecycle...\n"
-            "[SKIP] plugins/mpe_capsule.so not visible (run from v15S/src)\n"
+            "[SKIP] plugins/mpe_capsule.so not visible (run from v16R1/src)\n"
             "  [PASS] loader_lifecycle (checks failed: 0)\n"
             "  Running ftc_ecosystem...\n"
-            "[SKIP] bundle not built (run from v15S/src after make)\n"
+            "[SKIP] bundle not built (run from v16R1/src after make)\n"
             "  [PASS] ftc_ecosystem (checks failed: 0)\n"
             "[XFAIL][MFS-STRAFE-F1] mecanum strafe dx=0.1000 < 0.30\n"
         )

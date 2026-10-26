@@ -1,6 +1,6 @@
 # ============================================================
 # MPE root .gitignore
-# Repo root contains: v15S/  tools/  reference_materials/  run_all.sh  verify.sh
+# Repo root contains: v16R1/  tools/  reference_materials/  run_all.sh  verify.sh
 # (DESPOT-2026-10-01: was stale "v15R3/ fixes/ (retired)".)
 # ============================================================
 
@@ -77,7 +77,7 @@ temp/
 # of 475 lost it while 461 kept it -- a drift `sync_mfs_check.sh` cannot see,
 # because it compares working trees and both had the file. It is part of the
 # shared set the sync contract governs, so it must be versioned on both sides.
-!v15S/src/ecosystem/mfs/tests/test_*.c
+!v16R1/src/ecosystem/mfs/tests/test_*.c
 __pycache__/
 *.py[cod]
 .pytest_cache/

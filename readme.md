@@ -1,4 +1,4 @@
-# 🧊 MINIATURE PHYSICS ENGINE (MPE) — v15S
+# 🧊 MINIATURE PHYSICS ENGINE (MPE) — v16R1
 
 <img width="4426" height="1820" alt="Screenshot from 2026-10-25 15-16-11" src="https://github.com/user-attachments/assets/84b771cd-dc79-4f86-9b46-ca9b0f26dd4a" />
 <img width="4426" height="1820" alt="Screenshot from 2026-10-25 15-16-42" src="https://github.com/user-attachments/assets/c707edb4-1eb6-4ca6-b53a-7d9c2835803a" />
@@ -11,8 +11,8 @@
 > ASan/UBSan; the remaining reds are documented pre-existing limitations, not
 > regressions.
 >
-> **Active head:** `v15S` — GTK4 port with a modular kernel, per-world config,
-> and no kernel global simulation state. Build from `v15S/src`; verify from the
+> **Active head:** `v16R1` (opened 2026-10-25 off the official v15S release) — GTK4 port with a modular kernel, per-world config,
+> and no kernel global simulation state. Build from `v16R1/src`; verify from the
 > repository root with `python3 tools/test_runner.py --profile full`.
 
 **License:** GPL-3.0 · **Language:** C · **UI:** GTK4 · **Renderer:** OpenGL
@@ -43,7 +43,7 @@ sudo apt install build-essential pkg-config libgtk-4-dev libepoxy-dev
 # Optional, for the mpe-tui terminal debugger:
 sudo apt install libncurses-dev
 
-cd v15S/src
+cd v16R1/src
 make clean
 make
 ./engine
@@ -65,7 +65,7 @@ terminal, `F5`–`F11` run validation scenes. Full table and platform notes:
 | [`docs/API_REFERENCE.md`](docs/API_REFERENCE.md) | Public C API for embedders and module authors |
 | [`docs/MODULE_TUTORIAL.md`](docs/MODULE_TUTORIAL.md) | Write, build, and hot-load your first module |
 | [`docs/GLOSSARY.md`](docs/GLOSSARY.md) | Project vocabulary and audit-tag decoder |
-| [`docs/WHATS_NEW.md`](docs/WHATS_NEW.md) | v15S feature highlights |
+| [`docs/WHATS_NEW.md`](docs/WHATS_NEW.md) | v15S feature highlights (the v16R1 head opens on this set) |
 | [`docs/QUICKSTART.md`](docs/QUICKSTART.md) | Build, run, and controls |
 | [`docs/VERIFICATION.md`](docs/VERIFICATION.md) | Test profiles, gates, external validation |
 | [`docs/LIMITATIONS.md`](docs/LIMITATIONS.md) | Headline limitations |

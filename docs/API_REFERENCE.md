@@ -3,13 +3,13 @@
 > Who this is for: **embedders** (code that owns a world in-process) and
 > **module authors** (code loaded over the MPI C ABI). This document
 > catalogs the public surface and the ownership / lifetime rules the header
-> contracts enforce. The source of truth is the headers under `v15S/src/`;
+> contracts enforce. The source of truth is the headers under `v16R1/src/`;
 > signatures below are quoted from them. The interactive module lifecycle
 > (`mod load|attach|detach|unload|...`) is covered in
-> [`v15S/MODULES.md`](../v15S/MODULES.md); a complete worked example lives in
+> [`v16R1/MODULES.md`](../v16R1/MODULES.md); a complete worked example lives in
 > [`docs/MODULE_TUTORIAL.md`](MODULE_TUTORIAL.md).
 
-Header paths are relative to `v15S/src/`. Layout notes:
+Header paths are relative to `v16R1/src/`. Layout notes:
 
 | Layout element | File |
 |---|---|
@@ -95,7 +95,7 @@ bool mpe_config_save_guarded (const char *path);
 ```
 
 - 80 tunables in 13 categories; the authoritative list is
-  [`v15S/CONFIG.md`](../v15S/CONFIG.md).
+  [`v16R1/CONFIG.md`](../v16R1/CONFIG.md).
 - Module authors: read tunables through `world->cfg` **by struct field**
   (e.g. `cfg->solver.penetration_slop`), never through the key-string API
   inside the tick (keep hot paths table-free), and treat `cfg` as read-only.
@@ -118,7 +118,7 @@ lifecycle (`static_state`, sleep state).
 - **`object_id`/`object_generation`** identify bodies across array churn
   (removal compacts indices; ids survive).
 
-## 4. Module ABI — `core/mpe_module.h`  (full contract in [`v15S/MODULES.md`](../v15S/MODULES.md))
+## 4. Module ABI — `core/mpe_module.h`  (full contract in [`v16R1/MODULES.md`](../v16R1/MODULES.md))
 
 Kinds: `"shape" | "broadphase" | "solver" | "forcefield" | "constraint" | "generic"`.
 
@@ -191,7 +191,7 @@ void mpe_loader_release_module (const void *desc);
 ```
 
 - **Jail**: paths must resolve inside `ecosystem/` **relative to the
-  process working directory** (normally `v15S/src`). Anything else fails
+  process working directory** (normally `v16R1/src`). Anything else fails
   closed (`E_JAIL` / `E_NOFILE`).
 - **Load codes**: `0` loaded (or already loaded, file unchanged); `-1` bad
   path/jail/dlopen/registry; `-3` **stale** — path already loaded but the
@@ -228,7 +228,7 @@ Constraint family (one engine-side solve each, driven by a `*_params`
 struct): `revolute`, `prismatic`, `fixed`, `distance`, `rope` —
 `*_solve`, `*_pre_step`, `*_apply_motor`, and drift-correction helpers all
 take the world's `mpe_config_t`. The equations they implement are derived
-step-by-step in [`v15S/PHYSICS.md`](../v15S/PHYSICS.md).
+step-by-step in [`v16R1/PHYSICS.md`](../v16R1/PHYSICS.md).
 
 ## 8. Deterministic math — `core/det_math.h`
 
@@ -249,7 +249,7 @@ release-active telemetry — a test can assert zero, so a desync is never
 silent. `det_pin_fp_state` (called at world init) pins the portable FP
 subset (rounding mode + x86/ARM denormal flushing). Bitwise-twin claims
 are scoped to GCC/Clang IEEE targets; MSVC `/fp:strict` is unproven
-(`v15S/docs/NUMERICAL_GUARANTEES.md` has the precise budgets).
+(`v16R1/docs/NUMERICAL_GUARANTEES.md` has the precise budgets).
 
 ## 9. Diagnostics & validation — `core/mpe_diag.h`, `core/event_log.h`
 
@@ -266,9 +266,9 @@ record naming the subsystem, a stable code, the engine `file:line`, and
 runtime values — rejections are never silent. Runtime self-audit:
 `MPE_TESTS`-style validation scenes run from the F5–F11 keys report
 through `validation_report`. Details and the S2 bridge transcript:
-[`v15S/docs/DIAGNOSTICS.md`](../v15S/docs/DIAGNOSTICS.md).
+[`v16R1/docs/DIAGNOSTICS.md`](../v16R1/docs/DIAGNOSTICS.md).
 
-## 10. Threading contract (summary) — full model in [`v15S/MULTICORE.md`](../v15S/MULTICORE.md)
+## 10. Threading contract (summary) — full model in [`v16R1/MULTICORE.md`](../v16R1/MULTICORE.md)
 
 Parallel under `MPE_THREADS > 1`: per-body work, CCD sweeps, pair-local
 collision detection, narrowphase dispatch, solver sweeps **across
@@ -297,4 +297,4 @@ targets.
 
 *Corrections to this document follow the same discipline as the code in
 _tree_: quote the header, and—if a signature changed—fix both in the same
-commit. See [`v15S/DEV_GUIDE.md`](../v15S/DEV_GUIDE.md).*
+commit. See [`v16R1/DEV_GUIDE.md`](../v16R1/DEV_GUIDE.md).*

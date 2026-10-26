@@ -71,11 +71,11 @@ for all registered suites and sanitizers.
 Static and numerical checks used for the 2026-10-20 audit:
 
 ```bash
-cd v15S/src
+cd v16R1/src
 make analyze
 cd ../..
-python3 v15S/validation/property_sweep.py
-cd v15S/src
+python3 v16R1/validation/property_sweep.py
+cd v16R1/src
 make tsan                 # Linux launcher uses setarch -R by default
 ```
 

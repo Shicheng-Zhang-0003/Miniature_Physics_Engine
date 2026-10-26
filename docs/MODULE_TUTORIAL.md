@@ -1,10 +1,10 @@
 # Your First MPE Module — a Worked Tutorial
 
 > Build, hot-load, attach, verify, and unload a complete MPI module in about
-> fifteen minutes. The contract is in [`v15S/MODULES.md`](../v15S/MODULES.md);
+> fifteen minutes. The contract is in [`v16R1/MODULES.md`](../v16R1/MODULES.md);
 > the public API surface is in [`docs/API_REFERENCE.md`](API_REFERENCE.md);
 > the reference implementation this tutorial mirrors is
-> `v15S/src/ecosystem/capsule/mpe_capsule.c` (a *shape* module — the hardest
+> `v16R1/src/ecosystem/capsule/mpe_capsule.c` (a *shape* module — the hardest
 > kind). Here we build the *easiest* useful kind: a forcefield tick module.
 
 ## 0. What you will build
@@ -18,7 +18,7 @@ Fifteen-minute path: create the directory → paste the module → build →
 
 ## 1. The three contract rules that matter here
 
-Every rule lives in `v15S/src/core/mpe_module.h`; these three bite first:
+Every rule lives in `v16R1/src/core/mpe_module.h`; these three bite first:
 
 1. **Per-world state via `void *mod_state`** — `attach` mallocs it, `detach`
    frees it. Never allocate anywhere else, never share across worlds.
@@ -107,10 +107,10 @@ Notes on what is deliberately *not* in this example:
 
 The loader jail accepts anything resolving inside `ecosystem/<member>/`.
 Create the directory and build exactly as the engine builds the capsule module
-(rule at `v15S/src/makefile`, `ecosystem/capsule/mpe_capsule$(PLUGIN_EXT)`):
+(rule at `v16R1/src/makefile`, `ecosystem/capsule/mpe_capsule$(PLUGIN_EXT)`):
 
 ```bash
-cd v15S/src
+cd v16R1/src
 mkdir -p ecosystem/flow
 gcc -g -I. -fPIC -shared -Wall -Wextra -Werror -ffp-contract=off \
     ecosystem/flow/mpe_flow.c -o ecosystem/flow/mpe_flow.so
@@ -129,7 +129,7 @@ your arithmetic bit-stable (the engine pins it on every compile; see
 
 ## 4. Load → attach → verify → detach → unload
 
-Run the engine from `v15S/src` (the jail is relative to the **process CWD**)
+Run the engine from `v16R1/src` (the jail is relative to the **process CWD**)
 and open the debug page: **`1`** key. Then:
 
 ```text
@@ -159,7 +159,7 @@ again.
 
 ## 5. The mistakes that cost the maintainers real time
 
-(the pitfalls each cost an audit entry somewhere in `v15S/docs/DESPOT_*.md`)
+(the pitfalls each cost an audit entry somewhere in `v16R1/docs/DESPOT_*.md`)
 
 1. **Duplicate shared-symbol interposition.** Several plugins export a
    global named `mpe_module_desc`. If your `.so` locates *itself* with
@@ -171,7 +171,7 @@ again.
    hold it across an unload.
 3. **`static_state` vs sleep.** Statics never move; *sleeping dynamics*
    wake on their own when forces act — check `sleep_contact_wake` semantics
-   in `v15S/src/tests/` before assuming wind should wake them (this tutorial
+   in `v16R1/src/tests/` before assuming wind should wake them (this tutorial
    intentionally leaves sleeping bodies asleep, which is what world-honest
    physics wants).
 4. **`deterministic = true` without `det_math`.** One bare `powf` in your
@@ -191,9 +191,9 @@ again.
 | Goal | Read / copy |
 |---|---|
 | Write a new **shape** (pair handlers, bounding invariant, slop, contacts) | `ecosystem/capsule/mpe_capsule.c` — the reference module |
-| Replace the **broadphase / solver** (hooks) | `mpe_broadphase_if_t` / `mpe_solver_if_t` in `core/mpe_module.h`; indexing rules in `v15S/ARCHITECTURE.md` §data structures |
-| Build a **bundle** of several modules | `ecosystem/mfs/mfs_ecosystem.c` (`mpe_ecosystem_desc`) and `v15S/src/ecosystem/mfs/readme.md` |
-| Understand the **biggest module in the repo** (robotics fleet) | `v15S/FTC.md` + `v15S/src/ecosystem/mfs/docs/ARCHITECTURE.md` |
+| Replace the **broadphase / solver** (hooks) | `mpe_broadphase_if_t` / `mpe_solver_if_t` in `core/mpe_module.h`; indexing rules in `v16R1/ARCHITECTURE.md` §data structures |
+| Build a **bundle** of several modules | `ecosystem/mfs/mfs_ecosystem.c` (`mpe_ecosystem_desc`) and `v16R1/src/ecosystem/mfs/readme.md` |
+| Understand the **biggest module in the repo** (robotics fleet) | `v16R1/FTC.md` + `v16R1/src/ecosystem/mfs/docs/ARCHITECTURE.md` |
 | Understand why your module must respect tick boundaries | `core/mpe_loader.h` header contract |
 
 *Keep the module contract in view: `core/mpe_module.h` is short and is the

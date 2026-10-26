@@ -41,7 +41,7 @@ from typing import Iterable, Sequence
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 PROJECT_TEMP = PROJECT_ROOT / "temp"
-SRC_DIR = PROJECT_ROOT / "v15S" / "src"
+SRC_DIR = PROJECT_ROOT / "v16R1" / "src"
 MAKEFILE = SRC_DIR / "makefile"
 IS_WINDOWS = os.name == "nt" or sys.platform.startswith("win")
 PLUGIN_EXT = ".dll" if IS_WINDOWS else ".so"
@@ -718,9 +718,9 @@ class Runner:
         version_ok = False
         header = SRC_DIR / "mpe_engine.h"
         if header.is_file():
-            version_ok = 'a3_version_string "v15S-dev"' in header.read_text(encoding="utf-8")
+            version_ok = 'a3_version_string "v16R1-dev"' in header.read_text(encoding="utf-8")
         self.add("engine-version-contract", "engine", "PASS" if version_ok else "FAIL", kind="contract",
-                 return_code=0 if version_ok else 1, detail="expected v15S-dev version macro" if not version_ok else "")
+                 return_code=0 if version_ok else 1, detail="expected v16R1-dev version macro" if not version_ok else "")
         return build.status == "PASS" and flags.status == "PASS" and version_ok
 
     def run_profile(self) -> bool:
@@ -883,7 +883,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "run_id": run_id,
         "profile": args.profile,
         "project_root": str(PROJECT_ROOT),
-        "source_tree": "v15S/src",
+        "source_tree": "v16R1/src",
         "started_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
         "python": sys.version.split()[0],
     }

@@ -20,9 +20,9 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-DRIVER = ROOT / "v15S" / "src" / "core" / "simulation_physics_loop.c"
-CANONICAL = ROOT / "v15S" / "src" / "core" / "physics_world.c"
-WORLD_HEADER = ROOT / "v15S" / "src" / "core" / "physics_world.h"
+DRIVER = ROOT / "v16R1" / "src" / "core" / "simulation_physics_loop.c"
+CANONICAL = ROOT / "v16R1" / "src" / "core" / "physics_world.c"
+WORLD_HEADER = ROOT / "v16R1" / "src" / "core" / "physics_world.h"
 
 # Physics stages that must live in physics_world_step(), not in a driver.
 FORBIDDEN_STAGE_CALLS = (

@@ -1,5 +1,32 @@
 # Version History
 
+- **v16R1 — 2026-10-25: train opened — the working head is officially v16R1.**
+  The v15S official release committed the stable tree as-is; this head
+  re-opens under the v16R1 train. The source tree itself is renamed
+  `v15S/` → `v16R1/` (327 tracked paths, pure R100 renames), the version
+  macros are bumped (`a3_version_string` → "v16R1-dev" and
+  `a3_release_freeze_note` → "v16R1 development head (ex-v15S release
+  train)" in **both** `mpe_version.h` and the `mpe_engine.h` duplicate),
+  and every living reference re-pointed: `tools/test_runner.py` (SRC_DIR
+  chain, the engine-version-contract gate that asserted the literal
+  v15S-dev string, the manifest `source_tree` key), the runner contract
+  tests, the loader jail error text, the MFS suite banner (`src: v16R1`),
+  the MFS twin guard candidates + `build_tests.sh` engine discovery (both
+  trees), the Windows install paths, and the living docs (readme title +
+  Active head, docs/INDEX title + lineage row, RELEASE_POLICY head label +
+  freeze-note pointer, BUILD / ARCHITECTURE / TESTING / KNOWN_LIMITATIONS /
+  how_to_use titles, VERIFICATION / VALIDATION command paths, install
+  instructions). Dated snapshots intentionally still say v15S — both
+  release notes, the history rows above, AUDIT/DESPOT reports,
+  RELEASE_GATES — as do the per-commit "port (v15S)" code-history comments
+  and measured-baseline prose, so every record keeps naming the exact tree
+  it was taken on. Verification: quick profile 60/60 (build + the updated
+  version gate on the renamed tree), MFS unified suite 31/32 from the
+  standalone 461 build against the renamed sibling 475 engine (the one
+  failure is aim_solve, the pre-existing registration, failing identically
+  on both trees), twin guard green (`in sync, artifacts ignored`), link
+  check 76/0.
+
 - **v15S — 2026-10-20: mathematical, programming, and operational audit.**
   Closed the concurrent-world worker-pool race and narrowphase shared-body
   races; added the prismatic angular lock and exact antipodal recovery;

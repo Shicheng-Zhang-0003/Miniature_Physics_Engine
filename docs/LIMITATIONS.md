@@ -1,6 +1,6 @@
 # Known Limitations
 
-See [`v15S/KNOWN_LIMITATIONS.md`](../v15S/KNOWN_LIMITATIONS.md) for the
+See [`v16R1/KNOWN_LIMITATIONS.md`](../v16R1/KNOWN_LIMITATIONS.md) for the
 complete, honest list. Headlines:
 
 - **Warm start:** cold by default (stable across all regimes). Damped

@@ -41,9 +41,9 @@
 | **hot-load / hot-load cycle** | `mod load → attach → tick → detach → unload` with the suite green both sides (the loader must never leave a dangling pointer behind). |
 | **`E_BUSY` (-2) / `-3 stale`** | Loader protections: unload refuses while a world can still call into the image; remount refuses changed on-disk files rather than silently running the old image. |
 | **MFS** | The robotics “miniature fleet simulator” ecosystem member: mecanum drivetrains, motor models, gamepad shell verbs, BioBuzz matches. Lives in `ecosystem/mfs/`. |
-| **FTC** | FIRST Tech Challenge—style robotics; the MFS *purpose*, not a sponsor. See `v15S/FTC.md`. |
+| **FTC** | FIRST Tech Challenge—style robotics; the MFS *purpose*, not a sponsor. See `v16R1/FTC.md`. |
 | **mecanum (analytic mode)** | The default drivetrain mode: no roller bodies are built; roller geometry is computed analytically. The fully articulated roller model (8 bodies × 4 wheels on free bearings) is kept for forensics and does not converge in this GS solver (measured). |
-| **BioBuzz** | The built-in regulation league: robots intake & launch pieces at a hive. See `v15S/FTC.md` and `ftc/biobuzz.c`. |
+| **BioBuzz** | The built-in regulation league: robots intake & launch pieces at a hive. See `v16R1/FTC.md` and `ftc/biobuzz.c`. |
 | **hive / up-cell / mouth** | The match target structure; its mouth is divided into staged 3-deep “nectar seats”. An *up-cell* is one mouth cell in its tilted local frame. |
 | **entering band / march** | An arc is “entering” when the ball ends the 150-tick march settled inside the up-cell window; the *march* replays a candidate trajectory through a throwaway mirrored world with real aero. |
 | **aim solve** | `ftc_aim_params_solve`: deterministic grid + march, first hit at the lowest elevation row; publishes `(power, elevation)` and caches by pose. |
@@ -55,12 +55,12 @@
 | Term | Meaning |
 |---|---|
 | **profiles (quick / physics / full)** | The test-runner scopes: contracts + canonical suite; + legacy & paranoia bins; + sanitizers, MFS, TUI, build gates. |
-| **canonical suite** | The C regression suite (`v15S/src/tests/mpe_suite_main.c`): registry floors prevent entries silently disappearing (currently 46 entries, 2 informational). |
+| **canonical suite** | The C regression suite (`v16R1/src/tests/mpe_suite_main.c`): registry floors prevent entries silently disappearing (currently 46 entries, 2 informational). |
 | **registry floor** | The minimum entry-count contract in the runner (`MIN_SUITE_ENTRIES` etc.) — deleting a test fails verification rather than quietly greening it. |
 | **QA run artifacts** | Timestamped per-run logs/JSON/JUnit under `temp/qa_runs/<UTC-stamp>/` (newest 10 kept). |
 | **paranoia suites** | The adversarial suite family (`tests/paranoia_*.c`): FP edges, integration corners, UAF/lifetime traps, determinism. |
 | **[SKIP] contract** | Self-skipped coverage fails the run unless `--allow-skip` — otherwise suites rot into skipping everything that is inconvenient. |
-| **DESPOT** | The *external* audit practice: an independent outside reviewer that returns dated findings ("DESPOT-YYYY-MM-DD") which are either fixed or mounted. The dates in code comments are those verdicts. See `v15S/docs/DESPOT_AUDIT_*.md`. |
+| **DESPOT** | The *external* audit practice: an independent outside reviewer that returns dated findings ("DESPOT-YYYY-MM-DD") which are either fixed or mounted. The dates in code comments are those verdicts. See `v16R1/docs/DESPOT_AUDIT_*.md`. |
 | **audit tag format** | `DESPOT-YYYY-MM-DD` (external audit round) · `MPE_*NNN(S)` / `MFS_NNNx` (project internal work items) · `FIX-AUDIT-…` (a fix landing an audit finding).   e.g. `DESPOT-2026-10-20 CCD-TOI GRAVITY` marks the fix era of that finding. |
 | **twin repos (461-MFS / 472-MGB)** | The sibling checkouts the ecosystem was born independently in; the sync contract keeps shared files identical (`tools/sync_mfs_check.sh`). |
 | **LIE-## / P#-N** | Audit-severity tags from audit rounds (e.g. `DESPOT-2026-10-07 LIE-06`: a documented claim that measured false; `P1-2`: priority-1 finding #2). |
@@ -69,8 +69,8 @@
 
 1. [`readme.md`](../readme.md) → 2. [`docs/QUICKSTART.md`](QUICKSTART.md) →
 3. [`docs/OVERVIEW.md`](OVERVIEW.md) → 4. this glossary →
-5. [`v15S/ARCHITECTURE.md`](../v15S/ARCHITECTURE.md) →
-6. pick your depth: [`v15S/PHYSICS.md`](../v15S/PHYSICS.md) (equations),
-   [`v15S/MULTICORE.md`](../v15S/MULTICORE.md) (threads), or
-   [`v15S/docs/NUMERICAL_GUARANTEES.md`](../v15S/docs/NUMERICAL_GUARANTEES.md)
+5. [`v16R1/ARCHITECTURE.md`](../v16R1/ARCHITECTURE.md) →
+6. pick your depth: [`v16R1/PHYSICS.md`](../v16R1/PHYSICS.md) (equations),
+   [`v16R1/MULTICORE.md`](../v16R1/MULTICORE.md) (threads), or
+   [`v16R1/docs/NUMERICAL_GUARANTEES.md`](../v16R1/docs/NUMERICAL_GUARANTEES.md)
    (what the numbers hold and where they stop).

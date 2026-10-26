@@ -34,7 +34,7 @@ over `v15R3`:
   caused it; records land on stderr, the event log and (live) the debug
   terminal, and `diag` replays them. Replaces error paths that collapsed
   into a bare `-1` and a guessed message. Full reference:
-  [`v15S/docs/DIAGNOSTICS.md`](../v15S/docs/DIAGNOSTICS.md).
+  [`v16R1/docs/DIAGNOSTICS.md`](../v16R1/docs/DIAGNOSTICS.md).
 - **Everything modular lives under `ecosystem/`** — the former top-level
   `plugins/` is gone. The loader jails paths to `ecosystem/` (any nesting
   depth), and a plain `.so` must export `mpe_module_desc`.
@@ -49,8 +49,8 @@ over `v15R3`:
   **Phase 1 moves existing bodies in place each refresh tick** (`cfg->every >
   0`), repositioning staged bodies rather than re-spawning them, with stable
   S2-atom→MPE-body mapping and zero-force bond lines that follow. See
-  [`v15S/docs/DIAGNOSTICS.md`](../v15S/docs/DIAGNOSTICS.md) §4 and
-  `v15S/REMAINING_WORK.md`.
+  [`v16R1/docs/DIAGNOSTICS.md`](../v16R1/docs/DIAGNOSTICS.md) §4 and
+  `v16R1/REMAINING_WORK.md`.
 - **Multicore solver** (`core/physics_world.c`) — `MPE_THREADS` (1–8,
   default 1) parallelizes per-body work, two-phase CCD, pair-local collision
   detection, and solver sweeps across independent islands. Shared-body contact
