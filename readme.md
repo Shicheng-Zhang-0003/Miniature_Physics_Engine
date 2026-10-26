@@ -62,6 +62,9 @@ terminal, `F5`–`F11` run validation scenes. Full table and platform notes:
 | Document | Contents |
 |---|---|
 | [`docs/OVERVIEW.md`](docs/OVERVIEW.md) | Design priorities and modular kernel |
+| [`docs/API_REFERENCE.md`](docs/API_REFERENCE.md) | Public C API for embedders and module authors |
+| [`docs/MODULE_TUTORIAL.md`](docs/MODULE_TUTORIAL.md) | Write, build, and hot-load your first module |
+| [`docs/GLOSSARY.md`](docs/GLOSSARY.md) | Project vocabulary and audit-tag decoder |
 | [`docs/WHATS_NEW.md`](docs/WHATS_NEW.md) | v15S feature highlights |
 | [`docs/QUICKSTART.md`](docs/QUICKSTART.md) | Build, run, and controls |
 | [`docs/VERIFICATION.md`](docs/VERIFICATION.md) | Test profiles, gates, external validation |

@@ -16,7 +16,9 @@ replaceable pipeline plugins. `.so` modules use the stable C ABI in
 Modules are loaded live via the debug terminal (`mod load|unload|attach|
 detach|use-broadphase|use-solver|ls`) or programmatically. Everything
 modular lives under `v15S/src/ecosystem/<member>/…`; the old top-level
-`plugins/` no longer exists.
+`plugins/` no longer exists. A complete worked example — module source,
+build line, `mod load → attach → detach → unload`, and the pitfalls audit
+history — lives in [`docs/MODULE_TUTORIAL.md`](../docs/MODULE_TUTORIAL.md).
 
 ---
 
