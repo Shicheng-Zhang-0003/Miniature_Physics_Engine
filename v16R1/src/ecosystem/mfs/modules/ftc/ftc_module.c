@@ -45,7 +45,7 @@ static void ftc_fleet_pre_step (mpe_world_t *world, float dt, void *mod_state) {
 const mpe_module_desc_t mpe_module_desc = {
     .abi = MPE_MODULE_ABI,
     .name = "ftc-fleet",
-    .version = "1.0",
+    .version = "1.0-Stable",
     .kind = "generic",
     .deterministic = false, /* heading det_sin/det_cos now exact, but other libm remains; see above */
     .attach = ftc_fleet_attach,

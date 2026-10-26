@@ -716,7 +716,7 @@ static int mfs_reg_pre (physics_world *w, float dt, void *state) {
 static const mpe_module_desc_t mfs_reg_desc = {
     .abi = MPE_MODULE_ABI,
     .name = "mfs-registry-probe",
-    .version = "1.0",
+    .version = "1.0-Stable",
     .attach = mfs_reg_attach,
     .detach = mfs_reg_detach,
     .pre_step = mfs_reg_pre,

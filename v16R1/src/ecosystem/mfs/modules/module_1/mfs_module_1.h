@@ -49,7 +49,7 @@
 #include "modules/ftc/submodules/motor_presets.h"
 #include "modules/ftc/submodules/battery.h"
 #include "modules/module_1/submodules/gamepad/gamepad.h"
-#define MFS_MODULE_1_VERSION "1.0"
+#define MFS_MODULE_1_VERSION "1.0-Stable"
 #define MFS_MODULE_1_NAME "mfs-simulator"
 /* LEGACY practice-arena ball spec (42 mm; regulation is 71/91 mm). */
 #define MFS_BIOBUZZ_BALL_DIAMETER 0.042f /* 42mm */

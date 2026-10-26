@@ -457,7 +457,7 @@ static int mfs_ecosystem_command (void *eco_state, int argc, char **argv) {
 MPE_USED const mpe_ecosystem_desc_t mpe_ecosystem_desc = {
     .abi = 1,
     .name = "mfs-simulator",
-    .version = "1.0",
+    .version = "1.0-Stable",
     .author = "MFS Team",
     .description = "MFS overarching ecosystem: ftc-fleet drive module attached by default; BioBuzz game module "
     "(module_1) registered but parked, attach explicitly",
