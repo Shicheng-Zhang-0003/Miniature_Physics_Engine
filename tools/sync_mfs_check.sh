@@ -99,7 +99,15 @@ if [ "$STAND" = "$EMBED" ]; then
     exit 2
 fi
 
-DRIFT="$(diff -rq "$STAND" "$EMBED" --exclude=.git --exclude=build --exclude=temp --exclude=plugins --exclude='*.o' --exclude='*.d' --exclude='*.so' --exclude='*.dll' --exclude='*.exe' --exclude='*.a' --exclude='*.lib' --exclude=sync_mfs_check.sh --exclude=.gitignore --exclude=LICENSE 2>&1 || true)"
+# DESPOT-2026-10-25: readme.md is repo-level metadata, the same exclusion
+# class as .gitignore/LICENSE ("per-repo by nature"). The standalone copy
+# became this repo's GitHub landing page (c2a99e9: screenshots as
+# user-attachment URLs, project status banner) while the embedded twin
+# keeps the MFS module-lifecycle doc — the two files are intentionally
+# different objects now. Verified before excluding: exactly one readme per
+# twin root, no nested readme.md candidates in either tree, so a name
+# exclusion stays surgical. Verified after: guard green.
+DRIFT="$(diff -rq "$STAND" "$EMBED" --exclude=.git --exclude=build --exclude=temp --exclude=plugins --exclude='*.o' --exclude='*.d' --exclude='*.so' --exclude='*.dll' --exclude='*.exe' --exclude='*.a' --exclude='*.lib' --exclude=sync_mfs_check.sh --exclude=.gitignore --exclude=LICENSE --exclude=readme.md 2>&1 || true)"
 if [ -n "$DRIFT" ]; then
   echo "[sync-mfs] DRIFT DETECTED (standalone vs embedded):"
   echo "[sync-mfs]   standalone: $STAND"
