@@ -186,7 +186,7 @@ release:
 	$(MAKE) BUILD_DIR=build-release CFLAGS="$(BASE_CFLAGS) -O3 -DNDEBUG" engine
 
 PREFIX ?= $(HOME)/.local
-install: engine mpe-tui plugins/mpe_capsule$(PLUGIN_EXT)
+install: engine mpe-tui ecosystem/capsule/mpe_capsule$(PLUGIN_EXT)
 	install -d $(DESTDIR)$(PREFIX)/bin
 	install -m 0755 engine$(EXE_EXT) $(DESTDIR)$(PREFIX)/bin/mpe-engine$(EXE_EXT)
 	install -m 0755 mpe-tui$(EXE_EXT) $(DESTDIR)$(PREFIX)/bin/mpe-tui$(EXE_EXT)
@@ -246,7 +246,7 @@ help:
 	@echo "         WARNINGS_AS_ERRORS=1 for -Werror"
 	@echo "         flow: python3 ../../tools/test_runner.py --profile full"
 
-# MFS lives in its distinct folder: ecosystem/mfs/ (see ecosystem/mfs/README_MFS.md).
+# MFS lives in its distinct folder: ecosystem/mfs/ (see ecosystem/mfs/readme.md).
 # It builds itself (ecosystem/mfs/Makefile, objects in ecosystem/mfs/build/);
 # the generic $(BUILD_DIR)/%.o rule below is engine-only.
 
@@ -524,7 +524,7 @@ tsan: ecosystem/mfs/mfs_ecosystem$(PLUGIN_EXT) ecosystem/capsule/mpe_capsule$(PL
 	$(TSAN_LAUNCHER) env MPE_THREADS=4 TSAN_OPTIONS=halt_on_error=1 ./test_paranoia_determinism_tsan$(EXE_EXT)
 	$(TSAN_LAUNCHER) env MPE_THREADS=4 TSAN_OPTIONS=halt_on_error=1 ./test_mpe_suite_tsan$(EXE_EXT) --all
 
-plugins: plugins/mpe_capsule$(PLUGIN_EXT)
+plugins: ecosystem/capsule/mpe_capsule$(PLUGIN_EXT)
 
 .PHONY: clean build_two_world test_two_world build_revolute test_revolute \
 	analyze asan tsan \

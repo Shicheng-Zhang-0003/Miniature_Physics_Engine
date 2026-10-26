@@ -4,7 +4,9 @@
  * Stable C ABI for hot plug-and-play physics components.
  * Rules:
  *  - modules never touch g_cfg / g_physics_world / bodies[] directly;
- *    use mpe_world_* accessors + per-world cfg (mpe_world_cfg).
+ *    use the published physics_world.h accessors + the per-world config
+ *    via world->cfg (mpe_config_t); add-body entry points are
+ *    physics_world_add_*.
  *  - per-module per-world state via void* (attach stores, detach frees).
  *  - deterministic modules must use det_math.h, never bare sin/cos/pow
  *    (sqrtf/isfinite are IEEE-exact and allowed).
