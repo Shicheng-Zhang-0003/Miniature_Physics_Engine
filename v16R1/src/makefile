@@ -316,7 +316,7 @@ tui-smoke: build_tui
 # failing test is never misreported as a build failure); test_<name> builds
 # and runs (human use).
 # TRUE god file split: collision_mechanics.c (2305 lines) → 4 focused TUs
-MPE_TEST_CORE := core/physics_world.c core/rigidbody.c core/mpe_registry.c core/mpe_loader.c core/mpe_diag.c core/event_log.c core/det_math.c core/mpe_primary.c \
+MPE_TEST_CORE := core/physics_world.c core/rigidbody.c core/mpe_registry.c core/mpe_loader.c core/mpe_diag.c core/event_log.c core/det_math.c core/mpe_primary.c core/nu_mass.c \
 	physics/collision_narrowphase.c physics/collision_cache.c physics/collision_solver.c physics/collision_ccd.c physics/collision_cylinder.c physics/broadphase.c physics/constraint.c physics/revolute_joint.c physics/depenetration.c physics/islands.c \
 	config/mpe_config.c config/mpe_config_schema.c scene/boundary.c ecosystem/mpe_ecosystem.c
 ifeq ($(MPE_WINDOWS),1)
@@ -489,7 +489,7 @@ ecosystem/capsule/mpe_capsule$(PLUGIN_EXT): ecosystem/capsule/mpe_capsule.c core
 # One binary, exact-name dispatch, shared builders (no 30x core recompile).
 # Links core + spring physics + scene I/O (stubs for scene_init/camera live
 # in tests/mpe_suite_main.c). Replaces the 30-binary v1 layout over time.
-MPE_SUITE_SRCS := tests/mpe_suite_main.c tests/mpe_suite_a.c tests/mpe_suite_b.c tests/mpe_suite_c.c tests/mpe_suite_d.c tests/mpe_suite_loader.c tests/mpe_suite_ftc.c
+MPE_SUITE_SRCS := tests/mpe_suite_main.c tests/mpe_suite_a.c tests/mpe_suite_b.c tests/mpe_suite_c.c tests/mpe_suite_d.c tests/mpe_suite_loader.c tests/mpe_suite_ftc.c tests/mpe_suite_nuf.c
 MPE_SUITE_DEPS := $(MPE_TEST_CORE) $(SPRING_TEST_SRCS) $(SCENE_TEST_SRCS)
 # The ftc_ecosystem test needs the bundle fixture: build it first.
 build_suite: $(MPE_SUITE_SRCS) $(MPE_SUITE_DEPS) ecosystem/mfs/mfs_ecosystem$(PLUGIN_EXT) ecosystem/capsule/mpe_capsule$(PLUGIN_EXT)
@@ -503,7 +503,7 @@ ecosystem/mfs/mfs_ecosystem$(PLUGIN_EXT):
 	$(MAKE) -C ecosystem/mfs mfs_ecosystem$(PLUGIN_EXT)
 test_suite: build_suite
 	mkdir -p ../../temp
-	@echo "NOTE: test_suite runs 44 physics only (no --all); use test_suite_all / runner --profile quick for the 46 registry (44 blocking + 2 diag)."
+	@echo "NOTE: test_suite runs 45 physics only (no --all); use test_suite_all / runner --profile quick for the 47 registry (45 blocking + 2 diag)."
 	./test_mpe_suite$(EXE_EXT)
 test_suite_all: build_suite
 	mkdir -p ../../temp

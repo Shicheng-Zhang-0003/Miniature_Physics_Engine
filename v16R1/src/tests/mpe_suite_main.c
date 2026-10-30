@@ -107,6 +107,7 @@ int mpe_t_module (void);
 int mpe_t_loader_lifecycle (void);
 int mpe_t_diag_naming (void);
 int mpe_t_ftc_ecosystem (void);
+int mpe_t_nuf_mass_composite (void);
 typedef struct {
     const char *name;
     int (*fn) (void);
@@ -190,6 +191,10 @@ static const mpe_entry_t mpe_registry [] = {
     /* Every rejection names itself: distinct codes, source + call site, hook
      * invoked exactly once. See mpe_suite_loader.c mpe_t_diag_naming. */
     {"diag_naming", mpe_t_diag_naming, 0},
+    /* NUF stage-0 (v16S charter, docs/NON_UNIFORM_BODY.md WP0): mass/COM/
+     * inertia composition against independent closed forms. Blocking from
+     * day one — the later body-contract wiring inherits these sticks. */
+    {"nuf_mass_composite", mpe_t_nuf_mass_composite, 0},
 };
 #define MPE_NTESTS ((int) (sizeof (mpe_registry) / sizeof (mpe_registry [0])))
 /* Returns 0 pass, 1 fail, 2 skipped.

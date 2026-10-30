@@ -123,7 +123,11 @@ MPE_TEST_REGIMES = ("default", "light", "heavy", "brittle", "sticky")
 # -> 45 (2026-10-09, diag_naming: every rejection names its own source/code/call
 # site, and an attach hook with side effects must run exactly once)
 # -> 46 (2026-10-14, keydrive_axes: G V B N C M keyboard-drive convention).
-MIN_SUITE_ENTRIES = 46
+# -> 47 (2026-10-30, nuf_mass_composite: NUF stage-0, v16S charter
+# docs/NON_UNIFORM_BODY.md WP0 — mass/COM/inertia composition against
+# independent closed forms; the measuring sticks land before the body
+# contract they certify).
+MIN_SUITE_ENTRIES = 47
 # DESPOT-2026-10-01: pin per-suite floors so deleting a legacy/paranoia target
 # + its make target together cannot shrink the headline silently (the 220->204
 # drift). Canonical floor above; legacy 30 + paranoia 14 pinned here.
