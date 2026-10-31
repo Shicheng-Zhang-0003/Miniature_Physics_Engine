@@ -107,8 +107,8 @@ int mpe_t_module (void);
 int mpe_t_loader_lifecycle (void);
 int mpe_t_diag_naming (void);
 int mpe_t_ftc_ecosystem (void);
-int mpe_t_nuf_mass_composite (void);
-int mpe_t_nuf_pendulum_physical (void);
+int mpe_t_mig_mass_composite (void);
+int mpe_t_mig_pendulum_physical (void);
 typedef struct {
     const char *name;
     int (*fn) (void);
@@ -192,14 +192,14 @@ static const mpe_entry_t mpe_registry [] = {
     /* Every rejection names itself: distinct codes, source + call site, hook
      * invoked exactly once. See mpe_suite_loader.c mpe_t_diag_naming. */
     {"diag_naming", mpe_t_diag_naming, 0},
-    /* NUF stage-0 (v16S charter, docs/NON_UNIFORM_BODY.md WP0): mass/COM/
+    /* MIG stage-0 (v16S charter, docs/NON_UNIFORM_BODY.md WP0): mass/COM/
      * inertia composition against independent closed forms. Blocking from
      * day one — the later body-contract wiring inherits these sticks. */
-    {"nuf_mass_composite", mpe_t_nuf_mass_composite, 0},
+    {"mig_mass_composite", mpe_t_mig_mass_composite, 0},
     /* WP1 step 1.1 pre-change probe (plan §3): runs against the UNMODIFIED
      * engine — the revolute + hand-authored tensor must already satisfy
      * the physical-pendulum closed form before any body-contract change. */
-    {"nuf_pendulum_physical", mpe_t_nuf_pendulum_physical, 0},
+    {"mig_pendulum_physical", mpe_t_mig_pendulum_physical, 0},
 };
 #define MPE_NTESTS ((int) (sizeof (mpe_registry) / sizeof (mpe_registry [0])))
 /* Returns 0 pass, 1 fail, 2 skipped.

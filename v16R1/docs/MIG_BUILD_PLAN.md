@@ -1,4 +1,4 @@
-# NUF Build Plan — execution playbook for the v16S train
+# MIG Build Plan — execution playbook for the v16S train
 
 > Companion to [`NON_UNIFORM_BODY.md`](NON_UNIFORM_BODY.md) (the design
 > charter, frozen). Charter freezes **what and why**; this document carries
@@ -9,18 +9,21 @@
 >
 > ⏸ STATUS LINE (keep updated at every step): **WP0 landed and pushed
 > (181c2c0 charter, 0882935 WP0 code, 636b10e playbook — 2026-10-30).
-> WP1 step 1.1 landed 2026-10-30 (`b0e1cbb`): `nuf_pendulum_physical`
+> WP1 step 1.1 landed 2026-10-30 (`b0e1cbb`): `mig_pendulum_physical`
 > first-run green on the UNMODIFIED engine — measured period 1.8188 s vs
 > the corrected closed form 1.8184 s, max_drift 0.0003 m, Steiner term
 > 74% of I_pivot; zero pre-existing debt surfaced. RULINGS RECORDED
-> 2026-10-30 (§2): P1 RENAME NUF→MIG (MPE-Infinity-Generator), riding the
-> next commit together with WP1 1.2–1.4; P2 cap 16 counted confirmed with
-> the hybrid/GPU future-work note; P3 hulls in scope as incremental
-> WP2.5 (§8.5); P4 the 1.4 stub lands. NEXT COMMIT: the code landing —
-> files/identifiers renamed to mig_* inside the same commit as the 1.2
-> bridge, 1.3 clamp counter, and 1.4 stub; this playbook file is renamed
-> MIG_BUILD_PLAN.md in that same landing; engine still bit-unchanged
-> until then (`nu_mass.c` outside the engine link list).**
+> 2026-10-30 (§2): P1 RENAME NUF→MIG (MPE-Infinity-Generator); P2 cap 16
+> counted confirmed with the hybrid/GPU future-work note; P3 hulls in
+> scope as incremental WP2.5 (§8.5); P4 the 1.4 stub lands. THE P1
+> RENAME LANDED standalone 2026-10-30 (this commit) per the author's
+> rename-first directive: files/identifiers/gates are mig_* and this
+> playbook is MIG_BUILD_PLAN.md; the engine touched NOTHING —
+> `mig_mass.c` remains outside the engine link list, engine binary
+> bit-unchanged since v15S+MFS-v10S. NEXT: the massive changes WP1
+> 1.2–1.4 (bridge struct, clamp counter, add_composite stub) in their
+> own green landing, engine still untouched until then; WP2–6 not
+> started.**
 
 ---
 
@@ -70,20 +73,26 @@ Landed and pushed 2026-10-30 (WP0 block: commits `181c2c0` charter,
 | Artifact | Nature |
 |---|---|
 | `v16R1/docs/NON_UNIFORM_BODY.md` | design charter (frozen decisions) |
-| `v16R1/src/core/nu_mass.h` | composition contract + all type/error enums |
-| `v16R1/src/core/nu_mass.c` | exact composition: mass/COM/inertia, double accumulation, definition-order deterministic |
-| `v16R1/src/tests/mpe_suite_nuf.c` | gates `nuf_mass_composite` (7 probe families, oracle independence) + `nuf_pendulum_physical` (WP1 1.1 probe, hand-written oracle) |
+| `v16R1/src/core/mig_mass.h` | composition contract + all type/error enums |
+| `v16R1/src/core/mig_mass.c` | exact composition: mass/COM/inertia, double accumulation, definition-order deterministic |
+| `v16R1/src/tests/mpe_suite_mig.c` | gates `mig_mass_composite` (7 probe families, oracle independence) + `mig_pendulum_physical` (WP1 1.1 probe, hand-written oracle) |
 | `v16R1/src/tests/mpe_suite_main.c` | externs + registry entries (48th run blocking) |
-| `v16R1/src/makefile` | `MPE_TEST_CORE += core/nu_mass.c`, `MPE_SUITE_SRCS += tests/mpe_suite_nuf.c`, help-note renumber |
+| `v16R1/src/makefile` | `MPE_TEST_CORE += core/mig_mass.c`, `MPE_SUITE_SRCS += tests/mpe_suite_mig.c`, help-note renumber |
 | `tools/test_runner.py` | floor 46 → 47 → 48 with dated history comments |
+
+Names in this table are the PRESENT (post-P1-rename) spellings; at their
+landing commits the files were `nu_mass.{h,c}` and the gates were
+`nuf_*` — see §2's mapping and the rename line in §9. The rename landing
+also renamed this playbook file itself (`NUF_BUILD_PLAN.md` →
+`MIG_BUILD_PLAN.md`).
 
 Measured baseline (numbers a resume session must reproduce):
 
 - Suite: 48 registered, **46/46 blocking green**, 2 diag-informational
   (WP0 landing was 47/45; step 1.1 added the 48th blocking gate).
 - Runner quick: **62/62** (WP0 landing was 61/61).
-- ASan/UBSan suite build: green, both `nuf_*` gates clean.
-- Engine binary: unchanged bits (`nu_mass.c` outside the engine link
+- ASan/UBSan suite build: green, both `mig_*` gates clean.
+- Engine binary: unchanged bits (`mig_mass.c` outside the engine link
   list; step 1.1 touched no engine file).
 
 WP0's verdict is on record: the one red in its history was the test
@@ -110,21 +119,27 @@ the rename landing.
 
 - **P1 — the name: RENAMED.** Resolution (verbatim intent): *name it
   MIG (MPE-Infinity-Generator), fits the bill as we should be able to
-  create near infinite types of objects now.* Ride-along rule unchanged
-  and now binding: the rename lands together with WP1's first
-  body-contract change (steps 1.2/1.3/1.4), so the engine-facing surface
-  is born with `mig_` names and no engine-facing commit ever exists under
-  `nuf_*` names. Mapping applied at that landing:
-  `core/nu_mass.{h,c}` → `core/mig_mass.{h,c}`; `nu_compose` →
+  create near infinite types of objects now.*
+  Ride-along amendment (author directive, 2026-10-30): the rename lands
+  FIRST as a standalone green commit — *massive changes leave till
+  later* — and WP1's body-contract steps (1.2/1.3/1.4) follow in their
+  own landings. Binding consequence: the FIRST engine-facing commit is
+  born with `mig_` names and carries no rename (a rename after that
+  would be grep surgery); the standalone rename touches only test-core
+  files (`mig_mass.c` stays outside the engine link list), so the engine
+  binary is bit-unchanged through both.
+  Mapping as applied at the rename landing:
+  `core/nu_mass.{h,c}` became `core/mig_mass.{h,c}`; `nu_compose` →
   `mig_compose`, `nu_rebase_parts` → `mig_rebase_parts`, `nu_part` →
   `mig_part`, `nu_totals` → `mig_totals`, `nu_compose_*` errors →
-  `mig_compose_*` (header guard `mig_mass_h`); gates
+  `mig_compose_*` (header guard `nu_mass_h` → `mig_mass_h`); gates
   `nuf_mass_composite` → `mig_mass_composite` and
   `nuf_pendulum_physical` → `mig_pendulum_physical` (test functions
-  `mpe_t_mig_*`, registry name strings, externs); spec verb
-  `nuf <name>` → `mig <name>`; scene record `NUF1` → `MIG1`;
-  `docs/NUF_BUILD_PLAN.md` → `docs/MIG_BUILD_PLAN.md` (charter §9
-  cross-link updates); future gate names carry the `mig_` prefix
+  `mpe_t_mig_*`, registry name strings, externs; `tests/mpe_suite_nuf.c`
+  became `tests/mpe_suite_mig.c`); spec verb `nuf <name>` →
+  `mig <name>`; scene record `NUF1` → `MIG1`;
+  `docs/NUF_BUILD_PLAN.md` became `docs/MIG_BUILD_PLAN.md` (charter §9
+  cross-link updated); future gate names carry the `mig_` prefix
   (`mig_composite_stack`, `mig_floor_ccd_composite`,
   `mig_pendulum_com_offset`, `mig_scene_roundtrip`). The SCENE TYPE name
   stays `object_composite` (descriptive, not brand). Commit history
@@ -161,13 +176,13 @@ the rename landing.
 
 ## §3 WP1 — the mass contract touches the body (first engine change)
 
-**Scope:** let a body's mass tensor arrive from `nu_compose` instead of
+**Scope:** let a body's mass tensor arrive from `mig_compose` instead of
 the three hardcoded type formulas; wire the counted-clamp bridge. STILL
 no composite type, no parts pool (that is WP2). The WP0 suite stays
 exactly as green as it was.
 
-- [x] **1.1 Pre-change probe: `nuf_pendulum_physical`** in
-  `tests/mpe_suite_nuf.c` — revolute pendulum with a CUBE bob pivoted at a
+- [x] **1.1 Pre-change probe: `mig_pendulum_physical`** in
+  `tests/mpe_suite_mig.c` — revolute pendulum with a CUBE bob pivoted at a
   top-face anchor. Measured period vs the full physical-pendulum closed
   form `T = 2π·√(I_pivot/(M·g·d))` with `I_pivot = I_com + M·d²` (the
   setup steps must narrate that these ARE the parallel-axis numbers WP0's
@@ -183,8 +198,8 @@ exactly as green as it was.
   non-cubic cuboid half 0.15×0.6×0.25 (m=2), Steiner term 74% of
   I_pivot = 0.975 — the red clause above stays on the books for future
   probes.
-- [ ] **1.2 Bridge struct** in `core/nu_mass.h`: the handoff contract WP2
-  will consume — `nu_compose` totals + re-anchored part list, marked
+- [ ] **1.2 Bridge struct** in `core/mig_mass.h`: the handoff contract WP2
+  will consume — `mig_compose` totals + re-anchored part list, marked
   "caller owns; world copies in". No engine include added; keep the
   dependency-clean rule.
 - [ ] **1.3 Clamp counter:** `mpe_clamp_composite_events` (+ accessor) in
@@ -224,9 +239,9 @@ broadphase/floor/CCD hooks, editor-invisible (UI is WP4). Estimated
   style — rigidbody is engine-internal and NOT the external plugin ABI
   (`mpe_module.h` is; that bump belongs to 2.4).
 - [ ] **2.2 World API.** `physics_world_add_composite` completes the WP1
-  stub: `nu_compose` bridge (validate every part, whole-assembly
+  stub: `mig_compose` bridge (validate every part, whole-assembly
   invalidation semantics preserved — the composed body refuses nothing a
-  caller can count), `nu_rebase_parts` about the COM into the pool slice,
+  caller can count), `mig_rebase_parts` about the COM into the pool slice,
   body mass/inverse/authored `inertia_tensor_local` written, sanitize
   guard extended so a composed tensor is never regenerated from type
   defaults (mirror of the existing custom-type guard),
@@ -260,7 +275,7 @@ broadphase/floor/CCD hooks, editor-invisible (UI is WP4). Estimated
   never ship with (the TASK_05 both-side-match repair is the precedent
   to cite in the commit).
 - [ ] **2.6 Floor + CCD.** Per-part floor manifolds under the existing
-  plane path (gate `nuf_floor_ccd_composite`: tumbling L-composite
+  plane path (gate `mig_floor_ccd_composite`: tumbling L-composite
   clamps before tunneling at canonical dt, no landing pump); floor CCD
   lowest-point scan over parts; volume sweeps stay bounding-sphere.
   Rotation-only tunneling stays unsupported — same frontier as v15S,
@@ -270,10 +285,10 @@ broadphase/floor/CCD hooks, editor-invisible (UI is WP4). Estimated
   body-level `no_collide` respected. (Mesh instance count guard: parts
   are bounded by P2's cap — no renderer unboundedness.)
 - [ ] **2.8 Gates** (each its own suite entry, floor bump same commit):
-  `nuf_composite_stack` (10-primitive stack vs one 10-part composite,
-  same mass/materials: both settle asleep); `nuf_floor_ccd_composite`;
+  `mig_composite_stack` (10-primitive stack vs one 10-part composite,
+  same mass/materials: both settle asleep); `mig_floor_ccd_composite`;
   part-scoped cache probe (two resting parts → distinct cache entries,
-  warm starts never cross); `nuf_pendulum_com_offset` — the charter end-
+  warm starts never cross); `mig_pendulum_com_offset` — the charter end-
   to-end gate now becomes possible: composite bob with off-COM mass,
   period vs parallel-axis closed form (this gate certifying the whole
   contract through the solver is the thesis of the train); determinism
@@ -285,12 +300,12 @@ broadphase/floor/CCD hooks, editor-invisible (UI is WP4). Estimated
   pre-WP2 run (keep an un-touched `temp/qa_runs` summary from the
   pre-composite commit for the diff).
 
-## §5 WP3 — scene persistence (v200 `NUF1` record)
+## §5 WP3 — scene persistence (v200 `MIG1` record)
 
 Charter §5 is the contract; the plan adds touch-points only.
 
 - [ ] **3.1 Writer/reader two-pass:** body rows as v200 today, then a
-  `NUF1` extension record per composite (part tuples per charter layout),
+  `MIG1` extension record per composite (part tuples per charter layout),
   referenced by body id (the id-remap pass already exists —
   `scene/scene_id_remap.*`); CRC covers the stream unchanged.
 - [ ] **3.2 Loader kindness (degrade-not-veto):** missing blob →
@@ -298,7 +313,7 @@ Charter §5 is the contract; the plan adds touch-points only.
   `scene/scene_load.c` ~:228 is the template); unknown part type inside a
   blob → that part degrades, scene continues; load-time sum-consistency
   gate (recompose vs stored mass, mismatch = diag + clamp, never a veto).
-- [ ] **3.3 Gate:** `nuf_scene_roundtrip` (save → load → bitwise pose +
+- [ ] **3.3 Gate:** `mig_scene_roundtrip` (save → load → bitwise pose +
   mass identity) in the same commit as the writer.
 
 ## §6 WP4 — terminal verbs + spec format + the tiny CAD editor
@@ -310,11 +325,11 @@ the editor is a window onto it; no editor-only truth exists.
   reader's spec):
 
   ```
-  # NUF object spec — one file, one object. Reader rejects unknown
+  # MIG object spec — one file, one object. Reader rejects unknown
   # keywords LOUDLY (named diag), never guesses. `frame assembly` means
   # the part poses below are in the assembly frame and the COM is computed
   # on save (the body is always born COM-framed).
-  nuf <name>
+  mig <name>
     frame assembly
     part <index> type sphere|cube|cylinder
       dims radius r [half hl] [hx hx hy hy hz hz]     # per-type subset
@@ -324,17 +339,17 @@ the editor is a window onto it; no editor-only truth exists.
       colour r g b
   ```
 
-- [ ] **4.2 Headless surface first.** Parser that fills `nu_part` arrays
+- [ ] **4.2 Headless surface first.** Parser that fills `mig_part` arrays
   (pure, suite-gated for determinism/reject codes); terminal verbs in
-  `ui_input/term_obj.c`: `nuf load`, `nuf show`, `nuf save`, `nuf list`
+  `ui_input/term_obj.c`: `mig load`, `mig show`, `mig save`, `mig list`
   (spec store is a per-session named table, not a world write). Includes
   the spec-round-trip gate (read + write must reproduce byte-identical
   normalized output) BEFORE any button exists.
 - [ ] **4.3 microvim is the editor.** The in-app editing path is literally
-  `ui_input/microvim.c` (it already exists, 1390 lines) — `nuf edit`
+  `ui_input/microvim.c` (it already exists, 1390 lines) — `mig edit`
   opens the spec in the microvim buffer; saving re-parses and stages the
   body. "Tiny CAD" step one costs almost nothing and is native.
-- [ ] **4.4 GTK panel** (`ui_input/nuf_editor.c`, new): part-list panel +
+- [ ] **4.4 GTK panel** (`ui_input/mig_editor.c`, new): part-list panel +
   per-part fields (type, dims, pose, material, mass-or-density, colour)
   in the `config_menu`/`editor_dialog` construction style; two-axis
   translate gizmo first, rotate fields numeric; live COM marker rendered
@@ -375,7 +390,7 @@ Charter §8 is the contract; the plan adds the risk discipline.
 ## §8 WP6 — docs, policy amendment, release cadence (the v16S cut)
 
 - [ ] **6.1** Single-commit doc sweep: `docs/PHYSICS.md` §9-composition
-  (the equation block from `nu_mass.c`, the (A)-decision, part-scoped
+  (the equation block from `mig_mass.c`, the (A)-decision, part-scoped
   keys, ghost/vector-free view, kernel payload row);
   ARCHITECTURE kernel section (parts pool + part-pair iteration);
   GLOSSARY (composite, part, rebase, totals, ghost view);
@@ -428,9 +443,9 @@ reference gates force it.
 
 - **Cross-part warm-start aliasing** — highest. Mitigations: part-scoped
   keys in the SAME commit as the first manifold map (2.4+2.5); the
-  TASK_05 probe pattern as `nuf` cache gate; no part-index reuse ever.
+  TASK_05 probe pattern as `mig` cache gate; no part-index reuse ever.
 - **Floor churn (F10-class) through composites.** Mitigation: the
-  `nuf_composite_stack` sleep gate is named BEFORE 2.6 lands; pair-
+  `mig_composite_stack` sleep gate is named BEFORE 2.6 lands; pair-
   novelty wake should cover by construction; if it does not, the debugging
   path is the F10 root-cause record and the solver islands' sleep gates,
   documented in that order.
@@ -445,8 +460,11 @@ reference gates force it.
 - **ABI bump (2) breaking old `.so`** — append-only small-struct read
   keeps ABI-1 plugins loading; the loader test `module` +
   `loader_lifecycle` must stay green at every WP2 commit.
-- **Hull scope creep** — P3 default stands; anything touching SAT algebra
-  before the v16S cut requires an explicit amendment here, not momentum.
+- **Hull scope creep** — P3 ruled hulls in scope as INCREMENTAL WP2.5
+  (§8.5): every sub-step is green-or-rollback, the cut ships only green
+  increments behind `composite.hull 0` default, and anything charging
+  ahead of the staged list requires an explicit amendment here, not
+  momentum.
 
 Ledger (new entries get a line, never an edit of a past line):
 
@@ -461,6 +479,16 @@ Ledger (new entries get a line, never an edit of a past line):
   form with the Steiner term at 74% of I_pivot, so WP2's composite
   inherits a certified solver on that path (narrowphase claims nothing
   from this landing — only the tensor path is pinned).
+- 2026-10-30 — P1 rename landed (standalone, before 1.2+ per the
+  author's directive: massive changes later): every landed `nuf_*` name
+  on the chart is now spelled `mig_*` — `core/nu_mass.{h,c}` →
+  `core/mig_mass.{h,c}` (later re-listed in §1 annotations as was/now),
+  gates `nuf_mass_composite`/`nuf_pendulum_physical` (renamed at
+  landing) → `mig_mass_composite`/`mig_pendulum_physical`, playbook file
+  renamed `MIG_BUILD_PLAN.md`; the mapping bullets above date the
+  historical spellings. The two 2026-10-30 lines above had their
+  spellings updated by that rename — their content, verdicts, and hashes
+  are untouched and their gate/filenames are in the mapping bullets.
 
 ## §10 Definition of done for v16S (the cut checklist)
 

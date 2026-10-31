@@ -1,7 +1,7 @@
-/* NUF gate file (tests/mpe_suite_nuf.c):
- *   mpe_t_nuf_mass_composite — WP0 stage 0 regression (composition).
- *   mpe_t_nuf_pendulum_physical — WP1 step 1.1 pre-change probe (plan
- *     docs/NUF_BUILD_PLAN.md §3): runs against the UNMODIFIED engine,
+/* MIG gate file (tests/mpe_suite_mig.c):
+ *   mpe_t_mig_mass_composite — WP0 stage 0 regression (composition).
+ *   mpe_t_mig_pendulum_physical — WP1 step 1.1 pre-change probe (plan
+ *     docs/MIG_BUILD_PLAN.md §3): runs against the UNMODIFIED engine,
  *     hand-written oracle in this file, same independence contract.
  *
  * THE INDEPENDENCE CONTRACT: every expected value below is derived in THIS
@@ -36,14 +36,14 @@
 #include "mpe_test.h"
 #include "physics/spring_joint.h"
 #include "core/rigidbody.h"
-#include "core/nu_mass.h"
+#include "core/mig_mass.h"
 
 /* Probe-7 fixture checker: the untouched totals must read 0xAB in every
- * byte (nu_totals has no padding bytes; assert-in-code that this stays
+ * byte (mig_totals has no padding bytes; assert-in-code that this stays
  * true by checking the size the layout actually has). */
-static int unchanged_slab (const nu_totals *before);
+static int unchanged_slab (const mig_totals *before);
 
-static int unchanged_slab (const nu_totals *before) {
+static int unchanged_slab (const mig_totals *before) {
     const unsigned char *p = (const unsigned char *) before;
     for (size_t i = 0; i < sizeof (*before); i++) {
         if (p [i] != 0xAB) { return 0; }
@@ -51,9 +51,9 @@ static int unchanged_slab (const nu_totals *before) {
     return 1;
 }
 
-int mpe_t_nuf_mass_composite (void) {
+int mpe_t_mig_mass_composite (void) {
     mpe_test_t t;
-    mpe_test_begin (&t, "nuf_mass_composite");
+    mpe_test_begin (&t, "mig_mass_composite");
     /* The WP0 file is pure math and never steps the world; assert that the
      * determinism watchdog's own precondition holds for the whole run. */
     mpe_clamp_counters_reset ();
@@ -64,15 +64,15 @@ int mpe_t_nuf_mass_composite (void) {
      * Ixx = 2·0.05 (dx parallel to X contributes m·dy²+dz² = 0) = 0.1.
      * Iyy = Izz = 2·(0.05 + 2·0.25) = 1.1. */
     {
-        nu_part parts [2] = {0};
-        parts [0].type = nu_part_sphere; parts [0].radius = 0.25f;
-        parts [0].mass_mode = nu_mass_mode_explicit; parts [0].mass = 2.0f;
+        mig_part parts [2] = {0};
+        parts [0].type = mig_part_sphere; parts [0].radius = 0.25f;
+        parts [0].mass_mode = mig_mass_mode_explicit; parts [0].mass = 2.0f;
         parts [0].position = (vector3) {-0.5f, 0.0f, 0.0f};
         parts [0].orientation = (vector4) {1.0f, 0.0f, 0.0f, 0.0f};
         parts [1] = parts [0];
         parts [1].position = (vector3) {0.5f, 0.0f, 0.0f};
-        nu_totals total;
-        MPE_CHECK (&t, nu_compose (parts, 2, &total) == nu_compose_ok);
+        mig_totals total;
+        MPE_CHECK (&t, mig_compose (parts, 2, &total) == mig_compose_ok);
         MPE_CHECK_NEAR (&t, total.mass, 4.0, 1e-9, "dumbbell mass");
         MPE_CHECK_NEAR (&t, total.com.x, 0.0, 1e-9, "dumbbell com x");
         MPE_CHECK_NEAR (&t, total.inertia.matrix [0][0], 0.1, 1e-6, "dumbbell Ixx");
@@ -91,16 +91,16 @@ int mpe_t_nuf_mass_composite (void) {
      * Ixx = 2/24 + 2·0.140625 = 0.3645833333…; Izz same; Iyy = 2/24 +
      * 4·0.140625 = 0.6458333333… */
     {
-        nu_part parts [2] = {0};
-        parts [0].type = nu_part_cube;
+        mig_part parts [2] = {0};
+        parts [0].type = mig_part_cube;
         parts [0].half_extensions = (vector3) {0.25f, 0.25f, 0.25f};
-        parts [0].mass_mode = nu_mass_mode_explicit; parts [0].mass = 1.0f;
+        parts [0].mass_mode = mig_mass_mode_explicit; parts [0].mass = 1.0f;
         parts [0].position = (vector3) {0.0f, 0.0f, 0.0f};
         parts [0].orientation = (vector4) {1.0f, 0.0f, 0.0f, 0.0f};
         parts [1] = parts [0];
         parts [1].position = (vector3) {0.75f, 0.0f, 0.75f};
-        nu_totals total;
-        MPE_CHECK (&t, nu_compose (parts, 2, &total) == nu_compose_ok);
+        mig_totals total;
+        MPE_CHECK (&t, mig_compose (parts, 2, &total) == mig_compose_ok);
         MPE_CHECK_NEAR (&t, total.mass, 2.0, 1e-9, "L mass");
         MPE_CHECK_NEAR (&t, total.com.x, 0.375, 1e-9, "L com x");
         MPE_CHECK_NEAR (&t, total.com.z, 0.375, 1e-9, "L com z");
@@ -133,23 +133,23 @@ int mpe_t_nuf_mass_composite (void) {
      * Tols: com z and the Steiner-carrying rows carry the float-boundary
      * rounding of com (rel 6e-8), so rel 1e-5; mass exact. */
     {
-        nu_part parts [3] = {0};
-        parts [0].type = nu_part_sphere; parts [0].radius = 0.5f;
-        parts [0].mass_mode = nu_mass_mode_explicit; parts [0].mass = 1.5f;
+        mig_part parts [3] = {0};
+        parts [0].type = mig_part_sphere; parts [0].radius = 0.5f;
+        parts [0].mass_mode = mig_mass_mode_explicit; parts [0].mass = 1.5f;
         parts [0].position = (vector3) {-1.0f, 0.0f, 0.0f};
         parts [0].orientation = (vector4) {1.0f, 0.0f, 0.0f, 0.0f};
-        parts [1].type = nu_part_cube;
+        parts [1].type = mig_part_cube;
         parts [1].half_extensions = (vector3) {0.5f, 0.5f, 0.5f};
-        parts [1].mass_mode = nu_mass_mode_density; parts [1].mass = 1000.0f;
+        parts [1].mass_mode = mig_mass_mode_density; parts [1].mass = 1000.0f;
         parts [1].position = (vector3) {1.0f, 0.0f, 0.5f};
         parts [1].orientation = (vector4) {1.0f, 0.0f, 0.0f, 0.0f};
-        parts [2].type = nu_part_cylinder; parts [2].radius = 0.5f;
+        parts [2].type = mig_part_cylinder; parts [2].radius = 0.5f;
         parts [2].cylinder_half_length = 0.75f;
-        parts [2].mass_mode = nu_mass_mode_explicit; parts [2].mass = 3.0f;
+        parts [2].mass_mode = mig_mass_mode_explicit; parts [2].mass = 3.0f;
         parts [2].position = (vector3) {2.0f, 0.0f, 0.0f};
         parts [2].orientation = (vector4) {1.0f, 0.0f, 0.0f, 0.0f};
-        nu_totals total;
-        MPE_CHECK (&t, nu_compose (parts, 3, &total) == nu_compose_ok);
+        mig_totals total;
+        MPE_CHECK (&t, mig_compose (parts, 3, &total) == mig_compose_ok);
         MPE_CHECK_NEAR (&t, total.mass, 1004.5, 1e-9, "triple mass (density cube in the sum)");
         MPE_CHECK_NEAR (&t, total.com.x, 1.0, 1e-7, "triple com x (exact)");
         MPE_CHECK_REL (&t, total.com.z, 1000.0 / 2009.0, 1e-6, "triple com z");
@@ -174,15 +174,15 @@ int mpe_t_nuf_mass_composite (void) {
      * X axle onto Z: the composed tensor MUST read Ixx = Iyy = 1.0 (trans-
      * verse), Izz = 0.5 (axial). Tol = the float quat's rounding only. */
     {
-        nu_part parts [1] = {0};
-        parts [0].type = nu_part_cylinder; parts [0].radius = 0.5f;
+        mig_part parts [1] = {0};
+        parts [0].type = mig_part_cylinder; parts [0].radius = 0.5f;
         parts [0].cylinder_half_length = 0.75f;
-        parts [0].mass_mode = nu_mass_mode_explicit; parts [0].mass = 4.0f;
+        parts [0].mass_mode = mig_mass_mode_explicit; parts [0].mass = 4.0f;
         parts [0].position = (vector3) {0.0f, 0.0f, 0.0f};
         const float s = 0.70710678118654752f; /* cos/sin 45° */
         parts [0].orientation = (vector4) {s, 0.0f, s, 0.0f};
-        nu_totals total;
-        MPE_CHECK (&t, nu_compose (parts, 1, &total) == nu_compose_ok);
+        mig_totals total;
+        MPE_CHECK (&t, mig_compose (parts, 1, &total) == mig_compose_ok);
         MPE_CHECK_NEAR (&t, total.inertia.matrix [0][0], 1.0, 2e-5, "rot Ixx (transverse)");
         MPE_CHECK_NEAR (&t, total.inertia.matrix [1][1], 1.0, 2e-5, "rot Iyy (transverse)");
         MPE_CHECK_NEAR (&t, total.inertia.matrix [2][2], 0.5, 2e-5, "rot Izz (axial landed on Z)");
@@ -199,19 +199,19 @@ int mpe_t_nuf_mass_composite (void) {
      * Totals: Ixx = 1.00625, Iyy = 4.20625, Izz = 3.70625. All exact
      * fractions; axis-permutation truth through a rotated part again. */
     {
-        nu_part parts [2] = {0};
-        parts [0].type = nu_part_sphere; parts [0].radius = 0.125f;
-        parts [0].mass_mode = nu_mass_mode_explicit; parts [0].mass = 1.0f;
+        mig_part parts [2] = {0};
+        parts [0].type = mig_part_sphere; parts [0].radius = 0.125f;
+        parts [0].mass_mode = mig_mass_mode_explicit; parts [0].mass = 1.0f;
         parts [0].position = (vector3) {-1.0f, 0.0f, 0.0f};
         parts [0].orientation = (vector4) {1.0f, 0.0f, 0.0f, 0.0f};
-        parts [1].type = nu_part_cylinder; parts [1].radius = 0.5f;
+        parts [1].type = mig_part_cylinder; parts [1].radius = 0.5f;
         parts [1].cylinder_half_length = 0.75f;
-        parts [1].mass_mode = nu_mass_mode_explicit; parts [1].mass = 4.0f;
+        parts [1].mass_mode = mig_mass_mode_explicit; parts [1].mass = 4.0f;
         parts [1].position = (vector3) {1.0f, 0.0f, 0.0f};
         const float s = 0.70710678118654752f;
         parts [1].orientation = (vector4) {s, 0.0f, s, 0.0f};
-        nu_totals total;
-        MPE_CHECK (&t, nu_compose (parts, 2, &total) == nu_compose_ok);
+        mig_totals total;
+        MPE_CHECK (&t, mig_compose (parts, 2, &total) == mig_compose_ok);
         MPE_CHECK_NEAR (&t, total.mass, 5.0, 1e-9, "cross mass");
         MPE_CHECK_NEAR (&t, total.com.x, 0.6, 1e-7, "cross com x");
         MPE_CHECK_NEAR (&t, total.inertia.matrix [0][0], 1.00625, 2e-5, "cross Ixx");
@@ -222,31 +222,31 @@ int mpe_t_nuf_mass_composite (void) {
     }
 
     /* ---- 6. rebase invariance (probe 3's parts, COM re-anchored) ----
-     * nu_rebase_parts by the COM must leave mass and inertia unchanged and
+     * mig_rebase_parts by the COM must leave mass and inertia unchanged and
      * bring the COM to the origin. Drift here means the re-anchor and the
      * composition disagree about the frame — the exact bug the §2 decision
      * outlaws. Float re-subtraction bounds the drift, hence the rel tols. */
     {
-        nu_part parts [3] = {0};
-        parts [0].type = nu_part_sphere; parts [0].radius = 0.5f;
-        parts [0].mass_mode = nu_mass_mode_explicit; parts [0].mass = 1.5f;
+        mig_part parts [3] = {0};
+        parts [0].type = mig_part_sphere; parts [0].radius = 0.5f;
+        parts [0].mass_mode = mig_mass_mode_explicit; parts [0].mass = 1.5f;
         parts [0].position = (vector3) {-1.0f, 0.0f, 0.0f};
         parts [0].orientation = (vector4) {1.0f, 0.0f, 0.0f, 0.0f};
-        parts [1].type = nu_part_cube;
+        parts [1].type = mig_part_cube;
         parts [1].half_extensions = (vector3) {0.5f, 0.5f, 0.5f};
-        parts [1].mass_mode = nu_mass_mode_density; parts [1].mass = 1000.0f;
+        parts [1].mass_mode = mig_mass_mode_density; parts [1].mass = 1000.0f;
         parts [1].position = (vector3) {1.0f, 0.0f, 0.5f};
         parts [1].orientation = (vector4) {1.0f, 0.0f, 0.0f, 0.0f};
-        parts [2].type = nu_part_cylinder; parts [2].radius = 0.5f;
+        parts [2].type = mig_part_cylinder; parts [2].radius = 0.5f;
         parts [2].cylinder_half_length = 0.75f;
-        parts [2].mass_mode = nu_mass_mode_explicit; parts [2].mass = 3.0f;
+        parts [2].mass_mode = mig_mass_mode_explicit; parts [2].mass = 3.0f;
         parts [2].position = (vector3) {2.0f, 0.0f, 0.0f};
         parts [2].orientation = (vector4) {1.0f, 0.0f, 0.0f, 0.0f};
-        nu_totals before;
-        MPE_CHECK (&t, nu_compose (parts, 3, &before) == nu_compose_ok);
-        nu_rebase_parts (parts, 3, before.com);
-        nu_totals after;
-        MPE_CHECK (&t, nu_compose (parts, 3, &after) == nu_compose_ok);
+        mig_totals before;
+        MPE_CHECK (&t, mig_compose (parts, 3, &before) == mig_compose_ok);
+        mig_rebase_parts (parts, 3, before.com);
+        mig_totals after;
+        MPE_CHECK (&t, mig_compose (parts, 3, &after) == mig_compose_ok);
         MPE_CHECK_NEAR (&t, after.mass, before.mass, 1e-9, "rebase mass invariant");
         MPE_CHECK_NEAR (&t, after.com.x, 0.0, 1e-6, "rebase com x -> 0");
         MPE_CHECK_NEAR (&t, after.com.y, 0.0, 1e-6, "rebase com y -> 0");
@@ -270,36 +270,36 @@ int mpe_t_nuf_mass_composite (void) {
 
     /* ---- 7. error contract: named errors, untouched outputs ---- */
     {
-        nu_part parts [1] = {0};
-        parts [0].type = nu_part_sphere; parts [0].radius = 0.5f;
-        parts [0].mass_mode = nu_mass_mode_explicit; parts [0].mass = 1.0f;
+        mig_part parts [1] = {0};
+        parts [0].type = mig_part_sphere; parts [0].radius = 0.5f;
+        parts [0].mass_mode = mig_mass_mode_explicit; parts [0].mass = 1.0f;
         parts [0].position = (vector3) {0.0f, 0.0f, 0.0f};
         parts [0].orientation = (vector4) {1.0f, 0.0f, 0.0f, 0.0f};
-        nu_totals untouched;
+        mig_totals untouched;
         memset (&untouched, 0xAB, sizeof (untouched));
-        MPE_CHECK (&t, nu_compose (NULL, 1, &untouched) == nu_compose_null);
-        MPE_CHECK (&t, nu_compose (parts, 0, &untouched) == nu_compose_null);
+        MPE_CHECK (&t, mig_compose (NULL, 1, &untouched) == mig_compose_null);
+        MPE_CHECK (&t, mig_compose (parts, 0, &untouched) == mig_compose_null);
         {
-            nu_part bad = parts [0]; bad.type = (nu_part_type) 7;
-            MPE_CHECK (&t, nu_compose (&bad, 1, &untouched) == nu_compose_bad_type);
+            mig_part bad = parts [0]; bad.type = (mig_part_type) 7;
+            MPE_CHECK (&t, mig_compose (&bad, 1, &untouched) == mig_compose_bad_type);
         }
         {
-            nu_part bad = parts [0]; bad.radius = -1.0f;
-            MPE_CHECK (&t, nu_compose (&bad, 1, &untouched) == nu_compose_bad_dims);
+            mig_part bad = parts [0]; bad.radius = -1.0f;
+            MPE_CHECK (&t, mig_compose (&bad, 1, &untouched) == mig_compose_bad_dims);
         }
         {
-            nu_part bad = parts [0]; bad.orientation = (vector4) {0.5f, 0.0f, 0.0f, 0.0f};
-            MPE_CHECK (&t, nu_compose (&bad, 1, &untouched) == nu_compose_bad_quat);
+            mig_part bad = parts [0]; bad.orientation = (vector4) {0.5f, 0.0f, 0.0f, 0.0f};
+            MPE_CHECK (&t, mig_compose (&bad, 1, &untouched) == mig_compose_bad_quat);
         }
         {
-            nu_part bad = parts [0]; bad.mass = -1.0f;
-            MPE_CHECK (&t, nu_compose (&bad, 1, &untouched) == nu_compose_bad_mass);
+            mig_part bad = parts [0]; bad.mass = -1.0f;
+            MPE_CHECK (&t, mig_compose (&bad, 1, &untouched) == mig_compose_bad_mass);
         }
         {
             /* Total mass must not vanish: a massless composite is a render
              * prop, not a body. Single zero-mass part -> total 0. */
-            nu_part bad = parts [0]; bad.mass = 0.0f;
-            MPE_CHECK (&t, nu_compose (&bad, 1, &untouched) == nu_compose_bad_mass);
+            mig_part bad = parts [0]; bad.mass = 0.0f;
+            MPE_CHECK (&t, mig_compose (&bad, 1, &untouched) == mig_compose_bad_mass);
         }
         /* Write-on-success contract: seven failing calls must leave every
          * byte of the untouched slab exactly as memset wrote it. */
@@ -307,14 +307,14 @@ int mpe_t_nuf_mass_composite (void) {
     }
 
     if (t.failures == 0) {
-        printf ("[PASS] nuf stage0: composition matches independent closed-form mechanics\n");
+        printf ("[PASS] mig stage0: composition matches independent closed-form mechanics\n");
         MPE_INFO ("probes: dumbbell, L-Steiner offdiag, density mixing, 90-deg axis map, cross-type, rebase, 6 named errors");
     }
     mpe_test_end (&t);
     return t.failures;
 }
 
-/* ---- WP1 step 1.1 pre-change probe (docs/NUF_BUILD_PLAN.md §3): the
+/* ---- WP1 step 1.1 pre-change probe (docs/MIG_BUILD_PLAN.md §3): the
  * physical pendulum the composite train leans on.
  *
  * Runs against the UNMODIFIED engine ON PURPOSE: the existing revolute
@@ -338,9 +338,9 @@ int mpe_t_nuf_mass_composite (void) {
  * int crossings over the bob's horizontal COM displacement, drift bound,
  * plus amplitude bounds that catch both a dead-still hang and an
  * energy-pumping solver. */
-int mpe_t_nuf_pendulum_physical (void) {
+int mpe_t_mig_pendulum_physical (void) {
     mpe_test_t t;
-    mpe_test_begin (&t, "nuf_pendulum_physical");
+    mpe_test_begin (&t, "mig_pendulum_physical");
     /* DESPOT-2026-10-04: pin g the way the house pendulum gates do. */
     g_cfg.world.gravity = -9.81f;
     physics_world w;
@@ -369,7 +369,7 @@ int mpe_t_nuf_pendulum_physical (void) {
      * bodies, so the born-at-amplitude orientation maps axis_b identically. */
     MPE_CHECK (&t, constraint_add_revolute (&w, pid, bid, (vector3) {0.0f, -1.2f, 0.0f}, (vector3) {0.0f, hy, 0.0f},
                                             (vector3) {0.0f, 0.0f, 1.0f}) >= 0);
-    /* Closed form, hand-written — oracle independent of WP0's nu_mass code. */
+    /* Closed form, hand-written — oracle independent of WP0's mig_mass code. */
     const float i_com_z = (m / 12.0f) * ((2.0f * hy) * (2.0f * hy) + (2.0f * hx) * (2.0f * hx));
     const float i_pivot = i_com_z + m * d * d;
     const float t_exact = 2.0f * 3.14159265f * sqrtf (i_pivot / (m * 9.81f * d));
@@ -407,7 +407,7 @@ int mpe_t_nuf_pendulum_physical (void) {
     MPE_CHECK (&t, max_abs_x <= 1.6f * d * sinf (theta0)); /* no energy pump */
     if (crossings >= 4) { MPE_CHECK_REL (&t, t_meas, t_expected, 0.02f, "physical-pendulum period (I_com + M*d^2)"); }
     if (t.failures == 0) {
-        printf ("[PASS] nuf WP1 probe: top-face-pivoted cuboid swings at the I_com+M*d^2 closed form on the unmodified engine\n");
+        printf ("[PASS] mig WP1 probe: top-face-pivoted cuboid swings at the I_com+M*d^2 closed form on the unmodified engine\n");
         MPE_INFO ("parallel-axis sum required of the live tensor: Steiner term carries %.0f%% of I_pivot",
                   100.0f * (m * d * d) / i_pivot);
     }

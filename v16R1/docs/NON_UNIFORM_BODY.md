@@ -1,4 +1,4 @@
-# NUF — Non-Uniform Body Framework (design record, v16R1 → v16S)
+# MIG — Non-Uniform Body Framework (design record, v16R1 → v16S)
 
 > Design record for the non-uniform object physics surface: mass composition
 > (off-center COM, composed inertia), welded composite bodies (multi-part
@@ -85,7 +85,7 @@ shapes.
 
 ## 3. The mass contract (Axis 1)
 
-### 3.1 New core unit: `core/nu_mass.c`
+### 3.1 New core unit: `core/mig_mass.c`
 
 Ownership split away from `rigidbody.c` so the hardcoded primitive
 formulas stay the primitives' truth and composition gets its own audited
@@ -125,7 +125,7 @@ derives from the same formulas and must **duplicate, not call, the
 primitive functions if the call order would change their semantics**
 (cf. the audit rule: shared-stage behavior differences must be named).
 In practice composition calls the same per-part exact formulas in
-`nu_mass.c` and the `rigidbody.h` comment block gets a pointer to this
+`mig_mass.c` and the `rigidbody.h` comment block gets a pointer to this
 doc.
 
 ---
@@ -236,7 +236,7 @@ part pairs into the manifold list.
 
 Append-only, in the spirit of the loader's kindness rules:
 
-- Per composite body, a `NUF1` extension record after the body row:
+- Per composite body, a `MIG1` extension record after the body row:
   `part_count`, then per part: `(part_index u16, type u8, pose
   quad+f32×3, dims f32×3, µs, µk, restitution f32, mass_mode u8, mass
   f32, colour f32×3)`. CRC already covers the stream.
@@ -270,7 +270,7 @@ mutates and scenes serialize to — sketched (exact grammar frozen at
 implementation):
 
 ```
-nuf battery_box
+mig battery_box
   part 0 type cylinder            # wheels ride per-part later; fields below
     dims r 0.05 half 0.02 pose (0.0, -0.02, 0.03) qw..qx..qy..qz 1 0 0 0
     material mu_s 0.9 mu_k 0.7 rest 0.1
@@ -279,18 +279,18 @@ nuf battery_box
   part 1 type cube ...
 ```
 
-Terminal verbs in `term_obj.c` (new `nuf` family under the house verb
-taxonomy): `nuf load <file>`, `nuf spawn <name>`, `nuf show <name>`,
-`nuf edit` surface via the same spec. These make the object format
+Terminal verbs in `term_obj.c` (new `mig` family under the house verb
+taxonomy): `mig load <file>`, `mig spawn <name>`, `mig show <name>`,
+`mig edit` surface via the same spec. These make the object format
 read-them-once-and-be-done forever, and give the suite a full
 creation→step→save→load→step gate with zero GUI.
 
-### 6.2 GTK surface (`ui_input/nuf_editor.c`, new)
+### 6.2 GTK surface (`ui_input/mig_editor.c`, new)
 
 Built out of existing in-tree muscle (config_menu + editor_dialog +
 object_spawner patterns, GTK4 controllers, `mouse_lock` gestures):
 
-- Spawn target "NUF object"; part list panel (add per part: sphere /
+- Spawn target "MIG object"; part list panel (add per part: sphere /
   cube / cylinder; fields: dims, pose, material, mass-or-density,
   colour).
 - Two-axis translate gizmo + rotate fields; grid snap toggle (config
@@ -321,22 +321,22 @@ physics; hull-from-mesh is the NEXT train's geometry feature (§8).
 Per house audit style — the closed-form probes exist before the
 features they certify:
 
-- `nuf_mass_composite` — exact composed mass/COM/I against
+- `mig_mass_composite` — exact composed mass/COM/I against
   hand-closed-form parts (two-sphere dumbbell, cube+cube L, mixed
   triple). Gates the composition math in isolation.
-- `nuf_pendulum_com_offset` — revolute pendulum whose bob's COM is
+- `mig_pendulum_com_offset` — revolute pendulum whose bob's COM is
   offset from the anchor: measured period vs the parallel-axis shifted
   closed form within the pendulum ≤1.5% house band. **This one gate
   proves the mass contract end-to-end through the solver**, because the
   lever arm, revolute constraint, and angular draw all read the COM.
-- `nuf_composite_stack` — a 10-primitive stack vs one 10-part composite,
+- `mig_composite_stack` — a 10-primitive stack vs one 10-part composite,
   same total mass/materials: both settle asleep, composite stack top-
   block drift within the documented slop band of the primitive stack.
-- `nuf_floor_ccd_composite` — tumbling L-composite dropped from height:
+- `mig_floor_ccd_composite` — tumbling L-composite dropped from height:
   floor clamp before tunneling at canonical dt, no landing pump.
-- `nuf_scene_roundtrip` — composite scene save → load → bitwise pose +
+- `mig_scene_roundtrip` — composite scene save → load → bitwise pose +
   mass identity; degraded-load diag path green.
-- `nuf_determinism_twins` — composite scenes at MPE_THREADS 1/4/8
+- `mig_determinism_twins` — composite scenes at MPE_THREADS 1/4/8
   bitwise identical over 600 ticks.
 - Contact-cache part gate (inside the suite's builder): two parts of
   one composite resting — warm-start IDs distinct per part (probe used
@@ -347,7 +347,7 @@ features they certify:
   (the runner enforces this rule already).
 - Existing gates must not move: quick profile stays green, full stays
   green, ASan/UBSan/TSan stays clean, MFS suite stays at its current
-  numbers (31 gated with aim_solve's named open red — landing NUF must
+  numbers (31 gated with aim_solve's named open red — landing MIG must
   not "incidently" fix or break it; its state is reported, not touched).
 
 ---
@@ -380,10 +380,10 @@ features they certify:
 | WP | Content | Size estimate | Bitwise contract |
 |---|---|---|---|
 | WP0 | Gates-first probes (per §7, math-only harness, no contract change) | ~400 LOC tests | none needed |
-| WP1 | `core/nu_mass.c` + composition + clamps + WP0 gates green | ~700 LOC + tests | legacy untouched (bitwise) |
+| WP1 | `core/mig_mass.c` + composition + clamps + WP0 gates green | ~700 LOC + tests | legacy untouched (bitwise) |
 | WP2 | `object_composite` + parts pool + narrowphase part dispatch + part-scoped cache keys + broadphase/floor/CCD hooks | ~1800–2400 LOC | default-clean scenes bitwise |
-| WP3 | v200 `NUF1` blob + loader kindness + roundtrip gate | ~400 LOC | old scenes load unchanged |
-| WP4 | Terminal `nuf` verbs + spec format + (then) GTK editor | ~1400 LOC | new surface only |
+| WP3 | v200 `MIG1` blob + loader kindness + roundtrip gate | ~400 LOC | old scenes load unchanged |
+| WP4 | Terminal `mig` verbs + spec format + (then) GTK editor | ~1400 LOC | new surface only |
 | WP5 | MFS composite robot behind the toggle + FTC A/B | ~500 LOC | MFS gate numbers reported A/B |
 | WP6 | Docs (PHYSICS §9-composition, ARCHITECTURE kernel row, GLOSSARY entries, VERIFICATION commands), RELEASE_POLICY charter amendment, release-notes skeleton | docs | — |
 
@@ -391,7 +391,7 @@ Order notes: WP1 and WP2 are the physics surface; WP4's terminal half
 comes before any GTK (headless-first rule); WP5 last so the robotics
 stop is gated every time by the already-green engine.
 
-Execution playbook: docs/NUF_BUILD_PLAN.md — per-package step lists,
+Execution playbook: docs/MIG_BUILD_PLAN.md — per-package step lists,
 exact file touch-points, per-step verification commands, pending
 rulings (P1–P3) with defaults, the resume protocol for a lost session,
 and the baseline ledger. The charter freezes decisions; the plan carries
@@ -403,7 +403,7 @@ the how-and-when.
   one part-scoped keys + the TASK_05-style probe + the part-index
   no-reuse contract. Killed before it can exist, not after.
 - **Floor churn (F10-class)** — composites raise floor contact surface.
-  The `nuf_composite_stack` sleep gate is named before implementation;
+  The `mig_composite_stack` sleep gate is named before implementation;
   if churn appears, it reproduces a known bug class through a new door,
   and the F10 pair-novelty wake design covers it by construction.
 - **Editor/physics ownership drift** — spec files are the single truth;
