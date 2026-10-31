@@ -7,9 +7,15 @@
 > exact file touch-points, per-step verification commands, and the bitwise
 > contract each step must keep. Written 2026-10-30 after WP0 landed.
 >
-> ⏸ STATUS LINE (keep updated at every step): **WP0 landed, WP1 in
-> progress, WP2–6 not started. No engine physics column touched yet —
-> `nu_mass.c` is not in the engine link list, so the engine binary is
+> ⏸ STATUS LINE (keep updated at every step): **WP0 landed and pushed
+> (181c2c0 charter, 0882935 WP0 code, 636b10e playbook — 2026-10-30).
+> WP1 step 1.1 landed 2026-10-30 (`b0e1cbb`): `nuf_pendulum_physical`
+> first-run green on the UNMODIFIED engine — measured period 1.8188 s vs
+> the corrected closed form 1.8184 s, max_drift 0.0003 m, Steiner term
+> 74% of I_pivot; zero pre-existing debt surfaced. Next: WP1 1.2–1.6
+> (bridge struct, clamp counter, application point). WP2–6 not started.
+> No engine physics column touched: `nu_mass.c` stays outside the engine
+> link list and step 1.1 touched no engine file — the engine binary is
 > bit-unchanged since v15S+MFS-v10S.**
 
 ---
@@ -22,9 +28,9 @@ truth in this order and do not write a new line of code until green:
 ```bash
 cd 475-MPE/v16R1/src
 make build_suite            # zero complaints expected (-Werror is default)
-./test_mpe_suite --all      # expect: Total: 47 | Blocking failures: 0
+./test_mpe_suite --all      # expect: Total: 48 | Blocking failures: 0
 cd ../..
-python3 tools/test_runner.py --profile quick   # expect Checks: 61 | passed: 61
+python3 tools/test_runner.py --profile quick   # expect Checks: 62 | passed: 62
 git status --short          # manifest must match §1 exactly — no half-written files
 ```
 
@@ -54,26 +60,27 @@ survive a context loss.
 
 ## §1 Baseline ledger (as of 2026-10-30 — update at every landing)
 
-Landed (all currently **untracked/uncommitted** — first WP1 commit takes
-the whole block):
+Landed and pushed 2026-10-30 (WP0 block: commits `181c2c0` charter,
+`0882935` code, `636b10e` playbook; WP1 step 1.1 followed in `b0e1cbb`):
 
 | Artifact | Nature |
 |---|---|
 | `v16R1/docs/NON_UNIFORM_BODY.md` | design charter (frozen decisions) |
 | `v16R1/src/core/nu_mass.h` | composition contract + all type/error enums |
 | `v16R1/src/core/nu_mass.c` | exact composition: mass/COM/inertia, double accumulation, definition-order deterministic |
-| `v16R1/src/tests/mpe_suite_nuf.c` | gate `nuf_mass_composite` (7 probe families, oracle-independence contract) |
-| `v16R1/src/tests/mpe_suite_main.c` +3 lines | extern + registry entry (blocking) |
-| `v16R1/src/makefile` +3 lines | `MPE_TEST_CORE += core/nu_mass.c`, `MPE_SUITE_SRCS += tests/mpe_suite_nuf.c`, help-note renumber |
-| `tools/test_runner.py` | floor 46 → 47 with dated history comment |
+| `v16R1/src/tests/mpe_suite_nuf.c` | gates `nuf_mass_composite` (7 probe families, oracle independence) + `nuf_pendulum_physical` (WP1 1.1 probe, hand-written oracle) |
+| `v16R1/src/tests/mpe_suite_main.c` | externs + registry entries (48th run blocking) |
+| `v16R1/src/makefile` | `MPE_TEST_CORE += core/nu_mass.c`, `MPE_SUITE_SRCS += tests/mpe_suite_nuf.c`, help-note renumber |
+| `tools/test_runner.py` | floor 46 → 47 → 48 with dated history comments |
 
 Measured baseline (numbers a resume session must reproduce):
 
-- Suite: 47 registered, **45/45 blocking green**, 2 diag-informational.
-- Runner quick: **61/61**.
-- ASan/UBSan suite build: green, `nuf_mass_composite` clean.
-- Engine binary: unchanged bits (WP0 deliberately outside the engine link
-  list).
+- Suite: 48 registered, **46/46 blocking green**, 2 diag-informational
+  (WP0 landing was 47/45; step 1.1 added the 48th blocking gate).
+- Runner quick: **62/62** (WP0 landing was 61/61).
+- ASan/UBSan suite build: green, both `nuf_*` gates clean.
+- Engine binary: unchanged bits (`nu_mass.c` outside the engine link
+  list; step 1.1 touched no engine file).
 
 WP0's verdict is on record: the one red in its history was the test
 author's own oracle (missing cylinder dz-Steiner in the triple's Ixx), not
@@ -122,7 +129,7 @@ the three hardcoded type formulas; wire the counted-clamp bridge. STILL
 no composite type, no parts pool (that is WP2). The WP0 suite stays
 exactly as green as it was.
 
-- [ ] **1.1 Pre-change probe: `nuf_pendulum_physical`** in
+- [x] **1.1 Pre-change probe: `nuf_pendulum_physical`** in
   `tests/mpe_suite_nuf.c` — revolute pendulum with a CUBE bob pivoted at a
   top-face anchor. Measured period vs the full physical-pendulum closed
   form `T = 2π·√(I_pivot/(M·g·d))` with `I_pivot = I_com + M·d²` (the
@@ -132,6 +139,13 @@ exactly as green as it was.
   revolute+tensor machinery already behaves physically, so WP2's composite
   gets a green pre-decline. If it is red: file in §9's ledger —
   pre-existing debt, discovered by WP1's near-zero-cost side probe.
+  LANDED 2026-10-30 (`b0e1cbb`), first run green, zero debt surfaced:
+  measured 1.8188 s vs the amplitude-corrected oracle 1.8184 s (0.02%),
+  17 crossings, max_drift 0.0003 m against the 0.02 house bound,
+  amplitude decay 0.3% over ~8 periods, ASan clean. The bob is the
+  non-cubic cuboid half 0.15×0.6×0.25 (m=2), Steiner term 74% of
+  I_pivot = 0.975 — the red clause above stays on the books for future
+  probes.
 - [ ] **1.2 Bridge struct** in `core/nu_mass.h`: the handoff contract WP2
   will consume — `nu_compose` totals + re-anchored part list, marked
   "caller owns; world copies in". No engine include added; keep the
@@ -375,6 +389,13 @@ Ledger (new entries get a line, never an edit of a past line):
   missed the cylinder dz-Steiner term (3·cz²); implementation was correct;
   the gate fixed the mathematician. ASan clean. Nothing pre-existing
   surfaced.
+- 2026-10-30 — WP1 step 1.1 landed (`b0e1cbb`): first-run green, zero
+  incidents — measured 1.8188 s vs the corrected closed form 1.8184 s
+  (0.02%), max_drift 0.0003 m, ASan clean. Verdict recorded: the engine's
+  revolute + hand-authored tensor satisfies the physical-pendulum closed
+  form with the Steiner term at 74% of I_pivot, so WP2's composite
+  inherits a certified solver on that path (narrowphase claims nothing
+  from this landing — only the tensor path is pinned).
 
 ## §10 Definition of done for v16S (the cut checklist)
 
