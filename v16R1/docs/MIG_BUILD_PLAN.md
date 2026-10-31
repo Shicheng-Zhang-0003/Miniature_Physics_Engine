@@ -16,14 +16,24 @@
 > 2026-10-30 (§2): P1 RENAME NUF→MIG (MPE-Infinity-Generator); P2 cap 16
 > counted confirmed with the hybrid/GPU future-work note; P3 hulls in
 > scope as incremental WP2.5 (§8.5); P4 the 1.4 stub lands. THE P1
-> RENAME LANDED standalone 2026-10-30 (this commit) per the author's
-> rename-first directive: files/identifiers/gates are mig_* and this
-> playbook is MIG_BUILD_PLAN.md; the engine touched NOTHING —
-> `mig_mass.c` remains outside the engine link list, engine binary
-> bit-unchanged since v15S+MFS-v10S. NEXT: the massive changes WP1
-> 1.2–1.4 (bridge struct, clamp counter, add_composite stub) in their
-> own green landing, engine still untouched until then; WP2–6 not
-> started.**
+> RENAME LANDED standalone 2026-10-30 (`84f8c8d`): files/identifiers/
+> gates are mig_*, this playbook is MIG_BUILD_PLAN.md. WP1 STEPS 1.2+1.3+
+> 1.4 LANDED TOGETHER 2026-10-31 (`df383f0`, one green engine-touching
+> commit): the 1.2 `mig_bridge`/`mig_make_bridge` handoff in the pure
+> module, the 1.3 `mpe_clamp_composite_events` counter + the
+> grows-once body fields (`mass_is_composed`, `composite_part_count`,
+> zeroed at all three initializer sites), and the 1.4
+> `physics_world_add_composite` stub (composed mass + full authored
+> tensor on a sphere-backed body; policy pre-validated, zero clamp
+> events; parts dead weight until WP2). ENGINE TRUTH FROM 2026-10-31:
+> the engine binary CHANGES BITS for the first time since v15S+MFS-v10S
+> (struct grows once, one world entry point, physics_world.c calls
+> mig_compose); the plain-scene numeric path is certified unchanged by
+> the headless byte-probe A/B (bit-identical) and the in-suite
+> determinism twin, not by binary identity. 1.5 verified in the same
+> landing (suite 49/47+2, quick 63/63, ASan ×3 mig gates + determinism
+> green). NEXT: 1.6 (PHYSICS.md one-line pointer), then WP2 (composite
+> type, parts pool, narrowphase part dispatch).**
 
 ---
 
@@ -35,9 +45,9 @@ truth in this order and do not write a new line of code until green:
 ```bash
 cd 475-MPE/v16R1/src
 make build_suite            # zero complaints expected (-Werror is default)
-./test_mpe_suite --all      # expect: Total: 48 | Blocking failures: 0
+./test_mpe_suite --all      # expect: Total: 49 | Blocking failures: 0
 cd ../..
-python3 tools/test_runner.py --profile quick   # expect Checks: 62 | passed: 62
+python3 tools/test_runner.py --profile quick   # expect Checks: 63 | passed: 63
 git status --short          # manifest must match §1 exactly — no half-written files
 ```
 
@@ -65,20 +75,23 @@ survive a context loss.
 
 ---
 
-## §1 Baseline ledger (as of 2026-10-30 — update at every landing)
+## §1 Baseline ledger (as of 2026-10-31 — update at every landing)
 
-Landed and pushed 2026-10-30 (WP0 block: commits `181c2c0` charter,
-`0882935` code, `636b10e` playbook; WP1 step 1.1 followed in `b0e1cbb`):
+Landed and pushed (WP0 block: commits `181c2c0` charter, `0882935` code,
+`636b10e` playbook; WP1 1.1 in `b0e1cbb`; rulings `8385b95`; P1 rename
+`84f8c8d`; WP1 1.2–1.4 in `df383f0` — 2026-10-31):
 
 | Artifact | Nature |
 |---|---|
 | `v16R1/docs/NON_UNIFORM_BODY.md` | design charter (frozen decisions) |
-| `v16R1/src/core/mig_mass.h` | composition contract + all type/error enums |
-| `v16R1/src/core/mig_mass.c` | exact composition: mass/COM/inertia, double accumulation, definition-order deterministic |
-| `v16R1/src/tests/mpe_suite_mig.c` | gates `mig_mass_composite` (7 probe families, oracle independence) + `mig_pendulum_physical` (WP1 1.1 probe, hand-written oracle) |
-| `v16R1/src/tests/mpe_suite_main.c` | externs + registry entries (48th run blocking) |
+| `v16R1/src/core/mig_mass.h` | composition contract + error enums + the 1.2 `mig_bridge` handoff struct |
+| `v16R1/src/core/mig_mass.c` | exact composition: mass/COM/inertia, double accumulation, definition-order deterministic; + `mig_make_bridge` |
+| `v16R1/src/core/rigidbody.h/.c` | 1.3 counter + accessor + reset; grows-once body fields `mass_is_composed`/`composite_part_count` (zeroed at all three initializer sites) |
+| `v16R1/src/core/physics_world.h/.c` | 1.4 `physics_world_add_composite` stub (composed mass, sphere bounds, authored tensor) |
+| `v16R1/src/tests/mpe_suite_mig.c` | gates `mig_mass_composite` + `mig_pendulum_physical` + `mig_composite_stub` (49th, blocking) |
+| `v16R1/src/tests/mpe_suite_main.c` | externs + registry entries (49th run blocking) |
 | `v16R1/src/makefile` | `MPE_TEST_CORE += core/mig_mass.c`, `MPE_SUITE_SRCS += tests/mpe_suite_mig.c`, help-note renumber |
-| `tools/test_runner.py` | floor 46 → 47 → 48 with dated history comments |
+| `tools/test_runner.py` | floor 46 → 47 → 48 → 49 with dated history comments |
 
 Names in this table are the PRESENT (post-P1-rename) spellings; at their
 landing commits the files were `nu_mass.{h,c}` and the gates were
@@ -88,12 +101,19 @@ also renamed this playbook file itself (`NUF_BUILD_PLAN.md` →
 
 Measured baseline (numbers a resume session must reproduce):
 
-- Suite: 48 registered, **46/46 blocking green**, 2 diag-informational
-  (WP0 landing was 47/45; step 1.1 added the 48th blocking gate).
-- Runner quick: **62/62** (WP0 landing was 61/61).
-- ASan/UBSan suite build: green, both `mig_*` gates clean.
-- Engine binary: unchanged bits (`mig_mass.c` outside the engine link
-  list; step 1.1 touched no engine file).
+- Suite: 49 registered, **47/47 blocking green**, 2 diag-informational
+  (WP0 landing was 47/45; 1.1 made 48/46; 1.2–1.4 made 49/47).
+- Runner quick: **63/63** (WP0 was 61/61; 1.1 was 62/62).
+- ASan/UBSan suite build: green — `mig_composite_stub`,
+  `mig_mass_composite`, `mig_pendulum_physical`, `determinism` all clean.
+- Engine binary: **CHANGES BITS from 2026-10-31** (`df383f0` is the first
+  engine-touching landing since v15S+MFS-v10S: the struct grows once, one
+  world entry point appears, `physics_world.c` calls `mig_compose`).
+  The plain-scene numeric path is certified unchanged by the headless
+  byte-probe A/B (pre-edit vs post-edit output byte-identical:
+  ticks=3600 bodies=2 invalid=0 fallback_pow=0 fallback_trig=0
+  result=PASS) and the in-suite `determinism` twin (600 ticks bitwise
+  identical), NOT by binary identity.
 
 WP0's verdict is on record: the one red in its history was the test
 author's own oracle (missing cylinder dz-Steiner in the triple's Ixx), not
@@ -198,15 +218,28 @@ exactly as green as it was.
   non-cubic cuboid half 0.15×0.6×0.25 (m=2), Steiner term 74% of
   I_pivot = 0.975 — the red clause above stays on the books for future
   probes.
-- [ ] **1.2 Bridge struct** in `core/mig_mass.h`: the handoff contract WP2
+- [x] **1.2 Bridge struct** in `core/mig_mass.h`: the handoff contract WP2
   will consume — `mig_compose` totals + re-anchored part list, marked
   "caller owns; world copies in". No engine include added; keep the
   dependency-clean rule.
-- [ ] **1.3 Clamp counter:** `mpe_clamp_composite_events` (+ accessor) in
+  LANDED 2026-10-31 (`df383f0`): `mig_bridge {totals, parts, count}` +
+  `mig_make_bridge(src, count, out_parts, out)` — compose once into
+  scratch, copy into the caller's buffer, re-anchor the COPY by
+  `-totals.com` via `mig_rebase_parts` verbatim; `src` read-only, aliasing
+  rejected, write-on-success preserved, named compose errors pass
+  through verbatim. The P2 cap is deliberately absent here: exact
+  composition over any count, the cap belongs to WP2's stored pool.
+- [x] **1.3 Clamp counter:** `mpe_clamp_composite_events` (+ accessor) in
   `core/rigidbody.h` beside the existing block, atomic-per the
   DESPOT-2026-10-12 M4 note (this counter is shared with WP2's cap and
   WP3's load-sum gate).
-- [ ] **1.4 Application point:** a NEW world entry point
+  LANDED 2026-10-31 (`df383f0`): extern at `rigidbody.h:261`,
+  accessor `mpe_clamp_composite_total()` at `:273`, definition at
+  `rigidbody.c:60`, reset wired at `:1420`. Zero increments in WP1 BY
+  DESIGN — the stub pre-validates and rejects instead of substituting.
+  Same commit carries the grows-once body fields (`mass_is_composed`,
+  `composite_part_count`) zeroed at all three initializer sites.
+- [x] **1.4 Application point:** a NEW world entry point
   `physics_world_add_composite` (this is the WP1 stub that WP2 completes:
   in WP1 it creates a sphere-backed body with the composed
   mass/inertia/local tensor and records parts as DEAD WEIGHT to be
@@ -216,10 +249,39 @@ exactly as green as it was.
   WP1 = 1.1–1.3 only and the entry point moves wholly into WP2 — decide
   AT that step, record the choice here, and keep the commit boundary
   green either way.
-- [ ] **1.5 Verify:** suite `--all` green 45/45+1(1.1) blocking; quick
+  LANDED 2026-10-31 (`df383f0`, P4's choice recorded: the stub landed).
+  Decl `physics_world.h:209`, implementation `physics_world.c:1384`.
+  Whole-assembly validation first; policy PRE-validated at the engine's
+  own windows (mass [1e-4, 1e6], bound [0.01, 100], equality legal);
+  bound = max_i(|com−p_i| + B_i), B_i sphere r / cube √(hx²+hy²+hz²) /
+  cylinder √(hl²+r²) — COM-relative, so the cap case is spread, not a
+  moved single part; tensors authored BEFORE the construction sanitize
+  pass so no clamp can fire and nothing regenerates (the WP1 form of
+  the WP2 2.2 guard). Gate `mig_composite_stub` (49th, blocking) pins:
+  dumbbell truth (mass 4, Ixx 0.1 / Iyy=Izz 1.1 vs the 0.9 sphere
+  default), multiply-back via the gate's own float algebra, 27-entry
+  bitwise tensor survival over 120 free-fall ticks, free-fall vs a
+  plain-sphere control within 1e-7 (dy -19.6199 m both), zero-clamp
+  sweep over all five counters, nine rejections each with body_count
+  unchanged, plus a bridge sub-test on an asymmetric closed form.
+  Two gate-side incidents, both fixed gate-side: the bridge-Ixx oracle
+  first said 0.2 (WP0-style self-term mistake; true value 0.1 =
+  0.025 + 0.075) and the first free-fall assembled at y=0 on the
+  default floor (the 0.75-bound body depenetrated up 0.75 m; fixture
+  moved to y=30). ASan clean.
+- [x] **1.5 Verify:** suite `--all` green 45/45+1(1.1) blocking; quick
   profile (floor moves 47→48 in the same commit as 1.1); ASan gate rerun;
   engine bitwise contract: a plain scene with zero composite bodies must
   be bit-identical — run the existing `determinism` twin unchanged.
+  LANDED 2026-10-31 (`df383f0`): `--all` Total 49, 47/47 blocking + 2
+  diag green; quick 63/63 (floor moved 48→49 for the new gate); ASan
+  rerun on all three mig gates + `determinism`, all clean; the bitwise
+  contract holds TWICE — in-suite determinism twin (600 ticks bitwise
+  identical) and the headless byte-probe (pre-edit capture
+  /tmp/opencode/headless_before.txt vs post-edit build diff:
+  byte-identical, ticks=3600 bodies=2 invalid=0 fallback_pow=0
+  fallback_trig=0 result=PASS). The engine-binary era changes: v15S
+  bit-identity ends by design, replaced by the byte-probe contract.
 - [ ] **1.6 Docs:** PHYSICS.md gains a one-line pointer to the charter
   (full §9 phase at WP6); ledger notes.
 
@@ -479,6 +541,24 @@ Ledger (new entries get a line, never an edit of a past line):
   form with the Steiner term at 74% of I_pivot, so WP2's composite
   inherits a certified solver on that path (narrowphase claims nothing
   from this landing — only the tensor path is pinned).
+- 2026-10-31 — WP1 steps 1.2–1.4 landed (`df383f0`), the FIRST
+  engine-touching MIG commit. Scope: bridge struct + counter + the
+  add_composite stub; grows-once body fields; gate 49th. Incidents: two,
+  both gate-oracle side and fixed gate-side (bridge-Ixx 0.2→0.1
+  self-term mistake, machine corrected the mathematician again; free-fall
+  spawn at y=0 hit the default floor — 0.75-bound body depenetrated up,
+  fixture moved to y=30). Engine truth: binary changes bits from this
+  landing (struct +8 bytes, one world entry point, physics_world.c →
+  mig_compose); plain-scene numeric identity re-certified by the
+  headless byte-probe A/B (byte-identical) + determinism twin, and the
+  partial-truth note carried forward: WP1's stub does NOT yet extend the
+  explicit sanitize guard (a future rigidbody_set_static(rb, false) on a
+  composed body WILL regenerate the tensor from the sphere formula — the
+  full guard is WP2 2.2's first move; the WP1 gate does not exercise
+  that path and the stub is documented intermediate behavior). The
+  counter discipline held: mpe_clamp_composite_events stayed 0 across
+  construction, 120 ticks, and every rejection — substitution-counting
+  starts with WP2's cap exactly as P2 planned.
 - 2026-10-30 — P1 rename landed (standalone, before 1.2+ per the
   author's directive: massive changes later): every landed `nuf_*` name
   on the chart is now spelled `mig_*` — `core/nu_mass.{h,c}` →
