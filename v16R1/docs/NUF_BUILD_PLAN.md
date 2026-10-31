@@ -12,11 +12,15 @@
 > WP1 step 1.1 landed 2026-10-30 (`b0e1cbb`): `nuf_pendulum_physical`
 > first-run green on the UNMODIFIED engine — measured period 1.8188 s vs
 > the corrected closed form 1.8184 s, max_drift 0.0003 m, Steiner term
-> 74% of I_pivot; zero pre-existing debt surfaced. Next: WP1 1.2–1.6
-> (bridge struct, clamp counter, application point). WP2–6 not started.
-> No engine physics column touched: `nu_mass.c` stays outside the engine
-> link list and step 1.1 touched no engine file — the engine binary is
-> bit-unchanged since v15S+MFS-v10S.**
+> 74% of I_pivot; zero pre-existing debt surfaced. RULINGS RECORDED
+> 2026-10-30 (§2): P1 RENAME NUF→MIG (MPE-Infinity-Generator), riding the
+> next commit together with WP1 1.2–1.4; P2 cap 16 counted confirmed with
+> the hybrid/GPU future-work note; P3 hulls in scope as incremental
+> WP2.5 (§8.5); P4 the 1.4 stub lands. NEXT COMMIT: the code landing —
+> files/identifiers renamed to mig_* inside the same commit as the 1.2
+> bridge, 1.3 clamp counter, and 1.4 stub; this playbook file is renamed
+> MIG_BUILD_PLAN.md in that same landing; engine still bit-unchanged
+> until then (`nu_mass.c` outside the engine link list).**
 
 ---
 
@@ -96,29 +100,62 @@ composite. Composites are ONE rigid body with a parts payload, never a
 
 ---
 
-## §2 Pending rulings (P1–P3) and their default resolutions
+## §2 Rulings — recorded resolutions (ruled 2026-10-30, defaults void)
 
-These were left with the author on 2026-10-30. Each has a default so work
-never blocks; an override lands as an edit here BEFORE the affected WP's
-first commit.
+The three pending defaults were put to the author 2026-10-30 and each
+came back resolved; they are recorded here exactly as decided, BEFORE the
+affected WP's first commit (this section's own protocol). The
+identifiers map lives here; the ledger (§9) records the mapping line at
+the rename landing.
 
-- **P1 — the name.** Default: keep **NUF** (type `object_composite`,
-  `core/nu_mass.*`, spec `nuf <name>`). Renaming after any engine-facing
-  commit is grep surgery across the suite and docs — so if a rename is
-  coming, it must land in the SAME commit as WP1's first body-contract
-  change, before WP2 touches 20 files.
-- **P2 — part cap.** Default `composite.max_parts = 16`, config-schema
-  key in the ship registry, counted clamp (keep the FIRST 16 parts,
-  report the substitution through a new `mpe_clamp_composite_events`
-  counter, never veto the scene on load). The WP0 suite never collides
-  with the cap; a dedicated sub-cap probe ships with WP2.
-- **P3 — hull timing.** Default: hulls stay post-v16S (charter §8/§11).
-  If in-scope is ever wanted, a WP2.5 package gets appended here with its
-  own gate list (hull SAT reference + hull inertia by divergence theorem)
-  and the release target moves — hulls are the single biggest scope risk
-  in the charter and are not implied by "both axes in parallel": WP0+WP1+
-  WP2 already deliver non-uniform mass AND non-uniform *geometry* via
-  composed primitives.
+- **P1 — the name: RENAMED.** Resolution (verbatim intent): *name it
+  MIG (MPE-Infinity-Generator), fits the bill as we should be able to
+  create near infinite types of objects now.* Ride-along rule unchanged
+  and now binding: the rename lands together with WP1's first
+  body-contract change (steps 1.2/1.3/1.4), so the engine-facing surface
+  is born with `mig_` names and no engine-facing commit ever exists under
+  `nuf_*` names. Mapping applied at that landing:
+  `core/nu_mass.{h,c}` → `core/mig_mass.{h,c}`; `nu_compose` →
+  `mig_compose`, `nu_rebase_parts` → `mig_rebase_parts`, `nu_part` →
+  `mig_part`, `nu_totals` → `mig_totals`, `nu_compose_*` errors →
+  `mig_compose_*` (header guard `mig_mass_h`); gates
+  `nuf_mass_composite` → `mig_mass_composite` and
+  `nuf_pendulum_physical` → `mig_pendulum_physical` (test functions
+  `mpe_t_mig_*`, registry name strings, externs); spec verb
+  `nuf <name>` → `mig <name>`; scene record `NUF1` → `MIG1`;
+  `docs/NUF_BUILD_PLAN.md` → `docs/MIG_BUILD_PLAN.md` (charter §9
+  cross-link updates); future gate names carry the `mig_` prefix
+  (`mig_composite_stack`, `mig_floor_ccd_composite`,
+  `mig_pendulum_com_offset`, `mig_scene_roundtrip`). The SCENE TYPE name
+  stays `object_composite` (descriptive, not brand). Commit history
+  keeps the historical names — the ledger line makes the archaeological
+  mapping unambiguous.
+- **P2 — part cap: CONFIRMED at 16, counted.** Author note (verbatim):
+  *16 for now, hybrid arrangement with chance to change with potential
+  gpu possible layer in future.* Consequences committed to:
+  `composite.max_parts = 16`, config-schema key in the ship registry,
+  counted clamp (keep the FIRST 16 parts, report through
+  `mpe_clamp_composite_events`, never a load veto); and the note is
+  recorded as a named FUTURE-WORK row, not v16S scope: the parts backing
+  store may later grow a GPU-side layer in a hybrid CPU+GPU arrangement —
+  the config key is exactly what keeps that from becoming rename-style
+  surgery if it arrives.
+- **P3 — convex hulls: AMENDED into scope, incremental.** Resolution
+  (verbatim intent): *option 2, slowly and incrementally.* Hulls enter as
+  **WP2.5** (§8.5, appended below) — foundation-first staged sub-steps,
+  each its own green-or-rollback commit, NOT one SAT-charged block. The
+  v16S cut carries whichever increments are green at cut time; the rest
+  stay flag-OFF with ledger evidence. The original scope-risk framing
+  still applies (SAT algebra + divergence-theorem inertia are the two
+  real inventions), which is precisely why the staging exists.
+- **P4 — the §3 step 1.4 decision (was open): LAND THE STUB.**
+  `physics_world_add_composite` enters WP1 with the documented
+  intermediate behavior — composed mass + full authored inertia tensor
+  on a sphere-backed body, parts recorded inert until WP2. The plan's
+  binding caveat applies from day one: the composed tensor is NEVER
+  regenerated from type defaults by sanitize (the existing custom-tensor
+  guard pattern), so the stub cannot silently replace the very thing WP0
+  certified.
 
 ---
 
@@ -358,6 +395,34 @@ Charter §8 is the contract; the plan adds the risk discipline.
   `tools/sync_mfs_check.sh` green, per the twin discipline (engine files
   ride with the sync script's existing rules; the MFS deltas of WP5 mirror
   twin→both).
+
+## §8.5 WP2.5 — convex hulls (P3 ruling: in scope, incremental)
+
+Appended by the 2026-10-30 P3 ruling (option 2, *slowly and
+incrementally*). NOT a single SAT-charged block: every sub-step below is
+its own commit, green-or-rollback, and the v16S cut checklist (§10)
+counts only the green increments — the rest stay config-flag OFF with a
+ledger line saying so. Work files live in `core/` beside the MIG mass
+module; nothing here duplicates an existing primitive path until the
+reference gates force it.
+
+- [ ] **2.5.0 Flag.** `composite.hull 0|1` default 0, config-schema key;
+  NOT the load path — every hull increment ships behind this flag.
+- [ ] **2.5.1 Point collection (no physics).** Import or build hull
+  point sets as data; unit: exact tetra/box point sets, no solver
+  involvement, suite-gated garbage rejection (non-finite points).
+- [ ] **2.5.2 The 2D proof.** Divergence-theorem area/moment on polygon
+  cross-sections vs closed forms (box slice exact) — the mathematical
+  foundation of 2.5.3, proven on the lowest dimension first.
+- [ ] **2.5.3 Hull inertia, standalone.** Divergence-theorem mass
+  properties for closed triangle meshes as a pure math module (mig_mass
+  discipline: double accumulation, write-on-success, named errors);
+  gates: box hull reproduces the box closed form, tetra exact.
+- [ ] **2.5.4 SAT reference pairs.** hull-vs-primitive narrowphase
+  behind `composite.hull 1`, reference-pair gates only (box-hull vs box,
+  sphere-hull vs sphere); no scene-format default flips.
+- [ ] **2.5.5 Cut note.** Whichever of 2.5.1–2.5.4 are green at the v16S
+  cut ride to release; a ledger line names the shipped increment set.
 
 ## §9 Risk register + the standing ledger
 
