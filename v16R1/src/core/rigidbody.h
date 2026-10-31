@@ -145,6 +145,20 @@ typedef struct {
      * dv=0 for a whole tick). With this flag, any body with an external
      * force takes the constrained Euler path, which keeps it. */
     unsigned char ext_force_this_tick;
+    /* ---- MIG composite body contract (append-only; the struct grows ONCE
+     * in this WP1 bridge commit — playbook §4 2.1's grows-once rule) ----
+     * mass_is_composed: the body's mass + inertia_tensor_local arrived
+     * through mig_compose (authored truth), NOT from a type-default
+     * formula. WP1 keeps the authored tensor alive by staying inside
+     * every sanitize policy window (no clamp event => the regeneration
+     * branch never fires); WP2 2.2 extends the explicit guard for the
+     * full composite type. composite_part_count: how many parts the
+     * composition consumed — a dead-weight RECORD until WP2's pool
+     * attaches actual parts. Both are zeroed at every initializer site:
+     * a false/0 body is every pre-existing body, bit-identical. WP1's
+     * step path reads neither field. */
+    bool mass_is_composed;
+    int composite_part_count;
 } rigidbody;
 void rigidbody_update_axes (rigidbody *rigid_body);
 void rigidbody_initialisation_sphere (rigidbody *rigid_body, float radius, float mass, vector3 position_input);
@@ -235,6 +249,16 @@ extern _Atomic unsigned long mpe_clamp_half_length_events;
  * They now count here too, with the same bounded-stderr discipline, so a
  * fixture can assert zero and an operator can see the substitution. */
 extern _Atomic unsigned long mpe_clamp_solver_events;
+/* DESPOT-2026-10-31 WP1 1.3: composite-policy substitution counter — the
+ * shared bus for the P2 part-cap clamp (WP2 keeps the FIRST 16 of an
+ * over-cap assembly) and the WP3 load-sum gate. Zero in WP1 BY DESIGN:
+ * the add_composite stub pre-validates mass + bounding radius inside the
+ * sanitize policy windows and REJECTS malformed assemblies with -1
+ * instead of substituting anything, so a zero composite counter next to
+ * zero partner counters is the gate's proof the authored-tensor path ran
+ * untouched (a clamp would fire needs_inertia_recalc and regenerate the
+ * tensor the composition just authored). */
+extern _Atomic unsigned long mpe_clamp_composite_events;
 void mpe_note_solver_clamp (const char *kind, double requested, double stored);
 void mpe_clamp_counters_reset (void);
 static inline unsigned long mpe_clamp_mass_total (void)
@@ -245,4 +269,6 @@ static inline unsigned long mpe_clamp_half_length_total (void)
     { return MPE_ATOMIC_LOAD_n (&mpe_clamp_half_length_events, MPE_ATOMIC_RELAXED); }
 static inline unsigned long mpe_clamp_solver_total (void)
     { return MPE_ATOMIC_LOAD_n (&mpe_clamp_solver_events, MPE_ATOMIC_RELAXED); }
+static inline unsigned long mpe_clamp_composite_total (void)
+    { return MPE_ATOMIC_LOAD_n (&mpe_clamp_composite_events, MPE_ATOMIC_RELAXED); }
 #endif

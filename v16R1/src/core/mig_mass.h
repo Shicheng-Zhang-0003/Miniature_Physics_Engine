@@ -84,4 +84,35 @@ int mig_compose (const mig_part *parts, int count, mig_totals *out);
  * one (the pose re-anchor). Pure translation: no re-normalization, no
  * reordering — part indices stay exactly as the caller defined them. */
 void mig_rebase_parts (mig_part *parts, int count, vector3 delta);
+
+/* ---- WP1 1.2 bridge: the handoff contract WP2 will consume ----
+ * mig_compose totals plus the RE-ANCHORED copy of the part list, ready
+ * for a world to "copy in" to its own storage (WP2's per-world pool).
+ * The bridge owns nothing: the caller supplies the destination buffer,
+ * the module never mallocs, and `src` is read-only and never modified.
+ *
+ * Re-anchor: the copy is shifted by -totals.com (mig_rebase_parts), so
+ * the stored part poses are COM-framed — the frame the body itself
+ * lives in (charter decision (A): position stays the COM). The original
+ * definition frame survives in the caller's `src`; indices are untouched.
+ *
+ * Write-on-success rule (the mig_compose rule) holds here too: `out` and
+ * `out_parts` are overwritten only after a fully valid composition.
+ * 2026-10-31 sizing note: mig_compose composes EXACTLY over any count —
+ * the P2 cap (composite.max_parts = 16) is a property of WP2's parts
+ * POOL (where parts are stored and the counted clamp fires), not of
+ * pure math, so the bridge carries no cap and fires no counter. */
+typedef struct {
+    mig_totals totals;     /* composed truth: mass, COM, inertia about COM */
+    const mig_part *parts; /* the caller-owned re-anchored copy below */
+    int count;
+} mig_bridge;
+
+/* Compose once, copy into `out_parts` (which must hold `count` slots and
+ * must NOT alias `src` — the copy is then mutated in place by the
+ * re-anchor), re-anchor the copy to the COM frame, and record everything
+ * in `out`. Returns a mig_compose_err: mig_compose_ok on success, the
+ * compose error verbatim on a malformed assembly, mig_compose_null for
+ * NULL src/out_parts/out or a src==out_parts aliasing call. */
+int mig_make_bridge (const mig_part *src, int count, mig_part *out_parts, mig_bridge *out);
 #endif /* mig_mass_h */

@@ -53,6 +53,11 @@ _Atomic unsigned long mpe_clamp_half_length_events = 0;
 /* DESPOT-2026-10-13: solver-runtime substitution counter (split-impulse
  * slop/beta/bias caps, step dt>0.1 clamp). Same bounded discipline. */
 _Atomic unsigned long mpe_clamp_solver_events = 0;
+/* DESPOT-2026-10-31 WP1 1.3: composite-policy substitutions (the P2
+ * part-cap clamp counts here from WP2 on, the WP3 load-sum gate after
+ * that). WP1 increments NOTHING — the add_composite stub pre-validates
+ * and rejects instead of substituting; see rigidbody.h. */
+_Atomic unsigned long mpe_clamp_composite_events = 0;
 static void mpe_note_clamp (const char *kind, _Atomic unsigned long *counter, double requested, double stored) {
     unsigned long n = MPE_ATOMIC_FETCH_ADD (counter, 1ul, MPE_ATOMIC_RELAXED) + 1ul;
     /* Bounded: first 8 occurrences, then every 1000th. Enough to be seen
@@ -518,6 +523,10 @@ void rigidbody_initialisation_sphere (rigidbody *rigid_body, float radius, float
     rigid_body -> cylinder_half_length = 0.0f;
     rigid_body -> custom_shape = -1;
     rigid_body -> max_relative_speed_sq = 0.0f;
+    /* MIG composites (WP1 1.3, grows-once rule): zero here = every
+     * pre-existing body plain, bit-identical — the determinism lesson. */
+    rigid_body -> mass_is_composed = false;
+    rigid_body -> composite_part_count = 0;
     rigid_body -> ext_force_this_tick = 0;
     rigid_body -> no_collide = false;
     /* DETERMINISM: the body pool is malloc'd, so this _Bool would otherwise
@@ -1098,6 +1107,10 @@ void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_inpu
     rigid_body -> cylinder_half_length = 0.0f;
     rigid_body -> custom_shape = -1;
     rigid_body -> max_relative_speed_sq = 0.0f;
+    /* MIG composites (WP1 1.3, grows-once rule): zero here = every
+     * pre-existing body plain, bit-identical — the determinism lesson. */
+    rigid_body -> mass_is_composed = false;
+    rigid_body -> composite_part_count = 0;
     rigid_body -> ext_force_this_tick = 0;
     rigid_body -> no_collide = false;
     /* DETERMINISM: the body pool is malloc'd, so this _Bool would otherwise
@@ -1324,6 +1337,10 @@ void rigidbody_initialisation_cylinder (rigidbody *rigid_body, float radius, flo
     /* DETERMINISM: foreign-shape + diagnostic fields zeroed (see sphere). */
     rigid_body -> custom_shape = -1;
     rigid_body -> max_relative_speed_sq = 0.0f;
+    /* MIG composites (WP1 1.3, grows-once rule): zero here = every
+     * pre-existing body plain, bit-identical — the determinism lesson. */
+    rigid_body -> mass_is_composed = false;
+    rigid_body -> composite_part_count = 0;
     rigid_body -> ext_force_this_tick = 0;
     rigid_body -> no_collide = false;
     /* DETERMINISM: the body pool is malloc'd, so this _Bool would otherwise
@@ -1400,4 +1417,5 @@ void mpe_clamp_counters_reset (void) {
     MPE_ATOMIC_STORE_n (&mpe_clamp_radius_events, 0ul, MPE_ATOMIC_RELAXED);
     MPE_ATOMIC_STORE_n (&mpe_clamp_half_length_events, 0ul, MPE_ATOMIC_RELAXED);
     MPE_ATOMIC_STORE_n (&mpe_clamp_solver_events, 0ul, MPE_ATOMIC_RELAXED);
+    MPE_ATOMIC_STORE_n (&mpe_clamp_composite_events, 0ul, MPE_ATOMIC_RELAXED); /* WP1 1.3 */
 }

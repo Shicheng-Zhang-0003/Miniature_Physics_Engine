@@ -180,3 +180,20 @@ void mig_rebase_parts (mig_part *parts, int count, vector3 delta) {
         parts [i].position.z -= delta.z;
     }
 }
+
+/* WP1 1.2: the bridge — compose once, copy, re-anchor the COPY. See the
+ * header for the contract (caller-owned buffers, no malloc, write-on-
+ * success, no cap: the cap belongs to WP2's pool). The re-anchor calls
+ * mig_rebase_parts verbatim, so the pose shift is ONE code path. */
+int mig_make_bridge (const mig_part *src, int count, mig_part *out_parts, mig_bridge *out) {
+    if ((!src) || (!out_parts) || (!out) || (out_parts == src)) { return mig_compose_null; }
+    mig_totals composed;
+    int err = mig_compose (src, count, &composed);
+    if (err != mig_compose_ok) { return err; }
+    for (int i = 0; i < count; i++) { out_parts [i] = src [i]; }
+    mig_rebase_parts (out_parts, count, composed.com);
+    out -> totals = composed;
+    out -> parts = out_parts;
+    out -> count = count;
+    return mig_compose_ok;
+}

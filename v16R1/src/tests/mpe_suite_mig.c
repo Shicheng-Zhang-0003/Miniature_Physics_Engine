@@ -415,3 +415,199 @@ int mpe_t_mig_pendulum_physical (void) {
     mpe_test_end (&t);
     return t.failures;
 }
+
+/* ---- WP1 1.4 stub gate (docs/MIG_BUILD_PLAN.md §3 1.4; landing 2026-
+ * 10-31): the FIRST engine-facing MIG path. Same independence contract
+ * as above — every expected value is a hand-written closed form, and the
+ * gate never calls the implementation's matrix helpers (the multiply-
+ * back below is the gate's OWN float algebra, never math3_inverse or
+ * math3_multiplication round-tripping).
+ *
+ * Fixture: the WP0 dumbbell — two explicit-mass spheres, m = 2 apiece,
+ * r = 0.25, at (+-0.5, 0, 0). Composition truth: M = 4 at the origin,
+ * Ixx = 2*(2/5*2*0.25^2) = 0.1 (both part centres ride the x axle, so
+ * the x-Steiner term is exactly zero), Iyy = Izz = 2*(0.05 + 2*0.5^2) =
+ * 1.1, bounding radius 0.5 + 0.25 = 0.75. The sphere-default tensor the
+ * backing body "would" have had is 2/5*4*0.75^2 = 0.9 — different from
+ * EVERY composed entry, so regeneration (the failure this stub exists to
+ * make impossible) is caught by values, not vibes.
+ *
+ * The zero-clamp sweep is the guard's proof: the stub must pre-decline
+ * (return -1) whatever sanitize would substitute, and rejected calls
+ * must not grow the world. mpe_clamp_composite_events stays zero in WP1
+ * BY DESIGN (it counts the WP2 cap substitution and the WP3 load-sum
+ * gate); the WP1 assertion is that the four live counters AND it never
+ * move across construction, 120 free-fall ticks, and every rejection.
+ *
+ * Also exercised: 1.2's bridge (mig_make_bridge) on an ASYMMETRIC pair —
+ * m = 1 @ origin, m = 3 @ (2,0,0): com (1.5,0,0), Ixx = 0.025 + 0.075
+ * = 0.1 (part centres ride the x axle; per-part self-inertia 2/5*m*r^2),
+ * Iyy = (0.025 + 1*1.5^2) + (0.075 + 3*0.5^2) = 2.275 + 0.825 = 3.1,
+ * re-anchored part poses (-1.5,0,0) / (0.5,0,0), source list untouched. */
+int mpe_t_mig_composite_stub (void) {
+    mpe_test_t t;
+    mpe_test_begin (&t, "mig_composite_stub");
+    /* 1.2 bridge — pure math, no world. */
+    mig_part pair [2] = {
+        { mig_part_sphere, 0.25f, 0.0f, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f},
+          {1.0f, 0.0f, 0.0f, 0.0f}, mig_mass_mode_explicit, 1.0f },
+        { mig_part_sphere, 0.25f, 0.0f, {0.0f, 0.0f, 0.0f}, {2.0f, 0.0f, 0.0f},
+          {1.0f, 0.0f, 0.0f, 0.0f}, mig_mass_mode_explicit, 3.0f }
+    };
+    mig_part bridge_buf [2];
+    mig_bridge br;
+    MPE_CHECK (&t, mig_make_bridge (pair, 2, bridge_buf, &br) == mig_compose_ok);
+    MPE_CHECK_NEAR (&t, (float) br.totals.mass, 4.0f, 1e-6f, "bridge mass");
+    MPE_CHECK_NEAR (&t, br.totals.com.x, 1.5f, 1e-6f, "bridge com");
+    MPE_CHECK_NEAR (&t, br.totals.inertia.matrix [0][0], 0.1f, 1e-6f, "bridge Ixx (0.025 + 0.075)");
+    MPE_CHECK_NEAR (&t, br.totals.inertia.matrix [1][1], 3.1f, 1e-5f, "bridge Iyy");
+    MPE_CHECK_NEAR (&t, bridge_buf [0].position.x, -1.5f, 1e-6f, "rebase part A");
+    MPE_CHECK_NEAR (&t, bridge_buf [1].position.x, 0.5f, 1e-6f, "rebase part B");
+    MPE_CHECK (&t, (pair [0].position.x == 0.0f) && (pair [1].position.x == 2.0f)); /* src never mutated */
+    MPE_CHECK (&t, (br.parts == bridge_buf) && (br.count == 2));
+    MPE_CHECK (&t, mig_make_bridge (NULL, 2, bridge_buf, &br) == mig_compose_null);
+    MPE_CHECK (&t, mig_make_bridge (pair, 0, bridge_buf, &br) == mig_compose_null);
+    MPE_CHECK (&t, mig_make_bridge (pair, 2, bridge_buf, NULL) == mig_compose_null);
+    MPE_CHECK (&t, mig_make_bridge (pair, 2, pair, &br) == mig_compose_null); /* aliasing rejected */
+    MPE_CHECK (&t, (pair [0].position.x == 0.0f) && (pair [1].position.x == 2.0f)); /* still untouched */
+    mig_part tilted = pair [0];
+    tilted.orientation = (vector4) {0.5f, 0.0f, 0.0f, 0.0f};
+    MPE_CHECK (&t, mig_make_bridge (&tilted, 1, bridge_buf, &br) == mig_compose_bad_quat);
+    /* 1.4 stub: construction, authored tensor, zero clamps. The
+     * assembly floats at y = 30: the default world floor sits at y = 0
+     * (the house drop tests spawn high too), and 2 s of fall ends near
+     * y = 10.4 — far above it. */
+    g_cfg.world.gravity = -9.81f;
+    g_cfg.world.drag = 0.0f;
+    g_cfg.sleep.enable = 0;
+    mpe_clamp_counters_reset ();
+    const float yp = 30.0f; /* the assembly flies at this height */
+    const mig_part dumbbell [2] = {
+        { mig_part_sphere, 0.25f, 0.0f, {0.0f, 0.0f, 0.0f}, {0.5f, yp, 0.0f},
+          {1.0f, 0.0f, 0.0f, 0.0f}, mig_mass_mode_explicit, 2.0f },
+        { mig_part_sphere, 0.25f, 0.0f, {0.0f, 0.0f, 0.0f}, {-0.5f, yp, 0.0f},
+          {1.0f, 0.0f, 0.0f, 0.0f}, mig_mass_mode_explicit, 2.0f }
+    };
+    physics_world w;
+    mpe_world_begin (&w);
+    const int cb = physics_world_add_composite (&w, dumbbell, 2);
+    MPE_CHECK (&t, cb == 0);
+    MPE_CHECK (&t, w.body_count == 1);
+    MPE_CHECK (&t, w.bodies [cb].type == object_sphere);
+    MPE_CHECK (&t, w.bodies [cb].mass_is_composed);
+    MPE_CHECK (&t, w.bodies [cb].composite_part_count == 2);
+    MPE_CHECK_NEAR (&t, w.bodies [cb].mass, 4.0f, 1e-6f, "composed mass");
+    MPE_CHECK_NEAR (&t, w.bodies [cb].radius, 0.75f, 1e-6f, "bounding radius");
+    MPE_CHECK_NEAR (&t, w.bodies [cb].position.x, 0.0f, 1e-6f, "com x");
+    MPE_CHECK_NEAR (&t, w.bodies [cb].position.y, yp, 1e-6f, "com y");
+    MPE_CHECK_NEAR (&t, w.bodies [cb].inverse_mass, 0.25f, 1e-6f, "inverse mass");
+    const math3 *loc = &w.bodies [cb].inertia_tensor_local;
+    MPE_CHECK_NEAR (&t, loc -> matrix [0][0], 0.1f, 1e-6f, "Ixx authored");
+    MPE_CHECK_NEAR (&t, loc -> matrix [1][1], 1.1f, 1e-6f, "Iyy authored");
+    MPE_CHECK_NEAR (&t, loc -> matrix [2][2], 1.1f, 1e-6f, "Izz authored");
+    MPE_CHECK_NEAR (&t, fabsf (loc -> matrix [0][1]) + fabsf (loc -> matrix [0][2]) +
+                    fabsf (loc -> matrix [1][2]), 0.0f, 1e-9f, "off-diagonals zero");
+    /* Multiply-back through the GATE's own float algebra. */
+    const math3 inv = w.bodies [cb].inverse_inertia_tensor_local;
+    for (int r = 0; r < 3; r++) {
+        for (int c = 0; c < 3; c++) {
+            float s = 0.0f;
+            for (int k = 0; k < 3; k++) { s += inv.matrix [r][k] * loc -> matrix [k][c]; }
+            MPE_CHECK_NEAR (&t, s, (r == c) ? 1.0f : 0.0f, 2e-4f, "inv*I identity");
+        }
+    }
+    for (int r = 0; r < 3; r++) {
+        for (int c = 0; c < 3; c++) {
+            MPE_CHECK_NEAR (&t, w.bodies [cb].inverse_inertia_system.matrix [r][c],
+                            inv.matrix [r][c], 0.0f, "system inverse == local (identity frame)");
+        }
+    }
+    MPE_CHECK (&t, mpe_clamp_composite_total () == 0ul);
+    MPE_CHECK (&t, mpe_clamp_mass_total () == 0ul);
+    MPE_CHECK (&t, mpe_clamp_radius_total () == 0ul);
+    MPE_CHECK (&t, mpe_clamp_half_length_total () == 0ul);
+    MPE_CHECK (&t, mpe_clamp_solver_total () == 0ul);
+    /* Bitwise survival + free-fall smoke, 120 ticks (= 2 s at dt = 1/60). */
+    const math3 snap_local = w.bodies [cb].inertia_tensor_local;
+    const math3 snap_inv_local = w.bodies [cb].inverse_inertia_tensor_local;
+    const math3 snap_inv_sys = w.bodies [cb].inverse_inertia_system;
+    const float y0 = w.bodies [cb].position.y;
+    physics_world wctrl;
+    mpe_world_begin (&wctrl);
+    const int ctrl = physics_world_add_sphere (&wctrl, 0.5f, 4.0f, (vector3) {0.0f, yp, 0.0f});
+    MPE_CHECK (&t, ctrl == 0);
+    const float y0_ctrl = wctrl.bodies [ctrl].position.y;
+    for (int k = 0; k < 120; k++) {
+        physics_world_step (&w, 1.0f / 60.0f);
+        physics_world_step (&wctrl, 1.0f / 60.0f);
+    }
+    const float dy = w.bodies [cb].position.y - y0;
+    const float dy_c = wctrl.bodies [ctrl].position.y - y0_ctrl;
+    MPE_CHECK_REL (&t, -dy, 19.62f, 0.03f, "free-fall drop vs 0.5*9.81*2^2");
+    MPE_CHECK (&t, fabsf (dy - dy_c) <= 1e-7f); /* composite falls WITH the plain sphere */
+    for (int r = 0; r < 3; r++) {
+        for (int c = 0; c < 3; c++) {
+            MPE_CHECK_NEAR (&t, w.bodies [cb].inertia_tensor_local.matrix [r][c],
+                            snap_local.matrix [r][c], 0.0f, "authored tensor bitwise after 120 ticks");
+            MPE_CHECK_NEAR (&t, w.bodies [cb].inverse_inertia_tensor_local.matrix [r][c],
+                            snap_inv_local.matrix [r][c], 0.0f, "inverse local bitwise after 120 ticks");
+            MPE_CHECK_NEAR (&t, w.bodies [cb].inverse_inertia_system.matrix [r][c],
+                            snap_inv_sys.matrix [r][c], 0.0f, "system inverse bitwise after 120 ticks");
+        }
+    }
+    MPE_CHECK (&t, isfinite (w.bodies [cb].position.x) && isfinite (w.bodies [cb].position.y));
+    MPE_CHECK (&t, mpe_clamp_composite_total () == 0ul);
+    MPE_CHECK (&t, mpe_clamp_mass_total () == 0ul);
+    MPE_CHECK (&t, mpe_clamp_radius_total () == 0ul);
+    MPE_CHECK (&t, mpe_clamp_half_length_total () == 0ul);
+    MPE_CHECK (&t, mpe_clamp_solver_total () == 0ul);
+    /* Rejection contract: -1, nothing grown, NOTHING counted. The
+     * bounding radius is COM-relative (translation-invariant) — the
+     * spread case, not a moved single part, is what can exceed the
+     * engine's own radius cap. */
+    physics_world wr;
+    mpe_world_begin (&wr);
+    const int base = wr.body_count;
+    MPE_CHECK (&t, physics_world_add_composite (NULL, dumbbell, 2) == -1);
+    MPE_CHECK (&t, wr.body_count == base);
+    MPE_CHECK (&t, physics_world_add_composite (&wr, NULL, 2) == -1);
+    MPE_CHECK (&t, wr.body_count == base);
+    MPE_CHECK (&t, physics_world_add_composite (&wr, dumbbell, 0) == -1);
+    MPE_CHECK (&t, wr.body_count == base);
+    MPE_CHECK (&t, physics_world_add_composite (&wr, dumbbell, -3) == -1);
+    MPE_CHECK (&t, wr.body_count == base);
+    mig_part broken = dumbbell [0];
+    broken.radius = 0.0f; /* compose_bad_dims */
+    MPE_CHECK (&t, physics_world_add_composite (&wr, &broken, 1) == -1);
+    MPE_CHECK (&t, wr.body_count == base);
+    mig_part farpair [2] = { dumbbell [0], dumbbell [1] };
+    farpair [0].position = (vector3) {150.0f, 0.0f, 0.0f};
+    farpair [1].position = (vector3) {-150.0f, 0.0f, 0.0f};
+    /* com stays the origin but d = 150 => bound 150.25 > 100 (the
+     * engine's own radius cap): WP1 sphere-backing cannot host it. */
+    MPE_CHECK (&t, physics_world_add_composite (&wr, farpair, 2) == -1);
+    MPE_CHECK (&t, wr.body_count == base);
+    mig_part tiny = dumbbell [0];
+    tiny.mass = 1e-5f; /* below the engine's 1e-4 mass floor */
+    MPE_CHECK (&t, physics_world_add_composite (&wr, &tiny, 1) == -1);
+    MPE_CHECK (&t, wr.body_count == base);
+    mig_part small = dumbbell [0];
+    small.radius = 0.002f; /* bound 0.002 < the 0.01 floor */
+    MPE_CHECK (&t, physics_world_add_composite (&wr, &small, 1) == -1);
+    MPE_CHECK (&t, wr.body_count == base);
+    MPE_CHECK (&t, mpe_clamp_composite_total () == 0ul);
+    MPE_CHECK (&t, mpe_clamp_mass_total () == 0ul);
+    MPE_CHECK (&t, mpe_clamp_radius_total () == 0ul);
+    MPE_CHECK (&t, mpe_clamp_half_length_total () == 0ul);
+    MPE_CHECK (&t, mpe_clamp_solver_total () == 0ul);
+    physics_world_cleanup (&wr);
+    physics_world_cleanup (&wctrl);
+    physics_world_cleanup (&w);
+    if (t.failures == 0) {
+        printf ("[PASS] mig WP1 stub: composed mass + authored tensor survive construction sanitize and 120 ticks, zero clamp events\n");
+        MPE_INFO ("dumbbell: mass 4, Ixx 0.1, Iyy=Izz 1.1, bound 0.75 (sphere default would be 0.9); free-fall dy = %.4f m vs control %.4f m",
+                  dy, dy_c);
+    }
+    mpe_test_end (&t);
+    return t.failures;
+}

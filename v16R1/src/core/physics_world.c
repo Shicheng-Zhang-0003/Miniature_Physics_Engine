@@ -1360,6 +1360,89 @@ int physics_world_add_custom (physics_world *world, int custom_shape, vector3 po
     physics_world_bump_revision (world);
     return world -> body_count++;
 }
+/* ---- WP1 1.4 stub — docs/MIG_BUILD_PLAN.md §3 1.4 (P4 ruling: land the
+ * stub). Intermediate behavior, by the playbook's own words: "composed
+ * mass, sphere bounds" — ONE type-object_sphere body carrying the
+ * composed truth at the assembly COM; the parts arrive as weight only
+ * (composite_part_count records what mig_compose consumed; WP2 attaches
+ * actual parts to a per-world pool).
+ *
+ * THE AUTHORED-TENSOR GUARD, WP1 FORM: sanitize's tensor regeneration
+ * (rigidbody.c, the needs_inertia_recalc branch) fires ONLY on a mass/
+ * radius/half-length clamp event or a zero/non-finite inverse tensor —
+ * so this entry point PRE-VALIDATES every policy bound (the windows
+ * sanitize itself enforces: mass [1e-4, 1e6], bounding radius
+ * [0.01, 100]; equality parks legally — sanitize rewrites only strictly
+ * outside) and REJECTS with -1 what sanitize would substitute — a named
+ * rejection, never a counted substitution (mixing those two is exactly
+ * the failure DESPOT-2026-10-02 built the counters to expose). Then it
+ * authors the composed tensors BEFORE the construction sanitize pass,
+ * which now sees a fully formed policy-clean body and rewrites nothing.
+ * Zero clamp events is the gate's contract: mpe_clamp_composite_events
+ * counts the WP2 cap substitution and the WP3 load-sum gate, not this
+ * stub. */
+int physics_world_add_composite (physics_world *world, const mig_part *parts, int count) {
+    if ((!world) || (!world -> bodies)) { return -1; }
+    /* Whole-assembly validation first (write-on-success): one compose
+     * call covers NULL / count<=0 / bad type / dims / quat / mass as
+     * named errors — malformed assemblies mutate nothing. */
+    mig_totals totals;
+    if (mig_compose (parts, count, &totals) != mig_compose_ok) { return -1; }
+    if (totals.mass < 1e-4 || totals.mass > 1e6) { return -1; }
+    const float mass_f = (float) totals.mass;
+    /* Bounding radius: max over parts of |com - p_i| + B_i, with B_i the
+     * part's worst-case metric radius — sphere r; cube sqrt of the
+     * squared half-extensions; cylinder sqrt(half_length^2 + radius^2)
+     * (axle is local X, but the worst-case norm is axis-agnostic).
+     * Part orientations never change it: rotation preserves norms. */
+    float bound = 0.0f;
+    for (int i = 0; i < count; i++) {
+        float part_bound = 0.0f;
+        if (parts [i].type == mig_part_sphere) { part_bound = parts [i].radius; }
+        else if (parts [i].type == mig_part_cube) {
+            part_bound = sqrtf (parts [i].half_extensions.x * parts [i].half_extensions.x +
+                                parts [i].half_extensions.y * parts [i].half_extensions.y +
+                                parts [i].half_extensions.z * parts [i].half_extensions.z);
+        } else { /* mig_part_cylinder */
+            part_bound = sqrtf (parts [i].cylinder_half_length * parts [i].cylinder_half_length +
+                                parts [i].radius * parts [i].radius);
+        }
+        const float dx = totals.com.x - parts [i].position.x;
+        const float dy = totals.com.y - parts [i].position.y;
+        const float dz = totals.com.z - parts [i].position.z;
+        const float r = sqrtf (dx * dx + dy * dy + dz * dz) + part_bound;
+        if (r > bound) { bound = r; }
+    }
+    if (!((bound >= 0.01f) && (bound <= 100.0f))) { return -1; }
+    if (world -> body_count >= world -> body_capacity && physics_world_grow_bodies (world) != 0) { return -1; }
+    rigidbody *rb = &world -> bodies [world -> body_count];
+    rigidbody_initialisation_sphere (rb, bound, mass_f, totals.com); /* decision (A): position IS the COM */
+    /* DESPOT-2026-10-07 P1-3: per-world material stamp (see add_sphere). */
+    {
+        const mpe_config_t *wcfg = mpe_world_cfg (world);
+        rb -> friction_static = wcfg -> body_defaults.sphere_fric_s;
+        rb -> friction_kinetic = wcfg -> body_defaults.sphere_fric_k;
+        rb -> restitution = wcfg -> body_defaults.sphere_restitution;
+    }
+    /* Author the composed truth over the sphere defaults BEFORE the
+     * construction sanitize pass: finite tensors, policy-clean mass and
+     * radius => no clamp fires, nothing regenerates. Identity body frame
+     * => inverse_inertia_system = inverse local (the same identity-frame
+     * rule the sphere update path applies). */
+    rb -> inertia_tensor_local = totals.inertia;
+    rb -> inverse_inertia_tensor_local = math3_inverse (totals.inertia);
+    rb -> inverse_inertia_system = rb -> inverse_inertia_tensor_local;
+    rb -> mass_is_composed = true;
+    rb -> composite_part_count = count;
+    if (world -> next_object_id == 0 || world -> next_object_id == 0xFFFFFFFFu) { world -> next_object_id = 1; }
+    rb -> object_id = world -> next_object_id++;
+    if (world -> next_object_id == 0 || world -> next_object_id == 0xFFFFFFFFu) { world -> next_object_id = 1; }
+    rb -> object_generation = 1;
+    rb -> body_index = world -> body_count;
+    rigidbody_sanitize (rb); /* authored tensors pass through untouched: no clamp can fire */
+    physics_world_bump_revision (world);
+    return world -> body_count++;
+}
 void physics_world_clear (physics_world *world) {
     if (!world) { return; }
     world -> body_count = 0;
