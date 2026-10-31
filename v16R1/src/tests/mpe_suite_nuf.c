@@ -1,4 +1,8 @@
-/* NUF stage 0 regression gate (mpe_t_nuf_mass_composite).
+/* NUF gate file (tests/mpe_suite_nuf.c):
+ *   mpe_t_nuf_mass_composite — WP0 stage 0 regression (composition).
+ *   mpe_t_nuf_pendulum_physical — WP1 step 1.1 pre-change probe (plan
+ *     docs/NUF_BUILD_PLAN.md §3): runs against the UNMODIFIED engine,
+ *     hand-written oracle in this file, same independence contract.
  *
  * THE INDEPENDENCE CONTRACT: every expected value below is derived in THIS
  * file from closed-form rigid-body mechanics written out by hand — the test
@@ -30,6 +34,8 @@
 #include <stdio.h>
 #include <string.h>
 #include "mpe_test.h"
+#include "physics/spring_joint.h"
+#include "core/rigidbody.h"
 #include "core/nu_mass.h"
 
 /* Probe-7 fixture checker: the untouched totals must read 0xAB in every
@@ -304,6 +310,108 @@ int mpe_t_nuf_mass_composite (void) {
         printf ("[PASS] nuf stage0: composition matches independent closed-form mechanics\n");
         MPE_INFO ("probes: dumbbell, L-Steiner offdiag, density mixing, 90-deg axis map, cross-type, rebase, 6 named errors");
     }
+    mpe_test_end (&t);
+    return t.failures;
+}
+
+/* ---- WP1 step 1.1 pre-change probe (docs/NUF_BUILD_PLAN.md §3): the
+ * physical pendulum the composite train leans on.
+ *
+ * Runs against the UNMODIFIED engine ON PURPOSE: the existing revolute
+ * joint + hand-authored cuboid tensor must already satisfy the full
+ * physical-pendulum closed form. If this is red it is PRE-EXISTING debt
+ * (filed in the playbook ledger, never fixed silently inside a WP1
+ * commit).
+ *
+ * The bob is a NON-cubic cuboid (half 0.15 x 0.6 x 0.25, m = 2) pivoted
+ * at its TOP-FACE CENTER — local (0, +hy, 0), so d = hy straight off the
+ * shape's own half-extension, never a hand-picked constant. The swing
+ * inertia the pivot sees is the parallel-axis sum:
+ *   I_com(z) = m/12*((2hy)^2 + (2hx)^2) = 2/12*(1.44 + 0.09) = 0.255
+ *   I_pivot  = I_com + M*d^2            = 0.255 + 2*0.36   = 0.975
+ * The Steiner term carries 74% of I_pivot — the relation WP0 certified
+ * in closed form is here required of the ENGINE's live tensor.
+ * Period: T = 2*pi*sqrt(I_pivot/(M*g*d)) = 1.8082 s at g = 9.81, times the
+ * O(theta0^2) amplitude correction (1 + theta0^2/16) = 1.8184 s for
+ * theta0 = 0.3 rad (next elliptic term 11*theta0^4/3072 ~ 3e-5: noise).
+ * Same cross-measure discipline as the house pendulum gate (suite_a):
+ * int crossings over the bob's horizontal COM displacement, drift bound,
+ * plus amplitude bounds that catch both a dead-still hang and an
+ * energy-pumping solver. */
+int mpe_t_nuf_pendulum_physical (void) {
+    mpe_test_t t;
+    mpe_test_begin (&t, "nuf_pendulum_physical");
+    /* DESPOT-2026-10-04: pin g the way the house pendulum gates do. */
+    g_cfg.world.gravity = -9.81f;
+    physics_world w;
+    mpe_world_begin (&w);
+    const float hx = 0.15f, hy = 0.6f, hz = 0.25f, m = 2.0f;
+    const float d = hy; /* the pivot rides the TOP-FACE center */
+    const float theta0 = 0.3f;
+    /* Static pivot (mass 0, the house pattern). Its anchor rides (0, -1.2, 0)
+     * → world hinge (0, 6.8, 0), 1.0 below the pivot body's bottom face so
+     * no shape ever overlaps the bob's top face, which pivots AT that point. */
+    int pivot = physics_world_add_cube (&w, (vector3) {0.0f, 8.0f, 0.0f}, (vector3) {0.2f, 0.2f, 0.2f}, 0.0f);
+    MPE_CHECK (&t, pivot >= 0);
+    const vector3 hinge = {0.0f, 6.8f, 0.0f};
+    /* The bob is BORN rotated theta0 about Z, zero angular velocity: its COM
+     * sits at hinge + R(theta0)*(0, -d, 0) = hinge + (d*sin, -d*cos, 0). */
+    int bob = physics_world_add_cube (&w, (vector3) {hinge.x + d * sinf (theta0), hinge.y - d * cosf (theta0), 0.0f},
+                                      (vector3) {hx, hy, hz}, m);
+    MPE_CHECK (&t, bob >= 0);
+    w.bodies [bob].orientation =
+        (vector4) {cosf (theta0 * 0.5f), 0.0f, 0.0f, sinf (theta0 * 0.5f)}; /* born at amplitude */
+    uint32_t pid = w.bodies [pivot].object_id;
+    uint32_t bid = w.bodies [bob].object_id;
+    /* Hinge about Z; anchors are BODY-LOCAL (rotated by q each solve):
+     * pivot local (0, -1.2, 0), bob local (0, +hy, 0) = top-face center.
+     * The hinge axis (0,0,1) is invariant under the rotation stored in both
+     * bodies, so the born-at-amplitude orientation maps axis_b identically. */
+    MPE_CHECK (&t, constraint_add_revolute (&w, pid, bid, (vector3) {0.0f, -1.2f, 0.0f}, (vector3) {0.0f, hy, 0.0f},
+                                            (vector3) {0.0f, 0.0f, 1.0f}) >= 0);
+    /* Closed form, hand-written — oracle independent of WP0's nu_mass code. */
+    const float i_com_z = (m / 12.0f) * ((2.0f * hy) * (2.0f * hy) + (2.0f * hx) * (2.0f * hx));
+    const float i_pivot = i_com_z + m * d * d;
+    const float t_exact = 2.0f * 3.14159265f * sqrtf (i_pivot / (m * 9.81f * d));
+    const float t_expected = t_exact * (1.0f + (theta0 * theta0) / 16.0f);
+    const float dt = 1.0f / 60.0f;
+    float prev_x = w.bodies [bob].position.x - hinge.x;
+    int crossings = 0, first = -1, last = -1;
+    float max_drift = 0.0f, max_abs_x = 0.0f;
+    for (int k = 0; k < 900; k++) {
+        physics_world_step (&w, dt);
+        const rigidbody *b = &w.bodies [bob];
+        if (!isfinite (b -> position.x) || !isfinite (b -> position.y) || !isfinite (b -> position.z)) {
+            printf ("[FAIL] bob non-finite at tick %d\n", k);
+            t.failures++;
+            break;
+        }
+        const float dx = b -> position.x - hinge.x;
+        const float dy = b -> position.y - hinge.y;
+        max_drift = fmaxf (max_drift, fabsf (sqrtf (dx * dx + dy * dy) - d));
+        const float ax = fabsf (dx);
+        if (ax > max_abs_x) { max_abs_x = ax; }
+        if ((prev_x <= 0.0f && dx > 0.0f) || (prev_x >= 0.0f && dx < 0.0f)) {
+            crossings++;
+            if (first < 0) { first = k; }
+            last = k;
+        } prev_x = dx;
+    }
+    float t_meas = 0.0f;
+    if (crossings >= 2) { t_meas = 2.0f * (float) (last - first) * dt / (float) (crossings - 1); }
+    MPE_INFO ("period: measured=%.4f analytic=%.4f (theta0-corrected %.4f) crossings=%d max_drift=%.4f max_x=%.4f (start %.4f)",
+              t_meas, t_exact, t_expected, crossings, max_drift, max_abs_x, d * sinf (theta0));
+    MPE_CHECK (&t, crossings >= 6); /* 900 ticks ~ 8 periods at T = 1.82 s */
+    MPE_CHECK (&t, max_drift <= 0.02f); /* the house revolute drift bound */
+    MPE_CHECK (&t, max_abs_x >= 0.4f * d * sinf (theta0)); /* no dead-still hang */
+    MPE_CHECK (&t, max_abs_x <= 1.6f * d * sinf (theta0)); /* no energy pump */
+    if (crossings >= 4) { MPE_CHECK_REL (&t, t_meas, t_expected, 0.02f, "physical-pendulum period (I_com + M*d^2)"); }
+    if (t.failures == 0) {
+        printf ("[PASS] nuf WP1 probe: top-face-pivoted cuboid swings at the I_com+M*d^2 closed form on the unmodified engine\n");
+        MPE_INFO ("parallel-axis sum required of the live tensor: Steiner term carries %.0f%% of I_pivot",
+                  100.0f * (m * d * d) / i_pivot);
+    }
+    physics_world_cleanup (&w);
     mpe_test_end (&t);
     return t.failures;
 }

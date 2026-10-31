@@ -127,7 +127,10 @@ MPE_TEST_REGIMES = ("default", "light", "heavy", "brittle", "sticky")
 # docs/NON_UNIFORM_BODY.md WP0 — mass/COM/inertia composition against
 # independent closed forms; the measuring sticks land before the body
 # contract they certify).
-MIN_SUITE_ENTRIES = 47
+# -> 48 (2026-10-30, nuf_pendulum_physical: WP1 step 1.1 pre-change probe —
+# compound pendulum period vs the I_com + M*d^2 closed form on the
+# unmodified engine; gates the contract the composite must inherit).
+MIN_SUITE_ENTRIES = 48
 # DESPOT-2026-10-01: pin per-suite floors so deleting a legacy/paranoia target
 # + its make target together cannot shrink the headline silently (the 220->204
 # drift). Canonical floor above; legacy 30 + paranoia 14 pinned here.
