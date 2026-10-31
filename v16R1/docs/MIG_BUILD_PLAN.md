@@ -559,6 +559,26 @@ Ledger (new entries get a line, never an edit of a past line):
   counter discipline held: mpe_clamp_composite_events stayed 0 across
   construction, 120 ticks, and every rejection — substitution-counting
   starts with WP2's cap exactly as P2 planned.
+- 2026-10-31 — `fix:` follow-up to `df383f0` — the first engine-touching
+  landing missed its DOWNSTREAM consumers: `ecosystem/mgb/makefile`
+  (`CORE` :18, linked by both `mgb_mpe_test` and `mgb_probe`) and
+  `ecosystem/mfs/build_tests.sh` (`CORE` :95) compile the engine core
+  DIRECTLY instead of through MPE_TEST_CORE, so physics_world.c's new
+  `mig_compose` reference found no definition when the author ran
+  `make everything` (the main makefile's `mgb_bridge` target recurses
+  into the mgb sub-tree's default `all`). All three lists gained
+  `core/mig_mass.c` right after `core/mpe_primary.c` — the main
+  makefile's MPE_TEST_CORE order — with the third being the canonical
+  `ecosystem/mfs/mfs_sources.mk` (its own header says "update both files
+  together"). Battery-gap honesty: build_suite + the quick profile never
+  touch the ecosystem targets, so the landing's verification had not run
+  `make everything`; the author's own build found the hole. Post-fix
+  evidence: default `make` green, `make mgb_bridge` builds the full mgb
+  `all` (mgb_mpe_test 1.9 MB, mgb_probe 1.9 MB, mgb_bridge.so loads and
+  exports mpe_module_desc), `make test` tier A = PASS 44 FAIL 0
+  (tier B skips by its own s2tui contract), `make everything` scanned
+  with zero error lines, and the engine battery re-run green (suite 49/
+  47+2, quick 63/63, docs-consistency OK).
 - 2026-10-30 — P1 rename landed (standalone, before 1.2+ per the
   author's directive: massive changes later): every landed `nuf_*` name
   on the chart is now spelled `mig_*` — `core/nu_mass.{h,c}` →

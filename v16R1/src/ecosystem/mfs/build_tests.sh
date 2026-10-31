@@ -92,7 +92,7 @@ fi
 CFLAGS="-I$SRC -I$MFS -O2 -Wall -Wextra -ffp-contract=off ${MFS_TEST_CFLAGS:-}"
 # Engine CORE: absolute engine paths (was engine-relative + cd; absolute
 # survives any CWD and both modes).
-CORE="$SRC/core/physics_world.c $SRC/core/rigidbody.c $SRC/core/mpe_registry.c $SRC/core/mpe_loader.c $SRC/core/mpe_diag.c $SRC/core/event_log.c $SRC/core/det_math.c $SRC/core/mpe_primary.c $SRC/physics/collision_narrowphase.c $SRC/physics/collision_cache.c $SRC/physics/collision_solver.c $SRC/physics/collision_ccd.c $SRC/physics/collision_cylinder.c $SRC/physics/broadphase.c $SRC/physics/constraint.c $SRC/physics/revolute_joint.c $SRC/physics/depenetration.c $SRC/physics/islands.c $SRC/config/mpe_config.c $SRC/config/mpe_config_schema.c $SRC/scene/boundary.c $SRC/ecosystem/mpe_ecosystem.c"
+CORE="$SRC/core/physics_world.c $SRC/core/rigidbody.c $SRC/core/mpe_registry.c $SRC/core/mpe_loader.c $SRC/core/mpe_diag.c $SRC/core/event_log.c $SRC/core/det_math.c $SRC/core/mpe_primary.c $SRC/core/mig_mass.c $SRC/physics/collision_narrowphase.c $SRC/physics/collision_cache.c $SRC/physics/collision_solver.c $SRC/physics/collision_ccd.c $SRC/physics/collision_cylinder.c $SRC/physics/broadphase.c $SRC/physics/constraint.c $SRC/physics/revolute_joint.c $SRC/physics/depenetration.c $SRC/physics/islands.c $SRC/config/mpe_config.c $SRC/config/mpe_config_schema.c $SRC/scene/boundary.c $SRC/ecosystem/mpe_ecosystem.c"
 # MFS sources: absolute under $MFS (identical layout in both trees).
 # DESPOT-2026-10-06: mfs_internal.c is now linked into the SUITE as well as
 # the bundle -- tests/mfs_suite_c.c gained mfs_t_registry, which gates the
