@@ -32,8 +32,19 @@
 > the headless byte-probe A/B (bit-identical) and the in-suite
 > determinism twin, not by binary identity. 1.5 verified in the same
 > landing (suite 49/47+2, quick 63/63, ASan ×3 mig gates + determinism
-> green). NEXT: 1.6 (PHYSICS.md one-line pointer), then WP2 (composite
-> type, parts pool, narrowphase part dispatch).**
+> green). The `fix:` follow-up landed 2026-10-31 (`b99d4fc`): the three
+> downstream link lists that compile the engine core directly
+> (ecosystem/mgb/makefile, ecosystem/mfs/build_tests.sh,
+> ecosystem/mfs/mfs_sources.mk) gained `core/mig_mass.c` after the
+> author's `make everything` exposed the mgb link failure; mgb tier A
+> 44/0 against the modified engine, everything rescanned clean, and the
+> standing rule recorded — an engine-touching landing must scan
+> `make everything`, not only build_suite. 1.6 landed 2026-10-31:
+> PHYSICS.md carries the one-line MIG pointer (charter + build plan +
+> the honest WP1 intermediate behavior). NEXT: WP2 (2.1 composite type +
+> per-world parts pool + the P2 counted cap, 2.2 world API completion +
+> explicit sanitize guard, 2.3 broadphase part dispatch, 2.4
+> ghost-view narrowphase — each its own green commit).**
 
 ---
 
@@ -282,8 +293,13 @@ exactly as green as it was.
   byte-identical, ticks=3600 bodies=2 invalid=0 fallback_pow=0
   fallback_trig=0 result=PASS). The engine-binary era changes: v15S
   bit-identity ends by design, replaced by the byte-probe contract.
-- [ ] **1.6 Docs:** PHYSICS.md gains a one-line pointer to the charter
+- [x] **1.6 Docs:** PHYSICS.md gains a one-line pointer to the charter
   (full §9 phase at WP6); ledger notes.
+  LANDED 2026-10-31 (docs commit): the pointer sits in PHYSICS.md's top
+  blockquote and states all three truths at once — the charter path, the
+  build-plan path, and the honest WP1 intermediate behavior (composed
+  mass/tensor on a sphere-backed body, parts inert) with the full
+  composite equations deferred to WP6. No numbers moved anywhere.
 
 ## §4 WP2 — composite type, parts pool, narrowphase part dispatch (the heavy one)
 
@@ -559,6 +575,13 @@ Ledger (new entries get a line, never an edit of a past line):
   counter discipline held: mpe_clamp_composite_events stayed 0 across
   construction, 120 ticks, and every rejection — substitution-counting
   starts with WP2's cap exactly as P2 planned.
+- 2026-10-31 — WP1 1.6 landed: PHYSICS.md's top blockquote gains the
+  one-line MIG pointer citing the charter
+  (`docs/NON_UNIFORM_BODY.md`), this playbook, and the honest WP1
+  intermediate behavior (composed mass/tensor on a sphere-backed body,
+  parts inert until WP2), with the full composite equations deferred to
+  WP6 as the charter's §9 always planned; zero incidents, zero numbers
+  moved.
 - 2026-10-31 — `fix:` follow-up to `df383f0` — the first engine-touching
   landing missed its DOWNSTREAM consumers: `ecosystem/mgb/makefile`
   (`CORE` :18, linked by both `mgb_mpe_test` and `mgb_probe`) and

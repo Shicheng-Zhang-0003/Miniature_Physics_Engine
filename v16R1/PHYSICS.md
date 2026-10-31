@@ -4,6 +4,14 @@
 > derived and stated exactly as implemented. This is the authoritative
 > reference for the physics model; `docs/NUMERICAL_GUARANTEES.md` gives the
 > measured budgets and what does / does not hold.
+>
+> MIG pointer — non-uniform (multi-part) bodies: design charter
+> `docs/NON_UNIFORM_BODY.md`, build plan `docs/MIG_BUILD_PLAN.md`. As of
+> WP1 (df383f0) a composite is admitted by `physics_world_add_composite`
+> as a sphere-backed body carrying the composed mass, center of mass and
+> inertia tensor, with the serving parts inert (documented intermediate
+> behavior); full multi-shape dynamics is the WP2–WP6 build-out and this
+> document cites that math when it lands (WP6).
 
 ---
 
