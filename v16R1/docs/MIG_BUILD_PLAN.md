@@ -56,10 +56,19 @@
 > cap `composite.max_parts` default 16 (config can only lower; a foreign
 > 99 is frozen to 16) counted once through `mpe_clamp_composite_events`;
 > gate `mig_composite_pool` is the 50th blocking entry, suite 50/48+2,
-> quick 64/64, make everything exit 0. NEXT: WP2 2.2 (world API
-> completion + `mig_rebase_parts` into the pool slice + explicit
-> sanitize guard), 2.3 broadphase part dispatch, 2.4 ghost-view
-> narrowphase — each its own green commit.**
+> quick 64/64, make everything exit 0. WP2 STEP 2.2 LANDED 2026-11-01
+> (`364428d`): `physics_world_add_composite` is the real application
+> point — whole-assembly validation including any over-cap tail, the
+> body composed over the STORED slice only through `mig_make_bridge`,
+> `mig_rebase_parts` COM framing into a per-world pool slice, per-part
+> effective kilograms via `mig_part_mass`, the P2 cap counted once only
+> after a successful append, and the explicit composed-inertia guard in
+> sanitize/wake/set_static with all three `rigidbody_update_inertia_*`
+> entry points refusing to overwrite authored tensors; gate
+> `mig_composite_world` is the 51st registered blocking entry, suite
+> 51/49+2, quick 65/65, make everything exit 0. NEXT: WP2 2.3
+> broadphase part dispatch, 2.4 ghost-view narrowphase — each its own
+> green commit.**
 
 ---
 
@@ -105,21 +114,21 @@ survive a context loss.
 
 Landed and pushed (WP0 block: commits `181c2c0` charter, `0882935` code,
 `636b10e` playbook; WP1 1.1 in `b0e1cbb`; rulings `8385b95`; P1 rename
-`84f8c8d`; WP1 1.2–1.4 in `df383f0` — 2026-10-31; WP2 2.1 in `98debd9`
-— 2026-11-01):
+`84f8c8d`; WP1 1.2–1.4 in `df383f0` — 2026-10-31; WP2 2.1 in `98debd9`,
+WP2 2.2 in `364428d` — 2026-11-01):
 
 | Artifact | Nature |
 |---|---|
 | `v16R1/docs/NON_UNIFORM_BODY.md` | design charter (frozen decisions) |
-| `v16R1/src/core/mig_mass.h` | composition contract + error enums + the 1.2 `mig_bridge` handoff struct |
-| `v16R1/src/core/mig_mass.c` | exact composition: mass/COM/inertia, double accumulation, definition-order deterministic; + `mig_make_bridge` |
-| `v16R1/src/core/rigidbody.h/.c` | 1.3 counter + accessor + reset; grows-once body fields `mass_is_composed`/`composite_part_count` (zeroed at all three initializer sites); 2.1 appends `object_composite` + `OBJECT_COMPOSITE`, the engine-internal `part_base` slice anchor, and `mpe_note_composite_clamp` |
-| `v16R1/src/core/physics_world.h/.c` | 1.4 `physics_world_add_composite` stub (composed mass, sphere bounds, authored tensor); 2.1 `composite_part` + per-world pool (`composite_parts`/count/capacity), grower, write-on-success `physics_world_composite_parts_append`, cleanup free + clear compaction |
+| `v16R1/src/core/mig_mass.h` | composition contract + error enums + the 1.2 `mig_bridge` handoff struct + 2.2 `mig_part_mass` (effective per-part kg) |
+| `v16R1/src/core/mig_mass.c` | exact composition: mass/COM/inertia, double accumulation, definition-order deterministic; + `mig_make_bridge` + `mig_part_mass` |
+| `v16R1/src/core/rigidbody.h/.c` | 1.3 counter + accessor + reset; grows-once body fields `mass_is_composed`/`composite_part_count` (zeroed at all three initializer sites); 2.1 appends `object_composite` + `OBJECT_COMPOSITE`, the engine-internal `part_base` slice anchor, and `mpe_note_composite_clamp`; 2.2 `rigidbody_restore_composed_inertia` + sanitize composite type/geometry branches and composed restores in sanitize/wake/`set_static(false)`, with all three `rigidbody_update_inertia_*` early-returning for composed bodies |
+| `v16R1/src/core/physics_world.h/.c` | 1.4 `physics_world_add_composite` stub (composed mass, sphere bounds, authored tensor); 2.1 `composite_part` + per-world pool (`composite_parts`/count/capacity), grower, write-on-success `physics_world_composite_parts_append`, cleanup free + clear compaction; 2.2 completes `physics_world_add_composite` (whole-assembly validation, stored-slice composition under the cap, COM-framed pool slice, effective per-part kg, authored-tensor precondition) with `physics_world_composite_cap` shared by append |
 | `v16R1/src/config/mpe_config.h/.c, mpe_config_schema.c` | 2.1 appended `cat_composite` + `composite.max_parts` (default 16, schema 1–16, save loop reaches the new category) |
-| `v16R1/src/tests/mpe_suite_mig.c` | gates `mig_mass_composite` + `mig_pendulum_physical` + `mig_composite_stub` + `mig_composite_pool` (50th, blocking) |
-| `v16R1/src/tests/mpe_suite_main.c` | externs + registry entries (50th run blocking) |
+| `v16R1/src/tests/mpe_suite_mig.c` | gates `mig_mass_composite` + `mig_pendulum_physical` + `mig_composite_stub` + `mig_composite_pool` + `mig_composite_world` (51st, blocking) |
+| `v16R1/src/tests/mpe_suite_main.c` | externs + registry entries (51st run blocking) |
 | `v16R1/src/makefile` | `MPE_TEST_CORE += core/mig_mass.c`, `MPE_SUITE_SRCS += tests/mpe_suite_mig.c`, help-note renumber |
-| `tools/test_runner.py` | floor 46 → 47 → 48 → 49 → 50 with dated history comments |
+| `tools/test_runner.py` | floor 46 → 47 → 48 → 49 → 50 → 51 with dated history comments |
 
 Names in this table are the PRESENT (post-P1-rename) spellings; at their
 landing commits the files were `nu_mass.{h,c}` and the gates were
@@ -129,26 +138,30 @@ also renamed this playbook file itself (`NUF_BUILD_PLAN.md` →
 
 Measured baseline (numbers a resume session must reproduce):
 
-- Suite: 50 registered, **48/48 blocking green**, 2 diag-informational
+- Suite: 51 registered, **49/49 blocking green**, 2 diag-informational
   (WP0 landing was 47/45; 1.1 made 48/46; 1.2–1.4 made 49/47; 2.1 made
-  50/48).
-- Runner quick: **64/64** (WP0 was 61/61; 1.1 was 62/62; 1.2–1.4 was
-  63/63).
-- ASan/UBSan suite build: the MIG gates are clean — `mig_composite_pool`,
-  `mig_composite_stub`, `mig_mass_composite`, `mig_pendulum_physical`,
-  `determinism` all pass with no sanitizer report; the asan target itself
-  still fails `loader_lifecycle` and `ftc_ecosystem` on the pre-existing
-  missing `-rdynamic` export of `g_cfg` (undefined symbol), unrelated to
-  MIG and recorded in §9.
-- Engine binary: **CHANGES BITS again from 2026-11-01** (`98debd9`: the
-  internal `rigidbody` grows 4 bytes for `part_base`, a config category
-  and key appear, the pool entry point exists). Every zero-composite
-  scene keeps the same numeric path: the headless byte-probe against
-  `4ffb4c1` is byte-identical
+  50/48; 2.2 made 51/49).
+- Runner quick: **65/65** (WP0 was 61/61; 1.1 was 62/62; 1.2–1.4 was
+  63/63; 2.1 was 64/64).
+- ASan/UBSan suite build: the MIG gates are clean —
+  `mig_composite_world`, `mig_composite_pool`, `mig_composite_stub`,
+  `mig_mass_composite`, `mig_pendulum_physical`, `determinism` all pass
+  with no sanitizer report (run total 51, 47/49 blocking: the asan
+  target itself still fails `loader_lifecycle` and `ftc_ecosystem` on
+  the pre-existing missing `-rdynamic` export of `g_cfg`, unrelated to
+  MIG and recorded in §9).
+- Engine binary: **code changes, the plain-scene numeric path does not**
+  (`364428d`: no struct grows — `rigidbody` stays 396 bytes — no config
+  key moves, and every new branch is gated on `mass_is_composed` or
+  `type == object_composite`; `physics_world_add_composite` itself now
+  produces the real composite body instead of the WP1 sphere-backed
+  stub, and no scene path can construct one yet). Binary identity with
+  2.1 is not claimed; the plain-scene numeric path is certified by the
+  headless byte-probe against `13ccf9c`, byte-identical
   (ticks=3600 bodies=2 invalid=0 fallback_pow=0 fallback_trig=0
-  result=PASS) and the in-suite `determinism` twin stays 600 ticks
-  bitwise identical. The WP1 byte-probe evidence remains the entry for
-  the first engine-era change (`df383f0`).
+  result=PASS), and the in-suite `determinism` twin stays 600 ticks
+  bitwise identical. The WP1 (`df383f0`) and 2.1 (`98debd9`) byte-probe
+  entries remain the record of the two bits-changing landings.
 
 WP0's verdict is on record: the one red in its history was the test
 author's own oracle (missing cylinder dz-Steiner in the triple's Ixx), not
@@ -371,7 +384,7 @@ broadphase/floor/CCD hooks, editor-invisible (UI is WP4). Estimated
   fixed with an int cast in the gate. ASan runs the new gate clean; the
   asan target's two plugin-loader gates stay red on its pre-existing
   missing `-rdynamic` export of `g_cfg` (see §9).
-- [ ] **2.2 World API.** `physics_world_add_composite` completes the WP1
+- [x] **2.2 World API.** `physics_world_add_composite` completes the WP1
   stub: `mig_compose` bridge (validate every part, whole-assembly
   invalidation semantics preserved — the composed body refuses nothing a
   caller can count), `mig_rebase_parts` about the COM into the pool slice,
@@ -379,6 +392,53 @@ broadphase/floor/CCD hooks, editor-invisible (UI is WP4). Estimated
   guard extended so a composed tensor is never regenerated from type
   defaults (mirror of the existing custom-type guard),
   `rigidbody_update_axes`-equivalent bounds.
+  LANDED 2026-11-01 (`364428d`). `physics_world_add_composite` at
+  `physics_world.c:1506` validates the WHOLE assembly with `mig_compose`
+  whenever `count` exceeds the cap (a bad part at index 16 of 17 rejects
+  with no body, pool slot, or counter movement), then composes only the
+  STORED slice through `mig_make_bridge`: 20 one-kilogram parts store the
+  first 16, the body weighs 16 kg not 20, bound 0.425, and
+  `mpe_note_composite_clamp` fires exactly once after the append
+  succeeds; a lowered cap of 4 stores 4 and weighs 4. The body is
+  `object_composite` at the assembly COM with `part_base`/
+  `composite_part_count` pointing at a COM-framed slice (dumbbell parts
+  stay in definition order at +0.5/-0.5), per-part materials copied from
+  the config defaults for each part's own primitive type, and per-part
+  effective kilograms from `mig_part_mass` (`mig_mass.h:94`,
+  `mig_mass.c:184`; density cube 2 kg/m^3 over 1 m^3 lands 2 kg,
+  I = 1/3, bound 0.8660254). The cap helper
+  `physics_world_composite_cap` (`physics_world.c:888`) is shared with
+  the append at `:914` (default 16, frozen ceiling 16, non-positive
+  falls back to 16). Pre-append windows reject with -1 and mutate
+  nothing: mass [1e-4,1e6], bound [0.01,100], and a finite non-zero
+  authored inverse (`physics_world_composite_inverse` at `:1452`);
+  `physics_world_composite_part_from_mig` at `:1475` stages the pool
+  records before world storage is touched. The explicit guard lives in
+  `rigidbody.c`: `rigidbody_restore_composed_inertia` at `:205`
+  rebuilds both inverses from `inertia_tensor_local`; `object_composite`
+  passes the corrupt-type check at `:240`; the composite geometry branch
+  at `:379` keeps the authored radius and never regenerates a tensor;
+  the `needs_inertia_recalc` site at `:525`, `rigidbody_wake` at `:1270`
+  and `rigidbody_set_static(false)` at `:1310` all restore first; and
+  `rigidbody_update_inertia_sphere/cube/cylinder` early-return at
+  `:683/:699/:1379` for composed bodies. `physics_world.h:226` documents
+  the full order. Gate `mig_composite_world` (51st, blocking,
+  `mpe_suite_mig.c:768`, registry `mpe_suite_main.c:222`, runner floor
+  51 at `test_runner.py:144`) pins the literals above plus
+  `rigidbody_set_static(true)` keeping the authored tensor while zeroing
+  inverses, set_static(false)/set_kinematic(true/false)/a direct
+  zero-inverse sanitize restoring inv*I within 2e-4 without a type
+  formula, ten gravity ticks preserving type/slice/tensor bitwise, and
+  the caller's source arrays never mutated. Two incidents, both
+  gate-side and engine-untouched: the drafted multi-condition checks
+  passed a label as a third argument to the two-argument `MPE_CHECK`
+  macro and failed to compile until the labels were removed, and the
+  first run failed two part-position checks because the oracle assumed
+  the -0.5 part was stored first when `mig_rebase_parts` preserves
+  definition order and stores +0.5 first — the engine was right and the
+  oracle was fixed. No struct or config change this step (`rigidbody`
+  stays 396 bytes); ASan runs the new gate clean while the target's two
+  pre-existing plugin-loader gates stay red as recorded in §9.
 - [ ] **2.3 Broadphase.** `broadphase_bounding_radius` (~`
   physics/broadphase.c:139`) composites = max over parts of
   `|d_part,+ part bounding radius|` (exact, conservative); the AABB path
@@ -696,6 +756,46 @@ Ledger (new entries get a line, never an edit of a past line):
   outside 2.1, now on record so a later green-ASan claim must either fix
   the target or name those two gates. No pre-existing engine defect
   surfaced; no numbers moved outside the new gate's own counter.
+- 2026-11-01 — WP2 step 2.2 landed (`364428d`), the third
+  engine-touching MIG commit and the second WP2 one. Scope: the world API
+  completion — `physics_world_add_composite` now joins an assembly into
+  ONE `object_composite` body at the COM, validating the whole caller
+  list (including parts beyond the P2 cap, so a bad discarded tail refuses
+  everything), composing mass/inertia over the stored slice only (20
+  one-kilogram parts become a 16 kg body with bound 0.425, never 20),
+  re-anchoring parts into the pool through `mig_make_bridge`/
+  `mig_rebase_parts` in definition order, storing effective per-part
+  kilograms via the new `mig_part_mass`, copying per-part materials from
+  each part's own primitive defaults, counting exactly one
+  `mpe_clamp_composite_events` substitute only after a successful append,
+  and sharing the frozen cap helper between add and append. The explicit
+  guard: `rigidbody_restore_composed_inertia` rebuilds both inverses from
+  the authored tensor, sanitize accepts `object_composite`, keeps its
+  authored radius, and restores instead of substituting a type formula at
+  the recalc site, `rigidbody_wake` and `rigidbody_set_static(false)` use
+  the same restore, and the three `rigidbody_update_inertia_*` functions
+  early-return for composed bodies. Incidents: two, both gate-side and
+  engine-untouched — the drafted multi-condition checks passed a label as
+  a third argument to the two-argument `MPE_CHECK` macro (compile
+  failure, labels removed), and the first run caught the gate's own
+  part-order oracle assuming the -0.5 part was stored first when
+  definition order stores +0.5 first (engine right, oracle fixed). Engine
+  truth: no struct or config change (the internal `rigidbody` stays 396
+  bytes, no key moves), the binary differs from 2.1 only in the new
+  composite-gated code, and binary identity is not claimed; the
+  plain-scene numeric path is certified by the headless byte-probe
+  against `13ccf9c`, byte-identical (ticks=3600 bodies=2 invalid=0
+  fallback_pow=0 fallback_trig=0 result=PASS), with the in-suite
+  `determinism` twin bitwise identical. Battery: suite 51 total, 49/49
+  blocking + 2 diag; quick 65/65; docs consistency 7/7; `make everything`
+  exit 0 (log /tmp/opencode/make_everything_22.log); MFS sync guard in
+  sync. ASan/UBSan: `mig_composite_world` and the other five
+  MIG/determinism gates are clean with no sanitizer report, while the
+  asan target as written still fails only `loader_lifecycle` and
+  `ftc_ecosystem` on undefined symbol `g_cfg` from its missing
+  `-rdynamic` (47/49, pre-existing, unchanged, outside 2.2). No
+  pre-existing engine defect surfaced; no numbers moved outside the new
+  gate's own assertions.
 
 ## §10 Definition of done for v16S (the cut checklist)
 
