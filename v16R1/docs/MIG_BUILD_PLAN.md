@@ -41,7 +41,13 @@
 > standing rule recorded — an engine-touching landing must scan
 > `make everything`, not only build_suite. 1.6 landed 2026-10-31:
 > PHYSICS.md carries the one-line MIG pointer (charter + build plan +
-> the honest WP1 intermediate behavior). NEXT: WP2 (2.1 composite type +
+> the honest WP1 intermediate behavior). MFS INTERRUPTION LANDED
+> 2026-11-01 (`2e02c97`, twin `22a8c76`): the v10S aim_solve red gate was
+> closed as a test-harness double step (explicit `ftc_fleet_step_all` plus
+> the attached module's `pre_step` hook, so two ball-aero passes per tick
+> against live's one), suite 32/32 gated pass=5 fail=0 on both trees, sync
+> guard green after the twin also gained the b99d4fc core/mig_mass.c link
+> lists; WP2 has NOT begun. NEXT: WP2 (2.1 composite type +
 > per-world parts pool + the P2 counted cap, 2.2 world API completion +
 > explicit sanitize guard, 2.3 broadphase part dispatch, 2.4
 > ghost-view narrowphase — each its own green commit).**
