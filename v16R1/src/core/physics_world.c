@@ -882,6 +882,15 @@ int physics_world_grow_bodies (physics_world *world) {
     world -> body_capacity = want;
     return 0;
 }
+/* MIG WP2 2.1/2.2: the P2 cap in force for one world. Default 16, frozen
+ * ceiling 16 (configuration can only lower the stored ceiling); a
+ * non-positive/garbage config value falls back to the default. */
+static int physics_world_composite_cap (const physics_world *world) {
+    const mpe_config_t *cfg = mpe_world_cfg (world);
+    int cap = (cfg && cfg -> composite.max_parts > 0) ? cfg -> composite.max_parts : 16;
+    if (cap > 16) { cap = 16; }
+    return cap;
+}
 /* MIG WP2 2.1: composite part pool grower. Ceiling = mpe_max_bodies * the
  * frozen P2 cap (16) — the most parts any legal body population can own.
  * Doubles from 16; relocation is safe because bodies store part_base
@@ -902,9 +911,7 @@ static int physics_world_grow_composite_parts (physics_world *world) {
 int physics_world_composite_parts_append (physics_world *world, const composite_part *parts, int count,
                                           int first_index, int *stored_out) {
     if (!world || !parts || count <= 0 || first_index < 0) { return -1; }
-    const mpe_config_t *cfg = mpe_world_cfg (world);
-    int cap = (cfg && cfg -> composite.max_parts > 0) ? cfg -> composite.max_parts : 16;
-    if (cap > 16) { cap = 16; } /* the P2 ceiling is frozen at 16 */
+    const int cap = physics_world_composite_cap (world);
     const int stored = (count > cap) ? cap : count;
     /* Validate the entries that will actually be stored before mutating:
      * the pool holds core primitives only; object_custom/composite are not
@@ -1414,86 +1421,162 @@ int physics_world_add_custom (physics_world *world, int custom_shape, vector3 po
     physics_world_bump_revision (world);
     return world -> body_count++;
 }
-/* ---- WP1 1.4 stub — docs/MIG_BUILD_PLAN.md §3 1.4 (P4 ruling: land the
- * stub). Intermediate behavior, by the playbook's own words: "composed
- * mass, sphere bounds" — ONE type-object_sphere body carrying the
- * composed truth at the assembly COM; the parts arrive as weight only
- * (composite_part_count records what mig_compose consumed; WP2 attaches
- * actual parts to a per-world pool).
+/* ---- MIG composite application point (the WP1 1.4 stub completed by WP2
+ * 2.2): one object_composite body at the assembly COM carrying the
+ * composed mass and AUTHORED inertia tensor, plus the stored part slice
+ * in the per-world pool.
  *
- * THE AUTHORED-TENSOR GUARD, WP1 FORM: sanitize's tensor regeneration
- * (rigidbody.c, the needs_inertia_recalc branch) fires ONLY on a mass/
- * radius/half-length clamp event or a zero/non-finite inverse tensor —
- * so this entry point PRE-VALIDATES every policy bound (the windows
- * sanitize itself enforces: mass [1e-4, 1e6], bounding radius
- * [0.01, 100]; equality parks legally — sanitize rewrites only strictly
- * outside) and REJECTS with -1 what sanitize would substitute — a named
- * rejection, never a counted substitution (mixing those two is exactly
- * the failure DESPOT-2026-10-02 built the counters to expose). Then it
- * authors the composed tensors BEFORE the construction sanitize pass,
- * which now sees a fully formed policy-clean body and rewrites nothing.
- * Zero clamp events is the gate's contract: mpe_clamp_composite_events
- * counts the WP2 cap substitution and the WP3 load-sum gate, not this
- * stub. */
-int physics_world_add_composite (physics_world *world, const mig_part *parts, int count) {
-    if ((!world) || (!world -> bodies)) { return -1; }
-    /* Whole-assembly validation first (write-on-success): one compose
-     * call covers NULL / count<=0 / bad type / dims / quat / mass as
-     * named errors — malformed assemblies mutate nothing. */
-    mig_totals totals;
-    if (mig_compose (parts, count, &totals) != mig_compose_ok) { return -1; }
-    if (totals.mass < 1e-4 || totals.mass > 1e6) { return -1; }
-    const float mass_f = (float) totals.mass;
-    /* Bounding radius: max over parts of |com - p_i| + B_i, with B_i the
-     * part's worst-case metric radius — sphere r; cube sqrt of the
-     * squared half-extensions; cylinder sqrt(half_length^2 + radius^2)
-     * (axle is local X, but the worst-case norm is axis-agnostic).
-     * Part orientations never change it: rotation preserves norms. */
-    float bound = 0.0f;
-    for (int i = 0; i < count; i++) {
-        float part_bound = 0.0f;
-        if (parts [i].type == mig_part_sphere) { part_bound = parts [i].radius; }
-        else if (parts [i].type == mig_part_cube) {
-            part_bound = sqrtf (parts [i].half_extensions.x * parts [i].half_extensions.x +
-                                parts [i].half_extensions.y * parts [i].half_extensions.y +
-                                parts [i].half_extensions.z * parts [i].half_extensions.z);
-        } else { /* mig_part_cylinder */
-            part_bound = sqrtf (parts [i].cylinder_half_length * parts [i].cylinder_half_length +
-                                parts [i].radius * parts [i].radius);
+ * Contract, in order:
+ *  1. Validate the WHOLE caller assembly with mig_compose — a malformed
+ *     part anywhere refuses the whole assembly (write-on-success), even
+ *     when that part would fall outside the P2 cap.
+ *  2. Apply the P2 cap (first max_parts kept). The body's truth is
+ *     composed over the STORED slice, so mass/inertia never include
+ *     discarded weight; the substitution is counted exactly once, only
+ *     after the pool append has succeeded.
+ *  3. Compose the stored slice through mig_make_bridge, which returns
+ *     COM-framed parts and totals about the COM (decision (A)).
+ *  4. Pre-validate the engine windows (mass [1e-4,1e6], bounding radius
+ *     [0.01,100], finite authored tensor with a finite non-zero inverse).
+ *     Every rejection is a named -1 and mutates nothing — never a counted
+ *     substitution.
+ *  5. Reserve body storage, append the pool slice, then write the body:
+ *     mass/inverse/authored tensors, type object_composite,
+ *     part_base/count, sphere-backed bound. The sanitize pass runs under
+ *     the composed-inertia guard (rigidbody.c), which restores from the
+ *     authored tensor instead of a type default; rigidbody_update_axes
+ *     refreshes the world-frame cache.
+ * Part materials are copied per part from the config defaults for the
+ * part's own primitive type, so 2.4's ghost views never re-read the
+ * parent body's body-level materials. */
+static int physics_world_composite_inverse (const math3 *inertia, math3 *inverse_out) {
+    if ((!inertia) || (!inverse_out)) { return -1; }
+    bool nonzero = false;
+    for (int r = 0; r < 3; r++) {
+        for (int c = 0; c < 3; c++) {
+            if (!isfinite (inertia -> matrix [r][c])) { return -1; }
         }
-        const float dx = totals.com.x - parts [i].position.x;
-        const float dy = totals.com.y - parts [i].position.y;
-        const float dz = totals.com.z - parts [i].position.z;
-        const float r = sqrtf (dx * dx + dy * dy + dz * dz) + part_bound;
+    }
+    const math3 inv = math3_inverse (*inertia);
+    for (int r = 0; r < 3; r++) {
+        for (int c = 0; c < 3; c++) {
+            if (!isfinite (inv.matrix [r][c])) { return -1; }
+            if (inv.matrix [r][c] != 0.0f) { nonzero = true; }
+        }
+    }
+    if (!nonzero) { return -1; }
+    *inverse_out = inv;
+    return 0;
+}
+/* Copy one COM-framed mig part into the engine's pool record. Mass is the
+ * EFFECTIVE kg from mig_part_mass (density mode already converted by the
+ * same exact formulas mig_compose used), so the pool never stores a
+ * density where a mass belongs. */
+static void physics_world_composite_part_from_mig (composite_part *dst, const mig_part *src, int part_index,
+                                                   const mpe_config_t *cfg) {
+    *dst = (composite_part) {0};
+    dst -> local_position = src -> position;
+    dst -> local_orientation = src -> orientation;
+    dst -> part_index = part_index;
+    dst -> active = 1;
+    double effective_mass = 0.0;
+    (void) mig_part_mass (src, &effective_mass); /* validated by the compose pass */
+    dst -> mass = (float) effective_mass;
+    if (src -> type == mig_part_cube) {
+        dst -> type = object_cube;
+        dst -> half_extensions = src -> half_extensions;
+        dst -> friction_static = cfg -> body_defaults.cube_fric_s;
+        dst -> friction_kinetic = cfg -> body_defaults.cube_fric_k;
+        dst -> restitution = cfg -> body_defaults.cube_restitution;
+    } else if (src -> type == mig_part_cylinder) {
+        dst -> type = object_cylinder;
+        dst -> radius = src -> radius;
+        dst -> cylinder_half_length = src -> cylinder_half_length;
+        dst -> friction_static = cfg -> body_defaults.cylinder_fric_s;
+        dst -> friction_kinetic = cfg -> body_defaults.cylinder_fric_k;
+        dst -> restitution = cfg -> body_defaults.cylinder_restitution;
+    } else {
+        dst -> type = object_sphere;
+        dst -> radius = src -> radius;
+        dst -> friction_static = cfg -> body_defaults.sphere_fric_s;
+        dst -> friction_kinetic = cfg -> body_defaults.sphere_fric_k;
+        dst -> restitution = cfg -> body_defaults.sphere_restitution;
+    }
+}
+int physics_world_add_composite (physics_world *world, const mig_part *parts, int count) {
+    if ((!world) || (!world -> bodies) || (!parts) || count <= 0) { return -1; }
+    const int cap = physics_world_composite_cap (world);
+    const int stored = (count > cap) ? cap : count;
+    /* Whole-assembly structural validation including any over-cap tail:
+     * one malformed discarded part still refuses the whole assembly. The
+     * stored slice is re-composed below because the body must not carry
+     * weight it does not store. */
+    if (stored < count) {
+        mig_totals all;
+        if (mig_compose (parts, count, &all) != mig_compose_ok) { return -1; }
+    }
+    mig_part scratch [16];
+    mig_bridge bridge;
+    if (mig_make_bridge (parts, stored, scratch, &bridge) != mig_compose_ok) { return -1; }
+    /* Engine policy windows, pre-validated so sanitize substitutes
+     * nothing: mass [1e-4, 1e6], bound [0.01, 100]. */
+    if (!(bridge.totals.mass >= 1e-4) || (bridge.totals.mass > 1e6)) { return -1; }
+    float bound = 0.0f;
+    for (int i = 0; i < stored; i++) {
+        const mig_part *p = &bridge.parts [i];
+        float part_bound = 0.0f;
+        if (p -> type == mig_part_sphere) { part_bound = p -> radius; }
+        else if (p -> type == mig_part_cube) {
+            part_bound = sqrtf (p -> half_extensions.x * p -> half_extensions.x +
+                                p -> half_extensions.y * p -> half_extensions.y +
+                                p -> half_extensions.z * p -> half_extensions.z);
+        } else { /* mig_part_cylinder */
+            part_bound = sqrtf (p -> cylinder_half_length * p -> cylinder_half_length + p -> radius * p -> radius);
+        }
+        /* bridge.parts are already COM-framed, so |position| IS the
+         * COM offset; orientations cannot change a worst-case norm. */
+        const float r = sqrtf (p -> position.x * p -> position.x + p -> position.y * p -> position.y +
+                               p -> position.z * p -> position.z) + part_bound;
         if (r > bound) { bound = r; }
     }
-    if (!((bound >= 0.01f) && (bound <= 100.0f))) { return -1; }
-    if (world -> body_count >= world -> body_capacity && physics_world_grow_bodies (world) != 0) { return -1; }
-    rigidbody *rb = &world -> bodies [world -> body_count];
-    rigidbody_initialisation_sphere (rb, bound, mass_f, totals.com); /* decision (A): position IS the COM */
-    /* DESPOT-2026-10-07 P1-3: per-world material stamp (see add_sphere). */
-    {
-        const mpe_config_t *wcfg = mpe_world_cfg (world);
-        rb -> friction_static = wcfg -> body_defaults.sphere_fric_s;
-        rb -> friction_kinetic = wcfg -> body_defaults.sphere_fric_k;
-        rb -> restitution = wcfg -> body_defaults.sphere_restitution;
+    if ((!isfinite (bound)) || (!(bound >= 0.01f)) || (bound > 100.0f)) { return -1; }
+    math3 authored_inverse;
+    if (physics_world_composite_inverse (&bridge.totals.inertia, &authored_inverse) != 0) { return -1; }
+    /* Build the pool records before touching world storage. */
+    composite_part staged [16];
+    const mpe_config_t *wcfg = mpe_world_cfg (world);
+    for (int i = 0; i < stored; i++) {
+        physics_world_composite_part_from_mig (&staged [i], &bridge.parts [i], i, wcfg);
     }
-    /* Author the composed truth over the sphere defaults BEFORE the
-     * construction sanitize pass: finite tensors, policy-clean mass and
-     * radius => no clamp fires, nothing regenerates. Identity body frame
-     * => inverse_inertia_system = inverse local (the same identity-frame
-     * rule the sphere update path applies). */
-    rb -> inertia_tensor_local = totals.inertia;
-    rb -> inverse_inertia_tensor_local = math3_inverse (totals.inertia);
-    rb -> inverse_inertia_system = rb -> inverse_inertia_tensor_local;
+    /* Reserve before the pool append so the only remaining failure is the
+     * append itself; a failed append leaves body_count and the counter
+     * untouched. */
+    if (world -> body_count >= world -> body_capacity && physics_world_grow_bodies (world) != 0) { return -1; }
+    int stored_actual = 0;
+    const int base = physics_world_composite_parts_append (world, staged, stored, 0, &stored_actual);
+    if (base < 0) { return -1; }
+    if (count > stored) { mpe_note_composite_clamp ((double) count, (double) stored); }
+    rigidbody *rb = &world -> bodies [world -> body_count];
+    rigidbody_initialisation_sphere (rb, bound, (float) bridge.totals.mass, bridge.totals.com);
+    /* DESPOT-2026-10-07 P1-3: per-world material stamp (body level; the
+     * per-part copies above are what 2.4's ghost views read). */
+    rb -> friction_static = wcfg -> body_defaults.sphere_fric_s;
+    rb -> friction_kinetic = wcfg -> body_defaults.sphere_fric_k;
+    rb -> restitution = wcfg -> body_defaults.sphere_restitution;
+    rb -> type = object_composite;
+    rb -> inertia_tensor_local = bridge.totals.inertia;
+    rb -> inverse_inertia_tensor_local = authored_inverse;
+    rb -> inverse_inertia_system = authored_inverse; /* identity body frame */
     rb -> mass_is_composed = true;
-    rb -> composite_part_count = count;
+    rb -> composite_part_count = stored;
+    rb -> part_base = base;
     if (world -> next_object_id == 0 || world -> next_object_id == 0xFFFFFFFFu) { world -> next_object_id = 1; }
     rb -> object_id = world -> next_object_id++;
     if (world -> next_object_id == 0 || world -> next_object_id == 0xFFFFFFFFu) { world -> next_object_id = 1; }
     rb -> object_generation = 1;
     rb -> body_index = world -> body_count;
-    rigidbody_sanitize (rb); /* authored tensors pass through untouched: no clamp can fire */
+    rigidbody_sanitize (rb); /* composed guard: authored tensors pass through */
+    rigidbody_update_axes (rb);
     physics_world_bump_revision (world);
     return world -> body_count++;
 }

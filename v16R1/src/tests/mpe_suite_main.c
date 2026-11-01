@@ -111,6 +111,7 @@ int mpe_t_mig_mass_composite (void);
 int mpe_t_mig_pendulum_physical (void);
 int mpe_t_mig_composite_stub (void);
 int mpe_t_mig_composite_pool (void);
+int mpe_t_mig_composite_world (void);
 typedef struct {
     const char *name;
     int (*fn) (void);
@@ -214,6 +215,11 @@ static const mpe_entry_t mpe_registry [] = {
      * never reused, P2 cap 16 counted once (config can only lower), clear
      * as the sole compaction point, write-on-success bad inputs. */
     {"mig_composite_pool", mpe_t_mig_composite_pool, 0},
+    /* WP2 2.2 gate (plan §4): world API completion — whole-assembly
+     * validation, stored-slice composition under the P2 cap, COM-framed
+     * pool slices, effective per-part kg, and the composed-inertia guard
+     * through static/kinematic/sanitize/wake. */
+    {"mig_composite_world", mpe_t_mig_composite_world, 0},
 };
 #define MPE_NTESTS ((int) (sizeof (mpe_registry) / sizeof (mpe_registry [0])))
 /* Returns 0 pass, 1 fail, 2 skipped.

@@ -223,19 +223,20 @@ int physics_world_add_cube (physics_world *world, vector3 position, vector3 half
 int physics_world_add_cylinder (physics_world *world, float radius, float half_length, float mass,
                                 vector3 position); /* MPE_FTC_090 */
 int physics_world_add_custom (physics_world *world, int custom_shape, vector3 position, float mass, float radius);
-/* ---- WP1 1.4 stub (docs/MIG_BUILD_PLAN.md §3 1.4; P4 ruling: land the
- * stub): compose an assembly of primitive parts (core/mig_mass.h) into
- * ONE body. WP1 intermediate behavior — "composed mass, sphere bounds":
- * a type-object_sphere body at the assembly COM, radius = the
- * conservative bound max_i(|com - p_i| + |part_i|), carrying the
- * AUTHORED composed inertia tensor (the sphere-default tensor is
- * overwritten BEFORE the construction sanitize pass, which then fires
- * nothing — mass and radius policy are pre-validated, the WP1 form of
- * the authored-tensor guard; the explicit sanitize guard extension is
- * WP2 2.2). Parts are dead weight until WP2: only the consumed count is
- * recorded on the body. Whole-assembly invalidation: any compose error
- * or policy violation rejects with -1 and mutates nothing. Returns the
- * new body index, or -1. */
+/* MIG composite application point (WP1 1.4 stub completed by 2.2): compose
+ * an assembly of primitive parts (core/mig_mass.h) into ONE
+ * type-object_composite body at the assembly COM, carrying the composed
+ * mass and AUTHORED inertia tensor and owning a contiguous slice of the
+ * per-world part pool. Parts are re-anchored by mig_rebase_parts into the
+ * COM frame before storage; the P2 cap keeps the FIRST max_parts and
+ * counts exactly one mpe_clamp_composite_events substitute; mass/inertia
+ * are composed over the STORED slice so discarded weight never counts.
+ * Whole-assembly invalidation: any compose error or policy violation
+ * (mass [1e-4,1e6], bound [0.01,100], unusable tensor) rejects with -1
+ * and mutates nothing. Per-part materials are copied from the config
+ * defaults for each part's own primitive type. The sanitize pass runs
+ * under the composed-inertia guard, so the authored tensor is never
+ * regenerated from a type default. Returns the new body index, or -1. */
 int physics_world_add_composite (physics_world *world, const mig_part *parts, int count);
 /* MIG WP2 2.1 pool primitive (2.2's add_composite consumes it): append one
  * body's contiguous part slice, copying the first min(count, config

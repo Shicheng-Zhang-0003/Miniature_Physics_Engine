@@ -181,6 +181,16 @@ void mig_rebase_parts (mig_part *parts, int count, vector3 delta) {
     }
 }
 
+int mig_part_mass (const mig_part *part, double *out_mass) {
+    if ((!part) || (!out_mass)) { return mig_compose_null; }
+    double m;
+    double diag [3];
+    int err = mig_part_tensor_local (part, part -> mass_mode, &m, diag);
+    if (err != mig_compose_ok) { return err; }
+    *out_mass = m;
+    return mig_compose_ok;
+}
+
 /* WP1 1.2: the bridge — compose once, copy, re-anchor the COPY. See the
  * header for the contract (caller-owned buffers, no malloc, write-on-
  * success, no cap: the cap belongs to WP2's pool). The re-anchor calls

@@ -196,6 +196,31 @@ static bool a3_math3_is_zero (math3 m) {
         }
     } return true;
 }
+/* MIG WP2 2.2: a composed body's tensor is AUTHORED (mig_compose), never a
+ * type formula. This restores the inverse pair from that authored local
+ * tensor, rotating it into the system frame exactly as the dynamic path
+ * does. Returns false when mass_is_composed is clear or the authored
+ * tensor is unusable; callers then leave the inverses zeroed rather than
+ * regenerate a cube/sphere/cylinder default over a composite. */
+static bool rigidbody_restore_composed_inertia (rigidbody *rigid_body) {
+    if ((!rigid_body) || (!rigid_body -> mass_is_composed)) { return false; }
+    if ((!a3_math3_is_finite (rigid_body -> inertia_tensor_local)) ||
+        (a3_math3_is_zero (rigid_body -> inertia_tensor_local))) {
+        return false;
+    }
+    math3 inv = math3_inverse (rigid_body -> inertia_tensor_local);
+    if ((!a3_math3_is_finite (inv)) || (a3_math3_is_zero (inv))) { return false; }
+    rigid_body -> inverse_inertia_tensor_local = inv;
+    if ((!rigid_body -> static_state) && (!rigid_body -> kinematic)) {
+        math3 rot = vector4_to_math3 (rigid_body -> orientation);
+        math3 rot_t = math3_transposition (rot);
+        math3 sys = math3_multiplication (rot, math3_multiplication (inv, rot_t));
+        rigid_body -> inverse_inertia_system = a3_math3_is_finite (sys) ? sys : inv;
+    } else {
+        rigid_body -> inverse_inertia_system = (math3) {{{0.0f}}};
+    }
+    return true;
+}
 void rigidbody_sanitize (rigidbody *rigid_body) {
     if (!rigid_body) { return; }
     /* TRUTH: normalize boolean garbage from malloc (any nonzero -> true). */
@@ -212,7 +237,7 @@ void rigidbody_sanitize (rigidbody *rigid_body) {
     }
     /* TRUTH: corrupt type enum (uninit garbage) must not silently become cube. */
     if (rigid_body -> type != object_sphere && rigid_body -> type != object_cube && rigid_body -> type != object_cylinder &&
-        rigid_body -> type != object_custom) {
+        rigid_body -> type != object_custom && rigid_body -> type != object_composite) {
         rigid_body -> type = object_cube;
     }
     if (rigid_body -> type == object_custom && rigid_body -> custom_shape < 100) { rigid_body -> custom_shape = 100; }
@@ -351,6 +376,27 @@ void rigidbody_sanitize (rigidbody *rigid_body) {
         if (rigid_body -> half_extensions.x > 100.0f) { rigid_body -> half_extensions.x = 100.0f; }
         if (rigid_body -> half_extensions.y > 100.0f) { rigid_body -> half_extensions.y = 100.0f; }
         if (rigid_body -> half_extensions.z > 100.0f) { rigid_body -> half_extensions.z = 100.0f; }
+    } else if (rigid_body -> type == object_composite) {
+        /* MIG WP2 2.2: radius is the AUTHORED conservative bound
+         * max_i(|com - p_i| + B_i), kept as the body's sphere bound.
+         * Unlike the cube branch it must never be re-derived from
+         * half_extensions (that would inflate it by sqrt(3)); the
+         * half-extents mirror the sphere-backed form so existing OBB
+         * readers stay conservative until 2.3 adds part dispatch. These
+         * clamp paths are unreachable from add_composite (it pre-validates
+         * the same windows) and NEVER request tensor regeneration: a
+         * composite keeps its authored tensor. */
+        if (!isfinite (rigid_body -> radius) || (rigid_body -> radius <= 0.0f)) {
+            double req = (double) rigid_body -> radius;
+            rigid_body -> radius = 0.01f;
+            mpe_note_clamp ("sanitize radius", &mpe_clamp_radius_events, req, 0.01);
+        }
+        if (rigid_body -> radius > 100.0f) {
+            double req = (double) rigid_body -> radius;
+            rigid_body -> radius = 100.0f;
+            mpe_note_clamp ("sanitize radius", &mpe_clamp_radius_events, req, 100.0);
+        }
+        rigid_body -> half_extensions = (vector3) {rigid_body -> radius, rigid_body -> radius, rigid_body -> radius};
     } else {
         if (!isfinite (rigid_body -> half_extensions.x) || (rigid_body -> half_extensions.x <= 0.0f)) {
             rigid_body -> half_extensions.x = 0.01f;
@@ -476,7 +522,14 @@ void rigidbody_sanitize (rigidbody *rigid_body) {
         if (needs_inertia_recalc || (!a3_math3_is_finite (rigid_body -> inverse_inertia_tensor_local)) ||
             (!a3_math3_is_finite (rigid_body -> inverse_inertia_system)) ||
             (a3_math3_is_zero (rigid_body -> inverse_inertia_system))) {
-            if (rigid_body -> type == object_sphere) {
+            if (rigid_body -> mass_is_composed) {
+                /* MIG WP2 2.2 composed guard: restore the inverse pair from
+                 * the authored tensor; NEVER substitute a type formula. */
+                if (!rigidbody_restore_composed_inertia (rigid_body)) {
+                    rigid_body -> inverse_inertia_tensor_local = zero_matrix;
+                    rigid_body -> inverse_inertia_system = zero_matrix;
+                }
+            } else if (rigid_body -> type == object_sphere) {
                 rigidbody_update_inertia_sphere (rigid_body);
             } else if (rigid_body -> type == object_cylinder) { /* MPE_FTC_093d */
                 rigidbody_update_inertia_cylinder (rigid_body);
@@ -627,6 +680,7 @@ void rigidbody_initialisation_sphere (rigidbody *rigid_body, float radius, float
 } // Helper to update inertia tensor after mass/radius change
 void rigidbody_update_inertia_sphere (rigidbody *rigid_body) {
     if (!rigid_body) { return; }
+    if (rigid_body -> mass_is_composed) { return; } /* WP2 2.2: authored tensor owns this body */
     float inertia_coefficient_sphere = (2.0f / 5.0f) * rigid_body -> mass * rigid_body -> radius * rigid_body -> radius;
     rigid_body -> inertia_tensor_local = (math3) {{{0}}};
     rigid_body -> inertia_tensor_local.matrix [0][0] = inertia_coefficient_sphere;
@@ -642,6 +696,7 @@ void rigidbody_update_inertia_sphere (rigidbody *rigid_body) {
 } // Helper to update inertia tensor after mass/radius change
 void rigidbody_update_inertia_cube (rigidbody *rigid_body) {
     if (!rigid_body) { return; }
+    if (rigid_body -> mass_is_composed) { return; } /* WP2 2.2: authored tensor owns this body */
     float width = rigid_body -> half_extensions.x * 2.0f;
     float height = rigid_body -> half_extensions.y * 2.0f;
     float depth = rigid_body -> half_extensions.z * 2.0f;
@@ -1209,8 +1264,15 @@ void rigidbody_wake (rigidbody *rigid_body) {
                     math3_multiplication (rot, math3_multiplication (rigid_body -> inverse_inertia_tensor_local, rot_t));
                 if (a3_math3_is_finite (sys)) { rigid_body -> inverse_inertia_system = sys; }
             } else {
-                /* TRUTH: stale zero/NaN local must be rebuilt, not reused. */
-                if (rigid_body -> type == object_sphere) { rigidbody_update_inertia_sphere (rigid_body); } else if (rigid_body -> type == object_cylinder) {
+                /* TRUTH: stale zero/NaN local must be rebuilt, not reused.
+                 * MIG WP2 2.2: a composed body rebuilds from its AUTHORED
+                 * tensor, never from a type default. */
+                if (rigid_body -> mass_is_composed) {
+                    if (!rigidbody_restore_composed_inertia (rigid_body)) {
+                        rigid_body -> inverse_inertia_tensor_local = (math3) {{{0}}};
+                        rigid_body -> inverse_inertia_system = (math3) {{{0}}};
+                    }
+                } else if (rigid_body -> type == object_sphere) { rigidbody_update_inertia_sphere (rigid_body); } else if (rigid_body -> type == object_cylinder) {
                     rigidbody_update_inertia_cylinder (rigid_body);
                 } else { rigidbody_update_inertia_cube (rigid_body); }
             }
@@ -1245,7 +1307,10 @@ void rigidbody_set_static (rigidbody *rigid_body, bool make_static) {
         /* TRUTH: sanitize geometry before rebuilding inertia, else NaN
          * radius propagates to NaN inertia. */
         rigidbody_sanitize (rigid_body);
-        if (rigid_body -> type == object_sphere) {
+        if (rigid_body -> mass_is_composed) {
+            /* MIG WP2 2.2: sanitize restored the inverse pair from the
+             * authored tensor; a type formula must not overwrite it. */
+        } else if (rigid_body -> type == object_sphere) {
             rigidbody_update_inertia_sphere (rigid_body);
         } else if (rigid_body -> type == object_cylinder) { /* MPE_FTC_091 */
             rigidbody_update_inertia_cylinder (rigid_body); /* R3-001 dedupe */
@@ -1311,6 +1376,7 @@ void rigidbody_clear_friction_anisotropic (rigidbody *rigid_body) {
 } /* MPE_FTC_090: Cylinder inertia and initialization */
 void rigidbody_update_inertia_cylinder (rigidbody *rigid_body) {
     if (!rigid_body) { return; }
+    if (rigid_body -> mass_is_composed) { return; } /* WP2 2.2: authored tensor owns this body */
     float r = rigid_body -> radius;
     float h = rigid_body -> cylinder_half_length;
     float mass = rigid_body -> mass;

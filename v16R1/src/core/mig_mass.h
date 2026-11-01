@@ -85,6 +85,14 @@ int mig_compose (const mig_part *parts, int count, mig_totals *out);
  * reordering — part indices stay exactly as the caller defined them. */
 void mig_rebase_parts (mig_part *parts, int count, vector3 delta);
 
+/* Effective mass of one part in kg, using the SAME exact formulas and
+ * validation as mig_compose (explicit kg, or density kg/m^3 times the
+ * primitive volume). WP2 2.2 uses this to store per-part kilograms in the
+ * world pool without duplicating the density math. Write-on-success:
+ * *out_mass is untouched unless mig_compose_ok is returned; malformed
+ * parts return the same named compose errors as mig_compose. */
+int mig_part_mass (const mig_part *part, double *out_mass);
+
 /* ---- WP1 1.2 bridge: the handoff contract WP2 will consume ----
  * mig_compose totals plus the RE-ANCHORED copy of the part list, ready
  * for a world to "copy in" to its own storage (WP2's per-world pool).

@@ -137,7 +137,11 @@ MPE_TEST_REGIMES = ("default", "light", "heavy", "brittle", "sticky")
 # -> 50 (2026-11-01, mig_composite_pool: WP2 2.1 gate — composite type +
 # per-world part pool (contiguous slices, per-body indices, inactive slots,
 # P2 cap 16 counted once, clear compaction, write-on-success bad inputs)).
-MIN_SUITE_ENTRIES = 50
+# -> 51 (2026-11-01, mig_composite_world: WP2 2.2 gate — world API completes
+# the composite: whole-assembly validation, stored-slice composition under
+# the cap, COM-framed pool slices, effective per-part kg, and the
+# composed-inertia guard through static/kinematic/sanitize/wake).
+MIN_SUITE_ENTRIES = 51
 # DESPOT-2026-10-01: pin per-suite floors so deleting a legacy/paranoia target
 # + its make target together cannot shrink the headline silently (the 220->204
 # drift). Canonical floor above; legacy 30 + paranoia 14 pinned here.

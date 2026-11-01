@@ -493,7 +493,7 @@ int mpe_t_mig_composite_stub (void) {
     const int cb = physics_world_add_composite (&w, dumbbell, 2);
     MPE_CHECK (&t, cb == 0);
     MPE_CHECK (&t, w.body_count == 1);
-    MPE_CHECK (&t, w.bodies [cb].type == object_sphere);
+    MPE_CHECK (&t, w.bodies [cb].type == object_composite);
     MPE_CHECK (&t, w.bodies [cb].mass_is_composed);
     MPE_CHECK (&t, w.bodies [cb].composite_part_count == 2);
     MPE_CHECK_NEAR (&t, w.bodies [cb].mass, 4.0f, 1e-6f, "composed mass");
@@ -738,6 +738,243 @@ int mpe_t_mig_composite_pool (void) {
         printf ("[PASS] mig WP2.1: composite type + pool slice, per-body indices, inactive slots, cap 16 counted, clear compaction\n");
         MPE_INFO ("pool: 20 requested -> 16 stored (1 clamp), second slice base 16, dead slot 2 preserved, cap-4 config -> 4, foreign cap 99 -> frozen 16, clear -> count 0/capacity %d",
                   cap_before);
+    }
+    mpe_test_end (&t);
+    return t.failures;
+}
+
+/* WP2 2.2 gate (plan §4): the WORLD API completion — composition, the
+ * COM-framed pool slice, the P2 cap over stored truth, and the explicit
+ * composed-inertia guard through static/kinematic/wake/sanitize paths.
+ *
+ * The oracle is the charter §4.1/§4.2 contract written out as literals:
+ *  - the dumbbell (2 kg spheres r=0.25 at x=±0.5) enters as ONE
+ *    object_composite at the COM with mass 4, Ixx 0.1, Iyy=Izz 1.1,
+ *    bound 0.75, and its two COM-framed parts in pool slots 0/1 with
+ *    masses 2/2 and per-body indices 0/1;
+ *  - density mode lands effective kilograms in the pool: a 1 m cube at
+ *    density 2 is 2 kg, I = 1/3 on every axis, bound sqrt(3)/2;
+ *  - the cap stores the FIRST 16 of 20 and composes the body over those
+ *    16 only (mass 16, not 20), counting one substitute; a lowered cap
+ *    of 4 stores 4; a malformed part beyond the cap still rejects the
+ *    WHOLE assembly with no body, pool slot, or counter movement;
+ *  - the authored tensor is bitwise invariant through
+ *    rigidbody_set_static(false), rigidbody_set_kinematic(false), and a
+ *    direct zero-inverse sanitize; inverses restore from the authored
+ *    tensor, never from a sphere/cube/cylinder formula;
+ *  - 10 gravity ticks keep type/composite fields/tensor intact.
+ * Every expected number here is a hand-derived literal; no value is read
+ * back from the implementation's own bookkeeping. */
+int mpe_t_mig_composite_world (void) {
+    mpe_test_t t;
+    mpe_test_begin (&t, "mig_composite_world");
+    g_cfg.world.gravity = -9.81f;
+    g_cfg.world.drag = 0.0f;
+    g_cfg.sleep.enable = 0;
+    mpe_clamp_counters_reset ();
+    const mig_part dumbbell [2] = {
+        { mig_part_sphere, 0.25f, 0.0f, {0.0f, 0.0f, 0.0f}, {0.5f, 30.0f, 0.0f},
+          {1.0f, 0.0f, 0.0f, 0.0f}, mig_mass_mode_explicit, 2.0f },
+        { mig_part_sphere, 0.25f, 0.0f, {0.0f, 0.0f, 0.0f}, {-0.5f, 30.0f, 0.0f},
+          {1.0f, 0.0f, 0.0f, 0.0f}, mig_mass_mode_explicit, 2.0f }
+    };
+    physics_world w;
+    mpe_world_begin (&w);
+    const int cb = physics_world_add_composite (&w, dumbbell, 2);
+    MPE_CHECK (&t, cb == 0 && w.body_count == 1);
+    if (cb >= 0) {
+        rigidbody *body = &w.bodies [cb];
+        MPE_CHECK (&t, body -> type == object_composite);
+        MPE_CHECK (&t, body -> mass_is_composed && body -> composite_part_count == 2 && body -> part_base == 0);
+        MPE_CHECK_NEAR (&t, body -> mass, 4.0f, 1e-6f, "composed mass");
+        MPE_CHECK_NEAR (&t, body -> inverse_mass, 0.25f, 1e-6f, "inverse mass");
+        MPE_CHECK_NEAR (&t, body -> position.x, 0.0f, 1e-6f, "body at COM x");
+        MPE_CHECK_NEAR (&t, body -> position.y, 30.0f, 1e-6f, "body at COM y");
+        MPE_CHECK_NEAR (&t, body -> radius, 0.75f, 1e-6f, "bound radius");
+        MPE_CHECK_NEAR (&t, body -> half_extensions.x, 0.75f, 1e-6f, "bound half-extent");
+        const math3 *loc = &body -> inertia_tensor_local;
+        MPE_CHECK_NEAR (&t, loc -> matrix [0][0], 0.1f, 1e-6f, "authored Ixx");
+        MPE_CHECK_NEAR (&t, loc -> matrix [1][1], 1.1f, 1e-6f, "authored Iyy");
+        MPE_CHECK_NEAR (&t, loc -> matrix [2][2], 1.1f, 1e-6f, "authored Izz");
+        MPE_CHECK_NEAR (&t, fabsf (loc -> matrix [0][1]) + fabsf (loc -> matrix [0][2]) +
+                        fabsf (loc -> matrix [1][2]), 0.0f, 1e-9f, "no product of inertia for the axle pair");
+        for (int r = 0; r < 3; r++) {
+            for (int c = 0; c < 3; c++) {
+                float s = 0.0f;
+                for (int k = 0; k < 3; k++) { s += body -> inverse_inertia_tensor_local.matrix [r][k] * loc -> matrix [k][c]; }
+                MPE_CHECK_NEAR (&t, s, (r == c) ? 1.0f : 0.0f, 2e-4f, "inv*I identity after add");
+            }
+        }
+        MPE_CHECK (&t, w.composite_part_count == 2);
+        MPE_CHECK (&t, w.composite_parts [0].type == object_sphere && w.composite_parts [1].type == object_sphere);
+        MPE_CHECK_NEAR (&t, w.composite_parts [0].local_position.x, 0.5f, 1e-6f, "part A COM-framed");
+        MPE_CHECK_NEAR (&t, w.composite_parts [1].local_position.x, -0.5f, 1e-6f, "part B COM-framed");
+        MPE_CHECK_NEAR (&t, w.composite_parts [0].local_position.y, 0.0f, 1e-6f, "part A local y");
+        MPE_CHECK (&t, w.composite_parts [0].mass == 2.0f && w.composite_parts [1].mass == 2.0f);
+        MPE_CHECK (&t, w.composite_parts [0].part_index == 0 && w.composite_parts [1].part_index == 1);
+        MPE_CHECK (&t, w.composite_parts [0].active == 1 && w.composite_parts [1].active == 1);
+        MPE_CHECK_NEAR (&t, w.composite_parts [0].radius, 0.25f, 0.0f, "part radius copied");
+        MPE_CHECK (&t, w.composite_parts [0].friction_static == g_cfg.body_defaults.sphere_fric_s);
+        MPE_CHECK (&t, w.composite_parts [1].friction_kinetic == g_cfg.body_defaults.sphere_fric_k);
+        MPE_CHECK (&t, w.composite_parts [0].restitution == g_cfg.body_defaults.sphere_restitution);
+        /* Source untouched: the caller's assembly frame survives. */
+        MPE_CHECK_NEAR (&t, dumbbell [0].position.x, 0.5f, 0.0f, "source A untouched");
+        MPE_CHECK_NEAR (&t, dumbbell [1].position.x, -0.5f, 0.0f, "source B untouched");
+        MPE_CHECK (&t, mpe_clamp_composite_total () == 0ul && mpe_clamp_mass_total () == 0ul);
+        /* Composed-inertia guard: static -> dynamic must not regenerate. */
+        const math3 snap_local = body -> inertia_tensor_local;
+        rigidbody_set_static (body, true);
+        MPE_CHECK (&t, body -> type == object_composite && body -> composite_part_count == 2);
+        MPE_CHECK_NEAR (&t, body -> inverse_inertia_tensor_local.matrix [0][0], 0.0f, 0.0f, "static zeros inverse local");
+        MPE_CHECK (&t, body -> inertia_tensor_local.matrix [0][0] == snap_local.matrix [0][0] &&
+                        body -> inertia_tensor_local.matrix [1][1] == snap_local.matrix [1][1]);
+        rigidbody_set_static (body, false);
+        MPE_CHECK (&t, body -> type == object_composite && body -> mass_is_composed);
+        MPE_CHECK (&t, body -> inertia_tensor_local.matrix [0][0] == snap_local.matrix [0][0] &&
+                        body -> inertia_tensor_local.matrix [1][1] == snap_local.matrix [1][1] &&
+                        body -> inertia_tensor_local.matrix [2][2] == snap_local.matrix [2][2]);
+        for (int r = 0; r < 3; r++) {
+            for (int c = 0; c < 3; c++) {
+                float s = 0.0f;
+                for (int k = 0; k < 3; k++) {
+                    s += body -> inverse_inertia_tensor_local.matrix [r][k] * snap_local.matrix [k][c];
+                }
+                MPE_CHECK_NEAR (&t, s, (r == c) ? 1.0f : 0.0f, 2e-4f, "guard restores inverse local");
+            }
+        }
+        MPE_CHECK_NEAR (&t, body -> inverse_inertia_system.matrix [0][0], body -> inverse_inertia_tensor_local.matrix [0][0],
+                        0.0f, "guard system == local at identity");
+        /* Kinematic toggle uses the same restore path. */
+        rigidbody_set_kinematic (body, true);
+        MPE_CHECK (&t, body -> kinematic && body -> inertia_tensor_local.matrix [0][0] == snap_local.matrix [0][0]);
+        rigidbody_set_kinematic (body, false);
+        MPE_CHECK (&t, (!body -> kinematic) && body -> inertia_tensor_local.matrix [1][1] == snap_local.matrix [1][1]);
+        /* Direct zero-inverse sanitize: restore from authored, not defaults. */
+        body -> inverse_inertia_tensor_local = (math3) {{{0.0f}}};
+        body -> inverse_inertia_system = (math3) {{{0.0f}}};
+        rigidbody_sanitize (body);
+        MPE_CHECK (&t, body -> inertia_tensor_local.matrix [0][0] == snap_local.matrix [0][0] &&
+                        body -> inertia_tensor_local.matrix [1][1] == snap_local.matrix [1][1]);
+        for (int r = 0; r < 3; r++) {
+            for (int c = 0; c < 3; c++) {
+                float s = 0.0f;
+                for (int k = 0; k < 3; k++) {
+                    s += body -> inverse_inertia_tensor_local.matrix [r][k] * snap_local.matrix [k][c];
+                }
+                MPE_CHECK_NEAR (&t, s, (r == c) ? 1.0f : 0.0f, 2e-4f, "sanitize restores authored inverse");
+            }
+        }
+        /* Ten gravity ticks: type, slice fields, and tensor survive the
+         * every-tick sanitize pass. */
+        for (int k = 0; k < 10; k++) { physics_world_step (&w, 1.0f / 60.0f); }
+        MPE_CHECK (&t, body -> type == object_composite && body -> composite_part_count == 2 && body -> part_base == 0);
+        MPE_CHECK (&t, body -> inertia_tensor_local.matrix [0][0] == snap_local.matrix [0][0] &&
+                        body -> inertia_tensor_local.matrix [1][1] == snap_local.matrix [1][1]);
+        MPE_CHECK (&t, mpe_clamp_composite_total () == 0ul && mpe_clamp_mass_total () == 0ul);
+    }
+    /* Density mode: effective kg, not density, lands in the pool. A 1 m
+     * cube at 2 kg/m^3 is 2 kg; I = (2/12)(1^2+1^2) = 1/3 on every axis;
+     * bound = sqrt(3)/2. */
+    physics_world wd;
+    mpe_world_begin (&wd);
+    const mig_part density_cube [1] = {
+        { mig_part_cube, 0.0f, 0.0f, {0.5f, 0.5f, 0.5f}, {0.0f, 10.0f, 0.0f},
+          {1.0f, 0.0f, 0.0f, 0.0f}, mig_mass_mode_density, 2.0f }
+    };
+    const int dc = physics_world_add_composite (&wd, density_cube, 1);
+    MPE_CHECK (&t, dc == 0);
+    if (dc >= 0) {
+        MPE_CHECK_NEAR (&t, wd.bodies [dc].mass, 2.0f, 1e-6f, "density cube mass");
+        MPE_CHECK_NEAR (&t, wd.bodies [dc].inertia_tensor_local.matrix [0][0], 1.0f / 3.0f, 1e-6f, "density cube Ixx");
+        MPE_CHECK_NEAR (&t, wd.bodies [dc].radius, 0.8660254f, 1e-6f, "density cube bound");
+        MPE_CHECK (&t, wd.composite_part_count == 1);
+        MPE_CHECK (&t, wd.composite_parts [0].type == object_cube && wd.composite_parts [0].mass == 2.0f);
+        MPE_CHECK_NEAR (&t, wd.composite_parts [0].half_extensions.x, 0.5f, 0.0f, "cube half extent copied");
+        MPE_CHECK (&t, wd.composite_parts [0].friction_static == g_cfg.body_defaults.cube_fric_s);
+        MPE_CHECK (&t, wd.composite_parts [0].restitution == g_cfg.body_defaults.cube_restitution);
+        MPE_CHECK (&t, mpe_clamp_composite_total () == 0ul);
+    }
+    /* P2 cap over STORED truth: 20 identical 1 kg parts keep the first 16;
+     * the body weighs 16, not 20; one counted substitute. */
+    physics_world wc;
+    mpe_world_begin (&wc);
+    mig_part many [20];
+    memset (many, 0, sizeof (many));
+    for (int i = 0; i < 20; i++) {
+        many [i].type = mig_part_sphere;
+        many [i].radius = 0.05f;
+        many [i].position = (vector3) {0.05f * (float) i, 20.0f, 0.0f};
+        many [i].orientation = (vector4) {1.0f, 0.0f, 0.0f, 0.0f};
+        many [i].mass_mode = mig_mass_mode_explicit;
+        many [i].mass = 1.0f;
+    }
+    mpe_clamp_counters_reset ();
+    const int cbc = physics_world_add_composite (&wc, many, 20);
+    MPE_CHECK (&t, cbc == 0 && wc.body_count == 1 && wc.composite_part_count == 16);
+    if (cbc >= 0) {
+        MPE_CHECK (&t, wc.bodies [cbc].composite_part_count == 16 && wc.bodies [cbc].part_base == 0);
+        MPE_CHECK_NEAR (&t, wc.bodies [cbc].mass, 16.0f, 1e-6f, "body composes stored 16, not requested 20");
+        MPE_CHECK_NEAR (&t, wc.bodies [cbc].radius, 0.425f, 1e-6f, "bound over stored 16");
+        MPE_CHECK (&t, mpe_clamp_composite_total () == 1ul);
+        for (int i = 0; i < 16; i++) {
+            MPE_CHECK (&t, wc.composite_parts [i].part_index == i && wc.composite_parts [i].mass == 1.0f);
+            MPE_CHECK_NEAR (&t, wc.composite_parts [i].local_position.x, 0.05f * (float) i - 0.375f, 1e-6f,
+                            "stored part COM-framed under the cap");
+        }
+        MPE_CHECK_NEAR (&t, many [19].position.x, 0.95f, 0.0f, "over-cap source tail untouched");
+    }
+    /* Lowered cap: 6 requested, 4 stored, body mass 4. */
+    physics_world wl;
+    mpe_world_begin (&wl);
+    mpe_config_t lowered = g_cfg;
+    lowered.composite.max_parts = 4;
+    physics_world_set_config (&wl, &lowered);
+    mpe_clamp_counters_reset ();
+    const int cbl = physics_world_add_composite (&wl, many, 6);
+    MPE_CHECK (&t, cbl == 0 && wl.composite_part_count == 4);
+    if (cbl >= 0) {
+        MPE_CHECK (&t, wl.bodies [cbl].composite_part_count == 4);
+        MPE_CHECK_NEAR (&t, wl.bodies [cbl].mass, 4.0f, 1e-6f, "lowered cap composes 4");
+        MPE_CHECK (&t, mpe_clamp_composite_total () == 1ul);
+    }
+    /* Whole-assembly invalidation: a bad part BEYOND the cap still refuses
+     * the whole add — no body, no pool slot, no counted substitute. */
+    physics_world wbad;
+    mpe_world_begin (&wbad);
+    mig_part bad_tail [17];
+    memcpy (bad_tail, many, sizeof (bad_tail));
+    bad_tail [16].type = (mig_part_type) 9;
+    mpe_clamp_counters_reset ();
+    MPE_CHECK (&t, physics_world_add_composite (&wbad, bad_tail, 17) == -1);
+    MPE_CHECK (&t, wbad.body_count == 0 && wbad.composite_part_count == 0 && wbad.composite_parts == NULL);
+    MPE_CHECK (&t, mpe_clamp_composite_total () == 0ul);
+    /* Named rejections keep the whole world untouched. */
+    physics_world wr;
+    mpe_world_begin (&wr);
+    MPE_CHECK (&t, physics_world_add_composite (NULL, dumbbell, 2) == -1);
+    MPE_CHECK (&t, physics_world_add_composite (&wr, NULL, 2) == -1);
+    MPE_CHECK (&t, physics_world_add_composite (&wr, dumbbell, 0) == -1);
+    mig_part badquat = dumbbell [0];
+    badquat.orientation = (vector4) {0.5f, 0.0f, 0.0f, 0.0f};
+    MPE_CHECK (&t, physics_world_add_composite (&wr, &badquat, 1) == -1);
+    mig_part spread [2] = { dumbbell [0], dumbbell [1] };
+    spread [0].position = (vector3) {150.0f, 0.0f, 0.0f};
+    spread [1].position = (vector3) {-150.0f, 0.0f, 0.0f};
+    MPE_CHECK (&t, physics_world_add_composite (&wr, spread, 2) == -1);
+    mig_part tiny = dumbbell [0];
+    tiny.mass = 1e-5f;
+    MPE_CHECK (&t, physics_world_add_composite (&wr, &tiny, 1) == -1);
+    MPE_CHECK (&t, wr.body_count == 0 && wr.composite_part_count == 0);
+    MPE_CHECK (&t, mpe_clamp_composite_total () == 0ul && mpe_clamp_mass_total () == 0ul);
+    physics_world_cleanup (&wr);
+    physics_world_cleanup (&wbad);
+    physics_world_cleanup (&wl);
+    physics_world_cleanup (&wc);
+    physics_world_cleanup (&wd);
+    physics_world_cleanup (&w);
+    if (t.failures == 0) {
+        printf ("[PASS] mig WP2.2: world API composes one composite body with a COM-framed pool slice, cap over stored truth, authored-tensor guard\n");
+        MPE_INFO ("dumbbell mass 4/Ixx 0.1/Iyy 1.1/bound 0.75, density cube 2 kg/I 1-3/bound 0.866, 20->16 stored mass 16 (1 clamp), cap 4->4, bad tail rejected, static/kinematic/sanitize keep tensor");
     }
     mpe_test_end (&t);
     return t.failures;
