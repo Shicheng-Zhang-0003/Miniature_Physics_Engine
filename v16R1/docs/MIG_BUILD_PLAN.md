@@ -47,10 +47,19 @@
 > the attached module's `pre_step` hook, so two ball-aero passes per tick
 > against live's one), suite 32/32 gated pass=5 fail=0 on both trees, sync
 > guard green after the twin also gained the b99d4fc core/mig_mass.c link
-> lists; WP2 has NOT begun. NEXT: WP2 (2.1 composite type +
-> per-world parts pool + the P2 counted cap, 2.2 world API completion +
-> explicit sanitize guard, 2.3 broadphase part dispatch, 2.4
-> ghost-view narrowphase — each its own green commit).**
+> lists. WP2 STEP 2.1 LANDED 2026-11-01 (`98debd9`): the fifth object
+> type `object_composite` with every earlier numeric value stable, the
+> append-only internal `part_base` after the WP1 pair (zeroed at all
+> three initializer sites), the per-world contiguous part pool with
+> write-on-success `physics_world_composite_parts_append`, per-body
+> monotonic indices, inactive slots never reused until clear, and the P2
+> cap `composite.max_parts` default 16 (config can only lower; a foreign
+> 99 is frozen to 16) counted once through `mpe_clamp_composite_events`;
+> gate `mig_composite_pool` is the 50th blocking entry, suite 50/48+2,
+> quick 64/64, make everything exit 0. NEXT: WP2 2.2 (world API
+> completion + `mig_rebase_parts` into the pool slice + explicit
+> sanitize guard), 2.3 broadphase part dispatch, 2.4 ghost-view
+> narrowphase — each its own green commit.**
 
 ---
 
@@ -92,23 +101,25 @@ survive a context loss.
 
 ---
 
-## §1 Baseline ledger (as of 2026-10-31 — update at every landing)
+## §1 Baseline ledger (as of 2026-11-01 — update at every landing)
 
 Landed and pushed (WP0 block: commits `181c2c0` charter, `0882935` code,
 `636b10e` playbook; WP1 1.1 in `b0e1cbb`; rulings `8385b95`; P1 rename
-`84f8c8d`; WP1 1.2–1.4 in `df383f0` — 2026-10-31):
+`84f8c8d`; WP1 1.2–1.4 in `df383f0` — 2026-10-31; WP2 2.1 in `98debd9`
+— 2026-11-01):
 
 | Artifact | Nature |
 |---|---|
 | `v16R1/docs/NON_UNIFORM_BODY.md` | design charter (frozen decisions) |
 | `v16R1/src/core/mig_mass.h` | composition contract + error enums + the 1.2 `mig_bridge` handoff struct |
 | `v16R1/src/core/mig_mass.c` | exact composition: mass/COM/inertia, double accumulation, definition-order deterministic; + `mig_make_bridge` |
-| `v16R1/src/core/rigidbody.h/.c` | 1.3 counter + accessor + reset; grows-once body fields `mass_is_composed`/`composite_part_count` (zeroed at all three initializer sites) |
-| `v16R1/src/core/physics_world.h/.c` | 1.4 `physics_world_add_composite` stub (composed mass, sphere bounds, authored tensor) |
-| `v16R1/src/tests/mpe_suite_mig.c` | gates `mig_mass_composite` + `mig_pendulum_physical` + `mig_composite_stub` (49th, blocking) |
-| `v16R1/src/tests/mpe_suite_main.c` | externs + registry entries (49th run blocking) |
+| `v16R1/src/core/rigidbody.h/.c` | 1.3 counter + accessor + reset; grows-once body fields `mass_is_composed`/`composite_part_count` (zeroed at all three initializer sites); 2.1 appends `object_composite` + `OBJECT_COMPOSITE`, the engine-internal `part_base` slice anchor, and `mpe_note_composite_clamp` |
+| `v16R1/src/core/physics_world.h/.c` | 1.4 `physics_world_add_composite` stub (composed mass, sphere bounds, authored tensor); 2.1 `composite_part` + per-world pool (`composite_parts`/count/capacity), grower, write-on-success `physics_world_composite_parts_append`, cleanup free + clear compaction |
+| `v16R1/src/config/mpe_config.h/.c, mpe_config_schema.c` | 2.1 appended `cat_composite` + `composite.max_parts` (default 16, schema 1–16, save loop reaches the new category) |
+| `v16R1/src/tests/mpe_suite_mig.c` | gates `mig_mass_composite` + `mig_pendulum_physical` + `mig_composite_stub` + `mig_composite_pool` (50th, blocking) |
+| `v16R1/src/tests/mpe_suite_main.c` | externs + registry entries (50th run blocking) |
 | `v16R1/src/makefile` | `MPE_TEST_CORE += core/mig_mass.c`, `MPE_SUITE_SRCS += tests/mpe_suite_mig.c`, help-note renumber |
-| `tools/test_runner.py` | floor 46 → 47 → 48 → 49 with dated history comments |
+| `tools/test_runner.py` | floor 46 → 47 → 48 → 49 → 50 with dated history comments |
 
 Names in this table are the PRESENT (post-P1-rename) spellings; at their
 landing commits the files were `nu_mass.{h,c}` and the gates were
@@ -118,19 +129,26 @@ also renamed this playbook file itself (`NUF_BUILD_PLAN.md` →
 
 Measured baseline (numbers a resume session must reproduce):
 
-- Suite: 49 registered, **47/47 blocking green**, 2 diag-informational
-  (WP0 landing was 47/45; 1.1 made 48/46; 1.2–1.4 made 49/47).
-- Runner quick: **63/63** (WP0 was 61/61; 1.1 was 62/62).
-- ASan/UBSan suite build: green — `mig_composite_stub`,
-  `mig_mass_composite`, `mig_pendulum_physical`, `determinism` all clean.
-- Engine binary: **CHANGES BITS from 2026-10-31** (`df383f0` is the first
-  engine-touching landing since v15S+MFS-v10S: the struct grows once, one
-  world entry point appears, `physics_world.c` calls `mig_compose`).
-  The plain-scene numeric path is certified unchanged by the headless
-  byte-probe A/B (pre-edit vs post-edit output byte-identical:
-  ticks=3600 bodies=2 invalid=0 fallback_pow=0 fallback_trig=0
-  result=PASS) and the in-suite `determinism` twin (600 ticks bitwise
-  identical), NOT by binary identity.
+- Suite: 50 registered, **48/48 blocking green**, 2 diag-informational
+  (WP0 landing was 47/45; 1.1 made 48/46; 1.2–1.4 made 49/47; 2.1 made
+  50/48).
+- Runner quick: **64/64** (WP0 was 61/61; 1.1 was 62/62; 1.2–1.4 was
+  63/63).
+- ASan/UBSan suite build: the MIG gates are clean — `mig_composite_pool`,
+  `mig_composite_stub`, `mig_mass_composite`, `mig_pendulum_physical`,
+  `determinism` all pass with no sanitizer report; the asan target itself
+  still fails `loader_lifecycle` and `ftc_ecosystem` on the pre-existing
+  missing `-rdynamic` export of `g_cfg` (undefined symbol), unrelated to
+  MIG and recorded in §9.
+- Engine binary: **CHANGES BITS again from 2026-11-01** (`98debd9`: the
+  internal `rigidbody` grows 4 bytes for `part_base`, a config category
+  and key appear, the pool entry point exists). Every zero-composite
+  scene keeps the same numeric path: the headless byte-probe against
+  `4ffb4c1` is byte-identical
+  (ticks=3600 bodies=2 invalid=0 fallback_pow=0 fallback_trig=0
+  result=PASS) and the in-suite `determinism` twin stays 600 ticks
+  bitwise identical. The WP1 byte-probe evidence remains the entry for
+  the first engine-era change (`df383f0`).
 
 WP0's verdict is on record: the one red in its history was the test
 author's own oracle (missing cylinder dz-Steiner in the triple's Ixx), not
@@ -314,7 +332,7 @@ per-world pool, ghost-view narrowphase, part-scoped cache identity,
 broadphase/floor/CCD hooks, editor-invisible (UI is WP4). Estimated
 1800–2400 LOC. Every step ends green or does not commit.
 
-- [ ] **2.1 Type + pool.** Append `object_composite` to the `object_type`
+- [x] **2.1 Type + pool.** Append `object_composite` to the `object_type`
   enum + `OBJECT_COMPOSITE` alias (`core/rigidbody.h`); new per-world
   composite part pool in `core/physics_world.h/.c` (slice
   `part_base/part_count` on the body; monotonic part indices; inactive
@@ -322,6 +340,37 @@ broadphase/floor/CCD hooks, editor-invisible (UI is WP4). Estimated
   SAME commit as the WP1 bridge so the struct grows once, abi-document
   style — rigidbody is engine-internal and NOT the external plugin ABI
   (`mpe_module.h` is; that bump belongs to 2.4).
+  LANDED 2026-11-01 (`98debd9`). Enum/alias at `rigidbody.h:31/:40`
+  (values 0–4, every earlier value stable); one additional append-only
+  internal field `part_base` at `:174` after the WP1 pair, zeroed at all
+  three initializer sites `rigidbody.c:533/:1118/:1349` (the WP1 bridge
+  carried no base, so this is the one extra struct append 2.1 requires;
+  the plugin ABI is untouched). `composite_part` at
+  `physics_world.h:47-60`; world fields at `:71-73`; grower at
+  `physics_world.c:889`, append at `:902` — write-on-success, validates
+  the stored slice as sphere/cube/cylinder only, authors
+  `part_index = first_index + i` and `active = 1`, never mutates the
+  source; cleanup frees at `:836`, clear is the sole compaction point at
+  `:1506` (count 0, capacity kept). P2 cap: `composite.max_parts` in the
+  appended `cat_composite` category (`mpe_config.h:35/:184`;
+  `mpe_config_schema.c:279-281`, default 16, schema 1–16;
+  `mpe_config.c:260` save loop reaches it); an over-cap request keeps
+  the first cap entries, fires `mpe_note_composite_clamp`
+  (`rigidbody.c:84`) exactly once through `mpe_clamp_composite_events`,
+  and a foreign cap above 16 freezes to 16 in the append. Gate
+  `mig_composite_pool` (50th, blocking, `mpe_suite_mig.c:634`,
+  registry `mpe_suite_main.c:216`) pins enum values, zeroed body fields,
+  20→16 with one counted clamp and no mass-counter leak, source
+  untouched, second slice base 16 with indices restarting at 0, inactive
+  slot 2 preserved while the next append continues at `first_index` 2,
+  four bad-input no-ops (NULL, count 0, negative first_index,
+  `object_custom`), cap 4→4 and foreign 99→16 each with one more clamp,
+  clear keeping capacity 64, cleanup NULLing pointer/count/capacity. One
+  gate-side build incident, engine untouched: the alias equality line
+  compared two anonymous enums and `-Werror=enum-compare` rejected it;
+  fixed with an int cast in the gate. ASan runs the new gate clean; the
+  asan target's two plugin-loader gates stay red on its pre-existing
+  missing `-rdynamic` export of `g_cfg` (see §9).
 - [ ] **2.2 World API.** `physics_world_add_composite` completes the WP1
   stub: `mig_compose` bridge (validate every part, whole-assembly
   invalidation semantics preserved — the composed body refuses nothing a
@@ -618,6 +667,35 @@ Ledger (new entries get a line, never an edit of a past line):
   historical spellings. The two 2026-10-30 lines above had their
   spellings updated by that rename — their content, verdicts, and hashes
   are untouched and their gate/filenames are in the mapping bullets.
+- 2026-11-01 — WP2 step 2.1 landed (`98debd9`), the second
+  engine-touching MIG commit and the first WP2 one. Scope: the fifth
+  object type + alias, the per-world contiguous part pool with
+  write-on-success append and per-body monotonic indices, inactive slots
+  never reused, the P2 cap as `composite.max_parts` default 16 with a
+  counted clamp, clear as the sole compaction point, cleanup free. One
+  deliberate deviation from the "grows once" wish, recorded rather than
+  hidden: `part_base` is one additional append after the WP1 pair
+  because the WP1 bridge carried no pool base; `rigidbody` is
+  engine-internal (not `mpe_module.h`), so no plugin ABI moved and 2.4
+  still owns that bump. Incidents: one, gate-side and engine-untouched —
+  `-Werror=enum-compare` rejected the gate's alias equality line (two
+  anonymous enums), fixed with an int cast. Engine truth: the binary
+  changes bits again (internal struct +4 bytes, new config category/key,
+  new pool entry point) while the zero-composite numeric path is
+  certified unchanged twice on this tree — the headless byte-probe
+  against `4ffb4c1` is byte-identical (ticks=3600 bodies=2 invalid=0
+  fallback_pow=0 fallback_trig=0 result=PASS) and the in-suite
+  `determinism` twin stays 600 ticks bitwise identical. Battery: suite
+  50 total, 48/48 blocking + 2 diag; quick 64/64; docs consistency 7/7;
+  `make everything` exit 0 (log /tmp/opencode/make_everything_21.log);
+  MFS sync guard in sync. ASan/UBSan: the new gate and the other four
+  MIG/determinism gates are clean with no sanitizer report, but the asan
+  target as written fails `loader_lifecycle` and `ftc_ecosystem` with
+  undefined symbol `g_cfg` because it omits the `-rdynamic` the normal
+  build passes — pre-existing target gap, unchanged by this commit and
+  outside 2.1, now on record so a later green-ASan claim must either fix
+  the target or name those two gates. No pre-existing engine defect
+  surfaced; no numbers moved outside the new gate's own counter.
 
 ## §10 Definition of done for v16S (the cut checklist)
 
