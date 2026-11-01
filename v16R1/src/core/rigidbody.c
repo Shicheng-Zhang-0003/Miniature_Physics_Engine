@@ -80,6 +80,9 @@ static void mpe_note_clamp (const char *kind, _Atomic unsigned long *counter, do
 }
 void mpe_note_solver_clamp (const char *kind, double requested, double stored) {
     mpe_note_clamp (kind, &mpe_clamp_solver_events, requested, stored);
+}
+void mpe_note_composite_clamp (double requested, double stored) {
+    mpe_note_clamp ("composite part cap", &mpe_clamp_composite_events, requested, stored);
 } /* Exact free-flight integration under constant gravity + linear viscous drag.
  * The config 'drag' is a VELOCITY RETENTION FACTOR per second (0 to 1).
  * Continuous ODE: dv/dt = -c*v + g, where c = -ln(drag) [1/s], g = gravity vector.
@@ -527,6 +530,7 @@ void rigidbody_initialisation_sphere (rigidbody *rigid_body, float radius, float
      * pre-existing body plain, bit-identical — the determinism lesson. */
     rigid_body -> mass_is_composed = false;
     rigid_body -> composite_part_count = 0;
+    rigid_body -> part_base = 0; /* WP2 2.1 pool slice anchor */
     rigid_body -> ext_force_this_tick = 0;
     rigid_body -> no_collide = false;
     /* DETERMINISM: the body pool is malloc'd, so this _Bool would otherwise
@@ -1111,6 +1115,7 @@ void rigidbody_initialisation_cube (rigidbody *rigid_body, vector3 position_inpu
      * pre-existing body plain, bit-identical — the determinism lesson. */
     rigid_body -> mass_is_composed = false;
     rigid_body -> composite_part_count = 0;
+    rigid_body -> part_base = 0; /* WP2 2.1 pool slice anchor */
     rigid_body -> ext_force_this_tick = 0;
     rigid_body -> no_collide = false;
     /* DETERMINISM: the body pool is malloc'd, so this _Bool would otherwise
@@ -1341,6 +1346,7 @@ void rigidbody_initialisation_cylinder (rigidbody *rigid_body, float radius, flo
      * pre-existing body plain, bit-identical — the determinism lesson. */
     rigid_body -> mass_is_composed = false;
     rigid_body -> composite_part_count = 0;
+    rigid_body -> part_base = 0; /* WP2 2.1 pool slice anchor */
     rigid_body -> ext_force_this_tick = 0;
     rigid_body -> no_collide = false;
     /* DETERMINISM: the body pool is malloc'd, so this _Bool would otherwise

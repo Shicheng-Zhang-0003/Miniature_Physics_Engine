@@ -27,13 +27,17 @@ typedef enum {
     object_sphere,
     object_cube,
     object_cylinder,
-    object_custom
-} object_type; /* MPE_FTC_090 + modular custom */
+    object_custom,
+    object_composite /* MIG WP2 2.1: fifth value, appended so every existing
+                      * numeric value is unchanged; core-owned rigid assembly
+                      * whose primitives live in the per-world parts pool. */
+} object_type; /* MPE_FTC_090 + modular custom + MIG composite */
 enum {
     OBJECT_SPHERE = object_sphere,
     OBJECT_CUBE = object_cube,
     OBJECT_CYLINDER = object_cylinder,
-    OBJECT_CUSTOM = object_custom
+    OBJECT_CUSTOM = object_custom,
+    OBJECT_COMPOSITE = object_composite
 };
 typedef struct {
     // Linear Kinematics
@@ -159,6 +163,15 @@ typedef struct {
      * step path reads neither field. */
     bool mass_is_composed;
     int composite_part_count;
+    /* WP2 2.1 pool slice anchor: the first slot of this body's contiguous
+     * part slice in physics_world.composite_parts. The WP1 bridge commit
+     * carried only the two fields above (the stub needed no base), so this
+     * is the one additional internal-struct append 2.1 requires; it is
+     * engine-internal, not the plugin ABI (mpe_module.h), and every
+     * initializer zeroes it exactly like the WP1 fields. Non-composite
+     * bodies keep part_base 0 and are identified by composite_part_count
+     * == 0, so slot 0 remains a legal composite base. */
+    int part_base;
 } rigidbody;
 void rigidbody_update_axes (rigidbody *rigid_body);
 void rigidbody_initialisation_sphere (rigidbody *rigid_body, float radius, float mass, vector3 position_input);
@@ -260,6 +273,11 @@ extern _Atomic unsigned long mpe_clamp_solver_events;
  * tensor the composition just authored). */
 extern _Atomic unsigned long mpe_clamp_composite_events;
 void mpe_note_solver_clamp (const char *kind, double requested, double stored);
+/* MIG WP2 2.1: counted substitute for the composite part cap (P2): the
+ * assembly keeps its first max_parts and this increments the shared
+ * composite counter with the same bounded-stderr discipline as every other
+ * input clamp. */
+void mpe_note_composite_clamp (double requested, double stored);
 void mpe_clamp_counters_reset (void);
 static inline unsigned long mpe_clamp_mass_total (void)
     { return MPE_ATOMIC_LOAD_n (&mpe_clamp_mass_events, MPE_ATOMIC_RELAXED); }

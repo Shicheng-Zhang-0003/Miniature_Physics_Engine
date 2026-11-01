@@ -110,6 +110,7 @@ int mpe_t_ftc_ecosystem (void);
 int mpe_t_mig_mass_composite (void);
 int mpe_t_mig_pendulum_physical (void);
 int mpe_t_mig_composite_stub (void);
+int mpe_t_mig_composite_pool (void);
 typedef struct {
     const char *name;
     int (*fn) (void);
@@ -208,6 +209,11 @@ static const mpe_entry_t mpe_registry [] = {
      * regenerate what mig_compose authored (mpe_clamp_composite_events
      * stays zero in WP1 by design; it counts the WP2 cap + WP3 gate). */
     {"mig_composite_stub", mpe_t_mig_composite_stub, 0},
+    /* WP2 2.1 gate (plan §4): composite TYPE + per-world part pool. Type
+     * enum append, contiguous slices with per-body indices, inactive slots
+     * never reused, P2 cap 16 counted once (config can only lower), clear
+     * as the sole compaction point, write-on-success bad inputs. */
+    {"mig_composite_pool", mpe_t_mig_composite_pool, 0},
 };
 #define MPE_NTESTS ((int) (sizeof (mpe_registry) / sizeof (mpe_registry [0])))
 /* Returns 0 pass, 1 fail, 2 skipped.

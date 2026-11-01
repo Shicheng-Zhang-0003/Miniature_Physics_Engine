@@ -36,11 +36,41 @@ typedef struct {
      * per tick in contact-heavy scenes). */
     int32_t hash_next;
 } cached_contact;
+/* MIG WP2 2.1 (charter §4.1): one part in a composite body's per-world
+ * contiguous pool slice. Poses are body-local about the body COM (the
+ * rebase is 2.2's job); materials are copied per part so the 2.4 ghost
+ * views never re-read the parent body's body-level materials. part_index
+ * is the PER-BODY monotonic index contact-cache keys embed from 2.5; the
+ * global pool slot is body.part_base + part_index. active=0 marks a
+ * deleted part whose slot is never reused until physics_world_clear
+ * compacts the pool. */
+typedef struct {
+    object_type type; /* primitive only in v16S: sphere/cube/cylinder */
+    vector3 local_position; /* part COM relative to the body COM, body-local */
+    vector4 local_orientation; /* part orientation relative to the body frame */
+    vector3 half_extensions; /* cube half sizes */
+    float radius; /* sphere radius / cylinder radius */
+    float cylinder_half_length; /* cylinder half length (axle local X) */
+    float mass; /* part mass (kg) */
+    float friction_static;
+    float friction_kinetic;
+    float restitution;
+    int part_index; /* per-body monotonic, never reused */
+    int active; /* 0 = deleted; every system skips inactive parts */
+} composite_part;
 typedef struct physics_world {
     rigidbody *bodies;
     int body_count;
     int body_capacity;
     uint32_t next_object_id;
+    /* MIG WP2 2.1: per-world composite part pool (contiguous slices, one
+     * slice per composite body; body.part_base/composite_part_count index
+     * it). Grows by doubling on append, count resets on
+     * physics_world_clear (the only compaction point), storage freed by
+     * cleanup. Zero-initialised by the init memset: no eager allocation. */
+    composite_part *composite_parts;
+    int composite_part_count;
+    int composite_part_capacity;
     /* Phase-1 modularisation: per-world config. Defaults to &g_cfg
      * (global singleton, back-compat). Call physics_world_set_config()
      * to bind a foreign/isolated mpe_config_t. Hot path must read
@@ -207,6 +237,17 @@ int physics_world_add_custom (physics_world *world, int custom_shape, vector3 po
  * or policy violation rejects with -1 and mutates nothing. Returns the
  * new body index, or -1. */
 int physics_world_add_composite (physics_world *world, const mig_part *parts, int count);
+/* MIG WP2 2.1 pool primitive (2.2's add_composite consumes it): append one
+ * body's contiguous part slice, copying the first min(count, config
+ * composite.max_parts) entries into the pool. Stored parts receive
+ * part_index = first_index + i and active = 1; the caller records the
+ * returned base on the body's part_base. An over-cap request substitutes
+ * the first max_parts (P2 ruling), counts one mpe_clamp_composite_events
+ * occurrence and prints the bounded clamp line. Write-on-success: a bad
+ * argument or OOM mutates nothing and returns -1. *stored_out (optional)
+ * receives the stored count only on success. */
+int physics_world_composite_parts_append (physics_world *world, const composite_part *parts, int count,
+                                          int first_index, int *stored_out);
 void physics_world_clear (physics_world *world);
 void physics_world_step (physics_world *world, float dt);
 /* Shared pair pipeline (narrowphase dispatch + 3-gate wake + solver prep).

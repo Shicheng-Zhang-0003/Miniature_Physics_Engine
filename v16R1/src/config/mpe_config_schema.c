@@ -273,6 +273,12 @@ static mpe_param s_registry [] = {
      &g_cfg.ui.enter_spawn_delay, 0.3, 0.0, 5.0, false},
     {"ui.enter_spawn_interval", "Enter Spawn Interval", "Seconds between rapid-fire spawns (s)", p_float, cat_ui,
      &g_cfg.ui.enter_spawn_interval, 0.02, 0.001, 1.0, false},
+    /* ============================================================
+     * cat_composite
+     * ============================================================ */
+    {"composite.max_parts", "Composite Max Parts",
+     "Per-composite part ceiling (P2 cap 16): an over-cap assembly keeps its first max_parts and counts one clamp",
+     p_int, cat_composite, &g_cfg.composite.max_parts, 16.0, 1.0, 16.0, false},
 };
 /* ------------------------------------------------------------------
  * Registry count and public aliases

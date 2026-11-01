@@ -43,6 +43,8 @@ const char *mpe_config_category_name (param_category cat) {
         return "render";
         case cat_ui:
         return "ui";
+        case cat_composite:
+        return "composite";
         default:
         return "unknown";
     }
@@ -255,7 +257,7 @@ bool mpe_config_save (const char *path) {
         snprintf (stamp, sizeof (stamp), "unknown-time");
     } fprintf (file, "# MPE Engine Configuration\n");
     fprintf (file, "# saved:   %s\n\n", stamp);
-    for (int cat = 0; cat <= cat_ui; cat++) {
+    for (int cat = 0; cat <= cat_composite; cat++) {
         bool wrote_header = false;
         for (size_t i = 0; i < g_registry_count; i++) {
             if ((int) g_registry [i].category != cat) { continue; }

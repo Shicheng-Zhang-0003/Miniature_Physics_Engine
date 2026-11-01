@@ -611,3 +611,134 @@ int mpe_t_mig_composite_stub (void) {
     mpe_test_end (&t);
     return t.failures;
 }
+
+/* WP2 2.1 gate (plan §4): the composite TYPE and per-world part POOL only.
+ * No composition math, no narrowphase, no world API — those are 2.2/2.4.
+ * The oracle is the charter §4.1 contract written out as plain predicates:
+ *  - object_composite is the fifth value and every earlier value is stable;
+ *  - a pool slice is contiguous, its parts carry per-body indices
+ *    0..stored-1, and the source array is never mutated;
+ *  - an over-cap assembly (20 parts against the P2 cap 16) stores the FIRST
+ *    16 and counts exactly one mpe_clamp_composite_events substitute; a
+ *    lowered config cap (4) clamps to 4; a foreign config cannot raise the
+ *    frozen ceiling above 16;
+ *  - deleting a part sets active=0 and the slot is NOT reused (the next
+ *    append continues the per-body index with first_index), until
+ *    physics_world_clear — the only compaction point — resets the count
+ *    while keeping capacity;
+ *  - bad inputs (NULL, count<=0, negative first_index, non-primitive type)
+ *    mutate neither the pool nor the counter;
+ *  - non-composite bodies keep part_base/composite_part_count zero.
+ * Expected numbers are literals from this contract, never read back from
+ * the implementation's own bookkeeping. */
+int mpe_t_mig_composite_pool (void) {
+    mpe_test_t t;
+    mpe_test_begin (&t, "mig_composite_pool");
+    /* Enum append: every pre-2.1 numeric value is unchanged. */
+    MPE_CHECK (&t, object_sphere == 0 && object_cube == 1 && object_cylinder == 2 && object_custom == 3);
+    MPE_CHECK (&t, object_composite == 4 && (int) OBJECT_COMPOSITE == 4);
+    physics_world w;
+    mpe_world_begin (&w);
+    /* A normal body carries the slice fields zeroed. */
+    int b = physics_world_add_sphere (&w, 0.25f, 1.0f, (vector3) {0.0f, 5.0f, 0.0f});
+    MPE_CHECK (&t, b >= 0);
+    if (b >= 0) {
+        MPE_CHECK (&t, w.bodies [b].part_base == 0);
+        MPE_CHECK (&t, w.bodies [b].composite_part_count == 0);
+    }
+    MPE_CHECK (&t, w.composite_parts == NULL);
+    MPE_CHECK (&t, w.composite_part_count == 0);
+    MPE_CHECK (&t, w.composite_part_capacity == 0);
+    /* Fixture: 20 distinct sphere parts; deliberately poisoned part_index/
+     * active so the append must author both. */
+    composite_part src [20];
+    memset (src, 0, sizeof (src));
+    for (int i = 0; i < 20; i++) {
+        src [i].type = object_sphere;
+        src [i].radius = 0.05f;
+        src [i].mass = 1.0f + (float) i;
+        src [i].local_position = (vector3) {0.1f * (float) i, 0.0f, 0.0f};
+        src [i].local_orientation = (vector4) {1.0f, 0.0f, 0.0f, 0.0f};
+        src [i].part_index = -1;
+        src [i].active = 0;
+    }
+    mpe_clamp_counters_reset ();
+    /* Over-cap slice: keep the first 16, count exactly one substitute. */
+    int stored = -1;
+    int base = physics_world_composite_parts_append (&w, src, 20, 0, &stored);
+    MPE_CHECK (&t, base == 0);
+    MPE_CHECK (&t, stored == 16);
+    MPE_CHECK (&t, w.composite_part_count == 16);
+    MPE_CHECK (&t, w.composite_part_capacity >= 16);
+    MPE_CHECK (&t, mpe_clamp_composite_total () == 1ul);
+    MPE_CHECK (&t, mpe_clamp_mass_total () == 0ul); /* no counter-channel leak */
+    for (int i = 0; i < 16; i++) {
+        MPE_CHECK (&t, w.composite_parts [i].part_index == i);
+        MPE_CHECK (&t, w.composite_parts [i].active == 1);
+        MPE_CHECK (&t, w.composite_parts [i].mass == src [i].mass);
+    }
+    MPE_CHECK (&t, src [0].part_index == -1 && src [0].active == 0); /* source untouched */
+    /* A second body's slice starts at the next pool slot; its per-body
+     * indices restart at 0. */
+    stored = -1;
+    int base2 = physics_world_composite_parts_append (&w, src, 2, 0, &stored);
+    MPE_CHECK (&t, base2 == 16);
+    MPE_CHECK (&t, stored == 2);
+    MPE_CHECK (&t, w.composite_part_count == 18);
+    MPE_CHECK (&t, w.composite_parts [16].part_index == 0 && w.composite_parts [17].part_index == 1);
+    MPE_CHECK (&t, mpe_clamp_composite_total () == 1ul);
+    /* Deletion deactivates, never reuses: slot 2 stays dead and untouched;
+     * the next append continues this body's index with first_index=2. */
+    w.composite_parts [2].active = 0;
+    float dead_mass = w.composite_parts [2].mass;
+    stored = -1;
+    int base3 = physics_world_composite_parts_append (&w, src, 1, 2, &stored);
+    MPE_CHECK (&t, base3 == 18 && stored == 1 && w.composite_part_count == 19);
+    MPE_CHECK (&t, w.composite_parts [18].part_index == 2);
+    MPE_CHECK (&t, w.composite_parts [2].active == 0);
+    MPE_CHECK (&t, w.composite_parts [2].mass == dead_mass);
+    /* Bad inputs are write-on-success no-ops. */
+    int before = w.composite_part_count;
+    unsigned long cbefore = mpe_clamp_composite_total ();
+    MPE_CHECK (&t, physics_world_composite_parts_append (&w, NULL, 1, 0, NULL) == -1);
+    MPE_CHECK (&t, physics_world_composite_parts_append (&w, src, 0, 0, NULL) == -1);
+    MPE_CHECK (&t, physics_world_composite_parts_append (&w, src, 1, -1, NULL) == -1);
+    composite_part bad = src [0];
+    bad.type = object_custom;
+    MPE_CHECK (&t, physics_world_composite_parts_append (&w, &bad, 1, 0, NULL) == -1);
+    MPE_CHECK (&t, w.composite_part_count == before);
+    MPE_CHECK (&t, mpe_clamp_composite_total () == cbefore);
+    /* Configuration lowers the cap; the frozen P2 ceiling cannot be raised. */
+    mpe_config_t local_cfg = *mpe_world_cfg (&w);
+    local_cfg.composite.max_parts = 4;
+    physics_world_set_config (&w, &local_cfg);
+    stored = -1;
+    int base4 = physics_world_composite_parts_append (&w, src, 6, 0, &stored);
+    MPE_CHECK (&t, base4 == 19 && stored == 4 && w.composite_part_count == 23);
+    MPE_CHECK (&t, mpe_clamp_composite_total () == cbefore + 1ul);
+    local_cfg.composite.max_parts = 99;
+    stored = -1;
+    int base5 = physics_world_composite_parts_append (&w, src, 20, 0, &stored);
+    MPE_CHECK (&t, base5 == 23 && stored == 16 && w.composite_part_count == 39);
+    MPE_CHECK (&t, mpe_clamp_composite_total () == cbefore + 2ul);
+    /* clear is the only compaction point: count resets, capacity stays. */
+    int cap_before = w.composite_part_capacity;
+    physics_world_clear (&w);
+    MPE_CHECK (&t, w.composite_part_count == 0);
+    MPE_CHECK (&t, w.composite_part_capacity == cap_before && w.composite_parts != NULL);
+    stored = -1;
+    int base6 = physics_world_composite_parts_append (&w, src, 2, 0, &stored);
+    MPE_CHECK (&t, base6 == 0 && stored == 2 && w.composite_part_count == 2);
+    MPE_CHECK (&t, w.composite_parts [0].part_index == 0 && w.composite_parts [1].part_index == 1);
+    physics_world_cleanup (&w);
+    MPE_CHECK (&t, w.composite_parts == NULL);
+    MPE_CHECK (&t, w.composite_part_count == 0);
+    MPE_CHECK (&t, w.composite_part_capacity == 0);
+    if (t.failures == 0) {
+        printf ("[PASS] mig WP2.1: composite type + pool slice, per-body indices, inactive slots, cap 16 counted, clear compaction\n");
+        MPE_INFO ("pool: 20 requested -> 16 stored (1 clamp), second slice base 16, dead slot 2 preserved, cap-4 config -> 4, foreign cap 99 -> frozen 16, clear -> count 0/capacity %d",
+                  cap_before);
+    }
+    mpe_test_end (&t);
+    return t.failures;
+}

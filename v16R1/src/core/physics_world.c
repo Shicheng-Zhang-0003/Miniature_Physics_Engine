@@ -832,6 +832,9 @@ void physics_world_cleanup (physics_world *world) {
     live_world_remove (world);
     world -> tick_module_count = 0;
     physics_world_free_ptr ((void **) &world -> bodies);
+    physics_world_free_ptr ((void **) &world -> composite_parts);
+    world -> composite_part_count = 0;
+    world -> composite_part_capacity = 0;
     physics_world_free_ptr ((void **) &world -> world_contact_cache);
     physics_world_free_ptr ((void **) &world -> contact_hash_head);
     broadphase_cleanup (world); /* frees the node pool; struct freed below */
@@ -878,6 +881,57 @@ int physics_world_grow_bodies (physics_world *world) {
     world -> bodies = grown;
     world -> body_capacity = want;
     return 0;
+}
+/* MIG WP2 2.1: composite part pool grower. Ceiling = mpe_max_bodies * the
+ * frozen P2 cap (16) — the most parts any legal body population can own.
+ * Doubles from 16; relocation is safe because bodies store part_base
+ * indices, never pointers into this array. */
+static int physics_world_grow_composite_parts (physics_world *world) {
+    if (!world) { return -1; }
+    const int ceiling = mpe_max_bodies * 16;
+    if (world -> composite_part_capacity >= ceiling) { return -1; }
+    int want = world -> composite_part_capacity > 0 ? world -> composite_part_capacity * 2 : 16;
+    if (want > ceiling) { want = ceiling; }
+    composite_part *grown =
+        (composite_part *) realloc (world -> composite_parts, (size_t) want * sizeof (composite_part));
+    if (!grown) { return -1; }
+    world -> composite_parts = grown;
+    world -> composite_part_capacity = want;
+    return 0;
+}
+int physics_world_composite_parts_append (physics_world *world, const composite_part *parts, int count,
+                                          int first_index, int *stored_out) {
+    if (!world || !parts || count <= 0 || first_index < 0) { return -1; }
+    const mpe_config_t *cfg = mpe_world_cfg (world);
+    int cap = (cfg && cfg -> composite.max_parts > 0) ? cfg -> composite.max_parts : 16;
+    if (cap > 16) { cap = 16; } /* the P2 ceiling is frozen at 16 */
+    const int stored = (count > cap) ? cap : count;
+    /* Validate the entries that will actually be stored before mutating:
+     * the pool holds core primitives only; object_custom/composite are not
+     * legal parts (2.2's assembly validation rejects them with mig errors). */
+    for (int i = 0; i < stored; i++) {
+        if (parts [i].type != object_sphere && parts [i].type != object_cube &&
+            parts [i].type != object_cylinder) {
+            return -1;
+        }
+    }
+    while (world -> composite_part_count + stored > world -> composite_part_capacity) {
+        if (physics_world_grow_composite_parts (world) != 0) { return -1; }
+    }
+    /* Write-on-success: the substitute is counted only once the storage is
+     * guaranteed, so a failed append leaves both the pool and the counter
+     * untouched. */
+    if (count > cap) { mpe_note_composite_clamp ((double) count, (double) stored); }
+    const int base = world -> composite_part_count;
+    for (int i = 0; i < stored; i++) {
+        composite_part *dst = &world -> composite_parts [base + i];
+        *dst = parts [i];
+        dst -> part_index = first_index + i;
+        dst -> active = 1;
+    }
+    world -> composite_part_count = base + stored;
+    if (stored_out) { *stored_out = stored; }
+    return base;
 }
 int physics_world_grow_contact_cache (physics_world *world) {
     if (!world || !world -> world_contact_cache) { return -1; }
@@ -1446,6 +1500,10 @@ int physics_world_add_composite (physics_world *world, const mig_part *parts, in
 void physics_world_clear (physics_world *world) {
     if (!world) { return; }
     world -> body_count = 0;
+    /* MIG WP2 2.1: clear is the ONLY pool compaction point — every body's
+     * slice dies with its body, so the count returns to 0 while the
+     * allocated capacity is kept for reuse. */
+    world -> composite_part_count = 0;
     world -> world_contact_cache_count = 0; /* MFS_131A */
     world -> manifold_overflow_count = 0;
     world -> contact_cache_hits = 0;

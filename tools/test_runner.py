@@ -134,7 +134,10 @@ MPE_TEST_REGIMES = ("default", "light", "heavy", "brittle", "sticky")
 # engine-touching MIG landing — composed mass + full authored inertia
 # tensor on a sphere-backed body, parts recorded as dead weight until
 # WP2; zero-clamp pre-validation discipline).
-MIN_SUITE_ENTRIES = 49
+# -> 50 (2026-11-01, mig_composite_pool: WP2 2.1 gate — composite type +
+# per-world part pool (contiguous slices, per-body indices, inactive slots,
+# P2 cap 16 counted once, clear compaction, write-on-success bad inputs)).
+MIN_SUITE_ENTRIES = 50
 # DESPOT-2026-10-01: pin per-suite floors so deleting a legacy/paranoia target
 # + its make target together cannot shrink the headline silently (the 220->204
 # drift). Canonical floor above; legacy 30 + paranoia 14 pinned here.

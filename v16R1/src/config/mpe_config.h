@@ -31,7 +31,8 @@ typedef enum {
     cat_body_defaults,
     cat_camera,
     cat_render,
-    cat_ui
+    cat_ui,
+    cat_composite /* MIG WP2 2.1: appended, existing category values stable */
 } param_category;
 /* ------------------------------------------------------------------
  * The live config struct — all tunables grouped by domain
@@ -174,6 +175,14 @@ typedef struct {
         float enter_spawn_delay;
         float enter_spawn_interval;
     } ui;
+    struct {
+        /* MIG WP2 2.1 (charter §4.1, P2 ruling): per-composite part ceiling.
+         * An assembly above the cap keeps its first max_parts and counts one
+         * mpe_clamp_composite_events substitute. Default 16 is the P2 cap;
+         * the schema ceiling is also 16, so configuration can only lower the
+         * ceiling, never silently raise the frozen cap. */
+        int max_parts;
+    } composite;
 } mpe_config_t;
 /* ------------------------------------------------------------------
  * Parameter registry entry — describes one tunable
