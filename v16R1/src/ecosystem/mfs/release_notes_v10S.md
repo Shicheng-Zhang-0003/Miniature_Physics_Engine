@@ -68,7 +68,12 @@ embedded twin keeps the module-lifecycle doc; both are per-repo objects.
   possession validation, and state-set ejection.
 - **Aim tooling:** `ftc_aim_params_solve` — deterministic grid first-hit at
   the steepest settling elevation, mini-world entry-arc march that mirrors
-  live double-aero flight, guilded pose cache, gamepad auto-aim throttle.
+  the live single-pass fleet step, guilded pose cache, gamepad auto-aim
+  throttle. The `aim_solve` red gate shipped in this release was a
+  test-harness double step, fixed 2026-11-01 (see
+  `docs/KNOWN_FAILURES.md`, [AIM-SOLVE-DOUBLE-STEP]): the ball now rests
+  at local `(-0.003, 0.134, -0.112)` inside the mouth and the suite is
+  32/32.
 - **Match processing:** one field, four robots, preloads, staged nectar
   seats, flower/garden/table scoring in `docs/FTC_SPECS.md` order.
 - **Runtime config:** per-module key-5 menu, four live setters (Shooter
@@ -77,12 +82,6 @@ embedded twin keeps the module-lifecycle doc; both are per-repo objects.
 
 ## 4. Known open items (honesty section)
 
-- `aim_solve` registers **1 red gate on both trees** (32 total, 31 pass):
-  the solved rest lands on the hive roof (`local (0.000, 1.109, -0.841)`
-  — the pre-`fbb6d66` trace), suspected to be re-opened by release-day
-  churn. Failing identically on both trees is proof the mirror is
-  faithful; the fix lands in 475 first per the canonical-direction
-  contract, then mirrors.
 - Flywheel wall-grind recovery and the intake velocity-gate strictness
   ("takes a few sojourns" when a piece is compressed against the wall)
   are documented engine-faithful behaviors, awaiting an implementation
@@ -93,7 +92,7 @@ embedded twin keeps the module-lifecycle doc; both are per-repo objects.
 The unified suite builds and runs through `build_tests.sh` (dual-mode:
 embedded `$MFS/../../core` exists, standalone discovers the engine via
 `MFS_ENGINE_SRC`, else sibling `../475-MPE/v16R1/src`): suite **32 total,
-31/32** (one aim_solve gate, section 4), FTC gated **pass=4 fail=1**, 12
+32/32**, FTC gated **pass=5 fail=0**, 12
 informational diagnostics ungated (teleop/mechanum/odometry/integration/
 hotload/idle-spin rigs), plus the embedded engine quick profile **60/60**
 including the engine-version contract gate. Windows runs through MSYS2

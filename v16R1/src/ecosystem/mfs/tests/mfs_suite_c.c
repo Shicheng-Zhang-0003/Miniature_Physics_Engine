@@ -1510,8 +1510,13 @@ int mfs_t_aim_solve (void) {
      * AND everything inside the −Z perimeter wall). */
     MFS_CHECK (t_ptr, ftc_fleet_spawn (&w, -0.3239f, ftc_robot_rest_height (), -1.585f, MOTOR_GB_5203_26_9,
                                        FTC_DRIVETRAIN_MECANUM) == 0);
-    void *mod = w.tick_module_state [0];
-    for (int k = 0; k < 90; k++) { ftc_fleet_step_all (&w, mod, DT); physics_world_step (&w, DT); }
+    /* Fleet step ONCE per tick via the attached module's pre_step hook
+     * (ftc_module.c wires it to ftc_fleet_step_all): physics_world_step
+     * invokes it at :1583. Calling ftc_fleet_step_all here as well ran the
+     * whole fleet — including the ball aero — twice per tick, while the aim
+     * march (fresh pred world, no module) and the live game both run it
+     * once; the doubled drag shortened the real arc into a floor miss. */
+    for (int k = 0; k < 90; k++) { physics_world_step (&w, DT); }
     ftc_robot *r = ftc_fleet_get (&w, 0);
     MFS_CHECK (t_ptr, r != NULL);
     if (!r) {
@@ -1539,7 +1544,7 @@ int mfs_t_aim_solve (void) {
         rigidbody_wake (&w.bodies [bi_piece]);
     }
     MFS_CHECK (t_ptr, ftc_intake_set (&w, 0, 1) == 1); /* intake setting the state returns the state */
-    for (int k = 0; k < 90; k++) { ftc_fleet_step_all (&w, mod, DT); physics_world_step (&w, DT); }
+    for (int k = 0; k < 90; k++) { physics_world_step (&w, DT); }
     MFS_CHECK (t_ptr, r -> intake_count >= 1);
     if (r -> intake_count < 1) {
         printf ("[FAIL] aim_solve: capture failed (piece at mouth not taken)\n");
@@ -1580,7 +1585,6 @@ int mfs_t_aim_solve (void) {
      * the real flight diverges from the mini-world march. */
     int trace = getenv ("MPE_AIM_TRACE") != NULL;
     for (int k = 0; k < 300; k++) {
-        ftc_fleet_step_all (&w, mod, DT);
         if (trace && k < 10) {
             rigidbody *tb0 = &w.bodies [bi_piece];
             printf ("  [pre] t=%d v=(%.3f,%.3f,%.3f) F=(%.5f,%.5f,%.5f)%s\n", k, (double) tb0 -> velocity.x,

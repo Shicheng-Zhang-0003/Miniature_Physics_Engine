@@ -1977,3 +1977,56 @@ mixer rotate authority (structural gates pin it), strafe progression
 (joint pump vs gyro ratchet) is un-instrumented — the governor keeps
 drivers out of its regime; the physics stays open alongside
 [MECANUM-PIVOT].
+
+## [AIM-SOLVE-DOUBLE-STEP] The aim gate stepped the fleet twice and judged a game nobody plays (FIXED 2026-11-01)
+
+The `aim_solve` gate was the one red gate shipped in v10S (32 total, 31
+pass, both trees identical). The recorded symptom was a resting ball at
+local `(0.000, 1.109, -0.841)` — on the hive roof, far outside the
+`(0.211, 0.134)` mouth window. It was a test-recipe defect, not a shooter
+or engine defect:
+
+- **The loop stepped the fleet twice per tick.** `mfs_t_aim_solve` called
+  `ftc_fleet_step_all (&w, mod, DT)` and then `physics_world_step (&w,
+  DT)`; the world step dispatches every attached module's `pre_step`
+  (`core/physics_world.c:1583`), and `ftc_module.c:44` wires that hook to
+  the same `ftc_fleet_step_all`. The fleet — including both ball-aero
+  passes at `ftc_fleet.c:1006-1007` — ran twice per tick. The live game
+  attaches the fleet the same way and calls only `physics_world_step`, so
+  it runs once; the aim march creates a fresh world with no module, so it
+  runs once too.
+
+- **Measured size of the extra pass.** A twin probe fired the same solved
+  `(power 0.65, elevation 80°)` launch into the suite's loaded world and
+  into a march-identical mirror world. Launch states were bit-identical
+  (`v0=(0, 5.7611, 1.0158)`, spin `(-9.75, 0, 0)`), and the pre-step
+  force matched exactly (`F=(0, -0.03841, -0.00677)`). After each
+  `physics_world_step` the suite-world ball had lost an extra
+  `-0.0508 m/s` along `v̂` — exactly `0.03841 N / 0.0126 kg × 1/60 s`,
+  one more aero pass. The two arcs diverged at tick 1, mid-air. The
+  doubled drag lowered the apex from 1.712 m to 1.549 m and pulled the
+  descent in: the single-pass twin crossed the mouth plane at y=1.2715 on
+  tick 54 and settled at `(-0.3279, 1.2447, -0.2082)` inside the cell,
+  while the suite ball crossed the same plane at y=0.0355 on tick 75 — on
+  the floor, short — and rested at `(-0.3239, 0.0355, -0.0649)`.
+
+- **The fix is in the gate, not the module.** All three `aim_solve` loops
+  (two 90-tick settles and the 300-tick flight) now call only
+  `physics_world_step`, letting the attached module's `pre_step` drive the
+  fleet once. The other 31 gates keep their recipes; their calibration is
+  not ball-flight-sensitive and none of them was failing. No module,
+  engine, or launch constant changed.
+
+- **Verification (2026-11-01).** Unified suite 32 total, 32 pass, 0 fail;
+  FTC gated pass=5 fail=0. `aim_solve` reports the resting ball at local
+  `(-0.003, 0.134, -0.112)` against the `(0.211, 0.134)` window — inside
+  the mouth with the intended 8 mm wall margin, and behind the mouth plane
+  (`z=-0.112`). The march's 8-iteration predictor and the world's 128
+  iterations agree for this shot, so the solver-iteration split was not
+  the cause.
+
+- **Lesson.** An attached module that already runs in `pre_step` must not
+  be stepped explicitly in the same loop; attach-plus-explicit-step is a
+  double step. The live game was always single-pass, so this gate was
+  testing a different simulation than the one shipped.
+
