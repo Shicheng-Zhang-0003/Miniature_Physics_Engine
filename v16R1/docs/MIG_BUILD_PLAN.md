@@ -66,9 +66,17 @@
 > sanitize/wake/set_static with all three `rigidbody_update_inertia_*`
 > entry points refusing to overwrite authored tensors; gate
 > `mig_composite_world` is the 51st registered blocking entry, suite
-> 51/49+2, quick 65/65, make everything exit 0. NEXT: WP2 2.3
-> broadphase part dispatch, 2.4 ghost-view narrowphase — each its own
-> green commit.**
+> 51/49+2, quick 65/65, make everything exit 0. WP2 STEP 2.3 LANDED
+> 2026-11-01 (`d74319c`): broadphase part dispatch — the scalar radius
+> is the AUTHORED covering sphere (not the sqrt(3) cube inflation), the
+> hash AABB is the per-part COM-symmetric hull
+> max_i(|R_body d_i| + part extent) through each part's own primitive
+> and part-local orientation, and an all-inactive slice falls back to
+> the conservative scalar box; the spatial hash, swept insert and cull
+> are untouched. Gate `mig_composite_broadphase` is the 52nd registered
+> blocking entry, suite 52/50+2, quick 66/66, make everything exit 0.
+> NEXT: WP2 2.4 ghost-view narrowphase, then 2.5 contact identity —
+> each its own green commit.**
 
 ---
 
@@ -115,7 +123,7 @@ survive a context loss.
 Landed and pushed (WP0 block: commits `181c2c0` charter, `0882935` code,
 `636b10e` playbook; WP1 1.1 in `b0e1cbb`; rulings `8385b95`; P1 rename
 `84f8c8d`; WP1 1.2–1.4 in `df383f0` — 2026-10-31; WP2 2.1 in `98debd9`,
-WP2 2.2 in `364428d` — 2026-11-01):
+WP2 2.2 in `364428d`, WP2 2.3 in `d74319c` — 2026-11-01):
 
 | Artifact | Nature |
 |---|---|
@@ -124,11 +132,12 @@ WP2 2.2 in `364428d` — 2026-11-01):
 | `v16R1/src/core/mig_mass.c` | exact composition: mass/COM/inertia, double accumulation, definition-order deterministic; + `mig_make_bridge` + `mig_part_mass` |
 | `v16R1/src/core/rigidbody.h/.c` | 1.3 counter + accessor + reset; grows-once body fields `mass_is_composed`/`composite_part_count` (zeroed at all three initializer sites); 2.1 appends `object_composite` + `OBJECT_COMPOSITE`, the engine-internal `part_base` slice anchor, and `mpe_note_composite_clamp`; 2.2 `rigidbody_restore_composed_inertia` + sanitize composite type/geometry branches and composed restores in sanitize/wake/`set_static(false)`, with all three `rigidbody_update_inertia_*` early-returning for composed bodies |
 | `v16R1/src/core/physics_world.h/.c` | 1.4 `physics_world_add_composite` stub (composed mass, sphere bounds, authored tensor); 2.1 `composite_part` + per-world pool (`composite_parts`/count/capacity), grower, write-on-success `physics_world_composite_parts_append`, cleanup free + clear compaction; 2.2 completes `physics_world_add_composite` (whole-assembly validation, stored-slice composition under the cap, COM-framed pool slice, effective per-part kg, authored-tensor precondition) with `physics_world_composite_cap` shared by append |
+| `v16R1/src/physics/broadphase.c` | 2.3 composite part dispatch: authored covering-sphere scalar radius at `:149` (no sqrt(3) inflation), `broadphase_composite_extent` at `:187` (per-part COM-symmetric hull from body `cached_axes` × part `local_orientation`, primitive extents, inactive-slot scalar fallback), AABB call at `:379`; spatial hash, swept insert and sphere cull untouched |
 | `v16R1/src/config/mpe_config.h/.c, mpe_config_schema.c` | 2.1 appended `cat_composite` + `composite.max_parts` (default 16, schema 1–16, save loop reaches the new category) |
-| `v16R1/src/tests/mpe_suite_mig.c` | gates `mig_mass_composite` + `mig_pendulum_physical` + `mig_composite_stub` + `mig_composite_pool` + `mig_composite_world` (51st, blocking) |
-| `v16R1/src/tests/mpe_suite_main.c` | externs + registry entries (51st run blocking) |
+| `v16R1/src/tests/mpe_suite_mig.c` | gates `mig_mass_composite` + `mig_pendulum_physical` + `mig_composite_stub` + `mig_composite_pool` + `mig_composite_world` + `mig_composite_broadphase` (52nd, blocking) |
+| `v16R1/src/tests/mpe_suite_main.c` | externs + registry entries (52nd run blocking) |
 | `v16R1/src/makefile` | `MPE_TEST_CORE += core/mig_mass.c`, `MPE_SUITE_SRCS += tests/mpe_suite_mig.c`, help-note renumber |
-| `tools/test_runner.py` | floor 46 → 47 → 48 → 49 → 50 → 51 with dated history comments |
+| `tools/test_runner.py` | floor 46 → 47 → 48 → 49 → 50 → 51 → 52 with dated history comments |
 
 Names in this table are the PRESENT (post-P1-rename) spellings; at their
 landing commits the files were `nu_mass.{h,c}` and the gates were
@@ -138,26 +147,26 @@ also renamed this playbook file itself (`NUF_BUILD_PLAN.md` →
 
 Measured baseline (numbers a resume session must reproduce):
 
-- Suite: 51 registered, **49/49 blocking green**, 2 diag-informational
+- Suite: 52 registered, **50/50 blocking green**, 2 diag-informational
   (WP0 landing was 47/45; 1.1 made 48/46; 1.2–1.4 made 49/47; 2.1 made
-  50/48; 2.2 made 51/49).
-- Runner quick: **65/65** (WP0 was 61/61; 1.1 was 62/62; 1.2–1.4 was
-  63/63; 2.1 was 64/64).
+  50/48; 2.2 made 51/49; 2.3 made 52/50).
+- Runner quick: **66/66** (WP0 was 61/61; 1.1 was 62/62; 1.2–1.4 was
+  63/63; 2.1 was 64/64; 2.2 was 65/65).
 - ASan/UBSan suite build: the MIG gates are clean —
-  `mig_composite_world`, `mig_composite_pool`, `mig_composite_stub`,
-  `mig_mass_composite`, `mig_pendulum_physical`, `determinism` all pass
-  with no sanitizer report (run total 51, 47/49 blocking: the asan
-  target itself still fails `loader_lifecycle` and `ftc_ecosystem` on
-  the pre-existing missing `-rdynamic` export of `g_cfg`, unrelated to
-  MIG and recorded in §9).
+  `mig_composite_broadphase`, `mig_composite_world`, `mig_composite_pool`,
+  `mig_composite_stub`, `mig_mass_composite`, `mig_pendulum_physical`,
+  `determinism` all pass with no sanitizer report (run total 52, 48/50
+  blocking: the asan target itself still fails `loader_lifecycle` and
+  `ftc_ecosystem` on the pre-existing missing `-rdynamic` export of
+  `g_cfg`, unrelated to MIG and recorded in §9).
 - Engine binary: **code changes, the plain-scene numeric path does not**
-  (`364428d`: no struct grows — `rigidbody` stays 396 bytes — no config
-  key moves, and every new branch is gated on `mass_is_composed` or
-  `type == object_composite`; `physics_world_add_composite` itself now
-  produces the real composite body instead of the WP1 sphere-backed
-  stub, and no scene path can construct one yet). Binary identity with
-  2.1 is not claimed; the plain-scene numeric path is certified by the
-  headless byte-probe against `13ccf9c`, byte-identical
+  (`d74319c`: no struct grows — `rigidbody` stays 396 bytes — no config
+  key moves, and the new broadphase arms are gated on `type ==
+  object_composite`; the scalar radius and AABB helper are reachable only
+  for composites, so the hash, swept insert and cull paths for every
+  other shape are textually and numerically unchanged). Binary identity
+  with 2.2 is not claimed; the plain-scene numeric path is certified by
+  the headless byte-probe against `f3bdb7c`, byte-identical
   (ticks=3600 bodies=2 invalid=0 fallback_pow=0 fallback_trig=0
   result=PASS), and the in-suite `determinism` twin stays 600 ticks
   bitwise identical. The WP1 (`df383f0`) and 2.1 (`98debd9`) byte-probe
@@ -439,11 +448,56 @@ broadphase/floor/CCD hooks, editor-invisible (UI is WP4). Estimated
   oracle was fixed. No struct or config change this step (`rigidbody`
   stays 396 bytes); ASan runs the new gate clean while the target's two
   pre-existing plugin-loader gates stay red as recorded in §9.
-- [ ] **2.3 Broadphase.** `broadphase_bounding_radius` (~`
+- [x] **2.3 Broadphase.** `broadphase_bounding_radius` (~`
   physics/broadphase.c:139`) composites = max over parts of
   `|d_part,+ part bounding radius|` (exact, conservative); the AABB path
   (~:306) gains the composite branch vs per-part axis slicing; the
   spatial hash itself is untouched.
+  LANDED 2026-11-01 (`d74319c`). `broadphase_bounding_radius` gains the
+  `object_composite` arm at `broadphase.c:149` returning the AUTHORED
+  `rb->radius` (the exact `max_i(|com - p_i| + B_i)` written by 2.2) with
+  the 0.5 fallback, not the `sqrt(3)` cube inflation of the mirrored
+  half_extents. The new static `broadphase_composite_extent`
+  (`broadphase.c:187`) builds the per-part COM-symmetric hull the
+  one-box-per-body insertion path can represent,
+  `max_i(|R_body d_i| + extent_i_axis)`: body rotation from
+  `cached_axes` (world columns) composed with the part's
+  `local_orientation` via `vector4_to_math3`, primitive extents sphere
+  `(r,r,r)`, cube `half_extensions`, cylinder `(half_length, radius,
+  radius)` with the axle on part-local X, inactive and out-of-slice
+  slots skipped, false when no usable part remains. The AABB loop calls
+  it at `broadphase.c:379` and falls through to the existing cube branch
+  on false, where the composed body's `half_extensions` mirror the
+  authored radius — so the fallback stays conservative, never zero. The
+  spatial hash, swept insert, sphere cull and every non-composite path
+  are untouched. Gate `mig_composite_broadphase` (52nd, blocking,
+  `mpe_suite_mig.c:1002`, extern/registry `mpe_suite_main.c:115/:228`,
+  runner floor 52 at `test_runner.py:147`) pins a 0.5 m grid: dumbbell
+  authored bound 0.75 (not 1.299) and rotation-invariant, hull cell
+  count 16 at identity → 32 at 45 deg Z → 64 for the all-inactive scalar
+  box (+8 anchor cells: 24/40/72); an off-centre cube+sphere composite
+  (COM +0.15) reads 24 cube cells under the cube's own 90 deg Z
+  orientation, 16 with that orientation cleared, 64 for the inactive
+  scalar box (+8: 32/24/72); two dumbbells 1.4 m apart emit exactly one
+  pair; a cylinder (radius 0.1, half length 0.52, axle local X) rotated
+  90 deg about Y reaches z = 0.52 and pairs with a 0.06 sphere at
+  z = 0.58 inside the authored 0.529528 cull sphere, while a
+  `(radius, radius, half_length)` reading would stop at z = 0.1 and lose
+  the shared cell; an all-inactive dumbbell still pairs with a sphere at
+  y = 0.6 through the conservative 0.75 scalar box. Two incidents, both
+  gate-side and engine-untouched: the first oracle draft asserted zero
+  pairs for rotated/cleared-part fixtures and failed because the hash
+  bucket is coarser than the cell, so two bodies in distinct cells can
+  share a bucket and the conservative sphere cull legitimately admits
+  the candidate — the negative direction was moved to the exact
+  `world->broadphase->node_count` cell-occupancy oracle while positive
+  pair assertions remain; and the first cylinder fixture placed the
+  extent on an exact 0.5 cell boundary where a 90 deg rotation's float
+  epsilon produced 0.99999994 and `floor()` dropped the band — fixture
+  values moved off integer boundaries, not the engine. No struct or
+  config change (`rigidbody` stays 396 bytes); ASan runs the new gate
+  clean while the target's two pre-existing plugin-loader gates stay red
+  as recorded in §9.
 - [ ] **2.4 Narrowphase — ghost-view dispatch (the WP2 crux).** Design,
   verbatim from the charter's "reuses the EXISTING builtin primitive pair
   functions against part-translated poses": per-world scratch `rigidbody`
@@ -794,6 +848,43 @@ Ledger (new entries get a line, never an edit of a past line):
   asan target as written still fails only `loader_lifecycle` and
   `ftc_ecosystem` on undefined symbol `g_cfg` from its missing
   `-rdynamic` (47/49, pre-existing, unchanged, outside 2.2). No
+  pre-existing engine defect surfaced; no numbers moved outside the new
+  gate's own assertions.
+- 2026-11-01 — WP2 step 2.3 landed (`d74319c`), the fourth
+  engine-touching MIG commit and the third WP2 one. Scope: broadphase
+  part dispatch. `broadphase_bounding_radius` returns the authored
+  covering sphere for `object_composite` instead of the `sqrt(3)`
+  inflation the generic cube arm would apply; the new
+  `broadphase_composite_extent` builds the per-part COM-symmetric AABB
+  hull `max_i(|R_body d_i| + extent_i_axis)` from the world pool, body
+  `cached_axes` × part `local_orientation`, primitive extents (sphere,
+  cube, cylinder axle-local-X), skipping inactive slots and returning
+  false when no part is usable so the AABB path keeps the conservative
+  scalar-box fallback; the spatial hash, swept insert and cull are
+  untouched. Incidents: two, both gate-side and engine-untouched — the
+  first oracle draft asserted zero pairs for rotated/cleared-part
+  fixtures and failed because the hash bucket is coarser than the cell
+  (distinct cells can share a bucket, and the conservative sphere cull
+  then admits the candidate as designed), so the negative direction
+  moved to the exact `node_count` cell-occupancy oracle; and the first
+  cylinder fixture put an extent on an exact 0.5 cell boundary where a
+  90 deg rotation's float epsilon landed on 0.99999994 and `floor()`
+  dropped the band, fixed by moving fixture values off integer
+  boundaries. Engine truth: no struct or config change (`rigidbody`
+  stays 396 bytes, no key moves), the binary differs from 2.2 only in
+  the composite-gated broadphase code, and binary identity is not
+  claimed; the plain-scene numeric path is certified by the headless
+  byte-probe against `f3bdb7c`, byte-identical (ticks=3600 bodies=2
+  invalid=0 fallback_pow=0 fallback_trig=0 result=PASS), with the
+  in-suite `determinism` twin bitwise identical. Battery: suite 52
+  total, 50/50 blocking + 2 diag; the new gate passes default plus
+  light/heavy/brittle/sticky; quick 66/66; docs consistency 7/7; `make
+  everything` exit 0 (log /tmp/opencode/make_everything_23.log); MFS
+  sync guard in sync. ASan/UBSan: `mig_composite_broadphase` and the
+  other six MIG/determinism gates are clean with no sanitizer report,
+  while the asan target as written still fails only `loader_lifecycle`
+  and `ftc_ecosystem` on undefined symbol `g_cfg` from its missing
+  `-rdynamic` (48/50, pre-existing, unchanged, outside 2.3). No
   pre-existing engine defect surfaced; no numbers moved outside the new
   gate's own assertions.
 
