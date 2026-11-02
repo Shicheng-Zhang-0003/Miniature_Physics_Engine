@@ -115,10 +115,11 @@ static bool a3_task05_cached_impulses_are_usable (float normal_impulse, float ta
     return true;
 }
 static int contact_cache_match_role (const cached_contact *cc, uint32_t id_a, uint32_t id_b, uint32_t stamp_a,
-                                     uint32_t stamp_b, vector3 local_a, vector3 local_b, float match_dist_sq) {
+                                     uint32_t stamp_b, uint8_t part_a, uint8_t part_b, vector3 local_a,
+                                     vector3 local_b, float match_dist_sq) {
     if ((!cc) || (id_a == 0) || (id_b == 0)) { return 0; }
     if ((cc -> object_id_a == id_a) && (cc -> object_id_b == id_b) && (cc -> property_stamp_a == stamp_a) &&
-        (cc -> property_stamp_b == stamp_b)) {
+        (cc -> property_stamp_b == stamp_b) && (cc -> part_a == part_a) && (cc -> part_b == part_b)) {
         /* TRUTH: strict both-side matching. Old side-A-only aliased two B
          * bodies sharing an A anchor within 5cm (wrong impulse injection).
          * Both material points must coincide; resting contacts satisfy this
@@ -131,7 +132,7 @@ static int contact_cache_match_role (const cached_contact *cc, uint32_t id_a, ui
         } return 0;
     }
     if ((cc -> object_id_a == id_b) && (cc -> object_id_b == id_a) && (cc -> property_stamp_a == stamp_b) &&
-        (cc -> property_stamp_b == stamp_a)) {
+        (cc -> property_stamp_b == stamp_a) && (cc -> part_a == part_b) && (cc -> part_b == part_a)) {
         float dist_sq_ab = vector3_length_squared (simd_sub (cc -> local_position_a, local_b));
         float dist_sq_ba = vector3_length_squared (simd_sub (cc -> local_position_b, local_a));
         if ((dist_sq_ab < match_dist_sq) && (dist_sq_ba < match_dist_sq) &&
@@ -141,10 +142,11 @@ static int contact_cache_match_role (const cached_contact *cc, uint32_t id_a, ui
     } return 0;
 }
 static bool contact_cache_adoptable (const cached_contact *cc, uint32_t id_a, uint32_t id_b, uint32_t stamp_a,
-                                     uint32_t stamp_b, vector3 local_a, vector3 local_b, float match_dist_sq) {
+                                     uint32_t stamp_b, uint8_t part_a, uint8_t part_b, vector3 local_a,
+                                     vector3 local_b, float match_dist_sq) {
     if ((!cc) || (id_a == 0) || (id_b == 0)) { return false; }
     if (!((cc -> object_id_a == id_a) && (cc -> object_id_b == id_b) && (cc -> property_stamp_a == stamp_a) &&
-          (cc -> property_stamp_b == stamp_b))) {
+          (cc -> property_stamp_b == stamp_b) && (cc -> part_a == part_a) && (cc -> part_b == part_b))) {
         return false;
     }
     /* TRUTH: require BOTH sides like match_role. Side-A-only matching let
@@ -222,7 +224,8 @@ void collision_prepare_solver (struct physics_world *world, collision_data *sour
                  slot = cache_array [slot].hash_next, guard++) {
                 cached_contact *cc = &cache_array [slot];
                 int role = contact_cache_match_role (cc, cache_id_a, cache_id_b, cache_stamp_a, cache_stamp_b,
-                                                     cp -> local_position_a, cp -> local_position_b, prep_match_sq);
+                                                     cp -> part_a, cp -> part_b, cp -> local_position_a,
+                                                     cp -> local_position_b, prep_match_sq);
                 if (role == 1) {
                     cp -> accumulated_normal_impulse = fmaxf (cc -> accumulated_normal_impulse, 0.0f);
                     cp -> accumulated_tangent_impulse = cc -> accumulated_tangent_impulse;
@@ -243,7 +246,8 @@ void collision_prepare_solver (struct physics_world *world, collision_data *sour
             for (int c = 0; c < cache_count; c++) {
                 cached_contact *cc = &cache_array [c];
                 int role = contact_cache_match_role (cc, cache_id_a, cache_id_b, cache_stamp_a, cache_stamp_b,
-                                                     cp -> local_position_a, cp -> local_position_b, prep_match_sq);
+                                                     cp -> part_a, cp -> part_b, cp -> local_position_a,
+                                                     cp -> local_position_b, prep_match_sq);
                 if (role == 1) {
                     cp -> accumulated_normal_impulse = fmaxf (cc -> accumulated_normal_impulse, 0.0f);
                     cp -> accumulated_tangent_impulse = cc -> accumulated_tangent_impulse;
@@ -363,7 +367,8 @@ void collision_prepare_solver (struct physics_world *world, collision_data *sour
                      slot = cache_array [slot].hash_next, guard++) {
                     cached_contact *cc = &cache_array [slot];
                     if (contact_cache_adoptable (cc, cache_id_a, cache_id_b, cache_stamp_a, cache_stamp_b,
-                                                 cp -> local_position_a, cp -> local_position_b, prep_match_sq)) {
+                                                 cp -> part_a, cp -> part_b, cp -> local_position_a,
+                                                 cp -> local_position_b, prep_match_sq)) {
                         adopted_tangent = cc -> tangent_dir;
                         break;
                     }
@@ -372,7 +377,8 @@ void collision_prepare_solver (struct physics_world *world, collision_data *sour
                 for (int c = 0; c < cache_count; c++) {
                     cached_contact *cc = &cache_array [c];
                     if (contact_cache_adoptable (cc, cache_id_a, cache_id_b, cache_stamp_a, cache_stamp_b,
-                                                 cp -> local_position_a, cp -> local_position_b, prep_match_sq)) {
+                                                 cp -> part_a, cp -> part_b, cp -> local_position_a,
+                                                 cp -> local_position_b, prep_match_sq)) {
                         adopted_tangent = cc -> tangent_dir;
                         break;
                     }

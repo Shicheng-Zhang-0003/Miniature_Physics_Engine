@@ -72,6 +72,14 @@ typedef struct {
      * resolve callers without a snapshot keep the legacy live behaviour).
      * Tail-appended: existing offsets (and the plugin ABI) do not shift. */
     float snap_friction_mu;
+    /* MIG WP2 2.4/2.5 (charter §4.3): part identity for a contact. Append-
+     * only tail fields; every pre-existing primitive path stamps 0/0 and
+     * every composite part-pair manifold stamps the per-body monotonic
+     * part indices. The warm-start cache key is
+     * (object_id_a, part_a, object_id_b, part_b), so a composite resting
+     * on two parts can never share impulses across them. */
+    uint8_t part_a;
+    uint8_t part_b;
 } contact_point_data;
 /* ---- Anisotropic Coulomb cone --------------------------------------------
  *
@@ -372,6 +380,9 @@ int contact_cache_get_misses (const struct physics_world *world);
 /* Pair-novelty probe: true if this id pair has any entry saved from a prior
  * tick (either order). Drives wake-on-first-touch (see implementation). */
 bool contact_cache_has_pair (struct physics_world *world, uint32_t id_a, uint32_t id_b);
+/* MIG WP2 2.4/2.5: part-scoped novelty probe (same cache, part fields). */
+bool contact_cache_has_part_pair (struct physics_world *world, uint32_t id_a, uint8_t part_a, uint32_t id_b,
+                                  uint8_t part_b);
 /* Cylinder-vs-object narrowphase. TRUE solid-cylinder geometry:
  * flat end-caps (SDF), rim circle, inside SDF branch; segment-OBB convex
  * exact for cube; coaxial face-gap + parallel 2-point for cyl-cyl.

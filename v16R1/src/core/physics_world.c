@@ -449,7 +449,13 @@ static void physics_world_prepare_detected_pair (physics_world *world, int index
     bool a_was_sleeping = body_a->is_sleeping;
     bool b_was_sleeping = body_b->is_sleeping;
     if (!a_was_sleeping || !b_was_sleeping) {
-        bool new_edge = !contact_cache_has_pair (world, body_a->object_id, body_b->object_id);
+        /* MIG WP2 2.4/2.5: novelty is part-scoped. A composite that rolls
+         * a new part onto a sleeper is a new contact edge even when another
+         * part of the same body pair was already cached. */
+        uint8_t edge_part_a = (source->contact_count > 0) ? source->contacts[0].part_a : 0u;
+        uint8_t edge_part_b = (source->contact_count > 0) ? source->contacts[0].part_b : 0u;
+        bool new_edge = !contact_cache_has_part_pair (world, body_a->object_id, edge_part_a,
+                                                      body_b->object_id, edge_part_b);
         if (a_was_sleeping && !body_b->static_state && new_edge) rigidbody_wake (body_a);
         if (b_was_sleeping && !body_a->static_state && new_edge) rigidbody_wake (body_b);
         const mpe_config_t *cfg = mpe_world_cfg (world);
@@ -509,6 +515,15 @@ static void mpe_narrowphase_range (void *data, int start, int end) {
             w -> pair_skipped [p] = 1;
             continue;
         }
+        /* MIG WP2 2.4: one body pair can emit one manifold per touching
+         * part pair, so composite pairs cannot use the one-slot-per-pair
+         * parallel mapping. They are detected serially after the barrier
+         * (physics_world_process_pair appends to the manifold tail); the
+         * ghost scratch is thread-local either way. */
+        if ((body_a -> type == object_composite) || (body_b -> type == object_composite)) {
+            w -> pair_skipped [p] = 0;
+            continue;
+        }
         collision_data narrowphase_collision = {0};
         bool collided = mpe_shape_dispatch (w, body_a, body_b, &narrowphase_collision);
         if (!collided) {
@@ -531,11 +546,11 @@ static int physics_world_ensure_manifold_capacity (physics_world *world, int nee
     }
     return 0;
 }
-static void mpe_parallel_narrowphase (physics_world *world, int pair_count, int slot_count, float dt,
-                                      const mpe_config_t *cfg) {
+static int mpe_parallel_narrowphase (physics_world *world, int pair_count, int slot_count, float dt,
+                                     const mpe_config_t *cfg) {
     if ((pair_count <= 0) || (slot_count <= 0) || (!world) || (!world -> pair_buffer) || (!world -> manifolds) ||
         (!world -> manifold_awake)) {
-        return;
+        return slot_count;
     }
     if (slot_count > world -> manifold_capacity) { slot_count = world -> manifold_capacity; }
     mpe_pool_init ();
@@ -558,9 +573,10 @@ static void mpe_parallel_narrowphase (physics_world *world, int pair_count, int 
         }
         /* The serial compactor fills [0, k); the caller zeroed every slot
          * up to slot_count, so slots [k, slot_count) stay empty and are
-         * awake-skipped exactly like non-collided parallel slots. */
-        (void) manifold_count;
-        return;
+         * awake-skipped exactly like non-collided parallel slots. A
+         * composite pair may append more manifolds than the pair count, so
+         * return the larger of the compacted count and the zeroed span. */
+        return (manifold_count > slot_count) ? manifold_count : slot_count;
     }
     mpe_narrowphase_slice_t slice;
     slice.world = world;
@@ -575,6 +591,23 @@ static void mpe_parallel_narrowphase (physics_world *world, int pair_count, int 
         collision_data source = world->manifolds[p];
         physics_world_prepare_detected_pair (world, ia, ib, dt, &source, &world->manifolds[p]);
     }
+    /* Composite part-pair expansion: serial because each pair may append
+     * several manifolds. Slots [pair_count, total) are the expansion tail;
+     * physics_world_process_pair grows the arrays on demand and counts any
+     * overflow pair. Primitive pairs already prepared above are untouched. */
+    int total_manifolds = slot_count;
+    for (int p = 0; p < pair_count; p++) {
+        int ia = world->pair_buffer[p].object_index_a;
+        int ib = world->pair_buffer[p].object_index_b;
+        if ((ia < 0) || (ia >= world->body_count) || (ib < 0) || (ib >= world->body_count)) { continue; }
+        rigidbody *body_a = &world->bodies[ia];
+        rigidbody *body_b = &world->bodies[ib];
+        if ((body_a->type != object_composite) && (body_b->type != object_composite)) { continue; }
+        if (world->pair_skipped[p]) { continue; }
+        physics_world_process_pair (world, ia, ib, dt, &total_manifolds);
+        world->pair_skipped[p] = 0;
+    }
+    return total_manifolds;
 }
 /* Canonical spring pass is weakly linked so spring-less headless test
  * binaries (which omit physics/spring_joint.c for its GL dependency)
@@ -1116,9 +1149,10 @@ int physics_world_attach_module (physics_world *world, const mpe_module_desc_t *
                         (const void *) world, (const void *) desc);
         return MPE_ATTACH_E_NULL;
     }
-    if (desc->abi != MPE_MODULE_ABI) {
-        MPE_DIAG_ERROR ("attach", "E_ABI", "attach rejected: '%s' has ABI %u, engine expects %u", desc->name ? desc->name : "(unnamed)",
-                        desc->abi, (unsigned) MPE_MODULE_ABI);
+    if (desc->abi < MPE_MODULE_ABI_MIN || desc->abi > MPE_MODULE_ABI) {
+        MPE_DIAG_ERROR ("attach", "E_ABI", "attach rejected: '%s' has ABI %u, engine accepts %u..%u",
+                        desc->name ? desc->name : "(unnamed)", desc->abi,
+                        (unsigned) MPE_MODULE_ABI_MIN, (unsigned) MPE_MODULE_ABI);
         return MPE_ATTACH_E_ABI;
     }
     /* DESPOT-2026-10-12 P1: validate count BEFORE any indexed read. A
@@ -1284,13 +1318,169 @@ static bool a3_sanitize_plugin_manifold (collision_data *out, const rigidbody *a
         }
     } return true;
 }
-bool mpe_shape_dispatch (physics_world *world, rigidbody *a, rigidbody *b, collision_data *out) {
-    if (!a || !b || !out)
-        return false;
-    /* Render-only proxies never collide (semantic backstop for direct
-     * dispatch users; broadphase/floor/CCD skip them earlier for perf). */
-    if (a -> no_collide || b -> no_collide)
-        return false;
+/* ---- MIG WP2 2.4: composite ghost-view narrowphase ---------------------
+ *
+ * A composite body is one rigid body whose collision surface is the union
+ * of its active parts. The primitive pair functions take rigidbody poses,
+ * so the composite branch refreshes a pair of ghost views (memcpy of the
+ * parent + part-local pose override) and reuses the registry/builtin pair
+ * path unchanged. Ghosts are thread-local scratch: under MPE_THREADS > 1
+ * every worker owns its own pair, writes are pair-local, and the pair
+ * functions only read the ghost after the refresh. Nothing in the parent
+ * is mutated by detection.
+ *
+ * Contact identity maps back to the PARENT bodies; each contact carries
+ * the per-body monotonic part index (0/0 for a non-composite side). The
+ * world pipeline emits ONE manifold per colliding part pair: collision_data
+ * carries a single normal, so merging part pairs with different normals
+ * into one manifold would solve contacts against the wrong plane.    */
+#define MPE_COMPOSITE_MAX_PARTS 16
+#define MPE_COMPOSITE_MAX_PART_PAIRS (MPE_COMPOSITE_MAX_PARTS * MPE_COMPOSITE_MAX_PARTS)
+typedef struct {
+    rigidbody a;
+    rigidbody b;
+} mpe_composite_ghosts;
+static _Thread_local mpe_composite_ghosts s_composite_ghosts;
+typedef bool (*mpe_composite_emit_fn) (void *ctx, const collision_data *manifold);
+/* Bounded, write-on-success pool lookup: a malformed slice is refused, not
+ * read past the world pool. */
+static const composite_part *mpe_composite_part_at (const physics_world *world, const rigidbody *body, int slot) {
+    if ((!world) || (!body) || (body -> type != object_composite)) { return NULL; }
+    if ((body -> part_base < 0) || (body -> composite_part_count < 0)) { return NULL; }
+    if ((slot < 0) || (slot >= body -> composite_part_count)) { return NULL; }
+    long index = (long) body -> part_base + (long) slot;
+    if ((index < 0) || (index >= (long) world -> composite_part_count)) { return NULL; }
+    return &world -> composite_parts [index];
+} static bool mpe_composite_side_count (const physics_world *world, const rigidbody *body, int *count_out) {
+    if ((!body) || (!count_out)) { return false; }
+    if (body -> type != object_composite) {
+        *count_out = 1;
+        return true;
+    }
+    if ((!world) || (body -> part_base < 0) || (body -> composite_part_count < 0)) { return false; }
+    long end = (long) body -> part_base + (long) body -> composite_part_count;
+    if (end > (long) world -> composite_part_count) { return false; }
+    *count_out = body -> composite_part_count;
+    return true;
+} /* Refresh the ghost from the parent, then override exactly the fields a
+ * primitive pair function reads as geometry/material. The parent's motion
+ * state is inherited (foreign handlers may read it); the composed-mass and
+ * pool bookkeeping is cleared so a ghost can never be mistaken for a body. */
+static void mpe_composite_ghost_refresh (rigidbody *ghost, const rigidbody *parent, const composite_part *part) {
+    memcpy (ghost, parent, sizeof (*ghost));
+    ghost -> type = part -> type;
+    ghost -> position = simd_add (parent -> position,
+                                  vector4_rotate_to_vector3 (parent -> orientation, part -> local_position));
+    ghost -> orientation = vector4_normalisation (
+        vector4_multiplication (parent -> orientation, part -> local_orientation));
+    ghost -> radius = part -> radius;
+    ghost -> half_extensions = part -> half_extensions;
+    ghost -> cylinder_half_length = part -> cylinder_half_length;
+    ghost -> mass = part -> mass;
+    ghost -> inverse_mass =
+        ((part -> mass > 0.0f) && isfinite (part -> mass)) ? (1.0f / part -> mass) : 0.0f;
+    ghost -> friction_static = part -> friction_static;
+    ghost -> friction_kinetic = part -> friction_kinetic;
+    ghost -> restitution = part -> restitution;
+    ghost -> mass_is_composed = false;
+    ghost -> composite_part_count = 0;
+    ghost -> part_base = 0;
+    rigidbody_update_axes (ghost);
+} static float mpe_vector3_axis (vector3 value, int axis) {
+    return (axis == 0) ? value.x : ((axis == 1) ? value.y : value.z);
+} /* Conservative world AABB of one primitive (the local box hull of a
+ * cylinder is (half_length, radius, radius), axle local X — the house
+ * convention). Used only as a prefilter; pair functions remain the truth. */
+static void mpe_composite_world_aabb (const rigidbody *body, vector3 *center_out, vector3 *half_out) {
+    vector3 local = {body -> radius, body -> radius, body -> radius};
+    if (body -> type == object_cube) {
+        local = body -> half_extensions;
+    } else if (body -> type == object_cylinder) {
+        local = (vector3) {body -> cylinder_half_length, body -> radius, body -> radius};
+    }
+    *center_out = body -> position;
+    for (int axis = 0; axis < 3; axis++) {
+        float extent = fabsf (mpe_vector3_axis (body -> cached_axes [0], axis)) * fabsf (local.x) +
+                       fabsf (mpe_vector3_axis (body -> cached_axes [1], axis)) * fabsf (local.y) +
+                       fabsf (mpe_vector3_axis (body -> cached_axes [2], axis)) * fabsf (local.z);
+        if (axis == 0) { half_out -> x = extent; }
+        else if (axis == 1) { half_out -> y = extent; }
+        else { half_out -> z = extent; }
+    }
+} static bool mpe_composite_aabb_overlap (vector3 ca, vector3 ha, vector3 cb, vector3 hb, float margin) {
+    if (fabsf (ca.x - cb.x) > ha.x + hb.x + margin) { return false; }
+    if (fabsf (ca.y - cb.y) > ha.y + hb.y + margin) { return false; }
+    if (fabsf (ca.z - cb.z) > ha.z + hb.z + margin) { return false; }
+    return true;
+} static bool mpe_shape_dispatch_primitive (physics_world *world, rigidbody *a, rigidbody *b,
+                                           collision_data *out);
+/* Iterate the active part pairs in fixed definition order. The prefilter
+ * runs in the parent pair frame with the solver's slop as margin: a pair
+ * admitted as a zero-depth resting contact by the narrowphase must never be
+ * discarded here. */
+static bool mpe_composite_iterate (physics_world *world, rigidbody *a, rigidbody *b,
+                                   mpe_composite_emit_fn emit, void *ctx) {
+    if ((!world) || (!a) || (!b) || (!emit)) { return false; }
+    bool a_composite = (a -> type == object_composite);
+    bool b_composite = (b -> type == object_composite);
+    if ((!a_composite) && (!b_composite)) { return false; }
+    int a_count = 1, b_count = 1;
+    if (!mpe_composite_side_count (world, a, &a_count) ||
+        !mpe_composite_side_count (world, b, &b_count)) { return false; }
+    const mpe_config_t *cfg = mpe_world_cfg (world);
+    float margin = cfg -> solver.penetration_slop;
+    if ((!(margin >= 0.0f)) || (!isfinite (margin))) { margin = 0.0f; }
+    int part_index_a = 0, part_index_b = 0;
+    for (int ia = 0; ia < a_count; ia++) {
+        rigidbody *ghost_a = a;
+        if (a_composite) {
+            const composite_part *part = mpe_composite_part_at (world, a, ia);
+            if ((!part) || (!part -> active)) { continue; }
+            mpe_composite_ghost_refresh (&s_composite_ghosts.a, a, part);
+            ghost_a = &s_composite_ghosts.a;
+            part_index_a = part -> part_index;
+        }
+        for (int ib = 0; ib < b_count; ib++) {
+            rigidbody *ghost_b = b;
+            if (b_composite) {
+                const composite_part *part = mpe_composite_part_at (world, b, ib);
+                if ((!part) || (!part -> active)) { continue; }
+                mpe_composite_ghost_refresh (&s_composite_ghosts.b, b, part);
+                ghost_b = &s_composite_ghosts.b;
+                part_index_b = part -> part_index;
+            }
+            vector3 center_a, half_a, center_b, half_b;
+            mpe_composite_world_aabb (ghost_a, &center_a, &half_a);
+            mpe_composite_world_aabb (ghost_b, &center_b, &half_b);
+            if (!mpe_composite_aabb_overlap (center_a, half_a, center_b, half_b, margin)) { continue; }
+            collision_data part_collision = {0};
+            if (!mpe_shape_dispatch_primitive (world, ghost_a, ghost_b, &part_collision)) { continue; }
+            if (part_collision.contact_count <= 0) { continue; }
+            /* Parent identity + part stamps: the solver applies impulses to
+             * the real bodies, and the cache key can tell the parts apart. */
+            part_collision.object_a = a;
+            part_collision.object_b = b;
+            uint8_t part_a_u8 = (part_index_a >= 0 && part_index_a <= 255) ? (uint8_t) part_index_a : 0u;
+            uint8_t part_b_u8 = (part_index_b >= 0 && part_index_b <= 255) ? (uint8_t) part_index_b : 0u;
+            for (int c = 0; c < part_collision.contact_count; c++) {
+                part_collision.contacts [c].part_a = part_a_u8;
+                part_collision.contacts [c].part_b = part_b_u8;
+            } if (!emit (ctx, &part_collision)) { return true; }
+        }
+    } return true;
+} static void a3_clear_contact_parts (collision_data *out) {
+    if ((!out) || (out -> contact_count <= 0)) { return; }
+    int count = out -> contact_count;
+    if (count > MPE_MAX_MANIFOLD_CONTACTS) { count = MPE_MAX_MANIFOLD_CONTACTS; }
+    for (int i = 0; i < count; i++) {
+        out -> contacts [i].part_a = 0u;
+        out -> contacts [i].part_b = 0u;
+    }
+} /* The pre-composite dispatch body, unchanged: registry-first with the
+ * builtin fallback and swapped-orientation handling. Composite iteration
+ * calls this directly (its ghosts are primitives) so the branch below can
+ * never recurse. */
+static bool mpe_shape_dispatch_primitive (physics_world *world, rigidbody *a, rigidbody *b, collision_data *out) {
     /* Builtins are once-registered at world init; no per-pair call. */
     int ca = (a -> type == object_custom) ? a -> custom_shape : -1;
     int cb = (b -> type == object_custom) ? b -> custom_shape : -1;
@@ -1300,6 +1490,7 @@ bool mpe_shape_dispatch (physics_world *world, rigidbody *a, rigidbody *b, colli
             return false;
         if (!a3_sanitize_plugin_manifold (out, a, b))
             return false;
+        a3_clear_contact_parts (out);
         return true;
     }
     /* try swapped orientation (registry may hold canonical order only) */
@@ -1326,8 +1517,72 @@ bool mpe_shape_dispatch (physics_world *world, rigidbody *a, rigidbody *b, colli
             vector3 r = out -> contacts [i].ra;
             out -> contacts [i].ra = out -> contacts [i].rb;
             out -> contacts [i].rb = r;
-        } return true;
+        } a3_clear_contact_parts (out);
+        return true;
     } return false;
+} typedef struct {
+    collision_data best;
+    float best_depth;
+    bool found;
+} mpe_best_sink;
+static bool mpe_best_emit (void *ctx, const collision_data *manifold) {
+    mpe_best_sink *s = (mpe_best_sink *) ctx;
+    float depth = -1.0f;
+    for (int i = 0; i < manifold -> contact_count; i++) {
+        if (manifold -> contacts [i].penetration > depth) { depth = manifold -> contacts [i].penetration; }
+    } if ((!s -> found) || (depth > s -> best_depth)) {
+        s -> best = *manifold;
+        s -> best_depth = depth;
+        s -> found = true;
+    } return true;
+} /* Single-manifold entry (direct callers, depenetration). For composites it
+ * returns the part-pair manifold with the deepest contact; the world step
+ * path uses mpe_shape_dispatch_all below because one body pair can emit one
+ * manifold per touching part pair. A NULL world cannot resolve a pool slice,
+ * so a composite direct call without a world has no collision surface. */
+bool mpe_shape_dispatch (physics_world *world, rigidbody *a, rigidbody *b, collision_data *out) {
+    if ((!a) || (!b) || (!out)) { return false; }
+    /* Render-only proxies never collide (semantic backstop for direct
+     * dispatch users; broadphase/floor/CCD skip them earlier for perf). */
+    if (a -> no_collide || b -> no_collide) { return false; }
+    if ((a -> type != object_composite) && (b -> type != object_composite)) {
+        return mpe_shape_dispatch_primitive (world, a, b, out);
+    } if (!world) { return false; }
+    mpe_best_sink sink = {{0}, -1.0f, false};
+    mpe_composite_iterate (world, a, b, mpe_best_emit, &sink);
+    if (!sink.found) { return false; }
+    *out = sink.best;
+    return true;
+} typedef struct {
+    collision_data *out;
+    int max_manifolds;
+    int written;
+    int total;
+} mpe_all_sink;
+static bool mpe_all_emit (void *ctx, const collision_data *manifold) {
+    mpe_all_sink *s = (mpe_all_sink *) ctx;
+    s -> total++;
+    if (s -> written < s -> max_manifolds) { s -> out [s -> written++] = *manifold; }
+    return true;
+} /* Multi-manifold entry for the world pipeline: one collision_data per
+ * colliding part pair, parent identities, part indices stamped per contact.
+ * `dropped_out` (optional) reports part-pair manifolds that did not fit in
+ * `max_manifolds`; the caller counts them, never silently loses them. */
+int mpe_shape_dispatch_all (physics_world *world, rigidbody *a, rigidbody *b,
+                            collision_data *out, int max_manifolds, int *dropped_out) {
+    if (dropped_out) { *dropped_out = 0; }
+    if ((!a) || (!b) || (!out) || (max_manifolds <= 0)) { return 0; }
+    if (a -> no_collide || b -> no_collide) { return 0; }
+    if ((a -> type != object_composite) && (b -> type != object_composite)) {
+        collision_data manifold = {0};
+        if (!mpe_shape_dispatch_primitive (world, a, b, &manifold)) { return 0; }
+        out [0] = manifold;
+        return 1;
+    } if (!world) { return 0; }
+    mpe_all_sink sink = {out, max_manifolds, 0, 0};
+    mpe_composite_iterate (world, a, b, mpe_all_emit, &sink);
+    if (dropped_out && (sink.total > sink.written)) { *dropped_out = sink.total - sink.written; }
+    return sink.written;
 }
 int physics_world_add_sphere (physics_world *world, float radius, float mass, vector3 position) {
     if ((!world) || (!world -> bodies)) { return -1; }
@@ -1623,6 +1878,28 @@ void physics_world_process_pair (physics_world *world, int index_a, int index_b,
      * legacy loops) from paying narrowphase/solver cost for immovable
      * geometry. */
     if (body_a -> static_state && body_b -> static_state) { return; }
+    /* MIG WP2 2.4: a composite body emits one manifold per colliding part
+     * pair. They are appended and prepared individually so each keeps its
+     * own normal (collision_data has exactly one). */
+    if ((body_a -> type == object_composite) || (body_b -> type == object_composite)) {
+        if (body_a->is_sleeping && body_b->is_sleeping) { return; }
+        if ((*manifold_count_ptr) >= world -> manifold_capacity) {
+            if (physics_world_grow_manifolds (world) != 0) {
+                world -> manifold_overflow_count++;
+                return;
+            }
+        }
+        int room = world -> manifold_capacity - *manifold_count_ptr;
+        int dropped = 0;
+        collision_data *slots = &world -> manifolds [*manifold_count_ptr];
+        int written = mpe_shape_dispatch_all (world, body_a, body_b, slots, room, &dropped);
+        for (int i = 0; i < written; i++) {
+            collision_data source = slots [i];
+            physics_world_prepare_detected_pair (world, index_a, index_b, dt, &source, &slots [i]);
+        } *manifold_count_ptr += written;
+        if (dropped > 0) { world -> manifold_overflow_count += dropped; }
+        return;
+    }
     collision_data narrowphase_collision = {0};
     /* Phase-2: registry-first dispatch (foreign shapes plug in here),
          * built-in table fallback preserves exact legacy behaviour. */
@@ -1848,8 +2125,7 @@ void physics_world_step (physics_world *world, float dt) {
             memset (world -> manifold_awake, 0, (size_t) slot_count);
         }
     }
-    mpe_parallel_narrowphase (world, pair_count, slot_count, dt, step_cfg);
-    manifold_count = slot_count;
+    manifold_count = mpe_parallel_narrowphase (world, pair_count, slot_count, dt, step_cfg);
     /* Sleep-wake revisit fixpoint: pairs skipped above as both-asleep get
      * re-processed if either endpoint woke during the main loop (a woken
      * body with no manifold free-falls the whole tick otherwise). Each

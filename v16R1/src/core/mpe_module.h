@@ -12,31 +12,38 @@
  *    (sqrtf/isfinite are IEEE-exact and allowed).
  *  - pair handlers self-unregister in a destructor (see
  *    ecosystem/capsule/mpe_capsule.c); the loader purges leftovers by code address.
- *  - ABI VERSIONING: abi must equal MPE_MODULE_ABI (1). The ABI
- *    transitively includes rigidbody/broadphase_pair/collision_data
- *    layouts, which are passed by pointer and NOT frozen: any engine
- *    change to those structs requires bumping MPE_MODULE_ABI and
- *    rebuilding all plugins. Registry find results are unowned interior
- *    pointers — copy what you keep, never store them across unload.
- *    Unregistering a module/stage detaches it from every live world first.
- *  - ABI STAYS 1 FOR stage_detach (append-only tail field): the field was
- *    added at the END of mpe_module_desc_t, so a .so built against the
- *    older header keeps working — readers MUST null-check stage_detach
- *    before calling (an old .so has no such pointer; the loader further
- *    validates the address via dladdr before invoking). Any future field
- *    reordering, removal, or semantic change to the existing fields
- *    requires bumping MPE_MODULE_ABI.
+ *  - ABI VERSIONING: abi must be in [MPE_MODULE_ABI_MIN, MPE_MODULE_ABI]
+ *    (1..2). The ABI transitively includes rigidbody/broadphase_pair/
+ *    collision_data layouts, which are passed by pointer and NOT frozen:
+ *    any engine change to those structs requires bumping MPE_MODULE_ABI
+ *    and rebuilding all plugins. Registry find results are unowned
+ *    interior pointers — copy what you keep, never store them across
+ *    unload. Unregistering a module/stage detaches it from every live
+ *    world first.
+ *  - MIG WP2 2.4/2.5 bumped the ABI 1 -> 2: contact_point_data and
+ *    cached_contact gained append-only uint8_t part_a/part_b tails. ABI-1
+ *    descriptors still load (small-struct-read rule), and an ABI-1
+ *    plugin cannot see the new fields; its pair handlers are compiled
+ *    against the smaller contact stride, so composite bodies must only be
+ *    handed to plugins rebuilt at ABI 2 (the in-tree capsule plugin is).
+ *  - stage_detach remains an append-only tail field of
+ *    mpe_module_desc_t: readers MUST null-check it before calling (an old
+ *    .so has no such pointer; the loader further validates the address
+ *    via dladdr before invoking). Any future field reordering, removal,
+ *    or semantic change to the existing fields requires bumping
+ *    MPE_MODULE_ABI.
  */
 #include <stdbool.h>
 #include <stdint.h>
 #include "../core/math3d.h"
 #include "../core/rigidbody.h"
 #include "../physics/broadphase.h"
-#define MPE_MODULE_ABI 1
+#define MPE_MODULE_ABI_MIN 1
+#define MPE_MODULE_ABI 2
 struct physics_world;
 typedef struct physics_world mpe_world_t;
 typedef struct {
-    uint32_t abi; /* must equal MPE_MODULE_ABI */
+    uint32_t abi; /* must be in [MPE_MODULE_ABI_MIN, MPE_MODULE_ABI] */
     const char *name; /* e.g. "capsule-shape" */
     const char *version; /* e.g. "1.0" */
     const char *kind; /* "shape" | "broadphase" | "solver" | "forcefield" | "constraint" | "generic" */
@@ -45,8 +52,9 @@ typedef struct {
     void (*detach) (mpe_world_t *world, void *mod_state);
     void (*pre_step) (mpe_world_t *world, float dt, void *mod_state);
     void (*post_step) (mpe_world_t *world, float dt, void *mod_state);
-    /* Optional stage-state destructor (append-only; ABI still 1 — see
-     * note above). Called with the owning world BEFORE the engine drops
+    /* Optional stage-state destructor (append-only tail; added in the
+     * ABI-1 era, carried into ABI 2 — see note above). Called with the
+     * owning world BEFORE the engine drops
      * that module's broadphase_state/solver_state (loader unload +
      * registry stage-unregister paths). NULL = no foreign stage state.
      * Old .so binaries (smaller struct) read as NULL via the loader's

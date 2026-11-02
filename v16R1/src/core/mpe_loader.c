@@ -328,10 +328,10 @@ int mpe_loader_load (const char *path, char *errbuf, int errlen) {
     const mpe_module_desc_t *desc = (const mpe_module_desc_t *) dlsym (h, "mpe_module_desc");
     sym_err = dlerror ();
     if (!sym_err && desc) {
-        if (desc -> abi != MPE_MODULE_ABI || !desc -> name) {
+        if (desc -> abi < MPE_MODULE_ABI_MIN || desc -> abi > MPE_MODULE_ABI || !desc -> name) {
             loader_report (errbuf, errlen, "E_ABI",
-                           "load rejected: '%s' descriptor has ABI %u (engine expects %u) or no name", resolved,
-                           desc->abi, (unsigned) MPE_MODULE_ABI);
+                           "load rejected: '%s' descriptor has ABI %u (engine accepts %u..%u) or no name", resolved,
+                           desc->abi, (unsigned) MPE_MODULE_ABI_MIN, (unsigned) MPE_MODULE_ABI);
             loader_unlock ();
             dlclose (h);
             mpe_registry_truncate_pairs (snap_pairs);

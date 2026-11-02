@@ -51,7 +51,12 @@ int contact_cache_get_misses (const struct physics_world *world) {
     if (!world) { return 0; }
     return world -> contact_cache_misses;
 }
-bool contact_cache_has_pair (struct physics_world *world, uint32_t id_a, uint32_t id_b) {
+/* MIG WP2 2.4/2.5: part-scoped novelty probe. The warm-start cache key is
+ * (id_a, part_a, id_b, part_b); wake-on-first-touch must be novelty of the
+ * PART pair, not merely of the body pair, or a composite that rolls from
+ * one part onto a sleeping neighbour never wakes it. */
+bool contact_cache_has_part_pair (struct physics_world *world, uint32_t id_a, uint8_t part_a, uint32_t id_b,
+                                  uint8_t part_b) {
     /* TRUTH: zero ids mean "unknown", not "seen". Returning true suppressed
      * first-touch wake for id-0 bodies (they never woke sleepers). */
     if (!world || id_a == 0 || id_b == 0) { return false; }
@@ -61,6 +66,35 @@ bool contact_cache_has_pair (struct physics_world *world, uint32_t id_a, uint32_
     /* O(chain) hash walk over the chains rebuilt by contact_cache_save
      * (same entries, same order semantics as the old O(n) scan; boolean
      * result identical). Degrades to linear only if heads are missing. */
+    int32_t *heads = world -> contact_hash_head;
+    if (heads) {
+        uint32_t slot = contact_pair_key (id_a, id_b);
+        for (int32_t s = heads [slot], guard = 0; s >= 0 && s < count && guard <= count;
+             s = cache [s].hash_next, guard++) {
+            uint32_t ca = cache [s].object_id_a;
+            uint32_t cb = cache [s].object_id_b;
+            if (((ca == id_a) && (cb == id_b) && (cache [s].part_a == part_a) && (cache [s].part_b == part_b)) ||
+                ((ca == id_b) && (cb == id_a) && (cache [s].part_a == part_b) && (cache [s].part_b == part_a))) {
+                return true;
+            }
+        } return false;
+    }
+    if (count > world -> world_contact_cache_capacity) { count = world -> world_contact_cache_capacity; }
+    for (int i = 0; i < count; i++) {
+        uint32_t ca = cache [i].object_id_a;
+        uint32_t cb = cache [i].object_id_b;
+        if (((ca == id_a) && (cb == id_b) && (cache [i].part_a == part_a) && (cache [i].part_b == part_b)) ||
+            ((ca == id_b) && (cb == id_a) && (cache [i].part_a == part_b) && (cache [i].part_b == part_a))) {
+            return true;
+        }
+    } return false;
+} /* Body-pair novelty probe: true if ANY part pair of these bodies was seen
+ * (the legacy semantic; kept for external and non-composite callers). */
+bool contact_cache_has_pair (struct physics_world *world, uint32_t id_a, uint32_t id_b) {
+    if (!world || id_a == 0 || id_b == 0) { return false; }
+    cached_contact *cache = world -> world_contact_cache;
+    int count = world -> world_contact_cache_count;
+    if (!cache || count <= 0) { return false; }
     int32_t *heads = world -> contact_hash_head;
     if (heads) {
         uint32_t slot = contact_pair_key (id_a, id_b);
@@ -100,6 +134,10 @@ void contact_cache_save (struct physics_world *world, collision_data *manifolds,
             cached_contact *cc = &cache_array [(*cache_count)++];
             cc -> object_id_a = (manifold -> object_a) ? manifold -> object_a -> object_id : 0;
             cc -> object_id_b = (manifold -> object_b) ? manifold -> object_b -> object_id : 0;
+            /* MIG WP2 2.5: the part identity is part of the cache key, so
+             * two parts of one composite never share warm-start memory. */
+            cc -> part_a = cp -> part_a;
+            cc -> part_b = cp -> part_b;
             /* MPE_TASK_05_CACHE_SAVE_STAMP_BEGIN */
             cc -> property_stamp_a = a3_task05_body_property_stamp (manifold -> object_a);
             cc -> property_stamp_b = a3_task05_body_property_stamp (manifold -> object_b);

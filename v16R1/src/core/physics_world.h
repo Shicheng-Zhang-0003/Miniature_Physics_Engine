@@ -35,6 +35,10 @@ typedef struct {
      * instead of linear-scanning the whole cache per contact (was O(n^2)
      * per tick in contact-heavy scenes). */
     int32_t hash_next;
+    /* MIG WP2 2.4/2.5: part-scoped warm-start identity. Append-only tail
+     * (MPE_MODULE_ABI 1 -> 2). Non-composite contacts carry 0/0. */
+    uint8_t part_a;
+    uint8_t part_b;
 } cached_contact;
 /* MIG WP2 2.1 (charter §4.1): one part in a composite body's per-world
  * contiguous pool slice. Poses are body-local about the body COM (the
@@ -312,6 +316,13 @@ int physics_world_index_by_id (physics_world *world, uint32_t id);
 rigidbody *physics_world_body_by_id (physics_world *world, uint32_t id);
 /* Shape dispatch: registry-first, built-in fallback. Returns true on contact. */
 bool mpe_shape_dispatch (physics_world *world, rigidbody *a, rigidbody *b, collision_data *out);
+/* MIG WP2 2.4: multi-manifold dispatch for the step pipeline. A composite
+ * body emits one manifold per colliding part pair (collision_data carries a
+ * single normal, so unlike normals are never merged). Returns the number
+ * written (<= max_manifolds); `dropped_out` (optional) counts part-pair
+ * manifolds that did not fit. Non-composite pairs write at most one. */
+int mpe_shape_dispatch_all (physics_world *world, rigidbody *a, rigidbody *b,
+                            collision_data *out, int max_manifolds, int *dropped_out);
 /* FIX-AUDIT-DESPOT: per-tick deterministic state hash for lockstep desync
  * detection (CRC32 over body pos/vel/orient/ids in index order; see
  * scene/scene_crc.c). NULL world hashes as 0. */
