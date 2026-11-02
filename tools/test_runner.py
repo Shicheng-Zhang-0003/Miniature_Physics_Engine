@@ -141,7 +141,10 @@ MPE_TEST_REGIMES = ("default", "light", "heavy", "brittle", "sticky")
 # the composite: whole-assembly validation, stored-slice composition under
 # the cap, COM-framed pool slices, effective per-part kg, and the
 # composed-inertia guard through static/kinematic/sanitize/wake).
-MIN_SUITE_ENTRIES = 51
+# -> 52 (2026-11-01, mig_composite_broadphase: WP2 2.3 gate — the authored
+# covering sphere as the scalar bound plus the per-part COM-symmetric AABB
+# hull (body rotation × part-local rotation, inactive-part scalar fallback)).
+MIN_SUITE_ENTRIES = 52
 # DESPOT-2026-10-01: pin per-suite floors so deleting a legacy/paranoia target
 # + its make target together cannot shrink the headline silently (the 220->204
 # drift). Canonical floor above; legacy 30 + paranoia 14 pinned here.

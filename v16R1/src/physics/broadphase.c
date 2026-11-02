@@ -146,6 +146,12 @@ float broadphase_bounding_radius (rigidbody *rb) {
         out = rb -> radius;
     } else if (rb -> type == object_cylinder) { /* MPE_FTC_091 */
         if (isfinite (rb -> radius) && isfinite (rb -> cylinder_half_length)) { out = sqrtf (rb -> radius * rb -> radius + rb -> cylinder_half_length * rb -> cylinder_half_length); }
+    } else if (rb -> type == object_composite) {
+        /* MIG WP2 2.3: the authored bound max_i(|com - p_i| + B_i) is the
+         * exact covering sphere of every part (rotation-invariant), so the
+         * scalar broadphase radius IS the body radius — not the sqrt(3)
+         * inflation the cube fallback would apply to half_extensions. */
+        out = (isfinite (rb -> radius) && rb -> radius > 0.0f) ? rb -> radius : 0.5f;
     } else if (rb -> type == object_custom) {
         /* Foreign shape: radius, but never smaller than the box the plugin
          * may actually occupy (old code ignored half_extensions and tunneled
@@ -166,6 +172,69 @@ float broadphase_bounding_radius (rigidbody *rb) {
     if (!isfinite (out) || out <= 0.0f) { out = 0.5f; } else if (out > 500.0f) {
         out = 500.0f;
     } return out;
+}
+/* MIG WP2 2.3: composite AABB half-extents about the body COM. The hash
+ * inserts ONE world-axis-aligned box per body, so the per-part union is
+ * expressed as a symmetric hull about the COM: for each world axis,
+ * max_i(|(R_body d_i)_axis| + extent_i_axis). A min/max union is not
+ * representable by the insertion path (it always re-centres on
+ * rb->position). Part extent uses the part's own primitive: sphere
+ * (r,r,r), cube half_extensions, cylinder (half_length, radius, radius)
+ * with the axle on part-local X (the MPE_FTC_090 convention the pool
+ * staging records). R_world = R_body * R_part; cached_axes hold R_body's
+ * WORLD columns. Returns false when the slice has no usable part; the
+ * caller then keeps the scalar-bound fallback. */
+static bool broadphase_composite_extent (const physics_world *world, const rigidbody *rb, float *extent_x,
+                                         float *extent_y, float *extent_z) {
+    if ((!world) || (!rb) || (!extent_x) || (!extent_y) || (!extent_z)) { return false; }
+    if ((!world -> composite_parts) || (rb -> part_base < 0) || (rb -> composite_part_count <= 0)) { return false; }
+    const vector3 *axes = rb -> cached_axes;
+    float hull_x = 0.0f, hull_y = 0.0f, hull_z = 0.0f;
+    bool any = false;
+    for (int i = 0; i < rb -> composite_part_count; i++) {
+        const int slot = rb -> part_base + i;
+        if ((slot < 0) || (slot >= world -> composite_part_count)) { continue; }
+        const composite_part *part = &world -> composite_parts [slot];
+        if (!part -> active) { continue; }
+        vector3 half;
+        if (part -> type == object_sphere) {
+            half = (vector3) {part -> radius, part -> radius, part -> radius};
+        } else if (part -> type == object_cylinder) {
+            half = (vector3) {part -> cylinder_half_length, part -> radius, part -> radius};
+        } else {
+            half = part -> half_extensions;
+        }
+        if ((!isfinite (half.x)) || (!isfinite (half.y)) || (!isfinite (half.z)) || (half.x < 0.0f) ||
+            (half.y < 0.0f) || (half.z < 0.0f)) {
+            continue;
+        }
+        const math3 rp = vector4_to_math3 (part -> local_orientation);
+        vector3 col [3];
+        for (int c = 0; c < 3; c++) {
+            col [c] = (vector3) {
+                axes [0].x * rp.matrix [0][c] + axes [1].x * rp.matrix [1][c] + axes [2].x * rp.matrix [2][c],
+                axes [0].y * rp.matrix [0][c] + axes [1].y * rp.matrix [1][c] + axes [2].y * rp.matrix [2][c],
+                axes [0].z * rp.matrix [0][c] + axes [1].z * rp.matrix [1][c] + axes [2].z * rp.matrix [2][c]};
+        }
+        const vector3 d = part -> local_position;
+        const vector3 off = (vector3) {
+            axes [0].x * d.x + axes [1].x * d.y + axes [2].x * d.z,
+            axes [0].y * d.x + axes [1].y * d.y + axes [2].y * d.z,
+            axes [0].z * d.x + axes [1].z * d.y + axes [2].z * d.z};
+        const float ex = fabsf (off.x) + fabsf (col [0].x) * half.x + fabsf (col [1].x) * half.y + fabsf (col [2].x) * half.z;
+        const float ey = fabsf (off.y) + fabsf (col [0].y) * half.x + fabsf (col [1].y) * half.y + fabsf (col [2].y) * half.z;
+        const float ez = fabsf (off.z) + fabsf (col [0].z) * half.x + fabsf (col [1].z) * half.y + fabsf (col [2].z) * half.z;
+        if ((!isfinite (ex)) || (!isfinite (ey)) || (!isfinite (ez))) { continue; }
+        if (ex > hull_x) { hull_x = ex; }
+        if (ey > hull_y) { hull_y = ey; }
+        if (ez > hull_z) { hull_z = ez; }
+        any = true;
+    }
+    if (!any) { return false; }
+    *extent_x = hull_x;
+    *extent_y = hull_y;
+    *extent_z = hull_z;
+    return true;
 } static inline uint64_t a3_broadphase_pair_key (int object_a, int object_b) {
     return ((uint64_t) (uint32_t) object_a << 32) | (uint64_t) (uint32_t) object_b;
 } static inline uint32_t a3_broadphase_pair_hash (uint64_t key) {
@@ -306,6 +375,15 @@ int broadphase_generate_pairing (struct physics_world *world, broadphase_pair *c
         if (rb -> type == object_sphere) { extent_x = extent_y = extent_z = rb -> radius; } else if (rb -> type == object_cylinder || rb -> type == object_custom) {
             float r = broadphase_bounding_radius (rb);
             extent_x = extent_y = extent_z = r;
+        } else if (rb -> type == object_composite &&
+                   broadphase_composite_extent (world, rb, &extent_x, &extent_y, &extent_z)) {
+            /* MIG WP2 2.3: per-part AABB hull about the COM. The hash can
+             * only insert a symmetric box, so the helper already returns
+             * max_i(|R_body d_i| + part extent), not a min/max union.
+             * Inactive/absent parts fall through to the cube branch below
+             * (the composed geometry keeps half_extensions = authored
+             * radius), so the fallback stays conservative, never a
+             * zero-size false negative. */
         } else {
             vector3 *axes = rb -> cached_axes;
             extent_x = fabsf (axes [0].x) * rb -> half_extensions.x + fabsf (axes [1].x) * rb -> half_extensions.y +

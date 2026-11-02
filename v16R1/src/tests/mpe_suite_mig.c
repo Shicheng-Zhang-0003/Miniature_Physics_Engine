@@ -35,6 +35,7 @@
 #include <string.h>
 #include "mpe_test.h"
 #include "physics/spring_joint.h"
+#include "physics/broadphase.h"
 #include "core/rigidbody.h"
 #include "core/mig_mass.h"
 
@@ -975,6 +976,181 @@ int mpe_t_mig_composite_world (void) {
     if (t.failures == 0) {
         printf ("[PASS] mig WP2.2: world API composes one composite body with a COM-framed pool slice, cap over stored truth, authored-tensor guard\n");
         MPE_INFO ("dumbbell mass 4/Ixx 0.1/Iyy 1.1/bound 0.75, density cube 2 kg/I 1-3/bound 0.866, 20->16 stored mass 16 (1 clamp), cap 4->4, bad tail rejected, static/kinematic/sanitize keep tensor");
+    }
+    mpe_test_end (&t);
+    return t.failures;
+}
+
+/* WP2 2.3 gate (plan §4): broadphase part dispatch. The oracle is the
+ * charter §4.2/§4.3 bound contract written out by hand:
+ *  - the scalar broadphase radius of a composite is the AUTHORED covering
+ *    sphere max_i(|com - p_i| + B_i), NOT the sqrt(3) cube inflation of
+ *    the mirrored half_extensions, and it is rotation-invariant;
+ *  - the hash AABB is the per-part symmetric hull about the COM,
+ *    max_i(|R_body d_i| + rotated part extent), using each part's own
+ *    primitive extents and part-local orientation;
+ *  - a slice with no usable part (all inactive) falls back to the
+ *    conservative scalar box, never to a zero-size false negative.
+ * The grid is pinned to 0.5 m. The cell-count oracle
+ * (world->broadphase->node_count) is exact and hand-derived from the AABB
+ * extents: each body inserts one node per occupied cell, so the sum
+ * counts the hull directly. Pair counts alone are NOT used for the
+ * negative direction: the hash bucket is coarser than the cell, so two
+ * bodies in distinct cells can still share a bucket, and the sphere cull
+ * (which must stay conservative) then admits them as legitimate
+ * candidates. Cell occupancy has no such ambiguity. */
+int mpe_t_mig_composite_broadphase (void) {
+    mpe_test_t t;
+    mpe_test_begin (&t, "mig_composite_broadphase");
+    mpe_clamp_counters_reset ();
+    mpe_config_t bcfg = g_cfg;
+    bcfg.broadphase.cell_size_default = 0.5f;
+    bcfg.broadphase.cell_size_min = 0.5f;
+    bcfg.broadphase.cell_size_max = 0.5f;
+    broadphase_pair pairs [16];
+    const float dt = 1.0f / 60.0f;
+    const vector3 anchor_position = (vector3) {10.0f, 10.0f, 10.0f};
+    const mig_part dumbbell [2] = {
+        { mig_part_sphere, 0.25f, 0.0f, {0.0f, 0.0f, 0.0f}, {-0.5f, 0.0f, 0.0f},
+          {1.0f, 0.0f, 0.0f, 0.0f}, mig_mass_mode_explicit, 2.0f },
+        { mig_part_sphere, 0.25f, 0.0f, {0.0f, 0.0f, 0.0f}, {0.5f, 0.0f, 0.0f},
+          {1.0f, 0.0f, 0.0f, 0.0f}, mig_mass_mode_explicit, 2.0f }
+    };
+    /* --- authored scalar bound + AABB cell count, identity then 45 deg Z ---
+     * Dumbbell hull: |+/-0.5| + 0.25 = 0.75 on X, 0.25 on Y/Z.
+     * Identity cells: 4 x 2 x 2 = 16. At 45 deg Z the parts land at
+     * +/-0.353553, so the hull is (0.603553, 0.603553, 0.25) and the
+     * cells are 4 x 4 x 2 = 32. The anchor sphere r=0.1 at (10,10,10)
+     * inserts 2 x 2 x 2 = 8 cells. Deactivating both parts leaves no
+     * usable extent: the fallback scalar box (half 0.75) is 4 x 4 x 4 =
+     * 64 cells, i.e. the conservative authored bound, never zero. */
+    physics_world wn;
+    mpe_world_begin (&wn);
+    physics_world_set_config (&wn, &bcfg);
+    const int nb = physics_world_add_composite (&wn, dumbbell, 2);
+    const int na = physics_world_add_sphere (&wn, 0.1f, 1.0f, anchor_position);
+    MPE_CHECK (&t, nb == 0 && na == 1);
+    if (nb == 0 && na == 1) {
+        MPE_CHECK_NEAR (&t, broadphase_bounding_radius (&wn.bodies [nb]), 0.75f, 1e-6f,
+                        "authored covering sphere, not sqrt(3) inflation");
+        MPE_CHECK (&t, wn.bodies [nb].half_extensions.x == 0.75f);
+        MPE_CHECK (&t, broadphase_generate_pairing (&wn, pairs, 16, dt) >= 0);
+        MPE_CHECK (&t, wn.broadphase -> node_count == 24);
+        MPE_CHECK_NEAR (&t, wn.broadphase -> current_cell_size, 0.5f, 0.0f, "pinned cell size");
+        wn.bodies [nb].orientation = (vector4) {0.9238795325f, 0.0f, 0.0f, 0.3826834324f};
+        rigidbody_update_axes (&wn.bodies [nb]);
+        MPE_CHECK_NEAR (&t, broadphase_bounding_radius (&wn.bodies [nb]), 0.75f, 1e-6f,
+                        "authored bound invariant under rotation");
+        MPE_CHECK (&t, broadphase_generate_pairing (&wn, pairs, 16, dt) >= 0);
+        MPE_CHECK (&t, wn.broadphase -> node_count == 40);
+        wn.bodies [nb].orientation = (vector4) {1.0f, 0.0f, 0.0f, 0.0f};
+        rigidbody_update_axes (&wn.bodies [nb]);
+        wn.composite_parts [0].active = 0;
+        wn.composite_parts [1].active = 0;
+        MPE_CHECK (&t, broadphase_generate_pairing (&wn, pairs, 16, dt) >= 0);
+        MPE_CHECK (&t, wn.broadphase -> node_count == 72);
+    }
+    physics_world_cleanup (&wn);
+    /* --- pair emission at the pinned grid ---
+     * Two identity dumbbells 1.4 m apart: their x hulls overlap cell 1
+     * (A -2..1, B 1..4), so exactly one pair is emitted. */
+    physics_world wp;
+    mpe_world_begin (&wp);
+    physics_world_set_config (&wp, &bcfg);
+    mig_part dumbbell_b [2] = { dumbbell [0], dumbbell [1] };
+    dumbbell_b [0].position.x += 1.4f;
+    dumbbell_b [1].position.x += 1.4f;
+    const int pb0 = physics_world_add_composite (&wp, dumbbell, 2);
+    const int pb1 = physics_world_add_composite (&wp, dumbbell_b, 2);
+    MPE_CHECK (&t, pb0 == 0 && pb1 == 1);
+    if (pb0 == 0 && pb1 == 1) {
+        const int n = broadphase_generate_pairing (&wp, pairs, 16, dt);
+        MPE_CHECK (&t, n == 1 && pairs [0].object_index_a == 0 && pairs [0].object_index_b == 1);
+    }
+    physics_world_cleanup (&wp);
+    /* --- off-centre cube part: part-local orientation is honoured ---
+     * Cube half (0.55, 0.27, 0.13) at +0.3 X and a 0.1 sphere at the
+     * origin, equal masses -> COM +0.15. Rotated 90 deg about its own Z,
+     * the cube lands (0.27, 0.55, 0.13), so the COM-framed hull is
+     * (0.42, 0.55, 0.13) at body x 0.15: cells 3 x 4 x 2 = 24, plus the
+     * 8 anchor cells = 32. With the part orientation cleared the same
+     * pool record reads (0.55, 0.27, 0.13): hull (0.70, 0.27, 0.13) ->
+     * 4 x 2 x 2 = 16, +8 = 24. Deactivating both parts falls back to the
+     * authored 0.776339 box: 4 x 4 x 4 = 64, +8 = 72. */
+    physics_world wc;
+    mpe_world_begin (&wc);
+    physics_world_set_config (&wc, &bcfg);
+    const mig_part cube_parts [2] = {
+        { mig_part_cube, 0.0f, 0.0f, {0.55f, 0.27f, 0.13f}, {0.3f, 0.0f, 0.0f},
+          {0.7071067812f, 0.0f, 0.0f, 0.7071067812f}, mig_mass_mode_explicit, 1.0f },
+        { mig_part_sphere, 0.1f, 0.0f, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f},
+          {1.0f, 0.0f, 0.0f, 0.0f}, mig_mass_mode_explicit, 1.0f }
+    };
+    const int cc = physics_world_add_composite (&wc, cube_parts, 2);
+    const int ca = physics_world_add_sphere (&wc, 0.1f, 1.0f, anchor_position);
+    MPE_CHECK (&t, cc == 0 && ca == 1);
+    if (cc == 0 && ca == 1) {
+        const float expected = 0.15f + sqrtf (0.55f * 0.55f + 0.27f * 0.27f + 0.13f * 0.13f);
+        MPE_CHECK_NEAR (&t, broadphase_bounding_radius (&wc.bodies [cc]), expected, 1e-6f,
+                        "cube-part authored bound");
+        MPE_CHECK (&t, broadphase_generate_pairing (&wc, pairs, 16, dt) >= 0);
+        MPE_CHECK (&t, wc.broadphase -> node_count == 32);
+        wc.composite_parts [0].local_orientation = (vector4) {1.0f, 0.0f, 0.0f, 0.0f};
+        MPE_CHECK (&t, broadphase_generate_pairing (&wc, pairs, 16, dt) >= 0);
+        MPE_CHECK (&t, wc.broadphase -> node_count == 24);
+        wc.composite_parts [0].active = 0;
+        wc.composite_parts [1].active = 0;
+        MPE_CHECK (&t, broadphase_generate_pairing (&wc, pairs, 16, dt) >= 0);
+        MPE_CHECK (&t, wc.broadphase -> node_count == 72);
+    }
+    physics_world_cleanup (&wc);
+    /* --- cylinder: axle on part-local X, rotated 90 deg about Y ---
+     * Correct hull: (0.1, 0.1, 0.52). A 0.06 sphere at z = 0.58 shares
+     * the z = 1 cell band with the body (whose z reaches 0.52) and sits
+     * inside the authored 0.529528 cull sphere; exactly one pair.
+     * Reading the part as (radius, radius, half_length) would leave
+     * z = 0.1 and lose the shared cell. The 0.52/0.58 values keep every
+     * cell boundary off an integer so float rotation epsilon cannot
+     * decide the count. */
+    physics_world wcyl;
+    mpe_world_begin (&wcyl);
+    physics_world_set_config (&wcyl, &bcfg);
+    const mig_part cylinder_part [1] = {
+        { mig_part_cylinder, 0.1f, 0.52f, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f},
+          {0.7071067812f, 0.0f, 0.7071067812f, 0.0f}, mig_mass_mode_explicit, 1.0f }
+    };
+    const int yc = physics_world_add_composite (&wcyl, cylinder_part, 1);
+    const int ys = physics_world_add_sphere (&wcyl, 0.06f, 1.0f, (vector3) {0.0f, 0.0f, 0.58f});
+    MPE_CHECK (&t, yc == 0 && ys == 1);
+    if (yc == 0 && ys == 1) {
+        MPE_CHECK_NEAR (&t, broadphase_bounding_radius (&wcyl.bodies [yc]), sqrtf (0.2804f), 1e-6f,
+                        "cylinder-part authored bound");
+        const int n = broadphase_generate_pairing (&wcyl, pairs, 16, dt);
+        MPE_CHECK (&t, n == 1);
+    }
+    physics_world_cleanup (&wcyl);
+    /* --- inactive slice: conservative fallback pairs, never vanishes ---
+     * Both dumbbell parts inactive: the AABB path falls back to the
+     * authored 0.75 scalar box, so the sphere at y = 0.6 (inside that
+     * box, outside the real parts) still pairs. A zero-size fallback
+     * would insert only the origin cell and emit nothing. */
+    physics_world wfall;
+    mpe_world_begin (&wfall);
+    physics_world_set_config (&wfall, &bcfg);
+    const int fb = physics_world_add_composite (&wfall, dumbbell, 2);
+    const int fs = physics_world_add_sphere (&wfall, 0.1f, 1.0f, (vector3) {0.0f, 0.6f, 0.0f});
+    MPE_CHECK (&t, fb == 0 && fs == 1);
+    if (fb == 0 && fs == 1) {
+        wfall.composite_parts [0].active = 0;
+        wfall.composite_parts [1].active = 0;
+        const int n = broadphase_generate_pairing (&wfall, pairs, 16, dt);
+        MPE_CHECK (&t, n == 1 && pairs [0].object_index_a == 0 && pairs [0].object_index_b == 1);
+    }
+    physics_world_cleanup (&wfall);
+    MPE_CHECK (&t, mpe_clamp_composite_total () == 0ul && mpe_clamp_mass_total () == 0ul);
+    if (t.failures == 0) {
+        printf ("[PASS] mig WP2.3: composite broadphase uses the authored covering sphere and the per-part COM-symmetric AABB hull\n");
+        MPE_INFO ("bound 0.75 (not 1.299), dumbbell cells 16 -> 45Z 32 -> inactive scalar box 64 (+8 anchor), part-rotated cube cells 24 -> identity 16 -> inactive 64, pair at dx 1.4 = 1, cylinder axle 90Y pairs at z 0.58, inactive+sphere = 1");
     }
     mpe_test_end (&t);
     return t.failures;

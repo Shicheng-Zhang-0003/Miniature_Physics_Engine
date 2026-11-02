@@ -112,6 +112,7 @@ int mpe_t_mig_pendulum_physical (void);
 int mpe_t_mig_composite_stub (void);
 int mpe_t_mig_composite_pool (void);
 int mpe_t_mig_composite_world (void);
+int mpe_t_mig_composite_broadphase (void);
 typedef struct {
     const char *name;
     int (*fn) (void);
@@ -220,6 +221,11 @@ static const mpe_entry_t mpe_registry [] = {
      * pool slices, effective per-part kg, and the composed-inertia guard
      * through static/kinematic/sanitize/wake. */
     {"mig_composite_world", mpe_t_mig_composite_world, 0},
+    /* WP2 2.3 gate (plan §4): broadphase part dispatch — the authored
+     * covering sphere as the scalar bound, and the per-part COM-symmetric
+     * AABB hull through the world pool (body rotation + part-local
+     * rotation, inactive-part scalar fallback). */
+    {"mig_composite_broadphase", mpe_t_mig_composite_broadphase, 0},
 };
 #define MPE_NTESTS ((int) (sizeof (mpe_registry) / sizeof (mpe_registry [0])))
 /* Returns 0 pass, 1 fail, 2 skipped.
