@@ -72,7 +72,7 @@ endif
 # failed with "no fleet attached". Append-only fields do NOT save you here:
 # the struct SIZE still changes. See readme.md build-invariants.
 CFLAGS = -I$(MPE_SRC) -I$(MFS) -O3 -Wall -Wextra -ffp-contract=off $(MPE_FPIC) -fno-inline -fno-lto -fno-inline-functions-called-once -fvisibility=default \
-         -DMPE_MODULE_ABI=1 -DMPE_ECOSYSTEM_ABI=1 -DMPE_GTK4=1 -MMD -MP
+         -DMPE_MODULE_ABI=2 -DMPE_ECOSYSTEM_ABI=1 -DMPE_GTK4=1 -MMD -MP
 
 include mfs_sources.mk
 

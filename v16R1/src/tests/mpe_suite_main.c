@@ -113,6 +113,7 @@ int mpe_t_mig_composite_stub (void);
 int mpe_t_mig_composite_pool (void);
 int mpe_t_mig_composite_world (void);
 int mpe_t_mig_composite_broadphase (void);
+int mpe_t_mig_composite_narrowphase (void);
 typedef struct {
     const char *name;
     int (*fn) (void);
@@ -226,6 +227,12 @@ static const mpe_entry_t mpe_registry [] = {
      * AABB hull through the world pool (body rotation + part-local
      * rotation, inactive-part scalar fallback). */
     {"mig_composite_broadphase", mpe_t_mig_composite_broadphase, 0},
+    /* WP2 2.4/2.5 gate (plan §4): part-pair ghost-view narrowphase —
+     * one manifold per colliding part pair over the per-world pool, parent
+     * identities with per-contact part stamps, part-local pose through the
+     * AABB prefilter and primitive path, part-scoped warm-start keys, and
+     * the plugin ABI bump (2, accepting 1). */
+    {"mig_composite_narrowphase", mpe_t_mig_composite_narrowphase, 0},
 };
 #define MPE_NTESTS ((int) (sizeof (mpe_registry) / sizeof (mpe_registry [0])))
 /* Returns 0 pass, 1 fail, 2 skipped.

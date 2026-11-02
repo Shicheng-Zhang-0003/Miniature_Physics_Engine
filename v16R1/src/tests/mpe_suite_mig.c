@@ -38,6 +38,7 @@
 #include "physics/broadphase.h"
 #include "core/rigidbody.h"
 #include "core/mig_mass.h"
+#include "core/mpe_registry.h"
 
 /* Probe-7 fixture checker: the untouched totals must read 0xAB in every
  * byte (mig_totals has no padding bytes; assert-in-code that this stays
@@ -1151,6 +1152,349 @@ int mpe_t_mig_composite_broadphase (void) {
     if (t.failures == 0) {
         printf ("[PASS] mig WP2.3: composite broadphase uses the authored covering sphere and the per-part COM-symmetric AABB hull\n");
         MPE_INFO ("bound 0.75 (not 1.299), dumbbell cells 16 -> 45Z 32 -> inactive scalar box 64 (+8 anchor), part-rotated cube cells 24 -> identity 16 -> inactive 64, pair at dx 1.4 = 1, cylinder axle 90Y pairs at z 0.58, inactive+sphere = 1");
+    }
+    mpe_test_end (&t);
+    return t.failures;
+}
+
+/* WP2 2.4/2.5 gate (plan §4): ghost-view narrowphase + contact identity.
+ * Oracles are hand geometry, not calls into the implementation:
+ *  - a dumbbell's two spheres each generate their OWN manifold over a flat
+ *    cube (two part pairs -> two manifolds, one normal each), contacts
+ *    stamped with the per-body part index, parent bodies byte-identical
+ *    after detection (ghosts are scratch, not aliases);
+ *  - a part-local 90 deg cube rotation moves the collision face from
+ *    y=0.27 to y=0.55, so a probe at y=0.56 collides only when the ghost
+ *    carries the part orientation through BOTH the AABB prefilter and the
+ *    narrowphase; with the orientation cleared the same probe is empty;
+ *  - composite-vs-composite part-pair iteration finds exactly the one pair
+ *    whose centres coincide (1,1), proving the cross product is over parts,
+ *    not bodies;
+ *  - warm-start identity is (id_a, part_a, id_b, part_b): two cache
+ *    entries that differ ONLY in part fields restore disjoint impulses,
+ *    an unknown part misses, and the reversed-body role matches with the
+ *    part fields swapped (the TASK_05 both-side discipline);
+ *  - a stepped dumbbell over a static slab saves one cache entry per
+ *    touching part with distinct part indices and distinct local points;
+ *  - MPE_MODULE_ABI is 2 with MIN 1, an ABI-1 descriptor still attaches,
+ *    and the next ABI is refused.
+ */
+int mpe_t_mig_composite_narrowphase (void) {
+    mpe_test_t t;
+    mpe_test_begin (&t, "mig_composite_narrowphase");
+    mpe_clamp_counters_reset ();
+    collision_data manifolds [8];
+    const float dt = 1.0f / 60.0f;
+    /* --- 1. one manifold per colliding part pair ----------------------- */
+    physics_world wpart;
+    mpe_world_begin (&wpart);
+    const mig_part low_dumbbell [2] = {
+        { mig_part_sphere, 0.25f, 0.0f, {0.0f, 0.0f, 0.0f}, {-0.5f, 0.24f, 0.0f},
+          {1.0f, 0.0f, 0.0f, 0.0f}, mig_mass_mode_explicit, 2.0f },
+        { mig_part_sphere, 0.25f, 0.0f, {0.0f, 0.0f, 0.0f}, {0.5f, 0.24f, 0.0f},
+          {1.0f, 0.0f, 0.0f, 0.0f}, mig_mass_mode_explicit, 2.0f }
+    };
+    const int cb = physics_world_add_composite (&wpart, low_dumbbell, 2);
+    const int ck = physics_world_add_cube (&wpart, (vector3) {0.0f, -0.25f, 0.0f},
+                                           (vector3) {2.0f, 0.25f, 2.0f}, 0.0f);
+    MPE_CHECK (&t, cb == 0 && ck == 1);
+    if (cb == 0 && ck == 1) {
+        const int base = wpart.bodies [cb].part_base;
+        rigidbody parent_before = wpart.bodies [cb];
+        composite_part parts_before [2];
+        memcpy (parts_before, &wpart.composite_parts [base], sizeof (parts_before));
+        int dropped = -1;
+        int n = mpe_shape_dispatch_all (&wpart, &wpart.bodies [cb], &wpart.bodies [ck], manifolds, 8, &dropped);
+        MPE_CHECK (&t, n == 2 && dropped == 0);
+        MPE_CHECK (&t, memcmp (&parent_before, &wpart.bodies [cb], sizeof (parent_before)) == 0);
+        MPE_CHECK (&t, memcmp (parts_before, &wpart.composite_parts [base], sizeof (parts_before)) == 0);
+        if (n == 2) {
+            MPE_CHECK (&t, manifolds [0].object_a == &wpart.bodies [cb] &&
+                              manifolds [0].object_b == &wpart.bodies [ck]);
+            MPE_CHECK (&t, manifolds [1].object_a == &wpart.bodies [cb] &&
+                              manifolds [1].object_b == &wpart.bodies [ck]);
+            MPE_CHECK (&t, manifolds [0].contact_count == 1 && manifolds [1].contact_count == 1);
+            if (manifolds [0].contact_count == 1 && manifolds [1].contact_count == 1) {
+                MPE_CHECK (&t, manifolds [0].contacts [0].part_a == 0 && manifolds [0].contacts [0].part_b == 0);
+                MPE_CHECK (&t, manifolds [1].contacts [0].part_a == 1 && manifolds [1].contacts [0].part_b == 0);
+                MPE_CHECK_NEAR (&t, manifolds [0].contacts [0].position.x, -0.5f, 1e-5f,
+                                "part 0 contact sits under sphere 0");
+                MPE_CHECK_NEAR (&t, manifolds [1].contacts [0].position.x, 0.5f, 1e-5f,
+                                "part 1 contact sits under sphere 1");
+                MPE_CHECK_NEAR (&t, manifolds [0].contacts [0].penetration, 0.01f, 1e-5f, "part 0 depth");
+                MPE_CHECK_NEAR (&t, manifolds [1].contacts [0].penetration, 0.01f, 1e-5f, "part 1 depth");
+            }
+        }
+        /* A bounded sink reports the overflow, never silently drops it. */
+        int capped_dropped = 0;
+        MPE_CHECK (&t, mpe_shape_dispatch_all (&wpart, &wpart.bodies [cb], &wpart.bodies [ck],
+                                               manifolds, 1, &capped_dropped) == 1);
+        MPE_CHECK (&t, capped_dropped == 1);
+        /* Single-manifold entry stays valid for direct callers (deepest;
+         * the equal-depth tie keeps definition order). */
+        collision_data single = {0};
+        MPE_CHECK (&t, mpe_shape_dispatch (&wpart, &wpart.bodies [cb], &wpart.bodies [ck], &single));
+        MPE_CHECK (&t, single.contact_count == 1 && single.contacts [0].part_a == 0 &&
+                          single.object_a == &wpart.bodies [cb] && single.object_b == &wpart.bodies [ck]);
+        /* Inactive parts vanish from the collision surface, one at a time. */
+        wpart.composite_parts [base].active = 0;
+        n = mpe_shape_dispatch_all (&wpart, &wpart.bodies [cb], &wpart.bodies [ck], manifolds, 8, &dropped);
+        MPE_CHECK (&t, n == 1 && manifolds [0].contacts [0].part_a == 1);
+        wpart.composite_parts [base + 1].active = 0;
+        MPE_CHECK (&t, mpe_shape_dispatch_all (&wpart, &wpart.bodies [cb], &wpart.bodies [ck],
+                                               manifolds, 8, &dropped) == 0);
+        wpart.composite_parts [base].active = 1;
+        wpart.composite_parts [base + 1].active = 1;
+    }
+    physics_world_cleanup (&wpart);
+    /* --- 2. part-local orientation through AABB + narrowphase ---------- */
+    physics_world worient;
+    mpe_world_begin (&worient);
+    const mig_part cube_mix [2] = {
+        { mig_part_cube, 0.0f, 0.0f, {0.55f, 0.27f, 0.13f}, {0.3f, 0.0f, 0.0f},
+          {0.7071067812f, 0.0f, 0.0f, 0.7071067812f}, mig_mass_mode_explicit, 1.0f },
+        { mig_part_sphere, 0.1f, 0.0f, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f},
+          {1.0f, 0.0f, 0.0f, 0.0f}, mig_mass_mode_explicit, 1.0f }
+    };
+    const int cq = physics_world_add_composite (&worient, cube_mix, 2);
+    const int ps = physics_world_add_sphere (&worient, 0.06f, 0.5f, (vector3) {0.15f, 0.56f, 0.0f});
+    MPE_CHECK (&t, cq == 0 && ps == 1);
+    if (cq == 0 && ps == 1) {
+        const int base = worient.bodies [cq].part_base;
+        int dropped = -1;
+        /* Cube part world centre is x=0.30 (COM 0.15 + local 0.15); after
+         * 90 deg Z its local X half 0.55 is the world Y half, so the top
+         * face is y=0.55 and a 0.06 sphere at y=0.56 penetrates 0.05. */
+        int n = mpe_shape_dispatch_all (&worient, &worient.bodies [cq], &worient.bodies [ps],
+                                        manifolds, 8, &dropped);
+        MPE_CHECK (&t, n == 1 && dropped == 0);
+        if (n == 1 && manifolds [0].contact_count == 1) {
+            MPE_CHECK (&t, manifolds [0].contacts [0].part_a == 0 && manifolds [0].contacts [0].part_b == 0);
+            MPE_CHECK_NEAR (&t, manifolds [0].normal_vector.y, 1.0f, 1e-5f, "cube(A)->probe(B) normal");
+            MPE_CHECK_NEAR (&t, manifolds [0].contacts [0].position.y, 0.55f, 1e-5f, "rotated face is the contact");
+            MPE_CHECK_NEAR (&t, manifolds [0].contacts [0].position.x, 0.15f, 1e-5f, "contact stays in the face");
+            MPE_CHECK_NEAR (&t, manifolds [0].contacts [0].penetration, 0.05f, 1e-5f, "0.56 - 0.55 gap");
+        }
+        /* Clearing ONLY the part-local rotation drops the face to y=0.27:
+         * the same probe is outside both the AABB and the primitive, so
+         * the orientation really is part-local rather than body-level. */
+        worient.composite_parts [base].local_orientation = (vector4) {1.0f, 0.0f, 0.0f, 0.0f};
+        MPE_CHECK (&t, mpe_shape_dispatch_all (&worient, &worient.bodies [cq], &worient.bodies [ps],
+                                               manifolds, 8, &dropped) == 0);
+        worient.composite_parts [base].local_orientation =
+            (vector4) {0.7071067812f, 0.0f, 0.0f, 0.7071067812f};
+        /* Far probe: no part pair may be invented. */
+        worient.bodies [ps].position = (vector3) {0.15f, 0.9f, 0.0f};
+        MPE_CHECK (&t, mpe_shape_dispatch_all (&worient, &worient.bodies [cq], &worient.bodies [ps],
+                                               manifolds, 8, &dropped) == 0);
+    }
+    physics_world_cleanup (&worient);
+    /* --- 3. composite vs composite: exactly part pair (1,1) ------------ */
+    physics_world wcc;
+    mpe_world_begin (&wcc);
+    const mig_part cc_a [2] = {
+        { mig_part_sphere, 0.25f, 0.0f, {0.0f, 0.0f, 0.0f}, {-0.5f, 0.0f, 0.0f},
+          {1.0f, 0.0f, 0.0f, 0.0f}, mig_mass_mode_explicit, 2.0f },
+        { mig_part_sphere, 0.25f, 0.0f, {0.0f, 0.0f, 0.0f}, {0.5f, 0.0f, 0.0f},
+          {1.0f, 0.0f, 0.0f, 0.0f}, mig_mass_mode_explicit, 2.0f }
+    };
+    /* B's part 0 is parked at x=2.5 and its part 1 at x=0.5; the COM is
+     * x=1.5, so only A's +0.5 sphere meets B's part 1 exactly. A/A and
+     * B/B are 1.0 and 2.0 apart (sum of radii 0.5): no other pair. */
+    const mig_part cc_b [2] = {
+        { mig_part_sphere, 0.25f, 0.0f, {0.0f, 0.0f, 0.0f}, {2.5f, 0.0f, 0.0f},
+          {1.0f, 0.0f, 0.0f, 0.0f}, mig_mass_mode_explicit, 2.0f },
+        { mig_part_sphere, 0.25f, 0.0f, {0.0f, 0.0f, 0.0f}, {0.5f, 0.0f, 0.0f},
+          {1.0f, 0.0f, 0.0f, 0.0f}, mig_mass_mode_explicit, 2.0f }
+    };
+    const int cca = physics_world_add_composite (&wcc, cc_a, 2);
+    const int ccb = physics_world_add_composite (&wcc, cc_b, 2);
+    MPE_CHECK (&t, cca == 0 && ccb == 1);
+    if (cca == 0 && ccb == 1) {
+        int dropped = -1;
+        int n = mpe_shape_dispatch_all (&wcc, &wcc.bodies [cca], &wcc.bodies [ccb],
+                                        manifolds, 8, &dropped);
+        MPE_CHECK (&t, n == 1 && dropped == 0);
+        if (n == 1) {
+            MPE_CHECK (&t, manifolds [0].object_a == &wcc.bodies [cca] &&
+                              manifolds [0].object_b == &wcc.bodies [ccb]);
+            MPE_CHECK (&t, manifolds [0].contacts [0].part_a == 1 && manifolds [0].contacts [0].part_b == 1);
+            MPE_CHECK_NEAR (&t, manifolds [0].contacts [0].position.x, 0.5f, 1e-5f, "coincident part centres");
+        }
+    }
+    physics_world_cleanup (&wcc);
+    /* --- 4. part-scoped warm-start identity ---------------------------- */
+    physics_world wcache;
+    mpe_world_begin (&wcache);
+    mpe_config_t ccfg = g_cfg;
+    ccfg.solver.warm_start_damping = 1.0f; /* restore seeds so the oracle is the saved value */
+    physics_world_set_config (&wcache, &ccfg);
+    const int cia = physics_world_add_sphere (&wcache, 0.5f, 1.0f, (vector3) {0.0f, 0.0f, 0.0f});
+    const int cib = physics_world_add_sphere (&wcache, 0.5f, 1.0f, (vector3) {0.0f, 1.0f, 0.0f});
+    MPE_CHECK (&t, cia == 0 && cib == 1);
+    if (cia == 0 && cib == 1) {
+        const uint32_t ida = wcache.bodies [cia].object_id;
+        const uint32_t idb = wcache.bodies [cib].object_id;
+        collision_data saved = {0};
+        saved.object_a = &wcache.bodies [cia];
+        saved.object_b = &wcache.bodies [cib];
+        saved.normal_vector = (vector3) {0.0f, 1.0f, 0.0f};
+        saved.contact_count = 2;
+        for (int k = 0; k < 2; k++) {
+            contact_point_data *cp = &saved.contacts [k];
+            cp -> position = (vector3) {0.0f, 0.5f, 0.0f};
+            cp -> penetration = 0.01f;
+            cp -> local_position_a = (vector3) {0.0f, 0.5f, 0.0f};
+            cp -> local_position_b = (vector3) {0.0f, -0.5f, 0.0f};
+            cp -> accumulated_normal_impulse = (k == 0) ? 3.0f : 7.0f;
+            cp -> accumulated_tangent_impulse = (k == 0) ? 0.1f : -0.1f;
+            cp -> tangent_vector = (vector3) {1.0f, 0.0f, 0.0f};
+            cp -> part_a = (k == 0) ? (uint8_t) 0 : (uint8_t) 1;
+            cp -> part_b = (k == 0) ? (uint8_t) 1 : (uint8_t) 0;
+        }
+        contact_cache_save (&wcache, &saved, 1);
+        MPE_CHECK (&t, wcache.world_contact_cache_count == 2);
+        MPE_CHECK (&t, contact_cache_has_part_pair (&wcache, ida, 0, idb, 1));
+        MPE_CHECK (&t, contact_cache_has_part_pair (&wcache, ida, 1, idb, 0));
+        MPE_CHECK (&t, contact_cache_has_part_pair (&wcache, idb, 1, ida, 0)); /* swapped bodies */
+        MPE_CHECK (&t, !contact_cache_has_part_pair (&wcache, ida, 0, idb, 0));
+        MPE_CHECK (&t, !contact_cache_has_part_pair (&wcache, ida, 2, idb, 0));
+        contact_cache_stats_reset (&wcache);
+        collision_data probe = {0};
+        probe.object_a = &wcache.bodies [cia];
+        probe.object_b = &wcache.bodies [cib];
+        probe.normal_vector = (vector3) {0.0f, 1.0f, 0.0f};
+        probe.contact_count = 1;
+        probe.contacts [0].position = (vector3) {0.0f, 0.5f, 0.0f};
+        probe.contacts [0].penetration = 0.01f;
+        /* Approach along the normal: a separating contact is deliberately
+         * cooled by prepare and would hide the cache decision. */
+        wcache.bodies [cia].velocity = (vector3) {0.0f, 1.0f, 0.0f};
+        wcache.bodies [cib].velocity = (vector3) {0.0f, -1.0f, 0.0f};
+        probe.contacts [0].part_a = 0;
+        probe.contacts [0].part_b = 1;
+        collision_data prepared = {0};
+        collision_prepare_solver (&wcache, &probe, &prepared, dt);
+        MPE_CHECK_NEAR (&t, prepared.contacts [0].accumulated_normal_impulse, 3.0f, 1e-5f,
+                        "part pair (0,1) restores its own seed");
+        MPE_CHECK_NEAR (&t, prepared.contacts [0].accumulated_tangent_impulse, 0.1f, 1e-5f,
+                        "part pair (0,1) restores its own tangent");
+        MPE_CHECK (&t, prepared.contacts [0].part_a == 0 && prepared.contacts [0].part_b == 1);
+        wcache.bodies [cia].velocity = (vector3) {0.0f, 1.0f, 0.0f};
+        wcache.bodies [cib].velocity = (vector3) {0.0f, -1.0f, 0.0f};
+        probe.contacts [0].part_a = 1;
+        probe.contacts [0].part_b = 0;
+        collision_prepare_solver (&wcache, &probe, &prepared, dt);
+        MPE_CHECK_NEAR (&t, prepared.contacts [0].accumulated_normal_impulse, 7.0f, 1e-5f,
+                        "part pair (1,0) restores its own seed, not (0,1)'s");
+        wcache.bodies [cia].velocity = (vector3) {0.0f, 1.0f, 0.0f};
+        wcache.bodies [cib].velocity = (vector3) {0.0f, -1.0f, 0.0f};
+        probe.contacts [0].part_a = 0;
+        probe.contacts [0].part_b = 0;
+        collision_prepare_solver (&wcache, &probe, &prepared, dt);
+        MPE_CHECK_NEAR (&t, prepared.contacts [0].accumulated_normal_impulse, 0.0f, 1e-6f,
+                        "unknown part pair must not alias a saved part");
+        /* Reversed body role: the part fields must swap too. Cache entry
+         * (A=0, B=1) is (B=1, A=0) from the probe's point of view. */
+        collision_data reversed = {0};
+        reversed.object_a = &wcache.bodies [cib];
+        reversed.object_b = &wcache.bodies [cia];
+        reversed.normal_vector = (vector3) {0.0f, -1.0f, 0.0f};
+        reversed.contact_count = 1;
+        reversed.contacts [0].position = (vector3) {0.0f, 0.5f, 0.0f};
+        reversed.contacts [0].penetration = 0.01f;
+        wcache.bodies [cia].velocity = (vector3) {0.0f, 1.0f, 0.0f};
+        wcache.bodies [cib].velocity = (vector3) {0.0f, -1.0f, 0.0f};
+        reversed.contacts [0].part_a = 1;
+        reversed.contacts [0].part_b = 0;
+        collision_prepare_solver (&wcache, &reversed, &prepared, dt);
+        MPE_CHECK_NEAR (&t, prepared.contacts [0].accumulated_normal_impulse, 3.0f, 1e-5f,
+                        "reversed role matches the swapped part pair");
+        MPE_CHECK_NEAR (&t, prepared.contacts [0].accumulated_tangent_impulse, -0.1f, 1e-5f,
+                        "reversed role negates the tangent");
+        wcache.bodies [cia].velocity = (vector3) {0.0f, 1.0f, 0.0f};
+        wcache.bodies [cib].velocity = (vector3) {0.0f, -1.0f, 0.0f};
+        reversed.contacts [0].part_a = 0;
+        reversed.contacts [0].part_b = 0;
+        collision_prepare_solver (&wcache, &reversed, &prepared, dt);
+        MPE_CHECK_NEAR (&t, prepared.contacts [0].accumulated_normal_impulse, 0.0f, 1e-6f,
+                        "reversed role with non-swapped parts misses");
+        MPE_CHECK (&t, contact_cache_get_hits (&wcache) == 3);
+        MPE_CHECK (&t, contact_cache_get_misses (&wcache) == 2);
+    }
+    physics_world_cleanup (&wcache);
+    /* --- 5. step path: one cache entry per touching part --------------- */
+    physics_world wstep;
+    mpe_world_begin (&wstep);
+    mpe_config_t scfg = g_cfg;
+    physics_world_set_config (&wstep, &scfg);
+    wstep.static_plane_enabled = false; /* support is the explicit slab */
+    const int sb = physics_world_add_composite (&wstep, low_dumbbell, 2);
+    const int sk = physics_world_add_cube (&wstep, (vector3) {0.0f, -0.25f, 0.0f},
+                                           (vector3) {2.0f, 0.25f, 2.0f}, 0.0f);
+    MPE_CHECK (&t, sb == 0 && sk == 1);
+    if (sb == 0 && sk == 1) {
+        physics_world_step (&wstep, dt);
+        MPE_CHECK (&t, mpe_world_finite (&wstep));
+        MPE_CHECK (&t, wstep.world_contact_cache_count == 2);
+        const uint32_t cid = wstep.bodies [sb].object_id;
+        const uint32_t kid = wstep.bodies [sk].object_id;
+        int part_seen [2] = {0, 0};
+        int comp_entries = 0;
+        if (wstep.world_contact_cache_count == 2) {
+            for (int i = 0; i < wstep.world_contact_cache_count; i++) {
+                const cached_contact *cc = &wstep.world_contact_cache [i];
+                if (cc -> object_id_a == cid && cc -> object_id_b == kid) {
+                    MPE_CHECK (&t, cc -> part_b == 0);
+                    MPE_CHECK (&t, cc -> part_a == 0 || cc -> part_a == 1);
+                    if (cc -> part_a < 2) { part_seen [cc -> part_a] = 1; }
+                    MPE_CHECK_NEAR (&t, fabsf (cc -> local_position_a.x), 0.5f, 1e-4f,
+                                    "composite-local contact x is the part centre");
+                    comp_entries++;
+                } else if (cc -> object_id_a == kid && cc -> object_id_b == cid) {
+                    MPE_CHECK (&t, cc -> part_a == 0);
+                    MPE_CHECK (&t, cc -> part_b == 0 || cc -> part_b == 1);
+                    if (cc -> part_b < 2) { part_seen [cc -> part_b] = 1; }
+                    MPE_CHECK_NEAR (&t, fabsf (cc -> local_position_b.x), 0.5f, 1e-4f,
+                                    "composite-local contact x is the part centre");
+                    comp_entries++;
+                }
+            }
+        }
+        MPE_CHECK (&t, comp_entries == 2);
+        MPE_CHECK (&t, part_seen [0] == 1 && part_seen [1] == 1);
+        MPE_CHECK (&t, contact_cache_has_part_pair (&wstep, cid, 0, kid, 0));
+        MPE_CHECK (&t, contact_cache_has_part_pair (&wstep, cid, 1, kid, 0));
+        MPE_CHECK (&t, contact_cache_has_part_pair (&wstep, kid, 0, cid, 1));
+        MPE_CHECK (&t, !contact_cache_has_part_pair (&wstep, cid, 2, kid, 0));
+    }
+    physics_world_cleanup (&wstep);
+    /* --- 6. plugin ABI: 2 current, 1 still loads, 3 refused ------------ */
+    MPE_CHECK (&t, MPE_MODULE_ABI == 2);
+    MPE_CHECK (&t, MPE_MODULE_ABI_MIN == 1);
+    physics_world wabi;
+    mpe_world_begin (&wabi);
+    mpe_module_desc_t legacy;
+    memset (&legacy, 0, sizeof (legacy));
+    legacy.name = "abi1-probe";
+    legacy.version = "1.0";
+    legacy.kind = "generic";
+    legacy.abi = 1;
+    MPE_CHECK (&t, physics_world_attach_module (&wabi, &legacy) >= 0);
+    MPE_CHECK (&t, physics_world_detach_module (&wabi, "abi1-probe") == 0);
+    mpe_module_desc_t future = legacy;
+    future.name = "abi3-probe";
+    future.abi = 3;
+    MPE_CHECK (&t, physics_world_attach_module (&wabi, &future) == MPE_ATTACH_E_ABI);
+    MPE_CHECK (&t, mpe_register_module (&legacy) >= 0);
+    MPE_CHECK (&t, mpe_find_module ("abi1-probe") != NULL);
+    mpe_unregister_module ("abi1-probe");
+    MPE_CHECK (&t, mpe_find_module ("abi1-probe") == NULL);
+    physics_world_cleanup (&wabi);
+    MPE_CHECK (&t, mpe_clamp_composite_total () == 0ul && mpe_clamp_mass_total () == 0ul);
+    if (t.failures == 0) {
+        printf ("[PASS] mig WP2.4/2.5: ghost views emit one manifold per part pair, stamped with the parent identity and part-scoped cache key\n");
+        MPE_INFO ("2 part manifolds over a slab, part-local 90Z cube face y 0.27 -> 0.55, composite/composite only (1,1), cache seeds 3.0/7.0 by part, step saves 2 parts, ABI 2 accepts legacy 1");
     }
     mpe_test_end (&t);
     return t.failures;

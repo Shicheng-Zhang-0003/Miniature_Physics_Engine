@@ -99,6 +99,8 @@ static int caches_equal (const physics_world *a, const physics_world *b) {
             return 0;
         if (ca -> property_stamp_a != cb -> property_stamp_a || ca -> property_stamp_b != cb -> property_stamp_b)
             return 0;
+        if (ca -> part_a != cb -> part_a || ca -> part_b != cb -> part_b)
+            return 0;
         if (!vec3_eq (ca -> local_position_a, cb -> local_position_a))
             return 0;
         if (!vec3_eq (ca -> local_position_b, cb -> local_position_b))

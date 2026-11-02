@@ -437,7 +437,8 @@ const mpe_solver_if_t *mpe_find_solver (const char *name) {
 static void module_store (int i, const mpe_module_desc_t *desc, int keep_origin) {
     char origin_keep [256];
     snprintf (origin_keep, sizeof (origin_keep), "%s", keep_origin ? s_module_origin [i] : "");
-    /* Size-safe copy for the append-only stage_detach tail (ABI still 1):
+    /* Size-safe copy for the append-only stage_detach tail (ABI-1 era,
+     * still present in ABI 2):
      * a .so built against the older header owns fewer bytes, so copy the
      * v1 prefix field-by-field and default the tail to NULL; only adopt a
      * non-NULL hook that dladdr proves lives in mapped code (stale
@@ -490,7 +491,7 @@ const char *mpe_registry_module_origin (const mpe_module_desc_t *desc) {
     return out;
 }
 int mpe_register_module (const mpe_module_desc_t *desc) {
-    if (!desc || desc -> abi != MPE_MODULE_ABI || !desc -> name)
+    if (!desc || desc -> abi < MPE_MODULE_ABI_MIN || desc -> abi > MPE_MODULE_ABI || !desc -> name)
         return -1;
     if (!name_fits (desc -> name, sizeof (s_module_names [0])))
         return -1;
