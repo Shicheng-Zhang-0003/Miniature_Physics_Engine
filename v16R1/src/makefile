@@ -232,7 +232,7 @@ check-new-files:
 
 help:
 	@echo "targets: engine (default) | everything (full build-only rebuild: engine, mpe-tui, headless,"
-	@echo "         suite+scalar, all 30 legacy + 14 paranoia binaries, capsule/MFS/MGB modules; runs nothing)"
+	@echo "         suite+scalar, all 30 legacy + 15 paranoia binaries, capsule/MFS/MGB modules; runs nothing)"
 	@echo "         debug | release | install | installcheck | installcheck-v1 | clean | distclean"
 	@echo "         test_<name> (build+run) | build_<name> (build only) | paranoia_*"
 	@echo "         test_runner.py --profile quick|physics|full (runner default: full; make default: engine)"
@@ -612,6 +612,15 @@ test_paranoia_scene_persistence: build_paranoia_scene_persistence
 	mkdir -p ../../temp
 	./test_paranoia_scene_persistence$(EXE_EXT)
 
+# Regression gate for the live "robot and view twitch/shiver" report: the
+# default sandbox filler must not enclose the origin spawn. Links the REAL
+# scene_init_default() path plus the FTC robot/drivetrain that `ftc spawn`
+# builds, so it fails on both the scene arrangement and the squeeze itself.
+build_paranoia_default_scene_spawn: tests/paranoia_default_scene_spawn.c $(PARANOIA_TEST_CORE) physics/spring_joint.c scene/scene_init.c ecosystem/mfs/modules/ftc/submodules/robot.c ecosystem/mfs/modules/ftc/submodules/drivetrain.c ecosystem/mfs/modules/ftc/submodules/intake.c ecosystem/mfs/modules/ftc/submodules/motor.c ecosystem/mfs/modules/ftc/submodules/motor_presets.c ecosystem/mfs/modules/ftc/submodules/battery.c
+	$(CC) $(PARANOIA_CFLAGS) -Iecosystem/mfs -Dmpe_paranoia_default_scene_spawn tests/paranoia_default_scene_spawn.c $(PARANOIA_TEST_CORE) physics/spring_joint.c scene/scene_init.c ecosystem/mfs/modules/ftc/submodules/robot.c ecosystem/mfs/modules/ftc/submodules/drivetrain.c ecosystem/mfs/modules/ftc/submodules/intake.c ecosystem/mfs/modules/ftc/submodules/motor.c ecosystem/mfs/modules/ftc/submodules/motor_presets.c ecosystem/mfs/modules/ftc/submodules/battery.c $(MPE_TEST_LIBS) $(shell pkg-config --libs epoxy) -o test_paranoia_default_scene_spawn$(EXE_EXT)
+test_paranoia_default_scene_spawn: build_paranoia_default_scene_spawn
+	./test_paranoia_default_scene_spawn$(EXE_EXT)
+
 build_paranoia_spring_joints: tests/paranoia_spring_joints.c $(PARANOIA_TEST_CORE) physics/spring_joint.c
 	$(CC) $(PARANOIA_CFLAGS) -Dmpe_paranoia_spring_joints tests/paranoia_spring_joints.c $(PARANOIA_TEST_CORE) physics/spring_joint.c $(MPE_TEST_LIBS) $(shell pkg-config --libs epoxy) -o test_paranoia_spring_joints$(EXE_EXT)
 test_paranoia_spring_joints: build_paranoia_spring_joints
@@ -640,7 +649,7 @@ test_paranoia_config: build_paranoia_config
 # produce it. (asan/tsan binaries and temp/ MFS verification binaries
 # stay runner-owned: the runner rebuilds them with its own flags/OUTDIR.)
 # Drift guard: keep these lists in sync with the build_* rules above AND
-# with tools/test_runner.py MIN_LEGACY_ENTRIES=30 / MIN_PARANOIA_ENTRIES=14.
+# with tools/test_runner.py MIN_LEGACY_ENTRIES=30 / MIN_PARANOIA_ENTRIES=15.
 build_all_legacy: build_two_world build_revolute build_cylinder_drop build_driven_wheel build_math3_inverse \
 	build_floor_collision_diag build_cylinder_sphere build_cylinder_cube build_cylinder_cylinder \
 	build_list4_cylinder_floor build_scene_roundtrip build_static_hold build_rolling_decay build_ccd_sweep \
@@ -650,6 +659,7 @@ build_all_legacy: build_two_world build_revolute build_cylinder_drop build_drive
 build_all_paranoia: build_paranoia_freeflight_exact build_paranoia_depenetration_sleep build_paranoia_contact_solver \
 	build_paranoia_constraints build_paranoia_broadphase build_paranoia_energy_momentum build_paranoia_ccd \
 	build_paranoia_cylinder_collision build_paranoia_determinism build_paranoia_scene_persistence \
+	build_paranoia_default_scene_spawn \
 	build_paranoia_spring_joints build_paranoia_integration_edges build_paranoia_fp_edges build_paranoia_config
 # MGB bridge (build-only `all`: build dir + mgb_mpe_test + mgb_bridge.so; the
 # `test`/`loadtest` targets run code and are never invoked from here).

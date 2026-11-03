@@ -9,7 +9,7 @@
 
 ```bash
 python3 tools/test_runner.py --profile quick   # runner contracts + canonical C suite (46 cases)
-python3 tools/test_runner.py --profile physics # quick + isolated legacy (30) + paranoia (14)
+python3 tools/test_runner.py --profile physics # quick + isolated legacy (30) + paranoia (15)
 python3 tools/test_runner.py --profile full    # physics + ASan/UBSan + MFS (30 gated) + TUI snapshots (9) + engine build
 python3 tools/test_runner.py --list            # discover registered test cases
 ```
@@ -22,7 +22,7 @@ to change the limit. The runner uses only the Python standard library.
 - Suite cases that print `[SKIP]` fail the run unless `--allow-skip`.
 - `[XFAIL]` markers are surfaced in summary counts but never block.
 - Registry floors: `MIN_SUITE_ENTRIES=46`, `MIN_LEGACY_ENTRIES=30`,
-  `MIN_PARANOIA_ENTRIES=14`.
+  `MIN_PARANOIA_ENTRIES=15`.
 - Summary contract: `Total == registry size` and `Blocking failures == 0`.
 
 The floor exists because a count floor that sits **below** the real registry

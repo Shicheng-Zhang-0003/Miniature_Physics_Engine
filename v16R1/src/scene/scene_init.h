@@ -4,6 +4,15 @@
 #include "../core/rigidbody.h"
 /* Body storage lives in the primary physics_world (body_capacity member);
  * no file-scope pool remains. */
+/* Default sandbox filler: one large immovable sphere. It must stay clear
+ * of the origin, which is the default hostile-spawn point for the FTC robot
+ * (`ftc spawn`) and for spawner objects. A 2 m sphere centred at (0,2,0)
+ * reaches y=0 at the origin and encloses a robot spawned there, so the
+ * solver squeezes the chassis between the sphere and the floor: the live
+ * "robot and camera twitch/shiver, refuses to drive" report. Keep this
+ * behind the origin (-Z) where the default camera can still see it. */
+#define SCENE_DEFAULT_FILLER_RADIUS 2.0f
+static inline vector3 scene_default_filler_position (void) {return (vector3) {0.0f, 2.0f, -6.0f};}
 int scene_add_object (float radius, float mass, vector3 initial_position);
 int scene_add_cube (vector3 position, vector3 half_extensions, float mass);
 /* Cylinder spawns (axle along local X). Same identity/sanitize/overlap path. */
