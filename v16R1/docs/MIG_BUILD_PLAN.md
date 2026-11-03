@@ -82,7 +82,18 @@
 > expand serially after the parallel primitive barrier, and the warm-start
 > key becomes (id_a, part_a, id_b, part_b); `MPE_MODULE_ABI` is 2 with
 > MIN 1, gate `mig_composite_narrowphase` is the 53rd registered blocking
-> entry, suite 53/51+2, quick 67/67, make everything exit 0. NEXT: WP2
+> entry, suite 53/51+2, quick 67/67, make everything exit 0. LIVE-DRIVE
+> INTERRUPTION LANDED 2026-11-03 (`76d6ccd`): the GUI default sandbox
+> filler sphere moved from (0,2,0) — where its surface reached the origin
+> and enclosed the FTC robot spawned there, squeezing the chassis between
+> sphere and floor and shaking every follow view — to (0,2,-6) behind the
+> spawn through shared `SCENE_DEFAULT_FILLER_RADIUS` /
+> `scene_default_filler_position()`; the real `scene_init_default()` +
+> `ftc spawn` repro now settles at rest height with flat roll/pitch, and
+> gate `paranoia_default_scene_spawn` (`default_scene_spawn_clearance`)
+> fails on the old arrangement and passes on the new one. Suite stays
+> 53/51+2, quick 67/67, physics 114/114 (15 paranoia), zero-composite
+> byte probe against `8e62e58` byte-identical. NEXT: WP2
 > 2.6 floor + CCD (per-part floor manifolds, floor CCD lowest-point scan),
 > then 2.7 renderer and 2.8's remaining gates.**
 
@@ -142,13 +153,15 @@ WP2 2.2 in `364428d`, WP2 2.3 in `d74319c`, WP2 2.4+2.5 in `0a03b85`
 | `v16R1/src/core/rigidbody.h/.c` | 1.3 counter + accessor + reset; grows-once body fields `mass_is_composed`/`composite_part_count` (zeroed at all three initializer sites); 2.1 appends `object_composite` + `OBJECT_COMPOSITE`, the engine-internal `part_base` slice anchor, and `mpe_note_composite_clamp`; 2.2 `rigidbody_restore_composed_inertia` + sanitize composite type/geometry branches and composed restores in sanitize/wake/`set_static(false)`, with all three `rigidbody_update_inertia_*` early-returning for composed bodies |
 | `v16R1/src/core/physics_world.h/.c` | 1.4 `physics_world_add_composite` stub (composed mass, sphere bounds, authored tensor); 2.1 `composite_part` + per-world pool (`composite_parts`/count/capacity), grower, write-on-success `physics_world_composite_parts_append`, cleanup free + clear compaction; 2.2 completes `physics_world_add_composite` (whole-assembly validation, stored-slice composition under the cap, COM-framed pool slice, effective per-part kg, authored-tensor precondition) with `physics_world_composite_cap` shared by append; 2.4/2.5 `_Thread_local` ghost views, per-part AABB prefilter, `mpe_shape_dispatch_all` (one manifold per part pair) and the serial composite expansion in `physics_world_process_pair`, plus part-scoped novelty |
 | `v16R1/src/physics/broadphase.c` | 2.3 composite part dispatch: authored covering-sphere scalar radius at `:149` (no sqrt(3) inflation), `broadphase_composite_extent` at `:187` (per-part COM-symmetric hull from body `cached_axes` × part `local_orientation`, primitive extents, inactive-slot scalar fallback), AABB call at `:379`; spatial hash, swept insert and sphere cull untouched |
+| `v16R1/src/scene/scene_init.h/.c` | live-drive fix (`76d6ccd`): shared `SCENE_DEFAULT_FILLER_RADIUS` + `scene_default_filler_position()` place the default sandbox filler at (0,2,-6), clear of the origin `ftc spawn`; the default scene still rests it on the friction floor |
+| `v16R1/src/tests/paranoia_default_scene_spawn.c` | named live-drive regression gate `default_scene_spawn_clearance`: real `scene_init_default()` + FTC robot/drivetrain; filler clearance, settled rest height, and 600-tick drive roll/pitch/height/jitter assertions; proven to fail against the old (0,2,0) arrangement |
 | `v16R1/src/physics/collision_mechanics.h, collision_cache.c, collision_solver.c` | 2.4/2.5 append-only `contact_point_data.part_a/.part_b` at `collision_mechanics.h:81`; `cached_contact` tails at `physics_world.h:40`; `contact_cache_save` writes the part key, `contact_cache_has_part_pair` at `collision_cache.c:58` drives part-scoped novelty, and `contact_cache_match_role`/`contact_cache_adoptable` at `collision_solver.c:117/:144` require both part fields in both body roles |
 | `v16R1/src/core/mpe_module.h, mpe_loader.c, mpe_registry.c` | 2.4/2.5 ABI 2 with `MPE_MODULE_ABI_MIN 1` (`mpe_module.h:41`); loader/registry/attach accept 1..2 (`mpe_loader.c:331`, `mpe_registry.c:493`, `physics_world.c:1152`); in-tree capsule plugin and both MFS makefiles build at ABI 2 |
 | `v16R1/src/config/mpe_config.h/.c, mpe_config_schema.c` | 2.1 appended `cat_composite` + `composite.max_parts` (default 16, schema 1–16, save loop reaches the new category) |
 | `v16R1/src/tests/mpe_suite_mig.c` | gates `mig_mass_composite` + `mig_pendulum_physical` + `mig_composite_stub` + `mig_composite_pool` + `mig_composite_world` + `mig_composite_broadphase` + `mig_composite_narrowphase` (53rd, blocking) |
 | `v16R1/src/tests/mpe_suite_main.c` | externs + registry entries (53rd run blocking) |
 | `v16R1/src/makefile` | `MPE_TEST_CORE += core/mig_mass.c`, `MPE_SUITE_SRCS += tests/mpe_suite_mig.c`, help-note renumber |
-| `tools/test_runner.py` | floor 46 → 47 → 48 → 49 → 50 → 51 → 52 → 53 with dated history comments; docstring re-based to the real 53-entry suite |
+| `tools/test_runner.py` | floor 46 → 47 → 48 → 49 → 50 → 51 → 52 → 53 with dated history comments; docstring re-based to the real 53-entry suite; paranoia floor 14 → 15 for `paranoia_default_scene_spawn` |
 
 Names in this table are the PRESENT (post-P1-rename) spellings; at their
 landing commits the files were `nu_mass.{h,c}` and the gates were
@@ -163,6 +176,9 @@ Measured baseline (numbers a resume session must reproduce):
   50/48; 2.2 made 51/49; 2.3 made 52/50; 2.4+2.5 made 53/51).
 - Runner quick: **67/67** (WP0 was 61/61; 1.1 was 62/62; 1.2–1.4 was
   63/63; 2.1 was 64/64; 2.2 was 65/65; 2.4+2.5 was 67/67).
+- Runner physics: **114/114** after the live-drive fix (30 legacy + 15
+  paranoia, including `paranoia_default_scene_spawn`; the canonical 2
+  informational diags stay non-blocking; 0 blocking failures).
 - ASan/UBSan suite build: the MIG gates are clean —
   `mig_composite_narrowphase`, `mig_composite_broadphase`,
   `mig_composite_world`, `mig_composite_pool`, `mig_composite_stub`,
