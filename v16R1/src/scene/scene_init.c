@@ -207,7 +207,7 @@ void scene_init_default (void) {
      * clamp (no friction, no rolling resistance, no bounce) while tests rest
      * on friction — the same mismatch that broke F5/F8. */
     scene_ensure_friction_floor ();
-    int object_grey_index = scene_add_object (2.0f, 0.0f, (vector3) {0.0f, 2.0f, 0.0f});
+    int object_grey_index = scene_add_object (SCENE_DEFAULT_FILLER_RADIUS, 0.0f, scene_default_filler_position ());
     /* DESPOT-2026-10-20 (GUARD): scene_add_object returns -1 when the pool
      * is exhausted/init fails — the unchecked index indexed bodies[-1]
      * (out-of-bounds write into whatever sits before the array). With

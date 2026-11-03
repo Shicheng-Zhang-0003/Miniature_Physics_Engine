@@ -5,7 +5,7 @@ Profiles:
   quick    Python runner-contract tests and the canonical C regression suite
            (53 cases incl. 2 informational diags; full suite re-run under 5
            regimes default/light/heavy/brittle/sticky via MPE_TEST_REGIME).
-  physics  quick + every isolated legacy case (30) and all paranoia cases (14).
+  physics  quick + every isolated legacy case (30) and all paranoia cases (15).
   full     physics + ASan/UBSan suite, MFS robotics (30 gated), TUI snapshots
            (9 files), engine build + check-flags.
 
@@ -17,7 +17,7 @@ only the Python standard library.
 Strict contract: suite cases that print [SKIP] (self-skipped coverage) fail
 the run unless --allow-skip is given; [XFAIL] markers are surfaced in the
 summary counts but never block. Registry floors: MIN_SUITE_ENTRIES=53,
-MIN_LEGACY_ENTRIES=30, MIN_PARANOIA_ENTRIES=14; summary contract requires
+MIN_LEGACY_ENTRIES=30, MIN_PARANOIA_ENTRIES=15; summary contract requires
 Total == registry size and Blocking failures == 0.
 """
 
@@ -152,9 +152,9 @@ MPE_TEST_REGIMES = ("default", "light", "heavy", "brittle", "sticky")
 MIN_SUITE_ENTRIES = 53
 # DESPOT-2026-10-01: pin per-suite floors so deleting a legacy/paranoia target
 # + its make target together cannot shrink the headline silently (the 220->204
-# drift). Canonical floor above; legacy 30 + paranoia 14 pinned here.
+# drift). Canonical floor above; legacy 30 + paranoia 15 pinned here.
 MIN_LEGACY_ENTRIES = 30
-MIN_PARANOIA_ENTRIES = 14
+MIN_PARANOIA_ENTRIES = 15
 
 
 def discover_suite_entries(source: str) -> list[tuple[str, bool]]:
