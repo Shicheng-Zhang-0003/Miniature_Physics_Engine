@@ -93,9 +93,19 @@
 > gate `paranoia_default_scene_spawn` (`default_scene_spawn_clearance`)
 > fails on the old arrangement and passes on the new one. Suite stays
 > 53/51+2, quick 67/67, physics 114/114 (15 paranoia), zero-composite
-> byte probe against `8e62e58` byte-identical. NEXT: WP2
-> 2.6 floor + CCD (per-part floor manifolds, floor CCD lowest-point scan),
-> then 2.7 renderer and 2.8's remaining gates.**
+> byte probe against `8e62e58` byte-identical. WP2 STEP 2.6 LANDED
+> 2026-11-08 (`bc395b2`): per-part composite floor manifolds — one
+> prepared plane manifold per touching active part with PARENT identity
+> and `part_a` stamps, staged before the wake decision so
+> `collision_prepare_solver` sees an awake parent — and a floor CCD
+> lowest-point scan over the active part slice (sphere bottom, cube
+> projected corner, cylinder cap+barrel, horizontal lever arm included),
+> so a tumbling L-composite clamps at its true support point instead of
+> the old covering-sphere box reading. Volume sweeps stay
+> bounding-sphere; rotation-only tunneling remains unsupported exactly
+> as in v15S. Gate `mig_floor_ccd_composite` is the 54th registered
+> blocking entry, suite 54/52+2, quick 68/68, make everything exit 0.
+> NEXT: WP2 2.7 renderer, then 2.8's remaining gates.**
 
 ---
 
@@ -107,9 +117,9 @@ truth in this order and do not write a new line of code until green:
 ```bash
 cd 475-MPE/v16R1/src
 make build_suite            # zero complaints expected (-Werror is default)
-./test_mpe_suite --all      # expect: Total: 53 | Blocking failures: 0
+./test_mpe_suite --all      # expect: Total: 54 | Blocking failures: 0
 cd ../..
-python3 tools/test_runner.py --profile quick   # expect Checks: 67 | passed: 67
+python3 tools/test_runner.py --profile quick   # expect Checks: 68 | passed: 68
 git status --short          # manifest must match §1 exactly — no half-written files
 ```
 
@@ -137,13 +147,14 @@ survive a context loss.
 
 ---
 
-## §1 Baseline ledger (as of 2026-11-01 — update at every landing)
+## §1 Baseline ledger (as of 2026-11-08 — update at every landing)
 
 Landed and pushed (WP0 block: commits `181c2c0` charter, `0882935` code,
 `636b10e` playbook; WP1 1.1 in `b0e1cbb`; rulings `8385b95`; P1 rename
 `84f8c8d`; WP1 1.2–1.4 in `df383f0` — 2026-10-31; WP2 2.1 in `98debd9`,
 WP2 2.2 in `364428d`, WP2 2.3 in `d74319c`, WP2 2.4+2.5 in `0a03b85`
-— 2026-11-01):
+— 2026-11-01; live-drive fix `76d6ccd`; WP2 2.6 in `bc395b2`
+— 2026-11-08):
 
 | Artifact | Nature |
 |---|---|
@@ -151,17 +162,18 @@ WP2 2.2 in `364428d`, WP2 2.3 in `d74319c`, WP2 2.4+2.5 in `0a03b85`
 | `v16R1/src/core/mig_mass.h` | composition contract + error enums + the 1.2 `mig_bridge` handoff struct + 2.2 `mig_part_mass` (effective per-part kg) |
 | `v16R1/src/core/mig_mass.c` | exact composition: mass/COM/inertia, double accumulation, definition-order deterministic; + `mig_make_bridge` + `mig_part_mass` |
 | `v16R1/src/core/rigidbody.h/.c` | 1.3 counter + accessor + reset; grows-once body fields `mass_is_composed`/`composite_part_count` (zeroed at all three initializer sites); 2.1 appends `object_composite` + `OBJECT_COMPOSITE`, the engine-internal `part_base` slice anchor, and `mpe_note_composite_clamp`; 2.2 `rigidbody_restore_composed_inertia` + sanitize composite type/geometry branches and composed restores in sanitize/wake/`set_static(false)`, with all three `rigidbody_update_inertia_*` early-returning for composed bodies |
-| `v16R1/src/core/physics_world.h/.c` | 1.4 `physics_world_add_composite` stub (composed mass, sphere bounds, authored tensor); 2.1 `composite_part` + per-world pool (`composite_parts`/count/capacity), grower, write-on-success `physics_world_composite_parts_append`, cleanup free + clear compaction; 2.2 completes `physics_world_add_composite` (whole-assembly validation, stored-slice composition under the cap, COM-framed pool slice, effective per-part kg, authored-tensor precondition) with `physics_world_composite_cap` shared by append; 2.4/2.5 `_Thread_local` ghost views, per-part AABB prefilter, `mpe_shape_dispatch_all` (one manifold per part pair) and the serial composite expansion in `physics_world_process_pair`, plus part-scoped novelty |
+| `v16R1/src/core/physics_world.h/.c` | 1.4 `physics_world_add_composite` stub (composed mass, sphere bounds, authored tensor); 2.1 `composite_part` + per-world pool (`composite_parts`/count/capacity), grower, write-on-success `physics_world_composite_parts_append`, cleanup free + clear compaction; 2.2 completes `physics_world_add_composite` (whole-assembly validation, stored-slice composition under the cap, COM-framed pool slice, effective per-part kg, authored-tensor precondition) with `physics_world_composite_cap` shared by append; 2.4/2.5 `_Thread_local` ghost views, per-part AABB prefilter, `mpe_shape_dispatch_all` (one manifold per part pair) and the serial composite expansion in `physics_world_process_pair`, plus part-scoped novelty; 2.6 `mpe_composite_floor_batch` + `mpe_composite_floor_detect` stage one plane manifold per touching active part (parent identity, `part_a` stamp, `part_b` 0) and wake once before `collision_prepare_solver`, with the parallel CCD phase-1 worker calling the world-aware TOI entry |
+| `v16R1/src/physics/collision_ccd.c`, `collision_mechanics.h` | 2.6 composite floor support scan: `ccd_composite_part_at` bounded by the world pool, `ccd_part_support_down` (sphere bottom, cube projected corner, cylinder cap+barrel), `ccd_composite_support_point` returns the true parent-COM-relative lowest point including the horizontal lever arm, `ccd_min_thickness_world` uses the minimum active part thickness, and the floor TOI consumes that point; `ccd_sweep_clamp_full_impl` + `collision_ccd_toi_range_world` carry the world pointer, non-composite arithmetic stays byte-identical, and volume sweeps keep `broadphase_bounding_radius` (composites join the bounding-sphere obstacle branch) |
 | `v16R1/src/physics/broadphase.c` | 2.3 composite part dispatch: authored covering-sphere scalar radius at `:149` (no sqrt(3) inflation), `broadphase_composite_extent` at `:187` (per-part COM-symmetric hull from body `cached_axes` × part `local_orientation`, primitive extents, inactive-slot scalar fallback), AABB call at `:379`; spatial hash, swept insert and sphere cull untouched |
 | `v16R1/src/scene/scene_init.h/.c` | live-drive fix (`76d6ccd`): shared `SCENE_DEFAULT_FILLER_RADIUS` + `scene_default_filler_position()` place the default sandbox filler at (0,2,-6), clear of the origin `ftc spawn`; the default scene still rests it on the friction floor |
 | `v16R1/src/tests/paranoia_default_scene_spawn.c` | named live-drive regression gate `default_scene_spawn_clearance`: real `scene_init_default()` + FTC robot/drivetrain; filler clearance, settled rest height, and 600-tick drive roll/pitch/height/jitter assertions; proven to fail against the old (0,2,0) arrangement |
 | `v16R1/src/physics/collision_mechanics.h, collision_cache.c, collision_solver.c` | 2.4/2.5 append-only `contact_point_data.part_a/.part_b` at `collision_mechanics.h:81`; `cached_contact` tails at `physics_world.h:40`; `contact_cache_save` writes the part key, `contact_cache_has_part_pair` at `collision_cache.c:58` drives part-scoped novelty, and `contact_cache_match_role`/`contact_cache_adoptable` at `collision_solver.c:117/:144` require both part fields in both body roles |
 | `v16R1/src/core/mpe_module.h, mpe_loader.c, mpe_registry.c` | 2.4/2.5 ABI 2 with `MPE_MODULE_ABI_MIN 1` (`mpe_module.h:41`); loader/registry/attach accept 1..2 (`mpe_loader.c:331`, `mpe_registry.c:493`, `physics_world.c:1152`); in-tree capsule plugin and both MFS makefiles build at ABI 2 |
 | `v16R1/src/config/mpe_config.h/.c, mpe_config_schema.c` | 2.1 appended `cat_composite` + `composite.max_parts` (default 16, schema 1–16, save loop reaches the new category) |
-| `v16R1/src/tests/mpe_suite_mig.c` | gates `mig_mass_composite` + `mig_pendulum_physical` + `mig_composite_stub` + `mig_composite_pool` + `mig_composite_world` + `mig_composite_broadphase` + `mig_composite_narrowphase` (53rd, blocking) |
-| `v16R1/src/tests/mpe_suite_main.c` | externs + registry entries (53rd run blocking) |
+| `v16R1/src/tests/mpe_suite_mig.c` | gates `mig_mass_composite` + `mig_pendulum_physical` + `mig_composite_stub` + `mig_composite_pool` + `mig_composite_world` + `mig_composite_broadphase` + `mig_composite_narrowphase` + `mig_floor_ccd_composite` (54th, blocking) |
+| `v16R1/src/tests/mpe_suite_main.c` | externs + registry entries (54th run blocking) |
 | `v16R1/src/makefile` | `MPE_TEST_CORE += core/mig_mass.c`, `MPE_SUITE_SRCS += tests/mpe_suite_mig.c`, help-note renumber |
-| `tools/test_runner.py` | floor 46 → 47 → 48 → 49 → 50 → 51 → 52 → 53 with dated history comments; docstring re-based to the real 53-entry suite; paranoia floor 14 → 15 for `paranoia_default_scene_spawn` |
+| `tools/test_runner.py` | floor 46 → 47 → 48 → 49 → 50 → 51 → 52 → 53 → 54 with dated history comments; docstring re-based to the real 54-entry suite; paranoia floor 14 → 15 for `paranoia_default_scene_spawn` |
 
 Names in this table are the PRESENT (post-P1-rename) spellings; at their
 landing commits the files were `nu_mass.{h,c}` and the gates were
@@ -171,22 +183,24 @@ also renamed this playbook file itself (`NUF_BUILD_PLAN.md` →
 
 Measured baseline (numbers a resume session must reproduce):
 
-- Suite: 53 registered, **51/51 blocking green**, 2 diag-informational
+- Suite: 54 registered, **52/52 blocking green**, 2 diag-informational
   (WP0 landing was 47/45; 1.1 made 48/46; 1.2–1.4 made 49/47; 2.1 made
-  50/48; 2.2 made 51/49; 2.3 made 52/50; 2.4+2.5 made 53/51).
-- Runner quick: **67/67** (WP0 was 61/61; 1.1 was 62/62; 1.2–1.4 was
-  63/63; 2.1 was 64/64; 2.2 was 65/65; 2.4+2.5 was 67/67).
+  50/48; 2.2 made 51/49; 2.3 made 52/50; 2.4+2.5 made 53/51; 2.6 made
+  54/52).
+- Runner quick: **68/68** (WP0 was 61/61; 1.1 was 62/62; 1.2–1.4 was
+  63/63; 2.1 was 64/64; 2.2 was 65/65; 2.4+2.5 was 67/67; 2.6 was 68/68).
 - Runner physics: **114/114** after the live-drive fix (30 legacy + 15
   paranoia, including `paranoia_default_scene_spawn`; the canonical 2
   informational diags stay non-blocking; 0 blocking failures).
 - ASan/UBSan suite build: the MIG gates are clean —
-  `mig_composite_narrowphase`, `mig_composite_broadphase`,
-  `mig_composite_world`, `mig_composite_pool`, `mig_composite_stub`,
-  `mig_mass_composite`, `mig_pendulum_physical`, `determinism` all pass
-  with no sanitizer report (run total 53, 49/51 blocking: the asan target
-  itself still fails `loader_lifecycle` and `ftc_ecosystem` on the
-  pre-existing missing `-rdynamic` export of `g_cfg`, unrelated to MIG and
-  recorded in §9).
+  `mig_floor_ccd_composite`, `mig_composite_narrowphase`,
+  `mig_composite_broadphase`, `mig_composite_world`,
+  `mig_composite_pool`, `mig_composite_stub`, `mig_mass_composite`,
+  `mig_pendulum_physical`, `determinism` all pass with no sanitizer
+  report (run total 54, 50/52 blocking: the asan target itself still
+  fails `loader_lifecycle` and `ftc_ecosystem` on the pre-existing
+  missing `-rdynamic` export of `g_cfg`, unrelated to MIG and recorded
+  in §9).
 - Engine binary: **code changes, the plain-scene numeric path does not**
   (`0a03b85`: `contact_point_data` grows 132 → 136 bytes, `cached_contact`
   68 → 72 and `collision_data` 560 → 576 for the append-only part fields,
@@ -200,7 +214,11 @@ Measured baseline (numbers a resume session must reproduce):
   fallback_trig=0 result=PASS), and the in-suite `determinism` twin stays
   600 ticks bitwise identical. The WP1 (`df383f0`) and 2.1 (`98debd9`)
   entries remain the record of the bits-changing struct landings; 2.4/2.5
-  is the third such landing, now with an explicit plugin-ABI bump.
+  is the third such landing, now with an explicit plugin-ABI bump. 2.6
+  adds no struct growth and no ABI change: its floor-staging and CCD
+  branches are gated on `object_composite` or a non-NULL world pointer,
+  so every non-composite sweep keeps the old arithmetic, and the
+  determinism twin remains green.
 
 WP0's verdict is on record: the one red in its history was the test
 author's own oracle (missing cylinder dz-Steiner in the triple's Ixx), not
@@ -628,20 +646,66 @@ broadphase/floor/CCD hooks, editor-invisible (UI is WP4). Estimated
   gate failures, and forcing `part_index_a/b = 0` in the iterator
   produced 6. No ABI-1 `.so` test binary is run as a pair handler; the
   gate proves descriptor attach/registry acceptance and ABI-3 refusal.
-- [ ] **2.6 Floor + CCD.** Per-part floor manifolds under the existing
+- [x] **2.6 Floor + CCD.** Per-part floor manifolds under the existing
   plane path (gate `mig_floor_ccd_composite`: tumbling L-composite
   clamps before tunneling at canonical dt, no landing pump); floor CCD
   lowest-point scan over parts; volume sweeps stay bounding-sphere.
   Rotation-only tunneling stays unsupported — same frontier as v15S,
   now named once for composites in the same sentence.
+  LANDED 2026-11-08 (`bc395b2`). Floor: `mpe_composite_floor_detect`
+  (`core/physics_world.c:1401`) walks the active part slice, refreshes a
+  fresh ghost per part through the 2.4 helper, and runs the unchanged
+  `collision_static_plane_body`; each touching part becomes its own
+  staged `collision_data` with `object_a` remapped to the parent,
+  `object_b` the static plane, and every contact stamped `part_a = part
+  index`, `part_b = 0`. The whole batch is staged before the wake
+  decision so one `rigidbody_wake` on the deepest staged penetration
+  precedes every `collision_prepare_solver`, and each manifold is then
+  prepared/appended individually; a manifold-array grow failure drops
+  only the affected staged manifold and counts it in
+  `manifold_overflow_count`. Non-composite bodies keep the original
+  single-manifold branch byte-for-byte. CCD: the phase-1 sweep gained a
+  world-aware entry (`collision_ccd_toi_range_world` at
+  `physics/collision_ccd.c:441`, declaration at
+  `collision_mechanics.h:359`; the parallel worker at
+  `physics_world.c:408` uses it), and the floor TOI consumes
+  `ccd_composite_support_point` (`collision_ccd.c:118`) — the actual
+  lowest point of each active part (sphere bottom, cube projected
+  corner, cylinder cap+barrel) offset by its rotated local center,
+  including the horizontal lever arm for the `w × r` term — instead of
+  the old body-level box support. `ccd_min_thickness_world` (`:152`)
+  takes the minimum active part thickness, and `ccd_sweep_clamp_full_impl`
+  (`:548`) carries the world pointer through the existing full sweep.
+  Volume sweeps deliberately keep `broadphase_bounding_radius`: a
+  composite joins the bounding-sphere obstacle branch, and no per-part
+  swept-volume claim is made. Rotation-only tunneling remains the v15S
+  frontier, unchanged. Gate `mig_floor_ccd_composite`
+  (`tests/mpe_suite_mig.c:1577`, extern/registry
+  `mpe_suite_main.c:117/:241`, 54th blocking) pins hand oracles: the
+  two-sphere dumbbell over the plane emits exactly two parent-stamped
+  floor manifolds with contacts at x = ±0.5 and depth 0.01; a 45 deg Z
+  L-composite at y = 0.5975 has true lowest point 0.2793 m while the old
+  box support read −0.0010 m (inside the resting slop), and a −30 m/s +
+  10 rad/s tumble clamps
+  in-tick with time remaining in (0, dt), then survives 30 landing ticks
+  with max upward speed < 0.5 m/s and no penetration below −0.05 m.
+  Falsifiability was proven, not assumed: temporarily forcing
+  `ccd_composite_support_point` to return false made the clamped,
+  time-remaining and lowest-after checks fail (3 failures); the mutation
+  was restored and rebuilt. ASan/UBSan run is clean for the new gate and
+  the other MIG/determinism gates; the target as written still fails
+  only the pre-existing `loader_lifecycle` / `ftc_ecosystem` pair
+  (50/52, recorded in §9). No struct grows and no ABI moves in 2.6.
 - [ ] **2.7 Renderer.** composite draws per part through the existing
   cube/sphere/cylinder meshing+instancing paths with part poses;
   body-level `no_collide` respected. (Mesh instance count guard: parts
   are bounded by P2's cap — no renderer unboundedness.)
 - [ ] **2.8 Gates** (each its own suite entry, floor bump same commit):
   `mig_composite_stack` (10-primitive stack vs one 10-part composite,
-  same mass/materials: both settle asleep); `mig_floor_ccd_composite`;
-  part-scoped cache probe (two resting parts → distinct cache entries,
+  same mass/materials: both settle asleep); `mig_floor_ccd_composite`
+  — ALREADY LANDED as the 54th entry in `bc395b2` (WP2 2.6), rather
+  than deferred, because the step's own contract is the gate; part-scoped
+  cache probe (two resting parts → distinct cache entries,
   warm starts never cross) — ALREADY LANDED inside
   `mig_composite_narrowphase` in `0a03b85` rather than as a later
   duplicate entry, because the ORDER MATTERS rule put the identity work
@@ -807,7 +871,9 @@ reference gates force it.
   `mig_composite_stack` sleep gate is named BEFORE 2.6 lands; pair-
   novelty wake should cover by construction; if it does not, the debugging
   path is the F10 root-cause record and the solver islands' sleep gates,
-  documented in that order.
+  documented in that order. 2.6 landed with the floor/CCD gate
+  (`mig_floor_ccd_composite`, `bc395b2`); `mig_composite_stack` itself
+  remains a 2.8 gate.
 - **Ghost-view determinism** — memcpy order fixed = parent index order;
   ghost refresh per pair is deterministic; TSan + 1/4/8 twins are the
   always-runs, not the once-runs.
@@ -1048,6 +1114,57 @@ Ledger (new entries get a line, never an edit of a past line):
   asan target as written still fails only `loader_lifecycle` and
   `ftc_ecosystem` on undefined symbol `g_cfg` from its missing
   `-rdynamic` (49/51, pre-existing, unchanged, outside 2.4/2.5). No
+  pre-existing engine defect surfaced; no numbers moved outside the new
+  gate's own assertions.
+- 2026-11-08 — WP2 step 2.6 landed (`bc395b2`), the sixth
+  engine-touching MIG commit and the fifth WP2 one. Scope: per-part
+  composite floor manifolds and the floor CCD lowest-point scan. Floor:
+  `mpe_composite_floor_detect` walks the active part slice, refreshes a
+  fresh ghost per part through the 2.4 helper, and runs the unchanged
+  `collision_static_plane_body`; each touching part becomes its own
+  staged manifold with PARENT `object_a`, the static plane as
+  `object_b`, and every contact stamped `part_a = part index`,
+  `part_b = 0`. The batch is staged before the wake decision so one
+  `rigidbody_wake` on the deepest staged penetration precedes every
+  `collision_prepare_solver`; each manifold is prepared/appended
+  individually, and a manifold-array grow failure drops only the
+  affected staged manifold into `manifold_overflow_count`. Non-composite
+  bodies keep the original single-manifold branch unchanged. CCD: the
+  sweep gained a world-aware phase-1 entry
+  (`collision_ccd_toi_range_world`, used by the parallel worker); the
+  floor TOI consumes the true active-part support point in
+  parent-COM-relative coordinates (sphere bottom, cube projected corner,
+  cylinder cap+barrel, horizontal lever arm included), and
+  `ccd_min_thickness_world` uses the minimum active part thickness.
+  Volume sweeps keep `broadphase_bounding_radius` and composites join
+  the bounding-sphere obstacle branch; rotation-only tunneling remains
+  the v15S frontier, unchanged. Gate `mig_floor_ccd_composite`
+  (`tests/mpe_suite_mig.c:1577`, extern/registry
+  `mpe_suite_main.c:117/:241`, 54th blocking): the two-sphere dumbbell
+  over the plane emits exactly two parent-stamped floor manifolds with
+  contacts at x = ±0.5 and depth 0.01; a 45 deg Z L-composite at
+  y = 0.5975 has true lowest 0.2793 m while the old box support read
+  −0.0010 m (inside the resting slop), and a −30 m/s + 10 rad/s tumble
+  clamps in-tick (time
+  remaining in (0, dt)), then survives 30 landing ticks with max upward
+  speed < 0.5 m/s and no penetration below −0.05 m. Incidents: two,
+  gate-side and engine-untouched — the independence oracle first forgot
+  to add the parent COM to its part-lowest start (reported −0.318198
+  vs 0.2793), and the quaternion helper was rewritten with a local
+  cross product so the gate never calls engine math. Gate
+  falsifiability was proven: forcing `ccd_composite_support_point` to
+  return false made the clamped, time-remaining and lowest-after checks
+  fail (3 failures); the mutation was restored and rebuilt. Engine
+  truth: no struct grows, no config key moves, `MPE_MODULE_ABI` stays
+  2; every new floor/CCD branch is composite- or world-pointer-gated,
+  and the in-suite `determinism` twin stays bitwise identical. Battery:
+  suite 54 total, 52/52 blocking + 2 diag; the new gate passes default
+  plus light/heavy/brittle/sticky; quick 68/68; `make everything` exit 0
+  (log /tmp/opencode/make_everything_26b.log). ASan/UBSan:
+  `mig_floor_ccd_composite` is clean with no sanitizer report, while
+  the asan target as written still fails only `loader_lifecycle` and
+  `ftc_ecosystem` on undefined symbol `g_cfg` from its missing
+  `-rdynamic` (50/52, pre-existing, unchanged, outside 2.6). No
   pre-existing engine defect surfaced; no numbers moved outside the new
   gate's own assertions.
 
