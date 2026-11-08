@@ -44,6 +44,125 @@ static float ccd_min_thickness (const rigidbody *body) {
     if (body -> type == object_custom) { return body -> radius; }
     if (body -> type == object_cylinder) { return fminf (body -> radius, body -> cylinder_half_length); }
     return fminf (body -> half_extensions.x, fminf (body -> half_extensions.y, body -> half_extensions.z));
+} /* MIG WP2 2.6: composite floor support. The body-level fields of a
+ * composite are its authored covering sphere (bound), not its collision
+ * surface: reading them as a box both overstates the lowest point and
+ * discards the horizontal lever arm, so a tumbling assembly is clamped
+ * late (or not at all when the conservative depth makes it look already
+ * resting). These helpers walk the active part slice and return the true
+ * tick-start support point in parent-COM-relative coordinates. Volume
+ * sweeps deliberately keep using broadphase_bounding_radius: per-part
+ * swept volumes are not a WP2.6 deliverable. */
+static const composite_part *ccd_composite_part_at (const physics_world *world,
+                                                    const rigidbody *body, int slot) {
+    if ((!world) || (!body) || (body -> type != object_composite)) { return NULL; }
+    if ((body -> part_base < 0) || (body -> composite_part_count < 0)) { return NULL; }
+    if ((slot < 0) || (slot >= body -> composite_part_count)) { return NULL; }
+    long index = (long) body -> part_base + (long) slot;
+    if ((index < 0) || (index >= (long) world -> composite_part_count)) { return NULL; }
+    return &world -> composite_parts [index];
+} static float ccd_down_sign (float y) {
+    if (y > 0.0f) { return 1.0f; }
+    if (y < 0.0f) { return -1.0f; }
+    return 0.0f;
+} /* Support point of one part in world -Y, relative to the part centre.
+ * Sphere: bottom point. Cube: the corner selected by the world-down
+ * direction on each body axis. Cylinder (axle local X): cap term
+ * -h*sign(axis.y)*axis plus the radial barrel term. */
+static bool ccd_part_support_down (const rigidbody *parent, const composite_part *part, vector3 *out) {
+    if ((!parent) || (!part) || (!out)) { return false; }
+    if (part -> type == object_sphere) {
+        float r = part -> radius;
+        if ((!isfinite (r)) || (!(r > 0.0f))) { return false; }
+        *out = (vector3) {0.0f, -r, 0.0f};
+        return true;
+    }
+    vector4 q = vector4_normalisation (
+        vector4_multiplication (parent -> orientation, part -> local_orientation));
+    math3 rotation = vector4_to_math3 (q);
+    vector3 axis_x = {rotation.matrix [0][0], rotation.matrix [1][0], rotation.matrix [2][0]};
+    vector3 axis_y = {rotation.matrix [0][1], rotation.matrix [1][1], rotation.matrix [2][1]};
+    vector3 axis_z = {rotation.matrix [0][2], rotation.matrix [1][2], rotation.matrix [2][2]};
+    if (part -> type == object_cube) {
+        vector3 h = part -> half_extensions;
+        if ((!isfinite (h.x)) || (!isfinite (h.y)) || (!isfinite (h.z)) ||
+            (!(h.x > 0.0f)) || (!(h.y > 0.0f)) || (!(h.z > 0.0f))) {
+            return false;
+        } *out = simd_add (
+            simd_add (simd_scale (axis_x, -ccd_down_sign (axis_x.y) * h.x),
+                      simd_scale (axis_y, -ccd_down_sign (axis_y.y) * h.y)),
+            simd_scale (axis_z, -ccd_down_sign (axis_z.y) * h.z));
+        return isfinite (out -> x) && isfinite (out -> y) && isfinite (out -> z);
+    }
+    if (part -> type == object_cylinder) {
+        float r = part -> radius;
+        float h = part -> cylinder_half_length;
+        if ((!isfinite (r)) || (!isfinite (h)) || (!(r > 0.0f)) || (!(h > 0.0f))) { return false; }
+        float axis_len = vector3_length (axis_x);
+        if ((!isfinite (axis_len)) || (!(axis_len > 1e-6f))) { return false; }
+        vector3 axis = simd_scale (axis_x, 1.0f / axis_len);
+        float ay = axis.y;
+        if (ay > 1.0f) { ay = 1.0f; }
+        if (ay < -1.0f) { ay = -1.0f; }
+        vector3 down = {0.0f, -1.0f, 0.0f};
+        /* radial = down - axis*(down.axis) = down + ay*axis */
+        vector3 radial = simd_add (down, simd_scale (axis, ay));
+        float radial_len = vector3_length (radial);
+        vector3 side = vector3_zero ();
+        if (radial_len > 1e-6f) { side = simd_scale (radial, r / radial_len); }
+        vector3 caps = simd_scale (axis, -h * ccd_down_sign (ay));
+        *out = simd_add (caps, side);
+        return isfinite (out -> x) && isfinite (out -> y) && isfinite (out -> z);
+    }
+    return false;
+} static bool ccd_composite_support_point (const physics_world *world, const rigidbody *body,
+                                          vector3 *r_lowest_out) {
+    if ((!world) || (!body) || (!r_lowest_out) || (body -> type != object_composite)) { return false; }
+    bool found = false;
+    float lowest_y = 0.0f;
+    vector3 lowest = vector3_zero ();
+    for (int slot = 0; slot < body -> composite_part_count; slot++) {
+        const composite_part *part = ccd_composite_part_at (world, body, slot);
+        if ((!part) || (!part -> active)) { continue; }
+        vector3 support;
+        if (!ccd_part_support_down (body, part, &support)) { continue; }
+        vector3 center = vector4_rotate_to_vector3 (body -> orientation, part -> local_position);
+        vector3 point = simd_add (center, support);
+        if ((!isfinite (point.x)) || (!isfinite (point.y)) || (!isfinite (point.z))) { continue; }
+        if ((!found) || (point.y < lowest_y)) {
+            lowest_y = point.y;
+            lowest = point;
+            found = true;
+        }
+    }
+    if (!found) { return false; }
+    *r_lowest_out = lowest;
+    return true;
+} static float ccd_part_min_thickness (const composite_part *part) {
+    if (!part) { return 0.0f; }
+    if (part -> type == object_sphere) { return part -> radius; }
+    if (part -> type == object_cylinder) {
+        return fminf (part -> radius, part -> cylinder_half_length);
+    }
+    if (part -> type == object_cube) {
+        return fminf (part -> half_extensions.x,
+                      fminf (part -> half_extensions.y, part -> half_extensions.z));
+    }
+    return 0.0f;
+} static float ccd_min_thickness_world (const physics_world *world, const rigidbody *body) {
+    if ((!world) || (!body) || (body -> type != object_composite)) { return ccd_min_thickness (body); }
+    bool found = false;
+    float best = FLT_MAX;
+    for (int slot = 0; slot < body -> composite_part_count; slot++) {
+        const composite_part *part = ccd_composite_part_at (world, body, slot);
+        if ((!part) || (!part -> active)) { continue; }
+        float thickness = ccd_part_min_thickness (part);
+        if (isfinite (thickness) && (thickness > 0.0f) && (thickness < best)) {
+            best = thickness;
+            found = true;
+        }
+    }
+    return found ? best : ccd_min_thickness (body);
 } /* Earliest positive time at which |dp + dv*t| reaches radius. Compute the
  * quadratic in double and use the cancellation-resistant q formulation; the
  * direct (-b-sqrt(D))/(2a) root loses the near root for distant/high-speed
@@ -89,9 +208,9 @@ static float ccd_sphere_sweep_toi (vector3 dp, vector3 dv, float radius, float d
  * closing on each other both stop exactly at contact instead of the
  * first-clamped body hiding the second's TOI from an interleaved pass.
  * Returns the number of hits recorded. */
-int collision_ccd_toi_range (rigidbody *bodies, int body_count, int start, int end,
-                             float dt, const mpe_config_t *C,
-                             float *best_tois_out, unsigned char *hit_flags_out) {
+static int ccd_toi_range_internal (const physics_world *world, rigidbody *bodies, int body_count,
+                                   int start, int end, float dt, const mpe_config_t *C,
+                                   float *best_tois_out, unsigned char *hit_flags_out) {
     if ((!bodies) || (body_count <= 0) || (start < 0) || (end > body_count) || (start >= end) ||
         (!(dt > 0.0f)) || !isfinite (dt) || !C || !best_tois_out || !hit_flags_out) {
         return 0;
@@ -116,7 +235,7 @@ int collision_ccd_toi_range (rigidbody *bodies, int body_count, int start, int e
         if ((!isfinite (bound_r)) || (bound_r < 0.0f)) { bound_r = 0.0f; }
         float sweep_speed = lin_speed + ang_speed * bound_r;
         if (sweep_speed <= 0.0001f) { continue; }
-        float thickness = ccd_min_thickness (mover);
+        float thickness = ccd_min_thickness_world (world, mover);
         if ((thickness <= 0.0f) || (!isfinite (thickness))) { continue; }
         float displacement = sweep_speed * dt;
         bool do_volumes = displacement > fminf (thickness, 0.2f);
@@ -125,8 +244,18 @@ int collision_ccd_toi_range (rigidbody *bodies, int body_count, int start, int e
         } float best_toi = dt;
         bool hit = false;
         /* 1. Floor plane y = 0. */
-        float r_lowest_y = ccd_support_depth (mover);
-        float lowest = mover -> position.y - r_lowest_y;
+        vector3 r_lowest = {0.0f, 0.0f, 0.0f};
+        float lowest = 0.0f;
+        if ((mover -> type == object_composite) && world &&
+            ccd_composite_support_point (world, mover, &r_lowest)) {
+            /* WP2 2.6: the actual lowest part point, with its horizontal
+             * lever arm for the angular term below. */
+            lowest = mover -> position.y + r_lowest.y;
+        } else {
+            float r_lowest_y = ccd_support_depth (mover);
+            r_lowest = (vector3) {0.0f, -r_lowest_y, 0.0f};
+            lowest = mover -> position.y - r_lowest_y;
+        }
         /* DESPOT-2026-10-21 (RESTING-GATE): a body already resting inside the
          * solver's penetration-slop band is IN contact with the floor, not
          * about to tunnel through it. Its gravity root here is not a real
@@ -149,7 +278,6 @@ int collision_ccd_toi_range (rigidbody *bodies, int body_count, int start, int e
                                still tunnel sideways into obstacles */ }
             else { continue; }
         } else {
-        vector3 r_lowest = {0.0f, -r_lowest_y, 0.0f};
         vector3 w_cross_rlow = vector3_cross (mover -> angular_velocity, r_lowest);
         float v0 = mover -> velocity.y + w_cross_rlow.y;
         {
@@ -194,7 +322,8 @@ int collision_ccd_toi_range (rigidbody *bodies, int body_count, int start, int e
                 rigidbody *other = &bodies [j];
                 if (other -> no_collide) { continue; }
                 vector3 other_v = ((other -> static_state) || (other -> is_sleeping)) ? vector3_zero () : other -> velocity;
-                if ((other -> type == object_sphere) || (other -> type == object_custom)) {
+                if ((other -> type == object_sphere) || (other -> type == object_custom) ||
+                    (other -> type == object_composite)) {
                     vector3 dp = simd_sub (other -> position, mover -> position);
                     vector3 dv = simd_sub (other_v, mover -> velocity);
                     float mover_radius =
@@ -303,6 +432,19 @@ int collision_ccd_toi_range (rigidbody *bodies, int body_count, int start, int e
     }
     return hits;
 }
+int collision_ccd_toi_range (rigidbody *bodies, int body_count, int start, int end,
+                             float dt, const mpe_config_t *C,
+                             float *best_tois_out, unsigned char *hit_flags_out) {
+    return ccd_toi_range_internal (NULL, bodies, body_count, start, end, dt, C,
+                                   best_tois_out, hit_flags_out);
+}
+int collision_ccd_toi_range_world (const struct physics_world *world, int start, int end,
+                                   float dt, const mpe_config_t *C,
+                                   float *best_tois_out, unsigned char *hit_flags_out) {
+    if ((!world) || (!world -> bodies) || (world -> body_count <= 0)) { return 0; }
+    return ccd_toi_range_internal (world, world -> bodies, world -> body_count, start, end, dt, C,
+                                   best_tois_out, hit_flags_out);
+}
 /* Phase 2 of the symmetric two-phase CCD sweep: apply the recorded TOI
  * clamp for bodies [start, end). MUST run only after phase 1 completed for
  * the WHOLE body set (barrier): the TOIs were computed from tick-start
@@ -403,8 +545,9 @@ int collision_ccd_sweep_clamp_range (rigidbody *bodies, int body_count, int star
     return collision_ccd_apply_range (bodies, body_count, start, end, dt, C, time_remaining_out,
                                       best_tois_out, hit_flags_out);
 }
-int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt, float *time_remaining_out,
-                                    const mpe_config_t *cfg, float *best_tois_out, unsigned char *hit_flags_out) {
+static int ccd_sweep_clamp_full_impl (const physics_world *world, rigidbody *bodies, int body_count,
+                                      float dt, float *time_remaining_out, const mpe_config_t *cfg,
+                                      float *best_tois_out, unsigned char *hit_flags_out) {
     if ((!bodies) || (body_count <= 0) || (!(dt > 0.0f)) || !isfinite (dt)) { return 0; }
     /* TRUTH: low-memory NULL path must NOT pre-move. Degraded mode: discrete only. */
     bool record_remainder = (time_remaining_out != NULL);
@@ -437,7 +580,7 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
      * Symmetric pairs (two bodies closing on each other) both stop exactly
      * at contact instead of the first-clamped body hiding the second's TOI
      * from an interleaved pass. */
-    collision_ccd_toi_range (bodies, body_count, 0, body_count, dt, cfg, best_tois, hit_flags);
+    ccd_toi_range_internal (world, bodies, body_count, 0, body_count, dt, cfg, best_tois, hit_flags);
     int clamped = 0;
     if (record_remainder) {
         clamped = collision_ccd_apply_range (bodies, body_count, 0, body_count, dt, cfg,
@@ -450,12 +593,16 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
         free (hit_flags);
     } return clamped;
 }
+int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt, float *time_remaining_out,
+                                    const mpe_config_t *cfg, float *best_tois_out, unsigned char *hit_flags_out) {
+    return ccd_sweep_clamp_full_impl (NULL, bodies, body_count, dt, time_remaining_out, cfg,
+                                      best_tois_out, hit_flags_out);
+}
 int collision_ccd_sweep_clamp (rigidbody *bodies, int body_count, float dt) {return collision_ccd_sweep_clamp_full (bodies, body_count, dt, NULL, NULL, NULL, NULL);}
 int collision_ccd_sweep_clamp_world (struct physics_world *world, float dt) {
     if (!world || !world -> bodies || world -> body_count <= 0) { return 0; }
     const mpe_config_t *C = world -> cfg ? world -> cfg : &g_cfg;
-    if (world -> ccd_time_remaining) {
-        return collision_ccd_sweep_clamp_full (world -> bodies, world -> body_count, dt, world -> ccd_time_remaining, C,
-                                               world -> ccd_best_tois, world -> ccd_hit_flags);
-    } return collision_ccd_sweep_clamp_full (world -> bodies, world -> body_count, dt, NULL, C, NULL, NULL);
+    return ccd_sweep_clamp_full_impl (world, world -> bodies, world -> body_count, dt,
+                                      world -> ccd_time_remaining, C,
+                                      world -> ccd_best_tois, world -> ccd_hit_flags);
 }

@@ -3,7 +3,7 @@
 
 Profiles:
   quick    Python runner-contract tests and the canonical C regression suite
-           (53 cases incl. 2 informational diags; full suite re-run under 5
+           (54 cases incl. 2 informational diags; full suite re-run under 5
            regimes default/light/heavy/brittle/sticky via MPE_TEST_REGIME).
   physics  quick + every isolated legacy case (30) and all paranoia cases (15).
   full     physics + ASan/UBSan suite, MFS robotics (30 gated), TUI snapshots
@@ -16,7 +16,7 @@ only the Python standard library.
 
 Strict contract: suite cases that print [SKIP] (self-skipped coverage) fail
 the run unless --allow-skip is given; [XFAIL] markers are surfaced in the
-summary counts but never block. Registry floors: MIN_SUITE_ENTRIES=53,
+summary counts but never block. Registry floors: MIN_SUITE_ENTRIES=54,
 MIN_LEGACY_ENTRIES=30, MIN_PARANOIA_ENTRIES=15; summary contract requires
 Total == registry size and Blocking failures == 0.
 """
@@ -149,7 +149,11 @@ MPE_TEST_REGIMES = ("default", "light", "heavy", "brittle", "sticky")
 # identities with per-contact part stamps, part-local orientation through the
 # AABB prefilter and primitive path, part-scoped warm-start keys, and the
 # plugin ABI 1->2 range acceptance).
-MIN_SUITE_ENTRIES = 53
+# -> 54 (2026-11-08, mig_floor_ccd_composite: WP2 2.6 gate — per-part floor
+# manifolds over the infinite plane (parent identity, part stamps) and the
+# floor CCD lowest-point scan over the part pool: a tumbling L clamps before
+# tunneling at canonical dt and landing does not pump upward).
+MIN_SUITE_ENTRIES = 54
 # DESPOT-2026-10-01: pin per-suite floors so deleting a legacy/paranoia target
 # + its make target together cannot shrink the headline silently (the 220->204
 # drift). Canonical floor above; legacy 30 + paranoia 15 pinned here.

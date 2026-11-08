@@ -352,6 +352,13 @@ int collision_ccd_sweep_clamp_full (rigidbody *bodies, int body_count, float dt,
 int collision_ccd_toi_range (rigidbody *bodies, int body_count, int start, int end,
                              float dt, const mpe_config_t *cfg,
                              float *best_tois_out, unsigned char *hit_flags_out);
+/* MIG WP2 2.6: world-aware phase 1. Identical sweep, plus composite
+ * bodies resolve their per-part floor support point from the world's part
+ * pool instead of the body-level covering-sphere approximation. */
+struct physics_world;
+int collision_ccd_toi_range_world (const struct physics_world *world, int start, int end,
+                                   float dt, const mpe_config_t *cfg,
+                                   float *best_tois_out, unsigned char *hit_flags_out);
 int collision_ccd_apply_range (rigidbody *bodies, int body_count, int start, int end,
                                float dt, const mpe_config_t *cfg,
                                float *time_remaining_out, const float *best_tois_in,

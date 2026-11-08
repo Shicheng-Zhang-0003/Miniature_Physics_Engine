@@ -405,9 +405,9 @@ typedef struct {
 } mpe_ccd_slice_t;
 static void mpe_ccd_toi_range (void *data, int start, int end) {
     mpe_ccd_slice_t *s = (mpe_ccd_slice_t *) data;
-    collision_ccd_toi_range (s -> world -> bodies, s -> world -> body_count, start, end,
-                             s -> dt, s -> cfg,
-                             s -> world -> ccd_best_tois, s -> world -> ccd_hit_flags);
+    collision_ccd_toi_range_world (s -> world, start, end,
+                                   s -> dt, s -> cfg,
+                                   s -> world -> ccd_best_tois, s -> world -> ccd_hit_flags);
 }
 static void mpe_ccd_apply_range (void *data, int start, int end) {
     mpe_ccd_slice_t *s = (mpe_ccd_slice_t *) data;
@@ -1386,6 +1386,51 @@ static void mpe_composite_ghost_refresh (rigidbody *ghost, const rigidbody *pare
     ghost -> composite_part_count = 0;
     ghost -> part_base = 0;
     rigidbody_update_axes (ghost);
+} /* MIG WP2 2.6: stage one floor manifold per touching composite part.
+ * The existing static-plane primitive path runs against the same ghost
+ * views as 2.4; the solver identity is remapped to the parent and every
+ * contact carries the part index, so floor warm starts are part-scoped
+ * exactly like broadphase contacts. Manifolds are staged before the wake
+ * decision because a sleeping parent must be awake before its floor
+ * manifolds run collision_prepare_solver (effective mass is read there). */
+typedef struct {
+    collision_data manifolds [MPE_COMPOSITE_MAX_PARTS];
+    int count;
+    float deepest;
+} mpe_composite_floor_batch;
+static void mpe_composite_floor_detect (physics_world *world, rigidbody *rb, const mpe_config_t *cfg,
+                                        mpe_composite_floor_batch *batch) {
+    batch -> count = 0;
+    batch -> deepest = 0.0f;
+    if ((!world) || (!rb) || (!cfg) || (rb -> type != object_composite)) { return; }
+    for (int slot = 0; slot < rb -> composite_part_count; slot++) {
+        const composite_part *part = mpe_composite_part_at (world, rb, slot);
+        if ((!part) || (!part -> active)) { continue; }
+        rigidbody ghost;
+        mpe_composite_ghost_refresh (&ghost, rb, part);
+        collision_data part_floor = {0};
+        if (!collision_static_plane_body (&world -> static_plane_body, &ghost, 0.0f,
+                                          &part_floor, cfg)) { continue; }
+        if (part_floor.contact_count <= 0) { continue; }
+        part_floor.object_a = rb;
+        part_floor.object_b = &world -> static_plane_body;
+        uint8_t part_index = ((part -> part_index >= 0) && (part -> part_index <= 255))
+                                 ? (uint8_t) part -> part_index : 0u;
+        float part_deepest = 0.0f;
+        for (int c = 0; c < part_floor.contact_count; c++) {
+            part_floor.contacts [c].part_a = part_index;
+            part_floor.contacts [c].part_b = 0u;
+            if (part_floor.contacts [c].penetration > part_deepest) {
+                part_deepest = part_floor.contacts [c].penetration;
+            }
+        }
+        if (part_deepest > batch -> deepest) { batch -> deepest = part_deepest; }
+        if (batch -> count < MPE_COMPOSITE_MAX_PARTS) {
+            batch -> manifolds [batch -> count++] = part_floor;
+        } else {
+            world -> manifold_overflow_count++;
+        }
+    }
 } static float mpe_vector3_axis (vector3 value, int axis) {
     return (axis == 0) ? value.x : ((axis == 1) ? value.y : value.z);
 } /* Conservative world AABB of one primitive (the local box hull of a
@@ -2170,21 +2215,47 @@ void physics_world_step (physics_world *world, float dt) {
             world -> static_plane_body.friction_static = step_cfg -> world.floor_friction_s;
             world -> static_plane_body.friction_kinetic = step_cfg -> world.floor_friction_k;
             bool was_sleeping = rb -> is_sleeping;
-            collision_data floor_collision = {0};
-            if (collision_static_plane_body (&world -> static_plane_body, rb, 0.0f, &floor_collision, step_cfg)) {
-                if (manifold_count >= world -> manifold_capacity) {
-                    if (physics_world_grow_manifolds (world) != 0) {
-                        world -> manifold_overflow_count++;
-                        continue;
-                    }
-                } float deepest = 0.0f;
-                for (int fi = 0; fi < floor_collision.contact_count; fi++) {
-                    if (floor_collision.contacts [fi].penetration > deepest) { deepest = floor_collision.contacts [fi].penetration; }
+            if (rb -> type == object_composite) {
+                /* MIG WP2 2.6: the plane path is the same primitive path
+                 * per part; one manifold per touching part keeps each
+                 * part's normal/contact frame separate. */
+                mpe_composite_floor_batch floor_batch;
+                mpe_composite_floor_detect (world, rb, step_cfg, &floor_batch);
+                if (floor_batch.count > 0) {
+                    if (was_sleeping && floor_batch.deepest > step_cfg -> depenetration.wake_depth_thresh) {
+                        rigidbody_wake (rb);
+                    } bool appended = false;
+                    bool storage_failed = false;
+                    for (int fk = 0; fk < floor_batch.count; fk++) {
+                        if (manifold_count >= world -> manifold_capacity) {
+                            if (storage_failed || physics_world_grow_manifolds (world) != 0) {
+                                storage_failed = true;
+                                world -> manifold_overflow_count++;
+                                continue;
+                            }
+                        } collision_prepare_solver (world, &floor_batch.manifolds [fk],
+                                                    &world -> manifolds [manifold_count], dt);
+                        manifold_count++;
+                        appended = true;
+                    } if (appended && world -> has_contact) { world -> has_contact [i] = 1; }
                 }
-                if (was_sleeping && deepest > step_cfg -> depenetration.wake_depth_thresh) { rigidbody_wake (rb); }
-                collision_prepare_solver (world, &floor_collision, &world -> manifolds [manifold_count], dt);
-                manifold_count++;
-                if (world -> has_contact) { world -> has_contact [i] = 1; }
+            } else {
+                collision_data floor_collision = {0};
+                if (collision_static_plane_body (&world -> static_plane_body, rb, 0.0f, &floor_collision, step_cfg)) {
+                    if (manifold_count >= world -> manifold_capacity) {
+                        if (physics_world_grow_manifolds (world) != 0) {
+                            world -> manifold_overflow_count++;
+                            continue;
+                        }
+                    } float deepest = 0.0f;
+                    for (int fi = 0; fi < floor_collision.contact_count; fi++) {
+                        if (floor_collision.contacts [fi].penetration > deepest) { deepest = floor_collision.contacts [fi].penetration; }
+                    }
+                    if (was_sleeping && deepest > step_cfg -> depenetration.wake_depth_thresh) { rigidbody_wake (rb); }
+                    collision_prepare_solver (world, &floor_collision, &world -> manifolds [manifold_count], dt);
+                    manifold_count++;
+                    if (world -> has_contact) { world -> has_contact [i] = 1; }
+                }
             }
         }
     }

@@ -1499,3 +1499,188 @@ int mpe_t_mig_composite_narrowphase (void) {
     mpe_test_end (&t);
     return t.failures;
 }
+
+/* WP2 2.6 gate helpers: independent quaternion math, written here so the
+ * floor-support oracle never calls the engine's rotation/support code. */
+static vector3 mig_gate_cross (vector3 a, vector3 b) {
+    return (vector3) {a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x};
+} static vector3 mig_gate_qrotate (vector4 q, vector3 v) {
+    vector3 u = {q.x, q.y, q.z};
+    vector3 t = mig_gate_cross (u, v);
+    t = (vector3) {2.0f * t.x, 2.0f * t.y, 2.0f * t.z};
+    vector3 ut = mig_gate_cross (u, t);
+    return (vector3) {v.x + q.w * t.x + ut.x, v.y + q.w * t.y + ut.y,
+                      v.z + q.w * t.z + ut.z};
+} static vector4 mig_gate_qmul (vector4 a, vector4 b) {
+    return (vector4) {
+        a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z,
+        a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
+        a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
+        a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w
+    };
+} static vector4 mig_gate_qnorm (vector4 q) {
+    float n = sqrtf (q.w * q.w + q.x * q.x + q.y * q.y + q.z * q.z);
+    if ((!isfinite (n)) || (!(n > 1e-12f))) { return (vector4) {1.0f, 0.0f, 0.0f, 0.0f}; }
+    float inv = 1.0f / n;
+    return (vector4) {q.w * inv, q.x * inv, q.y * inv, q.z * inv};
+} /* Exact world -Y of every active part's lowest point, hand-derived:
+ * sphere bottom; cube projected corner; cylinder cap+barrel formula. */
+static float mig_gate_composite_lowest_y (const physics_world *world, const rigidbody *body) {
+    float lowest = INFINITY;
+    if ((!world) || (!body) || (body -> type != object_composite)) { return lowest; }
+    for (int slot = 0; slot < body -> composite_part_count; slot++) {
+        long index = (long) body -> part_base + (long) slot;
+        if ((index < 0) || (index >= (long) world -> composite_part_count)) { continue; }
+        const composite_part *part = &world -> composite_parts [index];
+        if (!part -> active) { continue; }
+        vector3 center = mig_gate_qrotate (body -> orientation, part -> local_position);
+        float part_lowest = INFINITY;
+        if (part -> type == object_sphere) {
+            part_lowest = center.y - part -> radius;
+        } else if (part -> type == object_cube) {
+            vector4 q = mig_gate_qnorm (mig_gate_qmul (body -> orientation, part -> local_orientation));
+            vector3 ax0 = mig_gate_qrotate (q, (vector3) {1.0f, 0.0f, 0.0f});
+            vector3 ax1 = mig_gate_qrotate (q, (vector3) {0.0f, 1.0f, 0.0f});
+            vector3 ax2 = mig_gate_qrotate (q, (vector3) {0.0f, 0.0f, 1.0f});
+            part_lowest = center.y - (part -> half_extensions.x * fabsf (ax0.y) +
+                                      part -> half_extensions.y * fabsf (ax1.y) +
+                                      part -> half_extensions.z * fabsf (ax2.y));
+        } else if (part -> type == object_cylinder) {
+            vector4 q = mig_gate_qnorm (mig_gate_qmul (body -> orientation, part -> local_orientation));
+            vector3 axis = mig_gate_qrotate (q, (vector3) {1.0f, 0.0f, 0.0f});
+            float ay = axis.y;
+            if (ay > 1.0f) { ay = 1.0f; }
+            if (ay < -1.0f) { ay = -1.0f; }
+            part_lowest = center.y - (part -> radius * sqrtf (fmaxf (0.0f, 1.0f - ay * ay)) +
+                                      part -> cylinder_half_length * fabsf (ay));
+        } else {
+            continue;
+        }
+        if (part_lowest < lowest) { lowest = part_lowest; }
+    }
+    return (lowest == INFINITY) ? lowest : (body -> position.y + lowest);
+}
+
+/* WP2 2.6 gate (plan §4): per-part floor manifolds + floor CCD lowest
+ * point. Oracles are hand geometry:
+ *  - the low dumbbell's two sphere parts both rest over the infinite
+ *    plane, so the step emits TWO floor manifolds with parent object
+ *    identity, part stamps 0/1 and the per-part contact x = -/+0.5;
+ *  - a 45 deg Z L-composite is positioned so the old body-level box
+ *    support (bound * (|ax0.y|+|ax1.y|+|ax2.y|)) would claim it is already
+ *    resting on the floor while its real lowest corner is ~0.28 m above
+ *    it; a -30 m/s vertical + 10 rad/s tumble then drops 0.5 m in one
+ *    canonical tick. The world floor sweep must clamp at the real lowest
+ *    point before the L tunnels, and must not pump the body upward;
+ *  - thirty landing ticks keep the body on the plane (no upward launch,
+ *    no penetration below the solver slop). */
+int mpe_t_mig_floor_ccd_composite (void) {
+    mpe_test_t t;
+    mpe_test_begin (&t, "mig_floor_ccd_composite");
+    mpe_clamp_counters_reset ();
+    const float dt = 1.0f / 60.0f;
+    /* --- 1. per-part floor manifolds ----------------------------------- */
+    physics_world wfloor;
+    mpe_world_begin (&wfloor);
+    mpe_config_t fcfg = g_cfg;
+    physics_world_set_config (&wfloor, &fcfg);
+    wfloor.static_plane_enabled = true;
+    const mig_part low_dumbbell [2] = {
+        { mig_part_sphere, 0.25f, 0.0f, {0.0f, 0.0f, 0.0f}, {-0.5f, 0.24f, 0.0f},
+          {1.0f, 0.0f, 0.0f, 0.0f}, mig_mass_mode_explicit, 2.0f },
+        { mig_part_sphere, 0.25f, 0.0f, {0.0f, 0.0f, 0.0f}, {0.5f, 0.24f, 0.0f},
+          {1.0f, 0.0f, 0.0f, 0.0f}, mig_mass_mode_explicit, 2.0f }
+    };
+    const int fb = physics_world_add_composite (&wfloor, low_dumbbell, 2);
+    MPE_CHECK (&t, fb == 0);
+    if (fb == 0) {
+        physics_world_step (&wfloor, dt);
+        MPE_CHECK (&t, mpe_world_finite (&wfloor));
+        /* Authored COM y is 0.24; the pool rebase puts both part centres on
+         * the parent COM. 0.25 radius => 0.01 plane penetration per part. */
+        MPE_CHECK (&t, wfloor.last_manifold_count == 2);
+        int floor_manifolds = 0;
+        int part_seen [2] = {0, 0};
+        float deepest = 0.0f;
+        for (int m = 0; m < wfloor.last_manifold_count; m++) {
+            collision_data *manifold = &wfloor.manifolds [m];
+            if ((manifold -> object_a != &wfloor.bodies [fb]) ||
+                (manifold -> object_b != &wfloor.static_plane_body)) { continue; }
+            if (manifold -> contact_count <= 0) { continue; }
+            floor_manifolds++;
+            MPE_CHECK_NEAR (&t, manifold -> normal_vector.y, -1.0f, 1e-6f, "floor normal");
+            for (int c = 0; c < manifold -> contact_count; c++) {
+                const contact_point_data *cp = &manifold -> contacts [c];
+                MPE_CHECK (&t, cp -> part_b == 0);
+                MPE_CHECK (&t, cp -> part_a == 0 || cp -> part_a == 1);
+                if (cp -> part_a < 2) { part_seen [cp -> part_a] = 1; }
+                MPE_CHECK_NEAR (&t, fabsf (cp -> position.x), 0.5f, 1e-5f,
+                                "each floor contact sits under its own part");
+                MPE_CHECK_NEAR (&t, cp -> position.y, -0.01f, 1e-5f, "sphere bottom");
+                MPE_CHECK_NEAR (&t, cp -> penetration, 0.01f, 1e-5f, "resting depth");
+                if (cp -> penetration > deepest) { deepest = cp -> penetration; }
+            }
+        }
+        MPE_CHECK (&t, floor_manifolds == 2);
+        MPE_CHECK (&t, part_seen [0] == 1 && part_seen [1] == 1);
+        MPE_CHECK_NEAR (&t, deepest, 0.01f, 1e-5f, "deepest staged part");
+        MPE_CHECK (&t, wfloor.has_contact != NULL && wfloor.has_contact [fb] == 1);
+    }
+    physics_world_cleanup (&wfloor);
+    /* --- 2. floor CCD: true lowest point, before tunneling ------------- */
+    physics_world wccd;
+    mpe_world_begin (&wccd);
+    mpe_config_t ccfg = g_cfg;
+    ccfg.world.gravity = -9.81f;
+    physics_world_set_config (&wccd, &ccfg);
+    wccd.static_plane_enabled = true;
+    const mig_part l_parts [2] = {
+        { mig_part_cube, 0.0f, 0.0f, {0.1f, 0.1f, 0.1f}, {0.0f, 0.0f, 0.0f},
+          {1.0f, 0.0f, 0.0f, 0.0f}, mig_mass_mode_explicit, 1.0f },
+        { mig_part_cube, 0.0f, 0.0f, {0.1f, 0.1f, 0.1f}, {0.5f, 0.0f, 0.0f},
+          {1.0f, 0.0f, 0.0f, 0.0f}, mig_mass_mode_explicit, 1.0f }
+    };
+    const int lc = physics_world_add_composite (&wccd, l_parts, 2);
+    MPE_CHECK (&t, lc == 0);
+    if (lc == 0) {
+        rigidbody *lbody = &wccd.bodies [lc];
+        lbody -> position.y = 0.5975f; /* old box support says "resting" */
+        lbody -> orientation = (vector4) {0.9238795325f, 0.0f, 0.0f, 0.3826834324f};
+        lbody -> velocity = (vector3) {0.0f, -30.0f, 0.0f};
+        lbody -> angular_velocity = (vector3) {0.0f, 0.0f, 10.0f};
+        rigidbody_update_axes (lbody);
+        lbody -> restitution = 0.0f;
+        const float lowest_before = mig_gate_composite_lowest_y (&wccd, lbody);
+        MPE_CHECK_NEAR (&t, lowest_before, 0.2793f, 1e-3f,
+                        "hand oracle: true lowest corner");
+        const int clamped = collision_ccd_sweep_clamp_world (&wccd, dt);
+        MPE_CHECK (&t, clamped == 1);
+        MPE_CHECK (&t, wccd.ccd_time_remaining != NULL && wccd.ccd_time_remaining [lc] > 0.0f &&
+                          wccd.ccd_time_remaining [lc] < dt);
+        const float lowest_after = mig_gate_composite_lowest_y (&wccd, lbody);
+        MPE_CHECK (&t, lowest_after >= -0.02f && lowest_after <= 0.05f);
+        MPE_CHECK (&t, lbody -> velocity.y <= 0.0f);
+        /* No-landing-pump: the clamped body settles on the plane without an
+         * upward launch or a deep re-entry. */
+        float max_up = 0.0f;
+        float min_lowest = lowest_after;
+        for (int tick = 0; tick < 30; tick++) {
+            physics_world_step (&wccd, dt);
+            const float low = mig_gate_composite_lowest_y (&wccd, lbody);
+            if (low < min_lowest) { min_lowest = low; }
+            if (lbody -> velocity.y > max_up) { max_up = lbody -> velocity.y; }
+        }
+        MPE_CHECK (&t, mpe_world_finite (&wccd));
+        MPE_CHECK (&t, min_lowest > -0.05f);
+        MPE_CHECK (&t, max_up < 0.5f);
+        MPE_CHECK (&t, lbody -> position.y > 0.0f && lbody -> position.y < 0.6f);
+    }
+    physics_world_cleanup (&wccd);
+    MPE_CHECK (&t, mpe_clamp_composite_total () == 0ul && mpe_clamp_mass_total () == 0ul);
+    if (t.failures == 0) {
+        printf ("[PASS] mig WP2.6: composite floor emits one manifold per part and floor CCD clamps the true lowest point\n");
+        MPE_INFO ("dumbbell floor 2 part manifolds at x -/+0.5 depth 0.01; 45Z L true lowest 0.2793 vs old box -0.0010 (inside the resting slop), -30 m/s + 10 rad/s clamps in-tick, 30 landing ticks max_up < 0.5");
+    }
+    mpe_test_end (&t);
+    return t.failures;
+}

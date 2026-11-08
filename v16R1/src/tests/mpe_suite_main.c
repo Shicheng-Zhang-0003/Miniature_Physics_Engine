@@ -114,6 +114,7 @@ int mpe_t_mig_composite_pool (void);
 int mpe_t_mig_composite_world (void);
 int mpe_t_mig_composite_broadphase (void);
 int mpe_t_mig_composite_narrowphase (void);
+int mpe_t_mig_floor_ccd_composite (void);
 typedef struct {
     const char *name;
     int (*fn) (void);
@@ -233,6 +234,11 @@ static const mpe_entry_t mpe_registry [] = {
      * AABB prefilter and primitive path, part-scoped warm-start keys, and
      * the plugin ABI bump (2, accepting 1). */
     {"mig_composite_narrowphase", mpe_t_mig_composite_narrowphase, 0},
+    /* WP2 2.6 gate (plan §4): per-part floor manifolds (two sphere parts
+     * over the infinite plane -> two parent-stamped manifolds) and the
+     * floor CCD lowest-point scan over the part pool (tumbling L clamps
+     * before tunneling; landing does not pump upward). */
+    {"mig_floor_ccd_composite", mpe_t_mig_floor_ccd_composite, 0},
 };
 #define MPE_NTESTS ((int) (sizeof (mpe_registry) / sizeof (mpe_registry [0])))
 /* Returns 0 pass, 1 fail, 2 skipped.
