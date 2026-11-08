@@ -1936,7 +1936,7 @@ repose/symmetry as self-consistency.
   four-constant change; the gates assert internal consistency, so a mirror
   stays green.
 
-## [YAW-HANDLING] No yaw saturation + lift feedback + linear sticks (BOUNDED 2026-10-14)
+## [YAW-HANDLING] No yaw saturation + lift feedback + linear sticks (CONTROLLED 2026-11-07)
 
 Driver report: "like trying to control a Ferrari F14T — oversteer then
 understeer all in one go, precarious." Measured, not vibes:
@@ -1968,6 +1968,22 @@ differential couple opposing spin, same deadband, unscaled authority
 expo x^1.5 (UI-side only, endpoints preserved). Result: sustained full
 rotate caps at -4.4 ±0.03 over 900+ ticks; release still snaps clean.
 `yaw_stability` gates the cap (proven red pre-fix at 11.07/10.81).
+
+**2026-11-07 update — rate target replaces the damper.** The damper above
+was still too weak after the analytic-tire closure fix (measured sustained
+rotate 7.1 → 8.0 rad/s and climbing: the wheels end up UNDER the yaw
+demand, so the roller force feeds the spin instead of opposing it).
+`ftc_robot_update` now recovers the driver's rotate component from the
+wheel commands (exact mixer inverse), maps it to a ±4.5 rad/s target, and
+applies a proportional (Kp 6.0, 12 N·m cap) mirrored differential torque
+through the wheels — zero net planar force, cone-safe at ~0.625 N·m/wheel.
+Mecanum only; tank keeps the legacy >3 rad/s damper so its calibrated
+pivot baseline is unchanged. Measured at 26.9:1: peak 5.92 / settled 5.22
+(was 8.03 and climbing); at the new 13.7:1 spawn default: peak 5.17 /
+settled 4.75. Counter-steer crosses zero in ~0.7 s, and a translate-only
+stick after a spin bleeds -4.7 → -0.3 rad/s in 2 s instead of preserving
+the spin, so the driver no longer has to release every stick to recover.
+`yaw_stability` now runs both presets.
 
 **Deliberately NOT touched:** analytic VREF (binary lateral feel;
 F2 margin thin), cut slam immediacy (debounce to 3 ticks broke

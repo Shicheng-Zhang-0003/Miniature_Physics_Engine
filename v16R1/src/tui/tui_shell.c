@@ -514,7 +514,7 @@ static void cmd_ftc_spawn (physics_world *w, int argc, char **argv) {
     float x = (argc > 2) ? atof(argv[2]) : 0.0f;
     float y = (argc > 3) ? atof(argv[3]) : 0.5f;
     float z = (argc > 4) ? atof(argv[4]) : 0.0f;
-    motor_preset_id preset = MOTOR_GB_5203_71_2;
+    motor_preset_id preset = MOTOR_GB_5203_13_7;
     if (argc > 5) preset = (motor_preset_id)atoi(argv[5]);
     /* DESPOT-2026-10-21: bare spawn used to skip both spawn guarantees
      * (tile floor + 128 iterations) that every other spawn path applies —
@@ -685,7 +685,7 @@ static void cmd_ftc (physics_world *w, int argc, char **argv) {
                     float xyz [3]; float yaw = 0.0f;
                     p_pose (a, s, xyz, &yaw);
                     xyz [1] = p_rest ();
-                    int idx = p_spawn (w, xyz [0], xyz [1], xyz [2], MOTOR_GB_5203_26_9, FTC_DRIVETRAIN_MECANUM);
+                    int idx = p_spawn (w, xyz [0], xyz [1], xyz [2], MOTOR_GB_5203_13_7, FTC_DRIVETRAIN_MECANUM);
                     if (idx < 0 || p_place (w, idx, yaw) != 0) { made = -1; break; }
                     made++;
                 }

@@ -1579,7 +1579,18 @@ int mfs_t_aim_solve (void) {
     vector3 cc; vector4 cq;
     MFS_CHECK (t_ptr, biobuzz_up_cell_frame (0, -1, &cc, &cq) == 0);
     MFS_CHECK (t_ptr, fabsf (cc.y - 1.4165f) < 0.02f);
-    MFS_CHECK (t_ptr, ftc_shoot_aimed (&w, 0, sp, se) >= 0);
+    int shot_id = ftc_shoot_aimed (&w, 0, sp, se);
+    MFS_CHECK (t_ptr, shot_id >= 0);
+    /* Entry is judged at the FIRST mouth-plane crossing, not at the final
+     * resting position. Gravity/tilt parks every successful ball against
+     * the lower wall, so a settle-only gate cannot tell a centred arc from
+     * a lip scrape (the old gate passed a ball sitting exactly on its
+     * margin while the solver picked the lowest entering arc). */
+    vector3 cn = vector4_rotate_to_vector3 (cq, (vector3) {0.0f, 0.0f, 1.0f});
+    int entry_crossed = 0;
+    float entry_margin = -1.0f;
+    vector3 prev_p = w.bodies [bi_piece].position;
+    float prev_ala = vector3_dot (vector3_subtraction (prev_p, cc), cn);
     /* Opt-in flight trace: the fire is the march's twin in the FULL world
      * (loaded cell, full solver); log the ball every 20 ticks to spot where
      * the real flight diverges from the mini-world march. */
@@ -1593,6 +1604,33 @@ int mfs_t_aim_solve (void) {
                     tb0 -> kinematic ? " KIN" : (tb0 -> is_sleeping ? " SLEEP" : ""));
         }
         physics_world_step (&w, DT);
+        {
+            int sbi = physics_world_index_by_id (&w, (uint32_t) shot_id);
+            if (sbi >= 0) {
+                rigidbody *sb = &w.bodies [sbi];
+                vector3 d = vector3_subtraction (sb -> position, cc);
+                float ala = vector3_dot (d, cn);
+                if (!entry_crossed && prev_ala > 0.0f && ala <= 0.0f) {
+                    float den = prev_ala - ala;
+                    float f = (den > 1e-9f) ? (prev_ala / den) : 1.0f;
+                    if (f < 0.0f) { f = 0.0f; }
+                    if (f > 1.0f) { f = 1.0f; }
+                    vector3 cp = vector3_addition (prev_p, vector3_scaling (vector3_subtraction (sb -> position, prev_p), f));
+                    vector3 lo = biobuzz_unrotate (cq, vector3_subtraction (cp, cc));
+                    float mx = BIOBUZZ_CELL_W * 0.5f - sb -> radius - 0.005f;
+                    float my = BIOBUZZ_CELL_H * 0.5f - sb -> radius - 0.005f;
+                    float vn = vector3_dot (sb -> velocity, cn);
+                    if (fabsf (lo.x) <= mx && fabsf (lo.y) <= my && vn < 0.0f) {
+                        float sx = mx - fabsf (lo.x);
+                        float sy = my - fabsf (lo.y);
+                        entry_margin = (sy < sx) ? sy : sx;
+                    }
+                    entry_crossed = 1;
+                }
+                prev_p = sb -> position;
+                prev_ala = ala;
+            }
+        }
         if (trace && ((k < 40 && k % 2 == 0) || k % 20 == 0)) {
             rigidbody *tb = &w.bodies [bi_piece];
             printf ("  [post] t=%d pos=(%.3f,%.3f,%.3f) v=(%.2f,%.2f,%.2f) a=(%.2f,%.2f,%.2f) F=(%.4f,%.4f,%.4f)%s\n", k,
@@ -1604,18 +1642,22 @@ int mfs_t_aim_solve (void) {
         }
     }
     MFS_CHECK (t_ptr, mfs_test_finite (&w) == 1);
-    /* Entry: local cell coordinates of the resting ball must sit in the
-     * mouth window (ball radius off the walls) and behind the mouth plane
-     * (local z along the outward normal, negative = inside; the ball can
-     * settle deep toward the lower wall — the cell is 15.2 cm deep). */
+    /* Final position: local cell coordinates of the resting ball must sit
+     * behind the mouth plane and inside the physical cell. The old gate
+     * subtracted an extra 8 mm from the window, which failed a ball resting
+     * legitimately against the lower wall (y = H/2 - radius). A 2 mm solver
+     * tolerance keeps the wall-contact case honest. */
     {
         rigidbody *ball = &w.bodies [bi_piece];
         vector3 d = vector3_subtraction (ball -> position, cc);
         vector3 lo = biobuzz_unrotate (cq, d);
-        float mx = BIOBUZZ_CELL_W * 0.5f - BIOBUZZ_POLLEN_RADIUS - 0.008f;
-        float my = BIOBUZZ_CELL_H * 0.5f - BIOBUZZ_POLLEN_RADIUS - 0.008f;
-        printf ("[INFO] aim_solve: ball local=(%.3f,%.3f,%.3f) win=(%.3f,%.3f)\n", (double) lo.x, (double) lo.y,
-                (double) lo.z, (double) mx, (double) my);
+        float mx = BIOBUZZ_CELL_W * 0.5f - BIOBUZZ_POLLEN_RADIUS + 0.002f;
+        float my = BIOBUZZ_CELL_H * 0.5f - BIOBUZZ_POLLEN_RADIUS + 0.002f;
+        printf ("[INFO] aim_solve: entry_margin=%.4f crossed=%d ball local=(%.3f,%.3f,%.3f) win=(%.3f,%.3f)\n",
+                (double) entry_margin, entry_crossed, (double) lo.x, (double) lo.y, (double) lo.z, (double) mx,
+                (double) my);
+        MFS_CHECK (t_ptr, entry_crossed == 1);
+        MFS_CHECK (t_ptr, entry_margin >= 0.02f);
         MFS_CHECK (t_ptr, fabsf (lo.x) <= mx && fabsf (lo.y) <= my && lo.z <= 0.015f && lo.z > -0.145f);
     }
     if (t_ptr -> failures == 0) { printf ("[PASS] aim_solve: solve->fire enters the up-cell mouth\n"); }
@@ -1750,55 +1792,64 @@ int mfs_t_select (void) {
 /* yaw_stability: sustained full rotate must saturate, not run away.
  * The plant had ~zero passive yaw damping with a lift feedback past
  * ~3.5-4 rad/s (chassis rises ~1 cm, contacts unload to the slop
- * boundary): measured -13.5 rad/s over 20 s still creeping. The yaw
- * governor + active damper cap it ~4.4 rock-steady. Gate: 600 ticks of
- * rotate=1 peaks below 6.0 and ends bounded (pre-fix: peak 10.8, end
- * -10.8 — fails both). */
+ * boundary): measured -13.5 rad/s over 20 s still creeping. A governor
+ * plus handling aid cap it; the 2026-11-07 aid is a yaw-rate target
+ * controller (see robot.c MFS_YAW_*), and the spawn default moved from
+ * 26.9:1 to 13.7:1. Run the same "never runs away" gate on BOTH the old
+ * reference preset and the shipped default: measured peaks ~5.9 (26.9)
+ * and ~5.2 (13.7, settled ~4.75) against the 8.0/7.5 bands. */
 int mfs_t_yaw_stability (void) {
     mfs_test_t t;
     mfs_test_begin (&t, "yaw_stability");
     mfs_test_t *t_ptr = &t;
-    physics_world w;
-    mfs_test_world (&w);
     extern const mpe_module_desc_t mpe_module_desc;
-    MFS_CHECK (t_ptr, physics_world_attach_module (&w, &mpe_module_desc) >= 0);
-    int si = ftc_fleet_spawn (&w, 0.0f, ftc_robot_rest_height (), 0.0f, MOTOR_GB_5203_26_9, FTC_DRIVETRAIN_MECANUM);
-    MFS_CHECK (t_ptr, si >= 0);
-    ftc_robot *robot = ftc_fleet_get (&w, si);
-    MFS_CHECK (t_ptr, robot != NULL);
-    float peak = 0.0f;
-    int fail = 0;
-    for (int k = 0; k < 600 && !fail; k++) {
-        mfs_drive_mecanum (robot, 0.0f, 0.0f, 1.0f);
-        physics_world_step (&w, DT);
-        if (!mfs_test_finite (&w)) { fail = 1; break; }
-        rigidbody *ch = mfs_chassis_or_null (&w, robot);
-        if (ch) {
-            float y = fabsf (ch -> angular_velocity.y);
-            if (y > peak) { peak = y; }
+    const motor_preset_id presets [2] = {MOTOR_GB_5203_26_9, MOTOR_GB_5203_13_7};
+    const char *labels [2] = {"26.9:1", "13.7:1 default"};
+    for (int p = 0; p < 2 && t_ptr -> failures == 0; p++) {
+        physics_world w;
+        mfs_test_world (&w);
+        MFS_CHECK (t_ptr, physics_world_attach_module (&w, &mpe_module_desc) >= 0);
+        int si = ftc_fleet_spawn (&w, 0.0f, ftc_robot_rest_height (), 0.0f, presets [p], FTC_DRIVETRAIN_MECANUM);
+        MFS_CHECK (t_ptr, si >= 0);
+        ftc_robot *robot = ftc_fleet_get (&w, si);
+        MFS_CHECK (t_ptr, robot != NULL);
+        float peak = 0.0f;
+        int fail = 0;
+        for (int k = 0; k < 600 && !fail; k++) {
+            mfs_drive_mecanum (robot, 0.0f, 0.0f, 1.0f);
+            physics_world_step (&w, DT);
+            if (!mfs_test_finite (&w)) { fail = 1; break; }
+            rigidbody *ch = mfs_chassis_or_null (&w, robot);
+            if (ch) {
+                float y = fabsf (ch -> angular_velocity.y);
+                if (y > peak) { peak = y; }
+            }
         }
+        MFS_CHECK (t_ptr, fail == 0);
+        MFS_INFO ("%s sustained-rotate peak yaw=%.3f", labels [p], peak);
+        /* DESPOT-2026-10-21 ROLLING-WHEEL re-baseline: the old 6.0/5.5 bands
+         * were validated while the drivetrain ride the saturated Coulomb slip
+         * lock (rotate saturated at 4.53 rad/s never approaching the band).
+         * With the resting-gate in the CCD sweep (no more per-tick virtual
+         * bounce on the preloaded wheels) and impulse-closure traction, the
+         * sustained rotate stabilises at its TRUE rolling fixed point:
+         * peak == end == 7.129 rad/s (deterministic, verified suite-wide:
+         * teleop/odometry/strafe/yaw-sign/stall all still reference-pass).
+         * The gate's intent is unchanged — "never runs away": the fixed
+         * point is stable, peak and end agree exactly. Bands widened, not
+         * hand-hoisted: 8.0/7.5 sit above the measured 7.129 with margin.
+         * DESPOT-2026-11-07: the rate controller pulls that fixed point
+         * down (26.9 measured 5.919 peak; 13.7 measured 5.16 first peak,
+         * 4.75 settled), so the widened bands keep their margin. */
+        MFS_CHECK (t_ptr, peak < 8.0f);
+        {
+            rigidbody *ch = mfs_chassis_or_null (&w, robot);
+            float end_yaw = ch ? fabsf (ch -> angular_velocity.y) : 99.0f;
+            MFS_INFO ("%s end yaw=%.3f", labels [p], end_yaw);
+            MFS_CHECK (t_ptr, end_yaw < 7.5f);
+        }
+        physics_world_cleanup (&w);
     }
-    MFS_CHECK (t_ptr, fail == 0);
-    MFS_INFO ("sustained-rotate peak yaw=%.3f", peak);
-    /* DESPOT-2026-10-21 ROLLING-WHEEL re-baseline: the old 6.0/5.5 bands
-     * were validated while the drivetrain ride the saturated Coulomb slip
-     * lock (rotate saturated at 4.53 rad/s never approaching the band).
-     * With the resting-gate in the CCD sweep (no more per-tick virtual
-     * bounce on the preloaded wheels) and impulse-closure traction, the
-     * sustained rotate stabilises at its TRUE rolling fixed point:
-     * peak == end == 7.129 rad/s (deterministic, verified suite-wide:
-     * teleop/odometry/strafe/yaw-sign/stall all still reference-pass).
-     * The gate's intent is unchanged — "never runs away": the fixed
-     * point is stable, peak and end agree exactly. Bands widened, not
-     * hand-hoisted: 8.0/7.5 sit above the measured 7.129 with margin. */
-    MFS_CHECK (t_ptr, peak < 8.0f);
-    {
-        rigidbody *ch = mfs_chassis_or_null (&w, robot);
-        float end_yaw = ch ? fabsf (ch -> angular_velocity.y) : 99.0f;
-        MFS_INFO ("end yaw=%.3f", end_yaw);
-        MFS_CHECK (t_ptr, end_yaw < 7.5f);
-    }
-    physics_world_cleanup (&w);
     if (t_ptr -> failures == 0) { printf ("[PASS] yaw_stability: sustained rotate saturates, never runs away\n"); }
     mfs_test_end (t_ptr);
     return t_ptr -> failures;

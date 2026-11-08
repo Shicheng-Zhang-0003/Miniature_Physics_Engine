@@ -241,13 +241,16 @@ void cmd_ftc (int argc, char **argv) {
             term_err ("mpe: ftc: one robot already (scene_clear to reset the field)\n");
             return;
         }
-        /* Default: first preset matching 5203 26.9 (223 RPM workhorse). */
+        /* Default: first preset matching 5203 13.7 (435 RPM workhorse:
+         * 2.28 m/s free speed at 100 mm wheels). 26.9:1 capped the plant
+         * at ~1.2 m/s measured top speed, so the drivetrain default moved
+         * to the next standard ratio up (DESPOT-2026-11-07). */
         int preset = 0;
         for (int id = 0; id < 512; id++) {
             const char *nm = p_name ((motor_preset_id) id);
             if (!nm || strcmp (nm, "unknown") == 0)
                 break;
-            if (strstr (nm, "5203") && strstr (nm, "26.9")) {
+            if (strstr (nm, "5203") && strstr (nm, "13.7")) {
                 preset = id;
                 break;
             }
@@ -629,7 +632,7 @@ void cmd_ftc (int argc, char **argv) {
                     const char *nm = p_name ((motor_preset_id) id);
                     if (!nm || strcmp (nm, "unknown") == 0)
                         break;
-                    if (strstr (nm, "5203") && strstr (nm, "26.9")) {
+                    if (strstr (nm, "5203") && strstr (nm, "13.7")) {
                         preset = id;
                         break;
                     }

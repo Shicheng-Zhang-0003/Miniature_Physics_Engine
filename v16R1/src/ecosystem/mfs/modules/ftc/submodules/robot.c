@@ -582,6 +582,32 @@ int ftc_robot_create_with_drive (physics_world *world, ftc_robot *robot, float x
     return -1;
 }
 int ftc_robot_create (physics_world *world, ftc_robot *robot, float x, float y, float z, motor_preset_id preset) {return ftc_robot_create_with_drive (world, robot, x, y, z, preset, FTC_DRIVETRAIN_MECANUM);}
+/* Yaw-rate tracking (DESPOT-2026-11-07). The old handling aid was a damper
+ * that only woke above 3.0 rad/s and a governor that only cut motor torque
+ * above the same band; measured sustained rotate went 7.13 -> 8.03 rad/s
+ * after the tire closure fix and was still climbing. A damper alone cannot
+ * fix that: the wheels end up UNDER the yaw demand, so the roller force feeds
+ * the spin instead of opposing it. This is a rate target instead:
+ *   - recover the driver's rotate component from the four wheel commands
+ *     (exact mixer inverse: (FR+BR-FL-BL)/4),
+ *   - map it to a target yaw rate (±MFS_YAW_RATE_MAX; rotate+ drives -yaw
+ *     by the plant convention pinned in drive_directions),
+ *   - apply a proportional yaw moment, delivered through the wheels as a
+ *     mirrored differential torque (zero net planar force), positive yaw =
+ *     even wheels +, odd wheels -.
+ * At target the correction is zero; above it the robot is actively braked;
+ * with the rotate stick centred the target is zero, so a translational
+ * command now bleeds off residual spin instead of preserving it. This is
+ * what makes "once it starts spinning" recoverable without dropping every
+ * stick. The moment is capped well inside the tire cone (12 N.m -> 0.625 N.m
+ * per wheel -> ~12.5 N/wheel vs the ~19 N per-wheel analytic cone). Mecanum
+ * only: tank pivot is a steel-tyre differential that already has full engine
+ * hub friction and a calibrated response; the controller is applied only
+ * where the analytic roller contact under-damps yaw (see the gate below). */
+#define MFS_YAW_RATE_MAX 4.5f
+#define MFS_YAW_RATE_KP 6.0f
+#define MFS_YAW_MOMENT_MAX 12.0f
+#define MFS_YAW_MOMENT_ARM 0.24f
 void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
     if ((!world) || (!robot) || (dt <= 0.0f)) { return; }
     /* A commanded robot is awake by definition. Wake the chassis when any
@@ -874,61 +900,74 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
          * brake 0.15-coasts it into uselessness while the contact solver
          * already cone-bounds whatever reaches the ground. */
         if (!idle_coast) {
-            /* Yaw stability damper (active counterpart to the governor
-             * above): a pure yaw couple opposing chassis spin, deadbanded
-             * below 3.0 rad/s and ramping to full by 4.5. Real tire scrub
-             * damps yaw passively; this plant's analytic tire under-provides
-             * it (roller-axis projection dilutes yaw slip ~11x, then the
-             * lift feedback unloads the patches entirely), so ESC-style
-             * active damping stands in. Differential (mirrored per side) =
-             * zero net force, pure moment — planar drive is untouched. Same
-             * deadband as the governor, so green gates (all sub-3.0) never
-             * see it; tank peaks at 1.2. */
+            /* Yaw-rate tracking (see the MFS_YAW_* block above). Recover the
+             * driver's rotate component from the wheel commands, map it to a
+             * target yaw rate and deliver a proportional correcting moment
+             * through the wheels. Mirrored odd/even pattern = zero net planar
+             * force, pure moment. Applied AFTER the motor scaling on purpose:
+             * the governor floor (0.15x) would neuter the correction exactly
+             * when it is needed most, and the traction cut must not regulate
+             * a stability torque (its peel logic reads wheel-vs-ground slip,
+             * which a yaw couple intentionally creates). Cone-safe by
+             * construction: MOMENT_MAX -> 0.625 N.m/wheel -> ~12.5 N/wheel
+             * vs the ~19 N per-wheel analytic cone.
+             * MECANUM ONLY (DESPOT-2026-11-07): the feedback source is the
+             * mecanum mixer inverse, and the under-damped plant this fixes
+             * is the analytic mecanum roller contact. On tank the same
+             * left/right differential is a steel-tyre pivot that already has
+             * full engine hub friction; mapping it to a 4.5 rad/s target
+             * fought the calibrated pivot (measured heading 3.06 -> 0.83,
+             * translation 0.156 -> 0.020). Tank keeps the legacy >3 rad/s
+             * damper in the else branch below, so its measured baseline is
+             * reproduced exactly. */
             float chiral = 0.0f;
-            if (robot -> chassis_body >= 0 && robot -> chassis_body < world -> body_count) {
+            const int yaw_chassis_ok =
+                (robot -> chassis_body >= 0 && robot -> chassis_body < world -> body_count);
+            if (yaw_chassis_ok && robot -> drivetrain_type == FTC_DRIVETRAIN_MECANUM &&
+                robot -> wheel_count == 4) {
+                float yaw_now = world -> bodies [robot -> chassis_body].angular_velocity.y;
+                if (isfinite (yaw_now)) {
+                    float rot_cmd = 0.25f * (robot -> wheel_motors [1].command + robot -> wheel_motors [3].command -
+                                             robot -> wheel_motors [0].command - robot -> wheel_motors [2].command);
+                    /* Plant convention (pinned by drive_directions): rotate+
+                     * drives -yaw, hence the sign flip on the target. */
+                    float yaw_target = -rot_cmd * MFS_YAW_RATE_MAX;
+                    float yaw_err = yaw_target - yaw_now;
+                    float moment = MFS_YAW_RATE_KP * yaw_err;
+                    if (moment > MFS_YAW_MOMENT_MAX) {
+                        moment = MFS_YAW_MOMENT_MAX;
+                    } else if (moment < -MFS_YAW_MOMENT_MAX) {
+                        moment = -MFS_YAW_MOMENT_MAX;
+                    }
+                    float dd = moment * r_run / (4.0f * MFS_YAW_MOMENT_ARM);
+                    /* +moment (desired +yaw): even wheels +dd, odd -dd. */
+                    chiral = ((i % 2) == 0) ? dd : -dd;
+                }
+            } else if (yaw_chassis_ok && robot -> wheel_count == 4) {
+                /* Legacy handling aid for non-mecanum drivetrains (tank):
+                 * deadbanded above 3.0 rad/s and ramping to full by 4.5.
+                 * Kept verbatim so the calibrated tank pivot baseline
+                 * (0.1555 m / 3.0639 rad) is reproduced; the tank plant has
+                 * full engine hub friction and does not need the rate target.
+                 * Mirrored per side = zero net force, pure moment.
+                 * DESPOT-2026-10-20 (constants policy): 0.6 ramp ceiling and
+                 * the 3.0/1.5 band are EMPIRICALLY TUNED A/B values, not
+                 * derived from a published anti-slip law. Do not "fix" toward
+                 * a textbook form without an A/B run. */
                 float yaw_now = world -> bodies [robot -> chassis_body].angular_velocity.y;
                 if (isfinite (yaw_now)) {
                     float yaw_mag = (yaw_now < 0.0f) ? -yaw_now : yaw_now;
                     if (yaw_mag > 3.0f) {
                         float ramp = (yaw_mag - 3.0f) / 1.5f;
                         if (ramp > 1.0f) { ramp = 1.0f; }
-                        /* 0.6 N.m.s at full ramp: stops 0.27 kg.m^2 from
-                         * 4.5 rad/s in ~1 s against the measured residual
-                         * excitation (~0.2 N.m).
-                         * DESPOT-2026-10-20 (constants policy): 0.6 ramp
-                         * ceiling and the 3.0/1.5 band here are EMPIRICALLY
-                         * TUNED A/B values (log-driven; NOT derived from a
-                         * published anti-slip law) standing in for the ESC
-                         * current-regulation loop this sim does not model
-                         * motor-side. Do not "fix" toward a textbook form
-                         * without an A/B run; retune via the same harness
-                         * that produced these (see REMAINING_WORK.md). */
                         float moment = 0.6f * ramp * yaw_mag;
                         float dd = moment * 0.05f / (4.0f * 0.24f);
                         float sgn = (yaw_now >= 0.0f) ? 1.0f : -1.0f;
-                        /* Oppose: rotate+ pattern (left -, right +) drives
-                         * -yaw (measured), so it damps +yaw; mirrored for
-                         * -yaw. Verified by sign audit above. */
                         chiral = ((i % 2) == 0) ? (-sgn * dd) : (sgn * dd);
                     }
                 }
             }
             robot -> wheel_motors [i].output_torque *= robot -> wheel_traction_scale [i] * yaw_gov;
-            /* Damper applies AFTER the scales above (deliberately): the
-             * governor floor (0.15x) would neuter it exactly when it is
-             * needed most, and the traction cut must not regulate a
-             * stability torque (its peel logic reads wheel-vs-ground slip,
-             * which a yaw couple intentionally creates). Damper magnitude
-             * is cone-safe by construction (<=6.3 N/wheel vs ~15 N cone).
-             * DESPOT-FIX 2026-10-15: chiral was added twice — once before
-             * scaling (line above, scaled down by gov exactly when most
-             * needed) and once after. Removed the pre-scale addition; the
-             * post-scale add below is the only one, matching the comment.
-             * Double application over-damped at low yaw (gov/scale near 1:
-             * 2x chiral) and under-damped at high yaw (gov near 0.15: only
-             * 1.15x chiral), so the robot felt sluggish then snap-oversteer
-             * as the governor cut in. Single unscaled add gives consistent
-             * damping. */
             robot -> wheel_motors [i].output_torque += chiral;
         }
         /* Apply motor torque along the actual physical axle in world space.

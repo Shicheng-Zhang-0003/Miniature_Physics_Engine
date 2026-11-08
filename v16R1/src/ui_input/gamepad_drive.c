@@ -428,12 +428,17 @@ void gamepad_drive_tick (void) {
                 s_last_solve_pos = chp;
                 s_solve_yaw_dirty = 0;
             }
-            if (stick_centred && s_solved_ok) {
-                pubPow = s_solvedPower;
-                pubElev = s_solvedElev;
-            }
         } else {
             s_solve_frames = 9999; /* idle: force a solve at the next charge */
+        }
+        /* Publish the solved pair OUTSIDE the charging guard. The release
+         * tick is exactly the tick that fires (rt <= 0.2), so computing the
+         * aim only while rt > 0.2 made the shot fall back to the raw trigger
+         * peak + stick elevation: the solved arc was previewed but never
+         * fired. Keep raw twin-stick semantics when the stick is deflected. */
+        if (stick_centred && s_solved_ok) {
+            pubPow = s_solvedPower;
+            pubElev = s_solvedElev;
         }
         if (s_aim_set && wg) { s_aim_set (wg, pubPow, pubElev); }
         if (s_rt_charging && rt <= 0.2f) {

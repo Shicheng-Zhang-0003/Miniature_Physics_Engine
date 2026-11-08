@@ -348,10 +348,36 @@ static void drivetrain_mecanum_analytic (physics_world *world, ftc_robot *robot,
         float m_eff = 0.0f;
         if (invI_spin > 0.0f && m_share > 0.0f) { m_eff = 1.0f / (1.0f / m_share + r_run * r_run * invI_spin); }
         if (!(m_eff > 0.0f) || !isfinite (m_eff)) { m_eff = 0.0f; }
-        float f_eff = (dt > 0.0f && m_eff > 0.0f) ? (m_eff * fabsf (v_a) / dt) : 0.0f;
+        /* DESPOT-2026-11-07 (launch slip / traction-cut latch): the one-tick
+         * closure above cancels only the slip that already existed when the
+         * tire ran. The motor torque banked earlier THIS tick (ftc_robot_update
+         * runs first) still adds r*DeltaOmega of fresh contact slip before the
+         * integrator. Wheel inertia is tiny, so that increment dominates: at
+         * 15 % throttle the wheel settled ~10 rad/s above the rolling demand,
+         * past the traction cut's 4 rad/s engage, and the cut latched at 0.15
+         * for the whole launch. Include the spin torque in the closure: the
+         * tire then holds static friction until the force it needs exceeds the
+         * Coulomb cone, which is the real breakaway point. The torque comes
+         * from the wheel accumulator, i.e. exactly what is about to be
+         * integrated, so no double-count and no reordering. */
+        float dv_a_motor = 0.0f;
+        {
+            vector3 roll_dir = vector3_cross (axle_spin, (vector3) {0.0f, 1.0f, 0.0f});
+            float roll_len_sq = vector3_length_squared (roll_dir);
+            if (roll_len_sq > 1e-12f && invI_spin > 0.0f && isfinite (roll_len_sq)) {
+                roll_dir = vector3_scaling (roll_dir, 1.0f / sqrtf (roll_len_sq));
+                float tau_axle = vector3_dot (wheel -> torque_accumulator, axle_spin);
+                /* v_spin at the contact = -r*omega*roll_dir; project on the
+                 * roller axle to get this tick's added slip along a_world. */
+                dv_a_motor = -r_run * tau_axle * invI_spin * dt * vector3_dot (roll_dir, a_world);
+                if (!isfinite (dv_a_motor)) { dv_a_motor = 0.0f; }
+            }
+        }
+        float v_slip = v_a + dv_a_motor;
+        float f_eff = (dt > 0.0f && m_eff > 0.0f) ? (m_eff * fabsf (v_slip) / dt) : 0.0f;
         if (f_eff > f_max) { f_eff = f_max; }
         if (!isfinite (f_eff)) { continue; }
-        vector3 F = vector3_scaling (a_world, (v_a > 0.0f) ? -f_eff : f_eff);
+        vector3 F = vector3_scaling (a_world, (v_slip > 0.0f) ? -f_eff : f_eff);
         wheel -> force_accumulator = vector3_addition (wheel -> force_accumulator, F);
         wheel -> ext_force_this_tick = 1;
         /* DESPOT-2026-10-04 (axle projection TRIED AND REVERTED): keeping

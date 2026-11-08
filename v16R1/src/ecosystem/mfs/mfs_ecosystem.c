@@ -332,7 +332,7 @@ static int mfs_ecosystem_command (void *eco_state, int argc, char **argv) {
         return 0;
     }
     if (strcmp (argv [0], "spawn") == 0) {
-        int preset = (int) MOTOR_GB_5203_26_9;
+        int preset = (int) MOTOR_GB_5203_13_7;
         ftc_drivetrain_type dtype = FTC_DRIVETRAIN_MECANUM;
         int ai = 1;
         /* argv[1] may be a preset substring OR a drive type. */

@@ -94,3 +94,6 @@ __pycache__/
 #   spatial_hashing/     Teschner GDC 2003
 #   textbooks_theses/    Baraff thesis
 reference_materials/
+
+# Personal study artifact: generated textbook, kept out of version control.
+/MATHEMATICS_OF_MPE.md

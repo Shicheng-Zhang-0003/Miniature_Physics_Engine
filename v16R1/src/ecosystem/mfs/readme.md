@@ -192,7 +192,7 @@ controller is the physical Logitech F310, mode switch X):
 ```
 mod load ecosystem/mfs/mfs_ecosystem.so   # load the bundle
 eco attach mfs-simulator                  # attach ftc-fleet to the primary world
-ftc spawn                                 # THE mecanum robot, tile field auto-added
+ftc spawn                                 # THE mecanum robot (default goBILDA 13.7:1, 2.28 m/s free), tile field auto-added
 ftc telemetry                             # pose, odometry, battery, wheels
 ```
 
