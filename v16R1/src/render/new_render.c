@@ -58,6 +58,54 @@ static traj_line_mesh main_traj;
 static float *sphere_instances = NULL;
 static float *cube_instances = NULL;
 static float *cylinder_instances = NULL;
+/* MIG WP2 2.7 (build plan §4): pack ONE instance for a composite part into
+ * the per-type instance buffer through the same T*R*S composition the
+ * primitive path uses (M[c][r] = R[c][r]*s[c], M[3][r] = t[r]). The part
+ * world pose is body ∘ part-local: position = body_pos + R_body*local,
+ * orientation = R_body ⊗ local (normalised — the exact composition the
+ * 2.4 narrowphase ghost uses, physics_world.c mpe_composite_ghost_refresh,
+ * so what you see is what collides). Scale comes from the part's own
+ * primitive (unit meshes: sphere r; cylinder axle-X half-length/r; cube
+ * half extensions). Parts carry no authored colour until the WP4 editor,
+ * so the parent body's colour is the truth. Returns 0 when the per-type
+ * instance guard is full (caller counts the drop). */
+static int render_pack_composite_part (float *target_array, int *target_count, const vector3 *world_pos,
+                                       const vector4 *world_ori, const composite_part *part,
+                                       const vector3 *body_colour) {
+    vector3 scale;
+    if (part -> type == object_sphere) {
+        scale = (vector3) {part -> radius, part -> radius, part -> radius};
+    } else if (part -> type == object_cylinder) {
+        /* Unit mesh: axle X half-length 1, radius 1 (see cylinder_meshing.h),
+         * same column mapping as the primitive cylinder path. */
+        scale = (vector3) {part -> cylinder_half_length, part -> radius, part -> radius};
+    } else {
+        scale = part -> half_extensions;
+    }
+    if ((*target_count) >= mpe_max_bodies) {
+        return 0; /* mesh instance count guard (build plan §4 2.7): parts
+                     are bounded by composite.max_parts, so the budget is
+                     finite; overflow drops loudly, never silently. */
+    }
+    math4 rotation_matrix = vector4_to_math4 (*world_ori);
+    float scale_comp [3] = {scale.x, scale.y, scale.z};
+    math4 model_matrix = {{{0}}};
+    for (int mc = 0; mc < 3; mc++) {
+        for (int mr = 0; mr < 3; mr++) {
+            model_matrix.matrix [mc][mr] = rotation_matrix.matrix [mc][mr] * scale_comp [mc];
+        } model_matrix.matrix [mc][3] = 0.0f;
+        model_matrix.matrix [3][mc] = (mc == 0) ? world_pos -> x
+        : (mc == 1) ? world_pos -> y
+        : world_pos -> z;
+    } model_matrix.matrix [3][3] = 1.0f;
+    int idx = (*target_count) * 19;
+    math4_to_flat_array (model_matrix, &target_array [idx]);
+    target_array [idx + 16] = body_colour -> x;
+    target_array [idx + 17] = body_colour -> y;
+    target_array [idx + 18] = body_colour -> z;
+    (*target_count)++;
+    return 1;
+}
 static void render_delete_gl_objects (void);
 void render_cleanup (void);
 void render_init () {
@@ -292,6 +340,7 @@ void render_scene_current (int widget_width, int widget_height) {
     int sphere_inst_count = 0;
     int cube_inst_count = 0;
     int cylinder_inst_count = 0;
+    int dropped_instances = 0; /* MIG WP2 2.7: per-frame part-drop count. */
     for (int object_index = 0; object_index < (physics_world_get_primary () -> body_count); object_index++) {
         rigidbody *rigid_body = &(physics_world_get_primary () -> bodies) [object_index];
         /* DESPOT-2026-10-04: a NaN body used to poison the instance buffer
@@ -312,6 +361,45 @@ void render_scene_current (int widget_width, int widget_height) {
                                                rigid_body -> position.z, bound)) {
                 continue;
             }
+        }
+        /* MIG WP2 2.7: a composite draws per PART — the sphere-backed
+         * covering body (radius = authored bound) is a physics envelope,
+         * not geometry, and drawing it instead would show one giant sphere
+         * around the assembly. Each active part is packed into the same
+         * three instanced paths with its composed pose; the part-pool
+         * slice is bounds-checked exactly like every other consumer.
+         * no_collide stays body-level exactly as for primitives (it gates
+         * collision, physics_world.c:1592 — never visibility). */
+        if (rigid_body -> type == object_composite) {
+            const physics_world *rw = physics_world_get_primary ();
+            for (int pi = 0; pi < rigid_body -> composite_part_count; pi++) {
+                long slot = (long) rigid_body -> part_base + (long) pi;
+                if ((slot < 0) || (slot >= (long) rw -> composite_part_count)) { continue; }
+                const composite_part *part = &rw -> composite_parts [slot];
+                if (!part -> active) { continue; }
+                vector3 part_pos = vector3_addition (
+                    rigid_body -> position,
+                    vector4_rotate_to_vector3 (rigid_body -> orientation, part -> local_position));
+                vector4 part_ori = vector4_normalisation (vector4_multiplication (rigid_body -> orientation,
+                                                                                  part -> local_orientation));
+                float *target_array;
+                int *target_count;
+                if (part -> type == object_sphere) {
+                    target_array = sphere_instances;
+                    target_count = &sphere_inst_count;
+                } else if (part -> type == object_cylinder) {
+                    target_array = cylinder_instances;
+                    target_count = &cylinder_inst_count;
+                } else {
+                    target_array = cube_instances;
+                    target_count = &cube_inst_count;
+                }
+                if (!render_pack_composite_part (target_array, target_count, &part_pos, &part_ori, part,
+                                                 &rigid_body -> colour)) {
+                    dropped_instances++;
+                }
+            }
+            continue;
         }
         /* Direct T*R*S composition (~20 flops) instead of two full 4x4
          * multiplies (~128): M[c][r] = R[c][r]*s[c], M[c][3] = 0,
@@ -389,6 +477,14 @@ void render_scene_current (int widget_width, int widget_height) {
     } glBindVertexArray (0);
     spring_joint_render (utility_shader_program, view_matrix, projection_matrix);
     wireframe_render_selected_object (utility_shader_program, view_matrix, projection_matrix);
+    if (dropped_instances > 0) {
+        /* Mesh instance count guard overflow (build plan §4 2.7): name the
+         * drop instead of silently missing parts. One line per frame; the
+         * budget is per mesh type (mpe_max_bodies instances, the VBO size),
+         * finite because parts are bounded by composite.max_parts. */
+        fprintf (stderr, "[render] WARNING: dropped %d composite part instance(s) (per-type instance budget %d)\n",
+                 dropped_instances, (int) mpe_max_bodies);
+    }
     /* DESPOT-2026-10-04: zero glGetError coverage meant every GL misuse
      * above (zero VBO/VAO, bad enum, torn context) failed silently. Drain
      * the error queue once per frame and name it — one bounded stderr line

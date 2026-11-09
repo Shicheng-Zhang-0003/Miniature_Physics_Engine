@@ -105,7 +105,28 @@
 > bounding-sphere; rotation-only tunneling remains unsupported exactly
 > as in v15S. Gate `mig_floor_ccd_composite` is the 54th registered
 > blocking entry, suite 54/52+2, quick 68/68, make everything exit 0.
-> NEXT: WP2 2.7 renderer, then 2.8's remaining gates.**
+> WP2 STEP 2.7 LANDED 2026-11-09: composites draw per PART through the
+> unchanged sphere/cube/cylinder instanced paths — static helper
+> `render_pack_composite_part` (`render/new_render.c`) packs one instance
+> per active part with the same T*R*S column composition as the
+> primitive path; part world pose = body ∘ part-local (position =
+> body_pos + R_body·local_position, orientation = normalised
+> R_body ⊗ local_orientation — the exact composition the 2.4 ghost uses,
+> so what you see is what collides); scale per part primitive (sphere r,
+> cylinder axle-X half-length/r, cube half_extensions); colour = parent
+> body's (parts carry no authored colour until WP4). The sphere-backed
+> covering shape is NOT drawn — it is a physics envelope, not geometry.
+> `no_collide` stays body-level exactly as for primitives (gates
+> collision, never visibility). Mesh instance count guard: per-type
+> budget stays `mpe_max_bodies` (the VBO size); overflow drops parts
+> LOUDLY (per-frame `dropped_instances` stderr warning), never silently —
+> finite because parts are bounded by composite.max_parts. The primitive
+> draw path is untouched, so zero-composite scenes are unchanged (2.9's
+> A2 byte probe statement holds). Renderer is GL-bound and suite-unlinked:
+> no new gate; verification = GTK4 build 0 under -Werror, suite 54/52+2,
+> quick 68/68.
+> NEXT: WP2 2.8's remaining gates (`mig_composite_stack`,
+> `mig_pendulum_com_offset`, determinism twins), then 2.9 verification.**
 
 ---
 
@@ -696,10 +717,36 @@ broadphase/floor/CCD hooks, editor-invisible (UI is WP4). Estimated
   the other MIG/determinism gates; the target as written still fails
   only the pre-existing `loader_lifecycle` / `ftc_ecosystem` pair
   (50/52, recorded in §9). No struct grows and no ABI moves in 2.6.
-- [ ] **2.7 Renderer.** composite draws per part through the existing
+- [x] **2.7 Renderer.** composite draws per part through the existing
   cube/sphere/cylinder meshing+instancing paths with part poses;
   body-level `no_collide` respected. (Mesh instance count guard: parts
   are bounded by P2's cap — no renderer unboundedness.)
+  LANDED 2026-11-09. `render/new_render.c` only — three additions, zero
+  primitive-path changes: (1) static helper `render_pack_composite_part`
+  packs ONE instance for one part into a per-type instance buffer through
+  the same T*R*S column composition the primitive path uses
+  (M[c][r] = R[c][r]·s[c], M[3][r] = t[r], `math4_to_flat_array` tail);
+  scale per part primitive — sphere r, cylinder axle-X half-length/r,
+  cube half_extensions (the unit meshes are shared, not resized);
+  (2) the `render_scene_current` body loop gains a composite branch
+  BEFORE the primitive path: per active part of the bounds-checked pool
+  slice (`part_base + i`), world pose = body ∘ part-local — position =
+  body_pos + R_body·local_position, orientation = normalised
+  R_body ⊗ local_orientation — the exact composition
+  `mpe_composite_ghost_refresh` (2.4) uses, so what you see is what
+  collides; colour = parent body's (parts carry no authored colour until
+  the WP4 editor); the sphere-backed covering shape is NOT drawn (it is
+  a physics envelope, not geometry — drawing it showed one giant sphere
+  around the assembly); `no_collide` stays body-level exactly as for
+  primitives (`physics_world.c:1592` gates collision, never visibility);
+  (3) instance guard: per-type budget stays `mpe_max_bodies` (the VBO
+  size, `cube_meshing.c:46`); overflow drops parts LOUDLY via a
+  per-frame `dropped_instances` stderr warning, never silently — finite
+  because parts are bounded by composite.max_parts (P2 cap 16). The
+  primitive draw path is untouched, so zero-composite scenes are
+  byte-identical (2.9's A2 statement holds). Renderer is GL-bound and
+  suite-unlinked: NO new gate — verification is the GTK4 build exiting 0
+  under -Werror, suite 54/52+2, quick 68/68 (re-run at landing).
 - [ ] **2.8 Gates** (each its own suite entry, floor bump same commit):
   `mig_composite_stack` (10-primitive stack vs one 10-part composite,
   same mass/materials: both settle asleep); `mig_floor_ccd_composite`
