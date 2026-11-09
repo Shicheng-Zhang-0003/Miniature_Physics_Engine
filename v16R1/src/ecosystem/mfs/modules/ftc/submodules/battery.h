@@ -1,9 +1,13 @@
 /* MPE_FTC_072: Battery model with voltage sag */
 #ifndef battery_h
 #define battery_h
-/* Pack fuse: 20 A PTC, resettable (both standard FTC packs carry one).
- * fuse_heat integrates sustained overcurrent; the pack browns out while
- * tripped and recovers when the load drops. */
+/* Pack fuse: 20 A. FIX-AUDIT 2026-11-09: the claim "resettable PTC" was
+ * too strong — the real REV-31-1302 / goBILDA 3100-0012-0020 packs ship a
+ * ONE-SHOT 20 A ATM blade fuse (blown = replace the fuse, match over). The
+ * sim models a resettable PTC anyway (browns out at 1.2 V while tripped,
+ * recovers when the load drops) so a tripped pack is recoverable
+ * mid-match; treat the RECOVERY as a model choice, not a pack spec.
+ * fuse_heat integrates sustained overcurrent. */
 #define MPE_BATTERY_FUSE_A 20.0f
 #define MPE_BATTERY_FUSE_RESET_A 15.0f
 #define MPE_BATTERY_OCV_FLOOR_V 10.0f /* NiMH 10-cell cutoff */

@@ -4,7 +4,15 @@ Defects and limits that are measured, ticketed, and NOT hidden by gates.
 Suite marks are XFAIL (loud + ticketed) or documented observations — never
 silent passes. Measurements from the 2026-09-26 audit on this tree.
 
-## [CCD-OBSTACLE-MARGIN] Tank suite red: heading, pivot and odometry yaw (OPEN, regression)
+## [CCD-OBSTACLE-MARGIN] Tank suite red: heading, pivot and odometry yaw (RESOLVED 2026-10-25)
+
+- **RESOLVED (recorded 2026-11-09 during the [AUDIT-2026-11-09] docs
+  truth-sync):** the candidate fix below SHIPPED — the per-pair margin
+  landed in the v16R1 cutover commit `b8b95cc` (2026-10-25): each body's
+  CCD sweep is now driven by its own motion only, and the global
+  `g_ccd_obstacle_margin` is zeroed telemetry (`collision_ccd.c:22`). The
+  suite has been green continuously since (33/33 as of 2026-11-09). The
+  "OPEN 14/17" state below is kept verbatim as the record of the failure.
 
 - **Status 2026-10-09: the MFS suite is 14/17.** `tank`, `drive_directions`
   and `odometry_yaw` are red. This is the current truth; any document saying
@@ -1994,6 +2002,18 @@ mixer rotate authority (structural gates pin it), strafe progression
 drivers out of its regime; the physics stays open alongside
 [MECANUM-PIVOT].
 
+- **Re-measured 2026-11-09 ([AUDIT-2026-11-09] / [STALE-YAW-ARM] fix).**
+  The audit found the controller's moment arm was a stale hardcoded 0.24
+  against the current WHEEL_OFFSET_X 0.20 — it delivered 0.833× of the
+  commanded moment (the 12 N·m cap actually delivered 10). With the arm
+  now derived from the real stance, the numbers above re-measure to
+  26.9:1 peak 5.717 / settled 5.097 and 13.7:1 peak 5.073 / settled
+  4.703 — the controller with full authority converges to its 4.5 rad/s
+  target with LESS overshoot (was 5.92/5.22 and 5.17/4.75). The 8.0/7.5
+  yaw_stability bands keep their margin; the tank legacy damper keeps
+  its tuned 0.24 literal (empirical gain, see robot.c) and the tank
+  pivot baseline is untouched.
+
 ## [AIM-SOLVE-DOUBLE-STEP] The aim gate stepped the fleet twice and judged a game nobody plays (FIXED 2026-11-01)
 
 The `aim_solve` gate was the one red gate shipped in v10S (32 total, 31
@@ -2045,4 +2065,78 @@ or engine defect:
   be stepped explicitly in the same loop; attach-plus-explicit-step is a
   double step. The live game was always single-pass, so this gate was
   testing a different simulation than the one shipped.
+
+## [AUDIT-2026-11-09] Full mathematical + programmatic audit after the faster-motor change (7 findings, ALL FIXED)
+
+Trigger: the 26.9:1 → 13.7:1 default motor change (`14abe59`, 2026-11-08)
+roughly doubled free speed (23.35 → 45.55 rad/s wheel, ~1.12 → ~2.28 m/s)
+and halved stall torque (3.7265 → 1.8338 N·m). The audit re-derived every
+live physics path and found **no conservation-law, force-law or kinematic
+violation** in the engine or the motor model (motor endpoints and energy
+consistency kt·η/ke = 0.757 < 1, traction-closure effective mass, mecanum
+odometry arms lx+lz, mixer inverse exactness, chiral reaction
+cancellation, torque-couple third law, battery sag/fuse/units, all 47
+presets vs spec sheet to 4 decimals, drag/Magnus forms, per-pair CCD +
+analytic floor CCD — a 2.28 m/s chassis at 36.7 mm/tick cannot tunnel
+60 mm swept walls, and there is no velocity guillotine). Seven real
+defects survived, all fixed same-day:
+
+1. **[STALE-YAW-ARM]** `robot.c` hardcoded `MFS_YAW_MOMENT_ARM 0.24` —
+   the pre-2026-10-12 wheel stance. The chiral torques become
+   roll-direction contact forces whose yaw arm is the wheel x-offset
+   only, so the yaw controller delivered 0.20/0.24 = **0.833×** of the
+   commanded moment (the 12 N·m cap actually delivered 10). Fix: derive
+   `MFS_YAW_MOMENT_ARM` from `WHEEL_OFFSET_X` (robot.h single source of
+   truth). The legacy TANK damper's `0.24` is an empirically tuned gain,
+   NOT the stance — kept verbatim, now with a comment saying so.
+   Re-measured peaks DROPPED (full authority → less overshoot): 26.9
+   5.717/5.097, 13.7 5.073/4.703 — see [YAW-HANDLING].
+2. **[ENC-F32]** `drivetrain.c` computed revs/exact/q_angle in float32.
+   Above 2²⁴ = 16.7M counts the float32 spacing exceeds one count, so
+   the quantized angle jumped 2 counts in a tick (w_rad spikes ~10
+   rad/s). Time-to-defect ~100 min at the 13.7's 45.5 rad/s (was ~195
+   min at 26.9). Fix: `wheel_radians`/`wheel_radians_quant` are double
+   in robot.h; all count math double (spacing < 1 count to 2⁵³); the
+   INT_MAX ceiling hold and round-half-away-from-zero semantics kept.
+3. **[BATT-NAN]** `battery_get_voltage` was the only one of the three
+   battery entry points without a non-finite gate (NaN current → NaN
+   sag → the `terminal < 0` clamp is FALSE for NaN → NaN bus voltage),
+   and `battery_fuse_step`/`battery_drain` accepted NaN dt, which
+   NaNed state and let the NEXT tick's isfinite-reset manufacture a
+   full charge (snap to 1.0). Fix: voltage read treats non-finite
+   current as 0 draw; the two mutators reject non-finite dt.
+4. **[BUCKET-SCORE]** the arcade bucket's score band topped at rim
+   +5 cm with no speed gate — a fast line drive clipping the band
+   MID-AIR froze kinematic and scored without entering the mouth (more
+   frequent at 2× speed). Fix: zone top = rim plane exactly. The
+   regulation Biobuzz scorer was verified clean (mouth-entry counting,
+   carried balls kinematic).
+5. **[DOCS-DRIFT]** `KNOWN_FAILURES.md` opened with [CCD-OBSTACLE-MARGIN]
+   "OPEN 14/17" though the per-pair fix shipped in `b8b95cc` (2026-10-25)
+   and the suite has been green since; `TESTING.md` pointed readers to
+   `[TANK-PIVOT-*]`/`[ODOMETRY-YAW]` sections that do not exist, said
+   "25 gated" (32) and "Current status (2026-10-14): 29/30" (33/33).
+   Fixed in place; dated history kept as-was.
+6. **[THERMAL-137]** torque per amp halves at 13.7 (0.405 → 0.199
+   N·m/A), so equal thrust draws 2.03× the current and makes ~4.1× the
+   heat (P = I²R). Sustained hard driving now pins the 150 °C magnet
+   ceiling and the +49% R derating bites back — load-bearing for the
+   first time and completely ungated. Fix: new gated `thermal_137`
+   (registry 32 → 33). Phase A (motor-level locked-rotor dyno, fixed
+   12.8 V): ceiling at tick 803, current derates 9.20 → 6.58 A, torque
+   to 1.312 N·m (71.5% of spec). Phase B (brake dyno: 60 N on the live
+   chassis, full command, 600 ticks — a kinematic-chassis freeze was
+   TRIED AND REJECTED: it reads as 100% slip to the burnout regulation,
+   which cut torque to 1.16 A/wheel and measured the governor instead
+   of the thermal path): 9.46 A total, bus 12.232 V (sag exactly
+   12.8 − 9.46×0.06), fuse untripped, wheels 81.3 °C.
+7. **[INFORM-30]** driven wheels free-run 45.5 rad/s, above the
+   `timestep.max_angular_speed` inform threshold default of 30 — healthy
+   wheels flagged overspeed. Inform-only (nothing clamps;
+   `long_run_validation.c` is the only consumer). Fix: schema default
+   30 → 60 rad/s.
+
+**Verification:** unified suite 33 total, 33 pass, 0 fail; FTC gated
+pass=5 fail=0, info-diags 12; sanitizers clean. Yaw re-baselines quoted
+above are from the same log.
 

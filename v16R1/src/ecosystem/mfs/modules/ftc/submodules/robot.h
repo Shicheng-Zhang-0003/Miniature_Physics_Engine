@@ -85,8 +85,16 @@ typedef struct {
     float axle_axis_x, axle_axis_y, axle_axis_z;
     /* (removed: mecanum_chassis_force/torque dead fields, zero uses) */
     ftc_drivetrain_type drivetrain_type; /* MFS_DRIVETRAIN_TYPE */
-    /* MFS_151_ODOMETRY: Wheel encoders and pose estimation */
-    float wheel_radians [FTC_MAX_WHEELS]; /* MFS_163_BOUNDS_FIX: was [4], OOB if wheel_count > 4 */
+    /* MFS_151_ODOMETRY: Wheel encoders and pose estimation.
+     * FIX-AUDIT 2026-11-09 [ENC-F32]: wheel_radians and wheel_radians_quant
+     * are DOUBLE. float32 spacing is 2 at 2^24 counts (~16.7M) — above
+     * that a float accumulator cannot advance by a single count, and the
+     * quantized angle lost resolution entirely (sporadic 2-count jumps,
+     * ~10 rad/s one-tick w_rad spikes). At the 13.7:1 default's 45.5 rad/s
+     * free wheel speed that defect arrived after ~100 min of continuous
+     * running (was ~195 min at 26.9:1). double holds <1-count spacing
+     * until 2^53. */
+    double wheel_radians [FTC_MAX_WHEELS]; /* MFS_163_BOUNDS_FIX: was [4], OOB if wheel_count > 4 */
     /* DESPOT-2026-09-26: encoder quantization state. wheel_radians above is
      * the TRUE continuous hub angle; the counts below are what a real
      * quadrature encoder reports (integer, PPR-limited). Odometry integrates
@@ -95,7 +103,7 @@ typedef struct {
      * error was unmodeled. counts_per_rev is derived per robot from the
      * preset (base_ppr * gear_ratio); zero-size memset gives count 0. */
     int wheel_encoder_counts [FTC_MAX_WHEELS];
-    float wheel_radians_quant [FTC_MAX_WHEELS];
+    double wheel_radians_quant [FTC_MAX_WHEELS];
     float odom_x, odom_z, odom_theta;
     /* odom_slip: slip REPORT flag (no fusion — odometry is never corrected).
      * DESPOT-2026-09-26: was hard-zeroed "ABI only". Now 1 when the

@@ -58,8 +58,9 @@ static mpe_param s_registry [] = {
         "resolves the impact",
      p_float, cat_timestep, &g_cfg.timestep.max_linear_speed, 150.0, 10.0, 10000.0, true},
     {"timestep.max_angular_speed", "Max Angular Speed",
-     "Inform-only overspeed guard (rad/s): spin is never scaled back; rotors are exact and unconditionally stable",
-     p_float, cat_timestep, &g_cfg.timestep.max_angular_speed, 30.0, 5.0, 500.0, true},
+     "Inform-only overspeed guard (rad/s): spin is never scaled back; rotors are exact and unconditionally stable. "
+        "Default 60: FTC-class wheels free-run 45.5 rad/s (13.7:1 on 48 mm) and must not be flagged healthy",
+     p_float, cat_timestep, &g_cfg.timestep.max_angular_speed, 60.0, 5.0, 500.0, true},
     /* ============================================================
      * cat_sleep
      * ============================================================ */

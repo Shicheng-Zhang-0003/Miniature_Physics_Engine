@@ -509,12 +509,12 @@ static void drivetrain_odometry_update (physics_world *world, ftc_robot *robot, 
      * Now: integrate true angle, quantize to counts, differentiate the
      * QUANTIZED angle for odometry. Low-speed motion staircases / sticks at
      * zero exactly like hardware. */
-    float counts_per_rev = 0.0f;
+    double counts_per_rev = 0.0;
     {
         int base_ppr = motor_preset_base_encoder_ppr (robot -> motor_preset);
         float gear = (robot -> wheel_count > 0) ? robot -> wheel_motors [0].gear_ratio : 1.0f;
-        if (base_ppr > 0 && gear > 0.0f && isfinite (gear)) { counts_per_rev = (float) base_ppr * gear; }
-    } const float quant_on = (counts_per_rev > 1.0f && dt > 0.0f) ? 1.0f : 0.0f;
+        if (base_ppr > 0 && gear > 0.0f && isfinite (gear)) { counts_per_rev = (double) base_ppr * gear; }
+    } const float quant_on = (counts_per_rev > 1.0 && dt > 0.0f) ? 1.0f : 0.0f;
     for (int i = 0; i < robot -> wheel_count && i < FTC_MAX_WHEELS; i++) {
         const int wi = robot -> wheel_bodies [i];
         if ((wi < 0) || (wi >= world -> body_count)) { continue; }
@@ -529,34 +529,44 @@ static void drivetrain_odometry_update (physics_world *world, ftc_robot *robot, 
              * DESPOT-2026-09-28: was floor() — negative creep reported -1
              * immediately while positive needed a full count (half-count
              * directional bias on reversal; hardware quadrature is
-             * symmetric). Round-half-away-from-zero. */
-            const float revs = robot -> wheel_radians [i] * 0.15915494309189535f; /* /2pi */
-            const float exact = revs * counts_per_rev;
-            /* DESPOT-2026-10-20: float exact already exceeds INT_MAX ~2e9
-             * counts (wheel_radians ~1.8e4 rad on an unbraked multi-hour
-             * run) — the (int) cast is then IMPLEMENTATION-DEFINED out of
-             * domain and the NaN/Inf guard below could never see it
-             * through the new_count. Hold the previous count beyond the
-             * representable ceiling; a real odometer counter would long
-             * since have overflowed and wrapped (hardware wraps, we
-             * choose to hold and let every consumer see no motion).
+             * symmetric). Round-half-away-from-zero.
+             * FIX-AUDIT 2026-11-09 [ENC-F32]: revs/exact/q_angle were
+             * float32. Above 2^24 = 16.7M counts the float32 spacing
+             * exceeds one count, so `exact` rounded to multiples of 2-4
+             * and dq jumped ~2 counts in one tick (w_rad spikes ~10 rad/s
+             * at the 13.7:1 PPR = 383.6 counts/rev); time-to-defect was
+             * ~100 min of continuous running at the new default's 45.5
+             * rad/s free wheel speed (~195 min at the old 26.9:1). All
+             * count math below is double (spacing < 1 count to 2^53);
+             * only the per-tick w_rad rate stays float (one count
+             * divided by dt — small). */
+            const double revs = robot -> wheel_radians [i] * 0.15915494309189535; /* /2pi */
+            const double exact = revs * counts_per_rev;
+            /* DESPOT-2026-10-20: exact already exceeds INT_MAX ~2e9
+             * counts on an unbraked multi-hour run — the (int) cast is
+             * then IMPLEMENTATION-DEFINED out of domain and the NaN/Inf
+             * guard below could never see it through the new_count. Hold
+             * the previous count beyond the representable ceiling; a real
+             * odometer counter would long since have overflowed and
+             * wrapped (hardware wraps, we choose to hold and let every
+             * consumer see no motion).
              * ceiling = 2^31-1 minus a round-off margin. */
             int new_count = robot -> wheel_encoder_counts [i];
-            if (exact > 2147000000.0f) {
+            if (!isfinite (exact)) {
+                /* NaN/Inf angle (corrupt omega): hold previous count. */
+            } else if (exact > 2147000000.0) {
                 new_count = INT_MAX - 1000000;
-            } else if (exact < -2147000000.0f) {
+            } else if (exact < -2147000000.0) {
                 new_count = INT_MIN + 1000000;
             } else {
-                new_count = (int) (exact >= 0.0f ? floorf (exact + 0.5f) : ceilf (exact - 0.5f));
+                new_count = (int) (exact >= 0.0 ? floor (exact + 0.5) : ceil (exact - 0.5));
             }
-            if (!isfinite ((float) new_count))
-                new_count = robot -> wheel_encoder_counts [i];
             int old_count = robot -> wheel_encoder_counts [i];
             robot -> wheel_encoder_counts [i] = new_count;
-            float q_angle = (float) new_count * 6.283185307179586f / counts_per_rev;
-            float dq = q_angle - robot -> wheel_radians_quant [i];
+            const double q_angle = (double) new_count * 6.283185307179586 / counts_per_rev;
+            const double dq = q_angle - robot -> wheel_radians_quant [i];
             robot -> wheel_radians_quant [i] = q_angle;
-            w_rad [i] = (old_count == new_count) ? 0.0f : (dq / dt);
+            w_rad [i] = (old_count == new_count) ? 0.0f : (float) (dq / dt);
         } else {
             robot -> wheel_radians_quant [i] = robot -> wheel_radians [i];
             w_rad [i] = omega;

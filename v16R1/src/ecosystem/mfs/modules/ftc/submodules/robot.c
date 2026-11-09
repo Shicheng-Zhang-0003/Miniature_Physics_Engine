@@ -599,15 +599,24 @@ int ftc_robot_create (physics_world *world, ftc_robot *robot, float x, float y, 
  * with the rotate stick centred the target is zero, so a translational
  * command now bleeds off residual spin instead of preserving it. This is
  * what makes "once it starts spinning" recoverable without dropping every
- * stick. The moment is capped well inside the tire cone (12 N.m -> 0.625 N.m
- * per wheel -> ~12.5 N/wheel vs the ~19 N per-wheel analytic cone). Mecanum
+ * stick. The moment is capped well inside the tire cone (12 N.m -> 0.75 N.m
+ * per wheel -> ~15 N/wheel vs the ~19.4 N per-wheel analytic cone; with the
+ * arm derived from the real stance, the cap is the moment that actually
+ * reaches the floor). Mecanum
  * only: tank pivot is a steel-tyre differential that already has full engine
  * hub friction and a calibrated response; the controller is applied only
  * where the analytic roller contact under-damps yaw (see the gate below). */
 #define MFS_YAW_RATE_MAX 4.5f
 #define MFS_YAW_RATE_KP 6.0f
 #define MFS_YAW_MOMENT_MAX 12.0f
-#define MFS_YAW_MOMENT_ARM 0.24f
+/* FIX-AUDIT 2026-11-09 [STALE-YAW-ARM]: was 0.24f — the pre-2026-10-12
+ * wheel stance. The chiral wheel torques become roll-direction contact
+ * forces whose yaw arm is the wheel x-offset ONLY, so a hardcoded 0.24
+ * against the current WHEEL_OFFSET_X 0.20 delivered 0.20/0.24 = 0.833x of
+ * the commanded moment (the 12 N.m cap actually delivered 10). Derive the
+ * arm from the single-source-of-truth geometry (robot.h) so the two can
+ * never drift apart again. */
+#define MFS_YAW_MOMENT_ARM WHEEL_OFFSET_X
 void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
     if ((!world) || (!robot) || (dt <= 0.0f)) { return; }
     /* A commanded robot is awake by definition. Wake the chassis when any
@@ -961,6 +970,16 @@ void ftc_robot_update (physics_world *world, ftc_robot *robot, float dt) {
                         float ramp = (yaw_mag - 3.0f) / 1.5f;
                         if (ramp > 1.0f) { ramp = 1.0f; }
                         float moment = 0.6f * ramp * yaw_mag;
+                        /* The 0.24 below is an EMPIRICALLY TUNED GAIN, NOT
+                         * the wheel stance: the calibrated tank pivot
+                         * baseline (0.1555 m / 3.0639 rad) was measured with
+                         * this literal value, and the tank plant routes yaw
+                         * through full engine hub friction, not the analytic
+                         * roller path. Do NOT "fix" it toward WHEEL_OFFSET_X
+                         * (0.20, which drifted from this number) without an
+                         * A/B run — see DESPOT-2026-10-20 above. The mecanum
+                         * controller above now DERIVES its arm; this one is
+                         * deliberately left a tuned constant. */
                         float dd = moment * 0.05f / (4.0f * 0.24f);
                         float sgn = (yaw_now >= 0.0f) ? 1.0f : -1.0f;
                         chiral = ((i % 2) == 0) ? (-sgn * dd) : (sgn * dd);

@@ -4,7 +4,7 @@ What the suite contains, what each gate proves, and how to run it.
 
 ## Suite layout
 
-- **Unified suite** (`tests/mfs_suite_main.c` + `mfs_suite_a/b/c.c`, 25 gated
+- **Unified suite** (`tests/mfs_suite_main.c` + `mfs_suite_a/b/c.c`, 33 gated
   tests, registry with exact-name dispatch, config save/restore, NaN
   watchdog). This is what `build_tests.sh` runs and what the release gates
   count.
@@ -22,21 +22,25 @@ What the suite contains, what each gate proves, and how to run it.
   `tests/mfs_test_common.h` (tile slab top y=0, μ 1.0/0.8, e=0). Robot tests
   pin **128 solver iterations** (40:1 chassis/wheel mass ratio).
 
-## Current status (2026-10-14): 29/30
+## Current status (2026-11-09): 33/33, gated 5/0
 
-One gate is **red**: `tank` (pivot heading/translation baselines — still
-red after the observer Q-filter moved it 2.37→2.78 / 0.043→0.118 with
-cause chain in [OBSERVER-Q]; the yaw governor/damper left its numbers
-bit-identical — peaks never reach the 3.0 band; no baseline touched).
-`odometry_yaw` went red→GREEN on the Q-filter. `partial_throttle` and
-`bucket_game` are green after re-derivation to saturation-tolerant laws.
-The new `yaw_stability` gate is green (proven red pre-fix). The earlier
-`drive_directions` red resolved; the 2026-10-09 "14/17" line and the
-CCD-margin narrative below it are historical. Full measurements and the
-root-cause write-ups are in
-[`KNOWN_FAILURES.md`](KNOWN_FAILURES.md) → `[TANK-PIVOT-*]` /
-`[ODOMETRY-YAW]` (search the archives for `[CCD-OBSTACLE-MARGIN]` for the older
-set).
+All gates green at the 13.7:1 spawn default, including the new
+`thermal_137` (the first gate over the 150 °C motor ceiling — see its row
+below). The 2026-11-09 full audit ([STALE-YAW-ARM], [ENC-F32],
+[BATT-NAN], [BUCKET-SCORE], [THERMAL-137], [INFORM-30]) landed the same
+day; [DOCS-DRIFT] items are fixed in place. Historical status entries:
+
+- *2026-10-14: 29/30* — `tank` red (pivot heading/translation baselines
+  after the observer Q-filter moved it 2.37→2.78 / 0.043→0.118 with cause
+  chain in [OBSERVER-Q]; the yaw governor/damper left its numbers
+  bit-identical — peaks never reach the 3.0 band; no baseline touched).
+  `odometry_yaw` went red→GREEN on the Q-filter. `partial_throttle` and
+  `bucket_game` green after re-derivation to saturation-tolerant laws.
+  The `yaw_stability` gate green (proven red pre-fix).
+- The earlier `drive_directions` red resolved; the 2026-10-09 "14/17"
+  line and the CCD-margin narrative in
+  [`KNOWN_FAILURES.md`](KNOWN_FAILURES.md) → `[CCD-OBSTACLE-MARGIN]`
+  (now RESOLVED) are historical. Root-cause write-ups live there.
 
 ## Gate table (unified suite, `--all`)
 
@@ -65,8 +69,9 @@ set).
 | `biobuzz_flower` | constructed stack (bottom red nectar, 2 pollen, top blue nectar) + red-garden pieces, 90 ticks | red: owned 0 + bottom 5 + garden 3 = 8; blue: owned 4×2=8 + bottom 5 = 13 (Table 10-2 ownership/colours) |
 | `biobuzz_table` | pure predicates, no world | Table 10-2 values (3/5/20/20/2/5/2/1), RP thresholds (swarm 16, P1 4, P2 7), piece spec (40/16, radii), start poses (walls/yaw/zones) |
 | `select` | two worlds, two robots in the first | fresh attach reads −1; default 0 after first spawn; OOB selects fail −1 leaving stored untouched; second world independent; drive routed through the selection moves robot 1 (> 0.30 m) while robot 0 holds (< 0.20 m) — pins the terminal/gamepad controlled-robot routing |
-| `yaw_stability` | rotate=1.0 for 600 ticks, peak + end yaw, on both 26.9:1 and the 13.7:1 spawn default | peak < 8.0 rad/s and end < 7.5 (pre-fix: 11.07/10.81 — unbounded spin with ~zero passive decay + lift feedback; measured with the yaw-rate target controller: 26.9 peak/settled 5.92/5.22, 13.7 5.17/4.75). See [YAW-HANDLING] |
+| `yaw_stability` | rotate=1.0 for 600 ticks, peak + end yaw, on both 26.9:1 and the 13.7:1 spawn default | peak < 8.0 rad/s and end < 7.5 (pre-fix: 11.07/10.81 — unbounded spin with ~zero passive decay + lift feedback; with the yaw-rate target controller, re-measured 2026-11-09 after the [STALE-YAW-ARM] fix: 26.9 peak/settled 5.72/5.10, 13.7 5.07/4.70 — full authority converges with LESS overshoot). See [YAW-HANDLING] |
 | `fleet_clear` | spawn robot + balls + bucket + BIOBUZZ pieces, clear, respawn; then wipe pool behind the fleet, step, respawn | direct API forgets count/selection/balls/scores/tips and respawn works (the "9 3 then one-robot-already" report); pre_step self-heal fires on a replaced pool and respawn works immediately |
+| `thermal_137` | Phase A: motor-level locked-rotor dyno at fixed 12.8 V, 900 ticks (observer handshake as in `stall_endpoint` phase 2); Phase B: brake dyno — 60 N opposing force on the live chassis, full command, 600 ticks | Phase A: 150 °C ceiling reached (measured tick 803) AND derating active (current 9.20 → 6.58 A, torque 1.312 of 1.834 N·m); stall clamp never exceeded. Phase B: finite, 20 A fuse untripped (measured 9.46 A), bus sag present (measured 12.232 V vs 12.8 OCV), wheels heated (measured 81.3 °C) but ceiling not pinned (2026-11-09, [THERMAL-137]: equal thrust at 13.7:1 draws 2.03× current and ~4.1× heat vs 26.9:1 — the ceiling is load-bearing for the first time) |
 | `shoot_power` | same muzzle, fire at power 1.0 / 0.7 / 0.4, fly 180 ticks each | exit speeds scale exactly (9.0 / 6.3 / 3.6 m/s); ranges order 14.2 > 9.1 > 4.7 m; full-power path bit-identical (bucket calibration depends on it) |
 | `hive_shot` | robot at a legal wall-adjacent spot, aimed lob (0.65 power, 70 deg), 300 ticks | ball rests INSIDE the red up-cell (cell census 1/0) + last-shot params recorded (the "only undersides" report: stock 50-degree muzzle provably cannot reach the 1.5 m mouths from legal spots at any power) |
 

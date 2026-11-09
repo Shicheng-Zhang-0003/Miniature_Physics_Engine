@@ -42,6 +42,7 @@ extern int mfs_t_module_config (void);
 extern int mfs_t_select (void);
 extern int mfs_t_yaw_stability (void);
 extern int mfs_t_fleet_clear (void);
+extern int mfs_t_thermal_137 (void);
 static const mfs_test_entry_t registry [] = {
     {"teleop", mfs_t_teleop, false},
     {"mecanum", mfs_t_mecanum, false},
@@ -75,6 +76,7 @@ static const mfs_test_entry_t registry [] = {
     {"select", mfs_t_select, false},
     {"yaw_stability", mfs_t_yaw_stability, false},
     {"fleet_clear", mfs_t_fleet_clear, false},
+    {"thermal_137", mfs_t_thermal_137, false},
 };
 int main (int argc, char **argv) {
     if (argc > 1 && strcmp (argv [1], "--list") == 0) {

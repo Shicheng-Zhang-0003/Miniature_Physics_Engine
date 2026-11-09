@@ -1796,8 +1796,13 @@ int mfs_t_select (void) {
  * plus handling aid cap it; the 2026-11-07 aid is a yaw-rate target
  * controller (see robot.c MFS_YAW_*), and the spawn default moved from
  * 26.9:1 to 13.7:1. Run the same "never runs away" gate on BOTH the old
- * reference preset and the shipped default: measured peaks ~5.9 (26.9)
- * and ~5.2 (13.7, settled ~4.75) against the 8.0/7.5 bands. */
+ * reference preset and the shipped default.
+ * FIX-AUDIT 2026-11-09 [STALE-YAW-ARM] re-baseline: the yaw moment arm
+ * is now DERIVED from WHEEL_OFFSET_X (was a stale 0.24 that delivered
+ * 0.833x of the commanded moment). Full authority lets the rate loop
+ * converge to its 4.5 rad/s target with LESS overshoot, not more:
+ * re-measured peaks 5.717 (26.9, end 5.097) and 5.073 (13.7, end 4.703)
+ * — down from 5.919/5.16 pre-fix. The 8.0/7.5 bands keep their margin. */
 int mfs_t_yaw_stability (void) {
     mfs_test_t t;
     mfs_test_begin (&t, "yaw_stability");
@@ -2103,6 +2108,130 @@ int mfs_t_hive_shot (void) {
     }
     physics_world_cleanup (&w);
     if (t_ptr -> failures == 0) { printf ("[PASS] hive_shot: aimed lob scores the up-cell from a legal spot\n"); }
+    mfs_test_end (t_ptr);
+    return t_ptr -> failures;
+}
+/* thermal_137: sustained-load thermal saturation at the 13.7:1 default.
+ *
+ * FIX-AUDIT 2026-11-09 [THERMAL-137]. The 26.9:1 -> 13.7:1 motor change
+ * halved output torque per amp (0.405 -> 0.199 N.m/A at the wheel), so
+ * producing the SAME wheel thrust now draws 2.03x the current and makes
+ * ~4.1x the copper heat (P = I^2 R). Every thermal claim in the docs was
+ * measured at 26.9:1, every gated test finishes in <10 s of simulated
+ * time, and the 150 C magnet ceiling — previously unreachable in
+ * practice — is now load-bearing: sustained hard driving pins it, and
+ * the +49% winding-resistance derating bites back into torque and
+ * current. A physics effect that is load-bearing and untested is a
+ * physics effect that can silently regress, so this gate pins BOTH
+ * levels of the stack:
+ *
+ *   Phase A (motor model): locked-rotor dyno at a fixed 12.8 V bus,
+ *   observer handshake replicated from the robot caller exactly as in
+ *   stall_endpoint phase 2. ~15 s of simulated stall must REACH the
+ *   150 C ceiling, and the ceiling must DERATE: current falls well
+ *   under the 9.2 A stall clamp and output torque under 85% of the
+ *   1.8338 N.m output spec. A model that pins 150 C while still
+ *   delivering stall current is not derating, it is lying.
+ *
+ *   Phase B (robot level): brake dyno — a constant 60 N opposing force on
+ *   the LIVE chassis (rb_apply_forces_perfect, the same external-force
+ *   choke point every in-tree force source uses), all four wheels
+ *   commanded full against it. A kinematic-chassis freeze was TRIED AND
+ *   REJECTED: a frozen chassis reads as 100% slip to the burnout
+ *   regulation, which cuts drive torque — the motors ran nearly unloaded
+ *   (measured 1.16 A/wheel, +1.75 K in 10 s), measuring the governor
+ *   instead of the thermal path. 10 s of hauled driving must stay
+ *   finite, must NOT trip the 20 A pack fuse (sustained draw ~15 A;
+ *   breakaway transients ride through by design), must show bus sag
+ *   (V = OCV - I*R_int through the 0.06 ohm pack), and must heat every
+ *   wheel measurably above ambient WITHOUT pinning the ceiling. */
+int mfs_t_thermal_137 (void) {
+    mfs_test_t t;
+    mfs_test_begin (&t, "thermal_137");
+    mfs_test_t *t_ptr = &t;
+    const float dt = DT;
+    const float spec_stall_nm = 1.8338f; /* 5203-13.7 OUTPUT-shaft stall */
+    /* ---- Phase A: motor-level locked rotor, fixed 12.8 V bus ---- */
+    {
+        motor m;
+        motor_from_spec (&m, spec_stall_nm, 435.0f, 9.2f, 12.0f, 13.7f, 0.85f);
+        m.command = 1.0f;
+        const float axle_I = 0.5f * 0.5f * 0.05f * 0.05f; /* 6.25e-4 kg.m^2 */
+        const float held_w = 0.0f;
+        float w_prev = 0.0f;
+        float peak_current = 0.0f;
+        int ceiling_tick = -1;
+        for (int i = 0; i < 900; i++) {
+            /* Observer handshake, verbatim from robot.c / stall_endpoint. */
+            float alpha = (held_w - w_prev) / dt;
+            float tau_l = axle_I * alpha - m.tau_exp_prev;
+            float cap = 2.0f * m.stall_current * m.kt * m.gear_ratio * m.efficiency;
+            if (tau_l > cap) { tau_l = cap; }
+            if (tau_l < -cap) { tau_l = -cap; }
+            m.load_torque = tau_l;
+            m.wprev_valid = (i > 0) ? 1 : 0;
+            motor_update_load (&m, held_w, dt, 12.8f, axle_I);
+            w_prev = held_w;
+            if (m.current > peak_current) { peak_current = m.current; }
+            if (ceiling_tick < 0 && m.temperature >= 149.5f) { ceiling_tick = i; }
+        }
+        MFS_CHECK (t_ptr, isfinite (m.temperature) && isfinite (m.current) && isfinite (m.output_torque));
+        MFS_INFO ("phase A: T=%.2f C (ceiling at tick %d), peak I=%.3f A, end I=%.3f A, "
+                  "end torque=%.4f N.m (spec %.4f)",
+                  m.temperature, ceiling_tick, peak_current, m.current, m.output_torque, spec_stall_nm);
+        /* The ceiling must be reached within ~15 s of simulated stall. */
+        MFS_CHECK (t_ptr, ceiling_tick >= 0);
+        MFS_CHECK (t_ptr, m.temperature >= 149.5f);
+        /* ...and it must DERATE (hot copper pulls current under the stall
+         * clamp and torque under 85% of spec). */
+        MFS_CHECK (t_ptr, m.current < 8.0f);
+        MFS_CHECK (t_ptr, m.output_torque < 0.85f * spec_stall_nm);
+        /* The 9.2 A stall clamp must never have been exceeded. */
+        MFS_CHECK (t_ptr, peak_current <= 9.2f + 0.01f);
+    }
+    /* ---- Phase B: robot-level brake dyno ---- */
+    {
+        physics_world w;
+        mfs_test_world (&w);
+        extern const mpe_module_desc_t mpe_module_desc;
+        MFS_CHECK (t_ptr, physics_world_attach_module (&w, &mpe_module_desc) >= 0);
+        /* Spawn at x=-8: a 13.7:1 robot hauling 60 N covers ~13 m in 10 s
+         * and must still be on the 20 m test slab (x in [-10, 10]). */
+        int si = ftc_fleet_spawn (&w, -8.0f, ftc_robot_rest_height (), 0.0f, MOTOR_GB_5203_13_7, FTC_DRIVETRAIN_MECANUM);
+        MFS_CHECK (t_ptr, si >= 0);
+        ftc_robot *robot = ftc_fleet_get (&w, si);
+        MFS_CHECK (t_ptr, robot != NULL);
+        rigidbody *ch = mfs_chassis_or_null (&w, robot);
+        MFS_CHECK (t_ptr, ch != NULL);
+        const vector3 brake = {-60.0f, 0.0f, 0.0f}; /* dyno brake, opposes +x haul */
+        float t_max = 0.0f;
+        int fail = 0;
+        for (int k = 0; k < 600 && !fail; k++) {
+            mfs_drive_mecanum (robot, 1.0f, 0.0f, 0.0f);
+            rb_apply_forces_perfect (ch, brake);
+            physics_world_step (&w, DT);
+            if (!mfs_test_finite (&w)) { fail = 1; break; }
+            for (int i = 0; i < robot -> wheel_count; i++) {
+                if (!isfinite (robot -> wheel_motors [i].temperature)) { fail = 1; break; }
+                if (robot -> wheel_motors [i].temperature > t_max) { t_max = robot -> wheel_motors [i].temperature; }
+            }
+        }
+        MFS_CHECK (t_ptr, fail == 0);
+        /* Bus sag read through the pack model from the measured wheel
+         * currents (4 x ~3.8 A through 0.06 ohm ~ 0.9 V of sag — the
+         * brownout this battery model exists to expose). */
+        float total_I = 0.0f;
+        for (int i = 0; i < robot -> wheel_count; i++) { total_I += robot -> wheel_motors [i].current; }
+        float v_bus = battery_get_voltage (&robot -> battery, total_I);
+        MFS_INFO ("phase B: total I=%.2f A, bus=%.3f V, fuse_tripped=%d, max wheel T=%.2f C", total_I, v_bus,
+                  battery_fuse_tripped (&robot -> battery), t_max);
+        MFS_CHECK (t_ptr, !battery_fuse_tripped (&robot -> battery));
+        MFS_CHECK (t_ptr, v_bus < 12.35f && v_bus > 6.0f);
+        MFS_CHECK (t_ptr, t_max > 32.0f);  /* measurably heated above 25 C ambient */
+        MFS_CHECK (t_ptr, t_max < 150.0f); /* a 10 s haul must NOT pin the ceiling */
+        physics_world_cleanup (&w);
+    }
+    if (t_ptr -> failures == 0) { printf ("[PASS] thermal_137: 150 C ceiling reachable and derating at 13.7:1; part throttle heats without tripping the fuse\n"); }
     mfs_test_end (t_ptr);
     return t_ptr -> failures;
 }

@@ -28,6 +28,14 @@ float battery_get_voltage (const battery *b, float total_current_draw) {
         fprintf (stderr, "battery_get_voltage: NULL battery (caller bug)\n");
         return NAN;
     }
+    /* FIX-AUDIT 2026-11-09 [BATT-NAN]: this read path was the only one of
+     * the three without a non-finite gate. NaN current made sag NaN, the
+     * clamp `terminal < 0` is FALSE for NaN, and the poison propagated to
+     * the bus voltage (and from there into every motor). A corrupt sample
+     * reads as ZERO draw here — 0 A sags nothing — instead of poisoning
+     * the bus (siblings REJECT instead: fuse_step/drain must not mutate
+     * state, this is a pure read). */
+    if (!isfinite (total_current_draw)) { total_current_draw = 0.0f; }
     /* FIX-AUDIT: OCV was linear in SoC (6.4V at 50% - non-physical).
      * LiPo OCV is flat ~12.4-12.8V then cliff. Quadratic shoulder. */
     float soc = b -> charge_fraction;
@@ -50,7 +58,11 @@ float battery_get_voltage (const battery *b, float total_current_draw) {
     return terminal;
 }
 void battery_fuse_step (battery *b, float total_current_draw, float dt) {
-    if (!b || dt <= 0.0f)
+    /* FIX-AUDIT 2026-11-09 [BATT-NAN]: NaN dt passed `dt <= 0` (false for
+     * NaN), heated NaN, and the next tick's !isfinite(fuse_heat) reset
+     * silently cleared a tripped fuse. Reject non-finite dt like the
+     * callers' corrupt ticks. */
+    if (!b || !isfinite (dt) || dt <= 0.0f)
         return;
     /* DESPOT-FIX: NaN/Inf current used to poison fuse_heat forever (NaN
      * comparisons false, heat stuck). Reject non-finite loads. */
@@ -77,7 +89,11 @@ void battery_reset_fuse (battery *b) {
         b -> fuse_heat = 0.0f;
 }
 void battery_drain (battery *b, float total_current_draw, float dt) {
-    if ((!b) || (dt <= 0.0f)) { return; }
+    /* FIX-AUDIT 2026-11-09 [BATT-NAN]: NaN dt passed `dt <= 0`, NaNed
+     * charge_fraction, and the NEXT tick's !isfinite(charge_fraction)
+     * reset snapped it to 1.0 — manufactured charge out of corrupt input
+     * (a full battery from NaN). Reject non-finite dt. */
+    if ((!b) || !isfinite (dt) || dt <= 0.0f) { return; }
     /* DESPOT-FIX: NaN current drained SoC to NaN and bricked the pack for the
      * run; negative spikes over-charged past physics. Reject non-finite,
      * allow negative (regen, credited upstream at 50%) but keep SoC in

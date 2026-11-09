@@ -1154,10 +1154,16 @@ static void ftc_game_update (struct physics_world *world, ftc_fleet_t *f, float 
      * was here rejected valid line-drives). Scored balls freeze kinematic
      * (visible pile, stable, never re-scored since the candidate gate
      * requires dynamic). Carried balls are kinematic at the mouth, so
-     * driving the hopper through the zone cannot false-score. */
+     * driving the hopper through the zone cannot false-score.
+     * FIX-AUDIT 2026-11-09 [BUCKET-SCORE]: the zone top had +5 cm of
+     * above-rim headroom, so a fast line drive clipping the band MID-AIR
+     * (never below the rim plane) froze kinematic and scored without ever
+     * entering the mouth — and at 2x drivetrain speed those phantom scores
+     * got frequent. The zone top is now the rim plane EXACTLY: entering
+     * the mouth means the centre is below it. */
     if (f -> bucket_active) {
         float hx = BUCKET_PAD_HALF - 0.1f, hz = BUCKET_PAD_HALF - 0.1f;
-        float y0 = f -> bucket_cy + 0.02f, y1 = f -> bucket_cy + 0.05f + BUCKET_WALL_H + 0.05f;
+        float y0 = f -> bucket_cy + 0.02f, y1 = f -> bucket_cy + 0.05f + BUCKET_WALL_H;
         for (int i = 0; i < f -> ball_count; i++) {
             int bi = physics_world_index_by_id (world, (uint32_t) f -> ball_ids [i]);
             if (bi < 0 || bi >= world -> body_count) { continue; }

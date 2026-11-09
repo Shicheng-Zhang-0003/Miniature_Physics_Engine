@@ -1,11 +1,24 @@
 # MFS — overarching module ecosystem ("mfs-simulator")
 
+> **Status 2026-11-09: the suite is 33/33, gated 5/0, 12 ungated info
+> diags.** The full mathematical + programmatic audit prompted by the
+> 26.9:1 → 13.7:1 motor change found seven defects — a stale yaw moment
+> arm delivering 0.833× of the commanded moment, float32 encoder
+> saturation past 2²⁴ counts, battery non-finite guard gaps, a phantom
+> above-rim bucket score band, doc drift, the now load-bearing 150 °C
+> thermal ceiling (newly gated as `thermal_137`), and an overspeed
+> inform threshold under the new free speed. All seven are fixed and
+> verified; findings and measurements are in
+> `docs/KNOWN_FAILURES.md` → `[AUDIT-2026-11-09]`. The 2026-10-09 block
+> below describes an earlier tree.
+
 > **Status 2026-10-09: the suite is 14/17, not green.** `tank`,
 > `drive_directions` and `odometry_yaw` are red from one root cause — the
 > global CCD obstacle margin added in commit `41bcc0b`, which perturbs
 > motion on a pivoting chassis. Zeroing it restores 17/17. Measurements and
 > the harness fix that made the failure visible at all are in
-> `docs/KNOWN_FAILURES.md` → `[CCD-OBSTACLE-MARGIN]`.
+> `docs/KNOWN_FAILURES.md` → `[CCD-OBSTACLE-MARGIN]` (RESOLVED 2026-10-25:
+> the per-pair margin shipped in the v16R1 cutover `b8b95cc`).
 > Any "15/15 green" wording below describes an earlier tree.
 
 > **Audit state (2026-10-06).** The yaw axis was audited by writing probes
