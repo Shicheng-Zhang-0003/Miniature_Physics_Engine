@@ -173,10 +173,27 @@
 > MPE_THREADS=4 FAILED 5 checks (contact-cache footprint + all 4 dynamic
 > bodies bitwise-diverged); restored, twins green at 1/4/8.
 > test_runner.py floor 54→57 in the same commit. Suite 57/55+2 (Total:
-> 57, blocking failures 0), quick 71/71.
-> NEXT: WP2 2.9 verification — `make tsan` over the suite (ghost scratch
-> is the worker-race surface), A2 byte-probe statement against a pre-WP2
-> `temp/qa_runs` summary — then WP3.**
+> 57, blocking failures 0), quick 71/71. WP2 STEP 2.9 LANDED 2026-11-09
+> — WP2 COMPLETE: `make tsan` green (TSan-built suite `--all` at
+> MPE_THREADS=4 under TSAN_OPTIONS=halt_on_error=1: Total 57, 0
+> blocking, no reports — the ghost scratch, the `_Thread_local`
+> per-worker composite ghost views, is the worker-race surface the
+> profile exists for, and it is clean; the paranoia determinism TSan
+> probe ran clean ahead of it). The A2 byte-probe statement is
+> CERTIFIED EMPIRICALLY, not just documented: a 3-body zero-composite
+> headless probe (settling sphere + settling cube + one sphere flung
+> sideways at 60 m/s so `boundary_apply_box_world_cfg` clamps it at
+> x = 250 − r for the majority of the run — the delegation path the 2.8
+> boundary fix claims byte-identical), 3600 ticks, prints every body's
+> full pose/velocities/sleep state as hex-float — BYTE-IDENTICAL
+> against a `git worktree` build of the pre-WP2 engine `8e62e58` (the
+> same base the 2.3-era probe used); invalid=0 fallback_pow=0
+> fallback_trig=0 result=PASS on both sides. Probe source and both
+> captures kept under `temp/qa_runs/A2_2p9_byteprobe/`. Plain headless
+> smoke unchanged (ticks=3600 bodies=2 … PASS). Suite `--all` green at
+> floor 57.
+> NEXT: WP3 — scene persistence (v200 `MIG1` record): 3.1 writer/reader
+> two-pass with the id-remap pass, 3.2 degrade-not-veto loader.**
 
 ---
 
@@ -861,12 +878,27 @@ broadphase/floor/CCD hooks, editor-invisible (UI is WP4). Estimated
   (cache footprint + all 4 dynamic bodies diverged). Every mutation
   restored and rebuilt green: suite 57/55+2 (Total: 57, blocking
   failures 0), quick 71/71.
-- [ ] **2.9 Verify:** quick profile green; `make tsan` (exists) green
-  over the suite (ghost scratch is the worker-race surface the TSan
-  profile exists for); suite `--all` green at the bumped floor;
-  documented A2 statement: zero-composite scenes byte-identical to the
-  pre-WP2 run (keep an un-touched `temp/qa_runs` summary from the
-  pre-composite commit for the diff).
+- [x] **2.9 Verify:** LANDED 2026-11-09 — WP2 COMPLETE. (1) `make tsan`
+  green: the TSan-built suite ran `--all` at MPE_THREADS=4 with
+  TSAN_OPTIONS=halt_on_error=1 — Total 57, 0 blocking failures, no
+  reports. The ghost scratch (the `_Thread_local` per-worker composite
+  ghost views) is the worker-race surface this profile exists for —
+  clean; the paranoia determinism TSan probe ran clean ahead of the
+  suite. (2) A2 byte probe CERTIFIED EMPIRICALLY: the probe source
+  (pre-WP2-stable API only, so it compiles against both eras) builds a
+  ZERO-composite scene — settling sphere, settling cube, and one sphere
+  flung sideways at 60 m/s so the boundary safety net clamps it at
+  x = 250 − r for most of the run (this exercises exactly the
+  `world=NULL` delegation the 2.8 boundary fix claims byte-identical) —
+  steps 3600 ticks and prints every body's full pose, velocities and
+  sleep state as hex-float. Current engine vs a `git worktree` build of
+  `8e62e58` (pre-WP2, the same base as the 2.3-era probe):
+  BYTE-IDENTICAL — invalid=0 fallback_pow=0 fallback_trig=0 result=PASS
+  on both sides. Probe source + both captures:
+  `temp/qa_runs/A2_2p9_byteprobe/`. (3) Plain headless smoke unchanged
+  (ticks=3600 bodies=2 invalid=0 fallback_pow=0 fallback_trig=0
+  result=PASS). (4) Suite `--all` green at floor 57 (Total: 57, 55/55
+  physics blocking + 2 diag).
 
 ## §5 WP3 — scene persistence (v200 `MIG1` record)
 
