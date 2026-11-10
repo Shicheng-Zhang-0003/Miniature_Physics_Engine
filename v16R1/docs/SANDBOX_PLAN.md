@@ -95,7 +95,13 @@
 > anchor would bring it to life; the Situation screen toggles first).
 > Over-cap assemblies clamp at the engine's 16-part cap. The floor is
 > the solver plane, not a body, so dropping on the ground never welds.
-> GUI-only; suite 57/0 re-run, build 0 under -Werror.**
+> GUI-only; suite 57/0 re-run, build 0 under -Werror.
+> S4 LIVE REVIEW PASSED 2026-11-10 (user-verified): resize panel, drag
+> carry, and weld-on-drop all behaved to spec on first contact — the
+> weld proves the MIG compose path end-to-end at runtime (ad-hoc
+> world-frame part array → `mig_compose` mass/COM/inertia → engine
+> re-anchor → solver). MIG WORKS.**
+
 
 ## Findings this plan builds on (2026-11-09 survey)
 
