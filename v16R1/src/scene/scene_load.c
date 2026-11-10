@@ -119,7 +119,25 @@ static bool scene_id_in_staged (const int32_t *staged_ids, int staged_count, uin
  * everything validates (including the CRC32 footer) before the live scene
  * is touched. IDs are preserved verbatim (no remap); the allocator is
  * advanced past them. Returns 1 on commit, 0 leaving the scene untouched. */
-static int scene_loading_v200 (FILE *f, uint32_t header_crc) {
+/* MIG WP3 (v201): staging record for one composite body. The envelope
+ * body record supplies the dynamic state; the composites section
+ * supplies the world-frame part slice. The body itself is NEVER trusted
+ * from the file — it is rebuilt at commit through
+ * physics_world_add_composite, so mass/COM/inertia are recomputed as
+ * engine truth. Part cap mirrors the engine's per-assembly cap. */
+typedef struct {
+    uint32_t owner_id;
+    int part_count;   /* from the section; 0 = no usable slice yet */
+    int has_parts;    /* section entry matched this envelope */
+    mig_part parts [16];
+    float fric_s [16], fric_k [16], rest_e [16]; /* per-part carry */
+    vector3 velocity, angular_velocity, colour;
+    float restitution, friction_static, friction_kinetic, sleep_timer;
+    uint32_t nice_value, object_generation;
+    int is_static, is_kinematic, is_sleeping;
+} staged_composite;
+
+static int scene_loading_sectioned (FILE *f, uint32_t header_crc, int32_t version) {
     uint32_t crc = header_crc;
     uint32_t body_count_u = 0;
     if (!scene_r32 (f, &crc, &body_count_u)) { return 0; }
@@ -142,6 +160,26 @@ static int scene_loading_v200 (FILE *f, uint32_t header_crc) {
     for (int i = 0; i < count; i++) {
         staged_ids [i] = 0;
     } int staged_body_count = 0;
+    /* MIG WP3 (v201): composite staging. Worst case every record is a
+     * composite; flags map file ordinal -> staged_composite index (-1 =
+     * primitive). v200 keeps these empty and vetoes type 4 below. */
+    staged_composite *staged_comps = NULL;
+    int staged_comp_count = 0;
+    int *staged_comp_index = (int *) malloc ((size_t) alloc_count * sizeof (int));
+    if (!staged_comp_index) {
+        free (staged_bodies);
+        free (staged_ids);
+        return 0;
+    }
+    for (int i = 0; i < count; i++) { staged_comp_index [i] = -1; }
+    staged_comps = (staged_composite *) malloc ((size_t) alloc_count * sizeof (staged_composite));
+    if (!staged_comps) {
+        free (staged_bodies);
+        free (staged_ids);
+        free (staged_comp_index);
+        return 0;
+    }
+    for (int i = 0; i < alloc_count; i++) { memset (&staged_comps [i], 0, sizeof (staged_composite)); }
     int body_ok = 1;
     for (int i = 0; (i < count) && body_ok; i++) {
         uint32_t type_u = 0, static_u = 0, id_u = 0, nice_u = 0, sleep_u = 0, kin_u = 0, gen_u = 0;
@@ -176,8 +214,13 @@ static int scene_loading_v200 (FILE *f, uint32_t header_crc) {
         /* Structural validation (CRC gates corruption; this gates logic).
          * object_custom persists as bare type tag (no plugin blob yet):
          * accept and init as sphere placeholder so one custom body never
-         * vetoes the whole file. Full blob persistence is future work. */
-        if ((type_u > (uint32_t) object_custom) || (id_u == 0) || (gen_u == 0) || (static_u > 1u) || (sleep_u > 1u) ||
+         * vetoes the whole file. Full blob persistence is future work.
+         * MIG WP3: v201 files also accept object_composite (4) — its
+         * geometry lives in the composites section, the body is rebuilt
+         * at commit. v200 keeps the stricter veto (its files never
+         * carried composites; a type 4 there is corruption). */
+        uint32_t max_type_u = (version >= 201) ? (uint32_t) object_composite : (uint32_t) object_custom;
+        if ((type_u > max_type_u) || (id_u == 0) || (gen_u == 0) || (static_u > 1u) || (sleep_u > 1u) ||
             (kin_u > 1u) || (nice_u > (uint32_t) INT_MAX) || (!isfinite (mass)) || (mass < 0.0f) ||
             (sleep_timer_f < 0.0f)) {
             body_ok = 0;
@@ -223,6 +266,34 @@ static int scene_loading_v200 (FILE *f, uint32_t header_crc) {
         }
         if (!body_ok) { break; }
         object_type type = (object_type) type_u;
+        if (type == object_composite) {
+            /* MIG WP3 (v201): stage the ENVELOPE only — dynamic state +
+             * identity. No rigidbody is initialised here (the commit
+             * rebuilds the body from the composites section through the
+             * engine's compose path); staged_bodies [i] stays untouched
+             * and the commit skips this ordinal. */
+            staged_composite *sc = &staged_comps [staged_comp_count];
+            sc -> owner_id = id_u;
+            sc -> part_count = 0;
+            sc -> has_parts = 0;
+            sc -> velocity = vel;
+            sc -> angular_velocity = ang;
+            sc -> colour = colour;
+            sc -> restitution = rest;
+            sc -> friction_static = fs;
+            sc -> friction_kinetic = fk;
+            sc -> sleep_timer = sleep_timer_f;
+            sc -> nice_value = nice_u;
+            sc -> object_generation = gen_u;
+            sc -> is_static = (static_u != 0);
+            sc -> is_kinematic = (kin_u != 0);
+            sc -> is_sleeping = (sleep_u != 0);
+            staged_comp_index [i] = staged_comp_count;
+            staged_comp_count++;
+            staged_ids [i] = (int32_t) id_u;
+            staged_body_count++;
+            continue;
+        }
         if (type == object_cube) { rigidbody_initialisation_cube (&staged_bodies [i], pos, half_ext, mass); } else if (type == object_cylinder) {
             rigidbody_initialisation_cylinder (&staged_bodies [i], radius, half_len, mass, pos);
         } else if (type == object_custom) {
@@ -476,8 +547,80 @@ static int scene_loading_v200 (FILE *f, uint32_t header_crc) {
             continue;
         } staged_revs [staged_rev_count++] = r;
     }
+    /* MIG WP3 (v201): composite part slices. v200 files end at the
+     * revolute section — this read is skipped for them and the strict
+     * EOF check below stays byte-exact for v200. Each section entry
+     * must match a staged composite envelope (by saved id); parts are
+     * WORLD-frame and go straight into the engine's compose path. */
+    int comps_ok = revs_ok;
+    if (comps_ok && (version >= 201)) {
+        uint32_t comp_count_u = 0;
+        comps_ok = comps_ok && scene_r32 (f, &crc, &comp_count_u);
+        if (comps_ok && (comp_count_u > (uint32_t) count)) { comps_ok = 0; }
+        for (uint32_t ci = 0; comps_ok && (ci < comp_count_u); ci++) {
+            uint32_t owner_u = 0, pc_u = 0;
+            comps_ok = comps_ok && scene_r32 (f, &crc, &owner_u);
+            comps_ok = comps_ok && scene_r32 (f, &crc, &pc_u);
+            if (!comps_ok) { break; }
+            staged_composite *sc = NULL;
+            for (int si = 0; si < staged_comp_count; si++) {
+                if (staged_comps [si].owner_id == owner_u) { sc = &staged_comps [si]; break; }
+            }
+            /* Owner must be a staged composite body; a duplicate entry or
+             * an over-cap slice is corruption (CRC passed, so this was
+             * either hand-edited or written by a hostile build). */
+            if ((!sc) || (owner_u == 0) || (pc_u > 16u) || sc -> has_parts) { comps_ok = 0; break; }
+            sc -> part_count = (int) pc_u;
+            for (uint32_t pi = 0; comps_ok && (pi < pc_u); pi++) {
+                uint32_t pt_u = 0;
+                float p_radius = 0.0f, p_half_len = 0.0f, p_mass = 0.0f;
+                float p_fs = 0.0f, p_fk = 0.0f, p_rest = 0.0f;
+                vector3 p_he = {0.0f, 0.0f, 0.0f}, p_pos = {0.0f, 0.0f, 0.0f};
+                vector4 p_ori = {1.0f, 0.0f, 0.0f, 0.0f};
+                comps_ok = comps_ok && scene_r32 (f, &crc, &pt_u);
+                comps_ok = comps_ok && scene_rfloat (f, &crc, &p_radius);
+                comps_ok = comps_ok && scene_rfloat (f, &crc, &p_half_len);
+                comps_ok = comps_ok && scene_load_vec3 (f, &crc, &p_he);
+                comps_ok = comps_ok && scene_load_vec3 (f, &crc, &p_pos);
+                comps_ok = comps_ok && scene_load_quat (f, &crc, &p_ori);
+                comps_ok = comps_ok && scene_rfloat (f, &crc, &p_mass);
+                comps_ok = comps_ok && scene_rfloat (f, &crc, &p_fs);
+                comps_ok = comps_ok && scene_rfloat (f, &crc, &p_fk);
+                comps_ok = comps_ok && scene_rfloat (f, &crc, &p_rest);
+                if (!comps_ok) { break; }
+                double pq2 = (double) p_ori.w * p_ori.w + (double) p_ori.x * p_ori.x +
+                             (double) p_ori.y * p_ori.y + (double) p_ori.z * p_ori.z;
+                bool dims_ok = false;
+                if (pt_u == (uint32_t) mig_part_sphere) { dims_ok = (p_radius > 0.0f); }
+                else if (pt_u == (uint32_t) mig_part_cylinder) { dims_ok = (p_radius > 0.0f) && (p_half_len > 0.0f); }
+                else if (pt_u == (uint32_t) mig_part_cube) {
+                    dims_ok = (p_he.x > 0.0f) && (p_he.y > 0.0f) && (p_he.z > 0.0f);
+                }
+                if ((pt_u > (uint32_t) mig_part_cylinder) || !dims_ok || (pq2 <= 1e-12) ||
+                    !isfinite (p_mass) || (p_mass < 0.0f) || !isfinite (p_fs) || !isfinite (p_fk) ||
+                    !isfinite (p_rest) || fabsf (p_pos.x) > 1e6f || fabsf (p_pos.y) > 1e6f ||
+                    fabsf (p_pos.z) > 1e6f) {
+                    comps_ok = 0;
+                    break;
+                }
+                mig_part *mp = &sc -> parts [pi];
+                mp -> type = (mig_part_type) pt_u;
+                mp -> radius = p_radius;
+                mp -> cylinder_half_length = p_half_len;
+                mp -> half_extensions = p_he;
+                mp -> position = p_pos;
+                mp -> orientation = vector4_normalisation (p_ori);
+                mp -> mass_mode = mig_mass_mode_explicit;
+                mp -> mass = p_mass;
+                sc -> fric_s [pi] = p_fs;
+                sc -> fric_k [pi] = p_fk;
+                sc -> rest_e [pi] = p_rest;
+            }
+            if (comps_ok) { sc -> has_parts = 1; }
+        }
+    }
     /* Footer CRC over every preceding byte (read raw, then compare). */
-    int crc_ok = revs_ok;
+    int crc_ok = comps_ok;
     unsigned char footer [4] = {0, 0, 0, 0};
     if (crc_ok) { crc_ok = (fread (footer, 1, 4, f) == 4); }
     if (crc_ok) {
@@ -512,6 +655,8 @@ static int scene_loading_v200 (FILE *f, uint32_t header_crc) {
         free (staged_dists);
         free (staged_prisms);
         free (staged_ropes);
+        free (staged_comps);
+        free (staged_comp_index);
         return 0;
     }
     /* Delay world-pool growth until the complete staged file has passed all
@@ -528,6 +673,8 @@ static int scene_loading_v200 (FILE *f, uint32_t header_crc) {
         free (staged_dists);
         free (staged_prisms);
         free (staged_ropes);
+        free (staged_comps);
+        free (staged_comp_index);
         return 0;
     }
     /* --- Commit: clear scene AND joint pools, install staged data --- */
@@ -536,23 +683,89 @@ static int scene_loading_v200 (FILE *f, uint32_t header_crc) {
     scene_id_remap_reset ();
     contact_cache_clear (physics_world_get_primary ());
     joint_init_pool (physics_world_get_primary ());
-    (physics_world_get_primary () -> body_count) = staged_body_count;
+    /* Pass 1 (primitives, file order): composite ordinals are skipped —
+     * their bodies are rebuilt in pass 2 from the part slices. */
+    int installed = 0;
     for (int i = 0; i < staged_body_count; i++) {
+        if (staged_comp_index [i] >= 0) { continue; } /* composite: pass 2 */
         int staged_cs = staged_bodies [i].custom_shape;
-        (physics_world_get_primary () -> bodies) [i] = staged_bodies [i];
-        (physics_world_get_primary () -> bodies) [i].body_index = i;
+        (physics_world_get_primary () -> bodies) [installed] = staged_bodies [i];
+        (physics_world_get_primary () -> bodies) [installed].body_index = installed;
         /* Preserve foreign custom identity (staged); non-custom bodies
          * keep custom_shape=-1. Clobbering customs to -1 broke dispatch
          * (100/-1 mismatch rejects the capsule handler). */
-        if ((physics_world_get_primary () -> bodies) [i].type == object_custom) {
+        if ((physics_world_get_primary () -> bodies) [installed].type == object_custom) {
             if (staged_cs < 100) { staged_cs = 100; }
-            (physics_world_get_primary () -> bodies) [i].custom_shape = staged_cs;
+            (physics_world_get_primary () -> bodies) [installed].custom_shape = staged_cs;
         } else {
-            (physics_world_get_primary () -> bodies) [i].custom_shape = -1;
-        } (physics_world_get_primary () -> bodies) [i].max_relative_speed_sq = 0.0f;
-        rigidbody_update_axes (&(physics_world_get_primary () -> bodies) [i]);
-        scene_note_loaded_id ((physics_world_get_primary () -> bodies) [i].object_id);
-    } physics_world_bump_revision (physics_world_get_primary ());
+            (physics_world_get_primary () -> bodies) [installed].custom_shape = -1;
+        }
+        (physics_world_get_primary () -> bodies) [installed].max_relative_speed_sq = 0.0f;
+        rigidbody_update_axes (&(physics_world_get_primary () -> bodies) [installed]);
+        scene_note_loaded_id ((physics_world_get_primary () -> bodies) [installed].object_id);
+        installed++;
+    }
+    (physics_world_get_primary () -> body_count) = installed;
+    physics_world_bump_revision (physics_world_get_primary ());
+    /* Pass 2 (MIG WP3, v201): rebuild every composite through the
+     * engine's own compose path — mass/COM/inertia are recomputed from
+     * the world-frame part slice, never trusted from the file. Bodies
+     * append after the primitives; saved ids are preserved so joints
+     * rewire unchanged below. */
+    int composite_dropped = 0;
+    for (int si = 0; si < staged_comp_count; si++) {
+        staged_composite *sc = &staged_comps [si];
+        if ((!sc -> has_parts) || (sc -> part_count < 1)) {
+            fprintf (stderr, "[scene] v201 load: composite id %u has no part slice; body dropped\n",
+                     (unsigned) sc -> owner_id);
+            composite_dropped++;
+            continue;
+        }
+        physics_world *wp3_world = physics_world_get_primary ();
+        int new_index = physics_world_add_composite (wp3_world, sc -> parts, sc -> part_count);
+        if ((new_index < 0) || (new_index >= wp3_world -> body_count)) {
+            fprintf (stderr, "[scene] v201 load: composite id %u rejected by compose (degenerate); body dropped\n",
+                     (unsigned) sc -> owner_id);
+            composite_dropped++;
+            continue;
+        }
+        rigidbody *rb = &wp3_world -> bodies [new_index];
+        rb -> velocity = sc -> velocity;
+        rb -> angular_velocity = sc -> angular_velocity;
+        rb -> colour = sc -> colour;
+        rb -> restitution = sc -> restitution;
+        rb -> friction_static = sc -> friction_static;
+        rb -> friction_kinetic = sc -> friction_kinetic;
+        rb -> nice_value = (int) sc -> nice_value;
+        rb -> object_id = sc -> owner_id;
+        rb -> object_generation = sc -> object_generation;
+        /* Per-part material carry: the add path stamps body_defaults,
+         * the file carries what the author set. */
+        for (int pi = 0; (pi < rb -> composite_part_count) && (pi < sc -> part_count); pi++) {
+            long slot = (long) rb -> part_base + (long) pi;
+            if ((slot < 0) || (slot >= (long) wp3_world -> composite_part_count)) { continue; }
+            composite_part *cp = &wp3_world -> composite_parts [slot];
+            cp -> friction_static = sc -> fric_s [pi];
+            cp -> friction_kinetic = sc -> fric_k [pi];
+            cp -> restitution = sc -> rest_e [pi];
+        }
+        if (sc -> is_static) { rigidbody_set_static (rb, true); } else { rigidbody_set_static (rb, false); }
+        if (sc -> is_kinematic) { rigidbody_set_kinematic (rb, true); }
+        if ((sc -> is_sleeping) && (!rb -> static_state) && (!rb -> kinematic)) {
+            rb -> is_sleeping = true;
+            rb -> sleep_timer = sc -> sleep_timer;
+            rb -> velocity = vector3_zero ();
+            rb -> angular_velocity = vector3_zero ();
+        }
+        rigidbody_sanitize (rb); /* must not renumber a preserved identity */
+        rb -> object_id = sc -> owner_id;
+        rb -> body_index = new_index;
+        scene_note_loaded_id (sc -> owner_id);
+    }
+    if (composite_dropped > 0) {
+        fprintf (stderr, "[scene] v201 load: dropped %d composite body(s) at commit\n", composite_dropped);
+        physics_world_bump_revision (physics_world_get_primary ());
+    }
     /* DESPOT-2026-10-13: every commit return is checked. The old code ignored
      * spring/fixed/distance/rope returns (only rev/prism checked index>=0,
      * still silent), so a full pool silently dropped joints with return 1.
@@ -621,6 +834,8 @@ static int scene_loading_v200 (FILE *f, uint32_t header_crc) {
     free (staged_dists);
     free (staged_prisms);
     free (staged_ropes);
+    free (staged_comps);
+    free (staged_comp_index);
     return 1;
 }
 int scene_loading (const char *file_source_path) {
@@ -654,10 +869,12 @@ int scene_loading (const char *file_source_path) {
         return 0;
     } int32_t version = (int32_t) version_le;
     int32_t count = 0;
-    if (version == 200) {
-        int v200_result = scene_loading_v200 (f, header_crc);
+    if ((version == 200) || (version == 201)) {
+        /* v200 and v201 share the sectioned reader; 201 adds the
+         * composite-bodies section and accepts type tag 4. */
+        int sectioned_result = scene_loading_sectioned (f, header_crc, version);
         fclose (f);
-        return v200_result;
+        return sectioned_result;
     }
     /* Legacy native-order reader (v130..v153). */
     if ((version != 130) && (version != 140) && (version != 150) && (version != 151) && (version != 152) &&

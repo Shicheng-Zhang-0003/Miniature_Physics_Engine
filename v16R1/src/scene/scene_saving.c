@@ -18,9 +18,9 @@
 #include <unistd.h>
 #endif
 #include <sys/stat.h>
-/* Scene format v200: explicit little-endian fields + sectioned joints +
- * CRC32 footer. Layout (all integers/floats LE):
- *   u32 magic ("MPE3"), u32 version (200), u32 body_count,
+/* Scene format v201: v200 plus a composite-bodies section (MIG WP3).
+ * Layout (all integers/floats LE):
+ *   u32 magic ("MPE3"), u32 version (201), u32 body_count,
  *   bodies[]: u32 type, f32 mass, radius, half_length,
  *     half_extents xyz, position xyz, velocity xyz, angular_velocity xyz,
  *     orientation wxyz, colour xyz, restitution, fric_s, fric_k,
@@ -41,9 +41,16 @@
  *     u32 limits_enabled, f32 limit_min, limit_max,
  *   u32 rope_count, ropes[]: u32 type, id_a, id_b,
  *     anchor_a xyz, anchor_b xyz, f32 rest_length,
+ *   u32 composite_count (v201 only),
+ *   composites[]: u32 owner_object_id, u32 active_part_count,
+ *     parts[]: u32 part_type, f32 radius, half_length,
+ *       half_extents xyz, position xyz (WORLD), orientation wxyz (WORLD),
+ *       f32 mass, fric_s, fric_k, restitution,
  *   u32 crc32 (IEEE, over every preceding byte).
- * Older versions (<=153) keep their native-order legacy reader in
- * scene_load.c; the saver only ever writes v200. */
+ * v200 files are the same layout WITHOUT the composite section; the
+ * sectioned reader accepts both. Older versions (<=153) keep their
+ * native-order legacy reader in scene_load.c; the saver only ever
+ * writes the current version. */
 static int save_vec3 (FILE *f, uint32_t *crc, vector3 v) {return scene_wfloat (f, crc, v.x) && scene_wfloat (f, crc, v.y) && scene_wfloat (f, crc, v.z);}
 static int save_quat (FILE *f, uint32_t *crc, vector4 q) {
     return scene_wfloat (f, crc, q.w) && scene_wfloat (f, crc, q.x) && scene_wfloat (f, crc, q.y) &&
@@ -270,6 +277,54 @@ int save_scene (const char *file_destination_path) {
         ok = ok && scene_w32 (f, &crc, c -> p.revolute.limits_enabled ? 1u : 0u);
         ok = ok && scene_wfloat (f, &crc, c -> p.revolute.limit_min_rad);
         ok = ok && scene_wfloat (f, &crc, c -> p.revolute.limit_max_rad);
+    }
+    /* MIG WP3 (v201): composite bodies persist as a dedicated section.
+     * The envelope record above already carries the body-level state
+     * (type tag, id, generation, velocity, colour, materials, flags);
+     * this section carries each composite's ACTIVE part slice expanded
+     * to the WORLD frame — the same representation
+     * physics_world_add_composite consumes at load, so a saved weld
+     * rebuilds through the engine's own compose path and mass/COM/
+     * inertia are recomputed as truth, never trusted from the file. */
+    int wp3_composite_count = 0;
+    for (int i = 0; i < (physics_world_get_primary () -> body_count); i++) {
+        if ((physics_world_get_primary () -> bodies) [i].type == object_composite) { wp3_composite_count++; }
+    }
+    ok = ok && scene_w32 (f, &crc, (uint32_t) wp3_composite_count);
+    for (int i = 0; ok && (i < (physics_world_get_primary () -> body_count)); i++) {
+        rigidbody *rb = &(physics_world_get_primary () -> bodies) [i];
+        if (rb -> type != object_composite) { continue; }
+        ok = ok && scene_w32 (f, &crc, rb -> object_id);
+        /* Count ACTIVE parts first: inactive pool holes are dead state
+         * and must not shift the slice on reload. */
+        int wp3_active = 0;
+        for (int pi = 0; pi < rb -> composite_part_count; pi++) {
+            long slot = (long) rb -> part_base + (long) pi;
+            if ((slot < 0) || (slot >= (long) physics_world_get_primary () -> composite_part_count)) { continue; }
+            if (physics_world_get_primary () -> composite_parts [slot].active) { wp3_active++; }
+        }
+        ok = ok && scene_w32 (f, &crc, (uint32_t) wp3_active);
+        for (int pi = 0; ok && (pi < rb -> composite_part_count); pi++) {
+            long slot = (long) rb -> part_base + (long) pi;
+            if ((slot < 0) || (slot >= (long) physics_world_get_primary () -> composite_part_count)) { continue; }
+            const composite_part *wp3_part = &physics_world_get_primary () -> composite_parts [slot];
+            if (!wp3_part -> active) { continue; }
+            /* Part pose out to world frame — the renderer's exact math. */
+            vector3 part_pos = vector3_addition (
+                rb -> position, vector4_rotate_to_vector3 (rb -> orientation, wp3_part -> local_position));
+            vector4 part_ori = vector4_normalisation (vector4_multiplication (rb -> orientation,
+                                                                              wp3_part -> local_orientation));
+            ok = ok && scene_w32 (f, &crc, (uint32_t) wp3_part -> type);
+            ok = ok && scene_wfloat (f, &crc, wp3_part -> radius);
+            ok = ok && scene_wfloat (f, &crc, wp3_part -> cylinder_half_length);
+            ok = ok && save_vec3 (f, &crc, wp3_part -> half_extensions);
+            ok = ok && save_vec3 (f, &crc, part_pos);
+            ok = ok && save_quat (f, &crc, part_ori);
+            ok = ok && scene_wfloat (f, &crc, wp3_part -> mass);
+            ok = ok && scene_wfloat (f, &crc, wp3_part -> friction_static);
+            ok = ok && scene_wfloat (f, &crc, wp3_part -> friction_kinetic);
+            ok = ok && scene_wfloat (f, &crc, wp3_part -> restitution);
+        }
     }
     /* Footer CRC over every preceding byte (finalize + raw LE append). */
     uint32_t final_crc = crc ^ 0xFFFFFFFFu;

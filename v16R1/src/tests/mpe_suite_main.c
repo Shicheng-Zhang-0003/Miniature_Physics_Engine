@@ -84,6 +84,7 @@ int mpe_t_cylinder_platform (void);
 int mpe_t_cylinder_cylinder (void);
 int mpe_t_list4_cylinder_floor (void);
 int mpe_t_scene_roundtrip (void);
+int mpe_t_composite_roundtrip (void);
 int mpe_t_static_hold (void);
 int mpe_t_rolling_decay (void);
 int mpe_t_ccd_sweep (void);
@@ -167,6 +168,7 @@ static const mpe_entry_t mpe_registry [] = {
     {"cylinder_cylinder", mpe_t_cylinder_cylinder, 0},
     {"list4_cylinder_floor", mpe_t_list4_cylinder_floor, 0},
     {"scene_roundtrip", mpe_t_scene_roundtrip, 0},
+    {"composite_roundtrip", mpe_t_composite_roundtrip, 0},
     {"static_hold", mpe_t_static_hold, 0},
     {"rolling_decay", mpe_t_rolling_decay, 0},
     {"ccd_sweep", mpe_t_ccd_sweep, 0},

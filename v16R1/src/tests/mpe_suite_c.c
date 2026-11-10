@@ -743,6 +743,115 @@ int mpe_t_scene_roundtrip (void) {
     physics_world_cleanup (w);
     mpe_test_end (&t);
     return t.failures;
+} /* composite_roundtrip (MIG WP3): a welded composite survives save/load
+ * through the engine's own compose path — the file carries the world-frame
+ * part slice, the loader recomputes mass/COM/inertia, per-part materials
+ * carry, the saved id is preserved so a spring rewires to it, and a
+ * second save/load cycle proves the rebuilt body re-persists identically. */
+int mpe_t_composite_roundtrip (void) {
+    mpe_test_t t;
+    mpe_test_begin (&t, "composite_roundtrip");
+    physics_world *w = physics_world_get_primary ();
+    physics_world_init (w);
+    constraint_pool_init (w);
+    int anchor = physics_world_add_sphere (w, 0.5f, 1.5f, (vector3) {5.0f, 3.0f, 0.0f});
+    MPE_CHECK (&t, anchor >= 0);
+    /* Weld: sphere (r 0.3, m 1) + cube (he 0.4, m 2) in world frame —
+     * the same representation the S4c weld and the v201 saver emit. */
+    mig_part parts [2];
+    memset (parts, 0, sizeof (parts));
+    parts [0].type = mig_part_sphere;
+    parts [0].radius = 0.3f;
+    parts [0].position = (vector3) {0.0f, 2.0f, 0.0f};
+    parts [0].orientation = vector4_identity ();
+    parts [0].mass_mode = mig_mass_mode_explicit;
+    parts [0].mass = 1.0f;
+    parts [1].type = mig_part_cube;
+    parts [1].half_extensions = (vector3) {0.4f, 0.4f, 0.4f};
+    parts [1].position = (vector3) {2.0f, 1.0f, 0.0f};
+    parts [1].orientation = vector4_identity ();
+    parts [1].mass_mode = mig_mass_mode_explicit;
+    parts [1].mass = 2.0f;
+    int comp = physics_world_add_composite (w, parts, 2);
+    MPE_CHECK (&t, comp >= 0 && w -> bodies [comp].type == object_composite);
+    MPE_CHECK (&t, w -> bodies [comp].composite_part_count == 2);
+    /* Author the state the round-trip must preserve. */
+    w -> bodies [comp].velocity = (vector3) {0.5f, -0.25f, 0.0f};
+    w -> bodies [comp].colour = (vector3) {0.9f, 0.1f, 0.5f};
+    w -> bodies [comp].friction_static = 0.7f;
+    uint32_t comp_id = w -> bodies [comp].object_id;
+    float comp_px = w -> bodies [comp].position.x, comp_py = w -> bodies [comp].position.y;
+    float comp_mass = w -> bodies [comp].mass;
+    /* Per-part materials (what the add path stamped body_defaults). */
+    {
+        physics_world *pw = physics_world_get_primary ();
+        for (int pi = 0; pi < 2; pi++) {
+            composite_part *cp = &pw -> composite_parts [(long) w -> bodies [comp].part_base + pi];
+            cp -> friction_static = 0.11f + (float) pi;
+            cp -> friction_kinetic = 0.07f + (float) pi;
+            cp -> restitution = 0.2f + 0.1f * (float) pi;
+        }
+    }
+    /* A spring primitive->composite proves id-preserving rewire. */
+    int sj = add_joint (w, anchor, comp, 2.0f, 5.0f, 0.1f);
+    MPE_CHECK (&t, sj >= 0);
+    int n_body = w -> body_count;
+    char cr_path [512];
+    const char *tmpd = getenv ("TMPDIR");
+    if (tmpd && tmpd [0])
+        snprintf (cr_path, sizeof (cr_path), "%s/mpe_suite_composite_roundtrip.dat", tmpd);
+    else
+        snprintf (cr_path, sizeof (cr_path), "../../temp/mpe_suite_composite_roundtrip.dat");
+    const char *path = cr_path;
+    /* Cycle 1: save, wreck the scene, reload. */
+    MPE_CHECK (&t, save_scene (path) != 0);
+    w -> body_count = 0; /* pretend the scene was torn down */
+    MPE_CHECK (&t, scene_loading (path) != 0);
+    MPE_CHECK (&t, w -> body_count == n_body);
+    rigidbody *rc = physics_world_body_by_id (w, comp_id);
+    MPE_CHECK (&t, rc != NULL && rc -> type == object_composite);
+    MPE_CHECK (&t, rc -> composite_part_count == 2);
+    MPE_CHECK_NEAR (&t, rc -> mass, comp_mass, 1e-4f, "composite-mass");
+    MPE_CHECK_NEAR (&t, comp_mass, 3.0f, 1e-3f, "composite-mass-sum");
+    if (rc) {
+        MPE_CHECK_NEAR (&t, rc -> position.x, comp_px, 1e-3f, "composite-com-x");
+        MPE_CHECK_NEAR (&t, rc -> position.y, comp_py, 1e-3f, "composite-com-y");
+        MPE_CHECK_NEAR (&t, rc -> velocity.x, 0.5f, 1e-4f, "composite-v");
+        MPE_CHECK_NEAR (&t, rc -> colour.x, 0.9f, 1e-5f, "composite-colour");
+        MPE_CHECK_NEAR (&t, rc -> friction_static, 0.7f, 1e-5f, "composite-mu");
+        /* Per-part materials must come from the FILE, not body_defaults. */
+        physics_world *pw = physics_world_get_primary ();
+        for (int pi = 0; pi < 2; pi++) {
+            composite_part *cp = &pw -> composite_parts [(long) rc -> part_base + pi];
+            MPE_CHECK_NEAR (&t, cp -> friction_static, 0.11f + (float) pi, 1e-5f, "composite-part-mu-s");
+            MPE_CHECK_NEAR (&t, cp -> restitution, 0.2f + 0.1f * (float) pi, 1e-5f, "composite-part-e");
+            MPE_CHECK (&t, cp -> active);
+        }
+    }
+    MPE_CHECK (&t, w -> spring_joint_count == 1);
+    if (w -> spring_joint_count == 1) {
+        MPE_CHECK (&t, w -> spring_joints [0].is_active);
+        /* Both endpoints must reference live ids — the composite's among them. */
+        uint32_t ja = w -> spring_joints [0].object_id_a, jb = w -> spring_joints [0].object_id_b;
+        MPE_CHECK (&t, (ja == comp_id) || (jb == comp_id));
+        MPE_CHECK (&t, physics_world_body_by_id (w, ja) != NULL);
+        MPE_CHECK (&t, physics_world_body_by_id (w, jb) != NULL);
+    }
+    /* Cycle 2: the REBUILT composite must re-persist identically. */
+    MPE_CHECK (&t, save_scene (path) != 0);
+    MPE_CHECK (&t, scene_loading (path) != 0);
+    MPE_CHECK (&t, w -> body_count == n_body);
+    rigidbody *rc2 = physics_world_body_by_id (w, comp_id);
+    MPE_CHECK (&t, rc2 != NULL && rc2 -> type == object_composite && rc2 -> composite_part_count == 2);
+    if (rc2) {
+        MPE_CHECK_NEAR (&t, rc2 -> position.x, comp_px, 1e-3f, "composite-repersist-x");
+        MPE_CHECK_NEAR (&t, rc2 -> mass, comp_mass, 1e-4f, "composite-repersist-mass");
+    }
+    remove (path);
+    if (t.failures == 0) { printf ("[PASS] composite round-trip complete (2 cycles)\n"); }
+    physics_world_cleanup (w);
+    mpe_test_end (&t);
+    return t.failures;
 } /* module: per-world cfg, registry dispatch, custom shapes, hooks, id cache,
  * pool growth, det counters. Condensed port of module_test.c. */
 static int mpe_mod_pre_calls = 0;
