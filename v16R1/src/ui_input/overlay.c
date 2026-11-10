@@ -255,7 +255,7 @@ void overlay_update (void) {
                 const char *rl = t -> type == object_cube ? "Radius (N/A)" : "Radius";
                 int len = snprintf (
                     buf, sizeof (buf),
-                    "-- Object %d (%s) --\n1: Mass\n2: %s\n3: Friction\n4: Immovable Toggle\n5: Mark for Joint\n",
+                    "-- Object %d (%s) --\n1: Mass\n2: %s\n3: Friction\n4: Situation (static/kinematic/no-collide)\n5: Mark for Joint\n",
                     selected_object, tn, rl);
                 if (main_inputs.marked_joint_object_index != -1 &&
                     main_inputs.marked_joint_object_index != selected_object)
@@ -276,8 +276,19 @@ void overlay_update (void) {
                           "(step %.2f)",
                           t -> friction_static, t -> friction_kinetic, adj);
             else if (main_inputs.object_menu_level == 5) {
-                const char *s = t -> static_state ? "YES" : "NO";
-                snprintf (buf, sizeof (buf), "-- Immovable Status --\nCurrent: %s\n\nUp/Down: Toggle\nEnter: Save", s);
+                /* SANDBOX S2: the Situation screen. The status bar keeps
+                 * showing static/dynamic; this screen is the full truth
+                 * (static, kinematic, no-collide — plus sleeping as an
+                 * emergent display). */
+                snprintf (buf, sizeof (buf),
+                          "-- Situation --\n%s Static (immovable): %s\n%s Kinematic: %s\n%s No-collide: %s\n  Sleeping: %s (emergent)\n\nUp/Down: select   Enter: toggle   E: close",
+                          main_inputs.situation_cursor == 0 ? ">" : " ",
+                          t -> static_state ? "YES" : "NO",
+                          main_inputs.situation_cursor == 1 ? ">" : " ",
+                          t -> kinematic ? "YES" : "NO",
+                          main_inputs.situation_cursor == 2 ? ">" : " ",
+                          t -> no_collide ? "YES" : "NO",
+                          t -> is_sleeping ? "YES" : "NO");
             } else if (main_inputs.object_menu_level == 8)
                 snprintf (buf, sizeof (buf),
                           "-- Preset Colours --\n1: Red\n2: Green\n3: Blue\n4: Orange\n5: Cyan\n6: Magenta\n7: "
@@ -325,7 +336,8 @@ void overlay_update (void) {
     } rigidbody *rb = &(physics_world_get_primary () -> bodies) [selected_object];
     float spd = vector3_length (rb -> velocity);
     const char *ot = rb -> type == object_sphere ? "Sphere" : rb -> type == object_cylinder ? "Cylinder" : "Cube";
-    const char *stt = rb -> static_state ? "(Static)" : "(Dynamic)";
+    const char *stt = rb -> static_state ? "(Static)" : rb -> kinematic ? "(Kinematic)"
+                    : rb -> no_collide ? "(Dynamic, no-collide)" : "(Dynamic)";
     snprintf (ibuf, sizeof (ibuf),
               "[%s] | %s [%d] %s | Pos: (%.1f, %.1f, %.1f) | Speed: %.2f | E: Menu | F: Impulse | M-Click: remove",
               mode, ot, selected_object, stt, rb -> position.x, rb -> position.y, rb -> position.z, spd);

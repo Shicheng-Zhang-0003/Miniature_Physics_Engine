@@ -20,6 +20,11 @@ typedef struct {
      * tick while frozen. Free globally by the same modal-microvim
      * convention as the robot keys above. */
     bool p_key_pressed, o_key_pressed;
+    /* SANDBOX S2: the Situation screen's cursor (object menu level 5).
+     * 0 = static, 1 = kinematic, 2 = no-collide; Up/Down move it, Enter
+     * toggles the row. Lives in the input state so editor.c mutates and
+     * overlay.c renders without cross-file statics. */
+    int situation_cursor;
     bool enter_spawn_held;
     bool r_key_pressed;
     bool i_key_pressed, j_key_pressed, k_key_pressed, l_key_pressed;

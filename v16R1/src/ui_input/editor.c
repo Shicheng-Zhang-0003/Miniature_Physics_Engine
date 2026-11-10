@@ -220,21 +220,47 @@ void editor_update_menus (GtkWidget *parent_window) {
         main_inputs.object_menu_level = 0;
     }
     if (main_inputs.object_menu_level == 5) {
+        /* SANDBOX S2: the Situation screen — static / kinematic /
+         * no-collide with a cursor. Up/Down move the cursor, Enter
+         * toggles the row in place, E closes (the E dispatch toggle
+         * already closes from any sub-level). Sleeping stays
+         * display-only: it is an emergent state, not a setting. */
         rigidbody *selected_rigid_body = editor_selected_object_or_null ();
         if (!selected_rigid_body) {
             main_inputs.object_menu_level = 0;
             return;
         }
-        if ((main_inputs.up_arrow_pressed) || (main_inputs.down_arrow_pressed)) {
-            rigidbody_set_static (selected_rigid_body, !selected_rigid_body -> static_state);
-            /* MPE_TASK_06_CACHE_CLEAR_STATIC */
-            contact_cache_clear (physics_world_get_primary ());
+        if (main_inputs.up_arrow_pressed) {
+            main_inputs.situation_cursor = (main_inputs.situation_cursor + 2) % 3;
             main_inputs.up_arrow_pressed = false;
+        }
+        if (main_inputs.down_arrow_pressed) {
+            main_inputs.situation_cursor = (main_inputs.situation_cursor + 1) % 3;
             main_inputs.down_arrow_pressed = false;
         }
         if (main_inputs.enter_key_pressed) {
-            main_inputs.object_menu_level = 0;
             main_inputs.enter_key_pressed = false;
+            if (main_inputs.situation_cursor == 0) {
+                /* Static and kinematic are exclusive: set_static(true)
+                 * alone would leave a stale kinematic flag, so clear it
+                 * first — a static body is never kinematic. */
+                selected_rigid_body -> kinematic = false;
+                rigidbody_set_static (selected_rigid_body, !selected_rigid_body -> static_state);
+            } else if (main_inputs.situation_cursor == 1) {
+                /* set_kinematic clears static itself, and the
+                 * make_kinematic=false path re-derives a dynamic body
+                 * through set_static(false). */
+                rigidbody_set_kinematic (selected_rigid_body, !selected_rigid_body -> kinematic);
+            } else {
+                /* No mutator exists for no_collide (the field is written
+                 * directly by the visual-proxy layers — the documented
+                 * convention); the situation screen follows it. */
+                selected_rigid_body -> no_collide = !selected_rigid_body -> no_collide;
+            }
+            /* MPE_TASK_06 pattern: any situation change invalidates the
+             * contact cache — pair membership and material frames may
+             * both change. */
+            contact_cache_clear (physics_world_get_primary ());
         }
     } else if (main_inputs.object_menu_level == 6) {
         main_inputs.marked_joint_object_index = selected_object;

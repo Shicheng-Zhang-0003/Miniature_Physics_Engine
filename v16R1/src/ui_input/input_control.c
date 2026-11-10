@@ -28,6 +28,7 @@ void initialize_input (input_status *s) {
     s -> period_key_pressed = false;
     s -> p_key_pressed = false;
     s -> o_key_pressed = false;
+    s -> situation_cursor = 0;
     s -> r_key_pressed = false;
     s -> i_key_pressed = false;
     s -> j_key_pressed = false;
@@ -313,8 +314,10 @@ gboolean on_keypress (GtkEventControllerKey *w, guint keyval, guint keycode, Gdk
             st -> object_menu_level = 3;
         if (keyval == GDK_KEY_3)
             st -> object_menu_level = 4;
-        if (keyval == GDK_KEY_4)
+        if (keyval == GDK_KEY_4) {
             st -> object_menu_level = 5;
+            st -> situation_cursor = 0; /* SANDBOX S2: open on the first row */
+        }
         if (keyval == GDK_KEY_5)
             st -> object_menu_level = 6;
         if (keyval == GDK_KEY_6) {
