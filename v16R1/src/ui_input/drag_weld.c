@@ -3,16 +3,158 @@
  * time (dot(pos − cam_pos, fwd), clamped to >= 1 m) so the body keeps
  * its reach instead of snapping to the crosshair plane. The tick runs
  * from input dispatch every frame — including while physics is frozen
- * (P) — so a frozen world is still an arrangement world. */
+ * (P) — so a frozen world is still an arrangement world.
+ *
+ * SANDBOX S4c: weld-on-drop. Releasing the carried body while its
+ * covering sphere overlaps another body pieces the two into ONE rigid
+ * object_composite via the public MIG API physics_world_add_composite —
+ * GUI-only orchestration, zero engine changes. Both source bodies are
+ * expanded into a world-frame mig_part array (primitive = one part at
+ * the body pose; composite = its pool slice rotated out to world), the
+ * engine computes the COM and re-anchors, then the originals are
+ * removed (higher index first) and the selection hands to the new
+ * body's id. Per-part friction/restitution are carried post-hoc: the
+ * add path stamps body_defaults onto every part, and mig_part has no
+ * material fields. Statics/kinematics refuse the weld — one rigid
+ * composite has a single static_state, so welding to an infinite-mass
+ * anchor would have to bring the anchor to life; the Situation screen
+ * toggles that first. */
 #include "drag_weld.h"
 #include "../mpe_engine.h"
 #include "object_selector.h"
 #include <math.h>
 #include <stdio.h>
 
+#define WELD_PART_CAP 16        /* the engine's composite part cap */
+#define WELD_OVERLAP_EPS 0.02f  /* covering spheres must overlap by this */
+
 static bool drag_active = false;
 static float grab_distance = 1.0f;
 static uint32_t dragged_id = 0;
+
+static int weld_type_to_mig (object_type t) {
+    return t == object_sphere ? mig_part_sphere : t == object_cylinder ? mig_part_cylinder : mig_part_cube;
+} /* Expand one source body into world-frame mig_parts appended to the
+   * caller's array. fr_* run parallel to the part array so the materials
+   * can be carried post-hoc (the add path stamps body_defaults). */
+static void weld_collect_parts (physics_world *w, rigidbody *src, mig_part parts [], int *count,
+                                float fr_s [], float fr_k [], float rest []) {
+    if (src -> type != object_composite) {
+        if (*count >= WELD_PART_CAP) { return; }
+        mig_part *p = &parts [*count];
+        p -> type = (mig_part_type) weld_type_to_mig (src -> type);
+        p -> radius = (src -> type == object_cube) ? 0.0f : src -> radius;
+        p -> cylinder_half_length = src -> cylinder_half_length;
+        p -> half_extensions = src -> half_extensions;
+        p -> position = src -> position;   /* WORLD frame: engine rebases to COM */
+        p -> orientation = src -> orientation; /* part->assembly = part->world */
+        p -> mass_mode = mig_mass_mode_explicit;
+        p -> mass = src -> mass;
+        fr_s [*count] = src -> friction_static;
+        fr_k [*count] = src -> friction_kinetic;
+        rest [*count] = src -> restitution;
+        *count += 1;
+        return;
+    }
+    /* Composite source: expand its pool slice out to world frame, the
+     * exact pose math the renderer draws with (new_render.c:383). */
+    for (int pi = 0; pi < src -> composite_part_count; pi++) {
+        if (*count >= WELD_PART_CAP) {
+            printf ("[weld] part cap %d reached: tail parts dropped\n", WELD_PART_CAP);
+            return;
+        }
+        long slot = (long) src -> part_base + (long) pi;
+        if ((slot < 0) || (slot >= (long) w -> composite_part_count)) { continue; }
+        const composite_part *cp = &w -> composite_parts [slot];
+        if (!cp -> active) { continue; }
+        mig_part *p = &parts [*count];
+        p -> type = (mig_part_type) weld_type_to_mig (cp -> type);
+        p -> radius = (cp -> type == object_cube) ? 0.0f : cp -> radius;
+        p -> cylinder_half_length = cp -> cylinder_half_length;
+        p -> half_extensions = cp -> half_extensions;
+        p -> position = vector3_addition (src -> position,
+                                          vector4_rotate_to_vector3 (src -> orientation, cp -> local_position));
+        p -> orientation = vector4_normalisation (vector4_multiplication (src -> orientation,
+                                                                          cp -> local_orientation));
+        p -> mass_mode = mig_mass_mode_explicit;
+        p -> mass = cp -> mass;
+        fr_s [*count] = cp -> friction_static;
+        fr_k [*count] = cp -> friction_kinetic;
+        rest [*count] = cp -> restitution;
+        *count += 1;
+    }
+} static int weld_find_target (physics_world *w, int dragged_idx) {
+    rigidbody *a = &w -> bodies [dragged_idx];
+    int best = -1;
+    float best_d = 1e30f;
+    for (int i = 0; i < w -> body_count; i++) {
+        if (i == dragged_idx) { continue; }
+        rigidbody *b = &w -> bodies [i];
+        float d = vector3_length (vector3_subtraction (b -> position, a -> position));
+        if (d < ((a -> radius + b -> radius) - WELD_OVERLAP_EPS) && d < best_d) {
+            best_d = d;
+            best = i;
+        }
+    } return best;
+} static void weld_try (int dragged_idx) {
+    physics_world *w = physics_world_get_primary ();
+    if ((!w) || (dragged_idx < 0) || (dragged_idx >= w -> body_count)) { return; }
+    rigidbody *a = &w -> bodies [dragged_idx];
+    if (a -> static_state || a -> kinematic) {
+        printf ("[weld] refused: carried body is static/kinematic (toggle its Situation first)\n");
+        return;
+    }
+    int target_idx = weld_find_target (w, dragged_idx);
+    if (target_idx < 0) { return; } /* plain drop, nothing overlapped */
+    rigidbody *b = &w -> bodies [target_idx];
+    if (b -> static_state || b -> kinematic) {
+        printf ("[weld] refused: target body is static/kinematic (toggle its Situation first)\n");
+        return;
+    }
+    mig_part parts [WELD_PART_CAP];
+    float fr_s [WELD_PART_CAP], fr_k [WELD_PART_CAP], rest [WELD_PART_CAP];
+    int count = 0;
+    weld_collect_parts (w, a, parts, &count, fr_s, fr_k, rest);
+    weld_collect_parts (w, b, parts, &count, fr_s, fr_k, rest);
+    if (count < 2) { return; }
+    /* Body-level materials of the carrier, captured before removals. */
+    float a_fs = a -> friction_static, a_fk = a -> friction_kinetic, a_r = a -> restitution;
+    int new_index = physics_world_add_composite (w, parts, count);
+    if (new_index < 0) {
+        printf ("[weld] refused: engine rejected the assembly (mass window / degenerate)\n");
+        return;
+    }
+    uint32_t new_id = w -> bodies [new_index].object_id;
+    /* Carry per-part materials: the add path stamped body_defaults. */
+    rigidbody *nb = &w -> bodies [new_index];
+    for (int i = 0; i < nb -> composite_part_count; i++) {
+        long slot = (long) nb -> part_base + (long) i;
+        if ((slot < 0) || (slot >= (long) w -> composite_part_count)) { continue; }
+        composite_part *cp = &w -> composite_parts [slot];
+        cp -> friction_static = fr_s [i];
+        cp -> friction_kinetic = fr_k [i];
+        cp -> restitution = rest [i];
+    }
+    /* Remove both originals, HIGHER index first — removal compacts the
+     * array, so the lower index must stay meaningful. */
+    if (target_idx > dragged_idx) {
+        scene_remove_object_by_index (target_idx);
+        scene_remove_object_by_index (dragged_idx);
+    } else {
+        scene_remove_object_by_index (dragged_idx);
+        scene_remove_object_by_index (target_idx);
+    }
+    /* Hand the selection to the welded body (its index moved down during
+     * the removals; the id is stable). */
+    int sel = scene_find_object_index_by_id (new_id);
+    if (sel >= 0) {
+        select_object_by_index (sel);
+        w -> bodies [sel].friction_static = a_fs;
+        w -> bodies [sel].friction_kinetic = a_fk;
+        w -> bodies [sel].restitution = a_r;
+        printf ("[weld] fused %d parts -> new body [%d] (id %u)\n", count, sel, (unsigned) new_id);
+    }
+}
 
 void drag_weld_press (void) {
     if (drag_active) { return; } /* second button-down while held: ignore */
@@ -55,10 +197,12 @@ void drag_weld_tick (void) {
 
 void drag_weld_release (void) {
     if (!drag_active) { return; }
+    int idx = scene_find_object_index_by_id (dragged_id);
     drag_active = false;
     dragged_id = 0;
-    printf ("[drag] dropped\n");
-    /* SANDBOX S4c: weld-on-drop check lands here. */
+    /* SANDBOX S4c: overlap at release = weld the two into one composite. */
+    if (idx >= 0) { weld_try (idx); }
+    else { printf ("[drag] dropped\n"); }
 }
 
 bool drag_weld_is_active (void) {

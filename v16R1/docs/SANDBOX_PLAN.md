@@ -76,6 +76,25 @@
 > `ui_input/drag_weld.c`+`.h` (new), `lmb_pressed`/`lmb_released`
 > latches in `input_state.h` + press/release/initialize/focus-out
 > spots in `input_control.c`, dispatch consumption + per-frame tick.
+> GUI-only; suite 57/0 re-run, build 0 under -Werror. S4c LANDED
+> 2026-11-10: weld-on-drop — releasing the carried body while its
+> covering sphere overlaps another (nearest, `d < ra + rb − 0.02`)
+> pieces the two into ONE rigid `object_composite` through the public
+> MIG API `physics_world_add_composite` (GUI-only orchestration, zero
+> engine changes). Sources expand into a world-frame `mig_part` array —
+> a primitive is one part at its body pose; a composite source expands
+> its pool slice to world with the renderer's exact pose math (`pos =
+> body_pos + R·local_pos`, `ori = q_body ⊗ q_local`) — the engine
+> computes the COM, re-anchors, and returns the new body. Per-part
+> friction/restitution are carried post-hoc from tracked sources (the
+> add path stamps body_defaults; `mig_part` has no material fields);
+> the new body's body-level materials come from the carrier. Both
+> originals are removed higher-index-first and the selection hands to
+> the new body's stable id. Statics/kinematics refuse the weld (one
+> composite has a single static_state — welding to an infinite-mass
+> anchor would bring it to life; the Situation screen toggles first).
+> Over-cap assemblies clamp at the engine's 16-part cap. The floor is
+> the solver plane, not a body, so dropping on the ground never welds.
 > GUI-only; suite 57/0 re-run, build 0 under -Werror.**
 
 ## Findings this plan builds on (2026-11-09 survey)
@@ -173,7 +192,7 @@
   follows `cam_pos + fwd · grab_dist` while held; velocities zeroed,
   body woken; release drops it. LMB latches join the four-latch
   discipline (`on_button_press` btn==1 only when `is_mouse_locked`).
-- [ ] **S4c weld-on-drop:** releasing a dragged body while its covering
+- [x] **S4c weld-on-drop (LANDED):** releasing a dragged body while its covering
   sphere overlaps another body (nearest, `dist < ra + rb − 0.02`)
   pieces the two into ONE rigid `object_composite` via the public
   `physics_world_add_composite` (MIG API, world-frame part array, cap

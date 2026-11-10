@@ -10,6 +10,6 @@
  * so the drag is keyed to the stable object id, re-resolved per tick. */
 void drag_weld_press (void);  /* consume the LMB press edge: select + grab */
 void drag_weld_tick (void);   /* every frame while held: follow the camera */
-void drag_weld_release (void);/* consume the LMB release edge: drop (S4c: weld) */
+void drag_weld_release (void);/* release edge: drop; S4c welds on overlap */
 bool drag_weld_is_active (void);
 #endif /* drag_weld_h */
