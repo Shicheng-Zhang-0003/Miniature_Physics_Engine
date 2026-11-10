@@ -101,6 +101,7 @@ void physics_halt_set (bool halted);
 void physics_halt_for_ticks (int ticks);
 bool physics_is_halted (void);
 bool physics_halt_tick_update (void); /* MFS_PHASE_A */
+void physics_halt_step_once (void); /* SANDBOX S1: run exactly one tick, then re-halt */
 /* MPE_TASK_V15R2_PHYSICS_HALT_EXTERN_END */
 #define a3_version_string "v16R1-dev" /* v16R1 development head */
 /* MPE_RELEASE_FREEZE_BEGIN */

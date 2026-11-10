@@ -14,6 +14,15 @@
  * single-word flag, tick path never blocks. */
 static _Atomic int physics_halt_ticks_remaining = 0;
 static _Atomic bool physics_halted = false;
+/* SANDBOX S1: frame-stepping while frozen. O arms exactly one tick;
+ * physics_halt_tick_update consumes the arm, runs that tick, and has
+ * physics_halted already TRUE again for the tick after it — so
+ * physics_is_halted() (the overlay badge) never flickers. */
+static _Atomic bool physics_halt_step_pending = false;
+void physics_halt_step_once (void) {
+    physics_halt_step_pending = true;
+    physics_halted = false;
+}
 void physics_halt_set (bool halted) {
     physics_halted = halted;
     if (!halted) { physics_halt_ticks_remaining = 0; }
@@ -39,6 +48,13 @@ bool physics_is_halted (void) {return physics_halted;}
 /* MFS_PHASE_A: per-tick halt bookkeeping. Returns true if physics should be
  * skipped this tick (timed halt counting down, or indefinite halt). */
 bool physics_halt_tick_update (void) {
+    if (physics_halt_step_pending) {
+        /* SANDBOX S1: the one armed tick — run it, and make sure the
+         * tick after it is skipped again. */
+        physics_halt_step_pending = false;
+        physics_halted = true;
+        return false;
+    }
     if (physics_halt_ticks_remaining > 0) {
         physics_halt_ticks_remaining--;
         if (physics_halt_ticks_remaining == 0) { physics_halted = false; }

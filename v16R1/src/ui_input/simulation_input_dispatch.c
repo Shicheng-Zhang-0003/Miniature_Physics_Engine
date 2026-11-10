@@ -7,6 +7,19 @@
 #include "../core/validation_report.h" /* MFS_INCREMENT_SPLIT: validation_report_print */
 #include "../core/long_run_validation.h"
 void simulation_input_dispatch (GtkWidget *parent_window) {
+    /* SANDBOX S1: freeze (P) and frame-step (O). P toggles the physics
+     * halt; O runs exactly one tick while frozen (no-op when running).
+     * Dispatch runs BEFORE this frame's physics tick, so the toggle and
+     * the armed step take effect immediately. Camera and overlay stay
+     * live while frozen (the halt contract). */
+    if (main_inputs.p_key_pressed) {
+        physics_halt_set (!physics_is_halted ());
+        main_inputs.p_key_pressed = false;
+    }
+    if (main_inputs.o_key_pressed) {
+        if (physics_is_halted ()) { physics_halt_step_once (); }
+        main_inputs.o_key_pressed = false;
+    }
     /* Mouse, Escape, E, F key bindings */
     if (main_inputs.escape_key_pressed) {
         if (main_inputs.is_mouse_locked) {

@@ -16,6 +16,10 @@ typedef struct {
      * Comma (or shifted `<`) held = intake runs; period (or shifted `>`)
      * pressed = shoot once (edge). See ui_input/keydrive.h. */
     bool comma_key_pressed, period_key_pressed;
+    /* SANDBOX S1: freeze/step. P toggles the physics halt, O steps one
+     * tick while frozen. Free globally by the same modal-microvim
+     * convention as the robot keys above. */
+    bool p_key_pressed, o_key_pressed;
     bool enter_spawn_held;
     bool r_key_pressed;
     bool i_key_pressed, j_key_pressed, k_key_pressed, l_key_pressed;

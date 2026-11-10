@@ -307,13 +307,16 @@ void overlay_update (void) {
     if (!debug_information_label)
         return;
     char ibuf [1024];
-    char mode [32];
-    snprintf (mode, sizeof (mode), "%s", main_inputs.is_debug_mode_active ? "DEBUG MODE" : "GAME MODE");
+    char mode [48];
+    /* SANDBOX S1: the frozen state rides the mode badge so it is visible
+     * in both the selected and no-selection status bars. */
+    snprintf (mode, sizeof (mode), "%s%s", main_inputs.is_debug_mode_active ? "DEBUG MODE" : "GAME MODE",
+              physics_is_halted () ? " | FROZEN (P resume, O step)" : "");
     if ((selected_object < 0) || (selected_object >= (physics_world_get_primary () -> body_count))) {
         const char *st = main_inputs.current_spawn_type == 0 ? "sphere"
         : main_inputs.current_spawn_type == 1 ? "cube"
         : "cylinder";
-        snprintf (ibuf, sizeof (ibuf), "[%s] | No object selected | Enter: spawn %s | R-Click: select | 0: Toggle Mode",
+        snprintf (ibuf, sizeof (ibuf), "[%s] | No object selected | Enter: spawn %s | R-Click: select | P: freeze | 0: Toggle Mode",
                   mode, st);
         overlay_append_stats_text (ibuf, sizeof (ibuf));
         overlay_append_overflow_text (ibuf, sizeof (ibuf));
