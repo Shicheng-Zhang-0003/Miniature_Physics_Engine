@@ -97,3 +97,6 @@ reference_materials/
 
 # Personal study artifact: generated textbook, kept out of version control.
 /MATHEMATICS_OF_MPE.md
+
+# Local user archives (2026-11-10): 79MB blob must not live in git
+BEE-linux.tar.gz
