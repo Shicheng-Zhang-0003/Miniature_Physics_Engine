@@ -6,6 +6,7 @@
 #include "../mpe_engine.h"
 #include "../core/validation_report.h" /* MFS_INCREMENT_SPLIT: validation_report_print */
 #include "../core/long_run_validation.h"
+#include "resize_panel.h" /* SANDBOX S4a: T toggles the panel */
 void simulation_input_dispatch (GtkWidget *parent_window) {
     /* SANDBOX S1: freeze (P) and frame-step (O). P toggles the physics
      * halt; O runs exactly one tick while frozen (no-op when running).
@@ -19,6 +20,12 @@ void simulation_input_dispatch (GtkWidget *parent_window) {
     if (main_inputs.o_key_pressed) {
         if (physics_is_halted ()) { physics_halt_step_once (); }
         main_inputs.o_key_pressed = false;
+    }
+    /* SANDBOX S4a: T toggles the resize panel (tiny terminal-style editor
+     * window bound to the selected body). */
+    if (main_inputs.t_key_pressed) {
+        resize_panel_toggle (parent_window);
+        main_inputs.t_key_pressed = false;
     }
     /* Mouse, Escape, E, F key bindings */
     if (main_inputs.escape_key_pressed) {

@@ -20,6 +20,9 @@ typedef struct {
      * tick while frozen. Free globally by the same modal-microvim
      * convention as the robot keys above. */
     bool p_key_pressed, o_key_pressed;
+    /* SANDBOX S4a: T toggles the resize panel (the tiny terminal-style
+     * editor window for the selected body). Free by the same convention. */
+    bool t_key_pressed;
     /* SANDBOX S2: the Situation screen's cursor (object menu level 5).
      * 0 = static, 1 = kinematic, 2 = no-collide; Up/Down move it, Enter
      * toggles the row. Lives in the input state so editor.c mutates and

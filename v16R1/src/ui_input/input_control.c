@@ -28,6 +28,7 @@ void initialize_input (input_status *s) {
     s -> period_key_pressed = false;
     s -> p_key_pressed = false;
     s -> o_key_pressed = false;
+    s -> t_key_pressed = false;
     s -> situation_cursor = 0;
     s -> r_key_pressed = false;
     s -> i_key_pressed = false;
@@ -116,6 +117,9 @@ gboolean on_keypress (GtkEventControllerKey *w, guint keyval, guint keycode, Gdk
         st -> p_key_pressed = true;
     if (keyval == GDK_KEY_o || keyval == GDK_KEY_O)
         st -> o_key_pressed = true;
+    /* SANDBOX S4a: toggle the resize panel. */
+    if (keyval == GDK_KEY_t || keyval == GDK_KEY_T)
+        st -> t_key_pressed = true;
     if (keyval == GDK_KEY_F5)
         st -> stability_test_pressed = true;
     if (keyval == GDK_KEY_F6)
@@ -398,6 +402,9 @@ gboolean on_key_released (GtkEventControllerKey *w, guint keyval, guint keycode,
         st -> p_key_pressed = false;
     if (keyval == GDK_KEY_o || keyval == GDK_KEY_O)
         st -> o_key_pressed = false;
+    /* SANDBOX S4a: resize panel toggle release latch. */
+    if (keyval == GDK_KEY_t || keyval == GDK_KEY_T)
+        st -> t_key_pressed = false;
     if (keyval == GDK_KEY_i || keyval == GDK_KEY_I)
         st -> i_key_pressed = false;
     if (keyval == GDK_KEY_j || keyval == GDK_KEY_J)
@@ -581,6 +588,7 @@ gboolean on_focus_out (GtkEventControllerFocus *ctrl, gpointer user_data_stored)
     st -> period_key_pressed = false;
     st -> p_key_pressed = false;
     st -> o_key_pressed = false;
+    st -> t_key_pressed = false;
     st -> i_key_pressed = false;
     st -> j_key_pressed = false;
     st -> k_key_pressed = false;

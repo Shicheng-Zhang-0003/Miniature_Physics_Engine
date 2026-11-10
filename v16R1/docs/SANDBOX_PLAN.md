@@ -48,7 +48,22 @@
 > (+ the S3 trail sample, which must track simulated ticks): input,
 > camera, menus, terminal and overlay run every frame — a frozen world
 > is an inspection world. Terminal halt/sleep share the corrected
-> semantics. Suite 57/0 re-run.**
+> semantics. Suite 57/0 re-run. S4a LANDED 2026-11-10: the resize
+> panel — a tiny terminal-style GTK window (debug-terminal recipe:
+> plain GtkWindow, transient, Esc closes, own CSS provider) toggled
+> with T, one slider row per size dimension of the SELECTED body
+> (sphere radius / cylinder radius + half-length / cube XYZ half
+> extents). Dragging a slider resizes live with the full editor
+> radius-edit tail (inertia update, contact-cache clear, wake); cube
+> resize maintains the covering bound `radius = |half_extensions|`
+> (the spawn convention — stale bound = missed broadphase pairs). Rows
+> are built once, shown/hidden per type; sliders sync from the
+> selection (id-keyed, `syncing` guard against value-changed
+> recursion); opening releases the mouse lock (sliders need the
+> pointer). Files: `ui_input/resize_panel.c`+`.h` (new), `T` latch in
+> `input_state.h` + the four-latch spots in `input_control.c`,
+> dispatch consumption, `resize_panel_sync()` in `overlay_update`.
+> GUI-only; suite 57/0 re-run, build 0 under -Werror.**
 
 ## Findings this plan builds on (2026-11-09 survey)
 
@@ -133,8 +148,30 @@
   Distinct colour (cyan) vs the FTC predicted-shot line. GUI-only;
   render files are suite-unlinked.
 
-## S4 — reserved ("so forth")
+## S4 — piece together + resize (user request 2026-11-10)
 
-- [ ] **S4 reserve:** candidates after a live review of S1–S3: a
-  slow-motion time scale knob, a step-N-ticks variant, an object list
-  overlay, trail length/style options. Not scoped until S1–S3 land.
+- [x] **S4a resize panel (LANDED):** T toggles a tiny terminal-style
+  GTK window with a slider per size dimension of the selected body;
+  drag to resize live (inertia + contact cache + wake follow; cube
+  covering radius maintained). Landed — see STATUS LINE.
+- [ ] **S4b drag-move:** LMB (while mouse-locked) grabs the aimed body
+  — crosshair ray selects, then the body holds its distance along the
+  camera forward (`grab_dist = dot(pos − cam_pos, fwd)`, min 1.0) and
+  follows `cam_pos + fwd · grab_dist` while held; velocities zeroed,
+  body woken; release drops it. LMB latches join the four-latch
+  discipline (`on_button_press` btn==1 only when `is_mouse_locked`).
+- [ ] **S4c weld-on-drop:** releasing a dragged body while its covering
+  sphere overlaps another body (nearest, `dist < ra + rb − 0.02`)
+  pieces the two into ONE rigid `object_composite` via the public
+  `physics_world_add_composite` (MIG API, world-frame part array, cap
+  16) — then removes both originals (higher index first) and
+  re-selects the new body by id. Per-part friction/restitution carried
+  post-hoc (`mig_part` has no material fields; composite parts get
+  `body_defaults`). Composite parts of a source composite expand into
+  world frame (`pos = body_pos + R_body·local_pos`,
+  `ori = q_body ⊗ q_local`). GUI-only; welded composites won't
+  scene-persist yet (WP3 scope).
+- [ ] **S4 reserve:** candidates after a live review: a slow-motion
+  time scale knob, a step-N-ticks variant, an object list overlay,
+  trail length/style options, a K-key explicit weld as an alternative
+  to drop-weld.

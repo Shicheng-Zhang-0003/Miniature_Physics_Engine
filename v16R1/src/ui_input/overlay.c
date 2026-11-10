@@ -2,6 +2,7 @@
 #include "../mpe_engine.h"
 #include "overlay.h"
 #include "object_spawner.h"
+#include "resize_panel.h" /* SANDBOX S4a: per-frame slider/selection sync */
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -114,6 +115,7 @@ static void overlay_append_stats_text (char *buffer, size_t buffer_size) {
     }
 }
 void overlay_update (void) {
+    resize_panel_sync (); /* SANDBOX S4a: follow selection changes every frame */
     float adj = g_cfg.ui.change_rate_game;
     if (menu_label) {
         if (main_inputs.is_menu_open) {
