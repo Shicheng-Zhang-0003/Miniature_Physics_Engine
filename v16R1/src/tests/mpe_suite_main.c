@@ -115,6 +115,9 @@ int mpe_t_mig_composite_world (void);
 int mpe_t_mig_composite_broadphase (void);
 int mpe_t_mig_composite_narrowphase (void);
 int mpe_t_mig_floor_ccd_composite (void);
+int mpe_t_mig_composite_stack (void);
+int mpe_t_mig_pendulum_com_offset (void);
+int mpe_t_mig_determinism_twins (void);
 typedef struct {
     const char *name;
     int (*fn) (void);
@@ -239,6 +242,16 @@ static const mpe_entry_t mpe_registry [] = {
      * floor CCD lowest-point scan over the part pool (tumbling L clamps
      * before tunneling; landing does not pump upward). */
     {"mig_floor_ccd_composite", mpe_t_mig_floor_ccd_composite, 0},
+    /* WP2 2.8 gates (plan §4, charter §7): the stack value claim (ten
+     * primitives vs one 10-part composite, same mass/materials — both
+     * settle asleep, top blocks agree within the documented band), the
+     * end-to-end mass contract through the solver (off-COM composite bob
+     * vs the parallel-axis closed form, 1.5% house band), and the
+     * §4.5 determinism twins (composite scene, 600-tick bitwise at the
+     * ambient MPE_THREADS; landing verifies 1/4/8 by three env runs). */
+    {"mig_composite_stack", mpe_t_mig_composite_stack, 0},
+    {"mig_pendulum_com_offset", mpe_t_mig_pendulum_com_offset, 0},
+    {"mig_determinism_twins", mpe_t_mig_determinism_twins, 0},
 };
 #define MPE_NTESTS ((int) (sizeof (mpe_registry) / sizeof (mpe_registry [0])))
 /* Returns 0 pass, 1 fail, 2 skipped.

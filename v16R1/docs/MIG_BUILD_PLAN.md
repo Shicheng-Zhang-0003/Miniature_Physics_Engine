@@ -124,9 +124,59 @@
 > draw path is untouched, so zero-composite scenes are unchanged (2.9's
 > A2 byte probe statement holds). Renderer is GL-bound and suite-unlinked:
 > no new gate; verification = GTK4 build 0 under -Werror, suite 54/52+2,
-> quick 68/68.
-> NEXT: WP2 2.8's remaining gates (`mig_composite_stack`,
-> `mig_pendulum_com_offset`, determinism twins), then 2.9 verification.**
+> quick 68/68. WP2 STEP 2.8 LANDED 2026-11-09 (gates + one real engine
+> defect fixed): three new blocking entries — `mig_composite_stack`
+> (55th: 10-primitive stack vs one 10-part composite, pitch 1.002,
+> settle contract pinned to the CANONICAL config — gravity −9.81, sleep
+> ON, cube restitution 0, friction 0.8/0.7, solver_iterations 64; RULING:
+> the `light` regime at 8 iterations genuinely slumps a 10-stack, so
+> gates pin their own meaning after `mpe_test_begin`; both settle ASLEEP,
+> tops agree within 5 cm), `mig_pendulum_com_offset` (56th: 2-sphere
+> composite bob d=0.8, hand-closed form I_pivot=3.164 with transport
+> terms 96%, θ₀-corrected analytic 2.0060 s, 1.5% band — measured
+> 2.0048; the whole mass contract certified end-to-end through the
+> solver), `mig_determinism_twins` (57th: dumbbell×L×rain composite
+> scene ×2 worlds, 600 ticks bitwise, ambient MPE_THREADS since the
+> pool is process-lazy — landing verified at 1/4/8; bodies=5 parts=4
+> cache_entries=28). THE GATES CAUGHT A REAL ENGINE DEFECT: the boundary
+> safety net (`scene/boundary.c`) read body-level OBB fields, but
+> composites are sphere-initialised (half_extensions=(r,r,r)) then
+> retyped — min_y = 5.009−5.375 = −0.366 m put the net at COVERING-SPHERE
+> rest, so the 10-stack lived in a perpetual clamp/fall cycle and never
+> slept (first run: 3 checks failed). FIX: per-part exact support
+> `boundary_composite_extrema_along_axis` (world passed down to the part
+> pool) + `boundary_apply_box_world_cfg`; legacy signatures delegate
+> with world=NULL byte-identical, and the engine call site
+> (`physics_world.c:2574`) passes the STEPPED world, not
+> `physics_world_get_primary` — twin test worlds stay independent. The
+> fix exposed a 2.6 fixture lie: composite floor contacts read PART pool
+> materials (body_defaults cube_restitution default 0.5), not the
+> body-level restitution the gate pinned — the old boundary clamp had
+> been swallowing the bounce. The gate now pins
+> `body_defaults.cube_restitution = 0` (and sphere=0 for the dumbbell
+> scene); the max_up band recalibrated from fixed 0.5 to self-scaling
+> `0.25·v_impact` because the corner impact converts spin to COM rise
+> (ωz −29.5 → −2.3 rad/s, vy +0.955) with energy DECREASING — a lawful
+> bounce, not a pump — plus a settle check |vy| < 0.25 at tick 30.
+> FALSIFIABILITY (mutate → expect failure → restore → rebuild): M1 —
+> composites excluded from the sleep-calm condition (`rigidbody.c:1137`)
+> → stack gate FAILED 1 check (`first_sleep_b`); restored, green. M2 —
+> the composed-tensor overwrite in `physics_world_add_composite` skipped
+> (covering-sphere 2/5·mr² survives) → pendulum gate FAILED 1 check
+> (period 2.1359 vs 2.0060); restored, green. M3a — floor-batch part
+> order reversed (call-counter keyed, periods 2 then 3) was a NULL
+> MUTATION: twins stayed bitwise identical — same-body floor-manifold
+> order is bitwise-insensitive on this solver path (robustness fact,
+> recorded); M3b — the REAL order-matters surface is the part-PAIR path:
+> `mpe_composite_iterate` order keyed to the world's runtime address (a
+> non-pure order source; twin worlds differ in address) → twins at
+> MPE_THREADS=4 FAILED 5 checks (contact-cache footprint + all 4 dynamic
+> bodies bitwise-diverged); restored, twins green at 1/4/8.
+> test_runner.py floor 54→57 in the same commit. Suite 57/55+2 (Total:
+> 57, blocking failures 0), quick 71/71.
+> NEXT: WP2 2.9 verification — `make tsan` over the suite (ghost scratch
+> is the worker-race surface), A2 byte-probe statement against a pre-WP2
+> `temp/qa_runs` summary — then WP3.**
 
 ---
 
@@ -747,22 +797,70 @@ broadphase/floor/CCD hooks, editor-invisible (UI is WP4). Estimated
   byte-identical (2.9's A2 statement holds). Renderer is GL-bound and
   suite-unlinked: NO new gate — verification is the GTK4 build exiting 0
   under -Werror, suite 54/52+2, quick 68/68 (re-run at landing).
-- [ ] **2.8 Gates** (each its own suite entry, floor bump same commit):
-  `mig_composite_stack` (10-primitive stack vs one 10-part composite,
-  same mass/materials: both settle asleep); `mig_floor_ccd_composite`
-  — ALREADY LANDED as the 54th entry in `bc395b2` (WP2 2.6), rather
+- [x] **2.8 Gates** (each its own suite entry, floor bump same commit):
+  LANDED 2026-11-09 as one commit with the `test_runner.py` floor bump
+  54→57. Three new blocking entries:
+  `mig_composite_stack` (55th) — 10-primitive stack vs one 10-part
+  composite, pitch 1.002, same masses/materials; RULING: the settle
+  contract is pinned to the CANONICAL config (gravity −9.81, sleep ON,
+  cube restitution 0, friction 0.8/0.7, solver_iterations 64) because
+  the `light` regression regime (8 iterations) genuinely slumps a
+  10-stack — every 2.8 gate pins its own meaning after `mpe_test_begin`;
+  checks: both settle ASLEEP inside the window, top-block poses within
+  5 cm, first all-sleep tick finite (`mig_floor_ccd_composite` —
+  ALREADY LANDED as the 54th entry in `bc395b2` (WP2 2.6), rather
   than deferred, because the step's own contract is the gate; part-scoped
   cache probe (two resting parts → distinct cache entries,
   warm starts never cross) — ALREADY LANDED inside
   `mig_composite_narrowphase` in `0a03b85` rather than as a later
   duplicate entry, because the ORDER MATTERS rule put the identity work
   in that same gate (the 3.0/7.0 seed split, unknown-part miss,
-  reversed-role swap and stepped two-entry check are the probe);
-  `mig_pendulum_com_offset` — the charter end-
-  to-end gate now becomes possible: composite bob with off-COM mass,
-  period vs parallel-axis closed form (this gate certifying the whole
-  contract through the solver is the thesis of the train); determinism
-  twins with composites at threads 1/4/8 (charter §4.5).
+  reversed-role swap and stepped two-entry check are the probe)).
+  `mig_pendulum_com_offset` (56th) — the charter end-to-end gate:
+  composite bob with off-COM mass (2 spheres, d=0.8, explicit masses),
+  period vs the hand-closed-form parallel-axis I_pivot=3.164 (transport
+  terms 96% of it), θ₀-corrected analytic 2.0060 s, 1.5% band; measured
+  2.0048 — this gate certifies the whole composed-mass contract through
+  the solver, which is the thesis of the train. `mig_determinism_twins`
+  (57th) — charter §4.5: the dumbbell×L×raining-primitives composite
+  scene built twice, 600 ticks, every body's pose/velocities/sleep state
+  and the contact-cache footprint bitwise equal, at the AMBIENT
+  MPE_THREADS (the pool is process-lazy — cannot be set in-process);
+  landing verification ran the gate at 1/4/8, all bitwise identical.
+  ENGINE DEFECT FOUND BY THE STACK GATE AND FIXED IN THIS STEP: the
+  boundary safety net (`scene/boundary.c`) read body-level OBB fields;
+  composites are sphere-initialised (radius=bound,
+  half_extensions=(r,r,r)) then retyped, so min_y = 5.009−5.375 =
+  −0.366 m — the net clamped every composite to its COVERING-SPHERE
+  rest and the 10-stack never slept (first run: 3 checks failed). Fix:
+  `boundary_composite_extrema_along_axis` computes per-part exact
+  support (world passed down to read the part pool), applied through
+  `boundary_apply_box_world_cfg`; the legacy entry points delegate with
+  world=NULL byte-identically, and the engine call site
+  (`physics_world.c:2574`) passes the STEPPED world (not
+  `physics_world_get_primary`) so twin test worlds stay independent.
+  The fix exposed a 2.6 fixture lie: composite floor contacts read PART
+  pool materials (body_defaults cube_restitution default 0.5), not the
+  body-level restitution the gate pinned — the old boundary clamp had
+  been swallowing the bounce. The gate now pins
+  `ccfg.body_defaults.cube_restitution = 0` (and sphere=0 for the
+  dumbbell scene); the max_up band recalibrated from fixed 0.5 to
+  self-scaling `max_up < 0.25·v_impact` — the corner impact converts
+  spin to COM rise (ωz −29.5 → −2.3 rad/s, vy +0.955) with energy
+  DECREASING, a lawful bounce and not a pump — plus a settle check
+  |vy| < 0.25 at tick 30. FALSIFIABILITY (mutate → expect failure →
+  restore → rebuild): M1 composites excluded from the sleep-calm
+  condition (`rigidbody.c:1137`) → stack gate 1 failure (`first_sleep_b`);
+  M2 the composed-tensor overwrite in `physics_world_add_composite`
+  skipped → pendulum gate 1 failure (2.1359 vs 2.0060); M3a floor-batch
+  part-order reversal = NULL mutation (twins bitwise identical —
+  same-body floor-manifold order is bitwise-insensitive on this solver
+  path, a robustness fact worth keeping); M3b part-PAIR iteration order
+  in `mpe_composite_iterate` keyed to the world's runtime address (a
+  non-pure order source) → twins at MPE_THREADS=4 5 failures
+  (cache footprint + all 4 dynamic bodies diverged). Every mutation
+  restored and rebuilt green: suite 57/55+2 (Total: 57, blocking
+  failures 0), quick 71/71.
 - [ ] **2.9 Verify:** quick profile green; `make tsan` (exists) green
   over the suite (ghost scratch is the worker-race surface the TSan
   profile exists for); suite `--all` green at the bumped floor;

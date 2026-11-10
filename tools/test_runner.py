@@ -153,7 +153,15 @@ MPE_TEST_REGIMES = ("default", "light", "heavy", "brittle", "sticky")
 # manifolds over the infinite plane (parent identity, part stamps) and the
 # floor CCD lowest-point scan over the part pool: a tumbling L clamps before
 # tunneling at canonical dt and landing does not pump upward).
-MIN_SUITE_ENTRIES = 54
+# -> 57 (2026-11-09, WP2 2.8 gates — mig_composite_stack: ten primitives vs
+# one 10-part composite, same mass/materials, both settle asleep with top
+# blocks within the 5 cm documented band; mig_pendulum_com_offset: off-COM
+# composite bob vs the parallel-axis closed form inside the 1.5% house band
+# (the mass contract certified end-to-end through the solver);
+# mig_determinism_twins: composite scene, 600-tick bitwise twins; charter
+# §4.5's MPE_THREADS 1/4/8 matrix is verified by three env-var runs of this
+# gate at landing, since the worker pool is process-lazy).
+MIN_SUITE_ENTRIES = 57
 # DESPOT-2026-10-01: pin per-suite floors so deleting a legacy/paranoia target
 # + its make target together cannot shrink the headline silently (the 220->204
 # drift). Canonical floor above; legacy 30 + paranoia 15 pinned here.

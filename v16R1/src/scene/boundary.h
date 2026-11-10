@@ -2,6 +2,7 @@
 #define boundary_h
 #include "../core/math3d.h"
 #include "../core/rigidbody.h"
+#include "../core/physics_world.h"
 #include "../config/mpe_config.h"
 /* TRUTH: per-world config (NULL = global). The old signatures read g_cfg
  * directly, so foreign worlds with different floor_emergency_slop got the
@@ -11,4 +12,9 @@ void boundary_apply_floor_cfg (rigidbody *rigid_body, float floor_y_coordinate, 
 void boundary_apply_box (rigidbody *rigid_body, vector3 minimum_bounds, vector3 maximum_bounds);
 void boundary_apply_box_cfg (rigidbody *rigid_body, vector3 minimum_bounds, vector3 maximum_bounds,
                              const mpe_config_t *cfg);
+/* MIG WP2 2.8: composite-aware safety net. `world` is the stepped world
+ * whose part pool the body's part_base indexes (NULL = legacy body-level
+ * projection, byte-identical for non-composites and world-less callers). */
+void boundary_apply_box_world_cfg (rigidbody *rigid_body, vector3 minimum_bounds, vector3 maximum_bounds,
+                                   const mpe_config_t *cfg, const physics_world *world);
 #endif

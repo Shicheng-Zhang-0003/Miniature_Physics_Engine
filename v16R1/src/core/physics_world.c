@@ -2571,7 +2571,8 @@ void physics_world_step (physics_world *world, float dt) {
     if (step_cfg -> boundary.safety_net_enabled) {
         for (int i = 0; i < world -> body_count; i++) {
             vector3 a3_pre_boundary_position = world -> bodies [i].position;
-            boundary_apply_box_cfg (&world -> bodies [i], (vector3) {-250, 0, -250}, (vector3) {250, 500, 250}, step_cfg);
+            boundary_apply_box_world_cfg (&world -> bodies [i], (vector3) {-250, 0, -250}, (vector3) {250, 500, 250},
+                                          step_cfg, world);
             if (vector3_length_squared (simd_sub (world -> bodies [i].position, a3_pre_boundary_position)) >
                 0.000001f) {
                 a3_boundary_moved_any = true;
