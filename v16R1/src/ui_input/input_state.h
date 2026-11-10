@@ -49,6 +49,11 @@ typedef struct {
     bool config_torture_pressed;
     bool is_mouse_locked, is_debug_mode_active;
     bool right_mouse_button_clicked, middle_mouse_button_clicked;
+    /* SANDBOX S4b: LMB drag latches. pressed is armed on button 1 ONLY
+     * while the mouse is already locked (the lock-acquiring first click
+     * must not grab); released arms on button 1 or on the generic
+     * release (btn==0) — the drag module no-ops it when not dragging. */
+    bool lmb_pressed, lmb_released;
     float mouse_delta_x, mouse_delta_y;
     bool suppress_mouse_delta;
     int marked_joint_object_index;

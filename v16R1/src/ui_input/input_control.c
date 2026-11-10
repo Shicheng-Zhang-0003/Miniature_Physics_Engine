@@ -62,6 +62,8 @@ void initialize_input (input_status *s) {
     s -> is_debug_mode_active = false;
     s -> right_mouse_button_clicked = false;
     s -> middle_mouse_button_clicked = false;
+    s -> lmb_pressed = false;
+    s -> lmb_released = false;
     s -> mouse_delta_x = 0;
     s -> mouse_delta_y = 0;
     s -> suppress_mouse_delta = false;
@@ -525,6 +527,10 @@ gboolean on_button_press (GtkGestureClick *gest, int n_press, double x, double y
         st -> middle_mouse_button_clicked = true;
     if (btn == 3)
         st -> right_mouse_button_clicked = true;
+    /* SANDBOX S4b: LMB grabs only in FPS mode — the click that ACQUIRES
+     * the lock must not also grab whatever is under the crosshair. */
+    if (btn == 1 && st -> is_mouse_locked)
+        st -> lmb_pressed = true;
     if (!st -> is_mouse_locked) {
         GtkWidget *target = NULL;
         if (g_gl_area && GTK_IS_WIDGET (g_gl_area))
@@ -554,6 +560,7 @@ gboolean on_button_release (GtkGestureClick *gest, int n_press, double x, double
     if (!gest || !GTK_IS_GESTURE_SINGLE (gest)) {
         st -> middle_mouse_button_clicked = false;
         st -> right_mouse_button_clicked = false;
+        st -> lmb_released = true; /* end any active drag (S4b) */
         return FALSE;
     } guint btn = gtk_gesture_single_get_current_button (GTK_GESTURE_SINGLE (gest));
     /* During "released" current_button is often 0 (no button held).
@@ -563,6 +570,10 @@ gboolean on_button_release (GtkGestureClick *gest, int n_press, double x, double
         st -> middle_mouse_button_clicked = false;
     if (btn == 3 || btn == 0)
         st -> right_mouse_button_clicked = false;
+    /* SANDBOX S4b: release ends the drag. Button 1 or the generic 0 —
+     * the drag module no-ops a stray release when nothing is held. */
+    if (btn == 1 || btn == 0)
+        st -> lmb_released = true;
     return FALSE;
 }
 gboolean on_focus_out (GtkEventControllerFocus *ctrl, gpointer user_data_stored) {
@@ -611,6 +622,8 @@ gboolean on_focus_out (GtkEventControllerFocus *ctrl, gpointer user_data_stored)
     st -> mouse_delta_y = 0;
     st -> right_mouse_button_clicked = false;
     st -> middle_mouse_button_clicked = false;
+    st -> lmb_pressed = false;
+    st -> lmb_released = true; /* SANDBOX S4b: focus loss mid-drag = drop */
     st -> suppress_mouse_delta = false;
     return FALSE;
 }

@@ -63,6 +63,19 @@
 > pointer). Files: `ui_input/resize_panel.c`+`.h` (new), `T` latch in
 > `input_state.h` + the four-latch spots in `input_control.c`,
 > dispatch consumption, `resize_panel_sync()` in `overlay_update`.
+> GUI-only; suite 57/0 re-run, build 0 under -Werror. S4b LANDED
+> 2026-11-10: LMB drag-move — pressing LMB while the mouse is locked
+> (FPS mode) selects under the crosshair AND grabs the body at its
+> current depth along the camera forward ray (`dot(pos − cam_pos,
+> fwd)`, clamped >= 1 m); while held, the body rides that ray every
+> frame (`cam_pos + fwd · grab_dist`, velocities zeroed, woken) —
+> dispatch runs every frame, so carrying works in a frozen world too.
+> Release drops it. The lock-ACQUIRING first click does not grab; the
+> drag is keyed to the stable object id (deleting it mid-drag ends the
+> drag); a focus loss mid-drag arms the release latch (drop). Files:
+> `ui_input/drag_weld.c`+`.h` (new), `lmb_pressed`/`lmb_released`
+> latches in `input_state.h` + press/release/initialize/focus-out
+> spots in `input_control.c`, dispatch consumption + per-frame tick.
 > GUI-only; suite 57/0 re-run, build 0 under -Werror.**
 
 ## Findings this plan builds on (2026-11-09 survey)
@@ -154,7 +167,7 @@
   GTK window with a slider per size dimension of the selected body;
   drag to resize live (inertia + contact cache + wake follow; cube
   covering radius maintained). Landed — see STATUS LINE.
-- [ ] **S4b drag-move:** LMB (while mouse-locked) grabs the aimed body
+- [x] **S4b drag-move (LANDED):** LMB (while mouse-locked) grabs the aimed body
   — crosshair ray selects, then the body holds its distance along the
   camera forward (`grab_dist = dot(pos − cam_pos, fwd)`, min 1.0) and
   follows `cam_pos + fwd · grab_dist` while held; velocities zeroed,
