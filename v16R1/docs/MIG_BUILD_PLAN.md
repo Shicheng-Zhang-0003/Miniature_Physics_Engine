@@ -900,21 +900,39 @@ broadphase/floor/CCD hooks, editor-invisible (UI is WP4). Estimated
   result=PASS). (4) Suite `--all` green at floor 57 (Total: 57, 55/55
   physics blocking + 2 diag).
 
-## §5 WP3 — scene persistence (v200 `MIG1` record)
+## §5 WP3 — scene persistence (v200 `MIG1` record) — LANDED 2026-11-10
 
 Charter §5 is the contract; the plan adds touch-points only.
 
-- [ ] **3.1 Writer/reader two-pass:** body rows as v200 today, then a
-  `MIG1` extension record per composite (part tuples per charter layout),
-  referenced by body id (the id-remap pass already exists —
-  `scene/scene_id_remap.*`); CRC covers the stream unchanged.
-- [ ] **3.2 Loader kindness (degrade-not-veto):** missing blob →
-  bounding-cube placeholder + counted diag (the custom-body precedent in
-  `scene/scene_load.c` ~:228 is the template); unknown part type inside a
-  blob → that part degrades, scene continues; load-time sum-consistency
-  gate (recompose vs stored mass, mismatch = diag + clamp, never a veto).
-- [ ] **3.3 Gate:** `mig_scene_roundtrip` (save → load → bitwise pose +
-  mass identity) in the same commit as the writer.
+- [x] **3.1 Writer/reader two-pass (LANDED, shape deviation):** delivered
+  as scene format **v201** (`mpe_version` 200→201) with a dedicated
+  `composite_count` section after revolutes rather than in-band `MIG1`
+  body-row extensions — same contract, cleaner layout: per composite,
+  `owner_object_id` + ACTIVE part slice expanded to the WORLD frame (the
+  exact representation `physics_world_add_composite` consumes). CRC
+  covers the stream unchanged; the strict v200 EOF check stays
+  byte-exact for v200 files (which keep loading through the same
+  sectioned reader, type 4 still vetoed there).
+- [x] **3.2 Loader kindness (LANDED, stricter-than-plan):** the loader
+  never trusts the file for the body — mass/COM/inertia are recomputed
+  through `physics_world_add_composite` at commit (the load-sum gate is
+  structural: the compose path IS the recomposition). Deviation, deemed
+  stricter and simpler: a composite with no usable part slice or a
+  rejected compose is DROPPED LOUDLY (stderr, counted) instead of
+  placeholdering a bounding cube — a placeholder composite would be a
+  body that looks welded but is not. Structurally corrupt section
+  entries (bad owner, over-cap slice, bad dims/quat) veto the file, per
+  the loader's hostile-file philosophy. Envelope dynamic state
+  (velocity, colour, materials, static/kinematic/sleep, generation,
+  saved id) re-applies to the rebuilt body; ids are preserved so joints
+  rewire unchanged.
+- [x] **3.3 Gate (LANDED):** `composite_roundtrip` in
+  `tests/mpe_suite_c.c` (same commit as the writer): weld 2 parts →
+  author state → save → reload → assert body count, type, part count,
+  recomposed mass (1+2), COM within 1e-3, velocity/colour/body
+  materials, per-part materials from the FILE (not body_defaults),
+  spring rewired to the preserved id — then a second save/load cycle
+  proves the rebuilt body re-persists. Suite floor 57 → 58.
 
 ## §6 WP4 — terminal verbs + spec format + the tiny CAD editor
 

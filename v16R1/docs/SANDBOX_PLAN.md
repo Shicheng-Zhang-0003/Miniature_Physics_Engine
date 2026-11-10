@@ -100,7 +100,17 @@
 > carry, and weld-on-drop all behaved to spec on first contact — the
 > weld proves the MIG compose path end-to-end at runtime (ad-hoc
 > world-frame part array → `mig_compose` mass/COM/inertia → engine
-> re-anchor → solver). MIG WORKS.**
+> re-anchor → solver). MIG WORKS.
+> WP3 LANDED 2026-11-10 (closes the S4c persistence gap): scene format
+> v201 — a composite-bodies section (owner id + ACTIVE part slice in
+> WORLD frame) after revolutes; the loader rebuilds each composite
+> through physics_world_add_composite at commit (mass/COM/inertia
+> recomputed, never trusted), re-applies the envelope's dynamic state,
+> preserves ids so joints rewire; per-part materials carry from the
+> file. v200 files keep loading unchanged; corrupt sections veto,
+> unusable slices drop loudly. Gate: suite `composite_roundtrip` (two
+> save/load cycles + spring rewire + material carry), floor 57→58.
+> Suite 58/0.**
 
 
 ## Findings this plan builds on (2026-11-09 survey)
