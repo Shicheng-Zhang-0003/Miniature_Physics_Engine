@@ -38,7 +38,17 @@
 > `new_render.c` init/cleanup/draw, `simulation.c` sampling. GUI-only;
 > suite 57/0 re-run, build 0 under -Werror.
 > NEXT: S4 reserve — slow-mo time scale / step-N / object list / trail
-> options, after a live review of S1–S3.**
+> options, after a live review of S1–S3.
+> S1 FIX LANDED 2026-11-10 (`8a6ff21`): user report — P locked the
+> ENTIRE engine (no camera, no un-freeze). Root cause: the halt gate
+> early-returned at the TOP of physics_step_increment, skipping input
+> polling, camera AND dispatch — and dispatch is what consumes the
+> p_key_pressed latch, so a frozen engine could never resume. The gate
+> now sits with THE PHYSICS LOOP and gates only simulation_physics_tick
+> (+ the S3 trail sample, which must track simulated ticks): input,
+> camera, menus, terminal and overlay run every frame — a frozen world
+> is an inspection world. Terminal halt/sleep share the corrected
+> semantics. Suite 57/0 re-run.**
 
 ## Findings this plan builds on (2026-11-09 survey)
 
