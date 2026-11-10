@@ -16,7 +16,14 @@
 > ⏸ STATUS LINE (keep updated at every step): **PLANNED 2026-11-09.
 > MIG WP2 complete at `9f97b68`; suite 57/55+2, quick 71/71, TSan
 > clean, A2 byte probe certified against `8e62e58`.
-> NEXT: S1 freeze/step keys.**
+> S1 LANDED 2026-11-09 (`8077bfa`): P freezes/resumes, O steps one
+> tick while frozen (`physics_halt_step_once` — armed tick runs with
+> `physics_halted` re-set TRUE for the following tick, so the
+> `FROZEN (P resume, O step)` badge never flickers); four-latch key
+> discipline (keypress/released/initialize/focus-out); suite 57/0,
+> quick 71/71 re-run (physics_halt.c is GUI-linked only, not in the
+> suite link list).
+> NEXT: S2 situation screen.**
 
 ## Findings this plan builds on (2026-11-09 survey)
 
