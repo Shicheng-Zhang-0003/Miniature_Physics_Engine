@@ -10,6 +10,7 @@
 #include "ui_input/gamepad_drive.h"
 #include "ui_input/ftc_view.h"
 #include "ui_input/ftc_traj.h"
+#include "render/trail.h" /* SANDBOX S3: selected-object trail sampling */
 #include <gtk/gtk.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -101,6 +102,11 @@ gboolean physics_step_increment (gpointer user_data_pointer) {
     config_menu_update (parent_window);
     /* THE PHYSICS LOOP */
     simulation_physics_tick (frame_delta_time);
+    /* SANDBOX S3: sample the selected body's position once per SIMULATED
+     * tick. The frozen early-return above means a frozen world never
+     * grows its trail; the O frame-step lands here too, so a stepped
+     * tick extends the trail by exactly one point. */
+    trail_note_tick ();
     /* Post-physics bookkeeping */
     gtk_widget_queue_draw (GTK_WIDGET (user_data_pointer));
     int a3_sleeping_object_count = 0;

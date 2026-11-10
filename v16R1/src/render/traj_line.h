@@ -18,5 +18,9 @@ void traj_line_init (traj_line_mesh *m);
  * n < 2 clears the line. */
 void traj_line_update (traj_line_mesh *m, const vector3 *pts, int n);
 void traj_line_render (traj_line_mesh *m, GLuint shader_program, math4 view_matrix, math4 projection_matrix);
+/* SANDBOX S3: colour-parameterized draw (traj_line_render delegates with
+ * the original purple). */
+void traj_line_render_colour (traj_line_mesh *m, GLuint shader_program, math4 view_matrix,
+                              math4 projection_matrix, vector3 colour);
 void traj_line_cleanup (traj_line_mesh *m);
 #endif /* traj_line_h */

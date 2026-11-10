@@ -22,8 +22,23 @@
 > `FROZEN (P resume, O step)` badge never flickers); four-latch key
 > discipline (keypress/released/initialize/focus-out); suite 57/0,
 > quick 71/71 re-run (physics_halt.c is GUI-linked only, not in the
-> suite link list).
-> NEXT: S2 situation screen.**
+> suite link list). S2 LANDED 2026-11-09 (`f5d3dde`): the object
+> menu's level-5 screen is now `-- Situation --` (static / kinematic /
+> no-collide cursor + Enter-toggle, sleeping display-only) through the
+> safe mutators with the contact-cache-clear pattern; root menu item
+> renamed; status bar shows (Static)/(Kinematic)/(Dynamic,
+> no-collide)/(Dynamic). S3 LANDED 2026-11-10: the selected object's
+> trajectory trail — cyan `traj_line` polyline (`traj_line_render_colour`
+> added; the original purple is now just the default), 256-point ring
+> sampled once per SIMULATED tick in `physics_step_increment` (frozen
+> worlds never grow it; each O step adds exactly one point), keyed to
+> `selected_object_id` so it clears on reselect/deselect, drawn next to
+> the selected wireframe ONLY while a body is selected. Files:
+> `render/trail.c`+`.h` (new), `traj_line` colour variant,
+> `new_render.c` init/cleanup/draw, `simulation.c` sampling. GUI-only;
+> suite 57/0 re-run, build 0 under -Werror.
+> NEXT: S4 reserve — slow-mo time scale / step-N / object list / trail
+> options, after a live review of S1–S3.**
 
 ## Findings this plan builds on (2026-11-09 survey)
 

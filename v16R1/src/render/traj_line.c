@@ -17,8 +17,7 @@ extern camera main_camera_fov;
 #define TRAJ_G 0.13f
 #define TRAJ_B 0.86f
 void traj_line_init (traj_line_mesh *m) {
-    if (!m)
-        return;
+    if (!m)        return;
     m -> vertex_count = 0;
     m -> cpu = NULL;
     m -> cpu_cap = 0;
@@ -88,7 +87,8 @@ static void traj_cache_uniforms (GLuint prog) {
     s_u_spec_coeff = glGetUniformLocation (prog, "u_specular_coeff");
     s_u_spec_exp = glGetUniformLocation (prog, "u_specular_exponent");
 }
-void traj_line_render (traj_line_mesh *m, GLuint shader_program, math4 view_matrix, math4 projection_matrix) {
+void traj_line_render_colour (traj_line_mesh *m, GLuint shader_program, math4 view_matrix,
+                              math4 projection_matrix, vector3 colour) {
     if (!m || m -> vertex_count <= 0)
         return;
     glUseProgram (shader_program);
@@ -115,13 +115,19 @@ void traj_line_render (traj_line_mesh *m, GLuint shader_program, math4 view_matr
     glUniform1f (s_u_spec_coeff, g_cfg.render.specular_coeff);
     glUniform1f (s_u_spec_exp, g_cfg.render.specular_exponent);
     if (s_u_object_colour >= 0)
-        glUniform3f (s_u_object_colour, TRAJ_R, TRAJ_G, TRAJ_B);
+        glUniform3f (s_u_object_colour, colour.x, colour.y, colour.z);
     glBindVertexArray (m -> vertex_array_object);
     /* Constant surface normal for the (unlit-meaningful) line, same ordering
      * rule as grid: bind the VAO FIRST, then set the generic attribute. */
     glVertexAttrib3f (1, 0.0f, 1.0f, 0.0f);
     glDrawArrays (GL_LINES, 0, m -> vertex_count / 3);
     glBindVertexArray (0);
+}
+void traj_line_render (traj_line_mesh *m, GLuint shader_program, math4 view_matrix, math4 projection_matrix) {
+    /* SANDBOX S3: the original purple is now just the default colour;
+     * the selected-object trail draws cyan through the same path. */
+    traj_line_render_colour (m, shader_program, view_matrix, projection_matrix,
+                             (vector3) {TRAJ_R, TRAJ_G, TRAJ_B});
 }
 void traj_line_cleanup (traj_line_mesh *m) {
     if (m) {

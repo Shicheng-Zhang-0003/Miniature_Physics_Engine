@@ -14,6 +14,7 @@
 #include "cylinder_meshing.h"
 #include "grid.h"
 #include "traj_line.h"
+#include "trail.h"
 #include "../ui_input/ftc_traj.h"
 #include "wireframe.h"
 #include "../physics/spring_joint.h"
@@ -186,6 +187,7 @@ void render_init () {
 #undef MPE_CHECK_UNIFORM
     grid_init (&main_grid, 250, 5);
     traj_line_init (&main_traj);
+    trail_init ();
     init_sm_system (&sphere_mesh, 32, 32);
     cube_meshing_init ();
     init_cylinder_system (&cylinder_mesh, 24);
@@ -254,6 +256,7 @@ static void render_delete_gl_objects (void) {
         main_grid.vertex_buffer_object = 0;
     } main_grid.line_vertex_count = 0;
     traj_line_cleanup (&main_traj);
+    trail_cleanup ();
     wireframe_invalidate_cache ();
     grid_invalidate_cache ();
 }
@@ -476,6 +479,10 @@ void render_scene_current (int widget_width, int widget_height) {
         glDrawElementsInstanced (GL_TRIANGLES, cylinder_mesh.index_count, GL_UNSIGNED_INT, 0, cylinder_inst_count);
     } glBindVertexArray (0);
     spring_joint_render (utility_shader_program, view_matrix, projection_matrix);
+    /* SANDBOX S3: the selected object's motion trail — cyan polyline of
+     * its recent positions, drawn ONLY while something is selected
+     * (trail_note_tick fills it once per simulated tick). */
+    trail_render (utility_shader_program, view_matrix, projection_matrix);
     wireframe_render_selected_object (utility_shader_program, view_matrix, projection_matrix);
     if (dropped_instances > 0) {
         /* Mesh instance count guard overflow (build plan §4 2.7): name the
