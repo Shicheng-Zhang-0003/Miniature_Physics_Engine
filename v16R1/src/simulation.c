@@ -48,11 +48,15 @@ gboolean physics_step_increment (gpointer user_data_pointer) {
     }
     /* Guard checks */
     if (editor_dialog_is_active ()) { return TRUE; }
-    if (physics_halt_tick_update ()) {
-        gtk_widget_queue_draw (GTK_WIDGET (user_data_pointer));
-        overlay_update ();
-        return TRUE;
-    }
+    /* SANDBOX S1 FIX: the halt gate used to early-return HERE — which
+     * skipped input polling, camera and dispatch while frozen. That
+     * nailed the player view down AND starved the latch consumers
+     * (simulation_input_dispatch is what clears p_key_pressed), so a
+     * frozen engine could never un-freeze: P locked the whole engine.
+     * Freeze semantics now: the WORLD is frozen — input, camera, menus,
+     * terminal and overlay stay alive. The gate sits with the physics
+     * loop below; the terminal halt/sleep commands share these
+     * semantics. */
     /* Mode watch */
     static bool a3_previous_debug_mode_state = false;
     static bool a3_debug_mode_watch_ready = false;
@@ -100,13 +104,14 @@ gboolean physics_step_increment (gpointer user_data_pointer) {
     simulation_menu_dispatch (parent_window);
     editor_update_menus (parent_window);
     config_menu_update (parent_window);
-    /* THE PHYSICS LOOP */
-    simulation_physics_tick (frame_delta_time);
-    /* SANDBOX S3: sample the selected body's position once per SIMULATED
-     * tick. The frozen early-return above means a frozen world never
-     * grows its trail; the O frame-step lands here too, so a stepped
-     * tick extends the trail by exactly one point. */
-    trail_note_tick ();
+    /* THE PHYSICS LOOP — and the ONLY thing the freeze gates. */
+    if (!physics_halt_tick_update ()) {
+        simulation_physics_tick (frame_delta_time);
+        /* SANDBOX S3: sample the selected body's position once per
+         * SIMULATED tick — a frozen world never grows its trail, and
+         * each O frame-step extends it by exactly one point. */
+        trail_note_tick ();
+    }
     /* Post-physics bookkeeping */
     gtk_widget_queue_draw (GTK_WIDGET (user_data_pointer));
     int a3_sleeping_object_count = 0;
