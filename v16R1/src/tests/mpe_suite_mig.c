@@ -2790,3 +2790,172 @@ int mpe_t_mig_hull_2d_proof (void) {
     mpe_test_end (&t);
     return t.failures;
 }
+
+/* WP2.5 2.5.3 gate (plan §8.5): hull mass properties via the divergence
+ * theorem over face tetras. Oracles are hand-derived closed forms, never
+ * calls into the implementation:
+ *  - solid box hull (8 verts, 12 outward tris): V = 8abc = 48, com 0,
+ *    I_xx = m(b²+c²)/3 = 208, I_yy = 160, I_zz = 80 (density 1, m = 48);
+ *  - regular tetra (±2,±2,±2) even-minus (4 verts, 4 outward tris):
+ *    V = 8s³/3 = 64/3, I = m·a²/20 = 16s⁵/15 = 512/15 per centroid axis;
+ *  - translation: com carries the offset, inertia about the COM unchanged;
+ *  - density: mass and inertia scale with ρ, com does not;
+ *  - error contracts: NULL, vert/face count < 4, non-finite vertex
+ *    (bad_point), out-of-range/negative index (bad_index), density ≤ 0 or
+ *    NaN, inward winding (V < 0), degenerate zero-volume mesh (bad_mesh). */
+int mpe_t_mig_hull_mass_props (void) {
+    mpe_test_t t;
+    mpe_test_begin (&t, "mig_hull_mass_props");
+
+    /* ---- 1. box hull: 12 outward-wound tris over the 2.5.1 corners ----
+     * hx=1, hy=2, hz=3, density 1: m = 48, Ixx = 48·13/3, Iyy = 48·10/3,
+     * Izz = 48·5/3, off-diagonals 0 (symmetry planes through the COM). */
+    static const mig_hull_point box_v [8] = {
+        { 1.0,  2.0,  3.0}, { 1.0,  2.0, -3.0}, { 1.0, -2.0,  3.0}, { 1.0, -2.0, -3.0},
+        {-1.0,  2.0,  3.0}, {-1.0,  2.0, -3.0}, {-1.0, -2.0,  3.0}, {-1.0, -2.0, -3.0},
+    };
+    static const int box_f [12][3] = {
+        {0, 2, 3}, {0, 3, 1},  /* +X */
+        {4, 7, 6}, {4, 5, 7},  /* -X */
+        {0, 1, 5}, {0, 5, 4},  /* +Y */
+        {2, 7, 3}, {2, 6, 7},  /* -Y */
+        {0, 4, 6}, {0, 6, 2},  /* +Z */
+        {1, 7, 5}, {1, 3, 7},  /* -Z */
+    };
+    {
+        mig_hull_mass m;
+        MPE_CHECK (&t, mig_hull_mesh_props (box_v, 8, &box_f [0][0], 12, 1.0, &m)
+                   == mig_hull_ok);
+        MPE_CHECK_NEAR (&t, m.mass, 48.0, 1e-9, "box mass 8abc");
+        MPE_CHECK_NEAR (&t, m.com [0], 0.0, 1e-9, "box com x");
+        MPE_CHECK_NEAR (&t, m.com [1], 0.0, 1e-9, "box com y");
+        MPE_CHECK_NEAR (&t, m.com [2], 0.0, 1e-9, "box com z");
+        MPE_CHECK_NEAR (&t, m.inertia [0][0], 208.0, 1e-9, "box Ixx m(b²+c²)/3");
+        MPE_CHECK_NEAR (&t, m.inertia [1][1], 160.0, 1e-9, "box Iyy m(a²+c²)/3");
+        MPE_CHECK_NEAR (&t, m.inertia [2][2], 80.0, 1e-9, "box Izz m(a²+b²)/3");
+        MPE_CHECK_NEAR (&t, m.inertia [0][1], 0.0, 1e-9, "box Ixy");
+        MPE_CHECK_NEAR (&t, m.inertia [0][2], 0.0, 1e-9, "box Ixz");
+        MPE_CHECK_NEAR (&t, m.inertia [1][2], 0.0, 1e-9, "box Iyz");
+    }
+
+    /* ---- 2. regular tetra (±2,±2,±2) even-minus: V = 8s³/3, I = 16s⁵/15 ----
+     * Edge a = 2√2·s = 4√2; I = m·a²/20 = (64/3)·32/20 = 512/15. */
+    static const mig_hull_point tet_v [4] = {
+        { 2.0,  2.0,  2.0}, { 2.0, -2.0, -2.0}, {-2.0,  2.0, -2.0}, {-2.0, -2.0,  2.0},
+    };
+    static const int tet_f [4][3] = {
+        {0, 1, 2}, {0, 3, 1}, {0, 2, 3}, {1, 3, 2},
+    };
+    {
+        mig_hull_mass m;
+        MPE_CHECK (&t, mig_hull_mesh_props (tet_v, 4, &tet_f [0][0], 4, 1.0, &m)
+                   == mig_hull_ok);
+        MPE_CHECK_NEAR (&t, m.mass, 64.0 / 3.0, 1e-9, "tetra mass 8s³/3");
+        MPE_CHECK_NEAR (&t, m.com [0], 0.0, 1e-9, "tetra com x");
+        MPE_CHECK_NEAR (&t, m.com [1], 0.0, 1e-9, "tetra com y");
+        MPE_CHECK_NEAR (&t, m.com [2], 0.0, 1e-9, "tetra com z");
+        MPE_CHECK_NEAR (&t, m.inertia [0][0], 512.0 / 15.0, 1e-9, "tetra Ixx");
+        MPE_CHECK_NEAR (&t, m.inertia [1][1], 512.0 / 15.0, 1e-9, "tetra Iyy");
+        MPE_CHECK_NEAR (&t, m.inertia [2][2], 512.0 / 15.0, 1e-9, "tetra Izz");
+        MPE_CHECK_NEAR (&t, m.inertia [0][1], 0.0, 1e-9, "tetra Ixy");
+        MPE_CHECK_NEAR (&t, m.inertia [0][2], 0.0, 1e-9, "tetra Ixz");
+        MPE_CHECK_NEAR (&t, m.inertia [1][2], 0.0, 1e-9, "tetra Iyz");
+    }
+
+    /* ---- 3. translation: com moves, inertia about the COM does not ----
+     * The same tetra shifted by (10, −5, 3). */
+    {
+        mig_hull_point tv [4];
+        for (int i = 0; i < 4; i++) {
+            tv [i].x = tet_v [i].x + 10.0;
+            tv [i].y = tet_v [i].y - 5.0;
+            tv [i].z = tet_v [i].z + 3.0;
+        }
+        mig_hull_mass m;
+        MPE_CHECK (&t, mig_hull_mesh_props (tv, 4, &tet_f [0][0], 4, 1.0, &m)
+                   == mig_hull_ok);
+        MPE_CHECK_NEAR (&t, m.com [0], 10.0, 1e-9, "translated com x");
+        MPE_CHECK_NEAR (&t, m.com [1], -5.0, 1e-9, "translated com y");
+        MPE_CHECK_NEAR (&t, m.com [2], 3.0, 1e-9, "translated com z");
+        MPE_CHECK_NEAR (&t, m.mass, 64.0 / 3.0, 1e-9, "translated mass");
+        MPE_CHECK_NEAR (&t, m.inertia [0][0], 512.0 / 15.0, 1e-8, "translated Ixx");
+        MPE_CHECK_NEAR (&t, m.inertia [1][1], 512.0 / 15.0, 1e-8, "translated Iyy");
+        MPE_CHECK_NEAR (&t, m.inertia [2][2], 512.0 / 15.0, 1e-8, "translated Izz");
+    }
+
+    /* ---- 4. density: mass and inertia scale with ρ, com does not ---- */
+    {
+        mig_hull_mass m;
+        MPE_CHECK (&t, mig_hull_mesh_props (tet_v, 4, &tet_f [0][0], 4, 2.5, &m)
+                   == mig_hull_ok);
+        MPE_CHECK_NEAR (&t, m.mass, 2.5 * 64.0 / 3.0, 1e-9, "density mass");
+        MPE_CHECK_NEAR (&t, m.inertia [0][0], 2.5 * 512.0 / 15.0, 1e-9, "density Ixx");
+        MPE_CHECK_NEAR (&t, m.inertia [2][2], 2.5 * 512.0 / 15.0, 1e-9, "density Izz");
+        MPE_CHECK_NEAR (&t, m.com [0], 0.0, 1e-9, "density com x");
+    }
+
+    /* ---- 5. error contracts ----
+     * NULL → mig_hull_null; vert/face count < 4 → bad_count; non-finite
+     * vertex → bad_point; out-of-range or negative face index → bad_index;
+     * density ≤ 0 or NaN, inward winding (V < 0), degenerate zero-volume
+     * mesh → bad_mesh. */
+    {
+        mig_hull_mass m;
+        MPE_CHECK (&t, mig_hull_mesh_props (NULL, 8, &box_f [0][0], 12, 1.0, &m)
+                   == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_mesh_props (box_v, 8, NULL, 12, 1.0, &m)
+                   == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_mesh_props (box_v, 8, &box_f [0][0], 12, 1.0, NULL)
+                   == mig_hull_null);
+        MPE_CHECK (&t, mig_hull_mesh_props (box_v, 3, &box_f [0][0], 12, 1.0, &m)
+                   == mig_hull_bad_count);
+        MPE_CHECK (&t, mig_hull_mesh_props (box_v, 8, &box_f [0][0], 3, 1.0, &m)
+                   == mig_hull_bad_count);
+        static const int bad_hi [4][3] = {
+            {0, 1, 2}, {0, 3, 1}, {0, 2, 3}, {1, 3, 8}
+        };
+        static const int bad_neg [4][3] = {
+            {0, 1, 2}, {0, 3, 1}, {0, 2, 3}, {1, 3, -1}
+        };
+        MPE_CHECK (&t, mig_hull_mesh_props (tet_v, 4, &bad_hi [0][0], 4, 1.0, &m)
+                   == mig_hull_bad_index);
+        MPE_CHECK (&t, mig_hull_mesh_props (tet_v, 4, &bad_neg [0][0], 4, 1.0, &m)
+                   == mig_hull_bad_index);
+        MPE_CHECK (&t, mig_hull_mesh_props (box_v, 8, &box_f [0][0], 12, 0.0, &m)
+                   == mig_hull_bad_mesh);
+        MPE_CHECK (&t, mig_hull_mesh_props (box_v, 8, &box_f [0][0], 12, -1.0, &m)
+                   == mig_hull_bad_mesh);
+        MPE_CHECK (&t, mig_hull_mesh_props (box_v, 8, &box_f [0][0], 12, 0.0 / 0.0, &m)
+                   == mig_hull_bad_mesh);
+        mig_hull_point nan_v [8] = {
+            { 1.0,  2.0,  3.0}, { 1.0,  2.0, -3.0}, { 1.0, -2.0,  3.0}, { 1.0, -2.0, -3.0},
+            {-1.0,  2.0,  3.0}, {-1.0,  2.0, -3.0}, {-1.0, -2.0,  3.0}, {-1.0, -2.0, -3.0},
+        };
+        nan_v [7].z = 0.0 / 0.0;
+        MPE_CHECK (&t, mig_hull_mesh_props (nan_v, 8, &box_f [0][0], 12, 1.0, &m)
+                   == mig_hull_bad_point);
+        /* Fully reversed tetra winding: every dV negated, V < 0 → bad_mesh. */
+        static const int rev_f [4][3] = {
+            {0, 2, 1}, {0, 1, 3}, {0, 3, 2}, {1, 2, 3}
+        };
+        MPE_CHECK (&t, mig_hull_mesh_props (tet_v, 4, &rev_f [0][0], 4, 1.0, &m)
+                   == mig_hull_bad_mesh);
+        /* Degenerate: four coincident vertices enclose zero volume. */
+        static const mig_hull_point degen_v [4] = {
+            {1.0, 2.0, 3.0}, {1.0, 2.0, 3.0}, {1.0, 2.0, 3.0}, {1.0, 2.0, 3.0}
+        };
+        MPE_CHECK (&t, mig_hull_mesh_props (degen_v, 4, &tet_f [0][0], 4, 1.0, &m)
+                   == mig_hull_bad_mesh);
+    }
+
+    if (t.failures == 0) {
+        printf ("[PASS] mig WP2.5 2.5.3: hull mass properties — divergence "
+                "theorem over face tetras vs closed forms\n");
+        MPE_INFO ("box hull: m 48, I (208,160,80), com 0; tetra s=2: m 64/3, "
+                  "I 512/15 per axis; translation moves com only; density "
+                  "scales mass+inertia; NULL/bad_count/bad_point/bad_index/"
+                  "bad_mesh contracts");
+    }
+    mpe_test_end (&t);
+    return t.failures;
+}

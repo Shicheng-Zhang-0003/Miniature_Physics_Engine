@@ -129,3 +129,92 @@ mig_hull_err mig_hull_polygon_props (const mig_hull_point *verts, int count,
     out -> second_xy = sxy / 24.0;
     return mig_hull_ok;
 }
+
+/* ---- WP2.5 2.5.3: hull mass properties ----
+ * Divergence theorem over face tetras anchored at the origin. For a face
+ * (a, b, c) wound outward: signed dV = (a×b)·c / 6, and with the tetra
+ * vertices {0, a, b, c} the monomial integrals are
+ *   ∫ x_i  dV = (dV/4)·S_i                      (S_i = a_i+b_i+c_i)
+ *   ∫ x_i x_j dV = (dV/20)·[S_i S_j + Q_ij]     (Q_ij = Σ_k k_i k_j)
+ * both derived from the barycentric integrals ∫λ_k² dV = V/10,
+ * ∫λ_k λ_l dV = V/20 (k ≠ l), then x = Σ λ_k v_k. Signed dVs cancel
+ * across the closed surface, so accumulation order is face order.
+ * Finally com = M/V, J_com = J − V·com⊗com, and
+ * I = trace(J_com)·Id − J_com (L = I·ω). Verified against the solid box
+ * (V = 8abc, I_xx = m(b²+c²)/3) and the regular tetra (±s,±s,±s)
+ * even-minus (V = 8s³/3, I = m·a²/20 = 16s⁵/15 at density 1). */
+mig_hull_err mig_hull_mesh_props (const mig_hull_point *verts, int vert_count,
+                                  const int *faces, int face_count,
+                                  double density, mig_hull_mass *out) {
+    if ((!verts) || (!faces) || (!out)) { return mig_hull_null; }
+    if (vert_count < 4 || face_count < 4) { return mig_hull_bad_count; }
+    if (!isfinite (density) || density <= 0.0) { return mig_hull_bad_mesh; }
+    for (int i = 0; i < vert_count; i++) {
+        if (!isfinite (verts [i].x) || !isfinite (verts [i].y) ||
+            !isfinite (verts [i].z)) {
+            return mig_hull_bad_point;
+        }
+    }
+    for (int f = 0; f < face_count; f++) {
+        for (int k = 0; k < 3; k++) {
+            const int idx = faces [3 * f + k];
+            if (idx < 0 || idx >= vert_count) { return mig_hull_bad_index; }
+        }
+    }
+    double V = 0.0, M [3] = {0.0, 0.0, 0.0}, J [3][3] = {{0.0}};
+    for (int f = 0; f < face_count; f++) {
+        const mig_hull_point *tv [3] = {
+            &verts [faces [3 * f + 0]],
+            &verts [faces [3 * f + 1]],
+            &verts [faces [3 * f + 2]],
+        };
+        const double abx = tv [0] -> y * tv [1] -> z - tv [0] -> z * tv [1] -> y;
+        const double aby = tv [0] -> z * tv [1] -> x - tv [0] -> x * tv [1] -> z;
+        const double abz = tv [0] -> x * tv [1] -> y - tv [0] -> y * tv [1] -> x;
+        const double dV = (abx * tv [2] -> x + aby * tv [2] -> y +
+                           abz * tv [2] -> z) / 6.0;
+        double S [3] = {0.0, 0.0, 0.0};
+        double Q [3][3] = {{0.0}};
+        for (int k = 0; k < 3; k++) {
+            const double kv [3] = {tv [k] -> x, tv [k] -> y, tv [k] -> z};
+            for (int i = 0; i < 3; i++) {
+                S [i] += kv [i];
+                for (int j = 0; j < 3; j++) { Q [i][j] += kv [i] * kv [j]; }
+            }
+        }
+        V += dV;
+        for (int i = 0; i < 3; i++) { M [i] += dV * S [i] / 4.0; }
+        for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < 3; j++) {
+                J [i][j] += dV * (S [i] * S [j] + Q [i][j]) / 20.0;
+            }
+        }
+    }
+    if (!isfinite (V) || V <= 0.0) { return mig_hull_bad_mesh; }
+    for (int i = 0; i < 3; i++) {
+        if (!isfinite (M [i])) { return mig_hull_bad_mesh; }
+    }
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            if (!isfinite (J [i][j])) { return mig_hull_bad_mesh; }
+        }
+    }
+    double com [3];
+    for (int i = 0; i < 3; i++) { com [i] = M [i] / V; }
+    double Jc [3][3], tr = 0.0;
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            Jc [i][j] = J [i][j] - V * com [i] * com [j];
+        }
+        tr += Jc [i][i];
+    }
+    out -> mass = density * V;
+    for (int i = 0; i < 3; i++) { out -> com [i] = com [i]; }
+    /* Inertia scales with density like mass: I = ρ·(tr·Id − J_com). */
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            out -> inertia [i][j] = density * (((i == j) ? tr : 0.0) - Jc [i][j]);
+        }
+    }
+    return mig_hull_ok;
+}

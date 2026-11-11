@@ -82,4 +82,24 @@ typedef struct {
 mig_hull_err mig_hull_polygon_props (const mig_hull_point *verts, int count,
                                      mig_hull_area2 *out);
 
+/* ---- WP2.5 2.5.3: hull mass properties (divergence theorem, 3D) ----
+ * The same per-element signed-contribution discipline, one dimension up:
+ * each face anchors a tetra at the origin; signed dV = (a×b)·c/6 sums to
+ * the enclosed volume for any closed mesh. */
+
+typedef struct {
+    double mass;
+    double com[3];
+    double inertia[3][3]; /* about the COM (L = I·ω convention) */
+} mig_hull_mass;
+
+/* Mass properties of a closed triangle mesh (the convex hull's boundary).
+ * faces: 3 vertex indices per face (face_count * 3 ints total), wound so
+ * the right-hand-rule normal points OUT of the enclosed volume. Vertices
+ * must be finite; a closed mesh needs vert_count >= 4 and face_count >= 4.
+ * density must be finite and > 0. All results are written only on success. */
+mig_hull_err mig_hull_mesh_props (const mig_hull_point *verts, int vert_count,
+                                  const int *faces, int face_count,
+                                  double density, mig_hull_mass *out);
+
 #endif /* mig_hull_h */
