@@ -119,6 +119,7 @@ int mpe_t_mig_floor_ccd_composite (void);
 int mpe_t_mig_composite_stack (void);
 int mpe_t_mig_pendulum_com_offset (void);
 int mpe_t_mig_determinism_twins (void);
+int mpe_t_mig_boundary_rotated_part (void);
 typedef struct {
     const char *name;
     int (*fn) (void);
@@ -254,6 +255,11 @@ static const mpe_entry_t mpe_registry [] = {
     {"mig_composite_stack", mpe_t_mig_composite_stack, 0},
     {"mig_pendulum_com_offset", mpe_t_mig_pendulum_com_offset, 0},
     {"mig_determinism_twins", mpe_t_mig_determinism_twins, 0},
+    /* 2026-11-10 audit gate: the world-edge safety net's composite
+     * extrema conjugate the world axis by the part's OWN orientation,
+     * not just the body's — a rotated cylinder part used to read its
+     * half-length as its radius and sink 0.7 m under the net. */
+    {"mig_boundary_rotated_part", mpe_t_mig_boundary_rotated_part, 0},
 };
 #define MPE_NTESTS ((int) (sizeof (mpe_registry) / sizeof (mpe_registry [0])))
 /* Returns 0 pass, 1 fail, 2 skipped.

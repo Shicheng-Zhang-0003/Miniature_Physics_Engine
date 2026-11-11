@@ -16,7 +16,7 @@ only the Python standard library.
 
 Strict contract: suite cases that print [SKIP] (self-skipped coverage) fail
 the run unless --allow-skip is given; [XFAIL] markers are surfaced in the
-summary counts but never block. Registry floors: MIN_SUITE_ENTRIES=54,
+summary counts but never block. Registry floors: MIN_SUITE_ENTRIES=59,
 MIN_LEGACY_ENTRIES=30, MIN_PARANOIA_ENTRIES=15; summary contract requires
 Total == registry size and Blocking failures == 0.
 """
@@ -161,7 +161,16 @@ MPE_TEST_REGIMES = ("default", "light", "heavy", "brittle", "sticky")
 # mig_determinism_twins: composite scene, 600-tick bitwise twins; charter
 # §4.5's MPE_THREADS 1/4/8 matrix is verified by three env-var runs of this
 # gate at landing, since the worker pool is process-lazy).
-MIN_SUITE_ENTRIES = 57
+# -> 58 (2026-11-10, composite_roundtrip: WP3 gate — weld sphere+cube,
+# author state, save, reload, assert recomposed truth and preserved ids,
+# then a SECOND save/load cycle proves the rebuilt body re-persists;
+# format v201 with a dedicated composite section after revolutes).
+# -> 59 (2026-11-10, mig_boundary_rotated_part: audit gate — the
+# world-edge safety net's composite extrema conjugate the world axis by
+# the part's OWN local_orientation, not just the body's; a cylinder
+# posed axle-along-+Y used to read its half-length as its radius and
+# sink 0.7 m under the net; NULL-world legacy projection pinned).
+MIN_SUITE_ENTRIES = 59
 # DESPOT-2026-10-01: pin per-suite floors so deleting a legacy/paranoia target
 # + its make target together cannot shrink the headline silently (the 220->204
 # drift). Canonical floor above; legacy 30 + paranoia 15 pinned here.

@@ -63,7 +63,10 @@ static float get_obb_max_along_axis (rigidbody *rigid_body, vector3 axis) {
  * 2.6 CCD support (ccd_composite_support_point): part world pose =
  * body ∘ part-local, per-part support exact per shape (sphere r;
  * cylinder axle-local-X exact form; cube |axis·he| through the part's
- * OWN frame). min/max are asymmetric for a composite, so both extrema
+ * OWN frame — the axis is conjugated by the part's local_orientation
+ * too, not just the body's: 2026-11-10 audit fix, the gate
+ * mig_boundary_rotated_part pins it). min/max are asymmetric for a
+ * composite, so both extrema
  * are computed, not a symmetric radius. World-less callers (NULL) keep
  * the legacy body-level projection — the documented degraded mode, the
  * CCD's low-memory precedent. */
@@ -85,7 +88,21 @@ static int boundary_composite_extrema_along_axis (const physics_world *world, co
         if (!part -> active) { continue; }
         vector3 part_world = vector3_addition (rigid_body -> position,
                                                vector4_rotate_to_vector3 (rigid_body -> orientation, part -> local_position));
-        vector3 local_axis = vector4_rotate_to_vector3 (inv, axis);
+        /* 2026-11-10 audit fix: the axis must reach the part's OWN frame —
+         * body frame first (inv), THEN the part's local_orientation
+         * conjugate. The original code stopped at the body frame, so a
+         * part posed with a non-identity local_orientation (first-class
+         * state: drag_weld, save/load and the ghost view all produce it;
+         * collision_ccd.c composes the same pair for its support) was
+         * projected as if its primitive were axis-aligned to the BODY:
+         * a cylinder with its axle along body +Y read S_y = r instead of
+         * hl, letting the safety net sink 0.7 m before firing on an
+         * r=0.3/hl=1.0 part. Quaternion identity used below:
+         * rot(conj(q_local) ⊗ conj(q_body), axis) ==
+         * rot(conj(q_local), rot(conj(q_body), axis)). */
+        vector4 pinv = {part -> local_orientation.w, -part -> local_orientation.x,
+                        -part -> local_orientation.y, -part -> local_orientation.z};
+        vector3 local_axis = vector4_rotate_to_vector3 (pinv, vector4_rotate_to_vector3 (inv, axis));
         float support = 0.0f;
         if (part -> type == object_sphere) {
             support = part -> radius;

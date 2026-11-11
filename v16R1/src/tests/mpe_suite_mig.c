@@ -36,6 +36,7 @@
 #include "mpe_test.h"
 #include "physics/spring_joint.h"
 #include "physics/broadphase.h"
+#include "scene/boundary.h"
 #include "core/rigidbody.h"
 #include "core/mig_mass.h"
 #include "core/mpe_registry.h"
@@ -2043,6 +2044,76 @@ int mpe_t_mig_determinism_twins (void) {
     }
     physics_world_cleanup (&w1);
     physics_world_cleanup (&w2);
+    mpe_test_end (&t);
+    return t.failures;
+}
+
+/* ---- 2026-11-10 audit gate: the boundary extrema must reach the ----
+ * ---- part's OWN frame, not stop at the body frame                ----
+ * The world-edge safety net's composite extrema conjugated the world
+ * axis by the BODY orientation only while its comment promised "the
+ * part's OWN frame" (collision_ccd.c composes the same pair for its
+ * support). A cylinder part posed axle-along-body-+Y (local_orientation
+ * = Rz(+90 deg), first-class state: drag_weld, save/load and the ghost
+ * view all produce non-identity part orientations) read S_y = r = 0.3
+ * instead of hl = 1.0, so the net let the true bottom sink 0.7 m before
+ * firing. Oracles are hand geometry, exact:
+ *  - Y-axle cylinder: S_y = hl = 1.0 and S_x = r = 0.3 (the buggy body-
+ *    frame reading claimed 0.3 and 1.0 -- swapped, and the X wall would
+ *    teleport the body to x = -0.5 against a 0.5 wall);
+ *  - 45 deg-yaw cube: S_y = he*(sin45 + cos45) = 0.14142136
+ *    (the buggy reading claimed he = 0.1);
+ *  - the NULL-world legacy degraded mode still clamps at the
+ *    sphere-backed covering bound sqrt(r^2 + hl^2) = 1.04403065. */
+int mpe_t_mig_boundary_rotated_part (void) {
+    mpe_test_t t;
+    mpe_test_begin (&t, "mig_boundary_rotated_part");
+    mpe_clamp_counters_reset ();
+    physics_world w;
+    mpe_world_begin (&w);
+    mpe_config_t cfg = g_cfg;
+    cfg.boundary.floor_emergency_slop = 0.0f; /* exact clamp, no slack */
+    physics_world_set_config (&w, &cfg);
+    const float c45 = 0.7071067811865476f; /* cos/sin 45 deg: Rz(+90 deg) */
+    /* Cylinder r=0.3 hl=1.0 posed axle-along-body-+Y; part at the
+     * assembly origin, so the COM is the part centre. */
+    const mig_part cyl [1] = {
+        { mig_part_cylinder, 0.3f, 1.0f, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f},
+          {c45, 0.0f, 0.0f, c45}, mig_mass_mode_explicit, 2.0f }
+    };
+    const int cb = physics_world_add_composite (&w, cyl, 1);
+    MPE_CHECK (&t, cb == 0);
+    /* 45 deg-yaw cube, its own body in the same world. */
+    const mig_part yaw [1] = {
+        { mig_part_cube, 0.0f, 0.0f, {0.1f, 0.1f, 0.1f}, {0.0f, 0.0f, 0.0f},
+          {0.9238795325112867f, 0.0f, 0.0f, 0.3826834323650898f},
+          mig_mass_mode_explicit, 1.0f }
+    };
+    const int yb = physics_world_add_composite (&w, yaw, 1);
+    MPE_CHECK (&t, yb == 1);
+    if ((cb == 0) && (yb == 1)) {
+        rigidbody *cyl_body = &w.bodies [cb];
+        rigidbody *yaw_body = &w.bodies [yb];
+        cyl_body -> position = (vector3) {0.0f, 0.5f, 0.0f};  /* true min_y -0.5; bug reads +0.2 */
+        yaw_body -> position = (vector3) {0.0f, 0.05f, 0.0f}; /* true min_y -0.09142044; bug reads -0.05 */
+        vector3 lo = {-100.0f, 0.0f, -100.0f};
+        vector3 hi = { 100.0f, 100.0f, 100.0f};
+        boundary_apply_box_world_cfg (cyl_body, lo, hi, &cfg, &w);
+        boundary_apply_box_world_cfg (yaw_body, lo, hi, &cfg, &w);
+        MPE_CHECK_NEAR (&t, cyl_body -> position.y, 1.0f, 1e-6f,
+                        "Y-axle cylinder rests on its END (hl), not its radius");
+        MPE_CHECK_NEAR (&t, cyl_body -> position.x, 0.0f, 1e-6f,
+                        "cylinder X support is r: the 0.5 wall is untouched");
+        MPE_CHECK_NEAR (&t, yaw_body -> position.y, 0.14142136f, 1e-6f,
+                        "45 deg-yaw cube corner support exact");
+        /* Legacy degraded mode unchanged: world=NULL projects the
+         * sphere-backed envelope (the 2.8 documented behaviour). */
+        cyl_body -> position = (vector3) {0.0f, 1.0f, 0.0f};
+        boundary_apply_box_world_cfg (cyl_body, lo, hi, &cfg, NULL);
+        MPE_CHECK_NEAR (&t, cyl_body -> position.y, 1.04403065f, 1e-6f,
+                        "NULL-world legacy clamp at the covering bound");
+    }
+    physics_world_cleanup (&w);
     mpe_test_end (&t);
     return t.failures;
 }
